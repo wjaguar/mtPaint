@@ -28,7 +28,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 3.10 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.10 - Copyright (C) 2004-2007 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"

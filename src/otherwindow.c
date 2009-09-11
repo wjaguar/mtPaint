@@ -620,22 +620,24 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 
 #define BRCOSA_ITEMS 6
 
-static GtkWidget *brcosa_window;
-static GtkWidget *brcosa_toggles[6],
-		 *brcosa_spins[BRCOSA_ITEMS+2];	// Extra 2 used for palette limits
-static GtkWidget *brcosa_buttons[5];
+static GtkWidget *brcosa_window,
+		*brcosa_toggles[6],
+		*brcosa_spins[BRCOSA_ITEMS+2],	// Extra 2 used for palette limits
+		*brcosa_buttons[5];
 
-static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2];
+static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2],
+	brcosa_values_default[BRCOSA_ITEMS] = {0, 0, 0, 8, 100, 0};
 png_color brcosa_pal[256];
 
 static void brcosa_buttons_sensitive() // Set 4 brcosa button as sensitive if the user has assigned changes
 {
-	int i, vals[] = {0, 0, 0, 8, 100};
+	int i;
 	gboolean state = FALSE;
 
 	if ( brcosa_buttons[0] == NULL ) return;
 
-	for ( i=0; i<BRCOSA_ITEMS; i++ ) if ( brcosa_values[i] != vals[i] ) state = TRUE;
+	for ( i=0; i<BRCOSA_ITEMS; i++ )
+		if ( brcosa_values[i] != brcosa_values_default[i] ) state = TRUE;
 	for ( i=2; i<5; i++ ) gtk_widget_set_sensitive( brcosa_buttons[i], state );
 }
 
@@ -816,14 +818,13 @@ static gint click_brcosa_ok()
 
 static gint click_brcosa_reset()
 {
-	static unsigned char inits[BRCOSA_ITEMS] = {0, 0, 0, 8, 100, 0};
 	int i;
 
 	mem_pal_copy( mem_pal, brcosa_pal );
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
-		mt_spinslide_set_value(brcosa_spins[i], inits[i]);
+		mt_spinslide_set_value(brcosa_spins[i], brcosa_values_default[i]);
 	}
 	pal_refresher();
 
@@ -836,7 +837,6 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 	static int mins[] = {-255, -100, -100, 1, 20, -1529},
 		maxs[] = {255, 100, 100, 8, 500, 1529},
-		vals[] = {0, 0, 0, 8, 100, 0},
 		order[] = {1, 2, 3, 5, 0, 4};
 	char	*tog_txt[] = {	_("Auto-Preview"), _("Red"), _("Green"), _("Blue"), _("Palette"),
 				_("Image") },
@@ -848,7 +848,7 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 	mem_pal_copy( brcosa_pal, mem_pal );		// Remember original palette
 
-	for ( i=0; i<BRCOSA_ITEMS; i++ ) mem_prev_bcsp[i] = vals[i];
+	for ( i=0; i<BRCOSA_ITEMS; i++ ) mem_prev_bcsp[i] = brcosa_values_default[i];
 
 	for ( i=0; i<4; i++ ) brcosa_buttons[i] = NULL;
 			// Enables preview_toggle code to detect an initialisation call
@@ -869,13 +869,13 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
 		add_to_table(tab_txt[i], table2, order[i], 0, 0);
-		brcosa_values[i] = vals[i];
+		brcosa_values[i] = brcosa_values_default[i];
 		brcosa_spins[i] = mt_spinslide_new(255, 20);
 		gtk_table_attach(GTK_TABLE(table2), brcosa_spins[i], 1, 2,
 			order[i], order[i] + 1, GTK_EXPAND | GTK_FILL,
 			GTK_FILL, 0, 0);
 		mt_spinslide_set_range(brcosa_spins[i], mins[i], maxs[i]);
-		mt_spinslide_set_value(brcosa_spins[i], vals[i]);
+		mt_spinslide_set_value(brcosa_spins[i], brcosa_values_default[i]);
 		mt_spinslide_connect(brcosa_spins[i],
 			GTK_SIGNAL_FUNC(brcosa_spinslide_moved), (gpointer)i);
 	}
@@ -2969,7 +2969,9 @@ void gradient_setup(int mode)
 	GtkWidget *win, *mainbox, *hbox, *table, *align;
 	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
-
+#if GTK_MAJOR_VERSION == 1
+	GtkWidget *hbox1, *hbox2;
+#endif
 
 	memcpy(grad_temps, gradient, sizeof(grad_temps));
 	memcpy(grad_tmaps, graddata, sizeof(grad_tmaps));
@@ -3002,7 +3004,6 @@ void gradient_setup(int mode)
 	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
 	/* Protect spinslider from option menus in GTK1 */
 #if GTK_MAJOR_VERSION == 1
-	GtkWidget *hbox1, *hbox2;
 
 	align = widget_align_minsize(grad_opt_type, 0, 0);
 	hbox1 = gtk_hbox_new(FALSE, 0);
