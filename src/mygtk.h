@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -60,6 +60,10 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
+
+// Easier way with spinbuttons
+
+int read_spin(GtkWidget *spin);
 
 // Box unpacking macro
 #define BOX_CHILD(box, n) \

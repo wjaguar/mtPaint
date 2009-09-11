@@ -48,8 +48,8 @@
 
 
 GtkWidget
-	*main_window, *main_vsplit,
-	*drawing_palette, *drawing_canvas,
+	*main_window, *main_vsplit, *main_hsplit, *main_split,
+	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],
@@ -1829,7 +1829,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom,
 			layer_selected + 1, layers_total, 1);
 
-	gdk_draw_rgb_image(the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
 			margin_main_x + px1, margin_main_y + py1,
 			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw3);
 	free(pix);
@@ -2034,7 +2034,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	draw_grid(rgb, px, py, pw, ph);
 
-	gdk_draw_rgb_image ( the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image ( drawing_canvas->window, drawing_canvas->style->black_gc,
 		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
 
 	free( rgb );
@@ -2092,14 +2092,14 @@ void repaint_perim_real( int r, int g, int b, int ox, int oy )
 		rgb[ 2 + 3*i ] = b * ((i/3) % 2);
 	}
 
-	gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 		x, y, 1, s, GDK_RGB_DITHER_NONE, rgb, 3 );
-	gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 		x+s-1, y, 1, s, GDK_RGB_DITHER_NONE, rgb, 3 );
 
-	gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 		x, y, s, 1, GDK_RGB_DITHER_NONE, rgb, 3*s );
-	gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 		x, y+s-1, s, 1, GDK_RGB_DITHER_NONE, rgb, 3*s );
 	free(rgb);
 }
@@ -2376,8 +2376,6 @@ static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
 {
 	int px, py, pw, ph;
 
-	if ( the_canvas == NULL) the_canvas = widget->window;
-
 	px = event->area.x;		// Only repaint if we need to
 	py = event->area.y;
 	pw = event->area.width;
@@ -2527,6 +2525,25 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 	}
 }
 
+static void pressed_view_hori( GtkMenuItem *menu_item, gpointer user_data )
+{
+	gboolean vs = view_showing;
+
+	if (GTK_CHECK_MENU_ITEM(menu_item)->active)
+	{
+		if (main_split == main_hsplit) return;
+		view_hide();
+		main_split = main_hsplit;
+	}
+	else
+	{
+		if (main_split == main_vsplit) return;
+		view_hide();
+		main_split = main_vsplit;
+	}
+	if (vs) view_show();
+}
+
 static void parse_drag( char *txt )
 {
 	gboolean nlayer = TRUE;
@@ -2604,8 +2621,8 @@ void main_init()
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 
-	GtkWidget *vw_drawing, *vw_scrolledwindow, *menubar1, *vbox_main,
-			*hbox_bar, *hbox_bottom, *vbox_right;
+	GtkWidget *vw_drawing, *menubar1, *vbox_main,
+			*hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
 	GtkItemFactory *item_factory;
 
@@ -2703,6 +2720,7 @@ void main_init()
 		{ _("/View/Show zoom grid"),	NULL,		zoom_grid,0, "<CheckItem>" },
 		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/View/View Window"),	"V",		pressed_view,0, "<CheckItem>" },
+		{ _("/View/Horizontal Split"),	"H",		pressed_view_hori,0, "<CheckItem>" },
 		{ _("/View/Focus View Window"),	NULL,		pressed_view_focus,0, "<CheckItem>" },
 		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/View/Pan Window (End)"),	NULL,		pressed_pan,0, NULL },
@@ -3041,7 +3059,15 @@ void main_init()
 
 	main_vsplit = gtk_hpaned_new ();
 	gtk_widget_show (main_vsplit);
-	gtk_box_pack_start (GTK_BOX (vbox_right), main_vsplit, TRUE, TRUE, 0);
+	gtk_widget_ref(main_vsplit);
+	gtk_object_sink(GTK_OBJECT(main_vsplit));
+
+	main_hsplit = gtk_vpaned_new ();
+	gtk_widget_show (main_hsplit);
+	gtk_widget_ref(main_hsplit);
+	gtk_object_sink(GTK_OBJECT(main_hsplit));
+
+	main_split = main_vsplit;
 
 //	VIEW WINDOW
 
@@ -3049,14 +3075,15 @@ void main_init()
 	gtk_widget_show (vw_scrolledwindow);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(vw_scrolledwindow),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_paned_pack2 (GTK_PANED (main_vsplit), vw_scrolledwindow, FALSE, TRUE);
+	gtk_widget_ref(vw_scrolledwindow);
+	gtk_object_sink(GTK_OBJECT(vw_scrolledwindow));
 
 	vw_drawing = gtk_drawing_area_new ();
 	gtk_widget_set_usize( vw_drawing, 1, 1 );
 	gtk_widget_show( vw_drawing );
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(vw_scrolledwindow), vw_drawing);
 
-	init_view( vw_drawing, vw_scrolledwindow );
+	init_view(vw_drawing);
 
 //	MAIN WINDOW
 
@@ -3066,7 +3093,8 @@ void main_init()
 
 	scrolledwindow_canvas = gtk_scrolled_window_new (NULL, NULL);
 	gtk_widget_show (scrolledwindow_canvas);
-	gtk_paned_pack1 (GTK_PANED (main_vsplit), scrolledwindow_canvas, FALSE, TRUE);
+	gtk_box_pack_start (GTK_BOX (vbox_right), scrolledwindow_canvas, TRUE, TRUE, 0);
+
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_signal_connect_object(
@@ -3113,7 +3141,7 @@ void main_init()
 
 	hbox_bar = gtk_hbox_new (FALSE, 0);
 	if ( toolbar_status[TOOLBAR_STATUS] ) gtk_widget_show (hbox_bar);
-	gtk_box_pack_start (GTK_BOX (vbox_right), hbox_bar, FALSE, FALSE, 0);
+	gtk_box_pack_end (GTK_BOX (vbox_right), hbox_bar, FALSE, FALSE, 0);
 
 
 	for ( i=0; i<STATUS_ITEMS; i++ )

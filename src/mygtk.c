@@ -407,3 +407,12 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	gtk_widget_show_all(hbox);
 	return (hbox);
 }
+
+// Easier way with spinbuttons
+
+int read_spin(GtkWidget *spin)
+{
+	/* Needed in GTK+2 for late changes */
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
+}

@@ -17,6 +17,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Smudge tool can be configured to ignore opacity mode
 	* Library detection in configure script improved
 	* Channel deletion made easier to use
+	* View window can now be placed under drawing window
 	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	* BUGFIX - Lasso tool now properly handles clipboard alpha
 	...and more still remains to do... ;-)

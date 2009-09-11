@@ -89,8 +89,8 @@ extern key_action main_keys[];
 int wtf_pressed(GdkEventKey *event, key_action *keys);
 
 GtkWidget
-	*main_window, *main_vsplit,
-	*drawing_palette, *drawing_canvas,
+	*main_window, *main_split,
+	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],

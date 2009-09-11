@@ -579,7 +579,6 @@ static int old_split_pos = -1;
 GtkWidget *vw_drawing = NULL;
 gboolean vw_focus_on = FALSE;
 
-static GtkWidget *vw_scrolledwindow;
 static gboolean view_first_move = TRUE;
 
 void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
@@ -1060,35 +1059,32 @@ static gint view_window_click( GtkWidget *widget, GdkEventButton *event )
 
 void view_show()
 {
-	gtk_widget_show(vw_scrolledwindow);		// Not good in GTK+1!
-	view_showing = TRUE;
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE );
+	if (view_showing) return;
+	gtk_widget_ref(scrolledwindow_canvas);
+	gtk_container_remove(GTK_CONTAINER(vbox_right), scrolledwindow_canvas);
+	gtk_paned_pack1 (GTK_PANED (main_split), scrolledwindow_canvas, FALSE, TRUE);
+	gtk_paned_pack2 (GTK_PANED (main_split), vw_scrolledwindow, FALSE, TRUE);
+	gtk_box_pack_start (GTK_BOX (vbox_right), main_split, TRUE, TRUE, 0);
+	gtk_widget_unref(scrolledwindow_canvas);
+	gtk_widget_unref(vw_scrolledwindow);
+	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
-#if GTK_MAJOR_VERSION == 1
-	if ( old_split_pos >= 0 )
-	{
-		gtk_paned_set_position( GTK_PANED(main_vsplit), old_split_pos + old_split_pos/105 + 3 );
-	}
-	gtk_paned_set_gutter_size( GTK_PANED(main_vsplit), 6 );
-	gtk_paned_set_handle_size( GTK_PANED(main_vsplit), 10 );
-#endif
+	view_showing = TRUE;
 }
 
 void view_hide()
 {
-	gtk_widget_hide(vw_scrolledwindow);		// Not good in GTK+1!
-	view_showing = FALSE;
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE );
+	if (!view_showing) return;
+	gtk_widget_ref(scrolledwindow_canvas);
+	gtk_widget_ref(vw_scrolledwindow);
+	gtk_widget_ref(main_split);
+	gtk_container_remove(GTK_CONTAINER(vbox_right), main_split);
+	gtk_container_remove(GTK_CONTAINER(main_split), scrolledwindow_canvas);
+	gtk_container_remove(GTK_CONTAINER(main_split), vw_scrolledwindow);
+	gtk_box_pack_start (GTK_BOX (vbox_right), scrolledwindow_canvas, TRUE, TRUE, 0);
+	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
-#if GTK_MAJOR_VERSION == 1
-	old_split_pos = GTK_PANED(main_vsplit)->handle_xpos;
-	if ( old_split_pos >= 0 )
-	{
-		gtk_paned_set_position( GTK_PANED(main_vsplit), 10000 );
-	}
-	gtk_paned_set_gutter_size( GTK_PANED(main_vsplit), 0 );
-	gtk_paned_set_handle_size( GTK_PANED(main_vsplit), 0 );
-#endif
+	view_showing = FALSE;
 }
 
 
@@ -1113,14 +1109,13 @@ void pressed_view( GtkMenuItem *menu_item, gpointer user_data )
 	else view_hide();
 }
 
-void init_view( GtkWidget *canvas, GtkWidget *scroll )
+void init_view( GtkWidget *canvas )
 {
 	vw_focus_on = inifile_get_gboolean("view_focus", TRUE );
 	vw_width = 1;
 	vw_height = 1;
 
 	view_showing = FALSE;
-	vw_scrolledwindow = scroll;
 	vw_drawing = canvas;
 
 	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "configure_event",
@@ -1452,9 +1447,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if (mem_channel == CHN_IMAGE)
 	{
-		gtk_spin_button_update( GTK_SPIN_BUTTON(text_spin[0]) );
-		inifile_set_gint32( "fontBackground",
-			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(text_spin[0]) ) );
+		inifile_set_gint32( "fontBackground", read_spin(text_spin[0]));
 	}
 
 	inifile_set( "lastTextFont", t_font_name );

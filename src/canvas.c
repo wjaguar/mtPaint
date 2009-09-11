@@ -41,8 +41,6 @@
 #include "channels.h"
 #include "toolbar.h"
 
-GdkWindow *the_canvas = NULL;			// Pointer to the canvas we will be drawing on
-
 GtkWidget *label_bar[STATUS_ITEMS];
 
 
@@ -217,8 +215,7 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	do_effect((int)fdata, i);
 
@@ -1342,25 +1339,21 @@ static void fs_set_format()			// Check format selected and set memory accordingl
 		case 4:			// PNG, GIF, XPM
 		case 5:		if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fs_png[0])) )
 				{
-					mem_xpm_trans = gtk_spin_button_get_value_as_int(
-							GTK_SPIN_BUTTON(fs_png[1]) );
+					mem_xpm_trans = read_spin(fs_png[1]);
 				}
 				else
 				{
 					mem_xpm_trans = -1;
 				}
 				break;
-		case 1:		gtk_spin_button_update( GTK_SPIN_BUTTON(fs_jpg[1]) );		// JPG
-				mem_jpeg_quality = gtk_spin_button_get_value_as_int(
-							GTK_SPIN_BUTTON(fs_jpg[1]) );
+		case 1:			// JPG
+				mem_jpeg_quality = read_spin(fs_jpg[1]);
 				inifile_set_gint32( "jpegQuality", mem_jpeg_quality );
 				break;
 		case 6:		if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fs_xbm[0])) ) // XBM
 				{
-					mem_xbm_hot_x = gtk_spin_button_get_value_as_int(
-							GTK_SPIN_BUTTON(fs_xbm[2]) );
-					mem_xbm_hot_y = gtk_spin_button_get_value_as_int(
-							GTK_SPIN_BUTTON(fs_xbm[4]) );
+					mem_xbm_hot_x = read_spin(fs_xbm[2]);
+					mem_xbm_hot_y = read_spin(fs_xbm[4]);
 				}
 				else
 				{
@@ -2774,28 +2767,28 @@ void paint_marquee(int action, int new_x, int new_y)
 
 		if ( x >= vc_x1 )
 		{
-			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 				margin_main_x + rx, margin_main_y + ry,
 				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
 		}
 
 		if ( (x+w-1) <= vc_x2 && (x+w-1) < mem_width*can_zoom )
 		{
-			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 				margin_main_x + rx+rw-1, margin_main_y + ry,
 				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
 		}
 
 		if ( y >= vc_y1 )
 		{
-			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 				margin_main_x + rx, margin_main_y + ry,
 				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
 		}
 
 		if ( (y+h-1) <= vc_y2 && (y+h-1) < mem_height*can_zoom )
 		{
-			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 				margin_main_x + rx, margin_main_y + ry+rh-1,
 				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
 		}
@@ -2946,7 +2939,7 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 					rgb[ 1 + 3*j ] = pcol.green;
 					rgb[ 2 + 3*j ] = pcol.blue;
 				}
-				gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
+				gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
 					margin_main_x + px*canz, margin_main_y + py*canz,
 					canz, canz,
 					GDK_RGB_DITHER_NONE, rgb, 3*canz );

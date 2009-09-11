@@ -120,13 +120,9 @@ static void create_new(GtkWidget *widget)
 {
 	int nw, nh, nc, bpp = 1, err=0;
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_width) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_height) );	// All needed in GTK+2 for late changes
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_cols) );
-
-	nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_width) );
-	nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_height) );
-	nc = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_cols) );
+	nw = read_spin(spinbutton_width);
+	nh = read_spin(spinbutton_height);
+	nc = read_spin(spinbutton_cols);
 
 	if (im_type == 0) bpp = 3;
 
@@ -418,8 +414,7 @@ static void click_col_add_ok(GtkWidget *widget)
 {
 	int i, to_add;
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_col_add) );
-	to_add = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_col_add) );
+	to_add = read_spin(spinbutton_col_add);
 
 	if ( to_add != mem_cols )
 	{
@@ -529,8 +524,7 @@ int do_bacteria(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	mem_bacteria(i);
 
@@ -559,11 +553,8 @@ gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	reverse = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(spal_rev));
 	inifile_set_gboolean( "palrevSort", reverse );
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spal_spins[0]) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spal_spins[1]) );
-
-	index1 = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spal_spins[0]) );
-	index2 = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spal_spins[1]) );
+	index1 = read_spin(spal_spins[0]);
+	index2 = read_spin(spal_spins[1]);
 
 	if ( index1 == index2 ) return FALSE;
 
@@ -1158,11 +1149,8 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
 	int nw, nh, ox, oy, res = 1, scale_type = 0, gcor = FALSE;
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[0]) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[1]) );
-
-	nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-	nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
+	nw = read_spin(sisca_spins[0]);
+	nh = read_spin(sisca_spins[1]);
 	if ( nw != mem_width || nh != mem_height )
 	{
 		// Needed in Windows to stop GTK+ lowering the main window below window underneath
@@ -1680,10 +1668,8 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 {
 	int i, start, stop, start0;
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(range_spins[0]));
-	start = start0 = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(range_spins[0]));
-	gtk_spin_button_update(GTK_SPIN_BUTTON(range_spins[1]));
-	stop = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(range_spins[1]));
+	start = start0 = read_spin(range_spins[0]);
+	stop = read_spin(range_spins[1]);
 	if (start > stop) { i = start; start = stop; stop = i; }
 	if (stop < start + 2) return;
 
@@ -2140,12 +2126,10 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		{ 42,  0, 0, 0, 8, 4,  2, 4, 8, 4, 2,  1, 2, 4, 2, 1 };
 
 	dither = quantize_mode ? dither_mode : DITH_NONE;
-	gtk_spin_button_update(GTK_SPIN_BUTTON(quantize_spin));
-	new_cols = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(quantize_spin));
+	new_cols = read_spin(quantize_spin);
 	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
 	dither_scan = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_serpent));
-	gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
-	efrac = 0.01 * gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
+	efrac = 0.01 * read_spin(dither_spin);
 	dither_fract[dither_sel ? 1 : 0] = efrac;
 
 	gtk_widget_destroy(quantize_window);
@@ -2255,9 +2239,7 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 	/* Selectivity state toggled */
 	if ((dither_sel == 0) ^ ((int)user_data == 0))
 	{
-		gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
-		dither_fract[dither_sel ? 1 : 0] = 0.01 *
-			gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
+		dither_fract[dither_sel ? 1 : 0] = 0.01 * read_spin(dither_spin);
 		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), 100.0 *
 			((int)user_data ? dither_fract[1] : dither_fract[0]));
 	}

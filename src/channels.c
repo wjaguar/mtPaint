@@ -375,8 +375,7 @@ int do_threshold(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	mem_threshold(mem_channel, i);
 

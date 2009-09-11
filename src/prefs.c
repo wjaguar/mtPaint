@@ -265,31 +265,17 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 		status_on[i] = inifile_get_gboolean(txt, TRUE);
 	}
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_maxmem) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_greys) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_nudge) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_trans) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_hotx) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_hoty) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_jpeg) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_recent) );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_pan) );
-	for ( i=0; i<4; i++ )
-		gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_grid[i]) );
-			// All needed in GTK+2 for late changes
-
-	mem_undo_limit = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_maxmem) );
-	mem_background = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_greys) );
-	mem_nudge = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_nudge) );
-	mem_xpm_trans = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_trans) );
-	mem_xbm_hot_x = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_hotx) );
-	mem_xbm_hot_y = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_hoty) );
-	mem_jpeg_quality = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_jpeg) );
-	recent_files = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_recent) );
-	mem_grid_min = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_grid[0]) );
+	mem_undo_limit = read_spin(spinbutton_maxmem);
+	mem_background = read_spin(spinbutton_greys);
+	mem_nudge = read_spin(spinbutton_nudge);
+	mem_xpm_trans = read_spin(spinbutton_trans);
+	mem_xbm_hot_x = read_spin(spinbutton_hotx);
+	mem_xbm_hot_y = read_spin(spinbutton_hoty);
+	mem_jpeg_quality = read_spin(spinbutton_jpeg);
+	recent_files = read_spin(spinbutton_recent);
+	mem_grid_min = read_spin(spinbutton_grid[0]);
 	for ( i=0; i<3; i++ )
-		mem_grid_rgb[i] =
-			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_grid[i+1]) );
+		mem_grid_rgb[i] = read_spin(spinbutton_grid[i + 1]);
 
 	for ( i=0; i<3; i++ )
 	{
@@ -305,8 +291,7 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gint32( "gridB", mem_grid_rgb[2] );
 
 
-	inifile_set_gint32( "panSize",
-		gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_pan) ) );
+	inifile_set_gint32( "panSize", read_spin(spinbutton_pan));
 	inifile_set_gint32( "undoMBlimit", mem_undo_limit );
 	inifile_set_gint32( "backgroundGrey", mem_background );
 	inifile_set_gint32( "pixelNudge", mem_nudge );
