@@ -415,16 +415,14 @@ static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
 	in_pan = 0;
 }
 
-gint delete_pan( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void delete_pan()
 {
-	if ( pan_rgb != NULL ) free(pan_rgb);
+	free(pan_rgb);
 	pan_rgb = NULL;				// Needed to stop segfault
 	gtk_widget_destroy(pan_window);
-
-	return FALSE;
 }
 
-gint key_pan( GtkWidget *widget, GdkEventKey *event )
+static gboolean key_pan(GtkWidget *widget, GdkEventKey *event)
 {
 	int nv_h, nv_v, hm, vm;
 	GtkAdjustment *hori, *vert;
@@ -433,7 +431,7 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 	{
 		/* xine-ui sends bogus keypresses so don't delete on this */
 		if (!arrow_key(event, &hm, &vm, 4) &&
-			!XINE_FAKERY(event->keyval)) delete_pan(NULL, NULL, NULL);
+			!XINE_FAKERY(event->keyval)) delete_pan();
 		else
 		{
 			hori = gtk_scrolled_window_get_hadjustment(
@@ -449,16 +447,16 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 	}
 	else pan_thumbnail();	// Update selection box as user may have zoomed in/out
 
-	return TRUE;
+	return (TRUE);
 }
 
-void pan_button(int mx, int my, int button)
+static void pan_button(int mx, int my, int button)
 {
 	int nv_h, nv_v;
 	float cent_x, cent_y;
 	GtkAdjustment *hori, *vert;
 
-	if ( button == 1 )	// Left click = pan window
+	if (button == 1)	// Left click = pan window
 	{
 		hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 		vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
@@ -471,18 +469,16 @@ void pan_button(int mx, int my, int button)
 
 		do_pan(hori, vert, nv_h, nv_v);
 	}
-	if ( button == 3 )	// Right click = kill window
-		delete_pan(NULL, NULL, NULL);
+	else if (button == 3) delete_pan();	// Right click = kill window
 }
 
-static gint click_pan( GtkWidget *widget, GdkEventButton *event )
+static gboolean click_pan(GtkWidget *widget, GdkEventButton *event)
 {
 	pan_button(event->x, event->y, event->button);
-
-	return FALSE;
+	return (TRUE);
 }
 
-gint pan_motion( GtkWidget *widget, GdkEventMotion *event )
+static gboolean pan_motion(GtkWidget *widget, GdkEventMotion *event)
 {
 	int x, y, button = 0;
 	GdkModifierType state;
@@ -500,18 +496,16 @@ gint pan_motion( GtkWidget *widget, GdkEventMotion *event )
 
 	pan_button(x, y, button);
 
-	return TRUE;
+	return (TRUE);
 }
 
-static gint expose_pan( GtkWidget *widget, GdkEventExpose *event )
+static gboolean expose_pan(GtkWidget *widget, GdkEventExpose *event)
 {
-	gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				event->area.x, event->area.y, event->area.width, event->area.height,
-				GDK_RGB_DITHER_NONE,
-				pan_rgb + 3*( event->area.x + pan_w*event->area.y ),
-				pan_w*3
-				);
-	return FALSE;
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		event->area.x, event->area.y, event->area.width, event->area.height,
+		GDK_RGB_DITHER_NONE,
+		pan_rgb + (event->area.y * pan_w + event->area.x) * 3, pan_w * 3);
+	return (FALSE);
 }
 
 void pressed_pan()
@@ -547,19 +541,17 @@ void pressed_pan()
 	gtk_widget_set_usize( draw_pan, pan_w, pan_h );
 	gtk_container_add (GTK_CONTAINER (pan_window), draw_pan);
 	gtk_widget_show( draw_pan );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pan), "expose_event",
-		GTK_SIGNAL_FUNC (expose_pan), GTK_OBJECT(draw_pan) );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pan), "button_press_event",
-		GTK_SIGNAL_FUNC (click_pan), GTK_OBJECT(draw_pan) );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pan), "motion_notify_event",
-		GTK_SIGNAL_FUNC (pan_motion), GTK_OBJECT(draw_pan) );
-	gtk_widget_set_events (draw_pan, GDK_BUTTON_PRESS_MASK);
-	gtk_signal_connect_object (GTK_OBJECT (pan_window), "key_press_event",
-		GTK_SIGNAL_FUNC (key_pan), NULL);
+	gtk_signal_connect(GTK_OBJECT(draw_pan), "expose_event",
+		GTK_SIGNAL_FUNC(expose_pan), NULL);
+	gtk_signal_connect(GTK_OBJECT(draw_pan), "button_press_event",
+		GTK_SIGNAL_FUNC(click_pan), NULL);
+	gtk_signal_connect(GTK_OBJECT(draw_pan), "motion_notify_event",
+		GTK_SIGNAL_FUNC(pan_motion), NULL);
+	gtk_signal_connect(GTK_OBJECT(pan_window), "key_press_event",
+		GTK_SIGNAL_FUNC(key_pan), NULL);
+	gtk_widget_set_events(draw_pan, GDK_ALL_EVENTS_MASK);
 
-	gtk_widget_set_events (draw_pan, GDK_ALL_EVENTS_MASK);
-
-	gtk_widget_show (pan_window);
+	gtk_widget_show(pan_window);
 }
 
 
@@ -927,8 +919,8 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 		zoom = rint(1.0 / vw_zoom);
 		w += x;
 		h += y;
-		x = x < 0 ? -(-x / zoom) : (x + zoom - 1) / zoom;
-		y = y < 0 ? -(-y / zoom) : (y + zoom - 1) / zoom;
+		x = floor_div(x + zoom - 1, zoom);
+		y = floor_div(y + zoom - 1, zoom);
 		w = (w - x * zoom + zoom - 1) / zoom;
 		h = (h - y * zoom + zoom - 1) / zoom;
 		if ((w <= 0) || (h <= 0)) return;

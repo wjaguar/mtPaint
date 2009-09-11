@@ -102,10 +102,10 @@ static inilist ini_int[] = {
 	{ "lastspalType",	&spal_mode,		2   },
 	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
-	{ "gridRGB",		grid_rgb + 0,		RGB_2_INT(50, 50, 50)  },
-	{ "gridBorder",		grid_rgb + 1,		RGB_2_INT(0, 219, 0)   },
-	{ "gridTrans",		grid_rgb + 2,		RGB_2_INT(0, 109, 109) },
-	{ "gridTile",		grid_rgb + 3,		RGB_2_INT(0, 0, 0)     },
+	{ "gridRGB",		grid_rgb + 0,		RGB_2_INT( 50,  50,  50) },
+	{ "gridBorder",		grid_rgb + 1,		RGB_2_INT(  0, 219,   0) },
+	{ "gridTrans",		grid_rgb + 2,		RGB_2_INT(  0, 109, 109) },
+	{ "gridTile",		grid_rgb + 3,		RGB_2_INT(170, 170, 170) },
 	{ NULL,			NULL }
 };
 
@@ -2147,7 +2147,6 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 typedef struct {
 	chanlist tlist;		// Channel overrides
 	unsigned char *mask0;	// Active mask channel
-	int mw, mh;		// Screen-space image size - useless for now!
 	int px2, py2;		// Clipped area position
 	int pw2, ph2;		// Clipped area size
 	int dx;			// Image-space X offset
@@ -2304,11 +2303,11 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		mem_clipboard + dc * mem_clip_bpp, p->opacity, mem_clip_bpp);
 }
 
-static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
+static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)
 {
 	main_render_state r;
 	unsigned char **tlist = r.tlist;
-	int j, jj, j0, l, pw23, nix = 0, niy = 0, alpha_blend = !overlay_alpha;
+	int j, jj, j0, l, pw23, alpha_blend = !overlay_alpha;
 	unsigned char *xtemp = NULL;
 	xform_render_state xrstate;
 	unsigned char *cstemp = NULL;
@@ -2325,23 +2324,8 @@ static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	if (can_zoom < 1.0) r.zoom = rint(1.0 / can_zoom);
 	else r.scale = rint(can_zoom);
 
-	/* Align buffer with image */
-	r.px2 = px - margin_main_x;
-	r.py2 = py - margin_main_y;
-	if (r.px2 < 0) nix = -r.px2;
-	if (r.py2 < 0) niy = -r.py2;
-	rgb += (pw * niy + nix) * 3;
-
-	/* Clip update area to image bounds */
-	r.mw = (mem_width * r.scale + r.zoom - 1) / r.zoom;
-	r.mh = (mem_height * r.scale + r.zoom - 1) / r.zoom;
-	r.pw2 = pw + r.px2;
-	r.ph2 = ph + r.py2;
-	if (r.pw2 > r.mw) r.pw2 = r.mw;
-	if (r.ph2 > r.mh) r.ph2 = r.mh;
-	r.px2 += nix; r.py2 += niy;
-	r.pw2 -= r.px2; r.ph2 -= r.py2;
-	if ((r.pw2 < 1) || (r.ph2 < 1)) return (FALSE);
+	r.px2 = x; r.py2 = y;
+	r.pw2 = w; r.ph2 = h;
 
 	if (!channel_dis[CHN_MASK]) r.mask0 = mem_img[CHN_MASK];
 	if (!mem_img[CHN_ALPHA] || channel_dis[CHN_ALPHA]) alpha_blend = FALSE;
@@ -2445,13 +2429,6 @@ static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	return (!!ptemp); /* "There was paste" */
 }
 
-// !!! Later, make one in canvas.c global - and move it to memory.c
-// !!! Or make it an inline function in memory.h
-static int floor_div(int dd, int dr)
-{
-	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
-}
-
 /// GRID
 
 int mem_show_grid;	// Boolean show toggle
@@ -2459,6 +2436,9 @@ int mem_grid_min;	// Minimum zoom to show it at
 int color_grid;		// If to use grid coloring
 int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
 			// 1 for border, 2 for transparency, 3 for tile grid
+int show_tile_grid;	// Tile grid toggle
+int tgrid_x0, tgrid_y0;	// Tile grid origin
+int tgrid_dx, tgrid_dy;	// Tile grid spacing
 
 /* Buffer stores interleaved transparency bits for two pixel rows; current
  * row in bits 0, 2, etc., previous one in bits 1, 3, etc. */
@@ -2611,6 +2591,55 @@ static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 				if (nv < 0x400)
 					nv ^= (*buf++ << 8) ^ 0x2FD00; // Invert
 			}
+		}
+	}
+}
+
+/* Draw tile grid on rgb memory */
+static void draw_tgrid(unsigned char *rgb, int x, int y, int w, int h, int l)
+{
+	unsigned char *tmp, *tm2;
+	int i, j, k, dx, dy, nx, ny, xx, yy, tc, zoom = 1, scale = 1;
+
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+	if ((tgrid_dx < zoom * 2) || (tgrid_dy < zoom * 2)) return; // Too dense
+
+	dx = tgrid_x0 ? tgrid_dx - tgrid_x0 : 0;
+	nx = (x * zoom - dx) / (tgrid_dx * scale);
+	if (nx < 0) nx = 0; nx++; dx++;
+	dy = tgrid_y0 ? tgrid_dy - tgrid_y0 : 0;
+	ny = (y * zoom - dy) / (tgrid_dy * scale);
+	if (ny < 0) ny = 0; ny++; dy++;
+	xx = ((nx * tgrid_dx - dx) * scale) / zoom + scale - 1;
+	yy = ((ny * tgrid_dy - dy) * scale) / zoom + scale - 1;
+	if ((xx >= x + w) && (yy >= y + h)) return; // Entirely inside grid cell
+
+	l *= 3; tc = grid_rgb[3];
+	for (i = 0; i < h; i++)
+	{
+		tmp = rgb + l * i;
+		if (y + i == yy) /* Filled line */
+		{
+			for (j = 0; j < w; j++ , tmp += 3)
+			{
+				tmp[0] = INT_2_R(tc);
+				tmp[1] = INT_2_G(tc);
+				tmp[2] = INT_2_B(tc);
+			}
+			yy = ((++ny * tgrid_dy - dy) * scale) / zoom + scale - 1;
+			continue;
+		}
+		/* Spaced dots */
+		for (k = xx , j = nx + 1; k < x + w; j++)
+		{
+			tm2 = tmp + (k - x) * 3;
+			tm2[0] = INT_2_R(tc);
+			tm2[1] = INT_2_G(tc);
+			tm2[2] = INT_2_B(tc);
+			k = ((j * tgrid_dx - dx) * scale) / zoom + scale - 1;
 		}
 	}
 }
@@ -2775,11 +2804,43 @@ void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx)
 #undef PT_BATCH
 }
 
+/* Clip area to image & align rgb pointer with it */
+static unsigned char *clip_to_image(int *xywh, unsigned char *rgb,
+	int px, int py, int pw, int ph)
+{
+	int mw, mh, px2, py2, pw2, ph2, nix = 0, niy = 0, zoom = 1, scale = 1;
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	/* Align buffer with image */
+	px2 = px - margin_main_x;
+	py2 = py - margin_main_y;
+	if (px2 < 0) nix = -px2;
+	if (py2 < 0) niy = -py2;
+	rgb += (pw * niy + nix) * 3;
+
+	/* Clip update area to image bounds */
+	mw = (mem_width * scale + zoom - 1) / zoom;
+	mh = (mem_height * scale + zoom - 1) / zoom;
+	pw2 = pw + px2;
+	ph2 = ph + py2;
+	if (pw2 > mw) pw2 = mw;
+	if (ph2 > mh) ph2 = mh;
+	px2 += nix; py2 += niy;
+	pw2 -= px2; ph2 -= py2;
+	if ((pw2 < 1) || (ph2 < 1)) return (NULL);
+	xywh[0] = px2; xywh[1] = py2;
+	xywh[2] = pw2; xywh[3] = ph2;
+	return (rgb);
+}
+
 void repaint_canvas( int px, int py, int pw, int ph )
 {
 	rgbcontext ctx;
-	unsigned char *rgb;
-	int pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
+	unsigned char *rgb, *irgb;
+	int xywh[4], pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
 	int i, j, zoom = 1, scale = 1, paste_f;
 
 	if (px < 0)
@@ -2795,6 +2856,9 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	rgb = malloc(i = pw * ph * 3);
 	if (!rgb) return;
 	memset(rgb, mem_background, i);
+
+	/* Find out which part is image */
+	irgb = clip_to_image(xywh, rgb, px, py, pw, ph);
 
 	/* Init context */
 	ctx.x0 = px; ctx.y0 = py; ctx.x1 = px + pw; ctx.y1 = py + ph;
@@ -2832,7 +2896,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			can_zoom, 0, layer_selected - 1, 1);
 	}
 	else async_bk = !chequers_optimize; /* Only w/o layers */
-	paste_f = main_render_rgb(rgb, px, py, pw, ph);
+	paste_f = irgb && main_render_rgb(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw);
 	if (layers_total && show_layers_main)
 		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
 			can_zoom, layer_selected + 1, layers_total, 1);
@@ -2862,6 +2926,10 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			draw_grid(r, p[0], p[1], p[2], p[3], pw);
 		}
 	}
+
+	/* Tile grid */
+	if (show_tile_grid && irgb)
+		draw_tgrid(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw);
 
 	async_bk = FALSE;
 
@@ -2929,8 +2997,8 @@ void main_update_area(int x, int y, int w, int h)
 		zoom = rint(1.0 / can_zoom);
 		w += x;
 		h += y;
-		x = x < 0 ? -(-x / zoom) : (x + zoom - 1) / zoom;
-		y = y < 0 ? -(-y / zoom) : (y + zoom - 1) / zoom;
+		x = floor_div(x + zoom - 1, zoom);
+		y = floor_div(y + zoom - 1, zoom);
 		w = (w - x * zoom + zoom - 1) / zoom;
 		h = (h - y * zoom + zoom - 1) / zoom;
 		if ((w <= 0) || (h <= 0)) return;

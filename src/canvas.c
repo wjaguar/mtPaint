@@ -2938,12 +2938,6 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
-static int floor_div(int dd, int dr)
-{
-	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
-//	return (dd < 0 ? -((dr - 1 - dd) / dr) : dd / dr);
-}
-
 #define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx)
 {

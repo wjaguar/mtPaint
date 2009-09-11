@@ -339,6 +339,13 @@ extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 int mem_background;			// Non paintable area
 int mem_histogram[256];
 
+/// Floored integer division
+
+static inline int floor_div(int dd, int dr)
+{
+	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
+}
+
 /// Multiblock allocator
 
 void *multialloc(int align, void *ptr, int size, ...);

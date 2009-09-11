@@ -6,6 +6,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.30	2008
 
+	* Chinese (Simplified) translation updated by Cecc
 	* New colour picker (old one available as configure option)
 	* New file picker (old one available as configure option)
 	* Some menu items can have an icon (if set in the preferences)
@@ -25,8 +26,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Screenshots can now be grabbed into a new layer
 	* Lasso tool now trims existing clipboard if no selection is present
 	* Image->Skew skews image in one or two directions
-	* "Smart Grid" toggle shows layer boundaries around transparent pixels
 	* View->Configure Grid sets grid colour preferences
+	* "Smart Grid" toggle shows layer boundaries around transparent pixels
+	* Gaussian blur effect for images with alpha now is about 40% faster and uses less memory
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste preview eliminated
 	* BUGFIX - "Remove All Layers" wilh layers window closed doesn't cause crash

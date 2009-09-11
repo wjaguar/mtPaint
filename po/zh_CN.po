@@ -1,7 +1,6 @@
 # Traditional Chinese translation for mtpaint
 # This file is distributed under the same license as the mtpaint package.
-# Wei-Lun Chao <chaoweilun@pcmail.com.tw>, 2006.
-# Cecc <puppychinese@sohu.com>, 2007.
+# Cecc <puppylinux@sohu.com>, 2008.
 # 
 msgid ""
 msgstr ""
@@ -9,8 +8,8 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2008-06-08 05:58+0400\n"
 "PO-Revision-Date: 2006-11-20 17:32+0800\n"
-"Last-Translator: Wei-Lun Chao <chaoweilun@pcmail.com.tw>\n"
-"Language-Team: Chinese (traditional) <zh-l10n@linux.org.tw>\n"
+"Last-Translator: Cecc <puppylinux@sohu.com>\n"
+"Language-Team: Chinese (simplified) <puppylinux@sohu.com>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -106,7 +105,7 @@ msgstr "您必须至少有2层图层以建立动画"
 
 #: src/ani.c:1080
 msgid "You must save your layers file before creating an animation"
-msgstr "您必须在建立动画之前储存您的图层档案"
+msgstr "您必须在建立动画之前储存您的图层文件"
 
 #: src/ani.c:1092
 msgid "Configure Animation"
@@ -134,7 +133,7 @@ msgstr "输出路径"
 
 #: src/ani.c:1111
 msgid "File prefix"
-msgstr "档案前缀"
+msgstr "文件前缀"
 
 #: src/ani.c:1139
 msgid "Create GIF frames"
@@ -180,20 +179,20 @@ msgstr "边缘柔化"
 
 #: src/canvas.c:410
 msgid "Different X/Y"
-msgstr ""
+msgstr "差异化 X/Y"
 
 #: src/canvas.c:413 src/canvas.c:462 src/canvas.c:507 src/canvas.c:597
 #: src/otherwindow.c:1115
 msgid "Gamma corrected"
-msgstr ""
+msgstr "修正伽马"
 
 #: src/canvas.c:415 src/memory.c:6417
 msgid "Gaussian Blur"
-msgstr ""
+msgstr "高斯模糊"
 
 #: src/canvas.c:459
 msgid "Radius"
-msgstr ""
+msgstr "半径"
 
 #: src/canvas.c:460
 msgid "Amount"
@@ -205,15 +204,15 @@ msgstr ""
 
 #: src/canvas.c:464 src/memory.c:6567
 msgid "Unsharp Mask"
-msgstr ""
+msgstr "钝化遮罩"
 
 #: src/canvas.c:504
 msgid "Outer radius"
-msgstr ""
+msgstr "外径"
 
 #: src/canvas.c:505
 msgid "Inner radius"
-msgstr ""
+msgstr "内径"
 
 #: src/canvas.c:506 src/info.c:378
 msgid "Normalize"
@@ -221,7 +220,7 @@ msgstr "正规化"
 
 #: src/canvas.c:509 src/memory.c:6745
 msgid "Difference of Gaussians"
-msgstr ""
+msgstr "高斯差异"
 
 #: src/canvas.c:579
 msgid "The image is too large for this rotation."
@@ -241,7 +240,7 @@ msgstr "建立剪贴簿所需内存不足"
 
 #: src/canvas.c:1242
 msgid "Invalid channel file."
-msgstr "无效的通道档案。"
+msgstr "无效的通道文件。"
 
 #: src/canvas.c:1269
 msgid "Cannot open file"
@@ -267,14 +266,14 @@ msgid ""
 "some data as the header seemed fine, but I would suggest you save this image "
 "to a new file to ensure this does not happen again."
 msgstr ""
-"档案汇入函式库必须由于档案问题而终止(可能是图像资料破损或是档案被截断)。因为"
-"档头似乎还好，我有试着载入某些资料，但是我会建议您储存此图像到新的档案，以确"
+"文件汇入函式库必须由于文件问题而终止(可能是图像资料破损或是文件被截断)。因为"
+"档头似乎还好，我有试着载入某些资料，但是我会建议您储存此图像到新的文件，以确"
 "保这不会再次发生。"
 
 #: src/canvas.c:1343
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
-msgstr "档案：%s 已经存在。您要改写它吗？"
+msgstr "文件：%s 已经存在。您要改写它吗？"
 
 #: src/canvas.c:1344
 msgid "File Found"
@@ -298,7 +297,7 @@ msgstr "JPEG 储存品质 (100=高)"
 
 #: src/canvas.c:1383 src/prefs.c:435
 msgid "PNG Compression (0=None)"
-msgstr ""
+msgstr "PNG 压缩 (0=无)"
 
 #: src/canvas.c:1383 src/prefs.c:507
 msgid "TGA RLE Compression"
@@ -322,7 +321,7 @@ msgstr "文件格式"
 
 #: src/canvas.c:1495
 msgid "Undoable"
-msgstr ""
+msgstr "非可做的"
 
 #: src/canvas.c:1516
 msgid "Animation delay"
@@ -331,7 +330,7 @@ msgstr "动画延迟"
 #: src/canvas.c:1746
 #, c-format
 msgid "File: %s invalid - palette not updated"
-msgstr "档案：%s 无效 - 调色板未更新"
+msgstr "文件：%s 无效 - 调色盘未更新"
 
 #: src/canvas.c:1774
 msgid "Unable to export undo images"
@@ -360,7 +359,7 @@ msgstr "載入調色盤檔案"
 
 #: src/canvas.c:1951
 msgid "Save Palette File"
-msgstr "储存调色板文件"
+msgstr "储存调色盘文件"
 
 #: src/canvas.c:1954
 msgid "Export Undo Images"
@@ -452,7 +451,7 @@ msgstr "初始通道状态"
 
 #: src/channels.c:280
 msgid "Inverted"
-msgstr ""
+msgstr "反向"
 
 #: src/channels.c:283 src/channels.c:342 src/otherwindow.c:222
 #: src/otherwindow.c:390 src/otherwindow.c:438 src/otherwindow.c:537
@@ -472,19 +471,19 @@ msgstr "临界通道"
 
 #: src/font.c:1001
 msgid "Creating Font Index"
-msgstr ""
+msgstr "创建字体索引"
 
 #: src/font.c:1380
 msgid "You must select at least one directory to search for fonts."
-msgstr ""
+msgstr "你必须至少选择一个目录来搜索字体。"
 
 #: src/font.c:1532
 msgid "Font"
-msgstr ""
+msgstr "字体"
 
 #: src/font.c:1533
 msgid "Style"
-msgstr ""
+msgstr "风格"
 
 #: src/font.c:1534 src/prefs.c:440 src/toolbar.c:586
 msgid "Size"
@@ -492,7 +491,7 @@ msgstr "大小"
 
 #: src/font.c:1535
 msgid "Filename"
-msgstr ""
+msgstr "文件名"
 
 #: src/font.c:1535
 msgid "Face"
@@ -500,7 +499,7 @@ msgstr ""
 
 #: src/font.c:1536 src/spawn.c:449
 msgid "Directory"
-msgstr ""
+msgstr "目录"
 
 #: src/font.c:1777 src/font.c:1889 src/toolbar.c:722 src/viewer.c:1604
 #: src/viewer.c:1657
@@ -509,7 +508,7 @@ msgstr "贴上文字"
 
 #: src/font.c:1790 src/font.c:1818
 msgid "Text"
-msgstr ""
+msgstr "文字"
 
 #: src/font.c:1821 src/viewer.c:1666
 msgid "Enter Text Here"
@@ -521,7 +520,7 @@ msgstr "反锯齿"
 
 #: src/font.c:1854 src/viewer.c:1630
 msgid "Invert"
-msgstr "反相"
+msgstr "反向"
 
 #: src/font.c:1859 src/viewer.c:1635
 msgid "Background colour ="
@@ -529,7 +528,7 @@ msgstr "背景颜色="
 
 #: src/font.c:1869
 msgid "Oblique"
-msgstr ""
+msgstr "倾斜的"
 
 #: src/font.c:1872 src/viewer.c:1643
 msgid "Angle of rotation ="
@@ -537,27 +536,27 @@ msgstr "旋转角度="
 
 #: src/font.c:1895
 msgid "Font Directories"
-msgstr ""
+msgstr "字体目录"
 
 #: src/font.c:1903
 msgid "New Directory"
-msgstr ""
+msgstr "新目录"
 
 #: src/font.c:1904 src/spawn.c:450
 msgid "Select Directory"
-msgstr ""
+msgstr "选择目录"
 
 #: src/font.c:1915
 msgid "Add"
-msgstr ""
+msgstr "添加"
 
 #: src/font.c:1919
 msgid "Remove"
-msgstr ""
+msgstr "移除"
 
 #: src/font.c:1923
 msgid "Create Index"
-msgstr ""
+msgstr "创建索引"
 
 #: src/help.c:25 src/prefs.c:461
 msgid "General"
@@ -590,7 +589,7 @@ msgid ""
 "Foundation; either version 3 of the License, or (at your option) any later "
 "version.\n"
 msgstr ""
-"mtPaint为自由软体；基于自由软体基金会发布的GNU通用公共许可，您可以再次散布它"
+"mtPaint为自由软件；基于自由软件基金会发布的GNU通用公共许可，您可以再次散布它"
 "和/或修改它；可依版本3的授权，或是(依您的选择)任何之后的版本。\n"
 
 #: src/help.c:35
@@ -613,7 +612,7 @@ msgid ""
 "and older PC hardware.\n"
 msgstr ""
 "mtPaint为简单的GTK+1/2绘图程式，设计用来建立图示和基于像素的原图。它可以编辑"
-"索引过的调色板或24位元的RGB图像以及提供基本绘图和调色板处理工具。它也有更多其"
+"索引过的调色盘或24位元的RGB图像以及提供基本绘图和调色盘处理工具。它也有更多其"
 "他的强大特征像是通道、图层和动画。由于它的简易性和较少的相依性，它在GNU/"
 "Linux、Windows和旧的PC硬体上运行地很好。\n"
 
@@ -1097,7 +1096,7 @@ msgstr ""
 
 #: src/help.c:146
 msgid "Lou Afonso"
-msgstr ""
+msgstr "Lou Afonso"
 
 #: src/help.c:147
 msgid "Magnus Hjorth"
@@ -1127,7 +1126,7 @@ msgstr ""
 
 #: src/help.c:153
 msgid "Translations\n"
-msgstr ""
+msgstr "翻译\n"
 
 #: src/help.c:154
 msgid "Brazilian Portuguese - Paulo Trevizan"
@@ -1135,55 +1134,55 @@ msgstr ""
 
 #: src/help.c:155
 msgid "Czech - Pavel Ruzicka"
-msgstr ""
+msgstr "捷克语 - Pavel Ruzicka"
 
 #: src/help.c:156
 msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto"
-msgstr ""
+msgstr "法语 - Nicolas Velin, Pascal Billard, Sylvain Cresto"
 
 #: src/help.c:157
 msgid "Galician - Miguel Anxo Bouzada"
-msgstr ""
+msgstr "加利西亚语 - Miguel Anxo Bouzada"
 
 #: src/help.c:158
 msgid "German - Oliver Frommel"
-msgstr ""
+msgstr "德语 - Oliver Frommel"
 
 #: src/help.c:159
 msgid "Japanese - Norihiro YONEDA"
-msgstr ""
+msgstr "日语 - Norihiro YONEDA"
 
 #: src/help.c:160
 msgid "Polish - Simek, LucaS"
-msgstr ""
+msgstr "波兰语 - Simek, LucaS"
 
 #: src/help.c:161
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
-msgstr ""
+msgstr "葡萄牙语 - Israel G. Lugo, Tiago Silva"
 
 #: src/help.c:162
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
-msgstr ""
+msgstr "俄语 - Sergey Irupin, Dmitry Groshev"
 
 #: src/help.c:163
 msgid "Simplified Chinese - puppychinese(Cecc)"
-msgstr ""
+msgstr "简体中文 - Cecc"
 
 #: src/help.c:164
 msgid "Slovak - Jozef Riha"
-msgstr ""
+msgstr "斯洛伐克语 - Jozef Riha"
 
 #: src/help.c:165
 msgid "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon"
-msgstr ""
+msgstr "西班牙语 - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon"
 
 #: src/help.c:166
 msgid "Taiwanese Chinese - Wei-Lun Chao"
-msgstr ""
+msgstr "繁体中文 - Wei-Lun Chao"
 
 #: src/help.c:167
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
-msgstr ""
+msgstr "土耳其语 - Muhammet Kara, Tutku Dalmaz"
 
 #: src/info.c:295
 msgid "Information"
@@ -1255,7 +1254,7 @@ msgstr "段落前分页"
 #: src/inifile.c:709
 msgid ""
 "Could not find home directory. Using current directory as home directory."
-msgstr "找不到主目录。使用目前目录作为主目录。"
+msgstr "找不到主目录。使用当前目录作为主目录。"
 
 #: src/layer.c:49 src/layer.c:983
 msgid "Background"
@@ -1291,7 +1290,7 @@ msgstr "放弃变更"
 #: src/layer.c:666
 #, c-format
 msgid "%d layers failed to load"
-msgstr ""
+msgstr "%d 层无法成功加载"
 
 #: src/layer.c:788
 msgid ""
@@ -1299,7 +1298,7 @@ msgid ""
 "image individually before saving the layers text file in order to load this "
 "composite image in the future."
 msgstr ""
-"一个或更多的图像图层未储存。您必须在储存图层文字档案之前，个别地储存每个图"
+"一个或更多的图像图层未储存。您必须在储存图层文字文件之前，个别地储存每个图"
 "像，以便在之后载入这个合成图像。"
 
 #: src/layer.c:868
@@ -1337,15 +1336,15 @@ msgstr "没有未使用的颜色可移除！"
 
 #: src/mainwindow.c:293
 msgid "The palette does not contain enough colours to do a merge"
-msgstr "调色板不包含足够的颜色来做合并"
+msgstr "调色盘不包含足够的颜色来做合并"
 
 #: src/mainwindow.c:302
 msgid "The palette does not contain 2 colours that have identical RGB values"
-msgstr "调色板不包含两种具有相同RGB值的颜色"
+msgstr "调色盘不包含两种具有相同RGB值的颜色"
 
 #: src/mainwindow.c:309
 msgid "There are too many identical palette items to be reduced."
-msgstr "有太多相同的调色板项目可以来缩小。"
+msgstr "有太多相同的调色盘项目可以来缩小。"
 
 #: src/mainwindow.c:314
 #, c-format
@@ -1353,12 +1352,12 @@ msgid ""
 "The palette contains %i colours that have identical RGB values.  Do you "
 "really want to merge them into one index and realign the canvas?"
 msgstr ""
-"调色板含有%i种具有相等RGB值的颜色。您真的要将它们合并为一个索引和重新对整画布"
+"调色盘含有%i种具有相等RGB值的颜色。您真的要将它们合并为一个索引和重新对整画布"
 "吗？"
 
 #: src/mainwindow.c:359
 msgid "You must have 16 or fewer palette colours to export ASCII art."
-msgstr "您必须有16或更少的调色板颜色以输出ASCII图案。"
+msgstr "您必须有16或更少的调色盘颜色以输出ASCII图案。"
 
 #: src/mainwindow.c:366
 msgid "You must save at least one frame to create an animated GIF."
@@ -1405,7 +1404,7 @@ msgstr "无法储存剪贴簿"
 msgid ""
 "This canvas/palette contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
-msgstr "此画布/调色板含有未储存的变更。您真的要丢弃这些变更吗？"
+msgstr "此画布/调色盘含有未储存的变更。您真的要丢弃这些变更吗？"
 
 #: src/mainwindow.c:1253 src/otherwindow.c:768
 msgid "Image"
@@ -1417,219 +1416,219 @@ msgstr "您真的要离开吗？"
 
 #: src/mainwindow.c:3624
 msgid "/_File"
-msgstr "/档案"
+msgstr "/文件"
 
 #: src/mainwindow.c:3625
 msgid "/File/tear"
-msgstr "/档案/tear"
+msgstr "/文件/tear"
 
 #: src/mainwindow.c:3626
 msgid "/File/New"
-msgstr "/档案/新增"
+msgstr "/文件/新增"
 
 #: src/mainwindow.c:3627
 msgid "/File/Open ..."
-msgstr "/档案/开启…"
+msgstr "/文件/开启…"
 
 #: src/mainwindow.c:3628
 msgid "/File/Save"
-msgstr "/档案/储存"
+msgstr "/文件/储存"
 
 #: src/mainwindow.c:3629
 msgid "/File/Save As ..."
-msgstr "/档案/另存为…"
+msgstr "/文件/另存为…"
 
 #: src/mainwindow.c:3630
 msgid "/File/sep1"
-msgstr "/档案/sep1"
+msgstr "/文件/sep1"
 
 #: src/mainwindow.c:3631
 msgid "/File/Export Undo Images ..."
-msgstr "/档案/汇出复原图像…"
+msgstr "/文件/汇出复原图像…"
 
 #: src/mainwindow.c:3632
 msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/档案/汇出复原图像(反向)…"
+msgstr "/文件/汇出复原图像(反向)…"
 
 #: src/mainwindow.c:3633
 msgid "/File/Export ASCII Art ..."
-msgstr "/档案/汇出ASCII图案…"
+msgstr "/文件/汇出ASCII图案…"
 
 #: src/mainwindow.c:3634
 msgid "/File/Export Animated GIF ..."
-msgstr "/档案/汇出动画GIF…"
+msgstr "/文件/汇出动画GIF…"
 
 #: src/mainwindow.c:3635
 msgid "/File/sep2"
-msgstr "/档案/sep2"
+msgstr "/文件/sep2"
 
 #: src/mainwindow.c:3636
 msgid "/File/Actions"
-msgstr "/档案/Actions"
+msgstr "/文件/Actions"
 
 #: src/mainwindow.c:3637
 msgid "/File/Actions/tear"
-msgstr "/档案/Actions/tear"
+msgstr "/文件/Actions/tear"
 
 #: src/mainwindow.c:3638
 msgid "/File/Actions/1"
-msgstr "/档案/Actions/1"
+msgstr "/文件/Actions/1"
 
 #: src/mainwindow.c:3639
 msgid "/File/Actions/2"
-msgstr "/档案/Actions/2"
+msgstr "/文件/Actions/2"
 
 #: src/mainwindow.c:3640
 msgid "/File/Actions/3"
-msgstr "/档案/Actions/3"
+msgstr "/文件/Actions/3"
 
 #: src/mainwindow.c:3641
 msgid "/File/Actions/4"
-msgstr "/档案/Actions/4"
+msgstr "/文件/Actions/4"
 
 #: src/mainwindow.c:3642
 msgid "/File/Actions/5"
-msgstr "/档案/Actions/5"
+msgstr "/文件/Actions/5"
 
 #: src/mainwindow.c:3643
 msgid "/File/Actions/6"
-msgstr "/档案/Actions/6"
+msgstr "/文件/Actions/6"
 
 #: src/mainwindow.c:3644
 msgid "/File/Actions/7"
-msgstr "/档案/Actions/7"
+msgstr "/文件/Actions/7"
 
 #: src/mainwindow.c:3645
 msgid "/File/Actions/8"
-msgstr "/档案/Actions/8"
+msgstr "/文件/Actions/8"
 
 #: src/mainwindow.c:3646
 msgid "/File/Actions/9"
-msgstr "/档案/Actions/9"
+msgstr "/文件/Actions/9"
 
 #: src/mainwindow.c:3647
 msgid "/File/Actions/10"
-msgstr "/档案/Actions/10"
+msgstr "/文件/Actions/10"
 
 #: src/mainwindow.c:3648
 msgid "/File/Actions/11"
-msgstr "/档案/Actions/11"
+msgstr "/文件/Actions/11"
 
 #: src/mainwindow.c:3649
 msgid "/File/Actions/12"
-msgstr "/档案/Actions/12"
+msgstr "/文件/Actions/12"
 
 #: src/mainwindow.c:3650
 msgid "/File/Actions/13"
-msgstr "/档案/Actions/13"
+msgstr "/文件/Actions/13"
 
 #: src/mainwindow.c:3651
 msgid "/File/Actions/14"
-msgstr "/档案/Actions/14"
+msgstr "/文件/Actions/14"
 
 #: src/mainwindow.c:3652
 msgid "/File/Actions/15"
-msgstr "/档案/Actions/15"
+msgstr "/文件/Actions/15"
 
 #: src/mainwindow.c:3653
 msgid "/File/Actions/sepC"
-msgstr "/档案/Actions/sepC"
+msgstr "/文件/Actions/sepC"
 
 #: src/mainwindow.c:3654
 msgid "/File/Actions/Configure"
-msgstr "/档案/Actions/Configure"
+msgstr "/文件/Actions/Configure"
 
 #: src/mainwindow.c:3655
 msgid "/File/sepR"
-msgstr "/档案/sepR"
+msgstr "/文件/sepR"
 
 #: src/mainwindow.c:3656
 msgid "/File/1"
-msgstr "/档案/1"
+msgstr "/文件/1"
 
 #: src/mainwindow.c:3657
 msgid "/File/2"
-msgstr "/档案/2"
+msgstr "/文件/2"
 
 #: src/mainwindow.c:3658
 msgid "/File/3"
-msgstr "/档案/3"
+msgstr "/文件/3"
 
 #: src/mainwindow.c:3659
 msgid "/File/4"
-msgstr "/档案/4"
+msgstr "/文件/4"
 
 #: src/mainwindow.c:3660
 msgid "/File/5"
-msgstr "/档案/5"
+msgstr "/文件/5"
 
 #: src/mainwindow.c:3661
 msgid "/File/6"
-msgstr "/档案/6"
+msgstr "/文件/6"
 
 #: src/mainwindow.c:3662
 msgid "/File/7"
-msgstr "/档案/7"
+msgstr "/文件/7"
 
 #: src/mainwindow.c:3663
 msgid "/File/8"
-msgstr "/档案/8"
+msgstr "/文件/8"
 
 #: src/mainwindow.c:3664
 msgid "/File/9"
-msgstr "/档案/9"
+msgstr "/文件/9"
 
 #: src/mainwindow.c:3665
 msgid "/File/10"
-msgstr "/档案/10"
+msgstr "/文件/10"
 
 #: src/mainwindow.c:3666
 msgid "/File/11"
-msgstr "/档案/11"
+msgstr "/文件/11"
 
 #: src/mainwindow.c:3667
 msgid "/File/12"
-msgstr "/档案/12"
+msgstr "/文件/12"
 
 #: src/mainwindow.c:3668
 msgid "/File/13"
-msgstr "/档案/13"
+msgstr "/文件/13"
 
 #: src/mainwindow.c:3669
 msgid "/File/14"
-msgstr "/档案/14"
+msgstr "/文件/14"
 
 #: src/mainwindow.c:3670
 msgid "/File/15"
-msgstr "/档案/15"
+msgstr "/文件/15"
 
 #: src/mainwindow.c:3671
 msgid "/File/16"
-msgstr "/档案/16"
+msgstr "/文件/16"
 
 #: src/mainwindow.c:3672
 msgid "/File/17"
-msgstr "/档案/17"
+msgstr "/文件/17"
 
 #: src/mainwindow.c:3673
 msgid "/File/18"
-msgstr "/档案/18"
+msgstr "/文件/18"
 
 #: src/mainwindow.c:3674
 msgid "/File/19"
-msgstr "/档案/19"
+msgstr "/文件/19"
 
 #: src/mainwindow.c:3675
 msgid "/File/20"
-msgstr "/档案/20"
+msgstr "/文件/20"
 
 #: src/mainwindow.c:3676
 msgid "/File/sep3"
-msgstr "/档案/sep3"
+msgstr "/文件/sep3"
 
 #: src/mainwindow.c:3677
 msgid "/File/Quit"
-msgstr "/档案/离开"
+msgstr "/文件/离开"
 
 #: src/mainwindow.c:3679
 msgid "/_Edit"
@@ -1809,79 +1808,79 @@ msgstr "/编辑(E)/选取笔刷…"
 
 #: src/mainwindow.c:3726
 msgid "/_View"
-msgstr "/检视"
+msgstr "/查看"
 
 #: src/mainwindow.c:3727
 msgid "/View/tear"
-msgstr "/检视/tear"
+msgstr "/查看/tear"
 
 #: src/mainwindow.c:3728
 msgid "/View/Show Main Toolbar"
-msgstr "/检视/显示主工具列"
+msgstr "/查看/显示主工具列"
 
 #: src/mainwindow.c:3729
 msgid "/View/Show Tools Toolbar"
-msgstr "/检视/显示工具工具列"
+msgstr "/查看/显示工具工具列"
 
 #: src/mainwindow.c:3730
 msgid "/View/Show Settings Toolbar"
-msgstr "/检视/显示设定值工具列"
+msgstr "/查看/显示设定值工具列"
 
 #: src/mainwindow.c:3731
 msgid "/View/Show Palette"
-msgstr "/检视/显示调色板"
+msgstr "/查看/显示调色盘"
 
 #: src/mainwindow.c:3732
 msgid "/View/Show Status Bar"
-msgstr "/检视/显示状态列"
+msgstr "/查看/显示状态列"
 
 #: src/mainwindow.c:3733
 msgid "/View/sep1"
-msgstr "/检视/sep1"
+msgstr "/查看/sep1"
 
 #: src/mainwindow.c:3734
 msgid "/View/Toggle Image View"
-msgstr "/检视/切换图像检视"
+msgstr "/查看/切换图像查看"
 
 #: src/mainwindow.c:3735
 msgid "/View/Centralize Image"
-msgstr "/检视/图像置中"
+msgstr "/查看/图像置中"
 
 #: src/mainwindow.c:3736
 msgid "/View/Show Zoom Grid"
-msgstr "/检视/显示缩放格线"
+msgstr "/查看/显示缩放格线"
 
 #: src/mainwindow.c:3737
 msgid "/View/sep2"
-msgstr "/检视/sep2"
+msgstr "/查看/sep2"
 
 #: src/mainwindow.c:3738
 msgid "/View/View Window"
-msgstr "/检视/检视视窗"
+msgstr "/查看/查看视窗"
 
 #: src/mainwindow.c:3739
 msgid "/View/Horizontal Split"
-msgstr "/检视/Horizontal Split"
+msgstr "/查看/Horizontal Split"
 
 #: src/mainwindow.c:3740
 msgid "/View/Focus View Window"
-msgstr "/检视/焦点检视视窗"
+msgstr "/查看/焦点查看视窗"
 
 #: src/mainwindow.c:3741
 msgid "/View/sep3"
-msgstr "/检视/sep3"
+msgstr "/查看/sep3"
 
 #: src/mainwindow.c:3742
 msgid "/View/Pan Window"
-msgstr "/检视/全景视窗"
+msgstr "/查看/全景视窗"
 
 #: src/mainwindow.c:3743
 msgid "/View/Command Line Window"
-msgstr "/检视/命令列视窗"
+msgstr "/查看/命令列视窗"
 
 #: src/mainwindow.c:3744
 msgid "/View/Layers Window"
-msgstr "/检视/图层视窗"
+msgstr "/查看/图层视窗"
 
 #: src/mainwindow.c:3746
 msgid "/_Image"
@@ -2045,87 +2044,87 @@ msgstr "/选择(S)/清除遮罩"
 
 #: src/mainwindow.c:3788
 msgid "/_Palette"
-msgstr "/调色板(_P)"
+msgstr "/调色盘(_P)"
 
 #: src/mainwindow.c:3789
 msgid "/Palette/tear"
-msgstr "/调色板(P)/tear"
+msgstr "/调色盘(P)/tear"
 
 #: src/mainwindow.c:3790
 msgid "/Palette/Open ..."
-msgstr "/调色板(P)/开启…"
+msgstr "/调色盘(P)/开启…"
 
 #: src/mainwindow.c:3791
 msgid "/Palette/Save As ..."
-msgstr "/调色板(P)/另存为…"
+msgstr "/调色盘(P)/另存为…"
 
 #: src/mainwindow.c:3792
 msgid "/Palette/Load Default"
-msgstr "/调色板(P)/载入预设"
+msgstr "/调色盘(P)/载入预设"
 
 #: src/mainwindow.c:3793
 msgid "/Palette/sep1"
-msgstr "/调色板(P)/sep1"
+msgstr "/调色盘(P)/sep1"
 
 #: src/mainwindow.c:3794
 msgid "/Palette/Mask All"
-msgstr "/调色板(P)/全部遮罩"
+msgstr "/调色盘(P)/全部遮罩"
 
 #: src/mainwindow.c:3795
 msgid "/Palette/Mask None"
-msgstr "/调色板(P)/全无遮罩"
+msgstr "/调色盘(P)/全无遮罩"
 
 #: src/mainwindow.c:3796
 msgid "/Palette/sep2"
-msgstr "/调色板(P)/sep2"
+msgstr "/调色盘(P)/sep2"
 
 #: src/mainwindow.c:3797
 msgid "/Palette/Swap A & B"
-msgstr "/调色板(P)/交换A & B"
+msgstr "/调色盘(P)/交换A & B"
 
 #: src/mainwindow.c:3798
 msgid "/Palette/Edit Colour A & B ..."
-msgstr "/调色板(P)/编辑颜色A & B…"
+msgstr "/调色盘(P)/编辑颜色A & B…"
 
 #: src/mainwindow.c:3799
 msgid "/Palette/Dither A"
-msgstr "/调色板(P)/Dither A"
+msgstr "/调色盘(P)/Dither A"
 
 #: src/mainwindow.c:3800
 msgid "/Palette/Palette Editor ..."
-msgstr "/调色板(P)/调色板编辑器…"
+msgstr "/调色盘(P)/调色盘编辑器…"
 
 #: src/mainwindow.c:3801
 msgid "/Palette/Set Palette Size ..."
-msgstr "/调色板(P)/设定调色板大小…"
+msgstr "/调色盘(P)/设定调色盘大小…"
 
 #: src/mainwindow.c:3802
 msgid "/Palette/Merge Duplicate Colours"
-msgstr "/调色板(P)/合并重制颜色"
+msgstr "/调色盘(P)/合并重制颜色"
 
 #: src/mainwindow.c:3803
 msgid "/Palette/Remove Unused Colours"
-msgstr "/调色板(P)/移除未使用的颜色"
+msgstr "/调色盘(P)/移除未使用的颜色"
 
 #: src/mainwindow.c:3804
 msgid "/Palette/sep3"
-msgstr "/调色板(P)/sep3"
+msgstr "/调色盘(P)/sep3"
 
 #: src/mainwindow.c:3805
 msgid "/Palette/Create Quantized ..."
-msgstr "/调色板(P)/Create Quantized ..."
+msgstr "/调色盘(P)/Create Quantized ..."
 
 #: src/mainwindow.c:3806
 msgid "/Palette/sep4"
-msgstr "/调色板(P)/sep4"
+msgstr "/调色盘(P)/sep4"
 
 #: src/mainwindow.c:3807
 msgid "/Palette/Sort Colours ..."
-msgstr "/调色板(P)/排序颜色…"
+msgstr "/调色盘(P)/排序颜色…"
 
 #: src/mainwindow.c:3808
 msgid "/Palette/Palette Shifter ..."
-msgstr "/调色板(P)/Palette Shifter ..."
+msgstr "/调色盘(P)/Palette Shifter ..."
 
 #: src/mainwindow.c:3810
 msgid "/Effe_cts"
@@ -2141,7 +2140,7 @@ msgstr "/效果(C)/变换颜色…"
 
 #: src/mainwindow.c:3813
 msgid "/Effects/Invert"
-msgstr "/效果(C)/反相"
+msgstr "/效果(C)/反向"
 
 #: src/mainwindow.c:3814
 msgid "/Effects/Greyscale"
@@ -2377,7 +2376,7 @@ msgstr "/求助(H)/Rebind Shortcut Keycodes"
 
 #: src/memory.c:2457 src/memory.c:2842
 msgid "Converting to Indexed Palette"
-msgstr "转换到索引过的调色板"
+msgstr "转换到索引过的调色盘"
 
 #: src/memory.c:3916 src/otherwindow.c:460
 msgid "Bacteria Effect"
@@ -2425,7 +2424,7 @@ msgstr "灰阶"
 
 #: src/otherwindow.c:181
 msgid "Indexed Palette"
-msgstr "索引过的调色板"
+msgstr "索引过的调色盘"
 
 #: src/otherwindow.c:181
 msgid "Grab Screenshot"
@@ -2461,7 +2460,7 @@ msgstr "式样选择器"
 
 #: src/otherwindow.c:374
 msgid "Set Palette Size"
-msgstr "设定调色板大小"
+msgstr "设定调色盘大小"
 
 #: src/otherwindow.c:437 src/otherwindow.c:538 src/otherwindow.c:910
 #: src/otherwindow.c:2882 src/prefs.c:689
@@ -2482,11 +2481,11 @@ msgstr "照度"
 
 #: src/otherwindow.c:502
 msgid "Distance to A"
-msgstr ""
+msgstr "到 A 的距离"
 
 #: src/otherwindow.c:503
 msgid "Distance to A+B"
-msgstr ""
+msgstr "到 A+B 的距离"
 
 #: src/otherwindow.c:504 src/otherwindow.c:767 src/toolbar.c:424
 msgid "Red"
@@ -2502,7 +2501,7 @@ msgstr "蓝色"
 
 #: src/otherwindow.c:504
 msgid "Projection to A->B"
-msgstr ""
+msgstr "投影 A->B"
 
 #: src/otherwindow.c:505
 msgid "Frequency"
@@ -2510,7 +2509,7 @@ msgstr "频率"
 
 #: src/otherwindow.c:510
 msgid "Sort Palette Colours"
-msgstr "排序调色板颜色"
+msgstr "排序调色盘颜色"
 
 #: src/otherwindow.c:522
 msgid "Start Index"
@@ -2530,7 +2529,7 @@ msgstr "自动预览"
 
 #: src/otherwindow.c:767 src/otherwindow.c:842 src/otherwindow.c:2169
 msgid "Palette"
-msgstr "调色板"
+msgstr "调色盘"
 
 #: src/otherwindow.c:769
 msgid "Brightness"
@@ -2644,11 +2643,11 @@ msgstr "修复宽高比"
 
 #: src/otherwindow.c:1119 src/otherwindow.c:2157
 msgid "Settings"
-msgstr ""
+msgstr "配置"
 
 #: src/otherwindow.c:1124
 msgid "Sharper image reduction"
-msgstr ""
+msgstr "锐化图像削减"
 
 #: src/otherwindow.c:1149
 msgid "Scale Canvas"
@@ -2660,27 +2659,27 @@ msgstr "调整画布大小"
 
 #: src/otherwindow.c:1781
 msgid "From"
-msgstr ""
+msgstr "从"
 
 #: src/otherwindow.c:1781
 msgid "To"
-msgstr ""
+msgstr "到"
 
 #: src/otherwindow.c:1782 src/otherwindow.c:2613
 msgid "HSV"
-msgstr ""
+msgstr "HSV"
 
 #: src/otherwindow.c:1782 src/otherwindow.c:2798
 msgid "Gradient"
-msgstr ""
+msgstr "渐变"
 
 #: src/otherwindow.c:1797
 msgid "Scale"
-msgstr ""
+msgstr "缩放"
 
 #: src/otherwindow.c:1812
 msgid "Palette Editor"
-msgstr "调色板编辑器"
+msgstr "调色盘编辑器"
 
 #: src/otherwindow.c:1833
 msgid "Configure Overlays"
@@ -2724,19 +2723,19 @@ msgstr "精确转换"
 
 #: src/otherwindow.c:2116
 msgid "Use Current Palette"
-msgstr "使用目前调色板"
+msgstr "使用当前调色盘"
 
 #: src/otherwindow.c:2117
 msgid "PNN Quantize (slow, better quality)"
-msgstr ""
+msgstr "PNN 量化（缓慢但更好的质量）"
 
 #: src/otherwindow.c:2118
 msgid "Wu Quantize (fast)"
-msgstr ""
+msgstr "Wu 量化（快速）"
 
 #: src/otherwindow.c:2119
 msgid "Max-Min Quantize (best for small palettes and dithering)"
-msgstr ""
+msgstr "最大最小量化（适合小调色盘和抖动）"
 
 #: src/otherwindow.c:2122 src/otherwindow.c:2822
 msgid "None"
@@ -2752,15 +2751,15 @@ msgstr ""
 
 #: src/otherwindow.c:2125
 msgid "Floyd-Steinberg (quick)"
-msgstr ""
+msgstr "Floyd-Steinberg（快速）"
 
 #: src/otherwindow.c:2125
 msgid "Dithered (effect)"
-msgstr ""
+msgstr "抖动（效果）"
 
 #: src/otherwindow.c:2126
 msgid "Scattered (effect)"
-msgstr ""
+msgstr "分散（效果0"
 
 #: src/otherwindow.c:2129
 msgid "Largest (Linf)"
@@ -2820,15 +2819,15 @@ msgstr "所使用的索引颜色"
 
 #: src/otherwindow.c:2177
 msgid "Dither"
-msgstr ""
+msgstr "抖动"
 
 #: src/otherwindow.c:2184
 msgid "Colour space"
-msgstr ""
+msgstr "色彩空间"
 
 #: src/otherwindow.c:2187
 msgid "Difference measure"
-msgstr ""
+msgstr "差异度测量"
 
 #: src/otherwindow.c:2190
 msgid "Reduce colour bleed"
@@ -2836,7 +2835,7 @@ msgstr ""
 
 #: src/otherwindow.c:2192
 msgid "Serpentine scan"
-msgstr ""
+msgstr "蛇形扫描"
 
 #: src/otherwindow.c:2197
 msgid "Error propagation, %"
@@ -2852,7 +2851,7 @@ msgstr ""
 
 #: src/otherwindow.c:2590
 msgid "Edit Gradient"
-msgstr ""
+msgstr "编辑渐变"
 
 #: src/otherwindow.c:2613
 msgid "Backward HSV"
@@ -2868,7 +2867,7 @@ msgstr ""
 
 #: src/otherwindow.c:2803 src/toolbar.c:457
 msgid "Reverse"
-msgstr ""
+msgstr "反向"
 
 #: src/otherwindow.c:2804
 msgid "Edit Custom"
@@ -2876,31 +2875,31 @@ msgstr ""
 
 #: src/otherwindow.c:2821
 msgid "Linear"
-msgstr ""
+msgstr "线性的"
 
 #: src/otherwindow.c:2821
 msgid "Bilinear"
-msgstr ""
+msgstr "双线性的"
 
 #: src/otherwindow.c:2821
 msgid "Radial"
-msgstr ""
+msgstr "幅射状的"
 
 #: src/otherwindow.c:2821
 msgid "Square"
-msgstr ""
+msgstr "方形的"
 
 #: src/otherwindow.c:2822
 msgid "Level"
-msgstr ""
+msgstr "水平的"
 
 #: src/otherwindow.c:2822
 msgid "Repeat"
-msgstr ""
+msgstr "重复"
 
 #: src/otherwindow.c:2822
 msgid "Mirror"
-msgstr ""
+msgstr "镜像"
 
 #: src/otherwindow.c:2823
 msgid "A to B"
@@ -2908,15 +2907,15 @@ msgstr ""
 
 #: src/otherwindow.c:2823
 msgid "A to B (RGB)"
-msgstr ""
+msgstr "A 到 B (RGB)"
 
 #: src/otherwindow.c:2823
 msgid "A to B (HSV)"
-msgstr ""
+msgstr "A 到 B (HSV)"
 
 #: src/otherwindow.c:2824
 msgid "A to B (backward HSV)"
-msgstr ""
+msgstr "A 到 B (backward HSV)"
 
 #: src/otherwindow.c:2824
 msgid "A only"
@@ -2936,49 +2935,49 @@ msgstr ""
 
 #: src/otherwindow.c:2836
 msgid "Configure Gradient"
-msgstr ""
+msgstr "设置渐变"
 
 #: src/otherwindow.c:2844 src/png.c:553
 msgid "Channel"
-msgstr ""
+msgstr "频道"
 
 #: src/otherwindow.c:2849
 msgid "Length"
-msgstr ""
+msgstr "长度"
 
 #: src/otherwindow.c:2851
 msgid "Repeat length"
-msgstr ""
+msgstr "重复长度"
 
 #: src/otherwindow.c:2855
 msgid "Gradient type"
-msgstr ""
+msgstr "渐变类型"
 
 #: src/otherwindow.c:2857
 msgid "Extension type"
-msgstr ""
+msgstr "扩展类型"
 
 #: src/otherwindow.c:2863
 msgid "Preview opacity"
-msgstr ""
+msgstr "预览浊度"
 
 #: src/png.c:256
 #, c-format
 msgid "Saving %s image"
-msgstr ""
+msgstr "保存图像 %s 中"
 
 #: src/png.c:256
 #, c-format
 msgid "Loading %s image"
-msgstr ""
+msgstr "加载 %s 图像中"
 
 #: src/png.c:550
 msgid "Layer"
-msgstr ""
+msgstr "层"
 
 #: src/png.c:3756
 msgid "This is an animated GIF file.  What do you want to do?"
-msgstr "此为GIF的动画档案。您想要怎么做？"
+msgstr "此为GIF的动画文件。您想要怎么做？"
 
 #: src/png.c:3757
 msgid "Edit Frames"
@@ -2986,7 +2985,7 @@ msgstr "编辑图框"
 
 #: src/png.c:3759
 msgid "View Animation"
-msgstr "检视动画"
+msgstr "查看动画"
 
 #: src/png.c:3910
 #, c-format
@@ -3012,7 +3011,7 @@ msgstr "压力"
 
 #: src/prefs.c:160
 msgid "Current Device"
-msgstr "目前装置"
+msgstr "当前装置"
 
 #: src/prefs.c:418
 msgid "Default System Language"
@@ -3020,11 +3019,11 @@ msgstr "预设系统语言"
 
 #: src/prefs.c:419
 msgid "Chinese (Simplified)"
-msgstr ""
+msgstr "简体中文"
 
 #: src/prefs.c:419
 msgid "Chinese (Taiwanese)"
-msgstr ""
+msgstr "繁体中文"
 
 #: src/prefs.c:420
 msgid "Czech"
@@ -3040,7 +3039,7 @@ msgstr "法语"
 
 #: src/prefs.c:420
 msgid "Galician"
-msgstr ""
+msgstr "加利西亚语"
 
 #: src/prefs.c:421
 msgid "German"
@@ -3048,7 +3047,7 @@ msgstr "德语"
 
 #: src/prefs.c:421
 msgid "Japanese"
-msgstr ""
+msgstr "日语"
 
 #: src/prefs.c:421
 msgid "Polish"
@@ -3064,11 +3063,11 @@ msgstr "葡萄牙语(巴西)"
 
 #: src/prefs.c:422
 msgid "Russian"
-msgstr ""
+msgstr "俄语"
 
 #: src/prefs.c:422
 msgid "Slovak"
-msgstr ""
+msgstr "斯洛伐克语"
 
 #: src/prefs.c:423
 msgid "Spanish"
@@ -3076,7 +3075,7 @@ msgstr "西班牙语"
 
 #: src/prefs.c:423
 msgid "Turkish"
-msgstr ""
+msgstr "土耳其语"
 
 #: src/prefs.c:430
 msgid "Max memory used for undo (MB)"
@@ -3084,7 +3083,7 @@ msgstr "用于复原的最大记忆体(MB)"
 
 #: src/prefs.c:431
 msgid "Max undo levels"
-msgstr ""
+msgstr "最大恢复层数"
 
 #: src/prefs.c:431
 msgid "Greyscale backdrop"
@@ -3108,11 +3107,11 @@ msgstr "XBM Y热点"
 
 #: src/prefs.c:435
 msgid "Recently Used Files"
-msgstr "最近使用的档案"
+msgstr "最近使用的文件"
 
 #: src/prefs.c:436
 msgid "Progress bar silence limit"
-msgstr ""
+msgstr "进度条沉默限制"
 
 #: src/prefs.c:437
 msgid "Minimum grid zoom"
@@ -3172,19 +3171,19 @@ msgstr "认可贴上变更工具"
 
 #: src/prefs.c:485
 msgid "Centre tool settings dialogs"
-msgstr ""
+msgstr "中间工具配置对话"
 
 #: src/prefs.c:487
 msgid "Use gamma correction by default"
-msgstr ""
+msgstr "默认使用伽马修正"
 
 #: src/prefs.c:493
 msgid "Files"
-msgstr "档案"
+msgstr "文件"
 
 #: src/prefs.c:508
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
-msgstr ""
+msgstr "读取16位 TGA 为5:6:5 BGR "
 
 #: src/prefs.c:509
 msgid "Write TGAs in bottom-up row order"
@@ -3196,47 +3195,47 @@ msgstr ""
 
 #: src/prefs.c:514
 msgid "Paths"
-msgstr ""
+msgstr "路径"
 
 #: src/prefs.c:516
 msgid "Clipboard Files"
-msgstr "剪贴簿档案"
+msgstr "剪贴簿文件"
 
 #: src/prefs.c:517
 msgid "Select Clipboard File"
-msgstr "选取剪贴簿档案"
+msgstr "选取剪贴簿文件"
 
 #: src/prefs.c:521
 msgid "HTML Browser Program"
-msgstr ""
+msgstr "HTML 浏览程序"
 
 #: src/prefs.c:522
 msgid "Select Browser Program"
-msgstr ""
+msgstr "选择浏览程序"
 
 #: src/prefs.c:526
 msgid "Location of Handbook index"
-msgstr ""
+msgstr "手册索引位置"
 
 #: src/prefs.c:527
 msgid "Select Handbook Index File"
-msgstr ""
+msgstr "选择手册索引文件"
 
 #: src/prefs.c:531
 msgid "Default Palette"
-msgstr ""
+msgstr "默认调色盘"
 
 #: src/prefs.c:532
 msgid "Select Default Palette"
-msgstr ""
+msgstr "选择默认调色盘"
 
 #: src/prefs.c:536
 msgid "Default Patterns"
-msgstr ""
+msgstr "默认图案"
 
 #: src/prefs.c:537
 msgid "Select Default Patterns File"
-msgstr ""
+msgstr "选择默认图案"
 
 #: src/prefs.c:544
 msgid "Status Bar"
@@ -3260,7 +3259,7 @@ msgstr "最佳化Alpha审核员"
 
 #: src/prefs.c:575
 msgid "Disable view window transparencies"
-msgstr "停用检视视窗透明度"
+msgstr "停用查看视窗透明度"
 
 #: src/prefs.c:582
 msgid "Tablet"
@@ -3304,39 +3303,39 @@ msgstr ""
 
 #: src/shifter.c:208
 msgid "Frames"
-msgstr ""
+msgstr "框架"
 
 #: src/shifter.c:274
 msgid "Palette Shifter"
-msgstr ""
+msgstr "调色盘变换"
 
 #: src/shifter.c:284
 msgid "Start"
-msgstr ""
+msgstr "开始"
 
 #: src/shifter.c:286
 msgid "Finish"
-msgstr ""
+msgstr "完成"
 
 #: src/shifter.c:335
 msgid "Fix Palette"
-msgstr ""
+msgstr "修复调色盘"
 
 #: src/spawn.c:391 src/spawn.c:443
 msgid "Action"
-msgstr ""
+msgstr "动作"
 
 #: src/spawn.c:391 src/spawn.c:443
 msgid "Command"
-msgstr ""
+msgstr "命令"
 
 #: src/spawn.c:398
 msgid "Configure File Actions"
-msgstr ""
+msgstr "配置文件的动作"
 
 #: src/spawn.c:458
 msgid "Execute"
-msgstr ""
+msgstr "执行"
 
 #: src/toolbar.c:169
 msgid "Raise"
@@ -3364,19 +3363,19 @@ msgstr "关闭图层视窗"
 
 #: src/toolbar.c:426
 msgid "Normal"
-msgstr ""
+msgstr "正常"
 
 #: src/toolbar.c:426
 msgid "Value"
-msgstr ""
+msgstr "数值"
 
 #: src/toolbar.c:427
 msgid "Colour"
-msgstr ""
+msgstr "颜色"
 
 #: src/toolbar.c:427
 msgid "Saturate More"
-msgstr ""
+msgstr "更多饱和度"
 
 #: src/toolbar.c:443
 msgid "Brush spacing"
@@ -3384,7 +3383,7 @@ msgstr ""
 
 #: src/toolbar.c:468
 msgid "Blend mode"
-msgstr ""
+msgstr "混杂模式"
 
 #: src/toolbar.c:474
 msgid "RGB Cube"
@@ -3404,11 +3403,11 @@ msgstr "填充设定值"
 
 #: src/toolbar.c:482
 msgid "Respect opacity mode"
-msgstr ""
+msgstr "顾及浊度模式"
 
 #: src/toolbar.c:483
 msgid "Smudge settings"
-msgstr ""
+msgstr "斑点配置"
 
 #: src/toolbar.c:571
 msgid "Continuous Mode"
@@ -3428,7 +3427,7 @@ msgstr "色调+-"
 
 #: src/toolbar.c:576
 msgid "Blend Mode"
-msgstr ""
+msgstr "混杂模式"
 
 #: src/toolbar.c:577
 msgid "Disable All Masks"
@@ -3440,7 +3439,7 @@ msgstr "设定值工具列"
 
 #: src/toolbar.c:656
 msgid "Gradient Mode"
-msgstr ""
+msgstr "渐变模式"
 
 #: src/toolbar.c:702
 msgid "Cut"
@@ -3500,7 +3499,7 @@ msgstr "多边形选择"
 
 #: src/toolbar.c:720
 msgid "Place Gradient"
-msgstr ""
+msgstr "放置渐变"
 
 #: src/toolbar.c:721
 msgid "Lasso Selection"
@@ -3541,173 +3540,10 @@ msgstr "逆时针旋转选择区域"
 #: src/viewer.c:90
 #, c-format
 msgid "%i Files on Command Line"
-msgstr "%i个档案在命令列上"
+msgstr "%i个文件在命令列上"
 
 #: src/viewer.c:167
 msgid "About"
 msgstr "关于"
 
-#~ msgid "Not enough memory to rotate image"
-#~ msgstr "旋转图像所需内存不足"
 
-#~ msgid "Not enough memory to rotate clipboard"
-#~ msgstr "旋转剪贴簿所需内存不足"
-
-#~ msgid "File is too big, must be <= to width=%i height=%i : %s"
-#~ msgstr "文件太大，必须是 <= 宽度=%i 高度=%i：%s"
-
-#~ msgid "Could not open %s: %s"
-#~ msgstr "无法打开 %s:%s"
-
-#~ msgid "Error closing %s: %s"
-#~ msgstr "关闭 %s 时发生错误：%s"
-
-#~ msgid "Could not write to %s: %s"
-#~ msgstr "无法写入 %s:%s"
-
-#~ msgid "patterns_user.c could not be opened in current directory"
-#~ msgstr "patterns_user.c无法在目前的目录中开启"
-
-#~ msgid "Done"
-#~ msgstr "已完成"
-
-#~ msgid "patterns_user.c created in current directory"
-#~ msgstr "patterns_user.c 建立在目前的目录中"
-
-#~ msgid "Current image is not 94x94x3 so I cannot create patterns_user.c"
-#~ msgstr "目前图像并非 94x94x3 因而我无法建立 patterns_user.c"
-
-#~ msgid ""
-#~ "You are trying to save an RGB image to an XPM file which is not "
-#~ "possible.  I would suggest you save with a PNG extension."
-#~ msgstr ""
-#~ "您正试着储存RGB图像到XPM档案，而这并不可能。我会建议您储存为PNG延伸格式。"
-
-#~ msgid ""
-#~ "You are trying to save an RGB image to a GIF file which is not possible.  "
-#~ "I would suggest you save with a PNG extension."
-#~ msgstr ""
-#~ "您正试着储存RGB图像到GIF档案，而这并不可能。我会建议您储存为PNG延伸格式。"
-
-#~ msgid ""
-#~ "You are trying to save an XBM file with a palette of more than 2 "
-#~ "colours.  Either use another format or reduce the palette to 2 colours."
-#~ msgstr ""
-#~ "您正试着储存XBM档案，它的调色板有超过2种颜色。若非使用其他格式，就缩小调色"
-#~ "板到2种颜色。"
-
-#~ msgid ""
-#~ "You are trying to save an indexed canvas to a JPEG file which is not "
-#~ "possible.  I would suggest you save with a PNG extension."
-#~ msgstr ""
-#~ "您正试着储存索引过的画布为JPEG档案，而这并不可能。我会建议您储存为PNG延伸"
-#~ "格式。"
-
-#~ msgid ""
-#~ "You are trying to save an indexed canvas to a TIFF file which is not "
-#~ "possible.  I would suggest you save with a PNG extension."
-#~ msgstr ""
-#~ "您正试着储存索引过的画布为TIFF档案，而这并不可能。我会建议您储存为PNG延伸"
-#~ "格式。"
-
-#~ msgid "/Edit/Create Patterns"
-#~ msgstr "/编辑(E)/建立式样"
-
-#~ msgid "/View/Toggle Image View (Home)"
-#~ msgstr "/检视/切换图像检视(个人资料夹)"
-
-#~ msgid "/Palette/Create Quantized (DL1)"
-#~ msgstr "/调色板(P)/建立量化(DL1)"
-
-#~ msgid "/Palette/Create Quantized (DL3)"
-#~ msgstr "/调色板(P)/建立量化(DL3)"
-
-#~ msgid "/Palette/Create Quantized (Wu)"
-#~ msgstr "/调色板(P)/建立量化(Wu)"
-
-#~ msgid "/Frames"
-#~ msgstr "/图框"
-
-#~ msgid "/File/%i"
-#~ msgstr "/档案/%i"
-
-#~ msgid "Lanczos3"
-#~ msgstr "Lanczos3"
-
-#~ msgid "Width "
-#~ msgstr "宽度"
-
-#~ msgid "Height "
-#~ msgstr "高度"
-
-#~ msgid "Original "
-#~ msgstr "原值"
-
-#~ msgid "DL1 Quantize (fastest)"
-#~ msgstr "DL1量化(最快)"
-
-#~ msgid "DL3 Quantize (very slow, better quality)"
-#~ msgstr "DL3量化(很慢，较好品质)"
-
-#~ msgid "Wu Quantize (best method for small palettes)"
-#~ msgstr "Wu量化(用于小调色板的最好方法)"
-
-#~ msgid "Loading PNG image"
-#~ msgstr "载入PNG图像"
-
-#~ msgid "Loading clipboard image"
-#~ msgstr "载入剪贴簿图像"
-
-#~ msgid "Saving PNG image"
-#~ msgstr "储存PNG图像"
-
-#~ msgid "Saving Clipboard image"
-#~ msgstr "储存剪贴簿图像"
-
-#~ msgid "Saving Layer image"
-#~ msgstr "储存图层图像"
-
-#~ msgid "Loading GIF image"
-#~ msgstr "载入GIF图像"
-
-#~ msgid "Saving GIF image"
-#~ msgstr "储存GIF图像"
-
-#~ msgid "Loading JPEG image"
-#~ msgstr "载入JPEG图像"
-
-#~ msgid "Saving JPEG image"
-#~ msgstr "储存JPEG图像"
-
-#~ msgid "Loading TIFF image"
-#~ msgstr "载入TIFF图像"
-
-#~ msgid "Saving TIFF image"
-#~ msgstr "储存TIFF图像"
-
-#~ msgid "Loading BMP image"
-#~ msgstr "载入BMP图像"
-
-#~ msgid "Saving BMP image"
-#~ msgstr "储存BMP图像"
-
-#~ msgid "Loading XPM image"
-#~ msgstr "载入XPM图像"
-
-#~ msgid "Saving XPM image"
-#~ msgstr "储存XPM图像"
-
-#~ msgid "Loading XBM image"
-#~ msgstr "载入XBM图像"
-
-#~ msgid "Saving XBM image"
-#~ msgstr "储存XBM图像"
-
-#~ msgid "This is an animated GIF file. What do you want to do?"
-#~ msgstr "此为GIF的动画档案。您想要怎么做？"
-
-#~ msgid "Saving UNDO images"
-#~ msgstr "储存复原图像"
-
-#~ msgid "JPEG Save Quality (100=High) "
-#~ msgstr "JPEG储存品质(100=高) "

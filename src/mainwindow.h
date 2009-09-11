@@ -245,6 +245,9 @@ int mem_grid_min;	// Minimum zoom to show it at
 int color_grid;		// If to use grid coloring
 int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
 			// 1 for border, 2 for transparency, 3 for tile grid
+int show_tile_grid;	// Tile grid toggle
+int tgrid_x0, tgrid_y0;	// Tile grid origin
+int tgrid_dx, tgrid_dy;	// Tile grid spacing
 
 const unsigned char greyz[2]; // For opacity squares
 
