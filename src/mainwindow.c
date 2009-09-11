@@ -99,6 +99,7 @@ static inilist ini_int[] = {
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },
 	{ "undoMBlimit",	&mem_undo_limit,	32  },
+	{ "undoCommon",		&mem_undo_common,	25  },
 	{ "backgroundGrey",	&mem_background,	180 },
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },

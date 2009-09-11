@@ -334,6 +334,7 @@ int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 
 int mem_undo_limit;		// Max MB memory allocation limit
+int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
 /// PATTERNS

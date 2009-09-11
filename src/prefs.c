@@ -32,8 +32,8 @@
 ///	PREFERENCES WINDOW
 
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
-static GtkWidget *spinbutton_maxmem, *spinbutton_maxundo, *spinbutton_greys,
-	*spinbutton_nudge, *spinbutton_pan;
+static GtkWidget *spinbutton_maxmem, *spinbutton_maxundo, *spinbutton_commundo;
+static GtkWidget *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty,
 	*spinbutton_jpeg, *spinbutton_jp2, *spinbutton_png, *spinbutton_recent,
 	*spinbutton_silence;
@@ -256,6 +256,7 @@ static void prefs_apply(GtkWidget *widget)
 
 	mem_undo_limit = read_spin(spinbutton_maxmem);
 	mem_undo_depth = read_spin(spinbutton_maxundo);
+	mem_undo_common = read_spin(spinbutton_commundo);
 	mem_background = read_spin(spinbutton_greys);
 	mem_nudge = read_spin(spinbutton_nudge);
 	max_pan = read_spin(spinbutton_pan);
@@ -409,9 +410,6 @@ void pressed_preferences()
 	GtkWidget *vbox3, *hbox4, *table3, *table4, *drawingarea_tablet;
 	GtkWidget *button1, *notebook1, *page, *vbox_2, *label;
 
-	char *tab_tex[] = { _("Max memory used for undo (MB)"),
-		_("Max undo levels"), _("Greyscale backdrop"),
-		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
 		_("JPEG Save Quality (100=High)"), _("JPEG2000 Compression (0=Lossless)"),
 		_("PNG Compression (0=None)"), _("Recently Used Files"),
@@ -434,24 +432,44 @@ void pressed_preferences()
 ///	SETUP NOTEBOOK
 
 	notebook1 = xpack(vbox3, gtk_notebook_new());
-	gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook1), GTK_POS_TOP);
-	gtk_widget_show (notebook1);
+	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_RIGHT);
+//	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
+//	gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook1), TRUE);
+	gtk_widget_show(notebook1);
 
 ///	---- TAB1 - GENERAL
 
 	page = add_new_page(notebook1, _("General"));
-	table3 = add_a_table( 5, 2, 10, page );
+	table3 = add_a_table(3, 2, 10, page);
 
 ///	TABLE TEXT
-	for (i = 0; i < 5; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
+	add_to_table(_("Max memory used for undo (MB)"), table3, 0, 0, 5);
+	add_to_table(_("Max undo levels"), table3, 1, 0, 5);
+	add_to_table(_("Common undo space, %"), table3, 2, 0, 5);
 
 ///	TABLE SPINBUTTONS
 	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 2048);
 	spinbutton_maxundo = spin_to_table(table3, 1, 1, 5, mem_undo_depth & ~1,
 		MIN_UNDO & ~1, MAX_UNDO & ~1);
-	spinbutton_greys = spin_to_table(table3, 2, 1, 5, mem_background, 0, 255);
-	spinbutton_nudge = spin_to_table(table3, 3, 1, 5, mem_nudge, 2, MAX_WIDTH);
-	spinbutton_pan = spin_to_table(table3, 4, 1, 5, max_pan, 64, 256);
+	spinbutton_commundo = spin_to_table(table3, 2, 1, 5, mem_undo_common, 0, 100);
+
+	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
+		page, inifile_get_gboolean("defaultGamma", FALSE));
+
+///	---- TAB2 - INTERFACE
+
+	page = add_new_page(notebook1, _("Interface"));
+	table3 = add_a_table(3, 2, 10, page);
+
+///	TABLE TEXT
+	add_to_table(_("Greyscale backdrop"), table3, 0, 0, 5);
+	add_to_table(_("Selection nudge pixels"), table3, 1, 0, 5);
+	add_to_table(_("Max Pan Window Size"), table3, 2, 0, 5);
+
+///	TABLE SPINBUTTONS
+	spinbutton_greys = spin_to_table(table3, 0, 1, 5, mem_background, 0, 255);
+	spinbutton_nudge = spin_to_table(table3, 1, 1, 5, mem_nudge, 2, MAX_WIDTH);
+	spinbutton_pan = spin_to_table(table3, 2, 1, 5, max_pan, 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),
 		page, show_paste );
@@ -465,13 +483,11 @@ void pressed_preferences()
 		page, paste_commit);
 	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
 		page, inifile_get_gboolean("centerSettings", TRUE));
-	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
-		page, inifile_get_gboolean("defaultGamma", FALSE));
 #if GTK_MAJOR_VERSION == 2
 	checkbutton_menuicons = add_a_toggle(_("Use menu icons"), page, show_menu_icons);
 #endif
 
-///	---- TAB2 - FILES
+///	---- TAB3 - FILES
 
 	page = add_new_page(notebook1, _("Files"));
 	table4 = add_a_table(7, 2, 10, page);
@@ -492,7 +508,7 @@ void pressed_preferences()
 	checkbutton_tgadef = add_a_toggle(_("Write TGAs in bottom-up row order"), page, tga_defdir);
 	checkbutton_undo   = add_a_toggle(_("Undoable image loading"), page, undo_load);
 
-///	---- TAB3 - PATHS
+///	---- TAB4 - PATHS
 
 	page = add_new_page(notebook1, _("Paths"));
 
@@ -522,7 +538,7 @@ void pressed_preferences()
 	gtk_entry_set_text(GTK_ENTRY(entry_def[1]), txt);
 
 
-///	---- TAB4 - STATUS BAR
+///	---- TAB5 - STATUS BAR
 
 	page = add_new_page(notebook1, _("Status Bar"));
 
@@ -531,7 +547,7 @@ void pressed_preferences()
 		prefs_status[i] = add_a_toggle( stat_tex[i], page, status_on[i] );
 	}
 
-///	---- TAB5 - ZOOM
+///	---- TAB6 - ZOOM
 
 	page = add_new_page(notebook1, _("Zoom"));
 
@@ -548,7 +564,7 @@ void pressed_preferences()
 
 
 
-///	---- TAB6 - TABLET
+///	---- TAB7 - TABLET
 
 	page = add_new_page(notebook1, _("Tablet"));
 
@@ -628,7 +644,7 @@ void pressed_preferences()
 
 
 
-///	---- TAB7 - LANGUAGE
+///	---- TAB8 - LANGUAGE
 
 #ifdef U_NLS
 

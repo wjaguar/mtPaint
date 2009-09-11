@@ -41,7 +41,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Ctrl+Double click selects average colour underneath brush square or selection marquee
 	* "Convert to indexed" using current palette now truncates the palette only if requested
 	* "Convert to indexed" PNN and Wu quantizers now have diameter based weighting option
-	* Canvas, view and palette window now do not lose mouse button release events in GTK+1
+	* Brush preview area, canvas, view and palette window now do not lose mouse button release events in GTK+1
+	* Brush preview area border now can't be messed up by theme engines
 	* Makefiles now honor DESTDIR
 	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.8)
 	* BUGFIX - Polygon line selection now clearer in Windows version

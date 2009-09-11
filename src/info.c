@@ -311,7 +311,8 @@ void pressed_information()
 	snprintf(txt, 60, "%1.1f MB", ( (float) mem_used() )/1024/1024 );
 	add_to_table( txt, table4, 0, 1, 5 );
 
-	maxi = rint(((double)mem_undo_limit * 1024 * 1024) /
+	maxi = rint(((double)mem_undo_limit * 1024 * 1024) *
+		(mem_undo_common * layers_total * 0.01 + 1) /
 		(mem_width * mem_height * mem_img_bpp * (layers_total + 1)) - 1.25);
 	maxi = maxi < 0 ? 0 : maxi >= mem_undo_max ? mem_undo_max - 1 : maxi;
 

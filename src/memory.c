@@ -101,7 +101,8 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 #define UF_FLAT  2
 #define UF_SIZED 4
 
-int mem_undo_limit = 32;	// Max MB memory allocation limit
+int mem_undo_limit;		// Max MB memory allocation limit
+int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
 /// PATTERNS
@@ -642,10 +643,20 @@ unsigned char *mem_undo_previous(int channel)
 	return (res);
 }
 
-static size_t lose_oldest()			// Lose the oldest undo image
-{						// Pre-requisite: mem_undo_done > 0
-	return (undo_free_x(mem_undo_im_ +
-		(mem_undo_pointer - mem_undo_done-- + mem_undo_max) % mem_undo_max));
+static size_t lose_oldest(undo_stack *ustack)	// Lose the oldest undo image
+{
+	size_t res = 0;
+	int idx;
+
+	while (!res) // Drop any number of dummy frames at once
+	{
+		if (ustack->redo > ustack->done) idx = ustack->redo--;
+		else if (ustack->done) idx = ustack->max - ustack->done--;
+		else break;
+		res = undo_free_x(ustack->items + (ustack->pointer + idx) % ustack->max);
+	}
+	ustack->size -= res;
+	return (res);
 }
 
 /* Convert tile bitmap row into a set of spans (skip/copy), terminated by
@@ -1012,19 +1023,77 @@ static size_t mem_undo_size(undo_stack *ustack)
 /* Free requested amount of undo space */
 static int mem_undo_space(size_t mem_req)
 {
-	size_t mem_lim = ((size_t)mem_undo_limit * (1024 * 1024)) /
-		(layers_total + 1);
+	undo_stack *heap[MAX_LAYERS + 2], *wp, *hp;
+	size_t mem_r, mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
+	int i, l, l2, h, csz = mem_undo_common * layers_total;
+	
+	/* Layer mem limit including common arena */
+	mem_lim = mem_max * (csz * 0.01 + 1) / (layers_total + 1);
 
 	/* Fail if hopeless */
 	if (mem_req > mem_lim) return (2);
 
-	/* Mem limit exceeded - drop oldest */
-	mem_req += mem_undo_size(&mem_image.undo_);
-	while (mem_req > mem_lim)
+	/* Layer mem limit exceeded - drop oldest */
+	mem_r = mem_req + mem_undo_size(&mem_image.undo_);
+	while (mem_r > mem_lim)
 	{
-		if (!mem_undo_done) return (1);
-		mem_req -= lose_oldest();
+		size_t res = lose_oldest(&mem_image.undo_);
+		if (!res) return (1);
+		mem_r -= res;
 	}
+	/* All done if no common arena */
+	if (!csz) return (0);
+
+	mem_r = mem_req + mem_used_layers();
+	if (mem_r <= mem_max) return (0); // No need to trim other layers yet
+	mem_lim -= mem_max * (mem_undo_common * 0.01); // Reserved space per layer
+
+	/* Build heap of undo stacks */
+	for (i = h = 0; i <= layers_total; i++)
+	{
+		// Skip current layer
+		if (i == layer_selected) continue;
+		wp = &layer_table[i].image->image_.undo_;
+		// Skip layers without extra frames
+		if (!(wp->done + wp->redo)) continue;
+		// Skip layers under the memory limit
+		if (wp->size <= mem_lim) continue;
+		// Put undo stack onto heap
+		for (l = ++h; l > 1; l = l2)
+		{
+			l2 = l >> 1;
+			if ((hp = heap[l2])->size >= wp->size) break;
+			heap[l] = hp;
+		}
+		heap[l] = wp;
+	}
+
+	/* Drop frames of greediest layers */
+	while (h > 0)
+	{
+		size_t mem_nx = h > 1 ? heap[2]->size : 0;
+		if ((h > 2) && (heap[3]->size > mem_r)) mem_r = heap[3]->size;
+		/* Drop frames */
+		while (TRUE)
+		{
+			size_t res = lose_oldest(wp = heap[1]);
+			mem_r -= res;
+			if (mem_r <= mem_max) return (0);
+			if (!res) wp = heap[h--];
+			else if (wp->size >= mem_nx) continue;
+			break;
+		}
+		/* Reheap layer */
+		mem_nx = wp->size;
+		for (l = 1; (l2 = l + l) <= h; l = l2)
+		{
+			if ((l2 < h) && (heap[l2]->size < heap[l2 + 1]->size)) l2++;
+			if (mem_nx >= (hp = heap[l2])->size) break;
+			heap[l] = hp;
+		}
+		heap[l] = wp;
+	}
+
 	return (0);
 }
 
@@ -1036,8 +1105,7 @@ void *mem_try_malloc(size_t size)
 	while (!((ptr = malloc(size))))
 	{
 // !!! Hardcoded to work with mem_image for now
-		if (!mem_undo_done) return (NULL);
-		lose_oldest();
+		if (!lose_oldest(&mem_image.undo_)) return (NULL);
 	}
 	return (ptr);
 }
@@ -4330,7 +4398,8 @@ static void mem_clear_img(chanlist img, int w, int h, int bpp)
 {
 	int i, j, k, l = w * h;
 
-	if (bpp == 3)
+	if (!img[CHN_IMAGE]); // !!! Here, image channel CAN be absent
+	else if (bpp == 3)
 	{
 		unsigned char *tmp = img[CHN_IMAGE];
 		tmp[0] = mem_col_A24.red;
