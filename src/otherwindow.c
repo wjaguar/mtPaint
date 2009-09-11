@@ -1415,7 +1415,9 @@ gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 		if ( mem_img_bpp == 1 ) mem_pal_copy( brcosa_pal, mem_pal );
 		else
 		{
-			if ( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4])) )
+			if ( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4]))
+				&& (widget != NULL)	// Don't do this when clicking OK
+				)
 			{
 				mem_pal_copy( brcosa_pal, mem_pal );
 				click_brcosa_preview(NULL, NULL, NULL);
