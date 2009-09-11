@@ -21,7 +21,6 @@
 
 #define PNG_READ_PACK_SUPPORTED
 
-#include <math.h>
 #include <stdlib.h>
 #include <ctype.h>
 
@@ -37,15 +36,13 @@
 #include <tiffio.h>
 #endif
 
-#include <gtk/gtk.h>
-
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "canvas.h"
 #include "otherwindow.h"
-#include "mygtk.h"
 #include "layer.h"
 #include "ani.h"
 #include "inifile.h"

@@ -17,9 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
-
 #define HANDBOOK_BROWSER_INI "docsBrowser"
 #define HANDBOOK_LOCATION_INI "docsLocation"
 

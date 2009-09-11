@@ -29,6 +29,8 @@
 
 #include <errno.h>
 
+#include <gtk/gtk.h>
+
 #include "global.h"
 
 #include "inifile.h"

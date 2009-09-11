@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
 #define CMAPSIZE (64 * 64 * 64 / 16)
 
 typedef struct

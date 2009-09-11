@@ -24,11 +24,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <gdk/gdkkeysyms.h>
-#include <gtk/gtk.h>
-
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "ani.h"
 #include "png.h"
@@ -37,7 +35,6 @@
 #include "canvas.h"
 #include "viewer.h"
 #include "inifile.h"
-#include "mygtk.h"
 #include "layer.h"
 #include "mtlib.h"
 #include "quantizer.h"
@@ -156,9 +153,9 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 		}
 	}
 
-	layer_table[layer].x = mt_round( p1 * d[0][0] + p2 * d[1][0] );
-	layer_table[layer].y = mt_round( p1 * d[0][1] + p2 * d[1][1] );
-	layer_table[layer].opacity = mt_round( p1 * d[0][2] + p2 * d[1][2] );
+	layer_table[layer].x = rint( p1 * d[0][0] + p2 * d[1][0] );
+	layer_table[layer].y = rint( p1 * d[0][1] + p2 * d[1][1] );
+	layer_table[layer].opacity = rint( p1 * d[0][2] + p2 * d[1][2] );
 
 
 	if ( effect == 1 )		// Interpolated smooth in between - use p2 value

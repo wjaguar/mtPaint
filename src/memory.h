@@ -266,7 +266,6 @@ void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready
 
 
 int get_next_line(char *input, int length, FILE *fp);		// Get next length chars of text file
-int mt_round( float n );			// Round a float to nearest whole number
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
 
@@ -400,8 +399,7 @@ void tline( int x1, int y1, int x2, int y2, int size );		// Draw size thickness 
 void g_para( int x1, int y1, int x2, int y2, int xv, int yv );	// Draw general parallelogram
 void f_rectangle( int x, int y, int w, int h );			// Draw a filled rectangle
 void f_circle( int x, int y, int r );				// Draw a filled circle
-void f_ellipse( int x1, int y1, int x2, int y2 );		// Draw a filled ellipse
-void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse outline
+void mem_ellipse( int x1, int y1, int x2, int y2, int thick );	// Thickness 0 means filled
 
 // Draw whatever is bounded by two pairs of lines
 void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);

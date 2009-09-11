@@ -17,17 +17,15 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gdk/gdkkeysyms.h>
 #include <string.h>
-#include <math.h>
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "layer.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
-#include "mygtk.h"
 #include "inifile.h"
 #include "global.h"
 #include "viewer.h"
@@ -110,15 +108,11 @@ gboolean layers_initialized;		// Indicates if initializing is complete
 
 static void layers_update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[600], *extra = "-";
+	char txt[300], txt2[520], *extra = "-";
 
 	if ( layers_window == NULL ) return;		// Don't bother if window is not showing
 
-#if GTK_MAJOR_VERSION == 2
-	cleanse_txt( txt2, layers_filename );		// Clean up non ASCII chars
-#else
-	strcpy( txt2, layers_filename );
-#endif
+	gtkuncpy(txt2, layers_filename, 512);
 
 	if ( layers_changed == 1 ) extra = _("(Modified)");
 

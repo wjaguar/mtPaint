@@ -17,22 +17,18 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-#include <math.h>
-
 #if GTK_MAJOR_VERSION == 1
 	#include <gdk/gdkx.h>
 #endif
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"
 #include "canvas.h"
-#include "mygtk.h"
 #include "inifile.h"
 #include "layer.h"
 #include "channels.h"
@@ -101,7 +97,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	GtkWidget *vbox1, *button_close, *scrolledwindow, *col_list;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	gchar *item[1];
-	char txt[64], txt2[600];
+	char txt[64], txt2[520];
 
 	men_item_state(menu_cline, FALSE);
 	allow_cline = FALSE;
@@ -130,11 +126,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	item[0] = txt2;
 	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )
 	{
-#if GTK_MAJOR_VERSION == 2
-		cleanse_txt( txt2, global_argv[i] );			// Clean up non ASCII chars
-#else
-		strcpy( txt2, global_argv[i] );
-#endif
+		gtkuncpy(txt2, global_argv[i], 512);
 		gtk_clist_set_selectable ( GTK_CLIST(col_list),
 			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
 	}

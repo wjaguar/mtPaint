@@ -17,17 +17,15 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "inifile.h"
 #include "memory.h"
 #include "png.h"
-#include "mygtk.h"
 #include "canvas.h"
 #include "mainwindow.h"
 #include "spawn.h"

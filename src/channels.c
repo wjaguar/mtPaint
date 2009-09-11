@@ -20,13 +20,13 @@
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
 #include "inifile.h"
-#include "mygtk.h"
 #include "channels.h"
 
 int overlay_alpha = FALSE;

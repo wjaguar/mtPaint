@@ -17,17 +17,13 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-#include <math.h>
-
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
-#include "mygtk.h"
 #include "inifile.h"
 #include "layer.h"
 
@@ -316,12 +312,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	snprintf(txt, 60, "%1.1f MB", ( (float) mem_used() )/1024/1024 );
 	add_to_table( txt, table4, 0, 1, 5 );
 
-	mtMIN( maxi,
-		mt_round( ((double) mem_undo_limit*1024*1024) /
-			( mem_width * mem_height * mem_img_bpp * (layers_total+1) ) - 1.25),
-			MAX_UNDO-1 )
-
-	mtMAX( maxi, maxi, 0 )
+	maxi = rint(((double)mem_undo_limit * 1024 * 1024) /
+		(mem_width * mem_height * mem_img_bpp * (layers_total + 1)) - 1.25);
+	maxi = maxi < 0 ? 0 : maxi >= MAX_UNDO ? MAX_UNDO - 1 : maxi;
 
 	snprintf(txt, 60, "%i / %i / %i", mem_undo_done, mem_undo_redo, maxi );
 	add_to_table( txt, table4, 1, 1, 5 );

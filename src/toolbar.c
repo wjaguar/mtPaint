@@ -17,18 +17,15 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
-
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "inifile.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
-#include "mygtk.h"
 #include "toolbar.h"
 #include "layer.h"
 #include "viewer.h"
@@ -285,12 +282,8 @@ static float toolbar_get_zoom( GtkWidget *combo )
 	if ( strlen(txt) > 2)		// Weed out bogus calls
 	{
 		sscanf(txt, "%i%%", &i);
-		res = ((float) i ) / 100;
-		if ( res<1 )
-		{
-			res = mt_round( 1/res );
-			res = 1/res;
-		}
+		res = (float)i / 100;
+		if (res < 1.0) res = 1.0 / rint(1.0 / res);
 	}
 
 	return res;
@@ -399,6 +392,16 @@ static int set_smudge(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
+static int set_brush_step(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *spin;
+
+	spin = BOX_CHILD_0(box);
+	brush_spacing = read_spin(spin);
+
+	return TRUE;
+}
+
 static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -410,6 +413,14 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 
 	switch ((gint)user_data)
 	{
+	case SETB_CONT: /* Brush spacing */
+		box = gtk_vbox_new(FALSE, 5);
+		gtk_widget_show(box);
+		pack(box, add_a_spin(brush_spacing, 0, MAX_WIDTH));
+// !!! Not implemented yet
+//		add_a_toggle(_("Flat gradient strokes"), box, ???);
+		filter_window(_("Brush spacing"), box, set_brush_step, NULL, TRUE);
+		break;
 	case SETB_CSEL:
 		colour_selector(COLSEL_EDIT_CSEL);
 		break;
@@ -565,7 +576,7 @@ static GtkWidget *grad_view;
 #define _(X) X
 
 static toolbar_item settings_bar[] = {
-	{ SETB_CONT, 0, 0, 0, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
+	{ SETB_CONT, 0, 0, 1, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
 	{ SETB_OPAC, 0, 0, 0, 0, _("Opacity Mode"), xpm_mode_opac_xpm },
 	{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
 	{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },

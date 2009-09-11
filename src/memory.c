@@ -17,10 +17,10 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <png.h>
+
+#include <gtk/gtk.h>
 
 #include "global.h"
 
@@ -1397,32 +1397,23 @@ int mem_remove_unused()
 
 void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int b2 )
 {
-	int i, ls[8], tot;
+	double r0, g0, b0, dr, dg, db, d = i2 - i1;
+	int i, step = i2 > i1 ? 1 : -1;
 
-	if ( i1 < i2 )		// Switch if not in correct order
-	{
-		ls[0] = i1; ls[1] = r1; ls[2] = g1; ls[3] = b1;
-		ls[4] = i2; ls[5] = r2; ls[6] = g2; ls[7] = b2;
-	}
-	else
-	{
-		ls[4] = i1; ls[5] = r1; ls[6] = g1; ls[7] = b1;
-		ls[0] = i2; ls[1] = r2; ls[2] = g2; ls[3] = b2;
-	}
+	if (i2 == i1) return;
 
-	tot = ls[4] - ls[0];
-	if ( ls[0] != ls[4] )		// Only do something if index values are different
+	dr = (r2 - r1) / d;
+	r0 = r1 - dr * i1;
+	dg = (g2 - g1) / d;
+	g0 = g1 - dg * i1;
+	db = (b2 - b1) / d;
+	b0 = b1 - db * i1;
+
+	for (i = i1; i != i2; i += step)
 	{
-		// Change palette as requested
-		for ( i=ls[0]; i<=ls[4]; i++ )
-		{
-			mem_pal[i].red = mt_round(	((float) i - ls[0])/tot * ls[5] +
-							((float) ls[4] - i)/tot * ls[1] );
-			mem_pal[i].green = mt_round(	((float) i - ls[0])/tot * ls[6] +
-							((float) ls[4] - i)/tot * ls[2] );
-			mem_pal[i].blue = mt_round(	((float) i - ls[0])/tot * ls[7] +
-							((float) ls[4] - i)/tot * ls[3] );
-		}
+		mem_pal[i].red = rint(r0 + dr * i);
+		mem_pal[i].green = rint(g0 + dg * i);
+		mem_pal[i].blue = rint(b0 + db * i);
 	}
 }
 
@@ -2257,52 +2248,37 @@ void sline( int x1, int y1, int x2, int y2 )		// Draw single thickness straight 
 	}
 }
 
+void circle_line(int x0, int y0, int dx, int dy, int thick);
 
 void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness straight line
 {
 	linedata line;
-	int xv, yv;			// x/y vectors
-	int xv2, yv2;
 	int xdo, ydo, todo;
-	float xuv, yuv, llen;		// x/y unit vectors, line length
-	float xv1, yv1;			// vector for shadow x/y
 
 	xdo = abs(x2 - x1);
 	ydo = abs(y2 - y1);
 	todo = xdo > ydo ? xdo : ydo;
 	if (todo < 2) return;	// The 1st and last points are done by calling procedure
 
-	if (size < 2) sline(x1, y1, x2, y2);
-	/* Thick long line so use less accurate g_para */
-	if ((size > 20) && (todo > 20))
+	if (size < 2) /* One pixel wide */
 	{
-		xv = x2 - x1;
-		yv = y2 - y1;
-		llen = sqrt( xv * xv + yv * yv );
-		xuv = ((float) xv) / llen;
-		yuv = ((float) yv) / llen;
-
-		xv1 = -yuv * ((float) size - 0.5);
-		yv1 = xuv * ((float) size - 0.5);
-
-		xv2 = mt_round(xv1 / 2 + 0.5*((size+1) %2) );
-		yv2 = mt_round(yv1 / 2 + 0.5*((size+1) %2) );
-
-		xv1 = -yuv * ((float) size - 0.5);
-		yv1 = xuv * ((float) size - 0.5);
-
-		g_para( x1 - xv2, y1 - yv2, x2 - xv2, y2 - yv2,
-			mt_round(xv1), mt_round(yv1) );
+		sline(x1, y1, x2, y2);
+		return;
 	}
-	/* Short or thin line so use more accurate but slower iterative method */
-	else
-	{
-		line_init(line, x1, y1, x2, y2);
-		for (line_step(line); line[2] > 0; line_step(line))
-		{
-			f_circle(line[0], line[1], size);
-		}
-	}
+
+	/* Draw middle segment */
+	circle_line(x1, y1, x2 - x1, y2 - y1, size);
+
+	/* Add four more circles to cover all odd points */
+	if (!xdo || !ydo || (xdo == ydo)) return; /* Not needed */
+	line_init(line, x1, y1, x2, y2);
+	line_nudge(line, x1 + line[8] - 2 * line[6],
+		y1 + line[9] - 2 * line[7]); /* Jump to first diagonal step */
+	f_circle(line[0], line[1], size);
+	f_circle(line[0] - line[8], line[1] - line[9], size);
+	line_nudge(line, x2, y2); /* Jump to last diagonal step */
+	f_circle(line[0], line[1], size);
+	f_circle(line[0] - line[8], line[1] - line[9], size);
 }
 
 /* Draw whatever is bounded by two pairs of lines */
@@ -2585,55 +2561,15 @@ void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
 {
 	int i, j;
 
-	if ( x<0 )
+	w += x; h += y;
+	if (x < 0) x = 0;
+	if (y < 0) y = 0;
+	if (w > mem_width) w = mem_width;
+	if (h > mem_height) h = mem_height;
+
+	for (i = y; i < h; i++)
 	{
-		w = w + x;
-		x = 0;
-	}
-	if ( y<0 )
-	{
-		h = h + y;
-		y = 0;
-	}
-	if ( (x+w) > mem_width ) w = mem_width - x;
-	if ( (y+h) > mem_height ) h = mem_height - y;
-
-	for ( j=0; j<h; j++ )
-	{
-		for ( i=0; i<w; i++ ) put_pixel( x + i, y + j );
-	}
-}
-
-void f_circle( int x, int y, int r )				// Draw a filled circle
-{
-	float r2, r3, k;
-	int i, j, rx, ry, r4;
-	int ox = x - r/2, oy = y - r/2;
-
-	for ( j=0; j<r; j++ )
-	{
-		if ( r < 3 ) r4 = r-1;
-		else
-		{
-			if ( r>10 ) k = 0.3 + 0.4*((float) j)/(r-1);	// Better for larger
-			else k = 0.1 + 0.8*((float) j)/(r-1);		// Better for smaller
-
-			r2 = 2*(k+(float) j) / r - 1;
-
-			r3 = sqrt( 1 - r2*r2);
-			if ( r%2 == 1 ) r4 = 2*mt_round( (r-1) * r3 / 2 );
-			else
-			{
-				r4 = mt_round( (r-1) * r3 );
-				if ( r4 % 2 == 0 ) r4--;
-			}
-		}
-		ry = oy + j;
-		rx = ox + (r-r4)/2;
-		for ( i=0; i<=r4; i++)
-		{
-			IF_IN_RANGE( rx+i, ry ) put_pixel( rx+i, ry );
-		}
+		for (j = x; j < w; j++) put_pixel(j, i);
 	}
 }
 
@@ -2646,6 +2582,7 @@ static void put4pix(int dx, int dy)
 {
 	int x0, x1, y0, y1;
 
+	/* !!! Fully portable only for nonnegative coords */
 	x0 = (xc2 - dx) >> 1;
 	x1 = (xc2 + dx) >> 1;
 	y0 = (yc2 - dy) >> 1;
@@ -2658,7 +2595,7 @@ static void put4pix(int dx, int dy)
 	if (x0 != x1) put_pixel(x1, y1);
 }
 
-void trace_ellipse(int w, int h, int *left, int *right)
+static void trace_ellipse(int w, int h, int *left, int *right)
 {
 	int dx, dy;
 	double err, stx, sty, w2, h2;
@@ -2714,7 +2651,7 @@ void trace_ellipse(int w, int h, int *left, int *right)
 	if (right[1] < w - 2) right[1] = w - 2;
 }
 
-void wjellipse(int xs, int ys, int w, int h, int type, int thick)
+static void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 {
 	int i, j, k, *left, *right;
 
@@ -2768,41 +2705,92 @@ void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 	free(left);
 }
 
-void mem_ellipse( int x1, int y1, int x2, int y2, int thick, int type )		// 0=filled, 1=outline
+/* Thickness 0 means filled */
+void mem_ellipse(int x1, int y1, int x2, int y2, int thick)
 {
 	int xs, ys, xl, yl;
 
-	mtMIN( xs, x1, x2 )
-	mtMIN( ys, y1, y2 )
-	xl = abs( x2 - x1 ) + 1;
-	yl = abs( y2 - y1 ) + 1;
+	xs = x1 < x2 ? x1 : x2;
+	ys = y1 < y2 ? y1 : y2;
+	xl = abs(x2 - x1) + 1;
+	yl = abs(y2 - y1) + 1;
 
-	if ( xl <= 2 || yl <= 2 )
+	/* Draw rectangle instead if too small */
+	if ((xl <= 2) || (yl <= 2)) f_rectangle(xs, ys, xl, yl);
+	else wjellipse(xs, ys, xl, yl, thick && (thick * 2 < xl) &&
+		(thick * 2 < yl), thick);
+}
+
+static int circ_r, circ_trace[128];
+
+static void retrace_circle(int r)
+{
+	int sz, left[128];
+
+	circ_r = r--;
+	sz = ((r >> 1) + 1) * sizeof(int);
+	memset(left, 0, sz);
+	memset(circ_trace, 0, sz);
+	trace_ellipse(r, r, left, circ_trace);
+}
+
+void f_circle( int x, int y, int r )				// Draw a filled circle
+{
+	int i, j, x0, x1, y0, y1, r1 = r - 1, half = r1 & 1;
+
+	/* Prepare & cache circle contour */
+	if (circ_r != r) retrace_circle(r);
+
+	/* Draw result */
+	for (i = half; i <= r1; i += 2)
 	{
-		f_rectangle( xs, ys, xl, yl );		// Too small so draw rectangle instead
-		return;
+		y0 = y - ((i + half) >> 1);
+		y1 = y + ((i - half) >> 1);
+		if ((y0 >= mem_height) || (y1 < 0)) continue;
+
+		x0 = x - ((circ_trace[i >> 1] + half) >> 1);
+		x1 = x + ((circ_trace[i >> 1] - half) >> 1);
+		if (x0 < 0) x0 = 0;
+		if (x1 >= mem_width) x1 = mem_width - 1;
+
+		for (j = x0; j <= x1; j++)
+		{
+			if (y0 >= 0) put_pixel(j, y0);
+			if ((y1 != y0) && (y1 < mem_height)) put_pixel(j, y1);
+		}
 	}
-
-	wjellipse(xs, ys, xl, yl, type, thick);
 }
 
-void o_ellipse( int x1, int y1, int x2, int y2, int thick )	// Draw an ellipse outline
+static int find_tangent(int dx, int dy)
 {
-	if ( thick*2 > abs(x1 - x2) || thick*2 > abs(y1 - y2) )
-		mem_ellipse( x1, y1, x2, y2, thick, 0 );	// Too thick so draw filled ellipse
-	else
-		mem_ellipse( x1, y1, x2, y2, thick, 1 );
+	int i, j = 0, yy = (circ_r + 1) & 1, d, dist = 0;
+
+	dx = abs(dx); dy = abs(dy);
+	for (i = 0; i < (circ_r + 1) >> 1; i++)
+	{
+		d = (i + i + yy) * dy + circ_trace[i] * dx;
+		if (d < dist) continue;
+		dist = d;
+		j = i;
+	}
+	return (j);
 }
 
-void f_ellipse( int x1, int y1, int x2, int y2 )		// Draw a filled ellipse
+/* Draw line as if traced by circle brush */
+void circle_line(int x0, int y0, int dx, int dy, int thick)
 {
-	mem_ellipse( x1, y1, x2, y2, 0, 0 );
-}
+	int n, ix, iy, xx[2], yy[2], dt = (thick + 1) & 1;
 
-int mt_round( float n )			// Round a float to nearest whole number
-{
-	if ( n < 0 ) return ( (int) (n - 0.49999) );
-	else return ( (int) (n + 0.49999) );
+	if (circ_r != thick) retrace_circle(thick);
+	n = find_tangent(dx, dy);
+	ix = dx >= 0 ? 0 : 1;
+	iy = dy >= 0 ? 0 : 1;
+	xx[ix] = x0 - n - dt;
+	xx[ix ^ 1] = x0 + n;
+	yy[iy] = y0 + ((circ_trace[n] - dt) >> 1);
+	yy[iy ^ 1] = y0 - ((circ_trace[n] + dt) >> 1);
+
+	g_para(xx[0], yy[0], xx[1], yy[1], dx, dy);
 }
 
 int get_next_line(char *input, int length, FILE *fp)
@@ -4176,7 +4164,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
 	unsigned char *trans, int opacity, int noalpha)
 {
-	unsigned char newc, oldc;
+	unsigned char *xalpha = NULL;
 	int i, j, k, tint;
 
 	cnt = start + step * cnt;
@@ -4184,11 +4172,20 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
+	/* Use alpha as selection when pasting RGBA to RGB */
+	if (alpha && !alphar)
+	{
+		*(trans ? &xalpha : &trans) = alpha;
+		alpha = NULL;
+	}
+
 	/* Opacity mode */
 	if (opacity)
 	{
 		for (i = start; i < cnt; i += step)
 		{
+			unsigned char newc, oldc;
+
 			k = (255 - mask[i]) * opacity;
 			if (!k)
 			{
@@ -4197,9 +4194,13 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			}
 			k = (k + (k >> 8) + 1) >> 8;
 
-			if (trans)
+			if (trans) /* Have transparency mask */
 			{
-				/* Have transparency mask */
+				if (xalpha) /* Have two :-) */
+				{
+					k *= xalpha[i];
+					k = (k + (k >> 8) + 1) >> 8;
+				}
 				k *= trans[i];
 				k = (k + (k >> 8) + 1) >> 8;
 			}
@@ -4227,7 +4228,14 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	{
 		for (i = start; i < cnt; i += step)
 		{
-			if (trans) mask[i] |= trans[i] ^ 255;
+			unsigned char newc, oldc;
+
+			if (trans)
+			{
+				oldc = trans[i];
+				if (xalpha) oldc &= xalpha[i];
+				mask[i] |= oldc ^ 255;
+			}
 			if (!alpha || mask[i]) continue;
 			/* Have alpha channel - process it */
 			newc = alpha[i];
@@ -4352,8 +4360,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	}
 
 	/* Prepare alpha */
-	if (!mem_img[CHN_ALPHA]) alpha = NULL;
-	if (alpha)
+	if (alpha && mem_img[CHN_ALPHA])
 	{
 		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);
 		else old_alpha = mem_img[CHN_ALPHA];

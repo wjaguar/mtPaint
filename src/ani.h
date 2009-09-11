@@ -17,10 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
-
-
 #define MAX_CYC_SLOTS 100
 #define TOT_CYC_ITEMS 52
 // 52 = 2 items for start/finish, 50 for collection of layer #'s

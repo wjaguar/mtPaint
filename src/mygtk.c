@@ -17,14 +17,11 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-
 #include "global.h"
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
-#include "mygtk.h"
 #include "canvas.h"
 
 
@@ -437,6 +434,23 @@ char *gtkncpy(char *dest, const char *src, int cnt)
 {
 #if GTK_MAJOR_VERSION == 2
 	char *c = g_locale_from_utf8((gchar *)src, -1, NULL, NULL, NULL);
+	if (c)
+	{
+		strncpy(dest, c, cnt);
+		g_free(c);
+	}
+	else
+#endif
+	strncpy(dest, src, cnt);
+	return (dest);
+}
+
+// Wrapper for C->utf8 translation
+
+char *gtkuncpy(char *dest, const char *src, int cnt)
+{
+#if GTK_MAJOR_VERSION == 2
+	char *c = g_locale_to_utf8((gchar *)src, -1, NULL, NULL, NULL);
 	if (c)
 	{
 		strncpy(dest, c, cnt);

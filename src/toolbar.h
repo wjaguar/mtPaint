@@ -18,9 +18,6 @@
 */
 
 
-#include <gtk/gtk.h>
-
-
 //	DEFINITIONS
 
 

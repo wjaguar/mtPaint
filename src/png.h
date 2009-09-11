@@ -17,9 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
-
 //	Loading/Saving errors
 
 #define NOT_INDEXED -10

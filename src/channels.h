@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
 int overlay_alpha;
 int hide_image;
 int RGBA_mode;

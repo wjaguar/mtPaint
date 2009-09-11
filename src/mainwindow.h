@@ -18,8 +18,6 @@
 */
 
 
-#include <gtk/gtk.h>
-
 /* Keyboard action codes */
 #define ACT_QUIT	1
 #define ACT_ZOOM_IN	2

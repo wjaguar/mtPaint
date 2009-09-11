@@ -17,18 +17,15 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <math.h>
 #include <unistd.h>
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
-#include "mygtk.h"
 #include "inifile.h"
 #include "canvas.h"
 #include "quantizer.h"
@@ -59,12 +56,13 @@ int clone_x, clone_y;							// Clone offsets
 int recent_files;					// Current recent files setting
 
 gboolean show_paste,					// Show contents of clipboard while pasting
-	col_reverse = FALSE,				// Painting with right button
-	text_paste = FALSE,				// Are we pasting text?
+	col_reverse,					// Painting with right button
+	text_paste,					// Are we pasting text?
 	canvas_image_centre = TRUE,			// Are we centering the image?
 	chequers_optimize = TRUE			// Are we optimizing the chequers for speed?
 	;
 
+int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
 
 ///	STATUS BAR
 
@@ -240,7 +238,7 @@ void init_status_bar()
 }
 
 
-void commit_paste( gboolean undo )
+void commit_paste(int *update)
 {
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
 	int i, ofs = 0, ua;
@@ -267,7 +265,7 @@ void commit_paste( gboolean undo )
 	}
 	ua |= !mem_clip_alpha;
 
-	if ( undo ) mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
+	mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
 
 	/* Offset in memory */
 	if (marq_x1 < 0) ofs -= marq_x1;
@@ -287,9 +285,20 @@ void commit_paste( gboolean undo )
 	free(mask);
 	free(alpha);
 
-	update_menus();				// Update menu undo issues
-	vw_update_area(fx, fy, fw, fh);
-	main_update_area(fx, fy, fw, fh);
+	if (!update) /* Update right now */
+	{
+		update_menus();		
+		vw_update_area(fx, fy, fw, fh);
+		main_update_area(fx, fy, fw, fh);
+	}
+	else /* Accumulate update area for later */
+	{
+		fw += fx; fh += fy;
+		if (fx < update[0]) update[0] = fx;
+		if (fy < update[1]) update[1] = fy;
+		if (fw > update[2]) update[2] = fw;
+		if (fh > update[3]) update[3] = fh;
+	}
 }
 
 void paste_prepare()
@@ -804,8 +813,7 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	spot_undo(UNDO_DRAW);
-	if (!item) o_ellipse( marq_x1, marq_y1, marq_x2, marq_y2, tool_size );
-	else f_ellipse( marq_x1, marq_y1, marq_x2, marq_y2 );
+	mem_ellipse(marq_x1, marq_y1, marq_x2, marq_y2, item ? 0 : tool_size);
 	update_all_views();
 }
 
@@ -1169,24 +1177,6 @@ void init_pal()					// Initialise palette after loading
 	update_cols();
 	gtk_widget_queue_draw( drawing_palette );
 }
-
-#if GTK_MAJOR_VERSION == 2
-void cleanse_txt( char *out, char *in )		// Cleans up non ASCII chars for GTK+2
-{
-	char *c;
-
-	c = g_locale_to_utf8( (gchar *) in, -1, NULL, NULL, NULL );
-	if ( c == NULL )
-	{
-		sprintf(out, "Error in cleanse_txt using g_*_to_utf8");
-	}
-	else
-	{
-		strcpy( out, c );
-		g_free(c);
-	}
-}
-#endif
 
 void set_new_filename( char *fname )
 {
@@ -1805,7 +1795,7 @@ redo:
 
 void fs_setup(GtkWidget *fs, int action_type)
 {
-	char txt[300], txt2[300];
+	char txt[260], txt2[520];
 	GtkWidget *xtra;
 
 
@@ -1851,11 +1841,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 			DIR_SEP );		// Default
 	}
 
-#if GTK_MAJOR_VERSION == 2
-	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
-#else
-	strcpy( txt2, txt );
-#endif
+	gtkuncpy(txt2, txt, 512);
 	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
 
 	xtra = pack(GTK_FILE_SELECTION(fs)->main_vbox,
@@ -2083,23 +2069,142 @@ static void poly_add_po( int x, int y )
 	update_sel_bar();
 }
 
+static int first_point;
+
+static int tool_draw(int x, int y, int *update)
+{
+	static int ncx, ncy;
+	int minx, miny, xw, yh, ts2, tr2;
+	int i, j, k, ox, oy, px, py, rx, ry, sx, sy, off1, off2;
+
+	ts2 = tool_size >> 1;
+	tr2 = tool_size - ts2 - 1;
+	minx = x - ts2;
+	miny = y - ts2;
+	xw = yh = tool_size;
+
+	/* Save the brush coordinates for next step */
+	ox = ncx; oy = ncy;
+	ncx = x; ncy = y;
+
+	switch (tool_type)
+	{
+	case TOOL_SQUARE:
+		f_rectangle(x - ts2, y - ts2, tool_size, tool_size);
+		break;
+	case TOOL_CIRCLE:
+		f_circle(x, y, tool_size);
+		break;
+	case TOOL_HORIZONTAL:
+		miny = y; yh = 1;
+		sline(x - ts2, y, x + tr2, y);
+		break;
+	case TOOL_VERTICAL:
+		minx = x; xw = 1;
+		sline(x, y - ts2, x, y + tr2);
+		break;
+	case TOOL_SLASH:
+		sline(x + tr2, y - ts2, x - ts2, y + tr2);
+		break;
+	case TOOL_BACKSLASH:
+		sline(x - ts2, y - ts2, x + tr2, y + tr2);
+		break;
+	case TOOL_SPRAY:
+		for (j = 0; j < tool_flow; j++)
+		{
+			rx = x - ts2 + rand() % tool_size;
+			ry = y - ts2 + rand() % tool_size;
+			IF_IN_RANGE(rx, ry) put_pixel(rx, ry);
+		}
+		break;
+	case TOOL_SHUFFLE:
+		for (j = 0; j < tool_flow; j++)
+		{
+			rx = x - ts2 + rand() % tool_size;
+			ry = y - ts2 + rand() % tool_size;
+			sx = x - ts2 + rand() % tool_size;
+			sy = y - ts2 + rand() % tool_size;
+			IF_IN_RANGE(rx, ry) IF_IN_RANGE(sx, sy)
+			{
+		/* !!! Or do something for partial mask too? !!! */
+				if (pixel_protected(rx, ry) ||
+					pixel_protected(sx, sy))
+					continue;
+				off1 = rx + ry * mem_width;
+				off2 = sx + sy * mem_width;
+				if ((mem_channel == CHN_IMAGE) &&
+					RGBA_mode && mem_img[CHN_ALPHA])
+				{
+					px = mem_img[CHN_ALPHA][off1];
+					py = mem_img[CHN_ALPHA][off2];
+					mem_img[CHN_ALPHA][off1] = py;
+					mem_img[CHN_ALPHA][off2] = px;
+				}
+				k = MEM_BPP;
+				off1 *= k; off2 *= k;
+				for (i = 0; i < k; i++)
+				{
+					px = mem_img[mem_channel][off1];
+					py = mem_img[mem_channel][off2];
+					mem_img[mem_channel][off1++] = py;
+					mem_img[mem_channel][off2++] = px;
+				}
+			}
+		}
+		break;
+	case TOOL_SMUDGE:
+		if (first_point) return (FALSE);
+		mem_smudge(ox, oy, x, y);
+		break;
+	case TOOL_CLONE:
+		if (first_point || (ox != x) || (oy != y))
+			mem_clone(x + clone_x, y + clone_y, x, y);
+		else return (TRUE); /* May try again with other x & y */
+		break;
+	case TOOL_SELECT:
+	case TOOL_POLYGON:
+		/* Adjust paste location */
+		marq_x2 += x - marq_x1;
+		marq_y2 += y - marq_y1;
+		marq_x1 = x;
+		marq_y1 = y;
+
+		commit_paste(update);
+		return (TRUE); /* Area updated already */
+		break;
+	default: return (FALSE); /* Stop this nonsense now! */
+	}
+
+	/* Accumulate update info */
+	if (minx < update[0]) update[0] = minx;
+	if (miny < update[1]) update[1] = miny;
+	xw += minx; yh += miny;
+	if (xw > update[2]) update[2] = xw;
+	if (yh > update[3]) update[3] = yh;
+
+	return (TRUE);
+}
+
 void tool_action(int event, int x, int y, int button, gdouble pressure)
 {
+	static double lstep;
+	linedata ncline;
+	double len1;
+	int update_area[4];
 	int minx = -1, miny = -1, xw = -1, yh = -1;
-	int i, j, k, rx, ry, sx, sy, ts2, tr2, res;
-	int ox, oy, off1, off2;
+	int i, j, k, ts2, tr2, res, ox, oy;
 	int o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
-	int px, py, oox, ooy;	// Continuous smudge stuff
-	gboolean rmb_tool, first_point = FALSE;
+	int oox, ooy;	// Continuous smudge stuff
+	gboolean rmb_tool;
 
 	/* Does tool draw with color B when right button pressed? */
 	rmb_tool = (tool_type <= TOOL_SPRAY) || (tool_type == TOOL_FLOOD);
 
 	if (rmb_tool) tint_mode[2] = button; /* Swap tint +/- */
 
-	if ( pen_down == 0 )
+	if ((first_point = !pen_down))
 	{
-		first_point = TRUE;
+		lstep = 0.0;
 		if ((button == 3) && rmb_tool && !tint_mode[0])
 		{
 			col_reverse = TRUE;
@@ -2200,7 +2305,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
 			((button == 13) && (event == GDK_MOTION_NOTIFY))))
 		{	// User wants to commit the paste
-			commit_paste(TRUE);
+			res = 0; /* Fall through to noncontinuous tools */
 		}
 		if ( tool_type == TOOL_SELECT && button == 3 && (marq_status == MARQUEE_DONE ) )
 		{
@@ -2376,96 +2481,62 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	/* Handle non-continuous mode & tools */
 	if (!res)
 	{
-		minx = x - ts2;
-		miny = y - ts2;
-		xw = tool_size;
-		yh = tool_size;
+		update_area[0] = update_area[1] = MAX_WIDTH;
+		update_area[2] = update_area[3] = 0;
 
-		switch (tool_type)
+		/* Use marquee coords for paste */
+		i = j = 0;
+		ox = marq_x1;
+		oy = marq_y1;
+		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 		{
-		case TOOL_SQUARE:
-			f_rectangle(minx, miny, xw, yh);
-			break;
-		case TOOL_CIRCLE:
-			f_circle(x, y, tool_size);
-			break;
-		case TOOL_HORIZONTAL:
-			miny = y; yh = 1;
-			sline(x - ts2, y, x + tr2, y);
-			break;
-		case TOOL_VERTICAL:
-			minx = x; xw = 1;
-			sline(x, y - ts2, x, y + tr2);
-			break;
-		case TOOL_SLASH:
-			sline(x + tr2, y - ts2, x - ts2, y + tr2);
-			break;
-		case TOOL_BACKSLASH:
-			sline(x - ts2, y - ts2, x + tr2, y + tr2);
-			break;
-		case TOOL_SPRAY:
-			for (j = 0; j < tool_flow; j++)
-			{
-				rx = x - ts2 + rand() % tool_size;
-				ry = y - ts2 + rand() % tool_size;
-				IF_IN_RANGE(rx, ry) put_pixel(rx, ry);
-			}
-			break;
-		case TOOL_SHUFFLE:
-			for (j = 0; j < tool_flow; j++)
-			{
-				rx = x - ts2 + rand() % tool_size;
-				ry = y - ts2 + rand() % tool_size;
-				sx = x - ts2 + rand() % tool_size;
-				sy = y - ts2 + rand() % tool_size;
-				IF_IN_RANGE(rx, ry) IF_IN_RANGE(sx, sy)
-				{
-			/* !!! Or do something for partial mask too? !!! */
-					if (pixel_protected(rx, ry) ||
-						pixel_protected(sx, sy))
-						continue;
-					off1 = rx + ry * mem_width;
-					off2 = sx + sy * mem_width;
-					if ((mem_channel == CHN_IMAGE) &&
-						RGBA_mode && mem_img[CHN_ALPHA])
-					{
-						px = mem_img[CHN_ALPHA][off1];
-						py = mem_img[CHN_ALPHA][off2];
-						mem_img[CHN_ALPHA][off1] = py;
-						mem_img[CHN_ALPHA][off2] = px;
-					}
-					k = MEM_BPP;
-					off1 *= k; off2 *= k;
-					for (i = 0; i < k; i++)
-					{
-						px = mem_img[mem_channel][off1];
-						py = mem_img[mem_channel][off2];
-						mem_img[mem_channel][off1++] = py;
-						mem_img[mem_channel][off2++] = px;
-					}
-				}
-			}
-			break;
-		case TOOL_SMUDGE:
-			if (!first_point) mem_smudge(tool_ox, tool_oy, x, y);
-			break;
-		case TOOL_CLONE:
-			if (first_point || (tool_ox != x) || (tool_oy != y))
-				mem_clone(x + clone_x, y + clone_y, x, y);
-			break;
-		default: xw = yh = -1; /* Nothing was done */
-			break;
+			i = marq_x1 - x;
+			j = marq_y1 - y;
 		}
+
+		if (first_point || !brush_spacing) /* Single point */
+			tool_draw(x + i, y + j, update_area);
+		else /* Multiple points */
+		{
+			line_init(ncline, tool_ox + i, tool_oy + j, x + i, y + j);
+			i = abs(x - tool_ox);
+			j = abs(y - tool_oy);
+			len1 = sqrt(i * i + j * j) / (i > j ? i : j);
+			
+			while (TRUE)
+			{
+				if (lstep + (1.0 / 65536.0) >= brush_spacing)
+				{
+					/* Drop error for 1-pixel step */
+					lstep = brush_spacing == 1 ? 0.0 :
+						lstep - brush_spacing;
+					if (!tool_draw(ncline[0], ncline[1],
+						update_area)) break;
+				}
+				if (line_step(ncline) < 0) break;
+				lstep += len1;
+			}
+			marq_x2 += ox - marq_x1;
+			marq_y2 += oy - marq_y1;
+			marq_x1 = ox;
+			marq_y1 = oy;
+		}
+
+		/* Convert update limits */
+		minx = update_area[0];
+		miny = update_area[1];
+		xw = update_area[2] - minx;
+		yh = update_area[3] - miny;
 	}
 
-	if ((xw >= 0) && (yh >= 0)) /* Some drawing action */
+	if ((xw > 0) && (yh > 0)) /* Some drawing action */
 	{
 		if (xw + minx > mem_width) xw = mem_width - minx;
 		if (yh + miny > mem_height) yh = mem_height - miny;
 		if (minx < 0) xw += minx , minx = 0;
 		if (miny < 0) yh += miny , miny = 0;
 
-		if ((xw >= 0) && (yh >= 0))
+		if ((xw > 0) && (yh > 0))
 		{
 			main_update_area(minx, miny, xw, yh);
 			vw_update_area(minx, miny, xw, yh);
@@ -2897,7 +2968,7 @@ void men_item_visible( GtkWidget *menu_items[], gboolean state )
 
 void update_recent_files()			// Update the menu items
 {
-	char txt[64], *t, txt2[600];
+	char txt[64], *t, txt2[520];
 	int i, count;
 
 	if ( recent_files == 0 ) men_item_visible( menu_recent, FALSE );
@@ -2920,11 +2991,7 @@ void update_recent_files()			// Update the menu items
 				gtk_widget_hide( menu_recent[i] );	// Hide if empty
 			else
 			{
-#if GTK_MAJOR_VERSION == 2
-				cleanse_txt( txt2, t );		// Clean up non ASCII chars
-#else
-				strcpy( txt2, t );
-#endif
+				gtkuncpy(txt2, t, 512);
 				gtk_label_set_text( GTK_LABEL( GTK_MENU_ITEM(
 					menu_recent[i] )->item.bin.child ) , txt2 );
 				count++;

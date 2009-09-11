@@ -18,18 +18,15 @@
 */
 
 #include <stdlib.h>
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
 #include <string.h>
-#include <math.h>
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"
-#include "mygtk.h"
 #include "otherwindow.h"
 #include "inifile.h"
 #include "canvas.h"
@@ -1145,7 +1142,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 	case ACT_COMMIT:
 		if (marq_status >= MARQUEE_PASTE)
 		{
-			commit_paste(TRUE);
+			commit_paste(NULL);
 			pen_down = 0;	// Ensure each press of enter is a new undo level
 		}
 		else move_mouse(0, 0, 1);
@@ -2246,10 +2243,10 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	tlist[mem_channel] = pix;
 	clip_image = mem_clipboard;
 	clip_alpha = NULL;
-	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
+	if ((mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA])
 	{
 		clip_alpha = mem_clip_alpha;
-		if (!clip_alpha && RGBA_mode)
+		if (mem_img[CHN_ALPHA] && !clip_alpha && RGBA_mode)
 		{
 			t_alpha = malloc(l);
 			if (!t_alpha)
@@ -2266,6 +2263,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		clip_image = NULL;
 		clip_alpha = mem_clipboard;
 	}
+	if (!mem_img[CHN_ALPHA]) alpha = NULL;
 	if (clip_alpha || t_alpha) tlist[CHN_ALPHA] = alpha;
 
 	/* Setup opacity mode & mask */
@@ -3061,7 +3059,7 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			if ( marq_status >= MARQUEE_PASTE &&
 				inifile_get_gboolean( "pasteCommit", FALSE ) )
 			{
-				commit_paste(TRUE);
+				commit_paste(NULL);
 				pen_down = 0;
 			}
 
@@ -3875,13 +3873,9 @@ void setup_language()			// Change language
 
 void update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[600], *extra = "-";
+	char txt[300], txt2[520], *extra = "-";
 
-#if GTK_MAJOR_VERSION == 2
-	cleanse_txt( txt2, mem_filename );		// Clean up non ASCII chars
-#else
-	strcpy( txt2, mem_filename );
-#endif
+	gtkuncpy(txt2, mem_filename, 512);
 
 	if ( mem_changed == 1 ) extra = _("(Modified)");
 

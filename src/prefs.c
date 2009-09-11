@@ -17,10 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-#include <math.h>
-
 #include "global.h"
 #include "mygtk.h"
 #include "memory.h"

@@ -18,18 +18,15 @@
 */
 
 #include <stdlib.h>
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
 #include <string.h>
-#include <math.h>
 
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
-#include "mygtk.h"
 #include "canvas.h"
 
 #include "shifter.h"

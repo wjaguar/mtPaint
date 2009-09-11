@@ -17,7 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
 #include <png.h>
 
 

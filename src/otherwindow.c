@@ -17,18 +17,15 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <math.h>
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
 #if GTK_MAJOR_VERSION == 1
 	#include <unistd.h>
 #endif
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "otherwindow.h"
-#include "mygtk.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"

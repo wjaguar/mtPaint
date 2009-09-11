@@ -18,10 +18,12 @@
 */
 
 #include <stdlib.h>
+#include <math.h>
+
+#include <gtk/gtk.h>
 
 #include "polygon.h"
 #include "memory.h"
-#include "otherwindow.h"
 
 /* !!! Currently, poly_points should be set to 0 when there's no polygonal
  * selection, because poly_lasso() depends on that - WJ */
@@ -133,8 +135,9 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 				{
 					ratio = ( (float) j - poly_lines[i][0][1] ) /
 						( poly_lines[i][1][1] - poly_lines[i][0][1] );
-					poly_cuts[cuts++] = poly_lines[i][0][0] + mt_round(
-						ratio * ( poly_lines[i][1][0] - poly_lines[i][0][0] ) );
+					poly_cuts[cuts++] = poly_lines[i][0][0] +
+						rint(ratio * ( poly_lines[i][1][0] -
+						poly_lines[i][0][0]));
 					if ( j == poly_lines[i][0][1] )	cuts--;
 							// Don't count start point
 				}

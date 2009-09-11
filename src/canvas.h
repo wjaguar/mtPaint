@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
 float can_zoom;						// Zoom factor 1..MAX_ZOOM
 int margin_main_x, margin_main_y,			// Top left of image from top left of canvas
 	margin_view_x, margin_view_y;
@@ -29,6 +27,8 @@ int line_status, line_x1, line_y1, line_x2, line_y2;	// Line tool
 int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
 int recent_files;					// Current recent files setting
+int brush_spacing;					// Step in non-continuous mode
+
 
 #define MAX_RECENT 20
 
@@ -159,7 +159,7 @@ void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();
 void paste_prepare();
-void commit_paste(gboolean undo);
+void commit_paste(int *update);
 void canvas_undo_chores();
 
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,

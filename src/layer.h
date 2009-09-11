@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <gtk/gtk.h>
-
 #define MAX_LAYERS 100
 #define LAYERS_HEADER "# mtPaint layers"
 #define LAYERS_VERSION 1
