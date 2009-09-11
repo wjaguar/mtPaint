@@ -57,3 +57,5 @@ void memory_errors(int type);
 void gradient_setup(int mode);
 
 void pressed_skew();
+
+void bkg_setup();

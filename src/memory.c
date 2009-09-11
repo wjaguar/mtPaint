@@ -3248,12 +3248,19 @@ void mem_invert()			// Invert the palette
 	}
 	else
 	{
+		unsigned char *mask = calloc(1, mem_width);
+
 		j = mem_width * mem_height;
 		if (mem_channel == CHN_IMAGE) j *= 3;
 		img = mem_img[mem_channel];
 		for (i = 0; i < j; i++)
 		{
 			*img++ ^= 255;
+		}
+		if (mask)
+		{
+			mask_merge(mem_undo_previous(mem_channel), mem_channel, mask);
+			free(mask);
 		}
 	}
 }
@@ -6956,11 +6963,11 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 }	
 
 /* Retroactive masking - by blending with undo frame */
-static void mask_merge(unsigned char *old, int channel, unsigned char *mask)
+void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 {
 	chanlist tlist;
 	unsigned char *src, *dest, *tm, *mask0 = NULL;
-	int i, j, k, k1, k2, ofs, bpp = BPP(channel), w = mem_width * bpp;
+	int i, j, k, k1, k2, mv, ofs, bpp = BPP(channel), w = mem_width * bpp;
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	tlist[channel] = old;
@@ -6979,15 +6986,16 @@ static void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 		tm = mask;
 		for (j = 0; j < w; j += bpp , tm++)
 		{
+			mv = *tm;
 			k = dest[j];
-			k = k * 255 + (src[j] - k) * *tm;
+			k = k * 255 + (src[j] - k) * mv;
 			dest[j] = (k + (k >> 8) + 1) >> 8;
 			if (bpp == 1) continue;
 			k1 = dest[j + 1];
-			k1 = k1 * 255 + (src[j + 1] - k1) * *tm;
+			k1 = k1 * 255 + (src[j + 1] - k1) * mv;
 			dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
 			k2 = dest[j + 2];
-			k2 = k2 * 255 + (src[j + 2] - k2) * *tm;
+			k2 = k2 * 255 + (src[j + 2] - k2) * mv;
 			dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
 		}
 	}

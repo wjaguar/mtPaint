@@ -598,7 +598,7 @@ static void load_clip(int item)
 	else text_paste = TEXT_PASTE_NONE;
 
 	if (((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE)) ||
-		((tool_type == TOOL_POLYGON) && (poly_status >= POLY_NONE)))
+		((tool_type == TOOL_POLYGON) && (poly_status > POLY_NONE)))
 		pressed_select(FALSE);
 
 	update_menus();
@@ -698,8 +698,8 @@ static void quit_all(int mode)
 }
 
 /* Forward declaration */
-static void mouse_event(int event, int x0, int y0, guint state, guint button,
-	gdouble pressure, int mflag);
+static void mouse_event(int event, int xc, int yc, guint state, guint button,
+	gdouble pressure, int mflag, int dx, int dy);
 
 /* For "dual" mouse control */
 static int unreal_move, lastdx, lastdy;
@@ -709,26 +709,20 @@ static void move_mouse(int dx, int dy, int button)
 	static GdkModifierType bmasks[4] =
 		{0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK};
 	GdkModifierType state;
-	int x, y, nx, ny, zoom = 1, scale = 1;
+	int x, y, zoom = 1, scale = 1;
 
 	if (!unreal_move) lastdx = lastdy = 0;
 	if (!mem_img[CHN_IMAGE]) return;
-
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
+	dx += lastdx; dy += lastdy;
 
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
-
-	nx = ((x - margin_main_x) * zoom) / scale + lastdx + dx;
-	ny = ((y - margin_main_y) * zoom) / scale + lastdy + dy;
 
 	if (button) /* Clicks simulated without extra movements */
 	{
 		state |= bmasks[button];
-		mouse_event(GDK_BUTTON_PRESS, nx, ny, state, button, 1.0, 1);
+		mouse_event(GDK_BUTTON_PRESS, x, y, state, button, 1.0, 1, dx, dy);
 		state ^= bmasks[button];
-		mouse_event(GDK_BUTTON_RELEASE, nx, ny, state, button, 1.0, 1);
+		mouse_event(GDK_BUTTON_RELEASE, x, y, state, button, 1.0, 1, dx, dy);
 		return;
 	}
 
@@ -738,10 +732,14 @@ static void move_mouse(int dx, int dy, int button)
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
 	if (zoom > 1) /* Fine control required */
 	{
-		lastdx += dx; lastdy += dy;
-		mouse_event(GDK_MOTION_NOTIFY, nx, ny, state, button, 1.0, 1);
+		lastdx = dx; lastdy = dy;
+		mouse_event(GDK_MOTION_NOTIFY, x, y, state, button, 1.0, 1, dx, dy);
 
 		/* Nudge cursor when needed */
 		if ((abs(lastdx) >= zoom) || (abs(lastdy) >= zoom))
@@ -763,8 +761,8 @@ static void move_mouse(int dx, int dy, int button)
 		/* Simulate movement if failed to actually move mouse */
 		if (!move_mouse_relative(dx * scale, dy * scale))
 		{
-			lastdx += dx; lastdy += dy;
-			mouse_event(GDK_MOTION_NOTIFY, nx, ny, state, button, 1.0, 1);
+			lastdx = dx; lastdy = dy;
+			mouse_event(GDK_MOTION_NOTIFY, x, y, state, button, 1.0, 1, dx, dy);
 		}
 	}
 }
@@ -1356,17 +1354,27 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	return (TRUE);
 }
 
+static int get_bkg(int xc, int yc, int dclick);
+
 /* Mouse event from button/motion on the canvas */
-static void mouse_event(int event, int x0, int y0, guint state, guint button,
-	gdouble pressure, int mflag)
+static void mouse_event(int event, int xc, int yc, guint state, guint button,
+	gdouble pressure, int mflag, int dx, int dy)
 {
 	static int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
 	GdkCursor *temp_cursor = NULL;
 	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
 	int new_cursor;
-	int i, pixel, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
+	int i, pixel, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
+	int zoom = 1, scale = 1;
 
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	x0 = ((xc - margin_main_x) * zoom) / scale + dx;
+	y0 = ((yc - margin_main_y) * zoom) / scale + dy;
 
 	ox = x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
 	oy = y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
@@ -1440,7 +1448,8 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 			break;
 		}
 		if ((button != 1) && (button != 3)) break;
-		pixel = get_pixel(ox, oy);
+		pixel = get_bkg(xc + dx * scale, yc + dy * scale, event == GDK_2BUTTON_PRESS);
+		if (pixel < 0) pixel = get_pixel(ox, oy);
 		if (mem_channel != CHN_IMAGE)
 		{
 			if (button == 1)
@@ -1586,7 +1595,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 {
-	int x, y, zoom = 1, scale = 1, pflag = event->type != GDK_BUTTON_RELEASE;
+	int pflag = event->type != GDK_BUTTON_RELEASE;
 	gdouble pressure = 1.0;
 
 	if (pflag) /* For button press events only */
@@ -1610,14 +1619,8 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 #endif
 	}
 
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
-
-	x = ((int)(event->x - margin_main_x) * zoom) / scale;
-	y = ((int)(event->y - margin_main_y) * zoom) / scale;
-	mouse_event(event->type, x, y, event->state, event->button,
-		pressure, unreal_move & 1);
+	mouse_event(event->type, event->x, event->y, event->state, event->button,
+		pressure, unreal_move & 1, 0, 0);
 
 	return (pflag);
 }
@@ -1721,6 +1724,171 @@ static void render_background(unsigned char *rgb, int x0, int y0, int wid, int h
 		}
 		py ^= 1;
 	}
+}
+
+/// TRACING IMAGE
+
+unsigned char *bkg_rgb;
+int bkg_x, bkg_y, bkg_w, bkg_h, bkg_scale, bkg_flag;
+
+int config_bkg(int src)
+{
+	image_info *img;
+	int l;
+
+	if (!src) return (TRUE); // No change
+
+	// Remove old
+	free(bkg_rgb);
+	bkg_rgb = NULL;
+	bkg_w = bkg_h = 0;
+
+	img = src == 2 ? &mem_image : src == 3 ? &mem_clip : NULL;
+	if (!img || !img->img[CHN_IMAGE]) return (TRUE); // No image
+
+	l = img->width * img->height;
+	bkg_rgb = malloc(l * 3);
+	if (!bkg_rgb) return (FALSE);
+
+	if (img->bpp == 1)
+	{
+		unsigned char *src = img->img[CHN_IMAGE], *dest = bkg_rgb;
+		int i, j;
+
+		for (i = 0; i < l; i++ , dest += 3)
+		{
+			j = *src++;
+			dest[0] = mem_pal[j].red;
+			dest[1] = mem_pal[j].green;
+			dest[2] = mem_pal[j].blue;
+		}
+	}
+	else memcpy(bkg_rgb, img->img[CHN_IMAGE], l * 3);
+	bkg_w = img->width;
+	bkg_h = img->height;
+	return (TRUE);
+}
+
+static void render_bkg(rgbcontext *ctx)
+{
+	unsigned char *src, *dest;
+	int i, wx0, wy0, wx1, wy1, x0, x, y, ty, w3, l3, d0, dd, adj, bs;
+	int zoom = 1, scale = 1;
+
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	bs = bkg_scale * zoom;
+	adj = bs - scale > 0 ? bs - scale : 0;
+	wx0 = floor_div(bkg_x * scale + adj, bs) + margin_main_x;
+	wy0 = floor_div(bkg_y * scale + adj, bs) + margin_main_y;
+	wx1 = floor_div((bkg_x + bkg_w) * scale + adj, bs) + margin_main_x;
+	wy1 = floor_div((bkg_y + bkg_h) * scale + adj, bs) + margin_main_y;
+	if ((wx0 >= ctx->x1) || (wy0 >= ctx->y1) ||
+		(wx1 < ctx->x0) || (wy1 < ctx->y0)) return;
+	async_bk |= scale > 1;
+
+	dest = ctx->rgb;
+	w3 = (ctx->x1 - ctx->x0) * 3;
+	if (wx0 < ctx->x0) wx0 = ctx->x0;
+	else dest += (wx0 - ctx->x0) * 3;
+	if (wy0 < ctx->y0) wy0 = ctx->y0;
+	else dest += (wy0 - ctx->y0) * w3;
+	if (ctx->x1 < wx1) wx1 = ctx->x1;
+	if (ctx->y1 < wy1) wy1 = ctx->y1;
+	l3 = (wx1 - wx0) * 3;
+
+	d0 = (wx0 - margin_main_x) * bs;
+	x0 = floor_div(d0, scale);
+	d0 -= x0 * scale;
+	x0 -= bkg_x;
+
+	for (ty = -1 , i = wy0; i < wy1; i++)
+	{
+		y = floor_div((i - margin_main_y) * bs, scale) - bkg_y;
+		if (y != ty)
+		{
+			src = bkg_rgb + (y * bkg_w + x0) * 3;
+			for (dd = d0 , x = wx0; x < wx1; x++ , dest += 3)
+			{
+				dest[0] = src[0];
+				dest[1] = src[1];
+				dest[2] = src[2];
+				for (dd += bs; dd >= scale; dd -= scale)
+					src += 3;
+			}
+			ty = y;
+			dest += w3 - l3;
+		}
+		else
+		{
+			memcpy(dest, dest - w3, l3);
+			dest += w3;
+		}
+	}
+}
+
+static int get_bkg(int xc, int yc, int dclick)
+{
+	int xb, yb, xi, yi, x, scale;
+
+	/* No background / not RGB / wrong scale */
+	if (!bkg_flag || (mem_channel != CHN_IMAGE) || (mem_img_bpp != 3) ||
+		(can_zoom < 1.0)) return (-1);
+	scale = rint(can_zoom);
+	xi = floor_div(xc - margin_main_x, scale);
+	yi = floor_div(yc - margin_main_y, scale);
+	/* Inside image */
+	while ((xi >= 0) && (xi < mem_width) && (yi >= 0) && (yi < mem_height))
+	{
+		unsigned char *tmp;
+		double rr, gg, bb, dd;
+		int i, j, x0, y0, x1, y1;
+
+		/* Pixel must be transparent */
+		x = mem_width * yi + xi;
+		if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] &&
+			!mem_img[CHN_ALPHA][x]); // Alpha transparency
+		else if (mem_xpm_trans < 0) return (-1);
+		else if (x *= 3 , MEM_2_INT(mem_img[CHN_IMAGE], x) !=
+			PNG_2_INT(mem_pal[mem_xpm_trans])) return (-1);
+
+		/* Single clicks for single pixels */
+		if (!dclick) break;
+		x1 = (x0 = xi * bkg_scale - bkg_x) + bkg_scale;
+		y1 = (y0 = yi * bkg_scale - bkg_y) + bkg_scale;
+		if (x0 < 0) x0 = 0;
+		if (x1 > bkg_w) x1 = bkg_w;
+		if (y0 < 0) y0 = 0;
+		if (y1 > bkg_h) y1 = bkg_h;
+		/* Outside of backround */
+		if ((x0 >= x1) || (y0 >= y1)) return (-1);
+
+		/* Average (gamma corrected) background area under pixel */
+		x1 -= x0;
+		rr = gg = bb = 0.0;
+		for (i = y0; i < y1; i++)
+		{
+			tmp = bkg_rgb + (i * bkg_w + x0) * 3;
+			for (j = 0; j < x1; j++ , tmp += 3)
+			{
+				rr += gamma256[tmp[0]];
+				gg += gamma256[tmp[1]];
+				bb += gamma256[tmp[2]];
+			}
+		}
+		dd = 1.0 / (x1 * (y1 - y0));
+		rr *= dd; gg *= dd; bb *= dd;
+		return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
+	}
+	xb = floor_div((xc - margin_main_x) * bkg_scale, scale) - bkg_x;
+	yb = floor_div((yc - margin_main_y) * bkg_scale, scale) - bkg_y;
+	/* Outside of background */
+	if ((xb < 0) || (xb >= bkg_w) || (yb < 0) || (yb >= bkg_h)) return (-1);
+	x = (bkg_w * yb + xb) * 3;
+	return (MEM_2_INT(bkg_rgb, x));
 }
 
 /* This is for a faster way to pass parameters into render_row() */
@@ -2850,14 +3018,14 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	ph2 = rpy + ph - 1;
 
 	lr = layers_total && show_layers_main;
-// !!! Nondefault backrounds will be rendered here
-	if (!lr) /* Render default background if no layers shown */
+	if (bkg_flag && bkg_rgb) render_bkg(&ctx); /* Tracing image */
+	else if (!lr) /* Render default background if no layers shown */
 	{
 		if (irgb && ((mem_xpm_trans >= 0) ||
 			(!overlay_alpha && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])))
 			render_background(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw * 3);
 	}
-	else /* Render underlying layers */
+	if (lr) /* Render underlying layers */
 	{
 		if (layer_selected)
 		{
@@ -3078,7 +3246,7 @@ void repaint_perim(rgbcontext *ctx)
 
 static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
-	int x, y, rm, zoom = 1, scale = 1, button = 0;
+	int x, y, rm, button = 0;
 	GdkModifierType state;
 	gdouble pressure = 1.0;
 
@@ -3126,14 +3294,7 @@ static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
-
-	x = ((x - margin_main_x) * zoom) / scale;
-	y = ((y - margin_main_y) * zoom) / scale;
-
-	mouse_event(event->type, x, y, state, button, pressure, rm & 1);
+	mouse_event(event->type, x, y, state, button, pressure, rm & 1, 0, 0);
 
 	return TRUE;
 }
@@ -3695,6 +3856,13 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		}
 		else if (layer_selected) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
+		else if (bkg_flag)
+		{
+			/* !!! Later, maybe localize redraw to the changed part */
+			bkg_x += change * arrow_dx[dir];
+			bkg_y += change * arrow_dy[dir];
+			gtk_widget_queue_draw(drawing_canvas);
+		}
 		break;
 	case ACT_ESC:
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
@@ -3941,6 +4109,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		step_settings(); break;
 	case DLG_FILT:
 		blend_settings(); break;
+	case DLG_TRACE:
+		bkg_setup(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4436,6 +4606,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Centralize Image"), 0, MENU_CENTER, 0, NULL, ACT_CENTER, 0 },
 	{ _("/View/Show Zoom Grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
 	{ _("/View/Configure Grid ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_GRID },
+	{ _("/View/Tracing Image ..."), -1, 0, 0, NULL, DLG_TRACE, 0 },
 	{ _("/View/sep2"), -4 },
 	{ _("/View/View Window"), 0, MENU_VIEW, 0, "V", ACT_VWWIN, 0 },
 	{ _("/View/Horizontal Split"), 0, 0, 0, "H", ACT_VWSPLIT, 0 },

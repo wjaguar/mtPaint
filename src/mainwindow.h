@@ -123,6 +123,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_GRAD,
 	DLG_STEP,
 	DLG_FILT,
+	DLG_TRACE,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -137,7 +138,9 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_BACT,
 	FILT_THRES,
 	FILT_UALPHA,
-	FILT_KUWAHARA
+	FILT_KUWAHARA,
+
+	ACT_TEST /* Reserved for testing things */
 };
 
 // New layer sources for ACT_LR_ADD
@@ -238,6 +241,13 @@ enum {
 };
 
 #define MAX_RECENT 20
+
+/// TRACING IMAGE
+
+unsigned char *bkg_rgb;
+int bkg_x, bkg_y, bkg_w, bkg_h, bkg_scale, bkg_flag;
+
+int config_bkg(int src); // 0 = unchanged, 1 = none, 2 = image, 3 = clipboard
 
 /// GRID
 

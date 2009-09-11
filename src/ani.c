@@ -748,10 +748,8 @@ static void create_frames_ani()
 	ani_write_layer_data();
 	layer_press_save();		// Save layers data file
 
-	layers_filename[0] = 0;
 	command = strrchr(layers_filename, DIR_SEP);
 	if (command) l = command - layers_filename + 1;
-//	strncpy0(output_path, layers_filename, l + 1);
 
 	if (ani_output_path[0])	// Output path used?
 	{

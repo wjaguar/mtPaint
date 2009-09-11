@@ -696,7 +696,8 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 			8, settings->img[CHN_ALPHA] ? PNG_COLOR_TYPE_RGB_ALPHA :
 			PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
 			PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-		png_set_PLTE(png_ptr, info_ptr, settings->pal, settings->colors);
+		if (settings->pal) png_set_PLTE(png_ptr, info_ptr, settings->pal,
+			settings->colors);
 		/* Transparent index in use */
 		if ((settings->rgb_trans > -1) && !settings->img[CHN_ALPHA])
 		{

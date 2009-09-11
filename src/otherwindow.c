@@ -3110,3 +3110,104 @@ void pressed_skew()
 	gtk_window_set_transient_for(GTK_WINDOW(skew_window), GTK_WINDOW(main_window));
 	gtk_widget_show_all(skew_window);
 }
+
+/// TRACING IMAGE WINDOW
+
+typedef struct {
+	GtkWidget *wspin, *hspin, *xspin, *yspin, *zspin, *opt, *tog;
+	int src, x, y, scale, state;
+} bkg_widgets;
+
+static void bkg_update_widgets(bkg_widgets *bw)
+{
+	int w = 0, h = 0;
+
+	bw->src = wj_option_menu_get_history(bw->opt);
+	switch (bw->src)
+	{
+	case 0: w = bkg_w; h = bkg_h; break;
+	case 1: break;
+	case 2: w = mem_width; h = mem_height; break;
+	case 3: if (mem_clipboard) w = mem_clip_w , h = mem_clip_h;
+		break;
+	}
+
+	gtk_spin_button_set_range(GTK_SPIN_BUTTON(bw->wspin), w, w);
+	gtk_spin_button_set_range(GTK_SPIN_BUTTON(bw->hspin), h, h);
+
+	bw->x = read_spin(bw->xspin);
+	bw->y = read_spin(bw->yspin);
+	bw->scale = read_spin(bw->zspin);
+	bw->state = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(bw->tog));
+}
+
+static void click_bkg_apply(GtkWidget *widget)
+{
+	bkg_widgets *bw = gtk_object_get_user_data(GTK_OBJECT(widget));
+
+	bkg_update_widgets(bw);
+	bkg_x = bw->x;
+	bkg_y = bw->y;
+	bkg_scale = bw->scale;
+	bkg_flag = bw->state;
+	if (!config_bkg(bw->src)) memory_errors(1);
+	gtk_widget_queue_draw(drawing_canvas);
+}
+
+static void click_bkg_option(GtkMenuItem *menuitem, gpointer user_data)
+{
+	bkg_update_widgets(user_data);
+}
+
+static void click_bkg_ok(GtkWidget *widget)
+{
+	click_bkg_apply(widget);
+	gtk_widget_destroy(widget);
+}
+
+void bkg_setup()
+{
+	char *srcs[4] = { _("Unchanged"), _("None"), _("Image"), _("Clipboard") };
+	GtkWidget *win, *vbox, *table, *hbox;
+	bkg_widgets *bw;
+
+
+	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Tracing Image"), GTK_WIN_POS_CENTER, TRUE);
+	bw = bound_malloc(win, sizeof(bkg_widgets));
+	gtk_object_set_user_data(GTK_OBJECT(win), (gpointer)bw);
+
+	bw->src = 0;
+	bw->state = bkg_flag;
+
+	vbox = gtk_vbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(win), vbox);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
+
+	table = add_a_table(4, 3, 5, vbox);
+	add_to_table(_("Source"), table, 0, 0, 5);
+	add_to_table(_("Size"), table, 1, 0, 5);
+	add_to_table(_("Origin"), table, 2, 0, 5);
+	add_to_table(_("Relative scale"), table, 3, 0, 5);
+	bw->opt = wj_option_menu(srcs, 4, 0, bw, GTK_SIGNAL_FUNC(click_bkg_option));
+	gtk_table_attach(GTK_TABLE(table), bw->opt, 1, 3, 0, 1, GTK_FILL, 0, 0, 5);
+	bw->wspin = spin_to_table(table, 1, 1, 5, 0, 0, 0);
+	bw->hspin = spin_to_table(table, 1, 2, 5, 0, 0, 0);
+	GTK_WIDGET_UNSET_FLAGS(bw->wspin, GTK_CAN_FOCUS);
+	GTK_WIDGET_UNSET_FLAGS(bw->hspin, GTK_CAN_FOCUS);
+	bw->xspin = spin_to_table(table, 2, 1, 5, bkg_x, -MAX_WIDTH, MAX_WIDTH);
+	bw->yspin = spin_to_table(table, 2, 2, 5, bkg_y, -MAX_HEIGHT, MAX_HEIGHT);
+	bw->zspin = spin_to_table(table, 3, 1, 5, bkg_scale, 1, MAX_ZOOM);
+
+	bw->tog = add_a_toggle(_("Display"), vbox, bkg_flag);
+
+	add_hseparator(vbox, -2, 10);
+
+	/* Cancel / Apply / OK */
+
+	hbox = pack(vbox, OK_box(5, win, _("OK"), GTK_SIGNAL_FUNC(click_bkg_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
+	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_bkg_apply), 1);
+	bkg_update_widgets(bw);
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_widget_show_all(win);
+}

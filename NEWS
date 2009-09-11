@@ -36,12 +36,15 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Drawing in image channel with coupled alpha now ignores drawing modes for alpha channel
 	* Smudge tool now works about two times faster
 	* 12 new blend modes added
+	* Invert effect now respects masking
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste preview eliminated
-	* BUGFIX - "Remove All Layers" wilh layers window closed doesn't cause crash
+	* BUGFIX - "Remove All Layers" with layers window closed doesn't cause crash
 	* BUGFIX - Pasting in tint mode into indexed images' utility channels now works correctly
 	* BUGFIX - Gradient preview now properly shows effect of mask channel on alpha channel
 	* BUGFIX - Alt+S key now opens Selection menu as it should
+	* BUGFIX - Directory for animation frames is created relative to layers file, as it should be
+	* BUGFIX - Saving animation frames in PNG format doesn't cause crash
 
 3.21	2008-6-8
 

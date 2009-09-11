@@ -629,6 +629,9 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
 	unsigned char *alpha, unsigned char *trans, int opacity);
 
+// Retroactive masking - by blending with undo frame
+void mask_merge(unsigned char *old, int channel, unsigned char *mask);
+
 int pixel_protected(int x, int y);				// generic
 void row_protected(int x, int y, int len, unsigned char *mask);
 void put_pixel_def( int x, int y );				// generic
