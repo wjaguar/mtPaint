@@ -60,6 +60,7 @@ static inilist ini_bool[] = {
 	{ "disableTransparency", &opaque_view,		FALSE },
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "undoableLoad",	&undo_load,		FALSE },
+	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -111,7 +112,7 @@ GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS];
 
-int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
+int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
 int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
 char **global_argv;
 
@@ -3567,7 +3568,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
 			radio[items->radio_BTS] = wf.path;
 #if GTK_MAJOR_VERSION == 2
-		if ( items->xpm_icon_image )
+		if (show_menu_icons && items->xpm_icon_image)
 		{
 			wf.item_type = "<ImageItem>";
 			wf.extra_data = NULL;

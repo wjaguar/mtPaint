@@ -37,6 +37,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
+#include "fpick.h"
 
 GtkWidget *label_bar[STATUS_ITEMS];
 
@@ -1636,27 +1637,21 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static gboolean fs_destroy(GtkWidget *widget)
+static gboolean fs_destroy(GtkWidget *fs)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget), "fpicker");
-
-	win_store_pos(widget, "fs_window");
-	destroy_dialog(widget);
-	fpick_destroy(fp);
+	win_store_pos(fs, "fs_window");
+	fpick_destroy(fs);
 
 	return FALSE;
 }
 
 static void fs_ok(GtkWidget *fs)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(fs), "fpicker");
 	ls_settings settings;
 	GtkWidget *xtra, *entry;
 	char fname[PATHTXT], *msg, *f8;
 	char *c, *ext, *ext2, *tmp, *gif, *gif2;
 	int i, j;
-
-	if (!fp) return;
 
 	/* Pick up extra info */
 	xtra = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(fs)));
@@ -1670,9 +1665,7 @@ static void fs_ok(GtkWidget *fs)
 	gtk_widget_hide(fs);
 
 	/* File extension */
-//	strncpy0(fname, gtk_entry_get_text(GTK_ENTRY(
-//		GTK_FILE_SELECTION(fs)->selection_entry)), PATHTXT);
-	strncpy0(fname, fp->txt_file, 256);
+	strncpy0(fname, fpick_get_filename(fs, TRUE), PATHTXT);
 	c = strrchr(fname, '.');
 	while (TRUE)
 	{
@@ -1715,21 +1708,16 @@ static void fs_ok(GtkWidget *fs)
 			fname[i] = '.';
 			strncpy(fname + i + 1, ext, j + 1);
 		}
-//		gtk_entry_set_text(GTK_ENTRY(
-//			GTK_FILE_SELECTION(fs)->selection_entry), fname);
-		fpick_set_filename( fp, fname );
-
+		fpick_set_filename(fs, fname, TRUE);
 		break;
 	}
 
 	/* Get filename the proper way (convert it from UTF8 in GTK2/Windows,
 	 * leave it in system filename encoding on Unix) */
 #ifdef WIN32
-//	gtkncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), PATHBUF);
-	gtkncpy(fname, fp->txt_file, MIN(250,FPICK_FILENAME_MAX_LEN));
+	gtkncpy(fname, fpick_get_filename(fs, FALSE), PATHBUF);
 #else
-//	strncpy0(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), PATHBUF);
-	strncpy0(fname, fp->txt_file, MIN(250,FPICK_FILENAME_MAX_LEN));
+	strncpy0(fname, fpick_get_filename(fs, FALSE), PATHBUF);
 #endif
 
 	switch (settings.mode)
@@ -1865,8 +1853,7 @@ static void fs_ok(GtkWidget *fs)
 	}
 
 	update_menus();
-	destroy_dialog(fs);
-	fpick_destroy(fp);
+	fpick_destroy(fs);
 	return;
 redo_name:
 	f8 = gtkuncpy(NULL, fname, 0);
@@ -1875,34 +1862,15 @@ redo_name:
 	g_free(msg);
 	g_free(f8);
 redo:
-	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);
 	gtk_widget_show(fs);
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 }
 
-//void fs_setup(GtkWidget *fs, int action_type)
-void fs_setup(fpicker *fpick, int action_type)
+void fs_setup(GtkWidget *fs, int action_type)
 {
 	char txt[PATHTXT];
 	GtkWidget *xtra;
-#if GTK_MAJOR_VERSION == 1
-	GtkAccelGroup* ag = gtk_accel_group_new();
-#endif
 
-	if ((action_type == FS_SELECT_DIR) || (action_type == FS_GIF_EXPLODE))
-	{
-		fpick->allow_files = FALSE;
-		gtk_widget_hide (fpick->file_entry);
-	}
-
-	gtk_object_set_data( GTK_OBJECT(fpick->window), "fpicker", fpick );
-
-	gtk_signal_connect_object(GTK_OBJECT(fpick->ok_button),
-		"clicked", GTK_SIGNAL_FUNC(fs_ok), GTK_OBJECT(fpick->window));
-	gtk_signal_connect_object(GTK_OBJECT(fpick->cancel_button),
-		"clicked", GTK_SIGNAL_FUNC(fs_destroy), GTK_OBJECT(fpick->window));
-	gtk_signal_connect_object(GTK_OBJECT(fpick->window),
-		"delete_event", GTK_SIGNAL_FUNC(fs_destroy), GTK_OBJECT(fpick->window));
 
 	if ((action_type == FS_PNG_SAVE) && mem_filename[0])
 		strncpy(txt, mem_filename, PATHBUF);	// If we have a filename and saving
@@ -1925,14 +1893,18 @@ void fs_setup(fpicker *fpick, int action_type)
 	gtkuncpy(txt, txt, PATHTXT);
 #endif
 
-	fpick_set_filename( fpick, txt );
+	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
+	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);
 
-	xtra = pack(fpick->main_vbox, ls_settings_box(txt, action_type));
-	gtk_object_set_user_data(GTK_OBJECT(fpick->window), xtra);
+	xtra = ls_settings_box(txt, action_type);
+	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
+	fpick_setup(fs, xtra, GTK_SIGNAL_FUNC(fs_ok), GTK_SIGNAL_FUNC(fs_destroy),
+		(action_type == FS_SELECT_DIR) || (action_type == FS_GIF_EXPLODE));
+	fpick_set_filename(fs, txt, FALSE);
 
-	gtk_widget_show(fpick->window);
-
-	gtk_window_set_transient_for(GTK_WINDOW(fpick->window), GTK_WINDOW(main_window));
+	gtk_widget_show(fs);
+	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
+	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
 }
 
 void file_selector(int action_type)

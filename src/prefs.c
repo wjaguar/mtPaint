@@ -43,6 +43,9 @@ static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef,
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
+#if GTK_MAJOR_VERSION == 2
+static GtkWidget *checkbutton_menuicons;
+#endif
 static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2];
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
@@ -323,6 +326,10 @@ static void prefs_apply(GtkWidget *widget)
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_center)));
 	inifile_set_gboolean("defaultGamma",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_gamma)));
+#if GTK_MAJOR_VERSION == 2
+	show_menu_icons = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_menuicons));
+#endif
+
 
 #ifdef U_NLS
 	inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
@@ -486,7 +493,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		page, inifile_get_gboolean("centerSettings", TRUE));
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
 		page, inifile_get_gboolean("defaultGamma", FALSE));
-
+#if GTK_MAJOR_VERSION == 2
+	checkbutton_menuicons = add_a_toggle(_("Use menu icons"), page, show_menu_icons);
+#endif
 
 ///	---- TAB2 - FILES
 

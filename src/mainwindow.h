@@ -184,7 +184,7 @@ GtkWidget *main_window, *main_split,
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS];
 
-int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
+int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
 int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
 char **global_argv;
 

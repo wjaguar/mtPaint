@@ -33,8 +33,153 @@
 #include "canvas.h"
 #include "toolbar.h"
 #include "mainwindow.h"
-#include "mtlib.h"
+#include "icons.h"
+#include "fpick.h"
 
+#define FP_DATA_KEY "mtPaint.fp_data"
+
+#define FPICK_ICON_UP 0
+#define FPICK_ICON_HOME 1
+#define FPICK_ICON_DIR 2
+#define FPICK_ICON_HIDDEN 3
+#define FPICK_ICON_CASE 4
+#define FPICK_ICON_TOT 5
+
+#define FPICK_COMBO_ITEMS 16
+#define FPICK_FILENAME_MAX_LEN 512
+
+#define FPICK_CLIST_COLS 4
+#define FPICK_CLIST_COLS_HIDDEN 2			// Used for sorting file/directory names
+
+#define FPICK_CLIST_NAME 0
+#define FPICK_CLIST_TYPE 1
+#define FPICK_CLIST_SIZE 2
+#define FPICK_CLIST_DATE 3
+
+// ------ Main Data Structure ------
+
+typedef struct
+{
+	int		allow_files,			// Allow the user to select files/directories
+			allow_dirs,
+			sort_column,			// Which column is being sorted in clist
+			case_insensitive,		// For sorting
+			show_hidden
+			;
+
+	char		combo_items[FPICK_COMBO_ITEMS][FPICK_FILENAME_MAX_LEN],
+							// Stored as UTF8 in GTK+2
+			txt_directory[FPICK_FILENAME_MAX_LEN],	// Current directory - Normal C string
+			txt_file[FPICK_FILENAME_MAX_LEN]	// Full filename - Normal C string
+			;
+
+	GtkWidget	*window,			// Main window
+			*ok_button,			// OK button
+			*cancel_button,			// Cancel button
+			*main_vbox,			// For extra widgets
+			*toolbar,			// Toolbar
+			*icons[FPICK_ICON_TOT],		// Icons
+			*combo,				// List at top holding recent directories
+			*combo_entry,			// Directory entry area in combo
+			*clist,				// Containing list of files/directories
+			*sort_arrows[FPICK_CLIST_COLS+FPICK_CLIST_COLS_HIDDEN],	// Column sort arrows
+			*file_entry			// Text entry box for filename
+			;
+	GtkSortType	sort_direction;			// Sort direction of clist
+
+	GList		*combo_list;			// List of combo items
+} fpicker;
+
+
+/*
+	Add thousand separator(s) to a string containing a number, e.g.
+	str2thousands( dest, "1234567", 32, ',', '-', '.', 3, 0 );
+	Creates:
+
+	1234567		->	1,234,567
+	-123456		->	-123,456
+	-123456.7891	->	-123,456.7891
+
+
+	Can also be used to separate any text between two delimeters, e.g.
+	str2thousands( dest, "aaa>270907<bbb", 32, '-', '>', '<', 2, 0 );
+	Creates:
+
+	aaa>27-09-07<bbb
+
+*/
+
+static int str2thousands(	char *dest,		// Output buffer
+			char *src,		// Input string (can be same as destination)
+			int  dest_size,		// Size of output buffer
+			char separator,		// Separator character to use, typically ','
+			char minus,		// Minus character, typically '-'
+			char dpoint,		// Decimal point character, typically '.'
+			int  sep_num,		// Numbers to contain between separators, typically 3
+			int  right_justify	// Should output string be right justified?
+		)
+{
+	int	i, j, k, start, end, oldlen, newlen;
+	char	*ch;
+
+
+	if ( sep_num < 1 ) return -1;		// Sanity check
+
+	oldlen = strlen(src);
+	start  = 0;				// First character to be subjected to separating
+	end    = oldlen - 1;			// Last character to be subjected to separating
+
+	if ( (ch = strrchr(src, dpoint)) )	// Decimal point detected, adjust end accordingly
+		end = ch - src - 1;
+	if ( (ch = strchr(src, minus)) )	// Minus sign detected, adjust start accordingly
+		start = ch - src + 1;
+	if ( (end+1)<start ) return -1;		// Decimal point is before minus sign so bail out
+
+	newlen = oldlen + (end - start) / sep_num;
+	if ( newlen+1 > dest_size ) return -1;
+				// Output buffer is not large enough to hold the result, so bail out
+
+	i = oldlen - 1;				// Input buffer pointer
+	k = dest_size - 1;			// Output buffer pointer
+	dest[k--] = 0;				// Output string terminator
+
+	while ( i>end ) dest[k--] = src[i--];	// Copy characters from the end to the '.'
+
+	for ( j=0; i>=start; j++ )
+	{
+		if ( j && ((j % sep_num) == 0) )
+			dest[k--] = separator;	// Add separator
+
+		dest[k--] = src[i--];		// Copy char
+	}
+
+	while (i>=0) dest[k--] = src[i--];	// Copy characters from the '-' to the beginning
+
+	if ( right_justify )
+	{		 	// Right align so pad beginning of output with spaces
+		 while ( k>=0 ) dest[k--] = ' ';
+	}
+	else
+	{			// Left align so shift string flush to beginning
+		k++;
+		j = 0;
+		do	dest[j++] = dest[k++];
+		while	( dest[j-1] != 0 );
+	}
+
+	return 0;
+}
+
+static void str2lower(char *str, int len)		// Convert string to lowercase
+{
+	int i;
+
+	for (i=0; i<len; i++)
+	{
+		if ( str[i] == 0 ) break;
+		str[i] = tolower( str[i] );
+	}
+}
 
 static void fpick_sort_files(fpicker *win)
 {
@@ -54,7 +199,7 @@ static void fpick_sort_files(fpicker *win)
 
 static void fpick_column_button( GtkWidget *widget, gint col, gpointer *pointer)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget), FP_DATA_KEY);
 	GtkSortType direction;
 
 	if ( !fp || col<0 || col>=FPICK_CLIST_COLS ) return;
@@ -263,7 +408,7 @@ static void fpick_enter_dir_via_list( fpicker *fp, char *row_tex[1], char txt[3]
 static gint fpick_select_row(GtkWidget *widget, gint row, gint col, GdkEvent *event, gpointer *pointer)
 {
 	char *row_tex[1], txt[3][FPICK_FILENAME_MAX_LEN];
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget), FP_DATA_KEY);
 //printf("Select row %i\n",row);
 
 	if (!fp) return FALSE;
@@ -327,7 +472,7 @@ static void fpick_combo_check( fpicker *fp )
 
 static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), FP_DATA_KEY);
 
 	if ( !fp ) return;
 	fpick_combo_check( fp );
@@ -335,7 +480,7 @@ static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 
 static void fpick_name_activate(GtkWidget *widget, gpointer user_data)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), FP_DATA_KEY);
 
 	if ( !fp ) return;
 
@@ -345,7 +490,7 @@ static void fpick_name_activate(GtkWidget *widget, gpointer user_data)
 static void fpick_name_changed(GtkWidget *widget, gpointer user_data)
 {
 	char txt[FPICK_FILENAME_MAX_LEN];
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), FP_DATA_KEY);
 
 	if ( !fp ) return;
 
@@ -356,7 +501,7 @@ static void fpick_name_changed(GtkWidget *widget, gpointer user_data)
 
 static gint fpick_key_event(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(user_data), FP_DATA_KEY);
 
 	if ( fp && (event->keyval == GDK_KP_Enter || event->keyval == GDK_Return) )
 	{
@@ -386,7 +531,45 @@ static gint fpick_key_event(GtkWidget *widget, GdkEventKey *event, gpointer user
 	return FALSE;
 }
 
-fpicker *fpick_create( char *title )			// Initialize file picker
+#undef _
+#define _(X) X
+
+static toolbar_item fpick_bar[] = {
+	{ FPICK_ICON_UP,	-1, 0, 0, 0, _("Up"), xpm_up_xpm },
+	{ FPICK_ICON_HOME,	-1, 0, 0, 0, _("Home"), xpm_home_xpm },
+	{ FPICK_ICON_DIR,	-1, 0, 0, 0, _("Create New Directory"), xpm_newdir_xpm },
+	{ FPICK_ICON_HIDDEN,	 0, 0, 0, 0, _("Show Hidden Files"), xpm_hidden_xpm },
+	{ FPICK_ICON_CASE,	 0, 0, 0, 0, _("Case Insensitive Sort"), xpm_case_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+#undef _
+#define _(X) __(X)
+
+static void fpick_iconbar_click(GtkWidget *widget, gpointer data);
+
+static GtkWidget *fpick_toolbar(GtkWidget **wlist)
+{		
+	int i;
+	GtkWidget *toolbar;
+
+#if GTK_MAJOR_VERSION == 1
+	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#endif
+#if GTK_MAJOR_VERSION == 2
+	toolbar = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
+#endif
+	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar,
+		GTK_SIGNAL_FUNC(fpick_iconbar_click), 0, NULL, 0);
+	gtk_widget_show(toolbar);
+
+	for (i = 0; i < FPICK_ICON_TOT; i++)
+		wlist[i] = fpick_bar[i].widget;
+
+	return toolbar;
+}
+
+GtkWidget *fpick_create(char *title)			// Initialize file picker
 {
 	char txt[128], *col_titles[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
 				{ _("Name"), _("Type"), _("Size"), _("Modified"), "hidden1", "hidden2" };
@@ -407,6 +590,7 @@ fpicker *fpick_create( char *title )			// Initialize file picker
 	res->txt_file[0] = '\0';
 
 	res->window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_NONE, TRUE );
+	gtk_object_set_data(GTK_OBJECT(res->window), FP_DATA_KEY, res);
 
 	win_restore_pos(res->window, "fs_window", 0, 0, 550, 500);
 
@@ -435,7 +619,7 @@ fpicker *fpick_create( char *title )			// Initialize file picker
 		res->combo_list = g_list_append( res->combo_list, res->combo_items[i] );
 	}
 	gtk_combo_set_popdown_strings( GTK_COMBO(res->combo), res->combo_list );
-	gtk_object_set_data( GTK_OBJECT(res->combo), "fpicker", res );
+	gtk_object_set_data( GTK_OBJECT(res->combo), FP_DATA_KEY, res );
 
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(res->combo)->popwin),
 		"hide", GTK_SIGNAL_FUNC(fpick_combo_changed), res->combo);
@@ -453,7 +637,7 @@ fpicker *fpick_create( char *title )			// Initialize file picker
 
 	gtk_box_pack_start (GTK_BOX (hbox1), res->toolbar, FALSE, FALSE, 5);
 //	pack(hbox1, res->toolbar);
-	gtk_object_set_data( GTK_OBJECT(res->toolbar), "fpicker", res );
+	gtk_object_set_data( GTK_OBJECT(res->toolbar), FP_DATA_KEY, res );
 			// Set this after setting the toggles so any events are ignored
 
 	// ------- CLIST - File List -------
@@ -513,7 +697,7 @@ fpicker *fpick_create( char *title )			// Initialize file picker
 	gtk_container_add(GTK_CONTAINER( scrolledwindow1 ), res->clist);
 	gtk_widget_show( res->clist );
 
-	gtk_object_set_data( GTK_OBJECT(res->clist), "fpicker", res );
+	gtk_object_set_data( GTK_OBJECT(res->clist), FP_DATA_KEY, res );
 	gtk_signal_connect(GTK_OBJECT(res->clist), "click_column",
 		GTK_SIGNAL_FUNC(fpick_column_button), res->clist);
 	gtk_signal_connect(GTK_OBJECT(res->clist), "select_row",
@@ -565,14 +749,22 @@ fpicker *fpick_create( char *title )			// Initialize file picker
 
 	gtk_widget_grab_focus(res->file_entry);
 
-	return res;
+	return (res->window);
 }
 
-void fpick_set_filename( fpicker *win, char *name )	// Set the directory & filename
+void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 {
+	fpicker *win = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
 	int i;
 	char *c, d, txt[FPICK_FILENAME_MAX_LEN];
 
+	if (raw)
+	{
+		gtk_entry_set_text(GTK_ENTRY(win->file_entry), name);
+		return;
+	}
+
+// !!! BUG !!! - string might be constant & thus read-only
 	c = strrchr( name, DIR_SEP );
 	if (c)						// Extract filename & directory
 	{
@@ -596,11 +788,12 @@ void fpick_set_filename( fpicker *win, char *name )	// Set the directory & filen
 	}
 }
 
-void fpick_destroy( fpicker *win )			// Destroy structures and release memory
+void fpick_destroy(GtkWidget *fp)			// Destroy structures and release memory
 {
+	fpicker *win = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
 	char txt[128];
 	int i;
-	GtkCList *clist = (GtkCList *)win->clist;	// GTK_CLIST() causes warning at console
+	GtkCList *clist = GTK_CLIST(win->clist);
 	GtkCListColumn *col;
 
 	for ( i=0; i<FPICK_COMBO_ITEMS; i++ )		// Remember recently used directories
@@ -621,6 +814,7 @@ void fpick_destroy( fpicker *win )			// Destroy structures and release memory
 	inifile_set_gboolean("fpick_show_hidden", win->show_hidden );
 
 	free(win);
+	destroy_dialog(fp);
 }
 
 static void fpick_newdir_destroy( GtkWidget *widget, int *data )
@@ -717,9 +911,9 @@ static void fpick_up_directory(fpicker *fp)
 	}
 }
 
-void fpick_iconbar_click(GtkWidget *widget, gpointer data)
+static void fpick_iconbar_click(GtkWidget *widget, gpointer data)
 {
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget->parent), "fpicker");
+	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
 	char txt[2][FPICK_FILENAME_MAX_LEN];
 	gint j = (gint) data;
 
@@ -733,7 +927,7 @@ void fpick_iconbar_click(GtkWidget *widget, gpointer data)
 						FPICK_FILENAME_MAX_LEN );
 					snprintf( txt[1], FPICK_FILENAME_MAX_LEN, "%s%c%s",
 						get_home_directory(), DIR_SEP, txt[0]);
-					fpick_set_filename( fp, txt[1] );
+					fpick_set_filename(fp->window, txt[1], FALSE);
 					break;
 		case FPICK_ICON_DIR:	fpick_create_newdir(fp);
 					break;
@@ -746,4 +940,31 @@ void fpick_iconbar_click(GtkWidget *widget, gpointer data)
 					fpick_scan_directory(fp, fp->txt_directory);
 					break;
 	}
+}
+
+void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
+	GtkSignalFunc cancel_fn, int dirs_only)
+{
+	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
+
+	if (dirs_only)
+	{
+		fpick->allow_files = FALSE;
+		gtk_widget_hide(fpick->file_entry);
+	}
+	gtk_signal_connect_object(GTK_OBJECT(fpick->ok_button),
+		"clicked", ok_fn, GTK_OBJECT(fp));
+	gtk_signal_connect_object(GTK_OBJECT(fpick->cancel_button),
+		"clicked", cancel_fn, GTK_OBJECT(fp));
+	gtk_signal_connect_object(GTK_OBJECT(fpick->window),
+		"delete_event", cancel_fn, GTK_OBJECT(fp));
+	pack(fpick->main_vbox, xtra);
+}
+
+// !!! Encoding???
+const char *fpick_get_filename(GtkWidget *fp, int raw)
+{
+	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
+	if (raw) return (gtk_entry_get_text(GTK_ENTRY(fpick->file_entry)));
+	return (fpick->txt_file);
 }

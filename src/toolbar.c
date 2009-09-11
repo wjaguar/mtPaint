@@ -55,19 +55,6 @@ static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
 static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
 					// RGB colours, tool, pattern preview
 
-typedef struct
-{
-	unsigned char ID;
-	signed char radio;
-	unsigned char sep, rclick;
-	int actmap;
-	char *tooltip, **xpm;
-	GtkWidget *widget;
-} toolbar_item;
-
-static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
-	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase);
-
 #undef _
 #define _(X) X
 
@@ -79,15 +66,7 @@ static toolbar_item layer_bar[] = {
 	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
 	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
 	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }},
-	fpick_bar[] = {
-	{ FPICK_ICON_UP,	-1, 0, 0, 0, _("Up"), xpm_up_xpm },
-	{ FPICK_ICON_HOME,	-1, 0, 0, 0, _("Home"), xpm_home_xpm },
-	{ FPICK_ICON_DIR,	-1, 0, 0, 0, _("Create New Directory"), xpm_newdir_xpm },
-	{ FPICK_ICON_HIDDEN,	 0, 0, 0, 0, _("Show Hidden Files"), xpm_hidden_xpm },
-	{ FPICK_ICON_CASE,	 0, 0, 0, 0, _("Case Insensitive Sort"), xpm_case_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }}
-	;
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
 
 #undef _
 #define _(X) __(X)
@@ -111,28 +90,6 @@ GtkWidget *layer_toolbar(GtkWidget **wlist)
 
 	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
 		wlist[i] = layer_bar[i].widget;
-
-	return toolbar;
-}
-
-GtkWidget *fpick_toolbar(GtkWidget **wlist)
-{		
-	int i;
-	GtkWidget *toolbar;
-
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
-#endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar,
-		GTK_SIGNAL_FUNC(fpick_iconbar_click), 0, NULL, 0);
-	gtk_widget_show(toolbar);
-
-	for (i = 0; i < FPICK_ICON_TOT; i++)
-		wlist[i] = fpick_bar[i].widget;
 
 	return toolbar;
 }
@@ -468,7 +425,7 @@ static void toolbar_settings_exit()
 	toolbar_exit();
 }
 
-static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
+void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase)
 {
 	GtkWidget *iconw, *radio[32];

@@ -24,6 +24,7 @@
 #include "mainwindow.h"
 #include "canvas.h"
 #include "inifile.h"
+#include "fpick.h"
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 #include <X11/Xlib.h>
@@ -740,13 +741,12 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
-	fpicker *fp;
+	GtkWidget *fs;
 
-	fp = fpick_create((char *)gtk_object_get_user_data(
-		GTK_OBJECT(widget)));
-	gtk_object_set_data(GTK_OBJECT(fp->window), FS_ENTRY_KEY,
+	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)));
+	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
 		BOX_CHILD_0(widget->parent));
-	fs_setup(fp, (int)data);
+	fs_setup(fs, (int)data);
 }
 
 GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
