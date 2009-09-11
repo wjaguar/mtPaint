@@ -3,8 +3,8 @@
 
 echo
 
-MT_V="3.09.01"
-MT_DATE="2007-01-04"
+MT_V="3.09.02"
+MT_DATE="2007-01-12"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -18,6 +18,13 @@ BIN_INSTALL=
 MAKE_DIRS=src
 ICON_SET=icons1
 
+STATIC_PNG=
+STATIC_JPEG=
+STATIC_TIFF=
+STATIC_GIF=
+AS_NEEDED=
+IMAGE_LIBDIR=
+
 GTK_FILE=_conf.txt
 
 CFLAG=
@@ -25,6 +32,38 @@ MARCH=
 OPTS=YES
 DEBUG=NO
 HELP=1
+
+L_EX=
+STATIC_LAST=
+# Called with lib ID & static mode
+function LIB_NAME ()
+{
+	if [ "$IMAGE_LIBDIR" ]
+	then
+		L_EX="$L_EX ${IMAGE_LIBDIR}/lib$1"
+		if [ "$2" ]
+		then
+			L_EX="${L_EX}.a"
+		else
+			L_EX="${L_EX}.so"
+		fi
+	else
+		if [ "$2" ]
+		then
+			if [ -z "$STATIC_LAST" ]
+			then
+				L_EX="$L_EX -Wl,-dn"
+			fi
+		else
+			if [ "$STATIC_LAST" ]
+			then
+				L_EX="$L_EX -Wl,-dy"
+			fi
+		fi
+		L_EX="$L_EX -l$1"
+	fi
+	STATIC_LAST=$2
+}
 
 if [ "$OSTYPE" == "msys" ]
 then
@@ -87,14 +126,20 @@ do
 				rm -rf slack
 				rm -f *.tgz
 				exit;;
+		"staticpng" )	STATIC_PNG=PNG;;
 		"GIF" )		NGIF=GIF;;
 		"gif" )		NGIF=YES;;
 		"nogif" )	NGIF=NO;;
+		"staticgif" )	STATIC_GIF=GIF;;
 		"jpeg" )	NJPEG=YES;;
 		"nojpeg" )	NJPEG=NO;;
+		"staticjpeg" )	STATIC_JPEG=JPEG;;
 		"tiff" )	NTIFF=YES;;
 		"notiff" )	NTIFF=NO;;
+		"statictiff" )	STATIC_TIFF=TIFF;;
+		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
 		"slow" )	OPTS=NO;;
+		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
 		"debug" )	DEBUG=YES;;
 		"gtk1" )	GTK=1;;
 		"gtk2" )	GTK=2;;
@@ -152,12 +197,12 @@ do
 				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V*/
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man
+
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man asneeded staticgif
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
-				cp -ar ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-
+				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
 				make install
 				cp doc/slack-desc slack/install/
 				cd slack
@@ -165,21 +210,37 @@ do
 				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
 				./configure flush
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1
+
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 asneeded staticgif
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
-				cp -ar ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-
+				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
 				make install
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
-				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
+				makepkg --chown y $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
 				./configure flush
 
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man GIF staticgif --libdir=`pwd`/ubuntulib
+				make
+				mkdir -p slack/install/
+				mkdir -p slack/usr/share/doc/mtpaint/
+				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/share/doc/mtpaint/
+				make install
+				cp doc/slack-desc slack/install/
+				cd slack
+				makepkg --chown y $I_DIR/mtpaint-$MT_V.tgz
+				cd ..
+				./configure flush
+
+				cp doc/alien-desc "$I_DIR"
 				cd "$I_DIR"
+				export EMAIL="mtpaint-user@lists.sourceforge.net"
+				alien -d --version=$MT_V --description="`cat alien-desc`" mtpaint-$MT_V.tgz
+				rename -2_all _i486 *.deb
 				chown mark *
 				chgrp users *
 				exit;;
@@ -204,14 +265,20 @@ then
 	echo "486 ............. Target 486 machines"
 	echo "386 ............. Target 386 machines"
 	echo "slow ............ Don't use compiler optimizations"
+	echo "asneeded ........ Use linker optimization --as-needed"
 	echo
+	echo "staticpng ....... Statically link PNG library"
 	echo "GIF ............. Use libgif"
 	echo "gif ............. Use libungif"
 	echo "nogif ........... Don't use libgif and libungif"
+	echo "staticgif ....... Statically link GIF library"
 	echo "jpeg ............ Use libjpeg"
 	echo "nojpeg .......... Don't use libjpeg"
+	echo "staticjpeg ...... Statically link JPEG library"
 	echo "tiff ............ Use libtiff"
 	echo "notiff .......... Don't use libtiff"
+	echo "statictiff ...... Statically link TIFF library"
+	echo "--libdir=DIR .... DIR = location of image library files to use for cross-compilation"
 	echo
 	echo "flush ........... Flush directories to initial state"
 	echo "debug ........... Include debugging info in binary"
@@ -278,27 +345,38 @@ else
 		fi
 	fi
 
-	L_EX=
+	if [ "$IMAGE_LIBDIR" ]
+	then
+		AS_NEEDED="-Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
+	fi
+
+	L_EX=$AS_NEEDED
 	I_EX=
 	if [ "$NGIF" != "NO" ]
 	then
 		if [ "$NGIF" == "GIF" ]
 		then
-			L_EX="$L_EX -lgif"
+			LIB_NAME gif "$STATIC_GIF"
 		else
-			L_EX="$L_EX -lungif"
+			LIB_NAME ungif "$STATIC_GIF"
 		fi
 		I_EX="$I_EX -DU_GIF"
 	fi
 	if [ "$NJPEG" == "YES" ]
 	then
-		L_EX="$L_EX -ljpeg"
+		LIB_NAME jpeg "$STATIC_JPEG"
 		I_EX="$I_EX -DU_JPEG"
 	fi
 	if [ "$NTIFF" == "YES" ]
 	then
-		L_EX="$L_EX -ltiff"
+		LIB_NAME tiff "$STATIC_TIFF"
 		I_EX="$I_EX -DU_TIFF"
+	fi
+	LIB_NAME png "$STATIC_PNG"
+	LIB_NAME z "$STATIC_PNG"
+	if [ "$STATIC_LAST" ] && [ -z "$IMAGE_LIBDIR" ]
+	then
+		L_EX="$L_EX -Wl,-dy"
 	fi
 
 	if [ "$DEBUG" == NO ]
@@ -380,7 +458,7 @@ then
 	echo "MARCH target        $MARCH"
 	echo
 fi
-	echo "Optimizations       $OPTS"
+	echo "Optimizations       $OPTS $AS_NEEDED"
 fi
 	echo
 	echo "Debug info          $DEBUG"
@@ -412,6 +490,28 @@ fi
 if [ "$MT_CUSTOM" ]
 then
 	echo "Customized for      $MT_CUSTOM"
+	echo
+fi
+if [ "$STATIC_PNG" ] || [ "$STATIC_GIF" ] || [ "$STATIC_JPEG" ] || [ "$STATIC_TIFF" ]
+then
+	echo -n "Static libraries    "
+	if [ "$STATIC_PNG" ]
+	then
+		echo -n "$STATIC_PNG "
+	fi
+	if [ "$STATIC_GIF" ]
+	then
+		echo -n "$STATIC_GIF "
+	fi
+	if [ "$STATIC_JPEG" ]
+	then
+		echo -n "$STATIC_JPEG "
+	fi
+	if [ "$STATIC_TIFF" ]
+	then
+		echo -n "$STATIC_TIFF "
+	fi
+	echo
 	echo
 fi
 	echo "Icon set            $ICON_SET"

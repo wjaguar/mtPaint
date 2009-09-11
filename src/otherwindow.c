@@ -1008,6 +1008,10 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (brcosa_window);
 	gtk_window_add_accel_group(GTK_WINDOW (brcosa_window), ag);
 
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_queue_resize(brcosa_window); /* Reset shortened sliders */
+#endif
+
 	click_brcosa_preview_toggle( NULL, NULL, NULL );		// Show/hide preview button
 	brcosa_buttons_sensitive();					// Disable buttons
 	gtk_window_set_transient_for( GTK_WINDOW(brcosa_window), GTK_WINDOW(main_window) );
@@ -2748,6 +2752,10 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
 		grad_ed_opt = sw = wj_option_menu(interp, 4, 0, NULL,
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
+		/* Protect sliders from option menu in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+		sw = widget_align_minsize(sw, 0, 0);
+#endif
 	}
 	else /* Indexed / utility / opacity */
 	{
@@ -2771,10 +2779,10 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	/* Gradient bar */
 
-	hbox = gtk_hbox_new(TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	hbox2 = gtk_hbox_new(TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(mainbox), hbox2, FALSE, FALSE, 0);
 	grad_ed_left = btn = gtk_button_new();
-	gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
 		GTK_SHADOW_NONE));
 	gtk_widget_set_sensitive(btn, FALSE);
@@ -2785,7 +2793,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	{
 		grad_ed_bar[i] = btn = gtk_radio_button_new_from_widget(
 			GTK_RADIO_BUTTON_0(btn));
-		gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+		gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
 			GTK_SIGNAL_FUNC(grad_edit_slot), (gpointer)i);
@@ -2796,20 +2804,25 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 			GTK_SIGNAL_FUNC(grad_draw_slot), (gpointer)i);
 	}
 	grad_ed_right = btn = gtk_button_new();
-	gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
 		GTK_SHADOW_NONE));
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)1);
 
-	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
+	hbox2 = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(mainbox), hbox2, FALSE, FALSE, 0);
 
 	grad_load_slot(0);
 
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(grad_window));
 	gtk_widget_show_all(win);
+
+	/* Protect sliders from option menu in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+	gtk_container_set_resize_mode(GTK_CONTAINER(hbox), GTK_RESIZE_QUEUE);
+#endif
 }
 
 #define NUM_GTYPES 6

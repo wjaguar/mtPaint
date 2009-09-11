@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2877,6 +2877,7 @@ int detect_image_format(char *name)
 
 #define HANDBOOK_BROWSER "firefox"
 #define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
+#define HANDBOOK_LOCATION2 "/usr/share/doc/mtpaint/index.html"
 
 #include <unistd.h>
 #include <errno.h>
@@ -2951,7 +2952,11 @@ int show_html(char *browser, char *docs)
 		docs = buf;
 	}
 #else /* Linux */
-	if (!docs || !docs[0]) docs = HANDBOOK_LOCATION;
+	if (!docs || !docs[0])
+	{
+		docs = HANDBOOK_LOCATION;
+		if (!file_exists(docs)) docs = HANDBOOK_LOCATION2;
+	}
 #endif
 	else docs = gtkncpy(buf, docs, 260);
 

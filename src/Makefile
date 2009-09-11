@@ -1,7 +1,7 @@
 include ../_conf.txt
 
 CFLAGS = $(CFLAG)
-LDFLAGS = $(LDFLAG) -lpng -lz $(GLIB_LIB)
+LDFLAGS = $(LDFLAG) $(GLIB_LIB)
 
 BIN = mtpaint
 
