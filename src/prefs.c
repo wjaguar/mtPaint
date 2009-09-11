@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -438,7 +438,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
-	char *tab_tex2[] = { _("XPM/PNG transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
+	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
 		_("JPEG Save Quality (100=High)   "), _("Recently Used Files") };
 	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),

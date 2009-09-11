@@ -394,6 +394,15 @@ static gint ts_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 }
 
 
+static void toolbar_settings_exit()
+{
+	toolbar_status[TOOLBAR_SETTINGS] = FALSE;
+	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(toolbar_menu_widgets[TOOLBAR_SETTINGS]),
+			FALSE );
+	toolbar_exit();
+}
+
+
 static void toolbar_settings_init()
 {
 	int i, j, vals[] = {tool_size, tool_flow, tool_opacity};
@@ -505,7 +514,7 @@ static void toolbar_settings_init()
 	}
 
 	gtk_signal_connect_object (GTK_OBJECT (toolbar_boxes[TOOLBAR_SETTINGS]), "delete_event",
-		GTK_SIGNAL_FUNC (toolbar_exit), NULL);
+		GTK_SIGNAL_FUNC (toolbar_settings_exit), NULL);
 	gtk_window_set_transient_for( GTK_WINDOW(toolbar_boxes[TOOLBAR_SETTINGS]),
 		GTK_WINDOW(main_window) );
 
