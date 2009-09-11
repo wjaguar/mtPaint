@@ -538,7 +538,7 @@ void csel_init()
 {
 	csel_info *info;
 
-	info = ALIGNTO(calloc(1, sizeof(csel_info) + sizeof(double)), double);
+	info = ALIGN(calloc(1, sizeof(csel_info) + sizeof(double)));
 	if (!info)
 	{
 		memory_errors(1);

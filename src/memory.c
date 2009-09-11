@@ -318,13 +318,14 @@ void *multialloc(int align, void *ptr, int size, ...)
 	tmp = res = calloc(1, sz);
 	if (res)
 	{
-		if (align) tmp = ALIGNTO(tmp, double);
-		*(void **)ptr = (void *)tmp; tmp += size;
+		if (align) tmp = ALIGN(tmp);
+		*(void **)ptr = (void *)tmp; sz = size;
 		va_start(args, size);
 		while ((ptr = va_arg(args, void *)))
 		{
-			if (align) tmp = ALIGNTO(tmp, double);
-			*(void **)ptr = (void *)tmp; tmp += va_arg(args, int);
+			if (align) sz = (sz + (sizeof(double) - 1)) & ~(sizeof(double) - 1);
+			*(void **)ptr = (void *)(tmp + sz);
+			sz += va_arg(args, int);
 		}
 		va_end(args);
 	}
@@ -2583,10 +2584,10 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 		free(ddata2);
 		return (1);
 	}
-	row0 = ALIGNTO(ddata1, double);
+	row0 = ALIGN(ddata1);
 	row1 = row0 + rlen;
 	row2 = row1 + rlen;
-	ctp = ALIGNTO(ddata2, double);
+	ctp = ALIGN(ddata2);
 
 	if ((progress = mem_width * mem_height > 1000000))
 		progress_init(_("Converting to Indexed Palette"), 0);
@@ -3363,9 +3364,9 @@ int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
 
 /* Intersect outer & inner rectangle, write out 1 to 5 rectangles the outer one
  * separates into, return number of outer rectangles */
-int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi)
+int clip4(int *rect04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi)
 {
-	int *p = xywh04 + 4;
+	int *p = rect04 + 4;
 	int xo1 = xo + wo, yo1 = yo + ho, xi1 = xi + wi, yi1 = yi + hi;
 
 	// Whole outer rectangle
@@ -3373,7 +3374,7 @@ int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, i
 	// No intersection
 	if ((xi >= xo1) || (yi >= yo1) || (xo >= xi1) || (yo >= yi1))
 	{
-		xywh04[0] = xi; xywh04[1] = yi; xywh04[2] = xywh04[3] = 0;
+		rect04[0] = xi; rect04[1] = yi; rect04[2] = rect04[3] = 0;
 		return (1);
 	}
 	if (yi > yo) // Top rectangle
@@ -3391,10 +3392,10 @@ int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, i
 	else xi1 = xo1;
 	wi = xi1 - xi;
 	// Clipped inner rectangle
-	xywh04[0] = xi; xywh04[1] = yi; xywh04[2] = wi; xywh04[3] = hi;
+	rect04[0] = xi; rect04[1] = yi; rect04[2] = wi; rect04[3] = hi;
 
 	// Number of outer rectangles
-	return ((p - xywh04 - 4) >> 2);
+	return ((p - rect04 - 4) >> 2);
 }
 
 void line_init(linedata line, int x0, int y0, int x1, int y1)
@@ -3586,22 +3587,22 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv )
 
 /* Shapeburst engine */
 
-int sb_xywh[4];
+int sb_rect[4];
 static unsigned short *sb_buf;
 
 static void put_pixel_sb(int x, int y)
 {
 	int j, x1, y1;
 
-	x1 = x - sb_xywh[0];
-	y1 = y - sb_xywh[1];
-	if ((x1 < 0) || (x1 >= sb_xywh[2]) || (y1 < 0) || (y1 >= sb_xywh[3]))
+	x1 = x - sb_rect[0];
+	y1 = y - sb_rect[1];
+	if ((x1 < 0) || (x1 >= sb_rect[2]) || (y1 < 0) || (y1 >= sb_rect[3]))
 		return;
 
 	j = pixel_protected(x, y);
 	if (mem_img_bpp == 1 ? j : j == 255) return;
 
-	sb_buf[y1 * sb_xywh[2] + x1] = 0xFFFF;
+	sb_buf[y1 * sb_rect[2] + x1] = 0xFFFF;
 }
 
 /* Distance transform of binary image map;
@@ -3643,7 +3644,7 @@ static int shapeburst(int w, int h, unsigned short *dmap)
 
 int init_sb()
 {
-	sb_buf = calloc(sb_xywh[2] * sb_xywh[3], sizeof(unsigned short));
+	sb_buf = calloc(sb_rect[2] * sb_rect[3], sizeof(unsigned short));
 	if (!sb_buf)
 	{
 		memory_errors(1);
@@ -3662,7 +3663,7 @@ void render_sb()
 
 	if (!sb_buf) return; /* Uninitialized */
 	put_pixel = put_pixel_def;
-	maxd = shapeburst(sb_xywh[2], sb_xywh[3], sb_buf);
+	maxd = shapeburst(sb_rect[2], sb_rect[3], sb_buf);
 	if (maxd) /* Have something to draw */
 	{
 		svpath = grad_path;
@@ -3672,11 +3673,11 @@ void render_sb()
 		grad_update(grad);
 
 		tmp = sb_buf;
-		x1 = sb_xywh[0] + sb_xywh[2];
-		y1 = sb_xywh[1] + sb_xywh[3];
-		for (i = sb_xywh[1]; i < y1; i++)
+		x1 = sb_rect[0] + sb_rect[2];
+		y1 = sb_rect[1] + sb_rect[3];
+		for (i = sb_rect[1]; i < y1; i++)
 		{
-			for (j = sb_xywh[0]; j < x1; j++ , tmp++)
+			for (j = sb_rect[0]; j < x1; j++ , tmp++)
 			{
 				if (!(k = *tmp)) continue;
 				grad_path = k - 1;
@@ -3737,8 +3738,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	if (flood_step && ((mem_channel == CHN_IMAGE) || flood_img))
 	{
 		if (flood_slide) fmode = flood_cube ? 2 : 3;
-		else flood_data = ALIGNTO(tmp = calloc(1, sizeof(csel_info)
-			+ sizeof(double)), double);
+		else flood_data = ALIGN(tmp = calloc(1, sizeof(csel_info) + sizeof(double)));
 		if (flood_data)
 		{
 			flood_data->center = get_pixel_RGB(x, y);
@@ -3891,20 +3891,20 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 }
 
 /* Determine bitmap boundaries */
-static int bitmap_bounds(int *xywh, unsigned char *pat, int lw)
+static int bitmap_bounds(int *rect, unsigned char *pat, int lw)
 {
 	unsigned char buf[MAX_WIDTH / 8], *tmp;
 	int i, j, k, x0, x1, y0, y1, w, h;
 
 	/* Find top row */
-	k = lw * xywh[3];
+	k = lw * rect[3];
 	tmp = pat; i = k;
 	while (!*tmp++ && i--);
 	if (i <= 0) return (0); /* Nothing there */
 	y0 = y1 = (tmp - pat - 1) / lw;
 
 	/* Find bottom row */
-	for (j = y0 + 1; j < xywh[3]; j++)
+	for (j = y0 + 1; j < rect[3]; j++)
 	{
 		tmp = pat + j * lw; i = lw;
 		while (!*tmp++ && i--);
@@ -3921,11 +3921,11 @@ static int bitmap_bounds(int *xywh, unsigned char *pat, int lw)
 	for (x0 = 0; !buf[x0] && (x0 < lw); x0++);
 	for (x1 = lw - 1; !buf[x1] && (x1 > x0); x1--);
 	x0 *= 8; x1 = x1 * 8 + 8;
-	if (x1 > xywh[2]) x1 = xywh[2];
+	if (x1 > rect[2]) x1 = rect[2];
 
 	/* Set up boundaries */
-	xywh[0] += x0; xywh[1] += y0;
-	xywh[2] = w = x1 - x0; xywh[3] = h = y1 - y0;
+	rect[0] += x0; rect[1] += y0;
+	rect[2] = w = x1 - x0; rect[3] = h = y1 - y0;
 	return (w * h);
 }
 
@@ -3958,10 +3958,10 @@ void flood_fill(int x, int y, unsigned int target)
 	{
 		if (sb) /* Shapeburst - setup rendering backbuffer */
 		{
-			sb_xywh[0] = sb_xywh[1] = 0;
-			sb_xywh[2] = mem_width;
-			sb_xywh[3] = mem_height;
-			l = bitmap_bounds(sb_xywh, pat, lw);
+			sb_rect[0] = sb_rect[1] = 0;
+			sb_rect[2] = mem_width;
+			sb_rect[3] = mem_height;
+			l = bitmap_bounds(sb_rect, pat, lw);
 			if (!l) break; /* Nothing to draw */
 			if (!init_sb()) break; /* Not enough memory */
 		}
@@ -4155,8 +4155,8 @@ void mem_ellipse(int x1, int y1, int x2, int y2, int thick)
 	/* Shapeburst mode */
 	if (mem_gradient && (gradient[mem_channel].status == GRAD_NONE))
 	{
-		sb_xywh[0] = xs; sb_xywh[1] = ys;
-		sb_xywh[2] = xl; sb_xywh[3] = yl;
+		sb_rect[0] = xs; sb_rect[1] = ys;
+		sb_rect[2] = xl; sb_rect[3] = yl;
 		sb = init_sb();
 	}
 
@@ -4970,7 +4970,7 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 	double *wrk, *wrka, *work_area;
 	int i, j, cc, bpp, gc, tmask;
 
-	work_area = ALIGNTO(ctx->workarea, double);
+	work_area = ALIGN(ctx->workarea);
 	tmask = new_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] ? CMASK_RGBA : CMASK_NONE;
 
 	/* For each destination line */
@@ -6608,23 +6608,47 @@ static void vert_gauss(unsigned char *chan, int w, int h, int y, double *temp,
 typedef struct {
 	double *gaussX, *gaussY, *tmp, *temp;
 	unsigned char *mask;
-	int lenX, lenY, *idxx, *idx;
+	int lenX, lenY, *idx;
 } gaussd;
+
+/* Extend horizontal array, using precomputed indices */
+static void gauss_extend(gaussd *gd, double *temp, int w, int bpp)
+{
+	double *dest, *src;
+	int i, l = gd->lenX - 1, *tp = gd->idx;
+
+	dest = temp - l * bpp;
+	while (TRUE)
+	{
+		for (i = 0; i < l; i++ , dest += bpp)
+		{
+			src = temp + *tp++ * bpp;
+			dest[0] = src[0];
+			if (bpp == 1) continue;
+			dest[1] = src[1];
+			dest[2] = src[2];
+		}
+		if (dest != temp) break; // "w * bpp" is definitely nonzero
+		dest += w * bpp;
+	}
+}
 
 /* Most-used variables are local to inner blocks to shorten their live ranges -
  * otherwise stupid compilers might allocate them to memory */
 static void gauss_filter(gaussd *gd, int channel, int gcor)
 {
-	int i, wid, bpp, lenX = gd->lenX, *idx = gd->idx;
-	double sum, sum0, sum1, sum2, *temp = gd->temp, *gaussX = gd->gaussX;
+	int i, wid, bpp, lenX = gd->lenX;
+	double sum, sum0, sum1, sum2, *temp, *gaussX = gd->gaussX;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
 	bpp = BPP(channel);
 	wid = mem_width * bpp;
 	chan = mem_undo_previous(channel);
+	temp = gd->temp + (lenX - 1) * bpp;
 	for (i = 0; i < mem_height; i++)
 	{
 		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
+		gauss_extend(gd, temp, mem_width, bpp);
 		row_protected(0, i, mem_width, mask);
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
@@ -6637,11 +6661,11 @@ static void gauss_filter(gaussd *gd, int channel, int gcor)
 				sum0 = temp[j] * gaussX[0];
 				sum1 = temp[j + 1] * gaussX[0];
 				sum2 = temp[j + 2] * gaussX[0];
+				x1 = x2 = j;
 				for (k = 1; k < lenX; k++)
 				{
 					double gv = gaussX[k];
-					x1 = idx[jj - k] * 3;
-					x2 = idx[jj + k] * 3;
+					x1 -= 3; x2 += 3;
 					sum0 += (temp[x1] + temp[x2]) * gv;
 					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gv;
 					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gv;
@@ -6676,8 +6700,7 @@ static void gauss_filter(gaussd *gd, int channel, int gcor)
 				sum = temp[j] * gaussX[0];
 				for (k = 1; k < lenX; k++)
 				{
-					sum += (temp[idx[j - k]] +
-						temp[idx[j + k]]) * gaussX[k];
+					sum += (temp[j - k] + temp[j + k]) * gaussX[k];
 				}
 				k0 = rint(sum);
 				k0 = k0 * 255 + (dest[j] - k0) * mask[j];
@@ -6693,7 +6716,7 @@ static void gauss_filter(gaussd *gd, int channel, int gcor)
  * out for dumb compiler to get acceptable code out of it */
 static void gauss_filter_rgba(gaussd *gd, int gcor)
 {
-	int i, mh2, lenX = gd->lenX, lenY = gd->lenY, *idx = gd->idx;
+	int i, mh2, lenX = gd->lenX, lenY = gd->lenY;
 	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussX, *gaussY;
 	unsigned char *chan, *dest, *alpha, *dsta, *mask = gd->mask;
 
@@ -6701,12 +6724,12 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 	alpha = mem_undo_previous(CHN_ALPHA);
 	gaussX = gd->gaussX;
 	gaussY = gd->gaussY;
-	temp = gd->temp;
+	temp = gd->temp + (lenX - 1) * 3;
 	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
 
 	/* Set up the main row buffer and process the image */
-	tmpa = temp + mem_width * 3;
-	atmp = tmpa + mem_width * 3;
+	tmpa = temp + mem_width * 3 + (lenX - 1) * (3 + 3);
+	atmp = tmpa + mem_width * 3 + (lenX - 1) * (3 + 1);
 	for (i = 0; i < mem_height; i++)
 	{
 		/* Apply vertical filter */
@@ -6817,6 +6840,9 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 				}
 			}
 		}
+		gauss_extend(gd, temp, mem_width, 3);
+		gauss_extend(gd, tmpa, mem_width, 3);
+		gauss_extend(gd, atmp, mem_width, 1);
 		row_protected(0, i, mem_width, mask);
 		dest = mem_img[CHN_IMAGE] + i * mem_width * 3;
 		dsta = mem_img[CHN_ALPHA] + i * mem_width;
@@ -6830,7 +6856,7 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 				sum = atmp[j] * gaussX[0];
 				for (k = 1; k < lenX; k++)
 				{
-					sum += (atmp[idx[j - k]] + atmp[idx[j + k]]) * gaussX[k];
+					sum += (atmp[j - k] + atmp[j + k]) * gaussX[k];
 				}
 				kk = mask[j];
 				k = rint(sum);
@@ -6847,11 +6873,11 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 				sum = src[jj] * gaussX[0];
 				sum1 = src[jj + 1] * gaussX[0];
 				sum2 = src[jj + 2] * gaussX[0];
+				x1 = x2 = jj;
 				for (k = 1; k < lenX; k++)
 				{
 					double gv = gaussX[k];
-					x1 = idx[j - k] * 3;
-					x2 = idx[j + k] * 3;
+					x1 -= 3; x2 += 3;
 					sum += (src[x1] + src[x2]) * gv;
 					sum1 += (src[x1 + 1] + src[x2 + 1]) * gv;
 					sum2 += (src[x1 + 2] + src[x2 + 2]) * gv;
@@ -6885,7 +6911,7 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	int mode)
 {
-	int i, j, k, l, lenX, lenY, w = mem_width * MEM_BPP;
+	int i, j, k, l, lenX, lenY, w, bpp = MEM_BPP;
 	double sum, exkX, exkY, *gauss;
 
 	/* Cutoff point is where gaussian becomes < 1/255 */
@@ -6895,15 +6921,17 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	exkY = -log(255.0) / ((radiusY + 1.0) * (radiusY + 1.0));
 
 	/* Allocate memory */
-	if (mode == 1) i = mem_width * 7;	/* Extra linebuffer for RGBA */
-	else if (mode == 2) i = w + w;		/* Extra buffer in DoG mode */
-	else i = w;
+	if (mode == 1) i = 7;			/* Extra linebuffer for RGBA */
+	else if (mode == 2) i = bpp + bpp;	/* Extra buffer in DoG mode */
+	else i = bpp;
+	l = 2 * (lenX - 1);
+	w = mem_width + l;
 
 	gd->tmp = multialloc(TRUE,
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
-		&gd->temp, i * sizeof(double),
-		&gd->idxx, (mem_width + 2 * (lenX - 1)) * sizeof(int),
+		&gd->temp, i * w * sizeof(double),
+		&gd->idx, l * sizeof(int),
 		&gd->mask, mem_width, NULL);
 	if (!gd->tmp) return (FALSE);
 
@@ -6926,15 +6954,18 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	}
 
 	/* Prepare horizontal indices, assuming mirror boundary */
-	l = lenX - 1;
-	gd->idx = gd->idxx + l; // To simplify addressing
-	if (mem_width > 1) // Else don't run horizontal pass
+	if (mem_width > 1) // Else, good already (zeroed out)
 	{
+		int *idx = gd->idx + lenX - 1; // To simplify indexing
+
 		k = 2 * mem_width - 2;
-		for (i = -l; i < mem_width + l; i++)
+		for (i = 1; i < lenX; i++)
 		{
-			j = abs(i) % k;
-			gd->idx[i] = j < mem_width ? j : k - j;
+			j = i % k;
+			idx[-i] = j < mem_width ? j : k - j;
+			j = (mem_width + i - 1) % k;
+			idx[i - 1] = j < mem_width ? j : k - j;
+
 		}
 	}
 	return (TRUE);
@@ -6976,16 +7007,18 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 static void unsharp_filter(gaussd *gd, double amount, int threshold,
 	int channel, int gcor)
 {
-	int i, wid, bpp, lenX = gd->lenX, *idx = gd->idx;
-	double sum, sum1, sum2, *temp = gd->temp, *gaussX = gd->gaussX;
+	int i, wid, bpp, lenX = gd->lenX;
+	double sum, sum1, sum2, *temp, *gaussX = gd->gaussX;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
 	bpp = BPP(channel);
 	wid = mem_width * bpp;
 	chan = mem_undo_previous(channel);
+	temp = gd->temp + (lenX - 1) * bpp;
 	for (i = 0; i < mem_height; i++)
 	{
 		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
+		gauss_extend(gd, temp, mem_width, bpp);
 		row_protected(0, i, mem_width, mask);
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
@@ -6998,11 +7031,11 @@ static void unsharp_filter(gaussd *gd, double amount, int threshold,
 				sum = temp[j] * gaussX[0];
 				sum1 = temp[j + 1] * gaussX[0];
 				sum2 = temp[j + 2] * gaussX[0];
+				x1 = x2 = j;
 				for (k = 1; k < lenX; k++)
 				{
 					double gv = gaussX[k];
-					x1 = idx[jj - k] * 3;
-					x2 = idx[jj + k] * 3;
+					x1 -= 3; x2 += 3;
 					sum += (temp[x1] + temp[x2]) * gv;
 					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gv;
 					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gv;
@@ -7072,8 +7105,7 @@ static void unsharp_filter(gaussd *gd, double amount, int threshold,
 				sum = temp[j] * gaussX[0];
 				for (k = 1; k < lenX; k++)
 				{
-					sum += (temp[idx[j - k]] +
-						temp[idx[j + k]]) * gaussX[k];
+					sum += (temp[j - k] + temp[j + k]) * gaussX[k];
 				}
 				k = rint(sum);
 				/* Threshold */
@@ -7155,16 +7187,20 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 static void dog_filter(gaussd *gd, int channel, int norm, int gcor)
 {
 	int i, bpp = BPP(channel), wid = mem_width * bpp;
-	int lenW = gd->lenX, lenN = gd->lenY, *idx = gd->idx;
-	double sum, sum1, sum2, *tmp1 = gd->temp, *tmp2 = gd->temp + wid;
+	int lenW = gd->lenX, lenN = gd->lenY;
+	double sum, sum1, sum2, *tmp1, *tmp2;
 	double *gaussW = gd->gaussX, *gaussN = gd->gaussY;
 	unsigned char *chan, *dest;
 
 	chan = mem_undo_previous(channel);
+	tmp1 = gd->temp + (lenW - 1) * bpp;
+	tmp2 = tmp1 + wid + (lenW - 1) * bpp * 2;
 	for (i = 0; i < mem_height; i++)
 	{
 		vert_gauss(chan, wid, mem_height, i, tmp1, gaussW, lenW, gcor);
 		vert_gauss(chan, wid, mem_height, i, tmp2, gaussN, lenN, gcor);
+		gauss_extend(gd, tmp1, mem_width, bpp);
+		gauss_extend(gd, tmp2, mem_width, bpp);
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
 		{
@@ -7172,26 +7208,28 @@ static void dog_filter(gaussd *gd, int channel, int norm, int gcor)
 
 			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
 			{
+				int x1, x2, x3, x4;
+
 				sum = tmp1[j] * gaussW[0] - tmp2[j] * gaussN[0];
 				sum1 = tmp1[j + 1] * gaussW[0] - tmp2[j + 1] * gaussN[0];
 				sum2 = tmp1[j + 2] * gaussW[0] - tmp2[j + 2] * gaussN[0];
+				x1 = x2 = j;
 				for (k = 1; k < lenW; k++)
 				{
 					double gv = gaussW[k];
-					int x1 = idx[jj - k] * 3;
-					int x2 = idx[jj + k] * 3;
+					x1 -= 3; x2 += 3;
 					sum += (tmp1[x1] + tmp1[x2]) * gv;
 					sum1 += (tmp1[x1 + 1] + tmp1[x2 + 1]) * gv;
 					sum2 += (tmp1[x1 + 2] + tmp1[x2 + 2]) * gv;
 				}
+				x3 = x4 = j;
 				for (k = 1; k < lenN; k++)
 				{
 					double gv = gaussN[k];
-					int x1 = idx[jj - k] * 3;
-					int x2 = idx[jj + k] * 3;
-					sum -= (tmp2[x1] + tmp2[x2]) * gv;
-					sum1 -= (tmp2[x1 + 1] + tmp2[x2 + 1]) * gv;
-					sum2 -= (tmp2[x1 + 2] + tmp2[x2 + 2]) * gv;
+					x3 -= 3; x4 += 3;
+					sum -= (tmp2[x3] + tmp2[x4]) * gv;
+					sum1 -= (tmp2[x3 + 1] + tmp2[x4 + 1]) * gv;
+					sum2 -= (tmp2[x3 + 2] + tmp2[x4 + 2]) * gv;
 				}
 				if (gcor)
 				{
@@ -7229,13 +7267,11 @@ static void dog_filter(gaussd *gd, int channel, int norm, int gcor)
 				sum = tmp1[j] * gaussW[0] - tmp2[j] * gaussN[0];
 				for (k = 1; k < lenW; k++)
 				{
-					sum += (tmp1[idx[j - k]] +
-						tmp1[idx[j + k]]) * gaussW[k];
+					sum += (tmp1[j - k] + tmp1[j + k]) * gaussW[k];
 				}
 				for (k = 1; k < lenN; k++)
 				{
-					sum -= (tmp2[idx[j - k]] +
-						tmp2[idx[j + k]]) * gaussN[k];
+					sum -= (tmp2[j - k] + tmp2[j + k]) * gaussN[k];
 				}
 				k = rint(sum);
 				dest[j] = k < 0 ? 0 : k;
@@ -7291,6 +7327,84 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 	free(gd.tmp);
 }
 
+
+static void mem_nearest_rgb(unsigned char *dest, unsigned char *src,
+	unsigned char *map, int w, int h, int r, int gcor)
+{
+	unsigned char *found;
+	int x0, x1, y0, y1, x, y;
+
+
+	for (y = 0; y < h; y++)
+	{
+		y0 = y - r < 0 ? 0 : y - r;
+		y1 = y + r > h ? h : y + r;
+		for (x = 0; x < w; x++)
+		{
+			x0 = x - r < 0 ? 0 : x - r;
+			x1 = x + r > w ? w : x + r;
+
+			found = NULL;
+			if (gcor) /* Gamma corrected */
+			{
+				unsigned char *tmp;
+				double d, rr, gg, bb;
+				int i, j;
+
+				d = 100.0; // More than 3*1.0^2
+				rr = gamma256[src[0]];
+				gg = gamma256[src[1]];
+				bb = gamma256[src[2]];
+				src += 3;
+
+				for (i = y0; i < y1; i++)
+				{
+					tmp = map + (i * w + x0) * 3;
+					for (j = x0; j < x1; j++ , tmp += 3)
+					{
+						double d2, dr, dg, db;
+
+						dr = gamma256[tmp[0]] - rr;
+						dg = gamma256[tmp[1]] - gg;
+						db = gamma256[tmp[2]] - bb;
+						d2 = dr * dr + dg * dg + db * db;
+						if (d2 >= d) continue;
+						found = tmp; d = d2;
+					}
+				}
+			}
+			else /* Raw RGB */
+			{
+				unsigned char *tmp;
+				int i, j, d, d2, rr, gg, bb;
+
+				d = 1000000; // More than 3*255^2
+				rr = src[0];
+				gg = src[1];
+				bb = src[2];
+				src += 3;
+
+				for (i = y0; i < y1; i++)
+				{
+					tmp = map + (i * w + x0) * 3;
+					for (j = x0; j < x1; j++ , tmp += 3)
+					{
+						d2 = (rr - tmp[0]) * (rr - tmp[0]) +
+							(gg - tmp[1]) * (gg - tmp[1]) +
+							(bb - tmp[2]) * (bb - tmp[2]);
+						if (d2 >= d) continue;
+						found = tmp; d = d2;
+					}
+				}
+			}
+
+			dest[0] = found[0];
+			dest[1] = found[1];
+			dest[2] = found[2];
+			dest += 3;
+		}
+	}
+}
 
 /* !!! Kuwahara-Nagao filter's radius is limited to 255, to use byte offsets */
 typedef struct {
@@ -7435,10 +7549,10 @@ static int idx2row(int idx)
 }
 
 /* RGB only - cannot be generalized without speed loss */
-void mem_kuwahara(int r, int gcor)
+void mem_kuwahara(int r, int gcor, int detail)
 {
 	kuwahara_info info;
-	unsigned char *mem, *src, *dest, *mask, *tms, *tmp;
+	unsigned char *mem, *src, *dest, *mask, *tms, *tmp, *timg;
 	int i, j, k, l, ir, len, rl, r1 = r + 1;
 	int w = mem_width * 3, ch = mem_channel;
 	double r2i = 1.0 / (double)(r1 * r1);
@@ -7455,7 +7569,9 @@ void mem_kuwahara(int r, int gcor)
 		&info.dis, l * r1 * 3 * sizeof(int),
 		&info.idx, len * sizeof(int),
 		&info.min, l * r1,
-		&mask, mem_width, NULL);
+		&mask, mem_width,
+		&timg, detail ? mem_height * w : 0,
+		NULL);
 	if (!mem)
 	{
 		memory_errors(1);
@@ -7478,7 +7594,7 @@ void mem_kuwahara(int r, int gcor)
 
 	mem_channel = CHN_IMAGE; // For row_protected()
 	src = mem_undo_previous(CHN_IMAGE);
-	dest = mem_img[CHN_IMAGE];
+	dest = detail ? timg : mem_img[CHN_IMAGE];
 	/* Initialize the bottom sum */
 	for (i = -r; i <= 0; i++)
 		kuwahara_row(src + idx2row(i) * w, 0, TRUE, &info);
@@ -7554,6 +7670,11 @@ void mem_kuwahara(int r, int gcor)
 		kuwahara_min(jp, &info);
 		ir = (ir + 1) % r1;
 	}
+
+	/* Find nearest RGB in 3x3 square */
+	if (detail) mem_nearest_rgb(mem_img[CHN_IMAGE], src, dest,
+		mem_width, mem_height, 1, gcor);
+
 	mem_channel = ch;
 
 	progress_end();

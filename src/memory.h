@@ -389,7 +389,7 @@ void (*put_pixel)(int x, int y);
 int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy);
 
 	// Intersect outer & inner rectangle, write out what it separates into
-int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi);
+int clip4(int *rect04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi);
 
 /// Line iterator
 
@@ -470,7 +470,7 @@ void mem_bacteria( int val );			// Apply bacteria effect val times the canvas ar
 void mem_gauss(double radiusX, double radiusY, int gcor);
 void mem_unsharp(double radius, double amount, int threshold, int gcor);
 void mem_dog(double radiusW, double radiusN, int norm, int gcor);
-void mem_kuwahara(int r, int gcor);
+void mem_kuwahara(int r, int gcor, int detail);
 
 
 /// PALETTE PROCS
@@ -560,7 +560,7 @@ void *mem_try_malloc(size_t size);
 
 //// Drawing Primitives
 
-int sb_xywh[4];				// Backbuffer placement
+int sb_rect[4];				// Backbuffer placement
 int init_sb();				// Create shapeburst backbuffer
 void render_sb();			// Render from shapeburst backbuffer
 
@@ -688,9 +688,10 @@ int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int 
  * alignment; this macro serves as part of a workaround for that problem
  */
 #ifdef WIN32
-#define ALIGNTO(p,s) ((void *)(((int)(p) + sizeof(s) - 1) & (-sizeof(s))))
+/* In Win32, pointers fit into ints */
+#define ALIGN(p) ((void *)(((int)(p) + sizeof(double) - 1) & (-sizeof(double))))
 #else
-#define ALIGNTO(p,s) ((void *)(p))
+#define ALIGN(p) ((void *)(p))
 #endif
 
 /* x87 FPU uses long doubles internally, which may cause calculation results

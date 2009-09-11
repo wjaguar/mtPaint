@@ -1418,8 +1418,8 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 	gdk_window_set_back_pixmap(widget->window, NULL, TRUE);
 	if (draw_pmap) // To prevent blinking, clear just the outside part
 	{
-		int n, xywh04[5 * 4], *p = xywh04;
-		n = clip4(xywh04, area->x, area->y, area->width, area->height,
+		int n, rect04[5 * 4], *p = rect04;
+		n = clip4(rect04, area->x, area->y, area->width, area->height,
 			pdest.x, pdest.y, pdest.width, pdest.height);
 		while (n--)
 		{
@@ -2713,6 +2713,7 @@ typedef struct
 	GtkAdjustment	*adjustments[2];
 	GdkGC		*scroll_gc;	// For scrolling in GTK+1
 	int		xy[4];		// Viewport
+	int		size[2];	// Requested (virtual) size
 	int		resize;		// Resize was requested
 	int		resizing;	// Requested resize is happening
 } wjcanvas;
@@ -2818,7 +2819,7 @@ static int wjcanvas_readjust(wjcanvas *canvas, int which)
 
 	oldv = adj->value;
 	wp = which ? widget->allocation.height : widget->allocation.width;
-	sz = which ? widget->requisition.height : widget->requisition.width;
+	sz = canvas->size[which];
 	if (sz < wp) sz = wp;
 	adj->page_size = wp;
 	adj->step_increment = wp * 0.1;
@@ -3128,18 +3129,72 @@ GtkWidget *wjcanvas_new()
 
 void wjcanvas_size(GtkWidget *widget, int width, int height)
 {
-	if (!IS_WJCANVAS(widget) || ((widget->requisition.width == width) &&
-		(widget->requisition.height == height))) return;
+	wjcanvas *canvas;
 
-	WJCANVAS(widget)->resize = TRUE;
+	if (!IS_WJCANVAS(widget)) return;
+	canvas = WJCANVAS(widget);
+	if ((canvas->size[0] == width) && (canvas->size[1] == height)) return;
+	canvas->size[0] = width;
+	canvas->size[1] = height;
+	canvas->resize = TRUE;
+#if GTK_MAJOR_VERSION == 1
+	/* !!! The fields are limited to 16-bit signed, and the values aren't */
+	widget->requisition.width = MIN(width, 32767);
+	widget->requisition.height = MIN(height, 32767);
+#else /* if GTK_MAJOR_VERSION == 2 */
 	widget->requisition.width = width;
 	widget->requisition.height = height;
+#endif
 	gtk_widget_queue_resize(widget);
 }
 
 void wjcanvas_get_vport(GtkWidget *widget, int *vport)
 {
 	copy4(vport, WJCANVAS(widget)->xy);
+}
+
+static int wjcanvas_offset(GtkAdjustment *adj, int dv)
+{
+	double nv, up;
+	int step, dw = dv;
+
+	step = (int)(adj->step_increment + 0.5);
+	if (step)
+	{
+		dw = abs(dw) + step - 1;
+		dw -= dw % step;
+		if (dv < 0) dw = -dw;
+	}
+
+	up = adj->upper - adj->page_size;
+	nv = adj->value + dw;
+	if (nv > up) nv = up;
+	if (nv < 0.0) nv = 0.0;
+	up = adj->value;
+	adj->value = nv;
+	return (up != nv);
+}
+
+int wjcanvas_scroll_in(GtkWidget *widget, int x, int y)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int dx = 0, dy = 0;
+
+	if (!canvas->adjustments[0] || !canvas->adjustments[1]) return (FALSE);
+
+	if (x < canvas->xy[0]) dx = (x < 0 ? 0 : x) - canvas->xy[0];
+	else if (x >= canvas->xy[2]) dx = (x >= canvas->size[0] ?
+		canvas->size[0] : x + 1) - canvas->xy[2];
+	if (y < canvas->xy[1]) dy = (y < 0 ? 0 : y) - canvas->xy[1];
+	else if (y >= canvas->xy[3]) dy = (y >= canvas->size[1] ?
+		canvas->size[1] : y + 1) - canvas->xy[3];
+	if (!(dx | dy)) return (FALSE);
+
+	dx = wjcanvas_offset(canvas->adjustments[0], dx);
+	dy = wjcanvas_offset(canvas->adjustments[1], dy);
+	if (dx) gtk_adjustment_value_changed(canvas->adjustments[0]);
+	if (dy) gtk_adjustment_value_changed(canvas->adjustments[1]);
+	return (dx | dy);
 }
 
 // Repaint expose region

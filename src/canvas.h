@@ -110,18 +110,14 @@ int	col_reverse,					// Painting with right button
 int do_a_load( char *fname );
 void align_size(float new_zoom);
 void realign_size();
-int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
 void init_ls_settings(ls_settings *settings, GtkWidget *box);
 void fs_setup(GtkWidget *fs, int action_type);
 void file_selector( int action_type );
-void init_pal();			// Initialise palette after loading/palette changes
-void update_cols();
 void set_new_filename(int layer, char *fname);
 
 void main_undo();
 void main_redo();
 
-void choose_pattern();					// Bring up pattern chooser
 void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!
 void update_menus();					// Update undo/edit menu
 
@@ -170,7 +166,7 @@ void pressed_rotate_free();
 
 void iso_trans(int mode);
 
-void update_paste_chunk( int x1, int y1, int x2, int y2 );
+void marquee_at(int *rect);			// Read marquee location & size
 void check_marquee();
 void commit_paste(int swap, int *update);
 

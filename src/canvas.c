@@ -98,42 +98,39 @@ static void update_image_bar()
 void update_sel_bar()			// Update selection stats on status bar
 {
 	char txt[64] = "";
-	int x1, y1, w, h;
+	int rect[4];
 	float lang, llen;
 	grad_info *grad = gradient + mem_channel;
 
 
 	if (!status_on[STATUS_SELEGEOM]) return;
 
-	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+	if ((((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
+		(marq_status > MARQUEE_NONE)) ||
+		((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE)))
 	{
-		if ( marq_status > MARQUEE_NONE )
+		if (tool_type == TOOL_GRADIENT)
 		{
-			x1 = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-			y1 = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-			w = abs(marq_x2 - marq_x1) + 1;
-			h = abs(marq_y2 - marq_y1) + 1;
+			copy4(rect, grad->xy);
+			rect[2] -= rect[0];
+			rect[3] -= rect[1];
+			lang = (180.0 / M_PI) * atan2(rect[2], -rect[3]);
+		}
+		else
+		{
+			marquee_at(rect);
 			lang = (180.0 / M_PI) * atan2(marq_x2 - marq_x1,
 				marq_y1 - marq_y2);
-			llen = sqrt(w * w + h * h);
-			snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
-				x1, y1, w, h, lang, llen);
 		}
-		else if (tool_type == TOOL_POLYGON)
-		{
-			snprintf(txt, 60, "  (%i)%c", poly_points,
-				poly_status != POLY_DONE ? '+' : '\0');
-		}
+		llen = sqrt(rect[2] * rect[2] + rect[3] * rect[3]);
+		snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
+			rect[0], rect[1], rect[2], rect[3], lang, llen);
 	}
 
-	else if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
+	else if (tool_type == TOOL_POLYGON)
 	{
-		w = grad->xy[2] - grad->xy[0];
-		h = grad->xy[3] - grad->xy[1];
-		lang = (180.0 / M_PI) * atan2(w, -h);
-		llen = sqrt(w * w + h * h);
-		snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
-			grad->xy[0], grad->xy[1], w, h, lang, llen);
+		snprintf(txt, 60, "  (%i)%c", poly_points,
+			poly_status != POLY_DONE ? '+' : '\0');
 	}
 
 	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
@@ -230,7 +227,7 @@ void commit_paste(int swap, int *update)
 {
 	image_info ti;
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
-	int i, ua, cmask, op, upd = UPD_IMGP, ofs = 0, fail = TRUE;
+	int i, ua, cmask, op, ofs, upd = UPD_IMGP, fail = TRUE;
 	unsigned char *image, *mask, *alpha = NULL;
 
 	fx = marq_x1 > 0 ? marq_x1 : 0;
@@ -263,8 +260,7 @@ void commit_paste(int swap, int *update)
 	}
 
 	/* Offset in memory */
-	if (marq_x1 < 0) ofs -= marq_x1;
-	if (marq_y1 < 0) ofs -= marq_y1 * mem_clip_w;
+	ofs = (fy - marq_y1) * mem_clip_w + (fx - marq_x1);
 	image = mem_clipboard + ofs * mem_clip_bpp;
 
 	mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
@@ -541,14 +537,16 @@ void pressed_dog()
 
 static int do_kuwahara(GtkWidget *box, gpointer fdata)
 {
-	GtkWidget *spin = BOX_CHILD_0(box), *gamma = BOX_CHILD_1(box);
-	int r, gcor;
+	GtkWidget *spin = BOX_CHILD_0(box), *tog = BOX_CHILD_1(box);
+	GtkWidget *gamma = BOX_CHILD_2(box);
+	int r, detail, gcor;
 
 	r = read_spin(spin);
+	detail = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(tog));
 	gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gamma));
 
 	spot_undo(UNDO_COL); // Always processes RGB image channel
-	mem_kuwahara(r, gcor);
+	mem_kuwahara(r, gcor, detail);
 	mem_undo_prepare();
 
 	return (TRUE);
@@ -561,6 +559,7 @@ void pressed_kuwahara()
 	box = gtk_vbox_new(FALSE, 5);
 	gtk_widget_show(box);
 	pack(box, add_a_spin(1, 1, 127));
+	add_a_toggle(_("Protect details"), box, FALSE);
 	pack(box, gamma_toggle());
 	filter_window(_("Kuwahara-Nagao Blur"), box, do_kuwahara, NULL, FALSE);
 }
@@ -814,7 +813,7 @@ void pressed_paste(int centre)
 
 void pressed_rectangle(int filled)
 {
-	int x, y, w, h, sb, l2;
+	int sb;
 
 	spot_undo(UNDO_DRAW);
 
@@ -825,13 +824,14 @@ void pressed_rectangle(int filled)
 	{
 		if (sb)
 		{
-			l2 = tool_size >> 1;
-			sb_xywh[0] = poly_min_x > l2 ? poly_min_x - l2 : 0;
-			sb_xywh[1] = poly_min_y > l2 ? poly_min_y - l2 : 0;
-			sb_xywh[2] = (poly_max_x + l2 > mem_width ?
-				poly_max_x + l2 : mem_width) - sb_xywh[0];
-			sb_xywh[3] = (poly_max_y + l2 > mem_height ?
-				poly_max_y + l2 : mem_height) - sb_xywh[1];
+			int l2, l3, ixy[4] = { 0, 0, mem_width, mem_height };
+
+			l2 = l3 = filled ? 1 : tool_size;
+			l2 >>= 1; l3 -= l2;
+			clip(sb_rect, poly_min_x - l2, poly_min_y - l2,
+				poly_max_x + l3, poly_max_y + l3, ixy);
+			sb_rect[2] -= sb_rect[0];
+			sb_rect[3] -= sb_rect[1];
 			sb = init_sb();
 		}
 		if (!filled) poly_outline();
@@ -839,27 +839,27 @@ void pressed_rectangle(int filled)
 	}
 	else
 	{
-		x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-		w = abs(marq_x1 - marq_x2) + 1;
-		h = abs(marq_y1 - marq_y2) + 1;
+		int l2 = 2 * tool_size, rect[4];
 
+		marquee_at(rect);
 		if (sb)
 		{
-			sb_xywh[0] = x; sb_xywh[1] = y;
-			sb_xywh[2] = w; sb_xywh[3] = h;
+			copy4(sb_rect, rect);
 			sb = init_sb();
 		}
 
-		if (filled || (2 * tool_size >= w) || (2 * tool_size >= h))
-			f_rectangle(x, y, w, h);
+		if (filled || (l2 >= rect[2]) || (l2 >= rect[3]))
+			f_rectangle(rect[0], rect[1], rect[2], rect[3]);
 		else
 		{
-			f_rectangle(x, y, w, tool_size);
-			f_rectangle(x, y + tool_size, tool_size, h - 2 * tool_size);
-			f_rectangle(x, y + h - tool_size, w, tool_size);
-			f_rectangle(x + w - tool_size, y + tool_size,
-				tool_size, h - 2 * tool_size);
+			f_rectangle(rect[0], rect[1],
+				rect[2], tool_size);
+			f_rectangle(rect[0], rect[1] + rect[3] - tool_size,
+				rect[2], tool_size);
+			f_rectangle(rect[0], rect[1] + tool_size,
+				tool_size, rect[3] - l2);
+			f_rectangle(rect[0] + rect[2] - tool_size, rect[1] + tool_size,
+				tool_size, rect[3] - l2);
 		}
 	}
 
@@ -879,18 +879,13 @@ void pressed_ellipse(int filled)
 
 static int copy_clip()
 {
-	int x, y, w, h, bpp, cmask = CMASK_IMAGE;
+	int rect[4], bpp = MEM_BPP, cmask = CMASK_IMAGE;
 
 
-	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-	y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-	w = abs(marq_x1 - marq_x2) + 1;
-	h = abs(marq_y1 - marq_y2) + 1;
-
-	bpp = MEM_BPP;
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
 		 !channel_dis[CHN_ALPHA]) cmask = CMASK_RGBA;
-	mem_clip_new(w, h, bpp, cmask, FALSE);
+	marquee_at(rect);
+	mem_clip_new(rect[2], rect[3], bpp, cmask, FALSE);
 
 	if (!mem_clipboard)
 	{
@@ -899,10 +894,10 @@ static int copy_clip()
 		return (FALSE);
 	}
 
-	mem_clip_x = x;
-	mem_clip_y = y;
+	mem_clip_x = rect[0];
+	mem_clip_y = rect[1];
 
-	copy_area(&mem_clip, &mem_image, x, y);
+	copy_area(&mem_clip, &mem_image, mem_clip_x, mem_clip_y);
 
 	return (TRUE);
 }
@@ -2702,7 +2697,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	}
 }
 
-void check_marquee()		// Check marquee boundaries are OK - may be outside limits via arrow keys
+void check_marquee()	// Check marquee boundaries are OK - may be outside limits via arrow keys
 {
 	if (marq_status >= MARQUEE_PASTE)
 	{
@@ -2750,6 +2745,14 @@ static void repaint_clipped(int x0, int y0, int x1, int y1, const int *vxy)
 	if (clip(rxy, x0, y0, x1, y1, vxy))
 		repaint_canvas(margin_main_x + rxy[0], margin_main_y + rxy[1],
 			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+}
+
+void marquee_at(int *rect)			// Read marquee location & size
+{
+	rect[0] = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+	rect[1] = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+	rect[2] = abs(marq_x2 - marq_x1) + 1;
+	rect[3] = abs(marq_y2 - marq_y1) + 1;
 }
 
 static void locate_marquee(int *xy)

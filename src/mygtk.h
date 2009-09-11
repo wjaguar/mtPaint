@@ -310,6 +310,7 @@ void add_with_wjframe(GtkWidget *bin, GtkWidget *widget);
 GtkWidget *wjcanvas_new();
 void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
+int wjcanvas_scroll_in(GtkWidget *widget, int x, int y);
 
 // Repaint expose region
 

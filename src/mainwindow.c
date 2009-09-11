@@ -205,17 +205,15 @@ static void pressed_load_recent(int item)
 
 static void pressed_crop()
 {
-	int res, x1, y1, x2, y2;
+	int res, rect[4];
 
-	mtMIN( x1, marq_x1, marq_x2 )
-	mtMIN( y1, marq_y1, marq_y2 )
-	mtMAX( x2, marq_x1, marq_x2 )
-	mtMAX( y2, marq_y1, marq_y2 )
 
 	if ( marq_status != MARQUEE_DONE ) return;
-	if ( x1==0 && x2>=(mem_width-1) && y1==0 && y2>=(mem_height-1) ) return;
+	marquee_at(rect);
+	if ((rect[0] == 0) && (rect[2] >= mem_width) &&
+		(rect[1] == 0) && (rect[3] >= mem_height)) return;
 
-	res = mem_image_resize(x2 - x1 + 1, y2 - y1 + 1, -x1, -y1, 0);
+	res = mem_image_resize(rect[2], rect[3], -rect[0], -rect[1], 0);
 
 	if (!res)
 	{
@@ -656,10 +654,26 @@ static void zoom_grid(int state)
 	update_stuff(UPD_RENDER);
 }
 
-static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data );
+static gboolean delete_event(GtkWidget *widget, GdkEvent *event, gpointer data);
+
 static void quit_all(int mode)
 {
 	if (mode || q_quit) delete_event( NULL, NULL, NULL );
+}
+
+/* Autoscroll canvas if required */
+static int real_move_mouse(int *vxy, int x, int y, int dx, int dy)
+{
+	int nxy[4];
+
+	if ((x >= vxy[0]) && (x < vxy[2]) && (y >= vxy[1]) && (y < vxy[3]) &&
+		wjcanvas_scroll_in(drawing_canvas, x + dx, y + dy))
+	{
+		wjcanvas_get_vport(drawing_canvas, nxy);
+		dx += vxy[0] - nxy[0];
+		dy += vxy[1] - nxy[1];
+	}
+	return (move_mouse_relative(dx, dy));
 }
 
 /* Forward declaration */
@@ -672,7 +686,7 @@ static int unreal_move, lastdx, lastdy;
 static void move_mouse(int dx, int dy, int button)
 {
 	static GdkModifierType bmasks[4] =
-		{0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK};
+		{ 0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK };
 	GdkModifierType state;
 	int x, y, vxy[4], zoom = 1, scale = 1;
 
@@ -716,7 +730,7 @@ static void move_mouse(int dx, int dy, int button)
 			lastdy -= dy * zoom;
 			unreal_move = 3;
 			/* Event can be delayed or lost */
-			move_mouse_relative(dx, dy);
+			real_move_mouse(vxy, x, y, dx, dy);
 		}
 		else unreal_move = 2;
 	}
@@ -725,7 +739,7 @@ static void move_mouse(int dx, int dy, int button)
 		unreal_move = 1;
 
 		/* Simulate movement if failed to actually move mouse */
-		if (!move_mouse_relative(dx * scale, dy * scale))
+		if (!real_move_mouse(vxy, x, y, dx * scale, dy * scale))
 		{
 			lastdx = dx; lastdy = dy;
 			mouse_event(GDK_MOTION_NOTIFY, x, y, state, button, 1.0, 1, dx, dy);
@@ -1418,26 +1432,21 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		/* Otherwise, average brush or selection area on Ctrl+double click */
 		while ((pixel < 0) && (event == GDK_2BUTTON_PRESS) && (MEM_BPP == 3))
 		{
-			int x, y, w, h;
+			int rect[4];
 
 			/* Have brush square */
 			if (!NO_PERIM(tool_type))
 			{
 				int ts2 = tool_size >> 1;
-				x = ox - ts2; y = oy - ts2;
-				w = h = tool_size;
+				rect[0] = ox - ts2; rect[1] = oy - ts2;
+				rect[2] = rect[3] = tool_size;
 			}
 			/* Have selection marquee */
 			else if ((marq_status > MARQUEE_NONE) && (marq_status < MARQUEE_PASTE))
-			{
-				x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-				y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-				w = abs(marq_x2 - marq_x1) + 1;
-				h = abs(marq_y2 - marq_y1) + 1;
-			}
+				marquee_at(rect);
 			else break;
-			pixel = average_pixels(mem_img[CHN_IMAGE],
-				mem_width, mem_height, x, y, w, h);
+			pixel = average_pixels(mem_img[CHN_IMAGE], mem_width, mem_height,
+				rect[0], rect[1], rect[2], rect[3]);
 			break;
 		}
 		/* Failing that, just pick color from image */
@@ -2303,10 +2312,10 @@ static unsigned char *init_paste_render(paste_render_state *p,
 	memcpy(p->tlist, r->tlist, sizeof(chanlist));
 
 // !!! Store area dimensions somewhere for other functions' use
-//	xywh[0] = x;
-//	xywh[1] = y;
-//	xywh[2] = w;
-//	xywh[3] = h;
+//	rect[0] = x;
+//	rect[1] = y;
+//	rect[2] = w;
+//	rect[3] = h;
 
 	/* Setup row position and size */
 	p->dx = (x * zoom) / scale;
@@ -2846,7 +2855,7 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 }
 
 /* Clip area to image & align rgb pointer with it */
-static unsigned char *clip_to_image(int *xywh, unsigned char *rgb, int *vxy)
+static unsigned char *clip_to_image(int *rect, unsigned char *rgb, int *vxy)
 {
 	int rxy[4], mw, mh, zoom = 1, scale = 1;
 
@@ -2861,10 +2870,10 @@ static unsigned char *clip_to_image(int *xywh, unsigned char *rgb, int *vxy)
 	if (!clip(rxy, margin_main_x, margin_main_y,
 		margin_main_x + mw, margin_main_y + mh, vxy)) return (NULL);
 
-	xywh[0] = rxy[0] - margin_main_x;
-	xywh[1] = rxy[1] - margin_main_y;
-	xywh[2] = rxy[2] - rxy[0];
-	xywh[3] = rxy[3] - rxy[1];
+	rect[0] = rxy[0] - margin_main_x;
+	rect[1] = rxy[1] - margin_main_y;
+	rect[2] = rxy[2] - rxy[0];
+	rect[3] = rxy[3] - rxy[1];
 
 	/* Align buffer with image */
 	rgb += ((vxy[2] - vxy[0]) * (rxy[1] - vxy[1]) + (rxy[0] - vxy[0])) * 3;
@@ -2884,7 +2893,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 {
 	rgbcontext ctx;
 	unsigned char *rgb, *irgb;
-	int xywh[4], vxy[4], vport[4], lx = 0, ly = 0, rpx, rpy;
+	int rect[4], vxy[4], vport[4], lx = 0, ly = 0, rpx, rpy;
 	int i, lr, zoom = 1, scale = 1, paste_f = FALSE;
 
 
@@ -2900,7 +2909,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	ctx.rgb = rgb;
 
 	/* Find out which part is image */
-	irgb = clip_to_image(xywh, rgb, ctx.xy);
+	irgb = clip_to_image(rect, rgb, ctx.xy);
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -2915,7 +2924,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	{
 		if (irgb && ((mem_xpm_trans >= 0) ||
 			(!overlay_alpha && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])))
-			render_background(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw * 3);
+			render_background(irgb, rect[0], rect[1], rect[2], rect[3], pw * 3);
 	}
 	if (lr) /* Render underlying layers */
 	{
@@ -2928,7 +2937,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 			can_zoom, 0, layer_selected - 1, 1);
 	}
 
-	if (irgb) paste_f = main_render_rgb(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw);
+	if (irgb) paste_f = main_render_rgb(irgb, rect[0], rect[1], rect[2], rect[3], pw);
 
 	if (lr) render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
 		can_zoom, layer_selected + 1, layers_total, 1);
@@ -2940,7 +2949,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	/* With paste - zero to four areas */
 	else
 	{
-		int n, x0, y0, w0, h0, xywh04[5 * 4], *p = xywh04;
+		int n, x0, y0, w0, h0, rect04[5 * 4], *p = rect04;
 		unsigned char *r;
 
 		w0 = (marq_x2 < mem_width ? marq_x2 + 1 : mem_width) * scale;
@@ -2950,7 +2959,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 		y0 = marq_y1 > 0 ? marq_y1 * scale : 0;
 		h0 -= y0; y0 += margin_main_y;
 
-		n = clip4(xywh04, px, py, pw, ph, x0, y0, w0, h0);
+		n = clip4(rect04, px, py, pw, ph, x0, y0, w0, h0);
 		while (n--)
 		{
 			p += 4;
@@ -2961,7 +2970,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 
 	/* Tile grid */
 	if (show_tile_grid && irgb)
-		draw_tgrid(irgb, xywh[0], xywh[1], xywh[2], xywh[3], pw);
+		draw_tgrid(irgb, rect[0], rect[1], rect[2], rect[3], pw);
 
 	async_bk = FALSE;
 
@@ -4105,23 +4114,23 @@ static void pressed_pal_copy()
 {
 	png_color tpal[256];
 	unsigned char *img, *tm2, *alpha = NULL, *mask = NULL, *mask2 = NULL;
-	int i, j, x, y, w, h, step, bpp, n = 0;
+	int i, j, w, h, step, bpp, n = 0;
 
 	/* Source is selection */
 	if ((marq_status == MARQUEE_DONE) || (poly_status == POLY_DONE))
 	{
-		x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-		w = abs(marq_x1 - marq_x2) + 1;
-		h = abs(marq_y1 - marq_y2) + 1;
+		int rect[4];
+
+		marquee_at(rect);
 		bpp = MEM_BPP;
 		step = mem_width;
-		i = y * step + x;
+		i = rect[1] * step + rect[0];
 		img = mem_img[mem_channel] + i * bpp;
 		if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
 			alpha = mem_img[CHN_ALPHA] + i;
 		if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_SEL])
 			mask = mem_img[CHN_SEL] + i;
+		w = rect[2]; h = rect[3];
 		if (poly_status == POLY_DONE)
 		{
 			mask2 = calloc(1, w * h);
@@ -4424,28 +4433,25 @@ void dock_undock(int what, int state)
 static void pressed_sel_ramp(int vert)
 {
 	unsigned char *c0, *c1, *img, *dest;
-	int i, j, k, l, s1, s2, x, y, w, h, bpp = MEM_BPP;
+	int i, j, k, l, s1, s2, bpp = MEM_BPP, rect[4];
 
 	if (marq_status != MARQUEE_DONE) return;
 
-	w = abs(marq_x1 - marq_x2) + 1;
-	h = abs(marq_y1 - marq_y2) + 1;
+	marquee_at(rect);
 
 	if (vert)		// Vertical ramp
 	{
-		k = h - 1; l = w;
+		k = rect[3] - 1; l = rect[2];
 		s1 = mem_width * bpp; s2 = bpp;
 	}
 	else			// Horizontal ramp
 	{
-		k = w - 1; l = h;
+		k = rect[2] - 1; l = rect[3];
 		s1 = bpp; s2 = mem_width * bpp;
 	}
 
 	spot_undo(UNDO_FILT);
-	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-	y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-	img = mem_img[mem_channel] + (y * mem_width + x) * bpp;
+	img = mem_img[mem_channel] + (rect[1] * mem_width + rect[0]) * bpp;
 	for (i = 0; i < l; i++)
 	{
 		c0 = img; c1 = img + k * s1;
