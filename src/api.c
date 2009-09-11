@@ -17,6 +17,8 @@
 	along with mtPaint in the file COPYING.
 */
 
+#define API_SOURCES
+
 #ifdef WIN32
 #ifndef WEXITSTATUS
 #define WEXITSTATUS(A) ((A) & 0xFF)
@@ -46,7 +48,7 @@
 #include "csel.h"
 #include "channels.h"
 #include "toolbar.h"
-
+#include "api.h"
 
 
 void mtpaint_mem_init()			// Initialise memory & inifile
@@ -314,9 +316,9 @@ int mtpaint_selection_copy()		// Copy the rectangle selection area to the clipbo
 	return api_copy_rectangle();
 }
 
-int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction)
+int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction, int destructive)
 {
-	return mem_rotate_free(angle, smooth, gamma_correction, TRUE);
+	return mem_rotate_free(angle, smooth, gamma_correction, TRUE+destructive);
 }
 
 void mtpaint_clipboard_alpha2mask()		// Move alpha to clipboard mask
@@ -349,4 +351,106 @@ int mtpaint_screenshot()			// Grab a screenshot
 void mtpaint_opacity(int c)			// Set paint opacity 0-255
 {
 	tool_opacity = c;
+}
+
+static int api_coltrans(unsigned char *rgb, int bpp, int w, int h, int brightness, int contrast, int saturation, int posterize, int gamma, int hue, int red, int green, int blue, int destructive)
+{
+	int i;
+	unsigned char *mask, *rgb_dest = rgb;
+
+	mem_prev_bcsp[0] = brightness;
+	mem_prev_bcsp[1] = contrast;
+	mem_prev_bcsp[2] = saturation;
+	mem_prev_bcsp[3] = posterize;
+	mem_prev_bcsp[4] = gamma;
+	mem_prev_bcsp[5] = hue;
+
+	mem_brcosa_allow[0] = red;
+	mem_brcosa_allow[1] = green;
+	mem_brcosa_allow[2] = blue;
+
+	if ( !destructive && rgb == mem_clipboard )	// Do we want to keep the clipboard?
+	{
+		if ( mem_clip_real_w )		// Image already in reserve, so use it
+		{
+			free(mem_clipboard);	// Dispose of current clipboard if it exists
+			free(mem_clip_mask);
+			free(mem_clip_alpha);
+			mem_clipboard = NULL;
+			mem_clip_mask = NULL;
+			mem_clip_alpha = NULL;
+			w = mem_clip_real_w;
+			h = mem_clip_real_h;
+		}
+		else	// No clipboard in reserve, so sweep current clipboard into reserve
+		{
+			mem_clip_real_img[CHN_IMAGE] = mem_clipboard;
+			mem_clip_real_img[CHN_ALPHA] = mem_clip_alpha;
+			mem_clip_real_img[CHN_SEL] = mem_clip_mask;
+			mem_clip_real_w = mem_clip_w;
+			mem_clip_real_h = mem_clip_h;
+			mem_clipboard = NULL;
+			mem_clip_mask = NULL;
+			mem_clip_alpha = NULL;
+		}
+
+		mem_clipboard = malloc(w*h*bpp);		// Create new clipboard for transform
+		if (mem_clip_real_img[CHN_ALPHA])
+		{
+			mem_clip_alpha = malloc(w*h);
+			if (mem_clip_alpha) memcpy(mem_clip_alpha, mem_clip_real_img[CHN_ALPHA], w*h);
+		}
+		if (mem_clip_real_img[CHN_SEL])
+		{
+			mem_clip_mask = malloc(w*h);
+			if (mem_clip_mask) memcpy(mem_clip_mask, mem_clip_real_img[CHN_SEL], w*h);
+		}
+		if (!mem_clipboard || (mem_clip_real_img[CHN_ALPHA] && !mem_clip_alpha)
+			|| (mem_clip_real_img[CHN_SEL] && !mem_clip_mask))
+		{		// No memory so put reserve clipboard back into main clipboard
+			free(mem_clipboard);
+			free(mem_clip_alpha);
+			free(mem_clip_mask);
+			mem_clipboard = mem_clip_real_img[CHN_IMAGE];
+			mem_clip_alpha = mem_clip_real_img[CHN_ALPHA];
+			mem_clip_mask = mem_clip_real_img[CHN_SEL];
+			mem_clip_w = mem_clip_real_w;
+			mem_clip_h = mem_clip_real_h;
+			mem_clip_real_w = 0;
+			return -5;
+		}
+		rgb = mem_clip_real_img[CHN_IMAGE];
+		rgb_dest = mem_clipboard;
+		memcpy(rgb_dest, rgb, w*h*bpp);	// Keeps good clipboard in case of bail out later
+	}
+
+	mask = calloc(1, w);			// Allocate mask
+	if (!mask) return -1;			// No memory for mask so bail out
+
+	for ( i=0; i<h; i++ ) do_transform( 0, 1, w, mask, rgb_dest + i*w*bpp, rgb + i*w*bpp);
+
+	free(mask);				// Free the mask
+
+	return 0;
+}
+
+int mtpaint_image_rotate(float angle, int smooth, int gamma_correction)
+{
+	return mem_rotate_free(angle, smooth, gamma_correction, FALSE);
+}
+
+int mtpaint_image_coltrans(int brightness, int contrast, int saturation, int posterize, int gamma, int hue, int red, int green, int blue)		// Transform image colour
+{
+	if ( mem_img_bpp < 3 ) return -1;		// Must be RGB image
+
+	return api_coltrans(mem_img[CHN_IMAGE], mem_img_bpp, mem_width, mem_height, brightness,
+		contrast, saturation, posterize, gamma, hue, red, green, blue, TRUE);
+}
+
+int mtpaint_clipboard_coltrans(int brightness, int contrast, int saturation, int posterize, int gamma, int hue, int red, int green, int blue, int destructive)		// Transform clipboard colour
+{
+	if ( mem_clip_bpp < 3 ) return -1;		// Must be RGB image
+
+	return api_coltrans(mem_clipboard, mem_clip_bpp, mem_clip_w, mem_clip_h, brightness,
+		contrast, saturation, posterize, gamma, hue, red, green, blue, destructive);
 }
