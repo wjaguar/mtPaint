@@ -203,10 +203,6 @@ void win_store_pos(GtkWidget *window, char *inikey);
 void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	int defw, int defh);
 
-// Ensure viewport frames are always drawn as they should
-
-void viewport_style(GtkWidget *widget);
-
 // Fix for paned widgets losing focus in GTK+1
 
 #if GTK_MAJOR_VERSION == 1
@@ -214,11 +210,6 @@ void paned_mouse_fix(GtkWidget *widget);
 #else
 #define paned_mouse_fix(X)
 #endif
-
-// Eliminate flicker when scrolling
-
-void fix_vport(GtkWidget *vport);
-#define fix_scroll(scroll) fix_vport(GTK_BIN(scroll)->child)
 
 // Init-time bugfixes
 
@@ -307,6 +298,17 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 // Release outstanding pointer grabs
 
 int release_grab();
+
+// Frame widget with passthrough scrolling
+
+GtkWidget *wjframe_new();
+void add_with_wjframe(GtkWidget *bin, GtkWidget *widget);
+
+// Scrollable canvas widget
+
+GtkWidget *wjcanvas_new();
+void wjcanvas_size(GtkWidget *widget, int width, int height);
+void wjcanvas_get_vport(GtkWidget *widget, int *vport);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

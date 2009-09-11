@@ -766,14 +766,13 @@ gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 		/* Force redraw of whole canvas as the margin has shifted */
 		gtk_widget_queue_draw(vw_drawing);
 	}
+	if (idle_focus) vw_focus_view(); // Time to refocus is NOW
 
 	return TRUE;
 }
 
-void vw_align_size( float new_zoom )
+void vw_align_size(float new_zoom)
 {
-	int sw = mem_width, sh = mem_height, i;
-
 	if (!view_showing) return;
 
 	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
@@ -781,6 +780,15 @@ void vw_align_size( float new_zoom )
 	if (new_zoom == vw_zoom) return;
 
 	vw_zoom = new_zoom;
+	vw_realign();
+	toolbar_zoom_update();	// View zoom doesn't get changed elsewhere
+}
+
+void vw_realign()
+{
+	int sw = mem_width, sh = mem_height, i;
+
+	if (!view_showing) return;
 
 	if (layers_total && layer_selected)
 	{
@@ -804,27 +812,25 @@ void vw_align_size( float new_zoom )
 	{
 		vw_width = sw;
 		vw_height = sh;
-		gtk_widget_set_usize(vw_drawing, vw_width, vw_height);
+		wjcanvas_size(vw_drawing, vw_width, vw_height);
 	}
-	vw_focus_view();
-	toolbar_zoom_update();
+	/* !!! Let refocus wait a bit - if window is being resized, view pane's
+	 * allocation could be not yet updated (canvas is done first) - WJ */
+	vw_focus_idle();
 }
 
-void vw_realign()
-{
-	float old_zoom = vw_zoom;
-	vw_zoom = -1; /* Force resize */
-	vw_align_size(old_zoom);	// Update the view window as needed
-	vw_zoom = old_zoom; // !!! The call may have aborted early
-}
-
-void vw_repaint(int px, int py, int pw, int ph)
+static gboolean vw_expose(GtkWidget *widget, GdkEventExpose *event)
 {
 	unsigned char *rgb;
+	int px, py, pw, ph, vport[4];
 
-	if ((pw <= 0) || (ph <= 0)) return;
-	if (px < 0) px = 0;
-	if (py < 0) py = 0;
+	wjcanvas_get_vport(widget, vport);
+	px = event->area.x + vport[0];
+	py = event->area.y + vport[1];
+	pw = event->area.width;
+	ph = event->area.height;
+
+	if ((pw <= 0) || (ph <= 0)) return (FALSE);
 
 	rgb = calloc(1, pw * ph * 3);
 	if (rgb)
@@ -832,29 +838,18 @@ void vw_repaint(int px, int py, int pw, int ph)
 		memset(rgb, mem_background, pw * ph * 3);
 		view_render_rgb(rgb, px - margin_view_x, py - margin_view_y,
 			pw, ph, vw_zoom);
-		gdk_draw_rgb_image (vw_drawing->window, vw_drawing->style->black_gc,
-			px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
+		gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+			event->area.x, event->area.y, pw, ph,
+			GDK_RGB_DITHER_NONE, rgb, pw * 3);
 		free(rgb);
 	}
+
+	return (FALSE);
 }
 
-static gint vw_expose( GtkWidget *widget, GdkEventExpose *event )
+void vw_update_area(int x, int y, int w, int h)	// Update x,y,w,h area of current image
 {
-	int px, py, pw, ph;
-
-	px = event->area.x;
-	py = event->area.y;
-	pw = event->area.width;
-	ph = event->area.height;
-
-	vw_repaint( px, py, pw, ph );
-
-	return FALSE;
-}
-
-void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of current image
-{
-	int zoom, scale;
+	int zoom, scale, vport[4], rxy[4];
 
 	if (!view_showing) return;
 	
@@ -884,8 +879,12 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 		h *= scale;
 	}
 
-	gtk_widget_queue_draw_area(vw_drawing,
-		x + margin_view_x, y + margin_view_y, w, h);
+	x += margin_view_x; y += margin_view_y;
+	wjcanvas_get_vport(vw_drawing, vport);
+	if (clip(rxy, x, y, x + w, y + h, vport))
+		gtk_widget_queue_draw_area(vw_drawing,
+			rxy[0] - vport[0], rxy[1] - vport[1],
+			rxy[2] - rxy[0], rxy[3] - rxy[1]);
 }
 
 static void vw_mouse_event(int event, int x, int y, guint state, guint button)
@@ -967,11 +966,11 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 	}
 }
 
-static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )
+static gboolean view_window_motion(GtkWidget *widget, GdkEventMotion *event)
 {
-	int x, y;
 	GdkModifierType state;
 	guint button = 0;
+	int x, y, vport[4];
 
 	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
 	else
@@ -987,14 +986,15 @@ static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 
-	vw_mouse_event(event->type, x, y, state, button);
+	wjcanvas_get_vport(widget, vport);
+	vw_mouse_event(event->type, x + vport[0], y + vport[1], state, button);
 
-	return TRUE;
+	return (TRUE);
 }
 
 static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 {
-	int pflag = event->type != GDK_BUTTON_RELEASE;
+	int vport[4], pflag = event->type != GDK_BUTTON_RELEASE;
 
 	/* Steal focus from dock window */
 	if (pflag && dock_focused())
@@ -1003,7 +1003,9 @@ static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 		return (TRUE);
 	}
 
-	vw_mouse_event(event->type, event->x, event->y, event->state, event->button);
+	wjcanvas_get_vport(widget, vport);
+	vw_mouse_event(event->type, event->x + vport[0], event->y + vport[1],
+		event->state, event->button);
 
 	return (pflag);
 }

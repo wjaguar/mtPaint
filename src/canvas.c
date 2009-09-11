@@ -1141,7 +1141,7 @@ void update_stuff(int flags)
 	{
 		int w, h;
 		canvas_size(&w, &h);
-		gtk_widget_set_usize(drawing_canvas, w, h);
+		wjcanvas_size(drawing_canvas, w, h);
 	}
 	if (flags & (CF_GEOM | CF_CGEOM))
 		check_marquee();
@@ -1150,7 +1150,7 @@ void update_stuff(int flags)
 		if (mem_col_A >= mem_cols) mem_col_A = 0;
 		if (mem_col_B >= mem_cols) mem_col_B = 0;
 		mem_mask_init();	// Reinit RGB masks
-		gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
+		wjcanvas_size(drawing_palette, PALETTE_WIDTH,
 			mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
 	}
 	if (flags & CF_AB)
@@ -1207,11 +1207,7 @@ void update_stuff(int flags)
 		gtk_widget_queue_draw(drawing_col_prev);
 	}
 	if (flags & CF_ALIGN)
-	{
-		float old_zoom = can_zoom;
-		can_zoom = -1;
-		align_size(old_zoom);
-	}
+		realign_size();
 	if (flags & CF_VALIGN)
 		vw_realign();
 }
@@ -2026,24 +2022,24 @@ void file_selector(int action_type)
 	fs_setup(fpick_create(title, fpick_flags), action_type);
 }
 
-void align_size( float new_zoom )		// Set new zoom level
+void align_size(float new_zoom)		// Set new zoom level
 {
-	GtkAdjustment *hori, *vert;
-	int w, h, nv_h = 0, nv_v = 0;	// New positions of scrollbar
-
 	if (zoom_flag) return;		// Needed as we could be called twice per iteration
 
 	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
 	if (new_zoom > MAX_ZOOM) new_zoom = MAX_ZOOM;
-
 	if (new_zoom == can_zoom) return;
 
 	zoom_flag = 1;
-	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-
 	if (mem_ics == 0)
 	{
+		GtkAdjustment *hori, *vert;
+		int w, h;
+
+		hori = gtk_scrolled_window_get_hadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+		vert = gtk_scrolled_window_get_vadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
 		canvas_size(&w, &h);
 		if (hori->page_size > w) mem_icx = 0.5;
 		else mem_icx = (hori->value + hori->page_size * 0.5) / w;
@@ -2053,11 +2049,22 @@ void align_size( float new_zoom )		// Set new zoom level
 	mem_ics = 0;
 
 	can_zoom = new_zoom;
-	canvas_size(&w, &h);
+	realign_size();
+	zoom_flag = 0;
+}
 
+void realign_size()		// Reapply old zoom
+{
+	GtkAdjustment *hori, *vert;
+	int w, h, nv_h = 0, nv_v = 0;	// New positions of scrollbar
+
+	hori = gtk_scrolled_window_get_hadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+	vert = gtk_scrolled_window_get_vadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+	canvas_size(&w, &h);
 	if (hori->page_size < w)
 		nv_h = rint(w * mem_icx - hori->page_size * 0.5);
-
 	if (vert->page_size < h)
 		nv_v = rint(h * mem_icy - vert->page_size * 0.5);
 
@@ -2066,15 +2073,9 @@ void align_size( float new_zoom )		// Set new zoom level
 	vert->value = nv_v;
 	vert->upper = h;
 
-#if GTK_MAJOR_VERSION == 1
-	gtk_adjustment_value_changed(hori);
-	gtk_adjustment_value_changed(vert);
-#endif
-	gtk_widget_set_usize(drawing_canvas, w, h);
-
-	zoom_flag = 0;
-	vw_focus_view();		// View window position may need updating
-	toolbar_zoom_update();
+	wjcanvas_size(drawing_canvas, w, h);
+	vw_focus_view();	// View window position may need updating
+	toolbar_zoom_update();	// Zoom factor may have been reset
 }
 
 /* This tool is seamless: doesn't draw pixels twice if not requested to - WJ */
@@ -2726,15 +2727,8 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 
 void get_visible(int *vxy)
 {
-	GtkAdjustment *hori, *vert;
-
-	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-
-	vxy[0] = hori->value;
-	vxy[1] = vert->value;
-	vxy[2] = hori->value + hori->page_size - 1;
-	vxy[3] = vert->value + vert->page_size - 1;
+	wjcanvas_get_vport(drawing_canvas, vxy);
+	--vxy[2]; --vxy[3];
 }
 
 void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
@@ -3178,12 +3172,6 @@ void register_file( char *filename )		// Called after successful load/save
 	}
 
 	update_recent_files();
-}
-
-void scroll_wheel( int x, int y, int d )		// Scroll wheel action from mouse
-{
-	if (d == 1) zoom_in();
-	else zoom_out();
 }
 
 void create_default_image()			// Create default new image

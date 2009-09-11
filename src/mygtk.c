@@ -26,6 +26,10 @@
 #include "inifile.h"
 #include "fpick.h"
 
+#if GTK_MAJOR_VERSION == 1
+#include <gtk/gtkprivate.h>
+#endif
+
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 #include <X11/Xlib.h>
 #include <gdk/gdkx.h>
@@ -1022,75 +1026,6 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
 }
 
-// Ensure viewport frames are always drawn as they should
-
-#if GTK_MAJOR_VERSION == 1
-
-/* GTK1 is not as flexible as GTK2, so we need small "theme engine" of our own
- * to force viewport border to 1 pixel wide without messing up things - WJ */
-static void viewport_shadow(GtkStyle *style, GdkWindow *window,
-	GtkStateType state_type, GtkShadowType shadow_type, GdkRectangle *area,
-	GtkWidget *widget, gchar *detail, gint x, gint y, gint w, gint h)
-{
-	GdkGC *light, *dark;
-	int x1, y1;
-
-	if (!style || !window) return;
-	if ((w == -1) || (h == -1)) gdk_window_get_size(window,
-		w == -1 ? &w : NULL, h == -1 ? &h : NULL);
-
-	/* State, shadow, and widget type are hardcoded */
-	light = style->light_gc[GTK_STATE_NORMAL];
-	dark = style->dark_gc[GTK_STATE_NORMAL];
-	gdk_gc_set_clip_rectangle(light, area);
-	gdk_gc_set_clip_rectangle(dark, area);
-
-	x1 = x + w - 1; y1 = y + h - 1;
-	gdk_draw_line(window, light, x, y1, x1, y1);
-	gdk_draw_line(window, light, x1, y, x1, y1);
-	gdk_draw_line(window, dark, x, y, x1, y);
-	gdk_draw_line(window, dark, x, y, x, y1);
-
-	gdk_gc_set_clip_rectangle(light, NULL);
-	gdk_gc_set_clip_rectangle(dark, NULL);
-}
-
-void viewport_style(GtkWidget *widget)
-{
-	static GtkStyle *defstyle;
-	GtkStyleClass *class;
-
-	if (!defstyle)
-	{
-		defstyle = gtk_style_new();
-		class = g_malloc(sizeof(GtkStyleClass));
-		memcpy(class, defstyle->klass, sizeof(GtkStyleClass));
-		defstyle->klass = class;
-		class->xthickness = class->ythickness = 1;
-		class->draw_shadow = viewport_shadow;
-	}
-	gtk_widget_set_style(widget, defstyle);
-}
-
-#else /* #if GTK_MAJOR_VERSION == 2 */
-
-void viewport_style(GtkWidget *widget)
-{
-	static GtkStyle *defstyle;
-	GdkColor *col;
-
-	if (!defstyle)
-	{
-		defstyle = gtk_style_new();
-		col = &defstyle->bg[GTK_STATE_NORMAL];
-		col->red = col->green = col->blue = 0xD6D6;
-		defstyle->xthickness = defstyle->ythickness = 1;
-	}
-	gtk_widget_set_style(widget, defstyle);
-}
-
-#endif
-
 // Fix for paned widgets losing focus in GTK+1
 
 #if GTK_MAJOR_VERSION == 1
@@ -1119,40 +1054,6 @@ void paned_mouse_fix(GtkWidget *widget)
 }
 
 #endif
-
-// Eliminate flicker when scrolling
-
-/* This code serves a very important role - it disables background clear,
- * completely eliminating the annoying flicker when scrolling the canvas
- * in GTK+1 and GTK+2/Windows, and lessening CPU load in GTK+2/Linux.
- * The trick was discovered by Mark Tyler while developing MTK.
- * It also disables double buffering in GTK+2, because when rendering is
- * done properly, it is useless and just wastes considerable time. - WJ */
-
-static void realize_trick(GtkWidget *widget, gpointer user_data)
-{
-	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
-#if GTK_MAJOR_VERSION == 1
-	fix_gdk_events(widget->window); // Let's fix focus issues too
-#endif
-}
-
-void fix_vport(GtkWidget *vport)
-{
-	/* Stop theme engines from messing up viewport's frame */
-	viewport_style(vport);
-	gtk_signal_connect_after(GTK_OBJECT(vport), "realize",
-		GTK_SIGNAL_FUNC(realize_trick), NULL);
-#if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(vport, FALSE);
-#endif
-	vport = GTK_BIN(vport)->child;
-	gtk_signal_connect_after(GTK_OBJECT(vport), "realize",
-		GTK_SIGNAL_FUNC(realize_trick), NULL);
-#if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(vport, FALSE);
-#endif
-}
 
 // Init-time bugfixes
 
@@ -2001,10 +1902,6 @@ GtkWidget *wj_size_bin()
  * be easier to update this code if it becomes broken sometime in dim future,
  * than deal with premature updates right here and now - WJ */
 
-#if GTK_MAJOR_VERSION == 1
-#include <gtk/gtkprivate.h>
-#endif
-
 typedef struct {
 	int flags, pf, mode;
 } lock_state;
@@ -2454,6 +2351,718 @@ int release_grab()
 	if (res) gdk_pointer_ungrab(GDK_CURRENT_TIME);
 
 	return (res || grab);
+}
+
+// Frame widget with passthrough scrolling
+
+#define WJFRAME(obj)		GTK_CHECK_CAST(obj, wjframe_get_type(), wjframe)
+#define IS_WJFRAME(obj)		GTK_CHECK_TYPE(obj, wjframe_get_type())
+
+typedef struct
+{
+	GtkBin bin;	// Parent class
+	GtkAdjustment *adjustments[2];
+} wjframe;
+
+typedef struct
+{
+	GtkBinClass parent_class;
+	void (*set_scroll_adjustments)(wjframe *frame,
+		GtkAdjustment *hadjustment, GtkAdjustment *vadjustment);
+} wjframeClass;
+
+static GtkBinClass *bin_class;
+static GtkType wjframe_type;
+
+#define WJFRAME_SHADOW 1
+
+static GtkType wjframe_get_type();
+
+static void wjframe_realize(GtkWidget *widget)
+{
+	GdkWindowAttr attrs;
+	int border = GTK_CONTAINER(widget)->border_width;
+
+
+	GTK_WIDGET_SET_FLAGS(widget, GTK_REALIZED);
+
+	/* Make widget window */
+	attrs.x = widget->allocation.x + border;
+	attrs.y = widget->allocation.y + border;
+	attrs.width = widget->allocation.width - 2 * border;
+	attrs.height = widget->allocation.height - 2 * border;
+	attrs.window_type = GDK_WINDOW_CHILD;
+	attrs.wclass = GDK_INPUT_OUTPUT;
+	attrs.visual = gtk_widget_get_visual(widget);
+	attrs.colormap = gtk_widget_get_colormap(widget);
+	// Window exists only to render the shadow
+	attrs.event_mask = gtk_widget_get_events(widget) | GDK_EXPOSURE_MASK;
+	widget->window = gdk_window_new(gtk_widget_get_parent_window(widget),
+		&attrs, GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL | GDK_WA_COLORMAP);
+	gdk_window_set_user_data(widget->window, widget);
+
+	widget->style = gtk_style_attach(widget->style, widget->window);
+	/* Background clear is for wimps :-) */
+	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
+// !!! Do this instead if the widget is ever used for non-canvaslike stuff
+//	gtk_style_set_background(widget->style, widget->window, GTK_STATE_NORMAL);
+}
+
+static void wjframe_paint(GtkWidget *widget, GdkRectangle *area)
+{
+	GdkWindow *window = widget->window;
+	GdkGC *light, *dark;
+	gint w, h;
+	int x1, y1;
+
+	if (!window || !widget->style) return;
+	gdk_window_get_size(window, &w, &h);
+
+#if 0 /* !!! Useless with canvaslike widgets */
+	if ((w > WJFRAME_SHADOW * 2) && (h > WJFRAME_SHADOW * 2))
+		gtk_paint_flat_box(widget->style, window,
+			widget->state, GTK_SHADOW_NONE,
+			area, widget, NULL,
+			WJFRAME_SHADOW, WJFRAME_SHADOW,
+			w - WJFRAME_SHADOW * 2, h - WJFRAME_SHADOW * 2);
+#endif
+
+	/* State, shadow, and widget type are hardcoded */
+	light = widget->style->light_gc[GTK_STATE_NORMAL];
+	dark = widget->style->dark_gc[GTK_STATE_NORMAL];
+	gdk_gc_set_clip_rectangle(light, area);
+	gdk_gc_set_clip_rectangle(dark, area);
+
+	x1 = w - 1; y1 = h - 1;
+	gdk_draw_line(window, light, 0, y1, x1, y1);
+	gdk_draw_line(window, light, x1, 0, x1, y1);
+	gdk_draw_line(window, dark, 0, 0, x1, 0);
+	gdk_draw_line(window, dark, 0, 0, 0, y1);
+
+	gdk_gc_set_clip_rectangle(light, NULL);
+	gdk_gc_set_clip_rectangle(dark, NULL);
+}
+ 
+#if GTK_MAJOR_VERSION == 1
+
+static void wjframe_draw(GtkWidget *widget, GdkRectangle *area)
+{
+	GdkRectangle tmp, child;
+	GtkBin *bin = GTK_BIN(widget);
+	int border = GTK_CONTAINER(widget)->border_width;
+
+	if (!area || !GTK_WIDGET_DRAWABLE(widget)) return;
+
+	tmp = *area;
+	tmp.x -= border; tmp.y -= border;
+	wjframe_paint(widget, &tmp);
+
+	if (bin->child && gtk_widget_intersect(bin->child, &tmp, &child))
+		gtk_widget_draw(bin->child, &child);
+}
+
+static gboolean wjframe_expose(GtkWidget *widget, GdkEventExpose *event)
+{
+	GtkBin *bin = GTK_BIN(widget);
+
+	if (!GTK_WIDGET_DRAWABLE(widget)) return (FALSE);
+	wjframe_paint(widget, &event->area);
+
+	if (bin->child && GTK_WIDGET_NO_WINDOW(bin->child))
+	{
+		GdkEventExpose tmevent = *event;
+		if (gtk_widget_intersect(bin->child, &event->area, &tmevent.area))
+			gtk_widget_event(bin->child, (GdkEvent *)&tmevent);
+	}
+	return (FALSE);
+}
+
+#else /* if GTK_MAJOR_VERSION == 2 */
+
+static gboolean wjframe_expose(GtkWidget *widget, GdkEventExpose *event)
+{
+	if (!GTK_WIDGET_DRAWABLE(widget)) return (FALSE);
+	wjframe_paint(widget, &event->area);
+
+	GTK_WIDGET_CLASS(bin_class)->expose_event(widget, event);
+	return (FALSE);
+}
+
+#endif
+
+static void wjframe_size_request(GtkWidget *widget, GtkRequisition *requisition)
+{
+	GtkRequisition req;
+	GtkBin *bin = GTK_BIN(widget);
+	int border = GTK_CONTAINER(widget)->border_width;
+
+	requisition->width = requisition->height = (WJFRAME_SHADOW + border) * 2;
+	if (bin->child && GTK_WIDGET_VISIBLE(bin->child))
+	{
+		gtk_widget_size_request(bin->child, &req);
+		requisition->width += req.width;
+		requisition->height += req.height;
+	}
+}
+
+static void wjframe_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	GtkAllocation alloc;
+	GtkBin *bin = GTK_BIN(widget);
+	int border = GTK_CONTAINER(widget)->border_width;
+
+
+	widget->allocation = *allocation;
+	alloc.x = alloc.y = WJFRAME_SHADOW;
+	alloc.width = MAX(allocation->width - (WJFRAME_SHADOW + border) * 2, 0);
+	alloc.height = MAX(allocation->height - (WJFRAME_SHADOW + border) * 2, 0);
+
+	if (GTK_WIDGET_REALIZED(widget)) gdk_window_move_resize(widget->window,
+		allocation->x + border, allocation->y + border,
+		allocation->width - border * 2, allocation->height - border * 2);
+
+	if (bin->child) gtk_widget_size_allocate(bin->child, &alloc);
+}
+
+static void wjframe_set_adjustments(wjframe *frame,
+	GtkAdjustment *hadjustment, GtkAdjustment *vadjustment)
+{
+	if (hadjustment) gtk_object_ref(GTK_OBJECT(hadjustment));
+	if (frame->adjustments[0])
+		gtk_object_unref(GTK_OBJECT(frame->adjustments[0]));
+	frame->adjustments[0] = hadjustment;
+	if (vadjustment) gtk_object_ref(GTK_OBJECT(vadjustment));
+	if (frame->adjustments[1])
+		gtk_object_unref(GTK_OBJECT(frame->adjustments[1]));
+	frame->adjustments[1] = vadjustment;
+}
+
+static void wjframe_set_scroll_adjustments(wjframe *frame,
+	GtkAdjustment *hadjustment, GtkAdjustment *vadjustment)
+{
+	GtkBin *bin = GTK_BIN(frame);
+
+	if ((hadjustment == frame->adjustments[0]) &&
+		(vadjustment == frame->adjustments[1])) return;
+
+	wjframe_set_adjustments(frame, hadjustment, vadjustment);
+
+	if (bin->child) gtk_widget_set_scroll_adjustments(bin->child,
+		hadjustment, vadjustment);
+}
+
+static void wjframe_add(GtkContainer *container, GtkWidget *child)
+{
+	wjframe *frame = WJFRAME(container);
+	GtkBin *bin = GTK_BIN(container);
+	GtkWidget *widget = GTK_WIDGET(container);
+
+
+	if (bin->child) return;
+	bin->child = child;
+	gtk_widget_set_parent(child, widget);
+
+	/* Set only existing adjustments */
+	if (frame->adjustments[0] || frame->adjustments[1])
+		gtk_widget_set_scroll_adjustments(child,
+			frame->adjustments[0], frame->adjustments[1]);
+
+#if GTK_MAJOR_VERSION == 1
+	if (GTK_WIDGET_REALIZED(widget)) gtk_widget_realize(child);
+
+	if (GTK_WIDGET_VISIBLE(widget) && GTK_WIDGET_VISIBLE(child))
+	{
+		if (GTK_WIDGET_MAPPED(widget)) gtk_widget_map(child);
+		gtk_widget_queue_resize(child);
+	}
+#endif
+}
+
+static void wjframe_remove(GtkContainer *container, GtkWidget *child)
+{
+	wjframe *frame = WJFRAME(container);
+	GtkBin *bin = GTK_BIN(container);
+	
+
+	if (!child || (bin->child != child)) return;
+
+	/* Remove only existing adjustments */
+	if (frame->adjustments[0] || frame->adjustments[1])
+		gtk_widget_set_scroll_adjustments(child, NULL, NULL);
+
+	GTK_CONTAINER_CLASS(bin_class)->remove(container, child);
+}
+
+static void wjframe_destroy(GtkObject *object)
+{
+	wjframe_set_adjustments(WJFRAME(object), NULL, NULL);
+
+	GTK_OBJECT_CLASS(bin_class)->destroy(object);
+}
+
+static void wjframe_class_init(wjframeClass *class)
+{
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+	GtkContainerClass *cclass = GTK_CONTAINER_CLASS(class);
+
+	bin_class = gtk_type_class(GTK_TYPE_BIN);
+	GTK_OBJECT_CLASS(class)->destroy = wjframe_destroy;
+#if GTK_MAJOR_VERSION == 1
+	wclass->draw = wjframe_draw;
+#endif
+	wclass->realize = wjframe_realize;
+	wclass->expose_event = wjframe_expose;
+	wclass->size_request = wjframe_size_request;
+	wclass->size_allocate = wjframe_size_allocate;
+	// !!! Default "style_set" handler can reenable background clear
+	wclass->style_set = NULL;
+	cclass->add = wjframe_add;
+	cclass->remove = wjframe_remove;
+	class->set_scroll_adjustments = wjframe_set_scroll_adjustments;
+
+	wclass->set_scroll_adjustments_signal = gtk_signal_new(
+		"set_scroll_adjustments", GTK_RUN_LAST, wjframe_type,
+		GTK_SIGNAL_OFFSET(wjframeClass, set_scroll_adjustments),
+		gtk_marshal_NONE__POINTER_POINTER, GTK_TYPE_NONE,
+		2, GTK_TYPE_ADJUSTMENT, GTK_TYPE_ADJUSTMENT);
+}
+
+static void wjframe_init(wjframe *frame)
+{
+	GTK_WIDGET_UNSET_FLAGS(frame, GTK_NO_WINDOW);
+#if GTK_MAJOR_VERSION == 2
+	// !!! Would only waste time, with canvaslike child widgets
+	GTK_WIDGET_UNSET_FLAGS(frame, GTK_DOUBLE_BUFFERED);
+#endif
+	frame->adjustments[0] = frame->adjustments[1] = NULL;
+}
+
+static GtkType wjframe_get_type()
+{
+	if (!wjframe_type)
+	{
+		static const GtkTypeInfo wjframe_info = {
+			"wjFrame", sizeof(wjframe), sizeof(wjframeClass),
+			(GtkClassInitFunc)wjframe_class_init,
+			(GtkObjectInitFunc)wjframe_init,
+			NULL, NULL, NULL };
+		wjframe_type = gtk_type_unique(GTK_TYPE_BIN, &wjframe_info);
+	}
+
+	return (wjframe_type);
+}
+
+GtkWidget *wjframe_new()
+{
+	return (gtk_widget_new(wjframe_get_type(), NULL));
+}
+
+void add_with_wjframe(GtkWidget *bin, GtkWidget *widget)
+{
+	GtkWidget *frame = wjframe_new();
+
+	gtk_widget_show(frame);
+	gtk_container_add(GTK_CONTAINER(frame), widget);
+	gtk_container_add(GTK_CONTAINER(bin), frame);
+}
+
+// Scrollable canvas widget
+
+#define WJCANVAS(obj)		GTK_CHECK_CAST(obj, wjcanvas_get_type(), wjcanvas)
+#define IS_WJCANVAS(obj)	GTK_CHECK_TYPE(obj, wjcanvas_get_type())
+
+typedef struct
+{
+	GtkWidget	widget;		// Parent class
+	GtkAdjustment	*adjustments[2];
+	GdkGC		*scroll_gc;	// For scrolling in GTK+1
+	int		xy[4];		// Viewport
+	int		resize;		// Resize was requested
+	int		resizing;	// Requested resize is happening
+} wjcanvas;
+
+typedef struct
+{
+	GtkWidgetClass parent_class;
+	void  (*set_scroll_adjustments)(wjcanvas *canvas,
+		GtkAdjustment *hadjustment, GtkAdjustment *vadjustment);
+} wjcanvasClass;
+
+static GtkWidgetClass *widget_class;
+static GtkType wjcanvas_type;
+
+static GtkType wjcanvas_get_type();
+
+static void wjcanvas_send_configure(GtkWidget *widget)
+{
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 2) /* GTK+ 2.2+ */
+	GdkEvent *event = gdk_event_new(GDK_CONFIGURE);
+
+	event->configure.window = g_object_ref(widget->window);
+	event->configure.send_event = TRUE;
+	event->configure.x = widget->allocation.x;
+	event->configure.y = widget->allocation.y;
+	event->configure.width = widget->allocation.width;
+	event->configure.height = widget->allocation.height;
+
+	gtk_widget_event(widget, event);
+	gdk_event_free(event);
+#else /* GTK+ 1.x or 2.0 */
+	GdkEventConfigure event;
+
+	event.type = GDK_CONFIGURE;
+	event.window = widget->window;
+	event.send_event = TRUE;
+	event.x = widget->allocation.x;
+	event.y = widget->allocation.y;
+	event.width = widget->allocation.width;
+	event.height = widget->allocation.height;
+
+	gdk_window_ref(event.window);
+	gtk_widget_event(widget, (GdkEvent *)&event);
+	gdk_window_unref(event.window);
+#endif
+}
+
+static void wjcanvas_realize(GtkWidget *widget)
+{
+	GdkWindowAttr attrs;
+
+
+	GTK_WIDGET_SET_FLAGS(widget, GTK_REALIZED);
+
+	attrs.x = widget->allocation.x;
+	attrs.y = widget->allocation.y;
+	attrs.width = widget->allocation.width;
+	attrs.height = widget->allocation.height;
+	attrs.window_type = GDK_WINDOW_CHILD;
+	attrs.wclass = GDK_INPUT_OUTPUT;
+	attrs.visual = gtk_widget_get_visual(widget);
+	attrs.colormap = gtk_widget_get_colormap(widget);
+	// Add the same events as GtkViewport does
+	attrs.event_mask = gtk_widget_get_events(widget) | GDK_EXPOSURE_MASK |
+		GDK_BUTTON_PRESS_MASK;
+	widget->window = gdk_window_new(gtk_widget_get_parent_window(widget),
+		&attrs, GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL | GDK_WA_COLORMAP);
+	gdk_window_set_user_data(widget->window, widget);
+
+#if GTK_MAJOR_VERSION == 1
+	fix_gdk_events(widget->window);
+	WJCANVAS(widget)->scroll_gc = gdk_gc_new(widget->window);
+	gdk_gc_set_exposures(WJCANVAS(widget)->scroll_gc, TRUE);
+#endif
+
+	widget->style = gtk_style_attach(widget->style, widget->window);
+	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
+
+	/* Replicate behaviour of GtkDrawingCanvas */
+	wjcanvas_send_configure(widget);
+}
+
+#if GTK_MAJOR_VERSION == 1
+
+static void wjcanvas_unrealize(GtkWidget *widget)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+
+	gdk_gc_destroy(canvas->scroll_gc);
+	canvas->scroll_gc = NULL;
+
+	if (widget_class->unrealize) widget_class->unrealize(widget);
+}
+
+#endif
+
+static int wjcanvas_readjust(wjcanvas *canvas, int which)
+{
+	GtkWidget *widget = GTK_WIDGET(canvas);
+	GtkAdjustment *adj = canvas->adjustments[which];
+	int sz, wp;
+	double oldv, newv;
+
+	oldv = adj->value;
+	wp = which ? widget->allocation.height : widget->allocation.width;
+	sz = which ? widget->requisition.height : widget->requisition.width;
+	if (sz < wp) sz = wp;
+	adj->page_size = wp;
+	adj->step_increment = wp * 0.1;
+	adj->page_increment = wp * 0.9;
+	adj->lower = 0;
+	adj->upper = sz;
+	adj->value = newv = oldv < 0.0 ? 0.0 : oldv > sz - wp ? sz - wp : oldv;
+
+	return (newv != oldv);
+}
+
+static void wjcanvas_set_extents(wjcanvas *canvas)
+{
+	GtkWidget *widget = GTK_WIDGET(canvas);
+
+	canvas->xy[2] = (canvas->xy[0] = ADJ2INT(canvas->adjustments[0])) +
+		widget->allocation.width;
+	canvas->xy[3] = (canvas->xy[1] = ADJ2INT(canvas->adjustments[1])) +
+		widget->allocation.height;
+}
+
+static void wjcanvas_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int hchg, vchg, conf;
+
+
+	/* Don't send useless configure events */
+	conf = canvas->resize | (allocation->width ^ widget->allocation.width) |
+		(allocation->height ^ widget->allocation.height);
+	canvas->resizing = canvas->resize;
+	canvas->resize = FALSE;
+
+	widget->allocation = *allocation;
+	hchg = wjcanvas_readjust(canvas, 0);
+	vchg = wjcanvas_readjust(canvas, 1);
+	wjcanvas_set_extents(canvas);
+
+	if (GTK_WIDGET_REALIZED(widget))
+	{
+		gdk_window_move_resize(widget->window,
+			allocation->x, allocation->y,
+			allocation->width, allocation->height);
+
+		/* Replicate behaviour of GtkDrawingCanvas */
+		if (conf) wjcanvas_send_configure(widget);
+	}
+
+	gtk_adjustment_changed(canvas->adjustments[0]);
+	gtk_adjustment_changed(canvas->adjustments[1]);
+	if (hchg) gtk_adjustment_value_changed(canvas->adjustments[0]);
+	if (vchg) gtk_adjustment_value_changed(canvas->adjustments[1]);
+	canvas->resizing = FALSE;
+}
+
+#if GTK_MAJOR_VERSION == 1
+
+static void wjcanvas_send_expose(GtkWidget *widget, int x, int y, int w, int h)
+{
+	GdkEventExpose event;
+
+	event.type = GDK_EXPOSE;
+	event.send_event = TRUE;
+	event.window = widget->window;
+	event.area.x = x;
+	event.area.y = y;
+	event.area.width = w;
+	event.area.height = h;
+	event.count = 0;
+
+	gdk_window_ref(event.window);
+	gtk_widget_event(widget, (GdkEvent *)&event);
+	gdk_window_unref(event.window);
+}
+
+#endif
+
+/* We do scrolling in both directions at once if possible, to avoid ultimately
+ * useless repaint ops and associated flickers - WJ */
+static void wjcanvas_adjustment_value_changed(GtkAdjustment *adjustment, gpointer data)
+{
+	GtkWidget *widget = data;
+	wjcanvas *canvas;
+	int nxy[4], oxy[4], rxy[4], fulldraw;
+
+
+	if (!GTK_IS_ADJUSTMENT(adjustment) || !IS_WJCANVAS(data)) return;
+	canvas = WJCANVAS(data);
+
+	copy4(oxy, canvas->xy);
+	wjcanvas_set_extents(canvas); // Set new window extents
+	if (!memcmp(canvas->xy, oxy, sizeof(oxy))) return; // No change
+	if (!GTK_WIDGET_DRAWABLE(widget)) return; // No use
+	if (canvas->resizing) return; // No reason
+	copy4(nxy, canvas->xy);
+
+	/* Scroll or redraw? */
+	fulldraw = !clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], oxy);
+#if GTK_MAJOR_VERSION == 1
+	/* Check for in-flight draw ops */
+	if (GTK_WIDGET_FULLDRAW_PENDING(widget)) return;
+	fulldraw |= GTK_WIDGET_REDRAW_PENDING(widget);
+	// Updating draws in queue might be possible, but sure is insanely hard
+#endif
+
+	if (fulldraw) gtk_widget_queue_draw(widget); // Just redraw everything
+	else // Scroll
+	{
+#if GTK_MAJOR_VERSION == 1
+		GdkEvent *event;
+
+		gdk_window_copy_area(widget->window, canvas->scroll_gc,
+			rxy[0] - nxy[0], rxy[1] - nxy[1],
+			widget->window,
+			rxy[0] - oxy[0], rxy[1] - oxy[1],
+			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+
+		/* Have to process GraphicsExpose events before next scrolling */
+		while ((event = gdk_event_get_graphics_expose(widget->window)))
+		{
+			gtk_widget_event(widget, event);
+			if (event->expose.count == 0)
+			{
+				gdk_event_free(event);
+				break;
+			}
+			gdk_event_free(event);
+		}
+
+		/* Now draw the freed-up part(s) */
+		if (rxy[1] > nxy[1]) wjcanvas_send_expose(widget,
+			0, 0, nxy[2] - nxy[0], rxy[1] - nxy[1]);
+		if (rxy[3] < nxy[3]) wjcanvas_send_expose(widget,
+			0, rxy[3] - nxy[1], nxy[2] - nxy[0], nxy[3] - rxy[3]);
+		if (rxy[0] > nxy[0]) wjcanvas_send_expose(widget,
+			0, rxy[1] - nxy[1], rxy[0] - nxy[0], rxy[3] - rxy[1]);
+		if (rxy[2] < nxy[2]) wjcanvas_send_expose(widget,
+			rxy[2] - nxy[0], rxy[1] - nxy[1], nxy[2] - rxy[2], rxy[3] - rxy[1]);
+#else
+		gdk_window_scroll(widget->window,
+			oxy[0] - nxy[0], oxy[1] - nxy[1]);
+#endif
+	}
+
+/* !!! _Maybe_ we need gdk_window_process_updates(widget->window) here
+ * !!! in GTK+2 - but then, maybe we don't; only practice will tell */
+
+}
+
+static void wjcanvas_drop_adjustment(wjcanvas *canvas, int which)
+{
+	GtkAdjustment **slot = canvas->adjustments + which;
+
+	if (*slot)
+	{
+		GtkObject *adj = GTK_OBJECT(*slot);
+		gtk_signal_disconnect_by_func(adj,
+			GTK_SIGNAL_FUNC(wjcanvas_adjustment_value_changed), canvas);
+		gtk_object_unref(adj);
+		*slot = NULL;
+	}
+}
+
+static GtkAdjustment *wjcanvas_prepare_adjustment(wjcanvas *canvas,
+	GtkAdjustment *adjustment)
+{
+	GtkObject *adj;
+
+	if (!adjustment)
+		adjustment = GTK_ADJUSTMENT(gtk_adjustment_new(0, 0, 0, 0, 0, 0));
+	adj = GTK_OBJECT(adjustment);
+	gtk_object_ref(adj);
+	gtk_object_sink(adj);
+	gtk_signal_connect(adj, "value_changed",
+		GTK_SIGNAL_FUNC(wjcanvas_adjustment_value_changed), (gpointer)canvas);
+	return (adjustment);
+}
+
+static void wjcanvas_set_adjustment(wjcanvas *canvas, int which,
+	GtkAdjustment *adjustment)
+{
+	int changed;
+
+	wjcanvas_drop_adjustment(canvas, which);
+	adjustment = wjcanvas_prepare_adjustment(canvas, adjustment);
+	canvas->adjustments[which] = adjustment;
+
+	changed = wjcanvas_readjust(canvas, which);
+	gtk_adjustment_changed(adjustment);
+	if (changed) gtk_adjustment_value_changed(adjustment);
+	else wjcanvas_adjustment_value_changed(adjustment, canvas); // Readjust anyway
+}
+
+static void wjcanvas_set_scroll_adjustments(wjcanvas *canvas,
+	GtkAdjustment *hadjustment, GtkAdjustment *vadjustment)
+{
+	if (canvas->adjustments[0] != hadjustment)
+		wjcanvas_set_adjustment(canvas, 0, hadjustment);
+	if (canvas->adjustments[1] != vadjustment)
+		wjcanvas_set_adjustment(canvas, 1, vadjustment);
+}
+
+static void wjcanvas_destroy(GtkObject *object)
+{
+	wjcanvas *canvas = WJCANVAS(object);
+
+	wjcanvas_drop_adjustment(canvas, 0);
+	wjcanvas_drop_adjustment(canvas, 1);
+	GTK_OBJECT_CLASS(widget_class)->destroy(object);
+}
+
+static void wjcanvas_class_init(wjcanvasClass *class)
+{
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+
+
+	widget_class = gtk_type_class(GTK_TYPE_WIDGET);
+	GTK_OBJECT_CLASS(class)->destroy = wjcanvas_destroy;
+	wclass->realize = wjcanvas_realize;
+#if GTK_MAJOR_VERSION == 1
+	wclass->unrealize = wjcanvas_unrealize;
+#endif
+	wclass->size_allocate = wjcanvas_size_allocate;
+	// !!! Default "style_set" handler can reenable background clear
+	wclass->style_set = NULL;
+	class->set_scroll_adjustments = wjcanvas_set_scroll_adjustments;
+
+	wclass->set_scroll_adjustments_signal = gtk_signal_new(
+		"set_scroll_adjustments", GTK_RUN_LAST, wjcanvas_type,
+		GTK_SIGNAL_OFFSET(wjcanvasClass, set_scroll_adjustments),
+		gtk_marshal_NONE__POINTER_POINTER, GTK_TYPE_NONE,
+		2, GTK_TYPE_ADJUSTMENT, GTK_TYPE_ADJUSTMENT);
+}
+
+static void wjcanvas_init(wjcanvas *canvas)
+{
+	GTK_WIDGET_UNSET_FLAGS(canvas, GTK_NO_WINDOW);
+#if GTK_MAJOR_VERSION == 2
+	GTK_WIDGET_UNSET_FLAGS(canvas, GTK_DOUBLE_BUFFERED);
+	gtk_widget_set_redraw_on_allocate(GTK_WIDGET(canvas), FALSE);
+#endif
+	/* Install fake adjustments */
+	canvas->adjustments[0] = wjcanvas_prepare_adjustment(canvas, NULL);
+	canvas->adjustments[1] = wjcanvas_prepare_adjustment(canvas, NULL);
+}
+
+static GtkType wjcanvas_get_type()
+{
+	if (!wjcanvas_type)
+	{
+		static const GtkTypeInfo wjcanvas_info = {
+			"wjCanvas", sizeof(wjcanvas), sizeof(wjcanvasClass),
+			(GtkClassInitFunc)wjcanvas_class_init,
+			(GtkObjectInitFunc)wjcanvas_init,
+			NULL, NULL, NULL };
+		wjcanvas_type = gtk_type_unique(GTK_TYPE_WIDGET, &wjcanvas_info);
+	}
+
+	return (wjcanvas_type);
+}
+
+GtkWidget *wjcanvas_new()
+{
+	return (gtk_widget_new(wjcanvas_get_type(), NULL));
+}
+
+void wjcanvas_size(GtkWidget *widget, int width, int height)
+{
+	if (!IS_WJCANVAS(widget) || ((widget->requisition.width == width) &&
+		(widget->requisition.height == height))) return;
+
+	WJCANVAS(widget)->resize = TRUE;
+	widget->requisition.width = width;
+	widget->requisition.height = height;
+	gtk_widget_queue_resize(widget);
+}
+
+void wjcanvas_get_vport(GtkWidget *widget, int *vport)
+{
+	copy4(vport, WJCANVAS(widget)->xy);
 }
 
 // Maybe this will be needed someday...

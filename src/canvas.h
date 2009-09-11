@@ -108,7 +108,8 @@ int	col_reverse,					// Painting with right button
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 
 int do_a_load( char *fname );
-void align_size( float new_zoom );
+void align_size(float new_zoom);
+void realign_size();
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
 void init_ls_settings(ls_settings *settings, GtkWidget *box);
 void fs_setup(GtkWidget *fs, int action_type);
@@ -181,8 +182,6 @@ void repaint_line(const int *old);		// Repaint line on canvas and maybe clear ol
 void refresh_line(int mode, const int *lxy, rgbcontext *ctx);	// Refresh a part of line/gradient if needed
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
-
-void scroll_wheel( int x, int y, int d );	// Scroll wheel action from mouse
 
 void update_all_views();			// Update whole canvas on all views
 

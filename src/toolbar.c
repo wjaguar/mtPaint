@@ -825,32 +825,33 @@ void toolbar_update_settings()
 static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
-	int x2 = event->area.x + event->area.width;
-	int y2 = event->area.y + event->area.height;
+	int x1, y1, x2, y2, vport[4];
+
+	wjcanvas_get_vport(widget, vport);
+	x2 = (x1 = event->area.x + vport[0]) + event->area.width;
+	y2 = (y1 = event->area.y + vport[1]) + event->area.height;
 
 	/* With theme engines lurking out there, weirdest things can happen */
 	if (y2 > PALETTE_HEIGHT)
 	{
 		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, event->area.x, PALETTE_HEIGHT,
+			TRUE, event->area.x, PALETTE_HEIGHT - vport[1],
 			event->area.width, y2 - PALETTE_HEIGHT);
-		if (event->area.y >= PALETTE_HEIGHT) return (TRUE);
+		if (y1 >= PALETTE_HEIGHT) return (TRUE);
 		y2 = PALETTE_HEIGHT;
 	}
 	if (x2 > PALETTE_WIDTH)
 	{
 		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, PALETTE_WIDTH, event->area.y,
-			x2 - PALETTE_WIDTH, y2);
-		if (event->area.x >= PALETTE_WIDTH) return (TRUE);
+			TRUE, PALETTE_WIDTH - vport[0], event->area.y,
+			x2 - PALETTE_WIDTH, event->area.height);
+		if (x1 >= PALETTE_WIDTH) return (TRUE);
 		x2 = PALETTE_WIDTH;
 	}
 
 	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		event->area.x, event->area.y,
-		x2 - event->area.x, y2 - event->area.y,
-		GDK_RGB_DITHER_NONE, mem_pals + event->area.y * PALETTE_W3 +
-		event->area.x * 3, PALETTE_W3);
+		event->area.x, event->area.y, x2 - x1, y2 - y1,
+		GDK_RGB_DITHER_NONE, mem_pals + y1 * PALETTE_W3 + x1 * 3, PALETTE_W3);
 
 	return (TRUE);
 }
@@ -859,7 +860,7 @@ static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
 	GdkModifierType state;
-	int x, y, pindex;
+	int x, y, pindex, vport[4];
 
 	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
 	else
@@ -868,8 +869,9 @@ static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointe
 		y = event->y;
 		state = event->state;
 	}
+	wjcanvas_get_vport(widget, vport);
 
-	pindex = (y - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
+	pindex = (y + vport[1] - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
 	pindex = pindex < 0 ? 0 : pindex >= mem_cols ? mem_cols - 1 : pindex;
 
 	if (drag_index && (drag_index_vals[1] != pindex))
@@ -907,14 +909,15 @@ static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
 
 static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 {
-	int px, py, pindex;
+	int px, py, pindex, vport[4];
 
 
 	/* Filter out multiple clicks */
 	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
 
-	px = event->x;
-	py = event->y;
+	wjcanvas_get_vport(widget, vport);
+	px = event->x + vport[0];
+	py = event->y + vport[1];
 	if (py < PALETTE_SWATCH_Y) return (TRUE);
 	pindex = (py - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
 	if (pindex >= mem_cols) return (TRUE);
@@ -959,9 +962,9 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show(hbox);
 
-	drawing_col_prev = gtk_drawing_area_new();
+	drawing_col_prev = wjcanvas_new();
 	gtk_widget_show(drawing_col_prev);
-	gtk_widget_set_usize(drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+	wjcanvas_size(drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT);
 
 	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_release_event",
 		GTK_SIGNAL_FUNC (click_colours), GTK_OBJECT(drawing_col_prev) );
@@ -969,23 +972,20 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
 	gtk_widget_set_events (drawing_col_prev, GDK_ALL_EVENTS_MASK);
 
-	viewport_palette = gtk_viewport_new (NULL, NULL);
-	gtk_widget_show (viewport_palette);
-	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_col_prev);
-	gtk_box_pack_start( GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0 );
-	fix_vport(viewport_palette);
+	viewport_palette = wjframe_new();
+	gtk_widget_show(viewport_palette);
+	gtk_container_add(GTK_CONTAINER(viewport_palette), drawing_col_prev);
+	gtk_box_pack_start(GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0);
 
 	scrolledwindow_palette = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_palette);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_palette),
 		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
 
-	drawing_palette = gtk_drawing_area_new();
+	drawing_palette = wjcanvas_new();
 	gtk_widget_show(drawing_palette);
-	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH, 64);
-	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolledwindow_palette),
-		drawing_palette);
-	fix_scroll(scrolledwindow_palette);
+	wjcanvas_size(drawing_palette, PALETTE_WIDTH, 64);
+	add_with_wjframe(scrolledwindow_palette, drawing_palette);
 
 	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "expose_event",
 		GTK_SIGNAL_FUNC (expose_palette), GTK_OBJECT(drawing_palette) );

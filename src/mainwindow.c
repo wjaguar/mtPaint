@@ -674,13 +674,15 @@ static void move_mouse(int dx, int dy, int button)
 	static GdkModifierType bmasks[4] =
 		{0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK};
 	GdkModifierType state;
-	int x, y, zoom = 1, scale = 1;
+	int x, y, vxy[4], zoom = 1, scale = 1;
 
 	if (!unreal_move) lastdx = lastdy = 0;
 	if (!mem_img[CHN_IMAGE]) return;
 	dx += lastdx; dy += lastdy;
 
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
+	wjcanvas_get_vport(drawing_canvas, vxy);
+	x += vxy[0]; y += vxy[1];
 
 	if (button) /* Clicks simulated without extra movements */
 	{
@@ -1147,9 +1149,9 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 {
 	if (inifile_get_gboolean( "scrollwheelZOOM", FALSE ))
 	{
-		scroll_wheel(event->x / can_zoom, event->y / can_zoom,
-			event->direction == GDK_SCROLL_DOWN ? -1 : 1);
-		return TRUE;
+		if (event->direction == GDK_SCROLL_DOWN) zoom_out();
+		else zoom_in();
+		return (TRUE);
 	}
 	if (event->state & _C) /* Convert up-down into left-right */
 	{
@@ -1159,7 +1161,7 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 			event->direction = GDK_SCROLL_RIGHT;
 	}
 	/* Normal GTK+2 scrollwheel behaviour */
-	return FALSE;
+	return (FALSE);
 }
 #endif
 
@@ -1561,7 +1563,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
 {
-	int pflag = event->type != GDK_BUTTON_RELEASE;
+	int vport[4], pflag = event->type != GDK_BUTTON_RELEASE;
 	gdouble pressure = 1.0;
 
 	mouse_left_canvas = FALSE;
@@ -1586,8 +1588,9 @@ static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
 #endif
 	}
 
-	mouse_event(event->type, event->x, event->y, event->state, event->button,
-		pressure, unreal_move & 1, 0, 0);
+	wjcanvas_get_vport(widget, vport);
+	mouse_event(event->type, event->x + vport[0], event->y + vport[1],
+		event->state, event->button, pressure, unreal_move & 1, 0, 0);
 
 	return (pflag);
 }
@@ -2727,13 +2730,19 @@ static void draw_tgrid(unsigned char *rgb, int x, int y, int w, int h, int l)
 /* Redirectable RGB blitting */
 void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx)
 {
-	if (!ctx) gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		x, y, w, h, GDK_RGB_DITHER_NONE, rgb, step);
+	unsigned char *dest;
+	int l, rxy[4], vxy[4];
+
+	if (!ctx)
+	{
+		wjcanvas_get_vport(drawing_canvas, vxy);
+		if (!clip(rxy, x, y, x + w, y + h, vxy)) return;
+		gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+			rxy[0] - vxy[0], rxy[1] - vxy[1], rxy[2] - rxy[0], rxy[3] - rxy[1],
+			GDK_RGB_DITHER_NONE, rgb, step);
+	}
 	else
 	{
-		unsigned char *dest;
-		int l, rxy[4];
-
 		if (!clip(rxy, x, y, x + w, y + h, ctx->xy)) return;
 		rgb += (rxy[1] - y) * step + (rxy[0] - x) * 3;
 		l = (ctx->xy[2] - ctx->xy[0]) * 3;
@@ -2761,9 +2770,9 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 	{
 		copy4(vxy, ctx->xy);
 		w = vxy[2] - vxy[0];
-		--vxy[2]; --vxy[3];
 	}
-	else get_visible(vxy);
+	else wjcanvas_get_vport(drawing_canvas, vxy);
+	--vxy[2]; --vxy[3];
 
 	x1 = x00 + *xy++; y1 = y00 + *xy++;
 	a = x1 < vxy[0] ? 1 : x1 > vxy[2] ? 2:
@@ -2810,13 +2819,15 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 			if (dx & 4) // Draw to canvas in black
 			{
 				p = black + nb++;
-				p->x = line[0]; p->y = line[1];
+				p->x = line[0] - vxy[0];
+				p->y = line[1] - vxy[1];
 				if (nb < PT_BATCH) continue;
 			}
 			else // Draw to canvas in white
 			{
 				p = white + nw++;
-				p->x = line[0]; p->y = line[1];
+				p->x = line[0] - vxy[0];
+				p->y = line[1] - vxy[1];
 				if (nw < PT_BATCH) continue;
 			}
 			// Batch drawing to canvas
@@ -2836,64 +2847,52 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 }
 
 /* Clip area to image & align rgb pointer with it */
-static unsigned char *clip_to_image(int *xywh, unsigned char *rgb,
-	int px, int py, int pw, int ph)
+static unsigned char *clip_to_image(int *xywh, unsigned char *rgb, int *vxy)
 {
-	int mw, mh, px2, py2, pw2, ph2, nix = 0, niy = 0, zoom = 1, scale = 1;
+	int rxy[4], mw, mh, zoom = 1, scale = 1;
+
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	/* Align buffer with image */
-	px2 = px - margin_main_x;
-	py2 = py - margin_main_y;
-	if (px2 < 0) nix = -px2;
-	if (py2 < 0) niy = -py2;
-	rgb += (pw * niy + nix) * 3;
-
 	/* Clip update area to image bounds */
 	mw = (mem_width * scale + zoom - 1) / zoom;
 	mh = (mem_height * scale + zoom - 1) / zoom;
-	pw2 = pw + px2;
-	ph2 = ph + py2;
-	if (pw2 > mw) pw2 = mw;
-	if (ph2 > mh) ph2 = mh;
-	px2 += nix; py2 += niy;
-	pw2 -= px2; ph2 -= py2;
-	if ((pw2 < 1) || (ph2 < 1)) return (NULL);
-	xywh[0] = px2; xywh[1] = py2;
-	xywh[2] = pw2; xywh[3] = ph2;
+	if (!clip(rxy, margin_main_x, margin_main_y,
+		margin_main_x + mw, margin_main_y + mh, vxy)) return (NULL);
+
+	xywh[0] = rxy[0] - margin_main_x;
+	xywh[1] = rxy[1] - margin_main_y;
+	xywh[2] = rxy[2] - rxy[0];
+	xywh[3] = rxy[3] - rxy[1];
+
+	/* Align buffer with image */
+	rgb += ((vxy[2] - vxy[0]) * (rxy[1] - vxy[1]) + (rxy[0] - vxy[0])) * 3;
 	return (rgb);
 }
 
-void repaint_canvas( int px, int py, int pw, int ph )
+void repaint_canvas(int px, int py, int pw, int ph)
 {
 	rgbcontext ctx;
 	unsigned char *rgb, *irgb;
-	int xywh[4], vxy[4], lx = 0, ly = 0, rpx, rpy;
+	int xywh[4], vxy[4], vport[4], lx = 0, ly = 0, rpx, rpy;
 	int i, lr, zoom = 1, scale = 1, paste_f = FALSE;
 
-	if (px < 0)
-	{
-		pw += px; px = 0;
-	}
-	if (py < 0)
-	{
-		ph += py; py = 0;
-	}
 
-	if ((pw <= 0) || (ph <= 0)) return;
+	/* Clip area & init context */
+	wjcanvas_get_vport(drawing_canvas, vport);
+	if (!clip(ctx.xy, px, py, px + pw, py + ph, vport)) return;
+	pw = ctx.xy[2] - (px = ctx.xy[0]);
+	ph = ctx.xy[3] - (py = ctx.xy[1]);
+
 	rgb = malloc(i = pw * ph * 3);
 	if (!rgb) return;
 	memset(rgb, mem_background, i);
+	ctx.rgb = rgb;
 
 	/* Find out which part is image */
-	irgb = clip_to_image(xywh, rgb, px, py, pw, ph);
-
-	/* Init context */
-	ctx.xy[0] = px; ctx.xy[1] = py; ctx.xy[2] = px + pw; ctx.xy[3] = py + ph;
-	ctx.rgb = rgb;
+	irgb = clip_to_image(xywh, rgb, ctx.xy);
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -2901,12 +2900,6 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	rpx = px - margin_main_x;
 	rpy = py - margin_main_y;
-
-	/* Line-space clipping rectangle */
-	vxy[0] = floor_div(rpx, scale);
-	vxy[1] = floor_div(rpy, scale);
-	vxy[2] = floor_div(rpx + pw - 1, scale);
-	vxy[3] = floor_div(rpy + ph - 1, scale);
 
 	lr = layers_total && show_layers_main;
 	if (bkg_flag && bkg_rgb) render_bkg(&ctx); /* Tracing image */
@@ -2965,6 +2958,12 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	async_bk = FALSE;
 
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
+	/* Line-space clipping rectangle */
+	for (i = 0; i < 4; i++)
+	{
+		vxy[i] = floor_div(ctx.xy[i] - margin_main_xy[i & 1] -
+			(i >> 1), scale);
+	}
 	/* Redraw gradient line if needed */
 	i = gradient[mem_channel].status;
 	if ((mem_gradient || (tool_type == TOOL_GRADIENT)) &&
@@ -2986,14 +2985,15 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	if (perim_status && !mouse_left_canvas) repaint_perim(&ctx);
 
 	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
+		px - vport[0], py - vport[1], pw, ph,
+		GDK_RGB_DITHER_NONE, rgb, pw * 3);
 	free(rgb);
 }
 
 /* Update x,y,w,h area of current image */
 void main_update_area(int x, int y, int w, int h)
 {
-	int zoom, scale;
+	int zoom, scale, vport[4], rxy[4];
 
 	if (can_zoom < 1.0)
 	{
@@ -3017,8 +3017,12 @@ void main_update_area(int x, int y, int w, int h)
 			w++ , h++; // Redraw grid lines bordering the area
 	}
 
-	gtk_widget_queue_draw_area(drawing_canvas,
-		x + margin_main_x, y + margin_main_y, w, h);
+	x += margin_main_x; y += margin_main_y;
+	wjcanvas_get_vport(drawing_canvas, vport);
+	if (clip(rxy, x, y, x + w, y + h, vport))
+		gtk_widget_queue_draw_area(drawing_canvas,
+			rxy[0] - vport[0], rxy[1] - vport[1],
+			rxy[2] - rxy[0], rxy[3] - rxy[1]);
 }
 
 /* Get zoomed canvas size */
@@ -3097,7 +3101,7 @@ void repaint_perim(rgbcontext *ctx)
 
 static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
-	int x, y, rm, button = 0;
+	int x, y, rm, vport[4], button = 0;
 	GdkModifierType state;
 	gdouble pressure = 1.0;
 
@@ -3148,7 +3152,9 @@ static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 
-	mouse_event(event->type, x, y, state, button, pressure, rm & 1, 0, 0);
+	wjcanvas_get_vport(widget, vport);
+	mouse_event(event->type, x + vport[0], y + vport[1],
+		state, button, pressure, rm & 1, 0, 0);
 
 	return TRUE;
 }
@@ -3189,13 +3195,14 @@ void force_main_configure()
 static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
-	int px, py, pw, ph;
+	int px, py, pw, ph, vport[4];
 
 	/* Stops excess jerking in GTK+1 when zooming */
 	if (zoom_flag) return (TRUE);
 
-	px = event->area.x;		// Only repaint if we need to
-	py = event->area.y;
+	wjcanvas_get_vport(widget, vport);
+	px = event->area.x + vport[0];
+	py = event->area.y + vport[1];
 	pw = event->area.width;
 	ph = event->area.height;
 
@@ -4837,46 +4844,32 @@ void main_init()
 	gtk_widget_ref(vw_scrolledwindow);
 	gtk_object_sink(GTK_OBJECT(vw_scrolledwindow));
 
-	vw_drawing = gtk_drawing_area_new ();
-	gtk_widget_set_usize( vw_drawing, 1, 1 );
-	gtk_widget_show( vw_drawing );
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(vw_scrolledwindow), vw_drawing);
-	fix_scroll(vw_scrolledwindow);
+	vw_drawing = wjcanvas_new();
+	wjcanvas_size(vw_drawing, 1, 1);
+	gtk_widget_show(vw_drawing);
+	add_with_wjframe(vw_scrolledwindow, vw_drawing);
 
 	init_view();
 
 //	MAIN WINDOW
 
-	drawing_canvas = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_canvas, 48, 48 );
-	gtk_widget_show( drawing_canvas );
+	drawing_canvas = wjcanvas_new();
+	wjcanvas_size(drawing_canvas, 48, 48);
+	gtk_widget_show(drawing_canvas);
 
 	scrolledwindow_canvas = xpack(vbox_right, gtk_scrolled_window_new(NULL, NULL));
-	gtk_widget_show (scrolledwindow_canvas);
+	gtk_widget_show(scrolledwindow_canvas);
 
-	/* Handle "changed" signal only in GTK+2, because in GTK+1 resizes are
-	 * tracked by configure handler, and forced realign from there looks
-	 * better than idle-time realign from here - WJ */
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	adj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect(GTK_OBJECT(adj), "changed",
-		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
-#endif
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
 		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
 	adj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect(GTK_OBJECT(adj), "changed",
-		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
-#endif
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
 		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
 
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow_canvas),
-		drawing_canvas);
-	fix_scroll(scrolledwindow_canvas);
+	add_with_wjframe(scrolledwindow_canvas, drawing_canvas);
 
 	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "configure_event",
 		GTK_SIGNAL_FUNC (configure_canvas), NULL );
