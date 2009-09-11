@@ -983,7 +983,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	opj_cio_t *cio = NULL;
 	opj_image_t *image = NULL;
 	opj_image_comp_t *comp;
-	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char xtb[256], *dest, *buf = NULL;
 	FILE *fp;
 	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
@@ -1092,7 +1092,7 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	opj_image_cmptparm_t channels[4];
 	opj_cio_t *cio = NULL;
 	opj_image_t *image;
-	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char *src;
 	FILE *fp;
 	int i, j, k, nc, step;

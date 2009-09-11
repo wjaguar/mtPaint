@@ -823,14 +823,14 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 		inifile_get_gboolean("transcol_show", FALSE));
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(click_brcosa_show_toggle), vbox5);
-/*
+#if 0
 	button = gtk_button_new_with_label(_("Store Values"));
 	gtk_widget_show (button);
 	gtk_box_pack_end (GTK_BOX (hbox), button, FALSE, FALSE, 4);
 
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_brcosa_store), NULL);
-*/
+#endif
 
 ///	OPTIONAL SECTION
 
@@ -1369,31 +1369,25 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	if (extbox) pack(vbox, extbox);
 
 	hbut = pack(vbox, gtk_hbox_new(FALSE, 3));
-	gtk_widget_show(hbut);
 
-	button_ok = gtk_button_new_with_label(_("OK"));
-	gtk_widget_show( button_ok );
+	button_ok = pack_end5(hbut, gtk_button_new_with_label(_("OK")));
 	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
 	gtk_signal_connect_object(GTK_OBJECT(button_ok), "clicked",
 		GTK_SIGNAL_FUNC(allcol_ok), (gpointer)chook);
-	gtk_box_pack_end( GTK_BOX(hbut), button_ok, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_ok, 80, -2);
 
-	button_preview = gtk_button_new_with_label(_("Preview"));
-	gtk_widget_show( button_preview );
+	button_preview = pack_end5(hbut, gtk_button_new_with_label(_("Preview")));
 	gtk_signal_connect_object(GTK_OBJECT(button_preview), "clicked",
 		GTK_SIGNAL_FUNC(allcol_preview), (gpointer)chook);
-	gtk_box_pack_end( GTK_BOX(hbut), button_preview, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_preview, 80, -2);
 
-	button_cancel = gtk_button_new_with_label(_("Cancel"));
-	gtk_widget_show( button_cancel );
+	button_cancel = pack_end5(hbut, gtk_button_new_with_label(_("Cancel")));
 	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
 	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
 		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
-	gtk_box_pack_end( GTK_BOX(hbut), button_cancel, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_cancel, 80, -2);
+	gtk_widget_show_all(hbut);
 
 	gtk_widget_show( cs );
 	gtk_window_set_transient_for( GTK_WINDOW(allcol_window), GTK_WINDOW(main_window) );

@@ -864,6 +864,12 @@ GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget)
 	return (widget);
 }
 
+GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, 5);
+	return (widget);
+}
+
 // Save/restore window positions
 
 void win_store_pos(GtkWidget *window, char *inikey)
