@@ -63,59 +63,54 @@ void layers_init()
 	show_layers_main = inifile_get_gboolean( "layermainToggle", FALSE );
 }
 
-void repaint_layer(int l)			// Repaint layer in view/main window
+void repaint_layer(int l)		// Repaint layer in view/main window
 {
-	int lx = vw_zoom * layer_table[l].x, ly = vw_zoom * layer_table[l].y,
-		lw = vw_zoom * mem_width, lh = vw_zoom * mem_height;
+	int lx, ly, lw, lh;
+	int zoom = 1, scale = 1;
 
+	lx = layer_table[l].x;
+	ly = layer_table[l].y;
 	if ( l != layer_selected )
 	{
-		lw = vw_zoom * layer_table[l].image->mem_width + 1;
-		lh = vw_zoom * layer_table[l].image->mem_height + 1;
+		lw = layer_table[l].image->mem_width;
+		lh = layer_table[l].image->mem_height;
 	}
-	if ( vw_drawing != NULL )
-		gtk_widget_queue_draw_area( vw_drawing, lx + margin_view_x, ly + margin_view_y,
-						lw+1, lh+1 );
-
-	if ( show_layers_main )
+	else
 	{
-		if ( layer_selected == 0 )
-		{
-			lx = 0;
-			ly = 0;
-		}
-		else
-		{
-			lx = layer_table[layer_selected].x;
-			ly = layer_table[layer_selected].y;
-		}
-
-		if ( l == 0 )
-		{
-			lx = -lx;
-			ly = -ly;
-		}
-		else
-		{
-			lx = -lx + layer_table[l].x;
-			ly = -ly + layer_table[l].y;
-		}
-
-		if ( l == layer_selected )
-		{
-			lw = can_zoom * mem_width;
-			lh = can_zoom * mem_height;
-		}
-		else
-		{
-			lw = can_zoom * layer_table[l].image->mem_width + 1;
-			lh = can_zoom * layer_table[l].image->mem_height + 1;
-		}
-		lx *= can_zoom;
-		ly *= can_zoom;
-		gtk_widget_queue_draw_area( drawing_canvas, lx + margin_main_x, ly + margin_main_y,
-						lw, lh );
+		lw = mem_width;
+		lh = mem_height;
 	}
+	if (layer_selected)
+	{
+		lx -= layer_table[layer_selected].x;
+		ly -= layer_table[layer_selected].y;
+	}
+
+	vw_update_area(lx, ly, lw, lh);
+	if (!show_layers_main) return;
+
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	if (zoom > 1)
+	{
+		lw += lx;
+		lh += ly;
+		lx = lx < 0 ? -(-lx / zoom) : (lx + zoom - 1) / zoom;
+		ly = ly < 0 ? -(-ly / zoom) : (ly + zoom - 1) / zoom;
+		lw = (lw - lx * zoom + zoom - 1) / zoom;
+		lh = (lh - ly * zoom + zoom - 1) / zoom;
+		if ((lw <= 0) || (lh <= 0)) return;
+	}
+	else
+	{
+		lx *= scale;
+		ly *= scale;
+		lw *= scale;
+		lh *= scale;
+	}
+	gtk_widget_queue_draw_area(drawing_canvas,
+		lx + margin_main_x, ly + margin_main_y, lw, lh);
 }
 
 

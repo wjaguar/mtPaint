@@ -1263,12 +1263,15 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 {
 /* !!! This var has to be set up from config !!! */
 	int alpha_blend = TRUE;
-	unsigned char *src, *dest, *alpha, px, beta = 255;
+	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
 	int i, j, k, ii, ds, da = 0;
 
-	src = xtra_img[CHN_IMAGE];
+	if (xtra_img)
+	{
+		src = xtra_img[CHN_IMAGE];
+		alpha = xtra_img[CHN_ALPHA];
+	}
 	if (!src) src = base_img[CHN_IMAGE] + (rr_mw * y + x) * rr_bpp;
-	alpha = xtra_img[CHN_ALPHA];
 	if (!alpha) alpha = base_img[CHN_ALPHA] ? base_img[CHN_ALPHA] +
 		rr_mw * y + x : &beta;
 	if (alpha != &beta) da = rr_zoom;
@@ -1580,7 +1583,6 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 {
 /* !!! This var has to be set up from config !!! */
 	int alpha_blend = TRUE;
-	chanlist tlist;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
 	int j, jj, j0, dx, zoom = 1, scale = 1, nix = 0, niy = 0;
 
@@ -1602,7 +1604,6 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 
 	if ((pw2 < 1) || (ph2 < 1)) return;
 
-	memset(tlist, 0, sizeof(chanlist));
 	if (!mem_img[CHN_ALPHA] && (mem_xpm_trans < 0)) alpha_blend = FALSE;
 	if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw, czoom);
 
@@ -1619,8 +1620,8 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 			continue;
 		}
 		j0 = j;
-		render_row(rgb, mem_img, dx, j, tlist);
-		overlay_row(rgb, mem_img, dx, j, tlist);
+		render_row(rgb, mem_img, dx, j, NULL);
+		overlay_row(rgb, mem_img, dx, j, NULL);
 	}
 }
 

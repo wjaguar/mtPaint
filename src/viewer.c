@@ -582,7 +582,6 @@ static gboolean view_first_move = TRUE;
 void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
 {
-	chanlist tlist;
 	png_color *pal;
 	unsigned char *tmp, **img;
 	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp;
@@ -624,15 +623,14 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 			i = layer_table[0].image->mem_width;
 			j = layer_table[0].image->mem_height;
 		}
-		i = ((i - dx) / zoom) * scale;
-		j = ((j - dy) / zoom) * scale;
+		i = ((i - dx + zoom - 1) / zoom) * scale;
+		j = ((j - dy + zoom - 1) / zoom) * scale;
 		if (pw2 > i) pw2 = i;
 		if (ph2 > j) ph2 = j;
 		if ((pw2 <= 0) || (ph2 <= 0)) return;
 	}
 	xof = px % scale;
 	if (xof < 0) xof += scale;
-	memset(tlist, 0, sizeof(chanlist));
 
 	/* Get image-space bounds */
 	i = px % scale < 0 ? 1 : 0;
@@ -672,9 +670,9 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 			ddx = wx0 + mx * zoom - i;
 			ddy = wy0 + my * zoom - j;
 			if (ii - 1 >= wx1) mw = pw2 - mx;
-			else mw = (ii - i - ddx) / zoom;
+			else mw = (ii - i - ddx + zoom - 1) / zoom;
 			if (jj - 1 >= wy1) mh = ph2 - my;
-			else mh = (jj - j - ddy) / zoom;
+			else mh = (jj - j - ddy + zoom - 1) / zoom;
 			if ((mw <= 0) || (mh <= 0)) continue;
 		}
 		else
@@ -720,9 +718,9 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 				continue;
 			}
 			j = i / scale;
-			render_row(tmp, img, ddx, ddy + j, tlist);
+			render_row(tmp, img, ddx, ddy + j, NULL);
 			if (ll != layer_selected) continue;
-			overlay_row(tmp, img, ddx, ddy + j, tlist);
+			overlay_row(tmp, img, ddx, ddy + j, NULL);
 		}
 	}
 }
@@ -907,14 +905,12 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 	if (vw_zoom < 1.0)
 	{
 		zoom = rint(1.0 / vw_zoom);
-		w += x - 1;
-		h += y - 1;
-		w = w < 0 ? -((zoom - w - 1) / zoom) : w / zoom;
-		h = h < 0 ? -((zoom - h - 1) / zoom) : h / zoom;
+		w += x;
+		h += y;
 		x = x < 0 ? -(-x / zoom) : (x + zoom - 1) / zoom;
 		y = y < 0 ? -(-y / zoom) : (y + zoom - 1) / zoom;
-		w -= x - 1;
-		h -= y - 1;
+		w = (w - x * zoom + zoom - 1) / zoom;
+		h = (h - y * zoom + zoom - 1) / zoom;
 		if ((w <= 0) || (h <= 0)) return;
 	}
 	else

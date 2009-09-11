@@ -1500,8 +1500,8 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 		brcosa_scales[i] = add_slider2table( vals[i], mins[i], maxs[i], table2, (i+1)%5, 1, 255, 20 );
 		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment),
 			"value_changed", GTK_SIGNAL_FUNC(brcosa_slider_moved), NULL);
-		spin_to_table( table2, &brcosa_spins[i], (i+1)%5, 2, 5, vals[i], mins[i], maxs[i] );
-		GTK_WIDGET_UNSET_FLAGS (brcosa_spins[i], GTK_CAN_FOCUS);
+		spin_to_table( table2, &brcosa_spins[i], (i+1)%5, 2, 1, vals[i], mins[i], maxs[i] );
+//		GTK_WIDGET_UNSET_FLAGS (brcosa_spins[i], GTK_CAN_FOCUS);
 
 #if GTK_MAJOR_VERSION == 2
 		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[i])->entry ),
