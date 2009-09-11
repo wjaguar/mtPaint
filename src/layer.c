@@ -726,7 +726,7 @@ int load_layers( char *file_name )
 {
 	char tin[300], load_prefix[300], load_name[300], *c;
 	layer_image *lim2;
-	int i, j, k=0, layers_to_read = -1, layer_file_version = -1;
+	int i, j, k, layers_to_read = -1, layer_file_version = -1, lfail = 0;
 	FILE *fp;
 
 	strncpy( load_prefix, file_name, 256 );
@@ -750,8 +750,7 @@ int load_layers( char *file_name )
 
 	i = read_file_num(fp, tin);
 	if ( i==-987654321 ) goto fail2;
-	layers_to_read = i;
-	mtMIN( layers_to_read, layers_to_read, MAX_LAYERS )
+	layers_to_read = i < MAX_LAYERS ? i : MAX_LAYERS;
 
 	if ( layers_total>0 ) layers_remove_all();	// Remove all current layers if any
 	for ( i=0; i<=layers_to_read; i++ )
@@ -760,63 +759,59 @@ int load_layers( char *file_name )
 		j = get_next_line(tin, 256, fp);
 		string_chop(tin);
 		snprintf(load_name, 260, "%s%s", load_prefix, tin);
-		k = do_a_load(load_name);
-		if ( k==0 )				// Load was successful
+		k = 1;
+		j = detect_image_format(load_name);
+		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
+			k = load_image(load_name, FS_PNG_LOAD, j) != 1;
+
+		if (k) /* Failure - skip this layer */
 		{
-			lim2 = malloc( sizeof(layer_image) );
-			if ( lim2 == NULL )
-			{
-				memory_errors(1);	// We have run out of memory!
-				layers_remove_all();	// Remove all layers - total meltdown!
-				goto fail2;
-			}
-			else
-			{
-				layer_table[layers_total].image = lim2;
-				layer_copy_from_main( layers_total );
-
-				j = get_next_line(tin, 256, fp);
-				string_chop(tin);
-				strncpy(layer_table[layers_total].name, tin, 32); // Layer text name
-
-				k = read_file_num(fp, tin);
-				mtMAX(k, k, 0)
-				mtMIN(k, k, 1)
-				layer_table[layers_total].visible = k;
-
-				layer_table[layers_total].x = read_file_num(fp, tin);
-				layer_table[layers_total].y = read_file_num(fp, tin);
-
-				k = read_file_num(fp, tin);
-				mtMAX(k, k, 0)
-				mtMIN(k, k, 1)
-				layer_table[layers_total].use_trans = k;
-
-				k = read_file_num(fp, tin);
-				mtMAX(k, k, 0)
-				mtMIN(k, k, 255)
-				layer_table[layers_total].trans = k;
-
-				k = read_file_num(fp, tin);
-				mtMAX(k, k, 1)
-				mtMIN(k, k, 100)
-				layer_table[layers_total].opacity = k;
-
-				layers_total++;
-
-				// Bogus 1x1 image used
-				mem_width = 1;
-				mem_height = 1;
-				memset(mem_img, 0, sizeof(chanlist));
-				memset(&mem_undo_im_[0].img, 0, sizeof(chanlist));
-				mem_undo_im_[0].img[CHN_IMAGE] =
-					mem_img[CHN_IMAGE] = malloc(3);
-			}
+			for ( j=0; j<7; j++ ) read_file_num(fp, tin);
+			lfail++;
+			continue;
 		}
-		else		// Failed to load file
+
+		/* Load was successful */
+		set_new_filename(load_name);
+
+		lim2 = malloc( sizeof(layer_image) );
+		if (!lim2)
 		{
-			for ( j=0; j<7; j++ ) read_file_num(fp, tin);		// Skip this layer
+			memory_errors(1);	// We have run out of memory!
+			layers_remove_all();	// Remove all layers - total meltdown!
+			goto fail2;
 		}
+
+		layer_table[layers_total].image = lim2;
+		layer_copy_from_main( layers_total );
+
+		j = get_next_line(tin, 256, fp);
+		string_chop(tin);
+		strncpy(layer_table[layers_total].name, tin, 32); // Layer text name
+
+		k = read_file_num(fp, tin);
+		layer_table[layers_total].visible = k > 0;
+
+		layer_table[layers_total].x = read_file_num(fp, tin);
+		layer_table[layers_total].y = read_file_num(fp, tin);
+
+		k = read_file_num(fp, tin);
+		layer_table[layers_total].use_trans = k > 0;
+
+		k = read_file_num(fp, tin);
+		layer_table[layers_total].trans = k < 0 ? 0 : k > 255 ? 255 : k;
+
+		k = read_file_num(fp, tin);
+		layer_table[layers_total].opacity = k < 1 ? 1 : k > 100 ? 100 : k;
+
+		layers_total++;
+
+		// Bogus 1x1 image used
+		mem_width = 1;
+		mem_height = 1;
+		memset(mem_img, 0, sizeof(chanlist));
+		memset(&mem_undo_im_[0].img, 0, sizeof(chanlist));
+		mem_undo_im_[0].img[CHN_IMAGE] = mem_img[CHN_IMAGE] = malloc(3);
 	}
 	if ( layers_total>0 )
 	{
@@ -843,6 +838,12 @@ int load_layers( char *file_name )
 
 	update_cols();		// Update status bar info
 	if ( layers_total>0 ) men_item_state( menu_frames, TRUE );
+
+	if (lfail) /* There were failures */
+	{
+		snprintf(tin, 300, _("%d layers failed to load"), lfail);
+		alert_box( _("Error"), tin, _("OK"), NULL, NULL );
+	}
 
 	return 1;		// Success
 fail2:

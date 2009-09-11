@@ -1210,8 +1210,9 @@ static int populate_channel(char *filename)
 	ftype = detect_image_format(filename);
 	if (ftype < 0) return (-1); /* Silently fail if no file */
 
-	/* !!! No other formats for now */
-	if (ftype == FT_PNG) res = load_image(filename, FS_CHANNEL_LOAD, ftype);
+	/* Don't bother with mismatched formats */
+	if (file_formats[ftype].flags & (MEM_BPP == 1 ? FF_IDX | FF_BW : FF_RGB))
+		res = load_image(filename, FS_CHANNEL_LOAD, ftype);
 
 	/* Successful */
 	if (res == 1) canvas_undo_chores();
@@ -1255,37 +1256,21 @@ int do_a_load( char *fname )
 
 	set_image(FALSE);
 
-	switch (ftype)
-	{
-	case FT_PNG:
-	case FT_GIF:
-	case FT_JPEG:
-	case FT_TIFF:
-		res = load_image(real_fname, FS_PNG_LOAD, ftype);
-		break;
-	case FT_BMP: res = load_bmp( real_fname ); break;
-	case FT_XPM: res = load_xpm( real_fname ); break;
-	case FT_XBM: res = load_xbm( real_fname ); break;
-	case FT_LAYERS1: res = load_layers(real_fname); break;
-	default: res = -1; break;
-	}
+	if (ftype == FT_LAYERS1) res = load_layers(real_fname);
+	else res = load_image(real_fname, FS_PNG_LOAD, ftype);
 
 	if ( res<=0 )				// Error loading file
 	{
-		if (res == NOT_INDEXED)
+		if (res == TOO_BIG)
 		{
-			snprintf(mess, 500, _("Image is not indexed: %s"), fname);
-			alert_box( _("Error"), mess, ("OK"), NULL, NULL );
-		} else
-			if (res == TOO_BIG)
-			{
-				snprintf(mess, 500, _("File is too big, must be <= to width=%i height=%i : %s"), MAX_WIDTH, MAX_HEIGHT, fname);
-				alert_box( _("Error"), mess, _("OK"), NULL, NULL );
-			} else
-			{
-				alert_box( _("Error"), _("Unable to load file"),
-					_("OK"), NULL, NULL );
-			}
+			snprintf(mess, 500, _("File is too big, must be <= to width=%i height=%i : %s"), MAX_WIDTH, MAX_HEIGHT, fname);
+			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+		}
+		else
+		{
+			alert_box( _("Error"), _("Unable to load file"),
+				_("OK"), NULL, NULL );
+		}
 		goto fail;
 	}
 
@@ -1294,43 +1279,39 @@ int do_a_load( char *fname )
 
 	if ( res == FILE_MEM_ERROR ) memory_errors(1);		// Image was too large for OS
 
-/* !!! Not here - move to success-only path! */
-	if (ftype != FT_LAYERS1)
+	/* Whether we loaded something or failed to, old image is gone anyway */
+	register_file(real_fname);
+	if (ftype != FT_LAYERS1) /* A single image */
 	{
-		register_file(real_fname);
 		set_new_filename(real_fname);
 
-		/* To prevent automatic paste following a file load when enabling
-		 * "Changing tool commits paste" via preferences */
-		pressed_select_none(NULL, NULL);
-		reset_tools();
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
 	}
-	else
+	else /* A whole bunch of layers */
 	{
-		register_file(real_fname);		// Update recently used file list
 //		if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 		if ( !view_showing ) view_show();
 			// We have just loaded a layers file so display view & layers window if not up
-		update_menus();
 	}
+	/* To prevent automatic paste following a file load when enabling
+	 * "Changing tool commits paste" via preferences */
+	pressed_select_none(NULL, NULL);
+	reset_tools();
+	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 
-	if ( res>0 )
-	{
-		update_all_views();					// Show new image
-		update_image_bar();
+	/* Show new image */
+	update_all_views();
+	update_image_bar();
 
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-				// These 2 are needed to synchronize the scrollbars & image view
-		res = 1;
-	}
+	/* These 2 are needed to synchronize the scrollbars & image view */
+	gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
+	gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
+
 fail:	set_image(TRUE);
-	return (res != 1);
+	return (res <= 0);
 }
 
 

@@ -111,10 +111,6 @@ int save_image(char *file_name, ls_settings *settings);
 
 int load_image(char *file_name, int mode, int ftype);
 
-int load_xpm( char *file_name );
-int load_xbm( char *file_name );
-int load_bmp( char *file_name );
-
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );
 

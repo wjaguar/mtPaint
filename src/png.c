@@ -17,6 +17,8 @@
 	along with mtPaint in the file COPYING.
 */
 
+/* Rewritten for version 3.10 by Dmitry Groshev */
+
 #define PNG_READ_PACK_SUPPORTED
 
 #include <math.h>
@@ -78,7 +80,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "XPM", "xpm", "", FF_IDX | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 /* !!! Not supported yet */
-//	{ "TGA", "tga", "", FF_IDX | FF_RGB | FF_ALPHA },
+//	{ "TGA", "tga", "", FF_IDX | FF_RGB | FF_ALPHAR },
 //	{ "PCX", "pcx", "", FF_IDX | FF_RGB },
 /* !!! Placeholders */
 	{ "", "", "", 0},
@@ -124,6 +126,8 @@ int file_type_by_ext(char *name, guint32 mask)
 static int allocate_image(ls_settings *settings, int cmask)
 {
 	int i, j;
+
+	if ((settings->width < 1) || (settings->height < 1)) return (-1);
 
 	if ((settings->width > MAX_WIDTH) || (settings->height > MAX_HEIGHT))
 		return (TOO_BIG);
@@ -895,17 +899,8 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 }
 #endif
 
-#ifdef U_TIFF
-
-/* *** PREFACE ***
- * TIFF is a bitch, and libtiff is a joke. An unstable and buggy joke, at that.
- * It's a fact of life - and when some TIFFs don't load or are mangled, that
- * also is a fact of life. Installing latest libtiff may help - or not; sending
- * a bugreport with the offending file attached may help too - but again, it's
- * not guaranteed. But the common varieties of TIFF format should load OK. */
-
-/* Slow-but-sure universal bitstream parser; may read extra byte at the end */
-static void stream_bits(unsigned char *src, unsigned char *dest, int cnt,
+/* Slow-but-sure universal bitstream parsers; may read extra byte at the end */
+static void stream_MSB(unsigned char *src, unsigned char *dest, int cnt,
 	int bits, int bit0, int bitstep, int step)
 {
 	int i, j, v, mask = (1 << bits) - 1;
@@ -921,6 +916,31 @@ static void stream_bits(unsigned char *src, unsigned char *dest, int cnt,
 	}
 }
 
+static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
+	int bits, int bit0, int bitstep, int step)
+{
+	int i, j, v, mask = (1 << bits) - 1;
+
+	for (i = 0; i < cnt; i++)
+	{
+		j = bit0 >> 3;
+		v = (src[j + 1] << 8) | src[j];
+		v >>= bit0 & 7;
+		*dest = (unsigned char)(v & mask);
+		bit0 += bitstep;
+		dest += step;
+	}
+}
+
+#ifdef U_TIFF
+
+/* *** PREFACE ***
+ * TIFF is a bitch, and libtiff is a joke. An unstable and buggy joke, at that.
+ * It's a fact of life - and when some TIFFs don't load or are mangled, that
+ * also is a fact of life. Installing latest libtiff may help - or not; sending
+ * a bugreport with the offending file attached may help too - but again, it's
+ * not guaranteed. But the common varieties of TIFF format should load OK. */
+
 static int load_tiff(char *file_name, ls_settings *settings)
 {
 	char cbuf[1024];
@@ -929,7 +949,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	uint16 *sampinfo, *red16, *green16, *blue16;
 	uint32 width, height, tw = 0, th = 0, rps = 0;
 	uint32 *tr, *raster = NULL;
-	unsigned char *tmp, *src, *buf = NULL;
+	unsigned char xtable[256], *tmp, *src, *buf = NULL;
 	double d, d1;
 	int i, j, k, x0, y0, bsz, xstep, ystep, plane, nplanes, mirror;
 	int x, w, h, dx, bpr, bits1, bit0, db, n, nx;
@@ -1146,20 +1166,20 @@ static int load_tiff(char *file_name, ls_settings *settings)
 					dx = mirror & 1 ? -bpp : bpp;
 					tmp = settings->img[CHN_IMAGE] + i * bpp + plane;
 				}
-				stream_bits(src, tmp, w, bits1, bit0, db, dx);
+				stream_MSB(src, tmp, w, bits1, bit0, db, dx);
 				if (planar) continue;
 				if (bpp == 3)
 				{
-					stream_bits(src, tmp + 1, w, bits1,
+					stream_MSB(src, tmp + 1, w, bits1,
 						bit0 + bpsamp, db, dx);
-					stream_bits(src, tmp + 2, w, bits1,
+					stream_MSB(src, tmp + 2, w, bits1,
 						bit0 + bpsamp * 2, db, dx);
 				}
 				if (settings->img[CHN_ALPHA])
 				{
 					dx = mirror & 1 ? -1 : 1;
 					tmp = settings->img[CHN_ALPHA] + i;
-					stream_bits(src, tmp, w, bits1,
+					stream_MSB(src, tmp, w, bits1,
 						bit0 + bpsamp * bpp, db, dx);
 				}
 				if (pr && ((n * 10) % nx >= nx - 10))
@@ -1167,8 +1187,16 @@ static int load_tiff(char *file_name, ls_settings *settings)
 			}
 		}
 
+		/* Prepare to rescale what we've got */
+		j = 1 << bits1;
+		d1 = 255.0 / (double)(j - 1);
+		memset(xtable, 0, 256);
+		for (i = 0; i < j; i++)
+		{
+			xtable[i] = rint(d1 * i);
+		}
+
 		/* Un-associate alpha & rescale image data */
-		d1 = 255.0 / (double)((1 << bits1) - 1);
 		j = width * height;
 		tmp = settings->img[CHN_IMAGE];
 		src = settings->img[CHN_ALPHA];
@@ -1179,7 +1207,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 			{
 				if (!src[i]) continue;
 				d = 255.0 / (double)src[i];
-				src[i] = rint(d1 * src[i]);
+				src[i] = xtable[src[i]];
 				k = rint(d * tmp[0]);
 				tmp[0] = k > 255 ? 255 : k;
 				if (bpp == 1) continue;
@@ -1196,7 +1224,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		{
 			for (i = 0; i < j; i++)
 			{
-				src[i] = rint(d1 * src[i]);
+				src[i] = xtable[src[i]];
 			}
 		}
 
@@ -1205,7 +1233,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		{
 			for (i = 0; i < j * 3; i++)
 			{
-				tmp[i] = rint(d1 * tmp[i]);
+				tmp[i] = xtable[tmp[i]];
 			}
 		}
 
@@ -1377,135 +1405,14 @@ static int save_tiff(char *file_name, ls_settings *settings)
 }
 #endif
 
-int load_bmp( char *file_name )
-{
-	unsigned char buff[MAX_WIDTH*4], pix, *wrk_image;
-	int width, height, readin, bitcount, compression, cols, i, j, k, bpl=0;
-	FILE *fp;
-
-	if ((fp = fopen(file_name, "rb")) == NULL) return -1;
-
-	readin = fread(buff, 1, 54, fp);
-	if ( readin < 54 ) goto fail;					// No proper header
-//for (i=0; i<54; i++) printf("%3i %3i\n",i,buff[i]);
-
-	if ( buff[0] != 'B' || buff[1] != 'M' ) goto fail;		// Signature
-
-	width = buff[18] + (buff[19] << 8) + (buff[20] << 16) + (buff[21] << 24);
-	height = buff[22] + (buff[23] << 8) + (buff[24] << 16) + (buff[25] << 24);
-	bitcount = buff[28] + (buff[29] << 8);
-	compression = buff[30] + (buff[31] << 8) + (buff[32] << 16) + (buff[33] << 24);
-	cols = buff[46] + (buff[47] << 8) + (buff[48] << 16) + (buff[49] << 24);
-
-	if ( width > MAX_WIDTH || height > MAX_HEIGHT )
-	{
-		fclose(fp);
-		return TOO_BIG;
-	}
-//printf("BMP file %i x %i x %i bits x %i cols bpl=%i\n", width, height, bitcount, cols, bpl);
-
-	if ( bitcount!=1 && bitcount!=4 && bitcount!=8 && bitcount!=24 ) goto fail;
-	if ( compression != 0 ) goto fail;
-
-	bpl = width;						// Calculate bytes per line
-	if ( bitcount == 24 ) bpl = width*3;
-	if ( bitcount == 4 ) bpl = (width+1) / 2;
-	if ( bitcount == 1 ) bpl = (width+7) / 8;
-	if (bpl % 4 != 0) bpl = bpl + 4 - bpl % 4;		// 4 byte boundary for pixels
-
-	if ( bitcount == 24 )		// RGB image
-	{
-		mem_pal_load_def();
-		if (mem_new(width, height, 3, CMASK_IMAGE))
-			goto file_too_huge;
-		wrk_image = mem_img[CHN_IMAGE];
-		progress_init(_("Loading BMP image"),0);
-		for ( j=0; j<height; j++ )
-		{
-			if (j%16 == 0) progress_update( ((float) j) / height );
-			readin = fread(buff, 1, bpl, fp);	// Read in line of pixels
-			for ( i=0; i<width; i++ )
-			{
-				wrk_image[ 2 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i ];
-				wrk_image[ 1 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 1 ];
-				wrk_image[ 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 2 ];
-			}
-		}
-		progress_end();
-	}
-	else				// Indexed palette image
-	{
-		if ( cols == 0 ) cols = 1 << bitcount;
-		if ( cols<2 || cols>256 ) goto fail;
-		mem_cols = cols;
-
-		readin = fread(buff, 1, cols*4, fp);		// Read in colour table
-		for ( i=0; i<cols; i++ )
-		{
-			mem_pal[i].red = buff[2 + 4*i];
-			mem_pal[i].green = buff[1 + 4*i];
-			mem_pal[i].blue = buff[4*i];
-		}
-		if (mem_new(width, height, 1, CMASK_IMAGE))
-			goto file_too_huge;
-		wrk_image = mem_img[CHN_IMAGE];
-
-		progress_init(_("Loading BMP image"),0);
-		for ( j=0; j<height; j++ )
-		{
-			if (j%16 == 0) progress_update( ((float) j) / height );
-			readin = fread(buff, 1, bpl, fp);	// Read in line of pixels
-
-			if ( bitcount == 8 )
-			{
-				for ( i=0; i<width; i++ )
-				{
-					pix = buff[i];
-					wrk_image[ i + width*(height - 1 - j) ] = pix;
-				}
-			}
-			if ( bitcount == 4 )
-			{
-				for ( i=0; i<width; i=i+2 )
-				{
-					pix = buff[i/2];
-					wrk_image[ i + width*(height - 1 - j) ] = pix / 16;
-					if ( (i+1)<width )
-						wrk_image[ 1 + i + width*(height - 1 - j) ] = pix % 16;
-				}
-			}
-			if ( bitcount == 1 )
-			{
-				for ( i=0; i<width; i=i+8 )
-				{
-					pix = buff[i/8];
-					k = 0;
-					while ( (k<8) && (i+k)<width )
-					{
-						wrk_image[ i+k + width*(height - 1 - j) ]
-							= pix / (1 << (7-k)) % 2;
-						k++;
-					}
-				}
-			}
-		}
-		progress_end();
-	}
-
-	return 1;	// Success
-fail:
-	fclose (fp);
-	return -1;
-file_too_huge:
-	fclose (fp);
-	return FILE_MEM_ERROR;
-}
-
-/* Macros for writing values in Intel byte order */
+/* Macros for accessing values in Intel byte order */
+#define GET16(buf) (((buf)[1] << 8) + (buf)[0])
+#define GET32(buf) (((buf)[3] << 24) + ((buf)[2] << 16) + ((buf)[1] << 8) + (buf)[0])
 #define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
 #define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
 	(buf)[2] = ((v) >> 16) & 0xFF; (buf)[3] = (v) >> 24;
 
+/* Version 2 fields */
 #define BMP_FILESIZE  2		/* 32b */
 #define BMP_DATAOFS  10		/* 32b */
 #define BMP_HDR2SIZE 14		/* 32b */
@@ -1513,19 +1420,347 @@ file_too_huge:
 #define BMP_HEIGHT   22		/* 32b */
 #define BMP_PLANES   26		/* 16b */
 #define BMP_BPP      28		/* 16b */
+#define BMP2_HSIZE   30
+/* Version 3 fields */
 #define BMP_COMPRESS 30		/* 32b */
 #define BMP_DATASIZE 34		/* 32b */
 #define BMP_COLORS   46		/* 32b */
 #define BMP_ICOLORS  50		/* 32b */
-#define BMP_HSIZE    54
-#define BMP_H2SIZE   (BMP_HSIZE - BMP_HDR2SIZE)
-#define BMP_MAXHSIZE (BMP_HSIZE + 256 * 4)
+#define BMP3_HSIZE   54
+/* Version 4 fields */
+#define BMP_RMASK    54		/* 32b */
+#define BMP_GMASK    58		/* 32b */
+#define BMP_BMASK    62		/* 32b */
+#define BMP_AMASK    66		/* 32b */
+#define BMP_CSPACE   70		/* 32b */
+#define BMP4_HSIZE  122
+#define BMP5_HSIZE  138
+#define BMP_MAXHSIZE (BMP5_HSIZE + 256 * 4)
+
+static int load_bmp(char *file_name, ls_settings *settings)
+{
+	guint32 masks[4], m;
+	unsigned char hdr[BMP5_HSIZE], xlat[256], *dest, *tmp, *buf = NULL;
+	FILE *fp;
+	double d;
+	int shifts[4], bpps[4];
+	int i, j, k, n, ii, w, h, bpp, cmask = CMASK_IMAGE, comp = 0, res = -1;
+	int l, bl, rl, step, skip, dx, dy;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+
+	/* Read the largest header */
+	k = fread(hdr, 1, BMP5_HSIZE, fp);
+
+	/* Check general validity */
+	if (k < BMP2_HSIZE) goto fail; /* Least supported header size */
+	if ((hdr[0] != 'B') || (hdr[1] != 'M')) goto fail; /* Signature */
+	l = GET32(hdr + BMP_HDR2SIZE) + BMP_HDR2SIZE;
+	if (k < l) goto fail;
+
+	/* Check format */
+	if (GET16(hdr + BMP_PLANES) != 1) goto fail; /* Only one plane */
+	w = GET32(hdr + BMP_WIDTH);
+	h = GET32(hdr + BMP_HEIGHT);
+	bpp = GET16(hdr + BMP_BPP);
+	if (l >= BMP3_HSIZE) comp = GET32(hdr + BMP_COMPRESS);
+	/* Only 1, 4, 8, 16, 24 and 32 bpp allowed */
+	switch (bpp)
+	{
+	case 1: if (comp) goto fail; /* No compression */
+		break;
+	case 4: if (comp && ((comp != 2) || (h < 0))) goto fail; /* RLE4 */
+		break;
+	case 8: if (comp && ((comp != 1) || (h < 0))) goto fail; /* RLE8 */
+		break;
+	case 16: case 24: case 32:
+		if (comp && (comp != 3)) goto fail; /* Bitfields */
+		shifts[3] = bpps[3] = masks[3] = 0; /* No alpha by default */
+		if (comp == 3)
+		{
+			/* V3-style bitfields? */
+			if ((l == BMP3_HSIZE) &&
+				(GET32(hdr + BMP_DATAOFS) >= BMP_AMASK))
+				l = BMP_AMASK;
+			if (l < BMP_AMASK) goto fail;
+			masks[0] = GET32(hdr + BMP_RMASK);
+			masks[1] = GET32(hdr + BMP_GMASK);
+			masks[2] = GET32(hdr + BMP_BMASK);
+			if (l >= BMP_AMASK + 4)
+				masks[3] = GET32(hdr + BMP_AMASK);
+			if (masks[3]) cmask = CMASK_RGBA;
+
+			/* Convert masks into bit lengths and offsets */
+			for (i = 0; i < 4; i++)
+			{
+				/* Bit length - just count bits */
+				j = (masks[i] & 0x55555555) +
+					((masks[i] >> 1) & 0x55555555);
+				j = (j & 0x33333333) + ((j >> 2) & 0x33333333);
+				j = (j & 0x0F0F0F0F) + ((j >> 4) & 0x0F0F0F0F);
+				j = (j & 0x00FF00FF) + ((j >> 8) & 0x00FF00FF);
+				j = (j & 0xFFFF) + (j >> 16);
+				/* Bit offset - add bits _before_ mask */
+				m = ((~masks[i] + 1) & masks[i]) - 1;
+				k = (m & 0x55555555) + ((m >> 1) & 0x55555555);
+				k = (k & 0x33333333) + ((k >> 2) & 0x33333333);
+				k = (k & 0x0F0F0F0F) + ((k >> 4) & 0x0F0F0F0F);
+				k = (k & 0x00FF00FF) + ((k >> 8) & 0x00FF00FF);
+				k = (k & 0xFFFF) + (k >> 16) + j;
+				if (j > 8) j = 8;
+				shifts[i] = k - j;
+				bpps[i] = j;
+			}
+		}
+		else if (bpp == 16)
+		{
+			shifts[0] = 10;
+			shifts[1] = 5;
+			shifts[2] = 0;
+			bpps[0] = bpps[1] = bpps[2] = 5;
+		}
+		else
+		{
+			shifts[0] = 16;
+			shifts[1] = 8;
+			shifts[2] = 0;
+			bpps[0] = bpps[1] = bpps[2] = 8;
+			if (bpp == 32) /* Consider alpha present by default */
+			{
+				shifts[3] = 24;
+				bpps[3] = 8;
+				cmask = CMASK_RGBA;
+			}
+		}
+		break;
+	default: goto fail;
+	}
+
+	/* Allocate buffer and image */
+	settings->width = w;
+	settings->height = abs(h);
+	settings->bpp = bpp < 16 ? 1 : 3;
+	rl = ((w * bpp + 31) >> 3) & ~3; /* Row data length */
+	/* For RLE, load all image at once */
+	if (comp && (bpp < 16))
+		bl = GET32(hdr + BMP_FILESIZE) - GET32(hdr + BMP_DATAOFS);
+	/* Otherwise, only one row at a time */
+	else bl = rl;
+	/* To accommodate full palette and bitparser's extra step */
+	buf = malloc(bl < 1024 ? 1024 + 1 : bl + 1);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail2;
+	if ((res = allocate_image(settings, cmask))) goto fail2;
+	res = -1;
+
+	/* Load palette, if any */
+	j = 0;
+	if (bpp < 16)
+	{
+		if (l >= BMP_COLORS + 4) j = GET32(hdr + BMP_COLORS);
+		if (!j) j = 1 << bpp;
+		k = GET32(hdr + BMP_DATAOFS) - l;
+		k /= l < BMP3_HSIZE ? 3 : 4;
+		if (!k) goto fail2; /* No palette in file */
+		if (k < j) j = k;
+	}
+	if (j)
+	{
+		settings->colors = j;
+		fseek(fp, l, SEEK_SET);
+		k = l < BMP3_HSIZE ? 3 : 4;
+		i = fread(buf, 1, j * k, fp);
+		if (i < j * k) goto fail2; /* Cannot read palette */
+		tmp = buf;
+		for (i = 0; i < j; i++)
+		{
+			settings->pal[i].red = tmp[2];
+			settings->pal[i].green = tmp[1];
+			settings->pal[i].blue = tmp[0];
+			tmp += k;
+		}
+	}
+
+	if (!settings->silent) progress_init(_("Loading BMP image"), 0);
+
+	fseek(fp, GET32(hdr + BMP_DATAOFS), SEEK_SET); /* Seek to data */
+	if (h < 0) /* Prepare row loop */
+	{
+		step = 1;
+		i = 0;
+		h = -h;
+	}
+	else
+	{
+		step = -1;
+		i = h - 1;
+	}
+	res = FILE_LIB_ERROR;
+
+	if ((comp != 1) && (comp != 2)) /* No RLE */
+	{
+		for (n = 0; (i < h) && (i >= 0); n++ , i += step)
+		{
+			j = fread(buf, 1, rl, fp);
+			if (j < rl) goto fail3;
+			if (bpp < 16) /* Indexed */
+			{
+				dest = settings->img[CHN_IMAGE] + w * i;
+				stream_MSB(buf, dest, w, bpp, 0, bpp, 1);
+			}
+			else /* RGB */
+			{
+				dest = settings->img[CHN_IMAGE] + w * i * 3;
+				stream_LSB(buf, dest + 0, w, bpps[0],
+					shifts[0], bpp, 3);
+				stream_LSB(buf, dest + 1, w, bpps[1],
+					shifts[1], bpp, 3);
+				stream_LSB(buf, dest + 2, w, bpps[2],
+					shifts[2], bpp, 3);
+				if (settings->img[CHN_ALPHA])
+					stream_LSB(buf, settings->img[CHN_ALPHA] +
+						w * i, w, bpps[3], shifts[3], bpp, 1);
+			}
+			if (!settings->silent && ((n * 10) % h >= h - 10))
+				progress_update((float)n / h);
+		}
+
+		/* Rescale shorter-than-byte RGBA components */
+		if (bpp > 8)
+		for (i = 0; i < 4; i++)
+		{
+			if (bpps[i] >= 8) continue;
+			k = 3;
+			if (i == 3)
+			{
+				tmp = settings->img[CHN_ALPHA];
+				if (!tmp) continue;
+				k = 1;
+			}
+			else tmp = settings->img[CHN_IMAGE] + i;
+			n = (1 << bpps[i]) - 1;
+			d = 255.0 / (double)n;
+			for (j = 0; j <= n; j++) xlat[j] = rint(d * j);
+			n = w * h;
+			for (j = 0; j < n; j++ , tmp += k) *tmp = xlat[*tmp];
+		}
+
+		res = 1;
+	}
+	else /* RLE - always bottom-up */
+	{
+		k = fread(buf, 1, bl, fp);
+		if (k < bl) goto fail3;
+		memset(settings->img[CHN_IMAGE], 0, w * h);
+		skip = j = 0;
+
+		dest = settings->img[CHN_IMAGE] + w * i;
+		for (tmp = buf; tmp - buf + 1 < k; )
+		{
+			/* Don't fail on out-of-bounds writes */
+			if (*tmp) /* Fill block */
+			{
+				dx = n = *tmp;
+				if (j + n > w) dx = j > w ? 0 : w - j;
+				if (bpp == 8) /* 8-bit */
+				{
+					memset(dest + j, tmp[1], dx);
+					j += n; tmp += 2;
+					continue;
+				}
+				for (ii = 0; ii < dx; ii++) /* 4-bit */
+				{
+					dest[j++] = tmp[1] >> 4;
+					if (++ii >= dx) break;
+					dest[j++] = tmp[1] & 0xF;
+				}
+				j += n - dx;
+				tmp += 2;
+				continue;
+			}
+			if (tmp[1] > 2) /* Copy block */
+			{
+				dx = n = tmp[1];
+				if (j + n > w) dx = j > w ? 0 : w - j;
+				tmp += 2;
+				if (bpp == 8) /* 8-bit */
+				{
+					memcpy(dest + j, tmp, dx);
+					j += n; tmp += (n + 1) & ~1;
+					continue;
+				}
+				for (ii = 0; ii < dx; ii++) /* 4-bit */
+				{
+					dest[j++] = *tmp >> 4;
+					if (++ii >= dx) break;
+					dest[j++] = *tmp++ & 0xF;
+				}
+				j += n - dx;
+				tmp += (((n + 3) & ~3) - (dx & ~1)) >> 1;
+				continue;
+			}
+			if (tmp[1] == 2) /* Skip block */
+			{
+				dx = tmp[2] + j;
+				dy = tmp[3];
+				if ((dx > w) || (i - dy < 0)) goto fail3;
+			}
+			else /* End-of-something block */
+			{
+				dx = 0;
+				dy = tmp[1] ? i + 1 : 1;
+			}
+			/* Transparency detected first time? */
+			if (!skip && ((dy != 1) || dx || (j < w)))
+			{
+				if ((res = allocate_image(settings,
+					CMASK_FOR(CHN_ALPHA)))) goto fail3;
+				res = FILE_LIB_ERROR;
+				skip = 1;
+				if (settings->img[CHN_ALPHA]) /* Got alpha */
+				{
+					memset(settings->img[CHN_ALPHA], 255, w * h);
+					skip = 2;
+				}
+			}
+			/* Row skip */
+			for (ii = 0; ii < dy; ii++ , i--)
+			{
+				if (skip > 1) memset(settings->img[CHN_ALPHA] +
+					w * i + j, 0, w - j);
+				j = 0;
+				if (!settings->silent && ((i * 10) % h >= h - 10))
+					progress_update((float)(h - i - 1) / h);
+			}
+			/* Column skip */
+			if (skip > 1) memset(settings->img[CHN_ALPHA] +
+				w * i + j, 0, dx - j);
+			j = dx;
+			if (tmp[1] == 1) /* End-of-file block */
+			{
+				res = 1;
+				break;
+			}
+			dest = settings->img[CHN_IMAGE] + w * i;
+			tmp += 2 + tmp[1];
+		}
+	}
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	free(buf);
+fail:	fclose(fp);
+	return (res);
+}
+
+/* Use BMP4 instead of BMP3 for images with alpha */
+/* #define USE_BMP4 */ /* Most programs just use 32-bit RGB BMP3 for RGBA */
 
 static int save_bmp(char *file_name, ls_settings *settings)
 {
 	unsigned char *buf, *tmp, *src;
 	FILE *fp;
-	int i, j, ll, hsz, dsz, fsz;
+	int i, j, ll, hsz0, hsz, dsz, fsz;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 
 	i = w > BMP_MAXHSIZE / 4 ? w * 4 : BMP_MAXHSIZE;
@@ -1543,7 +1778,13 @@ static int save_bmp(char *file_name, ls_settings *settings)
 	if ((bpp == 3) && settings->img[CHN_ALPHA]) bpp = 4;
 	ll = (bpp * w + 3) & ~3;
 	j = bpp == 1 ? settings->colors : 0;
-	hsz = BMP_HSIZE + j * 4;
+
+#ifdef USE_BMP4
+	hsz0 = bpp == 4 ? BMP4_HSIZE : BMP3_HSIZE;
+#else
+	hsz0 = BMP3_HSIZE;
+#endif
+	hsz = hsz0 + j * 4;
 	dsz = ll * h;
 	fsz = hsz + dsz;
 
@@ -1551,16 +1792,31 @@ static int save_bmp(char *file_name, ls_settings *settings)
 	buf[0] = 'B'; buf[1] = 'M';
 	PUT32(buf + BMP_FILESIZE, fsz);
 	PUT32(buf + BMP_DATAOFS, hsz);
-	PUT32(buf + BMP_HDR2SIZE, BMP_H2SIZE);
+	i = hsz0 - BMP_HDR2SIZE;
+	PUT32(buf + BMP_HDR2SIZE, i);
 	PUT32(buf + BMP_WIDTH, w);
 	PUT32(buf + BMP_HEIGHT, h);
 	PUT16(buf + BMP_PLANES, 1);
 	PUT16(buf + BMP_BPP, bpp * 8);
+#ifdef USE_BMP4
+	i = bpp == 4 ? 3 : 0; /* Bitfield "compression" / no compression */
+	PUT32(buf + BMP_COMPRESS, i);
+#else
 	PUT32(buf + BMP_COMPRESS, 0); /* No compression */
+#endif
 	PUT32(buf + BMP_DATASIZE, dsz);
 	PUT32(buf + BMP_COLORS, j);
 	PUT32(buf + BMP_ICOLORS, j);
-	tmp = buf + BMP_HSIZE;
+#ifdef USE_BMP4
+	if (bpp == 4)
+	{
+		memset(buf + BMP_RMASK, 0, BMP4_HSIZE - BMP_RMASK);
+		buf[BMP_RMASK + 2] = buf[BMP_GMASK + 1] = buf[BMP_BMASK + 0] =
+			buf[BMP_AMASK + 3] = 0xFF; /* Masks for 8-bit BGRA */
+		buf[BMP_CSPACE] = 1; /* Device-dependent RGB */
+	}
+#endif
+	tmp = buf + hsz0;
 	for (i = 0; i < j; i++ , tmp += 4)
 	{
 		tmp[0] = settings->pal[i].blue;
@@ -1612,214 +1868,6 @@ static int save_bmp(char *file_name, ls_settings *settings)
 	return 0;
 }
 
-int load_xpm( char *file_name )
-{
-	char tin[4110], col_tab[257][3], *po;
-	FILE *fp;
-	int fw = 0, fh = 0, fc = 0, fcpp = 0, res;
-	int i, j, k, dub = 0, trans = -1;
-	float grey;
-
-	png_color t_pal[256];
-
-
-	if ((fp = fopen(file_name, "r")) == NULL) return -1;
-
-///	LOOK FOR XPM / xpm IN FIRST LINE
-	res = get_next_line( tin, 4108, fp );
-	if ( res < 0 ) goto fail;			// Some sort of file input error occured
-	if ( strlen(tin) < 5 || strlen(tin) > 25 ) goto fail;
-
-	if ( strstr( tin, "xpm" ) == NULL && strstr( tin, "XPM" ) == NULL ) goto fail;
-
-
-	do	// Search for first occurrence of " at beginning of line
-	{
-		res = get_next_line( tin, 4108, fp );
-		if ( res < 0 ) goto fail;			// Some sort of file input error occured
-	}
-	while ( tin[0] != '"' );
-
-	sscanf(tin, "\"%i %i %i %i", &fw, &fh, &fc, &fcpp );
-
-	if ( fc < 2 || fc > 256 || fcpp<1 || fcpp>2 )
-	{
-		fclose(fp);
-		return NOT_INDEXED;
-	}
-
-// !!! WTF??? A bug!!!
-//	if ( fw < 4 || fh < 4 ) goto fail;
-
-	if ( fw > MAX_WIDTH || fh > MAX_HEIGHT )
-	{
-		fclose(fp);
-		return TOO_BIG;
-	}
-
-	i=0;
-	while ( i<fc )			// Read in colour palette table
-	{
-		do
-		{
-			res = get_next_line( tin, 4108, fp );
-			if ( res < 0 ) goto fail;		// Some sort of file input error occured
-			if ( strlen( tin ) > 32 ) goto fail;	// Too many chars - not real XPM file
-		} while ( strlen( tin ) < 5 || strchr(tin, '"') == NULL );
-
-		po = strchr(tin, '"');
-		if ( po == NULL ) goto fail;			// Not real XPM file
-
-		po++;
-		if (po[0] < 32) goto fail;
-		col_tab[i][0] = po[0];				// Register colour reference
-		po++;
-		if (fcpp == 1) col_tab[i][1] = 0;
-		else
-		{
-			if (po[0] < 32) goto fail;
-			col_tab[i][1] = po[0];
-			col_tab[i][2] = 0;
-			po++;
-		}
-		while ( po[0] != 'c' && po[0] != 0 ) po++;
-		if ( po[0] == 0 || po[1] == 0 || po[2] == 0 ) goto fail;
-		po = po + 2;
-		if ( po[0] == '#' )
-		{
-			po++;
-			if ( strlen(po) < 7 ) goto fail;	// Check the hex RGB lengths are OK
-			if ( po[6] == '"' ) po[6] = 0;
-			else
-			{
-				if ( strlen(po) < 13 ) goto fail;
-				if ( po[12] == '"' ) po[12] = 0;
-				else goto fail;
-				dub = 1;				// Double hex system detected
-			}
-			res = read_hex_dub( po );
-			if ( res<0 ) goto fail;
-			t_pal[i].red = res;
-			if ( dub == 0 ) po = po + 2; else po = po + 4;
-
-			res = read_hex_dub( po );
-			if ( res<0 ) goto fail;
-			t_pal[i].green = res;
-			if ( dub == 0 ) po = po + 2; else po = po + 4;
-
-			res = read_hex_dub( po );
-			if ( res<0 ) goto fail;
-			t_pal[i].blue = res;
-			if ( dub == 0 ) po = po + 2; else po = po + 4;
-		}
-		else	// Not a hex description so could be "None" or a colour label like "red"
-		{
-			t_pal[i].red = 0;
-			t_pal[i].green = 0;			// Default to black
-			t_pal[i].blue = 0;
-			if ( check_str(4, po, "none") )
-			{
-				t_pal[i].red = 115;
-				t_pal[i].green = 115;
-				t_pal[i].blue = 0;
-				trans = i;
-			}
-			if ( check_str(3, po, "red") )
-			{	t_pal[i].red = 255;
-				t_pal[i].green = 0;
-				t_pal[i].blue = 0;	}
-			if ( check_str(5, po, "green") )
-			{	t_pal[i].red = 0;
-				t_pal[i].green = 255;
-				t_pal[i].blue = 0;	}
-			if ( check_str(6, po, "yellow") )
-			{	t_pal[i].red = 255;
-				t_pal[i].green = 255;
-				t_pal[i].blue = 0;	}
-			if ( check_str(4, po, "blue") )
-			{	t_pal[i].red = 0;
-				t_pal[i].green = 0;
-				t_pal[i].blue = 255;	}
-			if ( check_str(7, po, "magenta") )
-			{	t_pal[i].red = 255;
-				t_pal[i].green = 0;
-				t_pal[i].blue = 255;	}
-			if ( check_str(4, po, "cyan") )
-			{	t_pal[i].red = 0;
-				t_pal[i].green = 255;
-				t_pal[i].blue = 255;	}
-			if ( check_str(4, po, "gray") )
-			{
-				po = po + 4;
-				if ( read_hex(po[0])<0 || read_hex(po[0])<0 || read_hex(po[0])<0 )
-					goto fail;
-				grey = read_hex(po[0]);
-				if ( read_hex(po[1]) >= 0 ) grey = 10*grey + read_hex(po[1]);
-				if ( read_hex(po[2]) >= 0 ) grey = 10*grey + read_hex(po[1]);
-				if ( grey<0 || grey>100 ) grey = 0;
-
-				t_pal[i].red = mt_round( 255*grey/100 );
-				t_pal[i].green = mt_round( 255*grey/100 );
-				t_pal[i].blue = mt_round( 255*grey/100 );
-			}
-		}
-
-		i++;
-	}
-
-	mem_pal_copy( mem_pal, t_pal );
-	mem_cols = fc;
-	if (mem_new(fw, fh, 1, CMASK_IMAGE))
-	{
-		fclose(fp);
-		return FILE_MEM_ERROR;
-	}
-	if (mem_img[CHN_IMAGE] == NULL) goto fail;
-	mem_xpm_trans = trans;
-
-	progress_init(_("Loading XPM image"),0);
-	for ( j=0; j<fh; j++ )
-	{
-		if (j%16 == 0) progress_update( ((float) j) / fh );
-		do
-		{
-			res = get_next_line( tin, 4108, fp );
-			if ( res < 0 ) goto fail2;		// Some sort of file input error occured
-		} while ( strlen( tin ) < 5 || strchr(tin, '"') == NULL );
-		po = strchr(tin, '"') + 1;
-		for ( i=0; i<fw; i++ )
-		{
-			col_tab[256][0] = po[0];
-			col_tab[256][fcpp-1] = po[fcpp-1];
-			col_tab[256][fcpp] = 0;
-
-			k = 0;
-			while ( (col_tab[k][0] != col_tab[256][0] || col_tab[k][1] != col_tab[256][1])
-				&& k<fc )
-			{
-				k++;
-			}
-			if ( k>=fc ) goto fail2;	// Pixel reference was not in palette
-
-			mem_img[CHN_IMAGE][ i + fw*j ] = k;
-
-			po = po + fcpp;
-		}
-	}
-
-	fclose(fp);
-
-	progress_end();
-	return 1;
-fail:
-	fclose(fp);
-	return -1;
-fail2:
-	progress_end();
-	fclose(fp);
-	return 1;
-}
-
 /* Partial ctype implementation for C locale;
  * space 1, digit 2, alpha 4, punctuation 8 */
 static unsigned char ctypes[256] = {
@@ -1840,9 +1888,295 @@ static unsigned char ctypes[256] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 #define ISSPACE(x) (ctypes[(unsigned char)(x)] & 1)
-#define ISALPHA(x) (ctypes[(unsigned char)(x)] & 2)
+#define ISALPHA(x) (ctypes[(unsigned char)(x)] & 4)
 #define ISALNUM(x) (ctypes[(unsigned char)(x)] & 6)
 #define ISCNTRL(x) (!ctypes[(unsigned char)(x)])
+
+/* Reads text and cuts out C-style comments */
+static char *fgetsC(char *buf, int len, FILE *f)
+{
+	static int in_comment;
+	char *res;
+	int i, l, in_string = 0, has_chars = 0;
+
+	if (!len) /* Init */
+	{
+		*buf = '\0';
+		in_comment = 0;
+		return (NULL);
+	}
+
+	while (TRUE)
+	{
+		/* Read a line */
+		buf[0] = '\0';
+		res = fgets(buf, len, f);
+		if (res != buf) return (res);
+
+		/* Scan it for comments */
+		l = strlen(buf);
+		for (i = 0; i < l; i++)
+		{
+			if (in_string)
+			{
+				if ((buf[i] == '"') && (buf[i - 1] != '\\'))
+					in_string = 0; /* Close a string */
+				continue;
+			}
+			if (in_comment)
+			{
+				if ((buf[i] == '/') && i && (buf[i - 1] == '*'))
+				{
+					/* Replace comment by a single space */
+					buf[in_comment - 1] = ' ';
+					memcpy(buf + in_comment, buf + i + 1, l - i);
+					l = in_comment + l - i - 1;
+					i = in_comment - 1;
+					in_comment = 0;
+				}
+				continue;
+			}
+			if (!ISSPACE(buf[i])) has_chars++;
+			if (buf[i] == '"')
+				in_string = 1; /* Open a string */
+			else if ((buf[i] == '*') && i && (buf[i - 1] == '/'))
+			{
+				/* Open a comment */
+				in_comment = i;
+				has_chars -= 2;
+			}
+		}
+		/* For simplicity, have strings terminate on the same line */
+		if (in_string) return (NULL);
+
+		/* All line is a comment - read the next one */
+		if (in_comment == 1) continue;
+
+		/* Cut off and remember non-closed comment */
+		if (in_comment)
+		{
+			buf[in_comment - 1] = '\0';
+			in_comment = 1;
+		}
+
+		/* All line is whitespace - read the next one */
+		if (!has_chars) continue;
+		
+		return (res);
+	}
+}
+
+/* "One at a time" hash function */
+static guint32 hashf(guint32 seed, char *key, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+	{
+		seed += key[i];
+		seed += seed << 10;
+		seed ^= seed >> 6;
+	}
+	seed += seed << 3;
+	seed ^= seed >> 11;
+	seed += seed << 15;
+	return (seed);
+} 
+
+#define HASHSEED 0x811C9DC5
+#define HASH_RND(X) ((X) * 0x10450405 + 1)
+#define HSIZE 1024
+#define HMASK 0x1FF
+/* For cuckoo hashing of 256 items into 1024 slots */
+#define MAXLOOP 27
+
+#define XPM_COL_DEFS 5
+
+/* Comments are allowed where valid; but missing newlines or newlines where
+ * should be none aren't tolerated */
+static int load_xpm(char *file_name, ls_settings *settings)
+{
+	static const char *cmodes[XPM_COL_DEFS] =
+		{ "c", "g", "g4", "m", "s" };
+	unsigned char *dest;
+	char lbuf[4096], tstr[20], *buf = lbuf;
+	char ckeys[256][32], *cdefs[XPM_COL_DEFS], *r, *r2;
+	short cuckoo[HSIZE]; /* Cuckoo hash */
+	guint32 key, seed = HASHSEED;
+	FILE *fp;
+	int w, h, cols, cpp, hx, hy, lsz = 4096, res = -1;
+	int i, j, k, ii, idx, l;
+
+
+	if (!(fp = fopen(file_name, "r"))) return (-1);
+
+	/* Read the header - accept XPM3 and nothing else */
+	j = 0; fscanf(fp, " /* XPM */%n", &j);
+	if (!j) goto fail;
+	fgetsC(lbuf, 0, fp); /* Reset reader */
+
+	/* Read & validate the "intro sequence" */
+	if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
+	if (!j) goto fail;
+
+	/* Read the values section */
+	if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	i = sscanf(lbuf, " \"%d%d%d%d%d%d", &w, &h, &cols, &cpp, &hx, &hy);
+	if (i == 4) hx = hy = -1;
+	else if (i != 6) goto fail;
+	/* Extension marker is ignored, as are extensions themselves */
+
+	/* More than 256 colors or no colors at all aren't accepted */
+	if ((cols < 1) || (cols > 256)) goto fail;
+	/* Stupid colors per pixel values aren't either */
+	if ((cpp < 1) || (cpp > 31)) goto fail;
+
+	/* Store values */
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = 1;
+	settings->colors = cols;
+	settings->hot_x = hx;
+	settings->hot_y = hy;
+	settings->xpm_trans = -1;
+
+	/* Allocate row buffer and image */
+	i = w * cpp + 4 + 1024;
+	if (i > lsz) buf = malloc(lsz = i);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail;
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+	res = -1;
+
+	/* Read colormap */
+	sprintf(tstr, " \"%%%dc %%n", cpp);
+	for (i = 0; i < cols; i++)
+	{
+		if (!fgetsC(lbuf, 4096, fp)) goto fail2;
+
+		/* Parse color ID */
+		if (!sscanf(lbuf, tstr, ckeys[i], &l)) goto fail2;
+		ckeys[i][cpp] = '\0';
+
+		/* Parse color definitions */
+		if (!(r = strchr(lbuf + l, '"'))) goto fail2;
+		*r = '\0';
+		memset(cdefs, 0, sizeof(cdefs));
+		k = -1; r2 = NULL;
+		for (r = strtok(lbuf + l, " \t\n"); r; )
+		{
+			for (j = 0; j < XPM_COL_DEFS; j++)
+			{
+				if (!strcmp(r, cmodes[j])) break;
+			}
+			if (j < XPM_COL_DEFS) /* Key */
+			{
+				k = j; r2 = NULL;
+			}
+			else if (!r2) /* Color name */
+			{
+				if (k < 0) goto fail2;
+				cdefs[k] = r2 = r;
+			}
+			else /* Add next part of name */
+			{
+				l = strlen(r2);
+				r2[l] = ' ';
+				if ((l = r - r2 - l - 1))
+					for (; (*(r - l) = *r); r++);
+			}
+			r = strtok(NULL, " \t\n");
+		}
+		if (!r2) goto fail2; /* Key w/o name */
+
+		/* Translate the best one */
+		for (j = 0; j < XPM_COL_DEFS; j++)
+		{
+			GdkColor col;
+
+			if (!cdefs[j]) continue;
+			if (!stricmp(cdefs[j], "none")) /* Transparent */
+			{
+				settings->xpm_trans = i;
+				settings->pal[i].red = settings->pal[i].green = 115;
+				settings->pal[i].blue = 0;
+				break;
+			}
+			if (!gdk_color_parse(cdefs[j], &col)) continue;
+			settings->pal[i].red = (col.red + 128) / 257;
+			settings->pal[i].green = (col.green + 128) / 257;
+			settings->pal[i].blue = (col.blue + 128) / 257;
+			break;
+		}
+		/* Not one understandable color */
+		if (j >= XPM_COL_DEFS) goto fail2;
+	}
+
+	/* Build cuckoo hash of colors - simply dump all and rehash */
+	memset(cuckoo, 0, sizeof(cuckoo));
+	for (i = 0; i < cols; i++) cuckoo[i] = i + 1;
+	/* Until done */
+	while (TRUE)
+	{
+		/* Re-insert items */
+		for (ii = 0; ii < HSIZE; ii++)
+		{
+			idx = cuckoo[ii];
+			cuckoo[ii] = 0;
+			/* Normal cuckoo process */
+			for (i = 0; idx && (i < MAXLOOP); i++)
+			{
+				key = hashf(seed, ckeys[idx - 1], cpp);
+				key >>= (i & 1) << 4;
+				j = (key & HMASK) * 2 + (i & 1);
+				k = cuckoo[j];
+				cuckoo[j] = idx;
+				idx = k;
+			}
+			if (idx) break;
+		}
+		if (!idx) break;
+		/* Failed insertion - drop key somewhere */
+		for (i = 0; cuckoo[i] && (i < HSIZE); i++);
+		cuckoo[i] = idx;
+		/* Mutate seed */
+		seed = HASH_RND(seed);
+	}
+	
+	/* Now, read the image */
+	if (!settings->silent) progress_init(_("Loading XPM image"), 0);
+	res = FILE_LIB_ERROR;
+	dest = settings->img[CHN_IMAGE];
+	for (i = 0; i < h; i++)
+	{
+		if (!fgetsC(buf, lsz, fp)) goto fail3;
+		if (!(r = strchr(buf, '"'))) goto fail3;
+		if (++r - buf + w * cpp >= lsz) goto fail3;
+		for (j = 0; j < w; j++)
+		{
+			/* Check the two cuckoo slots for key being there */
+			key = hashf(seed, r, cpp);
+			k = cuckoo[(key & HMASK) * 2];
+			if (!k || strncmp(ckeys[k - 1], r, cpp))
+			{
+				k = cuckoo[((key >> 16) & HMASK) * 2 + 1];
+				if (!k || strncmp(ckeys[k - 1], r, cpp))
+					goto fail3;
+			}
+			*dest++ = k - 1;
+			r += cpp;
+		}
+		if (!settings->silent && ((i * 10) % h >= h - 10))
+			progress_update((float)i / h);
+	}
+	res = 1;
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	if (buf != lbuf) free(buf);
+fail:	fclose(fp);
+	return (res);
+}
 
 static char base64[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
@@ -1861,7 +2195,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
 	tmp = tmp ? tmp + 1 : file_name;
-	for (; *tmp && ISALPHA(*tmp); tmp++);
+	for (; *tmp && !ISALPHA(*tmp); tmp++);
 	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
 	if (!i) return -1;
 
@@ -1945,109 +2279,110 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	return 0;
 }
 
-int grab_val( char *tin, char *txt, FILE *fp )
+static int load_xbm(char *file_name, ls_settings *settings)
 {
-	char *po;
-	int res = -1;
-
-	res = get_next_line( tin, 250, fp );
-	if ( res < 0 ) return -1;
-	if ( strlen(tin) < 5 || strlen(tin) > 200 ) return -1;
-	po = strstr( tin, txt );
-	if ( po == NULL ) return -1;
-	sscanf( po + strlen(txt), "%i", &res );
-
-	return res;
-}
-
-int next_xbm_bits( char *tin, FILE *fp, int *sp )
-{
-	int res;
-again:
-	while ( *sp >= strlen(tin) )
-	{
-		res = get_next_line( tin, 250, fp );
-		if ( res < 0 || strlen(tin) > 200 ) return -1;
-		*sp = 0;
-	}
-again2:
-	while ( tin[*sp] != '0' && tin[*sp] != 0 ) (*sp)++;
-	if ( tin[*sp] == 0 ) goto again;
-	(*sp)++;
-	if ( tin[*sp] != 'x' ) goto again2;
-	(*sp)++;
-
-	return read_hex_dub( tin + *sp );
-}
-
-int load_xbm( char *file_name )
-{
-	char tin[256];
+	static const char XPMtext[] = "0123456789ABCDEFabcdef,} \t\n",
+		XPMval[] = {
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+			10, 11, 12, 13, 14, 15, 16, 16, 16, 16, 16 };
+	unsigned char ctb[256], *dest;
+	char lbuf[4096];
 	FILE *fp;
-	int fw, fh, xh=-1, yh=-1, res;
-	int i, j, k, sp, bits;
+	int w , h, hx = -1, hy = -1, bpn = 16, res = -1;
+	int i, j, k, c, v = 0;
 
-	if ((fp = fopen(file_name, "r")) == NULL) return -1;
 
-	fw = grab_val( tin, "width", fp );
-	fh = grab_val( tin, "height", fp );
+	if (!(fp = fopen(file_name, "r"))) return (-1);
 
-	if ( fw < 4 || fh < 4 ) goto fail;
-
-	xh = grab_val( tin, "x_hot", fp );
-	if ( xh>=0 )
+	/* Read & parse what serves as header to XBM */
+	fgetsC(lbuf, 0, fp); /* Reset reader */
+	/* Width and height - required part in fixed order */
+	if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	if (!sscanf(lbuf, "#define %*s%n %d", &i, &w)) goto fail;
+	if (strncmp(lbuf + i - 5, "width", 5)) goto fail;
+	if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	if (!sscanf(lbuf, "#define %*s%n %d", &i, &h)) goto fail;
+	if (strncmp(lbuf + i - 6, "height", 6)) goto fail;
+	/* Hotspot X and Y - optional part in fixed order */
+	if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	if (sscanf(lbuf, "#define %*s%n %d", &i, &hx))
 	{
-		yh = grab_val( tin, "y_hot", fp );
-		res = get_next_line( tin, 250, fp );
-		if ( res < 0 ) goto fail;
+		if (strncmp(lbuf + i - 5, "x_hot", 5)) goto fail;
+		if (!fgetsC(lbuf, 4096, fp)) goto fail;
+		if (!sscanf(lbuf, "#define %*s%n %d", &i, &hy)) goto fail;
+		if (strncmp(lbuf + i - 5, "y_hot", 5)) goto fail;
+		if (!fgetsC(lbuf, 4096, fp)) goto fail;
+	}
+	/* "Intro" string */
+	j = 0; sscanf(lbuf, " static short %*[^[]%n[] = {%n", &i, &j);
+	if (!j)
+	{
+		bpn = 8; /* X11 format - 8-bit data */
+		j = 0; sscanf(lbuf, " static unsigned char %*[^[]%n[] = {%n", &i, &j);
+		if (!j) sscanf(lbuf, " static char %*[^[]%n[] = {%n", &i, &j);
+		if (!j) goto fail;
+	}
+	if (strncmp(lbuf + i - 4, "bits", 4)) goto fail;
+
+	/* Store values */
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = 1;
+	settings->hot_x = hx;
+	settings->hot_y = hy;
+	/* Palette is white and black */
+	settings->colors = 2;
+	settings->pal[0].red = settings->pal[0].green = settings->pal[0].blue = 255;
+	settings->pal[1].red = settings->pal[1].green = settings->pal[1].blue = 0;
+
+	/* Allocate image */
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
+
+	/* Prepare to read data */
+	memset(ctb, 17, sizeof(ctb));
+	for (i = 0; XPMtext[i]; i++)
+	{
+		ctb[(unsigned char)XPMtext[i]] = XPMval[i];
 	}
 
-	if ( fw > MAX_WIDTH || fh > MAX_HEIGHT )
+	/* Now, read the image */
+	if (!settings->silent) progress_init(_("Loading XBM image"), 0);
+	res = FILE_LIB_ERROR;
+	dest = settings->img[CHN_IMAGE];
+	for (i = 0; i < h; i++)
 	{
-		fclose(fp);
-		return TOO_BIG;
-	}
-
-	mem_pal[0].red = 255;
-	mem_pal[0].green = 255;
-	mem_pal[0].blue = 255;
-	mem_pal[1].red = 0;
-	mem_pal[1].green = 0;
-	mem_pal[1].blue = 0;
-
-	mem_cols = 2;
-	if (mem_new(fw, fh, 1, CMASK_IMAGE))
-	{
-		fclose(fp);
-		return FILE_MEM_ERROR;
-	}
-	if (mem_img[CHN_IMAGE] == NULL) goto fail;
-
-	mem_xbm_hot_x = xh;
-	mem_xbm_hot_y = yh;
-
-	tin[1] = 0;
-	sp = 10;
-	progress_init(_("Loading XBM image"),0);
-	for ( j=0; j<fh; j++ )
-	{
-		if (j%16 == 0) progress_update( ((float) j) / fh );
-		for ( i=0; i<fw; i=i+8 )
+		for (j = k = 0; j < w; j++ , k--)
 		{
-			bits = next_xbm_bits( tin, fp, &sp );
-			if ( bits<0 ) goto fail2;
-			for ( k=0; k<8; k++ )
-				if ( (i+k) < mem_width )
-					mem_img[CHN_IMAGE][ i+k + mem_width*j ] = (bits & (1 << k)) >> k;
-		}
+			if (!k) /* Get next value, the way X itself does */
+			{
+				v = 0;
+				while (TRUE)
+				{
+					if ((c = getc(fp)) == EOF) goto fail2;
+					c = ctb[c & 255];
+					if (c < 16) /* Accept hex digits */
+					{
+						v = (v << 4) + c;
+						k++;
+					}
+					/* Silently ignore out-of-place chars */
+					else if (c > 16) continue;
+					/* Stop on delimiters after digits */
+					else if (k) break;
+				}
+				k = bpn;
+			}
+			*dest++ = v & 1;
+			v >>= 1;
+		}	
+		if (!settings->silent && ((i * 10) % h >= h - 10))
+			progress_update((float)i / h);
 	}
-fail2:
-	progress_end();
-	fclose(fp);
-	return 1;
-fail:
-	fclose(fp);
-	return -1;
+	res = 1;
+
+fail2:	if (!settings->silent) progress_end();
+fail:	fclose(fp);
+	return (res);
 }
 
 #define BPL 12 /* Bytes per line */
@@ -2065,7 +2400,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
 	tmp = tmp ? tmp + 1 : file_name;
-	for (; *tmp && ISALPHA(*tmp); tmp++);
+	for (; *tmp && !ISALPHA(*tmp); tmp++);
 	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
 	if (!i) return -1;
 
@@ -2212,6 +2547,12 @@ int load_image(char *file_name, int mode, int ftype)
 #ifdef U_TIFF
 	case FT_TIFF: res = load_tiff(file_name, &settings); break;
 #endif
+	case FT_BMP: res = load_bmp(file_name, &settings); break;
+	case FT_XPM: res = load_xpm(file_name, &settings); break;
+	case FT_XBM: res = load_xbm(file_name, &settings); break;
+/* !!! Not implemented yet */
+//	case FT_TGA:
+//	case FT_PCX:
 	}
 
 	/* Animated GIF was loaded so tell user */
@@ -2387,7 +2728,6 @@ int export_ascii ( char *file_name )
 
 	return 0;
 }
-
 
 int detect_image_format(char *name)
 {

@@ -192,10 +192,7 @@ void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready
 
 int get_next_line(char *input, int length, FILE *fp);		// Get next length chars of text file
 int mt_round( float n );			// Round a float to nearest whole number
-int check_str( int max, char *a, char *b );	// Compare up to max characters of 2 strings
-						// Case insensitive
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
-char get_hex( int in );				// Turn 0..15 into hex
 int read_hex_dub( char *in );			// Read hex double
 void clear_file_flags();		// Reset various file flags, e.g. XPM/XBM after new/load gif etc
 

@@ -184,6 +184,7 @@ _("\n"
 "Czech - Pavel Ruzicka\n"
 "French - Nicolas Velin, Pascal Billard\n"
 "German - Oliver Frommel\n"
+"Polish - Simek\n"
 "Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio San\n"
 ),

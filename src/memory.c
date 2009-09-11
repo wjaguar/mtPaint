@@ -2835,21 +2835,6 @@ int get_next_line(char *input, int length, FILE *fp)
 }
 
 
-int check_str( int max, char *a, char *b )	// Compare up to max characters of 2 strings
-						// Case insensitive
-{
-	return (strncasecmp(a, b, max) == 0);
-}
-
-char get_hex( int in )				// Turn 0..15 into hex
-{
-	char tab[] = "0123456789ABCDEF";
-
-	if ( in<0 || in>15 ) return 'X';
-
-	return tab[in];
-}
-
 int read_hex( char in )			// Convert character to hex value 0..15.  -1=error
 {
 	int res = -1;

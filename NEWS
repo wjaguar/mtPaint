@@ -11,11 +11,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* More palette sort modes added
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
-	* Saving compressed GIF files now supported (using libgif)
 	* New advanced dithering modes with many configuration options added to "Convert To Indexed" window
 	* Optional gamma correction for image scaling, rotation and Gaussian blur
 	* Smudge tool can be configured to ignore opacity mode - right click the tool icon
-	* Library detection in configure script improved
 	* Channel deletion made easier to use
 	* View window can now be placed under drawing window using the View menu or 'H' key
 	* "Blend A to B" with colour A identical to B now works like GIMP's Color To Alpha filter
@@ -23,12 +21,24 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Enter now simulates left mouse click, and Backspace, right click
 	* '[' ']' and '{' '}' keys now used to change colour A/B
 	* Selection marquee now persists through tool changes
+	* Image save/load completely rewritten, now with better support for TIFF, BMP, XPM and XBM formats
 	* Channels and composite images can now be saved to any suitable supported file format
+	* Image channel can now be saved and loaded just like other channels
 	* Paint tool in tint mode now respects both Tint +/- toggle and left/right mouse button
+	* "By image channel" flood fill option now works in non-fuzzy mode too
+	...and more still remains to do... ;-)
+
+3.02	2006-10-14
+
+	* Polish translation added by Simek
+	* Spanish translation updated for version 3 by Antonio San
+	* All menu items on all translations updated
+	* Saving compressed GIF files now supported (using libgif)
+	* Library detection in configure script improved
 	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	* BUGFIX - Lasso tool now properly handles clipboard alpha
 	* BUGFIX - Clipboard save path now can be changed in Preferences
-	...and more still remains to do... ;-)
+	* BUGFIX - XPM files smaller than 4*4 pixels can now be loaded
 
 3.01	2006-7-15
 
