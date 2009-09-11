@@ -18,9 +18,6 @@
 */
 
 #define MAX_CYC_SLOTS 100
-#define TOT_CYC_ITEMS 52
-// 52 = 2 items for start/finish, 50 for collection of layer #'s
-
 
 #define MAX_FRAME 99999
 

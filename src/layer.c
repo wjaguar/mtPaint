@@ -352,7 +352,7 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	lim->mem_xbm_hot_x = -1;
 	lim->mem_xbm_hot_y = -1;
 
-	lim->ani_pos[0][0] = 0;
+	lim->ani_pos[0].frame = 0;
 }
 
 void layer_new_chores2( int l )
@@ -494,9 +494,9 @@ static gint layer_press_duplicate()
 	sprintf( layer_table[layers_total].image->mem_filename,
 		layer_table[layer_selected].image->mem_filename );
 
-	for ( i=0; i<MAX_POS_SLOTS; i++ ) for ( j=0; j<5; j++ )
-		layer_table[layers_total].image->ani_pos[i][j] =
-			layer_table[layer_selected].image->ani_pos[i][j];
+	for ( i=0; i<MAX_POS_SLOTS; i++ )
+		layer_table[layers_total].image->ani_pos[i] =
+			layer_table[layer_selected].image->ani_pos[i];
 				// Copy across position data
 
 	layer_new_chores2( layers_total );
@@ -677,9 +677,9 @@ void string_chop( char *txt )
 
 int read_file_num(FILE *fp, char *txt)
 {
-	int i = get_next_line(txt, 32, fp);
+	int i;
 
-	if ( i<0 || i>30 ) return -987654321;
+	if (!fgets(txt, 32, fp)) return -987654321;
 	sscanf(txt, "%i", &i);
 
 	return i;
@@ -702,8 +702,7 @@ int load_layers( char *file_name )
 		// Try to save text file, return -1 if failure
 	if ((fp = fopen(file_name, "r")) == NULL) goto fail;
 
-	i = get_next_line(tin, 32, fp);
-	if ( i<0 || i>30 ) goto fail2;
+	if (!fgets(tin, 32, fp)) goto fail2;
 
 	string_chop( tin );
 	if ( strcmp( tin, LAYERS_HEADER ) != 0 ) goto fail2;		// Bad header
@@ -721,7 +720,7 @@ int load_layers( char *file_name )
 	for ( i=0; i<=layers_to_read; i++ )
 	{
 		// Read filename, strip end chars & try to load (if name length > 0)
-		j = get_next_line(tin, 256, fp);
+		fgets(tin, 256, fp);
 		string_chop(tin);
 		snprintf(load_name, 260, "%s%s", load_prefix, tin);
 		k = 1;
@@ -751,7 +750,7 @@ int load_layers( char *file_name )
 		init_istate(); /* Update image variables after load */
 		layer_copy_from_main( layers_total );
 
-		j = get_next_line(tin, 256, fp);
+		fgets(tin, 256, fp);
 		string_chop(tin);
 		strncpy(layer_table[layers_total].name, tin, 32); // Layer text name
 

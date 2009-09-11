@@ -23,9 +23,12 @@
 
 #define ANIMATION_HEADER "# mtPaint animation"
 #define MAX_POS_SLOTS 100
-#define TOT_POS_ITEMS 5
 
 ///	GLOBALS
+
+typedef struct {
+	int frame, x, y, opacity, effect;
+} ani_slot;
 
 typedef struct
 {
@@ -47,7 +50,7 @@ typedef struct
 	char mem_prot_mask[256];
 	int mem_prot;
 
-	int ani_pos[MAX_POS_SLOTS][5];
+	ani_slot ani_pos[MAX_POS_SLOTS];
 } layer_image;				// All as per memory.h definitions
 
 typedef struct

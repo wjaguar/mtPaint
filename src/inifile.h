@@ -18,7 +18,7 @@
 */
 
 typedef struct {
-	int key, defv;
+	int sec, key, defv;
 	char *value;
 	short type, flags;
 } inislot;
@@ -39,13 +39,16 @@ void forget_ini(inifile *inip);
 int read_ini(inifile *inip, char *fname);
 int write_ini(inifile *inip, char *fname, char *header);
 
-int ini_setstr(inifile *inip, char *key, char *value);
-int ini_setint(inifile *inip, char *key, int value);
-int ini_setbool(inifile *inip, char *key, int value);
+int ini_setstr(inifile *inip, int section, char *key, char *value);
+int ini_setint(inifile *inip, int section, char *key, int value);
+int ini_setbool(inifile *inip, int section, char *key, int value);
 
-char *ini_getstr(inifile *inip, char *key, char *defv);
-int ini_getint(inifile *inip, char *key, int defv);
-int ini_getbool(inifile *inip, char *key, int defv);
+char *ini_getstr(inifile *inip, int section, char *key, char *defv);
+int ini_getint(inifile *inip, int section, char *key, int defv);
+int ini_getbool(inifile *inip, int section, char *key, int defv);
+
+int ini_setsection(inifile *inip, int section, char *key);
+int ini_getsection(inifile *inip, int section, char *key);
 
 /* File function */
 

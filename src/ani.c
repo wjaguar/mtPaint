@@ -63,9 +63,15 @@ static GtkWidget *animate_window = NULL, *ani_prev_win,
 	*ani_prev_slider		// Slider widget on preview area
 	;
 
+#define MAX_CYC_ITEMS 50
+typedef struct {
+	int frame0, frame1, len, layers[MAX_CYC_ITEMS];
+} ani_cycle;
+
+static ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
+
 static int
-	ani_cycle_table[MAX_CYC_SLOTS][TOT_CYC_ITEMS], ani_cyc_len[MAX_CYC_SLOTS],
-	ani_layer_data[MAX_LAYERS + 1][4],			// x, y, opacity, visible
+	ani_layer_data[MAX_LAYERS + 1][4],	// x, y, opacity, visible
 	ani_currently_selected_layer;
 static char ani_output_path[260], ani_file_prefix[ANI_PREFIX_LEN+2];
 static gboolean ani_use_gif, ani_show_main_state;
@@ -86,55 +92,44 @@ static void ani_widget_changed()	// Widget changed so flag the layers as changed
 
 static void ani_cyc_len_init()		// Initialize the cycle length array before doing any animating
 {
-	int i, k, tot;
+	int i, k;
 
-	for ( i=0; i<MAX_CYC_SLOTS; i++ )
+	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
-		if ( ani_cycle_table[i][0] == 0 ) break;		// Last slot reached
-		tot = 0;
-		for ( k=2; k<TOT_CYC_ITEMS; k++ )
-		{
-			if ( ani_cycle_table[i][k] == 0 ) break;	// End of list reached
-			tot++;
-		}
-		if ( tot < 1 ) tot = 1;		// Must be a minimum of 1 for modulo use
-		ani_cyc_len[i] = tot;
+		if (!ani_cycle_table[i].frame0) break;	// Last slot reached
+		for (k = 0; (k < MAX_CYC_ITEMS) && ani_cycle_table[i].layers[k]; k++);
+		// Must be a minimum of 1 for modulo use
+		ani_cycle_table[i].len = k ? k : 1;
 	}
 }
 
 static void set_layer_from_slot( int layer, int slot )		// Set layer x, y, opacity from slot
 {
-	layer_table[layer].x = layer_table[layer].image->ani_pos[slot][1];
-	layer_table[layer].y = layer_table[layer].image->ani_pos[slot][2];
-	layer_table[layer].opacity = layer_table[layer].image->ani_pos[slot][3];
+	ani_slot *ani = layer_table[layer].image->ani_pos + slot;
+	layer_table[layer].x = ani->x;
+	layer_table[layer].y = ani->y;
+	layer_table[layer].opacity = ani->opacity;
 }
 
 static void set_layer_inbetween( int layer, int i, int frame, int effect )		// Calculate in between value for layer from slot i & (i+1) at given frame
 {
 	MT_Coor c[4], co_res, lenz;
-	float p1, p2, d[2][3];
-	int f0, f1, f2, f3, a, b, ii[4] = {i-1, i, i+1, i+2}, j;
+	float p1, p2;
+	int f0, f1, f2, f3, ii[4] = {i-1, i, i+1, i+2}, j;
+	ani_slot *ani = layer_table[layer].image->ani_pos;
 
-	f1 = layer_table[layer].image->ani_pos[i][0];
-	f2 = layer_table[layer].image->ani_pos[i+1][0];
 
-	if ( i>0 ) f0 = layer_table[layer].image->ani_pos[i-1][0];
+	f1 = ani[i].frame;
+	f2 = ani[i + 1].frame;
+
+	if (i > 0) f0 = ani[i - 1].frame;
 	else
 	{
 		f0 = f1;
 		ii[0] = ii[1];
 	}
 
-	if ( (i+2)<MAX_POS_SLOTS )
-	{
-		f3 = layer_table[layer].image->ani_pos[i+2][0];
-		if ( f3 == 0 )
-		{
-			f3 = f2;
-			ii[3] = ii[2];
-		}
-	}
-	else
+	if ((i >= MAX_POS_SLOTS - 2) || !(f3 = ani[i + 2].frame))
 	{
 		f3 = f2;
 		ii[3] = ii[2];
@@ -144,17 +139,10 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 	p1 = ( (float) (f2-frame) ) / ( (float) (f2-f1) );	// % of (i-1) slot
 	p2 = 1-p1;						// % of i slot
 
-	for ( a=0; a<2; a++ )
-	{
-		for ( b=0; b<3; b++ )
-		{
-			d[a][b] = layer_table[layer].image->ani_pos[i + a][1 + b];
-		}
-	}
-
-	layer_table[layer].x = rint( p1 * d[0][0] + p2 * d[1][0] );
-	layer_table[layer].y = rint( p1 * d[0][1] + p2 * d[1][1] );
-	layer_table[layer].opacity = rint( p1 * d[0][2] + p2 * d[1][2] );
+	layer_table[layer].x = rint(p1 * ani[i].x + p2 * ani[i + 1].x);
+	layer_table[layer].y = rint(p1 * ani[i].y + p2 * ani[i + 1].y);
+	layer_table[layer].opacity = rint(p1 * ani[i].opacity +
+		p2 * ani[i + 1].opacity);
 
 
 	if ( effect == 1 )		// Interpolated smooth in between - use p2 value
@@ -171,8 +159,8 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 		// Set up coords
 		for ( j=0; j<4; j++ )
 		{
-			c[j].x = layer_table[layer].image->ani_pos[ ii[j] ][1];
-			c[j].y = layer_table[layer].image->ani_pos[ ii[j] ][2];
+			c[j].x = ani[ii[j]].x;
+			c[j].y = ani[ii[j]].y;
 		}
 		co_res = MT_palin(p2, 0.35, c[0], c[1], c[2], c[3], lenz);
 
@@ -183,16 +171,18 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 
 static void ani_set_frame_state( int frame )
 {
-	int i, k, e, a, b, done;
+	int i, k, e, a, b, done, l;
+	ani_slot *ani;
 
 	for ( k=1; k<=layers_total; k++ )	// Set x, y, opacity for each layer
 	{
-		if ( layer_table[k].image->ani_pos[0][0] > 0 )
+		ani = layer_table[k].image->ani_pos;
+		if (ani[0].frame > 0)
 		{
 			for ( i=0; i<MAX_POS_SLOTS; i++ )		// Find first frame in position list that excedes or equals 'frame'
 			{
-				if ( layer_table[k].image->ani_pos[i][0] <= 0 ) break;		// End of list
-				if ( layer_table[k].image->ani_pos[i][0] >= frame ) break;	// Exact match or one exceding it found
+				if (ani[i].frame <= 0) break;		// End of list
+				if (ani[i].frame >= frame) break;	// Exact match or one exceding it found
 			}
 
 			if ( i>=MAX_POS_SLOTS )		// All position slots < 'frame'
@@ -202,14 +192,14 @@ static void ani_set_frame_state( int frame )
 			}
 			else
 			{
-				if ( layer_table[k].image->ani_pos[i][0] == 0 )		// All position slots < 'frame'
+				if (ani[i].frame == 0)		// All position slots < 'frame'
 				{
 					set_layer_from_slot( k, i - 1 );
 						// Set layer pos/opac to last slot values
 				}
 				else
 				{
-					if ( layer_table[k].image->ani_pos[i][0] == frame || i==0 )
+					if (ani[i].frame == frame || i == 0)
 					{
 						set_layer_from_slot( k, i );
 							// If closest frame = requested frame, set all values to this
@@ -218,8 +208,7 @@ static void ani_set_frame_state( int frame )
 					else
 					{
 						// i is currently pointing to slot that excedes 'frame', so in between this and the previous slot
-						e = layer_table[k].image->ani_pos[i-1][4];
-						set_layer_inbetween( k, i-1, frame, e );
+						set_layer_inbetween( k, i-1, frame, ani[i - 1].effect );
 					}
 				}
 			}
@@ -232,16 +221,15 @@ static void ani_set_frame_state( int frame )
 
 	for ( i=0; i<MAX_CYC_SLOTS; i++ )
 	{
-		if ( ani_cycle_table[i][0] == 0 ) break;		// End of list reached
-
-		a = ani_cycle_table[i][0];
-		b = ani_cycle_table[i][1];
+		a = ani_cycle_table[i].frame0;
+		b = ani_cycle_table[i].frame1;
+		if (!a) break;		// End of list reached
 
 		if ( a==b && a<=frame )		// Special case for enabling/disabling en-masse
 		{
-			for ( k=2; k<TOT_CYC_ITEMS; k++ )
+			for (k = 0; k < MAX_CYC_ITEMS; k++)
 			{
-				e = ani_cycle_table[i][k];
+				e = ani_cycle_table[i].layers[k];
 				if ( e==0 ) break;		// End delimeter encountered so stop
 				if ( e<0 )
 				{
@@ -258,13 +246,14 @@ static void ani_set_frame_state( int frame )
 		if ( a<b && a<=frame && frame<=b )	// Frame is between these points so act
 		{
 			done = -1;
-			for ( k=2; k<TOT_CYC_ITEMS; k++ )
+			l = ani_cycle_table[i].len;
+			for (k = 0; k < MAX_CYC_ITEMS; k++)
 			{
-				e = ani_cycle_table[i][k];
+				e = ani_cycle_table[i].layers[k];
 				if ( e==0 ) break;		// End delimeter encountered so stop
 				if ( e>0 && e<=layers_total && e!=done )
 				{
-					if ( (frame - a) % ani_cyc_len[i] == (k-2) )
+					if ((frame - a) % l == k)
 					{
 						layer_table[e].visible = TRUE;
 						done = e;
@@ -340,7 +329,7 @@ static void empty_text_widget(GtkWidget *w)	// Empty the text widget
 static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 {
 	int i, j, k;
-	char txt[256];
+	char txt[256], *tmp = txt;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
@@ -349,20 +338,18 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 #endif
 	empty_text_widget(ani_text_cyc);	// Clear the text in the widget
 
-	i = 0;
-	while ( ani_cycle_table[i][0] > 0 && i<MAX_CYC_SLOTS )
+	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
-		sprintf(txt, "%i\t%i\t%i", ani_cycle_table[i][0], ani_cycle_table[i][1],
-						ani_cycle_table[i][2] );
-		j = 3;
-		while ( j<TOT_CYC_ITEMS && ani_cycle_table[i][j] != 0 )
+		if (!ani_cycle_table[i].frame0) break;
+		tmp += sprintf(tmp, "%i\t%i\t%i", ani_cycle_table[i].frame0,
+			ani_cycle_table[i].frame1, ani_cycle_table[i].layers[0]);
+		for (j = 1; j < MAX_CYC_ITEMS; j++)
 		{
-			k = ani_cycle_table[i][j];
-
-			sprintf( txt + strlen(txt), ",%i", k );
-			j++;
+			k = ani_cycle_table[i].layers[j];
+			if (!k) break;
+			tmp += sprintf(tmp, ",%i", k);
 		}
-		sprintf( txt + strlen(txt), "\n" );
+		strcpy(tmp, "\n");
 #if GTK_MAJOR_VERSION == 1
 		gtk_text_insert (GTK_TEXT (ani_text_cyc), NULL, NULL, NULL, txt, -1);
 #endif
@@ -374,7 +361,6 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 		gtk_text_buffer_insert( GTK_TEXT_VIEW(ani_text_cyc)->buffer, &iter, txt, -1 );
 
 #endif
-		i++;
 	}
 
 #if GTK_MAJOR_VERSION == 2
@@ -388,6 +374,7 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 {
 	char txt[256];
 	int i = ani_currently_selected_layer, j;
+	ani_slot *ani;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
@@ -399,17 +386,13 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 
 	if ( i > 0 )		// Must no be for background layer or negative => PANIC!
 	{
-		j = 0;
-		while ( j<MAX_POS_SLOTS && layer_table[i].image->ani_pos[j][0] > 0 )
-		{	// Add a line if one exists
-			snprintf( txt, 250, "%i\t%i\t%i\t%i\t%i\n",
-					layer_table[i].image->ani_pos[j][0],
-					layer_table[i].image->ani_pos[j][1],
-					layer_table[i].image->ani_pos[j][2],
-					layer_table[i].image->ani_pos[j][3],
-					layer_table[i].image->ani_pos[j][4]
-					);
-			j++;
+		for (j = 0; j < MAX_POS_SLOTS; j++)
+		{
+			ani = layer_table[i].image->ani_pos + j;
+			if (ani->frame <= 0) break;
+			// Add a line if one exists
+			snprintf(txt, 250, "%i\t%i\t%i\t%i\t%i\n",
+				ani->frame, ani->x, ani->y, ani->opacity, ani->effect);
 #if GTK_MAJOR_VERSION == 1
 			gtk_text_insert (GTK_TEXT (ani_text_pos), NULL, NULL, NULL, txt, -1);
 #endif
@@ -436,11 +419,12 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 	ani_frame2 = 100;
 	ani_gif_delay = 10;
 
-	ani_cycle_table[0][0] = 0;
+	ani_cycle_table[0].frame0 = 0;
 
 	if ( layers_total>0 )		// No position array malloc'd until layers>0
 	{
-		for ( j=0; j<=layers_total; j++ ) layer_table[j].image->ani_pos[0][0] = 0;
+		for (j = 0; j <= layers_total; j++)
+			layer_table[j].image->ani_pos[0].frame = 0;
 	}
 
 	sprintf(ani_output_path, "frames");
@@ -488,8 +472,9 @@ static void delete_ani()
 
 static int parse_line_pos( char *txt, int layer, int row )	// Read in position row from some text
 {
+	ani_slot data = { -1, -1, -1, -1, -1 };
 	char *tx, *eol;
-	int data[5] = {-1,-1,-1,-1,-1}, tot, i;
+	int tot;
 
 	tx = strchr( txt, '\n' );			// Find out length of this input line
 	if ( tx == NULL ) tot = strlen(txt);
@@ -501,9 +486,10 @@ static int parse_line_pos( char *txt, int layer, int row )	// Read in position r
 		if ( txt[0] == 0 ) return -1;		// If we reach the end, tell the caller
 		txt = txt + 1;
 	}
-	sscanf( txt, "%i\t%i\t%i\t%i\t%i", &data[0], &data[1], &data[2], &data[3], &data[4] );
+	sscanf(txt, "%i\t%i\t%i\t%i\t%i", &data.frame, &data.x, &data.y,
+		&data.opacity, &data.effect);
 
-	for ( i=0; i<5; i++ ) layer_table[layer].image->ani_pos[row][i] = data[i];
+	layer_table[layer].image->ani_pos[row] = data;
 
 	return tot;
 }
@@ -521,7 +507,7 @@ static void ani_parse_store_positions()		// Read current positions in text input
 		if ( j<0 ) break;
 		txt += j;
 	}
-	if ( i<MAX_POS_SLOTS ) layer_table[layer].image->ani_pos[i][0] = 0;	// End delimeter
+	if ( i<MAX_POS_SLOTS ) layer_table[layer].image->ani_pos[i].frame = 0;	// End delimeter
 
 	g_free(tx);
 }
@@ -543,26 +529,22 @@ static int parse_line_cyc( char *txt, int row )		// Read in cycle row from some 
 		txt = txt + 1;
 	}
 	sscanf( txt, "%i\t%i\t%i", &a, &b, &c );
-	ani_cycle_table[row][0] = a;
-	ani_cycle_table[row][1] = b;
-	ani_cycle_table[row][2] = c;
+	ani_cycle_table[row].frame0 = a;
+	ani_cycle_table[row].frame1 = b;
+	ani_cycle_table[row].layers[0] = c;
 
 	// Read in a number after each comma
-	i = 3;
-	do
+	for (i = 1; i < MAX_CYC_ITEMS; i++)
 	{
-		tx = strchr( txt, ',' );			// Get next comma
-		if ( tx != NULL && (tx+1)<eol )			// Bail out if no comma on this line
-		{
-			sscanf(tx+1, "%i", &a);
-
-			ani_cycle_table[row][i] = a;
-			txt = tx + 1;
-			i++;
-		}
-	} while ( tx != NULL && i<TOT_CYC_ITEMS && tx<eol );
-
-	if ( i<TOT_CYC_ITEMS ) ani_cycle_table[row][i] = 0;	// Terminate with zero if needed
+		tx = strchr( txt, ',' );		// Get next comma
+		if (!tx || (eol - tx < 2)) break;	// Bail out if no comma on this line
+		a = -1;
+		sscanf(tx + 1, "%i", &a);
+		ani_cycle_table[row].layers[i] = a;
+		txt = tx + 1;
+	}
+	// Terminate with zero if needed
+	if (i < MAX_CYC_ITEMS) ani_cycle_table[row].layers[i] = 0;
 
 	return tot;
 }
@@ -580,7 +562,7 @@ static void ani_parse_store_cycles()		// Read current cycles in text input and s
 		if ( j<0 ) break;
 		txt += j;
 	}
-	if ( i<MAX_CYC_SLOTS ) ani_cycle_table[i][0] = 0;	// End delimeter
+	if ( i<MAX_CYC_SLOTS ) ani_cycle_table[i].frame0 = 0;	// End delimeter
 
 	g_free(tx);
 }
@@ -1031,25 +1013,26 @@ void pressed_remove_key_frames()
 	i = alert_box( _("Warning"), _("Do you really want to clear all of the position and cycle data for all of the layers?"), _("No"), _("Yes"), NULL );
 	if ( i==2 )
 	{
-		for ( j=0; j<=layers_total; j++ ) layer_table[j].image->ani_pos[0][0] = 0;
+		for (j = 0; j <= layers_total; j++)
+			layer_table[j].image->ani_pos[0].frame = 0;
 							// Flush array in each layer
-		ani_cycle_table[0][0] = 0;
+		ani_cycle_table[0].frame0 = 0;
 	}
 }
 
 void ani_set_key_frame(int key)		// Set key frame postions & cycles as per current layers
 {
+	ani_slot *ani;
 	int i, j, k, l;
 
 
 	for ( k=1; k<=layers_total; k++ )	// Add current position for each layer
 	{
+		ani = layer_table[k].image->ani_pos;
 		// Find first occurence of 0 or frame # < 'key'
 		for ( i=0; i<MAX_POS_SLOTS; i++ )
 		{
-			if ( layer_table[k].image->ani_pos[i][0] > key ||
-				layer_table[k].image->ani_pos[i][0] == 0 )
-					break;
+			if (ani[i].frame > key || ani[i].frame == 0) break;
 		}
 
 		if ( i>=MAX_POS_SLOTS ) i=MAX_POS_SLOTS-1;
@@ -1057,26 +1040,22 @@ void ani_set_key_frame(int key)		// Set key frame postions & cycles as per curre
 		//  Shift remaining data down a slot
 		for ( j=MAX_POS_SLOTS-1; j>i; j-- )
 		{
-			for ( l=0; l<TOT_POS_ITEMS; l++ )
-			{
-				layer_table[k].image->ani_pos[j][l] =
-					layer_table[k].image->ani_pos[j-1][l];
-			}
+			ani[j] = ani[j - 1];
 		}
 
 		//  Enter data for the current state
-		layer_table[k].image->ani_pos[i][0] = key;
-		layer_table[k].image->ani_pos[i][1] = layer_table[k].x;
-		layer_table[k].image->ani_pos[i][2] = layer_table[k].y;
-		layer_table[k].image->ani_pos[i][3] = layer_table[k].opacity;
-		layer_table[k].image->ani_pos[i][4] = 0;			// No effect
+		ani[i].frame = key;
+		ani[i].x = layer_table[k].x;
+		ani[i].y = layer_table[k].y;
+		ani[i].opacity = layer_table[k].opacity;
+		ani[i].effect = 0;			// No effect
 	}
 
 	// Find first occurence of 0 or frame # < 'key'
 	for ( i=0; i<MAX_CYC_SLOTS; i++ )
 	{
-		if ( ani_cycle_table[i][0] > key ||
-			ani_cycle_table[i][0] == 0 )
+		if ( ani_cycle_table[i].frame0 > key ||
+			ani_cycle_table[i].frame0 == 0 )
 				break;
 	}
 
@@ -1084,24 +1063,18 @@ void ani_set_key_frame(int key)		// Set key frame postions & cycles as per curre
 
 	//  Shift remaining data down a slot
 	for ( j=MAX_CYC_SLOTS-1; j>i; j-- )
-	{
-		for ( l=0; l<TOT_CYC_ITEMS; l++ )
-		{
-			ani_cycle_table[j][l] = ani_cycle_table[j-1][l];
-		}
-	}
+		ani_cycle_table[j] = ani_cycle_table[j - 1];
 
 	//  Enter data for the current state
-	ani_cycle_table[i][0] = key;
-	ani_cycle_table[i][1] = key;
+	ani_cycle_table[i].frame0 = ani_cycle_table[i].frame1 = key;
 	for ( j=1; j<=layers_total; j++ )
 	{
-		if ( (j+1) >= TOT_CYC_ITEMS ) break;	// More layers than free items so bail out
+		if (j > MAX_CYC_ITEMS) break;	// More layers than free items so bail out
 		if ( layer_table[j].visible ) l=j; else l=-j;
-		ani_cycle_table[i][j+1] = l;
+		ani_cycle_table[i].layers[j - 1] = l;
 	}
-	if ( j<TOT_CYC_ITEMS ) ani_cycle_table[i][j+1] = 0;	// Add terminator if needed
-
+	// Add terminator if needed
+	if (j <= MAX_CYC_ITEMS) ani_cycle_table[i].layers[j - 1] = 0;
 }
 
 static void ani_tog_gif(GtkToggleButton *togglebutton, gpointer user_data)
@@ -1415,8 +1388,7 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	ani_init();
 	do
 	{
-		i = get_next_line(tin, 2000, fp);
-		if ( i<0 || i>2000 ) return;			// BAILOUT - invalid line
+		if (!fgets(tin, 2000, fp)) return;		// BAILOUT - invalid line
 		string_chop( tin );
 	} while ( strcmp( tin, ANIMATION_HEADER ) != 0 );	// Look for animation header
 
@@ -1428,13 +1400,11 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	if ( i<0 ) return;				// BAILOUT - invalid #
 	ani_frame2 = i;
 
-	i = get_next_line(tin, 2000, fp);
-	if ( i<0 || i>250 ) return;			// BAILOUT - invalid line
+	if (!fgets(tin, 2000, fp)) return;		// BAILOUT - invalid line
 	string_chop( tin );
 	strcpy( ani_output_path, tin );
 
-	i = get_next_line(tin, 2000, fp);
-	if ( i<0 || i>(ANI_PREFIX_LEN+1) ) return;		// BAILOUT - invalid #
+	if (!fgets(tin, 2000, fp)) return;		// BAILOUT - invalid #
 	string_chop( tin );
 	strcpy( ani_file_prefix, tin );
 
@@ -1458,12 +1428,11 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	tot = i;
 	for ( j=0; j<tot; j++ )					// Read each cycle line
 	{
-		i = get_next_line(tin, 2000, fp);
-		if ( i<0 || i>2000 ) break;			// BAILOUT - invalid line
+		if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
 
 		parse_line_cyc( tin, j );
 	}
-	if ( j<MAX_CYC_SLOTS ) ani_cycle_table[j][0] = 0;	// Mark end
+	if ( j<MAX_CYC_SLOTS ) ani_cycle_table[j].frame0 = 0;	// Mark end
 
 ///	POSITION DATA
 
@@ -1475,19 +1444,18 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 		tot = i;
 		for ( j=0; j<tot; j++ )					// Read each position line
 		{
-			i = get_next_line(tin, 2000, fp);
-			if ( i<0 || i>2000 ) break;			// BAILOUT - invalid line
+			if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
 
 			parse_line_pos( tin, k, j );
 		}
 		if ( j<MAX_POS_SLOTS )
-			layer_table[k].image->ani_pos[j][0] = 0;	// Mark end
+			layer_table[k].image->ani_pos[j].frame = 0;	// Mark end
 	}
 }
 
 void ani_write_file( FILE *fp )			// Write data to layers file already opened
 {
-	int gifcode = ani_gif_delay, i, j, k;
+	int gifcode = ani_gif_delay, i, j, k, l;
 
 	if ( layers_total == 0 ) return;	// No layers memory allocated so bail out
 
@@ -1505,20 +1473,20 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 	// Count number of cycles, and output this data (if any)
 	for ( i=0; i<MAX_CYC_SLOTS; i++ )
 	{
-		if ( ani_cycle_table[i][0] == 0 ) break;	// Bail out at 1st 0
+		if (!ani_cycle_table[i].frame0) break;	// Bail out at 1st 0
 	}
 
 	fprintf( fp, "%i\n", i );
 
 	for ( k=0; k<i; k++ )
 	{
-		fprintf( fp, "%i\t%i\t%i", ani_cycle_table[k][0], ani_cycle_table[k][1],
-						ani_cycle_table[k][2] );
-		j = 3;
-		while ( ani_cycle_table[k][j] != 0 && j<TOT_CYC_ITEMS )
+		fprintf(fp, "%i\t%i\t%i", ani_cycle_table[k].frame0,
+			ani_cycle_table[k].frame1, ani_cycle_table[k].layers[0]);
+		for (j = 1; j < MAX_CYC_ITEMS; j++)
 		{
-			fprintf( fp, ",%i", ani_cycle_table[k][j] );
-			j++;
+			l = ani_cycle_table[k].layers[j];
+			if (!l) break;
+			fprintf( fp, ",%i", l);
 		}
 		fprintf( fp, "\n" );
 	}
@@ -1530,9 +1498,10 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 
 	for ( k=0; k<=layers_total; k++ )		// Write position table for each layer
 	{
+		ani_slot *ani = layer_table[k].image->ani_pos;
 		for ( i=0; i<MAX_POS_SLOTS; i++ )	// Count how many lines are in the table
 		{
-			if ( layer_table[k].image->ani_pos[i][0] == 0 ) break;
+			if (ani[i].frame == 0) break;
 		}
 		fprintf( fp, "%i\n", i );		// Number of position lines for this layer
 		if ( i>0 )
@@ -1540,12 +1509,8 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 			for ( j=0; j<i; j++ )
 			{
 				fprintf( fp, "%i\t%i\t%i\t%i\t%i\n",
-					layer_table[k].image->ani_pos[j][0],
-					layer_table[k].image->ani_pos[j][1],
-					layer_table[k].image->ani_pos[j][2],
-					layer_table[k].image->ani_pos[j][3],
-					layer_table[k].image->ani_pos[j][4]
-					);
+					ani[j].frame, ani[j].x, ani[j].y,
+					ani[j].opacity, ani[j].effect);
 			}
 		}
 	}

@@ -302,7 +302,6 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready for DL code
 
 
-int get_next_line(char *input, int length, FILE *fp);		// Get next length chars of text file
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
 

@@ -1358,7 +1358,7 @@ int mem_load_pal( char *file_name, png_color *pal )	// Load file into palette ar
 
 	if ((fp = fopen(file_name, "r")) == NULL) return -1;
 
-	if ( get_next_line(input, 30, fp) != 0 )
+	if (!fgets(input, 30, fp))
 	{
 		fclose( fp );
 		return -1;
@@ -1367,7 +1367,7 @@ int mem_load_pal( char *file_name, png_color *pal )	// Load file into palette ar
 	if ( strncmp( input, "GIMP Palette", 12 ) == 0 )
 	{
 //printf("Gimp palette file\n");
-		while ( get_next_line(input, 120, fp) == 0 && new_mem_cols<256 )
+		while (fgets(input, 120, fp) && (new_mem_cols < 256))
 		{	// Continue to read until EOF or new_mem_cols>255
 			// If line starts with a number or space assume its a palette entry
 			if ( input[0] == ' ' || (input[0]>='0' && input[0]<='9') )
@@ -1388,23 +1388,9 @@ int mem_load_pal( char *file_name, png_color *pal )	// Load file into palette ar
 
 		for ( i=0; i<new_mem_cols; i++ )
 		{
-			get_next_line(input, 30, fp);
-/*			if ( get_next_line(input, 30, fp) != 0 )
-			{
-printf("Failed - line %i is > 30 chars\n", i);
-				fclose( fp );
-				return -1;
-			}*/
+			fgets(input, 30, fp);
 			sscanf(input, "%i,%i,%i\n", &rgb[0], &rgb[1], &rgb[2] );
 			validate_pal( i, rgb, pal );
-/*			for ( j=0; j<3; j++ )
-			{
-				mtMAX( rgb[j], rgb[j], 0 )
-				mtMIN( rgb[j], rgb[j], 255 )
-			}
-			pal[i].red = rgb[0];
-			pal[i].green = rgb[1];
-			pal[i].blue = rgb[2];*/
 		}
 	}
 	fclose( fp );
@@ -3244,17 +3230,6 @@ void circle_line(int x0, int y0, int dx, int dy, int thick)
 
 	g_para(xx[0], yy[0], xx[1], yy[1], dx, dy);
 }
-
-int get_next_line(char *input, int length, FILE *fp)
-{
-	char *st;
-
-	st = fgets(input, length, fp);
-	if ( st==NULL ) return -1;
-
-	return 0;
-}
-
 
 int read_hex( char in )			// Convert character to hex value 0..15.  -1=error
 {

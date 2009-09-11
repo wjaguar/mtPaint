@@ -18,8 +18,8 @@
 */
 
 /* *** PREFACE ***
- *  This is deliberately simple implementation - no comment preservation and
- * no sections, because we've no need of them.
+ *  This implementation has no comment preservation, and has nested sections -
+ * because this is how we like our inifiles. :-)
  *  Allocations are done in slabs, because no slot is ever deallocated or
  * reordered; only modified string values are allocated singly, since it is
  * probable they will keep being modified.
@@ -54,6 +54,7 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 #define INI_STR   2
 #define INI_INT   3
 #define INI_BOOL  4
+// Negative types are section nesting levels
 
 /* Slot flags */
 #define INI_STRING  0x0001 /* Index of strings block - must be bit 0 */
@@ -62,9 +63,16 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 
 #define SLOT_NAME(I,S) ((I)->sblock[(S)->flags & INI_STRING] + (S)->key)
 
-/* "One at a time" hash function */
-static guint32 hashf(guint32 seed, char *key)
+/* Thomas Wang's and "One at a time" hash functions */
+static guint32 hashf(guint32 seed, int section, char *key)
 {
+	seed += section;
+	seed = (seed << 15) + ~seed;
+	seed ^= (seed >> 12);
+	seed += seed << 2;
+	seed ^= seed >> 4;
+	seed *= 2057;
+	seed ^= seed >> 16;
 	for (; *key; key++)
 	{
 		seed += *key;
@@ -79,17 +87,20 @@ static guint32 hashf(guint32 seed, char *key)
 
 static int cuckoo_insert(inifile *inip, inislot *slotp)
 {
-	char *name;
 	short idx, tmp;
 	guint32 key;
 	int i, j;
+
+	/* Update section's last slot index */
+	i = slotp->sec;
+	j = slotp - inip->slots;
+	if (i && (inip->slots[i - 1].defv < j)) inip->slots[i - 1].defv = j;
 
 	/* Normal cuckoo process */
 	idx = (slotp - inip->slots) + 1;
 	for (i = 0; i < inip->maxloop; i++)
 	{
-		name = SLOT_NAME(inip, slotp);
-		key = hashf(inip->seed, name);
+		key = hashf(inip->seed, slotp->sec, SLOT_NAME(inip, slotp));
 		key >>= (i & 1) << 4;
 		j = (key & inip->hmask) * 2 + (i & 1);
 		tmp = inip->hash[j];
@@ -144,22 +155,22 @@ static int rehash(inifile *inip)
 	}
 }
 
-static inislot *cuckoo_find(inifile *inip, char *name)
+static inislot *cuckoo_find(inifile *inip, int section, char *name)
 {
-	char *sname;
 	inislot *slotp;
 	guint32 key;
 	int i, j = 0;
 
-	key = hashf(inip->seed, name);
+	key = hashf(inip->seed, section, name);
 	while (TRUE)
 	{
 		i = inip->hash[(key & inip->hmask) * 2 + j];
 		if (i)
 		{
 			slotp = inip->slots + i - 1;
-			sname = SLOT_NAME(inip, slotp);
-			if (!strcmp(name, sname)) return (slotp);
+			if ((slotp->sec == section) &&
+				!strcmp(name, SLOT_NAME(inip, slotp)))
+				return (slotp);
 		}
 		if (j++) return (NULL);
 		key >>= 16;
@@ -211,11 +222,12 @@ static char *store_string(inifile *inip, char *str)
 	return (ra);
 }
 
-static inislot *key_slot(inifile *inip, char *key, int type)
+static inislot *key_slot(inifile *inip, int section, char *key, int type)
 {
 	inislot *slot;
 
-	slot = cuckoo_find(inip, key);
+	if ((type < 0) && section) type = inip->slots[section - 1].type - 1;
+	slot = cuckoo_find(inip, section, key);
 	if (slot)
 	{
 		if (type == INI_NONE) return (slot);
@@ -235,6 +247,7 @@ static inislot *key_slot(inifile *inip, char *key, int type)
 		if (!key) return (NULL);
 		slot = add_slot(inip);
 		if (!slot) return (NULL);
+		slot->sec = section;
 		slot->key = key - inip->sblock[1];
 		slot->flags |= INI_STRING;
 		if (!cuckoo_insert(inip, slot) && !rehash(inip))
@@ -278,7 +291,7 @@ int read_ini(inifile *inip, char *fname)
 	inifile ini;
 	inislot *slot;
 	char *tmp, *wrk, *w2, *str;
-	int i, l;
+	int i, j, l, sec = 0;
 
 
 	/* Init the structure */
@@ -303,22 +316,51 @@ int read_ini(inifile *inip, char *fname)
 		str = tmp + strcspn(tmp, "\r\n");
 		if (*str) *str++ = '\0';
 		if ((*tmp == ';') || (*tmp == '#')) continue; /* Comment */
+		if (*tmp == '[') /* Section */
+		{
+			if (!(w2 = strchr(tmp + 1, ']'))) goto error;
+			for (l = i = 0; tmp[i + 1] == '/'; i++);
+			if (i) /* Nested section */
+			{
+				if (!sec || ((j = i + ini.slots[sec - 1].type) > 0))
+					goto error;
+				l = sec;
+				while (j--) l = ini.slots[l - 1].sec;
+			}
+			*w2 = '\0';
+			/* Hash this */
+			slot = cuckoo_find(&ini, l, tmp + ++i);
+			if (!slot) /* New section */
+			{
+				slot = add_slot(&ini);
+				if (!slot) goto fail;
+				slot->type = -i;
+				slot->sec = l;
+				slot->key = (tmp - ini.sblock[0]) + i;
+				if (!cuckoo_insert(&ini, slot) && !rehash(&ini))
+					goto fail;
+			}
+			sec = slot - ini.slots + 1; /* Activate */
+			continue;
+		}
+		/* Variable */
 		wrk = strpbrk(tmp, "=\t ");
 		if (!wrk || (*(w2 = wrk + strspn(wrk, "\t ")) != '='))
 		{
-			g_printerr("Wrong INI line: '%s'\n", tmp);
+error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 			continue;
 		}
 		w2 += 1 + strspn(w2 + 1, "\t ");
 		*wrk = '\0';
 //		for (wrk = str - 1; *wrk && ((*wrk == '\t') || (*wrk == ' '); *wrk-- = '\0');
 		/* Hash this pair */
-		slot = cuckoo_find(&ini, tmp);
+		slot = cuckoo_find(&ini, sec, tmp);
 		if (!slot) /* New key */
 		{
 			slot = add_slot(&ini);
 			if (!slot) goto fail;
 			slot->type = INI_UNDEF;
+			slot->sec = sec;
 			slot->key = tmp - ini.sblock[0];
 			if (!cuckoo_insert(&ini, slot) && !rehash(&ini))
 				goto fail;
@@ -340,48 +382,74 @@ int write_ini(inifile *inip, char *fname, char *header)
 	FILE *fp;
 	inislot *slotp;
 	char *name, *sv;
-	int i;
+	int i, j, max, sec, var;
 
 	if (!(fp = fopen(fname, "w"))) return (FALSE);
 	if (header) fprintf(fp, "%s\n", header);
 
-	for (i = 0; i < inip->count; i++)
+	i = sec = 0; var = 0;
+	while (TRUE)
 	{
-		slotp = inip->slots + i;
-		name = SLOT_NAME(inip, slotp);
-		sv = slotp->value ? slotp->value : "";
-		switch (slotp->type)
+		max = sec ? inip->slots[sec - 1].defv : inip->count - 1;
+		for (; i <= max; i++)
 		{
-		case INI_STR:
-			if ((slotp->flags & INI_DEFAULT) &&
-				!strcmp(inip->sblock[1] + slotp->defv, sv))
+			slotp = inip->slots + i;
+
+			/* Only the current section */
+			if (slotp->sec != sec) continue;
+			/* Variables first, subsections second */
+			if ((slotp->type < 0) ^ var) continue;
+
+			name = SLOT_NAME(inip, slotp);
+			if (slotp->type < 0) /* Section */
+			{
+				if (slotp->defv <= i) continue; /* It's empty */
+				fputc('[', fp);
+				for (j = -1; j > slotp->type; j--) fputc('/', fp);
+				fprintf(fp, "%s]\n", name);
+				sec = i + 1; max = slotp->defv; var = 0;
+				continue;
+			}
+			sv = slotp->value ? slotp->value : "";
+			switch (slotp->type)
+			{
+			case INI_STR:
+				if ((slotp->flags & INI_DEFAULT) &&
+					!strcmp(inip->sblock[1] + slotp->defv, sv))
+					break;
+			case INI_UNDEF:
+			default:
+				fprintf(fp, "%s = %s\n", name, sv);
 				break;
-		case INI_UNDEF:
-		default:
-			fprintf(fp, "%s = %s\n", name, sv);
-			break;
-		case INI_INT:
-			if ((slotp->flags & INI_DEFAULT) &&
-				((int)slotp->value == slotp->defv)) break;
-			fprintf(fp, "%s = %d\n", name, (int)slotp->value);
-			break;
-		case INI_BOOL:
-			if ((slotp->flags & INI_DEFAULT) &&
-				(!!slotp->value == !!slotp->defv)) break;
-			fprintf(fp, "%s = %s\n", name, slotp->value ?
-				"true" : "false");
-			break;
+			case INI_INT:
+				if ((slotp->flags & INI_DEFAULT) &&
+					((int)slotp->value == slotp->defv)) break;
+				fprintf(fp, "%s = %d\n", name, (int)slotp->value);
+				break;
+			case INI_BOOL:
+				if ((slotp->flags & INI_DEFAULT) &&
+					(!!slotp->value == !!slotp->defv)) break;
+				fprintf(fp, "%s = %s\n", name, slotp->value ?
+					"true" : "false");
+				break;
+			}
 		}
+		i = sec;
+		if (!var) var = 1; /* Process subsections now */
+		else if (!sec) break; /* All done */
+		/* Return to scanning for parent's subsections */
+		else sec = inip->slots[sec - 1].sec;
 	}
+
 	fclose(fp);
 	return (TRUE);
 }
 
-int ini_setstr(inifile *inip, char *key, char *value)
+int ini_setstr(inifile *inip, int section, char *key, char *value)
 {
 	inislot *slot;
 
-	if (!(slot = key_slot(inip, key, INI_STR))) return (FALSE);
+	if (!(slot = key_slot(inip, section, key, INI_STR))) return (FALSE);
 /* NULLs are stored as empty strings, for less hazardous handling */
 	slot->value = "";
 /* Uncomment this instead if want NULLs to remain NULLs */
@@ -396,31 +464,31 @@ int ini_setstr(inifile *inip, char *key, char *value)
 	return (TRUE);
 }
 
-int ini_setint(inifile *inip, char *key, int value)
+int ini_setint(inifile *inip, int section, char *key, int value)
 {
 	inislot *slot;
 
-	if (!(slot = key_slot(inip, key, INI_INT))) return (FALSE);
+	if (!(slot = key_slot(inip, section, key, INI_INT))) return (FALSE);
 	slot->value = (char *)value;
 	return (TRUE);
 }
 
-int ini_setbool(inifile *inip, char *key, int value)
+int ini_setbool(inifile *inip, int section, char *key, int value)
 {
 	inislot *slot;
 
-	if (!(slot = key_slot(inip, key, INI_BOOL))) return (FALSE);
+	if (!(slot = key_slot(inip, section, key, INI_BOOL))) return (FALSE);
 	slot->value = (char *)!!value;
 	return (TRUE);
 }
 
-char *ini_getstr(inifile *inip, char *key, char *defv)
+char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 {
 	inislot *slot;
 	char *tail;
 
 	/* Read existing */
-	slot = key_slot(inip, key, INI_NONE);
+	slot = key_slot(inip, section, key, INI_NONE);
 	if (!slot) return (defv);
 	if (slot->type == INI_STR)
 	{
@@ -460,14 +528,14 @@ char *ini_getstr(inifile *inip, char *key, char *defv)
 	return (slot->value);
 }
 
-int ini_getint(inifile *inip, char *key, int defv)
+int ini_getint(inifile *inip, int section, char *key, int defv)
 {
 	inislot *slot;
 	char *tail;
 	long l;
 
 	/* Read existing */
-	slot = key_slot(inip, key, INI_NONE);
+	slot = key_slot(inip, section, key, INI_NONE);
 	if (!slot) return (defv);
 	if (slot->type == INI_INT)
 	{
@@ -503,7 +571,7 @@ int ini_getint(inifile *inip, char *key, int defv)
 	return ((int)(slot->value));
 }
 
-int ini_getbool(inifile *inip, char *key, int defv)
+int ini_getbool(inifile *inip, int section, char *key, int defv)
 {
 	static const char *YN[] = { "n", "y", "0", "1", "no", "yes",
 		"off", "on", "false", "true", "disabled", "enabled", NULL };
@@ -513,7 +581,7 @@ int ini_getbool(inifile *inip, char *key, int defv)
 	defv = !!defv;
 
 	/* Read existing */
-	slot = key_slot(inip, key, INI_NONE);
+	slot = key_slot(inip, section, key, INI_NONE);
 	if (!slot) return (defv);
 	if (slot->type == INI_BOOL)
 	{
@@ -547,6 +615,26 @@ int ini_getbool(inifile *inip, char *key, int defv)
 	}
 	slot->type = INI_BOOL;
 	return ((int)(slot->value));
+}
+
+int ini_setsection(inifile *inip, int section, char *key)
+{
+	inislot *slot;
+
+	slot = key_slot(inip, section, key, -1);
+	if (!slot) return (-1);
+	return (slot - inip->slots + 1);
+}
+
+int ini_getsection(inifile *inip, int section, char *key)
+{
+	inislot *slot;
+	int type;
+
+	type = section ? inip->slots[section - 1].type - 1 : -1;
+	slot = cuckoo_find(inip, section, key);
+	if (!slot || (slot->type != type)) return (-1);
+	return (slot - inip->slots + 1);
 }
 
 #ifdef WIN32
@@ -613,30 +701,30 @@ void inifile_quit()
 
 char *inifile_get(char *setting, char *defaultValue)
 {
-	return (ini_getstr(&main_ini, setting, defaultValue));
+	return (ini_getstr(&main_ini, 0, setting, defaultValue));
 }
 
 int inifile_get_gint32(char *setting, int defaultValue)
 {
-	return (ini_getint(&main_ini, setting, defaultValue));
+	return (ini_getint(&main_ini, 0, setting, defaultValue));
 }
 
 int inifile_get_gboolean(char *setting, int defaultValue)
 {
-	return (ini_getbool(&main_ini, setting, defaultValue));
+	return (ini_getbool(&main_ini, 0, setting, defaultValue));
 }
 
 int inifile_set(char *setting, char *value)
 {
-	return (ini_setstr(&main_ini, setting, value));
+	return (ini_setstr(&main_ini, 0, setting, value));
 }
 
 int inifile_set_gint32(char *setting, int value)
 {
-	return (ini_setint(&main_ini, setting, value));
+	return (ini_setint(&main_ini, 0, setting, value));
 }
 
 int inifile_set_gboolean(char *setting, int value)
 {
-	return (ini_setbool(&main_ini, setting, value));
+	return (ini_setbool(&main_ini, 0, setting, value));
 }
