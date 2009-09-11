@@ -118,9 +118,8 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (cline_window), vbox1);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow = xpack(vbox1, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show(scrolledwindow);
-	gtk_box_pack_start(GTK_BOX(vbox1), scrolledwindow, TRUE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(scrolledwindow),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
@@ -202,13 +201,11 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_add (GTK_CONTAINER (help_window), box1);
 	gtk_widget_show (box1);
 
-	box2 = gtk_vbox_new (FALSE, 10);
+	box2 = xpack(box1, gtk_vbox_new(FALSE, 10));
 	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
-	gtk_box_pack_start (GTK_BOX (box1), box2, TRUE, TRUE, 0);
 	gtk_widget_show (box2);
 
-	table = gtk_table_new (3, 6, FALSE);
-	gtk_box_pack_start (GTK_BOX (box2), table, TRUE, TRUE, 0);
+	table = xpack(box2, gtk_table_new(3, 6, FALSE));
 
 	notebook = gtk_notebook_new ();
 	gtk_table_attach_defaults (GTK_TABLE (table), notebook, 0, 6, 0, 1);
@@ -259,12 +256,11 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
 
-	box2 = gtk_vbox_new (FALSE, 10);
+	box2 = pack(box1, gtk_vbox_new(FALSE, 10));
 	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
-	gtk_box_pack_start (GTK_BOX (box1), box2, FALSE, TRUE, 0);
 	gtk_widget_show (box2);
 
-	button = gtk_button_new_with_label (_("Close"));
+	button = xpack(box2, gtk_button_new_with_label (_("Close")));
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
@@ -275,7 +271,6 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect_object (GTK_OBJECT (help_window), "delete_event",
 		GTK_SIGNAL_FUNC (click_help_end), NULL);
 
-	gtk_box_pack_start (GTK_BOX (box2), button, TRUE, TRUE, 0);
 	gtk_widget_show (button);
 
 	gtk_widget_show (table);
@@ -1597,17 +1592,15 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox);
 	gtk_container_add (GTK_CONTAINER (text_window), vbox);
 
-	text_font_window = gtk_font_selection_new ();
+	text_font_window = xpack(vbox, gtk_font_selection_new());
 	gtk_widget_show(text_font_window);
 	gtk_container_set_border_width (GTK_CONTAINER (text_font_window), 4);
-
-	gtk_box_pack_start( GTK_BOX(vbox), text_font_window, TRUE, TRUE, 0 );
 
 	add_hseparator( vbox, 200, 10 );
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 5);
+	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
 
 	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
 			inifile_get_gboolean( "fontAntialias", FALSE ) );
@@ -1627,14 +1620,14 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 		text_spin[0] = add_a_spin(inifile_get_gint32("fontBackground", 0)
 			% mem_cols, 0, mem_cols - 1);
-		gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, TRUE, 5);
+		gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, FALSE, 5);
 	}
 
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
 #if GTK_CHECK_VERSION(2,6,0)
 	text_spin[1] = add_float_spin(inifile_get_gfloat("fontAngle", 0), -360, 360);
-	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, TRUE, 5);
+	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, FALSE, 5);
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
 		inifile_get_gboolean( "fontAntialias2", FALSE ) );
 #else
@@ -1645,7 +1638,7 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	hbox = OK_box(0, text_window, _("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(delete_text));
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 5);
+	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
 
 	gtk_widget_show(text_window);
 	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );

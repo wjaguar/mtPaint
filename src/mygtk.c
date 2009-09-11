@@ -65,22 +65,16 @@ GtkWidget *add_a_spin( int value, int min, int max )
 
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box )
 {
-	GtkWidget *table = gtk_table_new(rows, columns, FALSE);
+	GtkWidget *table = pack(box, gtk_table_new(rows, columns, FALSE));
 	gtk_widget_show(table);
-	gtk_box_pack_start(GTK_BOX(box), table, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (table), bord);
+	gtk_container_set_border_width(GTK_CONTAINER(table), bord);
 
 	return table;
 }
 
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 {
-	GtkWidget *tog;
-
-	tog = sig_toggle(label, value, NULL, NULL);
-	gtk_box_pack_start(GTK_BOX(box), tog, FALSE, FALSE, 0);
-
-	return tog;
+	return (pack(box, sig_toggle(label, value, NULL, NULL)));
 }
 
 GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
@@ -110,10 +104,9 @@ GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 
 void add_hseparator( GtkWidget *widget, int xs, int ys )
 {
-	GtkWidget *sep = gtk_hseparator_new ();
-	gtk_widget_show (sep);
-	gtk_box_pack_start (GTK_BOX (widget), sep, FALSE, FALSE, 0);
-	gtk_widget_set_usize (sep, xs, ys);
+	GtkWidget *sep = pack(widget, gtk_hseparator_new());
+	gtk_widget_show(sep);
+	gtk_widget_set_usize(sep, xs, ys);
 }
 
 
@@ -152,8 +145,7 @@ void progress_init(char *text, int canc)		// Initialise progress window
 	gtk_widget_show(vbox6);
 	gtk_container_add(GTK_CONTAINER(viewport), vbox6);
 
-	progress_bar = gtk_progress_bar_new ();
-	gtk_box_pack_start( GTK_BOX (vbox6), progress_bar, FALSE, FALSE, 0 );
+	progress_bar = pack(vbox6, gtk_progress_bar_new());
 	gtk_progress_set_format_string( GTK_PROGRESS (progress_bar), text );
 	gtk_progress_set_show_text( GTK_PROGRESS (progress_bar), TRUE );
 	gtk_container_set_border_width (GTK_CONTAINER (vbox6), 10);
@@ -345,12 +337,11 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 			GTK_RADIO_BUTTON_0(button), names[i]);
 		if ((vnum > 1) && !(j % vnum))
 		{
-			wbox = gtk_vbox_new(FALSE, 0);
-			gtk_box_pack_start(GTK_BOX(box), wbox, TRUE, TRUE, 0);
+			wbox = xpack(box, gtk_vbox_new(FALSE, 0));
 			gtk_object_set_user_data(GTK_OBJECT(wbox), var);
 		}
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-		gtk_box_pack_start(GTK_BOX(wbox), button, FALSE, TRUE, 0);
+		gtk_box_pack_start(GTK_BOX(wbox), button, FALSE, FALSE, 0);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "toggled", handler,
@@ -373,16 +364,14 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 
 	hbox = gtk_hbox_new(TRUE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
-	button = gtk_button_new_with_label(nCancel);
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 0);
+	button = xpack(hbox, gtk_button_new_with_label(nCancel));
 	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
 		Cancel, GTK_OBJECT(window));
 	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0,
 		(GtkAccelFlags)0);
 
-	button = gtk_button_new_with_label(nOK);
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 0);
+	button = xpack(hbox, gtk_button_new_with_label(nOK));
 	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
 		OK, GTK_OBJECT(window));
@@ -402,8 +391,7 @@ GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx
 {
 	GtkWidget *button;
 
-	button = gtk_button_new_with_label(name);
-	gtk_box_pack_start(GTK_BOX(box), button, TRUE, TRUE, 0);
+	button = xpack(box, gtk_button_new_with_label(name));
 	gtk_box_reorder_child(GTK_BOX(box), button, idx);
 	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
@@ -783,6 +771,20 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	*button = sig_toggle_button(button_label, FALSE, GTK_NOTEBOOK(notebook),
 		GTK_SIGNAL_FUNC(toggle_book));
 	return (notebook);
+}
+
+// Most common use of boxes
+
+GtkWidget *pack(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_start(GTK_BOX(box), widget, FALSE, FALSE, 0);
+	return (widget);
+}
+
+GtkWidget *xpack(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_start(GTK_BOX(box), widget, TRUE, TRUE, 0);
+	return (widget);
 }
 
 

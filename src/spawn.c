@@ -273,7 +273,7 @@ void pressed_file_configure()
 	gtk_container_add(GTK_CONTAINER(sw), clist);
 	/* Store directories in a hidden third column */
 	gtk_clist_set_column_visibility(GTK_CLIST(clist), 2, FALSE);
-//	gtk_clist_set_column_width(GTK_CLIST(clist), 0, 200);
+	gtk_clist_set_column_width(GTK_CLIST(clist), 0, 200);
 //	gtk_clist_set_column_width(GTK_CLIST(clist), 1, 200);
 	gtk_clist_column_titles_passive(GTK_CLIST(clist));
 	gtk_clist_set_selection_mode(GTK_CLIST(clist), GTK_SELECTION_BROWSE);
@@ -314,10 +314,9 @@ void pressed_file_configure()
 
 	/* Cancel / Execute / OK */
 
-	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(faction_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	hbox = pack(vbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(faction_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 	OK_box_add(hbox, _("Execute"), GTK_SIGNAL_FUNC(faction_execute), 1);
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_widget_show_all(win);

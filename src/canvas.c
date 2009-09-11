@@ -440,8 +440,7 @@ void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_widget_show(box);
 	for (i = 0; i < 2; i++)
 	{
-		spin = add_float_spin(1, 0, 200);
-		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+		spin = pack(box, add_float_spin(1, 0, 200));
 	}
 	gtk_widget_set_sensitive(spin, FALSE);
 	check = add_a_toggle(_("Different X/Y"), box, FALSE);
@@ -586,10 +585,11 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 
 void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *box, *spin = add_a_spin(45, -360, 360);
+	GtkWidget *box, *spin;
+
 	box = gtk_vbox_new(FALSE, 5);
 	gtk_widget_show(box);
-	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+	spin = pack(box, add_a_spin(45, -360, 360));
 	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 	if (mem_img_bpp == 3)
 	{
@@ -1470,9 +1470,8 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
 		break;
 	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
-		label = gtk_label_new(_("Animation delay"));
+		label = pack(box, gtk_label_new(_("Animation delay")));
 		gtk_widget_show(label);
-		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
 		label = add_a_spin(preserved_gif_delay, 1, MAX_DELAY);
 		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
 		break;
@@ -1859,9 +1858,8 @@ void fs_setup(GtkWidget *fs, int action_type)
 #endif
 	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
 
-	xtra = ls_settings_box(txt2, action_type);
-	gtk_box_pack_start(GTK_BOX(GTK_FILE_SELECTION(fs)->main_vbox), xtra,
-		FALSE, TRUE, 0);
+	xtra = pack(GTK_FILE_SELECTION(fs)->main_vbox,
+		ls_settings_box(txt2, action_type));
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
 	gtk_widget_show(fs);

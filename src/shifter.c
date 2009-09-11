@@ -307,29 +307,22 @@ void pressed_shifter()
 			if ( j==2 ) max=255; else max=mem_cols-1;
 			shifter_spin[i][j] = spin_to_table( table, i+1, j+1, 2,
 						shifter_in[i][j], 0, max );
-#if GTK_MAJOR_VERSION == 2
-			gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(shifter_spin[i][j])->entry ),
-				"value_changed", GTK_SIGNAL_FUNC(shifter_moved), NULL);
-#else
-			gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(shifter_spin[i][j])->entry ),
-				"changed", GTK_SIGNAL_FUNC(shifter_moved), NULL);
-#endif
+			spin_connect(shifter_spin[i][j],
+				GTK_SIGNAL_FUNC(shifter_moved), NULL);
 		}
 	}
 
 
-	hbox = gtk_hbox_new (FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show (hbox);
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
 	button = add_a_toggle(_("Play"), hbox, FALSE);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(shift_but_playstop), NULL);
 	shift_play_state = FALSE;			// Stopped
 
-	shifter_label = gtk_label_new("");
+	shifter_label = xpack(hbox, gtk_label_new(""));
 	gtk_widget_show( shifter_label );
 	gtk_misc_set_alignment( GTK_MISC(shifter_label), 0.5, 0.5 );
-	gtk_box_pack_start( GTK_BOX(hbox), shifter_label, TRUE, TRUE, 0 );
 
 
 	shifter_slider = mt_spinslide_new( -1, -1 );
@@ -341,9 +334,8 @@ void pressed_shifter()
 
 	add_hseparator( vbox, -2, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show (hbox);
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
 	button = gtk_button_new_with_label(_("Clear"));
 	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);

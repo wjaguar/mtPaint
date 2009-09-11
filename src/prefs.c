@@ -440,8 +440,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	SETUP NOTEBOOK
 
-	notebook1 = gtk_notebook_new ();
-	gtk_box_pack_start (GTK_BOX (vbox3), notebook1, TRUE, TRUE, 0);
+	notebook1 = xpack(vbox3, gtk_notebook_new());
 	gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook1), GTK_POS_TOP);
 	gtk_widget_show (notebook1);
 
@@ -595,18 +594,16 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	add_with_frame(vbox_3, _("Device Settings"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
-	label_tablet_device = gtk_label_new ("");
+	label_tablet_device = pack(vbox_2, gtk_label_new(""));
 	gtk_widget_show (label_tablet_device);
-	gtk_box_pack_start (GTK_BOX (vbox_2), label_tablet_device, FALSE, FALSE, 0);
 	gtk_misc_set_alignment (GTK_MISC (label_tablet_device), 0, 0.5);
 	gtk_misc_set_padding (GTK_MISC (label_tablet_device), 5, 5);
 
 	button1 = add_a_button( _("Configure Device"), 0, vbox_2, FALSE );
 	gtk_signal_connect(GTK_OBJECT(button1), "clicked", GTK_SIGNAL_FUNC(conf_tablet), NULL);
 
-	table3 = gtk_table_new (4, 2, FALSE);
+	table3 = xpack(vbox_2, gtk_table_new(4, 2, FALSE));
 	gtk_widget_show (table3);
-	gtk_box_pack_start (GTK_BOX (vbox_2), table3, TRUE, TRUE, 0);
 
 	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
@@ -641,9 +638,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	add_with_frame(vbox_3, _("Test Area"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
-	drawingarea_tablet = gtk_drawing_area_new ();
+	drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());
 	gtk_widget_show (drawingarea_tablet);
-	gtk_box_pack_start (GTK_BOX (vbox_2), drawingarea_tablet, TRUE, TRUE, 0);
 	gtk_widget_set_usize (drawingarea_tablet, 128, 64);
 	gtk_signal_connect( GTK_OBJECT(drawingarea_tablet), "expose_event",
 		GTK_SIGNAL_FUNC (expose_tablet_preview), (gpointer) drawingarea_tablet );
@@ -663,9 +659,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 
 
-	label_tablet_pressure = gtk_label_new ("");
+	label_tablet_pressure = pack(vbox_2, gtk_label_new(""));
 	gtk_widget_show (label_tablet_pressure);
-	gtk_box_pack_start (GTK_BOX (vbox_2), label_tablet_pressure, FALSE, FALSE, 0);
 	gtk_misc_set_alignment (GTK_MISC (label_tablet_pressure), 0, 0.5);
 
 
@@ -685,10 +680,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 5), label);
 
 	add_hseparator( vbox_2, 200, 10 );
-	label = gtk_label_new( _("Select preferred language translation\n\n"
-				"You will need to restart mtPaint\nfor this to take full effect") );
+	label = pack(vbox_2, gtk_label_new( _("Select preferred language translation\n\n"
+				"You will need to restart mtPaint\nfor this to take full effect")));
 	gtk_widget_show (label);
-	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 0 );
 	add_hseparator( vbox_2, 200, 10 );
 
 	for (i = 0; i < PREF_LANGS; i++)
@@ -696,8 +690,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		if (!strcmp(pref_lang_ini_code[i],
 			inifile_get("languageSETTING", "system"))) break;
 	}
-	hbox4 = wj_radio_pack(pref_langs, PREF_LANGS, 6, i, &pref_lang, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox_2), hbox4, TRUE, TRUE, 0);
+	xpack(vbox_2, wj_radio_pack(pref_langs, PREF_LANGS, 6, i, &pref_lang, NULL));
 
 #endif
 
@@ -705,10 +698,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	Bottom of Prefs window
 
-	hbox4 = OK_box(0, prefs_window, _("OK"), GTK_SIGNAL_FUNC(prefs_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(delete_prefs));
+	hbox4 = pack(vbox3, OK_box(0, prefs_window, _("OK"), GTK_SIGNAL_FUNC(prefs_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(delete_prefs)));
 	OK_box_add(hbox4, _("Apply"), GTK_SIGNAL_FUNC(prefs_apply), 1);
-	gtk_box_pack_start (GTK_BOX (vbox3), hbox4, FALSE, FALSE, 0);
 
 	gtk_window_set_transient_for( GTK_WINDOW(prefs_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (prefs_window);

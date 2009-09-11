@@ -272,16 +272,13 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_widget_show(vbox2);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
 	add_with_frame(vbox, _("Initial Channel State"), vbox2, 5);
-	hbox = wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0);
+	pack(vbox2, wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL));
 
 	add_hseparator(vbox2, -2, 10);
-	hbox = sig_toggle(_("Inverted"), FALSE, &chan_new_invert, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0);
+	pack(vbox2, sig_toggle(_("Inverted"), FALSE, &chan_new_invert, NULL));
 
-	hbox = OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(click_newchan_cancel));
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+	pack(vbox, OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(click_newchan_cancel)));
 
 	gtk_window_set_transient_for(GTK_WINDOW(newchan_window), GTK_WINDOW(main_window));
 	gtk_widget_show(newchan_window);
@@ -317,7 +314,7 @@ static void click_delete_ok(GtkWidget *window)
 
 void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint item)
 {
-	GtkWidget *window, *vbox, *check, *hbox;
+	GtkWidget *window, *vbox, *check;
 	int i;
 
 	/* Are there utility channels at all? */
@@ -341,9 +338,8 @@ void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint ite
 
 	add_hseparator(vbox, 200, 10);
 
-	hbox = OK_box(5, window, _("OK"), GTK_SIGNAL_FUNC(click_delete_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+	pack(vbox, OK_box(5, window, _("OK"), GTK_SIGNAL_FUNC(click_delete_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_widget_show(window);
 }

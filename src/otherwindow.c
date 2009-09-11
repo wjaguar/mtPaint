@@ -197,8 +197,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 		*title_txt[] = {_("New Image"), _("New Layer")};
 	int w = mem_width, h = mem_height, c = mem_cols;
 
-	GtkWidget *vbox1, *hbox3;
-	GtkWidget *table1;
+	GtkWidget *vbox1, *table1;
 
 	new_window_type = type;
 
@@ -230,14 +229,12 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	add_to_table( _("Height"), table1, 1, 0, 5 );
 	add_to_table( _("Colours"), table1, 2, 0, 5 );
 
-	hbox3 = wj_radio_pack(rad_txt, type ? 3 : 4, 0, im_type, &im_type, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox1), hbox3, TRUE, TRUE, 0);
+	xpack(vbox1, wj_radio_pack(rad_txt, type ? 3 : 4, 0, im_type, &im_type, NULL));
 
 	add_hseparator( vbox1, 200, 10 );
 
-	hbox3 = OK_box(5, new_window, _("Create"), GTK_SIGNAL_FUNC(create_new),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(vbox1), hbox3, FALSE, FALSE, 0);
+	pack(vbox1, OK_box(5, new_window, _("Create"), GTK_SIGNAL_FUNC(create_new),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_window_set_transient_for( GTK_WINDOW(new_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (new_window);
@@ -437,7 +434,7 @@ static void click_col_add_ok(GtkWidget *widget)
 
 void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *vbox5, *hbox6;
+	GtkWidget *vbox5;
 
 	add_col_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Set Palette Size"),
 		GTK_WIN_POS_CENTER, TRUE );
@@ -455,9 +452,8 @@ void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox5, -2, 10 );
 
-	hbox6 = OK_box(0, add_col_window, _("OK"), GTK_SIGNAL_FUNC(click_col_add_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(vbox5), hbox6, FALSE, FALSE, 0);
+	pack(vbox5, OK_box(0, add_col_window, _("OK"), GTK_SIGNAL_FUNC(click_col_add_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_widget_show (add_col_window);
 }
@@ -485,7 +481,7 @@ void run_filter(GtkButton *button, gpointer user_data)
 
 void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool)
 {
-	GtkWidget *hbox7, *vbox6;
+	GtkWidget *vbox6;
 	GtkWindowPosition pos = istool && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
@@ -505,9 +501,8 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 	add_hseparator(vbox6, -2, 10);
 
-	hbox7 = OK_box(0, filter_win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(vbox6), hbox7, FALSE, FALSE, 0);
+	pack(vbox6, OK_box(0, filter_win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_widget_show(filter_win);
 }
@@ -595,9 +590,8 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("Start Index"), table1, 0, 0, 5 );
 	add_to_table( _("End Index"), table1, 1, 0, 5 );
 
-	table1 = wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
-		inifile_get_gint32("lastspalType", 2), &spal_mode, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox1), table1, FALSE, FALSE, 0);
+	table1 = pack(vbox1, wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
+		inifile_get_gint32("lastspalType", 2), &spal_mode, NULL));
 	gtk_container_set_border_width(GTK_CONTAINER(table1), 5);
 
 	spal_rev = add_a_toggle(_("Reverse Order"), vbox1,
@@ -607,10 +601,9 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 
 	/* Cancel / Apply / OK */
 
-	hbox3 = OK_box(5, spal_window, _("OK"), GTK_SIGNAL_FUNC(click_spal_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	hbox3 = pack(vbox1, OK_box(5, spal_window, _("OK"), GTK_SIGNAL_FUNC(click_spal_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 	OK_box_add(hbox3, _("Apply"), GTK_SIGNAL_FUNC(click_spal_apply), 1);
-	gtk_box_pack_start (GTK_BOX (vbox1), hbox3, FALSE, TRUE, 0);
 
 	gtk_widget_show (spal_window);
 }
@@ -886,15 +879,15 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, -2, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
-	vbox5 = gtk_vbox_new (FALSE, 0);
-	if ( inifile_get_gboolean( "transcol_show", FALSE ) ) gtk_widget_show (vbox5);
-	gtk_box_pack_start (GTK_BOX (vbox), vbox5, FALSE, FALSE, 0);
+	vbox5 = pack(vbox, gtk_vbox_new(FALSE, 0));
+	if (inifile_get_gboolean("transcol_show", FALSE))
+		gtk_widget_show (vbox5);
 
-	button = add_a_toggle( _("Show Detail"), hbox, inifile_get_gboolean( "transcol_show", FALSE ) );
+	button = add_a_toggle(_("Show Detail"), hbox,
+		inifile_get_gboolean("transcol_show", FALSE));
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(click_brcosa_show_toggle), vbox5);
 /*
@@ -908,9 +901,8 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	OPTIONAL SECTION
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox5), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox5, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
 	if ( mem_img_bpp == 1 )
 	{
@@ -928,26 +920,17 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 		}
 	}
 	brcosa_pal_lim[0] = 0;
-	brcosa_pal_lim[1] = mem_cols-1;
-	brcosa_spins[BRCOSA_ITEMS] = add_a_spin( 0, 0, mem_cols-1 );
-	brcosa_spins[BRCOSA_ITEMS+1] = add_a_spin( mem_cols-1, 0, mem_cols-1 );
-	gtk_box_pack_start (GTK_BOX (hbox), brcosa_spins[BRCOSA_ITEMS], FALSE, FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (hbox), brcosa_spins[BRCOSA_ITEMS+1], FALSE, FALSE, 0);
-
-	for ( i=0; i<2; i++ )
+	brcosa_pal_lim[1] = mem_cols - 1;
+	for (i = 0; i < 2; i++)
 	{
-#if GTK_MAJOR_VERSION == 2
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i])->entry ),
-			"value_changed", GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
-#else
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i])->entry ),
-			"changed", GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
-#endif
+		brcosa_spins[BRCOSA_ITEMS + i] = pack(hbox,
+			add_a_spin(brcosa_pal_lim[i], 0, mem_cols - 1));
+		spin_connect(brcosa_spins[BRCOSA_ITEMS + i],
+			GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
 	}
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox5), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox5, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
 	for ( i=0; i<4; i++ )
 	{
@@ -970,9 +953,8 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, -2, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 	gtk_container_set_border_width (GTK_CONTAINER (hbox), 5);
 
 	button = add_a_button(_("Cancel"), 4, hbox, TRUE);
@@ -1219,26 +1201,23 @@ void sisca_init( char *title )
 	/* RGB rescale */
 	else if (mem_img_bpp == 3)
 	{
-		sisca_hbox = gtk_hbox_new(FALSE, 0);
-		gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
-		wvbox = gtk_vbox_new(FALSE, 0);
-		gtk_box_pack_start(GTK_BOX(sisca_hbox), wvbox, FALSE, FALSE, 0);
+		sisca_hbox = pack(sisca_vbox, gtk_hbox_new(FALSE, 0));
+		wvbox = pack(sisca_hbox, gtk_vbox_new(FALSE, 0));
 
 		sisca_gc = sig_toggle(_("Gamma corrected"),
 			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL);
 		gtk_box_pack_end(GTK_BOX(wvbox), sisca_gc, FALSE, FALSE, 0);
 
-		notebook = buttoned_book(&page0, &page1, &button, _("Settings"));
-		gtk_box_pack_start(GTK_BOX(sisca_vbox), notebook, FALSE, FALSE, 0);
+		notebook = pack(sisca_vbox, buttoned_book(&page0, &page1,
+			&button, _("Settings")));
 		wvbox2 = gtk_vbox_new(FALSE, 0);
 		gtk_box_pack_end(GTK_BOX(sisca_hbox), wvbox2, FALSE, FALSE, 0);
 		gtk_box_pack_start(GTK_BOX(wvbox2), button, FALSE, FALSE, 0);
 
 		add_hseparator(page1, -2, 10);
-		button = sig_toggle(_("Sharper image reduction"),
+		button = pack(page1, sig_toggle(_("Sharper image reduction"),
 			inifile_get_gboolean("sharperReduce", FALSE),
-			&sharper_reduce, NULL);
-		gtk_box_pack_start(GTK_BOX(page1), button, FALSE, FALSE, 0);
+			&sharper_reduce, NULL));
 
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 	}
@@ -1252,9 +1231,8 @@ void sisca_init( char *title )
 	}
 	add_hseparator(page0, -2, 10);
 
-	sisca_hbox = OK_box(5, sisca_window, _("OK"), GTK_SIGNAL_FUNC(click_sisca_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
+	pack(sisca_vbox, OK_box(5, sisca_window, _("OK"), GTK_SIGNAL_FUNC(click_sisca_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_window_set_transient_for(GTK_WINDOW(sisca_window), GTK_WINDOW(main_window));
 	gtk_widget_show_all(sisca_window);
@@ -1431,13 +1409,11 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt,
 	gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
 	gtk_container_add( GTK_CONTAINER(allcol_window), vbox );
 
-	hbox = gtk_hbox_new( FALSE, 10 );
+	hbox = xpack(vbox, gtk_hbox_new(FALSE, 10));
 	gtk_widget_show( hbox );
-	gtk_box_pack_start( GTK_BOX(vbox), hbox, TRUE, TRUE, 0);
 
-	swindow = gtk_scrolled_window_new (NULL, NULL);
-	gtk_widget_show (swindow);
-	gtk_box_pack_start (GTK_BOX (hbox), swindow, FALSE, TRUE, 0);
+	swindow = pack(hbox, gtk_scrolled_window_new(NULL, NULL));
+	gtk_widget_show(swindow);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (swindow),
 		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
@@ -1467,28 +1443,25 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt,
 		gtk_container_set_border_width( GTK_CONTAINER(hbox2), 3 );
 		gtk_container_add( GTK_CONTAINER(l_item), hbox2 );
 
-		drw = gtk_drawing_area_new();
+		drw = pack(hbox2, gtk_drawing_area_new());
 		gtk_drawing_area_size( GTK_DRAWING_AREA(drw), 20, 20 );
 		gtk_signal_connect(GTK_OBJECT(drw), "expose_event",
 			GTK_SIGNAL_FUNC(color_expose), (gpointer)(&ctable[i]));
-		gtk_box_pack_start( GTK_BOX(hbox2), drw, FALSE, FALSE, 0 );
-		gtk_widget_show( drw );
+		gtk_widget_show(drw);
 
 		if (cnames) tmp = cnames[i];
 		else sprintf(txt, "%i", i);
-		label = gtk_label_new(tmp);
+		label = xpack(hbox2, gtk_label_new(tmp));
 		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.0, 1.0 );
-		gtk_box_pack_start( GTK_BOX(hbox2), label, TRUE, TRUE, 0 );
 	}
 
 	gtk_box_pack_start( GTK_BOX(hbox), cs, TRUE, TRUE, 0 );
 
 	if (extbox) gtk_box_pack_start(GTK_BOX(vbox), extbox, FALSE, FALSE, 0);
 
-	hbut = gtk_hbox_new(FALSE, 3);
-	gtk_widget_show( hbut );
-	gtk_box_pack_start( GTK_BOX(vbox), hbut, FALSE, FALSE, 0 );
+	hbut = pack(vbox, gtk_hbox_new(FALSE, 3));
+	gtk_widget_show(hbut);
 
 	button_ok = gtk_button_new_with_label(_("OK"));
 	gtk_widget_show( button_ok );
@@ -1908,19 +1881,16 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		/* Prepare range controls */
 		extbox = gtk_hbox_new(FALSE, 0);
-		gtk_box_pack_start(GTK_BOX(extbox), gtk_label_new(_("Scale")),
-			FALSE, FALSE, 0);
+		pack(extbox, gtk_label_new(_("Scale")));
 		for (i = 0; i < 2; i++)
 		{
 			button = add_a_button(fromto[i], 4, extbox, TRUE);
-			spin = range_spins[i] = add_a_spin(0, 0, 255);
-			gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
+			spin = range_spins[i] = pack(extbox, add_a_spin(0, 0, 255));
 			gtk_signal_connect(GTK_OBJECT(button), "clicked",
 				GTK_SIGNAL_FUNC(set_range_spin), spin);
 		}
-		opt = wj_option_menu(scales, 3, 0, NULL, NULL);
+		opt = xpack(extbox, wj_option_menu(scales, 3, 0, NULL, NULL));
 		gtk_container_set_border_width(GTK_CONTAINER(opt), 4);
-		gtk_box_pack_start(GTK_BOX(extbox), opt, TRUE, TRUE, 0);
 		button = add_a_button(_("Create"), 4, extbox, TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(make_cscale), (gpointer)opt);
@@ -1989,8 +1959,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		gtk_table_attach(GTK_TABLE(extbox), win, 0, 3, 0, 1,
 			GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
 		button = add_a_button(_("Posterize"), 4, win, TRUE);
-		spin = add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8);
-		gtk_box_pack_start(GTK_BOX(win), spin, FALSE, FALSE, 0);
+		spin = pack(win, add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8));
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(posterize_AB), spin);
 
@@ -2051,16 +2020,11 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		/* Prepare extra controls */
 		extbox = gtk_hbox_new(FALSE, 0);
-		gtk_box_pack_start(GTK_BOX(extbox), gtk_label_new(_("Range")),
-			FALSE, FALSE, 0);
-		spin = csel_spin = add_a_spin(0, 0, 765);
-		gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
-		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), csel_data->range);
+		pack(extbox, gtk_label_new(_("Range")));
+		csel_spin = pack(extbox, add_float_spin(csel_data->range, 0, 765));
 		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_data->invert);
-		win = wj_radio_pack(csel_modes, -1, 1, csel_data->mode, NULL,
-			GTK_SIGNAL_FUNC(csel_mode_changed));
-		gtk_box_pack_start(GTK_BOX(extbox), win, FALSE, FALSE, 0);
+		pack(extbox, wj_radio_pack(csel_modes, -1, 1, csel_data->mode,
+			NULL, GTK_SIGNAL_FUNC(csel_mode_changed)));
 		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour-Selective Mode"),
@@ -2242,7 +2206,7 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
-	GtkWidget *label, *vbox, *hbox;
+	GtkWidget *vbox, *hbox;
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
 		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
@@ -2272,19 +2236,16 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* Colours spin */
 
-	topbox = gtk_hbox_new(FALSE, 5);
-	gtk_box_pack_start(GTK_BOX(mainbox), topbox, FALSE, FALSE, 0);
+	topbox = pack(mainbox, gtk_hbox_new(FALSE, 5));
 	gtk_container_set_border_width(GTK_CONTAINER(topbox), 10);
-	label = gtk_label_new(_("Indexed Colours To Use"));
-	gtk_box_pack_start(GTK_BOX(topbox), label, FALSE, FALSE, 0);
-	quantize_spin = add_a_spin(quantize_cols > 256 ? mem_cols :
-		quantize_cols, 1, 256);
-	gtk_box_pack_start(GTK_BOX(topbox), quantize_spin, TRUE, TRUE, 0);
+	pack(topbox, gtk_label_new(_("Indexed Colours To Use")));
+	quantize_spin = xpack(topbox, add_a_spin(quantize_cols > 256 ?
+		mem_cols : quantize_cols, 1, 256));
 
 	/* Notebook */
 
-	notebook = buttoned_book(&page0, &page1, &button, _("Settings"));
-	gtk_box_pack_start(GTK_BOX(mainbox), notebook, TRUE, TRUE, 0);
+	notebook = xpack(mainbox, buttoned_book(&page0, &page1, &button,
+		_("Settings")));
 	gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
 
 	/* Main page - Palette frame */
@@ -2316,14 +2277,11 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
 
-	hbox = gtk_hbox_new(FALSE, 5);
+	hbox = pack(page1, gtk_hbox_new(FALSE, 5));
 	gtk_widget_show(hbox);
-	gtk_box_pack_start(GTK_BOX(page1), hbox, FALSE, FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	label = gtk_label_new(_("Error propagation, %"));
-	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
-	dither_spin = add_a_spin(100, 0, 100);
-	gtk_box_pack_start(GTK_BOX(hbox), dither_spin, TRUE, TRUE, 0);
+	pack(hbox, gtk_label_new(_("Error propagation, %")));
+	dither_spin = xpack(hbox, add_a_spin(100, 0, 100));
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), (dither_sel ?
 		dither_fract[1] : dither_fract[0]) * 100.0);
 
@@ -2333,9 +2291,8 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* OK / Cancel */
 
-	hbox = OK_box(0, quantize_window, _("OK"), GTK_SIGNAL_FUNC(click_quantize_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	pack(mainbox, OK_box(0, quantize_window, _("OK"), GTK_SIGNAL_FUNC(click_quantize_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_window_set_transient_for(GTK_WINDOW(quantize_window),
 		GTK_WINDOW(main_window));
@@ -2674,10 +2631,9 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	/* Palette pad */
 
+	sw = pack(mainbox, gtk_alignment_new(0.5, 0.5, 0.0, 0.0));
 	pix = wj_pixmap(PPAD_WIDTH(PPAD_SLOT), PPAD_HEIGHT(PPAD_SLOT));
-	sw = gtk_alignment_new(0.5, 0.5, 0.0, 0.0);
 	gtk_container_add(GTK_CONTAINER(sw), pix);
-	gtk_box_pack_start(GTK_BOX(mainbox), sw, FALSE, FALSE, 0);
 	gtk_signal_connect(GTK_OBJECT(pix), "configure_event",
 		GTK_SIGNAL_FUNC(palette_pad_draw),
 		(gpointer)(opac ? -1 : grad_channel));
@@ -2691,8 +2647,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	{
 		char *interp[] = {"RGB", "HSV",	_("Backward HSV"), _("Constant")};
 
-		grad_ed_cs = cs = gtk_color_selection_new();
-		gtk_box_pack_start(GTK_BOX(mainbox), cs, FALSE, FALSE, 0);
+		grad_ed_cs = cs = pack(mainbox, gtk_color_selection_new());
 #if GTK_MAJOR_VERSION == 1
 		gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), FALSE);
 #endif
@@ -2711,30 +2666,24 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	}
 	else /* Indexed / utility / opacity */
 	{
-		grad_ed_ss = ss = mt_spinslide_new(-2, -2);
-		gtk_box_pack_start(GTK_BOX(mainbox), ss, FALSE, FALSE, 0);
+		grad_ed_ss = ss = pack(mainbox, mt_spinslide_new(-2, -2));
 		mt_spinslide_set_range(ss, 0, grad_mode == CHN_IMAGE + 1 ?
 			mem_cols - 1 : 255);
 		mt_spinslide_connect(ss, GTK_SIGNAL_FUNC(grad_edit_move_slide), NULL);
 		grad_ed_tog = sw = sig_toggle(_("Constant"), FALSE, NULL,
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
-	hbox = gtk_hbox_new(TRUE, 5);
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(mainbox, gtk_hbox_new(TRUE, 5));
 	gtk_box_pack_start(GTK_BOX(hbox), sw, TRUE, TRUE, 0);
-	hbox2 = gtk_hbox_new(FALSE, 5);
-	gtk_box_pack_start(GTK_BOX(hbox), hbox2, TRUE, TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(hbox2), gtk_label_new(_("Points:")), FALSE, FALSE, 0);
-	grad_ed_len = sw = add_a_spin(grad_cnt, 2, GRAD_POINTS);
-	gtk_box_pack_start(GTK_BOX(hbox2), sw, FALSE, FALSE, 0);
+	hbox2 = xpack(hbox, gtk_hbox_new(FALSE, 5));
+	pack(hbox2, gtk_label_new(_("Points:")));
+	grad_ed_len = sw = pack(hbox2, add_a_spin(grad_cnt, 2, GRAD_POINTS));
 	spin_connect(sw, GTK_SIGNAL_FUNC(grad_edit_length), NULL);
 
 	/* Gradient bar */
 
-	hbox2 = gtk_hbox_new(TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox2, FALSE, FALSE, 0);
-	grad_ed_left = btn = gtk_button_new();
-	gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
+	hbox2 = pack(mainbox, gtk_hbox_new(TRUE, 0));
+	grad_ed_left = btn = xpack(hbox2, gtk_button_new());
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
 		GTK_SHADOW_NONE));
 	gtk_widget_set_sensitive(btn, FALSE);
@@ -2743,9 +2692,8 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	btn = NULL;
 	for (i = 0; i < 16; i++)
 	{
-		grad_ed_bar[i] = btn = gtk_radio_button_new_from_widget(
-			GTK_RADIO_BUTTON_0(btn));
-		gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
+		grad_ed_bar[i] = btn = xpack(hbox2, gtk_radio_button_new_from_widget(
+			GTK_RADIO_BUTTON_0(btn)));
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
 			GTK_SIGNAL_FUNC(grad_edit_slot), (gpointer)i);
@@ -2755,16 +2703,14 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
 			GTK_SIGNAL_FUNC(grad_draw_slot), (gpointer)i);
 	}
-	grad_ed_right = btn = gtk_button_new();
-	gtk_box_pack_start(GTK_BOX(hbox2), btn, TRUE, TRUE, 0);
+	grad_ed_right = btn = xpack(hbox2, gtk_button_new());
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
 		GTK_SHADOW_NONE));
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)1);
 
-	hbox2 = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox2, FALSE, FALSE, 0);
+	pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	grad_load_slot(0);
 
@@ -2890,11 +2836,10 @@ static void grad_selector_box(GtkWidget *box, char **mtext, int op)
 
 	vbox = gtk_vbox_new(FALSE, 0);
 	add_with_frame_x(box, op ? _("Opacity") : _("Gradient"), vbox, 5, TRUE);
-	menu = wj_option_menu(mtext, op ? NUM_OTYPES : NUM_GTYPES, 0, NULL, NULL);
+	menu = pack(vbox, wj_option_menu(mtext, op ? NUM_OTYPES : NUM_GTYPES,
+		0, NULL, NULL));
 	gtk_container_set_border_width(GTK_CONTAINER(menu), 5);
-	gtk_box_pack_start(GTK_BOX(vbox), menu, FALSE, FALSE, 0);
-	hbox = gtk_hbox_new(TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
 	rev = add_a_toggle(_("Reverse"), hbox, FALSE);
 	btn = add_a_button(_("Edit Custom"), 5, hbox, TRUE);
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
@@ -2957,14 +2902,12 @@ void gradient_setup(int mode)
 	/* Protect spinslider from option menus in GTK1 */
 #if GTK_MAJOR_VERSION == 1
 
-	align = widget_align_minsize(grad_opt_type, 0, 0);
 	hbox1 = gtk_hbox_new(FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(hbox1), align, TRUE, TRUE, 0);
+	xpack(hbox1, widget_align_minsize(grad_opt_type, 0, 0));
 	gtk_table_attach(GTK_TABLE(table), hbox1, 3, 4, 0, 1,
 		GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	align = widget_align_minsize(grad_opt_bound, 0, 0);
 	hbox2 = gtk_hbox_new(FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(hbox2), align, TRUE, TRUE, 0);
+	xpack(hbox2, widget_align_minsize(grad_opt_bound, 0, 0));
 	gtk_table_attach(GTK_TABLE(table), hbox2, 3, 4, 1, 2,
 		GTK_EXPAND | GTK_FILL, 0, 0, 5);
 #else
@@ -2984,17 +2927,15 @@ void gradient_setup(int mode)
 
 	/* Select page */
 
-	hbox = gtk_hbox_new(TRUE, 0);
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(mainbox, gtk_hbox_new(TRUE, 0));
 	grad_selector_box(hbox, gradtypes, 0);
 	grad_selector_box(hbox, optypes, 1);
 
 	/* Cancel / Apply / OK */
 
-	align = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	align = pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 	OK_box_add(align, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply), 1);
-	gtk_box_pack_start(GTK_BOX(mainbox), align, FALSE, FALSE, 0);
 
 	/* Fill in values */
 

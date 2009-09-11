@@ -638,11 +638,9 @@ static gboolean ani_play_timer_call()
 	}
 	else
 	{
-		i = GTK_ADJUSTMENT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment)->value + 1;
-		if ( i>ani_frame2 ) i = ani_frame1;
-		GTK_ADJUSTMENT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment)->value = i;
-		gtk_adjustment_value_changed( GTK_HSCALE(ani_prev_slider)->scale.range.adjustment );
-//printf("[%i - %i] animating frame %i\n", ani_frame1, ani_frame2, i);
+		i = ADJ2INT(SPINSLIDE_ADJUSTMENT(ani_prev_slider)) + 1;
+		if (i > ani_frame2) i = ani_frame1;
+		mt_spinslide_set_value(ani_prev_slider, i);
 		return TRUE;
 	}
 }
@@ -665,21 +663,17 @@ static void ani_play_stop()
 
 ///	PREVIEW WINDOW CALLBACKS
 
-static void ani_but_playstop( GtkWidget *widget )
+static void ani_but_playstop(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	gboolean play = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-
-	if ( play ) ani_play_start();
+	if (gtk_toggle_button_get_active(togglebutton)) ani_play_start();
 	else ani_play_stop();
-
-//printf("state = %i\n", ani_play_state);
 }
 
-static void ani_frame_slider_moved( GtkWidget *widget )
+static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data)
 {
 	int x = 0, y = 0, w = mem_width, h = mem_height;
 
-	ani_set_frame_state(GTK_ADJUSTMENT(widget)->value);
+	ani_set_frame_state(ADJ2INT(adjustment));
 
 	if ( layer_selected != 0 )
 	{
@@ -739,6 +733,7 @@ void ani_but_preview()
 
 	ani_prev_win = add_a_window( GTK_WINDOW_TOPLEVEL,
 			_("Animation Preview"), GTK_WIN_POS_NONE, TRUE );
+	gtk_container_set_border_width(GTK_CONTAINER(ani_prev_win), 5);
 
 	gtk_widget_set_uposition( ani_prev_win,
 		inifile_get_gint32("ani_prev_x", 0 ), inifile_get_gint32("ani_prev_y", 0 ) );
@@ -749,21 +744,15 @@ void ani_but_preview()
 	gtk_widget_show (hbox3);
 	gtk_container_add (GTK_CONTAINER (ani_prev_win), hbox3);
 
-	button = add_a_toggle(_("Play"), hbox3, FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_but_playstop), NULL);
+	pack(hbox3, sig_toggle_button(_("Play"), FALSE, NULL,
+		GTK_SIGNAL_FUNC(ani_but_playstop)));
 	ani_play_state = FALSE;			// Stopped
 
-	ani_prev_slider = gtk_hscale_new (
-		GTK_ADJUSTMENT( gtk_adjustment_new (ani_frame1, ani_frame1, ani_frame2, 1, 10, 0) ) );
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment),
-		"value_changed", GTK_SIGNAL_FUNC(ani_frame_slider_moved), NULL);
-
-
-	gtk_widget_set_usize( ani_prev_slider, 200, -2 );
-
-	gtk_widget_show (ani_prev_slider);
-	gtk_box_pack_start (GTK_BOX (hbox3), ani_prev_slider, TRUE, TRUE, 0);
-	gtk_scale_set_digits (GTK_SCALE (ani_prev_slider), 0);
+	ani_prev_slider = xpack(hbox3, mt_spinslide_new(200, -2));
+	mt_spinslide_set_range(ani_prev_slider, ani_frame1, ani_frame2);
+	mt_spinslide_set_value(ani_prev_slider, ani_frame1);
+	mt_spinslide_connect(ani_prev_slider,
+		GTK_SIGNAL_FUNC(ani_frame_slider_moved), NULL);
 
 	if ( animate_window == NULL )	// If called via the menu have a fix button
 	{
@@ -790,7 +779,7 @@ void ani_but_preview()
 		update_all_views();
 	}
 
-	gtk_adjustment_value_changed( GTK_HSCALE(ani_prev_slider)->scale.range.adjustment );
+	gtk_adjustment_value_changed(SPINSLIDE_ADJUSTMENT(ani_prev_slider));
 }
 
 void wild_space_change( char *in, char *out, int length )
@@ -1232,9 +1221,8 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	frame = add_with_frame(vbox1, _("Output Files"), vbox4, 5);
 	gtk_frame_set_label_align (GTK_FRAME (frame), 0.0, 0.5);
 
-	table = gtk_table_new (5, 3, FALSE);
-	gtk_widget_show (table);
-	gtk_box_pack_start (GTK_BOX (vbox4), table, TRUE, TRUE, 0);
+	table = xpack(vbox4, gtk_table_new(5, 3, FALSE));
+	gtk_widget_show(table);
 
 	label = add_to_table( _("Start frame"), table, 0, 0, 5 );
 	add_to_table( _("End frame"), table, 1, 0, 5 );
@@ -1275,9 +1263,8 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(ani_entry_prefix), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	ani_toggle_gif = sig_toggle(_("Create GIF frames"), ani_use_gif, NULL,
-		GTK_SIGNAL_FUNC(ani_tog_gif));
-	gtk_box_pack_start(GTK_BOX (vbox4), ani_toggle_gif, FALSE, FALSE, 0);
+	ani_toggle_gif = pack(vbox4, sig_toggle(_("Create GIF frames"),
+		ani_use_gif, NULL, GTK_SIGNAL_FUNC(ani_tog_gif)));
 
 ///	LAYERS TABLES
 
@@ -1285,18 +1272,16 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (hbox3);
 	add_with_frame_x(vbox1, _("Layers"), hbox3, 5, TRUE);
 
-	notebook1 = gtk_notebook_new ();
+	notebook1 = xpack(hbox3, gtk_notebook_new());
 	gtk_widget_show (notebook1);
-	gtk_box_pack_start (GTK_BOX (hbox3), notebook1, TRUE, TRUE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (notebook1), 5);
 
 	hbox4 = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox4);
 	gtk_container_add (GTK_CONTAINER (notebook1), hbox4);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow = pack(hbox4, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow);
-	gtk_box_pack_start (GTK_BOX (hbox4), scrolledwindow, FALSE, FALSE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 			GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
@@ -1320,21 +1305,18 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_widget_show( list_data );
 
 		sprintf(txt, "%i", i);					// Layer number
-		label = gtk_label_new( txt );
+		label = pack(hbox2, gtk_label_new(txt));
 		gtk_widget_set_usize (label, 40, -2);
 		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
-		gtk_box_pack_start( GTK_BOX(hbox2), label, FALSE, FALSE, 0 );
 
-		label = gtk_label_new( layer_table[i].name );		// Layer name
+		label = xpack(hbox2, gtk_label_new(layer_table[i].name)); // Layer name
 		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
-		gtk_box_pack_start( GTK_BOX(hbox2), label, TRUE, TRUE, 0 );
 	}
 
-	vbox3 = gtk_vbox_new (FALSE, 0);
+	vbox3 = xpack(hbox4, gtk_vbox_new(FALSE, 0));
 	gtk_widget_show (vbox3);
-	gtk_box_pack_start (GTK_BOX (hbox4), vbox3, TRUE, TRUE, 0);
 
 #if GTK_MAJOR_VERSION == 1
 	ani_text_pos = gtk_text_new (NULL, NULL);
@@ -1344,7 +1326,8 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(ani_text_pos), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, GTK_TEXT(ani_text_pos)->vadj);
+	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(NULL,
+		GTK_TEXT(ani_text_pos)->vadj));
 #endif
 #if GTK_MAJOR_VERSION == 2
 	texbuf = gtk_text_buffer_new( NULL );
@@ -1353,11 +1336,11 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 	g_signal_connect( texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
 
-	scrolledwindow = gtk_scrolled_window_new (GTK_TEXT_VIEW(ani_text_pos)->hadjustment,
-					GTK_TEXT_VIEW(ani_text_pos)->vadjustment);
+	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(
+			GTK_TEXT_VIEW(ani_text_pos)->hadjustment,
+			GTK_TEXT_VIEW(ani_text_pos)->vadjustment));
 #endif
 	gtk_widget_show (scrolledwindow);
-	gtk_box_pack_start (GTK_BOX (vbox3), scrolledwindow, TRUE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add (GTK_CONTAINER (scrolledwindow), ani_text_pos);
@@ -1384,7 +1367,8 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(ani_text_cyc), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, GTK_TEXT(ani_text_cyc)->vadj);
+	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(NULL,
+		GTK_TEXT(ani_text_cyc)->vadj));
 #endif
 #if GTK_MAJOR_VERSION == 2
 	texbuf = gtk_text_buffer_new( NULL );
@@ -1392,11 +1376,11 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 	g_signal_connect( texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
 
-	scrolledwindow = gtk_scrolled_window_new (GTK_TEXT_VIEW(ani_text_cyc)->hadjustment,
-					GTK_TEXT_VIEW(ani_text_cyc)->vadjustment);
+	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(
+		GTK_TEXT_VIEW(ani_text_cyc)->hadjustment,
+		GTK_TEXT_VIEW(ani_text_cyc)->vadjustment));
 #endif
 	gtk_widget_show (scrolledwindow);
-	gtk_box_pack_start (GTK_BOX (vbox3), scrolledwindow, TRUE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	gtk_container_add (GTK_CONTAINER (scrolledwindow), ani_text_cyc);
@@ -1414,9 +1398,8 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	MAIN BUTTONS
 
-	hbox2 = gtk_hbox_new (FALSE, 0);
+	hbox2 = pack(vbox1, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show (hbox2);
-	gtk_box_pack_start (GTK_BOX (vbox1), hbox2, FALSE, FALSE, 0);
 
 	button = add_a_button(_("Close"), 5, hbox2, TRUE);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(delete_ani), NULL);

@@ -1083,11 +1083,11 @@ static gint layer_main_toggled( GtkWidget *widget, GdkEvent *event, gpointer dat
 	return FALSE;
 }
 
-static gint layer_inputs_changed()
+static void layer_inputs_changed()
 {
 	gboolean txt_changed = FALSE;
 
-	if ( !layers_initialized ) return FALSE;
+	if (!layers_initialized) return;
 
 	layers_notify_changed();
 
@@ -1107,8 +1107,6 @@ static gint layer_inputs_changed()
 
 	if ( !txt_changed ) repaint_layer( layer_selected );
 		// Update layer image if not just changing text
-
-	return FALSE;
 }
 
 void layer_choose( int l )				// Select a new layer from the list
@@ -1373,9 +1371,8 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_add (GTK_CONTAINER (layers_window), vbox);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow);
-	gtk_box_pack_start (GTK_BOX (vbox), scrolledwindow, TRUE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
@@ -1396,19 +1393,16 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_container_add(GTK_CONTAINER(item), hbox);
 
 		sprintf(txt, "%i", i);
-		label = gtk_label_new( txt );
+		label = pack(hbox, gtk_label_new(txt));
 		gtk_widget_set_usize (label, 40, -2);
 		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
-		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 0 );
 
-		label = gtk_label_new( "" );
+		label = xpack(hbox, gtk_label_new(""));
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
-		gtk_box_pack_start( GTK_BOX(hbox), label, TRUE, TRUE, 0 );
 		layer_list_data[i].name = label;
 
-		tog = gtk_check_button_new_with_label("");
+		tog = pack(hbox, gtk_check_button_new_with_label(""));
 		gtk_object_set_user_data(GTK_OBJECT(tog), (gpointer)i);
-		gtk_box_pack_start (GTK_BOX(hbox), tog, FALSE, FALSE, 0);
 		layer_list_data[i].toggle = tog;
 		gtk_widget_show_all(item);
 		if ( i == 0 ) gtk_widget_hide(tog);
@@ -1465,24 +1459,15 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	mt_spinslide_connect(layer_slider, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 	mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
 	layer_trans_toggle = add_a_toggle( _("Transparent Colour"), hbox, TRUE );
 	gtk_signal_connect(GTK_OBJECT(layer_trans_toggle), "clicked",
 			GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 
-	layer_spin = add_a_spin(0, 0, 255);
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(layer_spin)->entry ),
-			"value_changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
-#endif
-#if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(layer_spin)->entry ),
-			"changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
-#endif
-	gtk_box_pack_start (GTK_BOX (hbox), layer_spin, FALSE, FALSE, 0);
+	layer_spin = pack(hbox, add_a_spin(0, 0, 255));
+	spin_connect(layer_spin, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 
 	layer_show_toggle = add_a_toggle( _("Show all layers in main window"), vbox, show_layers_main );
 	gtk_signal_connect(GTK_OBJECT(layer_show_toggle), "clicked",

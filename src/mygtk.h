@@ -47,6 +47,8 @@ void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	gpointer user_data);
+#define SPINSLIDE_ADJUSTMENT(s) \
+	(GTK_SPIN_BUTTON(BOX_CHILD_1(s))->adjustment)
 #define ADJ2INT(a) ((int)((a)->value + 0.5))
 
 // Self-contained package of radio buttons
@@ -136,6 +138,11 @@ void destroy_dialog(GtkWidget *window);
 
 GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	GtkWidget **button, char *button_label);
+
+// Most common use of boxes
+
+GtkWidget *pack(GtkWidget *box, GtkWidget *widget);
+GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
 
 // Moving mouse cursor
 

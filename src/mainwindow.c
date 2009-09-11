@@ -3642,12 +3642,11 @@ void main_init()
 	gtk_widget_show (vbox_main);
 	gtk_container_add (GTK_CONTAINER (main_window), vbox_main);
 
-	menubar1 = gtk_item_factory_get_widget(item_factory,"<main>");
 	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
 	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
-	gtk_widget_show (menubar1);
-	gtk_box_pack_start (GTK_BOX (vbox_main), menubar1, FALSE, FALSE, 0);
+	menubar1 = pack(vbox_main, gtk_item_factory_get_widget(item_factory, "<main>"));
+	gtk_widget_show(menubar1);
 
 
 // we need to realize the window because we use pixmaps for 
@@ -3660,16 +3659,13 @@ void main_init()
 
 ///	PALETTE
 
-	hbox_bottom = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox_bottom);
-	gtk_box_pack_start (GTK_BOX (vbox_main), hbox_bottom, TRUE, TRUE, 0);
+	hbox_bottom = xpack(vbox_main, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox_bottom);
 
 	toolbar_palette_init(hbox_bottom);
 
-
-	vbox_right = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_right);
-	gtk_box_pack_start (GTK_BOX (hbox_bottom), vbox_right, TRUE, TRUE, 0);
+	vbox_right = xpack(hbox_bottom, gtk_vbox_new(FALSE, 0));
+	gtk_widget_show(vbox_right);
 
 
 ///	DRAWING AREA
@@ -3708,9 +3704,8 @@ void main_init()
 	gtk_widget_set_usize( drawing_canvas, 48, 48 );
 	gtk_widget_show( drawing_canvas );
 
-	scrolledwindow_canvas = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow_canvas = xpack(vbox_right, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_canvas);
-	gtk_box_pack_start (GTK_BOX (vbox_right), scrolledwindow_canvas, TRUE, TRUE, 0);
 
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);

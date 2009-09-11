@@ -173,14 +173,13 @@ GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
 	gtk_widget_realize( window );
 
 #if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
+	toolbar = pack(box, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+		GTK_TOOLBAR_ICONS));
 #endif
 #if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
+	toolbar = pack(box, gtk_toolbar_new());
 	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
 #endif
-
-	gtk_box_pack_start ( GTK_BOX (box), toolbar, FALSE, FALSE, 0 );
 
 	for (i=0; i<7; i++)
 	{
@@ -251,10 +250,9 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 	GList *combo_list = NULL;
 
 
-	combo = gtk_combo_new ();
+	combo = pack(box, gtk_combo_new());
 	gtk_combo_set_value_in_list (GTK_COMBO (combo), FALSE, FALSE);
 	gtk_widget_show (combo);
-	gtk_box_pack_start (GTK_BOX (box), combo, FALSE, FALSE, 0);
 	combo_entry = GTK_COMBO (combo)->entry;
 	GTK_WIDGET_UNSET_FLAGS (combo_entry, GTK_CAN_FOCUS);
 	gtk_widget_set_usize(GTK_COMBO(combo)->button, 18, -1);
@@ -404,7 +402,7 @@ static int set_smudge(GtkWidget *box, gpointer fdata)
 static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
-	GtkWidget *spin, *box;
+	GtkWidget *box;
 
 	/* Handle only right clicks */
 	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
@@ -419,12 +417,9 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		gradient_setup(1);
 		break;
 	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
-		spin = add_a_spin(0, 0, 200);
-		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), flood_step);
 		box = gtk_vbox_new(FALSE, 5);
 		gtk_widget_show(box);
-		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+		pack(box, add_float_spin(flood_step, 0, 200));
 		add_a_toggle(_("RGB Cube"), box, flood_cube);
 		add_a_toggle(_("By image channel"), box, flood_img);
 		add_a_toggle(_("Gradient-driven"), box, flood_slide);
@@ -599,12 +594,25 @@ static void toolbar_settings_init()
 
 ///	SETTINGS TOOLBAR
 
+	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window(GTK_WINDOW_TOPLEVEL,
+		_("Settings Toolbar"), GTK_WIN_POS_NONE, FALSE);
+
+	gtk_widget_set_uposition( toolbar_boxes[TOOLBAR_SETTINGS],
+		inifile_get_gint32("toolbar_settings_x", 0 ),
+		inifile_get_gint32("toolbar_settings_y", 0 ) );
+
+	vbox = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show(vbox);
+	gtk_container_add (GTK_CONTAINER (toolbar_boxes[TOOLBAR_SETTINGS]), vbox);
+	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
+
 #if GTK_MAJOR_VERSION == 1
-	toolbar_settings = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
+	toolbar_settings = pack(vbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+		GTK_TOOLBAR_ICONS));
 #endif
 #if GTK_MAJOR_VERSION == 2
-	toolbar_settings = gtk_toolbar_new();
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS );
+	toolbar_settings = pack(vbox, gtk_toolbar_new());
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS);
 #endif
 
 	fill_toolbar(GTK_TOOLBAR(toolbar_settings), settings_bar,
@@ -617,24 +625,10 @@ static void toolbar_settings_init()
 			!!*(vars_settings[i]));
 	}
 
-	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window( GTK_WINDOW_TOPLEVEL, _("Settings Toolbar"),
-			GTK_WIN_POS_NONE, FALSE );
-
-	gtk_widget_set_uposition( toolbar_boxes[TOOLBAR_SETTINGS],
-		inifile_get_gint32("toolbar_settings_x", 0 ),
-		inifile_get_gint32("toolbar_settings_y", 0 ) );
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_add (GTK_CONTAINER (toolbar_boxes[TOOLBAR_SETTINGS]), vbox);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
-
-	gtk_box_pack_start ( GTK_BOX (vbox), toolbar_settings, FALSE, FALSE, 0 );
 	gtk_widget_show(toolbar_settings);
 
 	/* Gradient mode button+preview */
-	button = gtk_toggle_button_new();
-	gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
+	button = pack(vbox, gtk_toggle_button_new());
 	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
 	grad_view = gtk_pixmap_new(pmap, NULL);
 	gdk_pixmap_unref(pmap);
@@ -655,19 +649,17 @@ static void toolbar_settings_init()
 		button, _("Gradient Mode"), "Private");
 
 	/* Colors A & B */
-	label = gtk_label_new("");
+	label = pack(vbox, gtk_label_new(""));
 	toolbar_labels[0] = label;
 	gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 	gtk_widget_show (label);
 	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
-	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
 
-	label = gtk_label_new("");
+	label = pack(vbox, gtk_label_new(""));
 	toolbar_labels[1] = label;
 	gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 	gtk_widget_show (label);
 	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
-	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
 
 	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	table = add_a_table(3, 2, 5, vbox);
@@ -770,31 +762,24 @@ void toolbar_init(GtkWidget *vbox_main)
 
 ///	MAIN TOOLBAR
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	toolbar_boxes[TOOLBAR_MAIN] = hbox;
-	if ( toolbar_status[TOOLBAR_MAIN] ) gtk_widget_show (hbox);	// Only show if user wants
-	gtk_box_pack_start ( GTK_BOX (vbox_main), hbox, FALSE, FALSE, 0 );
-
+	toolbar_boxes[TOOLBAR_MAIN] = hbox = pack(vbox_main, gtk_hbox_new(FALSE, 0));
+	if (toolbar_status[TOOLBAR_MAIN]) gtk_widget_show(hbox); // Only show if user wants
 
 #if GTK_MAJOR_VERSION == 1
-	toolbar_main = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
-	toolbar_tools = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
+	toolbar_main = pack(hbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+		GTK_TOOLBAR_ICONS));
 #endif
 #if GTK_MAJOR_VERSION == 2
-	toolbar_main = gtk_toolbar_new();
+	toolbar_main = pack(hbox, gtk_toolbar_new());
 	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_main), GTK_TOOLBAR_ICONS );
-	toolbar_tools = gtk_toolbar_new();
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_tools), GTK_TOOLBAR_ICONS );
 #endif
 
-	gtk_box_pack_start ( GTK_BOX (hbox), toolbar_main, FALSE, FALSE, 0 );
-
 	toolbar_zoom_main = toolbar_add_zoom( hbox );
-	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_main)->entry), "changed",
-		GTK_SIGNAL_FUNC (toolbar_zoom_main_change), NULL);
+	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_main)->entry),
+		"changed", GTK_SIGNAL_FUNC (toolbar_zoom_main_change), NULL);
 	toolbar_zoom_view = toolbar_add_zoom( hbox );
-	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_view)->entry), "changed",
-		GTK_SIGNAL_FUNC (toolbar_zoom_view_change), NULL);
+	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_view)->entry),
+		"changed", GTK_SIGNAL_FUNC (toolbar_zoom_view_change), NULL);
 	toolbar_viewzoom(FALSE);
 
 	for (i=0; i<TOTAL_CURSORS; i++)
@@ -814,6 +799,27 @@ void toolbar_init(GtkWidget *vbox_main)
 	gdk_pixmap_unref( icon );
 	gdk_pixmap_unref( mask );
 
+	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
+		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
+	tool_dis_add(main_bar);
+
+	gtk_widget_show(toolbar_main);
+
+
+///	TOOLS TOOLBAR
+
+	toolbar_boxes[TOOLBAR_TOOLS] = hbox = pack(vbox_main, gtk_hbox_new(FALSE, 0));
+	if (toolbar_status[TOOLBAR_TOOLS]) gtk_widget_show(hbox); // Only show if user wants
+
+#if GTK_MAJOR_VERSION == 1
+	toolbar_tools = pack(hbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+		GTK_TOOLBAR_ICONS));
+#endif
+#if GTK_MAJOR_VERSION == 2
+	toolbar_tools = pack(hbox, gtk_toolbar_new());
+	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_tools), GTK_TOOLBAR_ICONS );
+#endif
+
 	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar,
 		GTK_SIGNAL_FUNC(toolbar_icon_event), 0,
 		GTK_SIGNAL_FUNC(toolbar_rclick), TTB_0);
@@ -822,25 +828,9 @@ void toolbar_init(GtkWidget *vbox_main)
 	{
 		icon_buttons[tools_bar[i].ID] = tools_bar[i].widget;
 	}
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE);
 
-	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
-		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
-	tool_dis_add(main_bar);
-
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
-	gtk_widget_show ( toolbar_main );
-
-
-
-///	TOOLS TOOLBAR
-
-	hbox = gtk_hbox_new (FALSE, 0);
-	toolbar_boxes[TOOLBAR_TOOLS] = hbox;
-	if ( toolbar_status[TOOLBAR_TOOLS] ) gtk_widget_show (hbox);	// Only show if user wants
-	gtk_box_pack_start ( GTK_BOX (vbox_main), hbox, FALSE, FALSE, 0 );
-
-	gtk_box_pack_start ( GTK_BOX (hbox), toolbar_tools, FALSE, FALSE, 0 );
-	gtk_widget_show ( toolbar_tools );
+	gtk_widget_show(toolbar_tools);
 }
 
 void ts_update_gradient()
@@ -1082,11 +1072,8 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	GtkWidget *vbox, *hbox, *scrolledwindow_palette, *viewport_palette;
 
 
-	vbox = gtk_vbox_new (FALSE, 0);
-	if ( toolbar_status[TOOLBAR_PALETTE] ) gtk_widget_show (vbox);
-	gtk_box_pack_start (GTK_BOX (box), vbox, FALSE, TRUE, 0);
-
-	toolbar_boxes[TOOLBAR_PALETTE] = vbox;		// Hide palette area
+	toolbar_boxes[TOOLBAR_PALETTE] = vbox = pack(box, gtk_vbox_new(FALSE, 0));
+	if (toolbar_status[TOOLBAR_PALETTE]) gtk_widget_show(vbox);
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
@@ -1114,9 +1101,8 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
 	gtk_widget_set_events (drawing_col_prev, GDK_ALL_EVENTS_MASK);
 
-	scrolledwindow_palette = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow_palette = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_palette);
-	gtk_box_pack_start (GTK_BOX (vbox), scrolledwindow_palette, TRUE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_palette),
 		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
 

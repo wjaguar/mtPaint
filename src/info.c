@@ -377,16 +377,14 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	hs_populate_rgb();
 	hs_plot_graph();
 
-	hs_drawingarea = gtk_drawing_area_new ();
+	hs_drawingarea = pack(vbox5, gtk_drawing_area_new());
 	gtk_widget_show (hs_drawingarea);
-	gtk_box_pack_start (GTK_BOX (vbox5), hs_drawingarea, FALSE, FALSE, 0);
 	gtk_widget_set_usize (hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H*mem_img_bpp);
 	gtk_signal_connect_object( GTK_OBJECT(hs_drawingarea), "expose_event",
 		GTK_SIGNAL_FUNC (hs_expose_graph), NULL );
 
-	hs_normalize_check = sig_toggle(_("Normalize"), FALSE, NULL,
-		GTK_SIGNAL_FUNC(hs_click_normalize));
-	gtk_box_pack_start(GTK_BOX (vbox5), hs_normalize_check, FALSE, FALSE, 0);
+	hs_normalize_check = pack(vbox5, sig_toggle(_("Normalize"), FALSE, NULL,
+		GTK_SIGNAL_FUNC(hs_click_normalize)));
 
 	if ( mem_img_bpp == 1 )
 	{
