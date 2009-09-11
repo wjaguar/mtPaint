@@ -344,7 +344,12 @@ unsigned char *mt_text_render(
 //	FT_Select_Charmap( face, FT_ENCODING_UNICODE );
 	FT_Set_Charmap( face, face->charmaps[0] );	// Needed to make dingbat fonts work
 
-	cd = iconv_open("UTF-32LE", encoding);		// Convert input string to UTF-32 little endian
+	/* Convert input string to UTF-32, using native byte order */
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+	cd = iconv_open("UTF-32LE", encoding);
+#else /* G_BYTE_ORDER == G_BIG_ENDIAN */
+	cd = iconv_open("UTF-32BE", encoding);
+#endif
 
 	if ( cd == (iconv_t)(-1) ) goto fail0;
 

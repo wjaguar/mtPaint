@@ -354,7 +354,11 @@ void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
 
-void mem_clear();				// Remove old image if any
+//	Clear/remove image data
+void mem_free_image(image_info *image, int final);
+//	Allocate new image data
+int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
+	chanlist src);
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
 void mem_init();				// Initialise memory
@@ -372,7 +376,7 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor);
 int mem_load_pal( char *file_name, png_color *pal );	// Load file into palette array >1 => cols read
 void mem_pal_load_def();		// Load default palette
 
-#define mem_pal_copy(A, B) memcpy((A), (B), sizeof(png_color) * 256)
+#define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
 int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 	png_color *pal2 );
@@ -428,8 +432,6 @@ void rgb2hsv(unsigned char *rgb, double *hsv);
 #define UNDO_PASTE 7	/* Paste operation (current / RGBA) */
 #define UNDO_TOOL  8	/* Same as UNDO_DRAW but respects pen_down */
 
-
-int undo_free_x(undo_item *undo);
 int mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
 //	 Get address of previous channel data (or current if none)
 unsigned char *mem_undo_previous(int channel);
@@ -444,6 +446,7 @@ void mem_undo_forward();		// REDO requested by user
 #define UC_PENDOWN 8	/* Respect pen_down */
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
+void update_undo(image_info *image);	// Copy image state into current undo frame
 
 
 void mem_clip_real_clear();				// Empty the non rotated clipboard

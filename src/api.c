@@ -49,6 +49,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "api.h"
+#include "font.h"
 
 
 void mtpaint_mem_init()			// Initialise memory & inifile
@@ -70,7 +71,12 @@ void mtpaint_window_init()		// Create main window and setup default image
 	update_menus();
 }
 
-void mtpaint_mem_end()			// Finish memory & inifile
+void mtpaint_init()			// Initialise memory & inifile
+{
+	mtpaint_mem_init();
+}
+
+void mtpaint_quit()			// Finish memory & inifile
 {
 	inifile_quit();
 }
@@ -284,22 +290,96 @@ int mtpaint_clipboard_save(char *filename, int type, int arg)	// Save clipboard 
 }
 
 
-void mtpaint_text(char *text, char *font, float angle, int antialias)
-							// Render text to the clipboard
+// FIXME - this function could be put into memory.c to be used by GTK+ text renderer
+#ifdef U_FREETYPE
+static int mem_text_clip_prep(int w, int h)		// Prepare new clipboard for text rendering
 {
-	gboolean rot = FALSE;
-	int rang = angle*100.0;
+	unsigned char *dest, *pat_off;
+	int i, j, clip_bpp;
 
-	inifile_set( "lastTextFont", font );
-	inifile_set( "textString", text );
-	inifile_set_gint32("fontAngle", rang);
-	if ( rang!=0 ) rot=TRUE;
-	inifile_set_gboolean( "fontAntialias2", rang );
-	inifile_set_gboolean( "fontAntialias", antialias );
-	render_text( drawing_canvas );
-#if GTK_MAJOR_VERSION == 1
-	if (angle!=0) mem_rotate_free(angle, antialias, TRUE, TRUE);
+	if ( w<1 || h<1 ) return 1;
+
+	if (mem_channel == CHN_IMAGE) clip_bpp = mem_img_bpp;
+	else clip_bpp = 1;
+
+	mem_clip_real_clear();	// Lose old un-rotated clipboard
+	free( mem_clipboard );	// Lose old clipboard
+	free( mem_clip_alpha );	// Lose old clipboard alpha
+	mem_clip_mask_clear();	// Lose old clipboard mask
+	mem_clip_alpha = NULL;
+	mem_clipboard = malloc( w * h * clip_bpp );
+	mem_clip_w = w;
+	mem_clip_h = h;
+	mem_clip_bpp = clip_bpp;
+
+	if ( mem_clipboard == NULL )
+	{
+		free( mem_clipboard );
+		return 1;
+	}
+
+	if (mem_channel == CHN_IMAGE)		// Pasting to image so use the pattern
+	{
+		for ( j=0; j<h; j++ )
+		{
+			dest = mem_clipboard + mem_clip_w*j*mem_clip_bpp;
+			if ( mem_clip_bpp == 1 )
+			{
+				pat_off = mem_col_pat + (j%8)*8;
+				for ( i=0; i<w; i++ )
+				{
+					dest[i] = pat_off[i%8];
+				}
+			}
+			if ( mem_clip_bpp == 3 )
+			{
+				pat_off = mem_col_pat24 + (j%8)*8*3;
+				for ( i=0; i<w; i++ )
+				{
+					dest[3*i]   = pat_off[3*(i%8)];
+					dest[3*i+1] = pat_off[3*(i%8)+1];
+					dest[3*i+2] = pat_off[3*(i%8)+2];
+				}
+			}
+		}
+	}
+
+	return 0;
+}
 #endif
+
+int mtpaint_text(				// Render text to the clipboard
+		char	*text,		// Text to render
+		int	characters,	// Characters to render (may be less if 0 is encountered first)
+		char	*filename,	// Font file
+		char	*encoding,	// Encoding of text, e.g. ASCII, UTF-8, UNICODE
+		double	size,		// Scalable font size
+		int	face_index,	// Usually 0, but maybe higher for bitmap fonts like *.FON
+		double	angle,		// Rotation, anticlockwise
+		int	flags		// MT_TEXT_* flags
+		)
+{
+	unsigned char *new;
+	int w=0, h=0;
+
+	new = mt_text_render( text, characters, filename, encoding, size,
+			face_index, angle, flags, &w, &h );
+
+	if (new)
+	{
+		if ( !mem_text_clip_prep(w, h) )
+		{
+			mem_clip_mask = new;
+		}
+		else
+		{
+			free(new);	// Couldn't set up clipboard so free memory and bail out
+			return -1;
+		}
+	}
+	else return -1;
+
+	return 0;
 }
 
 
