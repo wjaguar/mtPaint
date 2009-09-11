@@ -333,6 +333,10 @@ void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item
 	if (newchan_window) return;
 	if (item == mem_channel) return;
 
+	if ( marq_status >= MARQUEE_PASTE && mem_clip_bpp == 3)
+		pressed_select_none( NULL, NULL );
+	// Stop pasting if with RGB paste
+
 	if (!mem_img[item])
 	{
 		pressed_channel_create(menu_item, user_data, item);

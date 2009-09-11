@@ -594,9 +594,42 @@ int move_arrows( int *c1, int *c2, int value )
 	return 1;
 }
 
+static void resize_marquee( int dx, int dy )
+{
+	paint_marquee(0, marq_x1, marq_y1);
+
+	marq_x2 += dx;
+	marq_y2 += dy;
+
+	paint_marquee(1, marq_x1, marq_y1);
+}
+
 int check_arrows(int action)
 {
 	int mv = mem_nudge;
+
+	if ( marq_status == MARQUEE_DONE )
+	{		// User is selecting so allow CTRL+arrow keys to resize the marquee
+		switch (action)
+		{
+			case ACT_LR_LEFT: mv = 1;
+			case ACT_LR_2LEFT:
+				resize_marquee(-mv, 0);
+				return 1;
+			case ACT_LR_RIGHT: mv = 1;
+			case ACT_LR_2RIGHT:
+				resize_marquee(mv, 0);
+				return 1;
+			case ACT_LR_DOWN: mv = 1;
+			case ACT_LR_2DOWN:
+				resize_marquee(0, mv);
+				return 1;
+			case ACT_LR_UP: mv = 1;
+			case ACT_LR_2UP:
+				resize_marquee(0, -mv);
+				return 1;
+		}
+	}
 
 	switch (action)
 	{

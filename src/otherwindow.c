@@ -2086,7 +2086,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	}
 	if (cs_type == COLSEL_EDIT_CSEL)
 	{
-		static char *csel_txt[] = { _("Center"), _("Limit"), _("Preview") };
+		static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview") };
 		static char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
 
 		if (csel_center < 0)
