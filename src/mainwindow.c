@@ -1092,6 +1092,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_A) mem_col_A--;
+			mem_col_A24 = mem_pal[mem_col_A];
 		}
 		else if (channel_col_A[mem_channel])
 			channel_col_A[mem_channel]--;
@@ -1100,6 +1101,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_A < mem_cols - 1) mem_col_A++;
+			mem_col_A24 = mem_pal[mem_col_A];
 		}
 		else if (channel_col_A[mem_channel] < 255)
 			channel_col_A[mem_channel]++;
@@ -1108,6 +1110,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_B) mem_col_B--;
+			mem_col_B24 = mem_pal[mem_col_B];
 		}
 		else if (channel_col_B[mem_channel])
 			channel_col_B[mem_channel]--;
@@ -1116,6 +1119,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_B < mem_cols - 1) mem_col_B++;
+			mem_col_B24 = mem_pal[mem_col_B];
 		}
 		else if (channel_col_B[mem_channel] < 255)
 			channel_col_B[mem_channel]++;
@@ -1208,12 +1212,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		return (TRUE);
 	}
 	/* Finalize colour-change */
-	if (mem_channel == CHN_IMAGE)
-	{
-		mem_col_A24 = mem_pal[mem_col_A];
-		mem_col_B24 = mem_pal[mem_col_B];
-		update_cols();
-	}
+	if (mem_channel == CHN_IMAGE) update_cols();
 	else pressed_opacity(channel_col_A[mem_channel]);
 	return TRUE;
 }

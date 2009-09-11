@@ -974,6 +974,7 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
 	int nw, nh, ox = 0, oy = 0, res = 1, scale_type = 0, gcor = FALSE;
 
+	read_spin(sisca_spins[1]); // For aspect ratio handling
 	nw = read_spin(sisca_spins[0]);
 	nh = read_spin(sisca_spins[1]);
 	if (!sisca_scale)

@@ -173,7 +173,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		j = undo_next_core(UC_CREATE | UC_GETMEM, settings->width,
 			settings->height, settings->bpp, oldmask);
 		/* Drop current image if not enough memory for undo */
-		if (j) mem_free_image(&mem_image, FALSE);
+		if (j) mem_free_image(&mem_image, FREE_IMAGE);
 		/* Allocate, or at least try to */
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
