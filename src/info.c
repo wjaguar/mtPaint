@@ -24,6 +24,7 @@
 #include "global.h"
 
 #include "memory.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
 #include "mygtk.h"

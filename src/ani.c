@@ -31,11 +31,11 @@
 
 #include "memory.h"
 #include "ani.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
 #include "viewer.h"
-#include "png.h"
 #include "inifile.h"
 #include "mygtk.h"
 #include "layer.h"
@@ -823,10 +823,11 @@ void wild_space_change( char *in, char *out, int length )
 
 static void create_frames_ani()
 {
+	ls_settings settings;
 	png_color pngpal[256];
-	unsigned char *irgb = NULL, newpal[3][256], npt[3];
+	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256], npt[3];
 	char output_path[300], *txt, command[512], wild_path[300];
-	int a, b, k, i, cols, trans;
+	int a, b, k, i, cols, trans, layer_w, layer_h;
 	float percent;
 #ifndef WIN32
 	mode_t mode = 0777;
@@ -842,7 +843,7 @@ static void create_frames_ani()
 
 	gtk_widget_show( ani_frames[1] );
 	ani_write_layer_data();
-	layer_press_save();		// Save layers data file and prepare layer_w/h
+	layer_press_save();		// Save layers data file
 
 	strncpy( output_path, layers_filename, 250 );
 
@@ -879,22 +880,64 @@ static void create_frames_ani()
 	mtMIN( a, ani_frame1, ani_frame2 )
 	mtMAX( b, ani_frame1, ani_frame2 )
 
-	if (ani_use_gif)
+	if (layer_selected)
 	{
-		irgb = malloc( layer_w * layer_h );	// Resulting indexed image
-		if ( irgb == NULL )
-		{
-			memory_errors(1);
-			goto failure;
-		}
+		layer_w = layer_table[0].image->mem_width;
+		layer_h = layer_table[0].image->mem_height;
 	}
-
+	else
+	{
+		layer_w = mem_width;
+		layer_h = mem_height;
+	}
 	layer_rgb = malloc( layer_w * layer_h * 3);	// Primary layer image for RGB version
 
 	if ( layer_rgb == NULL )
 	{
 		memory_errors(1);
 		goto failure;
+	}
+
+	/* Prepare settings */
+	init_ls_settings(&settings, NULL);
+	settings.mode = FS_COMPOSITE_SAVE;
+	settings.width = layer_w;
+	settings.height = layer_h;
+	settings.colors = 256;
+	settings.silent = TRUE;
+	if (ani_use_gif)
+	{
+		irgb = malloc(layer_w * layer_h);	// Resulting indexed image
+		if (!irgb)
+		{
+			free(layer_rgb);
+			memory_errors(1);
+			goto failure;
+		}
+		settings.ftype = FT_GIF;
+		settings.img[CHN_IMAGE] = irgb;
+		settings.bpp = 1;
+		settings.pal = pngpal;
+	}
+	else
+	{
+		settings.ftype = FT_PNG;
+		settings.img[CHN_IMAGE] = layer_rgb;
+		settings.bpp = 3;
+		/* Background transparency */
+		if (layer_selected)
+		{
+			settings.xpm_trans = layer_table[0].image->mem_xpm_trans;
+			settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
+				PNG_2_INT(layer_table[0].image->
+				mem_pal[settings.xpm_trans]);
+		}
+		else
+		{
+			settings.xpm_trans = mem_xpm_trans;
+			settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
+				PNG_2_INT(mem_pal[settings.xpm_trans]);
+		}
 	}
 
 	ani_bail_out = FALSE;
@@ -974,6 +1017,10 @@ static void create_frames_ani()
 				if ( i>=cols ) trans = -1;	// Not in final image so ignore
 			}
 
+			/* Save GIF file */
+			settings.xpm_trans = trans;
+// !!!			i = save_image(output_path, &settings);
+
 			i = save_gif_real( output_path, irgb, pngpal, layer_w, layer_h,
 				trans, 0 ); // Save GIF file
 
@@ -982,7 +1029,7 @@ static void create_frames_ani()
 		else				// Create Indexed GIF file
 		{
 			sprintf(txt, "%s%c%s%05d.png", ani_output_path, DIR_SEP, ani_file_prefix, k);
-			if ( save_png( output_path, 3 ) < 0 )				// Save to PNG
+			if (save_image(output_path, &settings) < 0)	// Save to PNG
 			{
 				alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
 				goto failure2;

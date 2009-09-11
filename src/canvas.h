@@ -88,6 +88,7 @@ gboolean col_reverse,					// Painting with right button
 int do_a_load( char *fname );
 void align_size( float new_zoom );
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
+void init_ls_settings(ls_settings *settings, GtkWidget *box);
 void file_selector( int action_type );
 void init_pal();			// Initialise palette after loading/palette changes
 void update_cols();

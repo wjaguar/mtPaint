@@ -25,9 +25,9 @@
 #include "global.h"
 
 #include "memory.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
-#include "png.h"
 #include "patterns.c"
 #include "mygtk.h"
 #include "layer.h"
@@ -73,7 +73,6 @@ unsigned char *mem_clip_mask;		// Pointer to clipboard mask
 unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
 unsigned char *mem_brushes;		// Preset brushes screen memory
 int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
-char mem_clip_file[2][256];		// 0=Current filename, 1=temp filename
 int mem_clip_bpp;			// Bytes per pixel
 int mem_clip_w = -1, mem_clip_h = -1;	// Clipboard geometry
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas

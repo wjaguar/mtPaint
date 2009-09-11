@@ -22,6 +22,7 @@
 #include <math.h>
 
 #include "memory.h"
+#include "png.h"
 #include "layer.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
@@ -30,7 +31,6 @@
 #include "inifile.h"
 #include "global.h"
 #include "viewer.h"
-#include "png.h"
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
@@ -38,11 +38,9 @@
 
 int	layers_total = 0,		// Layers currently being used
 	layer_selected = 0,		// Layer currently selected in the layers window
-	layers_changed = 0,		// 0=Unchanged
-	layer_w, layer_h;		// Layer geometry for saving
+	layers_changed = 0;		// 0=Unchanged
 
 char	layers_filename[256];		// Current filename for layers file
-unsigned char *layer_rgb;		// Memory containing composite layers image
 gboolean show_layers_main = FALSE,	// Show all layers in main window
 	layers_pastry_cut = FALSE;	// Pastry cut layers in view area (for animation previews)
 
@@ -924,26 +922,38 @@ void layer_press_save_composite()		// Create, save, free the composite image
 	file_selector( FS_COMPOSITE_SAVE );
 }
 
-int layer_save_composite( char *fname )
+int layer_save_composite(char *fname, ls_settings *settings)
 {
-	int res=0;
+	unsigned char *layer_rgb;
+	int w, h, res=0;
 
-	if ( layer_selected != 0 )
+	if (layer_selected)
 	{
-		layer_w = layer_table[0].image->mem_width;
-		layer_h = layer_table[0].image->mem_height;
+		w = layer_table[0].image->mem_width;
+		h = layer_table[0].image->mem_height;
 	}
 	else
 	{
-		layer_w = mem_width;
-		layer_h = mem_height;
+		w = mem_width;
+		h = mem_height;
 	}
-
-	layer_rgb = malloc( layer_w * layer_h * 3);
-	if ( layer_rgb != NULL )
+	layer_rgb = malloc(w * h * 3);
+	if (layer_rgb)
 	{
-		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
-		res = save_png( fname, 3 );					// Save to PNG
+		view_render_rgb(layer_rgb, 0, 0, w, h, 1);	// Render layer
+		settings->img[CHN_IMAGE] = layer_rgb;
+		settings->width = w;
+		settings->height = h;
+		settings->bpp = 3;
+		if (layer_selected) /* Set up background transparency */
+		{
+			res = layer_table[0].image->mem_xpm_trans;
+			settings->xpm_trans = res;
+			settings->rgb_trans = res < 0 ? -1 :
+				PNG_2_INT(layer_table[0].image->mem_pal[res]);
+
+		}
+		res = save_image(fname, settings);
 		free( layer_rgb );
 	}
 	else memory_errors(1);
@@ -989,17 +999,6 @@ int save_layers( char *file_name )
 	fclose(fp);
 	layer_update_filename( file_name );
 	register_file( file_name );		// Recently used file list / last directory
-
-	if ( layer_selected != 0 )
-	{
-		layer_w = layer_table[0].image->mem_width;
-		layer_h = layer_table[0].image->mem_height;
-	}
-	else
-	{
-		layer_w = mem_width;
-		layer_h = mem_height;
-	}
 
 	return 1;		// Success
 fail:

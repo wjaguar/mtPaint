@@ -22,6 +22,7 @@
 
 #include "global.h"
 #include "memory.h"
+#include "png.h"
 #include "mainwindow.h"
 
 

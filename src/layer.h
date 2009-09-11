@@ -67,11 +67,9 @@ layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
 
 int	layers_total,			// Layers currently in use
 	layer_selected,			// Layer currently selected in the layers window
-	layers_changed,			// 0=Unchanged
-	layer_w, layer_h;		// Layer geometry for saving
+	layers_changed;			// 0=Unchanged
 
 char	layers_filename[256];		// Current filename for layers file
-unsigned char *layer_rgb;		// Memory containing composite layers image
 gboolean show_layers_main,		// Show all layers in main window
 	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
@@ -90,7 +88,7 @@ gboolean layers_check_header( char *file_name );
 void layer_press_save();
 void layer_press_save_as();
 void layer_press_save_composite();
-int layer_save_composite( char *fname );
+int layer_save_composite(char *fname, ls_settings *settings);
 
 void layers_notify_changed();
 void layers_remove_all();

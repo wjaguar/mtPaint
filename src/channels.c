@@ -24,6 +24,7 @@
 #include "global.h"
 
 #include "memory.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
@@ -416,7 +417,6 @@ void pressed_channel_load()
 
 void pressed_channel_save()
 {
-	if ( mem_channel == CHN_IMAGE ) return;
 	file_selector( FS_CHANNEL_SAVE );
 }
 

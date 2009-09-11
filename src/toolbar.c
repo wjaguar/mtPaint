@@ -24,6 +24,7 @@
 
 #include "memory.h"
 #include "inifile.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
@@ -31,7 +32,6 @@
 #include "toolbar.h"
 #include "layer.h"
 #include "viewer.h"
-#include "png.h"
 #include "channels.h"
 #include "csel.h"
 

@@ -22,8 +22,9 @@
 
 #include "global.h"
 #include "mygtk.h"
-#include "canvas.h"
 #include "memory.h"
+#include "png.h"
+#include "canvas.h"
 #include "inifile.h"
 #include "viewer.h"
 #include "mainwindow.h"
@@ -37,7 +38,7 @@ static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbut
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
-static GtkWidget *clipboard_entry;
+GtkWidget *clipboard_entry = NULL;
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
@@ -141,6 +142,7 @@ gint delete_prefs( GtkWidget *widget, GdkEvent *event, gpointer data )
 	if ( inputd != NULL ) delete_inputd( NULL, NULL, NULL );
 	gtk_widget_destroy(prefs_window);
 	men_item_state( menu_prefs, TRUE );
+	clipboard_entry = NULL;
 
 	return FALSE;
 }
@@ -332,9 +334,8 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	setup_language();
 #endif
 
-	strncpy( mem_clip_file[1], gtk_entry_get_text( GTK_ENTRY(clipboard_entry) ), 250 );
-	strncpy( mem_clip_file[0], mem_clip_file[1], 250 );
-	inifile_set( "clipFilename", mem_clip_file[0] );
+	strncpy(mem_clip_file, gtk_entry_get_text(GTK_ENTRY(clipboard_entry)), 250);
+	inifile_set("clipFilename", mem_clip_file);
 
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 
@@ -511,8 +512,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	clipboard_entry = gtk_entry_new();
 	gtk_widget_show( clipboard_entry );
 	gtk_box_pack_start( GTK_BOX(vbox_2), clipboard_entry, FALSE, FALSE, 0 );
-	gtk_entry_set_text( GTK_ENTRY(clipboard_entry), mem_clip_file[0] );
-	strncpy( mem_clip_file[1], mem_clip_file[0], 250 );
+	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
 
 	button1 = add_a_button( _("Browse"), 4, vbox_2, FALSE );
 	gtk_signal_connect(GTK_OBJECT(button1), "clicked",

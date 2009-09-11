@@ -111,7 +111,6 @@ unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
 unsigned char *mem_brushes;		// Preset brushes image
 int brush_tool_type;			// Last brush tool type
 int mem_brush_list[81][3];		// Preset brushes parameters
-char mem_clip_file[2][256];		// 0=Current filename, 1=temp filename
 int mem_clip_bpp;			// Bytes per pixel
 int mem_clip_w, mem_clip_h;		// Clipboard geometry
 int mem_clip_x, mem_clip_y;		// Clipboard location on canvas

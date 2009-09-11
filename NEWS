@@ -25,6 +25,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Selection marquee now persists through tool changes
 	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	* BUGFIX - Lasso tool now properly handles clipboard alpha
+	* BUGFIX - Clipboard save path now can be changed in Preferences
 	...and more still remains to do... ;-)
 
 3.01	2006-7-15

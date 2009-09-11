@@ -113,6 +113,7 @@ char **global_argv;
 
 GdkGC *dash_gc;
 
+char mem_clip_file[256];
 
 void main_init();			// Initialise and display the main window
 gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data );
@@ -141,7 +142,8 @@ void spot_undo(int mode);		// Take snapshot for undo
 void set_cursor();			// Set mouse cursor
 int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 
-int gui_save( char *filename );		// Try to save file + warn if error + return < 0 if fail
+//	Try to save file + warn if error + return < 0 if fail
+int gui_save(char *filename, ls_settings *settings);
 
 void pressed_select_none( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_opacity( int opacity );

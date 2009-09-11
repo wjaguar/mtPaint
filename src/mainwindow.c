@@ -26,12 +26,12 @@
 #include "global.h"
 
 #include "memory.h"
+#include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"
 #include "mygtk.h"
 #include "otherwindow.h"
 #include "inifile.h"
-#include "png.h"
 #include "canvas.h"
 #include "polygon.h"
 #include "layer.h"
@@ -384,12 +384,20 @@ void pressed_open_file( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_save_file_as( GtkMenuItem *menu_item, gpointer user_data )
 {	file_selector( FS_PNG_SAVE ); }
 
-int gui_save( char *filename )
+int gui_save(char *filename, ls_settings *settings)
 {
 	int res;
 	char mess[512];
 
-	res = save_image( filename );
+	/* Prepare to save image */
+	memcpy(settings->img, mem_img, sizeof(chanlist));
+	settings->pal = mem_pal;
+	settings->width = mem_width;
+	settings->height = mem_height;
+	settings->bpp = mem_img_bpp;
+	settings->colors = mem_cols;
+
+	res = save_image(filename, settings);
 	if ( res < 0 )
 	{
 		if ( res == NOT_XPM )
@@ -427,18 +435,31 @@ int gui_save( char *filename )
 	return res;
 }
 
-void pressed_save_file( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_save_file(GtkMenuItem *menu_item, gpointer user_data)
 {
-	if ( strcmp( mem_filename, _("Untitled") ) ) gui_save(mem_filename);
-	else pressed_save_file_as( menu_item, user_data );
+	ls_settings settings;
+
+	while (strcmp(mem_filename, _("Untitled")))
+	{
+		init_ls_settings(&settings, NULL);
+		settings.ftype = file_type_by_ext(mem_filename, FF_IMAGE);
+		if (settings.ftype == FT_NONE) break;
+		settings.mode = FS_PNG_SAVE;
+		if (gui_save(mem_filename, &settings) < 0) break;
+		return;
+	}
+	file_selector(FS_PNG_SAVE);
 }
+
+char mem_clip_file[256];
 
 void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
+	char clip[256];
 	int i;
 
-	snprintf( mem_clip_file[1], 251, "%s%i", mem_clip_file[0], item );
-	i = load_png( mem_clip_file[1], 1 );
+	snprintf(clip, 251, "%s%i", mem_clip_file, item);
+	i = load_png(clip, 1 );
 
 	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
 	else text_paste = FALSE;
@@ -456,10 +477,25 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
+	ls_settings settings;
+	char clip[256];
 	int i;
 
-	snprintf( mem_clip_file[1], 251, "%s%i", mem_clip_file[0], item );
-	i = save_png( mem_clip_file[1], 1 );
+	/* Prepare settings */
+	init_ls_settings(&settings, NULL);
+	settings.mode = FS_CLIP_FILE;
+	settings.ftype = FT_PNG;
+	settings.img[CHN_IMAGE] = mem_clipboard;
+	settings.img[CHN_ALPHA] = mem_clip_alpha;
+	settings.img[CHN_SEL] = mem_clip_mask;
+	settings.pal = mem_pal;
+	settings.width = mem_clip_w;
+	settings.height = mem_clip_h;
+	settings.bpp = mem_clip_bpp;
+	settings.colors = mem_cols;
+
+	snprintf(clip, 251, "%s%i", mem_clip_file, item);
+	i = save_image(clip, &settings);
 
 	if ( i!=0 ) alert_box( _("Error"), _("Unable to save clipboard"), _("OK"), NULL, NULL );
 }
@@ -2685,7 +2721,7 @@ static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context, gin
 void main_init()
 {
 	gint i;
-	char txt[64];
+	char txt[256];
 	float f=0;
 
 	GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
@@ -2975,7 +3011,7 @@ void main_init()
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
 			NULL},
 	*item_chan_del[] = {  _("/Channels/Delete ..."),NULL },
-	*item_chan_ls[] = {  _("/Channels/Load ..."), _("/Channels/Save As ..."),NULL },
+	*item_chan_ls[] = {  _("/Channels/Load ..."), NULL },
 	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
 			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
 	;
@@ -3275,8 +3311,8 @@ void main_init()
 	set_cursor();
 	init_status_bar();
 
-	snprintf( mem_clip_file[1], 250, "%s/.clipboard", get_home_directory() );
-	snprintf( mem_clip_file[0], 250, "%s", inifile_get( "clipFilename", mem_clip_file[1] ) );
+	snprintf(txt, 250, "%s/.clipboard", get_home_directory());
+	snprintf(mem_clip_file, 250, "%s", inifile_get("clipFilename", txt));
 
 	if (files_passed > 1)
 		pressed_cline(NULL, NULL);
