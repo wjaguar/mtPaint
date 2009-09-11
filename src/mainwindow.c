@@ -2586,6 +2586,8 @@ static void parse_drag( char *txt )
 		if ( do_a_load( fname ) == 0 ) nlayer = TRUE;		// Load the file
 	}
 
+	if ( layers_total > 0 ) view_show();
+
 	gtk_widget_set_sensitive( layers_window, TRUE );
 	gtk_widget_set_sensitive( main_window, TRUE );
 }
