@@ -1028,6 +1028,9 @@ void layer_press_save()
 
 static void update_main_with_new_layer()
 {
+	/* Switch channels if needed */
+	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
+
 	gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
 	update_all_views();
 

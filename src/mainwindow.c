@@ -1176,6 +1176,8 @@ static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
 	return FALSE;
 }
 
+int async_bk = FALSE;
+
 #define GREY_W 153
 #define GREY_B 102
 /*
@@ -1189,11 +1191,12 @@ void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int
 	static unsigned char greyz[2] = {GREY_W, GREY_B};
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) step = 4;
+	if (async_bk) step = 8;
+	else if (can_zoom <= 1.0) step = 6;
 	else
 	{
 		scale = rint(can_zoom);
-		step = scale < 3 ? scale * 2 : scale;
+		step = scale < 4 ? 6 : scale == 4 ? 8 : scale;
 	}
 	dx = x0 % step;
 	dy = y0 % step;
@@ -1373,6 +1376,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 				i = ii;
 				continue;
 			}
+rr2_as:
 			if (rr_opac == 255)
 			{
 				dest[0] = rr_pal[px].red;
@@ -1388,14 +1392,14 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 				j = 255 * dest[2] + rr_opac * (rr_pal[px].blue - dest[2]);
 				dest[2] = (j + (j >> 8) + 1) >> 8;
 			}
+rr2_s:
 			dest += 3;
-			for(i++; i < ii; i++)
-			{
-				dest[0] = *(dest - 3);
-				dest[1] = *(dest - 2);
-				dest[2] = *(dest - 1);
-				dest += 3;
-			}
+			if (++i >= ii) continue;
+			if (async_bk) goto rr2_as;
+			dest[0] = *(dest - 3);
+			dest[1] = *(dest - 2);
+			dest[2] = *(dest - 1);
+			goto rr2_s;
 		}
 	}
 
@@ -1437,6 +1441,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 			}
 			k = rr_opac * alpha[0];
 			k = (k + (k >> 8) + 1) >> 8;
+rr4_as:
 			if (k == 255)
 			{
 				dest[0] = src[0];
@@ -1452,14 +1457,14 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 				j = 255 * dest[2] + k * (src[2] - dest[2]);
 				dest[2] = (j + (j >> 8) + 1) >> 8;
 			}
+rr4_s:
 			dest += 3;
-			for(i++; i < ii; i++)
-			{
-				dest[0] = *(dest - 3);
-				dest[1] = *(dest - 2);
-				dest[2] = *(dest - 1);
-				dest += 3;
-			}
+			if (++i >= ii) continue;
+			if (async_bk) goto rr4_as;
+			dest[0] = *(dest - 3);
+			dest[1] = *(dest - 2);
+			dest[2] = *(dest - 1);
+			goto rr4_s;
 		}
 	}
 }
@@ -1533,20 +1538,21 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 			t3 += j * channel_rgb[CHN_MASK][2];
 		}
 		j = (256 * 255) - t0;
-		t1 += j * dest[0];
-		t2 += j * dest[1];
-		t3 += j * dest[2];
-		dest[0] = (t1 + (t1 >> 8) + 0x100) >> 16;
-		dest[1] = (t2 + (t2 >> 8) + 0x100) >> 16;
-		dest[2] = (t3 + (t3 >> 8) + 0x100) >> 16;
+or_as:
+		k = t1 + j * dest[0];
+		dest[0] = (k + (k >> 8) + 0x100) >> 16;
+		k = t2 + j * dest[1];
+		dest[1] = (k + (k >> 8) + 0x100) >> 16;
+		k = t3 + j * dest[2];
+		dest[2] = (k + (k >> 8) + 0x100) >> 16;
+or_s:
 		dest += 3;
-		for(i++; i < ii; i++)
-		{
-			dest[0] = *(dest - 3);
-			dest[1] = *(dest - 2);
-			dest[2] = *(dest - 1);
-			dest += 3;
-		}
+		if (++i >= ii) continue;
+		if (async_bk) goto or_as;
+		dest[0] = *(dest - 3);
+		dest[1] = *(dest - 2);
+		dest[2] = *(dest - 1);
+		goto or_s;
 	}
 }
 
@@ -1672,30 +1678,33 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	for (jj = 0; jj < ph; jj++ , tmp += pw3)
 	{
 		j = ((py1 + jj) * zoom) / scale;
-		if (j == j0)
+		if (j != j0)
+		{
+			j0 = j;
+			di = mem_width * j + dx;
+			dc = mem_clip_w * (j - marq_y1) + dx - marq_x1;
+			if (tlist[CHN_ALPHA])
+				memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
+			prep_mask(0, zoom, pww, mask, mask0 ? mask0 + di : NULL,
+				mem_img[CHN_IMAGE] + di * mem_img_bpp);
+			process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] + di,
+				clip_alpha ? clip_alpha + dc : t_alpha,
+				mem_clip_mask ? mem_clip_mask + dc : NULL, opac);
+			if (clip_image)
+			{
+				if (mem_img[mem_channel])
+					memcpy(pix, mem_img[mem_channel] + di *
+						mem_clip_bpp, l * mem_clip_bpp);
+				else memset(pix, 0, l * mem_clip_bpp);
+				process_img(0, zoom, pww, mask, pix,
+					mem_img[mem_channel] + di * mem_clip_bpp,
+					mem_clipboard + dc * mem_clip_bpp, opac);
+			}
+		}
+		else if (!async_bk)
 		{
 			memcpy(tmp, tmp - pw3, pw3);
 			continue;
-		}
-		j0 = j;
-		di = mem_width * j + dx;
-		dc = mem_clip_w * (j - marq_y1) + dx - marq_x1;
-		if (tlist[CHN_ALPHA])
-			memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
-		prep_mask(0, zoom, pww, mask, mask0 ? mask0 + di : NULL,
-			mem_img[CHN_IMAGE] + di * mem_img_bpp);
-		process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] + di,
-			clip_alpha ? clip_alpha + dc : t_alpha, mem_clip_mask ?
-			mem_clip_mask + dc : NULL, opac);
-		if (clip_image)
-		{
-			if (mem_img[mem_channel])
-				memcpy(pix, mem_img[mem_channel] + di * mem_clip_bpp,
-					l * mem_clip_bpp);
-			else memset(pix, 0, l * mem_clip_bpp);
-			process_img(0, zoom, pww, mask, pix,
-				mem_img[mem_channel] + di * mem_clip_bpp,
-				mem_clipboard + dc * mem_clip_bpp, opac);
 		}
 		render_row(tmp, mem_img, dx, j, tlist);
 		overlay_row(tmp, mem_img, dx, j, tlist);
@@ -1759,7 +1768,7 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	for (jj = 0; jj < ph2; jj++ , rgb += pw)
 	{
 		j = ((py2 + jj) * zoom) / scale;
-		if (j == j0)
+		if (!async_bk && (j == j0))
 		{
 			memcpy(rgb, rgb - pw, pw2);
 			continue;
@@ -1856,6 +1865,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
 			pw, ph, can_zoom, 0, layer_selected - 1, 1);
 	}
+	else async_bk = !chequers_optimize; /* Only here and only w/o layers */
 	main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
@@ -1911,6 +1921,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			repaint_paste( ax1, ay1, ax2, ay2 );
 		}
 	}
+	async_bk = FALSE;
 
 	if ( marq_status != MARQUEE_NONE ) paint_marquee(11, marq_x1, marq_y1);
 	if ( perim_status > 0 ) repaint_perim();
