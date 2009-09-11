@@ -64,7 +64,8 @@ static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
-	if (init_undo(&lim->image_.undo_, MAX_UNDO))
+	if (init_undo(&lim->image_.undo_, MAX_UNDO) &&
+		(lim->image_.undo_.items->pal_ = calloc(1, SIZEOF_PALETTE)))
 	{
 		for (; ; i++)
 		{
@@ -76,6 +77,7 @@ static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 		}
 	}
 	while (--i >= 0) free(lim->image_.img[i]);
+	if (lim->image_.undo_.items) free(lim->image_.undo_.items->pal_);
 	free(lim->image_.undo_.items);
 	free(lim);
 	return (NULL);
@@ -271,7 +273,7 @@ static void layer_new_chores(int l, int w, int h, int type, int cols,
 	undo->width = lim->image_.width = w;
 	undo->height = lim->image_.height = h;
 	undo->cols = lim->image_.cols = cols;
-	mem_pal_copy(undo->pal, lim->image_.pal);
+	mem_pal_copy(undo->pal_, lim->image_.pal);
 
 	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
@@ -658,11 +660,12 @@ int load_layers( char *file_name )
 
 		layers_total++;
 
+// !!! A brittle hack - have to find other way to stop mem_clear() in loader
 		// Bogus 1x1 image used
 		mem_width = 1;
 		mem_height = 1;
 		memset(mem_img, 0, sizeof(chanlist));
-		memset(&mem_undo_im_[0].img, 0, sizeof(chanlist));
+		init_undo(&mem_image.undo_, MAX_UNDO);
 		mem_undo_im_[0].img[CHN_IMAGE] = mem_img[CHN_IMAGE] = malloc(3);
 	}
 	if ( layers_total>0 )

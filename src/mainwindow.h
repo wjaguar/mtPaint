@@ -212,8 +212,6 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img);
 void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img);
-void repaint_paste(int px1, int py1, int px2, int py2, rgbcontext *ctx);
-void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph );
 
 void stop_line();
 

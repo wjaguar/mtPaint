@@ -25,7 +25,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Tile based undo system introduced to save memory when changes affect only small areas of the canvas
 	* mtPaint can now be compiled as a library (libmtpaint)
 	* Main menu now rearranges itself to fit in window
+	* Image rotation now sharper and faster
 	* BUGFIX - Colour selective mode with zoom < 100% doesn't cause crash
+	* BUGFIX - Gradient preview now properly shows effect of mask channel
 	* Lanczos3 rescaling filter removed due to unfavourable results
 
 3.11	2007-4-2

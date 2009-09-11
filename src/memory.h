@@ -93,13 +93,15 @@
 #define CMASK_CURR  (1 << mem_channel)
 #define CMASK_FOR(A) (1 << (A))
 
+#define SIZEOF_PALETTE (256 * sizeof(png_color))
+
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 #define UNDO_TILEMAP_SIZE 32
 
 typedef struct {
 	chanlist img;
-	png_color pal[256];
+	png_color *pal_;
 	unsigned char tilemap[UNDO_TILEMAP_SIZE], *tileptr;
 	int cols, width, height, bpp, flags, size;
 } undo_item;

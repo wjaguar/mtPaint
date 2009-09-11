@@ -2744,11 +2744,11 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 			/* Display paste RGB, only if not being called from repaint_canvas */
 			/* Only do something if there is a change in position */
 			if (show_paste && !ctx &&
-				((new_x != marq_x1) || (new_y != marq_y1)) &&
-				clip(rxy, marq_x1 < 0 ? 0 : x1 + 1,
+				((new_x != marq_x1) || (new_y != marq_y1)))
+				repaint_clipped(marq_x1 < 0 ? 0 : x1 + 1,
 					marq_y1 < 0 ? 0 : y1 + 1,
-					x2 - 1, y2 - 1, vxy))
-				repaint_paste(rxy[0], rxy[1], rxy[2] - 1, rxy[3] - 1, NULL);
+					x2 - 1, y2 - 1, vxy);
+
 			r = g = 0; b = 255; /* Draw in blue */
 		}
 

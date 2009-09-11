@@ -2234,196 +2234,6 @@ op_s:
 	}
 }
 
-void repaint_paste(int px1, int py1, int px2, int py2, rgbcontext *ctx)
-{
-	chanlist tlist;
-	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0, *wrk = NULL;
-	unsigned char *clip_alpha, *clip_image, *t_alpha = NULL;
-	int i, j, l, pw, ph, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
-	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
-	int step;
-
-	if ((px1 > px2) || (py1 > py2)) return;
-
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	zoom = scale = 1;
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
-
-	/* Check bounds */
-	i = (marq_x1 * scale + zoom - 1) / zoom;
-	j = (marq_y1 * scale + zoom - 1) / zoom;
-	if (px1 < i) px1 = i;
-	if (py1 < j) py1 = j;
-	i = (marq_x2 * scale) / zoom + scale - 1;
-	j = (marq_y2 * scale) / zoom + scale - 1;
-	if (px2 > i) px2 = i;
-	if (py2 > j) py2 = j;
-
-	pw = px2 - px1 + 1; ph = py2 - py1 + 1;
-	if ((pw <= 0) || (ph <= 0)) return;
-
-	if (ctx) /* Render directly into context */
-	{
-		rgb = ctx->rgb;
-		step = (ctx->x1 - ctx->x0) * 3;
-		/* Guaranteed to be in bounds */
-		i = px1 + margin_main_x;
-		j = py1 + margin_main_y;
-		if (i > ctx->x0) rgb += (i - ctx->x0) * 3;
-		if (j > ctx->y0) rgb += (j - ctx->y0) * step;
-		for (j = 0 , tmp = rgb; j < ph; j++ , tmp += step)
-			memset(tmp, mem_background, pw * 3);
-	}
-	else /* Allocate a buffer */
-	{
-		rgb = wrk = malloc(i = pw * ph * 3);
-		if (!wrk) return;
-		step = pw * 3;
-		memset(rgb, mem_background, i);
-	}
-
-	/* Horizontal zoom */
-	if (scale == 1)
-	{
-		dx = px1 * zoom;
-		l = (pw - 1) * zoom + 1;
-		pww = pw;
-	}
-	else
-	{
-		dx = px1 / scale;
-		pww = l = px2 / scale - dx + 1;
-	}
-
-	i = l * (bpp + 2);
-	pix = malloc(i);
-	if (!pix)
-	{
-		free(wrk);
-		return;
-	}
-	alpha = pix + l * bpp;
-	mask = alpha + l;
-
-	memset(tlist, 0, sizeof(chanlist));
-	tlist[mem_channel] = pix;
-	clip_image = mem_clipboard;
-	clip_alpha = NULL;
-	if ((mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA])
-	{
-		clip_alpha = mem_clip_alpha;
-		if (mem_img[CHN_ALPHA] && !clip_alpha && RGBA_mode)
-		{
-			t_alpha = malloc(l);
-			if (!t_alpha)
-			{
-				free(pix);
-				free(wrk);
-				return;
-			}
-			memset(t_alpha, channel_col_A[CHN_ALPHA], l);
-		}
-	}
-	if (mem_channel == CHN_ALPHA)
-	{
-		clip_image = NULL;
-		clip_alpha = mem_clipboard;
-	}
-	if (!mem_img[CHN_ALPHA]) alpha = NULL;
-	if (clip_alpha || t_alpha) tlist[CHN_ALPHA] = alpha;
-
-	/* Setup opacity mode & mask */
-	opac = tool_opacity;
-	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1)) opac = 0;
-	mask0 = NULL;
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK])
-		mask0 = mem_img[CHN_MASK];
-
-	if (layers_total && show_layers_main)
-	{
-		if (layer_selected)
-		{
-			lx = layer_table[layer_selected].x;
-			ly = layer_table[layer_selected].y;
-			if (zoom > 1)
-			{
-				i = lx / zoom;
-				lx = i * zoom > lx ? i - 1 : i;
-				j = ly / zoom;
-				ly = j * zoom > ly ? j - 1 : j;
-			}
-			else
-			{
-				lx *= scale;
-				ly *= scale;
-			}
-			xpm = layer_table[layer_selected].use_trans ?
-				layer_table[layer_selected].trans : -1;
-			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
-		}
-		render_layers(rgb, step, lx + px1, ly + py1, pw, ph,
-			can_zoom, 0, layer_selected - 1, 1);
-	}
-	else
-	{
-		async_bk = !chequers_optimize; /* Only w/o layers */
-		render_background(rgb, px1, py1, pw, ph, step);
-	}
-
-	setup_row(px1, pw, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
-	j0 = -1; tmp = rgb;
-	for (jj = 0; jj < ph; jj++ , tmp += step)
-	{
-		j = ((py1 + jj) * zoom) / scale;
-		if (j != j0)
-		{
-			j0 = j;
-			di = mem_width * j + dx;
-			dc = mem_clip_w * (j - marq_y1) + dx - marq_x1;
-			if (tlist[CHN_ALPHA])
-				memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
-			prep_mask(0, zoom, pww, mask, mask0 ? mask0 + di : NULL,
-				mem_img[CHN_IMAGE] + di * mem_img_bpp);
-			process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] + di,
-				clip_alpha ? clip_alpha + dc : t_alpha,
-				mem_clip_mask ? mem_clip_mask + dc : NULL, opac, 0);
-			if (clip_image)
-			{
-				if (mem_img[mem_channel])
-					memcpy(pix, mem_img[mem_channel] +
-						di * bpp, l * bpp);
-				else memset(pix, 0, l * bpp);
-				process_img(0, zoom, pww, mask, pix,
-					mem_img[mem_channel] + di * bpp,
-					mem_clipboard + dc * mem_clip_bpp,
-					opac, mem_clip_bpp);
-			}
-		}
-		else if (!async_bk)
-		{
-			memcpy(tmp, tmp - step, pw * 3);
-			continue;
-		}
-		render_row(tmp, mem_img, dx, j, tlist);
-		overlay_row(tmp, mem_img, dx, j, tlist);
-	}
-
-	if (layers_total && show_layers_main)
-		render_layers(rgb, step, lx + px1, ly + py1, pw, ph,
-			can_zoom, layer_selected + 1, layers_total, 1);
-
-	/* Image already in place if using context */
-	if (!ctx) gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		margin_main_x + px1, margin_main_y + py1, pw, ph,
-		GDK_RGB_DITHER_NONE, rgb, step);
-
-	free(pix);
-	free(wrk);
-	free(t_alpha);
-	async_bk = FALSE;
-}
-
 typedef struct {
 	unsigned char *wmask, *gmask, *walpha, *galpha, *talpha;
 	unsigned char *wimg, *gimg, *rgb;
@@ -2510,125 +2320,314 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 			mem_img[CHN_ALPHA] + l, grstate->walpha, grad_opacity);
 }
 
-void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
+typedef struct {
+	chanlist tlist;		// Channel overrides
+	unsigned char *mask0;	// Active mask channel
+	int mw, mh;		// Screen-space image size - useless for now!
+	int px2, py2;		// Clipped area position
+	int pw2, ph2;		// Clipped area size
+	int dx;			// Image-space X offset
+	int lx;			// Allocated row length
+	int pww;		// Logical row length
+	int zoom;		// Decimation factor
+	int scale;		// Replication factor
+	int lop;		// Base opacity
+	int xpm;		// Transparent color
+} main_render_state;
+
+typedef struct {
+	unsigned char *pvi;	// Temp image row
+	unsigned char *pvm;	// Temp mask row
+} xform_render_state;
+
+typedef struct {
+	chanlist tlist;		// Channel overrides for rendering clipboard
+	unsigned char *clip_image;	// Pasted into current channel
+	unsigned char *clip_alpha;	// Pasted into alpha channel
+	unsigned char *t_alpha;		// Fake pasted alpha
+	unsigned char *pix, *alpha;	// Destinations for the above
+	unsigned char *mask, *wmask;	// Temp mask: one we use, other we init
+	unsigned char *mask0;		// Image mask channel to use
+	int opacity, bpp;	// Just that
+	int pixf;		// Flag: need current channel override filled
+	int dx;			// Memory-space X offset
+	int lx;			// Allocated row length
+	int pww;		// Logical row length
+} paste_render_state;
+
+/* !!! This function copies existing override set to build its own modified
+ * !!! one, so override set must not be changed after calling it */
+static unsigned char *init_paste_render(paste_render_state *p,
+	main_render_state *r, unsigned char *xmask)
 {
-	chanlist tlist;
-	unsigned char *mask0 = NULL, *pvi = NULL, *pvm = NULL, *pvx = NULL;
-	int alpha_blend = !overlay_alpha;
-	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
-	int j, jj, j0, l, lx, dx, pww, zoom = 1, scale = 1, nix = 0, niy = 0;
-	int lop = 255, xpm = mem_xpm_trans;
+	unsigned char *temp, *tmp;
+	int i, x, y, w, h, ddx, bpp, scale = r->scale, zoom = r->zoom;
+	int ti = 0, tm = 0, ta = 0, fa = 0;
+
+	/* Clip paste area to update area */
+	x = (marq_x1 * scale + zoom - 1) / zoom;
+	y = (marq_y1 * scale + zoom - 1) / zoom;
+	if (x < r->px2) x = r->px2;
+	if (y < r->py2) y = r->py2;
+	w = (marq_x2 * scale) / zoom + scale - x;
+	h = (marq_y2 * scale) / zoom + scale - y;
+	if (w > r->pw2) w = r->pw2;
+	if (h > r->ph2) h = r->ph2;
+	if ((w <= 0) || (h <= 0)) return (NULL);
+
+	memset(p, 0, sizeof(paste_render_state));
+	memcpy(p->tlist, r->tlist, sizeof(chanlist));
+
+// !!! Store area dimensions somewhere for other functions' use
+//	xywh[0] = x;
+//	xywh[1] = y;
+//	xywh[2] = w;
+//	xywh[3] = h;
+
+	/* Setup row position and size */
+	p->dx = (x * zoom) / scale;
+	if (zoom > 1) p->lx = (w - 1) * zoom + 1 , p->pww = w;
+	else p->lx = p->pww = (x + w - 1) / scale - p->dx + 1;
+
+	/* Decide what goes where */
+	if ((mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA])
+	{
+		p->clip_alpha = mem_clip_alpha;
+		if (mem_img[CHN_ALPHA])
+		{
+			if (!mem_clip_alpha && RGBA_mode)
+				fa = 1; /* Need fake alpha */
+			if (mem_clip_alpha || fa)
+				ta = 1; /* Need temp alpha */
+		}
+	}
+	if (mem_channel == CHN_ALPHA)
+	{
+		p->clip_alpha = mem_clipboard;
+		ta = 1; /* Need temp alpha */
+	}
+	else p->clip_image = mem_clipboard;
+	ddx = p->dx - r->dx;
+
+	/* Allocate temp area */
+	bpp = p->bpp = MEM_BPP;
+	tm = !xmask; /* Need temp mask if not have one ready */
+	ti = p->clip_image && !p->tlist[mem_channel]; /* Same for temp image */
+	i = r->lx * (ti * bpp + ta) + p->lx * (tm + fa);
+	temp = tmp = malloc(i);
+	if (!temp) return (NULL);
+
+	/* Setup "image" (current) channel override */
+	if (p->clip_image)
+	{
+		if (ti) p->tlist[mem_channel] = tmp , tmp += r->lx * bpp;
+		p->pix = p->tlist[mem_channel] + ddx * bpp;
+		/* Need it prefilled if no override data incoming */
+		p->pixf = ti;
+	}
+
+	/* Setup alpha channel override */
+	if (ta)
+	{
+		p->tlist[CHN_ALPHA] = tmp;
+		p->alpha = tmp + ddx;
+		tmp += r->lx;
+	}
+
+	/* Setup mask */
+	if (mem_channel <= CHN_ALPHA) p->mask0 = r->mask0;
+	if (tm) p->mask = p->wmask = tmp , tmp += p->lx;
+	else
+	{
+		p->mask = xmask + ddx;
+		if (r->mask0 != p->mask0)
+		/* Mask has wrong data - reuse memory but refill values */
+			p->wmask = xmask + ddx;
+	}
+
+	/* Setup fake alpha */
+	if (fa)
+	{
+		p->t_alpha = tmp;
+		memset(tmp, channel_col_A[CHN_ALPHA], p->lx);
+	}
+
+	/* Setup opacity mode */
+	if ((mem_channel <= CHN_ALPHA) && (mem_img_bpp == 3))
+		p->opacity = tool_opacity;
+
+	return (temp);
+}
+
+static void paste_render(int start, int step, int y, paste_render_state *p)
+{
+	int ld = mem_width * y + p->dx;
+	int dc = mem_clip_w * (y - marq_y1) + p->dx - marq_x1;
+	int bpp = p->bpp;
+	int cnt = p->pww;
+
+	if (p->wmask) prep_mask(start, step, cnt, p->wmask, p->mask0 ?
+		p->mask0 + ld : NULL, mem_img[CHN_IMAGE] + ld * mem_img_bpp);
+	process_mask(start, step, cnt, p->mask, p->alpha, mem_img[CHN_ALPHA] + ld,
+		p->clip_alpha ? p->clip_alpha + dc : p->t_alpha,
+		mem_clip_mask ? mem_clip_mask + dc : NULL, p->opacity, 0);
+	if (!p->clip_image) return;
+	if (!p->pixf) /* Fill just the underlying part */
+		memcpy(p->pix, mem_img[mem_channel] + ld * bpp, p->lx * bpp);
+	process_img(start, step, cnt, p->mask, p->pix, mem_img[mem_channel] + ld * bpp,
+		mem_clipboard + dc * mem_clip_bpp, p->opacity, mem_clip_bpp);
+}
+
+static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
+{
+	main_render_state r;
+	unsigned char **tlist = r.tlist;
+	int j, jj, j0, l, pw23, nix = 0, niy = 0, alpha_blend = !overlay_alpha;
+	unsigned char *xtemp = NULL;
+	xform_render_state xrstate;
+	unsigned char *cstemp = NULL;
 	unsigned char *gtemp = NULL;
 	grad_render_state grstate;
+	unsigned char *ptemp = NULL;
+	paste_render_state prstate;
 
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
 
-	pw2 = pw + px2;
-	ph2 = ph + py2;
+	memset(&r, 0, sizeof(r));
 
-	if (px2 < 0) nix = -px2;
-	if (py2 < 0) niy = -py2;
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	r.zoom = r.scale = 1;
+	if (can_zoom < 1.0) r.zoom = rint(1.0 / can_zoom);
+	else r.scale = rint(can_zoom);
+
+	/* Align buffer with image */
+	r.px2 = px - margin_main_x;
+	r.py2 = py - margin_main_y;
+	if (r.px2 < 0) nix = -r.px2;
+	if (r.py2 < 0) niy = -r.py2;
 	rgb += (pw * niy + nix) * 3;
 
-	// Update image + blank space outside
-	j = (mem_width * scale + zoom - 1) / zoom;
-	jj = (mem_height * scale + zoom - 1) / zoom;
-	if (pw2 > j) pw2 = j;
-	if (ph2 > jj) ph2 = jj;
-	px2 += nix; py2 += niy;
-	pw2 -= px2; ph2 -= py2;
+	/* Clip update area to image bounds */
+	r.mw = (mem_width * r.scale + r.zoom - 1) / r.zoom;
+	r.mh = (mem_height * r.scale + r.zoom - 1) / r.zoom;
+	r.pw2 = pw + r.px2;
+	r.ph2 = ph + r.py2;
+	if (r.pw2 > r.mw) r.pw2 = r.mw;
+	if (r.ph2 > r.mh) r.ph2 = r.mh;
+	r.px2 += nix; r.py2 += niy;
+	r.pw2 -= r.px2; r.ph2 -= r.py2;
+	if ((r.pw2 < 1) || (r.ph2 < 1)) return (FALSE);
 
-	if ((pw2 < 1) || (ph2 < 1)) return;
+	if (!channel_dis[CHN_MASK]) r.mask0 = mem_img[CHN_MASK];
+	if (!mem_img[CHN_ALPHA] || channel_dis[CHN_ALPHA]) alpha_blend = FALSE;
 
-	if ((!mem_img[CHN_ALPHA] || channel_dis[CHN_ALPHA]) && (xpm < 0))
-		alpha_blend = FALSE;
+	r.xpm = mem_xpm_trans; r.lop = 255;
 	if (layers_total && show_layers_main)
 	{
 		if (layer_selected)
 		{
-			xpm = layer_table[layer_selected].use_trans ?
+			r.xpm = layer_table[layer_selected].use_trans ?
 				layer_table[layer_selected].trans : -1;
-			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
+			r.lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
 		}
 	}
-	else if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw * 3);
+	else if (alpha_blend || (mem_xpm_trans >= 0))
+		render_background(rgb, r.px2, r.py2, r.pw2, r.ph2, pw * 3);
 
-	dx = (px2 * zoom) / scale;
-	memset(tlist, 0, sizeof(chanlist));
-	if (!channel_dis[CHN_MASK]) mask0 = mem_img[CHN_MASK];
-	pww = pw2;
-	if (scale > 1) lx = pww = (px2 + pw2 - 1) / scale - dx + 1;
-	else lx = (pw2 - 1) * zoom + 1;
+	/* Setup row position and size */
+	r.dx = (r.px2 * r.zoom) / r.scale;
+	if (r.zoom > 1) r.lx = (r.pw2 - 1) * r.zoom + 1 , r.pww = r.pw2;
+	else r.lx = r.pww = (r.px2 + r.pw2 - 1) / r.scale - r.dx + 1;
 
 	/* Color transform preview */
 	if (mem_preview && (mem_img_bpp == 3))
 	{
-		pvm = malloc(lx * 4);
-		if (pvm)
-		{
-			pvi = pvm + lx;
-			tlist[CHN_IMAGE] = pvi;
-		}
+		xtemp = xrstate.pvm = malloc(r.lx * 4);
+		if (xtemp) r.tlist[CHN_IMAGE] = xrstate.pvi = xtemp + r.lx;
 	}
+
 	/* Color selective mode preview */
-	else if (csel_overlay) pvx = malloc(lx);
+	else if (csel_overlay) cstemp = malloc(r.lx);
+
 	/* Gradient preview */
 	else if ((tool_type == TOOL_GRADIENT) && grad_opacity)
-		gtemp = init_grad_render(&grstate, lx, tlist);
-
-	setup_row(px2, pw2, can_zoom, mem_width, xpm, lop,
-		gtemp && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
- 	j0 = -1; pw *= 3; pw2 *= 3;
-	for (jj = 0; jj < ph2; jj++ , rgb += pw)
 	{
-		j = ((py2 + jj) * zoom) / scale;
+		if (mem_channel >= CHN_ALPHA) r.mask0 = NULL;
+		gtemp = init_grad_render(&grstate, r.lx, r.tlist);
+	}
+
+	/* Paste preview - can coexist with transform */
+	if (show_paste && (marq_status >= MARQUEE_PASTE))
+		ptemp = init_paste_render(&prstate, &r, xtemp ? xrstate.pvm : NULL);
+
+	/* Start rendering */
+	setup_row(r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
+		gtemp && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
+ 	j0 = -1; pw *= 3; pw23 = r.pw2 * 3;
+	for (jj = 0; jj < r.ph2; jj++ , rgb += pw)
+	{
+		j = ((r.py2 + jj) * r.zoom) / r.scale;
 		if (j != j0)
 		{
 			j0 = j;
-			l = mem_width * j + dx;
+			l = mem_width * j + r.dx;
+			tlist = r.tlist; /* Default override */
 
 			/* Color transform preview */
-			if (pvm)
+			if (xtemp)
 			{
-				prep_mask(0, zoom, pww, pvm, mask0 ? mask0 + l : NULL,
+				prep_mask(0, r.zoom, r.pww, xrstate.pvm,
+					r.mask0 ? r.mask0 + l : NULL,
 					mem_img[CHN_IMAGE] + l * 3);
-				do_transform(0, zoom, pww, pvm, pvi,
-					mem_img[CHN_IMAGE] + l * 3);
+				do_transform(0, r.zoom, r.pww, xrstate.pvm,
+					xrstate.pvi, mem_img[CHN_IMAGE] + l * 3);
 			}
 			/* Color selective mode preview */
-			else if (pvx)
+			else if (cstemp)
 			{
-				memset(pvx, 0, lx);
-				csel_scan(0, zoom, pww, pvx, mem_img[CHN_IMAGE] +
-					l * mem_img_bpp, csel_data);
+				memset(cstemp, 0, r.lx);
+				csel_scan(0, r.zoom, r.pww, cstemp,
+					mem_img[CHN_IMAGE] + l * mem_img_bpp,
+					csel_data);
 			}
 			/* Gradient preview */
-			else if (gtemp) grad_render(0, zoom, pww, dx, j,
-				mask0 ? mask0 + l : NULL, &grstate);
+			else if (gtemp) grad_render(0, r.zoom, r.pww, r.dx, j,
+				r.mask0 ? r.mask0 + l : NULL, &grstate);
+
+			/* Paste preview - should be after transform */
+			if (ptemp && (j >= marq_y1) && (j <= marq_y2))
+			{
+				tlist = prstate.tlist; /* Paste-area override */
+				if (tlist[CHN_ALPHA]) memcpy(tlist[CHN_ALPHA],
+					mem_img[CHN_ALPHA] + l, r.lx);
+				if (prstate.pixf) memcpy(tlist[mem_channel],
+					mem_img[mem_channel] + l * prstate.bpp,
+					r.lx * prstate.bpp);
+				paste_render(0, r.zoom, j, &prstate);
+			}
 		}
 		else if (!async_bk)
 		{
-			memcpy(rgb, rgb - pw, pw2);
+			memcpy(rgb, rgb - pw, pw23);
 			continue;
 		}
-		render_row(rgb, mem_img, dx, j, tlist);
-		if (!pvx) overlay_row(rgb, mem_img, dx, j, tlist);
-		else overlay_preview(rgb, pvx, csel_preview, csel_preview_a);
+		render_row(rgb, mem_img, r.dx, j, tlist);
+		if (!cstemp) overlay_row(rgb, mem_img, r.dx, j, tlist);
+		else overlay_preview(rgb, cstemp, csel_preview, csel_preview_a);
 	}
-	free(pvm);
-	free(pvx);
+	free(xtemp);
+	free(cstemp);
 	free(gtemp);
+	free(ptemp);
+
+	return (!!ptemp); /* "There was paste" */
 }
 
 /* Draw grid on rgb memory */
-void draw_grid(unsigned char *rgb, int x, int y, int w, int h)
+static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 {
 	int i, j, k, dx, dy, step, step3;
 	unsigned char *tmp;
 
-
-	if (!mem_show_grid || (can_zoom < mem_grid_min)) return;
 	step = can_zoom;
 
 	dx = (x - margin_main_x) % step;
@@ -2636,11 +2635,11 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)
 	dy = (y - margin_main_y) % step;
 	if (dy < 0) dy += step;
 	if (dx) dx = (step - dx) * 3;
-	w *= 3;
+	w *= 3; l *= 3;
 
 	for (k = dy , i = 0; i < h; i++)
 	{
-		tmp = rgb + i * w;
+		tmp = rgb + i * l;
 		if (!k) /* Filled line */
 		{
 			j = 0; step3 = 3;
@@ -2693,7 +2692,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	rgbcontext ctx;
 	unsigned char *rgb;
 	int pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
-	int i, j, zoom = 1, scale = 1;
+	int i, j, zoom = 1, scale = 1, paste_f;
 
 	if (px < 0)
 	{
@@ -2744,16 +2743,56 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			can_zoom, 0, layer_selected - 1, 1);
 	}
 	else async_bk = !chequers_optimize; /* Only w/o layers */
-	main_render_rgb(rgb, px, py, pw, ph);
+	paste_f = main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
 		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
 			can_zoom, layer_selected + 1, layers_total, 1);
 
-	draw_grid(rgb, px, py, pw, ph);
+	/* No grid at all */
+	if (!mem_show_grid || (scale < mem_grid_min));
+	/* No paste - single area */
+	else if (!paste_f) draw_grid(rgb, px, py, pw, ph, pw);
+	/* With paste - zero to four areas */
+	else
+	{
+		int y0, y1, x0, x1, h1, w1;
+		unsigned char *r;
+
+		/* Areas _do_ intersect - cut intersection out */
+		/* Top rectangle */
+		y0 = marq_y1 > 0 ? marq_y1 : 0;
+		y0 = margin_main_y + y0 * scale;
+		h1 = y0 - py;
+		if (h1 <= 0) y0 = py;
+		else draw_grid(rgb, px, py, pw, h1, pw);
+
+		/* Bottom rectangle */
+		y1 = marq_y2 < mem_height ? marq_y2 + 1 : mem_height;
+		y1 = margin_main_y + y1 * scale;
+		h1 = py + ph - y1;
+		if (h1 <= 0) y1 = py + ph;
+		else draw_grid(rgb + (y1 - py) * pw * 3, px, y1, pw, h1, pw);
+
+		/* Middle rectangles */
+		h1 = y1 - y0;
+		r = rgb + (y0 - py) * pw * 3;
+
+		/* Left rectangle */
+		x0 = marq_x1 > 0 ? marq_x1 : 0;
+		x0 = margin_main_x + x0 * scale;
+		w1 = x0 - px;
+		if (w1 > 0) draw_grid(r, px, y0, w1, h1, pw);
+		
+		/* Right rectangle */
+		x1 = marq_x2 < mem_width ? marq_x2 + 1 : mem_width;
+		x1 = margin_main_x + x1 * scale;
+		w1 = px + pw - x1;
+		if (w1 > 0) draw_grid(r + (x1 - px) * 3, x1, y0, w1, h1, pw);
+	}
 
 	async_bk = FALSE;
 
-	/* Redraw gradient line if needed (and put it underneath cliboard) */
+	/* Redraw gradient line if needed */
 	while (gradient[mem_channel].status == GRAD_DONE)
 	{
 		grad_info *grad = gradient + mem_channel;
@@ -2790,29 +2829,9 @@ void repaint_canvas( int px, int py, int pw, int ph )
 				((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
 				break;
 		}
+// !!! Wrong order - overlays clipboard !!!
 		refresh_grad(&ctx);
 		break;
-	}
-
-	/* Add clipboard image to redraw if needed */
-	if (show_paste && (marq_status >= MARQUEE_PASTE))
-	{
-		/* Enforce image bounds */
-		if (rpx < 0) rpx = 0;
-		if (rpy < 0) rpy = 0;
-		i = ((mem_width + zoom - 1) * scale) / zoom;
-		j = ((mem_height + zoom - 1) * scale) / zoom;
-		if (pw2 >= i) pw2 = i - 1;
-		if (ph2 >= j) ph2 = j - 1;
-
-		/* Check paste bounds for intersection, but leave actually
-		 * enforcing them to repaint_paste() */
-		rx1 = (marq_x1 * scale + zoom - 1) / zoom;
-		ry1 = (marq_y1 * scale + zoom - 1) / zoom;
-		rx2 = (marq_x2 * scale) / zoom + scale - 1;
-		ry2 = (marq_y2 * scale) / zoom + scale - 1;
-		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
-			repaint_paste(rpx, rpy, pw2, ph2, &ctx);
 	}
 
 	/* Draw perimeter & marquee as we may have drawn over them */
@@ -3546,8 +3565,9 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 			alloc->width - border2 : 0;
 		child_alloc.height = alloc->height > border2 ?
 			alloc->height - border2 : 0;
-		if (r_menu_state > 0 ? child_alloc.width != child_req.width :
-			child_alloc.width < child_req.width)
+		if ((child_alloc.width != child->allocation.width) &&
+			(r_menu_state > 0 ? child_alloc.width != child_req.width :
+			child_alloc.width < child_req.width))
 			smart_menu_state_to_width(widget, child_req.width,
 				child_alloc.width);
 		if (in_alloc < 2) break;
