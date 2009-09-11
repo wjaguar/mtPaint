@@ -4,11 +4,13 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.31	2009-3-?
+3.31	2009-4-?
 
 	* Japanese translation updated by Norihiro YONEDA
 	* Swedish translation updated by Daniel Nylander
+	* French translation updated by Plume
 	* Builtin file selector uses stock file and directory icons on GTK+2
+	* Default settings are loaded from file /etc/mtpaint/mtpaintrc if it exists
 	* BUGFIX - Compilation with GTK+ colour selector now works
 	* BUGFIX - Escape key now works properly in builtin file selector in GTK+1
 	* BUGFIX - Filename length in builtin file selector no longer is limited to 100 characters

@@ -729,12 +729,6 @@ gchar *get_home_directory(void)
 
 /* Compatibility functions */
 
-#ifdef WIN32
-#define SYS_ININAME NULL
-#else
-#define SYS_ININAME "/usr/share/mtpaint/defaults"
-#endif
-
 static inifile main_ini;
 static char *main_ininame;
 
@@ -745,12 +739,14 @@ void inifile_init(char *ini_filename)
 	main_ininame = g_strdup_printf("%s%s", get_home_directory(), ini_filename);
 	while (new_ini(&main_ini))
 	{
+#ifndef WIN32
 		if (mask & 1)
 		{
-			res = read_ini(&main_ini, SYS_ININAME, INI_SYSTEM);
+			res = read_ini(&main_ini, "/etc/mtpaint/mtpaintrc", INI_SYSTEM);
 			if (res <= 0) mask ^= 1; // Don't try again if failed
 			if (res < 0) continue; // Restart if struct got deleted
 		}
+#endif
 		if (mask & 2)
 		{
 			res = read_ini(&main_ini, main_ininame, INI_USER);
