@@ -1057,8 +1057,6 @@ void update_menus()			// Update edit/undo menu
 	else  men_item_state( menu_redo, TRUE );
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
-	if ( mem_channel == CHN_IMAGE ) men_item_state( menu_chan_ls, FALSE );
-	else men_item_state( menu_chan_ls, TRUE );
 
 	for (i = j = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
 	{
@@ -1205,75 +1203,69 @@ void set_new_filename( char *fname )
 	update_titlebar();
 }
 
-static int populate_channel( char *filename, int c )
+static int populate_channel(char *filename)
 {
-	int res;
-	unsigned char *temp;
+	int ftype, res = -1;
 
-	if ( valid_file(filename) == 0 )
-	{
-		temp = malloc( mem_width * mem_height );
-		if (temp)
-		{
-			res = load_channel( filename, temp, mem_width, mem_height);
-			if ( res != 0 )
-			{
-				free(temp);	// Problem with file I/O
-				alert_box( _("Error"), _("Invalid channel file."), _("OK"), NULL, NULL );
-				return -1;
-			}
-			else
-			{
-				spot_undo( UNDO_FILT );
-				mem_img[c] = mem_undo_im_[mem_undo_pointer].img[c] = temp;
-				canvas_undo_chores();
-			}
-		}
-		else memory_errors(1);		// Not enough memory available
-	}
+	ftype = detect_image_format(filename);
+	if (ftype < 0) return (-1); /* Silently fail if no file */
 
-	return 0;
+	/* !!! No other formats for now */
+	if (ftype == FT_PNG) res = load_png(filename, FS_CHANNEL_LOAD);
+
+	/* Successful */
+	if (res == 1) canvas_undo_chores();
+
+	/* Not enough memory available */
+	else if (res == FILE_MEM_ERROR) memory_errors(1);
+
+	/* Unspecified error */
+	else alert_box(_("Error"), _("Invalid channel file."), _("OK"), NULL, NULL);
+
+	return (res == 1 ? 0 : -1);
 }
-
 
 int do_a_load( char *fname )
 {
-	gboolean loading_single = FALSE;
-	int res, i, gif_delay;
 	char mess[512], real_fname[300];
+	int res, i, gif_delay, ftype;
 
-#if DIR_SEP == '/'
-	if ( fname[0] != DIR_SEP )		// GNU/Linux
+
+	if ((fname[0] != DIR_SEP)
+#ifdef WIN32
+		&& (fname[1] != ':')
 #endif
-#if DIR_SEP == '\\'
-	if ( fname[1] != ':' )			// Windows
-#endif
+	)
 	{
-		getcwd( real_fname, 256 );
+		getcwd(real_fname, 256);
 		i = strlen(real_fname);
 		real_fname[i] = DIR_SEP;
-		real_fname[i+1] = 0;
-		strncat( real_fname, fname, 256 );
+		real_fname[i + 1] = 0;
+		strncat(real_fname, fname, 256);
 	}
-	else strncpy( real_fname, fname, 256 );
+	else strncpy(real_fname, fname, 256);
 
-gtk_widget_hide( drawing_canvas );
+	ftype = detect_image_format(real_fname);
+	if ((ftype < 0) || (ftype == FT_NONE))
+	{
+		alert_box(_("Error"), ftype < 0 ? _("Cannot open file") :
+			_("Unsupported file format"), _("OK"), NULL, NULL);
+		return (1);
+	}
 
-	if ( (res = load_gif( real_fname, &gif_delay )) == -1 )
-	if ( (res = load_tiff( real_fname )) == -1 )
-	if ( (res = load_bmp( real_fname )) == -1 )
-	if ( (res = load_jpeg( real_fname )) == -1 )
-	if ( (res = load_xpm( real_fname )) == -1 )
-	if ( (res = load_xbm( real_fname )) == -1 )
-		res = load_png( real_fname, 0 );
+	set_image(FALSE);
 
-	if ( res>0 ) loading_single = TRUE;
-	else
-	{		// Not a single image file, but is it an mtPaint layers file?
-		if ( layers_check_header(real_fname) )
-		{
-			res = load_layers(real_fname);
-		}
+	switch (ftype)
+	{
+	case FT_PNG: res = load_png(real_fname, FS_PNG_LOAD); break;
+	case FT_JPEG: res = load_jpeg( real_fname ); break;
+	case FT_TIFF: res = load_tiff( real_fname ); break;
+	case FT_GIF: res = load_gif( real_fname, &gif_delay ); break;
+	case FT_BMP: res = load_bmp( real_fname ); break;
+	case FT_XPM: res = load_xpm( real_fname ); break;
+	case FT_XBM: res = load_xbm( real_fname ); break;
+	case FT_LAYERS1: res = load_layers(real_fname); break;
+	default: res = -1; break;
 	}
 
 	if ( res<=0 )				// Error loading file
@@ -1300,17 +1292,16 @@ gtk_widget_hide( drawing_canvas );
 
 	if ( res == FILE_MEM_ERROR ) memory_errors(1);		// Image was too large for OS
 
-	if ( loading_single )
+/* !!! Not here - move to success-only path! */
+	if (ftype != FT_LAYERS1)
 	{
-		reset_tools();
 		register_file(real_fname);
 		set_new_filename(real_fname);
-		if ( marq_status > MARQUEE_NONE ) marq_status = MARQUEE_NONE;
-			// Stops unwanted automatic paste following a file load when enabling
-			// "Changing tool commits paste" via preferences
 
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
-			// Set tool to square for new image - easy way to lose a selection marquee
+		/* To prevent automatic paste following a file load when enabling
+		 * "Changing tool commits paste" via preferences */
+		pressed_select_none(NULL, NULL);
+		reset_tools();
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
@@ -1321,6 +1312,7 @@ gtk_widget_hide( drawing_canvas );
 //		if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 		if ( !view_showing ) view_show();
 			// We have just loaded a layers file so display view & layers window if not up
+		update_menus();
 	}
 
 	if ( res>0 )
@@ -1360,13 +1352,10 @@ gtk_widget_hide( drawing_canvas );
 		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
 			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
 				// These 2 are needed to synchronize the scrollbars & image view
+		res = 1;
 	}
-	gtk_widget_show( drawing_canvas );
-	return 0;
-
-fail:
-	gtk_widget_show( drawing_canvas );
-	return 1;
+fail:	set_image(TRUE);
+	return (res != 1);
 }
 
 
@@ -1825,7 +1814,7 @@ static gint fs_ok(GtkWidget *fs)
 
 		break;
 	case FS_CHANNEL_LOAD:
-		if (populate_channel(fname, mem_channel)) goto redo;
+		if (populate_channel(fname)) goto redo;
 		break;
 	case FS_CHANNEL_SAVE:
 		if (check_file(fname)) goto redo;

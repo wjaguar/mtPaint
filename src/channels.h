@@ -28,8 +28,9 @@ unsigned char channel_opacity[NUM_CHANNELS];
 unsigned char channel_inv[NUM_CHANNELS];
 
 unsigned char channel_fill[NUM_CHANNELS];
-unsigned char channel_col_A[NUM_CHANNELS];
-unsigned char channel_col_B[NUM_CHANNELS];
+unsigned char channel_col_[2][NUM_CHANNELS];
+#define channel_col_A channel_col_[0]
+#define channel_col_B channel_col_[1]
 
 int channel_dis[NUM_CHANNELS];
 

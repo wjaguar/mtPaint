@@ -96,6 +96,7 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 
 /// PATTERNS
 
+unsigned char *mem_pattern;		// Original 0-1 pattern
 unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
 unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 
@@ -124,8 +125,8 @@ int mem_jpeg_quality = 85;		// JPEG quality setting
 
 png_color mem_pal[256];			// RGB entries for all 256 palette colours
 int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
-int mem_col_A = 1, mem_col_B = 0;	// Index for colour A & B
-png_color mem_col_A24, mem_col_B24;	// RGB for colour A & B
+int mem_col_[2] = { 1, 0 };		// Index for colour A & B
+png_color mem_col_24[2];		// RGB for colour A & B
 char *mem_pals = NULL;			// RGB screen memory holding current palette
 static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
 char mem_prot_mask[256];		// 256 bytes used for indexed images
@@ -396,6 +397,7 @@ void mem_clear()
 	for (i = 0; i < MAX_UNDO; i++)		// Release old UNDO images
 		undo_free(i);
 	memset(mem_img, 0, sizeof(chanlist));	// Already freed along with UNDO
+	mem_undo_pointer = mem_undo_done = mem_undo_redo = 0;
 }
 
 /* Allocate space for new image, removing old if needed */
@@ -435,10 +437,6 @@ int mem_new( int width, int height, int bpp, int cmask )
 	mem_height = height;
 	mem_img_bpp = bpp;
 	mem_channel = CHN_IMAGE;
-
-	mem_undo_pointer = 0;
-	mem_undo_done = 0;
-	mem_undo_redo = 0;
 
 	memcpy(undo->img, mem_img, sizeof(chanlist));
 	undo->cols = mem_cols;
@@ -518,9 +516,12 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	/* Mem limit exceeded - drop oldest */
 	while (mem_used() + mem_req > mem_lim)
 	{
-		/* Fail if not enough memory */
-		if (!mem_undo_done) return (1);
-		lose_oldest();
+		if (!mem_undo_done)
+		{
+			/* Fail if not enough memory */
+			if (!(mode & 4)) return (1);
+		}
+		else lose_oldest();
 	}
 
 	/* Fill undo frame */
@@ -1409,13 +1410,6 @@ void set_zoom_centre( int x, int y )
 		mem_icy = ((float) y ) / mem_height;
 		mem_ics = 1;
 	}
-}
-
-void mem_pal_copy( png_color *pal1, png_color *pal2 )	// Palette 1 = Palette 2
-{
-	int i;
-
-	for ( i=0; i<256; i++) pal1[i] = pal2[i];
 }
 
 int mem_pal_cmp( png_color *pal1, png_color *pal2 )	// Count itentical palette entries
@@ -4062,8 +4056,8 @@ void put_pixel( int x, int y )	/* Combined */
 	j = pixel_protected(x, y);
 	if (mem_img_bpp == 1 ? j : j == 255) return;
 
-	tint = tint_mode[0] ? 1 : 0;
-	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+	tint = tint_mode[0];
+	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
 	else old_image = mem_img[mem_channel];
@@ -4087,8 +4081,7 @@ void put_pixel( int x, int y )	/* Combined */
 	/* Alpha channel */
 	if (old_alpha && mem_img[CHN_ALPHA])
 	{
-		newc = mem_col_pat[i] == mem_col_A ? channel_col_A[CHN_ALPHA] :
-			channel_col_B[CHN_ALPHA];
+		newc = channel_col_[mem_pattern[i] ^ 1][CHN_ALPHA];
 		oldc = old_alpha[offset];
 		if (tint)
 		{
@@ -4112,8 +4105,7 @@ void put_pixel( int x, int y )	/* Combined */
 	{
 		newc = mem_col_pat[i];
 		if (mem_channel != CHN_IMAGE)
-			newc = newc == mem_col_A ? channel_col_A[mem_channel] :
-				channel_col_B[mem_channel];
+			newc = channel_col_[mem_pattern[i] ^ 1][mem_channel];
 		if (tint)
 		{
 			if (tint < 0)
@@ -4185,8 +4177,8 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 
 	cnt = start + step * cnt;
 
-	tint = tint_mode[0] ? 1 : 0;
-	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+	tint = tint_mode[0];
+	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	/* Opacity mode */
 	if (opacity)
@@ -4256,8 +4248,8 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 
 	cnt = start + step * cnt;
 
-	tint = tint_mode[0] ? 1 : 0;
-	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+	tint = tint_mode[0];
+	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	/* Indexed image or utility channel */
 	if (!opacity)
@@ -5024,11 +5016,33 @@ int mem_clip_mask_init(unsigned char val)		// Initialise the clipboard mask
 	return 0;
 }
 
+void mem_mask_colors(unsigned char *mask, unsigned char *img, unsigned char v,
+	int width, int height, int bpp, int col0, int col1)
+{
+	int i, j = width * height, k;
+
+	if (bpp == 1)
+	{
+		for (i = 0; i < j; i++)
+		{
+			if ((img[i] == col0) || (img[i] == col1)) mask[i] = v;
+		}
+	}
+	else
+	{
+		for (i = 0; i < j; i++ , img += 3)
+		{
+			k = MEM_2_INT(img, 0);
+			if ((k == col0) || (k == col1)) mask[i] = v;
+		}
+	}
+}
+
 void mem_clip_mask_set(unsigned char val)		// (un)Mask colours A and B on the clipboard
 {
-	int i, j = mem_clip_w * mem_clip_h, k, aa, bb;
+	int aa, bb;
 
-	if ( mem_clip_bpp == 1 )
+	if (mem_clip_bpp == 1) /* Indexed/utility */
 	{
 		if (mem_channel == CHN_IMAGE)
 		{
@@ -5040,23 +5054,14 @@ void mem_clip_mask_set(unsigned char val)		// (un)Mask colours A and B on the cl
 			aa = channel_col_A[mem_channel];
 			bb = channel_col_B[mem_channel];
 		}
-		for ( i=0; i<j; i++ )
-		{
-			if ( mem_clipboard[i] == aa || mem_clipboard[i] == bb )
-				mem_clip_mask[i] = val;
-		}
 	}
-	if ( mem_clip_bpp == 3 )
+	else /* RGB */
 	{
 		aa = PNG_2_INT(mem_col_A24);
 		bb = PNG_2_INT(mem_col_B24);
-		for ( i=0; i<j; i++ )
-		{
-			k = MEM_2_INT(mem_clipboard, i * 3);
-			if ((k == aa) || (k == bb))
-				mem_clip_mask[i] = val;
-		}
 	}
+	mem_mask_colors(mem_clip_mask, mem_clipboard, val,
+		mem_clip_w, mem_clip_h, mem_clip_bpp, aa, bb);
 }
 
 void mem_clip_mask_clear()		// Clear/remove the clipboard mask

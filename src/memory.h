@@ -137,6 +137,7 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 /// PATTERNS
 
 char mem_patterns[81][8][8];		// Pattern bitmaps
+unsigned char *mem_pattern;		// Original 0-1 pattern
 unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
 unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 
@@ -169,8 +170,12 @@ char mem_prot_mask[256];		// 256 bytes used for indexed images
 int mem_prot_RGB[256];			// Up to 256 RGB colours protected
 int mem_prot;				// 0..256 : Number of protected colours in mem_prot_RGB
 
-int mem_col_A, mem_col_B;		// Index for colour A & B
-png_color mem_col_A24, mem_col_B24;	// RGB for colour A & B
+int mem_col_[2];			// Index for colour A & B
+#define mem_col_A mem_col_[0]
+#define mem_col_B mem_col_[1]
+png_color mem_col_24[2];		// RGB for colour A & B
+#define mem_col_A24 mem_col_24[0]
+#define mem_col_B24 mem_col_24[1]
 int mem_background;			// Non paintable area
 int mem_histogram[256];
 
@@ -213,9 +218,8 @@ void mem_gauss(double radiusX, double radiusY, int gcor);
 int mem_load_pal( char *file_name, png_color *pal );	// Load file into palette array >1 => cols read
 void mem_pal_load_def();		// Load default palette
 
+#define mem_pal_copy(A, B) memcpy((A), (B), sizeof(png_color) * 256)
 void mem_pal_init();			// Initialise whole of palette RGB
-void mem_pal_copy( png_color *pal1,	// Palette 1 = Palette 2
-	png_color *pal2 );
 int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 	png_color *pal2 );
 void mem_greyscale();			// Convert image to greyscale
@@ -288,6 +292,8 @@ int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
 //	Extract alpha info from RGB clipboard
 int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	int width, int height, int mode);
+void mem_mask_colors(unsigned char *mask, unsigned char *img, unsigned char v,
+	int width, int height, int bpp, int col0, int col1);
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 

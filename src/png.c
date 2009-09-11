@@ -114,324 +114,423 @@ int file_type_by_ext(char *name, guint32 mask)
 	return (FT_NONE);
 }
 
-int load_png( char *file_name, int stype )		// 0=image, 1=clipboard
+/* Receives struct with image parameters, and channel flags;
+ * returns 0 for success, or an error code;
+ * success doesn't mean that anything was allocated, loader must check that;
+ * loader may call this multiple times - say, for each channel */
+static int allocate_image(ls_settings *settings, int cmask)
 {
-	char buf[PNG_BYTES_TO_CHECK], *mess, *chunk_names[] = { "", "alPh", "seLc", "maSk" };
-	unsigned char *rgb, *rgb2, *rgb3, *alpha;
-	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height, num_uk,
-		chunk_type;
-	long dest_len;
-	FILE *fp;
-	png_unknown_chunkp uk_p;		// Pointer to unknown chunk structures
-	png_bytep *row_pointers, trans;
-	png_color_16p trans_rgb;
+	int i, j;
 
+	if ((settings->width > MAX_WIDTH) || (settings->height > MAX_HEIGHT))
+		return (TOO_BIG);
+
+/* !!! Currently allocations are created committed, have to rollback on error */
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!(cmask & CMASK_FOR(i))) continue;
+
+		/* Overwriting is allowed */
+		if (settings->img[i]) continue;
+		/* No utility channels without image */
+		if ((i != CHN_IMAGE) && !settings->img[CHN_IMAGE]) return (-1);
+
+		switch (settings->mode)
+		{
+		case FS_PNG_LOAD: /* Regular image */
+			/* Allocate the entire batch at once */
+			if (i == CHN_IMAGE)
+			{
+				j = mem_new(settings->width, settings->height,
+					settings->bpp, cmask);
+				if (j) return (FILE_MEM_ERROR);
+				memcpy(settings->img, mem_img, sizeof(chanlist));
+			}
+			/* Try to add an utility channel */
+			else
+			{
+				settings->img[i] = malloc(settings->width *
+					settings->height);
+				if (!settings->img[i]) return (FILE_MEM_ERROR);
+				mem_undo_im_[mem_undo_pointer].img[i] =
+					mem_img[i] = settings->img[i];
+			}
+			break;
+		case FS_CLIP_FILE: /* Clipboard */
+			/* Allocate the clipboard image */
+			if (i == CHN_IMAGE)
+			{
+				free(mem_clipboard);
+				free(mem_clip_alpha);
+				mem_clipboard = mem_clip_alpha = NULL;
+				mem_clip_mask_clear();
+				mem_clipboard = malloc(settings->width *
+					settings->height * settings->bpp);
+				if (!mem_clipboard) return (FILE_MEM_ERROR);
+				settings->img[CHN_IMAGE] = mem_clipboard;
+			}
+			/* There's no such thing */
+			else if ((i != CHN_ALPHA) && (i != CHN_SEL)) break;
+			/* Try to add clipboard alpha or mask */
+			else
+			{
+				settings->img[i] = malloc(settings->width *
+					settings->height);
+				if (!settings->img[i]) return (FILE_MEM_ERROR);
+				(i == CHN_ALPHA ? mem_clip_alpha : mem_clip_mask) =
+					settings->img[i];
+			}
+			break;
+		case FS_CHANNEL_LOAD: /* Current channel */
+			/* Allocate temp image */
+			if (i == CHN_IMAGE)
+			{
+				/* Dimensions & depth have to be the same */
+				if ((settings->width != mem_width) ||
+					(settings->height != mem_height) ||
+					(settings->bpp != MEM_BPP)) return (-1);
+				settings->img[CHN_IMAGE] = malloc(settings->width *
+					settings->height * settings->bpp);
+				if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
+			}
+			/* There's nothing else */
+			break;
+		default: /* Something has gone mad */
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+#define PNG_BYTES_TO_CHECK 8
+#define PNG_HANDLE_CHUNK_ALWAYS 3
+
+static char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
+
+static int do_load_png(char *file_name, ls_settings *settings)
+{
 	png_structp png_ptr;
 	png_infop info_ptr;
-	png_uint_32 pwidth, pheight;
+	png_color_16p trans_rgb;
+	png_unknown_chunkp uk_p;
+	png_bytep *row_pointers = NULL, trans;
 	png_colorp png_palette;
+	png_uint_32 pwidth, pheight;
+	char buf[PNG_BYTES_TO_CHECK + 1], *msg = NULL;
+	unsigned char *src, *dest, *dsta;
+	long dest_len;
+	FILE *fp;
+	int i, j, bit_depth, color_type, interlace_type, num_uk, res = -1;
 
 	if ((fp = fopen(file_name, "rb")) == NULL) return -1;
 	i = fread(buf, 1, PNG_BYTES_TO_CHECK, fp);
-	if ( i != PNG_BYTES_TO_CHECK ) goto fail;
-	i = !png_sig_cmp(buf, (png_size_t)0, PNG_BYTES_TO_CHECK);
-	if ( i<=0 ) goto fail;
-	rewind( fp );
+	if (i != PNG_BYTES_TO_CHECK) goto fail;
+	if (png_sig_cmp(buf, 0, PNG_BYTES_TO_CHECK)) goto fail;
 
 	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (png_ptr == NULL) goto fail;
+	if (!png_ptr) goto fail;
 
 	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL)
-	{
-		png_destroy_read_struct(&png_ptr, NULL, NULL);
-		goto fail;
-	}
+	if (!info_ptr) goto fail2;
 
 	if (setjmp(png_jmpbuf(png_ptr)))
 	{
-		png_destroy_read_struct(&png_ptr, NULL, NULL);
-		fclose(fp);
-		return -1;
+		res = FILE_LIB_ERROR;
+		goto fail2;
 	}
 
 	png_init_io(png_ptr, fp);
-	png_set_sig_bytes(png_ptr, 0);
+	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);
 
-	png_set_keep_unknown_chunks(png_ptr, 3, NULL, 0);	// Allow all chunks to be read
+	/* Stupid libpng handles private chunks on all-or-nothing basis */
+	png_set_keep_unknown_chunks(png_ptr, PNG_HANDLE_CHUNK_ALWAYS, NULL, 0);
 
 	png_read_info(png_ptr, info_ptr);
-
 	png_get_IHDR(png_ptr, info_ptr, &pwidth, &pheight, &bit_depth, &color_type,
 		&interlace_type, NULL, NULL);
 
-	width = (int) pwidth;
-	height = (int) pheight;
+	res = TOO_BIG;
+	if ((pwidth > MAX_WIDTH) || (pheight > MAX_HEIGHT)) goto fail2;
 
-	if ( width > MAX_WIDTH || height > MAX_HEIGHT )
+	/* Call allocator for image data */
+	settings->width = (int)pwidth;
+	settings->height = (int)pheight;
+	settings->bpp = 1;
+	if ((color_type != PNG_COLOR_TYPE_PALETTE) || (bit_depth > 8))
+		settings->bpp = 3;
+	i = CMASK_IMAGE;
+	if ((color_type == PNG_COLOR_TYPE_RGB_ALPHA) ||
+		(color_type == PNG_COLOR_TYPE_GRAY_ALPHA)) i = CMASK_RGBA;
+	if ((res = allocate_image(settings, i))) goto fail2;
+	res = -1;
+
+	i = sizeof(png_bytep) * (int)pheight;
+	row_pointers = malloc(i + (int)pwidth * 4);
+	if (!row_pointers) goto fail2;
+	row_pointers[0] = (char *)row_pointers + i;
+
+	if (!settings->silent)
 	{
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		fclose(fp);
-		return TOO_BIG;
-	}
-
-	row_pointers = malloc( sizeof(png_bytep) * height );
-
-	if (setjmp(png_jmpbuf(png_ptr)))	// If libpng generates an error now, clean up
-	{
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		fclose(fp);
-		free(row_pointers);
-		return FILE_LIB_ERROR;
-	}
-
-	rgb = NULL;
-	mess = NULL;
-	alpha = NULL;
-	if ( width*height > FILE_PROGRESS ) do_prog = 1;
-	else do_prog = 0;
-
-	if ( stype == 0 )
-	{
-		mess = _("Loading PNG image");
-		rgb = mem_img[CHN_IMAGE];
-	}
-	if ( stype == 1 )
-	{
-		mess = _("Loading clipboard image");
-		rgb = mem_clipboard;
-		if ( rgb ) free( rgb );			// Lose old clipboard
-		if ( mem_clip_alpha )
+		switch(settings->mode)
 		{
-			free( mem_clip_alpha );		// Lose old alpha
-			mem_clip_alpha = NULL;
+		case FS_PNG_LOAD:
+			msg = _("Loading PNG image");
+			break;
+		case FS_CLIP_FILE:
+			msg = _("Loading clipboard image");
+			break;
 		}
-		
-		mem_clip_mask_clear();			// Lose old clipboard mask
 	}
+	if (msg)
+	{
+		progress_init(msg, 0);
+		progress_update(0.0);
+	}
+	res = 1;
 
-	if ( color_type != PNG_COLOR_TYPE_PALETTE || bit_depth>8 )	// RGB PNG file
+	/* RGB PNG file */
+	if (settings->bpp == 3)
 	{
 		png_set_strip_16(png_ptr);
 		png_set_gray_1_2_4_to_8(png_ptr);
 		png_set_palette_to_rgb(png_ptr);
 		png_set_gray_to_rgb(png_ptr);
 
-		if ( stype == 0 )			// Load RGB image
+		/* Is there a transparent color? */
+		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
-			mem_pal_load_def();
-			i = CMASK_IMAGE;
-			if ((color_type == PNG_COLOR_TYPE_RGB_ALPHA) ||
-				(color_type == PNG_COLOR_TYPE_GRAY_ALPHA))
-				i = CMASK_RGBA;
-			if (mem_new(width, height, 3, i))
-				goto file_too_huge;
-			rgb = mem_img[CHN_IMAGE];
-			alpha = mem_img[CHN_ALPHA];
-			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
+			png_get_tRNS(png_ptr, info_ptr, 0, 0, &trans_rgb);
+			if (color_type == PNG_COLOR_TYPE_GRAY)
 			{
-				// Image has a transparent index
-				png_get_tRNS(png_ptr, info_ptr, 0, 0, &trans_rgb);
-				mem_pal[255].red = trans_rgb->red;
-				mem_pal[255].green = trans_rgb->green;
-				mem_pal[255].blue = trans_rgb->blue;
-				if (color_type == PNG_COLOR_TYPE_GRAY)
-				{
-					if ( bit_depth==4 ) i = trans_rgb->gray * 17;
-					if ( bit_depth==8 ) i = trans_rgb->gray;
-					if ( bit_depth==16 ) i = trans_rgb->gray >> (bit_depth-8);
-					mem_pal[255].red = i;
-					mem_pal[255].green = i;
-					mem_pal[255].blue = i;
-				}
-				mem_xpm_trans = 255;
-				mem_cols = 256;		// Force full palette
+				if (bit_depth == 4) i = trans_rgb->gray * 17;
+				else if (bit_depth == 8) i = trans_rgb->gray;
+				/* Hope libpng compiled w/o accurate transform */
+				else if (bit_depth == 16) i = trans_rgb->gray >> 8;
+				settings->rgb_trans = RGB_2_INT(i, i, i);
 			}
+			else settings->rgb_trans = RGB_2_INT(trans_rgb->red,
+				trans_rgb->green, trans_rgb->blue);
 		}
-		if ( stype == 1 )			// Load RGB clipboard
+		else settings->rgb_trans = -1;
+
+		if (settings->img[CHN_ALPHA]) /* RGBA */
 		{
-			rgb = malloc( width * height * 3 );
-			if ( rgb == NULL )
-			{
-				png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-				fclose(fp);
-				free(row_pointers);
-				return -1;
-			}
+			/* !!! Currently can't handle interlaced RGBA files */
+			if (interlace_type != PNG_INTERLACE_NONE) goto fail2;
 
-			if ( color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
-				color_type == PNG_COLOR_TYPE_GRAY_ALPHA )
-			{
-				alpha = malloc( width * height );
-			}
-			else	alpha = NULL;
-
-			mem_clip_bpp = 3;
-			mem_clipboard = rgb;
-			mem_clip_alpha = alpha;
-			mem_clip_w = width;
-			mem_clip_h = height;
-		}
-
-		if ( do_prog ) progress_init( mess, 0 );
-
-		if (alpha)				// 32bpp RGBA image/clipboard
-		{
-			row_pointers[0] = malloc(width * 4);
-			if ( row_pointers[0] == NULL ) goto force_RGB;
-			for (row = 0; row < height; row++)
+			for (i = 0; i < (int)pheight; i++)
 			{
 				png_read_rows(png_ptr, &row_pointers[0], NULL, 1);
-				rgb2 = rgb + row*width*3;
-				rgb3 = row_pointers[0];
-				for (i=0; i<width; i++)
+				src = row_pointers[0];
+				dest = settings->img[CHN_IMAGE] + i * (int)pwidth * 3;
+				dsta = settings->img[CHN_ALPHA] + i * (int)pwidth;
+				for (j = 0; j < (int)pwidth; j++)
 				{
-					rgb2[0] = rgb3[0];
-					rgb2[1] = rgb3[1];
-					rgb2[2] = rgb3[2];
-					alpha[0] = rgb3[3];
-
-					alpha++;
-					rgb2 += 3;
-					rgb3 += 4;
+					dest[0] = src[0];
+					dest[1] = src[1];
+					dest[2] = src[2];
+					dsta[j] = src[3];
+					src += 4; dest += 3;
 				}
+				if (msg && ((i * 20) % (int)pheight >= (int)pheight - 20))
+					progress_update((float)i / (int)pheight);
 			}
-			free(row_pointers[0]);
 		}
-		else					// 24bpp RGB
+		else /* RGB */
 		{
-force_RGB:
 			png_set_strip_alpha(png_ptr);
-			for (row = 0; row < height; row++)
+			for (i = 0; i < (int)pheight; i++)
 			{
-				if ( row%16 == 0 && do_prog ) progress_update( ((float) row) / height );
-				row_pointers[row] = rgb + 3*row*width;
+				row_pointers[i] = settings->img[CHN_IMAGE] +
+					i * (int)pwidth * 3;
 			}
 			png_read_image(png_ptr, row_pointers);
 		}
-
-		if ( do_prog ) progress_end();
 	}
-	else			// Indexed Palette file
+	/* Paletted PNG file */
+	else
 	{
-		if ( stype == 1 )
+		png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
+		memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
+		/* Is there a transparent index? */
+		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
-			rgb = malloc( width * height );
-			if ( rgb == NULL ) return -1;
-			mem_clip_bpp = 1;
-			mem_clipboard = rgb;
-			mem_clip_w = width;
-			mem_clip_h = height;
-		}
-		if ( stype == 0 )
-		{
-			png_get_PLTE(png_ptr, info_ptr, &png_palette, &mem_cols);
-			for ( i=0; i<mem_cols; i++ ) mem_pal[i] = png_palette[i];
-			if (mem_new(width, height, 1, CMASK_IMAGE))
-				goto file_too_huge;
-			rgb = mem_img[CHN_IMAGE];
-			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
+			/* !!! Currently no support for partial transparency */
+			png_get_tRNS(png_ptr, info_ptr, &trans, &i, 0);
+			settings->xpm_trans = -1;
+			for (j = 0; j < i; j++)
 			{
-				// Image has a transparent index
-				png_get_tRNS(png_ptr, info_ptr, &trans, &i, 0);
-				for ( i=0; i<256; i++ ) if ( trans[i]==0 ) break;
-				if ( i>255 ) i=-1;	// No transparency found
-				mem_xpm_trans = i;
+				if (trans[j]) continue;
+				settings->xpm_trans = j;
+				break;
 			}
 		}
 		png_set_strip_16(png_ptr);
 		png_set_strip_alpha(png_ptr);
 		png_set_packing(png_ptr);
-
-		if (color_type == PNG_COLOR_TYPE_GRAY && bit_depth < 8)
+		if ((color_type == PNG_COLOR_TYPE_GRAY) && (bit_depth < 8))
 			png_set_gray_1_2_4_to_8(png_ptr);
-
-		if ( do_prog ) progress_init( mess, 0 );
-		for (row = 0; row < height; row++)
+		for (i = 0; i < (int)pheight; i++)
 		{
-			if ( row%16 == 0 && do_prog ) progress_update( ((float) row) / height );
-			row_pointers[row] = rgb + row*width;
+			row_pointers[i] = settings->img[CHN_IMAGE] +
+				i * (int)pwidth;
 		}
-		if ( do_prog ) progress_end();
-
 		png_read_image(png_ptr, row_pointers);
 	}
+	if (msg) progress_update(1.0);
 
 	png_read_end(png_ptr, info_ptr);
 
 	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
-//printf("unknown chunks = %i\n", num_uk);
-	if (num_uk)				// File contains extra unknown chunks
+	if (num_uk)	/* File contains mtPaint's private chunks */
 	{
-		for (i=0; i<num_uk; i++)	// Examine each chunk
+		for (i = 0; i < num_uk; i++)	/* Examine each chunk */
 		{
-//printf("unknown %i = %s size = %i\n", i, uk_p[i].name, uk_p[i].size);
-
-			for ( chunk_type = 1; chunk_type<4; chunk_type++ )
+			for (j = CHN_ALPHA; j < NUM_CHANNELS; j++)
 			{
-				if ( strcmp(uk_p[i].name, chunk_names[chunk_type]) == 0 ) break;
+				if (!strcmp(uk_p[i].name, chunk_names[j])) break;
 			}
+			if (j >= NUM_CHANNELS) continue;
 
-			if ( stype == 0 && chunk_type<4 )		// Load chunk into image
-			{
-				if ( mem_img[chunk_type] )
-					free( mem_img[chunk_type] );
+			/* Try to allocate a channel */
+			if ((res = allocate_image(settings, CMASK_FOR(j)))) break;
+			/* Skip if not allocated */
+			if (!settings->img[j]) continue;
 
-				mem_img[chunk_type] = calloc( 1, width*height );
-
-				if ( mem_img[chunk_type] )
-				{
-					dest_len = width * height;
-					uncompress( mem_img[chunk_type], &dest_len,
-						uk_p[i].data, uk_p[i].size );
-
-					mem_undo_im_[mem_undo_pointer].img[chunk_type] =
-						mem_img[chunk_type];
-				}
-			}
-			if ( stype == 1 && chunk_type<4 )		// Load chunk into clipboard
-			{
-				if ( chunk_type == CHN_ALPHA )
-				{
-					dest_len = width * height;
-					if ( mem_clip_alpha ) free( mem_clip_alpha );
-					mem_clip_alpha = calloc( 1, dest_len );
-					if ( mem_clip_alpha )
-					{
-						uncompress( mem_clip_alpha, &dest_len,
-							uk_p[i].data, uk_p[i].size );
-					}
-				}
-				if ( chunk_type == CHN_SEL )
-				{
-					dest_len = width * height;
-					if ( mem_clip_mask ) free( mem_clip_mask );
-					mem_clip_mask = calloc( 1, dest_len );
-					if ( mem_clip_mask )
-					{
-						uncompress( mem_clip_mask, &dest_len,
-							uk_p[i].data, uk_p[i].size );
-					}
-				}
-			}
+			dest_len = (int)pwidth * (int)pheight;
+			uncompress(settings->img[j], &dest_len, uk_p[i].data,
+				uk_p[i].size);
 		}
+		/* !!! Is this call really needed? */
 		png_free_data(png_ptr, info_ptr, PNG_FREE_UNKN, -1);
 	}
+	if (!res) res = 1;
 
-	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-	fclose(fp);
-
+fail2:	if (msg) progress_end();
 	free(row_pointers);
+	png_destroy_read_struct(&png_ptr, NULL, NULL);
+fail:	fclose(fp);
+	return (res);
+}
 
-	return 1;
-fail:
-	fclose(fp);
-	return -1;
-file_too_huge:
-	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-	fclose(fp);
-	free(row_pointers);
-	return FILE_MEM_ERROR;
+static void store_image_extras(ls_settings *settings)
+{
+	/* Stuff RGB transparency into color 255 */
+	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
+	{
+		settings->pal[255].red = INT_2_R(settings->rgb_trans);
+		settings->pal[255].green = INT_2_G(settings->rgb_trans);
+		settings->pal[255].blue = INT_2_B(settings->rgb_trans);
+		settings->xpm_trans = 255;
+		settings->colors = 256;
+	}
+
+	/* Accept vars */
+	mem_xpm_trans = settings->xpm_trans;
+	mem_jpeg_quality = settings->jpeg_quality;
+	mem_xbm_hot_x = settings->hot_x;
+	mem_xbm_hot_y = settings->hot_y;
+	preserved_gif_delay = settings->gif_delay;
+
+	/* Accept palette */
+	mem_pal_copy(mem_pal, settings->pal);
+	mem_cols = settings->colors;
+}
+
+int load_png(char *file_name, int mode)
+{
+	png_color pal[256];
+	ls_settings settings;
+	int i, tr, res;
+
+	init_ls_settings(&settings, NULL);
+	settings.mode = mode;
+	settings.ftype = FT_PNG;
+	settings.pal = pal;
+
+	/* !!! Use default palette - for now */
+	mem_pal_copy(pal, mem_pal_def);
+	settings.colors = mem_pal_def_i;
+
+	res = do_load_png(file_name, &settings);
+
+	switch (settings.mode)
+	{
+	case FS_PNG_LOAD: /* Image */
+		/* Success - accept data */
+		if (res == 1)
+		{
+			/* !!! Image data and dimensions committed already */
+
+			store_image_extras(&settings);
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE])
+		{
+			/* !!! Too late to restore previous image */
+			create_default_image();
+		}
+		break;
+	case FS_CLIP_FILE: /* Clipboard */
+		/* Convert color transparency to alpha */
+		tr = settings.bpp == 3 ? settings.rgb_trans : settings.xpm_trans;
+		if ((res == 1) && (tr >= 0))
+		{
+			/* Add alpha channel if no alpha yet */
+			if (!settings.img[CHN_ALPHA])
+			{
+				i = settings.width * settings.height;
+				/* !!! Create committed */
+				mem_clip_alpha = malloc(i);
+				if (mem_clip_alpha)
+				{
+					settings.img[CHN_ALPHA] = mem_clip_alpha;
+					memset(mem_clip_alpha, 255, i);
+				}
+			}
+			if (!settings.img[CHN_ALPHA]) res = FILE_MEM_ERROR;
+			else mem_mask_colors(settings.img[CHN_ALPHA],
+				settings.img[CHN_IMAGE], 0, settings.width,
+				settings.height, settings.bpp, tr, tr);
+		}
+		/* Success - accept data */
+		if (res == 1)
+		{
+			/* !!! Clipboard data committed already */
+
+			/* Accept dimensions */
+			mem_clip_w = settings.width;
+			mem_clip_h = settings.height;
+			mem_clip_bpp = settings.bpp;
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE])
+		{
+			/* !!! Too late to restore previous clipboard */
+			free(mem_clipboard);
+			free(mem_clip_alpha);
+			mem_clip_mask_clear();
+		}
+		break;
+	case FS_CHANNEL_LOAD:
+		/* Success - accept data */
+		if (res == 1)
+		{
+			/* Add frame & stuff data into it */
+			undo_next_core(4, mem_width, mem_height, mem_img_bpp,
+				CMASK_CURR);
+			mem_undo_im_[mem_undo_pointer].img[mem_channel] =
+				mem_img[mem_channel] = settings.img[CHN_IMAGE];
+
+			if (mem_channel == CHN_IMAGE)
+				store_image_extras(&settings);
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE]) free(settings.img[CHN_IMAGE]);
+		break;
+	}
+	return (res);
 }
 
 #ifndef PNG_AFTER_IDAT
@@ -440,7 +539,6 @@ file_too_huge:
 
 static int save_png(char *file_name, ls_settings *settings)
 {
-	static char *chunk_names[] = { "", "alPh", "seLc", "maSk" };
 	png_unknown_chunk unknown0;
 	png_structp png_ptr;
 	png_infop info_ptr;
@@ -2008,79 +2106,81 @@ int export_ascii ( char *file_name )
 }
 
 
-int load_channel( char *filename, unsigned char *image, int w, int h )
+int detect_image_format(char *name)
 {
-	char buf[PNG_BYTES_TO_CHECK];
-	int i, bit_depth, color_type, interlace_type;
+	unsigned char buf[66], *stop;
+	int i;
 	FILE *fp;
 
-	png_bytep *row_pointers;
-	png_structp png_ptr;
-	png_infop info_ptr;
-	png_uint_32 pwidth, pheight;
-
-
-	if ((fp = fopen(filename, "rb")) == NULL) return -1;
-	i = fread(buf, 1, PNG_BYTES_TO_CHECK, fp);
-	if ( i != PNG_BYTES_TO_CHECK ) goto fail;
-
-	i = !png_sig_cmp(buf, (png_size_t)0, PNG_BYTES_TO_CHECK);
-	if ( i<=0 ) goto fail;
-
-	rewind( fp );
-	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	if (png_ptr == NULL) goto fail;
-
-	info_ptr = png_create_info_struct(png_ptr);
-	if (info_ptr == NULL)
-	{
-		png_destroy_read_struct(&png_ptr, NULL, NULL);
-		goto fail;
-	}
-
-	if (setjmp(png_jmpbuf(png_ptr)))
-	{
-		png_destroy_read_struct(&png_ptr, NULL, NULL);
-		fclose(fp);
-		return -1;
-	}
-
-	png_init_io(png_ptr, fp);
-	png_set_sig_bytes(png_ptr, 0);
-	png_read_info(png_ptr, info_ptr);
-	png_get_IHDR(png_ptr, info_ptr, &pwidth, &pheight, &bit_depth, &color_type,
-		&interlace_type, NULL, NULL);
-
-	if ( pwidth != w || pheight != h  || color_type != PNG_COLOR_TYPE_PALETTE || bit_depth!=8 )
-	{
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		goto fail;			// Wrong image geometry so bail out
-	}
-
-	row_pointers = malloc( sizeof(png_bytep) * pheight );
-
-	if (setjmp(png_jmpbuf(png_ptr)))	// If libpng generates an error now, clean up
-	{
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		fclose(fp);
-		free(row_pointers);
-		return -1;
-	}
-
-	png_set_packing(png_ptr);
-
-	for (i = 0; i < pheight; i++) row_pointers[i] = image + i*pwidth;
-
-	png_read_image(png_ptr, row_pointers);
-	png_read_end(png_ptr, info_ptr);
-
-	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+	if (!(fp = fopen(name, "rb"))) return (-1);
+	i = fread(buf, 1, 64, fp);
 	fclose(fp);
-	free(row_pointers);
 
-	return 0;
+	/* Check all unambiguous signatures */
+	if (!strncmp(buf, "\x89PNG", 4)) return (FT_PNG);
+	if (!strncmp(buf, "\xFF\xD8", 2))
+#ifdef U_JPEG
+		return (FT_JPEG);
+#else
+		return (FT_NONE);
+#endif
+	if (!strncmp(buf, "II", 2) || !strncmp(buf, "MM", 2))
+#ifdef U_TIFF
+		return (FT_TIFF);
+#else
+		return (FT_NONE);
+#endif
+	if (!strncmp(buf, "GIF8", 4))
+#ifdef U_GIF
+		return (FT_GIF);
+#else
+		return (FT_NONE);
+#endif
+	if (!strncmp(buf, "BM", 2)) return (FT_BMP);
+	/* Check layers signature and version */
+	if (!strncmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
+	{
+		stop = strchr(buf, '\n');
+		if (!stop || (stop - buf > 32)) return (FT_NONE);
+		i = atoi(++stop);
+		if (i == 1) return (FT_LAYERS1);
+/* !!! Not implemented yet */
+//		if (i == 2) return (FT_LAYERS2);
+		return (FT_NONE);
+	}
 
-fail:
-	fclose(fp);
-	return -1;
+/* !!! Not implemented yet */
+#if 0
+	/* Discern PCX from TGA */
+	while (buf[0] == 10)
+	{
+		if (buf[1] > 5) break;
+		if (buf[1] > 1) return (FT_PCX);
+		if (buf[2] != 1) break;
+		/* Ambiguity - look at name as a last resort
+		 * Bias to PCX - TGAs usually have 0th byte = 0 */
+		stop = strrchr(name, '.');
+		if (!stop) return (FT_PCX);
+		if (!strncasecmp(stop + 1, "tga", 4)) break;
+		return (FT_PCX);
+	}
+	/* Check if this is TGA */
+	if ((buf[1] < 2) && (buf[2] < 12) && ((1 << buf[2]) & 0x0E0F))
+		return (FT_TGA);
+#endif
+
+	/* Simple check for XPM */
+	stop = strstr(buf, "XPM");
+	if (stop)
+	{
+		i = stop - buf;
+		stop = strchr(buf, '\n');
+		if (!stop || (stop - buf > i)) return (FT_XPM);
+	}
+	/* Check possibility of XBM by absence of control chars */
+	for (i = 0; buf[i] && (buf[i] != '\n'); i++)
+	{
+		if (ISCNTRL(buf[i])) return (FT_NONE);
+	}
+	return (FT_XBM);
 }

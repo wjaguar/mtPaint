@@ -57,7 +57,7 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2], *menu_chan_ls[3],
+	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
 	*menu_chan_dis[NUM_CHANNELS+1]
 	;
 
@@ -459,18 +459,18 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	int i;
 
 	snprintf(clip, 251, "%s%i", mem_clip_file, item);
-	i = load_png(clip, 1 );
+	i = load_png(clip, FS_CLIP_FILE);
 
 	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
 	else text_paste = FALSE;
-
-	update_menus();
 
 	if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
 		pressed_select_none( NULL, NULL );
 
 	if ( tool_type == TOOL_POLYGON && poly_status >= POLY_NONE )
 		pressed_select_none( NULL, NULL );
+
+	update_menus();
 
 	if ( MEM_BPP == mem_clip_bpp ) pressed_paste_centre( NULL, NULL );
 }
@@ -2652,6 +2652,16 @@ static void pressed_view_hori( GtkMenuItem *menu_item, gpointer user_data )
 	if (vs) view_show();
 }
 
+void set_image(gboolean state)
+{
+	static int depth = 0;
+
+	if (state ? --depth : depth++) return;
+
+	(state ? gtk_widget_show_all : gtk_widget_hide)(view_showing ? main_split :
+		scrolledwindow_canvas);
+}
+
 static void parse_drag( char *txt )
 {
 	gboolean nlayer = TRUE;
@@ -3011,7 +3021,6 @@ void main_init()
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
 			NULL},
 	*item_chan_del[] = {  _("/Channels/Delete ..."),NULL },
-	*item_chan_ls[] = {  _("/Channels/Load ..."), NULL },
 	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
 			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
 	;
@@ -3067,7 +3076,6 @@ void main_init()
 	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
 	pop_men_dis( item_factory, item_chann_x, menu_chann_x );
 	pop_men_dis( item_factory, item_chan_del, menu_chan_del );
-	pop_men_dis( item_factory, item_chan_ls, menu_chan_ls );
 	pop_men_dis( item_factory, item_chan_dis, menu_chan_dis );
 
 	for (i = 1; i <= 12; i++)	// Set up save clipboard slots

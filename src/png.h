@@ -19,8 +19,6 @@
 
 #include <gtk/gtk.h>
 
-#define PNG_BYTES_TO_CHECK 8
-
 #define FILE_PROGRESS 1048576
 
 //	Loading/Saving errors
@@ -109,7 +107,7 @@ int file_type_by_ext(char *name, guint32 mask);
 
 int save_image(char *file_name, ls_settings *settings);
 
-int load_png( char *file_name, int stype );
+int load_png(char *file_name, int mode);
 
 int load_gif( char *file_name, int *delay );
 
@@ -119,7 +117,7 @@ int load_jpeg( char *file_name );
 int load_tiff( char *file_name );
 int load_bmp( char *file_name );
 
-int load_channel( char *filename, unsigned char *image, int w, int h );
-
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );
+
+int detect_image_format(char *name);

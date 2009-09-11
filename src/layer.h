@@ -41,8 +41,8 @@ typedef struct
 	int mem_undo_pointer, mem_undo_done, mem_undo_redo;
 
 	png_color mem_pal[256];
-	int mem_cols, tool_pat, mem_prot_RGB[256], mem_col_A, mem_col_B;
-	png_color mem_col_A24, mem_col_B24;
+	int mem_cols, tool_pat, mem_prot_RGB[256], mem_col_[2];
+	png_color mem_col_24[2];
 
 	int mem_xpm_trans, mem_xbm_hot_x, mem_xbm_hot_y;
 
@@ -84,7 +84,6 @@ gint delete_layers_window();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );
-gboolean layers_check_header( char *file_name );
 void layer_press_save();
 void layer_press_save_as();
 void layer_press_save_composite();

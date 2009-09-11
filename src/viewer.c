@@ -1067,6 +1067,7 @@ void view_show()
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	view_showing = TRUE;
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE);
 	vw_focus_view();
 }
 
@@ -1083,6 +1084,7 @@ void view_hide()
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
 	view_showing = FALSE;
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE);
 }
 
 

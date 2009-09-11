@@ -18,9 +18,6 @@
 */
 
 
-#include <gtk/gtk.h>
-#include <gdk/gdkkeysyms.h>
-
 #include "global.h"
 
 #include "memory.h"
@@ -30,6 +27,7 @@
 #include "canvas.h"
 #include "inifile.h"
 #include "mygtk.h"
+#include "channels.h"
 
 int overlay_alpha = FALSE;
 int hide_image = FALSE;
@@ -52,8 +50,10 @@ unsigned char channel_inv[NUM_CHANNELS] = {0, 255, 0, 0};
 unsigned char channel_fill[NUM_CHANNELS] = {0, 255, 0, 0};
 
 /* Per-channel drawing "colours" */
-unsigned char channel_col_A[NUM_CHANNELS] = {255, 255, 255, 255};
-unsigned char channel_col_B[NUM_CHANNELS] = {0, 0, 0, 0};
+unsigned char channel_col_[2][NUM_CHANNELS] = {
+	{255, 255, 255, 255},	/* A */
+	{0, 0, 0, 0}		/* B */
+};
 
 /* Channel disable flags */
 int channel_dis[NUM_CHANNELS] = {0, 0, 0, 0};
@@ -411,7 +411,6 @@ void pressed_channel_config_overlay()
 
 void pressed_channel_load()
 {
-	if ( mem_channel == CHN_IMAGE ) return;
 	file_selector( FS_CHANNEL_LOAD );
 }
 

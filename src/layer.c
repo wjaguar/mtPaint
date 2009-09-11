@@ -722,33 +722,6 @@ int read_file_num(FILE *fp, char *txt)
 	return i;
 }
 
-gboolean layers_check_header( char *file_name )
-{
-	char tin[64];
-	int i;
-	FILE *fp;
-
-
-	if ((fp = fopen(file_name, "r")) == NULL) goto fail;
-
-	i = get_next_line(tin, 32, fp);
-	if ( i<0 || i>30 ) goto fail2;
-
-	string_chop( tin );
-	if ( strcmp( tin, LAYERS_HEADER ) != 0 ) goto fail2;		// Bad header
-
-	i = read_file_num(fp, tin);
-	if ( i==-987654321 ) goto fail2;
-	if ( i>LAYERS_VERSION ) goto fail2;		// Version number must be compatible
-
-	fclose(fp);
-	return TRUE;
-fail2:
-	fclose(fp);
-fail:
-	return FALSE;
-}
-
 int load_layers( char *file_name )
 {
 	char tin[300], load_prefix[300], load_name[300], *c;
@@ -763,9 +736,6 @@ int load_layers( char *file_name )
 
 		// Try to save text file, return -1 if failure
 	if ((fp = fopen(file_name, "r")) == NULL) goto fail;
-
-	gtk_widget_hide( drawing_canvas );
-		// This stops a nasty segfault caused by a redraw during the loading process
 
 	i = get_next_line(tin, 32, fp);
 	if ( i<0 || i>30 ) goto fail2;
@@ -874,15 +844,10 @@ int load_layers( char *file_name )
 	update_cols();		// Update status bar info
 	if ( layers_total>0 ) men_item_state( menu_frames, TRUE );
 
-	gtk_widget_show( drawing_canvas );
-
 	return 1;		// Success
-fail:
-	return -1;
 fail2:
-	gtk_widget_show( drawing_canvas );
-
 	fclose(fp);
+fail:
 	return -1;
 }
 

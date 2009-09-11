@@ -1708,6 +1708,9 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		rgb1[2] = (ctable[stop].b + 128) / 257;
 		rgb2hsv(rgb, hsv);
 		rgb2hsv(rgb1, hsv1);
+		/* Grey has no hue */
+		if (hsv[1] == 0.0) hsv[0] = hsv1[0];
+		if (hsv1[1] == 0.0) hsv1[0] = hsv[0];
 
 		/* Always go from 1st to 2nd hue in ascending order */
 		if (start == start0)

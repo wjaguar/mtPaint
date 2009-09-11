@@ -103,7 +103,7 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2], *menu_chan_ls[3],
+	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
 	*menu_chan_dis[NUM_CHANNELS+1]
 	;
 
@@ -169,3 +169,5 @@ void force_main_configure();	// Force reconfigure of main drawing area - for cen
 void toolbar_icon_event2(GtkWidget *widget, gpointer data);
 void toolbar_icon_event (GtkWidget *widget, gpointer data);
 void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] );
+
+void set_image(gboolean state);	// Toggle image access (nestable)

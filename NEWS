@@ -24,6 +24,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* '[' ']' and '{' '}' keys now used to change colour A/B
 	* Selection marquee now persists through tool changes
 	* Channels and composite images can now be saved to any suitable supported file format
+	* Paint tool in tint mode now respects both Tint +/- toggle and left/right mouse button
 	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	* BUGFIX - Lasso tool now properly handles clipboard alpha
 	* BUGFIX - Clipboard save path now can be changed in Preferences

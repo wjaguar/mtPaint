@@ -340,7 +340,7 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 {
 	gint j = (gint) data;
 
-	*(vars_settings[j]) = GTK_TOGGLE_BUTTON(widget)->active;
+	*(vars_settings[j]) = !!GTK_TOGGLE_BUTTON(widget)->active;
 
 	switch (j)
 	{
@@ -1100,46 +1100,33 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 
 void mem_pat_update()			// Update indexed and then RGB pattern preview
 {
-	int i, j, i2, j2, c, offset;
-	png_color c24;
+	int i, j, k, l;
 
 	if ( mem_img_bpp == 1 )
 	{
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];
 	}
+	mem_pattern = (unsigned char *)mem_patterns[tool_pat];
 
-	for ( j=0; j<8; j++ )
+	for (i = 0; i < 8 * 8; i++)
 	{
-		for ( i=0; i<8; i++ )
+		j = mem_pattern[i] ^ 1;
+		mem_col_pat[i] = mem_col_[j];
+		mem_col_pat24[i * 3 + 0] = mem_col_24[j].red;
+		mem_col_pat24[i * 3 + 1] = mem_col_24[j].green;
+		mem_col_pat24[i * 3 + 2] = mem_col_24[j].blue;
+	}
+
+	k = PREVIEW_WIDTH * 32 * 3;
+	for (i = 0; i < 16; i++)
+	{
+		for (j = 0; j < PREVIEW_WIDTH; j++ , k += 3)
 		{
-			if ( mem_patterns[tool_pat][j][i] == 1 )
-			{
-				c = mem_col_A;
-				c24 = mem_col_A24;
-			}
-			else
-			{
-				c = mem_col_B;
-				c24 = mem_col_B24;
-			}
-
-			mem_col_pat[i + j*8] = c;
-
-			mem_col_pat24[ 3*(i + j*8) ] = c24.red;
-			mem_col_pat24[ 1 + 3*(i + j*8) ] = c24.green;
-			mem_col_pat24[ 2 + 3*(i + j*8) ] = c24.blue;
-
-			for ( j2=0; j2<2; j2++ )		// 16 pixels high (8x2)
-			{
-				for ( i2=0; i2<(PREVIEW_WIDTH / 8); i2++ )
-				{
-					offset = 3*(i+i2*8 + (j+j2*8+32)*PREVIEW_WIDTH);
-					mem_prev[ 0 + offset ] = c24.red;
-					mem_prev[ 1 + offset ] = c24.green;
-					mem_prev[ 2 + offset ] = c24.blue;
-				}
-			}
+			l = ((i & 7) * 8 + (j & 7)) * 3;
+			mem_prev[k + 0] = mem_col_pat24[l + 0];
+			mem_prev[k + 1] = mem_col_pat24[l + 1];
+			mem_prev[k + 2] = mem_col_pat24[l + 2];
 		}
 	}
 }
