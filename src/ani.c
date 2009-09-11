@@ -678,18 +678,19 @@ static void ani_but_playstop( GtkWidget *widget )
 
 static void ani_frame_slider_moved( GtkWidget *widget )
 {
-	int i = GTK_ADJUSTMENT(widget)->value, w = mem_width, h = mem_height;
+	int x = 0, y = 0, w = mem_width, h = mem_height;
 
-	ani_set_frame_state( i );
+	ani_set_frame_state(GTK_ADJUSTMENT(widget)->value);
 
 	if ( layer_selected != 0 )
 	{
+		x = -layer_table[layer_selected].x;
+		y = -layer_table[layer_selected].y;
 		w = layer_table[0].image->mem_width;
 		h = layer_table[0].image->mem_height;
 	}
 
-	gtk_widget_queue_draw_area( vw_drawing, margin_view_x, margin_view_y,
-			w*vw_zoom+1, h*vw_zoom+1 );	// Update only the area we need
+	vw_update_area(x, y, w, h);	// Update only the area we need
 }
 
 static void ani_but_preview_close()

@@ -68,16 +68,26 @@ char **global_argv;
 GdkGC *dash_gc;
 
 
+static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
 
 static void clear_perim_real( int ox, int oy )
 {
-	int	x = margin_main_x + (perim_x + ox)*can_zoom,
-		y = margin_main_y + (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
+	int x0, y0, x1, y1, zoom = 1, scale = 1;
 
-	repaint_canvas( x, y, 1, s );
-	repaint_canvas(	x+s-1, y, 1, s );
-	repaint_canvas(	x, y, s, 1 );
-	repaint_canvas(	x, y+s-1, s, 1 );
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
+	y0 = margin_main_y + ((perim_y + oy) * scale) / zoom;
+	x1 = margin_main_x + ((perim_x + ox + perim_s - 1) * scale) / zoom + scale - 1;
+	y1 = margin_main_y + ((perim_y + oy + perim_s - 1) * scale) / zoom + scale - 1;
+
+	repaint_canvas(x0, y0, 1, y1 - y0 + 1);
+	repaint_canvas(x1, y0, 1, y1 - y0 + 1);
+	repaint_canvas(x0 + 1, y0, x1 - x0 - 1, 1);
+	repaint_canvas(x0 + 1, y1, x1 - x0 - 1, 1);
 }
 
 void men_item_state( GtkWidget *menu_items[], gboolean state )
@@ -615,15 +625,19 @@ static void move_mouse(int dx, int dy, int button)
 	static GdkModifierType bmasks[4] =
 		{0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK};
 	GdkModifierType state;
-	int x, y, nx, ny, zoom, scale;
+	int x, y, nx, ny, zoom = 1, scale = 1;
 
 	if (!unreal_move) lastdx = lastdy = 0;
 	if (!mem_img[CHN_IMAGE]) return;
 
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
 
-	nx = (x - margin_main_x) / can_zoom + lastdx + dx;
-	ny = (y - margin_main_y) / can_zoom + lastdy + dy;
+	nx = ((x - margin_main_x) * zoom) / scale + lastdx + dx;
+	ny = ((y - margin_main_y) * zoom) / scale + lastdy + dy;
 
 	if (button) /* Clicks simulated without extra movements */
 	{
@@ -640,9 +654,8 @@ static void move_mouse(int dx, int dy, int button)
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON1_MASK) button = 1;
 
-	if (can_zoom < 1.0) /* Fine control required */
+	if (zoom > 1) /* Fine control required */
 	{
-		zoom = rint(1.0 / can_zoom);
 		lastdx += dx; lastdy += dy;
 		mouse_event(GDK_MOTION_NOTIFY, nx, ny, state, button, 1.0, 1);
 
@@ -653,14 +666,14 @@ static void move_mouse(int dx, int dy, int button)
 			dy = lastdy * can_zoom;
 			lastdx -= dx * zoom;
 			lastdy -= dy * zoom;
-			unreal_move = ~0;
+			unreal_move = 3;
+			/* Event can be delayed or lost */
 			move_mouse_relative(dx, dy);
 		}
-		unreal_move = 2;
+		else unreal_move = 2;
 	}
 	else /* Real mouse is precise enough */
 	{
-		scale = rint(can_zoom);
 		unreal_move = 1;
 
 		/* Simulate movement if failed to actually move mouse */
@@ -923,10 +936,7 @@ int wtf_pressed(GdkEventKey *event, key_action *keys)
 
 gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 {
-	int change;
-	int i, aco[3][2], minx, maxx, miny, maxy, xw, yh;	// Arrow coords
-	float llen, uvx, uvy;					// Line length & unit vector lengths
-	int action;
+	int change, action;
 
 	action = wtf_pressed(event, main_keys);
 	if (!action) return (FALSE);
@@ -1067,70 +1077,70 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		return TRUE;
 	case ACT_ARROW:
 	case ACT_ARROW3:
-		if ((tool_type == TOOL_LINE) && (line_status > LINE_NONE))
+		if ((tool_type == TOOL_LINE) && (line_status > LINE_NONE) &&
+			((line_x1 != line_x2) || (line_y1 != line_y2)))
 		{
-			if ( ! (line_x1 == line_x2 && line_y1 == line_y2) )
+			int i, xa1, xa2, ya1, ya2, minx, maxx, miny, maxy, w, h;
+			double uvx, uvy;	// Line length & unit vector lengths
+			int oldmode = mem_undo_opacity;
+
+
+				// Calculate 2 coords for arrow corners
+			uvy = sqrt((line_x1 - line_x2) * (line_x1 - line_x2) +
+				(line_y1 - line_y2) * (line_y1 - line_y2));
+			uvx = (line_x2 - line_x1) / uvy;
+			uvy = (line_y2 - line_y1) / uvy;
+
+			xa1 = rint(line_x1 + tool_flow * (uvx - uvy * 0.5));
+			xa2 = rint(line_x1 + tool_flow * (uvx + uvy * 0.5));
+			ya1 = rint(line_y1 + tool_flow * (uvy + uvx * 0.5));
+			ya2 = rint(line_y1 + tool_flow * (uvy - uvx * 0.5));
+
+			pen_down = 0;
+			tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
+			line_status = LINE_LINE;
+			update_menus();
+
+				// Draw arrow lines & circles
+			mem_undo_opacity = TRUE;
+			f_circle(xa1, ya1, tool_size);
+			f_circle(xa2, ya2, tool_size);
+			tline(xa1, ya1, line_x1, line_y1, tool_size);
+			tline(xa2, ya2, line_x1, line_y1, tool_size);
+
+			if (action == ACT_ARROW3)
 			{
-				int oldmode = mem_undo_opacity;
-
-					// Calculate 2 coords for arrow corners
-				llen = sqrt( (line_x1-line_x2) * (line_x1-line_x2) +
-						(line_y1-line_y2) * (line_y1-line_y2) );
-				uvx = (line_x2 - line_x1) / llen;
-				uvy = (line_y2 - line_y1) / llen;
-
-				aco[0][0] = mt_round(line_x1 + tool_flow * uvx);
-				aco[0][1] = mt_round(line_y1 + tool_flow * uvy);
-				aco[1][0] = mt_round(aco[0][0] + tool_flow / 2 * -uvy);
-				aco[1][1] = mt_round(aco[0][1] + tool_flow / 2 * uvx);
-				aco[2][0] = mt_round(aco[0][0] - tool_flow / 2 * -uvy);
-				aco[2][1] = mt_round(aco[0][1] - tool_flow / 2 * uvx);
-
-				pen_down = 0;
-				tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
-				line_status = LINE_LINE;
-				update_menus();
-
-					// Draw arrow lines & circles
-				mem_undo_opacity = TRUE;
-				f_circle( aco[1][0], aco[1][1], tool_size );
-				f_circle( aco[2][0], aco[2][1], tool_size );
-				tline( aco[1][0], aco[1][1], line_x1, line_y1, tool_size );
-				tline( aco[2][0], aco[2][1], line_x1, line_y1, tool_size );
-
-				if (action == ACT_ARROW3)
-				{
-					// Draw 3rd line and fill arrowhead
-					tline( aco[1][0], aco[1][1], aco[2][0], aco[2][1], tool_size );
-					poly_points = 0;
-					poly_add( line_x1, line_y1 );
-					for ( i=1; i<3; i++ )
-						poly_add( aco[i][0], aco[i][1] );
-					poly_init();
-					poly_paint();
-					poly_points = 0;
-				}
-				mem_undo_opacity = oldmode;
-
-					// Update screen areas
-				mtMIN( minx, aco[1][0]-tool_size/2-1, aco[2][0]-tool_size/2-1 )
-				mtMIN( minx, minx, line_x1-tool_size/2-1 )
-				mtMAX( maxx, aco[1][0]+tool_size/2+1, aco[2][0]+tool_size/2+1 )
-				mtMAX( maxx, maxx, line_x1+tool_size/2+1 )
-
-				mtMIN( miny, aco[1][1]-tool_size/2-1, aco[2][1]-tool_size/2-1 )
-				mtMIN( miny, miny, line_y1-tool_size/2-1 )
-				mtMAX( maxy, aco[1][1]+tool_size/2+1, aco[2][1]+tool_size/2+1 )
-				mtMAX( maxy, maxy, line_y1+tool_size/2+1 )
-
-				xw = maxx - minx + 1;
-				yh = maxy - miny + 1;
-
-				gtk_widget_queue_draw_area( drawing_canvas,
-					minx*can_zoom + margin_main_x, miny*can_zoom + margin_main_y,
-					xw*can_zoom + 1, yh*can_zoom + 1);
-				vw_update_area( minx, miny, xw+1, yh+1 );
+				// Draw 3rd line and fill arrowhead
+				tline(xa1, ya1, xa2, ya2, tool_size );
+				poly_points = 0;
+				poly_add(line_x1, line_y1);
+				poly_add(xa1, ya1);
+				poly_add(xa2, ya2);
+				poly_init();
+				poly_paint();
+				poly_points = 0;
 			}
+			mem_undo_opacity = oldmode;
+
+				// Update screen areas
+			minx = xa1 < xa2 ? xa1 : xa2;
+			if (minx > line_x1) minx = line_x1;
+			maxx = xa1 > xa2 ? xa1 : xa2;
+			if (maxx < line_x1) maxx = line_x1;
+
+			miny = ya1 < ya2 ? ya1 : ya2;
+			if (miny > line_y1) miny = line_y1;
+			maxy = ya1 > ya2 ? ya1 : ya2;
+			if (maxy < line_y1) maxy = line_y1;
+
+			i = (tool_size + 1) >> 1;
+			minx -= i; miny -= i; maxx += i; maxy += i;
+
+			w = maxx - minx + 1;
+			h = maxy - miny + 1;
+
+			main_update_area(minx, miny, w, h);
+			vw_update_area(minx, miny, w, h);
 		}
 		return (TRUE);
 	default:
@@ -1236,7 +1246,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
 	unsigned char pixel;
 	png_color pixel24;
-	int s, new_cursor;
+	int new_cursor;
 	int x, y, ox, oy, i, tox = tool_ox, toy = tool_oy;
 
 
@@ -1417,13 +1427,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 ///	TOOL PERIMETER BOX UPDATES
 
-	s = tool_size;
-	if ( perim_status > 0 )
-	{
-		perim_status = 0;
-		clear_perim();
-		perim_status = 1; // Remove old perimeter box
-	}
+	if ( perim_status > 0 ) clear_perim();	// Remove old perimeter box
 
 	if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
 	{
@@ -1431,15 +1435,13 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		clone_y += (toy-oy);
 	}
 
-	if ( s*can_zoom > 4 )
+	if (tool_size * can_zoom > 4)
 	{
-		perim_status = 1;
-		perim_x = ox - (tool_size - (tool_size % 2) )/2;
-		perim_y = oy - (tool_size - (tool_size % 2) )/2;
-		perim_s = s;
+		perim_x = ox - (tool_size >> 1);
+		perim_y = oy - (tool_size >> 1);
+		perim_s = tool_size;
 		repaint_perim();			// Repaint 4 sides
 	}
-	else	perim_status = 0;
 
 ///	LINE UPDATES
 
@@ -1464,40 +1466,33 @@ static gint main_scroll_changed()
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 {
-	int x, y;
+	int x, y, zoom = 1, scale = 1, pflag = event->type != GDK_BUTTON_RELEASE;
 	gdouble pressure = 1.0;
 
+	if (pflag) /* For button press events only */
+	{
+		if (!mem_img[CHN_IMAGE]) return (TRUE);
 
+		if (tablet_working)
 #if GTK_MAJOR_VERSION == 1
-	if ( tablet_working )
-		pressure = event->pressure;
+			pressure = event->pressure;
 #endif
 #if GTK_MAJOR_VERSION == 2
-	if ( tablet_working )
-		gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
+			gdk_event_get_axis((GdkEvent *)event, GDK_AXIS_PRESSURE,
+				&pressure);
 #endif
-
-	if (mem_img[CHN_IMAGE])
-	{
-		x = (event->x - margin_main_x) / can_zoom;
-		y = (event->y - margin_main_y) / can_zoom;
-		mouse_event(event->type, x, y, event->state, event->button,
-			pressure, unreal_move & 1);
 	}
 
-	return TRUE;
-}
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
 
-static gint canvas_release( GtkWidget *widget, GdkEventButton *event )
-{
-	int x, y;
-
-	x = (event->x - margin_main_x) / can_zoom;
-	y = (event->y - margin_main_y) / can_zoom;
+	x = ((int)(event->x - margin_main_x) * zoom) / scale;
+	y = ((int)(event->y - margin_main_y) * zoom) / scale;
 	mouse_event(event->type, x, y, event->state, event->button,
-		1.0, unreal_move & 1);
+		pressure, unreal_move & 1);
 
-	return FALSE;
+	return (pflag);
 }
 
 static gint canvas_enter( GtkWidget *widget, GdkEventMotion *event )	// Mouse enters the canvas
@@ -1513,11 +1508,7 @@ static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
 			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
 		if ( status_on[STATUS_PIXELRGB] )
 			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-		if ( perim_status > 0 )
-		{
-			perim_status = 0;
-			clear_perim();
-		}
+		if (perim_status > 0) clear_perim();
 		if ( tool_type == TOOL_LINE && line_status != LINE_NONE ) repaint_line(0);
 		if ( tool_type == TOOL_POLYGON && poly_status == POLY_SELECTING ) repaint_line(0);
 	}
@@ -1947,46 +1938,45 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	chanlist tlist;
 	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0;
 	unsigned char *clip_alpha, *clip_image, *t_alpha = NULL;
-	int pw = (px2 - px1 + 1), ph = (py2 - py1 + 1);
-	int i, j, l, pw3, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
+	int i, j, l, pw, ph, pw3, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
 	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
 
-	if ( pw<=0 || ph<=0 ) return;
 
-	// Its a grimy hack, but it avoids a nasty segfault
-	i = ceil(marq_x1 * can_zoom);
-	if (px1 < i)
-	{
-		pw += px1 - i;
-		px1 = i;
-	}
-	j = ceil(marq_y1 * can_zoom);
-	if (py1 < j)
-	{
-		ph += py1 - j;
-		py1 = j;
-	}
-	if ( pw<=0 || ph<=0 ) return;
-	rgb = grab_memory( pw*ph*3, mem_background );
-	if ( rgb == NULL ) return;
+	if ((px1 > px2) || (py1 > py2)) return;
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	zoom = scale = 1;
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	/* Check bounds */
+	i = (marq_x1 * scale + zoom - 1) / zoom;
+	j = (marq_y1 * scale + zoom - 1) / zoom;
+	if (px1 < i) px1 = i;
+	if (py1 < j) py1 = j;
+	i = (marq_x2 * scale) / zoom + scale - 1;
+	j = (marq_y2 * scale) / zoom + scale - 1;
+	if (px2 > i) px2 = i;
+	if (py2 > j) py2 = j;
+
+	pw = px2 - px1 + 1; ph = py2 - py1 + 1;
+	if ((pw <= 0) || (ph <= 0)) return;
+
+	rgb = malloc(i = pw * ph * 3);
+	if (!rgb) return;
+	memset(rgb, mem_background, i);
 
 	/* Horizontal zoom */
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0)
+	if (zoom >= 1)
 	{
-		zoom = rint(1.0 / can_zoom);
-		scale = 1;
 		dx = px1 * zoom;
 		l = (pw - 1) * zoom + 1;
 		pww = pw;
 	}
 	else
 	{
-		zoom = 1;
-		scale = rint(can_zoom);
 		dx = px1 / scale;
-		l = (px1 + pw - 1) / scale - dx + 1;
-		pww = l;
+		pww = l = px2 / scale - dx + 1;
 	}
 
 	i = l * (bpp + 2);
@@ -2133,8 +2123,8 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	rgb += (pw * niy + nix) * 3;
 
 	// Update image + blank space outside
-	j = (mem_width * scale) / zoom;
-	jj = (mem_height * scale) / zoom;
+	j = (mem_width * scale + zoom - 1) / zoom;
+	jj = (mem_height * scale + zoom - 1) / zoom;
 	if (pw2 > j) pw2 = j;
 	if (ph2 > jj) ph2 = jj;
 	px2 += nix; py2 += niy;
@@ -2208,45 +2198,40 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	free(pvx);
 }
 
-void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on rgb memory
+/* Draw grid on rgb memory */
+void draw_grid(unsigned char *rgb, int x, int y, int w, int h)
 {
-	int i, j, gap = can_zoom;
-	unsigned char r=mem_grid_rgb[0], g=mem_grid_rgb[1], b=mem_grid_rgb[2], *t_rgb;
+	int i, j, k, dx, dy, step, step3;
+	unsigned char *tmp;
 
-	if ( gap>=mem_grid_min && mem_show_grid )
+
+	if (!mem_show_grid || (can_zoom < mem_grid_min)) return;
+	step = can_zoom;
+
+	dx = (x - margin_main_x) % step;
+	if (dx < 0) dx += step;
+	dy = (y - margin_main_y) % step;
+	if (dy < 0) dy += step;
+	if (dx) dx = (step - dx) * 3;
+	w *= 3;
+
+	for (k = dy , i = 0; i < h; i++)
 	{
-		i = (y - margin_main_y) % gap;
-		while ( i<0 ) i=i+gap;
-		if (i != 0 ) i = gap - i;			// Calculate y offset at start
-
-		while ( i<h )
+		tmp = rgb + i * w;
+		if (!k) /* Filled line */
 		{
-			t_rgb = rgb + i*w*3;
-			for ( j=0; j<w; j++ )			// Horzontal lines
-			{
-				t_rgb[0] = r;
-				t_rgb[1] = g;
-				t_rgb[2] = b;
-				t_rgb = t_rgb + 3;
-			}
-			i = i + gap;
+			j = 0; step3 = 3;
 		}
-
-		i = (x - margin_main_x) % gap;
-		while ( i<0 ) i=i+gap;
-		if (i != 0 ) i = gap - i;			// Calculate x offset at start
-
-		while ( i<w )
+		else /* Spaced dots */
 		{
-			t_rgb = rgb + i*3;
-			for ( j=0; j<h; j++ )			// Vertical lines
-			{
-				t_rgb[0] = r;
-				t_rgb[1] = g;
-				t_rgb[2] = b;
-				t_rgb = t_rgb + 3*w;
-			}
-			i = i + gap;
+			j = dx; step3 = step * 3;
+		}
+		k = (k + 1) % step;
+		for (; j < w; j += step3)
+		{
+			tmp[j + 0] = mem_grid_rgb[0];
+			tmp[j + 1] = mem_grid_rgb[1];
+			tmp[j + 2] = mem_grid_rgb[2];
 		}
 	}
 }
@@ -2254,20 +2239,24 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on r
 void repaint_canvas( int px, int py, int pw, int ph )
 {
 	unsigned char *rgb;
-	int pw2, ph2, lx = 0, ly = 0,
-		rx1, ry1, rx2, ry2,
-		ax1, ay1, ax2, ay2,
-		rpx, rpy;
+	int pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
 	int i, j, zoom = 1, scale = 1;
 
 	if (zoom_flag == 1) return;		// Stops excess jerking in GTK+1 when zooming
 
-	mtMAX(px, px, 0)
-	mtMAX(py, py, 0)
+	if (px < 0)
+	{
+		pw += px; px = 0;
+	}
+	if (py < 0)
+	{
+		ph += py; py = 0;
+	}
 
-	if ( pw<=0 || ph<=0 ) return;
-	rgb = grab_memory( pw*ph*3, mem_background );
-	if ( rgb == NULL ) return;
+	if ((pw <= 0) || (ph <= 0)) return;
+	rgb = malloc(i = pw * ph * 3);
+	if (!rgb) return;
+	memset(rgb, mem_background, i);
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
@@ -2300,51 +2289,97 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
 			pw, ph, can_zoom, layer_selected + 1, layers_total, 1);
 
-	pw2 = pw;
-	ph2 = ph;
-	if ( (px+pw2 - margin_main_x) >= mem_width*can_zoom )	// Update image + blank space outside
-		pw2 = mem_width*can_zoom - px + margin_main_x;
-	if ( (py+ph2 - margin_main_y) >= mem_height*can_zoom )	// Update image + blank space outside
-		ph2 = mem_height*can_zoom - py + margin_main_y;
-
 	draw_grid(rgb, px, py, pw, ph);
 
-	gdk_draw_rgb_image ( drawing_canvas->window, drawing_canvas->style->black_gc,
-		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
 
-	free( rgb );
+	free(rgb);
 	async_bk = FALSE;
 
-	if ( marq_status >= MARQUEE_PASTE && show_paste )
-	{	// Add clipboard image to redraw if needed
-		mtMAX(rpx, px, margin_main_x)
-		mtMAX(rpy, py, margin_main_y)
+	/* Add clipboard image to redraw if needed */
+	if (show_paste && (marq_status >= MARQUEE_PASTE))
+	{
+		/* Enforce image bounds */
+		rpx = px - margin_main_x;
+		rpy = py - margin_main_y;
+		pw2 = rpx + pw - 1;
+		ph2 = rpy + ph - 1;
+		if (rpx < 0) rpx = 0;
+		if (rpy < 0) rpy = 0;
+		i = ((mem_width + zoom - 1) * scale) / zoom;
+		j = ((mem_height + zoom - 1) * scale) / zoom;
+		if (pw2 >= i) pw2 = i - 1;
+		if (ph2 >= j) ph2 = j - 1;
 
-		pw2 -= rpx-px;
-		ph2 -= rpy-py;
-
-		rx1 = (rpx - margin_main_x)/can_zoom;
-		ry1 = (rpy - margin_main_y)/can_zoom;
-		rx2 = (rpx - margin_main_x + pw2 - 1)/can_zoom;
-		ry2 = (rpy - margin_main_y + ph2 - 1)/can_zoom;
-		if ( !(marq_x1<rx1 && marq_x2<rx1) && !(marq_x1>rx2 && marq_x2>rx2) &&
-			!(marq_y1<ry1 && marq_y2<ry1) && !(marq_y1>ry2 && marq_y2>ry2) )
-		{
-			mtMAX( ax1, rpx - margin_main_x, marq_x1*can_zoom )
-			mtMAX( ay1, rpy - margin_main_y, marq_y1*can_zoom )
-			mtMIN( ax2, (rpx - margin_main_x + pw2 - 1), (can_zoom*(marq_x2 + 1) - 1 ) )
-			mtMIN( ay2, (rpy - margin_main_y + ph2 - 1), (can_zoom*(marq_y2 + 1) - 1 ) )
-			repaint_paste( ax1, ay1, ax2, ay2 );
-		}
+		/* Check paste bounds for intersection, but leave actually
+		 * enforcing them to repaint_paste() */
+		rx1 = (marq_x1 * scale + zoom - 1) / zoom;
+		ry1 = (marq_y1 * scale + zoom - 1) / zoom;
+		rx2 = (marq_x2 * scale) / zoom + scale - 1;
+		ry2 = (marq_y2 * scale) / zoom + scale - 1;
+		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
+			repaint_paste(rpx, rpy, pw2, ph2);
 	}
 
-	if ( marq_status != MARQUEE_NONE ) paint_marquee(11, marq_x1, marq_y1);
-	if ( perim_status > 0 ) repaint_perim();
-				// Draw perimeter/marquee/line as we may have drawn over them
+	/* Draw perimeter/marquee/line as we may have drawn over them */
+/* !!! All other over-the-image things have to be redrawn here as well !!! */
+	if (marq_status != MARQUEE_NONE) paint_marquee(11, marq_x1, marq_y1);
+	if (perim_status > 0) repaint_perim();
+}
+
+/* Update x,y,w,h area of current image */
+void main_update_area(int x, int y, int w, int h)
+{
+	int zoom, scale;
+
+	if (can_zoom < 1.0)
+	{
+		zoom = rint(1.0 / can_zoom);
+		w += x;
+		h += y;
+		x = x < 0 ? -(-x / zoom) : (x + zoom - 1) / zoom;
+		y = y < 0 ? -(-y / zoom) : (y + zoom - 1) / zoom;
+		w = (w - x * zoom + zoom - 1) / zoom;
+		h = (h - y * zoom + zoom - 1) / zoom;
+		if ((w <= 0) || (h <= 0)) return;
+	}
+	else
+	{
+		scale = rint(can_zoom);
+		x *= scale;
+		y *= scale;
+		w *= scale;
+		h *= scale;
+	}
+
+	gtk_widget_queue_draw_area(drawing_canvas,
+		x + margin_main_x, y + margin_main_y, w, h);
+}
+
+/* Get zoomed canvas size */
+void canvas_size(int *w, int *h)
+{
+	int i;
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0)
+	{
+		i = rint(1.0 / can_zoom);
+		*w = (mem_width + i - 1) / i;
+		*h = (mem_height + i - 1) / i;
+	}
+	else
+	{
+		i = rint(can_zoom);
+		*w = mem_width * i;
+		*h = mem_height * i;
+	}
 }
 
 void clear_perim()
 {
+	perim_status = 0; /* Cleared */
 	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON && tool_type != TOOL_FLOOD )
 	{		// Don't bother if we are selecting or filling
 		clear_perim_real(0, 0);
@@ -2354,28 +2389,40 @@ void clear_perim()
 
 void repaint_perim_real( int r, int g, int b, int ox, int oy )
 {
-	int	x = margin_main_x + (perim_x + ox)*can_zoom,
-		y = margin_main_y + (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
-	int i;
-	char *rgb;
+	int i, j, w, h, x0, y0, x1, y1, zoom = 1, scale = 1;
+	unsigned char *rgb;
 
-	rgb = grab_memory( s*3, 255 );
-	for ( i=0; i<s; i++ )
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
+	y0 = margin_main_y + ((perim_y + oy) * scale) / zoom;
+	x1 = margin_main_x + ((perim_x + ox + perim_s - 1) * scale) / zoom + scale - 1;
+	y1 = margin_main_y + ((perim_y + oy + perim_s - 1) * scale) / zoom + scale - 1;
+
+	w = x1 - x0 + 1;
+	h = y1 - y0 + 1;
+	j = (w > h ? w : h) * 3;
+	rgb = calloc(j + 2 * 3, 1); /* 2 extra pixels reserved for loop */
+	if (!rgb) return;
+	for (i = 0; i < j; i += 6 * 3)
 	{
-		rgb[ 0 + 3*i ] = r * ((i/3) % 2);
-		rgb[ 1 + 3*i ] = g * ((i/3) % 2);
-		rgb[ 2 + 3*i ] = b * ((i/3) % 2);
+		rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
+		rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
+		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
 	}
 
-	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-		x, y, 1, s, GDK_RGB_DITHER_NONE, rgb, 3 );
-	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-		x+s-1, y, 1, s, GDK_RGB_DITHER_NONE, rgb, 3 );
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		x0, y0, 1, h, GDK_RGB_DITHER_NONE, rgb, 3);
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		x1, y0, 1, h, GDK_RGB_DITHER_NONE, rgb, 3);
 
-	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-		x, y, s, 1, GDK_RGB_DITHER_NONE, rgb, 3*s );
-	gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-		x, y+s-1, s, 1, GDK_RGB_DITHER_NONE, rgb, 3*s );
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		x0 + 1, y0, w - 2, 1, GDK_RGB_DITHER_NONE, rgb, 0);
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		x0 + 1, y1, w - 2, 1, GDK_RGB_DITHER_NONE, rgb, 0);
 	free(rgb);
 }
 
@@ -2387,89 +2434,95 @@ void repaint_perim()
 		repaint_perim_real( 255, 255, 255, 0, 0 );
 		if ( tool_type == TOOL_CLONE )
 			repaint_perim_real( 255, 0, 0, clone_x, clone_y );
+		perim_status = 1; /* Drawn */
 	}
 }
 
 static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 {
-	int x, y, rm;
+	int x, y, rm, zoom = 1, scale = 1, button = 0;
 	GdkModifierType state;
-	guint button = 0;
 	gdouble pressure = 1.0;
 
 	/* Skip synthetic mouse moves */
+	if (unreal_move == 3)
+	{
+		unreal_move = 2;
+		return TRUE;
+	}
 	rm = unreal_move;
 	unreal_move = 0;
-	if (rm == ~0) return TRUE;
 
-	if (mem_img[CHN_IMAGE])		// Only do this if we have an image
-	{
+	/* Do nothing if no image */
+	if (!mem_img[CHN_IMAGE]) return (TRUE);
+
 #if GTK_MAJOR_VERSION == 1
-		if (event->is_hint)
-		{
-			gdk_input_window_get_pointer (event->window, event->deviceid,
-					NULL, NULL, &pressure, NULL, NULL, &state);
-			gdk_window_get_pointer (event->window, &x, &y, &state);
-		}
-		else
-		{
-			x = event->x;
-			y = event->y;
-			pressure = event->pressure;
-			state = event->state;
-		}
-#endif
-#if GTK_MAJOR_VERSION == 2
-		if (event->is_hint) gdk_device_get_state (event->device, event->window, NULL, &state);
+	if (event->is_hint)
+	{
+		gdk_input_window_get_pointer(event->window, event->deviceid,
+			NULL, NULL, &pressure, NULL, NULL, &state);
+		gdk_window_get_pointer(event->window, &x, &y, &state);
+	}
+	else
+	{
 		x = event->x;
 		y = event->y;
+		pressure = event->pressure;
 		state = event->state;
+	}
+#endif
+#if GTK_MAJOR_VERSION == 2
+	if (event->is_hint) gdk_device_get_state(event->device, event->window,
+		NULL, &state);
+	x = event->x;
+	y = event->y;
+	state = event->state;
 
-		if ( tablet_working )
-			gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
+	if (tablet_working) gdk_event_get_axis((GdkEvent *)event,
+		GDK_AXIS_PRESSURE, &pressure);
 #endif
 
-		if (state & GDK_BUTTON2_MASK) button = 2;
-		if (state & GDK_BUTTON3_MASK) button = 3;
-		if (state & GDK_BUTTON1_MASK) button = 1;
-		if ( (state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK) ) button = 13;
-		x = (x - margin_main_x) / can_zoom;
-		y = (y - margin_main_y) / can_zoom;
+	if (state & GDK_BUTTON2_MASK) button = 2;
+	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
+		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
+	else if (state & GDK_BUTTON3_MASK) button = 3;
+	else if (state & GDK_BUTTON1_MASK) button = 1;
 
-		mouse_event(event->type, x, y, state, button, pressure, rm & 1);
-	}
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	x = ((x - margin_main_x) * zoom) / scale;
+	y = ((y - margin_main_y) * zoom) / scale;
+
+	mouse_event(event->type, x, y, state, button, pressure, rm & 1);
 
 	return TRUE;
 }
 
 static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 {
-	int ww = widget->allocation.width, wh = widget->allocation.height
-		, new_margin_x = margin_main_x, new_margin_y = margin_main_y
-		;
+	int w, h, new_margin_x = 0, new_margin_y = 0;
 
 	if ( canvas_image_centre )
 	{
-		if ( ww > (mem_width*can_zoom) ) new_margin_x = (ww - mem_width*can_zoom) / 2;
-		else new_margin_x = 0;
+		canvas_size(&w, &h);
 
-		if ( wh > (mem_height*can_zoom) ) new_margin_y = (wh - mem_height*can_zoom) / 2;
-		else new_margin_y = 0;
-	}
-	else
-	{
-		new_margin_x = 0;
-		new_margin_y = 0;
+		w = drawing_canvas->allocation.width - w;
+		h = drawing_canvas->allocation.height - h;
+
+		if (w > 0) new_margin_x = w >> 1;
+		if (h > 0) new_margin_y = h >> 1;
 	}
 
-	if ( new_margin_x != margin_main_x || new_margin_y != margin_main_y )
+	if ((new_margin_x != margin_main_x) || (new_margin_y != margin_main_y))
 	{
-		gtk_widget_queue_draw(drawing_canvas);
-			// Force redraw of whole canvas as the margin has shifted
 		margin_main_x = new_margin_x;
 		margin_main_y = new_margin_y;
+		gtk_widget_queue_draw(drawing_canvas);
+			// Force redraw of whole canvas as the margin has shifted
 	}
-	vw_align_size( vw_zoom );		// Update the view window as needed
+	vw_align_size(vw_zoom);		// Update the view window as needed
 
 	return TRUE;
 }
@@ -3233,23 +3286,23 @@ void main_init()
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow_canvas),
 		drawing_canvas);
 
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "configure_event",
-		GTK_SIGNAL_FUNC (configure_canvas), GTK_OBJECT(drawing_canvas) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "expose_event",
-		GTK_SIGNAL_FUNC (expose_canvas), GTK_OBJECT(drawing_canvas) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "button_press_event",
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "configure_event",
+		GTK_SIGNAL_FUNC (configure_canvas), NULL );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "expose_event",
+		GTK_SIGNAL_FUNC (expose_canvas), NULL );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "button_press_event",
 		GTK_SIGNAL_FUNC (canvas_button), NULL );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "motion_notify_event",
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "button_release_event",
+		GTK_SIGNAL_FUNC (canvas_button), NULL );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "motion_notify_event",
 		GTK_SIGNAL_FUNC (canvas_motion), NULL );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "enter_notify_event",
-		GTK_SIGNAL_FUNC (canvas_enter), GTK_OBJECT(drawing_canvas) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "leave_notify_event",
-		GTK_SIGNAL_FUNC (canvas_left), GTK_OBJECT(drawing_canvas) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "button_release_event",
-		GTK_SIGNAL_FUNC (canvas_release), GTK_OBJECT(drawing_canvas) );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "enter_notify_event",
+		GTK_SIGNAL_FUNC (canvas_enter), NULL );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "leave_notify_event",
+		GTK_SIGNAL_FUNC (canvas_left), NULL );
 #if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "scroll_event",
-		GTK_SIGNAL_FUNC (canvas_scroll_gtk2), GTK_OBJECT(drawing_canvas) );
+	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "scroll_event",
+		GTK_SIGNAL_FUNC (canvas_scroll_gtk2), NULL );
 #endif
 
 	gtk_widget_set_events (drawing_canvas, GDK_ALL_EVENTS_MASK);

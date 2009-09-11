@@ -289,84 +289,87 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 ///	PAN WINDOW
 
 
-GtkWidget *pan_window, *draw_pan=NULL;
-int pan_w, pan_h;
-unsigned char *pan_rgb;
+static GtkWidget *pan_window, *draw_pan;
+static int pan_w, pan_h;
+static unsigned char *pan_rgb;
 
 void draw_pan_thumb(int x1, int y1, int x2, int y2)
 {
-	int i, j, k, ix, iy;
-	unsigned char pix, *wrk_image = mem_img[CHN_IMAGE];
+	int i, j, k, ix, iy, zoom = 1, scale = 1;
+	unsigned char *dest, *src;
 
-	if ( pan_rgb == NULL ) return;		// Needed to stop segfault
+	if (!pan_rgb) return;		// Needed to stop segfault
 
-	for ( j=0; j<pan_h; j++ )		// Create thumbnail
+	/* Create thumbnail */
+	dest = pan_rgb;
+	for (i = 0; i < pan_h; i++)
 	{
-		iy = ((float) j)/pan_h * mem_height;
-		for ( i=0; i<pan_w; i++ )
+		iy = (i * mem_height) / pan_h;
+		src = mem_img[CHN_IMAGE] + iy * mem_width * mem_img_bpp;
+		if (mem_img_bpp == 3) /* RGB */
 		{
-			ix = ((float) i)/pan_w * mem_width;
-			if (mem_img_bpp == 3)
+			for (j = 0; j < pan_w; j++ , dest += 3)
 			{
-			   for ( k=0; k<3; k++ )
-				pan_rgb[ k + 3*(i + j*pan_w) ] = wrk_image[ k + 3*(ix + iy*mem_width) ];
-			}
-			else
-			{
-				pix = wrk_image[ ix + iy*mem_width ];
-				pan_rgb[ 0 + 3*(i + j*pan_w) ] = mem_pal[pix].red;
-				pan_rgb[ 1 + 3*(i + j*pan_w) ] = mem_pal[pix].green;
-				pan_rgb[ 2 + 3*(i + j*pan_w) ] = mem_pal[pix].blue;
+				ix = ((j * mem_width) / pan_w) * 3;
+				dest[0] = src[ix + 0];
+				dest[1] = src[ix + 1];
+				dest[2] = src[ix + 2];
 			}
 		}
-	}
-
-	x2 = (x1 + x2)/can_zoom;
-	y2 = (y1 + y2)/can_zoom;
-	x1 = x1 / can_zoom;
-	y1 = y1 / can_zoom;
-
-	mtMAX(x1, x1, 0)
-	mtMAX(y1, y1, 0)
-	mtMIN(x1, x1, mem_width-1)
-	mtMIN(y1, y1, mem_height-1)
-	mtMAX(x2, x2, 0)
-	mtMAX(y2, y2, 0)
-	mtMIN(x2, x2, mem_width-1)
-	mtMIN(y2, y2, mem_height-1)
-
-	// Convert real image coords to thumbnail coords
-
-	x1 = (((float) x1)/mem_width) * pan_w;
-	y1 = (((float) y1)/mem_height) * pan_h;
-	x2 = (((float) x2)/mem_width) * pan_w;
-	y2 = (((float) y2)/mem_height) * pan_h;
-
-	j=0;
-	for ( i=x1; i<=x2; i++ )
-	{
-		for ( k=0; k<3; k++ )
+		else /* Indexed */
 		{
-			pan_rgb[ k + 3*(i + y1*pan_w) ] = 255 * ( (j/4) % 2 );
-			pan_rgb[ k + 3*(i + y2*pan_w) ] = 255 * ( (j/4) % 2 );
+			for (j = 0; j < pan_w; j++ , dest += 3)
+			{
+				ix = src[(j * mem_width) / pan_w];
+				dest[0] = mem_pal[ix].red;
+				dest[1] = mem_pal[ix].green;
+				dest[2] = mem_pal[ix].blue;
+			}
 		}
-		j++;
-	}
-	j=0;
-	for ( i=y1; i<=y2; i++ )
-	{
-		for ( k=0; k<3; k++ )
-		{
-			pan_rgb[ k + 3*(x1 + i*pan_w) ] = 255 * ( (j/4) % 2 );
-			pan_rgb[ k + 3*(x2 + i*pan_w) ] = 255 * ( (j/4) % 2 );
-		}
-		j++;
 	}
 
-	if ( draw_pan != NULL )
-		gdk_draw_rgb_image( draw_pan->window, draw_pan->style->black_gc,
-				0, 0, pan_w, pan_h, GDK_RGB_DITHER_NONE,
-				pan_rgb, pan_w*3 );
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	/* Canvas coords to image coords */
+	x2 = ((x1 + x2) / scale) * zoom;
+	y2 = ((y1 + y2) / scale) * zoom;
+	x1 = (x1 / scale) * zoom;
+	y1 = (y1 / scale) * zoom;
+	x1 = x1 < 0 ? 0 : x1 >= mem_width ? mem_width - 1 : x1;
+	x2 = x2 < 0 ? 0 : x2 >= mem_width ? mem_width - 1 : x2;
+	y1 = y1 < 0 ? 0 : y1 >= mem_height ? mem_height - 1 : y1;
+	y2 = y2 < 0 ? 0 : y2 >= mem_height ? mem_height - 1 : y2;
+
+	/* Image coords to thumbnail coords */
+	x1 = (x1 * pan_w) / mem_width;
+	x2 = (x2 * pan_w) / mem_width;
+	y1 = (y1 * pan_h) / mem_height;
+	y2 = (y2 * pan_h) / mem_height;
+
+	/* Draw the border */
+	dest = src = pan_rgb + (y1 * pan_w + x1) * 3;
+	j = y2 - y1;
+	k = (x2 - x1) * 3;
+	for (i = 0; i <= j; i++)
+	{
+		dest[k + 0] = dest[k + 1] = dest[k + 2] =
+			dest[0] = dest[1] = dest[2] = ((i >> 2) & 1) * 255;
+		dest += pan_w * 3;
+	}
+	j = x2 - x1;
+	k = (y2 - y1) * pan_w * 3;
+	for (i = 0; i <= j; i++)
+	{
+		src[k + 0] = src[k + 1] = src[k + 2] =
+			src[0] = src[1] = src[2] = ((i >> 2) & 1) * 255;
+		src += 3;
+	}
+
+	if (draw_pan) gdk_draw_rgb_image(draw_pan->window, draw_pan->style->black_gc,
+		0, 0, pan_w, pan_h, GDK_RGB_DITHER_NONE, pan_rgb, pan_w * 3);
 }
 
 void pan_thumbnail()		// Create thumbnail and selection box
@@ -744,98 +747,84 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 
 void vw_focus_view()						// Focus view window to main window
 {
-	int nv_h, nv_v, px, py;
-	float main_h = 0.5, main_v = 0.5;
+	int w, h;
+	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
 	GtkAdjustment *hori, *vert;
 
-	if ( vw_drawing == NULL ) return;			// Bail out if not visible
-	if ( !vw_focus_on ) return;				// Only focus if user wants to
+	if (!vw_drawing) return;		// Bail out if not visible
+	if (!vw_focus_on) return;		// Only focus if user wants to
 
 	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 
-	if ( hori->page_size > mem_width*can_zoom ) main_h = 0.5;
-	else main_h = ( hori->value + hori->page_size/2 ) / (mem_width*can_zoom);
+	canvas_size(&w, &h);
+	if (hori->page_size < w)
+		main_h = (hori->value + hori->page_size * 0.5) / w;
+	if (vert->page_size < h)
+		main_v = (vert->value + vert->page_size * 0.5) / h;
 
-	if ( vert->page_size > mem_height*can_zoom ) main_v = 0.5;
-	else main_v = ( vert->value + vert->page_size/2 ) / (mem_height*can_zoom);
-
-	if ( layers_total > 0 )
+	/* If we are editing a layer above the background make adjustments */
+	if ((layers_total > 0) && layer_selected)
 	{
-		if ( layer_selected != 0 )
-		{		// If we are editing a layer above the background make adjustments
-			px = main_h * (mem_width - 1) + layer_table[layer_selected].x;
-			py = main_v * (mem_height - 1) + layer_table[layer_selected].y;
-			mtMAX( px, px, 0)
-			mtMAX( py, py, 0)
-			mtMIN( px, px, layer_table[0].image->mem_width - 1)
-			mtMIN( py, py, layer_table[0].image->mem_height - 1)
-			if ( px == 0 )
-				main_h = 0;	// Traps division by zero if width=1
-			else
-				main_h = ((float) px ) / ( layer_table[0].image->mem_width - 1 );
-
-			if ( py == 0 )
-				main_v = 0;	// Traps division by zero if width=1
-			else
-				main_v = ((float) py ) / ( layer_table[0].image->mem_height - 1 );
-		}
+		px = main_h * mem_width + layer_table[layer_selected].x;
+		py = main_v * mem_height + layer_table[layer_selected].y;
+		px = px < 0.0 ? 0.0 : px >= layer_table[0].image->mem_width ?
+			layer_table[0].image->mem_width - 1 : px;
+		py = py < 0.0 ? 0.0 : py >= layer_table[0].image->mem_height ?
+			layer_table[0].image->mem_height - 1 : px;
+		main_h = px / layer_table[0].image->mem_width;
+		main_v = py / layer_table[0].image->mem_height;
 	}
 
-	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(vw_scrolledwindow) );
-	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(vw_scrolledwindow) );
+	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
+	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
 
-	if ( hori->page_size < vw_width )
+	if (hori->page_size < vw_width)
 	{
-		nv_h = vw_width*main_h - hori->page_size/2;
-		if ( (nv_h + hori->page_size) > vw_width ) nv_h = vw_width - hori->page_size;
-		mtMAX( nv_h, nv_h, 0 )
+		nv_h = vw_width * main_h - hori->page_size * 0.5;
+		if (nv_h + hori->page_size > vw_width)
+			nv_h = vw_width - hori->page_size;
+		if (nv_h < 0.0) nv_h = 0.0;
 	}
-	else	nv_h = 0;
+	else nv_h = 0.0;
 
 	if ( vert->page_size < vw_height )
 	{
-		nv_v = vw_height*main_v - vert->page_size/2;
-		if ( (nv_v + vert->page_size) > vw_height )
+		nv_v = vw_height * main_v - vert->page_size * 0.5;
+		if (nv_v + vert->page_size > vw_height)
 			nv_v = vw_height - vert->page_size;
-		mtMAX( nv_v, nv_v, 0 )
+		if (nv_v < 0.0) nv_v = 0.0;
 	}
-	else	nv_v = 0;
+	else nv_v = 0.0;
 
 	hori->value = nv_h;
 	vert->value = nv_v;
 
-	gtk_adjustment_value_changed( hori );		// Update position of view window scrollbars
-	gtk_adjustment_value_changed( vert );
+	/* Update position of view window scrollbars */
+	gtk_adjustment_value_changed(hori);
+	gtk_adjustment_value_changed(vert);
 }
 
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 {
-	int ww = widget->allocation.width, wh = widget->allocation.height
-		, new_margin_x = margin_view_x, new_margin_y = margin_view_y
-		;
+	int ww, wh, new_margin_x = 0, new_margin_y = 0;
 
-	if ( canvas_image_centre )
+	if (canvas_image_centre)
 	{
-		if ( ww > vw_width ) new_margin_x = (ww - vw_width) / 2;
-		else new_margin_x = 0;
+		ww = widget->allocation.width - vw_width;
+		wh = widget->allocation.height - vw_height;
 
-		if ( wh > vw_height ) new_margin_y = (wh - vw_height) / 2;
-		else new_margin_y = 0;
-	}
-	else
-	{
-		new_margin_x = 0;
-		new_margin_y = 0;
+		if (ww > 0) new_margin_x = ww >> 1;
+		if (wh > 0) new_margin_y = wh >> 1;
 	}
 
-	if ( new_margin_x != margin_view_x || new_margin_y != margin_view_y )
+	if ((new_margin_x != margin_view_x) || (new_margin_y != margin_view_y))
 	{
-		gtk_widget_queue_draw(vw_drawing);
-			// Force redraw of whole canvas as the margin has shifted
 		margin_view_x = new_margin_x;
 		margin_view_y = new_margin_y;
+		/* Force redraw of whole canvas as the margin has shifted */
+		gtk_widget_queue_draw(vw_drawing);
 	}
 
 	return TRUE;
@@ -843,7 +832,7 @@ gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 
 void vw_align_size( float new_zoom )
 {
-	int sw = mem_width, sh = mem_height;
+	int sw = mem_width, sh = mem_height, i;
 
 	vw_zoom = new_zoom;
 
@@ -853,14 +842,23 @@ void vw_align_size( float new_zoom )
 		sh = layer_table[0].image->mem_height;
 	}
 
-	sw *= vw_zoom;
-	sh *= vw_zoom;
+	if (vw_zoom < 1.0)
+	{
+		i = rint(1.0 / vw_zoom);
+		sw = (sw + i - 1) / i;
+		sh = (sh + i - 1) / i;
+	}
+	else
+	{
+		i = rint(vw_zoom);
+		sw *= i; sh *= i;
+	}
 
-	if ( vw_width != sw || vw_height != sh )
+	if ((vw_width != sw) || (vw_height != sh))
 	{
 		vw_width = sw;
 		vw_height = sh;
-		gtk_widget_set_usize( vw_drawing, vw_width, vw_height );
+		gtk_widget_set_usize(vw_drawing, vw_width, vw_height);
 	}
 	vw_focus_view();
 }

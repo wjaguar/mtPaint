@@ -124,6 +124,8 @@ void pop_men_dis( GtkItemFactory *item_factory, char *items[], GtkWidget *menu_i
 void men_item_state( GtkWidget *menu_items[], gboolean state );
 	// Change state of preset menu items
 
+void canvas_size(int *w, int *h);	// Get zoomed canvas size
+void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of current image
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void repaint_perim();			// Draw perimeter around mouse cursor
 void clear_perim();			// Clear perimeter around mouse cursor

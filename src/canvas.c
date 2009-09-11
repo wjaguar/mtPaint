@@ -48,7 +48,6 @@ float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_x=0, margin_main_y=0,		// Top left of image from top left of canvas
 	margin_view_x=0, margin_view_y=0;
 int zoom_flag = 0;
-int perim_status = 0, perim_x = 0, perim_y = 0, perim_s = 2;		// Tool perimeter
 int marq_status = MARQUEE_NONE,
 	marq_x1 = -1, marq_y1 = -1, marq_x2 = -1, marq_y2 = -1;		// Selection marquee
 int marq_drag_x = 0, marq_drag_y = 0;					// Marquee dragging offset
@@ -270,17 +269,13 @@ void init_status_bar()
 void commit_paste( gboolean undo )
 {
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
-	int mx = 0, my = 0;			// Mem coords
-	int i, ofs, ua;
+	int i, ofs = 0, ua;
 	unsigned char *image, *mask, *alpha = NULL;
 
-	if ( marq_x1 < 0 ) mx = -marq_x1;
-	if ( marq_y1 < 0 ) my = -marq_y1;
-
-	mtMAX( fx, marq_x1, 0 )
-	mtMAX( fy, marq_y1, 0 )
-	mtMIN( fx2, marq_x2, mem_width-1 )
-	mtMIN( fy2, marq_y2, mem_height-1 )
+	fx = marq_x1 > 0 ? marq_x1 : 0;
+	fy = marq_y1 > 0 ? marq_y1 : 0;
+	fx2 = marq_x2 < mem_width ? marq_x2 : mem_width - 1;
+	fy2 = marq_y2 < mem_height ? marq_y2 : mem_height - 1;
 
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
@@ -300,7 +295,9 @@ void commit_paste( gboolean undo )
 
 	if ( undo ) mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
 
-	ofs = my * mem_clip_w + mx;
+	/* Offset in memory */
+	if (marq_x1 < 0) ofs -= marq_x1;
+	if (marq_y1 < 0) ofs -= marq_y1 * mem_clip_w;
 	image = mem_clipboard + ofs * mem_clip_bpp;
 
 	for (i = 0; i < fh; i++)
@@ -317,10 +314,8 @@ void commit_paste( gboolean undo )
 	free(alpha);
 
 	update_menus();				// Update menu undo issues
-	vw_update_area( fx, fy, fw, fh );
-	gtk_widget_queue_draw_area( drawing_canvas,
-			fx*can_zoom + margin_main_x, fy*can_zoom + margin_main_y,
-			fw*can_zoom + 1, fh*can_zoom + 1);
+	vw_update_area(fx, fy, fw, fh);
+	main_update_area(fx, fy, fw, fh);
 }
 
 void paste_prepare()
@@ -329,7 +324,6 @@ void paste_prepare()
 	poly_points = 0;
 	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON )
 	{
-		perim_status = 0;
 		clear_perim();
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
@@ -805,24 +799,23 @@ void pressed_paste( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data )
 {
-	int canz = can_zoom;
+	int w, h;
 	GtkAdjustment *hori, *vert;
 
-	if ( canz<1 ) canz = 1;
+	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
 
-	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
+	canvas_size(&w, &h);
+	if (hori->page_size > w) mem_icx = 0.5;
+	else mem_icx = (hori->value + hori->page_size * 0.5) / w;
 
-	if ( hori->page_size > mem_width*can_zoom ) mem_icx = 0.5;
-	else mem_icx = ( hori->value + hori->page_size/2 ) / (mem_width*can_zoom);
-
-	if ( vert->page_size > mem_height*can_zoom ) mem_icy = 0.5;
-	else mem_icy = ( vert->value + vert->page_size/2 ) / (mem_height*can_zoom);
+	if (vert->page_size > h) mem_icy = 0.5;
+	else mem_icy = (vert->value + vert->page_size * 0.5) / h;
 
 	paste_prepare();
-	align_size( can_zoom );
-	marq_x1 = mem_width * mem_icx - mem_clip_w/2;
-	marq_y1 = mem_height * mem_icy - mem_clip_h/2;
+	align_size(can_zoom);
+	marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
+	marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
 	marq_x2 = marq_x1 + mem_clip_w - 1;
 	marq_y2 = marq_y1 + mem_clip_h - 1;
 	paste_init();
@@ -1117,11 +1110,14 @@ void update_menus()			// Update edit/undo menu
 
 void canvas_undo_chores()
 {
-	gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
-	update_all_views();				// redraw canvas widget
+	int w, h;
+
+	canvas_size(&w, &h);
+	gtk_widget_set_usize(drawing_canvas, w, h);
+	update_all_views();			// redraw canvas widget
 	update_menus();
 	init_pal();
-	gtk_widget_queue_draw( drawing_col_prev );
+	gtk_widget_queue_draw(drawing_col_prev);
 }
 
 void check_undo_paste_bpp()
@@ -1970,57 +1966,53 @@ void file_selector(int action_type)
 void align_size( float new_zoom )		// Set new zoom level
 {
 	GtkAdjustment *hori, *vert;
-	int nv_h = 0, nv_v = 0;			// New positions of scrollbar
+	int w, h, nv_h = 0, nv_v = 0;	// New positions of scrollbar
 
-	if ( zoom_flag != 0 ) return;		// Needed as we could be called twice per iteration
+	if (zoom_flag) return;		// Needed as we could be called twice per iteration
 
-	if ( new_zoom<MIN_ZOOM ) new_zoom = MIN_ZOOM;
-	if ( new_zoom>MAX_ZOOM ) new_zoom = MAX_ZOOM;
+	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
+	if (new_zoom > MAX_ZOOM) new_zoom = MAX_ZOOM;
 
-	if ( new_zoom != can_zoom )
+	if (new_zoom == can_zoom) return;
+
+	zoom_flag = 1;
+	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+
+	if (mem_ics == 0)
 	{
-		zoom_flag = 1;
-		hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-		vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
+		canvas_size(&w, &h);
+		if (hori->page_size > w) mem_icx = 0.5;
+		else mem_icx = (hori->value + hori->page_size * 0.5) / w;
+		if (vert->page_size > h) mem_icy = 0.5;
+		else mem_icy = (vert->value + vert->page_size * 0.5) / h;
+	}
+	mem_ics = 0;
 
-		if ( mem_ics == 0 )
-		{
-			if ( hori->page_size > mem_width*can_zoom ) mem_icx = 0.5;
-			else mem_icx = ( hori->value + ((float) hori->page_size )/2 )
-				/ (mem_width*can_zoom);
+	can_zoom = new_zoom;
+	canvas_size(&w, &h);
 
-			if ( vert->page_size > mem_height*can_zoom ) mem_icy = 0.5;
-			else mem_icy = ( vert->value + ((float) vert->page_size )/2 )
-				/ (mem_height*can_zoom);
-		}
-		mem_ics = 0;
+	if (hori->page_size < w)
+		nv_h = rint(w * mem_icx - hori->page_size * 0.5);
 
-		can_zoom = new_zoom;
+	if (vert->page_size < h)
+		nv_v = rint(h * mem_icy - vert->page_size * 0.5);
 
-		if ( hori->page_size < mem_width*can_zoom )
-			nv_h = mt_round( mem_width*can_zoom*mem_icx - ((float)hori->page_size)/2 );
-		else	nv_h = 0;
-
-		if ( vert->page_size < mem_height*can_zoom )
-			nv_v = mt_round( mem_height*can_zoom*mem_icy - ((float)vert->page_size)/2 );
-		else	nv_v = 0;
-
-		hori->value = nv_h;
-		hori->upper = mt_round(mem_width*can_zoom);
-		vert->value = nv_v;
-		vert->upper = mt_round(mem_height*can_zoom);
+	hori->value = nv_h;
+	hori->upper = w;
+	vert->value = nv_v;
+	vert->upper = h;
 
 #if GTK_MAJOR_VERSION == 1
-		gtk_adjustment_value_changed( hori );
-		gtk_adjustment_value_changed( vert );
+	gtk_adjustment_value_changed(hori);
+	gtk_adjustment_value_changed(vert);
 #endif
-		gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
+	gtk_widget_set_usize(drawing_canvas, w, h);
 
-		update_image_bar();
-		zoom_flag = 0;
-		vw_focus_view();		// View window position may need updating
-		toolbar_zoom_update();
-	}
+	update_image_bar();
+	zoom_flag = 0;
+	vw_focus_view();		// View window position may need updating
+	toolbar_zoom_update();
 }
 
 void square_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
@@ -2586,14 +2578,10 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			{
 				paint_marquee(0, marq_x1-mem_width, marq_y1-mem_height);
 				i = close_to(x, y);
-				if ( (i%2) == 0 )
-				{	mtMAX(marq_x1, marq_x1, marq_x2)	}
-				else
-				{	mtMIN(marq_x1, marq_x1, marq_x2)	}
-				if ( (i/2) == 0 )
-				{	mtMAX(marq_y1, marq_y1, marq_y2)	}
-				else
-				{	mtMIN(marq_y1, marq_y1, marq_y2)	}
+				if (!(i & 1) ^ (marq_x1 > marq_x2))
+					marq_x1 = marq_x2;
+				if (!(i & 2) ^ (marq_y1 > marq_y2))
+					marq_y1 = marq_y2;
 				set_cursor();
 			}
 			else
@@ -2645,33 +2633,18 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 	}
 
-	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON )
+	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON) &&
+		(tool_type != TOOL_FLOOD) && (paint_action || (button == 1)))
 	{
-		if ( minx<0 )
-		{
-			xw = xw + minx;
-			minx = 0;
-		}
+		if (xw + minx > mem_width) xw = mem_width - minx;
+		if (yh + miny > mem_height) yh = mem_height - miny;
+		if (minx < 0) xw += minx , minx = 0;
+		if (miny < 0) yh += miny , miny = 0;
 
-		if ( miny<0 )
+		if ((xw >= 0) && (yh >= 0))
 		{
-			yh = yh + miny;
-			miny = 0;
-		}
-		if ( can_zoom<1 )
-		{
-			xw = xw + mt_round(1/can_zoom) + 1;
-			yh = yh + mt_round(1/can_zoom) + 1;
-		}
-		if ( (minx+xw) > mem_width ) xw = mem_width - minx;
-		if ( (miny+yh) > mem_height ) yh = mem_height - miny;
-		if ( tool_type != TOOL_FLOOD && (button == 1 || paint_action) &&
-			minx>-1 && miny>-1 && xw>-1 && yh>-1)
-		{
-			gtk_widget_queue_draw_area( drawing_canvas,
-				margin_main_x + minx*can_zoom, margin_main_y + miny*can_zoom,
-				xw*can_zoom + 1, yh*can_zoom + 1);
-			vw_update_area( minx, miny, xw+1, yh+1 );
+			main_update_area(minx, miny, xw, yh);
+			vw_update_area(minx, miny, xw, yh);
 		}
 	}
 	tool_ox = x;	// Remember the coords just used as they are needed in continuous mode
@@ -2721,8 +2694,7 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 	}
 }
 
-int vc_x1, vc_y1, vc_x2, vc_y2;			// Visible canvas
-GtkAdjustment *hori, *vert;
+static int vc_x1, vc_y1, vc_x2, vc_y2;	// Visible canvas
 
 void get_visible()
 {
@@ -2755,213 +2727,208 @@ void clip_area( int *rx, int *ry, int *rw, int *rh )		// Clip area to visible ca
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 )
 {
-	int ux1, uy1, ux2, uy2;
+	int ux1, uy1, ux2, uy2, w, h;
 
 	get_visible();
+	canvas_size(&w, &h);
 
-	mtMAX( ux1, vc_x1, x1 )
-	mtMAX( uy1, vc_y1, y1 )
-	mtMIN( ux2, vc_x2, x2 )
-	mtMIN( uy2, vc_y2, y2 )
+	ux1 = x1 > vc_x1 ? x1 : vc_x1;
+	uy1 = y1 > vc_y1 ? y1 : vc_y1;
+	ux2 = x2 < vc_x2 ? x2 : vc_x2;
+	uy2 = y2 < vc_y2 ? y2 : vc_y2;
+	if (ux2 >= w) ux2 = w - 1;
+	if (uy2 >= h) uy2 = h - 1;
 
-	mtMIN( ux2, ux2, mem_width*can_zoom - 1 )
-	mtMIN( uy2, uy2, mem_height*can_zoom - 1 )
-
-	if ( ux1 <= ux2 && uy1 <= uy2 )		// Only repaint if on visible canvas
-		repaint_paste( ux1, uy1, ux2, uy2 );
+	/* Only repaint if on visible canvas */
+	if ((ux1 <= ux2) && (uy1 <= uy2))
+		repaint_paste(ux1, uy1, ux2, uy2);
 }
 
 void paint_poly_marquee()			// Paint polygon marquee
 {
-	int i, j, last = poly_points-1, co[2];
-	
-	GdkPoint xy[MAX_POLY+1];
+	int i, last = poly_points;
+	GdkPoint xy[MAX_POLY + 1];
+
 
 	check_marquee();
+	if ((tool_type != TOOL_POLYGON) || (poly_points < 2)) return;
 
-	if ( tool_type == TOOL_POLYGON && poly_points > 1 )
+	for (i = 0; i < last; i++)
 	{
-		if ( poly_status == POLY_DONE ) last++;		// Join 1st & last point if finished
-		for ( i=0; i<=last; i++ )
-		{
-			for ( j=0; j<2; j++ )
-			{
-				co[j] = poly_mem[ i % (poly_points) ][j];
-				co[j] = mt_round(co[j] * can_zoom + can_zoom/2);
-						// Adjust for zoom
-			}
-			xy[i].x = margin_main_x + co[0];
-			xy[i].y = margin_main_y + co[1];
-		}
-		gdk_draw_lines( drawing_canvas->window, dash_gc, xy, last+1 );
+		xy[i].x = margin_main_x + rint((poly_mem[i][0] + 0.5) * can_zoom);
+		xy[i].y = margin_main_y + rint((poly_mem[i][1] + 0.5) * can_zoom);
 	}
+	/* Join 1st & last point if finished */
+	if (poly_status == POLY_DONE) xy[last++] = xy[0];
+
+	gdk_draw_lines( drawing_canvas->window, dash_gc, xy, last );
 }
+
 
 void paint_marquee(int action, int new_x, int new_y)
 {
-	int x1, y1, x2, y2;
-	int x, y, w, h, offx = 0, offy = 0;
-	int rx, ry, rw, rh, canz = can_zoom, zerror = 0;
-	int i, j, new_x2 = new_x + (marq_x2-marq_x1), new_y2 = new_y + (marq_y2-marq_y1);
-	char *rgb;
+	unsigned char *rgb;
+	int x1, y1, x2, y2, w, h, new_x2, new_y2, mst, zoom = 1, scale = 1;
+	int i, j, r, g, b, rx, ry, rw, rh, offx, offy;
 
-	if ( canz<1 )
-	{
-		canz = 1;
-		zerror = 2;
-	}
 
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	new_x2 = new_x + marq_x2 - marq_x1;
+	new_y2 = new_y + marq_y2 - marq_y1;
+
+	/* Get onscreen coords */
 	check_marquee();
-	x1 = marq_x1*can_zoom; y1 = marq_y1*can_zoom;
-	x2 = marq_x2*can_zoom; y2 = marq_y2*can_zoom;
-
-	mtMIN( x, x1, x2 )
-	mtMIN( y, y1, y2 )
-	w = x1 - x2;
-	h = y1 - y2;
-
-	if ( w < 0 ) w = -w;
-	if ( h < 0 ) h = -h;
-
-	w = w + canz;
-	h = h + canz;
+	x1 = (marq_x1 * scale) / zoom;
+	y1 = (marq_y1 * scale) / zoom;
+	x2 = (marq_x2 * scale) / zoom;
+	y2 = (marq_y2 * scale) / zoom;
+	w = abs(x2 - x1) + scale;
+	h = abs(y2 - y1) + scale;
+	if (x2 < x1) x1 = x2;
+	if (y2 < y1) y1 = y2;
 
 	get_visible();
 
-	if ( action == 0 )		// Clear marquee
+	if (action == 0) /* Clear */
 	{
-		j = marq_status;
+		mst = marq_status;
 		marq_status = 0;
-		if ( j >= MARQUEE_PASTE && show_paste )
+		/* Redraw inner area if displaying the clipboard */
+		if (show_paste && (mst >= MARQUEE_PASTE))
 		{
-			if ( new_x != marq_x1 || new_y != marq_y1 )
-			{	// Only do something if there is a change
-				if (	new_x2 < marq_x1 || new_x > marq_x2 ||
-					new_y2 < marq_y1 || new_y > marq_y2	)
-						repaint_canvas( margin_main_x + x, margin_main_y + y,
-							w, h );	// Remove completely
-				else
+			/* Do nothing if not moved anywhere */
+			if ((new_x == marq_x1) && (new_y == marq_y1));
+			/* Full redraw if no intersection */
+			else if ((new_x2 < marq_x1) || (new_x > marq_x2) ||
+				(new_y2 < marq_y1) || (new_y > marq_y2))
+				repaint_canvas(margin_main_x + x1,
+					margin_main_y + y1, w, h);
+			/* Partial redraw */
+			else
+			{
+				if (new_x != marq_x1) /* Horizontal shift */
 				{
-					if ( new_x != marq_x1 )
-					{	// Horizontal shift
-						if ( new_x < marq_x1 )	// LEFT
-						{
-							ry = y; rh = h + zerror;
-							rx = (new_x2 + 1) * can_zoom;
-							rw = (marq_x2 - new_x2) * can_zoom + zerror;
-						}
-						else			// RIGHT
-						{
-							ry = y; rx = x; rh = h + zerror;
-							rw = (new_x - marq_x1) * can_zoom + zerror;
-						}
-						clip_area( &rx, &ry, &rw, &rh );
-						repaint_canvas( margin_main_x + rx, margin_main_y + ry,
-							rw, rh );
+					ry = y1; rh = h;
+					if (new_x < marq_x1) /* Move left */
+					{
+						rx = (new_x2 * scale) / zoom + scale;
+						rw = x1 + w - rx;
 					}
-					if ( new_y != marq_y1 )
-					{	// Vertical shift
-						if ( new_y < marq_y1 )	// UP
-						{
-							rx = x; rw = w + zerror;
-							ry = (new_y2 + 1) * can_zoom;
-							rh = (marq_y2 - new_y2) * can_zoom + zerror;
-						}
-						else			// DOWN
-						{
-							rx = x; ry = y; rw = w + zerror;
-							rh = (new_y - marq_y1) * can_zoom + zerror;
-						}
-						clip_area( &rx, &ry, &rw, &rh );
-						repaint_canvas( margin_main_x + rx, margin_main_y + ry,
-							rw, rh );
+					else /* Move right */
+					{
+						rx = x1;
+						rw = (new_x * scale) / zoom - x1;
 					}
+					clip_area(&rx, &ry, &rw, &rh);
+					repaint_canvas(margin_main_x + rx,
+						margin_main_y + ry, rw, rh);
+				}
+				if (new_y != marq_y1) /* Vertical shift */
+				{
+					rx = x1; rw = w;
+					if (new_y < marq_y1) /* Move up */
+					{
+						ry = (new_y2 * scale) / zoom + scale;
+						rh = y1 + h - ry;
+					}
+					else /* Move down */
+					{
+						ry = y1;
+						rh = (new_y * scale) / zoom - y1;
+					}
+					clip_area(&rx, &ry, &rw, &rh);
+					repaint_canvas(margin_main_x + rx,
+						margin_main_y + ry, rw, rh);
 				}
 			}
 		}
+		/* Redraw only borders themselves */
 		else
 		{
-			repaint_canvas( margin_main_x + x, margin_main_y + y, 1, h );
-			repaint_canvas(	margin_main_x + x+w-1-zerror/2, margin_main_y + y, 1+zerror, h );
-			repaint_canvas(	margin_main_x + x, margin_main_y + y, w, 1 );
-			repaint_canvas(	margin_main_x + x, margin_main_y + y+h-1-zerror/2, w, 1+zerror );
-				// zerror required here to stop artifacts being left behind while dragging
-				// a selection at the right/bottom edges
+			repaint_canvas(margin_main_x + x1,
+				margin_main_y + y1 + 1, 1, h - 2);
+			repaint_canvas(margin_main_x + x1 + w - 1,
+				margin_main_y + y1 + 1, 1, h - 2);
+			repaint_canvas(margin_main_x + x1,
+				margin_main_y + y1, w, 1);
+			repaint_canvas(margin_main_x + x1,
+				margin_main_y + y1 + h - 1, w, 1);
 		}
-		marq_status = j;
+		marq_status = mst;
 	}
-	if ( action == 1 || action == 11 )		// Draw marquee
+
+	/* Draw */
+	else if ((action == 1) || (action == 11))
 	{
-		mtMAX( j, w, h )
-		rgb = grab_memory( j*3, 255 );
-
-		if ( marq_status >= MARQUEE_PASTE )
+		r = 255; g = b = 0; /* Draw in red */
+		if (marq_status >= MARQUEE_PASTE)
 		{
-			if ( action == 1 && show_paste )
-			{	// Display paste RGB, only if not being called from repaint_canvas
-				if ( new_x != marq_x1 || new_y != marq_y1 )
-				{	// Only do something if there is a change in position
-					update_paste_chunk( x1+1, y1+1,
-						x2 + canz-2, y2 + canz-2 );
-				}
-			}
-			for ( i=0; i<j; i++ )
-			{
-				rgb[ 0 + 3*i ] = 255 * ((i/3) % 2);
-				rgb[ 1 + 3*i ] = 255 * ((i/3) % 2);
-				rgb[ 2 + 3*i ] = 255;
-			}
-		}
-		else
-		{
-			for ( i=0; i<j; i++ )
-			{
-				rgb[ 0 + 3*i ] = 255;
-				rgb[ 1 + 3*i ] = 255 * ((i/3) % 2);
-				rgb[ 2 + 3*i ] = 255 * ((i/3) % 2);
-			}
+			/* Display paste RGB, only if not being called from repaint_canvas */
+			/* Only do something if there is a change in position */
+			if (show_paste && (action == 1) &&
+				((new_x != marq_x1) || (new_y != marq_y1)))
+				update_paste_chunk(marq_x1 < 0 ? 0 : x1 + 1,
+					marq_y1 < 0 ? 0 : y1 + 1,
+					x1 + w - 2, y1 + h - 2);
+			r = g = 0; b = 255; /* Draw in blue */
 		}
 
-		rx = x; ry = y; rw = w; rh = h;
-		clip_area( &rx, &ry, &rw, &rh );
+		/* Determine visible area */
+		rx = x1; ry = y1; rw = w; rh = h;
+		clip_area(&rx, &ry, &rw, &rh);
+		if ((rw < 1) || (rh < 1)) return;
 
-		if ( rx != x ) offx = 3*( abs(rx - x) );
-		if ( ry != y ) offy = 3*( abs(ry - y) );
+		offx = (abs(rx - x1) % 6) * 3;
+		offy = (abs(ry - y1) % 6) * 3;
 
-		if ( (rx + rw) >= mem_width*can_zoom ) rw = mem_width*can_zoom - rx;
-		if ( (ry + rh) >= mem_height*can_zoom ) rh = mem_height*can_zoom - ry;
-
-		if ( x >= vc_x1 )
+		/* Create pattern */
+		j = (rw > rh ? rw : rh) * 3 + 6 * 3; /* 6 pixels for offset */
+		rgb = malloc(j + 2 * 3); /* 2 extra pixels reserved for loop */
+		if (!rgb) return;
+		memset(rgb, 255, j);
+		for (i = 0; i < j; i += 6 * 3)
 		{
-			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
+			rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
+			rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
+			rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
+		}
+
+		i = ((mem_width + zoom - 1) * scale) / zoom;
+		j = ((mem_height + zoom - 1) * scale) / zoom;
+		if (rx + rw > i) rw = i - rx;
+		if (ry + rh > j) rh = j - ry;
+
+		if ((x1 >= vc_x1) && (marq_x1 >= 0) && (marq_x2 >= 0))
+			gdk_draw_rgb_image(drawing_canvas->window,
+				drawing_canvas->style->black_gc,
 				margin_main_x + rx, margin_main_y + ry,
-				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
-		}
+				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3);
 
-		if ( (x+w-1) <= vc_x2 && (x+w-1) < mem_width*can_zoom )
-		{
-			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-				margin_main_x + rx+rw-1, margin_main_y + ry,
-				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
-		}
+		if ((x1 + w - 1 <= vc_x2) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
+			gdk_draw_rgb_image(drawing_canvas->window,
+				drawing_canvas->style->black_gc,
+				margin_main_x + rx + rw - 1, margin_main_y + ry,
+				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3);
 
-		if ( y >= vc_y1 )
-		{
-			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
+		if ((y1 >= vc_y1) && (marq_y1 >= 0) && (marq_y2 >= 0))
+			gdk_draw_rgb_image(drawing_canvas->window,
+				drawing_canvas->style->black_gc,
 				margin_main_x + rx, margin_main_y + ry,
-				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
-		}
+				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 0);
 
-		if ( (y+h-1) <= vc_y2 && (y+h-1) < mem_height*can_zoom )
-		{
-			gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-				margin_main_x + rx, margin_main_y + ry+rh-1,
-				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
-		}
+		if ((y1 + h - 1 <= vc_y2) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
+			gdk_draw_rgb_image(drawing_canvas->window,
+				drawing_canvas->style->black_gc,
+				margin_main_x + rx, margin_main_y + ry + rh - 1,
+				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 0);
 
 		free(rgb);
 	}
 }
+
 
 int close_to( int x1, int y1 )		// Which corner of selection is coordinate closest to?
 {
@@ -2969,118 +2936,86 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
-
+#define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
 void repaint_line(int mode)			// Repaint or clear line on canvas
 {
-	png_color pcol;
-	int i, j, pixy = 1, xdo, ydo, px, py, todo, todor;
-	int minx, miny, xw, yh, canz = can_zoom, canz2 = 1;
-	int lx1, ly1, lx2, ly2,
-		ax=-1, ay=-1, bx, by, aw, ah;
-	float rat;
-	char *rgb;
-	gboolean do_redraw = FALSE;
+	int lx1 = line_x1, ly1 = line_y1, lx2 = line_x2, ly2 = line_y2;
+	int i, j, l, x, y, tx, ty, aw, ah, ax = -1, ay = -1, zoom = 1, scale = 1;
+	unsigned char rgb[MAX_ZOOM * 3], col[3];
 
-	if ( canz<1 )
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0)
 	{
-		canz = 1;
-		canz2 = mt_round(1/can_zoom);
-	}
-	pixy = canz*canz;
-	lx1 = line_x1;
-	ly1 = line_y1;
-	lx2 = line_x2;
-	ly2 = line_y2;
+		zoom = rint(1.0 / can_zoom);
+		lx1 /= zoom;
+		ly1 /= zoom;
+		lx2 = (lx2 + zoom - 1) / zoom;
+		ly2 = (ly2 + zoom - 1) / zoom;
+ 	}
+	else scale = rint(can_zoom);
 
-	xdo = abs(lx2 - lx1);
-	ydo = abs(ly2 - ly1);
-	mtMAX( todo, xdo, ydo )
+	i = abs(lx2 - lx1);
+	j = abs(ly2 - ly1);
+	l = i > j ? i : j;
 
-	mtMIN( minx, lx1, lx2 )
-	mtMIN( miny, ly1, ly2 )
-	minx = minx * canz;
-	miny = miny * canz;
-	xw = (xdo + 1)*canz;
-	yh = (ydo + 1)*canz;
+	/* !!! This is for incorrect, and thus temporary, line algorithm !!! */
+	int kk = l ? l : 1;
+
 	get_visible();
-	clip_area( &minx, &miny, &xw, &yh );
-
-	mtMIN( lx1, lx1 / canz2, mem_width / canz2 - 1 )
-	mtMIN( ly1, ly1 / canz2, mem_height / canz2 - 1 )
-	mtMIN( lx2, lx2 / canz2, mem_width / canz2 - 1 )
-	mtMIN( ly2, ly2 / canz2, mem_height / canz2 - 1 )
-	todo = todo / canz2;
-
-	if ( todo == 0 ) todor = 1; else todor = todo;
-	rgb = grab_memory( pixy*3, 255 );
-
-	for ( i=0; i<=todo; i++ )
+	for (i = 0; i <= l; i++)
 	{
-		rat = ((float) i ) / todor;
-		px = mt_round(lx1 + (lx2 - lx1) * rat);
-		py = mt_round(ly1 + (ly2 - ly1) * rat);
+		/* !!! Incorrect algorithm - must be exactly as in sline() !!! */
+		float rat = (float)i / kk;
+		x = (tx = mt_round(lx1 + rat * (lx2 - lx1))) * scale;
+		y = (ty = mt_round(ly1 + rat * (ly2 - ly1))) * scale;
 
-		if ( (px+1)*canz > vc_x1 && (py+1)*canz > vc_y1 &&
-			px*canz <= vc_x2 && py*canz <= vc_y2 )
+		if ((x + scale > vc_x1) && (y + scale > vc_y1) &&
+			(x <= vc_x2) && (y <= vc_y2))
 		{
-			if ( mode == 2 )
+			if (mode != 0) /* Show a line */
 			{
-				pcol.red   = 255*( (todo-i)/4 % 2 );
-				pcol.green = pcol.red;
-				pcol.blue  = pcol.red;
+				if (mode == 1) /* Drawing */
+				{
+					j = ((ty & 7) * 8 + (tx & 7)) * 3;
+					col[0] = mem_col_pat24[j + 0];
+					col[1] = mem_col_pat24[j + 1];
+					col[2] = mem_col_pat24[j + 2];
+				}
+				else if (mode == 2) /* Tracking */
+				{
+					col[0] = col[1] = col[2] =
+						(((l - i) >> 2) & 1) * 255;
+				}
+/* !!! Put gradient placement mode in here */
+				for (j = 0; j < scale * 3; j += 3)
+				{
+					rgb[j + 0] = col[0];
+					rgb[j + 1] = col[1];
+					rgb[j + 2] = col[2];
+				}
+				gdk_draw_rgb_image(drawing_canvas->window,
+					drawing_canvas->style->black_gc,
+					margin_main_x + x, margin_main_y + y,
+					scale, scale, GDK_RGB_DITHER_NONE, rgb, 0);
+				continue;
 			}
-			if ( mode == 1 )
-			{
-				pcol.red   = mem_col_pat24[     3*((px % 8) + 8*(py % 8)) ];
-				pcol.green = mem_col_pat24[ 1 + 3*((px % 8) + 8*(py % 8)) ];
-				pcol.blue  = mem_col_pat24[ 2 + 3*((px % 8) + 8*(py % 8)) ];
-			}
+			/* Doing a clear */
+			if (ax < 0) ax = x , ay = y; // Start a new rectangle
+		}
+		/* Do nothing if no area to clear */
+		else if ((mode != 0) || (ax < 0)) continue;
+		
+		/* Redraw now or wait some more? */
+		aw = scale + abs(x - ax);
+		ah = scale + abs(y - ay);
+		if ((aw < MIN_REDRAW) && (ah < MIN_REDRAW) && (i < l)) continue;
 
-			if ( mode == 0 )
-			{
-				if ( ax<0 )	// 1st corner of repaint rectangle
-				{
-					ax = px;
-					ay = py;
-				}
-				do_redraw = TRUE;
-			}
-			else
-			{
-				for ( j=0; j<pixy; j++ )
-				{
-					rgb[ 3*j ] = pcol.red;
-					rgb[ 1 + 3*j ] = pcol.green;
-					rgb[ 2 + 3*j ] = pcol.blue;
-				}
-				gdk_draw_rgb_image (drawing_canvas->window, drawing_canvas->style->black_gc,
-					margin_main_x + px*canz, margin_main_y + py*canz,
-					canz, canz,
-					GDK_RGB_DITHER_NONE, rgb, 3*canz );
-			}
-		}
-		else
-		{
-			if ( ax>=0 && mode==0 ) do_redraw = TRUE;
-		}
-		if ( do_redraw )
-		{
-			do_redraw = FALSE;
-			bx = px;	// End corner
-			by = py;
-			aw = canz * (1 + abs(bx-ax));	// Width of rectangle on canvas
-			ah = canz * (1 + abs(by-ay));
-			if ( aw>16 || ah>16 || i==todo )
-			{ // Commit canvas clear if >16 pixels or final pixel of this line
-				mtMIN( ax, ax, bx )
-				mtMIN( ay, ay, by )
-				repaint_canvas( margin_main_x + ax*canz, margin_main_y + ay*canz,
-					aw, ah );
-				ax = -1;
-			}
-		}
+		/* Commit canvas clear if >16 pixels or final pixel of this line */
+		repaint_canvas(margin_main_x + (ax < x ? ax : x),
+			margin_main_y + (ay < y ? ay : y), aw, ah);
+		ax = -1;
 	}
-	free(rgb);
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

@@ -683,11 +683,7 @@ static gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer d
 		transform_pal(mem_pal, brcosa_pal, p1, p2);
 		pal_refresher();
 	}
-	if ( mem_img_bpp == 3 )
-	{
-		gtk_widget_queue_draw_area( drawing_canvas, margin_main_x, margin_main_y,
-			mem_width*can_zoom + 1, mem_height*can_zoom + 1);
-	}
+	if (mem_img_bpp == 3) main_update_area(0, 0, mem_width, mem_height);
 
 	return FALSE;
 }

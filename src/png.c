@@ -2865,6 +2865,7 @@ int show_html(char *browser, char *docs)
 		docs = buf;
 	}
 #else /* Linux */
+	char buf3[300];
 	if (!docs || !docs[0]) docs = HANDBOOK_LOCATION;
 #endif
 	else docs = gtkncpy(buf, docs, 260);
@@ -2891,8 +2892,8 @@ int show_html(char *browser, char *docs)
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 
-	snprintf(buf, 260, "%s %s", browser, docs);
-	i = system(buf);
+	snprintf(buf3, 260, "%s %s &", browser, docs);
+	i = system(buf3);
 #endif
 	if (i) alert_box( _("Error"),
 		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),

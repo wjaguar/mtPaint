@@ -65,7 +65,6 @@ void layers_init()
 void repaint_layer(int l)		// Repaint layer in view/main window
 {
 	int lx, ly, lw, lh;
-	int zoom = 1, scale = 1;
 
 	lx = layer_table[l].x;
 	ly = layer_table[l].y;
@@ -88,28 +87,7 @@ void repaint_layer(int l)		// Repaint layer in view/main window
 	vw_update_area(lx, ly, lw, lh);
 	if (!show_layers_main) return;
 
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
-
-	if (zoom > 1)
-	{
-		lw += lx;
-		lh += ly;
-		lx = lx < 0 ? -(-lx / zoom) : (lx + zoom - 1) / zoom;
-		ly = ly < 0 ? -(-ly / zoom) : (ly + zoom - 1) / zoom;
-		lw = (lw - lx * zoom + zoom - 1) / zoom;
-		lh = (lh - ly * zoom + zoom - 1) / zoom;
-		if ((lw <= 0) || (lh <= 0)) return;
-	}
-	else
-	{
-		lx *= scale;
-		ly *= scale;
-		lw *= scale;
-		lh *= scale;
-	}
-	gtk_widget_queue_draw_area(drawing_canvas,
-		lx + margin_main_x, ly + margin_main_y, lw, lh);
+	main_update_area(lx, ly, lw, lh);
 }
 
 
@@ -1011,7 +989,10 @@ void layer_press_save()
 
 static void update_main_with_new_layer()
 {
-	gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
+	int w, h;
+
+	canvas_size(&w, &h);
+	gtk_widget_set_usize(drawing_canvas, w, h);
 	update_all_views();
 
 	init_pal();		// Update Palette, pattern & mask area + widgets
@@ -1345,10 +1326,6 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & update window labels
 {
 	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh;
-	int zoom = 1, scale = 1;
-
-	if (vw_zoom < 1.0) zoom = rint(1.0 / vw_zoom);
-	else scale = rint(vw_zoom);
 
 	layer_table[l].x += change_x;
 	layer_table[l].y += change_y;
