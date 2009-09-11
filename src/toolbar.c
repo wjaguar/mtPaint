@@ -131,68 +131,69 @@
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
 gboolean toolbar_status[TOOLBAR_MAX];			// True=show
-GtkWidget *toolbar_boxes[TOOLBAR_MAX]			// Used for showing/hiding
-		= {NULL, NULL, NULL, NULL, NULL, NULL},
-	*toolbar_menu_widgets[TOOLBAR_MAX],		// Menu widgets
-	*drawing_col_prev = NULL;
+GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
+	*drawing_col_prev;
 
 GdkCursor *move_cursor;
 GdkCursor *m_cursor[32];		// My mouse cursors
 
 
 
-static GtkWidget *toolbar_zoom_main = NULL, *toolbar_zoom_view,
+static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
 	*toolbar_labels[2],		// Colour A & B details
 	*ts_spinslides[3],		// Size, flow, opacity
 	*tb_label_opacity		// Opacity label
 	;
-static unsigned char *mem_prev = NULL;		// RGB colours, tool, pattern preview
+static unsigned char *mem_prev;		// RGB colours, tool, pattern preview
 
+typedef struct
+{
+	unsigned char ID;
+	signed char radio;
+	unsigned char sep, rclick;
+	int actmap;
+	char *tooltip, **xpm;
+	GtkWidget *widget;
+} toolbar_item;
 
-GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
-{		// Create iconbar for layers window
-	char **icon_list[7] = {
-		xpm_new_xpm, xpm_up_xpm, xpm_down_xpm, xpm_copy_xpm, xpm_centre_xpm,
-		xpm_cut_xpm, xpm_close_xpm
-		};
+static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
+	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase);
 
-	char *hint_text[7] = {
-		_("New Layer"), _("Raise"), _("Lower"), _("Duplicate Layer"), _("Centralise Layer"),
-		_("Delete Layer"), _("Close Layers Window")
-		};
+#undef _
+#define _(X) X
 
-	gint i, offset[7] = {3, 1, 2, 4, 6, 5, 8};//0, 0, 7, 8};
+static toolbar_item layer_bar[] = {
+	{ LTB_NEW,    -1, 0, 0, 0, _("New Layer"), xpm_new_xpm },
+	{ LTB_RAISE,  -1, 0, 0, 0, _("Raise"), xpm_up_xpm },
+	{ LTB_LOWER,  -1, 0, 0, 0, _("Lower"), xpm_down_xpm },
+	{ LTB_DUP,    -1, 0, 0, 0, _("Duplicate Layer"), xpm_copy_xpm },
+	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
+	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
+	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
 
-	GtkWidget *toolbar, *iconw;
-	GdkPixmap *icon, *mask;
+#undef _
+#define _(X) __(X)
 
-// we need to realize the window because we use pixmaps for 
-// items on the toolbar in the context of it
-	gtk_widget_realize( window );
+/* Create toolbar for layers window */
+GtkWidget *layer_toolbar(GtkWidget **wlist)
+{		
+	int i;
+	GtkWidget *toolbar;
 
 #if GTK_MAJOR_VERSION == 1
-	toolbar = pack(box, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
-		GTK_TOOLBAR_ICONS));
+	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
 #endif
 #if GTK_MAJOR_VERSION == 2
-	toolbar = pack(box, gtk_toolbar_new());
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
+	toolbar = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
 #endif
+	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar,
+		GTK_SIGNAL_FUNC(layer_iconbar_click), 0, NULL, 0);
+	gtk_widget_show_all(toolbar);
 
-	for (i=0; i<7; i++)
-	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		icons[ offset[i] ] =
-			gtk_toolbar_append_element( GTK_TOOLBAR(toolbar),
-			GTK_TOOLBAR_CHILD_BUTTON, NULL, "None", hint_text[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(layer_iconbar_click), (gpointer) i);
-	}
-	gtk_widget_show ( toolbar );
+	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
+		wlist[i] = layer_bar[i].widget;
 
 	return toolbar;
 }
@@ -533,17 +534,10 @@ static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 static void toolbar_settings_exit()
 {
 	toolbar_status[TOOLBAR_SETTINGS] = FALSE;
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(toolbar_menu_widgets[TOOLBAR_SETTINGS]),
-			FALSE );
+	gtk_check_menu_item_set_active(
+		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
 	toolbar_exit();
 }
-
-typedef struct
-{
-	int ID, radio, sep, rclick, actmap;
-	char *tooltip, **xpm;
-	GtkWidget *widget;
-} toolbar_item;
 
 static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase)
@@ -570,51 +564,7 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
 			"button_press_event", rclick, (gpointer)(items->ID + rbase));
 		if (items->sep) gtk_toolbar_append_space(bar);
-	}
-}
-
-#define NEED_UNDO  0x0001
-#define NEED_REDO  0x0002
-#define NEED_CROP  0x0004
-#define NEED_MARQ  0x0008
-#define NEED_SEL   0x0010
-#define NEED_CLIP  0x0020
-#define NEED_HELP  0x0040
-#define NEED_24    0x0080
-#define NEED_IDX   0x0100
-#define NEED_CLINE 0x0200
-#define NEED_LAYER 0x0400
-#define NEED_LASSO 0x0800
-#define NEED_PREFS 0x1000
-#define NEED_FRAME 0x2000
-#define NEED_ALPHA 0x4000
-#define NEED_CHAN  0x8000
-#define NEED_SEL2  (NEED_SEL | NEED_LASSO)
-
-static GtkWidget **need_lists[] = {
-	menu_undo, menu_redo, menu_crop, menu_need_marquee,
-	menu_need_selection, menu_need_clipboard, menu_help, menu_only_24,
-	menu_only_indexed, menu_cline, menu_layer, menu_lasso, menu_prefs,
-	menu_frames, menu_alphablend, menu_chan_del };
-
-static void tool_dis_add(toolbar_item *items)
-{
-	int i, j;
-
-	for (; items->xpm; items++)
-	{
-		if (!items->actmap) continue;
-		i = items->actmap;
-		while (i)
-		{
-			j = i; i &= i - 1; j = (j ^ i) - 1;
-			j = (j & 0x55555555) + ((j >> 1) & 0x55555555);
-			j = (j & 0x33333333) + ((j >> 2) & 0x33333333);
-			j = (j & 0x0F0F0F0F) + ((j >> 4) & 0x0F0F0F0F);
-			j = (j & 0x00FF00FF) + ((j >> 8) & 0x00FF00FF);
-			j = (j & 0xFFFF) + (j >> 16);
-			men_dis_add(items->widget, need_lists[j]);
-		}
+		mapped_dis_add(items->widget, items->actmap);
 	}
 }
 
@@ -818,8 +768,9 @@ void toolbar_init(GtkWidget *vbox_main)
 		sprintf(txt, "toolbar%i", i);
 		toolbar_status[i] = inifile_get_gboolean( txt, TRUE );
 
-		gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(toolbar_menu_widgets[i]),
-				toolbar_status[i] );	// Menu toggles = status
+		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+			menu_widgets[MENU_TBMAIN - TOOLBAR_MAIN + i]),
+			toolbar_status[i]);	// Menu toggles = status
 	}
 
 ///	MAIN TOOLBAR
@@ -863,7 +814,6 @@ void toolbar_init(GtkWidget *vbox_main)
 
 	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
 		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
-	tool_dis_add(main_bar);
 
 	gtk_widget_show(toolbar_main);
 
@@ -885,7 +835,6 @@ void toolbar_init(GtkWidget *vbox_main)
 	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar,
 		GTK_SIGNAL_FUNC(toolbar_icon_event), 0,
 		GTK_SIGNAL_FUNC(toolbar_rclick), TTB_0);
-	tool_dis_add(tools_bar);
 	for (i = 0; tools_bar[i].xpm; i++)
 	{
 		icon_buttons[tools_bar[i].ID] = tools_bar[i].widget;

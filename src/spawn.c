@@ -74,8 +74,6 @@ int spawn_expansion(char *cline, char *directory)
 
 // Front End stuff
 
-GtkWidget *menu_faction[FACTION_PRESETS_TOTAL + 2];
-
 static GtkWidget *faction_list, *faction_entry[3];
 static int faction_current_row;
 static char *faction_ini[3] = { "fact%dName", "fact%dCommand", "fact%dDir" };
@@ -146,11 +144,13 @@ static void update_faction_menu()	// Populate menu
 {
 	int i, items = 0;
 	char txt[64], *nm, *cm;
+	GtkWidget *item;
 
 	/* Show valid slots in menu */
 	for (i = 1; i <= FACTION_PRESETS_TOTAL; i++)
 	{
-		gtk_widget_hide(menu_faction[i]); /* Hide by default */
+		item = menu_widgets[MENU_FACTION1 - 1 + i];
+		gtk_widget_hide(item);		/* Hide by default */
 		sprintf(txt, faction_ini[0], i);
 		nm = inifile_get(txt, "");
 
@@ -165,14 +165,14 @@ static void update_faction_menu()	// Populate menu
 		if (!cm || !cm[0] || (cm[0] == '!')) continue;
 
 //		if (!cm || !cm[0] || (cm[0] == '#')) continue;
-		gtk_label_set_text(GTK_LABEL(GTK_MENU_ITEM(menu_faction[i])->
-			item.bin.child), nm);
-		gtk_widget_show(menu_faction[i]);
+		gtk_label_set_text(
+			GTK_LABEL(GTK_MENU_ITEM(item)->item.bin.child), nm);
+		gtk_widget_show(item);
 		items++;
 	}
 
 	/* Hide separator if no valid slots */
-	(items ? gtk_widget_show : gtk_widget_hide)(menu_faction[0]);
+	(items ? gtk_widget_show : gtk_widget_hide)(menu_widgets[MENU_FACTION_S]);
 }	
 
 void init_factions()

@@ -1052,12 +1052,13 @@ void update_menus()			// Update edit/undo menu
 	men_item_state(menu_undo, !!mem_undo_done);
 	men_item_state(menu_redo, !!mem_undo_redo);
 
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
 
 	for (i = j = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
 	{
 		if (mem_img[i]) j++;
-		gtk_widget_set_sensitive(menu_chan_dis[i], !!mem_img[i]);
+		gtk_widget_set_sensitive(menu_widgets[MENU_DCHAN0 + i], !!mem_img[i]);
 	}
 	men_item_state(menu_chan_del, j > 1);
 }
@@ -1315,7 +1316,7 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 
 static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 {
-	static int flags[] = {FF_TRANS, FF_COMPR, FF_SPOT, FF_SPOT, 0};
+	static int flags[] = {FF_TRANS, FF_JCOMP, FF_ZCOMP, FF_SPOT, FF_SPOT, 0};
 	GList *chain = GTK_BOX(box)->children->next->next;
 	int i, ftype;
 
@@ -1339,6 +1340,11 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 
 static void image_widgets(GtkWidget *box, char *name, int mode)
 {
+	char *spinnames[5] = { _("Transparency index"), _("JPEG Save Quality (100=High)"),
+		_("PNG Compression (0=None)"), _("Hotspot at X ="), _("Y =") };
+	int spindata[5][3] = { {mem_xpm_trans, -1, mem_cols - 1}, {jpeg_quality, 0, 100},
+		{png_compression, 0, 9}, {mem_xbm_hot_x, -1, mem_width - 1},
+		{mem_xbm_hot_y, -1, mem_height - 1} };
 	GtkWidget *opt, *menu, *item, *label, *spin;
 	int i, j, k, mask = FF_256;
 	char *ext = strrchr(name, '.');
@@ -1358,27 +1364,13 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
 	opt = gtk_option_menu_new();
 	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 5);
-
-	label = gtk_label_new(_("Transparency index"));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-	spin = add_a_spin(mem_xpm_trans, -1, mem_cols - 1);
-	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
-
-	label = gtk_label_new(_("JPEG Save Quality (100=High)"));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-	spin = add_a_spin(mem_jpeg_quality, 0, 100);
-	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
-
-	label = gtk_label_new(_("Hotspot at X ="));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-	spin = add_a_spin(mem_xbm_hot_x, -1, mem_width - 1);
-	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
-
-	label = gtk_label_new(_("Y ="));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-	spin = add_a_spin(mem_xbm_hot_y, -1, mem_height - 1);
-	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
-
+	for (i = 0; i < 5; i++)
+	{
+		label = gtk_label_new(spinnames[i]);
+		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+		spin = add_a_spin(spindata[i][0], spindata[i][1], spindata[i][2]);
+		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+	}
 	gtk_widget_show_all(box);
 
 	menu = gtk_menu_new();
@@ -1496,9 +1488,10 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 	memset(settings, 0, sizeof(ls_settings));
 	settings->ftype = FT_NONE;
 	settings->xpm_trans = mem_xpm_trans;
-	settings->jpeg_quality = mem_jpeg_quality;
 	settings->hot_x = mem_xbm_hot_x;
 	settings->hot_y = mem_xbm_hot_y;
+	settings->jpeg_quality = jpeg_quality;
+	settings->png_compression = png_compression;
 	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
@@ -1514,8 +1507,9 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 			settings->ftype = selected_file_type(box);
 			settings->xpm_trans = read_spin(BOX_CHILD(box, 3));
 			settings->jpeg_quality = read_spin(BOX_CHILD(box, 5));
-			settings->hot_x = read_spin(BOX_CHILD(box, 7));
-			settings->hot_y = read_spin(BOX_CHILD(box, 9));
+			settings->png_compression = read_spin(BOX_CHILD(box, 7));
+			settings->hot_x = read_spin(BOX_CHILD(box, 9));
+			settings->hot_y = read_spin(BOX_CHILD(box, 11));
 			break;
 		case FS_LAYER_SAVE: /* Nothing to do yet */
 			break;
@@ -1548,15 +1542,20 @@ static void store_ls_settings(ls_settings *settings)
 	case FS_COMPOSITE_SAVE:
 		if (fflags & FF_TRANS)
 			mem_xpm_trans = settings->xpm_trans;
-		if (fflags & FF_COMPR)
-		{
-			mem_jpeg_quality = settings->jpeg_quality;
-			inifile_set_gint32("jpegQuality", mem_jpeg_quality);
-		}
 		if (fflags & FF_SPOT)
 		{
 			mem_xbm_hot_x = settings->hot_x;
 			mem_xbm_hot_y = settings->hot_y;
+		}
+		if (fflags & FF_JCOMP)
+		{
+			jpeg_quality = settings->jpeg_quality;
+			inifile_set_gint32("jpegQuality", jpeg_quality);
+		}
+		if (fflags & FF_ZCOMP)
+		{
+			png_compression = settings->png_compression;
+			inifile_set_gint32("pngCompression", png_compression);
 		}
 		break;
 	case FS_EXPORT_GIF:
@@ -2968,36 +2967,30 @@ void men_item_visible( GtkWidget *menu_items[], gboolean state )
 void update_recent_files()			// Update the menu items
 {
 	char txt[64], *t, txt2[520];
-	int i, count;
+	int i, count = 0;
 
-	if ( recent_files == 0 ) men_item_visible( menu_recent, FALSE );
-	else
+	for (i = 0; i < recent_files; i++)	// Display recent filenames
 	{
-		for ( i=0; i<=MAX_RECENT; i++ )			// Show or hide items
-		{
-			if ( i <= recent_files )
-				gtk_widget_show( menu_recent[i] );
-			else
-				gtk_widget_hide( menu_recent[i] );
-		}
-		count = 0;
-		for ( i=1; i<=recent_files; i++ )		// Display recent filenames
-		{
-			sprintf( txt, "file%i", i );
+		sprintf(txt, "file%i", i + 1);
 
-			t = inifile_get( txt, "." );
-			if ( strlen(t) < 2 )
-				gtk_widget_hide( menu_recent[i] );	// Hide if empty
-			else
-			{
-				gtkuncpy(txt2, t, 512);
-				gtk_label_set_text( GTK_LABEL( GTK_MENU_ITEM(
-					menu_recent[i] )->item.bin.child ) , txt2 );
-				count++;
-			}
+		t = inifile_get(txt, ".");
+		if (strlen(t) < 2)	// Hide if empty
+		{
+			gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
+			continue;
 		}
-		if ( count == 0 ) gtk_widget_hide( menu_recent[0] );	// Hide separator if not needed
+		gtkuncpy(txt2, t, 512);
+		gtk_label_set_text(GTK_LABEL(GTK_MENU_ITEM(
+			menu_widgets[MENU_RECENT1 + i])->item.bin.child), txt2);
+		gtk_widget_show(menu_widgets[MENU_RECENT1 + i]);
+		count++;
 	}
+	for (; i < MAX_RECENT; i++)		// Hide extra items
+		gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
+
+	// Hide separator if not needed
+	if (count) gtk_widget_show(menu_widgets[MENU_RECENT_S]);
+		else gtk_widget_hide(menu_widgets[MENU_RECENT_S]);
 }
 
 void register_file( char *filename )		// Called after successful load/save

@@ -23,9 +23,6 @@
 		// This number must exactly match the number of menu items declared
 
 
-GtkWidget *menu_faction[FACTION_PRESETS_TOTAL+2];
-
-
 
 int spawn_process(char *argv[], char *directory);	// argv must be NULL terminated!
 int spawn_expansion(char *cline, char *directory);

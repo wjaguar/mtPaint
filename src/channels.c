@@ -64,7 +64,8 @@ static int chan_new_type, chan_new_state, chan_new_invert;
 
 static void click_newchan_cancel()
 {
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
 		// Stops cancelled new channel showing as selected in the menu
 
 	gtk_widget_destroy( newchan_window );

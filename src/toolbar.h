@@ -20,9 +20,7 @@
 
 //	DEFINITIONS
 
-
-// If this order changes, main_init work on toolbar_menu_widgets will need changing
-
+/* !!! Must match order of menu item IDs (MENU_TBMAIN etc.) */
 #define TOOLBAR_MAIN 1
 #define TOOLBAR_TOOLS 2
 #define TOOLBAR_SETTINGS 3
@@ -89,6 +87,17 @@
 #define SETB_GRAD 7
 #define TOTAL_SETTINGS 8
 
+//	Layer toolbar buttons
+#define LTB_NEW    0
+#define LTB_RAISE  1
+#define LTB_LOWER  2
+#define LTB_DUP    3
+#define LTB_CENTER 4
+#define LTB_DEL    5
+#define LTB_CLOSE  6
+
+#define TOTAL_ICONS_LAYER 7
+
 //	GLOBAL VARIABLES
 
 
@@ -98,7 +107,6 @@ GdkCursor *move_cursor;
 
 gboolean toolbar_status[TOOLBAR_MAX];		// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
-	*toolbar_menu_widgets[TOOLBAR_MAX],	// Menu widgets
 	*drawing_col_prev;
 
 
@@ -123,9 +131,6 @@ void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
 void repaint_top_swatch();		// Update selected colours A & B, 
 
-
-
-GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons);
-	// Create iconbar for layers window
+GtkWidget *layer_toolbar(GtkWidget **wlist);	// Create toolbar for layers window
 
 

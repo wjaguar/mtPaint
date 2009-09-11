@@ -24,6 +24,7 @@
 #define NOT_XBM -12
 #define NOT_JPEG -13
 #define NOT_XPM -14
+#define NOT_LSS -15
 #define NOT_GIF -16
 
 #define FILE_LIB_ERROR 123456
@@ -69,10 +70,11 @@
 #define FF_ALPHA   0x0060 /* Alpha channel for all images */
 #define FF_MULTI   0x0080 /* Multiple channels */
 #define FF_TRANS   0x0100 /* Indexed transparency */
-#define FF_COMPR   0x0200 /* Compression levels */
-#define FF_SPOT    0x0400 /* "Hot spot" */
-#define FF_LAYER   0x0800 /* Layered images */
-#define FF_PALETTE 0x1000 /* Palette file (not image) */
+#define FF_JCOMP   0x0200 /* JPEG compression */
+#define FF_ZCOMP   0x0400 /* zlib compression */
+#define FF_SPOT    0x0800 /* "Hot spot" */
+#define FF_LAYER   0x1000 /* Layered images */
+#define FF_PALETTE 0x2000 /* Palette file (not image) */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -90,7 +92,10 @@ fformat file_formats[NUM_FTYPES];
 typedef struct {
 	/* Configuration data */
 	int mode, ftype;
-	int xpm_trans, jpeg_quality, hot_x, hot_y;
+	int xpm_trans;
+	int hot_x, hot_y;
+	int jpeg_quality;
+	int png_compression;
 	int gif_delay;
 	int rgb_trans;
 	int silent;
@@ -101,7 +106,7 @@ typedef struct {
 } ls_settings;
 
 char preserved_gif_filename[256];
-int preserved_gif_delay, silence_limit;
+int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
 
 
 int file_type_by_ext(char *name, guint32 mask);

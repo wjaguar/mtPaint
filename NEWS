@@ -14,6 +14,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* LSS16 file format load/save added to support syslinux bootup splash screens
 	* Clipboard alpha is now used as clipboard mask when pasting to image without alpha channel
 	* "Filtered" drawing mode added
+	* PNG compression level made configurable
 	* BUGFIX - Negative values in Transform Colour and Resize Canvas dialogs are read correctly again
 	* BUGFIX - Drawing a 2 pixels high filled ellipse doesn't cause crash
 	* Lanczos3 rescaling filter removed due to unfavourable results

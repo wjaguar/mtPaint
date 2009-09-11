@@ -89,19 +89,95 @@
 
 int wtf_pressed(GdkEventKey *event);
 
-GtkWidget
-	*main_window, *main_split,
+/* Widget dependence flags */
+#define NEED_UNDO  0x0001
+#define NEED_REDO  0x0002
+#define NEED_CROP  0x0004
+#define NEED_MARQ  0x0008
+#define NEED_SEL   0x0010
+#define NEED_CLIP  0x0020
+#define NEED_24    0x0040
+#define NEED_NOIDX 0x0080
+#define NEED_IDX   0x0100
+#define NEED_LASSO 0x0200
+#define NEED_ALPHA 0x0400
+#define NEED_CHAN  0x0800
+#define NEED_SEL2  (NEED_SEL | NEED_LASSO)
+
+void mapped_dis_add(GtkWidget *widget, int actmap);
+
+/* Notable menu items */
+#define MENU_FACTION1  1
+#define MENU_FACTION2  2
+#define MENU_FACTION3  3
+#define MENU_FACTION4  4
+#define MENU_FACTION5  5
+#define MENU_FACTION6  6
+#define MENU_FACTION7  7
+#define MENU_FACTION8  8
+#define MENU_FACTION9  9
+#define MENU_FACTION10 10
+#define MENU_FACTION11 11
+#define MENU_FACTION12 12
+#define MENU_FACTION13 13
+#define MENU_FACTION14 14
+#define MENU_FACTION15 15
+#define MENU_FACTION_S 16
+#define MENU_RECENT_S  17
+#define MENU_RECENT1   18
+#define MENU_RECENT2   19
+#define MENU_RECENT3   20
+#define MENU_RECENT4   21
+#define MENU_RECENT5   22
+#define MENU_RECENT6   23
+#define MENU_RECENT7   24
+#define MENU_RECENT8   25
+#define MENU_RECENT9   26
+#define MENU_RECENT10  27
+#define MENU_RECENT11  28
+#define MENU_RECENT12  29
+#define MENU_RECENT13  30
+#define MENU_RECENT14  31
+#define MENU_RECENT15  32
+#define MENU_RECENT16  33
+#define MENU_RECENT17  34
+#define MENU_RECENT18  35
+#define MENU_RECENT19  36
+#define MENU_RECENT20  37
+#define MENU_TBMAIN    38
+#define MENU_TBTOOLS   39
+#define MENU_TBSET     40
+#define MENU_SHOWPAL   41
+#define MENU_SHOWSTAT  42
+#define MENU_CENTER    43
+#define MENU_SHOWGRID  44
+#define MENU_VIEW      45
+#define MENU_VWFOCUS   46
+#define MENU_CLINE     47
+#define MENU_LAYER     48
+#define MENU_PREFS     49
+#define MENU_CHAN0     50
+#define MENU_CHAN1     51
+#define MENU_CHAN2     52
+#define MENU_CHAN3     53
+#define MENU_DCHAN0    54
+#define MENU_DCHAN1    55
+#define MENU_DCHAN2    56
+#define MENU_DCHAN3    57
+#define MENU_RGBA      58
+#define MENU_HELP      59
+#define TOTAL_MENU_IDS 60
+
+#define MAX_RECENT 20
+
+GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
-	*menu_undo[5], *menu_redo[5], *menu_crop[5],
-	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
-	*menu_help[2], *menu_only_24[10], *menu_not_indexed[10], *menu_only_indexed[10],
-	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
-	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
-	*menu_chan_dis[NUM_CHANNELS+1]
-	;
+	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
+	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
+	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
+	*menu_alphablend[2], *menu_chan_del[2], *menu_widgets[TOTAL_MENU_IDS];
 
 gboolean view_image_only, viewer_mode, drag_index, q_quit;
 int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;

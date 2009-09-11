@@ -30,8 +30,6 @@ int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
 
 
-#define MAX_RECENT 20
-
 #define STATUS_ITEMS 5
 #define STATUS_GEOMETRY 0
 #define STATUS_CURSORXY 1

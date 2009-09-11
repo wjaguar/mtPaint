@@ -46,19 +46,14 @@
 
 
 
-GtkWidget
-	*main_window, *main_vsplit, *main_hsplit, *main_split,
+GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
-	*menu_undo[5], *menu_redo[5], *menu_crop[5],
-	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
-	*menu_help[2], *menu_only_24[10], *menu_not_indexed[10], *menu_only_indexed[10],
-	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
-	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
-	*menu_chan_dis[NUM_CHANNELS+1]
-	;
+	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
+	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
+	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
+	*menu_alphablend[2], *menu_chan_del[2], *menu_widgets[TOTAL_MENU_IDS];
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
 int files_passed, file_arg_start = -1, drag_index_vals[2], cursor_corner;
@@ -398,41 +393,49 @@ void pressed_save_file_as( GtkMenuItem *menu_item, gpointer user_data )
 
 int gui_save(char *filename, ls_settings *settings)
 {
-	int res;
+	int res = -2, fflags = file_formats[settings->ftype].flags;
 	char mess[512];
 
-	/* Prepare to save image */
-	memcpy(settings->img, mem_img, sizeof(chanlist));
-	settings->pal = mem_pal;
-	settings->width = mem_width;
-	settings->height = mem_height;
-	settings->bpp = mem_img_bpp;
-	settings->colors = mem_cols;
-
-	res = save_image(filename, settings);
-	if ( res < 0 )
+	mess[0] = 0;
+	/* Mismatched format - raise an error right here */
+	if (!(fflags & FF_SAVE_MASK))
 	{
-		if ( res == NOT_XPM )
-		{
-			alert_box( _("Error"), _("You are trying to save an RGB image to an XPM file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
-		}
-		if ( res == NOT_GIF )
-		{
-			alert_box( _("Error"), _("You are trying to save an RGB image to a GIF file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
-		}
-		if ( res == NOT_XBM )
-		{
-			alert_box( _("Error"), _("You are trying to save an XBM file with a palette of more than 2 colours.  Either use another format or reduce the palette to 2 colours."), _("OK"), NULL, NULL );
-		}
-		if ( res == NOT_JPEG )
-		{
-			alert_box( _("Error"), _("You are trying to save an indexed canvas to a JPEG file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
-		}
-		if ( res == -1 )
+		int maxc = 0;
+		char *fform = NULL, *fname = file_formats[settings->ftype].name;
+
+		/* RGB to indexed */
+		if (mem_img_bpp == 3) fform = _("RGB");
+		/* Indexed to RGB */
+		else if (!(fflags & FF_IDX)) fform = _("indexed");
+		/* More than 16 colors */
+		else if (fflags & FF_16) maxc = 16;
+		/* More than 2 colors */
+		else maxc = 2;
+		/* Build message */
+		if (fform) snprintf(mess, 500, _("You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."),
+			fform, fname);
+		else snprintf(mess, 500, _("You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."),
+			fname, maxc, maxc);
+	}
+	else
+	{
+		/* Prepare to save image */
+		memcpy(settings->img, mem_img, sizeof(chanlist));
+		settings->pal = mem_pal;
+		settings->width = mem_width;
+		settings->height = mem_height;
+		settings->bpp = mem_img_bpp;
+		settings->colors = mem_cols;
+
+		res = save_image(filename, settings);
+	}
+	if (res < 0)
+	{
+		if (res == -1)
 		{
 			snprintf(mess, 500, _("Unable to save file: %s"), filename);
-			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 		}
+		if (mess[0]) alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 	}
 	else
 	{
@@ -3193,6 +3196,329 @@ static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context, gin
 }
 
 
+typedef struct
+{
+	char *path; /* Full path for now */
+	signed char radio_BTS; /* -2..-5 are for BTS */
+	unsigned short ID;
+	int actmap;
+	char *shortcut; /* Text form for now */
+	void (*handler)();
+	int parm;
+	GtkWidget *widget;
+} menu_item;
+
+static GtkWidget **need_lists[] = {
+	menu_undo, menu_redo, menu_crop, menu_need_marquee,
+	menu_need_selection, menu_need_clipboard, menu_only_24,
+	menu_not_indexed, menu_only_indexed, menu_lasso, menu_alphablend,
+	menu_chan_del };
+
+void mapped_dis_add(GtkWidget *widget, int actmap)
+{
+	int i;
+
+	while (actmap)
+	{
+		i = actmap; actmap &= actmap - 1; i = (i ^ actmap) - 1;
+		i = (i & 0x55555555) + ((i >> 1) & 0x55555555);
+		i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+		i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
+		i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
+		i = (i & 0xFFFF) + (i >> 16);
+		men_dis_add(widget, need_lists[i]);
+	}
+}
+
+static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
+{
+	static char *bts[6] = { "<CheckItem>", NULL, "<Branch>", "<Tearoff>",
+		"<Separator>", "<LastBranch>" };
+	GtkItemFactoryEntry wf;
+	GtkItemFactory *factory;
+	char *radio[32];
+
+
+	memset(&wf, 0, sizeof(wf));
+	memset(radio, 0, sizeof(radio));
+	factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", accel_group);
+	for (; items->path; items++)
+	{
+		wf.path = _(items->path);
+		wf.accelerator = items->shortcut;
+		wf.callback = items->handler;
+		wf.callback_action = items->parm;
+		wf.item_type = items->radio_BTS < 1 ? bts[-items->radio_BTS] :
+			radio[items->radio_BTS] ? radio[items->radio_BTS] :
+			"<RadioItem>";
+		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
+			radio[items->radio_BTS] = wf.path;
+		gtk_item_factory_create_item(factory, &wf, NULL, 2);
+		items->widget = gtk_item_factory_get_item(factory, wf.path);
+		mapped_dis_add(items->widget, items->actmap);
+		if (items->ID) menu_widgets[items->ID] = items->widget;
+	}
+	return (gtk_item_factory_get_widget(factory, "<main>"));
+}
+
+#undef _
+#define _(X) X
+
+static menu_item main_menu[] = {
+	{ _("/_File"), -2 },
+	{ _("/File/tear"), -3 },
+	{ _("/File/New"), -1, 0, 0, "<control>N", pressed_new, 0 },
+	{ _("/File/Open ..."), -1, 0, 0, "<control>O", pressed_open_file, 0 },
+	{ _("/File/Save"), -1, 0, 0, "<control>S", pressed_save_file, 0 },
+	{ _("/File/Save As ..."), -1, 0, 0, NULL, pressed_save_file_as, 0 },
+	{ _("/File/sep1"), -4 },
+	{ _("/File/Export Undo Images ..."), -1, 0, NEED_UNDO, NULL, pressed_export_undo, 0 },
+	{ _("/File/Export Undo Images (reversed) ..."), -1, 0, NEED_UNDO, NULL, pressed_export_undo2, 0 },
+	{ _("/File/Export ASCII Art ..."), -1, 0, NEED_IDX, NULL, pressed_export_ascii, 0 },
+	{ _("/File/Export Animated GIF ..."), -1, 0, NEED_IDX, NULL, pressed_export_gif, 0 },
+	{ _("/File/sep2"), -4 },
+	{ _("/File/Actions"), -2 },
+	{ _("/File/Actions/tear"), -3 },
+	{ _("/File/Actions/1"), -1, MENU_FACTION1, 0, NULL, pressed_file_action, 1 },
+	{ _("/File/Actions/2"), -1, MENU_FACTION2, 0, NULL, pressed_file_action, 2 },
+	{ _("/File/Actions/3"), -1, MENU_FACTION3, 0, NULL, pressed_file_action, 3 },
+	{ _("/File/Actions/4"), -1, MENU_FACTION4, 0, NULL, pressed_file_action, 4 },
+	{ _("/File/Actions/5"), -1, MENU_FACTION5, 0, NULL, pressed_file_action, 5 },
+	{ _("/File/Actions/6"), -1, MENU_FACTION6, 0, NULL, pressed_file_action, 6 },
+	{ _("/File/Actions/7"), -1, MENU_FACTION7, 0, NULL, pressed_file_action, 7 },
+	{ _("/File/Actions/8"), -1, MENU_FACTION8, 0, NULL, pressed_file_action, 8 },
+	{ _("/File/Actions/9"), -1, MENU_FACTION9, 0, NULL, pressed_file_action, 9 },
+	{ _("/File/Actions/10"), -1, MENU_FACTION10, 0, NULL, pressed_file_action, 10 },
+	{ _("/File/Actions/11"), -1, MENU_FACTION11, 0, NULL, pressed_file_action, 11 },
+	{ _("/File/Actions/12"), -1, MENU_FACTION12, 0, NULL, pressed_file_action, 12 },
+	{ _("/File/Actions/13"), -1, MENU_FACTION13, 0, NULL, pressed_file_action, 13 },
+	{ _("/File/Actions/14"), -1, MENU_FACTION14, 0, NULL, pressed_file_action, 14 },
+	{ _("/File/Actions/15"), -1, MENU_FACTION15, 0, NULL, pressed_file_action, 15 },
+	{ _("/File/Actions/sepC"), -4, MENU_FACTION_S },
+	{ _("/File/Actions/Configure"), -1, 0, 0, NULL, pressed_file_configure, 0 },
+	{ _("/File/sepR"), -4, MENU_RECENT_S },
+	{ _("/File/1"), -1, MENU_RECENT1, 0, "<shift><control>F1", pressed_load_recent, 1 },
+	{ _("/File/2"), -1, MENU_RECENT2, 0, "<shift><control>F2", pressed_load_recent, 2 },
+	{ _("/File/3"), -1, MENU_RECENT3, 0, "<shift><control>F3", pressed_load_recent, 3 },
+	{ _("/File/4"), -1, MENU_RECENT4, 0, "<shift><control>F4", pressed_load_recent, 4 },
+	{ _("/File/5"), -1, MENU_RECENT5, 0, "<shift><control>F5", pressed_load_recent, 5 },
+	{ _("/File/6"), -1, MENU_RECENT6, 0, "<shift><control>F6", pressed_load_recent, 6 },
+	{ _("/File/7"), -1, MENU_RECENT7, 0, "<shift><control>F7", pressed_load_recent, 7 },
+	{ _("/File/8"), -1, MENU_RECENT8, 0, "<shift><control>F8", pressed_load_recent, 8 },
+	{ _("/File/9"), -1, MENU_RECENT9, 0, "<shift><control>F9", pressed_load_recent, 9 },
+	{ _("/File/10"), -1, MENU_RECENT10, 0, "<shift><control>F10", pressed_load_recent, 10 },
+	{ _("/File/11"), -1, MENU_RECENT11, 0, NULL, pressed_load_recent, 11 },
+	{ _("/File/12"), -1, MENU_RECENT12, 0, NULL, pressed_load_recent, 12 },
+	{ _("/File/13"), -1, MENU_RECENT13, 0, NULL, pressed_load_recent, 13 },
+	{ _("/File/14"), -1, MENU_RECENT14, 0, NULL, pressed_load_recent, 14 },
+	{ _("/File/15"), -1, MENU_RECENT15, 0, NULL, pressed_load_recent, 15 },
+	{ _("/File/16"), -1, MENU_RECENT16, 0, NULL, pressed_load_recent, 16 },
+	{ _("/File/17"), -1, MENU_RECENT17, 0, NULL, pressed_load_recent, 17 },
+	{ _("/File/18"), -1, MENU_RECENT18, 0, NULL, pressed_load_recent, 18 },
+	{ _("/File/19"), -1, MENU_RECENT19, 0, NULL, pressed_load_recent, 19 },
+	{ _("/File/20"), -1, MENU_RECENT20, 0, NULL, pressed_load_recent, 20 },
+	{ _("/File/sep3"), -4 },
+	{ _("/File/Quit"), -1, 0, 0, "<control>Q", quit_all, 0 },
+
+	{ _("/_Edit"), -2 },
+	{ _("/Edit/tear"), -3 },
+	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", main_undo, 0 },
+	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", main_redo, 0 },
+	{ _("/Edit/sep1"), -4 },
+	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", pressed_copy, 1 },
+	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", pressed_copy, 0 },
+	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", pressed_paste_centre, 0 },
+	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", pressed_paste_layer, 0 },
+	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", pressed_paste, 0 },
+	{ _("/Edit/Paste Text"), -1, 0, 0, "T", pressed_text, 0 },
+	{ _("/Edit/sep2"), -4 },
+	{ _("/Edit/Load Clipboard"), -2 },
+	{ _("/Edit/Load Clipboard/tear"), -3 },
+	{ _("/Edit/Load Clipboard/1"), -1, 0, 0, "<shift>F1", load_clip, 1 },
+	{ _("/Edit/Load Clipboard/2"), -1, 0, 0, "<shift>F2", load_clip, 2 },
+	{ _("/Edit/Load Clipboard/3"), -1, 0, 0, "<shift>F3", load_clip, 3 },
+	{ _("/Edit/Load Clipboard/4"), -1, 0, 0, "<shift>F4", load_clip, 4 },
+	{ _("/Edit/Load Clipboard/5"), -1, 0, 0, "<shift>F5", load_clip, 5 },
+	{ _("/Edit/Load Clipboard/6"), -1, 0, 0, "<shift>F6", load_clip, 6 },
+	{ _("/Edit/Load Clipboard/7"), -1, 0, 0, "<shift>F7", load_clip, 7 },
+	{ _("/Edit/Load Clipboard/8"), -1, 0, 0, "<shift>F8", load_clip, 8 },
+	{ _("/Edit/Load Clipboard/9"), -1, 0, 0, "<shift>F9", load_clip, 9 },
+	{ _("/Edit/Load Clipboard/10"), -1, 0, 0, "<shift>F10", load_clip, 10 },
+	{ _("/Edit/Load Clipboard/11"), -1, 0, 0, "<shift>F11", load_clip, 11 },
+	{ _("/Edit/Load Clipboard/12"), -1, 0, 0, "<shift>F12", load_clip, 12 },
+	{ _("/Edit/Save Clipboard"), -2 },
+	{ _("/Edit/Save Clipboard/tear"), -3 },
+	{ _("/Edit/Save Clipboard/1"), -1, 0, NEED_CLIP, "<control>F1", save_clip, 1 },
+	{ _("/Edit/Save Clipboard/2"), -1, 0, NEED_CLIP, "<control>F2", save_clip, 2 },
+	{ _("/Edit/Save Clipboard/3"), -1, 0, NEED_CLIP, "<control>F3", save_clip, 3 },
+	{ _("/Edit/Save Clipboard/4"), -1, 0, NEED_CLIP, "<control>F4", save_clip, 4 },
+	{ _("/Edit/Save Clipboard/5"), -1, 0, NEED_CLIP, "<control>F5", save_clip, 5 },
+	{ _("/Edit/Save Clipboard/6"), -1, 0, NEED_CLIP, "<control>F6", save_clip, 6 },
+	{ _("/Edit/Save Clipboard/7"), -1, 0, NEED_CLIP, "<control>F7", save_clip, 7 },
+	{ _("/Edit/Save Clipboard/8"), -1, 0, NEED_CLIP, "<control>F8", save_clip, 8 },
+	{ _("/Edit/Save Clipboard/9"), -1, 0, NEED_CLIP, "<control>F9", save_clip, 9 },
+	{ _("/Edit/Save Clipboard/10"), -1, 0, NEED_CLIP, "<control>F10", save_clip, 10 },
+	{ _("/Edit/Save Clipboard/11"), -1, 0, NEED_CLIP, "<control>F11", save_clip, 11 },
+	{ _("/Edit/Save Clipboard/12"), -1, 0, NEED_CLIP, "<control>F12", save_clip, 12 },
+	{ _("/Edit/sep3"), -4 },
+	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", pressed_choose_patterns, 0 },
+	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", pressed_choose_brush, 0 },
+	{ _("/Edit/Create Patterns"), -1, 0, 0, NULL, pressed_create_patterns, 0 },
+
+	{ _("/_View"), -2 },
+	{ _("/View/tear"), -3 },
+	{ _("/View/Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", pressed_toolbar_toggle, TOOLBAR_MAIN },
+	{ _("/View/Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", pressed_toolbar_toggle, TOOLBAR_TOOLS },
+	{ _("/View/Show Settings Toolbar"), 0, MENU_TBSET, 0, "F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS },
+	{ _("/View/Show Palette"), 0, MENU_SHOWPAL, 0, "F8", pressed_toolbar_toggle, TOOLBAR_PALETTE },
+	{ _("/View/Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, pressed_toolbar_toggle, TOOLBAR_STATUS },
+	{ _("/View/sep1"), -4 },
+	{ _("/View/Toggle Image View (Home)"), -1, 0, 0, NULL, toggle_view, 0 },
+	{ _("/View/Centralize Image"), 0, MENU_CENTER, 0, NULL, pressed_centralize, 0 },
+	{ _("/View/Show zoom grid"), 0, MENU_SHOWGRID, 0, NULL, zoom_grid, 0 },
+	{ _("/View/sep2"), -4 },
+	{ _("/View/View Window"), 0, MENU_VIEW, 0, "V", pressed_view, 0 },
+	{ _("/View/Horizontal Split"), 0, 0, 0, "H", pressed_view_hori, 0 },
+	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, pressed_view_focus, 0 },
+	{ _("/View/sep3"), -4 },
+	{ _("/View/Pan Window (End)"), -1, 0, 0, NULL, pressed_pan, 0 },
+	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", pressed_cline, 0 },
+	{ _("/View/Layers Window"), -1, MENU_LAYER, 0, "L", pressed_layers, 0 },
+
+	{ _("/_Image"), -2 },
+	{ _("/Image/tear"), -3 },
+	{ _("/Image/Convert To RGB"), -1, 0, NEED_IDX, NULL, pressed_convert_rgb, 0 },
+	{ _("/Image/Convert To Indexed"), -1, 0, NEED_24, NULL, pressed_quantize, 0 },
+	{ _("/Image/sep1"), -4 },
+	{ _("/Image/Scale Canvas ..."), -1, 0, 0, NULL, pressed_scale, 0 },
+	{ _("/Image/Resize Canvas ..."), -1, 0, 0, NULL, pressed_size, 0 },
+	{ _("/Image/Crop"), -1, 0, NEED_CROP, "<control><shift>X", pressed_crop, 0 },
+	{ _("/Image/sep2"), -4 },
+	{ _("/Image/Flip Vertically"), -1, 0, 0, NULL, pressed_flip_image_v, 0 },
+	{ _("/Image/Flip Horizontally"), -1, 0, 0, "<control>M", pressed_flip_image_h, 0 },
+	{ _("/Image/Rotate Clockwise"), -1, 0, 0, NULL, pressed_rotate_image, 0 },
+	{ _("/Image/Rotate Anti-Clockwise"), -1, 0, 0, NULL, pressed_rotate_image, 1 },
+	{ _("/Image/Free Rotate ..."), -1, 0, 0, NULL, pressed_rotate_free, 0 },
+	{ _("/Image/sep3"), -4 },
+	{ _("/Image/Information ..."), -1, 0, 0, "<control>I", pressed_information, 0 },
+	{ _("/Image/Preferences ..."), -1, MENU_PREFS, 0, "<control>P", pressed_preferences, 0 },
+
+	{ _("/_Selection"), -2 },
+	{ _("/Selection/tear"), -3 },
+	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", pressed_select_all, 0 },
+	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", pressed_select_none, 0 },
+	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LASSO, NULL, pressed_lasso, 0 },
+	{ _("/Selection/Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, pressed_lasso, 1 },
+	{ _("/Selection/sep1"), -4 },
+	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", pressed_rectangle, 0 },
+	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", pressed_rectangle, 1 },
+	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", pressed_ellipse, 0 },
+	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", pressed_ellipse, 1 },
+	{ _("/Selection/sep2"), -4 },
+	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_v, 0 },
+	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_h, 0 },
+	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 0 },
+	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 1 },
+	{ _("/Selection/sep3"), -4 },
+	{ _("/Selection/Alpha Blend A,B"), -1, 0, NEED_ALPHA, NULL, pressed_clip_alpha_scale, 0 },
+	{ _("/Selection/Move Alpha to Mask"), -1, 0, NEED_CLIP, NULL, pressed_clip_alphamask, 0 },
+	{ _("/Selection/Mask Colour A,B"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask, 0 },
+	{ _("/Selection/Unmask Colour A,B"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask, 255 },
+	{ _("/Selection/Mask All Colours"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask_all, 0 },
+	{ _("/Selection/Clear Mask"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask_clear, 0 },
+
+	{ _("/_Palette"), -2 },
+	{ _("/Palette/tear"), -3 },
+	{ _("/Palette/Open ..."), -1, 0, 0, NULL, pressed_open_pal, 0 },
+	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, pressed_save_pal, 0 },
+	{ _("/Palette/Load Default"), -1, 0, 0, NULL, pressed_default_pal, 0 },
+	{ _("/Palette/sep1"), -4 },
+	{ _("/Palette/Mask All"), -1, 0, 0, NULL, pressed_mask, 255 },
+	{ _("/Palette/Mask None"), -1, 0, 0, NULL, pressed_mask, 0 },
+	{ _("/Palette/sep2"), -4 },
+	{ _("/Palette/Swap A & B"), -1, 0, 0, "X", pressed_swap_AB, 0 },
+	{ _("/Palette/Edit Colour A & B ..."), -1, 0, 0, "<control>E", pressed_edit_AB, 0 },
+	{ _("/Palette/Palette Editor ..."), -1, 0, 0, "<control>W", pressed_allcol, 0 },
+	{ _("/Palette/Set Palette Size ..."), -1, 0, 0, NULL, pressed_add_cols, 0 },
+	{ _("/Palette/Merge Duplicate Colours"), -1, 0, NEED_IDX, NULL, pressed_remove_duplicates, 0 },
+	{ _("/Palette/Remove Unused Colours"), -1, 0, NEED_IDX, NULL, pressed_remove_unused, 0 },
+	{ _("/Palette/sep3"), -4 },
+	{ _("/Palette/Create Quantized (DL1)"), -1, 0, NEED_24, NULL, create_pal_quantized, 1 },
+	{ _("/Palette/Create Quantized (DL3)"), -1, 0, NEED_24, NULL, create_pal_quantized, 3 },
+	{ _("/Palette/Create Quantized (Wu)"), -1, 0, NEED_24, NULL, create_pal_quantized, 5 },
+	{ _("/Palette/sep4"), -4 },
+	{ _("/Palette/Sort Colours ..."), -1, 0, 0, NULL, pressed_sort_pal, 0 },
+	{ _("/Palette/Palette Shifter ..."), -1, 0, 0, NULL, pressed_shifter, 0 },
+
+	{ _("/Effe_cts"), -2 },
+	{ _("/Effects/tear"), -3 },
+	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", pressed_brcosa, 0 },
+	{ _("/Effects/Invert"), -1, 0, 0, "<control><shift>I", pressed_invert, 0 },
+	{ _("/Effects/Greyscale"), -1, 0, 0, "<control>G", pressed_greyscale, 0 },
+	{ _("/Effects/Greyscale (Gamma corrected)"), -1, 0, 0, "<control><shift>G", pressed_greyscale, 1 },
+	{ _("/Effects/Isometric Transformation"), -2 },
+	{ _("/Effects/Isometric Transformation/tear"), -3 },
+	{ _("/Effects/Isometric Transformation/Left Side Down"), -1, 0, 0, NULL, iso_trans, 0 },
+	{ _("/Effects/Isometric Transformation/Right Side Down"), -1, 0, 0, NULL, iso_trans, 1 },
+	{ _("/Effects/Isometric Transformation/Top Side Right"), -1, 0, 0, NULL, iso_trans, 2 },
+	{ _("/Effects/Isometric Transformation/Bottom Side Right"), -1, 0, 0, NULL, iso_trans, 3 },
+	{ _("/Effects/sep1"), -4 },
+	{ _("/Effects/Edge Detect"), -1, 0, NEED_NOIDX, NULL, pressed_edge_detect, 0 },
+	{ _("/Effects/Sharpen ..."), -1, 0, NEED_NOIDX, NULL, pressed_sharpen, 0 },
+	{ _("/Effects/Unsharp Mask ..."), -1, 0, NEED_NOIDX, NULL, pressed_unsharp, 0 },
+	{ _("/Effects/Soften ..."), -1, 0, NEED_NOIDX, NULL, pressed_soften, 0 },
+	{ _("/Effects/Gaussian Blur ..."), -1, 0, NEED_NOIDX, NULL, pressed_gauss, 0 },
+	{ _("/Effects/Emboss"), -1, 0, NEED_NOIDX, NULL, pressed_emboss, 0 },
+	{ _("/Effects/sep2"), -4 },
+	{ _("/Effects/Bacteria ..."), -1, 0, NEED_IDX, NULL, pressed_bacteria, 0 },
+
+	{ _("/Cha_nnels"), -2 },
+	{ _("/Channels/tear"), -3 },
+	{ _("/Channels/New ..."), -1, 0, 0, NULL, pressed_channel_create, -1 },
+	{ _("/Channels/Load ..."), -1, 0, 0, NULL, pressed_channel_load, 0 },
+	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, pressed_channel_save, 0 },
+	{ _("/Channels/Delete ..."), -1, 0, NEED_CHAN, NULL, pressed_channel_delete, -1 },
+	{ _("/Channels/sep1"), -4 },
+	{ _("/Channels/Edit Image"), 1, MENU_CHAN0, 0, NULL, pressed_channel_edit, CHN_IMAGE },
+	{ _("/Channels/Edit Alpha"), 1, MENU_CHAN1, 0, NULL, pressed_channel_edit, CHN_ALPHA },
+	{ _("/Channels/Edit Selection"), 1, MENU_CHAN2, 0, NULL, pressed_channel_edit, CHN_SEL },
+	{ _("/Channels/Edit Mask"), 1, MENU_CHAN3, 0, NULL, pressed_channel_edit, CHN_MASK },
+	{ _("/Channels/sep2"), -4 },
+	{ _("/Channels/Hide Image"), 0, MENU_DCHAN0, 0, NULL, pressed_channel_toggle, 1 },
+	{ _("/Channels/Disable Alpha"), 0, MENU_DCHAN1, 0, NULL, pressed_channel_disable, CHN_ALPHA },
+	{ _("/Channels/Disable Selection"), 0, MENU_DCHAN2, 0, NULL, pressed_channel_disable, CHN_SEL },
+	{ _("/Channels/Disable Mask"), 0, MENU_DCHAN3, 0, NULL, pressed_channel_disable, CHN_MASK },
+	{ _("/Channels/sep3"), -4 },
+	{ _("/Channels/Couple RGBA Operations"), 0, MENU_RGBA, 0, NULL, pressed_RGBA_toggle, 0 },
+	{ _("/Channels/Threshold ..."), -1, 0, 0, NULL, pressed_threshold, 0 },
+	{ _("/Channels/sep4"), -4 },
+	{ _("/Channels/View Alpha as an Overlay"), 0, 0, 0, NULL, pressed_channel_toggle, 0 },
+	{ _("/Channels/Configure Overlays ..."), -1, 0, 0, NULL, pressed_channel_config_overlay, 0 },
+
+	{ _("/_Layers"), -2 },
+	{ _("/Layers/tear"), -3 },
+	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", layer_press_save, 0 },
+	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, layer_press_save_as, 0 },
+	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, layer_press_save_composite, 0 },
+	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, layer_press_remove_all, 0 },
+	{ _("/Layers/sep1"), -4 },
+	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, pressed_animate_window, 0 },
+	{ _("/Layers/Preview Animation ..."), -1, 0, 0, NULL, ani_but_preview, 0 },
+	{ _("/Layers/Set key frame ..."), -1, 0, 0, NULL, pressed_set_key_frame, 0 },
+	{ _("/Layers/Remove all key frames ..."), -1, 0, 0, NULL, pressed_remove_key_frames, 0 },
+
+	{ _("/_Help"), -5 },
+	{ _("/Help/Documentation"), -1, 0, 0, NULL, pressed_docs, 0 },
+	{ _("/Help/About"), -1, MENU_HELP, 0, "F1", pressed_help, 0 },
+	{ _("/Help/sep1"), -4 },
+	{ _("/Help/Rebind Shortcut Keycodes"), -1, 0, 0, NULL, rebind_keys, 0 },
+
+	{ NULL, 0 }
+	};
+
+#undef _
+#define _(X) __(X)
+
 void main_init()
 {
 	gint i;
@@ -3207,318 +3533,12 @@ void main_init()
 	GtkWidget *vw_drawing, *menubar1, *vbox_main,
 			*hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
-	GtkItemFactory *item_factory;
-
-	GtkItemFactoryEntry menu_items[] = {
-		{ _("/_File"),			NULL,		NULL,0, "<Branch>" },
-		{ _("/File/tear"),		NULL,		NULL,0, "<Tearoff>" },
-		{ _("/File/New"),		"<control>N",	pressed_new,0, NULL },
-		{ _("/File/Open ..."),		"<control>O",	pressed_open_file, 0, NULL },
-		{ _("/File/Save"),		"<control>S",	pressed_save_file,0, NULL },
-		{ _("/File/Save As ..."),	NULL,		pressed_save_file_as, 0, NULL },
-		{ _("/File/sep1"),		NULL, 	  NULL,0, "<Separator>" },
-		{ _("/File/Export Undo Images ..."), NULL,	pressed_export_undo,0, NULL },
-		{ _("/File/Export Undo Images (reversed) ..."), NULL, pressed_export_undo2,0, NULL },
-		{ _("/File/Export ASCII Art ..."), NULL, 	pressed_export_ascii,0, NULL },
-		{ _("/File/Export Animated GIF ..."), NULL, 	pressed_export_gif,0, NULL },
-		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/File/Actions"),		NULL, 		NULL, 0, "<Branch>" },
-		{ _("/File/Actions/tear"),	NULL, 		NULL, 0, "<Tearoff>" },
-		{ _("/File/Actions/1"),		NULL, 		pressed_file_action, 1, NULL },
-		{ _("/File/Actions/2"),		NULL,		pressed_file_action, 2, NULL },
-		{ _("/File/Actions/3"),		NULL,		pressed_file_action, 3, NULL },
-		{ _("/File/Actions/4"),		NULL,		pressed_file_action, 4, NULL },
-		{ _("/File/Actions/5"),		NULL,		pressed_file_action, 5, NULL },
-		{ _("/File/Actions/6"),		NULL,		pressed_file_action, 6, NULL },
-		{ _("/File/Actions/7"),		NULL,		pressed_file_action, 7, NULL },
-		{ _("/File/Actions/8"),		NULL,		pressed_file_action, 8, NULL },
-		{ _("/File/Actions/9"),		NULL,		pressed_file_action, 9, NULL },
-		{ _("/File/Actions/10"),	NULL,		pressed_file_action, 10, NULL },
-		{ _("/File/Actions/11"),	NULL, 		pressed_file_action, 11, NULL },
-		{ _("/File/Actions/12"),	NULL,		pressed_file_action, 12, NULL },
-		{ _("/File/Actions/13"),	NULL,		pressed_file_action, 13, NULL },
-		{ _("/File/Actions/14"),	NULL,		pressed_file_action, 14, NULL },
-		{ _("/File/Actions/15"),	NULL,		pressed_file_action, 15, NULL },
-		{ _("/File/Actions/sep2"),	NULL,		NULL,0, "<Separator>" },
-		{ _("/File/Actions/Configure"),	NULL,		pressed_file_configure, 0, NULL },
-		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/File/1"),  		"<shift><control>F1", pressed_load_recent, 1, NULL },
-		{ _("/File/2"),  		"<shift><control>F2", pressed_load_recent, 2, NULL },
-		{ _("/File/3"),  		"<shift><control>F3", pressed_load_recent, 3, NULL },
-		{ _("/File/4"),  		"<shift><control>F4", pressed_load_recent, 4, NULL },
-		{ _("/File/5"),  		"<shift><control>F5", pressed_load_recent, 5, NULL },
-		{ _("/File/6"),  		"<shift><control>F6", pressed_load_recent, 6, NULL },
-		{ _("/File/7"),  		"<shift><control>F7", pressed_load_recent, 7, NULL },
-		{ _("/File/8"),  		"<shift><control>F8", pressed_load_recent, 8, NULL },
-		{ _("/File/9"),  		"<shift><control>F9", pressed_load_recent, 9, NULL },
-		{ _("/File/10"), 		"<shift><control>F10", pressed_load_recent, 10, NULL },
-		{ _("/File/11"), 		NULL,		pressed_load_recent, 11, NULL },
-		{ _("/File/12"), 		NULL,		pressed_load_recent, 12, NULL },
-		{ _("/File/13"), 		NULL,		pressed_load_recent, 13, NULL },
-		{ _("/File/14"), 		NULL,		pressed_load_recent, 14, NULL },
-		{ _("/File/15"), 		NULL,		pressed_load_recent, 15, NULL },
-		{ _("/File/16"), 		NULL,		pressed_load_recent, 16, NULL },
-		{ _("/File/17"), 		NULL,		pressed_load_recent, 17, NULL },
-		{ _("/File/18"), 		NULL,		pressed_load_recent, 18, NULL },
-		{ _("/File/19"), 		NULL,		pressed_load_recent, 19, NULL },
-		{ _("/File/20"),		NULL,		pressed_load_recent, 20, NULL },
-		{ _("/File/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/File/Quit"),		"<control>Q",	quit_all,	0, NULL },
-
-		{ _("/_Edit"),			NULL,		NULL,0, "<Branch>" },
-		{ _("/Edit/tear"),		NULL,		NULL,0, "<Tearoff>" },
-		{ _("/Edit/Undo"),		"<control>Z",	main_undo,0, NULL },
-		{ _("/Edit/Redo"),		"<control>R",	main_redo,0, NULL },
-		{ _("/Edit/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Edit/Cut"),		"<control>X",	pressed_copy, 1, NULL },
-		{ _("/Edit/Copy"),		"<control>C",	pressed_copy, 0, NULL },
-		{ _("/Edit/Paste To Centre"),	"<control>V",	pressed_paste_centre, 0, NULL },
-		{ _("/Edit/Paste To New Layer"), "<control><shift>V", pressed_paste_layer, 0, NULL },
-		{ _("/Edit/Paste"),		"<control>K",	pressed_paste, 0, NULL },
-		{ _("/Edit/Paste Text"),	"T",		pressed_text, 0, NULL },
-		{ _("/Edit/sep1"),			NULL, 	  NULL,0, "<Separator>" },
-		{ _("/Edit/Load Clipboard"),		NULL, 	  NULL, 0, "<Branch>" },
-		{ _("/Edit/Load Clipboard/tear"),	NULL, 	  NULL, 0, "<Tearoff>" },
-		{ _("/Edit/Load Clipboard/1"),		"<shift>F1",    load_clip, 1, NULL },
-		{ _("/Edit/Load Clipboard/2"),		"<shift>F2",    load_clip, 2, NULL },
-		{ _("/Edit/Load Clipboard/3"),		"<shift>F3",    load_clip, 3, NULL },
-		{ _("/Edit/Load Clipboard/4"),		"<shift>F4",    load_clip, 4, NULL },
-		{ _("/Edit/Load Clipboard/5"),		"<shift>F5",    load_clip, 5, NULL },
-		{ _("/Edit/Load Clipboard/6"),		"<shift>F6",    load_clip, 6, NULL },
-		{ _("/Edit/Load Clipboard/7"),		"<shift>F7",    load_clip, 7, NULL },
-		{ _("/Edit/Load Clipboard/8"),		"<shift>F8",    load_clip, 8, NULL },
-		{ _("/Edit/Load Clipboard/9"),		"<shift>F9",    load_clip, 9, NULL },
-		{ _("/Edit/Load Clipboard/10"),		"<shift>F10",   load_clip, 10, NULL },
-		{ _("/Edit/Load Clipboard/11"),		"<shift>F11",   load_clip, 11, NULL },
-		{ _("/Edit/Load Clipboard/12"),		"<shift>F12",   load_clip, 12, NULL },
-		{ _("/Edit/Save Clipboard"),		NULL, 	  NULL, 0, "<Branch>" },
-		{ _("/Edit/Save Clipboard/tear"),	NULL, 	  NULL, 0, "<Tearoff>" },
-		{ _("/Edit/Save Clipboard/1"),		"<control>F1",  save_clip, 1, NULL },
-		{ _("/Edit/Save Clipboard/2"),		"<control>F2",  save_clip, 2, NULL },
-		{ _("/Edit/Save Clipboard/3"),		"<control>F3",  save_clip, 3, NULL },
-		{ _("/Edit/Save Clipboard/4"),		"<control>F4",  save_clip, 4, NULL },
-		{ _("/Edit/Save Clipboard/5"),		"<control>F5",  save_clip, 5, NULL },
-		{ _("/Edit/Save Clipboard/6"),		"<control>F6",  save_clip, 6, NULL },
-		{ _("/Edit/Save Clipboard/7"),		"<control>F7",  save_clip, 7, NULL },
-		{ _("/Edit/Save Clipboard/8"),		"<control>F8",  save_clip, 8, NULL },
-		{ _("/Edit/Save Clipboard/9"),		"<control>F9",  save_clip, 9, NULL },
-		{ _("/Edit/Save Clipboard/10"),  	"<control>F10", save_clip, 10, NULL },
-		{ _("/Edit/Save Clipboard/11"),  	"<control>F11", save_clip, 11, NULL },
-		{ _("/Edit/Save Clipboard/12"),  	"<control>F12", save_clip, 12, NULL },
-		{ _("/Edit/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Edit/Choose Pattern ..."),	"F2",	pressed_choose_patterns,0, NULL },
-		{ _("/Edit/Choose Brush ..."),		"F3",	pressed_choose_brush,0, NULL },
-		{ _("/Edit/Create Patterns"),		NULL,	pressed_create_patterns,0, NULL },
-
-		{ _("/_View"),			NULL,		NULL,0, "<Branch>" },
-		{ _("/View/tear"),		NULL,		NULL,0, "<Tearoff>" },
-{ _("/View/Show Main Toolbar"),		"F5", pressed_toolbar_toggle, TOOLBAR_MAIN, "<CheckItem>" },
-{ _("/View/Show Tools Toolbar"),	"F6", pressed_toolbar_toggle, TOOLBAR_TOOLS, "<CheckItem>" },
-{ _("/View/Show Settings Toolbar"),	"F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS, "<CheckItem>" },
-{ _("/View/Show Palette"),		"F8", pressed_toolbar_toggle, TOOLBAR_PALETTE, "<CheckItem>" },
-{ _("/View/Show Status Bar"),		NULL, pressed_toolbar_toggle, TOOLBAR_STATUS, "<CheckItem>" },
-		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/View/Toggle Image View (Home)"), NULL,	toggle_view,0, NULL },
-		{ _("/View/Centralize Image"),	NULL,		pressed_centralize,0, "<CheckItem>" },
-		{ _("/View/Show zoom grid"),	NULL,		zoom_grid,0, "<CheckItem>" },
-		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/View/View Window"),	"V",		pressed_view,0, "<CheckItem>" },
-		{ _("/View/Horizontal Split"),	"H",		pressed_view_hori,0, "<CheckItem>" },
-		{ _("/View/Focus View Window"),	NULL,		pressed_view_focus,0, "<CheckItem>" },
-		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/View/Pan Window (End)"),	NULL,		pressed_pan,0, NULL },
-		{ _("/View/Command Line Window"),	"C",	pressed_cline,0, NULL },
-		{ _("/View/Layers Window"),		"L",	pressed_layers, 0, NULL },
-
-		{ _("/_Image"),  			NULL, 	NULL,0, "<Branch>" },
-		{ _("/Image/tear"),			NULL, 	NULL,0, "<Tearoff>" },
-		{ _("/Image/Convert To RGB"),		NULL, 	pressed_convert_rgb,0, NULL },
-		{ _("/Image/Convert To Indexed"),	NULL,	pressed_quantize,0, NULL },
-		{ _("/Image/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Image/Scale Canvas ..."),  	NULL,	pressed_scale,0, NULL },
-		{ _("/Image/Resize Canvas ..."), 	NULL,	pressed_size,0, NULL },
-		{ _("/Image/Crop"),			"<control><shift>X", pressed_crop, 0, NULL },
-		{ _("/Image/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Image/Flip Vertically"),		NULL,	pressed_flip_image_v,0, NULL },
-		{ _("/Image/Flip Horizontally"), 	"<control>M", pressed_flip_image_h,0, NULL },
-		{ _("/Image/Rotate Clockwise"),  	NULL,	pressed_rotate_image, 0, NULL },
-		{ _("/Image/Rotate Anti-Clockwise"),	NULL,	pressed_rotate_image, 1, NULL },
-		{ _("/Image/Free Rotate ..."),		NULL,	pressed_rotate_free,0, NULL },
-		{ _("/Image/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Image/Information ..."),		"<control>I", pressed_information,0, NULL },
-		{ _("/Image/Preferences ..."),		"<control>P", pressed_preferences,0, NULL },
-
-		{ _("/_Selection"),			NULL,	NULL,0, "<Branch>" },
-		{ _("/Selection/tear"),  		NULL,	NULL,0, "<Tearoff>" },
-		{ _("/Selection/Select All"),		"<control>A",   pressed_select_all, 0, NULL },
-		{ _("/Selection/Select None (Esc)"), "<shift><control>A", pressed_select_none,0, NULL },
-		{ _("/Selection/Lasso Selection"),	NULL,	pressed_lasso, 0, NULL },
-		{ _("/Selection/Lasso Selection Cut"),	NULL,	pressed_lasso, 1, NULL },
-		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Selection/Outline Selection"), "<control>T", pressed_rectangle, 0, NULL },
-		{ _("/Selection/Fill Selection"), "<shift><control>T", pressed_rectangle, 1, NULL },
-		{ _("/Selection/Outline Ellipse"), "<control>L", pressed_ellipse, 0, NULL },
-		{ _("/Selection/Fill Ellipse"), "<shift><control>L", pressed_ellipse, 1, NULL },
-		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Selection/Flip Vertically"),	NULL,	pressed_flip_sel_v,0, NULL },
-		{ _("/Selection/Flip Horizontally"),	NULL,	pressed_flip_sel_h,0, NULL },
-		{ _("/Selection/Rotate Clockwise"),	NULL,	pressed_rotate_sel, 0, NULL },
-		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel, 1, NULL },
-		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Selection/Alpha Blend A,B"),	NULL,	pressed_clip_alpha_scale,0, NULL },
-		{ _("/Selection/Move Alpha to Mask"),	NULL,	pressed_clip_alphamask,0, NULL },
-		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask, 0, NULL },
-		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_mask, 255, NULL },
-		{ _("/Selection/Mask All Colours"),	NULL,	pressed_clip_mask_all,0, NULL },
-		{ _("/Selection/Clear Mask"),		NULL,	pressed_clip_mask_clear,0, NULL },
-
-		{ _("/_Palette"),			NULL, 	NULL,0, "<Branch>" },
-		{ _("/Palette/tear"),			NULL,	NULL,0, "<Tearoff>" },
-		{ _("/Palette/Open ..."),		NULL,	pressed_open_pal,0, NULL },
-		{ _("/Palette/Save As ..."),		NULL,	pressed_save_pal,0, NULL },
-		{ _("/Palette/Load Default"),		NULL, 	pressed_default_pal,0, NULL },
-		{ _("/Palette/sep1"),			NULL, 	NULL,0, "<Separator>" },
-		{ _("/Palette/Mask All"),		NULL, 	pressed_mask, 255, NULL },
-		{ _("/Palette/Mask None"),		NULL, 	pressed_mask, 0, NULL },
-		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Palette/Swap A & B"),		"X",	pressed_swap_AB,0, NULL },
-		{ _("/Palette/Edit Colour A & B ..."), "<control>E", pressed_edit_AB,0, NULL },
-		{ _("/Palette/Palette Editor ..."), "<control>W", pressed_allcol,0, NULL },
-		{ _("/Palette/Set Palette Size ..."),	NULL,	pressed_add_cols,0, NULL },
-		{ _("/Palette/Merge Duplicate Colours"), NULL,	pressed_remove_duplicates,0, NULL },
-		{ _("/Palette/Remove Unused Colours"),	NULL,	pressed_remove_unused,0, NULL },
-		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Palette/Create Quantized (DL1)"), NULL,	create_pal_quantized, 1, NULL },
-		{ _("/Palette/Create Quantized (DL3)"), NULL,	create_pal_quantized, 3, NULL },
-		{ _("/Palette/Create Quantized (Wu)"),  NULL,	create_pal_quantized, 5, NULL },
-		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Palette/Sort Colours ..."),	NULL,	pressed_sort_pal,0, NULL },
-		{ _("/Palette/Palette Shifter ..."),	NULL,	pressed_shifter,0, NULL },
-
-		{ _("/Effe_cts"),		NULL,	 	NULL, 0, "<Branch>" },
-		{ _("/Effects/tear"),		NULL,	 	NULL, 0, "<Tearoff>" },
-		{ _("/Effects/Transform Colour ..."), "<control><shift>C", pressed_brcosa,0, NULL },
-		{ _("/Effects/Invert"),		"<control><shift>I", pressed_invert,0, NULL },
-		{ _("/Effects/Greyscale"),	"<control>G",	pressed_greyscale, 0, NULL },
-		{ _("/Effects/Greyscale (Gamma corrected)"), "<control><shift>G", pressed_greyscale, 1, NULL },
-		{ _("/Effects/Isometric Transformation"), NULL, NULL, 0, "<Branch>" },
-		{ _("/Effects/Isometric Transformation/tear"), NULL, NULL, 0, "<Tearoff>" },
-		{ _("/Effects/Isometric Transformation/Left Side Down"), NULL, iso_trans, 0, NULL },
-		{ _("/Effects/Isometric Transformation/Right Side Down"), NULL, iso_trans, 1, NULL },
-		{ _("/Effects/Isometric Transformation/Top Side Right"), NULL, iso_trans, 2, NULL },
-		{ _("/Effects/Isometric Transformation/Bottom Side Right"), NULL, iso_trans, 3, NULL },
-		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Effects/Edge Detect"),	NULL,		pressed_edge_detect,0, NULL },
-		{ _("/Effects/Sharpen ..."),	NULL,		pressed_sharpen,0, NULL },
-		{ _("/Effects/Unsharp Mask ..."), NULL,		pressed_unsharp,0, NULL },
-		{ _("/Effects/Soften ..."),	NULL,		pressed_soften,0, NULL },
-		{ _("/Effects/Gaussian Blur ..."), NULL,	pressed_gauss,0, NULL },
-		{ _("/Effects/Emboss"),		NULL,		pressed_emboss,0, NULL },
-		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Effects/Bacteria ..."),	NULL,		pressed_bacteria, 0, NULL },
-
-		{ _("/Cha_nnels"),		NULL,		NULL, 0, "<Branch>" },
-		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Channels/New ..."),	NULL,		pressed_channel_create, -1, NULL },
-		{ _("/Channels/Load ..."),	NULL,		pressed_channel_load, 0, NULL },
-		{ _("/Channels/Save As ..."),	NULL,		pressed_channel_save, 0, NULL },
-		{ _("/Channels/Delete ..."),	NULL,		pressed_channel_delete, -1, NULL },
-		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, CHN_IMAGE, "<RadioItem>" },
-		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, CHN_ALPHA, _("/Channels/Edit Image") },
-		{ _("/Channels/Edit Selection"), NULL, pressed_channel_edit, CHN_SEL, _("/Channels/Edit Image") },
-		{ _("/Channels/Edit Mask"), 	NULL, pressed_channel_edit, CHN_MASK, _("/Channels/Edit Image") },
-		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/Hide Image"),	NULL, pressed_channel_toggle, 1, "<CheckItem>" },
-		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, CHN_ALPHA, "<CheckItem>" },
-		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, CHN_SEL, "<CheckItem>" },
-		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
-		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/Couple RGBA Operations"), NULL, pressed_RGBA_toggle, 0, "<CheckItem>" },
-		{ _("/Channels/Threshold ..."), NULL, pressed_threshold, 0, NULL },
-		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_toggle, 0, "<CheckItem>" },
-		{ _("/Channels/Configure Overlays ..."), NULL, pressed_channel_config_overlay, 0, NULL },
-
-		{ _("/_Layers"),	 	NULL, 		NULL, 0, "<Branch>" },
-		{ _("/Layers/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Layers/Save"),		"<shift><control>S", layer_press_save, 0, NULL },
-		{ _("/Layers/Save As ..."),	NULL,		layer_press_save_as, 0, NULL },
-		{ _("/Layers/Save Composite Image ..."), NULL,	layer_press_save_composite, 0, NULL },
-		{ _("/Layers/Remove All Layers ..."), NULL,	layer_press_remove_all, 0, NULL },
-		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
-		{ _("/Layers/Configure Animation ..."),		NULL, pressed_animate_window,0, NULL },
-		{ _("/Layers/Preview Animation ..."), NULL,	ani_but_preview, 0, NULL },
-		{ _("/Layers/Set key frame ..."), NULL,		pressed_set_key_frame, 0, NULL },
-		{ _("/Layers/Remove all key frames ..."), NULL, pressed_remove_key_frames, 0, NULL },
-
-		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
-		{ _("/Help/Documentation"),	NULL,		pressed_docs,0, NULL },
-		{ _("/Help/About"),		"F1",		pressed_help,0, NULL },
-		{ _("/Help/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
-		{ _("/Help/Rebind Shortcut Keycodes"), NULL,	rebind_keys, 0, NULL }
-	};
-
-	char
-	*item_undo[] = {_("/Edit/Undo"), _("/File/Export Undo Images ..."),
-			_("/File/Export Undo Images (reversed) ..."),
-			NULL},
-	*item_redo[] = {_("/Edit/Redo"),
-			NULL},
-	*item_need_marquee[] = {_("/Selection/Select None (Esc)"),
-			NULL},
-	*item_need_selection[] = { _("/Edit/Cut"), _("/Edit/Copy"), _("/Selection/Fill Selection"),
-				_("/Selection/Outline Selection"), _("/Selection/Fill Ellipse"),
-				_("/Selection/Outline Ellipse"),
-			NULL},
-	*item_crop[] = { _("/Image/Crop"),
-			NULL},
-	*item_need_clipboard[] = {_("/Edit/Paste"), _("/Edit/Paste To Centre"),
-			_("/Edit/Paste To New Layer"),
-			_("/Selection/Flip Horizontally"), _("/Selection/Flip Vertically"),
-			_("/Selection/Rotate Clockwise"), _("/Selection/Rotate Anti-Clockwise"),
-			_("/Selection/Move Alpha to Mask"),
-			_("/Selection/Mask Colour A,B"), _("/Selection/Clear Mask"),
-			_("/Selection/Unmask Colour A,B"), _("/Selection/Mask All Colours"),
-			NULL},
-	*item_help[] = {_("/Help/About"), NULL},
-	*item_prefs[] = {_("/Image/Preferences ..."), NULL},
-	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Palette/Create Quantized (DL1)"),
-			_("/Palette/Create Quantized (DL3)"), _("/Palette/Create Quantized (Wu)"),
-			NULL },
-	*item_not_indexed[] = { _("/Effects/Edge Detect"), _("/Effects/Emboss"),
-			_("/Effects/Sharpen ..."), _("/Effects/Unsharp Mask ..."),
-			_("/Effects/Soften ..."), _("/Effects/Gaussian Blur ..."),
-			NULL },
-	*item_only_indexed[] = { _("/Image/Convert To RGB"), _("/Effects/Bacteria ..."),
-			_("/Palette/Merge Duplicate Colours"), _("/Palette/Remove Unused Colours"),
-			_("/File/Export ASCII Art ..."), _("/File/Export Animated GIF ..."),
-			NULL },
-	*item_cline[] = {_("/View/Command Line Window"),
-			NULL},
-	*item_view[] = {_("/View/View Window"),
-			NULL},
-	*item_layer[] = {_("/View/Layers Window"),
-			NULL},
-	*item_lasso[] = {_("/Selection/Lasso Selection"), _("/Selection/Lasso Selection Cut"),
-			_("/Edit/Cut"), _("/Edit/Copy"),
-			_("/Selection/Fill Selection"), _("/Selection/Outline Selection"),
-			NULL},
-	*item_frames[] = {_("/Frames"), NULL},
-	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL},
-	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
-			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
-			NULL},
-	*item_chan_del[] = {  _("/Channels/Delete ..."),NULL },
-	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
-			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
-	;
-
 
 
 	gdk_rgb_init();
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
-	mem_jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
+	jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
+	png_compression = inifile_get_gint32( "pngCompression", 9 );
 	q_quit = inifile_get_gboolean( "quitToggle", TRUE );
 	chequers_optimize = inifile_get_gboolean( "optimizeChequers", TRUE );
 
@@ -3535,86 +3555,24 @@ void main_init()
 	mem_nudge = inifile_get_gint32("pixelNudge", 8 );
 
 	accel_group = gtk_accel_group_new ();
-	item_factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR,"<main>", accel_group);
-	gtk_item_factory_create_items_ac(item_factory, (sizeof(menu_items)/sizeof((menu_items)[0])),
-		menu_items, NULL, 2);
+	menubar1 = fill_menu(main_menu, accel_group);
 
-	menu_recent[0] = gtk_item_factory_get_item(item_factory, _("/File/sep2") );
-	for ( i=1; i<21; i++ )
-	{
-		sprintf(txt, _("/File/%i"), i);
-		menu_recent[i] = gtk_item_factory_get_widget(item_factory, txt );
-	}
-	menu_recent[21] = NULL;
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]),
+		inifile_get_gboolean("couple_RGBA", TRUE));
 
-	menu_faction[0] = gtk_item_factory_get_item(item_factory, _("/File/Actions/sep2") );
-	for ( i=1; i<(FACTION_PRESETS_TOTAL+1); i++ )
-	{
-		sprintf(txt, _("/File/Actions/%i"), i);
-		menu_faction[i] = gtk_item_factory_get_widget(item_factory, txt );
-	}
-	menu_faction[FACTION_PRESETS_TOTAL+1] = NULL;
-
-
-	pop_men_dis( item_factory, item_undo, menu_undo );
-	pop_men_dis( item_factory, item_redo, menu_redo );
-	pop_men_dis( item_factory, item_need_marquee, menu_need_marquee );
-	pop_men_dis( item_factory, item_need_selection, menu_need_selection );
-	pop_men_dis( item_factory, item_need_clipboard, menu_need_clipboard );
-	pop_men_dis( item_factory, item_crop, menu_crop );
-	pop_men_dis( item_factory, item_help, menu_help );
-	pop_men_dis( item_factory, item_prefs, menu_prefs );
-	pop_men_dis( item_factory, item_frames, menu_frames );
-	pop_men_dis( item_factory, item_only_24, menu_only_24 );
-	pop_men_dis( item_factory, item_not_indexed, menu_not_indexed );
-	pop_men_dis( item_factory, item_only_indexed, menu_only_indexed );
-	pop_men_dis( item_factory, item_cline, menu_cline );
-	pop_men_dis( item_factory, item_view, menu_view );
-	pop_men_dis( item_factory, item_layer, menu_layer );
-	pop_men_dis( item_factory, item_lasso, menu_lasso );
-	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
-	pop_men_dis( item_factory, item_chann_x, menu_chann_x );
-	pop_men_dis( item_factory, item_chan_del, menu_chan_del );
-	pop_men_dis( item_factory, item_chan_dis, menu_chan_dis );
-
-	for (i = 1; i <= 12; i++)	// Set up save clipboard slots
-	{
-		snprintf( txt, 60, "%s/%i", _("/Edit/Save Clipboard"), i );
-		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_need_clipboard );
-	}
-
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
-		_("/Channels/Couple RGBA Operations") ) ),
-		inifile_get_gboolean("couple_RGBA", TRUE ) );
-
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
-		_("/View/Focus View Window") ) ),
-		inifile_get_gboolean("view_focus", TRUE ) );
-
-	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
-		_("/View/Centralize Image") ) ), canvas_image_centre );
-
-
-	toolbar_menu_widgets[1] = gtk_item_factory_get_item(item_factory,
-			_("/View/Show Main Toolbar") );
-	toolbar_menu_widgets[2] = gtk_item_factory_get_item(item_factory,
-			_("/View/Show Tools Toolbar") );
-	toolbar_menu_widgets[3] = gtk_item_factory_get_item(item_factory,
-			_("/View/Show Settings Toolbar") );
-	toolbar_menu_widgets[4] = gtk_item_factory_get_item(item_factory,
-			_("/View/Show Palette") );
-	toolbar_menu_widgets[5] = gtk_item_factory_get_item(item_factory,
-			_("/View/Show Status Bar") );
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VWFOCUS]),
+		inifile_get_gboolean("view_focus", TRUE));
 
 	mem_continuous = inifile_get_gboolean( "continuousPainting", TRUE );
 	mem_undo_opacity = inifile_get_gboolean( "opacityToggle", TRUE );
 	smudge_mode = inifile_get_gboolean("smudgeOpacity", FALSE);
+	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
 	mem_show_grid = inifile_get_gboolean( "gridToggle", TRUE );
-	gtk_check_menu_item_set_active(
-		GTK_CHECK_MENU_ITEM(
-			gtk_item_factory_get_item(item_factory, _("/View/Show zoom grid") )
-					), mem_show_grid );
+
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_CENTER]),
+		canvas_image_centre);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_SHOWGRID]),
+		mem_show_grid);
 
 	mem_grid_min = inifile_get_gint32("gridMin", 8 );
 	mem_grid_rgb[0] = inifile_get_gint32("gridR", 50 );
@@ -3643,7 +3601,7 @@ void main_init()
 	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
 	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
-	menubar1 = pack(vbox_main, gtk_item_factory_get_widget(item_factory, "<main>"));
+	pack(vbox_main, menubar1);
 	gtk_widget_show(menubar1);
 
 
@@ -3785,7 +3743,6 @@ void main_init()
 	gtk_signal_connect_object (GTK_OBJECT (main_window), "key_press_event",
 		GTK_SIGNAL_FUNC (handle_keypress), NULL);
 
-	men_item_state( menu_frames, FALSE );
 	men_item_state( menu_undo, FALSE );
 	men_item_state( menu_redo, FALSE );
 	men_item_state( menu_need_marquee, FALSE );
@@ -3822,10 +3779,8 @@ void main_init()
 	snprintf(txt, 250, "%s%c.clipboard", get_home_directory(), DIR_SEP);
 	snprintf(mem_clip_file, 250, "%s", inifile_get("clipFilename", txt));
 
-	if (files_passed > 1)
-		pressed_cline(NULL, NULL);
-	else
-		men_item_state(menu_cline, FALSE);
+	if (files_passed > 1) pressed_cline(NULL, NULL);
+	else gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
 
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 

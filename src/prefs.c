@@ -34,7 +34,7 @@
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg,
-	*spinbutton_recent, *spinbutton_silence;
+	*spinbutton_png, *spinbutton_recent, *spinbutton_silence;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
@@ -134,7 +134,7 @@ static void delete_prefs(GtkWidget *widget)
 {
 	if ( inputd != NULL ) delete_inputd( NULL, NULL, NULL );
 	gtk_widget_destroy(prefs_window);
-	men_item_state( menu_prefs, TRUE );
+	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
 	clipboard_entry = NULL;
 }
 
@@ -264,7 +264,8 @@ static void prefs_apply(GtkWidget *widget)
 	mem_xpm_trans = read_spin(spinbutton_trans);
 	mem_xbm_hot_x = read_spin(spinbutton_hotx);
 	mem_xbm_hot_y = read_spin(spinbutton_hoty);
-	mem_jpeg_quality = read_spin(spinbutton_jpeg);
+	jpeg_quality = read_spin(spinbutton_jpeg);
+	png_compression = read_spin(spinbutton_png);
 	recent_files = read_spin(spinbutton_recent);
 	silence_limit = read_spin(spinbutton_silence);
 
@@ -291,7 +292,8 @@ static void prefs_apply(GtkWidget *widget)
 	inifile_set_gint32( "undoMBlimit", mem_undo_limit );
 	inifile_set_gint32( "backgroundGrey", mem_background );
 	inifile_set_gint32( "pixelNudge", mem_nudge );
-	inifile_set_gint32( "jpegQuality", mem_jpeg_quality );
+	inifile_set_gint32( "jpegQuality", jpeg_quality );
+	inifile_set_gint32( "pngCompression", png_compression );
 	inifile_set_gint32( "recentFiles", recent_files );
 	inifile_set_gint32( "silence_limit", silence_limit );
 
@@ -429,8 +431,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
-		_("JPEG Save Quality (100=High)   "), _("Recently Used Files"),
-		_("Progress bar silence limit") };
+//		_("JPEG Save Quality (100=High)   "), _("PNG Compression (0=None)"),
+		_("JPEG Save Quality (100=High)"), _("PNG Compression (0=None)"),
+		_("Recently Used Files"), _("Progress bar silence limit") };
 	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
 		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
@@ -438,7 +441,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char txt[64];
 
 
-	men_item_state( menu_prefs, FALSE );	// Make sure the user can only open 1 prefs window
+	// Make sure the user can only open 1 prefs window
+	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
 
 	prefs_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Preferences"), GTK_WIN_POS_CENTER, FALSE );
 
@@ -485,16 +489,17 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 ///	---- TAB2 - FILES
 
 	page = add_new_page(notebook1, _("Files"));
-	table4 = add_a_table( 5, 2, 10, page );
+	table4 = add_a_table(6, 2, 10, page);
 
-	for ( i=0; i<6; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0 );
+	for (i = 0; i < 7; i++) add_to_table(tab_tex2[i], table4, i, 0, 4);
 
 	spinbutton_trans   = spin_to_table(table4, 0, 1, 4, mem_xpm_trans, -1, mem_cols - 1);
 	spinbutton_hotx    = spin_to_table(table4, 1, 1, 4, mem_xbm_hot_x, -1, mem_width - 1);
 	spinbutton_hoty    = spin_to_table(table4, 2, 1, 4, mem_xbm_hot_y, -1, mem_height - 1);
-	spinbutton_jpeg    = spin_to_table(table4, 3, 1, 4, mem_jpeg_quality, 0, 100);
-	spinbutton_recent  = spin_to_table(table4, 4, 1, 4, recent_files, 0, MAX_RECENT);
-	spinbutton_silence = spin_to_table(table4, 5, 1, 4, silence_limit, 0, 28);
+	spinbutton_jpeg    = spin_to_table(table4, 3, 1, 4, jpeg_quality, 0, 100);
+	spinbutton_png     = spin_to_table(table4, 4, 1, 4, png_compression, 0, 9);
+	spinbutton_recent  = spin_to_table(table4, 5, 1, 4, recent_files, 0, MAX_RECENT);
+	spinbutton_silence = spin_to_table(table4, 6, 1, 4, silence_limit, 0, 28);
 
 ///	---- TAB3 - PATHS
 

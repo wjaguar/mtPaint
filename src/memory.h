@@ -226,7 +226,6 @@ int mem_brcosa_allow[3];		// BRCOSA RGB
 
 int mem_xpm_trans;			// Current XPM file transparency colour index
 int mem_xbm_hot_x, mem_xbm_hot_y;	// Current XBM hot spot
-int mem_jpeg_quality;			// JPEG quality setting
 
 /// PALETTE
 

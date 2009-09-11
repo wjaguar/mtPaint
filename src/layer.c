@@ -98,7 +98,7 @@ typedef struct {
 } layer_item;
 
 static GtkWidget *layer_list, *entry_layer_name,
-	*layer_buttons[10], *layer_spin, *layer_slider,
+	*layer_tools[TOTAL_ICONS_LAYER], *layer_spin, *layer_slider,
 	*layer_label_position, *layer_trans_toggle, *layer_show_toggle;
 static layer_item layer_list_data[MAX_LAYERS + 1];
 
@@ -239,12 +239,12 @@ static void shift_layer(int val)
 	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
 	layers_notify_changed();
 	if ( layer_selected == layers_total )
-		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
+		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
 	if ( layer_selected == 0 )
-		gtk_widget_set_sensitive( layer_buttons[2], FALSE );	// Lower button
+		gtk_widget_set_sensitive(layer_tools[LTB_LOWER], FALSE);
 
-	if ( val==1 ) gtk_widget_set_sensitive( layer_buttons[2], TRUE );	// Lower button
-	if ( val==-1 ) gtk_widget_set_sensitive( layer_buttons[1], TRUE );	// Raise button
+	if ( val==1 ) gtk_widget_set_sensitive(layer_tools[LTB_LOWER], TRUE);
+	if ( val==-1 ) gtk_widget_set_sensitive(layer_tools[LTB_RAISE], TRUE);
 
 	update_cols();				// Update status bar info
 
@@ -375,16 +375,13 @@ void layer_new_chores2( int l )
 			layer_table[l].visible);
 
 		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[l].item );
-		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
-		if ( l == 1 )
-			gtk_widget_set_sensitive( layer_buttons[2], FALSE );	// Lower button
-		else
-			gtk_widget_set_sensitive( layer_buttons[2], TRUE );	// Lower button
+		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
+		gtk_widget_set_sensitive(layer_tools[LTB_LOWER], l != 1);
 
-		if ( l == MAX_LAYERS )			// Hide new/duplicate if we have max layers
+		if ( l == MAX_LAYERS )		// Hide new/duplicate if we have max layers
 		{
-			gtk_widget_set_sensitive( layer_buttons[3], FALSE );
-			gtk_widget_set_sensitive( layer_buttons[4], FALSE );
+			gtk_widget_set_sensitive(layer_tools[LTB_NEW], FALSE);
+			gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE);
 		}
 	}
 
@@ -436,7 +433,6 @@ void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed
 	layer_new_chores( layers_total, w, h, type, cols, temp_img, lim );
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
-	men_item_state( menu_frames, TRUE );
 
 	if ( layers_total == 1 ) ani_init();		// Start with fresh animation data if new
 }
@@ -544,8 +540,6 @@ static void layer_delete(int item)
 
 	layers_notify_changed();
 	update_all_views();
-
-	if ( layers_total < 1 ) men_item_state( menu_frames, FALSE );
 }
 
 
@@ -572,9 +566,9 @@ static void layer_refresh_list()
 		}
 	}
 	if ( layer_selected == layers_total )
-		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
-	gtk_widget_set_sensitive( layer_buttons[3], TRUE );		// New
-	gtk_widget_set_sensitive( layer_buttons[4], TRUE );		// Duplicate
+		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
+	gtk_widget_set_sensitive(layer_tools[LTB_NEW], TRUE);
+	gtk_widget_set_sensitive(layer_tools[LTB_DUP], TRUE);
 }
 
 static gint layer_press_delete()
@@ -817,7 +811,6 @@ int load_layers( char *file_name )
 	layer_update_filename( file_name );
 
 	update_cols();		// Update status bar info
-	if ( layers_total>0 ) men_item_state( menu_frames, TRUE );
 
 	if (lfail) /* There were failures */
 	{
@@ -1154,10 +1147,10 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 		gtk_entry_set_text( GTK_ENTRY(entry_layer_name), layer_table[j].name );
 		if ( j==0 )		// Background layer selected
 		{
-			gtk_widget_set_sensitive( layer_buttons[1], layers_total > 0);	// Raise button
-			gtk_widget_set_sensitive( layer_buttons[2], FALSE );	// Lower button
-			gtk_widget_set_sensitive( layer_buttons[5], FALSE );	// Delete button
-			gtk_widget_set_sensitive( layer_buttons[6], FALSE );	// Centre button
+			gtk_widget_set_sensitive(layer_tools[LTB_RAISE], layers_total > 0);
+			gtk_widget_set_sensitive(layer_tools[LTB_LOWER], FALSE);
+			gtk_widget_set_sensitive(layer_tools[LTB_DEL], FALSE);
+			gtk_widget_set_sensitive(layer_tools[LTB_CENTER], FALSE);
 			gtk_widget_set_sensitive( layer_trans_toggle, FALSE );
 			gtk_widget_set_sensitive( layer_spin, FALSE );
 			gtk_label_set_text( GTK_LABEL(layer_label_position), _("Background") );
@@ -1172,19 +1165,14 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_trans_toggle ),
 				layer_table[layer_selected].use_trans);
 
-			gtk_widget_set_sensitive( layer_buttons[1], TRUE );	// Raise button
-			gtk_widget_set_sensitive( layer_buttons[2], TRUE );	// Lower button
-			gtk_widget_set_sensitive( layer_buttons[5], TRUE );	// Delete button
-			gtk_widget_set_sensitive( layer_buttons[6], TRUE );	// Centre button
+			gtk_widget_set_sensitive(layer_tools[LTB_RAISE], j != layers_total);
+			gtk_widget_set_sensitive(layer_tools[LTB_LOWER], TRUE);
+			gtk_widget_set_sensitive(layer_tools[LTB_DEL], TRUE);
+			gtk_widget_set_sensitive(layer_tools[LTB_CENTER], TRUE);
 			gtk_widget_set_sensitive( layer_trans_toggle, TRUE );
 
 			gtk_widget_set_sensitive( layer_spin, TRUE );
 			gtk_spin_button_set_value( GTK_SPIN_BUTTON(layer_spin), layer_table[j].trans);
-
-			if ( j==layers_total )		// Top layer
-			{
-				gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
-			}
 		}
 		
 	}
@@ -1211,7 +1199,7 @@ gint delete_layers_window()
 	inifile_set_gint32("layers_h", height );
 
 	gtk_widget_destroy(layers_window);
-	men_item_state(menu_layer, TRUE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], TRUE);
 	layers_window = NULL;
 
 	return FALSE;
@@ -1348,7 +1336,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	char txt[256];
 	int i;
 
-	men_item_state(menu_layer, FALSE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], FALSE);
 
 	entry_layer_name = NULL;
 	layers_initialized = FALSE;
@@ -1420,12 +1408,12 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 		}
 	}
 
-	layer_iconbar(layers_window, vbox, layer_buttons);
+	pack(vbox, layer_toolbar(layer_tools));
 
 	if ( layers_total == MAX_LAYERS )	// Hide new/duplicate if we have max layers
 	{
-		gtk_widget_set_sensitive( layer_buttons[3], FALSE );
-		gtk_widget_set_sensitive( layer_buttons[4], FALSE );
+		gtk_widget_set_sensitive(layer_tools[LTB_NEW], FALSE);
+		gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE );
 	}
 
 	table = add_a_table( 3, 2, 5, vbox );
@@ -1467,7 +1455,8 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect(GTK_OBJECT(layer_show_toggle), "clicked",
 			GTK_SIGNAL_FUNC(layer_main_toggled), NULL);
 
-	gtk_widget_add_accelerator (layer_buttons[8], "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
+	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
+		GDK_Escape, 0, (GtkAccelFlags) 0);
 
 	gtk_signal_connect_object (GTK_OBJECT (layers_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_layers_window), NULL);

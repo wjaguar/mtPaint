@@ -49,14 +49,14 @@
 
 
 char preserved_gif_filename[256];
-int preserved_gif_delay = 10, silence_limit;
+int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-		| FF_TRANS },
+		| FF_TRANS | FF_ZCOMP },
 #ifdef U_JPEG
-	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPR },
+	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_JCOMP },
 #else
 	{ "", "", "", 0},
 #endif
@@ -536,7 +536,7 @@ static int save_png(char *file_name, ls_settings *settings)
 
 	res = 0;
 	png_init_io(png_ptr, fp);
-	png_set_compression_level(png_ptr, Z_BEST_COMPRESSION);
+	png_set_compression_level(png_ptr, settings->png_compression);
 
 	if (settings->bpp == 1)
 	{
@@ -2600,6 +2600,8 @@ static int save_lss(char *file_name, ls_settings *settings)
 	int w = settings->width, h = settings->height;
 
 
+	if ((settings->bpp != 1) || (settings->colors > 16)) return NOT_LSS;
+
 	i = w > LSS_HSIZE ? w : LSS_HSIZE;
 	buf = malloc(i);
 	if (!buf) return -1;
@@ -2728,9 +2730,8 @@ static void store_image_extras(ls_settings *settings)
 		settings->colors = 256;
 	}
 
-	/* Accept vars */
+	/* Accept vars which make sense */
 	mem_xpm_trans = settings->xpm_trans;
-	mem_jpeg_quality = settings->jpeg_quality;
 	mem_xbm_hot_x = settings->hot_x;
 	mem_xbm_hot_y = settings->hot_y;
 	preserved_gif_delay = settings->gif_delay;

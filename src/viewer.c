@@ -69,7 +69,7 @@ gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gint32("cline_h", height );
 
 	gtk_widget_destroy(cline_window);
-	men_item_state(menu_cline, TRUE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], TRUE);
 	cline_window = NULL;
 	allow_cline = TRUE;
 
@@ -99,7 +99,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	gchar *item[1];
 	char txt[64], txt2[520];
 
-	men_item_state(menu_cline, FALSE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
 	allow_cline = FALSE;
 
 	snprintf(txt, 60, _("%i Files on Command Line"), files_passed );
@@ -157,7 +157,8 @@ GtkWidget *help_window;
 
 gint click_help_end( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	men_item_state( menu_help, TRUE );	// Make sure the user can only open 1 help window
+	// Make sure the user can only open 1 help window
+	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], TRUE);
 	gtk_widget_destroy( help_window );
 
 	return FALSE;
@@ -179,7 +180,8 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 	ag = gtk_accel_group_new();
 
-	men_item_state( menu_help, FALSE );	// Make sure the user can only open 1 help help_window
+	// Make sure the user can only open 1 help help_window
+	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], FALSE);
 
 	help_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 
@@ -1065,7 +1067,9 @@ void view_show()
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	view_showing = TRUE;
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE);
+	set_cursor(); /* Because canvas window is now a new one */
+	gtk_check_menu_item_set_active(
+		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), TRUE);
 	vw_focus_view();
 }
 
@@ -1082,7 +1086,9 @@ void view_hide()
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
 	view_showing = FALSE;
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE);
+	set_cursor(); /* Because canvas window is now a new one */
+	gtk_check_menu_item_set_active(
+		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), FALSE);
 }
 
 
