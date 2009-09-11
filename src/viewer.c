@@ -819,18 +819,12 @@ void vw_realign()
 	vw_focus_idle();
 }
 
-static gboolean vw_expose(GtkWidget *widget, GdkEventExpose *event)
+static void vw_repaint(int px, int py, int pw, int ph)
 {
 	unsigned char *rgb;
-	int px, py, pw, ph, vport[4];
+	int vport[4];
 
-	wjcanvas_get_vport(widget, vport);
-	px = event->area.x + vport[0];
-	py = event->area.y + vport[1];
-	pw = event->area.width;
-	ph = event->area.height;
-
-	if ((pw <= 0) || (ph <= 0)) return (FALSE);
+	if ((pw <= 0) || (ph <= 0)) return;
 
 	rgb = calloc(1, pw * ph * 3);
 	if (rgb)
@@ -838,11 +832,22 @@ static gboolean vw_expose(GtkWidget *widget, GdkEventExpose *event)
 		memset(rgb, mem_background, pw * ph * 3);
 		view_render_rgb(rgb, px - margin_view_x, py - margin_view_y,
 			pw, ph, vw_zoom);
-		gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-			event->area.x, event->area.y, pw, ph,
+		wjcanvas_get_vport(vw_drawing, vport);
+		gdk_draw_rgb_image(vw_drawing->window, vw_drawing->style->black_gc,
+			px - vport[0], py - vport[1], pw, ph,
 			GDK_RGB_DITHER_NONE, rgb, pw * 3);
 		free(rgb);
 	}
+}
+
+#define REPAINT_VIEW_COST 256
+
+static gboolean vw_expose(GtkWidget *widget, GdkEventExpose *event)
+{
+	int vport[4];
+
+	wjcanvas_get_vport(widget, vport);
+	repaint_expose(event, vport, vw_repaint, REPAINT_VIEW_COST);
 
 	return (FALSE);
 }

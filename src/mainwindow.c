@@ -235,7 +235,7 @@ void pressed_select(int all)
 	{
 		i = UPD_SEL;
 		if (marq_status >= MARQUEE_PASTE) i = UPD_SEL | CF_DRAW;
-		else paint_marquee(0, 0, 0);
+		else paint_marquee(0, 0, 0, NULL);
 		marq_status = MARQUEE_NONE;
 	}
 	if ((tool_type == TOOL_POLYGON) && (poly_status != POLY_NONE))
@@ -264,7 +264,7 @@ void pressed_select(int all)
 		}
 		marq_status = MARQUEE_DONE;
 		if (i & CF_DRAW) break; // Full redraw will draw marquee too
-		paint_marquee(1, 0, 0);
+		paint_marquee(1, 0, 0, NULL);
 		break;
 	}
 	if (i) update_stuff(i);
@@ -686,9 +686,8 @@ static void move_mouse(int dx, int dy, int button)
 
 	if (button) /* Clicks simulated without extra movements */
 	{
-		state |= bmasks[button];
 		mouse_event(GDK_BUTTON_PRESS, x, y, state, button, 1.0, 1, dx, dy);
-		state ^= bmasks[button];
+		state |= bmasks[button]; // Shows state _prior_ to event
 		mouse_event(GDK_BUTTON_RELEASE, x, y, state, button, 1.0, 1, dx, dy);
 		return;
 	}
@@ -2646,7 +2645,7 @@ static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 					continue;
 				}
 				// Intersection
-				/* 0->0, 15->3, in-between remains between */
+				/* 0->0, 15->2, in-between remains between */
 				tc = grid_rgb[((nv & 0xF) * 9 + 0x79) >> 7];
 				tmp[0] = INT_2_R(tc);
 				tmp[1] = INT_2_G(tc);
@@ -2665,7 +2664,7 @@ static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 			j = step - dx; tmp += j * 3;
 			for (; j < w; j += step , tmp += step * 3)
 			{
-				/* 0->0, 5->3, in-between remains between */
+				/* 0->0, 5->2, in-between remains between */
 				int tc = grid_rgb[((nv & 5) + 3) >> 2];
 				tmp[0] = INT_2_R(tc);
 				tmp[1] = INT_2_G(tc);
@@ -2872,6 +2871,15 @@ static unsigned char *clip_to_image(int *xywh, unsigned char *rgb, int *vxy)
 	return (rgb);
 }
 
+/* Map clipping rectangle to line-space, for use with line_clip() */
+void prepare_line_clip(int *lxy, int *vxy, int scale)
+{
+	int i;
+
+	for (i = 0; i < 4; i++)
+		lxy[i] = floor_div(vxy[i] - margin_main_xy[i & 1] - (i >> 1), scale);
+}
+
 void repaint_canvas(int px, int py, int pw, int ph)
 {
 	rgbcontext ctx;
@@ -2958,12 +2966,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	async_bk = FALSE;
 
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
-	/* Line-space clipping rectangle */
-	for (i = 0; i < 4; i++)
-	{
-		vxy[i] = floor_div(ctx.xy[i] - margin_main_xy[i & 1] -
-			(i >> 1), scale);
-	}
+	prepare_line_clip(vxy, ctx.xy, scale);
 	/* Redraw gradient line if needed */
 	i = gradient[mem_channel].status;
 	if ((mem_gradient || (tool_type == TOOL_GRADIENT)) &&
@@ -2971,7 +2974,8 @@ void repaint_canvas(int px, int py, int pw, int ph)
 		refresh_line(3, vxy, &ctx);
 
 	/* Draw marquee as we may have drawn over it */
-	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
+	if (marq_status != MARQUEE_NONE)
+		paint_marquee(1, 0, 0, &ctx);
 	if ((tool_type == TOOL_POLYGON) && poly_points)
 		paint_poly_marquee(&ctx, TRUE);
 
@@ -3192,21 +3196,18 @@ void force_main_configure()
 	if (view_showing && vw_drawing) vw_configure(vw_drawing, NULL);
 }
 
+#define REPAINT_CANVAS_COST 512
+
 static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
-	int px, py, pw, ph, vport[4];
+	int vport[4];
 
 	/* Stops excess jerking in GTK+1 when zooming */
 	if (zoom_flag) return (TRUE);
 
 	wjcanvas_get_vport(widget, vport);
-	px = event->area.x + vport[0];
-	py = event->area.y + vport[1];
-	pw = event->area.width;
-	ph = event->area.height;
-
-	repaint_canvas( px, py, pw, ph );
+	repaint_expose(event, vport, repaint_canvas, REPAINT_CANVAS_COST);
 
 	return (TRUE);
 }
@@ -3296,7 +3297,7 @@ void change_to_tool(int icon)
 		&& (marq_x2 >= 0) && (marq_y2 >= 0))
 	{
 		marq_status = MARQUEE_DONE;
-		paint_marquee(1, 0, 0);
+		paint_marquee(1, 0, 0, NULL);
 	}
 	if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
@@ -3690,7 +3691,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
 		{
 			paint_marquee(2, marq_x1 + change * arrow_dx[dir],
-				marq_y1 + change * arrow_dy[dir]);
+				marq_y1 + change * arrow_dy[dir], NULL);
 			update_stuff(UPD_SGEOM);
 		}
 		else move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
@@ -3705,7 +3706,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		if ((tool_type != TOOL_GRADIENT) && (marq_status == MARQUEE_DONE))
 		{
 			paint_marquee(3, marq_x2 + change * arrow_dx[dir],
-				marq_y2 + change * arrow_dy[dir]);
+				marq_y2 + change * arrow_dy[dir], NULL);
 			update_stuff(UPD_SGEOM);
 		}
 		else if (layer_selected) move_layer_relative(layer_selected,

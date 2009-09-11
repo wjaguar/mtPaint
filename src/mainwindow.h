@@ -293,6 +293,7 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx);
 
 void canvas_size(int *w, int *h);	// Get zoomed canvas size
+void prepare_line_clip(int *lxy, int *vxy, int scale);	// Map clipping rectangle to line-space
 void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of current image
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void repaint_perim(rgbcontext *ctx);	// Draw perimeter around mouse cursor

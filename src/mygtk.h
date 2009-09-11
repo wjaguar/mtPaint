@@ -310,6 +310,19 @@ GtkWidget *wjcanvas_new();
 void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
 
+// Repaint expose region
+
+// !!! For now, repaint_func() is expected to know widget & window to repaint
+typedef void (*repaint_func)(int x, int y, int w, int h);
+
+#if GTK_MAJOR_VERSION == 1 /* No regions there */
+#define repaint_expose(event, vport, repaint, cost) \
+	(repaint)((event)->area.x + (vport)[0], (event)->area.y + (vport)[1], \
+		(event)->area.width, (event)->area.height)
+#else 
+void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int cost);
+#endif
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

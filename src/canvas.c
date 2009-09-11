@@ -778,7 +778,7 @@ void pressed_paste(int centre)
 	poly_points = 0;
 	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON))
 		change_to_tool(TTB_SELECT);
-	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0);
+	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0, NULL);
 
 	if (centre)
 	{
@@ -2454,7 +2454,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( marq_status == MARQUEE_PASTE_DRAG && ( button == 1 || button == 13 || button == 2 ) )
 		{	// User wants to drag the paste box
-			paint_marquee(2, x - marq_drag_x, y - marq_drag_y);
+			paint_marquee(2, x - marq_drag_x, y - marq_drag_y, NULL);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
 			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
@@ -2471,7 +2471,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		{
 			if ( marq_status == MARQUEE_DONE )
 			{
-				paint_marquee(0, 0, 0);
+				paint_marquee(0, 0, 0, NULL);
 				i = close_to(x, y);
 				if (!(i & 1) ^ (marq_x1 > marq_x2))
 					marq_x1 = marq_x2;
@@ -2487,12 +2487,12 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			marq_x2 = x;
 			marq_y2 = y;
 			marq_status = MARQUEE_SELECTING;
-			paint_marquee(1, 0, 0);
+			paint_marquee(1, 0, 0, NULL);
 		}
 		else
 		{
 			if (marq_status == MARQUEE_SELECTING)	// Continuing to make a selection
-				paint_marquee(3, x, y);
+				paint_marquee(3, x, y, NULL);
 		}
 
 		if ( tool_type == TOOL_POLYGON )
@@ -2725,12 +2725,6 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 	marq_y2 = marq_y2 < 0 ? 0 : marq_y2 >= mem_height ? mem_height - 1 : marq_y2;
 }
 
-void get_visible(int *vxy)
-{
-	wjcanvas_get_vport(drawing_canvas, vxy);
-	--vxy[2]; --vxy[3];
-}
-
 void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
 {
 	int i;
@@ -2787,8 +2781,8 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 	int i, j, nc, r, g, b, rw, rh, offx, offy, mst = marq_status;
 
 	locate_marquee(xy);
-	memcpy(nxy, xy, sizeof(xy));
-	memcpy(clips, xy, sizeof(xy));
+	copy4(nxy, xy);
+	copy4(clips, xy);
 	nc = action == 1 ? 0 : 4; // No clear if showing anew
 
 	/* Determine which parts moved outside */
@@ -2902,30 +2896,19 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 	free(rgb);
 }
 
-void paint_marquee(int action, int new_x, int new_y)
+void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
 {
 	int vxy[4], cxy[4];
 
 	cxy[0] = cxy[1] = 0;
 	canvas_size(cxy + 2, cxy + 3);
-	get_visible(vxy);
-	clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x + 1, vxy[3] - margin_main_y + 1, cxy);
-	/* Have to call in any case, to update location */
-	trace_marquee(action, new_x, new_y, vxy, NULL);
-}
+	if (ctx) copy4(vxy, ctx->xy);
+	else wjcanvas_get_vport(drawing_canvas, vxy);
 
-void refresh_marquee(rgbcontext *ctx)
-{
-	int vxy[4], cxy[4];
-
-	cxy[0] = cxy[1] = 0;
-	canvas_size(cxy + 2, cxy + 3);
-	get_visible(vxy);
-	clip(vxy, vxy[0], vxy[1], vxy[2] + 1, vxy[3] + 1, ctx->xy);
 	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x, vxy[3] - margin_main_y, cxy))
-		trace_marquee(1, 0, 0, vxy, ctx);
+		vxy[2] - margin_main_x, vxy[3] - margin_main_y, cxy) || !ctx)
+		/* If not in a refresh, must call to update location */
+		trace_marquee(action, new_x, new_y, vxy, ctx);
 }
 
 
@@ -2977,9 +2960,8 @@ static void refresh_lines(int flip, const int xy0[4], const int xy1[4])
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	get_visible(ixy);
-	for (k = 0; k < 4; k++)
-		ixy[k] = floor_div(ixy[k] - margin_main_xy[k & 1], scale);
+	wjcanvas_get_vport(drawing_canvas, ixy);
+	prepare_line_clip(ixy, ixy, scale);
 
 	flip = flip ? 2 : 0;
 	k = flip ^ 2;
