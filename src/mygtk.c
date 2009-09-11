@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1270,15 +1270,32 @@ int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult)
 	switch (event->keyval)
 	{
 		case GDK_KP_Left: case GDK_Left:
-			*dx = -1; break;
+			*dx = -mult; break;
 		case GDK_KP_Right: case GDK_Right:
-			*dx = 1; break;
+			*dx = mult; break;
 		case GDK_KP_Up: case GDK_Up:
-			*dy = -1; break;
+			*dy = -mult; break;
 		case GDK_KP_Down: case GDK_Down:
-			*dy = 1; break;
+			*dy = mult; break;
 	}
 	return (*dx || *dy);
+}
+
+// Create pixmap cursor
+
+GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
+	int tip_x, int tip_y)
+{
+	static GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
+	GdkPixmap *icn, *msk;
+	GdkCursor *cursor;
+
+	icn = gdk_bitmap_create_from_data(NULL, icon, w, h);
+	msk = gdk_bitmap_create_from_data(NULL, mask, w, h);
+	cursor = gdk_cursor_new_from_pixmap(icn, msk, &cfg, &cbg, tip_x, tip_y);
+	gdk_pixmap_unref(icn);
+	gdk_pixmap_unref(msk);
+	return (cursor);
 }
 
 // Focusable pixmap widget
@@ -1523,8 +1540,7 @@ void wj_fpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
 	if (!d->pixmap) return;
 	gdk_gc_get_values(widget->style->black_gc, &sv);
 	gdk_rgb_gc_set_foreground(widget->style->black_gc, rgb);
-	gdk_draw_rectangle(widget->window, widget->style->black_gc,
-		TRUE, x + d->pm.x, y + d->pm.y, w, h);
+	gdk_draw_rectangle(d->pixmap, widget->style->black_gc, TRUE, x, y, w, h);
 	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
 	gtk_widget_queue_draw_area(widget, x + d->pm.x, y + d->pm.y, w, h);
 }
@@ -1852,6 +1868,155 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
 	}
 	return (state);
 }
+
+// Drawable to RGB
+
+/* This code exists to read back both windows and pixmaps. In GTK+1 pixmap
+ * handling capabilities are next to nonexistent, so a GdkWindow must always
+ * be passed in, to serve as source of everything but actual pixels.
+ * Parsing GdkImage pixels loosely follows the example of convert_real_slow()
+ * in GTK+2 (gdk/gdkpixbuf-drawable.c) - WJ
+ */
+
+#if GTK_MAJOR_VERSION == 1
+
+unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
+	unsigned char *buf, int x, int y, int width, int height)
+{
+	GdkImage *img;
+	GdkColormap *cmap;
+	GdkVisual *vis;
+	GdkColor bw[2], *cols = NULL;
+	unsigned char *dest, *wbuf = NULL;
+	guint32 rmask, gmask, bmask, pix;
+	int mode, rshift, gshift, bshift;
+	int i, j;
+
+
+	if (window == (GdkWindow *)&gdk_root_parent) /* Not a proper window */
+	{
+		vis = gdk_visual_get_system();
+		cmap = gdk_colormap_get_system();
+	}
+	else
+	{
+		vis = gdk_window_get_visual(window);
+		cmap = gdk_window_get_colormap(window);
+	}
+
+	if (!vis) return (NULL);
+	mode = vis->type;
+
+	if (cmap) cols = cmap->colors;
+	else if ((mode != GDK_VISUAL_TRUE_COLOR) && (vis->depth != 1))
+		return (NULL); /* Can't handle other types w/o colormap */
+
+	if (!buf) buf = wbuf = malloc(width * height * 3);
+	if (!buf) return (NULL);
+
+	img = gdk_image_get(pixmap ? pixmap : window, x, y, width, height);
+	if (!img)
+	{
+		free(wbuf);
+		return (NULL);
+	}
+
+	rmask = vis->red_mask;
+	gmask = vis->green_mask;
+	bmask = vis->blue_mask;
+	rshift = vis->red_shift;
+	gshift = vis->green_shift;
+	bshift = vis->blue_shift;
+
+	if (mode == GDK_VISUAL_TRUE_COLOR)
+	{
+		/* !!! Unlikely to happen, but it's cheap to be safe */
+		if (vis->red_prec > 8) rshift += vis->red_prec - 8;
+		if (vis->green_prec > 8) gshift += vis->green_prec - 8;
+		if (vis->blue_prec > 8) bshift += vis->blue_prec - 8;
+	}
+	else if (!cmap && (vis->depth == 1)) /* Bitmap */
+	{
+		/* Make a palette for it */
+		mode = GDK_VISUAL_PSEUDO_COLOR;
+		bw[0].red = bw[0].green = bw[0].blue = 0;
+		bw[1].red = bw[1].green = bw[1].blue = 65535;
+		cols = bw;
+	}
+
+	dest = buf;
+	for (i = 0; i < height; i++)
+	for (j = 0; j < width; j++ , dest += 3)
+	{
+		pix = gdk_image_get_pixel(img, j, i);
+		if (mode == GDK_VISUAL_TRUE_COLOR)
+		{
+			dest[0] = (pix & rmask) >> rshift;
+			dest[1] = (pix & gmask) >> gshift;
+			dest[2] = (pix & bmask) >> bshift;
+		}
+		else if (mode == GDK_VISUAL_DIRECT_COLOR)
+		{
+			dest[0] = cols[(pix & rmask) >> rshift].red >> 8;
+			dest[1] = cols[(pix & gmask) >> gshift].green >> 8;
+			dest[2] = cols[(pix & bmask) >> bshift].blue >> 8;
+		}
+		else /* Paletted */
+		{
+			dest[0] = cols[pix].red >> 8;
+			dest[1] = cols[pix].green >> 8;
+			dest[2] = cols[pix].blue >> 8;
+		}
+	}
+
+	/* Now extend the precision to 8 bits where necessary */
+	if (mode == GDK_VISUAL_TRUE_COLOR)
+	{
+		unsigned char xlat[128], *dest;
+		int i, j, k, l = width * height;
+
+		for (i = 0; i < 3; i++)
+		{
+			k = !i ? vis->red_prec : i == 1 ? vis->green_prec :
+				vis->blue_prec;
+			if (k >= 8) continue;
+			set_xlate(xlat, k);
+			dest = buf + i;
+			for (j = 0; j < l; j++ , dest += 3)
+				*dest = xlat[*dest];
+		}
+	}
+
+	gdk_image_destroy(img);
+	return (buf);
+}
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
+	unsigned char *buf, int x, int y, int width, int height)
+{
+	GdkPixbuf *pix, *res;
+	unsigned char *wbuf = NULL;
+
+	if (!buf) buf = wbuf = malloc(width * height * 3);
+	if (!buf) return (NULL);
+
+	pix = gdk_pixbuf_new_from_data(buf, GDK_COLORSPACE_RGB,
+		FALSE, 8, width, height, width * 3, NULL, NULL);
+	if (pix)
+	{
+		res = gdk_pixbuf_get_from_drawable(pix,
+			pixmap ? pixmap : window, NULL,
+			x, y, 0, 0, width, height);
+		g_object_unref(pix);
+		if (res) return (buf);
+	}
+	free(wbuf);
+	return (NULL);
+}
+
+#endif
 
 // Maybe this will be needed someday...
 

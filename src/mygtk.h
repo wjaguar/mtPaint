@@ -212,6 +212,11 @@ guint keyval_key(guint keyval);
 
 int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult);
 
+// Create pixmap cursor
+
+GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
+	int tip_x, int tip_y);
+
 // Focusable pixmap widget
 
 GtkWidget *wj_fpixmap(int width, int height);
@@ -239,6 +244,11 @@ GtkWidget *wj_size_bin();
 
 gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 
+// Drawable to RGB
+
+unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
+	unsigned char *buf, int x, int y, int width, int height);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0
@@ -250,10 +260,8 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 // Workaround for stupid GTK1 typecasts
 #if GTK_MAJOR_VERSION == 1
 #define GTK_RADIO_BUTTON_0(X) (GtkRadioButton *)(X)
-#define GTK_BUTTON_0(X) (GtkButton *)(X)
 #else
 #define GTK_RADIO_BUTTON_0(X) GTK_RADIO_BUTTON(X)
-#define GTK_BUTTON_0(X) GTK_BUTTON(X)
 #endif
 
 // Path string sizes

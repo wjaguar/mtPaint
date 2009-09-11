@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -629,13 +629,6 @@ static toolbar_item tools_bar[] = {
 
 void toolbar_init(GtkWidget *vbox_main)
 {
-	char txt[32];
-	int i;
-
-	GdkPixmap *icon, *mask;
-	GtkWidget *toolbar_main, *toolbar_tools, *hbox;
-	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
-
 	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
 		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
@@ -651,6 +644,10 @@ void toolbar_init(GtkWidget *vbox_main)
 	static unsigned char cursor_tip[TOTAL_CURSORS][2] = { {0, 0}, {0, 0},
 		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 19},
 		{10, 10}, {0, 0}, {0, 0}, {10, 10}, {0, 0}, {0, 0} };
+	GtkWidget *toolbar_main, *toolbar_tools, *hbox;
+	char txt[32];
+	int i;
+
 
 	for ( i=1; i<TOOLBAR_MAX; i++ )
 	{
@@ -694,21 +691,9 @@ void toolbar_init(GtkWidget *vbox_main)
 	toolbar_viewzoom(FALSE);
 
 	for (i=0; i<TOTAL_CURSORS; i++)
-	{
-		icon = gdk_bitmap_create_from_data (NULL, xbm_list[i], 20, 20);
-		mask = gdk_bitmap_create_from_data (NULL, xbm_mask_list[i], 20, 20);
-
-		m_cursor[i] = gdk_cursor_new_from_pixmap(icon, mask, &cfg, &cbg,
-			cursor_tip[i][0], cursor_tip[i][1]);
-
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-	}
-	icon = gdk_bitmap_create_from_data (NULL, xbm_move_bits, 20, 20);
-	mask = gdk_bitmap_create_from_data (NULL, xbm_move_mask_bits, 20, 20);
-	move_cursor = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 10, 10);
-	gdk_pixmap_unref( icon );
-	gdk_pixmap_unref( mask );
+		m_cursor[i] = make_cursor(xbm_list[i], xbm_mask_list[i],
+			20, 20, cursor_tip[i][0], cursor_tip[i][1]);
+	move_cursor = make_cursor(xbm_move_bits, xbm_move_mask_bits, 20, 20, 10, 10);
 
 	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
 		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);

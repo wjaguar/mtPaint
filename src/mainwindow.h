@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -171,6 +171,8 @@ void mapped_dis_add(GtkWidget *widget, int actmap);
 #define TOTAL_MENU_IDS 60
 
 #define MAX_RECENT 20
+
+const unsigned char greyz[2]; // For opacity squares
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 

@@ -1898,7 +1898,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 
 	xtra = ls_settings_box(txt, action_type);
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
-	fpick_setup(fs, xtra, GTK_SIGNAL_FUNC(fs_ok), GTK_SIGNAL_FUNC(fs_destroy) );
+	fpick_setup(fs, xtra, GTK_SIGNAL_FUNC(fs_ok), GTK_SIGNAL_FUNC(fs_destroy));
 	fpick_set_filename(fs, txt, FALSE);
 
 	gtk_widget_show(fs);
@@ -1908,8 +1908,8 @@ void fs_setup(GtkWidget *fs, int action_type)
 
 void file_selector(int action_type)
 {
-	int fpick_flags = 0;
 	char *title = NULL;
+	int fpick_flags = FPICK_ENTRY;
 
 	switch (action_type)
 	{
@@ -1921,7 +1921,6 @@ void file_selector(int action_type)
 		break;
 	case FS_PNG_SAVE:
 		title = _("Save Image File");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_PALETTE_LOAD:
 		title = _("Load Palette File");
@@ -1929,23 +1928,18 @@ void file_selector(int action_type)
 		break;
 	case FS_PALETTE_SAVE:
 		title = _("Save Palette File");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_EXPORT_UNDO:
 		title = _("Export Undo Images");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_EXPORT_UNDO2:
 		title = _("Export Undo Images (reversed)");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_EXPORT_ASCII:
 		title = _("Export ASCII Art");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_LAYER_SAVE:
 		title = _("Save Layer Files");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_GIF_EXPLODE:
 		title = _("Import GIF animation - Choose frames directory");
@@ -1953,7 +1947,6 @@ void file_selector(int action_type)
 		break;
 	case FS_EXPORT_GIF:
 		title = _("Export GIF animation");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_CHANNEL_LOAD:
 		title = _("Load Channel");
@@ -1961,11 +1954,9 @@ void file_selector(int action_type)
 		break;
 	case FS_CHANNEL_SAVE:
 		title = _("Save Channel");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	case FS_COMPOSITE_SAVE:
 		title = _("Save Composite Image");
-		fpick_flags = FPICK_ENTRY;
 		break;
 	}
 

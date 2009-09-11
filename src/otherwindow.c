@@ -1850,7 +1850,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		{
 			j = i - CHN_ALPHA;
 			spin = gtk_label_new(allchannames[i]);
-			if ( mem_img[i] ) gtk_widget_show(spin);
+			gtk_widget_show(spin);
 			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
 				1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
 			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
@@ -1861,7 +1861,6 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			mt_spinslide_set_value(spin, channel_col_A[i]);
 			mt_spinslide_connect(spin,
 				GTK_SIGNAL_FUNC(AB_spin_moved), (gpointer)i);
-			if ( !mem_img[i] ) gtk_widget_hide(spin);
 		}
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
@@ -2294,7 +2293,9 @@ static void palette_pad_select(int i, int mode)
 	if (!mode) mt_spinslide_set_value(grad_ed_ss, i);
 	else if (i < mem_cols) /* Valid RGB */
 	{
-		cpick_set_colour( grad_ed_cs, mem_pal[i].red, mem_pal[i].green, mem_pal[i].blue, -1 );
+		cpick_set_colour( grad_ed_cs,
+			mem_pal[i].red, mem_pal[i].green, mem_pal[i].blue, -1 );
+// !!! GTK+2 emits "color_changed" when setting color, others need explicit call
 #if GTK_MAJOR_VERSION == 1 || defined U_CPICK_MTPAINT
 		grad_edit_set_rgb(grad_ed_cs, NULL);
 #endif

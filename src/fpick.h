@@ -23,6 +23,7 @@
 
 GtkWidget *fpick_create(char *title, int flags);
 void fpick_destroy(GtkWidget *fp);
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn, GtkSignalFunc cancel_fn);
+void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
+	GtkSignalFunc cancel_fn);
 const char *fpick_get_filename(GtkWidget *fp, int raw);
 void fpick_set_filename(GtkWidget *fp, char *name, int raw);

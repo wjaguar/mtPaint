@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -40,6 +40,10 @@
 #include "font.h"
 #include "icons.h"
 
+
+#define GREY_W 153
+#define GREY_B 102
+const unsigned char greyz[2] = {GREY_W, GREY_B}; // For opacity squares
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 
@@ -1774,13 +1778,10 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 
 static int async_bk;
 
-#define GREY_W 153
-#define GREY_B 102
 void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
 {
 	int i, j, k, scale, dx, dy, step, ii, jj, ii0, px, py;
 	int xwid = 0, xhgt = 0, wid3 = wid * 3;
-	static unsigned char greyz[2] = {GREY_W, GREY_B};
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (async_bk) step = 8;
