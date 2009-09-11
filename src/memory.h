@@ -244,7 +244,8 @@ void pal_hsl( png_color col, float *hh, float *ss, float *ll );	// Turn RGB into
 
 void undo_free_x(undo_item *undo);
 int mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
-unsigned char *mem_undo_previous();	// Get address of previous image (or current if none)
+//	 Get address of previous channel data (or current if none)
+unsigned char *mem_undo_previous(int channel);
 
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user

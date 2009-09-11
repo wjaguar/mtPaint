@@ -444,15 +444,16 @@ int mem_new( int width, int height, int bpp, int cmask )
 	return (!res);
 }
 
-unsigned char *mem_undo_previous()	// Get address of previous image (or current if none)
+/* Get address of previous channel data (or current if none) */
+unsigned char *mem_undo_previous(int channel)
 {
 	unsigned char *res;
 	int i;
 
 	i = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
-	res = mem_undo_im_[i].img[mem_channel];
+	res = mem_undo_im_[i].img[channel];
 	if (!res || (res == (void *)(-1)))
-		res = mem_img[mem_channel];	// No undo so use current
+		res = mem_img[channel];	// No undo so use current
 	return (res);
 }
 
@@ -876,6 +877,14 @@ void mem_swap_cols()
 	int oc;
 	png_color o24;
 
+	if (mem_channel != CHN_IMAGE)
+	{
+		oc = channel_col_A[mem_channel];
+		channel_col_A[mem_channel] = channel_col_B[mem_channel];
+		channel_col_B[mem_channel] = oc;
+		return;
+	}
+
 	oc = mem_col_A;
 	mem_col_A = mem_col_B;
 	mem_col_B = oc;
@@ -883,6 +892,13 @@ void mem_swap_cols()
 	o24 = mem_col_A24;
 	mem_col_A24 = mem_col_B24;
 	mem_col_B24 = o24;
+
+	if (RGBA_mode)
+	{
+		oc = channel_col_A[CHN_ALPHA];
+		channel_col_A[CHN_ALPHA] = channel_col_B[CHN_ALPHA];
+		channel_col_B[CHN_ALPHA] = oc;
+	}
 
 	mem_pat_update();
 }
@@ -3452,26 +3468,62 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 
 void put_pixel( int x, int y )	/* Combined */
 {
-	unsigned char *old_image, *new_image, newc;
+	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
 	unsigned char r, g, b, nr, ng, nb;
-	int i, j, offset, ofs3;
+	int i, j, offset, ofs3, opacity = 0, tint;
 
 	if (pixel_protected(x, y)) return;
 
-	if ( mem_undo_opacity ) old_image = mem_undo_previous();
+	tint = tint_mode[0] ? 1 : 0;
+	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+
+	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
 	else old_image = mem_img[mem_channel];
+	if (mem_channel <= CHN_ALPHA)
+	{
+		if (RGBA_mode || (mem_channel == CHN_ALPHA))
+		{
+			if (mem_undo_opacity)
+				old_alpha = mem_undo_previous(CHN_ALPHA);
+			else old_alpha = mem_img[CHN_ALPHA];
+		}
+		if (mem_img_bpp == 3) opacity = tool_opacity;
+	}
 	offset = x + mem_width * y;
 	i = ((x & 7) + 8 * (y & 7));
+
+	/* Alpha channel */
+	if (old_alpha && mem_img[CHN_ALPHA])
+	{
+		newc = mem_col_pat[i] == mem_col_A ? channel_col_A[CHN_ALPHA] :
+			channel_col_B[CHN_ALPHA];
+		oldc = old_alpha[offset];
+		if (tint)
+		{
+			if (tint < 0) newc = oldc > 255 - newc ?
+				255 : oldc + newc;
+			else newc = oldc > newc ? oldc - newc : 0;
+		}
+		if (opacity)
+		{
+			j = oldc * 255 + (newc - oldc) * opacity;
+			mem_img[CHN_ALPHA][offset] = (j + (j >> 8) + 1) >> 8;
+			opacity = j ? (255 * opacity * newc) / j : 127;
+		}
+		else mem_img[CHN_ALPHA][offset] = newc;
+		if (mem_channel == CHN_ALPHA) return;
+	}
 
 	/* Indexed image or utility channel */
 	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
 		newc = mem_col_pat[i];
 		if (mem_channel != CHN_IMAGE)
-			newc = newc == mem_col_A ? channel_col_A[mem_channel] : 0;
-		if (tint_mode[0])
+			newc = newc == mem_col_A ? channel_col_A[mem_channel] :
+				channel_col_B[mem_channel];
+		if (tint)
 		{
-			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+			if (tint < 0)
 			{
 				j = mem_channel == CHN_IMAGE ? mem_cols - 1 : 255;
 				newc = old_image[offset] > j - newc ? j : old_image[offset] + newc;
@@ -3493,9 +3545,9 @@ void put_pixel( int x, int y )	/* Combined */
 		ng = mem_col_pat24[i + 1];
 		nb = mem_col_pat24[i + 2];
 
-		if (tint_mode[0])
+		if (tint)
 		{
-			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+			if (tint < 0)
 			{
 				nr = old_image[ofs3] > 255 - nr ? 255 : old_image[ofs3] + nr;
 				ng = old_image[ofs3 + 1] > 255 - ng ? 255 : old_image[ofs3 + 1] + ng;
@@ -3509,7 +3561,7 @@ void put_pixel( int x, int y )	/* Combined */
 			}
 		}
 
-		if ( tool_opacity == 255 )
+		if (opacity == 255)
 		{
 			new_image[ofs3] = nr;
 			new_image[ofs3 + 1] = ng;
@@ -3521,11 +3573,11 @@ void put_pixel( int x, int y )	/* Combined */
 			g = old_image[ofs3 + 1];
 			b = old_image[ofs3 + 2];
 
-			i = r * 255 + (nr - r) * tool_opacity;
+			i = r * 255 + (nr - r) * opacity;
 			new_image[ofs3] = (i + (i >> 8) + 1) >> 8;
-			i = g * 255 + (ng - g) * tool_opacity;
+			i = g * 255 + (ng - g) * opacity;
 			new_image[ofs3 + 1] = (i + (i >> 8) + 1) >> 8;
-			i = b * 255 + (nb - b) * tool_opacity;
+			i = b * 255 + (nb - b) * opacity;
 			new_image[ofs3 + 2] = (i + (i >> 8) + 1) >> 8;
 		}
 	}
@@ -3687,7 +3739,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	unsigned char *alpha, unsigned char *trans, int opacity)
 {
 	unsigned char *old_image, *old_alpha = NULL, *dest = NULL;
-	int i, bpp, ofs = x + mem_width * y;
+	int bpp, ofs = x + mem_width * y;
 
 	bpp = MEM_BPP;
 
@@ -3704,13 +3756,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	/* Prepare alpha */
 	if (alpha)
 	{
-		if (mem_undo_opacity)
-		{
-			i = mem_channel;
-			mem_channel = CHN_ALPHA;
-			old_alpha = mem_undo_previous();
-			mem_channel = i;
-		}
+		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);
 		else old_alpha = mem_img[CHN_ALPHA];
 		old_alpha += ofs;
 		dest = mem_img[CHN_ALPHA] + ofs;
@@ -3721,7 +3767,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	/* Stop if we have alpha without image */
 	if (!img) return;
 
-	if (mem_undo_opacity) old_image = mem_undo_previous();
+	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
 	else old_image = mem_img[mem_channel];
 	old_image += ofs * bpp;
 	dest = mem_img[mem_channel] + ofs * bpp;
@@ -3850,7 +3896,7 @@ void do_effect( int type, int param )		// 0=edge detect 1=blur 2=emboss
 	}
 	else
 	{
-		src = mem_undo_previous();
+		src = mem_undo_previous(mem_channel);
 		dest = mem_img[mem_channel];
 		progress_init(_("Applying Effect"), 1);
 	}
@@ -3927,9 +3973,19 @@ void mem_clip_mask_set(unsigned char val)		// (un)Mask colours A and B on the cl
 
 	if ( mem_clip_bpp == 1 )
 	{
+		if (mem_channel == CHN_IMAGE)
+		{
+			aa = mem_col_A;
+			bb = mem_col_B;
+		}
+		else
+		{
+			aa = channel_col_A[mem_channel];
+			bb = channel_col_B[mem_channel];
+		}
 		for ( i=0; i<j; i++ )
 		{
-			if ( mem_clipboard[i] == mem_col_A || mem_clipboard[i] == mem_col_B )
+			if ( mem_clipboard[i] == aa || mem_clipboard[i] == bb )
 				mem_clip_mask[i] = val;
 		}
 	}
@@ -4056,7 +4112,7 @@ void mem_smudge(int ox, int oy, int nx, int ny)		// Smudge from old to new @ too
 	if ((w < 1) || (h < 1)) return;
 
 /* !!! I modified this tool action somewhat - White Jaguar */
-	if ( mem_undo_opacity ) src = mem_undo_previous();
+	if ( mem_undo_opacity ) src = mem_undo_previous(mem_channel);
 	else src = mem_img[mem_channel];
 	dest = mem_img[mem_channel];
 	bpp = MEM_BPP;
@@ -4126,7 +4182,7 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 	if ((w < 1) || (h < 1)) return;
 
 /* !!! I modified this tool action somewhat - White Jaguar */
-	if ( mem_undo_opacity ) src = mem_undo_previous();
+	if ( mem_undo_opacity ) src = mem_undo_previous(mem_channel);
 	else src = mem_img[mem_channel];
 	dest = mem_img[mem_channel];
 	bpp = MEM_BPP;

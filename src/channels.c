@@ -27,11 +27,13 @@
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
+#include "inifile.h"
 #include "mygtk.h"
 
 /* !!! Maybe store it in config? !!! */
 int overlay_alpha = FALSE;
 int hide_image = FALSE;
+int RGBA_mode = FALSE;
 
 unsigned char channel_rgb[NUM_CHANNELS][3] = {
 	{0, 0, 0},	/* Image */
@@ -51,6 +53,7 @@ unsigned char channel_fill[NUM_CHANNELS] = {0, 255, 0, 0};
 
 /* Per-channel drawing "colours" */
 unsigned char channel_col_A[NUM_CHANNELS] = {255, 255, 255, 255};
+unsigned char channel_col_B[NUM_CHANNELS] = {0, 0, 0, 0};
 
 static GtkWidget *newchan_window;
 static int chan_new_type, chan_new_state;
@@ -316,6 +319,12 @@ void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 	if (*toggle == GTK_CHECK_MENU_ITEM(menu_item)->active) return;
 	*toggle = GTK_CHECK_MENU_ITEM(menu_item)->active;
 	update_all_views();
+}
+
+void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	RGBA_mode = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	inifile_set_gboolean("couple_RGBA", RGBA_mode );
 }
 
 void pressed_channel_config_overlay()

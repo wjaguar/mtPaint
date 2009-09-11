@@ -111,9 +111,13 @@ void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] )		// Add widget to
 void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 {
 	mem_swap_cols();
-	repaint_top_swatch();
-	init_pal();
-	gtk_widget_queue_draw( drawing_col_prev );
+	if (mem_channel == CHN_IMAGE)
+	{
+		repaint_top_swatch();
+		init_pal();
+		gtk_widget_queue_draw( drawing_col_prev );
+	}
+	else pressed_opacity(channel_col_A[mem_channel]);
 }
 
 void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data )
@@ -797,12 +801,22 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 			switch (event->keyval)
 			{
 			case GDK_Left: case GDK_KP_Left:
-				if (mem_channel != CHN_IMAGE) break;
-				if (mem_col_B) mem_col_B--;
+				if (mem_channel == CHN_IMAGE)
+				{
+					if (mem_col_B) mem_col_B--;
+					break;
+				}
+				if (channel_col_B[mem_channel])
+					channel_col_B[mem_channel]--;
 				break;
 			case GDK_Right: case GDK_KP_Right:
-				if (mem_channel != CHN_IMAGE) break;
-				if (mem_col_B < mem_cols - 1) mem_col_B++;
+				if (mem_channel == CHN_IMAGE)
+				{
+					if (mem_col_B < mem_cols - 1) mem_col_B++;
+					break;
+				}
+				if (channel_col_B[mem_channel] < 255)
+					channel_col_B[mem_channel]++;
 				break;
 			case GDK_Down: case GDK_KP_Down:
 				if (mem_channel == CHN_IMAGE)
@@ -1043,6 +1057,12 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 			pixel = get_pixel( x, y );
 			if ((button == 1) && (channel_col_A[mem_channel] != pixel))
 				pressed_opacity(pixel);
+			if ((button == 3) && (channel_col_B[mem_channel] != pixel))
+			{
+				channel_col_B[mem_channel] = pixel;
+				/* To update displayed value */
+				pressed_opacity(channel_col_A[mem_channel]);
+			}
 		}
 		else if (mem_img_bpp == 1)
 		{
@@ -2509,7 +2529,7 @@ void main_init()
 		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
-		{ _("/Channels/Couple Image Alpha"), NULL, NULL, 0, "<CheckItem>" },
+		{ _("/Channels/Couple RGBA Operations"), NULL, pressed_RGBA_toggle, 0, "<CheckItem>" },
 		{ _("/Channels/Threshold ..."), NULL, pressed_threshold, 0, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_toggle, 0, "<CheckItem>" },
@@ -2643,6 +2663,10 @@ static char
 		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_clip_save );
 		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_need_clipboard );
 	}
+
+	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
+		_("/Channels/Couple RGBA Operations") ) ),
+		inifile_get_gboolean("couple_RGBA", TRUE ) );
 
 	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
 		_("/View/Focus View Window") ) ),

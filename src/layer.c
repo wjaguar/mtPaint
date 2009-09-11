@@ -1273,7 +1273,8 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 				// This stops a nasty segfault if users does 2 quick paste layers
 
 		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols,
-			mem_clip_alpha ? CMASK_RGBA : CMASK_IMAGE);
+			(mem_clip_alpha ? CMASK_RGBA : CMASK_IMAGE) |
+			CMASK_FOR(mem_channel));
 		if ( layer_selected != ol )	// If == then new layer wasn't created
 		{
 			layer_table[layer_selected].x = mem_clip_x;
