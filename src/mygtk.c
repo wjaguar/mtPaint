@@ -416,3 +416,54 @@ int read_spin(GtkWidget *spin)
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
 	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
 }
+
+// Whatever is needed to move mouse pointer 
+
+#if ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 8)) /* GTK+ 2.8+ */
+
+int move_mouse_relative(int x0, int y0, int dx, int dy)
+{
+	gdk_display_warp_pointer(gtk_widget_get_display(drawing_canvas),
+		gtk_widget_get_screen(drawing_canvas), x0 + dx, y0 + dy);
+	return (TRUE);
+}
+
+#else /* Have to manage on our own */
+
+#ifdef GDK_WINDOWING_X11 /* Call X */
+
+#include <X11/Xlib.h>
+#include <gdk/gdkx.h>
+
+int move_mouse_relative(int x0, int y0, int dx, int dy)
+{
+	XWarpPointer(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+		None, None, 0, 0, 0, 0, dx, dy);
+	return (TRUE);
+}
+
+#elif defined GDK_WINDOWING_WIN32 /* Call GDI */
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+int move_mouse_relative(int x0, int y0, int dx, int dy)
+{
+	POINT point;
+	if (GetCursorPos(&point))
+	{
+		SetCursorPos(point.x + dx, point.y + dy);
+		return (TRUE);
+	}
+	else return (FALSE);
+}
+
+#else /* Always fail */
+
+int move_mouse_relative(int x0, int y0, int dx, int dy)
+{
+	return (FALSE);
+}
+
+#endif
+#endif

@@ -5076,8 +5076,8 @@ void mem_clip_mask_clear()		// Clear/remove the clipboard mask
 int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	int width, int height, int mode)
 {
-	int i, j, AA[3], BB[3], DD[6], chan, c1, c2, dc1, dc2;
-	double p, dchan;
+	int i, j = width * height, AA[3], BB[3], DD[6], chan, c1, c2, dc1, dc2;
+	double p0, p1, p2, dchan, KK[6];
 
 	if (!img || !alpha) return (1);
 
@@ -5104,39 +5104,72 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	chan = 0;	// Find the channel with the widest range - gives most accurate result later
 	if (DD[4] - DD[1] > DD[3] - DD[0]) chan = 1;
 	if (DD[5] - DD[2] > DD[chan + 3] - DD[chan]) chan = 2;
-	if (AA[chan] == BB[chan]) return 1;	// A == B so bail out - nothing to do
-	dchan = 1.0 / (BB[chan] - AA[chan]);
-	c1 = 1 ^ (chan & 1);
-	c2 = 2 ^ (chan & 2);
-	dc1 = BB[c1] - AA[c1];
-	dc2 = BB[c2] - AA[c2];
 
-	j = width * height;
-	for (i = 0; i < j; i++ , alpha++ , img += 3)
+	if (AA[chan] == BB[chan])	/* if A == B then work GIMP-like way */
 	{
-		/* Already semi-opaque so don't touch */
-		if (*alpha != 255) continue;
-		/* Ensure pixel lies between A and B for each channel */
-		if ((img[0] < DD[0]) || (img[0] > DD[3])) continue;
-		if ((img[1] < DD[1]) || (img[1] > DD[4])) continue;
-		if ((img[2] < DD[2]) || (img[2] > DD[5])) continue;
+		for (i = 0; i < 3; i++)
+		{
+			KK[i] = AA[i] ? 255.0 / AA[i] : 1.0;
+			KK[i + 3] = AA[i] < 255 ? -255.0 / (255 - AA[i]) : 0.0;
+		}
 
-		p = (img[chan] - AA[chan]) * dchan;
+		for (i = 0; i < j; i++ , alpha++ , img += 3)
+		{
+			/* Already semi-opaque so don't touch */
+			if (*alpha != 255) continue;
 
-		/* Check delta for all channels is roughly the same ...
-		 * ... if it isn't, ignore this pixel as its not in A->B scale
-		 */
-		if (abs(AA[c1] + (int)rint(p * dc1) - img[c1]) > 2) continue;
-		if (abs(AA[c2] + (int)rint(p * dc2) - img[c2]) > 2) continue;
-		
-		/* Pixel is a shade of A/B so set alpha */
-		*alpha = (int)rint(p * 255) ^ 255;
+			/* Evaluate the three possible alphas */
+			p0 = (AA[0] - img[0]) * (img[0] <= AA[0] ? KK[0] : KK[3]);
+			p1 = (AA[1] - img[1]) * (img[1] <= AA[1] ? KK[1] : KK[4]);
+			p2 = (AA[2] - img[2]) * (img[2] <= AA[2] ? KK[2] : KK[5]);
+			if (p0 < p1) p0 = p1;
+			if (p0 < p2) p0 = p2;
 
-		/* Demultiply image if this is alpha */
-		if (!mode) continue;
-		img[0] = AA[0];
-		img[1] = AA[1];
-		img[2] = AA[2];
+			/* Set alpha */
+			*alpha = rint(p0);
+
+			/* Demultiply image if this is alpha and nonzero */
+			if (!mode) continue;
+			dchan = p0 ? 255.0 / p0 : 0.0;
+			img[0] = rint((img[0] - AA[0]) * dchan) + AA[0];
+			img[1] = rint((img[1] - AA[1]) * dchan) + AA[1];
+			img[2] = rint((img[2] - AA[2]) * dchan) + AA[2];
+		}
+	}
+	else	/* Limit processing to A->B scale */
+	{
+		dchan = 1.0 / (BB[chan] - AA[chan]);
+		c1 = 1 ^ (chan & 1);
+		c2 = 2 ^ (chan & 2);
+		dc1 = BB[c1] - AA[c1];
+		dc2 = BB[c2] - AA[c2];
+
+		for (i = 0; i < j; i++ , alpha++ , img += 3)
+		{
+			/* Already semi-opaque so don't touch */
+			if (*alpha != 255) continue;
+			/* Ensure pixel lies between A and B for each channel */
+			if ((img[0] < DD[0]) || (img[0] > DD[3])) continue;
+			if ((img[1] < DD[1]) || (img[1] > DD[4])) continue;
+			if ((img[2] < DD[2]) || (img[2] > DD[5])) continue;
+
+			p0 = (img[chan] - AA[chan]) * dchan;
+
+			/* Check delta for all channels is roughly the same ...
+			 * ... if it isn't, ignore this pixel as its not in A->B scale
+			 */
+			if (abs(AA[c1] + (int)rint(p0 * dc1) - img[c1]) > 2) continue;
+			if (abs(AA[c2] + (int)rint(p0 * dc2) - img[c2]) > 2) continue;
+
+			/* Pixel is a shade of A/B so set alpha */
+			*alpha = (int)rint(p0 * 255) ^ 255;
+
+			/* Demultiply image if this is alpha */
+			if (!mode) continue;
+			img[0] = AA[0];
+			img[1] = AA[1];
+			img[2] = AA[2];
+		}
 	}
 
 	return 0;

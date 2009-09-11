@@ -77,6 +77,10 @@
 #define ACT_COMMIT	54
 #define ACT_ARROW	55
 #define ACT_ARROW3	56
+#define ACT_A_PREV	57
+#define ACT_A_NEXT	58
+#define ACT_B_PREV	59
+#define ACT_B_NEXT	60
 
 typedef struct
 {

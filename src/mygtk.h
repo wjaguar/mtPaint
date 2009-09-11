@@ -68,3 +68,7 @@ int read_spin(GtkWidget *spin);
 // Box unpacking macro
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
+
+// Moving mouse cursor
+
+int move_mouse_relative(int x0, int y0, int dx, int dy);

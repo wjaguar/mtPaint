@@ -562,6 +562,67 @@ static void resize_marquee( int dx, int dy )
 	paint_marquee(1, marq_x1, marq_y1);
 }
 
+/* Forward declaration */
+static void mouse_event(int event, int x0, int y0, guint state, guint button,
+	gdouble pressure, int mflag);
+
+/* For "dual" mouse control */
+static int unreal_move, lastdx, lastdy;
+
+static void move_mouse(int dx, int dy)
+{
+	int x, y, zoom, scale, button;
+	GdkModifierType state;
+
+	if (!unreal_move) lastdx = lastdy = 0;
+	if (!mem_img[CHN_IMAGE]) return;
+
+	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
+	if ((state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK))
+		button = 13;
+	else if (state & GDK_BUTTON2_MASK) button = 2;
+	else if (state & GDK_BUTTON3_MASK) button = 3;
+	else if (state & GDK_BUTTON1_MASK) button = 1;
+	else button = 0;
+
+	if (can_zoom < 1.0) /* Fine control required */
+	{
+		zoom = rint(1.0 / can_zoom);
+		lastdx += dx; lastdy += dy;
+		mouse_event(GDK_MOTION_NOTIFY,
+			(x - margin_main_x) / can_zoom + lastdx,
+			(y - margin_main_y) / can_zoom + lastdy,
+			state, button, 1.0, 1);
+
+		/* Nudge cursor when needed */
+		if ((abs(lastdx) >= zoom) || (abs(lastdy) >= zoom))
+		{
+			dx = lastdx * can_zoom;
+			dy = lastdy * can_zoom;
+			lastdx -= dx * zoom;
+			lastdy -= dy * zoom;
+			unreal_move = ~0;
+			move_mouse_relative(x, y, dx, dy);
+		}
+		unreal_move = 2;
+	}
+	else /* Real mouse is precise enough */
+	{
+		scale = rint(can_zoom);
+		unreal_move = 1;
+
+		/* Simulate movement if failed to actually move mouse */
+		if (!move_mouse_relative(x, y, dx * scale, dy * scale))
+		{
+			lastdx += dx; lastdy += dy;
+			mouse_event(GDK_MOTION_NOTIFY,
+				(x - margin_main_x) / can_zoom + lastdx,
+				(y - margin_main_y) / can_zoom + lastdy,
+				state, button, 1.0, 1);
+		}
+	}
+}
+
 int check_arrows(int action)
 {
 	int mv = mem_nudge;
@@ -791,6 +852,10 @@ key_action main_keys[] = {
 	{"",		ACT_ARROW, GDK_A, _C, 0},
 	{"ARROW3",	ACT_ARROW3, GDK_s, _C, 0},
 	{"",		ACT_ARROW3, GDK_S, _C, 0},
+	{"A_PREV",	ACT_A_PREV, GDK_bracketleft, _C, 0},
+	{"A_NEXT",	ACT_A_NEXT, GDK_bracketright, _C, 0},
+	{"B_PREV",	ACT_B_PREV, GDK_braceleft, _C, 0},
+	{"B_NEXT",	ACT_B_NEXT, GDK_braceright, _C, 0},
 	{NULL,		0, 0, 0, 0}
 };
 
@@ -829,8 +894,36 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 	}
 	change = inifile_get_gint32("pixelNudge", 8);
 
+/* !!! Make a pref or something later !!! */
+#if 0
+	/* The colour-change override */
 	switch (action)
 	{
+	case ACT_SEL_LEFT: action = ACT_B_PREV; break;
+	case ACT_SEL_RIGHT: action = ACT_B_NEXT; break;
+	case ACT_SEL_DOWN: action = ACT_A_NEXT; break;
+	case ACT_SEL_UP: action = ACT_A_PREV; break;
+	}
+#endif
+
+	switch (action)
+	{
+	case ACT_SEL_LEFT: change = 1;
+	case ACT_SEL_2LEFT:
+		move_mouse(-change, 0);
+		return (TRUE);
+	case ACT_SEL_RIGHT: change = 1;
+	case ACT_SEL_2RIGHT:
+		move_mouse(change, 0);
+		return (TRUE);
+	case ACT_SEL_DOWN: change = 1;
+	case ACT_SEL_2DOWN:
+		move_mouse(0, change);
+		return (TRUE);
+	case ACT_SEL_UP: change = 1;
+	case ACT_SEL_2UP:
+		move_mouse(0, -change);
+		return (TRUE);
 	// Opacity keys, i.e. CTRL + keypad
 	case ACT_OPAC_01:
 	case ACT_OPAC_02:
@@ -879,24 +972,15 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		pressed_scale(NULL, NULL); return TRUE;
 	case ACT_SIZE:
 		pressed_size(NULL, NULL); return TRUE;
-	/* The @#$% colour-change override */
-	case ACT_SEL_LEFT:
+	case ACT_A_PREV:
 		if (mem_channel == CHN_IMAGE)
 		{
-			if (mem_col_B) mem_col_B--;
+			if (mem_col_A) mem_col_A--;
 		}
-		else if (channel_col_B[mem_channel])
-			channel_col_B[mem_channel]--;
+		else if (channel_col_A[mem_channel])
+			channel_col_A[mem_channel]--;
 		break;
-	case ACT_SEL_RIGHT:
-		if (mem_channel == CHN_IMAGE)
-		{
-			if (mem_col_B < mem_cols - 1) mem_col_B++;
-		}
-		else if (channel_col_B[mem_channel] < 255)
-			channel_col_B[mem_channel]++;
-		break;
-	case ACT_SEL_DOWN:
+	case ACT_A_NEXT:
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_A < mem_cols - 1) mem_col_A++;
@@ -904,13 +988,21 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		else if (channel_col_A[mem_channel] < 255)
 			channel_col_A[mem_channel]++;
 		break;
-	case ACT_SEL_UP:
+	case ACT_B_PREV:
 		if (mem_channel == CHN_IMAGE)
 		{
-			if (mem_col_A) mem_col_A--;
+			if (mem_col_B) mem_col_B--;
 		}
-		else if (channel_col_A[mem_channel])
-			channel_col_A[mem_channel]--;
+		else if (channel_col_B[mem_channel])
+			channel_col_B[mem_channel]--;
+		break;
+	case ACT_B_NEXT:
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_col_B < mem_cols - 1) mem_col_B++;
+		}
+		else if (channel_col_B[mem_channel] < 255)
+			channel_col_B[mem_channel]++;
 		break;
 	case ACT_COMMIT:
 		if (marq_status >= MARQUEE_PASTE)
@@ -1109,18 +1201,33 @@ gint canvas_release( GtkWidget *widget, GdkEventButton *event )
 	return FALSE;
 }
 
-void mouse_event(int event, int x, int y, guint state, guint button, gdouble pressure)
+
+static void chan_txt_cat(char *txt, int chan, int x, int y)
+{
+	char txt2[8];
+
+	if ( mem_img[chan] )
+	{
+		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
+		strcat(txt, txt2);
+	}
+}
+
+static void mouse_event(int event, int x0, int y0, guint state, guint button,
+	gdouble pressure, int mflag)
 {	// Mouse event from button/motion on the canvas
+	char txt[96];
+	GdkCursor *temp_cursor = NULL;
+	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
+		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
 	unsigned char pixel;
 	png_color pixel24;
+	int r, g, b, s, new_cursor;
+	int x, y, ox, oy, i, tox = tool_ox, toy = tool_oy;
 
-	x = x / can_zoom;
-	y = y / can_zoom;
 
-	mtMAX( x, x, 0 )
-	mtMAX( y, y, 0 )
-	mtMIN( x, x, mem_width - 1)
-	mtMIN( y, y, mem_height - 1)
+	x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
+	y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
 
 	if ( (state & GDK_CONTROL_MASK) && !(state & GDK_SHIFT_MASK) )		// Set colour A/B
 	{
@@ -1173,17 +1280,22 @@ void mouse_event(int event, int x, int y, guint state, guint button, gdouble pre
 	}
 	else
 	{
-		if ( tool_fixy < 0 && (state & GDK_SHIFT_MASK) && (state & GDK_CONTROL_MASK) )
+		if (!mflag)
 		{
-			tool_fixx = -1;
-			tool_fixy = y;
+			if ((tool_fixy < 0) &&
+				((state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) ==
+				(GDK_SHIFT_MASK | GDK_CONTROL_MASK)))
+			{
+				tool_fixx = -1;
+				tool_fixy = y;
+			}
+			if ((tool_fixx < 0) &&
+				((state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) ==
+				GDK_SHIFT_MASK))
+				tool_fixx = x;
+			if (!(state & GDK_SHIFT_MASK)) tool_fixx = tool_fixy = -1;
+			if (!(state & GDK_CONTROL_MASK)) tool_fixy = -1;
 		}
-
-		if ( tool_fixx < 0 && (state & GDK_SHIFT_MASK) && !(state & GDK_CONTROL_MASK) )
-			tool_fixx = x;
-
-		if ( !(state & GDK_SHIFT_MASK) ) tool_fixx = -1;
-		if ( !(state & GDK_CONTROL_MASK) ) tool_fixy = -1;
 
 		if ( button == 3 && (state & GDK_SHIFT_MASK) )
 			set_zoom_centre( x, y );
@@ -1192,6 +1304,154 @@ void mouse_event(int event, int x, int y, guint state, guint button, gdouble pre
 		if ( tool_type == TOOL_SELECT ) update_sel_bar();
 	}
 	if ( button == 2 ) set_zoom_centre( x, y );
+
+	/* ****** Now to mouse-move-specific part ****** */
+
+	if (event != GDK_MOTION_NOTIFY) return;
+
+	/* No use when moving cursor by keyboard */
+	if (mflag) tool_fixx = tool_fixy = -1;
+
+	if (tool_fixx > 0) x = x0 = tool_fixx;
+	if (tool_fixy > 0) y = y0 = tool_fixy;
+
+	if ( tool_type == TOOL_CLONE )
+	{
+		tool_ox = x;
+		tool_oy = y;
+	}
+
+	ox = x; oy = y;
+
+	if ( poly_status == POLY_SELECTING && button == 0 )
+	{
+		stretch_poly_line(ox, oy);
+	}
+
+	if ((x0 < 0) || (x0 >= mem_width)) x = -1;
+	if ((y0 < 0) || (y0 >= mem_height)) y = -1;
+
+	if ( tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON )
+	{
+		if ( marq_status == MARQUEE_DONE )
+		{
+			if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
+			{
+				i = close_to(ox, oy);
+				if ( i!=cursor_corner ) // Stops excessive CPU/flickering
+				{
+					 cursor_corner = i;
+					 temp_cursor = gdk_cursor_new(pointers[i]);
+					 gdk_window_set_cursor(drawing_canvas->window, temp_cursor);
+					 gdk_cursor_destroy(temp_cursor);
+				}
+			}
+			else set_cursor();
+		}
+		if ( marq_status >= MARQUEE_PASTE )
+		{
+			new_cursor = 0;		// Cursor = normal
+			if ( ox>=marq_x1 && ox<=marq_x2 && oy>=marq_y1 && oy<=marq_y2 )
+				new_cursor = 1;		// Cursor = 4 way arrow
+
+			if ( new_cursor != cursor_corner ) // Stops flickering on slow hardware
+			{
+				if ( !inifile_get_gboolean( "cursorToggle", TRUE ) ||
+					new_cursor == 0 )
+					set_cursor();
+				else
+					gdk_window_set_cursor( drawing_canvas->window, move_cursor );
+				cursor_corner = new_cursor;
+			}
+		}
+	}
+	update_sel_bar();
+
+	if ( x>=0 && y>= 0 )
+	{
+		if ( status_on[STATUS_CURSORXY] )
+		{
+			snprintf(txt, 60, "%i,%i", x, y);
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
+		}
+
+		if ( status_on[STATUS_PIXELRGB] )
+		{
+			if ( mem_img_bpp == 1 )
+			{
+				pixel = GET_PIXEL( x, y );
+				r = mem_pal[pixel].red;
+				g = mem_pal[pixel].green;
+				b = mem_pal[pixel].blue;
+				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
+			}
+			else
+			{
+				pixel24 = get_pixel24( x, y );
+				r = pixel24.red;
+				g = pixel24.green;
+				b = pixel24.blue;
+				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
+			}
+			if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
+			{
+				strcat(txt, " + {");
+				chan_txt_cat(txt, CHN_ALPHA, x, y);
+				strcat(txt, ",");
+				chan_txt_cat(txt, CHN_SEL, x, y);
+				strcat(txt, ",");
+				chan_txt_cat(txt, CHN_MASK, x, y);
+				strcat(txt, "}");
+			}
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
+		}
+	}
+	else
+	{
+		if ( status_on[STATUS_CURSORXY] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+		if ( status_on[STATUS_PIXELRGB] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+	}
+
+///	TOOL PERIMETER BOX UPDATES
+
+	s = tool_size;
+	if ( perim_status > 0 )
+	{
+		perim_status = 0;
+		clear_perim();
+		perim_status = 1; // Remove old perimeter box
+	}
+
+	if ( tool_type == TOOL_CLONE && button == 0 && (state & GDK_CONTROL_MASK) )
+	{
+		clone_x += (tox-ox);
+		clone_y += (toy-oy);
+	}
+
+	if ( s*can_zoom > 4 )
+	{
+		perim_status = 1;
+		perim_x = ox - (tool_size - (tool_size % 2) )/2;
+		perim_y = oy - (tool_size - (tool_size % 2) )/2;
+		perim_s = s;
+		repaint_perim();			// Repaint 4 sides
+	}
+	else	perim_status = 0;
+
+///	LINE UPDATES
+
+	if ( tool_type == TOOL_LINE && line_status != LINE_NONE )
+	{
+		if ( line_x1 != ox || line_y1 != oy )
+		{
+			repaint_line(0);
+			line_x1 = ox;
+			line_y1 = oy;
+			repaint_line(1);
+		}
+	}
 }
 
 static gint main_scroll_changed()
@@ -1203,8 +1463,13 @@ static gint main_scroll_changed()
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 {
-	int x, y;
+	int x, y, rm;
 	gdouble pressure = 1.0;
+
+	/* Skip synthetic mouse moves */
+	rm = unreal_move;
+	unreal_move = 0;
+	if (rm == ~0) return TRUE;
 
 #if GTK_MAJOR_VERSION == 1
 	if ( tablet_working )
@@ -1217,9 +1482,10 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 
 	if (mem_img[CHN_IMAGE])
 	{
-		x = event->x - margin_main_x;
-		y = event->y - margin_main_y;
-		mouse_event(event->type, x, y, event->state, event->button, pressure);
+		x = (event->x - margin_main_x) / can_zoom;
+		y = (event->y - margin_main_y) / can_zoom;
+		mouse_event(event->type, x, y, event->state, event->button,
+			pressure, rm & 1);
 	}
 
 	return TRUE;
@@ -2115,36 +2381,17 @@ void repaint_perim()
 	}
 }
 
-static void chan_txt_cat(char *txt, int chan, int x, int y)
-{
-	char txt2[8];
-
-	if ( mem_img[chan] )
-	{
-		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
-		strcat(txt, txt2);
-	}
-}
-
 static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 {
-	char txt[96];
-	GdkCursor *temp_cursor = NULL;
-	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
-		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
-	unsigned char pixel;
-	png_color pixel24;
-	int x, y, r, g, b, s;
-	int ox, oy, i, new_cursor;
-	int tox = tool_ox, toy = tool_oy;
+	int x, y, rm;
 	GdkModifierType state;
 	guint button = 0;
 	gdouble pressure = 1.0;
 
-	mtMIN( tox, tox, mem_width-1 )
-	mtMIN( toy, toy, mem_height-1 )
-	mtMAX( tox, tox, 0 )
-	mtMAX( toy, toy, 0 )
+	/* Skip synthetic mouse moves */
+	rm = unreal_move;
+	unreal_move = 0;
+	if (rm == ~0) return TRUE;
 
 	if (mem_img[CHN_IMAGE])		// Only do this if we have an image
 	{
@@ -2177,158 +2424,10 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 		if (state & GDK_BUTTON3_MASK) button = 3;
 		if (state & GDK_BUTTON1_MASK) button = 1;
 		if ( (state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK) ) button = 13;
-		x = x - margin_main_x;
-		y = y - margin_main_y;
-//		mtMAX( x, x, 0 )
-//		mtMAX( y, y, 0 )
-		mouse_event(event->type, x, y, state, button, pressure );
+		x = (x - margin_main_x) / can_zoom;
+		y = (y - margin_main_y) / can_zoom;
 
-		x = x / can_zoom;
-		y = y / can_zoom;
-		if ( tool_fixx > 0 ) x = tool_fixx;
-		if ( tool_fixy > 0 ) y = tool_fixy;
-
-		if ( tool_type == TOOL_CLONE )
-		{
-			tool_ox = x;
-			tool_oy = y;
-		}
-
-		ox = x; oy = y;
-		mtMIN( ox, x, mem_width-1 )
-		mtMIN( oy, y, mem_height-1 )
-		mtMAX( ox, ox, 0 )
-		mtMAX( oy, oy, 0 )
-
-		if ( poly_status == POLY_SELECTING && button == 0 )
-		{
-			stretch_poly_line(ox, oy);
-		}
-
-		if ( x >= mem_width ) x = -1;
-		if ( y >= mem_height ) y = -1;
-
-		if ( tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON )
-		{
-			if ( marq_status == MARQUEE_DONE )
-			{
-				if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
-				{
-					i = close_to(ox, oy);
-					if ( i!=cursor_corner ) // Stops excessive CPU/flickering
-					{
-					 cursor_corner = i;
-					 temp_cursor = gdk_cursor_new(pointers[i]);
-					 gdk_window_set_cursor(drawing_canvas->window, temp_cursor);
-					 gdk_cursor_destroy(temp_cursor);
-					}
-				}
-				else	set_cursor();
-			}
-			if ( marq_status >= MARQUEE_PASTE )
-			{
-				new_cursor = 0;		// Cursor = normal
-				if ( ox>=marq_x1 && ox<=marq_x2 && oy>=marq_y1 && oy<=marq_y2 )
-					new_cursor = 1;		// Cursor = 4 way arrow
-
-				if ( new_cursor != cursor_corner ) // Stops flickering on slow hardware
-				{
-					if ( !inifile_get_gboolean( "cursorToggle", TRUE ) ||
-						new_cursor == 0 )
-							 set_cursor();
-					else
-					 gdk_window_set_cursor( drawing_canvas->window, move_cursor );
-					cursor_corner = new_cursor;
-				}
-			}
-		}
-		update_sel_bar();
-
-		if ( x>=0 && y>= 0 )
-		{
-			if ( status_on[STATUS_CURSORXY] )
-			{
-				snprintf(txt, 60, "%i,%i", x, y);
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
-			}
-
-			if ( status_on[STATUS_PIXELRGB] )
-			{
-				if ( mem_img_bpp == 1 )
-				{
-					pixel = GET_PIXEL( x, y );
-					r = mem_pal[pixel].red;
-					g = mem_pal[pixel].green;
-					b = mem_pal[pixel].blue;
-					snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
-				}
-				else
-				{
-					pixel24 = get_pixel24( x, y );
-					r = pixel24.red;
-					g = pixel24.green;
-					b = pixel24.blue;
-					snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
-				}
-				if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
-				{
-					strcat(txt, " + {");
-					chan_txt_cat(txt, CHN_ALPHA, x, y);
-					strcat(txt, ",");
-					chan_txt_cat(txt, CHN_SEL, x, y);
-					strcat(txt, ",");
-					chan_txt_cat(txt, CHN_MASK, x, y);
-					strcat(txt, "}");
-				}
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
-			}
-		}
-		else
-		{
-			if ( status_on[STATUS_CURSORXY] )
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-			if ( status_on[STATUS_PIXELRGB] )
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-		}
-
-///	TOOL PERIMETER BOX UPDATES
-
-		s = tool_size;
-		if ( perim_status > 0 )
-		{
-			perim_status = 0;
-			clear_perim();
-			perim_status = 1;
-					// Remove old perimeter box
-		}
-
-		if ( tool_type == TOOL_CLONE && button == 0 && (state & GDK_CONTROL_MASK) )
-		{
-			clone_x += (tox-ox);
-			clone_y += (toy-oy);
-		}
-
-		if ( s*can_zoom > 4 )
-		{
-			perim_status = 1;
-			perim_x = ox - (tool_size - (tool_size % 2) )/2;
-			perim_y = oy - (tool_size - (tool_size % 2) )/2;
-			perim_s = s;
-			repaint_perim();			// Repaint 4 sides
-		}
-		else	perim_status = 0;
-
-///	LINE UPDATES
-		if ( tool_type == TOOL_LINE && line_status != LINE_NONE )
-		{
-			if ( line_x1 != ox || line_y1 != oy )
-			{
-				repaint_line(0);
-				line_x1 = ox;
-				line_y1 = oy;
-				repaint_line(1);
-			}
-		}
+		mouse_event(event->type, x, y, state, button, pressure, rm & 1);
 	}
 
 	return TRUE;

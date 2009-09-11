@@ -572,9 +572,6 @@ void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
 ////	VIEW WINDOW
 
 static int vw_width, vw_height, vw_last_x, vw_last_y, vw_move_layer;
-#if GTK_MAJOR_VERSION == 1
-static int old_split_pos = -1;
-#endif
 
 GtkWidget *vw_drawing = NULL;
 gboolean vw_focus_on = FALSE;
@@ -1070,6 +1067,7 @@ void view_show()
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	view_showing = TRUE;
+	vw_focus_view();
 }
 
 void view_hide()
