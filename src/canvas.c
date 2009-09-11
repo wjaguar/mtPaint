@@ -1558,8 +1558,14 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 {
 	int xmode;
 
+	/* Set defaults */
 	memset(settings, 0, sizeof(ls_settings));
 	settings->ftype = FT_NONE;
+	settings->xpm_trans = mem_xpm_trans;
+	settings->jpeg_quality = mem_jpeg_quality;
+	settings->hot_x = mem_xbm_hot_x;
+	settings->hot_y = mem_xbm_hot_y;
+	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
 	if (box)
@@ -1588,19 +1594,8 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 			settings->ftype = selected_file_type(box);
 			break;
 		default: /* Use defaults */
-			box = NULL;
 			break;
 		}
-	}
-
-	/* Set defaults */
-	if (!box)
-	{
-		settings->xpm_trans = mem_xpm_trans;
-		settings->jpeg_quality = mem_jpeg_quality;
-		settings->hot_x = mem_xbm_hot_x;
-		settings->hot_y = mem_xbm_hot_y;
-		settings->gif_delay = preserved_gif_delay;
 	}
 
 	/* Default expansion of xpm_trans */

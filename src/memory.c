@@ -1683,9 +1683,9 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dis
 				}
 				else if (limit == 2) /* To 1/4, with damping */
 				{
-					err = err < -0.1 ? (err < -0.25 ?
+					err = err < -0.1 ? (err < -0.4 ?
 						-0.25 : 0.5 * err - 0.05) :
-						err > 0.1 ? (err > 0.25 ?
+						err > 0.1 ? (err > 0.4 ?
 						0.25 : 0.5 * err + 0.05) : err;
 				}
 				color1[k] = color0[k] + err;
@@ -4777,13 +4777,14 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 		{
 			int j, k;
 
-			k = i + lenY - 1;
-			if ((k %= mh2) >= mem_height) k = mh2 - k;
+			j = i + lenY - 1;
+			k = j % mh2;
+			if (k >= mem_height) k = mh2 - k;
 			alf0 = alpha + k * mem_width;
 			src0 = chan + k * mem_width * 3;
 			if (gcor) /* Gamma correct */
 			{
-				td0 = (void *)buf[k];
+				td0 = (void *)buf[j];
 				for (j = k = 0; j < mem_width; j++ , k += 3)
 				{
 					td0[k] = gamma256[src0[k]] * alf0[j];
@@ -4793,7 +4794,7 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 			}
 			else /* Use as is */
 			{
-				ts0 = (void *)buf[k];
+				ts0 = (void *)buf[j];
 				for (j = k = 0; j < mem_width; j++ , k += 3)
 				{
 					ts0[k] = src0[k] * alf0[j];

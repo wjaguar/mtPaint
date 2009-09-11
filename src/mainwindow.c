@@ -347,6 +347,9 @@ void pressed_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	mem_mask_setall(item);
 	mem_pal_init();
 	gtk_widget_queue_draw( drawing_palette );
+	/* !!! Do the same for any other kind of preview */
+	if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+		update_all_views();
 }
 
 static void pressed_export_undo( GtkMenuItem *menu_item, gpointer user_data )

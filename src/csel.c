@@ -32,6 +32,10 @@
 /* From my point of view, ITU-R 709 is a better model of a real CRT */
 // #define SRGB
 
+/* Use distorted L*X*N* model; the distortion possibly makes it better for *
+ * smaller colour differences, but at extrema, error becomes unacceptable  */
+// #define DISTORT_LXN
+
 #define CIENUM 8192
 
 csel_info *csel_data;
@@ -66,11 +70,16 @@ static void xyz2XN(double *XN, double x, double y, double z)
 		yk * yk * (520.0 - yk * 13295.0) +
 		xk * yk * (32327.0 - xk * 25491.0 - yk * 41672.0 + xk * xk * 10.0) -
 		sxk * 5227.0 + sqrt(sxk) * 2952.0) / 900.0;
-//	k = 10.0 / (y * 4.2 - x + xyz);
-/* The "k" value below is incorrect, but I feel that in reality it's better -
- * it compresses the colour plane so that green and blue are farther from red
- * than from each other, which conforms to human perception - WJ */
+#ifndef DISTORT_LXN
+	/* Do transform properly */
+	k = 10.0 / (y * 4.2 - x + xyz);
+#else
+	/* This equation is incorrect, but I felt that in reality it's better -
+	 * it compresses the colour plane so that green and blue are farther
+	 * from red than from each other, which conforms to human perception.
+	 * Yet for pure colours, distortion tends to become too high. - WJ */
 	k = 10.0 / (y * 5.2 - x + xyz);
+#endif
 	xk = x * k; yk = y * k;
 	XN[1] = (yk * (404.0 - yk * (185.0 - yk * 52.0)) +
 		xk * (69.0 - yk * (yk * (69.0 - yk * 30.0) + xk * 3.0))) / 900.0;
@@ -103,7 +112,14 @@ void rgb2LXN(double *tmp, double r, double g, double b)
 //	double L = CIEpow(y) * 116.0 - 16.0;
 	double XN[2];
 	xyz2XN(XN, x, y, z);
+	/* Luminance's range must be near to chrominance's _diameter_ */
+#ifndef DISTORT_LXN
+	/* As recommended in literature (but sqrt(3) may be better) */
+	tmp[0] = L * 2.0;
+#else
+	/* As felt good in practice */
 	tmp[0] = L * M_SQRT2;
+#endif
 	tmp[1] = (XN[0] - wXN[0]) * L * 13.0;
 	tmp[2] = (XN[1] - wXN[1]) * L * 13.0;
 }

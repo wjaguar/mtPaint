@@ -935,6 +935,9 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 				PALETTE_WIDTH, 32 );			// Update widget
 
 			mem_mask_init();		// Prepare RGB masks
+			/* !!! Do the same for any other kind of preview */
+			if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+				update_all_views();
 		}
 	}
 
