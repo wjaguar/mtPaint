@@ -18,7 +18,13 @@
 */
 
 
-#define FACTION_ROWS_TOTAL 20
+#define FACTION_ROWS_TOTAL 25
+#define FACTION_PRESETS_TOTAL 15
+		// This number must exactly match the number of menu items declared
+
+
+GtkWidget *menu_faction[FACTION_PRESETS_TOTAL+2];
+
 
 
 int spawn_process(char *argv[], char *directory);	// argv must be NULL terminated!
@@ -28,3 +34,5 @@ int spawn_expansion(char *cline, char *directory);
 void pressed_file_configure();
 void pressed_file_action( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void init_factions();					// Initialize file action menu
+
+void spawn_set_new_directory(char *fname);

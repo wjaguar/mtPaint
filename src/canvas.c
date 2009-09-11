@@ -40,6 +40,7 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "spawn.h"
 
 GtkWidget *label_bar[STATUS_ITEMS];
 
@@ -1799,6 +1800,9 @@ static gint fs_ok(GtkWidget *fs)
 		if (check_file(fname)) goto redo;
 		if (layer_save_composite(fname, &settings)) goto redo_name;
 		break;
+	case FS_SPAWN_DIR:
+		spawn_set_new_directory(fname);
+		break;
 	}
 
 	update_menus();
@@ -1877,6 +1881,9 @@ void file_selector(int action_type)
 	case FS_COMPOSITE_SAVE:
 		title = _("Save Composite Image");
 		break;
+	case FS_SPAWN_DIR:
+		title = _("Select Directory");
+		break;
 	}
 
 	fs = gtk_file_selection_new(title);
@@ -1889,7 +1896,7 @@ void file_selector(int action_type)
 		inifile_get_gint32("fs_window_x", 0),
 		inifile_get_gint32("fs_window_y", 0));
 
-	if (action_type ==  FS_GIF_EXPLODE)
+	if ( action_type == FS_SPAWN_DIR ||action_type ==  FS_GIF_EXPLODE)
 		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
 
 	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->ok_button),
@@ -1917,6 +1924,12 @@ void file_selector(int action_type)
 		snprintf(txt, 256, "%s%c",
 			inifile_get("last_dir", get_home_directory()),
 			DIR_SEP );		// Default
+	}
+
+	if ( action_type == FS_SPAWN_DIR || FS_GIF_EXPLODE )
+	{
+		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list),
+			FALSE );		// Don't let the user select files
 	}
 
 #if GTK_MAJOR_VERSION == 2

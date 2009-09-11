@@ -3236,6 +3236,11 @@ void main_init()
 		{ _("/File/Actions/8"),		NULL,		pressed_file_action, 8, NULL },
 		{ _("/File/Actions/9"),		NULL,		pressed_file_action, 9, NULL },
 		{ _("/File/Actions/10"),	NULL,		pressed_file_action, 10, NULL },
+		{ _("/File/Actions/11"),	NULL, 		pressed_file_action, 11, NULL },
+		{ _("/File/Actions/12"),	NULL,		pressed_file_action, 12, NULL },
+		{ _("/File/Actions/13"),	NULL,		pressed_file_action, 13, NULL },
+		{ _("/File/Actions/14"),	NULL,		pressed_file_action, 14, NULL },
+		{ _("/File/Actions/15"),	NULL,		pressed_file_action, 15, NULL },
 		{ _("/File/Actions/sep2"),	NULL,		NULL,0, "<Separator>" },
 		{ _("/File/Actions/Configure"),	NULL,		pressed_file_configure, 0, NULL },
 		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
@@ -3543,6 +3548,15 @@ void main_init()
 		menu_recent[i] = gtk_item_factory_get_widget(item_factory, txt );
 	}
 	menu_recent[21] = NULL;
+
+	menu_faction[0] = gtk_item_factory_get_item(item_factory, _("/File/Actions/sep2") );
+	for ( i=1; i<(FACTION_PRESETS_TOTAL+1); i++ )
+	{
+		sprintf(txt, _("/File/Actions/%i"), i);
+		menu_faction[i] = gtk_item_factory_get_widget(item_factory, txt );
+	}
+	menu_faction[FACTION_PRESETS_TOTAL+1] = NULL;
+
 
 	pop_men_dis( item_factory, item_undo, menu_undo );
 	pop_men_dis( item_factory, item_redo, menu_redo );

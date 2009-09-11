@@ -34,8 +34,12 @@
 #include "memory.h"
 #include "png.h"
 #include "mygtk.h"
+#include "canvas.h"
 #include "mainwindow.h"
 #include "spawn.h"
+
+
+// Process spawning code
 
 int spawn_process(char *argv[], char *directory)
 {
@@ -120,14 +124,35 @@ int spawn_expansion(char *cline, char *directory)
 
 
 
+// Front End stuff
+
+GtkWidget *menu_faction[FACTION_PRESETS_TOTAL+2];
+
+static GtkWidget *faction_entry[3]		// Action, command, directory
+		;
+static int faction_current_row;
+static char *faction_ini[4] = { "faction_action_%i", "faction_command_%i",
+	"faction_directory_%i", "faction_preset_%i" };
+
+
 void pressed_file_action( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
+	gchar *comm, *dir, txt[64];
+
+	sprintf(txt, faction_ini[1], item);
+	comm = inifile_get(txt,"");
+	sprintf(txt, faction_ini[2], item);
+	dir = inifile_get(txt,"");
+
+	spawn_expansion(comm, dir);
 }
 
 
 static gint faction_window_destroy( GtkWidget *widget, GdkEvent *event, GtkWidget *window )
 {
 	gtk_widget_destroy(window);
+
+	init_factions();
 
 	return FALSE;
 }
@@ -139,40 +164,118 @@ static gint faction_window_close( GtkWidget *widget, GtkWidget *window )
 
 static gint faction_execute( GtkWidget *widget, GtkWidget *window )
 {
+	gchar	*comm = (char *)gtk_entry_get_text( GTK_ENTRY(faction_entry[1]) ),
+		*dir  = (char *)gtk_entry_get_text( GTK_ENTRY(faction_entry[2]) );
+
+	spawn_expansion(comm, dir);
+
 	return FALSE;
 }
 
+static void faction_entry_changed(int entry, GtkWidget *clist)
+{
+	char *st = (char *)gtk_entry_get_text( GTK_ENTRY(faction_entry[entry]) ),
+		txt[64];
+
+	if ( entry !=2 )
+		gtk_clist_set_text( GTK_CLIST(clist), faction_current_row, entry, st );	// Update list
+
+	sprintf(txt, faction_ini[entry], faction_current_row+1);
+	inifile_set(txt, st);						// Update inifile
+
+//printf("row=%i entry=%i text=%s ini=%s\n", faction_current_row, entry, st, txt);
+}
+
+static gint faction_action_changed(GtkWidget *widget, GtkWidget *clist)
+{
+	faction_entry_changed(0, clist);
+
+	return FALSE;
+}
+
+static gint faction_command_changed(GtkWidget *widget, GtkWidget *clist)
+{
+	faction_entry_changed(1, clist);
+
+	return FALSE;
+}
+
+static gint faction_directory_changed(GtkWidget *widget, GtkWidget *clist)
+{
+	faction_entry_changed(2, clist);
+
+	return FALSE;
+}
+
+static void faction_block_events(GtkWidget *clist)		// Block entry update events
+{
+	gtk_signal_handler_block_by_func( GTK_OBJECT(faction_entry[0]),
+		(GtkSignalFunc) faction_action_changed, clist );
+	gtk_signal_handler_block_by_func( GTK_OBJECT(faction_entry[1]),
+		(GtkSignalFunc) faction_command_changed, clist );
+	gtk_signal_handler_block_by_func( GTK_OBJECT(faction_entry[2]),
+		(GtkSignalFunc) faction_directory_changed, clist );
+}
+
+static void faction_unblock_events(GtkWidget *clist)		// Unblock entry update events
+{
+	gtk_signal_handler_unblock_by_func( GTK_OBJECT(faction_entry[0]),
+		(GtkSignalFunc) faction_action_changed, clist );
+	gtk_signal_handler_unblock_by_func( GTK_OBJECT(faction_entry[1]),
+		(GtkSignalFunc) faction_command_changed, clist );
+	gtk_signal_handler_unblock_by_func( GTK_OBJECT(faction_entry[2]),
+		(GtkSignalFunc) faction_directory_changed, clist );
+}
+
+
 static void faction_select_row(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
 {
-	gchar *txt[1];
+	char txt[64];
 
-	gtk_clist_get_text( GTK_CLIST(clist), row, 0, txt);
+	faction_current_row = row;
 
-//printf("row=%i col=%i txt=%s\n", row, col, txt[0]);
+	faction_block_events(clist);
+
+	sprintf(txt, faction_ini[0], row+1);
+	gtk_entry_set_text(GTK_ENTRY(faction_entry[0]), inifile_get( txt, "" ));
+
+	sprintf(txt, faction_ini[1], row+1);
+	gtk_entry_set_text(GTK_ENTRY(faction_entry[1]), inifile_get( txt, "" ));
+
+	sprintf(txt, faction_ini[2], row+1);
+	gtk_entry_set_text(GTK_ENTRY(faction_entry[2]), inifile_get( txt, "" ));
+
+	faction_unblock_events(clist);
 }
 
 static void update_faction_menu()
 {
-	int i, j;
+	int i, j, items=0;
 	char txt[64], *st;
 
-	for ( i=0; i<10; i++ )			// Populate menu
+	for ( i=0; i<FACTION_PRESETS_TOTAL; i++ )			// Populate menu
 	{
-		sprintf(txt, "faction_preset_%i", i+1);
-		j = inifile_get_gint32( txt, 0 );
+		sprintf(txt, faction_ini[3], i+1);
+		j = inifile_get_gint32( txt, -1 );
 
 		if ( j>=0 && j<FACTION_ROWS_TOTAL )
 		{
-			sprintf(txt, "faction_action_%i", j);
+			items++;
+			sprintf(txt, faction_ini[0], j);
 			st = inifile_get( txt, "" );
-				// Show menu item widget
-				// Change text of menu item
+			gtk_widget_show( menu_faction[i+1] );	// Show menu item widget
+			gtk_label_set_text( GTK_LABEL( GTK_MENU_ITEM(menu_faction[i+1]
+						)->item.bin.child ), st );
+					// Change text of menu item
 		}
 		else
 		{
-				// Hide menu item widget
+			gtk_widget_hide( menu_faction[i+1] );	// Hide menu item widget
 		}
 	}
+
+	if ( items == 0 ) gtk_widget_hide( menu_faction[0] );	// No presets so hide separator
+	else gtk_widget_show( menu_faction[0] );		// Use separator
 }
 
 void init_factions()
@@ -184,33 +287,49 @@ void init_factions()
 		{"Edit in Gimp", "gimp %f"},
 		{"View in GQview", "gqview %f"},
 		{"Print image", "kprinter %f"},
-		{"Email image", "kmail %f"},
-		{"Send Image to Firefox", "firefox %f"},
-		{"Send Image to OpenOffice", "soffice %f"},
+		{"Email image", "seamonkey -compose attachment=file://%f"},
+		{"Send image to Firefox", "firefox %f"},
+		{"Send image to OpenOffice", "soffice %f"},
 		{"Edit Clipboards", "mtpaint ~/.clip*"},
-		{"View image information", "identify --verbose %f"},
-		{"Convert TIFF files to JPEG", "mogrify -format jpeg *.tiff"},
+		{"Time delayed screenshot", "sleep 10; mtpaint -s"},
+		{"View image information", "xterm -hold -sb -rightbar -geometry 100x100 -e identify -verbose %f"},
+		{"Create temp directory", "mkdir ~/images"},
+		{"Remove temp directory", "rm -rf ~/images"},
+		{"GIF to PNG conversion (in situ)", "mogrify -format png *.gif"},
+		{"ICO to PNG conversion (temp directory)", "ls --file-type *.ico | xargs -I FILE convert FILE ~/images/FILE.png"},
+		{"Convert image to ICO file", "mogrify -format ico %f"},
+		{"Create thumbnails in temp directory", "ls --file-type * | xargs -I FILE convert FILE -thumbnail 90x90 ~/images/th_FILE.jpg"},
+		{"Create thumbnails (in situ)", "ls --file-type * | xargs -I FILE convert FILE -thumbnail 90x90 th_FILE.jpg"},
+		{"Peruse temp images", "mtpaint ~/images/*"},
+		{"Rename *.jpeg to *.jpg", "rename .jpeg .jpg *.jpeg"},
+		{"Remove spaces from filenames", "for file in *\" \"*; do mv \"$file\" `echo $file | sed -e 's/ /_/g'`; done"},
+//		{"", ""},
 		{NULL, NULL, NULL}
 		},
 		txt[64];
 
 	for ( i=0; row_def[i][0]; i++ )		// Needed for first time usage - populate inifile list
 	{
-		sprintf(txt, "faction_action_%i", i+1);
+		sprintf(txt, faction_ini[0], i+1);
 		inifile_get( txt, row_def[i][0] );
 
-		sprintf(txt, "faction_command_%i", i+1);
+		sprintf(txt, faction_ini[1], i+1);
 		inifile_get( txt, row_def[i][1] );
 
 		j = i+1;
-		if ( j<=10 )			// Only 10 presets used
+		if ( j<=FACTION_PRESETS_TOTAL )
 		{
-			sprintf(txt, "faction_preset_%i", j);
+			sprintf(txt, faction_ini[3], j);
 			inifile_get_gint32( txt, j );
 		}
 	}
 
 	update_faction_menu();			// Prepare menus
+}
+
+void click_faction_browse()
+{
+	file_selector(FS_SPAWN_DIR);
 }
 
 void pressed_file_configure()
@@ -219,9 +338,8 @@ void pressed_file_configure()
 	GtkWidget *vbox, *hbox, *win, *sw, *clist, *button, *entry, *omenu;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	gchar *clist_titles[3] = { _("Action"), _("Command"), _("Preset"),},
-		*row_text[3], *omenu_txt[] = { _("None"), "1", "2", "3", "4", "5",
-		"6", "7", "8", "9", "10" },
-		txt[64];
+		*row_text[3], *omenu_txt[FACTION_PRESETS_TOTAL+1],
+		txt[64], num[FACTION_PRESETS_TOTAL][5];
 
 
 	win = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure File Actions"), GTK_WIN_POS_CENTER, TRUE );
@@ -245,10 +363,10 @@ void pressed_file_configure()
 
 	for ( i=0; i<FACTION_ROWS_TOTAL; i++ )
 	{
-		sprintf(txt, "faction_action_%i", i+1);
+		sprintf(txt, faction_ini[0], i+1);
 		row_text[0] = inifile_get( txt, "" );
 
-		sprintf(txt, "faction_command_%i", i+1);
+		sprintf(txt, faction_ini[1], i+1);
 		row_text[1] = inifile_get( txt, "" );
 
 		row_text[2] = "";		// Done next
@@ -256,12 +374,12 @@ void pressed_file_configure()
 		gtk_clist_append( GTK_CLIST(clist), row_text );
 	}
 
-	for ( i=0; i<10; i++ )
+	for ( i=0; i<FACTION_PRESETS_TOTAL; i++ )
 	{
-		sprintf(txt, "faction_preset_%i", i+1);
+		sprintf(txt, faction_ini[3], i+1);
 		j = inifile_get_gint32( txt, -1 );
 
-		if ( j>=0 )
+		if ( j>0 )
 		{
 			sprintf(txt, "%i", j);
 			gtk_clist_set_text( GTK_CLIST(clist), j-1, 2, txt ); // Enter preset into table
@@ -273,25 +391,44 @@ void pressed_file_configure()
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame(vbox, _("Action / Preset"), hbox, 5);
 	entry = gtk_entry_new();
+	faction_entry[0] = entry;
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
-	omenu = wj_option_menu(omenu_txt, 11, 0, NULL, NULL);
+
+	omenu_txt[0] = _("None");
+	for ( i=1; i<=FACTION_PRESETS_TOTAL; i++ )
+	{
+		sprintf( num[i-1], "%i", i );
+		omenu_txt[i] = num[i-1];
+	}
+
+	omenu = wj_option_menu(omenu_txt, FACTION_PRESETS_TOTAL+1, 0, NULL, NULL);
 	gtk_box_pack_start(GTK_BOX(hbox), omenu, FALSE, FALSE, 4);
+	gtk_signal_connect( GTK_OBJECT(faction_entry[0]), "changed",
+			GTK_SIGNAL_FUNC(faction_action_changed), clist);
 
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame(vbox, _("Command"), hbox, 5);
 	entry = gtk_entry_new();
+	faction_entry[1] = entry;
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	gtk_signal_connect( GTK_OBJECT(faction_entry[1]), "changed",
+			GTK_SIGNAL_FUNC(faction_command_changed), clist);
 
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame(vbox, _("Directory"), hbox, 5);
 	entry = gtk_entry_new();
+	faction_entry[2] = entry;
 	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	gtk_signal_connect( GTK_OBJECT(faction_entry[2]), "changed",
+			GTK_SIGNAL_FUNC(faction_directory_changed), clist);
 	button = add_a_button(_("Browse"), 2, hbox, FALSE);
-//	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-//		GTK_SIGNAL_FUNC(click_faction_browse), NULL);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_faction_browse), NULL);
 
+
+	faction_block_events(clist);
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
@@ -313,5 +450,13 @@ void pressed_file_configure()
 	gtk_widget_show_all(win);
 	gtk_window_add_accel_group(GTK_WINDOW (win), ag);
 
+	faction_current_row = 0;
 	gtk_clist_select_row( GTK_CLIST(clist), 0, 0 );		// Select first item
+	faction_unblock_events(clist);				// Enable updates
+}
+
+
+void spawn_set_new_directory(char *fname)
+{
+	gtk_entry_set_text(GTK_ENTRY(faction_entry[2]), fname);
 }
