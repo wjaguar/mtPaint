@@ -106,7 +106,9 @@ void paint_marquee(int action, int new_x, int new_y);	// Draw/clear marquee
 void paint_poly_marquee();				// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
 
+void update_image_bar();		// Update image stats on status bar
 void update_sel_bar();			// Update selection stats on status bar
+void update_xy_bar(int x, int y);	// Update cursor tracking on status bar
 void init_status_bar();			// Initialize status bar
 
 void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data );

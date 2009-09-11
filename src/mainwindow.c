@@ -169,6 +169,7 @@ void pressed_select_none( GtkMenuItem *menu_item, gpointer user_data )
 	{
 		paint_marquee(0, marq_x1, marq_y1);
 		marq_status = MARQUEE_NONE;
+		marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
 		update_menus();
 		gtk_widget_queue_draw( drawing_canvas );
 		set_cursor();
@@ -569,30 +570,41 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 /* For "dual" mouse control */
 static int unreal_move, lastdx, lastdy;
 
-static void move_mouse(int dx, int dy)
+static void move_mouse(int dx, int dy, int button)
 {
-	int x, y, zoom, scale, button;
+	static GdkModifierType bmasks[4] =
+		{0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK};
 	GdkModifierType state;
+	int x, y, nx, ny, zoom, scale;
 
 	if (!unreal_move) lastdx = lastdy = 0;
 	if (!mem_img[CHN_IMAGE]) return;
 
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
+
+	nx = (x - margin_main_x) / can_zoom + lastdx + dx;
+	ny = (y - margin_main_y) / can_zoom + lastdy + dy;
+
+	if (button) /* Clicks simulated without extra movements */
+	{
+		state |= bmasks[button];
+		mouse_event(GDK_BUTTON_PRESS, nx, ny, state, button, 1.0, 1);
+		state ^= bmasks[button];
+		mouse_event(GDK_BUTTON_RELEASE, nx, ny, state, button, 1.0, 1);
+		return;
+	}
+
 	if ((state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK))
 		button = 13;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON1_MASK) button = 1;
-	else button = 0;
 
 	if (can_zoom < 1.0) /* Fine control required */
 	{
 		zoom = rint(1.0 / can_zoom);
 		lastdx += dx; lastdy += dy;
-		mouse_event(GDK_MOTION_NOTIFY,
-			(x - margin_main_x) / can_zoom + lastdx,
-			(y - margin_main_y) / can_zoom + lastdy,
-			state, button, 1.0, 1);
+		mouse_event(GDK_MOTION_NOTIFY, nx, ny, state, button, 1.0, 1);
 
 		/* Nudge cursor when needed */
 		if ((abs(lastdx) >= zoom) || (abs(lastdy) >= zoom))
@@ -602,7 +614,7 @@ static void move_mouse(int dx, int dy)
 			lastdx -= dx * zoom;
 			lastdy -= dy * zoom;
 			unreal_move = ~0;
-			move_mouse_relative(x, y, dx, dy);
+			move_mouse_relative(dx, dy);
 		}
 		unreal_move = 2;
 	}
@@ -612,13 +624,10 @@ static void move_mouse(int dx, int dy)
 		unreal_move = 1;
 
 		/* Simulate movement if failed to actually move mouse */
-		if (!move_mouse_relative(x, y, dx * scale, dy * scale))
+		if (!move_mouse_relative(dx * scale, dy * scale))
 		{
 			lastdx += dx; lastdy += dy;
-			mouse_event(GDK_MOTION_NOTIFY,
-				(x - margin_main_x) / can_zoom + lastdx,
-				(y - margin_main_y) / can_zoom + lastdy,
-				state, button, 1.0, 1);
+			mouse_event(GDK_MOTION_NOTIFY, nx, ny, state, button, 1.0, 1);
 		}
 	}
 }
@@ -848,6 +857,7 @@ key_action main_keys[] = {
 	{"SIZE",	ACT_SIZE, GDK_Page_Down, _CS, 0},
 	{"COMMIT",	ACT_COMMIT, GDK_Return, 0, 0},
 	{"",		ACT_COMMIT, GDK_KP_Enter, 0, 0},
+	{"RCLICK",	ACT_RCLICK, GDK_BackSpace, 0, 0},
 	{"ARROW",	ACT_ARROW, GDK_a, _C, 0},
 	{"",		ACT_ARROW, GDK_A, _C, 0},
 	{"ARROW3",	ACT_ARROW3, GDK_s, _C, 0},
@@ -910,19 +920,19 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 	{
 	case ACT_SEL_LEFT: change = 1;
 	case ACT_SEL_2LEFT:
-		move_mouse(-change, 0);
+		move_mouse(-change, 0, 0);
 		return (TRUE);
 	case ACT_SEL_RIGHT: change = 1;
 	case ACT_SEL_2RIGHT:
-		move_mouse(change, 0);
+		move_mouse(change, 0, 0);
 		return (TRUE);
 	case ACT_SEL_DOWN: change = 1;
 	case ACT_SEL_2DOWN:
-		move_mouse(0, change);
+		move_mouse(0, change, 0);
 		return (TRUE);
 	case ACT_SEL_UP: change = 1;
 	case ACT_SEL_2UP:
-		move_mouse(0, -change);
+		move_mouse(0, -change, 0);
 		return (TRUE);
 	// Opacity keys, i.e. CTRL + keypad
 	case ACT_OPAC_01:
@@ -1010,6 +1020,10 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 			commit_paste(TRUE);
 			pen_down = 0;	// Ensure each press of enter is a new undo level
 		}
+		else move_mouse(0, 0, 1);
+		return TRUE;
+	case ACT_RCLICK:
+		if (marq_status < MARQUEE_PASTE) move_mouse(0, 0, 3);
 		return TRUE;
 	case ACT_ARROW:
 	case ACT_ARROW3:
@@ -1170,66 +1184,59 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 }
 #endif
 
-gint canvas_release( GtkWidget *widget, GdkEventButton *event )
-{
-	tint_mode[2] = 0;
-	pen_down = 0;
-	if ( col_reverse )
-	{
-		col_reverse = FALSE;
-		mem_swap_cols();
-	}
-
-	if ( tool_type == TOOL_LINE && event->button == 1 && line_status == LINE_START )
-	{
-		line_status = LINE_LINE;
-		repaint_line(1);
-	}
-
-	if ( (tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON) && event->button == 1 )
-	{
-		if ( marq_status == MARQUEE_SELECTING ) marq_status = MARQUEE_DONE;
-		if ( marq_status == MARQUEE_PASTE_DRAG ) marq_status = MARQUEE_PASTE;
-		cursor_corner = -1;
-	}
-
-	if ( tool_type == TOOL_POLYGON && poly_status == POLY_DRAGGING )
-		tool_action(GDK_NOTHING, 0, 0, 0, 0 );	// Finish off dragged polygon selection
-
-	update_menus();
-
-	return FALSE;
-}
-
-
-static void chan_txt_cat(char *txt, int chan, int x, int y)
-{
-	char txt2[8];
-
-	if ( mem_img[chan] )
-	{
-		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
-		strcat(txt, txt2);
-	}
-}
-
 static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	gdouble pressure, int mflag)
 {	// Mouse event from button/motion on the canvas
-	char txt[96];
 	GdkCursor *temp_cursor = NULL;
 	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
 	unsigned char pixel;
 	png_color pixel24;
-	int r, g, b, s, new_cursor;
+	int s, new_cursor;
 	int x, y, ox, oy, i, tox = tool_ox, toy = tool_oy;
 
 
 	x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
 	y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
 
-	if ( (state & GDK_CONTROL_MASK) && !(state & GDK_SHIFT_MASK) )		// Set colour A/B
+	/* ****** Release-event-specific code ****** */
+	if (event == GDK_BUTTON_RELEASE)
+	{
+		tint_mode[2] = 0;
+		pen_down = 0;
+		if ( col_reverse )
+		{
+			col_reverse = FALSE;
+			mem_swap_cols();
+		}
+
+		if ((tool_type == TOOL_LINE) && (button == 1) &&
+			(line_status == LINE_START))
+		{
+			line_status = LINE_LINE;
+			repaint_line(1);
+		}
+
+		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
+			(button == 1))
+		{
+			if (marq_status == MARQUEE_SELECTING)
+				marq_status = MARQUEE_DONE;
+			if (marq_status == MARQUEE_PASTE_DRAG)
+				marq_status = MARQUEE_PASTE;
+			cursor_corner = -1;
+		}
+
+		// Finish off dragged polygon selection
+		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
+			tool_action(event, x, y, button, pressure);
+
+		update_menus();
+
+		return;
+	}
+
+	if ((state & _CS) == _C)	// Set colour A/B
 	{
 		if (mem_channel != CHN_IMAGE)
 		{
@@ -1282,26 +1289,23 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	{
 		if (!mflag)
 		{
-			if ((tool_fixy < 0) &&
-				((state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) ==
-				(GDK_SHIFT_MASK | GDK_CONTROL_MASK)))
+			if ((tool_fixy < 0) && ((state & _CS) == _CS))
 			{
 				tool_fixx = -1;
 				tool_fixy = y;
 			}
-			if ((tool_fixx < 0) &&
-				((state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) ==
-				GDK_SHIFT_MASK))
+			if ((tool_fixx < 0) && ((state & _CS) == _S))
 				tool_fixx = x;
-			if (!(state & GDK_SHIFT_MASK)) tool_fixx = tool_fixy = -1;
-			if (!(state & GDK_CONTROL_MASK)) tool_fixy = -1;
+			if (!(state & _S)) tool_fixx = tool_fixy = -1;
+			if (!(state & _C)) tool_fixy = -1;
 		}
 
-		if ( button == 3 && (state & GDK_SHIFT_MASK) )
+		if ((button == 3) && (state & _S))
 			set_zoom_centre( x, y );
 		else if ( button == 1 || button >= 3 )
 			tool_action(event, x, y, button, pressure);
-		if ( tool_type == TOOL_SELECT ) update_sel_bar();
+		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+			update_sel_bar();
 	}
 	if ( button == 2 ) set_zoom_centre( x, y );
 
@@ -1365,54 +1369,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 			}
 		}
 	}
-	update_sel_bar();
-
-	if ( x>=0 && y>= 0 )
-	{
-		if ( status_on[STATUS_CURSORXY] )
-		{
-			snprintf(txt, 60, "%i,%i", x, y);
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
-		}
-
-		if ( status_on[STATUS_PIXELRGB] )
-		{
-			if ( mem_img_bpp == 1 )
-			{
-				pixel = GET_PIXEL( x, y );
-				r = mem_pal[pixel].red;
-				g = mem_pal[pixel].green;
-				b = mem_pal[pixel].blue;
-				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
-			}
-			else
-			{
-				pixel24 = get_pixel24( x, y );
-				r = pixel24.red;
-				g = pixel24.green;
-				b = pixel24.blue;
-				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
-			}
-			if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
-			{
-				strcat(txt, " + {");
-				chan_txt_cat(txt, CHN_ALPHA, x, y);
-				strcat(txt, ",");
-				chan_txt_cat(txt, CHN_SEL, x, y);
-				strcat(txt, ",");
-				chan_txt_cat(txt, CHN_MASK, x, y);
-				strcat(txt, "}");
-			}
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
-		}
-	}
-	else
-	{
-		if ( status_on[STATUS_CURSORXY] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-		if ( status_on[STATUS_PIXELRGB] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-	}
+	update_xy_bar(x, y);
 
 ///	TOOL PERIMETER BOX UPDATES
 
@@ -1424,7 +1381,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		perim_status = 1; // Remove old perimeter box
 	}
 
-	if ( tool_type == TOOL_CLONE && button == 0 && (state & GDK_CONTROL_MASK) )
+	if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
 	{
 		clone_x += (tox-ox);
 		clone_y += (toy-oy);
@@ -1463,13 +1420,9 @@ static gint main_scroll_changed()
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 {
-	int x, y, rm;
+	int x, y;
 	gdouble pressure = 1.0;
 
-	/* Skip synthetic mouse moves */
-	rm = unreal_move;
-	unreal_move = 0;
-	if (rm == ~0) return TRUE;
 
 #if GTK_MAJOR_VERSION == 1
 	if ( tablet_working )
@@ -1485,10 +1438,22 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 		x = (event->x - margin_main_x) / can_zoom;
 		y = (event->y - margin_main_y) / can_zoom;
 		mouse_event(event->type, x, y, event->state, event->button,
-			pressure, rm & 1);
+			pressure, unreal_move & 1);
 	}
 
 	return TRUE;
+}
+
+static gint canvas_release( GtkWidget *widget, GdkEventButton *event )
+{
+	int x, y;
+
+	x = (event->x - margin_main_x) / can_zoom;
+	y = (event->y - margin_main_y) / can_zoom;
+	mouse_event(event->type, x, y, event->state, event->button,
+		1.0, unreal_move & 1);
+
+	return FALSE;
 }
 
 static gint canvas_enter( GtkWidget *widget, GdkEventMotion *event )	// Mouse enters the canvas
@@ -1520,10 +1485,6 @@ int async_bk = FALSE;
 
 #define GREY_W 153
 #define GREY_B 102
-/*
- * !!! This draws *pixel-synched* "transparency background" !!!
- * The synching allows to simply copy images' pixels and lines for enlargement
- */
 void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
 {
 	int i, j, k, scale, dx, dy, step, ii, jj, ii0, px, py;
@@ -1595,16 +1556,20 @@ void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int
 }
 
 /* This is for a faster way to pass parameters into render_row() */
-static int rr_dx;
-static int rr_width;
-static int rr_xwid;
-static int rr_zoom;
-static int rr_scale;
-static int rr_mw;
-static int rr_opac;
-static int rr_xpm;
-static int rr_bpp;
-static png_color *rr_pal;
+typedef struct {
+	int dx;
+	int width;
+	int xwid;
+	int zoom;
+	int scale;
+	int mw;
+	int opac;
+	int xpm;
+	int bpp;
+	png_color *pal;
+} renderstate;
+
+static renderstate rr;
 
 void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 	int bpp, png_color *pal)
@@ -1613,38 +1578,38 @@ void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (czoom <= 1.0)
 	{
-		rr_zoom = rint(1.0 / czoom);
-		rr_scale = 1;
+		rr.zoom = rint(1.0 / czoom);
+		rr.scale = 1;
 		x0 = 0;
 	}
 	else
 	{
-		rr_zoom = 1;
-		rr_scale = rint(czoom);
-		x0 %= rr_scale;
+		rr.zoom = 1;
+		rr.scale = rint(czoom);
+		x0 %= rr.scale;
 	}
-	if (width + x0 > rr_scale)
+	if (width + x0 > rr.scale)
 	{
-		rr_dx = rr_scale - x0;
-		x0 = (width + x0) % rr_scale;
-		if (!x0) x0 = rr_scale;
+		rr.dx = rr.scale - x0;
+		x0 = (width + x0) % rr.scale;
+		if (!x0) x0 = rr.scale;
 		width -= x0;
-		rr_xwid = x0 - rr_scale;
+		rr.xwid = x0 - rr.scale;
 	}
 	else
 	{
-		rr_dx = width--;
-		rr_xwid = 0;
+		rr.dx = width--;
+		rr.xwid = 0;
 	}
-	rr_width = width;
-	rr_mw = mw;
+	rr.width = width;
+	rr.mw = mw;
 
 	if ((xpm > -1) && (bpp == 3)) xpm = PNG_2_INT(pal[xpm]);
-	rr_xpm = xpm;
-	rr_opac = opac;
+	rr.xpm = xpm;
+	rr.opac = opac;
 
-	rr_bpp = bpp;
-	rr_pal = pal;
+	rr.bpp = bpp;
+	rr.pal = pal;
 }
 
 void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
@@ -1652,8 +1617,8 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 {
 	int alpha_blend = !overlay_alpha;
 	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
-	int i, j, k, ii, ds = rr_zoom * 3, da = 0;
-	int w_bpp = rr_bpp, w_xpm = rr_xpm;
+	int i, j, k, ii, ds = rr.zoom * 3, da = 0;
+	int w_bpp = rr.bpp, w_xpm = rr.xpm;
 
 	if (xtra_img)
 	{
@@ -1661,12 +1626,12 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 		alpha = xtra_img[CHN_ALPHA];
 	}
 	if (channel_dis[CHN_ALPHA]) alpha = &beta; /* Ignore alpha if disabled */
-	if (!src) src = base_img[CHN_IMAGE] + (rr_mw * y + x) * rr_bpp;
+	if (!src) src = base_img[CHN_IMAGE] + (rr.mw * y + x) * rr.bpp;
 	if (!alpha) alpha = base_img[CHN_ALPHA] ? base_img[CHN_ALPHA] +
-		rr_mw * y + x : &beta;
-	if (alpha != &beta) da = rr_zoom;
+		rr.mw * y + x : &beta;
+	if (alpha != &beta) da = rr.zoom;
 	dest = rgb;
-	ii = rr_dx;
+	ii = rr.dx;
 
 	if (hide_image) /* Substitute non-transparent "image overlay" colour */
 	{
@@ -1675,25 +1640,25 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 		ds = 0;
 		src = channel_rgb[CHN_IMAGE];
 	}
-	if (!da && (w_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
+	if (!da && (w_xpm < 0) && (rr.opac == 255)) alpha_blend = FALSE;
 
 	/* Indexed fully opaque */
 	if ((w_bpp == 1) && !alpha_blend)
 	{
-		for (i = 0; ; ii += rr_scale)
+		for (i = 0; ; ii += rr.scale)
 		{
-			if (i >= rr_width)
+			if (i >= rr.width)
 			{
-				if (i > rr_width) break;
-				ii += rr_xwid;
+				if (i > rr.width) break;
+				ii += rr.xwid;
 			}
 			px = *src;
-			src += rr_zoom;
+			src += rr.zoom;
 			for(; i < ii; i++)
 			{
-				dest[0] = rr_pal[px].red;
-				dest[1] = rr_pal[px].green;
-				dest[2] = rr_pal[px].blue;
+				dest[0] = rr.pal[px].red;
+				dest[1] = rr.pal[px].green;
+				dest[2] = rr.pal[px].blue;
 				dest += 3;
 			}
 		}
@@ -1702,15 +1667,15 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	/* Indexed transparent */
 	else if (w_bpp == 1)
 	{
-		for (i = 0; ; ii += rr_scale , alpha += da)
+		for (i = 0; ; ii += rr.scale , alpha += da)
 		{
-			if (i >= rr_width)
+			if (i >= rr.width)
 			{
-				if (i > rr_width) break;
-				ii += rr_xwid;
+				if (i > rr.width) break;
+				ii += rr.xwid;
 			}
 			px = *src;
-			src += rr_zoom;
+			src += rr.zoom;
 			if (!*alpha || (px == w_xpm))
 			{
 				dest += (ii - i) * 3;
@@ -1718,19 +1683,19 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 				continue;
 			}
 rr2_as:
-			if (rr_opac == 255)
+			if (rr.opac == 255)
 			{
-				dest[0] = rr_pal[px].red;
-				dest[1] = rr_pal[px].green;
-				dest[2] = rr_pal[px].blue;
+				dest[0] = rr.pal[px].red;
+				dest[1] = rr.pal[px].green;
+				dest[2] = rr.pal[px].blue;
 			}
 			else
 			{
-				j = 255 * dest[0] + rr_opac * (rr_pal[px].red - dest[0]);
+				j = 255 * dest[0] + rr.opac * (rr.pal[px].red - dest[0]);
 				dest[0] = (j + (j >> 8) + 1) >> 8;
-				j = 255 * dest[1] + rr_opac * (rr_pal[px].green - dest[1]);
+				j = 255 * dest[1] + rr.opac * (rr.pal[px].green - dest[1]);
 				dest[1] = (j + (j >> 8) + 1) >> 8;
-				j = 255 * dest[2] + rr_opac * (rr_pal[px].blue - dest[2]);
+				j = 255 * dest[2] + rr.opac * (rr.pal[px].blue - dest[2]);
 				dest[2] = (j + (j >> 8) + 1) >> 8;
 			}
 rr2_s:
@@ -1747,12 +1712,12 @@ rr2_s:
 	/* RGB fully opaque */
 	else if (!alpha_blend)
 	{
-		for (i = 0; ; ii += rr_scale , src += ds)
+		for (i = 0; ; ii += rr.scale , src += ds)
 		{
-			if (i >= rr_width)
+			if (i >= rr.width)
 			{
-				if (i > rr_width) break;
-				ii += rr_xwid;
+				if (i > rr.width) break;
+				ii += rr.xwid;
 			}
 			for(; i < ii; i++)
 			{
@@ -1767,12 +1732,12 @@ rr2_s:
 	/* RGB transparent */
 	else
 	{
-		for (i = 0; ; ii += rr_scale , src += ds , alpha += da)
+		for (i = 0; ; ii += rr.scale , src += ds , alpha += da)
 		{
-			if (i >= rr_width)
+			if (i >= rr.width)
 			{
-				if (i > rr_width) break;
-				ii += rr_xwid;
+				if (i > rr.width) break;
+				ii += rr.xwid;
 			}
 			if (!*alpha || (MEM_2_INT(src, 0) == w_xpm))
 			{
@@ -1780,7 +1745,7 @@ rr2_s:
 				i = ii;
 				continue;
 			}
-			k = rr_opac * alpha[0];
+			k = rr.opac * alpha[0];
 			k = (k + (k >> 8) + 1) >> 8;
 rr4_as:
 			if (k == 255)
@@ -1823,7 +1788,7 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 		mask = xtra_img[CHN_MASK];
 	}
 	else alpha = sel = mask = NULL;
-	j = rr_mw * y + x;
+	j = rr.mw * y + x;
 	if (!alpha && base_img[CHN_ALPHA]) alpha = base_img[CHN_ALPHA] + j;
 	if (!sel && base_img[CHN_SEL]) sel = base_img[CHN_SEL] + j;
 	if (!mask && base_img[CHN_MASK]) mask = base_img[CHN_MASK] + j;
@@ -1846,13 +1811,13 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	if (!(opA + opS + opM)) return;
 
 	dest = rgb;
-	ii = rr_dx;
-	for (i = dw = 0; ; ii += rr_scale , dw += rr_zoom)
+	ii = rr.dx;
+	for (i = dw = 0; ; ii += rr.scale , dw += rr.zoom)
 	{
-		if (i >= rr_width)
+		if (i >= rr.width)
 		{
-			if (i > rr_width) break;
-			ii += rr_xwid;
+			if (i > rr.width) break;
+			ii += rr.xwid;
 		}
 		t0 = t1 = t2 = t3 = 0;
 		if (opA)
@@ -1905,13 +1870,13 @@ void overlay_preview(unsigned char *rgb, unsigned char *map, int col, int opacit
 	int i, j, k, ii, dw;
 
 	dest = rgb;
-	ii = rr_dx;
-	for (i = dw = 0; ; ii += rr_scale , dw += rr_zoom)
+	ii = rr.dx;
+	for (i = dw = 0; ; ii += rr.scale , dw += rr.zoom)
 	{
-		if (i >= rr_width)
+		if (i >= rr.width)
 		{
-			if (i > rr_width) break;
-			ii += rr_xwid;
+			if (i > rr.width) break;
+			ii += rr.xwid;
 		}
 		k = opacity * map[dw];
 		k = (k + (k >> 8) + 1) >> 8;
@@ -2618,6 +2583,14 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 		{
 			clone_x = -tool_size;
 			clone_y = tool_size;
+		}
+		/* Persistent selection frame */
+		if ((tool_type == TOOL_SELECT) && (marq_x1 >= 0) &&
+			(marq_y1 >= 0) && (marq_x2 >= 0) && (marq_y2 >= 0))
+		{
+			marq_status = MARQUEE_DONE;
+			check_marquee();
+			paint_marquee(1, marq_x1, marq_y1);
 		}
 		update_menus();
 		set_cursor();

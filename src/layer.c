@@ -1095,7 +1095,7 @@ void layers_remove_all()
 	layers_notify_unchanged();
 
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
-	init_status_bar();					// Update status bar
+	update_image_bar();					// Update status bar
 	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
 }
 

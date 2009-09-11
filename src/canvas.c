@@ -51,7 +51,7 @@ int zoom_flag = 0;
 int fs_type = 0;
 int perim_status = 0, perim_x = 0, perim_y = 0, perim_s = 2;		// Tool perimeter
 int marq_status = MARQUEE_NONE,
-	marq_x1 = 0, marq_y1 = 0, marq_x2 = 0, marq_y2 = 0;		// Selection marquee
+	marq_x1 = -1, marq_y1 = -1, marq_x2 = -1, marq_y2 = -1;		// Selection marquee
 int marq_drag_x = 0, marq_drag_y = 0;					// Marquee dragging offset
 int line_status = LINE_NONE,
 	line_x1 = 0, line_y1 = 0, line_x2 = 0, line_y2 = 0;		// Line tool
@@ -67,6 +67,207 @@ gboolean show_paste,					// Show contents of clipboard while pasting
 	fs_do_gif_explode = FALSE,
 	chequers_optimize = TRUE			// Are we optimizing the chequers for speed?
 	;
+
+
+///	STATUS BAR
+
+void update_image_bar()
+{
+	char txt[64], txt2[16];
+
+	toolbar_update_settings();		// Update A/B labels in settings toolbar
+
+	if ( mem_img_bpp == 1 )
+		sprintf(txt2, "%i", mem_cols);
+	else
+		sprintf(txt2, "RGB");
+
+	snprintf(txt, 50, "%s %i x %i x %s", channames[mem_channel],
+		mem_width, mem_height, txt2);
+
+	if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
+	{
+		strcat(txt, " + ");
+		if ( mem_img[CHN_ALPHA] ) strcat(txt, "A");
+		if ( mem_img[CHN_SEL] ) strcat(txt, "S");
+		if ( mem_img[CHN_MASK] ) strcat(txt, "M");
+	}
+
+	if ( layers_total>0 )
+	{
+		sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
+		strcat(txt, txt2);
+	}
+	if ( mem_xpm_trans>=0 )
+	{
+		sprintf(txt2, "  (T=%i)", mem_xpm_trans);
+		strcat(txt, txt2);
+	}
+	strcat(txt, "  ");
+	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), txt );
+}
+
+void update_sel_bar()			// Update selection stats on status bar
+{
+	char txt[64];
+	int x1, y1, x2, y2;
+	float lang = 0, llen = 1;
+
+	if ( (tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON) )
+	{
+		if ( marq_status > MARQUEE_NONE )
+		{
+			mtMIN( x1, marq_x1, marq_x2 )
+			mtMIN( y1, marq_y1, marq_y2 )
+			mtMAX( x2, marq_x1, marq_x2 )
+			mtMAX( y2, marq_y1, marq_y2 )
+			if ( status_on[STATUS_SELEGEOM] )
+			{
+				if ( x1==x2 )
+				{
+					if ( marq_y1 < marq_y2 ) lang = 180;
+				}
+				else
+				{
+					lang = 90 + 180*atan( ((float) marq_y1 - marq_y2) /
+						(marq_x1 - marq_x2) ) / M_PI;
+					if ( marq_x1 > marq_x2 )
+						lang = lang - 180;
+				}
+
+				llen = sqrt( (x2-x1+1)*(x2-x1+1) + (y2-y1+1)*(y2-y1+1) );
+
+				snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
+					x1, y1, x2-x1+1, y2-y1+1, lang, llen);
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
+			}
+		}
+		else
+		{
+			if ( tool_type == TOOL_POLYGON )
+			{
+				snprintf(txt, 60, "  (%i)", poly_points);
+				if ( poly_status != POLY_DONE ) strcat(txt, "+");
+				if ( status_on[STATUS_SELEGEOM] )
+					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
+			}
+			else if ( status_on[STATUS_SELEGEOM] )
+					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
+		}
+	}
+	else if ( status_on[STATUS_SELEGEOM] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
+}
+
+static void chan_txt_cat(char *txt, int chan, int x, int y)
+{
+	char txt2[8];
+
+	if ( mem_img[chan] )
+	{
+		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
+		strcat(txt, txt2);
+	}
+}
+
+void update_xy_bar(int x, int y)
+{
+	char txt[96];
+	unsigned char pixel;
+	png_color pixel24;
+	int r, g, b;
+
+	if ( x>=0 && y>= 0 )
+	{
+		if ( status_on[STATUS_CURSORXY] )
+		{
+			snprintf(txt, 60, "%i,%i", x, y);
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
+		}
+
+		if ( status_on[STATUS_PIXELRGB] )
+		{
+			if ( mem_img_bpp == 1 )
+			{
+				pixel = GET_PIXEL( x, y );
+				r = mem_pal[pixel].red;
+				g = mem_pal[pixel].green;
+				b = mem_pal[pixel].blue;
+				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
+			}
+			else
+			{
+				pixel24 = get_pixel24( x, y );
+				r = pixel24.red;
+				g = pixel24.green;
+				b = pixel24.blue;
+				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
+			}
+			if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
+			{
+				strcat(txt, " + {");
+				chan_txt_cat(txt, CHN_ALPHA, x, y);
+				strcat(txt, ",");
+				chan_txt_cat(txt, CHN_SEL, x, y);
+				strcat(txt, ",");
+				chan_txt_cat(txt, CHN_MASK, x, y);
+				strcat(txt, "}");
+			}
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
+		}
+	}
+	else
+	{
+		if ( status_on[STATUS_CURSORXY] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+		if ( status_on[STATUS_PIXELRGB] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+	}
+}
+
+static void update_undo_bar()
+{
+	char txt[32];
+
+	if (status_on[STATUS_UNDOREDO])
+	{
+		sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
+		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt);
+	}
+}
+
+void init_status_bar()
+{
+	update_image_bar();
+	if ( !status_on[STATUS_GEOMETRY] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), "" );
+
+	if ( status_on[STATUS_CURSORXY] )
+		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
+	else
+	{
+		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 0, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+	}
+
+	if ( !status_on[STATUS_PIXELRGB] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+
+	if ( !status_on[STATUS_SELEGEOM] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
+
+	if (status_on[STATUS_UNDOREDO])
+	{	
+		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
+		update_undo_bar();
+	}
+	else
+	{
+		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 0, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "" );
+	}
+}
+
 
 void commit_paste( gboolean undo )
 {
@@ -100,7 +301,6 @@ void commit_paste( gboolean undo )
 	ua |= !mem_clip_alpha;
 
 	if ( undo ) mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
-	update_menus();				// Update menu undo issues
 
 	ofs = my * mem_clip_w + mx;
 	image = mem_clipboard + ofs * mem_clip_bpp;
@@ -118,6 +318,7 @@ void commit_paste( gboolean undo )
 	free(mask);
 	free(alpha);
 
+	update_menus();				// Update menu undo issues
 	vw_update_area( fx, fy, fw, fh );
 	gtk_widget_queue_draw_area( drawing_canvas,
 			fx*can_zoom + margin_main_x, fy*can_zoom + margin_main_y,
@@ -788,12 +989,8 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data )
 void update_menus()			// Update edit/undo menu
 {
 	int i, j;
-	char txt[32];
 
-	sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
-
-	if ( status_on[STATUS_UNDOREDO] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt );
+	update_undo_bar();
 
 	if ( mem_img_bpp == 1 )
 	{
@@ -838,14 +1035,11 @@ void update_menus()			// Update edit/undo menu
 		}
 		else	men_item_state( menu_need_selection, TRUE );
 
-		if ( marq_status <= MARQUEE_DONE )
-		{
-			if ( (marq_x1 - marq_x2)*(marq_x1 - marq_x2) < (mem_width-1)*(mem_width-1) ||
-				(marq_y1 - marq_y2)*(marq_y1 - marq_y2) < (mem_height-1)*(mem_height-1) )
-					men_item_state( menu_crop, TRUE );
-				// Only offer the crop option if the user hasn't selected everything
-			else men_item_state( menu_crop, FALSE );
-		}
+		// Only offer the crop option if the user hasn't selected everything
+		if ((marq_status <= MARQUEE_DONE) &&
+			((abs(marq_x1 - marq_x2) < mem_width - 1) ||
+			(abs(marq_y1 - marq_y2) < mem_height - 1)))
+			men_item_state( menu_crop, TRUE );
 		else men_item_state( menu_crop, FALSE );
 	}
 
@@ -957,46 +1151,12 @@ int load_pal(char *file_name)			// Load palette file
 	return 0;
 }
 
-void update_status_bar1()
-{
-	char txt[64], txt2[16];
-
-	toolbar_update_settings();		// Update A/B labels in settings toolbar
-
-	if ( mem_img_bpp == 1 )
-		sprintf(txt2, "%i", mem_cols);
-	else
-		sprintf(txt2, "RGB");
-
-	snprintf(txt, 50, "%s %i x %i x %s", channames[mem_channel], mem_width, mem_height, txt2);
-
-	if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
-	{
-		strcat(txt, " + ");
-		if ( mem_img[CHN_ALPHA] ) strcat(txt, "A");
-		if ( mem_img[CHN_SEL] ) strcat(txt, "S");
-		if ( mem_img[CHN_MASK] ) strcat(txt, "M");
-	}
-
-	if ( layers_total>0 )
-	{
-		sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
-		strcat(txt, txt2);
-	}
-	if ( mem_xpm_trans>=0 )
-	{
-		sprintf(txt2, "  (T=%i)", mem_xpm_trans);
-		strcat(txt, txt2);
-	}
-	strcat(txt, "  ");
-	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), txt );
-}
 
 void update_cols()
 {
 	if (!mem_img[CHN_IMAGE]) return;	// Only do this if we have an image
 
-	update_status_bar1();
+	update_image_bar();
 	mem_pat_update();
 
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
@@ -1196,7 +1356,7 @@ gtk_widget_hide( drawing_canvas );
 		}
 
 		update_all_views();					// Show new image
-		init_status_bar();
+		update_image_bar();
 
 		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
 			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
@@ -1443,7 +1603,7 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 			// Filename has changed so layers file needs re-saving to be correct
 					}
 					set_new_filename( fname );
-					update_status_bar1();	// Update transparency info
+					update_image_bar();	// Update transparency info
 					update_all_views();	// Redraw in case transparency changed
 					break;
 		case FS_PALETTE_LOAD:
@@ -1848,7 +2008,7 @@ void align_size( float new_zoom )		// Set new zoom level
 #endif
 		gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
 
-		init_status_bar();
+		update_image_bar();
 		zoom_flag = 0;
 		vw_focus_view();		// View window position may need updating
 		toolbar_zoom_update();
@@ -2458,7 +2618,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	{
 		if ( poly_status == POLY_NONE && marq_status == MARQUEE_NONE )
 		{
-			if ( button != 0 )		// Start doing something
+			if (button)		// Start doing something
 			{
 				if ( button == 1 )
 					poly_status = POLY_SELECTING;
@@ -2468,16 +2628,16 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( poly_status == POLY_SELECTING )
 		{
-			if ( button == 1 ) poly_add_po(x, y);		// Add another point to polygon
-			else
-			{
-				if ( button == 3 ) poly_conclude();	// Stop adding points
-			}
+			if ( button == 1 )
+				poly_add_po(x, y);	// Add another point to polygon
+			else if ( button == 3 )
+				poly_conclude();	// Stop adding points
 		}
 		if ( poly_status == POLY_DRAGGING )
 		{
-			if ( button == 0 ) poly_conclude();		// Stop forming polygon
-			else poly_add_po(x, y);				// Add another point to polygon
+			if (event == GDK_BUTTON_RELEASE)
+				poly_conclude();	// Stop forming polygon
+			else poly_add_po(x, y);		// Add another point to polygon
 		}
 	}
 
@@ -2803,58 +2963,6 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
-void update_sel_bar()			// Update selection stats on status bar
-{
-	char txt[64];
-	int x1, y1, x2, y2;
-	float lang = 0, llen = 1;
-
-	if ( (tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON) )
-	{
-		if ( marq_status > MARQUEE_NONE )
-		{
-			mtMIN( x1, marq_x1, marq_x2 )
-			mtMIN( y1, marq_y1, marq_y2 )
-			mtMAX( x2, marq_x1, marq_x2 )
-			mtMAX( y2, marq_y1, marq_y2 )
-			if ( status_on[STATUS_SELEGEOM] )
-			{
-				if ( x1==x2 )
-				{
-					if ( marq_y1 < marq_y2 ) lang = 180;
-				}
-				else
-				{
-					lang = 90 + 180*atan( ((float) marq_y1 - marq_y2) /
-						(marq_x1 - marq_x2) ) / M_PI;
-					if ( marq_x1 > marq_x2 )
-						lang = lang - 180;
-				}
-
-				llen = sqrt( (x2-x1+1)*(x2-x1+1) + (y2-y1+1)*(y2-y1+1) );
-
-				snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
-					x1, y1, x2-x1+1, y2-y1+1, lang, llen);
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
-			}
-		}
-		else
-		{
-			if ( tool_type == TOOL_POLYGON )
-			{
-				snprintf(txt, 60, "  (%i)", poly_points);
-				if ( poly_status != POLY_DONE ) strcat(txt, "+");
-				if ( status_on[STATUS_SELEGEOM] )
-					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
-			}
-			else if ( status_on[STATUS_SELEGEOM] )
-					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
-		}
-	}
-	else if ( status_on[STATUS_SELEGEOM] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
-}
-
 
 void repaint_line(int mode)			// Repaint or clear line on canvas
 {
@@ -2968,41 +3076,6 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 	}
 	free(rgb);
 }
-
-void init_status_bar()
-{
-	char txt[64];
-
-	update_status_bar1();
-	if ( !status_on[STATUS_GEOMETRY] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), "" );
-
-	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
-	else
-	{
-		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-	}
-
-	if ( !status_on[STATUS_PIXELRGB] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-
-	if ( !status_on[STATUS_SELEGEOM] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
-
-	if ( status_on[STATUS_UNDOREDO] )
-	{
-		sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt );
-		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
-	}
-	else
-	{
-		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "" );
-	}
-}
-
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )
 {	// Show or hide menu items

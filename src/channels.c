@@ -303,7 +303,7 @@ static void click_delete_ok(GtkWidget *window)
 		if (cmask & CMASK_CURR) mem_channel = CHN_IMAGE;
 
 		update_all_views();		// Update images
-		init_status_bar();
+		update_image_bar();
 		update_menus();
 	}
 

@@ -7,20 +7,22 @@ Here is a summary of the main changes in this release (see handbook for full det
 3.10	2006-?-?
 
 	* Image tiling mode added to "Resize Canvas"
-	* Gaussian blur effect added
-	* More palette sort modes
+	* Gaussian blur effect replaces the old blur effect
+	* More palette sort modes added
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
 	* Saving compressed GIF files now supported (using libgif)
-	* New advanced dithering modes with many configuration options
+	* New advanced dithering modes with many configuration options added to "Convert To Indexed" window
 	* Optional gamma correction for image scaling, rotation and Gaussian blur
-	* Smudge tool can be configured to ignore opacity mode
+	* Smudge tool can be configured to ignore opacity mode - right click the tool icon
 	* Library detection in configure script improved
 	* Channel deletion made easier to use
-	* View window can now be placed under drawing window
+	* View window can now be placed under drawing window using the View menu or 'H' key
 	* "Blend A to B" with colour A identical to B now works like GIMP's Color To Alpha filter
 	* Arrows and Shift+Arrows now move cursor around on canvas
+	* Enter now simulates left mouse click, and Backspace, right click
 	* '[' ']' and '{' '}' keys now used to change colour A/B
+	* Selection marquee now persists through tool changes
 	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	* BUGFIX - Lasso tool now properly handles clipboard alpha
 	...and more still remains to do... ;-)

@@ -71,4 +71,4 @@ int read_spin(GtkWidget *spin);
 
 // Moving mouse cursor
 
-int move_mouse_relative(int x0, int y0, int dx, int dy);
+int move_mouse_relative(int dx, int dy);

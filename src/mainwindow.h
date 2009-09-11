@@ -75,12 +75,13 @@
 #define ACT_SCALE	52
 #define ACT_SIZE	53
 #define ACT_COMMIT	54
-#define ACT_ARROW	55
-#define ACT_ARROW3	56
-#define ACT_A_PREV	57
-#define ACT_A_NEXT	58
-#define ACT_B_PREV	59
-#define ACT_B_NEXT	60
+#define ACT_RCLICK	55
+#define ACT_ARROW	56
+#define ACT_ARROW3	57
+#define ACT_A_PREV	58
+#define ACT_A_NEXT	59
+#define ACT_B_PREV	60
+#define ACT_B_NEXT	61
 
 typedef struct
 {

@@ -419,23 +419,12 @@ int read_spin(GtkWidget *spin)
 
 // Whatever is needed to move mouse pointer 
 
-#if ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 8)) /* GTK+ 2.8+ */
-
-int move_mouse_relative(int x0, int y0, int dx, int dy)
-{
-	gdk_display_warp_pointer(gtk_widget_get_display(drawing_canvas),
-		gtk_widget_get_screen(drawing_canvas), x0 + dx, y0 + dy);
-	return (TRUE);
-}
-
-#else /* Have to manage on our own */
-
-#ifdef GDK_WINDOWING_X11 /* Call X */
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */
 
 #include <X11/Xlib.h>
 #include <gdk/gdkx.h>
 
-int move_mouse_relative(int x0, int y0, int dx, int dy)
+int move_mouse_relative(int dx, int dy)
 {
 	XWarpPointer(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
 		None, None, 0, 0, 0, 0, dx, dy);
@@ -447,7 +436,7 @@ int move_mouse_relative(int x0, int y0, int dx, int dy)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-int move_mouse_relative(int x0, int y0, int dx, int dy)
+int move_mouse_relative(int dx, int dy)
 {
 	POINT point;
 	if (GetCursorPos(&point))
@@ -458,12 +447,24 @@ int move_mouse_relative(int x0, int y0, int dx, int dy)
 	else return (FALSE);
 }
 
+#elif (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 8) /* GTK+ 2.8+ */
+
+int move_mouse_relative(int dx, int dy)
+{
+	gint x0, y0;
+	GdkScreen *screen;
+	GdkDisplay *display = gtk_widget_get_display(drawing_canvas);
+
+	gdk_display_get_pointer(display, &screen, &x0, &y0, NULL);
+	gdk_display_warp_pointer(display, screen, x0 + dx, y0 + dy);
+	return (TRUE);
+}
+
 #else /* Always fail */
 
-int move_mouse_relative(int x0, int y0, int dx, int dy)
+int move_mouse_relative(int dx, int dy)
 {
 	return (FALSE);
 }
 
-#endif
 #endif
