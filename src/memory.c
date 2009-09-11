@@ -1956,81 +1956,173 @@ void h_para( int x1, int y1, int x2, int y2, int hlen )		// Draw horizontal top/
 	}
 }
 
-void flood_fill( int x, int y, unsigned int target )	// Recursively flood fill an area
-{
-	int minx = x, maxx = x, newx;
-
-	put_pixel(x, y);
-	while (--minx >= 0)		// Search left for target pixels
-	{
-		if (get_pixel(minx, y) != target) break;
-		put_pixel(minx, y);
-	}
-	minx++;
-
-	while (++maxx < mem_width)	// Search right for target pixels
-	{
-		if (get_pixel(maxx, y) != target) break;
-		put_pixel(maxx, y);
-	}
-	maxx--;
-
-	if (y > 0)				// Recurse upwards
-		for (newx = minx; newx <= maxx; newx++)
-			if (get_pixel(newx, y - 1) == target)
-				flood_fill(newx, y - 1, target);
-
-	if (y < mem_height - 1)			// Recurse downwards
-		for (newx = minx; newx <= maxx; newx++)
-			if (get_pixel(newx, y + 1) == target)
-				flood_fill(newx, y + 1, target);
-}
-
 /*
-By using the next procedure you can flood fill using patterns without problems.
-The only snag is that a chunk of memory must be allocated as a mask - the same size as the image.
-This is very wasteful which is why I still use the old procedure above for flat filling.
-M.Tyler 26-3-2005
-*/
-
-void flood_fill_pat( int x, int y, unsigned int target, unsigned char *pat_mem )
-{	// Recursively flood fill an area with a pattern
-	int minx = x, maxx = x, newx;
-
-	pat_mem[ x + y*mem_width ] = 1;
-	while (--minx >= 0)		// Search left for target pixels
-	{
-		if (get_pixel(minx, y) != target) break;
-		pat_mem[ minx + y*mem_width ] = 1;
-	}
-	minx++;
-
-	while (++maxx < mem_width)	// Search right for target pixels
-	{
-		if (get_pixel(maxx, y) != target) break;
-		pat_mem[ maxx + y*mem_width ] = 1;
-	}
-	maxx--;
-
-	if (y > 0)				// Recurse upwards
-		for (newx = minx; newx <= maxx; newx++)
-			if ((get_pixel(newx, y - 1) == target) && !pat_mem[newx + mem_width * (y - 1)])
-				flood_fill_pat(newx, y - 1, target, pat_mem);
-
-	if (y < mem_height - 1)			// Recurse downwards
-		for (newx = minx; newx <= maxx; newx++)
-			if ((get_pixel(newx, y + 1) == target) && !pat_mem[newx + mem_width * (y + 1)])
-				flood_fill_pat(newx, y + 1, target, pat_mem);
-}
-
-void mem_paint_mask( unsigned char *pat_mem )		// Paint over image using mask
+ * This flood fill algorithm processes image in quadtree order, and thus has
+ * guaranteed upper bound on memory consumption, of order O(width + height).
+ * (C) Dmitry Groshev
+ */
+#define QLEVELS 11
+#define QMINSIZE 32
+#define QMINLEVEL 5
+void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 {
-	int i, j;
+	short *nearq, *farq;
+	int qtail[QLEVELS + 1], ntail = 0;
+	int borders[4] = {0, mem_width, 0, mem_height};
+	int corners[4], levels[4], coords[4];
+	int i, j, k, kk, lvl, tx, ty;
 
-	for (i = 0; i < mem_height; i++)
-		for (j = 0; j < mem_width; j++)
-			if (*pat_mem++) put_pixel(j, i);
+	/* Init */
+	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
+		(get_pixel(x, y) != col) || pixel_protected(x, y))
+		return;
+	i = ((mem_width + mem_height) * 3 + QMINSIZE * QMINSIZE) * 2 * sizeof(short);
+	nearq = malloc(i); // Exact limit is less, but it's too complicated 
+	if (!nearq) return;
+	farq = nearq + QMINSIZE * QMINSIZE;
+	memset(qtail, 0, sizeof(qtail));
+
+	/* Start drawing */
+	if (bmap) bmap[y * lw + (x >> 3)] |= 1 << (x & 7);
+	else
+	{
+		put_pixel(x, y);
+		if (get_pixel(x, y) == col)
+		{
+			/* Can't draw */
+			free(nearq);
+			return;
+		}
+	}
+
+	while (1)
+	{
+		/* Determine area */
+		corners[0] = x & ~(QMINSIZE - 1);
+		corners[1] = corners[0] + QMINSIZE;
+		corners[2] = y & ~(QMINSIZE - 1);
+		corners[3] = corners[2] + QMINSIZE;
+		/* Determine queue levels */
+		for (i = 0; i < 4; i++)
+		{
+			j = (corners[i] & ~(corners[i] - 1)) - 1;
+			j = (j & 0x5555) + ((j & 0xAAAA) >> 1);
+			j = (j & 0x3333) + ((j & 0xCCCC) >> 2);
+			j = (j & 0x0F0F) + ((j & 0xF0F0) >> 4);
+			levels[i] = (j & 0xFF) + (j >> 8) - QMINLEVEL;
+		}
+		/* Process near points */
+		while (1)
+		{
+			coords[0] = x;
+			coords[2] = y;
+			for (i = 0; i < 4; i++)
+			{
+				coords[1] = x;
+				coords[3] = y;
+				coords[(i & 2) + 1] += ((i + i) & 2) - 1;
+				/* Is pixel valid? */
+				if (coords[i] == borders[i]) continue;
+				tx = coords[1];
+				ty = coords[3];
+				if (get_pixel(tx, ty) != col) continue;
+				/* Is pixel writable? */
+				if (bmap)
+				{
+					j = ty * lw + (tx >> 3);
+					k = 1 << (tx & 7);
+					if (bmap[j] & k) continue;
+					if (pixel_protected(tx, ty)) continue;
+					bmap[j] |= k;
+				}
+				else
+				{
+					put_pixel(tx, ty);
+					if (get_pixel(tx, ty) == col) continue;
+				}
+				/* Near queue */
+				if (coords[i] != corners[i])
+				{
+					nearq[ntail++] = tx;
+					nearq[ntail++] = ty;
+					continue;
+				}
+				/* Far queue */
+				lvl = levels[i];
+				for (j = 0; j < lvl; j++) // Slide lower levels
+				{
+					k = qtail[j];
+					qtail[j] = k + 2;
+					if (k > qtail[j + 1])
+					{
+						kk = qtail[j + 1];
+						farq[k] = farq[kk];
+						farq[k + 1] = farq[kk + 1];
+					}
+				}
+				k = qtail[lvl];
+				farq[k] = tx;
+				farq[k + 1] = ty;
+				qtail[lvl] = k + 2;
+			}
+			if (!ntail) break;
+			y = nearq[--ntail];
+			x = nearq[--ntail];
+		}
+		/* All done? */
+		if (!qtail[0]) break;
+		i = qtail[0] - 2;
+		x = farq[i];
+		y = farq[i + 1];
+		qtail[0] = i;
+		for (j = 1; qtail[j] > i; j++)
+			qtail[j] = i;
+	}
+	free(nearq);
 }
+
+/* Regular flood fill */
+void flood_fill(int x, int y, unsigned int target)
+{
+	wjfloodfill(x, y, target, NULL, 0);
+}
+
+/* Pattern flood fill - uses temporary area (1 bit per pixel) */
+void flood_fill_pat(int x, int y, unsigned int target)
+{
+	unsigned char *pat, *temp;
+	int i, j, k, lw = (mem_width + 7) >> 3;
+
+	j = lw * mem_height;
+	pat = temp = malloc(j);
+	if (!pat)
+	{
+		memory_errors(1);
+		return;
+	}
+	memset(pat, 0, j);
+	wjfloodfill(x, y, target, pat, lw);
+	for (i = 0; i < mem_height; i++)
+	{
+		for (j = 0; j < mem_width; )
+		{
+			k = *temp++;
+			if (!k)
+			{
+				j += 8;
+				continue;
+			}
+			for (; k; k >>= 1)
+			{
+				if (k & 1) put_pixel(j, i);
+				j++;
+			}
+			j = (j + 7) & ~(7);
+		}
+	}
+	free(pat);
+}
+
 
 void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
 {

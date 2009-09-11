@@ -1806,24 +1806,6 @@ void horizontal_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *
 	}
 }
 
-unsigned char *pattern_fill_allocate()		// Allocate memory for pattern fill
-{
-	int err = 0, i, j = mem_width * mem_height;
-	unsigned char *mem = NULL;
-
-	if ( j < mem_undo_limit * 1024 * 1024 )
-	{
-		mem = malloc( j );
-		if ( mem == NULL ) err = 1;
-		else for ( i=0; i<j; i++ ) mem[i] = 0;		// Flush all to zero
-	}
-	else err = 2;
-
-	if ( err>0 ) memory_errors(err);	// Not enough system/allocated memory so tell the user
-
-	return mem;
-}
-
 void update_all_views()				// Update whole canvas on all views
 {
 	if ( view_showing && vw_drawing ) gtk_widget_queue_draw( vw_drawing );
@@ -1891,7 +1873,6 @@ void tool_action( int x, int y, int button, gdouble pressure )
 	int ox, oy, off1, off2, o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
 	int xdo, ydo, px, py, todo, oox, ooy;	// Continuous smudge stuff
 	float rat;
-	unsigned char *pat_fill;
 	gboolean first_point = FALSE, paint_action = FALSE;
 
 	if ( tool_fixx > -1 ) x = tool_fixx;
@@ -2093,33 +2074,22 @@ void tool_action( int x, int y, int button, gdouble pressure )
 		}
 		if ( tool_type == TOOL_FLOOD && button == 1 )
 		{
-			/* Flood fill shouldn't start on masked points anyway */
+			/* Flood fill shouldn't start on masked points */
 			if (!pixel_protected(x, y))
 			{
 				j = get_pixel(x, y);
-				i = tool_opacity;
-				tool_opacity = 255; // 100% pure colour for flood filling
 				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
 					mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
-				if (!tool_pat && (j != k))	// Pure colour fill
+				if (j != k) /* And never start on colour A */
 				{
 					spot_undo(UNDO_DRAW);
-					flood_fill(x, y, j);
+					/* Regular fill */
+					if (!tool_pat && (tool_opacity == 255))
+						flood_fill(x, y, j);
+					/* Fill using temp buffer */
+					else flood_fill_pat(x, y, j);
 					update_all_views();
 				}
-				if (tool_pat)			// Patteren fill
-				{
-					pat_fill = pattern_fill_allocate();
-					if (pat_fill)
-					{
-						spot_undo(UNDO_DRAW);
-						flood_fill_pat(x, y, j, pat_fill);
-						mem_paint_mask(pat_fill);
-						update_all_views();
-						free(pat_fill);
-					}
-				}
-				tool_opacity = i;
 			}
 		}
 		if ( tool_type == TOOL_SMUDGE && button == 1 )

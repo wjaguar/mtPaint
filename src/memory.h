@@ -278,12 +278,8 @@ int mem_image_resize( int nw, int nh, int ox, int oy );		// Resize image
 
 int mem_isometrics(int type);
 
-void flood_fill( int x, int y, unsigned int target );		// Recursively flood fill an area Indexed
-
-//	Flood fill using patterns - pat_mem points to width*height area of memory blanked to zero
-void flood_fill_pat( int x, int y, unsigned int target, unsigned char *pat_mem );
-
-void mem_paint_mask( unsigned char *pat_mem );			// Paint fill on image using mask
+void flood_fill( int x, int y, unsigned int target );
+void flood_fill_pat( int x, int y, unsigned int target );
 
 void sline( int x1, int y1, int x2, int y2 );			// Draw single thickness straight line
 void tline( int x1, int y1, int x2, int y2, int size );		// Draw size thickness straight line

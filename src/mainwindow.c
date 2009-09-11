@@ -1591,6 +1591,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	}
 	if (mem_channel == CHN_ALPHA)
 	{
+		tlist[CHN_ALPHA] = alpha;
 		clip_image = NULL;
 		clip_alpha = mem_clipboard;
 	}
