@@ -622,8 +622,7 @@ static void toolbar_settings_init()
 	table = add_a_table(3, 2, 5, vbox);
 	for (i = 0; i < 3; i++)
 	{
-		labels[i] = add_to_table(ts_titles[i], table, i, 0, 0,
-			GTK_JUSTIFY_LEFT, 0, 0.5);
+		labels[i] = add_to_table(ts_titles[i], table, i, 0, 0);
 		ts_spinslides[i] = mt_spinslide_new(150, -1);
 		gtk_table_attach(GTK_TABLE(table), ts_spinslides[i], 1, 2,
 			i, i + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
@@ -686,7 +685,7 @@ void toolbar_init(GtkWidget *vbox_main)
 		{ TTB_SELRCCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Anti-Clockwise"), xpm_rotate_as_xpm },
 		{ 0, 0, 0, 0, 0, NULL, NULL }};
 
-	char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
+	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
 		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
 		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits

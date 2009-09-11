@@ -1263,12 +1263,12 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (table);
 	gtk_box_pack_start (GTK_BOX (vbox4), table, TRUE, TRUE, 0);
 
-	label = add_to_table( _("Start frame"), table, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("End frame"), table, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	label = add_to_table( _("Start frame"), table, 0, 0, 5 );
+	add_to_table( _("End frame"), table, 1, 0, 5 );
 
-	add_to_table( _("Delay"), table, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Output path"), table, 3, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("File prefix"), table, 4, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Delay"), table, 2, 0, 5 );
+	add_to_table( _("Output path"), table, 3, 0, 5 );
+	add_to_table( _("File prefix"), table, 4, 0, 5 );
 
 	spin_to_table( table, &ani_spin[0], 0, 1, 5, ani_frame1, 1, MAX_FRAME );	// Start
 	spin_to_table( table, &ani_spin[1], 1, 1, 5, ani_frame2, 1, MAX_FRAME );	// End

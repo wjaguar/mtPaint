@@ -7,12 +7,14 @@ Here is a summary of the main changes in this release (see handbook for full det
 3.10	2006-?-?
 
 	* Image tiling mode added to "Resize Canvas"
+	* Greyscale effect now respects masking
 	* Gaussian blur effect replaces the old blur effect
+	* Unsharp mask effect added
 	* More palette sort modes added
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
 	* New advanced dithering modes with many configuration options added to "Convert To Indexed" window
-	* Optional gamma correction for image scaling, rotation and Gaussian blur
+	* Optional gamma correction for image scaling, rotation, Gaussian blur and unsharp mask
 	* Smudge tool can be configured to ignore opacity mode - right click the tool icon
 	* Smudge tool respects tool opacity for RGB images
 	* Channel deletion made easier to use
@@ -31,6 +33,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Paint tool in tint mode now respects both Tint +/- toggle and left/right mouse button
 	* "By image channel" flood fill option now works in non-fuzzy mode too
 	* BUGFIX - Polygonal selections now respect selection channel
+	* BUGFIX - Effects menu items now remain enabled for indexed images' utility channels
 	...and more still remains to do... ;-)
 
 3.02	2006-10-14

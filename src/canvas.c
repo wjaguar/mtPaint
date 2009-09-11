@@ -442,13 +442,15 @@ void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 
 int do_gauss(GtkWidget *box, gpointer fdata)
 {
-	GtkWidget *spinX, *spinY, *toggleXY, *toggleGC;
+	GtkWidget *spinX, *spinY, *toggleXY;
 	double radiusX, radiusY;
+	int gcor = FALSE;
 
-	spinX = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
-	spinY = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
-	toggleXY = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget;
-	toggleGC = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->next->data)->widget;
+	spinX = BOX_CHILD(box, 0);
+	spinY = BOX_CHILD(box, 1);
+	toggleXY = BOX_CHILD(box, 2);
+	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 3)));
 
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spinX));
 	radiusX = radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinX));
@@ -459,8 +461,7 @@ int do_gauss(GtkWidget *box, gpointer fdata)
 	}
 
 	spot_undo(UNDO_DRAW);
-	mem_gauss(radiusX, radiusY, gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(toggleGC)));
+	mem_gauss(radiusX, radiusY, gcor);
 
 	return TRUE;
 }
@@ -480,18 +481,67 @@ void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_widget_show(box);
 	for (i = 0; i < 2; i++)
 	{
-		spin = add_a_spin(1, 0, 200);
+		spin = add_float_spin(1, 0, 200);
 		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
-		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 	}
 	gtk_widget_set_sensitive(spin, FALSE);
 	check = add_a_toggle(_("Different X/Y"), box, FALSE);
 	gtk_signal_connect(GTK_OBJECT(check), "clicked",
 		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
-	check = add_a_toggle(_("Gamma corrected"), box,
+	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
 		inifile_get_gboolean("defaultGamma", FALSE));
-	if (mem_channel != CHN_IMAGE) gtk_widget_hide(check);
 	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, FALSE);
+}
+
+int do_unsharp(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *table, *spinR, *spinA, *spinT;
+	double radius, amount;
+	int threshold, gcor = FALSE;
+
+	table = BOX_CHILD(box, 0);
+	spinR = table_slot(table, 0, 1);
+	spinA = table_slot(table, 1, 1);
+	spinT = table_slot(table, 2, 1);
+	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 1)));
+
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spinR));
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spinA));
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spinT));
+	radius = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinR));
+	amount = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinA));
+	threshold = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spinT));
+
+	// !!! No RGBA mode for now, so UNDO_DRAW isn't needed
+	spot_undo(UNDO_FILT);
+	mem_unsharp(radius, amount, threshold, gcor);
+
+	return TRUE;
+}
+
+void pressed_unsharp(GtkMenuItem *menu_item, gpointer user_data)
+{
+	GtkWidget *box, *table, *spin;
+
+	box = gtk_vbox_new(FALSE, 5);
+	table = add_a_table(3, 2, 0, box);
+	gtk_widget_show_all(box);
+	spin = add_float_spin(5, 0, 200);
+	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
+		0, 1, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	spin = add_float_spin(0.5, 0, 10);
+	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
+		1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	spin = add_a_spin(0, 0, 255);
+	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
+		2, 3, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	add_to_table(_("Radius"), table, 0, 0, 5);
+	add_to_table(_("Amount"), table, 1, 0, 5);
+	add_to_table(_("Threshold "), table, 2, 0, 5);
+	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
+		inifile_get_gboolean("defaultGamma", FALSE));
+	filter_window(_("Unsharp Mask"), box, do_unsharp, NULL, FALSE);
 }
 
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
@@ -884,7 +934,7 @@ static void channel_mask()
 {
 	int i, j, ofs, delta;
 
-	if (!mem_img[CHN_SEL]) return;
+	if (!mem_img[CHN_SEL] || channel_dis[CHN_SEL]) return;
 	if (mem_channel > CHN_ALPHA) return;
 
 	if (!mem_clip_mask) mem_clip_mask_init(255);
@@ -1020,8 +1070,10 @@ void update_menus()			// Update edit/undo menu
 
 	update_undo_bar();
 
-	men_item_state(menu_only_indexed, mem_img_bpp == 1);
 	men_item_state(menu_only_24, mem_img_bpp == 3);
+	men_item_state(menu_not_indexed, (mem_img_bpp == 3) ||
+		(mem_channel != CHN_IMAGE));
+	men_item_state(menu_only_indexed, mem_img_bpp == 1);
 
 	men_item_state(menu_alphablend, mem_clipboard && (mem_clip_bpp == 3));
 

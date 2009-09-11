@@ -101,7 +101,7 @@ GtkWidget *add_slider2table(int val, int min, int max, GtkWidget *table,
 	return hscale;
 }
 
-GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing, int a, int b, int c )
+GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
 {
 	GtkWidget *label;
 
@@ -110,8 +110,8 @@ GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int 
 	gtk_table_attach (GTK_TABLE (table), label, column, column+1, row, row+1,
 		(GtkAttachOptions) (GTK_FILL),
 		(GtkAttachOptions) (0), spacing, spacing);
-	gtk_label_set_justify(GTK_LABEL (label), a);
-	gtk_misc_set_alignment(GTK_MISC (label), b, c);
+	gtk_label_set_justify(GTK_LABEL (label), GTK_JUSTIFY_LEFT);
+	gtk_misc_set_alignment(GTK_MISC (label), 0.0, 0.5);
 
 	return label;
 }
@@ -418,6 +418,19 @@ int read_spin(GtkWidget *spin)
 	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
 }
 
+GtkWidget *add_float_spin(double value, double min, double max)
+{
+	GtkWidget *spin;
+	GtkObject *adj;
+
+	adj = gtk_adjustment_new(value, min, max, 1, 10, 10);
+	spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 2);
+	gtk_widget_show(spin);
+	gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
+
+	return (spin);
+}
+
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt)
@@ -433,6 +446,21 @@ char *gtkncpy(char *dest, const char *src, int cnt)
 #endif
 	strncpy(dest, src, cnt);
 	return (dest);
+}
+
+// Extracting widget from GtkTable
+
+GtkWidget *table_slot(GtkWidget *table, int row, int col)
+{
+	GList *curr;
+
+	for (curr = GTK_TABLE(table)->children; curr; curr = curr->next)
+	{
+		if ((((GtkTableChild *)curr->data)->left_attach == col) &&
+			(((GtkTableChild *)curr->data)->top_attach == row))
+			return (((GtkTableChild *)curr->data)->widget);
+	}
+	return (NULL);
 }
 
 // Whatever is needed to move mouse pointer 

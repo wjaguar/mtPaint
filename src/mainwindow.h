@@ -100,7 +100,7 @@ GtkWidget
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],
 	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
-	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
+	*menu_help[2], *menu_only_24[10], *menu_not_indexed[10], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
 	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],

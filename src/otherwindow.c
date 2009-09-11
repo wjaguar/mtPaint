@@ -226,9 +226,9 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	spin_to_table( table1, &spinbutton_height, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT );
 	spin_to_table( table1, &spinbutton_cols, 2, 1, 5, c, 2, 256 );
 
-	add_to_table( _("Width"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Height"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Colours"), table1, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Width"), table1, 0, 0, 5 );
+	add_to_table( _("Height"), table1, 1, 0, 5 );
+	add_to_table( _("Colours"), table1, 2, 0, 5 );
 
 	hbox3 = wj_radio_pack(rad_txt, type ? 3 : 4, 0, im_type, &im_type, NULL);
 	gtk_box_pack_start(GTK_BOX(vbox1), hbox3, TRUE, TRUE, 0);
@@ -593,8 +593,8 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	spin_to_table( table1, &spal_spins[0], 0, 1, 5, 0, 0, mem_cols-1 );
 	spin_to_table( table1, &spal_spins[1], 1, 1, 5, mem_cols-1, 0, mem_cols-1 );
 
-	add_to_table( _("Start Index"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("End Index"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Start Index"), table1, 0, 0, 5 );
+	add_to_table( _("End Index"), table1, 1, 0, 5 );
 
 	table1 = wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
 		inifile_get_gint32("lastspalType", 2), &spal_mode, NULL);
@@ -887,7 +887,7 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	table2 = add_a_table(6, 2, 10, vbox );
 	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
-		add_to_table(tab_txt[i], table2, order[i], 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+		add_to_table(tab_txt[i], table2, order[i], 0, 0);
 		brcosa_values[i] = vals[i];
 		brcosa_spins[i] = mt_spinslide_new(255, 20);
 		gtk_table_attach(GTK_TABLE(table2), brcosa_spins[i], 1, 2,
@@ -1229,16 +1229,16 @@ void sisca_init( char *title )
 
 	sisca_table = add_a_table(3, 3, 5, sisca_vbox);
 
-	add_to_table( _("Width     "), sisca_table, 0, 1, 0, GTK_JUSTIFY_LEFT, 0, 0 );
-	add_to_table( _("Height    "), sisca_table, 0, 2, 0, GTK_JUSTIFY_LEFT, 0, 0 );
+	add_to_table( _("Width     "), sisca_table, 0, 1, 0 );
+	add_to_table( _("Height    "), sisca_table, 0, 2, 0 );
 
-	add_to_table( _("Original      "), sisca_table, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+	add_to_table( _("Original      "), sisca_table, 1, 0, 0);
 	spin_to_table( sisca_table, &sisca_spins[0], 1, 1, 5, mem_width, mem_width, mem_width );
 	spin_to_table( sisca_table, &sisca_spins[1], 1, 2, 5, mem_height, mem_height, mem_height );
 	GTK_WIDGET_UNSET_FLAGS (sisca_spins[0], GTK_CAN_FOCUS);
 	GTK_WIDGET_UNSET_FLAGS (sisca_spins[1], GTK_CAN_FOCUS);
 
-	add_to_table( _("New"), sisca_table, 2, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+	add_to_table( _("New"), sisca_table, 2, 0, 0 );
 	spin_to_table( sisca_table, &sisca_spins[0], 2, 1, 5, mem_width, 1, MAX_WIDTH );
 	spin_to_table( sisca_table, &sisca_spins[1], 2, 2, 5, mem_height, 1, MAX_HEIGHT );
 
@@ -1261,7 +1261,7 @@ void sisca_init( char *title )
 
 	if ( !sisca_scale )
 	{
-		add_to_table( _("Offset"), sisca_table, 3, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+		add_to_table( _("Offset"), sisca_table, 3, 0, 0 );
 		spin_to_table( sisca_table, &sisca_spins[2], 3, 1, 5, 0, 0, 0 );
 		spin_to_table( sisca_table, &sisca_spins[3], 3, 2, 5, 0, 0, 0 );
 

@@ -1858,12 +1858,15 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 	return 0;
 }
 
-void mem_greyscale()			// Convert image to greyscale
+/* Convert image to greyscale */
+void mem_greyscale()
 {
-	unsigned char *img = mem_img[CHN_IMAGE];
-	int i, j, v;
-	float value;
+	unsigned char *mask, *img = mem_img[CHN_IMAGE];
+	int i, j, k, v, ch;
+	double value;
 
+	/* !!! Would it be worth it to use real phosphors' brightness and
+	 * (optional) gamma correction in here instead? - WJ */
 	if ( mem_img_bpp == 1)
 	{
 		for (i = 0; i < 256; i++)
@@ -1878,15 +1881,27 @@ void mem_greyscale()			// Convert image to greyscale
 	}
 	else
 	{
-		j = mem_width * mem_height;
-		for (i = 0; i < j; i++)
+		mask = malloc(mem_width);
+		if (!mask) return;
+		ch = mem_channel;
+		mem_channel = CHN_IMAGE;
+		for (i = 0; i < mem_height; i++)
 		{
-			value = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2];
-			v = (int)rint(value);
-			*img++ = v;
-			*img++ = v;
-			*img++ = v;
+			row_protected(0, i, mem_width, mask);
+			for (j = 0; j < mem_width; j++)
+			{
+				value = 0.299 * img[0] + 0.587 * img[1] +
+					0.114 * img[2];
+				v = (int)rint(value) * (255 - mask[j]);
+				k = *img * mask[j] + v;
+				*img++ = (k + (k >> 8) + 1) >> 8;
+				k = *img * mask[j] + v;
+				*img++ = (k + (k >> 8) + 1) >> 8;
+				k = *img * mask[j] + v;
+				*img++ = (k + (k >> 8) + 1) >> 8;
+			}
 		}
+		free(mask);
 	}
 }
 
@@ -4546,67 +4561,74 @@ void do_effect( int type, int param )		// 0=edge detect 1=UNUSED 2=emboss
 	progress_end();
 }
 
+/* Apply vertical filter */
+static void vert_gauss(unsigned char *chan, int w, int h, int y, double *temp,
+	double *gaussY, int lenY, int gcor)
+{
+	unsigned char *src0, *src1;
+	int j, k, mh2 = h > 1 ? h + h - 2 : 1;
+
+	src0 = chan + y * w;
+	if (gcor) /* Gamma-correct RGB values */
+	{
+		for (j = 0; j < w; j++)
+		{
+			temp[j] = gamma256[src0[j]] * gaussY[0];
+		}
+	}
+	else /* Leave RGB values as they were */
+	{
+		for (j = 0; j < w; j++)
+		{
+			temp[j] = src0[j] * gaussY[0];
+		}
+	}
+	for (j = 1; j < lenY; j++)
+	{
+		k = (y + j) % mh2;
+		if (k >= h) k = mh2 - k;
+		src0 = chan + k * w;
+		k = abs(y - j) % mh2;
+		if (k >= h) k = mh2 - k;
+		src1 = chan + k * w;
+		if (gcor) /* Gamma-correct */
+		{
+			for (k = 0; k < w; k++)
+			{
+				temp[k] += (gamma256[src0[k]] +
+					gamma256[src1[k]]) * gaussY[j];
+			}
+		}
+		else /* Leave alone */
+		{
+			for (k = 0; k < w; k++)
+			{
+				temp[k] += (src0[k] + src1[k]) * gaussY[j];
+			}
+		}
+	}
+}
+
+typedef struct {
+	double *gaussX, *gaussY, *tmp, *temp;
+	unsigned char *mask, **abuf;
+	int lenX, lenY, *idxx, *idx;
+} gaussd;
+
 /* Most-used variables are local to inner blocks to shorten their live ranges -
  * otherwise stupid compilers might allocate them to memory */
-static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
-	unsigned char *mask, int channel, int gcor)
+static void gauss_filter(gaussd *gd, int channel, int gcor)
 {
-	int i, wid, mh2, bpp;
-	double sum, sum1, sum2, *temp, *gaussY;
-	unsigned char *src0, *src1, *chan, *dest;
+	int i, wid, bpp, lenX = gd->lenX, *idx = gd->idx;
+	double sum, sum1, sum2, *temp = gd->temp, *gaussX = gd->gaussX;
+	unsigned char *chan, *dest, *mask = gd->mask;
 
 	bpp = BPP(channel);
 	wid = mem_width * bpp;
-	gaussY = gaussX + lenX;
-	temp = gaussY + lenY;
 	chan = mem_undo_previous(channel);
-	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
 	for (i = 0; i < mem_height; i++)
 	{
-		/* Apply vertical filter */
-		{
-			int j, k;
-
-			src0 = chan + i * wid;
-			if (gcor) /* Gamma-correct RGB values */
-			{
-				for (j = 0; j < wid; j++)
-				{
-					temp[j] = gamma256[src0[j]] * gaussY[0];
-				}
-			}
-			else /* Leave RGB values as they were */
-			{
-				for (j = 0; j < wid; j++)
-				{
-					temp[j] = src0[j] * gaussY[0];
-				}
-			}
-			for (j = 1; j < lenY; j++)
-			{
-				k = (i + j) % mh2;
-				if (k >= mem_height) k = mh2 - k;
-				src0 = chan + k * wid;
-				k = abs(i - j) % mh2;
-				if (k >= mem_height) k = mh2 - k;
-				src1 = chan + k * wid;
-				if (gcor) /* Gamma-correct */
-				{
-					for (k = 0; k < wid; k++)
-					{
-						temp[k] += (gamma256[src0[k]] +
-							gamma256[src1[k]]) * gaussY[j];
-					}
-				}
-				else /* Leave alone */
-				{
-					for (k = 0; k < wid; k++)
-					{
-						temp[k] += (src0[k] + src1[k]) * gaussY[j];
-					}
-				}
-			}
-		}
+		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
 		row_protected(0, i, mem_width, mask);
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
@@ -4672,11 +4694,11 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 
 /* While slower, and rather complex and memory hungry, this is the only way
  * to do *PRECISE* RGBA-coupled Gaussian blur */
-static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
-	unsigned char *mask, unsigned char **buf, int gcor)
+static void gauss_filter_rgba(gaussd *gd, int gcor)
 {
-	int i, j, k, mh2, len, slide;
-	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussY;
+	int i, j, k, mh2, len, slide, lenX = gd->lenX, lenY = gd->lenY, *idx = gd->idx;
+	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussX, *gaussY;
+	unsigned char *mask = gd->mask, **buf = gd->abuf;
 	unsigned char *src0, *src1, *chan, *dest;
 	unsigned char *alf0, *alf1, *alpha, *dsta;
 	unsigned char *tm0, *tm1;
@@ -4685,6 +4707,9 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 
 	chan = mem_undo_previous(CHN_IMAGE);
 	alpha = mem_undo_previous(CHN_ALPHA);
+	gaussX = gd->gaussX;
+	gaussY = gd->gaussY;
+	temp = gd->temp;
 	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
 
 	/* Set up the premultiplied row buffer */
@@ -4743,8 +4768,6 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 	}
 
 	/* Set up the main row buffer and process the image */
-	gaussY = gaussX + lenX;
-	temp = gaussY + lenY;
 	tmpa = temp + mem_width * 3;
 	atmp = tmpa + mem_width * 3;
 	for (i = 0; i < mem_height; i++)
@@ -4920,25 +4943,20 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 	}
 }
 
-/* Gaussian blur */
-void mem_gauss(double radiusX, double radiusY, int gcor)
+static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
+	int rgba_mode)
 {
-	int i, j, k, l, lenX, lenY, rgba, rgbb, *idxx, *idx;
-	double exkX, exkY, sum, *tmp, *gaussX, *gaussY;
-	unsigned char *mask, **abuf = NULL;
+	int i, j, k, l, lenX, lenY;
+	double sum, exkX, exkY, *gauss;
 
 	/* Cutoff point is where gaussian becomes < 1/255 */
-	lenX = ceil(radiusX) + 2;
-	lenY = ceil(radiusY) + 2;
+	gd->lenX = lenX = ceil(radiusX) + 2;
+	gd->lenY = lenY = ceil(radiusY) + 2;
 	exkX = -log(255.0) / ((radiusX + 1.0) * (radiusX + 1.0));
 	exkY = -log(255.0) / ((radiusY + 1.0) * (radiusY + 1.0));
 
-	/* RGBA or not? */
-	rgba = (mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && RGBA_mode;
-	rgbb = rgba && !channel_dis[CHN_ALPHA];
-
 	/* Allocate memory */
-	if (rgbb) /* Cyclic buffer for premultiplied RGB + extra linebuffer */
+	if (rgba_mode) /* Cyclic buffer for premultiplied RGB + extra linebuffer */
 	{
 		i = mem_height + 2 * (lenY - 1); // row pointers
 		j = (mem_height < i ? mem_height : i) * mem_width * 3; // data
@@ -4946,73 +4964,234 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 		if (gcor) k = i * sizeof(double *) + (j + 1) * sizeof(double);
 		/* No gamma - shorts are enough */
 		else k = i * sizeof(short *) + j * sizeof(short);
-		abuf = malloc(k);
-		if (!abuf) return;
+		gd->abuf = malloc(k);
+		if (!gd->abuf) return (FALSE);
 		i = mem_width * 7 + lenX + lenY + 1;
 	}
-	else i = mem_width * MEM_BPP + lenX + lenY + 1;
-	tmp = malloc(i * sizeof(double));
-	i = mem_width + 2 * (lenX - 1);
-	idxx = calloc(i, sizeof(int));
-	mask = malloc(mem_width);
-	if (!tmp || !idxx || !mask)
+	else
 	{
-		free(abuf);
-		free(tmp);
-		free(idxx);
-		free(mask);
-		return;
+		gd->abuf = NULL;
+		i = mem_width * MEM_BPP + lenX + lenY + 1;
 	}
-	gaussX = ALIGNTO(tmp, double);
+	gd->tmp = malloc(i * sizeof(double));
+	i = mem_width + 2 * (lenX - 1);
+	gd->idxx = calloc(i, sizeof(int));
+	gd->mask = malloc(mem_width);
+	if (!gd->tmp || !gd->idxx || !gd->mask)
+	{
+		free(gd->abuf);
+		free(gd->tmp);
+		free(gd->idxx);
+		free(gd->mask);
+		return (FALSE);
+	}
+	gd->gaussX = ALIGNTO(gd->tmp, double);
+	gd->gaussY = gd->gaussX + lenX;
+	gd->temp = gd->gaussY + lenY;
 
 	/* Prepare filters */
-	j = lenX; gaussY = gaussX;
+	j = lenX; gauss = gd->gaussX;
 	while (1)
 	{
-		sum = gaussY[0] = 1.0;
+		sum = gauss[0] = 1.0;
 		for (i = 1; i < j; i++)
 		{
-			sum += 2.0 * (gaussY[i] = exp((double)(i * i) * exkX));
+			sum += 2.0 * (gauss[i] = exp((double)(i * i) * exkX));
 		}
 		sum = 1.0 / sum;
 		for (i = 0; i < j; i++)
 		{
-			gaussY[i] *= sum;
+			gauss[i] *= sum;
 		}
-		if (gaussY != gaussX) break;
-		exkX = exkY; j = lenY; gaussY = gaussX + lenX;
+		if (gauss != gd->gaussX) break;
+		exkX = exkY; j = lenY; gauss += lenX;
 	}
 
 	/* Prepare horizontal indices, assuming mirror boundary */
 	l = lenX - 1;
-	idx = idxx + l; // To simplify addressing
+	gd->idx = gd->idxx + l; // To simplify addressing
 	if (mem_width > 1) // Else don't run horizontal pass
 	{
 		k = 2 * mem_width - 2;
 		for (i = -l; i < mem_width + l; i++)
 		{
 			j = abs(i) % k;
-			idx[i] = j < mem_width ? j : k - j;
+			gd->idx[i] = j < mem_width ? j : k - j;
 		}
 	}
+	return (TRUE);
+}
+
+/* Gaussian blur */
+void mem_gauss(double radiusX, double radiusY, int gcor)
+{
+	gaussd gd;
+	int rgba, rgbb;
+
+	/* RGBA or not? */
+	rgba = (mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && RGBA_mode;
+	rgbb = rgba && !channel_dis[CHN_ALPHA];
+
+	/* Create arrays */
+	if (mem_channel != CHN_IMAGE) gcor = 0;
+	if (!init_gauss(&gd, radiusX, radiusY, gcor, rgbb)) return;
 
 	/* Run filter */
 	progress_init(_("Gaussian Blur"), 1);
 	progress_update(0.0);
 	if (!rgba) /* One channel */
-		gauss_filter(gaussX, lenX, lenY, idx, mask, mem_channel, gcor);
+		gauss_filter(&gd, mem_channel, gcor);
 	else if (rgbb) /* Coupled RGBA */
-		gauss_filter_rgba(gaussX, lenX, lenY, idx, mask, abuf, gcor);
+		gauss_filter_rgba(&gd, gcor);
 	else /* RGB and alpha */
 	{
-		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_IMAGE, gcor);
-		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_ALPHA, FALSE);
+		gauss_filter(&gd, CHN_IMAGE, gcor);
+		gauss_filter(&gd, CHN_ALPHA, FALSE);
 	}
 	progress_end();
-	free(abuf);
-	free(tmp);
-	free(idxx);
-	free(mask);
+	free(gd.abuf);
+	free(gd.tmp);
+	free(gd.idxx);
+	free(gd.mask);
+}	
+
+static void unsharp_filter(gaussd *gd, double amount, int threshold,
+	int channel, int gcor)
+{
+	int i, wid, bpp, lenX = gd->lenX, *idx = gd->idx;
+	double sum, sum1, sum2, *temp = gd->temp, *gaussX = gd->gaussX;
+	unsigned char *chan, *dest, *mask = gd->mask;
+
+	bpp = BPP(channel);
+	wid = mem_width * bpp;
+	chan = mem_undo_previous(channel);
+	for (i = 0; i < mem_height; i++)
+	{
+		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
+		row_protected(0, i, mem_width, mask);
+		dest = mem_img[channel] + i * wid;
+		if (bpp == 3) /* Run 3-bpp horizontal filter */
+		{
+			int j, jj, k, k1, k2, x1, x2;
+
+			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
+			{
+				if (mask[jj] == 255) continue;
+				sum = temp[j] * gaussX[0];
+				sum1 = temp[j + 1] * gaussX[0];
+				sum2 = temp[j + 2] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					x1 = idx[jj - k] * 3;
+					x2 = idx[jj + k] * 3;
+					sum += (temp[x1] + temp[x2]) * gaussX[k];
+					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gaussX[k];
+					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gaussX[k];
+				}
+				if (gcor) /* Reverse gamma correction */
+				{
+					k = UNGAMMA256(sum);
+					k1 = UNGAMMA256(sum1);
+					k2 = UNGAMMA256(sum2);
+				}
+				else /* Simply round to nearest */
+				{
+					k = rint(sum);
+					k1 = rint(sum1);
+					k2 = rint(sum2);
+				}
+				/* Threshold */
+	/* !!! GIMP has an apparent bug which I won't reproduce - so mtPaint's
+	 * threshold value means _actual_ difference, not half of it - WJ */
+				if ((abs(k - dest[j]) < threshold) &&
+					(abs(k1 - dest[j + 1]) < threshold) &&
+					(abs(k2 - dest[j + 2]) < threshold))
+					continue;
+				if (gcor) /* Involve gamma *AGAIN* */
+				{
+					sum = gamma256[dest[j]] + amount *
+						(gamma256[dest[j]] - sum);
+					sum1 = gamma256[dest[j + 1]] + amount *
+						(gamma256[dest[j + 1]] - sum1);
+					sum2 = gamma256[dest[j + 2]] + amount *
+						(gamma256[dest[j + 2]] - sum2);
+					k = sum <= 0.0 ? 0 : sum >= 1.0 ?
+						255 : UNGAMMA256(sum);
+					k1 = sum1 <= 0.0 ? 0 : sum1 >= 1.0 ?
+						255 : UNGAMMA256(sum1);
+					k2 = sum2 <= 0.0 ? 0 : sum2 >= 1.0 ?
+						255 : UNGAMMA256(sum2);
+				}
+				else /* Combine values as linear */
+				{
+					k = rint(dest[j] + amount *
+						(dest[j] - sum));
+					k = k < 0 ? 0 : k > 255 ? 255 : k;
+					k1 = rint(dest[j + 1] + amount *
+						(dest[j + 1] - sum1));
+					k1 = k1 < 0 ? 0 : k1 > 255 ? 255 : k1;
+					k2 = rint(dest[j + 2] + amount *
+						(dest[j + 2] - sum2));
+					k2 = k2 < 0 ? 0 : k2 > 255 ? 255 : k2;
+				}
+				/* Store the result */
+				k = k * 255 + (dest[j] - k) * mask[jj];
+				dest[j] = (k + (k >> 8) + 1) >> 8;
+				k1 = k1 * 255 + (dest[j + 1] - k1) * mask[jj];
+				dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
+				k2 = k2 * 255 + (dest[j + 2] - k2) * mask[jj];
+				dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
+			}
+		}
+		else /* Run 1-bpp horizontal filter - no gamma here */
+		{
+			int j, k;
+
+			for (j = 0; j < mem_width; j++)
+			{
+				if (mask[j] == 255) continue;
+				sum = temp[j] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					sum += (temp[idx[j - k]] +
+						temp[idx[j + k]]) * gaussX[k];
+				}
+				k = rint(sum);
+				/* Threshold */
+				/* !!! Same non-bug as above */
+				if (abs(k - dest[j]) < threshold) continue;
+				/* Combine values */
+				k = rint(dest[j] + amount * (dest[j] - sum));
+				k = k < 0 ? 0 : k > 255 ? 255 : k;
+				/* Store the result */
+				k = k * 255 + (dest[j] - k) * mask[j];
+				dest[j] = (k + (k >> 8) + 1) >> 8;
+			}
+		}
+		if ((i * 10) % mem_height >= mem_height - 10)
+			if (progress_update((float)(i + 1) / mem_height)) break;
+	}
+}
+
+/* Unsharp mask */
+void mem_unsharp(double radius, double amount, int threshold, int gcor)
+{
+	gaussd gd;
+
+	/* Create arrays */
+	if (mem_channel != CHN_IMAGE) gcor = 0;
+// !!! No RGBA mode for now
+	if (!init_gauss(&gd, radius, radius, gcor, FALSE)) return;
+
+	/* Run filter */
+	progress_init(_("Unsharp Mask"), 1);
+	progress_update(0.0);
+	unsharp_filter(&gd, amount, threshold, mem_channel, gcor);
+	progress_end();
+	free(gd.abuf);
+	free(gd.tmp);
+	free(gd.idxx);
+	free(gd.mask);
 }	
 
 ///	CLIPBOARD MASK
@@ -5196,7 +5375,7 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 
 void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 {
-	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
+	unsigned char mask[256], *src, *dest, *srca = NULL, *dsta = NULL;
 	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
 	int xv = nx - ox, yv = ny - oy;		// Vector
 	int i, j, k, rx, ry, offs, delta, delta1, bpp;
@@ -5234,7 +5413,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 	delta1 = yv * mem_width + xv;
 	delta = delta1 * bpp;
 
-	if (xv > 0)
+	if (!yv && (xv > 0))
 	{
 		x0 = w - 1; x1 = -1; dx = -1;
 	}
@@ -5255,11 +5434,12 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 	{
 		ry = ay + yv + j;
 		if ((ry < 0) || (ry >= mem_height)) continue;
+		row_protected(ax + xv, ry, w, mask);
 		for (i = x0; i != x1; i += dx)
 		{
 			rx = ax + xv + i;
 			if ((rx < 0) || (rx >= mem_width)) continue;
-			k = pixel_protected(rx, ry);
+			k = mask[i];
 			offs = mem_width * ry + rx;
 			if (opacity < 0)
 			{

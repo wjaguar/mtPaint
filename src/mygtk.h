@@ -28,8 +28,7 @@ GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
 GtkWidget *add_slider2table(int val, int min, int max, GtkWidget *table,
 			int row, int column, int width, int height);
-GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing,
-	int a, int b, int c );
+GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
 void spin_to_table( GtkWidget *table, GtkWidget **spin, int row, int column, int spacing,
 	int value, int min, int max );
 void add_hseparator( GtkWidget *widget, int xs, int ys );
@@ -64,6 +63,7 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 // Easier way with spinbuttons
 
 int read_spin(GtkWidget *spin);
+GtkWidget *add_float_spin(double value, double min, double max);
 
 // Box unpacking macro
 #define BOX_CHILD(box, n) \
@@ -72,6 +72,10 @@ int read_spin(GtkWidget *spin);
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt);
+
+// Extracting widget from GtkTable
+
+GtkWidget *table_slot(GtkWidget *table, int row, int col);
 
 // Moving mouse cursor
 

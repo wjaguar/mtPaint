@@ -1475,9 +1475,9 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_table_set_row_spacings (GTK_TABLE (table), 5);
 	gtk_table_set_col_spacings (GTK_TABLE (table), 5);
 
-	add_to_table( _("Layer Name"), table, 0, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Position"), table, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Opacity"), table, 2, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Layer Name"), table, 0, 0, 0 );
+	add_to_table( _("Position"), table, 1, 0, 0 );
+	add_to_table( _("Opacity"), table, 2, 0, 0 );
 
 	entry_layer_name = gtk_entry_new_with_max_length (32);
 	gtk_widget_set_usize(entry_layer_name, 100, -2);
@@ -1487,8 +1487,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(entry_layer_name),
 			"changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 
-	layer_label_position = add_to_table( "-320, 200", table, 1, 1, 1,
-			GTK_JUSTIFY_LEFT, 0, 0.5 );
+	layer_label_position = add_to_table( "-320, 200", table, 1, 1, 1 );
 
 	layer_slider = add_slider2table( 100, 0, 100, table, 2, 1, -2, -2 );
 	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(layer_slider)->scale.range.adjustment),

@@ -465,7 +465,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	table3 = add_a_table( 3, 2, 10, vbox_1 );
 
 ///	TABLE TEXT
-	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
 
 ///	TABLE SPINBUTTONS
 	spin_to_table( table3, &spinbutton_maxmem, 0, 1, 5, inifile_get_gint32("undoMBlimit", 32 ), 1, 1000 );
@@ -502,7 +502,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	table4 = add_a_table( 5, 2, 10, vbox_2 );
 
-	for ( i=0; i<5; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	for ( i=0; i<5; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0 );
 
 	spin_to_table( table4, &spinbutton_trans, 0, 1, 5, mem_xpm_trans, -1, mem_cols-1 );
 	spin_to_table( table4, &spinbutton_hotx, 1, 1, 5, mem_xbm_hot_x, -1, mem_width-1 );
@@ -583,7 +583,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	table5 = add_a_table( 2, 4, 10, vbox_3 );
 
 ///	TABLE TEXT
-	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 5 );
 
 ///	TABLE SPINBUTTONS
 	spin_to_table( table5, &spinbutton_grid[0], 0, 1, 5, mem_grid_min, 2, 12 );
@@ -644,9 +644,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (table3);
 	gtk_box_pack_start (GTK_BOX (vbox_2), table3, TRUE, TRUE, 0);
 
-	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0, 0, 0, 0 );
+	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-	label = add_to_table( _("Factor"), table3, 0, 1, 0, 0, 0, 0 );
+	label = add_to_table( _("Factor"), table3, 0, 1, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
 	gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
 

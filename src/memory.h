@@ -210,6 +210,7 @@ int mem_used_layers();			// Return the number of bytes used in image + undo in a
 void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
 void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
 void mem_gauss(double radiusX, double radiusY, int gcor);
+void mem_unsharp(double radius, double amount, int threshold, int gcor);
 
 /// PALETTE PROCS
 

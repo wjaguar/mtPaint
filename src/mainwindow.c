@@ -54,7 +54,7 @@ GtkWidget
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],
 	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
-	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
+	*menu_help[2], *menu_only_24[10], *menu_not_indexed[10], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
 	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
@@ -159,6 +159,7 @@ void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		canvas_undo_chores();
+		pressed_select_none(NULL, NULL);
 	}
 	else memory_errors(3-res);
 }
@@ -2920,6 +2921,7 @@ void main_init()
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Edge Detect"),	NULL,		pressed_edge_detect,0, NULL },
 		{ _("/Effects/Sharpen ..."),	NULL,		pressed_sharpen,0, NULL },
+		{ _("/Effects/Unsharp Mask ..."), NULL,		pressed_unsharp,0, NULL },
 		{ _("/Effects/Soften ..."),	NULL,		pressed_soften,0, NULL },
 		{ _("/Effects/Gaussian Blur ..."), NULL,	pressed_gauss,0, NULL },
 		{ _("/Effects/Emboss"),		NULL,		pressed_emboss,0, NULL },
@@ -2990,11 +2992,12 @@ void main_init()
 			NULL},
 	*item_help[] = {_("/Help/About"), NULL},
 	*item_prefs[] = {_("/Image/Preferences ..."), NULL},
-	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Effects/Edge Detect"),
-			_("/Effects/Emboss"), _("/Effects/Sharpen ..."),
-			_("/Effects/Soften ..."), _("/Palette/Create Quantized (DL1)"),
+	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Palette/Create Quantized (DL1)"),
 			_("/Palette/Create Quantized (DL3)"), _("/Palette/Create Quantized (Wu)"),
-			_("/Effects/Gaussian Blur ..."),
+			NULL },
+	*item_not_indexed[] = { _("/Effects/Edge Detect"), _("/Effects/Emboss"),
+			_("/Effects/Sharpen ..."), _("/Effects/Unsharp Mask ..."),
+			_("/Effects/Soften ..."), _("/Effects/Gaussian Blur ..."),
 			NULL },
 	*item_only_indexed[] = { _("/Image/Convert To RGB"), _("/Effects/Bacteria ..."),
 			_("/Palette/Merge Duplicate Colours"), _("/Palette/Remove Unused Colours"),
@@ -3063,6 +3066,7 @@ void main_init()
 	pop_men_dis( item_factory, item_prefs, menu_prefs );
 	pop_men_dis( item_factory, item_frames, menu_frames );
 	pop_men_dis( item_factory, item_only_24, menu_only_24 );
+	pop_men_dis( item_factory, item_not_indexed, menu_not_indexed );
 	pop_men_dis( item_factory, item_only_indexed, menu_only_indexed );
 	pop_men_dis( item_factory, item_cline, menu_cline );
 	pop_men_dis( item_factory, item_view, menu_view );

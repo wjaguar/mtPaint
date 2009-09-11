@@ -320,11 +320,10 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_add (GTK_CONTAINER (frame), table4);
 	gtk_container_set_border_width (GTK_CONTAINER (table4), 5);
 
-	add_to_table( _("Total memory for main + undo images"),
-			table4, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Total memory for main + undo images"), table4, 0, 0, 5 );
 
 	snprintf(txt, 60, "%1.1f MB", ( (float) mem_used() )/1024/1024 );
-	add_to_table( txt, table4, 0, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( txt, table4, 0, 1, 5 );
 
 	mtMIN( maxi,
 		mt_round( ((double) mem_undo_limit*1024*1024) /
@@ -334,14 +333,14 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	mtMAX( maxi, maxi, 0 )
 
 	snprintf(txt, 60, "%i / %i / %i", mem_undo_done, mem_undo_redo, maxi );
-	add_to_table( txt, table4, 1, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( txt, table4, 1, 1, 5 );
 
-	add_to_table( _("Undo / Redo / Max levels used"), table4, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Undo / Redo / Max levels used"), table4, 1, 0, 5 );
 
 	if ( mem_clipboard == NULL )
 	{
-		add_to_table( _("Clipboard"), table4, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-		add_to_table( _("Unused"), table4, 2, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Clipboard"), table4, 2, 0, 5 );
+		add_to_table( _("Unused"), table4, 2, 1, 5 );
 	}
 	else
 	{
@@ -349,14 +348,14 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 			snprintf(txt, 250, _("Clipboard = %i x %i"), mem_clip_w, mem_clip_h );
 		if ( mem_clip_bpp == 3 )
 			snprintf(txt, 250, _("Clipboard = %i x %i x RGB"), mem_clip_w, mem_clip_h );
-		add_to_table( txt, table4, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table4, 2, 0, 5 );
 		snprintf(txt, 250, "%1.1f MB", ( (float) mem_clip_w * mem_clip_h * mem_clip_bpp )/1024/1024 );
-		add_to_table( txt, table4, 2, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table4, 2, 1, 5 );
 	}
 
 	if ( mem_img_bpp == 3)		// RGB image so count different colours
 	{
-		add_to_table( _("Unique RGB pixels"), table4, 3, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Unique RGB pixels"), table4, 3, 0, 5 );
 		i = mem_count_all_cols();
 		if ( i<0 )
 		{
@@ -364,18 +363,18 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 			if ( maxi < 1024 ) snprintf(txt, 250, "%i", maxi);
 			else sprintf( txt, ">1023" );
 		}	else snprintf(txt, 250, "%i", i);
-		add_to_table( txt, table4, 3, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table4, 3, 1, 5 );
 	}
 
 	if ( layers_total>0 )
 	{
-		add_to_table( _("Layers"), table4, 4, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Layers"), table4, 4, 0, 5 );
 		snprintf(txt, 60, "%i", layers_total );
-		add_to_table( txt, table4, 4, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table4, 4, 1, 5 );
 
-		add_to_table( _("Total layer memory usage"), table4, 5, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Total layer memory usage"), table4, 5, 0, 5 );
 		snprintf(txt, 60, "%1.1f MB", ( (float) mem_used_layers() )/1024/1024 );
-		add_to_table( txt, table4, 5, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table4, 5, 1, 5 );
 	}
 
 	frame = gtk_frame_new (_("Colour Histogram"));
@@ -435,31 +434,31 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_widget_show (table5);
 		gtk_container_add (GTK_CONTAINER (viewport1), table5);
 
-		add_to_table( _("Index"), table5, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-		add_to_table( _("Canvas pixels"), table5, 0, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-		add_to_table( "%", table5, 0, 2, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Index"), table5, 0, 0, 5 );
+		add_to_table( _("Canvas pixels"), table5, 0, 1, 5 );
+		add_to_table( "%", table5, 0, 2, 5 );
 
 		for ( i=0; i<mem_cols; i++ )
 		{
 			snprintf(txt, 60, "%i", i);
-			add_to_table( txt, table5, i+1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+			add_to_table( txt, table5, i+1, 0, 0 );
 
 			snprintf(txt, 60, "%i", mem_histogram[i]);
-			add_to_table( txt, table5, i+1, 1, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+			add_to_table( txt, table5, i+1, 1, 0 );
 
 			snprintf(txt, 60, "%1.1f", 100*((float) mem_histogram[i]) /
 				(mem_width*mem_height));
-			add_to_table( txt, table5, i+1, 2, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+			add_to_table( txt, table5, i+1, 2, 0 );
 		}
-		add_to_table( _("Orphans"), table5, mem_cols+1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( _("Orphans"), table5, mem_cols+1, 0, 0 );
 		if ( mem_cols < 256 ) for ( i=mem_cols; i<256; i++ ) orphans = orphans +
 			mem_histogram[i];
 
 		snprintf(txt, 60, "%i", orphans);
-		add_to_table( txt, table5, mem_cols+1, 1, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table5, mem_cols+1, 1, 0 );
 
 		snprintf(txt, 60, "%1.1f", 100*((float) orphans) / (mem_width*mem_height));
-		add_to_table( txt, table5, mem_cols+1, 2, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+		add_to_table( txt, table5, mem_cols+1, 2, 0 );
 	}
 
 	add_hseparator( vbox4, -2, 10 );
