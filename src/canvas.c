@@ -40,9 +40,6 @@
 #include "font.h"
 #include "fpick.h"
 
-GtkWidget *label_bar[STATUS_ITEMS];
-
-
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_xy[2];				// Top left of image from top left of canvas
 int margin_view_xy[2];
@@ -64,7 +61,13 @@ int	show_paste,					// Show contents of clipboard while pasting
 
 int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
 
+char preserved_gif_filename[PATHBUF];
+int preserved_gif_delay = 10, undo_load;
+
+
 ///	STATUS BAR
+
+GtkWidget *label_bar[STATUS_ITEMS];
 
 static void update_image_bar()
 {
@@ -329,8 +332,8 @@ void iso_trans(int mode)
 	int i = mem_isometrics(mode);
 
 	if (!i) update_stuff(UPD_GEOM);
-	else if (i == -5) alert_box( _("Error"),
-		_("The image is too large to transform."), _("OK"), NULL, NULL );
+	else if (i == -5) alert_box(_("Error"),
+		_("The image is too large to transform."), NULL);
 	else memory_errors(i);
 }
 
@@ -616,8 +619,7 @@ static int do_rotate_free(GtkWidget *box, gpointer fdata)
 	else
 	{
 		if (j == -5) alert_box(_("Error"),
-			_("The image is too large for this rotation."),
-			_("OK"), NULL, NULL);
+			_("The image is too large for this rotation."), NULL);
 		else memory_errors(j);
 	}
 
@@ -889,8 +891,7 @@ static int copy_clip()
 
 	if (!mem_clipboard)
 	{
-		alert_box( _("Error"), _("Not enough memory to create clipboard"),
-			_("OK"), NULL, NULL );
+		alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
 		return (FALSE);
 	}
 
@@ -1298,12 +1299,12 @@ static int populate_channel(char *filename)
 	else if (res == FILE_MEM_ERROR) memory_errors(1);
 
 	/* Unspecified error */
-	else alert_box(_("Error"), _("Invalid channel file."), _("OK"), NULL, NULL);
+	else alert_box(_("Error"), _("Invalid channel file."), NULL);
 
 	return (res == 1 ? 0 : -1);
 }
 
-int do_a_load( char *fname )
+int do_a_load(char *fname, int undo)
 {
 	char mess[256], real_fname[PATHBUF];
 	int res, i = 0, ftype;
@@ -1326,34 +1327,53 @@ int do_a_load( char *fname )
 	if ((ftype < 0) || (ftype == FT_NONE))
 	{
 		alert_box(_("Error"), ftype < 0 ? _("Cannot open file") :
-			_("Unsupported file format"), _("OK"), NULL, NULL);
+			_("Unsupported file format"), NULL);
 		return (1);
 	}
 
 	set_image(FALSE);
 
 	if (ftype == FT_LAYERS1) res = load_layers(real_fname);
-	else res = load_image(real_fname, FS_PNG_LOAD, ftype);
+	else res = load_image(real_fname, FS_PNG_LOAD, undo ? ftype | FTM_UNDO : ftype);
 
 	if ( res<=0 )				// Error loading file
 	{
 		if (res == TOO_BIG)
 		{
 			snprintf(mess, 250, _("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
-			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			alert_box(_("Error"), mess, NULL);
 		}
 		else
 		{
-			alert_box( _("Error"), _("Unable to load file"),
-				_("OK"), NULL, NULL );
+			alert_box(_("Error"), _("Unable to load file"), NULL);
 		}
 		goto fail;
 	}
 
-	if ( res == FILE_LIB_ERROR )
-		alert_box( _("Error"), _("The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again."), _("OK"), NULL, NULL );
+	else if (res == FILE_LIB_ERROR)
+		alert_box(_("Error"), _("The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again."), NULL);
 
-	if ( res == FILE_MEM_ERROR ) memory_errors(1);		// Image was too large for OS
+	/* Image was too large for OS */
+	else if (res == FILE_MEM_ERROR) memory_errors(1);
+
+	/* Animated GIF was loaded so tell user */
+	else if (res == FILE_GIF_ANIM)
+	{
+		int i = alert_box(_("Warning"), _("This is an animated GIF file.  What do you want to do?"),
+			_("Cancel"), _("Edit Frames"),
+#ifndef WIN32
+			_("View Animation"),
+#endif
+			NULL);
+
+		if (i == 2) /* Ask for directory to explode frames to */
+		{
+			/* Needed when starting new mtpaint process later */
+			strncpy(preserved_gif_filename, real_fname, PATHBUF);
+			file_selector(FS_GIF_EXPLODE);
+		}
+		else if (i == 3) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
+	}
 
 	/* Whether we loaded something or failed to, old image is gone anyway */
 	register_file(real_fname);
@@ -1372,7 +1392,7 @@ int do_a_load( char *fname )
 	}
 
 	/* Show new image */
-	if (!undo_load) reset_tools();
+	if (!undo) reset_tools();
 	else // No reason to reset tools in undoable mode
 	{
 		notify_unchanged();
@@ -1777,7 +1797,7 @@ static void fs_ok(GtkWidget *fs)
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD:
-		if (do_a_load(fname) == 1) goto redo;
+		if (do_a_load(fname, undo_load) == 1) goto redo;
 		break;
 	case FS_PNG_SAVE:
 		if (check_file(fname)) goto redo;
@@ -1796,7 +1816,7 @@ static void fs_ok(GtkWidget *fs)
 		{
 			f8 = gtkuncpy(NULL, fname, 0);
 			msg = g_strdup_printf(_("File: %s invalid - palette not updated"), f8);
-			alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+			alert_box(_("Error"), msg, NULL);
 			g_free(msg);
 			g_free(f8);
 			goto redo;
@@ -1823,14 +1843,12 @@ static void fs_ok(GtkWidget *fs)
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
 		if (export_undo(fname, &settings))
-			alert_box( _("Error"), _("Unable to export undo images"),
-				_("OK"), NULL, NULL );
+			alert_box(_("Error"), _("Unable to export undo images"), NULL);
 		break;
 	case FS_EXPORT_ASCII:
 		if (check_file(fname)) goto redo;
 		if (export_ascii(fname))
-			alert_box( _("Error"), _("Unable to export ASCII file"),
-				_("OK"), NULL, NULL );
+			alert_box(_("Error"), _("Unable to export ASCII file"), NULL);
 		break;
 	case FS_LAYER_SAVE:
 		if (check_file(fname)) goto redo;
@@ -1897,7 +1915,7 @@ static void fs_ok(GtkWidget *fs)
 redo_name:
 	f8 = gtkuncpy(NULL, fname, 0);
 	msg = g_strdup_printf(_("Unable to save file: %s"), f8);
-	alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+	alert_box(_("Error"), msg, NULL);
 	g_free(msg);
 	g_free(f8);
 redo:
@@ -1979,8 +1997,7 @@ void file_selector(int action_type)
 	case FS_EXPORT_ASCII:
 		if (mem_cols > 16)
 		{
-			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."),
-				_("OK"), NULL, NULL );
+			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."), NULL);
 			return;
 		}
 		title = _("Export ASCII Art");
@@ -1996,8 +2013,7 @@ void file_selector(int action_type)
 	case FS_EXPORT_GIF:
 		if (!mem_filename[0])
 		{
-			alert_box( _("Error"), _("You must save at least one frame to create an animated GIF."),
-				_("OK"), NULL, NULL );
+			alert_box(_("Error"), _("You must save at least one frame to create an animated GIF."), NULL);
 			return;
 		}
 		title = _("Export GIF animation");

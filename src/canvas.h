@@ -45,6 +45,9 @@ int brush_spacing;					// Step in non-continuous mode
 #define line_x2 line_xy[2]
 #define line_y2 line_xy[3]
 
+extern char preserved_gif_filename[];
+int preserved_gif_delay, undo_load;
+
 #define STATUS_ITEMS 5
 #define STATUS_GEOMETRY 0
 #define STATUS_CURSORXY 1
@@ -107,7 +110,7 @@ int	col_reverse,					// Painting with right button
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 
-int do_a_load( char *fname );
+int do_a_load(char *fname, int undo);
 void align_size(float new_zoom);
 void realign_size();
 void init_ls_settings(ls_settings *settings, GtkWidget *box);

@@ -756,8 +756,7 @@ static void create_frames_ani()
 		{
 			if ( errno != EEXIST )
 			{
-				alert_box(_("Error"), _("Unable to create output directory"),
-					_("OK"), NULL, NULL );
+				alert_box(_("Error"), _("Unable to create output directory"), NULL);
 				goto failure;			// Failure to create directory
 			}
 		}
@@ -861,7 +860,7 @@ static void create_frames_ani()
 
 		if (save_image(output_path, &settings) < 0)
 		{
-			alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
+			alert_box(_("Error"), _("Unable to save image"), NULL);
 			goto failure2;
 		}
 	}
@@ -895,7 +894,8 @@ void pressed_remove_key_frames()
 {
 	int i, j;
 
-	i = alert_box( _("Warning"), _("Do you really want to clear all of the position and cycle data for all of the layers?"), _("No"), _("Yes"), NULL );
+	i = alert_box(_("Warning"), _("Do you really want to clear all of the position and cycle data for all of the layers?"),
+		_("No"), _("Yes"), NULL);
 	if ( i==2 )
 	{
 		for (j = 0; j <= layers_total; j++)
@@ -1042,15 +1042,13 @@ void pressed_animate_window()
 
 	if ( layers_total < 1 )					// Only background layer available
 	{
-		alert_box(_("Error"), _("You must have at least 2 layers to create an animation"),
-			_("OK"), NULL, NULL );
+		alert_box(_("Error"), _("You must have at least 2 layers to create an animation"), NULL);
 		return;
 	}
 
 	if (!layers_filename[0])
 	{
-		alert_box(_("Error"), _("You must save your layers file before creating an animation"),
-			_("OK"), NULL, NULL );
+		alert_box(_("Error"), _("You must save your layers file before creating an animation"), NULL);
 		return;
 	}
 

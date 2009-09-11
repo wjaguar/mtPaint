@@ -56,6 +56,8 @@
 
 #define FTM_FTYPE   0x00FF /* File type mask */
 #define FTM_EXTEND  0x0100 /* Allow extended format */
+#define FTM_UNDO    0x0200 /* Allow undoing */
+#define FTM_FRAMES  0x0400 /* Allow frameset use */
 
 /* Features supported by file formats */
 #define FF_BW      0x00001 /* Black and white */
@@ -114,9 +116,8 @@ typedef struct {
 	int width, height, bpp, colors;
 } ls_settings;
 
-extern char preserved_gif_filename[];
-int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
+int silence_limit, jpeg_quality, png_compression;
+int tga_RLE, tga_565, tga_defdir, jp2_rate;
 
 int file_type_by_ext(char *name, guint32 mask);
 

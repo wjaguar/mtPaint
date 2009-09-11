@@ -1360,7 +1360,7 @@ static gint click_create_font_index( GtkWidget *widget, gpointer user )
 	}
 	else
 	{
-		alert_box(_("Error"), _("You must select at least one directory to search for fonts."), _("OK"), NULL, NULL);
+		alert_box(_("Error"), _("You must select at least one directory to search for fonts."), NULL);
 	}
 
 	return FALSE;

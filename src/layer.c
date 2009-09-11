@@ -413,7 +413,7 @@ void layer_press_delete()
 	snprintf(txt, 256, _("Do you really want to delete layer %i (%s) ?"),
 		layer_selected, layer_table[layer_selected].name );
 
-	i = alert_box( _("Warning"), txt, _("No"), _("Yes"), NULL );
+	i = alert_box(_("Warning"), txt, _("No"), _("Yes"), NULL);
 	if ((i != 2) || (check_for_changes() == 1)) return;
 
 	layer_copy_from_main(layer_selected);
@@ -480,17 +480,12 @@ static int layers_changed_tot()	// Return number of layers with changes
 	return j;
 }
 
-int check_layers_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
+int check_layers_for_changes()		// 1=STOP, 2=IGNORE, -10=NOT CHANGED
 {
-	int i = -10, j = 0;
-	char *warning = _("One or more of the layers contains changes that have not been saved.  Do you really want to lose these changes?");
-
-
-	j = j + layers_changed_tot() + layers_changed;
-	if ( j>0 )
-		i = alert_box( _("Warning"), warning, _("Cancel Operation"), _("Lose Changes"), NULL );
-
-	return i;
+	if (!(layers_changed_tot() + layers_changed)) return (-10);
+	return (alert_box(_("Warning"),
+		_("One or more of the layers contains changes that have not been saved.  Do you really want to lose these changes?"),
+		_("Cancel Operation"), _("Lose Changes"), NULL));
 }
 
 static void layer_update_filename( char *name )
@@ -633,7 +628,7 @@ int load_layers( char *file_name )
 	if (lfail) /* There were failures */
 	{
 		snprintf(tin, 300, _("%d layers failed to load"), lfail);
-		alert_box( _("Error"), tin, _("OK"), NULL, NULL );
+		alert_box(_("Error"), tin, NULL);
 	}
 
 	return 1;		// Success
@@ -763,7 +758,7 @@ int save_layers( char *file_name )
 fail:
 	c = gtkuncpy(NULL, layers_filename, 0);
 	msg = g_strdup_printf(_("Unable to save file: %s"), c);
-	alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+	alert_box(_("Error"), msg, NULL);
 	g_free(msg);
 	g_free(c);
 
@@ -773,9 +768,9 @@ fail:
 
 int check_layers_all_saved()
 {
-	if ( layers_unsaved_tot() > 0 )
+	if (layers_unsaved_tot())
 	{
-		alert_box( _("Warning"), _("One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."), _("OK"), NULL, NULL );
+		alert_box(_("Warning"), _("One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."), NULL);
 		return 1;
 	}
 
@@ -795,7 +790,10 @@ void layer_press_save()
 void layer_press_remove_all()
 {
 	int i = check_layers_for_changes();
-	if (i < 0) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
+
+	if (i < 0) i = alert_box(_("Warning"),
+		_("Do you really want to delete all of the layers?"),
+		_("No"), _("Yes"), NULL);
 	if (i != 2) return;
 
 	layers_free_all();
@@ -933,8 +931,7 @@ void pressed_paste_layer()
 
 	if (layers_total >= MAX_LAYERS)
 	{
-		alert_box(_("Error"), _("You cannot add any more layers."),
-			_("OK"), NULL, NULL);
+		alert_box(_("Error"), _("You cannot add any more layers."), NULL);
 		return;
 	}
 

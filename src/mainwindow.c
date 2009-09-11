@@ -188,19 +188,13 @@ void mapped_item_state(int statemap)
 
 static void pressed_load_recent(int item)
 {
-	int change;
-	char txt[64], *c;
+	char txt[64];
 
-	sprintf( txt, "file%i", item );
-	c = inifile_get( txt, "." );
+	if ((layers_total ? check_layers_for_changes() :
+		check_for_changes()) == 1) return;
 
-	if ( layers_total==0 )
-		change = check_for_changes();
-	else
-		change = check_layers_for_changes();
-
-	if ( change == 2 || change == -10 )
-		do_a_load(c);		// Load requested file
+	sprintf(txt, "file%i", item);
+	do_a_load(inifile_get(txt, "."), undo_load);	// Load requested file
 }
 
 static void pressed_crop()
@@ -274,8 +268,7 @@ static void pressed_remove_unused()
 
 	i = mem_remove_unused_check();
 	if ( i <= 0 )
-		alert_box( _("Error"), _("There were no unused colours to remove!"),
-			_("OK"), NULL, NULL);
+		alert_box(_("Error"), _("There were no unused colours to remove!"), NULL);
 	if ( i > 0 )
 	{
 		spot_undo(UNDO_XPAL);
@@ -302,7 +295,7 @@ static void pressed_remove_duplicates()
 
 	if (!dups)
 	{
-		alert_box( _("Error"), _("The palette does not contain 2 colours that have identical RGB values"), _("OK"), NULL, NULL );
+		alert_box(_("Error"), _("The palette does not contain 2 colours that have identical RGB values"), NULL);
 		return;
 	}
 	mess = g_strdup_printf(_("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
@@ -531,7 +524,7 @@ int gui_save(char *filename, ls_settings *settings)
 			mess = g_strdup(_("You are trying to save an XPM file with more than 4096 colours.  Either use another format or posterize the image to 4 bits, or otherwise reduce the number of colours."));
 		if (mess)
 		{
-			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			alert_box(_("Error"), mess, NULL);
 			g_free(mess);
 		}
 	}
@@ -575,7 +568,7 @@ static void load_clip(int item)
 		i = load_image(clip, FS_CLIP_FILE, FT_PNG) == 1;
 	}
 
-	if (!i) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
+	if (!i) alert_box(_("Error"), _("Unable to load clipboard"), NULL);
 
 	update_stuff(UPD_XCOPY);
 	if (i && (MEM_BPP >= mem_clip_bpp)) pressed_paste(TRUE);
@@ -601,7 +594,7 @@ static void save_clip(int item)
 	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
 	i = save_image(clip, &settings);
 
-	if ( i!=0 ) alert_box( _("Error"), _("Unable to save clipboard"), _("OK"), NULL, NULL );
+	if (i) alert_box(_("Error"), _("Unable to save clipboard"), NULL);
 }
 
 void pressed_opacity(int opacity)
@@ -1083,15 +1076,12 @@ static void draw_arrow(int mode)
 	vw_update_area(minx, miny, w, h);
 }
 
-int check_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
+int check_for_changes()			// 1=STOP, 2=IGNORE, -10=NOT CHANGED
 {
-	int i = -10;
-	char *warning = _("This canvas/palette contains changes that have not been saved.  Do you really want to lose these changes?");
-
-	if ( mem_changed == 1 )
-		i = alert_box( _("Warning"), warning, _("Cancel Operation"), _("Lose Changes"), NULL );
-
-	return i;
+	if (!mem_changed) return (-10);
+	return (alert_box(_("Warning"),
+		_("This canvas/palette contains changes that have not been saved.  Do you really want to lose these changes?"),
+		_("Cancel Operation"), _("Lose Changes"), NULL));
 }
 
 void var_init()
@@ -1121,40 +1111,34 @@ static void toggle_dock(int state, int internal);
 static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	inilist *ilp;
-	int i = 2, j = 0;
+	int i;
 
-	if ( layers_total == 0 )
-		j = check_for_changes();
-	else
-		j = check_layers_for_changes();
-
-	if ( j == -10 )
+	i = layers_total ? check_layers_for_changes() : check_for_changes();
+	if (i == -10)
 	{
-		if ( inifile_get_gboolean( "exitToggle", FALSE ) )
-			i = alert_box( VERSION, _("Do you really want to quit?"), _("NO"), _("YES"), NULL );
+		i = 2;
+		if (inifile_get_gboolean("exitToggle", FALSE))
+			i = alert_box(VERSION, _("Do you really want to quit?"),
+				_("NO"), _("YES"), NULL);
 	}
-	else i = j;
+	if (i != 2) return (TRUE); // Cancel quitting
 
-	if ( i==2 )
-	{
-		toggle_dock(FALSE, TRUE);
-		win_store_pos(main_window, "window");
+	toggle_dock(FALSE, TRUE);
+	win_store_pos(main_window, "window");
 
-		// Get rid of extra windows + remember positions
-		delete_layers_window();
+	// Get rid of extra windows + remember positions
+	delete_layers_window();
 
-		toolbar_exit();			// Remember the toolbar settings
+	toolbar_exit();			// Remember the toolbar settings
 
-		/* Store listed settings */
-		for (ilp = ini_bool; ilp->name; ilp++)
-			inifile_set_gboolean(ilp->name, *(ilp->var));
-		for (ilp = ini_int; ilp->name; ilp++)
-			inifile_set_gint32(ilp->name, *(ilp->var));
+	/* Store listed settings */
+	for (ilp = ini_bool; ilp->name; ilp++)
+		inifile_set_gboolean(ilp->name, *(ilp->var));
+	for (ilp = ini_int; ilp->name; ilp++)
+		inifile_set_gint32(ilp->name, *(ilp->var));
 
-		gtk_main_quit ();
-		return FALSE;
-	}
-	else return TRUE;
+	gtk_main_quit();
+	return (FALSE);
 }
 
 #if GTK_MAJOR_VERSION == 2

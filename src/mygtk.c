@@ -212,11 +212,12 @@ static void alert_reply(gpointer data)
 	if (!alert_result) alert_result = (int)data;
 }
 
-int alert_box( char *title, char *message, char *text1, char *text2, char *text3 )
+int alert_box(char *title, char *message, char *text1, ...)
 {
-	GtkWidget *alert, *buttons[3], *label;
-	char *butxt[3] = {text1, text2, text3};
-	gint i;
+	va_list args;
+	GtkWidget *alert, *button, *label;
+	char *txt;
+	int i = 0;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	/* This function must be immune to pointer grabs */
@@ -227,33 +228,39 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	gtk_window_set_modal( GTK_WINDOW(alert), TRUE );
 	gtk_window_set_position( GTK_WINDOW(alert), GTK_WIN_POS_CENTER );
 	gtk_container_set_border_width( GTK_CONTAINER(alert), 6 );
-	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
-		GTK_SIGNAL_FUNC(alert_reply), (gpointer)10);
 	
 	label = gtk_label_new( message );
 	gtk_label_set_line_wrap( GTK_LABEL(label), TRUE );
 	gtk_box_pack_start( GTK_BOX(GTK_DIALOG(alert)->vbox), label, TRUE, FALSE, 8 );
 	gtk_widget_show( label );
 
-	for ( i=0; i<=2; i++ )
+	txt = text1 ? text1 : _("OK");
+	va_start(args, text1);
+	while (TRUE)
 	{
-		if (!butxt[i]) continue;
-		buttons[i] = add_a_button(butxt[i], 2, GTK_DIALOG(alert)->action_area, TRUE);
-		gtk_signal_connect_object(GTK_OBJECT(buttons[i]), "clicked",
-			GTK_SIGNAL_FUNC(alert_reply), (gpointer)(i + 1));
+		button = add_a_button(txt, 2, GTK_DIALOG(alert)->action_area, TRUE);
+		if (!i) gtk_widget_add_accelerator(button, "clicked", ag,
+			GDK_Escape, 0, (GtkAccelFlags)0);
+		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(alert_reply), (gpointer)(++i));
+		if (!text1) break;
+		if (!(txt = va_arg(args, char *))) break;
 	}
-	gtk_widget_add_accelerator (buttons[0], "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
+	va_end(args);
 
+	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
+		GTK_SIGNAL_FUNC(alert_reply), (gpointer)(++i));
 	gtk_window_set_transient_for( GTK_WINDOW(alert), GTK_WINDOW(main_window) );
 	gtk_widget_show(alert);
 	gdk_window_raise(alert->window);
 	alert_result = 0;
 	gtk_window_add_accel_group(GTK_WINDOW(alert), ag);
 
-	while ( alert_result == 0 ) gtk_main_iteration();
-	if ( alert_result != 10 ) gtk_widget_destroy( alert );
+	while (!alert_result) gtk_main_iteration();
+	if (alert_result != i) gtk_widget_destroy(alert);
+	else alert_result = 1;
 
-	return alert_result;
+	return (alert_result);
 }
 
 // Add page to notebook

@@ -1002,8 +1002,7 @@ static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 
 static void alert_same_geometry()
 {
-	alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
-		_("OK"), NULL, NULL);
+	alert_box(_("Error"), _("New geometry is the same as now - nothing to do."), NULL);
 }
 
 static int scale_mode = 6;
@@ -1051,9 +1050,9 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 void memory_errors(int type)
 {
 	if ( type == 1 )
-		alert_box(_("Error"), _("The operating system cannot allocate the memory for this operation."), _("OK"), NULL, NULL);
+		alert_box(_("Error"), _("The operating system cannot allocate the memory for this operation."), NULL);
 	if ( type == 2 )
-		alert_box(_("Error"), _("You have not allocated enough memory in the Preferences window for this operation."), _("OK"), NULL, NULL);
+		alert_box(_("Error"), _("You have not allocated enough memory in the Preferences window for this operation."), NULL);
 }
 
 gint click_sisca_centre( GtkWidget *widget, GdkEvent *event, gpointer data )

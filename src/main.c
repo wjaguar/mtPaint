@@ -34,7 +34,7 @@
 
 int main( int argc, char *argv[] )
 {
-	int tmp_undo_load, new_empty = TRUE, get_screenshot = FALSE;
+	int new_empty = TRUE, get_screenshot = FALSE;
 
 	if (argc > 1)
 	{
@@ -112,10 +112,6 @@ int main( int argc, char *argv[] )
 	layers_init();
 	init_cols();
 
-	/* Don't let undoable loads take effect just yet */
-	tmp_undo_load = undo_load;
-	undo_load = FALSE;
-
 	if ( get_screenshot )
 	{
 		if (load_image(NULL, FS_PNG_LOAD, FT_PIXMAP) == 1)
@@ -131,7 +127,7 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		if ((files_passed > 0) && !do_a_load(argv[file_arg_start]))
+		if ((files_passed > 0) && !do_a_load(argv[file_arg_start], FALSE))
 			new_empty = FALSE;
 	}
 
@@ -139,9 +135,6 @@ int main( int argc, char *argv[] )
 	{
 		create_default_image();
 	}
-
-	/* Let undoable loads take effect */
-	undo_load = tmp_undo_load;
 
 	update_menus();
 

@@ -49,13 +49,10 @@
 #include "canvas.h"
 #include "toolbar.h"
 #include "layer.h"
-#include "spawn.h"
-#include "inifile.h"
 
 
-char preserved_gif_filename[PATHBUF];
-int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
+int silence_limit, jpeg_quality, png_compression;
+int tga_RLE, tga_565, tga_defdir, jp2_rate;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
@@ -4091,7 +4088,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	layer_image *lim = NULL;
 	png_color pal[256];
 	ls_settings settings;
-	int i, tr, res, undo = FALSE;
+	int i, tr, res, res0, undo = ftype & FTM_UNDO;
+
 
 	/* Clipboard import - from mtPaint, or from something other? */
 	if ((mode == FS_CLIPBOARD) && (ftype & FTM_EXTEND)) mode = FS_CLIP_FILE;
@@ -4108,10 +4106,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	}
 
 	init_ls_settings(&settings, NULL);
-	/* Image loads can be undoable */
-	if (mode == FS_PNG_LOAD) undo = undo_load;
-	/* 0th layer load is a non-undoable image load */
-	else if ((mode == FS_LAYER_LOAD) && !layers_total) mode = FS_PNG_LOAD;
+	/* 0th layer load is just an image load */
+	if ((mode == FS_LAYER_LOAD) && !layers_total) mode = FS_PNG_LOAD;
 	settings.mode = mode;
 	settings.ftype = ftype;
 	settings.pal = pal;
@@ -4128,51 +4124,32 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	switch (ftype)
 	{
 	default:
-	case FT_PNG: res = load_png(file_name, &settings, mf); break;
+	case FT_PNG: res0 = load_png(file_name, &settings, mf); break;
 #ifdef U_GIF
-	case FT_GIF: res = load_gif(file_name, &settings); break;
+	case FT_GIF: res0 = load_gif(file_name, &settings); break;
 #endif
 #ifdef U_JPEG
-	case FT_JPEG: res = load_jpeg(file_name, &settings); break;
+	case FT_JPEG: res0 = load_jpeg(file_name, &settings); break;
 #endif
 #ifdef U_JP2
 	case FT_JP2:
-	case FT_J2K: res = load_jpeg2000(file_name, &settings); break;
+	case FT_J2K: res0 = load_jpeg2000(file_name, &settings); break;
 #endif
 #ifdef U_TIFF
-	case FT_TIFF: res = load_tiff(file_name, &settings); break;
+	case FT_TIFF: res0 = load_tiff(file_name, &settings); break;
 #endif
-	case FT_BMP: res = load_bmp(file_name, &settings, mf); break;
-	case FT_XPM: res = load_xpm(file_name, &settings); break;
-	case FT_XBM: res = load_xbm(file_name, &settings); break;
-	case FT_LSS: res = load_lss(file_name, &settings); break;
-	case FT_TGA: res = load_tga(file_name, &settings); break;
+	case FT_BMP: res0 = load_bmp(file_name, &settings, mf); break;
+	case FT_XPM: res0 = load_xpm(file_name, &settings); break;
+	case FT_XBM: res0 = load_xbm(file_name, &settings); break;
+	case FT_LSS: res0 = load_lss(file_name, &settings); break;
+	case FT_TGA: res0 = load_tga(file_name, &settings); break;
 /* !!! Not implemented yet */
 //	case FT_PCX:
-	case FT_PIXMAP: res = load_pixmap(file_name, &settings); break;
+	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
 	}
 
-	/* Animated GIF was loaded so tell user */
-	if (res == FILE_GIF_ANIM)
-	{
-		i = alert_box(_("Warning"), _("This is an animated GIF file.  What do you want to do?"),
-			_("Cancel"), _("Edit Frames"),
-#ifndef WIN32
-			_("View Animation")
-#else
-			NULL
-#endif
-			);
-
-		if (i == 2) /* Ask for directory to explode frames to */
-		{
-			/* Needed when starting new mtpaint process later */
-			preserved_gif_delay = settings.gif_delay;
-			strncpy(preserved_gif_filename, file_name, PATHBUF);
-			file_selector(FS_GIF_EXPLODE);
-		}
-		else if (i == 3) run_def_action(DA_GIF_PLAY, file_name, NULL, 0);
-	}
+	/* Consider animated GIF a success */
+	res = res0 == FILE_GIF_ANIM ? 1 : res0;
 
 	switch (settings.mode)
 	{
@@ -4190,6 +4167,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			update_undo(&mem_image);
 			mem_undo_prepare();
 			if (lim) layer_copy_from_main(0);
+			/* Report whether the file is animated */
+			res = res0;
 		}
 		/* Failure */
 		else
@@ -4276,8 +4255,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		free(settings.img[CHN_IMAGE]);
 		break;
 	}
-	/* Don't report animated GIF as failure */
-	return (res == FILE_GIF_ANIM ? 1 : res);
+	return (res);
 }
 
 int load_image(char *file_name, int mode, int ftype)
@@ -4349,7 +4327,7 @@ int export_undo(char *file_name, ls_settings *settings)
 	{
 		snprintf(new_name, 300, _("%d out of %d frames could not be saved as %s - saved as PNG instead"),
 			miss, mem_undo_done, file_formats[deftype].name);
-		alert_box(_("Warning"), new_name, _("OK"), NULL, NULL);
+		alert_box(_("Warning"), new_name, NULL);
 	}
 
 	return res;
@@ -4533,8 +4511,7 @@ int show_html(char *browser, char *docs)
 	if ((valid_file(docs) < 0))
 	{
 		alert_box( _("Error"),
-			_("I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."),
- 			_("OK"), NULL, NULL );
+			_("I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."), NULL);
 		return (-1);
 	}
 
@@ -4565,7 +4542,6 @@ int show_html(char *browser, char *docs)
 	i = spawn_process(argv, NULL);
 #endif
 	if (i) alert_box( _("Error"),
-		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),
-		_("OK"), NULL, NULL );
+		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."), NULL);
 	return (i);
 }

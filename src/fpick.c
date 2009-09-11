@@ -860,7 +860,7 @@ static int fpick_enter_dirname(fpicker *fp, const char *name)
 	if (!fpick_scan_directory(fp, txt, NULL))
 	{	// Directory doesn't exist so ask user if they want to create it
 		ctxt = g_strdup_printf(_("Could not access directory %s"), name);
-		alert_box(_("Error"), ctxt, _("OK"), NULL, NULL);
+		alert_box(_("Error"), ctxt, NULL);
 		g_free(ctxt);
 		return (-1);
 	}
@@ -984,7 +984,7 @@ static void fpick_file_dialog(fpicker *fp, int row)
 	}
 	g_free(snm);
 
-	if (tmp) alert_box(_("Error"), tmp, _("OK"), NULL, NULL);
+	if (tmp) alert_box(_("Error"), tmp, NULL);
 	else if (res > 1)
 	{
 		if (row >= 0) /* Deleted/renamed a file - move down */

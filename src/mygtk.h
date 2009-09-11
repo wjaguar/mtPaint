@@ -49,7 +49,7 @@ void progress_init(char *text, int canc);		// Initialise progress window
 int progress_update(float val);				// Update progress window
 void progress_end();					// Close progress window
 
-int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
+int alert_box(char *title, char *message, char *text1, ...);
 
 // Add page to notebook
 

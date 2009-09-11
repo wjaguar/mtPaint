@@ -51,15 +51,14 @@ static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
 {
 	static int last_row; // 0 initially
-	int change;
 
 	if (row != last_row)
 	{
-		if (!layers_total) change = check_for_changes();
-		else change = check_layers_for_changes();
-		if ((change == 2) || (change == -10))	// Load requested file
-			do_a_load(global_argv[(last_row = row) + file_arg_start]);
-		else clist_reselect_row(GTK_CLIST(clist), last_row); // Go back
+		if ((layers_total ? check_layers_for_changes() :
+			check_for_changes()) == 1)
+			clist_reselect_row(GTK_CLIST(clist), last_row); // Go back
+		// Load requested file
+		else do_a_load(global_argv[(last_row = row) + file_arg_start], undo_load);
 	}
 }
 
@@ -1343,8 +1342,7 @@ void render_text( GtkWidget *widget )
 	else have_rgb = make_text_clipboard(buf, width, height, 3);
 
 	if (have_rgb) text_paste = TEXT_PASTE_GTK;
-	else alert_box( _("Error"), _("Not enough memory to create clipboard"),
-		_("OK"), NULL, NULL );
+	else alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
 }
 
 static gint delete_text( GtkWidget *widget, GdkEvent *event, gpointer data )

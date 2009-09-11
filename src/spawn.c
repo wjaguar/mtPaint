@@ -612,7 +612,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		c8 = gtkuncpy(NULL, command, 0);
 		msg = g_strdup_printf(_("Error %i reported when trying to run %s"),
 			code, c8);
-		alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+		alert_box(_("Error"), msg, NULL);
 		g_free(msg);
 		g_free(c8);
 	}
