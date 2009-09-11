@@ -1650,10 +1650,11 @@ GtkWidget *wj_size_bin()
 
 	if (!size_bin_type)
 	{
-		GtkWidgetClass *wc;
-		GtkTypeInfo info = { "WJSizeBin", sizeof(GtkBin),
+		static const GtkTypeInfo info = {
+			"WJSizeBin", sizeof(GtkBin),
 			sizeof(GtkBinClass), NULL /* class init */,
 			NULL /* instance init */, NULL, NULL, NULL };
+		GtkWidgetClass *wc;
 		size_bin_type = gtk_type_unique(GTK_TYPE_BIN, &info);
 		wc = gtk_type_class(size_bin_type);
 		wc->size_request = NULL;

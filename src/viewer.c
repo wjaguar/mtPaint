@@ -1378,145 +1378,134 @@ gint render_text( GtkWidget *widget )
 	g = mem_pal[back].green;
 	b = mem_pal[back].blue;
 
-	if ( t_image != NULL )
+	while (t_image)
 	{
-		mem_clip_real_clear();	// Lose old un-rotated clipboard
-		free( mem_clipboard );	// Lose old clipboard
-		free( mem_clip_alpha );	// Lose old clipboard alpha
-		mem_clip_alpha = NULL;
-		mem_clipboard = malloc( width * height * clip_bpp );
-		mem_clip_w = width;
-		mem_clip_h = height;
-		mem_clip_bpp = clip_bpp;
-		if ( !antialias[1] && mem_channel == CHN_IMAGE ) mem_clip_mask_init(255);
-		else mem_clip_mask_clear();
+		int cmask = CMASK_IMAGE;
+		if (!antialias[1] && (mem_channel == CHN_IMAGE))
+			cmask |= CMASK_FOR(CHN_SEL);
+		mem_clip_new(width, height, clip_bpp, cmask, FALSE);
 	
-		if ( mem_clipboard == NULL ||
-			( !antialias[1] && mem_channel == CHN_IMAGE && mem_clip_mask == NULL) )
+		if (!mem_clipboard)
 		{
 			alert_box( _("Error"), _("Not enough memory to create clipboard"),
 					_("OK"), NULL, NULL );
-			if ( mem_clipboard != NULL ) free( mem_clipboard );
-			mem_clip_mask_clear();
 			text_paste = TEXT_PASTE_NONE;
+			break;
 		}
-		else
+		text_paste = TEXT_PASTE_GTK;
+		for ( j=0; j<height; j++ )
 		{
-			text_paste = TEXT_PASTE_GTK;
-			for ( j=0; j<height; j++ )
+			source = (unsigned char *) (t_image->mem) + j * t_image->bpl;
+			dest = mem_clipboard + width * j * clip_bpp;
+			dest2 = mem_clip_mask + width*j;
+			if ( clip_bpp == 3 )		// RGB Clipboard
 			{
-				source = (unsigned char *) (t_image->mem) + j * t_image->bpl;
-				dest = mem_clipboard + width * j * clip_bpp;
-				dest2 = mem_clip_mask + width*j;
-				if ( clip_bpp == 3 )		// RGB Clipboard
+				pat_off = mem_col_pat24 + (j%8)*8*3;
+				if ( antialias[0] )	// Antialiased
 				{
-					pat_off = mem_col_pat24 + (j%8)*8*3;
-					if ( antialias[0] )	// Antialiased
-					{
-					  if ( antialias[1] )	// Antialiased with background
-					  {
-						for ( i=0; i<width; i++ )
-						{
-							v = source[0] & pix_and;
-							dest[0] = ( (pix_and-v)*pat_off[3*(i%8)] +
-								v*r ) / pix_and;
-							dest[1] = ( (pix_and-v)*pat_off[3*(i%8)+1] +
-								v*g ) / pix_and;
-							dest[2] = ( (pix_and-v)*pat_off[3*(i%8)+2] +
-								v*b ) / pix_and;
-
-							source += bpp;
-							dest += 3;
-						}
-					  }
-					  else			// Antialiased without background
-					  {
-						for ( i=0; i<width; i++ )
-						{
-							v = source[0] & pix_and;
-							dest2[i] = (v * 255 / pix_and) ^ 255;	// Alpha blend
-
-							dest[0] = pat_off[3*(i%8)];
-							dest[1] = pat_off[3*(i%8)+1];
-							dest[2] = pat_off[3*(i%8)+2];
-
-							source += bpp;
-							dest += 3;
-						}
-					  }
-					}
-					else		// Not antialiased
-					{
-					 for ( i=0; i<width; i++ )
-					 {
-						if ( (source[0] & pix_and) > (pix_and/2) )
-						{				// Background
-							if ( !antialias[1] ) dest2[i] = 0;
-							dest[0] = r;
-							dest[1] = g;
-							dest[2] = b;
-						}
-						else				// Text
-						{
-							dest[0] = pat_off[3*(i%8)];
-							dest[1] = pat_off[3*(i%8)+1];
-							dest[2] = pat_off[3*(i%8)+2];
-						}
-						source += bpp;
-						dest += 3;
-					 }
-					}
-				}
-				if ( clip_bpp == 1 && mem_channel == CHN_IMAGE )
-				{
-					pat_off = mem_col_pat + (j%8)*8;
+				  if ( antialias[1] )	// Antialiased with background
+				  {
 					for ( i=0; i<width; i++ )
 					{
-						if ( (source[0] & pix_and) > (pix_and/2) ) // Background
-						{
-							if ( !antialias[1] ) dest2[i] = 0;
-							dest[i] = back;
-						}
-						else dest[i] = pat_off[i%8];	// Text
+						v = source[0] & pix_and;
+						dest[0] = ( (pix_and-v)*pat_off[3*(i%8)] +
+							v*r ) / pix_and;
+						dest[1] = ( (pix_and-v)*pat_off[3*(i%8)+1] +
+							v*g ) / pix_and;
+						dest[2] = ( (pix_and-v)*pat_off[3*(i%8)+2] +
+							v*b ) / pix_and;
+
+						source += bpp;
+						dest += 3;
+					}
+				  }
+				  else			// Antialiased without background
+				  {
+					for ( i=0; i<width; i++ )
+					{
+						v = source[0] & pix_and;
+						dest2[i] = (v * 255 / pix_and) ^ 255;	// Alpha blend
+						dest[0] = pat_off[3*(i%8)];
+						dest[1] = pat_off[3*(i%8)+1];
+						dest[2] = pat_off[3*(i%8)+2];
+
+						source += bpp;
+						dest += 3;
+					}
+				  }
+				}
+				else		// Not antialiased
+				{
+				 for ( i=0; i<width; i++ )
+				 {
+					if ( (source[0] & pix_and) > (pix_and/2) )
+					{				// Background
+						if ( !antialias[1] ) dest2[i] = 0;
+						dest[0] = r;
+						dest[1] = g;
+						dest[2] = b;
+					}
+					else				// Text
+					{
+						dest[0] = pat_off[3*(i%8)];
+						dest[1] = pat_off[3*(i%8)+1];
+						dest[2] = pat_off[3*(i%8)+2];
+					}
+					source += bpp;
+					dest += 3;
+				 }
+				}
+			}
+			if ( clip_bpp == 1 && mem_channel == CHN_IMAGE )
+			{
+				pat_off = mem_col_pat + (j%8)*8;
+				for ( i=0; i<width; i++ )
+				{
+					if ( (source[0] & pix_and) > (pix_and/2) ) // Background
+					{
+						if ( !antialias[1] ) dest2[i] = 0;
+						dest[i] = back;
+					}
+					else dest[i] = pat_off[i%8];	// Text
+					source += bpp;
+				}
+			}
+			if ( clip_bpp == 1 && mem_channel != CHN_IMAGE )
+			{
+				if ( antialias[1] )	// Inverted
+				{
+					k = 0;
+					m = 1;
+				}
+				else			// Normal
+				{
+					k = 255;
+					m = -1;
+				}
+				if ( antialias[0] )	// Antialiased
+				{
+					for ( i=0; i<width; i++ )
+					{
+						v = source[0] & pix_and;
+						dest[i] = k + m * v * 255 / pix_and;
 						source += bpp;
 					}
 				}
-				if ( clip_bpp == 1 && mem_channel != CHN_IMAGE )
+				else			// Not antialiased
 				{
-					if ( antialias[1] )	// Inverted
+					for ( i=0; i<width; i++ )
 					{
-						k = 0;
-						m = 1;
-					}
-					else			// Normal
-					{
-						k = 255;
-						m = -1;
-					}
-					if ( antialias[0] )	// Antialiased
-					{
-						for ( i=0; i<width; i++ )
-						{
-							v = source[0] & pix_and;
-							dest[i] = k + m * v * 255 / pix_and;
-							source += bpp;
-						}
-					}
-					else			// Not antialiased
-					{
-						for ( i=0; i<width; i++ )
-						{
-							v = source[0] & pix_and;
-							if ( v > pix_and/2 ) dest[i] = 255-k;
-							else dest[i] = k;
-							source += bpp;
-						}
+						v = source[0] & pix_and;
+						if ( v > pix_and/2 ) dest[i] = 255-k;
+						else dest[i] = k;
+						source += bpp;
 					}
 				}
 			}
-			gdk_image_destroy(t_image);
 		}
+		break;
 	}
+	if (t_image) gdk_image_destroy(t_image);
 	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
 #if GTK_MAJOR_VERSION == 2
 	g_object_unref( layout );
@@ -1560,7 +1549,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "fontAntialias2", antialias[2] );
 
 	render_text( widget );
-	if ( mem_clipboard != NULL ) pressed_paste_centre( NULL, NULL );
+	if (mem_clipboard) pressed_paste_centre( NULL, NULL );
 
 	delete_text( widget, event, data );
 

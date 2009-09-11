@@ -375,7 +375,7 @@ static void layer_delete(int item)
 	layer_image *lp = layer_table[item].image;
 	int i;
 
-	mem_free_image(&lp->image_, TRUE);
+	mem_free_image(&lp->image_, FREE_ALL);
 	free(lp);
 
 	if (item < layers_total)	// If deleted item is not at the end shuffle rest down
@@ -639,7 +639,7 @@ int load_layers( char *file_name )
 		layers_total--;
 
 		/* Free unused mem_image */
-		mem_free_image(&mem_image, TRUE);
+		mem_free_image(&mem_image, FREE_ALL);
 
 		layer_copy_to_main(layers_total);
 		if ( layers_total == 0 )

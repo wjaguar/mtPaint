@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007 Mark Tyler
+	Copyright (C) 2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -140,6 +140,8 @@ typedef struct
 } mtfontsel;
 
 
+static struct fontNODE *global_font_node;
+static char *font_text;
 
 
 /*
@@ -575,24 +577,10 @@ static int mem_text_clip_prep(int w, int h)		// Prepare new clipboard for text r
 
 	if ( w<1 || h<1 ) return 1;
 
-	if (mem_channel == CHN_IMAGE) clip_bpp = mem_img_bpp;
-	else clip_bpp = 1;
+	clip_bpp = MEM_BPP;
+	mem_clip_new(w, h, clip_bpp, CMASK_IMAGE, FALSE);
 
-	mem_clip_real_clear();	// Lose old un-rotated clipboard
-	free( mem_clipboard );	// Lose old clipboard
-	free( mem_clip_alpha );	// Lose old clipboard alpha
-	mem_clip_mask_clear();	// Lose old clipboard mask
-	mem_clip_alpha = NULL;
-	mem_clipboard = malloc( w * h * clip_bpp );
-	mem_clip_w = w;
-	mem_clip_h = h;
-	mem_clip_bpp = clip_bpp;
-
-	if ( mem_clipboard == NULL )
-	{
-		free( mem_clipboard );
-		return 1;
-	}
+	if (!mem_clipboard) return (1);
 
 	if (mem_channel == CHN_IMAGE)		// Pasting to image so use the pattern
 	{
@@ -730,86 +718,65 @@ fail:
 }
 
 
-static void font_mem_clear(struct fontNODE *head)		// Empty whole structure from memory
+static void font_mem_clear()		// Empty whole structure from memory
 {
-	struct fontNODE		*fo = head, *fo2;
+	struct fontNODE		*fo, *fo2;
 	struct styleNODE	*sn, *sn2;
 	struct sizeNODE		*zn, *zn2;
 	struct filenameNODE	*fl, *fl2;
 
-	while (fo)
+	free(font_text); font_text = NULL;
+	for (fo = global_font_node; fo; fo = fo2)
 	{
-		free( fo->font_name );
-		sn = fo->style;
-		while (sn)
+		for (sn = fo->style; sn; sn = sn2)
 		{
-			free( sn->style_name );
-			zn = sn->size;
-			while (zn)
+			for (zn = sn->size; zn; zn = zn2)
 			{
-				fl = zn->filename;
-				while (fl)
+				for (fl = zn->filename; fl; fl = fl2)
 				{
-					free( fl->filename );
 					fl2 = fl->next;
 					free( fl );
-					fl = fl2;
 				}
 				zn2 = zn->next;
 				free( zn );
-				zn = zn2;
 			}
 			sn2 = sn->next;
 			free( sn );
-			sn = sn2;
 		}
 		fo2 = fo->next;
 		free( fo );
-		fo = fo2;
 	}
+	global_font_node = NULL;
 }
 
-static struct fontNODE *font_mem_add(struct fontNODE *head, char *in[SLOT_TOT])
-{// Add new font data to memory structure. NULL return = failure + empty structure. Returns new head node.
-	int			l, fsize=0, dirn=0, bm_index;
-	struct fontNODE		*fo = head;
+static int font_mem_add(char *font, int dirn, char *style, int fsize,
+	char *filename)
+{// Add new font data to memory structure. Returns TRUE if successful.
+	int			bm_index, res = FALSE;
+	struct fontNODE		*fo;
 	struct styleNODE	*st;
 	struct sizeNODE		*ze;
 	struct filenameNODE	*fl;
 
 
-	sscanf(in[SLOT_DIR], "%i", &dirn);
-	sscanf(in[SLOT_SIZE], "%i", &fsize);
-	bm_index = fsize >> (SIZE_SHIFT*2);
-	fsize = fsize % (1<<(SIZE_SHIFT*2));
+	bm_index = fsize >> SIZE_SHIFT * 2;
+	fsize &= (1 << SIZE_SHIFT * 2) - 1;
 
-	while ( fo )
+	for (fo = global_font_node; fo; fo = fo->next)
 	{
-		if ( !strcmp(fo->font_name, in[SLOT_FONT] ) &&
-			fo->directory == dirn ) break;	// Font family+directory already exists
-		fo = fo->next;
+		if (!strcmp(fo->font_name, font) && (fo->directory == dirn))
+			break;	// Font family+directory already exists
 	}
 
-	if ( fo == NULL )		// Set up new structure as no match currently exists
+	if (!fo)		// Set up new structure as no match currently exists
 	{
 		fo = calloc(1, sizeof(*fo) );	// calloc empties all records
 		if (fo == NULL) goto fail;	// Memory failure
+		fo->next = global_font_node;
+		global_font_node = fo;
+
 		fo->directory = dirn;
-
-		if ( head )		// There is a previous head so link to the new node
-		{
-			fo->next = head;
-		}
-		head = fo;		// New head
-
-		if ( (l = strlen(in[SLOT_FONT])) > 0 )
-		{
-			if ( (fo->font_name = malloc(l+1)) )
-			{
-				strncpy( fo->font_name, in[SLOT_FONT], l+1 );
-			}
-			else	goto fail;		// Memory failure
-		}
+		fo->font_name = font;
 /*
 Its more efficient to load the newest font family/style/size as the new head because
 when checking subsequent new items, its more likely that the next match will be the
@@ -819,50 +786,32 @@ MT 22-8-2007
 */
 	}
 
-	st = fo->style;
-	while ( st )
+	for (st = fo->style; st; st = st->next)
 	{
-		if ( !strcmp(st->style_name, in[SLOT_STYLE] ) ) break;	// Font style already exists
-		st = st->next;
+		if (!strcmp(st->style_name, style))
+			break;	// Font style already exists
 	}
 
-	if ( st == NULL )		// Set up new structure as no match currently exists
+	if (!st)		// Set up new structure as no match currently exists
 	{
 		st = calloc(1, sizeof(*st) );	// calloc empties all records
 		if (st == NULL) goto fail;	// Memory failure
-
-		if ( fo->style )			// There is a previous style, so link it in
-		{
-			st->next = fo->style;
-		}
+		st->next = fo->style;
 		fo->style = st;				// New head style
 
-		if ( (l = strlen(in[SLOT_STYLE])) > 0 )
-		{
-			if ( (st->style_name = malloc(l+1)) )
-			{
-				strncpy( st->style_name, in[SLOT_STYLE], l+1 );
-			}
-			else	goto fail;		// Memory failure
-		}
+		st->style_name = style;
 	}
 
-	ze = st->size;
-	while ( ze )
+	for (ze = st->size; ze; ze = ze->next)
 	{
 		if ( ze->size == fsize ) break;		// Font size already exists
-		ze = ze->next;
 	}
 
-	if ( ze == NULL )		// Set up new structure
+	if (!ze)		// Set up new structure
 	{
 		ze = calloc(1, sizeof(*ze) );	// calloc empties all records
 		if (ze == NULL) goto fail;	// Memory failure
-
-		if ( st->size )			// There is a previous style, so link it in
-		{
-			ze->next = st->size;
-		}
+		ze->next = st->size;
 		st->size = ze;			// New head size
 		ze->size = fsize;
 	}
@@ -874,62 +823,44 @@ shown to them in glorious technicolour so they don't do it again!  ;-)
 MT 24-8-2007
 */
 	fl = calloc(1, sizeof(*fl));
-	if ( fl == NULL ) goto fail;
+	if (!fl) goto fail;
 
 	fl->next = ze->filename;		// Old first filename (maybe NULL)
 	ze->filename = fl;			// This is the new first filename
 
-	if ( (l = strlen(in[SLOT_FILENAME])) > 0 )
-	{
-		if ( (fl->filename = malloc(l+1)) )
-		{
-			strncpy( fl->filename, in[SLOT_FILENAME], l+1 );
-			fl->face_index = bm_index;
-		}
-		else	goto fail;		// Memory failure
-	}
+	fl->filename = filename;
+	fl->face_index = bm_index;
 
-	return head;
-fail:
-	font_mem_clear(head);
-
-	return NULL;
+	res = TRUE;
+fail:	return (res);
 }
 
-static struct fontNODE *font_index_load(char *filename)
+static void font_index_load(char *filename)
 {
-	struct fontNODE	*res = NULL;
-	FILE		*fp;
-	char		buf[4096], *in[SLOT_TOT] = {buf, buf, buf, buf, buf}, *s;
-	int		i;
+	char *buf;
+	int res, family_s, family_e, dir, style_s, style_e, size, name_s, name_e;
 
 
-	if ( (fp = fopen(filename, "r") ) == NULL) return res;
+	font_text = slurp_file(filename);
+	if (!font_text) return;
 
-	while ( fgets(buf, 4090, fp) )
+	for (buf = font_text + 1; *buf; buf += name_e + 1)
 	{
-		for (i=1; i<SLOT_TOT; i++)
-		{
-			s = strchr(in[i-1], '\t');
-			if (s)
-			{
-				s[0] = 0;
-				in[i] = s+1;
-				while ( (s = strrchr(in[i], '\n') ) ) s[0] = 0;
-							// Remove unwanted newline chars
-			}
-			else	in[i] = buf;		// Fallback
+		res = sscanf(buf, " %n%*[^\t]%n\t%d\t%n%*[^\t]%n\t%d\t%n%*[^\r\n]%n",
+			&family_s, &family_e, &dir, &style_s, &style_e, &size,
+			&name_s, &name_e);
+		if (res < 2) break;
+		buf[family_e] = buf[style_e] = buf[name_e] = '\0';
+		if (!font_mem_add(buf + family_s, dir, buf + style_s, size,
+			buf + name_s))
+		{	// Memory failure
+			font_mem_clear();
+			break;
 		}
-		res = font_mem_add(res, in);
-		if ( res == NULL ) break;		// Memory failure
 	}
-
-	fclose(fp);
-
-	return res;
 }
 
-/*
+#if 0
 static void font_index_display(struct fontNODE	*head)
 {
 	int			tot=0, families=0, styles=0, sizes=0, filenames=0;
@@ -977,17 +908,13 @@ static void font_index_display(struct fontNODE	*head)
 	}
 	printf("\nMemory Used\t%'i (%.1fK)\nFont Families\t%i\nFont Styles\t%i\nFont Sizes\t%i\nFont Filenames\t%i\n\n", tot, ((double)tot)/1024, families, styles, sizes, filenames);
 }
-*/
+#endif
 
 /*
 	-----------------------------------------------------------------
 	|			GTK+ Front End Code			|
 	-----------------------------------------------------------------
 */
-
-
-static struct fontNODE *global_font_node = NULL;
-
 
 
 static unsigned char *render_to_1bpp(int *w, int *h)
@@ -1003,9 +930,10 @@ static unsigned char *render_to_1bpp(int *w, int *h)
 		size = inifile_get_gint32( "fontSize", 12 );
 
 	if ( mem_img_bpp == 1 || !inifile_get_gboolean( "fontAntialias0", TRUE ) )
+	{
 		flags |= MT_TEXT_MONO;
-	if ( mem_img_bpp == 1 || !inifile_get_gboolean( "fontAntialias0", TRUE ) )
 		flags |= MT_TEXT_ROTATE_NN;	// RGB image without AA = nearest neighbour rotation
+	}
 	if ( inifile_get_gboolean( "fontAntialias3", TRUE ) )
 		flags |= MT_TEXT_OBLIQUE;
 	if ( inifile_get_gboolean( "fontAntialias2", FALSE ) )
@@ -1062,9 +990,8 @@ static void font_preview_update(mtfontsel *fp)		// Re-render the preview text an
 
 			for ( i=0; i<j; i++ )
 			{
-				*dest++ = 255 - *src;
-				*dest++ = 255 - *src;
-				*dest++ = 255 - *src++;
+				dest[0] = dest[1] = dest[2] = *src++ ^ 255;
+				dest += 3;
 			}
 
 			fp->preview_w = w;
@@ -1146,9 +1073,9 @@ void ft_render_text()		// FreeType equivalent of render_text()
 				if ( back )
 				{		// With background
 					int bindex = inifile_get_gint32( "fontBackground", 0 );
-					unsigned char	r = mem_pal[bindex].red,
-							g = mem_pal[bindex].green,
-							b = mem_pal[bindex].blue;
+					int	r = mem_pal[bindex].red,
+						g = mem_pal[bindex].green,
+						b = mem_pal[bindex].blue;
 
 					if ( mem_clip_bpp == 1 )
 					{
@@ -1183,9 +1110,9 @@ void ft_render_text()		// FreeType equivalent of render_text()
 			else					// Channel Text Paste
 			{
 				if ( back )			// Invert
-					for ( i=0; i<j; i++ ) mem_clipboard[i] = 255 - text_1bpp[i];
-				else
-					memcpy( mem_clipboard, text_1bpp, j );
+					for ( i=0; i<j; i++ )
+						mem_clipboard[i] = text_1bpp[i] ^ 255;
+				else memcpy( mem_clipboard, text_1bpp, j );
 
 				free( text_1bpp );
 			}
@@ -1284,8 +1211,9 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 	}
 	if ( cl == CLIST_FONTSTYLE )
 	{
-		char *default_styles[] = { "Regular", "Medium", "Book", "Roman", NULL },
-			*last_font_style = inifile_get( "lastFontStyle", "" );
+		static const char *default_styles[] =
+			{ "Regular", "Medium", "Book", "Roman", NULL };
+		char *last_font_style = inifile_get( "lastFontStyle", "" );
 		struct styleNODE *sn = mem->current_style_node;
 		int default_row = -1;
 
@@ -1318,9 +1246,10 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 
 		if ( zn && zn->size == 0 )		// Scalable font so populate with selection
 		{
-			int sizes[] = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20,
-					22, 24, 26, 28, 32, 36, 40, 48, 56, 64, 72, -1 },
-					last_size = inifile_get_gint32("fontSize", 12);
+			static const unsigned char sizes[] =
+				{ 8, 9, 10, 11, 12, 13, 14, 16, 18, 20,
+				22, 24, 26, 28, 32, 36, 40, 48, 56, 64, 72, 0 };
+			int last_size = inifile_get_gint32("fontSize", 12);
 
 			for ( i=0; sizes[i]>0 ; i++ )
 			{
@@ -1495,8 +1424,8 @@ static gint click_create_font_index( GtkWidget *widget, gpointer user )
 		for (i=0; i<=CLIST_FONTFILE; i++ )		// Empty all clists
 			gtk_clist_clear( GTK_CLIST(fp->clist[i]) );
 
-		font_mem_clear(fp->head_node);			// Empty memory of current nodes
-		global_font_node = font_index_load(txt);
+		font_mem_clear();		// Empty memory of current nodes
+		font_index_load(txt);
 		fp->head_node = global_font_node;
 		fp->current_style_node = NULL;			// Now empty
 		fp->current_size_node = NULL;			// Now empty
@@ -1548,19 +1477,11 @@ static void font_clist_select_row( GtkWidget *clist, gint row, gint column, GdkE
 
 		if ( fn )
 		{
-			int bitmap_font = 1;
+			int bitmap_font = !!fn->style->size->size;
 
-			if ( fn->style->size->size == 0 )
-			{
-				inifile_set_gboolean( "fontTypeBitmap", FALSE );
-				bitmap_font = 0;
-				gtk_widget_set_sensitive( fp->toggle[TX_TOGG_OBLIQUE], TRUE );
-			}
-			else
-			{
-				inifile_set_gboolean( "fontTypeBitmap", TRUE );
-				gtk_widget_set_sensitive( fp->toggle[TX_TOGG_OBLIQUE], FALSE );
-			}
+			inifile_set_gboolean( "fontTypeBitmap", bitmap_font );
+			gtk_widget_set_sensitive( fp->toggle[TX_TOGG_OBLIQUE],
+				!bitmap_font );
 
 			silent_update_size_spin( fp );			// Update size spin
 
@@ -1755,7 +1676,7 @@ static void init_font_lists()		//	LIST INITIALIZATION
 
 	snprintf(txt, 512, "%s%c%s", root, DIR_SEP, FONT_INDEX_FILENAME);
 
-	global_font_node = font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
+	font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
 
 	if ( !global_font_node )		// Index file not loaded
 	{
@@ -1840,7 +1761,7 @@ static void init_font_lists()		//	LIST INITIALIZATION
 				font_gui_create_index(txt);
 			}
 		}
-		global_font_node = font_index_load(txt);	// Try for second and last time
+		font_index_load(txt);	// Try for second and last time
 	}
 }
 
@@ -1862,7 +1783,7 @@ static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
 	if ( fp->preview_rgb )
 	{
 		unsigned char *src, *dest;
-		int w2, h2, i, j;
+		int w2, h2, j;
 
 		if ( x < fp->preview_w && y < fp->preview_h )
 		{
@@ -1873,12 +1794,7 @@ static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
 			{
 				src = fp->preview_rgb + 3*(x + fp->preview_w*(y+j));
 				dest = rgb + 3*w*j;
-				for ( i=0; i<w2; i++ )
-				{
-					*dest++ = *src++;
-					*dest++ = *src++;
-					*dest++ = *src++;
-				}
+				memcpy(dest, src, w2 * 3);
 			}
 		}
 	}

@@ -293,9 +293,33 @@ void forget_ini(inifile *inip)
 	memset(inip, 0, sizeof(inifile));
 }
 
-int read_ini(inifile *inip, char *fname)
+/* Load file whole into memory, with a zero byte before and two after */
+char *slurp_file(char *fname)
 {
 	FILE *fp;
+	char *buf;
+	int i, l;
+
+	if ((fp = fopen(fname, "rb")) == NULL) return (NULL);
+	fseek(fp, 0, SEEK_END);
+	l = ftell(fp);
+	buf = calloc(1, l + 3);
+	if (buf)
+	{
+		fseek(fp, 0, SEEK_SET);
+		i = fread(buf + 1, 1, l, fp);
+		if (i != l)
+		{
+			free(buf);
+			buf = NULL;
+		}
+	}
+	fclose(fp);
+	return (buf);
+}
+
+int read_ini(inifile *inip, char *fname)
+{
 	inifile ini;
 	inislot *slot;
 	char *tmp, *wrk, *w2, *str;
@@ -306,15 +330,8 @@ int read_ini(inifile *inip, char *fname)
 	if (!new_ini(&ini)) return (FALSE);
 
 	/* Read the file */
-	if ((fp = fopen(fname, "rb")) == NULL) goto fail;
-	fseek(fp, 0, SEEK_END);
-	l = ftell(fp);
-	ini.sblock[0] = calloc(1, l + 2);
-	if (!ini.sblock[0]) goto ffail;
-	fseek(fp, 0, SEEK_SET);
-	i = fread(ini.sblock[0] + 1, 1, l, fp);
-	if (i != l) goto ffail;
-	fclose(fp);
+	ini.sblock[0] = slurp_file(fname);
+	if (!ini.sblock[0]) goto fail;
 
 	/* Parse the contents */
 	for (tmp = ini.sblock[0] + 1; ; tmp = str)
@@ -380,7 +397,6 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 	*inip = ini;
 	return (TRUE);
 
-ffail:	fclose(fp);
 fail:	forget_ini(&ini);
 	return (FALSE);
 }

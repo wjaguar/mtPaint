@@ -550,7 +550,7 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
 			smooth = 1;
 	}
-	j = mem_rotate_free(angle, smooth, gcor, FALSE);
+	j = mem_rotate_free(angle, smooth, gcor, 0);
 	if (!j) canvas_undo_chores();
 	else
 	{
@@ -695,20 +695,26 @@ void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data )
 {
 	unsigned char *temp;
+	int i, bpp = mem_clip_bpp;
 
 	temp = malloc(mem_clip_w * mem_clip_bpp);
 	if (!temp) return; /* Not enough memory for temp buffer */
-	mem_flip_v(mem_clipboard, temp, mem_clip_w, mem_clip_h, mem_clip_bpp);
-	if (mem_clip_mask) mem_flip_v(mem_clip_mask, temp, mem_clip_w, mem_clip_h, 1);
-	if (mem_clip_alpha) mem_flip_v(mem_clip_alpha, temp, mem_clip_w, mem_clip_h, 1);
+	for (i = 0; i < NUM_CHANNELS; i++ , bpp = 1)
+	{
+		if (!mem_clip.img[i]) continue;
+		mem_flip_v(mem_clip.img[i], temp, mem_clip_w, mem_clip_h, bpp);
+	}
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
 void pressed_flip_sel_h( GtkMenuItem *menu_item, gpointer user_data )
 {
-	mem_flip_h(mem_clipboard, mem_clip_w, mem_clip_h, mem_clip_bpp);
-	if (mem_clip_mask) mem_flip_h(mem_clip_mask, mem_clip_w, mem_clip_h, 1);
-	if (mem_clip_alpha) mem_flip_h(mem_clip_alpha, mem_clip_w, mem_clip_h, 1);
+	int i, bpp = mem_clip_bpp;
+	for (i = 0; i < NUM_CHANNELS; i++ , bpp = 1)
+	{
+		if (!mem_clip.img[i]) continue;
+		mem_flip_h(mem_clip.img[i], mem_clip_w, mem_clip_h, bpp);
+	}
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
@@ -799,7 +805,7 @@ void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 static int copy_clip(gboolean api)
 {
-	int i, x, y, w, h, bpp, ofs, delta, len;
+	int i, x, y, w, h, bpp, ofs, delta, len, cmask = CMASK_IMAGE;
 
 
 	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
@@ -808,29 +814,20 @@ static int copy_clip(gboolean api)
 	h = abs(marq_y1 - marq_y2) + 1;
 
 	bpp = MEM_BPP;
-	free(mem_clipboard);		// Lose old clipboard
-	free(mem_clip_alpha);		// Lose old clipboard alpha
-	mem_clip_mask_clear();		// Lose old clipboard mask
-	mem_clip_alpha = NULL;
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
-		 !channel_dis[CHN_ALPHA]) mem_clip_alpha = malloc(w * h);
-	mem_clipboard = malloc(w * h * bpp);
+		 !channel_dis[CHN_ALPHA]) cmask = CMASK_RGBA;
+	mem_clip_new(w, h, bpp, cmask, FALSE);
 	text_paste = TEXT_PASTE_NONE;
 
 	if (!mem_clipboard)
 	{
-		free(mem_clip_alpha);
 		if (!api) alert_box( _("Error"), _("Not enough memory to create clipboard"),
 				_("OK"), NULL, NULL );
 		return (FALSE);
 	}
-	mem_clip_real_clear();		// Lose un-rotated clipboard
 
-	mem_clip_bpp = bpp;
 	mem_clip_x = x;
 	mem_clip_y = y;
-	mem_clip_w = w;
-	mem_clip_h = h;
 
 	/* Current channel */
 	ofs = (y * mem_width + x) * bpp;
@@ -907,7 +904,7 @@ static void cut_clip()
 
 static void trim_clip()
 {
-	int i, j, offs, offd, maxx, maxy, minx, miny, nw, nh;
+	int i, j, k, offs, offd, maxx, maxy, minx, miny, nw, nh;
 	unsigned char *tmp;
 
 	minx = MAX_WIDTH; miny = MAX_HEIGHT; maxx = maxy = 0;
@@ -940,22 +937,23 @@ static void trim_clip()
 	{
 		offs = j * mem_clip_w + minx;
 		offd = (j - miny) * nw;
-		memmove(mem_clip_mask + offd, mem_clip_mask + offs, nw);
-		if (mem_clip_alpha)
-			memmove(mem_clip_alpha + offd, mem_clip_alpha + offs, nw);
 		memmove(mem_clipboard + offd * mem_clip_bpp,
 			mem_clipboard + offs * mem_clip_bpp, nw * mem_clip_bpp);
+		for (k = 1; k < NUM_CHANNELS; k++)
+		{
+			if (!(tmp = mem_clip.img[k])) continue;
+			memmove(tmp + offd, tmp + offs, nw);
+		}
 	}
 
 	/* Try to realloc memory for smaller clipboard */
 	tmp = realloc(mem_clipboard, nw * nh * mem_clip_bpp);
 	if (tmp) mem_clipboard = tmp;
-	tmp = realloc(mem_clip_mask, nw * nh);
-	if (tmp) mem_clip_mask = tmp;
-	if (mem_clip_alpha)
+	for (k = 1; k < NUM_CHANNELS; k++)
 	{
-		tmp = realloc(mem_clip_alpha, nw * nh);
-		if (tmp) mem_clip_alpha = tmp;
+		if (!(tmp = mem_clip.img[k])) continue;
+		tmp = realloc(tmp, nw * nh);
+		if (tmp) mem_clip.img[k] = tmp;
 	}
 
 	mem_clip_w = nw;

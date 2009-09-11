@@ -92,6 +92,7 @@
 #define CMASK_ALL   ((1 << NUM_CHANNELS) - 1)
 #define CMASK_CURR  (1 << mem_channel)
 #define CMASK_FOR(A) (1 << (A))
+#define CMASK_CLIP  ((1 << CHN_IMAGE) | (1 << CHN_ALPHA) | (1 << CHN_SEL))
 
 #define SIZEOF_PALETTE (256 * sizeof(png_color))
 
@@ -259,6 +260,15 @@ image_info mem_clip;			// Current clipboard
 #define mem_clip_w		mem_clip.width
 #define mem_clip_h		mem_clip.height
 
+// Always use undo slot #1 for clipboard backup
+#define OLD_CLIP 1
+// mem_clip.undo_.done == 0 means no backup clipboard
+#define HAVE_OLD_CLIP		(mem_clip.undo_.done)
+#define mem_clip_real_img	mem_clip.undo_.items[OLD_CLIP].img
+#define mem_clip_real_w		mem_clip.undo_.items[OLD_CLIP].width
+#define mem_clip_real_h		mem_clip.undo_.items[OLD_CLIP].height
+#define mem_clip_real_clear()	mem_free_image(&mem_clip, FREE_UNDO)
+
 image_state mem_state;			// Current edit settings
 
 #define mem_filename		mem_state.filename
@@ -282,9 +292,6 @@ image_state mem_state;			// Current edit settings
 #define mem_col_B24		mem_state.col_24[1]
 
 int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
-
-chanlist mem_clip_real_img;		// Unrotated clipboard
-int mem_clip_real_w, mem_clip_real_h;	// mem_clip_real_w=0 => no unrotated clipboard
 
 extern unsigned char mem_brushes[];	// Preset brushes image
 int brush_tool_type;			// Last brush tool type
@@ -354,13 +361,19 @@ void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
 
+#define FREE_IMAGE 1
+#define FREE_UNDO  2
+#define FREE_ALL   3
+
 //	Clear/remove image data
-void mem_free_image(image_info *image, int final);
+void mem_free_image(image_info *image, int mode);
 //	Allocate new image data
 int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 	chanlist src);
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
+//	Allocate new clipboard, removing or preserving old as needed
+int mem_clip_new(int width, int height, int bpp, int cmask, int backup);
 void mem_init();				// Initialise memory
 
 int mem_used();				// Return the number of bytes used in image + undo stuff
@@ -448,8 +461,6 @@ void mem_undo_forward();		// REDO requested by user
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 void update_undo(image_info *image);	// Copy image state into current undo frame
 
-
-void mem_clip_real_clear();				// Empty the non rotated clipboard
 
 //// Drawing Primitives
 

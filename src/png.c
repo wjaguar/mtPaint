@@ -181,29 +181,21 @@ static int allocate_image(ls_settings *settings, int cmask)
 			}
 			break;
 		case FS_CLIP_FILE: /* Clipboard */
-			/* Allocate the clipboard image */
+			/* Allocate the entire batch at once */
 			if (i == CHN_IMAGE)
 			{
-				mem_clip_real_clear();
-				free(mem_clipboard);
-				free(mem_clip_alpha);
-				mem_clipboard = mem_clip_alpha = NULL;
-				mem_clip_mask_clear();
-				mem_clipboard = malloc(settings->width *
-					settings->height * settings->bpp);
-				if (!mem_clipboard) return (FILE_MEM_ERROR);
-				settings->img[CHN_IMAGE] = mem_clipboard;
+				j = mem_clip_new(settings->width, settings->height,
+					settings->bpp, cmask & CMASK_CLIP, TRUE);
+				if (j) return (FILE_MEM_ERROR);
+				memcpy(settings->img, mem_clip.img, sizeof(chanlist));
 			}
-			/* There's no such thing */
-			else if ((i != CHN_ALPHA) && (i != CHN_SEL)) break;
 			/* Try to add clipboard alpha or mask */
-			else
+			else if (CMASK_FOR(i) & CMASK_CLIP)
 			{
 				settings->img[i] = malloc(settings->width *
 					settings->height);
 				if (!settings->img[i]) return (FILE_MEM_ERROR);
-				*(i == CHN_ALPHA ? &mem_clip_alpha : &mem_clip_mask) =
-					settings->img[i];
+				mem_clip.img[i] = settings->img[i];
 			}
 			break;
 		case FS_CHANNEL_LOAD: /* Current channel */
@@ -250,8 +242,7 @@ static void deallocate_image(ls_settings *settings, int cmask)
 				mem_img[i] = NULL;
 			break;
 		case FS_CLIP_FILE: /* Clipboard */
-			if (i == CHN_ALPHA) mem_clip_alpha = NULL;
-			else if (i == CHN_SEL) mem_clip_mask = NULL;
+			mem_clip.img[i] = NULL;
 			break;
 		default: break;
 		}
@@ -3678,9 +3669,7 @@ int load_image(char *file_name, int mode, int ftype)
 		else if (settings.img[CHN_IMAGE])
 		{
 			/* !!! Too late to restore previous clipboard */
-			free(mem_clipboard);
-			free(mem_clip_alpha);
-			mem_clip_mask_clear();
+			mem_free_image(&mem_clip, FREE_ALL);
 		}
 		break;
 	case FS_CHANNEL_LOAD:

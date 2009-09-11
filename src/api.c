@@ -277,9 +277,7 @@ int mtpaint_clipboard_save(char *filename, int type, int arg)	// Save clipboard 
 	settings.jp2_rate = arg;
 	settings.silent = TRUE;
 
-	settings.img[CHN_IMAGE] = mem_clipboard;
-	settings.img[CHN_ALPHA] = mem_clip_alpha;
-	settings.img[CHN_SEL] = mem_clip_mask;
+	memcpy(settings.img, mem_clip.img, sizeof(chanlist));
 	settings.pal = mem_pal;
 	settings.width = mem_clip_w;
 	settings.height = mem_clip_h;
@@ -301,22 +299,9 @@ static int mem_text_clip_prep(int w, int h)		// Prepare new clipboard for text r
 
 	if (mem_channel == CHN_IMAGE) clip_bpp = mem_img_bpp;
 	else clip_bpp = 1;
+	mem_clip_new(w, h, clip_bpp, CMASK_IMAGE, FALSE);
 
-	mem_clip_real_clear();	// Lose old un-rotated clipboard
-	free( mem_clipboard );	// Lose old clipboard
-	free( mem_clip_alpha );	// Lose old clipboard alpha
-	mem_clip_mask_clear();	// Lose old clipboard mask
-	mem_clip_alpha = NULL;
-	mem_clipboard = malloc( w * h * clip_bpp );
-	mem_clip_w = w;
-	mem_clip_h = h;
-	mem_clip_bpp = clip_bpp;
-
-	if ( mem_clipboard == NULL )
-	{
-		free( mem_clipboard );
-		return 1;
-	}
+	if (!mem_clipboard) return 1;
 
 	if (mem_channel == CHN_IMAGE)		// Pasting to image so use the pattern
 	{
@@ -398,7 +383,8 @@ int mtpaint_selection_copy()		// Copy the rectangle selection area to the clipbo
 
 int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction, int destructive)
 {
-	return mem_rotate_free(angle, smooth, gamma_correction, TRUE+destructive);
+	return mem_rotate_free(angle, smooth, gamma_correction,
+		destructive ? 2 : 1);
 }
 
 void mtpaint_clipboard_alpha2mask()		// Move alpha to clipboard mask
@@ -451,6 +437,7 @@ static int api_coltrans(unsigned char *rgb, int bpp, int w, int h, int brightnes
 
 	if ( !destructive && rgb == mem_clipboard )	// Do we want to keep the clipboard?
 	{
+// !!! FIXME: this is broken in 3.14.50+ - WJ
 		if ( mem_clip_real_w )		// Image already in reserve, so use it
 		{
 			free(mem_clipboard);	// Dispose of current clipboard if it exists
@@ -516,7 +503,7 @@ static int api_coltrans(unsigned char *rgb, int bpp, int w, int h, int brightnes
 
 int mtpaint_image_rotate(float angle, int smooth, int gamma_correction)
 {
-	return mem_rotate_free(angle, smooth, gamma_correction, FALSE);
+	return mem_rotate_free(angle, smooth, gamma_correction, 0);
 }
 
 int mtpaint_image_coltrans(int brightness, int contrast, int saturation, int posterize, int gamma, int hue, int red, int green, int blue)		// Transform image colour

@@ -49,8 +49,9 @@ int ini_getbool(inifile *inip, int section, char *key, int defv);
 int ini_setsection(inifile *inip, int section, char *key);
 int ini_getsection(inifile *inip, int section, char *key);
 
-/* File function */
+/* File functions */
 
+char *slurp_file(char *fname);
 char *get_home_directory(void);
 
 /* Compatibility functions */

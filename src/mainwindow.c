@@ -2361,7 +2361,7 @@ static unsigned char *init_paste_render(paste_render_state *p,
 	main_render_state *r, unsigned char *xmask)
 {
 	unsigned char *temp, *tmp;
-	int i, x, y, w, h, ddx, bpp, scale = r->scale, zoom = r->zoom;
+	int i, x, y, w, h, mx, my, ddx, bpp, scale = r->scale, zoom = r->zoom;
 	int ti = 0, tm = 0, ta = 0, fa = 0;
 
 	/* Clip paste area to update area */
@@ -2369,10 +2369,12 @@ static unsigned char *init_paste_render(paste_render_state *p,
 	y = (marq_y1 * scale + zoom - 1) / zoom;
 	if (x < r->px2) x = r->px2;
 	if (y < r->py2) y = r->py2;
-	w = (marq_x2 * scale) / zoom + scale - x;
-	h = (marq_y2 * scale) / zoom + scale - y;
-	if (w > r->pw2) w = r->pw2;
-	if (h > r->ph2) h = r->ph2;
+	w = (marq_x2 * scale) / zoom + scale;
+	h = (marq_y2 * scale) / zoom + scale;
+	mx = r->px2 + r->pw2;
+	w = (w < mx ? w : mx) - x;
+	my = r->py2 + r->ph2;
+	h = (h < my ? h : my) - y;
 	if ((w <= 0) || (h <= 0)) return (NULL);
 
 	memset(p, 0, sizeof(paste_render_state));
@@ -2555,8 +2557,8 @@ static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 		gtemp = init_grad_render(&grstate, r.lx, r.tlist);
 	}
 
-	/* Paste preview - can coexist with transform */
-	if (show_paste && (marq_status >= MARQUEE_PASTE))
+	/* Paste preview - can only coexist with transform */
+	if (show_paste && (marq_status >= MARQUEE_PASTE) && !cstemp && !gtemp)
 		ptemp = init_paste_render(&prstate, &r, xtemp ? xrstate.pvm : NULL);
 
 	/* Start rendering */
