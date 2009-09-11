@@ -52,8 +52,9 @@ float Fgamma256[256];
 #define UNGAMMA256(X) (ungamma256[(int)((X) * kgamma256)] - \
 	((X) < midgamma256[ungamma256[(int)((X) * kgamma256)]]))
 
-double gamma65536(int idx);
-int ungamma65536(double v);
+//double gamma65536(int idx);
+//int ungamma65536(double v);
+int ungamma65281(double v); // Used in gradient engine
 
 double rgb2B(double r, double g, double b);
 void rgb2LXN(double *tmp, double r, double g, double b);

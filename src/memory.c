@@ -8109,8 +8109,9 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 
 ///	GRADIENTS
 
-/* Evaluate channel gradient at coordinate, return opacity */
-/* Coordinate 0 is center of 1st pixel, 1 center of last */
+/* Evaluate channel gradient at coordinate, return opacity
+ * Coordinate 0 is center of 1st pixel, 1 center of last
+ * Scale of return values is 0x0000..0xFF00 (NOT 0xFFFF) */
 int grad_value(int *dest, int slot, double x)
 {
 	int i, k, len, op;
@@ -8172,11 +8173,11 @@ int grad_value(int *dest, int slot, double x)
 			dest[MOD3(j3 + 2)] = ((int)hsv[1] + 1) >> 1;
 			break;
 		case GRAD_TYPE_SRGB: /* sRGB interpolation */
-			dest[0] = ungamma65536(gamma256[gslot[0]] + (xx - i) *
+			dest[0] = ungamma65281(gamma256[gslot[0]] + (xx - i) *
 				(gamma256[gslot[3]] - gamma256[gslot[0]]));
-			dest[1] = ungamma65536(gamma256[gslot[1]] + (xx - i) *
+			dest[1] = ungamma65281(gamma256[gslot[1]] + (xx - i) *
 				(gamma256[gslot[4]] - gamma256[gslot[1]]));
-			dest[2] = ungamma65536(gamma256[gslot[2]] + (xx - i) *
+			dest[2] = ungamma65281(gamma256[gslot[2]] + (xx - i) *
 				(gamma256[gslot[5]] - gamma256[gslot[2]]));
 			break;
 		default: /* RGB interpolation */

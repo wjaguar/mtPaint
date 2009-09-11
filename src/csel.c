@@ -270,6 +270,7 @@ static double gamma64K[255 * 4 + 2];
 static double gammaslope64K[255 * 4 + 1];
 static unsigned short ungamma64K[KGAMMA64K + 1];
 
+#if 0 /* Disable while not in use */
 double gamma65536(int idx)
 {
 	int n;
@@ -285,7 +286,25 @@ int ungamma65536(double v)
 	int n = ungamma64K[(int)(v * KGAMMA64K)];
 
 	n -= v < gamma64K[n];
-	return ((int)((n + (v - gamma64K[n]) * gammaslope64K[n]) * (257.0 / 4.0) + 0.5));
+	return ((int)((n + (v - gamma64K[n]) * gammaslope64K[n]) * 64.25 + 0.5));
+}
+
+double gamma65281(int idx)
+{
+	int n;
+
+	n = idx >> 6;
+	return ((idx & 0x3F) * (1.0 / 64.0) * (gamma64K[n + 1] - gamma64K[n]) +
+		gamma64K[n]);
+}
+#endif
+
+int ungamma65281(double v)
+{
+	int n = ungamma64K[(int)(v * KGAMMA64K)];
+
+	n -= v < gamma64K[n];
+	return ((int)((n + (v - gamma64K[n]) * gammaslope64K[n]) * 64.0 + 0.5));
 }
 
 static void make_ungamma64K()

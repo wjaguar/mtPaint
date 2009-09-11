@@ -612,7 +612,7 @@ int load_layers( char *file_name )
 		k = read_file_num(fp, tin);
 		t->opacity = k < 1 ? 1 : k > 100 ? 100 : k;
 
-		layers_total++;
+		if (!layers_total++) layer_copy_to_main(0); // Update mem_state
 	}
 	if (layers_total) layers_total--;
 	layer_refresh_list();
