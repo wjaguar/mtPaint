@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint 0.78\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-06-27 17:34+0100\n"
+"POT-Creation-Date: 2006-07-06 17:32+0100\n"
 "PO-Revision-Date: 2005-03-18 18:08+0000\n"
 "Last-Translator: Mark Tyler\n"
 "Language-Team: Spanish <es@li.org>\n"
@@ -1759,10 +1759,6 @@ msgstr ""
 msgid "/Help/About"
 msgstr "/Ayuda/Acerca de"
 
-#: src/mainwindow.c:2877
-msgid "/Opacity"
-msgstr "/Opacidad"
-
 #: src/mainwindow.c:2900
 msgid "/Frames"
 msgstr ""
@@ -1776,31 +1772,31 @@ msgstr "/Archivo/%i"
 msgid "Converting to Indexed Palette"
 msgstr "Convertir a Paleta Indexada"
 
-#: src/memory.c:2672 src/otherwindow.c:643
+#: src/memory.c:2674 src/otherwindow.c:643
 msgid "Bacteria Effect"
 msgstr "Efecto Bacteriado"
 
-#: src/memory.c:2708
+#: src/memory.c:2710
 msgid "Rotating"
 msgstr "Rotando"
 
-#: src/memory.c:2812
+#: src/memory.c:2814
 msgid "Free Rotation"
 msgstr "Rotación Libre"
 
-#: src/memory.c:3293
+#: src/memory.c:3297
 msgid "Scaling Image"
 msgstr "Escalando la Imagen"
 
-#: src/memory.c:3988
+#: src/memory.c:3992
 msgid "Counting Unique RGB Pixels"
 msgstr "Contando Pixeles RGB unicos"
 
-#: src/memory.c:4064
+#: src/memory.c:4068
 msgid "Image Blur Effect"
 msgstr "Efecto Imagen Borrosa"
 
-#: src/memory.c:4070
+#: src/memory.c:4074
 msgid "Applying Effect"
 msgstr "Aplicando Efecto"
 

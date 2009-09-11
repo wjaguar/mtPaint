@@ -2769,7 +2769,6 @@ void main_init()
 		{ _("/Palette/tear"),			NULL,	NULL,0, "<Tearoff>" },
 		{ _("/Palette/Open ..."),		NULL,	pressed_open_pal,0, NULL },
 		{ _("/Palette/Save As ..."),		NULL,	pressed_save_pal,0, NULL },
-		{ _("/Palette/Create Scale A->B"),	NULL,	pressed_create_pscale,0, NULL },
 		{ _("/Palette/Load Default"),		NULL, 	pressed_default_pal,0, NULL },
 		{ _("/Palette/sep1"),			NULL, 	NULL,0, "<Separator>" },
 		{ _("/Palette/Mask All"),		NULL, 	pressed_mask, 255, NULL },

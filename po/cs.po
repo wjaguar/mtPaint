@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: cs\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-06-27 17:34+0100\n"
+"POT-Creation-Date: 2006-07-06 17:32+0100\n"
 "PO-Revision-Date: 2006-05-28 20:07+0200\n"
 "Last-Translator: Pavel Ruzicka <pavel.ruzicka@gtsnovera.cz>\n"
 "Language-Team:  <en@li.org>\n"
@@ -520,25 +520,23 @@ msgstr ""
 "\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
-"mtPaint je svobodný software; mù¾ete ho ¹íøit a/nebo modifikovat v "
-"souladu s GNU General Public Licencí jak byla publikována Free Software "
-"Foundation; buï verzí 2, nebo( dle va¹eho zvá¾ení) jakoukoliv dal¹í "
-"verzí.\n"
+"mtPaint je svobodný software; mù¾ete ho ¹íøit a/nebo modifikovat v souladu s "
+"GNU General Public Licencí jak byla publikována Free Software Foundation; "
+"buï verzí 2, nebo( dle va¹eho zvá¾ení) jakoukoliv dal¹í verzí.\n"
 "\n"
 "mtPaint je distribuován v nadìji, ¾e bude pou¾íván, ale BEZ JAKÉKOLIV "
 "ZÁRUKY; a také bez samozøejmé záruky PRODEJNOSTI, nebo SCHOPNOSTI PLNIT "
-"SPECIÁLNÍ ÚÈELY. Pro více detailù si pøeètìte GNU General Public "
-"Licenci.\n"
+"SPECIÁLNÍ ÚÈELY. Pro více detailù si pøeètìte GNU General Public Licenci.\n"
 "\n"
-"mtPaint je jednoduchý GTK+1/2 kreslící program navr¾ený pro vytváøení "
-"ikon a kreseb tvoøených pixely. Mù¾e upravovat obrázky s indexovanou, "
-"nebo 24 bit RGB paletou a nabídnout základní kreslicí a manipulaèní "
-"nástroje. Má také mnoho dal¹ích mocných nástrojù, jako kanály, vrstvy a "
-"animace. Vzhledem ke své jednoduchosti a bez závislostí bì¾í dobøe na "
-"GNU/ Linuxu, Windows a star¹ím PC hardware.\n"
+"mtPaint je jednoduchý GTK+1/2 kreslící program navr¾ený pro vytváøení ikon a "
+"kreseb tvoøených pixely. Mù¾e upravovat obrázky s indexovanou, nebo 24 bit "
+"RGB paletou a nabídnout základní kreslicí a manipulaèní nástroje. Má také "
+"mnoho dal¹ích mocných nástrojù, jako kanály, vrstvy a animace. Vzhledem ke "
+"své jednoduchosti a bez závislostí bì¾í dobøe na GNU/ Linuxu, Windows a "
+"star¹ím PC hardware.\n"
 "\n"
-"Kompletní dokumentace funkcí mtPaintu je k dispozici v pøíruèce. Jestli¾e "
-"ji je¹tì nemáte, mù¾ete si ji stáhnout z webových stránek mtPaintu.\n"
+"Kompletní dokumentace funkcí mtPaintu je k dispozici v pøíruèce. Jestli¾e ji "
+"je¹tì nemáte, mù¾ete si ji stáhnout z webových stránek mtPaintu.\n"
 "\n"
 "Pokud se vám mtPaint líbí a chcete mít v¾dy nejnovìj¹í verzi, nebo chcete "
 "sdìlit nìjaké názory, mù¾e být pro vás zajímavá tato konference:\n"
@@ -1913,10 +1911,6 @@ msgstr "/Pomoc/Dokumentace"
 msgid "/Help/About"
 msgstr "/Pomoc/O aplikaci"
 
-#: src/mainwindow.c:2877
-msgid "/Opacity"
-msgstr "/Neprùsvitnost"
-
 #: src/mainwindow.c:2900
 msgid "/Frames"
 msgstr "/Snímky"
@@ -1930,31 +1924,31 @@ msgstr "/Soubor/%i"
 msgid "Converting to Indexed Palette"
 msgstr "Pøevádím na indexovou paletu"
 
-#: src/memory.c:2672 src/otherwindow.c:643
+#: src/memory.c:2674 src/otherwindow.c:643
 msgid "Bacteria Effect"
 msgstr "Efekt baktérie"
 
-#: src/memory.c:2708
+#: src/memory.c:2710
 msgid "Rotating"
 msgstr "Otáèím"
 
-#: src/memory.c:2812
+#: src/memory.c:2814
 msgid "Free Rotation"
 msgstr "Volné otáèení"
 
-#: src/memory.c:3293
+#: src/memory.c:3297
 msgid "Scaling Image"
 msgstr "Mìním mìøítko obrázku"
 
-#: src/memory.c:3988
+#: src/memory.c:3992
 msgid "Counting Unique RGB Pixels"
 msgstr "Poèítám poèet unikátních RGB pixelù"
 
-#: src/memory.c:4064
+#: src/memory.c:4068
 msgid "Image Blur Effect"
 msgstr "Efekt rozmazání obrázku"
 
-#: src/memory.c:4070
+#: src/memory.c:4074
 msgid "Applying Effect"
 msgstr "Aplikuji efekt"
 

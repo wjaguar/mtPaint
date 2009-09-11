@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -277,4 +277,69 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	if ( alert_result != 10 ) gtk_widget_destroy( alert );
 
 	return alert_result;
+}
+
+// Slider-spin combo (practically a new widget class)
+
+GtkWidget *mt_spinslide_new(gint swidth, gint sheight)
+{
+	GtkWidget *box, *slider, *spin;
+	GtkObject *adj;
+
+	adj = gtk_adjustment_new(0, 0, 1, 1, 10, 0);
+	box = gtk_hbox_new(FALSE, 0);
+
+	slider = gtk_hscale_new(GTK_ADJUSTMENT(adj));
+	gtk_box_pack_start(GTK_BOX(box), slider, swidth < 0, TRUE, 0);
+	gtk_widget_set_usize(slider, swidth, sheight);
+	gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
+	gtk_scale_set_digits(GTK_SCALE(slider), 0);
+
+	spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
+	gtk_box_pack_start(GTK_BOX(box), spin, swidth >= 0, TRUE, 2);
+	gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
+
+	gtk_widget_show_all(box);
+	return (box);
+}
+
+void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv)
+{
+	GtkAdjustment *adj;
+	
+	adj = gtk_range_get_adjustment(GTK_RANGE(((GtkBoxChild*)
+		GTK_BOX(spinslide)->children->data)->widget));
+	adj->lower = minv;
+	adj->upper = maxv;
+	gtk_adjustment_changed(adj);
+}
+
+gint mt_spinslide_get_value(GtkWidget *spinslide)
+{
+	GtkSpinButton *spin;
+
+	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
+		next->data)->widget);
+	gtk_spin_button_update(spin);
+	return (gtk_spin_button_get_value_as_int(spin));
+}
+
+void mt_spinslide_set_value(GtkWidget *spinslide, gint value)
+{
+	GtkSpinButton *spin;
+
+	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
+		next->data)->widget);
+	gtk_spin_button_set_value(spin, value);
+}
+
+/* void handler(GtkAdjustment *adjustment, gpointer user_data); */
+void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
+	gpointer user_data)
+{
+	GtkAdjustment *adj;
+	
+	adj = gtk_range_get_adjustment(GTK_RANGE(((GtkBoxChild*)
+		GTK_BOX(spinslide)->children->data)->widget));
+	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
 }

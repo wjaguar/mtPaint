@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-06-27 17:34+0100\n"
+"POT-Creation-Date: 2006-07-06 17:32+0100\n"
 "PO-Revision-Date: 2006-06-24 13:30+0100\n"
 "Last-Translator: Oliver Frommel <oliver@firstfloor.org>\n"
 "Language-Team: German <de_DE@li.org>\n"
@@ -1735,10 +1735,6 @@ msgstr "/Hilfe/Dokumentation"
 msgid "/Help/About"
 msgstr "/Hilfe/Über"
 
-#: src/mainwindow.c:2877
-msgid "/Opacity"
-msgstr "/Deckkraft"
-
 #: src/mainwindow.c:2900
 msgid "/Frames"
 msgstr ""
@@ -1752,31 +1748,31 @@ msgstr "/Datei/%i"
 msgid "Converting to Indexed Palette"
 msgstr "Nach Indexed konvertieren"
 
-#: src/memory.c:2672 src/otherwindow.c:643
+#: src/memory.c:2674 src/otherwindow.c:643
 msgid "Bacteria Effect"
 msgstr "Bakterieneffekt"
 
-#: src/memory.c:2708
+#: src/memory.c:2710
 msgid "Rotating"
 msgstr "Drehen"
 
-#: src/memory.c:2812
+#: src/memory.c:2814
 msgid "Free Rotation"
 msgstr "Frei Drehen"
 
-#: src/memory.c:3293
+#: src/memory.c:3297
 msgid "Scaling Image"
 msgstr "Bildgröße verändern"
 
-#: src/memory.c:3988
+#: src/memory.c:3992
 msgid "Counting Unique RGB Pixels"
 msgstr "Zähle nur einmal vorhandene RGB-Pixel"
 
-#: src/memory.c:4064
+#: src/memory.c:4068
 msgid "Image Blur Effect"
 msgstr "Bildunschärfeeffekte"
 
-#: src/memory.c:4070
+#: src/memory.c:4074
 msgid "Applying Effect"
 msgstr "Wende Effekt an"
 

@@ -531,32 +531,6 @@ void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_window_add_accel_group(GTK_WINDOW (add_col_window), ag);
 }
 
-
-///	CREATE PALETTE SCALE
-
-void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int i = mem_col_A, j = mem_col_B;
-
-	mtMAX( i, i, 0 )
-	mtMAX( j, j, 0 )
-	mtMIN( i, i, mem_cols-1 )
-	mtMIN( j, j, mem_cols-1 )
-
-	if ( abs(i-j)>1 )		// Only do this if we have something to do
-	{
-		spot_undo(UNDO_PAL);
-
-		mem_scale_pal( i, mem_col_A24.red, mem_col_A24.green, mem_col_A24.blue,
-			j, mem_col_B24.red, mem_col_B24.green, mem_col_B24.blue );
-
-		init_pal();
-		update_all_views();
-		gtk_widget_queue_draw( drawing_col_prev );
-	}
-}
-
-
 void pal_refresher()
 {
 	update_all_views();
@@ -772,8 +746,8 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 #define BRCOSA_ITEMS 6
 
 static GtkWidget *brcosa_window;
-static GtkWidget *brcosa_scales[BRCOSA_ITEMS], *brcosa_toggles[6],
-		 *brcosa_spins[BRCOSA_ITEMS+2];		// Extra 2 used for palette limits
+static GtkWidget *brcosa_toggles[6],
+		 *brcosa_spins[BRCOSA_ITEMS+2];	// Extra 2 used for palette limits
 static GtkWidget *brcosa_buttons[5];
 
 static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2];
@@ -788,39 +762,6 @@ static void brcosa_buttons_sensitive() // Set 4 brcosa button as sensitive if th
 
 	for ( i=0; i<BRCOSA_ITEMS; i++ ) if ( brcosa_values[i] != vals[i] ) state = TRUE;
 	for ( i=2; i<5; i++ ) gtk_widget_set_sensitive( brcosa_buttons[i], state );
-}
-
-static void brcosa_update_sliders()
-{
-	int i;
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
-		gtk_adjustment_set_value( GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment,
-			brcosa_values[i] );
-}
-
-static void brcosa_update_spins()
-{
-	int i;
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
-	{
-		gtk_spin_button_update( GTK_SPIN_BUTTON(brcosa_spins[i]) );
-		gtk_spin_button_set_value( GTK_SPIN_BUTTON(brcosa_spins[i]), brcosa_values[i] );
-	}
-}
-
-static gint brcosa_spin_moved()
-{
-	int i;
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
-		brcosa_values[i] = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(brcosa_spins[i]) );
-
-	brcosa_buttons_sensitive();
-	brcosa_update_sliders();
-
-	return FALSE;
 }
 
 static gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -867,7 +808,7 @@ static void brcosa_pal_lim_change()
 
 	for ( i=0; i<2; i++ )
 		brcosa_pal_lim[i] = gtk_spin_button_get_value_as_int(
-				GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i]) );
+			GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i]) );
 
 	click_brcosa_preview( NULL, NULL, NULL );	// Update everything
 }
@@ -897,21 +838,13 @@ static gint click_brcosa_RGB_toggle( GtkWidget *widget, GdkEvent *event, gpointe
 	return FALSE;
 }
 
-static gint brcosa_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void brcosa_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 {
-	int i;
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
-		brcosa_values[i] = GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment->value;
-
+	brcosa_values[(int)user_data] = ADJ2INT(adj);
 	brcosa_buttons_sensitive();
 
-	brcosa_update_spins();
-
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_toggles[0]) ) )
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_toggles[0])))
 		click_brcosa_preview( NULL, NULL, NULL );
-
-	return FALSE;
 }
 
 static gint delete_brcosa( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -1012,19 +945,14 @@ static gint click_brcosa_ok()
 
 static gint click_brcosa_reset()
 {
+	static unsigned char inits[BRCOSA_ITEMS] = {0, 0, 0, 8, 100, 0};
 	int i;
 
 	mem_pal_copy( mem_pal, brcosa_pal );
 
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
+	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
-		if (i<3 || i==5) brcosa_values[i] = 0;
-		if (i==3) brcosa_values[i] = 8;
-		if (i==4) brcosa_values[i] = 100;
-		gtk_adjustment_set_value( GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment,
-			brcosa_values[i] );
-		gtk_spin_button_set_value( GTK_SPIN_BUTTON(brcosa_spins[i]), brcosa_values[i] );
-		gtk_spin_button_update( GTK_SPIN_BUTTON(brcosa_spins[i]) );
+		mt_spinslide_set_value(brcosa_spins[i], inits[i]);
 	}
 	pal_refresher();
 
@@ -1035,15 +963,15 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *vbox, *vbox5, *table2, *hbox, *label, *button;
 
-	int	mins[] = {-255, -100, -100, 1, 20, -1529},
+	static int mins[] = {-255, -100, -100, 1, 20, -1529},
 		maxs[] = {255, 100, 100, 8, 500, 1529},
 		vals[] = {0, 0, 0, 8, 100, 0},
-		order[] = {1, 2, 3, 5, 0, 4},
-		i;
+		order[] = {1, 2, 3, 5, 0, 4};
 	char	*tog_txt[] = {	_("Auto-Preview"), _("Red"), _("Green"), _("Blue"), _("Palette"),
 				_("Image") },
 		*tab_txt[] = {	_("Brightness"), _("Contrast"), _("Saturation"), _("Posterize"),
 				_("Gamma"), _("Hue") };
+	int i;
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
@@ -1066,27 +994,19 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox);
 	gtk_container_add (GTK_CONTAINER (brcosa_window), vbox);
 
-	table2 = add_a_table( 4, 3, 10, vbox );
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
-		add_to_table( tab_txt[i], table2, order[i], 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-
-	for ( i=0; i<BRCOSA_ITEMS; i++ )
+	table2 = add_a_table(6, 2, 10, vbox );
+	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
+		add_to_table(tab_txt[i], table2, order[i], 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
 		brcosa_values[i] = vals[i];
-		brcosa_scales[i] = add_slider2table( vals[i], mins[i], maxs[i],
-						table2, order[i], 1, 255, 20 );
-		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment),
-			"value_changed", GTK_SIGNAL_FUNC(brcosa_slider_moved), NULL);
-		spin_to_table( table2, &brcosa_spins[i], order[i], 2, 1, vals[i], mins[i], maxs[i] );
-
-#if GTK_MAJOR_VERSION == 2
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[i])->entry ),
-			"value_changed", GTK_SIGNAL_FUNC(brcosa_spin_moved), NULL);
-#else
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[i])->entry ),
-			"changed", GTK_SIGNAL_FUNC(brcosa_spin_moved), NULL);
-#endif
+		brcosa_spins[i] = mt_spinslide_new(255, 20);
+		gtk_table_attach(GTK_TABLE(table2), brcosa_spins[i], 1, 2,
+			order[i], order[i] + 1, GTK_EXPAND | GTK_FILL,
+			GTK_FILL, 0, 0);
+		mt_spinslide_set_range(brcosa_spins[i], mins[i], maxs[i]);
+		mt_spinslide_set_value(brcosa_spins[i], vals[i]);
+		mt_spinslide_connect(brcosa_spins[i],
+			GTK_SIGNAL_FUNC(brcosa_spinslide_moved), (gpointer)i);
 	}
 
 
@@ -1856,6 +1776,8 @@ static void set_csel()
 //	csel_preview_a = (ctable[2].a + 128) / 257;
 }
 
+GtkWidget *range_spins[2];
+
 static void select_colour(int what)
 {
 	switch (what)
@@ -1874,6 +1796,116 @@ static void select_colour(int what)
 		do_allcol();
 		break;
 	}
+}
+
+static void set_range_spin(GtkButton *button, GtkWidget *spin)
+{
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), allcol_idx);
+}
+
+/* Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255 */
+static void rgb2hsv(int *rgb, double *hsv)
+{
+	int c0, c1, c2;
+
+	if (!((rgb[0] ^ rgb[1]) | (rgb[0] ^ rgb[2])))
+	{
+		hsv[0] = hsv[1] = 0.0;
+		hsv[2] = rgb[0];
+		return;
+	}
+	c2 = rgb[2] < rgb[0] ? 1 : 0;
+	if (rgb[c2] >= rgb[c2 + 1]) c2++;
+	c0 = (c2 + 1) % 3;
+	c1 = (c2 + 2) % 3;
+	hsv[2] = rgb[c0] > rgb[c1] ? rgb[c0] : rgb[c1];
+	hsv[1] = hsv[2] - rgb[c2];
+	hsv[0] = c0 * 2 + 1 + (rgb[c1] - rgb[c0]) / hsv[1];
+	hsv[1] /= hsv[2];
+}
+
+static void make_cscale(GtkButton *button, gpointer user_data)
+{
+	int i, start, stop, start0;
+
+	gtk_spin_button_update(GTK_SPIN_BUTTON(range_spins[0]));
+	start = start0 = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(range_spins[0]));
+	gtk_spin_button_update(GTK_SPIN_BUTTON(range_spins[1]));
+	stop = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(range_spins[1]));
+	if (start > stop) { i = start; start = stop; stop = i; }
+	if (stop < start + 2) return;
+
+	if ((int)user_data) /* RGB */
+	{
+		double r0, g0, b0, dr, dg, db, d;
+
+		d = stop - start;
+		r0 = (ctable[start].r + 128) / 257;
+		dr = ((ctable[stop].r + 128) / 257 - r0) / d;
+		r0 -= dr * start;
+		g0 = (ctable[start].g + 128) / 257;
+		dg = ((ctable[stop].g + 128) / 257 - g0) / d;
+		g0 -= dg * start;
+		b0 = (ctable[start].b + 128) / 257;
+		db = ((ctable[stop].b + 128) / 257 - b0) / d;
+		b0 -= db * start;
+
+		for (i = start + 1; i < stop; i++)
+		{
+			ctable[i].r = rint(r0 + dr * i) * 257;
+			ctable[i].g = rint(g0 + dg * i) * 257;
+			ctable[i].b = rint(b0 + db * i) * 257;
+		}
+	}
+	else /* HSV */
+	{
+		int rgb[3], rgb1[3], t;
+		double h0, dh, s0, ds, v0, dv, hsv[3], hsv1[3], hh, ss, vv, d;
+
+		rgb[0] = (ctable[start].r + 128) / 257;
+		rgb[1] = (ctable[start].g + 128) / 257;
+		rgb[2] = (ctable[start].b + 128) / 257;
+		rgb1[0] = (ctable[stop].r + 128) / 257;
+		rgb1[1] = (ctable[stop].g + 128) / 257;
+		rgb1[2] = (ctable[stop].b + 128) / 257;
+		rgb2hsv(rgb, hsv);
+		rgb2hsv(rgb1, hsv1);
+
+		/* Always go from 1st to 2nd hue in ascending order */
+		if (start == start0)
+		{
+			if (hsv[0] > hsv1[0]) hsv[0] -= 6.0;
+		}
+		else if (hsv1[0] > hsv[0]) hsv1[0] -= 6.0;
+
+		d = stop - start;
+		dh = (hsv1[0] - hsv[0]) / d;
+		h0 = hsv[0] - dh * start;
+		ds = (hsv1[1] - hsv[1]) / d;
+		s0 = hsv[1] - ds * start;
+		dv = (hsv1[2] - hsv[2]) / d;
+		v0 = hsv[2] - dv * start;
+
+		for (i = start + 1; i < stop; i++)
+		{
+			vv = v0 + dv * i;
+			ss = vv - vv * (s0 + ds * i);
+			hh = h0 + dh * i;
+			if (hh < 0.0) hh += 6.0;
+			t = floor(hh);
+			hh = (hh - t) * (vv - ss);
+			if (t & 1) { vv -= hh; hh += vv; }
+			else hh += ss;
+			t >>= 1;
+			rgb[t] = rint(vv);
+			rgb[(t + 1) % 3] = rint(hh);
+			rgb[(t + 2) % 3] = rint(ss);
+			ctable[i].r = rgb[0] * 257;
+			ctable[i].g = rgb[1] * 257;
+			ctable[i].b = rgb[2] * 257;
+		}
+	}
+	color_refresh();
 }
 
 static void select_overlay(int what)
@@ -1906,8 +1938,13 @@ static void select_overlay(int what)
 	}
 }
 
+static GtkWidget *AB_spins[NUM_CHANNELS];
+static int temp_AB[NUM_CHANNELS][2];
+
 static void select_AB(int what)
 {
+	int i;
+
 	switch (what)
 	{
 	case 0: /* Cancel */
@@ -1916,10 +1953,26 @@ static void select_AB(int what)
 	case 2: /* OK */
 		do_AB(2);
 		spot_undo(UNDO_PAL);
+		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+		{
+			channel_col_A[i] = temp_AB[i][0];
+			channel_col_B[i] = temp_AB[i][1];
+		}
 	case 1: /* Preview */
 		do_AB(0);
 		break;
+	case 3: /* Select */
+		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+		{
+			mt_spinslide_set_value(AB_spins[i], temp_AB[i][allcol_idx]);
+		}
+		break;
 	}
+}
+
+static void AB_spin_moved(GtkAdjustment *adj, gpointer user_data)
+{
+	temp_AB[(int)user_data][allcol_idx] = ADJ2INT(adj);
 }
 
 static void posterize_AB(GtkButton *button, gpointer user_data)
@@ -2007,11 +2060,15 @@ static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
+	char *ovl_txt[NUM_CHANNELS] =
+		{ _("Image"), _("Alpha"), _("Selection"), _("Mask") };
 	GtkWidget *win, *extbox, *button, *spin;
-	int i;
+	int i, j;
 
 	if (cs_type == COLSEL_EDIT_ALL)
 	{
+		char *fromto[] = { _("From"), _("To") };
+
 		mem_pal_copy( brcosa_pal, mem_pal );	// Remember old settings
 		ctable = malloc(mem_cols * sizeof(RGBA16));
 		if (!ctable) return;
@@ -2022,16 +2079,34 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			ctable[i].b = mem_pal[i].blue * 257;
 			ctable[i].a = 65535;
 		}
+
+		/* Prepare range controls */
+		extbox = gtk_hbox_new(FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(extbox), gtk_label_new(_("Scale")),
+			FALSE, FALSE, 0);
+		for (i = 0; i < 2; i++)
+		{
+			button = add_a_button(fromto[i], 4, extbox, TRUE);
+			spin = range_spins[i] = add_a_spin(0, 0, 255);
+			gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
+			gtk_signal_connect(GTK_OBJECT(button), "clicked",
+				GTK_SIGNAL_FUNC(set_range_spin), spin);
+		}
+		button = add_a_button("HSV", 4, extbox, TRUE);
+		gtk_signal_connect(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(make_cscale), (gpointer)0);
+		button = add_a_button("RGB", 4, extbox, TRUE);
+		gtk_signal_connect(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(make_cscale), (gpointer)1);
+		gtk_widget_show_all(extbox);
+
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, NULL, mem_cols, NULL, FALSE, select_colour);
+		colour_window(win, extbox, mem_cols, NULL, FALSE, select_colour);
 	}
 
 	if (cs_type == COLSEL_OVERLAYS)
 	{
-		char *ovl_txt[NUM_CHANNELS] =
-			{ _("Image"), _("Alpha"), _("Selection"), _("Mask") };
-
 		ctable = malloc(NUM_CHANNELS * 2 * sizeof(RGBA16));
 		if (!ctable) return;
 		for (i = 0; i < NUM_CHANNELS; i++)
@@ -2071,13 +2146,37 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		ctable[3] = ctable[1];
 
 		/* Prepare posterize controls */
-		extbox = gtk_hbox_new(FALSE, 0);
-		gtk_widget_show(extbox);
-		button = add_a_button(_("Posterize"), 4, extbox, TRUE);
+		
+		extbox = gtk_table_new(3, 3, FALSE);
+		win = gtk_hbox_new(FALSE, 0);
+		gtk_table_attach(GTK_TABLE(extbox), win, 0, 3, 0, 1,
+			GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+		button = add_a_button(_("Posterize"), 4, win, TRUE);
 		spin = add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8);
-		gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(win), spin, FALSE, FALSE, 0);
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(posterize_AB), spin);
+
+		/* Prepare channel A/B controls */
+
+		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+		{
+			j = i - CHN_ALPHA;
+			spin = gtk_label_new(ovl_txt[i]);
+			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
+				1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
+			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
+			spin = AB_spins[i] = mt_spinslide_new(-1, -1);
+			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
+				2, 3, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+			mt_spinslide_set_range(spin, 0, 255);
+			mt_spinslide_set_value(spin, channel_col_A[i]);
+			mt_spinslide_connect(spin,
+				GTK_SIGNAL_FUNC(AB_spin_moved), (gpointer)i);
+			temp_AB[i][0] = channel_col_A[i];
+			temp_AB[i][1] = channel_col_B[i];
+		}
+		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);

@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006 Mark Tyler
+	Copyright (C) 2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -141,7 +141,7 @@ GdkCursor *m_cursor[32];		// My mouse cursors
 
 static GtkWidget *toolbar_zoom_main = NULL, *toolbar_zoom_view,
 	*toolbar_labels[2],		// Colour A & B details
-	*ts_scales[3], *ts_spins[3],	// Size, flow, opacity
+	*ts_spinslides[3],		// Size, flow, opacity
 	*tb_label_opacity		// Opacity label
 	;
 static unsigned char *mem_prev = NULL;		// RGB colours, tool, pattern preview
@@ -414,60 +414,32 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	return (TRUE);
 }
 
-static void ts_update_sliders()
-{
-	int i, vals[3] = {tool_size, tool_flow, tool_opacity};
 
-	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
-	for ( i=0; i<3; i++ )
-		gtk_adjustment_set_value( GTK_HSCALE(ts_scales[i])->scale.range.adjustment,
-			vals[i] );
+static void ts_update_spinslides()
+{
+	mt_spinslide_set_value(ts_spinslides[0], tool_size);
+	mt_spinslide_set_value(ts_spinslides[1], tool_flow);
+	mt_spinslide_set_value(ts_spinslides[2], mem_channel == CHN_IMAGE ?
+		tool_opacity : channel_col_A[mem_channel]);
 }
 
-static void ts_update_spins()
-{
-	int i, vals[3] = {tool_size, tool_flow, tool_opacity};
 
-	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
-	for ( i=0; i<3; i++ )
+static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
+{
+	int n, i;
+
+	n = ADJ2INT(adj);
+	switch ((int)user_data)
 	{
-		gtk_spin_button_update( GTK_SPIN_BUTTON(ts_spins[i]) );
-		gtk_spin_button_set_value( GTK_SPIN_BUTTON(ts_spins[i]), vals[i] );
+	case 0: tool_size = n;
+		break;
+	case 1:	tool_flow = n;
+		break;
+	case 2:	i = mem_channel == CHN_IMAGE ? tool_opacity :
+			channel_col_A[mem_channel];
+		if (n != i) pressed_opacity(n);
+		break;
 	}
-}
-
-static gint ts_spin_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int i, vals[3];
-
-	for ( i=0; i<3; i++ )
-		vals[i] = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(ts_spins[i]) );
-
-	tool_size = vals[0];
-	tool_flow = vals[1];
-	i = mem_channel == CHN_IMAGE ? tool_opacity : channel_col_A[mem_channel];
-	if (vals[2] != i) pressed_opacity(vals[2]);
-
-	ts_update_sliders();
-
-	return FALSE;
-}
-
-static gint ts_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int i, vals[3];
-
-	for ( i=0; i<3; i++ )
-		vals[i] = GTK_HSCALE(ts_scales[i])->scale.range.adjustment->value;
-
-	tool_size = vals[0];
-	tool_flow = vals[1];
-	i = mem_channel == CHN_IMAGE ? tool_opacity : channel_col_A[mem_channel];
-	if (vals[2] != i) pressed_opacity(vals[2]);
-
-	ts_update_spins();
-
-	return FALSE;
 }
 
 
@@ -482,7 +454,7 @@ static void toolbar_settings_exit()
 
 static void toolbar_settings_init()
 {
-	int i, vals[] = {tool_size, tool_flow, tool_opacity}, max, min;
+	int i, vals[] = {tool_size, tool_flow, tool_opacity};
 	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") },
 	**icon_list_settings[TOTAL_ICONS_SETTINGS] = {
 		xpm_mode_cont_xpm, xpm_mode_opac_xpm, xpm_mode_tint_xpm, xpm_mode_tint2_xpm,
@@ -565,31 +537,20 @@ static void toolbar_settings_init()
 	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
 	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
 
-	table = add_a_table( 3, 3, 5, vbox );
-
-	for ( i=0; i<3; i++ )
-		labels[i] = add_to_table( ts_titles[i], table, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	tb_label_opacity = labels[2];
-
 	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
-	for ( i=0; i<3; i++ )
+	table = add_a_table(3, 2, 5, vbox);
+	for (i = 0; i < 3; i++)
 	{
-		min = i == 2 ? 0 : 1; max = 255;
-		ts_scales[i] = add_slider2table( vals[i], min, max, table, i, 1, 255, 20 );
-		gtk_widget_set_usize(ts_scales[i], 150, -1);
-		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ts_scales[i])->scale.range.adjustment),
-			"value_changed", GTK_SIGNAL_FUNC(ts_slider_moved), NULL);
-		if ( i<2 ) max = MAX_WIDTH;
-		spin_to_table( table, &ts_spins[i], i, 2, 2, vals[i], min, max );
-
-#if GTK_MAJOR_VERSION == 2
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(ts_spins[i])->entry ),
-			"value_changed", GTK_SIGNAL_FUNC(ts_spin_moved), NULL);
-#else
-		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(ts_spins[i])->entry ),
-			"changed", GTK_SIGNAL_FUNC(ts_spin_moved), NULL);
-#endif
+		labels[i] = add_to_table(ts_titles[i], table, i, 0, 0,
+			GTK_JUSTIFY_LEFT, 0, 0.5);
+		ts_spinslides[i] = mt_spinslide_new(150, -1);
+		gtk_table_attach(GTK_TABLE(table), ts_spinslides[i], 1, 2,
+			i, i + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+		mt_spinslide_set_range(ts_spinslides[i], i == 2 ? 0 : 1, 255);
+		mt_spinslide_connect(ts_spinslides[i],
+			GTK_SIGNAL_FUNC(ts_spinslide_moved), (gpointer)i);
 	}
+	tb_label_opacity = labels[2];
 
 	gtk_signal_connect_object (GTK_OBJECT (toolbar_boxes[TOOLBAR_SETTINGS]), "delete_event",
 		GTK_SIGNAL_FUNC (toolbar_settings_exit), NULL);
@@ -805,7 +766,7 @@ void toolbar_update_settings()
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
 
-	ts_update_spins();		// Update tool settings
+	ts_update_spinslides();		// Update tool settings
 
 	if ( mem_img_bpp == 1 )
 		snprintf(txt, 30, "A [%i] = {%i,%i,%i}", mem_col_A, mem_pal[mem_col_A].red,

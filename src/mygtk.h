@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004 Mark Tyler
+	Copyright (C) 2004 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -40,3 +40,14 @@ int progress_update(float val);				// Update progress window
 void progress_end();					// Close progress window
 
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
+
+// Slider-spin combo (practically a new widget class)
+
+GtkWidget *mt_spinslide_new(gint swidth, gint sheight);
+void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv);
+gint mt_spinslide_get_value(GtkWidget *spinslide);
+void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
+/* void handler(GtkAdjustment *adjustment, gpointer user_data); */
+void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
+	gpointer user_data);
+#define ADJ2INT(a) ((int)((a)->value + 0.5))

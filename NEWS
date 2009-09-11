@@ -6,16 +6,18 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.10	2006-?-?
 
-	*Image tiling mode added to "Resize Canvas"
-	*Gaussian blur effect added
-	*More palette sort modes
+	* Image tiling mode added to "Resize Canvas"
+	* Gaussian blur effect added
+	* More palette sort modes
+	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
+	* RGB and HSV colour scales generation integrated into palette editor
 	...and more still remains to do... ;-)
 
-3.01	2006-7-8
+3.01	2006-7-10
 
 	* German translation updated for version 3
-	*BUGFIX - Memory alignment problems on Windows fixed (might affect speed)
-	*BUGFIX - RGB-specific menu items now properly disabled in indexed mode
+	* BUGFIX - Memory alignment problems on Windows fixed (might affect speed)
+	* BUGFIX - RGB-specific menu items now properly disabled in indexed mode
 
 3.00	2006-6-21
 

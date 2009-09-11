@@ -37,7 +37,6 @@ void generic_new_window(int type);
 
 void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_bacteria( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_scale( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_size( GtkMenuItem *menu_item, gpointer user_data );
