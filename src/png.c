@@ -2113,11 +2113,10 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	/* Check if alpha channel is valid */
 	if (def_alpha && settings->img[CHN_ALPHA])
 	{
-		tmp = settings->img[CHN_ALPHA];
-		j = settings->width * settings->height;
-		for (i = 0; !tmp[i] && (i < j); i++);
 		/* Delete all-zero "alpha" */
-		if (i >= j) deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
+		if (is_filled(settings->img[CHN_ALPHA], 0,
+			settings->width * settings->height))
+			deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
 	}
 
 fail3:	if (!settings->silent) progress_end();

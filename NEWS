@@ -39,7 +39,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Smudge tool now works about two times faster
 	* 12 new blend modes added
 	* Ctrl+Double click selects average colour underneath brush square or selection marquee
-	* "Convert to indexed" using current palette now does not truncate the palette to the number of colours used
+	* "Convert to indexed" using current palette now truncates the palette only if requested
+	* "Convert to indexed" PNN and Wu quantizers now have diameter based weighting option
 	* Canvas, view and palette window now do not lose mouse button release events in GTK+1
 	* Makefiles now honor DESTDIR
 	* BUGFIX - Polygon line selection now clearer in Windows version

@@ -419,6 +419,7 @@ void mem_free_image(image_info *image, int mode);
 
 #define AI_COPY   1 /* Duplicate source channels, not insert them */
 #define AI_NOINIT 2 /* Do not initialize source-less channels */
+#define AI_CLEAR  4 /* Initialize image structure first */
 
 //	Allocate new image data
 int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
@@ -592,6 +593,7 @@ void mem_threshold(unsigned char *img, int len, int level);	// Threshold channel
 void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp);
 
 void set_xlate(unsigned char *xlat, int bpp);			// Build bitdepth translation table
+int is_filled(unsigned char *data, unsigned char val, int len);	// Check if byte array is all one value
 
 void flood_fill( int x, int y, unsigned int target );
 
@@ -630,6 +632,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	int sourcebpp, int destbpp);
 void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
 	unsigned char *alpha, unsigned char *trans, int opacity);
+void copy_area(image_info *dest, image_info *src, int x, int y);
 
 // Retroactive masking - by blending with undo frame
 void mask_merge(unsigned char *old, int channel, unsigned char *mask);

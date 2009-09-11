@@ -158,7 +158,7 @@ void iso_trans(int mode);
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();
-void commit_paste(int *update);
+void commit_paste(int swap, int *update);
 
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx);
 void repaint_line(int mode);			// Repaint or clear line on canvas
@@ -280,12 +280,8 @@ void create_default_image();			// Create default new image
 #define UPD_PREFS  (CF_PREFS | CF_MENU | CF_CURSOR | CF_DRAW | CF_VDRAW)
 //	Moved color in palette (no image redraw desired)
 #define UPD_MVPAL  (UPD_PAL & ~UPD_IMG)
+//	Mask covering all kinds of image redraw - for disabling them
+#define UPD_IMGMASK (UPD_MODE | CF_DRAW | CF_VDRAW)
 // !!! Do not forget: CF_MENU also tracks undo stack changes
 
 void update_stuff(int flags);
-
-#ifdef U_API
-int api_copy_rectangle();			// API function
-int api_copy_polygon();				// API function
-int api_clip_alphamask();			// API function
-#endif

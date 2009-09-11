@@ -227,10 +227,11 @@ void init_status_bar()
 }
 
 
-void commit_paste(int *update)
+void commit_paste(int swap, int *update)
 {
+	image_info ti;
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
-	int i, ofs = 0, ua;
+	int i, ua, cmask, op, upd = UPD_IMGP, ofs = 0, fail = TRUE;
 	unsigned char *image, *mask, *alpha = NULL;
 
 	fx = marq_x1 > 0 ? marq_x1 : 0;
@@ -241,47 +242,85 @@ void commit_paste(int *update)
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
 
-	ua = channel_dis[CHN_ALPHA];	// Ignore clipboard alpha if disabled
+	if (!(mask = malloc(fw))) goto quit; /* !!! Not enough memory */
 
-	mask = malloc(fw);
-	if (!mask) return;	/* !!! Not enough memory */
+	ua = channel_dis[CHN_ALPHA];	// Ignore clipboard alpha if disabled
 	if ((mem_channel == CHN_IMAGE) && RGBA_mode && !mem_clip_alpha &&
 		!ua && mem_img[CHN_ALPHA])
 	{
-		alpha = malloc(fw);
-		if (!alpha) return;
+		if (!(alpha = malloc(fw))) goto quit;
 		memset(alpha, channel_col_A[CHN_ALPHA], fw);
 	}
 	ua |= !mem_clip_alpha;
 
-	mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
+	if (swap) /* Prepare to convert image contents into new clipboard */
+	{
+		cmask = CMASK_IMAGE | CMASK_FOR(CHN_SEL);
+		if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
+			 !channel_dis[CHN_ALPHA]) cmask |= CMASK_FOR(CHN_ALPHA);
+		if (!mem_alloc_image(AI_CLEAR | AI_NOINIT, &ti, fw, fh, MEM_BPP,
+			cmask, NULL)) goto quit;
+		copy_area(&ti, &mem_image, fx, fy);
+	}
 
 	/* Offset in memory */
 	if (marq_x1 < 0) ofs -= marq_x1;
 	if (marq_y1 < 0) ofs -= marq_y1 * mem_clip_w;
 	image = mem_clipboard + ofs * mem_clip_bpp;
 
+	mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
+
+	op = IS_INDEXED ? 0 : 255;
 	for (i = 0; i < fh; i++)
 	{
+		unsigned char *wa = ua ? alpha : mem_clip_alpha + ofs;
+		unsigned char *wm = mem_clip_mask ? mem_clip_mask + ofs : NULL;
+
 		row_protected(fx, fy + i, fw, mask);
-		paste_pixels(fx, fy + i, fw, mask, image, ua ?
-			alpha : mem_clip_alpha + ofs, mem_clip_mask ?
-			mem_clip_mask + ofs : NULL, tool_opacity);
+		if (swap)
+		{
+			unsigned char *ws = ti.img[CHN_SEL] + i * fw;
+
+			memcpy(ws, mask, fw);
+			process_mask(0, 1, fw, ws, NULL, NULL,
+				ti.img[CHN_ALPHA] ? NULL : wa, wm, op, 0);
+		}
+		paste_pixels(fx, fy + i, fw, mask, image, wa, wm, tool_opacity);
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;
 	}
 
-	free(mask);
+	if (swap)
+	{
+		if ((fw - mem_clip_w) | (fh - mem_clip_h))
+			upd |= UPD_CGEOM & ~UPD_IMGMASK;
+		/* Remove new mask if it's all 255 */
+		if (is_filled(ti.img[CHN_SEL], 255, fw * fh))
+		{
+			free(ti.img[CHN_SEL]);
+			ti.img[CHN_SEL] = NULL;
+		}
+		mem_clip_new(fw, fh, MEM_BPP, 0, FALSE);
+		memcpy(mem_clip.img, ti.img, sizeof(chanlist));
+		// !!! marq_x2, marq_y2 will be set by update_stuff()
+		mem_clip_x = marq_x1 = fx;
+		mem_clip_y = marq_y1 = fy;
+	}
+
+	fail = FALSE;
+quit:	free(mask);
 	free(alpha);
 
-	if (!update) /* Update right now */
+	if (fail) memory_errors(1); /* Warn and not update */
+	else if (!update) /* Update right now */
 	{
-		update_stuff(UPD_IMGP);
+		update_stuff(upd);
 		vw_update_area(fx, fy, fw, fh);
 		main_update_area(fx, fy, fw, fh);
 	}
 	else /* Accumulate update area for later */
 	{
+	/* !!! Swap does not use this branch, and isn't supported here */
 		fw += fx; fh += fy;
 		if (fx < update[0]) update[0] = fx;
 		if (fy < update[1]) update[1] = fy;
@@ -620,7 +659,7 @@ void pressed_clip_mask(int val)
 	update_stuff(UPD_CLIP);
 }
 
-int api_clip_alphamask()
+static int do_clip_alphamask()
 {
 	unsigned char *old_mask = mem_clip_mask;
 	int i, j = mem_clip_w * mem_clip_h, k;
@@ -645,7 +684,7 @@ int api_clip_alphamask()
 
 void pressed_clip_alphamask()
 {
-	if (api_clip_alphamask()) update_stuff(UPD_CLIP);
+	if (do_clip_alphamask()) update_stuff(UPD_CLIP);
 }
 
 void pressed_clip_alpha_scale()
@@ -840,9 +879,9 @@ void pressed_ellipse(int filled)
 	update_stuff(UPD_IMG);
 }
 
-static int copy_clip(gboolean api)
+static int copy_clip()
 {
-	int i, x, y, w, h, bpp, ofs, delta, len, cmask = CMASK_IMAGE;
+	int x, y, w, h, bpp, cmask = CMASK_IMAGE;
 
 
 	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
@@ -857,37 +896,15 @@ static int copy_clip(gboolean api)
 
 	if (!mem_clipboard)
 	{
-		if (!api) alert_box( _("Error"), _("Not enough memory to create clipboard"),
-				_("OK"), NULL, NULL );
+		alert_box( _("Error"), _("Not enough memory to create clipboard"),
+			_("OK"), NULL, NULL );
 		return (FALSE);
 	}
 
 	mem_clip_x = x;
 	mem_clip_y = y;
 
-	/* Current channel */
-	ofs = (y * mem_width + x) * bpp;
-	delta = 0;
-	len = w * bpp;
-	for (i = 0; i < h; i++)
-	{
-		memcpy(mem_clipboard + delta, mem_img[mem_channel] + ofs, len);
-		ofs += mem_width * bpp;
-		delta += len;
-	}
-
-	/* Alpha channel */
-	if (mem_clip_alpha)
-	{
-		ofs = y * mem_width + x;
-		delta = 0;
-		for (i = 0; i < h; i++)
-		{
-			memcpy(mem_clip_alpha + delta, mem_img[CHN_ALPHA] + ofs, w);
-			ofs += mem_width;
-			delta += w;
-		}
-	}
+	copy_area(&mem_clip, &mem_image, x, y);
 
 	return (TRUE);
 }
@@ -1006,36 +1023,12 @@ static void trim_clip()
 
 void pressed_copy(int cut)
 {
-	if (!copy_clip(FALSE)) return;
+	if (!copy_clip()) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	channel_mask();
 	if (cut) cut_clip();
 	update_stuff(cut ? UPD_CUT : UPD_COPY);
 }
-
-#ifdef U_API
-int api_copy_rectangle()
-{
-	return copy_clip(TRUE);
-}
-
-int api_copy_polygon()
-{
-	poly_init();
-	marq_x1 = poly_min_x;
-	marq_x2 = poly_max_x;
-	marq_y1 = poly_min_y;
-	marq_y2 = poly_max_y;
-	if ( copy_clip(TRUE) )
-	{
-		poly_mask();
-		channel_mask();
-	}
-	else return -1;			// Problem
-
-	return 1;
-}
-#endif
 
 void pressed_lasso(int cut)
 {
@@ -1043,7 +1036,7 @@ void pressed_lasso(int cut)
 	if (((marq_status > MARQUEE_NONE) && (marq_status < MARQUEE_PASTE)) ||
 		(poly_status == POLY_DONE))
 	{
-		if (!copy_clip(FALSE)) return;
+		if (!copy_clip()) return;
 		if (tool_type == TOOL_POLYGON) poly_mask();
 		else mem_clip_mask_init(255);
 		poly_lasso();
@@ -2357,7 +2350,7 @@ static int tool_draw(int x, int y, int *update)
 		marq_x1 = x;
 		marq_y1 = y;
 
-		commit_paste(update);
+		commit_paste(FALSE, update);
 		return (TRUE); /* Area updated already */
 		break;
 	default: return (FALSE); /* Stop this nonsense now! */

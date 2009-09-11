@@ -776,8 +776,10 @@ static const int mod_bits[] = { 0, _C, _S, _CS, _CSA };
 
 #define MOD_0   0x00
 #define MOD_c   0x01
+#define MOD_s   0x02
 #define MOD_cs  0x03
 #define MOD_csa 0x04
+#define MOD_S   0x22
 #define MOD_cS  0x23
 #define MOD_Cs  0x13
 #define MOD_CS  0x33
@@ -882,8 +884,10 @@ static key_action main_keys[] = {
 	{ ACT_ESC,	0,		GDK_Escape,	MOD_cs  },
 	{ DLG_SCALE,	0,		GDK_Page_Up,	MOD_cs  },
 	{ DLG_SIZE,	0,		GDK_Page_Down,	MOD_cs  },
-	{ ACT_COMMIT,	0,		GDK_Return,	MOD_0   },
-	{ ACT_COMMIT,	0,		GDK_KP_Enter,	MOD_0   },
+	{ ACT_COMMIT,	0,		GDK_Return,	MOD_s   },
+	{ ACT_COMMIT,	1,		GDK_Return,	MOD_S   },
+	{ ACT_COMMIT,	0,		GDK_KP_Enter,	MOD_s   },
+	{ ACT_COMMIT,	1,		GDK_KP_Enter,	MOD_S   },
 	{ ACT_RCLICK,	0,		GDK_BackSpace,	MOD_0   },
 	{ ACT_ARROW,	2,		GDK_a,		MOD_csa },
 	{ ACT_ARROW,	3,		GDK_s,		MOD_csa },
@@ -3350,7 +3354,7 @@ void change_to_tool(int icon)
 	{
 		if (paste_commit && (marq_status >= MARQUEE_PASTE))
 		{
-			commit_paste(NULL);
+			commit_paste(FALSE, NULL);
 			pen_down = 0;
 			mem_undo_prepare();
 		}
@@ -3815,7 +3819,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_COMMIT:
 		if (marq_status >= MARQUEE_PASTE)
 		{
-			commit_paste(NULL);
+			commit_paste(mode, NULL);
 			pen_down = 0;	// Ensure each press of enter is a new undo level
 			mem_undo_prepare();
 		}

@@ -490,6 +490,8 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	size_t sz = (size_t)w * h;
 	int i, l, mask0 = cmask;
 
+	if (mode & AI_CLEAR) memset(image, 0, sizeof(image_info));
+
 	image->width = w;
 	image->height = h;
 	image->bpp = bpp;
@@ -5456,6 +5458,14 @@ void set_xlate(unsigned char *xlat, int bpp)
 	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
 }
 
+/* Check if byte array is all one value */
+int is_filled(unsigned char *data, unsigned char val, int len)
+{
+	len++;
+	while (--len && (*data++ != val));
+	return (!len);
+}
+
 int get_pixel( int x, int y )	/* Mixed */
 {
 	x = mem_width * y + x;
@@ -5837,9 +5847,6 @@ void put_pixel_def( int x, int y )	/* Combined */
 	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
 	int i, j, offset, ofs3, opacity = 255, op = tool_opacity, tint;
 
-#ifdef U_API
-	if ( x<0 || y<0 || x>=mem_width || y>=mem_height ) return;	// Outside canvas
-#endif
 
 	j = pixel_protected(x, y);
 	if (mem_img_bpp == 1 ? j : j == 255) return;
@@ -6189,6 +6196,36 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 
 	process_img(0, 1, len, mask, dest, old_image, img, mem_clip_bpp,
 		opacity ? bpp : 0);
+}
+
+/* !!! This assumes dest area lies entirely within src, its bpp matches src's
+ * current channel bpp, and it has alpha channel only if src has it too */
+void copy_area(image_info *dest, image_info *src, int x, int y)
+{
+	int w = dest->width, h = dest->height, bpp = dest->bpp, ww = src->width;
+	int i, ofs, delta, len;
+
+	/* Current channel */
+	ofs = (y * ww + x) * bpp;
+	delta = 0;
+	len = w * bpp;
+	for (i = 0; i < h; i++)
+	{
+		memcpy(dest->img[CHN_IMAGE] + delta, src->img[mem_channel] + ofs, len);
+		ofs += ww * bpp;
+		delta += len;
+	}
+
+	/* Alpha channel */
+	if (!dest->img[CHN_ALPHA]) return;
+	ofs = y * ww + x;
+	delta = 0;
+	for (i = 0; i < h; i++)
+	{
+		memcpy(dest->img[CHN_ALPHA] + delta, src->img[CHN_ALPHA] + ofs, w);
+		ofs += ww;
+		delta += w;
+	}
 }
 
 int mem_count_all_cols()				// Count all colours - Using main image
