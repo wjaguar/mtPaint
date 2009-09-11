@@ -116,7 +116,7 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 	return res;
 }
 
-gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void create_new(GtkWidget *widget)
 {
 	int nw, nh, nc, bpp = 1, err=0;
 
@@ -199,8 +199,6 @@ gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 	}
 
 	gtk_widget_destroy(new_window);
-	
-	return FALSE;
 }
 
 void generic_new_window(int type)	// 0=New image, 1=New layer
@@ -211,9 +209,6 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 	GtkWidget *vbox1, *hbox3;
 	GtkWidget *table1;
-	GtkWidget *button_create, *button_cancel;
-
-	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	new_window_type = type;
 
@@ -250,28 +245,12 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 	add_hseparator( vbox1, 200, 10 );
 
-	hbox3 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox3);
-	gtk_box_pack_start (GTK_BOX (vbox1), hbox3, FALSE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (hbox3), 5);
-
-	button_cancel = add_a_button(_("Cancel"), 5, hbox3, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button_cancel), "clicked",
-			GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(new_window));
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button_create = add_a_button(_("Create"), 5, hbox3, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button_create), "clicked",
-			GTK_SIGNAL_FUNC(create_new), GTK_OBJECT(new_window));
-	gtk_widget_add_accelerator (button_create, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button_create, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-
-	gtk_signal_connect_object (GTK_OBJECT (new_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_new), NULL);
+	hbox3 = OK_box(5, new_window, _("Create"), GTK_SIGNAL_FUNC(create_new),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	gtk_box_pack_start(GTK_BOX(vbox1), hbox3, FALSE, FALSE, 0);
 
 	gtk_window_set_transient_for( GTK_WINDOW(new_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (new_window);
-	gtk_window_add_accel_group(GTK_WINDOW (new_window), ag);
 }
 
 void pressed_new( GtkMenuItem *menu_item, gpointer user_data )
@@ -435,14 +414,7 @@ GtkWidget *add_col_window;
 GtkWidget *spinbutton_col_add;
 
 
-gint delete_col_add( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	gtk_widget_destroy(add_col_window);
-
-	return FALSE;
-}
-
-gint click_col_add_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void click_col_add_ok(GtkWidget *widget)
 {
 	int i, to_add;
 
@@ -471,17 +443,12 @@ gint click_col_add_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	}
 
 	gtk_widget_destroy(add_col_window);
-
-	return FALSE;
 }
 
 
 void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *vbox5, *hbox6;
-	GtkWidget *button_cancel, *button_ok;
-
-	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	add_col_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Set Palette Size"),
 		GTK_WIN_POS_CENTER, TRUE );
@@ -499,23 +466,11 @@ void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox5, -2, 10 );
 
-	hbox6 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox6);
-	gtk_box_pack_start (GTK_BOX (vbox5), hbox6, FALSE, FALSE, 0);
-
-	button_cancel = add_a_button(_("Cancel"), 5, hbox6, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_cancel), "clicked", GTK_SIGNAL_FUNC(delete_col_add), NULL);
-	gtk_signal_connect_object (GTK_OBJECT (add_col_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_col_add), NULL);
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button_ok = add_a_button(_("OK"), 5, hbox6, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked", GTK_SIGNAL_FUNC(click_col_add_ok), NULL);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
+	hbox6 = OK_box(0, add_col_window, _("OK"), GTK_SIGNAL_FUNC(click_col_add_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	gtk_box_pack_start(GTK_BOX(vbox5), hbox6, FALSE, FALSE, 0);
 
 	gtk_widget_show (add_col_window);
-	gtk_window_add_accel_group(GTK_WINDOW (add_col_window), ag);
 }
 
 void pal_refresher()
@@ -541,8 +496,7 @@ void run_filter(GtkButton *button, gpointer user_data)
 
 void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool)
 {
-	GtkWidget *hbox7, *button_cancel, *button_apply, *vbox6;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *hbox7, *vbox6;
 	GtkWindowPosition pos = istool && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
@@ -562,28 +516,11 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 	add_hseparator(vbox6, -2, 10);
 
-	hbox7 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox7);
+	hbox7 = OK_box(0, filter_win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
 	gtk_box_pack_start(GTK_BOX(vbox6), hbox7, FALSE, FALSE, 0);
 
-	button_cancel = add_a_button(_("Cancel"), 5, hbox7, TRUE);
-	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(filter_win));
-	gtk_signal_connect(GTK_OBJECT(filter_win), "delete_event",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), NULL);
-	gtk_widget_add_accelerator(button_cancel, "clicked", ag, GDK_Escape,
-		0, (GtkAccelFlags) 0);
-
-	button_apply = add_a_button(_("Apply"), 5, hbox7, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_apply), "clicked",
-		GTK_SIGNAL_FUNC(run_filter), NULL);
-	gtk_widget_add_accelerator(button_apply, "clicked", ag, GDK_Return,
-		0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator(button_apply, "clicked", ag, GDK_KP_Enter,
-		0, (GtkAccelFlags) 0);
-
 	gtk_widget_show(filter_win);
-	gtk_window_add_accel_group(GTK_WINDOW(filter_win), ag);
 }
 
 ///	BACTERIA EFFECT
@@ -1217,13 +1154,7 @@ gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 static int scale_mode = 7;
 static int resize_mode = 0;
 
-gint click_sisca_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	gtk_widget_destroy(sisca_window);
-	return FALSE;
-}
-
-gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
 	int nw, nh, ox, oy, res = 1, scale_type = 0, gcor = FALSE;
 
@@ -1256,14 +1187,12 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 		if ( res == 0 )
 		{
 			canvas_undo_chores();
-			click_sisca_cancel( NULL, NULL, NULL );
+			gtk_widget_destroy(sisca_window);
 		}
 		else	memory_errors(res);
 	}
 	else alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
 			_("OK"), NULL, NULL);
-
-	return FALSE;
 }
 
 void memory_errors(int type)
@@ -1308,8 +1237,7 @@ void sisca_init( char *title )
 		NULL
 	};
 
-	GtkWidget *button_ok, *button_cancel, *button_centre, *sisca_vbox, *sisca_hbox;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *button_centre, *sisca_vbox, *sisca_hbox;
 
 	sisca_window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE );
 
@@ -1391,27 +1319,12 @@ void sisca_init( char *title )
 	}
 	add_hseparator( sisca_vbox, -2, 10 );
 
-	sisca_hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (sisca_hbox);
-	gtk_box_pack_start (GTK_BOX (sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (sisca_hbox), 5);
-
-	button_cancel = add_a_button( _("Cancel"), 4, sisca_hbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(button_cancel), "clicked",
-		GTK_SIGNAL_FUNC(click_sisca_cancel), NULL);
-	gtk_signal_connect_object (GTK_OBJECT (sisca_window), "delete_event",
-		GTK_SIGNAL_FUNC (click_sisca_cancel), NULL);
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button_ok = add_a_button( _("OK"), 4, sisca_hbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked",
-		GTK_SIGNAL_FUNC(click_sisca_ok), NULL);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
+	sisca_hbox = OK_box(5, sisca_window, _("OK"), GTK_SIGNAL_FUNC(click_sisca_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
 
 	gtk_window_set_transient_for( GTK_WINDOW(sisca_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (sisca_window);
-	gtk_window_add_accel_group(GTK_WINDOW (sisca_window), ag);
 
 	sisca_reset_offset_x();
 	sisca_reset_offset_y();
@@ -2355,8 +2268,6 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
 	GtkWidget *label, *frame, *vbox, *hbox;
-	GtkWidget *button_cancel, *button_ok;
-	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
 		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
@@ -2486,25 +2397,11 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* OK / Cancel */
 
-	hbox = gtk_hbox_new(FALSE, 0);
+	hbox = OK_box(0, quantize_window, _("OK"), GTK_SIGNAL_FUNC(click_quantize_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
-
-	button_cancel = add_a_button(_("Cancel"), 5, hbox, TRUE);
-	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(quantize_window));
-	gtk_widget_add_accelerator(button_cancel, "clicked", ag, GDK_Escape, 0,
-		(GtkAccelFlags)0);
-
-	button_ok = add_a_button(_("OK"), 5, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked",
-		GTK_SIGNAL_FUNC(click_quantize_ok), NULL);
-	gtk_widget_add_accelerator(button_ok, "clicked", ag, GDK_Return, 0,
-		(GtkAccelFlags)0);
-	gtk_widget_add_accelerator(button_ok, "clicked", ag, GDK_KP_Enter, 0,
-		(GtkAccelFlags)0);
 
 	gtk_window_set_transient_for(GTK_WINDOW(quantize_window),
 		GTK_WINDOW(main_window));
 	gtk_widget_show_all(quantize_window);
-	gtk_window_add_accel_group(GTK_WINDOW(quantize_window), ag);
 }

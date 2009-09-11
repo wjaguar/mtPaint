@@ -46,13 +46,6 @@ char preserved_gif_filename[256];
 int preserved_gif_delay = 10;
 
 
-static void flip_clip_mask()
-{
-	int i, j = mem_clip_w * mem_clip_h;
-
-	for ( i=0; i<j; i++ ) mem_clip_mask[i] ^= 255;
-}
-
 int load_png( char *file_name, int stype )		// 0=image, 1=clipboard
 {
 	char buf[PNG_BYTES_TO_CHECK], *mess, *chunk_names[] = { "", "alPh", "seLc", "maSk" };
@@ -350,7 +343,6 @@ force_RGB:
 					{
 						uncompress( mem_clip_mask, &dest_len,
 							uk_p[i].data, uk_p[i].size );
-						flip_clip_mask();
 					}
 				}
 			}
@@ -520,8 +512,6 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 #else
 			dest_len = w*h + ((w*h) >> 8) + 32;
 #endif
-			if ( f_img[i]==mem_clip_mask ) flip_clip_mask(); // Flip values for paste mask
-
 			z_temp = malloc( dest_len );	  // Temporary space for compression
 			if ( z_temp )
 			{
@@ -538,8 +528,6 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 				chunks++;
 				free( z_temp );
 			}
-
-			if ( f_img[i]==mem_clip_mask ) flip_clip_mask(); // Flip values for paste mask
 		}
 	}
 

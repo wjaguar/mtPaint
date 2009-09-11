@@ -76,7 +76,7 @@ static void activate_channel(int chan)
 	pressed_opacity(chan == CHN_IMAGE ? tool_opacity : channel_col_A[chan]);
 }
 
-static void click_newchan_ok(GtkButton *button, gpointer user_data)
+static void click_newchan_ok(GtkButton *window, gpointer user_data)
 {
 	chanlist tlist;
 	int i, ii, j = mem_width * mem_height, range, rgb[3];
@@ -178,7 +178,7 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 		if (mem_img_bpp != 3) goto dofail;
 		memset(dest, 255, j); /* Start with opaque */
 		if (mem_scale_alpha(mem_img[CHN_IMAGE], dest,
-			mem_width, mem_height, chan_new_type == CHN_ALPHA, 0))
+			mem_width, mem_height, chan_new_type == CHN_ALPHA))
 			goto dofail;
 		break;
 	case 4: /* Image red */
@@ -218,7 +218,8 @@ dofail:
 		memset(dest, chan_new_type == CHN_ALPHA ? 255 : 0, j);
 		break;
 	}
-	if ((gint)user_data >= CHN_ALPHA) activate_channel(chan_new_type);
+	if ((int)gtk_object_get_user_data(GTK_OBJECT(window)) >= CHN_ALPHA)
+		activate_channel(chan_new_type);
 	canvas_undo_chores();
 	click_newchan_cancel();
 }
@@ -240,8 +241,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		NULL
 		};
 
-	GtkAccelGroup* ag = gtk_accel_group_new();
-	GtkWidget *frame, *vbox, *vbox2, *hbox, *button;
+	GtkWidget *frame, *vbox, *vbox2, *hbox;
 
 
 	chan_new_type = item < CHN_ALPHA ? CHN_ALPHA : item;
@@ -249,9 +249,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
 			GTK_WIN_POS_CENTER, TRUE );
-
-	gtk_signal_connect_object (GTK_OBJECT (newchan_window), "delete_event",
-		GTK_SIGNAL_FUNC (click_newchan_cancel), NULL);
+	gtk_object_set_user_data(GTK_OBJECT(newchan_window), (gpointer)item);
 
 	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox);
@@ -276,51 +274,73 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_container_add(GTK_CONTAINER(frame), vbox2);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
+	hbox = OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(click_newchan_cancel));
+	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
 
-	button = gtk_button_new_with_label (_("Cancel"));
-	gtk_widget_show (button);
-	gtk_box_pack_start (GTK_BOX (hbox), button, TRUE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (button), 5);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_newchan_cancel), NULL);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button = gtk_button_new_with_label (_("OK"));
-	gtk_widget_show (button);
-	gtk_box_pack_start (GTK_BOX (hbox), button, TRUE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (button), 5);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_newchan_ok), (gpointer)item);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-
-	gtk_window_set_transient_for( GTK_WINDOW(newchan_window), GTK_WINDOW(main_window) );
+	gtk_window_set_transient_for(GTK_WINDOW(newchan_window), GTK_WINDOW(main_window));
 	gtk_widget_show(newchan_window);
-	gtk_window_add_accel_group(GTK_WINDOW (newchan_window), ag);
 }
 
-void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint item )
+static GtkWidget *cdel_box;
+static int cdel_count;
+
+static void click_delete_ok(GtkWidget *window)
 {
-	int i;
-	char txt[128];
+	GtkWidget *check;
+	int i, cmask;
 
-	if ( mem_channel == CHN_IMAGE ) return;		// Don't allow deletion of image channel
-
-	snprintf(txt, 120, _("Do you really want to delete the %s channel?"), channames[mem_channel] );
-	i = alert_box( _("Warning"), txt, _("No"), _("Yes"), NULL );
-
-	if ( i==2 )
+	for (i = cmask = 0; i < cdel_count; i++)
 	{
-		undo_next_core(4, mem_width, mem_height, mem_img_bpp, CMASK_CURR);
-		mem_channel = CHN_IMAGE;
+		check = BOX_CHILD(cdel_box, i);
+		if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
+			continue;
+		cmask |= (int)gtk_object_get_user_data(GTK_OBJECT(check));
+	}
+	if (cmask)
+	{
+		undo_next_core(4, mem_width, mem_height, mem_img_bpp, cmask);
+		if (cmask & CMASK_CURR) mem_channel = CHN_IMAGE;
 
 		update_all_views();		// Update images
 		init_status_bar();
 		update_menus();
 	}
+
+	gtk_widget_destroy(window);
+}
+
+void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint item)
+{
+	GtkWidget *window, *vbox, *check, *hbox;
+	int i;
+
+	/* Are there utility channels at all? */
+	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++) if (mem_img[i]) break;
+	if (i >= NUM_CHANNELS) return;
+	
+	window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Delete Channels"),
+		GTK_WIN_POS_CENTER, TRUE);
+
+	vbox = cdel_box = gtk_vbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(window), vbox);
+	cdel_count = 0;
+	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+	{
+		if (!mem_img[i]) continue;
+		check = add_a_toggle(channames[i], vbox, i == mem_channel);
+		gtk_object_set_user_data(GTK_OBJECT(check), (gpointer)CMASK_FOR(i));
+		cdel_count++;
+	}
+	gtk_widget_show_all(vbox);
+
+	add_hseparator(vbox, 200, 10);
+
+	hbox = OK_box(5, window, _("OK"), GTK_SIGNAL_FUNC(click_delete_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+
+	gtk_widget_show(window);
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */

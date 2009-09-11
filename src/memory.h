@@ -275,7 +275,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
 //	Extract alpha info from RGB clipboard
 int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
-	int width, int height, int mode, unsigned char xorr);
+	int width, int height, int mode);
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 

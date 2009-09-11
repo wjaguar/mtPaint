@@ -373,3 +373,37 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 	if (var) *var = idx < i ? idx : 0;
 	return (box);
 }
+
+// Buttons for standard dialogs
+
+GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
+	char *nCancel, GtkSignalFunc Cancel)
+{
+	GtkWidget *hbox, *button;
+	GtkAccelGroup* ag = gtk_accel_group_new();
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
+	button = gtk_button_new_with_label(nCancel);
+	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		Cancel, GTK_OBJECT(window));
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0,
+		(GtkAccelFlags)0);
+
+	button = gtk_button_new_with_label(nOK);
+	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		OK, GTK_OBJECT(window));
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0,
+		(GtkAccelFlags)0);
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0,
+		(GtkAccelFlags)0);
+ 
+	gtk_window_add_accel_group(GTK_WINDOW(window), ag);
+	gtk_signal_connect(GTK_OBJECT(window), "delete_event", Cancel, NULL);
+	gtk_widget_show_all(hbox);
+	return (hbox);
+}

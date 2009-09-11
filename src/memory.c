@@ -39,7 +39,7 @@
 #include "csel.h"
 
 
-char *channames[5];
+char *channames[NUM_CHANNELS + 1];
 
 
 /// Tint tool - contributed by Dmitry Groshev, January 2006
@@ -759,12 +759,13 @@ char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
 void mem_init()					// Initialise memory
 {
 	unsigned char *dest;
-	char txt[300], *cnames[5] = { "", _("Alpha"), _("Selection"), _("Mask"), NULL };
+	char txt[300], *cnames[NUM_CHANNELS + 1] =
+		{ "", _("Alpha"), _("Selection"), _("Mask"), NULL };
 	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
 
-	for ( i=0; i<5; i++ ) channames[i] = cnames[i];
+	for (i = 0; i < NUM_CHANNELS + 1; i++) channames[i] = cnames[i];
 
 	toolbar_preview_init();
 
@@ -4204,7 +4205,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			if (trans)
 			{
 				/* Have transparency mask */
-				k *= 255 - trans[i];
+				k *= trans[i];
 				k = (k + (k >> 8) + 1) >> 8;
 			}
 			mask[i] = k;
@@ -4228,10 +4229,9 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	/* Indexed mode with transparency mask and/or alpha */
 	else if (trans || alpha)
 	{
-		if (!trans) trans = mask;
 		for (i = start; i < cnt; i += step)
 		{
-			mask[i] |= trans[i];
+			if (trans) mask[i] |= trans[i] ^ 255;
 			if (!alpha || mask[i]) continue;
 			/* Have alpha channel - process it */
 			newc = alpha[i];
@@ -5074,14 +5074,13 @@ void mem_clip_mask_clear()		// Clear/remove the clipboard mask
  * scale of A->B. Return 0 if OK, 1 otherwise
  */
 int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
-	int width, int height, int mode, unsigned char xorr)
+	int width, int height, int mode)
 {
 	int i, j, AA[3], BB[3], DD[6], chan, c1, c2, dc1, dc2;
 	double p, dchan;
 
 	if (!img || !alpha) return (1);
 
-	xorr ^= 255;
 	AA[0] = mem_col_A24.red;
 	AA[1] = mem_col_A24.green;
 	AA[2] = mem_col_A24.blue;
@@ -5116,7 +5115,7 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	for (i = 0; i < j; i++ , alpha++ , img += 3)
 	{
 		/* Already semi-opaque so don't touch */
-		if (*alpha != xorr) continue;
+		if (*alpha != 255) continue;
 		/* Ensure pixel lies between A and B for each channel */
 		if ((img[0] < DD[0]) || (img[0] > DD[3])) continue;
 		if ((img[1] < DD[1]) || (img[1] > DD[4])) continue;
@@ -5131,7 +5130,7 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 		if (abs(AA[c2] + (int)rint(p * dc2) - img[c2]) > 2) continue;
 		
 		/* Pixel is a shade of A/B so set alpha */
-		*alpha = (int)rint(p * 255) ^ xorr;
+		*alpha = (int)rint(p * 255) ^ 255;
 
 		/* Demultiply image if this is alpha */
 		if (!mode) continue;

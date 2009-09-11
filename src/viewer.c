@@ -1288,7 +1288,7 @@ gint render_text( GtkWidget *widget )
 		mem_clip_w = width;
 		mem_clip_h = height;
 		mem_clip_bpp = clip_bpp;
-		if ( !antialias[1] && mem_channel == CHN_IMAGE ) mem_clip_mask_init(0);
+		if ( !antialias[1] && mem_channel == CHN_IMAGE ) mem_clip_mask_init(255);
 		else mem_clip_mask_clear();
 	
 		if ( mem_clipboard == NULL ||
@@ -1334,7 +1334,7 @@ gint render_text( GtkWidget *widget )
 						for ( i=0; i<width; i++ )
 						{
 							v = source[0] & pix_and;
-							dest2[i] = v * 255 / pix_and;	// Alpha blend
+							dest2[i] = (v * 255 / pix_and) ^ 255;	// Alpha blend
 
 							dest[0] = pat_off[3*(i%8)];
 							dest[1] = pat_off[3*(i%8)+1];
@@ -1351,7 +1351,7 @@ gint render_text( GtkWidget *widget )
 					 {
 						if ( (source[0] & pix_and) > (pix_and/2) )
 						{				// Background
-							if ( !antialias[1] ) dest2[i] = 255;
+							if ( !antialias[1] ) dest2[i] = 0;
 							dest[0] = r;
 							dest[1] = g;
 							dest[2] = b;
@@ -1374,7 +1374,7 @@ gint render_text( GtkWidget *widget )
 					{
 						if ( (source[0] & pix_and) > (pix_and/2) ) // Background
 						{
-							if ( !antialias[1] ) dest2[i] = 255;
+							if ( !antialias[1] ) dest2[i] = 0;
 							dest[i] = back;
 						}
 						else dest[i] = pat_off[i%8];	// Text

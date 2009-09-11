@@ -1343,7 +1343,7 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 				k = mem_clip_bpp == 1 ? mem_col_A : mem_col_A24.red;
 				for (i = 0; i < j; i++ , dest += mem_clip_bpp)
 				{
-					if (mem_clip_mask[i] != 255) continue;
+					if (mem_clip_mask[i]) continue;
 					dest[0] = k;
 					if (mem_clip_bpp == 1) continue;
 					dest[1] = mem_col_A24.green;
@@ -1359,7 +1359,7 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 				/* Mask the channel */
 				for (i = 0; i < j; i++)
 				{
-					k = dest[i] * (255 - mem_clip_mask[i]);
+					k = dest[i] * mem_clip_mask[i];
 					dest[i] = (k + (k >> 8) + 1) >> 8;
 				}
 			}

@@ -57,7 +57,8 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[5], *menu_chan_dis[NUM_CHANNELS+1]
+	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2], *menu_chan_ls[3],
+	*menu_chan_dis[NUM_CHANNELS+1]
 	;
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
@@ -2797,7 +2798,7 @@ void main_init()
 		{ _("/Channels/New ..."),	NULL,		pressed_channel_create, -1, NULL },
 		{ _("/Channels/Load ..."),	NULL,		pressed_channel_load, 0, NULL },
 		{ _("/Channels/Save As ..."),	NULL,		pressed_channel_save, 0, NULL },
-		{ _("/Channels/Delete"),	NULL,		pressed_channel_delete, -1, NULL },
+		{ _("/Channels/Delete ..."),	NULL,		pressed_channel_delete, -1, NULL },
 		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, CHN_IMAGE, "<RadioItem>" },
 		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, CHN_ALPHA, _("/Channels/Edit Image") },
@@ -2883,8 +2884,8 @@ void main_init()
 	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
 			NULL},
-	*item_chan_del[] = {  _("/Channels/Delete"), _("/Channels/Load ..."),
-				_("/Channels/Save As ..."),NULL },
+	*item_chan_del[] = {  _("/Channels/Delete ..."),NULL },
+	*item_chan_ls[] = {  _("/Channels/Load ..."), _("/Channels/Save As ..."),NULL },
 	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
 			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
 	;
@@ -2940,6 +2941,7 @@ void main_init()
 	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
 	pop_men_dis( item_factory, item_chann_x, menu_chann_x );
 	pop_men_dis( item_factory, item_chan_del, menu_chan_del );
+	pop_men_dis( item_factory, item_chan_ls, menu_chan_ls );
 	pop_men_dis( item_factory, item_chan_dis, menu_chan_dis );
 
 	for (i = 1; i <= 12; i++)	// Set up save clipboard slots

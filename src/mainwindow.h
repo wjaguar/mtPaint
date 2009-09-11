@@ -98,7 +98,8 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
 	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
-	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[5], *menu_chan_dis[NUM_CHANNELS+1]
+	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2], *menu_chan_ls[3],
+	*menu_chan_dis[NUM_CHANNELS+1]
 	;
 
 gboolean view_image_only, viewer_mode, drag_index, q_quit;

@@ -67,7 +67,7 @@ void memline( int x1, int y1, int x2, int y2 )	// Draw single thickness straight
 		rat = ((float) i ) / todo;
 		px = mt_round(x1 + (x2 - x1) * rat);
 		py = mt_round(y1 + (y2 - y1) * rat);
-		mem_clip_mask[px + py*mem_clip_w] = 0;
+		mem_clip_mask[px + py*mem_clip_w] = 255;
 	}
 }
 
@@ -80,7 +80,7 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 
 	if ( type==0 )
 	{
-		mem_clip_mask_init(255);		// Setup & Clear mask
+		mem_clip_mask_init(0);		// Setup & Clear mask
 		if ( mem_clip_mask == NULL ) return;	// Failed to get memory
 	}
 
@@ -174,7 +174,7 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 				{
 					j3 = (j-poly_min_y)*mem_clip_w;
 					for ( i2=poly_cuts[i]-poly_min_x; i2<=poly_cuts[i+1]-poly_min_x; 	i2++ )
-						mem_clip_mask[ i2 + j3  ] = 0;
+						mem_clip_mask[ i2 + j3  ] = 255;
 				}
 				else
 				{
@@ -312,9 +312,9 @@ void poly_lasso()		// Lasso around current clipboard
 	int i, j, x = poly_mem[0][0] - poly_min_x, y = poly_mem[0][1] - poly_min_y,
 		minx = mem_clip_w-1, miny = mem_clip_h - 1, maxx = 0, maxy = 0,
 		offs, offd, nw, nh;
-	unsigned char *t_clip, *t_mask;
+	unsigned char *t_clip, *t_mask, *t_alpha = NULL;
 
-	poly_mask();	// Initialize mask to all clear - 255 & Polygon on clipboard mask to 0
+	poly_mask();	// Initialize mask to all clear - 0 & Polygon on clipboard mask to 255
 	if ( mem_clip_mask == NULL ) return;	// Failed to get memory
 
 	if ( mem_clip_bpp == 1 )
@@ -331,15 +331,15 @@ void poly_lasso()		// Lasso around current clipboard
 
 	j = mem_clip_w*mem_clip_h;
 	for ( i=0; i<j; i++ )
-		if ( mem_clip_mask[i] == 1 ) mem_clip_mask[i] = 255;
-			// Turn flood (1) into clear (255)
+		if ( mem_clip_mask[i] == 1 ) mem_clip_mask[i] = 0;
+			// Turn flood (1) into clear (0)
 
 	for ( j=0; j<mem_clip_h; j++ )			// Find max & min values for shrink wrapping
 	{
 		offs = j*mem_clip_w;
 		for ( i=0; i<mem_clip_w; i++ )
 		{
-			if ( mem_clip_mask[offs + i] != 255 )
+			if (mem_clip_mask[offs + i])
 			{
 				mtMAX( maxx, maxx, i )
 				mtMAX( maxy, maxy, j )
@@ -353,53 +353,36 @@ void poly_lasso()		// Lasso around current clipboard
 	nw = maxx - minx + 1;
 	nh = maxy - miny + 1;
 
-//printf("minx = %i maxx = %i miny = %i maxy = %i\n", minx, maxx, miny, maxy);
+	/* No decrease so no resize either */
+	if ((nw == mem_clip_w) && (nh == mem_clip_h)) return;
 
-
-	t_mask = malloc(nw*nh);		// Try to malloc memory for smaller mask - return if fail
-	if ( t_mask == NULL )
+	/* Try to malloc memory for smaller clipboard */
+	t_clip = malloc(nw * nh * mem_clip_bpp);
+	t_mask = malloc(nw * nh);
+	if (mem_clip_alpha) t_alpha = malloc(nw * nh);
+	if (!t_clip || !t_mask || (!t_alpha && mem_clip_alpha))
 	{
+		free(t_clip); free(t_mask); free(t_alpha);
 		memory_errors(1);
 		return;
 	}
-	for ( j=miny; j<=maxy; j++ )		// Copy the mask data required
+	for (j = miny; j <= maxy; j++)	// Copy the data
 	{
-		offs = j*mem_clip_w + minx;
-		offd = (j-miny)*nw;
-		for ( i=minx; i<=maxx; i++ ) t_mask[offd++] = mem_clip_mask[offs++];
-	}
-
-	t_clip = malloc(nw*nh*mem_clip_bpp);	// Try to malloc memory for smaller clipboard
-	if ( t_clip == NULL )
-	{
-		free(t_mask);
-		memory_errors(1);
-		return;
-	}
-	for ( j=miny; j<=maxy; j++ )		// Copy the clipboard data required
-	{
-		offs = (j*mem_clip_w + minx)*mem_clip_bpp;
-		offd = (j-miny)*nw*mem_clip_bpp;
-
-		if ( mem_clip_bpp == 1 )
-		{
-			for ( i=minx; i<=maxx; i++ ) t_clip[offd++] = mem_clipboard[offs++];
-		}
-		if ( mem_clip_bpp == 3 )
-		{
-			for ( i=minx; i<=maxx; i++ )
-			{
-				t_clip[offd++] = mem_clipboard[offs++];
-				t_clip[offd++] = mem_clipboard[offs++];
-				t_clip[offd++] = mem_clipboard[offs++];
-			}
-		}
+		offs = j * mem_clip_w + minx;
+		offd = (j - miny) * nw;
+		memcpy(t_mask + offd, mem_clip_mask + offs, nw);
+		if (mem_clip_alpha)
+			memcpy(t_alpha + offd, mem_clip_alpha + offs, nw);
+		memcpy(t_clip + offd * mem_clip_bpp,
+			mem_clipboard + offs * mem_clip_bpp, nw * mem_clip_bpp);
 	}
 
 	free(mem_clipboard);		// Free old clipboard
 	free(mem_clip_mask);		// Free old mask
+	free(mem_clip_alpha);		// Free old mask
 	mem_clipboard = t_clip;
 	mem_clip_mask = t_mask;
+	mem_clip_alpha = t_alpha;
 	mem_clip_w = nw;
 	mem_clip_h = nh;
 	mem_clip_x += minx;
@@ -419,8 +402,7 @@ void poly_lasso_cut()		// Cut out area that was just lasso'd
 		offm = (j - mem_clip_y) * mem_clip_w;
 		for ( i=mem_clip_x; i<(mem_clip_x + mem_clip_w); i++ )
 		{
-			if ( mem_clip_mask[offm++] != 255 )
-				put_pixel(i, j);
+			if (mem_clip_mask[offm++]) put_pixel(i, j);
 		}
 	}
 }

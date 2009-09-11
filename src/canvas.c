@@ -414,14 +414,14 @@ void mask_ab(int v)
 
 	if ( mem_clip_mask == NULL )
 	{
-		i = mem_clip_mask_init(v);
+		i = mem_clip_mask_init(v ^ 255);
 		if ( i != 0 )
 		{
 			memory_errors(1);	// Not enough memory
 			return;
 		}
 	}
-	mem_clip_mask_set(255-v);
+	mem_clip_mask_set(v);
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
@@ -445,15 +445,10 @@ void pressed_clip_alphamask()
 	{
 		for (i = 0; i < j; i++)
 		{
-			k = (255 - old_mask[i]) * mem_clip_mask[i];
-			mem_clip_mask[i] = ((k + (k >> 8) + 1) >> 8) ^ 255;
+			k = old_mask[i] * mem_clip_mask[i];
+			mem_clip_mask[i] = (k + (k >> 8) + 1) >> 8;
 		}
 		free(old_mask);
-	}
-	else
-	{
-		for (i = 0; i < j; i++)
-			mem_clip_mask[i] ^= 255;	// Flip values
 	}
 
 	gtk_widget_queue_draw( drawing_canvas );
@@ -462,11 +457,11 @@ void pressed_clip_alphamask()
 void pressed_clip_alpha_scale()
 {
 	if (!mem_clipboard || (mem_clip_bpp != 3)) return;
-	if (!mem_clip_mask) mem_clip_mask_init(0);
+	if (!mem_clip_mask) mem_clip_mask_init(255);
 	if (!mem_clip_mask) return;
 
 	if (mem_scale_alpha(mem_clipboard, mem_clip_mask,
-		mem_clip_w, mem_clip_h, TRUE, 255)) return;
+		mem_clip_w, mem_clip_h, TRUE)) return;
 
 	gtk_widget_queue_draw( drawing_canvas );
 }
@@ -475,7 +470,7 @@ void pressed_clip_mask_all()
 {
 	int i;
 
-	i = mem_clip_mask_init(255);
+	i = mem_clip_mask_init(0);
 	if ( i != 0 )
 	{
 		memory_errors(1);	// Not enough memory
@@ -592,8 +587,7 @@ void do_the_copy(int op)
 	int x1 = marq_x1, y1 = marq_y1;
 	int x2 = marq_x2, y2 = marq_y2;
 	int x, y, w, h, bpp, ofs, delta, len;
-	int i, j;
-	unsigned char *src, *dest;
+	int i;
 
 	mtMIN( x, x1, x2 )
 	mtMIN( y, y1, y2 )
@@ -667,13 +661,14 @@ void do_the_copy(int op)
 			/* Selection channel */
 			if (mem_clip_mask)
 			{
-				src = mem_img[CHN_SEL] + y * mem_width + x;
-				dest = mem_clip_mask;
+				ofs = y * mem_width + x;
+				delta = 0;
 				for (i = 0; i < h; i++)
 				{
-					for (j = 0; j < w; j++)
-						*dest++ = 255 - *src++;
-					src += mem_width - w;
+					memcpy(mem_clip_mask + delta,
+						mem_img[CHN_SEL] + ofs, w);
+					ofs += mem_width;
+					delta += w;
 				}
 			}
 		}
@@ -795,7 +790,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data )
 /* !!! Add support for channel-specific option sets !!! */
 void update_menus()			// Update edit/undo menu
 {
-	int i;
+	int i, j;
 	char txt[32];
 
 	sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
@@ -872,13 +867,16 @@ void update_menus()			// Update edit/undo menu
 	else  men_item_state( menu_redo, TRUE );
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
-	if ( mem_channel == CHN_IMAGE ) men_item_state( menu_chan_del, FALSE );
-	else men_item_state( menu_chan_del, TRUE );
+	if ( mem_channel == CHN_IMAGE ) men_item_state( menu_chan_ls, FALSE );
+	else men_item_state( menu_chan_ls, TRUE );
 
-	for (i = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
+	for (i = j = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
 	{
+		if (mem_img[i]) j++;
 		gtk_widget_set_sensitive(menu_chan_dis[i], !!mem_img[i]);
 	}
+	if (j > 1) men_item_state(menu_chan_del, TRUE);
+	else men_item_state(menu_chan_del, FALSE);
 }
 
 void canvas_undo_chores()

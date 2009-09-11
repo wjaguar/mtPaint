@@ -55,3 +55,12 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 	GtkSignalFunc handler);
+
+// Buttons for standard dialogs
+
+GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
+	char *nCancel, GtkSignalFunc Cancel);
+
+// Box unpacking macro
+#define BOX_CHILD(box, n) \
+	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
