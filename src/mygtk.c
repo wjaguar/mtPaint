@@ -741,9 +741,13 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
+	int flag = FPICK_LOAD;
 	GtkWidget *fs;
 
-	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)));
+	if ( ((int) data) == FS_SELECT_DIR || ((int) data) == FS_GIF_EXPLODE ) 
+		flag |= FPICK_DIRS_ONLY;
+
+	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)), flag );
 	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
 		BOX_CHILD_0(widget->parent));
 	fs_setup(fs, (int)data);
@@ -1300,15 +1304,37 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 {
 	GdkRectangle pdest, cdest;
 	fpixmap_data *d;
+	int draw_pmap;
 
 	if (!GTK_WIDGET_DRAWABLE(widget)) return;
 	if (!(d = wj_fpixmap_data(widget))) return;
+	draw_pmap = d->pixmap && gdk_rectangle_intersect(&d->pm, area, &pdest);
 
 #if GTK_MAJOR_VERSION == 1
 	/* Preparation */
 	gdk_window_set_back_pixmap(widget->window, NULL, TRUE);
-	gdk_window_clear_area(widget->window, area->x, area->y,
-		area->width, area->height);
+	if (draw_pmap) // To prevent blinking, clear just the outside part
+	{
+		cdest = *area;
+		if ((cdest.height = pdest.y - cdest.y))
+			gdk_window_clear_area(widget->window,
+				cdest.x, cdest.y, cdest.width, cdest.height);
+		cdest.y = pdest.y + pdest.height;
+		if ((cdest.height = area->y + area->height - cdest.y))
+			gdk_window_clear_area(widget->window,
+				cdest.x, cdest.y, cdest.width, cdest.height);
+		cdest = pdest;
+		cdest.x = area->x;
+		if ((cdest.width = pdest.x - cdest.x))
+			gdk_window_clear_area(widget->window,
+				cdest.x, cdest.y, cdest.width, cdest.height);
+		cdest.x = pdest.x + pdest.width;
+		if ((cdest.width = area->x + area->width - cdest.x))
+			gdk_window_clear_area(widget->window,
+				cdest.x, cdest.y, cdest.width, cdest.height);
+	}
+	else gdk_window_clear_area(widget->window,
+		area->x, area->y, area->width, area->height);
 	gdk_gc_set_clip_rectangle(widget->style->black_gc, area);
 #endif
 
@@ -1316,7 +1342,7 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 	if (d->pixmap) gdk_draw_rectangle(widget->window, widget->style->black_gc,
 		FALSE, d->pm.x - 1, d->pm.y - 1, d->pm.width + 1, d->pm.height + 1);
 
-	while (d->pixmap && gdk_rectangle_intersect(&d->pm, area, &pdest))
+	while (draw_pmap)
 	{
 		/* Contents pixmap */
 		gdk_draw_pixmap(widget->window, widget->style->black_gc,
@@ -1568,9 +1594,9 @@ int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 	if (!(d = wj_fpixmap_data(widget))) return (FALSE);
 	if (!d->pixmap) return (FALSE);
 	x -= d->pm.x; y -= d->pm.y;
+	*xr = x; *yr = y;
 	if ((x < 0) || (x >= d->pm.width) || (y < 0) || (y >= d->pm.height))
 		return (FALSE);
-	*xr = x; *yr = y;
 	return (TRUE);
 }
 

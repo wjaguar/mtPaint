@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -460,6 +460,7 @@ void set_zoom_centre( int x, int y );
 
 // Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255
 void rgb2hsv(unsigned char *rgb, double *hsv);
+void hsv2rgb(unsigned char *rgb, double *hsv);
 
 //// UNDO
 

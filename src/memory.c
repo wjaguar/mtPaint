@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2998,6 +2998,23 @@ void rgb2hsv(unsigned char *rgb, double *hsv)
 	hsv[1] = hsv[2] - rgb[c2];
 	hsv[0] = c0 * 2 + 1 + (rgb[c1] - rgb[c0]) / hsv[1];
 	hsv[1] /= hsv[2];
+}
+
+void hsv2rgb(unsigned char *rgb, double *hsv)
+{
+	double h0, h1, h2;
+	int i;
+
+	h2 = hsv[2] * 2;
+	h1 = h2 * (1.0 - hsv[1]);
+	i = hsv[0];
+	h0 = (hsv[0] - i) * (h2 - h1);
+	if (i & 1) h2 -= h0 , h0 += h2;
+	else h0 += h1;
+	i >>= 1;
+	rgb[i] = ((int)h2 + 1) >> 1;
+	rgb[MOD3(i + 1)] = ((int)h0 + 1) >> 1;
+	rgb[MOD3(i + 2)] = ((int)h1 + 1) >> 1;
 }
 
 static double rgb_hsl(int t, png_color col)

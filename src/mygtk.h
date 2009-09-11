@@ -250,8 +250,10 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 // Workaround for stupid GTK1 typecasts
 #if GTK_MAJOR_VERSION == 1
 #define GTK_RADIO_BUTTON_0(X) (GtkRadioButton *)(X)
+#define GTK_BUTTON_0(X) (GtkButton *)(X)
 #else
 #define GTK_RADIO_BUTTON_0(X) GTK_RADIO_BUTTON(X)
+#define GTK_BUTTON_0(X) GTK_BUTTON(X)
 #endif
 
 // Path string sizes

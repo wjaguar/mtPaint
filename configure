@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.24.03"
-MT_DATE="2008-01-06"
+MT_V="3.24.04"
+MT_DATE="2008-01-24"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -14,6 +14,8 @@ MT_LANG_DEST=/usr/share/locale
 MT_PO_DEST=$MT_LANG_DEST
 MT_MAN_DEST=/usr/local/man/man1
 MT_PREFIX=/usr
+MT_CPICK=mtpaint
+MT_FPICK=mtpaint
 LIN_BIN_INSTALL=/usr/local/bin
 WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
 BIN_INSTALL=
@@ -204,6 +206,8 @@ do
 				OPTS=NO;;
 		"gtk1" )	GTK=1;;
 		"gtk2" )	GTK=2;;
+		"gtkfilesel" )	MT_FPICK=gtkfilesel;;
+		"gtkcolsel" )	MT_CPICK=gtkcolsel;;
 		"win" )		OS="MinGW/MSYS"
 				GTK=2;;
 		"intl" )	MT_LANG=YES;;
@@ -333,6 +337,8 @@ Options:
 win ............. Configure for Windows MinGW / MSYS
 gtk1 ............ Configure for GTK+1
 gtk2 ............ Configure for GTK+2
+gtkfilesel ...... Use GtkFileSelection file picker
+gtkcolsel ....... Use GtkColorSelection colour picker
 mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0
 noxft ........... Don't use Xft in MTK
 
@@ -380,7 +386,8 @@ pod ............. Compile new man page - see ./doc/README for details
 
 icons ........... Compile with alternative icon set - see ./src/icons1/README for details
 
-Default settings: GNU/Linux system, O2 optimizations, English only version
+Default settings: GNU/Linux system, O2 optimizations, English only version,
+mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
@@ -494,6 +501,24 @@ else
 		I_EX="$I_EX -DU_API"
 	fi
 
+	if [ "$MT_FPICK" = mtpaint ]
+	then
+		I_EX="$I_EX -DU_FPICK_MTPAINT"
+	fi
+	if [ "$MT_FPICK" = gtkfilesel ]
+	then
+		I_EX="$I_EX -DU_FPICK_GTKFILESEL"
+	fi
+
+	if [ "$MT_CPICK" = mtpaint ]
+	then
+		I_EX="$I_EX -DU_CPICK_MTPAINT"
+	fi
+	if [ "$MT_CPICK" = gtkcolsel ]
+	then
+		I_EX="$I_EX -DU_CPICK_GTK"
+	fi
+
 	if [ "$DEBUG" = NO ]
 	then
 		GTK_LIB="$GTK_LIB -s"
@@ -565,78 +590,58 @@ else
 	fi
 
 	echo
+	echo ---------------------
+	echo mtPaint Configuration
+	echo ---------------------
 	echo
-	echo --------------------------
-	echo $MT_VERSION configuration
-	echo --------------------------
+	echo "-------"
+	echo "General"
+	echo "-------"
 	echo
-	echo "System              $OS"
-	echo
-	echo -n "Toolkit             "
+	echo "    Version             $MT_V"
+	echo "    System              $OS"
+	echo -n "    Toolkit             "
 if [ "$MTK_DIR" ]
 then
 	echo "MTK - $MTK_DIR"
-	echo
-	echo "Use Xft             $MTK_XFT"
+	echo "    Use Xft             $MTK_XFT"
 else
 	echo "GTK+$GTK"
 fi
-	echo
+	echo "    File Picker         $MT_FPICK"
+	echo "    Colour Picker       $MT_CPICK"
 if [ "$API_CHECKS" ]
 then
-	echo "API checks          $API_CHECKS"
-	echo
+	echo "    API checks          $API_CHECKS"
 fi
+	echo "    Use FreeType        $NFT"
+if [ "$MT_CUSTOM" ]
+then
+	echo "    Customized for      $MT_CUSTOM"
+fi
+	echo "    Icon set            $ICON_SET"
+	echo "    Internationalized   $MT_LANG"
+
+
+	echo
+	echo "--------"
+	echo "Compiler"
+	echo "--------"
+	echo
 if [ "$CFLAG" ]
 then
-	echo "CFLAGS              $CFLAG"
+	echo "    CFLAGS              $CFLAG"
 else
 if [ "$MARCH" ]
 then
-	echo "MARCH target        $MARCH"
-	echo
+	echo "    MARCH target        $MARCH"
 fi
-	echo "Optimizations       $OPTS $AS_NEEDED"
+	echo "    Optimizations       $OPTS $AS_NEEDED"
 fi
-	echo
-	echo "Debug info          $DEBUG"
-	echo
-	echo "Use FreeType        $NFT"
-	echo
-	echo "Use GIF             $NGIF"
-	echo
-	echo "Use JPEG            $NJPEG"
-	echo
-	echo "Use JPEG 2000       $NJP2"
-	echo
-	echo "Use TIFF            $NTIFF"
-	echo
-	echo "Binary install      $BIN_INSTALL"
-	echo
-	echo "Internationalized   $MT_LANG"
-	echo
-if [ "$MT_LANG" = YES ]
-then
-	echo "Locale install      $MT_LANG_DEST"
-	echo
-	echo "Locale program      $MT_PO_DEST"
-	echo
-fi
-	echo "Install man page    $MT_MAN"
-	echo
-if [ "$MT_MAN" = YES ]
-then
-	echo "Man page install    $MT_MAN_DEST"
-	echo
-fi
-if [ "$MT_CUSTOM" ]
-then
-	echo "Customized for      $MT_CUSTOM"
-	echo
-fi
+	echo "    Debug info          $DEBUG"
 if [ "$STATIC_PNG" ] || [ "$STATIC_GIF" ] || [ "$STATIC_JPEG" ] || [ "$STATIC_JP2" ] || [ "$STATIC_TIFF" ]
 then
-	echo -n "Static libraries    "
+	echo -n "    Static libraries    "
 	if [ "$STATIC_PNG" ]
 	then
 		echo -n "$STATIC_PNG "
@@ -658,9 +663,37 @@ then
 		echo -n "$STATIC_TIFF "
 	fi
 	echo
-	echo
 fi
-	echo "Icon set            $ICON_SET"
+
+
+	echo
+	echo "----------"
+	echo "File Types"
+	echo "----------"
+	echo
+	echo "    Use GIF             $NGIF"
+	echo "    Use JPEG            $NJPEG"
+	echo "    Use JPEG 2000       $NJP2"
+	echo "    Use TIFF            $NTIFF"
+
+
+
+	echo
+	echo "------------"
+	echo "Installation"
+	echo "------------"
+	echo
+	echo "    Binary install      $BIN_INSTALL"
+if [ "$MT_LANG" = YES ]
+then
+	echo "    Locale install      $MT_LANG_DEST"
+	echo "    Locale program      $MT_PO_DEST"
+fi
+	echo "    Install man page    $MT_MAN"
+if [ "$MT_MAN" = YES ]
+then
+	echo "    Man page install    $MT_MAN_DEST"
+fi
 	echo
 
 

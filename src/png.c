@@ -257,6 +257,12 @@ static void ls_init(char *what, int save)
 	progress_init(buf, 0);
 }
 
+/* !!! libpng 1.2.17 or later loses extra chunks if there's no callback */
+static int buggy_libpng_handler()
+{
+	return (0);
+}
+
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
@@ -308,6 +314,9 @@ static int load_png(char *file_name, ls_settings *settings)
 		res = FILE_LIB_ERROR;
 		goto fail2;
 	}
+
+	/* !!! libpng 1.2.17+ needs this to read extra channels */
+	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
 	png_init_io(png_ptr, fp);
 	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);

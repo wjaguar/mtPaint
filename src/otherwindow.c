@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -34,6 +34,8 @@
 #include "toolbar.h"
 #include "csel.h"
 #include "font.h"
+#include "cpick.h"
+#include "icons.h"
 
 #if GTK_MAJOR_VERSION == 1
 #include <unistd.h>
@@ -1218,23 +1220,22 @@ static gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer
 }
 
 
-static void color_set( GtkColorSelection *selection, gpointer user_data )
+static void color_set( GtkWidget *cs, gpointer user_data )
 {
 	unsigned char *lc;
-	int idx;
-	gdouble color[4];
+	int idx, r, g, b, opacity;
 	GtkWidget *widget;
 	GdkColor c;
 
-	gtk_color_selection_get_color( selection, color );
-	widget = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(selection)));
+	cpick_get_colour( cs, &r, &g, &b, &opacity );
+	widget = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(cs)));
 
 	idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
 	lc = ctable_[CHN_IMAGE] + idx * 3;
-	lc[0] = rint(color[0] * 255.0);
-	lc[1] = rint(color[1] * 255.0);
-	lc[2] = rint(color[2] * 255.0);
-	opctable[idx] = rint(color[3] * 255.0);
+	lc[0] = r;
+	lc[1] = g;
+	lc[2] = b;
+	opctable[idx] = opacity;
 	c.pixel = 0;
 	c.red = lc[0] * 257; c.green = lc[1] * 257; c.blue = lc[2] * 257;
 	gdk_colormap_alloc_color( gdk_colormap_get_system(), &c, FALSE, TRUE );
@@ -1246,35 +1247,18 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 {
 	unsigned char *lc;
 	int idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
-	GtkColorSelection *cs = GTK_COLOR_SELECTION(user_data);
-	gdouble color[4];
-#if GTK_MAJOR_VERSION == 2
-	GdkColor c;
-#endif
+	GtkWidget *cs = GTK_WIDGET(user_data);
 
 	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
 	lc = ctable_[CHN_IMAGE] + idx * 3;
-	color[0] = (gdouble)lc[0] / 255.0;
-	color[1] = (gdouble)lc[1] / 255.0;
-	color[2] = (gdouble)lc[2] / 255.0;
-	color[3] = (gdouble)opctable[idx] / 255.0;
 
-	gtk_signal_disconnect_by_func(GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL);
+	gtk_signal_handler_block_by_func( GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL );
 
-	gtk_color_selection_set_color( cs, color );
-
-#if GTK_MAJOR_VERSION == 1
-	gtk_color_selection_set_color( cs, color);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	c.pixel = 0;
-	c.red = lc[0] * 257; c.green = lc[1] * 257; c.blue = lc[2] * 257;
-	gtk_color_selection_set_previous_color(cs, &c);
-	gtk_color_selection_set_previous_alpha(cs, opctable[idx] * 257);
-#endif
+	cpick_set_colour_previous( cs, lc[0], lc[1], lc[2], opctable[idx] );
+	cpick_set_colour( cs, lc[0], lc[1], lc[2], opctable[idx] );
 	allcol_idx = idx;
 
-	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
+	gtk_signal_handler_unblock_by_func( GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL );
 	allcol_hook(3);
 }
 
@@ -1291,16 +1275,11 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 
 
 	if (idx >= cnt) idx = 0;
-	cs = gtk_color_selection_new();
 
-#if GTK_MAJOR_VERSION == 1
-	gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), alpha);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(cs), alpha);
+	cs = cpick_create();
+	cpick_set_opacity_visibility( cs, alpha );
+	cpick_set_palette_visibility( cs, TRUE );
 
-	gtk_color_selection_set_has_palette (GTK_COLOR_SELECTION(cs), TRUE);
-#endif
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 
 	allcol_window = win;
@@ -1309,13 +1288,9 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	gtk_signal_connect_object(GTK_OBJECT(allcol_window), "delete_event",
 		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
 
-	vbox = gtk_vbox_new( FALSE, 5 );
-	gtk_widget_show( vbox );
-	gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
-	gtk_container_add( GTK_CONTAINER(allcol_window), vbox );
-
-	hbox = xpack(vbox, gtk_hbox_new(FALSE, 10));
+	hbox = gtk_hbox_new(FALSE, 5);
 	gtk_widget_show( hbox );
+	gtk_container_add( GTK_CONTAINER(allcol_window), hbox );
 
 	swindow = pack(hbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show(swindow);
@@ -1364,7 +1339,11 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	gtk_signal_connect(GTK_OBJECT(col_list), "select_child",
 		GTK_SIGNAL_FUNC(color_select), cs);
 
-	xpack(hbox, cs);
+	vbox = xpack(hbox, gtk_vbox_new(FALSE, 5));
+	gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
+	gtk_widget_show( vbox );
+
+	xpack(vbox, cs);
 
 	if (extbox) pack(vbox, extbox);
 
@@ -1853,13 +1832,17 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		/* Prepare posterize controls */
 		
 		extbox = gtk_table_new(3, 3, FALSE);
+		gtk_widget_show(extbox);
 		win = gtk_hbox_new(FALSE, 0);
+		gtk_widget_show(win);
 		gtk_table_attach(GTK_TABLE(extbox), win, 0, 3, 0, 1,
 			GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
 		button = add_a_button(_("Posterize"), 4, win, TRUE);
+		gtk_widget_show(button);
 		spin = pack(win, add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8));
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(posterize_AB), spin);
+		gtk_widget_show(spin);
 
 		/* Prepare channel A/B controls */
 
@@ -1867,6 +1850,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		{
 			j = i - CHN_ALPHA;
 			spin = gtk_label_new(allchannames[i]);
+			if ( mem_img[i] ) gtk_widget_show(spin);
 			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
 				1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
 			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
@@ -1877,8 +1861,8 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			mt_spinslide_set_value(spin, channel_col_A[i]);
 			mt_spinslide_connect(spin,
 				GTK_SIGNAL_FUNC(AB_spin_moved), (gpointer)i);
+			if ( !mem_img[i] ) gtk_widget_hide(spin);
 		}
-		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
@@ -2238,9 +2222,6 @@ static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
 #define PPAD_WIDTH(X) (PPAD_XSZ * (X) - 1)
 #define PPAD_HEIGHT(X) (PPAD_YSZ * (X) - 1)
 
-#include "graphics/xbm_ring4.xbm"
-#include "graphics/xbm_ring4_mask.xbm"
-
 static void palette_pad_set(int value)
 {
 	wj_fpixmap_move_cursor(grad_ed_pm, (value % PPAD_XSZ) * PPAD_SLOT,
@@ -2305,7 +2286,7 @@ static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
 	free(rgb);
 }
 
-static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data);
+static void grad_edit_set_rgb(GtkWidget *selection, gpointer user_data);
 static void palette_pad_select(int i, int mode)
 {
 	palette_pad_set(i);
@@ -2313,21 +2294,9 @@ static void palette_pad_select(int i, int mode)
 	if (!mode) mt_spinslide_set_value(grad_ed_ss, i);
 	else if (i < mem_cols) /* Valid RGB */
 	{
-		gdouble color[4] = { (gdouble)mem_pal[i].red / 255.0,
-			(gdouble)mem_pal[i].green / 255.0,
-			(gdouble)mem_pal[i].blue / 255.0, 1.0};
-
-#if GTK_MAJOR_VERSION == 1
-		GtkColorSelection *cs = GTK_COLOR_SELECTION(grad_ed_cs);
-		gdouble oldcolor[4];
-
-		/* Preserve old color, invoke "color_changed" handler */
-		memcpy(oldcolor, cs->old_values + 3, sizeof(oldcolor));
-		gtk_color_selection_set_color(cs, oldcolor);
-		gtk_color_selection_set_color(cs, color);
-		grad_edit_set_rgb(cs, NULL);
-#else
-		gtk_color_selection_set_color(GTK_COLOR_SELECTION(grad_ed_cs), color);
+		cpick_set_colour( grad_ed_cs, mem_pal[i].red, mem_pal[i].green, mem_pal[i].blue, -1 );
+#if GTK_MAJOR_VERSION == 1 || defined U_CPICK_MTPAINT
+		grad_edit_set_rgb(grad_ed_cs, NULL);
 #endif
 	}
 }
@@ -2389,12 +2358,6 @@ static void click_grad_edit_ok(GtkWidget *widget)
 
 static void grad_load_slot(int slot)
 {
-	gdouble color[4];
-	int i;
-#if GTK_MAJOR_VERSION == 2
-	GdkColor c;
-#endif
-
 	if (slot >= grad_cnt) /* Empty slot */
 	{
 		grad_slot = slot;
@@ -2404,21 +2367,11 @@ static void grad_load_slot(int slot)
 
 	if (!grad_mode) /* RGB */
 	{
-		GtkColorSelection *cs = GTK_COLOR_SELECTION(grad_ed_cs);
+		cpick_set_colour( grad_ed_cs, grad_pad[slot * 3 + 0],
+					grad_pad[slot * 3 + 1], grad_pad[slot * 3 + 2], -1 );
+		cpick_set_colour_previous( grad_ed_cs, grad_pad[slot * 3 + 0],
+					grad_pad[slot * 3 + 1], grad_pad[slot * 3 + 2], -1 );
 
-		for (i = 0; i < 3; i++)
-			color[i] = (gdouble)grad_pad[slot * 3 + i] / 255.0;
-		color[3] = 1.0;
-		gtk_color_selection_set_color(cs, color);
-#if GTK_MAJOR_VERSION == 1
-		gtk_color_selection_set_color(cs, color);
-#endif
-#if GTK_MAJOR_VERSION == 2
-		c.red = grad_pad[slot * 3 + 0] * 257;
-		c.green = grad_pad[slot * 3 + 1] * 257;
-		c.blue = grad_pad[slot * 3 + 2] * 257;
-		gtk_color_selection_set_previous_color(cs, &c);
-#endif
 		gtk_option_menu_set_history(GTK_OPTION_MENU(grad_ed_opt),
 			grad_mpad[slot]);
 	}
@@ -2459,15 +2412,15 @@ static void grad_edit_set_mode()
 	grad_redraw_slots(ix0, grad_slot);
 }
 
-static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data)
+static void grad_edit_set_rgb(GtkWidget *selection, gpointer user_data)
 {
-	gdouble color[4];
-	int i;
+	int i, rgb[4];
 
 	if (grad_slot < 0) return; /* Blocked */
-	gtk_color_selection_get_color(selection, color);
+	cpick_get_colour( selection, &rgb[0], &rgb[1], &rgb[2], &rgb[3] );
 	for (i = 0; i < 3; i++)
-		grad_pad[grad_slot * 3 + i] = rint(color[i] * 255.0);
+		grad_pad[grad_slot * 3 + i] = rgb[i];
+
 	grad_edit_set_mode();
 }
 
@@ -2556,7 +2509,7 @@ static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
 
 static void grad_edit(GtkWidget *widget, gpointer user_data)
 {
-	GtkWidget *win, *mainbox, *hbox, *hbox2, *pix, *cs, *ss, *sw, *btn;
+	GtkWidget *win, *mainbox, *hbox, *hbox2, *pix, *cs, *ss, *sw, *btn, *arrow;
 	int i, idx, opac = (int)user_data != 0;
 
 	idx = (grad_channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
@@ -2583,6 +2536,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Edit Gradient"),
 		GTK_WIN_POS_CENTER, TRUE);
 	mainbox = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(mainbox);
 	gtk_container_set_border_width(GTK_CONTAINER(mainbox), 5);
 	gtk_container_add(GTK_CONTAINER(win), mainbox);
 
@@ -2597,6 +2551,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		GTK_SIGNAL_FUNC(palette_pad_click), (gpointer)!grad_mode);
 	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
 		GTK_SIGNAL_FUNC(palette_pad_key), (gpointer)!grad_mode);
+
 	add_hseparator(mainbox, -2, 10);
 
 	/* Editor widgets */
@@ -2606,14 +2561,11 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		char *interp[] = {_("RGB"), _("HSV"), _("Backward HSV"),
 			_("Constant")};
 
-		grad_ed_cs = cs = pack(mainbox, gtk_color_selection_new());
-#if GTK_MAJOR_VERSION == 1
-		gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), FALSE);
-#endif
-#if GTK_MAJOR_VERSION == 2
-		gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(cs), FALSE);
-		gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(cs), TRUE);
-#endif
+		grad_ed_cs = cs = pack(mainbox, cpick_create());
+		gtk_widget_show(cs);
+		cpick_set_palette_visibility( cs, TRUE );
+		cpick_set_opacity_visibility( cs, FALSE );
+
 		gtk_signal_connect(GTK_OBJECT(cs), "color_changed",
 			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
 		grad_ed_opt = sw = wj_option_menu(interp, 4, 0, NULL,
@@ -2622,6 +2574,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	else /* Indexed / utility / opacity */
 	{
 		grad_ed_ss = ss = pack(mainbox, mt_spinslide_new(-2, -2));
+		gtk_widget_show(ss);
 		mt_spinslide_set_range(ss, 0, grad_mode == CHN_IMAGE + 1 ?
 			mem_cols - 1 : 255);
 		mt_spinslide_connect(ss, GTK_SIGNAL_FUNC(grad_edit_move_slide), NULL);
@@ -2629,8 +2582,12 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	hbox = pack(mainbox, gtk_hbox_new(TRUE, 5));
+	gtk_widget_show(hbox);
+
 	xpack(hbox, sw);
 	hbox2 = xpack(hbox, gtk_hbox_new(FALSE, 5));
+	gtk_widget_show(hbox2);
+
 	pack(hbox2, gtk_label_new(_("Points:")));
 	grad_ed_len = sw = pack(hbox2, add_a_spin(grad_cnt, 2, GRAD_POINTS));
 	spin_connect(sw, GTK_SIGNAL_FUNC(grad_edit_length), NULL);
@@ -2638,9 +2595,15 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	/* Gradient bar */
 
 	hbox2 = pack(mainbox, gtk_hbox_new(TRUE, 0));
+	gtk_widget_show(hbox2);
+
 	grad_ed_left = btn = xpack(hbox2, gtk_button_new());
-	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
-		GTK_SHADOW_NONE));
+	gtk_widget_show(btn);
+
+	arrow = gtk_arrow_new(GTK_ARROW_LEFT, GTK_SHADOW_NONE);
+	gtk_widget_show(arrow);
+	gtk_container_add(GTK_CONTAINER(btn), arrow);
+
 	gtk_widget_set_sensitive(btn, FALSE);
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)(-1));
@@ -2649,28 +2612,38 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	{
 		grad_ed_bar[i] = btn = xpack(hbox2, gtk_radio_button_new_from_widget(
 			GTK_RADIO_BUTTON_0(btn)));
+		gtk_widget_show(btn);
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
 			GTK_SIGNAL_FUNC(grad_edit_slot), (gpointer)i);
 		sw = gtk_drawing_area_new();
+		gtk_widget_show(sw);
 		gtk_container_add(GTK_CONTAINER(btn), sw);
 		gtk_widget_set_usize(sw, SLOT_SIZE, SLOT_SIZE);
 		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
 			GTK_SIGNAL_FUNC(grad_draw_slot), (gpointer)i);
 	}
 	grad_ed_right = btn = xpack(hbox2, gtk_button_new());
-	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
-		GTK_SHADOW_NONE));
+	gtk_widget_show(btn);
+
+	arrow = gtk_arrow_new(GTK_ARROW_RIGHT, GTK_SHADOW_NONE);
+	gtk_widget_show(arrow);
+	gtk_container_add(GTK_CONTAINER(btn), arrow);
+
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)1);
 
 	pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
+#ifndef U_CPICK_MTPAINT
 	grad_load_slot(0);
-
+#endif
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(grad_window));
-	gtk_widget_show_all(win);
+	gtk_widget_show(win);
+#ifdef U_CPICK_MTPAINT
+	grad_load_slot(0);
+#endif
 
 #if GTK_MAJOR_VERSION == 1
 	gtk_widget_queue_resize(win); /* Re-render sliders */

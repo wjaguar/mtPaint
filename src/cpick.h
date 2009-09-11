@@ -1,5 +1,5 @@
-/*	fpick.h
-	Copyright (C) 2007-2008 Mark Tyler and Dmitry Groshev
+/*	cpick.h
+	Copyright (C) 2008 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -17,12 +17,13 @@
 	along with mtPaint in the file COPYING.
 */
 
-#define FPICK_ENTRY	1
-#define FPICK_LOAD	2
-#define FPICK_DIRS_ONLY	4
+GtkWidget *cpick_create();
 
-GtkWidget *fpick_create(char *title, int flags);
-void fpick_destroy(GtkWidget *fp);
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn, GtkSignalFunc cancel_fn);
-const char *fpick_get_filename(GtkWidget *fp, int raw);
-void fpick_set_filename(GtkWidget *fp, char *name, int raw);
+void cpick_get_colour( GtkWidget *w, int *r, int *g, int *b, int *opacity );
+
+void cpick_set_colour( GtkWidget *w, int r, int g, int b, int opacity );
+void cpick_set_colour_previous( GtkWidget *w, int r, int g, int b, int opacity );
+
+void cpick_set_palette_visibility( GtkWidget *w, int visible );
+void cpick_set_opacity_visibility( GtkWidget *w, int visible );
+

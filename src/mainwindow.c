@@ -4293,7 +4293,7 @@ void main_init()
 
 	icon_pix = gdk_pixmap_create_from_xpm_d( main_window->window, NULL, NULL, icon_xpm );
 	gdk_window_set_icon( main_window->window, NULL, icon_pix, NULL );
-	gdk_pixmap_unref(icon_pix);
+//	gdk_pixmap_unref(icon_pix);
 
 	set_cursor();
 	init_status_bar();

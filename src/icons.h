@@ -85,8 +85,12 @@ extern unsigned char
 	xbm_line_mask_bits[],
 	xbm_move_bits[],
 	xbm_move_mask_bits[],
+	xbm_picker_bits[],
+	xbm_picker_mask_bits[],
 	xbm_polygon_bits[],
 	xbm_polygon_mask_bits[],
+	xbm_ring4_bits[],
+	xbm_ring4_mask_bits[],
 	xbm_select_bits[],
 	xbm_select_mask_bits[],
 	xbm_shuffle_bits[],
@@ -103,3 +107,12 @@ extern unsigned char
 	xbm_vertical_mask_bits[]
 	;
 
+#define xbm_ring4_width 9
+#define xbm_ring4_height 9
+#define xbm_ring4_x_hot 4
+#define xbm_ring4_y_hot 4
+
+#define xbm_picker_width 17
+#define xbm_picker_height 17
+#define xbm_picker_x_hot 2
+#define xbm_picker_y_hot 16
