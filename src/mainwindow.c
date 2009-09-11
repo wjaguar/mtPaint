@@ -267,6 +267,7 @@ static void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 		spot_undo(UNDO_XPAL);
 
 		mem_remove_unused();
+		mem_undo_prepare();
 
 		if ( mem_col_A >= mem_cols ) mem_col_A = 0;
 		if ( mem_col_B >= mem_cols ) mem_col_B = 0;
@@ -320,6 +321,7 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 					spot_undo(UNDO_XPAL);
 
 					remove_duplicates();
+					mem_undo_prepare();
 					init_pal();
 					gtk_widget_queue_draw( drawing_canvas );
 					gtk_widget_queue_draw(drawing_col_prev);
@@ -1175,6 +1177,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		{
 			commit_paste(NULL);
 			pen_down = 0;	// Ensure each press of enter is a new undo level
+			mem_undo_prepare();
 		}
 		else move_mouse(0, 0, 1);
 		return TRUE;
@@ -1202,6 +1205,8 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 			ya1 = rint(line_y1 + tool_flow * (uvy + uvx * 0.5));
 			ya2 = rint(line_y1 + tool_flow * (uvy - uvx * 0.5));
 
+// !!! Call this, or let undo engine do it?
+//			mem_undo_prepare();
 			pen_down = 0;
 			tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
 			line_status = LINE_LINE;
@@ -1227,6 +1232,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 				poly_points = 0;
 			}
 			mem_undo_opacity = oldmode;
+			mem_undo_prepare();
 
 				// Update screen areas
 			minx = xa1 < xa2 ? xa1 : xa2;
@@ -1573,6 +1579,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
 			tool_action(event, x, y, button, pressure);
 
+		mem_undo_prepare();
 		update_menus();
 
 		return;
@@ -3154,6 +3161,7 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			{
 				commit_paste(NULL);
 				pen_down = 0;
+				mem_undo_prepare();
 			}
 
 			marq_status = MARQUEE_NONE;			// Marquee is on so lose it!

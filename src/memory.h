@@ -95,11 +95,14 @@
 
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
+#define UNDO_TILEMAP_SIZE 32
+
 typedef struct
 {
 	chanlist img;
 	png_color pal[256];
-	int cols, width, height, bpp;
+	unsigned char tilemap[UNDO_TILEMAP_SIZE], *tileptr;
+	int cols, width, height, bpp, flags, size;
 } undo_item;
 
 /// GRADIENTS
@@ -378,10 +381,11 @@ void rgb2hsv(unsigned char *rgb, double *hsv);
 #define UNDO_TOOL  8	/* Same as UNDO_DRAW but respects pen_down */
 
 
-void undo_free_x(undo_item *undo);
+int undo_free_x(undo_item *undo);
 int mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
 //	 Get address of previous channel data (or current if none)
 unsigned char *mem_undo_previous(int channel);
+void mem_undo_prepare();	// Call this after changes to image, to compress last frame
 
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user

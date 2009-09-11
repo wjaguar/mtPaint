@@ -336,6 +336,7 @@ void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 	spot_undo(UNDO_INV);
 
 	mem_invert();
+	mem_undo_prepare();
 
 	init_pal();
 	update_all_views();
@@ -346,6 +347,7 @@ void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
 {
 	spot_undo(UNDO_FILT);
 	do_effect(0, 0);
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -356,6 +358,7 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	do_effect((int)fdata, i);
+	mem_undo_prepare();
 
 	return TRUE;
 }
@@ -376,6 +379,7 @@ void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 {
 	spot_undo(UNDO_FILT);
 	do_effect(2, 0);
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -397,6 +401,7 @@ int do_gauss(GtkWidget *box, gpointer fdata)
 
 	spot_undo(UNDO_DRAW);
 	mem_gauss(radiusX, radiusY, gcor);
+	mem_undo_prepare();
 
 	return TRUE;
 }
@@ -447,6 +452,7 @@ int do_unsharp(GtkWidget *box, gpointer fdata)
 	// !!! No RGBA mode for now, so UNDO_DRAW isn't needed
 	spot_undo(UNDO_FILT);
 	mem_unsharp(radius, amount, threshold, gcor);
+	mem_undo_prepare();
 
 	return TRUE;
 }
@@ -500,6 +506,7 @@ void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	spot_undo(UNDO_COL);
 
 	mem_greyscale(item);
+	mem_undo_prepare();
 
 	init_pal();
 	update_all_views();
@@ -661,6 +668,7 @@ void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data )
 		mem_flip_v(mem_img[i], temp, mem_width, mem_height, BPP(i));
 	}
 	free(temp);
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -674,6 +682,7 @@ void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
 		if (!mem_img[i]) continue;
 		mem_flip_h(mem_img[i], mem_width, mem_height, BPP(i));
 	}
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -770,6 +779,7 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 		}
 	}
 
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -777,6 +787,7 @@ void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	spot_undo(UNDO_DRAW);
 	mem_ellipse(marq_x1, marq_y1, marq_x2, marq_y2, item ? 0 : tool_size);
+	mem_undo_prepare();
 	update_all_views();
 }
 
@@ -884,6 +895,7 @@ static void cut_clip()
 		}
 	}
 	tool_opacity = to;
+	mem_undo_prepare();
 }
 
 static void trim_clip()

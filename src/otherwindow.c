@@ -501,6 +501,7 @@ int do_bacteria(GtkWidget *spin, gpointer fdata)
 	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	mem_bacteria(i);
+	mem_undo_prepare();
 
 	return FALSE;
 }
@@ -532,6 +533,7 @@ gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	spot_undo(UNDO_XPAL);
 	mem_pal_sort(spal_mode, index1, index2, reverse);
+	mem_undo_prepare();
 	init_pal();
 	update_all_views();
 	gtk_widget_queue_draw( drawing_col_prev );
@@ -761,6 +763,7 @@ static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer dat
 				click_brcosa_preview(NULL, NULL, NULL);
 			}
 		}	// Update palette values in RGB/indexed mode as required
+		mem_undo_prepare();
 	}
 
 	return FALSE;

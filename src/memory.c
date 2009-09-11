@@ -92,6 +92,16 @@ int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 int mem_preview;			// Preview an RGB change
 int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 
+/// UNDO ENGINE
+
+#define TILE_SIZE 64
+#define TILE_SHIFT 6
+#define MAX_TILEMAP ((((MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE + 7) / 8) * \
+	((MAX_HEIGHT + TILE_SIZE - 1) / TILE_SIZE))
+#define UF_TILED 1
+#define UF_FLAT  2
+#define UF_SIZED 4
+
 undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
 
 int mem_undo_pointer;		// Pointer to currently used image on canas/screen
@@ -291,8 +301,9 @@ png_color mem_pal_def[256]={		// Default palette entries for new image
 /// End: Primary (8) + Fades (42) + Shades (126) + Scales (66) + Misc (14) = 256
 };
 
+/// FONT FOR PALETTE WINDOW
+
 #define B8(A,B,C,D,E,F,G,H) (A|B<<1|C<<2|D<<3|E<<4|F<<5|G<<6|H<<7)
-#define B7(A,B,C,D,E,F,G) (A|B<<1|C<<2|D<<3|E<<4|F<<5|G<<6)
 
 static unsigned char mem_cross[PALETTE_CROSS_H] = {
 	B8( 1,1,0,0,0,0,1,1 ),
@@ -304,87 +315,11 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 	B8( 1,1,1,0,0,1,1,1 ),
 	B8( 1,1,0,0,0,0,1,1 )
 };
-static unsigned char mem_numbers[10][PALETTE_DIGIT_H] = {{
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 )
-},{
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,1,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 )
-},{
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,1,1,0,0,0 ),
-	B7( 0,1,1,1,1,1,1 )
-},{
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,0,0,1,1,1,0 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 )
-},{
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,0,1,1,1,0 ),
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,1,1,0 ),
-	B7( 0,1,1,1,1,1,1 ),
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,0,0,1,1,0 )
-},{
-	B7( 0,1,1,1,1,1,1 ),
-	B7( 0,1,1,0,0,0,0 ),
-	B7( 0,1,1,1,1,1,0 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 )
-},{
-	B7( 0,0,0,1,1,1,0 ),
-	B7( 0,0,1,1,0,0,0 ),
-	B7( 0,1,1,0,0,0,0 ),
-	B7( 0,1,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 )
-},{
-	B7( 0,1,1,1,1,1,1 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 ),
-	B7( 0,0,0,1,1,0,0 )
-},{
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,0 )
-},{
-	B7( 0,0,1,1,1,1,0 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,1,1,0,0,1,1 ),
-	B7( 0,0,1,1,1,1,1 ),
-	B7( 0,0,0,0,0,1,1 ),
-	B7( 0,0,0,0,1,1,0 ),
-	B7( 0,0,1,1,1,0,0 )
-}};
+
+#include "graphics/xbm_n7x7.xbm"
+#if (PALETTE_DIGIT_W != xbm_n7x7_width) || (PALETTE_DIGIT_H * 10 != xbm_n7x7_height)
+#error "Mismatched palette-window font"
+#endif
 
 /* Set initial state of image variables */
 void init_istate()
@@ -401,19 +336,21 @@ void init_istate()
 	tool_pat = 0;
 }
 
-void undo_free_x(undo_item *undo)
+int undo_free_x(undo_item *undo)
 {
-	int i;
+	int i, j = undo->size;
 
+	if (undo->tileptr) free(undo->tileptr);
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!undo->img[i]) continue;
 		if (undo->img[i] != (void *)(-1)) free(undo->img[i]);
-		undo->img[i] = NULL;
 	}
+	memset(undo, 0, sizeof(undo_item));
+	return (j);
 }
 
-void undo_free(int idx)
+static void undo_free(int idx)
 {
 	undo_free_x(&mem_undo_im_[idx]);
 }
@@ -486,15 +423,345 @@ unsigned char *mem_undo_previous(int channel)
 
 	i = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
 	res = mem_undo_im_[i].img[channel];
-	if (!res || (res == (void *)(-1)))
-		res = mem_img[channel];	// No undo so use current
+	if (!res || (res == (void *)(-1)) || (mem_undo_im_[i].flags & UF_TILED))
+		res = mem_img[channel];	// No usable undo so use current
 	return (res);
 }
 
-void lose_oldest()				// Lose the oldest undo image
+static int lose_oldest()			// Lose the oldest undo image
 {						// Pre-requisite: mem_undo_done > 0
-	undo_free((mem_undo_pointer - mem_undo_done + MAX_UNDO) % MAX_UNDO);
-	mem_undo_done--;
+	return (undo_free_x(mem_undo_im_ +
+		(mem_undo_pointer - mem_undo_done-- + MAX_UNDO) % MAX_UNDO));
+}
+
+/* Convert tile bitmap row into a set of spans (skip/copy), terminated by
+ * a zero-length copy span; return copied length */
+static int mem_undo_spans(int *spans, unsigned char *tmap, int width, int bpp)
+{
+	int bt = 0, bw = 0, tl = 0, l = 0, ll = bpp * TILE_SIZE;
+
+	while (width > 0)
+	{
+		if ((bw >>= 1) < 2) bw = 0x100 + *tmap++;
+		if (bt ^ (bw & 1))
+		{
+			*spans++ = tl * ll;
+			tl = 0;
+		}
+		tl++;
+		l += (bt = bw & 1) * ll;
+		width -= TILE_SIZE;
+	}
+	width *= bpp;
+	*spans++ = tl * ll + width;
+	l += bt * width;
+	spans[0] = spans[bt] = 0;
+	return (l);
+}
+
+/* Endianness-aware byte shifts */
+#if G_BYTE_ORDER == G_LITTLE_ENDIAN
+#define SHIFTUP(X,N) (X) <<= ((N) << 3)
+#define SHIFTDN(X,N) (X) >>= ((N) << 3)
+#else /* G_BYTE_ORDER == G_BIG_ENDIAN */
+#define SHIFTUP(X,N) (X) >>= ((N) << 3)
+#define SHIFTDN(X,N) (X) <<= ((N) << 3)
+#endif
+
+/* Register-sized unsigned integer - redefine if this isn't it */
+#include <stdint.h>
+#define R_INT uintptr_t
+
+/* Integer-at-a-time byte array comparison function; its efficiency depends on
+ * both arrays aligned, or misaligned, the same - which is natural for channel
+ * strips when geometry and position match - WJ */
+static int tile_row_compare(unsigned char *src, unsigned char *dest,
+	int w, int h, unsigned char *buf)
+{
+	const int amask = sizeof(R_INT) - 1;
+	int l = w * h, mc = (w + TILE_SIZE - 1) >> TILE_SHIFT, nc = 0;
+
+	/* Long enough & identically aligned - use fast path */
+	if ((w > sizeof(R_INT)) && (l > sizeof(R_INT) * 4) &&
+		(((int)src & amask) == ((int)dest & amask)))
+	{
+		R_INT v, vm, vt1, vt2, *isrc, *idest;
+		int i, k, t, x, d0, d1, il;
+
+		/* Given that loose ends, if any, belong to tiles too, we
+		 * simply leave them for later - maybe there won't be need */
+		d0 = (((int)src ^ amask) + 1) & amask;
+		d1 = (int)(src + l) & amask;
+		isrc = (R_INT *)(src + d0);
+		idest = (R_INT *)(dest + d0);
+		il = (l - d0 - d1) / sizeof(v);
+		i = 0;
+		while (TRUE)
+		{
+			/* Fast comparison loop - damn GCC's guts for not
+			 * allocating it on registers without heavy wizardry */
+			{
+				int wi = il - i;
+				R_INT *wsrc = isrc + i, *wdest = idest + i;
+				while (TRUE)
+				{
+					if (wi-- <= 0) goto done;
+					if (*wsrc != *wdest) break;
+					++wsrc; ++wdest;
+				}
+				t = (unsigned char *)wsrc - src;
+			}
+			k = (unsigned int)t % w;
+			x = TILE_SIZE - (k & (TILE_SIZE - 1));
+			if (k + x > w) x = w - k;
+			k >>= TILE_SHIFT;
+
+			/* Value overlaps two or three tiles */
+			while (x < sizeof(v))
+			{
+				v = isrc[i] ^ idest[i];
+tile2:				vm = ~0UL;
+				SHIFTUP(vm, x);
+				x += sizeof(v);
+				if (!(vm &= v)) break;
+				x -= sizeof(v);
+
+				/* Farther tile(s) differ */
+				if ((v != vm) && !buf[k]) /* First one differs too */
+				{
+					buf[k] = 1;
+					if (++nc >= mc) x = l; /* Done is done */
+				}
+				if (++k + 1 == mc) /* May be 3 tiles */
+				{
+					x += w & (TILE_SIZE - 1);
+					if (x >= sizeof(v)) break;
+					v = vm;
+					goto tile2;
+				}
+				x += TILE_SIZE;
+				if (k == mc) k = 0; /* Row wrap */
+				break;
+			}
+			i = (t + x - d0) / sizeof(v);
+			if (buf[k]) continue;
+			buf[k] = 1;
+			if (++nc >= mc) break;
+		}
+done:
+		/* Compare the ends - using the fact that memory blocks
+		 * *must* be aligned at least that much */
+		if (d1 && !buf[mc - 1])
+		{
+			vt2 = isrc[il] ^ idest[il];
+			SHIFTUP(vt2, sizeof(vt2) - d1);
+			if (vt2) ++nc , buf[mc - 1] = 1;
+		}
+		if (d0 && !buf[0])
+		{
+			vt1 = *(isrc - 1) ^ *(idest - 1);
+			SHIFTDN(vt1, d0);
+			if (vt1) ++nc , buf[0] = 1;
+		}
+	}
+	/* Misaligned - use slow path */
+	else
+	{
+		int i, k, x;
+
+		for (i = 0; i < l; i++)
+		{
+			if (src[i] != dest[i])
+			{
+				k = (unsigned int)i % w;
+				x = TILE_SIZE - (k & (TILE_SIZE - 1));
+				if (k + x > w) x = w - k;
+				i += x;
+				k >>= TILE_SHIFT;
+				if (buf[k]) continue;
+				buf[k] = 1;
+				if (++nc >= mc) break;
+			}
+		}
+	}
+	return (nc);
+}
+
+/* Convert undo frame to tiled representation */
+static void mem_undo_tile(undo_item *undo)
+{
+	unsigned char buf[((MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE) * 3];
+	unsigned char *tstrip, tmap[MAX_TILEMAP], *tmp = NULL;
+	int spans[(MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE + 3];
+	int i, j, k, nt, dw, cc, bpp, sz;
+	int h, nc, bw, tw, tsz, nstrips, ntiles = 0, area = 0, msize = 0;
+
+// clock_t t0 = clock();
+
+	undo->flags |= UF_FLAT; /* Not tiled by default */
+
+	/* Not tileable if too small */
+	if (mem_width + mem_height < TILE_SIZE * 3) return;
+
+	/* Not tileable if different geometry */
+	if ((undo->width != mem_width) || (undo->height != mem_height) ||
+		(undo->bpp != mem_img_bpp)) return;
+
+	for (i = nc = 0; i < NUM_CHANNELS; i++)
+	{
+		/* Not tileable if different set of channels */
+		if (!!undo->img[i] ^ !!mem_img[i]) return;
+		if (undo->img[i] && mem_img[i] &&
+			(undo->img[i] != (void *)(-1))) nc |= 1 << i;
+	}
+	/* Not tileable if no matching channels */
+	if (!nc) return;
+
+	/* Build tilemap */
+	nstrips = (mem_height + TILE_SIZE - 1) / TILE_SIZE;
+	dw = (TILE_SIZE - 1) & ~(mem_width - 1);
+	bw = (mem_width + TILE_SIZE - 1) / TILE_SIZE;
+	tw = (bw + 7) >> 3; tsz = tw * nstrips;
+	memset(tmap, 0, tsz);
+	for (i = 0 , tstrip = tmap; i < mem_height; i += TILE_SIZE , tstrip += tw)
+	{
+		h = mem_height - i;
+		if (h > TILE_SIZE) h = TILE_SIZE;
+
+		/* Compare strip of image */
+		memset(buf, 0, bw * 3);
+		for (cc = 0; nc >= 1 << cc; cc++)
+		{
+			unsigned char *src, *dest;
+			int j, k, j2, w;
+
+			if (!(nc & 1 << cc)) continue;
+			bpp = BPP(cc);
+			w = mem_width * bpp;
+			k = i * w;
+			src = undo->img[cc] + k;
+			dest = mem_img[cc] + k;
+			if (!tile_row_compare(src, dest, w, h, buf)) continue;
+			if (bpp == 1) continue;
+			/* 3 bpp happen only in image channel, which goes first;
+			 * so we can postprocess the results to match 1 bpp */
+			for (j = j2 = 0; j < bw; j++ , j2 += 3)
+				buf[j] = buf[j2] | buf[j2 + 1] | buf[j2 + 2];
+		}
+		/* Fill tilemap row */
+		for (j = nt = 0; j < bw; j++)
+		{
+			nt += (k = buf[j]);
+			tstrip[j >> 3] |= k << (j & 7);
+		}
+		ntiles += nt;
+		area += (nt * TILE_SIZE - buf[bw - 1] * dw) * h;
+	}
+	/* Not tileable if all tiles differ */
+	if (ntiles >= bw * nstrips) return;
+
+/* !!! Maybe decide whether tiling is worth doing, too */
+
+	/* Allocate tilemap */
+	if (ntiles && (tsz > UNDO_TILEMAP_SIZE))
+	{
+		tmp = malloc(tsz);
+		/* Not tileable if nowhere to store tilemap */
+		if (!tmp) return;
+	}
+
+	/* Implement tiling */
+	sz = mem_width * mem_height;
+	for (cc = 0; nc >= 1 << cc; cc++)
+	{
+		unsigned char *src, *dest, *blk;
+		int i, l;
+
+		if (!(nc & 1 << cc)) continue;
+		if (!ntiles) /* Channels unchanged - free the memory */
+		{
+			free(undo->img[cc]);
+			undo->img[cc] = (void *)(-1);
+			continue;
+		}
+
+		/* Try to reduce memory fragmentation - allocate small blocks
+		 * anew when possible, instead of carving up huge ones */
+		src = blk = undo->img[cc];
+		bpp = BPP(cc);
+		if (area * 3 <= sz) /* Small enough */
+		{
+			blk = malloc(area * bpp);
+			/* Use original chunk if cannot get new one */
+			if (!blk) blk = src;
+		}
+		dest = blk;
+
+		/* Compress channel */
+		for (i = 0; i < nstrips; i++)
+		{
+			int j, k, *span;
+
+			mem_undo_spans(spans, tmap + tw * i, mem_width, bpp);
+			k = mem_height - i * TILE_SIZE;
+			if (k > TILE_SIZE) k = TILE_SIZE;
+			for (j = 0; j < k; j++)
+			{
+				span = spans;
+				while (TRUE)
+				{
+					src += *span++;
+					if (!*span) break;
+					if (dest != src) memmove(dest, src, *span);
+					src += *span; dest += *span++;
+				}
+			}
+		}
+
+		/* Resize or free memory block */
+		l = area * bpp;
+		if (blk == undo->img[cc]) /* Resize old */
+		{
+			dest = realloc(undo->img[cc], l);
+			/* Leave chunk alone if resizing failed */
+			if (!dest) l = sz * bpp;
+			else undo->img[cc] = dest;
+		}
+		else /* Replace with new */
+		{
+			free(undo->img[cc]);
+			undo->img[cc] = blk;
+		}
+		msize += l + 32;
+	}
+
+	/* Re-label as tiled and store tilemap, if there *are* tiles */
+	if (msize)
+	{
+		undo->flags ^= UF_FLAT | UF_TILED;
+		undo->tileptr = tmp;
+		if (!tmp) tmp = undo->tilemap;
+		else msize += tsz + 32;
+		memcpy(tmp, tmap, tsz);
+	}
+
+	undo->size = msize;
+	undo->flags |= UF_SIZED;
+
+// g_print("Delta %d\n", (int)(clock() - t0));
+
+}
+
+/* Compress last undo frame */
+void mem_undo_prepare()
+{
+	int k;
+
+	if (!mem_undo_done) return;
+	k = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
+	/* Tile it if not processed yet */
+	if (!(mem_undo_im_[k].flags & (UF_TILED | UF_FLAT)))
+		mem_undo_tile(mem_undo_im_ + k);
 }
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask)
@@ -507,7 +774,6 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	notify_changed();
 	if (pen_down && (mode & UC_PENDOWN)) return (0);
 	pen_down = mode & UC_PENDOWN ? 1 : 0;
-//printf("Old undo # = %i\n", mem_undo_pointer);
 
 	/* Release redo data */
 	if (mem_undo_redo)
@@ -520,6 +786,9 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		}
 		mem_undo_redo = 0;
 	}
+
+	/* Compress last undo frame */
+	mem_undo_prepare();
 
 	mem_req = 0;
 	if (cmask && !(mode & UC_DELETE))
@@ -535,14 +804,15 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	mem_lim = (mem_undo_limit * (1024 * 1024)) / (layers_total + 1);
 
 	/* Mem limit exceeded - drop oldest */
-	while (mem_used() + mem_req > mem_lim)
+	mem_req += mem_used();
+	while (mem_req > mem_lim)
 	{
 		if (!mem_undo_done)
 		{
 			/* Fail if not enough memory */
 			if (!(mode & UC_DELETE)) return (1);
 		}
-		else lose_oldest();
+		else mem_req -= lose_oldest();
 	}
 
 	/* Fill undo frame */
@@ -577,13 +847,6 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		{
 			if (!mem_undo_done)
 			{
-#if 0
-				if (handle == 0)
-				{
-					printf("No memory for undo!\n");
-					exit(1);
-				}
-#endif
 				/* Release memory and fail */
 				for (j = 0; j < i; j++)
 				{
@@ -619,7 +882,6 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	undo->width = mem_width;
 	undo->height = mem_height;
 	undo->bpp = mem_img_bpp;
-//printf("New undo # = %i\n\n", mem_undo_pointer);
 
 	return (0);
 }
@@ -666,7 +928,66 @@ int mem_undo_next(int mode)
 	return (undo_next_core(wmode, mem_width, mem_height, mem_img_bpp, cmask));
 }
 
-void mem_undo_swap(int old, int new)
+/* Swap image & undo tiles; in process, normal order translates to reverse and
+ * vice versa - in order to do it in same memory with minimum extra copies */
+static void mem_undo_tile_swap(undo_item *undo, int redo)
+{
+	unsigned char buf[MAX_WIDTH * 3], *tmap, *src, *dest;
+	int spans[(MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE + 3];
+	int i, l, h, cc, nw, bpp, w;
+
+	tmap = undo->tileptr ? undo->tileptr : undo->tilemap;
+	nw = ((mem_width + TILE_SIZE - 1) / TILE_SIZE + 7) >> 3;
+	for (cc = 0; cc < NUM_CHANNELS; cc++)
+	{
+		if (!undo->img[cc] || (undo->img[cc] == (void *)(-1)))
+			continue;
+		bpp = BPP(cc);
+		w = mem_width * bpp;
+		src = undo->img[cc];
+		for (i = 0; i < mem_height; i += TILE_SIZE , tmap += nw)
+		{
+			int j, j1, dj;
+
+			if (!(l = mem_undo_spans(spans, tmap, mem_width, bpp)))
+				continue;
+			dest = mem_img[cc] + w * i;
+			h = mem_height - i;
+			if (h > TILE_SIZE) h = TILE_SIZE;
+
+			/* First row stored after last in redo frames */
+			if (!redo) j = 0 , j1 = h , dj = 1;
+			else
+			{
+				j = h - 1; j1 = dj = -1;
+				memcpy(buf, src + j * l, l);
+			}
+			/* Process undo normally, and redo backwards */
+			for (; j != j1; j += dj)
+			{
+				unsigned char *ts, *td, *tm;
+				int *span = spans;
+
+				td = dest + j * w;
+				tm = ts = src + j * l;
+				*(redo ? &ts : &tm) = j ? tm - l : buf;
+				while (TRUE)
+				{
+					td += *span++;
+					if (!*span) break;
+					memcpy(tm, td, *span);
+					memcpy(td, ts, *span);
+					tm += *span;
+					ts += *span; td += *span++;
+				}
+			}
+			src += h * l;
+			if (!redo) memcpy(src - l, buf, l);
+		}
+	}
+}
+
+static void mem_undo_swap(int old, int new, int redo)
 {
 	undo_item *curr, *prev;
 	int i;
@@ -674,12 +995,38 @@ void mem_undo_swap(int old, int new)
 	curr = &mem_undo_im_[old];
 	prev = &mem_undo_im_[new];
 
-	for (i = 0; i < NUM_CHANNELS; i++)
+	if (prev->flags & UF_TILED)
 	{
-		curr->img[i] = mem_img[i];
-		if (prev->img[i] == (void *)(-1)) curr->img[i] = (void *)(-1);
-		else mem_img[i] = prev->img[i];
+		mem_undo_tile_swap(prev, redo);
+		for (i = 0; i < NUM_CHANNELS; i++)
+		{
+			curr->img[i] = prev->img[i];
+			prev->img[i] = mem_img[i];
+		}
+		curr->tileptr = prev->tileptr;
+		prev->tileptr = NULL;
+		memcpy(curr->tilemap, prev->tilemap, UNDO_TILEMAP_SIZE);
+		curr->size = prev->size;
+		curr->flags = prev->flags;
 	}
+	else
+	{
+		for (i = 0; i < NUM_CHANNELS; i++)
+		{
+			if (prev->img[i] == (void *)(-1))
+			{
+				curr->img[i] = (void *)(-1);
+				prev->img[i] = mem_img[i];
+			}
+			else
+			{
+				curr->img[i] = mem_img[i];
+				mem_img[i] = prev->img[i];
+			}
+		}
+		curr->flags = UF_FLAT;
+	}
+	prev->flags = 0;
 
 	curr->width = mem_width;
 	curr->height = mem_height;
@@ -702,16 +1049,17 @@ void mem_undo_backward()		// UNDO requested by user
 {
 	int i;
 
+	/* Compress last undo frame */
+	mem_undo_prepare();
+
 	if ( mem_undo_done > 0 )
 	{
-//printf("UNDO!!! Old undo # = %i\n", mem_undo_pointer);
 		i = mem_undo_pointer;
 		mem_undo_pointer = (mem_undo_pointer - 1 + MAX_UNDO) % MAX_UNDO;	// New pointer
-		mem_undo_swap(i, mem_undo_pointer);
+		mem_undo_swap(i, mem_undo_pointer, 0);
 
 		mem_undo_done--;
 		mem_undo_redo++;
-//printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 	pen_down = 0;
 }
@@ -720,37 +1068,41 @@ void mem_undo_forward()			// REDO requested by user
 {
 	int i;
 
+	/* Compress last undo frame */
+	mem_undo_prepare();
+
 	if ( mem_undo_redo > 0 )
 	{
-//printf("REDO!!! Old undo # = %i\n", mem_undo_pointer);
 		i = mem_undo_pointer;
 		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;		// New pointer
-		mem_undo_swap(i, mem_undo_pointer);
+		mem_undo_swap(i, mem_undo_pointer, 1);
 
 		mem_undo_done++;
 		mem_undo_redo--;
-//printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 	pen_down = 0;
 }
 
-int mem_undo_size(undo_item *undo)
+static int mem_undo_size(undo_item *undo)
 {
-	int i, j, k, total = 0;
+	int i, j, k, l, total = 0;
 
-	for (i = 0; i < MAX_UNDO; i++)
+	for (i = 0; i < MAX_UNDO; i++ , total += (undo++)->size)
 	{
-		k = undo->width * undo->height + 32;
-		for (j = 0; j < NUM_CHANNELS; j++)
+		/* Empty or already scanned? */
+		if (!undo->width || (undo->flags & UF_SIZED)) continue;
+		k = undo->width * undo->height;
+		for (j = l = 0; j < NUM_CHANNELS; j++)
 		{
 			if (!undo->img[j] || (undo->img[j] == (void *)(-1)))
 				continue;
-			total += j == CHN_IMAGE ? k * undo->bpp : k;
+			l += (j == CHN_IMAGE ? k * undo->bpp : k) + 32;
 		}
-		undo++;
+		undo->size = l;
+		undo->flags |= UF_SIZED;
 	}
 
-	return total;
+	return (total);
 }
 
 void mem_init()					// Initialise memory
@@ -948,12 +1300,13 @@ static void copy_num(int index, int tx, int ty)
 	{
 		if ((index < d) && (d > 1)) continue;
 		v -= (n = v / d) * d;
+		n *= PALETTE_DIGIT_H;
 		for (i = 0; i < PALETTE_DIGIT_H; i++)
 		{
 			for (j = 0; j < PALETTE_DIGIT_W; j++)
 			{
 				tmp[0] = tmp[1] = tmp[2] =
-					pcol[(mem_numbers[n][i] >> j) & 1];
+					pcol[(xbm_n7x7_bits[n + i] >> j) & 1];
 				tmp += 3;
 			}
 			tmp += PALETTE_W3 - PALETTE_DIGIT_W * 3;
@@ -3350,6 +3703,7 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 		if (!mem_img[i]) continue;
 		mem_rotate(mem_img[i], old_img[i], ow, oh, dir, BPP(i));
 	}
+	mem_undo_prepare();
 	return 0;
 }
 
@@ -4068,6 +4422,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 			}
 		}
 	}
+	mem_undo_prepare();
 
 	return (0);
 }

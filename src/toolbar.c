@@ -1015,6 +1015,7 @@ static gint release_palette( GtkWidget *widget, GdkEventButton *event )
 			if ( mem_img_bpp == 1 )
 				mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
 
+			mem_undo_prepare();
 			canvas_undo_chores();
 		}
 	}

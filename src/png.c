@@ -277,22 +277,21 @@ static void ls_init(char *what, int save)
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
-static char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
-
-/* Description of PNG interlacing passes as X0, DX, Y0, DY */
-static unsigned char png_interlace[8][4] = {
-	{0, 1, 0, 1}, /* One pass for non-interlaced */
-	{0, 8, 0, 8}, /* Seven passes for Adam7 interlaced */
-	{4, 8, 0, 8},
-	{0, 4, 4, 8},
-	{2, 4, 0, 4},
-	{0, 2, 2, 4},
-	{1, 2, 0, 2},
-	{0, 1, 1, 2}
-};
+static const char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
 
 static int load_png(char *file_name, ls_settings *settings)
 {
+	/* Description of PNG interlacing passes as X0, DX, Y0, DY */
+	static const unsigned char png_interlace[8][4] = {
+		{0, 1, 0, 1}, /* One pass for non-interlaced */
+		{0, 8, 0, 8}, /* Seven passes for Adam7 interlaced */
+		{4, 8, 0, 8},
+		{0, 4, 4, 8},
+		{2, 4, 0, 4},
+		{0, 2, 2, 4},
+		{1, 2, 0, 2},
+		{0, 1, 1, 2}
+	};
 	static png_bytep *row_pointers;
 	static char *msg;
 	png_structp png_ptr;
@@ -679,7 +678,8 @@ exit0:	free(rgba_row);
 static int load_gif(char *file_name, ls_settings *settings)
 {
 	/* GIF interlace pattern: Y0, DY, ... */
-	static unsigned char interlace[10] = {0, 1, 0, 8, 4, 8, 2, 4, 1, 2};
+	static const unsigned char interlace[10] =
+		{ 0, 1, 0, 8, 4, 8, 2, 4, 1, 2 };
 	GifFileType *giffy;
 	GifRecordType gif_rec;
 	GifByteType *byte_ext;
@@ -1332,7 +1332,6 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		nplanes = !planar ? 1 :	(pmetric == PHOTOMETRIC_RGB ? 3 : 1) +
 			(settings->img[CHN_ALPHA] ? 1 : 0);
 		bits1 = bpsamp > 8 ? 8 : bpsamp;
-		*(uint32 *)cbuf = 1; /* Test endianness */
 
 		/* !!! Assume 16-, 32- and 64-bit data follow machine's
 		 * endianness, and everything else is packed big-endian way -
@@ -1342,7 +1341,8 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		 * versions handle them differently, so I leave them alone
 		 * for now - WJ */
 
-		bit0 = cbuf[0] && ((bpsamp == 16) || (bpsamp == 32) ||
+		bit0 = (G_BYTE_ORDER == G_LITTLE_ENDIAN) &&
+			((bpsamp == 16) || (bpsamp == 32) ||
 			(bpsamp == 64)) ? bpsamp - 8 : 0;
 		db = (planar ? 1 : sampp) * bpsamp;
 		bsz = (tw ? TIFFTileSize(tif) : TIFFStripSize(tif)) + 1;
@@ -3694,6 +3694,7 @@ int load_image(char *file_name, int mode, int ftype)
 
 			if (mem_channel == CHN_IMAGE)
 				store_image_extras(&settings);
+			mem_undo_prepare();
 		}
 		/* Failure needing rollback */
 		else if (settings.img[CHN_IMAGE]) free(settings.img[CHN_IMAGE]);

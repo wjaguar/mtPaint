@@ -225,6 +225,7 @@ dofail:
 	{
 		for (i = 0; i < j; i++) dest[i] ^= 255;
 	}
+	mem_undo_prepare();
 
 	if ((int)gtk_object_get_user_data(GTK_OBJECT(window)) >= CHN_ALPHA)
 		activate_channel(chan_new_type);
@@ -379,6 +380,7 @@ int do_threshold(GtkWidget *spin, gpointer fdata)
 	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
 	mem_threshold(mem_channel, i);
+	mem_undo_prepare();
 
 	return TRUE;
 }
@@ -394,6 +396,7 @@ void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item 
 	if (mem_img_bpp == 1) return;
 	spot_undo(UNDO_COL);
 	mem_demultiply(mem_img[CHN_IMAGE], mem_img[CHN_ALPHA], mem_width * mem_height, 3);
+	mem_undo_prepare();
 	update_all_views();
 }
 
