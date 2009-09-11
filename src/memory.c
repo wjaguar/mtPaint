@@ -48,7 +48,7 @@ const unsigned char bayer[16] = {
 
 /// Tint tool - contributed by Dmitry Groshev, January 2006
 
-int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
+int tint_mode[3];		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
 int mem_blend;

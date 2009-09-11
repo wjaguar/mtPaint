@@ -86,7 +86,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR },
-	{ "XPM", "xpm", "", FF_256 | FF_TRANS | FF_SPOT },
+	{ "XPM", "xpm", "", FF_256 | FF_RGB | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
 /* !!! Ideal state */
@@ -2198,10 +2198,76 @@ static guint32 hashf(guint32 seed, char *key, int len)
 
 #define HASHSEED 0x811C9DC5
 #define HASH_RND(X) ((X) * 0x10450405 + 1)
-#define HSIZE 1024
-#define HMASK 0x1FF
-/* For cuckoo hashing of 256 items into 1024 slots */
-#define MAXLOOP 27
+#define HSIZE 16384
+#define HMASK 0x1FFF
+/* For cuckoo hashing of 4096 items into 16384 slots */
+#define MAXLOOP 39
+
+/* This is the limit from libXPM */
+#define XPM_MAXCOL 4096
+
+/* Cuckoo hash of IDs for load or RGB triples for save */
+typedef struct {
+	short hash[HSIZE];
+	char *keys;
+	int step, cpp, cnt;
+	guint32 seed;
+} str_hash;
+
+static int ch_find(str_hash *cuckoo, char *str)
+{
+	guint32 key;
+	int k, idx, step = cuckoo->step, cpp = cuckoo->cpp;
+
+	key = hashf(cuckoo->seed, str, cpp);
+	k = (key & HMASK) * 2;
+	while (TRUE)
+	{
+		idx = cuckoo->hash[k];
+		if (idx && !strncmp(cuckoo->keys + (idx - 1) * step, str, cpp))
+			return (idx);
+		if (k & 1) return (0); /* Not found */
+		k = ((key >> 16) & HMASK) * 2 + 1;
+	}
+}
+
+static int ch_insert(str_hash *cuckoo, char *str)
+{
+	char *p, *keys;
+	guint32 key;
+	int i, j, k, n, idx, step, cpp;
+
+	n = ch_find(cuckoo, str);
+	if (n) return (n - 1);
+
+	keys = cuckoo->keys;
+	step = cuckoo->step; cpp = cuckoo->cpp;
+	if (cuckoo->cnt >= XPM_MAXCOL) return (-1);
+	p = keys + cuckoo->cnt++ * step;
+	memcpy(p, str, cpp); p[cpp] = 0;
+
+	for (n = cuckoo->cnt; n <= cuckoo->cnt; n++)
+	{	
+		idx = n;
+		/* Normal cuckoo process */
+		for (i = 0; i < MAXLOOP; i++)
+		{
+			key = hashf(cuckoo->seed, keys + (idx - 1) * step, cpp);
+			key >>= (i & 1) << 4;
+			j = (key & HMASK) * 2 + (i & 1);
+			k = cuckoo->hash[j];
+			cuckoo->hash[j] = idx;
+			idx = k;
+			if (!idx) break;
+		}
+		if (!idx) continue;
+		/* Failed insertion - mutate seed */
+		cuckoo->seed = HASH_RND(cuckoo->seed);
+		memset(cuckoo->hash, 0, sizeof(short) * HSIZE);
+		n = 1; /* Rehash everything */
+	}
+	return (cuckoo->cnt - 1);
+}
 
 #define XPM_COL_DEFS 5
 
@@ -2211,14 +2277,13 @@ static int load_xpm(char *file_name, ls_settings *settings)
 {
 	static const char *cmodes[XPM_COL_DEFS] =
 		{ "c", "g", "g4", "m", "s" };
-	unsigned char *dest;
+	unsigned char *src, *dest, pal[XPM_MAXCOL * 3];
 	char lbuf[4096], tstr[20], *buf = lbuf;
-	char ckeys[256][32], *cdefs[XPM_COL_DEFS], *r, *r2;
-	short cuckoo[HSIZE]; /* Cuckoo hash */
-	guint32 key, seed = HASHSEED;
+	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS], *r, *r2;
+	str_hash cuckoo;
 	FILE *fp;
-	int w, h, cols, cpp, hx, hy, lsz = 4096, res = -1;
-	int i, j, k, ii, idx, l;
+	int w, h, cols, cpp, hx, hy, lsz = 4096, res = -1, bpp = 1, trans = -1;
+	int i, j, k, l;
 
 
 	if (!(fp = fopen(file_name, "r"))) return (-1);
@@ -2240,16 +2305,19 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	else if (i != 6) goto fail;
 	/* Extension marker is ignored, as are extensions themselves */
 
-	/* More than 256 colors or no colors at all aren't accepted */
-	if ((cols < 1) || (cols > 256)) goto fail;
+	/* More than 4096 colors or no colors at all aren't accepted */
+	if ((cols < 1) || (cols > XPM_MAXCOL)) goto fail;
 	/* Stupid colors per pixel values aren't either */
 	if ((cpp < 1) || (cpp > 31)) goto fail;
+
+	/* RGB image if more than 256 colors */
+	if (cols > 256) bpp = 3;
 
 	/* Store values */
 	settings->width = w;
 	settings->height = h;
-	settings->bpp = 1;
-	settings->colors = cols;
+	settings->bpp = bpp;
+	if (bpp == 1) settings->colors = cols;
 	settings->hot_x = hx;
 	settings->hot_y = hy;
 	settings->xpm_trans = -1;
@@ -2262,18 +2330,31 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
 	res = -1;
 
+	if (!settings->silent) ls_init("XPM", 0);
+
+	/* Init hash */
+	memset(&cuckoo, 0, sizeof(cuckoo));
+	cuckoo.keys = ckeys;
+	cuckoo.step = 32;
+	cuckoo.cpp = cpp;
+	cuckoo.seed = HASHSEED;
+
 	/* Read colormap */
-	sprintf(tstr, " \"%%%dc %%n", cpp);
-	for (i = 0; i < cols; i++)
+	dest = pal;
+	sprintf(tstr, " \"%%n%%*%dc %%n", cpp);
+	for (i = 0; i < cols; i++ , dest += 3)
 	{
-		if (!fgetsC(lbuf, 4096, fp)) goto fail2;
+		if (!fgetsC(lbuf, 4096, fp)) goto fail3;
 
 		/* Parse color ID */
-		if (!sscanf(lbuf, tstr, ckeys[i], &l)) goto fail2;
-		ckeys[i][cpp] = '\0';
+		k = 0; sscanf(lbuf, tstr, &k, &l);
+		if (!k) goto fail3;
+
+		/* Insert color into hash */
+		ch_insert(&cuckoo, lbuf + k);
 
 		/* Parse color definitions */
-		if (!(r = strchr(lbuf + l, '"'))) goto fail2;
+		if (!(r = strchr(lbuf + l, '"'))) goto fail3;
 		*r = '\0';
 		memset(cdefs, 0, sizeof(cdefs));
 		k = -1; r2 = NULL;
@@ -2289,7 +2370,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			}
 			else if (!r2) /* Color name */
 			{
-				if (k < 0) goto fail2;
+				if (k < 0) goto fail3;
 				cdefs[k] = r2 = r;
 			}
 			else /* Add next part of name */
@@ -2301,7 +2382,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			}
 			r = strtok(NULL, " \t\n");
 		}
-		if (!r2) goto fail2; /* Key w/o name */
+		if (!r2) goto fail3; /* Key w/o name */
 
 		/* Translate the best one */
 		for (j = 0; j < XPM_COL_DEFS; j++)
@@ -2311,62 +2392,57 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			if (!cdefs[j]) continue;
 			if (!strcasecmp(cdefs[j], "none")) /* Transparent */
 			{
-				settings->xpm_trans = i;
-				settings->pal[i].red = settings->pal[i].green = 115;
-				settings->pal[i].blue = 0;
+				trans = i;
 				break;
 			}
 			if (!gdk_color_parse(cdefs[j], &col)) continue;
-			settings->pal[i].red = (col.red + 128) / 257;
-			settings->pal[i].green = (col.green + 128) / 257;
-			settings->pal[i].blue = (col.blue + 128) / 257;
+			dest[0] = (col.red + 128) / 257;
+			dest[1] = (col.green + 128) / 257;
+			dest[2] = (col.blue + 128) / 257;
 			break;
 		}
 		/* Not one understandable color */
-		if (j >= XPM_COL_DEFS) goto fail2;
+		if (j >= XPM_COL_DEFS) goto fail3;
 	}
 
-	/* Build cuckoo hash of colors */
-	while (TRUE) /* Until done */
+	/* Create palette */
+	if (bpp == 1)
 	{
-		memset(cuckoo, 0, sizeof(cuckoo));
-		/* [Re]insert items */
-		for (i = 0; i < cols; i++)
+		dest = pal;
+		for (i = 0; i < cols; i++ , dest += 3)
 		{
-			key = hashf(seed, ckeys[i], cpp);
-
-			/* Trivial case */
-			k = (key & HMASK) * 2;
-			idx = cuckoo[k];
-			cuckoo[k] = i + 1;
-			if (!idx) continue;
-
-			/* Remove duplicates */
-			if (!strncmp(ckeys[idx - 1], ckeys[i], cpp)) continue;
-			j = ((key >> 16) & HMASK) * 2 + 1;
-			if (cuckoo[j] && !strncmp(ckeys[cuckoo[j] - 1],
-				ckeys[i], cpp)) cuckoo[j] = 0;
-
-			/* Normal cuckoo process */
-			for (ii = 1; ii < MAXLOOP; ii++)
-			{
-				key = hashf(seed, ckeys[idx - 1], cpp);
-				key >>= (ii & 1) << 4;
-				j = (key & HMASK) * 2 + (ii & 1);
-				k = cuckoo[j];
-				cuckoo[j] = idx;
-				idx = k;
-				if (!idx) break;
-			}
-			if (idx) break;
+			settings->pal[i].red = dest[0];
+			settings->pal[i].green = dest[1];
+			settings->pal[i].blue = dest[2];
 		}
-		if (i >= cols) break;
-		/* Failed insertion - mutate seed */
-		seed = HASH_RND(seed);
+		if (trans >= 0)
+		{
+			settings->xpm_trans = trans;
+			settings->pal[trans].red = settings->pal[trans].green = 115;
+			settings->pal[trans].blue = 0;
+		}
 	}
-	
+
+	/* Find an unused color for transparency */
+	else if (trans >= 0)
+	{
+		char cmap[XPM_MAXCOL + 1];
+
+		memset(cmap, 0, sizeof(cmap));
+		dest = pal;
+		for (i = 0; i < cols; i++ , dest += 3)
+		{
+			j = MEM_2_INT(dest, 0);
+			if (j < XPM_MAXCOL) cmap[j] = 1;
+		}
+		settings->rgb_trans = j = strlen(cmap);
+		dest = pal + trans * 3;
+		dest[0] = INT_2_R(j);
+		dest[1] = INT_2_G(j);
+		dest[2] = INT_2_B(j);
+	}
+
 	/* Now, read the image */
-	if (!settings->silent) ls_init("XPM", 0);
 	res = FILE_LIB_ERROR;
 	dest = settings->img[CHN_IMAGE];
 	for (i = 0; i < h; i++)
@@ -2374,19 +2450,19 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		if (!fgetsC(buf, lsz, fp)) goto fail3;
 		if (!(r = strchr(buf, '"'))) goto fail3;
 		if (++r - buf + w * cpp >= lsz) goto fail3;
-		for (j = 0; j < w; j++)
+		for (j = 0; j < w; j++ , dest += bpp)
 		{
-			/* Check the two cuckoo slots for key being there */
-			key = hashf(seed, r, cpp);
-			k = cuckoo[(key & HMASK) * 2];
-			if (!k || strncmp(ckeys[k - 1], r, cpp))
-			{
-				k = cuckoo[((key >> 16) & HMASK) * 2 + 1];
-				if (!k || strncmp(ckeys[k - 1], r, cpp))
-					goto fail3;
-			}
-			*dest++ = k - 1;
+			k = ch_find(&cuckoo, r);
+			if (!k) goto fail3;
 			r += cpp;
+			if (bpp == 1) *dest = k - 1;
+			else
+			{
+				src = (pal - 3) + k * 3;
+				dest[0] = src[0];
+				dest[1] = src[1];
+				dest[2] = src[2];
+			}
 		}
 		if (!settings->silent && ((i * 10) % h >= h - 10))
 			progress_update((float)i / h);
@@ -2399,19 +2475,20 @@ fail:	fclose(fp);
 	return (res);
 }
 
-static char base64[] =
+static const char base64[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
 	hex[] = "0123456789ABCDEF";
 
 static int save_xpm(char *file_name, ls_settings *settings)
 {
-	unsigned char *src;
-	char ctb[256 * 2 + 1], *buf, *tmp;
+	unsigned char rgbmem[XPM_MAXCOL * 4], *src;
+	const char *ctb;
+	char ws[3], *buf, *tmp;
+	str_hash cuckoo;
 	FILE *fp;
-	int i, j, cpp, w = settings->width, h = settings->height;
+	int bpp = settings->bpp, w = settings->width, h = settings->height;
+	int i, j, k, cpp, cols, trans = -1;
 
-
-	if (settings->bpp != 1) return WRONG_FORMAT;
 
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
@@ -2420,7 +2497,51 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
 	if (!i) return -1;
 
-	cpp = settings->colors > 64 ? 2 : 1;
+	/* Collect RGB colors */
+	if (bpp == 3)
+	{
+		/* Init hash */
+		memset(&cuckoo, 0, sizeof(cuckoo));
+		cuckoo.keys = rgbmem;
+		cuckoo.step = 4;
+		cuckoo.cpp = 3;
+		cuckoo.seed = HASHSEED;
+
+		j = w * h;
+		src = settings->img[CHN_IMAGE];
+		for (i = 0; i < j; i++ , src += 3)
+		{
+			if (ch_insert(&cuckoo, src) < 0)
+				return (WRONG_FORMAT); /* Too many colors */
+		}
+		cols = cuckoo.cnt;
+		trans = settings->rgb_trans;
+		/* RGB to index */
+		if (trans > -1)
+		{
+			char trgb[3];
+			trgb[0] = INT_2_R(trans);
+			trgb[1] = INT_2_G(trans);
+			trgb[2] = INT_2_B(trans);
+			trans = ch_find(&cuckoo, trgb) - 1;
+		}
+	}
+
+	/* Process indexed colors */
+	else
+	{
+		cols = settings->colors;
+		src = rgbmem;
+		for (i = 0; i < cols; i++ , src += 4)
+		{
+			src[0] = settings->pal[i].red;
+			src[1] = settings->pal[i].green;
+			src[2] = settings->pal[i].blue;
+		}
+		trans = settings->xpm_trans;
+	}
+
+	cpp = cols > 64 ? 2 : 1;
 	buf = malloc(w * cpp + 16);
 	if (!buf) return -1;
 
@@ -2436,52 +2557,44 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	fprintf(fp, "static char *%.*s_xpm[] = {\n", i, tmp);
 
 	if ((settings->hot_x >= 0) && (settings->hot_y >= 0))
-		fprintf(fp, "\"%d %d %d %d %d %d\",\n", w, h, settings->colors,
-			cpp, settings->hot_x, settings->hot_y);
-	else fprintf(fp, "\"%d %d %d %d\",\n", w, h, settings->colors, cpp);
+		fprintf(fp, "\"%d %d %d %d %d %d\",\n", w, h, cols, cpp,
+			settings->hot_x, settings->hot_y);
+	else fprintf(fp, "\"%d %d %d %d\",\n", w, h, cols, cpp);
 
 	/* Create colortable */
-	tmp = settings->colors > 16 ? base64 : hex;
-	memset(ctb, 0, sizeof(ctb));
-	for (i = 0; i < settings->colors; i++)
+	ctb = cols > 16 ? base64 : hex;
+	ws[1] = ws[2] = '\0';
+	for (i = 0; i < cols; i++)
 	{
-		if (i == settings->xpm_trans)
+		if (i == trans)
 		{
-			if (cpp == 1) ctb[i] = ' ';
-			else ctb[2 * i] = ctb[2 * i + 1] = ' ';
-			fprintf(fp, "\"%s\tc None\",\n", ctb + i * cpp);
+			ws[0] = ' ';
+			if (cpp > 1) ws[1] = ' ';
+			fprintf(fp, "\"%s\tc None\",\n", ws);
 			continue;
 		}
-		if (cpp == 1) ctb[i] = tmp[i];
-		else
-		{
-			ctb[2 * i] = hex[i >> 4];
-			ctb[2 * i + 1] = hex[i & 0xF];
-		}
-		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ctb + i * cpp,
-			settings->pal[i].red, settings->pal[i].green,
-			settings->pal[i].blue);
-	}
-	if (cpp == 1) memset(ctb + i, ctb[0], 256 - i);
-	else
-	{
-		for (; i < 256; i++)
-		{
-			ctb[2 * i] = ctb[0];
-			ctb[2 * i + 1] = ctb[1];
-		}
+		ws[0] = ctb[i & 63];
+		if (cpp > 1) ws[1] = ctb[i >> 6];
+		src = rgbmem + i * 4;
+		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
+			src[0], src[1], src[2]);
 	}
 
+	w *= bpp;
 	for (i = 0; i < h; i++)
 	{
 		src = settings->img[CHN_IMAGE] + i * w;
 		tmp = buf;
 		*tmp++ = '"';
-		for (j = 0; j < w; j++)
+		for (j = 0; j < w; j += bpp, tmp += cpp)
 		{
-			*tmp++ = ctb[cpp * src[j]];
-			if (cpp == 1) continue;
-			*tmp++ = ctb[2 * src[j] + 1];
+			k = bpp == 1 ? src[j] : ch_find(&cuckoo, src + j) - 1;
+			if (k == trans) tmp[0] = tmp[1] = ' ';
+			else
+			{
+				tmp[0] = ctb[k & 63];
+				tmp[1] = ctb[k >> 6];
+			}
 		}
 		strcpy(tmp, i < h - 1 ? "\",\n" : "\"\n};\n");
 		fputs(buf, fp);
