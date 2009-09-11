@@ -175,6 +175,7 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 	memcpy(lp->mem_undo_im_, mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
 	memcpy(lp->mem_img, mem_img, sizeof(chanlist));
 
+	lp->mem_channel		= mem_channel;
 	lp->mem_img_bpp		= mem_img_bpp;
 	lp->mem_changed		= mem_changed;
 	lp->mem_width		= mem_width;
@@ -212,6 +213,7 @@ static void layer_copy_to_main( int l )		// Copy info from layer to main image
 	memcpy(mem_undo_im_, lp->mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
 	memcpy(mem_img, lp->mem_img, sizeof(chanlist));
 
+	mem_channel	= lp->mem_channel;
 	mem_img_bpp	= lp->mem_img_bpp;
 	mem_changed	= lp->mem_changed;
 	mem_width	= lp->mem_width;
@@ -343,6 +345,7 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 
 	memset(lim->mem_img, 0, sizeof(chanlist));
 	memcpy(lim->mem_img, temp_img, sizeof(chanlist));
+	lim->mem_channel = temp_img[mem_channel] ? mem_channel : CHN_IMAGE;
 	lim->mem_img_bpp = bpp;
 	lim->mem_changed = 0;
 	lim->mem_width = w;
@@ -1028,9 +1031,6 @@ void layer_press_save()
 
 static void update_main_with_new_layer()
 {
-	/* Switch channels if needed */
-	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
-
 	gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
 	update_all_views();
 

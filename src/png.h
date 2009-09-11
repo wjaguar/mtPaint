@@ -97,5 +97,8 @@ int save_tiff( char *file_name );
 int load_bmp( char *file_name );
 int save_bmp( char *file_name );
 
+int save_channel( char *filename, unsigned char *image, int w, int h );
+int load_channel( char *filename, unsigned char *image, int w, int h );
+
 int export_undo ( char *file_name, int type );
 int export_ascii ( char *file_name );

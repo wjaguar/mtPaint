@@ -1671,7 +1671,11 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom, 0,
 			layer_selected - 1, 1);
 	}
-	else render_background(rgb, px1, py1, pw, ph, pw);
+	else
+	{
+		async_bk = !chequers_optimize; /* Only w/o layers */
+		render_background(rgb, px1, py1, pw, ph, pw);
+	}
 
 	setup_row(px1, pw, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
 	j0 = -1; tmp = rgb; pw3 = pw * 3;
@@ -1720,6 +1724,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	free(pix);
 	free(rgb);
 	free(t_alpha);
+	async_bk = FALSE;
 }
 
 void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
@@ -1865,7 +1870,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
 			pw, ph, can_zoom, 0, layer_selected - 1, 1);
 	}
-	else async_bk = !chequers_optimize; /* Only here and only w/o layers */
+	else async_bk = !chequers_optimize; /* Only w/o layers */
 	main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
@@ -1901,6 +1906,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
 
 	free( rgb );
+	async_bk = FALSE;
 
 	if ( marq_status >= MARQUEE_PASTE && show_paste )
 	{	// Add clipboard image to redraw if needed
@@ -1921,7 +1927,6 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			repaint_paste( ax1, ay1, ax2, ay2 );
 		}
 	}
-	async_bk = FALSE;
 
 	if ( marq_status != MARQUEE_NONE ) paint_marquee(11, marq_x1, marq_y1);
 	if ( perim_status > 0 ) repaint_perim();
@@ -2504,6 +2509,7 @@ void main_init()
 		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel_anti, 0, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Selection/Alpha Blend A,B"),	NULL,	pressed_clip_alpha_scale,0, NULL },
+		{ _("/Selection/Copy Alpha to Mask"),	NULL,	pressed_clip_alphamask,0, NULL },
 		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask,0, NULL },
 		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_unmask,0, NULL },
 		{ _("/Selection/Mask All Colours"),	NULL,	pressed_clip_mask_all,0, NULL },
@@ -2611,6 +2617,7 @@ void main_init()
 			_("/Edit/Paste To New Layer"),
 			_("/Selection/Flip Horizontally"), _("/Selection/Flip Vertically"),
 			_("/Selection/Rotate Clockwise"), _("/Selection/Rotate Anti-Clockwise"),
+			_("/Selection/Copy Alpha to Mask"),
 			_("/Selection/Mask Colour A,B"), _("/Selection/Clear Mask"),
 			_("/Selection/Unmask Colour A,B"), _("/Selection/Mask All Colours"),
 			NULL},

@@ -33,6 +33,7 @@ typedef struct
 {
 	char mem_filename[256];
 	chanlist mem_img;
+	int mem_channel;
 	int mem_img_bpp, mem_changed, mem_width, mem_height, mem_ics;
 	float mem_icx, mem_icy;
 

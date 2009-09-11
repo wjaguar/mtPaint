@@ -392,6 +392,29 @@ void pressed_clip_unmask()
 void pressed_clip_mask()
 {	mask_ab(0);	}
 
+void pressed_clip_alphamask()
+{
+	int i, j = mem_clip_w * mem_clip_h;
+
+	if (!mem_clipboard || !mem_clip_alpha) return;
+
+	if ( !mem_clip_mask )		// Create clipboard mask if not already there
+	{
+		mem_clip_mask = malloc( j*mem_clip_bpp );
+		if ( !mem_clip_mask )
+		{
+			memory_errors(1);
+			return;		// Bail out - not enough memory
+		}
+	}
+
+	memcpy( mem_clip_mask, mem_clip_alpha, j * mem_clip_bpp );	// Copy alpha to mask
+
+	for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-mem_clip_mask[i];	// Flip values
+
+	gtk_widget_queue_draw( drawing_canvas );
+}
+
 void pressed_clip_alpha_scale()
 {
 	if (!mem_clipboard || (mem_clip_bpp != 3)) return;
@@ -970,11 +993,31 @@ void set_new_filename( char *fname )
 	update_titlebar();
 }
 
+static void populate_channel( char *filename, int c )
+{
+	int res;
+	unsigned char *temp;
+	undo_item *undo = &mem_undo_im_[mem_undo_pointer];
+
+	if ( valid_file(filename) == 0 )
+	{
+		temp = malloc( mem_width * mem_height );
+		if (temp)
+		{
+			res = load_channel( filename, temp, mem_width, mem_height);
+			if ( res != 0 ) free(temp);	// Problem with file I/O
+			else mem_img[c] = undo->img[c] = temp;
+		}
+		else memory_errors(1);		// Not enough memory available
+	}
+}
+
+
 int do_a_load( char *fname )
 {
-	gboolean loading_single = FALSE;
+	gboolean loading_single = FALSE, loading_png = FALSE;
 	int res, i, gif_delay;
-	char mess[512], real_fname[300];
+	char mess[512], real_fname[300], chan_fname[260];
 
 #if DIR_SEP == '/'
 	if ( fname[0] != DIR_SEP )		// GNU/Linux
@@ -999,7 +1042,10 @@ gtk_widget_hide( drawing_canvas );
 	if ( (res = load_jpeg( real_fname )) == -1 )
 	if ( (res = load_xpm( real_fname )) == -1 )
 	if ( (res = load_xbm( real_fname )) == -1 )
+	{
+		loading_png = TRUE;
 		res = load_png( real_fname, 0 );
+	}
 
 	if ( res>0 ) loading_single = TRUE;
 	else
@@ -1059,14 +1105,6 @@ gtk_widget_hide( drawing_canvas );
 
 	if ( res>0 )
 	{
-		update_all_views();					// Show new image
-
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-				// These 2 are needed to synchronize the scrollbars & image view
-
 		if ( res == FILE_GIF_ANIM )		// Animated GIF was loaded so tell user
 		{
 			res = alert_box( _("Warning"), _("This is an animated GIF file.  What do you want to do?"), _("Cancel"), _("Edit Frames"),
@@ -1100,6 +1138,32 @@ gtk_widget_hide( drawing_canvas );
 
 			create_default_image();		// Have empty image again to avoid destroying old animation
 		}
+		else	// Load channels files if they exist
+		{
+			// Check for existence of <filename>_c? (PNG) <filename>.png_c? (non-PNG)
+			// if not RGB PNG loaded, check for ?=0.  Always look for ?=1, ?=2
+
+			if ( loading_png ) snprintf( chan_fname, 256, "%s_c0", fname );
+			else snprintf( chan_fname, 256, "%s.png_c0", fname );
+
+			if ( !( loading_png && mem_img_bpp==3) )
+				populate_channel( chan_fname, CHN_ALPHA );
+
+			chan_fname[strlen(chan_fname)-1] = '1';
+			populate_channel( chan_fname, CHN_SEL );
+
+			chan_fname[strlen(chan_fname)-1] = '2';
+			populate_channel( chan_fname, CHN_MASK );
+		}
+
+		update_all_views();					// Show new image
+		init_status_bar();
+
+		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
+		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
+				// These 2 are needed to synchronize the scrollbars & image view
 	}
 	gtk_widget_show( drawing_canvas );
 	return 0;

@@ -128,6 +128,7 @@ void pressed_blur( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data );
 
 void pressed_clip_alpha_scale();
+void pressed_clip_alphamask();
 void pressed_clip_mask();
 void pressed_clip_unmask();
 void pressed_clip_mask_all();
