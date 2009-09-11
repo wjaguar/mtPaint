@@ -332,7 +332,8 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "scrollwheelZOOM",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[1])) );
 #endif
-
+	chequers_optimize = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
+	inifile_set_gboolean( "optimizeChequers", chequers_optimize );
 
 	inifile_set_gboolean( "pasteCommit",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit)) );
@@ -585,6 +586,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
 		vbox_3, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
 #endif
+	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
+		vbox_3, inifile_get_gboolean("optimizeChequers", TRUE) );
 
 
 

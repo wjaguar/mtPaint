@@ -2637,6 +2637,12 @@ void main_init()
 
 
 
+	gdk_rgb_init();
+	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
+	mem_jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
+	q_quit = inifile_get_gboolean( "quitToggle", TRUE );
+	chequers_optimize = inifile_get_gboolean( "optimizeChequers", TRUE );
+
 	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
@@ -2909,11 +2915,7 @@ void main_init()
 	icon_pix = gdk_pixmap_create_from_xpm_d( main_window->window, NULL, NULL, icon_xpm );
 	gdk_window_set_icon( main_window->window, NULL, icon_pix, NULL );
 
-	gdk_rgb_init();
 	set_cursor();
-	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
-	mem_jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
-	q_quit = inifile_get_gboolean( "quitToggle", TRUE );
 	init_status_bar();
 
 	snprintf( mem_clip_file[1], 250, "%s/.clipboard", get_home_directory() );

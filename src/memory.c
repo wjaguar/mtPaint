@@ -4091,14 +4091,13 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	return 0;
 }
 
-
-void mem_smudge(int ox, int oy, int nx, int ny)		// Smudge from old to new @ tool_size, RGB only
+void do_clone(int ox, int oy, int nx, int ny, int opacity)
 {
 	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
 	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
 	int xv = nx - ox, yv = ny - oy;		// Vector
-	int i, j, bpp, rx, ry, offs, delta, delta1;
-	int x0, x1, dx, y0, y1, dy;
+	int i, j, k, rx, ry, offs, delta, delta1, bpp;
+	int x0, x1, dx, y0, y1, dy, opw, op2;
 
 	if ( ax<0 )		// Ensure original area is within image
 	{
@@ -4131,89 +4130,8 @@ void mem_smudge(int ox, int oy, int nx, int ny)		// Smudge from old to new @ too
 	delta1 = yv * mem_width + xv;
 	delta = delta1 * bpp;
 
-	if (xv > 0)
-	{
-		x0 = w - 1; x1 = -1; dx = -1;
-	}
-	else
-	{
-		x0 = 0; x1 = w; dx = 1;
-	}
-	if (yv > 0)
-	{
-		y0 = h - 1; y1 = -1; dy = -1;
-	}
-	else
-	{
-		y0 = 0; y1 = h; dy = 1;
-	}
-
-	for (j = y0; j != y1; j += dy)	// Blend old area with new area
-	{
-		ry = ay + yv + j;
-		if ((ry < 0) || (ry >= mem_height)) continue;
-		for (i = x0; i != x1; i += dx)
-		{
-			rx = ax + xv + i;
-			if ((rx < 0) || (rx >= mem_width)) continue;
-			if (pixel_protected(rx, ry)) continue;
-			offs = mem_width * ry + rx;
-		/* !!! RGB and alpha averaged separately - is that good? - WJ */
-			if (dsta) dsta[offs] = (srca[offs - delta1] + dsta[offs]) / 2;
-			offs *= bpp;
-			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
-			if (bpp == 1) continue;
-			offs++;
-			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
-			offs++;
-			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
-		}
-	}
-}
-
-void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_size
-{
-	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
-	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
-	int xv = nx - ox, yv = ny - oy;		// Vector
-	int i, j, k, rx, ry, offs, delta, delta1, bpp;
-	int x0, x1, dx, y0, y1, dy;
-	int opac = 0, opw, op2;
-
-	if ( ax<0 )		// Ensure original area is within image
-	{
-		w = w + ax;
-		ax = 0;
-	}
-	if ( ay<0 )
-	{
-		h = h + ay;
-		ay = 0;
-	}
-	if ( (ax+w)>mem_width )
-		w = mem_width - ax;
-	if ( (ay+h)>mem_height )
-		h = mem_height - ay;
-
-	if ((w < 1) || (h < 1)) return;
-
-/* !!! I modified this tool action somewhat - White Jaguar */
-	if ( mem_undo_opacity ) src = mem_undo_previous(mem_channel);
-	else src = mem_img[mem_channel];
-	dest = mem_img[mem_channel];
-	if ((mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA])
-	{
-		if (mem_undo_opacity) srca = mem_undo_previous(CHN_ALPHA);
-		else srca = mem_img[CHN_ALPHA];
-		dsta = mem_img[CHN_ALPHA];
-	}
-	bpp = MEM_BPP;
-	delta1 = yv * mem_width + xv;
-	delta = delta1 * bpp;
-
-	/* Tool opacity functions only for RGB - for now, at least */
-	if (bpp == 3) opac = tool_opacity;
-	opw = opac; op2 = 255 - opac;
+	opw = opacity;
+	op2 = 255 - opacity;
 
 	if (xv > 0)
 	{
@@ -4242,7 +4160,7 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 			if ((rx < 0) || (rx >= mem_width)) continue;
 			if (pixel_protected(rx, ry)) continue;
 			offs = mem_width * ry + rx;
-			if (!opac)
+			if (!opacity)
 			{
 				dest[offs] = src[offs - delta];
 				if (!dsta) continue;
@@ -4252,10 +4170,10 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 			if (dsta)
 			{
 				k = srca[offs];
-				k = k * 255 + (srca[offs - delta1] - k) * tool_opacity;
+				k = k * 255 + (srca[offs - delta1] - k) * opacity;
 				dsta[offs] = (k + (k >> 8) + 1) >> 8;
-				opw = k ? (255 * tool_opacity * srca[offs - delta1]) / k :
-					tool_opacity;
+				opw = k ? (255 * opacity * srca[offs - delta1]) / k :
+					opacity;
 				op2 = 255 - opw;
 			}
 			offs *= bpp;
@@ -4271,4 +4189,3 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 		}
 	}
 }
-

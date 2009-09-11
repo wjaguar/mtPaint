@@ -66,7 +66,9 @@ gboolean show_paste,					// Show contents of clipboard while pasting
 	col_reverse = FALSE,				// Painting with right button
 	text_paste = FALSE,				// Are we pasting text?
 	canvas_image_centre = TRUE,			// Are we centering the image?
-	fs_do_gif_explode = FALSE;
+	fs_do_gif_explode = FALSE,
+	chequers_optimize = TRUE			// Are we optimizing the chequers for speed?
+	;
 
 void commit_paste( gboolean undo )
 {

@@ -263,8 +263,9 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
-void mem_smudge(int ox, int oy, int nx, int ny);		// Smudge from old to new @ tool_size
-void mem_clone(int ox, int oy, int nx, int ny);			// Clone from old to new @ tool_size
+void do_clone(int ox, int oy, int nx, int ny, int opacity);
+#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), 127)
+#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? tool_opacity : 0)
 
 void mem_brcosa_chunk( unsigned char *rgb, int len );		// Apply BRCOSA to RGB memory
 void mem_posterize_chunk( unsigned char *rgb, int len );	// Apply posterize to RGB memory

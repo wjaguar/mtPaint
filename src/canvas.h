@@ -48,7 +48,9 @@ gboolean col_reverse,					// Painting with right button
 	show_paste,					// Show contents of clipboard while pasting
 	status_on[STATUS_ITEMS],			// Show status bar items?
 	text_paste,					// Are we pasting text?
-	canvas_image_centre;				// Are we centering the image?
+	canvas_image_centre,				// Are we centering the image?
+	chequers_optimize				// Are we optimizing the chequers for speed?
+	;
 
 #define LINE_NONE 0
 #define LINE_START 1
