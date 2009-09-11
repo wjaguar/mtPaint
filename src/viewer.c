@@ -56,7 +56,7 @@ GtkWidget *cline_window = NULL;
 
 static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 {							// Used by command line window
-	if ( check_zoom_keys(event) ) return TRUE;		// Check HOME/zoom keys
+	if (check_zoom_keys(wtf_pressed(event, main_keys))) return TRUE;		// Check HOME/zoom keys
 
 	return FALSE;
 }
@@ -397,7 +397,7 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 	int nv_h, nv_v, arrow_key = 0;
 	GtkAdjustment *hori, *vert;
 
-	if ( !check_zoom_keys_real(event) )
+	if (!check_zoom_keys_real(wtf_pressed(event, main_keys)))
 	{
 		switch (event->keyval)
 		{

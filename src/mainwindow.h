@@ -20,6 +20,74 @@
 
 #include <gtk/gtk.h>
 
+/* Keyboard action codes */
+#define ACT_QUIT	1
+#define ACT_ZOOM_IN	2
+#define ACT_ZOOM_OUT	3
+#define ACT_ZOOM_01	4
+#define ACT_ZOOM_025	5
+#define ACT_ZOOM_05	6
+#define ACT_ZOOM_1	7
+#define ACT_ZOOM_4	8
+#define ACT_ZOOM_8	9
+#define ACT_ZOOM_12	10
+#define ACT_ZOOM_16	11
+#define ACT_ZOOM_20	12
+#define ACT_VIEW	13
+#define ACT_BRCOSA	14
+#define ACT_PAN		15
+#define ACT_CROP	16
+#define ACT_SWAP_AB	17
+#define ACT_CMDLINE	18
+#define ACT_PATTERN	19
+#define ACT_BRUSH	20
+#define ACT_PAINT	21
+#define ACT_SELECT	22
+#define ACT_SEL_2LEFT	23
+#define ACT_SEL_2RIGHT	24
+#define ACT_SEL_2DOWN	25
+#define ACT_SEL_2UP	26
+#define ACT_SEL_LEFT	27
+#define ACT_SEL_RIGHT	28
+#define ACT_SEL_DOWN	29
+#define ACT_SEL_UP	30
+#define ACT_OPAC_01	31
+#define ACT_OPAC_02	32
+#define ACT_OPAC_03	33
+#define ACT_OPAC_04	34
+#define ACT_OPAC_05	35
+#define ACT_OPAC_06	36
+#define ACT_OPAC_07	37
+#define ACT_OPAC_08	38
+#define ACT_OPAC_09	39
+#define ACT_OPAC_1	40
+#define ACT_OPAC_P	41
+#define ACT_OPAC_M	42
+#define ACT_LR_2LEFT	43
+#define ACT_LR_2RIGHT	44
+#define ACT_LR_2DOWN	45
+#define ACT_LR_2UP	46
+#define ACT_LR_LEFT	47
+#define ACT_LR_RIGHT	48
+#define ACT_LR_DOWN	49
+#define ACT_LR_UP	50
+#define ACT_ESC		51
+#define ACT_SCALE	52
+#define ACT_SIZE	53
+#define ACT_COMMIT	54
+#define ACT_ARROW	55
+#define ACT_ARROW3	56
+
+typedef struct
+{
+	char *actname;
+	int action, key, kmask, kflags;
+} key_action;
+
+extern key_action main_keys[];
+
+int wtf_pressed(GdkEventKey *event, key_action *keys);
+
 GtkWidget
 	*main_window, *main_vsplit,
 	*drawing_palette, *drawing_canvas,
@@ -75,8 +143,8 @@ void pressed_opacity( int opacity );
 void pressed_choose_patterns( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data );
 
-gint check_zoom_keys( GdkEventKey *event );
-gint check_zoom_keys_real( GdkEventKey *event );
+gint check_zoom_keys(int action);
+gint check_zoom_keys_real(int action);
 
 void zoom_in( GtkMenuItem *menu_item, gpointer user_data );
 void zoom_out( GtkMenuItem *menu_item, gpointer user_data );

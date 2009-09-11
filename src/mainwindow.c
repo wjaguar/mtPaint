@@ -605,23 +605,26 @@ int move_arrows( int *c1, int *c2, int value )
 	return 1;
 }
 
-int check_arrows( GdkEventKey *event, int change )
+int check_arrows(int action)
 {
-	int res = 0;
+	int mv = mem_nudge;
 
-	if ( event->keyval == GDK_Left || event->keyval == GDK_KP_Left )
-		res = move_arrows( &marq_x1, &marq_x2, -change );
-
-	if ( event->keyval == GDK_Right || event->keyval == GDK_KP_Right )
-		res = move_arrows( &marq_x1, &marq_x2, change );
-
-	if ( event->keyval == GDK_Down || event->keyval == GDK_KP_Down )
-		res = move_arrows( &marq_y1, &marq_y2, change );
-
-	if ( event->keyval == GDK_Up || event->keyval == GDK_KP_Up )
-		res = move_arrows( &marq_y1, &marq_y2, -change );
-
-	return res;
+	switch (action)
+	{
+	case ACT_SEL_LEFT: mv = 1;
+	case ACT_SEL_2LEFT:
+		return (move_arrows(&marq_x1, &marq_x2, -mv));
+	case ACT_SEL_RIGHT: mv = 1;
+	case ACT_SEL_2RIGHT:
+		return (move_arrows(&marq_x1, &marq_x2, mv));
+	case ACT_SEL_DOWN: mv = 1;
+	case ACT_SEL_2DOWN:
+		return (move_arrows(&marq_y1, &marq_y2, mv));
+	case ACT_SEL_UP: mv = 1;
+	case ACT_SEL_2UP:
+		return (move_arrows(&marq_y1, &marq_y2, -mv));
+	}
+	return (0);
 }
 
 void stop_line()
@@ -637,235 +640,308 @@ void change_to_tool(int icon)
 	if ( perim_status > 0 ) clear_perim_real(0, 0);
 }
 
-gint check_zoom_keys_real( GdkEventKey *event )
+gint check_zoom_keys_real(int action)
 {
-	int i=-1;
-	float zals[9] = { 0.1, 0.25, 0.5, 1, 4, 8, 12, 16, 20 };
+	static double zals[9] = { 0.1, 0.25, 0.5, 1, 4, 8, 12, 16, 20 };
 
-	if ( !(event->state & GDK_SHIFT_MASK) && !(event->state & GDK_CONTROL_MASK) )
+	switch (action)
 	{
-		switch (event->keyval)
-		{
-			case GDK_plus:		zoom_in(NULL, NULL); return TRUE;
-			case GDK_KP_Add:	zoom_in(NULL, NULL); return TRUE;
-			case GDK_equal:		zoom_in(NULL, NULL); return TRUE;
-			case GDK_minus:		zoom_out(NULL, NULL); return TRUE;
-			case GDK_KP_Subtract:	zoom_out(NULL, NULL); return TRUE;
-		}
-	}
-
-	if ( !(event->state & GDK_SHIFT_MASK) && !(event->state & GDK_CONTROL_MASK) )
-	{
-		if ( event->keyval >= GDK_KP_1 && event->keyval <= GDK_KP_9 )
-			i = event->keyval - GDK_KP_1;
-		if ( event->keyval >= GDK_1 && event->keyval <= GDK_9 )
-			i = event->keyval - GDK_1;
-
-		if ( i>=0 && i<=9 )
-		{
-			align_size( zals[i] );
-			return TRUE;
-		}
-	}
-
-	if ( event->keyval == GDK_Home )
-	{
+	case ACT_ZOOM_IN:
+		zoom_in(NULL, NULL); return TRUE;
+	case ACT_ZOOM_OUT:
+		zoom_out(NULL, NULL); return TRUE;
+	case ACT_ZOOM_01:
+	case ACT_ZOOM_025:
+	case ACT_ZOOM_05:
+	case ACT_ZOOM_1:
+	case ACT_ZOOM_4:
+	case ACT_ZOOM_8:
+	case ACT_ZOOM_12:
+	case ACT_ZOOM_16:
+	case ACT_ZOOM_20:
+		align_size(zals[action - ACT_ZOOM_01]);
+		return TRUE;
+	case ACT_VIEW:
 		toggle_view( NULL, NULL );
 		return TRUE;
 	}
-
 	return FALSE;
 }
 
-gint check_zoom_keys( GdkEventKey *event )
+gint check_zoom_keys(int action)
 {
-	if ( (event->keyval == GDK_q || event->keyval == GDK_Q ) && q_quit )
-		quit_all( NULL, NULL );
+	if ((action == ACT_QUIT) && q_quit) quit_all( NULL, NULL );
 
-	if ( check_zoom_keys_real(event) ) return TRUE;
+	if (check_zoom_keys_real(action)) return TRUE;
 
-	if ( !(event->state & GDK_SHIFT_MASK) && !(event->state & GDK_CONTROL_MASK) )
+	switch (action)
 	{
-		switch (event->keyval)
-		{
-		case GDK_Insert:	pressed_brcosa(NULL, NULL); return TRUE;
-		case GDK_End:		pressed_pan(NULL, NULL); return TRUE;
-		case GDK_Delete:	pressed_crop(NULL, NULL); return TRUE;
-		}
+	case ACT_BRCOSA:
+		pressed_brcosa(NULL, NULL); return TRUE;
+	case ACT_PAN:
+		pressed_pan(NULL, NULL); return TRUE;
+	case ACT_CROP:
+		pressed_crop(NULL, NULL); return TRUE;
+	case ACT_SWAP_AB:
+		pressed_swap_AB(NULL, NULL); return TRUE;
+	case ACT_CMDLINE:
+		if ( allow_cline ) pressed_cline(NULL, NULL); return TRUE;
+	case ACT_PATTERN:
+		pressed_choose_patterns(NULL, NULL); return TRUE;
+	case ACT_BRUSH:
+		pressed_choose_brush(NULL, NULL); return TRUE;
+	case ACT_PAINT:
+		change_to_tool(0); return TRUE;
+	case ACT_SELECT:
+		change_to_tool(6); return TRUE;
+	}
+	return FALSE;
+}
 
-		if ( !(event->state & GDK_MOD1_MASK) )	// We must avoid catching Alt-V, C etc.
-		switch (event->keyval)
-		{
-		case GDK_x:
-		case GDK_X:		pressed_swap_AB(NULL, NULL); return TRUE;
-		case GDK_c:
-		case GDK_C:		if ( allow_cline ) pressed_cline(NULL, NULL); return TRUE;
+#define _C (GDK_CONTROL_MASK)
+#define _S (GDK_SHIFT_MASK)
+#define _A (GDK_MOD1_MASK)
+#define _CS (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
+#define _CSA (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
+
+key_action main_keys[] = {
+	{"QUIT",	ACT_QUIT, GDK_q, 0, 0},
+	{"",		ACT_QUIT, GDK_Q, 0, 0},
+	{"ZOOM_IN",	ACT_ZOOM_IN, GDK_plus, _CS, 0},
+	{"",		ACT_ZOOM_IN, GDK_KP_Add, _CS, 0},
+	{"",		ACT_ZOOM_IN, GDK_equal, _CS, 0},
+	{"ZOOM_OUT",	ACT_ZOOM_OUT, GDK_minus, _CS, 0},
+	{"",		ACT_ZOOM_OUT, GDK_KP_Subtract, _CS, 0},
+	{"ZOOM_01",	ACT_ZOOM_01, GDK_KP_1, _CS, 0},
+	{"",		ACT_ZOOM_01, GDK_1, _CS, 0},
+	{"ZOOM_025",	ACT_ZOOM_025, GDK_KP_2, _CS, 0},
+	{"",		ACT_ZOOM_025, GDK_2, _CS, 0},
+	{"ZOOM_05",	ACT_ZOOM_05, GDK_KP_3, _CS, 0},
+	{"",		ACT_ZOOM_05, GDK_3, _CS, 0},
+	{"ZOOM_1",	ACT_ZOOM_1, GDK_KP_4, _CS, 0},
+	{"",		ACT_ZOOM_1, GDK_4, _CS, 0},
+	{"ZOOM_4",	ACT_ZOOM_4, GDK_KP_5, _CS, 0},
+	{"",		ACT_ZOOM_4, GDK_5, _CS, 0},
+	{"ZOOM_8",	ACT_ZOOM_8, GDK_KP_6, _CS, 0},
+	{"",		ACT_ZOOM_8, GDK_6, _CS, 0},
+	{"ZOOM_12",	ACT_ZOOM_12, GDK_KP_7, _CS, 0},
+	{"",		ACT_ZOOM_12, GDK_7, _CS, 0},
+	{"ZOOM_16",	ACT_ZOOM_16, GDK_KP_8, _CS, 0},
+	{"",		ACT_ZOOM_16, GDK_8, _CS, 0},
+	{"ZOOM_20",	ACT_ZOOM_20, GDK_KP_9, _CS, 0},
+	{"",		ACT_ZOOM_20, GDK_9, _CS, 0},
+	{"VIEW",	ACT_VIEW, GDK_Home, 0, 0},
+	{"BRCOSA",	ACT_BRCOSA, GDK_Insert, _CS, 0},
+	{"PAN",		ACT_PAN, GDK_End, _CS, 0},
+	{"CROP",	ACT_CROP, GDK_Delete, _CS, 0},
+	{"SWAP_AB",	ACT_SWAP_AB, GDK_x, _CSA, 0},
+	{"",		ACT_SWAP_AB, GDK_X, _CSA, 0}, // !!! Naturally, this doesn't work
+	{"CMDLINE",	ACT_CMDLINE, GDK_c, _CSA, 0},
+	{"",		ACT_CMDLINE, GDK_C, _CSA, 0}, // !!! And this, too
 #if GTK_MAJOR_VERSION == 2
-		case GDK_F2:		pressed_choose_patterns(NULL, NULL); return TRUE;
-		case GDK_F3:		pressed_choose_brush(NULL, NULL); return TRUE;
+	{"PATTERN",	ACT_PATTERN, GDK_F2, _CSA, 0},
+	{"BRUSH",	ACT_BRUSH, GDK_F3, _CSA, 0},
 #endif
 // GTK+1 creates a segfault if you use F2/F3 here - This doesn't matter as only GTK+2 needs it here as in full screen mode GTK+2 does not handle menu keyboard shortcuts
-		case GDK_F4:		change_to_tool(0); return TRUE;
-		case GDK_F9:		change_to_tool(6); return TRUE;
-		}
-	}
+	{"PAINT",	ACT_PAINT, GDK_F4, _CSA, 0},
+	{"SELECT",	ACT_SELECT, GDK_F9, _CSA, 0},
+	{"SEL_2LEFT",	ACT_SEL_2LEFT, GDK_Left, _CS, _S},
+	{"",		ACT_SEL_2LEFT, GDK_KP_Left, _CS, _S},
+	{"SEL_2RIGHT",	ACT_SEL_2RIGHT, GDK_Right, _CS, _S},
+	{"",		ACT_SEL_2RIGHT, GDK_KP_Right, _CS, _S},
+	{"SEL_2DOWN",	ACT_SEL_2DOWN, GDK_Down, _CS, _S},
+	{"",		ACT_SEL_2DOWN, GDK_KP_Down, _CS, _S},
+	{"SEL_2UP",	ACT_SEL_2UP, GDK_Up, _CS, _S},
+	{"",		ACT_SEL_2UP, GDK_KP_Up, _CS, _S},
+	{"SEL_LEFT",	ACT_SEL_LEFT, GDK_Left, _CS, 0},
+	{"",		ACT_SEL_LEFT, GDK_KP_Left, _CS, 0},
+	{"SEL_RIGHT",	ACT_SEL_RIGHT, GDK_Right, _CS, 0},
+	{"",		ACT_SEL_RIGHT, GDK_KP_Right, _CS, 0},
+	{"SEL_DOWN",	ACT_SEL_DOWN, GDK_Down, _CS, 0},
+	{"",		ACT_SEL_DOWN, GDK_KP_Down, _CS, 0},
+	{"SEL_UP",	ACT_SEL_UP, GDK_Up, _CS, 0},
+	{"",		ACT_SEL_UP, GDK_KP_Up, _CS, 0},
+	{"OPAC_01",	ACT_OPAC_01, GDK_KP_1, _C, _C},
+	{"",		ACT_OPAC_01, GDK_1, _C, _C},
+	{"OPAC_02",	ACT_OPAC_02, GDK_KP_2, _C, _C},
+	{"",		ACT_OPAC_02, GDK_2, _C, _C},
+	{"OPAC_03",	ACT_OPAC_03, GDK_KP_3, _C, _C},
+	{"",		ACT_OPAC_03, GDK_3, _C, _C},
+	{"OPAC_04",	ACT_OPAC_04, GDK_KP_4, _C, _C},
+	{"",		ACT_OPAC_04, GDK_4, _C, _C},
+	{"OPAC_05",	ACT_OPAC_05, GDK_KP_5, _C, _C},
+	{"",		ACT_OPAC_05, GDK_5, _C, _C},
+	{"OPAC_06",	ACT_OPAC_06, GDK_KP_6, _C, _C},
+	{"",		ACT_OPAC_06, GDK_6, _C, _C},
+	{"OPAC_07",	ACT_OPAC_07, GDK_KP_7, _C, _C},
+	{"",		ACT_OPAC_07, GDK_7, _C, _C},
+	{"OPAC_08",	ACT_OPAC_08, GDK_KP_8, _C, _C},
+	{"",		ACT_OPAC_08, GDK_8, _C, _C},
+	{"OPAC_09",	ACT_OPAC_09, GDK_KP_9, _C, _C},
+	{"",		ACT_OPAC_09, GDK_9, _C, _C},
+	{"OPAC_1",	ACT_OPAC_1, GDK_KP_0, _C, _C},
+	{"",		ACT_OPAC_1, GDK_0, _C, _C},
+	{"OPAC_P",	ACT_OPAC_P, GDK_plus, _C, _C},
+	{"",		ACT_OPAC_P, GDK_KP_Add, _C, _C},
+	{"",		ACT_OPAC_P, GDK_equal, _C, _C},
+	{"OPAC_M",	ACT_OPAC_M, GDK_minus, _C, _C},
+	{"",		ACT_OPAC_M, GDK_KP_Subtract, _C, _C},
+	{"LR_2LEFT",	ACT_LR_2LEFT, GDK_Left, _CS, _CS},
+	{"",		ACT_LR_2LEFT, GDK_KP_Left, _CS, _CS},
+	{"LR_2RIGHT",	ACT_LR_2RIGHT, GDK_Right, _CS, _CS},
+	{"",		ACT_LR_2RIGHT, GDK_KP_Right, _CS, _CS},
+	{"LR_2DOWN",	ACT_LR_2DOWN, GDK_Down, _CS, _CS},
+	{"",		ACT_LR_2DOWN, GDK_KP_Down, _CS, _CS},
+	{"LR_2UP",	ACT_LR_2UP, GDK_Up, _CS, _CS},
+	{"",		ACT_LR_2UP, GDK_KP_Up, _CS, _CS},
+	{"LR_LEFT",	ACT_LR_LEFT, GDK_Left, _CS, _C},
+	{"",		ACT_LR_LEFT, GDK_KP_Left, _CS, _C},
+	{"LR_RIGHT",	ACT_LR_RIGHT, GDK_Right, _CS, _C},
+	{"",		ACT_LR_RIGHT, GDK_KP_Right, _CS, _C},
+	{"LR_DOWN",	ACT_LR_DOWN, GDK_Down, _CS, _C},
+	{"",		ACT_LR_DOWN, GDK_KP_Down, _CS, _C},
+	{"LR_UP",	ACT_LR_UP, GDK_Up, _CS, _C},
+	{"",		ACT_LR_UP, GDK_KP_Up, _CS, _C},
+	{"ESC",		ACT_ESC, GDK_Escape, _CS, 0},
+	{"SCALE",	ACT_SCALE, GDK_Page_Up, _CS, 0},
+	{"SIZE",	ACT_SIZE, GDK_Page_Down, _CS, 0},
+	{"COMMIT",	ACT_COMMIT, GDK_Return, 0, 0},
+	{"",		ACT_COMMIT, GDK_KP_Enter, 0, 0},
+	{"ARROW",	ACT_ARROW, GDK_a, 0, 0},
+	{"",		ACT_ARROW, GDK_A, 0, 0},
+	{"ARROW3",	ACT_ARROW3, GDK_s, 0, 0},
+	{"",		ACT_ARROW3, GDK_S, 0, 0},
+	{NULL,		0, 0, 0, 0}
+};
 
-	return FALSE;
+int wtf_pressed(GdkEventKey *event, key_action *keys)
+{
+	while (keys->action)
+	{
+		if ((event->keyval == keys->key) &&
+			((event->state & keys->kmask) == keys->kflags))
+			return (keys->action);
+		keys++;
+	}
+	return (0);
 }
 
 gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 {
-	int change = 1, change_x = 0, change_y = 0;
+	int change;
 	int i, aco[3][2], minx, maxx, miny, maxy, xw, yh;	// Arrow coords
 	float llen, uvx, uvy;					// Line length & unit vector lengths
+	int action;
 
-	if ( check_zoom_keys( event ) ) return TRUE;		// Check HOME/zoom keys
+	action = wtf_pressed(event, main_keys);
+	if (!action) return (FALSE);
 
-	if ( !(event->state & GDK_CONTROL_MASK) && (event->state & GDK_SHIFT_MASK) )
+	if (check_zoom_keys(action)) return TRUE;		// Check HOME/zoom keys
+
+	if (marq_status > MARQUEE_NONE)
 	{
-		if ( marq_status > MARQUEE_NONE )
+		if (check_arrows(action) == 1)
 		{
-			if ( check_arrows( event, mem_nudge ) == 1 )
-			{
-				update_sel_bar();
-				update_menus();
-				return TRUE;
-			}
-		}
-	}
-
-	if ( (event->state & GDK_CONTROL_MASK) )		// Opacity keys, i.e. CTRL + keypad
-	{
-		if ( event->keyval >= GDK_KP_0 && event->keyval <= GDK_KP_9 )
-		{
-			i = event->keyval - GDK_KP_0;
-			if ( i<1 ) i=10;
-			pressed_opacity( (255 * i) / 10 );
-		}
-		if ( event->keyval >= GDK_0 && event->keyval <= GDK_9 )
-		{
-			i = event->keyval - GDK_0;
-			if ( i<1 ) i=10;
-			pressed_opacity( (255 * i) / 10 );
-		}
-		if ( event->keyval == GDK_plus || event->keyval == GDK_equal ||
-			event->keyval == GDK_KP_Add )
-				pressed_opacity( tool_opacity+1 );
-		if ( event->keyval == GDK_minus || event->keyval == GDK_KP_Subtract )
-				pressed_opacity( tool_opacity-1 );
-	}
-
-	if ( (event->state & GDK_CONTROL_MASK) && layers_total>0 )
-	{
-	  if ( layer_selected>0 )
-	  {
-		if ( event->state & GDK_SHIFT_MASK ) change = inifile_get_gint32("pixelNudge", 8 );
-
-		if ( event->keyval == GDK_Left || event->keyval == GDK_KP_Left ) change_x = -change;
-		if ( event->keyval == GDK_Right || event->keyval == GDK_KP_Right ) change_x = change;
-		if ( event->keyval == GDK_Down || event->keyval == GDK_KP_Down ) change_y = change;
-		if ( event->keyval == GDK_Up || event->keyval == GDK_KP_Up )  change_y = -change;
-
-		if ( (change_x != 0 || change_y !=0) && layer_selected != 0 )
-		{
-			move_layer_relative(layer_selected, change_x, change_y);
+			update_sel_bar();
+			update_menus();
 			return TRUE;
 		}
-	  }
 	}
+	change = inifile_get_gint32("pixelNudge", 8);
 
-	if ( !(event->state & GDK_CONTROL_MASK) && !(event->state & GDK_SHIFT_MASK) )
+	switch (action)
 	{
-		switch (event->keyval)
-		{
-			case GDK_Escape:	if ( tool_type == TOOL_SELECT ||
-							tool_type == TOOL_POLYGON )
-								pressed_select_none( NULL, NULL );
-						if ( tool_type == TOOL_LINE ) stop_line();
-						return TRUE;
-			case GDK_Page_Up:	pressed_scale(NULL, NULL); return TRUE;
-			case GDK_Page_Down:	pressed_size(NULL, NULL); return TRUE;
-		}
-		if ( marq_status > MARQUEE_NONE )
-		{
-			if ( check_arrows( event, 1 ) == 1 )
-			{
-				update_sel_bar();
-				update_menus();
-				return TRUE;
-			}
-		}
-		else
-		{
-			i = 1;
-			switch (event->keyval)
-			{
-			case GDK_Left: case GDK_KP_Left:
-				if (mem_channel == CHN_IMAGE)
-				{
-					if (mem_col_B) mem_col_B--;
-					break;
-				}
-				if (channel_col_B[mem_channel])
-					channel_col_B[mem_channel]--;
-				break;
-			case GDK_Right: case GDK_KP_Right:
-				if (mem_channel == CHN_IMAGE)
-				{
-					if (mem_col_B < mem_cols - 1) mem_col_B++;
-					break;
-				}
-				if (channel_col_B[mem_channel] < 255)
-					channel_col_B[mem_channel]++;
-				break;
-			case GDK_Down: case GDK_KP_Down:
-				if (mem_channel == CHN_IMAGE)
-				{
-					if (mem_col_A < mem_cols - 1) mem_col_A++;
-					break;
-				}
-				if (channel_col_A[mem_channel] < 255)
-					channel_col_A[mem_channel]++;
-				break;
-			case GDK_Up: case GDK_KP_Up:
-				if (mem_channel == CHN_IMAGE)
-				{
-					if (mem_col_A) mem_col_A--;
-					break;
-				}
-				if (channel_col_A[mem_channel])
-					channel_col_A[mem_channel]--;
-				break;
-			default:
-				i = 0;
-				break;
-			}
-			if (i)
-			{
-				if (mem_channel == CHN_IMAGE)
-				{
-					mem_col_A24 = mem_pal[mem_col_A];
-					mem_col_B24 = mem_pal[mem_col_B];
-					init_pal();
-				}
-				else pressed_opacity(channel_col_A[mem_channel]);
-				return TRUE;
-			}
-		}
-	}
-
-	if ( marq_status >= MARQUEE_PASTE &&
-		( event->keyval==GDK_KP_Enter || event->keyval==GDK_Return ) )
-	{
-		commit_paste(TRUE);
-		pen_down = 0;		// Ensure each press of enter is a new undo level
+	// Opacity keys, i.e. CTRL + keypad
+	case ACT_OPAC_01:
+	case ACT_OPAC_02:
+	case ACT_OPAC_03:
+	case ACT_OPAC_04:
+	case ACT_OPAC_05:
+	case ACT_OPAC_06:
+	case ACT_OPAC_07:
+	case ACT_OPAC_08:
+	case ACT_OPAC_09:
+	case ACT_OPAC_1:
+		pressed_opacity((255 * (action - ACT_OPAC_01 + 1)) / 10);
+		return (TRUE);
+	case ACT_OPAC_P:
+		pressed_opacity(tool_opacity + 1);
+		return (TRUE);
+	case ACT_OPAC_M:
+		pressed_opacity(tool_opacity - 1);
+		return (TRUE);
+	case ACT_LR_LEFT: change = 1;
+	case ACT_LR_2LEFT:
+		if (layer_selected)
+			move_layer_relative(layer_selected, -change, 0);
+		return (TRUE);
+	case ACT_LR_RIGHT: change = 1;
+	case ACT_LR_2RIGHT:
+		if (layer_selected)
+			move_layer_relative(layer_selected, change, 0);
+		return (TRUE);
+	case ACT_LR_DOWN: change = 1;
+	case ACT_LR_2DOWN:
+		if (layer_selected)
+			move_layer_relative(layer_selected, 0, change);
+		return (TRUE);
+	case ACT_LR_UP: change = 1;
+	case ACT_LR_2UP:
+		if (layer_selected)
+			move_layer_relative(layer_selected, 0, -change);
+		return (TRUE);
+	case ACT_ESC:
+		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+			pressed_select_none(NULL, NULL);
+		else if (tool_type == TOOL_LINE) stop_line();
 		return TRUE;
-	}
-
-	if ( tool_type == TOOL_LINE && line_status > LINE_NONE )
-	{
-		if ( event->keyval==GDK_a || event->keyval==GDK_A
-			|| event->keyval==GDK_s || event->keyval==GDK_S )
+	case ACT_SCALE:
+		pressed_scale(NULL, NULL); return TRUE;
+	case ACT_SIZE:
+		pressed_size(NULL, NULL); return TRUE;
+	/* The @#$% colour-change override */
+	case ACT_SEL_LEFT:
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_col_B) mem_col_B--;
+		}
+		else if (channel_col_B[mem_channel])
+			channel_col_B[mem_channel]--;
+		break;
+	case ACT_SEL_RIGHT:
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_col_B < mem_cols - 1) mem_col_B++;
+		}
+		else if (channel_col_B[mem_channel] < 255)
+			channel_col_B[mem_channel]++;
+		break;
+	case ACT_SEL_DOWN:
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_col_A < mem_cols - 1) mem_col_A++;
+		}
+		else if (channel_col_A[mem_channel] < 255)
+			channel_col_A[mem_channel]++;
+		break;
+	case ACT_SEL_UP:
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_col_A) mem_col_A--;
+		}
+		else if (channel_col_A[mem_channel])
+			channel_col_A[mem_channel]--;
+		break;
+	case ACT_COMMIT:
+		if (marq_status >= MARQUEE_PASTE)
+		{
+			commit_paste(TRUE);
+			pen_down = 0;	// Ensure each press of enter is a new undo level
+		}
+		return TRUE;
+	case ACT_ARROW:
+	case ACT_ARROW3:
+		if ((tool_type == TOOL_LINE) && (line_status > LINE_NONE))
 		{
 			if ( ! (line_x1 == line_x2 && line_y1 == line_y2) )
 			{
@@ -893,7 +969,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 				tline( aco[1][0], aco[1][1], line_x1, line_y1, tool_size );
 				tline( aco[2][0], aco[2][1], line_x1, line_y1, tool_size );
 
-				if ( event->keyval==GDK_s || event->keyval==GDK_S )
+				if (action == ACT_ARROW3)
 				{
 					// Draw 3rd line and fill arrowhead
 					tline( aco[1][0], aco[1][1], aco[2][0], aco[2][1], tool_size );
@@ -926,9 +1002,19 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 				vw_update_area( minx, miny, xw+1, yh+1 );
 			}
 		}
+		return (TRUE);
+	default:
+		return (FALSE);
 	}
-
-	return FALSE;
+	/* Finalize colour-change */
+	if (mem_channel == CHN_IMAGE)
+	{
+		mem_col_A24 = mem_pal[mem_col_A];
+		mem_col_B24 = mem_pal[mem_col_B];
+		init_pal();
+	}
+	else pressed_opacity(channel_col_A[mem_channel]);
+	return TRUE;
 }
 
 gint destroy_signal( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -2509,7 +2595,7 @@ void main_init()
 		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel_anti, 0, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Selection/Alpha Blend A,B"),	NULL,	pressed_clip_alpha_scale,0, NULL },
-		{ _("/Selection/Copy Alpha to Mask"),	NULL,	pressed_clip_alphamask,0, NULL },
+		{ _("/Selection/Move Alpha to Mask"),	NULL,	pressed_clip_alphamask,0, NULL },
 		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask,0, NULL },
 		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_unmask,0, NULL },
 		{ _("/Selection/Mask All Colours"),	NULL,	pressed_clip_mask_all,0, NULL },
@@ -2617,7 +2703,7 @@ void main_init()
 			_("/Edit/Paste To New Layer"),
 			_("/Selection/Flip Horizontally"), _("/Selection/Flip Vertically"),
 			_("/Selection/Rotate Clockwise"), _("/Selection/Rotate Anti-Clockwise"),
-			_("/Selection/Copy Alpha to Mask"),
+			_("/Selection/Move Alpha to Mask"),
 			_("/Selection/Mask Colour A,B"), _("/Selection/Clear Mask"),
 			_("/Selection/Unmask Colour A,B"), _("/Selection/Mask All Colours"),
 			NULL},

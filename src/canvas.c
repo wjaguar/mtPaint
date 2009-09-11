@@ -394,6 +394,7 @@ void pressed_clip_mask()
 
 void pressed_clip_alphamask()
 {
+	unsigned char *old_mask = mem_clip_mask;
 	int i, j = mem_clip_w * mem_clip_h;
 
 	if (!mem_clipboard || !mem_clip_alpha) return;
@@ -408,9 +409,12 @@ void pressed_clip_alphamask()
 		}
 	}
 
-	memcpy( mem_clip_mask, mem_clip_alpha, j * mem_clip_bpp );	// Copy alpha to mask
+	if ( old_mask )
+		for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-(mem_clip_alpha[i]*(255-old_mask[i])) / 255;
+	else	for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-mem_clip_alpha[i];	// Flip values
 
-	for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-mem_clip_mask[i];	// Flip values
+	free( mem_clip_alpha );
+	mem_clip_alpha = NULL;
 
 	gtk_widget_queue_draw( drawing_canvas );
 }
