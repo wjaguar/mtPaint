@@ -214,6 +214,9 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	gint i;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
+	/* This function must be immune to pointer grabs */
+	release_grab();
+
 	alert = gtk_dialog_new();
 	gtk_window_set_title( GTK_WINDOW(alert), title );
 	gtk_window_set_modal( GTK_WINDOW(alert), TRUE );
@@ -721,6 +724,39 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 	return (align);
 }
 
+// Make widget request no less size than before (in one direction)
+
+#define KEEPSIZE_KEY "mtPaint.keepsize"
+
+static guint keepsize_key;
+
+/* And if user manages to change theme on the fly... well, more fool him ;-) */
+static void widget_size_keep(GtkWidget *widget, GtkRequisition *requisition,
+	gpointer user_data)
+{
+	int l, l0;
+
+	l = (int)gtk_object_get_data_by_id(GTK_OBJECT(widget), keepsize_key);
+	if (user_data) // Adjust height if set, width if clear
+	{
+		if ((l0 = requisition->height) < l) requisition->height = l;
+	}
+	else if ((l0 = requisition->width) < l) requisition->width = l;
+
+	if (l0 > l) gtk_object_set_data_by_id(GTK_OBJECT(widget), keepsize_key,
+		(gpointer)l0);
+}
+
+/* !!! Warning: this function can't extend box containers in their "natural"
+ * direction, because GTK+ takes shortcuts with their allocation, abusing
+ * requisition value. */
+void widget_set_keepsize(GtkWidget *widget, int keep_height)
+{
+	if (!keepsize_key) keepsize_key = g_quark_from_static_string(KEEPSIZE_KEY);
+	gtk_signal_connect_after(GTK_OBJECT(widget), "size_request",
+		GTK_SIGNAL_FUNC(widget_size_keep), (gpointer)keep_height);
+}
+
 // Signalled toggles
 
 static void sig_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
@@ -822,6 +858,49 @@ void clist_enable_drag(GtkWidget *clist)
 }
 
 #endif
+
+// Move browse-mode selection in GtkCList without invoking callbacks
+
+void clist_reselect_row(GtkCList *clist, int n)
+{
+	GtkWidget *widget;
+
+	if (n < 0) return;
+#if GTK_MAJOR_VERSION == 1
+	GTK_CLIST_CLASS(((GtkObject *)clist)->klass)->select_row(clist, n, -1, NULL);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
+#endif
+	/* !!! Focus fails to follow selection in browse mode - have to move
+	 * it here; but it means a full redraw is necessary afterwards */
+	if (clist->focus_row == n) return;
+	clist->focus_row = n;
+	widget = GTK_WIDGET(clist);
+	if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
+		gtk_widget_queue_draw(widget);
+}
+
+// Move browse-mode selection in GtkList
+
+/* !!! An evil hack for reliably moving focus around in GtkList */
+void list_select_item(GtkWidget *list, GtkWidget *item)
+{
+	GtkWidget *win, *fw = NULL;
+
+	win = gtk_widget_get_toplevel(list);
+	if (GTK_IS_WINDOW(win)) fw = GTK_WINDOW(win)->focus_widget;
+
+	/* Focus is somewhere in list - move it, selection will follow */
+	if (fw && gtk_widget_is_ancestor(fw, list))
+		gtk_widget_grab_focus(item);
+	else /* Focus is elsewhere - move whatever remains, then */
+	{
+	/* !!! For simplicity, an undocumented field is used; a bit less hacky
+	 * but longer is to set focus child to item, NULL, and item again - WJ */
+		gtk_container_set_focus_child(GTK_CONTAINER(list), item);
+		GTK_LIST(list)->last_focus_child = item;
+	}
+}
 
 // Properly destroy transient window
 
@@ -2363,6 +2442,19 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 }
 
 #endif
+
+// Release outstanding pointer grabs
+
+int release_grab()
+{
+	GtkWidget *grab = gtk_grab_get_current();
+	int res = gdk_pointer_is_grabbed();
+
+	if (grab) gtk_grab_remove(grab);
+	if (res) gdk_pointer_ungrab(GDK_CURRENT_TIME);
+
+	return (res || grab);
+}
 
 // Maybe this will be needed someday...
 

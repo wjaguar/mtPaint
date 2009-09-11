@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -261,17 +261,19 @@ int tgrid_dx, tgrid_dy;	// Tile grid spacing
 const unsigned char greyz[2]; // For opacity squares
 
 #define DOCK_CLINE		0
-#define DOCK_TOOL_SETTINGS	1
+#define DOCK_SETTINGS		1
 #define DOCK_LAYERS		2
 
 #define DOCK_TOTAL		3
+
+#define DOCKABLE() ((files_passed > 1) + !layers_window + !toolbar_boxes[TOOLBAR_SETTINGS])
 
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
-	*scrolledwindow_canvas, *main_hidden[4],
+	*scrolledwindow_canvas,
 
 	*menu_widgets[TOTAL_MENU_IDS],
 	*dock_pane, *dock_area;
@@ -337,3 +339,4 @@ void force_main_configure();	// Force reconfigure of main drawing area - for cen
 void set_image(gboolean state);	// Toggle image access (nestable)
 
 int dock_focused();		// Check if focus is inside dock window
+void dock_undock(int what, int state);	// Move stuff into or out of dock

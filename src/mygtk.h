@@ -157,6 +157,10 @@ void wj_option_realize(GtkWidget *widget, gpointer user_data);
 void widget_set_minsize(GtkWidget *widget, int width, int height);
 GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 
+// Make widget request no less size than before (in one direction)
+
+void widget_set_keepsize(GtkWidget *widget, int keep_height);
+
 // Signalled toggles
 
 GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler);
@@ -165,6 +169,14 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 // Workaround for GtkCList reordering bug in GTK2
 
 void clist_enable_drag(GtkWidget *clist);
+
+// Move browse-mode selection in GtkCList without invoking callbacks
+
+void clist_reselect_row(GtkCList *clist, int n);
+
+// Move browse-mode selection in GtkList
+
+void list_select_item(GtkWidget *list, GtkWidget *item);
 
 // Properly destroy transient window
 
@@ -291,6 +303,10 @@ GtkWidget *xpm_image(char **xpm);
 GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 	GdkBitmap **mask);
 #endif
+
+// Release outstanding pointer grabs
+
+int release_grab();
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

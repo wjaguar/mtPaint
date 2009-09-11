@@ -40,7 +40,7 @@ GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
 gboolean toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
-	*drawing_col_prev;
+	*drawing_col_prev, *settings_box;
 
 GdkCursor *move_cursor;
 GdkCursor *m_cursor[32];		// My mouse cursors
@@ -356,10 +356,8 @@ static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 
 static void toolbar_settings_exit()
 {
-	toolbar_status[TOOLBAR_SETTINGS] = FALSE;
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
-	toolbar_exit();
 }
 
 static void toolbar_click(GtkWidget *widget, gpointer user_data)
@@ -436,37 +434,18 @@ static toolbar_item gradient_button =
 #undef _
 #define _(X) __(X)
 
-static void toolbar_settings_init()
+void create_settings_box()
 {
 	char *ts_titles[4] = { _("Size"), _("Flow"), _("Opacity"), "" };
-	GtkWidget *label, *vbox, *table, *toolbar_settings;
+	GtkWidget *box, *label, *vbox, *table, *toolbar_settings;
 	GtkWidget *button;
 	GdkPixmap *pmap;
 	int i;
 
 
-	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
-	{
-		gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );	// Used when Home key is pressed
-#if GTK_MAJOR_VERSION == 1
-		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Re-render sliders */
-#endif
-		return;
-	}
-
-///	SETTINGS TOOLBAR
-
-	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window(GTK_WINDOW_TOPLEVEL,
-		_("Settings Toolbar"), GTK_WIN_POS_NONE, FALSE);
-
-	gtk_widget_set_uposition( toolbar_boxes[TOOLBAR_SETTINGS],
-		inifile_get_gint32("toolbar_settings_x", 0 ),
-		inifile_get_gint32("toolbar_settings_y", 0 ) );
-
 	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show(vbox);
-	gtk_container_add (GTK_CONTAINER (toolbar_boxes[TOOLBAR_SETTINGS]), vbox);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
 #if GTK_MAJOR_VERSION == 1
 	toolbar_settings = pack(vbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
@@ -496,7 +475,6 @@ static void toolbar_settings_init()
 	gtk_signal_connect(GTK_OBJECT(button), "button_press_event",
 		GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)&gradient_button);
 	gtk_widget_show_all(button);
-	gtk_widget_realize(grad_view);
 	/* Parasite gradient tooltip on settings toolbar */
 	gtk_tooltips_set_tip(GTK_TOOLBAR(toolbar_settings)->tooltips,
 		button, gradient_button.tooltip, "Private");
@@ -536,14 +514,56 @@ static void toolbar_settings_init()
 // !!! Use the fact that channel value slider is the last one
 	ts_label_channel = label;
 
+	/* Keep height at max requested, to let dock contents stay put */
+	box = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
+	gtk_widget_show(box);
+	gtk_container_add(GTK_CONTAINER(box), vbox);
+	widget_set_keepsize(box, TRUE);
+
+	/* Make widget to report its demise */
+	gtk_signal_connect(GTK_OBJECT(box), "destroy",
+		GTK_SIGNAL_FUNC(gtk_widget_destroyed), &settings_box);
+
+	/* Keep the invariant */
+	gtk_widget_ref(box);
+	gtk_object_sink(GTK_OBJECT(box));
+
+	settings_box = box;
+}
+
+static void toolbar_settings_init()
+{
+	if (toolbar_boxes[TOOLBAR_SETTINGS])
+	{
+		gtk_widget_show(toolbar_boxes[TOOLBAR_SETTINGS]);	// Used when Home key is pressed
+#if GTK_MAJOR_VERSION == 1
+		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Re-render sliders */
+#endif
+		return;
+	}
+
+///	SETTINGS TOOLBAR
+
+	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window(GTK_WINDOW_TOPLEVEL,
+		_("Settings Toolbar"), GTK_WIN_POS_NONE, FALSE);
+
+	gtk_widget_set_uposition(toolbar_boxes[TOOLBAR_SETTINGS],
+		inifile_get_gint32("toolbar_settings_x", 0),
+		inifile_get_gint32("toolbar_settings_y", 0));
+
+	dock_undock(DOCK_SETTINGS, FALSE);
+	gtk_container_add(GTK_CONTAINER(toolbar_boxes[TOOLBAR_SETTINGS]),
+		settings_box);
+	gtk_widget_unref(settings_box);
+
 	gtk_signal_connect(GTK_OBJECT(toolbar_boxes[TOOLBAR_SETTINGS]),
 		"delete_event", GTK_SIGNAL_FUNC(toolbar_settings_exit), NULL);
-	gtk_window_set_transient_for( GTK_WINDOW(toolbar_boxes[TOOLBAR_SETTINGS]),
-		GTK_WINDOW(main_window) );
+	gtk_window_set_transient_for(GTK_WINDOW(toolbar_boxes[TOOLBAR_SETTINGS]),
+		GTK_WINDOW(main_window));
 
 	toolbar_update_settings();
 
-	gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );
+	gtk_widget_show(toolbar_boxes[TOOLBAR_SETTINGS]);
 }
 
 #undef _
@@ -693,6 +713,8 @@ void ts_update_gradient()
 	GdkPixmap *pmap;
 
 	if (!grad_view) return;
+	gtk_widget_realize(grad_view); // Ensure widget has a GC
+	if (!GTK_WIDGET_REALIZED(grad_view)) return;
 
 	slot = mem_channel + 1;
 	if (mem_channel != CHN_IMAGE) /* Create pseudo palette */
@@ -766,7 +788,7 @@ void toolbar_update_settings()
 	char txt[32];
 	int i, j, c;
 
-	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
+	if (!settings_box) return;
 
 	for (i = 0; i < 2; i++)
 	{
@@ -977,26 +999,26 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_widget_set_events (drawing_palette, GDK_ALL_EVENTS_MASK);
 }
 
-void toolbar_exit()				// Remember toolbar settings on program exit
+void toolbar_exit()		// Remember toolbar settings on program exit
 {
 	int i, x, y;
 	char txt[32];
 
-	for ( i=1; i<TOOLBAR_MAX; i++ )		// Remember current show/hide status
+	for (i =TOOLBAR_MAIN; i < TOOLBAR_MAX; i++)	// Remember current show/hide status
 	{
 		sprintf(txt, "toolbar%i", i);
-		inifile_set_gboolean( txt, toolbar_status[i] );
+		inifile_set_gboolean(txt, toolbar_status[i]);
 	}
 
-	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
+	if (!toolbar_boxes[TOOLBAR_SETTINGS]) return;
 
-	gdk_window_get_root_origin( toolbar_boxes[TOOLBAR_SETTINGS]->window, &x, &y );
+	gdk_window_get_root_origin(toolbar_boxes[TOOLBAR_SETTINGS]->window, &x, &y);
 	
-	inifile_set_gint32("toolbar_settings_x", x );
-	inifile_set_gint32("toolbar_settings_y", y );
+	inifile_set_gint32("toolbar_settings_x", x);
+	inifile_set_gint32("toolbar_settings_y", y);
 
+	dock_undock(DOCK_SETTINGS, TRUE);
 	gtk_widget_destroy(toolbar_boxes[TOOLBAR_SETTINGS]);
-
 	toolbar_boxes[TOOLBAR_SETTINGS] = NULL;
 }
 

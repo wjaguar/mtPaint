@@ -101,8 +101,8 @@
 #include "graphics/xpm_text.xpm"
 #include "graphics/xpm_undo.xpm"
 #include "graphics/xpm_up.xpm"
-//#include "graphics/xpm_cline.xpm"
+#include "graphics/xpm_cline.xpm"
+#include "graphics/xpm_layers.xpm"
 //#include "graphics/xpm_config.xpm"
-//#include "graphics/xpm_layers.xpm"
 
 #undef static

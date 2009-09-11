@@ -1,5 +1,5 @@
 /*	inifile.h
-	Copyright (C) 2007 Dmitry Groshev
+	Copyright (C) 2007-2009 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -24,7 +24,7 @@ typedef struct {
 } inislot;
 
 typedef struct {
-	char *sblock[2];
+	char *sblock[3];
 	inislot *slots;
 	gint32 *hash;
 	int count, slen, maxloop;
@@ -35,7 +35,7 @@ typedef struct {
 
 int new_ini(inifile *inip);
 void forget_ini(inifile *inip);
-int read_ini(inifile *inip, char *fname);
+int read_ini(inifile *inip, char *fname, int itype);
 int write_ini(inifile *inip, char *fname, char *header);
 
 int ini_setstr(inifile *inip, int section, char *key, char *value);

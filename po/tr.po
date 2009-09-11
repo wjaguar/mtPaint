@@ -736,7 +736,7 @@ msgid "Credits"
 msgstr "Katkıda Bulunanlar"
 
 #: src/help.c:32
-msgid "mtPaint 3.30 - Copyright (C) 2004-2009 The Authors\n"
+msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
 msgstr ""
 
 #: src/help.c:33
@@ -1296,7 +1296,7 @@ msgid "Dutch - Hans Strijards"
 msgstr ""
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
 msgstr ""
 
 #: src/help.c:159
@@ -1342,7 +1342,7 @@ msgid ""
 msgstr ""
 
 #: src/help.c:169
-msgid "Swedish - Daniel Nylander"
+msgid "Swedish - Daniel Nylander, Fredrik Forsmo"
 msgstr ""
 
 #: src/help.c:170

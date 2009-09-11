@@ -64,11 +64,11 @@ extern char
 	*xpm_smudge_xpm[],
 	*xpm_text_xpm[],
 	*xpm_undo_xpm[],
-	*xpm_up_xpm[];
+	*xpm_up_xpm[],
+	*xpm_cline_xpm[],
+	*xpm_layers_xpm[];
 //extern char
-//	*xpm_cline_xpm[],
-//	*xpm_config_xpm[],
-//	*xpm_layers_xpm[];
+//	*xpm_config_xpm[];
 
 
 

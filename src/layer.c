@@ -118,14 +118,15 @@ static void repaint_layers()
 
 ///	LAYERS WINDOW
 
-GtkWidget *layers_window = NULL;
+GtkWidget *layers_box, *layers_window;
 
 typedef struct {
 	GtkWidget *item, *name, *toggle;
 } layer_item;
 
-static GtkWidget *layer_list, *entry_layer_name, *layer_x, *layer_y,
-	*layer_tools[TOTAL_ICONS_LAYER], *layer_spin, *layer_slider;
+static GtkWidget *layer_list, *entry_layer_name,
+	*layer_x, *layer_y, *layer_spin, *layer_slider,
+	*layer_tools[TOTAL_ICONS_LAYER];
 static layer_item layer_list_data[MAX_LAYERS + 1];
 
 static int layers_initialized;		// Indicates if initializing is complete
@@ -135,26 +136,24 @@ static int layers_sensitive(int state)
 {
 	int res;
 
-	if (!layers_window) return (TRUE);
-	res = GTK_WIDGET_SENSITIVE(layers_window);
-	gtk_widget_set_sensitive(layers_window, state);
+	if (!layers_box) return (TRUE);
+	res = GTK_WIDGET_SENSITIVE(layers_box);
+	gtk_widget_set_sensitive(layers_box, state);
 	return (res);
 }
 
 static void layers_update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[PATHTXT], *extra = "-";
+	char txt[300], txt2[PATHTXT];
 
-	if ( layers_window == NULL ) return;		// Don't bother if window is not showing
+
+	if (!layers_window) return;	// Don't bother if window is not showing
 
 	gtkuncpy(txt2, layers_filename, PATHTXT);
-
-	if ( layers_changed == 1 ) extra = _("(Modified)");
-
-	snprintf( txt, 290, "%s %s %s", _("Layers"), extra, txt2[0] ? txt2 :
-		_("Untitled"));
-
-	gtk_window_set_title (GTK_WINDOW (layers_window), txt );
+	snprintf(txt, 290, "%s %s %s", _("Layers"),
+		layers_changed ? _("(Modified)") : "-",
+		txt2[0] ? txt2 : _("Untitled"));
+	gtk_window_set_title(GTK_WINDOW(layers_window), txt);
 }
 
 void layers_notify_changed()			// Layers have just changed - update vars as needed
@@ -194,26 +193,9 @@ void layer_copy_to_main( int l )		// Copy info from layer to main image
 	mem_state = lp->state_;
 }
 
-/* !!! An evil hack for reliably moving focus around in GtkList */
 static void layer_select_slot(int slot)
 {
-	GtkWidget *item, *fw;
-
-	if (!layers_window) return;
-
-	item = layer_list_data[slot].item;
-	fw = GTK_WINDOW(layers_window)->focus_widget;
-
-	/* Focus is somewhere in list - move it, selection will follow */
-	if (fw && gtk_widget_is_ancestor(fw, layer_list))
-		gtk_widget_grab_focus(item);
-	else /* Focus is elsewhere - move whatever remains, then */
-	{
-	/* !!! For simplicity, an undocumented field is used; a bit less hacky
-	 * but longer is to set focus child to item, NULL, and item again - WJ */
-		gtk_container_set_focus_child(GTK_CONTAINER(layer_list), item);
-		GTK_LIST(layer_list)->last_focus_child = item;
-	}
+	if (layers_box) list_select_item(layer_list, layer_list_data[slot].item);
 }
 
 void shift_layer(int val)
@@ -267,7 +249,7 @@ void layer_show_new()
 	update_main_with_new_layer();
 	layers_notify_changed();
 
-	if (layers_window)
+	if (layers_box)
 	{
 		layer_item *l = layer_list_data + layers_total;
 		layer_node *t = layer_table + layers_total;
@@ -380,7 +362,7 @@ void layer_refresh_list()
 	static int in_refresh;
 	int i;
 
-	if (!layers_window) return;
+	if (!layers_box) return;
 
 	// As befits a refresh, this should show the final state
 	if (in_refresh)
@@ -449,7 +431,7 @@ static void layer_show_position()
 	layer_node *t = layer_table + layer_selected;
 	int oldinit = layers_initialized;
 
-	if (!layers_window) return;
+	if (!layers_box) return;
 
 	layers_initialized = FALSE;
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_x), t->x);
@@ -927,15 +909,18 @@ gboolean delete_layers_window()
 	// No deletion if no window, or inside a sensitive action
 	if (!layers_window || !layers_initialized) return (TRUE);
 	// Stop user prematurely exiting while drag 'n' drop loading
-	if (!GTK_WIDGET_SENSITIVE(layers_window)) return (TRUE);
+	if (!GTK_WIDGET_SENSITIVE(layers_box)) return (TRUE);
 
 	layers_initialized = FALSE;
 	win_store_pos(layers_window, "layers");
 
+	gtk_widget_hide(layers_window); // Butcher it when out of sight :-)
+	dock_undock(DOCK_LAYERS, TRUE);
 	gtk_widget_destroy(layers_window);
 	layers_window = NULL;
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 		menu_widgets[MENU_LAYER]), FALSE); // Ensure it's unchecked
+	layers_initialized = !!layers_box; // It may be docked now
 
 	return (FALSE);
 }
@@ -1076,24 +1061,17 @@ static GtkWidget *layer_toolbar(GtkWidget **wlist)
 	return toolbar;
 }
 
-void pressed_layers()
+void create_layers_box()
 {
 	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
-	GtkAccelGroup* ag = gtk_accel_group_new();
 	char txt[32];
 	int i;
 
 
-	if (layers_window) return; // Already have one
 	layers_initialized = FALSE;
-
-	layers_window = add_a_window( GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE );
-	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox);
-	gtk_container_add (GTK_CONTAINER (layers_window), vbox);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
+	layers_box = vbox = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(vbox);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
 	scrolledwindow = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow);
@@ -1110,7 +1088,7 @@ void pressed_layers()
 	gtk_container_set_focus_vadjustment(GTK_CONTAINER(layer_list),
 		gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow)));
 
-	for ( i=MAX_LAYERS; i>=0; i-- )
+	for (i = MAX_LAYERS; i >= 0; i--)
 	{
 		hbox = gtk_hbox_new(FALSE, 3);
 
@@ -1165,13 +1143,17 @@ void pressed_layers()
 	add_to_table( _("Layer Name"), table, 0, 0, 0 );
 	add_to_table( _("Position"), table, 1, 0, 0 );
 	add_to_table( _("Opacity"), table, 2, 0, 0 );
-	add_to_table( _("Transparent Colour"), table, 3, 0, 0 );
+
+	label = gtk_label_new(_("Transparent Colour"));
+	gtk_widget_show(label);
+	gtk_table_attach(GTK_TABLE(table), label, 0, 2, 3, 4, GTK_FILL, 0, 0, 0);
+	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
 
 	entry_layer_name = gtk_entry_new_with_max_length(LAYER_NAMELEN - 1);
 	gtk_widget_set_usize(entry_layer_name, 100, -2);
-	gtk_widget_show (entry_layer_name);
-	gtk_table_attach (GTK_TABLE (table), entry_layer_name, 1, 3, 0, 1,
-		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (0), 0, 0);
+	gtk_widget_show(entry_layer_name);
+	gtk_table_attach(GTK_TABLE(table), entry_layer_name, 1, 3, 0, 1,
+		GTK_FILL, 0, 0, 0);
 	gtk_signal_connect(GTK_OBJECT(entry_layer_name), "changed",
 		GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)0);
 
@@ -1188,24 +1170,48 @@ void pressed_layers()
 		(gpointer)2);
 	mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
 
-	layer_spin = spin_to_table(table, 3, 1, 0, 0, -1, 255);
+	layer_spin = spin_to_table(table, 3, 2, 0, 0, -1, 255);
 	spin_connect(layer_spin, GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)3);
 
 	pack(vbox, sig_toggle(_("Show all layers in main window"),
 		show_layers_main, NULL, GTK_SIGNAL_FUNC(layer_main_toggled)));
 
-	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
-		GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	gtk_signal_connect_object (GTK_OBJECT (layers_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_layers_window), NULL);
-
-	layers_update_titlebar();
-
 	/* !!! Select *before* show - otherwise it's nontrivial (try & see) */
 	layers_initialized = TRUE;
 	layer_select_slot(layer_selected);
-	gtk_window_set_transient_for( GTK_WINDOW(layers_window), GTK_WINDOW(main_window) );
+
+	/* Make widget to report its demise */
+	gtk_signal_connect(GTK_OBJECT(layers_box), "destroy",
+		GTK_SIGNAL_FUNC(gtk_widget_destroyed), &layers_box);
+
+	/* Keep the invariant */
+	gtk_widget_ref(layers_box);
+	gtk_object_sink(GTK_OBJECT(layers_box));
+}
+
+void pressed_layers()
+{
+	GtkAccelGroup *ag;
+
+
+	if (layers_window) return; // Already have it open
+
+	layers_window = add_a_window(GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE);
+	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);
+	layers_update_titlebar();
+
+	dock_undock(DOCK_LAYERS, FALSE);
+	gtk_container_add(GTK_CONTAINER(layers_window), layers_box);
+	gtk_widget_unref(layers_box);
+
+	ag = gtk_accel_group_new();
+	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
+		GDK_Escape, 0, (GtkAccelFlags)0);
+
+	gtk_signal_connect_object(GTK_OBJECT(layers_window), "delete_event",
+		GTK_SIGNAL_FUNC(delete_layers_window), NULL);
+
+	gtk_window_set_transient_for(GTK_WINDOW(layers_window), GTK_WINDOW(main_window));
 	gtk_widget_show(layers_window);
-	gtk_window_add_accel_group(GTK_WINDOW (layers_window), ag);
+	gtk_window_add_accel_group(GTK_WINDOW(layers_window), ag);
 }
