@@ -1071,7 +1071,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	read_font_controls(fp);
 	ft_render_text();
-	if (mem_clipboard) pressed_paste_centre();
+	if (mem_clipboard) pressed_paste(TRUE);
 
 	delete_text( widget, data );
 

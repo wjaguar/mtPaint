@@ -67,6 +67,7 @@ static inilist ini_bool[] = {
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "colorGrid",		&color_grid,		FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
+	{ "pasteCommit",	&paste_commit,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -77,6 +78,7 @@ static inilist ini_bool[] = {
 	{ "view_focus",		&vw_focus_on,		TRUE  },
 	{ "pasteToggle",	&show_paste,		TRUE  },
 	{ "cursorToggle",	&cursor_tool,		TRUE  },
+	{ "autopreviewToggle",	&brcosa_auto,		TRUE  },
 #if STATUS_ITEMS != 5
 #error Wrong number of "status?Toggle" inifile items defined
 #endif
@@ -120,7 +122,8 @@ GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*menu_widgets[TOTAL_MENU_IDS],
 	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
 
-int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
+int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
+int	show_menu_icons, paste_commit;
 int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
@@ -179,13 +182,6 @@ void mapped_item_state(int statemap)
 	dis_miss = statemap;
 }
 
-static void pressed_swap_AB()
-{
-	mem_swap_cols();
-	if (mem_channel == CHN_IMAGE) update_cols();
-	else pressed_value(channel_col_A[mem_channel]);
-}
-
 static void pressed_load_recent(int item)
 {
 	int change;
@@ -221,7 +217,7 @@ static void pressed_crop()
 	{
 		pressed_select(FALSE);
 		change_to_tool(DEFAULT_TOOL_ICON);
-		canvas_undo_chores();
+		update_stuff(UPD_GEOM);
 	}
 	else memory_errors(res);
 }
@@ -233,22 +229,23 @@ void pressed_select(int all)
 	/* Remove old selection */
 	if (marq_status != MARQUEE_NONE)
 	{
-		i = 1;
-		if (marq_status >= MARQUEE_PASTE) i = 3;
+		i = UPD_SEL;
+		if (marq_status >= MARQUEE_PASTE) i = UPD_SEL | CF_DRAW;
 		else paint_marquee(0, 0, 0);
 		marq_status = MARQUEE_NONE;
-		marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
 	}
 	if ((tool_type == TOOL_POLYGON) && (poly_status != POLY_NONE))
 	{
 		poly_points = 0;
 		poly_status = POLY_NONE;
-		i = 3; // Have to erase polygon
+		i = UPD_SEL | CF_DRAW; // Have to erase polygon
 	}
+	/* And deal with selection persistence too */
+	marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
 
 	while (all) /* Select entire canvas */
 	{
-		i |= 1;
+		i |= UPD_SEL;
 		marq_x1 = 0;
 		marq_y1 = 0;
 		marq_x2 = mem_width - 1;
@@ -258,21 +255,15 @@ void pressed_select(int all)
 			/* Switch tool, and let that & marquee persistence
 			 * do all the rest except full redraw */
 			change_to_tool(TTB_SELECT);
-			i &= 2;
+			i &= CF_DRAW;
 			break;
 		}
 		marq_status = MARQUEE_DONE;
-		if (i & 2) break; // Full redraw will draw marquee too
+		if (i & CF_DRAW) break; // Full redraw will draw marquee too
 		paint_marquee(1, 0, 0);
 		break;
 	}
-	if (i & 1) // Interface update
-	{
-		update_menus();
-		set_cursor();
-		update_sel_bar();
-	}
-	if (i & 2) gtk_widget_queue_draw(drawing_canvas); // Full redraw
+	if (i) update_stuff(i);
 }
 
 static void pressed_remove_unused()
@@ -290,8 +281,7 @@ static void pressed_remove_unused()
 		mem_remove_unused();
 		mem_undo_prepare();
 
-		init_pal();
-		update_all_views();
+		update_stuff(UPD_PAL);
 	}
 }
 
@@ -300,8 +290,7 @@ static void pressed_default_pal()
 	spot_undo(UNDO_PAL);
 	mem_pal_copy( mem_pal, mem_pal_def );
 	mem_cols = mem_pal_def_i;
-	init_pal();
-	update_all_views();
+	update_stuff(UPD_PAL);
 }
 
 static void pressed_remove_duplicates()
@@ -321,8 +310,7 @@ static void pressed_remove_duplicates()
 
 		remove_duplicates();
 		mem_undo_prepare();
-		init_pal();
-		update_all_views();
+		update_stuff(UPD_PAL);
 	}
 	g_free(mess);
 }
@@ -330,17 +318,13 @@ static void pressed_remove_duplicates()
 static void pressed_dither_A()
 {
 	mem_find_dither(mem_col_A24.red, mem_col_A24.green, mem_col_A24.blue);
-	update_cols();
+	update_stuff(UPD_ABP);
 }
 
 static void pressed_mask(int val)
 {
 	mem_mask_setall(val);
-	mem_pal_init();
-	gtk_widget_queue_draw( drawing_palette );
-	/* !!! Do the same for any other kind of preview */
-	if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-		update_all_views();
+	update_stuff(UPD_CMASK);
 }
 
 // System clipboard import
@@ -595,15 +579,9 @@ static void load_clip(int item)
 	}
 
 	if (!i) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
-	else text_paste = TEXT_PASTE_NONE;
 
-	if (((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE)) ||
-		((tool_type == TOOL_POLYGON) && (poly_status > POLY_NONE)))
-		pressed_select(FALSE);
-
-	update_menus();
-
-	if (i && (MEM_BPP >= mem_clip_bpp)) pressed_paste_centre();
+	update_stuff(UPD_XCOPY);
+	if (i && (MEM_BPP >= mem_clip_bpp)) pressed_paste(TRUE);
 }
 
 static void save_clip(int item)
@@ -627,24 +605,11 @@ static void save_clip(int item)
 	if ( i!=0 ) alert_box( _("Error"), _("Unable to save clipboard"), _("OK"), NULL, NULL );
 }
 
-static void update_op_val()
-{
-	grad_def_update();
-	toolbar_update_settings();
-	if ((tool_type == TOOL_GRADIENT) && grad_opacity)
-		gtk_widget_queue_draw(drawing_canvas);
-}
-
 void pressed_opacity(int opacity)
 {
 	if (IS_INDEXED) opacity = 255;
 	tool_opacity = opacity < 1 ? 1 : opacity > 255 ? 255 : opacity;
-
-	// Update the paste on the canvas as we have changed the opacity value
-	if (show_paste && (marq_status >= MARQUEE_PASTE))
-		gtk_widget_queue_draw(drawing_canvas);
-
-	update_op_val();
+	update_stuff(UPD_OPAC);
 }
 
 void pressed_value(int value)
@@ -652,7 +617,7 @@ void pressed_value(int value)
 	if (mem_channel == CHN_IMAGE) return;
 	channel_col_A[mem_channel] =
 		value < 0 ? 0 : value > 255 ? 255 : value;
-	update_op_val();
+	update_stuff(UPD_CAB);
 }
 
 static void toggle_view()
@@ -688,7 +653,7 @@ void zoom_out()
 static void zoom_grid(int state)
 {
 	mem_show_grid = state;
-	if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
+	update_stuff(UPD_RENDER);
 }
 
 static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data );
@@ -1054,7 +1019,6 @@ static void draw_arrow(int mode)
 	pen_down = 0;
 	tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
 	line_status = LINE_LINE;
-	update_menus();
 
 	// Draw arrow lines & circles
 	mem_undo_opacity = TRUE;
@@ -1095,6 +1059,7 @@ static void draw_arrow(int mode)
 	w = maxx - minx + 1;
 	h = maxy - miny + 1;
 
+	update_stuff(UPD_IMGP);
 	main_update_area(minx, miny, w, h);
 	vw_update_area(minx, miny, w, h);
 }
@@ -1441,6 +1406,8 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 	while ((state & _CS) == _C)	// Set colour A/B
 	{
+		int ab = button == 3; /* A for left, B for right */
+
 		if (button == 2) /* Auto-dither */
 		{
 			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
@@ -1449,56 +1416,36 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		}
 		if ((button != 1) && (button != 3)) break;
 		pixel = get_bkg(xc + dx * scale, yc + dy * scale, event == GDK_2BUTTON_PRESS);
+		if ((pixel < 0) && (event == GDK_2BUTTON_PRESS) &&
+			(MEM_BPP == 3) && (tool_size > 1) && !NO_PERIM(tool_type))
+		{
+			int ts2 = tool_size >> 1, tr2 = tool_size - ts2 - 1;
+			pixel = average_pixels(mem_img[CHN_IMAGE], mem_width, mem_height,
+				ox - ts2, oy - ts2, ox + tr2, oy + tr2);
+		}
 		if (pixel < 0) pixel = get_pixel(ox, oy);
+
 		if (mem_channel != CHN_IMAGE)
 		{
-			if (button == 1)
-			{
-				if (channel_col_A[mem_channel] == pixel) break;
-				pressed_value(pixel);
-			}
-			else /* button == 3 */
-			{
-				if (channel_col_B[mem_channel] == pixel) break;
-				channel_col_B[mem_channel] = pixel;
-				/* To update displayed value */
-				pressed_value(channel_col_A[mem_channel]);
-			}
-			break;
+			if (channel_col_[ab][mem_channel] == pixel) break;
+			channel_col_[ab][mem_channel] = pixel;
 		}
-		if (mem_img_bpp == 1)
+		else if (mem_img_bpp == 1)
 		{
-			if (button == 1)
-			{
-				if (mem_col_A == pixel) break;
-				mem_col_A = pixel;
-				mem_col_A24 = mem_pal[pixel];
-			}
-			else /* button == 3 */
-			{
-				if (mem_col_B == pixel) break;
-				mem_col_B = pixel;
-				mem_col_B24 = mem_pal[pixel];
-			}
+			if (mem_col_[ab] == pixel) break;
+			mem_col_[ab] = pixel;
+			mem_col_24[ab] = mem_pal[pixel];
 		}
 		else
 		{
-			if (button == 1)
-			{
-				if (PNG_2_INT(mem_col_A24) == pixel) break;
-				mem_col_A24.red = INT_2_R(pixel);
-				mem_col_A24.green = INT_2_G(pixel);
-				mem_col_A24.blue = INT_2_B(pixel);
-			}
-			else /* button == 3 */
-			{
-				if (PNG_2_INT(mem_col_B24) == pixel) break;
-				mem_col_B24.red = INT_2_R(pixel);
-				mem_col_B24.green = INT_2_G(pixel);
-				mem_col_B24.blue = INT_2_B(pixel);
-			}
+			png_color *col = mem_col_24 + ab;
+
+			if (PNG_2_INT(*col) == pixel) break;
+			col->red = INT_2_R(pixel);
+			col->green = INT_2_G(pixel);
+			col->blue = INT_2_B(pixel);
 		}
-		update_cols();
+		update_stuff(UPD_CAB);
 		break;
 	}
 
@@ -1843,9 +1790,7 @@ static int get_bkg(int xc, int yc, int dclick)
 	/* Inside image */
 	while ((xi >= 0) && (xi < mem_width) && (yi >= 0) && (yi < mem_height))
 	{
-		unsigned char *tmp;
-		double rr, gg, bb, dd;
-		int i, j, x0, y0, x1, y1;
+		int x0, y0, x1, y1;
 
 		/* Pixel must be transparent */
 		x = mem_width * yi + xi;
@@ -1859,29 +1804,7 @@ static int get_bkg(int xc, int yc, int dclick)
 		if (!dclick) break;
 		x1 = (x0 = xi * bkg_scale - bkg_x) + bkg_scale;
 		y1 = (y0 = yi * bkg_scale - bkg_y) + bkg_scale;
-		if (x0 < 0) x0 = 0;
-		if (x1 > bkg_w) x1 = bkg_w;
-		if (y0 < 0) y0 = 0;
-		if (y1 > bkg_h) y1 = bkg_h;
-		/* Outside of backround */
-		if ((x0 >= x1) || (y0 >= y1)) return (-1);
-
-		/* Average (gamma corrected) background area under pixel */
-		x1 -= x0;
-		rr = gg = bb = 0.0;
-		for (i = y0; i < y1; i++)
-		{
-			tmp = bkg_rgb + (i * bkg_w + x0) * 3;
-			for (j = 0; j < x1; j++ , tmp += 3)
-			{
-				rr += gamma256[tmp[0]];
-				gg += gamma256[tmp[1]];
-				bb += gamma256[tmp[2]];
-			}
-		}
-		dd = 1.0 / (x1 * (y1 - y0));
-		rr *= dd; gg *= dd; bb *= dd;
-		return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
+		return (average_pixels(bkg_rgb, bkg_w, bkg_h, x0, y0, x1, y1));
 	}
 	xb = floor_div((xc - margin_main_x) * bkg_scale, scale) - bkg_x;
 	yb = floor_div((yc - margin_main_y) * bkg_scale, scale) - bkg_y;
@@ -3361,7 +3284,7 @@ void set_cursor()			// Set mouse cursor
 
 void change_to_tool(int icon)
 {
-	int i, t;
+	int i, t, update = CF_SELBAR | CF_MENU | CF_CURSOR;
 
 	if (!GTK_WIDGET_SENSITIVE(icon_buttons[icon])) return; // Blocked
 	if (!GTK_TOGGLE_BUTTON(icon_buttons[icon])->active) // Toggle the button
@@ -3403,28 +3326,26 @@ void change_to_tool(int icon)
 	{
 		if (gradient[mem_channel].status != GRAD_DONE)
 			gradient[mem_channel].status = GRAD_NONE;
-		else if (grad_opacity)
-			gtk_widget_queue_draw(drawing_canvas);
+		else if (grad_opacity) update |= CF_DRAW;
 		else if (!mem_gradient) repaint_grad(0);
 	}
 	if ( marq_status != MARQUEE_NONE)
 	{
-		if ( marq_status >= MARQUEE_PASTE &&
-			inifile_get_gboolean( "pasteCommit", FALSE ) )
+		if (paste_commit && (marq_status >= MARQUEE_PASTE))
 		{
 			commit_paste(NULL);
 			pen_down = 0;
 			mem_undo_prepare();
 		}
 
-		marq_status = MARQUEE_NONE;			// Marquee is on so lose it!
-		gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
+		marq_status = MARQUEE_NONE;	// Marquee is on so lose it!
+		update |= CF_DRAW;			// Needed to clear selection
 	}
 	if ( poly_status != POLY_NONE)
 	{
-		poly_status = POLY_NONE;			// Marquee is on so lose it!
+		poly_status = POLY_NONE;	// Marquee is on so lose it!
 		poly_points = 0;
-		gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
+		update |= CF_DRAW;			// Needed to clear selection
 	}
 	if ( tool_type == TOOL_CLONE )
 	{
@@ -3444,14 +3365,11 @@ void change_to_tool(int icon)
 	if ((tool_type == TOOL_GRADIENT) &&
 		(gradient[mem_channel].status == GRAD_DONE))
 	{
-		if (grad_opacity)
-			gtk_widget_queue_draw(drawing_canvas);
+		if (grad_opacity) update |= CF_DRAW;
 		else repaint_grad(1);
 	}
-	update_sel_bar();
-	update_menus();
-	set_cursor();
-	repaint_perim(NULL);
+	update_stuff(update);
+	if (!(update & CF_DRAW)) repaint_perim(NULL);
 }
 
 static void pressed_view_hori(int state)
@@ -3825,7 +3743,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_CROP:
 		pressed_crop(); break;
 	case ACT_SWAP_AB:
-		pressed_swap_AB(); break;
+		mem_swap_cols();
+		update_stuff(UPD_CAB);
+		break;
 	case ACT_TOOL:
 		if (state) change_to_tool(mode); // Ignore DEactivating buttons
 		break;
@@ -3836,7 +3756,6 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			paint_marquee(2, marq_x1 + change * arrow_dx[dir],
 				marq_y1 + change * arrow_dy[dir]);
 			update_sel_bar();
-			update_menus();
 		}
 		else move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
 		break;
@@ -3852,7 +3771,6 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			paint_marquee(3, marq_x2 + change * arrow_dx[dir],
 				marq_y2 + change * arrow_dy[dir]);
 			update_sel_bar();
-			update_menus();
 		}
 		else if (layer_selected) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
@@ -3861,7 +3779,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			/* !!! Later, maybe localize redraw to the changed part */
 			bkg_x += change * arrow_dx[dir];
 			bkg_y += change * arrow_dy[dir];
-			gtk_widget_queue_draw(drawing_canvas);
+			update_stuff(UPD_RENDER);
 		}
 		break;
 	case ACT_ESC:
@@ -3872,7 +3790,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			(gradient[mem_channel].status != GRAD_NONE))
 		{
 			gradient[mem_channel].status = GRAD_NONE;
-			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			if (grad_opacity) update_stuff(UPD_RENDER);
 			else repaint_grad(0);
 		}
 		break;
@@ -3898,15 +3816,14 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			if ((mode >= 0) && (mode < mem_cols))
 				mem_col_[action] = mode;
 			mem_col_24[action] = mem_pal[mem_col_[action]];
-			update_cols();
 		}
 		else
 		{
 			mode += channel_col_[action][mem_channel];
 			if ((mode >= 0) && (mode <= 255))
 				channel_col_[action][mem_channel] = mode;
-			pressed_value(channel_col_A[mem_channel]);
 		}
+		update_stuff(UPD_CAB);
 		break;
 	case ACT_CHANNEL:
 		if (kbd) state = TRUE;
@@ -3939,9 +3856,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_COPY:
 		pressed_copy(mode); break;
 	case ACT_PASTE:
-		if (mode) pressed_paste_centre();
-		else pressed_paste();
-		break;
+		pressed_paste(mode); break;
 	case ACT_COPY_PAL:
 		pressed_pal_copy(); break;
 	case ACT_PASTE_PAL:
@@ -4327,8 +4242,7 @@ static void pressed_pal_copy()
 	spot_undo(UNDO_PAL);
 	mem_pal_copy(mem_pal, tpal);
 	mem_cols = n;
-	init_pal();
-	update_all_views();
+	update_stuff(UPD_PAL);
 }
 
 static void pressed_pal_paste()
@@ -4345,7 +4259,6 @@ static void pressed_pal_paste()
 	h = (mem_cols + w - 1) / w;
 
 	mem_clip_new(w, h, 3, CMASK_IMAGE, FALSE);
-	text_paste = TEXT_PASTE_NONE;
 	if (!mem_clipboard)
 	{
 		memory_errors(1);
@@ -4360,9 +4273,8 @@ static void pressed_pal_paste()
 		dest[2] = mem_pal[i].blue;
 	}
 
-	if (MEM_BPP == 3) pressed_paste_centre();
-	else pressed_select(FALSE);
-	update_menus();
+	update_stuff(UPD_XCOPY);
+	if (MEM_BPP == 3) pressed_paste(TRUE);
 }
 
 ///	DOCK AREA
@@ -4477,8 +4389,7 @@ static void pressed_sel_ramp(int vert)
 		img += s2;
 	}
 
-	update_menus();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 #undef _

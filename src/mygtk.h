@@ -85,6 +85,12 @@ int read_spin(GtkWidget *spin);
 double read_float_spin(GtkWidget *spin);
 GtkWidget *add_float_spin(double value, double min, double max);
 void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
+#if GTK_MAJOR_VERSION == 1
+void spin_set_range(GtkWidget *spin, int min, int max);
+#else
+#define spin_set_range(spin, min, max) \
+	gtk_spin_button_set_range(GTK_SPIN_BUTTON(spin), (min), (max))
+#endif
 
 // Box unpacking macros
 #define BOX_CHILD_0(box) \
@@ -188,10 +194,6 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 
 void viewport_style(GtkWidget *widget);
 
-// Eliminate flicker when scrolling
-
-void fix_scroll(GtkWidget *scroll);
-
 // Fix for paned widgets losing focus in GTK+1
 
 #if GTK_MAJOR_VERSION == 1
@@ -199,6 +201,10 @@ void paned_mouse_fix(GtkWidget *widget);
 #else
 #define paned_mouse_fix(X)
 #endif
+
+// Eliminate flicker when scrolling
+
+void fix_scroll(GtkWidget *scroll);
 
 // Init-time bugfixes
 

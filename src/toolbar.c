@@ -153,10 +153,7 @@ static float toolbar_get_zoom( GtkWidget *combo )
 
 void toolbar_viewzoom(gboolean visible)
 {
-	if ( visible )
-		gtk_widget_show( toolbar_zoom_view );
-	else
-		gtk_widget_hide( toolbar_zoom_view );
+	(visible ? gtk_widget_show : gtk_widget_hide)(toolbar_zoom_view);
 }
 
 void toolbar_zoom_update()			// Update the zoom combos to reflect current zoom
@@ -202,22 +199,12 @@ void mode_change(int setting, int state)
 
 	if (!state == !*vars_settings[setting]) return; // No change, or changed already
 	*(vars_settings[setting]) = state;
-	switch (setting)
+	if ((setting == SETB_CSEL) && mem_cselect && !csel_data)
 	{
-	case SETB_CSEL:
-		if (mem_cselect && !csel_data)
-		{
-			csel_init();
-			mem_cselect = !!csel_data;
-		}
-		break;
-	case SETB_GRAD:
-		if ((gradient[mem_channel].status == GRAD_DONE) &&
-			(tool_type != TOOL_GRADIENT))
-			repaint_grad(mem_gradient);
-		break;
+		csel_init();
+		mem_cselect = !!csel_data;
 	}
-	gtk_widget_queue_draw(drawing_canvas);
+	update_stuff(setting == SETB_GRAD ? UPD_GMODE : UPD_MODE);
 }
 
 static int set_flood(GtkWidget *box, gpointer fdata)
@@ -871,14 +858,14 @@ static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointe
 	if (drag_index && (drag_index_vals[1] != pindex))
 	{
 		mem_pal_index_move(drag_index_vals[1], pindex);
-		init_pal();
+		update_stuff(UPD_MVPAL);
 		drag_index_vals[1] = pindex;
 	}
 
 	return (TRUE);
 }
 
-static gint release_palette( GtkWidget *widget, GdkEventButton *event )
+static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
 {
 	if (drag_index)
 	{
@@ -894,14 +881,14 @@ static gint release_palette( GtkWidget *widget, GdkEventButton *event )
 				mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
 
 			mem_undo_prepare();
-			canvas_undo_chores();
+			update_stuff(UPD_PAL | CF_MENU);
 		}
 	}
 
 	return FALSE;
 }
 
-static gint click_palette( GtkWidget *widget, GdkEventButton *event )
+static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 {
 	int px, py, pindex;
 
@@ -918,49 +905,27 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 	if (px < PALETTE_SWATCH_X) colour_selector(COLSEL_EDIT_ALL + pindex);
 	else if (px < PALETTE_CROSS_X)		// Colour A or B changed
 	{
-		if (event->button == 1)
+		if ((event->button == 1) && (event->state & GDK_SHIFT_MASK))
 		{
-			if (event->state & GDK_CONTROL_MASK)
-			{
-				mem_col_B = pindex;
-				mem_col_B24 = mem_pal[mem_col_B];
-			}
-			else if (event->state & GDK_SHIFT_MASK)
-			{
-				mem_pal_copy(brcosa_pal, mem_pal);
-				drag_index = TRUE;
-				drag_index_vals[0] = pindex;
-				drag_index_vals[1] = pindex;
-				gdk_window_set_cursor(drawing_palette->window, move_cursor);
-			}
-			else
-			{
-				mem_col_A = pindex;
-				mem_col_A24 = mem_pal[mem_col_A];
-			}
+			mem_pal_copy(brcosa_pal, mem_pal);
+			drag_index = TRUE;
+			drag_index_vals[0] = drag_index_vals[1] = pindex;
+			gdk_window_set_cursor(drawing_palette->window, move_cursor);
 		}
-		else if (event->button == 3)
+		else if ((event->button == 1) || (event->button == 3))
 		{
-			mem_col_B = pindex;
-			mem_col_B24 = mem_pal[mem_col_B];
-		}
+			int ab = (event->button == 3) || (event->state & GDK_CONTROL_MASK);
 
-		init_pal();
+			mem_col_[ab] = pindex;
+			mem_col_24[ab] = mem_pal[pindex];
+			update_stuff(UPD_AB);
+		}
 	}
 	else /* if (px >= PALETTE_CROSS_X) */		// Mask changed
 	{
 		mem_prot_mask[pindex] ^= 255;
-
-		/* Update & redraw swatch */
-		repaint_swatch(pindex);
-		gtk_widget_queue_draw_area(widget,
-			PALETTE_CROSS_X, PALETTE_SWATCH_Y + PALETTE_SWATCH_H * pindex,
-			PALETTE_WIDTH - PALETTE_CROSS_X, PALETTE_SWATCH_H);
-
 		mem_mask_init();		// Prepare RGB masks
-		/* !!! Do the same for any other kind of preview */
-		if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-			update_all_views();
+		update_stuff(UPD_CMASK);
 	}
 
 	return (TRUE);
@@ -1043,26 +1008,23 @@ void toolbar_exit()				// Remember toolbar settings on program exit
 
 void toolbar_showhide()				// Show/Hide all 4 toolbars
 {
-	int i, bar[] = { TOOLBAR_MAIN, TOOLBAR_TOOLS, TOOLBAR_PALETTE, TOOLBAR_STATUS };
+	static const unsigned char bar[4] =
+		{ TOOLBAR_MAIN, TOOLBAR_TOOLS, TOOLBAR_PALETTE, TOOLBAR_STATUS };
+	int i;
 
-	if ( toolbar_boxes[TOOLBAR_MAIN] == NULL ) return;		// Grubby hack to avoid segfault
+	if (!toolbar_boxes[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
 
-	for ( i=0; i<4; i++ )
+	for (i = 0; i < 4; i++)
 	{
-		if ( toolbar_status[ bar[i] ] )
-			gtk_widget_show( toolbar_boxes[ bar[i] ] );
-		else
-			gtk_widget_hide( toolbar_boxes[ bar[i] ] );
+		(toolbar_status[bar[i]] ? gtk_widget_show :
+			gtk_widget_hide)(toolbar_boxes[bar[i]]);
 	}
 
-	if ( !toolbar_status[TOOLBAR_SETTINGS] )
-	{
-		toolbar_exit();
-	}
+	if (!toolbar_status[TOOLBAR_SETTINGS]) toolbar_exit();
 	else
 	{
 		toolbar_settings_init();
-		gdk_window_raise( main_window->window );
+		gdk_window_raise(main_window->window);
 	}
 }
 
@@ -1098,8 +1060,6 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 				mem_prev[o + 3*i + k] = mem_brushes[o2 + 3*i + k];
 		}
 	}
-
-	if ( drawing_col_prev ) gtk_widget_queue_draw( drawing_col_prev );
 }
 
 #include "graphics/xbm_patterns.xbm"
@@ -1194,8 +1154,6 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 	}
 
 	grad_def_update();
-	if ((tool_type == TOOL_GRADIENT) && grad_opacity)
-		gtk_widget_queue_draw(drawing_canvas);
 }
 
 void update_top_swatch()			// Update selected colours A & B

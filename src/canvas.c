@@ -67,11 +67,12 @@ int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
 
 ///	STATUS BAR
 
-void update_image_bar()
+static void update_image_bar()
 {
 	char txt[128], txt2[16], *tmp = "RGB";
 
-	toolbar_update_settings();		// Update A/B labels in settings toolbar
+
+	if (!status_on[STATUS_GEOMETRY]) return;
 
 	if (mem_img_bpp == 1) sprintf(tmp = txt2, "%i", mem_cols);
 
@@ -195,9 +196,9 @@ static void update_undo_bar()
 
 void init_status_bar()
 {
-	update_image_bar();
 	if ( !status_on[STATUS_GEOMETRY] )
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), "" );
+	else update_image_bar();
 
 	if ( status_on[STATUS_CURSORXY] )
 		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
@@ -275,7 +276,7 @@ void commit_paste(int *update)
 
 	if (!update) /* Update right now */
 	{
-		update_menus();		
+		update_stuff(UPD_IMGP);
 		vw_update_area(fx, fy, fw, fh);
 		main_update_area(fx, fy, fw, fh);
 	}
@@ -289,20 +290,11 @@ void commit_paste(int *update)
 	}
 }
 
-void paste_prepare()
-{
-	poly_status = POLY_NONE;
-	poly_points = 0;
-	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON))
-		change_to_tool(TTB_SELECT);
-	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0);
-}
-
 void iso_trans(int mode)
 {
 	int i = mem_isometrics(mode);
 
-	if (!i) canvas_undo_chores();
+	if (!i) update_stuff(UPD_GEOM);
 	else if (i == -5) alert_box( _("Error"),
 		_("The image is too large to transform."), _("OK"), NULL, NULL );
 	else memory_errors(i);
@@ -315,8 +307,7 @@ void pressed_invert()
 	mem_invert();
 	mem_undo_prepare();
 
-	init_pal();
-	update_all_views();
+	update_stuff(UPD_COL);
 }
 
 static int edge_mode;
@@ -373,7 +364,7 @@ void pressed_fx(int what)
 	spot_undo(UNDO_FILT);
 	do_effect(what, 0);
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 static int do_gauss(GtkWidget *box, gpointer fdata)
@@ -541,11 +532,7 @@ void pressed_convert_rgb()
 	int i = mem_convert_rgb();
 
 	if (i) memory_errors(i);
-	else
-	{
-		check_undo_paste_bpp();
-		canvas_undo_chores();
-	}
+	else update_stuff(UPD_2RGB);
 }
 
 void pressed_greyscale(int mode)
@@ -555,25 +542,20 @@ void pressed_greyscale(int mode)
 	mem_greyscale(mode);
 	mem_undo_prepare();
 
-	init_pal();
-	update_all_views();
+	update_stuff(UPD_COL);
 }
 
 void pressed_rotate_image(int dir)
 {
 	int i = mem_image_rot(dir);
 	if (i) memory_errors(i);
-	else canvas_undo_chores();
+	else update_stuff(UPD_GEOM);
 }
 
 void pressed_rotate_sel(int dir)
 {
 	if (mem_sel_rot(dir)) memory_errors(1);
-	else
-	{
-		check_marquee();
-		gtk_widget_queue_draw( drawing_canvas );
-	}
+	else update_stuff(UPD_CGEOM);
 }
 
 static int do_rotate_free(GtkWidget *box, gpointer fdata)
@@ -593,7 +575,7 @@ static int do_rotate_free(GtkWidget *box, gpointer fdata)
 			smooth = 1;
 	}
 	j = mem_rotate_free(angle, smooth, gcor, 0);
-	if (!j) canvas_undo_chores();
+	if (!j) update_stuff(UPD_GEOM);
 	else
 	{
 		if (j == -5) alert_box(_("Error"),
@@ -635,7 +617,7 @@ void pressed_clip_mask(int val)
 		}
 	}
 	mem_clip_mask_set(val);
-	gtk_widget_queue_draw( drawing_canvas );
+	update_stuff(UPD_CLIP);
 }
 
 int api_clip_alphamask()
@@ -663,7 +645,7 @@ int api_clip_alphamask()
 
 void pressed_clip_alphamask()
 {
-	if (api_clip_alphamask()) gtk_widget_queue_draw( drawing_canvas );
+	if (api_clip_alphamask()) update_stuff(UPD_CLIP);
 }
 
 void pressed_clip_alpha_scale()
@@ -675,21 +657,21 @@ void pressed_clip_alpha_scale()
 	if (mem_scale_alpha(mem_clipboard, mem_clip_mask,
 		mem_clip_w, mem_clip_h, TRUE)) return;
 
-	gtk_widget_queue_draw( drawing_canvas );
+	update_stuff(UPD_CLIP);
 }
 
 void pressed_clip_mask_all()
 {
 	if (mem_clip_mask_init(0))
 		memory_errors(1);	// Not enough memory
-	else gtk_widget_queue_draw(drawing_canvas);
+	else update_stuff(UPD_CLIP);
 }
 
 void pressed_clip_mask_clear()
 {
 	if (!mem_clip_mask) return;
 	mem_clip_mask_clear();
-	gtk_widget_queue_draw(drawing_canvas);
+	update_stuff(UPD_CLIP);
 }
 
 void pressed_flip_image_v()
@@ -707,7 +689,7 @@ void pressed_flip_image_v()
 	}
 	free(temp);
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 void pressed_flip_image_h()
@@ -721,7 +703,7 @@ void pressed_flip_image_h()
 		mem_flip_h(mem_img[i], mem_width, mem_height, BPP(i));
 	}
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 void pressed_flip_sel_v()
@@ -736,7 +718,7 @@ void pressed_flip_sel_v()
 		if (!mem_clip.img[i]) continue;
 		mem_flip_v(mem_clip.img[i], temp, mem_clip_w, mem_clip_h, bpp);
 	}
-	gtk_widget_queue_draw( drawing_canvas );
+	update_stuff(UPD_CLIP);
 }
 
 void pressed_flip_sel_h()
@@ -747,51 +729,51 @@ void pressed_flip_sel_h()
 		if (!mem_clip.img[i]) continue;
 		mem_flip_h(mem_clip.img[i], mem_clip_w, mem_clip_h, bpp);
 	}
-	gtk_widget_queue_draw( drawing_canvas );
+	update_stuff(UPD_CLIP);
 }
 
-void paste_init()
+void pressed_paste(int centre)
 {
+	if (!mem_clipboard) return;
+
+	poly_status = POLY_NONE;
+	poly_points = 0;
+	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON))
+		change_to_tool(TTB_SELECT);
+	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0);
+
+	if (centre)
+	{
+		int w, h;
+		GtkAdjustment *hori, *vert;
+
+		hori = gtk_scrolled_window_get_hadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+		vert = gtk_scrolled_window_get_vadjustment(
+			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+
+		canvas_size(&w, &h);
+		if (hori->page_size > w) mem_icx = 0.5;
+		else mem_icx = (hori->value + hori->page_size * 0.5) / w;
+
+		if (vert->page_size > h) mem_icy = 0.5;
+		else mem_icy = (vert->value + vert->page_size * 0.5) / h;
+
+		marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
+		marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
+		marq_x2 = marq_x1 + mem_clip_w - 1;
+		marq_y2 = marq_y1 + mem_clip_h - 1;
+	}
+	else
+	{	
+		marq_x1 = mem_clip_x;
+		marq_y1 = mem_clip_y;
+		marq_x2 = mem_clip_x + mem_clip_w - 1;
+		marq_y2 = mem_clip_y + mem_clip_h - 1;
+	}
 	marq_status = MARQUEE_PASTE;
 	cursor_corner = -1;
-	update_sel_bar();
-	update_menus();
-	gtk_widget_queue_draw( drawing_canvas );
-}
-
-void pressed_paste()
-{
-	paste_prepare();
-	marq_x1 = mem_clip_x;
-	marq_y1 = mem_clip_y;
-	marq_x2 = mem_clip_x + mem_clip_w - 1;
-	marq_y2 = mem_clip_y + mem_clip_h - 1;
-	paste_init();
-}
-
-void pressed_paste_centre()
-{
-	int w, h;
-	GtkAdjustment *hori, *vert;
-
-	if (!mem_clipboard) return;
-	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-
-	canvas_size(&w, &h);
-	if (hori->page_size > w) mem_icx = 0.5;
-	else mem_icx = (hori->value + hori->page_size * 0.5) / w;
-
-	if (vert->page_size > h) mem_icy = 0.5;
-	else mem_icy = (vert->value + vert->page_size * 0.5) / h;
-
-	paste_prepare();
-	align_size(can_zoom);
-	marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
-	marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
-	marq_x2 = marq_x1 + mem_clip_w - 1;
-	marq_y2 = marq_y1 + mem_clip_h - 1;
-	paste_init();
+	update_stuff(UPD_PASTE);
 }
 
 void pressed_rectangle(int filled)
@@ -849,7 +831,7 @@ void pressed_rectangle(int filled)
 	if (sb) render_sb();
 
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 void pressed_ellipse(int filled)
@@ -857,7 +839,7 @@ void pressed_ellipse(int filled)
 	spot_undo(UNDO_DRAW);
 	mem_ellipse(marq_x1, marq_y1, marq_x2, marq_y2, filled ? 0 : tool_size);
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 static int copy_clip(gboolean api)
@@ -874,7 +856,6 @@ static int copy_clip(gboolean api)
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
 		 !channel_dis[CHN_ALPHA]) cmask = CMASK_RGBA;
 	mem_clip_new(w, h, bpp, cmask, FALSE);
-	text_paste = TEXT_PASTE_NONE;
 
 	if (!mem_clipboard)
 	{
@@ -1031,8 +1012,7 @@ void pressed_copy(int cut)
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	channel_mask();
 	if (cut) cut_clip();
-	update_all_views();
-	update_menus();
+	update_stuff(cut ? UPD_CUT : UPD_COPY);
 }
 
 #ifdef U_API
@@ -1072,7 +1052,7 @@ void pressed_lasso(int cut)
 		channel_mask();
 		trim_clip();
 		if (cut) cut_clip();
-		pressed_paste_centre();
+		pressed_paste(TRUE);
 	}
 	/* Trim an existing clipboard */
 	else
@@ -1090,8 +1070,7 @@ void pressed_lasso(int cut)
 		}
 		if (!mem_clip_mask) mem_clip_mask = oldmask;
 		trim_clip();
-		if (marq_status >= MARQUEE_PASTE)
-			gtk_widget_queue_draw(drawing_canvas);
+		update_stuff(UPD_CGEOM);
 	}
 }
 
@@ -1151,38 +1130,113 @@ void update_menus()			// Update edit/undo menu
 		change_to_tool(DEFAULT_TOOL_ICON);
 }
 
-void canvas_undo_chores()
+void update_stuff(int flags)
 {
-	int w, h;
+	/* Always check current channel first */
+	if (!mem_img[mem_channel])
+	{
+		mem_channel = CHN_IMAGE;
+		flags |= UPD_CHAN;
+	}
 
-	canvas_size(&w, &h);
-	gtk_widget_set_usize(drawing_canvas, w, h);
-	check_marquee();
-	update_menus();
-	init_pal();
-	update_all_views();			// redraw canvas widget
-}
-
-void check_undo_paste_bpp()
-{
-	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
-
-	if ((marq_status >= MARQUEE_PASTE) && (mem_clip_bpp > MEM_BPP))
+	/* And check paste validity too */
+	if ((marq_status >= MARQUEE_PASTE) &&
+		(!mem_clipboard || (mem_clip_bpp > MEM_BPP)))
 		pressed_select(FALSE);
+
+	if (flags & CF_CAB)
+		flags |= mem_channel == CHN_IMAGE ? UPD_AB : UPD_GRAD;
+	if (flags & CF_NAME)
+		update_titlebar();
+	if (flags & CF_GEOM)
+	{
+		int w, h;
+		canvas_size(&w, &h);
+		gtk_widget_set_usize(drawing_canvas, w, h);
+	}
+	if (flags & (CF_GEOM | CF_CGEOM))
+		check_marquee();
+	if (flags & CF_PAL)
+	{
+		if (mem_col_A >= mem_cols) mem_col_A = 0;
+		if (mem_col_B >= mem_cols) mem_col_B = 0;
+		mem_mask_init();	// Reinit RGB masks
+		gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
+			mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
+	}
+	if (flags & CF_AB)
+	{
+		mem_pat_update(); // Also updates gradient (CF_GRAD)
+		if (text_paste && (marq_status >= MARQUEE_PASTE))
+		{
+			if (text_paste == TEXT_PASTE_FT) ft_render_text();
+			else /* if ( text_paste == TEXT_PASTE_GTK ) */
+				render_text( drawing_col_prev );
+			check_marquee();
+			flags |= CF_PMODE;
+		}
+	}
+	if (flags & CF_GRAD)
+		grad_def_update();
+	if (flags & CF_PREFS)
+	{
+		update_undo_depth();	// If undo depth was changed
+		update_recent_files();
+		init_status_bar();	// Takes care of all statusbar parts
+	}
+	if (flags & CF_MENU)
+		update_menus();
+	if (flags & CF_SET)
+		toolbar_update_settings();
+	if (flags & CF_IMGBAR)
+		update_image_bar();
+	if (flags & CF_SELBAR)
+		update_sel_bar();
+#if 0
+// !!! Too risky for now - need a safe path which only calls update_xy_bar()
+	if (flags & CF_PIXEL)
+		move_mouse(0, 0, 0);	// To cause update of XY bar
+#endif
+	if (flags & CF_CURSOR)
+		set_cursor();
+	if (flags & CF_PMODE)
+		if ((marq_status >= MARQUEE_PASTE) && show_paste) flags |= CF_DRAW;
+	if (flags & CF_GMODE)
+		if ((tool_type == TOOL_GRADIENT) && grad_opacity) flags |= CF_DRAW;
+	if (flags & CF_DRAW)
+		if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
+	if (flags & CF_VDRAW)
+		if (view_showing && vw_drawing) gtk_widget_queue_draw(vw_drawing);
+	if (flags & CF_PDRAW)
+	{
+		mem_pal_init();		// Update palette RGB on screen
+		gtk_widget_queue_draw(drawing_palette);
+	}
+	if (flags & CF_TDRAW)
+	{
+		update_top_swatch();
+		gtk_widget_queue_draw(drawing_col_prev);
+	}
+	if (flags & CF_ALIGN)
+	{
+		float old_zoom = can_zoom;
+		can_zoom = -1;
+		align_size(old_zoom);
+	}
+	if (flags & CF_VALIGN)
+		vw_realign();
 }
 
 void main_undo()
 {
 	mem_undo_backward();
-	check_undo_paste_bpp();
-	canvas_undo_chores();
+	update_stuff(UPD_ALL);
 }
 
 void main_redo()
 {
 	mem_undo_forward();
-	check_undo_paste_bpp();
-	canvas_undo_chores();
+	update_stuff(UPD_ALL);
 }
 
 /* Save palette to a file */
@@ -1230,53 +1284,16 @@ int load_pal(char *file_name)			// Load palette file
 	mem_pal_copy( mem_pal, new_mem_pal );
 	mem_cols = i;
 
-	init_pal();
-	update_all_views();
+	update_stuff(UPD_PAL);
 
 	return 0;
 }
 
 
-void update_cols()
-{
-	if (!mem_img[CHN_IMAGE]) return;	// Only do this if we have an image
-
-	mem_pat_update();
-	/* !!! Depends on mem_pat_update() for setting colors */
-	update_top_swatch();
-	gtk_widget_queue_draw(drawing_col_prev);
-
-	/* !!! Renders gradient bar, which depends on mem_pat_update() */
-	update_image_bar();
-
-	if ( marq_status >= MARQUEE_PASTE && text_paste )
-	{
-		if ( text_paste == TEXT_PASTE_FT ) ft_render_text();
-		else /* if ( text_paste == TEXT_PASTE_GTK ) */
-			render_text( drawing_col_prev );
-		check_marquee();
-		gtk_widget_queue_draw( drawing_canvas );
-	}
-}
-
-void init_pal()					// Initialise palette after loading
-{
-	if (mem_col_A >= mem_cols) mem_col_A = 0;
-	if (mem_col_B >= mem_cols) mem_col_B = 0;
-
-	mem_mask_init();		// Reinit RGB masks
-	mem_pal_init();			// Update palette RGB on screen
-	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
-		mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
-	gtk_widget_queue_draw( drawing_palette );
-
-	update_cols();
-}
-
 void set_new_filename( char *fname )
 {
 	strncpy(mem_filename, fname, PATHBUF);
-	update_titlebar();
+	update_stuff(UPD_NAME);
 }
 
 static int populate_channel(char *filename)
@@ -1291,7 +1308,7 @@ static int populate_channel(char *filename)
 		res = load_image(filename, FS_CHANNEL_LOAD, ftype);
 
 	/* Successful */
-	if (res == 1) canvas_undo_chores();
+	if (res == 1) update_stuff(UPD_UIMG);
 
 	/* Not enough memory available */
 	else if (res == FILE_MEM_ERROR) memory_errors(1);
@@ -1370,17 +1387,13 @@ int do_a_load( char *fname )
 		view_show();
 	}
 
-	if (!undo_load) // No reason to reset tools in undoable mode
-	{
-		pressed_select(FALSE); // To prevent automatic paste
-		reset_tools();
-		change_to_tool(DEFAULT_TOOL_ICON);
-	}
-	else notify_unchanged();
-
 	/* Show new image */
-	check_undo_paste_bpp();
-	canvas_undo_chores();
+	if (!undo_load) reset_tools();
+	else // No reason to reset tools in undoable mode
+	{
+		notify_unchanged();
+		update_stuff(UPD_ALL);
+	}
 
 fail:	set_image(TRUE);
 	return (res <= 0);
@@ -1794,8 +1807,7 @@ static void fs_ok(GtkWidget *fs)
 			if (strcmp(fname, mem_filename)) layers_notify_changed();
 		}
 		set_new_filename(fname);
-		update_image_bar();	// Update transparency info
-		update_all_views();	// Redraw in case transparency changed
+		update_stuff(UPD_TRANS);
 		break;
 	case FS_PALETTE_LOAD:
 		if (load_pal(fname))
@@ -2083,7 +2095,6 @@ void align_size( float new_zoom )		// Set new zoom level
 #endif
 	gtk_widget_set_usize(drawing_canvas, w, h);
 
-	update_image_bar();
 	zoom_flag = 0;
 	vw_focus_view();		// View window position may need updating
 	toolbar_zoom_update();
@@ -2215,20 +2226,18 @@ static void poly_conclude()
 	{
 		poly_status = POLY_NONE;
 		poly_points = 0;
-		if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
 	}
 	else
 	{
 		poly_status = POLY_DONE;
-		poly_init();			// Set up polgon stats
+		poly_init();			// Set up polygon stats
 		marq_x1 = poly_min_x;
 		marq_y1 = poly_min_y;
 		marq_x2 = poly_max_x;
 		marq_y2 = poly_max_y;
-		update_menus();			// Update menu/icons
 		paint_poly_marquee(NULL, FALSE);
 	}
-	update_sel_bar();
+	update_stuff(UPD_PSEL);
 }
 
 static void poly_add_po( int x, int y )
@@ -3084,19 +3093,6 @@ void refresh_grad(rgbcontext *ctx)
 	vxy[2] = (ctx->x1 <= vxy[2] ? ctx->x1 - 1 : vxy[2]) - margin_main_x;
 	vxy[3] = (ctx->y1 <= vxy[3] ? ctx->y1 - 1 : vxy[3]) - margin_main_y;
 	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1, vxy, ctx);
-}
-
-void men_item_visible( GtkWidget *menu_items[], gboolean state )
-{	// Show or hide menu items
-	int i = 0;
-	while ( menu_items[i] != NULL )
-	{
-		if ( state )
-			gtk_widget_show( menu_items[i] );
-		else
-			gtk_widget_hide( menu_items[i] );
-		i++;
-	}
 }
 
 void update_recent_files()			// Update the menu items

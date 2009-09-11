@@ -327,7 +327,6 @@ int brush_tool_type;			// Last brush tool type
 int mem_brush_list[81][3];		// Preset brushes parameters
 int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-int mem_preview;			// Preview an RGB change
 int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 
 int mem_undo_limit;		// Max MB memory allocation limit
@@ -489,7 +488,6 @@ void mem_mask_init();			// Initialise RGB protection mask
 int mem_protected_RGB(int intcol);	// Is this intcol in list?
 
 void mem_swap_cols();			// Swaps colours and update memory
-void repaint_swatch( int index );	// Update a palette swatch
 void mem_get_histogram(int channel);	// Calculate how many of each colour index is on the canvas
 int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
@@ -658,6 +656,7 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 
 int mem_skew(double xskew, double yskew, int type, int gcor);
 
+int average_pixels(unsigned char *rgb, int w, int h, int x0, int y0, int x1, int y1);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

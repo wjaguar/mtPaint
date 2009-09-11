@@ -489,6 +489,20 @@ void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data)
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
 }
 
+#if GTK_MAJOR_VERSION == 1
+
+void spin_set_range(GtkWidget *spin, int min, int max)
+{
+	GtkAdjustment *adj = GTK_SPIN_BUTTON(spin)->adjustment;
+
+	adj->lower = min;
+	adj->upper = max;
+	gtk_adjustment_set_value(adj, adj->value);
+	gtk_adjustment_changed(adj);
+}
+
+#endif
+
 // Copy string quoting space chars
 
 char *quote_spaces(const char *src)
@@ -990,38 +1004,6 @@ void viewport_style(GtkWidget *widget)
 
 #endif
 
-// Eliminate flicker when scrolling
-
-/* This code serves a very important role - it disables background clear,
- * completely eliminating the annoying flicker when scrolling the canvas
- * in GTK+1 and GTK+2/Windows, and lessening CPU load in GTK+2/Linux.
- * The trick was discovered by Mark Tyler while developing MTK.
- * It also disables double buffering in GTK+2, because when rendering is
- * done properly, it is useless and just wastes considerable time. - WJ */
-
-static void realize_trick(GtkWidget *widget, gpointer user_data)
-{
-	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
-}
-
-void fix_scroll(GtkWidget *scroll)
-{
-	scroll = GTK_BIN(scroll)->child;
-	/* Stop theme engines from messing up viewport's frame */
-	viewport_style(scroll);
-	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
-		GTK_SIGNAL_FUNC(realize_trick), NULL);
-#if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(scroll, FALSE);
-#endif
-	scroll = GTK_BIN(scroll)->child;
-	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
-		GTK_SIGNAL_FUNC(realize_trick), NULL);
-#if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(scroll, FALSE);
-#endif
-}
-
 // Fix for paned widgets losing focus in GTK+1
 
 #if GTK_MAJOR_VERSION == 1
@@ -1050,6 +1032,41 @@ void paned_mouse_fix(GtkWidget *widget)
 }
 
 #endif
+
+// Eliminate flicker when scrolling
+
+/* This code serves a very important role - it disables background clear,
+ * completely eliminating the annoying flicker when scrolling the canvas
+ * in GTK+1 and GTK+2/Windows, and lessening CPU load in GTK+2/Linux.
+ * The trick was discovered by Mark Tyler while developing MTK.
+ * It also disables double buffering in GTK+2, because when rendering is
+ * done properly, it is useless and just wastes considerable time. - WJ */
+
+static void realize_trick(GtkWidget *widget, gpointer user_data)
+{
+	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
+#if GTK_MAJOR_VERSION == 1
+	fix_gdk_events(widget->window); // Let's fix focus issues too
+#endif
+}
+
+void fix_scroll(GtkWidget *scroll)
+{
+	scroll = GTK_BIN(scroll)->child;
+	/* Stop theme engines from messing up viewport's frame */
+	viewport_style(scroll);
+	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+		GTK_SIGNAL_FUNC(realize_trick), NULL);
+#if GTK_MAJOR_VERSION == 2
+	gtk_widget_set_double_buffered(scroll, FALSE);
+#endif
+	scroll = GTK_BIN(scroll)->child;
+	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+		GTK_SIGNAL_FUNC(realize_trick), NULL);
+#if GTK_MAJOR_VERSION == 2
+	gtk_widget_set_double_buffered(scroll, FALSE);
+#endif
+}
 
 // Init-time bugfixes
 

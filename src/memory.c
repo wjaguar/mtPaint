@@ -85,7 +85,6 @@ int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-int mem_preview;			// Preview an RGB change
 int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 
 /// UNDO ENGINE
@@ -585,6 +584,10 @@ int cmask_from(chanlist img)
 int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
 {
 	int res;
+
+
+	/* Text flag defaults to cleared */
+	text_paste = 0;
 
 	/* Clear everything if no backup needed */
 	if (!backup) mem_free_image(&mem_clip, FREE_ALL);
@@ -1581,7 +1584,7 @@ void mem_swap_cols()
 
 #define PALETTE_TEXT_GREY 200
 
-void repaint_swatch(int index)		// Update a palette colour swatch
+static void repaint_swatch(int index)		// Update a palette colour swatch
 {
 	unsigned char *tmp, pcol[2] = { 0, 0 };
 	int i, j;
@@ -8789,4 +8792,37 @@ int mem_skew(double xskew, double yskew, int type, int gcor)
 	progress_end();
 
 	return (0);
+}
+
+// Get gamma-corrected average of RGB pixels in an area, or -1 if out of bounds
+int average_pixels(unsigned char *rgb, int w, int h, int x0, int y0, int x1, int y1)
+{
+	unsigned char *tmp;
+	double rr, gg, bb, dd;
+	int i, j;
+
+
+	if (x0 < 0) x0 = 0;
+	if (x1 > w) x1 = w;
+	if (y0 < 0) y0 = 0;
+	if (y1 > h) y1 = h;
+	/* Outside of image */
+	if ((x0 >= x1) || (y0 >= y1)) return (-1);
+
+	/* Average (gamma corrected) area */
+	x1 -= x0;
+	rr = gg = bb = 0.0;
+	for (i = y0; i < y1; i++)
+	{
+		tmp = rgb + (i * w + x0) * 3;
+		for (j = 0; j < x1; j++ , tmp += 3)
+		{
+			rr += gamma256[tmp[0]];
+			gg += gamma256[tmp[1]];
+			bb += gamma256[tmp[2]];
+		}
+	}
+	dd = 1.0 / (x1 * (y1 - y0));
+	rr *= dd; gg *= dd; bb *= dd;
+	return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
 }

@@ -861,11 +861,9 @@ void vw_align_size( float new_zoom )
 
 void vw_realign()
 {
-	float old_zoom;
-	old_zoom = vw_zoom;
+	float old_zoom = vw_zoom;
 	vw_zoom = -1; /* Force resize */
-	vw_align_size(old_zoom);		// Update the view window as needed
-	vw_zoom = old_zoom;
+	vw_align_size(old_zoom);	// Update the view window as needed
 }
 
 void vw_repaint(int px, int py, int pw, int ph)
@@ -1113,7 +1111,6 @@ void pressed_centralize(int state)
 {
 	canvas_image_centre = state;
 	force_main_configure();		// Force configure of main window - for centalizing code
-	update_all_views();
 }
 
 void pressed_view_focus(int state)
@@ -1382,15 +1379,13 @@ void render_text( GtkWidget *widget )
 		buf, 0, 0, width, height);
 	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
 
-	text_paste = TEXT_PASTE_GTK;
+	text_paste = TEXT_PASTE_NONE;
 	if (!have_rgb) free(buf);
 	else have_rgb = make_text_clipboard(buf, width, height, 3);
-	if (!have_rgb)
-	{
-		alert_box( _("Error"), _("Not enough memory to create clipboard"),
-			_("OK"), NULL, NULL );
-		text_paste = TEXT_PASTE_NONE;
-	}
+
+	if (have_rgb) text_paste = TEXT_PASTE_GTK;
+	else alert_box( _("Error"), _("Not enough memory to create clipboard"),
+		_("OK"), NULL, NULL );
 }
 
 static gint delete_text( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -1429,8 +1424,9 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "fontAntialias1", antialias[1] );
 	inifile_set_gboolean( "fontAntialias2", antialias[2] );
 
-	render_text( widget );
-	if (mem_clipboard) pressed_paste_centre();
+	render_text(widget);
+	update_stuff(UPD_XCOPY);
+	if (mem_clipboard) pressed_paste(TRUE);
 
 	delete_text( widget, event, data );
 

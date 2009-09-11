@@ -117,15 +117,13 @@ void refresh_marquee(rgbcontext *ctx);			// Refresh a part of marquee
 void paint_poly_marquee(rgbcontext *ctx, int whole);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
 
-void update_image_bar();		// Update image stats on status bar
 void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar
 void init_status_bar();			// Initialize status bar
 
 void pressed_lasso(int cut);
 void pressed_copy(int cut);
-void pressed_paste();
-void pressed_paste_centre();
+void pressed_paste(int centre);
 void pressed_greyscale(int mode);
 void pressed_convert_rgb();
 void pressed_invert();
@@ -160,10 +158,7 @@ void iso_trans(int mode);
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();
-void paste_prepare();
 void commit_paste(int *update);
-void canvas_undo_chores();
-void check_undo_paste_bpp();
 
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx);
 void repaint_line(int mode);			// Repaint or clear line on canvas
@@ -176,12 +171,118 @@ void scroll_wheel( int x, int y, int d );	// Scroll wheel action from mouse
 
 void update_all_views();			// Update whole canvas on all views
 
-#if GTK_MAJOR_VERSION == 2
-void cleanse_txt( char *out, char *in );	// Cleans up non ASCII chars for GTK+2
-#endif
-
 void create_default_image();			// Create default new image
 
+/// UPDATE STUFF
+
+/* Atomic updates */
+
+#define CF_NAME   0x00000001 /* Name in titlebar */
+#define CF_GEOM   0x00000002 /* Image geometry */
+#define CF_CGEOM  0x00000004 /* Clipboard geometry */
+#define CF_PAL    0x00000008 /* Palette */
+#define CF_CAB    0x00000010 /* Current channel's A & B */
+#define CF_AB     0x00000020 /* Colors A & B */
+#define CF_GRAD   0x00000040 /* Gradients */
+#define CF_MENU   0x00000080 /* Menus and controls */
+#define CF_SET    0x00000100 /* Settings toolbar */
+#define CF_IMGBAR 0x00000200 /* Image statusbar */
+#define CF_SELBAR 0x00000400 /* Selection statusbar */
+#define CF_PIXEL  0x00000800 /* Pixel statusbar */
+#define CF_PREFS  0x00001000 /* Preferences */
+#define CF_CURSOR 0x00002000 /* Cursor */
+#define CF_PMODE  0x00004000 /* Paste preview */
+#define CF_GMODE  0x00008000 /* Gradient preview */
+#define CF_DRAW   0x00010000 /* Image window */
+#define CF_VDRAW  0x00020000 /* View window */
+#define CF_PDRAW  0x00040000 /* Palette window */
+#define CF_TDRAW  0x00080000 /* Color/brush/pattern window */
+#define CF_ALIGN  0x00100000 /* Realign image window */
+#define CF_VALIGN 0x00200000 /* Realign view window */
+
+/* Compound updates */
+
+//	Changed image contents
+#define UPD_IMG    (CF_DRAW | CF_VDRAW | CF_PIXEL)
+//	Changed image geometry (+undo)
+#define UPD_GEOM   (CF_GEOM | CF_MENU | CF_IMGBAR | UPD_IMG)
+//	Added a new channel (+)
+#define UPD_ADDCH  (CF_MENU | CF_IMGBAR | UPD_IMG)
+//	Deleted an existing channel (+)
+#define UPD_DELCH  UPD_ADDCH
+//	Switched to new channel (+)
+#define UPD_NEWCH  (UPD_ADDCH | UPD_CAB | CF_SELBAR)
+//	Switched to existing channel
+#define UPD_CHAN   UPD_NEWCH /* May avoid view window redraw, but won't bother */
+//	Changed color or value A or B
+#define UPD_CAB    CF_CAB
+//	Changed color A or B
+#define UPD_AB     (CF_AB | CF_SET | CF_GMODE | CF_TDRAW)
+//	Changed pattern
+#define UPD_PAT    (CF_AB | CF_TDRAW)
+//	Changed A, B, and pattern
+#define UPD_ABP    UPD_AB
+//	Changed palette 
+#define UPD_PAL    (CF_PAL | CF_IMGBAR | CF_PDRAW | UPD_AB | UPD_IMG)
+//	Added colors to palette
+#define UPD_ADDPAL (CF_PAL | CF_IMGBAR | CF_PDRAW)
+//	Changed drawing mode in some way
+#define UPD_MODE   (CF_PMODE | CF_GMODE)
+//	Toggled gradient mode
+#define UPD_GMODE  CF_DRAW
+//	Changed palette if indexed / image if RGB
+#define UPD_COL    UPD_PAL /* May avoid palette update for RGB, but... */
+//	Changed image contents (+undo, -redraw)
+#define UPD_IMGP   (CF_MENU | CF_PIXEL)
+//	Copied selection to clipboard
+#define UPD_COPY   CF_MENU
+//	Imported clipboard
+#define UPD_XCOPY  CF_MENU
+//	Converted indexed image to RGB
+#define UPD_2RGB   (CF_MENU | CF_IMGBAR | UPD_IMG)
+//	Converted RGB image to indexed
+#define UPD_2IDX   (UPD_2RGB | UPD_PAL)
+//	Created or loaded a new image (+)
+#define UPD_ALL    (UPD_GEOM | UPD_PAL | UPD_CAB)
+//	Changed clipboard contents
+#define UPD_CLIP   CF_PMODE
+//	Changed rendering options
+#define UPD_RENDER CF_DRAW
+//	Changed clipboard geometry
+#define UPD_CGEOM  (CF_CGEOM | CF_SELBAR | UPD_CLIP)
+//	Changed polygonal selection
+#define UPD_PSEL   (CF_MENU | CF_SELBAR)
+//	Changed selection
+#define UPD_SEL    (UPD_PSEL | CF_CURSOR)
+//	Initiated pasting something
+#define UPD_PASTE  (UPD_SEL | CF_DRAW)
+//	Changed filename
+#define UPD_NAME   CF_NAME
+//	Changed transparent color
+#define UPD_TRANS  (UPD_IMG | CF_IMGBAR)
+//	Changed image contents (+undo)
+#define UPD_UIMG   (UPD_IMG | CF_MENU)
+//	Cut selection
+#define UPD_CUT    UPD_UIMG
+//	Switched layers
+#define UPD_LAYER  (UPD_ALL | CF_NAME | CF_VALIGN)
+//	Changed color masking
+#define UPD_CMASK  (CF_PDRAW | UPD_MODE)
+//	Changed tool opacity
+#define UPD_OPAC   (CF_GRAD | CF_SET | UPD_MODE)
+//	Done "reset tools" (in addition to UPD_ALL)
+#define UPD_RESET  (CF_NAME | CF_ALIGN | UPD_PAL | UPD_OPAC)
+//	Changed brush
+#define UPD_BRUSH  (CF_SET | CF_CURSOR | CF_TDRAW)
+//	Changed gradient
+#define UPD_GRAD   (CF_GRAD | CF_SET | CF_GMODE)
+//	Changed preferences
+#define UPD_PREFS  (CF_PREFS | CF_MENU | CF_CURSOR | CF_DRAW | CF_VDRAW)
+//	Moved color in palette (no image redraw desired)
+#define UPD_MVPAL  (UPD_PAL & ~UPD_IMG)
+// !!! Do not forget: CF_MENU also tracks undo stack changes
+
+void update_stuff(int flags);
 
 #ifdef U_API
 int api_copy_rectangle();			// API function

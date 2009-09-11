@@ -83,10 +83,7 @@ static gboolean shift_play_timer_call()
 	else
 	{
 		i = mt_spinslide_get_value(shifter_slider);
-		i++;
-		if ( i>=shifter_max ) i=0;
-
-		shifter_set_palette( i );
+		if (++i >= shifter_max) i = 0;
 
 		mt_spinslide_set_value(shifter_slider, i);
 
@@ -125,7 +122,7 @@ static void shifter_slider_moved()		// Slider position changed
 	{
 		shifter_pos = pos;
 		shifter_set_palette(pos);
-		canvas_undo_chores();
+		update_stuff(UPD_PAL);
 	}
 }
 
@@ -226,14 +223,14 @@ static void click_shift_fix()			// Button to fix palette pressed
 
 	mt_spinslide_set_value(shifter_slider, 0);
 
-	canvas_undo_chores();
+	update_stuff(UPD_PAL);
 }
 
 static void click_shift_close()			// Palette Shifter window closed by user or WM
 {
-	mem_pal_copy( mem_pal, sh_old_pal );
-	canvas_undo_chores();
 	shift_play_stop();
+	mem_pal_copy( mem_pal, sh_old_pal );
+	update_stuff(UPD_PAL);
 
 	gtk_widget_destroy( shifter_window );
 }
@@ -259,7 +256,7 @@ static void click_shift_create()		// Button to create a sequence of undo images
 	}
 
 	shifter_set_palette( mt_spinslide_get_value(shifter_slider) );
-	canvas_undo_chores();
+	update_stuff(UPD_PAL);
 }
 
 

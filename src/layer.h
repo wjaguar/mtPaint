@@ -75,10 +75,11 @@ int save_layers( char *file_name );
 void layer_press_save();
 int layer_save_composite(char *fname, ls_settings *settings);
 
+#define update_main_with_new_layer() update_stuff(UPD_LAYER)
+
 void layers_notify_changed();
 void layer_copy_from_main( int l );	// Copy info from main image to layer
 void layer_copy_to_main( int l );	// Copy info from layer to main image
-void update_main_with_new_layer();
 void layer_refresh_list();
 void layer_press_remove_all();
 int check_layers_for_changes();

@@ -87,7 +87,7 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 	return (NULL);
 }
 
-static void repaint_layer(int l, int mainw)	// Repaint layer in view/main window
+static void repaint_layer(int l)	// Repaint layer in view/main window
 {
 	layer_node *t = layer_table + l;
 	image_info *image;
@@ -105,7 +105,13 @@ static void repaint_layer(int l, int mainw)	// Repaint layer in view/main window
 	}
 
 	vw_update_area(lx, ly, lw, lh);
-	if (mainw | show_layers_main) main_update_area(lx, ly, lw, lh);
+	if (show_layers_main) main_update_area(lx, ly, lw, lh);
+}
+
+static void repaint_layers()
+{
+	if (show_layers_main) gtk_widget_queue_draw(drawing_canvas);
+	if (view_showing) gtk_widget_queue_draw(vw_drawing);
 }
 
 
@@ -244,13 +250,12 @@ void shift_layer(int val)
 	layer_select_slot(layer_selected);
 	layers_notify_changed();
 
-	if (newbkg)
-	{	// Background layer changed
-		if (show_layers_main) gtk_widget_queue_draw(drawing_canvas);
+	if (newbkg)	// Background layer changed
+	{
 		vw_realign();
-		if (view_showing) gtk_widget_queue_draw(vw_drawing);
+		repaint_layers();
 	}
-	else repaint_layer(layer_selected, FALSE);	// Regular layer shifted
+	else repaint_layer(layer_selected);	// Regular layer shifted
 }
 
 void layer_show_new()
@@ -459,7 +464,7 @@ void layer_press_centre()
 		mem_height / 2;
 	layer_show_position();
 	layers_notify_changed();
-	update_all_views();
+	repaint_layers();
 }
 
 static int layers_unsaved_tot()	// Return number of layers with no filenames
@@ -641,8 +646,6 @@ int load_layers( char *file_name )
 	layers_sensitive(sens);
 	layer_update_filename( file_name );
 
-	update_cols();		// Update status bar info
-
 	if (lfail) /* There were failures */
 	{
 		snprintf(tin, 300, _("%d layers failed to load"), lfail);
@@ -805,14 +808,6 @@ void layer_press_save()
 	}
 }
 
-void update_main_with_new_layer()
-{
-	update_titlebar();
-	check_undo_paste_bpp();
-	canvas_undo_chores();
-	vw_focus_view();
-}
-
 void layer_press_remove_all()
 {
 	int i = check_layers_for_changes();
@@ -834,13 +829,13 @@ static void layer_tog_visible(GtkToggleButton *togglebutton, gpointer user_data)
 
 	layer_table[j].visible = gtk_toggle_button_get_active(togglebutton);
 	layers_notify_changed();
-	repaint_layer(j, FALSE);
+	repaint_layer(j);
 }
 
 static void layer_main_toggled(GtkToggleButton *togglebutton, gpointer user_data)
 {
 	show_layers_main = gtk_toggle_button_get_active(togglebutton);
-	gtk_widget_queue_draw(drawing_canvas);
+	update_stuff(UPD_RENDER);
 }
 
 static void layer_inputs_changed(GtkObject *thing, gpointer user_data)
@@ -867,12 +862,12 @@ static void layer_inputs_changed(GtkObject *thing, gpointer user_data)
 		break;
 	case 2: // Opacity slider
 		t->opacity = mt_spinslide_get_value(layer_slider);
-		repaint_layer(layer_selected, FALSE);
+		repaint_layer(layer_selected);
 		break;
 	case 3: // Transparency spin
 		mem_xpm_trans = gtk_spin_button_get_value_as_int(
 			GTK_SPIN_BUTTON(layer_spin));
-		repaint_layer(layer_selected, TRUE);
+		update_stuff(UPD_TRANS);
 		break;
 	}
 }

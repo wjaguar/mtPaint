@@ -71,14 +71,6 @@ static void click_newchan_cancel()
 	newchan_window = NULL;
 }
 
-static void activate_channel(int chan)
-{
-	mem_channel = chan;
-	check_undo_paste_bpp();
-	if (chan == CHN_IMAGE) pressed_opacity(tool_opacity);
-	else pressed_value(channel_col_A[chan]);
-}
-
 static void click_newchan_ok(GtkButton *window, gpointer user_data)
 {
 	chanlist tlist;
@@ -230,8 +222,11 @@ dofail:
 	mem_undo_prepare();
 
 	if ((int)gtk_object_get_user_data(GTK_OBJECT(window)) >= CHN_ALPHA)
-		activate_channel(chan_new_type);
-	canvas_undo_chores();
+	{
+		mem_channel = chan_new_type;
+		update_stuff(UPD_NEWCH);
+	}
+	else update_stuff(UPD_ADDCH);
 	click_newchan_cancel();
 }
 
@@ -306,8 +301,7 @@ static void click_delete_ok(GtkWidget *window)
 	{
 		undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp, cmask);
 
-		check_undo_paste_bpp();
-		canvas_undo_chores();
+		update_stuff(UPD_DELCH);
 	}
 
 	gtk_widget_destroy(window);
@@ -351,24 +345,18 @@ void pressed_channel_edit(int state, int channel)
 	/* Prevent spurious calls */
 	if (!state || newchan_window || (channel == mem_channel)) return;
 
-	if ( marq_status >= MARQUEE_PASTE && mem_clip_bpp == 3)
-		pressed_select(FALSE);
-	// Stop pasting if with RGB paste
-
-	if (!mem_img[channel])
+	if (!mem_img[channel]) pressed_channel_create(channel);
+	else
 	{
-		pressed_channel_create(channel);
-		return;
+		mem_channel = channel;
+		update_stuff(UPD_CHAN);
 	}
-
-	activate_channel(channel);
-	canvas_undo_chores();
 }
 
 void pressed_channel_disable(int state, int channel)
 {
 	channel_dis[channel] = state;
-	update_all_views();
+	update_stuff(UPD_MODE);
 }
 
 int do_threshold(GtkWidget *spin, gpointer fdata)
@@ -395,7 +383,7 @@ void pressed_unassociate()
 	spot_undo(UNDO_COL);
 	mem_demultiply(mem_img[CHN_IMAGE], mem_img[CHN_ALPHA], mem_width * mem_height, 3);
 	mem_undo_prepare();
-	update_all_views();
+	update_stuff(UPD_IMG);
 }
 
 void pressed_channel_toggle(int state, int what)
@@ -403,11 +391,11 @@ void pressed_channel_toggle(int state, int what)
 	int *toggle = what ? &hide_image : &overlay_alpha;
 	if (*toggle == state) return;
 	*toggle = state;
-	update_all_views();
+	update_stuff(UPD_RENDER);
 }
 
 void pressed_RGBA_toggle(int state)
 {
 	RGBA_mode = state;
-	update_all_views();
+	update_stuff(UPD_MODE);
 }

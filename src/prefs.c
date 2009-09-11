@@ -81,22 +81,12 @@ int pref_lang;
 #endif
 
 
-static gint expose_tablet_preview( GtkWidget *widget, GdkEventExpose *event )
+static gboolean expose_tablet_preview(GtkWidget *widget, GdkEventExpose *event)
 {
-	unsigned char *rgb;
-	int i, x = event->area.x, y = event->area.y, w = event->area.width, h = event->area.height;
+        gdk_draw_rectangle(widget->window, widget->style->white_gc, TRUE,
+		event->area.x, event->area.y, event->area.width, event->area.height);
 
-	rgb = malloc( w*h*3 );
-	if ( rgb == NULL ) return FALSE;
-
-	for ( i=0; i<(w*h*3); i++ ) rgb[i] = 255;		// Pure white
-
-	gdk_draw_rgb_image (widget->window, widget->style->black_gc,
-			x, y, w, h, GDK_RGB_DITHER_NONE, rgb, w*3 );
-
-	free( rgb );
-
-	return FALSE;
+	return (FALSE);
 }
 
 
@@ -308,8 +298,7 @@ static void prefs_apply(GtkWidget *widget)
 	chequers_optimize = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
 	opaque_view = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[3]));
 
-	inifile_set_gboolean( "pasteCommit",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit)) );
+	paste_commit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit));
 
 	q_quit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_quit));
 
@@ -347,12 +336,7 @@ static void prefs_apply(GtkWidget *widget)
 		load_def_patterns(path);
 	inifile_set(DEFAULT_PAT_INI, path);
 
-	update_undo_depth();		// If undo depth was changed
-	update_all_views();		// Update canvas for changes
-	set_cursor();
-
-	update_recent_files();
-	init_status_bar();
+	update_stuff(UPD_PREFS);
 }
 
 static void prefs_ok(GtkWidget *widget)
@@ -477,8 +461,8 @@ void pressed_preferences()
 		page, inifile_get_gboolean("exitToggle", FALSE) );
 	checkbutton_quit = add_a_toggle( _("Q key quits mtPaint"),
 		page, q_quit );
-	checkbutton_commit = add_a_toggle( _("Changing tool commits paste"),
-		page, inifile_get_gboolean("pasteCommit", FALSE) );
+	checkbutton_commit = add_a_toggle(_("Changing tool commits paste"),
+		page, paste_commit);
 	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
 		page, inifile_get_gboolean("centerSettings", TRUE));
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),

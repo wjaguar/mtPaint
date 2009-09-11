@@ -93,7 +93,7 @@ static void xyz2XN(double *XN, double x, double y, double z)
 		xk * (69.0 - yk * (yk * (69.0 - yk * 30.0) + xk * 3.0))) / 900.0;
 }
 
-static double CIElum(double x)
+static inline double CIElum(double x)
 {
 	int n;
 
@@ -102,7 +102,7 @@ static double CIElum(double x)
 	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x - n));
 }
 
-static double exp10(double x)
+static inline double exp10(double x)
 {
 	int n;
 
@@ -119,7 +119,7 @@ static double exp10(double x)
 #define XX1 (16.0 / 116.0)
 #define XX2 ((116.0 * 116.0) / (24.0 * 24.0 * 3.0))
 #define XX3 ((24.0 * 24.0 * 24.0) / (116.0 * 116.0 * 116.0))
-static double CIEpow(double x)
+static inline double CIEpow(double x)
 {
 	return ((x > XX3) ? cbrt(x) : x * XX2 + XX1);
 }
@@ -177,7 +177,7 @@ double rgb2B(double r, double g, double b)
 #define WHITE_Y 0.2932
 #endif
 
-static double det(double x1, double y1, double x2, double y2, double x3, double y3)
+static inline double det(double x1, double y1, double x2, double y2, double x3, double y3)
 {
 	return ((y1 - y2) * x3 + (y2 - y3) * x1 + (y3 - y1) * x2);
 }
