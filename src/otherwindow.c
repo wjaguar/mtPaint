@@ -2281,7 +2281,7 @@ static GtkWidget *grad_check_grev, *grad_check_orev;
 static unsigned char grad_pad[GRAD_POINTS * 3], grad_mpad[GRAD_POINTS];
 static int grad_cnt, grad_ofs, grad_slot, grad_mode;
 
-static GtkWidget *grad_ed_cs, *grad_ed_opt, *grad_ed_ss, *grad_ed_tog;
+static GtkWidget *grad_ed_cs, *grad_ed_opt, *grad_ed_ss, *grad_ed_tog, *grad_ed_pm;
 static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
 
 #define SLOT_SIZE 15
@@ -2289,29 +2289,36 @@ static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
 #define PPAD_SLOT 11
 #define PPAD_XSZ 32
 #define PPAD_YSZ 8
-#define PPAD_WIDTH(X) (PPAD_XSZ * (X) + 1)
-#define PPAD_HEIGHT(X) (PPAD_YSZ * (X) + 1)
+#define PPAD_WIDTH(X) (PPAD_XSZ * (X) - 1)
+#define PPAD_HEIGHT(X) (PPAD_YSZ * (X) - 1)
 
-static gboolean palette_pad_draw(GtkWidget *widget, GdkEventConfigure *event,
-	gpointer user_data)
+#include "graphics/xbm_ring4.xbm"
+#include "graphics/xbm_ring4_mask.xbm"
+
+static void palette_pad_set(int value)
+{
+	wj_fpixmap_move_cursor(grad_ed_pm, (value % PPAD_XSZ) * PPAD_SLOT,
+		(value / PPAD_XSZ) * PPAD_SLOT);
+}
+
+static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
 {
 	unsigned char *rgb, *tmp;
 	int i, j, k, w, h, col, row, cellsize = PPAD_SLOT;
 	int channel = (int)user_data;
-	GdkPixmap *pmap = gtk_object_get_user_data(GTK_OBJECT(widget));
 
-	if (!pmap) return (TRUE);
+	if (!wj_fpixmap_pixmap(widget)) return;
 	w = PPAD_WIDTH(cellsize);
 	h = PPAD_HEIGHT(cellsize);
 	row = w * 3;
 	rgb = malloc(h * row);
-	if (!rgb) return (TRUE);
+	if (!rgb) return;
 
 	memset(rgb, 0, h * row);
-	for (col = 0 , i = 1; i < h - 1; i += cellsize)
+	for (col = i = 0; i < h; i += cellsize)
 	{
 		tmp = rgb + i * row;
-		for (j = 3; j < row - 3; j += cellsize * 3 , col++)
+		for (j = 0; j < row; j += cellsize * 3 , col++)
 		{
 			if (channel == CHN_IMAGE) /* Palette as such */
 			{
@@ -2342,29 +2349,22 @@ static gboolean palette_pad_draw(GtkWidget *widget, GdkEventConfigure *event,
 			memcpy(rgb + j * row, tmp, row);
 	}
 
-	gdk_draw_rgb_image(pmap, widget->style->black_gc, 0, 0, w, h,
-		GDK_RGB_DITHER_NONE, rgb, row);
+	palette_pad_set(0);
+	wj_fpixmap_draw_rgb(widget, 0, 0, w, h, rgb, row);
+	col = (cellsize >> 1) - 1;
+	wj_fpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
+		xbm_ring4_width, xbm_ring4_height,
+		xbm_ring4_x_hot - col, xbm_ring4_y_hot - col, TRUE);
 
 	free(rgb);
-	return (TRUE);
 }
 
 static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data);
-static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
+static void palette_pad_select(int i, int mode)
 {
-	int x, y, i;
-
-	/* Only single clicks */
-	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
-
-	x = event->x / PPAD_SLOT;
-	y = event->y / PPAD_SLOT;
-	if ((x < 0) || (x >= PPAD_XSZ) || (y < 0) || (y >= PPAD_YSZ))
-		return (TRUE);
-	i = y * PPAD_XSZ + x;
+	palette_pad_set(i);
 	/* Indexed / utility / opacity */
-	if (!(int)user_data) mt_spinslide_set_value(grad_ed_ss, i);
+	if (!mode) mt_spinslide_set_value(grad_ed_ss, i);
 	else if (i < mem_cols) /* Valid RGB */
 	{
 		gdouble color[4] = { (gdouble)mem_pal[i].red / 255.0,
@@ -2384,6 +2384,35 @@ static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 		gtk_color_selection_set_color(GTK_COLOR_SELECTION(grad_ed_cs), color);
 #endif
 	}
+}
+
+static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	int x, y;
+
+	gtk_widget_grab_focus(widget);
+	/* Only single clicks */
+	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
+	/* Only inside pixmap */
+	if (!wj_fpixmap_xy(widget, event->x, event->y, &x, &y)) return (TRUE);
+	x /= PPAD_SLOT; y /= PPAD_SLOT;
+	palette_pad_select(y * PPAD_XSZ + x, (int)user_data);
+	return (TRUE);
+}
+
+static gboolean palette_pad_key(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	int x, y, dx, dy;
+
+	if (!arrow_key(event, &dx, &dy, 0)) return (FALSE);
+	wj_fpixmap_cursor(widget, &x, &y);
+	x = x / PPAD_SLOT + dx; y = y / PPAD_SLOT + dy;
+	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
+	y = y * PPAD_XSZ + x;
+	y = y < 0 ? 0 : y > 255 ? 255 : y;
+	palette_pad_select(y, (int)user_data);
 	return (TRUE);
 }
 
@@ -2448,6 +2477,7 @@ static void grad_load_slot(int slot)
 		mt_spinslide_set_value(grad_ed_ss, grad_pad[slot]);
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_ed_tog),
 			grad_mpad[slot] == GRAD_TYPE_CONST);
+		palette_pad_set(grad_pad[slot]);
 	}
 	grad_slot = slot;
 }
@@ -2494,7 +2524,7 @@ static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data)
 static void grad_edit_move_slide(GtkAdjustment *adj, gpointer user_data)
 {
 	if (grad_slot < 0) return; /* Blocked */
-	grad_pad[grad_slot] = ADJ2INT(adj);
+	palette_pad_set(grad_pad[grad_slot] = ADJ2INT(adj));
 	grad_edit_set_mode();
 }
 
@@ -2608,14 +2638,15 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	/* Palette pad */
 
-	sw = pack(mainbox, gtk_alignment_new(0.5, 0.5, 0.0, 0.0));
-	pix = wj_pixmap(PPAD_WIDTH(PPAD_SLOT), PPAD_HEIGHT(PPAD_SLOT));
-	gtk_container_add(GTK_CONTAINER(sw), pix);
-	gtk_signal_connect(GTK_OBJECT(pix), "configure_event",
+	pix = grad_ed_pm = pack(mainbox, wj_fpixmap(PPAD_WIDTH(PPAD_SLOT),
+		PPAD_HEIGHT(PPAD_SLOT)));
+	gtk_signal_connect(GTK_OBJECT(pix), "realize",
 		GTK_SIGNAL_FUNC(palette_pad_draw),
 		(gpointer)(opac ? -1 : grad_channel));
 	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
 		GTK_SIGNAL_FUNC(palette_pad_click), (gpointer)!grad_mode);
+	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
+		GTK_SIGNAL_FUNC(palette_pad_key), (gpointer)!grad_mode);
 	add_hseparator(mainbox, -2, 10);
 
 	/* Editor widgets */

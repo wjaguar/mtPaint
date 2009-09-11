@@ -3605,7 +3605,7 @@ static menu_item main_menu[] = {
 void main_init()
 {
 	static const GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
-	static const GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
+	static GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 	GtkAdjustment *adj;
@@ -3680,11 +3680,13 @@ void main_init()
 ///	DRAWING AREA
 
 	main_vsplit = gtk_hpaned_new ();
+	paned_mouse_fix(main_vsplit);
 	gtk_widget_show (main_vsplit);
 	gtk_widget_ref(main_vsplit);
 	gtk_object_sink(GTK_OBJECT(main_vsplit));
 
 	main_hsplit = gtk_vpaned_new ();
+	paned_mouse_fix(main_hsplit);
 	gtk_widget_show (main_hsplit);
 	gtk_widget_ref(main_hsplit);
 	gtk_object_sink(GTK_OBJECT(main_hsplit));

@@ -3106,10 +3106,10 @@ int mem_sel_rot( int dir )					// Rotate clipboard 90 degrees
 int mem_rotate_free(double angle, int type, int gcor)
 {
 	chanlist old_img;
-	unsigned char *src, *dest, *alpha, A_rgb[3], fillv;
+	unsigned char *src, *dest, *alpha, A_rgb[3];
 	unsigned char *pix1, *pix2, *pix3, *pix4;
 	int ow = mem_width, oh = mem_height, nw, nh, res;
-	int nx, ny, ox, oy, cc;
+	int nx, ny, ox, oy, cc, i, j, k;
 	double rangle = (M_PI / 180.0) * angle;	// Radians
 	double s1, s2, c1, c2;			// Trig values
 	double cx0, cy0, cx1, cy1;
@@ -3117,6 +3117,7 @@ int mem_rotate_free(double angle, int type, int gcor)
 	double fox, foy, k1, k2, k3, k4;	// Pixel weights
 	double aa1, aa2, aa3, aa4, aa;
 	double rr, gg, bb;
+	double tw, th, ta, ca, sa, sca, csa, Y00, Y0h, Yw0, Ywh, X00, Xwh;
 
 	c2 = cos(rangle);
 	s2 = sin(rangle);
@@ -3144,49 +3145,81 @@ int mem_rotate_free(double angle, int type, int gcor)
 	A_rgb[1] = mem_col_A24.green;
 	A_rgb[2] = mem_col_A24.blue;
 
+	/* Prepare clipping rectangle */
+	tw = 0.5 * (ow + (type ? 1 : 0));
+	th = 0.5 * (oh + (type ? 1 : 0));
+	ta = M_PI * (angle / 180.0 - floor(angle / 180.0));
+	ca = cos(ta); sa = sin(ta);
+	sca = ca ? sa / ca : 0.0;
+	csa = sa ? ca / sa : 0.0;
+	Y00 = cy1 - th * ca - tw * sa;
+	Y0h = cy1 + th * ca - tw * sa;
+	Yw0 = cy1 - th * ca + tw * sa;
+	Ywh = cy1 + th * ca + tw * sa;
+	X00 = cx1 - tw * ca + th * sa;
+	Xwh = cx1 + tw * ca - th * sa;
+
+	/* Clear the channels */
+	if (mem_img_bpp == 3)
+	{
+		unsigned char *tmp = mem_img[CHN_IMAGE];
+		tmp[0] = A_rgb[0];
+		tmp[1] = A_rgb[1];
+		tmp[2] = A_rgb[2];
+		j = nw * nh * 3;
+		for (i = 3; i < j; i++) tmp[i] = tmp[i - 3];
+	}
+	else memset(mem_img[CHN_IMAGE], mem_col_A, nw * nh);
+	for (k = CHN_IMAGE + 1; k < NUM_CHANNELS; k++)
+		if (mem_img[k]) memset(mem_img[k], 0, nw * nh);
+
 	progress_init(_("Free Rotation"),0);
 	for (ny = 0; ny < nh; ny++)
 	{
+		int xl, xm;
 		if ((ny * 10) % nh >= nh - 10)
 			progress_update((float)ny / nh);
+
+		/* Clip this row */
+		if (ny < Y0h) xl = ceil(X00 + (Y00 - ny) * sca);
+		else if (ny < Ywh) xl = ceil(Xwh + (ny - Ywh) * csa);
+		else /* if (ny < Yw0) */ xl = ceil(Xwh + (Ywh - ny) * sca);
+		if (ny < Y00) xm = ceil(X00 + (Y00 - ny) * sca);
+		else if (ny < Yw0) xm = ceil(X00 + (ny - Y00) * csa);
+		else /* if (ny < Ywh) */ xm = ceil(Xwh + (Ywh - ny) * sca);
+		if (xl < 0) xl = 0;
+		if (--xm >= nw) xm = nw - 1;
+
 		x0y = ny * s2 + x00;
 		y0y = ny * c2 + y00;
-
 		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
 			if (!mem_img[cc]) continue;
 			/* RGB nearest neighbour */
 			if (!type && (cc == CHN_IMAGE) && (mem_img_bpp == 3))
 			{
-				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
-				for (nx = 0; nx < nw; nx++)
+				dest = mem_img[CHN_IMAGE] + (ny * nw + xl) * 3;
+				for (nx = xl; nx <= xm; nx++ , dest += 3)
 				{
 					ox = rint(nx * s1 + x0y);
 					oy = rint(nx * c1 + y0y);
-					src = A_rgb;
-					if ((ox >= 0) && (ox < ow) &&
-						(oy >= 0) && (oy < oh))
-						src = old_img[CHN_IMAGE] +
-							(oy * ow + ox) * 3;
-					*dest++ = src[0];
-					*dest++ = src[1];
-					*dest++ = src[2];
+					src = old_img[CHN_IMAGE] +
+						(oy * ow + ox) * 3;
+					dest[0] = src[0];
+					dest[1] = src[1];
+					dest[2] = src[2];
 				}
 				continue;
 			}
 			/* One-bpp nearest neighbour */
 			if (!type)
 			{
-				fillv = cc == CHN_IMAGE ? mem_col_A : 0;
-				dest = mem_img[cc] + ny * nw;
-				for (nx = 0; nx < nw; nx++)
+				dest = mem_img[cc] + ny * nw + xl;
+				for (nx = xl; nx <= xm; nx++)
 				{
 					ox = rint(nx * s1 + x0y);
 					oy = rint(nx * c1 + y0y);
-					if ((ox >= 0) && (ox < ow) &&
-						(oy >= 0) && (oy < oh))
-						*dest++ = old_img[cc][oy * ow + ox];
-					else *dest++ = fillv;
+					*dest++ = old_img[cc][oy * ow + ox];
 				}
 				continue;
 			}
@@ -3195,25 +3228,15 @@ int mem_rotate_free(double angle, int type, int gcor)
 			{
 				alpha = NULL;
 				if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
-					alpha = mem_img[CHN_ALPHA] + ny * nw;
-				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
-				for (nx = 0; nx < nw; nx++)
+					alpha = mem_img[CHN_ALPHA] + ny * nw + xl;
+				dest = mem_img[CHN_IMAGE] + (ny * nw + xl) * 3;
+				for (nx = xl; nx <= xm; nx++ , dest += 3)
 				{
 					fox = nx * s1 + x0y;
 					foy = nx * c1 + y0y;
 					/* floor() is *SLOW* on Win32 - avoiding... */
 					ox = (int)(fox + 2.0) - 2;
 					oy = (int)(foy + 2.0) - 2;
-					if ((ox < -1) || (ox >= ow) ||
-						(oy < -1) || (oy >= oh))
-					{
-						*dest++ = A_rgb[0];
-						*dest++ = A_rgb[1];
-						*dest++ = A_rgb[2];
-						if (!alpha) continue;
-						*alpha++ = 0;
-						continue;
-					}
 					fox -= ox;
 					foy -= oy;
 					k4 = fox * foy;
@@ -3260,9 +3283,9 @@ int mem_rotate_free(double angle, int type, int gcor)
 							gamma256[pix2[2]] * k2 +
 							gamma256[pix3[2]] * k3 +
 							gamma256[pix4[2]] * k4;
-						*dest++ = UNGAMMA256(rr);
-						*dest++ = UNGAMMA256(gg);
-						*dest++ = UNGAMMA256(bb);
+						dest[0] = UNGAMMA256(rr);
+						dest[1] = UNGAMMA256(gg);
+						dest[2] = UNGAMMA256(bb);
 					}
 					else /* Leave as is */
 					{
@@ -3272,9 +3295,9 @@ int mem_rotate_free(double angle, int type, int gcor)
 							pix3[1] * k3 + pix4[1] * k4;
 						bb = pix1[2] * k1 + pix2[2] * k2 +
 							pix3[2] * k3 + pix4[2] * k4;
-						*dest++ = rint(rr);
-						*dest++ = rint(gg);
-						*dest++ = rint(bb);
+						dest[0] = rint(rr);
+						dest[1] = rint(gg);
+						dest[2] = rint(bb);
 					}
 				}
 				continue;
@@ -3283,20 +3306,14 @@ int mem_rotate_free(double angle, int type, int gcor)
 			if ((cc == CHN_ALPHA) && !channel_dis[CHN_ALPHA])
 				continue;
 			/* Utility channel bilinear */
-			dest = mem_img[cc] + ny * nw;
-			for (nx = 0; nx < nw; nx++)
+			dest = mem_img[cc] + ny * nw + xl;
+			for (nx = xl; nx <= xm; nx++)
 			{
 				fox = nx * s1 + x0y;
 				foy = nx * c1 + y0y;
 				/* floor() is *SLOW* on Win32 - avoiding... */
 				ox = (int)(fox + 2.0) - 2;
 				oy = (int)(foy + 2.0) - 2;
-				if ((ox < -1) || (ox >= ow) ||
-					(oy < -1) || (oy >= oh))
-				{
-					*dest++ = 0;
-					continue;
-				}
 				fox -= ox;
 				foy -= oy;
 				k4 = fox * foy;

@@ -170,6 +170,14 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 
 void fix_scroll(GtkWidget *scroll);
 
+// Fix for paned widgets losing focus in GTK+1
+
+#if GTK_MAJOR_VERSION == 1
+void paned_mouse_fix(GtkWidget *widget);
+#else
+#define paned_mouse_fix(X)
+#endif
+
 // Init-time bugfixes for GTK+1 and GTK+2/Win32
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_WIN32
@@ -187,6 +195,23 @@ int move_mouse_relative(int dx, int dy);
 guint real_key(GdkEventKey *event);
 guint low_key(GdkEventKey *event);
 guint keyval_key(guint keyval);
+
+// Interpreting arrow keys
+
+int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult);
+
+// Focusable pixmap widget
+
+GtkWidget *wj_fpixmap(int width, int height);
+GdkPixmap *wj_fpixmap_pixmap(GtkWidget *widget);
+void wj_fpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step);
+void wj_fpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb);
+void wj_fpixmap_move_cursor(GtkWidget *widget, int x, int y);
+int wj_fpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
+	int width, int height, int hot_x, int hot_y, int focused);
+int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr);
+void wj_fpixmap_cursor(GtkWidget *widget, int *x, int *y);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

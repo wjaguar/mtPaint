@@ -409,26 +409,14 @@ gint delete_pan( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 gint key_pan( GtkWidget *widget, GdkEventKey *event )
 {
-	int nv_h, nv_v, hm = 0, vm = 0;
+	int nv_h, nv_v, hm, vm;
 	GtkAdjustment *hori, *vert;
 
 	if (!check_zoom_keys_real(wtf_pressed(event)))
 	{
-		switch (event->keyval)
-		{
-			case GDK_KP_Left: case GDK_Left:
-				hm = -1; break;
-			case GDK_KP_Right: case GDK_Right:
-				hm = 1; break;
-			case GDK_KP_Up: case GDK_Up:
-				vm = -1; break;
-			case GDK_KP_Down: case GDK_Down:
-				vm = 1; break;
-		}
-
 		/* xine-ui sends bogus keypresses so don't delete on this */
-		if (!(hm | vm) && !XINE_FAKERY(event->keyval))
-			delete_pan(NULL, NULL, NULL);
+		if (!arrow_key(event, &hm, &vm, 4) &&
+			!XINE_FAKERY(event->keyval)) delete_pan(NULL, NULL, NULL);
 		else
 		{
 			hori = gtk_scrolled_window_get_hadjustment(
