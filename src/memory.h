@@ -95,12 +95,10 @@
 
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
-#define UNDO_TILEMAP_SIZE 32
-
 typedef struct {
 	chanlist img;
 	png_color *pal_;
-	unsigned char tilemap[UNDO_TILEMAP_SIZE], *tileptr;
+	unsigned char *tileptr;
 	int cols, width, height, bpp, flags;
 	size_t size;
 } undo_item;

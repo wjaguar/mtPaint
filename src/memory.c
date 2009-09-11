@@ -384,7 +384,6 @@ static size_t undo_free_x(undo_item *undo)
 {
 	int j = undo->size;
 
-	free(undo->tileptr);
 	free(undo->pal_);
 	mem_free_chanlist(undo->img);
 	memset(undo, 0, sizeof(undo_item));
@@ -863,18 +862,11 @@ static void mem_undo_tile(undo_item *undo)
 		ntiles += nt;
 		area += (nt * TILE_SIZE - buf[bw - 1] * dw) * h;
 	}
-	/* Not tileable if all tiles differ */
-	if (ntiles >= bw * nstrips) return;
 
-/* !!! Maybe decide whether tiling is worth doing, too */
-
-	/* Allocate tilemap */
-	if (ntiles && (tsz > UNDO_TILEMAP_SIZE))
-	{
-		tmp = malloc(tsz);
-		/* Not tileable if nowhere to store tilemap */
-		if (!tmp) return;
-	}
+	/* Not tileable if tilemap cannot fit in space gained */
+	sz = (size_t)mem_width * mem_height;
+	bpp = (nc & CMASK_IMAGE ? mem_img_bpp : 1);
+	if ((sz - area) * bpp <= tsz) return;
 
 	/* Implement tiling */
 	sz = (size_t)mem_width * mem_height;
@@ -896,9 +888,10 @@ static void mem_undo_tile(undo_item *undo)
 		 * anew when possible, instead of carving up huge ones */
 		src = blk = undo->img[cc];
 		bpp = BPP(cc);
-		if (area * 3 <= sz) /* Small enough */
+		l = area * bpp + (tmp ? 0 : tsz);
+		if (l * 3 <= sz * bpp) /* Small enough */
 		{
-			blk = malloc(area * bpp);
+			blk = malloc(l);
 			/* Use original chunk if cannot get new one */
 			if (!blk) blk = src;
 		}
@@ -926,7 +919,6 @@ static void mem_undo_tile(undo_item *undo)
 		}
 
 		/* Resize or free memory block */
-		l = area * bpp;
 		if (blk == undo->img[cc]) /* Resize old */
 		{
 			dest = realloc(undo->img[cc], l);
@@ -940,6 +932,9 @@ static void mem_undo_tile(undo_item *undo)
 			undo->img[cc] = blk;
 		}
 		msize += l + 32;
+
+		/* Place tilemap in first chunk */
+		if (!tmp) tmp = undo->img[cc] + area * bpp;
 	}
 
 	/* Re-label as tiled and store tilemap, if there *are* tiles */
@@ -947,8 +942,6 @@ static void mem_undo_tile(undo_item *undo)
 	{
 		undo->flags ^= UF_FLAT | UF_TILED;
 		undo->tileptr = tmp;
-		if (!tmp) tmp = undo->tilemap;
-		else msize += tsz + 32;
 		memcpy(tmp, tmap, tsz);
 	}
 
@@ -1199,7 +1192,7 @@ static void mem_undo_tile_swap(undo_item *undo, int redo)
 	{
 		if (!undo->img[cc] || (undo->img[cc] == (void *)(-1)))
 			continue;
-		tmap = undo->tileptr ? undo->tileptr : undo->tilemap;
+		tmap = undo->tileptr;
 		bpp = BPP(cc);
 		w = mem_width * bpp;
 		src = undo->img[cc];
@@ -1263,7 +1256,6 @@ static void mem_undo_swap(int old, int new, int redo)
 		}
 		curr->tileptr = prev->tileptr;
 		prev->tileptr = NULL;
-		memcpy(curr->tilemap, prev->tilemap, UNDO_TILEMAP_SIZE);
 		curr->size = prev->size;
 		curr->flags = prev->flags;
 	}
@@ -4743,7 +4735,7 @@ static fstep *make_filter(int l0, int l1, int type, int sharp)
 	fwidth /= kk;
 
 	i = (int)floor(fwidth) + 2;
-	res = buf = calloc(l1 * (i + 1), sizeof(fstep));
+	res = buf = calloc(l1 * (i + 1) + 1, sizeof(fstep));
 	if (!res) return (NULL);
 
 	fwidth *= 0.5;
@@ -4804,23 +4796,19 @@ static fstep *make_filter(int l0, int l1, int type, int sharp)
 		buf->idx = -1;
 		buf++;
 	}
-	(buf - 1)->idx = -2;
+	buf->idx = -2;
 
 	/* Normalization pass */
-	sum = 0.0;
-	for (buf = res, i = 0; ; i++)
+	for (buf = res; buf->idx >= -1; buf += i + 1)
 	{
-		if (buf[i].idx >= 0) sum += buf[i].k;
-		else
+		sum = 0.0; 
+		for (i = 0; buf[i].idx >= 0; i++)
+			sum += buf[i].k;
+		if ((sum != 0.0) && (sum != 1.0))
 		{
-			if ((sum != 0.0) && (sum != 1.0))
-			{
-				sum = 1.0 / sum;
-				for (j = 0; j < i; j++)
-					buf[j].k *= sum;
-			}
-			if (buf[i].idx < -1) break;
-			sum = 0.0; buf += i + 1; i = -1;
+			sum = 1.0 / sum;
+			for (j = 0; j < i; j++)
+				buf[j].k *= sum;
 		}
 	}
 
@@ -4860,8 +4848,7 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 {
 	unsigned char *src, *img, *imga;
 	fstep *tmp = NULL, *tmpx, *tmpy, *tmpp;
-	double *wrk, *wrk2, *wrka, *work_area;
-	double sum, sum1, sum2, kk, mult;
+	double *wrk, *wrka, *work_area;
 	int i, j, cc, bpp, gc, tmask;
 
 	work_area = ALIGNTO(ctx->workarea, double);
@@ -4884,9 +4871,9 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 			/* Build one vertically-scaled row */
 			for (tmp = tmpy; tmp->idx >= 0; tmp++)
 			{
+				const double kk = tmp->k;
 				img = src + tmp->idx * ow * bpp;
 				wrk = work_area;
-				kk = tmp->k;
 				if (gc) /* Gamma-correct */
 				{
 					for (j = 0; j < ow * bpp; j++)
@@ -4900,43 +4887,39 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 			}
 			/* Scale it horizontally */
 			img = new_img[cc] + i * nw * bpp;
-			sum = sum1 = sum2 = 0.0;
-			for (tmpx = ctx->hfilter; ; tmpx++)
+			for (tmpx = ctx->hfilter; tmpx->idx >= -1; tmpx++ , img += bpp)
 			{
-				if (tmpx->idx >= 0)
+				double sum, sum1, sum2;
+
+				sum = sum1 = sum2 = 0.0;
+				for (; tmpx->idx >= 0; tmpx++)
 				{
+					const double kk = tmpx->k;
 					wrk = work_area + tmpx->idx * bpp;
-					kk = tmpx->k;
 					sum += wrk[0] * kk;
 					if (bpp == 1) continue;
 					sum1 += wrk[1] * kk;
 					sum2 += wrk[2] * kk;
-					continue;
 				}
 				if (gc) /* Reverse gamma correction */
 				{
-					*img++ = sum < 0.0 ? 0 : sum > 1.0 ?
+					img[0] = sum < 0.0 ? 0 : sum > 1.0 ?
 						0xFF : UNGAMMA256(sum);
-					*img++ = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
+					img[1] = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
 						0xFF : UNGAMMA256(sum1);
-					*img++ = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
+					img[2] = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
 						0xFF : UNGAMMA256(sum2);
-					sum = sum1 = sum2 = 0.0;
-					if (tmpx->idx < -1) break;
-					continue;
 				}
-				if (bpp > 1)
+				else
 				{
+					j = (int)rint(sum);
+					img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					if (bpp == 1) continue;
 					j = (int)rint(sum1);
 					img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
 					j = (int)rint(sum2);
 					img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					sum1 = sum2 = 0.0;
 				}
-				j = (int)rint(sum);
-				img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-				sum = 0.0; img += bpp;
-				if (tmpx->idx < -1) break;
 			}
 		}
 		/* Process RGBA */
@@ -4949,43 +4932,50 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 				img = old_img[CHN_IMAGE] + tmp->idx * ow * 3;
 				imga = old_img[CHN_ALPHA] + tmp->idx * ow;
 				wrk = work_area + ow;
-				wrk2 = work_area + 4 * ow;
 				if (gcor) /* Gamma-correct */
 				{
 					for (j = 0; j < ow; j++)
 					{
-						kk = imga[j] * tmp->k;
+						const double tk = tmp->k;
+						const double kk = imga[j] * tk;
+						double tv;
+
 						work_area[j] += kk;
-						wrk[0] += gamma256[img[0]] * tmp->k;
-						wrk2[0] += gamma256[img[0]] * kk;
-						wrk[1] += gamma256[img[1]] * tmp->k;
-						wrk2[1] += gamma256[img[1]] * kk;
-						wrk[2] += gamma256[img[2]] * tmp->k;
-						wrk2[2] += gamma256[img[2]] * kk;
-						wrk += 3; wrk2 += 3; img += 3;
+						wrk[0] += (tv = gamma256[img[0]]) * tk;
+						wrk[3] += tv * kk;
+						wrk[1] += (tv = gamma256[img[1]]) * tk;
+						wrk[4] += tv * kk;
+						wrk[2] += (tv = gamma256[img[2]]) * tk;
+						wrk[5] += tv * kk;
+						wrk += 6; img += 3;
 					}
 				}
 				else /* Leave as is */
 				{
 					for (j = 0; j < ow; j++)
 					{
-						kk = imga[j] * tmp->k;
+						const double tk = tmp->k;
+						const double kk = imga[j] * tk;
+						double tv;
+
 						work_area[j] += kk;
-						wrk[0] += img[0] * tmp->k;
-						wrk2[0] += img[0] * kk;
-						wrk[1] += img[1] * tmp->k;
-						wrk2[1] += img[1] * kk;
-						wrk[2] += img[2] * tmp->k;
-						wrk2[2] += img[2] * kk;
-						wrk += 3; wrk2 += 3; img += 3;
+						wrk[0] += (tv = img[0]) * tk;
+						wrk[3] += tv * kk;
+						wrk[1] += (tv = img[1]) * tk;
+						wrk[4] += tv * kk;
+						wrk[2] += (tv = img[2]) * tk;
+						wrk[5] += tv * kk;
+						wrk += 6; img += 3;
 					}
 				}
 			}
 			/* Scale it horizontally */
 			img = new_img[CHN_IMAGE] + i * nw * 3;
 			imga = new_img[CHN_ALPHA] + i * nw;
-			for (tmpp = tmpx = ctx->hfilter; tmpp->idx >= -1; tmpx = tmpp + 1)
+			for (tmpx = ctx->hfilter; tmpx->idx >= -1; tmpx = tmpp + 1)
 			{
+				double sum, sum1, sum2, mult;
+
 				sum = 0.0;
 				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
 					sum += work_area[tmpp->idx] * tmpp->k;
@@ -4995,14 +4985,14 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 				mult = 1.0;
 				if (*imga++)
 				{
-					wrk = work_area + 4 * ow;
+					wrk += 3;
 					mult /= sum;
 				}
 				sum = sum1 = sum2 = 0.0;
 				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
 				{
-					wrka = wrk + tmpp->idx * 3;
-					kk = tmpp->k;
+					const double kk = tmpp->k;
+					wrka = wrk + tmpp->idx * 6;
 					sum += wrka[0] * kk;
 					sum1 += wrka[1] * kk;
 					sum2 += wrka[2] * kk;
@@ -5010,22 +5000,24 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 				sum *= mult; sum1 *= mult; sum2 *= mult;
 				if (gcor) /* Reverse gamma correction */
 				{
-					*img++ = sum < 0.0 ? 0 : sum > 1.0 ?
+					img[0] = sum < 0.0 ? 0 : sum > 1.0 ?
 						0xFF : UNGAMMA256(sum);
-					*img++ = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
+					img[1] = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
 						0xFF : UNGAMMA256(sum1);
-					*img++ = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
+					img[2] = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
 						0xFF : UNGAMMA256(sum2);
 				}
 				else /* Simply round to nearest */
 				{
+					int j;
 					j = (int)rint(sum);
-					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
 					j = (int)rint(sum1);
-					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
 					j = (int)rint(sum2);
-					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
 				}
+				img += 3;
 			}
 		}
 		if ( progress && (i * 10) % nh >= nh - 10 ) progress_update((float)(i + 1) / nh);
@@ -5760,6 +5752,8 @@ rep:	if (!(cf & 1))
 		{
 		default: // Some RGB mode applied to 1-bpp channel - ignore it
 			*dest = old;
+			break;
+		case BLEND_NORMAL: // Passthrough
 			break;
 		case BLEND_SCREEN: // ~mult(~old, ~new)
 			j = (old + new) * 255 - old * new;
