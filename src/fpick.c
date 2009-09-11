@@ -628,9 +628,14 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	int i, l, len, row, fail, idx = -1;
 
 
+	icons[0] = icons[1] = NULL;
 	masks[0] = masks[1] = NULL;
+#ifdef GTK_STOCK_DIRECTORY
 	icons[1] = render_stock_pixmap(win->clist, GTK_STOCK_DIRECTORY, &masks[1]);
+#endif
+#ifdef GTK_STOCK_FILE
 	icons[0] = render_stock_pixmap(win->clist, GTK_STOCK_FILE, &masks[0]);
+#endif
 	if (!icons[1]) icons[1] = gdk_pixmap_create_from_xpm_d(
 		main_window->window, &masks[1], NULL, xpm_open_xpm);
 	if (!icons[0]) icons[0] = gdk_pixmap_create_from_xpm_d(
@@ -1302,7 +1307,7 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 	// ------- Entry Box -------
 
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
-	res->file_entry = xpack5(hbox1, gtk_entry_new_with_max_length(100));
+	res->file_entry = xpack5(hbox1, gtk_entry_new_with_max_length(PATHBUF));
 	gtk_widget_show_all(hbox1);
 	gtk_signal_connect(GTK_OBJECT(res->file_entry), "key_press_event",
 		GTK_SIGNAL_FUNC(fpick_entry_key), res);
