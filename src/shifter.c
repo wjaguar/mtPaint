@@ -359,9 +359,8 @@ void pressed_shifter()
 	gtk_widget_show(shifter_window);
 	gtk_window_add_accel_group(GTK_WINDOW (shifter_window), ag);
 
-	/* Reset shortened slider in GTK1 */
 #if GTK_MAJOR_VERSION == 1
-	gtk_widget_queue_resize(shifter_window);
+	gtk_widget_queue_resize(shifter_window); /* Re-render sliders */
 #endif
 
 	mem_pal_copy( sh_old_pal, mem_pal );			// Backup the current palette

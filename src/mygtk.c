@@ -899,7 +899,9 @@ void fix_scroll(GtkWidget *scroll)
 #endif
 }
 
-// Init-time bugfix for GTK+1 - GtkViewport size request
+// Init-time bugfixes for GTK+1
+
+/* Bugs: GtkViewport size request; GtkHScale breakage in Smooth Theme Engine */
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -933,10 +935,51 @@ static void gtk_viewport_size_request_fixed(GtkWidget *widget,
 	}
 }
 
+/* This is for preventing Smooth Engine from ruining horizontal sliders */
+static void (*hsizereq)(GtkWidget *widget, GtkRequisition *requisition);
+static void gtk_hscale_size_request_smooth_fixed(GtkWidget *widget,
+	GtkRequisition *requisition)
+{
+	int realf = GTK_WIDGET_FLAGS(widget) & GTK_REALIZED;
+	GTK_WIDGET_UNSET_FLAGS(widget, GTK_REALIZED);
+	hsizereq(widget, requisition);
+	GTK_WIDGET_SET_FLAGS(widget, realf);
+}
+
+typedef struct {
+  GtkThemeEngine engine;
+  
+  void *library;
+  void *name;
+
+  void (*init) (GtkThemeEngine *);
+  void (*exit) (void);
+
+  guint refcount;
+} GtkThemeEnginePrivate;
+
+
 void gtk_init_bugfixes()
 {
+	GtkWidget *hs;
+	GtkStyle *st;
+	GtkWidgetClass *wc;
+	char *engine = "";
+
+
 	((GtkWidgetClass*)gtk_type_class(GTK_TYPE_VIEWPORT))->size_request =
 		gtk_viewport_size_request_fixed;
+
+	/* Detect if Smooth Engine is active, and fix its bugs */
+	st = gtk_rc_get_style(hs = gtk_hscale_new(NULL));
+	if (st->engine) engine = ((GtkThemeEnginePrivate *)(st->engine))->name;
+	if (!strcmp(engine, "smooth"))
+	{
+		wc = gtk_type_class(GTK_TYPE_HSCALE);
+		hsizereq = wc->size_request;
+		wc->size_request = gtk_hscale_size_request_smooth_fixed;
+	}
+	gtk_object_sink(GTK_OBJECT(hs)); /* Destroy a floating-ref thing */
 }
 
 #endif

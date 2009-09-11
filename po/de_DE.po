@@ -307,7 +307,7 @@ msgstr "Transparenz-Index"
 
 #: src/canvas.c:1378
 msgid "JPEG Save Quality (100=High)"
-msgstr "JPEG-Qualität einstellen (100=Hoch)"
+msgstr "JPEG-Qualität (100=Hoch)"
 
 #: src/canvas.c:1383
 msgid "Hotspot at X ="
@@ -1372,8 +1372,8 @@ msgid "/View/sep1"
 msgstr "/Ansicht/sep1"
 
 #: src/mainwindow.c:3323
-msgid "/View/Toggle Image View (Home)"
-msgstr "/Ansicht/Bildansicht umschalten (Home)"
+msgid "/View/Toggle Image View"
+msgstr "/Ansicht/Bildansicht umschalten"
 
 #: src/mainwindow.c:3324 src/mainwindow.c:3598
 msgid "/View/Centralize Image"

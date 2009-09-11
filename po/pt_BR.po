@@ -307,7 +307,7 @@ msgstr ""
 
 #: src/canvas.c:1378
 msgid "JPEG Save Quality (100=High)"
-msgstr "Salvar Qualidade JPEG (100=Alto)"
+msgstr "Qualidade JPEG (100=Alta)"
 
 #: src/canvas.c:1383
 msgid "Hotspot at X ="
@@ -1364,8 +1364,8 @@ msgid "/View/sep1"
 msgstr "/Ver/sep1"
 
 #: src/mainwindow.c:3323
-msgid "/View/Toggle Image View (Home)"
-msgstr "/Ver/Toggle Image View (Home)"
+msgid "/View/Toggle Image View"
+msgstr "/Ver/Toggle Image View"
 
 #: src/mainwindow.c:3324 src/mainwindow.c:3598
 msgid "/View/Centralize Image"

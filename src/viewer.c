@@ -134,30 +134,25 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	HELP WINDOW
 
-GtkWidget *help_window;
+#include "help.c"
 
-gint click_help_end( GtkWidget *widget, GdkEvent *event, gpointer data )
+gboolean click_help_end( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	// Make sure the user can only open 1 help window
 	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], TRUE);
-	gtk_widget_destroy( help_window );
+	gtk_widget_destroy(widget);
 
 	return FALSE;
 }
 
 void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 {
-#include "help.c"
-
 	GtkAccelGroup* ag;
-	GtkWidget *table,*notebook, *frame, *label, *button, *box1, *box2,
-		*scrolled_window1, *viewport1, *label2;
-#if GTK_MAJOR_VERSION == 2
-	GtkStyle *style;
-#endif
+	GtkWidget *help_window, *table, *notebook, *frame, *label, *button,
+		*box1, *box2, *scrolled_window1, *viewport1, *label2;
+	int i, j;
+	char txt[64], **tmp, *res, *strs[HELP_PAGE_MAX + 1];
 
-	int i;
-	char txt[64];
 
 	ag = gtk_accel_group_new();
 
@@ -186,8 +181,14 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_table_attach_defaults (GTK_TABLE (table), notebook, 0, 6, 0, 1);
 	gtk_widget_show (notebook);
 
-	for (i=0; i<help_page_count; i++)
+	strs[0] = "";
+	for (i = 0; i < HELP_PAGE_COUNT; i++)
 	{
+		tmp = help_pages[i];
+		for (j = 0; tmp[j]; j++) strs[j + 1] = _(tmp[j]);
+		strs[j + 1] = NULL;
+		res = g_strjoinv("\n", strs);
+
 		frame = gtk_frame_new (NULL);
 		gtk_container_set_border_width (GTK_CONTAINER (frame), 10);
 		gtk_widget_show (frame);
@@ -202,14 +203,16 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_widget_show (viewport1);
 		gtk_container_add (GTK_CONTAINER (scrolled_window1), viewport1);
 
-		label2 = gtk_label_new (help_page_contents[i]);
+		label2 = gtk_label_new(res);
+		g_free(res);
 #if GTK_MAJOR_VERSION == 2
-		if ( i == 1 || i == 2 )	// Keyboard/Mouse shortcuts tab only
+		if ((i == 1) || (i == 2))	// Keyboard/Mouse shortcuts tab only
 		{
-			style = gtk_style_copy (gtk_widget_get_style (label2));
-			style->font_desc = pango_font_description_from_string("Monospace 9");
-						// Courier also works
-			gtk_widget_set_style (label2, style);
+			PangoFontDescription *pfd =
+				pango_font_description_from_string("Monospace 9");
+				// Courier also works
+			gtk_widget_modify_font(label2, pfd);
+			pango_font_description_free(pfd);
 		}
 #endif
 		gtk_widget_set_usize( label2, 380, -2 );		// Set minimum width/height
@@ -225,7 +228,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_misc_set_alignment (GTK_MISC (label2), 0, 0);
 		gtk_misc_set_padding (GTK_MISC (label2), 5, 5);
 
-		label = gtk_label_new (help_page_titles[i]);
+		label = gtk_label_new(_(help_titles[i]));
 		gtk_notebook_append_page (GTK_NOTEBOOK (notebook), frame, label);
 	}
 
@@ -241,10 +244,10 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
 	GTK_WIDGET_SET_FLAGS (button, GTK_CAN_DEFAULT);
 
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked", (GtkSignalFunc) click_help_end,
-		GTK_OBJECT(help_window));
-	gtk_signal_connect_object (GTK_OBJECT (help_window), "delete_event",
-		GTK_SIGNAL_FUNC (click_help_end), NULL);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		(GtkSignalFunc)click_help_end, GTK_OBJECT(help_window));
+	gtk_signal_connect(GTK_OBJECT(help_window), "delete_event",
+		GTK_SIGNAL_FUNC(click_help_end), NULL);
 
 	gtk_widget_show (button);
 
@@ -355,6 +358,49 @@ void pan_thumbnail()		// Create thumbnail and selection box
 	draw_pan_thumb(hori->value, vert->value, hori->page_size, vert->page_size);
 }
 
+static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
+{
+	static int wait_h, wait_v, in_pan;
+
+	nv_h = nv_h < 0 ? 0 : nv_h > hori->upper - hori->page_size ?
+		hori->upper - hori->page_size : nv_h;
+	nv_v = nv_v < 0 ? 0 : nv_v > vert->upper - vert->page_size ?
+		vert->upper - vert->page_size : nv_v;
+
+	if (in_pan) /* Delay reaction */
+	{
+		wait_h = nv_h; wait_v = nv_v;
+		in_pan |= 2;
+		return;
+	}
+
+	while (TRUE)
+	{
+		in_pan = 1;
+
+		/* Update selection box */
+		draw_pan_thumb(nv_h, nv_v, hori->page_size, vert->page_size);
+
+		/* Update position of main window scrollbars */
+		hori->value = nv_h;
+		vert->value = nv_v;
+		gtk_adjustment_value_changed(hori);
+		gtk_adjustment_value_changed(vert);
+
+		/* Sequence events if vw_focus_view() isn't doing that */
+		if (!(view_showing && vw_focus_on))
+		{
+			while (gtk_events_pending()) gtk_main_iteration();
+		}
+		if (in_pan < 2) break;
+
+		/* Do delayed update */
+		nv_h = wait_h;
+		nv_v = wait_v;
+	}
+	in_pan = 0;
+}
+
 gint delete_pan( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( pan_rgb != NULL ) free(pan_rgb);
@@ -366,25 +412,25 @@ gint delete_pan( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 gint key_pan( GtkWidget *widget, GdkEventKey *event )
 {
-	int nv_h, nv_v, arrow_key = 0;
+	int nv_h, nv_v, hm = 0, vm = 0;
 	GtkAdjustment *hori, *vert;
 
 	if (!check_zoom_keys_real(wtf_pressed(event)))
 	{
 		switch (event->keyval)
 		{
-			case GDK_KP_Left:
-			case GDK_Left:		arrow_key = 1; break;
-			case GDK_KP_Right:
-			case GDK_Right:		arrow_key = 2; break;
-			case GDK_KP_Up:
-			case GDK_Up:		arrow_key = 3; break;
-			case GDK_KP_Down:
-			case GDK_Down:		arrow_key = 4; break;
+			case GDK_KP_Left: case GDK_Left:
+				hm = -1; break;
+			case GDK_KP_Right: case GDK_Right:
+				hm = 1; break;
+			case GDK_KP_Up: case GDK_Up:
+				vm = -1; break;
+			case GDK_KP_Down: case GDK_Down:
+				vm = 1; break;
 		}
 
 		/* xine-ui sends bogus keypresses so don't delete on this */
-		if (!arrow_key && !XINE_FAKERY(event->keyval))
+		if (!(hm | vm) && !XINE_FAKERY(event->keyval))
 			delete_pan(NULL, NULL, NULL);
 		else
 		{
@@ -393,24 +439,10 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 			vert = gtk_scrolled_window_get_vadjustment(
 				GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 
-			nv_h = hori->value;
-			nv_v = vert->value;
+			nv_h = hori->value + hm * (hori->page_size / 4);
+			nv_v = vert->value + vm * (hori->page_size / 4);
 
-			if ( arrow_key == 1 ) nv_h -= hori->page_size/4;
-			if ( arrow_key == 2 ) nv_h += hori->page_size/4;
-			if ( arrow_key == 3 ) nv_v -= vert->page_size/4;
-			if ( arrow_key == 4 ) nv_v += vert->page_size/4;
-
-			if ( (nv_h + hori->page_size) > hori->upper ) nv_h = hori->upper - hori->page_size;
-			if ( (nv_v + vert->page_size) > vert->upper ) nv_v = vert->upper - vert->page_size;
-			mtMAX(nv_h, nv_h, 0)
-			mtMAX(nv_v, nv_v, 0)
-			hori->value = nv_h;
-			vert->value = nv_v;
-			gtk_adjustment_value_changed( hori );
-			gtk_adjustment_value_changed( vert );
-
-			pan_thumbnail();	// Update selection box
+			do_pan(hori, vert, nv_h, nv_v);
 		}
 	}
 	else pan_thumbnail();	// Update selection box as user may have zoomed in/out
@@ -435,17 +467,7 @@ void pan_button(int mx, int my, int button)
 		nv_h = mem_width*can_zoom*cent_x - hori->page_size/2;
 		nv_v = mem_height*can_zoom*cent_y - vert->page_size/2;
 
-		if ( (nv_h + hori->page_size) > hori->upper ) nv_h = hori->upper - hori->page_size;
-		if ( (nv_v + vert->page_size) > vert->upper ) nv_v = vert->upper - vert->page_size;
-		mtMAX(nv_h, nv_h, 0)
-		mtMAX(nv_v, nv_v, 0)
-
-		hori->value = nv_h;
-		vert->value = nv_v;
-		gtk_adjustment_value_changed( hori );
-		gtk_adjustment_value_changed( vert );
-
-		draw_pan_thumb(nv_h, nv_v, hori->page_size, vert->page_size);
+		do_pan(hori, vert, nv_h, nv_v);
 	}
 	if ( button == 3 )	// Right click = kill window
 		delete_pan(NULL, NULL, NULL);
@@ -715,6 +737,8 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 
 void vw_focus_view()						// Focus view window to main window
 {
+	static int in_focus;
+	static float wait_h, wait_v;
 	int w, h;
 	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
 	GtkAdjustment *hori, *vert;
@@ -771,12 +795,32 @@ void vw_focus_view()						// Focus view window to main window
 	}
 	else nv_v = 0.0;
 
+	if (in_focus) /* Delay reaction */
+	{
+		wait_h = nv_h; wait_v = nv_v;
+		in_focus |= 2;
+		return;
+	}
+
 	hori->value = nv_h;
 	vert->value = nv_v;
 
-	/* Update position of view window scrollbars */
-	gtk_adjustment_value_changed(hori);
-	gtk_adjustment_value_changed(vert);
+	while (TRUE)
+	{
+		in_focus = 1;
+
+		/* Update position of view window scrollbars */
+		gtk_adjustment_value_changed(hori);
+		gtk_adjustment_value_changed(vert);
+
+		while (gtk_events_pending()) gtk_main_iteration();
+		if (in_focus < 2) break;
+
+		/* Do delayed update */
+		hori->value = wait_h;
+		vert->value = wait_v;
+	}
+	in_focus = 0;
 }
 
 

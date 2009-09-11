@@ -596,7 +596,7 @@ static void toolbar_settings_init()
 	{
 		gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );	// Used when Home key is pressed
 #if GTK_MAJOR_VERSION == 1
-		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Reset shortened sliders */
+		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Re-render sliders */
 #endif
 		return;
 	}
@@ -1042,7 +1042,7 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 	pindex = (py - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
 	if (pindex >= mem_cols) return (TRUE);
 
-	if (px < PALETTE_SWATCH_X) pressed_allcol(NULL, NULL);
+	if (px < PALETTE_SWATCH_X) colour_selector(COLSEL_EDIT_ALL + pindex);
 	else if (px < PALETTE_CROSS_X)		// Colour A or B changed
 	{
 		if (event->button == 1)
