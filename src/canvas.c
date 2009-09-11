@@ -1445,6 +1445,12 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	FIX_OPTION_MENU_SIZE(opt);
 }
 
+static void loader_widgets(GtkWidget *box, char *name, int mode)
+{
+	add_a_toggle(_("Undoable"), box, undo_load);
+	gtk_widget_show_all(box);
+}
+
 static GtkWidget *ls_settings_box(char *name, int mode)
 {
 	GtkWidget *box, *label;
@@ -1471,6 +1477,9 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 	case FS_EXPORT_UNDO2:
 	case FS_PALETTE_SAVE:
 		ftype_widgets(box, name, mode);
+		break;
+	case FS_PNG_LOAD:
+		loader_widgets(box, name, mode);
 		break;
 	default: /* Give a hidden empty box */
 		return (box);
@@ -1535,6 +1544,10 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 		case FS_EXPORT_UNDO2:
 		case FS_PALETTE_SAVE:
 			settings->ftype = selected_file_type(box);
+			break;
+		case FS_PNG_LOAD:
+			undo_load = gtk_toggle_button_get_active(
+				GTK_TOGGLE_BUTTON(BOX_CHILD_0(box)));
 			break;
 		default: /* Use defaults */
 			break;
@@ -1811,7 +1824,7 @@ redo:
 
 void fs_setup(GtkWidget *fs, int action_type)
 {
-	char txt[PATHBUF], *txt2 = txt;
+	char txt[PATHTXT];
 	GtkWidget *xtra;
 #if GTK_MAJOR_VERSION == 1
 	GtkAccelGroup* ag = gtk_accel_group_new();
@@ -1854,9 +1867,9 @@ void fs_setup(GtkWidget *fs, int action_type)
 	}
 
 #ifdef WIN32 /* Convert from codepage to UTF8 in GTK2/Windows */
-	txt2 = gtkuncpy(NULL, txt, 0);
+	gtkuncpy(txt, txt, PATHTXT);
 #endif
-	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
+	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt);
 
 	xtra = pack(GTK_FILE_SELECTION(fs)->main_vbox,
 		ls_settings_box(txt, action_type));

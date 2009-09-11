@@ -86,6 +86,7 @@ int	col_reverse,					// Painting with right button
 #define FS_COMPOSITE_SAVE 14
 #define FS_SELECT_FILE 15
 #define FS_SELECT_DIR 16
+#define FS_LAYER_LOAD 17
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 

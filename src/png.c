@@ -53,7 +53,7 @@
 
 char preserved_gif_filename[PATHBUF];
 int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
@@ -138,7 +138,8 @@ int file_type_by_ext(char *name, guint32 mask)
  * loader may call this multiple times - say, for each channel */
 static int allocate_image(ls_settings *settings, int cmask)
 {
-	int i, j;
+	size_t sz, l;
+	int i, j, oldmask;
 
 	if ((settings->width < 1) || (settings->height < 1)) return (-1);
 
@@ -149,73 +150,68 @@ static int allocate_image(ls_settings *settings, int cmask)
 	if (settings->width * settings->height <= (1<<silence_limit))
 		settings->silent = TRUE;
 
-/* !!! Currently allocations are created committed, have to rollback on error */
+	/* Reduce cmask according to mode */
+	if (settings->mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
+	else if (settings->mode == FS_CHANNEL_LOAD) cmask &= CMASK_IMAGE;
 
-	for (i = 0; i < NUM_CHANNELS; i++)
+	/* Overwriting is allowed */
+	oldmask = cmask_from(settings->img);
+	cmask &= ~oldmask;
+	if (!cmask) return (0); // Already allocated
+
+	/* No utility channels without image */
+	oldmask |= cmask;
+	if (!(oldmask & CMASK_IMAGE)) return (-1);
+
+	sz = (size_t)settings->width * settings->height;
+	switch (settings->mode)
 	{
-		if (!(cmask & CMASK_FOR(i))) continue;
-
-		/* Overwriting is allowed */
-		if (settings->img[i]) continue;
-		/* No utility channels without image */
-		if ((i != CHN_IMAGE) && !settings->img[CHN_IMAGE]) return (-1);
-
-		switch (settings->mode)
+	case FS_PNG_LOAD: /* Regular image */
+		/* Reserve memory */
+		j = undo_next_core(UC_CREATE | UC_GETMEM, settings->width,
+			settings->height, settings->bpp, oldmask);
+		/* Drop current image if not enough memory for undo */
+		if (j) mem_free_image(&mem_image, FALSE);
+		/* Allocate, or at least try to */
+		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-		case FS_PNG_LOAD: /* Regular image */
-			/* Allocate the entire batch at once */
-			if (i == CHN_IMAGE)
-			{
-				j = mem_new(settings->width, settings->height,
-					settings->bpp, cmask);
-				if (j) return (FILE_MEM_ERROR);
-				memcpy(settings->img, mem_img, sizeof(chanlist));
-			}
-			/* Try to add an utility channel */
-			else
-			{
-				settings->img[i] = malloc(settings->width *
-					settings->height);
-				if (!settings->img[i]) return (FILE_MEM_ERROR);
-				mem_undo_im_[mem_undo_pointer].img[i] =
-					mem_img[i] = settings->img[i];
-			}
-			break;
-		case FS_CLIP_FILE: /* Clipboard */
-			/* Allocate the entire batch at once */
-			if (i == CHN_IMAGE)
-			{
-				j = mem_clip_new(settings->width, settings->height,
-					settings->bpp, cmask & CMASK_CLIP, TRUE);
-				if (j) return (FILE_MEM_ERROR);
-				memcpy(settings->img, mem_clip.img, sizeof(chanlist));
-			}
-			/* Try to add clipboard alpha or mask */
-			else if (CMASK_FOR(i) & CMASK_CLIP)
-			{
-				settings->img[i] = malloc(settings->width *
-					settings->height);
-				if (!settings->img[i]) return (FILE_MEM_ERROR);
-				mem_clip.img[i] = settings->img[i];
-			}
-			break;
-		case FS_CHANNEL_LOAD: /* Current channel */
-			/* Allocate temp image */
-			if (i == CHN_IMAGE)
-			{
-				/* Dimensions & depth have to be the same */
-				if ((settings->width != mem_width) ||
-					(settings->height != mem_height) ||
-					(settings->bpp != MEM_BPP)) return (-1);
-				settings->img[CHN_IMAGE] = malloc(settings->width *
-					settings->height * settings->bpp);
-				if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
-			}
-			/* There's nothing else */
-			break;
-		default: /* Something has gone mad */
-			return (-1);
+			if (!(cmask & CMASK_FOR(i))) continue;
+			l = i == CHN_IMAGE ? sz * settings->bpp : sz;
+			settings->img[i] = j ? malloc(l) : mem_try_malloc(l);
+			if (!settings->img[i]) return (FILE_MEM_ERROR);
 		}
+		break;
+	case FS_CLIP_FILE: /* Clipboard */
+		/* Allocate the entire batch at once */
+		if (cmask & CMASK_IMAGE)
+		{
+			j = mem_clip_new(settings->width, settings->height,
+				settings->bpp, cmask, FALSE);
+			if (j) return (FILE_MEM_ERROR);
+			memcpy(settings->img, mem_clip.img, sizeof(chanlist));
+			break;
+		}
+		/* Try to add clipboard alpha and/or mask */
+		for (i = 0; i < NUM_CHANNELS; i++)
+		{
+			if (!(cmask & CMASK_FOR(i))) continue;
+			settings->img[i] = malloc(sz);
+			if (!settings->img[i]) return (FILE_MEM_ERROR);
+		}
+		break;
+	case FS_CHANNEL_LOAD: /* Current channel */
+		/* Dimensions & depth have to be the same */
+		if ((settings->width != mem_width) ||
+			(settings->height != mem_height) ||
+			(settings->bpp != MEM_BPP)) return (-1);
+		/* Reserve memory */
+		j = undo_next_core(UC_CREATE | UC_GETMEM, settings->width,
+			settings->height, settings->bpp, CMASK_CURR);
+		if (j) return (FILE_MEM_ERROR);
+		/* Allocate */
+		settings->img[mem_channel] = mem_try_malloc(sz * settings->bpp);
+		if (!settings->img[mem_channel]) return (FILE_MEM_ERROR);
+		break;
 	}
 	return (0);
 }
@@ -226,7 +222,9 @@ static void deallocate_image(ls_settings *settings, int cmask)
 	int i;
 
 	/* No deallocating image channel */
-	for (i = CHN_IMAGE + 1; i < NUM_CHANNELS; i++)
+	if (!(cmask &= ~CMASK_IMAGE)) return;
+
+	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!(cmask & CMASK_FOR(i))) continue;
 		if (!settings->img[i]) continue;
@@ -234,19 +232,8 @@ static void deallocate_image(ls_settings *settings, int cmask)
 		free(settings->img[i]);
 		settings->img[i] = NULL;
 
-/* !!! Currently allocations are created committed, have to rollback */
-
-		switch (settings->mode)
-		{
-		case FS_PNG_LOAD: /* Regular image */
-			mem_undo_im_[mem_undo_pointer].img[i] =
-				mem_img[i] = NULL;
-			break;
-		case FS_CLIP_FILE: /* Clipboard */
+		if (settings->mode == FS_CLIP_FILE) /* Clipboard */
 			mem_clip.img[i] = NULL;
-			break;
-		default: break;
-		}
 	}
 }
 
@@ -3545,9 +3532,12 @@ int load_image(char *file_name, int mode, int ftype)
 {
 	png_color pal[256];
 	ls_settings settings;
-	int i, tr, res;
+	int i, tr, res, undo = FALSE;
 
 	init_ls_settings(&settings, NULL);
+	/* Image loads can be undoable, layer loads cannot */
+	if (mode == FS_PNG_LOAD) undo = undo_load;
+	else if (mode == FS_LAYER_LOAD) mode = FS_PNG_LOAD;
 	settings.mode = mode;
 	settings.ftype = ftype;
 	settings.pal = pal;
@@ -3610,27 +3600,30 @@ int load_image(char *file_name, int mode, int ftype)
 			gifsicle(tmp);
 			g_free(tmp);
 		}
-		/* Have empty image again to avoid destroying old animation */
-		create_default_image();
-		mem_pal_copy(pal, mem_pal);
-		res = 1;
 	}
 
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD: /* Image */
-		/* Success OR LIB FAILURE - accept data */
+		/* Success OR LIB FAILURE - commit load */
 		if ((res == 1) || (res == FILE_LIB_ERROR))
 		{
-			/* !!! Image data and dimensions committed already */
-
+			if (!mem_img[CHN_IMAGE] || !undo)
+				mem_new(settings.width, settings.height,
+					settings.bpp, 0);
+			else undo_next_core(UC_DELETE, settings.width,
+				settings.height, settings.bpp, CMASK_ALL);
+			memcpy(mem_img, settings.img, sizeof(chanlist));
 			store_image_extras(&settings);
+			update_undo(&mem_image);
+			mem_undo_prepare();
 		}
-		/* Failure needing rollback */
-		else if (settings.img[CHN_IMAGE])
+		/* Failure */
+		else
 		{
-			/* !!! Too late to restore previous image */
-			create_default_image();
+			mem_free_chanlist(settings.img);
+			/* If loader managed to delete image before failing */
+			if (!mem_img[CHN_IMAGE]) create_default_image();
 		}
 		break;
 	case FS_CLIP_FILE: /* Clipboard */
@@ -3656,15 +3649,7 @@ int load_image(char *file_name, int mode, int ftype)
 				settings.height, settings.bpp, tr, tr);
 		}
 		/* Success - accept data */
-		if (res == 1)
-		{
-			/* !!! Clipboard data committed already */
-
-			/* Accept dimensions */
-			mem_clip_w = settings.width;
-			mem_clip_h = settings.height;
-			mem_clip_bpp = settings.bpp;
-		}
+		if (res == 1); /* !!! Clipboard data committed already */
 		/* Failure needing rollback */
 		else if (settings.img[CHN_IMAGE])
 		{
@@ -3673,24 +3658,25 @@ int load_image(char *file_name, int mode, int ftype)
 		}
 		break;
 	case FS_CHANNEL_LOAD:
-		/* Success - accept data */
+		/* Success - commit load */
 		if (res == 1)
 		{
 			/* Add frame & stuff data into it */
 			undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp,
 				CMASK_CURR);
-			mem_undo_im_[mem_undo_pointer].img[mem_channel] =
-				mem_img[mem_channel] = settings.img[CHN_IMAGE];
-
-			if (mem_channel == CHN_IMAGE)
-				store_image_extras(&settings);
+			mem_img[mem_channel] = settings.img[CHN_IMAGE];
+			update_undo(&mem_image);
+// !!! This is frequently harmful
+//			if (mem_channel == CHN_IMAGE)
+//				store_image_extras(&settings);
 			mem_undo_prepare();
 		}
-		/* Failure needing rollback */
-		else if (settings.img[CHN_IMAGE]) free(settings.img[CHN_IMAGE]);
+		/* Failure */
+		else free(settings.img[CHN_IMAGE]);
 		break;
 	}
-	return (res);
+	/* Don't report animated GIF as failure */
+	return (res == FILE_GIF_ANIM ? 1 : res);
 }
 
 int export_undo(char *file_name, ls_settings *settings)

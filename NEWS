@@ -24,6 +24,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Dragging the main/view window divider made to behave in GTK+1
 	* Tile based undo system introduced to save memory when changes affect only small areas of the canvas
 	* Max undo levels now configurable (from 10 to 1000)
+	* Image loading now can be made undoable
 	* mtPaint can now be compiled as a library (libmtpaint)
 	* Main menu now rearranges itself to fit in window
 	* Image rotation now sharper and faster

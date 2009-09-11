@@ -360,6 +360,9 @@ void init_istate();		// Set initial state of image variables
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
 void update_undo_depth();	// Resize all undo stacks
 
+void mem_free_chanlist(chanlist img);
+int cmask_from(chanlist img);	// Chanlist to cmask
+
 int mem_count_all_cols();			// Count all colours - Using main image
 int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy
 
@@ -471,10 +474,11 @@ void mem_undo_forward();		// REDO requested by user
 #define UC_DELETE  0x04	/* Force delete */
 #define UC_PENDOWN 0x08	/* Respect pen_down */
 #define UC_GETMEM  0x10 /* Get memory and do nothing */
-#define UC_NOALLOC 0x20 /* Do not allocate channels */
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 void update_undo(image_info *image);	// Copy image state into current undo frame
+//	Try to allocate a memory block, releasing undo frames if needed
+void *mem_try_malloc(size_t size);
 
 
 //// Drawing Primitives

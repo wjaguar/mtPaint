@@ -579,7 +579,7 @@ int load_layers( char *file_name )
 		k = 1;
 		j = detect_image_format(load_name);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
-			k = load_image(load_name, FS_PNG_LOAD, j) != 1;
+			k = load_image(load_name, FS_LAYER_LOAD, j) != 1;
 
 		if (k) /* Failure - skip this layer */
 		{

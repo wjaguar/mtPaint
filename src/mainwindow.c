@@ -76,6 +76,7 @@ static inilist ini_bool[] = {
 	{ "status2Toggle",	status_on + 2,		TRUE  },
 	{ "status3Toggle",	status_on + 3,		TRUE  },
 	{ "status4Toggle",	status_on + 4,		TRUE  },
+	{ "undoableLoad",	&undo_load,		FALSE },
 	{ NULL,			NULL }
 };
 

@@ -337,7 +337,7 @@ void update_undo(image_info *image)
 	undo->flags = 0;
 }
 
-static void mem_free_chanlist(chanlist img)
+void mem_free_chanlist(chanlist img)
 {
 	int i;
 
@@ -533,7 +533,7 @@ int mem_new( int width, int height, int bpp, int cmask )
 	return (!res);
 }
 
-static int cmask_from(chanlist img)
+int cmask_from(chanlist img)
 {
 	int i, j, k = 1;
 
@@ -974,20 +974,20 @@ static int mem_undo_space(size_t mem_req)
 		(layers_total + 1);
 
 	/* Fail if hopeless */
-	if (mem_req > mem_lim) return (FALSE);
+	if (mem_req > mem_lim) return (2);
 
 	/* Mem limit exceeded - drop oldest */
 	mem_req += mem_undo_size(&mem_image.undo_);
 	while (mem_req > mem_lim)
 	{
-		if (!mem_undo_done) return (FALSE);
+		if (!mem_undo_done) return (1);
 		mem_req -= lose_oldest();
 	}
-	return (TRUE);
+	return (0);
 }
 
 /* Try to allocate a memory block, releasing undo frames if needed */
-static void *mem_try_malloc(size_t size)
+void *mem_try_malloc(size_t size)
 {
 	void *ptr;
 
@@ -1044,7 +1044,8 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	/* Fill undo frame */
 	update_undo(&mem_image);
 // !!! Must be after update_undo() to get used memory right
-	if (!mem_undo_space(mem_req) && !(mode & UC_DELETE)) return (1);
+	if (!(mode & UC_DELETE))
+		if ((j = mem_undo_space(mem_req))) return (j);
 	if (mode & UC_GETMEM) return (0); // Enough memory was freed
 
 	/* Prepare outgoing frame */
@@ -1064,7 +1065,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	{
 		holder[i] = img = mem_img[i];
 		if (!(cmask & (1 << i))) continue;
-		if (mode & (UC_DELETE | UC_NOALLOC))
+		if (mode & UC_DELETE)
 		{
 			holder[i] = NULL;
 			continue;

@@ -108,7 +108,7 @@ typedef struct {
 
 extern char preserved_gif_filename[];
 int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
 
 int file_type_by_ext(char *name, guint32 mask);
 
