@@ -17,6 +17,8 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include "fpick.h"
+
 float can_zoom;						// Zoom factor 1..MAX_ZOOM
 int margin_main_x, margin_main_y,			// Top left of image from top left of canvas
 	margin_view_x, margin_view_y;
@@ -95,7 +97,7 @@ int do_a_load( char *fname );
 void align_size( float new_zoom );
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
 void init_ls_settings(ls_settings *settings, GtkWidget *box);
-void fs_setup(GtkWidget *fs, int action_type);
+void fs_setup(fpicker *fpick, int action_type);
 void file_selector( int action_type );
 void init_pal();			// Initialise palette after loading/palette changes
 void update_cols();

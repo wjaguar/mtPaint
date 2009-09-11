@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -173,7 +173,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		j = undo_next_core(UC_CREATE | UC_GETMEM, settings->width,
 			settings->height, settings->bpp, oldmask);
 		/* Drop current image if not enough memory for undo */
-		if (j) mem_free_image(&mem_image, FREE_IMAGE);
+		if (j) mem_free_image(&mem_image, FALSE);
 		/* Allocate, or at least try to */
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
@@ -257,12 +257,6 @@ static void ls_init(char *what, int save)
 	progress_init(buf, 0);
 }
 
-/* !!! libpng 1.2.17 or later loses extra chunks if there's no callback */
-static int buggy_libpng_handler()
-{
-	return (0);
-}
-
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
@@ -314,9 +308,6 @@ static int load_png(char *file_name, ls_settings *settings)
 		res = FILE_LIB_ERROR;
 		goto fail2;
 	}
-
-	/* !!! libpng 1.2.17+ needs this to read extra channels */
-	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
 	png_init_io(png_ptr, fp);
 	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);
@@ -992,7 +983,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	opj_cio_t *cio = NULL;
 	opj_image_t *image = NULL;
 	opj_image_comp_t *comp;
-	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
 	unsigned char xtb[256], *dest, *buf = NULL;
 	FILE *fp;
 	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
@@ -1101,7 +1092,7 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	opj_image_cmptparm_t channels[4];
 	opj_cio_t *cio = NULL;
 	opj_image_t *image;
-	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
 	unsigned char *src;
 	FILE *fp;
 	int i, j, k, nc, step;
@@ -2341,12 +2332,10 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	if (!j) goto fail;
 	fgetsC(lbuf, 0, fp); /* Reset reader */
 
-	/* Read the "intro sequence" */
+	/* Read & validate the "intro sequence" */
 	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	/* !!! Skip validation; libXpm doesn't do it, and some weird tools
-	 * write this line differently - WJ */
-//	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
-//	if (!j) goto fail;
+	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
+	if (!j) goto fail;
 
 	/* Read the values section */
 	if (!fgetsC(lbuf, 4096, fp)) goto fail;
@@ -4106,22 +4095,15 @@ int show_html(char *browser, char *docs)
 		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
 	else i = 0;
 #else
-	argv[1] = docs;
-	argv[2] = NULL;
 	/* Try to use default browser */
-	if (!browser || !browser[0])
-	{
-		argv[0] = "xdg-open";
-		i = spawn_process(argv, NULL);
-		if (!i) return (0); // System has xdg-utils installed
-		// No xdg-utils - try "BROWSER" variable then
-		browser = getenv("BROWSER");
-	}
+	if (!browser || !browser[0]) browser = getenv("BROWSER");
 	else browser = gtkncpy(buf2, browser, PATHBUF);
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 
 	argv[0] = browser;
+	argv[1] = docs;
+	argv[2] = NULL;
 	i = spawn_process(argv, NULL);
 #endif
 	if (i) alert_box( _("Error"),

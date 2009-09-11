@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
+#include <string.h>
+#include <ctype.h>
 
 #include "mtlib.h"
 
@@ -153,4 +155,94 @@ MT_Coor MT_palin(double position, double ratio, MT_Coor p1, MT_Coor p2, MT_Coor 
 	res.z = (1-position)*(1-position)*(1-position)*p2.z + 3*position*(1-position)*(1-position)*dd[1].z + 3*(1-position)*position*position*dd[2].z + position*position*position*p3.z;
 
 	return res;
+}
+
+/*
+	Add thousand separator(s) to a string containing a number, e.g.
+	str2thousands( dest, "1234567", 32, ',', '-', '.', 3, 0 );
+	Creates:
+
+	1234567		->	1,234,567
+	-123456		->	-123,456
+	-123456.7891	->	-123,456.7891
+
+
+	Can also be used to separate any text between two delimeters, e.g.
+	str2thousands( dest, "aaa>270907<bbb", 32, '-', '>', '<', 2, 0 );
+	Creates:
+
+	aaa>27-09-07<bbb
+
+*/
+
+int str2thousands(	char *dest,		// Output buffer
+			char *src,		// Input string (can be same as destination)
+			int  dest_size,		// Size of output buffer
+			char separator,		// Separator character to use, typically ','
+			char minus,		// Minus character, typically '-'
+			char dpoint,		// Decimal point character, typically '.'
+			int  sep_num,		// Numbers to contain between separators, typically 3
+			int  right_justify	// Should output string be right justified?
+		)
+{
+	int	i, j, k, start, end, oldlen, newlen;
+	char	*ch;
+
+
+	if ( sep_num < 1 ) return -1;		// Sanity check
+
+	oldlen = strlen(src);
+	start  = 0;				// First character to be subjected to separating
+	end    = oldlen - 1;			// Last character to be subjected to separating
+
+	if ( (ch = strrchr(src, dpoint)) )	// Decimal point detected, adjust end accordingly
+		end = ch - src - 1;
+	if ( (ch = strchr(src, minus)) )	// Minus sign detected, adjust start accordingly
+		start = ch - src + 1;
+	if ( (end+1)<start ) return -1;		// Decimal point is before minus sign so bail out
+
+	newlen = oldlen + (end - start) / sep_num;
+	if ( newlen+1 > dest_size ) return -1;
+				// Output buffer is not large enough to hold the result, so bail out
+
+	i = oldlen - 1;				// Input buffer pointer
+	k = dest_size - 1;			// Output buffer pointer
+	dest[k--] = 0;				// Output string terminator
+
+	while ( i>end ) dest[k--] = src[i--];	// Copy characters from the end to the '.'
+
+	for ( j=0; i>=start; j++ )
+	{
+		if ( j && ((j % sep_num) == 0) )
+			dest[k--] = separator;	// Add separator
+
+		dest[k--] = src[i--];		// Copy char
+	}
+
+	while (i>=0) dest[k--] = src[i--];	// Copy characters from the '-' to the beginning
+
+	if ( right_justify )
+	{		 	// Right align so pad beginning of output with spaces
+		 while ( k>=0 ) dest[k--] = ' ';
+	}
+	else
+	{			// Left align so shift string flush to beginning
+		k++;
+		j = 0;
+		do	dest[j++] = dest[k++];
+		while	( dest[j-1] != 0 );
+	}
+
+	return 0;
+}
+
+void str2lower(char *str, int len)		// Convert string to lowercase
+{
+	int i;
+
+	for (i=0; i<len; i++)
+	{
+		if ( str[i] == 0 ) break;
+		str[i] = tolower( str[i] );
+	}
 }

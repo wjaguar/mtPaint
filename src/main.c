@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -64,22 +64,11 @@ int main( int argc, char *argv[] )
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
 	inifile_init("/.mtpaint");
 
-#ifdef U_NLS
-#if GTK_MAJOR_VERSION == 1
-	/* !!! GTK+1 needs locale set up before gtk_init(); GTK+2, *QUITE*
-	 * the opposite - WJ */
-	setup_language();
-#endif
-#endif
-
 	gtk_init( &argc, &argv );
 	gtk_init_bugfixes();
 
 #ifdef U_NLS
-#if GTK_MAJOR_VERSION == 2
-	/* !!! GTK+2 starts acting up if this is before gtk_init() - WJ */
 	setup_language();
-#endif
 	bindtextdomain("mtpaint", MT_LANG_DEST);
 	textdomain("mtpaint");
 #if GTK_MAJOR_VERSION == 2

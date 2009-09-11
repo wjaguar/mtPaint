@@ -134,6 +134,7 @@ void mem_pat_update();			// Update indexed and then RGB pattern preview
 void update_top_swatch();		// Update selected colours A & B
 
 GtkWidget *layer_toolbar(GtkWidget **wlist);	// Create toolbar for layers window
+GtkWidget *fpick_toolbar(GtkWidget **wlist);	// Create toolbar for file picker window
 
 unsigned char *render_patterns();	// Create RGB dump of patterns to display
 void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns

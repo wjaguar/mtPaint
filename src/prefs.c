@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -65,14 +65,14 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 16
+#define PREF_LANGS 14
 
 char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"zh_CN.utf8", "zh_TW.utf8",
-	"cs_CZ", "en_GB", "fr_FR", "gl_ES",
-	"de_DE", "ja_JP.utf8", "pl_PL", "pt_PT",
-	"pt_BR", "ru_RU", "sk_SK",
-	"es_ES", "tr_TR" };
+	"cs_CZ", "en_GB", "fr_FR", "de_DE",
+	"ja_JP.utf8", "pl_PL", "pt_PT",
+	"pt_BR", "sk_SK", "es_ES",
+	"tr_TR" };
 
 int pref_lang;
 
@@ -417,10 +417,10 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 #ifdef U_NLS
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 		_("Chinese (Simplified)"), _("Chinese (Taiwanese)"),
-		_("Czech"), _("English (UK)"), _("French"), _("Galician"),
-		_("German"), _("Japanese"), _("Polish"), _("Portuguese"),
-		_("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
-		_("Spanish"), _("Turkish") };
+		_("Czech"), _("English (UK)"), _("French"), _("German"),
+		_("Japanese"), _("Polish"), _("Portuguese"),
+		_("Portuguese (Brazilian)"), _("Slovak"), _("Spanish"),
+		_("Turkish") };
 #endif
 
 
@@ -675,8 +675,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		if (!strcmp(pref_lang_ini_code[i],
 			inifile_get("languageSETTING", "system"))) break;
 	}
-	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, (PREF_LANGS + 1) / 2,
-		i, &pref_lang, NULL));
+	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, 7, i, &pref_lang, NULL));
 
 #endif
 

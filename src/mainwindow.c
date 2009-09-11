@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -38,6 +38,7 @@
 #include "shifter.h"
 #include "spawn.h"
 #include "font.h"
+#include "icons.h"
 
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
@@ -997,8 +998,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	if (action == ACT_DUMMY) return (TRUE);
 	if (check_zoom_keys(action)) return (TRUE);	// Check HOME/zoom keys
 
-	/* Gradient tool has precedence over selection */
-	if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
+	if (marq_status > MARQUEE_NONE)
 	{
 		if (check_arrows(action) == 1)
 		{
@@ -1093,7 +1093,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_A) mem_col_A--;
-			mem_col_A24 = mem_pal[mem_col_A];
 		}
 		else if (channel_col_A[mem_channel])
 			channel_col_A[mem_channel]--;
@@ -1102,7 +1101,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_A < mem_cols - 1) mem_col_A++;
-			mem_col_A24 = mem_pal[mem_col_A];
 		}
 		else if (channel_col_A[mem_channel] < 255)
 			channel_col_A[mem_channel]++;
@@ -1111,7 +1109,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_B) mem_col_B--;
-			mem_col_B24 = mem_pal[mem_col_B];
 		}
 		else if (channel_col_B[mem_channel])
 			channel_col_B[mem_channel]--;
@@ -1120,7 +1117,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		if (mem_channel == CHN_IMAGE)
 		{
 			if (mem_col_B < mem_cols - 1) mem_col_B++;
-			mem_col_B24 = mem_pal[mem_col_B];
 		}
 		else if (channel_col_B[mem_channel] < 255)
 			channel_col_B[mem_channel]++;
@@ -1213,7 +1209,12 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		return (TRUE);
 	}
 	/* Finalize colour-change */
-	if (mem_channel == CHN_IMAGE) update_cols();
+	if (mem_channel == CHN_IMAGE)
+	{
+		mem_col_A24 = mem_pal[mem_col_A];
+		mem_col_B24 = mem_pal[mem_col_B];
+		update_cols();
+	}
 	else pressed_opacity(channel_col_A[mem_channel]);
 	return TRUE;
 }
@@ -3283,6 +3284,7 @@ typedef struct
 	char *shortcut; /* Text form for now */
 	void (*handler)();
 	int parm;
+	char **xpm_icon_image;
 } menu_item;
 
 static GtkWidget **need_lists[] = {
@@ -3541,6 +3543,10 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	GtkWidget *widget, *wrap, *rwidgets[MENU_RESIZE_MAX];
 	char *radio[32], *rnames[MENU_RESIZE_MAX];
 	int i, j, rn = 0;
+#if GTK_MAJOR_VERSION == 2
+	GdkPixmap *icon, *mask;
+	GtkWidget *image;
+#endif
 #if GTK_MAJOR_VERSION == 1
 	GSList *en;
 #endif
@@ -3560,6 +3566,25 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 			"<RadioItem>";
 		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
 			radio[items->radio_BTS] = wf.path;
+#if GTK_MAJOR_VERSION == 2
+		if ( items->xpm_icon_image )
+		{
+			wf.item_type = "<ImageItem>";
+			wf.extra_data = NULL;
+			gtk_item_factory_create_item(factory, &wf, NULL, 2);
+
+			widget = gtk_item_factory_get_item(factory,
+				((GtkItemFactoryItem *)factory->items->data)->path);
+
+			icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, items->xpm_icon_image);
+			image = gtk_image_new_from_pixmap( icon, mask );
+			gdk_pixmap_unref(icon);
+			gdk_pixmap_unref(mask);
+
+			gtk_image_menu_item_set_image( GTK_IMAGE_MENU_ITEM(widget), image );
+		}
+		else
+#endif
 		gtk_item_factory_create_item(factory, &wf, NULL, 2);
 		/* !!! Workaround - internal path may differ from input path */
 		widget = gtk_item_factory_get_item(factory,
@@ -3615,6 +3640,168 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	return (wrap);
 }
 
+static void pressed_pal_copypaste( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	int	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2,
+		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2,
+		w = abs(marq_x1 - marq_x2) + 1,
+		h = abs(marq_y1 - marq_y2) + 1,
+		bpp = MEM_BPP,
+		i, k, col;
+
+	if ( item )				// Copy selection to palette
+	{
+		int cx, cy;
+
+		if ( mem_channel != CHN_IMAGE || bpp < 3 || tool_type != TOOL_SELECT ||
+			marq_status != MARQUEE_DONE )
+				return;		// Only do this for RGB image canvas + selection marquee
+
+		spot_undo(UNDO_PAL);
+		cx = x;
+		cy = y;
+		for ( k=0; k<mem_cols; k++ )
+		{
+			col = get_pixel_RGB( cx, cy );
+
+			mem_pal[k].red   = INT_2_R(col);
+			mem_pal[k].green = INT_2_G(col);
+			mem_pal[k].blue  = INT_2_B(col);
+			cx++;
+			if ( cx >= (x+w) )
+			{
+				cx = x;
+				cy++;
+				if ( cy >= (y+h) ) break;		// No more pixels to copy
+			}
+		}
+
+		mem_pal_init();						// Update palette view
+		gtk_widget_queue_draw( drawing_palette );
+	}
+	else					// Paste palette
+	{
+		int paste_width = 1, paste_height = mem_cols;
+
+		if ( tool_type == TOOL_SELECT && marq_status == MARQUEE_DONE )
+		{
+				// If selection exists, use it to set the width of the clipboard
+			if ( w >= mem_cols )
+			{
+				paste_width = mem_cols;
+				paste_height = 1;
+			}
+			else
+			{
+				paste_width = w;
+				paste_height = mem_cols / w;
+				while ( paste_width * paste_height < mem_cols ) paste_height++;
+			}
+		}
+
+		mem_clip_new(paste_width, paste_height, bpp, CMASK_IMAGE, FALSE);
+		text_paste = TEXT_PASTE_NONE;
+
+		if (!mem_clipboard)
+		{
+			alert_box( _("Error"), _("Not enough memory to create clipboard"),
+					_("OK"), NULL, NULL );
+			return;
+		}
+		else
+		{
+			unsigned char *dest = mem_clipboard;
+
+			memset(dest, 0, paste_width*paste_height*bpp);
+
+			if ( bpp == 1 )
+			{
+				for ( i=0; i<mem_cols; i++ ) *dest++ = i;
+			}
+			if ( bpp == 3 )
+			{
+				for ( i=0; i<mem_cols; i++ )
+				{
+					*dest++ = mem_pal[i].red;
+					*dest++ = mem_pal[i].green;
+					*dest++ = mem_pal[i].blue;
+				}
+			}
+
+			pressed_paste_centre( NULL, NULL );
+			update_menus();
+		}
+	}
+}
+
+static void pressed_sel_ramp( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	unsigned char rgb[2][3], *dest;
+	int	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2,
+		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2,
+		w = abs(marq_x1 - marq_x2) + 1,
+		h = abs(marq_y1 - marq_y2) + 1,
+		bpp = MEM_BPP,
+		col, cx, cy;
+
+	if ( mem_channel != CHN_IMAGE || bpp < 3 || tool_type != TOOL_SELECT ||
+		marq_status != MARQUEE_DONE )
+			return;		// Only do this for RGB image canvas + selection marquee
+
+	spot_undo(UNDO_DRAW);
+
+	if ( item )		// Vertical ramp
+	{
+		for ( cx = x; cx < (x+w); cx++ )
+		{
+			col = get_pixel_RGB( cx, y );
+			rgb[0][0] = INT_2_R(col);
+			rgb[0][1] = INT_2_G(col);
+			rgb[0][2] = INT_2_B(col);
+			col = get_pixel_RGB( cx, y+h-1 );
+			rgb[1][0] = INT_2_R(col);
+			rgb[1][1] = INT_2_G(col);
+			rgb[1][2] = INT_2_B(col);
+
+			dest = mem_img[CHN_IMAGE] + (cx + (y+1)*mem_width)*bpp;
+
+			for ( cy = 1; cy < (h-1); cy++ )
+			{
+				dest[0] = ( rgb[0][0] * (h-cy-1) + rgb[1][0] * cy ) / (h-1);
+				dest[1] = ( rgb[0][1] * (h-cy-1) + rgb[1][1] * cy ) / (h-1);
+				dest[2] = ( rgb[0][2] * (h-cy-1) + rgb[1][2] * cy ) / (h-1);
+				dest += mem_width*bpp;
+			}
+		}
+	}
+	else			// Horizontal ramp
+	{
+		for ( cy = y; cy < (y+h); cy++ )
+		{
+			col = get_pixel_RGB( x, cy );
+			rgb[0][0] = INT_2_R(col);
+			rgb[0][1] = INT_2_G(col);
+			rgb[0][2] = INT_2_B(col);
+			col = get_pixel_RGB( x+w-1, cy );
+			rgb[1][0] = INT_2_R(col);
+			rgb[1][1] = INT_2_G(col);
+			rgb[1][2] = INT_2_B(col);
+
+			dest = mem_img[CHN_IMAGE] + (x + 1 + cy*mem_width)*bpp;
+
+			for ( cx = 1; cx < (w-1); cx++ )
+			{
+				*dest++ = ( rgb[0][0] * (w-cx-1) + rgb[1][0] * cx ) / (w-1);
+				*dest++ = ( rgb[0][1] * (w-cx-1) + rgb[1][1] * cx ) / (w-1);
+				*dest++ = ( rgb[0][2] * (w-cx-1) + rgb[1][2] * cx ) / (w-1);
+			}
+		}
+	}
+
+	update_all_views();
+	update_menus();
+}
+
 #undef _
 #define _(X) X
 
@@ -3623,9 +3810,9 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 static menu_item main_menu[] = {
 	{ _("/_File"), -2 -16 },
 	{ _("/File/tear"), -3 },
-	{ _("/File/New"), -1, 0, 0, "<control>N", pressed_new, 0 },
-	{ _("/File/Open ..."), -1, 0, 0, "<control>O", pressed_open_file, 0 },
-	{ _("/File/Save"), -1, 0, 0, "<control>S", pressed_save_file, 0 },
+	{ _("/File/New"), -1, 0, 0, "<control>N", pressed_new, 0, xpm_new_xpm },
+	{ _("/File/Open ..."), -1, 0, 0, "<control>O", pressed_open_file, 0, xpm_open_xpm },
+	{ _("/File/Save"), -1, 0, 0, "<control>S", pressed_save_file, 0, xpm_save_xpm },
 	{ _("/File/Save As ..."), -1, 0, 0, NULL, pressed_save_file_as, 0 },
 	{ _("/File/sep1"), -4 },
 	{ _("/File/Export Undo Images ..."), -1, 0, NEED_UNDO, NULL, pressed_export_undo, 0 },
@@ -3678,18 +3865,20 @@ static menu_item main_menu[] = {
 
 	{ _("/_Edit"), -2 -16 },
 	{ _("/Edit/tear"), -3 },
-	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", main_undo, 0 },
-	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", main_redo, 0 },
+	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", main_undo, 0, xpm_undo_xpm },
+	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", main_redo, 0, xpm_redo_xpm },
 	{ _("/Edit/sep1"), -4 },
-	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", pressed_copy, 1 },
-	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", pressed_copy, 0 },
-	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", pressed_paste_centre, 0 },
+	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", pressed_copy, 1, xpm_cut_xpm },
+	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", pressed_copy, 0, xpm_copy_xpm },
+	{ _("/Edit/Copy to Palette"), -1, 0, NEED_SEL, NULL, pressed_pal_copypaste, 1 },
+	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", pressed_paste_centre, 0, xpm_paste_xpm },
 	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", pressed_paste_layer, 0 },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", pressed_paste, 0 },
-	{ _("/Edit/Paste Text"), -1, 0, 0, "T", pressed_text, 0 },
+	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", pressed_text, 0, xpm_text_xpm },
 #ifdef U_FREETYPE
-	{ _("/Edit/Paste Text (FreeType)"), -1, 0, 0, "<control>T", pressed_mt_text, 0 },
+	{ _("/Edit/Paste Text (FreeType)"), -1, 0, 0, "T", pressed_mt_text, 0 },
 #endif
+	{ _("/Edit/Paste Palette"), -1, 0, 0, NULL, pressed_pal_copypaste, 0 },
 	{ _("/Edit/sep2"), -4 },
 	{ _("/Edit/Load Clipboard"), -2 },
 	{ _("/Edit/Load Clipboard/tear"), -3 },
@@ -3739,7 +3928,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Horizontal Split"), 0, 0, 0, "H", pressed_view_hori, 0 },
 	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, pressed_view_focus, 0 },
 	{ _("/View/sep3"), -4 },
-	{ _("/View/Pan Window (End)"), -1, 0, 0, NULL, pressed_pan, 0 },
+	{ _("/View/Pan Window (End)"), -1, 0, 0, NULL, pressed_pan, 0, xpm_pan_xpm },
 	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", pressed_cline, 0 },
 	{ _("/View/Layers Window"), -1, MENU_LAYER, 0, "L", pressed_layers, 0 },
 
@@ -3765,19 +3954,22 @@ static menu_item main_menu[] = {
 	{ _("/Selection/tear"), -3 },
 	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", pressed_select_all, 0 },
 	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", pressed_select_none, 0 },
-	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LASSO, NULL, pressed_lasso, 0 },
+	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LASSO, NULL, pressed_lasso, 0, xpm_lasso_xpm },
 	{ _("/Selection/Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, pressed_lasso, 1 },
 	{ _("/Selection/sep1"), -4 },
-	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", pressed_rectangle, 0 },
-	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", pressed_rectangle, 1 },
-	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", pressed_ellipse, 0 },
-	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", pressed_ellipse, 1 },
+	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", pressed_rectangle, 0, xpm_rect1_xpm },
+	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", pressed_rectangle, 1, xpm_rect2_xpm },
+	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", pressed_ellipse, 0, xpm_ellipse2_xpm },
+	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", pressed_ellipse, 1, xpm_ellipse_xpm },
 	{ _("/Selection/sep2"), -4 },
-	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_v, 0 },
-	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_h, 0 },
-	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 0 },
-	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 1 },
+	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_v, 0, xpm_flip_vs_xpm },
+	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, pressed_flip_sel_h, 0, xpm_flip_hs_xpm },
+	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 0, xpm_rotate_cs_xpm },
+	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 1, xpm_rotate_as_xpm },
 	{ _("/Selection/sep3"), -4 },
+	{ _("/Selection/Horizontal Ramp"), -1, 0, NEED_SEL, NULL, pressed_sel_ramp, 0 },
+	{ _("/Selection/Vertical Ramp"), -1, 0, NEED_SEL, NULL, pressed_sel_ramp, 1 },
+	{ _("/Selection/sep4"), -4 },
 	{ _("/Selection/Alpha Blend A,B"), -1, 0, NEED_ACLIP, NULL, pressed_clip_alpha_scale, 0 },
 	{ _("/Selection/Move Alpha to Mask"), -1, 0, NEED_CLIP, NULL, pressed_clip_alphamask, 0 },
 	{ _("/Selection/Mask Colour A,B"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask, 0 },
@@ -3787,8 +3979,8 @@ static menu_item main_menu[] = {
 
 	{ _("/_Palette"), -2 -16 },
 	{ _("/Palette/tear"), -3 },
-	{ _("/Palette/Open ..."), -1, 0, 0, NULL, pressed_open_pal, 0 },
-	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, pressed_save_pal, 0 },
+	{ _("/Palette/Open ..."), -1, 0, 0, NULL, pressed_open_pal, 0, xpm_open_xpm },
+	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, pressed_save_pal, 0, xpm_save_xpm },
 	{ _("/Palette/Load Default"), -1, 0, 0, NULL, pressed_default_pal, 0 },
 	{ _("/Palette/sep1"), -4 },
 	{ _("/Palette/Mask All"), -1, 0, 0, NULL, pressed_mask, 255 },
@@ -3809,7 +4001,7 @@ static menu_item main_menu[] = {
 
 	{ _("/Effe_cts"), -2 -16 },
 	{ _("/Effects/tear"), -3 },
-	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", pressed_brcosa, 0 },
+	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", pressed_brcosa, 0, xpm_brcosa_xpm },
 	{ _("/Effects/Invert"), -1, 0, 0, "<control><shift>I", pressed_invert, 0 },
 	{ _("/Effects/Greyscale"), -1, 0, 0, "<control>G", pressed_greyscale, 0 },
 	{ _("/Effects/Greyscale (Gamma corrected)"), -1, 0, 0, "<control><shift>G", pressed_greyscale, 1 },
@@ -3832,9 +4024,9 @@ static menu_item main_menu[] = {
 
 	{ _("/Cha_nnels"), -2 -16 },
 	{ _("/Channels/tear"), -3 },
-	{ _("/Channels/New ..."), -1, 0, 0, NULL, pressed_channel_create, -1 },
-	{ _("/Channels/Load ..."), -1, 0, 0, NULL, pressed_channel_load, 0 },
-	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, pressed_channel_save, 0 },
+	{ _("/Channels/New ..."), -1, 0, 0, NULL, pressed_channel_create, -1, xpm_new_xpm },
+	{ _("/Channels/Load ..."), -1, 0, 0, NULL, pressed_channel_load, 0, xpm_open_xpm },
+	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, pressed_channel_save, 0, xpm_save_xpm },
 	{ _("/Channels/Delete ..."), -1, 0, NEED_CHAN, NULL, pressed_channel_delete, -1 },
 	{ _("/Channels/sep1"), -4 },
 	{ _("/Channels/Edit Image"), 1, MENU_CHAN0, 0, NULL, pressed_channel_edit, CHN_IMAGE },
@@ -3856,7 +4048,7 @@ static menu_item main_menu[] = {
 
 	{ _("/_Layers"), -2 -16 },
 	{ _("/Layers/tear"), -3 },
-	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", layer_press_save, 0 },
+	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", layer_press_save, 0, xpm_save_xpm },
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, layer_press_save_as, 0 },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, layer_press_save_composite, 0 },
 	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, layer_press_remove_all, 0 },
@@ -3899,15 +4091,6 @@ void main_init()
 	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
 
 	accel_group = gtk_accel_group_new ();
-	menubar1 = fill_menu(main_menu, accel_group);
-
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]), RGBA_mode);
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VWFOCUS]), vw_focus_on);
-
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_CENTER]),
-		canvas_image_centre);
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_SHOWGRID]),
-		mem_show_grid);
 
 	mem_grid_rgb[0] = inifile_get_gint32("gridR", 50 );
 	mem_grid_rgb[1] = inifile_get_gint32("gridG", 50 );
@@ -3929,16 +4112,24 @@ void main_init()
 	gtk_widget_show (vbox_main);
 	gtk_container_add (GTK_CONTAINER (main_window), vbox_main);
 
-	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
-	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
+// we need to realize the window because we use pixmaps for 
+// items on the toolbar & menus in the context of it
+	gtk_widget_realize( main_window );
+
+	menubar1 = fill_menu(main_menu, accel_group);
+
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]), RGBA_mode);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VWFOCUS]), vw_focus_on);
+
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_CENTER]),
+		canvas_image_centre);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_SHOWGRID]),
+		mem_show_grid);
 
 	pack(vbox_main, menubar1);
 
-
-// we need to realize the window because we use pixmaps for 
-// items on the toolbar in the context of it
-	gtk_widget_realize( main_window );
-
+	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
+	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
 	toolbar_init(vbox_main);
 
@@ -4149,8 +4340,9 @@ void setup_language()			// Change language
 
 	setlocale(LC_ALL, txt);
 #endif
-	/* !!! Slow or not, but NLS is *really* broken on GTK+1 without it - WJ */
+#if GTK_MAJOR_VERSION == 2
 	gtk_set_locale();	// GTK+1 hates this - it really slows things down
+#endif
 }
 #endif
 

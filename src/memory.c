@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -124,8 +124,8 @@ int mem_brcosa_allow[3];		// BRCOSA RGB
 /// PALETTE
 
 unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
-				// RGB screen memory holding current palette
-static int found[1024];		// Used by mem_cols_used() & mem_convert_indexed
+					// RGB screen memory holding current palette
+static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
 
 int mem_brush_list[81][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 5, 1 }, { TOOL_SPRAY, 7, 1 }, { TOOL_SPRAY, 9, 2 },
@@ -1903,9 +1903,10 @@ int mem_remove_unused_check()
 	for (i = 0; i < mem_cols; i++)
 		if (!mem_histogram[i]) found++;
 
-	if (!found) return 0;	// All palette colours are used on the canvas
-	// Leave at least one colour even if canvas is 0x0
-	return (mem_cols > found ? found : mem_cols - 1);
+	if (!found) return 0;		// All palette colours are used on the canvas
+	if (mem_cols - found < 2) return -1;	// Canvas is all one colour
+
+	return found;
 }
 
 int mem_remove_unused()
@@ -1913,9 +1914,8 @@ int mem_remove_unused()
 	unsigned char conv[256], *img;
 	int i, j, found = mem_remove_unused_check();
 
-	if (found <= 0) return (0);
+	if ( found <= 0 ) return found;
 
-	conv[0] = 0; // Ensure this works even with empty histogram
 	for (i = j = 0; i < 256; i++)	// Create conversion table
 	{
 		if (mem_histogram[i])
@@ -2035,21 +2035,10 @@ int mem_convert_rgb()			// Convert image to RGB
 	return 0;
 }
 
-// Convert RGB image to Indexed Palette - call after mem_cols_used
-int mem_convert_indexed(int img)
+int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after mem_cols_used
 {
 	unsigned char *old_image, *new_image;
 	int i, j, k, pix;
-
-	for (i = 0; i < 256; i++)
-	{
-		j = found[i];
-		mem_pal[i].red = INT_2_R(j);
-		mem_pal[i].green = INT_2_G(j);
-		mem_pal[i].blue = INT_2_B(j);
-	}
-
-	if (!img) return (0);
 
 	old_image = mem_undo_previous(CHN_IMAGE);
 	new_image = mem_img[CHN_IMAGE];
@@ -2059,14 +2048,21 @@ int mem_convert_indexed(int img)
 		pix = MEM_2_INT(old_image, 0);
 		for (k = 0; k < 256; k++)	// Find index of this RGB
 		{
-			if (found[k] == pix) break;
+			if (MEM_2_INT(found, k * 3) == pix) break;
 		}
-		if (k > 255) return (1);	// No index found - BAD ERROR!!
+		if (k > 255) return 1;		// No index found - BAD ERROR!!
 		*new_image++ = k;
 		old_image += 3;
 	}
 
-	return (0);
+	for (i = 0; i < 256; i++)
+	{
+		mem_pal[i].red = found[i * 3];
+		mem_pal[i].green = found[i * 3 + 1];
+		mem_pal[i].blue = found[i * 3 + 2];
+	}
+
+	return 0;
 }
 
 /* Max-Min quantization algorithm - good for preserving saturated colors,
@@ -5820,41 +5816,46 @@ int mem_cols_used(int max_count)			// Count colours used in main RGB image
 
 void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
 {
-	int i, j;
+	int i;
 
 	for (i = 0; i < 256; i++)
 	{
-		j = found[i];
-		userpal[0][i] = INT_2_R(j);
-		userpal[1][i] = INT_2_G(j);
-		userpal[2][i] = INT_2_B(j);
+		userpal[0][i] = found[i * 3];
+		userpal[1][i] = found[i * 3 + 1];
+		userpal[2][i] = found[i * 3 + 2];
 	}
 }
 
 int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			// Count colours used in RGB chunk
 {
-	int i, j = w * h * 3, k, res = 1, pix;
+	int i, j = w * h * 3, k, res, pix;
 
-	found[0] = MEM_2_INT(im, 0);
+	max_count *= 3;
+	found[0] = im[0];
+	found[1] = im[1];
+	found[2] = im[2];
 	if (prog) progress_init(_("Counting Unique RGB Pixels"), 0);
-	for (i = 3; (i < j) && (res < max_count); i += 3) // Skim all pixels
+	for (i = res = 3; (i < j) && (res < max_count); i += 3)	// Skim all pixels
 	{
 		pix = MEM_2_INT(im, i);
-		for (k = 0; k < res; k++)
+		for (k = 0; k < res; k += 3)
 		{
-			if (found[k] == pix) break;
+			if (MEM_2_INT(found, k) == pix) break;
 		}
 		if (k >= res)	// New colour so add to list
 		{
-			found[res++] = pix;
-			if (!prog || (res & 7)) continue;
+			found[res] = im[i];
+			found[res + 1] = im[i + 1];
+			found[res + 2] = im[i + 2];
+			res += 3;
+			if (!prog || (res & 15)) continue;
 			if (progress_update((float)res / max_count)) break;
 		}
 	}
 	if (prog) progress_end();
 
-	return (res);
+	return (res / 3);
 }
 
 

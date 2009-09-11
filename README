@@ -1,5 +1,5 @@
 --------------------------------------------------
-mtPaint 3.21 - Copyright (C) 2004-2008 The Authors
+mtPaint 3.20 - Copyright (C) 2004-2007 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
@@ -43,7 +43,7 @@ su -c "make uninstall"
 
 There are various configure options that may be useful for some people.  Use "./configure --help" to find out what options are available.  If you are compiling a binary for distribution to other peoples systems, the option 'asneeded' is particularly useful (if the gcc option -Wl,--as-needed is available, i.e. binutils >=2.17), as it only creates links to libraries which are absolutely necessary to mtPaint.  For example, without this option if you compile mtPaint against GTK+2.10 you will find it will not run on GTK+2.6 systems because Cairo doesn't exist on the older system.
 
-If you are compiling mtPaint on an older system without gtk-config, you may need to adjust the configure script so that the GTK+1 settings are done manually.  I have provided an example in the configure script to demonstrate.
+If your are compiling mtPaint on an older system without gtk-config, you may need to adjust the configure script so that the GTK+1 settings are done manually.  I have provided an example in the configure script to demonstrate.
 
 You can call mtpaint with the -v option and the program will start in viewer mode so there will be no palette, menu bar, etc.  You can restore these items by pressing the "Home" key.  After installation you can create a symlink to add a viewer command, e.g.
 
@@ -132,15 +132,13 @@ Translations
 Brazilian Portuguese - Paulo Trevizan
 Czech - Pavel Ruzicka
 French - Nicolas Velin, Pascal Billard, Sylvain Cresto
-Galician - Miguel Anxo Bouzada
 German - Oliver Frommel
 Japanese - Norihiro YONEDA
-Polish - Simek, LucaS
+Polish - Simek, Groszek150(LucaS)
 Portuguese - Israel G. Lugo, Tiago Silva
-Russian - Sergey Irupin, Dmitry Groshev
 Simplified Chinese - puppychinese(Cecc)
 Slovak - Jozef Riha
-Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon
+Spanish - Guadalinex Team (Junta de Andalucia), Antonio San
 Taiwanese Chinese - Wei-Lun Chao
 Turkish - Muhammet Kara, Tutku Dalmaz
 

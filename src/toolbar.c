@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -32,101 +32,8 @@
 #include "channels.h"
 #include "csel.h"
 #include "font.h"
+#include "icons.h"
 
-
-#include "graphics/xpm_paint.xpm"
-
-#include "graphics/xbm_square.xbm"
-#include "graphics/xbm_square_mask.xbm"
-
-#include "graphics/xbm_circle.xbm"
-#include "graphics/xbm_circle_mask.xbm"
-
-#include "graphics/xbm_horizontal.xbm"
-#include "graphics/xbm_horizontal_mask.xbm"
-
-#include "graphics/xbm_vertical.xbm"
-#include "graphics/xbm_vertical_mask.xbm"
-
-#include "graphics/xbm_slash.xbm"
-#include "graphics/xbm_slash_mask.xbm"
-
-#include "graphics/xbm_backslash.xbm"
-#include "graphics/xbm_backslash_mask.xbm"
-
-#include "graphics/xbm_spray.xbm"
-#include "graphics/xbm_spray_mask.xbm"
-
-#include "graphics/xpm_shuffle.xpm"
-#include "graphics/xbm_shuffle.xbm"
-#include "graphics/xbm_shuffle_mask.xbm"
-
-#include "graphics/xpm_flood.xpm"
-#include "graphics/xbm_flood.xbm"
-#include "graphics/xbm_flood_mask.xbm"
-
-#include "graphics/xpm_line.xpm"
-#include "graphics/xbm_line.xbm"
-#include "graphics/xbm_line_mask.xbm"
-
-#include "graphics/xpm_select.xpm"
-#include "graphics/xbm_select.xbm"
-#include "graphics/xbm_select_mask.xbm"
-
-#include "graphics/xpm_smudge.xpm"
-#include "graphics/xbm_smudge.xbm"
-#include "graphics/xbm_smudge_mask.xbm"
-
-#include "graphics/xpm_polygon.xpm"
-#include "graphics/xbm_polygon.xbm"
-#include "graphics/xbm_polygon_mask.xbm"
-
-#include "graphics/xpm_clone.xpm"
-#include "graphics/xbm_clone.xbm"
-#include "graphics/xbm_clone_mask.xbm"
-
-#include "graphics/xbm_move.xbm"
-#include "graphics/xbm_move_mask.xbm"
-
-#include "graphics/xpm_brcosa.xpm"
-#include "graphics/xpm_flip_vs.xpm"
-#include "graphics/xpm_flip_hs.xpm"
-#include "graphics/xpm_rotate_cs.xpm"
-#include "graphics/xpm_rotate_as.xpm"
-#include "graphics/xpm_text.xpm"
-#include "graphics/xpm_lasso.xpm"
-
-#include "graphics/xpm_ellipse.xpm"
-#include "graphics/xpm_ellipse2.xpm"
-#include "graphics/xpm_rect1.xpm"
-#include "graphics/xpm_rect2.xpm"
-#include "graphics/xpm_pan.xpm"
-
-#include "graphics/xpm_new.xpm"
-#include "graphics/xpm_open.xpm"
-#include "graphics/xpm_save.xpm"
-#include "graphics/xpm_cut.xpm"
-#include "graphics/xpm_copy.xpm"
-#include "graphics/xpm_paste.xpm"
-#include "graphics/xpm_undo.xpm"
-#include "graphics/xpm_redo.xpm"
-
-#include "graphics/xpm_up.xpm"
-#include "graphics/xpm_down.xpm"
-#include "graphics/xpm_centre.xpm"
-#include "graphics/xpm_close.xpm"
-
-#include "graphics/xpm_mode_cont.xpm"
-#include "graphics/xpm_mode_opac.xpm"
-#include "graphics/xpm_mode_tint.xpm"
-#include "graphics/xpm_mode_tint2.xpm"
-#include "graphics/xpm_mode_csel.xpm"
-#include "graphics/xpm_mode_blend.xpm"
-#include "graphics/xpm_mode_mask.xpm"
-
-#include "graphics/xpm_grad_place.xpm"
-#include "graphics/xbm_grad.xbm"
-#include "graphics/xbm_grad_mask.xbm"
 
 
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
@@ -172,7 +79,15 @@ static toolbar_item layer_bar[] = {
 	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
 	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
 	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ 0, 0, 0, 0, 0, NULL, NULL }},
+	fpick_bar[] = {
+	{ FPICK_ICON_UP,	-1, 0, 0, 0, _("Up"), xpm_up_xpm },
+	{ FPICK_ICON_HOME,	-1, 0, 0, 0, _("Home"), xpm_home_xpm },
+	{ FPICK_ICON_DIR,	-1, 0, 0, 0, _("Create New Directory"), xpm_newdir_xpm },
+	{ FPICK_ICON_HIDDEN,	 0, 0, 0, 0, _("Show Hidden Files"), xpm_hidden_xpm },
+	{ FPICK_ICON_CASE,	 0, 0, 0, 0, _("Case Insensitive Sort"), xpm_case_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }}
+	;
 
 #undef _
 #define _(X) __(X)
@@ -196,6 +111,28 @@ GtkWidget *layer_toolbar(GtkWidget **wlist)
 
 	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
 		wlist[i] = layer_bar[i].widget;
+
+	return toolbar;
+}
+
+GtkWidget *fpick_toolbar(GtkWidget **wlist)
+{		
+	int i;
+	GtkWidget *toolbar;
+
+#if GTK_MAJOR_VERSION == 1
+	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#endif
+#if GTK_MAJOR_VERSION == 2
+	toolbar = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
+#endif
+	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar,
+		GTK_SIGNAL_FUNC(fpick_iconbar_click), 0, NULL, 0);
+	gtk_widget_show(toolbar);
+
+	for (i = 0; i < FPICK_ICON_TOT; i++)
+		wlist[i] = fpick_bar[i].widget;
 
 	return toolbar;
 }
@@ -957,11 +894,9 @@ void toolbar_update_settings()
 static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
-	int x2 = event->area.x + event->area.width;
 	int y2 = event->area.y + event->area.height;
 
-	/* With theme engines lurking out there, weirdest things can happen */
-	if (y2 > PALETTE_HEIGHT)
+	if (y2 > PALETTE_HEIGHT) /* Better safe than sorry */
 	{
 		gdk_draw_rectangle(widget->window, widget->style->black_gc,
 			TRUE, event->area.x, PALETTE_HEIGHT,
@@ -969,18 +904,10 @@ static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 		if (event->area.y >= PALETTE_HEIGHT) return (TRUE);
 		y2 = PALETTE_HEIGHT;
 	}
-	if (x2 > PALETTE_WIDTH)
-	{
-		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, PALETTE_WIDTH, event->area.y,
-			x2 - PALETTE_WIDTH, y2);
-		if (event->area.x >= PALETTE_WIDTH) return (TRUE);
-		x2 = PALETTE_WIDTH;
-	}
 
 	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
 		event->area.x, event->area.y,
-		x2 - event->area.x, y2 - event->area.y,
+		event->area.width, y2 - event->area.y,
 		GDK_RGB_DITHER_NONE, mem_pals + event->area.y * PALETTE_W3 +
 		event->area.x * 3, PALETTE_W3);
 

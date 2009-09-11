@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -230,6 +230,7 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 
 	gtk_window_set_transient_for( GTK_WINDOW(alert), GTK_WINDOW(main_window) );
 	gtk_widget_show(alert);
+	gdk_window_raise(alert->window);
 	alert_result = 0;
 	gtk_window_add_accel_group(GTK_WINDOW(alert), ag);
 
@@ -739,13 +740,13 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
-	GtkWidget *fs;
+	fpicker *fp;
 
-	fs = gtk_file_selection_new((char *)gtk_object_get_user_data(
+	fp = fpick_create((char *)gtk_object_get_user_data(
 		GTK_OBJECT(widget)));
-	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
+	gtk_object_set_data(GTK_OBJECT(fp->window), FS_ENTRY_KEY,
 		BOX_CHILD_0(widget->parent));
-	fs_setup(fs, (int)data);
+	fs_setup(fp, (int)data);
 }
 
 GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
@@ -900,75 +901,6 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
 }
 
-// Ensure viewport frames are always drawn as they should
-
-#if GTK_MAJOR_VERSION == 1
-
-/* GTK1 is not as flexible as GTK2, so we need small "theme engine" of our own
- * to force viewport border to 1 pixel wide without messing up things - WJ */
-static void viewport_shadow(GtkStyle *style, GdkWindow *window,
-	GtkStateType state_type, GtkShadowType shadow_type, GdkRectangle *area,
-	GtkWidget *widget, gchar *detail, gint x, gint y, gint w, gint h)
-{
-	GdkGC *light, *dark;
-	int x1, y1;
-
-	if (!style || !window) return;
-	if ((w == -1) || (h == -1)) gdk_window_get_size(window,
-		w == -1 ? &w : NULL, h == -1 ? &h : NULL);
-
-	/* State, shadow, and widget type are hardcoded */
-	light = style->light_gc[GTK_STATE_NORMAL];
-	dark = style->dark_gc[GTK_STATE_NORMAL];
-	gdk_gc_set_clip_rectangle(light, area);
-	gdk_gc_set_clip_rectangle(dark, area);
-
-	x1 = x + w - 1; y1 = y + h - 1;
-	gdk_draw_line(window, light, x, y1, x1, y1);
-	gdk_draw_line(window, light, x1, y, x1, y1);
-	gdk_draw_line(window, dark, x, y, x1, y);
-	gdk_draw_line(window, dark, x, y, x, y1);
-
-	gdk_gc_set_clip_rectangle(light, NULL);
-	gdk_gc_set_clip_rectangle(dark, NULL);
-}
-
-void viewport_style(GtkWidget *widget)
-{
-	static GtkStyle *defstyle;
-	GtkStyleClass *class;
-
-	if (!defstyle)
-	{
-		defstyle = gtk_style_new();
-		class = g_malloc(sizeof(GtkStyleClass));
-		memcpy(class, defstyle->klass, sizeof(GtkStyleClass));
-		defstyle->klass = class;
-		class->xthickness = class->ythickness = 1;
-		class->draw_shadow = viewport_shadow;
-	}
-	gtk_widget_set_style(widget, defstyle);
-}
-
-#else /* #if GTK_MAJOR_VERSION == 2 */
-
-void viewport_style(GtkWidget *widget)
-{
-	static GtkStyle *defstyle;
-	GdkColor *col;
-
-	if (!defstyle)
-	{
-		defstyle = gtk_style_new();
-		col = &defstyle->bg[GTK_STATE_NORMAL];
-		col->red = col->green = col->blue = 0xD6D6;
-		defstyle->xthickness = defstyle->ythickness = 1;
-	}
-	gtk_widget_set_style(widget, defstyle);
-}
-
-#endif
-
 // Eliminate flicker when scrolling
 
 /* This code serves a very important role - it disables background clear,
@@ -986,8 +918,6 @@ static void realize_trick(GtkWidget *widget, gpointer user_data)
 void fix_scroll(GtkWidget *scroll)
 {
 	scroll = GTK_BIN(scroll)->child;
-	/* Stop theme engines from messing up viewport's frame */
-	viewport_style(scroll);
 	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
 		GTK_SIGNAL_FUNC(realize_trick), NULL);
 #if GTK_MAJOR_VERSION == 2
@@ -1330,13 +1260,13 @@ int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult)
 	switch (event->keyval)
 	{
 		case GDK_KP_Left: case GDK_Left:
-			*dx = -mult; break;
+			*dx = -1; break;
 		case GDK_KP_Right: case GDK_Right:
-			*dx = mult; break;
+			*dx = 1; break;
 		case GDK_KP_Up: case GDK_Up:
-			*dy = -mult; break;
+			*dy = -1; break;
 		case GDK_KP_Down: case GDK_Down:
-			*dy = mult; break;
+			*dy = 1; break;
 	}
 	return (*dx || *dy);
 }
@@ -1364,37 +1294,15 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 {
 	GdkRectangle pdest, cdest;
 	fpixmap_data *d;
-	int draw_pmap;
 
 	if (!GTK_WIDGET_DRAWABLE(widget)) return;
 	if (!(d = wj_fpixmap_data(widget))) return;
-	draw_pmap = d->pixmap && gdk_rectangle_intersect(&d->pm, area, &pdest);
 
 #if GTK_MAJOR_VERSION == 1
 	/* Preparation */
 	gdk_window_set_back_pixmap(widget->window, NULL, TRUE);
-	if (draw_pmap) // To prevent blinking, clear just the outside part
-	{
-		cdest = *area;
-		if ((cdest.height = pdest.y - cdest.y))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest.y = pdest.y + pdest.height;
-		if ((cdest.height = area->y + area->height - cdest.y))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest = pdest;
-		cdest.x = area->x;
-		if ((cdest.width = pdest.x - cdest.x))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest.x = pdest.x + pdest.width;
-		if ((cdest.width = area->x + area->width - cdest.x))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-	}
-	else gdk_window_clear_area(widget->window,
-		area->x, area->y, area->width, area->height);
+	gdk_window_clear_area(widget->window, area->x, area->y,
+		area->width, area->height);
 	gdk_gc_set_clip_rectangle(widget->style->black_gc, area);
 #endif
 
@@ -1402,7 +1310,7 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 	if (d->pixmap) gdk_draw_rectangle(widget->window, widget->style->black_gc,
 		FALSE, d->pm.x - 1, d->pm.y - 1, d->pm.width + 1, d->pm.height + 1);
 
-	while (draw_pmap)
+	while (d->pixmap && gdk_rectangle_intersect(&d->pm, area, &pdest))
 	{
 		/* Contents pixmap */
 		gdk_draw_pixmap(widget->window, widget->style->black_gc,
@@ -1583,7 +1491,8 @@ void wj_fpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
 	if (!d->pixmap) return;
 	gdk_gc_get_values(widget->style->black_gc, &sv);
 	gdk_rgb_gc_set_foreground(widget->style->black_gc, rgb);
-	gdk_draw_rectangle(d->pixmap, widget->style->black_gc, TRUE, x, y, w, h);
+	gdk_draw_rectangle(widget->window, widget->style->black_gc,
+		TRUE, x + d->pm.x, y + d->pm.y, w, h);
 	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
 	gtk_widget_queue_draw_area(widget, x + d->pm.x, y + d->pm.y, w, h);
 }
@@ -1653,9 +1562,9 @@ int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 	if (!(d = wj_fpixmap_data(widget))) return (FALSE);
 	if (!d->pixmap) return (FALSE);
 	x -= d->pm.x; y -= d->pm.y;
-	*xr = x; *yr = y;
 	if ((x < 0) || (x >= d->pm.width) || (y < 0) || (y >= d->pm.height))
 		return (FALSE);
+	*xr = x; *yr = y;
 	return (TRUE);
 }
 

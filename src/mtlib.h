@@ -33,3 +33,15 @@ MT_Coor MT_uni_vec(MT_Coor AA, MT_Coor BB);	// Return unit vector between two co
 MT_Coor MT_uni_vec2(MT_Coor AA);		// Return unit vector
 MT_Coor MT_palin(double position, double ratio, MT_Coor p1, MT_Coor p2, MT_Coor p3, MT_Coor p4, MT_Coor lenz);
 						// Parabolic Linear Interpolation from point 2 to point 3 at position (0-1) and ratio (0=flat, 0.25=curvy, 1=very bendy)
+
+int str2thousands(	char *dest,		// Output buffer
+			char *src,		// Input string (can be same as destination)
+			int  dest_size,		// Size of output buffer
+			char separator,		// Separator character to use, typically ','
+			char minus,		// Minus character, typically '-'
+			char dpoint,		// Decimal point character, typically '.'
+			int  sep_num,		// Numbers to contain between separators, typically 3
+			int  right_justify	// Should output string be right justified?
+		);
+
+void str2lower(char *str, int len);		// Convert string to lowercase
