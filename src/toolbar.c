@@ -126,7 +126,7 @@
 #include "graphics/xpm_mode_mask.xpm"
 
 
-GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS], *icon_buttons2[TOTAL_ICONS_MAIN];
+GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
 gboolean toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX]			// Used for showing/hiding
@@ -415,13 +415,13 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		add_a_toggle(_("RGB Cube"), box, flood_cube);
 		add_a_toggle(_("By image channel"), box, flood_img);
 		add_a_toggle(_("Gradient-driven"), box, flood_slide);
-		filter_window(_("Fill settings"), box, set_flood, NULL, GTK_WIN_POS_MOUSE);
+		filter_window(_("Fill settings"), box, set_flood, NULL, TRUE);
 		break;
 	case (TTB_0 + TTB_SMUDGE): /* Smudge opacity mode */
 		box = gtk_vbox_new(FALSE, 5);
 		gtk_widget_show(box);
 		add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
-		filter_window(_("Smudge settings"), box, set_smudge, NULL, GTK_WIN_POS_MOUSE);
+		filter_window(_("Smudge settings"), box, set_smudge, NULL, TRUE);
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
@@ -466,22 +466,102 @@ static void toolbar_settings_exit()
 	toolbar_exit();
 }
 
+typedef struct
+{
+	int ID, radio, sep, rclick, actmap;
+	char *tooltip, **xpm;
+	GtkWidget *widget;
+} toolbar_item;
+
+static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
+	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase)
+{
+	GtkWidget *iconw, *radio[32];
+	GdkPixmap *icon, *mask;
+
+	memset(radio, 0, sizeof(radio));
+	for (; items->xpm; items++)
+	{
+		icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
+			NULL, items->xpm);
+		iconw = gtk_pixmap_new(icon, mask);
+		gdk_pixmap_unref(icon);
+		gdk_pixmap_unref(mask);
+		items->widget = gtk_toolbar_append_element(bar,
+			items->radio < 0 ? GTK_TOOLBAR_CHILD_BUTTON :
+			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
+			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
+			items->radio > 0 ? radio[items->radio] : NULL,
+			"None", items->tooltip, "Private", iconw, lclick,
+			(gpointer)(items->ID + lbase));
+		if (items->radio > 0) radio[items->radio] = items->widget;
+		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
+			"button_press_event", rclick, (gpointer)(items->ID + rbase));
+		if (items->sep) gtk_toolbar_append_space(bar);
+	}
+}
+
+#define NEED_UNDO  0x0001
+#define NEED_REDO  0x0002
+#define NEED_CROP  0x0004
+#define NEED_MARQ  0x0008
+#define NEED_SEL   0x0010
+#define NEED_CLIP  0x0020
+#define NEED_HELP  0x0040
+#define NEED_24    0x0080
+#define NEED_IDX   0x0100
+#define NEED_CLINE 0x0200
+#define NEED_LAYER 0x0400
+#define NEED_LASSO 0x0800
+#define NEED_PREFS 0x1000
+#define NEED_FRAME 0x2000
+#define NEED_ALPHA 0x4000
+#define NEED_CHAN  0x8000
+#define NEED_SEL2  (NEED_SEL | NEED_LASSO)
+
+static GtkWidget **need_lists[] = {
+	menu_undo, menu_redo, menu_crop, menu_need_marquee,
+	menu_need_selection, menu_need_clipboard, menu_help, menu_only_24,
+	menu_only_indexed, menu_cline, menu_layer, menu_lasso, menu_prefs,
+	menu_frames, menu_alphablend, menu_chan_del };
+
+static void tool_dis_add(toolbar_item *items)
+{
+	int i, j;
+
+	for (; items->xpm; items++)
+	{
+		if (!items->actmap) continue;
+		i = items->actmap;
+		while (i)
+		{
+			j = i; i &= i - 1; j = (j ^ i) - 1;
+			j = (j & 0x55555555) + ((j >> 1) & 0x55555555);
+			j = (j & 0x33333333) + ((j >> 2) & 0x33333333);
+			j = (j & 0x0F0F0F0F) + ((j >> 4) & 0x0F0F0F0F);
+			j = (j & 0x00FF00FF) + ((j >> 8) & 0x00FF00FF);
+			j = (j & 0xFFFF) + (j >> 16);
+			men_dis_add(items->widget, need_lists[j]);
+		}
+	}
+}
 
 static void toolbar_settings_init()
 {
 	int i, vals[] = {tool_size, tool_flow, tool_opacity};
-	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") },
-	**icon_list_settings[TOTAL_ICONS_SETTINGS] = {
-		xpm_mode_cont_xpm, xpm_mode_opac_xpm, xpm_mode_tint_xpm, xpm_mode_tint2_xpm,
-		xpm_mode_csel_xpm, xpm_mode_mask_xpm
-		},
-	*hint_text_settings[TOTAL_ICONS_SETTINGS] = {
-		_("Continuous Mode"),  _("Opacity Mode"), _("Tint Mode"), _("Tint +-"),
-		_("Colour-Selective Mode"), _("Disable All Masks")
-		};
+	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") };
 
-	GtkWidget *iconw, *label, *vbox, *table, *toolbar_settings, *but, *labels[3];
-	GdkPixmap *icon, *mask;
+	toolbar_item settings_bar[] = {
+		{ SETB_CONT, 0, 0, 0, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
+		{ SETB_OPAC, 0, 0, 0, 0, _("Opacity Mode"), xpm_mode_opac_xpm },
+		{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
+		{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },
+		{ SETB_CSEL, 0, 0, 1, 0, _("Colour-Selective Mode"), xpm_mode_csel_xpm },
+		{ SETB_MASK, 0, 0, 0, 0, _("Disable All Masks"), xpm_mode_mask_xpm },
+		{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+	GtkWidget *label, *vbox, *table, *toolbar_settings, *labels[3];
+
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
 	{
@@ -499,29 +579,15 @@ static void toolbar_settings_init()
 	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS );
 #endif
 
-	for (i=0; i<TOTAL_ICONS_SETTINGS; i++)
+	fill_toolbar(GTK_TOOLBAR(toolbar_settings), settings_bar,
+		GTK_SIGNAL_FUNC(toolbar_mode_change), 0,
+		GTK_SIGNAL_FUNC(toolbar_rclick), 0);
+
+	for (i = 0; i < TOTAL_ICONS_SETTINGS; i++)
 	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list_settings[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		but = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar_settings),
-			GTK_TOOLBAR_CHILD_TOGGLEBUTTON, NULL, "None", hint_text_settings[i],
-			"Private", iconw,
-			GTK_SIGNAL_FUNC(toolbar_mode_change),
-			(gpointer) i);
-
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(but), !!*(vars_settings[i]));
-
-		if (i == SETB_CSEL)
-		{
-			gtk_signal_connect(GTK_OBJECT(but), "button_press_event",
-				GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)i);
-		}
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_bar[i].widget),
+			!!*(vars_settings[i]));
 	}
-
 
 	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window( GTK_WINDOW_TOPLEVEL, _("Settings Toolbar"),
 			GTK_WIN_POS_NONE, FALSE );
@@ -582,37 +648,45 @@ void toolbar_init(GtkWidget *vbox_main)
 	char txt[32];
 	int i;
 
-	GtkToolbarChildType child_type;
 	GdkPixmap *icon, *mask;
-	GtkWidget *iconw, *toolbar_main, *toolbar_tools, *previous = NULL, *hbox;
+	GtkWidget *toolbar_main, *toolbar_tools, *hbox;
 	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 
-	char **icon_list_main[TOTAL_ICONS_MAIN] = {
-		xpm_new_xpm, xpm_open_xpm, xpm_save_xpm, xpm_cut_xpm,
-		xpm_copy_xpm, xpm_paste_xpm, xpm_undo_xpm, xpm_redo_xpm,
-		xpm_brcosa_xpm, xpm_pan_xpm
-		},
-	*hint_text_main[TOTAL_ICONS_MAIN] = {
-		_("New Image"), _("Load Image File"), _("Save Image File"), _("Cut"),
-		_("Copy"), _("Paste"), _("Undo"), _("Redo"),
-		_("Transform Colour"), _("Pan Window")
-		 },
-	**icon_list_tools[TOTAL_ICONS_TOOLS] = {
-		xpm_paint_xpm, xpm_shuffle_xpm, xpm_flood_xpm,
-		xpm_line_xpm, xpm_smudge_xpm, xpm_clone_xpm, xpm_select_xpm,
-		xpm_polygon_xpm, xpm_lasso_xpm, xpm_text_xpm,
-		xpm_ellipse2_xpm, xpm_ellipse_xpm, xpm_rect1_xpm, xpm_rect2_xpm,
-		xpm_flip_vs_xpm, xpm_flip_hs_xpm, xpm_rotate_cs_xpm, xpm_rotate_as_xpm
-		},
-	*hint_text_tools[TOTAL_ICONS_TOOLS] = {
-		_("Paint"), _("Shuffle"), _("Flood Fill"),
-		_("Straight Line"), _("Smudge"), _("Clone"), _("Make Selection"),
-		_("Polygon Selection"), _("Lasso Selection"),_("Paste Text"),
-		_("Ellipse Outline"), _("Filled Ellipse"), _("Outline Selection"), _("Fill Selection"),
-		_("Flip Selection Vertically"), _("Flip Selection Horizontally"),
-		_("Rotate Selection Clockwise"), _("Rotate Selection Anti-Clockwise")
-		},
-	*xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
+	toolbar_item main_bar[] = {
+		{ MTB_NEW, -1, 0, 0, 0, _("New Image"), xpm_new_xpm },
+		{ MTB_OPEN, -1, 0, 0, 0, _("Load Image File"), xpm_open_xpm },
+		{ MTB_SAVE, -1, 1, 0, 0, _("Save Image File"), xpm_save_xpm },
+		{ MTB_CUT, -1, 0, 0, NEED_SEL2, _("Cut"), xpm_cut_xpm },
+		{ MTB_COPY, -1, 0, 0, NEED_SEL2, _("Copy"), xpm_copy_xpm },
+		{ MTB_PASTE, -1, 1, 0, NEED_CLIP, _("Paste"), xpm_paste_xpm },
+		{ MTB_UNDO, -1, 0, 0, NEED_UNDO, _("Undo"), xpm_undo_xpm },
+		{ MTB_REDO, -1, 1, 0, NEED_REDO, _("Redo"), xpm_redo_xpm },
+		{ MTB_BRCOSA, -1, 0, 0, 0, _("Transform Colour"), xpm_brcosa_xpm },
+		{ MTB_PAN, -1, 0, 0, 0, _("Pan Window"), xpm_pan_xpm },
+		{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+	toolbar_item tools_bar[] = {
+		{ TTB_PAINT, 1, 0, 0, 0, _("Paint"), xpm_paint_xpm },
+		{ TTB_SHUFFLE, 1, 0, 0, 0, _("Shuffle"), xpm_shuffle_xpm },
+		{ TTB_FLOOD, 1, 0, 1, 0, _("Flood Fill"), xpm_flood_xpm },
+		{ TTB_LINE, 1, 0, 0, 0, _("Straight Line"), xpm_line_xpm },
+		{ TTB_SMUDGE, 1, 0, 1, NEED_24, _("Smudge"), xpm_smudge_xpm },
+		{ TTB_CLONE, 1, 0, 0, 0, _("Clone"), xpm_clone_xpm },
+		{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
+		{ TTB_POLY, 1, 1, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
+		{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
+		{ TTB_TEXT, -1, 1, 0, 0, _("Paste Text"), xpm_text_xpm },
+		{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
+		{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },
+		{ TTB_OUTLINE, -1, 0, 0, NEED_SEL2, _("Outline Selection"), xpm_rect1_xpm },
+		{ TTB_FILL, -1, 1, 0, NEED_SEL2, _("Fill Selection"), xpm_rect2_xpm },
+		{ TTB_SELFV, -1, 0, 0, NEED_CLIP, _("Flip Selection Vertically"), xpm_flip_vs_xpm },
+		{ TTB_SELFH, -1, 0, 0, NEED_CLIP, _("Flip Selection Horizontally"), xpm_flip_hs_xpm },
+		{ TTB_SELRCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Clockwise"), xpm_rotate_cs_xpm },
+		{ TTB_SELRCCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Anti-Clockwise"), xpm_rotate_as_xpm },
+		{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+	char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
 		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
 		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits
@@ -686,81 +760,18 @@ void toolbar_init(GtkWidget *vbox_main)
 	gdk_pixmap_unref( icon );
 	gdk_pixmap_unref( mask );
 
-	previous = NULL;
-	for (i=0; i<TOTAL_ICONS_TOOLS; i++)
+	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar,
+		GTK_SIGNAL_FUNC(toolbar_icon_event), 0,
+		GTK_SIGNAL_FUNC(toolbar_rclick), TTB_0);
+	tool_dis_add(tools_bar);
+	for (i = 0; tools_bar[i].xpm; i++)
 	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list_tools[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		if (i > TTB_POLY)
-		{
-			child_type = GTK_TOOLBAR_CHILD_BUTTON;
-			previous = NULL;
-		}
-		else
-		{
-			child_type = GTK_TOOLBAR_CHILD_RADIOBUTTON;
-			previous = i ? icon_buttons[i - 1] : NULL;
-		}
-
-		icon_buttons[i] = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar_tools),
-			child_type, previous, "None", hint_text_tools[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event), (gpointer) i);
-		if ((i == TTB_FLOOD) || (i == TTB_SMUDGE))
-			gtk_signal_connect(GTK_OBJECT(icon_buttons[i]),
-				"button_press_event", GTK_SIGNAL_FUNC(toolbar_rclick),
-				(gpointer)(i + TTB_0));
-
+		icon_buttons[tools_bar[i].ID] = tools_bar[i].widget;
 	}
 
-
-	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_SELFV);
-	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_ELLIPSE);
-	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_LASSO);
-
-	men_dis_add(icon_buttons[TTB_SMUDGE], menu_only_24);
-	men_dis_add(icon_buttons[TTB_LASSO], menu_lasso);
-
-	men_dis_add(icon_buttons[TTB_ELLIPSE], menu_need_selection);
-	men_dis_add(icon_buttons[TTB_FELLIPSE], menu_need_selection);
-
-	men_dis_add(icon_buttons[TTB_OUTLINE], menu_need_selection);
-	men_dis_add(icon_buttons[TTB_FILL], menu_need_selection);
-	men_dis_add(icon_buttons[TTB_OUTLINE], menu_lasso);
-	men_dis_add(icon_buttons[TTB_FILL], menu_lasso);
-
-	men_dis_add(icon_buttons[TTB_SELFV], menu_need_clipboard );	// Flip sel V
-	men_dis_add(icon_buttons[TTB_SELFH], menu_need_clipboard );	// Flip sel H
-	men_dis_add(icon_buttons[TTB_SELRCW], menu_need_clipboard );	// Rot sel clock
-	men_dis_add(icon_buttons[TTB_SELRCCW], menu_need_clipboard );	// Rot sel anti
-
-
-	for (i=0; i<TOTAL_ICONS_MAIN; i++)
-	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list_main[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		icon_buttons2[i] = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar_main),
-			GTK_TOOLBAR_CHILD_BUTTON, NULL, "None", hint_text_main[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event2), (gpointer) i);
-	}
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_main), 8 );
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_main), 6 );
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_main), 3 );
-
-	men_dis_add( icon_buttons2[3], menu_need_selection );	// Cut
-	men_dis_add( icon_buttons2[3], menu_lasso );		// Cut
-	men_dis_add( icon_buttons2[4], menu_need_selection );	// Copy
-	men_dis_add( icon_buttons2[4], menu_lasso );		// Copy
-	men_dis_add( icon_buttons2[5], menu_need_clipboard );	// Paste
-	men_dis_add( icon_buttons2[6], menu_undo );		// Undo
-	men_dis_add( icon_buttons2[7], menu_redo );		// Undo
+	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
+		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
+	tool_dis_add(main_bar);
 
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
 	gtk_widget_show ( toolbar_main );

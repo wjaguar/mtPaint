@@ -539,10 +539,12 @@ void run_filter(GtkButton *button, gpointer user_data)
 	update_all_views();
 }
 
-void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, GtkWindowPosition pos)
+void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool)
 {
 	GtkWidget *hbox7, *button_cancel, *button_apply, *vbox6;
 	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWindowPosition pos = istool && !inifile_get_gboolean("centerSettings", TRUE) ?
+		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
 	filter_cont = content;
 	filter_func = filt;
@@ -601,7 +603,7 @@ int do_bacteria(GtkWidget *spin, gpointer fdata)
 void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
 {
 	GtkWidget *spin = add_a_spin(10, 1, 100);
-	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL, GTK_WIN_POS_CENTER);
+	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL, FALSE);
 }
 
 
@@ -1377,7 +1379,8 @@ void sisca_init( char *title )
 	/* RGB rescale */
 	else if (mem_img_bpp == 3)
 	{
-		sisca_gc = add_a_toggle(_("Gamma corrected"), sisca_vbox, FALSE);
+		sisca_gc = add_a_toggle(_("Gamma corrected"), sisca_vbox,
+			inifile_get_gboolean("defaultGamma", FALSE));
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 	}
 
@@ -2229,7 +2232,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
 	dither_scan = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_serpent));
 	gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
-	efrac = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
+	efrac = 0.01 * gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
 	dither_fract[dither_sel ? 1 : 0] = efrac;
 
 	gtk_widget_destroy(quantize_window);
@@ -2340,10 +2343,10 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 	if ((dither_sel == 0) ^ ((int)user_data == 0))
 	{
 		gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
-		dither_fract[dither_sel ? 1 : 0] =
+		dither_fract[dither_sel ? 1 : 0] = 0.01 *
 			gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin),
-			(int)user_data ? dither_fract[1] : dither_fract[0]);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), 100.0 *
+			((int)user_data ? dither_fract[1] : dither_fract[0]));
 	}
 	dither_sel = (int)user_data;
 }
@@ -2466,13 +2469,12 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_widget_show(hbox);
 	gtk_box_pack_start(GTK_BOX(page1), hbox, FALSE, FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	label = gtk_label_new(_("Error propagation level"));
+	label = gtk_label_new(_("Error propagation, %"));
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
-	dither_spin = add_a_spin(1, 0, 1);
+	dither_spin = add_a_spin(100, 0, 100);
 	gtk_box_pack_start(GTK_BOX(hbox), dither_spin, TRUE, TRUE, 0);
-	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(dither_spin), 2);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), dither_sel ?
-		dither_fract[1] : dither_fract[0]);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), (dither_sel ?
+		dither_fract[1] : dither_fract[0]) * 100.0);
 
 	frame = gtk_frame_new(_("Selective error propagation"));
 	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);

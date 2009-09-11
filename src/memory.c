@@ -3049,7 +3049,8 @@ int mem_sel_rot( int dir )					// Rotate clipboard 90 degrees
 	return 0;
 }
 
-int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (degrees)
+// Rotate canvas by any angle (degrees)
+int mem_rotate_free(double angle, int type, int gcor)
 {
 	chanlist old_img;
 	unsigned char *src, *dest, *alpha, A_rgb[3], fillv;
@@ -3107,8 +3108,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = nx * s1 + x0y;
-					oy = nx * c1 + y0y;
+					ox = rint(nx * s1 + x0y);
+					oy = rint(nx * c1 + y0y);
 					src = A_rgb;
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
@@ -3127,8 +3128,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[cc] + ny * nw;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = nx * s1 + x0y;
-					oy = nx * c1 + y0y;
+					ox = rint(nx * s1 + x0y);
+					oy = rint(nx * c1 + y0y);
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
 						*dest++ = old_img[cc][oy * ow + ox];
@@ -3191,15 +3192,36 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 							k4 = aa4 * aa;
 						}
 					}
-					rr = pix1[0] * k1 + pix2[0] * k2 +
-						pix3[0] * k3 + pix4[0] * k4;
-					gg = pix1[1] * k1 + pix2[1] * k2 +
-						pix3[1] * k3 + pix4[1] * k4;
-					bb = pix1[2] * k1 + pix2[2] * k2 +
-						pix3[2] * k3 + pix4[2] * k4;
-					*dest++ = rint(rr);
-					*dest++ = rint(gg);
-					*dest++ = rint(bb);
+					if (gcor) /* Gamma-correct */
+					{
+						rr = gamma256[pix1[0]] * k1 +
+							gamma256[pix2[0]] * k2 +
+							gamma256[pix3[0]] * k3 +
+							gamma256[pix4[0]] * k4;
+						gg = gamma256[pix1[1]] * k1 +
+							gamma256[pix2[1]] * k2 +
+							gamma256[pix3[1]] * k3 +
+							gamma256[pix4[1]] * k4;
+						bb = gamma256[pix1[2]] * k1 +
+							gamma256[pix2[2]] * k2 +
+							gamma256[pix3[2]] * k3 +
+							gamma256[pix4[2]] * k4;
+						*dest++ = UNGAMMA256(rr);
+						*dest++ = UNGAMMA256(gg);
+						*dest++ = UNGAMMA256(bb);
+					}
+					else /* Leave as is */
+					{
+						rr = pix1[0] * k1 + pix2[0] * k2 +
+							pix3[0] * k3 + pix4[0] * k4;
+						gg = pix1[1] * k1 + pix2[1] * k2 +
+							pix3[1] * k3 + pix4[1] * k4;
+						bb = pix1[2] * k1 + pix2[2] * k2 +
+							pix3[2] * k3 + pix4[2] * k4;
+						*dest++ = rint(rr);
+						*dest++ = rint(gg);
+						*dest++ = rint(bb);
+					}
 				}
 				continue;
 			}
@@ -3610,6 +3632,7 @@ int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
 	chanlist old_img;
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
+	double scalex, scaley, deltax, deltay;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
@@ -3631,6 +3654,11 @@ int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
 		do_scale(old_img, mem_img, ow, oh, nw, nh, gcor);
 	else
 	{
+		scalex = (double)ow / (double)nw;
+		scaley = (double)oh / (double)nh;
+		deltax = 0.5 * scalex - 0.5;
+		deltay = 0.5 * scaley - 0.5;
+
 		for (j = 0; j < nh; j++)
 		{
 			for (cc = 0; cc < NUM_CHANNELS; cc++)
@@ -3638,11 +3666,11 @@ int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
 				if (!mem_img[cc]) continue;
 				bpp = BPP(cc);
 				dest = mem_img[cc] + nw * j * bpp;
-				oj = (oh * j) / nh;
+				oj = rint(scaley * j + deltay);
 				src = old_img[cc] + ow * oj * bpp;
 				for (i = 0; i < nw; i++)
 				{
-					oi = ((ow * i) / nw) * bpp;
+					oi = (int)rint(scalex * i + deltax) * bpp;
 					*dest++ = src[oi];
 					if (bpp == 1) continue;
 					*dest++ = src[oi + 1];

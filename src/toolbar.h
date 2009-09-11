@@ -40,6 +40,18 @@
 
 #define TOTAL_CURSORS 14
 
+//	Main toolbar buttons
+#define MTB_NEW    0
+#define MTB_OPEN   1
+#define MTB_SAVE   2
+#define MTB_CUT    3
+#define MTB_COPY   4
+#define MTB_PASTE  5
+#define MTB_UNDO   6
+#define MTB_REDO   7
+#define MTB_BRCOSA 8
+#define MTB_PAN    9
+
 #define TOTAL_ICONS_MAIN 10
 
 

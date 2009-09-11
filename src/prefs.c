@@ -36,7 +36,7 @@ static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spin
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg, *spinbutton_recent;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
-	*checkbutton_commit;
+	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
 static GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
@@ -337,6 +337,11 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	q_quit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_quit));
 	inifile_set_gboolean( "quitToggle", q_quit );
 
+	inifile_set_gboolean("centerSettings",
+		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_center)));
+	inifile_set_gboolean("defaultGamma",
+		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_gamma)));
+
 #ifdef U_NLS
 	inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
 	setup_language();
@@ -486,6 +491,10 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		vbox_1, inifile_get_gboolean("quitToggle", TRUE) );
 	checkbutton_commit = add_a_toggle( _("Changing tool commits paste"),
 		vbox_1, inifile_get_gboolean("pasteCommit", FALSE) );
+	checkbutton_center = add_a_toggle(_("Center tool settings dialogs"),
+		vbox_1, inifile_get_gboolean("centerSettings", TRUE));
+	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
+		vbox_1, inifile_get_gboolean("defaultGamma", FALSE));
 
 
 ///	---- TAB2 - FILES

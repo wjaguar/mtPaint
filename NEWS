@@ -12,11 +12,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
 	* Saving compressed GIF files now supported (using libgif)
-	* sRGB model made default for gamma correction
 	* New advanced dithering modes with many configuration options
-	* Optional gamma correction for image scaling and Gaussian blur
+	* Optional gamma correction for image scaling, rotation and Gaussian blur
 	* Smudge tool can be configured to ignore opacity mode
 	* Library detection in configure script improved
+	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
 	...and more still remains to do... ;-)
 
 3.01	2006-7-15

@@ -228,13 +228,13 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3), GTK_WIN_POS_CENTER);
+	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3), FALSE);
 }
 
 void pressed_soften( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4), GTK_WIN_POS_CENTER);
+	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4), FALSE);
 }
 
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
@@ -292,9 +292,10 @@ void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
 	check = add_a_toggle(_("Different X/Y"), box, FALSE);
 	gtk_signal_connect(GTK_OBJECT(check), "clicked",
 		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
-	check = add_a_toggle(_("Gamma corrected"), box, FALSE);
+	check = add_a_toggle(_("Gamma corrected"), box,
+		inifile_get_gboolean("defaultGamma", FALSE));
 	if (mem_channel != CHN_IMAGE) gtk_widget_hide(check);
-	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, GTK_WIN_POS_CENTER);
+	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, FALSE);
 }
 
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
@@ -363,7 +364,7 @@ void pressed_rotate_sel_anti( GtkMenuItem *menu_item, gpointer user_data )
 int do_rotate_free(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *spin = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
-	int j, smooth = 0;
+	int j, smooth = 0, gcor = 0;
 	double angle;
 
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
@@ -371,11 +372,13 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 
 	if (mem_img_bpp == 3)
 	{
-		GtkWidget *check = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
+		GtkWidget *gch = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
+		GtkWidget *check = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget;
+		gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gch));
 		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
 			smooth = 1;
 	}
-	j = mem_rotate_free(angle, smooth);
+	j = mem_rotate_free(angle, smooth, gcor);
 	if (!j) canvas_undo_chores();
 	else
 	{
@@ -395,8 +398,13 @@ void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show(box);
 	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
 	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
-	if (mem_img_bpp == 3) add_a_toggle(_("Smooth"), box, TRUE);
-	filter_window(_("Free Rotate"), box, do_rotate_free, NULL, GTK_WIN_POS_CENTER);
+	if (mem_img_bpp == 3)
+	{
+		add_a_toggle(_("Gamma corrected"), box,
+			inifile_get_gboolean("defaultGamma", FALSE));
+		add_a_toggle(_("Smooth"), box, TRUE);
+	}
+	filter_window(_("Free Rotate"), box, do_rotate_free, NULL, FALSE);
 }
 
 

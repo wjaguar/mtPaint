@@ -2426,16 +2426,26 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 
 	switch (j)
 	{
-		case 0:	pressed_new( NULL, NULL ); break;
-		case 1:	pressed_open_file( NULL, NULL ); break;
-		case 2:	pressed_save_file( NULL, NULL ); break;
-		case 3:	pressed_cut( NULL, NULL ); break;
-		case 4:	pressed_copy( NULL, NULL ); break;
-		case 5:	pressed_paste_centre( NULL, NULL ); break;
-		case 6:	main_undo( NULL, NULL ); break;
-		case 7:	main_redo( NULL, NULL ); break;
-		case 8:	pressed_brcosa( NULL, NULL ); break;
-		case 9:	pressed_pan( NULL, NULL ); break;
+	case MTB_NEW:
+		pressed_new( NULL, NULL ); break;
+	case MTB_OPEN:
+		pressed_open_file( NULL, NULL ); break;
+	case MTB_SAVE:
+		pressed_save_file( NULL, NULL ); break;
+	case MTB_CUT:
+		pressed_cut( NULL, NULL ); break;
+	case MTB_COPY:
+		pressed_copy( NULL, NULL ); break;
+	case MTB_PASTE:
+		pressed_paste_centre( NULL, NULL ); break;
+	case MTB_UNDO:
+		main_undo( NULL, NULL ); break;
+	case MTB_REDO:
+		main_redo( NULL, NULL ); break;
+	case MTB_BRCOSA:
+		pressed_brcosa( NULL, NULL ); break;
+	case MTB_PAN:
+		pressed_pan( NULL, NULL ); break;
 	}
 }
 
