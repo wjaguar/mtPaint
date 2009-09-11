@@ -94,7 +94,7 @@ void layers_notify_changed();
 void layers_remove_all();
 int check_layers_for_changes();
 void move_layer_relative(int l, int change_x, int change_y);	// Move a layer & update window labels
-void layer_new( int w, int h, int type, int cols );	// Types 1=indexed, 2=grey, 3=RGB
+void layer_new( int w, int h, int type, int cols, int cmask );	// Types 1=indexed, 2=grey, 3=RGB
 void layer_choose( int l );				// Select a new layer from the list
 
 void layer_iconbar_click(GtkWidget *widget, gpointer data);

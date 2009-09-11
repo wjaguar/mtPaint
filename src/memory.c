@@ -1203,12 +1203,16 @@ void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int 
 
 void mem_brcosa_chunk( unsigned char *rgb, int len )		// Apply BRCOSA to RGB memory
 {	// brightness = -255..+255, contrast = 0..+4, saturation = -1..+1
-	float ch[3], grey;
-	int i, j;
+	// Hue: -1529..+1529 (Red->Green->Blue->Red)
+	double ch[3], grey;
+	int i, j, Rr, Gg, Bb, dc;
+	int dH = mem_prev_bcsp[5], sH, tH;
+	static unsigned char ixx[7] = {0, 1, 2, 0, 1, 2, 0};
+	int ix0, ix1, ix2, c0, c1, c2;
 
 	int	br = mem_prev_bcsp[0];
-	float	co = ((float) mem_prev_bcsp[1]) / 100,
-		sa = ((float) mem_prev_bcsp[2]) / 100;
+	double	co = mem_prev_bcsp[1] / 100.0,
+		sa = mem_prev_bcsp[2] / 100.0;
 
 	mtMIN( br, br, 255 )
 	mtMAX( br, br, -255 )
@@ -1220,11 +1224,55 @@ void mem_brcosa_chunk( unsigned char *rgb, int len )		// Apply BRCOSA to RGB mem
 	if ( co > 0 ) co = co*3 + 1;
 	else co = co + 1;
 
-	for ( i=0; i<len; i++ )
+	if (dH < 0) dH += 1530;
+	dc = (dH / 510) * 2; dH -= dc * 255;
+	if ((sH = dH > 255))
 	{
-		ch[0] = rgb[ 3*i ];
-		ch[1] = rgb[ 1 + 3*i ];
-		ch[2] = rgb[ 2 + 3*i ];
+		dH = 510 - dH;
+		dc = dc < 4 ? dc + 2 : 0;
+	}
+	ix0 = ixx[dc]; ix1 = ixx[dc + 1]; ix2 = ixx[dc + 2];
+
+	for ( i=0; i<len; i++ , rgb += 3)
+	{
+		Rr = rgb[ix0];
+		Gg = rgb[ix1];
+		Bb = rgb[ix2];
+
+		/* If we do hue transform & colour has a hue */
+		if (dH && ((Rr ^ Gg) | (Rr ^ Bb)))
+		{
+			/* Min. component */
+			c2 = Bb < Rr ? (Gg < Bb ? 1 : 2) :
+				(Rr < Gg ? 0 : 1);
+			/* Actual indices */
+			c2 = ixx[dc + c2];
+			c0 = ixx[c2 + 1];
+			c1 = ixx[c2 + 2];
+			/* Max. component & edge dir */
+			if ((tH = rgb[c0] <= rgb[c1]))
+			{
+				c0 = ixx[c2 + 2];
+				c1 = ixx[c2 + 1];
+			}
+			/* Do adjustment */
+			j = dH * (rgb[c0] - rgb[c2]) + 127; /* Round up (?) */
+			j = (j + (j >> 8) + 1) >> 8;
+			Rr = rgb[c0]; Gg = rgb[c1]; Bb = rgb[c2];
+			if (tH ^ sH) /* Falling edge */
+			{
+				rgb[c1] = Rr = Gg > j + Bb ? Gg - j : Bb;
+				rgb[c2] += j + Rr - Gg;
+			}
+			else /* Rising edge */
+			{
+				rgb[c1] = Bb = Gg < Rr - j ? Gg + j : Rr;
+				rgb[c0] -= j + Gg - Bb;
+			}
+		}
+		ch[0] = rgb[ix0];
+		ch[1] = rgb[ix1];
+		ch[2] = rgb[ix2];
 
 		for ( j=0; j<3; j++ )		// Calculate brightness/contrast
 		{
@@ -1235,20 +1283,20 @@ void mem_brcosa_chunk( unsigned char *rgb, int len )		// Apply BRCOSA to RGB mem
 				mtMAX( ch[j], ch[j], 0 )
 			}
 		}
-		grey = 0.3 * ch[0] + 0.58 * ch[1] + 0.12 * ch[2];
+		grey = 0.299 * ch[0] + 0.587 * ch[1] + 0.114 * ch[2];
 		for ( j=0; j<3; j++ )						// Calculate saturation
 		{
 			if ( mem_brcosa_allow[j] )
 			{
-				ch[j] = -grey * sa + ch[j] * (1 + sa);
+				ch[j] += sa * (ch[j] - grey);
 				mtMIN( ch[j], ch[j], 255 )
 				mtMAX( ch[j], ch[j], 0 )
 			}
 		}
 
-		rgb[ 3*i ] = mt_round( ch[0] );
-		rgb[ 1 + 3*i ] = mt_round( ch[1] );
-		rgb[ 2 + 3*i ] = mt_round( ch[2] );
+		rgb[0] = rint(ch[0]);
+		rgb[1] = rint(ch[1]);
+		rgb[2] = rint(ch[2]);
 	}
 }
 

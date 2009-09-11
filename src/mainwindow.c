@@ -1795,9 +1795,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	if ( layers_total == 0 || !show_layers_main )
-		main_render_rgb( rgb, px, py, pw, ph, can_zoom );
-	else
+	if (layers_total && show_layers_main)
 	{
 		if ( layer_selected > 0 )
 		{
@@ -1817,8 +1815,12 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			}
 		}
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
-			pw, ph, can_zoom, 0, layers_total, 1);
+			pw, ph, can_zoom, 0, layer_selected - 1, 1);
 	}
+	main_render_rgb( rgb, px, py, pw, ph, can_zoom );
+	if (layers_total && show_layers_main)
+		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
+			pw, ph, can_zoom, layer_selected + 1, layers_total, 1);
 
 	pw2 = pw;
 	ph2 = ph;
@@ -1837,7 +1839,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			if ( mem_prev_bcsp[4] != 100 )
 				mem_gamma_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
 			if ( mem_prev_bcsp[0] != 0 || mem_prev_bcsp[1] != 0 ||
-				mem_prev_bcsp[2] != 0)
+				mem_prev_bcsp[2] != 0 || mem_prev_bcsp[5] != 0 )
 					mem_brcosa_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
 			if ( mem_prev_bcsp[3] != 8 )
 				mem_posterize_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );

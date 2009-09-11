@@ -652,7 +652,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	thid = hide_image;
 	hide_image = FALSE;
 
-	for (ll = 0; ll <= layers_total; ll++)
+	for (ll = lr0; ll <= lr1; ll++)
 	{
 		if (ll && !layer_table[ll].visible) continue;
 		i = layer_table[ll].x;

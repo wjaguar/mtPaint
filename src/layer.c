@@ -413,9 +413,9 @@ void layer_new_chores2( int l )
 }
 
 
-void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3=RGB
+void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed, 2=grey, 3=RGB
 {
-	int bpp=type;
+	int i, j = w * h, bpp=type;
 	chanlist temp_img;
 	layer_image *lim;
 	unsigned char *rgb;
@@ -430,22 +430,28 @@ void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3
 
 	if ( type == 2 ) bpp = 1;	// Type 2 = greyscale indexed
 
-	rgb = malloc( w*h*bpp );
-
-	if ( rgb == NULL )
+	lim = malloc(sizeof(layer_image));
+	if (!lim)
 	{
-		memory_errors(1);
-		return;
-	}
-	lim = malloc( sizeof(layer_image) );
-	if ( lim == NULL )
-	{
-		free(rgb);
 		memory_errors(1);
 		return;
 	}
 	memset(temp_img, 0, sizeof(chanlist));
-	temp_img[CHN_IMAGE] = rgb;
+	rgb = temp_img[CHN_IMAGE] = malloc(j * bpp);
+	for (i = CHN_ALPHA; rgb && (cmask > CMASK_FOR(i)); i++)
+	{
+		if (!(cmask & CMASK_FOR(i))) continue;
+		rgb = temp_img[i] = malloc(j);
+	}
+	if (!rgb)	// Not enough memory
+	{
+		free(lim);
+		for (i = 0; i < NUM_CHANNELS; i++)
+			free(temp_img[i]);
+		memory_errors(1);
+		return;
+	}
+
 	layers_total++;
 
 	layer_new_chores( layers_total, w, h, type, cols, temp_img, lim );
@@ -1266,7 +1272,8 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 		if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
 				// This stops a nasty segfault if users does 2 quick paste layers
 
-		layer_new( mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols );
+		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols,
+			mem_clip_alpha ? CMASK_RGBA : CMASK_IMAGE);
 		if ( layer_selected != ol )	// If == then new layer wasn't created
 		{
 			layer_table[layer_selected].x = mem_clip_x;

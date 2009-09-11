@@ -193,7 +193,7 @@ gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 
-	if ( new_window_type == 1 ) layer_new( nw, nh, 3-nt, nc  );
+	if ( new_window_type == 1 ) layer_new( nw, nh, 3-nt, nc, CMASK_IMAGE);
 	else
 	{
 		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
@@ -1369,13 +1369,13 @@ static gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer d
 	int i, p1, p2;
 	gboolean do_pal = FALSE;	// RGB palette processing
 
-	mem_pal_copy( mem_pal, brcosa_pal );	// Get back normal palette as ...
+	mem_pal_copy( mem_pal, brcosa_pal );	// Get back normal palette
 	if (mem_img_bpp == 3)
 	{
 		do_pal = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4]) );
 		if ( !do_pal && widget == brcosa_toggles[4] )
 		{
-			pal_refresher();			// ... user has just cleared toggle
+			pal_refresher();			// User has just cleared toggle
 		}
 	}
 
@@ -1489,7 +1489,8 @@ static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer dat
 	mem_pal_copy( mem_pal, brcosa_pal );
 
 	if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 ||
-		brcosa_values[2] != 0 || brcosa_values[3] != 8 || brcosa_values[4] != 100 )
+		brcosa_values[2] != 0 || brcosa_values[3] != 8 || brcosa_values[4] != 100 ||
+		brcosa_values[5] != 0 )
 	{
 		spot_undo(UNDO_COL);
 
@@ -1499,7 +1500,8 @@ static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer dat
 		{
 			if ( brcosa_values[4] != 100 )
 				mem_gamma_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
-			if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 || brcosa_values[2] != 0 )
+			if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 || brcosa_values[2] != 0
+				|| brcosa_values[5] != 0 )
 				mem_brcosa_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
 			if ( brcosa_values[3] != 8 )
 				mem_posterize_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
