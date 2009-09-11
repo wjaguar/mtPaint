@@ -10,7 +10,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: cs\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-03-11 12:25+0000\n"
+"POT-Creation-Date: 2007-03-31 21:43+0100\n"
 "PO-Revision-Date: 2007-01-01 23:02+0100\n"
 "Last-Translator: Pavel Ruzicka <pavouk@pavouk.org>\n"
 "Language-Team: Czech <en@li.org>\n"
@@ -50,7 +50,7 @@ msgstr "Zavøít"
 #: src/mainwindow.c:431 src/mainwindow.c:435 src/mainwindow.c:440
 #: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1071
 #: src/otherwindow.c:1096 src/otherwindow.c:1098 src/png.c:3163 src/png.c:3185
-#: src/viewer.c:1412
+#: src/viewer.c:1425
 msgid "Error"
 msgstr "Chyba"
 
@@ -74,7 +74,7 @@ msgstr "Nelze vytvoøit výstupní adresáø"
 #: src/otherwindow.c:1072 src/otherwindow.c:1096 src/otherwindow.c:1098
 #: src/otherwindow.c:1209 src/otherwindow.c:1444 src/otherwindow.c:2304
 #: src/otherwindow.c:2745 src/otherwindow.c:2974 src/png.c:2957 src/png.c:3165
-#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1413
+#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1426
 msgid "OK"
 msgstr "OK"
 
@@ -249,7 +249,7 @@ msgstr "Vyhladit"
 msgid "Free Rotate"
 msgstr "Libovolná rotace"
 
-#: src/canvas.c:835 src/viewer.c:1412
+#: src/canvas.c:835 src/viewer.c:1425
 msgid "Not enough memory to create clipboard"
 msgstr "Nedostatek pamìti pro vytvoøení schránky"
 
@@ -345,11 +345,11 @@ msgstr "Nelze exportovat do ASCII souboru"
 msgid "Unable to save file: %s"
 msgstr "Nelze ulo¾it soubor: %s"
 
-#: src/canvas.c:1811 src/toolbar.c:701
+#: src/canvas.c:1811 src/toolbar.c:704
 msgid "Load Image File"
 msgstr "Naètení obrázku"
 
-#: src/canvas.c:1819 src/toolbar.c:702
+#: src/canvas.c:1819 src/toolbar.c:705
 msgid "Save Image File"
 msgstr "Ulo¾ení obrázku"
 
@@ -469,7 +469,7 @@ msgstr "Invertovaný"
 #: src/otherwindow.c:459 src/otherwindow.c:509 src/otherwindow.c:611
 #: src/otherwindow.c:978 src/otherwindow.c:1210 src/otherwindow.c:1460
 #: src/otherwindow.c:2305 src/otherwindow.c:2746 src/otherwindow.c:2975
-#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1645
+#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1658
 msgid "Cancel"
 msgstr "Storno"
 
@@ -1060,7 +1060,7 @@ msgid "Position"
 msgstr "Pozice"
 
 #: src/layer.c:1441 src/otherwindow.c:2872 src/prefs.c:456 src/toolbar.c:587
-#: src/toolbar.c:956
+#: src/toolbar.c:959
 msgid "Opacity"
 msgstr "Neprùsvitnost"
 
@@ -2027,11 +2027,11 @@ msgstr "Poèítám poèet unikátních RGB pixelù"
 msgid "Applying Effect"
 msgstr "Aplikuji efekt"
 
-#: src/mygtk.c:141
+#: src/mygtk.c:135
 msgid "Please Wait ..."
 msgstr "Prosím èekejte ..."
 
-#: src/mygtk.c:164
+#: src/mygtk.c:158
 msgid "STOP"
 msgstr "STOP"
 
@@ -2051,7 +2051,7 @@ msgstr "Indexovaná paleta"
 msgid "Grab Screenshot"
 msgstr "Sejmout obrazovku"
 
-#: src/otherwindow.c:197 src/toolbar.c:700
+#: src/otherwindow.c:197 src/toolbar.c:703
 msgid "New Image"
 msgstr "Nový obrázek"
 
@@ -2168,7 +2168,7 @@ msgstr "bitù na barvu"
 msgid "Gamma"
 msgstr "Gamma"
 
-#: src/otherwindow.c:858 src/toolbar.c:708
+#: src/otherwindow.c:858 src/toolbar.c:711
 msgid "Transform Colour"
 msgstr "Transformace barev"
 
@@ -3021,111 +3021,111 @@ msgstr "Kolorování +-"
 msgid "Disable All Masks"
 msgstr "Vypnout v¹echny masky"
 
-#: src/toolbar.c:620
+#: src/toolbar.c:623
 msgid "Settings Toolbar"
 msgstr "Li¹ta nastavení"
 
-#: src/toolbar.c:655
+#: src/toolbar.c:658
 msgid "Gradient Mode"
 msgstr "Re¾im Gradientu"
 
-#: src/toolbar.c:703
+#: src/toolbar.c:706
 msgid "Cut"
 msgstr "Vyjmout"
 
-#: src/toolbar.c:704
+#: src/toolbar.c:707
 msgid "Copy"
 msgstr "Kopírovat"
 
-#: src/toolbar.c:705
+#: src/toolbar.c:708
 msgid "Paste"
 msgstr "Vlo¾it"
 
-#: src/toolbar.c:706
+#: src/toolbar.c:709
 msgid "Undo"
 msgstr "Zpìt"
 
-#: src/toolbar.c:707
+#: src/toolbar.c:710
 msgid "Redo"
 msgstr "Vpøed"
 
-#: src/toolbar.c:709 src/viewer.c:546
+#: src/toolbar.c:712 src/viewer.c:546
 msgid "Pan Window"
 msgstr "Pøehledové okno"
 
-#: src/toolbar.c:713
+#: src/toolbar.c:716
 msgid "Paint"
 msgstr "Malování"
 
-#: src/toolbar.c:714
+#: src/toolbar.c:717
 msgid "Shuffle"
 msgstr "Pøeházení"
 
-#: src/toolbar.c:715
+#: src/toolbar.c:718
 msgid "Flood Fill"
 msgstr "Vyplnìní"
 
-#: src/toolbar.c:716
+#: src/toolbar.c:719
 msgid "Straight Line"
 msgstr "Rovná èára"
 
-#: src/toolbar.c:717
+#: src/toolbar.c:720
 msgid "Smudge"
 msgstr "Rozmazat"
 
-#: src/toolbar.c:718
+#: src/toolbar.c:721
 msgid "Clone"
 msgstr "Klonovat"
 
-#: src/toolbar.c:719
+#: src/toolbar.c:722
 msgid "Make Selection"
 msgstr "Oznaèit výbìr"
 
-#: src/toolbar.c:720
+#: src/toolbar.c:723
 msgid "Polygon Selection"
 msgstr "Výbìr polygonem"
 
-#: src/toolbar.c:721
+#: src/toolbar.c:724
 msgid "Place Gradient"
 msgstr "Vlo¾it Gradient"
 
-#: src/toolbar.c:722
+#: src/toolbar.c:725
 msgid "Lasso Selection"
 msgstr "Výbìr lasem"
 
-#: src/toolbar.c:723 src/viewer.c:1591 src/viewer.c:1644
+#: src/toolbar.c:726 src/viewer.c:1604 src/viewer.c:1657
 msgid "Paste Text"
 msgstr "Vlo¾it text"
 
-#: src/toolbar.c:724
+#: src/toolbar.c:727
 msgid "Ellipse Outline"
 msgstr "Prázdná elipsa"
 
-#: src/toolbar.c:725
+#: src/toolbar.c:728
 msgid "Filled Ellipse"
 msgstr "Vyplnìná elipsa"
 
-#: src/toolbar.c:726
+#: src/toolbar.c:729
 msgid "Outline Selection"
 msgstr "Orámovat výbìr"
 
-#: src/toolbar.c:727
+#: src/toolbar.c:730
 msgid "Fill Selection"
 msgstr "Vyplnit výbìr"
 
-#: src/toolbar.c:728
+#: src/toolbar.c:731
 msgid "Flip Selection Vertically"
 msgstr "Otoèit výbìr vertikálnì"
 
-#: src/toolbar.c:729
+#: src/toolbar.c:732
 msgid "Flip Selection Horizontally"
 msgstr "Otoèit výbìr horizontálnì"
 
-#: src/toolbar.c:730
+#: src/toolbar.c:733
 msgid "Rotate Selection Clockwise"
 msgstr "Otoèit výbìr po smìru ruèièek"
 
-#: src/toolbar.c:731
+#: src/toolbar.c:734
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "Otoèit výbìr proti smìru ruèièek"
 
@@ -3138,22 +3138,22 @@ msgstr "%i Souborù na pøíkazové øádce"
 msgid "About"
 msgstr "O aplikaci"
 
-#: src/viewer.c:1610
+#: src/viewer.c:1623
 msgid "Antialias"
 msgstr "Vyhlazení"
 
-#: src/viewer.c:1618
+#: src/viewer.c:1631
 msgid "Invert"
 msgstr "Invertovat"
 
-#: src/viewer.c:1623
+#: src/viewer.c:1636
 msgid "Background colour ="
 msgstr "Barva pozadí ="
 
-#: src/viewer.c:1631
+#: src/viewer.c:1644
 msgid "Angle of rotation ="
 msgstr "Úhel rotace ="
 
-#: src/viewer.c:1654
+#: src/viewer.c:1667
 msgid "Enter Text Here"
 msgstr "Zadejte text"

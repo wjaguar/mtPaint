@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint 0.78\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-03-11 12:25+0000\n"
+"POT-Creation-Date: 2007-03-31 21:43+0100\n"
 "PO-Revision-Date: 2005-03-18 18:08+0000\n"
 "Last-Translator: Mark Tyler\n"
 "Language-Team: Spanish <es@li.org>\n"
@@ -45,7 +45,7 @@ msgstr "Cerrar"
 #: src/mainwindow.c:431 src/mainwindow.c:435 src/mainwindow.c:440
 #: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1071
 #: src/otherwindow.c:1096 src/otherwindow.c:1098 src/png.c:3163 src/png.c:3185
-#: src/viewer.c:1412
+#: src/viewer.c:1425
 msgid "Error"
 msgstr "Error"
 
@@ -69,7 +69,7 @@ msgstr "No se puede crear directorio"
 #: src/otherwindow.c:1072 src/otherwindow.c:1096 src/otherwindow.c:1098
 #: src/otherwindow.c:1209 src/otherwindow.c:1444 src/otherwindow.c:2304
 #: src/otherwindow.c:2745 src/otherwindow.c:2974 src/png.c:2957 src/png.c:3165
-#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1413
+#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1426
 msgid "OK"
 msgstr "OK"
 
@@ -243,7 +243,7 @@ msgstr "Alisado"
 msgid "Free Rotate"
 msgstr "Rotado Libre"
 
-#: src/canvas.c:835 src/viewer.c:1412
+#: src/canvas.c:835 src/viewer.c:1425
 msgid "Not enough memory to create clipboard"
 msgstr "No hay suficiente memoria para crear el portapapeles"
 
@@ -341,11 +341,11 @@ msgstr "Imposible exportar fichero ASCII"
 msgid "Unable to save file: %s"
 msgstr "Imposible guardar: %s"
 
-#: src/canvas.c:1811 src/toolbar.c:701
+#: src/canvas.c:1811 src/toolbar.c:704
 msgid "Load Image File"
 msgstr "Cargar Imagen"
 
-#: src/canvas.c:1819 src/toolbar.c:702
+#: src/canvas.c:1819 src/toolbar.c:705
 msgid "Save Image File"
 msgstr "Guardar Imagen"
 
@@ -465,7 +465,7 @@ msgstr "Invertido"
 #: src/otherwindow.c:459 src/otherwindow.c:509 src/otherwindow.c:611
 #: src/otherwindow.c:978 src/otherwindow.c:1210 src/otherwindow.c:1460
 #: src/otherwindow.c:2305 src/otherwindow.c:2746 src/otherwindow.c:2975
-#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1645
+#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1658
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -532,8 +532,8 @@ msgstr ""
 "\n"
 "Ver la sección de 'Créditos' para el listado de autores.\n"
 "\n"
-"mtPaint es software libre; tu puedes residtribuirlo y/o modificarlo bajo "
-"los términos de la GNU General Public License publicada por la Free Software "
+"mtPaint es software libre; tu puedes residtribuirlo y/o modificarlo bajo los "
+"términos de la GNU General Public License publicada por la Free Software "
 "Foundation; con la versión 2 de la licencia, o cualquier versión posterior\n"
 "mtPaint se distribuye con la esperanza de que sea útil, pero SIN NINGUNA "
 "GARANTÍA. Ver la GNU General Public License para más detalles. \n"
@@ -726,8 +726,8 @@ msgstr ""
 "  Ctrl + + or =     Incrementar opacidad en 1%\n"
 "  Ctrl + -          Disminuir opacidad en 1%\n"
 "\n"
-"  Home              Mostrar o esconder la ventana principal menu/barra de"
-"estado/paleta\n"
+"  Home              Mostrar o esconder la ventana principal menu/barra "
+"de estado/paleta\n"
 "  Page Up           Escalar Imagen\n"
 "  Page Down         Redimensionar Lienzo\n"
 "  End               Quitar ventana\n"
@@ -1042,7 +1042,7 @@ msgid "Position"
 msgstr "Posición"
 
 #: src/layer.c:1441 src/otherwindow.c:2872 src/prefs.c:456 src/toolbar.c:587
-#: src/toolbar.c:956
+#: src/toolbar.c:959
 msgid "Opacity"
 msgstr "Opacidad"
 
@@ -1147,8 +1147,8 @@ msgid ""
 "You are trying to save an LSS16 file with a palette of more than 16 "
 "colours.  Either use another format or reduce the palette to 16 colours."
 msgstr ""
-"Está intentando guardar un fichero LSS16 con una paleta de mas de 16 colores. "
-"Reduzca la paleta a 16 colores o use otro formato."
+"Está intentando guardar un fichero LSS16 con una paleta de mas de 16 "
+"colores. Reduzca la paleta a 16 colores o use otro formato."
 
 #: src/mainwindow.c:478
 msgid "Unable to load clipboard"
@@ -2018,11 +2018,11 @@ msgstr "Contando Pixeles RGB únicos"
 msgid "Applying Effect"
 msgstr "Aplicando Efecto"
 
-#: src/mygtk.c:141
+#: src/mygtk.c:135
 msgid "Please Wait ..."
 msgstr "Espere Por Favor ..."
 
-#: src/mygtk.c:164
+#: src/mygtk.c:158
 msgid "STOP"
 msgstr "STOP"
 
@@ -2042,7 +2042,7 @@ msgstr "Paleta Indexada"
 msgid "Grab Screenshot"
 msgstr "Capturar Pantalla"
 
-#: src/otherwindow.c:197 src/toolbar.c:700
+#: src/otherwindow.c:197 src/toolbar.c:703
 msgid "New Image"
 msgstr "Nueva Imagen"
 
@@ -2159,7 +2159,7 @@ msgstr "Posterizar"
 msgid "Gamma"
 msgstr "Gamma"
 
-#: src/otherwindow.c:858 src/toolbar.c:708
+#: src/otherwindow.c:858 src/toolbar.c:711
 msgid "Transform Colour"
 msgstr "Tansformar el Color"
 
@@ -3014,111 +3014,111 @@ msgstr "Teñido +-"
 msgid "Disable All Masks"
 msgstr "Deshabilitar todas las Máscaras"
 
-#: src/toolbar.c:620
+#: src/toolbar.c:623
 msgid "Settings Toolbar"
 msgstr "Barra de Propiedades"
 
-#: src/toolbar.c:655
+#: src/toolbar.c:658
 msgid "Gradient Mode"
 msgstr "Modo Gradiente"
 
-#: src/toolbar.c:703
+#: src/toolbar.c:706
 msgid "Cut"
 msgstr "Cortar"
 
-#: src/toolbar.c:704
+#: src/toolbar.c:707
 msgid "Copy"
 msgstr "Copiar"
 
-#: src/toolbar.c:705
+#: src/toolbar.c:708
 msgid "Paste"
 msgstr "Pegar"
 
-#: src/toolbar.c:706
+#: src/toolbar.c:709
 msgid "Undo"
 msgstr "Deshacer"
 
-#: src/toolbar.c:707
+#: src/toolbar.c:710
 msgid "Redo"
 msgstr "Rehacer"
 
-#: src/toolbar.c:709 src/viewer.c:546
+#: src/toolbar.c:712 src/viewer.c:546
 msgid "Pan Window"
 msgstr "Vista preliminar"
 
-#: src/toolbar.c:713
+#: src/toolbar.c:716
 msgid "Paint"
 msgstr "Dibujar"
 
-#: src/toolbar.c:714
+#: src/toolbar.c:717
 msgid "Shuffle"
 msgstr "Emborronar"
 
-#: src/toolbar.c:715
+#: src/toolbar.c:718
 msgid "Flood Fill"
 msgstr "Rellenar con Pintura"
 
-#: src/toolbar.c:716
+#: src/toolbar.c:719
 msgid "Straight Line"
 msgstr "Línea recta"
 
-#: src/toolbar.c:717
+#: src/toolbar.c:720
 msgid "Smudge"
 msgstr "Mancha"
 
-#: src/toolbar.c:718
+#: src/toolbar.c:721
 msgid "Clone"
 msgstr "Clonar"
 
-#: src/toolbar.c:719
+#: src/toolbar.c:722
 msgid "Make Selection"
 msgstr "Realizar Selección"
 
-#: src/toolbar.c:720
+#: src/toolbar.c:723
 msgid "Polygon Selection"
 msgstr "Selección Poligonal"
 
-#: src/toolbar.c:721
+#: src/toolbar.c:724
 msgid "Place Gradient"
 msgstr "Situar Gradiente"
 
-#: src/toolbar.c:722
+#: src/toolbar.c:725
 msgid "Lasso Selection"
 msgstr "Selección libre"
 
-#: src/toolbar.c:723 src/viewer.c:1591 src/viewer.c:1644
+#: src/toolbar.c:726 src/viewer.c:1604 src/viewer.c:1657
 msgid "Paste Text"
 msgstr "Pegar Texto"
 
-#: src/toolbar.c:724
+#: src/toolbar.c:727
 msgid "Ellipse Outline"
 msgstr "Contorno de Elipse"
 
-#: src/toolbar.c:725
+#: src/toolbar.c:728
 msgid "Filled Ellipse"
 msgstr "Elipse Rellena"
 
-#: src/toolbar.c:726
+#: src/toolbar.c:729
 msgid "Outline Selection"
 msgstr "Resaltar la Selección"
 
-#: src/toolbar.c:727
+#: src/toolbar.c:730
 msgid "Fill Selection"
 msgstr "Rellenar la Selección"
 
-#: src/toolbar.c:728
+#: src/toolbar.c:731
 msgid "Flip Selection Vertically"
 msgstr "Girar la Selección Verticalmente"
 
-#: src/toolbar.c:729
+#: src/toolbar.c:732
 msgid "Flip Selection Horizontally"
 msgstr "Girar la Selección Horizontalmente"
 
-#: src/toolbar.c:730
+#: src/toolbar.c:733
 msgid "Rotate Selection Clockwise"
 msgstr "Rotar la Selección en Sentido Horario"
 
-#: src/toolbar.c:731
+#: src/toolbar.c:734
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "Rotar la Selección en Sentido Antihorario"
 
@@ -3131,22 +3131,22 @@ msgstr "%i Archivos en la Línea de Comandos"
 msgid "About"
 msgstr "Sobre"
 
-#: src/viewer.c:1610
+#: src/viewer.c:1623
 msgid "Antialias"
 msgstr "Antialias"
 
-#: src/viewer.c:1618
+#: src/viewer.c:1631
 msgid "Invert"
 msgstr "Invertir"
 
-#: src/viewer.c:1623
+#: src/viewer.c:1636
 msgid "Background colour ="
 msgstr "Color de fondo ="
 
-#: src/viewer.c:1631
+#: src/viewer.c:1644
 msgid "Angle of rotation ="
 msgstr "Ángulo de rotación ="
 
-#: src/viewer.c:1654
+#: src/viewer.c:1667
 msgid "Enter Text Here"
 msgstr "Introduzca aquí el texto"

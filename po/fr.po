@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-03-11 12:25+0000\n"
+"POT-Creation-Date: 2007-03-31 21:43+0100\n"
 "PO-Revision-Date: 2007-02-13 01:35+0000\n"
 "Last-Translator: Sylvain Cresto <scresto@gmail.com>\n"
 "Language-Team: French <fr@li.org>\n"
@@ -46,7 +46,7 @@ msgstr "Fermer"
 #: src/mainwindow.c:431 src/mainwindow.c:435 src/mainwindow.c:440
 #: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1071
 #: src/otherwindow.c:1096 src/otherwindow.c:1098 src/png.c:3163 src/png.c:3185
-#: src/viewer.c:1412
+#: src/viewer.c:1425
 msgid "Error"
 msgstr "Erreur"
 
@@ -70,7 +70,7 @@ msgstr "Impossible de créer le répertoire de destination"
 #: src/otherwindow.c:1072 src/otherwindow.c:1096 src/otherwindow.c:1098
 #: src/otherwindow.c:1209 src/otherwindow.c:1444 src/otherwindow.c:2304
 #: src/otherwindow.c:2745 src/otherwindow.c:2974 src/png.c:2957 src/png.c:3165
-#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1413
+#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1426
 msgid "OK"
 msgstr "OK"
 
@@ -246,7 +246,7 @@ msgstr "Lisser"
 msgid "Free Rotate"
 msgstr "Rotation"
 
-#: src/canvas.c:835 src/viewer.c:1412
+#: src/canvas.c:835 src/viewer.c:1425
 msgid "Not enough memory to create clipboard"
 msgstr "Pas assez de mémoire pour créer le presse-papiers"
 
@@ -344,11 +344,11 @@ msgstr "Erreur lors de l'exportation du fichier ASCII"
 msgid "Unable to save file: %s"
 msgstr "Impossible d'enregistrer le fichier : %s"
 
-#: src/canvas.c:1811 src/toolbar.c:701
+#: src/canvas.c:1811 src/toolbar.c:704
 msgid "Load Image File"
 msgstr "Ouvrir une image"
 
-#: src/canvas.c:1819 src/toolbar.c:702
+#: src/canvas.c:1819 src/toolbar.c:705
 msgid "Save Image File"
 msgstr "Enregistrer l'image"
 
@@ -469,7 +469,7 @@ msgstr "Inversé"
 #: src/otherwindow.c:459 src/otherwindow.c:509 src/otherwindow.c:611
 #: src/otherwindow.c:978 src/otherwindow.c:1210 src/otherwindow.c:1460
 #: src/otherwindow.c:2305 src/otherwindow.c:2746 src/otherwindow.c:2975
-#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1645
+#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1658
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -1079,7 +1079,7 @@ msgid "Position"
 msgstr "Position"
 
 #: src/layer.c:1441 src/otherwindow.c:2872 src/prefs.c:456 src/toolbar.c:587
-#: src/toolbar.c:956
+#: src/toolbar.c:959
 msgid "Opacity"
 msgstr "Opacité"
 
@@ -2054,11 +2054,11 @@ msgstr "Comptage des pixels RVB uniques"
 msgid "Applying Effect"
 msgstr "Application de l'Effet"
 
-#: src/mygtk.c:141
+#: src/mygtk.c:135
 msgid "Please Wait ..."
 msgstr "Veuillez patienter..."
 
-#: src/mygtk.c:164
+#: src/mygtk.c:158
 msgid "STOP"
 msgstr "STOP"
 
@@ -2078,7 +2078,7 @@ msgstr "Couleurs indexées"
 msgid "Grab Screenshot"
 msgstr "Prendre une capture d'Écran"
 
-#: src/otherwindow.c:197 src/toolbar.c:700
+#: src/otherwindow.c:197 src/toolbar.c:703
 msgid "New Image"
 msgstr "Nouvelle image"
 
@@ -2195,7 +2195,7 @@ msgstr "Isohélie"
 msgid "Gamma"
 msgstr "Gamma"
 
-#: src/otherwindow.c:858 src/toolbar.c:708
+#: src/otherwindow.c:858 src/toolbar.c:711
 msgid "Transform Colour"
 msgstr "Modifier les couleurs"
 
@@ -3056,111 +3056,111 @@ msgstr "Teinte +-"
 msgid "Disable All Masks"
 msgstr "Désactiver toutes les protections"
 
-#: src/toolbar.c:620
+#: src/toolbar.c:623
 msgid "Settings Toolbar"
 msgstr "Propriétés"
 
-#: src/toolbar.c:655
+#: src/toolbar.c:658
 msgid "Gradient Mode"
 msgstr "Mode de dégradé"
 
-#: src/toolbar.c:703
+#: src/toolbar.c:706
 msgid "Cut"
 msgstr "Couper"
 
-#: src/toolbar.c:704
+#: src/toolbar.c:707
 msgid "Copy"
 msgstr "Copier"
 
-#: src/toolbar.c:705
+#: src/toolbar.c:708
 msgid "Paste"
 msgstr "Coller"
 
-#: src/toolbar.c:706
+#: src/toolbar.c:709
 msgid "Undo"
 msgstr "Annuler"
 
-#: src/toolbar.c:707
+#: src/toolbar.c:710
 msgid "Redo"
 msgstr "Refaire"
 
-#: src/toolbar.c:709 src/viewer.c:546
+#: src/toolbar.c:712 src/viewer.c:546
 msgid "Pan Window"
 msgstr "Apperçu réduit"
 
-#: src/toolbar.c:713
+#: src/toolbar.c:716
 msgid "Paint"
 msgstr "Peindre"
 
-#: src/toolbar.c:714
+#: src/toolbar.c:717
 msgid "Shuffle"
 msgstr "Mélanger"
 
-#: src/toolbar.c:715
+#: src/toolbar.c:718
 msgid "Flood Fill"
 msgstr "Remplir"
 
-#: src/toolbar.c:716
+#: src/toolbar.c:719
 msgid "Straight Line"
 msgstr "Ligne droite"
 
-#: src/toolbar.c:717
+#: src/toolbar.c:720
 msgid "Smudge"
 msgstr "Barbouiller"
 
-#: src/toolbar.c:718
+#: src/toolbar.c:721
 msgid "Clone"
 msgstr "Cloner"
 
-#: src/toolbar.c:719
+#: src/toolbar.c:722
 msgid "Make Selection"
 msgstr "Faire une sélection"
 
-#: src/toolbar.c:720
+#: src/toolbar.c:723
 msgid "Polygon Selection"
 msgstr "Sélection polygone"
 
-#: src/toolbar.c:721
+#: src/toolbar.c:724
 msgid "Place Gradient"
 msgstr "Dégradé"
 
-#: src/toolbar.c:722
+#: src/toolbar.c:725
 msgid "Lasso Selection"
 msgstr "Sélection à main levée"
 
-#: src/toolbar.c:723 src/viewer.c:1591 src/viewer.c:1644
+#: src/toolbar.c:726 src/viewer.c:1604 src/viewer.c:1657
 msgid "Paste Text"
 msgstr "Coller le texte"
 
-#: src/toolbar.c:724
+#: src/toolbar.c:727
 msgid "Ellipse Outline"
 msgstr "Contour d'ellipse"
 
-#: src/toolbar.c:725
+#: src/toolbar.c:728
 msgid "Filled Ellipse"
 msgstr "Ellipse remplie"
 
-#: src/toolbar.c:726
+#: src/toolbar.c:729
 msgid "Outline Selection"
 msgstr "Tracer le contour de la sélection"
 
-#: src/toolbar.c:727
+#: src/toolbar.c:730
 msgid "Fill Selection"
 msgstr "Remplir la sélection"
 
-#: src/toolbar.c:728
+#: src/toolbar.c:731
 msgid "Flip Selection Vertically"
 msgstr "Miroir vertical de la sélection"
 
-#: src/toolbar.c:729
+#: src/toolbar.c:732
 msgid "Flip Selection Horizontally"
 msgstr "Miroir horizontal de la sélection"
 
-#: src/toolbar.c:730
+#: src/toolbar.c:733
 msgid "Rotate Selection Clockwise"
 msgstr "Rotation horaire de la sélection"
 
-#: src/toolbar.c:731
+#: src/toolbar.c:734
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "Rotation antihoraire de la sélection"
 
@@ -3173,22 +3173,22 @@ msgstr "%i Fichiers sur la ligne de commande"
 msgid "About"
 msgstr "À propos de"
 
-#: src/viewer.c:1610
+#: src/viewer.c:1623
 msgid "Antialias"
 msgstr "Lissage"
 
-#: src/viewer.c:1618
+#: src/viewer.c:1631
 msgid "Invert"
 msgstr "Inverser"
 
-#: src/viewer.c:1623
+#: src/viewer.c:1636
 msgid "Background colour ="
 msgstr "Couleur d'arrière-plan ="
 
-#: src/viewer.c:1631
+#: src/viewer.c:1644
 msgid "Angle of rotation ="
 msgstr "Angle de rotation ="
 
-#: src/viewer.c:1654
+#: src/viewer.c:1667
 msgid "Enter Text Here"
 msgstr "Écrivez le texte Ici"
