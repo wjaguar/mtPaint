@@ -406,6 +406,13 @@ int read_spin(GtkWidget *spin)
 	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
 }
 
+double read_float_spin(GtkWidget *spin)
+{
+	/* Needed in GTK+2 for late changes */
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	return (GTK_SPIN_BUTTON(spin)->adjustment->value);
+}
+
 GtkWidget *add_float_spin(double value, double min, double max)
 {
 	GtkWidget *spin;

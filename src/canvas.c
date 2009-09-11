@@ -420,13 +420,9 @@ int do_gauss(GtkWidget *box, gpointer fdata)
 	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
 		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 3)));
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spinX));
-	radiusX = radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinX));
+	radiusX = radiusY = read_float_spin(spinX);
 	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggleXY)))
-	{
-		gtk_spin_button_update(GTK_SPIN_BUTTON(spinY));
-		radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinY));
-	}
+		radiusY = read_float_spin(spinY);
 
 	spot_undo(UNDO_DRAW);
 	mem_gauss(radiusX, radiusY, gcor);
@@ -473,12 +469,9 @@ int do_unsharp(GtkWidget *box, gpointer fdata)
 	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
 		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 1)));
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spinR));
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spinA));
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spinT));
-	radius = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinR));
-	amount = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinA));
-	threshold = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spinT));
+	radius = read_float_spin(spinR);
+	amount = read_float_spin(spinA);
+	threshold = read_float_spin(spinT);
 
 	// !!! No RGBA mode for now, so UNDO_DRAW isn't needed
 	spot_undo(UNDO_FILT);
@@ -568,8 +561,7 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 	int j, smooth = 0, gcor = 0;
 	double angle;
 
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	angle = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spin));
+	angle = read_float_spin(spin);
 
 	if (mem_img_bpp == 3)
 	{
@@ -1808,7 +1800,9 @@ void fs_setup(GtkWidget *fs, int action_type)
 {
 	char txt[260], txt2[520];
 	GtkWidget *xtra;
-
+#if GTK_MAJOR_VERSION == 1
+	GtkAccelGroup* ag = gtk_accel_group_new();
+#endif
 
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 	gtk_window_set_default_size(GTK_WINDOW(fs),
@@ -1859,6 +1853,11 @@ void fs_setup(GtkWidget *fs, int action_type)
 		ls_settings_box(txt2, action_type));
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
+#if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
+	gtk_widget_add_accelerator(GTK_FILE_SELECTION(fs)->cancel_button,
+		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
+	gtk_window_add_accel_group(GTK_WINDOW(fs), ag);
+#endif
 	gtk_widget_show(fs);
 	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
 	gdk_window_raise(fs->window);	// Needed to ensure window is at the top

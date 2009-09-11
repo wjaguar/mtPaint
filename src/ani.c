@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

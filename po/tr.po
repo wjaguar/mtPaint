@@ -7,15 +7,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-02-07 10:50+0000\n"
-"PO-Revision-Date: 2006-11-04 23:24+0000\n"
+"POT-Creation-Date: 2007-03-11 12:25+0000\n"
+"PO-Revision-Date: 2007-02-23 20:44+0000\n"
 "Last-Translator: Tutku Dalmaz <tutkudalmaz@gmail.com>\n"
 "Language-Team: Turkish <tr@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"X-Rosetta-Export-Date: 2007-03-07 18:38+0000\n"
 
-#: src/ani.c:735
+#: src/ani.c:741
 msgid "Animation Preview"
 msgstr ""
 
@@ -221,15 +222,15 @@ msgstr ""
 msgid "Unsharp Mask"
 msgstr ""
 
-#: src/canvas.c:543
+#: src/canvas.c:544
 msgid "Not enough memory to rotate image"
-msgstr "Resmi çevirmek için yeterli bellek yok"
+msgstr "Resmi çevirecek için yeterli bellek yok"
 
-#: src/canvas.c:553
+#: src/canvas.c:554
 msgid "Not enough memory to rotate clipboard"
-msgstr "Panoyu çevirecek yeterli bellek yok."
+msgstr "Panoyu çevirmek için yeterli bellek yok."
 
-#: src/canvas.c:578
+#: src/canvas.c:579
 msgid "The image is too large for this rotation."
 msgstr "Resim bu çevrim için çok büyük"
 
@@ -333,11 +334,11 @@ msgstr "ASCII dosyası dışa aktarılamıyor"
 msgid "Unable to save file: %s"
 msgstr "Dosya kaydedilemedi: %s"
 
-#: src/canvas.c:1879 src/toolbar.c:693
+#: src/canvas.c:1811 src/toolbar.c:701
 msgid "Load Image File"
-msgstr "Resim Dosyasını Yükle"
+msgstr "Resim Dosyası Yükle"
 
-#: src/canvas.c:1882 src/toolbar.c:694
+#: src/canvas.c:1819 src/toolbar.c:702
 msgid "Save Image File"
 msgstr "Resim Dosyasını Kaydet"
 
@@ -476,7 +477,7 @@ msgstr "Katkıda Bulunanlar"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.10 - Copyright (C) 2004-2007 The Authors\n"
+"mtPaint 3.15 - Copyright (C) 2004-2007 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -636,7 +637,7 @@ msgid ""
 "\n"
 "mtPaint is maintained by Dmitry Groshev.\n"
 "\n"
-"wjaguar@mail.ru\n"
+"wjaguar@users.sourceforge.net\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
 "The following people (in alphabetical order) have contributed directly to "
@@ -682,10 +683,10 @@ msgid ""
 "\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
-"French - Nicolas Velin, Pascal Billard\n"
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto\n"
 "German - Oliver Frommel\n"
 "Polish - Simek\n"
-"Portuguese - Israel G. Lugo\n"
+"Portuguese - Israel G. Lugo, Tiago Silva\n"
 "Slovak - Jozef Riha\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio San\n"
 "Taiwanese Chinese - Wei-Lun Chao\n"
@@ -1606,87 +1607,87 @@ msgstr "/Palet/Renkleri Sırala ..."
 msgid "/Palette/Palette Shifter ..."
 msgstr "/Palet/Palette Shifter ..."
 
-#: src/mainwindow.c:3400
+#: src/mainwindow.c:3392
 msgid "/Effe_cts"
-msgstr "/Efektler"
+msgstr ""
+
+#: src/mainwindow.c:3393
+msgid "/Effects/tear"
+msgstr ""
+
+#: src/mainwindow.c:3394
+msgid "/Effects/Transform Colour ..."
+msgstr ""
+
+#: src/mainwindow.c:3395
+msgid "/Effects/Invert"
+msgstr ""
+
+#: src/mainwindow.c:3396
+msgid "/Effects/Greyscale"
+msgstr ""
+
+#: src/mainwindow.c:3397
+msgid "/Effects/Greyscale (Gamma corrected)"
+msgstr ""
+
+#: src/mainwindow.c:3398
+msgid "/Effects/Isometric Transformation"
+msgstr ""
+
+#: src/mainwindow.c:3399
+msgid "/Effects/Isometric Transformation/tear"
+msgstr ""
+
+#: src/mainwindow.c:3400
+msgid "/Effects/Isometric Transformation/Left Side Down"
+msgstr ""
 
 #: src/mainwindow.c:3401
-msgid "/Effects/tear"
-msgstr "/Efektler/yırt"
+msgid "/Effects/Isometric Transformation/Right Side Down"
+msgstr ""
 
 #: src/mainwindow.c:3402
-msgid "/Effects/Transform Colour ..."
-msgstr "/Efektler/Transform Colour ..."
+msgid "/Effects/Isometric Transformation/Top Side Right"
+msgstr ""
 
 #: src/mainwindow.c:3403
-msgid "/Effects/Invert"
-msgstr "/Efektler/Invert"
-
-#: src/mainwindow.c:3404
-msgid "/Effects/Greyscale"
-msgstr "/Efektler/Greyscale"
-
-#: src/mainwindow.c:3405
-msgid "/Effects/Greyscale (Gamma corrected)"
-msgstr "/Efektler/Greyscale (Gamma corrected)"
-
-#: src/mainwindow.c:3406
-msgid "/Effects/Isometric Transformation"
-msgstr "/Efektler/Isometric Transformation"
-
-#: src/mainwindow.c:3407
-msgid "/Effects/Isometric Transformation/tear"
-msgstr "/Efektler/Isometric Transformation/tear"
-
-#: src/mainwindow.c:3408
-msgid "/Effects/Isometric Transformation/Left Side Down"
-msgstr "/Efektler/Isometric Transformation/Left Side Down"
-
-#: src/mainwindow.c:3409
-msgid "/Effects/Isometric Transformation/Right Side Down"
-msgstr "/Efektler/Isometric Transformation/Right Side Down"
-
-#: src/mainwindow.c:3410
-msgid "/Effects/Isometric Transformation/Top Side Right"
-msgstr "/Efektler/Isometric Transformation/Top Side Right"
-
-#: src/mainwindow.c:3411
 msgid "/Effects/Isometric Transformation/Bottom Side Right"
-msgstr "/Efektler/Isometric Transformation/Bottom Side Right"
+msgstr ""
 
-#: src/mainwindow.c:3412 src/mainwindow.c:3419
+#: src/mainwindow.c:3404 src/mainwindow.c:3411
 msgid "/Effects/sep1"
-msgstr "/Efektler/sep1"
+msgstr ""
 
-#: src/mainwindow.c:3413 src/mainwindow.c:3491
+#: src/mainwindow.c:3405 src/mainwindow.c:3483
 msgid "/Effects/Edge Detect"
-msgstr "/Efektler/Edge Detect"
+msgstr ""
 
-#: src/mainwindow.c:3414 src/mainwindow.c:3492
+#: src/mainwindow.c:3406 src/mainwindow.c:3484
 msgid "/Effects/Sharpen ..."
-msgstr "/Efektler/Sharpen ..."
+msgstr ""
 
-#: src/mainwindow.c:3415 src/mainwindow.c:3492
+#: src/mainwindow.c:3407 src/mainwindow.c:3484
 msgid "/Effects/Unsharp Mask ..."
-msgstr "/Efektler/Unsharp Mask ..."
+msgstr ""
 
-#: src/mainwindow.c:3416 src/mainwindow.c:3493
+#: src/mainwindow.c:3408 src/mainwindow.c:3485
 msgid "/Effects/Soften ..."
-msgstr "/Efektler/Soften ..."
+msgstr ""
 
-#: src/mainwindow.c:3417 src/mainwindow.c:3493
+#: src/mainwindow.c:3409 src/mainwindow.c:3485
 msgid "/Effects/Gaussian Blur ..."
-msgstr "/Efektler/Gaussian Blur ..."
+msgstr ""
 
-#: src/mainwindow.c:3418 src/mainwindow.c:3491
+#: src/mainwindow.c:3410 src/mainwindow.c:3483
 msgid "/Effects/Emboss"
-msgstr "/Efektler/Emboss"
+msgstr ""
 
-#: src/mainwindow.c:3420 src/mainwindow.c:3495
+#: src/mainwindow.c:3412 src/mainwindow.c:3487
 msgid "/Effects/Bacteria ..."
-msgstr "/Efektler/Bacteria ..."
+msgstr ""
 
-#: src/mainwindow.c:3422
+#: src/mainwindow.c:3414
 msgid "/Cha_nnels"
 msgstr ""
 
@@ -2495,7 +2496,15 @@ msgstr "XBM resmi yükleniyor"
 msgid "Saving XBM image"
 msgstr "XBM resmi kaydediliyor"
 
-#: src/png.c:2604
+#: src/png.c:2565
+msgid "Loading LSS16 image"
+msgstr "LSS16 resmi yükleniyor"
+
+#: src/png.c:2646
+msgid "Saving LSS16 image"
+msgstr "LSS16 resmi kaydediliyor"
+
+#: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"
 msgstr ""
 
@@ -2753,11 +2762,11 @@ msgstr "Aygıt Ayarları"
 msgid "Configure Device"
 msgstr "Aygıtı Ayarla"
 
-#: src/prefs.c:608
+#: src/prefs.c:636
 msgid "Tool Variable"
-msgstr ""
+msgstr "Araç Değişkeni"
 
-#: src/prefs.c:610
+#: src/prefs.c:638
 msgid "Factor"
 msgstr "Etken"
 
@@ -2789,15 +2798,15 @@ msgstr ""
 msgid "Palette Shifter"
 msgstr ""
 
-#: src/shifter.c:291
-msgid "Start"
-msgstr ""
-
 #: src/shifter.c:293
-msgid "Finish"
-msgstr ""
+msgid "Start"
+msgstr "Başlat"
 
-#: src/shifter.c:344
+#: src/shifter.c:295
+msgid "Finish"
+msgstr "Bitir"
+
+#: src/shifter.c:354
 msgid "Fix Palette"
 msgstr ""
 

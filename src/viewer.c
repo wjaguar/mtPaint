@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1320,7 +1320,7 @@ gint render_text( GtkWidget *widget )
 	pango_layout_set_font_description( layout, font_desc );
 
 #if GTK_MINOR_VERSION >= 6
-	degs = inifile_get_gfloat( "fontAngle", 0.0 );
+	degs = inifile_get_gint32("fontAngle", 0) * 0.01;
 	angle = G_PI*degs/180;
 
 	if ( antialias[2] )		// Rotation Toggle
@@ -1551,9 +1551,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 #endif
 
 #if GTK_CHECK_VERSION(2,6,0)
-	gtk_spin_button_update( GTK_SPIN_BUTTON(text_spin[1]) );
-	inifile_set_gfloat( "fontAngle",
-		gtk_spin_button_get_value_as_float( GTK_SPIN_BUTTON(text_spin[1]) ) );
+	inifile_set_gint32("fontAngle", rint(read_float_spin(text_spin[1]) * 100.0));
 #endif
 
 	if (mem_channel == CHN_IMAGE)
@@ -1620,7 +1618,7 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
 #if GTK_CHECK_VERSION(2,6,0)
-	text_spin[1] = add_float_spin(inifile_get_gfloat("fontAngle", 0), -360, 360);
+	text_spin[1] = add_float_spin(inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360);
 	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, FALSE, 5);
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
 		inifile_get_gboolean( "fontAntialias2", FALSE ) );

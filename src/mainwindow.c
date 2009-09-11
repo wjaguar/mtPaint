@@ -3198,7 +3198,6 @@ typedef struct
 	char *shortcut; /* Text form for now */
 	void (*handler)();
 	int parm;
-	GtkWidget *widget;
 } menu_item;
 
 static GtkWidget **need_lists[] = {
@@ -3229,6 +3228,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		"<Separator>", "<LastBranch>" };
 	GtkItemFactoryEntry wf;
 	GtkItemFactory *factory;
+	GtkWidget *widget;
 	char *radio[32];
 
 
@@ -3247,9 +3247,10 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
 			radio[items->radio_BTS] = wf.path;
 		gtk_item_factory_create_item(factory, &wf, NULL, 2);
-		items->widget = gtk_item_factory_get_item(factory, wf.path);
-		mapped_dis_add(items->widget, items->actmap);
-		if (items->ID) menu_widgets[items->ID] = items->widget;
+		widget = gtk_item_factory_get_item(factory, wf.path);
+		mapped_dis_add(widget, items->actmap);
+		/* For now, remember only requested widgets */
+		if (items->ID) menu_widgets[items->ID] = widget;
 	}
 	return (gtk_item_factory_get_widget(factory, "<main>"));
 }

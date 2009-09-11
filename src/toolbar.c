@@ -243,8 +243,8 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 {
 	int i;
-	char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%", "200%", "300%",
-		"400%", "800%", "1200%", "1600%", "2000%", NULL };
+	static char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%",
+		"200%", "300%", "400%", "800%", "1200%", "1600%", "2000%", NULL };
 	GtkWidget *combo, *combo_entry;
 	GList *combo_list = NULL;
 
@@ -370,8 +370,7 @@ static int set_flood(GtkWidget *box, gpointer fdata)
 	GList *chain = GTK_BOX(box)->children;
 
 	spin = ((GtkBoxChild*)chain->data)->widget;
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	flood_step = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spin));
+	flood_step = read_float_spin(spin);
 	chain = chain->next;
 	toggle = ((GtkBoxChild*)chain->data)->widget;
 	flood_cube = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
@@ -787,12 +786,21 @@ void toolbar_init(GtkWidget *vbox_main)
 	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_main), GTK_TOOLBAR_ICONS );
 #endif
 
-	toolbar_zoom_main = toolbar_add_zoom( hbox );
-	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_main)->entry),
-		"changed", GTK_SIGNAL_FUNC (toolbar_zoom_main_change), NULL);
-	toolbar_zoom_view = toolbar_add_zoom( hbox );
-	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_view)->entry),
-		"changed", GTK_SIGNAL_FUNC (toolbar_zoom_view_change), NULL);
+	toolbar_zoom_main = toolbar_add_zoom(hbox);
+	toolbar_zoom_view = toolbar_add_zoom(hbox);
+	/* In GTK1, combo box entry is updated continuously */
+#if GTK_MAJOR_VERSION == 1
+	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->popwin),
+		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
+	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->popwin),
+		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
+#endif
+#if GTK_MAJOR_VERSION == 2
+	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->entry),
+		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
+	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->entry),
+		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
+#endif
 	toolbar_viewzoom(FALSE);
 
 	for (i=0; i<TOTAL_CURSORS; i++)

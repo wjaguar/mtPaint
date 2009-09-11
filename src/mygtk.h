@@ -67,6 +67,7 @@ GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx
 // Easier way with spinbuttons
 
 int read_spin(GtkWidget *spin);
+double read_float_spin(GtkWidget *spin);
 GtkWidget *add_float_spin(double value, double min, double max);
 void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
 

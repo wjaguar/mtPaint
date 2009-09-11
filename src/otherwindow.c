@@ -1785,8 +1785,7 @@ static void select_csel(int what)
 	case 1: /* Preview */
 	case 2: /* OK */
 		csel_overlay = 0;
-		gtk_spin_button_update(GTK_SPIN_BUTTON(csel_spin));
-		csel_data->range = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(csel_spin));
+		csel_data->range = read_float_spin(csel_spin);
 		csel_data->invert = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(csel_toggle));
 		set_csel();
 		csel_reset(csel_data);
