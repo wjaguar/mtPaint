@@ -601,16 +601,77 @@ static void trim_tab( char *buf, char *txt)
 	if ( buf[0] == 0 ) snprintf(buf, MAXLEN, "_None");
 }
 
-static int font_index_create(char *filename, char **dir_in)
-{	// dir_in points to NULL terminated sequence of directories to search for fonts
-	FT_Library	library;
+static int font_dir_search( FT_Library *ft_lib, int dirnum, FILE *fp, char *dir )
+{	// Search given directory for font files - recursively traverse directories
 	FT_Face		face;
 	FT_Error	error;
 	DIR		*dp;
 	struct dirent	*ep;
 	struct stat	buf;
 	char		full_name[PATHBUF], size_type[MAXLEN], tmp[2][MAXLEN];
-	int		i, res=-1, face_index;
+	int		face_index;
+
+
+	dp = opendir(dir);
+	if (!dp) return 0;
+
+	while ( (ep = readdir(dp)) )
+	{
+		snprintf(full_name, PATHBUF, "%s%c%s", dir, DIR_SEP, ep->d_name);
+
+		if ( stat(full_name, &buf)<0 ) continue;	// Get file details
+
+#ifdef WIN32
+		if ( S_ISDIR(buf.st_mode) )
+#else
+		if ( ep->d_type == DT_DIR || S_ISDIR(buf.st_mode) )
+#endif
+		{				// Subdirectory so recurse
+			if ( strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..") != 0 )
+			{
+				font_dir_search( ft_lib, dirnum, fp, full_name );
+			}
+		}
+		else		// File so see if its a font
+		for (	face_index = 0;
+			!(error = FT_New_Face( *ft_lib, full_name, face_index, &face ));
+			face_index++ )
+		{
+			if ( FT_IS_SCALABLE( face ) )
+				snprintf(size_type, MAXLEN, "0");
+			else
+				snprintf(size_type, MAXLEN, "%i",
+					face->available_sizes[0].height +
+					(face->available_sizes[0].width << SIZE_SHIFT) +
+					(face_index << (SIZE_SHIFT*2))
+					);
+
+// I use a tab character as a field delimeter, so replace any in the strings with a space
+
+			trim_tab( tmp[0], face->family_name );
+			trim_tab( tmp[1], face->style_name );
+
+			fprintf(fp, "%s\t%i\t%s\t%s\t%s\n",
+				tmp[0], dirnum, tmp[1], size_type, full_name);
+
+			if ( (face_index+1) >= face->num_faces )
+			{
+				FT_Done_Face(face);
+				break;
+			}
+			FT_Done_Face(face);
+		}
+	}
+	closedir(dp);
+
+	return 0;		// No error
+}
+
+static int font_index_create(char *filename, char **dir_in)
+{	// dir_in points to NULL terminated sequence of directories to search for fonts
+	FT_Library	library;
+	FT_Error	error;
+	int		i, res=-1;
 	FILE		*fp;
 
 
@@ -619,53 +680,12 @@ static int font_index_create(char *filename, char **dir_in)
 
 	if ((fp = fopen(filename, "w")) == NULL) goto fail;
 
-	for ( i=0; ; i++ )
+	for ( i=0, res=0; dir_in[i] && !res; i++ )
 	{
-		if ( !dir_in[i] ) break;
-
-		dp = opendir(dir_in[i]);
-		if (!dp) continue;
-
-		while ( (ep = readdir(dp)) )
-		{
-			snprintf(full_name, PATHBUF, "%s%c%s", dir_in[i],
-				DIR_SEP, ep->d_name);
-
-			if ( stat(full_name, &buf)<0 ) continue;	// Get file details
-
-			for (	face_index = 0;
-				!(error = FT_New_Face( library, full_name, face_index, &face ));
-				face_index++ )
-			{
-				if ( FT_IS_SCALABLE( face ) )
-					snprintf(size_type, MAXLEN, "0");
-				else
-					snprintf(size_type, MAXLEN, "%i",
-						face->available_sizes[0].height +
-						(face->available_sizes[0].width << SIZE_SHIFT) +
-						(face_index << (SIZE_SHIFT*2))
-						);
-
-// I use a tab character as a field delimeter, so replace any in the strings with a space
-
-				trim_tab( tmp[0], face->family_name );
-				trim_tab( tmp[1], face->style_name );
-
-				fprintf(fp, "%s\t%i\t%s\t%s\t%s\n",
-					tmp[0], i, tmp[1], size_type, full_name);
-
-				if ( (face_index+1) >= face->num_faces )
-				{
-					FT_Done_Face(face);
-					break;
-				}
-				FT_Done_Face(face);
-			}
-		}
-		closedir(dp);
+		res = font_dir_search( &library, i, fp, dir_in[i] );
 	}
+
 	fclose(fp);
-	res = 0;		// Success
 fail:
 	FT_Done_FreeType(library);
 

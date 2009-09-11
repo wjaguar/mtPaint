@@ -197,8 +197,8 @@ static int allocate_image(ls_settings *settings, int cmask)
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
 			if (!(cmask & CMASK_FOR(i))) continue;
-			settings->img[i] = malloc(sz);
-			if (!settings->img[i]) return (FILE_MEM_ERROR);
+			if (!(settings->img[i] = mem_clip.img[i] = malloc(sz)))
+				return (FILE_MEM_ERROR);
 		}
 		break;
 	case FS_CHANNEL_LOAD: /* Current channel */
@@ -361,16 +361,28 @@ static int load_png(char *file_name, ls_settings *settings)
 		png_set_palette_to_rgb(png_ptr);
 		png_set_gray_to_rgb(png_ptr);
 
+		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
+		{
+			png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
+			memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
+		}
+
 		/* Is there a transparent color? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
 			png_get_tRNS(png_ptr, info_ptr, 0, 0, &trans_rgb);
 			if (color_type == PNG_COLOR_TYPE_GRAY)
 			{
-				if (bit_depth == 4) i = trans_rgb->gray * 17;
-				else if (bit_depth == 8) i = trans_rgb->gray;
+				i = trans_rgb->gray;
+				switch (bit_depth)
+				{
+				case 1: i *= 0xFF; break;
+				case 2: i *= 0x55; break;
+				case 4: i *= 0x11; break;
+				case 8: default: break;
 				/* Hope libpng compiled w/o accurate transform */
-				else if (bit_depth == 16) i = trans_rgb->gray >> 8;
+				case 16: i >>= 8; break;
+				}
 				settings->rgb_trans = RGB_2_INT(i, i, i);
 			}
 			else settings->rgb_trans = RGB_2_INT(trans_rgb->red,
@@ -489,7 +501,7 @@ static int load_png(char *file_name, ls_settings *settings)
 
 fail2:	if (msg) progress_end();
 	free(row_pointers);
-	png_destroy_read_struct(&png_ptr, NULL, NULL);
+	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 fail:	fclose(fp);
 	return (res);
 }
@@ -570,6 +582,7 @@ static int save_png(char *file_name, ls_settings *settings)
 			8, settings->img[CHN_ALPHA] ? PNG_COLOR_TYPE_RGB_ALPHA :
 			PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
 			PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+		png_set_PLTE(png_ptr, info_ptr, settings->pal, settings->colors);
 		/* Transparent index in use */
 		if ((settings->rgb_trans > -1) && !settings->img[CHN_ALPHA])
 		{
@@ -651,7 +664,7 @@ static int save_png(char *file_name, ls_settings *settings)
 	if (mess) progress_end();
 
 	/* Tidy up */
-exit2:	png_destroy_write_struct(&png_ptr, NULL);
+exit2:	png_destroy_write_struct(&png_ptr, &info_ptr);
 exit1:	fclose(fp);
 exit0:	free(rgba_row);
 	return (res);
@@ -959,6 +972,10 @@ static int save_jpeg(char *file_name, ls_settings *settings)
  * several times the unpacked image size. So it can fail to handle even such
  * resolutions that fit into available memory with lots of room to spare. */
 
+static void stupid_callback(const char *msg, void *client_data)
+{
+}
+
 static int load_jpeg2000(char *file_name, ls_settings *settings)
 {
 	opj_dparameters_t par;
@@ -966,6 +983,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	opj_cio_t *cio = NULL;
 	opj_image_t *image = NULL;
 	opj_image_comp_t *comp;
+	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
 	unsigned char xtb[256], *dest, *buf = NULL;
 	FILE *fp;
 	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
@@ -990,6 +1008,10 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	/* Decompress it */
 	dinfo = opj_create_decompress(codec);
 	if (!dinfo) goto lfail;
+	memset(&useless_events, 0, sizeof(useless_events));
+	useless_events.error_handler = useless_events.warning_handler =
+		useless_events.info_handler = stupid_callback;
+	opj_set_event_mgr((opj_common_ptr)dinfo, &useless_events, stderr);
 	opj_set_default_decoder_parameters(&par);
 	opj_setup_decoder(dinfo, &par);
 	cio = opj_cio_open((opj_common_ptr)dinfo, buf, l);
@@ -1070,6 +1092,7 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	opj_image_cmptparm_t channels[4];
 	opj_cio_t *cio = NULL;
 	opj_image_t *image;
+	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
 	unsigned char *src;
 	FILE *fp;
 	int i, j, k, nc, step;
@@ -1117,6 +1140,10 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	/* Compress it */
 	cinfo = opj_create_compress(settings->ftype == FT_JP2 ? CODEC_JP2 : CODEC_J2K);
 	if (!cinfo) goto fail;
+	memset(&useless_events, 0, sizeof(useless_events));
+	useless_events.error_handler = useless_events.warning_handler =
+		useless_events.info_handler = stupid_callback;
+	opj_set_event_mgr((opj_common_ptr)cinfo, &useless_events, stderr);
 	opj_set_default_encoder_parameters(&par);
 	par.tcp_numlayers = 1;
 	par.tcp_rates[0] = settings->jp2_rate;
@@ -2499,15 +2526,15 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	str_hash cuckoo;
 	FILE *fp;
 	int bpp = settings->bpp, w = settings->width, h = settings->height;
-	int i, j, k, cpp, cols, trans = -1;
+	int i, j, k, l, cpp, cols, trans = -1;
 
 
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
 	tmp = tmp ? tmp + 1 : file_name;
 	for (; *tmp && !ISALPHA(*tmp); tmp++);
-	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
-	if (!i) return -1;
+	for (l = 0; (l < 256) && ISALNUM(tmp[l]); l++);
+	if (!l) return -1;
 
 	/* Collect RGB colors */
 	if (bpp == 3)
@@ -2566,7 +2593,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	if (!settings->silent) ls_init("XPM", 1);
 
 	fprintf(fp, "/* XPM */\n" );
-	fprintf(fp, "static char *%.*s_xpm[] = {\n", i, tmp);
+	fprintf(fp, "static char *%.*s_xpm[] = {\n", l, tmp);
 
 	if ((settings->hot_x >= 0) && (settings->hot_y >= 0))
 		fprintf(fp, "\"%d %d %d %d %d %d\",\n", w, h, cols, cpp,
@@ -3635,11 +3662,23 @@ static void store_image_extras(ls_settings *settings)
 	/* Stuff RGB transparency into color 255 */
 	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
 	{
-		settings->pal[255].red = INT_2_R(settings->rgb_trans);
-		settings->pal[255].green = INT_2_G(settings->rgb_trans);
-		settings->pal[255].blue = INT_2_B(settings->rgb_trans);
-		settings->xpm_trans = 255;
-		settings->colors = 256;
+		int i;
+
+		for ( i=0; i<settings->colors; i++ )	// Look for transparent colour in palette
+		{
+			if ( RGB_2_INT(settings->pal[i].red, settings->pal[i].green,
+				settings->pal[i].blue) == settings->rgb_trans ) break;
+		}
+
+		if ( i < settings->colors ) settings->xpm_trans = i;
+		else
+		{		// Colour not in palette so force it into last entry
+			settings->pal[255].red = INT_2_R(settings->rgb_trans);
+			settings->pal[255].green = INT_2_G(settings->rgb_trans);
+			settings->pal[255].blue = INT_2_B(settings->rgb_trans);
+			settings->xpm_trans = 255;
+			settings->colors = 256;
+		}
 	}
 
 	/* Accept vars which make sense */

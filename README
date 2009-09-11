@@ -74,12 +74,10 @@ libungif-4.1.4-lib.zip
 jpeg-6b-3-lib.zip
 tiff-3.6.1-2-lib.zip
 
-If you want to compile the internationlized version you will need to download and extract the following zip files to c:/msys: 
-gettext-0.14.1-bin.zip
-gettext-0.14.1-dep.zip
-gettext-0.14.1-lib.zip
-libiconv-1.8-1-bin.zip
-libintl-0.11.5-2-bin.zip
+If you want to compile the internationlized version you will need to download and extract to c:/msys the following zip files from http://sourceforge.net/projects/gettext : 
+gettext-runtime-0.13.1.bin.woe32.zip
+gettext-tools-0.13.1.bin.woe32.zip
+libiconv-1.9.1.bin.woe32.zip
 
 For some reason I needed to move c:/msys/bin/msgfmt & xgettext to c:/msys/local/bin/ in order to get it to run properly. If you have trouble running msgfmt you may need to do the same. 
 

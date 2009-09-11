@@ -1087,6 +1087,11 @@ void update_menus()			// Update edit/undo menu
 		gtk_widget_set_sensitive(menu_widgets[MENU_DCHAN0 + i], !!mem_img[i]);
 	}
 	men_item_state(menu_chan_del, j > 1);
+
+	/* Switch to default tool if active smudge tool got disabled */
+	if ((tool_type == TOOL_SMUDGE) &&
+		!GTK_WIDGET_IS_SENSITIVE(icon_buttons[SMUDGE_TOOL_ICON]))
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 }
 
 void canvas_undo_chores()
@@ -1106,11 +1111,6 @@ void check_undo_paste_bpp()
 
 	if ((marq_status >= MARQUEE_PASTE) && (mem_clip_bpp > MEM_BPP))
 		pressed_select_none(NULL, NULL);
-
-	// User is smudging and image has become indexed - reset tool
-	if ((tool_type == TOOL_SMUDGE) && (mem_img_bpp == 1))
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-			icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 }
 
 void main_undo( GtkMenuItem *menu_item, gpointer user_data )

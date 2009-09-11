@@ -460,13 +460,13 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 	image->bpp = bpp;
 	memset(image->img, 0, sizeof(chanlist));
 
-	if (!src && !cmask) return (TRUE); /* Empty block requested */
-
 	if (src == (void *)(-1)) /* No-init mode */
 	{
 		noinit = TRUE;
 		src = NULL;
 	}
+
+	if (!src && !cmask) return (TRUE); /* Empty block requested */
 
 	res = image->img[CHN_IMAGE] = malloc(sz * bpp);
 	for (i = CHN_ALPHA; res && (i < NUM_CHANNELS); i++)

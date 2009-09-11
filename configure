@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.19"
-MT_DATE="2007-11-18"
+MT_V="3.20"
+MT_DATE="2007-12-27"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -13,6 +13,7 @@ MT_MAN=NO
 MT_LANG_DEST=/usr/share/locale
 MT_PO_DEST=$MT_LANG_DEST
 MT_MAN_DEST=/usr/local/man/man1
+MT_PREFIX=/usr
 LIN_BIN_INSTALL=/usr/local/bin
 WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
 BIN_INSTALL=
@@ -36,6 +37,9 @@ MARCH=
 OPTS=YES
 DEBUG=NO
 HELP=1
+
+CC=gcc
+CROSSPF=
 
 L_EX=
 STATIC_LAST=
@@ -82,6 +86,21 @@ then
 		echo "main() { $1(); }" > _conf.c
 		redir -e /dev/null gcc _conf.c -o _conf.tmp -L/lib > /dev/null 2>&1
 	}
+elif [ "$CROSSCC" ]
+then
+	OS="MinGW/GNU/Linux"
+	GTK=2
+	CROSSPF="/usr/$CROSSCC"
+	CC=/usr/$CROSSCC/bin/$CROSSCC-gcc
+	IS_LIB()
+	{
+		$CROSSPF/bin/$CROSSCC-ld -$1 -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
+	}
+	HAVE_FUNC()
+	{
+		echo "main() { $1(); }" > _conf.c
+		$CC _conf.c -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
+	}
 else
 	OS="GNU/Linux"
 	if pkg-config gtk+-2.0 --cflags > /dev/null
@@ -90,6 +109,7 @@ else
 	else
 		GTK=1
 	fi
+	CROSSPF="/usr"
 	IS_LIB()
 	{
 		ld -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
@@ -180,7 +200,8 @@ do
 		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
 		"slow" )	OPTS=NO;;
 		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
-		"debug" )	DEBUG=YES;;
+		"debug" )	DEBUG=YES
+				OPTS=NO;;
 		"gtk1" )	GTK=1;;
 		"gtk2" )	GTK=2;;
 		"win" )		OS="MinGW/MSYS"
@@ -229,6 +250,8 @@ do
 		"486" )		MARCH='-march=i486';;
 		"586" )		MARCH='-march=i586';;
 		"686" )		MARCH='-march=i686';;
+		"release" )	CFLAG='-O2 -fweb -march=i386'
+				HAVE_FUNCS="$HAVE_FUNCS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS";;
 		"--prefix="* )	MT_PREFIX="`echo "$A" | sed -e "s/--prefix=//"`"
 				WIN_BIN_INSTALL="$MT_PREFIX/bin"
 				LIN_BIN_INSTALL="$MT_PREFIX/bin"
@@ -249,7 +272,7 @@ do
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man asneeded staticgif nojp2
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man release asneeded staticgif nojp2
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -258,11 +281,11 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk2
-				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
+				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i386-1.tgz
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 asneeded staticgif nojp2
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 release asneeded staticgif nojp2
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -271,11 +294,11 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
-				makepkg --chown y $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
+				makepkg --chown y $I_DIR/mtpaint-$MT_V$GTK_V-i386-1.tgz
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man GIF staticgif nojp2 --libdir=$I_DIR/ubuntulib
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man release GIF staticgif nojp2 --libdir=$I_DIR/ubuntulib
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/share/doc/mtpaint/
@@ -291,7 +314,7 @@ do
 				cd "$I_DIR"
 				export EMAIL="mtpaint-user@lists.sourceforge.net"
 				alien -d --version=$MT_V --description="`cat alien-desc`" mtpaint-$MT_V.tgz
-				rename -2_all _i486 *.deb
+				rename -2_all _i386 *.deb
 				chown mark *
 				chgrp users *
 				exit;;
@@ -301,68 +324,72 @@ done
 
 if [ "$HELP" = 0 ]
 then
-	echo "Usage: ./configure [OPTION] ... "
-	echo
-	echo "Options:"
-	echo
-	echo "win ............. Configure for Windows MinGW / MSYS"
-	echo "gtk1 ............ Configure for GTK+1"
-	echo "gtk2 ............ Configure for GTK+2"
-	echo "mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0"
-	echo "noxft ........... Don't use Xft in MTK"
-	echo
-	echo "cflags .......... Use CFLAGS environment variable"
-	echo "--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64"
-	echo "686 ............. Target 686 machines"
-	echo "586 ............. Target 586 machines"
-	echo "486 ............. Target 486 machines"
-	echo "386 ............. Target 386 machines"
-	echo "slow ............ Don't use compiler optimizations"
-	echo "asneeded ........ Use linker optimization --as-needed"
-	echo
-	echo "staticpng ....... Statically link PNG library"
-	echo "GIF ............. Use libgif"
-	echo "gif ............. Use libungif"
-	echo "nogif ........... Don't use libgif and libungif"
-	echo "staticgif ....... Statically link GIF library"
-	echo "jpeg ............ Use libjpeg"
-	echo "nojpeg .......... Don't use libjpeg"
-	echo "staticjpeg ...... Statically link JPEG library"
-	echo "jp2 ............. Use libopenjpeg"
-	echo "nojp2 ........... Don't use libopenjpeg"
-	echo "staticjp2 ....... Statically link JPEG 2000 library"
-	echo "tiff ............ Use libtiff"
-	echo "notiff .......... Don't use libtiff"
-	echo "statictiff ...... Statically link TIFF library"
-	echo "noft ............ Don't use FreeType"
-	echo "--libdir=DIR .... DIR = location of image library files to use for cross-compilation"
-	echo
-	echo "flush ........... Flush directories to initial state"
-	echo "debug ........... Include debugging info in binary"
-	echo "api ............. Use extra sanity checks required for libmtpaint"
-	echo "--bindir=DIR .... DIR = location of bin file to install, /usr/local/bin by default"
-	echo
-	echo "intl ............ Use internationalized po files"
-	echo "newpo ........... Create ./po/mtpaint.pot"
-	echo "merge ........... Update all po files with new strings - developers only"
-	echo "--locale=DIR .... DIR = location of locale files to install, /usr/share/locale by default"
-	echo
-	echo "man ............. Install the mtPaint man page"
-	echo "pod ............. Compile new man page - see ./doc/README for details"
-	echo "--mandir=DIR .... DIR = location of man page to install, /usr/local/man/man1 by default"
-	echo
-	echo "--prefix=DIR .... DIR = prefix location of all installs, e.g. /usr or /usr/local"
-	echo
-	echo "icons ........... Compile with alternative icon set - see ./src/icons1/README for details"
-	echo
-	echo "Default settings: GNU/Linux system, O2 optimizations, English only version"
-	echo "pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux"
+
+cat << EOF
+Usage: ./configure [OPTION] ...
+
+Options:
+
+win ............. Configure for Windows MinGW / MSYS
+gtk1 ............ Configure for GTK+1
+gtk2 ............ Configure for GTK+2
+mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0
+noxft ........... Don't use Xft in MTK
+
+cflags .......... Use CFLAGS environment variable
+--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64
+686 ............. Target 686 machines
+586 ............. Target 586 machines
+486 ............. Target 486 machines
+386 ............. Target 386 machines
+slow ............ Don't use compiler optimizations
+asneeded ........ Use linker optimization --as-needed
+
+staticpng ....... Statically link PNG library
+GIF ............. Use libgif
+gif ............. Use libungif
+nogif ........... Don't use libgif and libungif
+staticgif ....... Statically link GIF library
+jpeg ............ Use libjpeg
+nojpeg .......... Don't use libjpeg
+staticjpeg ...... Statically link JPEG library
+jp2 ............. Use libopenjpeg
+nojp2 ........... Don't use libopenjpeg
+staticjp2 ....... Statically link JPEG 2000 library
+tiff ............ Use libtiff
+notiff .......... Don't use libtiff
+statictiff ...... Statically link TIFF library
+noft ............ Don't use FreeType
+--libdir=DIR .... DIR = location of image library files to use for cross-compilation
+
+flush ........... Flush directories to initial state
+debug ........... Include debugging info in binary
+api ............. Use extra sanity checks required for libmtpaint
+--bindir=DIR .... DIR = location of bin file to install, /usr/local/bin by default
+
+intl ............ Use internationalized po files
+newpo ........... Create ./po/mtpaint.pot
+merge ........... Update all po files with new strings - developers only
+--locale=DIR .... DIR = location of locale files to install, /usr/share/locale by default
+
+man ............. Install the mtPaint man page
+pod ............. Compile new man page - see ./doc/README for details
+--mandir=DIR .... DIR = location of man page to install, /usr/local/man/man1 by default
+
+--prefix=DIR .... DIR = prefix location of all installs, e.g. /usr or /usr/local
+
+icons ........... Compile with alternative icon set - see ./src/icons1/README for details
+
+Default settings: GNU/Linux system, O2 optimizations, English only version
+pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
+EOF
 else
 	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
 
-	echo CC = gcc -Wall > $GTK_FILE
+	echo CC = $CC -Wall > $GTK_FILE
 	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
 	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
+	echo "MT_PREFIX=\"$MT_PREFIX\"" >> $GTK_FILE
 
 	if [ "$MTK_DIR" ]
 	then
@@ -413,8 +440,8 @@ else
 			GTK_INCLUDE="-I/include -I/include/glib-2.0 -I/lib/gtk+/include -I/lib/glib-2.0/include -mms-bitfields"
 			GTK_LIB="-L/lib -lgtk -lgdk -lglib-2.0 -lm -mwindows"
 		else
-			GTK_INCLUDE="-I/include/gtk-2.0 -I/lib/gtk-2.0/include -I/include/atk-1.0 -I/include/pango-1.0 -I/usr/include/freetype2 -I/include/glib-2.0 -I/usr/lib/glib-2.0/include -I/include -mms-bitfields"
-			GTK_LIB="-L/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 -lm -mwindows"
+			GTK_INCLUDE="-I$CROSSPF/include/gtk-2.0 -I$CROSSPF/lib/gtk-2.0/include -I$CROSSPF/include/atk-1.0 -I$CROSSPF/include/pango-1.0 -I$CROSSPF/include/freetype2 -I$CROSSPF/include/glib-2.0 -I$CROSSPF/lib/glib-2.0/include -I$CROSSPF/include -mms-bitfields"
+			GTK_LIB="-L$CROSSPF/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 -lm -mwindows"
 		fi
 	fi
 	fi	# MTK
@@ -444,8 +471,8 @@ else
 	if [ "$NJP2" = "YES" ]
 	then
 		LIB_NAME openjpeg "$STATIC_JP2"
-		I_EX="$I_EX -DU_JP2"
-		if [ "$STATIC_JP2" ] || [ "$OS" = "MinGW/MSYS" ]
+		I_EX="$I_EX -I$CROSSPF/include/openjpeg -DU_JP2"
+		if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]
 		then
 			I_EX="$I_EX -DOPJ_STATIC"
 		fi
@@ -470,6 +497,8 @@ else
 	if [ "$DEBUG" = NO ]
 	then
 		GTK_LIB="$GTK_LIB -s"
+	else
+		I_EX="$I_EX -ggdb"
 	fi
 
 	if [ "$MT_CUSTOM" ]
@@ -479,13 +508,13 @@ else
 
 	if [ "$NFT" = YES ]
 	then
-		if [ "$OS" = "MinGW/MSYS" ]
+		if [ "$OS" = "GNU/Linux" ]
 		then
-			I_EX="$I_EX -DU_FREETYPE"
-			L_EX="$L_EX -lfreetype -liconv"
-		else
 			I_EX="$I_EX -DU_FREETYPE `freetype-config --cflags`"
 			L_EX="$L_EX `freetype-config --libs`"
+		else
+			I_EX="$I_EX -DU_FREETYPE"
+			L_EX="$L_EX -lfreetype -liconv"
 		fi
 	fi
 
@@ -493,12 +522,13 @@ else
 	then
 		I_EX="$I_EX -DU_NLS -DMT_LANG_DEST=\"\\\"$MT_PO_DEST\"\\\""
 		MAKE_DIRS="$MAKE_DIRS po"
-		if [ "$OS" = "MinGW/MSYS" ]
+
+		if [ "$OS" = "GNU/Linux" ]
 		then
+			echo "MT_LANG_DEST=\"$MT_LANG_DEST\"" >> $GTK_FILE
+		else
 			L_EX="$L_EX -lintl"
 			echo "MT_LANG_DEST=\"$BIN_INSTALL/$MT_LANG_DEST\"" >> $GTK_FILE
-		else
-			echo "MT_LANG_DEST=\"$MT_LANG_DEST\"" >> $GTK_FILE
 		fi
 	fi
 	if [ "$MT_MAN" = YES ]

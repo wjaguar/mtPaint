@@ -1592,6 +1592,8 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	delete_text( widget, event, data );
 
+	if (t_font_name) g_free(t_font_name);
+
 	return FALSE;
 }
 

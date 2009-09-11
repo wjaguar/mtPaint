@@ -17,6 +17,7 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -512,7 +513,6 @@ int spawn_process(char *argv[], char *directory)
 
 #else
 
-#include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>

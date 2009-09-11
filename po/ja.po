@@ -25,7 +25,7 @@ msgstr "再生"
 
 #: src/ani.c:706
 msgid "Fix"
-msgstr "修正"
+msgstr "固定"
 
 #: src/ani.c:711 src/ani.c:1191 src/font.c:1878 src/font.c:1898
 #: src/shifter.c:345 src/viewer.c:119 src/viewer.c:242
@@ -2669,7 +2669,7 @@ msgstr "中央"
 
 #: src/otherwindow.c:1098
 msgid "Fix Aspect Ratio"
-msgstr "アスペクトレシオを修正"
+msgstr "アスペクトレシオを固定"
 
 #: src/otherwindow.c:1118 src/otherwindow.c:2155
 msgid "Settings"
@@ -3348,7 +3348,7 @@ msgstr "完了"
 
 #: src/shifter.c:335
 msgid "Fix Palette"
-msgstr "パレットを調整"
+msgstr "パレットを固定"
 
 #: src/spawn.c:390 src/spawn.c:442
 msgid "Action"

@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.20	2007-?-?
+3.20	2007-12-27
 
 	* mtPaint is now licensed as GPL version 3 (or later)
 	* Chinese (Simplified) added by puppychinese(Cecc)
@@ -16,9 +16,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Spacing for non-continuous tools is now configurable - right click the continuous mode toggle
 	* "Blend" drawing mode added
 	* "Unassociate Alpha" operation added to Channels menu
+	* Palette is now stored in RGB PNG files
 	* PNG compression level made configurable
 	* TGA file format save/load added
-	* JPEG2000 file format save/load added
+	* JPEG2000 file format save/load added (EXPERIMENTAL)
 	* XPM files with up to 4096 colours can now be saved and loaded as RGB images
 	* Palette->Dither A sets colour A/B and the pattern based on the current A colour and the palette
 	* Max-min quantizer added - creates small palettes with higher saturation and contrast
@@ -40,6 +41,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Gradient preview now properly shows effect of mask channel
 	* BUGFIX - "Resize Canvas" with negative offset now works correctly
 	* BUGFIX - Clipboard rotation now properly handles clipboard alpha
+	* BUGFIX - Transparency in greyscale PNG files is now read properly
 	* Lanczos3 rescaling filter removed due to unfavourable results
 	* DL1 quantizer removed for the same reason
 

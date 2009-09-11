@@ -1543,7 +1543,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		dr = ((int)c1[0] - c0[0]) / d;
 		r0 = c0[0];
 		dg = ((int)c1[1] - c0[1]) / d;
-		g0 = c1[1];
+		g0 = c0[1];
 		db = ((int)c1[2] - c0[2]) / d;
 		b0 = c0[2];
 
@@ -2076,8 +2076,9 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	case DITH_OLDSCATTER:
 		err = mem_quantize(old_image, new_cols, 3);
 		break;
-	default:
-	case DITH_MAX: break;
+	case DITH_MAX: /* Stay silent unless a memory error happened */
+		err = err < 0;
+		break;
 	}
 	if (err) memory_errors(1);
 

@@ -478,7 +478,7 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 	update_menus();
 
-	if ( MEM_BPP == mem_clip_bpp ) pressed_paste_centre( NULL, NULL );
+	if (MEM_BPP >= mem_clip_bpp) pressed_paste_centre( NULL, NULL );
 }
 
 void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )

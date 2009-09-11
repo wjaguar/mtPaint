@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Type=Application
+Name=mtPaint
+GenericName=Image Editor
+Comment=Painting program to create pixel art and manipulate digital photos
+TryExec=mtpaint
+Exec=mtpaint %F
+Icon=mtpaint
+Terminal=false
+Categories=Graphics;2DGraphics;RasterGraphics;GTK;
+MimeType=image/bmp;image/x-bmp;image/gif;image/jpeg;image/jpg;image/pjpeg;image/png;image/x-png;image/tiff;image/x-tga;image/xbm;image/x-xbm;image/x-xbitmap;image/xpm;image/x-xpm;image/x-xpixmap;

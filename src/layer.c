@@ -823,10 +823,6 @@ static void update_main_with_new_layer()
 	gtk_widget_set_usize(drawing_canvas, w, h);
 	vw_focus_view();
 	update_all_views();
-
-	if ((tool_type == TOOL_SMUDGE) && (MEM_BPP == 1))
-		gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 }
 
 static void layers_remove_all()
