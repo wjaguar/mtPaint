@@ -292,395 +292,6 @@ void pressed_new( GtkMenuItem *menu_item, gpointer user_data )
 }
 
 
-///	COLOUR A/B EDITOR WINDOW
-
-#define RGB_preview_width 64
-#define RGB_preview_height 32
-
-png_color a_old, b_old, a_new, b_new;
-
-GtkWidget *col_window;
-GtkWidget *label_A_RGB_2, *label_B_RGB_2;
-GtkWidget *drawingarea_A_1, *drawingarea_B_1;
-GtkWidget *drawingarea_A_2, *drawingarea_B_2;
-
-GtkWidget *hscale_A_R, *hscale_A_G, *hscale_A_B;
-GtkWidget *hscale_B_R, *hscale_B_G, *hscale_B_B;
-
-GtkWidget *checkbutton_posterize, *spinbutton_posterize;
-
-void paint_colour( char *mem, GtkWidget *drawing_area, int r, int g, int b, int x, int y, int w, int h)
-{
-	int i;
-	
-	for ( i=0; i<(RGB_preview_width*RGB_preview_height); i++ )
-	{
-		mem[ 0 + 3*i ] = r;
-		mem[ 1 + 3*i ] = g;
-		mem[ 2 + 3*i ] = b;
-	}
-	
-	gdk_draw_rgb_image (drawing_area->window,
-			drawing_area->style->black_gc,
-			x, y, w, h,
-			GDK_RGB_DITHER_NONE, mem, w*3
-			);
-}
-
-static gint expose_colours( GtkWidget *widget, GdkEventExpose *event )
-{
-	char *rgb;
-	int x = event->area.x, y = event->area.y;
-	int w = event->area.width, h = event->area.height;
-
-	mtMIN( w, w, RGB_preview_width )
-	mtMIN( h, h, RGB_preview_width )
-
-	rgb = grab_memory( RGB_preview_width*RGB_preview_height*3, 0 );
-
-//	This expose event could be from either of the 4 areas, so update all
-//	This is very lazy, but it seems OK
-
-	paint_colour( rgb, drawingarea_A_1, a_old.red, a_old.green, a_old.blue, x, y, w, h );
-	paint_colour( rgb, drawingarea_B_1, b_old.red, b_old.green, b_old.blue, x, y, w, h );
-	paint_colour( rgb, drawingarea_A_2, a_new.red, a_new.green, a_new.blue, x, y, w, h );
-	paint_colour( rgb, drawingarea_B_2, b_new.red, b_new.green, b_new.blue, x, y, w, h );
-
-	free( rgb );
-
-	return FALSE;
-}
-
-void update_RGB_labels()	// Update labels with values in a/b_new & impose posterizing
-{
-	int hue[6] = { a_new.red, a_new.green, a_new.blue, b_new.red, b_new.green, b_new.blue };
-	int posty, i;
-	char txt[64];
-
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_posterize)) )
-	{
-		posty = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_posterize) );
-
-		for ( i=0; i<6; i++) hue[i] = do_posterize( hue[i], posty );
-
-		a_new.red = hue[0]; a_new.green = hue[1]; a_new.blue = hue[2];
-		b_new.red = hue[3]; b_new.green = hue[4]; b_new.blue = hue[5];
-	}
-
-	snprintf(txt, 60, "%i,%i,%i", hue[0], hue[1], hue[2]);
-	gtk_label_set_text( GTK_LABEL(label_A_RGB_2), txt );
-
-	snprintf(txt, 60, "%i,%i,%i", hue[3], hue[4], hue[5]);
-	gtk_label_set_text( GTK_LABEL(label_B_RGB_2), txt );
-
-	gtk_widget_queue_draw(drawingarea_A_1);
-}
-
-gint slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int	ar = GTK_HSCALE(hscale_A_R)->scale.range.adjustment->value,
-		ag = GTK_HSCALE(hscale_A_G)->scale.range.adjustment->value,
-		ab = GTK_HSCALE(hscale_A_B)->scale.range.adjustment->value;
-	int	br = GTK_HSCALE(hscale_B_R)->scale.range.adjustment->value,
-		bg = GTK_HSCALE(hscale_B_G)->scale.range.adjustment->value,
-		bb = GTK_HSCALE(hscale_B_B)->scale.range.adjustment->value;
-
-	a_new.red = ar;
-	a_new.green = ag;
-	a_new.blue = ab;
-	b_new.red = br;
-	b_new.green = bg;
-	b_new.blue = bb;
-	
-	update_RGB_labels();
-
-	return FALSE;
-}
-
-void update_RGB_sliders()	// Update sliders with values in a/b new
-{
-	int ar = a_new.red, ag = a_new.green, ab = a_new.blue;
-	int br = b_new.red, bg = b_new.green, bb = b_new.blue;
-
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_A_R)->scale.range.adjustment, ar );
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_A_G)->scale.range.adjustment, ag );
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_A_B)->scale.range.adjustment, ab );
-
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_B_R)->scale.range.adjustment, br );
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_B_G)->scale.range.adjustment, bg );
-	gtk_adjustment_set_value( GTK_HSCALE(hscale_B_B)->scale.range.adjustment, bb );
-
-	update_RGB_labels();
-}
-
-void pal_refresher()
-{
-	update_all_views();
-	init_pal();
-	gtk_widget_queue_draw(drawing_col_prev);
-}
-
-void implement_cols(png_color A, png_color B)
-{
-	if ( mem_img_bpp == 1 )
-	{
-		mem_pal[mem_col_A] = A;
-		mem_pal[mem_col_B] = B;
-	}
-	mem_col_A24 = A;
-	mem_col_B24 = B;
-	pal_refresher();
-}
-
-gint delete_col( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	inifile_set_gboolean( "posterizeToggle",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_posterize)) );
-	inifile_set_gint32("posterizeInt",
-		gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_posterize) ) );
-
-	gtk_widget_destroy(col_window);
-
-	return FALSE;
-}
-
-gint click_col_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	implement_cols( a_old, b_old );
-	delete_col( NULL, NULL, NULL );
-
-	return FALSE;
-}
-
-gint click_col_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	implement_cols( a_old, b_old );
-
-	spot_undo(UNDO_PAL);
-
-	implement_cols( a_new, b_new );
-	delete_col( NULL, NULL, NULL );
-
-	return FALSE;
-}
-
-gint click_col_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	implement_cols( a_new, b_new );
-
-	return FALSE;
-}
-
-gint click_col_reset( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	a_new = a_old;
-	b_new = b_old;
-
-	update_RGB_sliders();
-
-	implement_cols( a_old, b_old );
-
-	return FALSE;
-}
-
-gint posterize_click( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_posterize)) )
-	{
-		update_RGB_labels();
-		update_RGB_sliders();
-	}
-
-	return FALSE;
-}
-
-void choose_colours()
-{
-	GtkWidget *vbox2, *table2;
-	GtkWidget *label_A, *label_B, *label_A_RGB_1, *label_B_RGB_1;
-	GtkWidget *drawingarea5, *drawingarea6;
-	GtkWidget *hbox_middle, *hbox_bottom;
-	GtkWidget *button_ok, *button_apply, *button_reset, *button_cancel;
-	char txt[64];
-
-	GtkAccelGroup* ag = gtk_accel_group_new();
-
-
-	if ( mem_img_bpp == 1 )
-	{
-		a_old = mem_pal[mem_col_A];
-		b_old = mem_pal[mem_col_B];
-	}
-	else
-	{
-		a_old = mem_col_A24;
-		b_old = mem_col_B24;
-	}
-	a_new = a_old;
-	b_new = b_old;
-
-	col_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Colour Editor"), GTK_WIN_POS_MOUSE, TRUE );
-
-	vbox2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox2);
-	gtk_container_add (GTK_CONTAINER (col_window), vbox2);
-
-	table2 = add_a_table( 6, 4, 5, vbox2 );
-
-	if ( mem_img_bpp == 1 )
-		snprintf(txt, 60, "A [%i]", mem_col_A);
-	else
-		sprintf(txt, "A");
-
-	label_A = add_to_table( txt, table2, 0, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	snprintf(txt, 60, "%i,%i,%i", a_old.red, a_old.green, a_old.blue);
-	label_A_RGB_1 = add_to_table( txt, table2, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	gtk_widget_set_usize (label_A_RGB_1, 80, -2);
-	label_A_RGB_2 = add_to_table( txt, table2, 2, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	gtk_widget_set_usize (label_A_RGB_2, 80, -2);
-
-	if ( mem_img_bpp == 1 )
-		snprintf(txt, 60, "B [%i]", mem_col_B);
-	else
-		sprintf(txt, "B");
-
-	label_B = add_to_table( txt, table2, 3, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	snprintf(txt, 60, "%i,%i,%i", b_old.red, b_old.green, b_old.blue);
-	label_B_RGB_1 = add_to_table( txt, table2, 4, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	label_B_RGB_2 = add_to_table( txt, table2, 5, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-
-	add_to_table( _("Red"), table2, 0, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	add_to_table( _("Green"), table2, 1, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	add_to_table( _("Blue"), table2, 2, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-
-	add_to_table( _("Red"), table2, 3, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	add_to_table( _("Green"), table2, 4, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-	add_to_table( _("Blue"), table2, 5, 3, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
-
-	drawingarea_A_1 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea_A_1);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea_A_1, 1, 2, 1, 2,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea_A_1, RGB_preview_width, RGB_preview_height);
-	gtk_signal_connect_object( GTK_OBJECT(drawingarea_A_1), "expose_event",
-		GTK_SIGNAL_FUNC (expose_colours), NULL );
-
-	drawingarea_A_2 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea_A_2);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea_A_2, 1, 2, 2, 3,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea_A_2, RGB_preview_width, RGB_preview_height);
-	gtk_signal_connect_object( GTK_OBJECT(drawingarea_A_2), "expose_event",
-		GTK_SIGNAL_FUNC (expose_colours), NULL );
-
-	drawingarea_B_1 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea_B_1);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea_B_1, 1, 2, 4, 5,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea_B_1, RGB_preview_width, RGB_preview_height);
-	gtk_signal_connect_object( GTK_OBJECT(drawingarea_B_1), "expose_event",
-		GTK_SIGNAL_FUNC (expose_colours), NULL );
-
-	drawingarea_B_2 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea_B_2);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea_B_2, 1, 2, 5, 6,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea_B_2, RGB_preview_width, RGB_preview_height);
-	gtk_signal_connect_object( GTK_OBJECT(drawingarea_B_2), "expose_event",
-		GTK_SIGNAL_FUNC (expose_colours), NULL );
-
-	hscale_A_R = add_slider2table( a_new.red, 0, 255, table2, 0, 2, 255, 20 );
-	hscale_A_G = add_slider2table( a_new.green, 0, 255, table2, 1, 2, 255, 20 );
-	hscale_A_B = add_slider2table( a_new.blue, 0, 255, table2, 2, 2, 255, 20 );
-
-	hscale_B_R = add_slider2table( b_new.red, 0, 255, table2, 3, 2, 255, 20 );
-	hscale_B_G = add_slider2table( b_new.green, 0, 255, table2, 4, 2, 255, 20 );
-	hscale_B_B = add_slider2table( b_new.blue, 0, 255, table2, 5, 2, 255, 20 );
-
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_A_R)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_A_G)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_A_B)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_B_R)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_B_G)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_B_B)->scale.range.adjustment), "value_changed",
-		GTK_SIGNAL_FUNC(slider_moved), NULL);
-
-	drawingarea5 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea5);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea5, 1, 2, 0, 1,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea5, RGB_preview_width, RGB_preview_height);
-
-	drawingarea6 = gtk_drawing_area_new ();
-	gtk_widget_show (drawingarea6);
-	gtk_table_attach (GTK_TABLE (table2), drawingarea6, 1, 2, 3, 4,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (drawingarea6, RGB_preview_width, RGB_preview_height);
-
-	add_hseparator( vbox2, -2, 10 );
-
-	hbox_middle = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox_middle);
-	gtk_box_pack_start (GTK_BOX (vbox2), hbox_middle, FALSE, FALSE, 0);
-
-	checkbutton_posterize = add_a_toggle( _("Posterize"),
-		hbox_middle, inifile_get_gboolean("posterizeToggle", FALSE) );
-
-	gtk_signal_connect(GTK_OBJECT(checkbutton_posterize), "clicked",
-		GTK_SIGNAL_FUNC(posterize_click), NULL);
-
-	spinbutton_posterize = add_a_spin( inifile_get_gint32("posterizeInt", 1), 1, 8 );
-	gtk_box_pack_start (GTK_BOX (hbox_middle), spinbutton_posterize, FALSE, FALSE, 0);
-
-	gtk_signal_connect(GTK_OBJECT( &GTK_SPIN_BUTTON(spinbutton_posterize)->entry ), "changed",
-		GTK_SIGNAL_FUNC(posterize_click), NULL);
-
-	add_hseparator( vbox2, -2, 10 );
-
-	hbox_bottom = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox_bottom);
-	gtk_box_pack_start (GTK_BOX (vbox2), hbox_bottom, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (hbox_bottom), 5);
-
-	button_cancel = add_a_button(_("Cancel"), 4, hbox_bottom, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_cancel), "clicked", GTK_SIGNAL_FUNC(click_col_cancel), NULL);
-	gtk_signal_connect_object (GTK_OBJECT (col_window), "delete_event",
-		GTK_SIGNAL_FUNC (click_col_cancel), NULL);
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button_apply = add_a_button(_("Preview"), 4, hbox_bottom, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_apply), "clicked",
-		GTK_SIGNAL_FUNC(click_col_preview), NULL);
-
-	button_reset = add_a_button(_("Reset"), 4, hbox_bottom, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_reset), "clicked",
-		GTK_SIGNAL_FUNC(click_col_reset), NULL);
-
-	button_ok = add_a_button(_("OK"), 4, hbox_bottom, TRUE );
-	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked",
-		GTK_SIGNAL_FUNC(click_col_ok), NULL);
-
-	update_RGB_sliders();				// Adjust for posterize & set sliders properly
-
-	gtk_window_set_transient_for( GTK_WINDOW(col_window), GTK_WINDOW(main_window) );
-	gtk_widget_show (col_window);
-	gtk_window_add_accel_group(GTK_WINDOW (col_window), ag);
-}
-
-
-
 ///	PATTERN & BRUSH CHOOSER WINDOW
 
 static GtkWidget *pat_window, *draw_pat;
@@ -944,6 +555,13 @@ void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
+
+void pal_refresher()
+{
+	update_all_views();
+	init_pal();
+	gtk_widget_queue_draw(drawing_col_prev);
+}
 
 
 /* Generic code to handle UI needs of common image transform tasks */
@@ -1926,9 +1544,9 @@ typedef struct {
 	guint16 r, g, b, a;
 } RGBA16;
 
-static GtkWidget *allcol_window;
+static GtkWidget *allcol_window, *allcol_list;
 static RGBA16 *ctable;
-static int cs_old_overlay[NUM_CHANNELS][4];
+static int allcol_idx, cs_old_overlay[NUM_CHANNELS][4];
 
 
 static void allcol_ok(colour_hook chook)
@@ -1949,6 +1567,15 @@ static gboolean allcol_cancel(colour_hook chook)
 	gtk_widget_destroy(allcol_window);
 	free(ctable);
 	return (FALSE);
+}
+
+static void color_refresh()
+{
+	gtk_list_select_item(GTK_LIST(allcol_list), allcol_idx);
+
+	/* Stupid GTK+ does nothing for gtk_widget_queue_draw(allcol_list) */
+	gtk_container_foreach(GTK_CONTAINER(allcol_list),
+		(GtkCallback)gtk_widget_queue_draw, NULL);
 }
 
 static gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_data )
@@ -2018,11 +1645,13 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	gtk_color_selection_set_previous_color(cs, &c);
 	gtk_color_selection_set_previous_alpha(cs, cc->a);
 #endif
+	allcol_idx = cc - ctable;
 
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 }
 
-void colour_window(GtkWidget *win, int cnt, char **cnames, int alpha, colour_hook chook)
+void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, char **cnames,
+	int alpha, colour_hook chook)
 {
 	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
@@ -2068,7 +1697,8 @@ void colour_window(GtkWidget *win, int cnt, char **cnames, int alpha, colour_hoo
 	gtk_widget_show(viewport);
 	gtk_container_add (GTK_CONTAINER (swindow), viewport);
 
-	col_list = gtk_list_new();
+	allcol_idx = 0;
+	allcol_list = col_list = gtk_list_new();
 	gtk_signal_connect(GTK_OBJECT(col_list), "select_child",
 		GTK_SIGNAL_FUNC(color_select), cs);
 	gtk_list_set_selection_mode( GTK_LIST(col_list), GTK_SELECTION_BROWSE );
@@ -2103,6 +1733,8 @@ void colour_window(GtkWidget *win, int cnt, char **cnames, int alpha, colour_hoo
 	}
 
 	gtk_box_pack_start( GTK_BOX(hbox), cs, TRUE, TRUE, 0 );
+
+	if (extbox) gtk_box_pack_start(GTK_BOX(vbox), extbox, FALSE, FALSE, 0);
 
 	hbut = gtk_hbox_new(FALSE, 3);
 	gtk_widget_show( hbut );
@@ -2177,6 +1809,22 @@ static void do_allover()
 	update_all_views();
 }
 
+static void do_AB(int idx)
+{
+	png_color *A0, *B0;
+	A0 = mem_img_bpp == 1 ? &mem_pal[mem_col_A] : &mem_col_A24;
+	B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
+
+	A0->red = (ctable[idx].r + 128) / 257;
+	A0->green = (ctable[idx].g + 128) / 257;
+	A0->blue = (ctable[idx].b + 128) / 257;
+	idx++;
+	B0->red = (ctable[idx].r + 128) / 257;
+	B0->green = (ctable[idx].g + 128) / 257;
+	B0->blue = (ctable[idx].b + 128) / 257;
+	pal_refresher();
+}
+
 static void select_colour(int what)
 {
 	switch (what)
@@ -2233,9 +1881,51 @@ static void select_overlay(int what)
 	}
 }
 
+static void select_AB(int what)
+{
+	switch (what)
+	{
+	case 0: /* Cancel */
+		do_AB(2);
+		break;
+	case 2: /* OK */
+		do_AB(2);
+		spot_undo(UNDO_PAL);
+	case 1: /* Preview */
+		do_AB(0);
+		break;
+	}
+}
+
+static void posterize_AB(GtkButton *button, gpointer user_data)
+{
+	static int posm[8] = {0, 0xFF00, 0x5500, 0x2480, 0x1100,
+				 0x0840, 0x0410, 0x0204};
+	int i, pm, ps;
+
+	ps = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(user_data));
+	inifile_set_gint32("posterizeInt", ps);
+	if (ps >= 8) return;
+	pm = posm[ps]; ps = 8 - ps;
+
+	i = (ctable[0].r + 128) / 257;
+	ctable[0].r = (((i >> ps) * pm) >> 8) * 257;
+	i = (ctable[0].g + 128) / 257;
+	ctable[0].g = (((i >> ps) * pm) >> 8) * 257;
+	i = (ctable[0].b + 128) / 257;
+	ctable[0].b = (((i >> ps) * pm) >> 8) * 257;
+	i = (ctable[1].r + 128) / 257;
+	ctable[1].r = (((i >> ps) * pm) >> 8) * 257;
+	i = (ctable[1].g + 128) / 257;
+	ctable[1].g = (((i >> ps) * pm) >> 8) * 257;
+	i = (ctable[1].b + 128) / 257;
+	ctable[1].b = (((i >> ps) * pm) >> 8) * 257;
+	color_refresh();
+}
+
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
-	GtkWidget *win;
+	GtkWidget *win, *extbox;
 	int i, j;
 
 	if (cs_type == COLSEL_EDIT_ALL)
@@ -2251,7 +1941,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		}
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, mem_cols, NULL, FALSE, select_colour);
+		colour_window(win, NULL, mem_cols, NULL, FALSE, select_colour);
 	}
 
 	if (cs_type == COLSEL_OVERLAYS)
@@ -2282,13 +1972,53 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
 			GTK_WIN_POS_CENTER, TRUE);
-		colour_window(win, 3, ovl_txt, TRUE, select_overlay);
+		colour_window(win, NULL, 3, ovl_txt, TRUE, select_overlay);
+	}
+
+	if (cs_type == COLSEL_EDIT_AB)
+	{
+		static char *AB_txt[] = { "A", "B" };
+		GtkWidget *button, *spin;
+		png_color *A0, *B0;
+		A0 = mem_img_bpp == 1 ? &mem_pal[mem_col_A] : &mem_col_A24;
+		B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
+
+		ctable = malloc(4 * sizeof(RGBA16));
+		ctable[0].r = A0->red * 257;
+		ctable[0].g = A0->green * 257;
+		ctable[0].b = A0->blue * 257;
+		ctable[0].a = 65535;
+		ctable[1].r = B0->red * 257;
+		ctable[1].g = B0->green * 257;
+		ctable[1].b = B0->blue * 257;
+		ctable[1].a = 65535;
+		/* Save previous values right here */
+		ctable[2] = ctable[0];
+		ctable[3] = ctable[1];
+
+		/* Prepare posterize controls */
+		extbox = gtk_hbox_new(FALSE, 0);
+		gtk_widget_show(extbox);
+		button = add_a_button(_("Posterize"), 4, extbox, TRUE);
+		spin = add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8);
+		gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
+		gtk_signal_connect(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(posterize_AB), spin);
+
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
+			GTK_WIN_POS_MOUSE, TRUE);
+		colour_window(win, extbox, 2, AB_txt, FALSE, select_AB);
 	}
 }
 
 void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
 {
 	colour_selector( COLSEL_EDIT_ALL );
+}
+
+void choose_colours()
+{
+	colour_selector(COLSEL_EDIT_AB);
 }
 
 ///	QUANTIZE WINDOW

@@ -16,8 +16,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Transform Colour Window - Selective palette option
 	* Undo now less wasteful of memory when adjusting the palette
 	* Major rewrite of back end code to improve performance
+	* Colour A/B editor now uses GTK+ colour dialog
 	* Most documentation has been removed from the F1 help and is now in HTML form
 	* HTML documentation available as a separate download package
+	* mtPaint mailing lists set up - http://sourceforge.net/mail/?group_id=155874
 	* BUGFIX - Saving a composite layer image does not occasionally leave transparent areas
 	* BUGFIX - Transforming colour of palette with preview (RGB images) now works properly
 	* BUGFIX - Status bar now updated after removing all layers
