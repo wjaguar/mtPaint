@@ -1039,6 +1039,33 @@ static void font_clist_centralise(mtfontsel *mem)
 	}
 }
 
+static void read_font_controls(mtfontsel *fp)
+{
+	int i;
+	char txt[128];
+
+	inifile_set("textString",
+		(char *)gtk_entry_get_text(GTK_ENTRY(fp->entry[TX_ENTRY_TEXT])));
+
+	for ( i=0; i<TX_TOGGS; i++ )
+	{
+		snprintf(txt, 128, "fontAntialias%i", i);
+		inifile_set_gboolean( txt,
+			gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fp->toggle[i])));
+	}
+
+	inifile_set_gint32("fontAngle",
+		rint(read_float_spin(fp->spin[TX_SPIN_ANGLE]) * 100.0));
+
+	if ( inifile_get_gboolean( "fontTypeBitmap", TRUE ) )
+		inifile_set_gint32("fontSizeBitmap", read_spin(fp->spin[TX_SPIN_SIZE]));
+	else
+		inifile_set_gint32("fontSize", read_spin(fp->spin[TX_SPIN_SIZE]) );
+
+	if (mem_channel == CHN_IMAGE)
+		inifile_set_gint32( "fontBackground", read_spin(fp->spin[TX_SPIN_BACKGROUND]));
+}
+
 static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
@@ -1046,6 +1073,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if ( !fp ) return FALSE;
 
+	read_font_controls(fp);
 	ft_render_text();
 	if ( mem_clipboard != NULL ) pressed_paste_centre( NULL, NULL );
 
@@ -1710,34 +1738,11 @@ static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
 
 static void font_entry_changed(GtkWidget *widget, gpointer user)	// A GUI entry has changed
 {
-	int i;
-	char txt[128];
-	mtfontsel *fp = (mtfontsel *) user;
+	mtfontsel *fp = user;
 
 
 	if (!fp) return;
-
-	inifile_set( "textString", (char *)gtk_entry_get_text( GTK_ENTRY(fp->entry[TX_ENTRY_TEXT]) ) );
-
-	for ( i=0; i<TX_TOGGS; i++ )
-	{
-		snprintf(txt, 128, "fontAntialias%i", i);
-		inifile_set_gboolean( txt,
-			gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(fp->toggle[i]) ) );
-	}
-
-	inifile_set_gint32("fontAngle", rint(read_float_spin(fp->spin[TX_SPIN_ANGLE]) * 100.0));
-
-	if ( inifile_get_gboolean( "fontTypeBitmap", TRUE ) )
-		inifile_set_gint32("fontSizeBitmap", read_spin(fp->spin[TX_SPIN_SIZE]) );
-	else
-		inifile_set_gint32("fontSize", read_spin(fp->spin[TX_SPIN_SIZE]) );
-
-	if (mem_channel == CHN_IMAGE)
-	{
-		inifile_set_gint32( "fontBackground", read_spin(fp->spin[TX_SPIN_BACKGROUND]));
-	}
-
+	read_font_controls(fp);
 	font_preview_update( fp );		// Update the font preview area
 }
 #endif		// U_FREETYPE

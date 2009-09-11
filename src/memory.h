@@ -25,6 +25,8 @@
 #define MAX_HEIGHT 16384
 #define MIN_WIDTH 1
 #define MIN_HEIGHT 1
+/* !!! If MAX_WIDTH * MAX_HEIGHT * max bpp won't fit into int, lots of code
+ * !!! will have to be modified to use size_t instead */
 
 #ifdef U_GUADALINEX
 	#define DEFAULT_WIDTH 800
@@ -104,7 +106,8 @@ typedef struct {
 	chanlist img;
 	png_color *pal_;
 	unsigned char tilemap[UNDO_TILEMAP_SIZE], *tileptr;
-	int cols, width, height, bpp, flags, size;
+	int cols, width, height, bpp, flags;
+	size_t size;
 } undo_item;
 
 typedef struct {
@@ -121,6 +124,7 @@ typedef struct {
 	int cols;	// Number of colours in the palette: 1..256 or 0 for no image
 	int bpp;		// Bytes per pixel = 1 or 3
 	int width, height;	// Image geometry
+	size_t size;
 	undo_stack undo_;	// Image's undo stack
 } image_info;
 
@@ -235,6 +239,12 @@ int smudge_mode;
 
 /// IMAGE
 
+#define MIN_UNDO 11	// Number of undo levels + 1
+#define DEF_UNDO 101
+#define MAX_UNDO 1001
+
+int mem_undo_depth;				// Current undo depth
+
 image_info mem_image;			// Current image
 
 #define mem_img		mem_image.img		
@@ -249,8 +259,6 @@ image_info mem_image;			// Current image
 #define mem_undo_done		mem_image.undo_.done
 #define mem_undo_redo		mem_image.undo_.redo
 #define mem_undo_max		mem_image.undo_.max
-
-#define MAX_UNDO 101			// Maximum number of undo levels + 1
 
 image_info mem_clip;			// Current clipboard
 
@@ -348,8 +356,9 @@ void line_nudge(linedata line, int x, int y);
 
 /// Procedures
 
-void init_istate();	// Set initial state of image variables
+void init_istate();		// Set initial state of image variables
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
+void update_undo_depth();	// Resize all undo stacks
 
 int mem_count_all_cols();			// Count all colours - Using main image
 int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy
@@ -378,8 +387,10 @@ int mem_new( int width, int height, int bpp, int cmask );
 int mem_clip_new(int width, int height, int bpp, int cmask, int backup);
 void mem_init();				// Initialise memory
 
-int mem_used();				// Return the number of bytes used in image + undo stuff
-int mem_used_layers();			// Return the number of bytes used in image + undo in all layers
+//	Return the number of bytes used in image + undo stuff
+size_t mem_used();
+//	Return the number of bytes used in image + undo in all layers
+size_t mem_used_layers();
 
 void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
 void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
@@ -455,10 +466,12 @@ void mem_undo_prepare();	// Call this after changes to image, to compress last f
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user
 
-#define UC_CREATE  1	/* Force create */
-#define UC_NOCOPY  2	/* Forbid copy */
-#define UC_DELETE  4	/* Force delete */
-#define UC_PENDOWN 8	/* Respect pen_down */
+#define UC_CREATE  0x01	/* Force create */
+#define UC_NOCOPY  0x02	/* Forbid copy */
+#define UC_DELETE  0x04	/* Force delete */
+#define UC_PENDOWN 0x08	/* Respect pen_down */
+#define UC_GETMEM  0x10 /* Get memory and do nothing */
+#define UC_NOALLOC 0x20 /* Do not allocate channels */
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 void update_undo(image_info *image);	// Copy image state into current undo frame

@@ -92,6 +92,7 @@ static inilist ini_int[] = {
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },
 	{ "lastspalType",	&spal_mode,		2   },
+	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
 	{ NULL,			NULL }
 };
 
@@ -4109,7 +4110,7 @@ void main_init()
 		else pack_end(hbox_bar, label_bar[(STATUS_ITEMS - 1) + 3 - i]);
 	}
 	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
-	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
+	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 70, -2);
 	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "0+0" );
 
 
@@ -4149,6 +4150,7 @@ void main_init()
 
 	icon_pix = gdk_pixmap_create_from_xpm_d( main_window->window, NULL, NULL, icon_xpm );
 	gdk_window_set_icon( main_window->window, NULL, icon_pix, NULL );
+	gdk_pixmap_unref(icon_pix);
 
 	set_cursor();
 	init_status_bar();

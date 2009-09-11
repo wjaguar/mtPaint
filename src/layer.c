@@ -55,14 +55,15 @@ void layers_init()
 	layer_table[0].opacity = 100;
 }
 
-/* Allocate layer image, its channels and undo stack */
+/* Allocate layer image, its channels and undo stack
+ * !!! Must be followed by update_undo() after setting up image is done */
 static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 {
 	layer_image *lim;
 
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
-	if (init_undo(&lim->image_.undo_, MAX_UNDO) &&
+	if (init_undo(&lim->image_.undo_, mem_undo_depth) &&
 		mem_alloc_image(&lim->image_, w, h, bpp, cmask, src))
 		return (lim);
 	free(lim->image_.undo_.items);
@@ -152,6 +153,7 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 
 	lp->image_ = mem_image;
 	lp->state_ = mem_state;
+	lp->image_.size = 0; // Invalidate
 }
 
 static void layer_copy_to_main( int l )		// Copy info from layer to main image
@@ -353,6 +355,7 @@ static gint layer_press_duplicate()
 	lim->state_ = ls->state_;
 	mem_pal_copy(lim->image_.pal, ls->image_.pal);
 	lim->image_.cols = ls->image_.cols;
+	update_undo(&lim->image_);
 
 	// Copy across position data
 	memcpy(lim->ani_pos, ls->ani_pos, sizeof(lim->ani_pos));
@@ -626,7 +629,7 @@ int load_layers( char *file_name )
 		mem_width = 1;
 		mem_height = 1;
 		memset(mem_img, 0, sizeof(chanlist));
-		init_undo(&mem_image.undo_, MAX_UNDO);
+		init_undo(&mem_image.undo_, mem_undo_depth);
 		mem_undo_im_[0].img[CHN_IMAGE] = mem_img[CHN_IMAGE] = malloc(3);
 	}
 	if ( layers_total>0 )

@@ -32,9 +32,11 @@
 ///	PREFERENCES WINDOW
 
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
-static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
-static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg,
-	*spinbutton_jp2, *spinbutton_png, *spinbutton_recent, *spinbutton_silence;
+static GtkWidget *spinbutton_maxmem, *spinbutton_maxundo, *spinbutton_greys,
+	*spinbutton_nudge, *spinbutton_pan;
+static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty,
+	*spinbutton_jpeg, *spinbutton_jp2, *spinbutton_png, *spinbutton_recent,
+	*spinbutton_silence;
 static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef;
 
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
@@ -256,6 +258,7 @@ static void prefs_apply(GtkWidget *widget)
 	}
 
 	mem_undo_limit = read_spin(spinbutton_maxmem);
+	mem_undo_depth = read_spin(spinbutton_maxundo);
 	mem_background = read_spin(spinbutton_greys);
 	mem_nudge = read_spin(spinbutton_nudge);
 	mem_xpm_trans = read_spin(spinbutton_trans);
@@ -329,6 +332,7 @@ static void prefs_apply(GtkWidget *widget)
 	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])), PATHBUF);
 	inifile_set(HANDBOOK_LOCATION_INI, path);
 
+	update_undo_depth();		// If undo depth was changed
 	update_all_views();		// Update canvas for changes
 	set_cursor();
 
@@ -405,7 +409,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet;
 	GtkWidget *button1, *notebook1, *page, *vbox_2, *label;
 
-	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
+	char *tab_tex[] = { _("Max memory used for undo (MB)"),
+		_("Max undo levels"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
 //		_("JPEG Save Quality (100=High)   "),
@@ -437,16 +442,19 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 ///	---- TAB1 - GENERAL
 
 	page = add_new_page(notebook1, _("General"));
-	table3 = add_a_table( 3, 2, 10, page );
+	table3 = add_a_table( 5, 2, 10, page );
 
 ///	TABLE TEXT
-	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
+	for (i = 0; i < 5; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
 
 ///	TABLE SPINBUTTONS
 	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 1000);
-	spinbutton_greys = spin_to_table(table3, 1, 1, 5, mem_background, 0, 255);
-	spinbutton_nudge = spin_to_table(table3, 2, 1, 5, mem_nudge, 2, 512);
-	spinbutton_pan = spin_to_table(table3, 3, 1, 5, inifile_get_gint32("panSize", 128 ), 64, 256);
+	spinbutton_maxundo = spin_to_table(table3, 1, 1, 5, mem_undo_depth & ~1,
+		MIN_UNDO & ~1, MAX_UNDO & ~1);
+	spinbutton_greys = spin_to_table(table3, 2, 1, 5, mem_background, 0, 255);
+	spinbutton_nudge = spin_to_table(table3, 3, 1, 5, mem_nudge, 2, 512);
+	spinbutton_pan = spin_to_table(table3, 4, 1, 5,
+		inifile_get_gint32("panSize", 128 ), 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),
 		page, show_paste );

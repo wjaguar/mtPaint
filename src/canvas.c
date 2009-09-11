@@ -215,7 +215,7 @@ void init_status_bar()
 
 	if (status_on[STATUS_UNDOREDO])
 	{	
-		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
+		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 70, -2);
 		update_undo_bar();
 	}
 	else
