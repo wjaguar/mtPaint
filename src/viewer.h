@@ -18,7 +18,7 @@
 */
 
 float vw_zoom;
-gboolean view_showing, allow_cline, vw_focus_on;
+int view_showing, allow_cline, vw_focus_on;
 int opaque_view;
 
 GtkWidget *cline_window, *vw_drawing;

@@ -29,6 +29,8 @@ typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 typedef void (*colour_hook)(int what);
 
 png_color brcosa_pal[256];
+int sharper_reduce;
+int spal_mode;
 
 void pressed_new( GtkMenuItem *menu_item, gpointer user_data );
 void generic_new_window(int type);

@@ -523,14 +523,12 @@ void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
 ///	SORT PALETTE COLOURS
 
 static GtkWidget *spal_window, *spal_spins[2], *spal_rev;
-static int spal_mode;
+int spal_mode;
 
 gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	int index1 = 0, index2 = 1;
 	gboolean reverse;
-
-	inifile_set_gint32("lastspalType", spal_mode);
 
 	reverse = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(spal_rev));
 	inifile_set_gboolean( "palrevSort", reverse );
@@ -584,7 +582,7 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("End Index"), table1, 1, 0, 5 );
 
 	table1 = pack(vbox1, wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
-		inifile_get_gint32("lastspalType", 2), &spal_mode, NULL));
+		spal_mode, &spal_mode, NULL));
 	gtk_container_set_border_width(GTK_CONTAINER(table1), 5);
 
 	spal_rev = add_a_toggle(_("Reverse Order"), vbox1,
@@ -1028,7 +1026,7 @@ static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 
 static int scale_mode = 6;
 static int resize_mode = 0;
-static int sharper_reduce = FALSE;
+int sharper_reduce;
 
 static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
@@ -1055,7 +1053,6 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 		{
 			scale_type = scale_mode;
 			gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_gc));
-			inifile_set_gboolean("sharperReduce", sharper_reduce);
 		}
 		res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce);
 	}
@@ -1184,8 +1181,7 @@ void sisca_init( char *title )
 
 		add_hseparator(page1, -2, 10);
 		button = pack(page1, sig_toggle(_("Sharper image reduction"),
-			inifile_get_gboolean("sharperReduce", FALSE),
-			&sharper_reduce, NULL));
+			sharper_reduce, &sharper_reduce, NULL));
 
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 	}
@@ -2781,7 +2777,6 @@ static void click_grad_apply(GtkWidget *widget)
 	memcpy(gradbytes, grad_tbytes, sizeof(grad_tbytes));
 
 	grad_opacity = mt_spinslide_get_value(grad_ss_pre);
-	inifile_set_gint32("gradientOpacity", grad_opacity);
 
 	for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
 	for (i = 0; i <= NUM_CHANNELS; i++) gmap_setup(graddata + i, gradbytes, i);

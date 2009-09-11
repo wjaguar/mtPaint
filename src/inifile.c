@@ -32,6 +32,9 @@
 #include <string.h>
 #include <gtk/gtk.h>
 
+#include "global.h"
+#include "inifile.h"
+
 /* Make code not compile where it cannot run */
 typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *)) - 1];
 
@@ -55,24 +58,6 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 #define INI_STRING  0x0001 /* Index of strings block - must be bit 0 */
 #define INI_MALLOC  0x0002 /* Value is allocated (not in strings block 0) */
 #define INI_DEFAULT 0x0004 /* Default value is defined */
-
-typedef struct inislot inislot;
-
-struct inislot
-{
-	int key, defv;
-	char *value;
-	short type, flags;
-};
-
-typedef struct {
-	char *sblock[2];
-	inislot *slots;
-	short *hash;
-	int hmask, maxloop;
-	int count, slen;
-	guint32 seed;
-} inifile;
 
 #define SLOT_NAME(I,S) ((I)->sblock[(S)->flags & INI_STRING] + (S)->key)
 
@@ -229,7 +214,6 @@ static inislot *key_slot(inifile *inip, char *key, int type)
 {
 	inislot *slot;
 
-//g_print("Key_slot: '%s' %d\n", key, type);
 	slot = cuckoo_find(inip, key);
 	if (slot)
 	{
@@ -436,6 +420,7 @@ char *ini_getstr(inifile *inip, char *key, char *defv)
 
 	/* Read existing */
 	slot = key_slot(inip, key, INI_NONE);
+	if (!slot) return (defv);
 	if (slot->type == INI_STR)
 	{
 #if VALIDATE_DEF
@@ -482,6 +467,7 @@ int ini_getint(inifile *inip, char *key, int defv)
 
 	/* Read existing */
 	slot = key_slot(inip, key, INI_NONE);
+	if (!slot) return (defv);
 	if (slot->type == INI_INT)
 	{
 #if VALIDATE_DEF
@@ -527,6 +513,7 @@ int ini_getbool(inifile *inip, char *key, int defv)
 
 	/* Read existing */
 	slot = key_slot(inip, key, INI_NONE);
+	if (!slot) return (defv);
 	if (slot->type == INI_BOOL)
 	{
 #if VALIDATE_DEF
@@ -561,10 +548,6 @@ int ini_getbool(inifile *inip, char *key, int defv)
 	return ((int)(slot->value));
 }
 
-#include <sys/stat.h>
-#include <unistd.h>
-#include <errno.h>
-
 #ifdef WIN32
 
 char *get_home_directory(void)
@@ -579,6 +562,7 @@ char *get_home_directory(void)
 
 #else
 
+#include <unistd.h>
 #include <pwd.h>
 
 /*
@@ -607,20 +591,6 @@ gchar *get_home_directory(void)
 }
 
 #endif
-
-/*
- * This function came from mhWaveEdit
- * by Magnus Hjorth, 2003.
- */
-gboolean file_exists(char *filename)
-{
-	FILE *f;
-
-	f = fopen(filename,"r");
-	if (!f) return (errno != ENOENT);
-	fclose(f);
-	return (TRUE);
-}
 
 /* Compatibility functions */
 

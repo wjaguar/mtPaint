@@ -30,9 +30,7 @@
 #include "channels.h"
 #include "toolbar.h"
 
-gboolean
-	view_showing = FALSE,
-	allow_cline = FALSE, view_update_pending = FALSE;
+int view_showing, allow_cline, view_update_pending;
 float vw_zoom = 1;
 
 int opaque_view = FALSE;
@@ -53,16 +51,7 @@ static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 
 gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int x, y, width, height;
-
-	gdk_window_get_size( cline_window->window, &width, &height );
-	gdk_window_get_root_origin( cline_window->window, &x, &y );
-	
-	inifile_set_gint32("cline_x", x );
-	inifile_set_gint32("cline_y", y );
-	inifile_set_gint32("cline_w", width );
-	inifile_set_gint32("cline_h", height );
-
+	win_store_pos(cline_window, "cline");
 	gtk_widget_destroy(cline_window);
 	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], TRUE);
 	cline_window = NULL;
@@ -100,10 +89,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	snprintf(txt, 60, _("%i Files on Command Line"), files_passed );
 	cline_window = add_a_window( GTK_WINDOW_TOPLEVEL, txt, GTK_WIN_POS_NONE, FALSE );
 	gtk_widget_set_usize(cline_window, 100, 100);
-	gtk_window_set_default_size( GTK_WINDOW(cline_window),
-		inifile_get_gint32("cline_w", 250 ), inifile_get_gint32("cline_h", 400 ) );
-	gtk_widget_set_uposition( cline_window,
-		inifile_get_gint32("cline_x", 0 ), inifile_get_gint32("cline_y", 0 ) );
+	win_restore_pos(cline_window, "cline", 0, 0, 250, 400);
 
 	vbox1 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox1);
@@ -561,7 +547,7 @@ static int vw_width, vw_height, vw_last_x, vw_last_y, vw_move_layer;
 static int vw_mouse_status;
 
 GtkWidget *vw_drawing;
-gboolean vw_focus_on;
+int vw_focus_on;
 
 void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
@@ -1090,7 +1076,6 @@ void view_hide()
 void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data )
 {
 	canvas_image_centre = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean( "imageCentre", canvas_image_centre );
 	force_main_configure();		// Force configure of main window - for centalizing code
 	update_all_views();
 }
@@ -1098,7 +1083,6 @@ void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_view_focus( GtkMenuItem *menu_item, gpointer user_data )
 {
 	vw_focus_on = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean("view_focus", vw_focus_on );
 	vw_focus_view();
 }
 
@@ -1110,7 +1094,6 @@ void pressed_view( GtkMenuItem *menu_item, gpointer user_data )
 
 void init_view( GtkWidget *canvas )
 {
-	vw_focus_on = inifile_get_gboolean("view_focus", TRUE );
 	vw_width = 1;
 	vw_height = 1;
 

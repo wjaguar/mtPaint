@@ -19,10 +19,9 @@
 
 /* Rewritten for version 3.10 by Dmitry Groshev */
 
-#define PNG_READ_PACK_SUPPORTED
+#include <errno.h>
 
-#include <stdlib.h>
-#include <ctype.h>
+#define PNG_READ_PACK_SUPPORTED
 
 #include <png.h>
 #include <zlib.h>
@@ -247,6 +246,14 @@ static void deallocate_image(ls_settings *settings, int cmask)
 	}
 }
 
+static void ls_init(char *what, int save)
+{
+	char buf[256];
+
+	sprintf(buf, save ? _("Saving %s image") : _("Loading %s image"), what);
+	progress_init(buf, 0);
+}
+
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
@@ -335,14 +342,14 @@ static int load_png(char *file_name, ls_settings *settings)
 		switch(settings->mode)
 		{
 		case FS_PNG_LOAD:
-			msg = _("Loading PNG image");
+			msg = "PNG";
 			break;
 		case FS_CLIP_FILE:
-			msg = _("Loading clipboard image");
+			msg = _("Clipboard");
 			break;
 		}
 	}
-	if (msg) progress_init(msg, 0);
+	if (msg) ls_init(msg, 0);
 
 	/* RGB PNG file */
 	if (settings->bpp == 3)
@@ -511,16 +518,16 @@ static int save_png(char *file_name, ls_settings *settings)
 	switch(settings->mode)
 	{
 	case FS_PNG_SAVE:
-		mess = _("Saving PNG image");
+		mess = "PNG";
 		break;
 	case FS_CLIP_FILE:
-		mess = _("Saving Clipboard image");
+		mess = _("Clipboard");
 		break;
 	case FS_COMPOSITE_SAVE:
-		mess = _("Saving Layer image");
+		mess = _("Layer");
 		break;
 	case FS_CHANNEL_SAVE:
-		mess = _("Saving Channel image");
+		mess = _("Channel");
 		break;
 	default:
 		mess = NULL;
@@ -573,7 +580,7 @@ static int save_png(char *file_name, ls_settings *settings)
 
 	png_write_info(png_ptr, info_ptr);
 
-	if (mess) progress_init( mess, 0 );
+	if (mess) ls_init(mess, 1);
 
 	if ((settings->bpp == 1) || !settings->img[CHN_ALPHA]) /* Flat RGB/Indexed image */
 	{
@@ -714,8 +721,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 			if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
 			res = -1;
 
-			if (!settings->silent)
-				progress_init(_("Loading GIF image"), 0);
+			if (!settings->silent) ls_init("GIF", 0);
 
 			if (giffy->Image.Interlace)
 			{
@@ -790,7 +796,7 @@ static int save_gif(char *file_name, ls_settings *settings)
 	if (EGifPutImageDesc(giffy, 0, 0, w, h, FALSE, NULL) == GIF_ERROR)
 		goto fail;
 
-	if (!settings->silent) progress_init(_("Saving GIF image"), 0);
+	if (!settings->silent) ls_init("GIF", 1);
 
 	for (i = 0; i < h; i++)
 	{
@@ -862,7 +868,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	res = -1;
 	pr = !settings->silent;
 
-	if (pr) progress_init(_("Loading JPEG image"), 0);
+	if (pr) ls_init("JPEG", 0);
 
 	for (i = 0; i < height; i++)
 	{
@@ -913,7 +919,7 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 	jpeg_start_compress( &cinfo, TRUE );
 
 	row_pointer = settings->img[CHN_IMAGE];
-	if (!settings->silent) progress_init(_("Saving JPEG image"), 0);
+	if (!settings->silent) ls_init("JPEG", 1);
 	for (i = 0; i < settings->height; i++ )
 	{
 		jpeg_write_scanlines(&cinfo, &row_pointer, 1);
@@ -1080,8 +1086,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	if ((res = allocate_image(settings, cmask))) goto fail;
 	res = -1;
 
-	if ((pr = !settings->silent))
-		progress_init(_("Loading TIFF image"), 0);
+	if ((pr = !settings->silent)) ls_init("TIFF", 0);
 
 	/* Read it as ARGB if can't understand it ourselves */
 	if (argb)
@@ -1383,7 +1388,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	if (xsamp) TIFFSetField(tif, TIFFTAG_EXTRASAMPLES, xsamp, xs);
 
 	/* Actually write the image */
-	if (!settings->silent) progress_init(_("Saving TIFF image"), 0);
+	if (!settings->silent) ls_init("TIFF", 1);
 	xsamp += bpp;
 	for (i = 0; i < h; i++)
 	{
@@ -1603,7 +1608,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 		}
 	}
 
-	if (!settings->silent) progress_init(_("Loading BMP image"), 0);
+	if (!settings->silent) ls_init("BMP", 0);
 
 	fseek(fp, GET32(hdr + BMP_DATAOFS), SEEK_SET); /* Seek to data */
 	if (h < 0) /* Prepare row loop */
@@ -1855,7 +1860,7 @@ static int save_bmp(char *file_name, ls_settings *settings)
 	fwrite(buf, 1, tmp - buf, fp);
 
 	/* Write rows */
-	if (!settings->silent) progress_init(_("Saving BMP image"), 0);
+	if (!settings->silent) ls_init("BMP", 1);
 	memset(buf + ll - 4, 0, 4);
 	for (i = h - 1; i >= 0; i--)
 	{
@@ -2182,7 +2187,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	}
 	
 	/* Now, read the image */
-	if (!settings->silent) progress_init(_("Loading XPM image"), 0);
+	if (!settings->silent) ls_init("XPM", 0);
 	res = FILE_LIB_ERROR;
 	dest = settings->img[CHN_IMAGE];
 	for (i = 0; i < h; i++)
@@ -2246,8 +2251,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		return -1;
 	}
 
-	if (!settings->silent)
-		progress_init(_("Saving XPM image"), 0);
+	if (!settings->silent) ls_init("XPM", 1);
 
 	fprintf(fp, "/* XPM */\n" );
 	fprintf(fp, "static char *%.*s_xpm[] = {\n", i, tmp);
@@ -2380,7 +2384,7 @@ static int load_xbm(char *file_name, ls_settings *settings)
 	}
 
 	/* Now, read the image */
-	if (!settings->silent) progress_init(_("Loading XBM image"), 0);
+	if (!settings->silent) ls_init("XBM", 0);
 	res = FILE_LIB_ERROR;
 	dest = settings->img[CHN_IMAGE];
 	for (i = 0; i < h; i++)
@@ -2449,7 +2453,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	}
 	fprintf(fp, "static unsigned char %.*s_bits[] = {\n", i, tmp);
 
-	if (!settings->silent) progress_init(_("Saving XBM image"), 0);
+	if (!settings->silent) ls_init("XBM", 1);
 
 	j = k = (w + 7) >> 3; i = l = 0;
 	while (TRUE)
@@ -2544,7 +2548,7 @@ static int load_lss(char *file_name, ls_settings *settings)
 	if (!buf) goto fail2;
 	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
 
-	if (!settings->silent) progress_init(_("Loading LSS16 image"), 0);
+	if (!settings->silent) ls_init("LSS16", 0);
 
 	res = FILE_LIB_ERROR;
 	j = fread(buf, 1, bl, fp);
@@ -2625,7 +2629,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 	fwrite(buf, 1, LSS_HSIZE, fp);
 
 	/* Write rows */
-	if (!settings->silent) progress_init(_("Saving LSS16 image"), 0);
+	if (!settings->silent) ls_init("LSS16", 1);
 	src = settings->img[CHN_IMAGE];
 	for (i = 0; i < h; i++)
 	{
@@ -2930,7 +2934,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	if (abits && settings->img[CHN_ALPHA]) wmode |= 1;
 	res = -1;
 
-	if (!settings->silent) progress_init(_("Loading TGA image"), 0);
+	if (!settings->silent) ls_init("TGA", 0);
 
 	fseek(fp, iofs, SEEK_SET); /* Seek to data */
 	/* Prepare loops */
@@ -3187,7 +3191,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 	}
 
 	/* Write rows */
-	if (!settings->silent) progress_init(_("Saving TGA image"), 0);
+	if (!settings->silent) ls_init("TGA", 1);
 	if (tga_defdir)
 	{
 		y0 = h - 1; y1 = -1; vstep = -1;
@@ -3500,7 +3504,7 @@ int export_undo(char *file_name, ls_settings *settings)
 	strncpy( new_name, file_name, 256);
 	lenny = strlen( file_name );
 
-	progress_init( _("Saving UNDO images"), 0 );
+	ls_init("UNDO", 1);
 	settings->silent = TRUE;
 
 	for (j = 0; j < 2; j++)
@@ -3665,8 +3669,20 @@ int detect_image_format(char *name)
 
 #include "spawn.h"
 
-
 #endif
+
+int valid_file( char *filename )		// Can this file be opened for reading?
+{
+	FILE *fp;
+
+	fp = fopen(filename, "r");
+	if (!fp) return (errno == ENOENT ? -1 : 1);
+	else
+	{
+		fclose(fp);
+		return 0;
+	}
+}
 
 int show_html(char *browser, char *docs)
 {
@@ -3691,12 +3707,12 @@ int show_html(char *browser, char *docs)
 	if (!docs || !docs[0])
 	{
 		docs = HANDBOOK_LOCATION;
-		if (!file_exists(docs)) docs = HANDBOOK_LOCATION2;
+		if (valid_file(docs) < 0) docs = HANDBOOK_LOCATION2;
 	}
 #endif
 	else docs = gtkncpy(buf, docs, 260);
 
-	if (!file_exists(docs))
+	if ((valid_file(docs) < 0))
 	{
 		alert_box( _("Error"),
 			_("I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."),

@@ -23,6 +23,7 @@
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
+#include "inifile.h"
 
 
 ///	GENERIC WIDGET PRIMITIVES
@@ -810,6 +811,42 @@ GtkWidget *xpack(GtkWidget *box, GtkWidget *widget)
 	return (widget);
 }
 
+// Save/restore window positions
+
+void win_store_pos(GtkWidget *window, char *inikey)
+{
+	char name[128];
+	gint xywh[4];
+	int i, l = strlen(inikey);
+
+	memcpy(name, inikey, l);
+	name[l++] = '_'; name[l + 1] = '\0';
+	gdk_window_get_size(window->window, xywh + 2, xywh + 3);
+	gdk_window_get_root_origin(window->window, xywh + 0, xywh + 1);
+	for (i = 0; i < 4; i++)
+	{
+		name[l] = "xywh"[i];
+		inifile_set_gint32(name, xywh[i]);
+	}
+}
+
+void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
+	int defw, int defh)
+{
+	char name[128];
+	int i, l = strlen(inikey), xywh[4] = { defx, defy, defw, defh };
+
+	memcpy(name, inikey, l);
+	name[l++] = '_'; name[l + 1] = '\0';
+	for (i = 0; i < 4; i++)
+	{
+		if (xywh[i] < 0) continue; /* Default of -1 means auto-size */
+		name[l] = "xywh"[i];
+		xywh[i] = inifile_get_gint32(name, xywh[i]);
+	}
+	gtk_window_set_default_size(GTK_WINDOW(window), xywh[2], xywh[3]);
+	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
+}
 
 // Whatever is needed to move mouse pointer 
 

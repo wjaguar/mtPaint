@@ -17,9 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "global.h"
 
 #include "mygtk.h"
@@ -42,9 +39,59 @@
 #include "spawn.h"
 
 
+///	INIFILE ENTRY LISTS
+
+typedef struct {
+	char *name;
+	int *var;
+	int defv;
+} inilist;
+
+static inilist ini_bool[] = {
+	{ "layermainToggle",	&show_layers_main,	FALSE },
+	{ "sharperReduce",	&sharper_reduce,	FALSE },
+	{ "tablet_USE",		&tablet_working,	FALSE },
+	{ "tga565",		&tga_565,		FALSE },
+	{ "tgaDefdir",		&tga_defdir,		FALSE },
+	{ "disableTransparency", &opaque_view,		FALSE },
+	{ "smudgeOpacity",	&smudge_mode,		FALSE },
+	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
+	{ "gridToggle",		&mem_show_grid,		TRUE  },
+	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
+	{ "quitToggle",		&q_quit,		TRUE  },
+	{ "continuousPainting",	&mem_continuous,	TRUE  },
+	{ "opacityToggle",	&mem_undo_opacity,	TRUE  },
+	{ "imageCentre",	&canvas_image_centre,	TRUE  },
+	{ "view_focus",		&vw_focus_on,		TRUE  },
+	{ "pasteToggle",	&show_paste,		TRUE  },
+	{ "cursorToggle",	&cursor_tool,		TRUE  },
+#if STATUS_ITEMS != 5
+#error Wrong number of "status?Toggle" inifile items defined
+#endif
+	{ "status0Toggle",	status_on + 0,		TRUE  },
+	{ "status1Toggle",	status_on + 1,		TRUE  },
+	{ "status2Toggle",	status_on + 2,		TRUE  },
+	{ "status3Toggle",	status_on + 3,		TRUE  },
+	{ "status4Toggle",	status_on + 4,		TRUE  },
+	{ NULL,			NULL }
+};
+
+static inilist ini_int[] = {
+	{ "jpegQuality",	&jpeg_quality,		85  },
+	{ "pngCompression",	&png_compression,	9   },
+	{ "tgaRLE",		&tga_RLE,		0   },
+	{ "silence_limit",	&silence_limit,		18  },
+	{ "gradientOpacity",	&grad_opacity,		128 },
+	{ "gridMin",		&mem_grid_min,		8   },
+	{ "undoMBlimit",	&mem_undo_limit,	32  },
+	{ "backgroundGrey",	&mem_background,	180 },
+	{ "pixelNudge",		&mem_nudge,		8   },
+	{ "recentFiles",	&recent_files,		10  },
+	{ "lastspalType",	&spal_mode,		2   },
+	{ NULL,			NULL }
+};
+
 #include "graphics/icon.xpm"
-
-
 
 GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
@@ -56,7 +103,7 @@ GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS];
 
-gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
+int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int files_passed, file_arg_start = -1, drag_index_vals[2], cursor_corner;
 char **global_argv;
 
@@ -552,7 +599,6 @@ void zoom_out()
 void zoom_grid( GtkMenuItem *menu_item, gpointer user_data )
 {
 	mem_show_grid = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean( "gridToggle", mem_show_grid );
 
 	if ( drawing_canvas ) gtk_widget_queue_draw( drawing_canvas );
 }
@@ -1008,7 +1054,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 			return TRUE;
 		}
 	}
-	change = inifile_get_gint32("pixelNudge", 8);
+	change = mem_nudge;
 
 /* !!! Make a pref or something later !!! */
 #if 0
@@ -1244,9 +1290,20 @@ int check_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 	return i;
 }
 
+void var_init()
+{
+	inilist *ilp;
+
+	/* Load listed settings */
+	for (ilp = ini_bool; ilp->name; ilp++)
+		*(ilp->var) = inifile_get_gboolean(ilp->name, ilp->defv);
+	for (ilp = ini_int; ilp->name; ilp++)
+		*(ilp->var) = inifile_get_gint32(ilp->name, ilp->defv);
+}
+
 static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	gint x,y,width,height;
+	inilist *ilp;
 	int i = 2, j = 0;
 
 	if ( !GTK_WIDGET_SENSITIVE(main_window) ) return TRUE;
@@ -1266,19 +1323,19 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 
 	if ( i==2 )
 	{
-		gdk_window_get_size( main_window->window, &width, &height );
-		gdk_window_get_root_origin( main_window->window, &x, &y );
-	
-		inifile_set_gint32("window_x", x );
-		inifile_set_gint32("window_y", y );
-		inifile_set_gint32("window_w", width );
-		inifile_set_gint32("window_h", height );
+		win_store_pos(main_window, "window");
 
 		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
 		if (layers_window != NULL) delete_layers_window( NULL, NULL, NULL );
 			// Get rid of extra windows + remember positions
 
 		toolbar_exit();			// Remember the toolbar settings
+
+		/* Store listed settings */
+		for (ilp = ini_bool; ilp->name; ilp++)
+			inifile_set_gboolean(ilp->name, *(ilp->var));
+		for (ilp = ini_int; ilp->name; ilp++)
+			inifile_set_gint32(ilp->name, *(ilp->var));
 
 		gtk_main_quit ();
 		return FALSE;
@@ -1629,7 +1686,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	{
 		if ( marq_status == MARQUEE_DONE )
 		{
-			if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
+			if (cursor_tool)
 			{
 				i = close_to(x, y);
 				if ( i!=cursor_corner ) // Stops excessive CPU/flickering
@@ -1650,11 +1707,8 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 			if ( new_cursor != cursor_corner ) // Stops flickering on slow hardware
 			{
-				if ( !inifile_get_gboolean( "cursorToggle", TRUE ) ||
-					new_cursor == 0 )
-					set_cursor();
-				else
-					gdk_window_set_cursor( drawing_canvas->window, move_cursor );
+				if (!cursor_tool || !new_cursor) set_cursor();
+				else gdk_window_set_cursor(drawing_canvas->window, move_cursor);
 				cursor_corner = new_cursor;
 			}
 		}
@@ -2954,10 +3008,8 @@ static void pressed_docs()
 void set_cursor()			// Set mouse cursor
 {
 	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
-	if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
-		gdk_window_set_cursor( drawing_canvas->window, m_cursor[tool_type] );
-	else
-		gdk_window_set_cursor( drawing_canvas->window, NULL );
+	gdk_window_set_cursor(drawing_canvas->window,
+		cursor_tool ? m_cursor[tool_type] : NULL);
 }
 
 
@@ -3531,48 +3583,21 @@ void main_init()
 
 
 	gdk_rgb_init();
-	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
-	jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
-	png_compression = inifile_get_gint32( "pngCompression", 9 );
-	tga_RLE = inifile_get_gint32( "tgaRLE", 0 );
-	tga_565 = inifile_get_gboolean("tga565", FALSE);
-	tga_defdir = inifile_get_gboolean("tgaDefdir", FALSE);
-	q_quit = inifile_get_gboolean( "quitToggle", TRUE );
-	chequers_optimize = inifile_get_gboolean( "optimizeChequers", TRUE );
+	init_tablet();					// Set up the tablet
 
 	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
-
-	for ( i=0; i<STATUS_ITEMS; i++ )
-	{
-		sprintf(txt, "status%iToggle", i);
-		status_on[i] = inifile_get_gboolean(txt, TRUE);
-	}
-
-	mem_background = inifile_get_gint32("backgroundGrey", 180 );
-	mem_undo_limit = inifile_get_gint32("undoMBlimit", 32 );
-	mem_nudge = inifile_get_gint32("pixelNudge", 8 );
 
 	accel_group = gtk_accel_group_new ();
 	menubar1 = fill_menu(main_menu, accel_group);
 
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]),
-		inifile_get_gboolean("couple_RGBA", TRUE));
-
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VWFOCUS]),
-		inifile_get_gboolean("view_focus", TRUE));
-
-	mem_continuous = inifile_get_gboolean( "continuousPainting", TRUE );
-	mem_undo_opacity = inifile_get_gboolean( "opacityToggle", TRUE );
-	smudge_mode = inifile_get_gboolean("smudgeOpacity", FALSE);
-	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
-	mem_show_grid = inifile_get_gboolean( "gridToggle", TRUE );
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]), RGBA_mode);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VWFOCUS]), vw_focus_on);
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_CENTER]),
 		canvas_image_centre);
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_SHOWGRID]),
 		mem_show_grid);
 
-	mem_grid_min = inifile_get_gint32("gridMin", 8 );
 	mem_grid_rgb[0] = inifile_get_gint32("gridR", 50 );
 	mem_grid_rgb[1] = inifile_get_gint32("gridG", 50 );
 	mem_grid_rgb[2] = inifile_get_gint32("gridB", 50 );
@@ -3582,10 +3607,7 @@ void main_init()
 
 	main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_widget_set_usize(main_window, 100, 100);		// Set minimum width/height
-	gtk_window_set_default_size( GTK_WINDOW(main_window),
-		inifile_get_gint32("window_w", 630 ), inifile_get_gint32("window_h", 400 ) );
-	gtk_widget_set_uposition( main_window,
-		inifile_get_gint32("window_x", 0 ), inifile_get_gint32("window_y", 0 ) );
+	win_restore_pos(main_window, "window", 0, 0, 630, 400);
 	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
 
 	gtk_drag_dest_set (main_window, GTK_DEST_DEFAULT_ALL, target_table, 1, GDK_ACTION_MOVE);
@@ -3747,12 +3769,7 @@ void main_init()
 	men_item_state( menu_need_selection, FALSE );
 	men_item_state( menu_need_clipboard, FALSE );
 
-	silence_limit = inifile_get_gint32( "silence_limit", 18 );
-
-	recent_files = inifile_get_gint32( "recentFiles", 10 );
-	mtMIN( recent_files, recent_files, 20 )
-	mtMAX( recent_files, recent_files, 0 )
-
+	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 	toolbar_boxes[TOOLBAR_STATUS] = hbox_bar;	// Hide status bar
 	main_hidden[0] = menubar1;			// Hide menu bar
@@ -3786,8 +3803,6 @@ void main_init()
 	gdk_gc_set_background(dash_gc, &cbg);
 	gdk_gc_set_foreground(dash_gc, &cfg);
 	gdk_gc_set_line_attributes( dash_gc, 1, GDK_LINE_DOUBLE_DASH, GDK_CAP_NOT_LAST, GDK_JOIN_MITER);
-
-	init_tablet();						// Set up the tablet
 
 	toolbar_showhide();
 	if (viewer_mode) toggle_view(NULL, NULL);

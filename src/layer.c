@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <string.h>
-
 #include "mygtk.h"
 #include "memory.h"
 #include "png.h"
@@ -39,8 +37,8 @@ int	layers_total = 0,		// Layers currently being used
 	layers_changed = 0;		// 0=Unchanged
 
 char	layers_filename[256];		// Current filename for layers file
-gboolean show_layers_main = FALSE,	// Show all layers in main window
-	layers_pastry_cut = FALSE;	// Pastry cut layers in view area (for animation previews)
+int	show_layers_main,		// Show all layers in main window
+	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
 
 layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
@@ -56,8 +54,6 @@ void layers_init()
 	layer_table[0].y = 0;
 	layer_table[0].trans = 0;
 	layer_table[0].opacity = 100;
-
-	show_layers_main = inifile_get_gboolean( "layermainToggle", FALSE );
 }
 
 void repaint_layer(int l)		// Repaint layer in view/main window
@@ -1060,7 +1056,6 @@ static gint layer_tog_visible( GtkWidget *widget, GdkEvent *event, gpointer data
 static gint layer_main_toggled( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	show_layers_main = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(layer_show_toggle) );
-	inifile_set_gboolean( "layermainToggle", show_layers_main );
 	gtk_widget_queue_draw(drawing_canvas);
 
 	return FALSE;
@@ -1181,18 +1176,10 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 
 gint delete_layers_window()
 {
-	int x, y, width, height;
-
 	if ( !GTK_WIDGET_SENSITIVE(layers_window) ) return TRUE;
 		// Stop user prematurely exiting while drag 'n' drop loading
 
-	gdk_window_get_size( layers_window->window, &width, &height );
-	gdk_window_get_root_origin( layers_window->window, &x, &y );
-	
-	inifile_set_gint32("layers_x", x );
-	inifile_set_gint32("layers_y", y );
-	inifile_set_gint32("layers_w", width );
-	inifile_set_gint32("layers_h", height );
+	win_store_pos(layers_window, "layers");
 
 	gtk_widget_destroy(layers_window);
 	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], TRUE);
@@ -1339,10 +1326,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 
 
 	layers_window = add_a_window( GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE );
-	gtk_window_set_default_size( GTK_WINDOW(layers_window),
-		inifile_get_gint32("layers_w", 400 ), inifile_get_gint32("layers_h", 400 ) );
-	gtk_widget_set_uposition( layers_window,
-		inifile_get_gint32("layers_x", 0 ), inifile_get_gint32("layers_y", 0 ) );
+	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);
 
 	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox);

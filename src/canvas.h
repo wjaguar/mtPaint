@@ -39,7 +39,7 @@ int brush_spacing;					// Step in non-continuous mode
 
 GtkWidget *label_bar[STATUS_ITEMS];
 
-gboolean col_reverse,					// Painting with right button
+int	col_reverse,					// Painting with right button
 	show_paste,					// Show contents of clipboard while pasting
 	status_on[STATUS_ITEMS],			// Show status bar items?
 	text_paste,					// Are we pasting text?

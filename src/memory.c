@@ -17,19 +17,14 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <stdlib.h>
-#include <string.h>
-
-#include <gtk/gtk.h>
-
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "patterns.c"
-#include "mygtk.h"
 #include "layer.h"
 #include "inifile.h"
 #include "canvas.h"
@@ -755,20 +750,6 @@ int mem_undo_size(undo_item *undo)
 	return total;
 }
 
-int valid_file( char *filename )		// Can this file be opened for reading?
-{
-	FILE *fp;
-
-	fp = fopen(filename, "r");
-	if ( fp == NULL ) return -1;
-	else
-	{
-		fclose( fp );
-		return 0;
-	}
-}
-
-
 char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
 {
 	char *chunk;
@@ -895,8 +876,6 @@ void mem_init()					// Initialise memory
 		}
 	}
 
-	opaque_view = inifile_get_gboolean( "disableTransparency", FALSE );
-
 	/* Preset gradients */
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
@@ -914,7 +893,6 @@ void mem_init()					// Initialise memory
 	grad_def_update();
 	for (i = 0; i <= NUM_CHANNELS; i++)
 		gmap_setup(graddata + i, gradbytes, i);
-	grad_opacity = inifile_get_gint32("gradientOpacity", 128);
 }
 
 void copy_dig( int index, int tx, int ty )

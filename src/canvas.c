@@ -55,7 +55,7 @@ int clone_x, clone_y;							// Clone offsets
 
 int recent_files;					// Current recent files setting
 
-gboolean show_paste,					// Show contents of clipboard while pasting
+int	show_paste,					// Show contents of clipboard while pasting
 	col_reverse,					// Painting with right button
 	text_paste,					// Are we pasting text?
 	canvas_image_centre = TRUE,			// Are we centering the image?
@@ -1548,20 +1548,11 @@ static void store_ls_settings(ls_settings *settings)
 		}
 		fflags &= FF_COMP;
 		if (fflags == FF_COMPJ)
-		{
 			jpeg_quality = settings->jpeg_quality;
-			inifile_set_gint32("jpegQuality", jpeg_quality);
-		}
 		else if (fflags == FF_COMPZ)
-		{
 			png_compression = settings->png_compression;
-			inifile_set_gint32("pngCompression", png_compression);
-		}
 		else if (fflags == FF_COMPR)
-		{
 			tga_RLE = settings->tga_RLE;
-			inifile_set_gint32("tgaRLE", tga_RLE);
-		}
 		break;
 	case FS_EXPORT_GIF:
 		preserved_gif_delay = settings->gif_delay;
@@ -1569,22 +1560,9 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static void fs_save_loc(GdkWindow *window)
-{
-	int x, y, width, height;
-
-	gdk_window_get_size(window, &width, &height);
-	gdk_window_get_root_origin(window, &x, &y);
-
-	inifile_set_gint32("fs_window_x", x);
-	inifile_set_gint32("fs_window_y", y);
-	inifile_set_gint32("fs_window_w", width);
-	inifile_set_gint32("fs_window_h", height);
-}
-
 static gboolean fs_destroy(GtkWidget *fs)
 {
-	fs_save_loc(fs->window);
+	win_store_pos(fs, "fs_window");
 	destroy_dialog(fs);
 
 	return FALSE;
@@ -1605,7 +1583,7 @@ static void fs_ok(GtkWidget *fs)
 	gtk_window_set_modal(GTK_WINDOW(fs), FALSE);
 
 	/* Looks better if no dialog under progressbar */
-	fs_save_loc(fs->window); /* Save the location */
+	win_store_pos(fs, "fs_window"); /* Save the location */
 	gtk_widget_hide(fs);
 
 	/* File extension */
@@ -1805,12 +1783,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 #endif
 
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
-	gtk_window_set_default_size(GTK_WINDOW(fs),
-		inifile_get_gint32("fs_window_w", 550),
-		inifile_get_gint32("fs_window_h", 500));
-	gtk_widget_set_uposition(fs,
-		inifile_get_gint32("fs_window_x", 0),
-		inifile_get_gint32("fs_window_y", 0));
+	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);
 
 	if ((action_type == FS_SELECT_DIR) || (action_type == FS_GIF_EXPLODE))
 	{

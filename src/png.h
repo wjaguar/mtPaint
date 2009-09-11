@@ -123,4 +123,6 @@ int export_ascii ( char *file_name );
 
 int detect_image_format(char *name);
 
+int valid_file(char *filename);		// Can this file be opened for reading?
+
 int show_html(char *browser, char *docs);

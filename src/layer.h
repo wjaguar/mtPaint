@@ -68,7 +68,7 @@ int	layers_total,			// Layers currently in use
 	layers_changed;			// 0=Unchanged
 
 char	layers_filename[256];		// Current filename for layers file
-gboolean show_layers_main,		// Show all layers in main window
+int	show_layers_main,		// Show all layers in main window
 	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
 

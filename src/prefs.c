@@ -45,19 +45,18 @@ static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
-		*tablet_ini2[] = { "tablet_use_size", "tablet_use_flow", "tablet_use_opacity" },
-		*tablet_ini3[] = { "tablet_name", "tablet_mode", "tablet_axes_v" };
+		*tablet_ini2[] = { "tablet_use_size", "tablet_use_flow", "tablet_use_opacity" };
 
 #if GTK_MAJOR_VERSION == 1
-static GdkDeviceInfo *tablet_device = NULL;
+static GdkDeviceInfo *tablet_device;
 #endif
 #if GTK_MAJOR_VERSION == 2
-static GdkDevice *tablet_device = NULL;
+static GdkDevice *tablet_device;
 #endif
 
-gboolean tablet_working = FALSE;		// Has the device been initialized?
+int tablet_working;		// Has the device been initialized?
 
-gboolean tablet_tool_use[3];			// Size, flow, opacity
+int tablet_tool_use[3];				// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity
 
 
@@ -109,8 +108,8 @@ gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if ( tablet_working )		// Store tablet settings in INI file for future session
 	{
-		inifile_set( tablet_ini3[0], dev->name );
-		inifile_set_gint32( tablet_ini3[1], dev->mode );
+		inifile_set( "tablet_name", dev->name );
+		inifile_set_gint32( "tablet_mode", dev->mode );
 
 		for ( i=0; i<dev->num_axes; i++ )
 		{
@@ -120,12 +119,11 @@ gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
 #if GTK_MAJOR_VERSION == 2
 			j = dev->axes[i].use;
 #endif
-			sprintf(txt, "%s%i", tablet_ini3[2], i);
+			sprintf(txt, "tablet_axes_v%i", i);
 			inifile_set_gint32( txt, j );
 		}
 	}
 
-	inifile_set_gboolean( "tablet_USE", tablet_working );
 	gtk_widget_destroy(inputd);
 	inputd = NULL;
 
@@ -250,14 +248,10 @@ gint conf_tablet( GtkWidget *widget, GdkEvent *event, gpointer data )
 static void prefs_apply(GtkWidget *widget)
 {
 	int i, j;
-	char txt[64];
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
-		sprintf(txt, "status%iToggle", i);
-		inifile_set_gboolean( txt,
-			gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(prefs_status[i])) );
-		status_on[i] = inifile_get_gboolean(txt, TRUE);
+		status_on[i] = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(prefs_status[i]));
 	}
 
 	mem_undo_limit = read_spin(spinbutton_maxmem);
@@ -284,31 +278,18 @@ static void prefs_apply(GtkWidget *widget)
 		tablet_tool_factor[i] = j / 100.0;
 	}
 
-	inifile_set_gint32( "gridMin", mem_grid_min );
 	inifile_set_gint32( "gridR", mem_grid_rgb[0] );
 	inifile_set_gint32( "gridG", mem_grid_rgb[1] );
 	inifile_set_gint32( "gridB", mem_grid_rgb[2] );
 
 
 	inifile_set_gint32( "panSize", read_spin(spinbutton_pan));
-	inifile_set_gint32( "undoMBlimit", mem_undo_limit );
-	inifile_set_gint32( "backgroundGrey", mem_background );
-	inifile_set_gint32( "pixelNudge", mem_nudge );
-	inifile_set_gint32( "jpegQuality", jpeg_quality );
-	inifile_set_gint32( "pngCompression", png_compression );
-	inifile_set_gint32( "recentFiles", recent_files );
-	inifile_set_gint32( "silence_limit", silence_limit );
-	inifile_set_gint32( "tgaRLE", tga_RLE = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(checkbutton_tgaRLE)) ? 1 : 0);
-	inifile_set_gboolean( "tga565", tga_565 = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(checkbutton_tga565)));
-	inifile_set_gboolean( "tgaDefdir", tga_565 = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(checkbutton_tgadef)));
+	tga_RLE = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgaRLE)) ? 1 : 0;
+	tga_565 = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tga565));
+	tga_defdir = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgadef));
 
-	inifile_set_gboolean( "pasteToggle",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste)) );
-	inifile_set_gboolean( "cursorToggle",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_cursor)) );
+	show_paste = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste));
+	cursor_tool = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_cursor));
 	inifile_set_gboolean( "exitToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_exit)) );
 
@@ -319,15 +300,12 @@ static void prefs_apply(GtkWidget *widget)
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[1])) );
 #endif
 	chequers_optimize = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
-	inifile_set_gboolean( "optimizeChequers", chequers_optimize );
 	opaque_view = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[3]));
-	inifile_set_gboolean( "disableTransparency", FALSE );
 
 	inifile_set_gboolean( "pasteCommit",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit)) );
 
 	q_quit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_quit));
-	inifile_set_gboolean( "quitToggle", q_quit );
 
 	inifile_set_gboolean("centerSettings",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_center)));
@@ -344,8 +322,6 @@ static void prefs_apply(GtkWidget *widget)
 
 	inifile_set(HANDBOOK_BROWSER_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[0])) );
 	inifile_set(HANDBOOK_LOCATION_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])) );
-
-	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 
 	update_all_views();		// Update canvas for changes
 	set_cursor();
@@ -473,19 +449,19 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
 
 ///	TABLE SPINBUTTONS
-	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, inifile_get_gint32("undoMBlimit", 32 ), 1, 1000);
-	spinbutton_greys = spin_to_table(table3, 1, 1, 5, inifile_get_gint32("backgroundGrey", 180 ), 0, 255);
-	spinbutton_nudge = spin_to_table(table3, 2, 1, 5, inifile_get_gint32("pixelNudge", 8 ), 2, 512);
+	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 1000);
+	spinbutton_greys = spin_to_table(table3, 1, 1, 5, mem_background, 0, 255);
+	spinbutton_nudge = spin_to_table(table3, 2, 1, 5, mem_nudge, 2, 512);
 	spinbutton_pan = spin_to_table(table3, 3, 1, 5, inifile_get_gint32("panSize", 128 ), 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),
-		page, inifile_get_gboolean("pasteToggle", TRUE) );
+		page, show_paste );
 	checkbutton_cursor = add_a_toggle( _("Mouse cursor = Tool"),
-		page, inifile_get_gboolean("cursorToggle", TRUE) );
+		page, cursor_tool );
 	checkbutton_exit = add_a_toggle( _("Confirm Exit"),
 		page, inifile_get_gboolean("exitToggle", FALSE) );
 	checkbutton_quit = add_a_toggle( _("Q key quits mtPaint"),
-		page, inifile_get_gboolean("quitToggle", TRUE) );
+		page, q_quit );
 	checkbutton_commit = add_a_toggle( _("Changing tool commits paste"),
 		page, inifile_get_gboolean("pasteCommit", FALSE) );
 	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
@@ -536,8 +512,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
-		sprintf(txt, "status%iToggle", i);
-		prefs_status[i] = add_a_toggle( stat_tex[i], page, inifile_get_gboolean(txt, TRUE) );
+		prefs_status[i] = add_a_toggle( stat_tex[i], page, status_on[i] );
 	}
 
 ///	---- TAB5 - ZOOM
@@ -694,7 +669,6 @@ void init_tablet()				// Set up variables
 	int i;
 	char *devname, txt[32];
 
-	gboolean use_tablet;
 	GList *dlist;
 
 #if GTK_MAJOR_VERSION == 1
@@ -706,11 +680,10 @@ void init_tablet()				// Set up variables
 	GdkAxisUse use;
 #endif
 
-	use_tablet = inifile_get_gboolean( "tablet_USE", FALSE );
-
-	if ( use_tablet )		// User has got tablet working in past so try to initialize it
+	if (tablet_working)	// User has got tablet working in past so try to initialize it
 	{
-		devname = inifile_get( tablet_ini3[0], "?" );	// Device name last used
+		tablet_working = FALSE;
+		devname = inifile_get( "tablet_name", "?" );	// Device name last used
 #if GTK_MAJOR_VERSION == 1
 		dlist = gdk_input_list_devices();
 #endif
@@ -725,14 +698,15 @@ void init_tablet()				// Set up variables
 
 #if GTK_MAJOR_VERSION == 1
 				gdk_input_set_mode(device->deviceid,
-					inifile_get_gint32( tablet_ini3[1], 0 ) );
+					inifile_get_gint32("tablet_mode", 0));
 #endif
 #if GTK_MAJOR_VERSION == 2
-				gdk_device_set_mode(device, inifile_get_gint32( tablet_ini3[1], 0 ) );
+				gdk_device_set_mode(device,
+					inifile_get_gint32("tablet_mode", 0));
 #endif
 				for ( i=0; i<device->num_axes; i++ )
 				{
-					sprintf(txt, "%s%i", tablet_ini3[2], i);
+					sprintf(txt, "tablet_axes_v%i", i);
 					use = inifile_get_gint32( txt, GDK_AXIS_IGNORE );
 #if GTK_MAJOR_VERSION == 1
 					device->axes[i] = use;

@@ -181,7 +181,7 @@ GtkWidget *main_window, *main_split,
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS];
 
-gboolean view_image_only, viewer_mode, drag_index, q_quit;
+int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
 char **global_argv;
 
@@ -189,6 +189,7 @@ GdkGC *dash_gc;
 
 char mem_clip_file[256];
 
+void var_init();			// Load INI variables
 void main_init();			// Initialise and display the main window
 
 void men_item_state( GtkWidget *menu_items[], gboolean state );

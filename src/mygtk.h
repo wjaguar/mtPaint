@@ -19,6 +19,8 @@
 
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+#include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 ///	Generic Widget Primitives
@@ -150,6 +152,12 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
+
+// Save/restore window positions
+
+void win_store_pos(GtkWidget *window, char *inikey);
+void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
+	int defw, int defh);
 
 // Moving mouse cursor
 

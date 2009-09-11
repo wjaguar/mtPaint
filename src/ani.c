@@ -22,7 +22,6 @@
 #include <errno.h>
 
 #include <stdio.h>
-#include <string.h>
 
 #include "global.h"
 
@@ -455,24 +454,9 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 ///	EXPORT ANIMATION FRAMES WINDOW
 
 
-static void ani_win_store_pos()
-{
-	int x, y, width, height;
-
-	gdk_window_get_size( animate_window->window, &width, &height );
-	gdk_window_get_root_origin( animate_window->window, &x, &y );
-	inifile_set_gint32("ani_x", x );
-	inifile_set_gint32("ani_y", y );
-	inifile_set_gint32("ani_w", width );
-	inifile_set_gint32("ani_h", height );
-}
-
 static void ani_win_set_pos()
 {
-	gtk_window_set_default_size( GTK_WINDOW(animate_window),
-		inifile_get_gint32("ani_w", 200 ), inifile_get_gint32("ani_h", 200 ) );
-	gtk_widget_set_uposition( animate_window,
-		inifile_get_gint32("ani_x", 0 ), inifile_get_gint32("ani_y", 0 ) );
+	win_restore_pos(animate_window, "ani", 0, 0, 200, 200);
 }
 
 static void ani_fix_pos()
@@ -490,7 +474,7 @@ static void ani_but_save()
 
 static void delete_ani()
 {
-	ani_win_store_pos();
+	win_store_pos(animate_window, "ani");
 	ani_win_read_widgets();
 	gtk_widget_destroy(animate_window);
 	animate_window = NULL;
@@ -685,17 +669,9 @@ static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data
 
 static void ani_but_preview_close()
 {
-	int x, y, width, height;
-
 	ani_play_stop();				// Stop animation playing if necessary
 
-	gdk_window_get_size( ani_prev_win->window, &width, &height );
-	gdk_window_get_root_origin( ani_prev_win->window, &x, &y );
-	inifile_set_gint32("ani_prev_x", x );
-	inifile_set_gint32("ani_prev_y", y );
-	inifile_set_gint32("ani_prev_w", width );
-
-
+	win_store_pos(ani_prev_win, "ani_prev");
 	gtk_widget_destroy( ani_prev_win );
 
 	if ( animate_window != NULL )
@@ -719,7 +695,8 @@ void ani_but_preview()
 
 	if ( animate_window != NULL )
 	{
-		ani_win_store_pos();		// We need to remember this as we are hiding it
+		/* We need to remember this as we are hiding it */
+		win_store_pos(animate_window, "ani");
 		ani_win_read_widgets();		// Get latest values for the preview
 	}
 	else	ani_read_layer_data();
@@ -732,10 +709,7 @@ void ani_but_preview()
 			_("Animation Preview"), GTK_WIN_POS_NONE, TRUE );
 	gtk_container_set_border_width(GTK_CONTAINER(ani_prev_win), 5);
 
-	gtk_widget_set_uposition( ani_prev_win,
-		inifile_get_gint32("ani_prev_x", 0 ), inifile_get_gint32("ani_prev_y", 0 ) );
-	gtk_window_set_default_size( GTK_WINDOW(ani_prev_win),
-		inifile_get_gint32("ani_prev_w", 200 ), -1 );
+	win_restore_pos(ani_prev_win, "ani_prev", 0, 0, 200, -1);
 
 	hbox3 = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox3);

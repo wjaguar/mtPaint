@@ -277,7 +277,6 @@ char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
 void mem_clear();				// Remove old image if any
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
-int valid_file( char *filename );		// Can this file be opened for reading?
 void mem_init();				// Initialise memory
 
 int mem_used();				// Return the number of bytes used in image + undo stuff

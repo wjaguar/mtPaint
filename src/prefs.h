@@ -22,7 +22,7 @@
 
 GtkWidget *clipboard_entry, *entry_handbook[2];
 
-gboolean tablet_working, tablet_tool_use[3];	// Size, flow, opacity
+int tablet_working, tablet_tool_use[3];		// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity
 
 void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data );

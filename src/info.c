@@ -24,7 +24,6 @@
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
-#include "inifile.h"
 #include "layer.h"
 
 

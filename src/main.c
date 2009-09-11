@@ -98,6 +98,7 @@ int main( int argc, char *argv[] )
 		if ( strstr(argv[0], "mtv") != NULL ) viewer_mode = TRUE;
 	}
 
+	var_init();					// Load INI variables
 	mem_init();					// Set up memory & back end
 	layers_init();
 	init_cols();

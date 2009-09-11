@@ -342,12 +342,6 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 
 	switch (j)
 	{
-	case SETB_CONT:
-		inifile_set_gboolean( "continuousPainting", mem_continuous );
-		return;
-	case SETB_OPAC:
-		inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
-		return;
 	case SETB_CSEL:
 		if (mem_cselect && !csel_data)
 		{

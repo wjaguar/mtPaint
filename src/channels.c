@@ -26,7 +26,6 @@
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
-#include "inifile.h"
 #include "channels.h"
 
 int overlay_alpha = FALSE;
@@ -409,7 +408,6 @@ void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	RGBA_mode = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean("couple_RGBA", RGBA_mode );
 	update_all_views();
 }
 
