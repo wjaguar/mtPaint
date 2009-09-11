@@ -66,7 +66,13 @@ int read_spin(GtkWidget *spin);
 GtkWidget *add_float_spin(double value, double min, double max);
 void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
 
-// Box unpacking macro
+// Box unpacking macros
+#define BOX_CHILD_0(box) \
+	(((GtkBoxChild*)GTK_BOX(box)->children->data)->widget)
+#define BOX_CHILD_1(box) \
+	(((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget)
+#define BOX_CHILD_2(box) \
+	(((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget)
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
 
@@ -85,7 +91,8 @@ GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
 GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border);
 
 // Entry + Browse
-GtkWidget *mt_path_box(char *name, GtkWidget *box, int fsmode);
+
+GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode);
 
 // Option menu
 
@@ -115,6 +122,10 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 // Signalled toggle
 
 GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler);
+
+// Workaround for GtkCList reordering bug in GTK2
+
+void clist_enable_drag(GtkWidget *clist);
 
 // Moving mouse cursor
 

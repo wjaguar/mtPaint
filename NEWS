@@ -4,7 +4,12 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.10	2006-1-17
+3.15	2007-?-?
+
+	* Actions section added to File menu
+	* Slovak translation added by Jozef Riha
+
+3.10	2007-1-22
 
 	* Gradient drawing mode added
 	* Palette shifting feature added to Palette menu

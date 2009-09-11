@@ -277,8 +277,7 @@ void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv)
 {
 	GtkAdjustment *adj;
 	
-	adj = gtk_range_get_adjustment(GTK_RANGE(((GtkBoxChild*)
-		GTK_BOX(spinslide)->children->data)->widget));
+	adj = gtk_range_get_adjustment(GTK_RANGE(BOX_CHILD_0(spinslide)));
 	adj->lower = minv;
 	adj->upper = maxv;
 	gtk_adjustment_changed(adj);
@@ -288,8 +287,7 @@ gint mt_spinslide_get_value(GtkWidget *spinslide)
 {
 	GtkSpinButton *spin;
 
-	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
-		next->data)->widget);
+	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	gtk_spin_button_update(spin);
 	return (gtk_spin_button_get_value_as_int(spin));
 }
@@ -299,8 +297,7 @@ gint mt_spinslide_read_value(GtkWidget *spinslide)
 {
 	GtkSpinButton *spin;
 
-	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
-		next->data)->widget);
+	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	return (gtk_spin_button_get_value_as_int(spin));
 }
 
@@ -308,8 +305,7 @@ void mt_spinslide_set_value(GtkWidget *spinslide, gint value)
 {
 	GtkSpinButton *spin;
 
-	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
-		next->data)->widget);
+	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	gtk_spin_button_set_value(spin, value);
 }
 
@@ -319,8 +315,7 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 {
 	GtkAdjustment *adj;
 	
-	adj = gtk_range_get_adjustment(GTK_RANGE(((GtkBoxChild*)
-		GTK_BOX(spinslide)->children->data)->widget));
+	adj = gtk_range_get_adjustment(GTK_RANGE(BOX_CHILD_0(spinslide)));
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
 }
 
@@ -685,6 +680,70 @@ GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler)
 	return (tog);
 }
 
+// Path box
+
+static void click_file_browse(GtkWidget *widget, gpointer data)
+{
+	GtkWidget *fs;
+
+	fs = gtk_file_selection_new((char *)gtk_object_get_user_data(
+		GTK_OBJECT(widget)));
+	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
+		BOX_CHILD_0(widget->parent));
+	fs_setup(fs, (int)data);
+}
+
+GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
+{
+	GtkWidget *hbox, *entry, *button;
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(hbox);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+
+	add_with_frame(box, name, hbox, 5);
+	entry = gtk_entry_new();
+	gtk_widget_show(entry);
+	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	button = add_a_button(_("Browse"), 2, hbox, FALSE);
+	gtk_object_set_user_data(GTK_OBJECT(button), title);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
+
+	return (entry);
+}
+
+// Workaround for GtkCList reordering bug
+
+/* This bug is the favorite pet of GNOME developer Behdad Esfahbod
+ * See http://bugzilla.gnome.org/show_bug.cgi?id=400249#c2 */
+
+#if GTK_MAJOR_VERSION == 2
+
+static void clist_drag_fix(GtkWidget *widget, GdkDragContext *drag_context,
+	gpointer user_data)
+{
+	g_dataset_remove_data(drag_context, "gtk-clist-drag-source");
+}
+
+void clist_enable_drag(GtkWidget *clist)
+{
+	gtk_signal_connect(GTK_OBJECT(clist), "drag_begin",
+		GTK_SIGNAL_FUNC(clist_drag_fix), NULL);
+	gtk_signal_connect(GTK_OBJECT(clist), "drag_end",
+		GTK_SIGNAL_FUNC(clist_drag_fix), NULL);
+	gtk_clist_set_reorderable(GTK_CLIST(clist), TRUE);
+}
+
+#else /* GTK1 doesn't have this bug */
+
+void clist_enable_drag(GtkWidget *clist)
+{
+	gtk_clist_set_reorderable(GTK_CLIST(clist), TRUE);
+}
+
+#endif
+
 
 // Whatever is needed to move mouse pointer 
 
@@ -784,28 +843,3 @@ guint keyval_key(guint keyval)
 }
 
 #endif
-
-
-static void click_file_browse( GtkWidget *widget, gpointer data )
-{
-	file_selector( (int) data );
-}
-
-GtkWidget *mt_path_box(char *name, GtkWidget *box, int fsmode)
-{
-	GtkWidget *hbox, *entry, *button;
-
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-
-	add_with_frame(box, name, hbox, 5);
-	entry = gtk_entry_new();
-	gtk_widget_show(entry);
-	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
-	button = add_a_button(_("Browse"), 2, hbox, FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
-
-	return (entry);
-}

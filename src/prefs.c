@@ -65,10 +65,10 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 11
+#define PREF_LANGS 12
 
 char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_TW.utf8", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
-		"pl_PL", "pt_PT", "pt_BR", "es_ES", "tr_TR" };
+		"pl_PL", "pt_PT", "pt_BR", "sk_SK", "es_ES", "tr_TR" };
 
 int pref_lang;
 
@@ -410,7 +410,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Taiwanese)"),
 		_("Czech"), _("English (UK)"),
 		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
-		_("Spanish"), _("Turkish")
+		_("Slovak"), _("Spanish"), _("Turkish")
 					};
 #endif
 
@@ -508,17 +508,19 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	clipboard_entry = mt_path_box(_("Clipboard Files"), vbox_2, FS_CLIP_FILE);
+	clipboard_entry = mt_path_box(_("Clipboard Files"), vbox_2,
+		_("Select Clipboard File"), FS_CLIP_FILE);
 	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), vbox_2, FS_BROWSER_PROG);
+	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), vbox_2,
+		_("Select Browser Program"), FS_SELECT_FILE);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
 		inifile_get(HANDBOOK_BROWSER_INI, ""));
 
 	entry_handbook[1] = mt_path_box(_("Location of Handbook index"), vbox_2,
-		FS_HANDBOOK_INDEX);
+		_("Select Handbook Index File"), FS_SELECT_FILE);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
 		inifile_get(HANDBOOK_LOCATION_INI, ""));
 

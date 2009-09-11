@@ -1404,6 +1404,9 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	GtkColorSelection *cs = GTK_COLOR_SELECTION(user_data);
 	RGBA16 *cc = gtk_object_get_user_data(GTK_OBJECT(widget));
 	gdouble color[4];
+#if GTK_MAJOR_VERSION == 2
+	GdkColor c = {0, cc->r, cc->g, cc->b};
+#endif
 
 	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
 	color[0] = ((gdouble)(cc->r)) / 65535.0;
@@ -1419,7 +1422,6 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	gtk_color_selection_set_color( cs, color);
 #endif
 #if GTK_MAJOR_VERSION == 2
-	GdkColor c = {0, cc->r, cc->g, cc->b};
 	gtk_color_selection_set_previous_color(cs, &c);
 	gtk_color_selection_set_previous_alpha(cs, cc->a);
 #endif
@@ -2527,6 +2529,9 @@ static void grad_load_slot(int slot)
 {
 	gdouble color[4];
 	int i;
+#if GTK_MAJOR_VERSION == 2
+	GdkColor c;
+#endif
 
 	if (slot >= grad_cnt) /* Empty slot */
 	{
@@ -2547,8 +2552,6 @@ static void grad_load_slot(int slot)
 		gtk_color_selection_set_color(cs, color);
 #endif
 #if GTK_MAJOR_VERSION == 2
-		GdkColor c;
-
 		c.red = grad_pad[slot * 3 + 0] * 257;
 		c.green = grad_pad[slot * 3 + 1] * 257;
 		c.blue = grad_pad[slot * 3 + 2] * 257;

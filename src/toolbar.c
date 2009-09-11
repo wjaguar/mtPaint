@@ -395,7 +395,7 @@ static int set_smudge(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *toggle;
 
-	toggle = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
+	toggle = BOX_CHILD_0(box);
 	smudge_mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
 
 	return TRUE;

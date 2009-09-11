@@ -40,7 +40,6 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
-#include "spawn.h"
 
 GtkWidget *label_bar[STATUS_ITEMS];
 
@@ -557,7 +556,7 @@ void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 int do_rotate_free(GtkWidget *box, gpointer fdata)
 {
-	GtkWidget *spin = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
+	GtkWidget *spin = BOX_CHILD_0(box);
 	int j, smooth = 0, gcor = 0;
 	double angle;
 
@@ -566,8 +565,8 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 
 	if (mem_img_bpp == 3)
 	{
-		GtkWidget *gch = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
-		GtkWidget *check = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget;
+		GtkWidget *gch = BOX_CHILD_1(box);
+		GtkWidget *check = BOX_CHILD_2(box);
 		gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gch));
 		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
 			smooth = 1;
@@ -1604,7 +1603,7 @@ static gboolean fs_destroy(GtkWidget *fs)
 static gint fs_ok(GtkWidget *fs)
 {
 	ls_settings settings;
-	GtkWidget *xtra;
+	GtkWidget *xtra, *entry;
 	char fname[256], mess[512], gif_nam[256], gif_nam2[320], *c, *ext, *ext2;
 	int i, j;
 
@@ -1706,16 +1705,10 @@ static gint fs_ok(GtkWidget *fs)
 		if (save_pal(fname, &settings) < 0) goto redo_name;
 		break;
 	case FS_CLIP_FILE:
-		if (clipboard_entry)
-			gtk_entry_set_text(GTK_ENTRY(clipboard_entry), fname);
-		break;
-	case FS_BROWSER_PROG:
-		if (entry_handbook[0])
-			gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]), fname);
-		break;
-	case FS_HANDBOOK_INDEX:
-		if (entry_handbook[1])
-			gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]), fname);
+	case FS_SELECT_FILE:
+	case FS_SELECT_DIR:
+		entry = gtk_object_get_data(GTK_OBJECT(fs), FS_ENTRY_KEY);
+		if (entry) gtk_entry_set_text(GTK_ENTRY(entry), fname);
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
@@ -1800,9 +1793,6 @@ static gint fs_ok(GtkWidget *fs)
 		if (check_file(fname)) goto redo;
 		if (layer_save_composite(fname, &settings)) goto redo_name;
 		break;
-	case FS_SPAWN_DIR:
-		spawn_set_new_directory(fname);
-		break;
 	}
 
 	update_menus();
@@ -1820,73 +1810,11 @@ redo:
 	return FALSE;
 }
 
-void file_selector(int action_type)
+void fs_setup(GtkWidget *fs, int action_type)
 {
-	char *title = NULL, txt[300], txt2[300];
-	GtkWidget *fs, *xtra;
+	char txt[300], txt2[300];
+	GtkWidget *xtra;
 
-
-	switch (action_type)
-	{
-	case FS_PNG_LOAD:
-		title = _("Load Image File");
-		if (layers_total == 0)
-		{
-			if (check_for_changes() == 1) return;
-		}
-		else if (check_layers_for_changes() == 1) return;
-		break;
-	case FS_PNG_SAVE:
-		title = _("Save Image File");
-		break;
-	case FS_PALETTE_LOAD:
-		title = _("Load Palette File");
-		break;
-	case FS_PALETTE_SAVE:
-		title = _("Save Palette File");
-		break;
-	case FS_CLIP_FILE:
-		title = _("Select Clipboard File");
-		break;
-	case FS_BROWSER_PROG:
-		title = _("Select Browser Program");
-		break;
-	case FS_HANDBOOK_INDEX:
-		title = _("Select Handbook Index File");
-		break;
-	case FS_EXPORT_UNDO:
-		title = _("Export Undo Images");
-		break;
-	case FS_EXPORT_UNDO2:
-		title = _("Export Undo Images (reversed)");
-		break;
-	case FS_EXPORT_ASCII:
-		title = _("Export ASCII Art");
-		break;
-	case FS_LAYER_SAVE:
-		title = _("Save Layer Files");
-		break;
-	case FS_GIF_EXPLODE:
-		title = _("Import GIF animation - Choose frames directory");
-		break;
-	case FS_EXPORT_GIF:
-		title = _("Export GIF animation");
-		break;
-	case FS_CHANNEL_LOAD:
-		title = _("Load Channel");
-		break;
-	case FS_CHANNEL_SAVE:
-		title = _("Save Channel");
-		break;
-	case FS_COMPOSITE_SAVE:
-		title = _("Save Composite Image");
-		break;
-	case FS_SPAWN_DIR:
-		title = _("Select Directory");
-		break;
-	}
-
-	fs = gtk_file_selection_new(title);
 
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 	gtk_window_set_default_size(GTK_WINDOW(fs),
@@ -1896,8 +1824,12 @@ void file_selector(int action_type)
 		inifile_get_gint32("fs_window_x", 0),
 		inifile_get_gint32("fs_window_y", 0));
 
-	if ( action_type == FS_SPAWN_DIR ||action_type ==  FS_GIF_EXPLODE)
+	if ((action_type == FS_SELECT_DIR) || (action_type == FS_GIF_EXPLODE))
+	{
 		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
+		gtk_widget_set_sensitive(GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list),
+			FALSE);		// Don't let the user select files
+	}
 
 	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->ok_button),
 		"clicked", GTK_SIGNAL_FUNC(fs_ok), GTK_OBJECT(fs));
@@ -1926,12 +1858,6 @@ void file_selector(int action_type)
 			DIR_SEP );		// Default
 	}
 
-	if ( action_type == FS_SPAWN_DIR || action_type == FS_GIF_EXPLODE )
-	{
-		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list),
-			FALSE );		// Don't let the user select files
-	}
-
 #if GTK_MAJOR_VERSION == 2
 	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
 #else
@@ -1947,6 +1873,58 @@ void file_selector(int action_type)
 	gtk_widget_show(fs);
 	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
 	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
+}
+
+void file_selector(int action_type)
+{
+	char *title = NULL;
+
+	switch (action_type)
+	{
+	case FS_PNG_LOAD:
+		if ((layers_total ? check_layers_for_changes() :
+			check_for_changes()) == 1) return;
+		title = _("Load Image File");
+		break;
+	case FS_PNG_SAVE:
+		title = _("Save Image File");
+		break;
+	case FS_PALETTE_LOAD:
+		title = _("Load Palette File");
+		break;
+	case FS_PALETTE_SAVE:
+		title = _("Save Palette File");
+		break;
+	case FS_EXPORT_UNDO:
+		title = _("Export Undo Images");
+		break;
+	case FS_EXPORT_UNDO2:
+		title = _("Export Undo Images (reversed)");
+		break;
+	case FS_EXPORT_ASCII:
+		title = _("Export ASCII Art");
+		break;
+	case FS_LAYER_SAVE:
+		title = _("Save Layer Files");
+		break;
+	case FS_GIF_EXPLODE:
+		title = _("Import GIF animation - Choose frames directory");
+		break;
+	case FS_EXPORT_GIF:
+		title = _("Export GIF animation");
+		break;
+	case FS_CHANNEL_LOAD:
+		title = _("Load Channel");
+		break;
+	case FS_CHANNEL_SAVE:
+		title = _("Save Channel");
+		break;
+	case FS_COMPOSITE_SAVE:
+		title = _("Save Composite Image");
+		break;
+	}
+
+	fs_setup(gtk_file_selection_new(title), action_type);
 }
 
 void align_size( float new_zoom )		// Set new zoom level
