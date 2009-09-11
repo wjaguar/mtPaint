@@ -34,7 +34,7 @@ GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg, *spinbutton_recent;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
-static GtkWidget *checkbutton_zoom[3],		// zoom 100%, wheel, centralize
+static GtkWidget *checkbutton_zoom[3],		// zoom 100%, wheel
 	*checkbutton_commit;
 static GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
@@ -59,14 +59,13 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 8
+#define PREF_LANGS 7
 
 char	*pref_lang_ini[PREF_LANGS * 2] = {
 		"system", NULL,
 		"cs_CZ", NULL,
 		"en_GB", NULL,
 		"fr_FR", NULL,
-		"de_DE", NULL,
 		"pt_PT", NULL,
 		"pt_BR", NULL,
 		"es_ES", NULL
@@ -333,7 +332,6 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "scrollwheelZOOM",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[1])) );
 #endif
-	canvas_image_centre = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
 
 
 	inifile_set_gboolean( "pasteCommit",
@@ -360,7 +358,6 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 
-	force_main_configure();		// Force configure of main window - for centalizing code
 	update_all_views();		// Update canvas for changes
 	set_cursor();
 
@@ -444,9 +441,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *tab_tex2[] = { _("XPM/PNG transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
 		_("JPEG Save Quality (100=High)   "), _("Recently Used Files") };
 	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
-	char *stat_tex[] = { _("Colour A & B"), _("Canvas Geometry"), _("Cursor X,Y"),
-		_("Pixel [I] {RGB}"), _("Zoom %"), _("Selection Geometry"), _("Continuous Mode"),
-		_("Undo / Redo"), _("Opacity %"), _("Opacity Mode") },
+	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
+		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
 		*tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
 	char txt[64];
 
@@ -554,12 +550,6 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
-		if (i==5)
-		{
-			vbox_3 = gtk_vbox_new (FALSE, 0);
-			gtk_widget_show (vbox_3);
-			gtk_box_pack_start (GTK_BOX (hbox4), vbox_3, FALSE, FALSE, 0);
-		}
 		sprintf(txt, "status%iToggle", i);
 		prefs_status[i] = add_a_toggle( stat_tex[i], vbox_3, inifile_get_gboolean(txt, TRUE) );
 	}
@@ -595,8 +585,6 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
 		vbox_3, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
 #endif
-	checkbutton_zoom[2] = add_a_toggle( _("Centralize image"),
-		vbox_3, canvas_image_centre );
 
 
 
@@ -714,10 +702,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	pref_lang_ini[3] = _("Czech");
 	pref_lang_ini[5] = _("English (UK)");
 	pref_lang_ini[7] = _("French");
-	pref_lang_ini[9] = _("German");
-	pref_lang_ini[11] = _("Portuguese");
-	pref_lang_ini[13] = _("Portuguese (Brazilian)");
-	pref_lang_ini[15] = _("Spanish");
+	pref_lang_ini[9] = _("Portuguese");
+	pref_lang_ini[11] = _("Portuguese (Brazilian)");
+	pref_lang_ini[13] = _("Spanish");
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);

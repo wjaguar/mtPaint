@@ -35,11 +35,11 @@
 #include "mygtk.h"
 #include "inifile.h"
 #include "layer.h"
+#include "toolbar.h"
 
 
 gboolean
 	view_showing = FALSE,
-//	allow_view = TRUE,
 	allow_cline = FALSE, view_update_pending = FALSE;
 float vw_zoom = 1;
 
@@ -191,8 +191,9 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_container_set_border_width (GTK_CONTAINER (help_window), 4);
 	gtk_window_set_position (GTK_WINDOW (help_window), GTK_WIN_POS_CENTER);
-	snprintf(txt, 60, "%s - %s", VERSION, _("Help"));
+	snprintf(txt, 60, "%s - %s", VERSION, _("About"));
 	gtk_window_set_title (GTK_WINDOW (help_window), txt);
+	gtk_widget_set_usize (help_window, -2, 400);
 
 	box1 = gtk_vbox_new (FALSE, 0);
 	gtk_container_add (GTK_CONTAINER (help_window), box1);
@@ -228,7 +229,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 		label2 = gtk_label_new (help_page_contents[i]);
 #if GTK_MAJOR_VERSION == 2
-		if ( i == 10 || i == 9 )	// Keyboard/Mouse shortcuts tab only
+		if ( i == 1 || i == 2 )	// Keyboard/Mouse shortcuts tab only
 		{
 			style = gtk_style_copy (gtk_widget_get_style (label2));
 			style->font_desc = pango_font_description_from_string("Monospace 9");
@@ -575,7 +576,7 @@ static int old_split_pos = -1;
 GtkWidget *vw_drawing = NULL;
 gboolean vw_focus_on = FALSE;
 
-static GtkWidget *vw_scrolledwindow; //, *vw_focus_toggle;
+static GtkWidget *vw_scrolledwindow;
 static gboolean view_first_move = TRUE;
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float zoom )
@@ -886,14 +887,6 @@ void vw_focus_view()						// Focus view window to main window
 	gtk_adjustment_value_changed( vert );
 }
 
-static void vw_focus( GtkWidget *widget, gpointer *data )
-{
-	vw_focus_on = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-	inifile_set_gboolean("view_focus", vw_focus_on );
-
-	vw_focus_view();
-}
-
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 {
@@ -1112,6 +1105,7 @@ void view_show()
 	gtk_widget_show(vw_scrolledwindow);		// Not good in GTK+1!
 	view_showing = TRUE;
 	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE );
+	toolbar_viewzoom(TRUE);
 #if GTK_MAJOR_VERSION == 1
 	if ( old_split_pos >= 0 )
 	{
@@ -1127,6 +1121,7 @@ void view_hide()
 	gtk_widget_hide(vw_scrolledwindow);		// Not good in GTK+1!
 	view_showing = FALSE;
 	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE );
+	toolbar_viewzoom(FALSE);
 #if GTK_MAJOR_VERSION == 1
 	old_split_pos = GTK_PANED(main_vsplit)->handle_xpos;
 	if ( old_split_pos >= 0 )
@@ -1138,6 +1133,21 @@ void view_hide()
 #endif
 }
 
+
+void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data )
+{
+	canvas_image_centre = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	inifile_set_gboolean( "imageCentre", canvas_image_centre );
+	force_main_configure();		// Force configure of main window - for centalizing code
+	update_all_views();
+}
+
+void pressed_view_focus( GtkMenuItem *menu_item, gpointer user_data )
+{
+	vw_focus_on = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	inifile_set_gboolean("view_focus", vw_focus_on );
+	vw_focus_view();
+}
 
 void pressed_view( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -1553,104 +1563,4 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 		inifile_get( "textString", _("Enter Text Here") ) );
 
 	gtk_widget_grab_focus( GTK_FONT_SELECTION(text_font_window)->preview_entry );
-}
-
-
-
-///	ZOOM POPUP WINDOW
-
-
-
-
-void setzoom_main_change( GtkWidget *widget, gpointer data )
-{
-	float new_zoom = 1.0;
-	int i = GTK_HSCALE(data)->scale.range.adjustment->value;;
-
-	mtMIN( i, i, 28 )
-	mtMAX( i, i, 0 )
-
-	if ( i<9 ) new_zoom = 1 / (float) (10-i);
-	else new_zoom = i-8;
-
-	align_size( new_zoom );
-}
-
-void setzoom_view_change( GtkWidget *widget, gpointer data )
-{
-	float new_zoom = 1.0;
-	int i = GTK_HSCALE(data)->scale.range.adjustment->value;;
-
-	mtMIN( i, i, 28 )
-	mtMAX( i, i, 0 )
-
-	if ( i<9 ) new_zoom = 1 / (float) (10-i);
-	else new_zoom = i-8;
-
-	vw_align_size( new_zoom );
-//	vw_zoom = new_zoom;
-
-	if ( view_showing ) gtk_widget_queue_draw( vw_drawing );
-}
-
-void setzoom_close( GtkWidget *widget, gpointer data )
-{
-	gtk_widget_destroy( GTK_WIDGET(data) );
-}
-
-void pressed_setzoom( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int z1, z2;	// 0 = 10%, 1=11%, ... , 9=100%, 10=200%, ... , 27=1900%, 28=2000%
-	GtkWidget *window_zoom, *table1, *hscale_zoom_main, *hscale_zoom_view,
-		*button, *check_zoom_focus;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-
-
-	if ( can_zoom >= 1 ) z1 = can_zoom + 8; else z1 = 10 - 1/can_zoom;
-	if ( vw_zoom >= 1 ) z2 = vw_zoom + 8; else z2 = 10 - 1/vw_zoom;
-
-	window_zoom = add_a_window( GTK_WINDOW_TOPLEVEL, _("Zoom"), GTK_WIN_POS_MOUSE, TRUE );
-	gtk_container_set_border_width (GTK_CONTAINER (window_zoom), 4);
-
-	table1 = gtk_table_new (2, 3, FALSE);
-	gtk_widget_show (table1);
-	gtk_container_add (GTK_CONTAINER (window_zoom), table1);
-
-	add_to_table( _("Main"), table1, 0, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("View"), table1, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-
-	hscale_zoom_main = add_slider2table( z1, 0, 28, table1, 0, 1, 200, -1 );
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_zoom_main)->scale.range.adjustment),
-		"value_changed", GTK_SIGNAL_FUNC(setzoom_main_change), hscale_zoom_main);
-
-	hscale_zoom_view = add_slider2table( z2, 0, 28, table1, 1, 1, 200, -1 );
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(hscale_zoom_view)->scale.range.adjustment),
-		"value_changed", GTK_SIGNAL_FUNC(setzoom_view_change), hscale_zoom_view);
-
-	button = gtk_button_new_with_label (_("Close"));
-	gtk_widget_show (button);
-	gtk_table_attach (GTK_TABLE (table1), button, 2, 3, 1, 2,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (button), 5);
-	gtk_signal_connect (GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(setzoom_close), GTK_OBJECT(window_zoom) );
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Z, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_z, 0, (GtkAccelFlags) 0);
-
-	check_zoom_focus = gtk_check_button_new_with_label (_("Focus"));
-	gtk_widget_show (check_zoom_focus);
-	gtk_table_attach (GTK_TABLE (table1), check_zoom_focus, 2, 3, 0, 1,
-		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (0), 0, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (check_zoom_focus), 5);
-	gtk_signal_connect (GTK_OBJECT(check_zoom_focus), "clicked",
-		GTK_SIGNAL_FUNC(vw_focus), NULL );
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_zoom_focus), vw_focus_on);
-
-	gtk_window_set_transient_for( GTK_WINDOW(window_zoom), GTK_WINDOW(main_window) );
-	gtk_widget_show( window_zoom );
-	gtk_window_add_accel_group(GTK_WINDOW (window_zoom), ag);
-
-	gtk_widget_grab_focus(hscale_zoom_view);	// Mark's choice ;-)
 }

@@ -32,6 +32,7 @@
 #include "layer.h"
 #include "inifile.h"
 #include "canvas.h"
+#include "toolbar.h"
 
 
 /// Tint tool - contributed by Dmitry Groshev, January 2006
@@ -77,14 +78,11 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 
 /// PATTERNS
 
-unsigned char *mem_pats = NULL;		// RGB screen memory holding current patterns
-unsigned char *mem_patch = NULL;	// RGB screen memory holding all patterns for choosing
 unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
 unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 
 /// PREVIEW/TOOLS
 
-char *mem_prev = NULL;			// RGB colours preview
 int tool_type = TOOL_SQUARE;		// Currently selected tool
 int tool_size = 1, tool_flow = 1;
 int tool_opacity = 100;			// Transparency - 100=solid
@@ -549,17 +547,9 @@ int undo_next_core( int handle, int new_width, int new_height, int x_start, int 
 	return 0;
 }
 
-void mem_undo_next()		// Call this after a draw event but before any changes to image
+void mem_undo_next(int mode)	// Call this after a draw event but before any changes to image
 {
 	undo_next_core( 0, mem_width, mem_height, 0, 0, mem_image_bpp );
-}
-
-int mem_undo_next2( int new_w, int new_h, int from_x, int from_y )
-					// Call this after crop/resize to record undo + new geometry
-{
-//printf("Cropping to w/h: %i,%i data from x/y : %i,%i\n", new_w, new_h, from_x, from_y);
-	pen_down = 0;
-	return undo_next_core( 1, new_w, new_h, from_x, from_y, mem_image_bpp );
 }
 
 void mem_undo_backward()		// UNDO requested by user
@@ -642,39 +632,17 @@ char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
 	return chunk;
 }
 
-void mem_set_brush(int val)			// Set brush, update size/flow/preview
-{
-	int offset, i, j, k, o, o2;
-
-	tool_type = mem_brush_list[val][0];
-	tool_size = mem_brush_list[val][1];
-	if ( mem_brush_list[val][2]>0 ) tool_flow = mem_brush_list[val][2];
-
-	offset = 3*( 2 + 36*(val % 9) + 36*PATCH_WIDTH*(val / 9) + 2*PATCH_WIDTH );
-			// Offset in brush RGB
-	for ( j=0; j<32; j++ )
-	{
-		o = 3*PATTERN_WIDTH*PATTERN_WIDTH + 3*PATTERN_WIDTH*j;	// Preview offset
-		o2 = offset + 3*PATCH_WIDTH*j;				// Offset in brush RGB
-		for ( i=0; i<32; i++ )
-		{
-			for ( k=0; k<3; k++ )
-				mem_pats[o + 3*i + k] = mem_brushes[o2 + 3*i + k];
-		}
-	}
-}
-
 void mem_init()					// Initialise memory
 {
 	char txt[300];
 	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
-	mem_pats = grab_memory( 3*PATTERN_WIDTH*PATTERN_HEIGHT, 0 );
+	toolbar_preview_init();
+
 	mem_col_pat = grab_memory( 8*8, 0 );
 	mem_col_pat24 = grab_memory( 3*8*8, 0 );
 	mem_pals = grab_memory( 3*PALETTE_WIDTH*PALETTE_HEIGHT, 0 );
-	mem_prev = grab_memory( 3*PREVIEW_WIDTH*PREVIEW_HEIGHT, 0 );
 	mem_brushes = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, 0 );
 
 	for ( i=0; i<256; i++ )		// Load up normal palette defaults
@@ -781,7 +749,7 @@ void copy_dig( int index, int tx, int ty )
 	
 }
 
-void copy_num( int index, int tx, int ty )
+static void copy_num( int index, int tx, int ty )
 {
 	index = index % 1000;
 
@@ -804,39 +772,6 @@ void mem_swap_cols()
 	mem_col_B24 = o24;
 
 	mem_pat_update();
-}
-
-void repaint_top_swatch()			// Update selected colours A & B
-{
-	int i, j, r[2], g[2], b[2], nx, ny;
-
-	if ( mem_image_bpp == 1 )
-	{
-		mem_col_A24 = mem_pal[mem_col_A];
-		mem_col_B24 = mem_pal[mem_col_B];
-	}
-	r[0] = mem_col_A24.red;
-	g[0] = mem_col_A24.green;
-	b[0] = mem_col_A24.blue;
-	r[1] = mem_col_B24.red;
-	g[1] = mem_col_B24.green;
-	b[1] = mem_col_B24.blue;
-
-	for ( j=0; j<30; j++ )
-	{
-		for ( i=0; i<30; i++ )
-		{
-			nx = 1+i; ny = 1+j;
-			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[0];
-			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[0];
-			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[0];
-
-			nx = 1+i; ny = 33+j;
-			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[1];
-			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[1];
-			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[1];
-		}
-	}
 }
 
 void repaint_swatch( int index )		// Update a palette colour swatch
@@ -986,52 +921,6 @@ void mem_mask_setall(char val)
 	int i;
 
 	for (i=0; i<256; i++) mem_prot_mask[i] = val;
-}
-
-void mem_pat_update()			// Update indexed and then RGB pattern preview
-{
-	int i, j, i2, j2, c, offset;
-	png_color c24;
-
-	if ( mem_image_bpp == 1 )
-	{
-		mem_col_A24 = mem_pal[mem_col_A];
-		mem_col_B24 = mem_pal[mem_col_B];
-	}
-
-	for ( j=0; j<8; j++ )
-	{
-		for ( i=0; i<8; i++ )
-		{
-			if ( mem_patterns[tool_pat][j][i] == 1 )
-			{
-				c = mem_col_A;
-				c24 = mem_col_A24;
-			}
-			else
-			{
-				c = mem_col_B;
-				c24 = mem_col_B24;
-			}
-
-			mem_col_pat[i + j*8] = c;
-
-			mem_col_pat24[ 3*(i + j*8) ] = c24.red;
-			mem_col_pat24[ 1 + 3*(i + j*8) ] = c24.green;
-			mem_col_pat24[ 2 + 3*(i + j*8) ] = c24.blue;
-
-			for ( j2=0; j2<4; j2++ )
-			{
-				for ( i2=0; i2<4; i2++ )
-				{
-					offset = 3*(i+i2*8 + (j+j2*8)*PATTERN_WIDTH);
-					mem_pats[ 0 + offset ] = c24.red;
-					mem_pats[ 1 + offset ] = c24.green;
-					mem_pats[ 2 + offset ] = c24.blue;
-				}
-			}
-		}
-	}
 }
 
 void mem_get_histogram()		// Calculate how many of each colour index is on the canvas
@@ -1336,36 +1225,25 @@ int mem_used_layers()		// Return the number of bytes used in image + undo in all
 
 int mem_convert_rgb()			// Convert image to RGB
 {
-	char *new_image = NULL;
+	char *old_image = mem_image, *new_image;
 	unsigned char pix;
 	int i, j, res;
-
-	j = mem_width * mem_height;
-	new_image = malloc( 3*j );		// Grab new memory chunk
-	if ( new_image == NULL ) return 1;	// Not enough memory
-
-	for ( i=0; i<j; i++ )
-	{
-		pix = mem_image[i];
-		new_image[ 3*i ] = mem_pal[pix].red;
-		new_image[ 1 + 3*i ] = mem_pal[pix].green;
-		new_image[ 2 + 3*i ] = mem_pal[pix].blue;
-	}
 
 	pen_down = 0;				// Ensure next tool action is treated separately
 	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 3 );
 	pen_down = 0;
-	if ( res == 1 )
+
+	if (res) return 1;	// Not enough memory
+
+	new_image = mem_image;
+	j = mem_width * mem_height;
+	for ( i=0; i<j; i++ )
 	{
-		free( new_image );		// Free memory
-		return 2;
+		pix = old_image[i];
+		new_image[ 3*i ] = mem_pal[pix].red;
+		new_image[ 1 + 3*i ] = mem_pal[pix].green;
+		new_image[ 2 + 3*i ] = mem_pal[pix].blue;
 	}
-
-	j = mem_height * mem_width * 3;
-	for ( i=0; i<j; i++)			// Copy new data to new mem_image
-		mem_image[i] = new_image[i];
-
-	free( new_image );			// Free memory
 
 	return 0;
 }
@@ -1378,7 +1256,7 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 	pen_down = 0;				// Ensure next tool action is treated separately
 	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 1 );
 	pen_down = 0;
-	if ( res == 1 )	return 2;
+	if ( res ) return 2;
 
 	j = mem_width * mem_height;
 	for ( i=0; i<j; i++ )
@@ -2897,26 +2775,16 @@ int mem_rotate_free( float angle, int type )	// Rotate canvas by any angle (degr
 
 int mem_image_rot( int dir )					// Rotate image 90 degrees
 {
-	char *new_image = NULL;
-	int i, j, ow = mem_width, oh = mem_height;
-
-	new_image = malloc( mem_width * mem_height * mem_image_bpp );
-						// Grab new memory chunk
-	if ( new_image == NULL ) return 1;			// Not enough memory
-
-	mem_rotate( new_image, mem_image, mem_width, mem_height, dir, mem_image_bpp );
+	char *old_image = mem_image;
+	int i, ow = mem_width, oh = mem_height;
 
 	pen_down = 0;				// Ensure next tool action is treated separately
-	undo_next_core( 2, mem_height, mem_width, 0, 0, mem_image_bpp );
+	i = undo_next_core( 2, mem_height, mem_width, 0, 0, mem_image_bpp );
 	pen_down = 0;				// Ensure next tool action is treated separately
 
-	mem_width = oh;
-	mem_height = ow;
-	j = mem_height * mem_width * mem_image_bpp;
-	for ( i=0; i<j; i++)			// Copy rotated data to new mem_image
-		mem_image[i] = new_image[i];
+	if (i) return 1;			// Not enough memory
 
-	free( new_image );			// Free memory
+	mem_rotate( mem_image, old_image, ow, oh, dir, mem_image_bpp );
 
 	return 0;
 }
@@ -3044,24 +2912,30 @@ float *work_area;
 fstep *hfilter, *vfilter;
 
 #define N_CHANNELS 3
-int prepare_scale(int nw, int nh, int type)
+void clear_scale()
+{
+	free(work_area);
+	free(hfilter);
+	free(vfilter);
+}
+
+int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
 	work_area = NULL;
 	hfilter = vfilter = NULL;
-	work_area = malloc(mem_width * N_CHANNELS * sizeof(float));
-	hfilter = make_filter(mem_width, nw, type);
-	vfilter = make_filter(mem_height, nh, type);
+	if (!type || (mem_image_bpp == 1)) return TRUE;
+	work_area = malloc(ow * N_CHANNELS * sizeof(float));
+	hfilter = make_filter(ow, nw, type);
+	vfilter = make_filter(oh, nh, type);
 	if (!work_area || !hfilter || !vfilter)
 	{
-		free(work_area);
-		free(hfilter);
-		free(vfilter);
+		clear_scale();
 		return FALSE;
 	}
-	else return TRUE;
+	return TRUE;
 }
 
-void do_scale(char *new_image, int nw, int nh)
+void do_scale(char *old_image, char *new_image, int ow, int oh, int nw, int nh)
 {
 	unsigned char *img;
 	fstep *tmp, *tmpx;
@@ -3073,15 +2947,15 @@ void do_scale(char *new_image, int nw, int nh)
 	tmp = vfilter;
 	for (i = 0; i < nh; i++, tmp++)
 	{
-		memset(work_area, 0, mem_width * N_CHANNELS * sizeof(float));
+		memset(work_area, 0, ow * N_CHANNELS * sizeof(float));
 
 		/* Build one vertically-scaled row */
 		for (; tmp->idx >= 0; tmp++)
 		{
-			img = mem_image + tmp->idx * mem_width * N_CHANNELS;
+			img = old_image + tmp->idx * ow * N_CHANNELS;
 			wrk = work_area;
 			kk = tmp->k;
-			for (j = 0; j < mem_width; j++)
+			for (j = 0; j < ow; j++)
 			{
 		/* WARNING: this for N_CHANNELS == 3 !!! */
 				wrk[0] += kk * img[0];
@@ -3123,75 +2997,70 @@ void do_scale(char *new_image, int nw, int nh)
 		if (tmp->idx < -1) break;
 	}
 
-	free(hfilter);
-	free(vfilter);
-	free(work_area);
+	clear_scale();
 }
 
 int mem_image_scale( int nw, int nh, int type )				// Scale image
 {
-	char *new_image = NULL;
-	int i, j, oi, oj, res;
+	char *old_image = mem_image, *new_image, *src, *dest;
+	int i, j, oi, oj, res, ow = mem_width, oh = mem_height;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
 	mtMIN( nh, nh, MAX_HEIGHT )
 	mtMAX( nh, nh, 1 )
 
-	new_image = malloc( nw * nh * mem_image_bpp );		// Grab new memory chunk
-	if ( new_image == NULL ) return 1;			// Not enough memory
-	if (type && (mem_image_bpp == 3))
-	{
-		if (!prepare_scale(nw, nh, type)) return 1;	// Not enough memory
-	}
-
-	progress_init(_("Scaling Image"),0);
-	if ( mem_image_bpp == 1 )
-		for ( j=0; j<nh; j++ )
-		{
-			progress_update( ((float) j)/nh );
-			oj = mem_height * ((float) j)/nh;
-			for ( i=0; i<nw; i++ )
-			{
-				oi = mem_width * ((float) i)/nw;
-				new_image[ i + nw*j ] = mem_image[ oi + mem_width*oj ];
-			}
-		}
-	else if ( mem_image_bpp == 3 )
-	{
-		if (type == 0)
-		{
-		    for ( j=0; j<nh; j++ )
-		    {
-			progress_update( ((float) j)/nh );
-			oj = mem_height * ((float) j)/nh;
-			for ( i=0; i<nw; i++ )
-			{
-				oi = mem_width * ((float) i)/nw;
-				new_image[ 3*(i + nw*j) ] = mem_image[ 3*(oi + mem_width*oj) ];
-				new_image[ 1 + 3*(i + nw*j) ] = mem_image[ 1 + 3*(oi + mem_width*oj) ];
-				new_image[ 2 + 3*(i + nw*j) ] = mem_image[ 2 + 3*(oi + mem_width*oj) ];
-			}
-		    }
-		}
-		else do_scale(new_image, nw, nh);
-	}
-	progress_end();
+	if (!prepare_scale(ow, oh, nw, nh, type)) return 1;	// Not enough memory
 
 	pen_down = 0;				// Ensure next tool action is treated separately
 	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
 	pen_down = 0;
-	if ( res == 1 )
+
+	if (res)
 	{
-		free( new_image );		// Free memory
-		return 2;
+		clear_scale();
+		return 1;			// Not enough memory
 	}
 
-	j = mem_height * mem_width * mem_image_bpp;
-	for ( i=0; i<j; i++)			// Copy scaled data to new mem_image
-		mem_image[i] = new_image[i];
-
-	free( new_image );			// Free memory
+	dest = new_image = mem_image;
+	progress_init(_("Scaling Image"),0);
+	if ( mem_image_bpp == 1 )
+	{
+		for ( j=0; j<nh; j++ )
+		{
+			oj = (oh * j) / nh;
+			src = old_image + ow * oj;
+			for ( i=0; i<nw; i++ )
+			{
+				oi = (ow * i) / nw;
+				*dest++ = src[oi];
+			}
+			if ((j * 10) % nh >= nh - 10)
+				progress_update((float)(j + 1) / nh);
+		}
+	}
+	else
+	{
+		if (!type)
+		{
+		    for ( j=0; j<nh; j++ )
+		    {
+				oj = (oh * j) / nh;
+				src = old_image + ow * oj * 3;
+			for ( i=0; i<nw; i++ )
+			{
+					oi = ((ow * i) / nw) * 3;
+					*dest++ = src[oi];
+					*dest++ = src[oi + 1];
+					*dest++ = src[oi + 2];
+			}
+				if ((j * 10) % nh >= nh - 10)
+					progress_update((float)(j + 1) / nh);
+		    }
+		}
+		else do_scale(old_image, new_image, ow, oh, nw, nh);
+	}
+	progress_end();
 
 	return 0;
 }
@@ -3279,26 +3148,34 @@ int mem_isometrics(int type)
 
 int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 {
-	char *new_image = NULL;
+	char *old_image = mem_image, *new_image, *src, *dest;
 	int i, j, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
+	int oww = mem_width, ohh = mem_height;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
 	mtMIN( nh, nh, MAX_HEIGHT )
 	mtMAX( nh, nh, 1 )
 
-	j = nw * nh * mem_image_bpp;
-	new_image = malloc( j );		// Grab new memory chunk
-	if ( new_image == NULL ) return 1;			// Not enough memory
+	pen_down = 0;				// Ensure next tool action is treated separately
+	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
+	pen_down = 0;
+	if (res) return 1;			// Not enough memory
 
+	j = nw * nh;
+	dest = new_image = mem_image;
 	if ( mem_image_bpp == 1 )
-		for ( i=0; i<j; i++ ) new_image[i] = mem_col_A;
-	if ( mem_image_bpp == 3 )
-		for ( i=0; i<j; i=i+3 )				// Background is current colour A
 		{
-			new_image[ i ] = mem_col_A24.red;
-			new_image[ 1 + i ] = mem_col_A24.green;
-			new_image[ 2 + i ] = mem_col_A24.blue;
+		memset(dest, mem_col_A, j);
+	}
+	else
+	{
+		for (i = 0; i < j; i++)		// Background is current colour A
+		{
+			*dest++ = mem_col_A24.red;
+			*dest++ = mem_col_A24.green;
+			*dest++ = mem_col_A24.blue;
+		}
 		}
 
 	if ( ox < 0 ) oxo = -ox;
@@ -3306,40 +3183,15 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 	if ( oy < 0 ) oyo = -oy;
 	else nyo = oy;
 
-	mtMIN( ow, mem_width, nw )
-	mtMIN( oh, mem_height, nh )
+	mtMIN( ow, oww, nw )
+	mtMIN( oh, ohh, nh )
 
-	if ( mem_image_bpp == 1 )
 		for ( j=0; j<oh; j++ )
-			for ( i=0; i<ow; i++ )
-				new_image[ i + nxo + nw*(j + nyo) ] =
-					mem_image[ i + oxo + mem_width*(j + oyo) ];
-	if ( mem_image_bpp == 3 )
-		for ( j=0; j<oh; j++ )
-			for ( i=0; i<ow; i++ )
 			{
-				new_image[ 3*(i + nxo + nw*(j + nyo)) ] =
-					mem_image[ 3*(i + oxo + mem_width*(j + oyo)) ];
-				new_image[ 1 + 3*(i + nxo + nw*(j + nyo)) ] =
-					mem_image[ 1 + 3*(i + oxo + mem_width*(j + oyo)) ];
-				new_image[ 2 + 3*(i + nxo + nw*(j + nyo)) ] =
-					mem_image[ 2 + 3*(i + oxo + mem_width*(j + oyo)) ];
-			}
-
-	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
-	pen_down = 0;
-	if ( res == 1 )
-	{
-		free( new_image );		// Free memory
-		return 2;
+		src = old_image + (oxo + oww * (j + oyo)) * mem_image_bpp;
+		dest = new_image + (nxo + nw * (j + nyo)) * mem_image_bpp;
+		memcpy(dest, src, ow * mem_image_bpp);
 	}
-
-	j = mem_height * mem_width * mem_image_bpp;
-	for ( i=0; i<j; i++)			// Copy rotated data to new mem_image
-		mem_image[i] = new_image[i];
-
-	free( new_image );			// Free memory
 
 	return 0;
 }

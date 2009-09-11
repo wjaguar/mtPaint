@@ -38,8 +38,12 @@
 #include "wu.h"
 #include "prefs.h"
 #include "ani.h"
+#include "toolbar.h"
 
 GdkWindow *the_canvas = NULL;			// Pointer to the canvas we will be drawing on
+
+GtkWidget *label_bar[STATUS_ITEMS];
+
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_x=0, margin_main_y=0,		// Top left of image from top left of canvas
@@ -82,7 +86,7 @@ void commit_paste( gboolean undo )
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
 
-	if ( undo ) mem_undo_next();		// Do memory stuff for undo
+	if ( undo ) mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
 	update_menus();				// Update menu undo issues
 
 	if ( mem_image_bpp == 1 )
@@ -204,7 +208,7 @@ void create_pal_quantized(int dl)
 	unsigned char newpal[3][256];
 
 	pen_down = 0;
-	mem_undo_next();
+	mem_undo_next(UNDO_PAL);
 	pen_down = 0;
 
 	if ( dl==1 )
@@ -240,7 +244,7 @@ void pressed_create_wu( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_INV);
 
 	mem_invert();
 
@@ -251,7 +255,7 @@ void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_FILT);
 	do_effect(0, 0);
 	update_all_views();
 }
@@ -267,7 +271,7 @@ void pressed_soften( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_FILT);
 	do_effect(2, 0);
 	update_all_views();
 }
@@ -294,7 +298,7 @@ void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_COL);
 
 	mem_greyscale();
 
@@ -396,14 +400,14 @@ void pressed_clip_mask_clear()
 
 void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_XFORM);
 	mem_flip_v( mem_image, mem_width, mem_height, mem_image_bpp );
 	update_all_views();
 }
 
 void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_XFORM);
 	mem_flip_h( mem_image, mem_width, mem_height, mem_image_bpp );
 	update_all_views();
 }
@@ -538,7 +542,7 @@ void pressed_outline_rectangle( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int x, y, w, h, x2, y2;
 
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 
 	if ( tool_type == TOOL_POLYGON )
 	{
@@ -570,21 +574,21 @@ void pressed_outline_rectangle( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_fill_ellipse( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 	f_ellipse( marq_x1, marq_y1, marq_x2, marq_y2 );
 	update_all_views();
 }
 
 void pressed_outline_ellipse( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 	o_ellipse( marq_x1, marq_y1, marq_x2, marq_y2, tool_size );
 	update_all_views();
 }
 
 void pressed_fill_rectangle( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 	if ( tool_type == TOOL_SELECT ) do_the_copy(2);
 	if ( tool_type == TOOL_POLYGON ) poly_paint();
 	update_all_views();
@@ -593,7 +597,7 @@ void pressed_fill_rectangle( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_cut( GtkMenuItem *menu_item, gpointer user_data )
 {			// Copy current selection to clipboard and then fill area with current pattern
 	do_the_copy(1);
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 	if ( tool_type == TOOL_SELECT ) do_the_copy(2);
 	if ( tool_type == TOOL_POLYGON )
 	{
@@ -617,7 +621,7 @@ void pressed_lasso_cut( GtkMenuItem *menu_item, gpointer user_data )
 {
 	pressed_lasso( menu_item, user_data );
 	if ( mem_clipboard == NULL ) return;		// No memory so bail out
-	spot_undo();
+	spot_undo(UNDO_DRAW);
 	poly_lasso_cut();
 }
 
@@ -641,7 +645,8 @@ void update_menus()			// Update edit/undo menu
 
 	sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
 
-	if ( status_on[7] ) gtk_label_set_text( GTK_LABEL(label_bar7), txt );
+	if ( status_on[STATUS_UNDOREDO] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt );
 
 	if ( mem_image_bpp == 1 )
 	{
@@ -781,7 +786,7 @@ int load_pal(char *file_name)			// Load palette file
 
 	if ( i < 0 ) return i;		// Failure
 
-	spot_undo();
+	spot_undo(UNDO_PAL);
 
 	mem_pal_copy( mem_pal, new_mem_pal );
 	mem_cols = i;
@@ -797,44 +802,24 @@ void update_status_bar1()
 {
 	char txt[64], txt2[16];
 
-	if (status_on[0])
-	{
-		if ( mem_image_bpp == 1 )
-			snprintf(txt, 30, "A [%i] = {%i,%i,%i}", mem_col_A, mem_pal[mem_col_A].red,
-				mem_pal[mem_col_A].green, mem_pal[mem_col_A].blue );
-		if ( mem_image_bpp == 3 )
-			snprintf(txt, 30, "A = {%i,%i,%i}", mem_col_A24.red,
-				mem_col_A24.green, mem_col_A24.blue );
+	toolbar_update_settings();		// Update A/B labels in settings toolbar
 
-		gtk_label_set_text( GTK_LABEL(label_A), txt );
-		if ( mem_image_bpp == 1 )
-			snprintf(txt, 30, "B [%i] = {%i,%i,%i}", mem_col_B, mem_pal[mem_col_B].red,
-				mem_pal[mem_col_B].green, mem_pal[mem_col_B].blue );
-		if ( mem_image_bpp == 3 )
-			snprintf(txt, 30, "B = {%i,%i,%i}", mem_col_B24.red,
-				mem_col_B24.green, mem_col_B24.blue );
-
-		gtk_label_set_text( GTK_LABEL(label_B), txt );
-	}
-	if (status_on[1])
+	if ( mem_image_bpp == 1 )
+		snprintf(txt, 30, "%i x %i x %i", mem_width, mem_height, mem_cols);
+	else
+		snprintf(txt, 30, "%i x %i x RGB", mem_width, mem_height);
+	if ( layers_total>0 )
 	{
-		if ( mem_image_bpp == 1 )
-			snprintf(txt, 30, "%i x %i x %i", mem_width, mem_height, mem_cols);
-		else
-			snprintf(txt, 30, "%i x %i x RGB", mem_width, mem_height);
-		if ( layers_total>0 )
-		{
-			sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
-			strcat(txt, txt2);
-		}
-		if ( mem_xpm_trans>=0 )
-		{
-			sprintf(txt2, "  (T=%i)", mem_xpm_trans);
-			strcat(txt, txt2);
-		}
-		strcat(txt, "  ");
-		gtk_label_set_text( GTK_LABEL(label_bar1), txt );
+		sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
+		strcat(txt, txt2);
 	}
+	if ( mem_xpm_trans>=0 )
+	{
+		sprintf(txt2, "  (T=%i)", mem_xpm_trans);
+		strcat(txt, txt2);
+	}
+	strcat(txt, "  ");
+	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), txt );
 }
 
 void update_cols()
@@ -980,7 +965,7 @@ gtk_widget_hide( drawing_canvas );
 			// Set tool to square for new image - easy way to lose a selection marquee
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		update_menus();
-		pressed_opacity( GTK_MENU_ITEM(menu_opac[9]), NULL );	// Set opacity to 100% to start with
+		pressed_opacity( 100 );		// Set opacity to 100% to start with
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
 	}
@@ -1570,6 +1555,7 @@ void file_selector( int action_type )
 		}
 
 		gtk_combo_set_popdown_strings( GTK_COMBO(combo), combo_list );
+		g_list_free( combo_list );
 		gtk_entry_set_text( GTK_ENTRY(fs_combo_entry), temp_txt );
 
 		gtk_signal_connect_object (GTK_OBJECT (fs_combo_entry), "changed",
@@ -1666,9 +1652,10 @@ void align_size( float new_zoom )		// Set new zoom level
 #endif
 		gtk_widget_set_usize( drawing_canvas, mem_width*can_zoom, mem_height*can_zoom );
 
-		if (status_on[4]) init_status_bar();
+		init_status_bar();
 		zoom_flag = 0;
 		vw_focus_view();		// View window position may need updating
+		toolbar_zoom_update();
 	}
 }
 
@@ -1855,8 +1842,8 @@ unsigned char *pattern_fill_allocate()		// Allocate memory for pattern fill
 
 void update_all_views()				// Update whole canvas on all views
 {
-	if ( view_showing ) gtk_widget_queue_draw( vw_drawing );
-	gtk_widget_queue_draw( drawing_canvas );
+	if ( view_showing && vw_drawing ) gtk_widget_queue_draw( vw_drawing );
+	if ( drawing_canvas ) gtk_widget_queue_draw( drawing_canvas );
 }
 
 
@@ -1948,7 +1935,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 	{
 		if ( !(tool_type == TOOL_LINE && line_status == LINE_NONE) )
 		{
-			mem_undo_next();		// Do memory stuff for undo
+			mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
 		}
 	}
 
@@ -2160,7 +2147,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 				{
 					if ( tool_pat == 0 && rpix != mem_col_A ) // Pure colour fill
 					{
-					 spot_undo();
+					 spot_undo(UNDO_DRAW);
 					 flood_fill( x, y, rpix );
 					 update_all_views();
 					}
@@ -2169,7 +2156,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 					  pat_fill = pattern_fill_allocate();
 					  if ( pat_fill != NULL )
 					  {
-						spot_undo();
+						spot_undo(UNDO_DRAW);
 						flood_fill_pat( x, y, rpix, pat_fill );
 						mem_paint_mask( pat_fill );
 						update_all_views();
@@ -2192,7 +2179,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 
 					if ( tool_pat == 0 && j != k)	// Pure colour fill
 					{
-						spot_undo();
+						spot_undo(UNDO_DRAW);
 						flood_fill24( x, y, fstart );
 						update_all_views();
 					}
@@ -2201,7 +2188,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 					  pat_fill = pattern_fill_allocate();
 					  if ( pat_fill != NULL )
 					  {
-						spot_undo();
+						spot_undo(UNDO_DRAW);
 						flood_fill24_pat( x, y, fstart, pat_fill );
 						mem_paint_mask( pat_fill );
 						update_all_views();
@@ -2739,7 +2726,7 @@ void update_sel_bar()			// Update selection stats on status bar
 			mtMIN( y1, marq_y1, marq_y2 )
 			mtMAX( x2, marq_x1, marq_x2 )
 			mtMAX( y2, marq_y1, marq_y2 )
-			if ( status_on[5] )
+			if ( status_on[STATUS_SELEGEOM] )
 			{
 				if ( x1==x2 )
 				{
@@ -2757,7 +2744,7 @@ void update_sel_bar()			// Update selection stats on status bar
 
 				snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
 					x1, y1, x2-x1+1, y2-y1+1, lang, llen);
-				gtk_label_set_text( GTK_LABEL(label_bar5), txt );
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
 			}
 		}
 		else
@@ -2766,12 +2753,15 @@ void update_sel_bar()			// Update selection stats on status bar
 			{
 				snprintf(txt, 60, "  (%i)", poly_points);
 				if ( poly_status != POLY_DONE ) strcat(txt, "+");
-				if ( status_on[5] ) gtk_label_set_text( GTK_LABEL(label_bar5), txt );
+				if ( status_on[STATUS_SELEGEOM] )
+					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
 			}
-			else if ( status_on[5] ) gtk_label_set_text( GTK_LABEL(label_bar5), "" );
+			else if ( status_on[STATUS_SELEGEOM] )
+					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
 		}
 	}
-	else if ( status_on[5] ) gtk_label_set_text( GTK_LABEL(label_bar5), "" );
+	else if ( status_on[STATUS_SELEGEOM] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
 }
 
 
@@ -2892,65 +2882,38 @@ void init_status_bar()
 {
 	char txt[64];
 
-	if ( status_on[0] || status_on[1] ) update_status_bar1();
-	if ( !status_on[0] )
-	{
-		gtk_label_set_text( GTK_LABEL(label_A), "" );
-		gtk_label_set_text( GTK_LABEL(label_B), "" );
-	}
-	if ( !status_on[1] ) gtk_label_set_text( GTK_LABEL(label_bar1), "" );
+	update_status_bar1();
+	if ( !status_on[STATUS_GEOMETRY] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), "" );
 
-	if ( status_on[2] ) gtk_widget_set_usize(label_bar2, 90, -2);
+	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
 	else
 	{
-		gtk_widget_set_usize(label_bar2, 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar2), "" );
+		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 0, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
 	}
 
-	if ( status_on[3] ) gtk_widget_set_usize(label_bar3, 160, -2);
+	if ( status_on[STATUS_PIXELRGB] ) gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 160, -2);
 	else
 	{
-		gtk_widget_set_usize(label_bar3, 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar3), "" );
+		gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 0, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
 	}
 
-	if (status_on[4])
-	{
-		sprintf(txt, "  %.0f%%", can_zoom*100);
-		gtk_label_set_text( GTK_LABEL(label_bar4), txt );
-	}
-	else gtk_label_set_text( GTK_LABEL(label_bar4), "" );
+	if ( !status_on[STATUS_SELEGEOM] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
 
-	if ( !status_on[5] ) gtk_label_set_text( GTK_LABEL(label_bar5), "" );
-
-	if ( mem_continuous && status_on[6] )
-		gtk_label_set_text( GTK_LABEL(label_bar6), "  CON" );
-	else
-		gtk_label_set_text( GTK_LABEL(label_bar6), "" );
-
-	if ( status_on[7] )
+	if ( status_on[STATUS_UNDOREDO] )
 	{
 		sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
-		gtk_label_set_text( GTK_LABEL(label_bar7), txt );
-		gtk_widget_set_usize(label_bar7, 50, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt );
+		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
 	}
 	else
 	{
-		gtk_widget_set_usize(label_bar7, 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar7), "" );
+		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 0, -2);
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "" );
 	}
-
-	if ( status_on[8] )
-	{
-		sprintf(txt, "  %i%%", tool_opacity);
-		gtk_label_set_text( GTK_LABEL(label_bar8), txt );
-	}
-	else gtk_label_set_text( GTK_LABEL(label_bar8), "" );
-
-	if ( mem_undo_opacity && status_on[9] )
-		gtk_label_set_text( GTK_LABEL(label_bar9), "  OP" );
-	else
-		gtk_label_set_text( GTK_LABEL(label_bar9), "" );
 }
 
 

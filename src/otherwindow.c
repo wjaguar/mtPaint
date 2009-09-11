@@ -37,6 +37,7 @@
 #include "layer.h"
 #include "wu.h"
 #include "ani.h"
+#include "toolbar.h"
 
 
 ///	NEW IMAGE WINDOW
@@ -72,7 +73,7 @@ void do_new_chores()
 		align_size(old_zoom);
 
 	set_new_filename( _("Untitled") );
-	pressed_opacity( GTK_MENU_ITEM(menu_opac[9]), NULL );	// Set opacity to 100% to start with
+	pressed_opacity( 100 );		// Set opacity to 100% to start with
 
 	update_all_views();
 	gtk_widget_queue_draw(drawing_col_prev);
@@ -449,7 +450,7 @@ gint click_col_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	implement_cols( a_old, b_old );
 
-	spot_undo();
+	spot_undo(UNDO_PAL);
 
 	implement_cols( a_new, b_new );
 	delete_col( NULL, NULL, NULL );
@@ -676,11 +677,12 @@ void choose_colours()
 
 ///	PATTERN & BRUSH CHOOSER WINDOW
 
-GtkWidget *pat_window, *draw_pat;
-int pat_brush;
+static GtkWidget *pat_window, *draw_pat;
+static int pat_brush;
+static unsigned char *mem_patch = NULL;
 
 
-gint delete_pat( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint delete_pat( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( pat_brush == 0 )
 	{
@@ -702,7 +704,7 @@ static gint key_pat( GtkWidget *widget, GdkEventKey *event )
 
 static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 {
-	int pat_no = 0, mx, my, n_flow, n_size;
+	int pat_no = 0, mx, my;
 
 	mx = event->x;
 	my = event->y;
@@ -717,7 +719,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		{
 			tool_pat = pat_no;
 			mem_pat_update();				// Update memory
-			gtk_widget_queue_draw( drawing_pat_prev );	// Update widget
+			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
 			if ( marq_status >= MARQUEE_PASTE && text_paste )
 			{
 				render_text( drawing_pat_prev );
@@ -729,11 +731,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		{
 			mem_set_brush(pat_no);
 			brush_tool_type = tool_type;
-			n_size = tool_size;
-			n_flow = tool_flow;
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(spinbutton_size), n_size );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(spinbutton_spray), n_flow );
-									// Update spin buttons
+			toolbar_update_settings();	// Update spin buttons
 			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
 					TRUE );			// Update toolbar
 			gtk_widget_queue_draw( drawing_pat_prev );	// Update brush preview area
@@ -849,7 +847,7 @@ gint click_col_add_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if ( to_add != mem_cols )
 	{
-		spot_undo();
+		spot_undo(UNDO_PAL);
 
 		if ( to_add>mem_cols )
 			for ( i=mem_cols; i<to_add; i++ )
@@ -930,7 +928,7 @@ void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data )
 
 	if ( abs(i-j)>1 )		// Only do this if we have something to do
 	{
-		spot_undo();
+		spot_undo(UNDO_PAL);
 
 		mem_scale_pal( i, mem_col_A24.red, mem_col_A24.green, mem_col_A24.blue,
 			j, mem_col_B24.red, mem_col_B24.green, mem_col_B24.blue );
@@ -995,7 +993,7 @@ gint bacteria_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	}
 	else
 	{
-		spot_undo();
+		spot_undo(UNDO_DRAW);
 		if (bac_type == 0) mem_bacteria( i );
 		if (bac_type == 1)
 		{
@@ -1125,7 +1123,7 @@ gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if ( index1 == index2 ) return FALSE;
 
-	spot_undo();
+	spot_undo(UNDO_XPAL);
 	mem_pal_sort(type, index1, index2, reverse);
 	init_pal();
 	update_all_views();
@@ -1402,7 +1400,7 @@ gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 ||
 		brcosa_values[2] != 0 || brcosa_values[3] != 8 || brcosa_values[4] != 100 )
 	{
-		spot_undo();
+		spot_undo(UNDO_COL);
 
 		click_brcosa_preview( NULL, NULL, NULL );
 		update_all_views();
@@ -1932,7 +1930,7 @@ gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	mem_pal_copy( mem_pal, brcosa_pal );
 	pal_refresher();
 
-	spot_undo();
+	spot_undo(UNDO_PAL);
 	do_allcol();
 	delete_allcol( NULL, NULL, NULL );
 	return FALSE;

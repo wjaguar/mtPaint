@@ -5,7 +5,9 @@ LDFLAGS = $(LDFLAG) -lpng -lz $(GLIB_LIB)
 
 BIN = mtpaint
 
-OBJS = main.o mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o viewer.o quantizer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o
+OBJS = main.o mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
+	viewer.o quantizer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\
+	toolbar.o channels.o
 
 $(BIN): $(OBJS)
 	$(CC) $(OBJS) -o $(BIN) $(LDFLAGS)

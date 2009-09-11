@@ -107,7 +107,7 @@ GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int 
 	gtk_widget_show (label);
 	gtk_table_attach (GTK_TABLE (table), label, column, column+1, row, row+1,
 		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (0), 5, spacing);
+		(GtkAttachOptions) (0), spacing, spacing);
 	gtk_label_set_justify(GTK_LABEL (label), a);
 	gtk_misc_set_alignment(GTK_MISC (label), b, c);
 

@@ -38,130 +38,32 @@
 #include "info.h"
 #include "prefs.h"
 #include "ani.h"
+#include "channels.h"
+#include "toolbar.h"
+
 
 #include "graphics/icon.xpm"
 
-#include "graphics/xpm_paint.xpm"
-#include "graphics/xpm_brush.xpm"
-
-#include "graphics/xbm_square.xbm"
-#include "graphics/xbm_square_mask.xbm"
-
-#include "graphics/xbm_circle.xbm"
-#include "graphics/xbm_circle_mask.xbm"
-
-#include "graphics/xbm_horizontal.xbm"
-#include "graphics/xbm_horizontal_mask.xbm"
-
-#include "graphics/xbm_vertical.xbm"
-#include "graphics/xbm_vertical_mask.xbm"
-
-#include "graphics/xbm_slash.xbm"
-#include "graphics/xbm_slash_mask.xbm"
-
-#include "graphics/xbm_backslash.xbm"
-#include "graphics/xbm_backslash_mask.xbm"
-
-#include "graphics/xbm_spray.xbm"
-#include "graphics/xbm_spray_mask.xbm"
-
-#include "graphics/xpm_shuffle.xpm"
-#include "graphics/xbm_shuffle.xbm"
-#include "graphics/xbm_shuffle_mask.xbm"
-
-#include "graphics/xpm_flood.xpm"
-#include "graphics/xbm_flood.xbm"
-#include "graphics/xbm_flood_mask.xbm"
-
-#include "graphics/xpm_line.xpm"
-#include "graphics/xbm_line.xbm"
-#include "graphics/xbm_line_mask.xbm"
-
-#include "graphics/xpm_select.xpm"
-#include "graphics/xbm_select.xbm"
-#include "graphics/xbm_select_mask.xbm"
-
-#include "graphics/xpm_smudge.xpm"
-#include "graphics/xbm_smudge.xbm"
-#include "graphics/xbm_smudge_mask.xbm"
-
-#include "graphics/xpm_polygon.xpm"
-#include "graphics/xbm_polygon.xbm"
-#include "graphics/xbm_polygon_mask.xbm"
-
-#include "graphics/xpm_clone.xpm"
-#include "graphics/xbm_clone.xbm"
-#include "graphics/xbm_clone_mask.xbm"
-
-#include "graphics/xbm_move.xbm"
-#include "graphics/xbm_move_mask.xbm"
-
-#include "graphics/xpm_brcosa.xpm"
-#include "graphics/xpm_crop.xpm"
-#include "graphics/xpm_flip_vs.xpm"
-#include "graphics/xpm_flip_hs.xpm"
-#include "graphics/xpm_rotate_cs.xpm"
-#include "graphics/xpm_rotate_as.xpm"
-#include "graphics/xpm_info.xpm"
-#include "graphics/xpm_text.xpm"
-#include "graphics/xpm_lasso.xpm"
-
-#include "graphics/xpm_ellipse.xpm"
-#include "graphics/xpm_ellipse2.xpm"
-#include "graphics/xpm_rect1.xpm"
-#include "graphics/xpm_rect2.xpm"
-#include "graphics/xpm_cols.xpm"
-#include "graphics/xpm_pan.xpm"
-
-#include "graphics/xpm_new.xpm"
-#include "graphics/xpm_open.xpm"
-#include "graphics/xpm_save.xpm"
-#include "graphics/xpm_cut.xpm"
-#include "graphics/xpm_copy.xpm"
-#include "graphics/xpm_paste.xpm"
-#include "graphics/xpm_undo.xpm"
-#include "graphics/xpm_redo.xpm"
-
-#include "graphics/xpm_up.xpm"
-#include "graphics/xpm_down.xpm"
-#include "graphics/xpm_saveas.xpm"
-#include "graphics/xpm_dustbin.xpm"
-#include "graphics/xpm_centre.xpm"
-#include "graphics/xpm_close.xpm"
 
 
 GtkWidget
-		*menu_undo[5], *menu_redo[5], *menu_crop[5],
-		*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
-		*menu_help[2], *menu_continuous[5], *menu_only_24[20], *menu_only_indexed[10],
-		*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15], *menu_opac[15],
-		*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-		*menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
-		;
+	*main_window, *main_vsplit,
+	*drawing_palette, *drawing_pat_prev, *drawing_col_prev, *drawing_canvas,
+	*scrolledwindow_canvas, *main_hidden[4],
 
-GtkWidget *main_hidden[4];
-gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE;
+	*menu_undo[5], *menu_redo[5], *menu_crop[5],
+	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
+	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
+	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
+	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
+	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
+	;
+
+gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
 int files_passed, file_arg_start = -1, drag_index_vals[2], cursor_corner;
 char **global_argv;
 
-GdkCursor *m_cursor[32];		// My mouse cursors
-GdkCursor *move_cursor;
-
-GtkWidget *main_window;
-GdkPixmap *icon_pix = NULL;
-GtkWidget *drawing_palette, *drawing_pat_prev, *drawing_col_prev, *drawing_canvas;
-GtkWidget *scrolledwindow_canvas, *scrolledwindow_palette;
-GtkWidget *spinbutton_spray, *spinbutton_size;
-GtkWidget *label_A, *label_B, *label_bar1, *label_bar2, *label_bar3,
-	*label_bar5, *label_bar4, *label_bar6 = NULL, *label_bar7 = NULL, *label_bar8;
-GtkWidget *viewport_palette;
-GtkWidget *menubar1;
-
-GtkWidget *main_vsplit;
-
 GdkGC *dash_gc;
-
-gboolean q_quit;			// Does q key quit the program?
 
 
 
@@ -240,29 +142,6 @@ void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-static void pressed_tint_mode( GtkMenuItem *menu_item, gpointer user_data, gint item )
-{
-	int state = GTK_CHECK_MENU_ITEM(menu_item)->active;
-
-	tint_mode[item] = state;
-}
-
-static void pressed_opacity_mode( GtkMenuItem *menu_item, gpointer user_data )
-{
-	mem_undo_opacity = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
-
-	if ( label_bar9 != NULL ) init_status_bar();
-}
-
-void pressed_continuous( GtkMenuItem *menu_item, gpointer user_data )
-{
-	mem_continuous = GTK_CHECK_MENU_ITEM(menu_item)->active;
-	inifile_set_gboolean( "continuousPainting", mem_continuous );
-
-	if ( label_bar6 != NULL ) init_status_bar();
-}
-
 void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int res, x1, y1, x2, y2;
@@ -275,8 +154,7 @@ void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 	if ( marq_status != MARQUEE_DONE ) return;
 	if ( x1==0 && x2>=(mem_width-1) && y1==0 && y2>=(mem_height-1) ) return;
 
-	res = mem_undo_next2( x2-x1+1, y2-y1+1, x1, y1 );
-	pen_down = 0;
+	res = mem_image_resize(x2 - x1 + 1, y2 - y1 + 1, -x1, -y1);
 
 	if ( res == 0 )
 	{
@@ -348,7 +226,7 @@ void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 			_("OK"), NULL, NULL);
 	if ( i > 0 )
 	{
-		spot_undo();
+		spot_undo(UNDO_XPAL);
 
 		mem_remove_unused();
 
@@ -362,7 +240,7 @@ void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 {
-	spot_undo();
+	spot_undo(UNDO_PAL);
 	mem_pal_copy( mem_pal, mem_pal_def );
 	mem_cols = mem_pal_def_i;
 	init_pal();
@@ -401,7 +279,7 @@ void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
 				snprintf(mess, 250, _("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups );
 				if ( alert_box( _("Warning"), mess, _("Yes"), _("No"), NULL ) == 1 )
 				{
-					spot_undo();
+					spot_undo(UNDO_XPAL);
 
 					remove_duplicates();
 					init_pal();
@@ -615,30 +493,20 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data )
 	save_clipboard(j+1);
 }
 
-void pressed_opacity( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_opacity( int opacity )
 {
-	int i, j=0;
-
 	if ( mem_image_bpp == 3 )
 	{
-		for ( i=0; i<12; i++ )
-			if ( menu_opac[i] == GTK_WIDGET(menu_item) ) j=i;
+		mtMIN( tool_opacity, opacity, 255 )
+		mtMAX( tool_opacity, tool_opacity, 1 )
 
-		if ( j<10 ) tool_opacity = (j+1)*10;
-		else
-		{
-			j = 2*(j-10)-1;
-			tool_opacity += j;
-			mtMIN( tool_opacity, tool_opacity, 100 )
-			mtMAX( tool_opacity, tool_opacity, 1 )
-		}
 		if ( marq_status >= MARQUEE_PASTE )
 			gtk_widget_queue_draw(drawing_canvas);
 				// Update the paste on the canvas as we have changed the opacity value
 	}
-	else tool_opacity = 100;
+	else tool_opacity = 255;
 
-	if ( status_on[8] ) init_status_bar();
+	toolbar_update_settings();
 }
 
 void toggle_view( GtkMenuItem *menu_item, gpointer user_data )
@@ -647,8 +515,16 @@ void toggle_view( GtkMenuItem *menu_item, gpointer user_data )
 
 	view_image_only = !view_image_only;
 
-	for ( i=0; i<4; i++ ) if (view_image_only) gtk_widget_hide(main_hidden[i]);
-				else gtk_widget_show(main_hidden[i]);
+	for ( i=0; i<1; i++ )
+		if (view_image_only) gtk_widget_hide(main_hidden[i]);
+			else gtk_widget_show(main_hidden[i]);
+
+	for ( i=1; i<TOOLBAR_MAX; i++ )
+	{
+		if ( toolbar_boxes[i] ) gtk_widget_hide(toolbar_boxes[i]);
+	}
+
+	if ( !view_image_only ) toolbar_showhide();	// Switch toolbar/status/palette on if needed
 }
 
 void zoom_in( GtkMenuItem *menu_item, gpointer user_data )
@@ -683,33 +559,6 @@ void zoom_grid( GtkMenuItem *menu_item, gpointer user_data )
 
 	if ( drawing_canvas ) gtk_widget_queue_draw( drawing_canvas );
 }
-
-void zoom_to1( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 1 );	}
-
-void zoom_to4( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 4 );	}
-
-void zoom_to8( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 8 );	}
-
-void zoom_to12( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 12 );	}
-
-void zoom_to16( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 16 );	}
-
-void zoom_to20( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 20 );	}
-
-void zoom_to10( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 0.10 );	}
-
-void zoom_to25( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 0.25 );	}
-
-void zoom_to50( GtkMenuItem *menu_item, gpointer user_data )
-{	align_size( 0.50 );	}
 
 void quit_all( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -837,18 +686,12 @@ gint check_zoom_keys( GdkEventKey *event )
 		case GDK_X:		pressed_swap_AB(NULL, NULL); return TRUE;
 		case GDK_c:
 		case GDK_C:		if ( allow_cline ) pressed_cline(NULL, NULL); return TRUE;
-//		case GDK_v:
-//		case GDK_V:		if ( allow_view ) pressed_view(NULL, NULL); return TRUE;
 #if GTK_MAJOR_VERSION == 2
 		case GDK_F2:		pressed_choose_patterns(NULL, NULL); return TRUE;
 		case GDK_F3:		pressed_choose_brush(NULL, NULL); return TRUE;
 #endif
 // GTK+1 creates a segfault if you use F2/F3 here - This doesn't matter as only GTK+2 needs it here as in full screen mode GTK+2 does not handle menu keyboard shortcuts
 		case GDK_F4:		change_to_tool(0); return TRUE;
-		case GDK_F5:		change_to_tool(1); return TRUE;
-		case GDK_F6:		change_to_tool(2); return TRUE;
-		case GDK_F7:		change_to_tool(3); return TRUE;
-		case GDK_F8:		if ( mem_image_bpp != 1 ) change_to_tool(4); return TRUE;
 		case GDK_F9:		change_to_tool(6); return TRUE;
 		}
 	}
@@ -881,15 +724,21 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 	{
 		if ( event->keyval >= GDK_KP_0 && event->keyval <= GDK_KP_9 )
 		{
-			i = event->keyval - GDK_KP_1;
-			if ( i<0 ) i=i+10;
-			pressed_opacity( GTK_MENU_ITEM(menu_opac[i]), NULL );
+			i = event->keyval - GDK_KP_0;
+			if ( i<1 ) i=10;
+			pressed_opacity( i*255/10 );
+		}
+		if ( event->keyval >= GDK_0 && event->keyval <= GDK_9 )
+		{
+			i = event->keyval - GDK_0;
+			if ( i<1 ) i=10;
+			pressed_opacity( i*255/10 );
 		}
 		if ( event->keyval == GDK_plus || event->keyval == GDK_equal ||
 			event->keyval == GDK_KP_Add )
-				pressed_opacity( GTK_MENU_ITEM(menu_opac[11]), NULL );
+				pressed_opacity( tool_opacity+1 );
 		if ( event->keyval == GDK_minus || event->keyval == GDK_KP_Subtract )
-				pressed_opacity( GTK_MENU_ITEM(menu_opac[10]), NULL );
+				pressed_opacity( tool_opacity-1 );
 	}
 
 	if ( (event->state & GDK_CONTROL_MASK) && layers_total>0 )
@@ -1093,11 +942,11 @@ gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 		inifile_set_gint32("window_w", width );
 		inifile_set_gint32("window_h", height );
 
-		inifile_set_gboolean( "imageCentre", canvas_image_centre );
-
 		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
 		if (layers_window != NULL) delete_layers_window( NULL, NULL, NULL );
 			// Get rid of extra windows + remember positions
+
+		toolbar_exit();			// Remember the toolbar settings
 
 		gtk_main_quit ();
 		return FALSE;
@@ -1257,9 +1106,6 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 
 static gint canvas_enter( GtkWidget *widget, GdkEventMotion *event )	// Mouse enters the canvas
 {
-	tool_flow = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_spray) );
-	tool_size = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_size) );
-
 	return TRUE;
 }
 
@@ -1267,8 +1113,10 @@ static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
 {
 	if ( mem_image != NULL )		// Only do this if we have an image
 	{
-		if ( status_on[2] ) gtk_label_set_text( GTK_LABEL(label_bar2), "" );
-		if ( status_on[3] ) gtk_label_set_text( GTK_LABEL(label_bar3), "" );
+		if ( status_on[STATUS_CURSORXY] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+		if ( status_on[STATUS_PIXELRGB] )
+			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
 		if ( perim_status > 0 )
 		{
 			perim_status = 0;
@@ -1924,10 +1772,10 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 
 		if ( x>=0 && y>= 0 )
 		{
-			if ( status_on[2] )
+			if ( status_on[STATUS_CURSORXY] )
 			{
 				snprintf(txt, 60, "%i,%i", x, y);
-				gtk_label_set_text( GTK_LABEL(label_bar2), txt );
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
 			}
 			if ( mem_image_bpp == 1 )
 			{
@@ -1945,15 +1793,17 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 				b = pixel24.blue;
 				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
 			}
-			if ( status_on[3] )
+			if ( status_on[STATUS_PIXELRGB] )
 			{
-				gtk_label_set_text( GTK_LABEL(label_bar3), txt );
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
 			}
 		}
 		else
 		{
-			if ( status_on[2] ) gtk_label_set_text( GTK_LABEL(label_bar2), "" );
-			if ( status_on[3] ) gtk_label_set_text( GTK_LABEL(label_bar3), "" );
+			if ( status_on[STATUS_CURSORXY] )
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+			if ( status_on[STATUS_PIXELRGB] )
+				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
 		}
 
 ///	TOOL PERIMETER BOX UPDATES
@@ -2033,8 +1883,8 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 
 void force_main_configure()
 {
-	configure_canvas( drawing_canvas, NULL );
-	vw_configure( vw_drawing, NULL );
+	if ( drawing_canvas ) configure_canvas( drawing_canvas, NULL );
+	if ( vw_drawing ) vw_configure( vw_drawing, NULL );
 }
 
 static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
@@ -2054,18 +1904,6 @@ static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
 	return FALSE;
 }
 
-static gint expose_palette( GtkWidget *widget, GdkEventExpose *event )
-{
-	gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				event->area.x, event->area.y, event->area.width, event->area.height,
-				GDK_RGB_DITHER_NONE,
-				mem_pals + 3*( event->area.x + PALETTE_WIDTH*event->area.y ),
-				PALETTE_WIDTH*3
-				);
-
-	return FALSE;
-}
-
 void pressed_choose_patterns( GtkMenuItem *menu_item, gpointer user_data )
 {	choose_pattern(0);	}
 
@@ -2075,186 +1913,9 @@ void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_edit_AB( GtkMenuItem *menu_item, gpointer user_data )
 {	choose_colours();	}
 
-static gint motion_palette( GtkWidget *widget, GdkEventMotion *event )
+static void pressed_docs()
 {
-	GdkModifierType state;
-	int x, y, px, py, pindex;
-
-	px = event->x;
-	py = event->y;
-	pindex = (py-39+34)/16;
-
-	mtMAX(pindex, pindex, 0)
-	mtMIN(pindex, pindex, mem_cols-1)
-
-	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
-	else
-	{
-		x = event->x;
-		y = event->y;
-		state = event->state;
-	}
-
-	if ( drag_index && drag_index_vals[1] != pindex )
-	{
-		mem_pal_index_move( drag_index_vals[1], pindex );
-		init_pal();
-		drag_index_vals[1] = pindex;
-	}
-
-	return TRUE;
-}
-
-static gint release_palette( GtkWidget *widget, GdkEventButton *event )
-{
-	if (drag_index)
-	{
-		drag_index = FALSE;
-		gdk_window_set_cursor( drawing_palette->window, NULL );
-		if ( drag_index_vals[0] != drag_index_vals[1] )
-		{
-			mem_pal_copy( mem_pal, brcosa_pal );		// Get old values back
-			pen_down = 0;
-			mem_undo_next();				// Do undo stuff
-			pen_down = 0;
-			mem_pal_index_move( drag_index_vals[0], drag_index_vals[1] );
-
-			if ( mem_image_bpp == 1 )
-				mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
-
-			canvas_undo_chores();
-		}
-	}
-
-	return FALSE;
-}
-
-static gint click_palette( GtkWidget *widget, GdkEventButton *event )
-{
-	int px, py, pindex;
-
-	px = event->x;
-	py = event->y;
-	pindex = (py-2)/16;
-	if (py < 2) pindex = -1;
-
-	if (pindex>=0 && pindex<mem_cols)
-	{
-		if ( px>22 && px <53 )		// Colour A or B changed
-		{
-			if ( event->button == 1 )
-			{
-				if ( (event->state & GDK_CONTROL_MASK) )
-				{
-					mem_col_B = pindex;
-					mem_col_B24 = mem_pal[mem_col_B];
-				}
-				else if ( (event->state & GDK_SHIFT_MASK) )
-				{
-					mem_pal_copy( brcosa_pal, mem_pal );
-					drag_index = TRUE;
-					drag_index_vals[0] = pindex;
-					drag_index_vals[1] = pindex;
-					gdk_window_set_cursor( drawing_palette->window, move_cursor );
-				}
-				else
-				{
-					mem_col_A = pindex;
-					mem_col_A24 = mem_pal[mem_col_A];
-				}
-			}
-			if ( event->button == 3 )
-			{
-				mem_col_B = pindex;
-				mem_col_B24 = mem_pal[mem_col_B];
-			}
-
-			repaint_top_swatch();
-			init_pal();
-			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
-		}
-		if ( px>=53 )			// Mask changed
-		{
-			if ( mem_prot_mask[pindex] == 0 ) mem_prot_mask[pindex] = 1;
-			else mem_prot_mask[pindex] = 0;
-
-			repaint_swatch(pindex);				// Update swatch
-			gtk_widget_queue_draw_area( widget, 0, event->y-16,
-				PALETTE_WIDTH, 32 );			// Update widget
-
-			mem_mask_init();		// Prepare RGB masks
-		}
-	}
-
-	return TRUE;
-}
-
-static gint click_colours( GtkWidget *widget, GdkEventButton *event )
-{
-	if ( mem_image != NULL ) choose_colours();
-
-	return FALSE;
-}
-
-static gint click_pattern( GtkWidget *widget, GdkEventButton *event )
-{
-	if ( mem_image != NULL )
-	{
-		if ( event->y < 32 ) choose_pattern(0); else choose_pattern(1);
-	}
-
-	return FALSE;
-}
-
-static gint expose_pattern( GtkWidget *widget, GdkEventExpose *event )
-{
-	int rx, ry, rw, rh;
-
-	rx = event->area.x;
-	ry = event->area.y;
-	rw = event->area.width;
-	rh = event->area.height;
-
-	if ( ry < PATTERN_HEIGHT )
-	{
-		if ( (ry+rh) >= PATTERN_HEIGHT )
-		{
-			rh = PATTERN_HEIGHT - ry;
-		}
-		gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				rx, ry, rw, rh,
-				GDK_RGB_DITHER_NONE,
-				mem_pats + 3*( rx + PATTERN_WIDTH*ry ),
-				PATTERN_WIDTH*3
-				);
-	}
-	return FALSE;
-}
-
-static gint expose_preview( GtkWidget *widget, GdkEventExpose *event )
-{
-	int rx, ry, rw, rh;
-
-	rx = event->area.x;
-	ry = event->area.y;
-	rw = event->area.width;
-	rh = event->area.height;
-
-	if ( ry < PREVIEW_HEIGHT )
-	{
-		if ( (ry+rh) >= PREVIEW_HEIGHT )
-		{
-			rh = PREVIEW_HEIGHT - ry;
-		}
-		gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				rx, ry, rw, rh,
-				GDK_RGB_DITHER_NONE,
-				mem_prev + 3*( rx + PREVIEW_WIDTH*ry ),
-				PREVIEW_WIDTH*3
-				);
-	}
-
-	return FALSE;
+	system("mtpaint-handbook");
 }
 
 void set_cursor()			// Set mouse cursor
@@ -2266,7 +1927,6 @@ void set_cursor()			// Set mouse cursor
 }
 
 
-GtkWidget *icon_buttons[TOTAL_ICONS_TOOLBAR], *icon_buttons2[TOTAL_ICONS_TOOLBAR];
 
 void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 {
@@ -2274,22 +1934,16 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 
 	switch (j)
 	{
-		case 0:  pressed_new( NULL, NULL ); break;
-		case 1:  pressed_open_file( NULL, NULL ); break;
-		case 2:  pressed_save_file( NULL, NULL ); break;
-		case 3:  pressed_cut( NULL, NULL ); break;
-		case 4:  pressed_copy( NULL, NULL ); break;
-		case 5:  pressed_paste_centre( NULL, NULL ); break;
-		case 6:  main_undo( NULL, NULL ); break;
-		case 7:  main_redo( NULL, NULL ); break;
-		case 8:  pressed_outline_ellipse( NULL, NULL ); break;
-		case 9:  pressed_fill_ellipse( NULL, NULL ); break;
-		case 10: pressed_outline_rectangle( NULL, NULL ); break;
-		case 11: pressed_fill_rectangle( NULL, NULL ); break;
-		case 12: pressed_flip_sel_v( NULL, NULL ); break;
-		case 13: pressed_flip_sel_h( NULL, NULL ); break;
-		case 14: pressed_rotate_sel_clock( NULL, NULL ); break;
-		case 15: pressed_rotate_sel_anti( NULL, NULL ); break;
+		case 0:	pressed_new( NULL, NULL ); break;
+		case 1:	pressed_open_file( NULL, NULL ); break;
+		case 2:	pressed_save_file( NULL, NULL ); break;
+		case 3:	pressed_cut( NULL, NULL ); break;
+		case 4:	pressed_copy( NULL, NULL ); break;
+		case 5:	pressed_paste_centre( NULL, NULL ); break;
+		case 6:	main_undo( NULL, NULL ); break;
+		case 7:	main_redo( NULL, NULL ); break;
+		case 8:	pressed_brcosa( NULL, NULL ); break;
+		case 9:	pressed_pan( NULL, NULL ); break;
 	}
 }
 
@@ -2299,22 +1953,24 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 
 	switch (j)
 	{
-		case 0:  pressed_choose_brush( NULL, NULL ); break;
-		case 1:  tool_type = brush_tool_type; break;
-		case 2:  tool_type = TOOL_SHUFFLE; break;
-		case 3:  tool_type = TOOL_FLOOD; break;
-		case 4:  tool_type = TOOL_LINE; break;
-		case 5:  tool_type = TOOL_SMUDGE; break;
-		case 6:  tool_type = TOOL_CLONE; break;
-		case 7:  tool_type = TOOL_SELECT; break;
-		case 8:  tool_type = TOOL_POLYGON; break;
-		case 9:  pressed_lasso( NULL, NULL ); break;
-		case 10: pressed_crop( NULL, NULL ); break;
-		case 11: pressed_text( NULL, NULL ); break;
-		case 12: pressed_brcosa( NULL, NULL ); break;
-		case 13: pressed_allcol( NULL, NULL ); break;
-		case 14: pressed_information( NULL, NULL ); break;
-		case 15: pressed_pan( NULL, NULL ); break;
+		case 0:  tool_type = brush_tool_type; break;
+		case 1:  tool_type = TOOL_SHUFFLE; break;
+		case 2:  tool_type = TOOL_FLOOD; break;
+		case 3:  tool_type = TOOL_LINE; break;
+		case 4:  tool_type = TOOL_SMUDGE; break;
+		case 5:  tool_type = TOOL_CLONE; break;
+		case 6:  tool_type = TOOL_SELECT; break;
+		case 7:  tool_type = TOOL_POLYGON; break;
+		case 8:  pressed_lasso( NULL, NULL ); break;
+		case 9:  pressed_text( NULL, NULL ); break;
+		case 10: pressed_outline_ellipse( NULL, NULL ); break;
+		case 11: pressed_fill_ellipse( NULL, NULL ); break;
+		case 12: pressed_outline_rectangle( NULL, NULL ); break;
+		case 13: pressed_fill_rectangle( NULL, NULL ); break;
+		case 14: pressed_flip_sel_v( NULL, NULL ); break;
+		case 15: pressed_flip_sel_h( NULL, NULL ); break;
+		case 16: pressed_rotate_sel_clock( NULL, NULL ); break;
+		case 17: pressed_rotate_sel_anti( NULL, NULL ); break;
 	}
 
 	if ( tool_type != i )		// User has changed tool
@@ -2350,114 +2006,21 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 	}
 }
 
-GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
-{		// Create iconbar for layers window
-	static char **icon_list[10] = {
-		xpm_new_xpm, xpm_up_xpm, xpm_down_xpm, xpm_copy_xpm, xpm_centre_xpm,
-		xpm_cut_xpm, xpm_save_xpm, xpm_saveas_xpm, xpm_dustbin_xpm, xpm_close_xpm
-		};
 
-	char *hint_text[10] = {
-		_("New Layer"), _("Raise"), _("Lower"), _("Duplicate Layer"), _("Centralise Layer"),
-		_("Delete Layer"), _("Save Layer Information & Composite Image"),
-		_("Save As ..."), _("Delete All Layers"), _("Close Layers Window")
-		};
-
-	gint i, offset[10] = {3, 1, 2, 4, 6, 5, 0, 0, 7, 8};
-
-	GtkWidget *toolbar, *iconw;
-	GdkPixmap *icon, *mask;
-
-// we need to realize the window because we use pixmaps for 
-// items on the toolbar in the context of it
-	gtk_widget_realize( window );
-
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
-#endif
-
-	gtk_box_pack_start ( GTK_BOX (box), toolbar, FALSE, FALSE, 0 );
-
-	for (i=0; i<10; i++)
-	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		icons[ offset[i] ] =
-			gtk_toolbar_append_element( GTK_TOOLBAR(toolbar),
-			GTK_TOOLBAR_CHILD_BUTTON, NULL, "None", hint_text[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(layer_iconbar_click), (gpointer) i);
-	}
-	gtk_widget_show ( toolbar );
-
-	return toolbar;
-}
 
 void main_init()
 {
 	gint i;
-
-	static char **icon_list2[TOTAL_ICONS_TOOLBAR] = {
-		xpm_new_xpm, xpm_open_xpm, xpm_save_xpm, xpm_cut_xpm,
-		xpm_copy_xpm, xpm_paste_xpm, xpm_undo_xpm, xpm_redo_xpm,
-		xpm_ellipse2_xpm, xpm_ellipse_xpm, xpm_rect1_xpm, xpm_rect2_xpm,
-		xpm_flip_vs_xpm, xpm_flip_hs_xpm, xpm_rotate_cs_xpm, xpm_rotate_as_xpm
-		};		// Top icon bar
-
-	static char **icon_list[TOTAL_ICONS_TOOLBAR] = {
-		xpm_brush_xpm, xpm_paint_xpm, xpm_shuffle_xpm, xpm_flood_xpm,
-		xpm_line_xpm, xpm_smudge_xpm, xpm_clone_xpm, xpm_select_xpm,
-		xpm_polygon_xpm, xpm_lasso_xpm, xpm_crop_xpm, xpm_text_xpm,
-		xpm_brcosa_xpm, xpm_cols_xpm, xpm_info_xpm, xpm_pan_xpm
-		};		// Bottom icon bar
-
-	static unsigned char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
-		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
-		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
-		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits };
-
-	static char *xbm_mask_list[TOTAL_CURSORS] = { xbm_square_mask_bits, xbm_circle_mask_bits,
-		xbm_horizontal_mask_bits, xbm_vertical_mask_bits, xbm_slash_mask_bits,
-		xbm_backslash_mask_bits, xbm_spray_mask_bits, xbm_shuffle_mask_bits,
-		xbm_flood_mask_bits, xbm_select_mask_bits, xbm_line_mask_bits,
-		xbm_smudge_mask_bits, xbm_polygon_mask_bits, xbm_clone_mask_bits };
-
-	char *hint_text2[TOTAL_ICONS_TOOLBAR] = {
-		_("New Image"), _("Load Image File"), _("Save Image File"), _("Cut"),
-		_("Copy"), _("Paste"), _("Undo"), _("Redo"),
-		_("Ellipse Outline"), _("Filled Ellipse"), _("Outline Selection"), _("Fill Selection"),
-		_("Flip Selection Vertically"), _("Flip Selection Horizontally"),
-		_("Rotate Selection Clockwise"), _("Rotate Selection Anti-Clockwise")
-		 };
-	char *hint_text[TOTAL_ICONS_TOOLBAR] = {
-		_("Choose Brush"), _("Paint"), _("Shuffle"), _("Flood Fill"),
-		_("Straight Line"), _("Smudge"), _("Clone"), _("Make Selection"),
-		_("Polygon Selection"), _("Lasso Selection"), _("Crop"), _("Paste Text"),
-		_("Transform Colour"), _("Edit All Colours"), _("Information"), _("Pan Window")
-		};
 	char txt[64];
+	float f=0;
 
-	GtkToolbarChildType child_type;
-	GtkWidget *previous = NULL;
-	GdkPixmap *icon, *mask;
-	GtkWidget *iconw;
 	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GtkRequisition req;
+	GdkPixmap *icon_pix = NULL;
 
-	GtkWidget *vw_drawing, *vw_scrolledwindow;
-
-	GtkWidget *vbox_main, *hbox_top, *hbox_bar;
-	GtkWidget *table_RGB, *table_tools;
-	GtkWidget *hbox_bottom, *vbox_right, *vbox_top, *toolbar, *toolbar2;
+	GtkWidget *vw_drawing, *vw_scrolledwindow, *menubar1, *vbox_main,
+			*hbox_bar, *hbox_bottom, *vbox_right;
 	GtkAccelGroup *accel_group;
-
 	GtkItemFactory *item_factory;
 
 	GtkItemFactoryEntry menu_items[] = {
@@ -2540,34 +2103,25 @@ void main_init()
 		{ _("/Edit/Choose Pattern ..."),	"F2",	pressed_choose_patterns,0, NULL },
 		{ _("/Edit/Choose Brush ..."),		"F3",	pressed_choose_brush,0, NULL },
 		{ _("/Edit/Create Patterns"),		NULL,	pressed_create_patterns,0, NULL },
-		{ _("/Edit/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Edit/Continuous Painting"),	"F11",	pressed_continuous, 0, "<CheckItem>" },
-		{ _("/Edit/Opacity Undo Mode"),		"F12",	pressed_opacity_mode, 0, "<CheckItem>" },
-		{ _("/Edit/Tint Mode"),			NULL,	pressed_tint_mode, 0, "<CheckItem>" },
-		{ _("/Edit/Tint +-"),			NULL,	pressed_tint_mode, 1, "<CheckItem>" },
 
 		{ _("/_View"),			NULL,		NULL,0, "<Branch>" },
 		{ _("/View/tear"),		NULL,		NULL,0, "<Tearoff>" },
-		{ _("/View/Set Zoom ..."),	"Z",		pressed_setzoom,0, NULL },
-		{ _("/View/10%"),		"1",		zoom_to10,0, NULL },
-		{ _("/View/25%"),		"2",		zoom_to25,0, NULL },
-		{ _("/View/50%"),		"3",		zoom_to50,0, NULL },
-		{ _("/View/100%"),		"4",		zoom_to1,0, NULL },
-		{ _("/View/400%"),		"5",		zoom_to4,0, NULL },
-		{ _("/View/800%"),		"6",		zoom_to8,0, NULL },
-		{ _("/View/1200%"),		"7",		zoom_to12,0, NULL },
-		{ _("/View/1600%"),		"8",		zoom_to16,0, NULL },
-		{ _("/View/2000%"),		"9",		zoom_to20,0, NULL },
-		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/View/Zoom in (+)"),	NULL,		zoom_in,0, NULL },
-		{ _("/View/Zoom out (-)"),	NULL,		zoom_out,0, NULL },
+		{ _("/View/Toggle Image View (Home)"), NULL,	toggle_view,0, NULL },
+		{ _("/View/Centralize Image"),	NULL,		pressed_centralize,0, "<CheckItem>" },
 		{ _("/View/Show zoom grid"),	NULL,		zoom_grid,0, "<CheckItem>" },
 		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/View/Toggle Image View (Home)"), NULL,	toggle_view,0, NULL },
+		{ _("/View/View Window"),	"V",		pressed_view,0, "<CheckItem>" },
+		{ _("/View/Focus View Window"),	NULL,		pressed_view_focus,0, "<CheckItem>" },
+		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/View/Pan Window (End)"),	NULL,		pressed_pan,0, NULL },
 		{ _("/View/Command Line Window"),	"C",	pressed_cline,0, NULL },
-		{ _("/View/View Window"),		"V",	pressed_view,0, "<CheckItem>" },
 		{ _("/View/Layers Window"),		"L",	pressed_layers, 0, NULL },
+		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
+{ _("/View/Show Main Toolbar"),		"F5", pressed_toolbar_toggle, TOOLBAR_MAIN, "<CheckItem>" },
+{ _("/View/Show Tools Toolbar"),	"F6", pressed_toolbar_toggle, TOOLBAR_TOOLS, "<CheckItem>" },
+{ _("/View/Show Settings Toolbar"),	"F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS, "<CheckItem>" },
+{ _("/View/Show Palette"),		"F8", pressed_toolbar_toggle, TOOLBAR_PALETTE, "<CheckItem>" },
+{ _("/View/Show Status Bar"),		NULL, pressed_toolbar_toggle, TOOLBAR_STATUS, "<CheckItem>" },
 
 		{ _("/_Image"),  			NULL, 	NULL,0, "<Branch>" },
 		{ _("/Image/tear"),			NULL, 	NULL,0, "<Tearoff>" },
@@ -2633,22 +2187,6 @@ void main_init()
 		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Palette/Sort Colours ..."),	NULL,	pressed_sort_pal,0, NULL },
 
-		{ _("/_Opacity"),		NULL,		NULL, 0, "<Branch>" },
-		{ _("/Opacity/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Opacity/10%"),		"<control>1",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/20%"),		"<control>2",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/30%"),		"<control>3",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/40%"),		"<control>4",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/50%"),		"<control>5",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/60%"),		"<control>6",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/70%"),		"<control>7",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/80%"),		"<control>8",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/90%"),		"<control>9",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/100%"),		"<control>0",	pressed_opacity, 0, NULL },
-		{ _("/Opacity/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Opacity/-1% Ctrl+ -"),	NULL,		pressed_opacity, 0, NULL },
-		{ _("/Opacity/+1% Ctrl+ +"),	NULL,		pressed_opacity, 0, NULL },
-
 		{ _("/Effe_cts"),		NULL,	 	NULL, 0, "<Branch>" },
 		{ _("/Effects/tear"),		NULL,	 	NULL, 0, "<Tearoff>" },
 		{ _("/Effects/Transform Colour ..."), "<control><shift>C", pressed_brcosa,0, NULL },
@@ -2677,8 +2215,26 @@ void main_init()
 		{ _("/Frames/Set key frame ..."), NULL,		pressed_set_key_frame, 0, NULL },
 		{ _("/Frames/Remove all key frames ..."), NULL,	pressed_remove_key_frames, 0, NULL },
 
+		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
+		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
+		{ _("/Channels/Create Channel ..."), NULL, pressed_channel_create, 0, NULL },
+		{ _("/Channels/Delete Channel ..."), NULL, pressed_channel_delete, 0, NULL },
+		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
+		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, 0, "<RadioItem>" },
+		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, 1, _("/Channels/Edit Image") },
+		{ _("/Channels/Edit Selection"), NULL, pressed_channel_edit, 2, _("/Channels/Edit Image") },
+		{ _("/Channels/Edit Mask"), 	NULL, pressed_channel_edit, 3, _("/Channels/Edit Image") },
+		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
+		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, 0, "<CheckItem>" },
+		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, 1, "<CheckItem>" },
+		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, 2, "<CheckItem>" },
+		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
+		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_alpha_overlay, 0, "<CheckItem>" },
+		{ _("/Channels/Configure Overlays ..."), NULL, pressed_channel_config_overlay, 0, NULL },
+
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
-		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
+		{ _("/Help/Documentation"),	"F1",		pressed_docs,0, NULL },
+		{ _("/Help/About"),		NULL,		pressed_help,0, NULL }
 	};
 
 char
@@ -2713,9 +2269,6 @@ char
 			_("/Palette/Merge Duplicate Colours"), _("/Palette/Remove Unused Colours"),
 			_("/File/Export ASCII Art ..."), _("/File/Export Animated GIF ..."),
 			NULL },
-	*item_continuous[] = {_("/Edit/Continuous Painting"), _("/Edit/Opacity Undo Mode"),
-			_("/View/Show zoom grid"),
-			NULL},
 	*item_cline[] = {_("/View/Command Line Window"),
 			NULL},
 	*item_view[] = {_("/View/View Window"),
@@ -2734,6 +2287,11 @@ char
 	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL}
 	;
 
+
+
+
+	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
+
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
 		sprintf(txt, "status%iToggle", i);
@@ -2743,7 +2301,6 @@ char
 	mem_background = inifile_get_gint32("backgroundGrey", 180 );
 	mem_undo_limit = inifile_get_gint32("undoMBlimit", 32 );
 	mem_nudge = inifile_get_gint32("pixelNudge", 8 );
-	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
 
 	accel_group = gtk_accel_group_new ();
 	item_factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR,"<main>", accel_group);
@@ -2764,7 +2321,6 @@ char
 	pop_men_dis( item_factory, item_need_selection, menu_need_selection );
 	pop_men_dis( item_factory, item_need_clipboard, menu_need_clipboard );
 	pop_men_dis( item_factory, item_crop, menu_crop );
-	pop_men_dis( item_factory, item_continuous, menu_continuous );
 	pop_men_dis( item_factory, item_help, menu_help );
 	pop_men_dis( item_factory, item_prefs, menu_prefs );
 	pop_men_dis( item_factory, item_frames, menu_frames );
@@ -2787,27 +2343,42 @@ char
 		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_clip_save );
 		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_need_clipboard );
 	}
-	menu_opac[0] = NULL;
-	for ( i=1; i<=10; i++ )
-	{
-		snprintf( txt, 60, _("/Opacity/%i0%%"), i );
-		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_opac );
-	}
-	men_dis_add( gtk_item_factory_get_item(item_factory, _("/Opacity/-1% Ctrl+ -")), menu_opac );
-	men_dis_add( gtk_item_factory_get_item(item_factory, _("/Opacity/+1% Ctrl+ +")), menu_opac );
+
+	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
+		_("/View/Focus View Window") ) ),
+		inifile_get_gboolean("view_focus", TRUE ) );
+
+	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
+	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( gtk_item_factory_get_item(item_factory,
+		_("/View/Centralize Image") ) ), canvas_image_centre );
+
+
+	toolbar_menu_widgets[1] = gtk_item_factory_get_item(item_factory,
+			_("/View/Show Main Toolbar") );
+	toolbar_menu_widgets[2] = gtk_item_factory_get_item(item_factory,
+			_("/View/Show Tools Toolbar") );
+	toolbar_menu_widgets[3] = gtk_item_factory_get_item(item_factory,
+			_("/View/Show Settings Toolbar") );
+	toolbar_menu_widgets[4] = gtk_item_factory_get_item(item_factory,
+			_("/View/Show Palette") );
+	toolbar_menu_widgets[5] = gtk_item_factory_get_item(item_factory,
+			_("/View/Show Status Bar") );
 
 	mem_continuous = inifile_get_gboolean( "continuousPainting", TRUE );
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_continuous[0]), mem_continuous );
-
 	mem_undo_opacity = inifile_get_gboolean( "opacityToggle", TRUE );
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_continuous[1]), mem_undo_opacity );
-
 	mem_show_grid = inifile_get_gboolean( "gridToggle", TRUE );
-	gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(menu_continuous[2]), mem_show_grid );
+	gtk_check_menu_item_set_active(
+		GTK_CHECK_MENU_ITEM(
+			gtk_item_factory_get_item(item_factory, _("/View/Show zoom grid") )
+					), mem_show_grid );
+
 	mem_grid_min = inifile_get_gint32("gridMin", 8 );
 	mem_grid_rgb[0] = inifile_get_gint32("gridR", 50 );
 	mem_grid_rgb[1] = inifile_get_gint32("gridG", 50 );
 	mem_grid_rgb[2] = inifile_get_gint32("gridB", 50 );
+
+
+///	MAIN WINDOW
 
 	main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_widget_set_usize(main_window, 100, 100);		// Set minimum width/height
@@ -2828,184 +2399,13 @@ char
 	gtk_widget_show (menubar1);
 	gtk_box_pack_start (GTK_BOX (vbox_main), menubar1, FALSE, FALSE, 0);
 
-	hbox_top = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox_top);
-	gtk_box_pack_start (GTK_BOX (vbox_main), hbox_top, FALSE, FALSE, 0);
-
-///	PREVIEW AREA
-
-	drawing_pat_prev = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_pat_prev, PATTERN_WIDTH, PATTERN_HEIGHT );
-	gtk_box_pack_start( GTK_BOX(hbox_top), drawing_pat_prev, FALSE, FALSE, 0 );
-	gtk_widget_show( drawing_pat_prev );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_pat_prev), "expose_event",
-		GTK_SIGNAL_FUNC (expose_pattern), GTK_OBJECT(drawing_pat_prev) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_pat_prev), "button_release_event",
-		GTK_SIGNAL_FUNC (click_pattern), GTK_OBJECT(drawing_pat_prev) );
-	gtk_widget_set_events (drawing_pat_prev, GDK_ALL_EVENTS_MASK);
-
-	drawing_col_prev = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT );
-	gtk_box_pack_start( GTK_BOX(hbox_top), drawing_col_prev, FALSE, FALSE, 0 );
-	gtk_widget_show( drawing_col_prev );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_press_event",
-		GTK_SIGNAL_FUNC (click_colours), GTK_OBJECT(drawing_col_prev) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "expose_event",
-		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
-	gtk_widget_set_events (drawing_col_prev, GDK_BUTTON_PRESS_MASK);
-
-
-///	TOOLBAR
-
-	vbox_top = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_top);
-	gtk_box_pack_start ( GTK_BOX (hbox_top), vbox_top, FALSE, FALSE, 5 );
 
 // we need to realize the window because we use pixmaps for 
 // items on the toolbar in the context of it
 	gtk_widget_realize( main_window );
 
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
-	toolbar2 = gtk_toolbar_new( GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS );
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS );
-	toolbar2 = gtk_toolbar_new();
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar2), GTK_TOOLBAR_ICONS );
-#endif
 
-	gtk_box_pack_start ( GTK_BOX (vbox_top), toolbar2, FALSE, FALSE, 0 );
-	gtk_box_pack_start ( GTK_BOX (vbox_top), toolbar, FALSE, FALSE, 0 );
-
-	for (i=0; i<TOTAL_CURSORS; i++)
-	{
-		icon = gdk_bitmap_create_from_data (NULL, xbm_list[i], 20, 20);
-		mask = gdk_bitmap_create_from_data (NULL, xbm_mask_list[i], 20, 20);
-
-		if ( i <= TOOL_SHUFFLE || i == TOOL_LINE || i == TOOL_SMUDGE || i == TOOL_CLONE )
-			m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 0, 0);
-		else
-		{
-			if ( i == TOOL_FLOOD)
-				m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 2, 19);
-			else
-				m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 10, 10);
-		}
-
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-	}
-	icon = gdk_bitmap_create_from_data (NULL, xbm_move_bits, 20, 20);
-	mask = gdk_bitmap_create_from_data (NULL, xbm_move_mask_bits, 20, 20);
-	move_cursor = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 10, 10);
-	gdk_pixmap_unref( icon );
-	gdk_pixmap_unref( mask );
-
-	previous = NULL;
-	for (i=0; i<TOTAL_ICONS_TOOLBAR; i++)		// Lower icon toolbar
-	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-/*
-		if ( i == TOTAL_ICONS_TOOLBAR )
-		{
-			child_type = GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
-			previous = NULL;
-		}
-		else*/
-		if ( i<1 || i>8 )
-		{
-			child_type = GTK_TOOLBAR_CHILD_BUTTON;
-			previous = NULL;
-		}
-		else
-		{
-			child_type = GTK_TOOLBAR_CHILD_RADIOBUTTON;
-			previous = icon_buttons[i-1];
-		}
-		if ( i == 1 ) previous = NULL;
-
-		icon_buttons[i] = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar),
-			child_type, previous, "None", hint_text[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event), (gpointer) i);
-	}
-	men_dis_add( icon_buttons[5], menu_only_24 );		// Smudge - Only RGB images
-	men_dis_add( icon_buttons[9], menu_lasso );		// Lasso
-	men_dis_add( icon_buttons[10], menu_crop );		// Crop
-
-	for (i=0; i<TOTAL_ICONS_TOOLBAR; i++)		// Upper icon toolbar
-	{
-		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
-			NULL, icon_list2[i] );
-		iconw = gtk_pixmap_new ( icon, mask );
-		gdk_pixmap_unref( icon );
-		gdk_pixmap_unref( mask );
-
-		icon_buttons2[i] = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar2),
-			GTK_TOOLBAR_CHILD_BUTTON, NULL, "None", hint_text2[i],
-			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event2), (gpointer) i);
-	}
-	men_dis_add( icon_buttons2[3], menu_need_selection );	// Cut
-	men_dis_add( icon_buttons2[3], menu_lasso );		// Cut
-	men_dis_add( icon_buttons2[4], menu_need_selection );	// Copy
-	men_dis_add( icon_buttons2[4], menu_lasso );		// Copy
-	men_dis_add( icon_buttons2[5], menu_need_clipboard );	// Paste
-	men_dis_add( icon_buttons2[6], menu_undo );		// Undo
-	men_dis_add( icon_buttons2[7], menu_redo );		// Undo
-
-	men_dis_add( icon_buttons2[8], menu_need_selection );	// Ellipse outline
-	men_dis_add( icon_buttons2[9], menu_need_selection );	// Ellipse
-
-	men_dis_add( icon_buttons2[10], menu_need_selection );	// Outline
-	men_dis_add( icon_buttons2[11], menu_need_selection );	// Fill
-	men_dis_add( icon_buttons2[10], menu_lasso );		// Outline
-	men_dis_add( icon_buttons2[11], menu_lasso );		// Fill
-
-	men_dis_add( icon_buttons2[12], menu_need_clipboard );	// Flip sel V
-	men_dis_add( icon_buttons2[13], menu_need_clipboard );	// Flip sel H
-	men_dis_add( icon_buttons2[14], menu_need_clipboard );	// Rot sel clock
-	men_dis_add( icon_buttons2[15], menu_need_clipboard );	// Rot sel anti
-
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
-	gtk_widget_show ( toolbar );
-	gtk_widget_show ( toolbar2 );
-
-///	Table for size & flow spin buttons
-
-	table_tools = gtk_table_new (2, 2, FALSE);
-	gtk_widget_show (table_tools);
-	gtk_box_pack_start (GTK_BOX (hbox_top), table_tools, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (table_tools), 5);
-
-	add_to_table( _("Size"), table_tools, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Flow"), table_tools, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-
-	spin_to_table( table_tools, &spinbutton_size, 0, 1, 0, 1, 1, 200 );
-	GTK_WIDGET_UNSET_FLAGS (spinbutton_size, GTK_CAN_FOCUS);
-	gtk_signal_connect_object( GTK_OBJECT(spinbutton_size), "changed",
-		GTK_SIGNAL_FUNC (canvas_enter), GTK_OBJECT(spinbutton_size) );
-
-	spin_to_table( table_tools, &spinbutton_spray, 1, 1, 0, 1, 1, 200 );
-	GTK_WIDGET_UNSET_FLAGS (spinbutton_spray, GTK_CAN_FOCUS);
-	gtk_signal_connect_object( GTK_OBJECT(spinbutton_spray), "changed",
-		GTK_SIGNAL_FUNC (canvas_enter), GTK_OBJECT(spinbutton_spray) );
-
-
-
-///	COLOUR LABELS
-	table_RGB = gtk_table_new (2, 1, FALSE);
-	gtk_widget_show (table_RGB);
-	gtk_box_pack_start (GTK_BOX (hbox_top), table_RGB, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (table_RGB), 5);
-
-	label_A = add_to_table( "-", table_RGB, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	label_B = add_to_table( "-", table_RGB, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
-
+	toolbar_init(vbox_main);
 
 
 ///	PALETTE
@@ -3014,32 +2414,7 @@ char
 	gtk_widget_show (hbox_bottom);
 	gtk_box_pack_start (GTK_BOX (vbox_main), hbox_bottom, TRUE, TRUE, 0);
 
-	scrolledwindow_palette = gtk_scrolled_window_new (NULL, NULL);
-	gtk_widget_show (scrolledwindow_palette);
-	gtk_box_pack_start (GTK_BOX (hbox_bottom), scrolledwindow_palette, FALSE, TRUE, 0);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_palette),
-		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
-
-	viewport_palette = gtk_viewport_new (NULL, NULL);
-
-	gtk_widget_set_usize( viewport_palette, PALETTE_WIDTH, 64 );
-	gtk_widget_show (viewport_palette);
-	gtk_container_add (GTK_CONTAINER (scrolledwindow_palette), viewport_palette);
-
-	drawing_palette = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_palette, PALETTE_WIDTH, 64 );
-	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_palette);
-	gtk_widget_show( drawing_palette );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "expose_event",
-		GTK_SIGNAL_FUNC (expose_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "button_press_event",
-		GTK_SIGNAL_FUNC (click_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "motion_notify_event",
-		GTK_SIGNAL_FUNC (motion_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "button_release_event",
-		GTK_SIGNAL_FUNC (release_palette), GTK_OBJECT(drawing_palette) );
-
-	gtk_widget_set_events (drawing_palette, GDK_ALL_EVENTS_MASK);
+	toolbar_palette_init(hbox_bottom);
 
 
 	vbox_right = gtk_vbox_new (FALSE, 0);
@@ -3122,52 +2497,29 @@ char
 ////	STATUS BAR
 
 	hbox_bar = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox_bar);
+	if ( toolbar_status[TOOLBAR_STATUS] ) gtk_widget_show (hbox_bar);
 	gtk_box_pack_start (GTK_BOX (vbox_right), hbox_bar, FALSE, FALSE, 0);
 
-	label_bar1 = gtk_label_new("");
-	gtk_widget_show (label_bar1);
-	gtk_box_pack_start (GTK_BOX (hbox_bar), label_bar1, FALSE, FALSE, 0);
-	gtk_misc_set_alignment (GTK_MISC (label_bar1), 0, 0);
 
-	label_bar2 = gtk_label_new("");
-	gtk_widget_show (label_bar2);
-	gtk_box_pack_start (GTK_BOX (hbox_bar), label_bar2, FALSE, FALSE, 0);
-	if ( status_on[2] ) gtk_widget_set_usize(label_bar2, 90, -2);
-	gtk_misc_set_alignment (GTK_MISC (label_bar2), 0.5, 0);
+	for ( i=0; i<STATUS_ITEMS; i++ )
+	{
+		label_bar[i] = gtk_label_new("");
+		gtk_widget_show (label_bar[i]);
+		if ( i==STATUS_GEOMETRY || i==STATUS_PIXELRGB || i==STATUS_SELEGEOM ) f = 0;	// LEFT
+		if ( i==STATUS_CURSORXY || i==STATUS_UNDOREDO ) f = 0.5;	// MIDDLE
+		gtk_misc_set_alignment (GTK_MISC (label_bar[i]), f, 0);
+	}
+	for ( i=0; i<STATUS_ITEMS; i++ )
+	{
+		if ( i<3 ) gtk_box_pack_start (GTK_BOX (hbox_bar), label_bar[i], FALSE, FALSE, 0);
+		else	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar[7-i], FALSE, FALSE, 0);
+	}
+	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
+	if ( status_on[STATUS_PIXELRGB] ) gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 160, -2);
+	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
+	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "0+0" );
 
-	label_bar3 = gtk_label_new("");		// Pixel info
-	gtk_widget_show (label_bar3);
-	gtk_box_pack_start (GTK_BOX (hbox_bar), label_bar3, FALSE, FALSE, 0);
-	if ( status_on[3] ) gtk_widget_set_usize(label_bar3, 160, -2);
-	gtk_misc_set_alignment (GTK_MISC (label_bar3), 0, 0);
 
-	label_bar4 = gtk_label_new("");
-	gtk_widget_show (label_bar4);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar4, FALSE, FALSE, 0);
-
-	label_bar9 = gtk_label_new("");
-	gtk_widget_show (label_bar9);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar9, FALSE, FALSE, 0);
-
-	label_bar6 = gtk_label_new("");
-	gtk_widget_show (label_bar6);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar6, FALSE, FALSE, 0);
-
-	label_bar8 = gtk_label_new("");
-	gtk_widget_show (label_bar8);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar8, FALSE, FALSE, 0);
-
-	if ( status_on[7] ) label_bar7 = gtk_label_new("0+0");
-	else label_bar7 = gtk_label_new("");
-	gtk_widget_show (label_bar7);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar7, FALSE, FALSE, 0);
-	if ( status_on[7] ) gtk_widget_set_usize(label_bar7, 50, -2);
-
-	label_bar5 = gtk_label_new("");		// Selection geometry
-	gtk_widget_show (label_bar5);
-	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar5, FALSE, FALSE, 0);
-	gtk_misc_set_alignment (GTK_MISC (label_bar5), 0, 0);
 
 	/* To prevent statusbar wobbling */
 	gtk_widget_size_request(hbox_bar, &req);
@@ -3181,8 +2533,6 @@ char
 	gtk_signal_connect_object (GTK_OBJECT (main_window), "key_press_event",
 		GTK_SIGNAL_FUNC (handle_keypress), NULL);
 
-//	gtk_container_set_border_width (GTK_CONTAINER (main_window), 2);
-
 	men_item_state( menu_frames, FALSE );
 	men_item_state( menu_undo, FALSE );
 	men_item_state( menu_redo, FALSE );
@@ -3195,17 +2545,15 @@ char
 	mtMAX( recent_files, recent_files, 0 )
 
 	update_recent_files();
+	toolbar_boxes[TOOLBAR_STATUS] = hbox_bar;	// Hide status bar
+	main_hidden[0] = menubar1;			// Hide menu bar
 
-	main_hidden[0] = hbox_bar;			// Hide status bar
-	main_hidden[1] = scrolledwindow_palette;	// Hide palette area
-	main_hidden[2] = hbox_top;			// Hide top area
-	main_hidden[3] = menubar1;			// Hide menu bar
-
-	if (viewer_mode) toggle_view(NULL, NULL);
 	view_hide();					// Hide paned view initially
 
 	gtk_widget_show (main_window);
+
 	gtk_widget_grab_focus(scrolledwindow_canvas);	// Stops first icon in toolbar being selected
+	gdk_window_raise( main_window->window );
 
 	icon_pix = gdk_pixmap_create_from_xpm_d( main_window->window, NULL, NULL, icon_xpm );
 	gdk_window_set_icon( main_window->window, NULL, icon_pix, NULL );
@@ -3230,16 +2578,18 @@ char
 	dash_gc = gdk_gc_new(drawing_canvas->window);		// Set up gc for polygon marquee
 	gdk_gc_set_background(dash_gc, &cbg);
 	gdk_gc_set_foreground(dash_gc, &cfg);
-//	gdk_gc_set_line_attributes( dash_gc, 1, GDK_LINE_DOUBLE_DASH, GDK_CAP_ROUND, GDK_JOIN_ROUND);
 	gdk_gc_set_line_attributes( dash_gc, 1, GDK_LINE_DOUBLE_DASH, GDK_CAP_NOT_LAST, GDK_JOIN_MITER);
 
 	init_tablet();						// Set up the tablet
+
+	toolbar_showhide();
+	if (viewer_mode) toggle_view(NULL, NULL);
 }
 
-void spot_undo()
+void spot_undo(int mode)
 {
 	pen_down = 0;			// Ensure previous tool action is treated separately
-	mem_undo_next();		// Do memory stuff for undo
+	mem_undo_next(mode);		// Do memory stuff for undo
 	update_menus();			// Update menu undo issues
 	pen_down = 0;			// Ensure next tool action is treated separately
 }

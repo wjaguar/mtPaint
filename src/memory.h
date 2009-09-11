@@ -23,10 +23,6 @@
 
 #define PALETTE_WIDTH 74
 #define PALETTE_HEIGHT 4500
-#define PATTERN_WIDTH 32
-#define PATTERN_HEIGHT 64
-#define PREVIEW_WIDTH 32
-#define PREVIEW_HEIGHT 64
 #define PATCH_WIDTH 324
 #define PATCH_HEIGHT 324
 
@@ -101,14 +97,11 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 /// PATTERNS
 
 char mem_patterns[81][8][8];		// Pattern bitmaps
-unsigned char *mem_pats;		// RGB screen memory holding current pattern preview
-unsigned char *mem_patch;		// RGB screen memory holding all patterns for choosing
 unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
 unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 
 /// PREVIEW/TOOLS
 
-char *mem_prev;				// RGB colours preview
 int tool_type, tool_size, tool_flow;	// Currently selected tool
 int tool_opacity;			// Transparency - 100=solid
 int tool_pat;				// Tool pattern number
@@ -190,15 +183,12 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 					// Convert image to Indexed Palette using quantize
 void mem_invert();			// Invert the palette
 
-void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_mask_setall(char val);		// Clear/set all masks
 void mem_mask_init();			// Initialise RGB protection mask
 int mem_protected_RGB(int intcol);	// Is this intcol in list?
 
 void mem_swap_cols();			// Swaps colours and update memory
 void repaint_swatch( int index );	// Update a palette swatch
-void repaint_top_swatch();		// Update selected colours A & B
-void mem_pat_update();			// Update indexed and then RGB pattern preview
 void mem_get_histogram();		// Calculate how many of each colour index is on the canvas
 int do_posterize(int val, int posty);	// Posterize a number
 int scan_duplicates();			// Find duplicate palette colours
@@ -224,9 +214,15 @@ void pal_hsl( png_color col, float *hh, float *ss, float *ll );	// Turn RGB into
 
 //// UNDO
 
-void mem_undo_next();			// Call this after a draw event but before any changes to image
-int mem_undo_next2( int new_w, int new_h, int from_x, int from_y );
-					// Call this after crop/resize to record undo + new geometry
+#define UNDO_PAL   0	/* Palette changes */
+#define UNDO_XPAL  1	/* Palette and indexed image changes */
+#define UNDO_COL   2	/* Palette and/or RGB image changes */
+#define UNDO_DRAW  3	/* Changes to current channel / RGBA */
+#define UNDO_INV   4	/* "Invert" operation */
+#define UNDO_XFORM 5	/* Changes to all channels */
+#define UNDO_FILT  6	/* Changes to current channel */
+
+void mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
 unsigned char *mem_undo_previous();	// Get address of previous image (or current if none)
 
 void mem_undo_backward();		// UNDO requested by user

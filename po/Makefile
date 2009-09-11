@@ -1,6 +1,6 @@
 include ../_conf.txt
 
-langs = es cs fr pt pt_BR de_DE
+langs = es cs fr pt pt_BR
 
 all:
 	for iii in $(langs); do msgfmt -o $$iii.mo $$iii.po; done

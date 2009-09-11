@@ -51,7 +51,6 @@ int load_png( char *file_name, int stype )
 	char buf[PNG_BYTES_TO_CHECK], *mess;
 	unsigned char *rgb, *rgb2, *rgb3;
 	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height;
-	unsigned int sig_read = 0;
 	FILE *fp;
 	png_bytep *row_pointers, trans;
 	png_color_16p trans_rgb;
@@ -87,7 +86,7 @@ int load_png( char *file_name, int stype )
 	}
 
 	png_init_io(png_ptr, fp);
-	png_set_sig_bytes(png_ptr, sig_read);
+	png_set_sig_bytes(png_ptr, 0);
 
 	png_read_info(png_ptr, info_ptr);
 
@@ -370,8 +369,8 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=laye
 			8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
 			PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 		scaler = 3;
-		if ( mem_xpm_trans > -1 && mem_xpm_trans < 256 )	// Transparent index in use
-		{
+		if ( stype!=3 && mem_xpm_trans > -1 && mem_xpm_trans < 256 )
+		{	// Transparent index in use - not for layers
 			trans_rgb.red = mem_pal[mem_xpm_trans].red;
 			trans_rgb.green = mem_pal[mem_xpm_trans].green;
 			trans_rgb.blue = mem_pal[mem_xpm_trans].blue;
@@ -1068,6 +1067,7 @@ int save_bmp( char *file_name )
 	}
 	else				// Indexed palette image
 	{
+		memset(buff, 0, mem_cols * 4);
 		for ( i=0; i<mem_cols; i++ )
 		{
 			buff[2 + 4*i] = mem_pal[i].red;

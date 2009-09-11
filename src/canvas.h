@@ -35,13 +35,20 @@ int recent_files;					// Current recent files setting
 
 #define MAX_RECENT 20
 
-gboolean col_reverse;					// Painting with right button
+#define STATUS_ITEMS 5
+#define STATUS_GEOMETRY 0
+#define STATUS_CURSORXY 1
+#define STATUS_PIXELRGB 2
+#define STATUS_SELEGEOM 3
+#define STATUS_UNDOREDO 4
 
-gboolean show_paste;					// Show contents of clipboard while pasting
-#define STATUS_ITEMS 10
-gboolean status_on[STATUS_ITEMS];			// Show status bar items?
-gboolean text_paste;					// Are we pasting text?
-gboolean canvas_image_centre;				// Are we centering the image?
+GtkWidget *label_bar[STATUS_ITEMS];
+
+gboolean col_reverse,					// Painting with right button
+	show_paste,					// Show contents of clipboard while pasting
+	status_on[STATUS_ITEMS],			// Show status bar items?
+	text_paste,					// Are we pasting text?
+	canvas_image_centre;				// Are we centering the image?
 
 #define LINE_NONE 0
 #define LINE_START 1

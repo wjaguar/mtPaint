@@ -31,9 +31,9 @@ gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data );
 void pressed_cline( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_pan( GtkMenuItem *menu_item, gpointer user_data );
 
-void pressed_setzoom( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
-
+void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
 void pressed_view( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
+void pressed_view_focus( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
 void init_view( GtkWidget *canvas, GtkWidget *scroll );			// Initial setup
 void view_show();
 void view_hide();

@@ -31,6 +31,7 @@
 #include "viewer.h"
 #include "png.h"
 #include "ani.h"
+#include "toolbar.h"
 
 
 int	layers_total = 0,		// Layers currently being used
@@ -1455,7 +1456,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	layer_label_position = add_to_table( "-320, 200", table, 1, 1, 1,
 			GTK_JUSTIFY_LEFT, 0, 0.5 );
 
-	layer_slider = add_slider2table( 100, 1, 100, table, 2, 1, -2, -2 );
+	layer_slider = add_slider2table( 100, 0, 100, table, 2, 1, -2, -2 );
 	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(layer_slider)->scale.range.adjustment),
 		"value_changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 	gtk_scale_set_draw_value(GTK_SCALE (layer_slider), TRUE);
