@@ -38,6 +38,7 @@
 #include "wu.h"
 #include "prefs.h"
 #include "ani.h"
+#include "channels.h"
 #include "toolbar.h"
 
 GdkWindow *the_canvas = NULL;			// Pointer to the canvas we will be drawing on
@@ -2092,12 +2093,14 @@ void tool_action( int x, int y, int button, gdouble pressure )
 		}
 		if ( tool_type == TOOL_FLOOD && button == 1 )
 		{
-			j = get_pixel(x, y);
-			if (mem_img_bpp == 1 ? !mem_prot_mask[j] : !mem_protected_RGB(j))
+			/* Flood fill shouldn't start on masked points anyway */
+			if (!pixel_protected(x, y))
 			{
+				j = get_pixel(x, y);
 				i = tool_opacity;
 				tool_opacity = 255; // 100% pure colour for flood filling
-				k = mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
+				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
+					mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
 				if (!tool_pat && (j != k))	// Pure colour fill
 				{
 					spot_undo(UNDO_DRAW);

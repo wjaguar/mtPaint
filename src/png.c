@@ -49,7 +49,7 @@ int preserved_gif_delay = 10;
 int load_png( char *file_name, int stype )
 {
 	char buf[PNG_BYTES_TO_CHECK], *mess;
-	unsigned char *rgb, *rgb2, *rgb3, *alpha;
+	unsigned char *rgb, *rgb2, *rgb3, *alpha = NULL;
 	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height;
 	FILE *fp;
 	png_bytep *row_pointers, trans;
@@ -141,8 +141,14 @@ int load_png( char *file_name, int stype )
 		if ( stype == 0 )
 		{
 			mem_pal_load_def();
-			if ( mem_new( width, height, 3 ) != 0 ) goto file_too_huge;
+			i = CMASK_IMAGE;
+			if ((color_type == PNG_COLOR_TYPE_RGB_ALPHA) ||
+				(color_type == PNG_COLOR_TYPE_GRAY_ALPHA))
+				i = CMASK_RGBA;
+			if (mem_new(width, height, 3, i))
+				goto file_too_huge;
 			rgb = mem_img[CHN_IMAGE];
+			alpha = mem_img[CHN_ALPHA];
 			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 			{
 				// Image has a transparent index
@@ -181,13 +187,8 @@ int load_png( char *file_name, int stype )
 
 		if ( do_prog ) progress_init( mess, 0 );
 
-		if (stype == 0 && (color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
-					color_type == PNG_COLOR_TYPE_GRAY_ALPHA ) )
+		if (stype == 0 && alpha)
 		{
-
-undo_next_core(1, mem_width, mem_height, mem_img_bpp, CMASK_FOR(CHN_ALPHA));		// Hack
-alpha = mem_img[CHN_ALPHA];
-
 			row_pointers[0] = malloc(width * 4);
 			if ( row_pointers[0] == NULL ) goto force_RGB;
 			for (row = 0; row < height; row++)
@@ -202,9 +203,7 @@ alpha = mem_img[CHN_ALPHA];
 					rgb2[2] = rgb3[2];
 					alpha[0] = rgb3[3];
 
-
-
-/*	OLD CODE PRE HACK
+#if 0 /*	OLD CODE PRE HACK */
 							// Check each pixel's alpha and copy across
 					if ( rgb3[3] > 127 )
 					{
@@ -218,8 +217,8 @@ alpha = mem_img[CHN_ALPHA];
 						rgb2[1] = 115;
 						rgb2[2] = 0;
 					}
-*/
-alpha++;
+#endif
+					alpha++;
 					rgb2 += 3;
 					rgb3 += 4;
 				}
@@ -264,7 +263,8 @@ force_RGB:
 		{
 			png_get_PLTE(png_ptr, info_ptr, &png_palette, &mem_cols);
 			for ( i=0; i<mem_cols; i++ ) mem_pal[i] = png_palette[i];
-			if ( mem_new( width, height, 1 ) != 0 ) goto file_too_huge;
+			if (mem_new(width, height, 1, CMASK_IMAGE))
+				goto file_too_huge;
 			rgb = mem_img[CHN_IMAGE];
 			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 			{
@@ -474,7 +474,8 @@ int load_gif( char *file_name, int *delay )
 					return TOO_BIG;
 				}
 				if ( width*height > FILE_PROGRESS ) do_prog = 1;
-				if ( mem_new( width, height, 1 ) != 0 ) goto fail_too_huge;
+				if (mem_new(width, height, 1, CMASK_IMAGE))
+					goto fail_too_huge;
 
 				if ( do_prog ) progress_init(_("Loading GIF image"),0);
 				if ( giffy->Image.Interlace )
@@ -684,13 +685,13 @@ int load_jpeg( char *file_name )
 	{
 		mem_cols = 256;
 		mem_scale_pal( 0, 0,0,0, 255, 255, 255, 255 );
-		if ( mem_new( width, height, 1 ) != 0 )
+		if (mem_new(width, height, 1, CMASK_IMAGE))
 			goto fail_too_huge;		// Greyscale
 	}
 	else
 	{
 		mem_pal_load_def();
-		if ( mem_new( width, height, 3 ) != 0 )
+		if (mem_new(width, height, 3, CMASK_IMAGE))
 			goto fail_too_huge;		// RGB
 	}
 	memp = mem_img[CHN_IMAGE];
@@ -813,7 +814,7 @@ int load_tiff( char *file_name )
 	if ( width*height > FILE_PROGRESS ) do_prog = 1;
 
 	mem_pal_load_def();
-	if ( mem_new( width, height, 3 ) != 0 )		// RGB
+	if (mem_new(width, height, 3, CMASK_IMAGE))		// RGB
 	{
 		_TIFFfree(raster);
 		TIFFClose(tif);
@@ -934,7 +935,8 @@ int load_bmp( char *file_name )
 	if ( bitcount == 24 )		// RGB image
 	{
 		mem_pal_load_def();
-		if ( mem_new( width, height, 3 ) != 0 ) goto file_too_huge;
+		if (mem_new(width, height, 3, CMASK_IMAGE))
+			goto file_too_huge;
 		wrk_image = mem_img[CHN_IMAGE];
 		progress_init(_("Loading BMP image"),0);
 		for ( j=0; j<height; j++ )
@@ -963,7 +965,8 @@ int load_bmp( char *file_name )
 			mem_pal[i].green = buff[1 + 4*i];
 			mem_pal[i].blue = buff[4*i];
 		}
-		if ( mem_new( width, height, 1 ) != 0 ) goto file_too_huge;
+		if (mem_new(width, height, 1, CMASK_IMAGE))
+			goto file_too_huge;
 		wrk_image = mem_img[CHN_IMAGE];
 
 		progress_init(_("Loading BMP image"),0);
@@ -1269,7 +1272,7 @@ int load_xpm( char *file_name )
 
 	mem_pal_copy( mem_pal, t_pal );
 	mem_cols = fc;
-	if ( mem_new( fw, fh, 1 ) != 0 )
+	if (mem_new(fw, fh, 1, CMASK_IMAGE))
 	{
 		fclose(fp);
 		return FILE_MEM_ERROR;
@@ -1478,7 +1481,7 @@ int load_xbm( char *file_name )
 	mem_pal[1].blue = 0;
 
 	mem_cols = 2;
-	if ( mem_new( fw, fh, 1 ) != 0 )
+	if (mem_new(fw, fh, 1, CMASK_IMAGE))
 	{
 		fclose(fp);
 		return FILE_MEM_ERROR;

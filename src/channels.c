@@ -40,10 +40,16 @@ unsigned char channel_rgb[NUM_CHANNELS][3] = {
 };
 
 /* The 0-th value is (255 - global opacity) - i.e., image visibility */
-unsigned char channel_opacity[NUM_CHANNELS] = {0, 128, 128, 128};
+unsigned char channel_opacity[NUM_CHANNELS] = {128, 128, 128, 128};
 
 /* 255 for channels where it's better to see inverse values - like alpha */
 unsigned char channel_inv[NUM_CHANNELS] = {0, 255, 0, 0};
+
+/* Default fill values for the channels */
+unsigned char channel_fill[NUM_CHANNELS] = {0, 255, 0, 0};
+
+/* Per-channel drawing "colours" */
+unsigned char channel_col_A[NUM_CHANNELS] = {255, 255, 255, 255};
 
 static GtkWidget *newchan_window;
 static int chan_new_type, chan_new_state;
@@ -272,7 +278,11 @@ void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item
 		if (newchan_window) click_newchan_cancel();
 	}
 
-	if (mem_img[item]) mem_channel = item;
+	if (mem_img[item])
+	{
+		mem_channel = item;
+		pressed_opacity(item == CHN_IMAGE ? tool_opacity : channel_col_A[item]);
+	}
 	canvas_undo_chores();
 }
 

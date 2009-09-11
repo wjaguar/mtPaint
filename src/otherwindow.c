@@ -104,7 +104,7 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 	mtMAX( nc, nc, 2 )
 
 	mem_cols = nc;
-	res = mem_new( nw, nh, bpp );
+	res = mem_new( nw, nh, bpp, CMASK_IMAGE );
 	if ( res!= 0 )			// Not enough memory!
 	{
 		memory_errors(1);

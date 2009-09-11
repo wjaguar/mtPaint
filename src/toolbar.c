@@ -32,6 +32,7 @@
 #include "layer.h"
 #include "viewer.h"
 #include "png.h"
+#include "channels.h"
 
 
 #include "graphics/xpm_paint.xpm"
@@ -346,6 +347,7 @@ static void ts_update_sliders()
 {
 	int i, vals[3] = {tool_size, tool_flow, tool_opacity};
 
+	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	for ( i=0; i<3; i++ )
 		gtk_adjustment_set_value( GTK_HSCALE(ts_scales[i])->scale.range.adjustment,
 			vals[i] );
@@ -355,6 +357,7 @@ static void ts_update_spins()
 {
 	int i, vals[3] = {tool_size, tool_flow, tool_opacity};
 
+	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	for ( i=0; i<3; i++ )
 	{
 		gtk_spin_button_update( GTK_SPIN_BUTTON(ts_spins[i]) );
@@ -371,7 +374,8 @@ static gint ts_spin_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	tool_size = vals[0];
 	tool_flow = vals[1];
-	if ( tool_opacity != vals[2] ) pressed_opacity( vals[2] );
+	i = mem_channel == CHN_IMAGE ? tool_opacity : channel_col_A[mem_channel];
+	if (vals[2] != i) pressed_opacity(vals[2]);
 
 	ts_update_sliders();
 
@@ -387,7 +391,8 @@ static gint ts_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	tool_size = vals[0];
 	tool_flow = vals[1];
-	if ( tool_opacity != vals[2] ) pressed_opacity( vals[2] );
+	i = mem_channel == CHN_IMAGE ? tool_opacity : channel_col_A[mem_channel];
+	if (vals[2] != i) pressed_opacity(vals[2]);
 
 	ts_update_spins();
 
@@ -495,6 +500,7 @@ static void toolbar_settings_init()
 	for ( i=0; i<3; i++ )
 		add_to_table( ts_titles[i], table, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
 
+	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	for ( i=0; i<3; i++ )
 	{
 		min = 0; max = 255;

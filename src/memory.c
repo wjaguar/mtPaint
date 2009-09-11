@@ -33,6 +33,7 @@
 #include "layer.h"
 #include "inifile.h"
 #include "canvas.h"
+#include "channels.h"
 #include "toolbar.h"
 
 
@@ -383,29 +384,38 @@ void mem_clear()
 	memset(mem_img, 0, sizeof(chanlist));	// Already freed along with UNDO
 }
 
-int mem_new( int width, int height, int bpp )	// Allocate space for new image, removing old if needed
+/* Allocate space for new image, removing old if needed */
+int mem_new( int width, int height, int bpp, int cmask )
 {
+	unsigned char *res;
 	undo_item *undo = &mem_undo_im_[0];
-	int i, j, res = 0;
+	int i, j = width * height;
 
 	mem_clear();
 
-	j = width * height * bpp;
-	mem_img[CHN_IMAGE] = malloc(j);
-	if (!mem_img[CHN_IMAGE])	// Not enough memory
+	res = mem_img[CHN_IMAGE] = malloc(j * bpp);
+	for (i = CHN_ALPHA; res && (cmask > CMASK_FOR(i)); i++)
 	{
-		width = 8;
-		height = 8;		// 8x8 is bound to work!
-		res = 1;
-		j = width * height * bpp;
-		mem_img[CHN_IMAGE] = malloc(j);
+		if (!(cmask & CMASK_FOR(i))) continue;
+		res = mem_img[i] = malloc(j);
+	}
+	if (!res)	// Not enough memory
+	{
+		for (i = 0; i < NUM_CHANNELS; i++)
+			free(mem_img[i]);
+		memset(mem_img, 0, sizeof(chanlist));
+		width = height = 8; // 8x8 is bound to work!
+		j = width * height;
+		mem_img[CHN_IMAGE] = malloc(j * bpp);
 	}
 
 	i = 0;
 #ifdef U_GUADALINEX
 	if ( bpp == 3 ) i = 255;
 #endif
-	memset(mem_img[CHN_IMAGE], i, j);
+	memset(mem_img[CHN_IMAGE], i, j * bpp);
+	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+		if (mem_img[i]) memset(mem_img[i], channel_fill[i], j);
 
 	mem_width = width;
 	mem_height = height;
@@ -427,10 +437,11 @@ int mem_new( int width, int height, int bpp )	// Allocate space for new image, r
 	mem_col_B = 0;
 	mem_col_A24 = mem_pal[mem_col_A];
 	mem_col_B24 = mem_pal[mem_col_B];
+	memset(channel_col_A, 255, NUM_CHANNELS);
 
 	clear_file_flags();
 
-	return res;
+	return (!res);
 }
 
 unsigned char *mem_undo_previous()	// Get address of previous image (or current if none)
@@ -516,7 +527,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
 			holder[i] = img = mem_img[i];
-			if (undo->img[i] != img) continue;
+			if (!(cmask & (1 << i))) continue;
 			if (mode & 4)
 			{
 				holder[i] = NULL;
@@ -759,7 +770,7 @@ void mem_init()					// Initialise memory
 
 		// Create brush presets
 
-	if ( mem_new( PATCH_WIDTH, PATCH_HEIGHT, 3 ) != 0 )	// Not enough memory!
+	if (mem_new(PATCH_WIDTH, PATCH_HEIGHT, 3, CMASK_IMAGE))	// Not enough memory!
 	{
 		memory_errors(1);
 		exit(0);
@@ -3279,22 +3290,28 @@ void put_pixel( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, newc;
 	unsigned char r, g, b, nr, ng, nb;
-	int i, offset, ofs3;
+	int i, j, offset, ofs3;
 
 	if (pixel_protected(x, y)) return;
 
 	if ( mem_undo_opacity ) old_image = mem_undo_previous();
 	else old_image = mem_img[mem_channel];
 	offset = x + mem_width * y;
+	i = ((x & 7) + 8 * (y & 7));
 
 	/* Indexed image or utility channel */
 	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
-		newc = mem_col_pat[((x) % 8) + 8*((y) % 8)];
+		newc = mem_col_pat[i];
+		if (mem_channel != CHN_IMAGE)
+			newc = newc == mem_col_A ? channel_col_A[mem_channel] : 0;
 		if (tint_mode[0])
 		{
 			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
-				newc = old_image[offset] > mem_cols - 1 - newc ? mem_cols-1 : old_image[offset] + newc;
+			{
+				j = mem_channel == CHN_IMAGE ? mem_cols - 1 : 255;
+				newc = old_image[offset] > j - newc ? j : old_image[offset] + newc;
+			}
 			else
 				newc = old_image[offset] > newc ? old_image[offset] - newc : 0;
 
@@ -3307,7 +3324,7 @@ void put_pixel( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
-		i = ((x & 7) + 8 * (y & 7)) * 3;
+		i *= 3;
 		nr = mem_col_pat24[i + 0];
 		ng = mem_col_pat24[i + 1];
 		nb = mem_col_pat24[i + 2];

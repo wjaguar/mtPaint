@@ -174,7 +174,8 @@ void clear_file_flags();		// Reset various file flags, e.g. XPM/XBM after new/lo
 
 char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
 void mem_clear();				// Remove old image if any
-int mem_new( int width, int height, int bpp );	// Allocate space for new image, removing old if needed
+//	Allocate space for new image, removing old if needed
+int mem_new( int width, int height, int bpp, int cmask );
 int valid_file( char *filename );		// Can this file be opened for reading?
 void mem_init();				// Initialise memory
 

@@ -495,15 +495,26 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_opacity( int opacity )
 {
-	if ( mem_img_bpp == 3 )
+	if (mem_channel == CHN_MASK) /* Only the two extremes */
 	{
-		mtMIN( tool_opacity, opacity, 255 )
-		mtMAX( tool_opacity, tool_opacity, 0 )
+		opacity -= channel_col_A[CHN_MASK];
+		if (opacity < 0) channel_col_A[mem_channel] = 0;
+		else if (opacity) channel_col_A[mem_channel] = 255;
+	}
+	else if (mem_channel != CHN_IMAGE)
+	{
+		channel_col_A[mem_channel] =
+			opacity < 0 ? 0 : opacity > 255 ? 255 : opacity;
+	}
+	else if (mem_img_bpp == 3)
+	{
+		tool_opacity = opacity < 1 ? 1 : opacity > 255 ? 255 : opacity;
 
 		if ( marq_status >= MARQUEE_PASTE )
 			gtk_widget_queue_draw(drawing_canvas);
 				// Update the paste on the canvas as we have changed the opacity value
 	}
+	else tool_opacity = 255;
 
 	toolbar_update_settings();
 }
@@ -782,37 +793,48 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		}
 		else
 		{
-			i = 0;
-			if ( event->keyval == GDK_Left || event->keyval == GDK_KP_Left )
+			i = 1;
+			switch (event->keyval)
 			{
-				mem_col_B--;
-				i=2;
+			case GDK_Left: case GDK_KP_Left:
+				if (mem_channel != CHN_IMAGE) break;
+				if (mem_col_B) mem_col_B--;
+				break;
+			case GDK_Right: case GDK_KP_Right:
+				if (mem_channel != CHN_IMAGE) break;
+				if (mem_col_B < mem_cols - 1) mem_col_B++;
+				break;
+			case GDK_Down: case GDK_KP_Down:
+				if (mem_channel == CHN_IMAGE)
+				{
+					if (mem_col_A < mem_cols - 1) mem_col_A++;
+					break;
+				}
+				if (channel_col_A[mem_channel] < 255)
+					channel_col_A[mem_channel]++;
+				break;
+			case GDK_Up: case GDK_KP_Up:
+				if (mem_channel == CHN_IMAGE)
+				{
+					if (mem_col_A) mem_col_A--;
+					break;
+				}
+				if (channel_col_A[mem_channel])
+					channel_col_A[mem_channel]--;
+				break;
+			default:
+				i = 0;
+				break;
 			}
-			if ( event->keyval == GDK_Right || event->keyval == GDK_KP_Right )
+			if (i)
 			{
-				mem_col_B++;
-				i=2;
-			}
-			if ( event->keyval == GDK_Down || event->keyval == GDK_KP_Down )
-			{
-				mem_col_A++;
-				i=1;
-			}
-			if ( event->keyval == GDK_Up || event->keyval == GDK_KP_Up )
-			{
-				mem_col_A--;
-				i=1;
-			}
-
-			if ( i>0 )
-			{
-				mtMIN( mem_col_A, mem_col_A, mem_cols-1 )
-				mtMAX( mem_col_A, mem_col_A, 0 )
-				mtMIN( mem_col_B, mem_col_B, mem_cols-1 )
-				mtMAX( mem_col_B, mem_col_B, 0 )
-				if ( i==1 ) mem_col_A24 = mem_pal[mem_col_A];
-				if ( i==2 ) mem_col_B24 = mem_pal[mem_col_B];
-				init_pal();
+				if (mem_channel == CHN_IMAGE)
+				{
+					mem_col_A24 = mem_pal[mem_col_A];
+					mem_col_B24 = mem_pal[mem_col_B];
+					init_pal();
+				}
+				else pressed_opacity(channel_col_A[mem_channel]);
 				return TRUE;
 			}
 		}
@@ -1016,7 +1038,13 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 
 	if ( (state & GDK_CONTROL_MASK) && !(state & GDK_SHIFT_MASK) )		// Set colour A/B
 	{
-		if ( mem_img_bpp == 1 )
+		if (mem_channel != CHN_IMAGE)
+		{
+			pixel = get_pixel( x, y );
+			if ((button == 1) && (channel_col_A[mem_channel] != pixel))
+				pressed_opacity(pixel);
+		}
+		else if (mem_img_bpp == 1)
 		{
 			pixel = get_pixel( x, y );
 			if (button == 1 && mem_col_A != pixel)
@@ -1034,7 +1062,7 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 				update_cols();
 			}
 		}
-		if ( mem_img_bpp == 3 )
+		else
 		{
 			pixel24 = get_pixel24( x, y );
 			if (button == 1 && png_cmp( mem_col_A24, pixel24 ) )
@@ -2474,6 +2502,7 @@ void main_init()
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, CHN_ALPHA, "<CheckItem>" },
 		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, CHN_SEL, "<CheckItem>" },
+		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },

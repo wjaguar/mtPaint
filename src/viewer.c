@@ -1128,7 +1128,7 @@ void init_view( GtkWidget *canvas, GtkWidget *scroll )
 void screen_copy_pixels( unsigned char *rgb, int w, int h )
 {
 	mem_pal_load_def();
-	if (mem_new( w, h, 3 )) return;
+	if (mem_new( w, h, 3, CMASK_IMAGE )) return;
 	memcpy(mem_img[CHN_IMAGE], rgb, w * h * 3);
 }
 
