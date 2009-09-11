@@ -273,7 +273,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 	{
 		if ( pat_brush == 0 )
 		{
-			tool_pat = pat_no;
+			mem_tool_pat = pat_no;
 			mem_pat_update();				// Update memory
 			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
 			if ( marq_status >= MARQUEE_PASTE && text_paste )

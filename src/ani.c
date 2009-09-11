@@ -634,12 +634,12 @@ static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data
 
 	ani_set_frame_state(ADJ2INT(adjustment));
 
-	if ( layer_selected != 0 )
+	if (layer_selected)
 	{
 		x = -layer_table[layer_selected].x;
 		y = -layer_table[layer_selected].y;
-		w = layer_table[0].image->mem_width;
-		h = layer_table[0].image->mem_height;
+		w = layer_table[0].image->image_.width;
+		h = layer_table[0].image->image_.height;
 	}
 
 	vw_update_area(x, y, w, h);	// Update only the area we need
@@ -762,6 +762,8 @@ void wild_space_change( char *in, char *out, int length )
 
 static void create_frames_ani()
 {
+	image_info *image;
+	image_state *state;
 	ls_settings settings;
 	png_color pngpal[256];
 	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256], npt[3];
@@ -812,22 +814,17 @@ static void create_frames_ani()
 
 		// Create output path and pointer for first char of filename
 
-	mtMIN( a, ani_frame1, ani_frame2 )
-	mtMAX( b, ani_frame1, ani_frame2 )
+	a = ani_frame1 < ani_frame2 ? ani_frame1 : ani_frame2;
+	b = ani_frame1 < ani_frame2 ? ani_frame2 : ani_frame1;
 
-	if (layer_selected)
-	{
-		layer_w = layer_table[0].image->mem_width;
-		layer_h = layer_table[0].image->mem_height;
-	}
-	else
-	{
-		layer_w = mem_width;
-		layer_h = mem_height;
-	}
+	if (layer_selected == 0) image = &mem_image , state = &mem_state;
+	else image = &layer_table[0].image->image_ , state = &layer_table[0].image->state_;
+
+	layer_w = image->width;
+	layer_h = image->height;
 	layer_rgb = malloc( layer_w * layer_h * 3);	// Primary layer image for RGB version
 
-	if ( layer_rgb == NULL )
+	if (!layer_rgb)
 	{
 		memory_errors(1);
 		goto failure;
@@ -860,19 +857,9 @@ static void create_frames_ani()
 		settings.img[CHN_IMAGE] = layer_rgb;
 		settings.bpp = 3;
 		/* Background transparency */
-		if (layer_selected)
-		{
-			settings.xpm_trans = layer_table[0].image->mem_xpm_trans;
-			settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
-				PNG_2_INT(layer_table[0].image->
-				mem_pal[settings.xpm_trans]);
-		}
-		else
-		{
-			settings.xpm_trans = mem_xpm_trans;
-			settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
-				PNG_2_INT(mem_pal[settings.xpm_trans]);
-		}
+		settings.xpm_trans = state->xpm_trans;
+		settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
+			PNG_2_INT(image->pal[settings.xpm_trans]);
 	}
 
 	progress_init(_("Creating Animation Frames"), 1);
@@ -916,30 +903,15 @@ static void create_frames_ani()
 				pngpal[i].blue	= newpal[2][i];
 			}
 
-			if ( layer_selected == 0 )
+			trans = state->xpm_trans;
+			if (trans >= 0)		// Background has transparency
 			{
-				trans = mem_xpm_trans;
-				if ( trans >= 0 )
-				{
-					npt[0] = mem_pal[trans].red;
-					npt[1] = mem_pal[trans].green;
-					npt[2] = mem_pal[trans].blue;
-				}
-			}
-			else
-			{
-				trans = layer_table[0].image->mem_xpm_trans;
-				if ( trans >= 0 )
-				{
-					npt[0] = layer_table[0].image->mem_pal[trans].red;
-					npt[1] = layer_table[0].image->mem_pal[trans].green;
-					npt[2] = layer_table[0].image->mem_pal[trans].blue;
-				}
-			}
-			if ( trans >= 0 )	// Background has transparency
-			{			// Does it exist in the composite frame?
+				npt[0] = image->pal[trans].red;
+				npt[1] = image->pal[trans].green;
+				npt[2] = image->pal[trans].blue;
+
 				for ( i=0; i<cols; i++ )
-				{
+				{		// Does it exist in the composite frame?
 					if (	newpal[0][i] == npt[0] &&
 						newpal[1][i] == npt[1] &&
 						newpal[2][i] == npt[2] )

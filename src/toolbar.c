@@ -1236,7 +1236,7 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];
 	}
-	mem_pattern = (unsigned char *)mem_patterns[tool_pat];
+	mem_pattern = (unsigned char *)mem_patterns[mem_tool_pat];
 
 	for (i = 0; i < 8 * 8; i++)
 	{

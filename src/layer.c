@@ -64,39 +64,34 @@ static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
-	if (init_undo(&(lim->undo_), MAX_UNDO))
+	if (init_undo(&lim->image_.undo_, MAX_UNDO))
 	{
 		for (; ; i++)
 		{
 			if (i >= NUM_CHANNELS) return (lim);
 			if (src && !src[i]) continue;
 			if (!(cmask & CMASK_FOR(i))) continue;
-			if (!(lim->mem_img[i] =
+			if (!(lim->image_.img[i] =
 				calloc(1, i == CHN_IMAGE ? j * bpp : j))) break;
 		}
 	}
-	while (--i >= 0) free(lim->mem_img[i]);
-	free(lim->undo_.undo_im);
+	while (--i >= 0) free(lim->image_.img[i]);
+	free(lim->image_.undo_.items);
 	free(lim);
 	return (NULL);
 }
 
 static void repaint_layer(int l)	// Repaint layer in view/main window
 {
+	image_info *image;
 	int lx, ly, lw, lh;
 
 	lx = layer_table[l].x;
 	ly = layer_table[l].y;
-	if ( l != layer_selected )
-	{
-		lw = layer_table[l].image->mem_width;
-		lh = layer_table[l].image->mem_height;
-	}
-	else
-	{
-		lw = mem_width;
-		lh = mem_height;
-	}
+	image = l == layer_selected ? &mem_image :
+		&layer_table[l].image->image_;
+	lw = image->width;
+	lh = image->height;
 	if (layer_selected)
 	{
 		lx -= layer_table[layer_selected].x;
@@ -165,70 +160,16 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 {
 	layer_image *lp = layer_table[l].image;
 
-	memcpy(lp->mem_filename, mem_filename, 256);
-	memcpy(lp->mem_pal, mem_pal, sizeof(mem_pal));
-	memcpy(lp->mem_prot_RGB, mem_prot_RGB, sizeof(mem_prot_RGB));
-	memcpy(lp->mem_prot_mask, mem_prot_mask, sizeof(mem_prot_mask));
-	memcpy(lp->mem_img, mem_img, sizeof(chanlist));
-
-	lp->mem_channel		= mem_channel;
-	lp->mem_img_bpp		= mem_img_bpp;
-	lp->mem_changed		= mem_changed;
-	lp->mem_width		= mem_width;
-	lp->mem_height		= mem_height;
-	lp->mem_ics		= mem_ics;
-	lp->mem_icx		= mem_icx;
-	lp->mem_icy		= mem_icy;
-
-	lp->undo_		= mem_undo;
-
-	lp->mem_cols		= mem_cols;
-	lp->tool_pat		= tool_pat;
-	lp->mem_col_A		= mem_col_A;
-	lp->mem_col_B		= mem_col_B;
-	lp->mem_col_A24		= mem_col_A24;
-	lp->mem_col_B24		= mem_col_B24;
-
-	lp->mem_xpm_trans	= mem_xpm_trans;
-	lp->mem_xbm_hot_x	= mem_xbm_hot_x;
-	lp->mem_xbm_hot_y	= mem_xbm_hot_y;
-
-	lp->mem_prot		= mem_prot;
+	lp->image_ = mem_image;
+	lp->state_ = mem_state;
 }
 
 static void layer_copy_to_main( int l )		// Copy info from layer to main image
 {
 	layer_image *lp = layer_table[l].image;
 
-	memcpy(mem_filename, lp->mem_filename, 256);
-	memcpy(mem_pal, lp->mem_pal, sizeof(mem_pal));
-	memcpy(mem_prot_RGB, lp->mem_prot_RGB, sizeof(mem_prot_RGB));
-	memcpy(mem_prot_mask, lp->mem_prot_mask, sizeof(mem_prot_mask));
-	memcpy(mem_img, lp->mem_img, sizeof(chanlist));
-
-	mem_channel	= lp->mem_channel;
-	mem_img_bpp	= lp->mem_img_bpp;
-	mem_changed	= lp->mem_changed;
-	mem_width	= lp->mem_width;
-	mem_height	= lp->mem_height;
-	mem_ics 	= lp->mem_ics;
-	mem_icx 	= lp->mem_icx;
-	mem_icy 	= lp->mem_icy;
-
-	mem_undo	= lp->undo_;
-
-	mem_cols	= lp->mem_cols;
-	tool_pat	= lp->tool_pat;
-	mem_col_A	= lp->mem_col_A;
-	mem_col_B	= lp->mem_col_B;
-	mem_col_A24	= lp->mem_col_A24;
-	mem_col_B24	= lp->mem_col_B24;
-
-	mem_xpm_trans	= lp->mem_xpm_trans;
-	mem_xbm_hot_x	= lp->mem_xbm_hot_x;
-	mem_xbm_hot_y	= lp->mem_xbm_hot_y;
-
-	mem_prot	= lp->mem_prot;
+	mem_image = lp->image_;
+	mem_state = lp->state_;
 }
 
 static void shift_layer(int val)
@@ -290,7 +231,8 @@ static gint layer_press_lower()
 static void layer_new_chores(int l, int w, int h, int type, int cols,
 	layer_image *lim)
 {
-	int bpp = type, i;
+	undo_item *undo;
+	int bpp = type;
 
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
@@ -311,52 +253,36 @@ static void layer_new_chores(int l, int w, int h, int type, int cols,
 	layer_table[l].visible = TRUE;
 	layer_table[l].use_trans = FALSE;
 
-	mem_pal_copy(lim->mem_pal, mem_pal_def); // Default
+	mem_pal_copy(lim->image_.pal, mem_pal_def); // Default
 	if ( type == 2 )	// Greyscale
 	{
 #ifdef U_GUADALINEX
-		mem_scale_pal(lim->mem_pal, 0, 255,255,255, cols - 1, 0,0,0);
+		mem_scale_pal(lim->image_.pal, 0, 255,255,255, cols - 1, 0,0,0);
 #else
-		mem_scale_pal(lim->mem_pal, 0, 0,0,0, cols - 1, 255,255,255);
+		mem_scale_pal(lim->image_.pal, 0, 0,0,0, cols - 1, 255,255,255);
 #endif
 	}
 
-	sprintf( lim->mem_filename, _("Untitled") );
+	strcpy(lim->state_.filename, _("Untitled"));
 
-	lim->mem_channel = lim->mem_img[mem_channel] ? mem_channel : CHN_IMAGE;
-	lim->mem_img_bpp = bpp;
-	lim->mem_changed = 0;
-	lim->mem_width = w;
-	lim->mem_height = h;
-	lim->mem_ics = 0;
-	lim->mem_icx = 0;
-	lim->mem_icy = 0;
+	undo = lim->image_.undo_.items;
+	memcpy(undo->img, lim->image_.img, sizeof(chanlist));
+	undo->bpp = lim->image_.bpp = bpp;
+	undo->width = lim->image_.width = w;
+	undo->height = lim->image_.height = h;
+	undo->cols = lim->image_.cols = cols;
+	mem_pal_copy(undo->pal, lim->image_.pal);
 
-	memcpy(lim->undo_.undo_im[0].img, lim->mem_img, sizeof(chanlist));
-	lim->undo_.undo_im[0].cols = cols;
-	lim->undo_.undo_im[0].bpp = bpp;
-	lim->undo_.undo_im[0].width = w;
-	lim->undo_.undo_im[0].height = h;
-	mem_pal_copy(lim->undo_.undo_im[0].pal, lim->mem_pal);
+	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
-	lim->mem_cols = cols;
-	lim->tool_pat = 0;
-	lim->mem_col_A = 1;
-	lim->mem_col_B = 0;
-	lim->mem_col_A24 = lim->mem_pal[1];
-	lim->mem_col_B24 = lim->mem_pal[0];
-	for ( i=0; i<256; i++ )
-	{
-		lim->mem_prot_RGB[i] = 0;
-		lim->mem_prot_mask[i] = 0;
-	}
-	lim->mem_prot = 0;
+	lim->state_.col_[0] = 1;
+	lim->state_.col_[1] = 0;
+	lim->state_.col_24[0] = lim->image_.pal[1];
+	lim->state_.col_24[1] = lim->image_.pal[0];
 
-	lim->mem_xpm_trans = -1;
-	lim->mem_xbm_hot_x = -1;
-	lim->mem_xbm_hot_y = -1;
-
-	lim->ani_pos[0].frame = 0;
+	lim->state_.xpm_trans = -1;
+	lim->state_.xbm_hot_x = -1;
+	lim->state_.xbm_hot_y = -1;
 }
 
 static void layer_new_chores2( int l )
@@ -429,7 +355,7 @@ static gint layer_press_new()
 static gint layer_press_duplicate()
 {
 	layer_image *lim;
-	int w = mem_width, h = mem_height, bpp = mem_img_bpp, cols = mem_cols, i, j;
+	int w = mem_width, h = mem_height, bpp = mem_img_bpp, i, j;
 
 	if ( layers_total>=MAX_LAYERS ) return FALSE;
 
@@ -448,34 +374,20 @@ static gint layer_press_duplicate()
 	}
 	layers_total++;
 
-	layer_new_chores( layers_total, w, h, bpp, cols, lim);
-
 	layer_table[layers_total] = layer_table[layer_selected];		// Copy layer info
 	layer_table[layers_total].image = lim;
+	lim->state_ = layer_table[layer_selected].image->state_;
 
-	for ( i=0; i<256; i++ )
-	{
-		layer_table[layers_total].image->mem_pal[i] =
-			layer_table[layer_selected].image->mem_pal[i];
-		layer_table[layers_total].image->mem_prot_RGB[i] =
-			layer_table[layer_selected].image->mem_prot_RGB[i];
-		layer_table[layers_total].image->mem_prot_mask[i] =
-			layer_table[layer_selected].image->mem_prot_mask[i];
-	}
-
+	mem_pal_copy(lim->image_.pal, layer_table[layer_selected].image->image_.pal);
 	j = mem_width * mem_height;
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!mem_img[i]) continue;
-		memcpy(lim->mem_img[i], mem_img[i], j * BPP(i));
+		memcpy(lim->image_.img[i], mem_img[i], j * BPP(i));
 	}
-	sprintf( layer_table[layers_total].image->mem_filename,
-		layer_table[layer_selected].image->mem_filename );
 
-	for ( i=0; i<MAX_POS_SLOTS; i++ )
-		layer_table[layers_total].image->ani_pos[i] =
-			layer_table[layer_selected].image->ani_pos[i];
-				// Copy across position data
+	memcpy(lim->ani_pos, layer_table[layer_selected].image->ani_pos,
+		sizeof(lim->ani_pos));		// Copy across position data
 
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
@@ -491,11 +403,11 @@ end:
 static void layer_delete(int item)
 {
 	layer_image *lp = layer_table[item].image;
-	int i, m = lp->undo_.undo_max;
+	int i, m = lp->image_.undo_.max;
 
 	for (i = 0; i < m; i++)		// Release old UNDO images
-		undo_free_x(lp->undo_.undo_im + i);
-	free(lp->undo_.undo_im);
+		undo_free_x(lp->image_.undo_.items + i);
+	free(lp->image_.undo_.items);
 	free(lp);
 
 	if (item < layers_total)	// If deleted item is not at the end shuffle rest down
@@ -579,8 +491,10 @@ static void layer_show_position()
 
 static gint layer_press_centre()
 {
-	layer_table[layer_selected].x = layer_table[0].image->mem_width / 2 - mem_width / 2;
-	layer_table[layer_selected].y = layer_table[0].image->mem_height / 2 - mem_height / 2;
+	layer_table[layer_selected].x = layer_table[0].image->image_.width / 2 -
+		mem_width / 2;
+	layer_table[layer_selected].y = layer_table[0].image->image_.height / 2 -
+		mem_height / 2;
 	layer_show_position();
 	layers_notify_changed();
 	update_all_views();
@@ -595,8 +509,8 @@ int layers_unsaved_tot()			// Return number of layers with no filenames
 
 	for ( k=0; k<=layers_total; k++ )	// Check each layer for proper filename
 	{
-		if ( k == layer_selected ) t = mem_filename;
-		else t = layer_table[k].image->mem_filename;
+		t = k == layer_selected ? mem_filename :
+			layer_table[k].image->state_.filename;
 
 		if ( strcmp( t, _("Untitled") ) == 0 ) j++;
 	}
@@ -606,20 +520,15 @@ int layers_unsaved_tot()			// Return number of layers with no filenames
 
 int layers_changed_tot()			// Return number of layers with changes
 {
-	int j = 0, k;
+	image_state *state;
+	int j, k;
 
-	for ( k=0; k<=layers_total; k++ )	// Check each layer for mem_changed
+	for (j = k =0; k <= layers_total; k++)	// Check each layer for mem_changed
 	{
-		if ( k == layer_selected )
-		{
-			j = j + mem_changed;
-			if ( strcmp( mem_filename, _("Untitled") ) == 0 ) j++;
-		}
-		else
-		{
-			j = j + layer_table[k].image->mem_changed;
-			if ( strcmp( layer_table[k].image->mem_filename, _("Untitled") ) == 0 ) j++;
-		}
+		state = k == layer_selected ? &mem_state :
+			&layer_table[k].image->state_;
+		j += state->changed;
+		if (!strcmp(state->filename, _("Untitled"))) j++;
 	}
 
 	return j;
@@ -832,19 +741,13 @@ void layer_press_save_composite()		// Create, save, free the composite image
 
 int layer_save_composite(char *fname, ls_settings *settings)
 {
+	image_info *image;
 	unsigned char *layer_rgb;
 	int w, h, res=0;
 
-	if (layer_selected)
-	{
-		w = layer_table[0].image->mem_width;
-		h = layer_table[0].image->mem_height;
-	}
-	else
-	{
-		w = mem_width;
-		h = mem_height;
-	}
+	image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
+	w = image->width;
+	h = image->height;
 	layer_rgb = malloc(w * h * 3);
 	if (layer_rgb)
 	{
@@ -855,10 +758,10 @@ int layer_save_composite(char *fname, ls_settings *settings)
 		settings->bpp = 3;
 		if (layer_selected) /* Set up background transparency */
 		{
-			res = layer_table[0].image->mem_xpm_trans;
+			res = layer_table[0].image->state_.xpm_trans;
 			settings->xpm_trans = res;
 			settings->rgb_trans = res < 0 ? -1 :
-				PNG_2_INT(layer_table[0].image->mem_pal[res]);
+				PNG_2_INT(layer_table[0].image->image_.pal[res]);
 
 		}
 		res = save_image(fname, settings);
@@ -877,8 +780,8 @@ int save_layers( char *file_name )
 
 	strncpy( save_prefix, file_name, 256 );
 	c = strrchr( save_prefix, DIR_SEP );
-	if ( c!=NULL ) c[1]=0;
-	else save_prefix[0]=0;
+	if (c) c[1] = 0;
+	else save_prefix[0] = 0;
 
 		// Try to save text file, return -1 if failure
 	if ((fp = fopen(file_name, "w")) == NULL) goto fail;
@@ -886,14 +789,9 @@ int save_layers( char *file_name )
 	fprintf( fp, "%s\n%i\n%i\n", LAYERS_HEADER, LAYERS_VERSION, layers_total );
 	for ( i=0; i<=layers_total; i++ )
 	{
-		if ( layer_selected == i )
-		{
-			parse_filename( comp_name, save_prefix, mem_filename );
-		}
-		else
-		{
-			parse_filename( comp_name, save_prefix, layer_table[i].image->mem_filename );
-		}
+		c = layer_selected == i ? mem_filename :
+			layer_table[i].image->state_.filename;
+		parse_filename(comp_name, save_prefix, c);
 		fprintf( fp, "%s\n", comp_name );
 
 		fprintf( fp, "%s\n%i\n%i\n%i\n%i\n%i\n%i\n",
@@ -1189,19 +1087,11 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 			layer_table[layer_selected].x = mem_clip_x;
 			layer_table[layer_selected].y = mem_clip_y;
 
-			mem_pal_copy(layer_table[layer_selected].image->mem_pal,
-				layer_table[ol].image->mem_pal);		// Copy palette
+			mem_pal_copy(layer_table[layer_selected].image->image_.pal,
+				layer_table[ol].image->image_.pal);	// Copy palette
 
-			layer_table[layer_selected].image->tool_pat =
-				layer_table[ol].image->tool_pat;
-			layer_table[layer_selected].image->mem_col_A =
-				layer_table[ol].image->mem_col_A;
-			layer_table[layer_selected].image->mem_col_B =
-				layer_table[ol].image->mem_col_B;
-			layer_table[layer_selected].image->mem_col_A24 =
-				layer_table[ol].image->mem_col_A24;
-			layer_table[layer_selected].image->mem_col_B24 =
-				layer_table[ol].image->mem_col_B24;
+			layer_table[layer_selected].image->state_ =
+				layer_table[ol].image->state_;
 
 			layer_copy_to_main( layer_selected );
 			update_main_with_new_layer();
@@ -1273,8 +1163,8 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	}
 	else
 	{
-		lw = layer_table[l].image->mem_width;
-		lh = layer_table[l].image->mem_height;
+		lw = layer_table[l].image->image_.width;
+		lh = layer_table[l].image->image_.height;
 	}
 	layers_notify_changed();
 

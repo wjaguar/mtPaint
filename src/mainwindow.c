@@ -533,9 +533,7 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	init_ls_settings(&settings, NULL);
 	settings.mode = FS_CLIP_FILE;
 	settings.ftype = FT_PNG;
-	settings.img[CHN_IMAGE] = mem_clipboard;
-	settings.img[CHN_ALPHA] = mem_clip_alpha;
-	settings.img[CHN_SEL] = mem_clip_mask;
+	memcpy(settings.img, mem_clip.img, sizeof(chanlist));
 	settings.pal = mem_pal;
 	settings.width = mem_clip_w;
 	settings.height = mem_clip_h;

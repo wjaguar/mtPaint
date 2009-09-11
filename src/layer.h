@@ -32,23 +32,8 @@ typedef struct {
 
 typedef struct
 {
-	char mem_filename[256];
-	chanlist mem_img;
-	int mem_channel;
-	int mem_img_bpp, mem_changed, mem_width, mem_height, mem_ics;
-	float mem_icx, mem_icy;
-
-	undo_stack undo_;
-
-	png_color mem_pal[256];
-	int mem_cols, tool_pat, mem_prot_RGB[256], mem_col_[2];
-	png_color mem_col_24[2];
-
-	int mem_xpm_trans, mem_xbm_hot_x, mem_xbm_hot_y;
-
-	char mem_prot_mask[256];
-	int mem_prot;
-
+	image_info image_;
+	image_state state_;
 	ani_slot ani_pos[MAX_POS_SLOTS];
 } layer_image;				// All as per memory.h definitions
 

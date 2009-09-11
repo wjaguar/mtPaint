@@ -105,12 +105,37 @@ typedef struct {
 } undo_item;
 
 typedef struct {
-	undo_item *undo_im;		// Pointer to undo images + current image being edited
-	int undo_pointer;		// Index of currently used image on canvas/screen
-	int undo_done;			// Undo images that we have behind current image (i.e. possible UNDO)
-	int undo_redo;			// Undo images that we have ahead of current image (i.e. possible REDO)
-	int undo_max;			// Total number of undo slots
+	undo_item *items;	// Pointer to undo images + current image being edited
+	int pointer;		// Index of currently used image on canvas/screen
+	int done;		// Undo images that we have behind current image (i.e. possible UNDO)
+	int redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
+	int max;		// Total number of undo slots
 } undo_stack;
+
+typedef struct {
+	chanlist img;		// Array of pointers to image channels
+	png_color pal[256];	// RGB entries for all 256 palette colours
+	int cols;	// Number of colours in the palette: 1..256 or 0 for no image
+	int bpp;		// Bytes per pixel = 1 or 3
+	int width, height;	// Image geometry
+	undo_stack undo_;	// Image's undo stack
+} image_info;
+
+typedef struct {
+	char filename[256];		// File name of file loaded/saved
+	int channel;			// Current active channel
+	int changed;			// Changed since last load/save flag
+	int ics;			// Has the centre been set by the user?
+	float icx, icy;			// Current centre x,y
+	int tool_pat;			// Tool pattern number
+	int xpm_trans;			// Transparent colour index (-1 if none)
+	int xbm_hot_x, xbm_hot_y;	// Current XBM hot spot
+	char prot_mask[256];		// 256 bytes used for indexed images
+	int prot;			// Number of protected colours in prot_RGB
+	int prot_RGB[256];		// Up to 256 RGB colours protected
+	int col_[2];			// Index for colour A & B
+	png_color col_24[2];		// RGB for colour A & B
+} image_state;
 
 /// GRADIENTS
 
@@ -206,37 +231,62 @@ int smudge_mode;
 
 /// IMAGE
 
-undo_stack mem_undo;
+image_info mem_image;			// Current image
 
-#define mem_undo_im_ mem_undo.undo_im
-#define mem_undo_pointer mem_undo.undo_pointer
-#define mem_undo_done mem_undo.undo_done
-#define mem_undo_redo mem_undo.undo_redo
-#define mem_undo_max mem_undo.undo_max
+#define mem_img		mem_image.img		
+#define mem_pal		mem_image.pal
+#define mem_cols	mem_image.cols
+#define mem_img_bpp	mem_image.bpp
+#define mem_width	mem_image.width
+#define mem_height	mem_image.height
+
+#define mem_undo_im_		mem_image.undo_.items
+#define mem_undo_pointer	mem_image.undo_.pointer
+#define mem_undo_done		mem_image.undo_.done
+#define mem_undo_redo		mem_image.undo_.redo
+#define mem_undo_max		mem_image.undo_.max
 
 #define MAX_UNDO 101			// Maximum number of undo levels + 1
 
-char mem_filename[256];			// File name of file loaded/saved
-chanlist mem_img;			// Array of pointers to image channels
-int mem_channel;			// Current active channel
-int mem_img_bpp;			// Bytes per pixel = 1 or 3
-int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
-int mem_width, mem_height;		// Current image geometry
-float mem_icx, mem_icy;			// Current centre x,y
-int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
+image_info mem_clip;			// Current clipboard
+
+#define mem_clipboard		mem_clip.img[CHN_IMAGE]
+#define mem_clip_alpha		mem_clip.img[CHN_ALPHA]
+#define mem_clip_mask		mem_clip.img[CHN_SEL]
+#define mem_clip_bpp		mem_clip.bpp
+#define mem_clip_w		mem_clip.width
+#define mem_clip_h		mem_clip.height
+
+image_state mem_state;			// Current edit settings
+
+#define mem_filename		mem_state.filename
+#define mem_channel		mem_state.channel
+#define mem_changed		mem_state.changed
+#define mem_icx			mem_state.icx
+#define mem_icy			mem_state.icy
+#define mem_ics			mem_state.ics
+#define mem_tool_pat		mem_state.tool_pat
+#define mem_xpm_trans		mem_state.xpm_trans
+#define mem_xbm_hot_x		mem_state.xbm_hot_x
+#define mem_xbm_hot_y		mem_state.xbm_hot_y
+#define mem_prot_mask		mem_state.prot_mask
+#define mem_prot_RGB		mem_state.prot_RGB
+#define mem_prot		mem_state.prot
+#define mem_col_		mem_state.col_
+#define mem_col_A		mem_state.col_[0]
+#define mem_col_B		mem_state.col_[1]
+#define mem_col_24		mem_state.col_24
+#define mem_col_A24		mem_state.col_24[0]
+#define mem_col_B24		mem_state.col_24[1]
+
+int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
 
 chanlist mem_clip_real_img;		// Unrotated clipboard
 int mem_clip_real_w, mem_clip_real_h;	// mem_clip_real_w=0 => no unrotated clipboard
 
-unsigned char *mem_clipboard;		// Pointer to clipboard data
-unsigned char *mem_clip_mask;		// Pointer to clipboard mask
-unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
 extern unsigned char mem_brushes[];	// Preset brushes image
 int brush_tool_type;			// Last brush tool type
 int mem_brush_list[81][3];		// Preset brushes parameters
-int mem_clip_bpp;			// Bytes per pixel
-int mem_clip_w, mem_clip_h;		// Clipboard geometry
-int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
 int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 
 int mem_preview;			// Preview an RGB change
@@ -261,35 +311,18 @@ unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colo
 
 int tool_type, tool_size, tool_flow;	// Currently selected tool
 int tool_opacity;			// Opacity - 255 = solid
-int tool_pat;				// Tool pattern number
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
 int mem_continuous;			// Area we painting the static shapes continuously?
 
 int mem_brcosa_allow[3];		// BRCOSA RGB
 
-/// FILE
-
-int mem_xpm_trans;			// Current XPM file transparency colour index
-int mem_xbm_hot_x, mem_xbm_hot_y;	// Current XBM hot spot
-
 /// PALETTE
 
-png_color mem_pal[256];			// RGB entries for all 256 palette colours
 png_color mem_pal_def[256];		// Default palette entries for new image
 int mem_pal_def_i;			// Items in default palette
-int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
 extern unsigned char mem_pals[];	// RGB screen memory holding current palette
-char mem_prot_mask[256];		// 256 bytes used for indexed images
-int mem_prot_RGB[256];			// Up to 256 RGB colours protected
-int mem_prot;				// 0..256 : Number of protected colours in mem_prot_RGB
 
-int mem_col_[2];			// Index for colour A & B
-#define mem_col_A mem_col_[0]
-#define mem_col_B mem_col_[1]
-png_color mem_col_24[2];		// RGB for colour A & B
-#define mem_col_A24 mem_col_24[0]
-#define mem_col_B24 mem_col_24[1]
 int mem_background;			// Non paintable area
 int mem_histogram[256];
 

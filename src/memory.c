@@ -68,27 +68,18 @@ int smudge_mode;
 
 /// IMAGE
 
-char mem_filename[256];			// File name of file loaded/saved
-chanlist mem_img;			// Array of pointers to image channels
-int mem_channel = CHN_IMAGE;		// Current active channel
-int mem_img_bpp;			// Bytes per pixel = 1 or 3
-int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
-int mem_width, mem_height;
-float mem_icx = 0.5, mem_icy = 0.5;	// Current centre x,y
-int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
+image_info mem_image;			// Current image
+image_info mem_clip;			// Current clipboard
+image_state mem_state;			// Current edit settings
+
 int mem_background = 180;		// Non paintable area
 
 chanlist mem_clip_real_img;		// Unrotated clipboard
 int mem_clip_real_w, mem_clip_real_h;	// mem_clip_real_w=0 => no unrotated clipboard
 
-unsigned char *mem_clipboard;		// Pointer to clipboard data
-unsigned char *mem_clip_mask;		// Pointer to clipboard mask
-unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
 unsigned char mem_brushes[PATCH_WIDTH * PATCH_HEIGHT * 3];
 					// Preset brushes screen memory
 int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
-int mem_clip_bpp;			// Bytes per pixel
-int mem_clip_w = -1, mem_clip_h = -1;	// Clipboard geometry
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
@@ -104,8 +95,6 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 #define UF_TILED 1
 #define UF_FLAT  2
 #define UF_SIZED 4
-
-undo_stack mem_undo;
 
 int mem_undo_limit = 32;	// Max MB memory allocation limit
 int mem_undo_opacity;		// Use previous image for opacity calculations?
@@ -126,7 +115,6 @@ unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colo
 int tool_type = TOOL_SQUARE;		// Currently selected tool
 int tool_size = 1, tool_flow = 1;
 int tool_opacity = 255;			// Opacity - 255 = solid
-int tool_pat;				// Tool pattern number
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
 int mem_continuous;			// Area we painting the static shapes continuously?
@@ -135,23 +123,11 @@ int mem_brcosa_allow[3];		// BRCOSA RGB
 
 
 
-/// FILE
-
-int mem_xpm_trans = -1;			// Current XPM file transparency colour index
-int mem_xbm_hot_x=-1, mem_xbm_hot_y=-1;	// Current XBM hot spot
-
 /// PALETTE
 
-png_color mem_pal[256];			// RGB entries for all 256 palette colours
-int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
-int mem_col_[2] = { 1, 0 };		// Index for colour A & B
-png_color mem_col_24[2];		// RGB for colour A & B
 unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
 					// RGB screen memory holding current palette
 static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
-char mem_prot_mask[256];		// 256 bytes used for indexed images
-int mem_prot_RGB[256];			// Up to 256 RGB colours protected
-int mem_prot;				// 0..256 : Number of protected colours in mem_prot_RGB
 
 int mem_brush_list[81][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 5, 1 }, { TOOL_SPRAY, 7, 1 }, { TOOL_SPRAY, 9, 2 },
@@ -333,16 +309,15 @@ void init_istate()
 	mem_col_B24 = mem_pal[mem_col_B];
 	memset(channel_col_A, 255, NUM_CHANNELS);
 	memset(channel_col_B, 0, NUM_CHANNELS);
-	tool_pat = 0;
+	mem_tool_pat = 0;
 }
 
 /* Create new undo stack of a given depth */
 int init_undo(undo_stack *ustack, int depth)
 {
-	if (!(ustack->undo_im = calloc(depth, sizeof(undo_item))))
-		return (FALSE);
-	ustack->undo_max = depth;
-	ustack->undo_pointer = ustack->undo_done = ustack->undo_redo = 0;
+	if (!(ustack->items = calloc(depth, sizeof(undo_item)))) return (FALSE);
+	ustack->max = depth;
+	ustack->pointer = ustack->done = ustack->redo = 0;
 	return (TRUE);
 }
 
@@ -1096,8 +1071,8 @@ void mem_undo_forward()			// REDO requested by user
 
 static int mem_undo_size(undo_stack *ustack)
 {
-	undo_item *undo = ustack->undo_im;
-	int i, j, k, l, total, umax = ustack->undo_max;
+	undo_item *undo = ustack->items;
+	int i, j, k, l, total, umax = ustack->max;
 
 	for (i = total = 0; i < umax; i++ , total += (undo++)->size)
 	{
@@ -1148,8 +1123,15 @@ void mem_init()					// Initialise memory
 		}
 	}
 
+	/* Init editor settings */
+	mem_channel = CHN_IMAGE;
+	mem_icx = mem_icy = 0.5;
+	mem_xpm_trans = mem_xbm_hot_x = mem_xbm_hot_y = -1;
+	mem_col_A = 1;
+	mem_col_B = 0;
+
 	/* Set up default undo stack */
-	if (!init_undo(&mem_undo, MAX_UNDO))
+	if (!init_undo(&mem_image.undo_, MAX_UNDO))
 	{
 		memory_errors(1);
 		exit(0);
@@ -1777,7 +1759,7 @@ int mem_pal_cmp( png_color *pal1, png_color *pal2 )	// Count itentical palette e
 
 int mem_used()				// Return the number of bytes used in image + undo
 {
-	return mem_undo_size(&mem_undo);
+	return mem_undo_size(&mem_image.undo_);
 }
 
 int mem_used_layers()		// Return the number of bytes used in image + undo in all layers
@@ -1786,8 +1768,8 @@ int mem_used_layers()		// Return the number of bytes used in image + undo in all
 
 	for (l = 0; l <= layers_total; l++)
 	{
-		total += mem_undo_size(l == layer_selected ? &mem_undo :
-			&(layer_table[l].image->undo_));
+		total += mem_undo_size(l == layer_selected ? &mem_image.undo_ :
+			&(layer_table[l].image->image_.undo_));
 	}
 
 	return total;
@@ -2967,7 +2949,7 @@ void flood_fill(int x, int y, unsigned int target)
 	int i, j, k, lw = (mem_width + 7) >> 3;
 
 	/* Regular fill? */
-	if (!tool_pat && (tool_opacity == 255) && !flood_step &&
+	if (!mem_tool_pat && (tool_opacity == 255) && !flood_step &&
 		(!flood_img || (mem_channel == CHN_IMAGE)))
 	{
 		wjfloodfill(x, y, target, NULL, 0);
@@ -3979,34 +3961,36 @@ static fstep *make_filter(int l0, int l1, int type, int sharp)
 	return (res);
 }
 
-static char *workarea;
-static fstep *hfilter, *vfilter;
+typedef struct {
+	char *workarea;
+	fstep *hfilter, *vfilter;
+} scale_context;
 
-static void clear_scale()
+static void clear_scale(scale_context *ctx)
 {
-	free(workarea);
-	free(hfilter);
-	free(vfilter);
+	free(ctx->workarea);
+	free(ctx->hfilter);
+	free(ctx->vfilter);
 }
 
-static int prepare_scale(int ow, int oh, int nw, int nh, int type, int sharp)
+static int prepare_scale(scale_context *ctx, int ow, int oh, int nw, int nh, int type, int sharp)
 {
-	workarea = NULL;
-	hfilter = vfilter = NULL;
+	ctx->workarea = NULL;
+	ctx->hfilter = ctx->vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
-	workarea = malloc((7 * ow + 1) * sizeof(double));
-	hfilter = make_filter(ow, nw, type, sharp);
-	vfilter = make_filter(oh, nh, type, sharp);
-	if (!workarea || !hfilter || !vfilter)
+	ctx->workarea = malloc((7 * ow + 1) * sizeof(double));
+	ctx->hfilter = make_filter(ow, nw, type, sharp);
+	ctx->vfilter = make_filter(oh, nh, type, sharp);
+	if (!ctx->workarea || !ctx->hfilter || !ctx->vfilter)
 	{
-		clear_scale();
+		clear_scale(ctx);
 		return FALSE;
 	}
 	return TRUE;
 }
 
-static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
-	int nw, int nh, int gcor)
+static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
+	int ow, int oh, int nw, int nh, int gcor)
 {
 	unsigned char *src, *img, *imga;
 	fstep *tmp = NULL, *tmpx, *tmpy, *tmpp;
@@ -4014,11 +3998,11 @@ static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
 	double sum, sum1, sum2, kk, mult;
 	int i, j, cc, bpp, gc, tmask;
 
-	work_area = ALIGNTO(workarea, double);
+	work_area = ALIGNTO(ctx->workarea, double);
 	tmask = new_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] ? CMASK_RGBA : CMASK_NONE;
 
 	/* For each destination line */
-	tmpy = vfilter;
+	tmpy = ctx->vfilter;
 	for (i = 0; i < nh; i++, tmpy++)
 	{
 		/* Process regular channels */
@@ -4051,7 +4035,7 @@ static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
 			/* Scale it horizontally */
 			img = new_img[cc] + i * nw * bpp;
 			sum = sum1 = sum2 = 0.0;
-			for (tmpx = hfilter; ; tmpx++)
+			for (tmpx = ctx->hfilter; ; tmpx++)
 			{
 				if (tmpx->idx >= 0)
 				{
@@ -4134,7 +4118,7 @@ static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
 			/* Scale it horizontally */
 			img = new_img[CHN_IMAGE] + i * nw * 3;
 			imga = new_img[CHN_ALPHA] + i * nw;
-			for (tmpp = tmpx = hfilter; tmpp->idx >= -1; tmpx = tmpp + 1)
+			for (tmpp = tmpx = ctx->hfilter; tmpp->idx >= -1; tmpx = tmpp + 1)
 			{
 				sum = 0.0;
 				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
@@ -4183,11 +4167,12 @@ static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
 		tmpy = tmp;
 	}
 
-	clear_scale();
+	clear_scale(ctx);
 }
 
 int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale image
 {
+	scale_context ctx;
 	chanlist old_img;
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
@@ -4196,19 +4181,20 @@ int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale imag
 	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
 
-	if (!prepare_scale(ow, oh, nw, nh, type, sharp)) return 1;	// Not enough memory
+	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp))
+		return 1;	// Not enough memory
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
 	if (res)
 	{
-		clear_scale();
+		clear_scale(&ctx);
 		return 1;			// Not enough memory
 	}
 
 	progress_init(_("Scaling Image"),0);
 	if (type && (mem_img_bpp == 3))
-		do_scale(old_img, mem_img, ow, oh, nw, nh, gcor);
+		do_scale(&ctx, old_img, mem_img, ow, oh, nw, nh, gcor);
 	else
 	{
 		scalex = (double)ow / (double)nw;

@@ -559,9 +559,9 @@ int vw_focus_on;
 void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
 {
-	png_color *pal;
+	image_info *image;
 	unsigned char *tmp, **img;
-	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp, thid, tdis;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, thid, tdis;
 	int ddx, ddy, mx, mw, my, mh;
 	int pw2 = pw, ph2 = ph, dx = 0, dy = 0;
 	int zoom = 1, scale = 1;
@@ -597,8 +597,8 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 		j = mem_height;
 		if (layers_total && layer_selected)
 		{
-			i = layer_table[0].image->mem_width;
-			j = layer_table[0].image->mem_height;
+			i = layer_table[0].image->image_.width;
+			j = layer_table[0].image->image_.height;
 		}
 		i = ((i - dx + zoom - 1) / zoom) * scale;
 		j = ((j - dy + zoom - 1) / zoom) * scale;
@@ -633,16 +633,10 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 		i = layer_table[ll].x;
 		j = layer_table[ll].y;
 		if (!ll) i = j = 0;
-		if (ll == layer_selected)
-		{
-			ii = i + mem_width;
-			jj = j + mem_height;
-		}
-		else
-		{
-			ii = i + layer_table[ll].image->mem_width;
-			jj = j + layer_table[ll].image->mem_height;
-		}
+		image = ll == layer_selected ? &mem_image :
+			&layer_table[ll].image->image_;
+		ii = i + image->width;
+		jj = j + image->height;
 		if ((i > wx1) || (j > wy1) || (ii <= wx0) || (jj <= wy0))
 			continue;
 		ddx = ddy = mx = my = 0;
@@ -677,19 +671,9 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 			opac = (layer_table[ll].opacity * 255 + 50) / 100;
 			if (layer_table[ll].use_trans) xpm = layer_table[ll].trans;
 		}
-		if (ll == layer_selected)
-		{
-			bpp = mem_img_bpp;
-			pal = mem_pal;
-			img = mem_img;
-		}
-		else
-		{
-			bpp = layer_table[ll].image->mem_img_bpp;
-			pal = layer_table[ll].image->mem_pal;
-			img = layer_table[ll].image->mem_img;
-		}
-		setup_row(xof + mx, mw, czoom, ii - i, xpm, opac, bpp, pal);
+		img = image->img;
+		setup_row(xof + mx, mw, czoom, ii - i, xpm, opac,
+			image->bpp, image->pal);
 		i = (py + my) % scale;
 		if (i < 0) i += scale;
 		mh = mh * zoom + i;
@@ -724,7 +708,7 @@ static guint idle_focus;
 
 void vw_focus_view()						// Focus view window to main window
 {
-	int w, h;
+	int w, h, w0, h0;
 	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
 	GtkAdjustment *hori, *vert;
 
@@ -751,14 +735,14 @@ void vw_focus_view()						// Focus view window to main window
 	/* If we are editing a layer above the background make adjustments */
 	if ((layers_total > 0) && layer_selected)
 	{
+		w0 = layer_table[0].image->image_.width;
+		h0 = layer_table[0].image->image_.height;
 		px = main_h * mem_width + layer_table[layer_selected].x;
 		py = main_v * mem_height + layer_table[layer_selected].y;
-		px = px < 0.0 ? 0.0 : px >= layer_table[0].image->mem_width ?
-			layer_table[0].image->mem_width - 1 : px;
-		py = py < 0.0 ? 0.0 : py >= layer_table[0].image->mem_height ?
-			layer_table[0].image->mem_height - 1 : py;
-		main_h = px / layer_table[0].image->mem_width;
-		main_v = py / layer_table[0].image->mem_height;
+		px = px < 0.0 ? 0.0 : px >= w0 ? w0 - 1 : px;
+		py = py < 0.0 ? 0.0 : py >= h0 ? h0 - 1 : py;
+		main_h = px / w0;
+		main_v = py / h0;
 	}
 
 	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
@@ -838,10 +822,10 @@ void vw_align_size( float new_zoom )
 
 	vw_zoom = new_zoom;
 
-	if ( layers_total>0 && layer_selected!=0 )
+	if (layers_total && layer_selected)
 	{
-		sw = layer_table[0].image->mem_width;
-		sh = layer_table[0].image->mem_height;
+		sw = layer_table[0].image->image_.width;
+		sh = layer_table[0].image->image_.height;
 	}
 
 	if (vw_zoom < 1.0)
@@ -938,6 +922,7 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 
 static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 {
+	image_info *image;
 	unsigned char *rgb, **img;
 	int dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
 	int zoom = 1, scale = 1;
@@ -972,22 +957,13 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 		{
 			lx = layer_table[i].x;
 			ly = layer_table[i].y;
-			if ( i == layer_selected )
-			{
-				lw = mem_width;
-				lh = mem_height;
-				bpp = mem_img_bpp;
-				img = mem_img;
-				pal = mem_pal;
-			}
-			else
-			{
-				lw = layer_table[i].image->mem_width;
-				lh = layer_table[i].image->mem_height;
-				bpp = layer_table[i].image->mem_img_bpp;
-				img = layer_table[i].image->mem_img;
-				pal = layer_table[i].image->mem_pal;
-			}
+			image = i == layer_selected ? &mem_image :
+				&layer_table[i].image->image_;
+			lw = image->width;
+			lh = image->height;
+			bpp = image->bpp;
+			img = image->img;
+			pal = image->pal;
 			rgb = img[CHN_IMAGE];
 
 			/* Is click within layer box? */
