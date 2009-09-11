@@ -50,6 +50,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Alt+S key now opens Selection menu as it should
 	* BUGFIX - Directory for animation frames is created relative to layers file, as it should be
 	* BUGFIX - Saving animation frames in PNG format doesn't cause crash
+	* BUGFIX - When pasting to a new layer it is created untitled, as it should
 
 3.21	2008-6-8
 

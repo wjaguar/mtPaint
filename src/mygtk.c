@@ -652,28 +652,27 @@ void wj_option_realize(GtkWidget *widget, gpointer user_data)
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler)
 {
-	int i;
+	int i, j;
 	GtkWidget *opt, *menu, *item;
+	GtkSignalFunc hdl = handler;
 
-	if (!handler && var)
-	{
-		*(int *)var = idx < cnt ? idx : 0;
-		handler = GTK_SIGNAL_FUNC(wj_option);
-	}
+	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_option);
 	opt = gtk_option_menu_new();
 	menu = gtk_menu_new();
-	for (i = 0; i < cnt; i++)
+	for (i = j = 0; (i != cnt) && names[i]; i++)
 	{
+		if (!names[i][0]) continue;
 		item = gtk_menu_item_new_with_label(names[i]);
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		if (handler) gtk_signal_connect(GTK_OBJECT(item), "activate",
-			handler, var);
+		if (hdl) gtk_signal_connect(GTK_OBJECT(item), "activate", hdl, var);
 		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+		if (i == idx) j = i;
   	}
+	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
 	gtk_widget_show_all(menu);
 	gtk_widget_show(opt); /* !!! Show now - or size won't be set properly */
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), idx);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
 
 	FIX_OPTION_MENU_SIZE(opt);
 
@@ -838,6 +837,21 @@ void destroy_dialog(GtkWidget *window)
 
 // Settings notebook
 
+GtkWidget *plain_book(GtkWidget **pages, int npages)
+{
+	GtkWidget *notebook = gtk_notebook_new();
+	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
+	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
+	while (npages--)
+	{
+		*pages = gtk_vbox_new(FALSE, 0);
+		gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *pages, NULL);
+		pages++;
+	}
+	gtk_widget_show_all(notebook);
+	return (notebook);
+}
+
 static void toggle_book(GtkToggleButton *button, GtkNotebook *book)
 {
 	int i = gtk_toggle_button_get_active(button);
@@ -847,14 +861,11 @@ static void toggle_book(GtkToggleButton *button, GtkNotebook *book)
 GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	GtkWidget **button, char *button_label)
 {
-	GtkWidget *notebook = gtk_notebook_new();
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
-	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
-	*page0 = gtk_vbox_new(FALSE, 0);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page0, NULL);
-	*page1 = gtk_vbox_new(FALSE, 0);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page1, NULL);
-	gtk_widget_show_all(notebook);
+	GtkWidget *notebook, *pages[2];
+
+	notebook = plain_book(pages, 2);
+	*page0 = pages[0];
+	*page1 = pages[1];
 	*button = sig_toggle_button(button_label, FALSE, GTK_NOTEBOOK(notebook),
 		GTK_SIGNAL_FUNC(toggle_book));
 	return (notebook);

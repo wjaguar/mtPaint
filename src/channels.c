@@ -356,7 +356,7 @@ void pressed_channel_edit(int state, int channel)
 void pressed_channel_disable(int state, int channel)
 {
 	channel_dis[channel] = state;
-	update_stuff(UPD_MODE);
+	update_stuff(UPD_RENDER);
 }
 
 int do_threshold(GtkWidget *spin, gpointer fdata)

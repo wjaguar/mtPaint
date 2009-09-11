@@ -172,6 +172,7 @@ void destroy_dialog(GtkWidget *window);
 
 // Settings notebook
 
+GtkWidget *plain_book(GtkWidget **pages, int npages);
 GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	GtkWidget **button, char *button_label);
 

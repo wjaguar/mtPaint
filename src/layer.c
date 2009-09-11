@@ -1009,6 +1009,7 @@ void pressed_paste_layer()
 	}
 
 	update_undo(&lim->image_);
+	set_new_filename(layers_total, "");
 
 	layer_show_new();
 //	pressed_layers();

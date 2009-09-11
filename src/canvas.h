@@ -99,7 +99,7 @@ void fs_setup(GtkWidget *fs, int action_type);
 void file_selector( int action_type );
 void init_pal();			// Initialise palette after loading/palette changes
 void update_cols();
-void set_new_filename( char *fname );
+void set_new_filename(int layer, char *fname);
 
 void main_undo();
 void main_redo();

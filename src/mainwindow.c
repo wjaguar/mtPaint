@@ -3456,6 +3456,7 @@ static void parse_drag( char *txt )
 		{
 			if (!nlayer || layer_add(0, 0, 1, 0, mem_pal_def, 0))
 				nlayer = load_image(fname, FS_LAYER_LOAD, j) == 1;
+			if (nlayer) set_new_filename(layers_total, fname);
 		}
 	}
 	if (!nlayer) layer_delete(layers_total);

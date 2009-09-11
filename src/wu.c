@@ -12,6 +12,8 @@
 
 	I updated the integration code to use mtPaint 3.30 interfaces.
 	Dmitry Groshev, July 2008.
+	And added "diameter weighting" mode.
+	Dmitry Groshev, November 2008.
 */
 
 #include "mygtk.h"
@@ -91,6 +93,20 @@ int *vwt, *vmr, *vmg, *vmb;
 		vmg[ind] += g;
 		vmb[ind] += b;
 		m2[ind] += (float)(table[r]+table[g]+table[b]);
+	}
+
+	if (!quan_sqrt) return;
+	// "Diameter weighting" in action
+	for (i = 0; i < 33 * 33 * 33; i++)
+	{
+		double d;
+		if (!vwt[i]) continue;
+		d = vwt[i];
+		d = (vwt[i] = sqrt(d)) / d;
+		vmr[i] *= d;
+		vmg[i] *= d;
+		vmb[i] *= d;
+		m2[i] *= d;
 	}
 }
 

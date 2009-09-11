@@ -70,6 +70,10 @@ int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
 
+/// QUANTIZATION SETTINGS
+
+int quan_sqrt;	// "Diameter based weighting" - use sqrt of pixel count
+
 /// IMAGE
 
 int mem_undo_depth = DEF_UNDO;		// Current undo depth
@@ -2283,6 +2287,7 @@ int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
 		*tb = bins[i];
 		d = 1.0 / (double)tb->cnt;
 		tb->rc *= d; tb->gc *= d; tb->bc *= d;
+		if (quan_sqrt) tb->cnt = sqrt(tb->cnt);
 		tb++;
 	}
 	maxbins = tb - bins;

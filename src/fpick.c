@@ -325,7 +325,7 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 		txt_name[PATHTXT], txt_size[64], txt_date[64], tmp_txt[64];
 	GdkPixmap *icons[2];
 	GdkBitmap *masks[2];
-	int i, l, len, row;
+	int i, l, len, row, fail;
 
 	icons[1] = gdk_pixmap_create_from_xpm_d(main_window->window, &masks[1],
 		NULL, xpm_open_xpm);
@@ -340,8 +340,25 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 	/* Ensure the invariant */
 	if (!len || (full_name[len - 1] != DIR_SEP))
 		full_name[len++] = DIR_SEP , full_name[len] = 0;
-	dp = opendir(full_name);
-	if (!dp) return FALSE;				// Directory doesn't exist so fail
+	/* Step up the path till a searchable dir is found */
+	fail = 0;
+	while (!(dp = opendir(full_name)))
+	{
+		full_name[len - 1] = 0;
+		cp = strrchr(full_name, DIR_SEP);
+		// Try to go one level up
+		if (cp) len = cp - full_name + 1;
+		// No luck - restart with current dir
+		else if (!fail++)
+                {
+			getcwd(full_name, PATHBUF - 1);
+			len = strlen(full_name);
+			full_name[len++] = DIR_SEP;
+                }
+		// If current dir hasn't helped either, give up
+		else return (FALSE);
+		full_name[len] = 0;
+	}
 
 	strncpy(win->txt_directory, full_name, PATHBUF);
 	fpick_directory_new(win, full_name);		// Register directory in combo

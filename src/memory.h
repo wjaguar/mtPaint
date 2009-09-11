@@ -256,6 +256,10 @@ int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
 
+/// QUANTIZATION SETTINGS
+
+int quan_sqrt;	// "Diameter based weighting" - use sqrt of pixel count
+
 /// IMAGE
 
 #define MIN_UNDO 11	// Number of undo levels + 1

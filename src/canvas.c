@@ -1288,10 +1288,14 @@ int load_pal(char *file_name)			// Load palette file
 }
 
 
-void set_new_filename( char *fname )
+void set_new_filename(int layer, char *fname)
 {
-	strncpy(mem_filename, fname, PATHBUF);
-	update_stuff(UPD_NAME);
+	if (layer == layer_selected)
+	{
+		strncpy(mem_filename, fname, PATHBUF);
+		update_stuff(UPD_NAME);
+	}
+	else strncpy(layer_table[layer].image->state_.filename, fname, PATHBUF);
 }
 
 static int populate_channel(char *filename)
@@ -1373,7 +1377,7 @@ int do_a_load( char *fname )
 	register_file(real_fname);
 	if (ftype != FT_LAYERS1) /* A single image */
 	{
-		set_new_filename(real_fname);
+		set_new_filename(layer_selected, real_fname);
 
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
@@ -1804,7 +1808,7 @@ static void fs_ok(GtkWidget *fs)
 			/* Filename has changed so layers file needs re-saving to be correct */
 			if (strcmp(fname, mem_filename)) layers_notify_changed();
 		}
-		set_new_filename(fname);
+		set_new_filename(layer_selected, fname);
 		update_stuff(UPD_TRANS);
 		break;
 	case FS_PALETTE_LOAD:
