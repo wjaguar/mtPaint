@@ -980,6 +980,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	update_menus();
 }
 
+#ifdef U_API
 int api_copy_rectangle()
 {
 	return copy_clip(TRUE);
@@ -1001,6 +1002,7 @@ int api_copy_polygon()
 
 	return 1;
 }
+#endif
 
 void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {

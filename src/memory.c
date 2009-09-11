@@ -3692,8 +3692,8 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 
 	c2 = cos(rangle);
 	s2 = sin(rangle);
-	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
-	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
+	nw = fabs(ow * c2) + fabs(oh * s2);
+	nh = fabs(oh * c2) + fabs(ow * s2);
 
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 
