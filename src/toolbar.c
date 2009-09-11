@@ -1122,16 +1122,13 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_palette),
 		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
 
-	viewport_palette = gtk_viewport_new (NULL, NULL);
+	drawing_palette = gtk_drawing_area_new();
+	gtk_widget_show(drawing_palette);
+	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH, 64);
+	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolledwindow_palette),
+		drawing_palette);
+	fix_scroll(scrolledwindow_palette);
 
-	gtk_widget_set_usize( viewport_palette, PALETTE_WIDTH, 64 );
-	gtk_widget_show (viewport_palette);
-	gtk_container_add (GTK_CONTAINER (scrolledwindow_palette), viewport_palette);
-
-	drawing_palette = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_palette, PALETTE_WIDTH, 64 );
-	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_palette);
-	gtk_widget_show( drawing_palette );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "expose_event",
 		GTK_SIGNAL_FUNC (expose_palette), GTK_OBJECT(drawing_palette) );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "button_press_event",

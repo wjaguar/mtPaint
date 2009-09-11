@@ -549,14 +549,14 @@ static int vw_mouse_status;
 GtkWidget *vw_drawing;
 int vw_focus_on;
 
-void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
+void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
 {
 	png_color *pal;
 	unsigned char *tmp, **img;
 	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp, thid, tdis;
 	int ddx, ddy, mx, mw, my, mh;
-	int pw2 = pw, ph2 = ph, dx = 0, dy = 0, pw3 = pw * 3;
+	int pw2 = pw, ph2 = ph, dx = 0, dy = 0;
 	int zoom = 1, scale = 1;
 
 	if (czoom < 1.0) zoom = rint(1.0 / czoom);
@@ -582,7 +582,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 		}
 		if (py < 0)
 		{
-			rgb -= py * pw3;
+			rgb -= py * step;
 			ph2 += py;
 			py = 0;
 		}
@@ -662,7 +662,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 			if (jj - 1 >= wy1) mh = ph2 - my;
 			else mh = jj * scale - py - my;
 		}
-		tmp = rgb + (my * pw + mx) * 3;
+		tmp = rgb + my * step + mx * 3;
 		xpm = -1;
 		opac = 255;
 		if (ll)
@@ -686,11 +686,11 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 		i = (py + my) % scale;
 		if (i < 0) i += scale;
 		mh = mh * zoom + i;
-		for (j = -1; i < mh; i += zoom , tmp += pw3)
+		for (j = -1; i < mh; i += zoom , tmp += step)
 		{
 			if (i / scale == j)
 			{
-				memcpy(tmp, tmp - pw3, mw * 3);
+				memcpy(tmp, tmp - step, mw * 3);
 				continue;
 			}
 			j = i / scale;
@@ -709,7 +709,7 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 	/* Control transparency separately */
 	overlay_alpha = opaque_view;
 	/* Always align on background layer */
-	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
+	render_layers(rgb, pw * 3, px, py, pw, ph, czoom, 0, layers_total, 0);
 	overlay_alpha = tmp;
 }
 

@@ -21,6 +21,8 @@
 #include <gtk/gtk.h>
 
 #include "global.h"
+
+#include "mygtk.h"
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"

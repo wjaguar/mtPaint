@@ -195,10 +195,12 @@ void main_init();			// Initialise and display the main window
 void men_item_state( GtkWidget *menu_items[], gboolean state );
 	// Change state of preset menu items
 
+void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx);
+
 void canvas_size(int *w, int *h);	// Get zoomed canvas size
 void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of current image
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
-void repaint_perim();			// Draw perimeter around mouse cursor
+void repaint_perim(rgbcontext *ctx);	// Draw perimeter around mouse cursor
 void clear_perim();			// Clear perimeter around mouse cursor
 void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 	int bpp, png_color *pal);
@@ -206,7 +208,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img);
 void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img);
-void repaint_paste( int px1, int py1, int px2, int py2 );
+void repaint_paste(int px1, int py1, int px2, int py2, rgbcontext *ctx);
 void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph );
 
 void stop_line();

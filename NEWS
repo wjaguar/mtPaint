@@ -17,9 +17,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* JPEG2000 file format save/load added
 	* Max-min quantizer added - creates small palettes with higher saturation and contrast
 	* Full error precision toggle added to settings page of 'Convert To Indexed' window
+	* Eliminated flicker when scrolling canvas in GTK+1 and GTK+2/Windows
 	* Lanczos3 rescaling filter removed due to unfavourable results
 
-3.11	2007-?-?
+3.11	2007-4-2
 
 	* Slovak translation added by Jozef Riha
 	* French translation updated by Sylvain Cresto

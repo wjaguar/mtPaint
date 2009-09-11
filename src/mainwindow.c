@@ -1718,7 +1718,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		perim_x = x - (tool_size >> 1);
 		perim_y = y - (tool_size >> 1);
 		perim_s = tool_size;
-		repaint_perim();			// Repaint 4 sides
+		repaint_perim(NULL);			// Repaint 4 sides
 	}
 
 ///	LINE UPDATES
@@ -1842,7 +1842,6 @@ void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int
 		xwid -= step;
 	}
 	else ii0 = wid--;
-	fwid *= 3;
 
 	for (j = 0; ; jj += step)
 	{
@@ -2219,14 +2218,14 @@ op_s:
 	}
 }
 
-void repaint_paste( int px1, int py1, int px2, int py2 )
+void repaint_paste(int px1, int py1, int px2, int py2, rgbcontext *ctx)
 {
 	chanlist tlist;
-	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0;
+	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0, *wrk = NULL;
 	unsigned char *clip_alpha, *clip_image, *t_alpha = NULL;
-	int i, j, l, pw, ph, pw3, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
+	int i, j, l, pw, ph, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
 	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
-
+	int step;
 
 	if ((px1 > px2) || (py1 > py2)) return;
 
@@ -2248,9 +2247,25 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	pw = px2 - px1 + 1; ph = py2 - py1 + 1;
 	if ((pw <= 0) || (ph <= 0)) return;
 
-	rgb = malloc(i = pw * ph * 3);
-	if (!rgb) return;
-	memset(rgb, mem_background, i);
+	if (ctx) /* Render directly into context */
+	{
+		rgb = ctx->rgb;
+		step = (ctx->x1 - ctx->x0) * 3;
+		/* Guaranteed to be in bounds */
+		i = px1 + margin_main_x;
+		j = py1 + margin_main_y;
+		if (i > ctx->x0) rgb += (i - ctx->x0) * 3;
+		if (j > ctx->y0) rgb += (j - ctx->y0) * step;
+		for (j = 0 , tmp = rgb; j < ph; j++ , tmp += step)
+			memset(tmp, mem_background, pw * 3);
+	}
+	else /* Allocate a buffer */
+	{
+		rgb = wrk = malloc(i = pw * ph * 3);
+		if (!wrk) return;
+		step = pw * 3;
+		memset(rgb, mem_background, i);
+	}
 
 	/* Horizontal zoom */
 	if (scale == 1)
@@ -2269,7 +2284,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	pix = malloc(i);
 	if (!pix)
 	{
-		free(rgb);
+		free(wrk);
 		return;
 	}
 	alpha = pix + l * bpp;
@@ -2288,7 +2303,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 			if (!t_alpha)
 			{
 				free(pix);
-				free(rgb);
+				free(wrk);
 				return;
 			}
 			memset(t_alpha, channel_col_A[CHN_ALPHA], l);
@@ -2331,18 +2346,18 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 				layer_table[layer_selected].trans : -1;
 			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
 		}
-		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom, 0,
-			layer_selected - 1, 1);
+		render_layers(rgb, step, lx + px1, ly + py1, pw, ph,
+			can_zoom, 0, layer_selected - 1, 1);
 	}
 	else
 	{
 		async_bk = !chequers_optimize; /* Only w/o layers */
-		render_background(rgb, px1, py1, pw, ph, pw);
+		render_background(rgb, px1, py1, pw, ph, step);
 	}
 
 	setup_row(px1, pw, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
-	j0 = -1; tmp = rgb; pw3 = pw * 3;
-	for (jj = 0; jj < ph; jj++ , tmp += pw3)
+	j0 = -1; tmp = rgb;
+	for (jj = 0; jj < ph; jj++ , tmp += step)
 	{
 		j = ((py1 + jj) * zoom) / scale;
 		if (j != j0)
@@ -2371,7 +2386,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		}
 		else if (!async_bk)
 		{
-			memcpy(tmp, tmp - pw3, pw3);
+			memcpy(tmp, tmp - step, pw * 3);
 			continue;
 		}
 		render_row(tmp, mem_img, dx, j, tlist);
@@ -2379,14 +2394,16 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	}
 
 	if (layers_total && show_layers_main)
-		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom,
-			layer_selected + 1, layers_total, 1);
+		render_layers(rgb, step, lx + px1, ly + py1, pw, ph,
+			can_zoom, layer_selected + 1, layers_total, 1);
 
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-			margin_main_x + px1, margin_main_y + py1,
-			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw3);
+	/* Image already in place if using context */
+	if (!ctx) gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		margin_main_x + px1, margin_main_y + py1, pw, ph,
+		GDK_RGB_DITHER_NONE, rgb, step);
+
 	free(pix);
-	free(rgb);
+	free(wrk);
 	free(t_alpha);
 	async_bk = FALSE;
 }
@@ -2519,7 +2536,7 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
 		}
 	}
-	else if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw);
+	else if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw * 3);
 
 	dx = (px2 * zoom) / scale;
 	memset(tlist, 0, sizeof(chanlist));
@@ -2626,13 +2643,40 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)
 	}
 }
 
+/* Redirectable RGB blitting */
+void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx)
+{
+	if (!ctx) gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		x, y, w, h, GDK_RGB_DITHER_NONE, rgb, step);
+	else
+	{
+		unsigned char *dest;
+		int l;
+
+		w += x; h += y;
+		if ((x >= ctx->x1) || (y >= ctx->y1) ||
+			(w <= ctx->x0) || (h <= ctx->y0)) return;
+		if (x < ctx->x0) rgb += 3 * (ctx->x0 - x) , x = ctx->x0;
+		if (y < ctx->y0) rgb += step * (ctx->y0 - y) , y = ctx->y0;
+		if (w > ctx->x1) w = ctx->x1;
+		if (h > ctx->y1) h = ctx->y1;
+		w = (w - x) * 3;
+		l = (ctx->x1 - ctx->x0) * 3;
+		dest = ctx->rgb + (y - ctx->y0) * l + (x - ctx->x0) * 3;
+		for (h -= y; h; h--)
+		{
+			memcpy(dest, rgb, w);
+			dest += l; rgb += step;
+		}
+	}
+}
+
 void repaint_canvas( int px, int py, int pw, int ph )
 {
+	rgbcontext ctx;
 	unsigned char *rgb;
 	int pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
 	int i, j, zoom = 1, scale = 1;
-
-	if (zoom_flag == 1) return;		// Stops excess jerking in GTK+1 when zooming
 
 	if (px < 0)
 	{
@@ -2647,6 +2691,10 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	rgb = malloc(i = pw * ph * 3);
 	if (!rgb) return;
 	memset(rgb, mem_background, i);
+
+	/* Init context */
+	ctx.x0 = px; ctx.y0 = py; ctx.x1 = px + pw; ctx.y1 = py + ph;
+	ctx.rgb = rgb;
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
@@ -2675,46 +2723,20 @@ void repaint_canvas( int px, int py, int pw, int ph )
 				ly *= scale;
 			}
 		}
-		render_layers(rgb, rpx + lx, rpy + ly,
-			pw, ph, can_zoom, 0, layer_selected - 1, 1);
+		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
+			can_zoom, 0, layer_selected - 1, 1);
 	}
 	else async_bk = !chequers_optimize; /* Only w/o layers */
 	main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
-		render_layers(rgb, rpx + lx, rpy + ly,
-			pw, ph, can_zoom, layer_selected + 1, layers_total, 1);
+		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
+			can_zoom, layer_selected + 1, layers_total, 1);
 
 	draw_grid(rgb, px, py, pw, ph);
 
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
-
-	free(rgb);
 	async_bk = FALSE;
 
-	/* Add clipboard image to redraw if needed */
-	if (show_paste && (marq_status >= MARQUEE_PASTE))
-	{
-		/* Enforce image bounds */
-		if (rpx < 0) rpx = 0;
-		if (rpy < 0) rpy = 0;
-		i = ((mem_width + zoom - 1) * scale) / zoom;
-		j = ((mem_height + zoom - 1) * scale) / zoom;
-		if (pw2 >= i) pw2 = i - 1;
-		if (ph2 >= j) ph2 = j - 1;
-
-		/* Check paste bounds for intersection, but leave actually
-		 * enforcing them to repaint_paste() */
-		rx1 = (marq_x1 * scale + zoom - 1) / zoom;
-		ry1 = (marq_y1 * scale + zoom - 1) / zoom;
-		rx2 = (marq_x2 * scale) / zoom + scale - 1;
-		ry2 = (marq_y2 * scale) / zoom + scale - 1;
-		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
-			repaint_paste(rpx, rpy, pw2, ph2);
-	}
-
-	/* Draw perimeter/marquee/gradient as we may have drawn over them */
-/* !!! All other over-the-image things have to be redrawn here as well !!! */
+	/* Redraw gradient line if needed (and put it underneath cliboard) */
 	while (gradient[mem_channel].status == GRAD_DONE)
 	{
 		grad_info *grad = gradient + mem_channel;
@@ -2751,12 +2773,39 @@ void repaint_canvas( int px, int py, int pw, int ph )
 				((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
 				break;
 		}
-		refresh_grad(px, py, pw, ph);
+		refresh_grad(&ctx);
 		break;
 	}
-	if (marq_status != MARQUEE_NONE)
-		refresh_marquee(px, py, pw, ph);
-	if (perim_status > 0) repaint_perim();
+
+	/* Add clipboard image to redraw if needed */
+	if (show_paste && (marq_status >= MARQUEE_PASTE))
+	{
+		/* Enforce image bounds */
+		if (rpx < 0) rpx = 0;
+		if (rpy < 0) rpy = 0;
+		i = ((mem_width + zoom - 1) * scale) / zoom;
+		j = ((mem_height + zoom - 1) * scale) / zoom;
+		if (pw2 >= i) pw2 = i - 1;
+		if (ph2 >= j) ph2 = j - 1;
+
+		/* Check paste bounds for intersection, but leave actually
+		 * enforcing them to repaint_paste() */
+		rx1 = (marq_x1 * scale + zoom - 1) / zoom;
+		ry1 = (marq_y1 * scale + zoom - 1) / zoom;
+		rx2 = (marq_x2 * scale) / zoom + scale - 1;
+		ry2 = (marq_y2 * scale) / zoom + scale - 1;
+		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
+			repaint_paste(rpx, rpy, pw2, ph2, &ctx);
+	}
+
+	/* Draw perimeter & marquee as we may have drawn over them */
+/* !!! All other over-the-image things have to be redrawn here as well !!! */
+	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
+	if (perim_status > 0) repaint_perim(&ctx);
+
+	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
+		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
+	free(rgb);
 }
 
 /* Update x,y,w,h area of current image */
@@ -2817,7 +2866,7 @@ void clear_perim()
 	if ( tool_type == TOOL_CLONE ) clear_perim_real(clone_x, clone_y);
 }
 
-void repaint_perim_real( int r, int g, int b, int ox, int oy )
+void repaint_perim_real(int r, int g, int b, int ox, int oy, rgbcontext *ctx)
 {
 	int i, j, w, h, x0, y0, x1, y1, zoom = 1, scale = 1;
 	unsigned char *rgb;
@@ -2844,25 +2893,21 @@ void repaint_perim_real( int r, int g, int b, int ox, int oy )
 		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
 	}
 
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		x0, y0, 1, h, GDK_RGB_DITHER_NONE, rgb, 3);
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		x1, y0, 1, h, GDK_RGB_DITHER_NONE, rgb, 3);
+	draw_rgb(x0, y0, 1, h, rgb, 3, ctx);
+	draw_rgb(x1, y0, 1, h, rgb, 3, ctx);
 
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		x0 + 1, y0, w - 2, 1, GDK_RGB_DITHER_NONE, rgb, 0);
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		x0 + 1, y1, w - 2, 1, GDK_RGB_DITHER_NONE, rgb, 0);
+	draw_rgb(x0 + 1, y0, w - 2, 1, rgb, 0, ctx);
+	draw_rgb(x0 + 1, y1, w - 2, 1, rgb, 0, ctx);
 	free(rgb);
 }
 
-void repaint_perim()
+void repaint_perim(rgbcontext *ctx)
 {
 	/* Don't bother if tool has no perimeter */
 	if (NO_PERIM(tool_type)) return;
-	repaint_perim_real( 255, 255, 255, 0, 0 );
+	repaint_perim_real(255, 255, 255, 0, 0, ctx);
 	if ( tool_type == TOOL_CLONE )
-		repaint_perim_real( 255, 0, 0, clone_x, clone_y );
+		repaint_perim_real(255, 0, 0, clone_x, clone_y, ctx);
 	perim_status = 1; /* Drawn */
 }
 
@@ -2965,9 +3010,13 @@ void force_main_configure()
 	if (view_showing && vw_drawing) vw_configure(vw_drawing, NULL);
 }
 
-static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
+static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
 {
 	int px, py, pw, ph;
+
+	/* Stops excess jerking in GTK+1 when zooming */
+	if (zoom_flag) return (TRUE);
 
 	px = event->area.x;		// Only repaint if we need to
 	py = event->area.y;
@@ -2977,7 +3026,7 @@ static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
 	repaint_canvas( px, py, pw, ph );
 	paint_poly_marquee();
 
-	return FALSE;
+	return (TRUE);
 }
 
 void pressed_choose_patterns( GtkMenuItem *menu_item, gpointer user_data )
@@ -3663,6 +3712,7 @@ void main_init()
 	gtk_widget_set_usize( vw_drawing, 1, 1 );
 	gtk_widget_show( vw_drawing );
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(vw_scrolledwindow), vw_drawing);
+	fix_scroll(vw_scrolledwindow);
 
 	init_view();
 
@@ -3694,6 +3744,7 @@ void main_init()
 
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow_canvas),
 		drawing_canvas);
+	fix_scroll(scrolledwindow_canvas);
 
 	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "configure_event",
 		GTK_SIGNAL_FUNC (configure_canvas), NULL );

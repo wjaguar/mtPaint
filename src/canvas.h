@@ -109,7 +109,7 @@ void update_menus();					// Update undo/edit menu
 int close_to( int x1, int y1 );
 
 void paint_marquee(int action, int new_x, int new_y);	// Draw/clear marquee
-void refresh_marquee(int px, int py, int pw, int ph);	// Refresh a part of marquee
+void refresh_marquee(rgbcontext *ctx);			// Refresh a part of marquee
 void paint_poly_marquee();				// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
 
@@ -162,10 +162,10 @@ void commit_paste(int *update);
 void canvas_undo_chores();
 
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
-	int vx1, int vy1, int vx2, int vy2);
+	int vx1, int vy1, int vx2, int vy2, rgbcontext *ctx);
 void repaint_line(int mode);			// Repaint or clear line on canvas
 void repaint_grad(int mode);			// Same for gradient line
-void refresh_grad(int px, int py, int pw, int ph);	// Refresh a part of gradient line
+void refresh_grad(rgbcontext *ctx);		// Refresh a part of gradient line
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
 

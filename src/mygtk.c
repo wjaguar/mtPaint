@@ -869,6 +869,36 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
 }
 
+// Eliminate flicker when scrolling
+
+/* This code serves a very important role - it disables background clear,
+ * completely eliminating the annoying flicker when scrolling the canvas
+ * in GTK+1 and GTK+2/Windows, and lessening CPU load in GTK+2/Linux.
+ * The trick was discovered by Mark Tyler while developing MTK.
+ * It also disables double buffering in GTK+2, because when rendering is
+ * done properly, it is useless and just wastes considerable time. - WJ */
+
+static void realize_trick(GtkWidget *widget, gpointer user_data)
+{
+	gdk_window_set_back_pixmap(widget->window, NULL, FALSE);
+}
+
+void fix_scroll(GtkWidget *scroll)
+{
+	scroll = GTK_BIN(scroll)->child;
+	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+		GTK_SIGNAL_FUNC(realize_trick), NULL);
+#if GTK_MAJOR_VERSION == 2
+	gtk_widget_set_double_buffered(scroll, FALSE);
+#endif
+	scroll = GTK_BIN(scroll)->child;
+	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+		GTK_SIGNAL_FUNC(realize_trick), NULL);
+#if GTK_MAJOR_VERSION == 2
+	gtk_widget_set_double_buffered(scroll, FALSE);
+#endif
+}
+
 // Whatever is needed to move mouse pointer 
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */

@@ -23,6 +23,13 @@
 #include <string.h>
 #include <math.h>
 
+///	Generic RGB buffer
+
+typedef struct {
+	int x0, y0, x1, y1;
+	unsigned char *rgb;
+} rgbcontext;
+
 ///	Generic Widget Primitives
 
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
@@ -158,6 +165,10 @@ GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
 void win_store_pos(GtkWidget *window, char *inikey);
 void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	int defw, int defh);
+
+// Eliminate flicker when scrolling
+
+void fix_scroll(GtkWidget *scroll);
 
 // Moving mouse cursor
 

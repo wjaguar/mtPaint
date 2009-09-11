@@ -64,8 +64,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 #ifdef U_JP2
-	{ "JPEG2000", "jp2", "", FF_RGB | FF_COMPJ2 },
-	{ "J2K", "j2k", "", FF_RGB | FF_COMPJ2 },
+	{ "JPEG2000", "jp2", "", FF_RGB | FF_ALPHA | FF_COMPJ2 },
+	{ "J2K", "j2k", "", FF_RGB | FF_ALPHA | FF_COMPJ2 },
 #else
 	{ "", "", "", 0},
 	{ "", "", "", 0},

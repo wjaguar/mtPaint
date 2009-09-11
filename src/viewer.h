@@ -45,8 +45,8 @@ void vw_repaint( int px, int py, int pw, int ph );
 void vw_update_area( int x, int y, int w, int h );		// Update x,y,w,h area of current image
 void vw_focus_view();						// Focus view window to main window
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom );
-void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
-	double czoom, int lr0, int lr1, int align );
+void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
+	double czoom, int lr0, int lr1, int align);
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event );
 gboolean grab_screen();

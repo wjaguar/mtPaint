@@ -2631,7 +2631,8 @@ static void repaint_clipped(int x0, int y0, int x1, int y1, const int *vxy)
 			rxy[2] - rxy[0], rxy[3] - rxy[1]);
 }
 
-static void trace_marquee(int action, int new_x, int new_y, const int *vxy)
+static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
+	rgbcontext *ctx)
 {
 	unsigned char *rgb;
 	int x1, y1, x2, y2, w, h, new_x2, new_y2, mst, zoom = 1, scale = 1;
@@ -2657,7 +2658,7 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy)
 	if (y2 < y1) y1 = y2;
 	x2 = x1 + w; y2 = y1 + h;
 
-	if (action == 0) /* Clear */
+	if (action == 0) /* Clear (always in void context) */
 	{
 		mst = marq_status;
 		marq_status = 0;
@@ -2709,19 +2710,19 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy)
 	}
 
 	/* Draw */
-	else if ((action == 1) || (action == 11))
+	else /* if (action == 1) */
 	{
 		r = 255; g = b = 0; /* Draw in red */
 		if (marq_status >= MARQUEE_PASTE)
 		{
 			/* Display paste RGB, only if not being called from repaint_canvas */
 			/* Only do something if there is a change in position */
-			if (show_paste && (action == 1) &&
+			if (show_paste && !ctx &&
 				((new_x != marq_x1) || (new_y != marq_y1)) &&
 				clip(rxy, marq_x1 < 0 ? 0 : x1 + 1,
 					marq_y1 < 0 ? 0 : y1 + 1,
 					x2 - 1, y2 - 1, vxy))
-				repaint_paste(rxy[0], rxy[1], rxy[2] - 1, rxy[3] - 1);
+				repaint_paste(rxy[0], rxy[1], rxy[2] - 1, rxy[3] - 1, NULL);
 			r = g = 0; b = 255; /* Draw in blue */
 		}
 
@@ -2745,32 +2746,20 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy)
 		}
 
 		if ((x1 >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
-			gdk_draw_rgb_image(drawing_canvas->window,
-				drawing_canvas->style->black_gc,
-				margin_main_x + rxy[0], margin_main_y + rxy[1],
-				1, rxy[3] - rxy[1], GDK_RGB_DITHER_NONE,
-				rgb + offy, 3);
+			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
+				1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
 
 		if ((x2 <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
-			gdk_draw_rgb_image(drawing_canvas->window,
-				drawing_canvas->style->black_gc,
-				margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
-				1, rxy[3] - rxy[1], GDK_RGB_DITHER_NONE,
-				rgb + offy, 3);
+			draw_rgb(margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
+				1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
 
 		if ((y1 >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
-			gdk_draw_rgb_image(drawing_canvas->window,
-				drawing_canvas->style->black_gc,
-				margin_main_x + rxy[0], margin_main_y + rxy[1],
-				rxy[2] - rxy[0], 1, GDK_RGB_DITHER_NONE,
-				rgb + offx, 0);
+			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
+				rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
 
 		if ((y2 <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
-			gdk_draw_rgb_image(drawing_canvas->window,
-				drawing_canvas->style->black_gc,
-				margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
-				rxy[2] - rxy[0], 1, GDK_RGB_DITHER_NONE,
-				rgb + offx, 0);
+			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
+				rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
 
 		free(rgb);
 	}
@@ -2785,22 +2774,22 @@ void paint_marquee(int action, int new_x, int new_y)
 	get_visible(vxy);
 	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
 		vxy[2] - margin_main_x + 1, vxy[3] - margin_main_y + 1, cxy))
-		trace_marquee(action, new_x, new_y, vxy);
+		trace_marquee(action, new_x, new_y, vxy, NULL);
 }
 
-void refresh_marquee(int px, int py, int pw, int ph)
+void refresh_marquee(rgbcontext *ctx)
 {
 	int vxy[4], cxy[4];
 
 	cxy[0] = cxy[1] = 0;
 	canvas_size(cxy + 2, cxy + 3);
 	get_visible(vxy);
-	pw += px - 1; ph += py - 1;
-	if (clip(vxy, (px > vxy[0] ? px : vxy[0]) - margin_main_x,
-		(py > vxy[1] ? py : vxy[1]) - margin_main_y,
-		(pw < vxy[2] ? pw : vxy[2]) - margin_main_x + 1,
-		(ph < vxy[3] ? ph : vxy[3]) - margin_main_y + 1, cxy))
-		trace_marquee(11, marq_x1, marq_y1, vxy);
+	++vxy[2]; ++vxy[3];
+	if (clip(vxy, (ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x,
+		(ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y,
+		(ctx->x1 < vxy[2] ? ctx->x1 : vxy[2]) - margin_main_x,
+		(ctx->y1 < vxy[3] ? ctx->y1 : vxy[3]) - margin_main_y, cxy))
+		trace_marquee(1, marq_x1, marq_y1, vxy, ctx);
 }
 
 
@@ -2817,7 +2806,7 @@ static int floor_div(int dd, int dr)
 
 #define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
-	int vx1, int vy1, int vx2, int vy2)
+	int vx1, int vy1, int vx2, int vy2, rgbcontext *ctx)
 {
 	int j, x, y, tx, ty, aw, ah, ax = 0, ay = 0, cf = 0, zoom = 1, scale = 1;
 	unsigned char rgb[MAX_ZOOM * 3], col[3];
@@ -2870,10 +2859,8 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 					rgb[j + 1] = col[1];
 					rgb[j + 2] = col[2];
 				}
-				gdk_draw_rgb_image(drawing_canvas->window,
-					drawing_canvas->style->black_gc,
-					margin_main_x + x, margin_main_y + y,
-					scale, scale, GDK_RGB_DITHER_NONE, rgb, 0);
+				draw_rgb(margin_main_x + x, margin_main_y + y,
+					scale, scale, rgb, 0, ctx);
 				continue;
 			}
 			/* Doing a clear */
@@ -2901,7 +2888,7 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 	get_visible(vxy);
 	trace_line(mode, line_x1, line_y1, line_x2, line_y2,
 // !!! This assumes that if there's clipping, then there aren't margins
-		vxy[0], vxy[1], vxy[2], vxy[3]);
+		vxy[0], vxy[1], vxy[2], vxy[3], NULL);
 }
 
 void repaint_grad(int mode)
@@ -2915,22 +2902,21 @@ void repaint_grad(int mode)
 	get_visible(vxy);
 	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1,
 		vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x, vxy[3] - margin_main_y);
+		vxy[2] - margin_main_x, vxy[3] - margin_main_y, NULL);
 	grad->status = oldgrad;
 }
 
-void refresh_grad(int px, int py, int pw, int ph)
+void refresh_grad(rgbcontext *ctx)
 {
 	grad_info *grad = gradient + mem_channel;
 	int vxy[4];
 
-	pw += px - 1; ph += py - 1;
 	get_visible(vxy);
 	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1,
-		(px > vxy[0] ? px : vxy[0]) - margin_main_x,
-		(py > vxy[1] ? py : vxy[1]) - margin_main_y,
-		(pw < vxy[2] ? pw : vxy[2]) - margin_main_x,
-		(ph < vxy[3] ? ph : vxy[3]) - margin_main_y);
+		(ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x,
+		(ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y,
+		(ctx->x1 <= vxy[2] ? ctx->x1 - 1 : vxy[2]) - margin_main_x,
+		(ctx->y1 <= vxy[3] ? ctx->y1 - 1 : vxy[3]) - margin_main_y, ctx);
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )
