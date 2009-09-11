@@ -35,6 +35,7 @@
 #include "icons.h"
 
 #define FP_DATA_KEY "mtPaint.fp_data"
+#define FP_BACKUP_KEY "mtPaint.fp_backup"
 
 #define FPICK_ICON_UP 0
 #define FPICK_ICON_HOME 1
@@ -69,7 +70,8 @@ typedef struct
 	char		combo_items[FPICK_COMBO_ITEMS][PATHTXT],	// UTF8 in GTK+2
 			/* Must be DIR_SEP terminated at all times */
 			txt_directory[PATHBUF],	// Current directory - Normal C string
-			txt_file[PATHTXT]	// Full filename - Normal C string except on Windows
+			txt_file[PATHTXT],	// Full filename - Normal C string except on Windows
+			txt_mask[PATHTXT]	// Filter mask - UTF8 in GTK+2
 			;
 
 	GtkWidget	*window,			// Main window
@@ -88,6 +90,281 @@ typedef struct
 
 	GList		*combo_list;			// List of combo items
 } fpicker;
+
+static int case_insensitive;
+
+#if GTK_MAJOR_VERSION == 1
+
+#define _GNU_SOURCE
+#include <fnmatch.h>
+#undef _GNU_SOURCE
+#ifndef FNM_CASEFOLD
+#define FNM_CASEFOLD 0
+#endif
+
+#define fpick_fnmatch(mask, str) !fnmatch(mask, str, FNM_PATHNAME | \
+	(case_insensitive ? FNM_CASEFOLD : 0))
+
+#elif (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4) /* GTK+ 2.0/2.2 */
+
+/*
+ * fpick_fnmatch(), get_char() and get_unescaped_char() are based on code
+ * from GTK+ 2.6.7
+ * Copyright (C) 1991, 1992, 1993 Free Software Foundation, Inc.
+ * Modified by the GTK+ Team and others 1997-2000.
+ * Stripped down, converted to UTF-8 and test cases added by Owen Taylor, 2002.
+ *
+ * Adapted for mtPaint by Dmitry Groshev, November 2008.
+ */
+
+#ifdef WIN32
+
+static gunichar get_char(const char **str)
+{
+	gunichar c = g_utf8_get_char(*str);
+	*str = g_utf8_next_char(*str);
+	return (g_unichar_tolower(c));
+}
+
+#define get_unescaped_char(str, was_escaped) get_char(str)
+
+#else
+
+static gunichar get_char(const char **str)
+{
+	gunichar c = g_utf8_get_char(*str);
+	*str = g_utf8_next_char(*str);
+	return (c);
+}
+
+static gunichar get_unescaped_char(const char **str, int *was_escaped)
+{
+	gunichar c = get_char (str);
+	if ((*was_escaped = c == '\\')) c = get_char(str);
+	return (c);
+}
+
+#endif /* !WIN32 */
+
+static int fpick_fnmatch(const char *pattern, const char *string)
+{
+	const char *p = pattern, *n = string;
+
+	while (*p)
+	{
+		const char *last_n = n;
+      		gunichar c = get_char(&p);
+		gunichar nc = get_char(&n);
+
+		switch (c)
+		{
+		case '?': if ((nc == '\0') || (nc == DIR_SEP)) return (FALSE);
+			break;
+		case '*':
+		{
+			const char *last_p;
+
+			while (TRUE)
+			{
+				last_p = p;
+				c = get_char(&p);
+				if (c == '?')
+				{
+					if ((nc == '\0') || (nc == DIR_SEP))
+						return (FALSE);
+					last_n = n;
+					nc = get_char(&n);
+				}
+				else if (c != '*') break;
+	      		}
+
+			/* If the pattern ends with wildcards, we have a
+			 * guaranteed match unless there is a dir separator
+			 * in the remainder of the string. */
+			if (c == '\0') return (!strchr(last_n, DIR_SEP));
+#ifndef WIN32
+			if (c == '\\') c = get_char(&p);
+#endif
+			for (p = last_p; nc != '\0';)
+			{
+/* !!! Can get exponential behaviour here, but I'm too lazy to fix this corner
+ * case just right now - WJ */
+				if (((c == '[') || (c == nc)) &&
+					fpick_fnmatch(p, last_n)) return (TRUE);
+				last_n = n;
+				nc = get_char(&n);
+			}
+			return (FALSE);
+		}
+		case '[':
+		{
+			int not; // Inverted class flag
+			int was_escaped = FALSE;
+
+			if ((nc == '\0') || (nc == DIR_SEP)) return (FALSE);
+			if ((not = ((*p == '!') || (*p == '^')))) p++;
+
+			c = get_unescaped_char(&p, &was_escaped);
+			while (TRUE)
+			{
+				gunichar cstart = c, cend = c;
+
+				/* [ (unterminated) loses.  */
+				if (c == '\0') return (FALSE);
+				c = get_unescaped_char(&p, &was_escaped);
+				if (!was_escaped && (c == '-') && (*p != ']'))
+				{
+					cend = get_unescaped_char(&p, &was_escaped);
+					if (cend == '\0') return (FALSE);
+					c = get_unescaped_char(&p, &was_escaped);
+				}
+				if ((nc >= cstart) && (nc <= cend)) goto matched;
+				if (!was_escaped && (c == ']')) break;
+			}
+			if (!not) return (FALSE);
+			break;
+matched:		if (not) return (FALSE);
+			/* Skip the rest of the [...] that already matched.  */
+			while (was_escaped || (c != ']'))
+			{
+				/* [ (unterminated) loses.  */
+				if (c == '\0') return (FALSE);
+				c = get_unescaped_char(&p, &was_escaped);
+			}
+			break;
+	  	}
+#ifndef WIN32
+		case '\\': c = get_char(&p);
+		/* Fallthrough */
+#endif
+		default: if (c != nc) return (FALSE);
+		}
+	}
+	return (*n == '\0');
+}
+
+#endif
+
+/* !!! The code below manipulates undocumented internals of GtkCList, to work
+ * around its lack of row hiding functionality; thankfully, internals of this
+ * "deprecated and unmaintained" widget are very unlikely to change - WJ */
+
+static void fpick_clist_drop_backup(GtkCList *clist)
+{
+	GtkObject *obj = GTK_OBJECT(clist);
+	GList *backup = gtk_object_get_data(obj, FP_BACKUP_KEY);
+	if (!backup) return;
+	clist->row_list = g_list_concat(clist->row_list, backup);
+	clist->row_list_end = g_list_last(clist->row_list);
+	gtk_object_set_data(obj, FP_BACKUP_KEY, NULL);
+}
+
+static void fpick_clist_clear(GtkCList *clist)
+{
+	fpick_clist_drop_backup(clist);
+	gtk_clist_clear(clist);
+}
+
+static void fpick_clist_select_row(GtkCList *clist, int n)
+{
+	if (n < 0) return;
+	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
+	/* !!! Focus fails to follow selection in browse mode - have to move
+	 * it here; but it means a full redraw is necessary afterwards */
+	clist->focus_row = n;
+}
+
+static void fpick_clist_scroll(GtkCList *clist) // Scroll to selected row
+{
+	gtk_clist_moveto(clist, clist->focus_row, -1, 0.5, 0.5);
+}
+
+static void fpick_clist_repattern(GtkCList *clist, const char *pattern)
+{
+	GtkObject *obj = GTK_OBJECT(clist);
+	GList *tmp, *backup, *cur, *res, *pos = NULL;
+	int n = 0;
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+	GtkFileFilter *filt = gtk_file_filter_new();
+	GtkFileFilterInfo info;
+	gtk_file_filter_add_pattern(filt, pattern);
+	info.contains = GTK_FILE_FILTER_DISPLAY_NAME;
+#endif
+
+	/* Stop updates & redraws */
+	gtk_clist_freeze(clist);
+	/* Get backed-up contents */
+	backup = gtk_object_get_data(obj, FP_BACKUP_KEY);
+	/* Clean selection if any */
+	if (clist->selection)
+	{
+		int n = GPOINTER_TO_INT(clist->selection->data);
+		pos = g_list_nth(clist->row_list, n);
+		gtk_clist_unselect_row(clist, n, -1);
+	}
+	/* Clear list but save its contents */
+	cur = g_list_concat(clist->row_list, backup);
+	clist->row_list = NULL;
+	gtk_clist_clear(clist);
+	/* Filter the contents */
+	backup = res = NULL;
+	while (cur)
+	{
+		GtkCListRow *row = cur->data;
+		char *name = GTK_CELL_TEXT(row->cell[FPICK_CLIST_NAME])->text;
+		GList **lst = &res; /* Add node to output list */
+
+		tmp = cur;
+		cur = cur->next;
+		tmp->prev = NULL;
+		/* Filter files, let directories pass */
+		if (GTK_CELL_TEXT(row->cell[FPICK_CLIST_SIZE])->text[0] && pattern[0] &&
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+			(info.display_name = name , !gtk_file_filter_filter(filt, &info)))
+#else
+			!fpick_fnmatch(pattern, name))
+#endif
+			lst = &backup; /* Add node to backup list */
+		else n++;
+		if ((tmp->next = *lst)) tmp->next->prev = tmp;
+		*lst = tmp;
+	}
+	/* Re-add filtered contents */
+	clist->row_list = res;
+	clist->row_list_end = g_list_last(res);
+	clist->rows = n;
+	gtk_object_set_data(obj, FP_BACKUP_KEY, backup);
+	/* Sort the list */
+	gtk_clist_sort(clist);
+	/* Reselect the previously selected row if possible */
+	n = g_list_position(clist->row_list, pos);
+	if (n < 0) n = 0;
+	fpick_clist_select_row(clist, n); // Avoid "select_row" signal emission
+	/* Let it be redrawn */
+	gtk_clist_thaw(clist);
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+	gtk_object_sink(GTK_OBJECT(filt));
+#endif
+}
+
+static void fpick_sort_files(fpicker *win)
+{
+	GtkCList *clist = GTK_CLIST(win->clist);
+
+	gtk_clist_set_sort_type(clist, win->sort_direction);
+	gtk_clist_set_sort_column(clist, win->sort_column);
+	gtk_clist_sort(clist);
+	/* No selection yet */
+	if (!clist->selection) fpick_clist_select_row(clist, 0);
+	else
+	{
+	/* !!! Evil hack using undocumented widget internals: widget implementor
+	 * forgot to move focus along with selection, so we do it here - WJ */
+		clist->focus_row = GPOINTER_TO_INT(clist->selection->data);
+		if (GTK_WIDGET_HAS_FOCUS(win->clist))
+			gtk_widget_queue_draw(win->clist);
+	}
+}
 
 /* *** A WORD OF WARNING ***
  * Collating string comparison functions consider letter case only *AFTER*
@@ -131,10 +408,6 @@ static char *isort_key(char *src)
 #define strcollcmp g_utf8_collate
 
 #endif
-
-static int case_insensitive;
-
-
 
 static void fpick_cleanse_path(char *txt)		// Clean up null terminated path
 {
@@ -214,12 +487,6 @@ static gint fpick_compare(GtkCList *clist, gconstpointer ptr1, gconstpointer ptr
 	return (d);
 }
 
-static void fpick_sort_files(fpicker *win)
-{
-	gtk_clist_set_sort_type(GTK_CLIST(win->clist), win->sort_direction);
-	gtk_clist_set_sort_column(GTK_CLIST(win->clist), win->sort_column);
-	gtk_clist_sort(GTK_CLIST(win->clist));
-}
 
 static void fpick_column_button(GtkCList *clist, gint column, gpointer user_data)
 {
@@ -248,6 +515,7 @@ static void fpick_column_button(GtkCList *clist, gint column, gpointer user_data
 	fp->sort_direction = direction;
 
 	fpick_sort_files(fp);
+	fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
 }
 
 
@@ -282,6 +550,7 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 	static char *empty_row[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
 		{ "", "", "", "", "", "" }, ws[4] = "C:\\";
 	char *cp, buf[128]; // More than enough for 26 4-char strings
+	GtkCList *clist = GTK_CLIST(fp->clist);
 	GdkPixmap *icon;
 	GdkBitmap *mask;
 	int row;
@@ -291,18 +560,18 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 	GetLogicalDriveStrings(sizeof(buf), buf);
 	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
 		NULL, xpm_open_xpm);
-	gtk_clist_clear(GTK_CLIST(fp->clist));
-	gtk_clist_freeze(GTK_CLIST(fp->clist));
+	gtk_clist_freeze(clist);
+	fpick_clist_clear(clist);
 	for (cp = buf; *cp; cp += strlen(cp) + 1)
 	{
 		ws[0] = toupper(cp[0]);
-		row = gtk_clist_append(GTK_CLIST(fp->clist), empty_row);
-		gtk_clist_set_pixtext(GTK_CLIST(fp->clist), row,
-			FPICK_CLIST_NAME, ws, 4, icon, mask);
+		row = gtk_clist_append(clist, empty_row);
+		gtk_clist_set_pixtext(clist, row, FPICK_CLIST_NAME, ws, 4, icon, mask);
 	}
+	fpick_clist_select_row(clist, 0);
 	fpick_sort_files(fp);
-	gtk_clist_select_row(GTK_CLIST(fp->clist), 0, 0);
-	gtk_clist_thaw(GTK_CLIST(fp->clist));
+	gtk_clist_thaw(clist);
+//	fpick_clist_scroll(clist); // Scroll to selected row
 	gdk_pixmap_unref(icon);
 	gdk_pixmap_unref(mask);
 
@@ -313,16 +582,19 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 
 static const char root_dir[] = { DIR_SEP, 0 };
 
-static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, populate widgets
+/* Scan directory, populate widgets */
+static int fpick_scan_directory(fpicker *win, char *name, int select)
 {
 	static char updir[] = { DIR_SEP, ' ', '.', '.', 0 };
 	static char nothing[] = "";
 	DIR	*dp;
 	struct	dirent *ep;
 	struct	stat buf;
-	char	*cp, *src, *dest, full_name[PATHBUF],
+	char	*cp, *src, *dest, *parent = NULL;
+	char	full_name[PATHBUF],
 		*row_txt[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN],
 		txt_name[PATHTXT], txt_size[64], txt_date[64], tmp_txt[64];
+	GtkCList  *clist = GTK_CLIST(win->clist);
 	GdkPixmap *icons[2];
 	GdkBitmap *masks[2];
 	int i, l, len, row, fail;
@@ -360,11 +632,21 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 		full_name[len] = 0;
 	}
 
+	/* If we're going up the path and want to show from where */
+	if (select && !strncmp(win->txt_directory, full_name, len) &&
+		win->txt_directory[len])
+	{
+		cp = strchr(win->txt_directory + len, DIR_SEP); // Guaranteed
+		parent = win->txt_directory + len;
+		parent = g_strndup(parent, cp - parent);
+	}
+	select = -1;
+
 	strncpy(win->txt_directory, full_name, PATHBUF);
 	fpick_directory_new(win, full_name);		// Register directory in combo
 
-	gtk_clist_clear( GTK_CLIST(win->clist) );	// Empty the list
-	gtk_clist_freeze( GTK_CLIST(win->clist) );
+	gtk_clist_freeze(clist);
+	fpick_clist_clear(clist);	// Empty the list
 
 	if (strcmp(full_name, root_dir)) // Have a parent dir to move to?
 	{
@@ -372,7 +654,7 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 		row_txt[FPICK_CLIST_TYPE] = row_txt[FPICK_CLIST_H_UC] =
 			row_txt[FPICK_CLIST_H_C] = "";
 		txt_size[0] = txt_date[0] = '\0';
-		gtk_clist_append( GTK_CLIST(win->clist), row_txt );
+		gtk_clist_append(clist, row_txt );
 	}
 
 	while ( (ep = readdir(dp)) )
@@ -441,12 +723,14 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 #endif
 		row_txt[FPICK_CLIST_H_UC] = isort_key(txt_name);
 		row_txt[FPICK_CLIST_NAME] = ""; // No use to set name just to reset again
-		row = gtk_clist_append( GTK_CLIST(win->clist), row_txt );
+		row = gtk_clist_append(clist, row_txt );
 		g_free(row_txt[FPICK_CLIST_H_UC]);
 
 		i = !txt_size[0];
-		gtk_clist_set_pixtext(GTK_CLIST(win->clist), row,
-			FPICK_CLIST_NAME, txt_name, 4, icons[i], masks[i]);
+		gtk_clist_set_pixtext(clist, row, FPICK_CLIST_NAME, txt_name, 4,
+			icons[i], masks[i]);
+		/* Remember which row has matching directory name */
+		if (parent && i && !strcmp(ep->d_name, parent)) select = row;
 
 		if (row_txt[FPICK_CLIST_TYPE] != nothing)
 			g_free(row_txt[FPICK_CLIST_TYPE]);
@@ -454,9 +738,14 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 		g_free(row_txt[FPICK_CLIST_H_C]);
 #endif
 	}
-	fpick_sort_files(win);
-	gtk_clist_select_row(GTK_CLIST(win->clist), 0, 0);
-	gtk_clist_thaw( GTK_CLIST(win->clist) );
+	g_free(parent);
+	fpick_clist_select_row(clist, select);
+	/* Apply file mask if present, just sort otherwise */
+	if (!win->txt_mask[0]) fpick_sort_files(win);
+	else fpick_clist_repattern(clist, win->txt_mask);
+	gtk_clist_thaw(clist);
+	fpick_clist_scroll(clist); // Scroll to selected row
+
 	closedir(dp);
 	gdk_pixmap_unref(icons[0]);
 	gdk_pixmap_unref(icons[1]);
@@ -490,7 +779,7 @@ static void fpick_enter_dir_via_list(fpicker *fp, char *name)
 	}
 	else gtkncpy(ndir + l, name, PATHBUF - l);
 	fpick_cleanse_path(ndir);
-	fpick_scan_directory(fp, ndir);	// Enter new directory
+	fpick_scan_directory(fp, ndir, TRUE);	// Enter new directory
 }
 
 static char *get_fname(GtkCList *clist, int row)
@@ -529,25 +818,31 @@ static void fpick_select_row(GtkCList *clist, gint row, gint col,
 	}
 }
 
-static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
+static int fpick_enter_dirname(fpicker *fp, const char *name)
 {
-	fpicker *fp = user_data;
 	char txt[PATHBUF], *ctxt;
 
-	ctxt = (char *)gtk_entry_get_text(GTK_ENTRY(fp->combo_entry));
-	gtkncpy(txt, ctxt, PATHBUF);
+	gtkncpy(txt, name, PATHBUF);
 
 	fpick_cleanse_path(txt); // Path might have been entered manually
 
 	// Only do something if the directory is new
-	if (!strcmp(txt, fp->txt_directory)) return;
+	if (!strcmp(txt, fp->txt_directory)) return (0);
 
-	if (!fpick_scan_directory(fp, txt))
+	if (!fpick_scan_directory(fp, txt, TRUE))
 	{	// Directory doesn't exist so ask user if they want to create it
-		ctxt = g_strdup_printf(_("Could not access directory %s"), ctxt);
+		ctxt = g_strdup_printf(_("Could not access directory %s"), name);
 		alert_box(_("Error"), ctxt, _("OK"), NULL, NULL);
 		g_free(ctxt);
+		return (-1);
 	}
+	return (1);
+}
+
+static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
+{
+	fpicker *fp = user_data;
+	fpick_enter_dirname(fp, gtk_entry_get_text(GTK_ENTRY(fp->combo_entry)));
 }
 
 static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
@@ -623,7 +918,68 @@ static GtkWidget *fpick_toolbar(GtkWidget **wlist)
 	return toolbar;
 }
 
-GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
+static void fpick_wildcard(GtkButton *button, gpointer user_data)
+{
+	fpicker *fp = user_data;
+	char *ctxt, *ds, *nm, *mask = fp->txt_mask;
+
+	if (!fp->allow_files) return; // File entry is hidden anyway
+	ctxt = (char *)gtk_entry_get_text(GTK_ENTRY(fp->file_entry));
+	/* Presume filename if called by user pressing "OK", pattern otherwise */
+	if (button)
+	{
+		/* Filename must have some chars and no wildcards in it */
+		if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return;
+		/* Don't let pattern pass as filename */
+		gtk_signal_emit_stop_by_name(GTK_OBJECT(button), "clicked");
+	}
+
+	/* Do we have directory in here? */
+	ds = strrchr(ctxt, DIR_SEP);
+#ifdef WIN32 /* Allow '/' separator too */
+	if ((nm = strrchr(ds ? ds : ctxt, '/'))) ds = nm;
+#endif
+
+	/* Store filename pattern */
+	nm = ds ? ds + 1 : ctxt;
+	strncpy0(mask, nm, PATHTXT - 1);
+	if (mask[0] && !strchr(mask, '*'))
+	{
+		/* Add a '*' at end if one isn't present in string */
+		int l = strlen(mask);
+		mask[l++] = '*';
+		mask[l] = '\0';
+	}
+
+	while (ds) /* Have directory - enter it */
+	{
+		int res = fpick_enter_dirname(fp,
+			ctxt = g_strndup(ctxt, ds + 1 - ctxt));
+		g_free(ctxt);
+		if (res <= 0) break; // If failed to open a new dir
+		gtk_entry_set_text(GTK_ENTRY(fp->file_entry), nm); // Cut dir off
+		return; // Opened a new dir - skip redisplay
+	}
+
+	/* Torture GtkCList into displaying only files that match pattern */
+	fpick_clist_repattern(GTK_CLIST(fp->clist), mask);
+	fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
+}
+
+/* "Tab completion" for entry field, like in GtkFileSelection */
+static gboolean fpick_entry_key(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	if (event->keyval != GDK_Tab) return (FALSE);
+#if GTK_MAJOR_VERSION == 1
+	/* Return value alone doesn't stop GTK1 from running other handlers */
+	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
+#endif
+	fpick_wildcard(NULL, user_data);
+	return (TRUE);
+}
+
+GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 {
 	static const short col_width[FPICK_CLIST_COLS] = {250, 64, 80, 150};
 	char txt[64], *col_titles[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
@@ -695,11 +1051,14 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	hbox1 = xpack5(vbox1, gtk_hbox_new(FALSE, 0));
 	scrolledwindow1 = xpack5(hbox1, gtk_scrolled_window_new(NULL, NULL));
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scrolledwindow1),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+		GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS);
 	gtk_widget_show_all(hbox1);
 
 	res->clist = gtk_clist_new(FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN);
 	gtk_clist_set_compare_func(GTK_CLIST(res->clist), fpick_compare);
+	gtk_signal_connect(GTK_OBJECT(res->clist), "destroy",
+		GTK_SIGNAL_FUNC(fpick_clist_drop_backup), NULL);
+
 
 	for (i = 0; i < (FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN); i++)
 	{
@@ -752,6 +1111,8 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
 	res->file_entry = xpack5(hbox1, gtk_entry_new_with_max_length(100));
 	gtk_widget_show_all(hbox1);
+	gtk_signal_connect(GTK_OBJECT(res->file_entry), "key_press_event",
+		GTK_SIGNAL_FUNC(fpick_entry_key), res);
 
 	// ------- Buttons -------
 
@@ -761,6 +1122,8 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	gtk_widget_set_usize(res->ok_button, 100, -1);
 //	gtk_widget_add_accelerator (res->ok_button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 //	gtk_widget_add_accelerator (res->ok_button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
+	gtk_signal_connect(GTK_OBJECT(res->ok_button), "clicked",
+		GTK_SIGNAL_FUNC(fpick_wildcard), res);
 
 	res->cancel_button = pack_end5(hbox1, gtk_button_new_with_label(_("Cancel")));
 	gtk_widget_set_usize(res->cancel_button, 100, -1);
@@ -845,7 +1208,7 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 #endif
 
 		// Scan directory, populate boxes if successful
-		if (!fpick_scan_directory(win, txt)) return;
+		if (!fpick_scan_directory(win, txt, FALSE)) return;
 
 #ifndef WIN32 /* Name is in locale encoding on input */
 		name = gtkuncpy(txt, name, PATHTXT);
@@ -956,7 +1319,7 @@ static void fpick_create_newdir(fpicker *fp)
 			alert_box(_("Error"), _("Unable to create directory"),
 				_("OK"), NULL, NULL);
 		}
-		else fpick_scan_directory(fp, fp->txt_directory);
+		else fpick_scan_directory(fp, fp->txt_directory, FALSE);
 	}
 }
 
@@ -983,11 +1346,12 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 		break;
 	case FPICK_ICON_HIDDEN:
 		fp->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-		fpick_scan_directory(fp, fp->txt_directory);
+		fpick_scan_directory(fp, fp->txt_directory, FALSE);
 		break;
 	case FPICK_ICON_CASE:
 		case_insensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 		fpick_sort_files(fp);
+		fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
 		break;
 	}
 }

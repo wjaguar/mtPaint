@@ -43,6 +43,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* "Convert to indexed" PNN and Wu quantizers now have diameter based weighting option
 	* Canvas, view and palette window now do not lose mouse button release events in GTK+1
 	* Makefiles now honor DESTDIR
+	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.8)
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste and gradient previews eliminated
 	* BUGFIX - "Remove All Layers" with layers window closed doesn't cause crash
