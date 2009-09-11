@@ -1593,14 +1593,12 @@ static void fs_save_loc(GdkWindow *window)
 static gboolean fs_destroy(GtkWidget *fs)
 {
 	fs_save_loc(fs->window);
-
-	gtk_window_set_transient_for(GTK_WINDOW(fs), NULL);
-	gtk_widget_destroy(fs);
+	destroy_dialog(fs);
 
 	return FALSE;
 }
 
-static gint fs_ok(GtkWidget *fs)
+static void fs_ok(GtkWidget *fs)
 {
 	ls_settings settings;
 	GtkWidget *xtra, *entry;
@@ -1796,18 +1794,14 @@ static gint fs_ok(GtkWidget *fs)
 	}
 
 	update_menus();
-
-	gtk_window_set_transient_for(GTK_WINDOW(fs), NULL);
-	gtk_widget_destroy(fs);
-
-	return FALSE;
+	destroy_dialog(fs);
+	return;
 redo_name:
 	snprintf(mess, 500, _("Unable to save file: %s"), fname);
 	alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 redo:
 	gtk_widget_show(fs);
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
-	return FALSE;
 }
 
 void fs_setup(GtkWidget *fs, int action_type)

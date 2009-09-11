@@ -1025,104 +1025,65 @@ GtkWidget *sisca_spins[6], *sisca_toggles[2], *sisca_gc;
 gboolean sisca_scale;
 
 
-void sisca_off_lim( int spin, int dim )
+static void sisca_off_lim(int spin)
 {
-	int nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[spin-2]) );
-	int min, max, val;
-	gboolean state = TRUE;
+	int nw = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[spin]));
+	int min = 0, max = 0, val = 0, dim = spin ? mem_height : mem_width;
 	GtkAdjustment *adj;
 
-	if ( sisca_scale ) return;			// Only do this if we are resizing
+	if (sisca_scale) return;			// Only do this if we are resizing
 
-	adj = gtk_spin_button_get_adjustment( GTK_SPIN_BUTTON(sisca_spins[spin]) );
-	val = adj -> value;
-	if ( nw == dim )
+	spin += 2;
+	adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(sisca_spins[spin]));
+	if (nw != dim)
 	{
-		state = FALSE;
-		min = 0;
-		max = 0;
-		val = 0;
+		/* Set min if shrinking, max if expanding */
+		*(nw < dim ? &min : &max) = nw - dim;
+		val = ADJ2INT(adj);
+		val = val < min ? min : val > max ? max : val;
+	}
+
+	adj->lower = min;
+	adj->upper = max;
+	adj->value = val;
+
+	gtk_adjustment_value_changed(adj);
+	gtk_adjustment_changed(adj);
+	gtk_widget_set_sensitive(sisca_spins[spin], nw != dim);
+	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[spin]));
+}
+
+static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
+{
+	int w, h, nw, idx = (int)user_data;
+
+
+	sisca_off_lim(idx);
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])))
+		return;
+	w = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[0]));
+	h = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[1]));
+	if (idx)
+	{
+		nw = rint(h * mem_width / (float)mem_height);
+		nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
+		if (nw == w) return;
 	}
 	else
 	{
-		if ( nw<dim )			// Size is shrinking
-		{
-			max = 0;
-			min = nw - dim;
-		}
-		else					// Size is expanding
-		{
-			max = nw - dim;
-			min = 0;
-		}
+		nw = rint(w * mem_height / (float)mem_width);
+		nw = nw < 1 ? 1 : nw > MAX_HEIGHT ? MAX_HEIGHT : nw;
+		if (nw == h) return;
 	}
-	mtMIN( val, val, max )
-	mtMAX( val, val, min )
-
-	adj -> lower = min;
-	adj -> upper = max;
-	adj -> value = val;
-
-	gtk_adjustment_value_changed( adj );
-	gtk_adjustment_changed( adj );
-	gtk_widget_set_sensitive( sisca_spins[spin], state );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[spin]) );
+	idx ^= 1; /* Other coordinate */
+	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[idx]));
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(sisca_spins[idx]), nw);
+	sisca_off_lim(idx);
 }
 
-void sisca_reset_offset_y()
-{	sisca_off_lim( 3, mem_height ); }
-
-void sisca_reset_offset_x()
-{	sisca_off_lim( 2, mem_width ); }
-
-gint sisca_width_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int nw, nh, oh;
-
-	sisca_reset_offset_x();
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])) )
-	{
-		nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-		oh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
-		nh = mt_round( nw * ((float) mem_height) / ((float) mem_width) );
-		mtMIN( nh, nh, MAX_HEIGHT )
-		mtMAX( nh, nh, 1 )
-		if ( nh != oh )
-		{
-			gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[1]) );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[1]), nh );
-			sisca_reset_offset_y();
-		}
-	}
-
-	return FALSE;
-}
-
-gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int nw, nh, ow;
-
-	sisca_reset_offset_y();
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])) )
-	{
-		ow = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-		nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
-		nw = mt_round( nh * ((float) mem_width) / ((float) mem_height) );
-		mtMIN( nw, nw, MAX_WIDTH )
-		mtMAX( nw, nw, 1 )
-		if ( nw != ow )
-		{
-			gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[0]) );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[0]), nw );
-			sisca_reset_offset_x();
-		}
-	}
-
-	return FALSE;
-}
-
-static int scale_mode = 7;
+static int scale_mode = 6;
 static int resize_mode = 0;
+static int sharper_reduce = FALSE;
 
 static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
@@ -1132,9 +1093,6 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 	nh = read_spin(sisca_spins[1]);
 	if ( nw != mem_width || nh != mem_height )
 	{
-		// Needed in Windows to stop GTK+ lowering the main window below window underneath
-		gtk_window_set_transient_for( GTK_WINDOW(sisca_window), NULL );
-
 		if ( sisca_scale )
 		{
 			if (mem_img_bpp == 3)
@@ -1142,21 +1100,22 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 				scale_type = scale_mode;
 				gcor = gtk_toggle_button_get_active(
 					GTK_TOGGLE_BUTTON(sisca_gc));
+				inifile_set_gboolean("sharperReduce", sharper_reduce);
 			}
-			res = mem_image_scale(nw, nh, scale_type, gcor);
+			res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce);
 		}
 		else 
 		{
-			ox = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[2]) );
-			oy = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[3]) );
+			ox = read_spin(sisca_spins[2]);
+			oy = read_spin(sisca_spins[3]);
 			res = mem_image_resize(nw, nh, ox, oy, resize_mode);
 		}
-		if ( res == 0 )
+		if (!res)
 		{
 			canvas_undo_chores();
-			gtk_widget_destroy(sisca_window);
+			destroy_dialog(sisca_window);
 		}
-		else	memory_errors(res);
+		else memory_errors(res);
 	}
 	else alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
 			_("OK"), NULL, NULL);
@@ -1193,7 +1152,6 @@ void sisca_init( char *title )
 		_("Bicubic edged"),
 		_("Bicubic better"),
 		_("Bicubic sharper"),
-		_("Lanczos3"),
 		_("Blackman-Harris"),
 		NULL
 	};
@@ -1205,6 +1163,7 @@ void sisca_init( char *title )
 	};
 
 	GtkWidget *button_centre, *sisca_vbox, *sisca_hbox;
+	GtkWidget *wvbox, *wvbox2, *notebook, *page0, *page1, *button;
 
 	sisca_window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE );
 
@@ -1227,22 +1186,8 @@ void sisca_init( char *title )
 	sisca_spins[0] = spin_to_table(sisca_table, 2, 1, 5, mem_width, 1, MAX_WIDTH);
 	sisca_spins[1] = spin_to_table(sisca_table, 2, 2, 5, mem_height, 1, MAX_HEIGHT);
 
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[0])->entry ),
-		"value_changed", GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[1])->entry ),
-		"value_changed", GTK_SIGNAL_FUNC(sisca_height_moved), NULL);
-#else
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[0])->entry ),
-		"changed", GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[1])->entry ),
-		"changed", GTK_SIGNAL_FUNC(sisca_height_moved), NULL);
-#endif
-	// Interesting variation between GTK+1/2 here.  I want to update each of the spinbuttons
-	// when either:
-	// i)  Up/down button clicked
-	// ii) Manual changed followed by a tab keypress
-	// MT 19-10-2004
+	spin_connect(sisca_spins[0], GTK_SIGNAL_FUNC(sisca_moved), (gpointer)0);
+	spin_connect(sisca_spins[1], GTK_SIGNAL_FUNC(sisca_moved), (gpointer)1);
 
 	if ( !sisca_scale )
 	{
@@ -1261,11 +1206,11 @@ void sisca_init( char *title )
 	}
 	add_hseparator( sisca_vbox, -2, 10 );
 
-	sisca_toggles[0] = add_a_toggle( _("Fix Aspect Ratio"), sisca_vbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
-		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
+	sisca_toggles[0] = sig_toggle(_("Fix Aspect Ratio"), TRUE, (gpointer)0,
+		GTK_SIGNAL_FUNC(sisca_moved));
 
 	sisca_hbox = sisca_gc = NULL;
+	wvbox = page0 = sisca_vbox;
 
 	/* Resize */
 	if (!sisca_scale)
@@ -1274,27 +1219,48 @@ void sisca_init( char *title )
 	/* RGB rescale */
 	else if (mem_img_bpp == 3)
 	{
-		sisca_gc = add_a_toggle(_("Gamma corrected"), sisca_vbox,
-			inifile_get_gboolean("defaultGamma", FALSE));
+		sisca_hbox = gtk_hbox_new(FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
+		wvbox = gtk_vbox_new(FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(sisca_hbox), wvbox, FALSE, FALSE, 0);
+
+		sisca_gc = sig_toggle(_("Gamma corrected"),
+			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL);
+		gtk_box_pack_end(GTK_BOX(wvbox), sisca_gc, FALSE, FALSE, 0);
+
+		notebook = buttoned_book(&page0, &page1, &button, _("Settings"));
+		gtk_box_pack_start(GTK_BOX(sisca_vbox), notebook, FALSE, FALSE, 0);
+		wvbox2 = gtk_vbox_new(FALSE, 0);
+		gtk_box_pack_end(GTK_BOX(sisca_hbox), wvbox2, FALSE, FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(wvbox2), button, FALSE, FALSE, 0);
+
+		add_hseparator(page1, -2, 10);
+		button = sig_toggle(_("Sharper image reduction"),
+			inifile_get_gboolean("sharperReduce", FALSE),
+			&sharper_reduce, NULL);
+		gtk_box_pack_start(GTK_BOX(page1), button, FALSE, FALSE, 0);
+
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 	}
 
+	gtk_box_pack_start(GTK_BOX(wvbox), sisca_toggles[0], FALSE, FALSE, 0);
+
 	if (sisca_hbox)
 	{
-		add_hseparator(sisca_vbox, -2, 10);
-		gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, TRUE, TRUE, 0);
+		add_hseparator(page0, -2, 10);
+		gtk_box_pack_start(GTK_BOX(page0), sisca_hbox, TRUE, TRUE, 0);
 	}
-	add_hseparator( sisca_vbox, -2, 10 );
+	add_hseparator(page0, -2, 10);
 
 	sisca_hbox = OK_box(5, sisca_window, _("OK"), GTK_SIGNAL_FUNC(click_sisca_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
 	gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, FALSE, FALSE, 0);
 
-	gtk_window_set_transient_for( GTK_WINDOW(sisca_window), GTK_WINDOW(main_window) );
-	gtk_widget_show (sisca_window);
+	gtk_window_set_transient_for(GTK_WINDOW(sisca_window), GTK_WINDOW(main_window));
+	gtk_widget_show_all(sisca_window);
 
-	sisca_reset_offset_x();
-	sisca_reset_offset_y();
+	sisca_off_lim(0);
+	sisca_off_lim(1);
 }
 
 void pressed_scale( GtkMenuItem *menu_item, gpointer user_data )
@@ -2259,12 +2225,6 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	gtk_widget_queue_draw(drawing_col_prev);
 }
 
-static void toggle_quantize(GtkToggleButton *button, GtkNotebook *book)
-{
-	int i = gtk_toggle_button_get_active(button);
-	gtk_notebook_set_page(book, i ? 1 : 0);
-}
-
 static void toggle_selective(GtkWidget *btn, gpointer user_data)
 {
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
@@ -2323,20 +2283,9 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* Notebook */
 
-	notebook = gtk_notebook_new();
+	notebook = buttoned_book(&page0, &page1, &button, _("Settings"));
 	gtk_box_pack_start(GTK_BOX(mainbox), notebook, TRUE, TRUE, 0);
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
-	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
-	page0 = gtk_vbox_new(FALSE, 0);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page0, NULL);
-	page1 = gtk_vbox_new(FALSE, 0);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page1, NULL);
-	button = gtk_toggle_button_new_with_label(_("Settings"));
 	gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "toggled",
-		GTK_SIGNAL_FUNC(toggle_quantize), GTK_NOTEBOOK(notebook));
 
 	/* Main page - Palette frame */
 

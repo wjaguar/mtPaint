@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -3256,8 +3256,40 @@ typedef struct {
 	float k;
 } fstep;
 
+static double Cubic(double x, double A)
+{
+	if (x < -1.5) return (0.0);
+	else if (x < -0.5) return (A * (-1.0 / 8.0) * (((x * 8.0 + 28.0) * x +
+		30.0) * x + 9.0));
+	else if (x < 0.5) return (0.5 * (((-4.0 * A - 4.0) * x * x + A + 3.0) *
+		x + 1.0));
+	else if (x < 1.5) return (A * (-1.0 / 8.0) * (((x * 8.0 - 28.0) * x +
+		30.0) * x - 9.0) + 1.0);
+	else return (1.0);
+}
 
-static fstep *make_filter(int l0, int l1, int type)
+static double BH1(double x)
+{
+	if (x < 1e-7) return (1.0);
+	return ((sin(M_PI * x) / (M_PI * x)) * (0.42323 +
+		0.49755 * cos(x * (M_PI * 2.0 / 6.0)) +
+		0.07922 * cos(x * (M_PI * 4.0 / 6.0))));
+}
+
+static double BH(double x)
+{
+	double y = 0.0, xx = fabs(x);
+
+	if (xx < 2.5)
+	{
+		y = BH1(xx + 0.5);
+		if (xx < 1.5) y += BH1(xx + 1.5);
+		if (xx < 0.5) y += BH1(xx + 2.5);
+	}
+	return (x > 0.0 ? 1.0 - y : y);
+}
+
+static fstep *make_filter(int l0, int l1, int type, int sharp)
 {
 	fstep *res, *buf;
 	double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
@@ -3271,30 +3303,27 @@ static fstep *make_filter(int l0, int l1, int type)
 	/* To correct scale-shift */
 	delta = 0.5 / scale - 0.5;
 
-	if (type == 0) type = -1;
-	if (scale < 1.0)
-	{
-		kk = scale;
-		if (type == 1) type = 0;
-	}
+	/* Untransformed bilinear is useless for reduction */
+	if (type == 1) sharp = TRUE;
+
+	if (scale < 1.0) kk = scale;
+	else sharp = FALSE;
 
 	switch (type)
 	{
-	case 0: fwidth = 1.0 + scale; /* Area-mapping */
-		break;
-	case 1: fwidth = 2.0; /* Bilinear */
+	case 1:	fwidth = 2.0; /* Bilinear / Area-mapping */
 		break;
 	case 2:	case 3: case 4: case 5:	/* Bicubic, all flavors */
 		fwidth = 4.0;
 		A = Aarray[type - 2];
 		break;
-	case 6: case 7:		/* Windowed sinc, all flavors */
-		fwidth = 6.0;
+	case 6:	fwidth = 6.0; /* Blackman-Harris windowed sinc */
 		break;
 	default:	 /* Bug */
 		fwidth = 0.0;
 		break;
 	}
+	if (sharp) fwidth += scale - 1.0;
 	fwidth /= kk;
 
 	i = (int)floor(fwidth) + 2;
@@ -3302,6 +3331,7 @@ static fstep *make_filter(int l0, int l1, int type)
 	if (!res) return (NULL);
 
 	fwidth *= 0.5;
+	type = type * 2 + (sharp ? 1 : 0);
 	for (i = 0; i < l1; i++)
 	{
 		basept = (double)i / scale + delta;
@@ -3329,27 +3359,25 @@ static fstep *make_filter(int l0, int l1, int type)
 			y = 0;
 			switch (type)
 			{
-			case 0: /* Area mapping */
+			case 2: /* Bilinear */
+				y = 1.0 - x;
+				break;
+			case 3: /* Area mapping */
 				if (x <= 0.5 - scale / 2.0) y = 1.0;
 				else y = 0.5 - (x - 0.5) / scale;
 				break;
-			case 1: /* Bilinear */
-				y = 1.0 - x;
-				break;
-			case 2: case 3: case 4: case 5: /* Bicubic */
+			case 4: case 6: case 8: case 10: /* Bicubic */
 				if (x < 1.0) y = ((A + 2.0) * x - (A + 3)) * x * x + 1.0;
 				else y = A * (((x - 5.0) * x + 8.0) * x - 4.0);
 				break;
-			case 6: /* Lanczos3 */
-				if (x < 1e-7) y = 1.0;
-				else y = sin(M_PI * x) * sin((M_PI / 3.0) * x) /
-					((M_PI * M_PI / 3.0) * x * x);
+			case 5: case 7: case 9: case 11: /* Sharpened bicubic */
+				y = Cubic(x + scale * 0.5, A) - Cubic(x - scale * 0.5, A);
 				break;
-			case 7: /* Blackman-Harris */
-				if (x < 1e-7) y = 1.0;
-				else y = (sin(M_PI * x) / (M_PI * x)) * (0.42323 +
-					0.49755 * cos(x * (M_PI * 2.0 / 6.0)) +
-					0.07922 * cos(x * (M_PI * 4.0 / 6.0)));
+			case 12: /* Blackman-Harris */
+				y = BH1(x);
+				break;
+			case 13: /* Sharpened Blackman-Harris */
+				y = BH(x + scale * 0.5) - BH(x - scale * 0.5);
 				break;
 			default: /* Bug */
 				break;
@@ -3393,14 +3421,14 @@ static void clear_scale()
 	free(vfilter);
 }
 
-static int prepare_scale(int ow, int oh, int nw, int nh, int type)
+static int prepare_scale(int ow, int oh, int nw, int nh, int type, int sharp)
 {
 	workarea = NULL;
 	hfilter = vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
 	workarea = malloc((7 * ow + 1) * sizeof(double));
-	hfilter = make_filter(ow, nw, type);
-	vfilter = make_filter(oh, nh, type);
+	hfilter = make_filter(ow, nw, type, sharp);
+	vfilter = make_filter(oh, nh, type, sharp);
 	if (!workarea || !hfilter || !vfilter)
 	{
 		clear_scale();
@@ -3590,19 +3618,17 @@ static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
 	clear_scale();
 }
 
-int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
+int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale image
 {
 	chanlist old_img;
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
 	double scalex, scaley, deltax, deltay;
 
-	mtMIN( nw, nw, MAX_WIDTH )
-	mtMAX( nw, nw, 1 )
-	mtMIN( nh, nh, MAX_HEIGHT )
-	mtMAX( nh, nh, 1 )
+	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
+	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
 
-	if (!prepare_scale(ow, oh, nw, nh, type)) return 1;	// Not enough memory
+	if (!prepare_scale(ow, oh, nw, nh, type, sharp)) return 1;	// Not enough memory
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);

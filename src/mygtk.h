@@ -119,13 +119,23 @@ GtkWidget *wj_pixmap(int width, int height);
 void widget_set_minsize(GtkWidget *widget, int width, int height);
 GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 
-// Signalled toggle
+// Signalled toggles
 
-GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler);
+GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler);
+GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc handler);
 
 // Workaround for GtkCList reordering bug in GTK2
 
 void clist_enable_drag(GtkWidget *clist);
+
+// Properly destroy transient window
+
+void destroy_dialog(GtkWidget *window);
+
+// Settings notebook
+
+GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
+	GtkWidget **button, char *button_label);
 
 // Moving mouse cursor
 

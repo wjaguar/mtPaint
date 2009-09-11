@@ -1,5 +1,5 @@
 /*	shifter.c
-	Copyright (C) 2006 Mark Tyler
+	Copyright (C) 2006-2007 Mark Tyler
 
 	This file is part of mtPaint.
 

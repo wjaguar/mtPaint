@@ -155,10 +155,18 @@ static void update_faction_menu()	// Populate menu
 		gtk_widget_hide(menu_faction[i]); /* Hide by default */
 		sprintf(txt, faction_ini[0], i);
 		nm = inifile_get(txt, "");
-		if (!nm || !nm[0]) continue;
+
+// !!! Temporary - till the bug in inifile loader isn't fixed !!!
+		if (!nm || !nm[0] || (nm[0] == '!')) continue;
+
+//		if (!nm || !nm[0] || (nm[0] == '#')) continue;
 		sprintf(txt, faction_ini[1], i);
 		cm = inifile_get(txt, "");
-		if (!cm || !cm[0] || (cm[0] == '#')) continue;
+
+// !!! Temporary - till the bug in inifile loader isn't fixed !!!
+		if (!cm || !cm[0] || (cm[0] == '!')) continue;
+
+//		if (!cm || !cm[0] || (cm[0] == '#')) continue;
 		gtk_label_set_text(GTK_LABEL(GTK_MENU_ITEM(menu_faction[i])->
 			item.bin.child), nm);
 		gtk_widget_show(menu_faction[i]);
@@ -171,6 +179,7 @@ static void update_faction_menu()	// Populate menu
 
 void init_factions()
 {
+#ifndef WIN32
 	int i, j;
 	static char *row_def[][3] = {
 		{"View EXIF data (leafpad)", "exif %f | leafpad"},
@@ -182,12 +191,12 @@ void init_factions()
 		{"Send image to Firefox", "firefox %f"},
 		{"Send image to OpenOffice", "soffice %f"},
 		{"Edit Clipboards", "mtpaint ~/.clip*"},
-		{"Time delayed screenshot", "sleep 10; mtpaint -s"},
+		{"Time delayed screenshot", "sleep 10; mtpaint -s &"},
 		{"View image information", "xterm -hold -sb -rightbar -geometry 100x100 -e identify -verbose %f"},
-		{"Create temp directory", "mkdir ~/images"},
-		{"Remove temp directory", "rm -rf ~/images"},
-		{"GIF to PNG conversion (in situ)", "mogrify -format png *.gif"},
-		{"ICO to PNG conversion (temp directory)", "ls --file-type *.ico | xargs -I FILE convert FILE ~/images/FILE.png"},
+		{"!Create temp directory", "mkdir ~/images"},
+		{"!Remove temp directory", "rm -rf ~/images"},
+		{"!GIF to PNG conversion (in situ)", "mogrify -format png *.gif"},
+		{"!ICO to PNG conversion (temp directory)", "ls --file-type *.ico | xargs -I FILE convert FILE ~/images/FILE.png"},
 		{"Convert image to ICO file", "mogrify -format ico %f"},
 		{"Create thumbnails in temp directory", "ls --file-type * | xargs -I FILE convert FILE -thumbnail 120x120 -sharpen 1 -quality 95 ~/images/th_FILE.jpg"},
 		{"Create thumbnails (in situ)", "ls --file-type * | xargs -I FILE convert FILE -thumbnail 120x120 -sharpen 1 -quality 95 th_FILE.jpg"},
@@ -208,6 +217,7 @@ void init_factions()
 			inifile_get(txt, row_def[i][j]);
 		}
 	}
+#endif
 
 	update_faction_menu();			// Prepare menu
 }
@@ -263,7 +273,7 @@ void pressed_file_configure()
 	gtk_container_add(GTK_CONTAINER(sw), clist);
 	/* Store directories in a hidden third column */
 	gtk_clist_set_column_visibility(GTK_CLIST(clist), 2, FALSE);
-	gtk_clist_set_column_width(GTK_CLIST(clist), 0, 200);
+//	gtk_clist_set_column_width(GTK_CLIST(clist), 0, 200);
 //	gtk_clist_set_column_width(GTK_CLIST(clist), 1, 200);
 	gtk_clist_column_titles_passive(GTK_CLIST(clist));
 	gtk_clist_set_selection_mode(GTK_CLIST(clist), GTK_SELECTION_BROWSE);

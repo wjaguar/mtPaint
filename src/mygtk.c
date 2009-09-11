@@ -653,30 +653,39 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 	return (align);
 }
 
-// Signalled toggle
+// Signalled toggles
 
 static void sig_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
 {
 	*(int *)user_data = gtk_toggle_button_get_active(togglebutton);
 }
 
-GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler)
+static void make_sig_toggle(GtkWidget *tog, int value, gpointer var, GtkSignalFunc handler)
 {
-	GtkWidget *tog;
-
 	if (!handler && var)
 	{
 		*(int *)var = value;
 		handler = GTK_SIGNAL_FUNC(sig_toggle_toggled);
 	}
 
-	tog = gtk_check_button_new_with_label(label);
 	gtk_widget_show(tog);
 	gtk_container_set_border_width(GTK_CONTAINER(tog), 5);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tog), value);
 	if (handler) gtk_signal_connect(GTK_OBJECT(tog), "toggled", handler,
 		(gpointer)var);
+}
 
+GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler)
+{
+	GtkWidget *tog = gtk_check_button_new_with_label(label);
+	make_sig_toggle(tog, value, var, handler);
+	return (tog);
+}
+
+GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc handler)
+{
+	GtkWidget *tog = gtk_toggle_button_new_with_label(label);
+	make_sig_toggle(tog, value, var, handler);
 	return (tog);
 }
 
@@ -743,6 +752,38 @@ void clist_enable_drag(GtkWidget *clist)
 }
 
 #endif
+
+// Properly destroy transient window
+
+void destroy_dialog(GtkWidget *window)
+{
+	/* Needed in Windows to stop GTK+ lowering the main window */
+	gtk_window_set_transient_for(GTK_WINDOW(window), NULL);
+	gtk_widget_destroy(window);
+}
+
+// Settings notebook
+
+static void toggle_book(GtkToggleButton *button, GtkNotebook *book)
+{
+	int i = gtk_toggle_button_get_active(button);
+	gtk_notebook_set_page(book, i ? 1 : 0);
+}
+
+GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
+	GtkWidget **button, char *button_label)
+{
+	GtkWidget *notebook = gtk_notebook_new();
+	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
+	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
+	*page0 = gtk_vbox_new(FALSE, 0);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page0, NULL);
+	*page1 = gtk_vbox_new(FALSE, 0);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page1, NULL);
+	*button = sig_toggle_button(button_label, FALSE, GTK_NOTEBOOK(notebook),
+		GTK_SIGNAL_FUNC(toggle_book));
+	return (notebook);
+}
 
 
 // Whatever is needed to move mouse pointer 

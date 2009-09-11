@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -386,7 +386,7 @@ void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
 int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
 int mem_rotate_free(double angle, int type, int gcor);		// Rotate canvas by any angle (degrees)
-int mem_image_scale(int nw, int nh, int type, int gcor);	// Scale image
+int mem_image_scale(int nw, int nh, int type, int gcor, int sharp);	// Scale image
 int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
 
 int mem_isometrics(int type);
