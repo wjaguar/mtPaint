@@ -2738,7 +2738,6 @@ void main_init()
 		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, CHN_SEL, "<CheckItem>" },
 		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
 		{ _("/Channels/Couple RGBA Operations"), NULL, pressed_RGBA_toggle, 0, "<CheckItem>" },
 		{ _("/Channels/Threshold ..."), NULL, pressed_threshold, 0, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },

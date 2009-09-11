@@ -211,30 +211,6 @@ void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
-int do_blur(GtkWidget *spin, gpointer fdata)
-{
-	int i, j;
-
-	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
-	spot_undo(UNDO_FILT);
-	progress_init(_("Image Blur Effect"), 1);
-	for (j = 0; j < i; j++)
-	{
-		if (progress_update(((float)j) / i)) break;
-		do_effect(1, 25 + i / 2);
-	}
-	progress_end();
-
-	return TRUE;
-}
-
-void pressed_blur( GtkMenuItem *menu_item, gpointer user_data )
-{
-	GtkWidget *spin = add_a_spin(10, 1, 100);
-	filter_window(_("Blur Effect"), spin, do_blur, NULL);
-}
-
 int do_fx(GtkWidget *spin, gpointer fdata)
 {
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
@@ -243,6 +219,12 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 	do_effect((int)fdata, i);
 
 	return TRUE;
+}
+
+void pressed_blur( GtkMenuItem *menu_item, gpointer user_data )
+{
+	GtkWidget *spin = add_a_spin(10, 1, 100);
+	filter_window(_("Blur Effect"), spin, do_fx, (gpointer)(1));
 }
 
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data )
