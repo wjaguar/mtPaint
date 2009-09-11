@@ -627,10 +627,14 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	GdkBitmap *masks[2];
 	int i, l, len, row, fail, idx = -1;
 
-	icons[1] = gdk_pixmap_create_from_xpm_d(main_window->window, &masks[1],
-		NULL, xpm_open_xpm);
-	icons[0] = gdk_pixmap_create_from_xpm_d(main_window->window, &masks[0],
-		NULL, xpm_new_xpm);
+
+	masks[0] = masks[1] = NULL;
+	icons[1] = render_stock_pixmap(win->clist, GTK_STOCK_DIRECTORY, &masks[1]);
+	icons[0] = render_stock_pixmap(win->clist, GTK_STOCK_FILE, &masks[0]);
+	if (!icons[1]) icons[1] = gdk_pixmap_create_from_xpm_d(
+		main_window->window, &masks[1], NULL, xpm_open_xpm);
+	if (!icons[0]) icons[0] = gdk_pixmap_create_from_xpm_d(
+		main_window->window, &masks[0], NULL, xpm_new_xpm);
 
 	row_txt[FPICK_CLIST_SIZE] = txt_size;
 	row_txt[FPICK_CLIST_DATE] = txt_date;
@@ -781,8 +785,8 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	closedir(dp);
 	gdk_pixmap_unref(icons[0]);
 	gdk_pixmap_unref(icons[1]);
-	gdk_pixmap_unref(masks[0]);
-	gdk_pixmap_unref(masks[1]);
+	if (masks[0]) gdk_pixmap_unref(masks[0]);
+	if (masks[1]) gdk_pixmap_unref(masks[1]);
 
 	return TRUE;
 }
@@ -1022,6 +1026,12 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 		return (TRUE);
 	case GDK_Return: case GDK_KP_Enter:
 		break;
+#if GTK_MAJOR_VERSION == 1
+	/* !!! Just having ESC as accelerator isn't enough in GTK+1 */
+	case GDK_Escape:
+		gtk_button_clicked(GTK_BUTTON(fp->cancel_button));
+		return (TRUE);
+#endif
 	default: return (FALSE);
 	}
 

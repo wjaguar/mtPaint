@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.30"
-MT_DATE="2009-02-12"
+MT_V="3.30.01"
+MT_DATE="2009-02-21"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -367,6 +367,7 @@ cflags .......... Use CFLAGS environment variable
 386 ............. Target 386 machines
 slow ............ Don't use compiler optimizations
 asneeded ........ Use linker optimization --as-needed
+release ......... Use the set of optimizations which work best for mtPaint code
 
 staticpng ....... Statically link PNG library
 GIF ............. Use libgif

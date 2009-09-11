@@ -1204,8 +1204,8 @@ int cpick_get_colour(GtkWidget *w, int *opacity)
 
 	gtk_color_selection_get_color(GTK_COLOR_SELECTION(w), color);
 	if (opacity) *opacity = rint(255 * color[3]);
-	return (RGB_2_INT(rint(255 * color[0]), rint(255 * color[1]),
-		rint(255 * color[2])));
+	return (RGB_2_INT((int)rint(255 * color[0]), (int)rint(255 * color[1]),
+		(int)rint(255 * color[2])));
 }
 
 void cpick_set_colour(GtkWidget *w, int rgb, int opacity)

@@ -2343,6 +2343,27 @@ GtkWidget *xpm_image(char **xpm)
 	return (widget);
 }
 
+// Render stock icons to pixmaps
+
+#if GTK_MAJOR_VERSION == 2
+
+GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
+	GdkBitmap **mask)
+{
+	GdkPixmap *pmap;
+	GdkPixbuf *buf;
+
+	buf = gtk_widget_render_icon(widget, stock_id,
+		GTK_ICON_SIZE_SMALL_TOOLBAR, NULL);
+	if (!buf) return (NULL);
+	gdk_pixbuf_render_pixmap_and_mask_for_colormap(buf,
+		gtk_widget_get_colormap(widget), &pmap, mask, 127);
+	g_object_unref(buf);
+	return (pmap);
+}
+
+#endif
+
 // Maybe this will be needed someday...
 
 #if 0

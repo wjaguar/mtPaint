@@ -282,6 +282,16 @@ GtkWidget *gamma_toggle();
 
 GtkWidget *xpm_image(char **xpm);
 
+// Render stock icons to pixmaps
+
+/* !!! Mask needs be zeroed before the call - especially with GTK+1 :-) */
+#if GTK_MAJOR_VERSION == 1
+#define render_stock_pixmap(X,Y,Z) NULL
+#else
+GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
+	GdkBitmap **mask);
+#endif
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0
