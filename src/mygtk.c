@@ -1061,21 +1061,20 @@ static void realize_trick(GtkWidget *widget, gpointer user_data)
 #endif
 }
 
-void fix_scroll(GtkWidget *scroll)
+void fix_vport(GtkWidget *vport)
 {
-	scroll = GTK_BIN(scroll)->child;
 	/* Stop theme engines from messing up viewport's frame */
-	viewport_style(scroll);
-	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+	viewport_style(vport);
+	gtk_signal_connect_after(GTK_OBJECT(vport), "realize",
 		GTK_SIGNAL_FUNC(realize_trick), NULL);
 #if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(scroll, FALSE);
+	gtk_widget_set_double_buffered(vport, FALSE);
 #endif
-	scroll = GTK_BIN(scroll)->child;
-	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
+	vport = GTK_BIN(vport)->child;
+	gtk_signal_connect_after(GTK_OBJECT(vport), "realize",
 		GTK_SIGNAL_FUNC(realize_trick), NULL);
 #if GTK_MAJOR_VERSION == 2
-	gtk_widget_set_double_buffered(scroll, FALSE);
+	gtk_widget_set_double_buffered(vport, FALSE);
 #endif
 }
 
@@ -2307,39 +2306,6 @@ int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 			return (TRUE);
 	}
 	return (FALSE);
-}
-
-#endif
-
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-
-/* It's unclear who should free clipboard pixmaps and when, so I do the same
- * thing Qt does, destroying the next-to-last allocated pixmap each time a new
- * one is allocated - WJ */
-
-int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height)
-{
-	static GdkPixmap *exported[2];
-	Pixmap xpixmap;
-
-	if (exported[1])
-	{
-		/* Someone might have destroyed the X pixmap already, so
-		 * get ready to live through an X error */
-		gdk_error_trap_push();
-		gdk_pixmap_unref(exported[1]);
-		gdk_error_trap_pop();
-	}
-	exported[1] = exported[0];
-	exported[0] = gdk_pixmap_new(main_window->window, width, height, -1);
-	if (!exported[0]) return (FALSE);
-
-	gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
-		0, 0, width, height, GDK_RGB_DITHER_NONE, rgb, width * 3);
-	xpixmap = GDK_WINDOW_XWINDOW(exported[0]);
-	gtk_selection_data_set(data, data->target, 32, (guchar *)&xpixmap,
-		sizeof(xpixmap));
-	return (TRUE);
 }
 
 #endif

@@ -10,7 +10,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* New colour picker (old one available as configure option)
 	* New file picker (old one available as configure option)
 	* Some menu items can have an icon (if set in the preferences)
-	* Dock area added which can hold the command line window
+	* Dock area added which now holds the former command line window (View->Show Dock)
 	* Layers window handling reworked to make it more responsive
 	* Layers window: position now editable via spin buttons
 	* Layers window: transparent colour toggle removed
@@ -33,8 +33,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Kuwahara-Nagao blur effect added (edge-preserving blur)
 	* Dilation and erosion effects added
 	* Seven new edge detection filters added - Sobel, Prewitt, Kirsch, Gradient, Roberts, Laplace, Morphological
-        * Invert effect now respects masking
- 	* Drawing operations on utility channels now respect tool opacity
+	* Invert effect now respects masking
+	* Drawing operations on utility channels now respect tool opacity
 	* Drawing in image channel with coupled alpha now ignores drawing modes for alpha channel
 	* Smudge tool now works about two times faster
 	* 12 new blend modes added
@@ -65,7 +65,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Counting used colours now about twice as fast
 	* Workaround for bug in libpng versions 1.2.17 - 1.2.24 added (was losing extra channels when loading)
 	* BUGFIX - Canvas, view and palette area borders now can't be messed up by theme engines
-        * BUGFIX - Persistent rectangle selection now doesn't steal arrow keys from gradient placement tool
+	* BUGFIX - Persistent rectangle selection now doesn't steal arrow keys from gradient placement tool
 	* BUGFIX - Internationalization now works properly in GTK+1
 	* BUGFIX - FreeType text rendering quality improved on Windows
 	* BUGFIX - Text in active menu items no longer becomes invisible on Windows Vista (fixed in GTK+)

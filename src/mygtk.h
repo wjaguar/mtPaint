@@ -205,7 +205,8 @@ void paned_mouse_fix(GtkWidget *widget);
 
 // Eliminate flicker when scrolling
 
-void fix_scroll(GtkWidget *scroll);
+void fix_vport(GtkWidget *vport);
+#define fix_scroll(scroll) fix_vport(GTK_BIN(scroll)->child)
 
 // Init-time bugfixes
 
@@ -268,9 +269,6 @@ int internal_clipboard(int which);
 int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data);
 int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 	GtkSignalFunc handler);
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* X special */
-int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height);
-#endif
 
 // Allocate a memory chunk which is freed along with a given widget
 

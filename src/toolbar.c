@@ -954,9 +954,9 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 
 	viewport_palette = gtk_viewport_new (NULL, NULL);
 	gtk_widget_show (viewport_palette);
-	gtk_viewport_set_shadow_type( GTK_VIEWPORT(viewport_palette), GTK_SHADOW_IN );
 	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_col_prev);
 	gtk_box_pack_start( GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0 );
+	fix_vport(viewport_palette);
 
 	scrolledwindow_palette = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_palette);

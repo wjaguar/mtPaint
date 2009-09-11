@@ -88,6 +88,7 @@ int	col_reverse,					// Painting with right button
 #define FS_SELECT_DIR 16
 #define FS_LAYER_LOAD 17
 #define FS_PATTERN_LOAD 18
+#define FS_CLIPBOARD 19
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 

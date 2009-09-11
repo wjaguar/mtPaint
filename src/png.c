@@ -45,6 +45,7 @@
 #include "mygtk.h"
 #include "memory.h"
 #include "png.h"
+#include "mainwindow.h"
 #include "canvas.h"
 #include "toolbar.h"
 #include "layer.h"
@@ -155,6 +156,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 
 	/* Reduce cmask according to mode */
 	if (settings->mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
+	else if (settings->mode == FS_CLIPBOARD) cmask &= CMASK_RGBA;
 	else if ((settings->mode == FS_CHANNEL_LOAD) ||
 		(settings->mode == FS_PATTERN_LOAD)) cmask &= CMASK_IMAGE;
 
@@ -188,6 +190,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		}
 		break;
 	case FS_CLIP_FILE: /* Clipboard */
+	case FS_CLIPBOARD:
 		/* Allocate the entire batch at once */
 		if (cmask & CMASK_IMAGE)
 		{
@@ -248,7 +251,9 @@ static void deallocate_image(ls_settings *settings, int cmask)
 		free(settings->img[i]);
 		settings->img[i] = NULL;
 
-		if (settings->mode == FS_CLIP_FILE) /* Clipboard */
+		/* Clipboard */
+		if ((settings->mode == FS_CLIP_FILE) ||
+			(settings->mode == FS_CLIPBOARD))
 			mem_clip.img[i] = NULL;
 	}
 }
@@ -314,6 +319,70 @@ static int mfseek(memFILE *mf, long offset, int mode)
 	else return (-1);
 	mf->here = offset;
 	return (0);
+}
+
+/* Fills temp buffer row, or returns image row if no buffer */
+static unsigned char *prepare_row(unsigned char *buf, ls_settings *settings,
+	int bpp, int y)
+{
+	unsigned char *tmp, *tmi, *tma, *tms;
+	int i, j, w = settings->width, h = y * w;
+	int bgr = settings->ftype == FT_PNG ? 0 : 2;
+
+	tmi = settings->img[CHN_IMAGE] + h * settings->bpp;
+	if (bpp < (bgr ? 3 : 4)) /* Return/copy image row */
+	{
+		if (!buf) return (tmi);
+		memcpy(buf, tmi, w * bpp);
+		return (buf);
+	}
+
+	/* Produce BGR / BGRx / RGBx */
+	tmp = buf;
+	if (settings->bpp == 1) // Indexed
+	{
+		png_color *pal = settings->pal;
+
+		for (i = 0; i < w; tmp += bpp , i++)
+		{
+			png_color *col = pal + *tmi++;
+			tmp[bgr] = col->red;
+			tmp[1] = col->green;
+			tmp[bgr ^ 2] = col->blue;
+		}
+	}
+	else // RGB
+	{
+		for (i = 0; i < w; tmp += bpp , tmi += 3 , i++)
+		{
+			tmp[0] = tmi[bgr];
+			tmp[1] = tmi[1];
+			tmp[2] = tmi[bgr ^ 2];
+		}
+	}
+
+	/* Add alpha to the mix */
+	tmp = buf + 3;
+	tma = settings->img[CHN_ALPHA] + h;
+	if (bpp == 3); // No alpha - all done
+	else if ((settings->mode != FS_CLIPBOARD) || !settings->img[CHN_SEL])
+	{
+		// Only alpha here
+		for (i = 0; i < w; tmp += bpp , i++)
+			*tmp = *tma++;
+	}
+	else
+	{
+		// Merge alpha and selection
+		tms = settings->img[CHN_SEL] + h;
+		for (i = 0; i < w; tmp += bpp , i++)
+		{
+			j = *tma++ * *tms++;
+			*tmp = (j + (j >> 8) + 1) >> 8;
+		}
+	}
+
+	return (buf);
 }
 
 static void ls_init(char *what, int save)
@@ -459,6 +528,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 			msg = "PNG";
 			break;
 		case FS_CLIP_FILE:
+		case FS_CLIPBOARD:
 			msg = _("Clipboard");
 			break;
 		}
@@ -628,17 +698,21 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	png_structp png_ptr;
 	png_infop info_ptr;
 	FILE *fp = NULL;
-	int i, j, h = settings->height, w = settings->width, res = -1;
-	int chunks = 0;
+	int h = settings->height, w = settings->width, bpp = settings->bpp;
+	int i, chunks = 0, res = -1;
 	long dest_len;
 	char *mess;
-	unsigned char trans[256], *rgba_row = NULL, *tmp, *tmi, *tma;
+	unsigned char trans[256], *tmp, *rgba_row = NULL;
 	png_color_16 trans_rgb;
 
-	if ((settings->bpp == 3) && settings->img[CHN_ALPHA])
+	/* Baseline PNG format does not support alpha for indexed images, so
+	 * we have to convert them to RGBA for clipboard export - WJ */
+	if (((settings->mode == FS_CLIPBOARD) || (bpp == 3)) &&
+		settings->img[CHN_ALPHA])
 	{
 		rgba_row = malloc(w * 4);
-		if (!rgba_row) return -1;
+		if (!rgba_row) return (-1);
+		bpp = 4;
 	}
 
 	switch(settings->mode)
@@ -647,6 +721,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		mess = "PNG";
 		break;
 	case FS_CLIP_FILE:
+	case FS_CLIPBOARD:
 		mess = _("Clipboard");
 		break;
 	case FS_COMPOSITE_SAVE:
@@ -676,7 +751,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	else png_set_write_fn(png_ptr, mf, png_memwrite, png_memflush);
 	png_set_compression_level(png_ptr, settings->png_compression);
 
-	if (settings->bpp == 1)
+	if (bpp == 1)
 	{
 		png_set_IHDR(png_ptr, info_ptr, w, h,
 			8, PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE,
@@ -693,7 +768,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	else
 	{
 		png_set_IHDR(png_ptr, info_ptr, w, h,
-			8, settings->img[CHN_ALPHA] ? PNG_COLOR_TYPE_RGB_ALPHA :
+			8, bpp == 4 ? PNG_COLOR_TYPE_RGB_ALPHA :
 			PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
 			PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
 		if (settings->pal) png_set_PLTE(png_ptr, info_ptr, settings->pal,
@@ -712,68 +787,45 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 
 	if (mess) ls_init(mess, 1);
 
-	if ((settings->bpp == 1) || !settings->img[CHN_ALPHA]) /* Flat RGB/Indexed image */
+	for (i = 0; i < h; i++)
 	{
-		w *= settings->bpp;
-		for (i = 0; i < h; i++)
-		{
-			png_write_row(png_ptr, (png_bytep)(settings->img[CHN_IMAGE] + i * w));
-			if (mess && ((i * 20) % h >= h - 20))
-				progress_update((float)i / h);
-		}
-	}
-	else /* RGBA image */
-	{
-		tmi = settings->img[CHN_IMAGE];
-		tma = settings->img[CHN_ALPHA];
-		for (i = 0; i < h; i++)
-		{
-			tmp = rgba_row;
-			for (j = 0; j < w; j++) /* Combine RGB and alpha */
-			{
-				tmp[0] = tmi[0];
-				tmp[1] = tmi[1];
-				tmp[2] = tmi[2];
-				tmp[3] = tma[0];
-				tmp += 4; tmi += 3; tma++;
-			}
-			png_write_row(png_ptr, (png_bytep)rgba_row);
-			if (mess && ((i * 20) % h >= h - 20))
-				progress_update((float)i / h);
-		}
+		tmp = prepare_row(rgba_row, settings, bpp, i);
+		png_write_row(png_ptr, (png_bytep)tmp);
+		if (mess && ((i * 20) % h >= h - 20))
+			progress_update((float)i / h);
 	}
 
 	/* Save private chunks into PNG file if we need to */
-	j = settings->bpp == 1 ? CHN_ALPHA : CHN_ALPHA + 1;
-	for (i = j; !settings->img[i] && (i < NUM_CHANNELS); i++);
-	if (i < NUM_CHANNELS)
+	tmp = NULL;
+	i = bpp == 1 ? CHN_ALPHA : CHN_ALPHA + 1;
+	if (settings->mode == FS_CLIPBOARD) i = NUM_CHANNELS; // Disable extensions
+	for (; i < NUM_CHANNELS; i++)
 	{
-		/* Get size required for each zlib compress */
-		w = settings->width * settings->height;
-#if ZLIB_VERNUM >= 0x1200
-		dest_len = compressBound(w);
-#else
-		dest_len = w + (w >> 8) + 32;
-#endif
-		tmp = malloc(dest_len);	  // Temporary space for compression
-		if (!tmp) res = -1;
-		else
+		if (!settings->img[i]) continue;
+		if (!tmp)
 		{
-			for (; i < NUM_CHANNELS; i++)
-			{
-				if (!settings->img[i]) continue;
-				if (compress2(tmp, &dest_len, settings->img[i], w,
-					settings->png_compression) != Z_OK) continue;
-				strncpy(unknown0.name, chunk_names[i], 5);
-				unknown0.data = tmp;
-				unknown0.size = dest_len;
-				png_set_unknown_chunks(png_ptr, info_ptr, &unknown0, 1);
-				png_set_unknown_chunk_location(png_ptr, info_ptr,
-					chunks++, PNG_AFTER_IDAT);
-			}
-			free(tmp);
+			/* Get size required for each zlib compress */
+			w = settings->width * settings->height;
+#if ZLIB_VERNUM >= 0x1200
+			dest_len = compressBound(w);
+#else
+			dest_len = w + (w >> 8) + 32;
+#endif
+			res = -1;
+			tmp = malloc(dest_len);	  // Temporary space for compression
+			if (!tmp) break;
+			res = 0;
 		}
+		if (compress2(tmp, &dest_len, settings->img[i], w,
+			settings->png_compression) != Z_OK) continue;
+		strncpy(unknown0.name, chunk_names[i], 5);
+		unknown0.data = tmp;
+		unknown0.size = dest_len;
+		png_set_unknown_chunks(png_ptr, info_ptr, &unknown0, 1);
+		png_set_unknown_chunk_location(png_ptr, info_ptr,
+			chunks++, PNG_AFTER_IDAT);
 	}
+	free(tmp);
 	png_write_end(png_ptr, info_ptr);
 
 	if (mess) progress_end();
@@ -2130,7 +2182,7 @@ fail:	if (fp) fclose(fp);
 
 static int save_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 {
-	unsigned char *buf, *tmp, *src;
+	unsigned char *buf, *tmp;
 	memFILE fake_mf;
 	FILE *fp = NULL;
 	int i, j, ll, hsz0, hsz, dsz, fsz;
@@ -2153,7 +2205,8 @@ static int save_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	}
 
 	/* Sizes of BMP parts */
-	if ((bpp == 3) && settings->img[CHN_ALPHA]) bpp = 4;
+	if (((settings->mode == FS_CLIPBOARD) || (bpp == 3)) &&
+		settings->img[CHN_ALPHA]) bpp = 4;
 	ll = (bpp * w + 3) & ~3;
 	j = bpp == 1 ? settings->colors : 0;
 
@@ -2208,32 +2261,7 @@ static int save_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	memset(buf + ll - 4, 0, 4);
 	for (i = h - 1; i >= 0; i--)
 	{
-		src = settings->img[CHN_IMAGE] + i * w * settings->bpp;
-		if (bpp == 1) /* Indexed */
-		{
-			memcpy(buf, src, w);
-		}
-		else if (bpp == 3) /* RGB */
-		{
-			for (j = 0; j < w * 3; j += 3)
-			{
-				buf[j + 0] = src[j + 2];
-				buf[j + 1] = src[j + 1];
-				buf[j + 2] = src[j + 0];
-			}
-		}
-		else /* if (bpp == 4) */ /* RGBA */
-		{
-			tmp = settings->img[CHN_ALPHA] + i * w;
-			for (j = 0; j < w * 4; j += 4)
-			{
-				buf[j + 0] = src[2];
-				buf[j + 1] = src[1];
-				buf[j + 2] = src[0];
-				buf[j + 3] = tmp[0];
-				src += 3; tmp++;
-			}
-		}
+		prepare_row(buf, settings, bpp, i);
 		mfwrite(buf, 1, ll, mf);
 		if (!settings->silent && ((i * 20) % h >= h - 20))
 			progress_update((float)(h - i) / h);
@@ -3661,22 +3689,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 	}
 	for (i = y0 , pcn = 0; i != y1; i += vstep , pcn++)
 	{
-		src = settings->img[CHN_IMAGE] + i * w * settings->bpp;
-		/* Fill uncompressed row */
-		if (bpp == 1) memcpy(buf, src, w);
-		else
-		{
-			srca = settings->img[CHN_ALPHA] + i * w;
-			dest = buf;
-			for (j = 0; j < w; j++ , dest += bpp)
-			{
-				dest[0] = src[2];
-				dest[1] = src[1];
-				dest[2] = src[0];
-				src += 3;
-				if (bpp > 3) dest[3] = *srca++;
-			}
-		}
+		prepare_row(buf, settings, bpp, i); /* Fill uncompressed row */
 		src = buf;
 		dest = buf + w * bpp;
 		if (rle) /* Compress */
@@ -3745,8 +3758,109 @@ static int save_tga(char *file_name, ls_settings *settings)
 /* Put screenshots and X pixmaps on an equal footing with regular files */
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+
 #include <X11/Xlib.h>
 #include <gdk/gdkx.h>
+
+/* It's unclear who should free clipboard pixmaps and when, so I do the same
+ * thing Qt does, destroying the next-to-last allocated pixmap each time a new
+ * one is allocated - WJ */
+
+static int save_pixmap(ls_settings *settings, memFILE *mf)
+{
+	static GdkPixmap *exported[2];
+	unsigned char *src, *dest, *sel, *buf = NULL;
+	int i, j, l, w = settings->width, h = settings->height;
+
+	/* !!! Pixmap export used only for FS_CLIPBOARD, where the case of
+	 * selection without alpha is already prevented */
+	if ((settings->bpp == 1) || settings->img[CHN_ALPHA])
+	{
+		buf = malloc(w * 3);
+		if (!buf) return (-1);
+	}
+
+	if (exported[0])
+	{
+		if (exported[1])
+		{
+			/* Someone might have destroyed the X pixmap already,
+			 * so get ready to live through an X error */
+			gdk_error_trap_push();
+			gdk_pixmap_unref(exported[1]);
+			gdk_error_trap_pop();
+		}
+		exported[1] = exported[0];
+	}
+	exported[0] = gdk_pixmap_new(main_window->window, w, h, -1);
+	if (!exported[0])
+	{
+		free(buf);
+		return (-1);
+	}
+
+	/* Plain RGB - copy it whole */
+	if (!buf) gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
+		0, 0, w, h, GDK_RGB_DITHER_NONE, settings->img[CHN_IMAGE], w * 3);
+	/* Something else - render & copy row by row */
+	else
+	{
+		l = w * settings->bpp;
+		for (i = 0; i < h; i++)
+		{
+			src = settings->img[CHN_IMAGE] + l * i;
+			dest = buf;
+			if (settings->bpp == 3) memcpy(dest, src, l);
+			else /* Indexed to RGB */
+			{
+				png_color *pal = settings->pal;
+
+				for (j = 0; j < w; j++ , dest += 3)
+				{
+					png_color *col = pal + *src++;
+					dest[0] = col->red;
+					dest[1] = col->green;
+					dest[2] = col->blue;
+				}
+			}
+			/* There is no way to send alpha to XPaint, so I use
+			 * alpha (and selection if any) to blend image with
+			 * white and send the result - WJ */
+			if (settings->img[CHN_ALPHA])
+			{
+				src = settings->img[CHN_ALPHA] + w * i;
+				sel = settings->img[CHN_SEL] ?
+					settings->img[CHN_SEL] + w * i : NULL;
+				dest = buf;
+				for (j = 0; j < w; j++)
+				{
+					int ii, jj, k = *src++;
+
+					if (sel)
+					{
+						k *= *sel++;
+						k = (k + (k >> 8) + 1) >> 8;
+					}
+					for (ii = 0; ii < 3; ii++)
+					{
+						jj = 255 * 255 + (*dest - 255) * k;
+						*dest++ = (jj + (jj >> 8) + 1) >> 8;
+					}
+				}
+			}
+			gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
+				0, i, w, 1, GDK_RGB_DITHER_NONE, buf, w * 3);
+		}
+	}
+	free(buf);
+
+	*(Pixmap *)&mf->buf = GDK_WINDOW_XWINDOW(exported[0]);
+	mf->top = sizeof(Pixmap);
+	return (0);
+}
+
+#else /* Pixmap export fails by definition in absence of X */
+#define save_pixmap(A,B) (-1)
 #endif
 
 static int load_pixmap(char *pixmap_id, ls_settings *settings)
@@ -3809,50 +3923,62 @@ static int load_pixmap(char *pixmap_id, ls_settings *settings)
 
 static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
+	ls_settings setw = *settings; // Make a copy to safely modify
 	png_color greypal[256];
 	int i, res;
 
+	/* Prepare to handle clipboard export */
+	if (setw.mode != FS_CLIPBOARD); // not export
+	else if (setw.ftype & FTM_EXTEND) setw.mode = FS_CLIP_FILE; // to mtPaint
+	else if (setw.img[CHN_SEL] && !setw.img[CHN_ALPHA])
+	{
+		/* Pass clipboard mask as alpha if there is no alpha already */
+		setw.img[CHN_ALPHA] = setw.img[CHN_SEL];
+		setw.img[CHN_SEL] = NULL;
+	}
+	setw.ftype &= FTM_FTYPE;
+
 	/* Provide a grayscale palette if needed */
-	if ((settings->bpp == 1) && !settings->pal)
+	if ((setw.bpp == 1) && !setw.pal)
 	{
 		for (i = 0; i < 256; i++)
 			greypal[i].red = greypal[i].green = greypal[i].blue = i;
-		settings->pal = greypal;
+		setw.pal = greypal;
 	}
 
 	/* Validate transparent color (for now, forbid out-of-palette RGB
 	 * transparency altogether) */
-	if (settings->xpm_trans >= settings->colors)
-		settings->xpm_trans = settings->rgb_trans = -1;
+	if (setw.xpm_trans >= setw.colors)
+		setw.xpm_trans = setw.rgb_trans = -1;
 
-	switch (settings->ftype)
+	switch (setw.ftype)
 	{
 	default:
-	case FT_PNG: res = save_png(file_name, settings, mf); break;
+	case FT_PNG: res = save_png(file_name, &setw, mf); break;
 #ifdef U_JPEG
-	case FT_JPEG: res = save_jpeg(file_name, settings); break;
+	case FT_JPEG: res = save_jpeg(file_name, &setw); break;
 #endif
 #ifdef U_JP2
 	case FT_JP2:
-	case FT_J2K: res = save_jpeg2000(file_name, settings); break;
+	case FT_J2K: res = save_jpeg2000(file_name, &setw); break;
 #endif
 #ifdef U_TIFF
-	case FT_TIFF: res = save_tiff(file_name, settings); break;
+	case FT_TIFF: res = save_tiff(file_name, &setw); break;
 #endif
 #ifdef U_GIF
-	case FT_GIF: res = save_gif(file_name, settings); break;
+	case FT_GIF: res = save_gif(file_name, &setw); break;
 #endif
-	case FT_BMP: res = save_bmp(file_name, settings, mf); break;
-	case FT_XPM: res = save_xpm(file_name, settings); break;
-	case FT_XBM: res = save_xbm(file_name, settings); break;
-	case FT_LSS: res = save_lss(file_name, settings); break;
-	case FT_TGA: res = save_tga(file_name, settings); break;
+	case FT_BMP: res = save_bmp(file_name, &setw, mf); break;
+	case FT_XPM: res = save_xpm(file_name, &setw); break;
+	case FT_XBM: res = save_xbm(file_name, &setw); break;
+	case FT_LSS: res = save_lss(file_name, &setw); break;
+	case FT_TGA: res = save_tga(file_name, &setw); break;
 /* !!! Not implemented yet */
 //	case FT_PCX:
+	case FT_PIXMAP: res = save_pixmap(&setw, mf); break;
 	}
 
-	if (settings->pal == greypal) settings->pal = NULL;
-	return res;
+	return (res);
 }
 
 int save_image(char *file_name, ls_settings *settings)
@@ -3865,9 +3991,20 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
 	memFILE mf;
 	int res;
 
-	if (!(file_formats[settings->ftype].flags & FF_WMEM)) return (-1);
-
 	memset(&mf, 0, sizeof(mf));
+	if ((settings->ftype & FTM_FTYPE) == FT_PIXMAP)
+	{
+		/* !!! Evil hack: we abuse memFILE struct, storing pixmap XID
+		 * in buffer pointer, and then copy it into passed-in buffer
+		 * pointer - WJ */
+		res = save_image_x(NULL, settings, &mf);
+		if (!res) *buf = mf.buf , *len = mf.top;
+		return (res);
+	}
+
+	if (!(file_formats[settings->ftype & FTM_FTYPE].flags & FF_WMEM))
+		return (-1);
+
 	mf.buf = malloc(mf.size = 0x4000 - 64);
 	/* Be silent when saving to memory */
 	settings->silent = TRUE;
@@ -3919,6 +4056,10 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	png_color pal[256];
 	ls_settings settings;
 	int i, tr, res, undo = FALSE;
+
+	/* Clipboard import - from mtPaint, or from something other? */
+	if ((mode == FS_CLIPBOARD) && (ftype & FTM_EXTEND)) mode = FS_CLIP_FILE;
+	ftype &= FTM_FTYPE;
 
 	/* Prepare layer slot */
 	if (mode == FS_LAYER_LOAD)
@@ -4027,6 +4168,15 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			if (!mem_img[CHN_IMAGE]) create_default_image();
 		}
 		break;
+	case FS_CLIPBOARD: /* Imported clipboard */
+		if ((res == 1) && mem_clip_alpha && !mem_clip_mask)
+		{
+			/* "Alpha" likely means clipboard mask here */
+			mem_clip_mask = mem_clip_alpha;
+			mem_clip_alpha = NULL;
+			memcpy(settings.img, mem_clip.img, sizeof(chanlist));
+		}
+		/* Fallthrough */
 	case FS_CLIP_FILE: /* Clipboard */
 		/* Convert color transparency to alpha */
 		tr = settings.bpp == 3 ? settings.rgb_trans : settings.xpm_trans;
@@ -4108,10 +4258,11 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 {
 	memFILE mf;
 
-	if (ftype == FT_PIXMAP) // Special case: buf points to a pixmap ID
-		return (load_image_x(buf, NULL, FS_CLIP_FILE, FT_PIXMAP));
+	if ((ftype & FTM_FTYPE) == FT_PIXMAP)
+		/* Special case: buf points to a pixmap ID */
+		return (load_image_x(buf, NULL, mode, ftype));
 
-	if (!(file_formats[ftype].flags & FF_RMEM)) return (-1);
+	if (!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
 
 	memset(&mf, 0, sizeof(mf));
 	mf.buf = buf; mf.top = mf.size = len;

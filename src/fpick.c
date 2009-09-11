@@ -268,7 +268,11 @@ static void fpick_clist_clear(GtkCList *clist)
 static void fpick_clist_select_row(GtkCList *clist, int n)
 {
 	if (n < 0) return;
+#if GTK_MAJOR_VERSION == 1
+	GTK_CLIST_CLASS(((GtkObject *)clist)->klass)->select_row(clist, n, -1, NULL);
+#else /* if GTK_MAJOR_VERSION == 2 */
 	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
+#endif
 	/* !!! Focus fails to follow selection in browse mode - have to move
 	 * it here; but it means a full redraw is necessary afterwards */
 	clist->focus_row = n;

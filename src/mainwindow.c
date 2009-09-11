@@ -331,6 +331,7 @@ static void pressed_mask(int val)
 
 static GtkTargetEntry clip_formats[] = {
 	{ NULL, 0, FT_NONE },
+	{ "application/x-mtpaint-clipboard", 0, FT_PNG | FTM_EXTEND },
 	{ "image/png", 0, FT_PNG },
 	{ "image/bmp", 0, FT_BMP },
 	{ "image/x-bmp", 0, FT_BMP },
@@ -339,17 +340,17 @@ static GtkTargetEntry clip_formats[] = {
 	/* These two don't make sense without X */
 	{ "PIXMAP", 0, FT_PIXMAP },
 	{ "BITMAP", 0, FT_PIXMAP },
+	/* !!! BITMAP requests are handled same as PIXMAP - because it is only
+	 * done to appease buggy XPaint which requests both and crashes if
+	 * receiving only one - WJ */
 #endif
 };
 #define CLIP_TARGETS (sizeof(clip_formats) / sizeof(GtkTargetEntry))
 static GdkAtom clip_atoms[CLIP_TARGETS];
 
 /* Seems it'll be better to prefer BMP when talking to the likes of GIMP -
- * they send PNGs really slowly (likely, compressed to the max); but then,
- * we'll need a mtPaint-specific clipboard type, with highest precedence, for
- * use among instances of mtPaint - like "application/x-krita-selection" which
- * Krita uses. Our "extended PNG" would serve for the purpose well enough.
- * And another question with BMPs is, not everyone supports alpha in them. */
+ * they send PNGs really slowly (likely, compressed to the max); but not
+ * everyone supports alpha in BMPs. */
 
 static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
 {
@@ -414,11 +415,9 @@ int import_clipboard(int mode)
 	return (i);
 }
 
-static void setup_clip_save(ls_settings *settings, int type)
+static void setup_clip_save(ls_settings *settings)
 {
 	init_ls_settings(settings, NULL);
-	settings->mode = FS_CLIP_FILE;
-	settings->ftype = type;
 	memcpy(settings->img, mem_clip.img, sizeof(chanlist));
 	settings->pal = mem_pal;
 	settings->width = mem_clip_w;
@@ -437,25 +436,24 @@ static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
 	if (!data) return (FALSE); // Someone else stole system clipboard
 	if (!mem_clipboard) return (FALSE); // Our own clipboard got emptied
 
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	if (type == FT_PIXMAP)
-	{
-// !!! Indexed clipboard will have to be converted to RGB buffer, later
-		if (mem_clip_bpp == 1) return (FALSE);
-		return (export_clip_Xpixmap(data, mem_clipboard, mem_clip_w, mem_clip_h));
-	}
-#endif
-
-// !!! Later, clipboard'll have to be simplified for use with lesser software -
-// with selection channel blended into alpha or even image itself
-
 	/* Prepare settings */
-	setup_clip_save(&settings, type);
+	setup_clip_save(&settings);
+	settings.mode = FS_CLIPBOARD;
+	settings.ftype = type;
 	settings.png_compression = 1; // Speed is of the essence
 
 	res = save_mem_image(&buf, &len, &settings);
 //g_print("Save returned %d\n", res);
 	if (res) return (FALSE); // No luck creating in-memory image
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	if ((type & FTM_FTYPE) == FT_PIXMAP)
+	{
+		/* !!! XID of pixmap gets returned in buffer pointer */
+		gtk_selection_data_set(data, data->target, 32, (guchar *)&buf, len);
+		return (TRUE);
+	}
+#endif
 
 /* !!! Should allocation for data copying fail, GTK+ will die horribly - so
  * maybe it'll be better to hack up the function and pass the original data
@@ -471,14 +469,11 @@ static int export_clipboard()
 	int res;
 
 	if (!mem_clipboard) return (FALSE);
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	/* Offer both CLIPBOARD and PRIMARY; BITMAPs not supported */
-	res = offer_clipboard(0, clip_formats + 1, CLIP_TARGETS - 2,
-		GTK_SIGNAL_FUNC(clipboard_export_fn));
-	res |= offer_clipboard(1, clip_formats + 1, CLIP_TARGETS - 2,
-		GTK_SIGNAL_FUNC(clipboard_export_fn));
-#else
 	res = offer_clipboard(0, clip_formats + 1, CLIP_TARGETS - 1,
+		GTK_SIGNAL_FUNC(clipboard_export_fn));
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	/* Offer both CLIPBOARD and PRIMARY */
+	res |= offer_clipboard(1, clip_formats + 1, CLIP_TARGETS - 1,
 		GTK_SIGNAL_FUNC(clipboard_export_fn));
 #endif
 	return (res);
@@ -571,7 +566,7 @@ static void load_clip(int item)
 	int i;
 
 	if (item == -1) // System clipboard
-		i = import_clipboard(FS_CLIP_FILE);
+		i = import_clipboard(FS_CLIPBOARD);
 	else // Disk file
 	{
 		snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
@@ -597,7 +592,9 @@ static void save_clip(int item)
 	}
 
 	/* Prepare settings */
-	setup_clip_save(&settings, FT_PNG);
+	setup_clip_save(&settings);
+	settings.mode = FS_CLIP_FILE;
+	settings.ftype = FT_PNG;
 
 	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
 	i = save_image(clip, &settings);

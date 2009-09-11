@@ -54,6 +54,9 @@
 #define FT_PIXMAP   18
 #define NUM_FTYPES  19
 
+#define FTM_FTYPE   0x00FF /* File type mask */
+#define FTM_EXTEND  0x0100 /* Allow extended format */
+
 /* Features supported by file formats */
 #define FF_BW      0x00001 /* Black and white */
 #define FF_16      0x00002 /* 16 colors */
