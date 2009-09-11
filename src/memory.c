@@ -5677,6 +5677,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 
 	/* Base length (one repeat) */
 	len1 = grad->len > 0 ? grad->len : len - grad->ofs;
+	if (len1 < 1.0) len1 = 1.0;
 
 	/* Apply repeat mode */
 	switch (grad->rmode)

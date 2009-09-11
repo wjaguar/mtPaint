@@ -242,7 +242,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		NULL
 		};
 
-	GtkWidget *frame, *vbox, *vbox2, *hbox;
+	GtkWidget *vbox, *vbox2, *hbox;
 
 
 	chan_new_type = item < CHN_ALPHA ? CHN_ALPHA : item;
@@ -256,23 +256,13 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_widget_show (vbox);
 	gtk_container_add (GTK_CONTAINER (newchan_window), vbox);
 
-	frame = gtk_frame_new (_("Channel Type"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	add_with_frame(vbox, _("Channel Type"), hbox, 5);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	if (item >= 0) gtk_widget_set_sensitive(hbox, FALSE);
 
-	frame = gtk_frame_new (_("Initial Channel State"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	vbox2 = wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), vbox2);
+	add_with_frame(vbox, _("Initial Channel State"), vbox2, 5);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
 
 	hbox = OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),

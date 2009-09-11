@@ -420,7 +420,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 #endif
 
 
-	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet, *frame;
+	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet;
 	GtkWidget *button1, *button2, *notebook1, *vbox_1, *vbox_2, *vbox_3, *label;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
@@ -621,14 +621,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 
 
-	frame = gtk_frame_new (_("Device Settings"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox_3), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	gtk_container_add (GTK_CONTAINER (frame), vbox_2);
+	add_with_frame(vbox_3, _("Device Settings"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	label_tablet_device = gtk_label_new ("");
@@ -671,14 +666,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	}
 
 
-	frame = gtk_frame_new (_("Test Area"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox_3), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	gtk_container_add (GTK_CONTAINER (frame), vbox_2);
+	add_with_frame(vbox_3, _("Test Area"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	drawingarea_tablet = gtk_drawing_area_new ();

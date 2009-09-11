@@ -839,6 +839,11 @@ void vw_align_size( float new_zoom )
 	int sw = mem_width, sh = mem_height, i;
 
 	if (!vw_drawing) return;
+
+	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
+	if (new_zoom > MAX_ZOOM) new_zoom = MAX_ZOOM;
+	if (new_zoom == vw_zoom) return;
+
 	vw_zoom = new_zoom;
 
 	if ( layers_total>0 && layer_selected!=0 )

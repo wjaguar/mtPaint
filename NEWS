@@ -6,6 +6,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.10	2006-?-?
 
+	* Gradient drawing mode added
 	* Turkish translation added by Muhammet Kara, Tutku Dalmaz
 	* Image tiling mode added to "Resize Canvas"
 	* Greyscale effect now respects masking
@@ -15,7 +16,6 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* More palette sort modes added
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
-	* Gradient drawing mode added
 	* New advanced dithering modes with many configuration options added to "Convert To Indexed" window
 	* Optional gamma correction for image scaling, rotation, Gaussian blur and unsharp mask
 	* Smudge tool can be configured to ignore opacity mode - right click the tool icon

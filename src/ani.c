@@ -60,10 +60,9 @@ int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10, ani_play_state = FALSE,
 
 ///	FORM VARIABLES
 
-static GtkWidget *animate_window = NULL, *ani_prev_win, *ani_progressbar,
+static GtkWidget *animate_window = NULL, *ani_prev_win,
 	*ani_entry_path, *ani_entry_prefix,
 	*ani_spin[5],			// start, end, delay
-	*ani_frames[5],			// Main frames: files, progress, layers, buttons, preview
 	*ani_text_pos, *ani_text_cyc,	// Text input widgets
 	*ani_prev_slider		// Slider widget on preview area
 	;
@@ -73,7 +72,7 @@ static int
 	ani_layer_data[MAX_LAYERS + 1][4],			// x, y, opacity, visible
 	ani_currently_selected_layer;
 static char ani_output_path[260], ani_file_prefix[ANI_PREFIX_LEN+2];
-static gboolean ani_use_gif, ani_show_main_state, ani_bail_out;
+static gboolean ani_use_gif, ani_show_main_state;
 
 
 
@@ -829,7 +828,6 @@ static void create_frames_ani()
 	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256], npt[3];
 	char output_path[300], *txt, command[512], wild_path[300];
 	int a, b, k, i, cols, trans, layer_w, layer_h;
-	float percent;
 #ifndef WIN32
 	mode_t mode = 0777;
 #endif
@@ -838,11 +836,8 @@ static void create_frames_ani()
 	ani_win_read_widgets();
 	ani_cyc_len_init();		// Prepare the cycle index for the animation
 
-	gtk_widget_set_sensitive( ani_frames[0], FALSE );
-	gtk_widget_set_sensitive( ani_frames[2], FALSE );
-	gtk_widget_set_sensitive( ani_frames[3], FALSE );
+	gtk_widget_hide(animate_window);
 
-	gtk_widget_show( ani_frames[1] );
 	ani_write_layer_data();
 	layer_press_save();		// Save layers data file
 
@@ -941,12 +936,11 @@ static void create_frames_ani()
 		}
 	}
 
-	ani_bail_out = FALSE;
+	progress_init(_("Creating Animation Frames"), 1);
 	for ( k=a; k<=b; k++ )			// Create each frame and save it as a PNG or GIF image
 	{
-		if ( b==a ) percent = 0.0;
-		else percent = ((float) k-a) / ((float) b-a);
-		gtk_progress_set_percentage( GTK_PROGRESS (ani_progressbar), percent );
+		if (progress_update(b == a ? 0.0 : (k - a) / (float)(b - a)))
+			break;
 
 		ani_set_frame_state(k);		// Change layer positions
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
@@ -1032,10 +1026,6 @@ static void create_frames_ani()
 				goto failure2;
 			}
 		}
-
-		while (gtk_events_pending()) gtk_main_iteration();	// Ensure GUI doesn't lock up
-		if ( ani_bail_out ) break;	// User has requested a stoppage
-		// Any errors result in break;
 	}
 
 	if ( ani_use_gif )	// all GIF files created OK so lets give them to gifsicle
@@ -1064,21 +1054,13 @@ static void create_frames_ani()
 	}
 
 failure2:
+	progress_end();
 	free( layer_rgb );
 
 failure:
-	if ( irgb != NULL ) free( irgb );
+	free( irgb );
 
-	gtk_widget_set_sensitive( ani_frames[0], TRUE );
-	gtk_widget_set_sensitive( ani_frames[2], TRUE );
-	gtk_widget_set_sensitive( ani_frames[3], TRUE );
-
-	gtk_widget_hide( ani_frames[1] );
-}
-
-static void ani_pressed_stop()
-{
-	ani_bail_out = TRUE;
+	gtk_widget_show(animate_window);
 }
 
 void pressed_remove_key_frames()
@@ -1203,7 +1185,7 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *frame, *table, *label, *button, *notebook1, *scrolledwindow;
 	GtkWidget *ani_toggle_gif, *ani_list_layers, *list_data;
-	GtkWidget *hbox1, *hbox3, *hbox4, *hbox2, *vbox1, *vbox2, *vbox3, *vbox4;
+	GtkWidget *hbox3, *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
 
 #if GTK_MAJOR_VERSION == 2
 	GtkTextBuffer *texbuf;
@@ -1245,20 +1227,10 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (animate_window), vbox1);
 
-	hbox1 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox1);
-	gtk_box_pack_start (GTK_BOX (vbox1), hbox1, FALSE, FALSE, 0);
-
-	frame = gtk_frame_new (_("Output Files"));
-	ani_frames[0] = frame;
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (hbox1), frame, TRUE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-	gtk_frame_set_label_align (GTK_FRAME (frame), 0.0, 0.5);
-
 	vbox4 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox4);
-	gtk_container_add (GTK_CONTAINER (frame), vbox4);
+	frame = add_with_frame(vbox1, _("Output Files"), vbox4, 5);
+	gtk_frame_set_label_align (GTK_FRAME (frame), 0.0, 0.5);
 
 	table = gtk_table_new (5, 3, FALSE);
 	gtk_widget_show (table);
@@ -1309,29 +1281,9 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (ani_toggle_gif), ani_use_gif);
 	gtk_signal_connect(GTK_OBJECT(ani_toggle_gif), "clicked", GTK_SIGNAL_FUNC(ani_tog_gif), NULL);
 
-	frame = gtk_frame_new (_("Progress"));
-	ani_frames[1] = frame;
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (hbox1), frame, TRUE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
-	vbox2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox2);
-	gtk_container_add (GTK_CONTAINER (frame), vbox2);
-
-	ani_progressbar = gtk_progress_bar_new ();
-	gtk_widget_show (ani_progressbar);
-	gtk_box_pack_start (GTK_BOX (vbox2), ani_progressbar, FALSE, FALSE, 5);
-	gtk_progress_set_show_text (GTK_PROGRESS (ani_progressbar), TRUE);
-
-	button = add_a_button( _("STOP"), 5, vbox2, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_pressed_stop), NULL);
-
-
 ///	LAYERS TABLES
 
 	frame = gtk_frame_new (_("Layers"));
-	ani_frames[2] = frame;
 	gtk_widget_show (frame);
 	gtk_box_pack_start (GTK_BOX (vbox1), frame, TRUE, TRUE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
@@ -1470,7 +1422,6 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 ///	MAIN BUTTONS
 
 	hbox2 = gtk_hbox_new (FALSE, 0);
-	ani_frames[3] = hbox2;
 	gtk_widget_show (hbox2);
 	gtk_box_pack_start (GTK_BOX (vbox1), hbox2, FALSE, FALSE, 0);
 
@@ -1489,8 +1440,6 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_signal_connect_object (GTK_OBJECT (animate_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_ani), NULL);
-
-	gtk_widget_hide( ani_frames[1] );	// Hide progress at beginning
 
 	ani_show_main_state = show_layers_main;	// Remember old state
 	show_layers_main = FALSE;		// Don't show all layers in main window - too messy

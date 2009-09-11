@@ -94,6 +94,7 @@ typedef struct
 {
 	char *actname;
 	int action, key, kmask, kflags;
+	guint hwcode;
 } key_action;
 
 extern key_action main_keys[];

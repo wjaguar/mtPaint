@@ -2240,7 +2240,7 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
-	GtkWidget *label, *frame, *vbox, *hbox;
+	GtkWidget *label, *vbox, *hbox;
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
 		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
@@ -2298,50 +2298,30 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* Main page - Palette frame */
 
-	frame = gtk_frame_new(_("Palette"));
-	gtk_box_pack_start(GTK_BOX(page0), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
-
 	/* No exact transfer if too many colours */
 	if (quantize_cols > 256) rad_txt[0] = "";
 	vbox = wj_radio_pack(rad_txt, -1, 0, quantize_cols > 256 ? 4 : 0,
 		&quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
-	gtk_container_add(GTK_CONTAINER(frame), vbox);
+	add_with_frame(page0, _("Palette"), vbox, 5);
 
 	/* Main page - Dither frame */
 
-	quantize_dither = frame = gtk_frame_new(_("Dither"));
-	gtk_box_pack_start(GTK_BOX(page0), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
-
 	hbox = wj_radio_pack(rad_txt2, -1, 6, quantize_cols > 256 ?
 		DITH_OLDFS : DITH_NONE, &dither_mode, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
 	if (quantize_cols <= 256)
 		gtk_widget_set_sensitive(quantize_dither, FALSE);
 
 	/* Settings page */
 
-	frame = gtk_frame_new(_("Colour space"));
-	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
-
 	hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
-
-	frame = gtk_frame_new(_("Difference measure"));
-	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+	add_with_frame(page1, _("Colour space"), hbox, 5);
 
 	hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
-
-	frame = gtk_frame_new(_("Reduce colour bleed"));
-	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+	add_with_frame(page1, _("Difference measure"), hbox, 5);
 
 	hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	add_with_frame(page1, _("Reduce colour bleed"), hbox, 5);
 
 	dither_serpent = gtk_check_button_new_with_label(_("Serpentine scan"));
 	gtk_widget_show(dither_serpent);
@@ -2360,13 +2340,9 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), (dither_sel ?
 		dither_fract[1] : dither_fract[0]) * 100.0);
 
-	frame = gtk_frame_new(_("Selective error propagation"));
-	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
-
 	hbox = wj_radio_pack(err_txt, -1, 3, dither_sel, &dither_sel,
 		GTK_SIGNAL_FUNC(toggle_selective));
-	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	add_with_frame(page1, _("Selective error propagation"), hbox, 5);
 
 	/* OK / Cancel */
 

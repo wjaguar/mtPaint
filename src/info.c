@@ -310,14 +310,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox4);
 	gtk_container_add (GTK_CONTAINER (info_window), vbox4);
 
-	frame = gtk_frame_new (_("Memory"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox4), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	table4 = gtk_table_new (3, 2, FALSE);
 	gtk_widget_show (table4);
-	gtk_container_add (GTK_CONTAINER (frame), table4);
+	add_with_frame(vbox4, _("Memory"), table4, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (table4), 5);
 
 	add_to_table( _("Total memory for main + undo images"), table4, 0, 0, 5 );
@@ -377,14 +372,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 		add_to_table( txt, table4, 5, 1, 5 );
 	}
 
-	frame = gtk_frame_new (_("Colour Histogram"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox4), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 4);
-
 	vbox5 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox5);
-	gtk_container_add (GTK_CONTAINER (frame), vbox5);
+	add_with_frame(vbox4, _("Colour Histogram"), vbox5, 4);
 
 	hs_norm = FALSE;
 	hs_rgb_mem = malloc( HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp );

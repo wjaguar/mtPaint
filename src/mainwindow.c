@@ -817,7 +817,7 @@ gint check_zoom_keys(int action)
 
 key_action main_keys[] = {
 	{"QUIT",	ACT_QUIT, GDK_q, 0, 0},
-	{"",		ACT_QUIT, GDK_Q, 0, 0},
+//	{"",		ACT_QUIT, GDK_Q, 0, 0},
 	{"ZOOM_IN",	ACT_ZOOM_IN, GDK_plus, _CS, 0},
 	{"",		ACT_ZOOM_IN, GDK_KP_Add, _CS, 0},
 	{"",		ACT_ZOOM_IN, GDK_equal, _CS, 0},
@@ -950,14 +950,28 @@ key_action main_keys[] = {
 	{NULL,		0, 0, 0, 0}
 };
 
+static void fill_keycodes(key_action *keys)
+{
+	for (; keys->action; keys++)
+	{
+		keys->hwcode = keyval_key(keys->key);
+	}
+}
+
 int wtf_pressed(GdkEventKey *event, key_action *keys)
 {
-	/* Only affects letters, but still somewhat useful */
-	guint lowkey = gdk_keyval_to_lower(event->keyval);
+// !!! Hope this won't be needed anymore
+//	/* Only affects letters, but still somewhat useful */
+//	guint lowkey = gdk_keyval_to_lower(event->keyval);
+	guint realkey = real_key(event);
+
+// g_print("!!! %d %d\n", real_key(event), keyval_key(event->keyval));
 
 	while (keys->action)
 	{
-		if ((lowkey == keys->key) &&
+// !!! Hope this won't be needed anymore
+//		if ((lowkey == keys->key) &&
+		if ((realkey == keys->hwcode) &&
 			((event->state & keys->kmask) == keys->kflags))
 			return (keys->action);
 		keys++;
@@ -2699,7 +2713,9 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 		gtk_widget_queue_draw(drawing_canvas);
 			// Force redraw of whole canvas as the margin has shifted
 	}
-	vw_align_size(vw_zoom);		// Update the view window as needed
+	float old_zoom = vw_zoom;
+	vw_zoom = -1; /* Force resize */
+	vw_align_size(old_zoom);		// Update the view window as needed
 
 	return TRUE;
 }
@@ -3543,6 +3559,9 @@ void main_init()
 	view_hide();					// Hide paned view initially
 
 	gtk_widget_show (main_window);
+
+	/* !!! Have to wait till canvas is displayed, to init keyboard */
+	fill_keycodes(main_keys);
 
 	gtk_widget_grab_focus(scrolledwindow_canvas);	// Stops first icon in toolbar being selected
 	gdk_window_raise( main_window->window );

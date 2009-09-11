@@ -77,9 +77,18 @@ char *gtkncpy(char *dest, const char *src, int cnt);
 
 GtkWidget *table_slot(GtkWidget *table, int row, int col);
 
+// Packing framed widget
+
+GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border);
+
 // Moving mouse cursor
 
 int move_mouse_relative(int dx, int dy);
+
+// Mapping keyval to key
+
+guint real_key(GdkEventKey *event);
+guint keyval_key(guint keyval);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

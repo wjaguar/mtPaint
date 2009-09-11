@@ -464,6 +464,18 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col)
 	return (NULL);
 }
 
+// Packing framed widget
+
+GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border)
+{
+	GtkWidget *frame = gtk_frame_new(text);
+	gtk_widget_show(frame);
+	gtk_box_pack_start(GTK_BOX(box), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), border);
+	gtk_container_add(GTK_CONTAINER(frame), widget);
+	return (frame);
+}
+
 // Whatever is needed to move mouse pointer 
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */
@@ -512,6 +524,46 @@ int move_mouse_relative(int dx, int dy)
 int move_mouse_relative(int dx, int dy)
 {
 	return (FALSE);
+}
+
+#endif
+
+// Whatever is needed to map keyval to key
+
+#if GTK_MAJOR_VERSION == 1 /* Call X */
+
+guint real_key(GdkEventKey *event)
+{
+	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+		event->keyval);
+}
+
+guint keyval_key(guint keyval)
+{
+	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+		keyval);
+}
+
+#else /* Use GDK */
+
+guint real_key(GdkEventKey *event)
+{
+	return (event->hardware_keycode);
+}
+
+guint keyval_key(guint keyval)
+{
+	GdkDisplay *display = gtk_widget_get_display(drawing_canvas);
+	GdkKeymap *keymap = gdk_keymap_get_for_display(display);
+	GdkKeymapKey *key;
+	gint nkeys;
+
+	if (!gdk_keymap_get_entries_for_keyval(keymap, keyval, &key, &nkeys))
+		return (0);
+	if (!nkeys) return (0);
+	keyval = key[0].keycode;
+	g_free(key);
+	return (keyval);
 }
 
 #endif
