@@ -25,6 +25,7 @@
 #include "canvas.h"
 #include "memory.h"
 #include "inifile.h"
+#include "viewer.h"
 #include "mainwindow.h"
 
 
@@ -34,7 +35,7 @@ GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg, *spinbutton_recent;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
-static GtkWidget *checkbutton_zoom[3],		// zoom 100%, wheel
+static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit;
 static GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
@@ -59,17 +60,10 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 7
+#define PREF_LANGS 8
 
-char	*pref_lang_ini[PREF_LANGS * 2] = {
-		"system", NULL,
-		"cs_CZ", NULL,
-		"en_GB", NULL,
-		"fr_FR", NULL,
-		"pt_PT", NULL,
-		"pt_BR", NULL,
-		"es_ES", NULL
-		};
+char	*pref_lang_ini_code[PREF_LANGS] = { "system", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
+		"pt_PT", "pt_BR", "es_ES" };
 
 GtkWidget *pref_lang_label, *pref_lang_radio[PREF_LANGS];
 
@@ -334,6 +328,8 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 #endif
 	chequers_optimize = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
 	inifile_set_gboolean( "optimizeChequers", chequers_optimize );
+	opaque_view = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[3]));
+	inifile_set_gboolean( "disableTransparency", FALSE );
 
 	inifile_set_gboolean( "pasteCommit",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit)) );
@@ -349,7 +345,7 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 				&(GTK_RADIO_BUTTON( pref_lang_radio[i] )->check_button.toggle_button)
 					) ) type = i;
 	}
-	inifile_set( "languageSETTING", pref_lang_ini[type*2] );
+	inifile_set( "languageSETTING", pref_lang_ini_code[type] );
 	setup_language();
 #endif
 
@@ -429,6 +425,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	int i;
 #ifdef U_NLS
 	int j;
+	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Czech"), _("English (UK)"),
+		_("French"), _("German"), _("Portuguese"), _("Portuguese (Brazilian)"), _("Spanish")
+					};
 	GSList *radio_group;
 #endif
 
@@ -587,7 +586,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		vbox_3, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
 #endif
 	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
-		vbox_3, inifile_get_gboolean("optimizeChequers", TRUE) );
+		vbox_3, chequers_optimize );
+	checkbutton_zoom[3] = add_a_toggle( _("Disable view window transparencies"),
+		vbox_3, opaque_view );
 
 
 
@@ -701,14 +702,6 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 #ifdef U_NLS
 
-	pref_lang_ini[1] = _("Default System Language");
-	pref_lang_ini[3] = _("Czech");
-	pref_lang_ini[5] = _("English (UK)");
-	pref_lang_ini[7] = _("French");
-	pref_lang_ini[9] = _("Portuguese");
-	pref_lang_ini[11] = _("Portuguese (Brazilian)");
-	pref_lang_ini[13] = _("Spanish");
-
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
 	gtk_container_add (GTK_CONTAINER (notebook1), vbox_2);
@@ -727,12 +720,12 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 0 );
 	add_hseparator( vbox_2, 200, 10 );
 
-	pref_lang_radio[0] = add_radio_button( pref_lang_ini[1], NULL,  NULL, vbox_2, 0 );
+	pref_lang_radio[0] = add_radio_button( pref_langs[0], NULL,  NULL, vbox_2, 0 );
 	radio_group = gtk_radio_button_group( GTK_RADIO_BUTTON(pref_lang_radio[0]) );
-	pref_lang_radio[1] = add_radio_button( pref_lang_ini[3], radio_group, NULL, vbox_2, 1 );
+	pref_lang_radio[1] = add_radio_button( pref_langs[1], radio_group, NULL, vbox_2, 1 );
 	for ( i=2; i<PREF_LANGS; i++ )
 		pref_lang_radio[i] = add_radio_button(
-					pref_lang_ini[i*2+1], NULL, pref_lang_radio[1], vbox_2, i );
+					pref_langs[i], NULL, pref_lang_radio[1], vbox_2, i );
 
 	for ( i=0; i<PREF_LANGS; i++ )
 		gtk_container_set_border_width( GTK_CONTAINER(pref_lang_radio[i]), 5 );
@@ -740,7 +733,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	j = 0;
 	for ( i = PREF_LANGS - 1; i>0; i-- )
 	{
-		if ( strcmp( pref_lang_ini[i*2], inifile_get( "languageSETTING", "system" ) ) == 0 )
+		if ( strcmp( pref_lang_ini_code[i], inifile_get( "languageSETTING", "system" ) ) == 0 )
 			j = i;
 	}
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(pref_lang_radio[j]), TRUE );

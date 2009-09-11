@@ -76,9 +76,10 @@ static void activate_channel(int chan)
 static void click_newchan_ok(GtkButton *button, gpointer user_data)
 {
 	chanlist tlist;
-	int i, ii, k, j = mem_width * mem_height, range, rgb[3];
+	int i, ii, j = mem_width * mem_height, range, rgb[3];
 	unsigned char sq1024[1024], *src, *dest, *tmp;
-	double r2;
+	unsigned int k;
+	double r2, rr;
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
@@ -131,9 +132,9 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 					(mem_pal[i].green - rgb[1]) +
 					(mem_pal[i].blue - rgb[2]) *
 					(mem_pal[i].blue - rgb[2]);
-				k = r2 * (double)range;
+				k = rr = r2 * (double)range;
 				/* Fast square root */
-				if (k >= (255 * 255)) ii = 255;
+				if (rr >= (255.0 * 255.0)) ii = 255;
 				else if (k < 1024) ii = sq1024[k];
 				else
 				{
@@ -155,9 +156,9 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 				range = (src[0] - rgb[0]) * (src[0] - rgb[0]) +
 					(src[1] - rgb[1]) * (src[1] - rgb[1]) +
 					(src[2] - rgb[2]) * (src[2] - rgb[2]);
-				k = r2 * (double)range;
+				k = rr = r2 * (double)range;
 				/* Fast square root */
-				if (k >= (255 * 255)) ii = 255;
+				if (rr >= (255.0 * 255.0)) ii = 255;
 				else if (k < 1024) ii = sq1024[k];
 				else
 				{
@@ -386,6 +387,8 @@ void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item
 
 void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
+	mem_img_dis[item] = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	update_all_views();
 }
 
 int do_threshold(GtkWidget *spin, gpointer fdata)
@@ -425,3 +428,16 @@ void pressed_channel_config_overlay()
 {
 	colour_selector( COLSEL_OVERLAYS );
 }
+
+void pressed_channel_load()
+{
+	if ( mem_channel == CHN_IMAGE ) return;
+	file_selector( FS_CHANNEL_LOAD );
+}
+
+void pressed_channel_save()
+{
+	if ( mem_channel == CHN_IMAGE ) return;
+	file_selector( FS_CHANNEL_SAVE );
+}
+

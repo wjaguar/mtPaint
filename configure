@@ -3,7 +3,7 @@
 
 echo
 
-MT_V="2.81.64"
+MT_V="2.83"
 MT_DATE="2006-8-7"
 
 MT_VERSION="mtPaint $MT_V"
@@ -23,7 +23,7 @@ GTK_FILE=_conf.txt
 GIFPATH=/usr/include/gif_lib.h
 JPEGPATH=/usr/include/jpeglib.h
 TIFFPATH=/usr/include/tiffio.h
-CPU=i586
+MARCH=
 OPTS=YES
 DEBUG=NO
 HELP=1
@@ -102,11 +102,12 @@ do
 		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
 				MT_PO_DEST=$MT_LANG_DEST;;
 		"--mandir="* )	MT_MAN_DEST="`echo "$A" | sed -e "s/--mandir=//"`";;
-		"--cpu="* )	CPU="`echo "$A" | sed -e "s/--cpu=//"`";;
+		"--cpu="* )	MARCH='-march='"`echo "$A" | sed -e "s/--cpu=//"`";;
 		"icons"* )	ICON_SET=$A;;
-		"386" )		CPU=i386;;
-		"486" )		CPU=i486;;
-		"686" )		CPU=i686;;
+		"386" )		MARCH='-march=i386';;
+		"486" )		MARCH='-march=i486';;
+		"586" )		MARCH='-march=i586';;
+		"686" )		MARCH='-march=i686';;
 		"--prefix="* )	MT_PREFIX="`echo "$A" | sed -e "s/--prefix=//"`"
 				WIN_BIN_INSTALL="$MT_PREFIX/bin"
 				LIN_BIN_INSTALL="$MT_PREFIX/bin"
@@ -114,7 +115,7 @@ do
 				MT_PO_DEST=$MT_LANG_DEST
 				MT_MAN_DEST="$MT_PREFIX/man/man1";;
 		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
-		"guada" )	CPU=i386
+		"guada" )	MARCH='-march=i386'
 				MT_LANG=YES
 				MT_MAN=YES
 				MT_POD=YES
@@ -164,8 +165,9 @@ then
 	echo "gtk1 ............ Configure for GTK+1"
 	echo "gtk2 ............ Configure for GTK+2"
 	echo
-	echo "--cpu=CPU ....... Target a specific CPU, e.g. athlon-xp, x86-64"
+	echo "--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64"
 	echo "686 ............. Target 686 machines"
+	echo "586 ............. Target 586 machines"
 	echo "486 ............. Target 486 machines"
 	echo "386 ............. Target 386 machines"
 	echo "slow ............ Don't use compiler optimizations"
@@ -194,7 +196,7 @@ then
 	echo
 	echo "icons ........... Compile with alternative icon set - see ./src/icons1/README for details"
 	echo
-	echo "Default settings: 586 CPU, GNU/Linux system, O2 optimizations, English only version"
+	echo "Default settings: GNU/Linux system, O2 optimizations, English only version"
 	echo "$GIFPATH is checked to determine GIF availability"
 	echo "$JPEGPATH is checked to determine JPEG availability"
 	echo "$TIFFPATH is checked to determine TIFF availability"
@@ -298,9 +300,9 @@ else
 
 	if [ "$OPTS" == "YES" ]
 	then
-		echo "CFLAG = -O2 -march=$CPU $GTK_INCLUDE" >> $GTK_FILE
+		echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
 	else
-		echo "CFLAG = -march=$CPU $GTK_INCLUDE" >> $GTK_FILE
+		echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
 	fi
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
@@ -324,8 +326,11 @@ else
 	echo
 	echo "GTK+ version        $GTK"
 	echo
-	echo "CPU target          $CPU"
+if [ "$MARCH" ]
+then
+	echo "MARCH target        $MARCH"
 	echo
+fi
 	echo "Optimizations       $OPTS"
 	echo
 	echo "Debug info          $DEBUG"

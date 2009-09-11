@@ -35,6 +35,7 @@
 #include "canvas.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "viewer.h"
 #include "csel.h"
 
 
@@ -57,6 +58,7 @@ int flood_cube, flood_img, flood_slide;
 
 char mem_filename[256];			// File name of file loaded/saved
 chanlist mem_img;			// Array of pointers to image channels
+int mem_img_dis[NUM_CHANNELS] = {0, 0, 0, 0};	// Disabled channels
 int mem_channel = CHN_IMAGE;		// Current active channel
 int mem_img_bpp;			// Bytes per pixel = 1 or 3
 int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
@@ -864,6 +866,8 @@ void mem_init()					// Initialise memory
 			else	channel_opacity[i] = inifile_get_gint32(txt, channel_opacity[i] );
 		}
 	}
+
+	opaque_view = inifile_get_gboolean( "disableTransparency", FALSE );
 }
 
 void copy_dig( int index, int tx, int ty )
@@ -3519,7 +3523,7 @@ int pixel_protected(int x, int y)
 		return (255);
 
 	/* Mask channel */
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !mem_img_dis[CHN_MASK])
 		return (mem_img[CHN_MASK][offset]);
 
 	return (0);
@@ -3539,7 +3543,7 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	}
 
 	/* Clear mask or copy mask channel into it */
-	if (mask0) memcpy(mask, mask0, cnt);
+	if (mask0 && !mem_img_dis[CHN_MASK]) memcpy(mask, mask0, cnt);
 	else memset(mask, 0, cnt);
 
 	/* Add colour protection to it */

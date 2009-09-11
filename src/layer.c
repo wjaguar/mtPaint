@@ -920,23 +920,34 @@ void parse_filename( char *dest, char *prefix, char *file )
 
 void layer_press_save_composite()		// Create, save, free the composite image
 {
-	char comp_name[300];
+	file_selector( FS_COMPOSITE_SAVE );
+}
 
-	layer_press_save();		// Save text file first
+int layer_save_composite( char *fname )
+{
+	int res=0;
 
-	if ( strcmp( layers_filename, _("Untitled") ) == 0 ) return;
-		// Bail out if user hasn't saved yet
+	if ( layer_selected != 0 )
+	{
+		layer_w = layer_table[0].image->mem_width;
+		layer_h = layer_table[0].image->mem_height;
+	}
+	else
+	{
+		layer_w = mem_width;
+		layer_h = mem_height;
+	}
 
 	layer_rgb = malloc( layer_w * layer_h * 3);
 	if ( layer_rgb != NULL )
 	{
-		sprintf(comp_name, "%s.png", layers_filename);			// Add .png to end
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
-		if ( save_png( comp_name, 3 ) < 0 )				// Save to PNG
-			alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
+		res = save_png( fname, 3 );					// Save to PNG
 		free( layer_rgb );
 	}
 	else memory_errors(1);
+
+	return res;
 }
 
 int save_layers( char *file_name )
@@ -1272,7 +1283,8 @@ gint delete_layers_window()
 
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 {
-	int ol = layer_selected;
+	int ol = layer_selected, new_type = CMASK_IMAGE, i, j;
+	unsigned char *src;
 
 	if ( layers_total<MAX_LAYERS )
 	{
@@ -1280,15 +1292,13 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 		if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
 				// This stops a nasty segfault if users does 2 quick paste layers
 
-		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols,
-			(mem_clip_alpha ? CMASK_RGBA : CMASK_IMAGE) |
-			CMASK_FOR(mem_channel));
+		if ( mem_clip_alpha || mem_clip_mask ) new_type = CMASK_RGBA;
+		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, new_type);
+
 		if ( layer_selected != ol )	// If == then new layer wasn't created
 		{
 			layer_table[layer_selected].x = mem_clip_x;
 			layer_table[layer_selected].y = mem_clip_y;
-//			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
-//				TRUE );			// Change tool
 
 			mem_pal_copy(layer_table[layer_selected].image->mem_pal,
 				layer_table[ol].image->mem_pal);		// Copy palette
@@ -1306,13 +1316,35 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 
 			layer_copy_to_main( layer_selected );
 			update_main_with_new_layer();
-			f_rectangle( 0, 0, mem_width, mem_height );
-			marq_x1=0;
-			marq_y1=0;
-			marq_x2=mem_width-1;
-			marq_y2=mem_height-1;
-			commit_paste(FALSE);					// Paste
-			if ( layers_window == NULL ) pressed_layers( NULL, NULL );
+
+			j = mem_clip_w*mem_clip_h;
+			memcpy(mem_img[CHN_IMAGE], mem_clipboard, j*mem_clip_bpp);
+					// Copy image data
+
+			if ( (mem_clip_mask || mem_clip_alpha) && mem_img[CHN_ALPHA] )
+			{
+				if ( mem_clip_mask && mem_clip_alpha )
+				{
+					for ( i=0; i<j; i++ )
+					{
+						mem_img[CHN_ALPHA][i] = (
+							mem_clip_alpha[i]*(255-mem_clip_mask[i])
+							) / 255;
+					}
+				}
+				else	// Simple copy from clipboard mask or alpha
+				{
+					src = mem_clip_mask ? mem_clip_mask : mem_clip_alpha;
+					memcpy(mem_img[CHN_ALPHA], src, j);
+
+					if ( mem_clip_mask )
+					{
+						for ( i=0; i<j; i++ ) mem_img[CHN_ALPHA][i] ^= 255;
+					}	// Remember to flip values if its the mask
+				}
+			}
+
+//			if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 			if ( !view_showing ) view_show();
 
 		}

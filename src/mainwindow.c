@@ -58,7 +58,7 @@ GtkWidget
 	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
 	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
 	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS+1],
-	*menu_chan_del[2], *menu_chan_dis[NUM_CHANNELS+1]
+	*menu_chan_del[5], *menu_chan_dis[NUM_CHANNELS+1]
 	;
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
@@ -1427,6 +1427,8 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	int i, j, k, ii, ds = rr_zoom * 3, da = 0;
 	int w_bpp = rr_bpp, w_xpm = rr_xpm;
 
+	if ( mem_img_dis[CHN_ALPHA] ) alpha_blend = FALSE;
+
 	if (xtra_img)
 	{
 		src = xtra_img[CHN_IMAGE];
@@ -1605,6 +1607,10 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	opA = alpha && overlay_alpha ? channel_opacity[CHN_ALPHA] : 0;
 	opS = sel ? channel_opacity[CHN_SEL] : 0;
 	opM = mask ? channel_opacity[CHN_MASK] : 0;
+
+	if ( mem_img_dis[CHN_ALPHA] ) opA = 0;
+	if ( mem_img_dis[CHN_SEL] ) opS = 0;
+	if ( mem_img_dis[CHN_MASK] ) opM = 0;
 
 	/* Nothing to do - don't waste time then */
 	j = opA + opS + opM;
@@ -1882,6 +1888,8 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
 	int j, jj, j0, l, dx, pww, zoom = 1, scale = 1, nix = 0, niy = 0;
 	int lop = 255, xpm = mem_xpm_trans;
+
+	if ( mem_img_dis[CHN_ALPHA] ) alpha_blend = FALSE;
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
@@ -2801,10 +2809,10 @@ void main_init()
 
 		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
 		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Channels/New ..."),	NULL, pressed_channel_create, -1, NULL },
-		{ _("/Channels/Load ..."),	NULL, NULL, -1, NULL },
-		{ _("/Channels/Save As ..."),	NULL, NULL, -1, NULL },
-		{ _("/Channels/Delete"),	NULL, pressed_channel_delete, -1, NULL },
+		{ _("/Channels/New ..."),	NULL,		pressed_channel_create, -1, NULL },
+		{ _("/Channels/Load ..."),	NULL,		pressed_channel_load, 0, NULL },
+		{ _("/Channels/Save As ..."),	NULL,		pressed_channel_save, 0, NULL },
+		{ _("/Channels/Delete"),	NULL,		pressed_channel_delete, -1, NULL },
 		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, CHN_IMAGE, "<RadioItem>" },
 		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, CHN_ALPHA, _("/Channels/Edit Image") },
@@ -2826,7 +2834,7 @@ void main_init()
 		{ _("/Layers/tear"),		NULL,		NULL, 0, "<Tearoff>" },
 		{ _("/Layers/Save"),		"<shift><control>S", layer_press_save, 0, NULL },
 		{ _("/Layers/Save As ..."),	NULL,		layer_press_save_as, 0, NULL },
-		{ _("/Layers/Save Composite Image"), NULL,	layer_press_save_composite, 0, NULL },
+		{ _("/Layers/Save Composite Image ..."), NULL,	layer_press_save_composite, 0, NULL },
 		{ _("/Layers/Remove All Layers ..."), NULL,	layers_remove_all, 0, NULL },
 		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
 		{ _("/Layers/Configure Animation ..."),		NULL, pressed_animate_window,0, NULL },
@@ -2893,7 +2901,8 @@ void main_init()
 	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
 			NULL},
-	*item_chan_del[] = {  _("/Channels/Delete"), NULL },
+	*item_chan_del[] = {  _("/Channels/Delete"), _("/Channels/Load ..."),
+				_("/Channels/Save As ..."),NULL },
 	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
 			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
 	;

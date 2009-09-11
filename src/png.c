@@ -19,6 +19,7 @@
 
 #define PNG_READ_PACK_SUPPORTED
 #include <png.h>
+#include <zlib.h>
 #include <stdlib.h>
 #include <ctype.h>
 
@@ -45,13 +46,22 @@ char preserved_gif_filename[256];
 int preserved_gif_delay = 10;
 
 
-
-int load_png( char *file_name, int stype )
+static void flip_clip_mask()
 {
-	char buf[PNG_BYTES_TO_CHECK], *mess;
+	int i, j = mem_clip_w * mem_clip_h;
+
+	for ( i=0; i<j; i++ ) mem_clip_mask[i] ^= 255;
+}
+
+int load_png( char *file_name, int stype )		// 0=image, 1=clipboard
+{
+	char buf[PNG_BYTES_TO_CHECK], *mess, *chunk_names[] = { "", "alPh", "seLc", "maSk" };
 	unsigned char *rgb, *rgb2, *rgb3, *alpha;
-	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height;
+	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height, num_uk,
+		chunk_type;
+	long dest_len;
 	FILE *fp;
+	png_unknown_chunkp uk_p;		// Pointer to unknown chunk structures
 	png_bytep *row_pointers, trans;
 	png_color_16p trans_rgb;
 
@@ -68,7 +78,6 @@ int load_png( char *file_name, int stype )
 	rewind( fp );
 
 	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-
 	if (png_ptr == NULL) goto fail;
 
 	info_ptr = png_create_info_struct(png_ptr);
@@ -87,6 +96,8 @@ int load_png( char *file_name, int stype )
 
 	png_init_io(png_ptr, fp);
 	png_set_sig_bytes(png_ptr, 0);
+
+	png_set_keep_unknown_chunks(png_ptr, 3, NULL, 0);	// Allow all chunks to be read
 
 	png_read_info(png_ptr, info_ptr);
 
@@ -145,7 +156,7 @@ int load_png( char *file_name, int stype )
 		png_set_palette_to_rgb(png_ptr);
 		png_set_gray_to_rgb(png_ptr);
 
-		if ( stype == 0 )
+		if ( stype == 0 )			// Load RGB image
 		{
 			mem_pal_load_def();
 			i = CMASK_IMAGE;
@@ -176,7 +187,7 @@ int load_png( char *file_name, int stype )
 				mem_cols = 256;		// Force full palette
 			}
 		}
-		if ( stype == 1 )
+		if ( stype == 1 )			// Load RGB clipboard
 		{
 			rgb = malloc( width * height * 3 );
 			if ( rgb == NULL )
@@ -186,15 +197,24 @@ int load_png( char *file_name, int stype )
 				free(row_pointers);
 				return -1;
 			}
+
+			if ( color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
+				color_type == PNG_COLOR_TYPE_GRAY_ALPHA )
+			{
+				alpha = malloc( width * height );
+			}
+			else	alpha = NULL;
+
 			mem_clip_bpp = 3;
 			mem_clipboard = rgb;
+			mem_clip_alpha = alpha;
 			mem_clip_w = width;
 			mem_clip_h = height;
 		}
 
 		if ( do_prog ) progress_init( mess, 0 );
 
-		if (stype == 0 && alpha)
+		if (alpha)				// 32bpp RGBA image/clipboard
 		{
 			row_pointers[0] = malloc(width * 4);
 			if ( row_pointers[0] == NULL ) goto force_RGB;
@@ -210,34 +230,14 @@ int load_png( char *file_name, int stype )
 					rgb2[2] = rgb3[2];
 					alpha[0] = rgb3[3];
 
-#if 0 /*	OLD CODE PRE HACK */
-							// Check each pixel's alpha and copy across
-					if ( rgb3[3] > 127 )
-					{
-						rgb2[0] = rgb3[0];
-						rgb2[1] = rgb3[1];
-						rgb2[2] = rgb3[2];
-					}
-					else
-					{
-						rgb2[0] = 115;
-						rgb2[1] = 115;
-						rgb2[2] = 0;
-					}
-#endif
 					alpha++;
 					rgb2 += 3;
 					rgb3 += 4;
 				}
-//				mem_pal[255].red = 115;
-//				mem_pal[255].green = 115;
-//				mem_pal[255].blue = 0;
-//				mem_xpm_trans = 255;
-//				mem_cols = 256;		// Force full palette
 			}
 			free(row_pointers[0]);
 		}
-		else
+		else					// 24bpp RGB
 		{
 force_RGB:
 			png_set_strip_alpha(png_ptr);
@@ -250,12 +250,8 @@ force_RGB:
 		}
 
 		if ( do_prog ) progress_end();
-
-		png_read_end(png_ptr, info_ptr);
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		fclose(fp);
 	}
-	else
+	else			// Indexed Palette file
 	{
 		if ( stype == 1 )
 		{
@@ -298,11 +294,73 @@ force_RGB:
 		if ( do_prog ) progress_end();
 
 		png_read_image(png_ptr, row_pointers);
-		png_read_end(png_ptr, info_ptr);
-
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		fclose(fp);
 	}
+
+	png_read_end(png_ptr, info_ptr);
+
+	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
+//printf("unknown chunks = %i\n", num_uk);
+	if (num_uk)				// File contains extra unknown chunks
+	{
+		for (i=0; i<num_uk; i++)	// Examine each chunk
+		{
+//printf("unknown %i = %s size = %i\n", i, uk_p[i].name, uk_p[i].size);
+
+			for ( chunk_type = 1; chunk_type<4; chunk_type++ )
+			{
+				if ( strcmp(uk_p[i].name, chunk_names[chunk_type]) == 0 ) break;
+			}
+
+			if ( stype == 0 && chunk_type<4 )		// Load chunk into image
+			{
+				if ( mem_img[chunk_type] )
+					free( mem_img[chunk_type] );
+
+				mem_img[chunk_type] = calloc( 1, width*height );
+
+				if ( mem_img[chunk_type] )
+				{
+					dest_len = width * height;
+					uncompress( mem_img[chunk_type], &dest_len,
+						uk_p[i].data, uk_p[i].size );
+
+					mem_undo_im_[mem_undo_pointer].img[chunk_type] =
+						mem_img[chunk_type];
+				}
+			}
+			if ( stype == 1 && chunk_type<4 )		// Load chunk into clipboard
+			{
+				if ( chunk_type == CHN_ALPHA )
+				{
+					dest_len = width * height;
+					if ( mem_clip_alpha ) free( mem_clip_alpha );
+					mem_clip_alpha = calloc( 1, dest_len );
+					if ( mem_clip_alpha )
+					{
+						uncompress( mem_clip_alpha, &dest_len,
+							uk_p[i].data, uk_p[i].size );
+					}
+				}
+				if ( chunk_type == CHN_SEL )
+				{
+					dest_len = width * height;
+					if ( mem_clip_mask ) free( mem_clip_mask );
+					mem_clip_mask = calloc( 1, dest_len );
+					if ( mem_clip_mask )
+					{
+						uncompress( mem_clip_mask, &dest_len,
+							uk_p[i].data, uk_p[i].size );
+						flip_clip_mask();
+					}
+				}
+			}
+		}
+		png_free_data(png_ptr, info_ptr, PNG_FREE_UNKN, -1);
+	}
+
+	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+	fclose(fp);
+
 	free(row_pointers);
 
 	return 1;
@@ -318,12 +376,14 @@ file_too_huge:
 
 int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=composite layer
 {
+	png_unknown_chunk unknowns[3];
 	png_structp png_ptr;
 	png_infop info_ptr;
 	FILE *fp;
-	int i, j, scaler, h=0, w=0, image_type=0;
-	char *rgb = NULL, *mess = NULL, *alpha = NULL;
-	unsigned char trans[256], *rgba_row;
+	int i, j, scaler, h=0, w=0, image_type=0, chunks=0;
+	long dest_len;
+	char *mess = NULL, *chunk_names[] = { "", "alPh", "seLc", "maSk" };
+	unsigned char trans[256], *rgba_row, *f_img[4] = { NULL, NULL, NULL, NULL }, *z_temp;
 	png_color_16 trans_rgb;
 	png_bytep row_pointer;
 
@@ -333,23 +393,23 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 	{
 		h = mem_height;
 		w = mem_width;
-		rgb = mem_img[CHN_IMAGE];
-		alpha = mem_img[CHN_ALPHA];
+		for ( i=0; i<4; i++ ) f_img[i] = mem_img[i];
 		if ( stype == 0 ) mess = _("Saving PNG image");
 	}
 	if ( stype == 1 )
 	{
 		h = mem_clip_h;
 		w = mem_clip_w;
-		rgb = mem_clipboard;
-		alpha = mem_clip_alpha;
+		f_img[0] = mem_clipboard;
+		f_img[1] = mem_clip_alpha;
+		f_img[2] = mem_clip_mask;
 		mess = _("Saving Clipboard image");
 	}
 	if ( stype == 3 )
 	{
 		h = layer_h;
 		w = layer_w;
-		rgb = layer_rgb;
+		f_img[0] = layer_rgb;
 		mess = _("Saving Layer image");
 	}
 
@@ -389,7 +449,7 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 	}
 	else
 	{
-		if ( alpha == NULL ) image_type = PNG_COLOR_TYPE_RGB;
+		if ( f_img[1] == NULL ) image_type = PNG_COLOR_TYPE_RGB;
 		else image_type = PNG_COLOR_TYPE_RGB_ALPHA;
 
 		png_set_IHDR(png_ptr, info_ptr, w, h,
@@ -398,7 +458,7 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 
 		scaler = 3;
 		if ( stype!=3 && mem_xpm_trans > -1 && mem_xpm_trans < 256 &&
-			alpha == NULL )
+			f_img[1] == NULL )
 		{	// Transparent index in use - not for layers
 			trans_rgb.red = mem_pal[mem_xpm_trans].red;
 			trans_rgb.green = mem_pal[mem_xpm_trans].green;
@@ -411,12 +471,12 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 
 	if ( stype < 2 ) progress_init( mess, 0 );
 
-	if ( mem_img_bpp == 1 || alpha == NULL )		// Flat RGB/Indexed image
+	if ( mem_img_bpp == 1 || f_img[1] == NULL )		// Flat RGB/Indexed image
 	{
 		for (i = 0; i<h; i++)
 		{
 			if (i%16 == 0 && stype < 2) progress_update( ((float) i) / h );
-			row_pointer = (png_bytep) (rgb + scaler*i*w);
+			row_pointer = (png_bytep) (f_img[0] + scaler*i*w);
 			png_write_row(png_ptr, row_pointer);
 		}
 	}
@@ -430,10 +490,10 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 			{
 				for ( j=0; j<w; j++ )		// Extract RGB & A pixels
 				{
-					rgba_row[j*4  ] = rgb[ 3*(i*w + j) ];
-					rgba_row[j*4+1] = rgb[ 3*(i*w + j) + 1 ];
-					rgba_row[j*4+2] = rgb[ 3*(i*w + j) + 2 ];
-					rgba_row[j*4+3] = alpha[ i*w + j ];
+					rgba_row[j*4  ] = f_img[0][ 3*(i*w + j) ];
+					rgba_row[j*4+1] = f_img[0][ 3*(i*w + j) + 1 ];
+					rgba_row[j*4+2] = f_img[0][ 3*(i*w + j) + 2 ];
+					rgba_row[j*4+3] = f_img[1][ i*w + j ];
 				}
 				if (i%16 == 0 && stype < 2) progress_update( ((float) i) / h );
 				png_write_row(png_ptr, row_pointer);
@@ -443,6 +503,47 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=comp
 	}
 
 	if ( stype < 2 ) progress_end();
+
+		// Save private chunks into PNG file if we need to
+
+	if ( mem_img_bpp == 1 && f_img[1] ) j=1;	// Indexed + alpha => save alpha as private chunk
+	else j=2;
+
+	for ( i=j; i<4; i++ )			// Prepare chunk data for selection/mask channels
+	{
+		if ( f_img[i] )
+		{
+
+				// Get size required for each zlib compress
+#if ZLIB_VERNUM >= 0x1200
+			dest_len = compressBound( w*h );
+#else
+			dest_len = w*h + ((w*h) >> 8) + 32;
+#endif
+			if ( f_img[i]==mem_clip_mask ) flip_clip_mask(); // Flip values for paste mask
+
+			z_temp = malloc( dest_len );	  // Temporary space for compression
+			if ( z_temp )
+			{
+				if ( compress( z_temp, &dest_len, f_img[i], w*h ) == Z_OK )
+				{
+					snprintf( unknowns[0].name, 5, chunk_names[i] );
+					unknowns[0].data = z_temp;
+					unknowns[0].size = dest_len;
+					png_set_unknown_chunks(png_ptr, info_ptr, unknowns, 1);
+					png_set_unknown_chunk_location(png_ptr, info_ptr, chunks, 8);
+//printf("chunk %i = %i\n", chunks, dest_len );
+				}
+//else printf("chunk %i failed\n", chunks);
+				chunks++;
+				free( z_temp );
+			}
+
+			if ( f_img[i]==mem_clip_mask ) flip_clip_mask(); // Flip values for paste mask
+		}
+	}
+
+		// Tidy up
 
 	png_write_end(png_ptr, info_ptr);
 	png_destroy_write_struct(&png_ptr, &info_ptr);
@@ -1642,8 +1743,7 @@ int file_extension_get( char *file_name )
 
 int save_image( char *file_name )	// Save current canvas to file - sense extension to set type
 {
-	char	tname[260],
-		*ftypes[9] = {".xpm", ".xbm", ".jpg", "jpeg", ".gif", ".tif", "tiff", ".bmp", ".png" },
+	char	*ftypes[9] = {".xpm", ".xbm", ".jpg", "jpeg", ".gif", ".tif", "tiff", ".bmp", ".png" },
 		*ff1, *pbest = file_name;
 	int i, j, res = 0;
 
@@ -1673,33 +1773,6 @@ int save_image( char *file_name )	// Save current canvas to file - sense extensi
 	if ( j==6 ) res = save_tiff( file_name );
 	if ( j==7 ) res = save_bmp( file_name );
 	if ( j==8 ) res = save_png( file_name, 0 );
-
-	if ( res==0 )
-	{
-		if ( j==8 ) snprintf(tname, 256, "%s_c0", file_name);
-		else snprintf(tname, 256, "%s.png_c0", file_name);
-
-		if ( mem_img[CHN_ALPHA] )
-		{
-			if ( !(j==8 && mem_img_bpp==3) )
-			{
-				// Alpha channel needs to be saved as a separate file as not RGB & PNG
-				res = save_channel( tname, mem_img[CHN_ALPHA], mem_width, mem_height);
-			}
-		}
-
-		if ( res==0 && mem_img[CHN_SEL] )
-		{
-			tname[strlen(tname)-1] = '1';
-			res = save_channel( tname, mem_img[CHN_SEL], mem_width, mem_height);
-		}
-
-		if ( res==0 && mem_img[CHN_MASK] )
-		{
-			tname[strlen(tname)-1] = '2';
-			res = save_channel( tname, mem_img[CHN_MASK], mem_width, mem_height);
-		}
-	}
 
 	return res;
 }

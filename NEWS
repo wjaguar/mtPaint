@@ -10,7 +10,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Menus & toolbars reworked to be more task oriented
 	* Toolbars can now be toggled on and off via the View menu
 	* Drag 'n' drop from file managers supported for loading new layers
-	* Clicking palette numbers opens up "Edit all colours" window
+	* Clicking palette numbers opens up "Palette Editor" window
 	* Paste preview now respects the palette protection mask
 	* Transform Colour Window - Hue control added
 	* Transform Colour Window - Selective palette option
@@ -19,12 +19,19 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Colour A/B editor now uses GTK+ colour dialog
 	* Ctrl+Arrows resizes selection area
 	* Flood fill has fuzzy mode - right click icon for controls
+	* Saving/Loading clipboards now includes mask data
+	* Saving a composite layer image now de-coupled from saving the layer data file
 	* Most documentation has been removed from the F1 help and is now in HTML form
 	* HTML documentation available as a separate download package
 	* mtPaint mailing lists set up - http://sourceforge.net/mail/?group_id=155874
+	* configure script makes no assumptions about CPU - ./configure --help
 	* BUGFIX - Saving a composite layer image does not occasionally leave transparent areas
 	* BUGFIX - Transforming colour of palette with preview (RGB images) now works properly
 	* BUGFIX - Status bar now updated after removing all layers
+
+2.31	2006-5-31
+
+	* German translation contributed by Oliver Frommel
 
 2.30	2006-3-1
 

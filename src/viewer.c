@@ -44,7 +44,6 @@ gboolean
 	allow_cline = FALSE, view_update_pending = FALSE;
 float vw_zoom = 1;
 
-/* !!! Needs to have controlling toggle in prefs !!! */
 int opaque_view = FALSE;
 
 
@@ -1280,6 +1279,8 @@ gint render_text( GtkWidget *widget )
 	if ( t_image != NULL )
 	{
 		if ( mem_clipboard != NULL ) free( mem_clipboard );	// Lose old clipboard
+		if ( mem_clip_alpha != NULL ) free( mem_clip_alpha );	// Lose old clipboard alpha
+		mem_clip_alpha = NULL;
 		mem_clipboard = malloc( width * height * clip_bpp );
 		mem_clip_w = width;
 		mem_clip_h = height;

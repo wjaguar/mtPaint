@@ -83,6 +83,7 @@ int flood_cube, flood_img, flood_slide;
 
 char mem_filename[256];			// File name of file loaded/saved
 chanlist mem_img;			// Array of pointers to image channels
+int mem_img_dis[NUM_CHANNELS];		// Disabled channels
 int mem_channel;			// Current active channel
 int mem_img_bpp;			// Bytes per pixel = 1 or 3
 int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
@@ -108,7 +109,6 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 #define MAX_UNDO 101			// Maximum number of undo levels + 1
 
 undo_item mem_undo_im_[MAX_UNDO];	// Pointers to undo images + current image being edited
-// undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
 
 int mem_undo_pointer;		// Pointer to currently used image on canvas/screen
 int mem_undo_done;		// Undo images that we have behind current image (i.e. possible UNDO)

@@ -39,4 +39,5 @@ void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_config_overlay();
-
+void pressed_channel_load();
+void pressed_channel_save();

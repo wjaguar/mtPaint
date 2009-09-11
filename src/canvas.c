@@ -558,8 +558,10 @@ void do_the_copy(int op)
 		mem_clip_alpha = NULL;
 		if (mem_channel == CHN_IMAGE)
 		{
-			if (mem_img[CHN_ALPHA]) mem_clip_alpha = malloc(w * h);
-			if (mem_img[CHN_SEL]) mem_clip_mask = malloc(w * h);
+			if (mem_img[CHN_ALPHA] && !mem_img_dis[CHN_ALPHA])
+				mem_clip_alpha = malloc(w * h);
+			if (mem_img[CHN_SEL] && !mem_img_dis[CHN_SEL])
+				mem_clip_mask = malloc(w * h);
 		}
 		mem_clipboard = malloc(w * h * bpp);
 		text_paste = FALSE;
@@ -988,11 +990,10 @@ void set_new_filename( char *fname )
 	update_titlebar();
 }
 
-static void populate_channel( char *filename, int c )
+static int populate_channel( char *filename, int c )
 {
 	int res;
 	unsigned char *temp;
-	undo_item *undo = &mem_undo_im_[mem_undo_pointer];
 
 	if ( valid_file(filename) == 0 )
 	{
@@ -1000,19 +1001,30 @@ static void populate_channel( char *filename, int c )
 		if (temp)
 		{
 			res = load_channel( filename, temp, mem_width, mem_height);
-			if ( res != 0 ) free(temp);	// Problem with file I/O
-			else mem_img[c] = undo->img[c] = temp;
+			if ( res != 0 )
+			{
+				free(temp);	// Problem with file I/O
+				alert_box( _("Error"), _("Invalid channel file."), _("OK"), NULL, NULL );
+				return -1;
+			}
+			else
+			{
+				spot_undo( UNDO_FILT );
+				mem_img[c] = mem_undo_im_[mem_undo_pointer].img[c] = temp;
+			}
 		}
 		else memory_errors(1);		// Not enough memory available
 	}
+
+	return 0;
 }
 
 
 int do_a_load( char *fname )
 {
-	gboolean loading_single = FALSE, loading_png = FALSE;
+	gboolean loading_single = FALSE;
 	int res, i, gif_delay;
-	char mess[512], real_fname[300], chan_fname[260];
+	char mess[512], real_fname[300];
 
 #if DIR_SEP == '/'
 	if ( fname[0] != DIR_SEP )		// GNU/Linux
@@ -1037,10 +1049,7 @@ gtk_widget_hide( drawing_canvas );
 	if ( (res = load_jpeg( real_fname )) == -1 )
 	if ( (res = load_xpm( real_fname )) == -1 )
 	if ( (res = load_xbm( real_fname )) == -1 )
-	{
-		loading_png = TRUE;
 		res = load_png( real_fname, 0 );
-	}
 
 	if ( res>0 ) loading_single = TRUE;
 	else
@@ -1132,23 +1141,6 @@ gtk_widget_hide( drawing_canvas );
 			}
 
 			create_default_image();		// Have empty image again to avoid destroying old animation
-		}
-		else	// Load channels files if they exist
-		{
-			// Check for existence of <filename>_c? (PNG) <filename>.png_c? (non-PNG)
-			// if not RGB PNG loaded, check for ?=0.  Always look for ?=1, ?=2
-
-			if ( loading_png ) snprintf( chan_fname, 256, "%s_c0", fname );
-			else snprintf( chan_fname, 256, "%s.png_c0", fname );
-
-			if ( !( loading_png && mem_img_bpp==3) )
-				populate_channel( chan_fname, CHN_ALPHA );
-
-			chan_fname[strlen(chan_fname)-1] = '1';
-			populate_channel( chan_fname, CHN_SEL );
-
-			chan_fname[strlen(chan_fname)-1] = '2';
-			populate_channel( chan_fname, CHN_MASK );
 		}
 
 		update_all_views();					// Show new image
@@ -1420,12 +1412,7 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 					if ( file_extension_get( fname ) == EXT_TXT )
 						res = save_pal( fname, 1 );	// .txt
 					else	res = save_pal( fname, 0 );	// .gpl
-					if ( res < 0 )
-					{
-						snprintf(mess, 500, _("Unable to save file: %s"), fname);
-						alert_box( _("Error"), mess, _("OK"), NULL, NULL );
-						goto redo;
-					}
+					if ( res < 0 ) goto redo_name;
 					break;
 		case FS_CLIP_FILE:
 					strncpy( mem_clip_file[1], fname, 250 );
@@ -1510,6 +1497,20 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 #endif
 
 					break;
+			case FS_CHANNEL_LOAD:
+					if ( populate_channel( fname, mem_channel ) !=0 ) goto redo;
+					break;
+			case FS_CHANNEL_SAVE:
+					if ( check_file(fname) == 1 ) goto redo;
+					if ( save_channel( fname, mem_img[mem_channel],
+						mem_width, mem_height) !=0 )
+							goto redo_name;
+					break;
+			case FS_COMPOSITE_SAVE:
+					if ( check_file(fname) == 1 ) goto redo;
+					if ( layer_save_composite(fname) !=0 )
+						goto redo_name;
+					break;
 	}
 
 	gtk_window_set_transient_for( GTK_WINDOW(filew), NULL );	// Needed in Windows to stop GTK+ lowering the main window below window underneath
@@ -1524,6 +1525,9 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 	}
 
 	return FALSE;
+redo_name:
+	snprintf(mess, 500, _("Unable to save file: %s"), fname);
+	alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 redo:
 	gtk_window_set_modal(GTK_WINDOW(filew), TRUE);
 	return FALSE;
@@ -1570,6 +1574,12 @@ void file_selector( int action_type )
 		case FS_GIF_EXPLODE:	title = _("Import GIF animation - Choose frames directory");
 					break;
 		case FS_EXPORT_GIF:	title = _("Export GIF animation");
+					break;
+		case FS_CHANNEL_LOAD:	title = _("Load Channel");
+					break;
+		case FS_CHANNEL_SAVE:	title = _("Save Channel");
+					break;
+		case FS_COMPOSITE_SAVE:	title = _("Save Composite Image");
 					break;
 	}
 
@@ -2207,7 +2217,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 						off1 = rx + ry * mem_width;
 						off2 = sx + sy * mem_width;
 						if ((mem_channel == CHN_IMAGE) &&
-							RGBA_mode && mem_img[CHN_ALPHA])
+							RGBA_mode && mem_img[CHN_ALPHA] &&
+							!mem_img_dis[CHN_ALPHA])
 						{
 							px = mem_img[CHN_ALPHA][off1];
 							py = mem_img[CHN_ALPHA][off2];

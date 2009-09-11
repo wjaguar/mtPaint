@@ -141,7 +141,8 @@ GdkCursor *m_cursor[32];		// My mouse cursors
 
 static GtkWidget *toolbar_zoom_main = NULL, *toolbar_zoom_view,
 	*toolbar_labels[2],		// Colour A & B details
-	*ts_scales[3], *ts_spins[3]	// Size, flow, opacity
+	*ts_scales[3], *ts_spins[3],	// Size, flow, opacity
+	*tb_label_opacity		// Opacity label
 	;
 static unsigned char *mem_prev = NULL;		// RGB colours, tool, pattern preview
 
@@ -492,7 +493,7 @@ static void toolbar_settings_init()
 		_("Colour-Selective Mode"), _("Disable All Masks")
 		};
 
-	GtkWidget *iconw, *label, *vbox, *table, *toolbar_settings, *but;
+	GtkWidget *iconw, *label, *vbox, *table, *toolbar_settings, *but, *labels[3];
 	GdkPixmap *icon, *mask;
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
@@ -567,7 +568,8 @@ static void toolbar_settings_init()
 	table = add_a_table( 3, 3, 5, vbox );
 
 	for ( i=0; i<3; i++ )
-		add_to_table( ts_titles[i], table, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+		labels[i] = add_to_table( ts_titles[i], table, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+	tb_label_opacity = labels[2];
 
 	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	for ( i=0; i<3; i++ )
@@ -818,6 +820,11 @@ void toolbar_update_settings()
 	else	snprintf(txt, 30, "B = {%i,%i,%i}", mem_col_B24.red,
 			mem_col_B24.green, mem_col_B24.blue );
 	gtk_label_set_text( GTK_LABEL(toolbar_labels[1]), txt );
+
+	if ( mem_channel == CHN_IMAGE )
+		gtk_label_set_text( GTK_LABEL(tb_label_opacity), _("Opacity") );
+	else
+		gtk_label_set_text( GTK_LABEL(tb_label_opacity), channames[mem_channel] );
 }
 
 static gint expose_palette( GtkWidget *widget, GdkEventExpose *event )
