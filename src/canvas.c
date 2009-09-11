@@ -311,12 +311,14 @@ void pressed_clip_mask()
 
 void pressed_clip_alpha_scale()
 {
-	int i = mem_clip_scale_alpha();
+	if (!mem_clipboard || (mem_clip_bpp != 3)) return;
+	if (!mem_clip_mask) mem_clip_mask_init(0);
+	if (!mem_clip_mask) return;
 
-	if ( i==0 )
-	{
-		gtk_widget_queue_draw( drawing_canvas );
-	}
+	if (mem_scale_alpha(mem_clipboard, mem_clip_mask,
+		mem_clip_w, mem_clip_h, TRUE, 255)) return;
+
+	gtk_widget_queue_draw( drawing_canvas );
 }
 
 void pressed_clip_mask_all()
@@ -715,6 +717,8 @@ void update_menus()			// Update edit/undo menu
 
 	if ( mem_undo_redo == 0 ) men_item_state( menu_redo, FALSE );
 	else  men_item_state( menu_redo, TRUE );
+
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
 }
 
 void canvas_undo_chores()
@@ -877,7 +881,6 @@ int do_a_load( char *fname )
 	gboolean loading_single = FALSE;
 	int res, i, gif_delay;
 	char mess[512], real_fname[300];
-	float old_zoom = can_zoom;
 
 #if DIR_SEP == '/'
 	if ( fname[0] != DIR_SEP )		// GNU/Linux
@@ -939,23 +942,9 @@ gtk_widget_hide( drawing_canvas );
 
 	if ( loading_single )
 	{
-		mem_mask_setall(0);		// Clear all mask info
-		mem_col_A = 1, mem_col_B = 0;
-		mem_col_A24 = mem_pal[mem_col_A];
-		mem_col_B24 = mem_pal[mem_col_B];
-		tool_pat = 0;
-		init_pal();
-
-		can_zoom = -1;
-		if ( inifile_get_gboolean("zoomToggle", FALSE) )
-			align_size(1);			// Always start at 100%
-		else
-			align_size(old_zoom);
-
+		reset_tools();
 		register_file(real_fname);
 		set_new_filename(real_fname);
-		notify_unchanged();
-
 		if ( marq_status > MARQUEE_NONE ) marq_status = MARQUEE_NONE;
 			// Stops unwanted automatic paste following a file load when enabling
 			// "Changing tool commits paste" via preferences
@@ -963,8 +952,6 @@ gtk_widget_hide( drawing_canvas );
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
 			// Set tool to square for new image - easy way to lose a selection marquee
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-		update_menus();
-		pressed_opacity( 255 );		// Set opacity to 100% to start with
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
 	}

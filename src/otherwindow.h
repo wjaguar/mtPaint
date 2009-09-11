@@ -49,6 +49,7 @@ void colour_selector( int cs_type );			// Bring up GTK+ colour wheel
 
 int do_new_one( int nw, int nh, int nc, int nt, int bpp );
 void do_new_chores();
+void reset_tools();
 
 void bac_form( int type );
 void memory_errors(int type);

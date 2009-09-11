@@ -55,6 +55,7 @@
 #define CMASK_RGBA  ((1 << CHN_IMAGE) | (1 << CHN_ALPHA))
 #define CMASK_ALL   ((1 << NUM_CHANNELS) - 1)
 #define CMASK_CURR  (1 << mem_channel)
+#define CMASK_FOR(A) (1 << (A))
 
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
@@ -247,14 +248,15 @@ unsigned char *mem_undo_previous();	// Get address of previous image (or current
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user
 
-int undo_next_core(int handle, int new_width, int new_height,
-	int x_start, int y_start, int new_bpp, int cmask);
+int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 
 
 //// Drawing Primitives
 
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
-int mem_clip_scale_alpha();				// Extract alpha info from RGB clipboard
+//	Extract alpha info from RGB clipboard
+int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
+	int width, int height, int mode, unsigned char xorr);
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 

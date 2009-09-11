@@ -37,6 +37,7 @@
 #include "layer.h"
 #include "wu.h"
 #include "ani.h"
+#include "channels.h"
 #include "toolbar.h"
 
 
@@ -54,15 +55,16 @@ gint delete_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void do_new_chores()
+void reset_tools()
 {
 	float old_zoom = can_zoom;
 
 	notify_unchanged();
-	update_menus();
 
 	mem_mask_setall(0);		// Clear all mask info
 	mem_col_A = 1, mem_col_B = 0;
+	mem_col_A24 = mem_pal[mem_col_A];
+	mem_col_B24 = mem_pal[mem_col_B];
 	tool_pat = 0;
 	init_pal();
 
@@ -72,9 +74,14 @@ void do_new_chores()
 	else
 		align_size(old_zoom);
 
-	set_new_filename( _("Untitled") );
 	pressed_opacity( 255 );		// Set opacity to 100% to start with
+	update_menus();
+}
 
+void do_new_chores()
+{
+	reset_tools();
+	set_new_filename( _("Untitled") );
 	update_all_views();
 	gtk_widget_queue_draw(drawing_col_prev);
 }
@@ -1926,6 +1933,24 @@ static void do_allcol()
 	gtk_widget_queue_draw( drawing_col_prev );
 }
 
+static void do_allover()
+{
+	channel_rgb[CHN_ALPHA][0] = (ctable[0].red + 128) / 257;
+	channel_rgb[CHN_ALPHA][1] = (ctable[0].green + 128) / 257;
+	channel_rgb[CHN_ALPHA][2] = (ctable[0].blue + 128) / 257;
+	channel_opacity[CHN_ALPHA] = (col_sel_opac[0] + 128) / 257;
+	channel_rgb[CHN_SEL][0] = (ctable[1].red + 128) / 257;
+	channel_rgb[CHN_SEL][1] = (ctable[1].green + 128) / 257;
+	channel_rgb[CHN_SEL][2] = (ctable[1].blue + 128) / 257;
+	channel_opacity[CHN_SEL] = (col_sel_opac[1] + 128) / 257;
+	channel_rgb[CHN_MASK][0] = (ctable[2].red + 128) / 257;
+	channel_rgb[CHN_MASK][1] = (ctable[2].green + 128) / 257;
+	channel_rgb[CHN_MASK][2] = (ctable[2].blue + 128) / 257;
+	channel_opacity[CHN_MASK] = (col_sel_opac[2] + 128) / 257;
+	update_all_views();
+//	gtk_widget_queue_draw( drawing_col_prev );
+}
+
 static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( col_sel_type == COLSEL_EDIT_ALL )
@@ -1935,6 +1960,9 @@ static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 		spot_undo(UNDO_PAL);
 		do_allcol();
 	}
+
+	if ( col_sel_type == COLSEL_OVERLAYS )
+		do_allover();
 
 	delete_allcol( NULL, NULL, NULL );
 
@@ -2072,25 +2100,11 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
 	GtkWidget *cs;
-	png_color ovl[3];	// Overlay colours
 	char txt[64], *ovl_txt[] = { _("Alpha"), _("Selection"), _("Mask") };
 	int i, j=0;
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
-
-	ovl[0].red = 0;		// Just for testing - real values should come from back end
-	ovl[0].green = 0;
-	ovl[0].blue = 255;
-	ovl[1].red = 255;
-	ovl[1].green = 255;
-	ovl[1].blue = 0;
-	ovl[2].red = 255;
-	ovl[2].green = 0;
-	ovl[2].blue = 0;
-	col_sel_opac[0] = 128 * 257;
-	col_sel_opac[1] = 128 * 257;
-	col_sel_opac[2] = 128 * 257;
 
 	col_sel_type = cs_type;
 
@@ -2113,15 +2127,27 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 	if ( col_sel_type == COLSEL_OVERLAYS )
 	{
 		ctable = malloc( 3*sizeof(GdkColor) );
-		for ( i=0; i<3; i++ )
-		{
-			ctable[i].red   = ovl[i].red*257;
-			ctable[i].green = ovl[i].green*257;
-			ctable[i].blue  = ovl[i].blue*257;
-			ctable[i].pixel = ovl[i].blue +
-						(ovl[i].green << 8) +
-						(ovl[i].red << 16);
-		}
+		ctable[0].red   = channel_rgb[CHN_ALPHA][0] * 257;
+		ctable[0].green = channel_rgb[CHN_ALPHA][1] * 257;
+		ctable[0].blue  = channel_rgb[CHN_ALPHA][2] * 257;
+		ctable[0].pixel = channel_rgb[CHN_ALPHA][2] +
+			(channel_rgb[CHN_ALPHA][1] << 8) +
+			(channel_rgb[CHN_ALPHA][0] << 16);
+		col_sel_opac[0] = channel_opacity[CHN_ALPHA] * 257;
+		ctable[1].red   = channel_rgb[CHN_SEL][0] * 257;
+		ctable[1].green = channel_rgb[CHN_SEL][1] * 257;
+		ctable[1].blue  = channel_rgb[CHN_SEL][2] * 257;
+		ctable[1].pixel = channel_rgb[CHN_SEL][2] +
+			(channel_rgb[CHN_SEL][1] << 8) +
+			(channel_rgb[CHN_SEL][0] << 16);
+		col_sel_opac[1] = channel_opacity[CHN_SEL] * 257;
+		ctable[2].red   = channel_rgb[CHN_MASK][0] * 257;
+		ctable[2].green = channel_rgb[CHN_MASK][1] * 257;
+		ctable[2].blue  = channel_rgb[CHN_MASK][2] * 257;
+		ctable[2].pixel = channel_rgb[CHN_MASK][2] +
+			(channel_rgb[CHN_MASK][1] << 8) +
+			(channel_rgb[CHN_MASK][0] << 16);
+		col_sel_opac[2] = channel_opacity[CHN_MASK] * 257;
 	}
 
 	cs = gtk_color_selection_new();
@@ -2316,7 +2342,7 @@ gint click_quantize_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	else
 	{
 		pen_down = 0;
-		i = undo_next_core(2, mem_width, mem_height, 0, 0, 1, CMASK_IMAGE);
+		i = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
 		pen_down = 0;
 		if ( i == 1 ) i=2;
 

@@ -49,7 +49,7 @@ int preserved_gif_delay = 10;
 int load_png( char *file_name, int stype )
 {
 	char buf[PNG_BYTES_TO_CHECK], *mess;
-	unsigned char *rgb, *rgb2, *rgb3;
+	unsigned char *rgb, *rgb2, *rgb3, *alpha;
 	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height;
 	FILE *fp;
 	png_bytep *row_pointers, trans;
@@ -184,6 +184,10 @@ int load_png( char *file_name, int stype )
 		if (stype == 0 && (color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
 					color_type == PNG_COLOR_TYPE_GRAY_ALPHA ) )
 		{
+
+undo_next_core(1, mem_width, mem_height, mem_img_bpp, CMASK_FOR(CHN_ALPHA));		// Hack
+alpha = mem_img[CHN_ALPHA];
+
 			row_pointers[0] = malloc(width * 4);
 			if ( row_pointers[0] == NULL ) goto force_RGB;
 			for (row = 0; row < height; row++)
@@ -192,7 +196,16 @@ int load_png( char *file_name, int stype )
 				rgb2 = rgb + row*width*3;
 				rgb3 = row_pointers[0];
 				for (i=0; i<width; i++)
-				{			// Check each pixel's alpha and copy across
+				{
+					rgb2[0] = rgb3[0];
+					rgb2[1] = rgb3[1];
+					rgb2[2] = rgb3[2];
+					alpha[0] = rgb3[3];
+
+
+
+/*	OLD CODE PRE HACK
+							// Check each pixel's alpha and copy across
 					if ( rgb3[3] > 127 )
 					{
 						rgb2[0] = rgb3[0];
@@ -205,14 +218,16 @@ int load_png( char *file_name, int stype )
 						rgb2[1] = 115;
 						rgb2[2] = 0;
 					}
+*/
+alpha++;
 					rgb2 += 3;
 					rgb3 += 4;
 				}
-				mem_pal[255].red = 115;
-				mem_pal[255].green = 115;
-				mem_pal[255].blue = 0;
-				mem_xpm_trans = 255;
-				mem_cols = 256;		// Force full palette
+//				mem_pal[255].red = 115;
+//				mem_pal[255].green = 115;
+//				mem_pal[255].blue = 0;
+//				mem_xpm_trans = 255;
+//				mem_cols = 256;		// Force full palette
 			}
 			free(row_pointers[0]);
 		}

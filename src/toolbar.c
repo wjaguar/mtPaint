@@ -406,7 +406,7 @@ static void toolbar_settings_exit()
 
 static void toolbar_settings_init()
 {
-	int i, j, vals[] = {tool_size, tool_flow, tool_opacity};
+	int i, vals[] = {tool_size, tool_flow, tool_opacity}, max, min;
 	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") },
 	**icon_list_settings[TOTAL_ICONS_SETTINGS] = {
 		xpm_mode_cont_xpm, xpm_mode_opac_xpm, xpm_mode_tint_xpm, xpm_mode_tint2_xpm,
@@ -497,13 +497,14 @@ static void toolbar_settings_init()
 
 	for ( i=0; i<3; i++ )
 	{
-		ts_scales[i] = add_slider2table( vals[i], 1, 255, table, i, 1, 255, 20 );
+		min = 0; max = 255;
+		if ( i==2 ) min = 0;
+		ts_scales[i] = add_slider2table( vals[i], min, max, table, i, 1, 255, 20 );
 		gtk_widget_set_usize(ts_scales[i], 150, -1);
 		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ts_scales[i])->scale.range.adjustment),
 			"value_changed", GTK_SIGNAL_FUNC(ts_slider_moved), NULL);
-		j = 255;
-		if ( i<2 ) j = MAX_WIDTH;
-		spin_to_table( table, &ts_spins[i], i, 2, 2, vals[i], 1, j );
+		if ( i<2 ) max = MAX_WIDTH;
+		spin_to_table( table, &ts_spins[i], i, 2, 2, vals[i], min, max );
 
 #if GTK_MAJOR_VERSION == 2
 		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(ts_spins[i])->entry ),

@@ -19,9 +19,13 @@
 
 #include <gtk/gtk.h>
 
+int overlay_alpha;
+unsigned char channel_rgb[NUM_CHANNELS][3];
+unsigned char channel_opacity[NUM_CHANNELS];
+unsigned char channel_inv[NUM_CHANNELS];
 
-void pressed_channel_create();
-void pressed_channel_delete();
+void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_alpha_overlay( GtkMenuItem *menu_item );

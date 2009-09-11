@@ -56,7 +56,7 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
 	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
+	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS]
 	;
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
@@ -498,13 +498,12 @@ void pressed_opacity( int opacity )
 	if ( mem_img_bpp == 3 )
 	{
 		mtMIN( tool_opacity, opacity, 255 )
-		mtMAX( tool_opacity, tool_opacity, 1 )
+		mtMAX( tool_opacity, tool_opacity, 0 )
 
 		if ( marq_status >= MARQUEE_PASTE )
 			gtk_widget_queue_draw(drawing_canvas);
 				// Update the paste on the canvas as we have changed the opacity value
 	}
-	else tool_opacity = 255;
 
 	toolbar_update_settings();
 }
@@ -1261,8 +1260,7 @@ void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img)
 {
-/* !!! This var has to be set up from config !!! */
-	int alpha_blend = TRUE;
+	int alpha_blend = !overlay_alpha;
 	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
 	int i, j, k, ii, ds, da = 0;
 
@@ -1415,12 +1413,86 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img)
 {
+	unsigned char *alpha, *sel, *mask, *dest;
+	int i, j, k, ii, dw, opA, opS, opM, t0, t1, t2, t3;
 
-/*
- * !!! Render channel overlays here; xtra_img[] has precedence over base_img[]
- * as it was before for current layer's image and alpha channels
- */
+	if (xtra_img)
+	{
+		alpha = xtra_img[CHN_ALPHA];
+		sel = xtra_img[CHN_SEL];
+		mask = xtra_img[CHN_MASK];
+	}
+	else alpha = sel = mask = NULL;
+	j = rr_mw * y + x;
+	if (!alpha && base_img[CHN_ALPHA]) alpha = base_img[CHN_ALPHA] + j;
+	if (!sel && base_img[CHN_SEL]) sel = base_img[CHN_SEL] + j;
+	if (!mask && base_img[CHN_MASK]) mask = base_img[CHN_MASK] + j;
 
+	/* Prepare channel weights (256-based) */
+	k = 256 - channel_opacity[CHN_IMAGE] - (channel_opacity[CHN_IMAGE] >> 7);
+	opA = alpha && overlay_alpha ? channel_opacity[CHN_ALPHA] : 0;
+	opS = sel ? channel_opacity[CHN_SEL] : 0;
+	opM = mask ? channel_opacity[CHN_MASK] : 0;
+
+	/* Nothing to do - don't waste time then */
+	j = opA + opS + opM;
+	if (!k || !j) return;
+
+	opA = (k * opA) / j;
+	opS = (k * opS) / j;
+	opM = (k * opM) / j;
+	if (!(opA + opS + opM)) return;
+
+	dest = rgb;
+	ii = rr_dx;
+	for (i = dw = 0; ; ii += rr_scale , dw += rr_zoom)
+	{
+		if (i >= rr_width)
+		{
+			if (i > rr_width) break;
+			ii += rr_xwid;
+		}
+		t0 = t1 = t2 = t3 = 0;
+		if (opA)
+		{
+			j = opA * (alpha[dw] ^ channel_inv[CHN_ALPHA]);
+			t0 += j;
+			t1 += j * channel_rgb[CHN_ALPHA][0];
+			t2 += j * channel_rgb[CHN_ALPHA][1];
+			t3 += j * channel_rgb[CHN_ALPHA][2];
+		}
+		if (opS)
+		{
+			j = opS * (sel[dw] ^ channel_inv[CHN_SEL]);
+			t0 += j;
+			t1 += j * channel_rgb[CHN_SEL][0];
+			t2 += j * channel_rgb[CHN_SEL][1];
+			t3 += j * channel_rgb[CHN_SEL][2];
+		}
+		if (opM)
+		{
+			j = opM * (mask[dw] ^ channel_inv[CHN_MASK]);
+			t0 += j;
+			t1 += j * channel_rgb[CHN_MASK][0];
+			t2 += j * channel_rgb[CHN_MASK][1];
+			t3 += j * channel_rgb[CHN_MASK][2];
+		}
+		j = (256 * 255) - t0;
+		t1 += j * dest[0];
+		t2 += j * dest[1];
+		t3 += j * dest[2];
+		dest[0] = (t1 + (t1 >> 8) + 0x100) >> 16;
+		dest[1] = (t2 + (t2 >> 8) + 0x100) >> 16;
+		dest[2] = (t3 + (t3 >> 8) + 0x100) >> 16;
+		dest += 3;
+		for(i++; i < ii; i++)
+		{
+			dest[0] = *(dest - 3);
+			dest[1] = *(dest - 2);
+			dest[2] = *(dest - 1);
+			dest += 3;
+		}
+	}
 }
 
 void repaint_paste( int px1, int py1, int px2, int py2 )
@@ -1581,8 +1653,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 
 void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float czoom )
 {
-/* !!! This var has to be set up from config !!! */
-	int alpha_blend = TRUE;
+	int alpha_blend = !overlay_alpha;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
 	int j, jj, j0, dx, zoom = 1, scale = 1, nix = 0, niy = 0;
 
@@ -2188,7 +2259,7 @@ void main_init()
 	GtkAccelGroup *accel_group;
 	GtkItemFactory *item_factory;
 
-	GtkItemFactoryEntry menu_items[] = {
+	static GtkItemFactoryEntry menu_items[] = {
 		{ _("/_File"),			NULL,		NULL,0, "<Branch>" },
 		{ _("/File/tear"),		NULL,		NULL,0, "<Tearoff>" },
 		{ _("/File/New"),		"<control>N",	pressed_new,0, NULL },
@@ -2271,6 +2342,12 @@ void main_init()
 
 		{ _("/_View"),			NULL,		NULL,0, "<Branch>" },
 		{ _("/View/tear"),		NULL,		NULL,0, "<Tearoff>" },
+{ _("/View/Show Main Toolbar"),		"F5", pressed_toolbar_toggle, TOOLBAR_MAIN, "<CheckItem>" },
+{ _("/View/Show Tools Toolbar"),	"F6", pressed_toolbar_toggle, TOOLBAR_TOOLS, "<CheckItem>" },
+{ _("/View/Show Settings Toolbar"),	"F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS, "<CheckItem>" },
+{ _("/View/Show Palette"),		"F8", pressed_toolbar_toggle, TOOLBAR_PALETTE, "<CheckItem>" },
+{ _("/View/Show Status Bar"),		NULL, pressed_toolbar_toggle, TOOLBAR_STATUS, "<CheckItem>" },
+		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/View/Toggle Image View (Home)"), NULL,	toggle_view,0, NULL },
 		{ _("/View/Centralize Image"),	NULL,		pressed_centralize,0, "<CheckItem>" },
 		{ _("/View/Show zoom grid"),	NULL,		zoom_grid,0, "<CheckItem>" },
@@ -2281,12 +2358,6 @@ void main_init()
 		{ _("/View/Pan Window (End)"),	NULL,		pressed_pan,0, NULL },
 		{ _("/View/Command Line Window"),	"C",	pressed_cline,0, NULL },
 		{ _("/View/Layers Window"),		"L",	pressed_layers, 0, NULL },
-		{ _("/View/sep1"),		NULL,		NULL,0, "<Separator>" },
-{ _("/View/Show Main Toolbar"),		"F5", pressed_toolbar_toggle, TOOLBAR_MAIN, "<CheckItem>" },
-{ _("/View/Show Tools Toolbar"),	"F6", pressed_toolbar_toggle, TOOLBAR_TOOLS, "<CheckItem>" },
-{ _("/View/Show Settings Toolbar"),	"F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS, "<CheckItem>" },
-{ _("/View/Show Palette"),		"F8", pressed_toolbar_toggle, TOOLBAR_PALETTE, "<CheckItem>" },
-{ _("/View/Show Status Bar"),		NULL, pressed_toolbar_toggle, TOOLBAR_STATUS, "<CheckItem>" },
 
 		{ _("/_Image"),  			NULL, 	NULL,0, "<Branch>" },
 		{ _("/Image/tear"),			NULL, 	NULL,0, "<Tearoff>" },
@@ -2393,17 +2464,16 @@ void main_init()
 
 		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
 		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Channels/Create Channel ..."), NULL, pressed_channel_create, 0, NULL },
-		{ _("/Channels/Delete Channel ..."), NULL, pressed_channel_delete, 0, NULL },
+		{ _("/Channels/Create Channel ..."), NULL, pressed_channel_create, -1, NULL },
+		{ _("/Channels/Delete Channel ..."), NULL, pressed_channel_delete, -1, NULL },
 		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, 0, "<RadioItem>" },
-		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, 1, _("/Channels/Edit Image") },
-		{ _("/Channels/Edit Selection"), NULL, pressed_channel_edit, 2, _("/Channels/Edit Image") },
-		{ _("/Channels/Edit Mask"), 	NULL, pressed_channel_edit, 3, _("/Channels/Edit Image") },
+		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, CHN_IMAGE, "<RadioItem>" },
+		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, CHN_ALPHA, _("/Channels/Edit Image") },
+		{ _("/Channels/Edit Selection"), NULL, pressed_channel_edit, CHN_SEL, _("/Channels/Edit Image") },
+		{ _("/Channels/Edit Mask"), 	NULL, pressed_channel_edit, CHN_MASK, _("/Channels/Edit Image") },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, 0, "<CheckItem>" },
-		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, 1, "<CheckItem>" },
-		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, 2, "<CheckItem>" },
+		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, CHN_ALPHA, "<CheckItem>" },
+		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, CHN_SEL, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
@@ -2417,7 +2487,7 @@ void main_init()
 		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
 	};
 
-char
+static char
 	*item_undo[] = {_("/Edit/Undo"), _("/File/Export Undo Images ..."),
 			_("/File/Export Undo Images (reversed) ..."),
 			NULL},
@@ -2464,7 +2534,10 @@ char
 			_("/Selection/Fill Selection"), _("/Selection/Outline Selection"),
 			NULL},
 	*item_frames[] = {_("/Frames"), NULL},
-	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL}
+	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL},
+	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
+			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
+			NULL}
 	;
 
 
@@ -2511,6 +2584,7 @@ char
 	pop_men_dis( item_factory, item_layer, menu_layer );
 	pop_men_dis( item_factory, item_lasso, menu_lasso );
 	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
+	pop_men_dis( item_factory, item_chann_x, menu_chann_x );
 
 	menu_clip_load[0] = NULL;
 	menu_clip_save[0] = NULL;

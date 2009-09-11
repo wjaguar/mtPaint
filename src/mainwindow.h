@@ -30,7 +30,7 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
 	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
+	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS]
 	;
 
 gboolean view_image_only, viewer_mode, drag_index, q_quit;

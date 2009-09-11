@@ -451,8 +451,8 @@ void lose_oldest()				// Lose the oldest undo image
 	mem_undo_done--;
 }
 
-int undo_next_core(int handle, int new_width, int new_height,
-	int x_start, int y_start, int new_bpp, int cmask)
+/* Mode bits are: |1 - force create, |2 - forbid copy, |4 - force delete */
+int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask)
 {
 	undo_item *undo;
 	unsigned char *img;
@@ -516,7 +516,13 @@ int undo_next_core(int handle, int new_width, int new_height,
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
 			holder[i] = img = mem_img[i];
-			if (!img || (undo->img[i] != img)) continue;
+			if (undo->img[i] != img) continue;
+			if (mode & 4)
+			{
+				holder[i] = NULL;
+				continue;
+			}
+			if (!img && !(mode & 1)) continue;
 			mem_lim = mem_req;
 			if (i == CHN_IMAGE) mem_lim *= new_bpp;
 			while (!((img = malloc(mem_lim))))
@@ -542,7 +548,8 @@ int undo_next_core(int handle, int new_width, int new_height,
 			}
 			holder[i] = img;
 			/* Copy */
-			if (!handle) memcpy(img, undo->img[i], mem_lim);
+			if (!undo->img[i] || (mode & 2)) continue;
+			memcpy(img, undo->img[i], mem_lim);
 		}
 
 		/* Commit */
@@ -600,7 +607,7 @@ int mem_undo_next(int mode)
 		cmask = CMASK_CURR;
 		break;
 	}
-	return (undo_next_core(0, mem_width, mem_height, 0, 0, mem_img_bpp, cmask));
+	return (undo_next_core(0, mem_width, mem_height, mem_img_bpp, cmask));
 }
 
 void mem_undo_swap(int old, int new)
@@ -632,6 +639,7 @@ void mem_undo_swap(int old, int new)
 
 	if ( mem_col_A >= mem_cols ) mem_col_A = 0;
 	if ( mem_col_B >= mem_cols ) mem_col_B = 0;
+	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
 }
 
 void mem_undo_backward()		// UNDO requested by user
@@ -1299,7 +1307,7 @@ int mem_convert_rgb()			// Convert image to RGB
 	int i, j, res;
 
 	pen_down = 0;		// Ensure next tool action is treated separately
-	res = undo_next_core(2, mem_width, mem_height, 0, 0, 3, CMASK_IMAGE);
+	res = undo_next_core(2, mem_width, mem_height, 3, CMASK_IMAGE);
 	pen_down = 0;
 
 	if (res) return 1;	// Not enough memory
@@ -1323,7 +1331,7 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 	int i, j, k, res;
 
 	pen_down = 0;		// Ensure next tool action is treated separately
-	res = undo_next_core(2, mem_width, mem_height, 0, 0, 1, CMASK_IMAGE);
+	res = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
 	pen_down = 0;
 	if ( res ) return 2;
 
@@ -2492,7 +2500,7 @@ int mem_rotate_free( float angle, int type )	// Rotate canvas by any angle (degr
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	pen_down = 0;		// Ensure next tool action is treated separately
-	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 	if ( res == 1 ) return 2;		// No undo space
 
@@ -2679,7 +2687,7 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	pen_down = 0;		// Ensure next tool action is treated separately
-	i = undo_next_core(2, oh, ow, 0, 0, mem_img_bpp, CMASK_ALL);
+	i = undo_next_core(2, oh, ow, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;		// Ensure next tool action is treated separately
 
 	if (i) return 1;			// Not enough memory
@@ -2985,7 +2993,7 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	pen_down = 0;		// Ensure next tool action is treated separately
-	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 
 	if (res)
@@ -3127,7 +3135,7 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 	if (res) return 1;			// Not enough memory
 
@@ -3766,61 +3774,75 @@ void mem_clip_mask_clear()		// Clear/remove the clipboard mask
 	}
 }
 
-int mem_clip_scale_alpha()	// Extract alpha information from RGB clipboard - alpha if pixel is in scale of A->B. Result 0=ok 1=problem
+/*
+ * Extract alpha information from RGB image - alpha if pixel is in colour
+ * scale of A->B. Return 0 if OK, 1 otherwise
+ */
+int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
+	int width, int height, int mode, unsigned char xorr)
 {
-	int i, ii, j, k, AA[3], BB[3], CC[3], chan, ok;
-	float p;
+	int i, j, AA[3], BB[3], DD[6], chan, c1, c2, dc1, dc2;
+	double p, dchan;
 
+	if (!img || !alpha) return (1);
+
+	xorr ^= 255;
 	AA[0] = mem_col_A24.red;
 	AA[1] = mem_col_A24.green;
 	AA[2] = mem_col_A24.blue;
 	BB[0] = mem_col_B24.red;
 	BB[1] = mem_col_B24.green;
 	BB[2] = mem_col_B24.blue;
+	for (i = 0; i < 3; i++)
+	{
+		if (AA[i] < BB[i])
+		{
+			DD[i] = AA[i];
+			DD[i + 3] = BB[i];
+		}
+		else
+		{
+			DD[i] = BB[i];
+			DD[i + 3] = AA[i];
+		}
+	}
 
 	chan = 0;	// Find the channel with the widest range - gives most accurate result later
-	if ( abs(AA[1] - BB[1]) > abs(AA[0] - BB[0]) ) chan = 1;
-	if ( abs(AA[2] - BB[2]) > abs(AA[chan] - BB[chan]) ) chan = 2;
-	if ( (AA[chan] - BB[chan]) == 0 ) return 1;	// A == B so bail out - nothing to do
+	if (DD[4] - DD[1] > DD[3] - DD[0]) chan = 1;
+	if (DD[5] - DD[2] > DD[chan + 3] - DD[chan]) chan = 2;
+	if (AA[chan] == BB[chan]) return 1;	// A == B so bail out - nothing to do
+	dchan = 1.0 / (BB[chan] - AA[chan]);
+	c1 = 1 ^ (chan & 1);
+	c2 = 2 ^ (chan & 2);
+	dc1 = BB[c1] - AA[c1];
+	dc2 = BB[c2] - AA[c2];
 
-	if ( mem_clipboard == NULL || mem_clip_bpp != 3 ) return 1;
-
-	if ( mem_clip_mask == NULL ) mem_clip_mask_init(0);	// Create new alpha memory if needed
-	if ( mem_clip_mask == NULL ) return 1;			// Bail out if not available
-
-	ii = 0;
-	j = mem_clip_w * mem_clip_h * 3;
-	for ( i=0; i<j; i+=3 )
+	j = width * height;
+	for (i = 0; i < j; i++ , alpha++ , img += 3)
 	{
-		ok = TRUE;		// Ensure pixel lies between A and B for each channel
-		for ( k=0; k<3; k++ )
-		{
-			if ( mem_clipboard[i+k] < AA[k] && mem_clipboard[i+k] < BB[k] ) ok = FALSE;
-			if ( mem_clipboard[i+k] > AA[k] && mem_clipboard[i+k] > BB[k] ) ok = FALSE;
-		}
-		if ( mem_clip_mask[ii] > 0 ) ok = FALSE;	// Already semi-opaque so don't touch
+		/* Already semi-opaque so don't touch */
+		if (*alpha != xorr) continue;
+		/* Ensure pixel lies between A and B for each channel */
+		if ((img[0] < DD[0]) || (img[0] > DD[3])) continue;
+		if ((img[1] < DD[1]) || (img[1] > DD[4])) continue;
+		if ((img[2] < DD[2]) || (img[2] > DD[5])) continue;
 
-		if ( ok )
-		{
-			p = ((float) (mem_clipboard[i+chan] - AA[chan])) / (BB[chan] - AA[chan]);
+		p = (img[chan] - AA[chan]) * dchan;
 
-				// Check delta for all channels is roughly the same ...
-				// ... if it isn't, ignore this pixel as its not in A->B scale
-			for ( k=0; k<3; k++ )
-			{
-				CC[k] = 0.5 + (1-p)*AA[k] + p*BB[k];
-				if ( abs(CC[k] - mem_clipboard[i+k]) > 2 ) ok = FALSE;
-			}
+		/* Check delta for all channels is roughly the same ...
+		 * ... if it isn't, ignore this pixel as its not in A->B scale
+		 */
+		if (abs(AA[c1] + (int)rint(p * dc1) - img[c1]) > 2) continue;
+		if (abs(AA[c2] + (int)rint(p * dc2) - img[c2]) > 2) continue;
+		
+		/* Pixel is a shade of A/B so set alpha */
+		*alpha = (int)rint(p * 255) ^ xorr;
 
-			if ( ok )	// Pixel is a shade of A/B so set alpha & clipboard values
-			{
-				mem_clipboard[i]   = AA[0];
-				mem_clipboard[i+1] = AA[1];
-				mem_clipboard[i+2] = AA[2];
-				mem_clip_mask[ii] = 0.5 + p*255;
-			}
-		}
-		ii++;
+		/* Demultiply image if this is alpha */
+		if (!mode) continue;
+		img[0] = AA[0];
+		img[1] = AA[1];
+		img[2] = AA[2];
 	}
 
 	return 0;
