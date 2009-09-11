@@ -5,7 +5,7 @@
 
 	mtPaint is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
+	the Free Software Foundation; either version 3 of the License, or
 	(at your option) any later version.
 
 	mtPaint is distributed in the hope that it will be useful,
@@ -176,3 +176,6 @@ void cleanse_txt( char *out, char *in );	// Cleans up non ASCII chars for GTK+2
 #endif
 
 void create_default_image();			// Create default new image
+
+int api_copy_rectangle();			// API function
+int api_clip_alphamask();			// API function

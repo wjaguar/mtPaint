@@ -5,7 +5,7 @@
 
 	mtPaint is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
+	the Free Software Foundation; either version 3 of the License, or
 	(at your option) any later version.
 
 	mtPaint is distributed in the hope that it will be useful,
@@ -936,12 +936,12 @@ static void mem_undo_tile_swap(undo_item *undo, int redo)
 	int spans[(MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE + 3];
 	int i, l, h, cc, nw, bpp, w;
 
-	tmap = undo->tileptr ? undo->tileptr : undo->tilemap;
 	nw = ((mem_width + TILE_SIZE - 1) / TILE_SIZE + 7) >> 3;
 	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
 		if (!undo->img[cc] || (undo->img[cc] == (void *)(-1)))
 			continue;
+		tmap = undo->tileptr ? undo->tileptr : undo->tilemap;
 		bpp = BPP(cc);
 		w = mem_width * bpp;
 		src = undo->img[cc];
@@ -3018,13 +3018,14 @@ void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
 static int xc2, yc2;
 static void put4pix(int dx, int dy)
 {
-	int x0, x1, y0, y1;
+	int x0 = xc2 - dx, x1 = xc2 + dx, y0 = yc2 - dy, y1 = yc2 + dy;
 
-	/* !!! Fully portable only for nonnegative coords */
-	x0 = (xc2 - dx) >> 1;
-	x1 = (xc2 + dx) >> 1;
-	y0 = (yc2 - dy) >> 1;
-	y1 = (yc2 + dy) >> 1;
+	if ((x1 < 0) || (y1 < 0)) return;
+	if (x0 < 0) x0 = x1;
+	x0 >>= 1; x1 >>= 1;
+	if (y0 < 0) y0 = y1;
+	y0 >>= 1; y1 >>= 1;
+	if ((x0 >= mem_width) || (y0 >= mem_height)) return;
 
 	put_pixel(x0, y0);
 	if (x0 != x1) put_pixel(x1, y0);
@@ -4727,6 +4728,10 @@ void put_pixel( int x, int y )	/* Combined */
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
 	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
 	int i, j, offset, ofs3, opacity = 0, op = tool_opacity, tint;
+
+#ifdef U_API
+	if ( x<0 || y<0 || x>=mem_width || y>=mem_height ) return;	// Outside canvas
+#endif
 
 	j = pixel_protected(x, y);
 	if (mem_img_bpp == 1 ? j : j == 255) return;

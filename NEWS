@@ -6,6 +6,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.15	2007-?-?
 
+	* mtPaint is now licensed as GPL version 3 (or later)
 	* Polish translation updated by Groszek150(LucaS)
 	* Actions section added to File menu
 	* Sharper image reduction toggle added to "Scale Canvas"
@@ -20,6 +21,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Eliminated flicker when scrolling canvas in GTK+1 and GTK+2/Windows
 	* Dragging the main/view window divider made to behave in GTK+1
 	* Tile based undo system introduced to save memory when changes affect only small areas of the canvas
+	* mtPaint can now be compiled as a library (libmtpaint)
 	* BUGFIX - Colour selective mode with zoom < 100% doesn't cause crash
 	* Lanczos3 rescaling filter removed due to unfavourable results
 

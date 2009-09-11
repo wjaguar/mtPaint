@@ -5,7 +5,7 @@
 
 	mtPaint is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation; either version 2 of the License, or
+	the Free Software Foundation; either version 3 of the License, or
 	(at your option) any later version.
 
 	mtPaint is distributed in the hope that it will be useful,
@@ -597,12 +597,12 @@ void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
-void pressed_clip_alphamask()
+int api_clip_alphamask()
 {
 	unsigned char *old_mask = mem_clip_mask;
 	int i, j = mem_clip_w * mem_clip_h, k;
 
-	if (!mem_clipboard || !mem_clip_alpha) return;
+	if (!mem_clipboard || !mem_clip_alpha) return FALSE;
 
 	mem_clip_mask = mem_clip_alpha;
 	mem_clip_alpha = NULL;
@@ -617,7 +617,12 @@ void pressed_clip_alphamask()
 		free(old_mask);
 	}
 
-	gtk_widget_queue_draw( drawing_canvas );
+	return TRUE;
+}
+
+void pressed_clip_alphamask()
+{
+	if (api_clip_alphamask()) gtk_widget_queue_draw( drawing_canvas );
 }
 
 void pressed_clip_alpha_scale()
@@ -791,7 +796,7 @@ void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	update_all_views();
 }
 
-static int copy_clip()
+static int copy_clip(gboolean api)
 {
 	int i, x, y, w, h, bpp, ofs, delta, len;
 
@@ -814,8 +819,8 @@ static int copy_clip()
 	if (!mem_clipboard)
 	{
 		free(mem_clip_alpha);
-		alert_box( _("Error"), _("Not enough memory to create clipboard"),
-			_("OK"), NULL, NULL );
+		if (!api) alert_box( _("Error"), _("Not enough memory to create clipboard"),
+				_("OK"), NULL, NULL );
 		return (FALSE);
 	}
 
@@ -966,7 +971,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
 		return;
 	}
 
-	if (!copy_clip()) return;
+	if (!copy_clip(FALSE)) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	channel_mask();
 	if (item) cut_clip();
@@ -974,9 +979,14 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	update_menus();
 }
 
+int api_copy_rectangle()
+{
+	return copy_clip(TRUE);
+}
+
 void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	if (!copy_clip()) return;
+	if (!copy_clip(FALSE)) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	else mem_clip_mask_init(255);
 	poly_lasso();
@@ -1324,7 +1334,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		{jp2_rate, 0, 100},
 		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
 	GtkWidget *opt, *menu, *item, *label, *spin;
-	int i, j, k, mask = FF_256;
+	int i, j, k, l, li, ft_sort[NUM_FTYPES][3], mask = FF_256;
 	char *ext = strrchr(name, '.');
 
 	ext = ext ? ext + 1 : "";
@@ -1352,6 +1362,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	gtk_widget_show_all(box);
 
 	menu = gtk_menu_new();
+/*
 	for (i = j = k = 0; i < NUM_FTYPES; i++)
 	{
 		if (!(file_formats[i].flags & mask)) continue;
@@ -1366,6 +1377,44 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 		k++;
   	}
+*/
+	for (i = k = 0; i < NUM_FTYPES; i++)		// Populate the unsorted filetype list
+	{
+		if (!(file_formats[i].flags & mask)) continue;
+		ft_sort[k][0] = (file_formats[i].name[0] << 16) + (file_formats[i].name[1] << 8) +
+				file_formats[i].name[2];
+		ft_sort[k][1] = i;
+		k++;
+	}
+	for ( i=0; i<k; i++ )				// Sort the filetype list
+	{
+		l = 1<<28;
+		for ( j = li = 0; j<k; j++ )
+		{
+			if ( ft_sort[j][0]!=0 && ft_sort[j][0] < l )
+			{
+				l = ft_sort[j][0];
+				li = j;
+			}
+		}
+		ft_sort[i][2] = ft_sort[li][1];
+		ft_sort[li][0] = 0;
+	}
+	j=-1;
+	for ( l=0; l<k; l++ )				// Populate the option menu list
+	{
+		i = ft_sort[l][2];
+		if ( j<0 && i==FT_PNG ) j = l;		// Default to PNG type if not saved yet
+		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
+			(file_formats[i].ext2[0] &&
+			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
+			j = l;
+		item = gtk_menu_item_new_with_label(file_formats[i].name);
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_signal_connect(GTK_OBJECT(item), "activate",
+			GTK_SIGNAL_FUNC(change_image_format), (gpointer)box);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+	}
 	gtk_widget_show_all(menu);
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
 

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.14.37"
-MT_DATE="2007-07-15"
+MT_V="3.14.38"
+MT_DATE="2007-08-03"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -19,6 +19,7 @@ BIN_INSTALL=
 MAKE_DIRS=src
 ICON_SET=icons1
 
+API_CHECKS=
 STATIC_PNG=
 STATIC_JPEG=
 STATIC_JP2=
@@ -137,6 +138,7 @@ do
 				rm -rf slack
 				rm -f *.tgz
 				exit;;
+		"api" )		API_CHECKS=YES;;
 		"staticpng" )	STATIC_PNG=PNG;;
 		"GIF" )		NGIF=GIF;;
 		"gif" )		NGIF=YES;;
@@ -312,6 +314,7 @@ then
 	echo
 	echo "flush ........... Flush directories to initial state"
 	echo "debug ........... Include debugging info in binary"
+	echo "api ............. Use extra sanity checks required for libmtpaint"
 	echo "--bindir=DIR .... DIR = location of bin file to install, /usr/local/bin by default"
 	echo
 	echo "intl ............ Use internationalized po files"
@@ -340,7 +343,12 @@ else
 	then
 		BIN_INSTALL=$LIN_BIN_INSTALL
 		GTK_INCLUDE="-I$MTK_DIR/include -I$MTK_DIR/include/glib -I/usr/include/X11 -DU_MTK"
-		GTK_LIB="-L/usr/lib -L/usr/X11R6/lib $MTK_DIR/lib/libgtk.a $MTK_DIR/lib/libgdk.a $MTK_DIR/lib/libgmodule.a $MTK_DIR/lib/libglib.a -ldl -lXi -lXext -lX11 -lm"
+		GTK_LIB="$MTK_DIR/lib/libgtk.a $MTK_DIR/lib/libgdk.a $MTK_DIR/lib/libgmodule.a $MTK_DIR/lib/libglib.a"
+
+		echo "MTK_LIB = $GTK_LIB" >> $GTK_FILE
+
+		GTK_LIB="-L/usr/lib -L/usr/X11R6/lib $GTK_LIB -ldl -lXi -lXext -lX11 -lm"
+
 		if [ "$MTK_XFT" = "YES" ]
 		then
 			GTK_LIB="$GTK_LIB -lXft"
@@ -429,6 +437,11 @@ else
 		L_EX="$L_EX -Wl,-dy"
 	fi
 
+	if [ "$API_CHECKS" ]
+	then
+		I_EX="$I_EX -DU_API"
+	fi
+
 	if [ "$DEBUG" = NO ]
 	then
 		GTK_LIB="$GTK_LIB -s"
@@ -502,6 +515,11 @@ else
 	echo "GTK+$GTK"
 fi
 	echo
+if [ "$API_CHECKS" ]
+then
+	echo "API checks          $API_CHECKS"
+	echo
+fi
 if [ "$CFLAG" ]
 then
 	echo "CFLAGS              $CFLAG"
