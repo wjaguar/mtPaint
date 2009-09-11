@@ -1848,7 +1848,8 @@ static void set_csel()
 	csel_data->limit_a = (ctable[1].a + 128) / 257;
 	csel_preview = RGB_2_INT((ctable[2].r + 128) / 257,
 		(ctable[2].g + 128) / 257, (ctable[2].b + 128) / 257);
-	csel_preview_a = (ctable[2].a + 128) / 257;
+/* !!! Alpha is disabled for now !!! */
+//	csel_preview_a = (ctable[2].a + 128) / 257;
 }
 
 static void select_colour(int what)

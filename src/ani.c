@@ -638,6 +638,15 @@ static void ani_frame_slider_moved( GtkWidget *widget )
 
 static void ani_but_preview_close()
 {
+	int x, y, width, height;
+
+	gdk_window_get_size( ani_prev_win->window, &width, &height );
+	gdk_window_get_root_origin( ani_prev_win->window, &x, &y );
+	inifile_set_gint32("ani_prev_x", x );
+	inifile_set_gint32("ani_prev_y", y );
+	inifile_set_gint32("ani_prev_w", width );
+
+
 	gtk_widget_destroy( ani_prev_win );
 
 	if ( animate_window != NULL )
@@ -657,28 +666,26 @@ void ani_but_preview()
 {
 	GtkWidget *hbox3, *ani_preview_hscale, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	gint pos;
 
 
 	if ( animate_window != NULL )
 	{
 		ani_win_store_pos();		// We need to remember this as we are hiding it
 		ani_win_read_widgets();		// Get latest values for the preview
-		pos = GTK_WIN_POS_MOUSE;
 	}
-	else
-	{
-		pos = GTK_WIN_POS_CENTER;
-		ani_read_layer_data();
-	}
+	else	ani_read_layer_data();
 
 	ani_cyc_len_init();		// Prepare the cycle index for the animation
 
 	if ( !view_showing ) view_show();	// If not showing, show the view window
 
-	ani_prev_win = add_a_window( GTK_WINDOW_TOPLEVEL, _("Animation Preview"), pos, TRUE );
+	ani_prev_win = add_a_window( GTK_WINDOW_TOPLEVEL,
+			_("Animation Preview"), GTK_WIN_POS_NONE, TRUE );
+
+	gtk_widget_set_uposition( ani_prev_win,
+		inifile_get_gint32("ani_prev_x", 0 ), inifile_get_gint32("ani_prev_y", 0 ) );
 	gtk_window_set_default_size( GTK_WINDOW(ani_prev_win),
-		inifile_get_gint32("ani_w", 200 ), -1 );
+		inifile_get_gint32("ani_prev_w", 200 ), -1 );
 
 	hbox3 = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox3);
