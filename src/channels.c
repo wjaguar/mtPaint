@@ -390,6 +390,13 @@ void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	filter_window(_("Threshold Channel"), spin, do_threshold, NULL, FALSE);
 }
 
+void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	if (mem_img_bpp == 1) return;
+	spot_undo(UNDO_COL);
+	mem_demultiply(mem_img[CHN_IMAGE], mem_img[CHN_ALPHA], mem_width * mem_height, 3);
+}
+
 void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int *toggle = item ? &hide_image : &overlay_alpha;

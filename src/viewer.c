@@ -17,10 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#if GTK_MAJOR_VERSION == 1
-	#include <gdk/gdkx.h>
-#endif
-
 #include "global.h"
 
 #include "mygtk.h"
@@ -33,7 +29,6 @@
 #include "layer.h"
 #include "channels.h"
 #include "toolbar.h"
-
 
 gboolean
 	view_showing = FALSE,
@@ -1148,6 +1143,7 @@ void screen_copy_pixels( unsigned char *rgb, int w, int h )
 }
 
 #if GTK_MAJOR_VERSION == 1
+#include <gdk/gdkx.h>
 static void gdk_get_rgb_image( GdkDrawable *drawable, GdkColormap *colormap,
 		gint x, gint y, gint width, gint height,
 		guchar *rgb_buf, gint rowstride )

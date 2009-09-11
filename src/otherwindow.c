@@ -17,10 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#if GTK_MAJOR_VERSION == 1
-	#include <unistd.h>
-#endif
-
 #include "global.h"
 
 #include "mygtk.h"
@@ -39,6 +35,9 @@
 #include "toolbar.h"
 #include "csel.h"
 
+#if GTK_MAJOR_VERSION == 1
+#include <unistd.h>
+#endif
 
 ///	NEW IMAGE WINDOW
 
@@ -2353,6 +2352,7 @@ static gboolean palette_pad_draw(GtkWidget *widget, GdkEventConfigure *event,
 	return (TRUE);
 }
 
+static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data);
 static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -2374,7 +2374,18 @@ static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 			(gdouble)mem_pal[i].green / 255.0,
 			(gdouble)mem_pal[i].blue / 255.0, 1.0};
 
+#if GTK_MAJOR_VERSION == 1
+		GtkColorSelection *cs = GTK_COLOR_SELECTION(grad_ed_cs);
+		gdouble oldcolor[4];
+
+		/* Preserve old color, invoke "color_changed" handler */
+		memcpy(oldcolor, cs->old_values + 3, sizeof(oldcolor));
+		gtk_color_selection_set_color(cs, oldcolor);
+		gtk_color_selection_set_color(cs, color);
+		grad_edit_set_rgb(cs, NULL);
+#else
 		gtk_color_selection_set_color(GTK_COLOR_SELECTION(grad_ed_cs), color);
+#endif
 	}
 	return (TRUE);
 }

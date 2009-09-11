@@ -1021,6 +1021,7 @@ void update_menus()			// Update edit/undo menu
 	men_item_state(menu_not_indexed, (mem_img_bpp == 3) ||
 		(mem_channel != CHN_IMAGE));
 	men_item_state(menu_only_indexed, mem_img_bpp == 1);
+	men_item_state(menu_rgba, (mem_img_bpp == 3) && mem_img[CHN_ALPHA]);
 
 	men_item_state(menu_alphablend, mem_clipboard && (mem_clip_bpp == 3));
 

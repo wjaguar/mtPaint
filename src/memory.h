@@ -395,6 +395,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
 int mem_isometrics(int type);
 
 void mem_threshold(int channel, int level);			// Threshold channel values
+void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp);
 
 void flood_fill( int x, int y, unsigned int target );
 

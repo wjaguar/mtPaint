@@ -53,7 +53,8 @@ GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
 	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
 	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
-	*menu_alphablend[2], *menu_chan_del[2], *menu_widgets[TOTAL_MENU_IDS];
+	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
+	*menu_widgets[TOTAL_MENU_IDS];
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
 int files_passed, file_arg_start = -1, drag_index_vals[2], cursor_corner;
@@ -84,37 +85,21 @@ static void clear_perim_real( int ox, int oy )
 	repaint_canvas(x0 + 1, y1, x1 - x0 - 1, 1);
 }
 
+/* Enable or disable menu items */
 void men_item_state( GtkWidget *menu_items[], gboolean state )
-{	// Enable or disable menu items
-	int i = 0;
-	while ( menu_items[i] != NULL )
-	{
-		gtk_widget_set_sensitive( menu_items[i], state );
-		i++;
-	}
-}
-
-void pop_men_dis( GtkItemFactory *item_factory, char *items[], GtkWidget *menu_items[] )
-{	// Populate disable menu item array
-	int i = 0;
-	while ( items[i] != NULL )
-	{
-		menu_items[i] = gtk_item_factory_get_item(item_factory, items[i]);
-		i++;
-	}
-	menu_items[i] = NULL;
-}
-
-void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] )		// Add widget to disable list
 {
-	int i = 0;
-
-	while ( menu_items[i] != NULL ) i++;
-	menu_items[i] = widget;
-	menu_items[i+1] = NULL;
+	while (*menu_items) gtk_widget_set_sensitive(*menu_items++, state);
 }
 
-void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
+/* Add widget to disable list */
+static void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] )
+{
+	while (*menu_items++);
+	*(menu_items - 1) = widget;
+	*menu_items = NULL;
+}
+
+static void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 {
 	mem_swap_cols();
 	if (mem_channel == CHN_IMAGE)
@@ -126,7 +111,7 @@ void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 	else pressed_opacity(channel_col_A[mem_channel]);
 }
 
-void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gint item )
+static void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int change;
 	char txt[64], *c, old_file[256];
@@ -144,7 +129,7 @@ void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gint item 
 		do_a_load(old_file);		// Load requested file
 }
 
-void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int res, x1, y1, x2, y2;
 
@@ -194,7 +179,7 @@ void pressed_select_none( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_select_all( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_select_all( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i = 0;
 
@@ -219,7 +204,7 @@ void pressed_select_all( GtkMenuItem *menu_item, gpointer user_data )
 	if ( i == 1 ) gtk_widget_queue_draw( drawing_canvas );		// Clear old past stuff
 }
 
-void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
 
@@ -241,7 +226,7 @@ void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 {
 	spot_undo(UNDO_PAL);
 	mem_pal_copy( mem_pal, mem_pal_def );
@@ -251,7 +236,7 @@ void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_queue_draw(drawing_col_prev);
 }
 
-void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int dups;
 	char mess[256];
@@ -294,7 +279,7 @@ void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
 {	// Create a pattern.c file from the current image
 
 	int row, column, pattern, sx, sy, pixel;
@@ -345,7 +330,7 @@ void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
+static void pressed_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	mem_mask_setall(item);
 	mem_pal_init();
@@ -572,6 +557,7 @@ void zoom_grid( GtkMenuItem *menu_item, gpointer user_data )
 	if ( drawing_canvas ) gtk_widget_queue_draw( drawing_canvas );
 }
 
+static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data );
 void quit_all( GtkMenuItem *menu_item, gpointer user_data )
 {
 	delete_event( NULL, NULL, NULL );
@@ -998,12 +984,18 @@ int wtf_pressed(GdkEventKey *event)
 	return (cmatch);
 }
 
-gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
+static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
 {
 	int change, action;
 
 	action = wtf_pressed(event);
 	if (!action) return (FALSE);
+
+#if GTK_MAJOR_VERSION == 1
+	/* Return value alone doesn't stop GTK1 from running other handlers */
+	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
+#endif
 
 	if (check_zoom_keys(action)) return TRUE;		// Check HOME/zoom keys
 
@@ -1220,9 +1212,8 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 			main_update_area(minx, miny, w, h);
 			vw_update_area(minx, miny, w, h);
 		}
-		return (TRUE);
 	default:
-		return (FALSE);
+		return (TRUE);
 	}
 	/* Finalize colour-change */
 	if (mem_channel == CHN_IMAGE)
@@ -1253,7 +1244,7 @@ int check_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 	return i;
 }
 
-gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	gint x,y,width,height;
 	int i = 2, j = 0;
@@ -2962,6 +2953,7 @@ static void pressed_docs()
 
 void set_cursor()			// Set mouse cursor
 {
+	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
 	if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
 		gdk_window_set_cursor( drawing_canvas->window, m_cursor[tool_type] );
 	else
@@ -3128,6 +3120,7 @@ void set_image(gboolean state)
 
 	(state ? gtk_widget_show_all : gtk_widget_hide)(view_showing ? main_split :
 		scrolledwindow_canvas);
+	if (state) set_cursor(); /* Canvas window is now a new one */
 }
 
 static void parse_drag( char *txt )
@@ -3212,7 +3205,7 @@ static GtkWidget **need_lists[] = {
 	menu_undo, menu_redo, menu_crop, menu_need_marquee,
 	menu_need_selection, menu_need_clipboard, menu_only_24,
 	menu_not_indexed, menu_only_indexed, menu_lasso, menu_alphablend,
-	menu_chan_del };
+	menu_chan_del, menu_rgba };
 
 void mapped_dis_add(GtkWidget *widget, int actmap)
 {
@@ -3420,7 +3413,7 @@ static menu_item main_menu[] = {
 	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 0 },
 	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, pressed_rotate_sel, 1 },
 	{ _("/Selection/sep3"), -4 },
-	{ _("/Selection/Alpha Blend A,B"), -1, 0, NEED_ALPHA, NULL, pressed_clip_alpha_scale, 0 },
+	{ _("/Selection/Alpha Blend A,B"), -1, 0, NEED_ACLIP, NULL, pressed_clip_alpha_scale, 0 },
 	{ _("/Selection/Move Alpha to Mask"), -1, 0, NEED_CLIP, NULL, pressed_clip_alphamask, 0 },
 	{ _("/Selection/Mask Colour A,B"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask, 0 },
 	{ _("/Selection/Unmask Colour A,B"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask, 255 },
@@ -3491,6 +3484,7 @@ static menu_item main_menu[] = {
 	{ _("/Channels/sep3"), -4 },
 	{ _("/Channels/Couple RGBA Operations"), 0, MENU_RGBA, 0, NULL, pressed_RGBA_toggle, 0 },
 	{ _("/Channels/Threshold ..."), -1, 0, 0, NULL, pressed_threshold, 0 },
+	{ _("/Channels/Unassociate Alpha"), -1, 0, NEED_RGBA, NULL, pressed_unassociate, 0 },
 	{ _("/Channels/sep4"), -4 },
 	{ _("/Channels/View Alpha as an Overlay"), 0, 0, 0, NULL, pressed_channel_toggle, 0 },
 	{ _("/Channels/Configure Overlays ..."), -1, 0, 0, NULL, pressed_channel_config_overlay, 0 },
@@ -3738,10 +3732,10 @@ void main_init()
 
 /////////	End of main window widget setup
 
-	gtk_signal_connect_object (GTK_OBJECT (main_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_event), NULL);
-	gtk_signal_connect_object (GTK_OBJECT (main_window), "key_press_event",
-		GTK_SIGNAL_FUNC (handle_keypress), NULL);
+	gtk_signal_connect( GTK_OBJECT (main_window), "delete_event",
+		GTK_SIGNAL_FUNC (delete_event), NULL );
+	gtk_signal_connect( GTK_OBJECT(main_window), "key_press_event",
+		GTK_SIGNAL_FUNC (handle_keypress), NULL );
 
 	men_item_state( menu_undo, FALSE );
 	men_item_state( menu_redo, FALSE );

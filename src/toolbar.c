@@ -190,7 +190,7 @@ GtkWidget *layer_toolbar(GtkWidget **wlist)
 #endif
 	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar,
 		GTK_SIGNAL_FUNC(layer_iconbar_click), 0, NULL, 0);
-	gtk_widget_show_all(toolbar);
+	gtk_widget_show(toolbar);
 
 	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
 		wlist[i] = layer_bar[i].widget;
@@ -558,7 +558,7 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			"None", _(items->tooltip), "Private", iconw, lclick,
+			NULL, _(items->tooltip), "Private", iconw, lclick,
 			(gpointer)(items->ID + lbase));
 		if (items->radio > 0) radio[items->radio] = items->widget;
 		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),

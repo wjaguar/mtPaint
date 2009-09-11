@@ -100,8 +100,9 @@ int wtf_pressed(GdkEventKey *event);
 #define NEED_NOIDX 0x0080
 #define NEED_IDX   0x0100
 #define NEED_LASSO 0x0200
-#define NEED_ALPHA 0x0400
+#define NEED_ACLIP 0x0400
 #define NEED_CHAN  0x0800
+#define NEED_RGBA  0x1000
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 
 void mapped_dis_add(GtkWidget *widget, int actmap);
@@ -177,7 +178,8 @@ GtkWidget *main_window, *main_split,
 	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
 	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
 	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
-	*menu_alphablend[2], *menu_chan_del[2], *menu_widgets[TOTAL_MENU_IDS];
+	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
+	*menu_widgets[TOTAL_MENU_IDS];
 
 gboolean view_image_only, viewer_mode, drag_index, q_quit;
 int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
@@ -188,10 +190,6 @@ GdkGC *dash_gc;
 char mem_clip_file[256];
 
 void main_init();			// Initialise and display the main window
-gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data );
-
-void pop_men_dis( GtkItemFactory *item_factory, char *items[], GtkWidget *menu_items[] );
-	// Populate disable menu item array
 
 void men_item_state( GtkWidget *menu_items[], gboolean state );
 	// Change state of preset menu items
@@ -242,6 +240,5 @@ void force_main_configure();	// Force reconfigure of main drawing area - for cen
 
 void toolbar_icon_event2(GtkWidget *widget, gpointer data);
 void toolbar_icon_event (GtkWidget *widget, gpointer data);
-void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] );
 
 void set_image(gboolean state);	// Toggle image access (nestable)

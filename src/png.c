@@ -78,8 +78,10 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "XPM", "xpm", "", FF_256 | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
+/* !!! Ideal state */
+//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_TRANS },
 /* !!! Not supported yet */
-//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR },
+//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS },
 //	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 /* !!! Placeholders */
 	{ "", "", "", 0},
@@ -964,6 +966,15 @@ static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
 	}
 }
 
+/* Build bitdepth translation table */
+static void set_xlate(unsigned char *xlat, int bpp)
+{
+	int i, n = (1 << bpp) - 1;
+	double d = 255.0 / (double)n;
+
+	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
+}
+
 #ifdef U_TIFF
 
 /* *** PREFACE ***
@@ -982,7 +993,6 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	uint32 width, height, tw = 0, th = 0, rps = 0;
 	uint32 *tr, *raster = NULL;
 	unsigned char xtable[256], *tmp, *src, *buf = NULL;
-	double d, d1;
 	int i, j, k, x0, y0, bsz, xstep, ystep, plane, nplanes, mirror;
 	int x, w, h, dx, bpr, bits1, bit0, db, n, nx;
 	int res = -1, bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
@@ -1061,9 +1071,8 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	if (argb && !TIFFRGBAImageOK(tif, cbuf)) goto fail;
 
 	settings->bpp = bpp;
-	if (xsamp && ((sampinfo[0] == EXTRASAMPLE_ASSOCALPHA) ||
-		(sampinfo[0] == EXTRASAMPLE_UNASSALPHA) || (sampp > 3)))
-		cmask = CMASK_RGBA;
+	/* Photoshop writes alpha as EXTRASAMPLE_UNSPECIFIED anyway */
+	if (xsamp) cmask = CMASK_RGBA;
 
 	/* !!! No alpha support for RGB mode yet */
 	if (argb) cmask = CMASK_IMAGE;
@@ -1217,44 +1226,31 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		}
 
 		/* Prepare to rescale what we've got */
-		j = 1 << bits1;
-		d1 = 255.0 / (double)(j - 1);
 		memset(xtable, 0, 256);
-		for (i = 0; i < j; i++)
-		{
-			xtable[i] = rint(d1 * i);
-		}
+		set_xlate(xtable, bits1);
 
 		/* Un-associate alpha & rescale image data */
 		j = width * height;
 		tmp = settings->img[CHN_IMAGE];
 		src = settings->img[CHN_ALPHA];
-		if (src && (pmetric != PHOTOMETRIC_PALETTE) &&
-			(sampinfo[0] != EXTRASAMPLE_UNASSALPHA))
+		while (src) /* Have alpha */
 		{
-			for (i = 0; i < j; i++ , tmp += bpp)
+			/* Unassociate alpha */
+			if ((pmetric != PHOTOMETRIC_PALETTE) &&
+				(sampinfo[0] == EXTRASAMPLE_ASSOCALPHA))
 			{
-				if (!src[i]) continue;
-				d = 255.0 / (double)src[i];
-				src[i] = xtable[src[i]];
-				k = rint(d * tmp[0]);
-				tmp[0] = k > 255 ? 255 : k;
-				if (bpp == 1) continue;
-				k = rint(d * tmp[1]);
-				tmp[1] = k > 255 ? 255 : k;
-				k = rint(d * tmp[2]);
-				tmp[2] = k > 255 ? 255 : k;
+				mem_demultiply(tmp, src, j, bpp);
+				if (bits1 >= 8) break;
+				bits1 = 8;
 			}
-			bits1 = 8;
-		}
+			else if (bits1 >= 8) break;
 
-		/* Rescale alpha */
-		if (src && (bits1 < 8))
-		{
+			/* Rescale alpha */
 			for (i = 0; i < j; i++)
 			{
 				src[i] = xtable[src[i]];
 			}
+			break;
 		}
 
 		/* Rescale RGB */
@@ -1471,7 +1467,6 @@ static int load_bmp(char *file_name, ls_settings *settings)
 	guint32 masks[4], m;
 	unsigned char hdr[BMP5_HSIZE], xlat[256], *dest, *tmp, *buf = NULL;
 	FILE *fp;
-	double d;
 	int shifts[4], bpps[4];
 	int def_alpha = FALSE, cmask = CMASK_IMAGE, comp = 0, res = -1;
 	int i, j, k, n, ii, w, h, bpp;
@@ -1670,9 +1665,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 				k = 1;
 			}
 			else tmp = settings->img[CHN_IMAGE] + i;
-			n = (1 << bpps[i]) - 1;
-			d = 255.0 / (double)n;
-			for (j = 0; j <= n; j++) xlat[j] = rint(d * j);
+			set_xlate(xlat, bpps[i]);
 			n = w * h;
 			for (j = 0; j < n; j++ , tmp += k) *tmp = xlat[*tmp];
 		}

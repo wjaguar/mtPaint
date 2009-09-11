@@ -37,6 +37,7 @@ void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint it
 void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_config_overlay();

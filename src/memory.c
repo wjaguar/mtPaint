@@ -3972,6 +3972,26 @@ void mem_threshold(int channel, int level)		// Threshold channel values
 	}
 }
 
+/* Only supports BPP = 1 and 3 */
+void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp)
+{
+	int i, k;
+	double d;
+
+	for (i = 0; i < len; i++ , img += bpp)
+	{
+		if (!alpha[i]) continue;
+		d = 255.0 / (double)alpha[i];
+		k = rint(d * img[0]);
+		img[0] = k > 255 ? 255 : k;
+		if (bpp == 1) continue;
+		k = rint(d * img[1]);
+		img[1] = k > 255 ? 255 : k;
+		k = rint(d * img[2]);
+		img[2] = k > 255 ? 255 : k;
+	}
+}
+
 int get_pixel( int x, int y )	/* Mixed */
 {
 	x = mem_width * y + x;
