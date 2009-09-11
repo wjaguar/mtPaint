@@ -3441,12 +3441,12 @@ void mem_clip_real_clear()				// Empty the non rotated clipboard
 	}
 }
 
-static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
+static void do_rotate_free(chanlist old_img, chanlist new_img, int ow, int oh,
+	int nw, int nh, int bpp, double angle, int mode, int gcor, int dis_a,
+	int silent)
 {
-	chanlist old_img, new_img;
 	unsigned char *src, *dest, *alpha, A_rgb[3];
 	unsigned char *pix1, *pix2, *pix3, *pix4;
-	int ow=0, oh=0, nw, nh, res, rot_bpp=1;
 	int nx, ny, ox, oy, cc, i, j, k;
 	double rangle = (M_PI / 180.0) * angle;	// Radians
 	double s1, s2, c1, c2;			// Trig values
@@ -3457,110 +3457,10 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 	double rr, gg, bb;
 	double tw, th, ta, ca, sa, sca, csa, Y00, Y0h, Yw0, Ywh, X00, Xwh;
 
-	if ( clipboard == 0 )
-	{
-		ow = mem_width;
-		oh = mem_height;
-		rot_bpp = mem_img_bpp;
-	}
-	if ( clipboard == 1 )
-	{
-		if ( mem_clip_real_w == 0 )
-		{
-			ow = mem_clip_w;
-			oh = mem_clip_h;
-		}
-		else
-		{
-			ow = mem_clip_real_w;
-			oh = mem_clip_real_h;
-		}
-		rot_bpp = mem_clip_bpp;
-	}
 	c2 = cos(rangle);
 	s2 = sin(rangle);
 	c1 = -s2;
 	s1 = c2;
-
-	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
-	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
-
-	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
-
-	if ( clipboard == 0 )
-	{
-		memcpy(old_img, mem_img, sizeof(chanlist));
-		res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
-		if ( res == 1 ) return 2;		// No undo space
-		memcpy(new_img, mem_img, sizeof(chanlist));
-	}
-	if ( clipboard == 1 )
-	{
-		if ( mem_clip_real_w == 0 )		// First rotation so store current clipboard
-		{
-			for ( i=0; i<NUM_CHANNELS; i++ )
-			{
-				mem_clip_real_img[i] = NULL;
-				if ( i == CHN_IMAGE ) mem_clip_real_img[i] = mem_clipboard;
-				if ( i == CHN_ALPHA ) mem_clip_real_img[i] = mem_clip_alpha;
-				if ( i == CHN_SEL )
-				{
-					mem_clip_real_img[i] = mem_clip_mask;
-					// Note:  even if the original clipboard doesn't have a mask,
-					// the rotation will need one to chop of the corners of
-					// a rotated rectangle.
-					if ( !mem_clip_real_img[i] )
-					{
-						if ( (mem_clip_real_img[i] = malloc(ow*oh)) )
-							memset(mem_clip_real_img[i], 255, ow*oh);
-					}
-				}
-			}
-			mem_clipboard = NULL;
-			mem_clip_alpha = NULL;
-			mem_clip_mask = NULL;
-			mem_clip_real_w = mem_clip_w;
-			mem_clip_real_h = mem_clip_h;
-		}
-		else
-		{
-			free(mem_clipboard);
-			free(mem_clip_alpha);		// Remove old rotation
-			free(mem_clip_mask);
-		}
-
-		for ( i=0; i<NUM_CHANNELS; i++ )	// Allocate memory for rotated clipboard
-		{
-			old_img[i] = mem_clip_real_img[i];
-			if ( mem_clip_real_img[i] )
-			{
-				if ( i == CHN_IMAGE ) new_img[i] = malloc(nw*nh*mem_clip_bpp);
-				else new_img[i] = malloc(nw*nh);
-
-				if ( !new_img[i] )	// Not enough memory so clean up and bail out
-				{
-					for ( i=i-1; i>=0; i-- )
-					{
-						free( new_img[i] );
-					}
-					mem_clipboard = mem_clip_real_img[CHN_IMAGE];
-					mem_clip_alpha = mem_clip_real_img[CHN_ALPHA];
-					mem_clip_mask = mem_clip_real_img[CHN_SEL];
-					mem_clip_w = mem_clip_real_w;
-					mem_clip_h = mem_clip_real_h;
-					mem_clip_real_w = 0;
-
-					return 2;
-				}
-			}
-			else new_img[i] = NULL;
-		}
-		mem_clipboard = new_img[CHN_IMAGE];
-		mem_clip_alpha = new_img[CHN_ALPHA];
-		mem_clip_mask = new_img[CHN_SEL];
-		mem_clip_w = nw;
-		mem_clip_h = nh;
-	}
 
 	/* Centerpoints, including half-pixel offsets */
 	cx0 = (ow - 1) / 2.0;
@@ -3575,8 +3475,8 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 	A_rgb[2] = mem_col_A24.blue;
 
 	/* Prepare clipping rectangle */
-	tw = 0.5 * (ow + (type ? 1 : 0));
-	th = 0.5 * (oh + (type ? 1 : 0));
+	tw = 0.5 * (ow + (mode ? 1 : 0));
+	th = 0.5 * (oh + (mode ? 1 : 0));
 	ta = M_PI * (angle / 180.0 - floor(angle / 180.0));
 	ca = cos(ta); sa = sin(ta);
 	sca = ca ? sa / ca : 0.0;
@@ -3589,7 +3489,7 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 	Xwh = cx1 + tw * ca - th * sa;
 
 	/* Clear the channels */
-	if (rot_bpp == 3)
+	if (bpp == 3)
 	{
 		unsigned char *tmp = new_img[CHN_IMAGE];
 		tmp[0] = A_rgb[0];
@@ -3602,11 +3502,10 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 	for (k = CHN_IMAGE + 1; k < NUM_CHANNELS; k++)
 		if (new_img[k]) memset(new_img[k], 0, nw * nh);
 
-	if (clipboard == 0) progress_init(_("Free Rotation"),0);
 	for (ny = 0; ny < nh; ny++)
 	{
 		int xl, xm;
-		if (clipboard == 0 && (ny * 10) % nh >= nh - 10)
+		if (!silent && ((ny * 10) % nh >= nh - 10))
 			progress_update((float)ny / nh);
 
 		/* Clip this row */
@@ -3625,7 +3524,7 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 		{
 			if (!new_img[cc]) continue;
 			/* RGB nearest neighbour */
-			if (!type && (cc == CHN_IMAGE) && (rot_bpp == 3))
+			if (!mode && (cc == CHN_IMAGE) && (bpp == 3))
 			{
 				dest = new_img[CHN_IMAGE] + (ny * nw + xl) * 3;
 				for (nx = xl; nx <= xm; nx++ , dest += 3)
@@ -3641,7 +3540,7 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 				continue;
 			}
 			/* One-bpp nearest neighbour */
-			if (!type)
+			if (!mode)
 			{
 				dest = new_img[cc] + ny * nw + xl;
 				for (nx = xl; nx <= xm; nx++)
@@ -3656,7 +3555,7 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 			if (cc == CHN_IMAGE)
 			{
 				alpha = NULL;
-				if (new_img[CHN_ALPHA] && (!channel_dis[CHN_ALPHA] || clipboard!=0))
+				if (new_img[CHN_ALPHA] && !dis_a)
 					alpha = new_img[CHN_ALPHA] + ny * nw + xl;
 				dest = new_img[CHN_IMAGE] + (ny * nw + xl) * 3;
 				for (nx = xl; nx <= xm; nx++ , dest += 3)
@@ -3732,7 +3631,7 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 				continue;
 			}
 			/* Alpha channel already done... maybe */
-			if ((cc == CHN_ALPHA) && (!channel_dis[CHN_ALPHA] || clipboard!=0))
+			if ((cc == CHN_ALPHA) && !dis_a)
 				continue;
 			/* Utility channel bilinear */
 			dest = new_img[cc] + ny * nw + xl;
@@ -3765,23 +3664,106 @@ static int mem_rotate_free_real(double angle, int type, int gcor, int clipboard)
 			}
 		}
 	}
-	if (clipboard == 0) progress_end();
+}
+
+
+// Rotate canvas or clipboard by any angle (degrees)
+int mem_rotate_free(double angle, int type, int gcor, int clipboard)
+{
+	chanlist old_img, new_img;
+	int i, ow, oh, nw, nh, res, rot_bpp;
+	double rangle = (M_PI / 180.0) * angle;	// Radians
+	double s2, c2;				// Trig values
+
+
+	if (clipboard)
+	{
+		if (!mem_clipboard) return (-1);	// Nothing to rotate
+		if (!mem_clip_real_w) ow = mem_clip_w , oh = mem_clip_h;
+		else ow = mem_clip_real_w , oh = mem_clip_real_h;
+		rot_bpp = mem_clip_bpp;
+	}
+	else
+	{
+		ow = mem_width;
+		oh = mem_height;
+		rot_bpp = mem_img_bpp;
+	}
+
+	c2 = cos(rangle);
+	s2 = sin(rangle);
+	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
+	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
+
+	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
+
+	if (!clipboard)
+	{
+		memcpy(old_img, mem_img, sizeof(chanlist));
+		res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
+		if ( res == 1 ) return 2;		// No undo space
+		memcpy(new_img, mem_img, sizeof(chanlist));
+	}
+	else
+	{
+		if (!mem_clip_real_w)		// First rotation so store current clipboard
+		{
+			memset(mem_clip_real_img, 0, sizeof(chanlist));
+			mem_clip_real_img[CHN_IMAGE] = mem_clipboard;
+			mem_clip_real_img[CHN_ALPHA] = mem_clip_alpha;
+			mem_clip_real_img[CHN_SEL] = mem_clip_mask;
+			/* Note:  even if the original clipboard doesn't have a mask,
+			 * the rotation will need one to chop off the corners of
+			 * a rotated rectangle. */
+			if (!mem_clip_mask)
+			{
+				if (!(mem_clip_real_img[CHN_SEL] = malloc(ow * oh)))
+					return (2);	// Not enough memory
+				memset(mem_clip_real_img[CHN_SEL], 255, ow * oh);
+			}
+			mem_clip_real_w = mem_clip_w;
+			mem_clip_real_h = mem_clip_h;
+			mem_clipboard = mem_clip_alpha = mem_clip_mask = NULL;
+		}
+		else
+		{
+			free(mem_clipboard);
+			free(mem_clip_alpha);		// Remove old rotation
+			free(mem_clip_mask);
+		}
+
+		memcpy(old_img, mem_clip_real_img, sizeof(chanlist));
+		memset(new_img, 0, sizeof(chanlist));
+		for (i = 0; i < NUM_CHANNELS; i++)	// Allocate memory for rotated clipboard
+		{
+			if (!old_img[i]) continue;
+			new_img[i] = malloc(nw * nh * (i == CHN_IMAGE ? mem_clip_bpp : 1));
+
+			if (new_img[i]) continue;
+			// Not enough memory so clean up and bail out
+			for (--i; i >= 0; i--) free(new_img[i]);
+			mem_clipboard = mem_clip_real_img[CHN_IMAGE];
+			mem_clip_alpha = mem_clip_real_img[CHN_ALPHA];
+			mem_clip_mask = mem_clip_real_img[CHN_SEL];
+			mem_clip_w = mem_clip_real_w;
+			mem_clip_h = mem_clip_real_h;
+			mem_clip_real_w = 0;
+			return 2;
+		}
+		mem_clipboard = new_img[CHN_IMAGE];
+		mem_clip_alpha = new_img[CHN_ALPHA];
+		mem_clip_mask = new_img[CHN_SEL];
+		mem_clip_w = nw;
+		mem_clip_h = nh;
+	}
+
+	if (!clipboard) progress_init(_("Free Rotation"),0);
+	if ( rot_bpp == 1 ) type = FALSE;
+	do_rotate_free(old_img, new_img, ow, oh, nw, nh, rot_bpp, angle, type,
+		gcor, channel_dis[CHN_ALPHA] && !clipboard, clipboard);
+	if (!clipboard) progress_end();
 
 	return 0;
-}
-
-int mem_rotate_clip(double angle, int type, int gcor)	// Rotate clipboard by any angle (degrees)
-{
-	if ( !mem_clipboard && !mem_clip_mask && !mem_clip_alpha ) return -1;
-
-	return mem_rotate_free_real(angle, type, gcor, 1);
-}
-
-
-// Rotate canvas by any angle (degrees)
-int mem_rotate_free(double angle, int type, int gcor)
-{
-	return mem_rotate_free_real(angle, type, gcor, 0);
 }
 
 int mem_image_rot( int dir )					// Rotate image 90 degrees

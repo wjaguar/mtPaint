@@ -178,4 +178,5 @@ void cleanse_txt( char *out, char *in );	// Cleans up non ASCII chars for GTK+2
 void create_default_image();			// Create default new image
 
 int api_copy_rectangle();			// API function
+int api_copy_polygon();				// API function
 int api_clip_alphamask();			// API function

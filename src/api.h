@@ -50,6 +50,7 @@ void mtpaint_polygon_new();			// Clear all polygon points
 void mtpaint_polygon_point(int x, int y);	// Add a new polygon point
 void mtpaint_polygon_fill();			// Fill the polygon
 void mtpaint_polygon_draw();			// Draw the polygon lines
+int mtpaint_polygon_copy();			// Copy polygon to clipboard
 
 void mtpaint_text(char *text, char *font, float angle, int antialias);
 							// Render text to the clipboard
@@ -73,7 +74,6 @@ int mtpaint_screenshot();		// Grab a screenshot
 
 
 /*
-void mtpaint_polygon_copy();			// Copy polygon to clipboard
 void mtpaint_selection_clear();				// Clear rectangle selection
 */
 

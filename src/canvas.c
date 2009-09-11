@@ -549,7 +549,7 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
 			smooth = 1;
 	}
-	j = mem_rotate_free(angle, smooth, gcor);
+	j = mem_rotate_free(angle, smooth, gcor, FALSE);
 	if (!j) canvas_undo_chores();
 	else
 	{
@@ -985,6 +985,23 @@ int api_copy_rectangle()
 	return copy_clip(TRUE);
 }
 
+int api_copy_polygon()
+{
+	poly_init();
+	marq_x1 = poly_min_x;
+	marq_x2 = poly_max_x;
+	marq_y1 = poly_min_y;
+	marq_y2 = poly_max_y;
+	if ( copy_clip(TRUE) )
+	{
+		poly_mask();
+		channel_mask();
+	}
+	else return -1;			// Problem
+
+	return 1;
+}
+
 void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	if (!copy_clip(FALSE)) return;
@@ -1335,7 +1352,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		{jp2_rate, 0, 100},
 		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
 	GtkWidget *opt, *menu, *item, *label, *spin;
-	int i, j, k, l, li, ft_sort[NUM_FTYPES][3], mask = FF_256;
+	int i, j, k, l, ft_sort[NUM_FTYPES][2], mask = FF_256;
 	char *ext = strrchr(name, '.');
 
 	ext = ext ? ext + 1 : "";
@@ -1363,48 +1380,25 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	gtk_widget_show_all(box);
 
 	menu = gtk_menu_new();
-/*
-	for (i = j = k = 0; i < NUM_FTYPES; i++)
+	for (i = k = 0; i < NUM_FTYPES; i++)		// Populate sorted filetype list
 	{
 		if (!(file_formats[i].flags & mask)) continue;
-		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
-			(file_formats[i].ext2[0] &&
-			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
-			j = k;
-		item = gtk_menu_item_new_with_label(file_formats[i].name);
-		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		gtk_signal_connect(GTK_OBJECT(item), "activate",
-			GTK_SIGNAL_FUNC(change_image_format), (gpointer)box);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-		k++;
-  	}
-*/
-	for (i = k = 0; i < NUM_FTYPES; i++)		// Populate the unsorted filetype list
-	{
-		if (!(file_formats[i].flags & mask)) continue;
-		ft_sort[k][0] = (file_formats[i].name[0] << 16) + (file_formats[i].name[1] << 8) +
+		l = (file_formats[i].name[0] << 16) + (file_formats[i].name[1] << 8) +
 				file_formats[i].name[2];
-		ft_sort[k][1] = i;
-		k++;
-	}
-	for ( i=0; i<k; i++ )				// Sort the filetype list
-	{
-		l = 1<<28;
-		for ( j = li = 0; j<k; j++ )
+		for (j = k; j > 0; j--)
 		{
-			if ( ft_sort[j][0]!=0 && ft_sort[j][0] < l )
-			{
-				l = ft_sort[j][0];
-				li = j;
-			}
+			if (ft_sort[j - 1][0] < l) break;
+			ft_sort[j][0] = ft_sort[j - 1][0];
+			ft_sort[j][1] = ft_sort[j - 1][1];
 		}
-		ft_sort[i][2] = ft_sort[li][1];
-		ft_sort[li][0] = 0;
+		ft_sort[j][0] = l;
+		ft_sort[j][1] = i;
+		k++;
 	}
 	j=-1;
 	for ( l=0; l<k; l++ )				// Populate the option menu list
 	{
-		i = ft_sort[l][2];
+		i = ft_sort[l][1];
 		if ( j<0 && i==FT_PNG ) j = l;		// Default to PNG type if not saved yet
 		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
 			(file_formats[i].ext2[0] &&

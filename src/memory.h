@@ -427,11 +427,10 @@ void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vert
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
 int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
-int mem_rotate_free(double angle, int type, int gcor);		// Rotate canvas by any angle (degrees)
+// Rotate canvas or clipboard by any angle (degrees)
+int mem_rotate_free(double angle, int type, int gcor, int clipboard);
 int mem_image_scale(int nw, int nh, int type, int gcor, int sharp);	// Scale image
 int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
-
-int mem_rotate_clip(double angle, int type, int gcor);	// Rotate clipboard by any angle (degrees)
 
 int mem_isometrics(int type);
 

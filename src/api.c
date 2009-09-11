@@ -186,6 +186,11 @@ void mtpaint_polygon_new()			// Clear all polygon points
 
 void mtpaint_polygon_point(int x, int y)	// Add a new polygon point
 {
+	if ( x<0 ) x=0;
+	if ( y<0 ) y=0;
+	if ( x>=mem_width ) x=mem_width-1;
+	if ( y>=mem_height ) y=mem_height-1;
+
 	poly_add(x, y);
 }
 
@@ -199,6 +204,11 @@ void mtpaint_polygon_draw()			// Draw the polygon lines
 {
 	poly_init();
 	poly_outline();
+}
+
+int mtpaint_polygon_copy()			// Copy polygon to clipboard
+{
+	return api_copy_polygon();
 }
 
 int mtpaint_file_load(char *filename)				// Load a file.  return<0=fail
@@ -286,7 +296,7 @@ void mtpaint_text(char *text, char *font, float angle, int antialias)
 	inifile_set_gboolean( "fontAntialias", antialias );
 	render_text( drawing_canvas );
 #if GTK_MAJOR_VERSION == 1
-	mem_rotate_clip(angle, 1, 0);
+	if (angle!=0) mem_rotate_free(angle, antialias, TRUE, TRUE);
 #endif
 }
 
@@ -306,7 +316,7 @@ int mtpaint_selection_copy()		// Copy the rectangle selection area to the clipbo
 
 int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction)
 {
-	return mem_rotate_clip(angle, smooth, gamma_correction);
+	return mem_rotate_free(angle, smooth, gamma_correction, TRUE);
 }
 
 void mtpaint_clipboard_alpha2mask()		// Move alpha to clipboard mask
