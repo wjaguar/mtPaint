@@ -53,7 +53,7 @@ int preserved_gif_delay = 10, silence_limit;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
-	{ "PNG", "png", "", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
+	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
 		| FF_TRANS },
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPR },
@@ -62,24 +62,25 @@ fformat file_formats[NUM_FTYPES] = {
 #endif
 #ifdef U_TIFF
 /* !!! Ideal state */
-//	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
+//	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
 //		/* | FF_TRANS | FF_LAYER */ },
 /* !!! Current state */
-	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA },
+	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA },
 #else
 	{ "", "", "", 0},
 #endif
 #ifdef U_GIF
-	{ "GIF", "gif", "", FF_IDX | FF_ANIM | FF_TRANS },
+	{ "GIF", "gif", "", FF_256 | FF_ANIM | FF_TRANS },
 #else
 	{ "", "", "", 0},
 #endif
-	{ "BMP", "bmp", "", FF_IDX | FF_RGB | FF_ALPHAR },
-	{ "XPM", "xpm", "", FF_IDX | FF_TRANS | FF_SPOT },
+	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR },
+	{ "XPM", "xpm", "", FF_256 | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
+	{ "LSS16", "lss", "", FF_16 },
 /* !!! Not supported yet */
-//	{ "TGA", "tga", "", FF_IDX | FF_RGB | FF_ALPHAR },
-//	{ "PCX", "pcx", "", FF_IDX | FF_RGB },
+//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR },
+//	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 /* !!! Placeholders */
 	{ "", "", "", 0},
 	{ "", "", "", 0},
@@ -111,7 +112,7 @@ int file_type_by_ext(char *name, guint32 mask)
 	}
 
 	/* Special case for Gifsicle's victims */
-	if ((mask & FF_IDX) && (ext - name > 4) &&
+	if ((mask & FF_256) && (ext - name > 4) &&
 		!strncasecmp(ext - 4, ".gif", 4)) return (FT_GIF);
 
 	return (FT_NONE);
@@ -2494,6 +2495,188 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	return 0;
 }
 
+/*
+ * Those who don't understand PCX are condemned to reinvent it, poorly. :-)
+ */
+
+#define LSS_WIDTH   4 /* 16b */
+#define LSS_HEIGHT  6 /* 16b */
+#define LSS_PALETTE 8 /* 16 * 3 * 8b */
+#define LSS_HSIZE   56
+
+static int load_lss(char *file_name, ls_settings *settings)
+{
+	unsigned char hdr[LSS_HSIZE], *dest, *tmp, *buf = NULL;
+	FILE *fp;
+	int i, j, k, w, h, bl, idx, last, cnt, res = -1;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+
+	/* Read the header */
+	k = fread(hdr, 1, LSS_HSIZE, fp);
+
+	/* Check general validity */
+	if (k < LSS_HSIZE) goto fail; /* Least supported header size */
+	if (strncmp(hdr, "\x3D\xF3\x13\x14", 4)) goto fail; /* Signature */
+
+	w = GET16(hdr + LSS_WIDTH);
+	h = GET16(hdr + LSS_HEIGHT);
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = 1;
+	settings->colors = 16;
+
+	/* Read palette */
+	tmp = hdr + LSS_PALETTE;
+	for (i = 0; i < 16; i++)
+	{
+		settings->pal[i].red = tmp[0] << 2 | tmp[0] >> 4;
+		settings->pal[i].green = tmp[1] << 2 | tmp[1] >> 4;
+		settings->pal[i].blue = tmp[2] << 2 | tmp[2] >> 4;
+		tmp += 3;
+	}
+
+	/* Load all image at once */
+	fseek(fp, 0, SEEK_END);
+	bl = ftell(fp) - LSS_HSIZE;
+	fseek(fp, LSS_HSIZE, SEEK_SET);
+	i = (w * h * 3) >> 1;
+	if (bl > i) bl = i; /* Cannot possibly be longer */
+	buf = malloc(bl);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail2;
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+
+	if (!settings->silent) progress_init(_("Loading LSS16 image"), 0);
+
+	res = FILE_LIB_ERROR;
+	j = fread(buf, 1, bl, fp);
+	if (j < bl) goto fail3;
+
+	dest = settings->img[CHN_IMAGE];
+	idx = 0; bl += bl;
+	for (i = 0; i < h; i++)
+	{
+		last = 0; idx = (idx + 1) & ~1;
+		for (j = 0; j < w; )
+		{
+			if (idx >= bl) goto fail3;
+			k = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
+			if (k != last)
+			{
+				dest[j++] = last = k;
+				continue;
+			}
+			if (idx >= bl) goto fail3;
+			cnt = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
+			if (!cnt)
+			{
+				if (idx >= bl) goto fail3;
+				cnt = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
+				if (idx >= bl) goto fail3;
+				k = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
+				cnt = (k << 4) + cnt + 16;
+			}
+			if (cnt > w - j) cnt = w - j;
+			memset(dest + j, last, cnt);
+			j += cnt;
+		}
+		dest += w;
+	}
+	res = 1;
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	free(buf);
+fail:	fclose(fp);
+	return (res);
+}
+
+static int save_lss(char *file_name, ls_settings *settings)
+{
+	unsigned char *buf, *tmp, *src;
+	FILE *fp;
+	int i, j, k, last, cnt, idx;
+	int w = settings->width, h = settings->height;
+
+
+	i = w > LSS_HSIZE ? w : LSS_HSIZE;
+	buf = malloc(i);
+	if (!buf) return -1;
+	memset(buf, 0, i);
+
+	if (!(fp = fopen(file_name, "wb")))
+	{
+		free(buf);
+		return -1;
+	}
+
+	/* Prepare header */
+	buf[0] = 0x3D; buf[1] = 0xF3; buf[2] = 0x13; buf[3] = 0x14;
+	PUT16(buf + LSS_WIDTH, w);
+	PUT16(buf + LSS_HEIGHT, h);
+	j = settings->colors > 16 ? 16 : settings->colors;
+	tmp = buf + LSS_PALETTE;
+	for (i = 0; i < j; i++)
+	{
+		tmp[0] = settings->pal[i].red >> 2;
+		tmp[1] = settings->pal[i].green >> 2;
+		tmp[2] = settings->pal[i].blue >> 2;
+		tmp += 3;
+	}
+	fwrite(buf, 1, LSS_HSIZE, fp);
+
+	/* Write rows */
+	if (!settings->silent) progress_init(_("Saving LSS16 image"), 0);
+	src = settings->img[CHN_IMAGE];
+	for (i = 0; i < h; i++)
+	{
+		memset(buf, 0, w);
+		last = cnt = idx = 0;
+		for (j = 0; j < w; )
+		{
+			for (; j < w; j++)
+			{
+				k = *src++ & 0xF;
+				if ((k != last) || (cnt >= 255 + 16)) break;
+				cnt++;
+			}
+			if (cnt)
+			{
+				buf[idx >> 1] |= last << ((idx & 1) << 2); ++idx;
+				if (cnt >= 16)
+				{
+					++idx; /* Insert zero */
+					cnt -= 16;
+					buf[idx >> 1] |= (cnt & 0xF) <<
+						((idx & 1) << 2); ++idx;
+					cnt >>= 4;
+				}
+				buf[idx >> 1] |= cnt << ((idx & 1) << 2); ++idx;
+			}
+			if (j++ >= w) break; /* Final repeat */
+			if (k == last)
+			{
+				cnt = 1;
+				continue; /* Chain of repeats */
+			}
+			cnt = 0;
+			buf[idx >> 1] |= k << ((idx & 1) << 2); ++idx;
+			last = k;
+		}			
+		idx = (idx + 1) & ~1;
+		fwrite(buf, 1, idx >> 1, fp);
+		if (!settings->silent && ((i * 10) % h >= h - 10))
+			progress_update((float)(h - i) / h);
+	}
+	fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return 0;
+}
+
 int save_image(char *file_name, ls_settings *settings)
 {
 	png_color greypal[256];
@@ -2523,6 +2706,7 @@ int save_image(char *file_name, ls_settings *settings)
 	case FT_BMP: res = save_bmp(file_name, settings); break;
 	case FT_XPM: res = save_xpm(file_name, settings); break;
 	case FT_XBM: res = save_xbm(file_name, settings); break;
+	case FT_LSS: res = save_lss(file_name, settings); break;
 /* !!! Not implemented yet */
 //	case FT_TGA:
 //	case FT_PCX:
@@ -2590,6 +2774,7 @@ int load_image(char *file_name, int mode, int ftype)
 	case FT_BMP: res = load_bmp(file_name, &settings); break;
 	case FT_XPM: res = load_xpm(file_name, &settings); break;
 	case FT_XBM: res = load_xbm(file_name, &settings); break;
+	case FT_LSS: res = load_lss(file_name, &settings); break;
 /* !!! Not implemented yet */
 //	case FT_TGA:
 //	case FT_PCX:
@@ -2725,9 +2910,7 @@ int export_undo(char *file_name, ls_settings *settings)
 			{
 				progress_update((float)i / (start + 1));
 				settings->ftype = deftype;
-				if (!(file_formats[deftype].flags &
-					(mem_img_bpp == 3 ? FF_RGB :
-					mem_cols > 2 ? FF_IDX : FF_IDX | FF_BW)))
+				if (!(file_formats[deftype].flags & FF_SAVE_MASK))
 				{
 					settings->ftype = FT_PNG;
 					miss++;
@@ -2816,6 +2999,9 @@ int detect_image_format(char *name)
 		return (FT_NONE);
 #endif
 	if (!strncmp(buf, "BM", 2)) return (FT_BMP);
+
+	if (!strncmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
+
 	/* Check layers signature and version */
 	if (!strncmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
 	{

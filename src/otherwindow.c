@@ -1004,40 +1004,11 @@ GtkWidget *sisca_spins[6], *sisca_toggles[2], *sisca_gc;
 gboolean sisca_scale;
 
 
-static void sisca_off_lim(int spin)
-{
-	int nw = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[spin]));
-	int min = 0, max = 0, val = 0, dim = spin ? mem_height : mem_width;
-	GtkAdjustment *adj;
-
-	if (sisca_scale) return;			// Only do this if we are resizing
-
-	spin += 2;
-	adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(sisca_spins[spin]));
-	if (nw != dim)
-	{
-		/* Set min if shrinking, max if expanding */
-		*(nw < dim ? &min : &max) = nw - dim;
-		val = ADJ2INT(adj);
-		val = val < min ? min : val > max ? max : val;
-	}
-
-	adj->lower = min;
-	adj->upper = max;
-	adj->value = val;
-
-	gtk_adjustment_value_changed(adj);
-	gtk_adjustment_changed(adj);
-	gtk_widget_set_sensitive(sisca_spins[spin], nw != dim);
-	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[spin]));
-}
-
 static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 {
 	int w, h, nw, idx = (int)user_data;
 
 
-	sisca_off_lim(idx);
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])))
 		return;
 	w = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[0]));
@@ -1057,7 +1028,6 @@ static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 	idx ^= 1; /* Other coordinate */
 	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[idx]));
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(sisca_spins[idx]), nw);
-	sisca_off_lim(idx);
 }
 
 static int scale_mode = 6;
@@ -1066,38 +1036,41 @@ static int sharper_reduce = FALSE;
 
 static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
-	int nw, nh, ox, oy, res = 1, scale_type = 0, gcor = FALSE;
+	int nw, nh, ox = 0, oy = 0, res = 1, scale_type = 0, gcor = FALSE;
 
 	nw = read_spin(sisca_spins[0]);
 	nh = read_spin(sisca_spins[1]);
-	if ( nw != mem_width || nh != mem_height )
+	if (!sisca_scale)
 	{
-		if ( sisca_scale )
-		{
-			if (mem_img_bpp == 3)
-			{
-				scale_type = scale_mode;
-				gcor = gtk_toggle_button_get_active(
-					GTK_TOGGLE_BUTTON(sisca_gc));
-				inifile_set_gboolean("sharperReduce", sharper_reduce);
-			}
-			res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce);
-		}
-		else 
-		{
-			ox = read_spin(sisca_spins[2]);
-			oy = read_spin(sisca_spins[3]);
-			res = mem_image_resize(nw, nh, ox, oy, resize_mode);
-		}
-		if (!res)
-		{
-			canvas_undo_chores();
-			destroy_dialog(sisca_window);
-		}
-		else memory_errors(res);
+		ox = read_spin(sisca_spins[2]);
+		oy = read_spin(sisca_spins[3]);
 	}
-	else alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
+
+	if ((nw == mem_width) && (nh == mem_height) && !ox && !oy)
+	{
+		alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
 			_("OK"), NULL, NULL);
+		return;
+	}
+
+	if (sisca_scale)
+	{
+		if (mem_img_bpp == 3)
+		{
+			scale_type = scale_mode;
+			gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_gc));
+			inifile_set_gboolean("sharperReduce", sharper_reduce);
+		}
+		res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce);
+	}
+	else res = mem_image_resize(nw, nh, ox, oy, resize_mode);
+
+	if (!res)
+	{
+		canvas_undo_chores();
+		destroy_dialog(sisca_window);
+	}
+	else memory_errors(res);
 }
 
 void memory_errors(int type)
@@ -1171,8 +1144,10 @@ void sisca_init( char *title )
 	if ( !sisca_scale )
 	{
 		add_to_table( _("Offset"), sisca_table, 3, 0, 0 );
-		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0, 0, 0);
-		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0, 0, 0);
+		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0,
+			-MAX_WIDTH, MAX_WIDTH);
+		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0,
+			-MAX_HEIGHT, MAX_HEIGHT);
 
 		button_centre = gtk_button_new_with_label(_("Centre"));
 
@@ -1233,9 +1208,6 @@ void sisca_init( char *title )
 
 	gtk_window_set_transient_for(GTK_WINDOW(sisca_window), GTK_WINDOW(main_window));
 	gtk_widget_show_all(sisca_window);
-
-	sisca_off_lim(0);
-	sisca_off_lim(1);
 }
 
 void pressed_scale( GtkMenuItem *menu_item, gpointer user_data )

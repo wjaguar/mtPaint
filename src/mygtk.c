@@ -783,6 +783,7 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page0, NULL);
 	*page1 = gtk_vbox_new(FALSE, 0);
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *page1, NULL);
+	gtk_widget_show_all(notebook);
 	*button = sig_toggle_button(button_label, FALSE, GTK_NOTEBOOK(notebook),
 		GTK_SIGNAL_FUNC(toggle_book));
 	return (notebook);

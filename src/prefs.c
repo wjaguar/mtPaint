@@ -398,6 +398,18 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
+static GtkWidget *add_new_page(GtkWidget *notebook, char *name)
+{
+	GtkWidget *page, *label;
+
+	page = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(page);
+	label = gtk_label_new(name);
+	gtk_widget_show(label);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page, label);
+	return (page);
+}
+
 
 void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -412,7 +424,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 
 	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet;
-	GtkWidget *button1, *notebook1, *vbox_1, *vbox_2, *vbox_3, *label;
+	GtkWidget *button1, *notebook1, *page, *vbox_2, *label;
 
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
@@ -442,17 +454,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	---- TAB1 - GENERAL
 
-	vbox_1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_1);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_1);
-
-	label = gtk_label_new( _("General") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 0), label);
-
-
-	table3 = add_a_table( 3, 2, 10, vbox_1 );
+	page = add_new_page(notebook1, _("General"));
+	table3 = add_a_table( 3, 2, 10, page );
 
 ///	TABLE TEXT
 	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
@@ -464,33 +467,25 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	spinbutton_pan = spin_to_table(table3, 3, 1, 5, inifile_get_gint32("panSize", 128 ), 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),
-		vbox_1, inifile_get_gboolean("pasteToggle", TRUE) );
+		page, inifile_get_gboolean("pasteToggle", TRUE) );
 	checkbutton_cursor = add_a_toggle( _("Mouse cursor = Tool"),
-		vbox_1, inifile_get_gboolean("cursorToggle", TRUE) );
+		page, inifile_get_gboolean("cursorToggle", TRUE) );
 	checkbutton_exit = add_a_toggle( _("Confirm Exit"),
-		vbox_1, inifile_get_gboolean("exitToggle", FALSE) );
+		page, inifile_get_gboolean("exitToggle", FALSE) );
 	checkbutton_quit = add_a_toggle( _("Q key quits mtPaint"),
-		vbox_1, inifile_get_gboolean("quitToggle", TRUE) );
+		page, inifile_get_gboolean("quitToggle", TRUE) );
 	checkbutton_commit = add_a_toggle( _("Changing tool commits paste"),
-		vbox_1, inifile_get_gboolean("pasteCommit", FALSE) );
+		page, inifile_get_gboolean("pasteCommit", FALSE) );
 	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
-		vbox_1, inifile_get_gboolean("centerSettings", TRUE));
+		page, inifile_get_gboolean("centerSettings", TRUE));
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
-		vbox_1, inifile_get_gboolean("defaultGamma", FALSE));
+		page, inifile_get_gboolean("defaultGamma", FALSE));
 
 
 ///	---- TAB2 - FILES
 
-	vbox_2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_2);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_2);
-
-	label = gtk_label_new( _("Files") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 1), label);
-
-	table4 = add_a_table( 5, 2, 10, vbox_2 );
+	page = add_new_page(notebook1, _("Files"));
+	table4 = add_a_table( 5, 2, 10, page );
 
 	for ( i=0; i<6; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0 );
 
@@ -501,52 +496,38 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	spinbutton_recent  = spin_to_table(table4, 4, 1, 4, recent_files, 0, MAX_RECENT);
 	spinbutton_silence = spin_to_table(table4, 5, 1, 4, silence_limit, 0, 28);
 
-//	add_hseparator( vbox_2, -2, 10 );
+///	---- TAB3 - PATHS
 
-	clipboard_entry = mt_path_box(_("Clipboard Files"), vbox_2,
+	page = add_new_page(notebook1, _("Paths"));
+
+	clipboard_entry = mt_path_box(_("Clipboard Files"), page,
 		_("Select Clipboard File"), FS_CLIP_FILE);
 	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
 
-//	add_hseparator( vbox_2, -2, 10 );
-
-	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), vbox_2,
+	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), page,
 		_("Select Browser Program"), FS_SELECT_FILE);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
 		inifile_get(HANDBOOK_BROWSER_INI, ""));
 
-	entry_handbook[1] = mt_path_box(_("Location of Handbook index"), vbox_2,
+	entry_handbook[1] = mt_path_box(_("Location of Handbook index"), page,
 		_("Select Handbook Index File"), FS_SELECT_FILE);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
 		inifile_get(HANDBOOK_LOCATION_INI, ""));
 
-///	---- TAB3 - STATUS BAR
+///	---- TAB4 - STATUS BAR
 
-	vbox_3 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_3);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
-
-	label = gtk_label_new( _("Status Bar") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 2), label);
+	page = add_new_page(notebook1, _("Status Bar"));
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
 		sprintf(txt, "status%iToggle", i);
-		prefs_status[i] = add_a_toggle( stat_tex[i], vbox_3, inifile_get_gboolean(txt, TRUE) );
+		prefs_status[i] = add_a_toggle( stat_tex[i], page, inifile_get_gboolean(txt, TRUE) );
 	}
 
-///	---- TAB4 - ZOOM
+///	---- TAB5 - ZOOM
 
-	vbox_3 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_3);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
-
-	label = gtk_label_new( _("Zoom") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 3), label);
-	table5 = add_a_table( 2, 4, 10, vbox_3 );
+	page = add_new_page(notebook1, _("Zoom"));
+	table5 = add_a_table( 2, 4, 10, page );
 
 ///	TABLE TEXT
 	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 5 );
@@ -560,34 +541,25 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	}
 
 	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
-		vbox_3, inifile_get_gboolean("zoomToggle", FALSE) );
+		page, inifile_get_gboolean("zoomToggle", FALSE) );
 #if GTK_MAJOR_VERSION == 2
 	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
-		vbox_3, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
+		page, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
 #endif
 	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
-		vbox_3, chequers_optimize );
+		page, chequers_optimize );
 	checkbutton_zoom[3] = add_a_toggle( _("Disable view window transparencies"),
-		vbox_3, opaque_view );
+		page, opaque_view );
 
 
 
-///	---- TAB5 - TABLET
+///	---- TAB6 - TABLET
 
-	vbox_3 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_3);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
-
-	label = gtk_label_new( _("Tablet") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 4), label);
-
-
+	page = add_new_page(notebook1, _("Tablet"));
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	add_with_frame(vbox_3, _("Device Settings"), vbox_2, 5);
+	add_with_frame(page, _("Device Settings"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	label_tablet_device = pack(vbox_2, gtk_label_new(""));
@@ -631,7 +603,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	add_with_frame(vbox_3, _("Test Area"), vbox_2, 5);
+	add_with_frame(page, _("Test Area"), vbox_2, 5);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());
@@ -661,32 +633,25 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 
 
-///	---- TAB6 - LANGUAGE
+///	---- TAB7 - LANGUAGE
 
 #ifdef U_NLS
 
-	vbox_2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_2);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox_2);
-	gtk_container_set_border_width( GTK_CONTAINER(vbox_2), 10 );
+	page = add_new_page(notebook1, _("Language"));
+	gtk_container_set_border_width(GTK_CONTAINER(page), 10);
 
-	label = gtk_label_new( _("Language") );
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label(GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 5), label);
-
-	add_hseparator( vbox_2, 200, 10 );
-	label = pack(vbox_2, gtk_label_new( _("Select preferred language translation\n\n"
+	add_hseparator( page, 200, 10 );
+	label = pack(page, gtk_label_new( _("Select preferred language translation\n\n"
 				"You will need to restart mtPaint\nfor this to take full effect")));
 	gtk_widget_show (label);
-	add_hseparator( vbox_2, 200, 10 );
+	add_hseparator( page, 200, 10 );
 
 	for (i = 0; i < PREF_LANGS; i++)
 	{
 		if (!strcmp(pref_lang_ini_code[i],
 			inifile_get("languageSETTING", "system"))) break;
 	}
-	xpack(vbox_2, wj_radio_pack(pref_langs, PREF_LANGS, 6, i, &pref_lang, NULL));
+	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, 6, i, &pref_lang, NULL));
 
 #endif
 

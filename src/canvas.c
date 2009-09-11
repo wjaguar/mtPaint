@@ -1192,7 +1192,7 @@ static int populate_channel(char *filename)
 	if (ftype < 0) return (-1); /* Silently fail if no file */
 
 	/* Don't bother with mismatched formats */
-	if (file_formats[ftype].flags & (MEM_BPP == 1 ? FF_IDX | FF_BW : FF_RGB))
+	if (file_formats[ftype].flags & (MEM_BPP == 1 ? FF_IDX : FF_RGB))
 		res = load_image(filename, FS_CHANNEL_LOAD, ftype);
 
 	/* Successful */
@@ -1340,7 +1340,7 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 static void image_widgets(GtkWidget *box, char *name, int mode)
 {
 	GtkWidget *opt, *menu, *item, *label, *spin;
-	int i, j, k, mask = FF_IDX;
+	int i, j, k, mask = FF_256;
 	char *ext = strrchr(name, '.');
 
 	ext = ext ? ext + 1 : "";
@@ -1348,8 +1348,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	{
 	default: return;
 	case FS_CHANNEL_SAVE: if (mem_channel != CHN_IMAGE) break;
-	case FS_PNG_SAVE: mask = mem_img_bpp == 3 ? FF_RGB : mem_cols <= 2 ?
-		FF_BW | FF_IDX : FF_IDX;
+	case FS_PNG_SAVE: mask = FF_SAVE_MASK;
 		break;
 	case FS_COMPOSITE_SAVE: mask = FF_RGB;
 	}
@@ -1414,7 +1413,7 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	int i, j, k, mask;
 	char *ext = strrchr(name, '.');
 
-	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_BW | FF_IDX | FF_RGB;
+	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_IMAGE;
 	ext = ext ? ext + 1 : "";
 
 	label = gtk_label_new(_("File Format"));
