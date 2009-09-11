@@ -2937,16 +2937,7 @@ int show_html(char *browser, char *docs)
 	argv[0] = browser;
 	argv[1] = docs;
 	argv[2] = NULL;
-//	i = spawn_process(argv, NULL, FALSE);
-
-//	spawn_expansion("mtpaint *.jpg", "/home/mark/_/w/Worm 65/Photos/Kilmington - July 2004/Sunny Day");	// Example
-//	i = spawn_expansion("exiif %f", NULL, TRUE);		// Example
-//	i = spawn_expansion("exif %f", NULL, TRUE);		// Example
-	i = spawn_expansion("identify -verbose %f", NULL, TRUE);		// Example
-//printf("i=%i\n", i);
-//	spawn_expansion("ls %f -l", NULL, FALSE);		// Example
-//	spawn_expansion("gqview %f", NULL, FALSE);		// Example
-
+	i = spawn_process(argv, NULL);
 #endif
 	if (i) alert_box( _("Error"),
 		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),

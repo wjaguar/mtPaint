@@ -3810,6 +3810,7 @@ void main_init()
 
 	set_cursor();
 	init_status_bar();
+	init_factions();				// Initialize file action menu
 
 	snprintf(txt, 250, "%s%c.clipboard", get_home_directory(), DIR_SEP);
 	snprintf(mem_clip_file, 250, "%s", inifile_get("clipFilename", txt));

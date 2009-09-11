@@ -18,11 +18,13 @@
 */
 
 
+#define FACTION_ROWS_TOTAL 20
+
 
 int spawn_process(char *argv[], char *directory);	// argv must be NULL terminated!
-int spawn_expansion(char *cline, char *directory, gboolean output);
+int spawn_expansion(char *cline, char *directory);
 		// Replace %f with "current filename", then run via shell
 
 void pressed_file_configure();
 void pressed_file_action( GtkMenuItem *menu_item, gpointer user_data, gint item );
-
+void init_factions();					// Initialize file action menu
