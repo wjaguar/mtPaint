@@ -28,32 +28,11 @@
 
 /* !!! Currently, poly_points should be set to 0 when there's no polygonal
  * selection, because poly_lasso() depends on that - WJ */
-int poly_mem[MAX_POLY][2], poly_points=0, poly_min_x, poly_max_x, poly_min_y, poly_max_y;
-				// Coords in poly_mem are raw coords as plotted over image
+int poly_points;
+int poly_mem[MAX_POLY][2];
+		// Coords in poly_mem are raw coords as plotted over image
+int poly_xy[4];
 
-
-
-int poly_init()			// Setup max/min -> Requires points in poly_mem
-{
-	int i;
-
-	if ((poly_points < 2) || (poly_points > MAX_POLY))
-		return 1;		// Bogus polygon
-
-	poly_min_x = poly_mem[0][0];
-	poly_max_x = poly_mem[0][0];
-	poly_min_y = poly_mem[0][1];
-	poly_max_y = poly_mem[0][1];
-	for (i=1; i<poly_points; i++)
-	{
-		mtMIN( poly_min_x, poly_min_x, poly_mem[i][0] )
-		mtMAX( poly_max_x, poly_max_x, poly_mem[i][0] )
-		mtMIN( poly_min_y, poly_min_y, poly_mem[i][1] )
-		mtMAX( poly_max_y, poly_max_y, poly_mem[i][1] )
-	}
-
-	return 0;		// Success
-}
 
 void poly_draw(int filled, unsigned char *buf, int wbuf)
 {
@@ -179,7 +158,7 @@ void poly_mask()	// Paint polygon onto clipboard mask
 	poly_draw(TRUE, mem_clip_mask, mem_clip_w);
 }
 
-void poly_paint()	// Paint polygon onto image - poly_init() must have been called
+void poly_paint()	// Paint polygon onto image
 {
 	poly_draw(TRUE, NULL, 0);
 }
@@ -191,16 +170,23 @@ void poly_outline()	// Paint polygon outline onto image
 
 void poly_add(int x, int y)	// Add point to list
 {
-	if ( poly_points > 0 )		// Point must be different from previous one
+	if (!poly_points)
 	{
-		if ( x == poly_mem[poly_points-1][0] && y == poly_mem[poly_points-1][1] ) return;
+		poly_min_x = poly_max_x = x;
+		poly_min_y = poly_max_y = y;
 	}
-	if ( poly_points < MAX_POLY )
+	else
 	{
-		poly_mem[poly_points][0] = x;
-		poly_mem[poly_points][1] = y;
-		poly_points++;
+		if (poly_points >= MAX_POLY) return;
+		if (poly_min_x > x) poly_min_x = x;
+		if (poly_max_x < x) poly_max_x = x;
+		if (poly_min_y > y) poly_min_y = y;
+		if (poly_max_y < y) poly_max_y = y;
 	}
+
+	poly_mem[poly_points][0] = x;
+	poly_mem[poly_points][1] = y;
+	poly_points++;
 }
 
 

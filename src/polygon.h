@@ -23,15 +23,19 @@
 #define MAX_POLY 1000
 				// Maximum points on any polygon
 
-int poly_mem[MAX_POLY][2], poly_points, poly_min_x, poly_max_x, poly_min_y, poly_max_y;
-				// Coords in poly_mem are raw coords as plotted over image
+int poly_points;
+int poly_mem[MAX_POLY][2];
+		// Coords in poly_mem are raw coords as plotted over image
+int poly_xy[4];
 
+#define poly_min_x poly_xy[0]
+#define poly_min_y poly_xy[1]
+#define poly_max_x poly_xy[2]
+#define poly_max_y poly_xy[3]
 
 ///	PROCEDURES
 
 void poly_add(int x, int y);	// Add point to polygon
-
-int poly_init();		// Setup max/min -> Requires points in poly_mem: needed for all below:
 
 void poly_draw(int filled, unsigned char *buf, int wbuf);
 void poly_mask();		// Paint polygon onto clipboard mask

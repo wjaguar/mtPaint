@@ -1036,7 +1036,6 @@ static void draw_arrow(int mode)
 		poly_add(line_x1, line_y1);
 		poly_add(xa1, ya1);
 		poly_add(xa2, ya2);
-		poly_init();
 		poly_paint();
 		poly_points = 0;
 	}
@@ -2801,7 +2800,7 @@ void fill_rgb(int x, int y, int w, int h, int rgb, rgbcontext *ctx)
 }
 
 /* Redirectable polygon drawing */
-void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx)
+void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 {
 #define PT_BATCH 100
 	GdkPoint white[PT_BATCH], black[PT_BATCH], *p;
@@ -2818,13 +2817,13 @@ void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx)
 	}
 	else get_visible(vxy);
 
-	x1 = *xy++; y1 = *xy++;
+	x1 = x00 + *xy++; y1 = y00 + *xy++;
 	a = x1 < vxy[0] ? 1 : x1 > vxy[2] ? 2:
 		y1 < vxy[1] ? 3 : y1 > vxy[3] ? 4 : 5;
 	for (i = 1; i < cnt; i++)
 	{
 		x0 = x1; y0 = y1; a0 = a;
-		x1 = *xy++; y1 = *xy++;
+		x1 = x00 + *xy++; y1 = y00 + *xy++;
 		dx = abs(x1 - x0); dy = abs(y1 - y0);
 		if (dx < dy) dx = dy; shift += dx;
 		switch (a0) // Basic clipping
@@ -3070,7 +3069,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	/* Draw perimeter & marquee as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
 	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
-	if ((tool_type == TOOL_POLYGON) && (poly_points > 1))
+	if ((tool_type == TOOL_POLYGON) && poly_points)
 		paint_poly_marquee(&ctx, TRUE);
 	if (perim_status > 0) repaint_perim(&ctx);
 
@@ -4898,16 +4897,21 @@ void main_init()
 		toggle_dock(show_dock, TRUE);
 		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 			menu_widgets[MENU_DOCK]), show_dock);
+		// !!! Filelist in the dock should have focus now
 	}
-	/* !!! Dock has no other function for now */
-	else gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], FALSE);
+	else
+	{
+		/* !!! Dock has no other function for now */
+		gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], FALSE);
+		// Stops first icon in toolbar being selected
+		gtk_widget_grab_focus(scrolledwindow_canvas);
+	}
 
 	gtk_widget_show(main_window);
 
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
 	fill_keycodes(main_keys);
 
-	gtk_widget_grab_focus(scrolledwindow_canvas);	// Stops first icon in toolbar being selected
 	gdk_window_raise( main_window->window );
 
 	icon_pix = gdk_pixmap_create_from_xpm_d( main_window->window, NULL, NULL, icon_xpm );

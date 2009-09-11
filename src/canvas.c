@@ -827,7 +827,6 @@ void pressed_rectangle(int filled)
 	{
 		if (sb)
 		{
-			poly_init();
 			l2 = tool_size >> 1;
 			sb_xywh[0] = poly_min_x > l2 ? poly_min_x - l2 : 0;
 			sb_xywh[1] = poly_min_y > l2 ? poly_min_y - l2 : 0;
@@ -2164,8 +2163,8 @@ static void poly_update_cache()
 	pxy = poly_cache.xy + i0 * 2;
 	for (i = i0; i < poly_points; i++)
 	{
-		*pxy++ = margin_main_x + (poly_mem[i][0] * scale) / zoom + ds;
-		*pxy++ = margin_main_y + (poly_mem[i][1] * scale) / zoom + ds;
+		*pxy++ = floor_div(poly_mem[i][0] * scale, zoom) + ds;
+		*pxy++ = floor_div(poly_mem[i][1] * scale, zoom) + ds;
 	}
 	/* Join 1st & last point if finished */
 	if (poly_status == POLY_DONE)
@@ -2188,7 +2187,7 @@ static void poly_update_cache()
 
 void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp line
 {
-	if ((poly_points <= 0) || (poly_points >= MAX_POLY)) return;
+	if (!poly_points || (poly_points >= MAX_POLY)) return;
 	if ((line_x1 == x) && (line_y1 == y)) return;	// This check reduces flicker
 
 	repaint_line(0);
@@ -2202,15 +2201,10 @@ void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp li
 static void poly_conclude()
 {
 	repaint_line(0);
-	if (poly_points < 2)
-	{
-		poly_status = POLY_NONE;
-		poly_points = 0;
-	}
+	if (!poly_points) poly_status = POLY_NONE;
 	else
 	{
 		poly_status = POLY_DONE;
-		poly_init();			// Set up polygon stats
 		marq_x1 = poly_min_x;
 		marq_y1 = poly_min_y;
 		marq_x2 = poly_max_x;
@@ -2222,9 +2216,9 @@ static void poly_conclude()
 
 static void poly_add_po( int x, int y )
 {
-	if (poly_points <= 0) poly_cache.c_zoom = 0; // Invalidate
-	if ((poly_points > 1) && (x == poly_mem[poly_points - 1][0]) &&
-		(y == poly_mem[poly_points - 1][1])) return; // Never stack
+	if (!poly_points) poly_cache.c_zoom = 0; // Invalidate
+	else if (!((x - poly_mem[poly_points - 1][0]) |
+		(y - poly_mem[poly_points - 1][1]))) return; // Never stack
 	repaint_line(0);
 	poly_add(x, y);
 	if ( poly_points >= MAX_POLY ) poly_conclude();
@@ -2732,12 +2726,16 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 		mtMIN( marq_x2, marq_x2, mem_width-1 )
 		mtMIN( marq_y2, marq_y2, mem_height-1 )
 	}
-	if ( tool_type == TOOL_POLYGON && poly_points > 0 )
+	if ((tool_type == TOOL_POLYGON) && poly_points &&
+		((poly_max_x >= mem_width) || (poly_max_y >= mem_height)))
 	{
-		for ( i=0; i<poly_points; i++ )
+		poly_cache.c_zoom = 0; // Invalidate
+		for (i = 0; i < poly_points; i++)
 		{
-			mtMIN( poly_mem[i][0], poly_mem[i][0], mem_width-1 )
-			mtMIN( poly_mem[i][1], poly_mem[i][1], mem_height-1 )
+			if (poly_mem[i][0] >= mem_width)
+				poly_max_x = poly_mem[i][0] = mem_width - 1;
+			if (poly_mem[i][1] >= mem_height)
+				poly_max_y = poly_mem[i][1] = mem_height - 1;
 		}
 	}
 }
@@ -2759,15 +2757,16 @@ void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
 {
 	int i;
 
-	if ((tool_type != TOOL_POLYGON) || (poly_points < 2)) return;
+	if ((tool_type != TOOL_POLYGON) || !poly_points) return;
 // !!! Maybe check boundary clipping too
 	poly_update_cache();
 	i = poly_cache.points;
-	if (whole) draw_poly(poly_cache.xy, i, 0, ctx);
+	if (whole) draw_poly(poly_cache.xy, i, 0, margin_main_x, margin_main_y, ctx);
 	else
 	{
 		i -= 2;
-		draw_poly(poly_cache.xy + i * 2, 2, poly_cache.step[i], ctx);
+		draw_poly(poly_cache.xy + i * 2, 2, poly_cache.step[i],
+			margin_main_x, margin_main_y, ctx);
 	}
 }
 
