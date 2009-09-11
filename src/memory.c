@@ -333,6 +333,119 @@ void *multialloc(int align, void *ptr, int size, ...)
 	return (res);
 }
 
+static int frameset_realloc(frameset *fset)
+{
+	image_frame *tmp;
+	int n = fset->cnt;
+
+	/* Next power of 2 */
+	n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8;
+	n |= n >> 16; n++;
+	if (n < FRAMES_MIN) n = FRAMES_MIN;
+	if (n == fset->max) return (TRUE);
+	tmp = realloc(fset->frames, n * sizeof(image_frame));
+	if (!tmp) return (FALSE);
+	fset->frames = tmp;
+	fset->max = n;
+	fset->size = 0; // Recalculate it later
+	return (TRUE);
+}
+
+/* Add one more frame to a frameset */
+int mem_add_frame(frameset *fset, int w, int h, int bpp, int cmask, png_color *pal)
+{
+	image_frame *frm;
+	unsigned char *res;
+	size_t l, sz = (size_t)w * h;
+	int i;
+
+	/* Extend frames array if necessary */
+	if (fset->cnt >= fset->max)
+	{
+		if ((fset->cnt >= FRAMES_MAX) || !frameset_realloc(fset))
+			return (FALSE);
+	}
+
+	/* Initialize the frame */
+	frm = fset->frames + fset->cnt;
+	memset(frm, 0, sizeof(image_frame));
+	frm->width = w;
+	frm->height = h;
+	frm->bpp = bpp;
+
+	/* Allocate channels */
+	l = sz * bpp;
+	res = (void *)(-1);
+	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)
+	{
+		if (cmask & CMASK_FOR(i))
+			res = frm->img[i] = malloc(l);
+		l = sz;
+	}
+
+	/* Allocate palette if it differs from default */
+	if (res && pal && (!fset->pal || memcmp(fset->pal, pal, SIZEOF_PALETTE)))
+	{
+		res = malloc(SIZEOF_PALETTE);
+		if (res)
+		{
+			/* Set as default if first frame and no default yet */
+			if (!fset->cnt && !fset->pal) fset->pal = (void *)res;
+			else frm->pal = (void *)res;
+			mem_pal_copy(res, pal);
+		}
+	}
+
+	if (!res) /* Not enough memory */
+	{
+		while (--i >= 0) free(frm->img[i]);
+		return (FALSE);
+	}
+
+	fset->cnt++;
+	fset->size = 0; // Recalculate it later
+	return (TRUE);
+}
+
+/* Remove specified frame from a frameset */
+void mem_remove_frame(frameset *fset, int frame)
+{
+	image_frame *tmp;
+	int l = fset->cnt;
+
+	if (frame >= l) return;
+	tmp = fset->frames + frame;
+	mem_free_chanlist(tmp->img);
+	free(tmp->pal);
+	memmove(tmp, tmp + 1, (--l - frame) * sizeof(image_frame));
+	fset->cnt = l;
+// !!! Like with layers, you switch to another frame before deleting current one
+	if (fset->cur > frame) fset->cur--;
+	/* Reduce array size if 2/3+ empty */
+	if ((l * 3 <= fset->max) && (fset->max > FRAMES_MIN))
+		frameset_realloc(fset);
+	fset->size = 0; // Recalculate it later
+}
+
+/* Empty a frameset */
+void mem_free_frames(frameset *fset)
+{
+	image_frame *frm;
+	int i;
+
+	if (fset->frames)
+	{
+		for (i = 0 , frm = fset->frames; i < fset->cnt; i++ , frm++)
+		{
+			mem_free_chanlist(frm->img);
+			free(frm->pal);
+		}
+		free(fset->frames);
+	}
+	free(fset->pal);
+	memset(fset, 0, sizeof(frameset));
+}
+
 /* Set initial state of image variables */
 void init_istate(image_state *state, image_info *image)
 {
@@ -488,8 +601,8 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	int cmask, chanlist src)
 {
 	unsigned char *res;
-	size_t sz = (size_t)w * h;
-	int i, l, mask0 = cmask;
+	size_t l, sz = (size_t)w * h;
+	int i, mask0 = cmask;
 
 	if (mode & AI_CLEAR) memset(image, 0, sizeof(image_info));
 

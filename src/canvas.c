@@ -1300,10 +1300,83 @@ static int populate_channel(char *filename)
 	return (res == 1 ? 0 : -1);
 }
 
+static int anim_mode = ANM_COMP;
+
+static void anim_dialog_fn(char *key)
+{
+	*(key - *key) = *key;
+}
+
+static int anim_file_dialog()
+{
+	char *modes[] = { _("Raw frames"), _("Composited frames"),
+		_("Composited frames with nonzero delay") };
+	char *opts[] = { _("Cancel"), _("Edit Frames"),
+#ifndef WIN32
+		_("View Animation"),
+#endif
+		NULL };
+	char keys[] = { 0, 1, 2, 3, 4, 5 };
+	GtkWidget *alert, *vbox, *button, *label;
+	GtkAccelGroup* ag = gtk_accel_group_new();
+	int i;
+
+
+	/* This function must be immune to pointer grabs */
+	release_grab();
+
+	alert = gtk_dialog_new();
+	gtk_window_set_title(GTK_WINDOW(alert), _("Warning"));
+	gtk_window_set_modal(GTK_WINDOW(alert), TRUE);
+	gtk_window_set_position(GTK_WINDOW(alert), GTK_WIN_POS_CENTER);
+	gtk_container_set_border_width(GTK_CONTAINER(alert), 6);
+	vbox = GTK_DIALOG(alert)->vbox;
+	
+	label = gtk_label_new(_("This is an animated GIF file.  What do you want to do?"));
+	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+	gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, FALSE, 8);
+#if 0
+	add_with_frame(vbox, NULL, wj_radio_pack(modes, 3, 0, anim_mode,
+		&anim_mode, NULL), 5);
+	button = add_a_button(_("Load into Layers"), 2, vbox, FALSE);
+#else
+	pack(vbox, gtk_hseparator_new());
+	button = add_a_button(_("Load into Layers"), 2, vbox, FALSE);
+	pack(vbox, wj_radio_pack(modes, 3, 0, anim_mode, &anim_mode, NULL));
+#endif
+	gtk_widget_grab_focus(button);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 5));
+	gtk_widget_show_all(vbox);
+
+	for (i = 0; opts[i]; i++)
+	{
+		button = add_a_button(opts[i], 2, GTK_DIALOG(alert)->action_area, TRUE);
+		if (!i) gtk_widget_add_accelerator(button, "clicked", ag,
+			GDK_Escape, 0, (GtkAccelFlags)0);
+		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + i + 2));
+	}
+	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
+		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 1));
+
+	gtk_window_set_transient_for(GTK_WINDOW(alert), GTK_WINDOW(main_window));
+	gtk_widget_show(alert);
+	gdk_window_raise(alert->window);
+	gtk_window_add_accel_group(GTK_WINDOW(alert), ag);
+
+	while (!keys[0]) gtk_main_iteration();
+	i = keys[0]; // !!! To save it from "destroy" event handler
+	if (i > 1) gtk_widget_destroy(alert);
+	else i = 2;
+
+	return (i - 2);
+}
+
 int do_a_load(char *fname, int undo)
 {
 	char mess[256], real_fname[PATHBUF];
-	int res, i = 0, ftype;
+	int res, i = 0, ftype, mult = 0;
 
 
 	if ((fname[0] != DIR_SEP)
@@ -1329,10 +1402,10 @@ int do_a_load(char *fname, int undo)
 
 	set_image(FALSE);
 
-	if (ftype == FT_LAYERS1) res = load_layers(real_fname);
+	if (ftype == FT_LAYERS1) mult = res = load_layers(real_fname);
 	else res = load_image(real_fname, FS_PNG_LOAD, undo ? ftype | FTM_UNDO : ftype);
 
-	if ( res<=0 )				// Error loading file
+loaded:	if ( res<=0 )				// Error loading file
 	{
 		if (res == TOO_BIG)
 		{
@@ -1349,31 +1422,43 @@ int do_a_load(char *fname, int undo)
 	else if (res == FILE_LIB_ERROR)
 		alert_box(_("Error"), _("The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again."), NULL);
 
+	else if (res == FILE_TOO_LONG)
+		alert_box(_("Error"), _("The animation is too long to load all of it into layers."), NULL);
+
 	/* Image was too large for OS */
 	else if (res == FILE_MEM_ERROR) memory_errors(1);
 
 	/* Animated GIF was loaded so tell user */
 	else if (res == FILE_GIF_ANIM)
 	{
-		int i = alert_box(_("Warning"), _("This is an animated GIF file.  What do you want to do?"),
-			_("Cancel"), _("Edit Frames"),
-#ifndef WIN32
-			_("View Animation"),
-#endif
-			NULL);
+		int i = anim_file_dialog();
 
-		if (i == 2) /* Ask for directory to explode frames to */
+		if (i == 3)
+		{
+			/* Make current layer, with first frame in it, background */
+			if (layer_selected)
+			{
+				/* Simply swap layer data pointers */
+				layer_image *tip = layer_table[layer_selected].image;
+				layer_table[layer_selected].image = layer_table[0].image;
+				layer_table[0].image = tip;
+				layer_selected = 0;
+			}
+			mult = res = load_to_layers(real_fname, ftype, anim_mode);
+			goto loaded;
+		} 
+		else if (i == 1) /* Ask for directory to explode frames to */
 		{
 			/* Needed when starting new mtpaint process later */
 			strncpy(preserved_gif_filename, real_fname, PATHBUF);
 			file_selector(FS_GIF_EXPLODE);
 		}
-		else if (i == 3) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
+		else if (i == 2) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
 	}
 
 	/* Whether we loaded something or failed to, old image is gone anyway */
 	register_file(real_fname);
-	if (ftype != FT_LAYERS1) /* A single image */
+	if (!mult) /* A single image */
 	{
 		set_new_filename(layer_selected, real_fname);
 

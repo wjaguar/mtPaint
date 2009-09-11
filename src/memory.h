@@ -93,7 +93,28 @@
 
 #define SIZEOF_PALETTE (256 * sizeof(png_color))
 
+// Both limits should be powers of two
+#define FRAMES_MIN 16
+#define FRAMES_MAX (1024 * 1024) /* A million frames should be QUITE enough */
+
 typedef unsigned char *chanlist[NUM_CHANNELS];
+
+typedef struct {
+	chanlist img;
+	png_color *pal;
+	int width, height;
+	int x, y, delay;
+	short cols, bpp, trans;
+} image_frame;
+
+typedef struct {
+	image_frame *frames;	// Pointer to frames array
+	png_color *pal;		// Default palette
+	int cur;		// Index of current frame
+	int cnt;		// Number of frames in use
+	int max;		// Total number of frame slots
+	size_t size;		// Total used memory (0 means count it anew)
+} frameset;
 
 typedef struct {
 	chanlist img;
@@ -404,6 +425,13 @@ int line_clip(linedata line, const int *vxy, int *step);
 void line_flip(linedata line);
 
 /// Procedures
+
+//	Add one more frame to a frameset
+int mem_add_frame(frameset *fset, int w, int h, int bpp, int cmask, png_color *pal);
+//	Remove specified frame from a frameset
+void mem_remove_frame(frameset *fset, int frame);
+//	Empty a frameset
+void mem_free_frames(frameset *fset);
 
 void init_istate(image_state *state, image_info *image);	// Set initial state of image variables
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth

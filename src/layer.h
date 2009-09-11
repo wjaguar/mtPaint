@@ -76,6 +76,8 @@ int save_layers( char *file_name );
 void layer_press_save();
 int layer_save_composite(char *fname, ls_settings *settings);
 
+int load_to_layers(char *file_name, int ftype, int ani_mode);
+
 #define update_main_with_new_layer() update_stuff(UPD_LAYER)
 
 void layers_notify_changed();

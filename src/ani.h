@@ -18,15 +18,21 @@
 */
 
 #define MAX_CYC_SLOTS 100
-
+#define MAX_CYC_ITEMS 100
 #define MAX_FRAME 99999
-
 #define MAX_DELAY 1000
-
 #define ANI_PREFIX_LEN 16
 
+#if MAX_LAYERS > 128
+#error "Layer indices cannot fit in ani_cycle structure"
+#endif
+typedef struct {
+	int frame0, frame1, len;
+	signed char layers[MAX_CYC_ITEMS];
+} ani_cycle;
 
-int	ani_frame1, ani_frame2, ani_gif_delay;
+int ani_frame1, ani_frame2, ani_gif_delay;
+ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
 
 void ani_init();			// Initialize variables/arrays etc.

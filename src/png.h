@@ -25,6 +25,7 @@
 #define FILE_LIB_ERROR 123456
 #define FILE_MEM_ERROR 123457
 #define FILE_GIF_ANIM 123458
+#define FILE_TOO_LONG 123459
 
 #ifdef WIN32
 	#define DIR_SEP '\\'
@@ -88,6 +89,11 @@
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
 
+/* Animation loading modes */
+#define ANM_RAW    0 /* Raw frames (as written) */
+#define ANM_COMP   1 /* Composited frames (as displayed) */
+#define ANM_NOZERO 2 /* Composited frames with nonzero delays (as seen) */
+
 #define LONGEST_EXT 5
 
 typedef struct {
@@ -114,6 +120,7 @@ typedef struct {
 	chanlist img;
 	png_color *pal;
 	int width, height, bpp, colors;
+	int x, y;
 } ls_settings;
 
 int silence_limit, jpeg_quality, png_compression;
@@ -126,6 +133,10 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings);
 
 int load_image(char *file_name, int mode, int ftype);
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype);
+
+// !!! The only allowed mode for now is FS_LAYER_LOAD
+int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
+	int ftype);
 
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );

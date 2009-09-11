@@ -139,6 +139,9 @@ static int layers_sensitive(int state)
 	if (!layers_box) return (TRUE);
 	res = GTK_WIDGET_SENSITIVE(layers_box);
 	gtk_widget_set_sensitive(layers_box, state);
+	/* Delayed action - selection could not be moved while insensitive */
+	if (!res && state)
+		list_select_item(layer_list, layer_list_data[layer_selected].item);
 	return (res);
 }
 
@@ -195,7 +198,9 @@ void layer_copy_to_main( int l )		// Copy info from layer to main image
 
 static void layer_select_slot(int slot)
 {
-	if (layers_box) list_select_item(layer_list, layer_list_data[slot].item);
+	/* !!! Selection gets stuck if tried to move it while insensitive */
+	if (layers_box && GTK_WIDGET_SENSITIVE(layers_box))
+		list_select_item(layer_list, layer_list_data[slot].item);
 }
 
 void shift_layer(int val)
@@ -609,13 +614,9 @@ int load_layers( char *file_name )
 
 		layers_total++;
 	}
-	if (layers_total)
-	{
-		layer_copy_to_main(--layers_total);
-		layer_selected = layers_total;
-	}
+	if (layers_total) layers_total--;
 	layer_refresh_list();
-	layer_select_slot(layer_selected);
+	layer_choose(layers_total);
 
 	/* Read in animation data - only if all layers loaded OK
 	 * (to do otherwise is likely to result in SIGSEGV) */
@@ -636,6 +637,113 @@ fail2:
 	fclose(fp);
 fail:
 	return -1;
+}
+
+int load_to_layers(char *file_name, int ftype, int ani_mode)
+{
+	char *buf, *tail;
+	image_frame *frm;
+	image_info *image;
+	image_state *state;
+	layer_node *t;
+	layer_image *lim;
+	frameset fset;
+	int i, j, dx, dy, sens, res, lname;
+
+
+	/* Create buffer for name mangling */
+	lname = strlen(file_name);
+	buf = malloc(lname + 64);
+	if (!buf) return (FILE_MEM_ERROR);
+	strcpy(buf, file_name);
+	tail = buf + lname;
+
+	/* Remove old layers, load new frames */
+	sens = layers_sensitive(FALSE);
+	if (layers_total) layers_free_all();	// Remove all current layers
+	res = load_frameset(&fset, ani_mode, file_name, FS_LAYER_LOAD, ftype);
+
+	if (!fset.cnt) /* Failure - we have no image */
+	{
+		if (res == FILE_LIB_ERROR) res = -1; // Failure is complete
+		layer_refresh_list();
+//		create_default_image();
+	}
+	else /* Got some frames - convert them into layers OVER background */
+	{
+		frm = fset.frames;
+
+		/* Create an empty indexed background of 0th frame's size */
+		do_new_one(frm->width, frm->height, 256, mem_pal_def, 1, FALSE);
+
+		for (i = 1; i <= fset.cnt; i++ , frm++)
+		{
+			t = layer_table + i;
+			lim = t->image = alloc_layer(frm->width, frm->height,
+				frm->bpp, 0, NULL);
+			if (!lim)
+			{
+				res = FILE_MEM_ERROR;
+				break;
+			}
+			t->visible = FALSE;
+			t->opacity = 100;
+			image = &lim->image_; state = &lim->state_;
+
+			/* Move frame data to image */
+			memcpy(image->img, frm->img, sizeof(chanlist));
+			memset(frm->img, 0, sizeof(chanlist));
+			state->xpm_trans = frm->trans;
+			mem_pal_copy(image->pal, frm->pal ? frm->pal :
+				fset.pal ? fset.pal : mem_pal_def);
+			image->cols = frm->cols;
+			t->x = frm->x; t->y = frm->y;
+			update_undo(image);
+
+			/* Create a name for this frame */
+			sprintf(tail, ".%03d", i - 1);
+			strncpy(state->filename, buf, PATHBUF);
+
+			init_istate(state, image);
+
+		}
+		layers_total = i - 1;
+
+// !!! These legacy things need be replaced by a per-layer field
+		preserved_gif_delay = ani_gif_delay = fset.frames[0].delay;
+
+		/* Build animation cycle for these layers */
+		memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
+		ani_frame1 = ani_cycle_table[0].frame0 = 1;
+		ani_frame2 = ani_cycle_table[0].frame1 = i - 1;
+		ani_cycle_table[0].len = i - 1;
+		for (j = 1; j < i; j++)
+			ani_cycle_table[0].layers[j - 1] = j;
+
+		/* Center the first frame over background */
+		dx = (mem_width - layer_table[1].image->image_.width) / 2;
+		dy = (mem_height - layer_table[1].image->image_.height) / 2;
+		for (j = 1; j < i; j++)
+		{
+			layer_table[j].x += dx;
+			layer_table[j].y += dy;
+		}
+
+		/* Display 1st layer in sequence */
+		layer_table[1].visible = TRUE;
+		layer_refresh_list();
+		layer_choose(1);
+	}
+	mem_free_frames(&fset);
+
+	layers_sensitive(sens);
+
+	/* Name change so that layers file would not overwrite the source */
+	strcpy(tail, ".txt");
+	layer_update_filename(buf);
+
+	free(buf);
+	return (res);
 }
 
 /* Convert absolute filename 'file' into one relative to prefix */

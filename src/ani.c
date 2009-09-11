@@ -54,12 +54,7 @@ static GtkWidget *animate_window = NULL, *ani_prev_win,
 	*ani_prev_slider		// Slider widget on preview area
 	;
 
-#define MAX_CYC_ITEMS 50
-typedef struct {
-	int frame0, frame1, len, layers[MAX_CYC_ITEMS];
-} ani_cycle;
-
-static ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
+ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
 static int
 	ani_layer_data[MAX_LAYERS + 1][4],	// x, y, opacity, visible
