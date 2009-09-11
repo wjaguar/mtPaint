@@ -64,7 +64,6 @@ gboolean show_paste,					// Show contents of clipboard while pasting
 	col_reverse = FALSE,				// Painting with right button
 	text_paste = FALSE,				// Are we pasting text?
 	canvas_image_centre = TRUE,			// Are we centering the image?
-	fs_do_gif_explode = FALSE,
 	chequers_optimize = TRUE			// Are we optimizing the chequers for speed?
 	;
 
@@ -1103,26 +1102,30 @@ void main_redo( GtkMenuItem *menu_item, gpointer user_data )
 	canvas_undo_chores();
 }
 
-static int save_pal(char *file_name, int type)		// Save the current palette to a file
+/* Save palette to a file */
+static int save_pal(char *file_name, ls_settings *settings)		
 {
 	FILE *fp;
 	int i;
 
 	if ((fp = fopen(file_name, "w")) == NULL) return -1;
 
-	if ( type == 0 )		// .gpl file
+	if (settings->ftype == FT_GPL)		// .gpl file
 	{
 		fprintf(fp, "GIMP Palette\nName: mtPaint\nColumns: 16\n#\n");
-		for ( i=0; i<mem_cols; i++ )
+		for (i = 0; i < settings->colors; i++)
 			fprintf(fp, "%3i %3i %3i\tUntitled\n",
-				mem_pal[i].red, mem_pal[i].green, mem_pal[i].blue );
+				settings->pal[i].red, settings->pal[i].green,
+				settings->pal[i].blue);
 	}
 
-	if ( type == 1 )		// .txt file
+	if (settings->ftype == FT_TXT)		// .txt file
 	{
-		fprintf(fp, "%i\n", mem_cols);
-		for ( i=0; i<mem_cols; i++ )
-			fprintf(fp, "%i,%i,%i\n", mem_pal[i].red, mem_pal[i].green, mem_pal[i].blue );
+		fprintf(fp, "%i\n", settings->colors);
+		for (i = 0; i < settings->colors; i++)
+			fprintf(fp, "%i,%i,%i\n",
+				settings->pal[i].red, settings->pal[i].green,
+				settings->pal[i].blue);
 	}
 
 	fclose( fp );
@@ -1337,14 +1340,7 @@ gtk_widget_hide( drawing_canvas );
 					// Needed when starting new mtpaint process later
 				strncpy( preserved_gif_filename, mem_filename, 250 );
 
-				if ( fs_type > 0 )
-					fs_do_gif_explode = TRUE;
-				else
-					file_selector( FS_GIF_EXPLODE );
-				/* This horrendous fiddle is needed:
-					1) Either we were called via a file selector for load, if so we must terminate this FS dialog before calling the next one
-					2) OR we could have been called on startup, command line window, or recently used file list in which case we must call the file selector now
-				*/
+				file_selector( FS_GIF_EXPLODE );
 			}
 			if ( res == 3 )
 			{
@@ -1376,178 +1372,6 @@ fail:
 
 ///	FILE SELECTION WINDOW
 
-
-GtkWidget *filew, *fs_png[2], *fs_jpg[2], *fs_xbm[5], *fs_combo_entry;
-
-static int fs_get_extension()			// Get the extension type from the combo box
-{
-	char txt[8], *txt2[] = { "", "PNG", "JPEG", "TIFF", "BMP", "GIF", "XPM", "XBM", "GPL", "TXT" };
-	int i, j=0;
-
-	strncpy( txt, gtk_entry_get_text( GTK_ENTRY(fs_combo_entry) ), 6 );
-
-	for ( i=0; i<10; i++ )
-	{
-		if ( strcmp( txt, txt2[i] ) == 0 ) j=i;
-	}
-
-	return j;		// The order of txt2 matches EXT_NONE, EXT_PNG ...
-}
-
-static void fs_set_extension()			// Change the filename extension to match the combo
-{
-	char *ext[] = { "NONE", ".png", ".jpg", ".tif", ".bmp", ".gif", ".xpm", ".xbm", ".gpl", ".txt" },
-		old_name[260], new_name[260];
-	int i, j, k, l;
-
-	strncpy( old_name,
-		gtk_entry_get_text( GTK_ENTRY(GTK_FILE_SELECTION(filew)->selection_entry) ),
-		256 );
-	strncpy( new_name, old_name, 256 );
-	i = fs_get_extension();			// New selected extension from combo
-	j = file_extension_get( old_name );	// Find out current extension
-
-	if ( i<1 || i>9 ) return;		// Ignore any dodgy numbers
-
-	if ( i != j )				// Only do this if the format is different
-	{
-		k = strlen( old_name );
-		if ( j == 0 )			// No current extension so just append it
-		{
-			if ( k<250 )
-			{
-				for ( l=0; l<4; l++ )
-				{
-					new_name[k++] = ext[i][l];
-				}
-				new_name[k] = 0;
-			}
-		}
-		else				// Remove old extension, put in new one
-		{
-			if ( k>3 )
-			{
-				for ( l=0; l<4; l++ )
-				{
-					new_name[k-1-l] = ext[i][3-l];
-				}
-			}
-		}
-		gtk_entry_set_text( GTK_ENTRY(GTK_FILE_SELECTION(filew)->selection_entry), new_name );
-	}
-}
-
-static void fs_check_format()			// Check format selected and hide widgets not needed
-{
-	char txt[8], *txt2[] = { "PNG", "JPEG", "TIFF", "BMP", "GIF", "XPM", "XBM" };
-	int i, j = -1;
-	gboolean w_show[3];
-
-	if ( fs_type == FS_PALETTE_SAVE ) return;	// Don't bother for palette saving
-
-	strncpy( txt, gtk_entry_get_text( GTK_ENTRY(fs_combo_entry) ), 6 );
-
-	for ( i=0; i<7; i++ )
-	{
-		if ( strcmp( txt, txt2[i] ) == 0 ) j=i;
-	}
-
-	w_show[0] = FALSE;
-	w_show[1] = FALSE;
-	w_show[2] = FALSE;
-	switch ( j )
-	{
-		case 0:
-		case 4:
-		case 5:		w_show[0] = TRUE;	// PNG, GIF, XPM
-				break;
-		case 1:		w_show[1] = TRUE;	// JPG
-				break;
-		case 6:		w_show[2] = TRUE;	// XBM
-				break;
-	}
-
-	for ( i=0; i<2; i++ )
-	{
-		if ( w_show[0] ) gtk_widget_show( fs_png[i] );
-		else gtk_widget_hide( fs_png[i] );
-		if ( w_show[1] ) gtk_widget_show( fs_jpg[i] );
-		else gtk_widget_hide( fs_jpg[i] );
-	}
-	for ( i=0; i<5; i++ )
-	{
-		if ( w_show[2] ) gtk_widget_show( fs_xbm[i] );
-		else gtk_widget_hide( fs_xbm[i] );
-	}
-}
-
-static void fs_set_format()			// Check format selected and set memory accordingly
-{
-	char txt[8], *txt2[] = { "PNG", "JPEG", "TIFF", "BMP", "GIF", "XPM", "XBM" };
-	int i, j = -1;
-
-	strncpy( txt, gtk_entry_get_text( GTK_ENTRY(fs_combo_entry) ), 6 );
-
-	for ( i=0; i<7; i++ )
-	{
-		if ( strcmp( txt, txt2[i] ) == 0 ) j=i;
-	}
-
-	switch ( j )
-	{
-		case 0:
-		case 4:			// PNG, GIF, XPM
-		case 5:		if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fs_png[0])) )
-				{
-					mem_xpm_trans = read_spin(fs_png[1]);
-				}
-				else
-				{
-					mem_xpm_trans = -1;
-				}
-				break;
-		case 1:			// JPG
-				mem_jpeg_quality = read_spin(fs_jpg[1]);
-				inifile_set_gint32( "jpegQuality", mem_jpeg_quality );
-				break;
-		case 6:		if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fs_xbm[0])) ) // XBM
-				{
-					mem_xbm_hot_x = read_spin(fs_xbm[2]);
-					mem_xbm_hot_y = read_spin(fs_xbm[4]);
-				}
-				else
-				{
-					mem_xbm_hot_x = -1;
-					mem_xbm_hot_y = -1;
-				}
-				break;
-	}
-}
-
-static void fs_combo_change( GtkWidget *widget, gpointer *user_data )
-{
-	fs_check_format();
-	fs_set_extension();
-}
-
-gint fs_destroy( GtkWidget *widget, GtkFileSelection *fs )
-{
-	int x, y, width, height;
-
-	gdk_window_get_size( filew->window, &width, &height );
-	gdk_window_get_root_origin( filew->window, &x, &y );
-
-	inifile_set_gint32("fs_window_x", x );
-	inifile_set_gint32("fs_window_y", y );
-	inifile_set_gint32("fs_window_w", width );
-	inifile_set_gint32("fs_window_h", height );
-
-	fs_type = 0;
-	gtk_widget_destroy( filew );
-
-	return FALSE;
-}
-
 int check_file( char *fname )		// Does file already exist?  Ask if OK to overwrite
 {
 	char mess[512];
@@ -1561,402 +1385,568 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 	return 0;
 }
 
-gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
+
+static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 {
-	char fname[256], mess[512], gif_nam[256], gif_nam2[320], *c;
-	int res, i;
-	gboolean found;
+	static int flags[] = {FF_TRANS, FF_COMPR, FF_SPOT, FF_SPOT, 0};
+	GList *chain = GTK_BOX(box)->children->next->next;
+	int i, ftype;
 
-	gtk_window_set_modal(GTK_WINDOW(filew),FALSE);
-		// Needed to show progress in Windows GTK+2
-
-	if (fs_type == FS_PNG_SAVE || fs_type == FS_PALETTE_SAVE )
-		fs_set_extension();		// Ensure extension is correct
-
-#if GTK_MAJOR_VERSION == 2
-	c = g_locale_from_utf8( (gchar *) gtk_file_selection_get_filename (GTK_FILE_SELECTION (fs)),
-			-1, NULL, NULL, NULL );
-	if ( c == NULL )
-#endif
-		strncpy( fname, gtk_file_selection_get_filename (GTK_FILE_SELECTION (fs)), 250 );
-#if GTK_MAJOR_VERSION == 2
-	else
+	ftype = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+	/* Hide/show name/value widget pairs */
+	for (i = 0; flags[i]; i++)
 	{
-		strncpy( fname, c, 250 );
+		if (file_formats[ftype].flags & flags[i])
+		{
+			gtk_widget_show(((GtkBoxChild*)chain->data)->widget);
+			gtk_widget_show(((GtkBoxChild*)chain->next->data)->widget);
+		}
+		else
+		{
+			gtk_widget_hide(((GtkBoxChild*)chain->data)->widget);
+			gtk_widget_hide(((GtkBoxChild*)chain->next->data)->widget);
+		}
+		chain = chain->next->next;
+	}
+}
+
+static void image_widgets(GtkWidget *box, char *name, int mode)
+{
+	GtkWidget *opt, *menu, *item, *label, *spin;
+	int i, j, k, mask = FF_IDX;
+	char *ext = strrchr(name, '.');
+
+	ext = ext ? ext + 1 : "";
+	switch (mode)
+	{
+	default: return;
+	case FS_CHANNEL_SAVE: if (mem_channel != CHN_IMAGE) break;
+	case FS_PNG_SAVE: mask = mem_img_bpp == 3 ? FF_RGB : mem_cols <= 2 ?
+		FF_BW | FF_IDX : FF_IDX;
+		break;
+	case FS_COMPOSITE_SAVE: mask = FF_RGB;
+	}
+
+	/* Create controls (!!! two widgets per value - used in traversal) */
+	label = gtk_label_new(_("File Format"));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+	opt = gtk_option_menu_new();
+	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 5);
+
+	label = gtk_label_new(_("Transparency index"));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+	spin = add_a_spin(mem_xpm_trans, -1, mem_cols - 1);
+	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+
+	label = gtk_label_new(_("JPEG Save Quality (100=High)"));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+	spin = add_a_spin(mem_jpeg_quality, 0, 100);
+	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+
+	label = gtk_label_new(_("Hotspot at X ="));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+	spin = add_a_spin(mem_xbm_hot_x, -1, mem_width - 1);
+	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+
+	label = gtk_label_new(_("Y ="));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
+	spin = add_a_spin(mem_xbm_hot_y, -1, mem_height - 1);
+	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+
+	gtk_widget_show_all(box);
+
+	menu = gtk_menu_new();
+	for (i = j = k = 0; i < NUM_FTYPES; i++)
+	{
+		if (!(file_formats[i].flags & mask)) continue;
+		if (!strncasecmp(ext, file_formats[i].ext, 4)) j = k;
+		item = gtk_menu_item_new_with_label(file_formats[i].name);
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_signal_connect(GTK_OBJECT(item), "activate",
+			GTK_SIGNAL_FUNC(change_image_format), (gpointer)box);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+		k++;
+  	}
+	gtk_widget_show_all(menu);
+	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
+
+	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
+
+	gtk_signal_emit_by_name(GTK_OBJECT(g_list_nth_data(
+		GTK_MENU_SHELL(menu)->children, j)), "activate", (gpointer)box);
+}
+
+static void palette_widgets(GtkWidget *box, char *name, int mode)
+{
+	GtkWidget *opt, *menu, *item, *label;
+	int i, j, k;
+	char *ext = strrchr(name, '.');
+
+	ext = ext ? ext + 1 : "";
+
+	label = gtk_label_new(_("File Format"));
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
+	opt = gtk_option_menu_new();
+	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 10);
+
+	menu = gtk_menu_new();
+	for (i = j = k = 0; i < NUM_FTYPES; i++)
+	{
+		if (!(file_formats[i].flags & FF_PALETTE)) continue;
+		if (!strncasecmp(ext, file_formats[i].ext, 4)) j = k;
+		item = gtk_menu_item_new_with_label(file_formats[i].name);
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+		k++;
+  	}
+	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
+
+	gtk_widget_show_all(box);
+}
+
+static GtkWidget *ls_settings_box(char *name, int mode)
+{
+	GtkWidget *box, *label;
+
+	box = gtk_hbox_new(FALSE, 0);
+	gtk_object_set_user_data(GTK_OBJECT(box), (gpointer)mode);
+
+	switch (mode) /* Only save operations need settings */
+	{
+	case FS_PNG_SAVE:
+/* !!! Doesn't work yet */
+//	case FS_CHANNEL_SAVE:
+//	case FS_COMPOSITE_SAVE:
+		image_widgets(box, name, mode);
+		break;
+	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
+		break;
+	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
+		label = gtk_label_new(_("Animation delay"));
+		gtk_widget_show(label);
+		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
+		label = add_a_spin(preserved_gif_delay, 1, MAX_DELAY);
+		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
+		break;
+	case FS_PALETTE_SAVE:
+		palette_widgets(box, name, mode);
+		break;
+	default: /* Give a hidden empty box */
+		return (box);
+	}
+
+	gtk_widget_show(box);
+	return (box);
+}
+
+static int selected_file_type(GtkWidget *box)
+{
+	GtkWidget *opt;
+
+	opt = BOX_CHILD(box, 1);
+	opt = gtk_option_menu_get_menu(GTK_OPTION_MENU(opt));
+	if (!opt) return (FT_NONE);
+	opt = gtk_menu_get_active(GTK_MENU(opt));
+	return ((int)gtk_object_get_user_data(GTK_OBJECT(opt)));
+}
+
+static void init_ls_settings(ls_settings *settings, GtkWidget *box)
+{
+	int xmode;
+
+	memset(settings, 0, sizeof(ls_settings));
+
+	if (!box) /* Set defaults */
+	{
+		settings->ftype = FT_NONE;
+		settings->xpm_trans = mem_xpm_trans;
+		settings->jpeg_quality = mem_jpeg_quality;
+		settings->hot_x = mem_xbm_hot_x;
+		settings->hot_y = mem_xbm_hot_y;
+		settings->gif_delay = preserved_gif_delay;
+
+		settings->silent = TRUE;
+
+		return;
+	}
+
+	/* Read in settings */
+	xmode = (int)gtk_object_get_user_data(GTK_OBJECT(box));
+	settings->mode = xmode;
+	switch (xmode)
+	{
+	case FS_PNG_SAVE:
+/* !!! Doesn't work yet */
+//	case FS_CHANNEL_SAVE:
+//	case FS_COMPOSITE_SAVE:
+		settings->ftype = selected_file_type(box);
+		settings->xpm_trans = read_spin(BOX_CHILD(box, 3));
+		settings->jpeg_quality = read_spin(BOX_CHILD(box, 5));
+		settings->hot_x = read_spin(BOX_CHILD(box, 7));
+		settings->hot_y = read_spin(BOX_CHILD(box, 9));
+		break;
+/* !!! Placeholder */
+	case FS_CHANNEL_SAVE:
+	case FS_COMPOSITE_SAVE:
+		settings->ftype = FT_PNG;
+		break;
+	case FS_LAYER_SAVE: /* Nothing to do yet */
+		break;
+	case FS_EXPORT_GIF: /* No formats yet */
+		settings->gif_delay = read_spin(BOX_CHILD(box, 1));
+		break;
+	case FS_PALETTE_SAVE:
+		settings->ftype = selected_file_type(box);
+		break;
+	default: /* Nothing to do at all */
+		break;
+	}
+}
+
+static void store_ls_settings(ls_settings *settings)
+{
+	guint32 fflags = file_formats[settings->ftype].flags;
+
+	switch (settings->mode)
+	{
+	case FS_PNG_SAVE:
+	case FS_CHANNEL_SAVE:
+	case FS_COMPOSITE_SAVE:
+		if (fflags & FF_TRANS)
+			mem_xpm_trans = settings->xpm_trans;
+		if (fflags & FF_COMPR)
+		{
+			mem_jpeg_quality = settings->jpeg_quality;
+			inifile_set_gint32("jpegQuality", mem_jpeg_quality);
+		}
+		if (fflags & FF_SPOT)
+		{
+			mem_xbm_hot_x = settings->hot_x;
+			mem_xbm_hot_y = settings->hot_y;
+		}
+		break;
+	case FS_EXPORT_GIF:
+		preserved_gif_delay = settings->gif_delay;
+		break;
+	}
+}
+
+static gboolean fs_destroy(GtkWidget *fs)
+{
+	int x, y, width, height;
+
+	gdk_window_get_size(fs->window, &width, &height);
+	gdk_window_get_root_origin(fs->window, &x, &y);
+
+	inifile_set_gint32("fs_window_x", x);
+	inifile_set_gint32("fs_window_y", y);
+	inifile_set_gint32("fs_window_w", width);
+	inifile_set_gint32("fs_window_h", height);
+
+	gtk_window_set_transient_for(GTK_WINDOW(fs), NULL);
+	gtk_widget_destroy(fs);
+
+	return FALSE;
+}
+
+static gint fs_ok(GtkWidget *fs)
+{
+	ls_settings settings;
+	GtkWidget *xtra;
+	char fname[256], mess[512], gif_nam[256], gif_nam2[320], *c, *file_ext;
+	int i, j;
+
+	/* Pick up extra info */
+	xtra = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(fs)));
+	init_ls_settings(&settings, xtra);
+	file_ext = file_formats[settings.ftype].ext;
+
+	/* Needed to show progress in Windows GTK+2 */
+	gtk_window_set_modal(GTK_WINDOW(fs), FALSE);
+
+	/* Better aesthetics? */
+	gtk_widget_hide(fs);
+
+	/* Modify the file extension if needed */
+	while (file_formats[settings.ftype].ext[0])
+	{
+		strncpy(fname, gtk_entry_get_text(GTK_ENTRY(
+			GTK_FILE_SELECTION(fs)->selection_entry)), 256);
+		c = strrchr(fname, '.');
+		if (c) /* There is an extension */
+		{
+			/* Same extension? */
+			if (!strncasecmp(c + 1, file_ext, 256)) break;
+			/* Truncate */
+			*c = '\0';
+		}
+		i = strlen(fname);
+		j = strlen(file_ext);
+		if (i + j + 1 > 250) break; /* Too long */
+		fname[i++] = '.';
+		strncpy(fname + i, file_formats[settings.ftype].ext, j + 1);
+		gtk_entry_set_text(GTK_ENTRY(
+			GTK_FILE_SELECTION(fs)->selection_entry), fname);
+	}
+
+	/* Get filename the proper way */
+#if GTK_MAJOR_VERSION == 2
+	c = g_locale_from_utf8((gchar *)gtk_file_selection_get_filename(
+		GTK_FILE_SELECTION(fs)), -1, NULL, NULL, NULL);
+	if (c)
+	{
+		strncpy(fname, c, 250);
 		g_free(c);
 	}
+	else
 #endif
+	strncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), 250);
 
-	switch ( fs_type )
+
+	switch (settings.mode)
 	{
-		case FS_PNG_LOAD:
-					if ( do_a_load( fname ) == 1) goto redo;
-					break;
-		case FS_PNG_SAVE:
-					if ( check_file(fname) == 1 ) goto redo;
-					fs_set_format();	// Update data in memory from widgets
-					if ( gui_save(fname) < 0 ) goto redo;
-					if ( layers_total>0 )
-					{
-						if ( strcmp(fname, mem_filename ) != 0 )
-							layers_notify_changed();
-			// Filename has changed so layers file needs re-saving to be correct
-					}
-					set_new_filename( fname );
-					update_image_bar();	// Update transparency info
-					update_all_views();	// Redraw in case transparency changed
-					break;
-		case FS_PALETTE_LOAD:
-					if ( load_pal(fname) !=0 )
-					{
-						snprintf(mess, 500, _("File: %s invalid - palette not updated"), fname);
-						res = alert_box( _("Error"), mess, _("OK"), NULL, NULL );
-						goto redo;
-					}
-					else	notify_changed();
-					break;
-		case FS_PALETTE_SAVE:
-					if ( check_file(fname) != 0 ) goto redo;
-					if ( file_extension_get( fname ) == EXT_TXT )
-						res = save_pal( fname, 1 );	// .txt
-					else	res = save_pal( fname, 0 );	// .gpl
-					if ( res < 0 ) goto redo_name;
-					break;
-		case FS_CLIP_FILE:
-					strncpy( mem_clip_file[1], fname, 250 );
-					gtk_entry_set_text( GTK_ENTRY(clipboard_entry),
-						mem_clip_file[1] );
-					break;
-		case FS_EXPORT_UNDO:
-		case FS_EXPORT_UNDO2:
-					if ( export_undo( fname, fs_type - FS_EXPORT_UNDO ) != 0 )
-						alert_box( _("Error"), _("Unable to export undo images"),
-							_("OK"), NULL, NULL );
-					break;
-		case FS_EXPORT_ASCII:
-					if ( check_file(fname) != 0 ) goto redo;
-					if ( export_ascii( fname ) != 0 )
-						alert_box( _("Error"), _("Unable to export ASCII file"),
-							_("OK"), NULL, NULL );
-					break;
-		case FS_LAYER_SAVE:
-					if ( check_file(fname) == 1 ) goto redo;
-					res = save_layers( fname );
-					if ( res != 1 ) goto redo;
-					break;
-		case FS_GIF_EXPLODE:
-					c = strrchr( preserved_gif_filename, DIR_SEP );
-					if ( c == NULL ) c = preserved_gif_filename;
-					else c++;
+	case FS_PNG_LOAD:
+		if (do_a_load(fname) == 1) goto redo;
+		break;
+	case FS_PNG_SAVE:
+		if (check_file(fname)) goto redo;
+		store_ls_settings(&settings);	// Update data in memory
+// !!!		if (gui_save(fname, &settings) < 0) goto redo;
 
-					snprintf(gif_nam, 250, "%s%c%s", fname, DIR_SEP, c);
-					snprintf(mess, 500,
-						"gifsicle -U --explode \"%s\" -o \"%s\"",
-						preserved_gif_filename, gif_nam );
+		if (gui_save(fname) < 0) goto redo;
+
+		if (layers_total > 0)
+		{
+			/* Filename has changed so layers file needs re-saving to be correct */
+			if (strcmp(fname, mem_filename)) layers_notify_changed();
+		}
+		set_new_filename(fname);
+		update_image_bar();	// Update transparency info
+		update_all_views();	// Redraw in case transparency changed
+		break;
+	case FS_PALETTE_LOAD:
+		if (load_pal(fname))
+		{
+			snprintf(mess, 500, _("File: %s invalid - palette not updated"), fname);
+			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			goto redo;
+		}
+		else notify_changed();
+		break;
+	case FS_PALETTE_SAVE:
+		if (check_file(fname)) goto redo;
+		settings.pal = mem_pal;
+		settings.colors = mem_cols;
+		if (save_pal(fname, &settings) < 0) goto redo_name;
+		break;
+	case FS_CLIP_FILE:
+		strncpy(mem_clip_file[1], fname, 250);
+		gtk_entry_set_text(GTK_ENTRY(clipboard_entry),
+			mem_clip_file[1]);
+		break;
+	case FS_EXPORT_UNDO:
+	case FS_EXPORT_UNDO2:
+		if (export_undo(fname, settings.mode != FS_EXPORT_UNDO))
+			alert_box( _("Error"), _("Unable to export undo images"),
+				_("OK"), NULL, NULL );
+		break;
+	case FS_EXPORT_ASCII:
+		if (check_file(fname)) goto redo;
+		if (export_ascii(fname))
+			alert_box( _("Error"), _("Unable to export ASCII file"),
+				_("OK"), NULL, NULL );
+		break;
+	case FS_LAYER_SAVE:
+		if (check_file(fname)) goto redo;
+		if (save_layers(fname) != 1) goto redo;
+		break;
+	case FS_GIF_EXPLODE:
+		c = strrchr( preserved_gif_filename, DIR_SEP );
+		if ( c == NULL ) c = preserved_gif_filename;
+		else c++;
+		snprintf(gif_nam, 250, "%s%c%s", fname, DIR_SEP, c);
+		snprintf(mess, 500,
+			"gifsicle -U --explode \"%s\" -o \"%s\"",
+			preserved_gif_filename, gif_nam );
 //printf("%s\n", mess);
-					gifsicle(mess);
-					strncat( gif_nam, ".???", 250 );
-					wild_space_change( gif_nam, gif_nam2, 315 );
-					snprintf(mess, 500,
-						"mtpaint -g %i %s &",
-						preserved_gif_delay, gif_nam2 );
+		gifsicle(mess);
+		strncat( gif_nam, ".???", 250 );
+		wild_space_change( gif_nam, gif_nam2, 315 );
+		snprintf(mess, 500,
+			"mtpaint -g %i %s &",
+			preserved_gif_delay, gif_nam2 );
 //printf("%s\n", mess);
-					gifsicle(mess);
-					break;
-		case FS_EXPORT_GIF:
-					if ( check_file(fname) == 1 ) goto redo;
-
-					snprintf(gif_nam, 250, "%s", mem_filename);
-					wild_space_change( gif_nam, gif_nam2, 315 );
-
-					i = strlen(gif_nam2) - 1;
-					found = FALSE;
-
-					while ( i>=0 && !found ) // Find numbers on end of filename
-					{
-						if ( gif_nam2[i] == DIR_SEP ) break;
-							// None in name as we have reached separator
-						if ( gif_nam2[i] >= '0' && gif_nam2[i] <= '9' )
-							found = TRUE;
-						else
-							i--;
-					}
-					while ( found )		// replace numbers on end with ?'s
-					{
-						if ( gif_nam2[i] >= '0' && gif_nam2[i] <= '9' )
-							gif_nam2[i] = '?';
-						i--;
-						if ( i<0 || gif_nam2[i] == DIR_SEP ) break;
-					}
-
-					preserved_gif_delay = gtk_spin_button_get_value_as_int(
-								GTK_SPIN_BUTTON(fs_png[1]) );
+		gifsicle(mess);
+		break;
+	case FS_EXPORT_GIF:
+		if (check_file(fname)) goto redo;
+		store_ls_settings(&settings);	// Update data in memory
+		snprintf(gif_nam, 250, "%s", mem_filename);
+		wild_space_change( gif_nam, gif_nam2, 315 );
+		for (i = strlen(gif_nam2) - 1; (i >= 0) && (gif_nam2[i] != DIR_SEP); i--)
+		{
+			if ((unsigned char)(gif_nam2[i] - '0') <= 9) gif_nam2[i] = '?';
+		}
 						
-					snprintf(mess, 500, "%s -d %i %s -o \"%s\"",
-						GIFSICLE_CREATE, preserved_gif_delay, gif_nam2, fname
-					);
+		snprintf(mess, 500, "%s -d %i %s -o \"%s\"",
+			GIFSICLE_CREATE, settings.gif_delay, gif_nam2, fname);
 //printf("%s\n", mess);
-					gifsicle(mess);
+		gifsicle(mess);
 
 #ifndef WIN32
-					snprintf(mess, 500, "gifview -a \"%s\" &", fname );
-					gifsicle(mess);
+		snprintf(mess, 500, "gifview -a \"%s\" &", fname );
+		gifsicle(mess);
 //printf("%s\n", mess);
 #endif
 
-					break;
-			case FS_CHANNEL_LOAD:
-					if ( populate_channel( fname, mem_channel ) !=0 ) goto redo;
-					break;
-			case FS_CHANNEL_SAVE:
-					if ( check_file(fname) == 1 ) goto redo;
-					if ( save_channel( fname, mem_img[mem_channel],
-						mem_width, mem_height) !=0 )
-							goto redo_name;
-					break;
-			case FS_COMPOSITE_SAVE:
-					if ( check_file(fname) == 1 ) goto redo;
-					if ( layer_save_composite(fname) !=0 )
-						goto redo_name;
-					break;
+		break;
+	case FS_CHANNEL_LOAD:
+		if (populate_channel(fname, mem_channel)) goto redo;
+		break;
+	case FS_CHANNEL_SAVE:
+		if (check_file(fname)) goto redo;
+// !!!		if (save_channel(fname, mem_channel, &settings)) goto redo_name;
+
+		if (save_channel(fname, mem_img[mem_channel],
+			mem_width, mem_height)) goto redo_name;
+
+		break;
+	case FS_COMPOSITE_SAVE:
+		if (check_file(fname)) goto redo;
+// !!!		if (layer_save_composite(fname, &settings)) goto redo_name;
+
+		if (layer_save_composite(fname)) goto redo_name;
+
+		break;
 	}
 
-	gtk_window_set_transient_for( GTK_WINDOW(filew), NULL );	// Needed in Windows to stop GTK+ lowering the main window below window underneath
 	update_menus();
 
-	fs_destroy( NULL, NULL );
-
-	if ( fs_do_gif_explode )
-	{
-		file_selector( FS_GIF_EXPLODE );
-		fs_do_gif_explode = FALSE;
-	}
+	fs_destroy(fs);
 
 	return FALSE;
 redo_name:
 	snprintf(mess, 500, _("Unable to save file: %s"), fname);
 	alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 redo:
-	gtk_window_set_modal(GTK_WINDOW(filew), TRUE);
+	gtk_widget_show(fs);
+	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 	return FALSE;
 }
 
-void file_selector( int action_type )
+void file_selector(int action_type)
 {
-	GtkWidget *hbox, *label, *combo;
-	GList *combo_list = NULL;
-	gboolean do_it;
-	int i, j, k;
-	char *combo_txt[] = { "PNG", "JPEG", "TIFF", "BMP", "PNG", "GIF", "BMP", "XPM", "XBM" },
-		*combo_txt2[] = { "GPL", "TXT" };
+	char *title = NULL, txt[300], txt2[300];
+	GtkWidget *fs, *xtra;
 
-	char *title = NULL, txt[300], txt2[300], *temp_txt = NULL;
-	
-	fs_type = action_type;
 
-	switch ( fs_type )
+	switch (action_type)
 	{
-		case FS_PNG_LOAD:	title = _("Load Image File");
-					if ( layers_total==0 )
-					{
-						if ( check_for_changes() == 1 ) return;
-					}
-					else	if ( check_layers_for_changes() == 1 ) return;
-					break;
-		case FS_PNG_SAVE:	title = _("Save Image File");
-					break;
-		case FS_PALETTE_LOAD:	title = _("Load Palette File");
-					break;
-		case FS_PALETTE_SAVE:	title = _("Save Palette File");
-					break;
-		case FS_CLIP_FILE:	title = _("Select Clipboard File");
-					break;
-		case FS_EXPORT_UNDO:	title = _("Export Undo Images");
-					break;
-		case FS_EXPORT_UNDO2:	title = _("Export Undo Images (reversed)");
-					break;
-		case FS_EXPORT_ASCII:	title = _("Export ASCII Art");
-					break;
-		case FS_LAYER_SAVE:	title = _("Save Layer Files");
-					break;
-		case FS_GIF_EXPLODE:	title = _("Import GIF animation - Choose frames directory");
-					break;
-		case FS_EXPORT_GIF:	title = _("Export GIF animation");
-					break;
-		case FS_CHANNEL_LOAD:	title = _("Load Channel");
-					break;
-		case FS_CHANNEL_SAVE:	title = _("Save Channel");
-					break;
-		case FS_COMPOSITE_SAVE:	title = _("Save Composite Image");
-					break;
-	}
-
-	filew = gtk_file_selection_new ( title );
-
-	gtk_window_set_modal(GTK_WINDOW(filew),TRUE);
-	gtk_window_set_default_size( GTK_WINDOW(filew),
-		inifile_get_gint32("fs_window_w", 550 ), inifile_get_gint32("fs_window_h", 500 ) );
-	gtk_widget_set_uposition( filew,
-		inifile_get_gint32("fs_window_x", 0 ), inifile_get_gint32("fs_window_y", 0 ) );
-
-	if ( fs_type == FS_EXPORT_UNDO || fs_type == FS_EXPORT_UNDO2 || fs_type == FS_GIF_EXPLODE )
-	{
-//		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(filew)->file_list), FALSE );
-		gtk_widget_hide( GTK_WIDGET(GTK_FILE_SELECTION(filew)->file_list) );
-		if ( fs_type == FS_GIF_EXPLODE )
-			gtk_widget_hide( GTK_WIDGET(GTK_FILE_SELECTION(filew)->selection_entry) );
-	}
-
-	gtk_signal_connect (GTK_OBJECT (GTK_FILE_SELECTION (filew)->ok_button),
-		"clicked", GTK_SIGNAL_FUNC(fs_ok), (gpointer) filew);
-
-	gtk_signal_connect_object (GTK_OBJECT (GTK_FILE_SELECTION (filew)->cancel_button),
-		"clicked", GTK_SIGNAL_FUNC( fs_destroy ), GTK_OBJECT (filew) );
-
-	gtk_signal_connect_object (GTK_OBJECT(filew),
-		"delete_event", GTK_SIGNAL_FUNC( fs_destroy ), GTK_OBJECT (filew) );
-
-	if ( fs_type == FS_PNG_SAVE && strcmp( mem_filename, _("Untitled") ) != 0 )
-		strncpy( txt, mem_filename, 256 );	// If we have a filename and saving
-	else
-	{
-		if ( fs_type == FS_LAYER_SAVE && strcmp( layers_filename, _("Untitled") ) != 0 )
-			strncpy( txt, layers_filename, 256 );
-		else
+	case FS_PNG_LOAD:
+		title = _("Load Image File");
+		if (layers_total == 0)
 		{
-			if ( fs_type == FS_LAYER_SAVE )
-			{
-				strncpy( txt, inifile_get("last_dir", "/"), 256 );
-				strncat( txt, "layers.txt", 256 );
-			}
-			else	strncpy( txt, inifile_get("last_dir", "/"), 256 );	// Default
+			if (check_for_changes() == 1) return;
 		}
+		else if (check_layers_for_changes() == 1) return;
+		break;
+	case FS_PNG_SAVE:
+		title = _("Save Image File");
+		break;
+	case FS_PALETTE_LOAD:
+		title = _("Load Palette File");
+		break;
+	case FS_PALETTE_SAVE:
+		title = _("Save Palette File");
+		break;
+	case FS_CLIP_FILE:
+		title = _("Select Clipboard File");
+		break;
+	case FS_EXPORT_UNDO:
+		title = _("Export Undo Images");
+		break;
+	case FS_EXPORT_UNDO2:
+		title = _("Export Undo Images (reversed)");
+		break;
+	case FS_EXPORT_ASCII:
+		title = _("Export ASCII Art");
+		break;
+	case FS_LAYER_SAVE:
+		title = _("Save Layer Files");
+		break;
+	case FS_GIF_EXPLODE:
+		title = _("Import GIF animation - Choose frames directory");
+		break;
+	case FS_EXPORT_GIF:
+		title = _("Export GIF animation");
+		break;
+	case FS_CHANNEL_LOAD:
+		title = _("Load Channel");
+		break;
+	case FS_CHANNEL_SAVE:
+		title = _("Save Channel");
+		break;
+	case FS_COMPOSITE_SAVE:
+		title = _("Save Composite Image");
+		break;
 	}
+
+	fs = gtk_file_selection_new(title);
+
+	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
+	gtk_window_set_default_size(GTK_WINDOW(fs),
+		inifile_get_gint32("fs_window_w", 550),
+		inifile_get_gint32("fs_window_h", 500));
+	gtk_widget_set_uposition(fs,
+		inifile_get_gint32("fs_window_x", 0),
+		inifile_get_gint32("fs_window_y", 0));
+
+	if ((action_type == FS_EXPORT_UNDO) || (action_type == FS_EXPORT_UNDO2)
+		 || (action_type == FS_GIF_EXPLODE))
+	{
+//		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list), FALSE );
+		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list));
+		if (action_type == FS_GIF_EXPLODE)
+			gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
+	}
+
+	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->ok_button),
+		"clicked", GTK_SIGNAL_FUNC(fs_ok), GTK_OBJECT(fs));
+
+	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->cancel_button),
+		"clicked", GTK_SIGNAL_FUNC(fs_destroy), GTK_OBJECT(fs));
+
+	gtk_signal_connect_object(GTK_OBJECT(fs),
+		"delete_event", GTK_SIGNAL_FUNC(fs_destroy), GTK_OBJECT(fs));
+
+	if ((action_type == FS_PNG_SAVE) && strcmp(mem_filename, _("Untitled")))
+		strncpy( txt, mem_filename, 256 );	// If we have a filename and saving
+	else if ((action_type == FS_LAYER_SAVE) &&
+		strcmp(layers_filename, _("Untitled")))
+		strncpy(txt, layers_filename, 256);
+	else if (action_type == FS_LAYER_SAVE)
+	{
+		strncpy(txt, inifile_get("last_dir", "/"), 256);
+		strncat(txt, "layers.txt", 256);
+	}
+	else strncpy(txt, inifile_get("last_dir", "/"), 256);	// Default
+
 #if GTK_MAJOR_VERSION == 2
 	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
 #else
 	strcpy( txt2, txt );
 #endif
-	gtk_file_selection_set_filename (GTK_FILE_SELECTION(filew), txt2 );
+	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
 
+	xtra = ls_settings_box(txt2, action_type);
+	gtk_box_pack_start(GTK_BOX(GTK_FILE_SELECTION(fs)->main_vbox), xtra,
+		FALSE, TRUE, 0);
+	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
-	if ( fs_type == FS_EXPORT_GIF )
-	{
-		hbox = gtk_hbox_new (FALSE, 0);
-		gtk_widget_show(hbox);
-		gtk_box_pack_start(GTK_BOX(GTK_FILE_SELECTION(filew)->main_vbox), hbox, FALSE, TRUE, 0);
-
-		label = gtk_label_new(_("Animation delay"));
-		gtk_widget_show (label);
-		gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
-
-		fs_png[1] = add_a_spin( preserved_gif_delay, 1, MAX_DELAY );
-
-		gtk_box_pack_start (GTK_BOX (hbox), fs_png[1], FALSE, FALSE, 10);
-	}
-
-
-	if ( fs_type == FS_PNG_SAVE || fs_type == FS_PALETTE_SAVE )
-	{
-		hbox = gtk_hbox_new (FALSE, 0);
-		gtk_widget_show(hbox);
-		gtk_box_pack_start(GTK_BOX(GTK_FILE_SELECTION(filew)->main_vbox), hbox, FALSE, TRUE, 0);
-
-		label = gtk_label_new( _("File Format") );
-		gtk_widget_show( label );
-		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 10 );
-
-		combo = gtk_combo_new ();
-		gtk_widget_set_usize(combo, 100, -2);
-		gtk_widget_show (combo);
-		gtk_box_pack_start (GTK_BOX (hbox), combo, FALSE, FALSE, 10);
-		fs_combo_entry = GTK_COMBO (combo)->entry;
-		gtk_widget_show (fs_combo_entry);
-		gtk_entry_set_editable( GTK_ENTRY(fs_combo_entry), FALSE );
-
-		if ( fs_type == FS_PNG_SAVE )
-		{
-			temp_txt = "PNG";
-			i = file_extension_get( mem_filename );
-			k = 4;
-			if ( i == EXT_BMP ) temp_txt = "BMP";
-			if ( mem_img_bpp == 3 )
-			{
-				j = 0;
-				if ( i == EXT_JPEG ) temp_txt = "JPEG";
-				if ( i == EXT_TIFF ) temp_txt = "TIFF";
-			}
-			else
-			{
-				if ( i == EXT_GIF ) temp_txt = "GIF";
-				if ( i == EXT_XPM ) temp_txt = "XPM";
-				j = 4;
-				if ( mem_cols == 2 )
-				{
-					k++;			// Allow XBM if indexed with 2 colours
-					if ( i == EXT_XBM ) temp_txt = "XBM";
-				}
-			}
-
-			for ( i=j; i<(j+k); i++ )
-			{
-				combo_list = g_list_append( combo_list, combo_txt[i] );
-			}
-		}
-		if ( fs_type == FS_PALETTE_SAVE )
-		{
-			temp_txt = "GPL";
-			combo_list = g_list_append( combo_list, combo_txt2[0] );
-			combo_list = g_list_append( combo_list, combo_txt2[1] );
-		}
-
-		gtk_combo_set_popdown_strings( GTK_COMBO(combo), combo_list );
-		g_list_free( combo_list );
-		gtk_entry_set_text( GTK_ENTRY(fs_combo_entry), temp_txt );
-
-		gtk_signal_connect_object (GTK_OBJECT (fs_combo_entry), "changed",
-			GTK_SIGNAL_FUNC (fs_combo_change), GTK_OBJECT (fs_combo_entry));
-
-		if ( fs_type == FS_PNG_SAVE )
-		{
-			if ( mem_xpm_trans >=0 ) do_it = TRUE; else do_it = FALSE;
-			fs_png[0] = add_a_toggle( _("Set transparency index"), hbox, do_it );
-
-			i = mem_xpm_trans;
-			if ( i<0 ) i=0;
-			fs_png[1] = add_a_spin( i, 0, mem_cols-1 );
-			gtk_box_pack_start (GTK_BOX (hbox), fs_png[1], FALSE, FALSE, 10);
-
-			fs_jpg[0] = gtk_label_new( _("JPEG Save Quality (100=High)") );
-			gtk_widget_show( fs_jpg[0] );
-			gtk_box_pack_start( GTK_BOX(hbox), fs_jpg[0], FALSE, FALSE, 10 );
-			fs_jpg[1] = add_a_spin( mem_jpeg_quality, 0, 100 );
-			gtk_box_pack_start (GTK_BOX (hbox), fs_jpg[1], FALSE, FALSE, 10);
-
-			if ( mem_xbm_hot_x >=0 ) do_it = TRUE; else do_it = FALSE;
-			fs_xbm[0] = add_a_toggle( _("Set hotspot"), hbox, do_it );
-			fs_xbm[1] = gtk_label_new( _("X =") );
-			gtk_widget_show( fs_xbm[1] );
-			gtk_box_pack_start( GTK_BOX(hbox), fs_xbm[1], FALSE, FALSE, 10 );
-			i = mem_xbm_hot_x;
-			if ( i<0 ) i = 0;
-			fs_xbm[2] = add_a_spin( i, 0, mem_width-1 );
-			gtk_box_pack_start (GTK_BOX (hbox), fs_xbm[2], FALSE, FALSE, 10);
-			fs_xbm[3] = gtk_label_new( _("Y =") );
-			gtk_widget_show( fs_xbm[3] );
-			gtk_box_pack_start( GTK_BOX(hbox), fs_xbm[3], FALSE, FALSE, 10 );
-			i = mem_xbm_hot_y;
-			if ( i<0 ) i = 0;
-			fs_xbm[4] = add_a_spin( i, 0, mem_height-1 );
-			gtk_box_pack_start (GTK_BOX (hbox), fs_xbm[4], FALSE, FALSE, 10);
-		}
-
-		fs_check_format();
-	}
-
-	gtk_widget_show (filew);
-	gtk_window_set_transient_for( GTK_WINDOW(filew), GTK_WINDOW(main_window) );
-	gdk_window_raise( filew->window );		// Needed to ensure window is at the top
+	gtk_widget_show(fs);
+	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
+	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
 }
 
 void align_size( float new_zoom )		// Set new zoom level
@@ -2693,8 +2683,10 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 		mtMIN( marq_y1, marq_y1, mem_height-1 )
 		marq_x2 = marq_x1 + mem_clip_w - 1;
 		marq_y2 = marq_y1 + mem_clip_h - 1;
+		return;
 	}
-	else			// Selection mode in operation
+	/* Selection mode in operation */
+	if ((marq_status != MARQUEE_NONE) || (poly_status == POLY_DONE))
 	{
 		mtMAX( marq_x1, marq_x1, 0 )
 		mtMAX( marq_y1, marq_y1, 0 )
@@ -2704,13 +2696,13 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 		mtMIN( marq_y1, marq_y1, mem_height-1 )
 		mtMIN( marq_x2, marq_x2, mem_width-1 )
 		mtMIN( marq_y2, marq_y2, mem_height-1 )
-		if ( tool_type == TOOL_POLYGON && poly_points > 0 )
+	}
+	if ( tool_type == TOOL_POLYGON && poly_points > 0 )
+	{
+		for ( i=0; i<poly_points; i++ )
 		{
-			for ( i=0; i<poly_points; i++ )
-			{
-				mtMIN( poly_mem[i][0], poly_mem[i][0], mem_width-1 )
-				mtMIN( poly_mem[i][1], poly_mem[i][1], mem_height-1 )
-			}
+			mtMIN( poly_mem[i][0], poly_mem[i][0], mem_width-1 )
+			mtMIN( poly_mem[i][1], poly_mem[i][1], mem_height-1 )
 		}
 	}
 }

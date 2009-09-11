@@ -21,6 +21,19 @@
 
 /// Definitions, structures & variables
 
+#define MAX_WIDTH 16384
+#define MAX_HEIGHT 16384
+#define MIN_WIDTH 1
+#define MIN_HEIGHT 1
+
+#ifdef U_GUADALINEX
+	#define DEFAULT_WIDTH 800
+	#define DEFAULT_HEIGHT 600
+#else
+	#define DEFAULT_WIDTH 640
+	#define DEFAULT_HEIGHT 480
+#endif
+
 #define PALETTE_WIDTH 74
 #define PALETTE_HEIGHT 4500
 #define PATCH_WIDTH 324

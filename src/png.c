@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -33,10 +33,12 @@
 #include <tiffio.h>
 #endif
 
+#include <gtk/gtk.h>
+
 #include "global.h"
 
-#include "png.h"
 #include "memory.h"
+#include "png.h"
 #include "otherwindow.h"
 #include "mygtk.h"
 #include "layer.h"
@@ -45,6 +47,65 @@
 char preserved_gif_filename[256];
 int preserved_gif_delay = 10;
 
+/* File types */
+#define FT_NONE     0
+#define FT_PNG      1
+#define FT_JPEG     2
+#define FT_TIFF     3
+#define FT_GIF      4
+#define FT_BMP      5
+#define FT_XPM      6
+#define FT_XBM      7
+#define FT_TGA      8
+#define FT_PCX      9
+#define FT_GPL      10
+#define FT_TXT      11
+#define FT_PAL      12
+#define FT_LAYERS1  13
+#define FT_LAYERS2  14
+
+fformat file_formats[NUM_FTYPES] = {
+	{ "", "", 0},
+	{ "PNG", "png", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
+		| FF_TRANS },
+#ifdef U_JPEG
+	{ "JPEG", "jpg", FF_RGB | FF_COMPR },
+#else
+	{ "", "", 0},
+#endif
+#ifdef U_TIFF
+/* !!! Ideal state */
+//	{ "TIFF", "tif", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
+//		/* | FF_TRANS | FF_LAYER */ },
+/* !!! Current state */
+	{ "TIFF", "tif", FF_RGB },
+#else
+	{ "", "", 0},
+#endif
+#ifdef U_GIF
+	{ "GIF", "gif", FF_IDX | FF_ANIM | FF_TRANS },
+#else
+	{ "", "", 0},
+#endif
+	{ "BMP", "bmp", FF_IDX | FF_RGB | FF_ALPHAR },
+	{ "XPM", "xpm", FF_IDX | FF_TRANS | FF_SPOT },
+	{ "XBM", "xbm", FF_BW | FF_SPOT },
+/* !!! Not supported yet */
+//	{ "TGA", "tga", FF_IDX | FF_RGB | FF_ALPHA },
+//	{ "PCX", "pcx", FF_IDX | FF_RGB },
+/* !!! Placeholders */
+	{ "", "", 0},
+	{ "", "", 0},
+	{ "GPL", "gpl", FF_PALETTE },
+	{ "TXT", "txt", FF_PALETTE },
+/* !!! Not supported yet */
+//	{ "PAL", "pal", FF_PALETTE },
+/* !!! Placeholder */
+	{ "", "", 0},
+	{ "LAYERS", "txt", FF_LAYER },
+/* !!! No 2nd layers format yet */
+	{ "", "", 0},
+};
 
 int load_png( char *file_name, int stype )		// 0=image, 1=clipboard
 {
