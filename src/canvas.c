@@ -403,8 +403,7 @@ void pressed_gauss()
 	check = add_a_toggle(_("Different X/Y"), box, FALSE);
 	gtk_signal_connect(GTK_OBJECT(check), "clicked",
 		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
-	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
-		inifile_get_gboolean("defaultGamma", FALSE));
+	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
 	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, FALSE);
 }
 
@@ -435,25 +434,18 @@ int do_unsharp(GtkWidget *box, gpointer fdata)
 
 void pressed_unsharp()
 {
-	GtkWidget *box, *table, *spin;
+	GtkWidget *box, *table;
 
 	box = gtk_vbox_new(FALSE, 5);
 	table = add_a_table(3, 2, 0, box);
 	gtk_widget_show_all(box);
-	spin = add_float_spin(5, 0, 200);
-	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
-		0, 1, GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	spin = add_float_spin(0.5, 0, 10);
-	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
-		1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	spin = add_a_spin(0, 0, 255);
-	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
-		2, 3, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	float_spin_to_table(table, 0, 1, 5, 5, 0, 200);
+	float_spin_to_table(table, 1, 1, 5, 0.5, 0, 10);
+	spin_to_table(table, 2, 1, 5, 0, 0, 255);
 	add_to_table(_("Radius"), table, 0, 0, 5);
 	add_to_table(_("Amount"), table, 1, 0, 5);
 	add_to_table(_("Threshold "), table, 2, 0, 5);
-	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
-		inifile_get_gboolean("defaultGamma", FALSE));
+	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
 	filter_window(_("Unsharp Mask"), box, do_unsharp, NULL, FALSE);
 }
 
@@ -497,8 +489,7 @@ void pressed_dog()
 	add_to_table(_("Outer radius"), table, 0, 0, 5);
 	add_to_table(_("Inner radius"), table, 1, 0, 5);
 	add_a_toggle(_("Normalize"), box, TRUE);
-	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
-		inifile_get_gboolean("defaultGamma", FALSE));
+	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
 	filter_window(_("Difference of Gaussians"), box, do_dog, NULL, FALSE);
 }
 
@@ -581,8 +572,7 @@ void pressed_rotate_free()
 	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 	if (mem_img_bpp == 3)
 	{
-		add_a_toggle(_("Gamma corrected"), box,
-			inifile_get_gboolean("defaultGamma", FALSE));
+		pack(box, gamma_toggle());
 		add_a_toggle(_("Smooth"), box, TRUE);
 	}
 	filter_window(_("Free Rotate"), box, do_rotate_free, NULL, FALSE);
@@ -985,6 +975,12 @@ static void trim_clip()
 	mem_clip_h = nh;
 	mem_clip_x += minx;
 	mem_clip_y += miny;
+
+	if (marq_status >= MARQUEE_PASTE) // We're trimming live paste area
+	{
+		marq_x2 = (marq_x1 += minx) + nw - 1;
+		marq_y2 = (marq_y1 += miny) + nh - 1;
+	}
 }
 
 void pressed_copy(int cut)
@@ -1023,14 +1019,38 @@ int api_copy_polygon()
 
 void pressed_lasso(int cut)
 {
-	if (!copy_clip(FALSE)) return;
-	if (tool_type == TOOL_POLYGON) poly_mask();
-	else mem_clip_mask_init(255);
-	poly_lasso();
-	channel_mask();
-	trim_clip();
-	if (cut) cut_clip();
-	pressed_paste_centre();
+	/* Lasso a new selection */
+	if (((marq_status > MARQUEE_NONE) && (marq_status < MARQUEE_PASTE)) ||
+		(poly_status == POLY_DONE))
+	{
+		if (!copy_clip(FALSE)) return;
+		if (tool_type == TOOL_POLYGON) poly_mask();
+		else mem_clip_mask_init(255);
+		poly_lasso();
+		channel_mask();
+		trim_clip();
+		if (cut) cut_clip();
+		pressed_paste_centre();
+	}
+	/* Trim an existing clipboard */
+	else
+	{
+		unsigned char *oldmask = mem_clip_mask;
+
+		mem_clip_mask = NULL;
+		mem_clip_mask_init(255);
+		poly_lasso();
+		if (mem_clip_mask && oldmask)
+		{
+			int i, j = mem_clip_w * mem_clip_h;
+			for (i = 0; i < j; i++) oldmask[i] &= mem_clip_mask[i];
+			mem_clip_mask_clear();
+		}
+		if (!mem_clip_mask) mem_clip_mask = oldmask;
+		trim_clip();
+		if (marq_status >= MARQUEE_PASTE)
+			gtk_widget_queue_draw(drawing_canvas);
+	}
 }
 
 void update_menus()			// Update edit/undo menu

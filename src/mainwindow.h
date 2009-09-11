@@ -114,6 +114,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_ANI_KEY,
 	DLG_ANI_KILLKEY,
 	DLG_ABOUT,
+	DLG_SKEW,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -155,6 +156,7 @@ int wtf_pressed(GdkEventKey *event);
 #define NEED_PCLIP 0x2000
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 #define NEED_PSEL  (NEED_MARQ | NEED_PCLIP)
+#define NEED_LAS2  (NEED_LASSO | NEED_PCLIP)
 
 void mapped_dis_add(GtkWidget *widget, int actmap);
 void mapped_item_state(int statemap);	// Change state of preset menu items

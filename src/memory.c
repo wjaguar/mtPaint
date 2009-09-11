@@ -128,8 +128,8 @@ int mem_brcosa_allow[3];		// BRCOSA RGB
 /// PALETTE
 
 unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
-					// RGB screen memory holding current palette
-static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
+				// RGB screen memory holding current palette
+static int found[1024];		// Used by mem_cols_used() & mem_convert_indexed
 
 int mem_brush_list[81][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 5, 1 }, { TOOL_SPRAY, 7, 1 }, { TOOL_SPRAY, 9, 2 },
@@ -294,6 +294,45 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #if (PALETTE_DIGIT_W != xbm_n7x7_width) || (PALETTE_DIGIT_H * 10 != xbm_n7x7_height)
 #error "Mismatched palette-window font"
 #endif
+
+
+#include <stdarg.h>
+
+/* This allocates several memory chunks in one block - making it one single
+ * point of allocation failure, and needing just a single free() later on.
+ * The "align" parameter forces all chunks to be aligned at double boundary.
+ * On Windows, allocations aren't guaranteed to be double-aligned, so this is
+ * necessary there unless no chunks contain doubles. */
+void *multialloc(int align, void *ptr, int size, ...)
+{
+	va_list args;
+	void *res;
+	char *tmp;
+	size_t sz = size;
+
+	va_start(args, size);
+	while (va_arg(args, void *))
+	{
+		if (align) sz = (sz + (sizeof(double) - 1)) & ~(sizeof(double) - 1);
+		sz += va_arg(args, int);
+	}
+	va_end(args);
+	if (align) sz += sizeof(double);
+	tmp = res = calloc(1, sz);
+	if (res)
+	{
+		if (align) tmp = ALIGNTO(tmp, double);
+		*(void **)ptr = (void *)tmp; tmp += size;
+		va_start(args, size);
+		while ((ptr = va_arg(args, void *)))
+		{
+			if (align) tmp = ALIGNTO(tmp, double);
+			*(void **)ptr = (void *)tmp; tmp += va_arg(args, int);
+		}
+		va_end(args);
+	}
+	return (res);
+}
 
 /* Set initial state of image variables */
 void init_istate(image_state *state, image_info *image)
@@ -2080,9 +2119,10 @@ int mem_convert_indexed(int img)
 
 	for (i = 0; i < 256; i++)
 	{
-		mem_pal[i].red = found[i * 3];
-		mem_pal[i].green = found[i * 3 + 1];
-		mem_pal[i].blue = found[i * 3 + 2];
+		j = found[i];
+		mem_pal[i].red = INT_2_R(j);
+		mem_pal[i].green = INT_2_G(j);
+		mem_pal[i].blue = INT_2_B(j);
 	}
 
 	if (!img) return (0);
@@ -2095,7 +2135,7 @@ int mem_convert_indexed(int img)
 		pix = MEM_2_INT(old_image, 0);
 		for (k = 0; k < 256; k++)	// Find index of this RGB
 		{
-			if (MEM_2_INT(found, k * 3) == pix) break;
+			if (found[k] == pix) break;
 		}
 		if (k > 255) return (1);	// No index found - BAD ERROR!!
 		*new_image++ = k;
@@ -4295,13 +4335,33 @@ int mem_sel_rot( int dir )			// Rotate clipboard 90 degrees
 	return (0);
 }
 
+/* Clear the channels */
+static void mem_clear_img(chanlist img, int w, int h, int bpp)
+{
+	int i, j, k, l = w * h;
+
+	if (bpp == 3)
+	{
+		unsigned char *tmp = img[CHN_IMAGE];
+		tmp[0] = mem_col_A24.red;
+		tmp[1] = mem_col_A24.green;
+		tmp[2] = mem_col_A24.blue;
+		j = l * 3;
+		for (i = 3; i < j; i++) tmp[i] = tmp[i - 3];
+	}
+	else memset(img[CHN_IMAGE], mem_col_A, l);
+
+	for (k = CHN_IMAGE + 1; k < NUM_CHANNELS; k++)
+		if (img[k]) memset(img[k], 0, l);
+}
+
 void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 	int nw, int nh, int bpp, double angle, int mode, int gcor, int dis_a,
 	int silent)
 {
 	unsigned char *src, *dest, *alpha, A_rgb[3];
 	unsigned char *pix1, *pix2, *pix3, *pix4;
-	int nx, ny, ox, oy, cc, i, j, k;
+	int nx, ny, ox, oy, cc;
 	double rangle = (M_PI / 180.0) * angle;	// Radians
 	double s1, s2, c1, c2;			// Trig values
 	double cx0, cy0, cx1, cy1;
@@ -4342,23 +4402,7 @@ void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 	X00 = cx1 - tw * ca + th * sa;
 	Xwh = cx1 + tw * ca - th * sa;
 
-	/* Clear the channels */
-	if ( new_img[CHN_IMAGE] )
-	{
-		if (bpp == 3)
-		{
-			unsigned char *tmp = new_img[CHN_IMAGE];
-			tmp[0] = A_rgb[0];
-			tmp[1] = A_rgb[1];
-			tmp[2] = A_rgb[2];
-			j = nw * nh * 3;
-			for (i = 3; i < j; i++) tmp[i] = tmp[i - 3];
-		}
-		else memset(new_img[CHN_IMAGE], mem_col_A, nw * nh);
-	}
-
-	for (k = CHN_IMAGE + 1; k < NUM_CHANNELS; k++)
-		if (new_img[k]) memset(new_img[k], 0, nw * nh);
+	mem_clear_img(new_img, nw, nh, bpp); /* Clear the channels */
 
 	for (ny = 0; ny < nh; ny++)
 	{
@@ -4524,6 +4568,7 @@ void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 	}
 }
 
+#define PIX_ADD (127.0 / 128.0) /* Include all _visibly_ altered pixels */
 
 void mem_rotate_geometry(int ow, int oh, double angle, int *nw, int *nh)
 				// Get new image geometry of rotation. angle = degrees
@@ -4540,10 +4585,8 @@ void mem_rotate_geometry(int ow, int oh, double angle, int *nw, int *nh)
 	dx = ow & 1; dy = oh & 1;
 	/* Exchange Y with X when rotated Y is nearer to old X */
 	if ((dx ^ dy) && (c2 < s2)) dx ^= 1 , dy ^= 1;
-#define DD (127.0 / 128.0) /* Include all _visibly_ altered pixels */
-	*nw = 2 * (int)(0.5 * (ow * c2 + oh * s2 - dx) + DD) + dx;
-	*nh = 2 * (int)(0.5 * (oh * c2 + ow * s2 - dy) + DD) + dy;
-#undef DD
+	*nw = 2 * (int)(0.5 * (ow * c2 + oh * s2 - dx) + PIX_ADD) + dx;
+	*nh = 2 * (int)(0.5 * (oh * c2 + ow * s2 - dy) + PIX_ADD) + dy;
 }
 
 // Rotate canvas or clipboard by any angle (degrees)
@@ -4680,10 +4723,11 @@ static double BH(double x)
 	return (x > 0.0 ? 1.0 - y : y);
 }
 
+static const double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
+
 static fstep *make_filter(int l0, int l1, int type, int sharp)
 {
 	fstep *res, *buf;
-	double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
 	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
 	double A = 0.0, kk = 1.0, sum;
 	int pic_tile = FALSE; /* Allow to enable tiling mode later */
@@ -6112,46 +6156,41 @@ int mem_cols_used(int max_count)			// Count colours used in main RGB image
 
 void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
 {
-	int i;
+	int i, j;
 
 	for (i = 0; i < 256; i++)
 	{
-		userpal[0][i] = found[i * 3];
-		userpal[1][i] = found[i * 3 + 1];
-		userpal[2][i] = found[i * 3 + 2];
+		j = found[i];
+		userpal[0][i] = INT_2_R(j);
+		userpal[1][i] = INT_2_G(j);
+		userpal[2][i] = INT_2_B(j);
 	}
 }
 
 int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			// Count colours used in RGB chunk
 {
-	int i, j = w * h * 3, k, res, pix;
+	int i, j = w * h * 3, k, res = 1, pix;
 
-	max_count *= 3;
-	found[0] = im[0];
-	found[1] = im[1];
-	found[2] = im[2];
+	found[0] = MEM_2_INT(im, 0);
 	if (prog) progress_init(_("Counting Unique RGB Pixels"), 0);
-	for (i = res = 3; (i < j) && (res < max_count); i += 3)	// Skim all pixels
+	for (i = 3; (i < j) && (res < max_count); i += 3) // Skim all pixels
 	{
 		pix = MEM_2_INT(im, i);
-		for (k = 0; k < res; k += 3)
+		for (k = 0; k < res; k++)
 		{
-			if (MEM_2_INT(found, k) == pix) break;
+			if (found[k] == pix) break;
 		}
 		if (k >= res)	// New colour so add to list
 		{
-			found[res] = im[i];
-			found[res + 1] = im[i + 1];
-			found[res + 2] = im[i + 2];
-			res += 3;
-			if (!prog || (res & 15)) continue;
+			found[res++] = pix;
+			if (!prog || (res & 7)) continue;
 			if (progress_update((float)res / max_count)) break;
 		}
 	}
 	if (prog) progress_end();
 
-	return (res / 3);
+	return (res);
 }
 
 
@@ -6615,7 +6654,7 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	int mode)
 {
-	int i, j, k, l, lenX, lenY, w = mem_width * MEM_BPP;
+	int i, j, k, l, lenX, lenY, asz = 0, w = mem_width * MEM_BPP;
 	double sum, exkX, exkY, *gauss;
 
 	/* Cutoff point is where gaussian becomes < 1/255 */
@@ -6630,34 +6669,21 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 		i = mem_height + 2 * (lenY - 1); // row pointers
 		j = (mem_height < i ? mem_height : i) * mem_width * 3; // data
 		/* Gamma corrected - allocate doubles for buffer */
-		if (gcor) k = i * sizeof(double *) + (j + 1) * sizeof(double);
+		if (gcor) asz = i * sizeof(double *) + (j + 1) * sizeof(double);
 		/* No gamma - shorts are enough */
-		else k = i * sizeof(short *) + j * sizeof(short);
-		gd->abuf = malloc(k);
-		if (!gd->abuf) return (FALSE);
-		i = mem_width * 7 + lenX + lenY + 1;
+		else asz = i * sizeof(short *) + j * sizeof(short);
+		i = mem_width * 7;
 	}
-	else
-	{
-		gd->abuf = NULL;
-		/* Allocate space for extra buffer in DoG mode */
-		i = (mode == 2 ? w + w : w) + lenX + lenY + 1;
-	}
-	gd->tmp = malloc(i * sizeof(double));
-	i = mem_width + 2 * (lenX - 1);
-	gd->idxx = calloc(i, sizeof(int));
-	gd->mask = malloc(mem_width);
-	if (!gd->tmp || !gd->idxx || !gd->mask)
-	{
-		free(gd->abuf);
-		free(gd->tmp);
-		free(gd->idxx);
-		free(gd->mask);
-		return (FALSE);
-	}
-	gd->gaussX = ALIGNTO(gd->tmp, double);
-	gd->gaussY = gd->gaussX + lenX;
-	gd->temp = gd->gaussY + lenY;
+	/* Allocate space for extra buffer in DoG mode */
+	else i = mode == 2 ? w + w : w;
+
+	gd->tmp = multialloc(TRUE, &gd->abuf, asz,
+		&gd->gaussX, lenX * sizeof(double),
+		&gd->gaussY, lenY * sizeof(double),
+		&gd->temp, i * sizeof(double),
+		&gd->idxx, (mem_width + 2 * (lenX - 1)) * sizeof(int),
+		&gd->mask, mem_width, NULL);
+	if (!gd->tmp) return (FALSE);
 
 	/* Prepare filters */
 	j = lenX; gauss = gd->gaussX;
@@ -6674,7 +6700,7 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 			gauss[i] *= sum;
 		}
 		if (gauss != gd->gaussX) break;
-		exkX = exkY; j = lenY; gauss += lenX;
+		exkX = exkY; j = lenY; gauss = gd->gaussY;
 	}
 
 	/* Prepare horizontal indices, assuming mirror boundary */
@@ -6722,10 +6748,7 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 		gauss_filter(&gd, CHN_ALPHA, FALSE);
 	}
 	progress_end();
-	free(gd.abuf);
 	free(gd.tmp);
-	free(gd.idxx);
-	free(gd.mask);
 }	
 
 static void unsharp_filter(gaussd *gd, double amount, int threshold,
@@ -6864,10 +6887,7 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	progress_init(_("Unsharp Mask"), 1);
 	unsharp_filter(&gd, amount, threshold, mem_channel, gcor);
 	progress_end();
-	free(gd.abuf);
 	free(gd.tmp);
-	free(gd.idxx);
-	free(gd.mask);
 }	
 
 /* Retroactive masking - by blending with undo frame */
@@ -7042,10 +7062,7 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 	progress_init(_("Difference of Gaussians"), 1);
 	dog_filter(&gd, mem_channel, norm, gcor);
 	progress_end();
-	free(gd.abuf);
 	free(gd.tmp);
-	free(gd.idxx);
-	free(gd.mask);
 }
 
 ///	CLIPBOARD MASK
@@ -7785,4 +7802,627 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 			mem_pal[img0[i]].blue);
 		rgb[i3 + 2] = (k + (k >> 8) + 1) >> 8;
 	}
+}
+
+///	SKEW ENGINE
+
+#define FILT_MAX 6 /* Must be no less than largest filter width */
+
+static void *make_skew_filter(double **filt, int **dcc, int *fw,
+	int len, double shift, double skew, int type)
+{
+	void *tmp;
+	double x, y, x0, dy, fw2, sum, A = 0.0, *fdata;
+	int i, j, k, y0, fwidth = 0, *ofdata;
+
+	// Use NN "filter" for integer shifts
+	if ((fabs(skew - rint(skew)) < 1e-10) &&
+		(fabs(shift - rint(shift)) < 1e-10)) type = 0;
+
+	switch (type)
+	{
+	case 0: fwidth = 1; /* Nearest neighbor */
+		break;
+	case 1:	fwidth = 2; /* Bilinear */
+		break;
+	case 2:	case 3: case 4: case 5:	/* Bicubic, all flavors */
+		fwidth = 4;
+		A = Aarray[type - 2];
+		break;
+	case 6:	fwidth = 6; /* Blackman-Harris windowed sinc */
+		break;
+	}
+
+	*filt = NULL; *dcc = NULL; *fw = fwidth;
+	tmp = multialloc(TRUE, filt, len * fwidth * sizeof(double),
+		dcc, len * sizeof(int), NULL);
+	if (!tmp) return (NULL);
+	fdata = *filt; ofdata = *dcc;
+
+	/* Generate filter */
+	fw2 = fwidth >> 1;
+	x0 = 0.5 * (len - 1);
+	for (i = 0; i < len; i++)
+	{
+		/* As mapping is dest-to-src, shifts are negative */
+		dy = (x0 - i) * skew - shift;
+		/* Specialcase NN filter, for simplicity */
+		if (!type)
+		{
+			*ofdata++ = rint(dy);
+			*fdata++ = 1.0;
+			continue;
+		}
+		/* Build regular filters*/
+		dy -= (*ofdata++ = y0 = ceil(dy - fw2)); // Mirrored offset
+		sum = 0.0;
+		for (j = 0; j < fwidth; j++ , dy -= 1.0)
+		{
+			x = fabs(dy);
+			y = 0;
+			switch (type)
+			{
+			case 1: /* Bilinear */
+				y = 1.0 - x;
+				break;
+			case 2: case 3: case 4: case 5: /* Bicubic */
+				if (x < 1.0) y = ((A + 2.0) * x - (A + 3)) * x * x + 1.0;
+				else y = A * (((x - 5.0) * x + 8.0) * x - 4.0);
+				break;
+			case 6: /* Blackman-Harris */
+				y = BH1(x);
+				break;
+			}
+			sum += (fdata[j] = y);
+		}
+		/* Normalization pass */
+		sum = 1.0 / sum;
+		for (k = 0; k < fwidth; k++) *fdata++ *= sum;
+	}
+	return (tmp);
+}
+
+static void skew_fill_rgba(double *buf, double *filler,
+	unsigned char *src, unsigned char *srca,
+	int y0, int ow, int xl, int xr, int x0l, int x0r,
+	int xfsz, double *xfilt, int *dxx, int *dyy, int gcor)
+{
+	double *dest, *tmp;
+	int j, k, l;
+
+	/* Initialize dest buffer */
+	k = x0l < xl ? x0l : xl;
+	l = (x0r > xr ? x0r : xr) - k - 1;
+	if (l < 0) return; // Nothing to do
+	tmp = buf + k * 7;
+	memcpy(tmp, filler, sizeof(double) * 7);
+	for (tmp += 7 , l *= 7; l > 0; tmp++ , l--) *tmp = *(tmp - 7);
+
+	/* Collect pixels */
+	dest = buf + xl * 7;
+	for (j = xl; j < xr; j++ , dest += 7)
+	{
+		unsigned char *img, *alpha;
+		double *filt, acc = 0.0;
+		int x, y, x1, ofs;
+
+		/* Get location */
+		y = y0 + dyy[j];
+		x = j + dxx[y];
+		x1 = x + xfsz;
+		filt = xfilt - x + y * xfsz;
+		
+		/* Accumulate empty space */
+		while (x1 > ow) acc += filt[--x1];
+		while (x < 0) acc += filt[x++];
+
+		/* Setup source & dest */
+		ofs = y * ow + x;
+		img = src + ofs * 3;
+		alpha = srca + ofs;
+// !!! Maybe use temp vars for accumulators - but will it make a difference?
+		dest[0] *= acc;
+		dest[1] *= acc;
+		dest[2] *= acc;
+
+		/* Accumulate image data */
+		filt += x;
+		for (; x < x1; x++ , img += 3)
+		{
+			double rr, gg, bb, aa, fv;
+
+			fv = *filt++;
+			if (gcor)
+			{
+				rr = gamma256[img[0]] * fv;
+				gg = gamma256[img[1]] * fv;
+				bb = gamma256[img[2]] * fv;
+			}
+			else
+			{
+				rr = img[0] * fv;
+				gg = img[1] * fv;
+				bb = img[2] * fv;
+			}
+			dest[6] += (aa = *alpha++) * fv;
+			dest[0] += rr;
+			dest[1] += gg;
+			dest[2] += bb;
+			dest[3] += rr * aa;
+			dest[4] += gg * aa;
+			dest[5] += bb * aa;
+		}
+	}
+}
+
+static void skew_fill_rgb(double *buf, double *filler,
+	unsigned char *src, unsigned char *srca,
+	int y0, int ow, int xl, int xr, int x0l, int x0r,
+	int xfsz, double *xfilt, int *dxx, int *dyy, int gcor)
+{
+	double *dest, *tmp;
+	int j, k, l;
+
+	/* Initialize dest buffer */
+	k = x0l < xl ? x0l : xl;
+	l = (x0r > xr ? x0r : xr) - k - 1;
+	if (l < 0) return; // Nothing to do
+	tmp = buf + k * 3;
+	memcpy(tmp, filler, sizeof(double) * 3);
+	for (tmp += 3 , l *= 3; l > 0; tmp++ , l--) *tmp = *(tmp - 3);
+
+	/* Collect pixels */
+	dest = buf + xl * 3;
+	for (j = xl; j < xr; j++ , dest += 3)
+	{
+		unsigned char *img;
+		double *filt, acc = 0.0;
+		double rv, gv, bv;
+		int x, y, x1;
+
+		/* Get location */
+		y = y0 + dyy[j];
+		x = j + dxx[y];
+		x1 = x + xfsz;
+		filt = xfilt - x + y * xfsz;
+		
+		/* Accumulate empty space */
+		while (x1 > ow) acc += filt[--x1];
+		while (x < 0) acc += filt[x++];
+
+		/* Setup source & dest */
+		img = src + (y * ow + x) * 3;
+		rv = dest[0] * acc;
+		gv = dest[1] * acc;
+		bv = dest[2] * acc;
+
+		/* Accumulate image data */
+		filt += x;
+		for (; x < x1; x++ , img += 3)
+		{
+			double fv = *filt++;
+			if (gcor)
+			{
+				rv += gamma256[img[0]] * fv;
+				gv += gamma256[img[1]] * fv;
+				bv += gamma256[img[2]] * fv;
+			}
+			else
+			{
+				rv += img[0] * fv;
+				gv += img[1] * fv;
+				bv += img[2] * fv;
+			}
+		}
+		dest[0] = rv;
+		dest[1] = gv;
+		dest[2] = bv;
+	}
+}
+
+static void skew_fill_util(double *buf, double *filler,
+	unsigned char *src, unsigned char *srca,
+	int y0, int ow, int xl, int xr, int x0l, int x0r,
+	int xfsz, double *xfilt, int *dxx, int *dyy, int gcor)
+{
+	double *dest;
+	int j, k, l;
+
+	/* Initialize dest buffer */
+	k = x0l < xl ? x0l : xl;
+	l = (x0r > xr ? x0r : xr) - k;
+	if (l <= 0) return; // Nothing to do
+	memset(buf + k, 0, l * sizeof(double));
+
+	/* Collect pixels */
+	dest = buf + xl * 3;
+	for (j = xl; j < xr; j++)
+	{
+		unsigned char *img;
+		double *filt, sum;
+		int x, y, x1;
+
+		/* Get location */
+		y = y0 + dyy[j];
+		x = j + dxx[y];
+		x1 = x + xfsz;
+		filt = xfilt - x + y * xfsz;
+		
+		/* Skip empty space */
+		while (x1 > ow) x1--;
+		while (x < 0) x++;
+
+		/* Setup source */
+		img = src + y * ow + x;
+
+		/* Accumulate image data */
+		filt += x; sum = 0.0;
+		for (; x < x1; x++) sum += *img++ * *filt++;
+		*dest++ = sum;
+	}
+}
+
+/* !!! This works, after a fashion - but remains 2.5 times slower than a smooth
+ * free-rotate if using 6-tap filter, or 1.5 times if using 2-tap one. Which,
+ * while still being several times faster than anything else, is rather bad
+ * for a high-quality tool like mtPaint. Needs improvement. - WJ */
+static void mem_skew_filt(chanlist old_img, chanlist new_img, int ow, int oh,
+	int nw, int nh, double xskew, double yskew, int mode, int gcor,
+	int dis_a, int silent)
+{
+	void *xmem, *ymem, *tmem;
+	double *xfilt, *yfilt, *wbuf, *rbuf;
+	int *dxx, *dyy;
+	double x0, y0, d, Kh, Kv, XX[4], YY[4], filler[7];
+	int i, cc, fw2, fh2, xfsz, yfsz, wbsz, rgba, step, ny, nr;
+
+
+	/* Create temp data */
+	step = (rgba = new_img[CHN_ALPHA] && !dis_a) ? 7 : 3;
+	xmem = make_skew_filter(&xfilt, &dxx, &xfsz, oh, (nw - ow) * 0.5, xskew, mode);
+	ymem = make_skew_filter(&yfilt, &dyy, &yfsz, nw, (nh - oh) * 0.5, yskew, mode);
+	fw2 = xfsz >> 1; fh2 = yfsz >> 1;
+
+	wbsz = nw * step;
+	tmem = multialloc(TRUE, &wbuf, wbsz * yfsz * sizeof(double),
+		&rbuf, wbsz * sizeof(double), NULL);
+	if (!xmem || !ymem || !tmem) goto fail;
+	x0 = 0.5 * (nw - 1); y0 = 0.5 * (nh - 1);
+
+	/* Calculate clipping parallelogram's corners */
+	// To avoid corner cases, we add an extra pixel to original dimensions
+	XX[1] = XX[3] = (XX[0] = XX[2] = 0.5 * (nw - ow) - 1) + ow + 1;
+	YY[2] = YY[3] = (YY[0] = YY[1] = 0.5 * (nh - oh) - 1) + oh + 1;
+	for (i = 0; i < 4; i++)
+	{
+		XX[i] += (YY[i] - y0) * xskew;
+		YY[i] += (XX[i] - x0) * yskew;
+	}
+	d = 1.0 + xskew * yskew;
+	Kv = d ? xskew / d : 0.0; // for left & right
+	Kh = yskew ? 1.0 / yskew : 0.0; // for top & bottom
+
+	/* Init filler */
+	memset(filler, 0, sizeof(filler));
+	if (gcor)
+	{
+		filler[0] = gamma256[mem_col_A24.red];
+		filler[1] = gamma256[mem_col_A24.green];
+		filler[2] = gamma256[mem_col_A24.blue];
+	}
+	else
+	{
+		filler[0] = mem_col_A24.red;
+		filler[1] = mem_col_A24.green;
+		filler[2] = mem_col_A24.blue;
+	}
+
+	/* Process image channels */
+	for (nr = cc = 0; cc < NUM_CHANNELS; cc++) nr += !!new_img[cc];
+	nr = (nr - rgba) * (nh + yfsz - 1);
+	for (ny = cc = 0; cc < NUM_CHANNELS; cc++)
+	{
+		int ring_l[FILT_MAX], ring_r[FILT_MAX];
+		int i, idx, bpp = cc == CHN_IMAGE ? step : 1;
+
+		if (!new_img[cc]) continue;
+		/* Alpha already processed for RGBA */
+		if ((cc == CHN_ALPHA) && rgba) continue;
+
+		/* Init border rings to all-filled */
+		for (i = 0; i < yfsz; i++) ring_l[i] = 0 , ring_r[i] = nw;
+
+		/* Row loop */
+		for (i = 1 - yfsz , idx = 0; i < nh; i++ , ++idx >= yfsz ? idx = 0 : 0)
+		{
+			double *filt0, *thatbuf, *thisbuf = wbuf + idx * wbsz;
+			int j, k, y0, xl, xr, len, ofs, lfx = -xfsz;
+
+			if (!silent && ((++ny * 10) % nr >= nr - 10))
+				progress_update((float)ny / nr);
+
+			/* Locate source row */
+			y0 = i + yfsz - 1; // Effective Y offset
+
+			/* !!! A reliable equation for pixel-precise clipping
+			 * of source rows stubbornly refuses to be found, so
+			 * a brute-force approach is used instead - WJ */
+			xl = 0; xr = nw;
+			for (; xl < xr; xl++) // Skip empty pixels on the left
+			{
+				int j = y0 + dyy[xl];
+				if ((j < 0) || (j >= oh)) continue;
+				j = xl + dxx[j];
+				if ((j <= lfx) || (j >= ow)) continue;
+				break;
+			}
+			for (; xl < xr; xr--) // Same on the right
+			{
+				int j = y0 + dyy[xr - 1];
+				if ((j < 0) || (j >= oh)) continue;
+				j = xr - 1 + dxx[j];
+				if ((j <= lfx) || (j >= ow)) continue;
+				break;
+			}
+			if (xl >= xr) xl = xr = ring_r[idx];
+
+			/* Read in a new row */
+			(cc != CHN_IMAGE ? skew_fill_util : rgba ?
+				skew_fill_rgba : skew_fill_rgb)(thisbuf,
+				filler, old_img[cc], old_img[CHN_ALPHA],
+				y0, ow, xl, xr, ring_l[idx], ring_r[idx],
+				xfsz, xfilt, dxx, dyy, gcor);
+
+			if (xl >= xr) xl = nw , xr = 0;
+			ring_l[idx] = xl;
+			ring_r[idx] = xr;
+
+			if (i < 0) continue; // Initialization phase
+
+			/* Clip target row */
+			if (i <= YY[0]) xl = ceil(XX[0] + (i - YY[0]) * Kh);
+			else if (i <= YY[2]) xl = ceil(XX[2] + (i - YY[2]) * Kv);
+			else /* if (i <= YY[3]) */ xl = ceil(XX[2] + (i - YY[2]) * Kh);
+			if (i <= YY[1]) xr = ceil(XX[1] + (i - YY[1]) * Kh);
+			else if (i <= YY[3]) xr = ceil(XX[3] + (i - YY[3]) * Kv);
+			else /* if (i <= YY[2]) */ xr = ceil(XX[3] + (i - YY[3]) * Kh);
+			if (xl < 0) xl = 0;
+			if (xr > nw) xr = nw; // Right boundary is exclusive
+
+			/* Run vertical filter over the row buffers */
+			thisbuf = rbuf + xl * bpp;
+			thatbuf = wbuf + xl * bpp;
+			len = xr - xl;
+			if (len <= 0); // Do nothing
+			else if (yfsz == 1) // Just copy
+				memcpy(thisbuf, thatbuf, len * bpp * sizeof(double));
+			else // Apply filter
+			{
+				memset(thisbuf, 0, len * bpp * sizeof(double));
+				filt0 = yfilt + xl * yfsz;
+				for (j = 0 , k = idx; j < yfsz; j++)
+				{
+					double *dsrc, *ddest = thisbuf, *filt = filt0++;
+					int l = len;
+
+					if (++k >= yfsz) k = 0;
+					dsrc = thatbuf + k * wbsz;
+					while (l-- > 0)
+					{
+						double kk = *filt;
+						filt += yfsz;
+						*ddest++ += *dsrc++ * kk;
+						if (bpp < 3) continue;
+						*ddest++ += *dsrc++ * kk;
+						*ddest++ += *dsrc++ * kk;
+						if (bpp == 3) continue;
+						*ddest++ += *dsrc++ * kk;
+						*ddest++ += *dsrc++ * kk;
+						*ddest++ += *dsrc++ * kk;
+						*ddest++ += *dsrc++ * kk;
+					}
+				}
+			}
+
+			/* Write out results */
+			ofs = i * nw + xl;
+			if (cc == CHN_IMAGE) // RGB and RGBA
+			{
+				double *dsrc = thisbuf;
+				unsigned char *dest, *dsta;
+				int l = len, n = step;
+
+				dest = new_img[CHN_IMAGE] + ofs * 3;
+				dsta = rgba ? new_img[CHN_ALPHA] + ofs : NULL;
+				while (l-- > 0)
+				{
+					double rr, gg, bb, aa;
+					int a;
+
+					if (dsta && (a = rint(aa = dsrc[6]) ,
+						*dsta++ = a < 0 ? 0 :
+						a > 0xFF ? 0xFF : a))
+					{
+						aa = 1.0 / aa;
+						rr = dsrc[3] * aa;
+						gg = dsrc[4] * aa;
+						bb = dsrc[5] * aa;
+					}
+					else
+					{
+						rr = dsrc[0];
+						gg = dsrc[1];
+						bb = dsrc[2];
+					}
+					if (gcor)
+					{
+						dest[0] = rr < 0.0 ? 0 : rr > 1.0 ?
+							0xFF : UNGAMMA256(rr);
+						dest[1] = gg < 0.0 ? 0 : gg > 1.0 ?
+							0xFF : UNGAMMA256(gg);
+						dest[2] = bb < 0.0 ? 0 : bb > 1.0 ?
+							0xFF : UNGAMMA256(bb);
+					}
+					else
+					{
+						int r, g, b;
+						r = rint(rr);
+						dest[0] = r < 0 ? 0 : r > 0xFF ? 0xFF : r;
+						g = rint(gg);
+						dest[1] = g < 0 ? 0 : g > 0xFF ? 0xFF : g;
+						b = rint(bb);
+						dest[2] = b < 0 ? 0 : b > 0xFF ? 0xFF : b;
+					}
+					dsrc += n; dest += 3;
+				}
+			}
+			else // Utility channel
+			{
+				double *dsrc = thisbuf;
+				unsigned char *dest = new_img[cc] + ofs;
+				int l = len, n;
+
+				while (l-- > 0)
+				{
+					n = rint(*dsrc++);
+					*dest++ = n < 0 ? 0 : n > 0xFF ? 0xFF : n;
+				}
+			}
+		}
+	}
+
+fail:	free(xmem);
+	free(ymem);
+	free(tmem);
+}
+
+static void mem_skew_nn(chanlist old_img, chanlist new_img, int ow, int oh,
+	int nw, int nh, int bpp, double xskew, double yskew, int silent)
+{
+	double x0, y0, d, Kh, Kv, XX[4], YY[4];
+	int i, ny;
+
+	/* Calculate clipping parallelogram's corners */
+	x0 = 0.5 * (nw - 1); y0 = 0.5 * (nh - 1);
+	XX[1] = XX[3] = (XX[0] = XX[2] = 0.5 * (nw - ow - 1)) + ow;
+	YY[2] = YY[3] = (YY[0] = YY[1] = 0.5 * (nh - oh - 1)) + oh;
+	for (i = 0; i < 4; i++)
+	{
+		XX[i] += (YY[i] - y0) * xskew;
+		YY[i] += (XX[i] - x0) * yskew;
+	}
+	d = 1.0 + xskew * yskew;
+	Kv = d ? xskew / d : 0.0; // for left & right
+	Kh = yskew ? 1.0 / yskew : 0.0; // for top & bottom
+
+	/* Process image row by row */
+	for (ny = 0; ny < nh; ny++)
+	{
+		int cc, xl, xr;
+
+		if (!silent && ((ny * 10) % nh >= nh - 10))
+			progress_update((float)ny / nh);
+
+		/* Clip row */
+		if (ny <= YY[0]) xl = ceil(XX[0] + (ny - YY[0]) * Kh);
+		else if (ny <= YY[2]) xl = ceil(XX[2] + (ny - YY[2]) * Kv);
+		else /* if (ny <= YY[3]) */ xl = ceil(XX[2] + (ny - YY[2]) * Kh);
+		if (ny <= YY[1]) xr = ceil(XX[1] + (ny - YY[1]) * Kh);
+		else if (ny <= YY[3]) xr = ceil(XX[3] + (ny - YY[3]) * Kv);
+		else /* if (ny <= YY[2]) */ xr = ceil(XX[3] + (ny - YY[3]) * Kh);
+		if (xl < 0) xl = 0;
+		if (xr > nw) xr = nw; // Right boundary is exclusive
+
+		for (cc = 0; cc < NUM_CHANNELS; cc++)
+		{
+			unsigned char *src, *dest;
+			double x0y, y0y;
+			int nx, ox, oy;
+
+			if (!new_img[cc]) continue;
+
+			x0y = 0.5 * (ow - 1) - x0 * d + (y0 - ny) * xskew;
+			y0y = x0 * yskew - 0.5 * (nh - oh) + ny;
+
+			/* RGB nearest neighbour */
+			if ((cc == CHN_IMAGE) && (bpp == 3))
+			{
+				dest = new_img[CHN_IMAGE] + (ny * nw + xl) * 3;
+				for (nx = xl; nx < xr; nx++ , dest += 3)
+				{
+					ox = rint(x0y + nx * d);
+					oy = rint(y0y - nx * yskew);
+					src = old_img[CHN_IMAGE] +
+						(oy * ow + ox) * 3;
+					dest[0] = src[0];
+					dest[1] = src[1];
+					dest[2] = src[2];
+				}
+			}
+			/* One-bpp nearest neighbour */
+			else
+			{
+				dest = new_img[cc] + ny * nw + xl;
+				for (nx = xl; nx < xr; nx++)
+				{
+					ox = rint(x0y + nx * d);
+					oy = rint(y0y - nx * yskew);
+					*dest++ = old_img[cc][oy * ow + ox];
+				}
+			}
+		}
+	}
+}
+
+static void mem_skew_geometry(int ow, int oh, double xskew, double yskew,
+	int swapxy, int *nw, int *nh)
+{
+	double nww, nhh, ax, ay;
+	int dx, dy;
+
+	/* Preserve original centering */
+	dx = ow & 1; dy = oh & 1;
+	/* Exchange Y with X when told to (for 3-skew rotation) */
+	if ((dx ^ dy) && swapxy) dx ^= 1 , dy ^= 1;
+	/* Calculate theoretical dimensions */
+	ax = fabs(xskew); ay = fabs(yskew);
+	nww = ow + oh * ax;
+	if (xskew * yskew >= 0) nhh = nww * ay + oh;
+	else if (ax * ay > 1) nhh = nww * ay - oh;
+	else nhh = (ow - oh * ax) * ay + oh;
+	/* Convert to actual pixel dimensions */
+	*nw = 2 * (int)(0.5 * (nww - dx) + PIX_ADD) + dx;
+	*nh = 2 * (int)(0.5 * (nhh - dy) + PIX_ADD) + dy;
+}
+
+// Skew canvas in one or two directions (X then Y)
+// !!! Later, extend to handle skew+shift in both directions, too
+int mem_skew(double xskew, double yskew, int type, int gcor)
+{
+	chanlist old_img, new_img;
+	int ow, oh, nw, nh, res, bpp;
+
+	ow = mem_width;
+	oh = mem_height;
+	bpp = mem_img_bpp;
+
+	mem_skew_geometry(ow, oh, xskew, yskew, FALSE, &nw, &nh);
+
+	if ((nw > MAX_WIDTH) || (nh > MAX_HEIGHT)) return (-5);
+
+	memcpy(old_img, mem_img, sizeof(chanlist));
+	res = undo_next_core(UC_NOCOPY, nw, nh, bpp, CMASK_ALL);
+	if (res) return (res);		// No undo space
+	memcpy(new_img, mem_img, sizeof(chanlist));
+	progress_init(_("Skew"), 0);
+
+	mem_clear_img(new_img, nw, nh, bpp);
+	if (!type || (mem_img_bpp == 1)) mem_skew_nn(old_img, new_img,
+		ow, oh, nw, nh, bpp, xskew, yskew, FALSE);
+	else mem_skew_filt(old_img, new_img, ow, oh, nw, nh, xskew, yskew,
+		type, gcor, channel_dis[CHN_ALPHA], FALSE);
+
+	progress_end();
+
+	return (0);
 }

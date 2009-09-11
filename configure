@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.24.17"
-MT_DATE="2008-03-23"
+MT_V="3.24.18"
+MT_DATE="2008-06-13"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -265,12 +265,6 @@ do
 				MT_PO_DEST=$MT_LANG_DEST
 				MT_MAN_DEST="$MT_PREFIX/man/man1";;
 		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
-		"guada" )	MARCH='-march=i386'
-				MT_LANG=YES
-				MT_MAN=YES
-				MT_POD=YES
-				LIN_BIN_INSTALL=/usr/bin
-				MT_CUSTOM=GUADALINEX;;
 		"build" )	./configure flush
 				I_DIR=/home/mark/sf
 				cd ..

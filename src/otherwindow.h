@@ -54,3 +54,5 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 void memory_errors(int type);
 
 void gradient_setup(int mode);
+
+void pressed_skew();

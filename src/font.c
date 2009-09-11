@@ -272,16 +272,11 @@ unsigned char *mt_text_render(
 	FT_Vector	pen;
 	FT_Error	error;
 	FT_UInt		glyph_index;
-	FT_Int32	load_flags = FT_LOAD_DEFAULT, *txt2;
-	FT_Render_Mode	render_mode = FT_RENDER_MODE_NORMAL;
+	FT_Int32	load_flags = FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT, *txt2;
 
 //printf("\n%s %i %s %s %f %i %f %i\n", text, characters, filename, encoding, size, face_index, angle, flags);
 
-	if ( flags & MT_TEXT_MONO )
-	{
-		load_flags = FT_LOAD_TARGET_MONO;
-		render_mode = FT_RENDER_MODE_MONO;
-	}
+	if ( flags & MT_TEXT_MONO ) load_flags |= FT_LOAD_TARGET_MONO;
 
 	if ( ssize1<1 ) return NULL;
 
@@ -363,9 +358,6 @@ unsigned char *mt_text_render(
 			}
 
 			error = FT_Load_Glyph( face, glyph_index, load_flags );
-			if ( error ) continue;
-
-			error = FT_Render_Glyph( face->glyph, render_mode );
 			if ( error ) continue;
 
 			switch ( face->glyph->bitmap.pixel_mode )

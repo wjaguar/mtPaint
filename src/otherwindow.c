@@ -1052,6 +1052,12 @@ static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(sisca_spins[idx]), nw);
 }
 
+static void alert_same_geometry()
+{
+	alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
+		_("OK"), NULL, NULL);
+}
+
 static int scale_mode = 6;
 static int resize_mode = 0;
 int sharper_reduce;
@@ -1071,8 +1077,7 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 
 	if ((nw == mem_width) && (nh == mem_height) && !ox && !oy)
 	{
-		alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
-			_("OK"), NULL, NULL);
+		alert_same_geometry();
 		return;
 	}
 
@@ -1117,11 +1122,11 @@ gint click_sisca_centre( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void sisca_init( char *title )
+static GtkWidget *filter_pack(int am, int idx, int *var)
 {
-	gchar* scale_fnames[] = {
+	char *fnames[] = {
 		_("Nearest Neighbour"),
-		_("Bilinear / Area Mapping"),
+		am ? _("Bilinear / Area Mapping") : _("Bilinear"),
 		_("Bicubic"),
 		_("Bicubic edged"),
 		_("Bicubic better"),
@@ -1129,6 +1134,12 @@ void sisca_init( char *title )
 		_("Blackman-Harris"),
 		NULL
 	};
+
+	return (wj_radio_pack(fnames, -1, 0, idx, var, NULL));
+}
+
+void sisca_init( char *title )
+{
 	gchar* resize_modes[] = {
 		_("Clear"),
 		_("Tile"),
@@ -1198,8 +1209,7 @@ void sisca_init( char *title )
 		sisca_hbox = pack(sisca_vbox, gtk_hbox_new(FALSE, 0));
 		wvbox = pack(sisca_hbox, gtk_vbox_new(FALSE, 0));
 
-		sisca_gc = pack_end(wvbox, sig_toggle(_("Gamma corrected"),
-			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
+		sisca_gc = pack_end(wvbox, gamma_toggle());
 
 		notebook = pack(sisca_vbox, buttoned_book(&page0, &page1,
 			&button, _("Settings")));
@@ -1210,7 +1220,7 @@ void sisca_init( char *title )
 		button = pack(page1, sig_toggle(_("Sharper image reduction"),
 			sharper_reduce, &sharper_reduce, NULL));
 
-		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
+		sisca_hbox = filter_pack(TRUE, scale_mode, &scale_mode);
 	}
 
 	pack(wvbox, sisca_toggles[0]);
@@ -2916,4 +2926,128 @@ void gradient_setup(int mode)
 	/* Re-render sliders, adjust option menus */
 	gtk_widget_queue_resize(win);
 #endif
+}
+
+/// SKEW WINDOW
+
+typedef struct {
+	GtkWidget *angle[2], *ofs[2], *dist[2], *gc;
+	int angles, lock;
+} skew_widgets;
+
+static int skew_mode = 6;
+
+static void click_skew_ok(GtkWidget *widget, gpointer user_data)
+{
+	skew_widgets *sw = gtk_object_get_user_data(GTK_OBJECT(widget));
+	double xskew, yskew;
+	int res, ftype = 0, gcor = FALSE;
+
+	if ((sw->angles & 1) || GTK_WIDGET_HAS_FOCUS(sw->angle[0]))
+		xskew = tan(read_float_spin(sw->angle[0]) * (M_PI / 180.0));
+	else xskew = read_float_spin(sw->ofs[0]) / (double)read_spin(sw->dist[0]);
+	if ((sw->angles & 2) || GTK_WIDGET_HAS_FOCUS(sw->angle[1]))
+		yskew = tan(read_float_spin(sw->angle[1]) * (M_PI / 180.0));
+	else yskew = read_float_spin(sw->ofs[1]) / (double)read_spin(sw->dist[1]);
+
+	if (!xskew && !yskew)
+	{
+		alert_same_geometry();
+		return;
+	}
+
+	if (mem_img_bpp == 3)
+	{
+		ftype = skew_mode;
+		gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sw->gc));
+	}
+
+	res = mem_skew(xskew, yskew, ftype, gcor);
+	if (!res)
+	{
+		canvas_undo_chores();
+		destroy_dialog(widget);
+	}
+	else memory_errors(res);
+}
+
+static void skew_moved(GtkAdjustment *adjustment, gpointer user_data)
+{
+	skew_widgets *sw = user_data;
+	int i;
+
+	if (sw->lock) return; // Avoid recursion
+	sw->lock = TRUE;
+
+	for (i = 0; i < 2; i++)
+	{
+		/* Offset for angle */
+		if (adjustment == GTK_SPIN_BUTTON(sw->angle[i])->adjustment)
+		{
+			gtk_spin_button_set_value(GTK_SPIN_BUTTON(sw->ofs[i]),
+				ADJ2INT(GTK_SPIN_BUTTON(sw->dist[i])->adjustment) *
+				tan(adjustment->value * (M_PI / 180.0)));
+			sw->angles |= 1 << i;
+		}
+		/* Angle for offset */
+		else if ((adjustment == GTK_SPIN_BUTTON(sw->ofs[i])->adjustment) ||
+			(adjustment == GTK_SPIN_BUTTON(sw->dist[i])->adjustment))
+		{
+			gtk_spin_button_set_value(GTK_SPIN_BUTTON(sw->angle[i]),
+				atan(GTK_SPIN_BUTTON(sw->ofs[i])->adjustment->value /
+				ADJ2INT(GTK_SPIN_BUTTON(sw->dist[i])->adjustment)) *
+				(180.0 / M_PI));
+			sw->angles &= ~(1 << i);
+		}
+	}
+
+	sw->lock = FALSE;
+}
+
+void pressed_skew()
+{
+	GtkWidget *skew_window, *vbox, *table;
+	skew_widgets *sw;
+
+
+	skew_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Skew"), GTK_WIN_POS_CENTER, TRUE);
+	sw = bound_malloc(skew_window, sizeof(skew_widgets));
+	gtk_object_set_user_data(GTK_OBJECT(skew_window), (gpointer)sw);
+
+	vbox = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(vbox);
+	gtk_container_add(GTK_CONTAINER(skew_window), vbox);
+
+	table = add_a_table(3, 4, 5, vbox);
+	add_to_table(_("Angle"), table, 0, 1, 0);
+	add_to_table(_("Offset"), table, 0, 2, 0);
+	add_to_table(_("At distance"), table, 0, 3, 0);
+	add_to_table(_("Horizontal "), table, 1, 0, 0);
+	add_to_table(_("Vertical"), table, 2, 0, 0);
+	sw->angle[0] = float_spin_to_table(table, 1, 1, 5, 0, -89.99, 89.99);
+	sw->angle[1] = float_spin_to_table(table, 2, 1, 5, 0, -89.99, 89.99);
+	sw->ofs[0] = float_spin_to_table(table, 1, 2, 5, 0, -MAX_WIDTH, MAX_WIDTH);
+	sw->ofs[1] = float_spin_to_table(table, 2, 2, 5, 0, -MAX_HEIGHT, MAX_HEIGHT);
+	sw->dist[0] = spin_to_table(table, 1, 3, 5, mem_height, 1, MAX_HEIGHT);
+	sw->dist[1] = spin_to_table(table, 2, 3, 5, mem_width, 1, MAX_WIDTH);
+	spin_connect(sw->angle[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	spin_connect(sw->ofs[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	spin_connect(sw->dist[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	spin_connect(sw->angle[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	spin_connect(sw->ofs[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	spin_connect(sw->dist[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
+	add_hseparator(vbox, -2, 10);
+
+	if (mem_img_bpp == 3)
+	{
+		sw->gc = pack(vbox, gamma_toggle());
+		add_hseparator(vbox, -2, 10);
+		xpack(vbox, filter_pack(FALSE, skew_mode, &skew_mode));
+		add_hseparator(vbox, -2, 10);
+	}
+
+	pack(vbox, OK_box(5, skew_window, _("OK"), GTK_SIGNAL_FUNC(click_skew_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
+	gtk_window_set_transient_for(GTK_WINDOW(skew_window), GTK_WINDOW(main_window));
+	gtk_widget_show_all(skew_window);
 }

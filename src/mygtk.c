@@ -103,6 +103,16 @@ GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	return (spin);
 }
 
+GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
+	double value, double min, double max)
+{
+	GtkWidget *spin = add_float_spin(value, min, max);
+	gtk_table_attach(GTK_TABLE(table), spin, column, column+1, row, row+1,
+		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
+		(GtkAttachOptions) (0), 0, spacing);
+	return (spin);
+}
+
 void add_hseparator( GtkWidget *widget, int xs, int ys )
 {
 	GtkWidget *sep = pack(widget, gtk_hseparator_new());
@@ -2305,6 +2315,24 @@ int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, i
 }
 
 #endif
+
+// Allocate a memory chunk which is freed along with a given widget
+
+void *bound_malloc(GtkWidget *widget, int size)
+{
+	void *mem = calloc(1, size);
+	if (mem) gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
+		GTK_SIGNAL_FUNC(free), (gpointer)mem);
+	return (mem);
+}
+
+// Gamma correction toggle
+
+GtkWidget *gamma_toggle()
+{
+	return (sig_toggle(_("Gamma corrected"),
+			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
+}
 
 // Maybe this will be needed someday...
 

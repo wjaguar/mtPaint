@@ -576,7 +576,7 @@ static toolbar_item tools_bar[] = {
 	{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
 	{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
 	{ TTB_GRAD, 1, 1, 1, 0, _("Place Gradient"), xpm_grad_place_xpm },
-	{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
+	{ TTB_LASSO, -1, 0, 0, NEED_LAS2, _("Lasso Selection"), xpm_lasso_xpm },
 	{ TTB_TEXT, -1, 1, 1, 0, _("Paste Text"), xpm_text_xpm },
 	{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
 	{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },

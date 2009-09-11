@@ -40,6 +40,8 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
+GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
+	double value, double min, double max);
 void add_hseparator( GtkWidget *widget, int xs, int ys );
 
 void progress_init(char *text, int canc);		// Initialise progress window
@@ -262,6 +264,14 @@ int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* X special */
 int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height);
 #endif
+
+// Allocate a memory chunk which is freed along with a given widget
+
+void *bound_malloc(GtkWidget *widget, int size);
+
+// Gamma correction toggle
+
+GtkWidget *gamma_toggle();
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

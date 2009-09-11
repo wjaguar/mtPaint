@@ -344,6 +344,10 @@ extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 int mem_background;			// Non paintable area
 int mem_histogram[256];
 
+/// Multiblock allocator
+
+void *multialloc(int align, void *ptr, int size, ...);
+
 /// Vectorized low-level drawing function
 
 void (*put_pixel)(int x, int y);
@@ -634,3 +638,5 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 #else
 #define ALIGNTO(p,s) ((void *)(p))
 #endif
+
+int mem_skew(double xskew, double yskew, int type, int gcor);

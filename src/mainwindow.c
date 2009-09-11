@@ -3663,8 +3663,7 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_ROTATE:
 		pressed_rotate_image(mode); break;
 	case ACT_SELECT:
-		pressed_select(mode);
-		break;
+		pressed_select(mode); break;
 	case ACT_LASSO:
 		pressed_lasso(mode); break;
 	case ACT_OUTLINE:
@@ -3775,6 +3774,8 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_remove_key_frames(); break;
 	case DLG_ABOUT:
 		pressed_help(); break;
+	case DLG_SKEW:
+		pressed_skew(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4290,6 +4291,7 @@ static menu_item main_menu[] = {
 	{ _("/Image/Rotate Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 0 },
 	{ _("/Image/Rotate Anti-Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 1 },
 	{ _("/Image/Free Rotate ..."), -1, 0, 0, NULL, DLG_ROTATE, 0 },
+	{ _("/Image/Skew..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
 	{ _("/Image/sep3"), -4 },
 	{ _("/Image/Information ..."), -1, 0, 0, "<control>I", DLG_INFO, 0 },
 	{ _("/Image/Preferences ..."), -1, MENU_PREFS, 0, "<control>P", DLG_PREFS, 0 },
@@ -4298,7 +4300,7 @@ static menu_item main_menu[] = {
 	{ _("/Selection/tear"), -3 },
 	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", ACT_SELECT, 1 },
 	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", ACT_SELECT, 0 },
-	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 0, xpm_lasso_xpm },
+	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, xpm_lasso_xpm },
 	{ _("/Selection/Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 1 },
 	{ _("/Selection/sep1"), -4 },
 	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, xpm_rect1_xpm },
@@ -4690,9 +4692,8 @@ void setup_language()			// Change language
 
 	setlocale(LC_ALL, txt);
 #endif
-#if GTK_MAJOR_VERSION == 2
+	/* !!! Slow or not, but NLS is *really* broken on GTK+1 without it - WJ */
 	gtk_set_locale();	// GTK+1 hates this - it really slows things down
-#endif
 }
 #endif
 
