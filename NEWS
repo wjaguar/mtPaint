@@ -45,6 +45,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Brush preview area border now can't be messed up by theme engines
 	* Makefiles now honor DESTDIR
 	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.8)
+	* Communal memory space now implemented for layers - see handbook section 8.4.3
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste and gradient previews eliminated
 	* BUGFIX - "Remove All Layers" with layers window closed doesn't cause crash

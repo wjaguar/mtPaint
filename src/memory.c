@@ -645,18 +645,14 @@ unsigned char *mem_undo_previous(int channel)
 
 static size_t lose_oldest(undo_stack *ustack)	// Lose the oldest undo image
 {
-	size_t res = 0;
 	int idx;
 
-	while (!res) // Drop any number of dummy frames at once
-	{
-		if (ustack->redo > ustack->done) idx = ustack->redo--;
-		else if (ustack->done) idx = ustack->max - ustack->done--;
-		else break;
-		res = undo_free_x(ustack->items + (ustack->pointer + idx) % ustack->max);
-	}
-	ustack->size -= res;
-	return (res);
+	if (ustack->redo > ustack->done) idx = ustack->redo--;
+	else if (ustack->done) idx = ustack->max - ustack->done--;
+	else return (0);
+/* !!! mem_try_malloc() may call this on an unsized undo stack - but it
+ * !!! doesn't need valid sizes anyway - WJ */
+	return (undo_free_x(ustack->items + (ustack->pointer + idx) % ustack->max));
 }
 
 /* Convert tile bitmap row into a set of spans (skip/copy), terminated by
@@ -1020,6 +1016,25 @@ static size_t mem_undo_size(undo_stack *ustack)
 	return (total);
 }
 
+/* Add up sizes of all layers other than current */
+static size_t mem_undo_lsize()
+{
+	undo_stack *ustack;
+	size_t total = 0;
+	int l;
+
+	for (l = 0; l <= layers_total; l++)
+	{
+		if (l == layer_selected) continue;
+		ustack = &layer_table[l].image->image_.undo_;
+// !!! This relies on layer_table items already processed by update_undo()
+		if (!ustack->size) ustack->size = mem_undo_size(ustack);
+		total += ustack->size;
+	}
+
+	return (total);
+}
+
 /* Free requested amount of undo space */
 static int mem_undo_space(size_t mem_req)
 {
@@ -1027,7 +1042,7 @@ static int mem_undo_space(size_t mem_req)
 	size_t mem_r, mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
 	int i, l, l2, h, csz = mem_undo_common * layers_total;
 	
-	/* Layer mem limit including common arena */
+	/* Layer mem limit including common area */
 	mem_lim = mem_max * (csz * 0.01 + 1) / (layers_total + 1);
 
 	/* Fail if hopeless */
@@ -1037,14 +1052,13 @@ static int mem_undo_space(size_t mem_req)
 	mem_r = mem_req + mem_undo_size(&mem_image.undo_);
 	while (mem_r > mem_lim)
 	{
-		size_t res = lose_oldest(&mem_image.undo_);
-		if (!res) return (1);
-		mem_r -= res;
+		if (!mem_undo_done) return (1);
+		mem_r -= lose_oldest(&mem_image.undo_);
 	}
-	/* All done if no common arena */
+	/* All done if no common area */
 	if (!csz) return (0);
 
-	mem_r = mem_req + mem_used_layers();
+	mem_r += mem_undo_lsize();
 	if (mem_r <= mem_max) return (0); // No need to trim other layers yet
 	mem_lim -= mem_max * (mem_undo_common * 0.01); // Reserved space per layer
 
@@ -1074,12 +1088,15 @@ static int mem_undo_space(size_t mem_req)
 		size_t mem_nx = h > 1 ? heap[2]->size : 0;
 		if ((h > 2) && (heap[3]->size > mem_r)) mem_r = heap[3]->size;
 		/* Drop frames */
+		wp = heap[1];
 		while (TRUE)
 		{
-			size_t res = lose_oldest(wp = heap[1]);
+			size_t res = lose_oldest(wp);
+			wp->size -= res; // Maintain undo stack size
 			mem_r -= res;
 			if (mem_r <= mem_max) return (0);
-			if (!res) wp = heap[h--];
+			if (!(wp->done + wp->redo) || (wp->size <= mem_lim))
+				wp = heap[h--];
 			else if (wp->size >= mem_nx) continue;
 			break;
 		}
@@ -1105,7 +1122,8 @@ void *mem_try_malloc(size_t size)
 	while (!((ptr = malloc(size))))
 	{
 // !!! Hardcoded to work with mem_image for now
-		if (!lose_oldest(&mem_image.undo_)) return (NULL);
+		if (!mem_undo_done) return (NULL);
+		lose_oldest(&mem_image.undo_);
 	}
 	return (ptr);
 }
@@ -1415,29 +1433,14 @@ void mem_undo_forward()			// REDO requested by user
 /* Return the number of bytes used in image + undo */
 size_t mem_used()
 {
+	update_undo(&mem_image);
 	return mem_undo_size(&mem_image.undo_);
 }
 
 /* Return the number of bytes used in image + undo in all layers */
 size_t mem_used_layers()
 {
-	image_info *image;
-	size_t total = 0;
-	int l;
-
-	for (l = 0; l <= layers_total; l++ , total += image->undo_.size)
-	{
-		if (l == layer_selected) image = &mem_image;
-		else
-		{
-			image = &layer_table[l].image->image_;
-			if (image->undo_.size) continue;
-		}
-		update_undo(image); // safety net
-		image->undo_.size = mem_undo_size(&image->undo_);
-	}
-
-	return (total);
+	return (mem_used() + mem_undo_lsize());
 }
 
 /* Fast approximate atan2() function, returning result in degrees. This code is

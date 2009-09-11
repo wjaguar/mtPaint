@@ -53,7 +53,8 @@ int	show_layers_main,		// Show all layers in main window
 	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
 
-layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
+// !!! Always follow adding/changing layer's image_info by update_undo()
+layer_node layer_table[MAX_LAYERS + 1];	// Table of layer info
 
 
 static void layer_clear_slot(int l, int visible)
@@ -182,6 +183,7 @@ void layer_copy_from_main( int l )	// Copy info from main image to layer
 	lp->image_ = mem_image;
 	lp->state_ = mem_state;
 	lp->image_.undo_.size = 0; // Invalidate
+	update_undo(&lp->image_); // Safety net
 }
 
 void layer_copy_to_main( int l )		// Copy info from layer to main image
@@ -1008,7 +1010,6 @@ void pressed_paste_layer()
 		}
 	}
 
-	update_undo(&lim->image_);
 	set_new_filename(layers_total, "");
 
 	layer_show_new();

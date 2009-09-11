@@ -445,7 +445,7 @@ void pressed_preferences()
 ///	TABLE TEXT
 	add_to_table(_("Max memory used for undo (MB)"), table3, 0, 0, 5);
 	add_to_table(_("Max undo levels"), table3, 1, 0, 5);
-	add_to_table(_("Common undo space, %"), table3, 2, 0, 5);
+	add_to_table(_("Communal layer undo space (%)"), table3, 2, 0, 5);
 
 ///	TABLE SPINBUTTONS
 	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 2048);
@@ -586,7 +586,7 @@ void pressed_preferences()
 
 	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-	snprintf(txt, 60, "%s, %%", _("Factor"));
+	snprintf(txt, 60, "%s (%%)", _("Factor"));
 	label = add_to_table( txt, table3, 0, 1, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
 	gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
