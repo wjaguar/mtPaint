@@ -28,10 +28,13 @@
 #include "channels.h"
 #include "csel.h"
 
+#define CIENUM 1024
+
 csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
 static double gamma256[256], gamma64[64];
+static float CIE[CIENUM + 2];
 
 /* This nightmarish code does conversion from CIE XYZ into my own perceptually
  * uniform colour space L*X*N*. To produce it, I combined McAdam's colour space
@@ -50,22 +53,27 @@ static void xyz2XN(double *XN, double x, double y, double z)
 		XN[0] = wXN[0]; XN[1] = wXN[1];
 		return;
 	}
-	x /= xyz; y /= xyz;
-	k = (x * 2.4 + y * 34.0 + 1.0) / 10.0;
-	xk = x / k; yk = y / k;
+	k = 10.0 / (x * 2.4 + y * 34.0 + xyz);
+	xk = x * k; yk = y * k;
 	sxk = sqrt(xk);
 	XN[0] = (xk * xk * (3751.0 - xk * xk * 10.0) -
 		yk * yk * (520.0 - yk * 13295.0) +
 		xk * yk * (32327.0 - xk * 25491.0 - yk * 41672.0 + xk * xk * 10.0) -
 		sxk * 5227.0 + sqrt(sxk) * 2952.0) / 900.0;
-//	k = (y * 4.2 - x + 1.0) / 10.0;
+//	k = 10.0 / (y * 4.2 - x + xyz);
 /* The "k" value below is incorrect, but I feel that in reality it's better -
  * it compresses the colour plane so that green and blue are farther from red
  * than from each other, which conforms to human perception - WJ */
-	k = (y * 5.2 - x + 1.0) / 10.0;
-	xk = x / k; yk = y / k;
+	k = 10.0 / (y * 5.2 - x + xyz);
+	xk = x * k; yk = y * k;
 	XN[1] = (yk * (404.0 - yk * (185.0 - yk * 52.0)) +
 		xk * (69.0 - yk * (yk * (69.0 - yk * 30.0) + xk * 3.0))) / 900.0;
+}
+
+static double CIElum(double x)
+{
+	int n = floor(x * CIENUM);
+	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x * CIENUM - n));
 }
 
 #ifndef cbrt
@@ -85,10 +93,11 @@ void rgb2LXN(double *tmp, double r, double g, double b)
 	double x = r * rxyz[0] + g * gxyz[0] + b * bxyz[0];
 	double y = r * rxyz[1] + g * gxyz[1] + b * bxyz[1];
 	double z = r * rxyz[2] + g * gxyz[2] + b * bxyz[2];
-	double L = CIEpow(y) * 116.0 - 16.0;
+	double L = CIElum(y);
+//	double L = CIEpow(y) * 116.0 - 16.0;
 	double XN[2];
 	xyz2XN(XN, x, y, z);
-	tmp[0] = L * sqrt(2.0);
+	tmp[0] = L * M_SQRT2;
 	tmp[1] = (XN[0] - wXN[0]) * L * 13.0;
 	tmp[2] = (XN[1] - wXN[1]) * L * 13.0;
 }
@@ -141,11 +150,23 @@ static void make_gamma(double *Gamma, int cnt)
 	}
 }
 
+static void make_CIE(void)
+{
+	int i;
+
+	for (i = 0; i < CIENUM; i++)
+	{
+		CIE[i] = CIEpow(i * (1.0 / CIENUM)) * 116.0 - 16.0;
+	}
+	CIE[CIENUM] = CIE[CIENUM + 1] = 100.0;
+}
+
 void init_cols(void)
 {
 	if (gamma256[255]) return; /* Done already */
 	make_gamma(gamma256, 256);
 	make_gamma(gamma64, 64);
+	make_CIE();
 	make_rgb_xyz();
 }
 

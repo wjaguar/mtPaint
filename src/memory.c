@@ -2100,6 +2100,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int borders[4] = {0, mem_width, 0, mem_height};
 	int corners[4], levels[4], coords[4];
 	int i, j, k, kk, lvl, tx, ty, fmode = 0, lastr[3], thisr[3];
+	int bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
 
@@ -2183,6 +2184,12 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 				if (coords[i] == borders[i]) continue;
 				tx = coords[1];
 				ty = coords[3];
+				if (bmap)
+				{
+					bidx = ty * lw + (tx >> 3);
+					bbit = 1 << (tx & 7);
+					if (bmap[bidx] & bbit) continue;
+				}
 				/* Sliding mode */
 				if (fmode == 3)
 				{
@@ -2215,12 +2222,9 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 				/* Is pixel writable? */
 				if (bmap)
 				{
-					j = ty * lw + (tx >> 3);
-					k = 1 << (tx & 7);
-					if (bmap[j] & k) continue;
 					if (pixel_protected(tx, ty) == 255)
 						continue;
-					bmap[j] |= k;
+					bmap[bidx] |= bbit;
 				}
 				else
 				{
