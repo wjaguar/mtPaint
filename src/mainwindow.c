@@ -1964,9 +1964,20 @@ void repaint_perim()
 	}
 }
 
+static void chan_txt_cat(char *txt, int chan, int x, int y)
+{
+	char txt2[8];
+
+	if ( mem_img[chan] )
+	{
+		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
+		strcat(txt, txt2);
+	}
+}
+
 static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 {
-	char txt[64];
+	char txt[96];
 	GdkCursor *temp_cursor = NULL;
 	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
@@ -2089,24 +2100,35 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 				snprintf(txt, 60, "%i,%i", x, y);
 				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
 			}
-			if ( mem_img_bpp == 1 )
-			{
-				pixel = GET_PIXEL( x, y );
-				r = mem_pal[pixel].red;
-				g = mem_pal[pixel].green;
-				b = mem_pal[pixel].blue;
-				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
-			}
-			else
-			{
-				pixel24 = get_pixel24( x, y );
-				r = pixel24.red;
-				g = pixel24.green;
-				b = pixel24.blue;
-				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
-			}
+
 			if ( status_on[STATUS_PIXELRGB] )
 			{
+				if ( mem_img_bpp == 1 )
+				{
+					pixel = GET_PIXEL( x, y );
+					r = mem_pal[pixel].red;
+					g = mem_pal[pixel].green;
+					b = mem_pal[pixel].blue;
+					snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
+				}
+				else
+				{
+					pixel24 = get_pixel24( x, y );
+					r = pixel24.red;
+					g = pixel24.green;
+					b = pixel24.blue;
+					snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
+				}
+				if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
+				{
+					strcat(txt, " + {");
+					chan_txt_cat(txt, CHN_ALPHA, x, y);
+					strcat(txt, ",");
+					chan_txt_cat(txt, CHN_SEL, x, y);
+					strcat(txt, ",");
+					chan_txt_cat(txt, CHN_MASK, x, y);
+					strcat(txt, "}");
+				}
 				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
 			}
 		}
@@ -2845,7 +2867,6 @@ void main_init()
 		else	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar[7-i], FALSE, FALSE, 0);
 	}
 	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
-	if ( status_on[STATUS_PIXELRGB] ) gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 160, -2);
 	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);
 	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "0+0" );
 

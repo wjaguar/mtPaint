@@ -2879,12 +2879,8 @@ void init_status_bar()
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
 	}
 
-	if ( status_on[STATUS_PIXELRGB] ) gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 160, -2);
-	else
-	{
-		gtk_widget_set_usize(label_bar[STATUS_PIXELRGB], 0, -2);
+	if ( !status_on[STATUS_PIXELRGB] )
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-	}
 
 	if ( !status_on[STATUS_SELEGEOM] )
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );

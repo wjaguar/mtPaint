@@ -477,7 +477,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	table3 = add_a_table( 3, 2, 10, vbox_1 );
 
 ///	TABLE TEXT
-	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	for ( i=0; i<4; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
 ///	TABLE SPINBUTTONS
 	spin_to_table( table3, &spinbutton_maxmem, 0, 1, 5, inifile_get_gint32("undoMBlimit", 32 ), 1, 1000 );
@@ -571,7 +571,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	table5 = add_a_table( 2, 4, 10, vbox_3 );
 
 ///	TABLE TEXT
-	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
 ///	TABLE SPINBUTTONS
 	spin_to_table( table5, &spinbutton_grid[0], 0, 1, 5, mem_grid_min, 2, 12 );

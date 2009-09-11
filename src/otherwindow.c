@@ -231,8 +231,6 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (new_window), vbox1);
 
-	add_hseparator( vbox1, 200, 10 );
-
 	table1 = add_a_table( 3, 2, 5, vbox1 );
 
 	if ( type == 0 )
@@ -248,9 +246,9 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	spin_to_table( table1, &spinbutton_height, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT );
 	spin_to_table( table1, &spinbutton_cols, 2, 1, 5, c, 2, 256 );
 
-	add_to_table( _("Width"), table1, 0, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Height"), table1, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("Colours"), table1, 2, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Width"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Height"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Colours"), table1, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
 	new_radio[0] = add_radio_button( rad_txt[0], NULL,  NULL, vbox1, 0 );
 	group = gtk_radio_button_group( GTK_RADIO_BUTTON(new_radio[0]) );
@@ -1226,28 +1224,23 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	int i;
 
 	GSList *group;
-	GtkWidget *vbox1, *hbox3, *hbox, *vbox[2];
-	GtkWidget *table1;
-	GtkWidget *button;
+	GtkWidget *vbox1, *hbox3, *hbox, *vbox[2], *table1, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	spal_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Sort Palette Colours"),
 		GTK_WIN_POS_CENTER, TRUE );
-	gtk_widget_set_usize (GTK_WIDGET (spal_window), 300, -2);
 
 	vbox1 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (spal_window), vbox1);
-
-	add_hseparator( vbox1, 200, 10 );
 
 	table1 = add_a_table( 2, 2, 5, vbox1 );
 
 	spin_to_table( table1, &spal_spins[0], 0, 1, 5, 0, 0, mem_cols-1 );
 	spin_to_table( table1, &spal_spins[1], 1, 1, 5, mem_cols-1, 0, mem_cols-1 );
 
-	add_to_table( _("Start Index"), table1, 0, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	add_to_table( _("End Index"), table1, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("Start Index"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
+	add_to_table( _("End Index"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);

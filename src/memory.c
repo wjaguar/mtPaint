@@ -4251,7 +4251,7 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 			}
 			if (dsta)
 			{
-				k = src[offs];
+				k = srca[offs];
 				k = k * 255 + (srca[offs - delta1] - k) * tool_opacity;
 				dsta[offs] = (k + (k >> 8) + 1) >> 8;
 				opw = k ? (255 * tool_opacity * srca[offs - delta1]) / k :
