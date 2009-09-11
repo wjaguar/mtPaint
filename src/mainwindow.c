@@ -65,7 +65,6 @@ static inilist ini_bool[] = {
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
-	{ "showDock",		&show_dock,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -794,33 +793,6 @@ static void move_mouse(int dx, int dy, int button)
 	}
 }
 
-static const signed char arrow_dx[4] = { 0, -1, 1, 0 },
-	arrow_dy[4] = { 1, 0, 0, -1 };
-
-int check_arrows(int act_m)
-{
-	int action = act_m >> 16, mode = (act_m & 0xFFFF) - 0x8000;
-	int mv = mode & 1 ? mem_nudge : 1;
-
-	mode = (mode >> 1) - 1; 
-	/* User is selecting so allow CTRL+arrow keys to resize the marquee */
-	if ((marq_status == MARQUEE_DONE) && (action == ACT_LR_MOVE))
-	{
-		paint_marquee(3, marq_x2 + mv * arrow_dx[mode],
-			marq_y2 + mv * arrow_dy[mode]);
-		return (1);
-	}
-
-	if (action == ACT_SEL_MOVE)
-	{
-		paint_marquee(2, marq_x1 + mv * arrow_dx[mode],
-			marq_y1 + mv * arrow_dy[mode]);
-		return (1);
-	}
-
-	return (0);
-}
-
 void stop_line()
 {
 	if ( line_status != LINE_NONE ) repaint_line(0);
@@ -834,51 +806,31 @@ void change_to_tool(int icon)
 	if ( perim_status > 0 ) clear_perim_real(0, 0);
 }
 
-gint check_zoom_keys_real(int act_m)
-{
-	int action = act_m >> 16, mode = (act_m & 0xFFFF) - 0x8000;
+static void action_dispatch(int action, int mode, int state, int kbd);
 
-	if (action == ACT_ZOOM)
+int check_zoom_keys_real(int act_m)
+{
+	int action = act_m >> 16;
+
+	if ((action == ACT_ZOOM) || (action == ACT_VIEW) || (action == ACT_VWZOOM))
 	{
-		if (!mode) zoom_in();
-		else if (mode == -1) zoom_out();
-		else align_size(mode > 0 ? mode : -1.0 / mode);
+		action_dispatch(action, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
+		return (TRUE);
 	}
-	else if (action == ACT_VIEW) toggle_view();
-	else if (action == ACT_VWZOOM)
-	{
-		if (!mode)
-		{
-			if (vw_zoom >= 1) vw_align_size(vw_zoom + 1);
-			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) - 1));
-		}
-		else if (mode == -1)
-		{
-			if (vw_zoom > 1) vw_align_size(vw_zoom - 1);
-			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) + 1));
-		}
-//		else vw_align_size(mode > 0 ? mode : -1.0 / mode);
-	}
-	else return (FALSE);
-	return (TRUE);
+	return (FALSE);
 }
 
-gint check_zoom_keys(int act_m)
+int check_zoom_keys(int act_m)
 {
-	int action = act_m >> 16, mode = (act_m & 0xFFFF) - 0x8000;
+	int action = act_m >> 16;
 
-	if (action == ACT_QUIT) quit_all(mode);
-
-	if (check_zoom_keys_real(act_m)) return TRUE;
-
-	if (action == DLG_BRCOSA) pressed_brcosa();
-	else if (action == ACT_PAN) pressed_pan();
-	else if (action == ACT_CROP) pressed_crop();
-	else if (action == ACT_SWAP_AB) pressed_swap_AB();
-	else if ((action == DLG_CMDLINE) && allow_cline) pressed_cline();
-	else if (action == DLG_PATTERN) choose_pattern(0);
-	else if (action == DLG_BRUSH) choose_pattern(1);
-	else if (action == ACT_TOOL) change_to_tool(mode);
+	if (check_zoom_keys_real(act_m)) return (TRUE);
+	if ((action == ACT_DOCK) || (action == ACT_QUIT) ||
+		(action == DLG_BRCOSA) || (action == ACT_PAN) ||
+		(action == ACT_CROP) || (action == ACT_SWAP_AB) ||
+		(action == DLG_CMDLINE) || (action == DLG_PATTERN) ||
+		(action == DLG_BRUSH) || (action == ACT_TOOL))
+		action_dispatch(action, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
 	else return (FALSE);
 
 	return (TRUE);
@@ -940,6 +892,7 @@ static key_action main_keys[] = {
 	{ DLG_BRUSH,	0,		GDK_F3,		MOD_csa },
 	{ ACT_TOOL,	TTB_PAINT,	GDK_F4,		MOD_csa },
 	{ ACT_TOOL,	TTB_SELECT,	GDK_F9, 	MOD_csa },
+	{ ACT_DOCK,	0,		GDK_F12,	MOD_csa },
 	{ ACT_SEL_MOVE,	5,		GDK_Left,	MOD_cS  },
 	{ ACT_SEL_MOVE,	5,		GDK_KP_Left,	MOD_cS  },
 	{ ACT_SEL_MOVE,	7,		GDK_Right,	MOD_cS  },
@@ -1083,7 +1036,7 @@ static int check_smart_menu_keys(GdkEventKey *event);
 static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
-	int change, dir, act_m, action, mode;
+	int act_m;
 
 	if (dock_focused())
 	{
@@ -1105,155 +1058,80 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
 #endif
 
-	if (act_m == ACTMOD_DUMMY) return (TRUE);
-	if (check_zoom_keys(act_m)) return (TRUE);	// Check HOME/zoom keys
+	if (act_m != ACTMOD_DUMMY)
+		action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
+	return (TRUE);
+}
 
-	if (marq_status > MARQUEE_NONE)
-	{
-		if (check_arrows(act_m) == 1)
-		{
-			update_sel_bar();
-			update_menus();
-			return TRUE;
-		}
-	}
-
-	action = act_m >> 16;
-	mode = (act_m & 0xFFFF) - 0x8000;
-	change = mode & 1 ? mem_nudge : 1;
-	dir = (mode >> 1) - 1;
-
-	if (action == ACT_SEL_MOVE)
-		move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
-	// Channel keys, i.e. SHIFT + keypad
-	else if (action == ACT_CHANNEL)
-		pressed_channel_edit(TRUE, mode);
-	// Opacity keys, i.e. CTRL + keypad
-	else if (action == ACT_OPAC)
-		pressed_opacity(mode > 0 ? (255 * mode) / 10 :
-			tool_opacity + 1 + mode + mode);
-	else if ((action == ACT_LR_MOVE) && layer_selected)
-		move_layer_relative(layer_selected,
-			change * arrow_dx[dir], change * arrow_dy[dir]);
-	else if (action == ACT_ESC)
-	{
-		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-			pressed_select(FALSE);
-		else if (tool_type == TOOL_LINE) stop_line();
-		else if ((tool_type == TOOL_GRADIENT) &&
-			(gradient[mem_channel].status != GRAD_NONE))
-		{
-			gradient[mem_channel].status = GRAD_NONE;
-			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
-			else repaint_grad(0);
-		}
-	}
-	else if (action == DLG_SCALE)
-		pressed_scale_size(TRUE);
-	else if (action == DLG_SIZE)
-		pressed_scale_size(FALSE);
-	else if ((action == ACT_A) || (action == ACT_B))
-	{
-		action = action == ACT_B;
-		if (mem_channel == CHN_IMAGE)
-		{
-			mode += mem_col_[action];
-			if ((mode >= 0) && (mode < mem_cols))
-				mem_col_[action] = mode;
-			mem_col_24[action] = mem_pal[mem_col_[action]];
-			update_cols();
-		}
-		else
-		{
-			mode += channel_col_[action][mem_channel];
-			if ((mode >= 0) && (mode <= 255))
-				channel_col_[action][mem_channel] = mode;
-			pressed_opacity(channel_col_A[mem_channel]);
-		}
-	}
-	else if (action == ACT_COMMIT)
-	{
-		if (marq_status >= MARQUEE_PASTE)
-		{
-			commit_paste(NULL);
-			pen_down = 0;	// Ensure each press of enter is a new undo level
-			mem_undo_prepare();
-		}
-		else move_mouse(0, 0, 1);
-	}
-	else if ((action == ACT_RCLICK) && (marq_status < MARQUEE_PASTE))
-		move_mouse(0, 0, 3);
-	else if ((action == ACT_ARROW) && (tool_type == TOOL_LINE) &&
-		(line_status > LINE_NONE) &&
-		((line_x1 != line_x2) || (line_y1 != line_y2)))
-	{
-		int i, xa1, xa2, ya1, ya2, minx, maxx, miny, maxy, w, h;
-		double uvx, uvy;	// Line length & unit vector lengths
-		int oldmode = mem_undo_opacity;
+static void draw_arrow(int mode)
+{
+	int i, xa1, xa2, ya1, ya2, minx, maxx, miny, maxy, w, h;
+	double uvx, uvy;	// Line length & unit vector lengths
+	int oldmode = mem_undo_opacity;
 
 
-		// Calculate 2 coords for arrow corners
-		uvy = sqrt((line_x1 - line_x2) * (line_x1 - line_x2) +
-			(line_y1 - line_y2) * (line_y1 - line_y2));
-		uvx = (line_x2 - line_x1) / uvy;
-		uvy = (line_y2 - line_y1) / uvy;
+	if (!((tool_type == TOOL_LINE) && (line_status > LINE_NONE) &&
+		((line_x1 != line_x2) || (line_y1 != line_y2)))) return;
 
-		xa1 = rint(line_x1 + tool_flow * (uvx - uvy * 0.5));
-		xa2 = rint(line_x1 + tool_flow * (uvx + uvy * 0.5));
-		ya1 = rint(line_y1 + tool_flow * (uvy + uvx * 0.5));
-		ya2 = rint(line_y1 + tool_flow * (uvy - uvx * 0.5));
+	// Calculate 2 coords for arrow corners
+	uvy = sqrt((line_x1 - line_x2) * (line_x1 - line_x2) +
+		(line_y1 - line_y2) * (line_y1 - line_y2));
+	uvx = (line_x2 - line_x1) / uvy;
+	uvy = (line_y2 - line_y1) / uvy;
+
+	xa1 = rint(line_x1 + tool_flow * (uvx - uvy * 0.5));
+	xa2 = rint(line_x1 + tool_flow * (uvx + uvy * 0.5));
+	ya1 = rint(line_y1 + tool_flow * (uvy + uvx * 0.5));
+	ya2 = rint(line_y1 + tool_flow * (uvy - uvx * 0.5));
 
 // !!! Call this, or let undo engine do it?
-//		mem_undo_prepare();
-		pen_down = 0;
-		tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
-		line_status = LINE_LINE;
-		update_menus();
+//	mem_undo_prepare();
+	pen_down = 0;
+	tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
+	line_status = LINE_LINE;
+	update_menus();
 
-		// Draw arrow lines & circles
-		mem_undo_opacity = TRUE;
-		f_circle(xa1, ya1, tool_size);
-		f_circle(xa2, ya2, tool_size);
-		tline(xa1, ya1, line_x1, line_y1, tool_size);
-		tline(xa2, ya2, line_x1, line_y1, tool_size);
+	// Draw arrow lines & circles
+	mem_undo_opacity = TRUE;
+	f_circle(xa1, ya1, tool_size);
+	f_circle(xa2, ya2, tool_size);
+	tline(xa1, ya1, line_x1, line_y1, tool_size);
+	tline(xa2, ya2, line_x1, line_y1, tool_size);
 
-		if (mode == 3)
-		{
-			// Draw 3rd line and fill arrowhead
-			tline(xa1, ya1, xa2, ya2, tool_size );
-			poly_points = 0;
-			poly_add(line_x1, line_y1);
-			poly_add(xa1, ya1);
-			poly_add(xa2, ya2);
-			poly_init();
-			poly_paint();
-			poly_points = 0;
-		}
-		mem_undo_opacity = oldmode;
-		mem_undo_prepare();
-
-		// Update screen areas
-		minx = xa1 < xa2 ? xa1 : xa2;
-		if (minx > line_x1) minx = line_x1;
-		maxx = xa1 > xa2 ? xa1 : xa2;
-		if (maxx < line_x1) maxx = line_x1;
-
-		miny = ya1 < ya2 ? ya1 : ya2;
-		if (miny > line_y1) miny = line_y1;
-		maxy = ya1 > ya2 ? ya1 : ya2;
-		if (maxy < line_y1) maxy = line_y1;
-
-		i = (tool_size + 1) >> 1;
-		minx -= i; miny -= i; maxx += i; maxy += i;
-
-		w = maxx - minx + 1;
-		h = maxy - miny + 1;
-
-		main_update_area(minx, miny, w, h);
-		vw_update_area(minx, miny, w, h);
+	if (mode == 3)
+	{
+		// Draw 3rd line and fill arrowhead
+		tline(xa1, ya1, xa2, ya2, tool_size );
+		poly_points = 0;
+		poly_add(line_x1, line_y1);
+		poly_add(xa1, ya1);
+		poly_add(xa2, ya2);
+		poly_init();
+		poly_paint();
+		poly_points = 0;
 	}
+	mem_undo_opacity = oldmode;
+	mem_undo_prepare();
 
-	return (TRUE);
+	// Update screen areas
+	minx = xa1 < xa2 ? xa1 : xa2;
+	if (minx > line_x1) minx = line_x1;
+	maxx = xa1 > xa2 ? xa1 : xa2;
+	if (maxx < line_x1) maxx = line_x1;
+
+	miny = ya1 < ya2 ? ya1 : ya2;
+	if (miny > line_y1) miny = line_y1;
+	maxy = ya1 > ya2 ? ya1 : ya2;
+	if (maxy < line_y1) maxy = line_y1;
+
+	i = (tool_size + 1) >> 1;
+	minx -= i; miny -= i; maxx += i; maxy += i;
+
+	w = maxx - minx + 1;
+	h = maxy - miny + 1;
+
+	main_update_area(minx, miny, w, h);
+	vw_update_area(minx, miny, w, h);
 }
 
 int check_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
@@ -3372,7 +3250,7 @@ static void parse_drag( char *txt )
 		j = detect_image_format(fname);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
 		{
-			if (!nlayer || layer_add(0, 0, 1, 0, 0))
+			if (!nlayer || layer_add(0, 0, 1, 0, mem_pal_def, 0))
 				nlayer = load_image(fname, FS_LAYER_LOAD, j) == 1;
 		}
 	}
@@ -3653,20 +3531,22 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 static void pressed_pal_copypaste(int copy);
 static void pressed_sel_ramp(int vert);
 
-static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
-{
-	menu_item *item = user_data;
-	int state, action, mode;
+static const signed char arrow_dx[4] = { 0, -1, 1, 0 },
+	arrow_dy[4] = { 1, 0, 0, -1 };
 
-	state = item->radio_BTS < 0 ? TRUE : GTK_CHECK_MENU_ITEM(widget)->active;
-	action = item->action;
-	mode = item->mode;
+static void action_dispatch(int action, int mode, int state, int kbd)
+{
+	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
 
 	switch (action)
 	{
 	case ACT_QUIT:
 		quit_all(mode); break;
-//	case ACT_ZOOM:
+	case ACT_ZOOM:
+		if (!mode) zoom_in();
+		else if (mode == -1) zoom_out();
+		else align_size(mode > 0 ? mode : -1.0 / mode);
+		break;
 	case ACT_VIEW:
 		toggle_view(); break;
 	case ACT_PAN:
@@ -3675,21 +3555,98 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 		pressed_crop(); break;
 	case ACT_SWAP_AB:
 		pressed_swap_AB(); break;
-//	case ACT_TOOL:
-//	case ACT_SEL_MOVE:
-//	case ACT_OPAC:
-//	case ACT_LR_MOVE:
-//	case ACT_ESC:
-//	case ACT_COMMIT:
-//	case ACT_RCLICK:
-//	case ACT_ARROW:
-//	case ACT_A:
-//	case ACT_B:
+	case ACT_TOOL:
+		change_to_tool(mode); break;
+	case ACT_SEL_MOVE:
+		/* Gradient tool has precedence over selection */
+		if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
+		{
+			paint_marquee(2, marq_x1 + change * arrow_dx[dir],
+				marq_y1 + change * arrow_dy[dir]);
+			update_sel_bar();
+			update_menus();
+		}
+		else move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
+		break;
+	case ACT_OPAC:
+		pressed_opacity(mode > 0 ? (255 * mode) / 10 :
+			tool_opacity + 1 + mode + mode);
+		break;
+	case ACT_LR_MOVE:
+		/* User is selecting so allow CTRL+arrow keys to resize the
+		 * marquee; for consistency, gradient tool blocks this */
+		if ((tool_type != TOOL_GRADIENT) && (marq_status == MARQUEE_DONE))
+		{
+			paint_marquee(3, marq_x2 + change * arrow_dx[dir],
+				marq_y2 + change * arrow_dy[dir]);
+			update_sel_bar();
+			update_menus();
+		}
+		else if (layer_selected) move_layer_relative(layer_selected,
+			change * arrow_dx[dir], change * arrow_dy[dir]);
+		break;
+	case ACT_ESC:
+		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+			pressed_select(FALSE);
+		else if (tool_type == TOOL_LINE) stop_line();
+		else if ((tool_type == TOOL_GRADIENT) &&
+			(gradient[mem_channel].status != GRAD_NONE))
+		{
+			gradient[mem_channel].status = GRAD_NONE;
+			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			else repaint_grad(0);
+		}
+		break;
+	case ACT_COMMIT:
+		if (marq_status >= MARQUEE_PASTE)
+		{
+			commit_paste(NULL);
+			pen_down = 0;	// Ensure each press of enter is a new undo level
+			mem_undo_prepare();
+		}
+		else move_mouse(0, 0, 1);
+		break;
+	case ACT_RCLICK:
+		if (marq_status < MARQUEE_PASTE) move_mouse(0, 0, 3);
+		break;
+	case ACT_ARROW: draw_arrow(mode); break;
+	case ACT_A:
+	case ACT_B:
+		action = action == ACT_B;
+		if (mem_channel == CHN_IMAGE)
+		{
+			mode += mem_col_[action];
+			if ((mode >= 0) && (mode < mem_cols))
+				mem_col_[action] = mode;
+			mem_col_24[action] = mem_pal[mem_col_[action]];
+			update_cols();
+		}
+		else
+		{
+			mode += channel_col_[action][mem_channel];
+			if ((mode >= 0) && (mode <= 255))
+				channel_col_[action][mem_channel] = mode;
+			pressed_opacity(channel_col_A[mem_channel]);
+		}
+		break;
 	case ACT_CHANNEL:
+		if (kbd) state = TRUE;
 		if (mode < 0) pressed_channel_create(mode);
 		else pressed_channel_edit(state, mode);
 		break;
-//	case ACT_VWZOOM:
+	case ACT_VWZOOM:
+		if (!mode)
+		{
+			if (vw_zoom >= 1) vw_align_size(vw_zoom + 1);
+			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) - 1));
+		}
+		else if (mode == -1)
+		{
+			if (vw_zoom > 1) vw_align_size(vw_zoom - 1);
+			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) + 1));
+		}
+//		else vw_align_size(mode > 0 ? mode : -1.0 / mode);
+		break;
 	case ACT_SAVE:
 		pressed_save_file(); break;
 	case ACT_FACTION:
@@ -3719,6 +3676,7 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 	case ACT_TBAR:
 		pressed_toolbar_toggle(state, mode); break;
 	case ACT_DOCK:
+		if (kbd) state = !show_dock;
 		toggle_dock(show_dock = state, FALSE); break;
 	case ACT_CENTER:
 		pressed_centralize(state); break;
@@ -3785,6 +3743,9 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 		pressed_channel_toggle(state, mode); break;
 	case ACT_LR_SAVE:
 		layer_press_save(); break;
+	case ACT_LR_ADD:
+		/* !!! Later, add 'New' & 'Duplicate' too as modes */
+		layer_add_composite(); break;
 	case ACT_LR_KILLALL:
 		layer_press_remove_all(); break;
 	case ACT_DOCS:
@@ -3796,7 +3757,7 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
 	case DLG_CMDLINE:
-		pressed_cline(); break;
+		if (allow_cline) pressed_cline(); break;
 	case DLG_PATTERN:
 		choose_pattern(0); break;
 	case DLG_BRUSH:
@@ -3872,6 +3833,14 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 	case FILT_UALPHA:
 		pressed_unassociate(); break;
 	}
+}
+
+static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
+{
+	menu_item *item = user_data;
+
+	action_dispatch(item->action, item->mode, item->radio_BTS < 0 ? TRUE :
+		GTK_CHECK_MENU_ITEM(widget)->active, FALSE);
 }
 
 static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
@@ -4331,7 +4300,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", ACT_TBAR, TOOLBAR_MAIN },
 	{ _("/View/Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", ACT_TBAR, TOOLBAR_TOOLS },
 	{ _("/View/Show Settings Toolbar"), 0, MENU_TBSET, 0, "F7", ACT_TBAR, TOOLBAR_SETTINGS },
-	{ _("/View/Show Dock"), 0, MENU_DOCK, 0, NULL, ACT_DOCK, 0 },
+	{ _("/View/Show Dock"), 0, MENU_DOCK, 0, "F12", ACT_DOCK, 0 },
 	{ _("/View/Show Palette"), 0, MENU_SHOWPAL, 0, "F8", ACT_TBAR, TOOLBAR_PALETTE },
 	{ _("/View/Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, ACT_TBAR, TOOLBAR_STATUS },
 	{ _("/View/sep1"), -4 },
@@ -4466,6 +4435,7 @@ static menu_item main_menu[] = {
 	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, xpm_save_xpm },
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
+	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, 0 },
 	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, ACT_LR_KILLALL, 0 },
 	{ _("/Layers/sep1"), -4 },
 	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },

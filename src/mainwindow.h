@@ -83,6 +83,7 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_SET_RGBA,
 	ACT_SET_OVERLAY,
 	ACT_LR_SAVE,
+	ACT_LR_ADD,
 	ACT_LR_KILLALL,
 	ACT_DOCS,
 	ACT_REBIND_KEYS,
@@ -272,8 +273,8 @@ int gui_save(char *filename, ls_settings *settings);
 void pressed_select(int all);
 void pressed_opacity( int opacity );
 
-gint check_zoom_keys(int act_m);
-gint check_zoom_keys_real(int act_m);
+int check_zoom_keys(int act_m);
+int check_zoom_keys_real(int act_m);
 
 void zoom_in();
 void zoom_out();

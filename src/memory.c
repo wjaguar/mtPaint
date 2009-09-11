@@ -1337,6 +1337,40 @@ size_t mem_used_layers()
 	return (total);
 }
 
+/* Fast approximate atan2() function, returning result in degrees. This code is
+ * approximately 2x faster than using libm on P4/Linux, and 6x on Windows.
+ * Absolute error is below 0.0003 degrees, which means 1/10 of a pixel in worst
+ * possible case. - WJ */
+
+#define ATANNUM 128
+static float ATAN[2 * ATANNUM + 2];
+
+double atan360(int x, int y)
+{
+	double d;
+	int xa, ya, n;
+
+	if (!(x | y)) return (0.0);
+	xa = abs(x); ya = abs(y);
+	d = ya < xa ? (double)ya / (double)xa : 2.0 - (double)xa / (double)ya;
+	d *= ATANNUM;
+	n = d;
+	d = ATAN[n] + (ATAN[n + 1] - ATAN[n]) * (d - n);
+
+	if (x < 0) d = 180.0 - d;
+	return (y >= 0 ? d : 360.0 - d);
+}
+
+static void make_ATAN()
+{
+	int i;
+
+	for (i = 0; i <= ATANNUM; i++)
+		ATAN[2 * ATANNUM - i] = 90.0 -
+			(ATAN[i] = atan(i * (1.0 / ATANNUM)) * (180.0 / M_PI));
+	ATAN[2 * ATANNUM + 1] = 90.0;
+}
+
 int load_def_palette(char *name)
 {
 	png_color temp_pal[256];
@@ -1373,6 +1407,8 @@ void mem_init()					// Initialise memory
 	char txt[64];
 	int i, j, ix, iy, bs, bf, bt;
 
+
+	make_ATAN();
 
 	for (i = 0; i < 256; i++)	// Load up normal palette defaults
 	{
@@ -7409,49 +7445,50 @@ int grad_pixel(unsigned char *dest, int x, int y)
 	if (grad->wmode == GRAD_MODE_NONE) return (0);
 
 	/* Distance for gradient mode */
-	while (1)
+	if (grad->status == GRAD_NONE)	/* Stroke gradient */
 	{
-		 /* Stroke gradient */
-		if (grad->status == GRAD_NONE)
-		{
-			dist = grad_path;
-			/* Shapeburst gradient */
-			if (grad->wmode == GRAD_MODE_BURST) break;
-			dist += (x - grad_x0) * grad->xv +
-				(y - grad_y0) * grad->yv;
-			break;
-		}
+		dist = grad_path;
+		/* Shapeburst gradient */
+		if (grad->wmode != GRAD_MODE_BURST)
+			dist += (x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
+	}
+	else
+	{
+		int dx = x - grad->x1, dy = y - grad->y1;
 
-		/* Linear/bilinear gradient */
-		if (grad->wmode <= GRAD_MODE_BILINEAR)
+		switch (grad->wmode)
 		{
-			dist = (x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv;
+		default:
+		case GRAD_MODE_LINEAR:	/* Linear/bilinear gradient */
+		case GRAD_MODE_BILINEAR:
+			dist = dx * grad->xv + dy * grad->yv;
 			if (grad->wmode == GRAD_MODE_LINEAR) break;
 			dist = fabs(dist); /* Bilinear */
 			break;
-		}
-
-		/* Radial gradient */
-		if (grad->wmode == GRAD_MODE_RADIAL)
-		{
-			dist = sqrt((x - grad->x1) * (x - grad->x1) +
-				(y - grad->y1) * (y - grad->y1));
+		case GRAD_MODE_RADIAL:	/* Radial gradient */
+			dist = sqrt(dx * dx + dy * dy);
+			break;
+		case GRAD_MODE_SQUARE:	/* Square gradient */
+			/* !!! Here is code duplication with linear/bilinear
+			 * path - but merged paths actually LOSE in both time
+			 * and space, at least with GCC - WJ */
+			dist = fabs(dx * grad->xv + dy * grad->yv) +
+				fabs(dx * grad->yv - dy * grad->xv);
+			break;
+		case GRAD_MODE_ANGULAR:	/* Angular/conical gradient */
+		case GRAD_MODE_CONICAL:
+			dist = atan360(dx, dy) - grad->wa;
+			if (dist < 0.0) dist += 360.0;
+			if (grad->wmode == GRAD_MODE_ANGULAR) break;
+			if (dist >= 180.0) dist = 360.0 - dist;
 			break;
 		}
-
-		/* Square gradient */
-		/* !!! Here is code duplication with linear/bilinear path - but
-		 * merged paths actually LOSE in both time and space, at least
-		 * with GCC - WJ */
-		dist = fabs((x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv) +
-			fabs((x - grad->x1) * grad->yv - (y - grad->y1) * grad->xv);
-		break;
 	}
 	dist -= grad->ofs;
 
 	/* Apply repeat mode */
 	len1 = grad->wrep;
-	switch (grad->rmode)
+	switch (grad->wrmode)
 	{
 	case GRAD_BOUND_MIRROR: /* Mirror repeat */
 		l2 = len1 + len1;
@@ -7464,8 +7501,16 @@ int grad_pixel(unsigned char *dest, int x, int y)
 		dist -= l2 * (int)((dist + 0.5) * grad->wil2);
 		if (dist < -0.5) dist += l2;
 		break;
+	case GRAD_BOUND_REP_A: /* Angular repeat */
+		dist -= len1 * (int)(dist * grad->wil2);
+		if (dist < 0.0) dist += len1;
+		break;
 	case GRAD_BOUND_STOP: /* Nothing is outside bounds */
 		if ((dist < -0.5) || (dist >= len1 + 0.5)) return (0);
+		break;
+	case GRAD_BOUND_STOP_A: /* Nothing is outside angle */
+		if ((dist < 0.0) || (dist > len1)) return (0);
+		break;
 	case GRAD_BOUND_LEVEL: /* Constant extension */
 	default:
 		break;
@@ -7508,6 +7553,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 void grad_update(grad_info *grad)
 {
 	double len, len1, l2;
+	int dx = grad->x2 - grad->x1, dy = grad->y2 - grad->y1;
 
 	/* Distance for gradient mode */
 	grad->wmode = grad->gmode;
@@ -7523,17 +7569,17 @@ void grad_update(grad_info *grad)
 		}
 
 		/* Placement length */
-		l2 = sqrt((grad->x2 - grad->x1) * (grad->x2 - grad->x1) +
-			(grad->y2 - grad->y1) * (grad->y2 - grad->y1));
-		if (!grad->len) len = l2;
-
+		l2 = sqrt(dx * dx + dy * dy);
 		if (l2 == 0.0)
 		{
 			grad->wmode = GRAD_MODE_RADIAL;
 			break;
 		}
-		grad->xv = (grad->x2 - grad->x1) / l2;
-		grad->yv = (grad->y2 - grad->y1) / l2;
+		grad->xv = dx / l2;
+		grad->yv = dy / l2;
+		grad->wa = atan360(dx, dy);
+		if (!grad->len) len = grad->wmode == GRAD_MODE_ANGULAR ? 360.0 :
+			grad->wmode == GRAD_MODE_CONICAL ? 180.0 : l2;
 		break;
 	}
 
@@ -7545,10 +7591,20 @@ void grad_update(grad_info *grad)
 
 	/* Inverse period */
 	l2 = 1.0;
+	grad->wrmode = grad->rmode;
 	if (grad->rmode == GRAD_BOUND_MIRROR) /* Mirror repeat */
 		l2 = len1 + len1;
 	else if (grad->rmode == GRAD_BOUND_REPEAT) /* Repeat */
 		l2 = len1 + 1.0;
+	/* Angular distance is in degrees, not pixels */
+	if ((grad->wmode == GRAD_MODE_ANGULAR) ||
+		(grad->wmode == GRAD_MODE_CONICAL))
+	{
+		if (grad->rmode == GRAD_BOUND_REPEAT)
+			grad->wrmode = GRAD_BOUND_REP_A , l2 = len1;
+		else if (grad->rmode == GRAD_BOUND_STOP)
+			grad->wrmode = GRAD_BOUND_STOP_A;
+	}
 	grad->wil2 = 1.0 / l2;
 }
 

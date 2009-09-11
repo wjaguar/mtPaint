@@ -151,8 +151,8 @@ typedef struct {
 	int len, rep, ofs;	// Gradient length, repeat, and offset
 	int gmode, rmode;	// Gradient mode and repeat mode
 	/* Derived values */
-	double wrep, wil1, wil2, xv, yv;
-	int wmode;
+	double wrep, wil1, wil2, xv, yv, wa;
+	int wmode, wrmode;
 } grad_info;
 
 typedef struct {
@@ -179,12 +179,16 @@ int grad_opacity;			// Preview opacity
 #define GRAD_MODE_BILINEAR 3
 #define GRAD_MODE_RADIAL   4
 #define GRAD_MODE_SQUARE   5
+#define GRAD_MODE_ANGULAR  6
+#define GRAD_MODE_CONICAL  7
 
 /* Boundary conditions */
 #define GRAD_BOUND_STOP    0
 #define GRAD_BOUND_LEVEL   1
 #define GRAD_BOUND_REPEAT  2
 #define GRAD_BOUND_MIRROR  3
+#define GRAD_BOUND_STOP_A  4 /* Stop mode for angular gradient */
+#define GRAD_BOUND_REP_A   5 /* Repeat mode for same */
 
 /* Gradient types */
 #define GRAD_TYPE_RGB      0

@@ -3131,9 +3131,8 @@ void create_default_image()			// Create default new image
 	int	nw = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH ),
 		nh = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT ),
 		nc = inifile_get_gint32("lastnewCols", 256 ),
-		nt = inifile_get_gint32("lastnewType", 2 ),
-		bpp = 1;
+		nt = inifile_get_gint32("lastnewType", 2 );
 
-	if ( nt == 0 || nt>2 ) bpp = 3;
-	do_new_one( nw, nh, nc, nt, bpp );
+	do_new_one(nw, nh, nc, nt == 1 ? NULL : mem_pal_def,
+		(nt == 0) || (nt > 2) ? 3 : 1);
 }

@@ -83,12 +83,12 @@ void do_new_chores()
 	gtk_widget_queue_draw(drawing_col_prev);
 }
 
-int do_new_one(int nw, int nh, int nc, int nt, int bpp)
+int do_new_one( int nw, int nh, int nc, png_color *pal, int bpp )
 {
 	int res;
 
-	mem_pal_copy(mem_pal, mem_pal_def);
-	if (nt == 1) mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
+	if (pal) mem_pal_copy(mem_pal, pal);
+	else mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
 
 	nw = nw < MIN_WIDTH ? MIN_WIDTH : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < MIN_HEIGHT ? MIN_HEIGHT : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
@@ -106,6 +106,7 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 
 static void create_new(GtkWidget *widget)
 {
+	png_color *pal = im_type == 1 ? NULL : mem_pal_def;
 	int nw, nh, nc, err, bpp = 1;
 
 	nw = read_spin(spinbutton_width);
@@ -115,13 +116,13 @@ static void create_new(GtkWidget *widget)
 	switch (im_type)
 	{
 	case 0: bpp = 3; // RGB
-	case 1: // Indexed
-	case 2: // Greyscale
+	case 1: // Greyscale
+	case 2: // Indexed
 		if (new_window_type == 1) // Layer
-			layer_new(nw, nh, 3 - im_type, nc, CMASK_IMAGE);
+			layer_new(nw, nh, bpp, nc, pal, CMASK_IMAGE);
 		else // Image
 		{
-			err = do_new_one( nw, nh, nc, im_type, bpp );
+			err = do_new_one(nw, nh, nc, pal, bpp);
 			if (err > 0)
 			{
 				/* System was unable to allocate memory for
@@ -2762,7 +2763,8 @@ static void grad_selector_box(GtkWidget *box, char **mtext, int op)
 
 void gradient_setup(int mode)
 {
-	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial"), _("Square")};
+	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial"), _("Square"),
+		_("Angular"), _("Conical")};
 	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
 	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (HSV)"),
 		_("A to B (backward HSV)"), _("A only"), _("Custom")};
@@ -2797,7 +2799,7 @@ void gradient_setup(int mode)
 	add_to_table(_("Offset"), table, 2, 0, 5);
 	grad_spin_ofs = spin_to_table(table, 2, 1, 5, 0, -MAX_GRAD, MAX_GRAD);
 	add_to_table(_("Gradient type"), table, 0, 2, 5);
-	grad_opt_type = wj_option_menu(gtypes, 4, 0, NULL, NULL);
+	grad_opt_type = wj_option_menu(gtypes, 6, 0, NULL, NULL);
 	add_to_table(_("Extension type"), table, 1, 2, 5);
 	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
 	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,

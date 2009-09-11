@@ -279,15 +279,11 @@ void layer_show_new()
 	}
 }
 
-// Types 1=indexed, 2=grey, 3=RGB
-int layer_add(int w, int h, int type, int cols, int cmask)
+int layer_add(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 {
-	int bpp;
 	layer_image *lim;
 
 	if (layers_total >= MAX_LAYERS) return (FALSE);
-
-	bpp = type == 2 ? 1 : type;	// Type 2 = greyscale indexed
 
 	lim = alloc_layer(w, h, bpp, cmask, NULL);
 	if (!lim)
@@ -299,9 +295,8 @@ int layer_add(int w, int h, int type, int cols, int cmask)
 	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
 	lim->image_.cols = cols;
-	mem_pal_copy(lim->image_.pal, mem_pal_def); // Default
-	if (type == 2)	// Greyscale
-		mem_scale_pal(lim->image_.pal, 0, 0,0,0, cols - 1, 255,255,255);
+	if (pal) mem_pal_copy(lim->image_.pal, pal);
+	else mem_scale_pal(lim->image_.pal, 0, 0,0,0, cols - 1, 255,255,255);
 
 	init_istate(&lim->state_, &lim->image_);
 	update_undo(&lim->image_);
@@ -318,9 +313,9 @@ int layer_add(int w, int h, int type, int cols, int cmask)
 
 /* !!! No calling GTK+ until after updating the structures - we don't need a
  * recursive call in the middle of it (possible on a slow machine) - WJ */
-void layer_new( int w, int h, int type, int cols, int cmask )
+void layer_new(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 {
-	if (layer_add(w, h, type, cols, cmask)) layer_show_new();
+	if (layer_add(w, h, bpp, cols, pal, cmask)) layer_show_new();
 }
 
 /* !!! Same as above: modify structures, *then* show results - WJ */
@@ -715,6 +710,30 @@ int layer_save_composite(char *fname, ls_settings *settings)
 	return res;
 }
 
+void layer_add_composite()
+{
+	layer_image *lim;
+	image_info *image = layer_selected ? &layer_table[0].image->image_ :
+		&mem_image;
+
+	if (layers_total >= MAX_LAYERS) return;
+	if (layer_add(image->width, image->height, 3, image->cols, image->pal,
+		CMASK_IMAGE))
+	{
+		/* Render to an invisible layer */
+		layer_table[layers_total].visible = FALSE;
+		lim = layer_table[layers_total].image;
+		view_render_rgb(lim->image_.img[CHN_IMAGE], 0, 0,
+			image->width, image->height, 1);
+		/* Copy background's transparency */
+		lim->state_.xpm_trans = layer_selected ?
+			layer_table[0].image->state_.xpm_trans : mem_xpm_trans;
+		/* Activate the result */
+		layer_show_new();
+	}
+	else memory_errors(1);
+}
+
 int save_layers( char *file_name )
 {
 	layer_node *t;
@@ -936,14 +955,13 @@ void pressed_paste_layer()
 		cmask = CMASK_RGBA;
 	cmask |= CMASK_FOR(mem_channel);
 
-	if (!layer_add(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, cmask))
-		return; // Failed
+	if (!layer_add(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, mem_pal,
+		cmask)) return; // Failed
 
 	layer_table[layers_total].x = mem_clip_x;
 	layer_table[layers_total].y = mem_clip_y;
 	lim = layer_table[layers_total].image;
 
-	mem_pal_copy(lim->image_.pal, mem_pal);
 	lim->state_ = mem_state;
 
 	j = mem_clip_w * mem_clip_h;

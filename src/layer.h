@@ -84,10 +84,12 @@ void layer_press_remove_all();
 int check_layers_for_changes();
 int check_layers_all_saved();
 void move_layer_relative(int l, int change_x, int change_y);	// Move a layer & update window labels
-void layer_new( int w, int h, int type, int cols, int cmask );	// Types 1=indexed, 2=grey, 3=RGB
-int layer_add(int w, int h, int type, int cols, int cmask);	// *Silently* add layer, return success
+void layer_new(int w, int h, int bpp, int cols, png_color *pal, int cmask);
+//	*Silently* add layer, return success
+int layer_add(int w, int h, int bpp, int cols, png_color *pal, int cmask);
 void layer_delete(int item);		// *Silently* delete layer
 void layer_choose( int l );		// Select a new layer from the list
+void layer_add_composite();		// Composite layers to new (invisible) layer
 
 void string_chop( char *txt );
 int read_file_num(FILE *fp, char *txt);

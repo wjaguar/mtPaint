@@ -83,7 +83,7 @@ void mtpaint_quit()			// Finish memory & inifile
 
 int mtpaint_new_image(int w, int h, int pal_cols, int pal_type, int bpp)
 {
-	return do_new_one(w, h, pal_cols, pal_type, bpp);
+	return do_new_one(w, h, pal_cols, pal_type == 1 ? NULL : mem_pal_def, bpp);
 }
 
 void mtpaint_refresh()			// Update canvases, menus, palette, etc.
