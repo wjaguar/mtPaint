@@ -251,8 +251,15 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 	gtk_box_pack_start (GTK_BOX (box), combo, FALSE, FALSE, 0);
 	combo_entry = GTK_COMBO (combo)->entry;
 	GTK_WIDGET_UNSET_FLAGS (combo_entry, GTK_CAN_FOCUS);
-	gtk_widget_set_usize(combo, 90, -1);
 	gtk_widget_set_usize(GTK_COMBO(combo)->button, 18, -1);
+
+
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_set_usize(combo, 75, -1);
+#endif
+#if GTK_MAJOR_VERSION == 2
+	gtk_entry_set_width_chars( GTK_ENTRY(combo_entry), 6);
+#endif
 
 	gtk_entry_set_editable( GTK_ENTRY(combo_entry), FALSE );
 

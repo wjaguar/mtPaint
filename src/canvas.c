@@ -2360,7 +2360,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			paint_marquee(1, ox, oy);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
-			(button == 13 || button == 3) && (event == GDK_BUTTON_PRESS))
+			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
+			((button == 13) && (event == GDK_MOTION_NOTIFY))))
 		{	// User wants to commit the paste
 			commit_paste(TRUE);
 		}
