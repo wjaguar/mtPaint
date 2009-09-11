@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

@@ -265,19 +265,6 @@ static void fpick_clist_clear(GtkCList *clist)
 	gtk_clist_clear(clist);
 }
 
-static void fpick_clist_select_row(GtkCList *clist, int n)
-{
-	if (n < 0) return;
-#if GTK_MAJOR_VERSION == 1
-	GTK_CLIST_CLASS(((GtkObject *)clist)->klass)->select_row(clist, n, -1, NULL);
-#else /* if GTK_MAJOR_VERSION == 2 */
-	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
-#endif
-	/* !!! Focus fails to follow selection in browse mode - have to move
-	 * it here; but it means a full redraw is necessary afterwards */
-	clist->focus_row = n;
-}
-
 static void fpick_clist_scroll(GtkCList *clist) // Scroll to selected row
 {
 	gtk_clist_moveto(clist, clist->focus_row, -1, 0.5, 0.5);
@@ -343,7 +330,7 @@ static void fpick_clist_repattern(GtkCList *clist, const char *pattern)
 	/* Reselect the previously selected row if possible */
 	n = g_list_position(clist->row_list, pos);
 	if (n < 0) n = 0;
-	fpick_clist_select_row(clist, n); // Avoid "select_row" signal emission
+	clist_reselect_row(clist, n); // Avoid "select_row" signal emission
 	/* Let it be redrawn */
 	gtk_clist_thaw(clist);
 #if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
@@ -359,7 +346,7 @@ static void fpick_sort_files(fpicker *win)
 	gtk_clist_set_sort_column(clist, win->sort_column);
 	gtk_clist_sort(clist);
 	/* No selection yet */
-	if (!clist->selection) fpick_clist_select_row(clist, 0);
+	if (!clist->selection) clist_reselect_row(clist, 0);
 	else
 	{
 	/* !!! Evil hack using undocumented widget internals: widget implementor
@@ -596,7 +583,7 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 		gtk_clist_set_pixtext(clist, row, FPICK_CLIST_NAME, ws, 4, icon, mask);
 		if (ws[0] == cdrive) idx = row;
 	}
-	fpick_clist_select_row(clist, idx);
+	clist_reselect_row(clist, idx);
 	fpick_sort_files(fp);
 	gtk_clist_thaw(clist);
 	fpick_clist_scroll(clist); // Scroll to selected row
@@ -780,7 +767,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 #endif
 	}
 	g_free(parent);
-	fpick_clist_select_row(clist, idx);
+	clist_reselect_row(clist, idx);
 	/* Apply file mask if present, just sort otherwise */
 	if (!win->txt_mask[0]) fpick_sort_files(win);
 	else fpick_clist_repattern(clist, win->txt_mask);
@@ -1069,11 +1056,7 @@ static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
 	if (!gtk_clist_get_selection_info(clist, event->x, event->y, &row, &col))
 		return (FALSE);
 
-	if (clist->focus_row != row)
-	{
-		fpick_clist_select_row(clist, row);
-		gtk_widget_queue_draw(fp->clist);
-	}
+	if (clist->focus_row != row) clist_reselect_row(clist, row);
 	if (clist->focus_row < 0) return (TRUE);
 
 	fpick_file_dialog(fp, clist->focus_row);

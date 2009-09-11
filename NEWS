@@ -16,6 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Filename length in builtin file selector no longer is limited to 100 characters
 	* BUGFIX - Resizing the canvas window now doesn't cause polygon marquee to slide out of place
 	* BUGFIX - Polygon marquee shrunk by resizing the canvas is now redrawn properly
+	* BUGFIX - Problem with message windows not responding to mouse in some cases is now eliminated
 
 3.30	2009-2-12
 

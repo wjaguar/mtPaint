@@ -214,6 +214,9 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	gint i;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
+	/* This function must be immune to pointer grabs */
+	release_grab();
+
 	alert = gtk_dialog_new();
 	gtk_window_set_title( GTK_WINDOW(alert), title );
 	gtk_window_set_modal( GTK_WINDOW(alert), TRUE );
@@ -822,6 +825,27 @@ void clist_enable_drag(GtkWidget *clist)
 }
 
 #endif
+
+// Move browse-mode selection in GtkCList without invoking callbacks
+
+void clist_reselect_row(GtkCList *clist, int n)
+{
+	GtkWidget *widget;
+
+	if (n < 0) return;
+#if GTK_MAJOR_VERSION == 1
+	GTK_CLIST_CLASS(((GtkObject *)clist)->klass)->select_row(clist, n, -1, NULL);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
+#endif
+	/* !!! Focus fails to follow selection in browse mode - have to move
+	 * it here; but it means a full redraw is necessary afterwards */
+	if (clist->focus_row == n) return;
+	clist->focus_row = n;
+	widget = GTK_WIDGET(clist);
+	if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
+		gtk_widget_queue_draw(widget);
+}
 
 // Properly destroy transient window
 
@@ -2363,6 +2387,19 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 }
 
 #endif
+
+// Release outstanding pointer grabs
+
+int release_grab()
+{
+	GtkWidget *grab = gtk_grab_get_current();
+	int res = gdk_pointer_is_grabbed();
+
+	if (grab) gtk_grab_remove(grab);
+	if (res) gdk_pointer_ungrab(GDK_CURRENT_TIME);
+
+	return (res || grab);
+}
 
 // Maybe this will be needed someday...
 

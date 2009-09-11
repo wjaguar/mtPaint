@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -50,16 +50,21 @@ static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 
 void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
 {
+	static int last_row; // 0 initially
 	int i = row + file_arg_start, change = 0;
 
-	if ( strcmp( global_argv[i], mem_filename ) != 0 )
+	if (row != last_row)
 	{
 		if ( layers_total==0 )
 			change = check_for_changes();
 		else
 			change = check_layers_for_changes();
-		if ( change == 2 || change == -10 )
-			do_a_load(global_argv[i]);				// Load requested file
+		if ((change == 2) || (change == -10))	// Load requested file
+		{
+			do_a_load(global_argv[i]);
+			last_row = row;
+		}
+		else clist_reselect_row(GTK_CLIST(clist), last_row); // Go back
 	}
 }
 
@@ -77,8 +82,6 @@ void create_cline_area( GtkWidget *vbox1 )
 
 	col_list = gtk_clist_new(1);
 	gtk_clist_set_column_auto_resize( GTK_CLIST(col_list), 0, TRUE );
-// !!! Which mode is better?
-//	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_SINGLE);
 	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_BROWSE);
 
 	item[0] = txt2;
