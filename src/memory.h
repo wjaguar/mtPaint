@@ -79,6 +79,8 @@ int mem_unmask;
 double flood_step;
 int flood_cube, flood_img, flood_slide;
 
+int smudge_mode;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
@@ -192,7 +194,7 @@ int mem_used_layers();			// Return the number of bytes used in image + undo in a
 
 void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
 void do_effect( int type, int param );		// 0=edge detect 1=blur 2=emboss
-void mem_gauss(double radiusX, double radiusY);
+void mem_gauss(double radiusX, double radiusY, int gcor);
 
 /// PALETTE PROCS
 
@@ -277,9 +279,11 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
-void do_clone(int ox, int oy, int nx, int ny, int opacity);
-#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), 127)
-#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? tool_opacity : 0)
+void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode);
+#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), 127, \
+	smudge_mode && mem_undo_opacity)
+#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? \
+	tool_opacity : 0, mem_undo_opacity)
 
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,
@@ -290,7 +294,7 @@ void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
 int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
 int mem_rotate_free( double angle, int type );			// Rotate canvas by any angle (degrees)
-int mem_image_scale( int nw, int nh, int type );		// Scale image
+int mem_image_scale(int nw, int nh, int type, int gcor);	// Scale image
 int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
 
 int mem_isometrics(int type);

@@ -252,12 +252,13 @@ void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 
 int do_gauss(GtkWidget *box, gpointer fdata)
 {
-	GtkWidget *spinX, *spinY, *toggleXY;
+	GtkWidget *spinX, *spinY, *toggleXY, *toggleGC;
 	double radiusX, radiusY;
 
 	spinX = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
 	spinY = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
 	toggleXY = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget;
+	toggleGC = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->next->data)->widget;
 
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spinX));
 	radiusX = radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinX));
@@ -268,7 +269,8 @@ int do_gauss(GtkWidget *box, gpointer fdata)
 	}
 
 	spot_undo(UNDO_DRAW);
-	mem_gauss(radiusX, radiusY);
+	mem_gauss(radiusX, radiusY, gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(toggleGC)));
 
 	return TRUE;
 }
@@ -296,6 +298,8 @@ void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
 	check = add_a_toggle(_("Different X/Y"), box, FALSE);
 	gtk_signal_connect(GTK_OBJECT(check), "clicked",
 		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
+	check = add_a_toggle(_("Gamma corrected"), box, FALSE);
+	if (mem_channel != CHN_IMAGE) gtk_widget_hide(check);
 	filter_window(_("Gaussian Blur"), box, do_gauss, NULL);
 }
 

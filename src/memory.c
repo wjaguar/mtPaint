@@ -54,6 +54,8 @@ int mem_unmask;
 double flood_step;
 int flood_cube, flood_img, flood_slide;
 
+int smudge_mode;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
@@ -1503,9 +1505,9 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
  * and any kind of dithering is imprecise by definition anyway - WJ */
 
 typedef struct {
-	double midgamma[64], xyz256[768];
+	double xyz256[768];
 	int cspace, cdist, ncols;
-	unsigned char cmap[64 * 64 * 64], xcmap[64 * 64 * 8], ungamma[301];
+	unsigned char cmap[64 * 64 * 64], xcmap[64 * 64 * 8];
 } ctable;
 
 static ctable *ctp;
@@ -1516,12 +1518,9 @@ static int lookup_srgb(double *srgb)
 	double d, td, td2, tmp[3];
 
 	/* Convert to 6-bit RGB coords */
-	j = ctp->ungamma[(int)(srgb[0] * 300.0)];
-	col[0] = j - (srgb[0] < ctp->midgamma[j]);
-	j = ctp->ungamma[(int)(srgb[1] * 300.0)];
-	col[1] = j - (srgb[1] < ctp->midgamma[j]);
-	j = ctp->ungamma[(int)(srgb[2] * 300.0)];
-	col[2] = j - (srgb[2] < ctp->midgamma[j]);
+	col[0] = UNGAMMA64(srgb[0]);
+	col[1] = UNGAMMA64(srgb[1]);
+	col[2] = UNGAMMA64(srgb[2]);
 
 	/* Use colour cache if possible */
 	k = (col[0] << 12) + (col[1] << 6) + col[2];
@@ -1548,7 +1547,7 @@ static int lookup_srgb(double *srgb)
 
 	/* Find nearest colour */
 	d = 1000000000.0;
-	for (i = 0; i < ctp->ncols; i++)
+	for (i = j = 0; i < ctp->ncols; i++)
 	{
 		switch (ctp->cdist)
 		{
@@ -1621,14 +1620,6 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dis
 		gamma6[i] = gamma64[j];
 		lin6[i] = j * (1.0 / 63.0);
 	}
-	ctp->midgamma[0] = 0.0;
-	for (k = 0 , i = 1; i < 64; i++)
-	{
-		ctp->midgamma[i] = (gamma64[i - 1] + gamma64[i]) / 2.0;
-		j = ctp->midgamma[i] * 300.0;
-		for (; k < j; k++) ctp->ungamma[k] = i - 1;
-	}
-	for (; k <= 300; k++) ctp->ungamma[k] = 63;
 	tmp = ctp->xyz256;
 	for (i = 0; i < ncols; i++ , tmp += 3)
 	{
@@ -3283,7 +3274,7 @@ typedef struct {
 } fstep;
 
 
-fstep *make_filter(int l0, int l1, int type)
+static fstep *make_filter(int l0, int l1, int type)
 {
 	fstep *res, *buf;
 	double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
@@ -3407,22 +3398,22 @@ fstep *make_filter(int l0, int l1, int type)
 	return (res);
 }
 
-char *workarea;
-fstep *hfilter, *vfilter;
+static char *workarea;
+static fstep *hfilter, *vfilter;
 
-void clear_scale()
+static void clear_scale()
 {
 	free(workarea);
 	free(hfilter);
 	free(vfilter);
 }
 
-int prepare_scale(int ow, int oh, int nw, int nh, int type)
+static int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
 	workarea = NULL;
 	hfilter = vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
-	workarea = malloc((5 * ow + 1) * sizeof(double));
+	workarea = malloc((7 * ow + 1) * sizeof(double));
 	hfilter = make_filter(ow, nw, type);
 	vfilter = make_filter(oh, nh, type);
 	if (!workarea || !hfilter || !vfilter)
@@ -3433,123 +3424,176 @@ int prepare_scale(int ow, int oh, int nw, int nh, int type)
 	return TRUE;
 }
 
-void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh)
+static void do_scale(chanlist old_img, chanlist new_img, int ow, int oh,
+	int nw, int nh, int gcor)
 {
-	unsigned char *src, *img, *imga, alpha;
-	fstep *tmp = NULL, *tmpx, *tmpy;
-	double *wrk, *wrka, *work_area;
-	double sum[4], kk;
-	int i, j, n, cc, bpp;
+	unsigned char *src, *img, *imga;
+	fstep *tmp = NULL, *tmpx, *tmpy, *tmpp;
+	double *wrk, *wrk2, *wrka, *work_area;
+	double sum, sum1, sum2, kk, mult;
+	int i, j, cc, bpp, gc, tmask;
 
 	work_area = ALIGNTO(workarea, double);
+	tmask = new_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] ? CMASK_RGBA : CMASK_NONE;
 
 	/* For each destination line */
 	tmpy = vfilter;
 	for (i = 0; i < nh; i++, tmpy++)
 	{
+		/* Process regular channels */
 		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
 			if (!new_img[cc]) continue;
-			/* If RGBA, wait for alpha */
-			if ((cc == CHN_IMAGE) && new_img[CHN_ALPHA] &&
-				!channel_dis[CHN_ALPHA]) continue;
+			/* Do RGBA separately */
+			if (tmask & CMASK_FOR(cc)) continue;
 			bpp = cc == CHN_IMAGE ? 3 : 1;
-			tmp = tmpy;
+			gc = cc == CHN_IMAGE ? gcor : FALSE;
 			memset(work_area, 0, ow * bpp * sizeof(double));
 			src = old_img[cc];
 			/* Build one vertically-scaled row */
-			for (; tmp->idx >= 0; tmp++)
+			for (tmp = tmpy; tmp->idx >= 0; tmp++)
 			{
 				img = src + tmp->idx * ow * bpp;
 				wrk = work_area;
 				kk = tmp->k;
-				for (j = 0; j < ow * bpp; j++)
-					*wrk++ += *img++ * kk;
+				if (gc) /* Gamma-correct */
+				{
+					for (j = 0; j < ow * bpp; j++)
+						*wrk++ += gamma256[*img++] * kk;
+				}
+				else /* Leave as is */
+				{
+					for (j = 0; j < ow * bpp; j++)
+						*wrk++ += *img++ * kk;
+				}
 			}
 			/* Scale it horizontally */
 			img = new_img[cc] + i * nw * bpp;
-			sum[0] = sum[1] = sum[2] = 0.0;
+			sum = sum1 = sum2 = 0.0;
 			for (tmpx = hfilter; ; tmpx++)
 			{
 				if (tmpx->idx >= 0)
 				{
 					wrk = work_area + tmpx->idx * bpp;
 					kk = tmpx->k;
-					sum[0] += wrk[0] * kk;
+					sum += wrk[0] * kk;
 					if (bpp == 1) continue;
-					sum[1] += wrk[1] * kk;
-					sum[2] += wrk[2] * kk;
+					sum1 += wrk[1] * kk;
+					sum2 += wrk[2] * kk;
 					continue;
 				}
-				for (n = 0; n < bpp; n++)
+				if (gc) /* Reverse gamma correction */
 				{
-					j = (int)rint(sum[n]);
-					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					sum[n] = 0.0;
+					*img++ = sum < 0.0 ? 0 : sum > 1.0 ?
+						0xFF : UNGAMMA256(sum);
+					*img++ = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
+						0xFF : UNGAMMA256(sum1);
+					*img++ = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
+						0xFF : UNGAMMA256(sum2);
+					sum = sum1 = sum2 = 0.0;
+					if (tmpx->idx < -1) break;
+					continue;
 				}
+				if (bpp > 1)
+				{
+					j = (int)rint(sum1);
+					img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					j = (int)rint(sum2);
+					img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					sum1 = sum2 = 0.0;
+				}
+				j = (int)rint(sum);
+				img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+				sum = 0.0; img += bpp;
 				if (tmpx->idx < -1) break;
 			}
-			/* Process RGB after alpha... maybe */
-			if ((cc != CHN_ALPHA) || channel_dis[CHN_ALPHA])
-				continue;
-			for (j = 0; j < ow; j++)
-			{
-				/* Make zero alphas slightly non-zero */
-				if (work_area[j] < (1.0 / 65536.0))
-					work_area[j] = (1.0 / 65536.0);
-				/* Prepare inverse alphas */
-				work_area[j + ow] = 1.0 / work_area[j];
-			}
-			tmp = tmpy;
-			wrk = work_area + 2 * ow;
-			memset(wrk, 0, ow * 3 * sizeof(double));
-			/* Build one vertically-scaled row */
-			for (; tmp->idx >= 0; tmp++)
+		}
+		/* Process RGBA */
+		if (tmask != CMASK_NONE)
+		{
+			memset(work_area, 0, ow * 7 * sizeof(double));
+			/* Build one vertically-scaled row - with & w/o alpha */
+			for (tmp = tmpy; tmp->idx >= 0; tmp++)
 			{
 				img = old_img[CHN_IMAGE] + tmp->idx * ow * 3;
 				imga = old_img[CHN_ALPHA] + tmp->idx * ow;
-				wrk = work_area + 2 * ow;
-				for (j = 0; j < ow; j++)
+				wrk = work_area + ow;
+				wrk2 = work_area + 4 * ow;
+				if (gcor) /* Gamma-correct */
 				{
-					kk = tmp->k * (work_area[j] < 0.5 ?
-						work_area[j] : imga[j]);
-					*wrk++ += *img++ * kk;
-					*wrk++ += *img++ * kk;
-					*wrk++ += *img++ * kk;
+					for (j = 0; j < ow; j++)
+					{
+						kk = imga[j] * tmp->k;
+						work_area[j] += kk;
+						wrk[0] += gamma256[img[0]] * tmp->k;
+						wrk2[0] += gamma256[img[0]] * kk;
+						wrk[1] += gamma256[img[1]] * tmp->k;
+						wrk2[1] += gamma256[img[1]] * kk;
+						wrk[2] += gamma256[img[2]] * tmp->k;
+						wrk2[2] += gamma256[img[2]] * kk;
+						wrk += 3; wrk2 += 3; img += 3;
+					}
+				}
+				else /* Leave as is */
+				{
+					for (j = 0; j < ow; j++)
+					{
+						kk = imga[j] * tmp->k;
+						work_area[j] += kk;
+						wrk[0] += img[0] * tmp->k;
+						wrk2[0] += img[0] * kk;
+						wrk[1] += img[1] * tmp->k;
+						wrk2[1] += img[1] * kk;
+						wrk[2] += img[2] * tmp->k;
+						wrk2[2] += img[2] * kk;
+						wrk += 3; wrk2 += 3; img += 3;
+					}
 				}
 			}
 			/* Scale it horizontally */
 			img = new_img[CHN_IMAGE] + i * nw * 3;
 			imga = new_img[CHN_ALPHA] + i * nw;
-			wrk = work_area + 2 * ow;
-			alpha = *imga++;
-			sum[0] = sum[1] = sum[2] = sum[3] = 0.0;
-			for (tmpx = hfilter; ; tmpx++)
+			for (tmpp = tmpx = hfilter; tmpp->idx >= -1; tmpx = tmpp + 1)
 			{
-				if (tmpx->idx >= 0)
+				sum = 0.0;
+				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
+					sum += work_area[tmpp->idx] * tmpp->k;
+				j = (int)rint(sum);
+				*imga = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+				wrk = work_area + ow;
+				mult = 1.0;
+				if (*imga++)
 				{
-					wrka = wrk + tmpx->idx * 3;
-					kk = tmpx->k;
-					if (!alpha) kk *= work_area[ow + tmpx->idx];
-					sum[0] += kk * wrka[0];
-					sum[1] += kk * wrka[1];
-					sum[2] += kk * wrka[2];
-					sum[3] += kk * work_area[tmpx->idx];
+					wrk = work_area + 4 * ow;
+					mult /= sum;
 				}
-				else
+				sum = sum1 = sum2 = 0.0;
+				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
 				{
-					kk = 1.0 / sum[3];
-					sum[0] *= kk;
-					sum[1] *= kk;
-					sum[2] *= kk;
-					for (n = 0; n < 3; n++)
-					{
-						j = (int)rint(sum[n]);
-						*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					}
-					if (tmpx->idx < -1) break;
-					alpha = *imga++;
-					sum[0] = sum[1] = sum[2] = sum[3] = 0.0;
+					wrka = wrk + tmpp->idx * 3;
+					kk = tmpp->k;
+					sum += wrka[0] * kk;
+					sum1 += wrka[1] * kk;
+					sum2 += wrka[2] * kk;
+				}
+				sum *= mult; sum1 *= mult; sum2 *= mult;
+				if (gcor) /* Reverse gamma correction */
+				{
+					*img++ = sum < 0.0 ? 0 : sum > 1.0 ?
+						0xFF : UNGAMMA256(sum);
+					*img++ = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
+						0xFF : UNGAMMA256(sum1);
+					*img++ = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
+						0xFF : UNGAMMA256(sum2);
+				}
+				else /* Simply round to nearest */
+				{
+					j = (int)rint(sum);
+					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					j = (int)rint(sum1);
+					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					j = (int)rint(sum2);
+					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
 				}
 			}
 		}
@@ -3561,7 +3605,7 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 	clear_scale();
 }
 
-int mem_image_scale( int nw, int nh, int type )				// Scale image
+int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
 {
 	chanlist old_img;
 	char *src, *dest;
@@ -3584,7 +3628,7 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 
 	progress_init(_("Scaling Image"),0);
 	if (type && (mem_img_bpp == 3))
-		do_scale(old_img, mem_img, ow, oh, nw, nh);
+		do_scale(old_img, mem_img, ow, oh, nw, nh, gcor);
 	else
 	{
 		for (j = 0; j < nh; j++)
@@ -4520,7 +4564,7 @@ blurr:
 /* Most-used variables are local to inner blocks to shorten their live ranges -
  * otherwise stupid compilers might allocate them to memory */
 static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
-	unsigned char *mask, int channel)
+	unsigned char *mask, int channel, int gcor)
 {
 	int i, wid, mh2, bpp;
 	double sum, sum1, sum2, *temp, *gaussY;
@@ -4539,9 +4583,19 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 			int j, k;
 
 			src0 = chan + i * wid;
-			for (j = 0; j < wid; j++)
+			if (gcor) /* Gamma-correct RGB values */
 			{
-				temp[j] = src0[j] * gaussY[0];
+				for (j = 0; j < wid; j++)
+				{
+					temp[j] = gamma256[src0[j]] * gaussY[0];
+				}
+			}
+			else /* Leave RGB values as they were */
+			{
+				for (j = 0; j < wid; j++)
+				{
+					temp[j] = src0[j] * gaussY[0];
+				}
 			}
 			for (j = 1; j < lenY; j++)
 			{
@@ -4551,9 +4605,20 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 				k = abs(i - j) % mh2;
 				if (k >= mem_height) k = mh2 - k;
 				src1 = chan + k * wid;
-				for (k = 0; k < wid; k++)
+				if (gcor) /* Gamma-correct */
 				{
-					temp[k] += (src0[k] + src1[k]) * gaussY[j];
+					for (k = 0; k < wid; k++)
+					{
+						temp[k] += (gamma256[src0[k]] +
+							gamma256[src1[k]]) * gaussY[j];
+					}
+				}
+				else /* Leave alone */
+				{
+					for (k = 0; k < wid; k++)
+					{
+						temp[k] += (src0[k] + src1[k]) * gaussY[j];
+					}
 				}
 			}
 		}
@@ -4561,7 +4626,7 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
 		{
-			int j, jj, k, x1, x2;
+			int j, jj, k, k1, k2, x1, x2;
 
 			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
 			{
@@ -4577,18 +4642,27 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gaussX[k];
 					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gaussX[k];
 				}
-				k = rint(sum);
+				if (gcor) /* Reverse gamma correction */
+				{
+					k = UNGAMMA256(sum);
+					k1 = UNGAMMA256(sum1);
+					k2 = UNGAMMA256(sum2);
+				}
+				else /* Simply round to nearest */
+				{
+					k = rint(sum);
+					k1 = rint(sum1);
+					k2 = rint(sum2);
+				}
 				k = k * 255 + (dest[j] - k) * mask[jj];
 				dest[j] = (k + (k >> 8) + 1) >> 8;
-				k = rint(sum1);
-				k = k * 255 + (dest[j + 1] - k) * mask[jj];
-				dest[j + 1] = (k + (k >> 8) + 1) >> 8;
-				k = rint(sum2);
-				k = k * 255 + (dest[j + 2] - k) * mask[jj];
-				dest[j + 2] = (k + (k >> 8) + 1) >> 8;
+				k1 = k1 * 255 + (dest[j + 1] - k1) * mask[jj];
+				dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
+				k2 = k2 * 255 + (dest[j + 2] - k2) * mask[jj];
+				dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
 			}
 		}
-		else /* Run 1-bpp horizontal filter */
+		else /* Run 1-bpp horizontal filter - no gamma here */
 		{
 			int j, k;
 
@@ -4614,60 +4688,72 @@ static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
 /* While slower, and rather complex and memory hungry, this is the only way
  * to do *PRECISE* RGBA-coupled Gaussian blur */
 static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
-	unsigned char *mask, unsigned short **abuf)
+	unsigned char *mask, unsigned char **buf, int gcor)
 {
-	int i, j, k, mh2, slide;
+	int i, j, k, mh2, len, slide;
 	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussY;
 	unsigned char *src0, *src1, *chan, *dest;
 	unsigned char *alf0, *alf1, *alpha, *dsta;
-	unsigned short *tmp0, *tmp1;
+	unsigned char *tm0, *tm1;
+	double *td0, *td1;
+	unsigned short *ts0, *ts1;
 
 	chan = mem_undo_previous(CHN_IMAGE);
 	alpha = mem_undo_previous(CHN_ALPHA);
 	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
 
 	/* Set up the premultiplied row buffer */
-	tmp0 = (void *)(abuf + (mem_height + 2 * lenY - 2));
+	tm0 = (void *)(buf + (mem_height + 2 * lenY - 2));
+	if (gcor) tm0 = ALIGNTO(tm0, double);
+	len = mem_width * 3 * (gcor ? sizeof(double) : sizeof(short));
 	slide = mem_height >= 2 * lenY;
+
 	if (slide) /* Buffer slides over image */
 	{
 		j = 2 * lenY - 1;
 		for (i = 0; i < mem_height + j - 1; i++)
 		{
-			abuf[i] = tmp0 + (i % j) * mem_width * 3;
+			buf[i] = tm0 + (i % j) * len;
 		}
-		abuf += lenY - 1;
-		for (i = -lenY + 1; i < lenY - 1; i++)
-		{
-			j = abs(i) % mh2;
-			if (j >= mem_height) j = mh2 - j;
-			src0 = chan + j * mem_width * 3;
-			alf0 = alpha + j * mem_width;
-			tmp1 = abuf[i];
-			for (j = 0; j < mem_width; j++)
-			{
-				tmp1[0] = src0[0] * alf0[j];
-				tmp1[1] = src0[1] * alf0[j];
-				tmp1[2] = src0[2] * alf0[j];
-				tmp1 += 3; src0 += 3;
-			}
-		}
+		buf += lenY - 1;
+		k = mem_width * lenY;
 	}
 	else /* Image fits into buffer */
 	{
-		abuf += lenY - 1;
-		for (i = -lenY + 1; i < mem_height + lenY; i++)
+		buf += lenY - 1;
+		for (i = -lenY + 1; i < mem_height + lenY - 1; i++)
 		{
 			j = abs(i) % mh2;
 			if (j >= mem_height) j = mh2 - j;
-			abuf[i] = tmp0 + j * mem_width * 3;
+			buf[i] = tm0 + j * len;
 		}
 		k = mem_width * mem_height;
+	}
+	if (gcor) /* Gamma correct */
+	{
+		td0 = (void *)buf[0];
 		for (i = j = 0; i < k; i++ , j += 3)
 		{
-			tmp0[j] = chan[j] * alpha[i];
-			tmp0[j + 1] = chan[j + 1] * alpha[i];
-			tmp0[j + 2] = chan[j + 2] * alpha[i];
+			td0[j] = gamma256[chan[j]] * alpha[i];
+			td0[j + 1] = gamma256[chan[j + 1]] * alpha[i];
+			td0[j + 2] = gamma256[chan[j + 2]] * alpha[i];
+		}
+	}
+	else /* Use as is */
+	{
+		ts0 = (void *)buf[0];
+		for (i = j = 0; i < k; i++ , j += 3)
+		{
+			ts0[j] = chan[j] * alpha[i];
+			ts0[j + 1] = chan[j + 1] * alpha[i];
+			ts0[j + 2] = chan[j + 2] * alpha[i];
+		}
+	}
+	if (slide) /* Mirror image rows */
+	{
+		for (i = 1; i < lenY - 1; i++)
+		{
+			memcpy(buf[-i], buf[i], len);
 		}
 	}
 
@@ -4684,15 +4770,28 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 			int j, k;
 
 			k = i + lenY - 1;
-			tmp0 = abuf[k];
 			if ((k %= mh2) >= mem_height) k = mh2 - k;
 			alf0 = alpha + k * mem_width;
 			src0 = chan + k * mem_width * 3;
-			for (j = k = 0; j < mem_width; j++ , k += 3)
+			if (gcor) /* Gamma correct */
 			{
-				tmp0[k] = src0[k] * alf0[j];
-				tmp0[k + 1] = src0[k + 1] * alf0[j];
-				tmp0[k + 2] = src0[k + 2] * alf0[j];
+				td0 = (void *)buf[k];
+				for (j = k = 0; j < mem_width; j++ , k += 3)
+				{
+					td0[k] = gamma256[src0[k]] * alf0[j];
+					td0[k + 1] = gamma256[src0[k + 1]] * alf0[j];
+					td0[k + 2] = gamma256[src0[k + 2]] * alf0[j];
+				}
+			}
+			else /* Use as is */
+			{
+				ts0 = (void *)buf[k];
+				for (j = k = 0; j < mem_width; j++ , k += 3)
+				{
+					ts0[k] = src0[k] * alf0[j];
+					ts0[k + 1] = src0[k + 1] * alf0[j];
+					ts0[k + 2] = src0[k + 2] * alf0[j];
+				}
 			}
 		}
 		/* Apply vertical filter */
@@ -4701,38 +4800,75 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 
 			alf0 = alpha + i * mem_width;
 			src0 = chan + i * mem_width * 3;
-			tmp0 = abuf[i];
-			for (j = jj = 0; j < mem_width; j++ , jj += 3)
+			if (gcor) /* Gamma correct */
 			{
-				atmp[j] = alf0[j] * gaussY[0];
-				temp[jj] = src0[jj] * gaussY[0];
-				temp[jj + 1] = src0[jj + 1] * gaussY[0];
-				temp[jj + 2] = src0[jj + 2] * gaussY[0];
-				tmpa[jj] = tmp0[jj] * gaussY[0];
-				tmpa[jj + 1] = tmp0[jj + 1] * gaussY[0];
-				tmpa[jj + 2] = tmp0[jj + 2] * gaussY[0];
+				td0 = (void *)buf[i];
+				for (j = jj = 0; j < mem_width; j++ , jj += 3)
+				{
+					atmp[j] = alf0[j] * gaussY[0];
+					temp[jj] = gamma256[src0[jj]] * gaussY[0];
+					temp[jj + 1] = gamma256[src0[jj + 1]] * gaussY[0];
+					temp[jj + 2] = gamma256[src0[jj + 2]] * gaussY[0];
+					tmpa[jj] = td0[jj] * gaussY[0];
+					tmpa[jj + 1] = td0[jj + 1] * gaussY[0];
+					tmpa[jj + 2] = td0[jj + 2] * gaussY[0];
+				}
+			}
+			else /* Use as is */
+			{
+				ts0 = (void *)buf[i];
+				for (j = jj = 0; j < mem_width; j++ , jj += 3)
+				{
+					atmp[j] = alf0[j] * gaussY[0];
+					temp[jj] = src0[jj] * gaussY[0];
+					temp[jj + 1] = src0[jj + 1] * gaussY[0];
+					temp[jj + 2] = src0[jj + 2] * gaussY[0];
+					tmpa[jj] = ts0[jj] * gaussY[0];
+					tmpa[jj + 1] = ts0[jj + 1] * gaussY[0];
+					tmpa[jj + 2] = ts0[jj + 2] * gaussY[0];
+				}
 			}
 			for (j = 1; j < lenY; j++)
 			{
-				tmp0 = abuf[i + j];
+				tm0 = buf[i + j];
 				k = (i + j) % mh2;
 				if (k >= mem_height) k = mh2 - k;
 				alf0 = alpha + k * mem_width;
 				src0 = chan + k * mem_width * 3;
-				tmp1 = abuf[i - j];
+				tm1 = buf[i - j];
 				k = abs(i - j) % mh2;
 				if (k >= mem_height) k = mh2 - k;
 				alf1 = alpha + k * mem_width;
 				src1 = chan + k * mem_width * 3;
-				for (k = kk = 0; k < mem_width; k++ , kk += 3)
+				if (gcor) /* Gamma correct */
 				{
-					atmp[k] += (alf0[k] + alf1[k]) * gaussY[j];
-					temp[kk] += (src0[kk] + src1[kk]) * gaussY[j];
-					temp[kk + 1] += (src0[kk + 1] + src1[kk + 1]) * gaussY[j];
-					temp[kk + 2] += (src0[kk + 2] + src1[kk + 2]) * gaussY[j];
-					tmpa[kk] += (tmp0[kk] + tmp1[kk]) * gaussY[j];
-					tmpa[kk + 1] += (tmp0[kk + 1] + tmp1[kk + 1]) * gaussY[j];
-					tmpa[kk + 2] += (tmp0[kk + 2] + tmp1[kk + 2]) * gaussY[j];
+					td0 = (void *)tm0;
+					td1 = (void *)tm1;
+					for (k = kk = 0; k < mem_width; k++ , kk += 3)
+					{
+						atmp[k] += (alf0[k] + alf1[k]) * gaussY[j];
+						temp[kk] += (gamma256[src0[kk]] + gamma256[src1[kk]]) * gaussY[j];
+						temp[kk + 1] += (gamma256[src0[kk + 1]] + gamma256[src1[kk + 1]]) * gaussY[j];
+						temp[kk + 2] += (gamma256[src0[kk + 2]] + gamma256[src1[kk + 2]]) * gaussY[j];
+						tmpa[kk] += (td0[kk] + td1[kk]) * gaussY[j];
+						tmpa[kk + 1] += (td0[kk + 1] + td1[kk + 1]) * gaussY[j];
+						tmpa[kk + 2] += (td0[kk + 2] + td1[kk + 2]) * gaussY[j];
+					}
+				}
+				else /* Use as is */
+				{
+					ts0 = (void *)tm0;
+					ts1 = (void *)tm1;
+					for (k = kk = 0; k < mem_width; k++ , kk += 3)
+					{
+						atmp[k] += (alf0[k] + alf1[k]) * gaussY[j];
+						temp[kk] += (src0[kk] + src1[kk]) * gaussY[j];
+						temp[kk + 1] += (src0[kk + 1] + src1[kk + 1]) * gaussY[j];
+						temp[kk + 2] += (src0[kk + 2] + src1[kk + 2]) * gaussY[j];
+						tmpa[kk] += (ts0[kk] + ts1[kk]) * gaussY[j];
+						tmpa[kk + 1] += (ts0[kk + 1] + ts1[kk + 1]) * gaussY[j];
+						tmpa[kk + 2] += (ts0[kk + 2] + ts1[kk + 2]) * gaussY[j];
+					}
 				}
 			}
 		}
@@ -4741,7 +4877,7 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 		dsta = mem_img[CHN_ALPHA] + i * mem_width;
 		/* Horizontal RGBA filter */
 		{
-			int j, jj, k, kk, x1, x2;
+			int j, jj, k, k1, k2, kk, x1, x2;
 
 			for (j = jj = 0; j < mem_width; j++ , jj += 3)
 			{
@@ -4774,15 +4910,24 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 					sum1 += (src[x1 + 1] + src[x2 + 1]) * gaussX[k];
 					sum2 += (src[x1 + 2] + src[x2 + 2]) * gaussX[k];
 				}
-				k = rint(sum * mult);
+				if (gcor) /* Reverse gamma correction */
+				{
+					k = UNGAMMA256(sum * mult);
+					k1 = UNGAMMA256(sum1 * mult);
+					k2 = UNGAMMA256(sum2 * mult);
+				}
+				else /* Simply round to nearest */
+				{
+					k = rint(sum * mult);
+					k1 = rint(sum1 * mult);
+					k2 = rint(sum2 * mult);
+				}
 				k = k * 255 + (dest[jj] - k) * kk;
 				dest[jj] = (k + (k >> 8) + 1) >> 8;
-				k = rint(sum1 * mult);
-				k = k * 255 + (dest[jj + 1] - k) * kk;
-				dest[jj + 1] = (k + (k >> 8) + 1) >> 8;
-				k = rint(sum2 * mult);
-				k = k * 255 + (dest[jj + 2] - k) * kk;
-				dest[jj + 2] = (k + (k >> 8) + 1) >> 8;
+				k1 = k1 * 255 + (dest[jj + 1] - k1) * kk;
+				dest[jj + 1] = (k1 + (k1 >> 8) + 1) >> 8;
+				k2 = k2 * 255 + (dest[jj + 2] - k2) * kk;
+				dest[jj + 2] = (k2 + (k2 >> 8) + 1) >> 8;
 			}
 		}
 		if ((i * 10) % mem_height >= mem_height - 10)
@@ -4791,12 +4936,11 @@ static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
 }
 
 /* Gaussian blur */
-void mem_gauss(double radiusX, double radiusY)
+void mem_gauss(double radiusX, double radiusY, int gcor)
 {
 	int i, j, k, l, lenX, lenY, rgba, rgbb, *idxx, *idx;
 	double exkX, exkY, sum, *tmp, *gaussX, *gaussY;
-	unsigned char *mask;
-	unsigned short **abuf = NULL;
+	unsigned char *mask, **abuf = NULL;
 
 	/* Cutoff point is where gaussian becomes < 1/255 */
 	lenX = ceil(radiusX) + 2;
@@ -4813,7 +4957,11 @@ void mem_gauss(double radiusX, double radiusY)
 	{
 		i = mem_height + 2 * (lenY - 1); // row pointers
 		j = (mem_height < i ? mem_height : i) * mem_width * 3; // data
-		abuf = malloc(i * sizeof(short *) + j * sizeof(short));
+		/* Gamma corrected - allocate doubles for buffer */
+		if (gcor) k = i * sizeof(double *) + (j + 1) * sizeof(double);
+		/* No gamma - shorts are enough */
+		else k = i * sizeof(short *) + j * sizeof(short);
+		abuf = malloc(k);
 		if (!abuf) return;
 		i = mem_width * 7 + lenX + lenY + 1;
 	}
@@ -4867,13 +5015,13 @@ void mem_gauss(double radiusX, double radiusY)
 	progress_init(_("Gaussian Blur"), 1);
 	progress_update(0.0);
 	if (!rgba) /* One channel */
-		gauss_filter(gaussX, lenX, lenY, idx, mask, mem_channel);
+		gauss_filter(gaussX, lenX, lenY, idx, mask, mem_channel, gcor);
 	else if (rgbb) /* Coupled RGBA */
-		gauss_filter_rgba(gaussX, lenX, lenY, idx, mask, abuf);
+		gauss_filter_rgba(gaussX, lenX, lenY, idx, mask, abuf, gcor);
 	else /* RGB and alpha */
 	{
-		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_IMAGE);
-		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_ALPHA);
+		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_IMAGE, gcor);
+		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_ALPHA, FALSE);
 	}
 	progress_end();
 	free(abuf);
@@ -5016,7 +5164,7 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	return 0;
 }
 
-void do_clone(int ox, int oy, int nx, int ny, int opacity)
+void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 {
 	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
 	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
@@ -5042,12 +5190,12 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity)
 	if ((w < 1) || (h < 1)) return;
 
 /* !!! I modified this tool action somewhat - White Jaguar */
-	if (mem_undo_opacity) src = mem_undo_previous(mem_channel);
+	if (mode) src = mem_undo_previous(mem_channel);
 	else src = mem_img[mem_channel];
 	dest = mem_img[mem_channel];
 	if ((mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA])
 	{
-		if (mem_undo_opacity) srca = mem_undo_previous(CHN_ALPHA);
+		if (mode) srca = mem_undo_previous(CHN_ALPHA);
 		else srca = mem_img[CHN_ALPHA];
 		dsta = mem_img[CHN_ALPHA];
 	}

@@ -2441,28 +2441,46 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 
 void toolbar_icon_event (GtkWidget *widget, gpointer data)
 {
-	gint i = tool_type, j = (gint) data;
+	gint i = tool_type;
 
-	switch (j)
+	switch ((gint)data)
 	{
-		case 0:  tool_type = brush_tool_type; break;
-		case 1:  tool_type = TOOL_SHUFFLE; break;
-		case 2:  tool_type = TOOL_FLOOD; break;
-		case 3:  tool_type = TOOL_LINE; break;
-		case 4:  tool_type = TOOL_SMUDGE; break;
-		case 5:  tool_type = TOOL_CLONE; break;
-		case 6:  tool_type = TOOL_SELECT; break;
-		case 7:  tool_type = TOOL_POLYGON; break;
-		case 8:  pressed_lasso( NULL, NULL ); break;
-		case 9:  pressed_text( NULL, NULL ); break;
-		case 10: pressed_outline_ellipse( NULL, NULL ); break;
-		case 11: pressed_fill_ellipse( NULL, NULL ); break;
-		case 12: pressed_outline_rectangle( NULL, NULL ); break;
-		case 13: pressed_fill_rectangle( NULL, NULL ); break;
-		case 14: pressed_flip_sel_v( NULL, NULL ); break;
-		case 15: pressed_flip_sel_h( NULL, NULL ); break;
-		case 16: pressed_rotate_sel_clock( NULL, NULL ); break;
-		case 17: pressed_rotate_sel_anti( NULL, NULL ); break;
+	case TTB_PAINT:
+		tool_type = brush_tool_type; break;
+	case TTB_SHUFFLE:
+		tool_type = TOOL_SHUFFLE; break;
+	case TTB_FLOOD:
+		tool_type = TOOL_FLOOD; break;
+	case TTB_LINE:
+		tool_type = TOOL_LINE; break;
+	case TTB_SMUDGE:
+		tool_type = TOOL_SMUDGE; break;
+	case TTB_CLONE:
+		tool_type = TOOL_CLONE; break;
+	case TTB_SELECT:
+		tool_type = TOOL_SELECT; break;
+	case TTB_POLY:
+		tool_type = TOOL_POLYGON; break;
+	case TTB_LASSO:
+		pressed_lasso( NULL, NULL ); break;
+	case TTB_TEXT:
+		pressed_text( NULL, NULL ); break;
+	case TTB_ELLIPSE:
+		pressed_outline_ellipse( NULL, NULL ); break;
+	case TTB_FELLIPSE:
+		pressed_fill_ellipse( NULL, NULL ); break;
+	case TTB_OUTLINE:
+		pressed_outline_rectangle( NULL, NULL ); break;
+	case TTB_FILL:
+		pressed_fill_rectangle( NULL, NULL ); break;
+	case TTB_SELFV:
+		pressed_flip_sel_v( NULL, NULL ); break;
+	case TTB_SELFH:
+		pressed_flip_sel_h( NULL, NULL ); break;
+	case TTB_SELRCW:
+		pressed_rotate_sel_clock( NULL, NULL ); break;
+	case TTB_SELRCCW:
+		pressed_rotate_sel_anti( NULL, NULL ); break;
 	}
 
 	if ( tool_type != i )		// User has changed tool
@@ -2947,6 +2965,7 @@ void main_init()
 
 	mem_continuous = inifile_get_gboolean( "continuousPainting", TRUE );
 	mem_undo_opacity = inifile_get_gboolean( "opacityToggle", TRUE );
+	smudge_mode = inifile_get_gboolean("smudgeOpacity", FALSE);
 	mem_show_grid = inifile_get_gboolean( "gridToggle", TRUE );
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(

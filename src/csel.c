@@ -38,6 +38,8 @@ csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
 double gamma256[256], gamma64[64];
+double midgamma256[256], midgamma64[64];
+
 static float CIE[CIENUM + 2];
 
 /* This nightmarish code does conversion from CIE XYZ into my own perceptually
@@ -154,6 +156,7 @@ static void make_rgb_xyz(void)
 #define GAMMA_SPLIT 0.03928
 #define GAMMA_DIV 12.92321
 #endif
+#define KGAMMA 800
 
 #else /* ITU-R 709 */
 
@@ -161,6 +164,7 @@ static void make_rgb_xyz(void)
 #define GAMMA_OFS 0.099
 #define GAMMA_SPLIT 0.081
 #define GAMMA_DIV 4.5
+#define KGAMMA 300
 
 #endif
 
@@ -183,6 +187,24 @@ static void make_gamma(double *Gamma, int cnt)
 	}
 }
 
+double kgamma256 = KGAMMA * 4, kgamma64 = KGAMMA;
+unsigned char ungamma256[KGAMMA * 4 + 1], ungamma64[KGAMMA + 1];
+
+static void make_ungamma(double *Gamma, double *Midgamma,
+	unsigned char *Ungamma,	int kgamma, int cnt)
+{
+	int i, j, k = 0;
+
+	Midgamma[0] = 0.0;
+	for (i = 1; i < cnt; i++)
+	{
+		Midgamma[i] = (Gamma[i - 1] + Gamma[i]) / 2.0;
+		j = Midgamma[i] * kgamma;
+		for (; k < j; k++) Ungamma[k] = i - 1;
+	}
+	for (; k <= kgamma; k++) Ungamma[k] = cnt - 1;
+}
+
 static void make_CIE(void)
 {
 	int i;
@@ -198,6 +220,8 @@ void init_cols(void)
 {
 	make_gamma(gamma256, 256);
 	make_gamma(gamma64, 64);
+	make_ungamma(gamma256, midgamma256, ungamma256, kgamma256, 256);
+	make_ungamma(gamma64, midgamma64, ungamma64, kgamma64, 64);
 	make_CIE();
 	make_rgb_xyz();
 }

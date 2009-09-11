@@ -41,11 +41,33 @@
 #define TOTAL_CURSORS 14
 
 #define TOTAL_ICONS_MAIN 10
-#define TOTAL_ICONS_TOOLS 18
-#define TOTAL_ICONS_SETTINGS 6
 
-#define DEFAULT_TOOL_ICON 6
-#define PAINT_TOOL_ICON 0
+
+//	Tools toolbar buttons
+#define TTB_PAINT    0
+#define TTB_SHUFFLE  1
+#define TTB_FLOOD    2
+#define TTB_LINE     3
+#define TTB_SMUDGE   4
+#define TTB_CLONE    5
+#define TTB_SELECT   6
+#define TTB_POLY     7
+#define TTB_LASSO    8
+#define TTB_TEXT     9
+#define TTB_ELLIPSE  10
+#define TTB_FELLIPSE 11
+#define TTB_OUTLINE  12
+#define TTB_FILL     13
+#define TTB_SELFV    14
+#define TTB_SELFH    15
+#define TTB_SELRCW   16
+#define TTB_SELRCCW  17
+
+#define DEFAULT_TOOL_ICON TTB_SELECT
+#define PAINT_TOOL_ICON TTB_PAINT
+
+#define TTB_0 TOTAL_ICONS_SETTINGS
+#define TOTAL_ICONS_TOOLS 18
 
 //	Settings toolbar buttons
 #define SETB_CONT 0
@@ -55,6 +77,7 @@
 #define SETB_CSEL 4
 #define SETB_MASK 5
 
+#define TOTAL_ICONS_SETTINGS 6
 
 //	GLOBAL VARIABLES
 

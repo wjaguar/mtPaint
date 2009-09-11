@@ -1112,7 +1112,7 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 ///	RESIZE/RESCALE WINDOWS
 
 GtkWidget *sisca_window, *sisca_table;
-GtkWidget *sisca_spins[6], *sisca_toggles[2];
+GtkWidget *sisca_spins[6], *sisca_toggles[2], *sisca_gc;
 gboolean sisca_scale;
 
 
@@ -1223,7 +1223,7 @@ gint click_sisca_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int nw, nh, ox, oy, res = 1, scale_type = 0;
+	int nw, nh, ox, oy, res = 1, scale_type = 0, gcor = FALSE;
 
 	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[0]) );
 	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[1]) );
@@ -1237,8 +1237,13 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 		if ( sisca_scale )
 		{
-			if (mem_img_bpp == 3) scale_type = scale_mode;
-			res = mem_image_scale( nw, nh, scale_type );
+			if (mem_img_bpp == 3)
+			{
+				scale_type = scale_mode;
+				gcor = gtk_toggle_button_get_active(
+					GTK_TOGGLE_BUTTON(sisca_gc));
+			}
+			res = mem_image_scale(nw, nh, scale_type, gcor);
 		}
 		else 
 		{
@@ -1363,7 +1368,7 @@ void sisca_init( char *title )
 	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
 		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
 
-	sisca_hbox = NULL;
+	sisca_hbox = sisca_gc = NULL;
 
 	/* Resize */
 	if (!sisca_scale)
@@ -1371,7 +1376,10 @@ void sisca_init( char *title )
 
 	/* RGB rescale */
 	else if (mem_img_bpp == 3)
+	{
+		sisca_gc = add_a_toggle(_("Gamma corrected"), sisca_vbox, FALSE);
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
+	}
 
 	if (sisca_hbox)
 	{
@@ -2176,14 +2184,12 @@ void choose_colours()
 
 #define DITH_NONE	0
 #define DITH_FS		1
-#define DITH_JARVIS	2
-#define DITH_STUCKI	3
-#define DITH_ATKINSON	4
-#define DITH_ORDERED	5
-#define DITH_OLDFS	6
-#define DITH_OLDDITHER	7
-#define DITH_OLDSCATTER	8
-#define DITH_MAX	9
+#define DITH_STUCKI	2
+#define DITH_ORDERED	3
+#define DITH_OLDFS	4
+#define DITH_OLDDITHER	5
+#define DITH_OLDSCATTER	6
+#define DITH_MAX	7
 
 GtkWidget *quantize_window, *quantize_spin, *quantize_dither;
 GtkWidget *dither_serpent, *dither_spin;
@@ -2210,20 +2216,12 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	double efrac;
 
 	/* Dithering filters */
-	static short dithers[4][16] = {
-		/* Floyd-Steinberg */
-		{ 16,  0, 0, 0, 7, 0,  0, 3, 5, 1, 0,  0, 0, 0, 0, 0 },
-		/* Jarvis */
-		{ 48,  0, 0, 0, 7, 5,  3, 5, 7, 5, 3,  1, 3, 5, 3, 1 },
-		/* Stucki */
-		{ 42,  0, 0, 0, 8, 4,  2, 4, 8, 4, 2,  1, 2, 4, 2, 1 },
-		/* Atkinson */
-		{  8,  0, 0, 0, 1, 1,  0, 1, 1, 1, 0,  0, 0, 1, 0, 0 }};
-
-/* Jarvis dither looks consistently worse than Stucki; candidate for deletion.
- * Atkinson is rather good in RGB space, but damped-to-0.75 Stucki does even
- * better, and in other colour spaces Atkinson dither is no good at all; seems
- * deletable too. */
+	/* Floyd-Steinberg dither */
+	static short fs_dither[16] =
+		{ 16,  0, 0, 0, 7, 0,  0, 3, 5, 1, 0,  0, 0, 0, 0, 0 };
+	/* Stucki dither */
+	static short s_dither[16] =
+		{ 42,  0, 0, 0, 8, 4,  2, 4, 8, 4, 2,  1, 2, 4, 2, 1 };
 
 	dither = quantize_mode ? dither_mode : DITH_NONE;
 	gtk_spin_button_update(GTK_SPIN_BUTTON(quantize_spin));
@@ -2288,12 +2286,11 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	{
 	case DITH_NONE:
 	case DITH_FS:
-	case DITH_JARVIS:
 	case DITH_STUCKI:
-	case DITH_ATKINSON:
 		mem_dither(old_image, new_cols, dither == DITH_NONE ? NULL :
-			dithers[dither - DITH_FS], dither_cspace, dither_dist,
-			dither_limit, dither_sel, dither_scan, efrac);
+			dither == DITH_FS ? fs_dither : s_dither,
+			dither_cspace, dither_dist, dither_limit, dither_sel,
+			dither_scan, efrac);
 		break;
 
 // !!! No code yet - temporarily disabled !!!
@@ -2363,9 +2360,9 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 		_("Wu Quantize (best method for small palettes)"), NULL
 		};
 
-	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Jarvis"),
+	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Stucki"),
 // !!! "Ordered" not done yet !!!
-		_("Stucki"), _("Atkinson"), /* _("Ordered") */ "",
+		/* _("Ordered") */ "",
 		_("Floyd-Steinberg (quick)"), _("Dithered (effect)"),
 		_("Scattered (effect)"), NULL
 		};

@@ -360,7 +360,7 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 	}
 }
 
-int set_flood(GtkWidget *box, gpointer fdata)
+static int set_flood(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *spin, *toggle;
 	GList *chain = GTK_BOX(box)->children;
@@ -381,6 +381,16 @@ int set_flood(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
+static int set_smudge(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *toggle;
+
+	toggle = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
+	smudge_mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
+
+	return TRUE;
+}
+
 static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -395,7 +405,7 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	case SETB_CSEL:
 		colour_selector(COLSEL_EDIT_CSEL);
 		break;
-	case (-2): /* Flood fill step */
+	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
 		spin = add_a_spin(0, 0, 200);
 		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), flood_step);
@@ -406,6 +416,12 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		add_a_toggle(_("By image channel"), box, flood_img);
 		add_a_toggle(_("Gradient-driven"), box, flood_slide);
 		filter_window(_("Fill settings"), box, set_flood, NULL);
+		break;
+	case (TTB_0 + TTB_SMUDGE): /* Smudge opacity mode */
+		box = gtk_vbox_new(FALSE, 5);
+		gtk_widget_show(box);
+		add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
+		filter_window(_("Smudge settings"), box, set_smudge, NULL);
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
@@ -679,7 +695,7 @@ void toolbar_init(GtkWidget *vbox_main)
 		gdk_pixmap_unref( icon );
 		gdk_pixmap_unref( mask );
 
-		if ( i>7 )
+		if (i > TTB_POLY)
 		{
 			child_type = GTK_TOOLBAR_CHILD_BUTTON;
 			previous = NULL;
@@ -687,36 +703,39 @@ void toolbar_init(GtkWidget *vbox_main)
 		else
 		{
 			child_type = GTK_TOOLBAR_CHILD_RADIOBUTTON;
-			if ( i == 0 ) previous = NULL; else previous = icon_buttons[i-1];
+			previous = i ? icon_buttons[i - 1] : NULL;
 		}
 
 		icon_buttons[i] = gtk_toolbar_append_element( GTK_TOOLBAR(toolbar_tools),
 			child_type, previous, "None", hint_text_tools[i],
 			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event), (gpointer) i);
+		if ((i == TTB_FLOOD) || (i == TTB_SMUDGE))
+			gtk_signal_connect(GTK_OBJECT(icon_buttons[i]),
+				"button_press_event", GTK_SIGNAL_FUNC(toolbar_rclick),
+				(gpointer)(i + TTB_0));
+
 	}
 
-	gtk_signal_connect(GTK_OBJECT(icon_buttons[2]), "button_press_event",
-				GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)(-2));
 
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 14 );
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 10 );
-	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 8 );
+	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_SELFV);
+	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_ELLIPSE);
+	gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar_tools), TTB_LASSO);
 
-	men_dis_add( icon_buttons[4], menu_only_24 );		// Smudge - Only RGB images
-	men_dis_add( icon_buttons[8], menu_lasso );		// Lasso
+	men_dis_add(icon_buttons[TTB_SMUDGE], menu_only_24);
+	men_dis_add(icon_buttons[TTB_LASSO], menu_lasso);
 
-	men_dis_add( icon_buttons[10], menu_need_selection );	// Ellipse outline
-	men_dis_add( icon_buttons[11], menu_need_selection );	// Ellipse
+	men_dis_add(icon_buttons[TTB_ELLIPSE], menu_need_selection);
+	men_dis_add(icon_buttons[TTB_FELLIPSE], menu_need_selection);
 
-	men_dis_add( icon_buttons[12], menu_need_selection );	// Outline
-	men_dis_add( icon_buttons[13], menu_need_selection );	// Fill
-	men_dis_add( icon_buttons[12], menu_lasso );		// Outline
-	men_dis_add( icon_buttons[13], menu_lasso );		// Fill
+	men_dis_add(icon_buttons[TTB_OUTLINE], menu_need_selection);
+	men_dis_add(icon_buttons[TTB_FILL], menu_need_selection);
+	men_dis_add(icon_buttons[TTB_OUTLINE], menu_lasso);
+	men_dis_add(icon_buttons[TTB_FILL], menu_lasso);
 
-	men_dis_add( icon_buttons[14], menu_need_clipboard );	// Flip sel V
-	men_dis_add( icon_buttons[15], menu_need_clipboard );	// Flip sel H
-	men_dis_add( icon_buttons[16], menu_need_clipboard );	// Rot sel clock
-	men_dis_add( icon_buttons[17], menu_need_clipboard );	// Rot sel anti
+	men_dis_add(icon_buttons[TTB_SELFV], menu_need_clipboard );	// Flip sel V
+	men_dis_add(icon_buttons[TTB_SELFH], menu_need_clipboard );	// Flip sel H
+	men_dis_add(icon_buttons[TTB_SELRCW], menu_need_clipboard );	// Rot sel clock
+	men_dis_add(icon_buttons[TTB_SELRCCW], menu_need_clipboard );	// Rot sel anti
 
 
 	for (i=0; i<TOTAL_ICONS_MAIN; i++)

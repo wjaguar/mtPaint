@@ -38,6 +38,14 @@ typedef struct
 csel_info *csel_data;
 int csel_preview, csel_preview_a, csel_overlay;
 double gamma256[256], gamma64[64];
+double midgamma256[256], midgamma64[64];
+double kgamma256, kgamma64;
+extern unsigned char ungamma256[], ungamma64[];
+
+#define UNGAMMA64(X) (ungamma64[(int)((X) * kgamma64)] - \
+	((X) < midgamma64[ungamma64[(int)((X) * kgamma64)]]))
+#define UNGAMMA256(X) (ungamma256[(int)((X) * kgamma256)] - \
+	((X) < midgamma256[ungamma256[(int)((X) * kgamma256)]]))
 
 void rgb2LXN(double *tmp, double r, double g, double b);
 void init_cols();
