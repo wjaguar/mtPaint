@@ -295,8 +295,6 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #endif
 
 
-#include <stdarg.h>
-
 /* This allocates several memory chunks in one block - making it one single
  * point of allocation failure, and needing just a single free() later on.
  * The "align" parameter forces all chunks to be aligned at double boundary.
@@ -1086,7 +1084,7 @@ static int mem_undo_space(size_t mem_req)
 	while (h > 0)
 	{
 		size_t mem_nx = h > 1 ? heap[2]->size : 0;
-		if ((h > 2) && (heap[3]->size > mem_r)) mem_r = heap[3]->size;
+		if ((h > 2) && (heap[3]->size > mem_nx)) mem_nx = heap[3]->size;
 		/* Drop frames */
 		wp = heap[1];
 		while (TRUE)
@@ -5149,7 +5147,8 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 	clear_scale(ctx);
 }
 
-static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo_img, int img_bpp, int type, int ow, int oh, int nw, int nh, int gcor, int progress)
+static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo_img,
+	int img_bpp, int type, int ow, int oh, int nw, int nh, int gcor, int progress)
 {
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp;
@@ -5191,7 +5190,8 @@ static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo
 }
 
 
-int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp, chanlist new_img, int nw, int nh, int type, int gcor, int sharp)
+int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp,
+	chanlist new_img, int nw, int nh, int type, int gcor, int sharp)
 {
 	scale_context ctx;
 
@@ -5199,7 +5199,8 @@ int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp, chanlist new
 	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp))
 		return 1;	// Not enough memory
 
-	do_scale_internal(&ctx, old_img, new_img, bpp, type, ow, oh, nw, nh, gcor, FALSE);
+	do_scale_internal(&ctx, old_img, new_img, bpp, type, ow, oh,
+		nw, nh, gcor, FALSE);
 
 	return 0;
 }
@@ -5225,7 +5226,8 @@ int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale imag
 	}
 
 	progress_init(_("Scaling Image"),0);
-	do_scale_internal(&ctx, old_img, mem_img, mem_img_bpp, type, ow, oh, nw, nh, gcor, TRUE);
+	do_scale_internal(&ctx, old_img, mem_img, mem_img_bpp, type, ow, oh,
+		nw, nh, gcor, TRUE);
 	progress_end();
 
 	return 0;

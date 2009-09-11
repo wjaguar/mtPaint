@@ -325,7 +325,7 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 	GtkTextIter iter;
 
 	g_signal_handlers_block_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 #endif
 	empty_text_widget(ani_text_cyc);	// Clear the text in the widget
 
@@ -352,7 +352,7 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 
 #if GTK_MAJOR_VERSION == 2
 	g_signal_handlers_unblock_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 	// We have to switch off then back on or it looks like the user changed it
 #endif
 }
@@ -1085,18 +1085,12 @@ void pressed_animate_window()
 	ani_spin[1] = spin_to_table(table, 1, 1, 5, ani_frame2, 1, MAX_FRAME);	// End
 	ani_spin[2] = spin_to_table(table, 2, 1, 5, ani_gif_delay, 1, MAX_DELAY);	// Delay
 
-	spin_connect(ani_spin[0], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	spin_connect(ani_spin[1], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	spin_connect(ani_spin[2], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-
 	ani_entry_path = gtk_entry_new_with_max_length(PATHBUF);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_path, 1, 2, 3, 4,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, 0);
 	gtkuncpy(txt, ani_output_path, PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(ani_entry_path), txt);
-	gtk_signal_connect( GTK_OBJECT(ani_entry_path), "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
 	ani_entry_prefix = gtk_entry_new_with_max_length(ANI_PREFIX_LEN);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_prefix, 1, 2, 4, 5,
@@ -1104,8 +1098,10 @@ void pressed_animate_window()
 		(GtkAttachOptions) (0), 0, 0);
 	gtkuncpy(txt, ani_file_prefix, PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(ani_entry_prefix), txt);
-	gtk_signal_connect( GTK_OBJECT(ani_entry_prefix), "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+
+	track_updates(GTK_SIGNAL_FUNC(ani_widget_changed),
+		ani_spin[0], ani_spin[1], ani_spin[2],
+		ani_entry_path, ani_entry_prefix, NULL);
 
 	ani_toggle_gif = pack(vbox4, sig_toggle(_("Create GIF frames"),
 		ani_use_gif, NULL, GTK_SIGNAL_FUNC(ani_tog_gif)));

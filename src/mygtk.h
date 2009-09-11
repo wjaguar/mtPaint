@@ -19,9 +19,10 @@
 
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+#include <math.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 ///	Generic RGB buffer
 
@@ -322,6 +323,10 @@ typedef void (*repaint_func)(int x, int y, int w, int h);
 #else 
 void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int cost);
 #endif
+
+// Track updates of multiple widgets (by whatever means necessary)
+
+void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

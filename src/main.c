@@ -17,9 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <stdlib.h>
-#include <gtk/gtk.h>
-
 #include "global.h"
 
 #include "mygtk.h"

@@ -17,11 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <stdlib.h>
-#include <math.h>
-
-#include <gtk/gtk.h>
-
 #include "polygon.h"
 #include "mygtk.h"
 #include "memory.h"

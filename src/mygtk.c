@@ -2713,7 +2713,6 @@ typedef struct
 	GtkAdjustment	*adjustments[2];
 	GdkGC		*scroll_gc;	// For scrolling in GTK+1
 	int		xy[4];		// Viewport
-	int		size[2];	// Requested (virtual) size
 	int		resize;		// Resize was requested
 	int		resizing;	// Requested resize is happening
 } wjcanvas;
@@ -2819,7 +2818,7 @@ static int wjcanvas_readjust(wjcanvas *canvas, int which)
 
 	oldv = adj->value;
 	wp = which ? widget->allocation.height : widget->allocation.width;
-	sz = canvas->size[which];
+	sz = which ? widget->requisition.height : widget->requisition.width;
 	if (sz < wp) sz = wp;
 	adj->page_size = wp;
 	adj->step_increment = wp * 0.1;
@@ -3129,22 +3128,12 @@ GtkWidget *wjcanvas_new()
 
 void wjcanvas_size(GtkWidget *widget, int width, int height)
 {
-	wjcanvas *canvas;
+	if (!IS_WJCANVAS(widget) || ((widget->requisition.width == width) &&
+		(widget->requisition.height == height))) return;
 
-	if (!IS_WJCANVAS(widget)) return;
-	canvas = WJCANVAS(widget);
-	if ((canvas->size[0] == width) && (canvas->size[1] == height)) return;
-	canvas->size[0] = width;
-	canvas->size[1] = height;
-	canvas->resize = TRUE;
-#if GTK_MAJOR_VERSION == 1
-	/* !!! The fields are limited to 16-bit signed, and the values aren't */
-	widget->requisition.width = MIN(width, 32767);
-	widget->requisition.height = MIN(height, 32767);
-#else /* if GTK_MAJOR_VERSION == 2 */
+	WJCANVAS(widget)->resize = TRUE;
 	widget->requisition.width = width;
 	widget->requisition.height = height;
-#endif
 	gtk_widget_queue_resize(widget);
 }
 
@@ -3181,6 +3170,33 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 }
 
 #endif
+
+// Track updates of multiple widgets (by whatever means necessary)
+
+/* void handler(GtkWidget *widget) */
+void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
+{
+	va_list args;
+	GtkWidget *w;
+
+	va_start(args, widget);
+	for (w = widget; w; w = va_arg(args, GtkWidget *))
+	{
+		if (GTK_IS_SPIN_BUTTON(w))
+		{
+			GtkAdjustment *adj = gtk_spin_button_get_adjustment(
+				GTK_SPIN_BUTTON(w));
+			gtk_signal_connect_object(GTK_OBJECT(adj),
+				"value_changed", handler, GTK_OBJECT(w));
+		}
+		else if (GTK_IS_TOGGLE_BUTTON(w)) gtk_signal_connect(
+			GTK_OBJECT(w), "toggled", handler, NULL);
+		else if (GTK_IS_ENTRY(w)) gtk_signal_connect(
+			GTK_OBJECT(w), "changed", handler, NULL);
+// !!! Add other widget types here
+	}
+	va_end(args);
+}
 
 // Maybe this will be needed someday...
 
