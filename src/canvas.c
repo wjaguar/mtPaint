@@ -1989,7 +1989,7 @@ void align_size( float new_zoom )		// Set new zoom level
 	toolbar_zoom_update();
 }
 
-void square_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
+void square_continuous(int nx, int ny)
 {
 	if ( tool_size == 1 )
 	{
@@ -1997,7 +1997,10 @@ void square_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
 	}
 	else
 	{
-		if ( tablet_working )	// Needed to fill in possible gap when size changes
+		// Needed to fill in possible gap when size changes - or
+		// to redraw stroke gradient in the proper direction
+		if (tablet_working || (mem_gradient &&
+			gradient[mem_channel].status == GRAD_NONE))
 		{
 			f_rectangle( tool_ox - tool_size/2, tool_oy - tool_size/2,
 					tool_size, tool_size );
@@ -2214,8 +2217,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	int minx = -1, miny = -1, xw = -1, yh = -1;
 	int i, j, k, rx, ry, sx, sy;
 	int ox, oy, off1, off2, o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
-	int xdo, ydo, px, py, todo, oox, ooy;	// Continuous smudge stuff
-	float rat;
+	int px, py, oox, ooy;	// Continuous smudge stuff
 	gboolean first_point = FALSE, paint_action = FALSE;
 
 	if ( (button == 1 || button == 3) && (tool_type <= TOOL_SPRAY) )
@@ -2245,23 +2247,18 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 	if ( tablet_working )
 	{
-		pressure = (pressure - 0.2)/0.8;
-		mtMIN( pressure, pressure, 1)
-		mtMAX( pressure, pressure, 0)
+		pressure = pressure <= 0.2 ? -1.0 : pressure >= 1.0 ? 0.0 :
+			(pressure - 1.0) * (1.0 / 0.8);
 
 		n_vs[0] = tool_size;
 		n_vs[1] = tool_flow;
 		n_vs[2] = tool_opacity;
-		for ( i=0; i<3; i++ )
+		for (i = 0; i < 3; i++)
 		{
-			if ( tablet_tool_use[i] )
-			{
-				if ( tablet_tool_factor[i] > 0 )
-					n_vs[i] *= (1 + tablet_tool_factor[i] * (pressure - 1));
-				else
-					n_vs[i] *= (0 - tablet_tool_factor[i] * (1 - pressure));
-				mtMAX( n_vs[i], n_vs[i], 1 )
-			}
+			if (!tablet_tool_use[i]) continue;
+			n_vs[i] *= (tablet_tool_factor[i] > 0 ? 1.0 : 0.0) +
+				tablet_tool_factor[i] * pressure;
+			if (n_vs[i] < 1) n_vs[i] = 1;
 		}
 		tool_size = n_vs[0];
 		tool_flow = n_vs[1];
@@ -2278,8 +2275,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	{		// Single point continuity
 		sline( tool_ox, tool_oy, x, y );
 
-		mtMIN( minx, tool_ox, x )
-		mtMIN( miny, tool_oy, y )
+		minx = tool_ox < x ? tool_ox : x;
+		miny = tool_oy < y ? tool_oy : y;
 		xw = abs( tool_ox - x ) + 1;
 		yh = abs( tool_oy - y ) + 1;
 	}
@@ -2287,15 +2284,13 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	{
 		if ( mem_continuous && !first_point && (button == 1 || button == 3) )
 		{
-			mtMIN( minx, tool_ox, x )
-			mtMAX( xw, tool_ox, x )
-			xw = xw - minx + tool_size;
-			minx = minx - tool_size/2;
+			minx = tool_ox < x ? tool_ox : x;
+			xw = (tool_ox > x ? tool_ox : x) - minx + tool_size;
+			minx -= tool_size / 2;
 
-			mtMIN( miny, tool_oy, y )
-			mtMAX( yh, tool_oy, y )
-			yh = yh - miny + tool_size;
-			miny = miny - tool_size/2;
+			miny = tool_oy < y ? tool_oy : y;
+			yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
+			miny -= tool_size / 2;
 
 			mem_boundary( &minx, &miny, &xw, &yh );
 		}
@@ -2305,7 +2300,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				f_rectangle( minx, miny, xw, yh );
 			else
 			{
-				square_continuous(x, y, &minx, &miny, &xw, &yh);
+				square_continuous(x, y);
 			}
 		}
 		if ( tool_type == TOOL_CIRCLE  && paint_action )
@@ -2438,20 +2433,15 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			{
 				if ( mem_continuous )
 				{
-					xdo = tool_ox - x;
-					ydo = tool_oy - y;
-					mtMAX( todo, abs(xdo), abs(ydo) )
-					oox = tool_ox;
-					ooy = tool_oy;
+					linedata line;
 
-					for ( i=1; i<=todo; i++ )
+					line_init(line, tool_ox, tool_oy, x, y);
+					while (TRUE)
 					{
-						rat = ((float) i ) / todo;
-						px = mt_round(tool_ox + (x - tool_ox) * rat);
-						py = mt_round(tool_oy + (y - tool_oy) * rat);
-						mem_smudge(oox, ooy, px, py);
-						oox = px;
-						ooy = py;
+						oox = line[0];
+						ooy = line[1];
+						if (line_step(line) < 0) break;
+						mem_smudge(oox, ooy, line[0], line[1]);
 					}
 				}
 				else mem_smudge(tool_ox, tool_oy, x, y);
@@ -2913,8 +2903,9 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	int vx1, int vy1, int vx2, int vy2)
 {
-	int i, j, l, x, y, tx, ty, aw, ah, ax = -1, ay = -1, zoom = 1, scale = 1;
+	int j, x, y, tx, ty, aw, ah, ax = -1, ay = -1, zoom = 1, scale = 1;
 	unsigned char rgb[MAX_ZOOM * 3], col[3];
+	linedata line;
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
@@ -2927,19 +2918,11 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
  	}
 	else scale = rint(can_zoom);
 
-	i = abs(lx2 - lx1);
-	j = abs(ly2 - ly1);
-	l = i > j ? i : j;
-
-	/* !!! This is for incorrect, and thus temporary, line algorithm !!! */
-	int kk = l ? l : 1;
-
-	for (i = 0; i <= l; i++)
+	line_init(line, lx1, ly1, lx2, ly2);
+	for (; line[2] >= 0; line_step(line))
 	{
-		/* !!! Incorrect algorithm - must be exactly as in sline() !!! */
-		float rat = (float)i / kk;
-		x = (tx = mt_round(lx1 + rat * (lx2 - lx1))) * scale;
-		y = (ty = mt_round(ly1 + rat * (ly2 - ly1))) * scale;
+		x = (tx = line[0]) * scale;
+		y = (ty = line[1]) * scale;
 
 		if ((x + scale > vx1) && (y + scale > vy1) &&
 			(x <= vx2) && (y <= vy2))
@@ -2956,7 +2939,7 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 				else if (mode == 2) /* Tracking */
 				{
 					col[0] = col[1] = col[2] =
-						(((l - i) >> 2) & 1) * 255;
+						((line[2] >> 2) & 1) * 255;
 				}
 				else if (mode == 3) /* Gradient */
 				{
@@ -2984,7 +2967,7 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 		/* Redraw now or wait some more? */
 		aw = scale + abs(x - ax);
 		ah = scale + abs(y - ay);
-		if ((aw < MIN_REDRAW) && (ah < MIN_REDRAW) && (i < l)) continue;
+		if ((aw < MIN_REDRAW) && (ah < MIN_REDRAW) && line[2]) continue;
 
 		/* Commit canvas clear if >16 pixels or final pixel of this line */
 		repaint_canvas(margin_main_x + (ax < x ? ax : x),

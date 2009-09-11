@@ -1243,9 +1243,9 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("Output path"), table, 3, 0, 5 );
 	add_to_table( _("File prefix"), table, 4, 0, 5 );
 
-	spin_to_table( table, &ani_spin[0], 0, 1, 5, ani_frame1, 1, MAX_FRAME );	// Start
-	spin_to_table( table, &ani_spin[1], 1, 1, 5, ani_frame2, 1, MAX_FRAME );	// End
-	spin_to_table( table, &ani_spin[2], 2, 1, 5, ani_gif_delay, 1, MAX_DELAY );	// Delay
+	ani_spin[0] = spin_to_table(table, 0, 1, 5, ani_frame1, 1, MAX_FRAME);	// Start
+	ani_spin[1] = spin_to_table(table, 1, 1, 5, ani_frame2, 1, MAX_FRAME);	// End
+	ani_spin[2] = spin_to_table(table, 2, 1, 5, ani_gif_delay, 1, MAX_DELAY);	// Delay
 
 #if GTK_MAJOR_VERSION == 1
 	ttxt = "changed";

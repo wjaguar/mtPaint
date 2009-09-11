@@ -222,9 +222,9 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	}
 	else im_type = 3 - mem_img_bpp;
 
-	spin_to_table( table1, &spinbutton_width, 0, 1, 5, w, MIN_WIDTH, MAX_WIDTH );
-	spin_to_table( table1, &spinbutton_height, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT );
-	spin_to_table( table1, &spinbutton_cols, 2, 1, 5, c, 2, 256 );
+	spinbutton_width = spin_to_table(table1, 0, 1, 5, w, MIN_WIDTH, MAX_WIDTH);
+	spinbutton_height = spin_to_table(table1, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT);
+	spinbutton_cols = spin_to_table(table1, 2, 1, 5, c, 2, 256);
 
 	add_to_table( _("Width"), table1, 0, 0, 5 );
 	add_to_table( _("Height"), table1, 1, 0, 5 );
@@ -590,8 +590,8 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 
 	table1 = add_a_table(2, 2, 5, vbox1);
 
-	spin_to_table( table1, &spal_spins[0], 0, 1, 5, 0, 0, mem_cols-1 );
-	spin_to_table( table1, &spal_spins[1], 1, 1, 5, mem_cols-1, 0, mem_cols-1 );
+	spal_spins[0] = spin_to_table(table1, 0, 1, 5, 0, 0, mem_cols - 1);
+	spal_spins[1] = spin_to_table(table1, 1, 1, 5, mem_cols - 1, 0, mem_cols - 1);
 
 	add_to_table( _("Start Index"), table1, 0, 0, 5 );
 	add_to_table( _("End Index"), table1, 1, 0, 5 );
@@ -1229,14 +1229,14 @@ void sisca_init( char *title )
 	add_to_table( _("Height    "), sisca_table, 0, 2, 0 );
 
 	add_to_table( _("Original      "), sisca_table, 1, 0, 0);
-	spin_to_table( sisca_table, &sisca_spins[0], 1, 1, 5, mem_width, mem_width, mem_width );
-	spin_to_table( sisca_table, &sisca_spins[1], 1, 2, 5, mem_height, mem_height, mem_height );
+	sisca_spins[0] = spin_to_table(sisca_table, 1, 1, 5, mem_width, mem_width, mem_width);
+	sisca_spins[1] = spin_to_table(sisca_table, 1, 2, 5, mem_height, mem_height, mem_height);
 	GTK_WIDGET_UNSET_FLAGS (sisca_spins[0], GTK_CAN_FOCUS);
 	GTK_WIDGET_UNSET_FLAGS (sisca_spins[1], GTK_CAN_FOCUS);
 
 	add_to_table( _("New"), sisca_table, 2, 0, 0 );
-	spin_to_table( sisca_table, &sisca_spins[0], 2, 1, 5, mem_width, 1, MAX_WIDTH );
-	spin_to_table( sisca_table, &sisca_spins[1], 2, 2, 5, mem_height, 1, MAX_HEIGHT );
+	sisca_spins[0] = spin_to_table(sisca_table, 2, 1, 5, mem_width, 1, MAX_WIDTH);
+	sisca_spins[1] = spin_to_table(sisca_table, 2, 2, 5, mem_height, 1, MAX_HEIGHT);
 
 #if GTK_MAJOR_VERSION == 2
 	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[0])->entry ),
@@ -1258,8 +1258,8 @@ void sisca_init( char *title )
 	if ( !sisca_scale )
 	{
 		add_to_table( _("Offset"), sisca_table, 3, 0, 0 );
-		spin_to_table( sisca_table, &sisca_spins[2], 3, 1, 5, 0, 0, 0 );
-		spin_to_table( sisca_table, &sisca_spins[3], 3, 2, 5, 0, 0, 0 );
+		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0, 0, 0);
+		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0, 0, 0);
 
 		button_centre = gtk_button_new_with_label(_("Centre"));
 
@@ -1889,8 +1889,6 @@ static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
-	char *ovl_txt[NUM_CHANNELS] =
-		{ _("Image"), _("Alpha"), _("Selection"), _("Mask") };
 	GtkWidget *win, *extbox, *button, *spin;
 	int i, j;
 
@@ -1950,7 +1948,8 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
 			GTK_WIN_POS_CENTER, TRUE);
-		colour_window(win, NULL, NUM_CHANNELS, ovl_txt, TRUE, select_overlay);
+		colour_window(win, NULL, NUM_CHANNELS, allchannames,
+			TRUE, select_overlay);
 	}
 
 	if (cs_type == COLSEL_EDIT_AB)
@@ -1991,7 +1990,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 		{
 			j = i - CHN_ALPHA;
-			spin = gtk_label_new(ovl_txt[i]);
+			spin = gtk_label_new(allchannames[i]);
 			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
 				1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
 			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
@@ -2353,4 +2352,142 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_window_set_transient_for(GTK_WINDOW(quantize_window),
 		GTK_WINDOW(main_window));
 	gtk_widget_show_all(quantize_window);
+}
+
+///	GRADIENT WINDOW
+
+//static GtkWidget *grad_window;
+static GtkWidget *grad_spin_len, *grad_spin_rep, *grad_spin_ofs;
+static GtkWidget *grad_opt_type, *grad_opt_bound;
+static GtkWidget *grad_ss_pre;
+static int grad_channel;
+static grad_info grad_temps[NUM_CHANNELS];
+
+static void store_channel_gradient(int channel)
+{
+	grad_info *grad = grad_temps + channel;
+
+	if (channel < 0) return;
+	grad->len = read_spin(grad_spin_len);
+	grad->gmode = wj_option_menu_get_history(grad_opt_type) + 1;
+	grad->rep = read_spin(grad_spin_rep);
+	grad->rmode = wj_option_menu_get_history(grad_opt_bound);
+	grad->ofs = read_spin(grad_spin_ofs);
+
+// !!! Store selected gradients
+
+}
+
+static void show_channel_gradient(int channel)
+{
+	grad_info *grad = grad_temps + channel;
+
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_len), grad->len);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type), grad->gmode - 1);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_rep), grad->rep);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_bound), grad->rmode);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_ofs), grad->ofs);
+
+// !!! Show selected gradients
+
+}
+
+static void click_grad_ok(GtkWidget *widget, gpointer data)
+{
+	int i;
+
+	store_channel_gradient(grad_channel);
+	memcpy(gradient, grad_temps, sizeof(grad_temps));
+
+// !!! Store preview opacity
+//	??? = mt_spinslide_get_value(grad_ss_pre);
+
+	for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
+	gtk_widget_destroy(widget);
+}
+
+static void grad_channel_changed(GtkToggleButton *widget, gpointer user_data)
+{
+	if ((int)user_data == grad_channel) return;
+	store_channel_gradient(grad_channel);
+	grad_channel = -1;
+	show_channel_gradient((int)user_data);
+	grad_channel = (int)user_data;
+}
+
+void gradient_setup(int mode)
+{
+	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial")};
+	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
+	GtkWidget *win, *mainbox, *notebook, *page0, *page1;
+	GtkWidget *label, *hbox, *table;
+	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?
+		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
+
+
+	memcpy(grad_temps, gradient, sizeof(grad_temps));
+	grad_channel = mem_channel;
+
+	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Gradient"), pos, TRUE);
+	mainbox = gtk_vbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(win), mainbox);
+
+	/* Channel box */
+
+	hbox = wj_radio_pack(allchannames, 4, 1, mem_channel, NULL,
+		GTK_SIGNAL_FUNC(grad_channel_changed));
+	add_with_frame(mainbox, _("Channel"), hbox, 5);
+
+	/* Notebook */
+
+	notebook = gtk_notebook_new();
+	gtk_box_pack_start(GTK_BOX(mainbox), notebook, TRUE, TRUE, 0);
+	page0 = gtk_vbox_new(FALSE, 0);
+	label = gtk_label_new(_("Setup"));
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page0, label);
+	page1 = gtk_vbox_new(FALSE, 0);
+	label = gtk_label_new(_("Select"));
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page1, label);
+	gtk_widget_show_all(notebook); /* Else unable to set page */
+	gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), mode);
+
+	/* Setup page */
+
+	table = add_a_table(3, 4, 5, page0);
+	add_to_table(_("Length"), table, 0, 0, 5);
+	grad_spin_len = spin_to_table(table, 0, 1, 5, 0, 0, MAX_GRAD);
+	add_to_table(_("Gradient type"), table, 0, 2, 5);
+	grad_opt_type = wj_option_menu(gtypes, 3, 0, NULL, NULL);
+	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	add_to_table(_("Repeat length"), table, 1, 0, 5);
+	grad_spin_rep = spin_to_table(table, 1, 1, 5, 0, 0, MAX_GRAD);
+	add_to_table(_("Extension type"), table, 1, 2, 5);
+	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
+	gtk_table_attach(GTK_TABLE(table), grad_opt_bound, 3, 4, 1, 2,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	add_to_table(_("Offset"), table, 2, 0, 5);
+	grad_spin_ofs = spin_to_table(table, 2, 1, 5, 0, -MAX_GRAD, MAX_GRAD);
+	add_to_table(_("Preview opacity"), table, 2, 2, 5);
+	grad_ss_pre = mt_spinslide_new(150, -2);
+	mt_spinslide_set_range(grad_ss_pre, 0, 255);
+	gtk_table_attach(GTK_TABLE(table), grad_ss_pre, 3, 4, 2, 3,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	show_channel_gradient(mem_channel);
+
+// !!! Show preview opacity
+//	mt_spinslide_set_value(grad_ss_pre, ???);
+
+	/* Select page */
+
+// !!! Build the controls
+
+	/* OK / Cancel */
+
+	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_widget_show_all(win);
 }

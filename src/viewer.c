@@ -55,7 +55,7 @@ GtkWidget *cline_window = NULL;
 
 static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 {							// Used by command line window
-	if (check_zoom_keys(wtf_pressed(event, main_keys))) return TRUE;		// Check HOME/zoom keys
+	if (check_zoom_keys(wtf_pressed(event))) return TRUE;	// Check HOME/zoom keys
 
 	return FALSE;
 }
@@ -399,7 +399,7 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 	int nv_h, nv_v, arrow_key = 0;
 	GtkAdjustment *hori, *vert;
 
-	if (!check_zoom_keys_real(wtf_pressed(event, main_keys)))
+	if (!check_zoom_keys_real(wtf_pressed(event)))
 	{
 		switch (event->keyval)
 		{
@@ -1590,7 +1590,6 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *button, *vbox, *hbox;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	GtkObject *adj;
 
 	text_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Paste Text"), GTK_WIN_POS_CENTER, TRUE );
 	gtk_window_set_default_size( GTK_WINDOW(text_window), 400, 400 );
@@ -1614,6 +1613,9 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
 			inifile_get_gboolean( "fontAntialias", FALSE ) );
 
+	if ( mem_img_bpp == 1 || GTK_MAJOR_VERSION == 1 )
+		gtk_widget_hide( text_toggle[0] );
+
 	if (mem_channel != CHN_IMAGE)
 	{
 		text_toggle[1] = add_a_toggle( _("Invert"), hbox,
@@ -1624,36 +1626,21 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 		text_toggle[1] = add_a_toggle( _("Background colour ="), hbox,
 			inifile_get_gboolean( "fontAntialias1", FALSE ) );
 
-		adj = gtk_adjustment_new( inifile_get_gint32( "fontBackground", 0 ) % mem_cols,
-			0, mem_cols-1, 1, 10, 10 );
-		text_spin[0] = gtk_spin_button_new( GTK_ADJUSTMENT (adj), 1, 0 );
-		gtk_widget_show(text_spin[0]);
-		gtk_spin_button_set_numeric (GTK_SPIN_BUTTON (text_spin[0]), TRUE);
+		text_spin[0] = add_a_spin(inifile_get_gint32("fontBackground", 0)
+			% mem_cols, 0, mem_cols - 1);
 		gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, TRUE, 5);
 	}
 
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
-	if ( GTK_MAJOR_VERSION == 2 )
-	{
-#if GTK_MINOR_VERSION >= 6
-		adj = gtk_adjustment_new( inifile_get_gfloat( "fontAngle", 0 ),
-			-360, 360, 1, 10, 10 );
-		text_spin[1] = gtk_spin_button_new( GTK_ADJUSTMENT (adj), 1, 0 );
-		gtk_widget_show(text_spin[1]);
-		gtk_spin_button_set_numeric (GTK_SPIN_BUTTON (text_spin[1]), TRUE);
-		gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, TRUE, 5);
-		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(text_spin[1]), 2);
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
-			inifile_get_gboolean( "fontAntialias2", FALSE ) );
+#if GTK_MAJOR_VERSION == 2 && GTK_MINOR_VERSION >= 6
+	text_spin[1] = add_float_spin(inifile_get_gfloat("fontAngle", 0), -360, 360);
+	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, TRUE, 5);
+	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
+		inifile_get_gboolean( "fontAntialias2", FALSE ) );
 #else
-		gtk_widget_hide( text_toggle[2] );
+	gtk_widget_hide( text_toggle[2] );
 #endif
-	}
-	else	gtk_widget_hide( text_toggle[2] );
-
-	if ( mem_img_bpp == 1 || GTK_MAJOR_VERSION == 1 )
-		gtk_widget_hide( text_toggle[0] );
 
 	add_hseparator( vbox, 200, 10 );
 

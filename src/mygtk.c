@@ -85,23 +85,6 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 	return tog;
 }
 
-GtkWidget *add_slider2table(int val, int min, int max, GtkWidget *table,
-			int row, int column, int width, int height)
-{
-	GtkWidget *hscale;
-
-	hscale = gtk_hscale_new (GTK_ADJUSTMENT (gtk_adjustment_new (val, min, max, 1, 1, 0)));
-	gtk_widget_show (hscale);
-	gtk_table_attach (GTK_TABLE (table), hscale, column, column+1, row, row+1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (GTK_FILL), 0, 0);
-	gtk_widget_set_usize (hscale, width, height);
-	gtk_scale_set_draw_value (GTK_SCALE (hscale), FALSE);
-	gtk_scale_set_digits (GTK_SCALE (hscale), 0);
-
-	return hscale;
-}
-
 GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
 {
 	GtkWidget *label;
@@ -117,13 +100,14 @@ GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int s
 	return label;
 }
 
-void spin_to_table( GtkWidget *table, GtkWidget **spin, int row, int column, int spacing,
-	int value, int min, int max )
+GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
+	int value, int min, int max)
 {
-	*spin = add_a_spin( value, min, max );
-	gtk_table_attach(GTK_TABLE (table), *spin, column, column+1, row, row+1,
+	GtkWidget *spin = add_a_spin( value, min, max );
+	gtk_table_attach(GTK_TABLE(table), spin, column, column+1, row, row+1,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, spacing);
+	return (spin);
 }
 
 void add_hseparator( GtkWidget *widget, int xs, int ys )
@@ -476,6 +460,48 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int bor
 	return (frame);
 }
 
+// Option menu
+
+static void wj_option(GtkMenuItem *menuitem, gpointer user_data)
+{
+	*(int *)user_data = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+}
+
+/* void handler(GtkMenuItem *menuitem, gpointer user_data); */
+GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
+	GtkSignalFunc handler)
+{
+	int i;
+	GtkWidget *opt, *menu, *item;
+
+	if (!handler && var)
+	{
+		*(int *)var = idx < cnt ? idx : 0;
+		handler = GTK_SIGNAL_FUNC(wj_option);
+	}
+	opt = gtk_option_menu_new();
+	menu = gtk_menu_new();
+	for (i = 0; i < cnt; i++)
+	{
+		item = gtk_menu_item_new_with_label(names[i]);
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		if (handler) gtk_signal_connect(GTK_OBJECT(item), "activate",
+			handler, var);
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+  	}
+	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
+	gtk_widget_show_all(opt);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), idx);
+	return (opt);
+}
+
+int wj_option_menu_get_history(GtkWidget *optmenu)
+{
+	optmenu = gtk_option_menu_get_menu(GTK_OPTION_MENU(optmenu));
+	optmenu = gtk_menu_get_active(GTK_MENU(optmenu));
+	return ((int)gtk_object_get_user_data(GTK_OBJECT(optmenu)));
+}
+
 // Whatever is needed to move mouse pointer 
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */
@@ -559,7 +585,14 @@ guint keyval_key(guint keyval)
 	gint nkeys;
 
 	if (!gdk_keymap_get_entries_for_keyval(keymap, keyval, &key, &nkeys))
+	{
+#ifdef GDK_WINDOWING_WIN32
+		/* Keypad numbers need specialcasing on Windows */
+		if ((keyval >= GDK_KP_0) && (keyval <= GDK_KP_9))
+			return(keyval - GDK_KP_0 + VK_NUMPAD0);
+#endif
 		return (0);
+	}
 	if (!nkeys) return (0);
 	keyval = key[0].keycode;
 	g_free(key);

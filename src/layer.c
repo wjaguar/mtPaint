@@ -256,7 +256,6 @@ static void shift_layer(int val)
 
 	if ( layer_selected == 0 || (layer_selected-val) == 0 )
 	{
-//		if ( view_window != NULL ) gtk_widget_queue_draw( vw_drawing );	// Update Whole window
 		if ( vw_drawing != NULL ) gtk_widget_queue_draw( vw_drawing );	// Update Whole window
 		if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
 	}
@@ -1084,7 +1083,7 @@ static gint layer_main_toggled( GtkWidget *widget, GdkEvent *event, gpointer dat
 	return FALSE;
 }
 
-static gint layer_inputs_changed( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint layer_inputs_changed()
 {
 	gboolean txt_changed = FALSE;
 
@@ -1094,8 +1093,7 @@ static gint layer_inputs_changed( GtkWidget *widget, GdkEvent *event, gpointer d
 
 	layer_table[layer_selected].trans =
 			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(layer_spin) );
-	layer_table[layer_selected].opacity =
-			GTK_HSCALE(layer_slider)->scale.range.adjustment->value;
+	layer_table[layer_selected].opacity = mt_spinslide_get_value(layer_slider);
 
 	if ( strncmp( layer_table[layer_selected].name,
 		gtk_entry_get_text( GTK_ENTRY(entry_layer_name) ), 35) ) txt_changed = TRUE;
@@ -1177,8 +1175,7 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 		else
 		{
 			gtk_widget_set_sensitive( layer_slider, TRUE );
-			gtk_adjustment_set_value( GTK_HSCALE(layer_slider)->scale.range.adjustment,
-				layer_table[layer_selected].opacity );
+			mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
 			layer_show_position();
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_trans_toggle ),
 				layer_table[layer_selected].use_trans);
@@ -1461,13 +1458,12 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 
 	layer_label_position = add_to_table( "-320, 200", table, 1, 1, 1 );
 
-	layer_slider = add_slider2table( 100, 0, 100, table, 2, 1, -2, -2 );
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(layer_slider)->scale.range.adjustment),
-		"value_changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
-	gtk_scale_set_draw_value(GTK_SCALE (layer_slider), TRUE);
-	gtk_scale_set_value_pos(GTK_SCALE (layer_slider), GTK_POS_RIGHT);
-	gtk_adjustment_set_value( GTK_HSCALE(layer_slider)->scale.range.adjustment,
-		layer_table[layer_selected].opacity );
+	layer_slider = mt_spinslide_new(-2, -2);
+	mt_spinslide_set_range(layer_slider, 0, 100);
+	gtk_table_attach(GTK_TABLE(table), layer_slider, 1, 2, 2, 3,
+		GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+	mt_spinslide_connect(layer_slider, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
+	mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);

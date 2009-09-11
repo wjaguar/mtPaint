@@ -815,12 +815,17 @@ gint check_zoom_keys(int action)
 #define _CS (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
 #define _CSA (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
 
-key_action main_keys[] = {
+typedef struct {
+	char *actname;
+	int action, key, kmask, kflags;
+} key_action;
+
+static key_action main_keys[] = {
 	{"QUIT",	ACT_QUIT, GDK_q, 0, 0},
 //	{"",		ACT_QUIT, GDK_Q, 0, 0},
 	{"ZOOM_IN",	ACT_ZOOM_IN, GDK_plus, _CS, 0},
 	{"",		ACT_ZOOM_IN, GDK_KP_Add, _CS, 0},
-	{"",		ACT_ZOOM_IN, GDK_equal, _CS, 0},
+//	{"",		ACT_ZOOM_IN, GDK_equal, _CS, 0},
 	{"ZOOM_OUT",	ACT_ZOOM_OUT, GDK_minus, _CS, 0},
 	{"",		ACT_ZOOM_OUT, GDK_KP_Subtract, _CS, 0},
 	{"ZOOM_01",	ACT_ZOOM_01, GDK_KP_1, _CS, 0},
@@ -894,7 +899,7 @@ key_action main_keys[] = {
 	{"",		ACT_OPAC_1, GDK_0, _CS, _C},
 	{"OPAC_P",	ACT_OPAC_P, GDK_plus, _CS, _C},
 	{"",		ACT_OPAC_P, GDK_KP_Add, _CS, _C},
-	{"",		ACT_OPAC_P, GDK_equal, _CS, _C},
+//	{"",		ACT_OPAC_P, GDK_equal, _CS, _C},
 	{"OPAC_M",	ACT_OPAC_M, GDK_minus, _CS, _C},
 	{"",		ACT_OPAC_M, GDK_KP_Subtract, _CS, _C},
 	{"LR_2LEFT",	ACT_LR_2LEFT, GDK_Left, _CS, _CS},
@@ -931,59 +936,72 @@ key_action main_keys[] = {
 	{"",		ACT_B_NEXT, GDK_braceright, _CS, _S},
 	{"TO_IMAGE",	ACT_TO_IMAGE, GDK_KP_1, _CS, _S},
 	{"",		ACT_TO_IMAGE, GDK_1, _CS, _S},
-	{"",		ACT_TO_IMAGE, GDK_exclam, _CS, _S},
+//	{"",		ACT_TO_IMAGE, GDK_exclam, _CS, _S},
 	{"TO_ALPHA",	ACT_TO_ALPHA, GDK_KP_2, _CS, _S},
 	{"",		ACT_TO_ALPHA, GDK_2, _CS, _S},
-	{"",		ACT_TO_ALPHA, GDK_at, _CS, _S},
+//	{"",		ACT_TO_ALPHA, GDK_at, _CS, _S},
 	{"TO_SEL",	ACT_TO_SEL, GDK_KP_3, _CS, _S},
 	{"",		ACT_TO_SEL, GDK_3, _CS, _S},
-	{"",		ACT_TO_SEL, GDK_numbersign, _CS, _S},
+//	{"",		ACT_TO_SEL, GDK_numbersign, _CS, _S},
 	{"TO_MASK",	ACT_TO_MASK, GDK_KP_4, _CS, _S},
 	{"",		ACT_TO_MASK, GDK_4, _CS, _S},
-	{"",		ACT_TO_MASK, GDK_dollar, _CS, _S},
+//	{"",		ACT_TO_MASK, GDK_dollar, _CS, _S},
 	{"VWZOOM_IN",	ACT_VWZOOM_IN, GDK_plus, _CS, _S},
 	{"",		ACT_VWZOOM_IN, GDK_KP_Add, _CS, _S},
-	{"",		ACT_VWZOOM_IN, GDK_equal, _CS, _S},
+//	{"",		ACT_VWZOOM_IN, GDK_equal, _CS, _S},
 	{"VWZOOM_OUT",	ACT_VWZOOM_OUT, GDK_minus, _CS, _S},
 	{"",		ACT_VWZOOM_OUT, GDK_KP_Subtract, _CS, _S},
-	{"",		ACT_VWZOOM_OUT, GDK_underscore, _CS, _S},
+//	{"",		ACT_VWZOOM_OUT, GDK_underscore, _CS, _S},
 	{NULL,		0, 0, 0, 0}
 };
 
-static void fill_keycodes(key_action *keys)
+static guint main_keycodes[sizeof(main_keys) / sizeof(key_action)];
+
+static void fill_keycodes()
 {
-	for (; keys->action; keys++)
+	int i;
+
+	for (i = 0; main_keys[i].action; i++)
 	{
-		keys->hwcode = keyval_key(keys->key);
+		main_keycodes[i] = keyval_key(main_keys[i].key);
 	}
 }
 
-int wtf_pressed(GdkEventKey *event, key_action *keys)
+/* "Tool of last resort" for when shortcuts don't work */
+static void rebind_keys()
 {
-// !!! Hope this won't be needed anymore
-//	/* Only affects letters, but still somewhat useful */
-//	guint lowkey = gdk_keyval_to_lower(event->keyval);
+	fill_keycodes();
+#if GTK_MAJOR_VERSION > 1
+	gtk_signal_emit_by_name(GTK_OBJECT(main_window), "keys_changed", NULL);
+#endif
+}
+
+int wtf_pressed(GdkEventKey *event)
+{
+	int i, cmatch = 0;
 	guint realkey = real_key(event);
+	guint lowkey = gdk_keyval_to_lower(event->keyval);
 
-// g_print("!!! %d %d\n", real_key(event), keyval_key(event->keyval));
-
-	while (keys->action)
+	for (i = 0; main_keys[i].action; i++)
 	{
-// !!! Hope this won't be needed anymore
-//		if ((lowkey == keys->key) &&
-		if ((realkey == keys->hwcode) &&
-			((event->state & keys->kmask) == keys->kflags))
-			return (keys->action);
-		keys++;
+		/* Relevant modifiers should match first */
+		if ((event->state & main_keys[i].kmask) != main_keys[i].kflags)
+			continue;
+		/* Let keyval have priority; this is also a workaround for
+		 * GTK2 bug #136280 */
+		if (lowkey == main_keys[i].key) return (main_keys[i].action);
+		/* Let keycodes match when keyvals don't */
+		if (realkey == main_keycodes[i]) cmatch = main_keys[i].action;
 	}
-	return (0);
+	/* Return keycode match, if any */
+	return (cmatch);
 }
 
 gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 {
 	int change, action;
 
-	action = wtf_pressed(event, main_keys);
+	action = wtf_pressed(event);
 	if (!action) return (FALSE);
 
 	if (check_zoom_keys(action)) return TRUE;		// Check HOME/zoom keys
@@ -1300,9 +1318,58 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 int grad_tool(int event, int x, int y, guint state, guint button)
 {
 	int i, j, *xx, *yy;
+	double d, stroke;
 	grad_info *grad = gradient + mem_channel;
 
-	if (tool_type != TOOL_GRADIENT) return (FALSE);
+	/* Handle stroke gradients */
+	if (tool_type != TOOL_GRADIENT)
+	{
+		/* Not a gradient stroke */
+		if (!mem_gradient || (grad->wmode == GRAD_MODE_NONE) ||
+			(event == GDK_BUTTON_RELEASE) || !button)
+			return (FALSE);
+		/* Standing still */
+		if ((tool_ox == x) && (tool_oy == y)) return (FALSE);
+		if (!pen_down || (tool_type > TOOL_SPRAY)) /* Begin stroke */
+		{
+			grad_path = grad->xv = grad->yv = 0.0;
+		}
+		else /* Continue stroke */
+		{
+			i = x - tool_ox; j = y - tool_oy;
+			stroke = sqrt(i * i + j * j);
+			/* First step - anchor rear end */
+			if (grad_path == 0.0)
+			{
+				d = tool_size * 0.5 / stroke;
+				grad_x0 = tool_ox - i * d;
+				grad_y0 = tool_oy - j * d;
+			}
+			/* Scalar product */
+			d = (tool_ox - grad_x0) * (x - tool_ox) +
+				(tool_oy - grad_y0) * (y - tool_oy);
+			if (d < 0.0) /* Going backward - flip rear */
+			{
+				d = tool_size * 0.5 / stroke;
+				grad_x0 = x - i * d;
+				grad_y0 = y - j * d;
+				grad_path += tool_size + stroke;
+			}
+			else /* Going forward or sideways - drag rear */
+			{
+				stroke = sqrt((x - grad_x0) * (x - grad_x0) +
+					(y - grad_y0) * (y - grad_y0));
+				d = tool_size * 0.5 / stroke;
+				grad_x0 = x + (grad_x0 - x) * d;
+				grad_y0 = y + (grad_y0 - y) * d;
+				grad_path += stroke - tool_size * 0.5;
+			}
+			d = 2.0 / (double)tool_size;
+			grad->xv = (x - grad_x0) * d;
+			grad->yv = (y - grad_y0) * d;
+		}
+		return (FALSE); /* Let drawing tools run */
+	}
 
 	/* Left click sets points and picks them up again */
 	if ((event == GDK_BUTTON_PRESS) && (button == 1))
@@ -3228,7 +3295,9 @@ void main_init()
 
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
 		{ _("/Help/Documentation"),	NULL,		pressed_docs,0, NULL },
-		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
+		{ _("/Help/About"),		"F1",		pressed_help,0, NULL },
+		{ _("/Help/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
+		{ _("/Help/Rebind Shortcut Keycodes"), NULL,	rebind_keys, 0, NULL }
 	};
 
 	char

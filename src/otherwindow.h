@@ -55,3 +55,5 @@ void reset_tools();
 
 void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool);
 void memory_errors(int type);
+
+void gradient_setup(int mode);

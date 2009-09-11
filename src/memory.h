@@ -75,7 +75,7 @@
 #define CMASK_CURR  (1 << mem_channel)
 #define CMASK_FOR(A) (1 << (A))
 
-char *channames[5];
+char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 typedef struct
@@ -86,6 +86,8 @@ typedef struct
 } undo_item;
 
 /// GRADIENTS
+
+#define MAX_GRAD 65536
 
 typedef struct {
 	/* Base values */
@@ -99,6 +101,7 @@ typedef struct {
 } grad_info;
 
 grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
+double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
 
 /* Gradient modes */
 #define GRAD_MODE_NONE     0
@@ -226,6 +229,14 @@ png_color mem_col_24[2];		// RGB for colour A & B
 #define mem_col_B24 mem_col_24[1]
 int mem_background;			// Non paintable area
 int mem_histogram[256];
+
+/// Line iterator
+
+/* Indices 0 and 1 are current X and Y, 2 is number of pixels remaining */
+typedef int linedata[10];
+
+void line_init(linedata line, int x0, int y0, int x1, int y1);
+int line_step(linedata line);
 
 /// Procedures
 

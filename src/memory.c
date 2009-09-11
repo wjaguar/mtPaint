@@ -39,9 +39,10 @@
 #include "csel.h"
 
 
-char *channames[NUM_CHANNELS + 1];
+char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 
 grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
+double grad_path, grad_x0, grad_y0;		// Stroke gradient temporaries
 
 /// Bayer ordered dithering
 
@@ -776,12 +777,14 @@ void mem_init()					// Initialise memory
 {
 	unsigned char *dest;
 	char txt[300], *cnames[NUM_CHANNELS + 1] =
-		{ "", _("Alpha"), _("Selection"), _("Mask"), NULL };
+		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
 	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
 
-	for (i = 0; i < NUM_CHANNELS + 1; i++) channames[i] = cnames[i];
+	for (i = 0; i < NUM_CHANNELS + 1; i++)
+		allchannames[i] = channames[i] = cnames[i];
+	channames[CHN_IMAGE] = "";
 
 	toolbar_preview_init();
 
@@ -2167,32 +2170,65 @@ void mem_boundary( int *x, int *y, int *w, int *h )		// Check/amend boundaries
 	}
 }
 
+void line_init(linedata line, int x0, int y0, int x1, int y1)
+{
+	line[0] = x0;
+	line[1] = y0;
+	line[6] = line[8] = x1 < x0 ? -1 : 1;
+	line[7] = line[9] = y1 < y0 ? -1 : 1;
+	line[4] = abs(x1 - x0);
+	line[5] = abs(y1 - y0);
+	if (line[4] < line[5]) /* More vertical */
+	{
+		line[2] = line[3] = line[5];
+		line[4] *= 2;
+		line[5] *= 2;
+		line[6] = 0;
+	}
+	else /* More horizontal */
+	{
+		line[2] = line[3] = line[4];
+		line[4] = 2 * line[5];
+		line[5] = 2 * line[2];
+		line[7] = 0;
+	}
+}
+
+int line_step(linedata line)
+{
+	line[3] -= line[4];
+	if (line[3] <= 0)
+	{
+		line[3] += line[5];
+		line[0] += line[8];
+		line[1] += line[9];
+	}
+	else
+	{
+		line[0] += line[6];
+		line[1] += line[7];
+	}
+	return (--line[2]);
+}
+
 void sline( int x1, int y1, int x2, int y2 )		// Draw single thickness straight line
 {
-	int i, xdo, ydo, px, py, todo;
-	float rat;
+	linedata line;
 
-	xdo = x2 - x1;
-	ydo = y2 - y1;
-	mtMAX( todo, abs(xdo), abs(ydo) )
-	if (todo==0) todo=1;
-
-	for ( i=0; i<=todo; i++ )
+	line_init(line, x1, y1, x2, y2);
+	for (; line[2] >= 0; line_step(line))
 	{
-		rat = ((float) i ) / todo;
-		px = mt_round(x1 + (x2 - x1) * rat);
-		py = mt_round(y1 + (y2 - y1) * rat);
-		IF_IN_RANGE( px, py ) put_pixel( px, py );
+		IF_IN_RANGE(line[0], line[1]) put_pixel(line[0], line[1]);
 	}
 }
 
 
 void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness straight line
 {
+	linedata line;
 	int xv, yv;			// x/y vectors
 	int xv2, yv2;
-	int i, xdo, ydo, px, py, todo;
-	float rat;
+	int xdo, ydo, todo;
 	float xuv, yuv, llen;		// x/y unit vectors, line length
 	float xv1, yv1;			// vector for shadow x/y
 
@@ -2201,10 +2237,11 @@ void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness s
 	mtMAX( todo, abs(xdo), abs(ydo) )
 	if (todo<2) return;		// The 1st and last points are done by calling procedure
 
-	if ( size < 2 || ( x1 == x2 && y1 == y2) ) sline( x1, y1, x2, y2 );
+	if ((size < 2) || ((x1 == x2) && (y1 == y2))) sline(x1, y1, x2, y2);
 	else
 	{
-		if ( size>20 && todo>20 )	// Thick long line so use less accurate g_para
+		/* Thick long line so use less accurate g_para */
+		if ((size > 20) && (todo > 20))
 		{
 			xv = x2 - x1;
 			yv = y2 - y1;
@@ -2224,14 +2261,13 @@ void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness s
 			g_para( x1 - xv2, y1 - yv2, x2 - xv2, y2 - yv2,
 				mt_round(xv1), mt_round(yv1) );
 		}
-		else	// Short or thin line so use more accurate but slower iterative method
+		/* Short or thin line so use more accurate but slower iterative method */
+		else
 		{
-			for ( i=1; i<todo; i++ )
+			line_init(line, x1, y1, x2, y2);
+			for (line_step(line); line[2] > 0; line_step(line))
 			{
-				rat = ((float) i ) / todo;
-				px = mt_round(x1 + (x2 - x1) * rat);
-				py = mt_round(y1 + (y2 - y1) * rat);
-				f_circle( px, py, size );
+				f_circle(line[0], line[1], size);
 			}
 		}
 	}
@@ -4094,10 +4130,6 @@ void put_pixel( int x, int y )	/* Combined */
 
 	if (mem_gradient) /* Gradient mode */
 	{
-
-// !!! Do nothing because there's no stroke gradient support yet
-if (gradient[mem_channel].status == GRAD_NONE) return;
-
 		if (!(op = grad_pixel(cset, x, y))) return;
 	}
 	else /* Default mode - init "colorset" */
@@ -5653,8 +5685,9 @@ int grad_pixel(unsigned char *dest, int x, int y)
 		 /* Stroke gradient */
 		if (grad->status == GRAD_NONE)
 		{
-// !!! Do nothing for now - no way to measure strokes yet
-			return (0);
+			dist = (x - grad_x0) * grad->xv +
+				(y - grad_y0) * grad->yv + grad_path;
+			break;
 		}
 
 		/* Radial gradient */

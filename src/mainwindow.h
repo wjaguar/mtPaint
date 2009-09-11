@@ -89,17 +89,7 @@
 #define ACT_VWZOOM_IN	66
 #define ACT_VWZOOM_OUT	67
 
-
-typedef struct
-{
-	char *actname;
-	int action, key, kmask, kflags;
-	guint hwcode;
-} key_action;
-
-extern key_action main_keys[];
-
-int wtf_pressed(GdkEventKey *event, key_action *keys);
+int wtf_pressed(GdkEventKey *event);
 
 GtkWidget
 	*main_window, *main_split,

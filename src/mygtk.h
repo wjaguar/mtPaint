@@ -26,10 +26,8 @@ GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
 GtkWidget *add_a_spin( int value, int min, int max );
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
-GtkWidget *add_slider2table(int val, int min, int max, GtkWidget *table,
-			int row, int column, int width, int height);
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
-void spin_to_table( GtkWidget *table, GtkWidget **spin, int row, int column, int spacing,
+GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
 void add_hseparator( GtkWidget *widget, int xs, int ys );
 
@@ -80,6 +78,12 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col);
 // Packing framed widget
 
 GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border);
+
+// Option menu
+
+GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
+	GtkSignalFunc handler);
+int wj_option_menu_get_history(GtkWidget *optmenu);
 
 // Moving mouse cursor
 

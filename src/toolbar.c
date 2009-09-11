@@ -409,10 +409,8 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	case SETB_CSEL:
 		colour_selector(COLSEL_EDIT_CSEL);
 		break;
-	case SETB_GRAD:
-
-// !!! Open gradient selection dialog here
-
+	case SETB_GRAD: /* Gradient selector */
+		gradient_setup(1);
 		break;
 	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
 		spin = add_a_spin(0, 0, 200);
@@ -432,10 +430,8 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
 		filter_window(_("Smudge settings"), box, set_smudge, NULL, TRUE);
 		break;
-	case (TTB_0 + TTB_GRAD):
-
-// !!! Open gradient placement dialog here
-
+	case (TTB_0 + TTB_GRAD): /* Gradient config */
+		gradient_setup(0);
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
