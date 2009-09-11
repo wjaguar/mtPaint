@@ -151,8 +151,6 @@ void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item
 void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data );
 
-void create_pal_quantized( GtkMenuItem *menu_item, gpointer user_data, gint item );
-
 void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item );
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 );

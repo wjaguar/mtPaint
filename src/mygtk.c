@@ -1317,6 +1317,7 @@ GtkWidget *wj_fpixmap(int width, int height)
 	w = gtk_drawing_area_new();
 	GTK_WIDGET_SET_FLAGS(w, GTK_CAN_FOCUS);
 	gtk_widget_set_events(w, GDK_ALL_EVENTS_MASK);
+	gtk_widget_show(w);
 	gtk_object_set_data_by_id(GTK_OBJECT(w), fpixmap_key, d);
 	gtk_signal_connect(GTK_OBJECT(w), "destroy",
 		GTK_SIGNAL_FUNC(wj_fpixmap_destroy), d);
@@ -1382,6 +1383,7 @@ void wj_fpixmap_move_cursor(GtkWidget *widget, int x, int y)
 	fpixmap_data *d;
 
 	if (!(d = wj_fpixmap_data(widget))) return;
+	if ((x == d->xc) && (y == d->yc)) return;
 	ocr = d->cr;
 	d->cr.x += x - d->xc;
 	d->cr.y += y - d->yc;
@@ -1452,3 +1454,166 @@ void wj_fpixmap_cursor(GtkWidget *widget, int *x, int *y)
 	if (d && d->cursor) *x = d->xc , *y = d->yc;
 	else *x = *y = 0;
 }
+
+// Menu-like combo box
+
+/* Use GtkComboBox when available */
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+
+static void wj_combo(GtkComboBox *widget, gpointer user_data)
+{
+	int i = gtk_combo_box_get_active(widget);
+	if (i >= 0) *(int *)user_data = i;
+}
+
+/* Tweak style settings for combo box */
+static void wj_combo_restyle(GtkWidget *cbox)
+{
+	static int done;
+	if (!done)
+	{
+		gtk_rc_parse_string("style \"mtPaint_cblist\" {\n"
+			"GtkComboBox::appears-as-list = 1\n}\n");
+		gtk_rc_parse_string("widget \"*.mtPaint_cbox\" "
+			"style \"mtPaint_cblist\"\n");
+		done = TRUE;
+	}
+	gtk_widget_set_name(cbox, "mtPaint_cbox");
+}
+
+/* void handler(GtkWidget *combo, gpointer user_data); */
+GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+	GtkSignalFunc handler)
+{
+	GtkWidget *cbox;
+	GtkComboBox *combo;
+	int i;
+
+
+	if (idx >= cnt) idx = 0;
+	if (!handler && var)
+	{
+		*(int *)var = idx;
+		handler = GTK_SIGNAL_FUNC(wj_combo);
+	}
+	combo = GTK_COMBO_BOX(cbox = gtk_combo_box_new_text());
+	wj_combo_restyle(cbox);
+	for (i = 0; i < cnt; i++) gtk_combo_box_append_text(combo, names[i]);
+	gtk_combo_box_set_active(combo, idx);
+	if (handler) gtk_signal_connect(GTK_OBJECT(cbox), "changed",
+		handler, var);
+
+	return (cbox);
+}
+
+int wj_combo_box_get_history(GtkWidget *combobox)
+{
+	return (gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
+}
+
+#else /* Use GtkCombo before GTK+ 2.4.0 */
+
+/* !!! In GTK+2, this handler is called twice for each change; in GTK+1,
+ * once if using cursor keys, twice if selecting from list */
+static void wj_combo(GtkWidget *entry, gpointer handler)
+{
+	GtkWidget *combo = entry->parent;
+	gpointer user_data;
+
+	/* GTK+1 updates the entry constantly - wait it out */
+#if GTK_MAJOR_VERSION == 1
+	if (GTK_WIDGET_VISIBLE(GTK_COMBO(combo)->popwin)) return;
+#endif
+	user_data = gtk_object_get_user_data(GTK_OBJECT(entry));
+	if (handler) ((void (*)(GtkWidget *, gpointer))handler)(combo, user_data);
+	else
+	{			
+		int i = wj_combo_box_get_history(combo);
+		if (i >= 0) *(int *)user_data = i;
+	}
+}
+
+#if GTK_MAJOR_VERSION == 1
+/* Notify the main handler that meaningless updates are finished */
+static void wj_combo_restart(GtkWidget *widget, GtkCombo *combo)
+{
+	gtk_signal_emit_by_name(GTK_OBJECT(combo->entry), "changed");
+}
+#endif
+
+#if GTK_MAJOR_VERSION == 2
+/* Tweak style settings for combo entry */
+static void wj_combo_restyle(GtkWidget *entry)
+{
+	static int done;
+	if (!done)
+	{
+		gtk_rc_parse_string("style \"mtPaint_extfocus\" {\n"
+			"GtkWidget::interior-focus = 0\n}\n");
+		gtk_rc_parse_string("widget \"*.mtPaint_cbentry\" "
+			"style \"mtPaint_extfocus\"\n");
+		done = TRUE;
+	}
+	gtk_widget_set_name(entry, "mtPaint_cbentry");
+}
+
+/* Prevent cursor from appearing */
+static gboolean wj_combo_kill_cursor(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
+{
+	/* !!! Private field - future binary compatibility isn't guaranteed */
+	GTK_ENTRY(widget)->cursor_visible = FALSE;
+	return (FALSE);
+}
+#endif
+
+/* void handler(GtkWidget *combo, gpointer user_data); */
+GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+	GtkSignalFunc handler)
+{
+	GtkWidget *cbox;
+	GtkCombo *combo;
+	GtkEntry *entry;
+	GList *list = NULL;
+	int i;
+
+
+	if (idx >= cnt) idx = 0;
+	if (!handler && var) *(int *)var = idx;
+	combo = GTK_COMBO(cbox = gtk_combo_new());
+#if GTK_MAJOR_VERSION == 2
+	wj_combo_restyle(combo->entry);
+	gtk_signal_connect(GTK_OBJECT(combo->entry), "expose_event",
+		GTK_SIGNAL_FUNC(wj_combo_kill_cursor), NULL);
+#endif
+	gtk_combo_set_value_in_list(combo, TRUE, FALSE);
+	for (i = 0; i < cnt; i++) list = g_list_append(list, names[i]);
+	gtk_combo_set_popdown_strings(combo, list);
+	g_list_free(list);
+	gtk_widget_show_all(cbox);
+	entry = GTK_ENTRY(combo->entry);
+	gtk_entry_set_editable(entry, FALSE);
+	gtk_entry_set_text(entry, names[idx]);
+	if (!handler && !var) return (cbox);
+
+	/* Install signal handler */
+	gtk_object_set_user_data(GTK_OBJECT(combo->entry), var);
+	gtk_signal_connect(GTK_OBJECT(combo->entry), "changed",
+		GTK_SIGNAL_FUNC(wj_combo), (gpointer)handler);
+#if GTK_MAJOR_VERSION == 1
+	gtk_signal_connect(GTK_OBJECT(combo->popwin), "hide",
+		GTK_SIGNAL_FUNC(wj_combo_restart), combo);
+#endif
+
+	return (cbox);
+}
+
+int wj_combo_box_get_history(GtkWidget *combobox)
+{
+	GtkList *list = GTK_LIST(GTK_COMBO(combobox)->list);
+
+	if (!list->selection || !list->selection->data) return (-1);
+	return(gtk_list_child_position(list, GTK_WIDGET(list->selection->data)));
+}
+
+#endif

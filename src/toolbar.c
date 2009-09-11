@@ -120,7 +120,7 @@
 #include "graphics/xpm_mode_tint.xpm"
 #include "graphics/xpm_mode_tint2.xpm"
 #include "graphics/xpm_mode_csel.xpm"
-#include "graphics/xpm_mode_filt.xpm"
+#include "graphics/xpm_mode_blend.xpm"
 #include "graphics/xpm_mode_mask.xpm"
 
 #include "graphics/xpm_grad_place.xpm"
@@ -331,7 +331,7 @@ static void toolbar_zoom_view_change()
 static int *vars_settings[TOTAL_SETTINGS] = {
 	&mem_continuous, &mem_undo_opacity,
 	&tint_mode[0], &tint_mode[1],
-	&mem_cselect, &mem_filtmode,
+	&mem_cselect, &mem_blend,
 	&mem_unmask, &mem_gradient
 };
 
@@ -399,29 +399,20 @@ static int set_brush_step(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
-static int set_filtmode(GtkWidget *box, gpointer fdata)
+static int blendtemp[5];
+
+static int set_blend(GtkWidget *box, gpointer fdata)
 {
-	GtkWidget *hbox;
-	int i, j, bits = 0;
+	int i, j;
 
-	hbox = BOX_CHILD_0(box);
-	for (i = 0; ; i++)
-	{
-		for (j = 0; j < 3; j++)
-		{
-			if (gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(BOX_CHILD(hbox, j))))
-				bits |= 1 << (i * 3 + j);
-		}
-		if (i) break;
-		hbox = BOX_CHILD_2(box);
-	}
+	i = blendtemp[0] < 0 ? BLEND_NORMAL : blendtemp[0];
+	j = !blendtemp[2] + (!blendtemp[3] << 1) + (!blendtemp[4] << 2);
 
-	/* Don't accept pass-all or stop-all masks */
-	if ((bits == 0x3F) || !(bits & 7) || !(bits & 0x38)) return (FALSE);
+	/* Don't accept stop-all or do-nothing */
+	if ((j == 7) || !(i | j)) return (FALSE);
 
-	filter_HSV = bits & 7;
-	filter_RGB = bits >> 3;
+	blend_mode = i | (blendtemp[1] ? BLEND_REVERSE : 0) |
+		(j << BLEND_RGBSHIFT);
 
 	return (TRUE);
 }
@@ -429,10 +420,12 @@ static int set_filtmode(GtkWidget *box, gpointer fdata)
 static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
-	char *hsvrgb[6] = { _("Hue"), _("Saturation"), _("Value"),
-		_("Red"), _("Green"), _("Blue") };
+	char *rgbnames[3] = { _("Red"), _("Green"), _("Blue") };
+	char *blends[BLEND_NMODES] = {
+		_("Normal"), _("Hue"), _("Saturation"), _("Value"),
+		_("Colour"), _("Saturate More") };
 	GtkWidget *box, *hbox;
-	int i, j, k;
+	int i, k;
 
 	/* Handle only right clicks */
 	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
@@ -454,23 +447,24 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	case SETB_GRAD: /* Gradient selector */
 		gradient_setup(1);
 		break;
-	case SETB_FILT: /* Component filter */
+	case SETB_FILT: /* Blend mode */
 		box = gtk_vbox_new(FALSE, 5);
-		k = filter_HSV;
-		for (i = 0; ; i++)
+		gtk_container_set_border_width(GTK_CONTAINER(box), 5);
+		k = 0;
+		pack(box, wj_combo_box(blends, BLEND_NMODES,
+			blend_mode & BLEND_MMASK, blendtemp + 0, NULL));
+		pack(box, sig_toggle(_("Reverse"), blend_mode & BLEND_REVERSE,
+			blendtemp + 1, NULL));
+		add_hseparator(box, -2, 10);
+		hbox = pack(box, gtk_hbox_new(TRUE, 5));
+		for (i = 0; i < 3; i++)
 		{
-			hbox = pack(box, gtk_hbox_new(TRUE, 5));
-			for (j = 0; j < 3; j++)
-			{
-				pack(hbox, sig_toggle(hsvrgb[i * 3 + j],
-					k & (1 << j), NULL, NULL));
-			}
-			if (i) break;
-			add_hseparator(box, -2, 10);
-			k = filter_RGB;
+			pack(hbox, sig_toggle(rgbnames[i],
+				~blend_mode & ((1 << BLEND_RGBSHIFT) << i),
+				blendtemp + 2 + i, NULL));
 		}
 		gtk_widget_show_all(box);
-		filter_window(_("Components to pass"), box, set_filtmode, NULL, TRUE);
+		filter_window(_("Blend mode"), box, set_blend, NULL, TRUE);
 		break;
 	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
 		box = gtk_vbox_new(FALSE, 5);
@@ -575,7 +569,7 @@ static toolbar_item settings_bar[] = {
 	{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
 	{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },
 	{ SETB_CSEL, 0, 0, 1, 0, _("Colour-Selective Mode"), xpm_mode_csel_xpm },
-	{ SETB_FILT, 0, 0, 1, 0, _("Filtered Mode"), xpm_mode_filt_xpm },
+	{ SETB_FILT, 0, 0, 1, 0, _("Blend Mode"), xpm_mode_blend_xpm },
 	{ SETB_MASK, 0, 0, 0, 0, _("Disable All Masks"), xpm_mode_mask_xpm },
 	{ 0, 0, 0, 0, 0, NULL, NULL }};
 

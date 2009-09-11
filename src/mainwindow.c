@@ -39,6 +39,8 @@
 #include "spawn.h"
 
 
+char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
+
 ///	INIFILE ENTRY LISTS
 
 typedef struct {
@@ -1289,6 +1291,17 @@ void var_init()
 		*(ilp->var) = inifile_get_gint32(ilp->name, ilp->defv);
 }
 
+void string_init()
+{
+	char *cnames[NUM_CHANNELS + 1] =
+		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
+	int i;
+
+	for (i = 0; i < NUM_CHANNELS + 1; i++)
+		allchannames[i] = channames[i] = cnames[i];
+	channames[CHN_IMAGE] = "";
+}
+
 static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	inilist *ilp;
@@ -1795,7 +1808,7 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 	return (FALSE);
 }
 
-int async_bk = FALSE;
+static int async_bk;
 
 #define GREY_W 153
 #define GREY_B 102
@@ -3470,7 +3483,7 @@ static menu_item main_menu[] = {
 	{ _("/_Image"), -2 },
 	{ _("/Image/tear"), -3 },
 	{ _("/Image/Convert To RGB"), -1, 0, NEED_IDX, NULL, pressed_convert_rgb, 0 },
-	{ _("/Image/Convert To Indexed"), -1, 0, NEED_24, NULL, pressed_quantize, 0 },
+	{ _("/Image/Convert To Indexed ..."), -1, 0, NEED_24, NULL, pressed_quantize, 0 },
 	{ _("/Image/sep1"), -4 },
 	{ _("/Image/Scale Canvas ..."), -1, 0, 0, NULL, pressed_scale, 0 },
 	{ _("/Image/Resize Canvas ..."), -1, 0, 0, NULL, pressed_size, 0 },
@@ -3525,9 +3538,7 @@ static menu_item main_menu[] = {
 	{ _("/Palette/Merge Duplicate Colours"), -1, 0, NEED_IDX, NULL, pressed_remove_duplicates, 0 },
 	{ _("/Palette/Remove Unused Colours"), -1, 0, NEED_IDX, NULL, pressed_remove_unused, 0 },
 	{ _("/Palette/sep3"), -4 },
-	{ _("/Palette/Create Quantized (DL1)"), -1, 0, NEED_24, NULL, create_pal_quantized, 1 },
-	{ _("/Palette/Create Quantized (DL3)"), -1, 0, NEED_24, NULL, create_pal_quantized, 3 },
-	{ _("/Palette/Create Quantized (Wu)"), -1, 0, NEED_24, NULL, create_pal_quantized, 5 },
+	{ _("/Palette/Create Quantized ..."), -1, 0, NEED_24, NULL, pressed_quantize, 1 },
 	{ _("/Palette/sep4"), -4 },
 	{ _("/Palette/Sort Colours ..."), -1, 0, 0, NULL, pressed_sort_pal, 0 },
 	{ _("/Palette/Palette Shifter ..."), -1, 0, 0, NULL, pressed_shifter, 0 },

@@ -9,7 +9,7 @@ msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2007-03-11 12:25+0000\n"
-"PO-Revision-Date: 2007-02-13 01:35+0000\n"
+"PO-Revision-Date: 2007-06-13 01:35+0000\n"
 "Last-Translator: Sylvain Cresto <scresto@gmail.com>\n"
 "Language-Team: French <fr@li.org>\n"
 "MIME-Version: 1.0\n"
@@ -547,7 +547,7 @@ msgstr ""
 "suggestions, la liste de diffusion peu vous intéresser:\n"
 
 msgid "http://sourceforge.net/mail/?group_id=155874"
-msgstr ""
+msgstr "http://sourceforge.net/mail/?group_id=155874"
 
 #: src/help.c:47
 msgid "  Ctrl-N            Create new image"
@@ -857,10 +857,10 @@ msgid "mtPaint is maintained by Dmitry Groshev.\n"
 msgstr "mtPaint est maintenu par Dmitry Groshev.\n"
 
 msgid "wjaguar@users.sourceforge.net"
-msgstr ""
+msgstr "wjaguar@users.sourceforge.net"
 
 msgid "http://mtpaint.sourceforge.net/\n"
-msgstr ""
+msgstr "http://mtpaint.sourceforge.net/\n"
 
 msgid ""
 "The following people (in alphabetical order) have contributed directly to "
@@ -917,16 +917,16 @@ msgid "Abdulla Al Muhairi - Website redesign April 2005"
 msgstr "Abdulla Al Muhairi - Nouveau look du site en Avril 2005"
 
 msgid "Alan Horkan"
-msgstr ""
+msgstr "Alan Horkan"
 
 msgid "Alexandre Prokoudine"
-msgstr ""
+msgstr "Alexandre Prokoudine"
 
 msgid "Antonio Andrea Bianco"
-msgstr ""
+msgstr "Antonio Andrea Bianco"
 
 msgid "Ed Jason"
-msgstr ""
+msgstr "Ed Jason"
 
 msgid ""
 "Eddie Kohler - Created Gifsicle which is needed for the creation and viewing "
@@ -943,25 +943,25 @@ msgstr ""
 "Rosetta"
 
 msgid "Lou Afonso"
-msgstr ""
+msgstr "Lou Afonso"
 
 msgid "Magnus Hjorth"
-msgstr ""
+msgstr "Magnus Hjorth"
 
 msgid "Martin Zelaia"
-msgstr ""
+msgstr "Martin Zelaia"
 
 msgid "Pavel Ruzicka"
-msgstr ""
+msgstr "Pavel Ruzicka"
 
 msgid "Puppy Linux (Barry Kauler)"
-msgstr ""
+msgstr "Puppy Linux (Barry Kauler)"
 
 msgid "Vlastimil Krejcir"
-msgstr ""
+msgstr "Vlastimil Krejcir"
 
 msgid "William Kern\n\n"
-msgstr ""
+msgstr "William Kern\n\n"
 
 msgid "Translations\n"
 msgstr "Traductions\n"
@@ -1113,7 +1113,7 @@ msgstr "Annuler"
 
 #: src/layer.c:678 src/mainwindow.c:1251
 msgid "Lose Changes"
-msgstr "Perdre les modifications"
+msgstr "Abandonner les modifications"
 
 #: src/layer.c:830
 #, c-format
@@ -1812,7 +1812,7 @@ msgstr "/Sélection/Tracer une ellipse"
 
 #: src/mainwindow.c:3363 src/mainwindow.c:3473
 msgid "/Selection/Fill Ellipse"
-msgstr "/Sélection/Tracer une ellipse pleinne"
+msgstr "/Sélection/Tracer une ellipse pleine"
 
 #: src/mainwindow.c:3365 src/mainwindow.c:3480
 msgid "/Selection/Flip Vertically"

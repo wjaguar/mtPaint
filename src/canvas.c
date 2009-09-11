@@ -331,35 +331,6 @@ void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	}
 }
 
-void create_pal_quantized( GtkMenuItem *menu_item, gpointer user_data, gint item )
-{
-	int i = 0;
-	unsigned char newpal[3][256];
-
-	mem_undo_next(UNDO_PAL);
-
-	if ( item==1 )
-		i = dl1quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
-	if ( item==3 )
-		i = dl3quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
-	if ( item==5 )
-		i = wu_quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
-
-	if ( i!=0 ) memory_errors(i);
-	else
-	{
-		for ( i=0; i<mem_cols; i++ )
-		{
-			mem_pal[i].red = newpal[0][i];
-			mem_pal[i].green = newpal[1][i];
-			mem_pal[i].blue = newpal[2][i];
-		}
-
-		update_menus();
-		init_pal();
-	}
-}
-
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 {
 	spot_undo(UNDO_INV);

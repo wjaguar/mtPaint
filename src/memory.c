@@ -34,8 +34,6 @@
 #include "csel.h"
 
 
-char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
-
 grad_info gradient[NUM_CHANNELS];	// Per-channel gradients
 double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
 grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
@@ -53,13 +51,13 @@ const unsigned char bayer[16] = {
 int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
-int mem_filtmode;
+int mem_blend;
 int mem_unmask;
 int mem_gradient;
 
-/// COMPONENT FILTER SETTINGS
+/// BLEND MODE SETTINGS
 
-unsigned char filter_HSV = 1, filter_RGB = 7;
+int blend_mode = BLEND_HUE;
 
 /// FLOOD FILL SETTINGS
 
@@ -293,97 +291,100 @@ png_color mem_pal_def[256]={		// Default palette entries for new image
 /// End: Primary (8) + Fades (42) + Shades (126) + Scales (66) + Misc (14) = 256
 };
 
-static unsigned char mem_cross[PALETTE_CROSS_H][PALETTE_CROSS_W] = {
-	{1,1,0,0,0,0,1,1},
-	{1,1,1,0,0,1,1,1},
-	{0,1,1,1,1,1,1,0},
-	{0,0,1,1,1,1,0,0},
-	{0,0,1,1,1,1,0,0},
-	{0,1,1,1,1,1,1,0},
-	{1,1,1,0,0,1,1,1},
-	{1,1,0,0,0,0,1,1}
+#define B8(A,B,C,D,E,F,G,H) (A|B<<1|C<<2|D<<3|E<<4|F<<5|G<<6|H<<7)
+#define B7(A,B,C,D,E,F,G) (A|B<<1|C<<2|D<<3|E<<4|F<<5|G<<6)
+
+static unsigned char mem_cross[PALETTE_CROSS_H] = {
+	B8( 1,1,0,0,0,0,1,1 ),
+	B8( 1,1,1,0,0,1,1,1 ),
+	B8( 0,1,1,1,1,1,1,0 ),
+	B8( 0,0,1,1,1,1,0,0 ),
+	B8( 0,0,1,1,1,1,0,0 ),
+	B8( 0,1,1,1,1,1,1,0 ),
+	B8( 1,1,1,0,0,1,1,1 ),
+	B8( 1,1,0,0,0,0,1,1 )
 };
-static unsigned char mem_numbers[10][PALETTE_DIGIT_H][PALETTE_DIGIT_W] = { {
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0}
+static unsigned char mem_numbers[10][PALETTE_DIGIT_H] = {{
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 )
 },{
-	{0,0,0,1,1,0,0},
-	{0,0,1,1,1,0,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0}
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,1,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 )
 },{
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,0,0,0,0,1,1},
-	{0,0,0,0,1,1,0},
-	{0,0,0,1,1,0,0},
-	{0,0,1,1,0,0,0},
-	{0,1,1,1,1,1,1}
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,1,1,0,0,0 ),
+	B7( 0,1,1,1,1,1,1 )
 },{
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,0,0,0,0,1,1},
-	{0,0,0,1,1,1,0},
-	{0,0,0,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0}
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,0,0,1,1,1,0 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 )
 },{
-	{0,0,0,0,1,1,0},
-	{0,0,0,1,1,1,0},
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,1,1,0},
-	{0,1,1,1,1,1,1},
-	{0,0,0,0,1,1,0},
-	{0,0,0,0,1,1,0}
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,0,1,1,1,0 ),
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,1,1,0 ),
+	B7( 0,1,1,1,1,1,1 ),
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,0,0,1,1,0 )
 },{
-	{0,1,1,1,1,1,1},
-	{0,1,1,0,0,0,0},
-	{0,1,1,1,1,1,0},
-	{0,0,0,0,0,1,1},
-	{0,0,0,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0}
+	B7( 0,1,1,1,1,1,1 ),
+	B7( 0,1,1,0,0,0,0 ),
+	B7( 0,1,1,1,1,1,0 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 )
 },{
-	{0,0,0,1,1,1,0},
-	{0,0,1,1,0,0,0},
-	{0,1,1,0,0,0,0},
-	{0,1,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0}
+	B7( 0,0,0,1,1,1,0 ),
+	B7( 0,0,1,1,0,0,0 ),
+	B7( 0,1,1,0,0,0,0 ),
+	B7( 0,1,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 )
 },{
-	{0,1,1,1,1,1,1},
-	{0,0,0,0,0,1,1},
-	{0,0,0,0,1,1,0},
-	{0,0,0,0,1,1,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0},
-	{0,0,0,1,1,0,0}
+	B7( 0,1,1,1,1,1,1 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 ),
+	B7( 0,0,0,1,1,0,0 )
 },{
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,0}
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,0 )
 },{
-	{0,0,1,1,1,1,0},
-	{0,1,1,0,0,1,1},
-	{0,1,1,0,0,1,1},
-	{0,0,1,1,1,1,1},
-	{0,0,0,0,0,1,1},
-	{0,0,0,0,1,1,0},
-	{0,0,1,1,1,0,0}
-} };
+	B7( 0,0,1,1,1,1,0 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,1,1,0,0,1,1 ),
+	B7( 0,0,1,1,1,1,1 ),
+	B7( 0,0,0,0,0,1,1 ),
+	B7( 0,0,0,0,1,1,0 ),
+	B7( 0,0,1,1,1,0,0 )
+}};
 
 /* Set initial state of image variables */
 void init_istate()
@@ -757,15 +758,10 @@ void mem_init()					// Initialise memory
 	static const unsigned char lookup[8] =
 		{ 0, 36, 73, 109, 146, 182, 219, 255 };
 	unsigned char *dest;
-	char txt[300], *cnames[NUM_CHANNELS + 1] =
-		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
+	char txt[300];
 	int i, j, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
-
-	for (i = 0; i < NUM_CHANNELS + 1; i++)
-		allchannames[i] = channames[i] = cnames[i];
-	channames[CHN_IMAGE] = "";
 
 	for (i = 0; i < 256; i++)	// Load up normal palette defaults
 	{
@@ -935,7 +931,7 @@ void repaint_swatch(int index)		// Update a palette colour swatch
 	{
 		for (j = 0; j < PALETTE_CROSS_W; j++)
 		{
-			tmp[0] = tmp[1] = tmp[2] = pcol[mem_cross[i][j]];
+			tmp[0] = tmp[1] = tmp[2] = pcol[(mem_cross[i] >> j) & 1];
 			tmp += 3;
 		}
 		tmp += PALETTE_W3 - PALETTE_CROSS_W * 3;
@@ -957,7 +953,7 @@ static void copy_num(int index, int tx, int ty)
 			for (j = 0; j < PALETTE_DIGIT_W; j++)
 			{
 				tmp[0] = tmp[1] = tmp[2] =
-					pcol[mem_numbers[n][i][j]];
+					pcol[(mem_numbers[n][i] >> j) & 1];
 				tmp += 3;
 			}
 			tmp += PALETTE_W3 - PALETTE_DIGIT_W * 3;
@@ -1094,15 +1090,14 @@ void mem_get_histogram(int channel)	// Calculate how many of each colour index i
 	for (i = 0; i < j; i++) mem_histogram[*img++]++;
 }
 
-static unsigned char gamma_table[256], bc_table[256];
-static int last_gamma, last_br, last_co;
-
 void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0)
 {
 	static int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
 	static int posm[9] = {0, 0xFF00, 0x5500, 0x2480, 0x1100,
 				 0x0840, 0x0410, 0x0204, 0};
+	static unsigned char gamma_table[256], bc_table[256];
+	static int last_gamma, last_br, last_co;
 	int do_gamma, do_bc, do_sa;
 	double w;
 	unsigned char rgb[3];
@@ -4224,7 +4219,7 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
-static void component_filter(unsigned char *dest, const unsigned char *src, int tint)
+static void blend_rgb(unsigned char *dest, const unsigned char *src, int tint)
 {
 	static const unsigned char hhsv[8 * 3] =
 		{0, 1, 2, /* #0: B..M */
@@ -4239,8 +4234,9 @@ static void component_filter(unsigned char *dest, const unsigned char *src, int 
 	const unsigned char *new, *old;
 	int nhex, ohex;
 
-	/* Backward transfer if passing two components */
-	if (filter_HSV & (filter_HSV - 1)) new = src , old = dest;
+	/* Backward transfer? */
+	if ((blend_mode & (BLEND_MMASK | BLEND_REVERSE)) > BLEND_REVERSE)
+		new = src , old = dest;
 	else new = dest , old = src;
 
 	nhex = ((((0x200 + new[0]) - new[1]) ^ ((0x400 + new[1]) - new[2]) ^
@@ -4248,10 +4244,9 @@ static void component_filter(unsigned char *dest, const unsigned char *src, int 
 	ohex = ((((0x200 + old[0]) - old[1]) ^ ((0x400 + old[1]) - old[2]) ^
 		 ((0x100 + old[2]) - old[0])) >> 8) * 3;
 
-	switch (filter_HSV)
+	switch (blend_mode & BLEND_MMASK)
 	{
-	case 6: /* Value + Saturation */
-	case 1: /* Hue only */
+	case BLEND_HUE: /* HS* Hue */
 	{
 		int i, nsi, nvi;
 		unsigned char os, ov;
@@ -4275,8 +4270,7 @@ static void component_filter(unsigned char *dest, const unsigned char *src, int 
 		dest[nvi] = ov;
 		break;
 	}
-	case 5: /* Value + Hue */
-	case 2: /* Saturation only */
+	case BLEND_SAT: /* HSV Saturation */
 	{
 		int i, osi, ovi;
 		unsigned char ov, os, ns, nv;
@@ -4309,8 +4303,7 @@ static void component_filter(unsigned char *dest, const unsigned char *src, int 
 		dest[ovi] = ov;
 		break;
 	}
-	case 3: /* Hue + Saturation */
-	case 4: /* Value only */
+	case BLEND_VALUE: /* HSV Value */
 	{
 		int osi, ovi;
 		unsigned char ov, nv;
@@ -4332,23 +4325,69 @@ static void component_filter(unsigned char *dest, const unsigned char *src, int 
 		dest[ovi] = nv;
 		break;
 	}
-	case 7: /* Do nothing */
+	case BLEND_COLOR: /* HSL Hue + Saturation */
+	{
+		int nsi, nvi, x0, x1, y0, y1, vsy1, vs1y;
+		unsigned char os, ov;
+
+		os = old[hhsv[ohex + 1]];
+		ov = old[hhsv[ohex + 2]];
+		x0 = os + ov;
+
+		/* New is white */
+		if (nhex == 7 * 3)
+		{
+			dest[0] = dest[1] = dest[2] = (x0 + 1) >> 1;
+			break;
+		}
+
+		nsi = hhsv[nhex + 1];
+		nvi = hhsv[nhex + 2];
+		x1 = new[nvi] + new[nsi];
+
+		y1 = x1 > 255 ? 510 - x1 : x1;
+		vs1y = (x0 + 1) * y1;
+		y0 = x0 > 255 ? 510 - x0 : x0;
+		vsy1 = (new[nvi] - new[nsi]) * y0;
+		y1 += y1;
+
+		dest[hhsv[nhex]] = (vs1y + (new[hhsv[nhex]] * 2 - x1) * y0) / y1;
+		dest[nsi] = (vs1y - vsy1) / y1;
+		dest[nvi] = (vs1y + vsy1) / y1;
+		break;
+	}
+	case BLEND_SATPP: /* Perceived saturation (a hack, but useful one) */
+	{
+		int i, xyz = old[0] + old[1] + old[2];
+
+		/* This makes difference between MIN and MAX twice larger -
+		 * somewhat like doubling HSL saturation, but without strictly
+		 * preserving L */
+		i = (old[0] * 6 - xyz + 2) / 3;
+		dest[0] = i < 0 ? 0 : i > 255 ? 255 : i;
+		i = (old[1] * 6 - xyz + 2) / 3;
+		dest[1] = i < 0 ? 0 : i > 255 ? 255 : i;
+		i = (old[2] * 6 - xyz + 2) / 3;
+		dest[2] = i < 0 ? 0 : i > 255 ? 255 : i;
+		break;
+	}
+	case BLEND_NORMAL: /* Do nothing */
 	default: break;
 	}
 
 	if (tint) src = zero;
-	switch (filter_RGB)
+	switch (blend_mode >> BLEND_RGBSHIFT)
 	{
-	case 7: /* Do nothing */
+	case 0: /* Do nothing */
 	default: return;
-	case 1: dest[1] = src[1]; /* Red */
-	case 3: dest[2] = src[2]; /* Red + Green */
+	case 6: dest[1] = src[1]; /* Red */
+	case 4: dest[2] = src[2]; /* Red + Green */
 		break;
-	case 2: dest[2] = src[2]; /* Green */
-	case 6: dest[0] = src[0]; /* Green + Blue */
+	case 5: dest[2] = src[2]; /* Green */
+	case 1: dest[0] = src[0]; /* Green + Blue */
 		break;
-	case 4: dest[0] = src[0]; /* Blue */
-	case 5: dest[1] = src[1]; /* Blue + Red */
+	case 3: dest[0] = src[0]; /* Blue */
+	case 2: dest[1] = src[1]; /* Blue + Red */
 		break;
 	}
 }
@@ -4444,7 +4483,7 @@ void put_pixel( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
-		if (mem_filtmode) component_filter(cset, old_image + ofs3, tint);
+		if (mem_blend) blend_rgb(cset, old_image + ofs3, tint);
 
 		if (tint)
 		{
@@ -4624,7 +4663,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				nrgb[1] = mem_pal[img[i]].green;
 				nrgb[2] = mem_pal[img[i]].blue;
 			}
-			if (mem_filtmode) component_filter(nrgb, img0 + ofs3, tint);
+			if (mem_blend) blend_rgb(nrgb, img0 + ofs3, tint);
 			if (tint)
 			{
 				r = img0[ofs3 + 0];

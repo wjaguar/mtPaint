@@ -43,7 +43,7 @@ void pressed_size( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data );
 
 void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_quantize( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette);
 
 void choose_pattern(int typ);				// Bring up pattern chooser
 void choose_colours();					// Bring up A/B colour editor

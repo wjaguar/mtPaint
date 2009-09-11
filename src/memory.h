@@ -93,7 +93,6 @@
 #define CMASK_CURR  (1 << mem_channel)
 #define CMASK_FOR(A) (1 << (A))
 
-char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 typedef struct
@@ -167,13 +166,26 @@ const unsigned char bayer[16];
 int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
-int mem_filtmode;
+int mem_blend;
 int mem_unmask;
 int mem_gradient;
 
-/// COMPONENT FILTER SETTINGS
+/// BLEND MODE
 
-unsigned char filter_HSV, filter_RGB;
+int blend_mode;
+
+/* Blend modes */
+#define BLEND_NORMAL 0
+#define BLEND_HUE    1
+#define BLEND_SAT    2
+#define BLEND_VALUE  3
+#define BLEND_COLOR  4
+#define BLEND_SATPP  5
+
+#define BLEND_NMODES 6
+#define BLEND_MMASK    0x7F
+#define BLEND_REVERSE  0x80
+#define BLEND_RGBSHIFT 8
 
 /// FLOOD FILL SETTINGS
 

@@ -316,6 +316,7 @@ static void prefs_apply(GtkWidget *widget)
 #ifdef U_NLS
 	inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
 	setup_language();
+	string_init();				// Translate static strings
 #endif
 
 	strncpy(mem_clip_file, gtk_entry_get_text(GTK_ENTRY(clipboard_entry)), 250);

@@ -2027,6 +2027,7 @@ static void click_quantize_radio(GtkWidget *widget, gpointer data)
 {
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
 	quantize_mode = (int)data;
+	if (dither_mode < 0) return; /* No image */
 
 	/* No dither for exact conversion */
 	gtk_widget_set_sensitive(quantize_dither, quantize_mode != 0);
@@ -2036,7 +2037,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 {
 	int i, dither, new_cols, err = 0;
 	unsigned char *old_image = mem_img[CHN_IMAGE], newpal[3][256];
-	double efrac;
+	double efrac = 0.0;
 
 	/* Dithering filters */
 	/* Floyd-Steinberg dither */
@@ -2049,17 +2050,24 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	dither = quantize_mode ? dither_mode : DITH_NONE;
 	new_cols = read_spin(quantize_spin);
 	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
-	dither_scan = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_serpent));
-	dither_8b = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_err));
-	efrac = 0.01 * read_spin(dither_spin);
-	dither_fract[dither_sel ? 1 : 0] = efrac;
+	if (dither_mode >= 0) /* Work on image */
+	{
+		dither_scan = gtk_toggle_button_get_active(
+			GTK_TOGGLE_BUTTON(dither_serpent));
+		dither_8b = gtk_toggle_button_get_active(
+			GTK_TOGGLE_BUTTON(dither_err));
+		efrac = 0.01 * read_spin(dither_spin);
+		dither_fract[dither_sel ? 1 : 0] = efrac;
+	}
 
 	gtk_widget_destroy(quantize_window);
 
 	/* Paranoia */
 	if ((quantize_mode >= 6) || (dither >= DITH_MAX)) return;
+	if ((dither_mode < 0) && (quantize_mode < 2)) return;
 
-	i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
+	if (dither_mode < 0) i = mem_undo_next(UNDO_PAL);
+	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
 	if (i)
 	{
 		memory_errors(2);
@@ -2135,20 +2143,25 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	case DITH_MAX: break;
 	}
 
-	// If the user is pasting or smudging, lose it!
-	if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-		pressed_select_none(NULL, NULL);
-	if (tool_type == TOOL_SMUDGE)
-		gtk_toggle_button_set_active(
+	if (dither_mode >= 0) /* Image was converted */
+	{
+		// If the user is pasting or smudging, lose it!
+		if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+			pressed_select_none(NULL, NULL);
+		if (tool_type == TOOL_SMUDGE) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+	}
 
 	mem_cols = new_cols;
-	mem_col_A = mem_cols > 1 ? 1 : 0;
-	mem_col_B = 0;
 	update_menus();
 	init_pal();
-	update_all_views();
-	gtk_widget_queue_draw(drawing_col_prev);
+	if (dither_mode >= 0) /* Image is now indexed */
+	{
+		mem_col_A = mem_cols > 1 ? 1 : 0;
+		mem_col_B = 0;
+		update_all_views();
+		gtk_widget_queue_draw(drawing_col_prev);
+	}
 }
 
 static void toggle_selective(GtkWidget *btn, gpointer user_data)
@@ -2165,7 +2178,7 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 	dither_sel = (int)user_data;
 }
 
-void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
+void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
 	GtkWidget *vbox, *hbox;
@@ -2192,7 +2205,8 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	quantize_cols = mem_cols_used(257);
 
-	quantize_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Convert To Indexed"),
+	quantize_window = add_a_window(GTK_WINDOW_TOPLEVEL, palette ?
+		_("Create Quantized") : _("Convert To Indexed"),
 		GTK_WIN_POS_CENTER, TRUE);
 	mainbox = gtk_vbox_new(FALSE, 0);
 	gtk_container_add(GTK_CONTAINER(quantize_window), mainbox);
@@ -2207,52 +2221,61 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	/* Notebook */
 
-	notebook = xpack(mainbox, buttoned_book(&page0, &page1, &button,
-		_("Settings")));
-	gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
+	if (!palette)
+	{
+		notebook = xpack(mainbox, buttoned_book(&page0, &page1, &button,
+			_("Settings")));
+		gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
+	}
+	else page0 = mainbox;
 
 	/* Main page - Palette frame */
 
 	/* No exact transfer if too many colours */
 	if (quantize_cols > 256) rad_txt[0] = "";
-	vbox = wj_radio_pack(rad_txt, -1, 0, quantize_cols > 256 ? 4 : 0,
-		&quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
+	if (palette) rad_txt[0] = rad_txt[1] = "";
+	vbox = wj_radio_pack(rad_txt, -1, 0, palette || (quantize_cols > 256) ?
+		4 : 0, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
 	add_with_frame(page0, _("Palette"), vbox, 5);
 
 	/* Main page - Dither frame */
 
-	hbox = wj_radio_pack(rad_txt2, -1, 6, quantize_cols > 256 ?
-		DITH_OLDFS : DITH_NONE, &dither_mode, NULL);
-	quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
-	if (quantize_cols <= 256)
-		gtk_widget_set_sensitive(quantize_dither, FALSE);
+	if (!palette)
+	{
+		hbox = wj_radio_pack(rad_txt2, -1, 6, quantize_cols > 256 ?
+			DITH_OLDFS : DITH_NONE, &dither_mode, NULL);
+		quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
+		if (quantize_cols <= 256)
+			gtk_widget_set_sensitive(quantize_dither, FALSE);
 
-	/* Settings page */
+		/* Settings page */
 
-	hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
-	add_with_frame(page1, _("Colour space"), hbox, 5);
+		hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
+		add_with_frame(page1, _("Colour space"), hbox, 5);
 
-	hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
-	add_with_frame(page1, _("Difference measure"), hbox, 5);
+		hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
+		add_with_frame(page1, _("Difference measure"), hbox, 5);
 
-	hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
-	add_with_frame(page1, _("Reduce colour bleed"), hbox, 5);
+		hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
+		add_with_frame(page1, _("Reduce colour bleed"), hbox, 5);
 
-	dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
+		dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
 
-	hbox = pack(page1, gtk_hbox_new(FALSE, 5));
-	gtk_widget_show(hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	pack(hbox, gtk_label_new(_("Error propagation, %")));
-	dither_spin = xpack(hbox, add_a_spin(100, 0, 100));
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), (dither_sel ?
-		dither_fract[1] : dither_fract[0]) * 100.0);
+		hbox = pack(page1, gtk_hbox_new(FALSE, 5));
+		gtk_widget_show(hbox);
+		gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+		pack(hbox, gtk_label_new(_("Error propagation, %")));
+		dither_spin = xpack(hbox, add_a_spin(100, 0, 100));
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin),
+			(dither_sel ? dither_fract[1] : dither_fract[0]) * 100.0);
 
-	hbox = wj_radio_pack(err_txt, -1, 3, dither_sel, &dither_sel,
-		GTK_SIGNAL_FUNC(toggle_selective));
-	add_with_frame(page1, _("Selective error propagation"), hbox, 5);
+		hbox = wj_radio_pack(err_txt, -1, 3, dither_sel, &dither_sel,
+			GTK_SIGNAL_FUNC(toggle_selective));
+		add_with_frame(page1, _("Selective error propagation"), hbox, 5);
 
-	dither_err = add_a_toggle(_("Full error precision"), page1, dither_8b);
+		dither_err = add_a_toggle(_("Full error precision"), page1, dither_8b);
+	}
+	else dither_mode = -1;
 
 	/* OK / Cancel */
 
@@ -2413,6 +2436,10 @@ static gboolean palette_pad_key(GtkWidget *widget, GdkEventKey *event,
 	y = y * PPAD_XSZ + x;
 	y = y < 0 ? 0 : y > 255 ? 255 : y;
 	palette_pad_select(y, (int)user_data);
+#if GTK_MAJOR_VERSION == 1
+	/* Return value alone doesn't stop GTK1 from running other handlers */
+	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
+#endif
 	return (TRUE);
 }
 

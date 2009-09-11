@@ -171,6 +171,8 @@ void mapped_dis_add(GtkWidget *widget, int actmap);
 
 #define MAX_RECENT 20
 
+char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
+
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
@@ -190,6 +192,7 @@ GdkGC *dash_gc;
 char mem_clip_file[256];
 
 void var_init();			// Load INI variables
+void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
 
 void men_item_state( GtkWidget *menu_items[], gboolean state );

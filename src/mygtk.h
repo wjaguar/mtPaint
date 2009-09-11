@@ -213,6 +213,12 @@ int wj_fpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr);
 void wj_fpixmap_cursor(GtkWidget *widget, int *x, int *y);
 
+// Menu-like combo box
+
+GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+	GtkSignalFunc handler);
+int wj_combo_box_get_history(GtkWidget *combobox);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0
