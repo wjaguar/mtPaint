@@ -38,7 +38,6 @@
 #include "otherwindow.h"
 #include "inifile.h"
 #include "canvas.h"
-#include "quantizer.h"
 #include "viewer.h"
 #include "layer.h"
 #include "polygon.h"

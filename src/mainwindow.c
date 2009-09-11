@@ -191,13 +191,13 @@ static void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 
 	res = mem_image_resize(x2 - x1 + 1, y2 - y1 + 1, -x1, -y1, 0);
 
-	if ( res == 0 )
+	if (!res)
 	{
 		pressed_select_none(NULL, NULL);
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		canvas_undo_chores();
 	}
-	else memory_errors(3-res);
+	else memory_errors(res);
 }
 
 void pressed_select_none( GtkMenuItem *menu_item, gpointer user_data )

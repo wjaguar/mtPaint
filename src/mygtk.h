@@ -193,13 +193,9 @@ void paned_mouse_fix(GtkWidget *widget);
 #define paned_mouse_fix(X)
 #endif
 
-// Init-time bugfixes for GTK+1 and GTK+2/Win32
+// Init-time bugfixes
 
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_WIN32
 void gtk_init_bugfixes();
-#else
-#define gtk_init_bugfixes()
-#endif
 
 // Moving mouse cursor
 

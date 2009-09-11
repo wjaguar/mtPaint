@@ -74,6 +74,7 @@ static void click_newchan_cancel()
 static void activate_channel(int chan)
 {
 	mem_channel = chan;
+	check_undo_paste_bpp();
 	pressed_opacity(chan == CHN_IMAGE ? tool_opacity : channel_col_A[chan]);
 }
 
@@ -303,11 +304,9 @@ static void click_delete_ok(GtkWidget *window)
 	if (cmask)
 	{
 		undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp, cmask);
-		if (cmask & CMASK_CURR) mem_channel = CHN_IMAGE;
 
-		update_all_views();		// Update images
-		update_image_bar();
-		update_menus();
+		check_undo_paste_bpp();
+		canvas_undo_chores();
 	}
 
 	gtk_widget_destroy(window);

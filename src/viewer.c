@@ -1335,6 +1335,7 @@ int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp)
 			else mask = img , pix = NULL;
 		if (!mask) goto fail;
 	}
+	else if (src_bpp < dest_bpp) pix = NULL;
 
 	if (mask) /* Set up clipboard mask */
 	{ 
@@ -1431,7 +1432,7 @@ fail:		free(img);
 			for (i = 0; i < w; i++ , src += src_bpp , dest += 3)
 			{
 				unsigned char *t2 = tmp + (i & 7) * 3;
-				int m = *src, r = t2[0], g = t2[1], b = t2[2];
+				int m = *src ^ 255, r = t2[0], g = t2[1], b = t2[2];
 				int kk;
 
 				kk = 255 * r + m * (bkg[0] - r);

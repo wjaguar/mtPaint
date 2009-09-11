@@ -27,6 +27,7 @@
 #include "layer.h"
 #include "inifile.h"
 #include "canvas.h"
+#include "prefs.h"
 #include "channels.h"
 #include "toolbar.h"
 #include "viewer.h"
@@ -1044,7 +1045,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	update_undo(&mem_image);
 // !!! Must be after update_undo() to get used memory right
 	if (!(mode & UC_DELETE))
-		if ((j = mem_undo_space(mem_req))) return (j);
+		if (mem_undo_space(mem_req)) return (2);
 	if (mode & UC_GETMEM) return (0); // Enough memory was freed
 
 	/* Prepare outgoing frame */
@@ -1057,7 +1058,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 
 	/* Allocate new palette */
 	newpal = mem_try_malloc(SIZEOF_PALETTE);
-	if (!newpal) return (2);
+	if (!newpal) return (1);
 
 	/* Duplicate affected channels */
 	for (i = 0; i < NUM_CHANNELS; i++)
@@ -1077,7 +1078,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 			free(newpal);
 			for (j = 0; j < i; j++)
 				if (holder[j] != mem_img[j]) free(holder[j]);
-			return (2);
+			return (1);
 		}
 		holder[i] = img;
 		/* Copy */
@@ -1262,10 +1263,6 @@ static void mem_undo_swap(int old, int new, int redo)
 	mem_height = prev->height;
 	mem_cols = prev->cols;
 	mem_img_bpp = prev->bpp;
-
-	if ( mem_col_A >= mem_cols ) mem_col_A = 0;
-	if ( mem_col_B >= mem_cols ) mem_col_B = 0;
-	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
 }
 
 void mem_undo_backward()		// UNDO requested by user
@@ -1334,14 +1331,41 @@ size_t mem_used_layers()
 	return (total);
 }
 
+int load_def_palette(char *name)
+{
+	png_color temp_pal[256];
+	int i;
+
+	if (!name[0]) return (FALSE); // Useless
+	if (valid_file(name) != 0) return (FALSE);
+
+	mem_pal_copy(temp_pal, mem_pal_def);
+	i = mem_load_pal(name, temp_pal);
+	if (i < 1) return (FALSE);
+
+	mem_pal_copy(mem_pal_def, temp_pal);
+	mem_pal_def_i = i;
+	return (TRUE);
+}
+
+int load_def_patterns(char *name)
+{
+	int i;
+
+	if (!name[0]) return (FALSE); // Useless
+	i = detect_image_format(name);
+	if ((i > FT_NONE) && (file_formats[i].flags & FF_IDX))
+		return (load_image(name, FS_PATTERN_LOAD, i) == 1);
+	return (FALSE);
+}
+
 void mem_init()					// Initialise memory
 {
 	static const unsigned char lookup[8] =
 		{ 0, 36, 73, 109, 146, 182, 219, 255 };
 	unsigned char *dest;
-	char txt[PATHBUF];
+	char txt[64];
 	int i, j, ix, iy, bs, bf, bt;
-	png_color temp_pal[256];
 
 
 	for (i = 0; i < 256; i++)	// Load up normal palette defaults
@@ -1350,20 +1374,9 @@ void mem_init()					// Initialise memory
 		mem_pal_def[i].green = lookup[mem_pal_def[i].green];
 		mem_pal_def[i].blue = lookup[mem_pal_def[i].blue];
 	}
-	mem_pal_copy( temp_pal, mem_pal_def );
 
-	snprintf(txt, PATHBUF, "%s/mtpaint.gpl", get_home_directory());
-	i = valid_file(txt);
-	if ( i == 0 )
-	{
-		i = mem_load_pal( txt, temp_pal );
-		if ( i>1 )
-		{
-			mem_pal_copy( mem_pal_def, temp_pal );
-			mem_cols = i;
-			mem_pal_def_i = i;
-		}
-	}
+	load_def_palette(inifile_get(DEFAULT_PAL_INI, ""));
+	load_def_patterns(inifile_get(DEFAULT_PAT_INI, ""));
 
 	/* Init editor settings */
 	mem_channel = CHN_IMAGE;
@@ -2007,7 +2020,7 @@ int mem_convert_rgb()			// Convert image to RGB
 	int i, j, res;
 
 	res = undo_next_core(UC_NOCOPY, mem_width, mem_height, 3, CMASK_IMAGE);
-	if (res) return 1;	// Not enough memory
+	if (res) return (res);	// Not enough memory
 
 	new_image = mem_img[CHN_IMAGE];
 	j = mem_width * mem_height;
@@ -2145,6 +2158,177 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	return (0);
 }
 
+/* Pairwise Nearest Neighbor quantization algorithm - minimizes mean square
+ * error measure; time used is proportional to number of bins squared - WJ */
+
+typedef struct {
+	double rc, gc, bc, err;
+	int cnt;
+	unsigned short nn, fw, bk, tm, mtm;
+} pnnbin;
+
+static void find_nn(pnnbin *bins, int idx)
+{
+	pnnbin *bin1, *bin2;
+	int i, nn = 0;
+	double n1, n2, dr, dg, db, nerr, err = 1e100;
+
+	bin1 = bins + idx;
+	n1 = bin1->cnt;
+	for (i = bin1->fw; i; i = bin2->fw)
+	{
+		bin2 = bins + i;
+		n2 = bin2->cnt;
+		dr = bin2->rc - bin1->rc;
+		dg = bin2->gc - bin1->gc;
+		db = bin2->bc - bin1->bc;
+		nerr = (((dr * dr + dg * dg + db * db) / (n1 + n2)) * n1 * n2);
+		if (nerr >= err) continue;
+		err = nerr;
+		nn = i;
+	}
+	bin1->err = err;
+	bin1->nn = nn;
+}
+
+int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
+	unsigned char userpal[3][256])
+{
+	unsigned short heap[32769];
+	pnnbin *bins, *tb, *nb;
+	double d, err, n1, n2;
+	int i, j, k, l, l2, h, b1, maxbins, extbins, res = 1;
+
+
+	heap[0] = 0; // Empty
+	bins = calloc(32768, sizeof(pnnbin));
+	if (!bins) return (-1);
+
+	progress_init("Quantize Pass 1", 1);
+
+	/* Build histogram */
+	k = width * height;
+	for (i = 0; i < k; i++ , inbuf += 3)
+	{
+// !!! Can throw gamma correction in here, but what to do about perceptual
+// !!! nonuniformity then?
+		j = ((inbuf[0] & 0xF8) << 7) + ((inbuf[1] & 0xF8) << 2) +
+			(inbuf[2] >> 3);
+		tb = bins + j;
+		tb->rc += inbuf[0]; tb->gc += inbuf[1]; tb->bc += inbuf[2];
+		tb->cnt++;
+	}
+
+	/* Cluster nonempty bins at one end of array */
+	tb = bins;
+	for (i = 0; i < 32768; i++)
+	{
+		if (!bins[i].cnt) continue;
+		*tb = bins[i];
+		d = 1.0 / (double)tb->cnt;
+		tb->rc *= d; tb->gc *= d; tb->bc *= d;
+		tb++;
+	}
+	maxbins = tb - bins;
+	for (i = 0; i < maxbins - 1; i++)
+	{
+		bins[i].fw = i + 1;
+		bins[i + 1].bk = i;
+	}
+// !!! Already zeroed out by calloc()
+//	bins[0].bk = bins[i].fw = 0;
+
+	/* Initialize nearest neighbors and build heap of them */
+	for (i = 0; i < maxbins; i++)
+	{
+		if (((i * 50) % maxbins >= maxbins - 50))
+			if (progress_update((float)i / maxbins)) goto quit;
+
+		find_nn(bins, i);
+		/* Push slot on heap */
+		err = bins[i].err;
+		for (l = ++heap[0]; l > 1; l = l2)
+		{
+			l2 = l >> 1;
+			if (bins[h = heap[l2]].err <= err) break;
+			heap[l] = h;
+		}
+		heap[l] = i;
+	}
+
+	progress_end();
+	progress_init("Quantize Pass 2", 1);
+
+	/* Merge bins which increase error the least */
+	extbins = maxbins - quant_to;
+	for (i = 0; i < extbins; )
+	{
+		if (((i * 50) % extbins >= extbins - 50))
+			if (progress_update((float)i / extbins)) goto quit;
+
+		/* Use heap to find which bins to merge */
+		while (TRUE)
+		{
+			tb = bins + (b1 = heap[1]); /* One with least error */
+			/* Is stored error up to date? */
+			if ((tb->tm >= tb->mtm) &&
+				(bins[tb->nn].mtm <= tb->tm)) break;
+			if (tb->mtm == 0xFFFF) /* Deleted node */
+				b1 = heap[1] = heap[heap[0]--];
+			else /* Too old error value */
+			{
+				find_nn(bins, b1);
+				tb->tm = i;
+			}
+			/* Push slot down */
+			err = bins[b1].err;
+			for (l = 1; (l2 = l + l) <= heap[0]; l = l2)
+			{
+				if ((l2 < heap[0]) && (bins[heap[l2]].err >
+					bins[heap[l2 + 1]].err)) l2++;
+				if (err <= bins[h = heap[l2]].err) break;
+				heap[l] = h;
+			}
+			heap[l] = b1;
+		}
+
+		/* Do a merge */
+		nb = bins + tb->nn;
+		n1 = tb->cnt;
+		n2 = nb->cnt;
+		d = 1.0 / (n1 + n2);
+		tb->rc = d * rint(n1 * tb->rc + n2 * nb->rc);
+		tb->gc = d * rint(n1 * tb->gc + n2 * nb->gc);
+		tb->bc = d * rint(n1 * tb->bc + n2 * nb->bc);
+		tb->cnt += nb->cnt;
+		tb->mtm = ++i;
+
+		/* Unchain deleted bin */
+		bins[nb->bk].fw = nb->fw;
+		bins[nb->fw].bk = nb->bk;
+		nb->mtm = 0xFFFF;
+	}
+
+	/* Fill palette */
+	i = j = 0;
+	while (TRUE)
+	{
+		userpal[0][j] = rint(bins[i].rc);
+		userpal[1][j] = rint(bins[i].gc);
+		userpal[2][j++] = rint(bins[i].bc);
+		if (!(i = bins[i].fw)) break;
+	}
+
+	/* Clear empty slots */
+	for (; j < quant_to; j++)
+		userpal[0][j] = userpal[1][j] = userpal[2][j] = 0;
+	res = 0;
+
+quit:	progress_end();
+	free(bins);
+	return (res);
+}
+
 /* Dithering works with 6-bit colours, because hardware VGA palette is 6-bit,
  * and any kind of dithering is imprecise by definition anyway - WJ */
 
@@ -2242,7 +2426,7 @@ static int lookup_srgb(double *srgb)
 int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int dist, int limit, int selc, int serpent, int rgb8b, double emult)
 {
-	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1;
+	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1, progress;
 	unsigned char *ddata1, *ddata2, *src, *dest;
 	double *row0, *row1, *row2, *tmp;
 	double err, intd, extd, *gamma6, *lin6;
@@ -2264,6 +2448,9 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	row1 = row0 + rlen;
 	row2 = row1 + rlen;
 	ctp = ALIGNTO(ddata2, double);
+
+	if ((progress = mem_width * mem_height > 1000000))
+		progress_init(_("Converting to Indexed Palette"), 0);
 
 	/* Preprocess palette to find whether to extend precision and where */
 	for (i = 0; i < ncols; i++)
@@ -2454,10 +2641,125 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 			}
 		}
 		tmp = row0; row0 = row1; row1 = row2; row2 = tmp;
+		if (progress && (i * 10) % mem_height >= mem_height - 10)
+			progress_update((float)(i + 1) / mem_height);
 	}
 
+	if (progress) progress_end();
 	free(ddata1);
 	free(ddata2);
+	return (0);
+}
+
+/* Dumb (but fast) Floyd-Steinberg dithering in RGB space, loosely based on
+ * Dennis Lee's dithering implementation from dl3quant.c, in turn based on
+ * dithering code from the IJG's jpeg library - WJ */
+int mem_dumb_dither(unsigned char *old, unsigned char *new, png_color *pal,
+	int width, int height, int ncols, int dither)
+{
+	unsigned short cols[32768], sqrtb[512], *sqr;
+	short limtb[512], *lim, fr[3] = {0, 0, 0};
+	short *rows = NULL, *row0 = fr, *row1 = fr;
+	unsigned char clamp[768], *src, *dest;
+	int i, j, k, j0, dj, dj3, r, g, b, rlen, serpent = 2;
+
+	/* Allocate working space */
+	rlen = (width + 2) * 3;
+	if (dither)
+	{
+		rows = calloc(rlen * 2, sizeof(short));
+		if (!rows) return (1);
+		serpent = 0;
+	}
+
+	/* Color cache, squares table, clamp table */
+	memset(cols, 0, sizeof(cols));
+	sqr = sqrtb + 256;
+	for (i = -255; i < 256; i++) sqr[i] = i * i;
+	memset(clamp, 0, 256);
+	memset(clamp + 512, 255, 256);
+	for (i = 0; i < 256; i++) clamp[i + 256] = i;
+
+	/* Error limiter table, Dennis Lee's way */
+#define ERR_LIM 20
+	lim = limtb + 256;
+	for (i = 0; i < ERR_LIM; i++)
+		lim[i] = i , lim[-i] = -i;
+	for (; i < 256; i++)
+		lim[i] = ERR_LIM , lim[-i] = -ERR_LIM;
+#undef ERR_LIM
+
+	/* Process image */
+	for (i = 0; i < height; i++)
+	{
+		src = old + i * width * 3;
+		dest = new + i * width;
+		if (serpent ^= 1)
+		{
+			j0 = 0; dj = 1;
+		}
+		else
+		{
+			j0 = (width - 1) * 3; dj = -1;
+			dest += width - 1;
+		}
+		if (dither)
+		{
+			row0 = row1 = rows + 3;
+			*(serpent ? &row1 : &row0) += rlen;
+			memset(row1 - 3, 0, rlen * sizeof(short));
+			src += j0; row0 += j0; row1 += j0;
+		}
+		dj3 = dj * 3;
+		for (j = 0; j < width; j++ , src += dj3 , dest += dj)
+		{
+			r = clamp[src[0] + ((row0[0] + 0x1008) >> 4)];
+			g = clamp[src[1] + ((row0[1] + 0x1008) >> 4)];
+			b = clamp[src[2] + ((row0[2] + 0x1008) >> 4)];
+			k = ((r & 0xF8) << 7) + ((g & 0xF8) << 2) + (b >> 3);
+			if (!cols[k]) /* Find nearest color in RGB */
+			{
+				int i, j, n = 0, l = 1000000;
+
+/* Searching for color nearest to first color in cell, instead of to cell
+ * itself, looks like a bug, but works like a feature - makes FS dither less
+ * prone to patterning. This trick I learned from Dennis Lee's code - WJ */
+				for (i = 0; i < ncols; i++)
+				{
+					j = sqr[r - pal[i].red] +
+						sqr[g - pal[i].green] +
+						sqr[b - pal[i].blue];
+					if (j >= l) continue;
+					l = j; n = i;
+				}
+				cols[k] = n + 1;
+			}
+			*dest = k = cols[k] - 1;
+			if (!dither) continue;
+
+			r = lim[r - pal[k].red];
+			g = lim[g - pal[k].green];
+			b = lim[b - pal[k].blue];
+			k = r + r;
+			row1[0 + dj3] += r;
+			row1[0 - dj3] += (r += k);
+			row1[0 + 0  ] += (r += k);
+			row0[0 + dj3] += r + k;
+			k = g + g;
+			row1[1 + dj3] += g;
+			row1[1 - dj3] += (g += k);
+			row1[1 + 0  ] += (g += k);
+			row0[1 + dj3] += g + k;
+			k = b + b;
+			row1[2 + dj3] += b;
+			row1[2 - dj3] += (b += k);
+			row1[2 + 0  ] += (b += k);
+			row0[2 + dj3] += b + k;
+			row0 += dj3; row1 += dj3;
+		}
+	}
+
+	free(rows);
 	return (0);
 }
 
@@ -3988,7 +4290,7 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 	{
 		memcpy(old_img, mem_img, sizeof(chanlist));
 		res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
-		if ( res == 1 ) return 2;		// No undo space
+		if (res) return (res);		// No undo space
 		memcpy(new_img, mem_img, sizeof(chanlist));
 		progress_init(_("Free Rotation"), 0);
 	}
@@ -4001,12 +4303,12 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 		if (!*oldmask)
 		{
 			if (!(*oldmask = malloc(ow * oh)))
-				return (2);	// Not enough memory
+				return (1);	// Not enough memory
 			memset(*oldmask, 255, ow * oh);
 		}
 
 		res = mem_clip_new(nw, nh, mem_clip_bpp, 0, TRUE);
-		if (res) return (2);	// Not enough memory
+		if (res) return (1);	// Not enough memory
 		memcpy(old_img, mem_clip_real_img, sizeof(chanlist));
 		memcpy(new_img, mem_clip.img, sizeof(chanlist));
 	}
@@ -4029,7 +4331,7 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	i = undo_next_core(UC_NOCOPY, oh, ow, mem_img_bpp, CMASK_ALL);
-	if (i) return 1;			// Not enough memory
+	if (i) return (i);			// Not enough memory
 
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
@@ -4484,7 +4786,7 @@ int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale imag
 	if (res)
 	{
 		clear_scale(&ctx);
-		return 1;			// Not enough memory
+		return (res);			// Not enough memory
 	}
 
 	progress_init(_("Scaling Image"),0);
@@ -4503,16 +4805,16 @@ int mem_isometrics(int type)
 
 	if ( type<2 )
 	{
-		if ( (oh + (ow-1)/2) > MAX_HEIGHT ) return -666;
+		if ( (oh + (ow-1)/2) > MAX_HEIGHT ) return -5;
 		i = mem_image_resize(ow, oh + (ow-1)/2, 0, 0, 0);
 	}
 	if ( type>1 )
 	{
-		if ( (ow+oh-1) > MAX_WIDTH ) return -666;
+		if ( (ow+oh-1) > MAX_WIDTH ) return -5;
 		i = mem_image_resize(ow + oh - 1, oh, 0, 0, 0);
 	}
 
-	if ( i<0 ) return i;
+	if (i) return (i);
 
 	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
@@ -4597,7 +4899,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
-	if (res) return (1);			// Not enough memory
+	if (res) return (res);			// Not enough memory
 
 	/* Special mode for simplest, one-piece-covering case */
 	if ((ox <= 0) && (nw - ox <= ow)) hmode = -1;
@@ -5136,8 +5438,8 @@ void put_pixel( int x, int y )	/* Combined */
 	else /* Default mode - init "colorset" */
 	{
 		i = ((x & 7) + 8 * (y & 7));
-		cset[mem_channel + 3] = channel_col_[mem_pattern[i] ^ 1][mem_channel];
-		cset[CHN_ALPHA + 3] = channel_col_[mem_pattern[i] ^ 1][CHN_ALPHA];
+		cset[mem_channel + 3] = channel_col_[mem_pattern[i]][mem_channel];
+		cset[CHN_ALPHA + 3] = channel_col_[mem_pattern[i]][CHN_ALPHA];
 		cset[CHN_IMAGE + 3] = mem_col_pat[i]; /* !!! This must be last! */
 		i *= 3;
 		cset[0] = mem_col_pat24[i + 0];
@@ -6106,7 +6408,11 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 
 	/* Create arrays */
 	if (mem_channel != CHN_IMAGE) gcor = 0;
-	if (!init_gauss(&gd, radiusX, radiusY, gcor, rgbb)) return;
+	if (!init_gauss(&gd, radiusX, radiusY, gcor, rgbb))
+	{
+		memory_errors(1);
+		return;
+	}
 
 	/* Run filter */
 	progress_init(_("Gaussian Blur"), 1);
@@ -6252,7 +6558,11 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	/* Create arrays */
 	if (mem_channel != CHN_IMAGE) gcor = 0;
 // !!! No RGBA mode for now
-	if (!init_gauss(&gd, radius, radius, gcor, 0)) return;
+	if (!init_gauss(&gd, radius, radius, gcor, 0))
+	{
+		memory_errors(1);
+		return;
+	}
 
 	/* Run filter */
 	progress_init(_("Unsharp Mask"), 1);
@@ -6426,7 +6736,11 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 	/* Create arrays */
 	if (mem_channel != CHN_IMAGE) gcor = 0;
 // !!! No RGBA mode for ever - DoG mode instead
-	if (!init_gauss(&gd, radiusW, radiusN, gcor, 2)) return;
+	if (!init_gauss(&gd, radiusW, radiusN, gcor, 2))
+	{
+		memory_errors(1);
+		return;
+	}
 
 	/* Run filter */
 	progress_init(_("Difference of Gaussians"), 1);

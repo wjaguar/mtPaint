@@ -87,6 +87,7 @@ int	col_reverse,					// Painting with right button
 #define FS_SELECT_FILE 15
 #define FS_SELECT_DIR 16
 #define FS_LAYER_LOAD 17
+#define FS_PATTERN_LOAD 18
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 
@@ -160,6 +161,7 @@ void check_marquee();
 void paste_prepare();
 void commit_paste(int *update);
 void canvas_undo_chores();
+void check_undo_paste_bpp();
 
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	int vx1, int vy1, int vx2, int vy2, rgbcontext *ctx);

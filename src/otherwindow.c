@@ -27,7 +27,6 @@
 #include "viewer.h"
 #include "inifile.h"
 #include "canvas.h"
-#include "quantizer.h"
 #include "layer.h"
 #include "wu.h"
 #include "ani.h"
@@ -349,7 +348,7 @@ GtkWidget *spinbutton_col_add;
 
 static void click_col_add_ok(GtkWidget *widget)
 {
-	int i, to_add;
+	int to_add;
 
 	to_add = read_spin(spinbutton_col_add);
 
@@ -357,20 +356,10 @@ static void click_col_add_ok(GtkWidget *widget)
 	{
 		spot_undo(UNDO_PAL);
 
-		if ( to_add>mem_cols )
-			for ( i=mem_cols; i<to_add; i++ )
-			{
-				mem_pal[i].red = 0;
-				mem_pal[i].green = 0;
-				mem_pal[i].blue = 0;
-			}
+		if (to_add > mem_cols) memset(mem_pal + mem_cols, 0,
+			(to_add - mem_cols) * sizeof(png_color));
 
 		mem_cols = to_add;
-		if ( mem_img_bpp == 1 )
-		{
-			if ( mem_col_A >= mem_cols ) mem_col_A = 0;
-			if ( mem_col_B >= mem_cols ) mem_col_B = 0;
-		}
 		init_pal();
 	}
 
@@ -1966,7 +1955,7 @@ void choose_colours()
 #define DITH_FS		1
 #define DITH_STUCKI	2
 #define DITH_ORDERED	3
-#define DITH_OLDFS	4
+#define DITH_DUMBFS	4
 #define DITH_OLDDITHER	5
 #define DITH_OLDSCATTER	6
 #define DITH_MAX	7
@@ -2020,14 +2009,14 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	gtk_widget_destroy(quantize_window);
 
 	/* Paranoia */
-	if ((quantize_mode >= 6) || (dither >= DITH_MAX)) return;
+	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
 	if ((dither_mode < 0) && (quantize_mode < 2)) return;
 
 	if (dither_mode < 0) i = mem_undo_next(UNDO_PAL);
 	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
 	if (i)
 	{
-		memory_errors(2);
+		memory_errors(i);
 		return;
 	}
 
@@ -2040,23 +2029,14 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		break;
 	default:
 	case 1: /* Use current palette */
-		for (i = 0; i < new_cols; i++)
-		{
-			newpal[0][i] = mem_pal[i].red;
-			newpal[1][i] = mem_pal[i].green;
-			newpal[2][i] = mem_pal[i].blue;
-		}
 		break;
-	case 2: /* DL1 quantizer */
-		err = dl1quant(old_image, mem_width, mem_height, new_cols, newpal);
+	case 2: /* PNN quantizer */
+		err = pnnquan(old_image, mem_width, mem_height, new_cols, newpal);
 		break;
-	case 3: /* DL3 quantizer */
-		err = dl3quant(old_image, mem_width, mem_height, new_cols, newpal);
-		break;
-	case 4: /* Wu quantizer */
+	case 3: /* Wu quantizer */
 		err = wu_quant(old_image, mem_width, mem_height, new_cols, newpal);
 		break;
-	case 5: /* Max-Min quantizer */
+	case 4: /* Max-Min quantizer */
 		err = maxminquan(old_image, mem_width, mem_height, new_cols, newpal);
 		break;
 	}
@@ -2077,8 +2057,8 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	case DITH_NONE:
 	case DITH_FS:
 	case DITH_STUCKI:
-		mem_dither(old_image, new_cols, dither == DITH_NONE ? NULL :
-			dither == DITH_FS ? fs_dither : s_dither,
+		err = mem_dither(old_image, new_cols, dither == DITH_NONE ?
+			NULL : dither == DITH_FS ? fs_dither : s_dither,
 			dither_cspace, dither_dist, dither_limit, dither_sel,
 			dither_scan, dither_8b, efrac);
 		break;
@@ -2086,9 +2066,9 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 // !!! No code yet - temporarily disabled !!!
 //	case DITH_ORDERED:
 
-	case DITH_OLDFS:
-		err = dl3floste(old_image, mem_img[CHN_IMAGE],
-			mem_width, mem_height, new_cols, 1, newpal);
+	case DITH_DUMBFS:
+		err = mem_dumb_dither(old_image, mem_img[CHN_IMAGE],
+			mem_pal, mem_width, mem_height, new_cols, TRUE);
 		break;
 	case DITH_OLDDITHER:
 		err = mem_quantize(old_image, new_cols, 2);
@@ -2099,26 +2079,17 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	default:
 	case DITH_MAX: break;
 	}
+	if (err) memory_errors(1);
 
 	if (dither_mode >= 0) /* Image was converted */
 	{
-		// If the user is pasting or smudging, lose it!
-		if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-			pressed_select_none(NULL, NULL);
-		if (tool_type == TOOL_SMUDGE) gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+		mem_col_A = mem_cols > 1 ? 1 : 0;
+		mem_col_B = 0;
+		check_undo_paste_bpp();
 	}
 
 	mem_cols = new_cols;
-	update_menus();
-	init_pal();
-	if (dither_mode >= 0) /* Image is now indexed */
-	{
-		mem_col_A = mem_cols > 1 ? 1 : 0;
-		mem_col_B = 0;
-		update_cols();
-		update_all_views();
-	}
+	canvas_undo_chores();
 }
 
 static void toggle_selective(GtkWidget *btn, gpointer user_data)
@@ -2141,9 +2112,9 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 	GtkWidget *vbox, *hbox;
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
-		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
-		_("Wu Quantize (best method for small palettes)"),
-		_("Max-Min Quantize (best with dithering)"), NULL
+		_("PNN Quantize (slow, better quality)"),
+		_("Wu Quantize (fast)"),
+		_("Max-Min Quantize (best for small palettes and dithering)"), NULL
 		};
 
 	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Stucki"),
@@ -2192,7 +2163,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 	if (quantize_cols > 256) rad_txt[0] = "";
 	if (palette) rad_txt[0] = rad_txt[1] = "";
 	vbox = wj_radio_pack(rad_txt, -1, 0, palette || (quantize_cols > 256) ?
-		4 : 0, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
+		3 : 0, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
 	add_with_frame(page0, _("Palette"), vbox, 5);
 
 	/* Main page - Dither frame */
@@ -2200,7 +2171,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 	if (!palette)
 	{
 		hbox = wj_radio_pack(rad_txt2, -1, 6, quantize_cols > 256 ?
-			DITH_OLDFS : DITH_NONE, &dither_mode, NULL);
+			DITH_DUMBFS : DITH_NONE, &dither_mode, NULL);
 		quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
 		if (quantize_cols <= 256)
 			gtk_widget_set_sensitive(quantize_dither, FALSE);

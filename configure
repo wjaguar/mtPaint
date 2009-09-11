@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.14.57"
-MT_DATE="2007-10-23"
+MT_V="3.19"
+MT_DATE="2007-11-18"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -249,7 +249,7 @@ do
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man asneeded staticgif
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man asneeded staticgif nojp2
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -262,7 +262,7 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 asneeded staticgif
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 asneeded staticgif nojp2
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -275,7 +275,7 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man GIF staticgif --libdir=$I_DIR/ubuntulib
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man GIF staticgif nojp2 --libdir=$I_DIR/ubuntulib
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/share/doc/mtpaint/

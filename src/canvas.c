@@ -28,7 +28,6 @@
 #include "otherwindow.h"
 #include "inifile.h"
 #include "canvas.h"
-#include "quantizer.h"
 #include "viewer.h"
 #include "layer.h"
 #include "polygon.h"
@@ -310,13 +309,10 @@ void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 	i = mem_isometrics(item);
 
-	if ( i==0 ) canvas_undo_chores();
-	else
-	{
-		if ( i==-666 ) alert_box( _("Error"), _("The image is too large to transform."),
-					_("OK"), NULL, NULL );
-		else memory_errors(i);
-	}
+	if (!i) canvas_undo_chores();
+	else if (i == -5) alert_box( _("Error"),
+		_("The image is too large to transform."), _("OK"), NULL, NULL );
+	else memory_errors(i);
 }
 
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
@@ -519,16 +515,11 @@ void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 
 	i = mem_convert_rgb();
 
-	if ( i!=0 ) memory_errors(i);
+	if (i) memory_errors(i);
 	else
 	{
-		if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-			pressed_select_none( NULL, NULL );
-				// If the user is pasting, lose it!
-
-		update_menus();
-		init_pal();
-		update_all_views();
+		check_undo_paste_bpp();
+		canvas_undo_chores();
 	}
 }
 
@@ -545,22 +536,23 @@ void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	if ( mem_image_rot(item) == 0 )
+	int i = mem_image_rot(item);
+	if (i) memory_errors(i);
+	else
 	{
 		check_marquee();
 		canvas_undo_chores();
 	}
-	else alert_box( _("Error"), _("Not enough memory to rotate image"), _("OK"), NULL, NULL );
 }
 
 void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	if ( mem_sel_rot(item) == 0 )
+	if (mem_sel_rot(item)) memory_errors(1);
+	else
 	{
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}
-	else	alert_box( _("Error"), _("Not enough memory to rotate clipboard"), _("OK"), NULL, NULL );
 }
 
 int do_rotate_free(GtkWidget *box, gpointer fdata)
@@ -617,7 +609,7 @@ void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	if ( mem_clip_mask == NULL )
 	{
 		i = mem_clip_mask_init(item ^ 255);
-		if ( i != 0 )
+		if (i)
 		{
 			memory_errors(1);	// Not enough memory
 			return;
@@ -672,7 +664,7 @@ void pressed_clip_mask_all()
 	int i;
 
 	i = mem_clip_mask_init(0);
-	if ( i != 0 )
+	if (i)
 	{
 		memory_errors(1);	// Not enough memory
 		return;
@@ -1110,12 +1102,15 @@ void canvas_undo_chores()
 
 void check_undo_paste_bpp()
 {
-	if (marq_status >= MARQUEE_PASTE && (mem_clip_bpp != MEM_BPP))
-		pressed_select_none( NULL, NULL );
+	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
 
-	if ( tool_type == TOOL_SMUDGE && mem_img_bpp == 1 )
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-		// User is smudging and undo/redo to an indexed image - reset tool
+	if ((marq_status >= MARQUEE_PASTE) && (mem_clip_bpp > MEM_BPP))
+		pressed_select_none(NULL, NULL);
+
+	// User is smudging and image has become indexed - reset tool
+	if ((tool_type == TOOL_SMUDGE) && (mem_img_bpp == 1))
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+			icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 }
 
 void main_undo( GtkMenuItem *menu_item, gpointer user_data )
@@ -1208,6 +1203,9 @@ void update_cols()
 
 void init_pal()					// Initialise palette after loading
 {
+	if (mem_col_A >= mem_cols) mem_col_A = 0;
+	if (mem_col_B >= mem_cols) mem_col_B = 0;
+
 	mem_mask_init();		// Reinit RGB masks
 	mem_pal_init();			// Update palette RGB on screen
 	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
@@ -1313,15 +1311,18 @@ int do_a_load( char *fname )
 		if ( !view_showing ) view_show();
 			// We have just loaded a layers file so display view & layers window if not up
 	}
-	/* To prevent automatic paste following a file load when enabling
-	 * "Changing tool commits paste" via preferences */
-	pressed_select_none(NULL, NULL);
-	reset_tools();
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
+
+	if (!undo_load) // No reason to reset tools in undoable mode
+	{
+		pressed_select_none(NULL, NULL); // To prevent automatic paste
+		reset_tools();
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+			icon_buttons[DEFAULT_TOOL_ICON]),TRUE);
+	}
 
 	/* Show new image */
-	update_all_views();
-	update_image_bar();
+	check_undo_paste_bpp();
+	canvas_undo_chores();
 
 fail:	set_image(TRUE);
 	return (res <= 0);

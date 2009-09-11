@@ -1268,6 +1268,18 @@ unsigned char *render_patterns()
 	return (buf);
 }
 
+/* Set 0-1 indexed image as new patterns */
+void set_patterns(unsigned char *src)
+{
+	int i, j, b, l = PATTERN_GRID_W * PATTERN_GRID_H * 8;
+
+	for (i = 0; i < l; i++)
+	{
+		for (b = j = 0; j < 8; j++) b += *src++ << j;
+		xbm_patterns_bits[i] = b;
+	}
+}
+
 void mem_pat_update()			// Update indexed and then RGB pattern preview
 {
 	int i, j, k, l, ii, b;

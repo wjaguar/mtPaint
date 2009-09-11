@@ -8,6 +8,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 	* mtPaint is now licensed as GPL version 3 (or later)
 	* Chinese (Simplified) added by puppychinese(Cecc)
+	* Japanese translation added by Norihiro YONEDA
 	* Polish translation updated by Groszek150(LucaS)
 	* FreeType text pasting facility added
 	* Actions section added to File menu
@@ -21,6 +22,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* XPM files with up to 4096 colours can now be saved and loaded as RGB images
 	* Palette->Dither A sets colour A/B and the pattern based on the current A colour and the palette
 	* Max-min quantizer added - creates small palettes with higher saturation and contrast
+	* Faster and better PNN quantizer replaces the old DL3 quantizer
 	* Full error precision toggle added to settings page of 'Convert To Indexed' window
 	* Eliminated flicker when scrolling canvas in GTK+1 and GTK+2/Windows
 	* Dragging the main/view window divider made to behave in GTK+1
@@ -31,11 +33,15 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* mtPaint can now be compiled as a library (libmtpaint)
 	* Image rotation now sharper and faster
 	* Difference of Gaussians effect added
+	* Patterns increased to 100 and now stored in xbm_patterns.xbm file
+	* Edit->Create Patterns removed as patterns are now saved as standard XBM file
+	* Preferences->Paths : Default palette and patterns now selectable
 	* BUGFIX - Colour selective mode with zoom < 100% doesn't cause crash
 	* BUGFIX - Gradient preview now properly shows effect of mask channel
 	* BUGFIX - "Resize Canvas" with negative offset now works correctly
 	* BUGFIX - Clipboard rotation now properly handles clipboard alpha
 	* Lanczos3 rescaling filter removed due to unfavourable results
+	* DL1 quantizer removed for the same reason
 
 3.11	2007-4-2
 

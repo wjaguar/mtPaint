@@ -43,7 +43,7 @@ static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef,
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
-GtkWidget *clipboard_entry, *entry_handbook[2];
+static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2];
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
@@ -65,10 +65,14 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 13
+#define PREF_LANGS 14
 
-char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_CN.utf8", "zh_TW.utf8", "cs_CZ", "en_GB",
-		"fr_FR", "de_DE", "pl_PL", "pt_PT", "pt_BR", "sk_SK", "es_ES", "tr_TR" };
+char *pref_lang_ini_code[PREF_LANGS] = { "system",
+	"zh_CN.utf8", "zh_TW.utf8",
+	"cs_CZ", "en_GB", "fr_FR", "de_DE",
+	"ja_JP.utf8", "pl_PL", "pt_PT",
+	"pt_BR", "sk_SK", "es_ES",
+	"tr_TR" };
 
 int pref_lang;
 
@@ -335,6 +339,16 @@ static void prefs_apply(GtkWidget *widget)
 	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])), PATHBUF);
 	inifile_set(HANDBOOK_LOCATION_INI, path);
 
+	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_def[0])), PATHBUF);
+	if (strcmp(path, inifile_get(DEFAULT_PAL_INI, "")))
+		load_def_palette(path);
+	inifile_set(DEFAULT_PAL_INI, path);
+
+	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_def[1])), PATHBUF);
+	if (strcmp(path, inifile_get(DEFAULT_PAT_INI, "")))
+		load_def_patterns(path);
+	inifile_set(DEFAULT_PAT_INI, path);
+
 	update_undo_depth();		// If undo depth was changed
 	update_all_views();		// Update canvas for changes
 	set_cursor();
@@ -401,11 +415,12 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
 #ifdef U_NLS
-	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Simplified)"),
-		 _("Chinese (Taiwanese)"), _("Czech"), _("English (UK)"),
-		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
-		_("Slovak"), _("Spanish"), _("Turkish")
-					};
+	char *pref_langs[PREF_LANGS] = { _("Default System Language"),
+		_("Chinese (Simplified)"), _("Chinese (Taiwanese)"),
+		_("Czech"), _("English (UK)"), _("French"), _("German"),
+		_("Japanese"), _("Polish"), _("Portuguese"),
+		_("Portuguese (Brazilian)"), _("Slovak"), _("Spanish"),
+		_("Turkish") };
 #endif
 
 
@@ -416,7 +431,6 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		_("Max undo levels"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
-//		_("JPEG Save Quality (100=High)   "),
 		_("JPEG Save Quality (100=High)"), _("JPEG2000 Compression (0=Lossless)"),
 		_("PNG Compression (0=None)"), _("Recently Used Files"),
 		_("Progress bar silence limit") };
@@ -451,7 +465,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	for (i = 0; i < 5; i++ ) add_to_table( tab_tex[i], table3, i, 0, 5 );
 
 ///	TABLE SPINBUTTONS
-	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 1000);
+	spinbutton_maxmem = spin_to_table(table3, 0, 1, 5, mem_undo_limit, 1, 2048);
 	spinbutton_maxundo = spin_to_table(table3, 1, 1, 5, mem_undo_depth & ~1,
 		MIN_UNDO & ~1, MAX_UNDO & ~1);
 	spinbutton_greys = spin_to_table(table3, 2, 1, 5, mem_background, 0, 255);
@@ -513,6 +527,17 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		_("Select Handbook Index File"), FS_SELECT_FILE);
 	gtkuncpy(txt, inifile_get(HANDBOOK_LOCATION_INI, ""), PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]), txt);
+
+	entry_def[0] = mt_path_box(_("Default Palette"), page,
+		_("Select Default Palette"), FS_SELECT_FILE);
+	gtkuncpy(txt, inifile_get(DEFAULT_PAL_INI, ""), PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(entry_def[0]), txt);
+
+	entry_def[1] = mt_path_box(_("Default Patterns"), page,
+		_("Select Default Patterns File"), FS_SELECT_FILE);
+	gtkuncpy(txt, inifile_get(DEFAULT_PAT_INI, ""), PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(entry_def[1]), txt);
+
 
 ///	---- TAB4 - STATUS BAR
 

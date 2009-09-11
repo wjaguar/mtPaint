@@ -46,6 +46,7 @@
 #include "memory.h"
 #include "png.h"
 #include "canvas.h"
+#include "toolbar.h"
 #include "layer.h"
 #include "ani.h"
 #include "inifile.h"
@@ -152,7 +153,8 @@ static int allocate_image(ls_settings *settings, int cmask)
 
 	/* Reduce cmask according to mode */
 	if (settings->mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
-	else if (settings->mode == FS_CHANNEL_LOAD) cmask &= CMASK_IMAGE;
+	else if ((settings->mode == FS_CHANNEL_LOAD) ||
+		(settings->mode == FS_PATTERN_LOAD)) cmask &= CMASK_IMAGE;
 
 	/* Overwriting is allowed */
 	oldmask = cmask_from(settings->img);
@@ -209,8 +211,18 @@ static int allocate_image(ls_settings *settings, int cmask)
 			settings->height, settings->bpp, CMASK_CURR);
 		if (j) return (FILE_MEM_ERROR);
 		/* Allocate */
-		settings->img[mem_channel] = mem_try_malloc(sz * settings->bpp);
-		if (!settings->img[mem_channel]) return (FILE_MEM_ERROR);
+		settings->img[CHN_IMAGE] = mem_try_malloc(sz * settings->bpp);
+		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
+		break;
+	case FS_PATTERN_LOAD: /* Patterns */
+		settings->silent = TRUE;
+		/* Fixed dimensions and depth */
+		if ((settings->width != PATTERN_GRID_W * 8) ||
+			(settings->height != PATTERN_GRID_H * 8) ||
+			(settings->bpp != 1)) return (-1);
+		/* Allocate temp memory */
+		settings->img[CHN_IMAGE] = calloc(1, sz);
+		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
 		break;
 	}
 	return (0);
@@ -2961,7 +2973,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 		idx = (idx + 1) & ~1;
 		fwrite(buf, 1, idx >> 1, fp);
 		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)(h - i) / h);
+			progress_update((float)i / h);
 	}
 	fclose(fp);
 
@@ -3424,7 +3436,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 	unsigned char hdr[TGA_HSIZE], ftr[TGA_FSIZE], pal[256 * 4];
 	unsigned char *buf, *src, *srca, *dest;
 	FILE *fp;
-	int i, j, y0, y1, vstep, pbpp = 3;
+	int i, j, y0, y1, vstep, pcn, pbpp = 3;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	int rle = settings->tga_RLE;
 
@@ -3492,7 +3504,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 	{
 		y0 = 0; y1 = h; vstep = 1;
 	}
-	for (i = y0; i != y1; i += vstep)
+	for (i = y0 , pcn = 0; i != y1; i += vstep , pcn++)
 	{
 		src = settings->img[CHN_IMAGE] + i * w * settings->bpp;
 		/* Fill uncompressed row */
@@ -3557,8 +3569,8 @@ static int save_tga(char *file_name, ls_settings *settings)
 			}
 		}
 		fwrite(src, 1, dest - src, fp);
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)(h - i) / h);
+		if (!settings->silent && ((pcn * 20) % h >= h - 20))
+			progress_update((float)pcn / h);
 	}
 
 	/* Write footer */
@@ -3786,6 +3798,12 @@ int load_image(char *file_name, int mode, int ftype)
 		}
 		/* Failure */
 		else free(settings.img[CHN_IMAGE]);
+		break;
+	case FS_PATTERN_LOAD:
+		/* Success - rebuild patterns */
+		if ((res == 1) && (settings.colors == 2))
+			set_patterns(settings.img[CHN_IMAGE]);
+		free(settings.img[CHN_IMAGE]);
 		break;
 	}
 	/* Don't report animated GIF as failure */

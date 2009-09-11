@@ -19,8 +19,8 @@
 
 #define HANDBOOK_BROWSER_INI "docsBrowser"
 #define HANDBOOK_LOCATION_INI "docsLocation"
-
-GtkWidget *clipboard_entry, *entry_handbook[2];
+#define DEFAULT_PAL_INI "defaultPalette"
+#define DEFAULT_PAT_INI "defaultPatterns"
 
 int tablet_working, tablet_tool_use[3];		// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity

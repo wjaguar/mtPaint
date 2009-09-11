@@ -36,7 +36,6 @@
 #include "inifile.h"
 #include "layer.h"
 #include "mtlib.h"
-#include "quantizer.h"
 #include "wu.h"
 
 #ifdef WIN32
@@ -851,16 +850,16 @@ static void create_frames_ani()
 					newpal)) goto failure2;
 			}
 
-			// Create new indexed image
-			if (dl3floste(layer_rgb, irgb, layer_w, layer_h, cols,
-				FALSE, newpal)) goto failure2;	// Some sort of memory error
-
 			for ( i=0; i<256; i++ )		// Assemble palette for GIF export
 			{
 				pngpal[i].red	= newpal[0][i];
 				pngpal[i].green	= newpal[1][i];
 				pngpal[i].blue	= newpal[2][i];
 			}
+
+			// Create new indexed image
+			if (mem_dumb_dither(layer_rgb, irgb, pngpal,
+				layer_w, layer_h, cols, FALSE)) goto failure2;
 
 			settings.xpm_trans = -1;	// Default is no transparency
 			if (state->xpm_trans >= 0)	// Background has transparency

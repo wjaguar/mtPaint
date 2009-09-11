@@ -12,7 +12,7 @@ INCINSTALL = /usr/include
 LIBINSTALL = /usr/lib
 
 OBJS = mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
-	viewer.o quantizer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\
+	viewer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\
 	toolbar.o channels.o csel.o shifter.o spawn.o font.o
 
 $(BIN): main.o $(OBJS)

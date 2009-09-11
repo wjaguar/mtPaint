@@ -387,6 +387,9 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 int mem_new( int width, int height, int bpp, int cmask );
 //	Allocate new clipboard, removing or preserving old as needed
 int mem_clip_new(int width, int height, int bpp, int cmask, int backup);
+
+int load_def_palette(char *name);
+int load_def_patterns(char *name);
 void mem_init();				// Initialise memory
 
 //	Return the number of bytes used in image + undo stuff
@@ -416,9 +419,15 @@ int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	unsigned char userpal[3][256]);
+//	Quantize image using PNN algorithm
+int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
+	unsigned char userpal[3][256]);
 //	Convert RGB->indexed using error diffusion with variety of options
 int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int dist, int limit, int selc, int serpent, int rgb8b, double emult);
+//	Do the same in dumb but fast way
+int mem_dumb_dither(unsigned char *old, unsigned char *new, png_color *pal,
+	int width, int height, int ncols, int dither);
 //	Set up colors A, B, and pattern for dithering a given RGB color
 void mem_find_dither(int red, int green, int blue); 
 //	Convert image to Indexed Palette using quantize

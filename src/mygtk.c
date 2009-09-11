@@ -962,7 +962,8 @@ void paned_mouse_fix(GtkWidget *widget)
 // Init-time bugfixes
 
 /* Bugs: GtkViewport size request in GTK+1; GtkHScale breakage in Smooth Theme
- * Engine in GTK+1; mixing up keys in GTK+2/Windows */
+ * Engine in GTK+1; mixing up keys in GTK+2/Windows; opaque focus rectangle in
+ * Gtk-Qt theme engine (v0.8) in GTK+2/X */
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -1065,6 +1066,33 @@ static GdkFilterReturn win_keys_peek(GdkXEvent *xevent, GdkEvent *event, gpointe
 void gtk_init_bugfixes()
 {
 	gdk_window_add_filter(NULL, (GdkFilterFunc)win_keys_peek, NULL);
+}
+
+#else /* if defined GDK_WINDOWING_X11 */
+
+/* Gtk-Qt's author was deluded when he decided he knows how to draw focus;
+ * doing nothing is *FAR* preferable to opaque box over a widget - WJ */
+static void fake_draw_focus()
+{
+	return;
+}
+
+void gtk_init_bugfixes()
+{
+	GtkWidget *bt;
+	GtkStyleClass *sc;
+	GType qtt;
+
+
+	/* Detect if Gtk-Qt engine is active, and fix its bugs */
+	bt = gtk_button_new();
+	qtt = g_type_from_name("QtEngineStyle");
+	if (qtt)
+	{
+		sc = g_type_class_ref(qtt); /* Have to ref to get it to init */
+		sc->draw_focus = fake_draw_focus;
+	}
+	gtk_object_sink(GTK_OBJECT(bt)); /* Destroy a floating-ref thing */
 }
 
 #endif
