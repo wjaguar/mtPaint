@@ -911,18 +911,6 @@ void mem_init()					// Initialise memory
 	for (i = 0; i <= NUM_CHANNELS; i++)
 		gmap_setup(graddata + i, gradbytes, i);
 	grad_opacity = inifile_get_gint32("gradientOpacity", 128);
-
-unsigned char *ttt;
-ttt = gradbytes + GRAD_CUSTOM_DATA(0);
-ttt[0] = 255; ttt[1] = 0; ttt[2] = 0; ttt[3] = 0; ttt[4] = 255; ttt[5] = 0;
-ttt = gradbytes + GRAD_CUSTOM_DMAP(0);
-ttt[0] = GRAD_TYPE_HSV;
-ttt = gradbytes + GRAD_CUSTOM_OPAC(0);
-ttt[0] = 255; ttt[1] = 128;
-ttt = gradbytes + GRAD_CUSTOM_OMAP(0);
-ttt[0] = GRAD_TYPE_RGB;
-graddata[0].cvslen = graddata[0].coplen = 2;
-
 }
 
 void copy_dig( int index, int tx, int ty )
@@ -5435,9 +5423,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 
 ///	GRADIENTS
 
-static unsigned char gtemp[4 + 8 + NUM_CHANNELS * 4];
-
-/* Evaluate RGBA/indexed gradient at coordinate, return opacity */
+/* Evaluate channel gradient at coordinate, return opacity */
 /* Coordinate 0 is center of 1st pixel, 1 center of last */
 int grad_value(int *dest, double x)
 {
@@ -5520,20 +5506,25 @@ int grad_value(int *dest, double x)
 			k * (gdata[i + 1] - gdata[i]);
 	}
 
-	/* Get coupled alpha */
-	if (RGBA_mode && (ix <= CHN_IMAGE + 1))
-	{
-		gradmap = graddata + CHN_ALPHA + 1;
-		gdata = gradmap->vs; gmap = gradmap->vsmap; len = gradmap->vslen;
-		xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
-		i = xx;
-		if (i > len - 2) i = len - 2;
-		k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
-		dest[CHN_ALPHA + 3] = (gdata[i] << 8) +
-			k * (gdata[i + 1] - gdata[i]);
-	}
-
 	return (op);
+}
+
+/* Evaluate (coupled) alpha gradient at coordinate */
+static void grad_alpha(int *dest, double x)
+{
+	int i, k, len;
+	unsigned char *gdata, *gmap;
+	grad_map *gradmap;
+	double xx;
+
+	/* Get coupled alpha */
+	gradmap = graddata + CHN_ALPHA + 1;
+	gdata = gradmap->vs; gmap = gradmap->vsmap; len = gradmap->vslen;
+	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
+	i = xx;
+	if (i > len - 2) i = len - 2;
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
+	dest[CHN_ALPHA + 3] = (gdata[i] << 8) + k * (gdata[i + 1] - gdata[i]);
 }
 
 /* Evaluate RGBA/indexed gradient at point, return opacity */
@@ -5608,7 +5599,11 @@ int grad_pixel(unsigned char *dest, int x, int y)
 
 	if (mem_channel == CHN_IMAGE)
 	{
-		dest[CHN_ALPHA + 3] = (wrk[CHN_ALPHA + 3] + dither) >> 8;
+		if (RGBA_mode)
+		{
+			grad_alpha(wrk, dist);
+			dest[CHN_ALPHA + 3] = (wrk[CHN_ALPHA + 3] + dither) >> 8;
+		}
 		if (mem_img_bpp == 3)
 		{
 			dest[0] = (wrk[0] + dither) >> 8;
@@ -5670,6 +5665,8 @@ void grad_update(grad_info *grad)
 		l2 = len1 + 1.0;
 	grad->wil2 = 1.0 / l2;
 }
+
+static unsigned char gtemp[4 + 8 + NUM_CHANNELS * 4];
 
 /* Setup gradient mapping */
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot)

@@ -143,7 +143,7 @@ static void click_newchan_ok(GtkButton *window, gpointer user_data)
 				else
 				{
 					ii = sq1024[k >> 6] << 3;
-					ii += (k - ii * ii) / (ii + ii);
+					ii = (ii + k / ii) >> 1;
 					ii -= ((k - ii * ii) >> 17) & 1;
 				}
 				p2l[i] = ii ^ 255;

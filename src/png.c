@@ -215,6 +215,37 @@ static int allocate_image(ls_settings *settings, int cmask)
 	return (0);
 }
 
+/* Receives struct with image parameters, and which channels to deallocate */
+static void deallocate_image(ls_settings *settings, int cmask)
+{
+	int i;
+
+	/* No deallocating image channel */
+	for (i = CHN_IMAGE + 1; i < NUM_CHANNELS; i++)
+	{
+		if (!(cmask & CMASK_FOR(i))) continue;
+		if (!settings->img[i]) continue;
+
+		free(settings->img[i]);
+		settings->img[i] = NULL;
+
+/* !!! Currently allocations are created committed, have to rollback */
+
+		switch (settings->mode)
+		{
+		case FS_PNG_LOAD: /* Regular image */
+			mem_undo_im_[mem_undo_pointer].img[i] =
+				mem_img[i] = NULL;
+			break;
+		case FS_CLIP_FILE: /* Clipboard */
+			if (i == CHN_ALPHA) mem_clip_alpha = NULL;
+			else if (i == CHN_SEL) mem_clip_mask = NULL;
+			break;
+		default: break;
+		}
+	}
+}
+
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
@@ -1444,7 +1475,8 @@ static int load_bmp(char *file_name, ls_settings *settings)
 	FILE *fp;
 	double d;
 	int shifts[4], bpps[4];
-	int i, j, k, n, ii, w, h, bpp, cmask = CMASK_IMAGE, comp = 0, res = -1;
+	int def_alpha = FALSE, cmask = CMASK_IMAGE, comp = 0, res = -1;
+	int i, j, k, n, ii, w, h, bpp;
 	int l, bl, rl, step, skip, dx, dy;
 
 
@@ -1531,6 +1563,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 				shifts[3] = 24;
 				bpps[3] = 8;
 				cmask = CMASK_RGBA;
+				def_alpha = TRUE; /* Uncertain if alpha */
 			}
 		}
 		break;
@@ -1745,6 +1778,16 @@ static int load_bmp(char *file_name, ls_settings *settings)
 			dest = settings->img[CHN_IMAGE] + w * i;
 			tmp += 2 + tmp[1];
 		}
+	}
+
+	/* Check if alpha channel is valid */
+	if (def_alpha && settings->img[CHN_ALPHA])
+	{
+		tmp = settings->img[CHN_ALPHA];
+		j = settings->width * settings->height;
+		for (i = 0; !tmp[i] && (i < j); i++);
+		/* Delete all-zero "alpha" */
+		if (i >= j) deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
 	}
 
 fail3:	if (!settings->silent) progress_end();

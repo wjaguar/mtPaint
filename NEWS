@@ -42,7 +42,6 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Effects menu items now remain enabled for indexed images' utility channels
 	* BUGFIX - 'Focus View Window' toggle now doesn't cause snatching during layer drags
 	* BUGFIX - Smudge now doesn't make pixels darker than it should
-	...and more still remains to do... ;-)
 
 3.02	2006-10-14
 

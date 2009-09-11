@@ -2368,13 +2368,13 @@ static GtkWidget *grad_ss_pre;
 static GtkWidget *grad_opt_gtype, *grad_opt_otype;
 static GtkWidget *grad_check_grev, *grad_check_orev;
 
-static void click_grad_edit_ok(GtkWidget *widget)
-{
+static unsigned char grad_pad[GRAD_POINTS * 3], grad_mpad[GRAD_POINTS];
+static int grad_cnt, grad_ofs, grad_slot, grad_mode;
 
-// !!! Get & store the result
+static GtkWidget *grad_ed_cs, *grad_ed_opt, *grad_ed_ss, *grad_ed_tog;
+static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
 
-	gtk_widget_destroy(widget);
-}
+#define SLOT_SIZE 15
 
 #define PPAD_SLOT 11
 #define PPAD_XSZ 32
@@ -2382,12 +2382,11 @@ static void click_grad_edit_ok(GtkWidget *widget)
 #define PPAD_WIDTH(X) (PPAD_XSZ * (X) + 1)
 #define PPAD_HEIGHT(X) (PPAD_YSZ * (X) + 1)
 
-static int ppad_slot_size;
-static gboolean draw_palette_pad(GtkWidget *widget, GdkEventConfigure *event,
+static gboolean palette_pad_draw(GtkWidget *widget, GdkEventConfigure *event,
 	gpointer user_data)
 {
 	unsigned char *rgb, *tmp;
-	int i, j, k, w, h, col, row, cellsize = ppad_slot_size;
+	int i, j, k, w, h, col, row, cellsize = PPAD_SLOT;
 	int channel = (int)user_data;
 	GdkPixmap *pmap = gtk_object_get_user_data(GTK_OBJECT(widget));
 
@@ -2440,13 +2439,243 @@ static gboolean draw_palette_pad(GtkWidget *widget, GdkEventConfigure *event,
 	return (TRUE);
 }
 
+static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	int x, y, i;
+
+	/* Only single clicks */
+	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
+
+	x = event->x / PPAD_SLOT;
+	y = event->y / PPAD_SLOT;
+	if ((x < 0) || (x >= PPAD_XSZ) || (y < 0) || (y >= PPAD_YSZ))
+		return (TRUE);
+	i = y * PPAD_XSZ + x;
+	/* Indexed / utility / opacity */
+	if (!(int)user_data) mt_spinslide_set_value(grad_ed_ss, i);
+	else if (i < mem_cols) /* Valid RGB */
+	{
+		gdouble color[4] = { (gdouble)mem_pal[i].red / 255.0,
+			(gdouble)mem_pal[i].green / 255.0,
+			(gdouble)mem_pal[i].blue / 255.0, 1.0};
+
+		gtk_color_selection_set_color(GTK_COLOR_SELECTION(grad_ed_cs), color);
+	}
+	return (TRUE);
+}
+
+static void click_grad_edit_ok(GtkWidget *widget)
+{
+	int idx = (grad_channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
+		grad_channel + 1;
+
+	if (grad_mode < 0) /* Opacity */
+	{
+		memcpy(grad_tbytes + GRAD_CUSTOM_OPAC(idx), grad_pad, GRAD_POINTS);
+		memcpy(grad_tbytes + GRAD_CUSTOM_OMAP(idx), grad_mpad, GRAD_POINTS);
+		grad_tmaps[idx].coplen = grad_cnt;
+	}
+	else /* Gradient */
+	{
+		memcpy(grad_tbytes + GRAD_CUSTOM_DATA(idx), grad_pad,
+			idx ? GRAD_POINTS : GRAD_POINTS * 3);
+		memcpy(grad_tbytes + GRAD_CUSTOM_DMAP(idx), grad_mpad, GRAD_POINTS);
+		grad_tmaps[idx].cvslen = grad_cnt;
+	}
+	gtk_widget_destroy(widget);
+}
+
+static void grad_load_slot(int slot)
+{
+	gdouble color[4];
+	int i;
+
+	if (slot >= grad_cnt) /* Empty slot */
+	{
+		grad_slot = slot;
+		return;
+	}
+	grad_slot = -1; /* Block circular signal calls */
+
+	if (!grad_mode) /* RGB */
+	{
+		GtkColorSelection *cs = GTK_COLOR_SELECTION(grad_ed_cs);
+
+		for (i = 0; i < 3; i++)
+			color[i] = (gdouble)grad_pad[slot * 3 + i] / 255.0;
+		color[3] = 1.0;
+		gtk_color_selection_set_color(cs, color);
+#if GTK_MAJOR_VERSION == 1
+		gtk_color_selection_set_color(cs, color);
+#endif
+#if GTK_MAJOR_VERSION == 2
+		GdkColor c;
+
+		c.red = grad_pad[slot * 3 + 0] * 257;
+		c.green = grad_pad[slot * 3 + 1] * 257;
+		c.blue = grad_pad[slot * 3 + 2] * 257;
+		gtk_color_selection_set_previous_color(cs, &c);
+#endif
+		gtk_option_menu_set_history(GTK_OPTION_MENU(grad_ed_opt),
+			grad_mpad[slot]);
+	}
+	else /* Indexed / utility / opacity */
+	{
+		mt_spinslide_set_value(grad_ed_ss, grad_pad[slot]);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_ed_tog),
+			grad_mpad[slot] == GRAD_TYPE_CONST);
+	}
+	grad_slot = slot;
+}
+
+static void grad_redraw_slots(int idx0, int idx1)
+{
+	if (idx0 < grad_ofs) idx0 = grad_ofs;
+	if (++idx1 > grad_ofs + 16) idx1 = grad_ofs + 16;
+	for (; idx0 < idx1; idx0++)
+		gtk_widget_queue_draw(GTK_BIN(grad_ed_bar[idx0 - grad_ofs])->child);
+}
+
+static void grad_edit_set_mode()
+{
+	int mode, ix0 = grad_slot;
+
+	if (grad_slot < 0) return; /* Blocked */
+	if (!grad_mode) mode = wj_option_menu_get_history(grad_ed_opt);
+	else mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_ed_tog)) ?
+		GRAD_TYPE_CONST : GRAD_TYPE_RGB;
+	grad_mpad[grad_slot] = mode;
+
+	if (grad_cnt <= grad_slot)
+	{
+		ix0 = grad_cnt;
+		grad_cnt = grad_slot + 1;
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_ed_len), grad_cnt);
+	}
+	grad_redraw_slots(ix0, grad_slot);
+}
+
+static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data)
+{
+	gdouble color[4];
+	int i;
+
+	if (grad_slot < 0) return; /* Blocked */
+	gtk_color_selection_get_color(selection, color);
+	for (i = 0; i < 3; i++)
+		grad_pad[grad_slot * 3 + i] = rint(color[i] * 255.0);
+	grad_edit_set_mode();
+}
+
+static void grad_edit_move_slide(GtkAdjustment *adj, gpointer user_data)
+{
+	if (grad_slot < 0) return; /* Blocked */
+	grad_pad[grad_slot] = ADJ2INT(adj);
+	grad_edit_set_mode();
+}
+
+static void grad_edit_length(GtkAdjustment *adj, gpointer user_data)
+{
+	int l0 = grad_cnt;
+	grad_cnt = ADJ2INT(adj);
+	if (l0 < grad_cnt) grad_redraw_slots(l0, grad_cnt - 1);
+	else if (l0 > grad_cnt) grad_redraw_slots(grad_cnt, l0 - 1);
+}
+
+static void grad_edit_scroll(GtkButton *button, gpointer user_data)
+{
+	int dir = (int)user_data;
+	
+	grad_ofs += dir;
+	gtk_widget_set_sensitive(grad_ed_left, !!grad_ofs);
+	gtk_widget_set_sensitive(grad_ed_right, grad_ofs < GRAD_POINTS - 16);
+	grad_redraw_slots(0, GRAD_POINTS);
+}
+
+static void grad_edit_slot(GtkWidget *btn, gpointer user_data)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
+	grad_load_slot((int)user_data + grad_ofs);
+}
+
+static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
+	gpointer idx)
+{
+	unsigned char rgb[SLOT_SIZE * 2 * 3];
+	int i, n = (int)idx + grad_ofs, mode = n >= grad_cnt ? -2 : grad_mode;
+
+	switch (mode)
+	{
+	default: /* Error */
+	case -2: /* Empty */
+		rgb[0] = rgb[1] = rgb[2] = 255;
+		break;
+	case -1: /* Opacity */
+		rgb[0] = rgb[1] = rgb[2] = grad_pad[n];
+		break;
+	case 0: /* RGB */
+		rgb[0] = grad_pad[n * 3 + 0];
+		rgb[1] = grad_pad[n * 3 + 1];
+		rgb[2] = grad_pad[n * 3 + 2];
+		break;
+	case CHN_IMAGE + 1: /* Indexed */
+		i = grad_pad[n];
+		if (i >= mem_cols) rgb[0] = rgb[1] = rgb[2] = 0;
+		else
+		{
+			rgb[0] = mem_pal[i].red;
+			rgb[1] = mem_pal[i].green;
+			rgb[2] = mem_pal[i].blue;
+		}
+		break;
+	case CHN_ALPHA + 1: /* Alpha */
+	case CHN_SEL + 1: /* Selection */
+	case CHN_MASK + 1: /* Mask */
+		i = channel_rgb[mode - 1][0] * grad_pad[n];
+		rgb[0] = (i + (i >> 8) + 1) >> 8;
+		i = channel_rgb[mode - 1][1] * grad_pad[n];
+		rgb[1] = (i + (i >> 8) + 1) >> 8;
+		i = channel_rgb[mode - 1][2] * grad_pad[n];
+		rgb[2] = (i + (i >> 8) + 1) >> 8;
+		break;
+	}
+	for (i = 3; i < SLOT_SIZE * 2 * 3; i++) rgb[i] = rgb[i - 3];
+	if (mode == -2) /* Empty slot - show that */
+		memset(rgb, 0, SLOT_SIZE * 3);
+
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		0, 0, SLOT_SIZE, SLOT_SIZE, GDK_RGB_DITHER_NONE,
+		rgb + SLOT_SIZE * 3, -3);
+
+	return (TRUE);
+}
+
 static void grad_edit(GtkWidget *widget, gpointer user_data)
 {
-	GtkWidget *win, *mainbox, *hbox, *pix, *cs, *ss, *sw;
+	GtkWidget *win, *mainbox, *hbox, *hbox2, *pix, *cs, *ss, *sw, *btn;
 	int i, idx, opac = (int)user_data != 0;
 
 	idx = (grad_channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
 		grad_channel + 1;
+
+	/* Copy to temp */
+	if (opac)
+	{
+		memcpy(grad_pad, grad_tbytes + GRAD_CUSTOM_OPAC(idx), GRAD_POINTS);
+		memcpy(grad_mpad, grad_tbytes + GRAD_CUSTOM_OMAP(idx), GRAD_POINTS);
+		grad_cnt = grad_tmaps[idx].coplen;
+	}
+	else
+	{
+		memcpy(grad_pad, grad_tbytes + GRAD_CUSTOM_DATA(idx),
+			idx ? GRAD_POINTS : GRAD_POINTS * 3);
+		memcpy(grad_mpad, grad_tbytes + GRAD_CUSTOM_DMAP(idx), GRAD_POINTS);
+		grad_cnt = grad_tmaps[idx].cvslen;
+	}
+	if (grad_cnt < 2) grad_cnt = 2;
+	grad_ofs = grad_slot = 0;
+	grad_mode = opac ? -1 : idx;
 
 	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Edit Gradient"),
 		GTK_WIN_POS_CENTER, TRUE);
@@ -2454,23 +2683,26 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	gtk_container_set_border_width(GTK_CONTAINER(mainbox), 5);
 	gtk_container_add(GTK_CONTAINER(win), mainbox);
 
+	/* Palette pad */
+
 	pix = wj_pixmap(PPAD_WIDTH(PPAD_SLOT), PPAD_HEIGHT(PPAD_SLOT));
 	sw = gtk_alignment_new(0.5, 0.5, 0.0, 0.0);
 	gtk_container_add(GTK_CONTAINER(sw), pix);
 	gtk_box_pack_start(GTK_BOX(mainbox), sw, FALSE, FALSE, 0);
-	ppad_slot_size = PPAD_SLOT;
 	gtk_signal_connect(GTK_OBJECT(pix), "configure_event",
-		GTK_SIGNAL_FUNC(draw_palette_pad),
+		GTK_SIGNAL_FUNC(palette_pad_draw),
 		(gpointer)(opac ? -1 : grad_channel));
-
-// !!! Add a click handler here
-
+	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
+		GTK_SIGNAL_FUNC(palette_pad_click), (gpointer)!grad_mode);
 	add_hseparator(mainbox, -2, 10);
-	if (!idx && !opac) /* RGB */
+
+	/* Editor widgets */
+
+	if (!grad_mode) /* RGB */
 	{
 		char *interp[] = {"RGB", "HSV",	_("Backward HSV"), _("Constant")};
 
-		cs = gtk_color_selection_new();
+		grad_ed_cs = cs = gtk_color_selection_new();
 		gtk_box_pack_start(GTK_BOX(mainbox), cs, FALSE, FALSE, 0);
 #if GTK_MAJOR_VERSION == 1
 		gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), FALSE);
@@ -2479,26 +2711,71 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(cs), FALSE);
 		gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(cs), TRUE);
 #endif
-		sw = wj_option_menu(interp, 4, 0, NULL, NULL);
+		gtk_signal_connect(GTK_OBJECT(cs), "color_changed",
+			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
+		grad_ed_opt = sw = wj_option_menu(interp, 4, 0, NULL,
+			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	else /* Indexed / utility / opacity */
 	{
-		ss = mt_spinslide_new(-2, -2);
+		grad_ed_ss = ss = mt_spinslide_new(-2, -2);
 		gtk_box_pack_start(GTK_BOX(mainbox), ss, FALSE, FALSE, 0);
-		mt_spinslide_set_range(ss, 0, 255);
-		sw = gtk_check_button_new_with_label(_("Constant"));
+		mt_spinslide_set_range(ss, 0, grad_mode == CHN_IMAGE + 1 ?
+			mem_cols - 1 : 255);
+		mt_spinslide_connect(ss, GTK_SIGNAL_FUNC(grad_edit_move_slide), NULL);
+		grad_ed_tog = sw = gtk_check_button_new_with_label(_("Constant"));
 		gtk_container_set_border_width(GTK_CONTAINER(sw), 5);
+		gtk_signal_connect(GTK_OBJECT(sw), "toggled",
+			GTK_SIGNAL_FUNC(grad_edit_set_mode), NULL);
 	}
-	hbox = gtk_hbox_new(FALSE, 0);
+	hbox = gtk_hbox_new(TRUE, 5);
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
-	gtk_box_pack_start(GTK_BOX(hbox), sw, FALSE, FALSE, 0);
-	
-// !!! Add a length spin here
-// !!! Add the slot button row here
+	gtk_box_pack_start(GTK_BOX(hbox), sw, TRUE, TRUE, 0);
+	hbox2 = gtk_hbox_new(FALSE, 5);
+	gtk_box_pack_start(GTK_BOX(hbox), hbox2, TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(hbox2), gtk_label_new(_("Points:")), FALSE, FALSE, 0);
+	grad_ed_len = sw = add_a_spin(grad_cnt, 2, GRAD_POINTS);
+	gtk_box_pack_start(GTK_BOX(hbox2), sw, FALSE, FALSE, 0);
+	spin_connect(sw, GTK_SIGNAL_FUNC(grad_edit_length), NULL);
+
+	/* Gradient bar */
+
+	hbox = gtk_hbox_new(TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	grad_ed_left = btn = gtk_button_new();
+	gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
+		GTK_SHADOW_NONE));
+	gtk_widget_set_sensitive(btn, FALSE);
+	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
+		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)(-1));
+	btn = NULL;
+	for (i = 0; i < 16; i++)
+	{
+		grad_ed_bar[i] = btn = gtk_radio_button_new_from_widget(
+			GTK_RADIO_BUTTON(btn));
+		gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
+		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
+			GTK_SIGNAL_FUNC(grad_edit_slot), (gpointer)i);
+		sw = gtk_drawing_area_new();
+		gtk_container_add(GTK_CONTAINER(btn), sw);
+		gtk_widget_set_usize(sw, SLOT_SIZE, SLOT_SIZE);
+		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
+			GTK_SIGNAL_FUNC(grad_draw_slot), (gpointer)i);
+	}
+	grad_ed_right = btn = gtk_button_new();
+	gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
+	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
+		GTK_SHADOW_NONE));
+	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
+		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)1);
 
 	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+
+	grad_load_slot(0);
 
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(grad_window));
 	gtk_widget_show_all(win);

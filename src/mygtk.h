@@ -65,6 +65,7 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 
 int read_spin(GtkWidget *spin);
 GtkWidget *add_float_spin(double value, double min, double max);
+void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
 
 // Box unpacking macro
 #define BOX_CHILD(box, n) \

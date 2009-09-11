@@ -876,7 +876,7 @@ void ts_update_gradient()
 	if ((mem_img_bpp == 3) && (mem_channel <= CHN_ALPHA))
 		idx = 0; /* Allow intermediate opacities */
 
-	/* Draw the preview */
+	/* Draw the preview, ignoring RGBA coupling */
 	memset(rgb, mem_background, sizeof(rgb));
 	for (i = 0; i < GP_WIDTH; i++)
 	{

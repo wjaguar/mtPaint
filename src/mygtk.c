@@ -444,6 +444,15 @@ GtkWidget *add_float_spin(double value, double min, double max)
 	return (spin);
 }
 
+/* void handler(GtkAdjustment *adjustment, gpointer user_data); */
+void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data)
+{
+	GtkAdjustment *adj;
+	
+	adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin));
+	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
+}
+
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt)
