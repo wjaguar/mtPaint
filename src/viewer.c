@@ -29,6 +29,7 @@
 #include "layer.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "font.h"
 
 int view_showing, allow_cline, view_update_pending;
 float vw_zoom = 1;
@@ -1397,11 +1398,11 @@ gint render_text( GtkWidget *widget )
 					_("OK"), NULL, NULL );
 			if ( mem_clipboard != NULL ) free( mem_clipboard );
 			mem_clip_mask_clear();
-			text_paste = FALSE;
+			text_paste = TEXT_PASTE_NONE;
 		}
 		else
 		{
-			text_paste = TRUE;
+			text_paste = TEXT_PASTE_GTK;
 			for ( j=0; j<height; j++ )
 			{
 				source = (unsigned char *) (t_image->mem) + j * t_image->bpl;

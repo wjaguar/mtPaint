@@ -7,7 +7,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 3.20	2007-?-?
 
 	* mtPaint is now licensed as GPL version 3 (or later)
+	* Chinese (Simplified) added by puppychinese(Cecc)
 	* Polish translation updated by Groszek150(LucaS)
+	* FreeType text pasting facility added
 	* Actions section added to File menu
 	* Sharper image reduction toggle added to "Scale Canvas"
 	* Spacing for non-continuous tools is now configurable - right click the continuous mode toggle

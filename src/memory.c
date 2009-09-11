@@ -3430,7 +3430,7 @@ void mem_clip_real_clear()				// Empty the non rotated clipboard
 	}
 }
 
-static void do_rotate_free(chanlist old_img, chanlist new_img, int ow, int oh,
+void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 	int nw, int nh, int bpp, double angle, int mode, int gcor, int dis_a,
 	int silent)
 {
@@ -3478,16 +3478,20 @@ static void do_rotate_free(chanlist old_img, chanlist new_img, int ow, int oh,
 	Xwh = cx1 + tw * ca - th * sa;
 
 	/* Clear the channels */
-	if (bpp == 3)
+	if ( new_img[CHN_IMAGE] )
 	{
-		unsigned char *tmp = new_img[CHN_IMAGE];
-		tmp[0] = A_rgb[0];
-		tmp[1] = A_rgb[1];
-		tmp[2] = A_rgb[2];
-		j = nw * nh * 3;
-		for (i = 3; i < j; i++) tmp[i] = tmp[i - 3];
+		if (bpp == 3)
+		{
+			unsigned char *tmp = new_img[CHN_IMAGE];
+			tmp[0] = A_rgb[0];
+			tmp[1] = A_rgb[1];
+			tmp[2] = A_rgb[2];
+			j = nw * nh * 3;
+			for (i = 3; i < j; i++) tmp[i] = tmp[i - 3];
+		}
+		else memset(new_img[CHN_IMAGE], mem_col_A, nw * nh);
 	}
-	else memset(new_img[CHN_IMAGE], mem_col_A, nw * nh);
+
 	for (k = CHN_IMAGE + 1; k < NUM_CHANNELS; k++)
 		if (new_img[k]) memset(new_img[k], 0, nw * nh);
 
@@ -3656,13 +3660,32 @@ static void do_rotate_free(chanlist old_img, chanlist new_img, int ow, int oh,
 }
 
 
+void mem_rotate_geometry(int ow, int oh, double angle, int *nw, int *nh)
+				// Get new image geometry of rotation. angle = degrees
+{
+	int dx, dy;
+	double rangle = (M_PI / 180.0) * angle,	// Radians
+		s2, c2;				// Trig values
+
+
+	c2 = cos(rangle);
+	s2 = sin(rangle);
+
+	/* Preserve original centering */
+	dx = ow & 1; dy = oh & 1;
+	/* Exchange Y with X when rotated Y is nearer to old X */
+	if ((dx ^ dy) && (fabs(c2) < fabs(s2))) dx ^= 1 , dy ^= 1;
+#define DD (127.0 / 128.0) /* Include all _visibly_ altered pixels */
+	*nw = 2 * floor(0.5 * (fabs(ow * c2) + fabs(oh * s2) - dx) + DD) + dx;
+	*nh = 2 * floor(0.5 * (fabs(oh * c2) + fabs(ow * s2) - dy) + DD) + dy;
+#undef DD
+}
+
 // Rotate canvas or clipboard by any angle (degrees)
 int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 {
 	chanlist old_img, new_img;
 	int i, ow, oh, nw, nh, res, rot_bpp;
-	double rangle = (M_PI / 180.0) * angle;	// Radians
-	double s2, c2;				// Trig values
 
 
 	if (clipboard)
@@ -3679,10 +3702,7 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 		rot_bpp = mem_img_bpp;
 	}
 
-	c2 = cos(rangle);
-	s2 = sin(rangle);
-	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
-	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
+	mem_rotate_geometry(ow, oh, angle, &nw, &nh);
 
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 
@@ -3765,7 +3785,7 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 
 	if (!clipboard) progress_init(_("Free Rotation"),0);
 	if ( rot_bpp == 1 ) type = FALSE;
-	do_rotate_free(old_img, new_img, ow, oh, nw, nh, rot_bpp, angle, type,
+	mem_rotate_free_real(old_img, new_img, ow, oh, nw, nh, rot_bpp, angle, type,
 		gcor, channel_dis[CHN_ALPHA] && !clipboard, clipboard);
 	if (!clipboard) progress_end();
 
@@ -3990,7 +4010,7 @@ static int prepare_scale(scale_context *ctx, int ow, int oh, int nw, int nh, int
 }
 
 static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
-	int ow, int oh, int nw, int nh, int gcor)
+	int ow, int oh, int nw, int nh, int gcor, int progress)
 {
 	unsigned char *src, *img, *imga;
 	fstep *tmp = NULL, *tmpx, *tmpy, *tmpp;
@@ -4162,7 +4182,7 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 				}
 			}
 		}
-		if ((i * 10) % nh >= nh - 10) progress_update((float)(i + 1) / nh);
+		if ( progress && (i * 10) % nh >= nh - 10 ) progress_update((float)(i + 1) / nh);
 		if (tmp->idx < -1) break;
 		tmpy = tmp;
 	}
@@ -4170,13 +4190,65 @@ static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
 	clear_scale(ctx);
 }
 
+static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo_img, int img_bpp, int type, int ow, int oh, int nw, int nh, int gcor, int progress)
+{
+	char *src, *dest;
+	int i, j, oi, oj, cc, bpp;
+	double scalex, scaley, deltax, deltay;
+
+
+	if (type && (img_bpp == 3))
+		do_scale(ctx, old_img, neo_img, ow, oh, nw, nh, gcor, progress);
+	else
+	{
+		scalex = (double)ow / (double)nw;
+		scaley = (double)oh / (double)nh;
+		deltax = 0.5 * scalex - 0.5;
+		deltay = 0.5 * scaley - 0.5;
+
+		for (j = 0; j < nh; j++)
+		{
+			for (cc = 0; cc < NUM_CHANNELS; cc++)
+			{
+				if (!neo_img[cc]) continue;
+				bpp = BPP(cc);
+				dest = neo_img[cc] + nw * j * bpp;
+				oj = rint(scaley * j + deltay);
+				src = old_img[cc] + ow * oj * bpp;
+				for (i = 0; i < nw; i++)
+				{
+					oi = (int)rint(scalex * i + deltax) * bpp;
+					*dest++ = src[oi];
+					if (bpp == 1) continue;
+					*dest++ = src[oi + 1];
+					*dest++ = src[oi + 2];
+				}
+			}
+			if (progress && (j * 10) % nh >= nh - 10)
+				progress_update((float)(j + 1) / nh);
+		}
+	}
+}
+
+
+int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp, chanlist new_img, int nw, int nh, int type, int gcor, int sharp)
+{
+	scale_context ctx;
+
+
+	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp))
+		return 1;	// Not enough memory
+
+	do_scale_internal(&ctx, old_img, new_img, bpp, type, ow, oh, nw, nh, gcor, FALSE);
+
+	return 0;
+}
+
 int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale image
 {
 	scale_context ctx;
 	chanlist old_img;
-	char *src, *dest;
-	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
-	double scalex, scaley, deltax, deltay;
+	int res, ow = mem_width, oh = mem_height;
 
 	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
@@ -4193,41 +4265,13 @@ int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale imag
 	}
 
 	progress_init(_("Scaling Image"),0);
-	if (type && (mem_img_bpp == 3))
-		do_scale(&ctx, old_img, mem_img, ow, oh, nw, nh, gcor);
-	else
-	{
-		scalex = (double)ow / (double)nw;
-		scaley = (double)oh / (double)nh;
-		deltax = 0.5 * scalex - 0.5;
-		deltay = 0.5 * scaley - 0.5;
-
-		for (j = 0; j < nh; j++)
-		{
-			for (cc = 0; cc < NUM_CHANNELS; cc++)
-			{
-				if (!mem_img[cc]) continue;
-				bpp = BPP(cc);
-				dest = mem_img[cc] + nw * j * bpp;
-				oj = rint(scaley * j + deltay);
-				src = old_img[cc] + ow * oj * bpp;
-				for (i = 0; i < nw; i++)
-				{
-					oi = (int)rint(scalex * i + deltax) * bpp;
-					*dest++ = src[oi];
-					if (bpp == 1) continue;
-					*dest++ = src[oi + 1];
-					*dest++ = src[oi + 2];
-				}
-			}
-			if ((j * 10) % nh >= nh - 10)
-				progress_update((float)(j + 1) / nh);
-		}
-	}
+	do_scale_internal(&ctx, old_img, mem_img, mem_img_bpp, type, ow, oh, nw, nh, gcor, TRUE);
 	progress_end();
 
 	return 0;
 }
+
+
 
 int mem_isometrics(int type)
 {

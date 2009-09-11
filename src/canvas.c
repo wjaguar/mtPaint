@@ -37,6 +37,7 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "font.h"
 
 GtkWidget *label_bar[STATUS_ITEMS];
 
@@ -814,7 +815,7 @@ static int copy_clip(gboolean api)
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
 		 !channel_dis[CHN_ALPHA]) mem_clip_alpha = malloc(w * h);
 	mem_clipboard = malloc(w * h * bpp);
-	text_paste = FALSE;
+	text_paste = TEXT_PASTE_NONE;
 
 	if (!mem_clipboard)
 	{
@@ -1167,7 +1168,8 @@ void update_cols()
 
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
 	{
-		render_text( drawing_col_prev );
+		if ( text_paste == TEXT_PASTE_FT ) ft_render_text();
+		if ( text_paste == TEXT_PASTE_GTK ) render_text( drawing_col_prev );
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}

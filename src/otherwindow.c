@@ -34,6 +34,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "csel.h"
+#include "font.h"
 
 #if GTK_MAJOR_VERSION == 1
 #include <unistd.h>
@@ -278,7 +279,8 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
 			if ( marq_status >= MARQUEE_PASTE && text_paste )
 			{
-				render_text( drawing_col_prev );
+				if ( text_paste == TEXT_PASTE_FT ) ft_render_text();
+				else render_text( drawing_col_prev );
 				check_marquee();
 				gtk_widget_queue_draw( drawing_canvas );
 			}

@@ -62,10 +62,10 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 12
+#define PREF_LANGS 13
 
-char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_TW.utf8", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
-		"pl_PL", "pt_PT", "pt_BR", "sk_SK", "es_ES", "tr_TR" };
+char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_CN.utf8", "zh_TW.utf8", "cs_CZ", "en_GB",
+		"fr_FR", "de_DE", "pl_PL", "pt_PT", "pt_BR", "sk_SK", "es_ES", "tr_TR" };
 
 int pref_lang;
 
@@ -390,8 +390,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
 #ifdef U_NLS
-	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Taiwanese)"),
-		_("Czech"), _("English (UK)"),
+	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Simplified)"),
+		 _("Chinese (Taiwanese)"), _("Czech"), _("English (UK)"),
 		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
 		_("Slovak"), _("Spanish"), _("Turkish")
 					};
@@ -634,7 +634,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		if (!strcmp(pref_lang_ini_code[i],
 			inifile_get("languageSETTING", "system"))) break;
 	}
-	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, 6, i, &pref_lang, NULL));
+	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, 7, i, &pref_lang, NULL));
 
 #endif
 

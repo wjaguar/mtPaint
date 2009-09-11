@@ -37,6 +37,7 @@
 #include "csel.h"
 #include "shifter.h"
 #include "spawn.h"
+#include "font.h"
 
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
@@ -510,7 +511,7 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	i = load_image(clip, FS_CLIP_FILE, FT_PNG);
 
 	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
-	else text_paste = FALSE;
+	else text_paste = TEXT_PASTE_NONE;
 
 	if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
 		pressed_select_none( NULL, NULL );
@@ -3712,6 +3713,9 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", pressed_paste_layer, 0 },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", pressed_paste, 0 },
 	{ _("/Edit/Paste Text"), -1, 0, 0, "T", pressed_text, 0 },
+#ifdef U_FREETYPE
+	{ _("/Edit/Paste Text (FreeType)"), -1, 0, 0, "<control>T", pressed_mt_text, 0 },
+#endif
 	{ _("/Edit/sep2"), -4 },
 	{ _("/Edit/Load Clipboard"), -2 },
 	{ _("/Edit/Load Clipboard/tear"), -3 },

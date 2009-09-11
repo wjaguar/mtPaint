@@ -491,6 +491,8 @@ char *gtkncpy(char *dest, const char *src, int cnt)
 	else
 #endif
 	strncpy(dest, src, cnt);
+	dest[cnt-1] = 0;
+
 	return (dest);
 }
 
@@ -508,6 +510,8 @@ char *gtkuncpy(char *dest, const char *src, int cnt)
 	else
 #endif
 	strncpy(dest, src, cnt);
+	dest[cnt-1] = 0;
+
 	return (dest);
 }
 

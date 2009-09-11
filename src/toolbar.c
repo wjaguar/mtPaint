@@ -31,6 +31,7 @@
 #include "viewer.h"
 #include "channels.h"
 #include "csel.h"
+#include "font.h"
 
 
 #include "graphics/xpm_paint.xpm"
@@ -484,6 +485,9 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	case (TTB_0 + TTB_GRAD): /* Gradient config */
 		gradient_setup(0);
 		break;
+	case (TTB_0 + TTB_TEXT): /* FreeType text paste */
+		pressed_mt_text(NULL, NULL);
+		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
 	}
@@ -715,7 +719,7 @@ static toolbar_item tools_bar[] = {
 	{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
 	{ TTB_GRAD, 1, 1, 1, 0, _("Place Gradient"), xpm_grad_place_xpm },
 	{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
-	{ TTB_TEXT, -1, 1, 0, 0, _("Paste Text"), xpm_text_xpm },
+	{ TTB_TEXT, -1, 1, 1, 0, _("Paste Text"), xpm_text_xpm },
 	{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
 	{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },
 	{ TTB_OUTLINE, -1, 0, 0, NEED_SEL2, _("Outline Selection"), xpm_rect1_xpm },

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.14.45"
-MT_DATE="2007-09-03"
+MT_V="3.14.47"
+MT_DATE="2007-09-08"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -123,6 +123,13 @@ else
 	NTIFF=NO
 fi
 
+if IS_LIB "lfreetype"
+then
+	NFT=YES
+else
+	NFT=NO
+fi
+
 rm _conf.tmp
 
 for A in "$@"
@@ -153,6 +160,7 @@ do
 		"tiff" )	NTIFF=YES;;
 		"notiff" )	NTIFF=NO;;
 		"statictiff" )	STATIC_TIFF=TIFF;;
+		"noft" )	NFT=NO;;
 		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
 		"slow" )	OPTS=NO;;
 		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
@@ -310,6 +318,7 @@ then
 	echo "tiff ............ Use libtiff"
 	echo "notiff .......... Don't use libtiff"
 	echo "statictiff ...... Statically link TIFF library"
+	echo "noft ............ Don't use FreeType"
 	echo "--libdir=DIR .... DIR = location of image library files to use for cross-compilation"
 	echo
 	echo "flush ........... Flush directories to initial state"
@@ -452,6 +461,18 @@ else
 		I_EX="$I_EX -DU_$MT_CUSTOM"
 	fi
 
+	if [ "$NFT" = YES ]
+	then
+		if [ "$OS" = "MinGW/MSYS" ]
+		then
+			I_EX="$I_EX -DU_FREETYPE"
+			L_EX="$L_EX -lfreetype -liconv"
+		else
+			I_EX="$I_EX -DU_FREETYPE `freetype-config --cflags`"
+			L_EX="$L_EX `freetype-config --libs`"
+		fi
+	fi
+
 	if [ "$MT_LANG" = YES ]
 	then
 		I_EX="$I_EX -DU_NLS -DMT_LANG_DEST=\"\\\"$MT_PO_DEST\"\\\""
@@ -533,6 +554,8 @@ fi
 fi
 	echo
 	echo "Debug info          $DEBUG"
+	echo
+	echo "Use FreeType        $NFT"
 	echo
 	echo "Use GIF             $NGIF"
 	echo
