@@ -4,6 +4,12 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.01	2006-7-15
+
+	* German translation updated for version 3
+	* BUGFIX - Memory alignment problems on Windows fixed (might affect speed)
+	* BUGFIX - RGB-specific menu items now properly disabled in indexed mode
+
 3.00	2006-6-21
 
 	* Channels facilities added

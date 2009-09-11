@@ -2103,6 +2103,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
+	char *tmp = NULL;
 
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
@@ -2131,7 +2132,8 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	if (flood_step && ((mem_channel == CHN_IMAGE) || flood_img))
 	{
 		if (flood_slide) fmode = flood_cube ? 2 : 3;
-		else flood_data = calloc(1, sizeof(csel_info));
+		else flood_data = ALIGNTO(tmp = calloc(1, sizeof(csel_info)
+			+ sizeof(double)), double);
 		if (flood_data)
 		{
 			flood_data->center = get_pixel_RGB(x, y);
@@ -2270,7 +2272,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 			qtail[j] = i;
 	}
 	free(nearq);
-	free(flood_data);
+	free(tmp);
 }
 
 /* Regular flood fill */
@@ -3117,25 +3119,25 @@ fstep *make_filter(int l0, int l1, int type)
 	return (res);
 }
 
-double *work_area;
+char *workarea;
 fstep *hfilter, *vfilter;
 
 void clear_scale()
 {
-	free(work_area);
+	free(workarea);
 	free(hfilter);
 	free(vfilter);
 }
 
 int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
-	work_area = NULL;
+	workarea = NULL;
 	hfilter = vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
-	work_area = malloc(5 * ow * sizeof(double));
+	workarea = malloc((5 * ow + 1) * sizeof(double));
 	hfilter = make_filter(ow, nw, type);
 	vfilter = make_filter(oh, nh, type);
-	if (!work_area || !hfilter || !vfilter)
+	if (!workarea || !hfilter || !vfilter)
 	{
 		clear_scale();
 		return FALSE;
@@ -3147,9 +3149,11 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 {
 	unsigned char *src, *img, *imga, alpha;
 	fstep *tmp = NULL, *tmpx, *tmpy;
-	double *wrk, *wrka;
+	double *wrk, *wrka, *work_area;
 	double sum[4], kk;
 	int i, j, n, cc, bpp;
+
+	work_area = ALIGNTO(workarea, double);
 
 	/* For each destination line */
 	tmpy = vfilter;
