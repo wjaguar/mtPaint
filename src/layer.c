@@ -224,7 +224,7 @@ static void layer_new_chores(int l, layer_image *lim)
 {
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
-		pressed_select_none();
+		pressed_select(FALSE);
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
 			icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
@@ -919,7 +919,7 @@ void layer_choose( int l )				// Select a new layer from the list
 					// Copy image info to layer table before we change
 			layer_selected = l;
 			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-				pressed_select_none();
+				pressed_select(FALSE);
 
 			layer_copy_to_main( layer_selected );
 			update_main_with_new_layer();
@@ -951,7 +951,7 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 		if ( !dont_update ) /* Move data before doing anything else */
 		{
 //			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-//				pressed_select_none();
+//				pressed_select(FALSE);
 			layer_copy_from_main( layer_selected );
 			layer_copy_to_main( layer_selected = j );
 			update_main_with_new_layer();

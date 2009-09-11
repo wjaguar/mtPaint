@@ -1936,6 +1936,7 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
 /* This code exists to read back both windows and pixmaps. In GTK+1 pixmap
  * handling capabilities are next to nonexistent, so a GdkWindow must always
  * be passed in, to serve as source of everything but actual pixels.
+ * The only exception is when the pixmap passed in is definitely a bitmap.
  * Parsing GdkImage pixels loosely follows the example of convert_real_slow()
  * in GTK+2 (gdk/gdkpixbuf-drawable.c) - WJ
  */
@@ -1947,7 +1948,7 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 {
 	GdkImage *img;
 	GdkColormap *cmap;
-	GdkVisual *vis;
+	GdkVisual *vis, fake_vis;
 	GdkColor bw[2], *cols = NULL;
 	unsigned char *dest, *wbuf = NULL;
 	guint32 rmask, gmask, bmask, pix;
@@ -1955,7 +1956,14 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	int i, j;
 
 
-	if (window == (GdkWindow *)&gdk_root_parent) /* Not a proper window */
+	if (!window) /* No window - we got us a bitmap */
+	{
+		vis = &fake_vis;
+		vis->type = GDK_VISUAL_STATIC_GRAY;
+		vis->depth = 1;
+		cmap = NULL;
+	}
+	else if (window == (GdkWindow *)&gdk_root_parent) /* Not a proper window */
 	{
 		vis = gdk_visual_get_system();
 		cmap = gdk_colormap_get_system();
@@ -2058,24 +2066,142 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	unsigned char *buf, int x, int y, int width, int height)
 {
+	GdkColormap *cmap = NULL;
 	GdkPixbuf *pix, *res;
 	unsigned char *wbuf = NULL;
 
 	if (!buf) buf = wbuf = malloc(width * height * 3);
 	if (!buf) return (NULL);
 
+	if (pixmap && window)
+	{
+		cmap = gdk_drawable_get_colormap(pixmap);
+		if (!cmap) cmap = gdk_drawable_get_colormap(window);
+	}
 	pix = gdk_pixbuf_new_from_data(buf, GDK_COLORSPACE_RGB,
 		FALSE, 8, width, height, width * 3, NULL, NULL);
 	if (pix)
 	{
 		res = gdk_pixbuf_get_from_drawable(pix,
-			pixmap ? pixmap : window, NULL,
+			pixmap ? pixmap : window, cmap,
 			x, y, 0, 0, width, height);
 		g_object_unref(pix);
 		if (res) return (buf);
 	}
 	free(wbuf);
 	return (NULL);
+}
+
+#endif
+
+// Clipboard
+
+/* Detect if current clipboard belongs to something in the program itself */
+int internal_clipboard()
+{
+	gpointer widget = NULL;
+	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("CLIPBOARD", FALSE));
+//	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("PRIMARY", FALSE));
+	if (!win) return (FALSE); // Unknown window
+	gdk_window_get_user_data(win, &widget);
+	return (!!widget); // Real widget or foreign window?
+}
+
+/* While GTK+2 allows for synchronous clipboard handling, it's implemented
+ * through copying the entire clipboard data - and when the data might be
+ * a huge image which mtPaint is bound to allocate *yet again*, this would be
+ * asking for trouble - WJ */
+
+typedef int (*clip_function)(GtkSelectionData *data, gpointer user_data);
+
+typedef struct {
+	int flag;
+	clip_function handler;
+	gpointer data;
+} clip_info;
+
+#if GTK_MAJOR_VERSION == 1
+
+static void selection_callback(GtkWidget *widget, GtkSelectionData *data,
+	guint time, clip_info *res)
+{
+	res->flag = (data->length >= 0) && res->handler(data, res->data);
+}
+
+int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
+{
+	clip_info res = { -1, (clip_function)handler, data };
+
+	gtk_signal_connect(GTK_OBJECT(main_window), "selection_received",
+		GTK_SIGNAL_FUNC(selection_callback), &res);
+	gtk_selection_convert(main_window, gdk_atom_intern("CLIPBOARD", FALSE),
+//	gtk_selection_convert(main_window, gdk_atom_intern("PRIMARY", FALSE),
+		gdk_atom_intern(what, FALSE), GDK_CURRENT_TIME);
+// !!! May need gtk_main_level() / gtk_main_quit() trick - must test
+	while (res.flag == -1) gtk_main_iteration();
+	gtk_signal_disconnect_by_func(GTK_OBJECT(main_window), 
+		GTK_SIGNAL_FUNC(selection_callback), &res);
+	return (res.flag);
+}
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+static void clipboard_callback(GtkClipboard *clipboard,
+	GtkSelectionData *selection_data, gpointer data)
+{
+	clip_info *res = data;
+	res->flag = (selection_data->length >= 0) &&
+		res->handler(selection_data, res->data);
+}
+
+int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
+{
+	clip_info res = { -1, (clip_function)handler, data };
+
+	gtk_clipboard_request_contents(
+		gtk_clipboard_get(GDK_SELECTION_CLIPBOARD),
+//		gtk_clipboard_get(GDK_SELECTION_PRIMARY),
+		gdk_atom_intern(what, FALSE), clipboard_callback, &res);
+	while (res.flag == -1) gtk_main_iteration();
+	return (res.flag);
+}
+
+#endif
+
+/* This ugly code imports XA_PIXMAP and XA_BITMAP selection types, native to
+ * X Window System; it's of no use elsewhere, but allows mtPaint to receive
+ * images from programs such as XPaint */
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+
+int import_clip_Xpixmap(GtkSelectionData *data)
+{
+	GdkPixmap *pm;
+	unsigned char *buf;
+	int w, h, d;
+
+	pm = gdk_pixmap_foreign_new(*(Pixmap *)data->data);
+	if (!pm) return (FALSE);
+#if GTK_MAJOR_VERSION == 1
+	gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
+	buf = wj_get_rgb_image(d == 1 ? NULL : (GdkWindow *)&gdk_root_parent,
+		pm, NULL, 0, 0, w, h);
+	/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
+	 * implement freeing all the rest of it here instead */
+	gdk_xid_table_remove(((GdkWindowPrivate *)pm)->xwindow);
+	g_dataset_destroy(pm);
+	g_free(pm);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gdk_drawable_get_size(pm, &w, &h);
+	d = gdk_drawable_get_depth(pm);
+	buf = wj_get_rgb_image(d == 1 ? NULL : gdk_get_default_root_window(),
+		pm, NULL, 0, 0, w, h);
+	gdk_pixmap_unref(pm);
+#endif
+	if (!buf) return (FALSE);
+	mem_clip_new(w, h, 3, 0, FALSE);
+	mem_clipboard = buf;
+	return (TRUE);
 }
 
 #endif

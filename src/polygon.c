@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -37,21 +37,20 @@ int poly_init()			// Setup max/min -> Requires points in poly_mem
 {
 	int i;
 
-	if ( poly_points>2 && poly_points<=MAX_POLY )
+	if ((poly_points < 2) || (poly_points > MAX_POLY))
+		return 1;		// Bogus polygon
+
+	poly_min_x = poly_mem[0][0];
+	poly_max_x = poly_mem[0][0];
+	poly_min_y = poly_mem[0][1];
+	poly_max_y = poly_mem[0][1];
+	for (i=1; i<poly_points; i++)
 	{
-		poly_min_x = poly_mem[0][0];
-		poly_max_x = poly_mem[0][0];
-		poly_min_y = poly_mem[0][1];
-		poly_max_y = poly_mem[0][1];
-		for (i=1; i<poly_points; i++)
-		{
-			mtMIN( poly_min_x, poly_min_x, poly_mem[i][0] )
-			mtMAX( poly_max_x, poly_max_x, poly_mem[i][0] )
-			mtMIN( poly_min_y, poly_min_y, poly_mem[i][1] )
-			mtMAX( poly_max_y, poly_max_y, poly_mem[i][1] )
-		}
+		mtMIN( poly_min_x, poly_min_x, poly_mem[i][0] )
+		mtMAX( poly_max_x, poly_max_x, poly_mem[i][0] )
+		mtMIN( poly_min_y, poly_min_y, poly_mem[i][1] )
+		mtMAX( poly_max_y, poly_max_y, poly_mem[i][1] )
 	}
-	else return 1;		// Bogus polygon
 
 	return 0;		// Success
 }

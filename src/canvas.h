@@ -110,9 +110,11 @@ void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );
 
+void get_visible(int *vxy);
+
 void paint_marquee(int action, int new_x, int new_y);	// Draw/clear marquee
 void refresh_marquee(rgbcontext *ctx);			// Refresh a part of marquee
-void paint_poly_marquee();				// Paint polygon marquee
+void paint_poly_marquee(rgbcontext *ctx, int whole);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
 
 void update_image_bar();		// Update image stats on status bar

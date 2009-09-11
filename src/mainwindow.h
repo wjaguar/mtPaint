@@ -241,8 +241,6 @@ int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_ico
 int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
-GdkGC *dash_gc;
-
 extern char mem_clip_file[];
 
 void var_init();			// Load INI variables
@@ -253,6 +251,7 @@ void men_item_state( GtkWidget *menu_items[], gboolean state );
 	// Change state of preset menu items
 
 void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx);
+void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx);
 
 void canvas_size(int *w, int *h);	// Get zoomed canvas size
 void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of current image
@@ -275,7 +274,7 @@ int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 //	Try to save file + warn if error + return < 0 if fail
 int gui_save(char *filename, ls_settings *settings);
 
-void pressed_select_none();
+void pressed_select(int all);
 void pressed_opacity( int opacity );
 
 gint check_zoom_keys(int act_m);

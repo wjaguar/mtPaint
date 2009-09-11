@@ -169,7 +169,7 @@ static void create_new(GtkWidget *widget)
 		inifile_set_gint32("lastnewType", im_type );
 
 		/* Lose a selection marquee */
-		pressed_select_none();
+		pressed_select(FALSE);
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 

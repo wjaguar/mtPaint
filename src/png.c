@@ -59,7 +59,7 @@ int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_COMPZ },
+		| FF_TRANS | FF_COMPZ | FF_RMEM },
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPJ },
 #else
@@ -86,7 +86,7 @@ fformat file_formats[NUM_FTYPES] = {
 #else
 	{ "", "", "", 0},
 #endif
-	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR },
+	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR | FF_RMEM },
 	{ "XPM", "xpm", "", FF_256 | FF_RGB | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
@@ -249,6 +249,42 @@ static void deallocate_image(ls_settings *settings, int cmask)
 	}
 }
 
+typedef struct {
+	FILE *file; // for traditional use
+	char *buf;  // data block
+	int here; // current position
+	int top;  // end of data
+	int size; // currently allocated
+	int step; // allocation increment
+} memFILE;
+
+size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
+{
+	size_t l, m;
+
+	if (mf->file) return (fread(ptr, size, nmemb, mf->file));
+
+	l = size * nmemb; m = mf->top - mf->here;
+	if ((mf->here < 0) || (m < 0)) return (0);
+	if (l > m) l = m , nmemb = m / size;
+	memcpy(ptr, mf->buf + mf->here, l);
+	mf->here += l;
+	return (nmemb);
+}
+
+int mfseek(memFILE *mf, long offset, int mode)
+{
+// !!! For operating on tarballs, adjust fseek() params here accordingly
+	if (mf->file) return (fseek(mf->file, offset, mode));
+
+	if (mode == SEEK_SET);
+	else if (mode == SEEK_CUR) offset += mf->here;
+	else if (mode == SEEK_END) offset += mf->top;
+	else return (-1);
+	mf->here = offset;
+	return (0);
+}
+
 static void ls_init(char *what, int save)
 {
 	char buf[256];
@@ -263,12 +299,24 @@ static int buggy_libpng_handler()
 	return (0);
 }
 
+static void png_memread(png_structp png_ptr, png_bytep data, png_size_t length)
+{
+	memFILE *mf = (memFILE *)png_get_io_ptr(png_ptr);
+//	memFILE *mf = (memFILE *)png_ptr->io_ptr;
+	size_t l = mf->top - mf->here;
+
+	if (l > length) l = length;
+	memcpy(data, mf->buf + mf->here, l);
+	mf->here += l;
+	if (l < length) png_error(png_ptr, "Read Error");
+}
+
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
 static const char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
 
-static int load_png(char *file_name, ls_settings *settings)
+static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	/* Description of PNG interlacing passes as X0, DX, Y0, DY */
 	static const unsigned char png_interlace[8][4] = {
@@ -293,12 +341,16 @@ static int load_png(char *file_name, ls_settings *settings)
 	char buf[PNG_BYTES_TO_CHECK + 1];
 	unsigned char *src, *dest, *dsta;
 	long dest_len;
-	FILE *fp;
+	FILE *fp = NULL;
 	int i, j, k, bit_depth, color_type, interlace_type, num_uk, res = -1;
 	int maxpass, x0, dx, y0, dy, n, nx, height, width;
 
-	if ((fp = fopen(file_name, "rb")) == NULL) return -1;
-	i = fread(buf, 1, PNG_BYTES_TO_CHECK, fp);
+	if (!mf)
+	{
+		if ((fp = fopen(file_name, "rb")) == NULL) return -1;
+		i = fread(buf, 1, PNG_BYTES_TO_CHECK, fp);
+	}
+	else i = mfread(buf, 1, PNG_BYTES_TO_CHECK, mf);
 	if (i != PNG_BYTES_TO_CHECK) goto fail;
 	if (png_sig_cmp(buf, 0, PNG_BYTES_TO_CHECK)) goto fail;
 
@@ -318,7 +370,8 @@ static int load_png(char *file_name, ls_settings *settings)
 	/* !!! libpng 1.2.17+ needs this to read extra channels */
 	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
-	png_init_io(png_ptr, fp);
+	if (!mf) png_init_io(png_ptr, fp);
+	else png_set_read_fn(png_ptr, mf, png_memread);
 	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);
 
 	/* Stupid libpng handles private chunks on all-or-nothing basis */
@@ -511,7 +564,7 @@ static int load_png(char *file_name, ls_settings *settings)
 fail2:	if (msg) progress_end();
 	free(row_pointers);
 	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-fail:	fclose(fp);
+fail:	if (fp) fclose(fp);
 	return (res);
 }
 
@@ -1689,21 +1742,27 @@ static int save_tiff(char *file_name, ls_settings *settings)
 #define BMP5_HSIZE  138
 #define BMP_MAXHSIZE (BMP5_HSIZE + 256 * 4)
 
-static int load_bmp(char *file_name, ls_settings *settings)
+static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	guint32 masks[4], m;
 	unsigned char hdr[BMP5_HSIZE], xlat[256], *dest, *tmp, *buf = NULL;
-	FILE *fp;
+	memFILE fake_mf;
+	FILE *fp = NULL;
 	int shifts[4], bpps[4];
 	int def_alpha = FALSE, cmask = CMASK_IMAGE, comp = 0, res = -1;
 	int i, j, k, n, ii, w, h, bpp;
 	int l, bl, rl, step, skip, dx, dy;
 
 
-	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	if (!mf)
+	{
+		if (!(fp = fopen(file_name, "rb"))) return (-1);
+		memset(mf = &fake_mf, 0, sizeof(fake_mf));
+		fake_mf.file = fp;
+	}
 
 	/* Read the largest header */
-	k = fread(hdr, 1, BMP5_HSIZE, fp);
+	k = mfread(hdr, 1, BMP5_HSIZE, mf);
 
 	/* Check general validity */
 	if (k < BMP2_HSIZE) goto fail; /* Least supported header size */
@@ -1821,9 +1880,9 @@ static int load_bmp(char *file_name, ls_settings *settings)
 	if (j)
 	{
 		settings->colors = j;
-		fseek(fp, l, SEEK_SET);
+		mfseek(mf, l, SEEK_SET);
 		k = l < BMP3_HSIZE ? 3 : 4;
-		i = fread(buf, 1, j * k, fp);
+		i = mfread(buf, 1, j * k, mf);
 		if (i < j * k) goto fail2; /* Cannot read palette */
 		tmp = buf;
 		for (i = 0; i < j; i++)
@@ -1837,7 +1896,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 
 	if (!settings->silent) ls_init("BMP", 0);
 
-	fseek(fp, GET32(hdr + BMP_DATAOFS), SEEK_SET); /* Seek to data */
+	mfseek(mf, GET32(hdr + BMP_DATAOFS), SEEK_SET); /* Seek to data */
 	if (h < 0) /* Prepare row loop */
 	{
 		step = 1;
@@ -1855,7 +1914,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 	{
 		for (n = 0; (i < h) && (i >= 0); n++ , i += step)
 		{
-			j = fread(buf, 1, rl, fp);
+			j = mfread(buf, 1, rl, mf);
 			if (j < rl) goto fail3;
 			if (bpp < 16) /* Indexed */
 			{
@@ -1901,7 +1960,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 	}
 	else /* RLE - always bottom-up */
 	{
-		k = fread(buf, 1, bl, fp);
+		k = mfread(buf, 1, bl, mf);
 		if (k < bl) goto fail3;
 		memset(settings->img[CHN_IMAGE], 0, w * h);
 		skip = j = 0;
@@ -2010,7 +2069,7 @@ static int load_bmp(char *file_name, ls_settings *settings)
 
 fail3:	if (!settings->silent) progress_end();
 fail2:	free(buf);
-fail:	fclose(fp);
+fail:	if (fp) fclose(fp);
 	return (res);
 }
 
@@ -3701,7 +3760,7 @@ static void store_image_extras(ls_settings *settings)
 	mem_cols = settings->colors;
 }
 
-int load_image(char *file_name, int mode, int ftype)
+static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 {
 	png_color pal[256];
 	ls_settings settings;
@@ -3717,6 +3776,8 @@ int load_image(char *file_name, int mode, int ftype)
 	/* Clear hotspot & transparency */
 	settings.hot_x = settings.hot_y = -1;
 	settings.xpm_trans = settings.rgb_trans = -1;
+	/* Be silent if working from memory */
+	if (mf) settings.silent = TRUE;
 
 	/* !!! Use default palette - for now */
 	mem_pal_copy(pal, mem_pal_def);
@@ -3725,7 +3786,7 @@ int load_image(char *file_name, int mode, int ftype)
 	switch (ftype)
 	{
 	default:
-	case FT_PNG: res = load_png(file_name, &settings); break;
+	case FT_PNG: res = load_png(file_name, &settings, mf); break;
 #ifdef U_GIF
 	case FT_GIF: res = load_gif(file_name, &settings); break;
 #endif
@@ -3739,7 +3800,7 @@ int load_image(char *file_name, int mode, int ftype)
 #ifdef U_TIFF
 	case FT_TIFF: res = load_tiff(file_name, &settings); break;
 #endif
-	case FT_BMP: res = load_bmp(file_name, &settings); break;
+	case FT_BMP: res = load_bmp(file_name, &settings, mf); break;
 	case FT_XPM: res = load_xpm(file_name, &settings); break;
 	case FT_XBM: res = load_xbm(file_name, &settings); break;
 	case FT_LSS: res = load_lss(file_name, &settings); break;
@@ -3856,6 +3917,22 @@ int load_image(char *file_name, int mode, int ftype)
 	}
 	/* Don't report animated GIF as failure */
 	return (res == FILE_GIF_ANIM ? 1 : res);
+}
+
+int load_image(char *file_name, int mode, int ftype)
+{
+	return (load_image_x(file_name, NULL, mode, ftype));
+}
+
+int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
+{
+	memFILE mf;
+
+	if (!(file_formats[ftype].flags & FF_RMEM)) return (-1);
+
+	memset(&mf, 0, sizeof(mf));
+	mf.buf = buf; mf.top = mf.size = len;
+	return (load_image_x(NULL, &mf, mode, ftype));
 }
 
 int export_undo(char *file_name, ls_settings *settings)

@@ -535,11 +535,7 @@ void pressed_rotate_image(int dir)
 {
 	int i = mem_image_rot(dir);
 	if (i) memory_errors(i);
-	else
-	{
-		check_marquee();
-		canvas_undo_chores();
-	}
+	else canvas_undo_chores();
 }
 
 void pressed_rotate_sel(int dir)
@@ -752,6 +748,7 @@ void pressed_paste_centre()
 	int w, h;
 	GtkAdjustment *hori, *vert;
 
+	if (!mem_clipboard) return;
 	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
 	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
 
@@ -1113,6 +1110,7 @@ void canvas_undo_chores()
 
 	canvas_size(&w, &h);
 	gtk_widget_set_usize(drawing_canvas, w, h);
+	check_marquee();
 	update_menus();
 	init_pal();
 	update_all_views();			// redraw canvas widget
@@ -1123,7 +1121,7 @@ void check_undo_paste_bpp()
 	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
 
 	if ((marq_status >= MARQUEE_PASTE) && (mem_clip_bpp > MEM_BPP))
-		pressed_select_none();
+		pressed_select(FALSE);
 }
 
 void main_undo()
@@ -1327,7 +1325,7 @@ int do_a_load( char *fname )
 
 	if (!undo_load) // No reason to reset tools in undoable mode
 	{
-		pressed_select_none(); // To prevent automatic paste
+		pressed_select(FALSE); // To prevent automatic paste
 		reset_tools();
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
 			icon_buttons[DEFAULT_TOOL_ICON]),TRUE);
@@ -2101,34 +2099,68 @@ void update_all_views()				// Update whole canvas on all views
 }
 
 
+static struct {
+	float c_zoom;
+	int points;
+	int xy[2 * MAX_POLY + 2], step[MAX_POLY + 1];
+} poly_cache;
+
+static void poly_update_cache()
+{
+	int i, i0, last, dx, dy, *pxy, *ps;
+
+	i0 = poly_cache.c_zoom == can_zoom ? poly_cache.points : 0;
+	last = poly_points + (poly_status == POLY_DONE);
+	if (i0 >= last) return; // Up to date
+	poly_cache.c_zoom = can_zoom;
+	poly_cache.points = last;
+	/* Get locations */
+	pxy = poly_cache.xy + i0 * 2;
+	for (i = i0; i < poly_points; i++)
+	{
+		*pxy++ = margin_main_x + rint((poly_mem[i][0] + 0.5) * can_zoom);
+		*pxy++ = margin_main_y + rint((poly_mem[i][1] + 0.5) * can_zoom);
+	}
+	/* Join 1st & last point if finished */
+	if (poly_status == POLY_DONE)
+	{
+		*pxy++ = poly_cache.xy[0];
+		*pxy++ = poly_cache.xy[1];
+	}
+	/* Get distances */
+	poly_cache.step[0] = 0;
+	if (!i0) i0 = 1;
+	ps = poly_cache.step + i0 - 1;
+	pxy = poly_cache.xy + i0 * 2 - 2;
+	for (i = i0; i < last; i++ , pxy += 2 , ps++)
+	{
+		dx = abs(pxy[2] - pxy[0]);
+		dy = abs(pxy[3] - pxy[1]);
+		ps[1] = ps[0] + (dx > dy ? dx : dy);
+	}
+}
+
 void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp line
 {
-	if ( poly_points>0 && poly_points<MAX_POLY )
-	{
-		if ( line_x1 != x || line_y1 != y )	// This check reduces flicker
-		{
-			repaint_line(0);
-			paint_poly_marquee();
+	if ((poly_points <= 0) || (poly_points >= MAX_POLY)) return;
+	if ((line_x1 == x) && (line_y1 == y)) return;	// This check reduces flicker
 
-			line_x1 = x;
-			line_y1 = y;
-			line_x2 = poly_mem[poly_points-1][0];
-			line_y2 = poly_mem[poly_points-1][1];
-
-			repaint_line(2);
-		}
-	}
+	repaint_line(0);
+	line_x1 = x;
+	line_y1 = y;
+	line_x2 = poly_mem[poly_points-1][0];
+	line_y2 = poly_mem[poly_points-1][1];
+	repaint_line(2);
 }
 
 static void poly_conclude()
 {
 	repaint_line(0);
-	if ( poly_points < 3 )
+	if (poly_points < 2)
 	{
 		poly_status = POLY_NONE;
 		poly_points = 0;
-		update_all_views();
-		update_sel_bar();
+		if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
 	}
 	else
 	{
@@ -2139,19 +2171,24 @@ static void poly_conclude()
 		marq_x2 = poly_max_x;
 		marq_y2 = poly_max_y;
 		update_menus();			// Update menu/icons
-
-		paint_poly_marquee();
-		update_sel_bar();
+		paint_poly_marquee(NULL, FALSE);
 	}
+	update_sel_bar();
 }
 
 static void poly_add_po( int x, int y )
 {
+	if (poly_points <= 0) poly_cache.c_zoom = 0; // Invalidate
+	if ((poly_points > 1) && (x == poly_mem[poly_points - 1][0]) &&
+		(y == poly_mem[poly_points - 1][1])) return; // Never stack
 	repaint_line(0);
 	poly_add(x, y);
 	if ( poly_points >= MAX_POLY ) poly_conclude();
-	paint_poly_marquee();
-	update_sel_bar();
+	else
+	{
+		paint_poly_marquee(NULL, FALSE);
+		update_sel_bar();
+	}
 }
 
 static int first_point;
@@ -2394,8 +2431,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( tool_type == TOOL_SELECT && button == 3 && (marq_status == MARQUEE_DONE ) )
 		{
-			pressed_select_none();
-			set_cursor();
+			pressed_select(FALSE);
 		}
 		if ( tool_type == TOOL_SELECT && button == 1 && (marq_status == MARQUEE_NONE ||
 			marq_status == MARQUEE_DONE) )		// Starting a selection
@@ -2674,7 +2710,7 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 	}
 }
 
-static void get_visible(int *vxy)
+void get_visible(int *vxy)
 {
 	GtkAdjustment *hori, *vert;
 
@@ -2687,24 +2723,20 @@ static void get_visible(int *vxy)
 	vxy[3] = vert->value + vert->page_size - 1;
 }
 
-void paint_poly_marquee()			// Paint polygon marquee
+void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
 {
-	int i, last = poly_points;
-	GdkPoint xy[MAX_POLY + 1];
+	int i;
 
-
-	check_marquee();
 	if ((tool_type != TOOL_POLYGON) || (poly_points < 2)) return;
-
-	for (i = 0; i < last; i++)
+// !!! Maybe check boundary clipping too
+	poly_update_cache();
+	i = poly_cache.points;
+	if (whole) draw_poly(poly_cache.xy, i, 0, ctx);
+	else
 	{
-		xy[i].x = margin_main_x + rint((poly_mem[i][0] + 0.5) * can_zoom);
-		xy[i].y = margin_main_y + rint((poly_mem[i][1] + 0.5) * can_zoom);
+		i -= 2;
+		draw_poly(poly_cache.xy + i * 2, 2, poly_cache.step[i], ctx);
 	}
-	/* Join 1st & last point if finished */
-	if (poly_status == POLY_DONE) xy[last++] = xy[0];
-
-	gdk_draw_lines( drawing_canvas->window, dash_gc, xy, last );
 }
 
 

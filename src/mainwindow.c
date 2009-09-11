@@ -121,8 +121,6 @@ int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_ico
 int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
-GdkGC *dash_gc;
-
 
 static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
 
@@ -200,63 +198,62 @@ static void pressed_crop()
 
 	if (!res)
 	{
-		pressed_select_none();
+		pressed_select(FALSE);
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		canvas_undo_chores();
 	}
 	else memory_errors(res);
 }
 
-void pressed_select_none()
-{
-	if ( marq_status != MARQUEE_NONE )
-	{
-		paint_marquee(0, marq_x1, marq_y1);
-		marq_status = MARQUEE_NONE;
-		marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
-		update_menus();
-		gtk_widget_queue_draw( drawing_canvas );
-		set_cursor();
-		update_sel_bar();
-	}
-
-	if ( tool_type == TOOL_POLYGON )
-	{
-		if ( poly_status != POLY_NONE )
-		{
-			poly_points = 0;
-			poly_status = POLY_NONE;
-			update_menus();
-			gtk_widget_queue_draw( drawing_canvas );
-			set_cursor();
-			update_sel_bar();
-		}
-	}
-}
-
-static void pressed_select_all()
+void pressed_select(int all)
 {
 	int i = 0;
 
-	paste_prepare();
-	if ( tool_type != TOOL_SELECT )
+	/* Remove old selection */
+	if (marq_status != MARQUEE_NONE)
 	{
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 		i = 1;
+		if (marq_status >= MARQUEE_PASTE) i = 3;
+		else paint_marquee(0, marq_x1 - mem_width, marq_y1 - mem_height);
+		marq_status = MARQUEE_NONE;
+		marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
+	}
+	if ((tool_type == TOOL_POLYGON) && (poly_status != POLY_NONE))
+	{
+		poly_points = 0;
+		poly_status = POLY_NONE;
+		i = 3; // Have to erase polygon
 	}
 
-	if ( marq_status >= MARQUEE_PASTE ) i = 1;
-
-	marq_status = MARQUEE_DONE;
-	marq_x1 = 0;
-	marq_y1 = 0;
-	marq_x2 = mem_width - 1;
-	marq_y2 = mem_height - 1;
-
-	update_menus();
-	paint_marquee(1, marq_x1-mem_width, marq_y1-mem_height);
-	update_sel_bar();
-	if ( i == 1 ) gtk_widget_queue_draw( drawing_canvas );		// Clear old past stuff
+	while (all) /* Select entire canvas */
+	{
+		i |= 1;
+		marq_x1 = 0;
+		marq_y1 = 0;
+		marq_x2 = mem_width - 1;
+		marq_y2 = mem_height - 1;
+		if (tool_type != TOOL_SELECT)
+		{
+			/* Switch tool, and let that & marquee persistence
+			 * do all the rest except full redraw */
+			clear_perim();
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+				icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+			i &= 2;
+			break;
+		}
+		marq_status = MARQUEE_DONE;
+		if (i & 2) break; // Full redraw will draw marquee too
+		paint_marquee(1, marq_x1 - mem_width, marq_y1 - mem_height);
+		break;
+	}
+	if (i & 1) // Interface update
+	{
+		update_menus();
+		set_cursor();
+		update_sel_bar();
+	}
+	if (i & 2) gtk_widget_queue_draw(drawing_canvas); // Full redraw
 }
 
 static void pressed_remove_unused()
@@ -350,6 +347,95 @@ static void pressed_mask(int val)
 		update_all_views();
 }
 
+// System clipboard import
+
+typedef struct {
+	char *target;
+	int ftype;
+	GdkAtom atom;
+} clipformat;
+
+static clipformat clip_formats[] = {
+	{ NULL, FT_NONE },
+	{ "image/png", FT_PNG },
+	{ "image/bmp", FT_BMP },
+	{ "image/x-bmp", FT_BMP },
+	{ "image/x-MS-bmp", FT_BMP },
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	/* These two don't make sense without X */
+	{ "PIXMAP", -1 },
+	{ "BITMAP", -1 },
+#endif
+// Here will be other things (likely, X bitmap & pixmap), arranged in the order
+// of preference
+// For identifying X-things, fake FT_xxx values will be needed - they aren't
+// real files and don't deserve slots in file_formats[]
+// And seems it'll be better to prefer BMP when talking to the likes of GIMP -
+// they send PNGs really slowly (likely, compressed to the max); question is,
+// how to detect it's a slow PNG writer on the other end - because if another
+// mtPaint is there instead, PNG is the best choice
+};
+
+static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
+{
+	GdkAtom *targets, tst;
+	int i, j, k, l, n = data->length / sizeof(GdkAtom);
+
+	if ((n <= 0) || (data->format != 32) ||
+		(data->type != GDK_SELECTION_TYPE_ATOM)) return (FALSE);
+	l = sizeof(clip_formats) / sizeof(clipformat);
+
+	/* Convert names to atoms if not done already */
+	if (!clip_formats[1].atom)
+	{
+		for (i = 1; i < l; i++) clip_formats[i].atom =
+			gdk_atom_intern(clip_formats[i].target, FALSE);
+	}
+
+	/* Search for best match */
+	targets = (GdkAtom *)data->data;
+	for (i = 0 , k = l; i < n; i++)
+	{
+		tst = *targets++;
+//g_print("\"%s\" ", gdk_atom_name(tst));
+		for (j = 1; j < k; j++)
+			if (tst == clip_formats[j].atom) break;
+		k = j;
+	}
+//g_print(": %d\n", k);
+	*(int *)user_data = k;
+	return (k < l);
+}
+
+static int check_clipboard()
+{
+	int res;
+
+	if (internal_clipboard()) return (0); // if we're who put data there
+	if (!process_clipboard("TARGETS", GTK_SIGNAL_FUNC(clipboard_check_fn), &res))
+		return (0); // no luck
+	return (res);
+}
+
+static int clipboard_import_fn(GtkSelectionData *data, gpointer user_data)
+{
+//g_print("!!! %X %d\n", data->data, data->length);
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	if ((int)user_data == -1) /* Got an X-something */
+		return (import_clip_Xpixmap(data));
+#endif
+	return (load_mem_image((unsigned char *)data->data, data->length,
+		FS_CLIP_FILE, (int)user_data) == 1);
+}
+
+static int import_clipboard(int format)
+{
+	if (internal_clipboard()) return (FALSE); // nothing to import
+	return (process_clipboard(clip_formats[format].target,
+		GTK_SIGNAL_FUNC(clipboard_import_fn),
+		(gpointer)clip_formats[format].ftype));
+}
+
 int gui_save(char *filename, ls_settings *settings)
 {
 	int res = -2, fflags = file_formats[settings->ftype].flags;
@@ -435,19 +521,27 @@ static void load_clip(int item)
 	char clip[PATHBUF];
 	int i;
 
-	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
-	i = load_image(clip, FS_CLIP_FILE, FT_PNG);
+	if (item == -1) // System clipboard
+	{
+		i = check_clipboard();
+		if (i) i = import_clipboard(i);
+	}
+	else // Disk file
+	{
+		snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
+		i = load_image(clip, FS_CLIP_FILE, FT_PNG) == 1;
+	}
 
-	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
+	if (!i) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
 	else text_paste = TEXT_PASTE_NONE;
 
 	if (((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE)) ||
 		((tool_type == TOOL_POLYGON) && (poly_status >= POLY_NONE)))
-		pressed_select_none();
+		pressed_select(FALSE);
 
 	update_menus();
 
-	if (MEM_BPP >= mem_clip_bpp) pressed_paste_centre();
+	if (i && (MEM_BPP >= mem_clip_bpp)) pressed_paste_centre();
 }
 
 static void save_clip(int item)
@@ -989,7 +1083,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	else if (action == ACT_ESC)
 	{
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-			pressed_select_none();
+			pressed_select(FALSE);
 		else if (tool_type == TOOL_LINE) stop_line();
 		else if ((tool_type == TOOL_GRADIENT) &&
 			(gradient[mem_channel].status != GRAD_NONE))
@@ -2530,6 +2624,94 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 	}
 }
 
+/* Redirectable polygon drawing */
+void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx)
+{
+#define PT_BATCH 100
+	GdkPoint white[PT_BATCH], black[PT_BATCH], *p;
+	linedata line;
+	unsigned char *rgb;
+	int w = 0, nw = 0, nb = 0;
+	int i, x0, y0, x1, y1, dx, dy, a0, a, vxy[4];
+
+	if (ctx)
+	{
+		vxy[0] = ctx->x0; vxy[1] = ctx->y0;
+		vxy[2] = ctx->x1 - 1; vxy[3] = ctx->y1 - 1;
+		w = ctx->x1 - ctx->x0;
+	}
+	else get_visible(vxy);
+
+	x1 = *xy++; y1 = *xy++;
+	a = x1 < vxy[0] ? 1 : x1 > vxy[2] ? 2:
+		y1 < vxy[1] ? 3 : y1 > vxy[3] ? 4 : 5;
+	for (i = 1; i < cnt; i++)
+	{
+		x0 = x1; y0 = y1; a0 = a;
+		x1 = *xy++; y1 = *xy++;
+		dx = abs(x1 - x0); dy = abs(y1 - y0);
+		if (dx < dy) dx = dy; shift += dx;
+		switch (a0) // Basic clipping
+		{
+		// Already visible - skip if same point
+		case 0: if (!dx) continue; break;
+		// Left of window - skip if still there
+		case 1: if (x1 < vxy[0]) continue; break;
+		// Right of window
+		case 2: if (x1 > vxy[2]) continue; break;
+		// Top of window
+		case 3: if (y1 < vxy[1]) continue; break;
+		// Bottom of window
+		case 4: if (y1 > vxy[3]) continue; break;
+		// First point - never skip
+		case 5: a0 = 0; break;
+		}
+		// May be visible - find where the other end goes
+		a = x1 < vxy[0] ? 1 : x1 > vxy[2] ? 2 :
+			y1 < vxy[1] ? 3 : y1 > vxy[3] ? 4 : 0;
+		line_init(line, x0, y0, x1, y1);
+		if (a0 + a) // If both ends inside area, no clipping needed
+		{
+			if (line_clip(line, vxy, &a0) < 0) continue;
+			dx -= a0;
+		}
+		for (dx = shift - dx; line[2] >= 0; line_step(line) , dx++)
+		{
+			if (ctx) // Draw to RGB
+			{
+				rgb = ctx->rgb + ((line[1] - ctx->y0) * w +
+					(line[0] - ctx->x0)) * 3;
+				rgb[0] = rgb[1] = rgb[2] = ((~dx >> 2) & 1) * 255;
+				continue;
+			}
+			if (dx & 4) // Draw to canvas in black
+			{
+				p = black + nb++;
+				p->x = line[0]; p->y = line[1];
+				if (nb < PT_BATCH) continue;
+			}
+			else // Draw to canvas in white
+			{
+				p = white + nw++;
+				p->x = line[0]; p->y = line[1];
+				if (nw < PT_BATCH) continue;
+			}
+			// Batch drawing to canvas
+			if (nb) gdk_draw_points(drawing_canvas->window,
+				drawing_canvas->style->black_gc, black, nb);
+			if (nw)	gdk_draw_points(drawing_canvas->window,
+				drawing_canvas->style->white_gc, white, nw);
+			nb = nw = 0;
+		}
+	}
+	// Finish drawing
+	if (nb) gdk_draw_points(drawing_canvas->window,
+		drawing_canvas->style->black_gc, black, nb);
+	if (nw) gdk_draw_points(drawing_canvas->window,
+		drawing_canvas->style->white_gc, white, nw);
+#undef PT_BATCH
+}
+
 void repaint_canvas( int px, int py, int pw, int ph )
 {
 	rgbcontext ctx;
@@ -2555,6 +2737,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	ctx.x0 = px; ctx.y0 = py; ctx.x1 = px + pw; ctx.y1 = py + ph;
 	ctx.rgb = rgb;
 
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
@@ -2664,6 +2847,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	/* Draw perimeter & marquee as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
 	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
+	if ((tool_type == TOOL_POLYGON) && (poly_points >1))
+		paint_poly_marquee(&ctx, TRUE);
 	if (perim_status > 0) repaint_perim(&ctx);
 
 	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
@@ -2887,7 +3072,6 @@ static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	ph = event->area.height;
 
 	repaint_canvas( px, py, pw, ph );
-	paint_poly_marquee();
 
 	return (TRUE);
 }
@@ -3479,8 +3663,7 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 	case ACT_ROTATE:
 		pressed_rotate_image(mode); break;
 	case ACT_SELECT:
-		if (mode) pressed_select_all();
-		else pressed_select_none();
+		pressed_select(mode);
 		break;
 	case ACT_LASSO:
 		pressed_lasso(mode); break;
@@ -4061,6 +4244,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Save Clipboard/10"), -1, 0, NEED_CLIP, "<control>F10", ACT_SAVE_CLIP, 10 },
 	{ _("/Edit/Save Clipboard/11"), -1, 0, NEED_CLIP, "<control>F11", ACT_SAVE_CLIP, 11 },
 	{ _("/Edit/Save Clipboard/12"), -1, 0, NEED_CLIP, "<control>F12", ACT_SAVE_CLIP, 12 },
+	{ _("/Edit/Import Clipboard"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
 	{ _("/Edit/sep3"), -4 },
 	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
 	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
@@ -4229,7 +4413,6 @@ static menu_item main_menu[] = {
 void main_init()
 {
 	static const GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
-	static GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 	GtkAdjustment *adj;
@@ -4468,11 +4651,6 @@ void main_init()
 	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], files_passed > 1);
 
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-
-	dash_gc = gdk_gc_new(drawing_canvas->window);		// Set up gc for polygon marquee
-	gdk_gc_set_background(dash_gc, &cbg);
-	gdk_gc_set_foreground(dash_gc, &cfg);
-	gdk_gc_set_line_attributes( dash_gc, 1, GDK_LINE_DOUBLE_DASH, GDK_CAP_NOT_LAST, GDK_JOIN_MITER);
 
 	toolbar_showhide();
 	if (viewer_mode) toggle_view();

@@ -54,26 +54,28 @@
 #define NUM_FTYPES  18
 
 /* Features supported by file formats */
-#define FF_BW      0x0001 /* Black and white */
-#define FF_16      0x0002 /* 16 colors */
-#define FF_256     0x0004 /* 256 colors */
-#define FF_IDX     0x0007 /* Indexed image */
-#define FF_RGB     0x0008 /* Truecolor */
-#define FF_IMAGE   0x000F /* Image of any kind */
-#define FF_ANIM    0x0010 /* Animation */
-#define FF_ALPHAI  0x0020 /* Alpha channel for indexed images */
-#define FF_ALPHAR  0x0040 /* Alpha channel for RGB images */
-#define FF_ALPHA   0x0060 /* Alpha channel for all images */
-#define FF_MULTI   0x0080 /* Multiple channels */
-#define FF_TRANS   0x0100 /* Indexed transparency */
-#define FF_COMP    0x0E00 /* Configurable compression */
-#define FF_COMPJ   0x0200 /* JPEG compression */
-#define FF_COMPZ   0x0400 /* zlib compression */
-#define FF_COMPR   0x0600 /* RLE compression */
-#define FF_COMPJ2  0x0800 /* JPEG2000 compression */
-#define FF_SPOT    0x1000 /* "Hot spot" */
-#define FF_LAYER   0x2000 /* Layered images */
-#define FF_PALETTE 0x4000 /* Palette file (not image) */
+#define FF_BW      0x00001 /* Black and white */
+#define FF_16      0x00002 /* 16 colors */
+#define FF_256     0x00004 /* 256 colors */
+#define FF_IDX     0x00007 /* Indexed image */
+#define FF_RGB     0x00008 /* Truecolor */
+#define FF_IMAGE   0x0000F /* Image of any kind */
+#define FF_ANIM    0x00010 /* Animation */
+#define FF_ALPHAI  0x00020 /* Alpha channel for indexed images */
+#define FF_ALPHAR  0x00040 /* Alpha channel for RGB images */
+#define FF_ALPHA   0x00060 /* Alpha channel for all images */
+#define FF_MULTI   0x00080 /* Multiple channels */
+#define FF_TRANS   0x00100 /* Indexed transparency */
+#define FF_COMP    0x00E00 /* Configurable compression */
+#define FF_COMPJ   0x00200 /* JPEG compression */
+#define FF_COMPZ   0x00400 /* zlib compression */
+#define FF_COMPR   0x00600 /* RLE compression */
+#define FF_COMPJ2  0x00800 /* JPEG2000 compression */
+#define FF_SPOT    0x01000 /* "Hot spot" */
+#define FF_LAYER   0x02000 /* Layered images */
+#define FF_PALETTE 0x04000 /* Palette file (not image) */
+#define FF_RMEM    0x08000 /* Can be read from memory */
+#define FF_WMEM    0x10000 /* Can be written to memory */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -115,6 +117,7 @@ int file_type_by_ext(char *name, guint32 mask);
 int save_image(char *file_name, ls_settings *settings);
 
 int load_image(char *file_name, int mode, int ftype);
+int load_mem_image(unsigned char *buf, int len, int mode, int ftype);
 
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );

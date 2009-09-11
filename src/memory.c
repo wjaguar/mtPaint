@@ -3292,6 +3292,44 @@ void line_nudge(linedata line, int x, int y)
 		line_step(line);
 }
 
+int line_clip(linedata line, int *vxy, int *step)
+{
+	int vh = !line[6], hv = vh ^ 1, hs = line[8 + vh], vs = line[8 + hv];
+	int dh = hs < 0, dv = vs < 0, l4 = line[4], steps[2];
+	int i, j, dx, dy;
+
+	for (i = 1; 1;)
+	{
+		dx = (vxy[(dh ^ i) * 2 + vh] - line[vh]) * hs + i;
+		if (dx < 0) dx = 0;
+		if (l4)
+		{
+			dy = (vxy[(dv ^ i) * 2 + hv] - line[hv]) * vs + i;
+			if (dy < 0) dy = 0;
+			dy = (line[5] * (dy - 1) + line[3] + l4 - 1) / l4;
+			if ((dy > dx) ^ i) dx = dy;
+		}
+		steps[i] = dx;
+		if (!i--) break;
+	}
+
+	if (line[5]) // Makes no sense for a single point
+	{
+		/* Too short? */
+		if ((line[2] -= dx) < 0) return (line[2]);
+		dy = (j = l4 * dx + line[5] - line[3]) / line[5];
+		line[vh] += hs * dx; line[hv] += vs * dy;
+		line[3] = line[5] * (dy + 1) - j;
+	}
+	/* Misses the rectangle? */
+	if ((line[0] < vxy[0]) || (line[0] > vxy[2]) ||
+		(line[1] < vxy[1]) || (line[1] > vxy[3])) return (line[2] = -1);
+	*step = dx;
+	j = steps[1] - dx - 1;
+	if (j < line[2]) line[2] = j;
+	return (line[2]);
+}
+
 /* Produce a horizontal segment from two connected lines */
 static void twoline_segment(int *xx, linedata line1, linedata line2)
 {

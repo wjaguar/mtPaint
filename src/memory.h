@@ -360,6 +360,7 @@ typedef int linedata[10];
 void line_init(linedata line, int x0, int y0, int x1, int y1);
 int line_step(linedata line);
 void line_nudge(linedata line, int x, int y);
+int line_clip(linedata line, int *vxy, int *step);
 
 /// Procedures
 

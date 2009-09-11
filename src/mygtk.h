@@ -253,6 +253,14 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	unsigned char *buf, int x, int y, int width, int height);
 
+// Clipboard
+
+int internal_clipboard();
+int process_clipboard(char *what, GtkSignalFunc handler, gpointer data);
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+int import_clip_Xpixmap(GtkSelectionData *data); // X special
+#endif
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

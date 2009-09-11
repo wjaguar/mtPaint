@@ -351,7 +351,7 @@ void pressed_channel_edit(int state, int channel)
 	if (!state || newchan_window || (channel == mem_channel)) return;
 
 	if ( marq_status >= MARQUEE_PASTE && mem_clip_bpp == 3)
-		pressed_select_none();
+		pressed_select(FALSE);
 	// Stop pasting if with RGB paste
 
 	if (!mem_img[channel])
