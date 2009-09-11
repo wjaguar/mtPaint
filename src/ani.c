@@ -1283,14 +1283,9 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	LAYERS TABLES
 
-	frame = gtk_frame_new (_("Layers"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox1), frame, TRUE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
 	hbox3 = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox3);
-	gtk_container_add (GTK_CONTAINER (frame), hbox3);
+	add_with_frame_x(vbox1, _("Layers"), hbox3, 5, TRUE);
 
 	notebook1 = gtk_notebook_new ();
 	gtk_widget_show (notebook1);

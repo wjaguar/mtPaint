@@ -230,6 +230,7 @@ static void click_shift_fix()			// Button to fix palette pressed
 
 	mem_pal_copy( mem_pal, sh_old_pal );
 	spot_undo(UNDO_PAL);
+	shifter_set_palette(i);
 	mem_pal_copy( sh_old_pal, mem_pal );
 
 	mt_spinslide_set_value(shifter_slider, 0);

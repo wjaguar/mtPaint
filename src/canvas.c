@@ -1856,14 +1856,8 @@ void file_selector(int action_type)
 		inifile_get_gint32("fs_window_x", 0),
 		inifile_get_gint32("fs_window_y", 0));
 
-	if ((action_type == FS_EXPORT_UNDO) || (action_type == FS_EXPORT_UNDO2)
-		 || (action_type == FS_GIF_EXPLODE))
-	{
-//		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list), FALSE );
-		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list));
-		if (action_type == FS_GIF_EXPLODE)
-			gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
-	}
+	if (action_type ==  FS_GIF_EXPLODE)
+		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
 
 	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->ok_button),
 		"clicked", GTK_SIGNAL_FUNC(fs_ok), GTK_OBJECT(fs));

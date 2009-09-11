@@ -88,11 +88,11 @@ typedef struct
 /// GRADIENTS
 
 #define MAX_GRAD 65536
+#define GRAD_POINTS 256
 
 typedef struct {
 	/* Base values */
 	int status, x1, y1, x2, y2;	// Gradient placement tool
-	int gtype, otype;	// Main and opacity gradients
 	int len, rep, ofs;	// Gradient length, repeat, and offset
 	int gmode, rmode;	// Gradient mode and repeat mode
 	/* Derived values */
@@ -100,8 +100,21 @@ typedef struct {
 	int wmode;
 } grad_info;
 
-grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
+typedef struct {
+	char gtype, otype;		// Main and opacity gradient types
+	char grev, orev;		// Main and opacity reversal flags
+	int vslen, oplen;		// Current gradient lengths
+	int cvslen, coplen;		// Custom gradient lengths
+	unsigned char *vs, *vsmap;	// Current gradient data
+	unsigned char *op, *opmap;	// Current gradient opacities
+} grad_map;
+
+typedef unsigned char grad_store[(6 + NUM_CHANNELS * 4) * GRAD_POINTS];
+
+grad_info gradient[NUM_CHANNELS];	// Per-channel gradient placement
 double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
+grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
+grad_store gradbytes;			// Storage space for custom gradients
 
 /* Gradient modes */
 #define GRAD_MODE_NONE     0
@@ -115,14 +128,12 @@ double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
 #define GRAD_BOUND_REPEAT  2
 #define GRAD_BOUND_MIRROR  3
 
-/* Gradient modes */
-#define GRAD_FLAG_REVERSE  0x10000
-#define GRAD_FLAG_DEFAULT  0x20000
-#define GRAD_INDEX_MASK    0x0FFFF
-#define GRAD_DEF_RGB       0
-#define GRAD_DEF_HSV       1
-#define GRAD_DEF_BK_HSV    2
-#define GRAD_DEF_CONST     3
+/* Gradient types */
+#define GRAD_TYPE_RGB      0
+#define GRAD_TYPE_HSV      1
+#define GRAD_TYPE_BK_HSV   2
+#define GRAD_TYPE_CONST    3
+#define GRAD_TYPE_CUSTOM   4
 
 /// Bayer ordered dithering
 
@@ -427,9 +438,10 @@ int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image
 
-int grad_color(unsigned char *dest, double x, int frac);
+int grad_value(int *dest, double x);
 int grad_pixel(unsigned char *dest, int x, int y);
 void grad_update(grad_info *grad);
+void gmap_setup(grad_map *gmap, grad_store gstore, int slot);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

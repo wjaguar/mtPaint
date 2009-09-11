@@ -2360,27 +2360,73 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 static GtkWidget *grad_spin_len, *grad_spin_rep, *grad_spin_ofs;
 static GtkWidget *grad_opt_type, *grad_opt_bound;
 static GtkWidget *grad_ss_pre;
+static GtkWidget *grad_opt_gtype, *grad_opt_otype;
+static GtkWidget *grad_check_grev, *grad_check_orev;
 static int grad_channel;
 static grad_info grad_temps[NUM_CHANNELS];
+static grad_map grad_tmaps[NUM_CHANNELS + 1];
+static grad_store grad_tbytes;
+
+
+#define NUM_GTYPES 6
+#define NUM_OTYPES 3
+static const char gtmap[NUM_GTYPES * 2] = {GRAD_TYPE_RGB, 1, GRAD_TYPE_RGB, 2,
+	GRAD_TYPE_HSV, 2, GRAD_TYPE_BK_HSV, 2, GRAD_TYPE_CONST, 3,
+	GRAD_TYPE_CUSTOM, 3};
+static const char opmap[NUM_OTYPES] = {GRAD_TYPE_RGB, GRAD_TYPE_CONST,
+	GRAD_TYPE_CUSTOM};
+
+static void grad_reset_menu(int mode, int bpp)
+{
+	GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
+		GTK_OPTION_MENU(grad_opt_gtype)))->children;
+	char f = bpp == 1 ? 1 : 2;
+	int i, j;
+
+	for (j = NUM_GTYPES - 1; j >= 0; j--)
+	{
+		if ((gtmap[j * 2] == mode) && (gtmap[j * 2 + 1] & f)) break;
+	}
+
+	for (; items; items = items->next)
+	{
+		i = (int)gtk_object_get_user_data(GTK_OBJECT(items->data));
+		(gtmap[2 * i + 1] & f ? gtk_widget_show : gtk_widget_hide)
+			(GTK_WIDGET(items->data));
+	}
+	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_gtype), j);
+}
 
 static void store_channel_gradient(int channel)
 {
 	grad_info *grad = grad_temps + channel;
+	grad_map *gmap = grad_tmaps + channel + 1;
 
 	if (channel < 0) return;
+	if ((channel == CHN_IMAGE) && (mem_img_bpp == 3)) gmap = grad_tmaps;
+
 	grad->len = read_spin(grad_spin_len);
 	grad->gmode = wj_option_menu_get_history(grad_opt_type) + 1;
 	grad->rep = read_spin(grad_spin_rep);
 	grad->rmode = wj_option_menu_get_history(grad_opt_bound);
 	grad->ofs = read_spin(grad_spin_ofs);
 
-// !!! Store selected gradients
+	gmap->gtype = gtmap[2 * wj_option_menu_get_history(grad_opt_gtype)];
+	gmap->grev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_grev));
+	gmap->otype = opmap[wj_option_menu_get_history(grad_opt_otype)];
+	gmap->orev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_orev));
+
+// !!! Store custom gradients
 
 }
 
 static void show_channel_gradient(int channel)
 {
 	grad_info *grad = grad_temps + channel;
+	grad_map *gmap = grad_tmaps + channel + 1;
+	int i, bpp = BPP(channel);
+
+	if (bpp == 3) gmap = grad_tmaps;
 
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_len), grad->len);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type), grad->gmode - 1);
@@ -2388,7 +2434,16 @@ static void show_channel_gradient(int channel)
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_bound), grad->rmode);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_ofs), grad->ofs);
 
-// !!! Show selected gradients
+	grad_reset_menu(gmap->gtype, bpp);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_grev), gmap->grev);
+	for (i = NUM_OTYPES - 1; i >= 0; i--)
+	{
+		if (opmap[i] == gmap->otype) break;
+	}
+	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_otype), i);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_orev), gmap->orev);
+
+// !!! Show custom gradients
 
 }
 
@@ -2398,11 +2453,16 @@ static void click_grad_ok(GtkWidget *widget, gpointer data)
 
 	store_channel_gradient(grad_channel);
 	memcpy(gradient, grad_temps, sizeof(grad_temps));
+	memcpy(graddata, grad_tmaps, sizeof(grad_tmaps));
+	memcpy(gradbytes, grad_tbytes, sizeof(grad_tbytes));
 
 // !!! Store preview opacity
 //	??? = mt_spinslide_get_value(grad_ss_pre);
 
 	for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
+	for (i = 0; i <= NUM_CHANNELS; i++) gmap_setup(graddata + i, gradbytes, i);
+	toolbar_update_settings();
+
 	gtk_widget_destroy(widget);
 }
 
@@ -2420,13 +2480,18 @@ void gradient_setup(int mode)
 {
 	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial")};
 	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
+	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (HSV)"),
+		_("A to B (backward HSV)"), _("A only"), _("Custom")};
+	char *optypes[] = {_("Current to 0"), _("Current only"), _("Custom")};
 	GtkWidget *win, *mainbox, *notebook, *page0, *page1;
-	GtkWidget *label, *hbox, *table;
+	GtkWidget *label, *hbox, *vbox, *table;
 	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
 
 	memcpy(grad_temps, gradient, sizeof(grad_temps));
+	memcpy(grad_tmaps, graddata, sizeof(grad_tmaps));
+	memcpy(grad_tbytes, gradbytes, sizeof(grad_tbytes));
 	grad_channel = mem_channel;
 
 	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Gradient"), pos, TRUE);
@@ -2446,7 +2511,7 @@ void gradient_setup(int mode)
 	page0 = gtk_vbox_new(FALSE, 0);
 	label = gtk_label_new(_("Setup"));
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page0, label);
-	page1 = gtk_vbox_new(FALSE, 0);
+	page1 = gtk_hbox_new(TRUE, 0);
 	label = gtk_label_new(_("Select"));
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page1, label);
 	gtk_widget_show_all(notebook); /* Else unable to set page */
@@ -2474,14 +2539,29 @@ void gradient_setup(int mode)
 	mt_spinslide_set_range(grad_ss_pre, 0, 255);
 	gtk_table_attach(GTK_TABLE(table), grad_ss_pre, 3, 4, 2, 3,
 		GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	show_channel_gradient(mem_channel);
 
 // !!! Show preview opacity
 //	mt_spinslide_set_value(grad_ss_pre, ???);
 
 	/* Select page */
 
-// !!! Build the controls
+	vbox = gtk_vbox_new(FALSE, 0);
+	add_with_frame_x(page1, _("Gradient"), vbox, 5, TRUE);
+	grad_opt_gtype = wj_option_menu(gradtypes, NUM_GTYPES, 0, NULL, NULL);
+	gtk_container_set_border_width(GTK_CONTAINER(grad_opt_gtype), 5);
+	gtk_box_pack_start(GTK_BOX(vbox), grad_opt_gtype, FALSE, FALSE, 0);
+	grad_check_grev = add_a_toggle(_("Reverse"), vbox, FALSE);
+
+// !!! Add gradient editor widgets here
+
+	vbox = gtk_vbox_new(FALSE, 0);
+	add_with_frame_x(page1, _("Opacity"), vbox, 5, TRUE);
+	grad_opt_otype = wj_option_menu(optypes, NUM_OTYPES, 0, NULL, NULL);
+	gtk_container_set_border_width(GTK_CONTAINER(grad_opt_otype), 5);
+	gtk_box_pack_start(GTK_BOX(vbox), grad_opt_otype, FALSE, FALSE, 0);
+	grad_check_orev = add_a_toggle(_("Reverse"), vbox, FALSE);
+
+// !!! Add opacity editor widgets here
 
 	/* OK / Cancel */
 
@@ -2489,6 +2569,11 @@ void gradient_setup(int mode)
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
 
+	/* Fill in values */
+
+	gtk_widget_show_all(mainbox);
+	show_channel_gradient(mem_channel);
+
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_widget_show_all(win);
+	gtk_widget_show(win);
 }

@@ -460,14 +460,20 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col)
 
 // Packing framed widget
 
-GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border)
+GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
+	int border, int expand)
 {
 	GtkWidget *frame = gtk_frame_new(text);
 	gtk_widget_show(frame);
-	gtk_box_pack_start(GTK_BOX(box), frame, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(box), frame, !!expand, !!expand, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(frame), border);
 	gtk_container_add(GTK_CONTAINER(frame), widget);
 	return (frame);
+}
+
+GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border)
+{
+	return (add_with_frame_x(box, text, widget, border, FALSE));
 }
 
 // Option menu

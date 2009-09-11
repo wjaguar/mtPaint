@@ -297,7 +297,7 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	char txt[256];
 	int i, j, orphans = 0, maxi;
 
-	GtkWidget *vbox4, *vbox5, *frame, *table4, *hs_normalize_check;
+	GtkWidget *vbox4, *vbox5, *table4, *hs_normalize_check;
 	GtkWidget *scrolledwindow1, *viewport1, *table5, *button3;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
@@ -401,15 +401,10 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 		j = 0;
 		for ( i=0; i<mem_cols; i++ ) if ( mem_histogram[i] > 0 ) j++;
 		snprintf( txt, 250, _("Colour index totals - %i of %i used"), j, mem_cols );
-		frame = gtk_frame_new (txt);
-
-		gtk_widget_show (frame);
-		gtk_box_pack_start (GTK_BOX (vbox4), frame, TRUE, TRUE, 0);
-		gtk_container_set_border_width (GTK_CONTAINER (frame), 4);
 
 		scrolledwindow1 = gtk_scrolled_window_new (NULL, NULL);
 		gtk_widget_show (scrolledwindow1);
-		gtk_container_add (GTK_CONTAINER (frame), scrolledwindow1);
+		add_with_frame_x(vbox4, txt, scrolledwindow1, 4, TRUE);
 		gtk_container_set_border_width (GTK_CONTAINER (scrolledwindow1), 4);
 		gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow1),
 			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);

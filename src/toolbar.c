@@ -662,7 +662,7 @@ static void toolbar_settings_init()
 	for (i = 0; i < 3; i++)
 	{
 		labels[i] = add_to_table(ts_titles[i], table, i, 0, 0);
-		ts_spinslides[i] = mt_spinslide_new(150, -1);
+		ts_spinslides[i] = mt_spinslide_new(-1, -1);
 		gtk_table_attach(GTK_TABLE(table), ts_spinslides[i], 1, 2,
 			i, i + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
 		mt_spinslide_set_range(ts_spinslides[i], i == 2 ? 0 : 1, 255);
@@ -827,10 +827,9 @@ void toolbar_init(GtkWidget *vbox_main)
 
 void ts_update_gradient()
 {
-	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3], cset[NUM_CHANNELS + 3];
+	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3], cset[3];
 	unsigned char pal[256 * 3], *tmp = NULL, *dest;
-	int i, j, k, op, idx = 255;
-	double x;
+	int i, j, k, op, op2, frac, idx = 255, wrk[NUM_CHANNELS + 3];
 	GdkPixmap *pmap;
 
 	if (!grad_view) return;
@@ -863,19 +862,33 @@ void ts_update_gradient()
 	memset(rgb, mem_background, sizeof(rgb));
 	for (i = 0; i < GP_WIDTH; i++)
 	{
-		x = i * (1.0 / (double)(GP_WIDTH - 1));
 		dest = rgb + i * 3;
+		wrk[CHN_IMAGE + 3] = 0;
+		op = grad_value(wrk, i * (1.0 / (double)(GP_WIDTH - 1)));
+		if (!op) continue;
 		for (j = 0; j < GP_HEIGHT; j++ , dest += GP_WIDTH * 3)
 		{
-			op = grad_color(cset, x, BAYER(i, j));
-			if (!op) continue;
-			op |= idx;
-			if (tmp != cset) tmp = pal + 3 * cset[mem_channel + 3];
-			k = dest[0] * 255 + (tmp[0] - dest[0]) * op;
+			frac = BAYER(i, j);
+			op2 = (op + frac) >> 8;
+			if (!op2) continue;
+			op2 |= idx;
+			if (tmp == cset)
+			{
+				cset[0] = (wrk[0] + frac) >> 8;
+				cset[1] = (wrk[1] + frac) >> 8;
+				cset[2] = (wrk[2] + frac) >> 8;
+			}
+			else
+			{
+				k = (wrk[mem_channel + 3] + frac) >> 8;
+				if (mem_channel == CHN_IMAGE) k = wrk[k];
+				tmp = pal + 3 * k;
+			}
+			k = dest[0] * 255 + (tmp[0] - dest[0]) * op2;
 			dest[0] = (k + (k >> 8) + 1) >> 8;
-			k = dest[1] * 255 + (tmp[1] - dest[1]) * op;
+			k = dest[1] * 255 + (tmp[1] - dest[1]) * op2;
 			dest[1] = (k + (k >> 8) + 1) >> 8;
-			k = dest[2] * 255 + (tmp[2] - dest[2]) * op;
+			k = dest[2] * 255 + (tmp[2] - dest[2]) * op2;
 			dest[2] = (k + (k >> 8) + 1) >> 8;
 		}
 	}
