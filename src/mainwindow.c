@@ -1020,12 +1020,15 @@ int wtf_pressed(GdkEventKey *event)
 	return (cmatch);
 }
 
+static int check_smart_menu_keys(GdkEventKey *event);
+
 static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
 	int change, action;
 
 	action = wtf_pressed(event);
+	if (!action) action = check_smart_menu_keys(event);
 	if (!action) return (FALSE);
 
 #if GTK_MAJOR_VERSION == 1
@@ -1033,7 +1036,8 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
 #endif
 
-	if (check_zoom_keys(action)) return TRUE;		// Check HOME/zoom keys
+	if (action == ACT_DUMMY) return (TRUE);
+	if (check_zoom_keys(action)) return (TRUE);	// Check HOME/zoom keys
 
 	if (marq_status > MARQUEE_NONE)
 	{
@@ -3329,18 +3333,246 @@ void mapped_dis_add(GtkWidget *widget, int actmap)
 	}
 }
 
+/* The following is main menu auto-rearrange code. If the menu is too long for
+ * the window, some of its items are moved into "overflow" submenu - and moved
+ * back to menubar when the window is made wider. This way, we can support
+ * small-screen devices without penalizing large-screen ones. - WJ */
+
+#define MENU_RESIZE_MAX 16
+
+typedef struct {
+	GtkWidget *item, *fallback;
+	guint key;
+	int width;
+} r_menu_slot;
+
+int r_menu_state;
+r_menu_slot r_menu[MENU_RESIZE_MAX];
+
+/* Handle keyboard accels for overflow menu */
+static int check_smart_menu_keys(GdkEventKey *event)
+{
+	guint lowkey;
+	int i;
+
+	/* No overflow - nothing to do */
+	if (r_menu_state == 0) return (0);
+	/* Alt+key only */
+	if ((event->state & _CSA) != _A) return (0);
+
+	lowkey = low_key(event);
+	for (i = 1; i <= r_menu_state; i++)
+	{
+		if (r_menu[i].key != lowkey) continue;
+		/* Just popup - if we're here, overflow menu is offscreen anyway */
+		gtk_menu_popup(GTK_MENU(GTK_MENU_ITEM(r_menu[i].fallback)->submenu),
+			NULL, NULL, NULL, NULL, 0, 0);
+
+		return (ACT_DUMMY);
+	}
+	return (0);
+}
+
+/* Invalidate width cache after width-affecting change */
+static void check_width_cache(int width)
+{
+	r_menu_slot *slot;
+
+	if (r_menu[r_menu_state].width == width) return;
+	if (r_menu[r_menu_state].width)
+		for (slot = r_menu; slot->item; slot++) slot->width = 0;
+	r_menu[r_menu_state].width = width;
+}
+
+/* Show/hide widgets according to new state */
+static void change_to_state(int state)
+{
+	int i, oldst = r_menu_state;
+
+	if (oldst < state)
+	{
+		for (i = oldst + 1; i <= state; i++)
+			gtk_widget_hide(r_menu[i].item);
+		if (oldst == 0) gtk_widget_show(r_menu[0].item);
+	}
+	else
+	{
+		for (i = oldst; i > state; i--)
+			gtk_widget_show(r_menu[i].item);
+		if (state == 0) gtk_widget_hide(r_menu[0].item);
+	}
+	r_menu_state = state;
+}
+
+/* Move submenus between menubar and overflow submenu */
+static void switch_states(int newstate, int oldstate)
+{
+	GtkWidget *submenu;
+	GtkMenuItem *item;
+	int i;
+
+	if (newstate < oldstate) /* To main menu */
+	{
+		for (i = oldstate; i > newstate; i--)
+		{
+			gtk_widget_hide(r_menu[i].fallback);
+			item = GTK_MENU_ITEM(r_menu[i].fallback);
+			gtk_widget_ref(submenu = item->submenu);
+			gtk_menu_item_remove_submenu(item);
+			item = GTK_MENU_ITEM(r_menu[i].item);
+			gtk_menu_item_set_submenu(item, submenu);
+			gtk_widget_unref(submenu);
+		}
+	}
+	else /* To overflow submenu */
+	{
+		for (i = oldstate + 1; i <= newstate; i++)
+		{
+			item = GTK_MENU_ITEM(r_menu[i].item);
+			gtk_widget_ref(submenu = item->submenu);
+			gtk_menu_item_remove_submenu(item);
+			item = GTK_MENU_ITEM(r_menu[i].fallback);
+			gtk_menu_item_set_submenu(item, submenu);
+			gtk_widget_unref(submenu);
+			gtk_widget_show(r_menu[i].fallback);
+		}
+	}
+}
+
+/* Get width request for default state */
+static int smart_menu_full_width(GtkWidget *widget, int width)
+{
+	check_width_cache(width);
+	if (!r_menu[0].width)
+	{
+		GtkRequisition req;
+		GtkWidget *child = GTK_BIN(widget)->child;
+		int oldst = r_menu_state;
+		gpointer lock = toggle_updates(widget, NULL);
+		change_to_state(0);
+		gtk_widget_size_request(child, &req);
+		r_menu[0].width = req.width;
+		change_to_state(oldst);
+		child->requisition.width = width;
+		toggle_updates(widget, lock);
+	}
+	return (r_menu[0].width);
+}
+
+/* Switch to the state which best fits the allocated width */
+static void smart_menu_state_to_width(GtkWidget *widget, int rwidth, int awidth)
+{
+	GtkWidget *child = GTK_BIN(widget)->child;
+	gpointer lock = NULL;
+	int state, oldst, newst;
+
+	check_width_cache(rwidth);
+	state = oldst = r_menu_state;
+	while (TRUE)
+	{
+		newst = rwidth < awidth ? state - 1 : state + 1;
+		if ((newst < 0) || !r_menu[newst].item) break;
+		if (!r_menu[newst].width)
+		{
+			GtkRequisition req;
+			if (!lock) lock = toggle_updates(widget, NULL);
+			change_to_state(newst);
+			gtk_widget_size_request(child, &req);
+			r_menu[newst].width = req.width;
+		}
+		state = newst;
+		if ((rwidth < awidth) ^ (r_menu[state].width <= awidth)) break;
+	}
+	while ((r_menu[state].width > awidth) && r_menu[state + 1].item) state++;
+	if (state != r_menu_state)
+	{
+		if (!lock) lock = toggle_updates(widget, NULL);
+		change_to_state(state);
+		child->requisition.width = r_menu[state].width;
+	}
+	if (state != oldst) switch_states(state, oldst);
+	if (lock) toggle_updates(widget, lock);
+}
+
+static void smart_menu_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkRequisition child_req;
+	GtkWidget *child = GTK_BIN(widget)->child;
+	int fullw;
+
+	req->width = req->height = GTK_CONTAINER(widget)->border_width * 2;
+	if (!child || !GTK_WIDGET_VISIBLE(child)) return;
+
+	gtk_widget_size_request(child, &child_req);
+	fullw = smart_menu_full_width(widget, child_req.width);
+
+	req->width += fullw;
+	req->height += child_req.height;
+}
+
+static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	static int in_alloc;
+	GtkRequisition child_req;
+	GtkAllocation child_alloc;
+	GtkWidget *child = GTK_BIN(widget)->child;
+	int border = GTK_CONTAINER(widget)->border_width, border2 = border * 2;
+
+	widget->allocation = *alloc;
+	if (!child || !GTK_WIDGET_VISIBLE(child)) return;
+
+	/* Maybe recursive calls to this cannot happen, but if they can,
+	 * crash would be quite spectacular - so, better safe than sorry */
+	if (in_alloc) /* Postpone reaction */
+	{
+		in_alloc |= 2;
+		return;
+	}
+
+	/* !!! Always keep child widget requisition set according to its
+	 * !!! mode, or this code will break down in interesting ways */
+	gtk_widget_get_child_requisition(child, &child_req);
+/* !!! Alternative approach - reliable but slow */
+//	gtk_widget_size_request(child, &child_req);
+	while (TRUE)
+	{
+		in_alloc = 1;
+		child_alloc.x = alloc->x + border;
+		child_alloc.y = alloc->y + border;
+		child_alloc.width = alloc->width > border2 ?
+			alloc->width - border2 : 0;
+		child_alloc.height = alloc->height > border2 ?
+			alloc->height - border2 : 0;
+		if (r_menu_state > 0 ? child_alloc.width != child_req.width :
+			child_alloc.width < child_req.width)
+			smart_menu_state_to_width(widget, child_req.width,
+				child_alloc.width);
+		if (in_alloc < 2) break;
+		alloc = &widget->allocation;
+	}
+	in_alloc = 0;
+
+	gtk_widget_size_allocate(child, &child_alloc);
+}
+
 static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 {
 	static char *bts[6] = { "<CheckItem>", NULL, "<Branch>", "<Tearoff>",
 		"<Separator>", "<LastBranch>" };
 	GtkItemFactoryEntry wf;
 	GtkItemFactory *factory;
-	GtkWidget *widget;
-	char *radio[32];
-
+	GtkWidget *widget, *wrap, *rwidgets[MENU_RESIZE_MAX];
+	char *radio[32], *rnames[MENU_RESIZE_MAX];
+	int i, j, rn = 0;
+#if GTK_MAJOR_VERSION == 1
+	GSList *en;
+#endif
 
 	memset(&wf, 0, sizeof(wf));
 	memset(radio, 0, sizeof(radio));
+	rnames[0] = NULL;
 	factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", accel_group);
 	for (; items->path; items++)
 	{
@@ -3348,25 +3580,73 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		wf.accelerator = items->shortcut;
 		wf.callback = items->handler;
 		wf.callback_action = items->parm;
-		wf.item_type = items->radio_BTS < 1 ? bts[-items->radio_BTS] :
+		wf.item_type = items->radio_BTS < 1 ? bts[-items->radio_BTS & 15] :
 			radio[items->radio_BTS] ? radio[items->radio_BTS] :
 			"<RadioItem>";
 		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
 			radio[items->radio_BTS] = wf.path;
 		gtk_item_factory_create_item(factory, &wf, NULL, 2);
-		widget = gtk_item_factory_get_item(factory, wf.path);
+		/* !!! Workaround - internal path may differ from input path */
+		widget = gtk_item_factory_get_item(factory,
+			((GtkItemFactoryItem *)factory->items->data)->path);
 		mapped_dis_add(widget, items->actmap);
 		/* For now, remember only requested widgets */
 		if (items->ID) menu_widgets[items->ID] = widget;
+		/* Remember what is size-aware */
+		if (items->radio_BTS > -16) continue;
+		rnames[rn] = wf.path;
+		rwidgets[rn++] = widget;
 	}
-	return (gtk_item_factory_get_widget(factory, "<main>"));
+
+	/* Setup overflow submenu */
+	r_menu[0].item = rwidgets[--rn];
+	memset(&wf, 0, sizeof(wf));
+	for (i = 0; i < rn; i++)
+	{
+		j = rn - i;
+		widget = r_menu[j].item = rwidgets[i];
+#if GTK_MAJOR_VERSION == 1
+		en = gtk_accel_group_entries_from_object(GTK_OBJECT(widget));
+	/* !!! This'll get confused if both underline and normal accelerators
+	 * are defined for the item */
+		r_menu[j].key = en ? ((GtkAccelEntry *)en->data)->accelerator_key :
+			GDK_VoidSymbol;
+#else
+		r_menu[j].key = gtk_label_get_mnemonic_keyval(GTK_LABEL(
+			GTK_BIN(widget)->child));
+#endif
+		wf.path = g_strconcat(rnames[rn], rnames[i], NULL);
+		wf.item_type = "<Branch>";
+		gtk_item_factory_create_item(factory, &wf, NULL, 2);
+		/* !!! Workaround - internal path may differ from input path */
+		widget = gtk_item_factory_get_item(factory,
+			((GtkItemFactoryItem *)factory->items->data)->path);
+		g_free(wf.path);
+		r_menu[j].fallback = widget;
+		gtk_widget_hide(widget);
+	}
+	gtk_widget_hide(r_menu[0].item);
+
+	/* Wrap menubar with resize-controller widget */
+	widget = gtk_item_factory_get_widget(factory, "<main>");
+	gtk_widget_show(widget);
+	wrap = wj_size_bin();
+	gtk_container_add(GTK_CONTAINER(wrap), widget);
+	gtk_signal_connect(GTK_OBJECT(wrap), "size_request",
+		GTK_SIGNAL_FUNC(smart_menu_size_req), NULL);
+	gtk_signal_connect(GTK_OBJECT(wrap), "size_allocate",
+		GTK_SIGNAL_FUNC(smart_menu_size_alloc), NULL);
+
+	return (wrap);
 }
 
 #undef _
 #define _(X) X
 
+/* !!! Keep MENU_RESIZE_MAX larger than number of resize-enabled items */
+
 static menu_item main_menu[] = {
-	{ _("/_File"), -2 },
+	{ _("/_File"), -2 -16 },
 	{ _("/File/tear"), -3 },
 	{ _("/File/New"), -1, 0, 0, "<control>N", pressed_new, 0 },
 	{ _("/File/Open ..."), -1, 0, 0, "<control>O", pressed_open_file, 0 },
@@ -3421,7 +3701,7 @@ static menu_item main_menu[] = {
 	{ _("/File/sep3"), -4 },
 	{ _("/File/Quit"), -1, 0, 0, "<control>Q", quit_all, 0 },
 
-	{ _("/_Edit"), -2 },
+	{ _("/_Edit"), -2 -16 },
 	{ _("/Edit/tear"), -3 },
 	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", main_undo, 0 },
 	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", main_redo, 0 },
@@ -3466,7 +3746,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", pressed_choose_brush, 0 },
 	{ _("/Edit/Create Patterns"), -1, 0, 0, NULL, pressed_create_patterns, 0 },
 
-	{ _("/_View"), -2 },
+	{ _("/_View"), -2 -16 },
 	{ _("/View/tear"), -3 },
 	{ _("/View/Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", pressed_toolbar_toggle, TOOLBAR_MAIN },
 	{ _("/View/Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", pressed_toolbar_toggle, TOOLBAR_TOOLS },
@@ -3486,7 +3766,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", pressed_cline, 0 },
 	{ _("/View/Layers Window"), -1, MENU_LAYER, 0, "L", pressed_layers, 0 },
 
-	{ _("/_Image"), -2 },
+	{ _("/_Image"), -2 -16 },
 	{ _("/Image/tear"), -3 },
 	{ _("/Image/Convert To RGB"), -1, 0, NEED_IDX, NULL, pressed_convert_rgb, 0 },
 	{ _("/Image/Convert To Indexed ..."), -1, 0, NEED_24, NULL, pressed_quantize, 0 },
@@ -3504,7 +3784,7 @@ static menu_item main_menu[] = {
 	{ _("/Image/Information ..."), -1, 0, 0, "<control>I", pressed_information, 0 },
 	{ _("/Image/Preferences ..."), -1, MENU_PREFS, 0, "<control>P", pressed_preferences, 0 },
 
-	{ _("/_Selection"), -2 },
+	{ _("/_Selection"), -2 -16 },
 	{ _("/Selection/tear"), -3 },
 	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", pressed_select_all, 0 },
 	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", pressed_select_none, 0 },
@@ -3528,7 +3808,7 @@ static menu_item main_menu[] = {
 	{ _("/Selection/Mask All Colours"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask_all, 0 },
 	{ _("/Selection/Clear Mask"), -1, 0, NEED_CLIP, NULL, pressed_clip_mask_clear, 0 },
 
-	{ _("/_Palette"), -2 },
+	{ _("/_Palette"), -2 -16 },
 	{ _("/Palette/tear"), -3 },
 	{ _("/Palette/Open ..."), -1, 0, 0, NULL, pressed_open_pal, 0 },
 	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, pressed_save_pal, 0 },
@@ -3549,7 +3829,7 @@ static menu_item main_menu[] = {
 	{ _("/Palette/Sort Colours ..."), -1, 0, 0, NULL, pressed_sort_pal, 0 },
 	{ _("/Palette/Palette Shifter ..."), -1, 0, 0, NULL, pressed_shifter, 0 },
 
-	{ _("/Effe_cts"), -2 },
+	{ _("/Effe_cts"), -2 -16 },
 	{ _("/Effects/tear"), -3 },
 	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", pressed_brcosa, 0 },
 	{ _("/Effects/Invert"), -1, 0, 0, "<control><shift>I", pressed_invert, 0 },
@@ -3571,7 +3851,7 @@ static menu_item main_menu[] = {
 	{ _("/Effects/sep2"), -4 },
 	{ _("/Effects/Bacteria ..."), -1, 0, NEED_IDX, NULL, pressed_bacteria, 0 },
 
-	{ _("/Cha_nnels"), -2 },
+	{ _("/Cha_nnels"), -2 -16 },
 	{ _("/Channels/tear"), -3 },
 	{ _("/Channels/New ..."), -1, 0, 0, NULL, pressed_channel_create, -1 },
 	{ _("/Channels/Load ..."), -1, 0, 0, NULL, pressed_channel_load, 0 },
@@ -3595,7 +3875,7 @@ static menu_item main_menu[] = {
 	{ _("/Channels/View Alpha as an Overlay"), 0, 0, 0, NULL, pressed_channel_toggle, 0 },
 	{ _("/Channels/Configure Overlays ..."), -1, 0, 0, NULL, pressed_channel_config_overlay, 0 },
 
-	{ _("/_Layers"), -2 },
+	{ _("/_Layers"), -2 -16 },
 	{ _("/Layers/tear"), -3 },
 	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", layer_press_save, 0 },
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, layer_press_save_as, 0 },
@@ -3606,6 +3886,8 @@ static menu_item main_menu[] = {
 	{ _("/Layers/Preview Animation ..."), -1, 0, 0, NULL, ani_but_preview, 0 },
 	{ _("/Layers/Set key frame ..."), -1, 0, 0, NULL, pressed_set_key_frame, 0 },
 	{ _("/Layers/Remove all key frames ..."), -1, 0, 0, NULL, pressed_remove_key_frames, 0 },
+
+	{ _("/More..."), -2 -16 }, /* This will hold overflow submenu */
 
 	{ _("/_Help"), -5 },
 	{ _("/Help/Documentation"), -1, 0, 0, NULL, pressed_docs, 0 },
@@ -3672,7 +3954,6 @@ void main_init()
 	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
 	pack(vbox_main, menubar1);
-	gtk_widget_show(menubar1);
 
 
 // we need to realize the window because we use pixmaps for 

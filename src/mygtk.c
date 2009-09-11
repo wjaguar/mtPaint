@@ -1631,3 +1631,101 @@ int wj_combo_box_get_history(GtkWidget *combobox)
 }
 
 #endif
+
+// Bin widget with customizable size handling
+
+/* There exist no way to override builtin handlers for GTK_RUN_FIRST signals,
+ * such as size-request and size-allocate; so instead of building multiple
+ * custom widget classes with different resize handling, it's better to build
+ * one with no builtin sizing at all - WJ */
+
+GtkWidget *wj_size_bin()
+{
+	static GtkType size_bin_type;
+	GtkWidget *widget;
+
+	if (!size_bin_type)
+	{
+		GtkWidgetClass *wc;
+		GtkTypeInfo info = { "WJSizeBin", sizeof(GtkBin),
+			sizeof(GtkBinClass), NULL /* class init */,
+			NULL /* instance init */, NULL, NULL, NULL };
+		size_bin_type = gtk_type_unique(GTK_TYPE_BIN, &info);
+		wc = gtk_type_class(size_bin_type);
+		wc->size_request = NULL;
+		wc->size_allocate = NULL;
+	}
+	widget = gtk_widget_new(size_bin_type, NULL);
+	GTK_WIDGET_SET_FLAGS(widget, GTK_NO_WINDOW);
+#if GTK_MAJOR_VERSION == 2
+	gtk_widget_set_redraw_on_allocate(widget, FALSE);
+#endif
+	gtk_widget_show(widget);
+	return (widget);
+}
+
+// Disable visual updates while tweaking container's contents
+
+/* This is an evil hack, and isn't guaranteed to work in future GTK+ versions;
+ * still, not providing such a function is a design mistake in GTK+, and it'll
+ * be easier to update this code if it becomes broken sometime in dim future,
+ * than deal with premature updates right here and now - WJ */
+
+#if GTK_MAJOR_VERSION == 1
+#include <gtk/gtkprivate.h>
+#endif
+
+typedef struct {
+	int flags, pf, mode;
+} lock_state;
+
+gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
+{
+	lock_state *state;
+	GtkContainer *cont = GTK_CONTAINER(widget);
+
+	if (!unlock) /* Locking... */
+	{
+		state = calloc(1, sizeof(lock_state));
+		state->mode = cont->resize_mode;
+		cont->resize_mode = GTK_RESIZE_IMMEDIATE;
+		state->flags = GTK_WIDGET_FLAGS(widget);
+#if GTK_MAJOR_VERSION == 1
+		GTK_WIDGET_UNSET_FLAGS(widget, GTK_VISIBLE);
+		state->pf = GTK_WIDGET_IS_OFFSCREEN(widget);
+		GTK_PRIVATE_SET_FLAG(widget, GTK_IS_OFFSCREEN);
+#else /* if GTK_MAJOR_VERSION == 2 */
+		GTK_WIDGET_UNSET_FLAGS(widget, GTK_VISIBLE | GTK_MAPPED);
+#endif
+	}
+	else /* Unlocking... */
+	{
+		state = unlock;
+		cont->resize_mode = state->mode;
+#if GTK_MAJOR_VERSION == 1
+		GTK_WIDGET_SET_FLAGS(widget, state->flags & GTK_VISIBLE);
+		if (!state->pf) GTK_PRIVATE_UNSET_FLAG(widget, GTK_IS_OFFSCREEN);
+#else /* if GTK_MAJOR_VERSION == 2 */
+		GTK_WIDGET_SET_FLAGS(widget, state->flags & (GTK_VISIBLE | GTK_MAPPED));
+#endif
+		free(state);
+		state = NULL;
+	}
+	return (state);
+}
+
+// Maybe this will be needed someday...
+
+#if 0
+/* This transmutes a widget into one of different type. If the two types aren't 
+ * bit-for-bit compatible, Bad Things (tm) will happen - WJ */
+
+static void steal_widget(GtkWidget *widget, GtkType wrapper_type)
+{
+#if GTK_MAJOR_VERSION == 1
+	GTK_OBJECT(widget)->klass = gtk_type_class(wrapper_type);
+#else
+	G_OBJECT(widget)->g_type_instance.g_class = gtk_type_class(wrapper_type);
+#endif
+}
+#endif

@@ -481,8 +481,8 @@ msgid "Credits"
 msgstr "Créditos"
 
 #: src/help.c:30
-msgid "mtPaint 3.15 - Copyright (C) 2004-2007 The Authors\n"
-msgstr "mtPaint 3.15 - Copyright (C) 2004-2007 Los Autores\n"
+msgid "mtPaint 3.20 - Copyright (C) 2004-2007 The Authors\n"
+msgstr "mtPaint 3.20 - Copyright (C) 2004-2007 Los Autores\n"
 
 msgid "See 'Credits' section for a list of the authors.\n"
 msgstr "Ver la sección de 'Créditos' para el listado de autores.\n"

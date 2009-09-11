@@ -19,6 +19,7 @@
 
 
 /* Keyboard action codes */
+#define ACT_DUMMY	-1 /* Means action is done already */
 #define ACT_QUIT	1
 #define ACT_ZOOM_IN	2
 #define ACT_ZOOM_OUT	3

@@ -219,6 +219,14 @@ GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler);
 int wj_combo_box_get_history(GtkWidget *combobox);
 
+// Bin widget with customizable size handling
+
+GtkWidget *wj_size_bin();
+
+// Disable visual updates while tweaking container's contents
+
+gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

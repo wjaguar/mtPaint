@@ -477,7 +477,7 @@ msgstr "Katkıda Bulunanlar"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.15 - Copyright (C) 2004-2007 The Authors\n"
+"mtPaint 3.20 - Copyright (C) 2004-2007 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
