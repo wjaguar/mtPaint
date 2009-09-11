@@ -35,6 +35,7 @@
 #include "canvas.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "csel.h"
 
 
 char *channames[5];
@@ -3441,6 +3442,10 @@ int pixel_protected(int x, int y)
 			offset * 3))) return (255);
 	}
 
+	/* Colour selectivity */
+	if (mem_cselect && csel_scan(offset, 1, 1, NULL, mem_img[CHN_IMAGE]))
+		return (255);
+
 	/* Mask channel */
 	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
 		return (mem_img[CHN_MASK][offset]);
@@ -3480,6 +3485,9 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 			mask[i] |= mem_protected_RGB(MEM_2_INT(img0, i * 3));
 		}
 	}
+
+	/* Add colour selectivity to it */
+	if (mem_cselect) csel_scan(start, step, cnt, mask, img0);
 }
 
 /* Prepare mask array - for each pixel >0 if masked, 0 if not */

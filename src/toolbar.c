@@ -33,6 +33,7 @@
 #include "viewer.h"
 #include "png.h"
 #include "channels.h"
+#include "csel.h"
 
 
 #include "graphics/xpm_paint.xpm"
@@ -348,7 +349,31 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 	case SETB_OPAC:
 		inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
 		break;
+	case SETB_CSEL:
+		if (mem_cselect && (csel_center < 0))
+		{
+			if (csel_init()) mem_cselect = FALSE;
+		}
+		break;
 	}
+}
+
+static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	/* Handle only right clicks */
+	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
+		return (FALSE);
+
+	switch ((gint)user_data)
+	{
+	case SETB_CSEL:
+		colour_selector(COLSEL_EDIT_CSEL);
+		break;
+	default: /* For other buttons, do nothing */
+		return (FALSE);
+	}
+	return (TRUE);
 }
 
 static void ts_update_sliders()
@@ -464,6 +489,12 @@ static void toolbar_settings_init()
 			(gpointer) i);
 
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(but), !!*(vars_settings[i]));
+
+		if (i == SETB_CSEL)
+		{
+			gtk_signal_connect(GTK_OBJECT(but), "button_press_event",
+				GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)i);
+		}
 	}
 
 

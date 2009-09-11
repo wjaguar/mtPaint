@@ -40,6 +40,7 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "csel.h"
 
 
 #include "graphics/icon.xpm"
@@ -1634,6 +1635,41 @@ or_s:
 	}
 }
 
+/* Specialized renderer for irregular overlays */
+void overlay_preview(unsigned char *rgb, unsigned char *map, int col, int opacity)
+{
+	unsigned char *dest, crgb[3] = {INT_2_R(col), INT_2_G(col), INT_2_B(col)};
+	int i, j, k, ii, dw;
+
+	dest = rgb;
+	ii = rr_dx;
+	for (i = dw = 0; ; ii += rr_scale , dw += rr_zoom)
+	{
+		if (i >= rr_width)
+		{
+			if (i > rr_width) break;
+			ii += rr_xwid;
+		}
+		k = opacity * map[dw];
+		k = (k + (k >> 8) + 1) >> 8;
+op_as:
+		j = 255 * dest[0] + k * (crgb[0] - dest[0]);
+		dest[0] = (j + (j >> 8) + 1) >> 8;
+		j = 255 * dest[1] + k * (crgb[1] - dest[1]);
+		dest[1] = (j + (j >> 8) + 1) >> 8;
+		j = 255 * dest[2] + k * (crgb[2] - dest[2]);
+		dest[2] = (j + (j >> 8) + 1) >> 8;
+op_s:
+		dest += 3;
+		if (++i >= ii) continue;
+		if (async_bk) goto op_as;
+		dest[0] = *(dest - 3);
+		dest[1] = *(dest - 2);
+		dest[2] = *(dest - 1);
+		goto op_s;
+	}
+}
+
 void repaint_paste( int px1, int py1, int px2, int py2 )
 {
 	chanlist tlist;
@@ -1808,10 +1844,10 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 {
 	chanlist tlist;
-	unsigned char *mask0, *pvi = NULL, *pvm = NULL;
+	unsigned char *mask0, *pvi = NULL, *pvm = NULL, *pvx = NULL;
 	int alpha_blend = !overlay_alpha;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
-	int j, jj, j0, l, dx, pww = 0, zoom = 1, scale = 1, nix = 0, niy = 0;
+	int j, jj, j0, l, dx, pww, zoom = 1, scale = 1, nix = 0, niy = 0;
 	int lop = 255, xpm = mem_xpm_trans;
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -1849,11 +1885,11 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	dx = (px2 * zoom) / scale;
 	memset(tlist, 0, sizeof(chanlist));
 	mask0 = mem_img[CHN_MASK];
+	pww = pw2;
+	if (scale > 1) l = pww = (px2 + pw2 - 1) / scale - dx + 1;
+	else l = (pw2 - 1) * zoom + 1;
 	if (mem_preview && (mem_img_bpp == 3))
 	{
-		pww = pw2;
-		if (scale > 1) l = pww = (px2 + pw2 - 1) / scale - dx + 1;
-		else l = (pw2 - 1) * zoom + 1;
 		pvm = malloc(l * 4);
 		if (pvm)
 		{
@@ -1861,6 +1897,7 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 			tlist[CHN_IMAGE] = pvi;
 		}
 	}
+	else if (csel_overlay) pvx = malloc(l);
 
 	setup_row(px2, pw2, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
  	j0 = -1; pw *= 3; pw2 *= 3;
@@ -1878,6 +1915,12 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 				do_transform(0, zoom, pww, pvm, pvi,
 					mem_img[CHN_IMAGE] + l * 3);
 			}
+			else if (pvx)
+			{
+				memset(pvx, 0, l);
+				csel_scan(0, zoom, pww, pvx, mem_img[CHN_IMAGE] +
+					(mem_width * j + dx) * mem_img_bpp);
+			}
 		}
 		else if (!async_bk)
 		{
@@ -1885,9 +1928,11 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 			continue;
 		}
 		render_row(rgb, mem_img, dx, j, tlist);
-		overlay_row(rgb, mem_img, dx, j, tlist);
+		if (!pvx) overlay_row(rgb, mem_img, dx, j, tlist);
+		else overlay_preview(rgb, pvx, csel_preview, csel_preview_a);
 	}
 	free(pvm);
+	free(pvx);
 }
 
 void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on rgb memory

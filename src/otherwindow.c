@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -40,6 +40,7 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "csel.h"
 
 
 ///	NEW IMAGE WINDOW
@@ -1547,6 +1548,7 @@ typedef struct {
 static GtkWidget *allcol_window, *allcol_list;
 static RGBA16 *ctable;
 static int allcol_idx, cs_old_overlay[NUM_CHANNELS][4];
+static colour_hook allcol_hook;
 
 
 static void allcol_ok(colour_hook chook)
@@ -1619,6 +1621,7 @@ static void color_set( GtkColorSelection *selection, gpointer user_data )
 	GdkColor c = {0, cc->r, cc->g, cc->b};
 	gdk_colormap_alloc_color( gdk_colormap_get_system(), &c, FALSE, TRUE );
 	gtk_widget_queue_draw(widget);
+	allcol_hook(4);
 }
 
 static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
@@ -1648,6 +1651,7 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	allcol_idx = cc - ctable;
 
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
+	allcol_hook(3);
 }
 
 void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, char **cnames,
@@ -1674,6 +1678,7 @@ void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, char **cnames,
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 
 	allcol_window = win;
+	allcol_hook = chook;
 
 	gtk_signal_connect_object(GTK_OBJECT(allcol_window), "delete_event",
 		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
@@ -1825,6 +1830,21 @@ static void do_AB(int idx)
 	pal_refresher();
 }
 
+static void do_csel(int mode)
+{
+	csel_center = RGB_2_INT((ctable[0].r + 128) / 257,
+		(ctable[0].g + 128) / 257, (ctable[0].b + 128) / 257);
+	csel_center_a = (ctable[0].a + 128) / 257;
+	csel_limit = RGB_2_INT((ctable[1].r + 128) / 257,
+		(ctable[1].g + 128) / 257, (ctable[1].b + 128) / 257);
+	csel_limit_a = (ctable[1].a + 128) / 257;
+	csel_preview = RGB_2_INT((ctable[2].r + 128) / 257,
+		(ctable[2].g + 128) / 257, (ctable[2].b + 128) / 257);
+	csel_preview_a = (ctable[2].a + 128) / 257;
+	if (mode) csel_reset();
+	else csel_eval();
+}
+
 static void select_colour(int what)
 {
 	switch (what)
@@ -1923,9 +1943,65 @@ static void posterize_AB(GtkButton *button, gpointer user_data)
 	color_refresh();
 }
 
+static GtkWidget *csel_spin, *csel_toggle;
+static int csel_mode0, csel_invert0;
+static double csel_range0;
+
+static void select_csel(int what)
+{
+	int old_over = csel_overlay;
+	switch (what)
+	{
+	case 0: /* Cancel */
+		csel_overlay = 0;
+		ctable[0] = ctable[3];
+		ctable[1] = ctable[4];
+		ctable[2] = ctable[5];
+		csel_mode = csel_mode0;
+		csel_invert = csel_invert0;
+		csel_range = csel_range0;
+		do_csel(1);
+		break;
+	case 1: /* Preview */
+	case 2: /* OK */
+		csel_overlay = 0;
+		gtk_spin_button_update(GTK_SPIN_BUTTON(csel_spin));
+		csel_range = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(csel_spin));
+		csel_invert = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(csel_toggle));
+		do_csel(1);
+		if (what != 1) break;
+		old_over = 0;
+		csel_overlay = 1;
+		break;
+	case 4: /* Set */
+		csel_overlay = 0;
+		if (allcol_idx != 1) break; /* Only for limit */
+		csel_range = -1.0; /* Invalidate range */
+		do_csel(0);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_range);
+		break;
+	}
+	if ((old_over != csel_overlay) && drawing_canvas)
+		gtk_widget_queue_draw(drawing_canvas);
+}
+
+static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
+{
+	if (!gtk_toggle_button_get_active(widget)) return;
+	if (csel_mode == (int)user_data) return;
+	int old_over = csel_overlay;
+	csel_overlay = 0;
+	csel_mode = (int)user_data;
+	/* Reset range spinbutton */
+	csel_range = -1.0;
+	do_csel(0);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_range);
+	if (old_over && drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
+}
+
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
-	GtkWidget *win, *extbox;
+	GtkWidget *win, *extbox, *button, *spin;
 	int i, j;
 
 	if (cs_type == COLSEL_EDIT_ALL)
@@ -1978,7 +2054,6 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	if (cs_type == COLSEL_EDIT_AB)
 	{
 		static char *AB_txt[] = { "A", "B" };
-		GtkWidget *button, *spin;
 		png_color *A0, *B0;
 		A0 = mem_img_bpp == 1 ? &mem_pal[mem_col_A] : &mem_col_A24;
 		B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
@@ -2008,6 +2083,66 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
 		colour_window(win, extbox, 2, AB_txt, FALSE, select_AB);
+	}
+	if (cs_type == COLSEL_EDIT_CSEL)
+	{
+		static char *csel_txt[] = { _("Center"), _("Limit"), _("Preview") };
+		static char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
+
+		if (csel_center < 0)
+		{
+			if (csel_init()) return;
+		}
+		ctable = malloc(6 * sizeof(RGBA16));
+		ctable[0].r = INT_2_R(csel_center) * 257;
+		ctable[0].g = INT_2_G(csel_center) * 257;
+		ctable[0].b = INT_2_B(csel_center) * 257;
+		ctable[0].a = csel_center_a * 257;
+		ctable[1].r = INT_2_R(csel_limit) * 257;
+		ctable[1].g = INT_2_G(csel_limit) * 257;
+		ctable[1].b = INT_2_B(csel_limit) * 257;
+		ctable[1].a = csel_limit_a * 257;
+		ctable[2].r = INT_2_R(csel_preview) * 257;
+		ctable[2].g = INT_2_G(csel_preview) * 257;
+		ctable[2].b = INT_2_B(csel_preview) * 257;
+		ctable[2].a = csel_preview_a * 257;
+		/* Save previous values */
+		ctable[3] = ctable[0];
+		ctable[4] = ctable[1];
+		ctable[5] = ctable[2];
+		csel_mode0 = csel_mode;
+		csel_range0 = csel_range;
+
+		/* Prepare extra controls */
+		extbox = gtk_hbox_new(FALSE, 0);
+		gtk_box_pack_start(GTK_BOX(extbox), gtk_label_new(_("Range")),
+			FALSE, FALSE, 0);
+		spin = csel_spin = add_a_spin(0, 0, 765);
+		gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
+		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), csel_range);
+		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_invert);
+		i = 0;
+		button = gtk_radio_button_new_with_label(NULL, csel_modes[0]);
+		while (1)
+		{
+			gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+			gtk_box_pack_start(GTK_BOX(extbox), button, FALSE, FALSE, 0);
+			if (i == csel_mode) gtk_toggle_button_set_active(
+				GTK_TOGGLE_BUTTON(button), TRUE);
+			gtk_signal_connect(GTK_OBJECT(button), "toggled",
+				GTK_SIGNAL_FUNC(csel_mode_changed), (gpointer)i);
+			if (!csel_modes[++i]) break;
+			button = gtk_radio_button_new_with_label_from_widget(
+				GTK_RADIO_BUTTON(button), csel_modes[i]);
+		}
+		gtk_widget_show_all(extbox);
+
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour-Selective Mode"),
+			GTK_WIN_POS_CENTER, TRUE);
+/* !!! Alpha ranges not implemented yet !!! */
+//		colour_window(win, extbox, 3, csel_txt, TRUE, select_csel);
+		colour_window(win, extbox, 3, csel_txt, FALSE, select_csel);
 	}
 }
 

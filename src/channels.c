@@ -76,8 +76,9 @@ static void activate_channel(int chan)
 static void click_newchan_ok(GtkButton *button, gpointer user_data)
 {
 	chanlist tlist;
-	int i, j = mem_width * mem_height;
-	unsigned char *src, *dest, *tmp;
+	int i, j = mem_width * mem_height, range;
+	unsigned char *src, *dest, *tmp,
+		prang[3][2];		// RGB min & max values
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
@@ -100,10 +101,37 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 		memset(dest, 255, j);
 		break;
 	case 2: /* Colour A radius B */
+		if ( mem_img_bpp == 3 )
+		{
+			mtMAX( prang[0][0], mem_col_A24.red - mem_col_B24.red, 0 )
+			mtMIN( prang[0][1], mem_col_A24.red + mem_col_B24.red, 255 )
+			mtMAX( prang[1][0], mem_col_A24.green - mem_col_B24.green, 0 )
+			mtMIN( prang[1][1], mem_col_A24.green + mem_col_B24.green, 255 )
+			mtMAX( prang[2][0], mem_col_A24.blue - mem_col_B24.blue, 0 )
+			mtMIN( prang[2][1], mem_col_A24.blue + mem_col_B24.blue, 255 )
 
-/* !!! Not implemented yet !!! */
-		goto dofail;
+			src = mem_img[CHN_IMAGE];
+			range = 1 +	prang[0][1] - prang[0][0] +
+					prang[1][1] - prang[1][0] +
+					prang[2][1] - prang[2][0];
+			for (i = 0; i < j; i++)
+			{
+				if (	(src[0] >= prang[0][0]) && (src[0] <= prang[0][1]) &&
+					(src[1] >= prang[1][0]) && (src[1] <= prang[1][1]) &&
+					(src[2] >= prang[2][0]) && (src[2] <= prang[2][1])
+					)
+				{
+					dest[i] = 255 - ((
+						abs(src[0] - mem_col_A24.red) +
+						abs(src[1] - mem_col_A24.green) +
+						abs(src[2] - mem_col_A24.blue) )<<8) /
+							range;
+				}
+				else dest[i] = 0;
 
+				src += 3;
+			}
+		}
 		break;
 	case 3: /* Blend A to B */
 		if (mem_img_bpp != 3) goto dofail;

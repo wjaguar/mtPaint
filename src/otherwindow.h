@@ -21,9 +21,10 @@
 #include <png.h>
 
 
-#define COLSEL_EDIT_ALL 0
-#define COLSEL_OVERLAYS 1
-#define COLSEL_EDIT_AB  2
+#define COLSEL_EDIT_ALL  0
+#define COLSEL_OVERLAYS  1
+#define COLSEL_EDIT_AB   2
+#define COLSEL_EDIT_CSEL 3
 
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 typedef void (*colour_hook)(int what);

@@ -307,6 +307,7 @@ void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse 
 #define INT_2_R(A) ((A) >> 16)
 #define INT_2_G(A) (((A) >> 8) & 0xFF)
 #define INT_2_B(A) ((A) & 0xFF)
+#define RGB_2_INT(R,G,B) (((R) << 16) + ((G) << 8) + (B))
 
 #define MEM_BPP (mem_channel == CHN_IMAGE ? mem_img_bpp : 1)
 #define BPP(x) ((x) == CHN_IMAGE ? mem_img_bpp : 1)
