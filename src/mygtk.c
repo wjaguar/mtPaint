@@ -545,46 +545,6 @@ void spin_set_range(GtkWidget *spin, int min, int max)
 
 #endif
 
-// Copy string quoting space chars
-
-char *quote_spaces(const char *src)
-{
-	char *tmp, *dest;
-	int n = 0;
-
-	for (*(const char **)&tmp = src; *tmp; tmp++)
-	{
-		if (*tmp == ' ')
-#ifdef WIN32
-			n += 2;
-#else
-			n++;
-#endif
-		n++;
-	}
-
-	dest = malloc(n + 1);
-	if (!dest) return ("");
-
-	for (tmp = dest; *src; src++)
-	{
-		if (*src == ' ')
-		{
-#ifdef WIN32
-			*tmp++ = '"';
-			*tmp++ = ' ';
-			*tmp++ = '"';
-#else
-			*tmp++ = '\\';
-			*tmp++ = ' ';
-#endif
-		}
-		else *tmp++ = *src;
-	}
-	*tmp = 0;
-	return (dest);
-}
-
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt)
@@ -842,10 +802,9 @@ static void click_file_browse(GtkWidget *widget, gpointer data)
 	int flag = FPICK_LOAD;
 	GtkWidget *fs;
 
-	if ( ((int) data) == FS_SELECT_DIR || ((int) data) == FS_GIF_EXPLODE ) 
-		flag |= FPICK_DIRS_ONLY;
+	if ((int)data == FS_SELECT_DIR) flag |= FPICK_DIRS_ONLY;
 
-	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)), flag );
+	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)), flag);
 	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
 		BOX_CHILD_0(widget->parent));
 	fs_setup(fs, (int)data);
@@ -2888,40 +2847,6 @@ static void wjcanvas_set_extents(wjcanvas *canvas)
 		widget->allocation.height;
 }
 
-static void wjcanvas_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
-{
-	wjcanvas *canvas = WJCANVAS(widget);
-	int hchg, vchg, conf;
-
-
-	/* Don't send useless configure events */
-	conf = canvas->resize | (allocation->width ^ widget->allocation.width) |
-		(allocation->height ^ widget->allocation.height);
-	canvas->resizing = canvas->resize;
-	canvas->resize = FALSE;
-
-	widget->allocation = *allocation;
-	hchg = wjcanvas_readjust(canvas, 0);
-	vchg = wjcanvas_readjust(canvas, 1);
-	wjcanvas_set_extents(canvas);
-
-	if (GTK_WIDGET_REALIZED(widget))
-	{
-		gdk_window_move_resize(widget->window,
-			allocation->x, allocation->y,
-			allocation->width, allocation->height);
-
-		/* Replicate behaviour of GtkDrawingCanvas */
-		if (conf) wjcanvas_send_configure(widget);
-	}
-
-	gtk_adjustment_changed(canvas->adjustments[0]);
-	gtk_adjustment_changed(canvas->adjustments[1]);
-	if (hchg) gtk_adjustment_value_changed(canvas->adjustments[0]);
-	if (vchg) gtk_adjustment_value_changed(canvas->adjustments[1]);
-	canvas->resizing = FALSE;
-}
-
 #if GTK_MAJOR_VERSION == 1
 
 static void wjcanvas_send_expose(GtkWidget *widget, int x, int y, int w, int h)
@@ -2944,28 +2869,23 @@ static void wjcanvas_send_expose(GtkWidget *widget, int x, int y, int w, int h)
 
 #endif
 
-/* We do scrolling in both directions at once if possible, to avoid ultimately
- * useless repaint ops and associated flickers - WJ */
-static void wjcanvas_adjustment_value_changed(GtkAdjustment *adjustment, gpointer data)
+static void wjcanvas_scroll(GtkWidget *widget, int *oxy)
 {
-	GtkWidget *widget = data;
-	wjcanvas *canvas;
-	int nxy[4], oxy[4], rxy[4], fulldraw;
+	wjcanvas *canvas = WJCANVAS(widget);
+	int nxy[4], rxy[4], fulldraw;
 
 
-	if (!GTK_IS_ADJUSTMENT(adjustment) || !IS_WJCANVAS(data)) return;
-	canvas = WJCANVAS(data);
-
-	copy4(oxy, canvas->xy);
-	wjcanvas_set_extents(canvas); // Set new window extents
-	if (!memcmp(canvas->xy, oxy, sizeof(oxy))) return; // No change
 	if (!GTK_WIDGET_DRAWABLE(widget)) return; // No use
 	if (canvas->resizing) return; // No reason
 	copy4(nxy, canvas->xy);
+	if (!((oxy[0] ^ nxy[0]) | (oxy[1] ^ nxy[1]))) return; // No scrolling
 
 	/* Scroll or redraw? */
 	fulldraw = !clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], oxy);
 #if GTK_MAJOR_VERSION == 1
+	/* Check for resize - GTK+1 operates with ForgetGravity */
+	if ((oxy[2] - oxy[0] - nxy[2] + nxy[0]) | (oxy[3] - oxy[1] - nxy[3] + nxy[1]))
+		return; // A full expose event should be queued anyway
 	/* Check for in-flight draw ops */
 	if (GTK_WIDGET_FULLDRAW_PENDING(widget)) return;
 	fulldraw |= GTK_WIDGET_REDRAW_PENDING(widget);
@@ -3055,6 +2975,58 @@ static void wjcanvas_adjustment_value_changed(GtkAdjustment *adjustment, gpointe
  * Rule of thumb is, you need atrociously slow render to make forced updates
  * useful - otherwise, they just create a slowdown. - WJ */
 
+}
+
+static void wjcanvas_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int hchg, vchg, conf, oxy[4];
+
+
+	/* Don't send useless configure events */
+	conf = canvas->resize | (allocation->width ^ widget->allocation.width) |
+		(allocation->height ^ widget->allocation.height);
+	canvas->resizing = canvas->resize;
+	canvas->resize = FALSE;
+
+	widget->allocation = *allocation;
+	hchg = wjcanvas_readjust(canvas, 0);
+	vchg = wjcanvas_readjust(canvas, 1);
+	wjcanvas_set_extents(canvas);
+
+	if (GTK_WIDGET_REALIZED(widget))
+	{
+		gdk_window_move_resize(widget->window,
+			allocation->x, allocation->y,
+			allocation->width, allocation->height);
+		wjcanvas_scroll(widget, oxy);
+
+		/* Replicate behaviour of GtkDrawingCanvas */
+		if (conf) wjcanvas_send_configure(widget);
+	}
+
+	gtk_adjustment_changed(canvas->adjustments[0]);
+	gtk_adjustment_changed(canvas->adjustments[1]);
+	if (hchg) gtk_adjustment_value_changed(canvas->adjustments[0]);
+	if (vchg) gtk_adjustment_value_changed(canvas->adjustments[1]);
+	canvas->resizing = FALSE;
+}
+
+/* We do scrolling in both directions at once if possible, to avoid ultimately
+ * useless repaint ops and associated flickers - WJ */
+static void wjcanvas_adjustment_value_changed(GtkAdjustment *adjustment, gpointer data)
+{
+	GtkWidget *widget = data;
+	wjcanvas *canvas;
+	int oxy[4];
+
+
+	if (!GTK_IS_ADJUSTMENT(adjustment) || !IS_WJCANVAS(data)) return;
+	canvas = WJCANVAS(data);
+
+	copy4(oxy, canvas->xy);
+	wjcanvas_set_extents(canvas); // Set new window extents
+	wjcanvas_scroll(widget, oxy);
 }
 
 static void wjcanvas_drop_adjustment(wjcanvas *canvas, int which)

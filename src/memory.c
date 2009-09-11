@@ -8113,7 +8113,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 /* Coordinate 0 is center of 1st pixel, 1 center of last */
 int grad_value(int *dest, int slot, double x)
 {
-	int i, k, i3, len, op;
+	int i, k, len, op;
 	unsigned char *gdata, *gmap;
 	grad_map *gradmap;
 	double xx, hsv[6];
@@ -8138,19 +8138,22 @@ int grad_value(int *dest, int slot, double x)
 	k = gmap[i] == GRAD_TYPE_CONST ? 0 : (int)((xx - i) * 0x10000 + 0.5);
 	if (!slot) /* RGB */
 	{
-		i3 = i * 3;
-		/* HSV interpolation */
-		if ((gmap[i] == GRAD_TYPE_HSV) || (gmap[i] == GRAD_TYPE_BK_HSV))
+		unsigned char *gslot = gdata + i * 3;
+		int j3 = 0;
+
+		switch (gmap[i])
 		{
+		case GRAD_TYPE_BK_HSV: /* Backward HSV interpolation */
+			j3 = 3;
+		case GRAD_TYPE_HSV: /* HSV interpolation */
 			/* Convert */
-			rgb2hsv(gdata + i3 + 0, hsv + 0);
-			rgb2hsv(gdata + i3 + 3, hsv + 3);
+			rgb2hsv(gslot + 0, hsv + 0);
+			rgb2hsv(gslot + 3, hsv + 3);
 			/* Grey has no hue */
 			if (hsv[1] == 0.0) hsv[0] = hsv[3];
 			if (hsv[4] == 0.0) hsv[3] = hsv[0];
 			/* Prevent wraparound */
-			i3 = gmap[i] == GRAD_TYPE_HSV ? 0 : 3;
-			if (hsv[i3] > hsv[i3 ^ 3]) hsv[i3] -= 6.0;
+			if (hsv[j3] > hsv[j3 ^ 3]) hsv[j3] -= 6.0;
 			/* Interpolate */
 			hsv[0] += (xx - i) * (hsv[3] - hsv[0]);
 			hsv[1] += (xx - i) * (hsv[4] - hsv[1]);
@@ -8159,24 +8162,31 @@ int grad_value(int *dest, int slot, double x)
 			hsv[2] *= 512;
 			hsv[1] = hsv[2] * (1.0 - hsv[1]);
 			if (hsv[0] < 0.0) hsv[0] += 6.0;
-			i3 = hsv[0];
-			hsv[0] = (hsv[0] - i3) * (hsv[2] - hsv[1]);
-			if (i3 & 1) { hsv[2] -= hsv[0]; hsv[0] += hsv[2]; }
+			j3 = hsv[0];
+			hsv[0] = (hsv[0] - j3) * (hsv[2] - hsv[1]);
+			if (j3 & 1) { hsv[2] -= hsv[0]; hsv[0] += hsv[2]; }
 			else hsv[0] += hsv[1];
-			i3 >>= 1;
-			dest[i3] = ((int)hsv[2] + 1) >> 1;
-			dest[MOD3(i3 + 1)] = ((int)hsv[0] + 1) >> 1;
-			dest[MOD3(i3 + 2)] = ((int)hsv[1] + 1) >> 1;
-		}
-		/* RGB interpolation */
-		else
-		{
-			dest[0] = (gdata[i3 + 0] << 8) +
-				((k * (gdata[i3 + 3] - gdata[i3 + 0]) + 127) >> 8);
-			dest[1] = (gdata[i3 + 1] << 8) +
-				((k * (gdata[i3 + 4] - gdata[i3 + 1]) + 127) >> 8);
-			dest[2] = (gdata[i3 + 2] << 8) +
-				((k * (gdata[i3 + 5] - gdata[i3 + 2]) + 127) >> 8);
+			j3 >>= 1;
+			dest[j3] = ((int)hsv[2] + 1) >> 1;
+			dest[MOD3(j3 + 1)] = ((int)hsv[0] + 1) >> 1;
+			dest[MOD3(j3 + 2)] = ((int)hsv[1] + 1) >> 1;
+			break;
+		case GRAD_TYPE_SRGB: /* sRGB interpolation */
+			dest[0] = ungamma65536(gamma256[gslot[0]] + (xx - i) *
+				(gamma256[gslot[3]] - gamma256[gslot[0]]));
+			dest[1] = ungamma65536(gamma256[gslot[1]] + (xx - i) *
+				(gamma256[gslot[4]] - gamma256[gslot[1]]));
+			dest[2] = ungamma65536(gamma256[gslot[2]] + (xx - i) *
+				(gamma256[gslot[5]] - gamma256[gslot[2]]));
+			break;
+		default: /* RGB interpolation */
+			dest[0] = (gslot[0] << 8) +
+				((k * (gslot[3] - gslot[0]) + 127) >> 8);
+			dest[1] = (gslot[1] << 8) +
+				((k * (gslot[4] - gslot[1]) + 127) >> 8);
+			dest[2] = (gslot[2] << 8) +
+				((k * (gslot[5] - gslot[2]) + 127) >> 8);
+			break;
 		}
 	}
 	else if (slot == CHN_IMAGE + 1) /* Indexed */

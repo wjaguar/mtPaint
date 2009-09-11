@@ -137,6 +137,7 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype);
 // !!! The only allowed mode for now is FS_LAYER_LOAD
 int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	int ftype);
+int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype);
 
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );

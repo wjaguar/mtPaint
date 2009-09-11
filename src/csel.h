@@ -1,5 +1,5 @@
 /*	csel.h
-	Copyright (C) 2006-2008 Dmitry Groshev
+	Copyright (C) 2006-2009 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -51,6 +51,9 @@ float Fgamma256[256];
 	((X) < midgamma64[ungamma64[(int)((X) * kgamma64)]]))
 #define UNGAMMA256(X) (ungamma256[(int)((X) * kgamma256)] - \
 	((X) < midgamma256[ungamma256[(int)((X) * kgamma256)]]))
+
+double gamma65536(int idx);
+int ungamma65536(double v);
 
 double rgb2B(double r, double g, double b);
 void rgb2LXN(double *tmp, double r, double g, double b);

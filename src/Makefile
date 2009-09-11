@@ -13,7 +13,11 @@ $(BIN): main.o $(OBJS)
 	$(CC) main.o $(OBJS) -o $(BIN) $(LDFLAGS)
 
 .c.o:
+ifdef HAVE_RANDSEED # Generate identical object files if possible
+	$(CC) $(CFLAGS) -frandom-seed=$* -c -o $*.o $*.c
+else
 	$(CC) $(CFLAGS) -c -o $*.o $*.c
+endif
 
 clean:
 	rm -f *.o $(BIN)* $(LIBNAME) $(LIBNAME2) $(SLIBNAME)

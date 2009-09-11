@@ -45,7 +45,6 @@ int brush_spacing;					// Step in non-continuous mode
 #define line_x2 line_xy[2]
 #define line_y2 line_xy[3]
 
-extern char preserved_gif_filename[];
 int preserved_gif_delay, undo_load;
 
 #define STATUS_ITEMS 5
@@ -97,7 +96,7 @@ int	col_reverse,					// Painting with right button
 #define FS_EXPORT_UNDO2 7
 #define FS_EXPORT_ASCII 8
 #define FS_LAYER_SAVE 9
-#define FS_GIF_EXPLODE 10
+#define FS_EXPLODE_FRAMES 10
 #define FS_EXPORT_GIF 11
 #define FS_CHANNEL_LOAD 12
 #define FS_CHANNEL_SAVE 13

@@ -214,6 +214,7 @@ static void make_rgb_xyz(void)
 #define GAMMA_DIV 12.92321
 #endif
 #define KGAMMA 800
+#define KGAMMA64K 12900
 
 #else /* ITU-R 709 */
 
@@ -222,6 +223,7 @@ static void make_rgb_xyz(void)
 #define GAMMA_SPLIT 0.081
 #define GAMMA_DIV 4.5
 #define KGAMMA 300
+#define KGAMMA64K 4550
 
 #endif
 
@@ -262,6 +264,44 @@ static void make_ungamma(double *Gamma, double *Midgamma,
 	for (; k <= kgamma; k++) Ungamma[k] = cnt - 1;
 }
 
+/* 16-bit gamma correction */
+
+static double gamma64K[255 * 4 + 2];
+static double gammaslope64K[255 * 4 + 1];
+static unsigned short ungamma64K[KGAMMA64K + 1];
+
+double gamma65536(int idx)
+{
+	int n;
+
+	idx *= 4;
+	n = idx / 257;
+	return ((idx % 257) * (1.0 / 257.0) * (gamma64K[n + 1] - gamma64K[n]) +
+		gamma64K[n]);
+}
+
+int ungamma65536(double v)
+{
+	int n = ungamma64K[(int)(v * KGAMMA64K)];
+
+	n -= v < gamma64K[n];
+	return ((int)((n + (v - gamma64K[n]) * gammaslope64K[n]) * (257.0 / 4.0) + 0.5));
+}
+
+static void make_ungamma64K()
+{
+	int i, j, k = 0;
+
+	for (i = 1; i < 255 * 4 + 1; i++)
+	{
+		gammaslope64K[i - 1] = 1.0 / (gamma64K[i] - gamma64K[i - 1]);
+		j = gamma64K[i] * KGAMMA64K;
+		for (; k < j; k++) ungamma64K[k] = i - 1;
+	}
+	gammaslope64K[255 * 4] = 0.0;
+	for (; k <= KGAMMA64K; k++) ungamma64K[k] = 255 * 4;
+}
+
 static void make_CIE(void)
 {
 	int i;
@@ -285,8 +325,11 @@ static void make_EXP(void)
 
 void init_cols(void)
 {
+	make_gamma(gamma64K, 255 * 4 + 1);
+	gamma64K[255 * 4 + 1] = 1.0;
 	make_gamma(gamma256, 256);
 	make_gamma(gamma64, 64);
+	make_ungamma64K();
 	make_ungamma(gamma256, midgamma256, ungamma256, kgamma256, 256);
 	make_ungamma(gamma64, midgamma64, ungamma64, kgamma64, 64);
 	make_CIE();

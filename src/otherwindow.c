@@ -2784,15 +2784,15 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	if (!grad_mode) /* RGB */
 	{
-		char *interp[] = {_("RGB"), _("HSV"), _("Backward HSV"),
-			_("Constant")};
+		char *interp[] = {_("RGB"), _("sRGB"), _("HSV"),
+			_("Backward HSV"), _("Constant")};
 
 		grad_ed_cs = cs = pack(mainbox, cpick_create());
 		cpick_set_opacity_visibility( cs, FALSE );
 
 		gtk_signal_connect(GTK_OBJECT(cs), "color_changed",
 			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
-		grad_ed_opt = sw = wj_option_menu(interp, 4, 0, NULL,
+		grad_ed_opt = sw = wj_option_menu(interp, 5, 0, NULL,
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	else /* Indexed / utility / opacity */
@@ -2857,13 +2857,13 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 #endif
 }
 
-#define NUM_GTYPES 6
+#define NUM_GTYPES 7
 #define NUM_OTYPES 3
-static const char gtmap[NUM_GTYPES * 2] = {GRAD_TYPE_RGB, 1, GRAD_TYPE_RGB, 2,
-	GRAD_TYPE_HSV, 2, GRAD_TYPE_BK_HSV, 2, GRAD_TYPE_CONST, 3,
-	GRAD_TYPE_CUSTOM, 3};
-static const char opmap[NUM_OTYPES] = {GRAD_TYPE_RGB, GRAD_TYPE_CONST,
-	GRAD_TYPE_CUSTOM};
+static const char gtmap[NUM_GTYPES * 2] = { GRAD_TYPE_RGB, 1, GRAD_TYPE_RGB, 2,
+	GRAD_TYPE_SRGB, 2, GRAD_TYPE_HSV, 2, GRAD_TYPE_BK_HSV, 2,
+	GRAD_TYPE_CONST, 3, GRAD_TYPE_CUSTOM, 3 };
+static const char opmap[NUM_OTYPES] = { GRAD_TYPE_RGB, GRAD_TYPE_CONST,
+	GRAD_TYPE_CUSTOM };
 
 static void grad_reset_menu(int mode, int bpp)
 {
@@ -2991,8 +2991,9 @@ void gradient_setup(int mode)
 	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial"), _("Square"),
 		_("Angular"), _("Conical")};
 	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
-	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (HSV)"),
-		_("A to B (backward HSV)"), _("A only"), _("Custom"), NULL};
+	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (sRGB)"),
+		_("A to B (HSV)"), _("A to B (backward HSV)"), _("A only"),
+		_("Custom"), NULL};
 	char *optypes[] = {_("Current to 0"), _("Current only"), _("Custom"), NULL};
 	GtkWidget *win, *mainbox, *hbox, *table, *align;
 	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?

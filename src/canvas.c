@@ -61,7 +61,6 @@ int	show_paste,					// Show contents of clipboard while pasting
 
 int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
 
-char preserved_gif_filename[PATHBUF];
 int preserved_gif_delay = 10, undo_load;
 
 
@@ -1379,6 +1378,9 @@ static int anim_file_dialog(int ftype)
 	return (i - 2);
 }
 
+static GtkWidget *file_selector_create(int action_type);
+#define FS_XNAME_KEY "mtPaint.fs_xname"
+
 int do_a_load(char *fname, int undo)
 {
 	char mess[256], real_fname[PATHBUF];
@@ -1460,9 +1462,15 @@ loaded:	if ( res<=0 )				// Error loading file
 		} 
 		else if (i == 1) /* Ask for directory to explode frames to */
 		{
-			/* Needed when starting new mtpaint process later */
-			strncpy(preserved_gif_filename, real_fname, PATHBUF);
-			file_selector(FS_GIF_EXPLODE);
+			GtkWidget *fs = file_selector_create(FS_EXPLODE_FRAMES);
+			if (fs)
+			{
+				/* Needed when starting new mtpaint process later */
+				gtk_object_set_data_full(GTK_OBJECT(fs),
+					FS_XNAME_KEY, g_strdup(real_fname),
+					(GtkDestroyNotify)g_free);
+				fs_setup(fs, FS_EXPLODE_FRAMES);
+			}
 		}
 		else if (i == 2) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
 	}
@@ -1948,23 +1956,22 @@ static void fs_ok(GtkWidget *fs)
 		if (check_file(fname)) goto redo;
 		if (save_layers(fname) != 1) goto redo;
 		break;
-	case FS_GIF_EXPLODE:
-		c = strrchr( preserved_gif_filename, DIR_SEP );
-		if (!c) c = preserved_gif_filename;
+	case FS_EXPLODE_FRAMES:
+		gif = gtk_object_get_data(GTK_OBJECT(fs), FS_XNAME_KEY);
+		c = strrchr(gif, DIR_SEP);
+		if (!c) c = gif;
 		else c++;
 		tmp = g_strdup_printf("%s%c%s", fname, DIR_SEP, c);
-		run_def_action(DA_GIF_EXPLODE, preserved_gif_filename, tmp, 0);
+		run_def_action(DA_GIF_EXPLODE, gif, tmp, 0);
 		gif = g_strconcat(tmp, ".???", NULL);
-		gif2 = quote_spaces(gif);
 		g_free(tmp);
+		run_def_action(DA_GIF_EDIT, gif, NULL, preserved_gif_delay);
 		g_free(gif);
-		run_def_action(DA_GIF_EDIT, gif2, NULL, preserved_gif_delay);
-		free(gif2);
 		break;
 	case FS_EXPORT_GIF:
 		if (check_file(fname)) goto redo;
 		store_ls_settings(&settings);	// Update data in memory
-		gif2 = quote_spaces(mem_filename);
+		gif2 = g_strdup(mem_filename);
 		for (i = strlen(gif2) - 1; i >= 0; i--)
 		{
 			if (gif2[i] == DIR_SEP) break;
@@ -1972,7 +1979,7 @@ static void fs_ok(GtkWidget *fs)
 		}
 		run_def_action(DA_GIF_CREATE, gif2, fname, settings.gif_delay);
 		run_def_action(DA_GIF_PLAY, fname, NULL, 0);
-		free(gif2);
+		g_free(gif2);
 		break;
 	case FS_CHANNEL_LOAD:
 		if (populate_channel(fname)) goto redo;
@@ -2057,7 +2064,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
 }
 
-void file_selector(int action_type)
+static GtkWidget *file_selector_create(int action_type)
 {
 	char *title = NULL;
 	int fpick_flags = FPICK_ENTRY;
@@ -2066,7 +2073,7 @@ void file_selector(int action_type)
 	{
 	case FS_PNG_LOAD:
 		if ((layers_total ? check_layers_for_changes() :
-			check_for_changes()) == 1) return;
+			check_for_changes()) == 1) return (NULL);
 		title = _("Load Image File");
 		fpick_flags = FPICK_LOAD;
 		break;
@@ -2081,18 +2088,18 @@ void file_selector(int action_type)
 		title = _("Save Palette File");
 		break;
 	case FS_EXPORT_UNDO:
-		if (!mem_undo_done) return;
+		if (!mem_undo_done) return (NULL);
 		title = _("Export Undo Images");
 		break;
 	case FS_EXPORT_UNDO2:
-		if (!mem_undo_done) return;
+		if (!mem_undo_done) return (NULL);
 		title = _("Export Undo Images (reversed)");
 		break;
 	case FS_EXPORT_ASCII:
 		if (mem_cols > 16)
 		{
 			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."), NULL);
-			return;
+			return (NULL);
 		}
 		title = _("Export ASCII Art");
 		break;
@@ -2100,15 +2107,15 @@ void file_selector(int action_type)
 		check_layers_all_saved();
 		title = _("Save Layer Files");
 		break;
-	case FS_GIF_EXPLODE:
-		title = _("Import GIF animation - Choose frames directory");
+	case FS_EXPLODE_FRAMES:
+		title = _("Choose frames directory");
 		fpick_flags = FPICK_DIRS_ONLY;
 		break;
 	case FS_EXPORT_GIF:
 		if (!mem_filename[0])
 		{
 			alert_box(_("Error"), _("You must save at least one frame to create an animated GIF."), NULL);
-			return;
+			return (NULL);
 		}
 		title = _("Export GIF animation");
 		break;
@@ -2124,7 +2131,13 @@ void file_selector(int action_type)
 		break;
 	}
 
-	fs_setup(fpick_create(title, fpick_flags), action_type);
+	return (fpick_create(title, fpick_flags));
+}
+
+void file_selector(int action_type)
+{
+	GtkWidget *fs = file_selector_create(action_type);
+	if (fs) fs_setup(fs, action_type);
 }
 
 void align_size(float new_zoom)		// Set new zoom level

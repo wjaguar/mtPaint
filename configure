@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.11"
-MT_DATE="2009-08-14"
+MT_V="3.34.12"
+MT_DATE="2009-09-04"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -52,7 +52,7 @@ fi
 LD=`which \`$CC -print-prog-name=ld\``
 CROSSPF=
 
-GCCVER=$($CC -dumpversion | tr -d '.' | cut -c 1-2)
+GCCVER=`$CC -dumpversion | tr -d '.' | cut -c 1-2`
 
 L_EX=
 STATIC_LAST=
@@ -611,6 +611,12 @@ else
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
 	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE
+
+	if [ "$GCCVER" \> "32" ]
+	then
+		echo "HAVE_RANDSEED=1" >> $GTK_FILE
+	fi
+
 
 
 	if [ "$MT_POD" = "YES" ]

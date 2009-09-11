@@ -14,6 +14,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* "Protect details" toggle added to Kuwahara-Nagao blur
 	* Moving the pointer with the arrow keys now scrolls the canvas when moving beyond the viewport
 	* sRGB colour scale generation added to palette editor
+	* sRGB gradients added
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
@@ -21,6 +22,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should
 	* BUGFIX - Layers list now correctly displays selected layer after loading layers file
+	* BUGFIX - Loading TIFF files with X or Y mirroring doesn't cause crash
 
 3.31	2009-4-15
 

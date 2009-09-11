@@ -112,10 +112,6 @@ void spin_set_range(GtkWidget *spin, int min, int max);
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
 
-// Copy string quoting space chars
-
-char *quote_spaces(const char *src);
-
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt);

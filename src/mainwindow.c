@@ -980,20 +980,45 @@ static int check_smart_menu_keys(GdkEventKey *event);
 static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
-	int act_m;
+	static GdkEventKey *now_handling;
+	int act_m = 0, handled = 0;
 
-	if (dock_focused())
+	/* Do nothing if called recursively */
+	if (event == now_handling) return (FALSE);
+
+	/* Builtin handlers have priority outside of dock */
+	if (!dock_focused());
+	/* Pressing Escape moves focus out of dock - to nowhere */
+	else if (event->keyval == GDK_Escape)
 	{
-		/* Builtin key handling disabled while dock has focus;
-		 * pressing Escape moves focus out of dock - to nowhere */
-		if (event->keyval != GDK_Escape) return (FALSE);
 		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
 		act_m = ACTMOD_DUMMY;
 	}
+#if GTK_MAJOR_VERSION == 2
+	/* We let docked widgets process the keys first */
+	else if (gtk_window_propagate_key_event(GTK_WINDOW(widget), event))
+		return (TRUE);
+#endif
+	/* Default handlers have priority inside dock */
 	else
+	{
+		// Be ready to handle nested events
+		GdkEventKey *was_handling = now_handling;
+		gint result = 0;
+
+		now_handling = event;
+		gtk_signal_emit_by_name(GTK_OBJECT(widget), "key_press_event",
+			event, &result);
+		now_handling = was_handling;
+		if (result) act_m = ACTMOD_DUMMY;
+		handled = ACTMOD_DUMMY;
+	}
+
+	if (!act_m) 
 	{
 		act_m = wtf_pressed(event);
 		if (!act_m) act_m = check_smart_menu_keys(event);
+		if (!act_m) act_m = handled;
 		if (!act_m) return (FALSE);
 	}
 

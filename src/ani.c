@@ -864,17 +864,16 @@ static void create_frames_ani()
 
 	if ( ani_use_gif )	// all GIF files created OK so lets give them to gifsicle
 	{
-		snprintf(output_path, PATHBUF, "%.*s%s%c%s?????.gif",
+		wild_path = g_strdup_printf("%.*s%s%c%s?????.gif",
 			l, layers_filename, ani_output_path, DIR_SEP,
 			ani_file_prefix);
-		wild_path = quote_spaces(output_path);
 		snprintf(output_path, PATHBUF, "%.*s%s%c%s.gif",
 			l, layers_filename, ani_output_path, DIR_SEP,
 			ani_file_prefix);
 
 		run_def_action(DA_GIF_CREATE, wild_path, output_path, ani_gif_delay);
 		run_def_action(DA_GIF_PLAY, output_path, NULL, 0);
-		free(wild_path);
+		g_free(wild_path);
 	}
 
 failure2:

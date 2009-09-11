@@ -55,6 +55,9 @@ typedef struct {
 	frameset fset;
 	ls_settings settings;
 	int mode;
+	/* Explode frames mode */
+	int error, miss, cnt;
+	char *destdir;
 } ani_settings;
 
 int silence_limit, jpeg_quality, png_compression;
@@ -189,6 +192,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 			settings->height, settings->bpp, oldmask);
 		/* Drop current image if not enough memory for undo */
 		if (j) mem_free_image(&mem_image, FREE_IMAGE);
+	case FS_EXPLODE_FRAMES: /* Frames' temporaries */
 	case FS_LAYER_LOAD: /* Layers */
 		/* Allocate, or at least try to */
 		for (i = 0; i < NUM_CHANNELS; i++)
@@ -1438,6 +1442,9 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 			// !!! "frame" pointer may be invalid past this point
 			mem_free_chanlist(w_set.img);
 			memset(w_set.img, 0, sizeof(chanlist));
+
+// !!! Handle FS_EXPLODE_FRAMES at this point
+
 		}
 	}
 // !!! Here (maybe) unify all frames - resize to full area, & promote to RGB/RGBA
@@ -2172,9 +2179,9 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			/* Prepare decoding loops */
 			if (mirror & 1) /* X mirror */
 			{
-				x = width - x0 - 1;
+				x = width - x0;
 				w = x < xstep ? x : xstep;
-				x -= w - 1;
+				x--;
 			}
 			else
 			{
@@ -2183,7 +2190,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			}
 			if (mirror & 2) /* Y mirror */
 			{
-				h = height - y0 - 1;
+				h = height - y0;
 				if (h > ystep) h = ystep;
 			}
 			else h = y0 + ystep > height ? height - y0 : ystep;
@@ -2192,7 +2199,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			/* Decode it */
 			for (j = y0; j < y0 + h; j++ , n++ , src += bpr)
 			{
-				i = (mirror & 2 ? height - j + 1 : j) * width + x;
+				i = (mirror & 2 ? height - 1 - j : j) * width + x;
 				if (plane > bpp)
 				{
 					dx = mirror & 1 ? -1 : 1;
@@ -2328,6 +2335,9 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 		w_set = ani->settings;
 		res = load_tiff_frame(tif, &w_set);
 		if (res != 1) goto fail;
+
+// !!! Handle FS_EXPLODE_FRAMES at this point, as alternative branch
+
 		/* Store a new frame */
 // !!! Currently, frames are allocated without checking any limits
 		res = FILE_MEM_ERROR;
@@ -4913,41 +4923,49 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 	return (load_image_x(NULL, &mf, mode, ftype));
 }
 
-// !!! The only allowed mode for now is FS_LAYER_LOAD
-int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
-	int ftype)
+// !!! The only allowed modes for now are FS_LAYER_LOAD and FS_EXPLODE_FRAMES
+static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
+	int mode, int ftype, char *dest_path)
 {
 	png_color pal[256];
-	ani_settings ani;
-	int res;
 
 
 	ftype &= FTM_FTYPE;
-	memset(&ani, 0, sizeof(ani));
-	ani.mode = ani_mode;
-	init_ls_settings(&ani.settings, NULL);
-	ani.settings.mode = mode;
-	ani.settings.ftype = ftype;
-	ani.settings.pal = pal;
+	memset(ani, 0, sizeof(ani_settings));
+	ani->mode = ani_mode;
+	ani->destdir = dest_path;
+	init_ls_settings(&ani->settings, NULL);
+	ani->settings.mode = mode;
+	ani->settings.ftype = ftype;
+	ani->settings.pal = pal;
 	/* Clear hotspot & transparency */
-	ani.settings.hot_x = ani.settings.hot_y = -1;
-	ani.settings.xpm_trans = ani.settings.rgb_trans = -1;
+	ani->settings.hot_x = ani->settings.hot_y = -1;
+	ani->settings.xpm_trans = ani->settings.rgb_trans = -1;
 
 	/* !!! Use default palette - for now */
 	mem_pal_copy(pal, mem_pal_def);
-	ani.settings.colors = mem_pal_def_i;
+	ani->settings.colors = mem_pal_def_i;
 
 	switch (ftype)
 	{
-	default: res = -1; break;
-//	case FT_PNG: res = load_apng_frames(file_name, &ani); break;
+//	case FT_PNG: return (load_apng_frames(file_name, ani));
 #ifdef U_GIF
-	case FT_GIF: res = load_gif_frames(file_name, &ani); break;
+	case FT_GIF: return (load_gif_frames(file_name, ani));
 #endif
 #ifdef U_TIFF
-	case FT_TIFF: res = load_tiff_frames(file_name, &ani); break;
+	case FT_TIFF: return (load_tiff_frames(file_name, ani));
 #endif
 	}
+	return (-1);
+}
+
+int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
+	int ftype)
+{
+	ani_settings ani;
+	int res;
+
+	res = load_frames_x(&ani, ani_mode, file_name, mode, ftype, NULL);
 
 	/* Treat out-of-memory error as fatal, to avoid worse things later */
 	if ((res == FILE_MEM_ERROR) || !ani.fset.cnt)
@@ -4962,13 +4980,36 @@ int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	return (res);
 }
 
+static void warn_miss(int miss, int total, int ftype)
+{
+	char *txt = g_strdup_printf(_("%d out of %d frames could not be saved as %s - saved as PNG instead"),
+		miss, total, file_formats[ftype].name);
+	alert_box(_("Warning"), txt, NULL);
+	g_free(txt);
+}
+
+int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype)
+{
+	ani_settings ani;
+	int res;
+
+	res = load_frames_x(&ani, ani_mode, file_name, FS_EXPLODE_FRAMES,
+		ftype, dest_path);
+
+	if (!res) res = ani.error;
+	if (ani.miss && !res) warn_miss(ani.miss, ani.cnt, ftype & FTM_FTYPE);
+	mem_free_frames(&ani.fset);
+
+	return (res);
+}
+
 int export_undo(char *file_name, ls_settings *settings)
 {
 	char new_name[PATHBUF + 32];
 	int start = mem_undo_done, res = 0, lenny, i, j;
 	int deftype = settings->ftype, miss = 0;
 
-	strncpy( new_name, file_name, PATHBUF);
+	strncpy(new_name, file_name, PATHBUF);
 	lenny = strlen( file_name );
 
 	ls_init("UNDO", 1);
@@ -5007,14 +5048,9 @@ int export_undo(char *file_name, ls_settings *settings)
 
 	progress_end();
 
-	if (miss && !res)
-	{
-		snprintf(new_name, 300, _("%d out of %d frames could not be saved as %s - saved as PNG instead"),
-			miss, mem_undo_done, file_formats[deftype].name);
-		alert_box(_("Warning"), new_name, NULL);
-	}
+	if (miss && !res) warn_miss(miss, mem_undo_done, deftype);
 
-	return res;
+	return (res);
 }
 
 int export_ascii ( char *file_name )

@@ -543,6 +543,46 @@ int spawn_process(char *argv[], char *directory)
 
 #endif
 
+// Copy string quoting space chars
+
+static char *quote_spaces(const char *src)
+{
+	char *tmp, *dest;
+	int n = 0;
+
+	for (*(const char **)&tmp = src; *tmp; tmp++)
+	{
+		if (*tmp == ' ')
+#ifdef WIN32
+			n += 2;
+#else
+			n++;
+#endif
+		n++;
+	}
+
+	dest = malloc(n + 1);
+	if (!dest) return ("");
+
+	for (tmp = dest; *src; src++)
+	{
+		if (*src == ' ')
+		{
+#ifdef WIN32
+			*tmp++ = '"';
+			*tmp++ = ' ';
+			*tmp++ = '"';
+#else
+			*tmp++ = '\\';
+			*tmp++ = ' ';
+#endif
+		}
+		else *tmp++ = *src;
+	}
+	*tmp = 0;
+	return (dest);
+}
+
 // Wrapper for animated GIF handling, or other builtin actions
 
 #ifdef U_ANIM_IMAGICK
@@ -581,7 +621,9 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 	switch (action)
 	{
 	case DA_GIF_CREATE:
-		command = g_strdup_printf(CMD_GIF_CREATE, delay, sname, dname);
+		c8 = quote_spaces(sname);
+		command = g_strdup_printf(CMD_GIF_CREATE, delay, c8, dname);
+		free(c8);
 		break;
 	case DA_GIF_EXPLODE:
 		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);
@@ -595,11 +637,13 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		return (-1);
 #endif
 	case DA_GIF_EDIT:
+		c8 = quote_spaces(sname);
 #ifndef WIN32
-		command = g_strdup_printf("mtpaint -g %d %s &", delay, sname);
+		command = g_strdup_printf("mtpaint -g %d %s &", delay, c8);
 #else /* Windows shell does not know "&", nor needs it to run mtPaint detached */
-		command = g_strdup_printf("mtpaint -g %d %s", delay, sname);
+		command = g_strdup_printf("mtpaint -g %d %s", delay, c8);
 #endif
+		free(c8);
 		break;
 	}
 

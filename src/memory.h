@@ -97,6 +97,13 @@
 #define FRAMES_MIN 16
 #define FRAMES_MAX (1024 * 1024) /* A million frames should be QUITE enough */
 
+/* Frame flags */
+#define FM_DISPOSAL     3 /* Disposal mask */
+#define FM_DISP_REMOVE  0 /* Remove (make transparent) (default) */
+#define FM_DISP_LEAVE   1 /* Leave in place */
+#define FM_DISP_RESTORE 2 /* Restore to previous state */
+#define FM_LOCK         4 /* Lock against deletion (if referenced) */
+
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 typedef struct {
@@ -105,6 +112,7 @@ typedef struct {
 	int width, height;
 	int x, y, delay;
 	short cols, bpp, trans;
+	unsigned short flags;
 } image_frame;
 
 typedef struct {
@@ -211,10 +219,11 @@ int grad_opacity;			// Preview opacity
 
 /* Gradient types */
 #define GRAD_TYPE_RGB      0
-#define GRAD_TYPE_HSV      1
-#define GRAD_TYPE_BK_HSV   2
-#define GRAD_TYPE_CONST    3
-#define GRAD_TYPE_CUSTOM   4
+#define GRAD_TYPE_SRGB     1
+#define GRAD_TYPE_HSV      2
+#define GRAD_TYPE_BK_HSV   3
+#define GRAD_TYPE_CONST    4
+#define GRAD_TYPE_CUSTOM   5
 
 /// Bayer ordered dithering
 
