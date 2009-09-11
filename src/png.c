@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -257,6 +257,12 @@ static void ls_init(char *what, int save)
 	progress_init(buf, 0);
 }
 
+/* !!! libpng 1.2.17 or later loses extra chunks if there's no callback */
+static int buggy_libpng_handler()
+{
+	return (0);
+}
+
 #define PNG_BYTES_TO_CHECK 8
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
@@ -308,6 +314,9 @@ static int load_png(char *file_name, ls_settings *settings)
 		res = FILE_LIB_ERROR;
 		goto fail2;
 	}
+
+	/* !!! libpng 1.2.17+ needs this to read extra channels */
+	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
 	png_init_io(png_ptr, fp);
 	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);
@@ -983,7 +992,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	opj_cio_t *cio = NULL;
 	opj_image_t *image = NULL;
 	opj_image_comp_t *comp;
-	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char xtb[256], *dest, *buf = NULL;
 	FILE *fp;
 	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
@@ -1092,7 +1101,7 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	opj_image_cmptparm_t channels[4];
 	opj_cio_t *cio = NULL;
 	opj_image_t *image;
-	opj_event_mgr_t useless_events; // !!! Silenty made mandatory in v1.2
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char *src;
 	FILE *fp;
 	int i, j, k, nc, step;
