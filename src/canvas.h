@@ -94,7 +94,7 @@ void main_undo( GtkMenuItem *menu_item, gpointer user_data );
 void main_redo( GtkMenuItem *menu_item, gpointer user_data );
 
 void choose_pattern();					// Bring up pattern chooser
-void tool_action( int x, int y, int button, gdouble pressure );		// Paint some pixels!
+void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!
 void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );

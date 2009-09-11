@@ -2033,7 +2033,7 @@ static void poly_add_po( int x, int y )
 	update_sel_bar();
 }
 
-void tool_action( int x, int y, int button, gdouble pressure )
+void tool_action(int event, int x, int y, int button, gdouble pressure)
 {
 	int minx = -1, miny = -1, xw = -1, yh = -1;
 	int i, j, k, rx, ry, sx, sy;
@@ -2360,7 +2360,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 			paint_marquee(1, ox, oy);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
-			(button == 13 || button == 3) )
+			(button == 13 || button == 3) && (event == GDK_BUTTON_PRESS))
 		{	// User wants to commit the paste
 			commit_paste(TRUE);
 		}

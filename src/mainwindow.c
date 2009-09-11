@@ -947,7 +947,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 				aco[2][1] = mt_round(aco[0][1] - tool_flow / 2 * uvx);
 
 				pen_down = 0;
-				tool_action( line_x1, line_y1, 1, 0 );
+				tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
 				line_status = LINE_LINE;
 				update_menus();
 
@@ -1026,8 +1026,10 @@ int check_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	gint x,y,width,height;
-
 	int i = 2, j = 0;
+
+	if ( !GTK_WIDGET_SENSITIVE(main_window) ) return TRUE;
+		// Stop user prematurely exiting while drag 'n' drop loading
 
 	if ( layers_total == 0 )
 		j = check_for_changes();
@@ -1104,14 +1106,14 @@ gint canvas_release( GtkWidget *widget, GdkEventButton *event )
 	}
 
 	if ( tool_type == TOOL_POLYGON && poly_status == POLY_DRAGGING )
-		tool_action( 0, 0, 0, 0 );		// Finish off dragged polygon selection
+		tool_action(GDK_NOTHING, 0, 0, 0, 0 );	// Finish off dragged polygon selection
 
 	update_menus();
 
 	return FALSE;
 }
 
-void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
+void mouse_event(int event, int x, int y, guint state, guint button, gdouble pressure)
 {	// Mouse event from button/motion on the canvas
 	unsigned char pixel;
 	png_color pixel24;
@@ -1187,8 +1189,10 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 		if ( !(state & GDK_SHIFT_MASK) ) tool_fixx = -1;
 		if ( !(state & GDK_CONTROL_MASK) ) tool_fixy = -1;
 
-		if ( button == 3 && (state & GDK_SHIFT_MASK) ) set_zoom_centre( x, y );
-		else if ( button == 1 || button >= 3 ) tool_action( x, y, button, pressure );
+		if ( button == 3 && (state & GDK_SHIFT_MASK) )
+			set_zoom_centre( x, y );
+		else if ( button == 1 || button >= 3 )
+			tool_action(event, x, y, button, pressure);
 		if ( tool_type == TOOL_SELECT ) update_sel_bar();
 	}
 	if ( button == 2 ) set_zoom_centre( x, y );
@@ -1219,7 +1223,7 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 	{
 		x = event->x - margin_main_x;
 		y = event->y - margin_main_y;
-		mouse_event( x, y, event->state, event->button, pressure );
+		mouse_event(event->type, x, y, event->state, event->button, pressure);
 	}
 
 	return TRUE;
@@ -2120,7 +2124,7 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 		y = y - margin_main_y;
 //		mtMAX( x, x, 0 )
 //		mtMAX( y, y, 0 )
-		mouse_event( x, y, state, button, pressure );
+		mouse_event(event->type, x, y, state, button, pressure );
 
 		x = x / can_zoom;
 		y = y / can_zoom;
@@ -2447,6 +2451,9 @@ static void parse_drag( char *txt )
 	if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 		// For some reason the layers window must be initialized, or bugs happen??
 
+	gtk_widget_set_sensitive( layers_window, FALSE );
+	gtk_widget_set_sensitive( main_window, FALSE );
+
 	tp = txt;
 	while ( layers_total<MAX_LAYERS && (tp2 = strpbrk( tp, "file:" )) != NULL )
 	{
@@ -2479,6 +2486,9 @@ static void parse_drag( char *txt )
 		}
 		if ( do_a_load( fname ) == 0 ) nlayer = TRUE;		// Load the file
 	}
+
+	gtk_widget_set_sensitive( layers_window, TRUE );
+	gtk_widget_set_sensitive( main_window, TRUE );
 }
 
 static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,

@@ -1927,118 +1927,27 @@ typedef struct {
 
 static GtkWidget *allcol_window;
 static RGBA16 *ctable;
-static int col_sel_type, cs_old_overlay[NUM_CHANNELS][4];
+static int cs_old_overlay[NUM_CHANNELS][4];
 
 
-static gint delete_allcol( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void allcol_ok(colour_hook chook)
 {
+	chook(2);
 	gtk_widget_destroy(allcol_window);
-	free( ctable );
-
-	return FALSE;
+	free(ctable);
 }
 
-static void do_allcol()
+static void allcol_preview(colour_hook chook)
 {
-	int i;
-
-	for ( i=0; i<mem_cols; i++ )
-	{
-		mem_pal[i].red = (ctable[i].r + 128) / 257;
-		mem_pal[i].green = (ctable[i].g + 128) / 257;
-		mem_pal[i].blue = (ctable[i].b + 128) / 257;
-	}
-
-	init_pal();
-	update_all_views();
-	gtk_widget_queue_draw( drawing_col_prev );
+	chook(1);
 }
 
-static void do_allover()
+static gboolean allcol_cancel(colour_hook chook)
 {
-	char txt[64];
-	int i, j;
-
-	channel_rgb[CHN_ALPHA][0] = (ctable[0].r + 128) / 257;
-	channel_rgb[CHN_ALPHA][1] = (ctable[0].g + 128) / 257;
-	channel_rgb[CHN_ALPHA][2] = (ctable[0].b + 128) / 257;
-	channel_opacity[CHN_ALPHA] = (ctable[0].a + 128) / 257;
-	channel_rgb[CHN_SEL][0] = (ctable[1].r + 128) / 257;
-	channel_rgb[CHN_SEL][1] = (ctable[1].g + 128) / 257;
-	channel_rgb[CHN_SEL][2] = (ctable[1].b + 128) / 257;
-	channel_opacity[CHN_SEL] = (ctable[1].a + 128) / 257;
-	channel_rgb[CHN_MASK][0] = (ctable[2].r + 128) / 257;
-	channel_rgb[CHN_MASK][1] = (ctable[2].g + 128) / 257;
-	channel_rgb[CHN_MASK][2] = (ctable[2].b + 128) / 257;
-	channel_opacity[CHN_MASK] = (ctable[2].a + 128) / 257;
-	update_all_views();
-//	gtk_widget_queue_draw( drawing_col_prev );
-
-	for ( i=0; i<NUM_CHANNELS; i++ )	// Save all settings to ini file
-	{
-		for ( j=0; j<4; j++ )
-		{
-			sprintf(txt, "overlay%i%i", i, j);
-			if ( j<3 )
-			{
-				inifile_set_gint32(txt, channel_rgb[i][j] );
-			}
-			else	inifile_set_gint32(txt, channel_opacity[i] );
-		}
-	}
-}
-
-static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-	{
-		mem_pal_copy( mem_pal, brcosa_pal );
-		pal_refresher();
-		spot_undo(UNDO_PAL);
-		do_allcol();
-	}
-
-	if ( col_sel_type == COLSEL_OVERLAYS )
-		do_allover();
-
-	delete_allcol( NULL, NULL, NULL );
-
-	return FALSE;
-}
-
-static gint allcol_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	if ( col_sel_type == COLSEL_EDIT_ALL ) do_allcol();
-	if ( col_sel_type == COLSEL_OVERLAYS ) do_allover();
-
-	return FALSE;
-}
-
-static gint allcol_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int i, j;
-
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-	{
-		mem_pal_copy( mem_pal, brcosa_pal );
-		pal_refresher();
-	}
-	if ( col_sel_type == COLSEL_OVERLAYS )
-	{
-		for ( i=0; i<NUM_CHANNELS; i++ )		// Restore original values
-		{
-			for (j = 0; j < 3; j++)
-			{
-				channel_rgb[i][j] = cs_old_overlay[i][j];
-			}
-			channel_opacity[i] = cs_old_overlay[i][3];
-		}
-		update_all_views();
-	}
-
-	delete_allcol( NULL, NULL, NULL );
-
-	return FALSE;
+	chook(0);
+	gtk_widget_destroy(allcol_window);
+	free(ctable);
+	return (FALSE);
 }
 
 static gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_data )
@@ -2079,7 +1988,7 @@ static void color_set( GtkColorSelection *selection, gpointer user_data )
 	cc->g = rint(color[1] * 65535.0);
 	cc->b = rint(color[2] * 65535.0);
 	cc->a = rint(color[3] * 65535.0);
-	GdkColor c = {(cc->r << 16) + (cc->g << 8) + cc->b, cc->r, cc->g, cc->b};
+	GdkColor c = {0, cc->r, cc->g, cc->b};
 	gdk_colormap_alloc_color( gdk_colormap_get_system(), &c, FALSE, TRUE );
 	gtk_widget_queue_draw(widget);
 }
@@ -2104,7 +2013,7 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	gtk_color_selection_set_color( cs, color);
 #endif
 #if GTK_MAJOR_VERSION == 2
-	GdkColor c = {(cc->r << 16) + (cc->g << 8) + cc->b, cc->r, cc->g, cc->b};
+	GdkColor c = {0, cc->r, cc->g, cc->b};
 	gtk_color_selection_set_previous_color(cs, &c);
 	gtk_color_selection_set_previous_alpha(cs, cc->a);
 #endif
@@ -2112,98 +2021,32 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 }
 
-void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
-{
-	colour_selector( COLSEL_EDIT_ALL );
-}
-
-
-void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
+void colour_window(GtkWidget *win, int cnt, char **cnames, int alpha, colour_hook chook)
 {
 	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
 	GtkWidget *cs;
-	char txt[64], *ovl_txt[] = { _("Alpha"), _("Selection"), _("Mask") };
-	int i, j=0;
+	char txt[64], *tmp = txt;
+	int i;
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
-
-
-	col_sel_type = cs_type;
-
-	mem_pal_copy( brcosa_pal, mem_pal );			// Remember old settings
-
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-	{
-		ctable = malloc(mem_cols * sizeof(RGBA16));
-		for ( i=0; i<mem_cols; i++ )
-		{
-			ctable[i].r = mem_pal[i].red * 257;
-			ctable[i].g = mem_pal[i].green * 257;
-			ctable[i].b = mem_pal[i].blue * 257;
-			ctable[i].a = 65535;
-		}
-	}
-
-	if ( col_sel_type == COLSEL_OVERLAYS )
-	{
-		for ( i=0; i<NUM_CHANNELS; i++ )	// Needed if Cancel is pressed
-		{
-			for (j = 0; j < 3; j++)
-			{
-				cs_old_overlay[i][j] = channel_rgb[i][j];
-			}
-			cs_old_overlay[i][3] = channel_opacity[i];
-		}
-
-		ctable = malloc(3 * sizeof(RGBA16));
-		ctable[0].r = channel_rgb[CHN_ALPHA][0] * 257;
-		ctable[0].g = channel_rgb[CHN_ALPHA][1] * 257;
-		ctable[0].b = channel_rgb[CHN_ALPHA][2] * 257;
-		ctable[0].a = channel_opacity[CHN_ALPHA] * 257;
-		ctable[1].r = channel_rgb[CHN_SEL][0] * 257;
-		ctable[1].g = channel_rgb[CHN_SEL][1] * 257;
-		ctable[1].b = channel_rgb[CHN_SEL][2] * 257;
-		ctable[1].a = channel_opacity[CHN_SEL] * 257;
-		ctable[2].r = channel_rgb[CHN_MASK][0] * 257;
-		ctable[2].g = channel_rgb[CHN_MASK][1] * 257;
-		ctable[2].b = channel_rgb[CHN_MASK][2] * 257;
-		ctable[2].a = channel_opacity[CHN_MASK] * 257;
-	}
 
 	cs = gtk_color_selection_new();
 
 #if GTK_MAJOR_VERSION == 1
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-		gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), FALSE);
-	else
-		gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), TRUE);
+	gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(cs), alpha);
 #endif
 #if GTK_MAJOR_VERSION == 2
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-		gtk_color_selection_set_has_opacity_control (GTK_COLOR_SELECTION(cs), FALSE);
-	else
-		gtk_color_selection_set_has_opacity_control (GTK_COLOR_SELECTION(cs), TRUE);
+	gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(cs), alpha);
 
 	gtk_color_selection_set_has_palette (GTK_COLOR_SELECTION(cs), TRUE);
 #endif
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 
-	if ( col_sel_type == COLSEL_EDIT_ALL )
-	{
-		allcol_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Edit All Colours"),
-			GTK_WIN_POS_MOUSE, TRUE );
-	}
+	allcol_window = win;
 
-	if ( col_sel_type == COLSEL_OVERLAYS )
-	{
-		allcol_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
-			GTK_WIN_POS_CENTER, TRUE );
-	}
-
-
-	gtk_signal_connect_object( GTK_OBJECT(allcol_window),"delete_event",
-		GTK_SIGNAL_FUNC(allcol_cancel), NULL );
+	gtk_signal_connect_object(GTK_OBJECT(allcol_window), "delete_event",
+		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
 
 	vbox = gtk_vbox_new( FALSE, 5 );
 	gtk_widget_show( vbox );
@@ -2225,15 +2068,13 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 	gtk_container_add (GTK_CONTAINER (swindow), viewport);
 
 	col_list = gtk_list_new();
-	gtk_signal_connect( GTK_OBJECT(col_list), "select_child", GTK_SIGNAL_FUNC(color_select), cs );
+	gtk_signal_connect(GTK_OBJECT(col_list), "select_child",
+		GTK_SIGNAL_FUNC(color_select), cs);
 	gtk_list_set_selection_mode( GTK_LIST(col_list), GTK_SELECTION_BROWSE );
 	gtk_container_add ( GTK_CONTAINER(viewport), col_list );
 	gtk_widget_show( col_list );
 
-	if ( col_sel_type == COLSEL_EDIT_ALL ) j = mem_cols;
-	if ( col_sel_type == COLSEL_OVERLAYS ) j = 3;
-
-	for ( i=0; i<j; i++ )
+	for (i = 0; i < cnt; i++)
 	{
 		l_item = gtk_list_item_new();
 		gtk_object_set_user_data( GTK_OBJECT(l_item), (gpointer)(&ctable[i]));
@@ -2247,14 +2088,14 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 
 		drw = gtk_drawing_area_new();
 		gtk_drawing_area_size( GTK_DRAWING_AREA(drw), 20, 20 );
-		gtk_signal_connect(GTK_OBJECT(drw),"expose_event", GTK_SIGNAL_FUNC(color_expose),
-			(gpointer)(&ctable[i]));
+		gtk_signal_connect(GTK_OBJECT(drw), "expose_event",
+			GTK_SIGNAL_FUNC(color_expose), (gpointer)(&ctable[i]));
 		gtk_box_pack_start( GTK_BOX(hbox2), drw, FALSE, FALSE, 0 );
 		gtk_widget_show( drw );
 
-		if ( col_sel_type == COLSEL_EDIT_ALL ) sprintf( txt, "%i", i );
-		if ( col_sel_type == COLSEL_OVERLAYS ) sprintf( txt, "%s", ovl_txt[i] );
-		label = gtk_label_new( txt );
+		if (cnames) tmp = cnames[i];
+		else sprintf(txt, "%i", i);
+		label = gtk_label_new(tmp);
 		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.0, 1.0 );
 		gtk_box_pack_start( GTK_BOX(hbox2), label, TRUE, TRUE, 0 );
@@ -2270,23 +2111,23 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 	gtk_widget_show( button_ok );
 	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect_object( GTK_OBJECT(button_ok), "clicked",
-		GTK_SIGNAL_FUNC(allcol_ok), NULL );
+	gtk_signal_connect_object(GTK_OBJECT(button_ok), "clicked",
+		GTK_SIGNAL_FUNC(allcol_ok), (gpointer)chook);
 	gtk_box_pack_end( GTK_BOX(hbut), button_ok, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_ok, 80, -2);
 
 	button_preview = gtk_button_new_with_label(_("Preview"));
 	gtk_widget_show( button_preview );
-	gtk_signal_connect( GTK_OBJECT(button_preview), "clicked",
-		GTK_SIGNAL_FUNC(allcol_preview), NULL );
+	gtk_signal_connect_object(GTK_OBJECT(button_preview), "clicked",
+		GTK_SIGNAL_FUNC(allcol_preview), (gpointer)chook);
 	gtk_box_pack_end( GTK_BOX(hbut), button_preview, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_preview, 80, -2);
 
 	button_cancel = gtk_button_new_with_label(_("Cancel"));
 	gtk_widget_show( button_cancel );
 	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect_object(GTK_OBJECT(button_cancel),"clicked",
-		GTK_SIGNAL_FUNC(allcol_cancel), NULL);
+	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
+		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
 	gtk_box_pack_end( GTK_BOX(hbut), button_cancel, FALSE, FALSE, 5 );
 	gtk_widget_set_usize(button_cancel, 80, -2);
 
@@ -2302,7 +2143,152 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 #endif
 }
 
+static void do_allcol()
+{
+	int i;
 
+	for (i = 0; i < mem_cols; i++)
+	{
+		mem_pal[i].red = (ctable[i].r + 128) / 257;
+		mem_pal[i].green = (ctable[i].g + 128) / 257;
+		mem_pal[i].blue = (ctable[i].b + 128) / 257;
+	}
+
+	init_pal();
+	update_all_views();
+	gtk_widget_queue_draw( drawing_col_prev );
+}
+
+static void do_allover()
+{
+	channel_rgb[CHN_ALPHA][0] = (ctable[0].r + 128) / 257;
+	channel_rgb[CHN_ALPHA][1] = (ctable[0].g + 128) / 257;
+	channel_rgb[CHN_ALPHA][2] = (ctable[0].b + 128) / 257;
+	channel_opacity[CHN_ALPHA] = (ctable[0].a + 128) / 257;
+	channel_rgb[CHN_SEL][0] = (ctable[1].r + 128) / 257;
+	channel_rgb[CHN_SEL][1] = (ctable[1].g + 128) / 257;
+	channel_rgb[CHN_SEL][2] = (ctable[1].b + 128) / 257;
+	channel_opacity[CHN_SEL] = (ctable[1].a + 128) / 257;
+	channel_rgb[CHN_MASK][0] = (ctable[2].r + 128) / 257;
+	channel_rgb[CHN_MASK][1] = (ctable[2].g + 128) / 257;
+	channel_rgb[CHN_MASK][2] = (ctable[2].b + 128) / 257;
+	channel_opacity[CHN_MASK] = (ctable[2].a + 128) / 257;
+	update_all_views();
+}
+
+static void select_colour(int what)
+{
+	switch (what)
+	{
+	case 0: /* Cancel */
+		mem_pal_copy(mem_pal, brcosa_pal);
+		pal_refresher();
+		break;
+	case 1: /* Preview */
+		do_allcol();
+		break;
+	case 2: /* OK */
+		mem_pal_copy(mem_pal, brcosa_pal);
+		pal_refresher();
+		spot_undo(UNDO_PAL);
+		do_allcol();
+		break;
+	}
+}
+
+static void select_overlay(int what)
+{
+	char txt[64];
+	int i, j;
+
+	switch (what)
+	{
+	case 0: /* Cancel */
+		for (i = 0; i < NUM_CHANNELS; i++)	// Restore original values
+		{
+			for (j = 0; j < 3; j++)
+			{
+				channel_rgb[i][j] = cs_old_overlay[i][j];
+			}
+			channel_opacity[i] = cs_old_overlay[i][3];
+		}
+		update_all_views();
+		break;
+	case 1: /* Preview */
+		do_allover();
+		break;
+	case 2: /* OK */
+		do_allover();
+		for (i = 0; i < NUM_CHANNELS; i++)	// Save all settings to ini file
+		{
+			for (j = 0; j < 4; j++)
+			{
+				sprintf(txt, "overlay%i%i", i, j);
+				inifile_set_gint32(txt, j < 3 ? channel_rgb[i][j] :
+					channel_opacity[i]);
+			}
+		}
+		break;
+	}
+}
+
+void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
+{
+	GtkWidget *win;
+	int i, j;
+
+	if (cs_type == COLSEL_EDIT_ALL)
+	{
+		mem_pal_copy( brcosa_pal, mem_pal );	// Remember old settings
+		ctable = malloc(mem_cols * sizeof(RGBA16));
+		for (i = 0; i < mem_cols; i++)
+		{
+			ctable[i].r = mem_pal[i].red * 257;
+			ctable[i].g = mem_pal[i].green * 257;
+			ctable[i].b = mem_pal[i].blue * 257;
+			ctable[i].a = 65535;
+		}
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Edit All Colours"),
+			GTK_WIN_POS_MOUSE, TRUE);
+		colour_window(win, mem_cols, NULL, FALSE, select_colour);
+	}
+
+	if (cs_type == COLSEL_OVERLAYS)
+	{
+		char *ovl_txt[] = { _("Alpha"), _("Selection"), _("Mask") };
+		for (i = 0; i < NUM_CHANNELS; i++)	// Needed if Cancel is pressed
+		{
+			for (j = 0; j < 3; j++)
+			{
+				cs_old_overlay[i][j] = channel_rgb[i][j];
+			}
+			cs_old_overlay[i][3] = channel_opacity[i];
+		}
+
+		ctable = malloc(3 * sizeof(RGBA16));
+		ctable[0].r = channel_rgb[CHN_ALPHA][0] * 257;
+		ctable[0].g = channel_rgb[CHN_ALPHA][1] * 257;
+		ctable[0].b = channel_rgb[CHN_ALPHA][2] * 257;
+		ctable[0].a = channel_opacity[CHN_ALPHA] * 257;
+		ctable[1].r = channel_rgb[CHN_SEL][0] * 257;
+		ctable[1].g = channel_rgb[CHN_SEL][1] * 257;
+		ctable[1].b = channel_rgb[CHN_SEL][2] * 257;
+		ctable[1].a = channel_opacity[CHN_SEL] * 257;
+		ctable[2].r = channel_rgb[CHN_MASK][0] * 257;
+		ctable[2].g = channel_rgb[CHN_MASK][1] * 257;
+		ctable[2].b = channel_rgb[CHN_MASK][2] * 257;
+		ctable[2].a = channel_opacity[CHN_MASK] * 257;
+
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
+			GTK_WIN_POS_CENTER, TRUE);
+		colour_window(win, 3, ovl_txt, TRUE, select_overlay);
+	}
+}
+
+void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
+{
+	colour_selector( COLSEL_EDIT_ALL );
+}
 
 ///	QUANTIZE WINDOW
 

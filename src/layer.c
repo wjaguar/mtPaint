@@ -1248,9 +1248,12 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	return FALSE;
 }
 
-void delete_layers_window()
+gint delete_layers_window()
 {
 	int x, y, width, height;
+
+	if ( !GTK_WIDGET_SENSITIVE(layers_window) ) return TRUE;
+		// Stop user prematurely exiting while drag 'n' drop loading
 
 	gdk_window_get_size( layers_window->window, &width, &height );
 	gdk_window_get_root_origin( layers_window->window, &x, &y );
@@ -1263,6 +1266,8 @@ void delete_layers_window()
 	gtk_widget_destroy(layers_window);
 	men_item_state(menu_layer, TRUE);
 	layers_window = NULL;
+
+	return FALSE;
 }
 
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )

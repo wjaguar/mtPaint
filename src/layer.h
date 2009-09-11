@@ -82,7 +82,7 @@ gboolean show_layers_main,		// Show all layers in main window
 void layers_init();
 void pressed_layers( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data );
-void delete_layers_window();
+gint delete_layers_window();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );

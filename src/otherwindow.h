@@ -25,6 +25,7 @@
 #define COLSEL_OVERLAYS 1
 
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
+typedef void (*colour_hook)(int what);
 
 GtkWidget *clipboard_entry;
 png_color brcosa_pal[256];
