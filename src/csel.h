@@ -19,12 +19,30 @@
 
 #include <gtk/gtk.h>
 
-int csel_center, csel_center_a, csel_limit, csel_limit_a;
-int csel_mode, csel_invert;
-double csel_range;
+#define CMAPSIZE (64 * 64 * 64 / 16)
+
+typedef struct
+{
+	/* Input fields */
+	int center, limit, center_a, limit_a;
+	int mode, invert;
+	double range;
+	/* Cache fields */
+	guint32 colormap[CMAPSIZE * 2];
+	guint32 pmap[256 / 32];
+	int pcache[256], cbase, irange, amin, amax;
+	double clxn[3], cvec, range2;
+} csel_info;
+#define CSEL_SVSIZE ((size_t)(&((csel_info *)0)->colormap))
+
+csel_info *csel_data;
 int csel_preview, csel_preview_a, csel_overlay;
 
-int csel_scan(int start, int step, int cnt, unsigned char *mask, unsigned char *img);
-void csel_eval();
-void csel_reset();
-int csel_init();
+void init_cols();
+void get_lxn(double *lxn, int col);
+
+int csel_scan(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *img, csel_info *info);
+double csel_eval(int mode, int center, int limit);
+void csel_reset(csel_info *info);
+csel_info *csel_init();

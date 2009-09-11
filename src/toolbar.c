@@ -350,17 +350,42 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 		inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
 		break;
 	case SETB_CSEL:
-		if (mem_cselect && (csel_center < 0))
+		if (mem_cselect && !csel_data)
 		{
-			if (csel_init()) mem_cselect = FALSE;
+			csel_data = csel_init();
+			mem_cselect = !!csel_data;
 		}
 		break;
 	}
 }
 
+int set_flood(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *spin, *toggle;
+	GList *chain = GTK_BOX(box)->children;
+
+	spin = ((GtkBoxChild*)chain->data)->widget;
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	flood_step = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spin));
+	if (flood_step) init_cols();
+	chain = chain->next;
+	toggle = ((GtkBoxChild*)chain->data)->widget;
+	flood_cube = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
+	chain = chain->next;
+	toggle = ((GtkBoxChild*)chain->data)->widget;
+	flood_img = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
+	chain = chain->next;
+	toggle = ((GtkBoxChild*)chain->data)->widget;
+	flood_slide = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
+
+	return TRUE;
+}
+
 static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
+	GtkWidget *spin, *box;
+
 	/* Handle only right clicks */
 	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
 		return (FALSE);
@@ -369,6 +394,18 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	{
 	case SETB_CSEL:
 		colour_selector(COLSEL_EDIT_CSEL);
+		break;
+	case (-2): /* Flood fill step */
+		spin = add_a_spin(0, 0, 200);
+		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), flood_step);
+		box = gtk_vbox_new(FALSE, 5);
+		gtk_widget_show(box);
+		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+		add_a_toggle(_("RGB Cube"), box, flood_cube);
+		add_a_toggle(_("By image channel"), box, flood_img);
+		add_a_toggle(_("Gradient-driven"), box, flood_slide);
+		filter_window(_("Fill settings"), box, set_flood, NULL);
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
@@ -695,6 +732,10 @@ void toolbar_init(GtkWidget *vbox_main)
 			child_type, previous, "None", hint_text_tools[i],
 			"Private", iconw, GTK_SIGNAL_FUNC(toolbar_icon_event), (gpointer) i);
 	}
+
+	gtk_signal_connect(GTK_OBJECT(icon_buttons[2]), "button_press_event",
+				GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)(-2));
+
 	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 14 );
 	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 10 );
 	gtk_toolbar_insert_space( GTK_TOOLBAR(toolbar_tools), 8 );

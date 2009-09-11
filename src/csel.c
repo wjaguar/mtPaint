@@ -26,21 +26,12 @@
 #include "memory.h"
 #include "otherwindow.h"
 #include "channels.h"
+#include "csel.h"
 
-int csel_center = -1, csel_center_a, csel_limit, csel_limit_a;
-int csel_mode, csel_invert;
-double csel_range;
+csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
-#define CMAPSIZE (64 * 64 * 64 / 16)
-
-/* !!! Or allocate 128 K statically? !!! */
-static guint32 *colormap;
-
 static double gamma256[256], gamma64[64];
-static guint32 pmap[256 / 32];
-static int pcache[256], cbase, amin, amax, irange;
-static double clxn[3], llxn[3], range2, cvec, lvec;
 
 /* This nightmarish code does conversion from CIE XYZ into my own perceptually
  * uniform colour space L*X*N*. To produce it, I combined McAdam's colour space
@@ -150,15 +141,16 @@ static void make_gamma(double *Gamma, int cnt)
 	}
 }
 
-static void init_cols(void)
+void init_cols(void)
 {
+	if (gamma256[255]) return; /* Done already */
 	make_gamma(gamma256, 256);
 	make_gamma(gamma64, 64);
 	make_rgb_xyz();
 }
 
 /* Get L*X*N* triple */
-static void get_lxn(double *lxn, int col)
+void get_lxn(double *lxn, int col)
 {
 	rgb2LXN(lxn, gamma256[INT_2_R(col)], gamma256[INT_2_G(col)],
 		gamma256[INT_2_B(col)]);
@@ -183,7 +175,8 @@ static double get_vect(int col)
 }
 
 /* Answer which pixels are masked through selectivity */
-int csel_scan(int start, int step, int cnt, unsigned char *mask, unsigned char *img)
+int csel_scan(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *img, csel_info *info)
 {
 	unsigned char res = 0;
 	double d, dist = 0.0, lxn[3];
@@ -201,41 +194,45 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask, unsigned char *
 		{
 			j = img[i];
 			k = PNG_2_INT(mem_pal[j]);
-			if (pcache[j] != k)
+			if (info->pcache[j] != k)
 			{
-				pcache[j] = k;
-				if (csel_mode == 0) /* Sphere mode */
+				info->pcache[j] = k;
+				if (info->mode == 0) /* Sphere mode */
 				{
 					get_lxn(lxn, k);
-					dist = (lxn[0] - clxn[0]) * (lxn[0] - clxn[0]) +
-						(lxn[1] - clxn[1]) * (lxn[1] - clxn[1]) +
-						(lxn[2] - clxn[2]) * (lxn[2] - clxn[2]);
+					dist = (lxn[0] - info->clxn[0]) *
+						(lxn[0] - info->clxn[0]) +
+						(lxn[1] - info->clxn[1]) *
+						(lxn[1] - info->clxn[1]) +
+						(lxn[2] - info->clxn[2]) *
+						(lxn[2] - info->clxn[2]);
 				}
-				else if (csel_mode == 1) /* Angle mode */
+				else if (info->mode == 1) /* Angle mode */
 				{
-					dist = fabs(get_vect(k) - cvec);
+					dist = fabs(get_vect(k) - info->cvec);
 					if (dist > 765.0) dist = 1530.0 - dist;
 				}
-				else if (csel_mode == 2) /* Cube mode */
+				else if (info->mode == 2) /* Cube mode */
 				{
-					l = abs(INT_2_R(csel_center) - INT_2_R(k));
-					jj = abs(INT_2_G(csel_center) - INT_2_G(k));
+					l = abs(INT_2_R(info->center) - INT_2_R(k));
+					jj = abs(INT_2_G(info->center) - INT_2_G(k));
 					if (l < jj) l = jj;
-					jj = abs(INT_2_B(csel_center) - INT_2_B(k));
+					jj = abs(INT_2_B(info->center) - INT_2_B(k));
 					dist = l > jj ? l : jj;
 				}
-				if (dist <= range2) pmap[j >> 5] |= 1 << (j & 31);
+				if (dist <= info->range2)
+					info->pmap[j >> 5] |= 1 << (j & 31);
 			}
-			if (((pmap[j >> 5] >> (j & 31)) ^ csel_invert) & 1)
+			if (((info->pmap[j >> 5] >> (j & 31)) ^ info->invert) & 1)
 				mask[i] |= 255;
 		}
 	}
-	else if (csel_mode == 0)	/* RGB image, sphere mode */
+	else if (info->mode == 0)	/* RGB image, sphere mode */
 	{
 		img += start * 3;
 		for (i = start; i < cnt; i += step , img += st3)
 		{
-			k = MEM_2_INT(img, 0) - cbase;
+			k = MEM_2_INT(img, 0) - info->cbase;
 			if (k & 0xFFC0C0C0) /* Coarse map */
 			{
 				j = ((img[0] & 0xFC) << 6) + (img[1] & 0xFC) +
@@ -248,23 +245,26 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask, unsigned char *
 					((k & 0x3F) >> 4) + CMAPSIZE;
 				k = (k + k) & 0x1E;
 			}
-			l = (colormap[j] >> k) & 3;
+			l = (info->colormap[j] >> k) & 3;
 			if (!l) /* Not mapped */
 			{
 				if (j < CMAPSIZE) rgb2LXN(lxn, gamma64[img[0] >> 2],
 					gamma64[img[1] >> 2], gamma64[img[2] >> 2]);
 				else rgb2LXN(lxn, gamma256[img[0]], gamma256[img[1]],
 					gamma256[img[2]]);
-				dist = (lxn[0] - clxn[0]) * (lxn[0] - clxn[0]) +
-					(lxn[1] - clxn[1]) * (lxn[1] - clxn[1]) +
-					(lxn[2] - clxn[2]) * (lxn[2] - clxn[2]);
-				l = dist <= range2 ? 3 : 2;
-				colormap[j] |= l << k;
+				dist = (lxn[0] - info->clxn[0]) *
+					(lxn[0] - info->clxn[0]) +
+					(lxn[1] - info->clxn[1]) *
+					(lxn[1] - info->clxn[1]) +
+					(lxn[2] - info->clxn[2]) *
+					(lxn[2] - info->clxn[2]);
+				l = dist <= info->range2 ? 3 : 2;
+				info->colormap[j] |= l << k;
 			}
-			if ((l ^ csel_invert) & 1) mask[i] |= 255;
+			if ((l ^ info->invert) & 1) mask[i] |= 255;
 		}
 	}
-	else if (csel_mode == 1)	/* RGB image, angle mode */
+	else if (info->mode == 1)	/* RGB image, angle mode */
 	{
 		static int ixx[5] = {0, 1, 2, 0, 1};
 
@@ -275,132 +275,133 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask, unsigned char *
 				(img[0] < img[1] ? 1 : 2);
 			j = (img[ixx[k]] << 8) + img[ixx[k + 1]] -
 				img[ixx[k + 2]] * 257;
-			l = (colormap[j >> 3] >> ((j & 7) << 2)) & 0xF;
+			l = (info->colormap[j >> 3] >> ((j & 7) << 2)) & 0xF;
 			if (!l) /* Not mapped */
 			{
 				/* Map 3 sectors at once */
-				d = get_vect(j << 8) - cvec;
+				d = get_vect(j << 8) - info->cvec;
 				for (jj = 1; jj < 8; jj += jj)
 				{
 					dist = fabs(d);
 					d += 510.0;
 					if (dist > 765.0) dist = 1530.0 - dist;
-					if (dist <= range2) l += jj;
+					if (dist <= info->range2) l += jj;
 				}
-				colormap[j >> 3] |= (l + 8) << ((j & 7) << 2);
+				info->colormap[j >> 3] |= (l + 8) << ((j & 7) << 2);
 			}
-			if (((l >> k) ^ csel_invert) & 1) mask[i] |= 255;
+			if (((l >> k) ^ info->invert) & 1) mask[i] |= 255;
 		}
 	}
-	else if (csel_mode == 2)	/* RGB image, cube mode */
+	else if (info->mode == 2)	/* RGB image, cube mode */
 	{
-		j = INT_2_R(csel_center);
-		k = INT_2_G(csel_center);
-		l = INT_2_B(csel_center);
-		jj = csel_invert & 1;
+		j = INT_2_R(info->center);
+		k = INT_2_G(info->center);
+		l = INT_2_B(info->center);
+		jj = info->invert & 1;
 		img += start * 3;
 		for (i = start; i < cnt; i += step , img += st3)
 		{
-			if (((abs(j - img[0]) <= irange) &&
-				(abs(k - img[1]) <= irange) &&
-				(abs(l - img[2]) <= irange)) ^ jj)
+			if (((abs(j - img[0]) <= info->irange) &&
+				(abs(k - img[1]) <= info->irange) &&
+				(abs(l - img[2]) <= info->irange)) ^ jj)
 				mask[i] |= 255;
 		}
 	}
 	return (res);
 }
 
-/* Re-evaluate center/limit/range */
-void csel_eval()
+/* Evaluate range */
+double csel_eval(int mode, int center, int limit)
 {
-	switch (csel_mode)
+	double cw[3], lw[3], cwv, lwv, r2;
+	int i, j, k, ir;
+
+	switch (mode)
 	{
 	case 0: /* L*X*N* spherical */
-		get_lxn(clxn, csel_center);
-		if (csel_range < 0.0)
-		{
-			get_lxn(llxn, csel_limit);
-			range2 = (llxn[0] - clxn[0]) * (llxn[0] - clxn[0]) +
-				(llxn[1] - clxn[1]) * (llxn[1] - clxn[1]) +
-				(llxn[2] - clxn[2]) * (llxn[2] - clxn[2]);
-			csel_range = sqrt(range2);
-		}
-		else range2 = csel_range * csel_range;
-		break;
+		get_lxn(cw, center);
+		get_lxn(lw, limit);
+		r2 = (lw[0] - cw[0]) * (lw[0] - cw[0]) +
+			(lw[1] - cw[1]) * (lw[1] - cw[1]) +
+			(lw[2] - cw[2]) * (lw[2] - cw[2]);
+		return (sqrt(r2));
 	case 1: /* RGB angular */
-		cvec = get_vect(csel_center);
-		if (csel_range < 0.0)
-		{
-			lvec = get_vect(csel_limit);
-			csel_range = fabs(lvec - cvec);
-			if (csel_range > 765.0) csel_range = 1530.0 - csel_range;
-		}
-		range2 = csel_range;
-		break;
+		cwv = get_vect(center);
+		lwv = get_vect(limit);
+		r2 = fabs(lwv - cwv);
+		if (r2 > 765.0) r2 = 1530.0 - r2;
+		return (r2);
 	case 2: /* RGB cubic */
-		if (csel_range < 0.0)
-		{
-			int i, j, k;
-			i = abs(INT_2_R(csel_center) - INT_2_R(csel_limit));
-			j = abs(INT_2_G(csel_center) - INT_2_G(csel_limit));
-			k = abs(INT_2_B(csel_center) - INT_2_B(csel_limit));
-			irange = i > j ? i : j;
-			if (irange < k) irange = k;
-			csel_range = range2 = irange;
-		}
-		else irange = range2 = floor(csel_range);
-		break;
+		i = abs(INT_2_R(center) - INT_2_R(limit));
+		j = abs(INT_2_G(center) - INT_2_G(limit));
+		k = abs(INT_2_B(center) - INT_2_B(limit));
+		ir = i > j ? i : j;
+		if (ir < k) ir = k;
+		return ((double)ir);
 	}
-	if (csel_center_a < csel_limit_a)
-	{
-		amin = csel_center_a;
-		amax = csel_limit_a;
-	}
-	else
-	{
-		amax = csel_center_a;
-		amin = csel_limit_a;
-	}
+	return (0.0);
 }
 
-/* Clear bitmaps and setup range */
-void csel_reset()
+/* Clear bitmaps and setup extra vars */
+void csel_reset(csel_info *info)
 {
 	int i, j, k, l;
 
-	csel_eval();
-	memset(colormap, 0, CMAPSIZE * 2 * sizeof(guint32));
-	memset(pmap, 0, sizeof(pmap));
-	memset(pcache, 255, sizeof(pcache));
-	/* Find fine-precision base for L*X*N* */
-	if (csel_mode == 0)
+	memset(info->colormap, 0, sizeof(info->colormap));
+	memset(info->pmap, 0, sizeof(info->pmap));
+	memset(info->pcache, 255, sizeof(info->pcache));
+	switch (info->mode)
 	{
-		l = csel_center & 0xFCFCFC;
+	case 0: /* L*X*N* sphere */
+		get_lxn(info->clxn, info->center);
+		info->range2 = info->range * info->range;
+		/* Find fine-precision base */
+		l = info->center & 0xFCFCFC;
 		i = INT_2_R(l);
 		j = INT_2_G(l);
 		k = INT_2_B(l);
 		i = i > 32 ? i - 32 : 0;
 		j = j > 32 ? j - 32 : 0;
 		k = k > 32 ? k - 32 : 0;
-		cbase = RGB_2_INT(i, j, k);
+		info->cbase = RGB_2_INT(i, j, k);
+		break;
+	case 1: /* RGB angular */
+		info->cvec = get_vect(info->center);
+		info->range2 = info->range;
+		break;
+	case 2: /* RGB cubic */
+		info->irange = info->range2 = floor(info->range);
+		break;
+	}
+	if (info->center_a < info->limit_a)
+	{
+		info->amin = info->center_a;
+		info->amax = info->limit_a;
+	}
+	else
+	{
+		info->amax = info->center_a;
+		info->amin = info->limit_a;
 	}
 }
 
 /* Set center at A, limit at B */
-int csel_init()
+csel_info *csel_init()
 {
-	colormap = malloc(2 * CMAPSIZE * sizeof(guint32));
-	if (!colormap)
+	csel_info *info;
+
+	info = calloc(1, sizeof(csel_info));
+	if (!info)
 	{
 		memory_errors(1);
-		return (1);
+		return (NULL);
 	}
 	init_cols();
-	csel_center = PNG_2_INT(mem_col_A24);
-	csel_limit = PNG_2_INT(mem_col_B24);
-	csel_center_a = channel_col_A[CHN_ALPHA];
-	csel_limit_a = channel_col_B[CHN_ALPHA];
-	csel_range = -1.0;
-	csel_reset();
-	return (0);
+	info->center = PNG_2_INT(mem_col_A24);
+	info->limit = PNG_2_INT(mem_col_B24);
+	info->center_a = channel_col_A[CHN_ALPHA];
+	info->limit_a = channel_col_B[CHN_ALPHA];
+	info->range = csel_eval(0, info->center, info->limit);
+	csel_reset(info);
+	return (info);
 }

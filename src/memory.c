@@ -48,6 +48,11 @@ int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (
 int mem_cselect;
 int mem_unmask;
 
+/// FLOOD FILL SETTINGS
+
+double flood_step;
+int flood_cube, flood_img, flood_slide;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
@@ -2091,7 +2096,9 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int qtail[QLEVELS + 1], ntail = 0;
 	int borders[4] = {0, mem_width, 0, mem_height};
 	int corners[4], levels[4], coords[4];
-	int i, j, k, kk, lvl, tx, ty;
+	int i, j, k, kk, lvl, tx, ty, fmode = 0, lastr[3], thisr[3];
+	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
+	csel_info *flood_data = NULL;
 
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
@@ -2116,6 +2123,22 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 		}
 	}
 
+	/* Configure fuzzy flood fill */
+	if (flood_step && ((mem_channel == CHN_IMAGE) || flood_img))
+	{
+		if (flood_slide) fmode = flood_cube ? 2 : 3;
+		else flood_data = calloc(1, sizeof(csel_info));
+		if (flood_data)
+		{
+			flood_data->center = get_pixel_RGB(x, y);
+			flood_data->range = flood_step;
+			flood_data->mode = flood_cube ? 2 : 0;
+/* !!! Alpha isn't tested yet !!! */
+			csel_reset(flood_data);
+			fmode = 1;
+		}
+	}
+
 	while (1)
 	{
 		/* Determine area */
@@ -2137,6 +2160,17 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 		{
 			coords[0] = x;
 			coords[2] = y;
+			if (fmode > 1)
+			{
+				k = get_pixel_RGB(x, y);
+				if (fmode == 3) get_lxn(lastc, k);
+				else
+				{
+					lastr[0] = INT_2_R(k);
+					lastr[1] = INT_2_G(k);
+					lastr[2] = INT_2_B(k);
+				}
+			}
 			for (i = 0; i < 4; i++)
 			{
 				coords[1] = x;
@@ -2146,7 +2180,35 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 				if (coords[i] == borders[i]) continue;
 				tx = coords[1];
 				ty = coords[3];
-				if (get_pixel(tx, ty) != col) continue;
+				/* Sliding mode */
+				if (fmode == 3)
+				{
+					get_lxn(thisc, get_pixel_RGB(tx, ty));
+					dist2 = (thisc[0] - lastc[0]) * (thisc[0] - lastc[0]) +
+						(thisc[1] - lastc[1]) * (thisc[1] - lastc[1]) +
+						(thisc[2] - lastc[2]) * (thisc[2] - lastc[2]);
+					if (dist2 > mdist2) continue;
+				}
+				else if (fmode == 2)
+				{
+					k = get_pixel_RGB(tx, ty);
+					thisr[0] = INT_2_R(k);
+					thisr[1] = INT_2_G(k);
+					thisr[2] = INT_2_B(k);
+					if ((abs(thisr[0] - lastr[0]) > flood_step) ||
+						(abs(thisr[1] - lastr[1]) > flood_step) ||
+						(abs(thisr[2] - lastr[2]) > flood_step))
+						continue;
+				}
+				/* Centered mode */
+				else if (fmode)
+				{
+					if (!csel_scan(ty * mem_width + tx, 1, 1,
+						NULL, mem_img[CHN_IMAGE], flood_data))
+						continue;
+				}
+				/* Normal mode */
+				else if (get_pixel(tx, ty) != col) continue;
 				/* Is pixel writable? */
 				if (bmap)
 				{
@@ -2201,6 +2263,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 			qtail[j] = i;
 	}
 	free(nearq);
+	free(flood_data);
 }
 
 /* Regular flood fill */
@@ -3414,6 +3477,15 @@ int get_pixel( int x, int y )	/* Mixed */
 	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
 }
 
+int get_pixel_RGB( int x, int y )	/* RGB */
+{
+	x = mem_width * y + x;
+	if (mem_img_bpp == 1)
+		return (PNG_2_INT(mem_pal[mem_img[CHN_IMAGE][x]]));
+	x *= 3;
+	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
+}
+
 int mem_protected_RGB(int intcol)		// Is this intcol in list?
 {
 	int i;
@@ -3443,7 +3515,7 @@ int pixel_protected(int x, int y)
 	}
 
 	/* Colour selectivity */
-	if (mem_cselect && csel_scan(offset, 1, 1, NULL, mem_img[CHN_IMAGE]))
+	if (mem_cselect && csel_scan(offset, 1, 1, NULL, mem_img[CHN_IMAGE], csel_data))
 		return (255);
 
 	/* Mask channel */
@@ -3487,7 +3559,7 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	}
 
 	/* Add colour selectivity to it */
-	if (mem_cselect) csel_scan(start, step, cnt, mask, img0);
+	if (mem_cselect) csel_scan(start, step, cnt, mask, img0, csel_data);
 }
 
 /* Prepare mask array - for each pixel >0 if masked, 0 if not */

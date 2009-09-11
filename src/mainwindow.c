@@ -1952,7 +1952,7 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 			{
 				memset(pvx, 0, l);
 				csel_scan(0, zoom, pww, pvx, mem_img[CHN_IMAGE] +
-					(mem_width * j + dx) * mem_img_bpp);
+					(mem_width * j + dx) * mem_img_bpp, csel_data);
 			}
 		}
 		else if (!async_bk)

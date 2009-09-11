@@ -76,9 +76,9 @@ static void activate_channel(int chan)
 static void click_newchan_ok(GtkButton *button, gpointer user_data)
 {
 	chanlist tlist;
-	int i, j = mem_width * mem_height, range;
-	unsigned char *src, *dest, *tmp,
-		prang[3][2];		// RGB min & max values
+	int i, ii, k, j = mem_width * mem_height, range, sq256[256], rgb[3];
+	unsigned char *src, *dest, *tmp;
+	double r2;
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
@@ -101,34 +101,79 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 		memset(dest, 255, j);
 		break;
 	case 2: /* Colour A radius B */
-		if ( mem_img_bpp == 3 )
+		rgb[0] = mem_col_A24.red;
+		rgb[1] = mem_col_A24.green;
+		rgb[2] = mem_col_A24.blue;
+		range = (mem_col_A24.red - mem_col_B24.red) *
+			(mem_col_A24.red - mem_col_B24.red) +
+			(mem_col_A24.green - mem_col_B24.green) *
+			(mem_col_A24.green - mem_col_B24.green) +
+			(mem_col_A24.blue - mem_col_B24.blue) *
+			(mem_col_A24.blue - mem_col_B24.blue);
+		r2 = 255.0 * 255.0;
+		if (range) r2 /= (double)range;
+		/* Prepare fast-square-root table */
+		for (i = ii = 0; i < 16; i++)
 		{
-			mtMAX( prang[0][0], mem_col_A24.red - mem_col_B24.red, 0 )
-			mtMIN( prang[0][1], mem_col_A24.red + mem_col_B24.red, 255 )
-			mtMAX( prang[1][0], mem_col_A24.green - mem_col_B24.green, 0 )
-			mtMIN( prang[1][1], mem_col_A24.green + mem_col_B24.green, 255 )
-			mtMAX( prang[2][0], mem_col_A24.blue - mem_col_B24.blue, 0 )
-			mtMIN( prang[2][1], mem_col_A24.blue + mem_col_B24.blue, 255 )
-
-			src = mem_img[CHN_IMAGE];
-			range = 1 +	prang[0][1] - prang[0][0] +
-					prang[1][1] - prang[1][0] +
-					prang[2][1] - prang[2][0];
+			k = (i + 1) * (i + 1);
+			for (; ii < k; ii++) sq256[ii] = i;
+		}
+		src = mem_img[CHN_IMAGE];
+		if (mem_img_bpp == 1)
+		{
+			unsigned char p2l[256];
+			memset(p2l, 0, 256);
+			for (i = 0; i < mem_cols; i++)
+			{
+				range = (mem_pal[i].red - rgb[0]) *
+					(mem_pal[i].red - rgb[0]) +
+					(mem_pal[i].green - rgb[1]) *
+					(mem_pal[i].green - rgb[1]) +
+					(mem_pal[i].blue - rgb[2]) *
+					(mem_pal[i].blue - rgb[2]);
+				k = r2 * (double)range;
+				/* Fast square root */
+				if (k >= (255 * 255)) ii = 255;
+				else if (k < 256) ii = sq256[k];
+				else
+				{
+					if (k < 736) ii = 17 + (k + 9 - 256) / 47;
+					else
+					{
+						ii = sq256[k >> 8] << 4;
+						ii += (k - ii * ii) / (ii + ii + 16) + 1;
+					}
+					ii -= ((k - ii * ii) >> 17) & 1;
+				}
+				p2l[i] = ii ^ 255;
+			}
 			for (i = 0; i < j; i++)
 			{
-				if (	(src[0] >= prang[0][0]) && (src[0] <= prang[0][1]) &&
-					(src[1] >= prang[1][0]) && (src[1] <= prang[1][1]) &&
-					(src[2] >= prang[2][0]) && (src[2] <= prang[2][1])
-					)
+				dest[i] = p2l[src[i]];
+			}
+		}
+		else
+		{
+			for (i = 0; i < j; i++)
+			{
+				range = (src[0] - rgb[0]) * (src[0] - rgb[0]) +
+					(src[1] - rgb[1]) * (src[1] - rgb[1]) +
+					(src[2] - rgb[2]) * (src[2] - rgb[2]);
+				k = r2 * (double)range;
+				/* Fast square root */
+				if (k >= (255 * 255)) ii = 255;
+				else if (k < 256) ii = sq256[k];
+				else
 				{
-					dest[i] = 255 - ((
-						abs(src[0] - mem_col_A24.red) +
-						abs(src[1] - mem_col_A24.green) +
-						abs(src[2] - mem_col_A24.blue) )<<8) /
-							range;
+					if (k < 736) ii = 17 + (k + 9 - 256) / 47;
+					else
+					{
+						ii = sq256[k >> 8] << 4;
+						ii += (k - ii * ii) / (ii + ii + 16) + 1;
+					}
+					ii -= ((k - ii * ii) >> 17) & 1;
 				}
-				else dest[i] = 0;
-
+				dest[i] = ii ^ 255;
 				src += 3;
 			}
 		}
@@ -353,8 +398,10 @@ void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint i
 
 int do_threshold(GtkWidget *spin, gpointer fdata)
 {
+	int i;
+
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
 	spot_undo(UNDO_FILT);
 	mem_threshold(mem_channel, i);
 

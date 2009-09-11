@@ -627,8 +627,10 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 int do_bacteria(GtkWidget *spin, gpointer fdata)
 {
+	int i;
+
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
 	spot_undo(UNDO_FILT);
 	mem_bacteria(i);
 
@@ -1002,9 +1004,11 @@ static void click_brcosa_show_toggle( GtkWidget *widget, GtkWidget *data )
 	}
 }
 
+/*
 static void click_brcosa_store()
 {
 }
+*/
 
 static gint click_brcosa_ok()
 {
@@ -1110,14 +1114,14 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	button = add_a_toggle( _("Show Detail"), hbox, inifile_get_gboolean( "transcol_show", FALSE ) );
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(click_brcosa_show_toggle), vbox5);
-
+/*
 	button = gtk_button_new_with_label(_("Store Values"));
 	gtk_widget_show (button);
 	gtk_box_pack_end (GTK_BOX (hbox), button, FALSE, FALSE, 4);
 
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_brcosa_store), NULL);
-
+*/
 
 ///	OPTIONAL SECTION
 
@@ -1609,6 +1613,7 @@ static void color_set( GtkColorSelection *selection, gpointer user_data )
 	gdouble color[4];
 	GtkWidget *widget;
 	RGBA16 *cc;
+	GdkColor c;
 
 	gtk_color_selection_get_color( selection, color );
 	widget = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(selection)));
@@ -1618,7 +1623,10 @@ static void color_set( GtkColorSelection *selection, gpointer user_data )
 	cc->g = rint(color[1] * 65535.0);
 	cc->b = rint(color[2] * 65535.0);
 	cc->a = rint(color[3] * 65535.0);
-	GdkColor c = {0, cc->r, cc->g, cc->b};
+	c.pixel = 0;
+	c.red   = cc->r;
+	c.green = cc->g;
+	c.blue  = cc->b;
 	gdk_colormap_alloc_color( gdk_colormap_get_system(), &c, FALSE, TRUE );
 	gtk_widget_queue_draw(widget);
 	allcol_hook(4);
@@ -1830,19 +1838,17 @@ static void do_AB(int idx)
 	pal_refresher();
 }
 
-static void do_csel(int mode)
+static void set_csel()
 {
-	csel_center = RGB_2_INT((ctable[0].r + 128) / 257,
+	csel_data->center = RGB_2_INT((ctable[0].r + 128) / 257,
 		(ctable[0].g + 128) / 257, (ctable[0].b + 128) / 257);
-	csel_center_a = (ctable[0].a + 128) / 257;
-	csel_limit = RGB_2_INT((ctable[1].r + 128) / 257,
+	csel_data->center_a = (ctable[0].a + 128) / 257;
+	csel_data->limit = RGB_2_INT((ctable[1].r + 128) / 257,
 		(ctable[1].g + 128) / 257, (ctable[1].b + 128) / 257);
-	csel_limit_a = (ctable[1].a + 128) / 257;
+	csel_data->limit_a = (ctable[1].a + 128) / 257;
 	csel_preview = RGB_2_INT((ctable[2].r + 128) / 257,
 		(ctable[2].g + 128) / 257, (ctable[2].b + 128) / 257);
 	csel_preview_a = (ctable[2].a + 128) / 257;
-	if (mode) csel_reset();
-	else csel_eval();
 }
 
 static void select_colour(int what)
@@ -1944,8 +1950,8 @@ static void posterize_AB(GtkButton *button, gpointer user_data)
 }
 
 static GtkWidget *csel_spin, *csel_toggle;
-static int csel_mode0, csel_invert0;
-static double csel_range0;
+static unsigned char csel_save[CSEL_SVSIZE];
+static int csel_preview0, csel_preview_a0;
 
 static void select_csel(int what)
 {
@@ -1954,21 +1960,19 @@ static void select_csel(int what)
 	{
 	case 0: /* Cancel */
 		csel_overlay = 0;
-		ctable[0] = ctable[3];
-		ctable[1] = ctable[4];
-		ctable[2] = ctable[5];
-		csel_mode = csel_mode0;
-		csel_invert = csel_invert0;
-		csel_range = csel_range0;
-		do_csel(1);
+		memcpy(csel_data, csel_save, CSEL_SVSIZE);
+		csel_preview = csel_preview0;
+		csel_preview_a = csel_preview_a0;
+		csel_reset(csel_data);
 		break;
 	case 1: /* Preview */
 	case 2: /* OK */
 		csel_overlay = 0;
 		gtk_spin_button_update(GTK_SPIN_BUTTON(csel_spin));
-		csel_range = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(csel_spin));
-		csel_invert = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(csel_toggle));
-		do_csel(1);
+		csel_data->range = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(csel_spin));
+		csel_data->invert = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(csel_toggle));
+		set_csel();
+		csel_reset(csel_data);
 		if (what != 1) break;
 		old_over = 0;
 		csel_overlay = 1;
@@ -1976,9 +1980,10 @@ static void select_csel(int what)
 	case 4: /* Set */
 		csel_overlay = 0;
 		if (allcol_idx != 1) break; /* Only for limit */
-		csel_range = -1.0; /* Invalidate range */
-		do_csel(0);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_range);
+		set_csel();
+		csel_data->range = csel_eval(csel_data->mode, csel_data->center,
+			csel_data->limit);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_data->range);
 		break;
 	}
 	if ((old_over != csel_overlay) && drawing_canvas)
@@ -1987,15 +1992,17 @@ static void select_csel(int what)
 
 static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 {
+	int old_over;
+
 	if (!gtk_toggle_button_get_active(widget)) return;
-	if (csel_mode == (int)user_data) return;
-	int old_over = csel_overlay;
+	if (csel_data->mode == (int)user_data) return;
+	old_over = csel_overlay;
 	csel_overlay = 0;
-	csel_mode = (int)user_data;
-	/* Reset range spinbutton */
-	csel_range = -1.0;
-	do_csel(0);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_range);
+	csel_data->mode = (int)user_data;
+	set_csel();
+	csel_data->range = csel_eval(csel_data->mode, csel_data->center,
+		csel_data->limit);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin), csel_data->range);
 	if (old_over && drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
 }
 
@@ -2086,32 +2093,32 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	}
 	if (cs_type == COLSEL_EDIT_CSEL)
 	{
-		static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview") };
-		static char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
+		char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview") };
+		char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
 
-		if (csel_center < 0)
+		if (!csel_data)
 		{
-			if (csel_init()) return;
+			csel_data = csel_init();
+			if (!csel_data) return;
 		}
-		ctable = malloc(6 * sizeof(RGBA16));
-		ctable[0].r = INT_2_R(csel_center) * 257;
-		ctable[0].g = INT_2_G(csel_center) * 257;
-		ctable[0].b = INT_2_B(csel_center) * 257;
-		ctable[0].a = csel_center_a * 257;
-		ctable[1].r = INT_2_R(csel_limit) * 257;
-		ctable[1].g = INT_2_G(csel_limit) * 257;
-		ctable[1].b = INT_2_B(csel_limit) * 257;
-		ctable[1].a = csel_limit_a * 257;
+		/* Save previous values */
+		memcpy(csel_save, csel_data, CSEL_SVSIZE);
+		csel_preview0 = csel_preview;
+		csel_preview_a0 = csel_preview_a;
+
+		ctable = malloc(3 * sizeof(RGBA16));
+		ctable[0].r = INT_2_R(csel_data->center) * 257;
+		ctable[0].g = INT_2_G(csel_data->center) * 257;
+		ctable[0].b = INT_2_B(csel_data->center) * 257;
+		ctable[0].a = csel_data->center_a * 257;
+		ctable[1].r = INT_2_R(csel_data->limit) * 257;
+		ctable[1].g = INT_2_G(csel_data->limit) * 257;
+		ctable[1].b = INT_2_B(csel_data->limit) * 257;
+		ctable[1].a = csel_data->limit_a * 257;
 		ctable[2].r = INT_2_R(csel_preview) * 257;
 		ctable[2].g = INT_2_G(csel_preview) * 257;
 		ctable[2].b = INT_2_B(csel_preview) * 257;
 		ctable[2].a = csel_preview_a * 257;
-		/* Save previous values */
-		ctable[3] = ctable[0];
-		ctable[4] = ctable[1];
-		ctable[5] = ctable[2];
-		csel_mode0 = csel_mode;
-		csel_range0 = csel_range;
 
 		/* Prepare extra controls */
 		extbox = gtk_hbox_new(FALSE, 0);
@@ -2120,15 +2127,15 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		spin = csel_spin = add_a_spin(0, 0, 765);
 		gtk_box_pack_start(GTK_BOX(extbox), spin, FALSE, FALSE, 0);
 		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), csel_range);
-		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_invert);
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), csel_data->range);
+		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_data->invert);
 		i = 0;
 		button = gtk_radio_button_new_with_label(NULL, csel_modes[0]);
 		while (1)
 		{
 			gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 			gtk_box_pack_start(GTK_BOX(extbox), button, FALSE, FALSE, 0);
-			if (i == csel_mode) gtk_toggle_button_set_active(
+			if (i == csel_data->mode) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(button), TRUE);
 			gtk_signal_connect(GTK_OBJECT(button), "toggled",
 				GTK_SIGNAL_FUNC(csel_mode_changed), (gpointer)i);

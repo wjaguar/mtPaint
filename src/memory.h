@@ -74,6 +74,11 @@ int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, lef
 int mem_cselect;
 int mem_unmask;
 
+/// FLOOD FILL SETTINGS
+
+double flood_step;
+int flood_cube, flood_img, flood_slide;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
@@ -333,6 +338,7 @@ void row_protected(int x, int y, int len, unsigned char *mask);
 void put_pixel( int x, int y );					// generic
 png_color get_pixel24( int x, int y );				// RGB version
 int get_pixel( int x, int y );					// generic
+int get_pixel_RGB( int x, int y );				// converter
 void put_pixel24( int x, int y );				// RGB version
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )

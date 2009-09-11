@@ -734,9 +734,10 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
 {
+	int tmp = overlay_alpha;
+
 	if (!rgb) return; /* Paranoia */
 	/* Control transparency separately */
-	int tmp = overlay_alpha;
 	overlay_alpha = opaque_view;
 	/* Always align on background layer */
 	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);

@@ -213,8 +213,10 @@ void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
 
 int do_fx(GtkWidget *spin, gpointer fdata)
 {
+	int i;
+
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
-	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
 	spot_undo(UNDO_FILT);
 	do_effect((int)fdata, i);
 
@@ -2237,7 +2239,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				{
 					spot_undo(UNDO_DRAW);
 					/* Regular fill */
-					if (!tool_pat && (tool_opacity == 255))
+					if (!tool_pat && (tool_opacity == 255) && !flood_step)
 						flood_fill(x, y, j);
 					/* Fill using temp buffer */
 					else flood_fill_pat(x, y, j);

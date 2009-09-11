@@ -49,7 +49,7 @@ int preserved_gif_delay = 10;
 int load_png( char *file_name, int stype )
 {
 	char buf[PNG_BYTES_TO_CHECK], *mess;
-	unsigned char *rgb, *rgb2, *rgb3, *alpha = NULL;
+	unsigned char *rgb, *rgb2, *rgb3, *alpha;
 	int i, row, do_prog, bit_depth, color_type, interlace_type, width, height;
 	FILE *fp;
 	png_bytep *row_pointers, trans;
@@ -115,6 +115,7 @@ int load_png( char *file_name, int stype )
 
 	rgb = NULL;
 	mess = NULL;
+	alpha = NULL;
 	if ( width*height > FILE_PROGRESS ) do_prog = 1;
 	else do_prog = 0;
 
