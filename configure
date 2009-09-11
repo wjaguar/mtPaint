@@ -3,8 +3,8 @@
 
 echo
 
-MT_V="3.02"
-MT_DATE="2006-10-14"
+MT_V="3.08.01"
+MT_DATE="2006-7-4"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -20,58 +20,38 @@ ICON_SET=icons1
 
 GTK_FILE=_conf.txt
 
-CFLAG=
+GIFPATH=/usr/include/gif_lib.h
+JPEGPATH=/usr/include/jpeglib.h
+TIFFPATH=/usr/include/tiffio.h
 MARCH=
 OPTS=YES
 DEBUG=NO
 HELP=1
+OS="GNU/Linux"
 
-if [ "$OSTYPE" == "msys" ]
+if ls $GIFPATH > /dev/null
 then
-	OS="MinGW/MSYS"
-	GTK=2
-	function IS_LIB
-	{
-		redir -e /dev/null ld -$1 -o ____3742.tmp -L/lib >& /dev/null
-	}
+	NGIF=YES
 else
-	OS="GNU/Linux"
-	if pkg-config gtk+-2.0 --cflags > /dev/null
-	then
-		GTK=2
-	else
-		GTK=1
-	fi
-	function IS_LIB
-	{
-		ld -$1 -o /dev/null -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm >& /dev/null
-	}
+	NGIF=NO
 fi
-
-if IS_LIB "lgif"
-then
-	NGIF=GIF
-else
-	if IS_LIB "lungif"
-	then
-		NGIF=YES
-	else
-		NGIF=NO
-	fi
-fi
-
-if IS_LIB "ljpeg"
+if ls $JPEGPATH > /dev/null
 then
 	NJPEG=YES
 else
 	NJPEG=NO
 fi
-
-if IS_LIB "ltiff"
+if ls $TIFFPATH > /dev/null
 then
 	NTIFF=YES
 else
 	NTIFF=NO
+fi
+if pkg-config gtk+-2.0 --cflags > /dev/null
+then
+	GTK=2
+else
+	GTK=1
 fi
 
 for A in "$@"
@@ -87,7 +67,6 @@ do
 				rm -rf slack
 				rm -f *.tgz
 				exit;;
-		"GIF" )		NGIF=GIF;;
 		"gif" )		NGIF=YES;;
 		"nogif" )	NGIF=NO;;
 		"jpeg" )	NJPEG=YES;;
@@ -123,7 +102,6 @@ do
 		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
 				MT_PO_DEST=$MT_LANG_DEST;;
 		"--mandir="* )	MT_MAN_DEST="`echo "$A" | sed -e "s/--mandir=//"`";;
-		"cflags" )	CFLAG=${CFLAGS};;
 		"--cpu="* )	MARCH='-march='"`echo "$A" | sed -e "s/--cpu=//"`";;
 		"icons"* )	ICON_SET=$A;;
 		"386" )		MARCH='-march=i386';;
@@ -144,10 +122,9 @@ do
 				LIN_BIN_INSTALL=/usr/bin
 				MT_CUSTOM=GUADALINEX;;
 		"build" )	./configure flush
-				I_DIR=/home/mark/sf
 				cd ..
-				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V/
-				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V/
+				zip -r /home/mark/sf/mtpaint-$MT_V.zip mtpaint-$MT_V/
+				tar cjvf /home/mark/sf/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V/
 				cd mtpaint-$MT_V
 				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man
 				make
@@ -156,8 +133,10 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk2
-				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
+				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
 				cd ..
+				chown mark /home/mark/sf/mtpaint-*
+				chgrp users /home/mark/sf/mtpaint-*
 				./configure flush
 				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1
 				make
@@ -166,8 +145,10 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
-				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
+				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
 				cd ..
+				chown mark /home/mark/sf/mtpaint-*
+				chgrp users /home/mark/sf/mtpaint-*
 				./configure flush
 				exit;;
 	esac
@@ -184,7 +165,6 @@ then
 	echo "gtk1 ............ Configure for GTK+1"
 	echo "gtk2 ............ Configure for GTK+2"
 	echo
-	echo "cflags .......... Use CFLAGS environment variable"
 	echo "--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64"
 	echo "686 ............. Target 686 machines"
 	echo "586 ............. Target 586 machines"
@@ -192,9 +172,8 @@ then
 	echo "386 ............. Target 386 machines"
 	echo "slow ............ Don't use compiler optimizations"
 	echo
-	echo "GIF ............. Use libgif"
 	echo "gif ............. Use libungif"
-	echo "nogif ........... Don't use libgif and libungif"
+	echo "nogif ........... Don't use libungif"
 	echo "jpeg ............ Use libjpeg"
 	echo "nojpeg .......... Don't use libjpeg"
 	echo "tiff ............ Use libtiff"
@@ -218,6 +197,9 @@ then
 	echo "icons ........... Compile with alternative icon set - see ./src/icons1/README for details"
 	echo
 	echo "Default settings: GNU/Linux system, O2 optimizations, English only version"
+	echo "$GIFPATH is checked to determine GIF availability"
+	echo "$JPEGPATH is checked to determine JPEG availability"
+	echo "$TIFFPATH is checked to determine TIFF availability"
 	echo "pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux"
 else
 	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
@@ -268,14 +250,9 @@ else
 
 	L_EX=
 	I_EX=
-	if [ "$NGIF" != "NO" ]
+	if [ "$NGIF" == "YES" ]
 	then
-		if [ "$NGIF" == "GIF" ]
-		then
-			L_EX="$L_EX -lgif"
-		else
-			L_EX="$L_EX -lungif"
-		fi
+		L_EX="$L_EX -lungif"
 		I_EX="$I_EX -DU_GIF"
 	fi
 	if [ "$NJPEG" == "YES" ]
@@ -321,16 +298,11 @@ else
 	GTK_INCLUDE="$GTK_INCLUDE $I_EX"
 	echo "LDFLAG = $L_EX $GTK_LIB" >> $GTK_FILE
 
-	if [ "$CFLAG" ]
+	if [ "$OPTS" == "YES" ]
 	then
-		echo "CFLAG = $CFLAG $GTK_INCLUDE" >> $GTK_FILE
+		echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
 	else
-		if [ "$OPTS" == "YES" ]
-		then
-			echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
-		else
-			echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
-		fi
+		echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
 	fi
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
@@ -344,11 +316,6 @@ else
 		cd ..
 	fi
 
-	if [ "$OSTYPE" == "msys" ]
-	then
-		rm ____3742.tmp
-	fi
-
 	echo
 	echo
 	echo --------------------------
@@ -359,17 +326,12 @@ else
 	echo
 	echo "GTK+ version        $GTK"
 	echo
-if [ "$CFLAG" ]
-then
-	echo "CFLAGS              $CFLAG"
-else
 if [ "$MARCH" ]
 then
 	echo "MARCH target        $MARCH"
 	echo
 fi
 	echo "Optimizations       $OPTS"
-fi
 	echo
 	echo "Debug info          $DEBUG"
 	echo

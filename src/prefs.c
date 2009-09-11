@@ -37,7 +37,7 @@ static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbut
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit;
-GtkWidget *clipboard_entry;
+static GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
@@ -60,10 +60,10 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 9
+#define PREF_LANGS 8
 
 char	*pref_lang_ini_code[PREF_LANGS] = { "system", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
-		"pl_PL", "pt_PT", "pt_BR", "es_ES" };
+		"pt_PT", "pt_BR", "es_ES" };
 
 GtkWidget *pref_lang_label, *pref_lang_radio[PREF_LANGS];
 
@@ -426,8 +426,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 #ifdef U_NLS
 	int j;
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Czech"), _("English (UK)"),
-		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
-		_("Spanish")
+		_("French"), _("German"), _("Portuguese"), _("Portuguese (Brazilian)"), _("Spanish")
 					};
 	GSList *radio_group;
 #endif

@@ -407,15 +407,15 @@ void csel_reset(csel_info *info)
 }
 
 /* Set center at A, limit at B */
-void csel_init()
+csel_info *csel_init()
 {
 	csel_info *info;
 
-	info = ALIGNTO(calloc(1, sizeof(csel_info) + sizeof(double)), double);
+	info = calloc(1, sizeof(csel_info));
 	if (!info)
 	{
 		memory_errors(1);
-		return;
+		return (NULL);
 	}
 	init_cols();
 	info->center = PNG_2_INT(mem_col_A24);
@@ -424,5 +424,5 @@ void csel_init()
 	info->limit_a = channel_col_B[CHN_ALPHA];
 	info->range = csel_eval(0, info->center, info->limit);
 	csel_reset(info);
-	csel_data = info;
+	return (info);
 }

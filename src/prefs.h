@@ -19,8 +19,6 @@
 
 #include <gtk/gtk.h>
 
-GtkWidget *clipboard_entry;
-
 gboolean tablet_working, tablet_tool_use[3];	// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity
 

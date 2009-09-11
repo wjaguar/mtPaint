@@ -344,13 +344,3 @@ void put_pixel24( int x, int y );				// RGB version
 
 #define mtMIN(a,b,c) if ( b<c ) a=b; else a=c;
 #define mtMAX(a,b,c) if ( b>c ) a=b; else a=c;
-
-/*
- * Win32 libc (MSVCRT.DLL) violates the C standard as to malloc()'ed memory
- * alignment; this macro serves as part of a workaround for that problem
- */
-#ifdef WIN32
-#define ALIGNTO(p,s) ((void *)(((int)(p) + sizeof(s) - 1) & (-sizeof(s))))
-#else
-#define ALIGNTO(p,s) ((void *)(p))
-#endif

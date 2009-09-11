@@ -2874,7 +2874,7 @@ void main_init()
 			NULL},
 	*item_help[] = {_("/Help/About"), NULL},
 	*item_prefs[] = {_("/Image/Preferences ..."), NULL},
-	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Effects/Edge Detect"),
+	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Opacity"), _("/Effects/Edge Detect"),
 			_("/Effects/Blur ..."), _("/Effects/Emboss"), _("/Effects/Sharpen ..."),
 			_("/Effects/Soften ..."), _("/Palette/Create Quantized (DL1)"),
 			_("/Palette/Create Quantized (DL3)"), _("/Palette/Create Quantized (Wu)"),

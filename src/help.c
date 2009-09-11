@@ -28,7 +28,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 3.02 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.00 - Copyright (C) 2004-2006 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -140,10 +140,11 @@ _("\n"
 "  Shift+Ctrl           Constrain mouse movements to horizontal line\n"
 ),
 _("\n"
-"mtPaint is maintained by Dmitry Groshev.\n"
+"mtPaint is maintained by Mark Tyler.\n"
 "\n"
-"wjaguar@mail.ru\n"
+"marktyler_5@hotmail.com\n"
 "http://mtpaint.sourceforge.net/\n"
+"\n"
 "\n"
 "The following people (in alphabetical order) have contributed directly to the project, and are therefore worthy of gracious thanks for their generosity and hard work:\n"
 "\n"
@@ -182,7 +183,6 @@ _("\n"
 "French - Nicolas Velin, Pascal Billard\n"
 "German - Oliver Frommel\n"
 "Portuguese - Israel G. Lugo\n"
-"Polish - Simek\n"
 "Spanish - Guadalinex Team (Junta de Andalucia)\n"
 ),
 NULL };

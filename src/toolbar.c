@@ -353,7 +353,7 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 	case SETB_CSEL:
 		if (mem_cselect && !csel_data)
 		{
-			csel_init();
+			csel_data = csel_init();
 			mem_cselect = !!csel_data;
 		}
 		break;

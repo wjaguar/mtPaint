@@ -2103,7 +2103,6 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
-	char *tmp = NULL;
 
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
@@ -2132,8 +2131,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	if (flood_step && ((mem_channel == CHN_IMAGE) || flood_img))
 	{
 		if (flood_slide) fmode = flood_cube ? 2 : 3;
-		else flood_data = ALIGNTO(tmp = calloc(1, sizeof(csel_info)
-			+ sizeof(double)), double);
+		else flood_data = calloc(1, sizeof(csel_info));
 		if (flood_data)
 		{
 			flood_data->center = get_pixel_RGB(x, y);
@@ -2272,7 +2270,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 			qtail[j] = i;
 	}
 	free(nearq);
-	free(tmp);
+	free(flood_data);
 }
 
 /* Regular flood fill */
@@ -2828,8 +2826,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = rint(nx * s1 + x0y);
-					oy = rint(nx * c1 + y0y);
+					ox = nx * s1 + x0y;
+					oy = nx * c1 + y0y;
 					src = A_rgb;
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
@@ -2848,8 +2846,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[cc] + ny * nw;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = rint(nx * s1 + x0y);
-					oy = rint(nx * c1 + y0y);
+					ox = nx * s1 + x0y;
+					oy = nx * c1 + y0y;
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
 						*dest++ = old_img[cc][oy * ow + ox];
@@ -3003,7 +3001,7 @@ fstep *make_filter(int l0, int l1, int type)
 	double A = 0.0, kk = 1.0, sum;
 	int pic_tile = FALSE; /* Allow to enable tiling mode later */
 	int pic_skip = FALSE; /* Allow to enable skip mode later */
-	int i, j, k, ix;
+	int i, j, k;
 
 
 	/* To correct scale-shift */
@@ -3044,23 +3042,10 @@ fstep *make_filter(int l0, int l1, int type)
 		k = (int)floor(basept + fwidth / 2.0);
 		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
 		{
-			ix = j;
-			if ((j < 0) || (j >= l0))
-			{
-				if (pic_skip) continue;
-				if (pic_tile)
-				{
-					if (ix < 0) ix = l0 - (-ix % l0);
-					ix %= l0;
-				}
-				else if (l0 == 1) ix = 0;
-				else 
-				{
-					ix = abs(ix) % (l0 + l0 - 2);
-					if (ix >= l0) ix = l0 + l0 - 2 - ix;
-				}
-			}
-			buf->idx = ix;
+			if (pic_skip && ((j < 0) || (j >= l0))) continue;
+			if (j < 0) buf->idx = pic_tile ? l0 + j : -j;
+			else if (j < l0) buf->idx = j;
+			else buf->idx = pic_tile ? j - l0 : 2 * (l0 - 1) - j;
 			x = fabs(((double)j - basept) * kk);
 			y = 0;
 			switch (type)
@@ -3119,25 +3104,25 @@ fstep *make_filter(int l0, int l1, int type)
 	return (res);
 }
 
-char *workarea;
+double *work_area;
 fstep *hfilter, *vfilter;
 
 void clear_scale()
 {
-	free(workarea);
+	free(work_area);
 	free(hfilter);
 	free(vfilter);
 }
 
 int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
-	workarea = NULL;
+	work_area = NULL;
 	hfilter = vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
-	workarea = malloc((5 * ow + 1) * sizeof(double));
+	work_area = malloc(5 * ow * sizeof(double));
 	hfilter = make_filter(ow, nw, type);
 	vfilter = make_filter(oh, nh, type);
-	if (!workarea || !hfilter || !vfilter)
+	if (!work_area || !hfilter || !vfilter)
 	{
 		clear_scale();
 		return FALSE;
@@ -3149,11 +3134,9 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 {
 	unsigned char *src, *img, *imga, alpha;
 	fstep *tmp = NULL, *tmpx, *tmpy;
-	double *wrk, *wrka, *work_area;
+	double *wrk, *wrka;
 	double sum[4], kk;
 	int i, j, n, cc, bpp;
-
-	work_area = ALIGNTO(workarea, double);
 
 	/* For each destination line */
 	tmpy = vfilter;
@@ -3278,7 +3261,6 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 	chanlist old_img;
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
-	double scalex, scaley, deltax, deltay;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
@@ -3300,11 +3282,6 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 		do_scale(old_img, mem_img, ow, oh, nw, nh);
 	else
 	{
-		scalex = (double)ow / (double)nw;
-		scaley = (double)oh / (double)nh;
-		deltax = 0.5 * scalex - 0.5;
-		deltay = 0.5 * scaley - 0.5;
-
 		for (j = 0; j < nh; j++)
 		{
 			for (cc = 0; cc < NUM_CHANNELS; cc++)
@@ -3312,11 +3289,11 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 				if (!mem_img[cc]) continue;
 				bpp = BPP(cc);
 				dest = mem_img[cc] + nw * j * bpp;
-				oj = rint(scaley * j + deltay);
+				oj = (oh * j) / nh;
 				src = old_img[cc] + ow * oj * bpp;
 				for (i = 0; i < nw; i++)
 				{
-					oi = (int)rint(scalex * i + deltax) * bpp;
+					oi = ((ow * i) / nw) * bpp;
 					*dest++ = src[oi];
 					if (bpp == 1) continue;
 					*dest++ = src[oi + 1];

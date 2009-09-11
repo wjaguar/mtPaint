@@ -2084,7 +2084,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		if (!csel_data)
 		{
-			csel_init();
+			csel_data = csel_init();
 			if (!csel_data) return;
 		}
 		/* Save previous values */

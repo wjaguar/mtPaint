@@ -4,31 +4,12 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.02	2006-10-14
-
-	* Polish translation added by Simek
-	* Spanish translation updated for version 3
-	* All menu items on all translations updated
-	* Saving compressed GIF files now supported (using libgif)
-	* Library detection in configure script improved
-	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
-	* BUGFIX - Lasso tool now properly handles clipboard alpha
-	* BUGFIX - Clipboard save path now can be changed in Preferences
-	* BUGFIX - XPM files smaller than 4*4 pixels can now be loaded
-
-3.01	2006-7-15
-
-	* German translation updated for version 3
-	* BUGFIX - Memory alignment problems on Windows fixed (might affect speed)
-	* BUGFIX - RGB-specific menu items now properly disabled in indexed mode
-
-3.00	2006-6-21
+3.00	2006-7-4
 
 	* Channels facilities added
 	* Menus & toolbars reworked to be more task oriented
 	* Toolbars can now be toggled on and off via the View menu
 	* Drag 'n' drop from file managers supported for loading new layers
-	* Animation preview has a play toggle
 	* Clicking palette numbers opens up "Palette Editor" window
 	* Paste preview now respects the palette protection mask
 	* Transform Colour Window - Hue control added
@@ -47,7 +28,6 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Saving a composite layer image does not occasionally leave transparent areas
 	* BUGFIX - Transforming colour of palette with preview (RGB images) now works properly
 	* BUGFIX - Status bar now updated after removing all layers
-	* BUGFIX - Scaling image to width/height 1/2 does not cause crash
 
 2.31	2006-5-31
 
