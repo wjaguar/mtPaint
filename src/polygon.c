@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -34,42 +34,51 @@ int poly_mem[MAX_POLY][2];
 int poly_xy[4];
 
 
+static int cmp_spans(const void *span1, const void *span2)
+{
+	return (((int *)span1)[2] - ((int *)span2)[2]);
+}
+
+/* !!! This code clips polygon to image boundaries, and when using buffer
+ * assumes it covers the intersection area - WJ */
 void poly_draw(int filled, unsigned char *buf, int wbuf)
 {
+#define SPAN_STEP 5 /* x0, x1, y0, y1, next */
 	linedata line;
-	int poly_lines[MAX_POLY][2][2], poly_cuts[MAX_POLY];
-	int i, i2, j, j2, j3, cuts, maxx = mem_width, maxy = mem_height;
+	unsigned char borders[MAX_WIDTH];
+	int spans[(MAX_POLY + 1) * SPAN_STEP], *span, *span2;
+	int i, j, k, nspans, y, rxy[4];
 	int oldmode = mem_undo_opacity;
-	float ratio;
+
+
+	/* Intersect image & polygon rectangles */
+	clip(rxy, 0, 0, mem_width - 1, mem_height - 1, poly_xy);
+	// !!! clip() can intersect inclusive rectangles, but not check result
+	if ((rxy[0] > rxy[2]) || (rxy[1] > rxy[3])) return;
+
+	/* Adjust buffer pointer */
+	if (buf) buf -= rxy[1] * wbuf + rxy[0];
 
 	mem_undo_opacity = TRUE;
-	for ( i=0; i<poly_points; i++ )		// Populate poly_lines - smallest Y is first point
+
+	j = poly_points - 1;
+	for (i = 0; i < poly_points; j = i++)
 	{
-		i2 = i+1;
-		if ( i2 >= poly_points ) i2 = 0;	// Remember last point back to 1st point
-
-		if ( poly_mem[i][1] < poly_mem[i2][1] )
-			j = 0;
-		else
-			j = 1;
-
-		poly_lines[i][j][0] = poly_mem[i][0];
-		poly_lines[i][j][1] = poly_mem[i][1];
-		poly_lines[i][1-j][0] = poly_mem[i2][0];
-		poly_lines[i][1-j][1] = poly_mem[i2][1];
+		int x0 = poly_mem[j][0], y0 = poly_mem[j][1];
+		int x1 = poly_mem[i][0], y1 = poly_mem[i][1];
 
 		if (!filled)
 		{
-			f_circle(poly_mem[i][0], poly_mem[i][1], tool_size);
-			tline(poly_mem[i][0], poly_mem[i][1],
-				poly_mem[i2][0], poly_mem[i2][1], tool_size);
+			f_circle(x0, y0, tool_size);
+			tline(x0, y0, x1, y1, tool_size);
 		}
-		else if (!buf) sline(poly_mem[i][0], poly_mem[i][1],
-			poly_mem[i2][0], poly_mem[i2][1]);
+		else if (!buf) sline(x0, y0, x1, y1);
 		else
 		{
-			line_init(line, poly_mem[i][0] - poly_min_x, poly_mem[i][1] - poly_min_y,
-				poly_mem[i2][0] - poly_min_x, poly_mem[i2][1] - poly_min_y);
+			int tk;
+
+			line_init(line, x0, y0, x1, y1);
+			if (line_clip(line, rxy, &tk) < 0) continue;
 			for (; line[2] >= 0; line_step(line))
 			{
 				buf[line[0] + line[1] * wbuf] = 255;
@@ -78,77 +87,87 @@ void poly_draw(int filled, unsigned char *buf, int wbuf)
 		// Outline is needed to properly edge the polygon
 	}
 
-	if (!filled)		// If drawing outline only, finish now
+	if (!filled) goto done;	// If drawing outline only, finish now
+
+	/* Build array of vertical spans */
+	span = spans + SPAN_STEP;
+	j = poly_points - 1;
+	for (i = 0; i < poly_points; j = i++)
 	{
-		mem_undo_opacity = oldmode;
-		return;
+		int x0 = poly_mem[j][0], y0 = poly_mem[j][1];
+		int x1 = poly_mem[i][0], y1 = poly_mem[i][1];
+
+		// No use for horizontal spans
+		if (y0 == y1) continue;
+		// Order points by increasing Y
+		k = y0 > y1;
+		span[k] = x0;
+		span[k + 2] = y0;
+		k ^= 1;
+		span[k] = x1;
+		span[k + 2] = y1;
+		// Check vertical boundaries
+		if ((span[3] <= 0) || (span[2] >= mem_height - 1)) continue;
+		// Accept the span
+		span += SPAN_STEP;
 	}
+	nspans = (span - spans) / SPAN_STEP - 1;
+	if (!nspans) goto done; // No interior to fill
 
-	if ( poly_min_y < 0 ) poly_min_y = 0;		// Vertical clipping
-	if ( poly_max_y >= maxy ) poly_max_y = maxy-1;
+	/* Sort and link spans */
+	qsort(spans + SPAN_STEP, nspans, SPAN_STEP * sizeof(int), cmp_spans);
+	for (i = 0; i < nspans; i++) spans[i * SPAN_STEP + 4] = i + 1;
+	spans[nspans * SPAN_STEP + 4] = 0; // Chain terminator
+	spans[2] = spans[3] = MAX_HEIGHT; // Loops breaker
 
-	for ( j=poly_min_y; j<=poly_max_y; j++ )	// Scanline
+	/* Let's scan! */
+	memset(borders, 0, mem_width);
+	y = spans[SPAN_STEP + 2] + 1;
+	if (y < 0) y = 0;
+	for (; y < mem_height; y++)
 	{
-		cuts = 0;			
-		for ( i=0; i<poly_points; i++ )		// Count up line intersections - X value cuts
+		unsigned char *bp, tv = 0;
+		int i, x, x0 = mem_width, x1 = 0;
+
+		/* Label the intersections */
+		if (!spans[4]) break; // List is empty
+		span = spans;
+		while (TRUE)
 		{
-			if ( j >= poly_lines[i][0][1] && j <= poly_lines[i][1][1] )
+			int dx, dy;
+
+			// Unchain used-up spans
+			while ((span2 = spans + span[4] * SPAN_STEP)[3] < y)
+				span[4] = span2[4];
+			if (y <= span2[2]) break; // Y too small yet
+			span = span2;
+			dx = span[1] - span[0];
+			dy = span[3] - span[2];
+			x = (dx * 2 * (y - span[2]) + dy) / (dy * 2) + span[0];
+			if (x >= mem_width) x1 = mem_width; // Fill to end
+			else
 			{
-				if ( poly_lines[i][0][1] == poly_lines[i][1][1] )
-				{	// Line is horizontal so use each end point as a cut
-					poly_cuts[cuts++] = poly_lines[i][0][0];
-					poly_cuts[cuts++] = poly_lines[i][1][0];
-				}
-				else	// Calculate cut X value - intersection on y=j
-				{
-					ratio = ( (float) j - poly_lines[i][0][1] ) /
-						( poly_lines[i][1][1] - poly_lines[i][0][1] );
-					poly_cuts[cuts++] = poly_lines[i][0][0] +
-						rint(ratio * ( poly_lines[i][1][0] -
-						poly_lines[i][0][0]));
-					if ( j == poly_lines[i][0][1] )	cuts--;
-							// Don't count start point
-				}
-			}
-		}
-		for ( i=cuts-1; i>0; i-- )	// Sort cuts table - the venerable bubble sort
-		{
-			for ( i2=0; i2<i; i2++ )
-			{
-				if ( poly_cuts[i2] > poly_cuts[i2+1] )
-				{
-					j2 = poly_cuts[i2];
-					poly_cuts[i2] = poly_cuts[i2+1];
-					poly_cuts[i2+1] = j2;
-				}
+				if (x < 0) x = 0;
+				if (x0 > x) x0 = x;
+				if (x1 <= x) x1 = x + 1;
+				borders[x] ^= 1;
 			}
 		}
 
-			// Paint from first X to 2nd, gap from 2-3, paint 3-4, gap 4-5 ...
-
-		for ( i=0; i<(cuts-1); i=i+2 )
+		/* Draw the runs */
+		if (x0 >= mem_width) continue; // No pixels
+		bp = buf ? buf + y * wbuf : NULL;
+		for (i = x0; i < x1; i++)
 		{
-			if ( poly_cuts[i] < maxx && poly_cuts[i+1] >= 0 )
-			{
-				if ( poly_cuts[i] < 0 ) poly_cuts[i] = 0;
-				if ( poly_cuts[i] >= maxx ) poly_cuts[i] = maxx-1;
-				if ( poly_cuts[i+1] < 0 ) poly_cuts[i+1] = 0;	// Horizontal Clipping
-				if ( poly_cuts[i+1] >= maxx ) poly_cuts[i+1] = maxx-1;
-
-				if (buf)
-				{
-					j3 = (j - poly_min_y) * wbuf + poly_cuts[i] - poly_min_x;
-					memset(buf + j3, 255, poly_cuts[i + 1] - poly_cuts[i] + 1);
-				}
-				else
-				{
-					for ( i2=poly_cuts[i]; i2<=poly_cuts[i+1]; i2++ )
-						put_pixel( i2, j );
-				}
-			}
+			if (!(tv ^= borders[i])) continue;
+			if (bp) bp[i] = 255;
+			else put_pixel(i, y);
 		}
-	}
-	mem_undo_opacity = oldmode;
+		memset(borders + x0, 0, x1 - x0);
+	}	
+
+done:	mem_undo_opacity = oldmode;
+#undef SPAN_STEP
 }
 
 void poly_mask()	// Paint polygon onto clipboard mask
@@ -292,6 +311,8 @@ void poly_lasso()		// Lasso around current clipboard
 	{
 		x = poly_mem[0][0] - poly_min_x;
 		y = poly_mem[0][1] - poly_min_y;
+		if ((x < 0) || (x >= mem_clip_w) || (y < 0) || (y >= mem_clip_h))
+			x = y = 0; // Point is outside clipboard
 	}
 
 	if ( mem_clip_bpp == 1 )

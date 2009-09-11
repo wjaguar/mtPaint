@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -288,7 +288,6 @@ void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
 
 void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx);
-void fill_rgb(int x, int y, int w, int h, int rgb, rgbcontext *ctx);
 void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx);
 
 void canvas_size(int *w, int *h);	// Get zoomed canvas size

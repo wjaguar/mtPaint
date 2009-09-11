@@ -44,14 +44,12 @@ GtkWidget *label_bar[STATUS_ITEMS];
 
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
-int margin_main_x, margin_main_y,		// Top left of image from top left of canvas
-	margin_view_x, margin_view_y;
+int margin_main_xy[2];				// Top left of image from top left of canvas
+int margin_view_xy[2];
 int zoom_flag;
-int marq_status = MARQUEE_NONE,
-	marq_x1 = -1, marq_y1 = -1, marq_x2 = -1, marq_y2 = -1;		// Selection marquee
+int marq_status = MARQUEE_NONE, marq_xy[4] = { -1, -1, -1, -1 };	// Selection marquee
 int marq_drag_x, marq_drag_y;						// Marquee dragging offset
-int line_status = LINE_NONE,
-	line_x1, line_y1, line_x2, line_y2;				// Line tool
+int line_status = LINE_NONE, line_xy[4];				// Line tool
 int poly_status = POLY_NONE;						// Polygon selection tool
 int clone_x, clone_y;							// Clone offsets
 
@@ -130,12 +128,12 @@ void update_sel_bar()			// Update selection stats on status bar
 
 	else if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
-		w = grad->x2 - grad->x1;
-		h = grad->y2 - grad->y1;
+		w = grad->xy[2] - grad->xy[0];
+		h = grad->xy[3] - grad->xy[1];
 		lang = (180.0 / M_PI) * atan2(w, -h);
 		llen = sqrt(w * w + h * h);
 		snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
-			grad->x1, grad->y1, w, h, lang, llen);
+			grad->xy[0], grad->xy[1], w, h, lang, llen);
 	}
 
 	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
@@ -2187,43 +2185,47 @@ static void poly_update_cache()
 
 void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp line
 {
+	int old[4];
+
 	if (!poly_points || (poly_points >= MAX_POLY)) return;
 	if ((line_x1 == x) && (line_y1 == y)) return;	// This check reduces flicker
 
-	repaint_line(0);
+	copy4(old, line_xy);
 	line_x1 = x;
 	line_y1 = y;
-	line_x2 = poly_mem[poly_points-1][0];
-	line_y2 = poly_mem[poly_points-1][1];
-	repaint_line(2);
+	line_x2 = poly_mem[poly_points - 1][0];
+	line_y2 = poly_mem[poly_points - 1][1];
+	repaint_line(old);
 }
 
 static void poly_conclude()
 {
-	repaint_line(0);
 	if (!poly_points) poly_status = POLY_NONE;
 	else
 	{
 		poly_status = POLY_DONE;
-		marq_x1 = poly_min_x;
-		marq_y1 = poly_min_y;
-		marq_x2 = poly_max_x;
-		marq_y2 = poly_max_y;
+		repaint_line(NULL);
+		check_marquee();
 		paint_poly_marquee(NULL, FALSE);
 	}
 	update_stuff(UPD_PSEL);
 }
 
-static void poly_add_po( int x, int y )
+static void poly_add_po(int x, int y)
 {
 	if (!poly_points) poly_cache.c_zoom = 0; // Invalidate
 	else if (!((x - poly_mem[poly_points - 1][0]) |
 		(y - poly_mem[poly_points - 1][1]))) return; // Never stack
-	repaint_line(0);
 	poly_add(x, y);
-	if ( poly_points >= MAX_POLY ) poly_conclude();
+	if (poly_points >= MAX_POLY) poly_conclude();
 	else
 	{
+		int old[4];
+
+		copy4(old, line_xy);
+		line_x1 = line_x2 = x;
+		line_y1 = line_y2 = y;
+		repaint_line(old);
 		paint_poly_marquee(NULL, FALSE);
 		update_sel_bar();
 	}
@@ -2433,9 +2435,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 				line_x2 = line_x1;
 				line_y2 = line_y1;
-				line_status = LINE_START;
 			}
-			if ( line_status == LINE_NONE ) line_status = LINE_START;
+			line_status = LINE_START;
 		}
 		else stop_line();	// Right button pressed so stop line process
 	}
@@ -2702,42 +2703,25 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 void check_marquee()		// Check marquee boundaries are OK - may be outside limits via arrow keys
 {
-	int i;
-
-	if ( marq_status >= MARQUEE_PASTE )
+	if (marq_status >= MARQUEE_PASTE)
 	{
-		mtMAX( marq_x1, marq_x1, 1-mem_clip_w )
-		mtMAX( marq_y1, marq_y1, 1-mem_clip_h )
-		mtMIN( marq_x1, marq_x1, mem_width-1 )
-		mtMIN( marq_y1, marq_y1, mem_height-1 )
+		marq_x1 = marq_x1 < 1 - mem_clip_w ? 1 - mem_clip_w :
+			marq_x1 > mem_width - 1 ? mem_width - 1 : marq_x1;
+		marq_y1 = marq_y1 < 1 - mem_clip_h ? 1 - mem_clip_h :
+			marq_y1 > mem_height - 1 ? mem_height - 1 : marq_y1;
 		marq_x2 = marq_x1 + mem_clip_w - 1;
 		marq_y2 = marq_y1 + mem_clip_h - 1;
 		return;
 	}
+	/* Reinit marquee from polygon bounds */
+	if (poly_status == POLY_DONE)
+		copy4(marq_xy, poly_xy);
+	else if (marq_status == MARQUEE_NONE) return;
 	/* Selection mode in operation */
-	if ((marq_status != MARQUEE_NONE) || (poly_status == POLY_DONE))
-	{
-		mtMAX( marq_x1, marq_x1, 0 )
-		mtMAX( marq_y1, marq_y1, 0 )
-		mtMAX( marq_x2, marq_x2, 0 )
-		mtMAX( marq_y2, marq_y2, 0 )
-		mtMIN( marq_x1, marq_x1, mem_width-1 )
-		mtMIN( marq_y1, marq_y1, mem_height-1 )
-		mtMIN( marq_x2, marq_x2, mem_width-1 )
-		mtMIN( marq_y2, marq_y2, mem_height-1 )
-	}
-	if ((tool_type == TOOL_POLYGON) && poly_points &&
-		((poly_max_x >= mem_width) || (poly_max_y >= mem_height)))
-	{
-		poly_cache.c_zoom = 0; // Invalidate
-		for (i = 0; i < poly_points; i++)
-		{
-			if (poly_mem[i][0] >= mem_width)
-				poly_max_x = poly_mem[i][0] = mem_width - 1;
-			if (poly_mem[i][1] >= mem_height)
-				poly_max_y = poly_mem[i][1] = mem_height - 1;
-		}
-	}
+	marq_x1 = marq_x1 < 0 ? 0 : marq_x1 >= mem_width ? mem_width - 1 : marq_x1;
+	marq_x2 = marq_x2 < 0 ? 0 : marq_x2 >= mem_width ? mem_width - 1 : marq_x2;
+	marq_y1 = marq_y1 < 0 ? 0 : marq_y1 >= mem_height ? mem_height - 1 : marq_y1;
+	marq_y2 = marq_y2 < 0 ? 0 : marq_y2 >= mem_height ? mem_height - 1 : marq_y2;
 }
 
 void get_visible(int *vxy)
@@ -2770,15 +2754,6 @@ void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
 	}
 }
 
-
-static int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
-{
-	rxy[0] = x0 < vxy[0] ? vxy[0] : x0;
-	rxy[1] = y0 < vxy[1] ? vxy[1] : y0;
-	rxy[2] = x1 > vxy[2] ? vxy[2] : x1;
-	rxy[3] = y1 > vxy[3] ? vxy[3] : y1;
-	return ((rxy[2] > rxy[0]) && (rxy[3] > rxy[1]));
-}
 
 static void repaint_clipped(int x0, int y0, int x1, int y1, const int *vxy)
 {
@@ -2953,11 +2928,9 @@ void refresh_marquee(rgbcontext *ctx)
 	cxy[0] = cxy[1] = 0;
 	canvas_size(cxy + 2, cxy + 3);
 	get_visible(vxy);
-	++vxy[2]; ++vxy[3];
-	if (clip(vxy, (ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x,
-		(ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y,
-		(ctx->x1 < vxy[2] ? ctx->x1 : vxy[2]) - margin_main_x,
-		(ctx->y1 < vxy[3] ? ctx->y1 : vxy[3]) - margin_main_y, cxy))
+	clip(vxy, vxy[0], vxy[1], vxy[2] + 1, vxy[3] + 1, ctx->xy);
+	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+		vxy[2] - margin_main_x, vxy[3] - margin_main_y, cxy))
 		trace_marquee(1, 0, 0, vxy, ctx);
 }
 
@@ -2968,110 +2941,173 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
-#define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
-void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx)
-{
-	int vxt[4];
-	int i, j, x, y, tx, ty, aw, ah, ax = 0, ay = 0, cf = 0;
-	int rgb = 0, zoom = 1, scale = 1;
-	linedata line;
 
+static void line_get_xy(int xy[4], linedata line, int y1)
+{
+	int k, x0, x1, y;
+
+	xy[1] = y = line[1];
+	x0 = x1 = line[0];
+	while ((line[1] < y1) && (line_step(line) >= 0))
+		x1 = line[0] , y = line[1];
+	xy[3] = y;
+	k = (x0 > x1) * 2; xy[k] = x0; xy[k ^ 2] = x1;
+}
+
+static void repaint_xy(int xy[4], int scale)
+{
+	repaint_canvas(margin_main_x + xy[0] * scale, margin_main_y + xy[1] * scale,
+		(xy[2] - xy[0] + 1) * scale, (xy[3] - xy[1] + 1) * scale);
+}
+
+// !!! For now, this function is hardcoded to merge 2 areas
+static int merge_xy(int cnt, int *xy, int step)
+{
+	if ((xy[0 + 0] > xy[4 + 2] + step + 1) ||
+		(xy[4 + 0] > xy[0 + 2] + step + 1)) return (2);
+	if (xy[0 + 0] > xy[4 + 0]) xy[0 + 0] = xy[4 + 0];
+	if (xy[0 + 1] > xy[4 + 1]) xy[0 + 1] = xy[4 + 1];
+	if (xy[0 + 2] < xy[4 + 2]) xy[0 + 2] = xy[4 + 2];
+	if (xy[0 + 3] < xy[4 + 3]) xy[0 + 3] = xy[4 + 3];
+	return (1);
+}
+
+/* Only 2 line-quads for now, but will be extended to 4 for line-join drag */
+static void refresh_lines(int flip, const int xy0[4], const int xy1[4])
+{
+	linedata ll1, ll2;
+	int ixy[4], getxy[8], *lines[2] = { ll1, ll2 };
+	int i, j, k, y, y1, y2, cnt, step, zoom = 1, scale = 1;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0)
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	get_visible(ixy);
+	for (k = 0; k < 4; k++)
+		ixy[k] = floor_div(ixy[k] - margin_main_xy[k & 1], scale);
+
+	flip = flip ? 2 : 0;
+	k = flip ^ 2;
+	for (i = j = 0; j < 2; j++)
 	{
-		zoom = rint(1.0 / can_zoom);
-		lx1 = floor_div(lx1, zoom);
-		ly1 = floor_div(ly1, zoom);
-		lx2 = floor_div(lx2, zoom);
-		ly2 = floor_div(ly2, zoom);
- 	}
-	else if (can_zoom > 1.0)
-	{
-		scale = rint(can_zoom);
-		for (i = 0; i < 4; i++) vxt[i] = floor_div(vxy[i], scale);
-		vxy = vxt;
+		const int *xy;
+		int tmp;
+
+		xy = j ? xy1 : xy0;
+		if (!xy) continue;
+		line_init(lines[i],
+			floor_div(xy[flip], zoom), floor_div(xy[flip + 1], zoom),
+			floor_div(xy[k], zoom), floor_div(xy[k + 1], zoom));
+		if (line_clip(lines[i], ixy, &tmp) < 0) continue;
+		if (lines[i][9] < 0) line_flip(lines[i]);
+		i++;
 	}
 
-	line_init(line, lx1, ly1, lx2, ly2); i = line[2];
-	if (line_clip(line, vxy, &j) < 0) return;
-	for (i -= j; line[2] >= 0; line_step(line) , i--)
+	step = scale < 8 ? (16 + scale - 1) / scale : 2;
+	for (cnt = i , y1 = ixy[1]; cnt; y1 += step)
 	{
-		x = (tx = line[0]) * scale;
-		y = (ty = line[1]) * scale;
-
-		if (mode != 0) /* Show a line */
+		y2 = ixy[3] + 1;
+		for (j = i = 0; i < cnt; i++)
 		{
-			if (mode == 1) /* Drawing */
+			y = lines[i][1];
+			if (lines[i][2] < 0) // Remove used-up line
 			{
-				j = ((ty & 7) * 8 + (tx & 7)) * 3;
-				rgb = MEM_2_INT(mem_col_pat24, j);
+				lines[i--] = lines[--cnt];
 			}
-			else if (mode == 2) /* Tracking */
+			else if (y >= y1) // Remember not-yet-started line
 			{
-				rgb = ((i >> 2) & 1) * 0xFFFFFF;
+				if (y2 > y) y2 = y;
 			}
-			else if (mode == 3) /* Gradient */
-			{
-				rgb = ((i >> 2) & 1) * 0xFFFFFF ^
-					((i >> 1) & 1) * 0x00FF00;
-			}
-// !!! This is slow as molasses on Win32 (or Win98SE at least) when unbuffered
-			fill_rgb(margin_main_x + x, margin_main_y + y,
-				scale, scale, rgb, ctx);
-			continue;
+			else line_get_xy(getxy + j++ * 4, lines[i], y1);
 		}
-
-		/* Doing a clear */
-		if (!cf) ax = x , ay = y , cf = 1; // Start a new rectangle
-
-		/* Redraw now or wait some more? */
-		aw = scale + abs(x - ax);
-		ah = scale + abs(y - ay);
-		if ((aw < MIN_REDRAW) && (ah < MIN_REDRAW) && line[2]) continue;
-
-		/* Commit canvas clear if >16 pixels or final pixel of this line */
-		repaint_canvas(margin_main_x + (ax < x ? ax : x),
-			margin_main_y + (ay < y ? ay : y), aw, ah);
-		cf = 0;
+		if (j)
+		{
+			if (j > 1) j = merge_xy(j, getxy, step);
+			for (i = 0; i < j; i++)
+				repaint_xy(getxy + i * 4, scale);
+		}
+		else y1 = y2;
 	}
 }
 
-void repaint_line(int mode)			// Repaint or clear line on canvas
+static void render_line(int mode, linedata line, int ofs, rgbcontext *ctx)
 {
-	int vxy[4];
+	int rxy[4], cxy[4];
+	int i, j, x, y, tx, ty, w3, rgb = 0, scale = 1;
 
-	get_visible(vxy);
-// !!! This assumes that if there's clipping, then there aren't margins
-	trace_line(mode, line_x1, line_y1, line_x2, line_y2, vxy, NULL);
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom > 1.0) scale = rint(can_zoom);
+
+	copy4(cxy, ctx->xy);
+	w3 = (cxy[2] - cxy[0]) * 3;
+	for (i = ofs; line[2] >= 0; line_step(line) , i--)
+	{
+		x = (tx = line[0]) * scale + margin_main_x;
+		y = (ty = line[1]) * scale + margin_main_y;
+
+		if (mode == 1) /* Drawing */
+		{
+			j = ((ty & 7) * 8 + (tx & 7)) * 3;
+			rgb = MEM_2_INT(mem_col_pat24, j);
+		}
+		else if (mode == 2) /* Tracking */
+		{
+			rgb = ((i >> 2) & 1) * 0xFFFFFF;
+		}
+		else if (mode == 3) /* Gradient */
+		{
+			rgb = ((i >> 2) & 1) * 0xFFFFFF ^
+				((i >> 1) & 1) * 0x00FF00;
+		}
+		if (clip(rxy, x, y, x + scale, y + scale, cxy))
+		{
+			unsigned char *dest, *tmp;
+			int i, h;
+
+			tmp = dest = ctx->rgb + (rxy[1] - cxy[1]) * w3 +
+				(rxy[0] - cxy[0]) * 3;
+			*tmp++ = INT_2_R(rgb);
+			*tmp++ = INT_2_G(rgb);
+			*tmp++ = INT_2_B(rgb);
+			for (i = (rxy[2] - rxy[0] - 1) * 3; i; i-- , tmp++)
+				*tmp = *(tmp - 3);
+			tmp = dest;
+			for (h = rxy[3] - rxy[1] - 1; h; h--)
+			{
+				dest += w3;
+				memcpy(dest, tmp, w3);
+			}
+		}
+	}
 }
 
-void repaint_grad(int mode)
+void repaint_grad(const int *old)
 {
-	grad_info *grad = gradient + mem_channel;
-	int vxy[4], oldgrad = grad->status;
-
-	if (mode) mode = 3;
-	else grad->status = GRAD_NONE; /* To avoid hitting repaint */
-
-	get_visible(vxy);
-	vxy[0] -= margin_main_x; vxy[1] -= margin_main_y;
-	vxy[2] -= margin_main_x; vxy[3] -= margin_main_y;
-	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1, vxy, NULL);
-	grad->status = oldgrad;
+	refresh_lines(TRUE, gradient[mem_channel].xy, old);
 }
 
-void refresh_grad(rgbcontext *ctx)
+void repaint_line(const int *old)
 {
-	grad_info *grad = gradient + mem_channel;
-	int vxy[4];
+	refresh_lines(FALSE, line_xy, old);
+}
 
-	get_visible(vxy);
-	vxy[0] = (ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x;
-	vxy[1] = (ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y;
-	vxy[2] = (ctx->x1 <= vxy[2] ? ctx->x1 - 1 : vxy[2]) - margin_main_x;
-	vxy[3] = (ctx->y1 <= vxy[3] ? ctx->y1 - 1 : vxy[3]) - margin_main_y;
-	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1, vxy, ctx);
+/* lxy is ctx's bounds scaled to "line space" (unchanged for zoom < 0, image
+ * coordinates otherwise) */
+void refresh_line(int mode, const int *lxy, rgbcontext *ctx)
+{
+	linedata line;
+	int *xy = line_xy;
+	int i, j, k = 0, zoom = 1;
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+
+	if (mode == 3) xy = gradient[mem_channel].xy , k = 2;
+	line_init(line, floor_div(xy[k], zoom), floor_div(xy[k + 1], zoom),
+		floor_div(xy[k ^ 2], zoom), floor_div(xy[(k ^ 2) + 1], zoom));
+	i = line[2];
+	if (line_clip(line, lxy, &j) >= 0) render_line(mode, line, i - j, ctx);
 }
 
 void update_recent_files()			// Update the menu items

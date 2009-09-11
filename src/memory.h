@@ -145,7 +145,7 @@ typedef struct {
 
 typedef struct {
 	/* Base values */
-	int status, x1, y1, x2, y2;	// Gradient placement tool
+	int status, xy[4];	// Gradient placement tool
 	int len, rep, ofs;	// Gradient length, repeat, and offset
 	int gmode, rmode;	// Gradient mode and repeat mode
 	/* Derived values */
@@ -369,6 +369,14 @@ static inline int floor_div(int dd, int dr)
 	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
 }
 
+/// Copying "x0y0x1y1" quad
+
+static inline void copy4(int *dest, int *src)
+{
+	dest[0] = src[0]; dest[1] = src[1];
+	dest[2] = src[2]; dest[3] = src[3];
+}
+
 /// Multiblock allocator
 
 void *multialloc(int align, void *ptr, int size, ...);
@@ -376,6 +384,9 @@ void *multialloc(int align, void *ptr, int size, ...);
 /// Vectorized low-level drawing function
 
 void (*put_pixel)(int x, int y);
+
+	// Intersect two rectangles
+int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy);
 
 	// Intersect outer & inner rectangle, write out what it separates into
 int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi);
@@ -388,7 +399,8 @@ typedef int linedata[10];
 void line_init(linedata line, int x0, int y0, int x1, int y1);
 int line_step(linedata line);
 void line_nudge(linedata line, int x, int y);
-int line_clip(linedata line, int *vxy, int *step);
+int line_clip(linedata line, const int *vxy, int *step);
+void line_flip(linedata line);
 
 /// Procedures
 

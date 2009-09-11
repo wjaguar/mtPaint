@@ -4,19 +4,19 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.31	2009-4-15
+3.35	2009-?-?
+
+	Eliminated flicker when positioning line, polygon side, or gradient in Windows version
+
+3.31	2009-?-?
 
 	* Japanese translation updated by Norihiro YONEDA
-	* Swedish translation updated by Daniel Nylander and Fredrik Forsmo
-	* French translation updated by Plume
+	* Swedish translation updated by Daniel Nylander
 	* Builtin file selector uses stock file and directory icons on GTK+2
-	* Default settings are loaded from file /etc/mtpaint/mtpaintrc if it exists
 	* BUGFIX - Compilation with GTK+ colour selector now works
 	* BUGFIX - Escape key now works properly in builtin file selector in GTK+1
-	* BUGFIX - Filename length in builtin file selector no longer is limited to 100 characters
 	* BUGFIX - Resizing the canvas window now doesn't cause polygon marquee to slide out of place
 	* BUGFIX - Polygon marquee shrunk by resizing the canvas is now redrawn properly
-	* BUGFIX - Problem with message windows not responding to mouse in some cases is now eliminated
 
 3.30	2009-2-12
 

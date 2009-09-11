@@ -26,7 +26,7 @@
 ///	Generic RGB buffer
 
 typedef struct {
-	int x0, y0, x1, y1;
+	int xy[4];
 	unsigned char *rgb;
 } rgbcontext;
 
@@ -166,10 +166,6 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 void clist_enable_drag(GtkWidget *clist);
 
-// Move browse-mode selection in GtkCList without invoking callbacks
-
-void clist_reselect_row(GtkCList *clist, int n);
-
 // Properly destroy transient window
 
 void destroy_dialog(GtkWidget *window);
@@ -295,10 +291,6 @@ GtkWidget *xpm_image(char **xpm);
 GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 	GdkBitmap **mask);
 #endif
-
-// Release outstanding pointer grabs
-
-int release_grab();
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

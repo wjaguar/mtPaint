@@ -18,17 +18,32 @@
 */
 
 float can_zoom;						// Zoom factor 1..MAX_ZOOM
-int margin_main_x, margin_main_y,			// Top left of image from top left of canvas
-	margin_view_x, margin_view_y;
+int margin_main_xy[2];					// Top left of image from top left of canvas
+int margin_view_xy[2];
 int zoom_flag;
-int marq_status, marq_x1, marq_y1, marq_x2, marq_y2;	// Selection marquee
+int marq_status, marq_xy[4];				// Selection marquee
 int marq_drag_x, marq_drag_y;				// Marquee dragging offset
-int line_status, line_x1, line_y1, line_x2, line_y2;	// Line tool
+int line_status, line_xy[4];				// Line tool
 int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
 int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
 
+#define margin_main_x margin_main_xy[0]
+#define margin_main_y margin_main_xy[1]
+
+#define margin_view_x margin_view_xy[0]
+#define margin_view_y margin_view_xy[1]
+
+#define marq_x1 marq_xy[0]
+#define marq_y1 marq_xy[1]
+#define marq_x2 marq_xy[2]
+#define marq_y2 marq_xy[3]
+
+#define line_x1 line_xy[0]
+#define line_y1 line_xy[1]
+#define line_x2 line_xy[2]
+#define line_y2 line_xy[3]
 
 #define STATUS_ITEMS 5
 #define STATUS_GEOMETRY 0
@@ -161,10 +176,9 @@ void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();
 void commit_paste(int swap, int *update);
 
-void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx);
-void repaint_line(int mode);			// Repaint or clear line on canvas
-void repaint_grad(int mode);			// Same for gradient line
-void refresh_grad(rgbcontext *ctx);		// Refresh a part of gradient line
+void repaint_grad(const int *old);		// Repaint gradient line and maybe clear old one
+void repaint_line(const int *old);		// Repaint line on canvas and maybe clear old one
+void refresh_line(int mode, const int *lxy, rgbcontext *ctx);	// Refresh a part of line/gradient if needed
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
 

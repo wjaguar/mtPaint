@@ -6,21 +6,21 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
-"Report-Msgid-Bugs-To: FULL NAME <EMAIL@ADDRESS>\n"
-"POT-Creation-Date: 2009-02-13 21:54+0300\n"
-"PO-Revision-Date: 2009-04-12 20:32+0000\n"
-"Last-Translator: Fredrik Forsmo <fredrik.forsmo@gmail.com>\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2009-02-15 16:36+0300\n"
+"PO-Revision-Date: 2009-02-13 14:54+0000\n"
+"Last-Translator: Daniel Nylander <yeager@ubuntu.com>\n"
 "Language-Team: Swedish <sv@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2009-04-13 19:56+0000\n"
+"X-Launchpad-Export-Date: 2009-02-14 18:20+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Rosetta-Version: 0.1\n"
 
 #: src/ani.c:676
 msgid "Animation Preview"
-msgstr "Animation Förhandsgranska"
+msgstr ""
 
 #: src/ani.c:685 src/shifter.c:307
 msgid "Play"
@@ -72,7 +72,7 @@ msgstr "OK"
 
 #: src/ani.c:816
 msgid "Creating Animation Frames"
-msgstr "Skapa Animation Ramar"
+msgstr ""
 
 #: src/ani.c:864
 msgid "Unable to save image"
@@ -89,8 +89,6 @@ msgid ""
 "Do you really want to clear all of the position and cycle data for all of "
 "the layers?"
 msgstr ""
-"Vill du verkligen radera alla i position och cykel uppgifter för alla i "
-"lager?"
 
 #: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:816
 #: src/mainwindow.c:308
@@ -104,7 +102,7 @@ msgstr "Ja"
 
 #: src/ani.c:1000
 msgid "Set Key Frame"
-msgstr "Ställ Nyckel Ram"
+msgstr ""
 
 #: src/ani.c:1045
 msgid "You must have at least 2 layers to create an animation"
@@ -120,7 +118,7 @@ msgstr "Konfigurera animering"
 
 #: src/ani.c:1074
 msgid "Output Files"
-msgstr "Utdatafiler"
+msgstr ""
 
 #: src/ani.c:1077
 msgid "Start frame"
@@ -136,7 +134,7 @@ msgstr "Fördröjning"
 
 #: src/ani.c:1081
 msgid "Output path"
-msgstr "Produktionens väg"
+msgstr ""
 
 #: src/ani.c:1082
 msgid "File prefix"
@@ -144,7 +142,7 @@ msgstr "Filprefix"
 
 #: src/ani.c:1110
 msgid "Create GIF frames"
-msgstr "Skapa GIF ramar"
+msgstr ""
 
 #: src/ani.c:1116
 msgid "Positions"
@@ -165,7 +163,7 @@ msgstr "Förhandsvisa"
 
 #: src/ani.c:1172 src/shifter.c:337
 msgid "Create Frames"
-msgstr "Skapa Ramar"
+msgstr ""
 
 #: src/canvas.c:339
 msgid "The image is too large to transform."
@@ -201,23 +199,23 @@ msgstr "Laplace"
 
 #: src/canvas.c:370
 msgid "Morphological"
-msgstr "Morfologiska"
+msgstr ""
 
 #: src/canvas.c:375
 msgid "Edge Detect"
-msgstr "Kant upptäckt"
+msgstr ""
 
 #: src/canvas.c:393
 msgid "Edge Sharpen"
-msgstr "Kant shärpan"
+msgstr ""
 
 #: src/canvas.c:399
 msgid "Edge Soften"
-msgstr "Kant soft"
+msgstr ""
 
 #: src/canvas.c:451
 msgid "Different X/Y"
-msgstr "Skillnad X/Y"
+msgstr ""
 
 #: src/canvas.c:455 src/memory.c:6935
 msgid "Gaussian Blur"
@@ -253,7 +251,7 @@ msgstr "Normalisera"
 
 #: src/canvas.c:541 src/memory.c:7261
 msgid "Difference of Gaussians"
-msgstr "Skillnad i Gaussians"
+msgstr ""
 
 #: src/canvas.c:567
 msgid "Kuwahara-Nagao Blur"
@@ -269,7 +267,7 @@ msgstr "Mjuk"
 
 #: src/canvas.c:642
 msgid "Free Rotate"
-msgstr "Fri Rotera"
+msgstr ""
 
 #: src/canvas.c:900 src/viewer.c:1341
 msgid "Not enough memory to create clipboard"
@@ -323,11 +321,11 @@ msgstr "JA"
 
 #: src/canvas.c:1449 src/prefs.c:415
 msgid "Transparency index"
-msgstr "Genomsilningt index"
+msgstr ""
 
 #: src/canvas.c:1449 src/prefs.c:416
 msgid "JPEG Save Quality (100=High)"
-msgstr "JPEG Sparad kvalitet(100=Högt)"
+msgstr ""
 
 #: src/canvas.c:1450 src/prefs.c:417
 msgid "PNG Compression (0=None)"
@@ -343,7 +341,7 @@ msgstr "JPEG2000-komprimering (0=förlustfri)"
 
 #: src/canvas.c:1452
 msgid "Hotspot at X ="
-msgstr "Hotspot på X ="
+msgstr ""
 
 #: src/canvas.c:1452
 msgid "Y ="
@@ -355,11 +353,11 @@ msgstr "Filformat"
 
 #: src/canvas.c:1562 src/otherwindow.c:302
 msgid "Undoable"
-msgstr "Ångras"
+msgstr ""
 
 #: src/canvas.c:1583
 msgid "Animation delay"
-msgstr "Animation dröjsmål"
+msgstr ""
 
 #: src/canvas.c:1810
 #, c-format
@@ -368,7 +366,7 @@ msgstr "Fil: %s ogiltig - paletten inte uppdaterad"
 
 #: src/canvas.c:1838
 msgid "Unable to export undo images"
-msgstr "Det går inte att exportera ångrade bilder"
+msgstr ""
 
 #: src/canvas.c:1844
 msgid "Unable to export ASCII file"
@@ -397,11 +395,11 @@ msgstr "Spara palettfil"
 
 #: src/canvas.c:1985
 msgid "Export Undo Images"
-msgstr "Exportera ångrade bilder"
+msgstr ""
 
 #: src/canvas.c:1989
 msgid "Export Undo Images (reversed)"
-msgstr "Exportera Ångrade Bilder (omvänd)"
+msgstr ""
 
 #: src/canvas.c:1994
 msgid "You must have 16 or fewer palette colours to export ASCII art."
@@ -418,7 +416,7 @@ msgstr "Spara lagerfiler"
 
 #: src/canvas.c:2005
 msgid "Import GIF animation - Choose frames directory"
-msgstr "Importera GIF animation - Välj ram mapp"
+msgstr ""
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -438,7 +436,7 @@ msgstr "Spara kanal"
 
 #: src/canvas.c:2025
 msgid "Save Composite Image"
-msgstr "Spara Komposit Bild"
+msgstr ""
 
 #: src/channels.c:236
 msgid "Cleared"
@@ -450,23 +448,23 @@ msgstr "Ange"
 
 #: src/channels.c:238
 msgid "Set colour A radius B"
-msgstr "Sätt färg A radie B"
+msgstr ""
 
 #: src/channels.c:239
 msgid "Set blend A to B"
-msgstr "Ställ blandning A till B"
+msgstr ""
 
 #: src/channels.c:240
 msgid "Image Red"
-msgstr "Bild Röd"
+msgstr ""
 
 #: src/channels.c:241
 msgid "Image Green"
-msgstr "Bild Grön"
+msgstr ""
 
 #: src/channels.c:242
 msgid "Image Blue"
-msgstr "Bild Blå"
+msgstr ""
 
 #: src/channels.c:244 src/mainwindow.c:1093
 msgid "Alpha"
@@ -511,7 +509,7 @@ msgstr "Ta bort kanaler"
 
 #: src/channels.c:377
 msgid "Threshold Channel"
-msgstr "Tröskel Kanal"
+msgstr ""
 
 #: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
 #: src/toolbar.c:298
@@ -736,8 +734,8 @@ msgid "Credits"
 msgstr "Tack till"
 
 #: src/help.c:32
-msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.31 - Copyright © 2004-2009 Upphovsmännen\n"
+msgid "mtPaint 3.30 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.30 - Copyright © 2004-2009 Upphovsmännen\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -920,8 +918,7 @@ msgid "  Ctrl-L            Draw an ellipse spanning the selection area"
 msgstr ""
 
 #: src/help.c:66
-msgid ""
-"  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
+msgid "  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
 msgstr ""
 
 #: src/help.c:67
@@ -1340,8 +1337,8 @@ msgid "Dutch - Hans Strijards"
 msgstr "Nederländska - Hans Strijards"
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
-msgstr "Franska - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
+msgstr "Franska - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
@@ -1388,8 +1385,8 @@ msgstr ""
 "Anxo Bouzada, Francisco Jose Rey"
 
 #: src/help.c:169
-msgid "Swedish - Daniel Nylander, Fredrik Forsmo"
-msgstr "Svenska - Daniel Nylander, Fredrik Forsmo"
+msgid "Swedish - Daniel Nylander"
+msgstr "Svenska - Daniel Nylander"
 
 #: src/help.c:170
 msgid "Taiwanese Chinese - Wei-Lun Chao"
@@ -1409,11 +1406,11 @@ msgstr "Minne"
 
 #: src/info.c:309
 msgid "Total memory for main + undo images"
-msgstr "Totalt minne viktigaste + ångrade bilder"
+msgstr ""
 
 #: src/info.c:322
 msgid "Undo / Redo / Max levels used"
-msgstr "Ångra / Redo / Maximal level använd"
+msgstr ""
 
 #: src/info.c:326 src/otherwindow.c:3162 src/png.c:532 src/png.c:725
 msgid "Clipboard"
@@ -1435,7 +1432,7 @@ msgstr "Urklipp = %i x %i x RGB"
 
 #: src/info.c:342
 msgid "Unique RGB pixels"
-msgstr "Unika RGB pixlar"
+msgstr ""
 
 #: src/info.c:355 src/layer.c:154
 msgid "Layers"
@@ -1443,7 +1440,7 @@ msgstr "Lager"
 
 #: src/info.c:359
 msgid "Total layer memory usage"
-msgstr "Totalt lager minnesanvändningen"
+msgstr ""
 
 #: src/info.c:366
 msgid "Colour Histogram"
@@ -1452,7 +1449,7 @@ msgstr "Färghistogram"
 #: src/info.c:388
 #, c-format
 msgid "Colour index totals - %i of %i used"
-msgstr "Färgindexnummer totalbeloppen - %i av %i används"
+msgstr ""
 
 #: src/info.c:407
 msgid "Index"
@@ -1679,11 +1676,11 @@ msgstr "/Arkiv/sep1"
 
 #: src/mainwindow.c:4418
 msgid "/File/Export Undo Images ..."
-msgstr "/Arkiv/Export Ångrade Bilder ..."
+msgstr "/Arkiv/Export Undo Images ..."
 
 #: src/mainwindow.c:4419
 msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/Arkiv/Export Ångrade Bilder (omvänd) ..."
+msgstr "/Arkiv/Export Undo Images (reversed) ..."
 
 #: src/mainwindow.c:4420
 msgid "/File/Export ASCII Art ..."

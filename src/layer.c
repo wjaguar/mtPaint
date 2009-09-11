@@ -1079,7 +1079,7 @@ static GtkWidget *layer_toolbar(GtkWidget **wlist)
 void pressed_layers()
 {
 	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
-	GtkAccelGroup* ag;
+	GtkAccelGroup* ag = gtk_accel_group_new();
 	char txt[32];
 	int i;
 
@@ -1194,7 +1194,6 @@ void pressed_layers()
 	pack(vbox, sig_toggle(_("Show all layers in main window"),
 		show_layers_main, NULL, GTK_SIGNAL_FUNC(layer_main_toggled)));
 
-	ag = gtk_accel_group_new();
 	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
 		GDK_Escape, 0, (GtkAccelFlags) 0);
 

@@ -3353,6 +3353,16 @@ void mem_invert()			// Invert the palette
 	}
 }
 
+/* !!! The rectangles here exclude bottom & right border */
+int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
+{
+	rxy[0] = x0 < vxy[0] ? vxy[0] : x0;
+	rxy[1] = y0 < vxy[1] ? vxy[1] : y0;
+	rxy[2] = x1 > vxy[2] ? vxy[2] : x1;
+	rxy[3] = y1 > vxy[3] ? vxy[3] : y1;
+	return ((rxy[2] > rxy[0]) && (rxy[3] > rxy[1]));
+}
+
 /* Intersect outer & inner rectangle, write out 1 to 5 rectangles the outer one
  * separates into, return number of outer rectangles */
 int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi)
@@ -3426,7 +3436,8 @@ void line_nudge(linedata line, int x, int y)
 		line_step(line);
 }
 
-int line_clip(linedata line, int *vxy, int *step)
+/* !!! The clipping rectangle here includes both borders */
+int line_clip(linedata line, const int *vxy, int *step)
 {
 	int vh = !line[6], hv = vh ^ 1, hs = line[8 + vh], vs = line[8 + hv];
 	int dh = hs < 0, dv = vs < 0, l4 = line[4], steps[2];
@@ -3462,6 +3473,20 @@ int line_clip(linedata line, int *vxy, int *step)
 	j = steps[1] - dx - 1;
 	if (j < line[2]) line[2] = j;
 	return (line[2]);
+}
+
+void line_flip(linedata line)
+{
+	int l, d2;
+
+	if (!line[2]) return; // Single point
+	l = line[4] * line[2] + line[5] - line[3];
+	d2 = l / line[5];
+	line[3] = l - d2 * line[5] + 1;
+	line[0] += line[2] * line[6] + d2 * (line[8] - line[6]);
+	line[1] += line[2] * line[7] + d2 * (line[9] - line[7]);
+	line[6] *= -1; line[7] *= -1;
+	line[8] *= -1; line[9] *= -1;
 }
 
 /* Produce a horizontal segment from two connected lines */
@@ -7947,7 +7972,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 	}
 	else
 	{
-		int dx = x - grad->x1, dy = y - grad->y1;
+		int dx = x - grad->xy[0], dy = y - grad->xy[1];
 
 		switch (grad->wmode)
 		{
@@ -8046,7 +8071,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 void grad_update(grad_info *grad)
 {
 	double len, len1, l2;
-	int dx = grad->x2 - grad->x1, dy = grad->y2 - grad->y1;
+	int dx = grad->xy[2] - grad->xy[0], dy = grad->xy[3] - grad->xy[1];
 
 	/* Distance for gradient mode */
 	grad->wmode = grad->gmode;

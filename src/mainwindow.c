@@ -128,6 +128,7 @@ int	show_menu_icons, paste_commit;
 int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
+static int mouse_left_canvas;
 
 static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
 
@@ -732,8 +733,10 @@ static void move_mouse(int dx, int dy, int button)
 
 void stop_line()
 {
-	if ( line_status != LINE_NONE ) repaint_line(0);
+	int i = line_status == LINE_LINE;
+
 	line_status = LINE_NONE;
+	if (i) repaint_line(NULL);
 }
 
 int check_zoom_keys_real(int act_m)
@@ -1001,7 +1004,7 @@ static void draw_arrow(int mode)
 	int oldmode = mem_undo_opacity;
 
 
-	if (!((tool_type == TOOL_LINE) && (line_status > LINE_NONE) &&
+	if (!((tool_type == TOOL_LINE) && (line_status != LINE_NONE) &&
 		((line_x1 != line_x2) || (line_y1 != line_y2)))) return;
 
 	// Calculate 2 coords for arrow corners
@@ -1162,7 +1165,7 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 
 int grad_tool(int event, int x, int y, guint state, guint button)
 {
-	int i, j, *xx, *yy;
+	int i, j, old[4];
 	double d, stroke;
 	grad_info *grad = gradient + mem_channel;
 
@@ -1222,23 +1225,24 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 		return (FALSE); /* Let drawing tools run */
 	}
 
+	copy4(old, grad->xy);
 	/* Left click sets points and picks them up again */
 	if ((event == GDK_BUTTON_PRESS) && (button == 1))
 	{
 		/* Start anew */
 		if (grad->status == GRAD_NONE)
 		{
-			grad->x1 = grad->x2 = x;
-			grad->y1 = grad->y2 = y;
+			grad->xy[0] = grad->xy[2] = x;
+			grad->xy[1] = grad->xy[3] = y;
 			grad->status = GRAD_END;
 			grad_update(grad);
-			repaint_grad(1);
+			repaint_grad(NULL);
 		}
 		/* Place starting point */
 		else if (grad->status == GRAD_START)
 		{
-			grad->x1 = x;
-			grad->y1 = y;
+			grad->xy[0] = x;
+			grad->xy[1] = y;
 			grad->status = GRAD_DONE;
 			grad_update(grad);
 			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
@@ -1246,8 +1250,8 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 		/* Place end point */
 		else if (grad->status == GRAD_END)
 		{
-			grad->x2 = x;
-			grad->y2 = y;
+			grad->xy[2] = x;
+			grad->xy[3] = y;
 			grad->status = GRAD_DONE;
 			grad_update(grad);
 			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
@@ -1255,31 +1259,25 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 		/* Pick up nearest end */
 		else if (grad->status == GRAD_DONE)
 		{
-			if (!grad_opacity) repaint_grad(0);
-			i = (x - grad->x1) * (x - grad->x1) +
-				(y - grad->y1) * (y - grad->y1);
-			j = (x - grad->x2) * (x - grad->x2) +
-				(y - grad->y2) * (y - grad->y2);
+			i = (x - grad->xy[0]) * (x - grad->xy[0]) +
+				(y - grad->xy[1]) * (y - grad->xy[1]);
+			j = (x - grad->xy[2]) * (x - grad->xy[2]) +
+				(y - grad->xy[3]) * (y - grad->xy[3]);
 			if (i < j)
 			{
-				grad->x1 = x;
-				grad->y1 = y;
+				grad->xy[0] = x;
+				grad->xy[1] = y;
 				grad->status = GRAD_START;
 			}
 			else
 			{
-				grad->x2 = x;
-				grad->y2 = y;
+				grad->xy[2] = x;
+				grad->xy[3] = y;
 				grad->status = GRAD_END;
 			}
 			grad_update(grad);
-			if (grad_opacity)
-			{
-				gtk_widget_queue_draw(drawing_canvas);
-				while (gtk_events_pending())
-					gtk_main_iteration();
-			}
-			repaint_grad(1);
+			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			else repaint_grad(old);
 		}
 	}
 
@@ -1291,7 +1289,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	{
 		grad->status = GRAD_NONE;
 		if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
-		else repaint_grad(0);
+		else repaint_grad(NULL);
 		grad_update(grad);
 	}
 
@@ -1301,19 +1299,18 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	/* Motion drags points around */
 	else if (event == GDK_MOTION_NOTIFY)
 	{
-		if (grad->status == GRAD_START) xx = &(grad->x1) , yy = &(grad->y1);
-		else xx = &(grad->x2) , yy = &(grad->y2);
-		if ((*xx != x) || (*yy != y))
+		int *xy = grad->xy + (grad->status == GRAD_START ? 0 : 2);
+		if ((xy[0] != x) || (xy[1] != y))
 		{
-			repaint_grad(0);
-			*xx = x; *yy = y;
+			xy[0] = x;
+			xy[1] = y;
 			grad_update(grad);
-			repaint_grad(1);
+			repaint_grad(old);
 		}
 	}
 
 	/* Leave hides the dragged line */
-	else if (event == GDK_LEAVE_NOTIFY) repaint_grad(0);
+	else if (event == GDK_LEAVE_NOTIFY) repaint_grad(NULL);
 
 	return (TRUE);
 }
@@ -1360,7 +1357,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			(line_status == LINE_START))
 		{
 			line_status = LINE_LINE;
-			repaint_line(1);
+			repaint_line(NULL);
 		}
 
 		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
@@ -1549,13 +1546,15 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 ///	LINE UPDATES
 
-	if ((tool_type == TOOL_LINE) && (line_status != LINE_NONE) &&
+	if ((tool_type == TOOL_LINE) && (line_status == LINE_LINE) &&
 		((line_x1 != x) || (line_y1 != y)))
 	{
-		repaint_line(0);
+		int old[4];
+
+		copy4(old, line_xy);
 		line_x1 = x;
 		line_y1 = y;
-		repaint_line(1);
+		repaint_line(old);
 	}
 }
 
@@ -1564,6 +1563,7 @@ static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
 	int pflag = event->type != GDK_BUTTON_RELEASE;
 	gdouble pressure = 1.0;
 
+	mouse_left_canvas = FALSE;
 	if (pflag) /* For button press events only */
 	{
 		/* Steal focus from dock window */
@@ -1597,7 +1597,9 @@ static gint canvas_enter(GtkWidget *widget, GdkEventCrossing *event, gpointer us
 	/* !!! Have to skip grab/ungrab related events if doing something */
 //	if (event->mode != GDK_CROSSING_NORMAL) return (TRUE);
 
-	return TRUE;
+	mouse_left_canvas = FALSE;
+
+	return (FALSE);
 }
 
 static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
@@ -1607,6 +1609,7 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 
 	/* Only do this if we have an image */
 	if (!mem_img[CHN_IMAGE]) return (FALSE);
+	mouse_left_canvas = TRUE;
 	if ( status_on[STATUS_CURSORXY] )
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
 	if ( status_on[STATUS_PIXELRGB] )
@@ -1615,9 +1618,9 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 
 	if (grad_tool(GDK_LEAVE_NOTIFY, 0, 0, 0, 0)) return (FALSE);
 
-	if (((tool_type == TOOL_LINE) && (line_status != LINE_NONE)) ||
-		((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)))
-		repaint_line(0);
+	if (((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
+		((tool_type == TOOL_LINE) && (line_status == LINE_LINE)))
+		repaint_line(NULL);
 
 	return (FALSE);
 }
@@ -1738,7 +1741,7 @@ int config_bkg(int src)
 static void render_bkg(rgbcontext *ctx)
 {
 	unsigned char *src, *dest;
-	int i, wx0, wy0, wx1, wy1, x0, x, y, ty, w3, l3, d0, dd, adj, bs;
+	int i, x0, x, y, ty, w3, l3, d0, dd, adj, bs, rxy[4];
 	int zoom = 1, scale = 1;
 
 
@@ -1748,36 +1751,29 @@ static void render_bkg(rgbcontext *ctx)
 
 	bs = bkg_scale * zoom;
 	adj = bs - scale > 0 ? bs - scale : 0;
-	wx0 = floor_div(bkg_x * scale + adj, bs) + margin_main_x;
-	wy0 = floor_div(bkg_y * scale + adj, bs) + margin_main_y;
-	wx1 = floor_div((bkg_x + bkg_w) * scale + adj, bs) + margin_main_x;
-	wy1 = floor_div((bkg_y + bkg_h) * scale + adj, bs) + margin_main_y;
-	if ((wx0 >= ctx->x1) || (wy0 >= ctx->y1) ||
-		(wx1 < ctx->x0) || (wy1 < ctx->y0)) return;
+	if (!clip(rxy, floor_div(bkg_x * scale + adj, bs) + margin_main_x,
+		floor_div(bkg_y * scale + adj, bs) + margin_main_y,
+		floor_div((bkg_x + bkg_w) * scale + adj, bs) + margin_main_x,
+		floor_div((bkg_y + bkg_h) * scale + adj, bs) + margin_main_y,
+		ctx->xy)) return;
 	async_bk |= scale > 1;
 
-	dest = ctx->rgb;
-	w3 = (ctx->x1 - ctx->x0) * 3;
-	if (wx0 < ctx->x0) wx0 = ctx->x0;
-	else dest += (wx0 - ctx->x0) * 3;
-	if (wy0 < ctx->y0) wy0 = ctx->y0;
-	else dest += (wy0 - ctx->y0) * w3;
-	if (ctx->x1 < wx1) wx1 = ctx->x1;
-	if (ctx->y1 < wy1) wy1 = ctx->y1;
-	l3 = (wx1 - wx0) * 3;
+	w3 = (ctx->xy[2] - ctx->xy[0]) * 3;
+	dest = ctx->rgb + (rxy[1] - ctx->xy[1]) * w3 + (rxy[0] - ctx->xy[0]) * 3;
+	l3 = (rxy[2] - rxy[0]) * 3;
 
-	d0 = (wx0 - margin_main_x) * bs;
+	d0 = (rxy[0] - margin_main_x) * bs;
 	x0 = floor_div(d0, scale);
 	d0 -= x0 * scale;
 	x0 -= bkg_x;
 
-	for (ty = -1 , i = wy0; i < wy1; i++)
+	for (ty = -1 , i = rxy[1]; i < rxy[3]; i++)
 	{
 		y = floor_div((i - margin_main_y) * bs, scale) - bkg_y;
 		if (y != ty)
 		{
 			src = bkg_rgb + (y * bkg_w + x0) * 3;
-			for (dd = d0 , x = wx0; x < wx1; x++ , dest += 3)
+			for (dd = d0 , x = rxy[0]; x < rxy[2]; x++ , dest += 3)
 			{
 				dest[0] = src[0];
 				dest[1] = src[1];
@@ -2735,66 +2731,17 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 	else
 	{
 		unsigned char *dest;
-		int l;
+		int l, rxy[4];
 
-		if ((w <= 0) || (h <= 0)) return;
-		w += x; h += y;
-		if ((x >= ctx->x1) || (y >= ctx->y1) ||
-			(w <= ctx->x0) || (h <= ctx->y0)) return;
-		if (x < ctx->x0) rgb += 3 * (ctx->x0 - x) , x = ctx->x0;
-		if (y < ctx->y0) rgb += step * (ctx->y0 - y) , y = ctx->y0;
-		if (w > ctx->x1) w = ctx->x1;
-		if (h > ctx->y1) h = ctx->y1;
-		w = (w - x) * 3;
-		l = (ctx->x1 - ctx->x0) * 3;
-		dest = ctx->rgb + (y - ctx->y0) * l + (x - ctx->x0) * 3;
-		for (h -= y; h; h--)
+		if (!clip(rxy, x, y, x + w, y + h, ctx->xy)) return;
+		rgb += (rxy[1] - y) * step + (rxy[0] - x) * 3;
+		l = (ctx->xy[2] - ctx->xy[0]) * 3;
+		dest = ctx->rgb + (rxy[1] - ctx->xy[1]) * l + (rxy[0] - ctx->xy[0]) * 3;
+		w = (rxy[2] - rxy[0]) * 3;
+		for (h = rxy[3] - rxy[1]; h; h--)
 		{
 			memcpy(dest, rgb, w);
 			dest += l; rgb += step;
-		}
-	}
-}
-
-/* Redirectable RGB fill */
-void fill_rgb(int x, int y, int w, int h, int rgb, rgbcontext *ctx)
-{
-	if (!ctx)
-	{
-		static GdkGC *gc;
-		static int oldrgb = -1;
-
-		if (!gc) gc = gdk_gc_new(drawing_canvas->window);
-		if (rgb != oldrgb)
-			gdk_rgb_gc_set_foreground(gc, oldrgb = rgb);
-		gdk_draw_rectangle(drawing_canvas->window, gc, TRUE,
-			x, y, w, h);
-	}
-	else
-	{
-		unsigned char *dest, *tmp;
-		int i, l;
-
-		if ((w <= 0) || (h <= 0)) return;
-		w += x; h += y;
-		if ((x >= ctx->x1) || (y >= ctx->y1) ||
-			(w <= ctx->x0) || (h <= ctx->y0)) return;
-		if (x < ctx->x0) x = ctx->x0;
-		if (y < ctx->y0) y = ctx->y0;
-		if (w > ctx->x1) w = ctx->x1;
-		if (h > ctx->y1) h = ctx->y1;
-		w = (w - x) * 3;
-		l = (ctx->x1 - ctx->x0) * 3;
-		tmp = dest = ctx->rgb + (y - ctx->y0) * l + (x - ctx->x0) * 3;
-		*tmp++ = INT_2_R(rgb);
-		*tmp++ = INT_2_G(rgb);
-		*tmp++ = INT_2_B(rgb);
-		for (i = w - 3; i; i-- , tmp++) *tmp = *(tmp - 3);
-		tmp = dest;
-		for (h -= y + 1; h; h--)
-		{
-			dest += l;
-			memcpy(dest, tmp, w);
 		}
 	}
 }
@@ -2811,9 +2758,9 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 
 	if (ctx)
 	{
-		vxy[0] = ctx->x0; vxy[1] = ctx->y0;
-		vxy[2] = ctx->x1 - 1; vxy[3] = ctx->y1 - 1;
-		w = ctx->x1 - ctx->x0;
+		copy4(vxy, ctx->xy);
+		w = vxy[2] - vxy[0];
+		--vxy[2]; --vxy[3];
 	}
 	else get_visible(vxy);
 
@@ -2854,8 +2801,8 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 		{
 			if (ctx) // Draw to RGB
 			{
-				rgb = ctx->rgb + ((line[1] - ctx->y0) * w +
-					(line[0] - ctx->x0)) * 3;
+				rgb = ctx->rgb + ((line[1] - ctx->xy[1]) * w +
+					(line[0] - ctx->xy[0])) * 3;
 				rgb[0] = rgb[1] = rgb[2] = ((~dx >> 2) & 1) * 255;
 				continue;
 			}
@@ -2923,8 +2870,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 {
 	rgbcontext ctx;
 	unsigned char *rgb, *irgb;
-	int xywh[4], pw2, ph2, lx = 0, ly = 0, rx1, ry1, rx2, ry2, rpx, rpy;
-	int i, j, lr, zoom = 1, scale = 1, paste_f = FALSE;
+	int xywh[4], vxy[4], lx = 0, ly = 0, rpx, rpy;
+	int i, lr, zoom = 1, scale = 1, paste_f = FALSE;
 
 	if (px < 0)
 	{
@@ -2944,7 +2891,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	irgb = clip_to_image(xywh, rgb, px, py, pw, ph);
 
 	/* Init context */
-	ctx.x0 = px; ctx.y0 = py; ctx.x1 = px + pw; ctx.y1 = py + ph;
+	ctx.xy[0] = px; ctx.xy[1] = py; ctx.xy[2] = px + pw; ctx.xy[3] = py + ph;
 	ctx.rgb = rgb;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
@@ -2953,8 +2900,12 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	rpx = px - margin_main_x;
 	rpy = py - margin_main_y;
-	pw2 = rpx + pw - 1;
-	ph2 = rpy + ph - 1;
+
+	/* Line-space clipping rectangle */
+	vxy[0] = floor_div(rpx, scale);
+	vxy[1] = floor_div(rpy, scale);
+	vxy[2] = floor_div(rpx + pw - 1, scale);
+	vxy[3] = floor_div(rpy + ph - 1, scale);
 
 	lr = layers_total && show_layers_main;
 	if (bkg_flag && bkg_rgb) render_bkg(&ctx); /* Tracing image */
@@ -2968,20 +2919,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	{
 		if (layer_selected)
 		{
-			lx = layer_table[layer_selected].x;
-			ly = layer_table[layer_selected].y;
-			if (zoom > 1)
-			{
-				i = lx / zoom;
-				lx = i * zoom > lx ? i - 1 : i;
-				j = ly / zoom;
-				ly = j * zoom > ly ? j - 1 : j;
-			}
-			else
-			{
-				lx *= scale;
-				ly *= scale;
-			}
+			lx = floor_div(layer_table[layer_selected].x * scale, zoom);
+			ly = floor_div(layer_table[layer_selected].y * scale, zoom);
 		}
 		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
 			can_zoom, 0, layer_selected - 1, 1);
@@ -3024,54 +2963,26 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	async_bk = FALSE;
 
-	/* Redraw gradient line if needed */
-	while (gradient[mem_channel].status == GRAD_DONE)
-	{
-		grad_info *grad = gradient + mem_channel;
-
-		/* Don't clutter screen needlessly */
-		if (!mem_gradient && (tool_type != TOOL_GRADIENT)) break;
-
-		/* Canvas-space endpoints */
-		if (grad->x1 < grad->x2) rx1 = grad->x1 , rx2 = grad->x2;
-		else rx1 = grad->x2 , rx2 = grad->x1;
-		if (grad->y1 < grad->y2) ry1 = grad->y1 , ry2 = grad->y2;
-		else ry1 = grad->y2 , ry2 = grad->y1;
-		rx1 = (rx1 * scale) / zoom;
-		ry1 = (ry1 * scale) / zoom;
-		rx2 = (rx2 * scale) / zoom + scale - 1;
-		ry2 = (ry2 * scale) / zoom + scale - 1;
-
-		/* Check intersection - coarse */
-		if ((rx1 > pw2) || (rx2 < rpx) || (ry1 > ph2) || (ry2 < rpy))
-			break;
-		if (rx1 != rx2) /* Check intersection - fine */
-		{
-			float ty1, ty2, dy;
-
-			if ((grad->x1 < grad->x2) ^ (grad->y1 < grad->y2))
-				i = ry2 , j = ry1;
-			else i = ry1 , j = ry2;
-
-			dy = (j - i) / (float)(rx2 - rx1);
-			ty1 = rx1 >= rpx ? i : i + (rpx - rx1 - 0.5) * dy;
-			ty2 = rx2 <= pw2 ? j : i + (pw2 - rx1 + 0.5) * dy;
-
-			if (((ty1 < rpy - scale) && (ty2 < rpy - scale)) ||
-				((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
-				break;
-		}
-// !!! Wrong order - overlays clipboard !!!
-		refresh_grad(&ctx);
-		break;
-	}
-
-	/* Draw perimeter & marquee as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
+	/* Redraw gradient line if needed */
+	i = gradient[mem_channel].status;
+	if ((mem_gradient || (tool_type == TOOL_GRADIENT)) &&
+		(mouse_left_canvas ? (i == GRAD_DONE) : (i != GRAD_NONE)))
+		refresh_line(3, vxy, &ctx);
+
+	/* Draw marquee as we may have drawn over it */
 	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
 	if ((tool_type == TOOL_POLYGON) && poly_points)
 		paint_poly_marquee(&ctx, TRUE);
-	if (perim_status > 0) repaint_perim(&ctx);
+
+	/* Redraw line if needed */
+	if ((((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
+		((tool_type == TOOL_LINE) && (line_status == LINE_LINE))) &&
+		!mouse_left_canvas)
+		refresh_line(tool_type == TOOL_LINE ? 1 : 2, vxy, &ctx);
+
+	/* Redraw perimeter if needed */
+	if (perim_status && !mouse_left_canvas) repaint_perim(&ctx);
 
 	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
 		px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
@@ -3189,6 +3100,9 @@ static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer
 	GdkModifierType state;
 	gdouble pressure = 1.0;
 
+
+	mouse_left_canvas = FALSE;
+
 	/* Skip synthetic mouse moves */
 	if (unreal_move == 3)
 	{
@@ -3296,10 +3210,9 @@ void set_cursor()			// Set mouse cursor
 		cursor_tool ? m_cursor[tool_type] : NULL);
 }
 
-
-
 void change_to_tool(int icon)
 {
+	grad_info *grad;
 	int i, t, update = CF_SELBAR | CF_MENU | CF_CURSOR;
 
 	if (!GTK_WIDGET_SENSITIVE(icon_buttons[icon])) return; // Blocked
@@ -3336,14 +3249,13 @@ void change_to_tool(int icon)
 	i = tool_type;
 	tool_type = t;
 
+	grad = gradient + mem_channel;
 	if (i == TOOL_LINE) stop_line();
-	if ((i == TOOL_GRADIENT) &&
-		(gradient[mem_channel].status != GRAD_NONE))
+	if ((i == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
-		if (gradient[mem_channel].status != GRAD_DONE)
-			gradient[mem_channel].status = GRAD_NONE;
+		if (grad->status != GRAD_DONE) grad->status = GRAD_NONE;
 		else if (grad_opacity) update |= CF_DRAW;
-		else if (!mem_gradient) repaint_grad(0);
+		else if (!mem_gradient) repaint_grad(NULL);
 	}
 	if ( marq_status != MARQUEE_NONE)
 	{
@@ -3378,11 +3290,10 @@ void change_to_tool(int icon)
 		marq_status = MARQUEE_DONE;
 		paint_marquee(1, 0, 0);
 	}
-	if ((tool_type == TOOL_GRADIENT) &&
-		(gradient[mem_channel].status == GRAD_DONE))
+	if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
 		if (grad_opacity) update |= CF_DRAW;
-		else repaint_grad(1);
+		else repaint_grad(NULL);
 	}
 	update_stuff(update);
 	if (!(update & CF_DRAW)) repaint_perim(NULL);
@@ -3808,7 +3719,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		{
 			gradient[mem_channel].status = GRAD_NONE;
 			if (grad_opacity) update_stuff(UPD_RENDER);
-			else repaint_grad(0);
+			else repaint_grad(NULL);
 		}
 		break;
 	case ACT_COMMIT:

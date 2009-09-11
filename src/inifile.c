@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2009 Dmitry Groshev
+	Copyright (C) 2007-2008 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -57,13 +57,9 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 // Negative types are section nesting levels
 
 /* Slot flags */
-#define INI_STRING  0x0003 /* Index of strings block - must be the lower bits */
-#define INI_SYSTEM  0x0000 /* Systemwide inifile */
-#define INI_USER    0x0001 /* User inifile */
-#define INI_NEW     0x0002 /* Memory only*/
-
-#define INI_MALLOC  0x0004 /* Value is allocated (not in strings block) */
-#define INI_DEFAULT 0x0008 /* Default value is defined */
+#define INI_STRING  0x0001 /* Index of strings block - must be bit 0 */
+#define INI_MALLOC  0x0002 /* Value is allocated (not in strings block 0) */
+#define INI_DEFAULT 0x0004 /* Default value is defined */
 
 #define SLOT_NAME(I,S) ((I)->sblock[(S)->flags & INI_STRING] + (S)->key)
 
@@ -215,7 +211,7 @@ static char *store_string(inifile *inip, char *str)
 	char *ra;
 
 	/* Zero offset for zero length */
-	if (!str || !*str) return (inip->sblock[INI_NEW]);
+	if (!str || !*str) return (inip->sblock[1]);
 
 	/* Extend the slab if needed */
 	l = strlen(str) + 1;
@@ -223,12 +219,12 @@ static char *store_string(inifile *inip, char *str)
 	j = (i + l) / SLAB_INCREMENT;
 	if (i / SLAB_INCREMENT < j)
 	{
-		ra = realloc(inip->sblock[INI_NEW], j * SLAB_INCREMENT - SLAB_RESERVED);
+		ra = realloc(inip->sblock[1], j * SLAB_INCREMENT - SLAB_RESERVED);
 		if (!ra) return (NULL);
-		inip->sblock[INI_NEW] = ra;
+		inip->sblock[1] = ra;
 	}
 
-	ra = inip->sblock[INI_NEW] + inip->slen;
+	ra = inip->sblock[1] + inip->slen;
 	memcpy(ra, str, l);
 	inip->slen += l;
 	return (ra);
@@ -260,8 +256,8 @@ static inislot *key_slot(inifile *inip, int section, char *key, int type)
 		slot = add_slot(inip);
 		if (!slot) return (NULL);
 		slot->sec = section;
-		slot->key = key - inip->sblock[INI_NEW];
-		slot->flags = INI_NEW;
+		slot->key = key - inip->sblock[1];
+		slot->flags |= INI_STRING;
 		if (!cuckoo_insert(inip, slot) && !rehash(inip))
 			return (NULL);
 	}
@@ -272,9 +268,9 @@ static inislot *key_slot(inifile *inip, int section, char *key, int type)
 int new_ini(inifile *inip)
 {
 	memset(inip, 0, sizeof(inifile));
-	inip->sblock[INI_NEW] = malloc(SLAB_INCREMENT - SLAB_RESERVED);
-	if (!inip->sblock[INI_NEW]) return (FALSE);
-	inip->sblock[INI_NEW][0] = 0;
+	inip->sblock[1] = malloc(SLAB_INCREMENT - SLAB_RESERVED);
+	if (!inip->sblock[1]) return (FALSE);
+	inip->sblock[1][0] = 0;
 	inip->slen = 1;
 	inip->slots = malloc(SLAB_INCREMENT - SLAB_RESERVED);
 	inip->seed[0] = inip->seed[1] = HASHSEED;
@@ -290,9 +286,8 @@ void forget_ini(inifile *inip)
 		if (inip->slots[i].flags & INI_MALLOC)
 			free(inip->slots[i].value);
 	}
-	free(inip->sblock[INI_SYSTEM]);
-	free(inip->sblock[INI_USER]);
-	free(inip->sblock[INI_NEW]);
+	free(inip->sblock[0]);
+	free(inip->sblock[1]);
 	free(inip->slots);
 	free(inip->hash);
 	memset(inip, 0, sizeof(inifile));
@@ -305,7 +300,7 @@ char *slurp_file(char *fname)
 	char *buf;
 	int i, l;
 
-	if (!fname || !(fp = fopen(fname, "rb"))) return (NULL);
+	if ((fp = fopen(fname, "rb")) == NULL) return (NULL);
 	fseek(fp, 0, SEEK_END);
 	l = ftell(fp);
 	buf = calloc(1, l + 3);
@@ -323,7 +318,7 @@ char *slurp_file(char *fname)
 	return (buf);
 }
 
-int read_ini(inifile *inip, char *fname, int itype)
+int read_ini(inifile *inip, char *fname)
 {
 	inifile ini;
 	inislot *slot;
@@ -331,14 +326,15 @@ int read_ini(inifile *inip, char *fname, int itype)
 	int i, j, l, sec = 0;
 
 
+	/* Init the structure */
+	if (!new_ini(&ini)) return (FALSE);
+
 	/* Read the file */
-	tmp = slurp_file(fname);
-	if (!tmp) return (0);
-	ini = *inip;
-	ini.sblock[itype] = tmp;
+	ini.sblock[0] = slurp_file(fname);
+	if (!ini.sblock[0]) goto fail;
 
 	/* Parse the contents */
-	for (tmp++; ; tmp = str)
+	for (tmp = ini.sblock[0] + 1; ; tmp = str)
 	{
 		tmp += strspn(tmp, "\r\n\t ");
 		if (!*tmp) break;
@@ -365,8 +361,7 @@ int read_ini(inifile *inip, char *fname, int itype)
 				if (!slot) goto fail;
 				slot->type = -i;
 				slot->sec = l;
-				slot->key = (tmp - ini.sblock[itype]) + i;
-				slot->flags = itype;
+				slot->key = (tmp - ini.sblock[0]) + i;
 				if (!cuckoo_insert(&ini, slot) && !rehash(&ini))
 					goto fail;
 			}
@@ -393,8 +388,7 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 			if (!slot) goto fail;
 			slot->type = INI_UNDEF;
 			slot->sec = sec;
-			slot->key = tmp - ini.sblock[itype];
-			slot->flags = itype;
+			slot->key = tmp - ini.sblock[0];
 			if (!cuckoo_insert(&ini, slot) && !rehash(&ini))
 				goto fail;
 		}
@@ -403,12 +397,10 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 
 	/* Return the result */
 	*inip = ini;
-	return (1);
+	return (TRUE);
 
-	/* Catastrophic failure - unable to add key */
 fail:	forget_ini(&ini);
-	*inip = ini;
-	return (-1);
+	return (FALSE);
 }
 
 int write_ini(inifile *inip, char *fname, char *header)
@@ -416,7 +408,7 @@ int write_ini(inifile *inip, char *fname, char *header)
 	FILE *fp;
 	inislot *slotp;
 	char *name, *sv;
-	int i, j, max, sec, var, defv;
+	int i, j, max, sec, var;
 
 	if (!(fp = fopen(fname, "w"))) return (FALSE);
 	if (header) fprintf(fp, "%s\n", header);
@@ -444,27 +436,25 @@ int write_ini(inifile *inip, char *fname, char *header)
 				sec = i + 1; max = slotp->defv; var = 0;
 				continue;
 			}
-
-			/* Keys from system inifile ignore defaults, because
-			 * they exist to override the defaults - WJ */
-			defv = ((slotp->flags & INI_STRING) != INI_SYSTEM) &&
-				(slotp->flags & INI_DEFAULT);
 			sv = slotp->value ? slotp->value : "";
 			switch (slotp->type)
 			{
 			case INI_STR:
-				if (defv && !strcmp(inip->sblock[INI_NEW] +
-					slotp->defv, sv)) break;
+				if ((slotp->flags & INI_DEFAULT) &&
+					!strcmp(inip->sblock[1] + slotp->defv, sv))
+					break;
 			case INI_UNDEF:
 			default:
 				fprintf(fp, "%s = %s\n", name, sv);
 				break;
 			case INI_INT:
-				if (defv && ((int)slotp->value == slotp->defv)) break;
+				if ((slotp->flags & INI_DEFAULT) &&
+					((int)slotp->value == slotp->defv)) break;
 				fprintf(fp, "%s = %d\n", name, (int)slotp->value);
 				break;
 			case INI_BOOL:
-				if (defv && (!!slotp->value == !!slotp->defv)) break;
+				if ((slotp->flags & INI_DEFAULT) &&
+					(!!slotp->value == !!slotp->defv)) break;
 				fprintf(fp, "%s = %s\n", name, slotp->value ?
 					"true" : "false");
 				break;
@@ -536,7 +526,7 @@ char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 	{
 #if VALIDATE_DEF
 		if ((slot->flags & INI_DEFAULT) &&
-			strcmp(defv ? defv : "", inip->sblock[INI_NEW] + slot->defv))
+			strcmp(defv ? defv : "", inip->sblock[1] + slot->defv))
 			g_warning("INI key '%s' new default\n", key);
 #endif
 		if (slot->flags & INI_DEFAULT) return (slot->value);
@@ -547,7 +537,7 @@ char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 	tail = store_string(inip, defv);
 	if (tail)
 	{
-		slot->defv = tail - inip->sblock[INI_NEW];
+		slot->defv = tail - inip->sblock[1];
 		slot->flags |= INI_DEFAULT;
 	}
 	else /* Cannot store the default */
@@ -734,27 +724,8 @@ static char *main_ininame;
 
 void inifile_init(char *ini_filename)
 {
-	int res, mask = 3;
-
 	main_ininame = g_strdup_printf("%s%s", get_home_directory(), ini_filename);
-	while (new_ini(&main_ini))
-	{
-#ifndef WIN32
-		if (mask & 1)
-		{
-			res = read_ini(&main_ini, "/etc/mtpaint/mtpaintrc", INI_SYSTEM);
-			if (res <= 0) mask ^= 1; // Don't try again if failed
-			if (res < 0) continue; // Restart if struct got deleted
-		}
-#endif
-		if (mask & 2)
-		{
-			res = read_ini(&main_ini, main_ininame, INI_USER);
-			if (res <= 0) mask ^= 2;
-			if (res < 0) continue;
-		}
-		break;
-	}
+	if (!read_ini(&main_ini, main_ininame)) new_ini(&main_ini);
 }
 
 void inifile_quit()
