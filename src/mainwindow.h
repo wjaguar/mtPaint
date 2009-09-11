@@ -19,74 +19,114 @@
 
 
 /* Keyboard action codes */
-#define ACT_DUMMY	-1 /* Means action is done already */
-#define ACT_QUIT	1
-#define ACT_ZOOM_IN	2
-#define ACT_ZOOM_OUT	3
-#define ACT_ZOOM_01	4
-#define ACT_ZOOM_025	5
-#define ACT_ZOOM_05	6
-#define ACT_ZOOM_1	7
-#define ACT_ZOOM_4	8
-#define ACT_ZOOM_8	9
-#define ACT_ZOOM_12	10
-#define ACT_ZOOM_16	11
-#define ACT_ZOOM_20	12
-#define ACT_VIEW	13
-#define ACT_BRCOSA	14
-#define ACT_PAN		15
-#define ACT_CROP	16
-#define ACT_SWAP_AB	17
-#define ACT_CMDLINE	18
-#define ACT_PATTERN	19
-#define ACT_BRUSH	20
-#define ACT_PAINT	21
-#define ACT_SELECT	22
-#define ACT_SEL_2LEFT	23
-#define ACT_SEL_2RIGHT	24
-#define ACT_SEL_2DOWN	25
-#define ACT_SEL_2UP	26
-#define ACT_SEL_LEFT	27
-#define ACT_SEL_RIGHT	28
-#define ACT_SEL_DOWN	29
-#define ACT_SEL_UP	30
-#define ACT_OPAC_01	31
-#define ACT_OPAC_02	32
-#define ACT_OPAC_03	33
-#define ACT_OPAC_04	34
-#define ACT_OPAC_05	35
-#define ACT_OPAC_06	36
-#define ACT_OPAC_07	37
-#define ACT_OPAC_08	38
-#define ACT_OPAC_09	39
-#define ACT_OPAC_1	40
-#define ACT_OPAC_P	41
-#define ACT_OPAC_M	42
-#define ACT_LR_2LEFT	43
-#define ACT_LR_2RIGHT	44
-#define ACT_LR_2DOWN	45
-#define ACT_LR_2UP	46
-#define ACT_LR_LEFT	47
-#define ACT_LR_RIGHT	48
-#define ACT_LR_DOWN	49
-#define ACT_LR_UP	50
-#define ACT_ESC		51
-#define ACT_SCALE	52
-#define ACT_SIZE	53
-#define ACT_COMMIT	54
-#define ACT_RCLICK	55
-#define ACT_ARROW	56
-#define ACT_ARROW3	57
-#define ACT_A_PREV	58
-#define ACT_A_NEXT	59
-#define ACT_B_PREV	60
-#define ACT_B_NEXT	61
-#define ACT_TO_IMAGE	62
-#define ACT_TO_ALPHA	63
-#define ACT_TO_SEL	64
-#define ACT_TO_MASK	65
-#define ACT_VWZOOM_IN	66
-#define ACT_VWZOOM_OUT	67
+#define ACTMOD_DUMMY	-1 /* Means action is done already */
+enum { // To let constants renumber themselves when adding new ones
+	ACT_QUIT = 1,
+	ACT_ZOOM,
+	ACT_VIEW,
+	ACT_PAN,
+	ACT_CROP,
+	ACT_SWAP_AB,
+	ACT_TOOL,
+	ACT_SEL_MOVE,
+	ACT_OPAC,
+	ACT_LR_MOVE,
+	ACT_ESC,
+	ACT_COMMIT,
+	ACT_RCLICK,
+	ACT_ARROW,
+	ACT_A,
+	ACT_B,
+	ACT_CHANNEL,
+	ACT_VWZOOM,
+	ACT_SAVE,
+	ACT_FACTION,
+	ACT_LOAD_RECENT,
+	ACT_UNDO,
+	ACT_REDO,
+	ACT_COPY,
+	ACT_PASTE,
+	ACT_PASTE_LR,
+	ACT_COPY_PAL,
+	ACT_PASTE_PAL,
+	ACT_LOAD_CLIP,
+	ACT_SAVE_CLIP,
+	ACT_TBAR,
+	ACT_CENTER,
+	ACT_GRID,
+	ACT_VWWIN,
+	ACT_VWSPLIT,
+	ACT_VWFOCUS,
+	ACT_FLIP,
+	ACT_ROTATE,
+	ACT_SELECT,
+	ACT_LASSO,
+	ACT_OUTLINE,
+	ACT_ELLIPSE,
+	ACT_SEL_FLIP,
+	ACT_SEL_ROT,
+	ACT_RAMP,
+	ACT_SEL_ALPHA_AB,
+	ACT_SEL_ALPHAMASK,
+	ACT_SEL_MASK_AB,
+	ACT_SEL_MASK,
+	ACT_PAL_DEF,
+	ACT_PAL_MASK,
+	ACT_DITHER_A,
+	ACT_PAL_MERGE,
+	ACT_PAL_CLEAN,
+	ACT_ISOMETRY,
+	ACT_CHN_DIS,
+	ACT_SET_RGBA,
+	ACT_ALPHA_OVERLAY,
+	ACT_LR_SAVE,
+	ACT_LR_KILLALL,
+	ACT_DOCS,
+	ACT_REBIND_KEYS,
+
+	DLG_BRCOSA,
+	DLG_CMDLINE,
+	DLG_PATTERN,
+	DLG_BRUSH,
+	DLG_SCALE,
+	DLG_SIZE,
+	DLG_NEW,
+	DLG_FSEL,
+	DLG_FACTIONS,
+	DLG_TEXT,
+	DLG_TEXT_FT,
+	DLG_LAYERS,
+	DLG_INDEXED,
+	DLG_ROTATE,
+	DLG_INFO,
+	DLG_PREFS,
+	DLG_COLORS,
+	DLG_PAL_SIZE,
+	DLG_QUANT,
+	DLG_PAL_SORT,
+	DLG_PAL_SHIFTER,
+	DLG_FILTER,
+	DLG_CHN_DEL,
+	DLG_ANI,
+	DLG_ANI_VIEW,
+	DLG_ANI_KEY,
+	DLG_ANI_KILLKEY,
+	DLG_ABOUT,
+
+	FILT_2RGB,
+	FILT_GREY,
+	FILT_INVERT,
+	FILT_EDGE,
+	FILT_DOG,
+	FILT_SHARPEN,
+	FILT_UNSHARP,
+	FILT_SOFTEN,
+	FILT_GAUSS,
+	FILT_EMBOSS,
+	FILT_BACT,
+	FILT_THRES,
+	FILT_UALPHA
+};
 
 int wtf_pressed(GdkEventKey *event);
 
@@ -239,8 +279,8 @@ void pressed_opacity( int opacity );
 void pressed_choose_patterns( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data );
 
-gint check_zoom_keys(int action);
-gint check_zoom_keys_real(int action);
+gint check_zoom_keys(int act_m);
+gint check_zoom_keys_real(int act_m);
 
 void zoom_in();
 void zoom_out();
