@@ -19,9 +19,11 @@
 
 #include <gtk/gtk.h>
 
-GdkWindow *the_canvas;		// Pointer to the canvas we will be drawing on
+GdkWindow *the_canvas;					// Pointer to the canvas we will be drawing on
 
-float can_zoom;			// Zoom factor 1..MAX_ZOOM
+float can_zoom;						// Zoom factor 1..MAX_ZOOM
+int margin_main_x, margin_main_y,			// Top left of image from top left of canvas
+	margin_view_x, margin_view_y;
 int zoom_flag;
 int perim_status, perim_x, perim_y, perim_s;		// Tool perimeter
 int marq_status, marq_x1, marq_y1, marq_x2, marq_y2;	// Selection marquee
@@ -39,6 +41,7 @@ gboolean show_paste;					// Show contents of clipboard while pasting
 #define STATUS_ITEMS 10
 gboolean status_on[STATUS_ITEMS];			// Show status bar items?
 gboolean text_paste;					// Are we pasting text?
+gboolean canvas_image_centre;				// Are we centering the image?
 
 #define LINE_NONE 0
 #define LINE_START 1
@@ -67,6 +70,8 @@ gboolean text_paste;					// Are we pasting text?
 #define FS_EXPORT_UNDO2 7
 #define FS_EXPORT_ASCII 8
 #define FS_LAYER_SAVE 9
+#define FS_GIF_EXPLODE 10
+#define FS_EXPORT_GIF 11
 
 int do_a_load( char *fname );
 void align_size( float new_zoom );
@@ -113,10 +118,11 @@ void pressed_soften( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_blur( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data );
 
-void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_clip_unmask( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_clip_mask_all( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_clip_mask_clear( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_clip_alpha_scale();
+void pressed_clip_mask();
+void pressed_clip_unmask();
+void pressed_clip_mask_all();
+void pressed_clip_mask_clear();
 
 void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data );
@@ -152,3 +158,5 @@ void update_all_views();			// Update whole canvas on all views
 #if GTK_MAJOR_VERSION == 2
 void cleanse_txt( char *out, char *in );	// Cleans up non ASCII chars for GTK+2
 #endif
+
+void create_default_image();			// Create default new image

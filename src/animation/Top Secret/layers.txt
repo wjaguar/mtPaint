@@ -1,0 +1,44 @@
+# mtPaint layers
+1
+2
+Top Secret.png
+Background
+1
+0
+0
+1
+0
+100
+icon.png
+Logo
+1
+55
+84
+0
+0
+100
+spotlight.png
+Spotlight
+1
+-18
+-77
+1
+1
+85
+# mtPaint animation
+1
+40
+frames
+secret
+10
+1
+1	1	1,2
+0
+1
+1	55	84	100	0
+5
+1	-200	-130	85	0
+5	-200	-130	85	0
+15	-104	-130	85	0
+25	-104	-77	85	0
+35	-18	-77	85	0

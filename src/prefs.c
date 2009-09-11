@@ -34,10 +34,8 @@ GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg, *spinbutton_recent;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
-static GtkWidget *checkbutton_zoom, *checkbutton_commit;
-#if GTK_MAJOR_VERSION == 2
-static GtkWidget *checkbutton_wheel;
-#endif
+static GtkWidget *checkbutton_zoom[3],		// zoom 100%, wheel, centralize
+	*checkbutton_commit;
 static GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
@@ -320,8 +318,7 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gint32( "pixelNudge", mem_nudge );
 	inifile_set_gint32( "jpegQuality", mem_jpeg_quality );
 	inifile_set_gint32( "recentFiles", recent_files );
-	inifile_set_gboolean( "zoomToggle",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom)) );
+
 	inifile_set_gboolean( "pasteToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste)) );
 	inifile_set_gboolean( "cursorToggle",
@@ -329,10 +326,14 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "exitToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_exit)) );
 
+	inifile_set_gboolean( "zoomToggle",
+		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[0])) );
 #if GTK_MAJOR_VERSION == 2
 	inifile_set_gboolean( "scrollwheelZOOM",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_wheel)) );
+		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[1])) );
 #endif
+	canvas_image_centre = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_zoom[2]));
+
 
 	inifile_set_gboolean( "pasteCommit",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_commit)) );
@@ -358,6 +359,7 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 
+	force_main_configure();		// Force configure of main window - for centalizing code
 	update_all_views();		// Update canvas for changes
 	set_cursor();
 
@@ -586,12 +588,14 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	spin_to_table( table5, &spinbutton_grid[2], 1, 2, 5, mem_grid_rgb[1], 0, 255 );
 	spin_to_table( table5, &spinbutton_grid[3], 1, 3, 5, mem_grid_rgb[2], 0, 255 );
 
-	checkbutton_zoom = add_a_toggle( _("New image sets zoom to 100%"),
+	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
 		vbox_3, inifile_get_gboolean("zoomToggle", FALSE) );
 #if GTK_MAJOR_VERSION == 2
-	checkbutton_wheel = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
+	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
 		vbox_3, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
 #endif
+	checkbutton_zoom[2] = add_a_toggle( _("Centralize image"),
+		vbox_3, canvas_image_centre );
 
 
 

@@ -4,6 +4,23 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see README or 'Help -> About' for details):
 
+2.30	2006-3-1
+
+	* Animation of layers is now possible - see 'Animation' in docs for info
+	* Animated GIF files can now be opened frame by frame if you have Gifsicle installed
+	* File->Export Animated GIF ... can create an animated GIF file if you have Gifsicle installed
+	* Image can now be centralized in the window - Preferences->Zoom to toggle
+	* Image scaling facilities improved and extended by Dmitry Groshev
+	* Edit->Tint Mode added by Dmitry Groshev - see bottom of Tools section in docs for info
+	* Ellipse outline code improved by Dmitry Groshev
+	* Selection->Alpha Blend A,B : see website tutorial for example
+	* Various tutorials added to website
+	* BUGFIX - Clone tool does not misbehave when dragging beyond image edge with CTRL pressed
+	* BUGFIX - Text rotation should now work properly in Windows XP
+	* BUGFIX - Files with UTF8 characters in the filenames can now be opened in Windows
+	* BUGFIX - Status bar wobbling with some Windows systems resolved
+	* BUGFIX - Text paste + selection mask + zoom doesn't lose mask
+
 2.20	2006-1-1
 
 	* mtPaint web site is now at http://mtpaint.sourceforge.net/

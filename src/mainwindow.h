@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -25,7 +25,7 @@ GtkWidget
 		*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
 		*menu_continuous[5], *menu_only_24[20], *menu_only_indexed[10], *menu_recent[23],
 		*menu_opac[15], *menu_cline[2], *menu_view[2], *menu_help[2], *menu_iso[5],
-		*menu_layer[2], *menu_lasso[15], *menu_prefs[2]
+		*menu_layer[2], *menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
 		;
 
 GtkWidget *main_hidden[4];
@@ -98,3 +98,5 @@ void setup_language();		// Change language
 void notify_changed();		// Image/palette has just changed - update vars as needed
 void notify_unchanged();	// Image/palette has just been unchanged (saved) - update vars as needed
 void update_titlebar();		// Update filename in titlebar
+
+void force_main_configure();	// Force reconfigure of main drawing area - for centralizing code

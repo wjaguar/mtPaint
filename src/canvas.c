@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -37,10 +37,13 @@
 #include "polygon.h"
 #include "wu.h"
 #include "prefs.h"
+#include "ani.h"
 
-GdkWindow *the_canvas = NULL;		// Pointer to the canvas we will be drawing on
+GdkWindow *the_canvas = NULL;			// Pointer to the canvas we will be drawing on
 
-float can_zoom = 1;			// Zoom factor 1..MAX_ZOOM
+float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
+int margin_main_x=0, margin_main_y=0,		// Top left of image from top left of canvas
+	margin_view_x=0, margin_view_y=0;
 int zoom_flag = 0;
 int fs_type = 0;
 int perim_status = 0, perim_x = 0, perim_y = 0, perim_s = 2;		// Tool perimeter
@@ -54,9 +57,11 @@ int clone_x, clone_y;							// Clone offsets
 
 int recent_files;					// Current recent files setting
 
-gboolean show_paste;					// Show contents of clipboard while pasting
-gboolean col_reverse = FALSE;				// Painting with right button
-gboolean text_paste = FALSE;				// Are we pasting text?
+gboolean show_paste,					// Show contents of clipboard while pasting
+	col_reverse = FALSE,				// Painting with right button
+	text_paste = FALSE,				// Are we pasting text?
+	canvas_image_centre = TRUE,			// Are we centering the image?
+	fs_do_gif_explode = FALSE;
 
 void commit_paste( gboolean undo )
 {
@@ -155,7 +160,9 @@ void commit_paste( gboolean undo )
 		}
 	}
 	vw_update_area( fx, fy, fw, fh );
-	gtk_widget_queue_draw_area( drawing_canvas, fx*can_zoom, fy*can_zoom, fw*can_zoom, fh*can_zoom );
+	gtk_widget_queue_draw_area( drawing_canvas,
+			fx*can_zoom + margin_main_x, fy*can_zoom + margin_main_y,
+			fw*can_zoom, fh*can_zoom );
 }
 
 void paste_prepare()
@@ -349,13 +356,23 @@ void mask_ab(int v)
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
-void pressed_clip_unmask( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_clip_unmask()
 {	mask_ab(255);	}
 
-void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_clip_mask()
 {	mask_ab(0);	}
 
-void pressed_clip_mask_all( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_clip_alpha_scale()
+{
+	int i = mem_clip_scale_alpha();
+
+	if ( i==0 )
+	{
+		gtk_widget_queue_draw( drawing_canvas );
+	}
+}
+
+void pressed_clip_mask_all()
 {
 	int i;
 
@@ -368,7 +385,7 @@ void pressed_clip_mask_all( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
-void pressed_clip_mask_clear( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_clip_mask_clear()
 {
 	if ( mem_clip_mask != NULL )
 	{
@@ -637,6 +654,10 @@ void update_menus()			// Update edit/undo menu
 		men_item_state( menu_only_24, TRUE );
 	}
 
+	if ( mem_image_bpp == 3 && mem_clipboard != NULL && mem_clip_bpp )
+		men_item_state( menu_alphablend, TRUE );
+	else	men_item_state( menu_alphablend, FALSE );
+
 	if ( marq_status == MARQUEE_NONE )
 	{
 		men_item_state( menu_need_selection, FALSE );
@@ -848,10 +869,10 @@ void cleanse_txt( char *out, char *in )		// Cleans up non ASCII chars for GTK+2
 {
 	char *c;
 
-	c = g_filename_to_utf8( (gchar *) in, -1, NULL, NULL, NULL );
+	c = g_locale_to_utf8( (gchar *) in, -1, NULL, NULL, NULL );
 	if ( c == NULL )
 	{
-		sprintf(out, "Error in cleanse_txt using g_filename_to_utf8");
+		sprintf(out, "Error in cleanse_txt using g_*_to_utf8");
 	}
 	else
 	{
@@ -870,7 +891,7 @@ void set_new_filename( char *fname )
 int do_a_load( char *fname )
 {
 	gboolean loading_single = FALSE;
-	int res, i;
+	int res, i, gif_delay;
 	char mess[512], real_fname[300];
 	float old_zoom = can_zoom;
 
@@ -889,7 +910,9 @@ int do_a_load( char *fname )
 	}
 	else strncpy( real_fname, fname, 256 );
 
-	if ( (res = load_gif( real_fname )) == -1 )
+gtk_widget_hide( drawing_canvas );
+
+	if ( (res = load_gif( real_fname, &gif_delay )) == -1 )
 	if ( (res = load_tiff( real_fname )) == -1 )
 	if ( (res = load_bmp( real_fname )) == -1 )
 	if ( (res = load_jpeg( real_fname )) == -1 )
@@ -922,7 +945,7 @@ int do_a_load( char *fname )
 				alert_box( _("Error"), _("Unable to load file"),
 					_("OK"), NULL, NULL );
 			}
-		return 1;
+		goto fail;
 	}
 
 	if ( res == FILE_LIB_ERROR )
@@ -979,9 +1002,47 @@ int do_a_load( char *fname )
 		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
 			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
 				// These 2 are needed to synchronize the scrollbars & image view
-	}
 
+		if ( res == FILE_GIF_ANIM )		// Animated GIF was loaded so tell user
+		{
+			res = alert_box( _("Warning"), _("This is an animated GIF file.  What do you want to do?"), _("Cancel"), _("Edit Frames"),
+#ifdef WIN32
+			NULL
+#else
+			_("View Animation")
+#endif
+			);
+
+			if ( res == 2 )			// Ask for directory to explode frames to
+			{
+				preserved_gif_delay = gif_delay;
+					// Needed when starting new mtpaint process later
+				strncpy( preserved_gif_filename, mem_filename, 250 );
+
+				if ( fs_type > 0 )
+					fs_do_gif_explode = TRUE;
+				else
+					file_selector( FS_GIF_EXPLODE );
+				/* This horrendous fiddle is needed:
+					1) Either we were called via a file selector for load, if so we must terminate this FS dialog before calling the next one
+					2) OR we could have been called on startup, command line window, or recently used file list in which case we must call the file selector now
+				*/
+			}
+			if ( res == 3 )
+			{
+				snprintf(mess, 500, "gifview -a \"%s\" &", fname );
+				gifsicle(mess);
+			}
+
+			create_default_image();		// Have empty image again to avoid destroying old animation
+		}
+	}
+	gtk_widget_show( drawing_canvas );
 	return 0;
+
+fail:
+	gtk_widget_show( drawing_canvas );
+	return 1;
 }
 
 
@@ -1179,8 +1240,9 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 
 gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 {
-	char fname[256], mess[512];
-	int res;
+	char fname[256], mess[512], gif_nam[256], gif_nam2[320], *c;
+	int res, i;
+	gboolean found;
 
 	gtk_window_set_modal(GTK_WINDOW(filew),FALSE);
 		// Needed to show progress in Windows GTK+2
@@ -1188,7 +1250,20 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 	if (fs_type == FS_PNG_SAVE || fs_type == FS_PALETTE_SAVE )
 		fs_set_extension();		// Ensure extension is correct
 
-	strncpy( fname, gtk_file_selection_get_filename (GTK_FILE_SELECTION (fs)), 250 );
+#if GTK_MAJOR_VERSION == 2
+	c = g_locale_from_utf8( (gchar *) gtk_file_selection_get_filename (GTK_FILE_SELECTION (fs)),
+			-1, NULL, NULL, NULL );
+	if ( c == NULL )
+#endif
+		strncpy( fname, gtk_file_selection_get_filename (GTK_FILE_SELECTION (fs)), 250 );
+#if GTK_MAJOR_VERSION == 2
+	else
+	{
+		strncpy( fname, c, 250 );
+		g_free(c);
+	}
+#endif
+
 	switch ( fs_type )
 	{
 		case FS_PNG_LOAD:
@@ -1251,12 +1326,80 @@ gint fs_ok( GtkWidget *widget, GtkFileSelection *fs )
 					res = save_layers( fname );
 					if ( res != 1 ) goto redo;
 					break;
+		case FS_GIF_EXPLODE:
+					c = strrchr( preserved_gif_filename, DIR_SEP );
+					if ( c == NULL ) c = preserved_gif_filename;
+					else c++;
+
+					snprintf(gif_nam, 250, "%s%c%s", fname, DIR_SEP, c);
+					snprintf(mess, 500,
+						"gifsicle -U --explode \"%s\" -o \"%s\"",
+						preserved_gif_filename, gif_nam );
+//printf("%s\n", mess);
+					gifsicle(mess);
+					strncat( gif_nam, ".???", 250 );
+					wild_space_change( gif_nam, gif_nam2, 315 );
+					snprintf(mess, 500,
+						"mtpaint -g %i %s &",
+						preserved_gif_delay, gif_nam2 );
+//printf("%s\n", mess);
+					gifsicle(mess);
+					break;
+		case FS_EXPORT_GIF:
+					if ( check_file(fname) == 1 ) goto redo;
+
+					snprintf(gif_nam, 250, "%s", mem_filename);
+					wild_space_change( gif_nam, gif_nam2, 315 );
+
+					i = strlen(gif_nam2) - 1;
+					found = FALSE;
+
+					while ( i>=0 && !found ) // Find numbers on end of filename
+					{
+						if ( gif_nam2[i] == DIR_SEP ) break;
+							// None in name as we have reached separator
+						if ( gif_nam2[i] >= '0' && gif_nam2[i] <= '9' )
+							found = TRUE;
+						else
+							i--;
+					}
+					while ( found )		// replace numbers on end with ?'s
+					{
+						if ( gif_nam2[i] >= '0' && gif_nam2[i] <= '9' )
+							gif_nam2[i] = '?';
+						i--;
+						if ( i<0 || gif_nam2[i] == DIR_SEP ) break;
+					}
+
+					preserved_gif_delay = gtk_spin_button_get_value_as_int(
+								GTK_SPIN_BUTTON(fs_png[1]) );
+						
+					snprintf(mess, 500, "%s -d %i %s -o \"%s\"",
+						GIFSICLE_CREATE, preserved_gif_delay, gif_nam2, fname
+					);
+//printf("%s\n", mess);
+					gifsicle(mess);
+
+#ifndef WIN32
+					snprintf(mess, 500, "gifview -a \"%s\" &", fname );
+					gifsicle(mess);
+//printf("%s\n", mess);
+#endif
+
+					break;
 	}
 
 	gtk_window_set_transient_for( GTK_WINDOW(filew), NULL );	// Needed in Windows to stop GTK+ lowering the main window below window underneath
 	update_menus();
 
 	fs_destroy( NULL, NULL );
+
+	if ( fs_do_gif_explode )
+	{
+		file_selector( FS_GIF_EXPLODE );
+		fs_do_gif_explode = FALSE;
+	}
+
 	return FALSE;
 redo:
 	gtk_window_set_modal(GTK_WINDOW(filew), TRUE);
@@ -1272,7 +1415,7 @@ void file_selector( int action_type )
 	char *combo_txt[] = { "PNG", "JPEG", "TIFF", "BMP", "PNG", "GIF", "BMP", "XPM", "XBM" },
 		*combo_txt2[] = { "GPL", "TXT" };
 
-	char *title = NULL, txt[300], *temp_txt = NULL;
+	char *title = NULL, txt[300], txt2[300], *temp_txt = NULL;
 	
 	fs_type = action_type;
 
@@ -1301,6 +1444,10 @@ void file_selector( int action_type )
 					break;
 		case FS_LAYER_SAVE:	title = _("Save Layer Files");
 					break;
+		case FS_GIF_EXPLODE:	title = _("Import GIF animation - Choose frames directory");
+					break;
+		case FS_EXPORT_GIF:	title = _("Export GIF animation");
+					break;
 	}
 
 	filew = gtk_file_selection_new ( title );
@@ -1311,8 +1458,13 @@ void file_selector( int action_type )
 	gtk_widget_set_uposition( filew,
 		inifile_get_gint32("fs_window_x", 0 ), inifile_get_gint32("fs_window_y", 0 ) );
 
-	if ( fs_type == FS_EXPORT_UNDO )
-		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(filew)->file_list), FALSE );
+	if ( fs_type == FS_EXPORT_UNDO || fs_type == FS_EXPORT_UNDO2 || fs_type == FS_GIF_EXPLODE )
+	{
+//		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(filew)->file_list), FALSE );
+		gtk_widget_hide( GTK_WIDGET(GTK_FILE_SELECTION(filew)->file_list) );
+		if ( fs_type == FS_GIF_EXPLODE )
+			gtk_widget_hide( GTK_WIDGET(GTK_FILE_SELECTION(filew)->selection_entry) );
+	}
 
 	gtk_signal_connect (GTK_OBJECT (GTK_FILE_SELECTION (filew)->ok_button),
 		"clicked", GTK_SIGNAL_FUNC(fs_ok), (gpointer) filew);
@@ -1324,24 +1476,44 @@ void file_selector( int action_type )
 		"delete_event", GTK_SIGNAL_FUNC( fs_destroy ), GTK_OBJECT (filew) );
 
 	if ( fs_type == FS_PNG_SAVE && strcmp( mem_filename, _("Untitled") ) != 0 )
-		gtk_file_selection_set_filename( GTK_FILE_SELECTION(filew), mem_filename );
+		strncpy( txt, mem_filename, 256 );	// If we have a filename and saving
 	else
 	{
 		if ( fs_type == FS_LAYER_SAVE && strcmp( layers_filename, _("Untitled") ) != 0 )
-			gtk_file_selection_set_filename( GTK_FILE_SELECTION(filew), layers_filename );
+			strncpy( txt, layers_filename, 256 );
 		else
 		{
 			if ( fs_type == FS_LAYER_SAVE )
 			{
 				strncpy( txt, inifile_get("last_dir", "/"), 256 );
 				strncat( txt, "layers.txt", 256 );
-				gtk_file_selection_set_filename (GTK_FILE_SELECTION(filew), txt );
 			}
-			else
-				gtk_file_selection_set_filename (GTK_FILE_SELECTION(filew),
-					inifile_get("last_dir", "/") );
+			else	strncpy( txt, inifile_get("last_dir", "/"), 256 );	// Default
 		}
 	}
+#if GTK_MAJOR_VERSION == 2
+	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
+#else
+	strcpy( txt2, txt );
+#endif
+	gtk_file_selection_set_filename (GTK_FILE_SELECTION(filew), txt2 );
+
+
+	if ( fs_type == FS_EXPORT_GIF )
+	{
+		hbox = gtk_hbox_new (FALSE, 0);
+		gtk_widget_show(hbox);
+		gtk_box_pack_start(GTK_BOX(GTK_FILE_SELECTION(filew)->main_vbox), hbox, FALSE, TRUE, 0);
+
+		label = gtk_label_new(_("Animation delay"));
+		gtk_widget_show (label);
+		gtk_box_pack_start (GTK_BOX (hbox), label, FALSE, FALSE, 0);
+
+		fs_png[1] = add_a_spin( preserved_gif_delay, 1, MAX_DELAY );
+
+		gtk_box_pack_start (GTK_BOX (hbox), fs_png[1], FALSE, FALSE, 10);
+	}
+
 
 	if ( fs_type == FS_PNG_SAVE || fs_type == FS_PALETTE_SAVE )
 	{
@@ -1758,10 +1930,12 @@ void tool_action( int x, int y, int button, gdouble pressure )
 	if ( (button == 1 || button == 3) && (tool_type <= TOOL_SPRAY) )
 		paint_action = TRUE;
 
+	if ( tool_type <= TOOL_SHUFFLE ) tint_mode[2] = button;
+
 	if ( pen_down == 0 )
 	{
 		first_point = TRUE;
-		if ( button == 3 && paint_action && !col_reverse )
+		if ( button == 3 && paint_action && !tint_mode[0] )
 		{
 			col_reverse = TRUE;
 			mem_swap_cols();
@@ -2234,7 +2408,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 			minx>-1 && miny>-1 && xw>-1 && yh>-1)
 		{
 			gtk_widget_queue_draw_area( drawing_canvas,
-				minx*can_zoom, miny*can_zoom,
+				margin_main_x + minx*can_zoom, margin_main_y + miny*can_zoom,
 				mt_round(xw*can_zoom), mt_round(yh*can_zoom) );
 			vw_update_area( minx, miny, xw+1, yh+1 );
 		}
@@ -2353,8 +2527,8 @@ void paint_poly_marquee()			// Paint polygon marquee
 				co[j] = mt_round(co[j] * can_zoom + can_zoom/2);
 						// Adjust for zoom
 			}
-			xy[i].x = co[0];
-			xy[i].y = co[1];
+			xy[i].x = margin_main_x + co[0];
+			xy[i].y = margin_main_y + co[1];
 		}
 		gdk_draw_lines( drawing_canvas->window, dash_gc, xy, last+1 );
 	}
@@ -2401,7 +2575,8 @@ void paint_marquee(int action, int new_x, int new_y)
 			{	// Only do something if there is a change
 				if (	new_x2 < marq_x1 || new_x > marq_x2 ||
 					new_y2 < marq_y1 || new_y > marq_y2	)
-						repaint_canvas( x, y, w, h );	// Remove completely
+						repaint_canvas( margin_main_x + x, margin_main_y + y,
+							w, h );	// Remove completely
 				else
 				{
 					if ( new_x != marq_x1 )
@@ -2418,7 +2593,8 @@ void paint_marquee(int action, int new_x, int new_y)
 							rw = (new_x - marq_x1) * can_zoom + zerror;
 						}
 						clip_area( &rx, &ry, &rw, &rh );
-						repaint_canvas( rx, ry, rw, rh );
+						repaint_canvas( margin_main_x + rx, margin_main_y + ry,
+							rw, rh );
 					}
 					if ( new_y != marq_y1 )
 					{	// Vertical shift
@@ -2434,17 +2610,18 @@ void paint_marquee(int action, int new_x, int new_y)
 							rh = (new_y - marq_y1) * can_zoom + zerror;
 						}
 						clip_area( &rx, &ry, &rw, &rh );
-						repaint_canvas( rx, ry, rw, rh );
+						repaint_canvas( margin_main_x + rx, margin_main_y + ry,
+							rw, rh );
 					}
 				}
 			}
 		}
 		else
 		{
-			repaint_canvas( x, y, 1, h );
-			repaint_canvas(	x+w-1-zerror/2, y, 1+zerror, h );
-			repaint_canvas(	x, y, w, 1 );
-			repaint_canvas(	x, y+h-1-zerror/2, w, 1+zerror );
+			repaint_canvas( margin_main_x + x, margin_main_y + y, 1, h );
+			repaint_canvas(	margin_main_x + x+w-1-zerror/2, margin_main_y + y, 1+zerror, h );
+			repaint_canvas(	margin_main_x + x, margin_main_y + y, w, 1 );
+			repaint_canvas(	margin_main_x + x, margin_main_y + y+h-1-zerror/2, w, 1+zerror );
 				// zerror required here to stop artifacts being left behind while dragging
 				// a selection at the right/bottom edges
 		}
@@ -2453,7 +2630,7 @@ void paint_marquee(int action, int new_x, int new_y)
 	if ( action == 1 || action == 11 )		// Draw marquee
 	{
 		mtMAX( j, w, h )
-		rgb = grab_memory( j*3, "marquee RGB redraw", 255 );
+		rgb = grab_memory( j*3, 255 );
 
 		if ( marq_status >= MARQUEE_PASTE )
 		{
@@ -2494,25 +2671,29 @@ void paint_marquee(int action, int new_x, int new_y)
 		if ( x >= vc_x1 )
 		{
 			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
-				rx, ry, 1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
+				margin_main_x + rx, margin_main_y + ry,
+				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
 		}
 
 		if ( (x+w-1) <= vc_x2 && (x+w-1) < mem_width*can_zoom )
 		{
 			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
-				rx+rw-1, ry, 1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
+				margin_main_x + rx+rw-1, margin_main_y + ry,
+				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3 );
 		}
 
 		if ( y >= vc_y1 )
 		{
 			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
-				rx, ry, rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
+				margin_main_x + rx, margin_main_y + ry,
+				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
 		}
 
 		if ( (y+h-1) <= vc_y2 && (y+h-1) < mem_height*can_zoom )
 		{
 			gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
-				rx, ry+rh-1, rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
+				margin_main_x + rx, margin_main_y + ry+rh-1,
+				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 3*j );
 		}
 
 		free(rgb);
@@ -2636,7 +2817,7 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 	todo = todo / canz2;
 
 	if ( todo == 0 ) todor = 1; else todor = todo;
-	rgb = grab_memory( pixy*3, "repaint_line", 255 );
+	rgb = grab_memory( pixy*3, 255 );
 
 	for ( i=0; i<=todo; i++ )
 	{
@@ -2678,7 +2859,8 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 					rgb[ 2 + 3*j ] = pcol.blue;
 				}
 				gdk_draw_rgb_image (the_canvas, drawing_canvas->style->black_gc,
-					px*canz, py*canz, canz, canz,
+					margin_main_x + px*canz, margin_main_y + py*canz,
+					canz, canz,
 					GDK_RGB_DITHER_NONE, rgb, 3*canz );
 			}
 		}
@@ -2697,7 +2879,8 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 			{ // Commit canvas clear if >16 pixels or final pixel of this line
 				mtMIN( ax, ax, bx )
 				mtMIN( ay, ay, by )
-				repaint_canvas( ax*canz, ay*canz, aw, ah );
+				repaint_canvas( margin_main_x + ax*canz, margin_main_y + ay*canz,
+					aw, ah );
 				ax = -1;
 			}
 		}
@@ -2709,7 +2892,7 @@ void init_status_bar()
 {
 	char txt[64];
 
-	if ( status_on[0] || status_on[1] ) update_cols();
+	if ( status_on[0] || status_on[1] ) update_status_bar1();
 	if ( !status_on[0] )
 	{
 		gtk_label_set_text( GTK_LABEL(label_A), "" );
@@ -2868,4 +3051,16 @@ void register_file( char *filename )		// Called after successful load/save
 void scroll_wheel( int x, int y, int d )		// Scroll wheel action from mouse
 {
 	if ( d == 1 ) zoom_in( NULL, NULL ); else zoom_out( NULL, NULL );
+}
+
+void create_default_image()			// Create default new image
+{
+	int	nw = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH ),
+		nh = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT ),
+		nc = inifile_get_gint32("lastnewCols", 256 ),
+		nt = inifile_get_gint32("lastnewType", 2 ),
+		bpp = 1;
+
+	if ( nt == 0 || nt>2 ) bpp = 3;
+	do_new_one( nw, nh, nc, nt, bpp );
 }

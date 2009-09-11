@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -20,6 +20,7 @@
 #define PNG_READ_PACK_SUPPORTED
 #include <png.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #ifdef U_GIF
 #include <gif_lib.h>
@@ -38,6 +39,11 @@
 #include "otherwindow.h"
 #include "mygtk.h"
 #include "layer.h"
+
+
+char preserved_gif_filename[256];
+int preserved_gif_delay = 10;
+
 
 
 int load_png( char *file_name, int stype )
@@ -375,14 +381,14 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=laye
 
 	png_write_info(png_ptr, info_ptr);
 
-	if ( stype != 2 ) progress_init( mess, 0 );
+	if ( stype < 2 ) progress_init( mess, 0 );
 	for (i = 0; i<h; i++)
 	{
-		if (i%16 == 0 && stype != 2) progress_update( ((float) i) / h );
+		if (i%16 == 0 && stype < 2) progress_update( ((float) i) / h );
 		row_pointer = (png_bytep) (rgb + scaler*i*w);
 		png_write_row(png_ptr, row_pointer);
 	}
-	if ( stype != 2 ) progress_end();
+	if ( stype < 2 ) progress_end();
 
 	png_write_end(png_ptr, info_ptr);
 	png_destroy_write_struct(&png_ptr, &info_ptr);
@@ -393,7 +399,7 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=laye
 }
 
 
-int load_gif( char *file_name )
+int load_gif( char *file_name, int *delay )
 {
 #ifdef U_GIF
 	ColorMapObject *cmap = NULL;
@@ -406,7 +412,7 @@ int load_gif( char *file_name )
 
 	int width = -1, height = -1, cols = -1, i, j, k, val, transparency =-1;
 	int interlaced_offset[] = { 0, 4, 2, 1 }, interlaced_jumps[] = { 8, 8, 4, 2 };
-	int do_prog = 0, frames = 0;
+	int do_prog = 0, frames = 0, res = 1;
 
 	giffy = DGifOpenFileName( file_name );
 
@@ -500,6 +506,7 @@ int load_gif( char *file_name )
 					if ( byte_ext[1] % 2 == 1 && frames <= 1 )
 					{
 						transparency = byte_ext[4];
+						*delay = byte_ext[2] + (byte_ext[3]<<8);
 					}
 				}
 				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
@@ -509,11 +516,12 @@ int load_gif( char *file_name )
 	while ( gif_rec != TERMINATE_RECORD_TYPE );
 
 //printf("Total frames = %i\n", frames);
+	if ( frames > 1 ) res = FILE_GIF_ANIM;
 
 	mem_xpm_trans = transparency;
 
 	DGifCloseFile(giffy);
-	return 1;
+	return res;
 
 fail:
 	DGifCloseFile(giffy);
@@ -528,6 +536,15 @@ fail_too_huge:
 
 int save_gif( char *file_name )
 {
+	if ( mem_image_bpp != 1 ) return NOT_GIF;		// GIF save must be on indexed image
+
+	return save_gif_real( file_name, mem_image, mem_pal, mem_width, mem_height, mem_xpm_trans, 1 );
+}
+
+
+int save_gif_real( char *file_name,
+	unsigned char *im, png_color *pal, int w, int h, int trans, int skip )
+{
 #ifdef U_GIF
 	GifFileType *giffy;
 
@@ -537,40 +554,39 @@ int save_gif( char *file_name )
 	unsigned char gif_ext_data[8];
 	int i, j;
 
-	if ( mem_image_bpp != 1 ) return NOT_GIF;		// GIF save must be on indexed image
 
 	gif_map = MakeMapObject(256, gif_pal);
 	for ( i=0; i<256; i++ )					// Prepare GIF palette
 	{
-		gif_map->Colors[i].Red = mem_pal[i].red;
-		gif_map->Colors[i].Green = mem_pal[i].green;
-		gif_map->Colors[i].Blue = mem_pal[i].blue;
+		gif_map->Colors[i].Red	 = pal[i].red;
+		gif_map->Colors[i].Green = pal[i].green;
+		gif_map->Colors[i].Blue	 = pal[i].blue;
 	}
 
 	giffy = EGifOpenFileName(file_name, FALSE);
 	if ( giffy==NULL ) goto fail;
 
-	if ( EGifPutScreenDesc( giffy, mem_width, mem_height, 256, 0, gif_map )  == GIF_ERROR )
+	if ( EGifPutScreenDesc( giffy, w, h, 256, 0, gif_map )  == GIF_ERROR )
 		goto fail;
-	if ( mem_xpm_trans > -1 )
+	if ( trans > -1 )
 	{
 		gif_ext_data[0] = 1;
 		gif_ext_data[1] = 0;
 		gif_ext_data[2] = 0;
-		gif_ext_data[3] = mem_xpm_trans;
+		gif_ext_data[3] = trans;
 		EGifPutExtension( giffy, GRAPHICS_EXT_FUNC_CODE, 4, gif_ext_data );
 	}
-	if ( EGifPutImageDesc( giffy, 0, 0, mem_width, mem_height, FALSE, NULL )  == GIF_ERROR )
+	if ( EGifPutImageDesc( giffy, 0, 0, w, h, FALSE, NULL )  == GIF_ERROR )
 		goto fail;
 
-	progress_init(_("Saving GIF image"),0);
+	if ( skip == 1 ) progress_init(_("Saving GIF image"),0);
 
-	for ( j=0; j<mem_height; j++ )
+	for ( j=0; j<h; j++ )
 	{
-		if (j%16 == 0) progress_update( ((float) j) / mem_height );
-		EGifPutLine( giffy, mem_image + j*mem_width, mem_width );
+		if ( j%16 == 0 && skip == 1 ) progress_update( ((float) j) / h );
+		EGifPutLine( giffy, im + j*w, w );
 	}
-	progress_end();
+	if ( skip == 1 ) progress_end();
 
 	FreeMapObject( gif_map );
 	EGifCloseFile(giffy);
@@ -1565,23 +1581,47 @@ int file_extension_get( char *file_name )
 
 int save_image( char *file_name )	// Save current canvas to file - sense extension to set type
 {
-	int res = 0;
-	char *po;
+	char loname[260],
+		*ftypes[9] = {".xpm", ".xbm", ".jpg", "jpeg", ".gif", ".tif", "tiff", ".bmp", ".png" },
+		*ff1, *ff2 = NULL, *pbest;
+	int i, j, res = 0;
 
-	if ( strlen(file_name) > 3 )
+	strncpy( loname, file_name, 256 );
+	for ( i=0; i<256; i++ )			// Get lower case of filename
 	{
-		po = file_name + strlen(file_name) - 4;
-		if	( check_str( 4, ".xpm", po ) ) res = save_xpm( file_name );
-		else if	( check_str( 4, ".xbm", po ) ) res = save_xbm( file_name );
-		else if	( check_str( 4, ".jpg", po ) ) res = save_jpeg( file_name );
-		else if	( check_str( 4, "jpeg", po ) ) res = save_jpeg( file_name );
-		else if	( check_str( 4, ".gif", po ) ) res = save_gif( file_name );
-		else if	( check_str( 4, ".tif", po ) ) res = save_tiff( file_name );
-		else if	( check_str( 4, "tiff", po ) ) res = save_tiff( file_name );
-		else if	( check_str( 4, ".bmp", po ) ) res = save_bmp( file_name );
-		else res = save_png( file_name, 0 );
+		loname[i] = tolower( file_name[i] );
+		if ( file_name[i] == 0 ) break;
 	}
-	else res = save_png( file_name, 0 );
+
+	pbest = NULL;
+	j = 8;					// Default = PNG
+	for ( i=0; i<9; i++ )			// Get rightmost match of this file extension
+	{
+		ff1 = strstr( loname, ftypes[i] );	// Get 1st occurrence
+		while ( ff1 != NULL )			// Get rightmost
+		{
+			ff2 = ff1;
+			ff1 = strstr( ff2+1, ftypes[i] );
+		}
+		if ( ff2 > pbest )
+		{
+			pbest = ff2;
+			j = i;
+//printf("found match = %i\n", j);
+		}
+	}
+//printf("best match = %i\n", j);
+	// We have to check the whole filename in case its the Gifsicle filename *.gif.???
+
+	if ( j==0 ) res = save_xpm( file_name );
+	if ( j==1 ) res = save_xbm( file_name );
+	if ( j==2 ) res = save_jpeg( file_name );
+	if ( j==3 ) res = save_jpeg( file_name );
+	if ( j==4 ) res = save_gif( file_name );
+	if ( j==5 ) res = save_tiff( file_name );
+	if ( j==6 ) res = save_tiff( file_name );
+	if ( j==7 ) res = save_bmp( file_name );
+	if ( j==8 ) res = save_png( file_name, 0 );
 
 	return res;
 }

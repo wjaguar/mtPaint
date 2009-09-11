@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -36,6 +36,7 @@
 #include "quantizer.h"
 #include "layer.h"
 #include "wu.h"
+#include "ani.h"
 
 
 ///	NEW IMAGE WINDOW
@@ -328,7 +329,7 @@ static gint expose_colours( GtkWidget *widget, GdkEventExpose *event )
 	mtMIN( w, w, RGB_preview_width )
 	mtMIN( h, h, RGB_preview_width )
 
-	rgb = grab_memory( RGB_preview_width*RGB_preview_height*3, _("RGB colours"), 0 );
+	rgb = grab_memory( RGB_preview_width*RGB_preview_height*3, 0 );
 
 //	This expose event could be from either of the 4 areas, so update all
 //	This is very lazy, but it seems OK
@@ -762,7 +763,7 @@ void choose_pattern(int typ)			// Bring up pattern chooser (0) or brush (1)
 
 	if ( typ == 0 )
 	{
-		mem_patch = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, "pattern chooser RGB", 0 );
+		mem_patch = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, 0 );
 
 		for ( pattern = 0; pattern < 81; pattern++ )
 		{
@@ -944,7 +945,8 @@ void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	BACTERIA EFFECT
 
-int bac_type;			// Type of form needed 0=bacteria 1=blur
+int bac_type;
+	// Type of form needed 0-5 = bacteria, blur, sharpen, soften, rotate, set key frame
 GtkWidget *bacteria_window;
 GtkWidget *spin_bacteria, *bac_toggles[1];
 
@@ -965,21 +967,30 @@ gint bacteria_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	i = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spin_bacteria) );
 	angle = gtk_spin_button_get_value_as_float( GTK_SPIN_BUTTON(spin_bacteria) );
 
-	if (bac_type == 4)
+	if (bac_type >= 4)
 	{
-		if ( mem_image_bpp == 3 )
+		if ( bac_type == 5 )		// Set key frame
 		{
-			if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(bac_toggles[0])) )
-				smooth = 1;
-			else	smooth = 0;
+			ani_set_key_frame(i);
+			layers_notify_changed();
 		}
-		j = mem_rotate_free( angle, smooth );
-		if ( j == 0 ) canvas_undo_chores();
-		else
+		if ( bac_type == 4 )
 		{
-			if ( j == -5 ) alert_box(_("Error"),
-				_("The image is too large for this rotation."), _("OK"), NULL, NULL);
-			else memory_errors(j);
+			if ( mem_image_bpp == 3 )
+			{
+				if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(bac_toggles[0])) )
+					smooth = 1;
+				else	smooth = 0;
+			}
+			j = mem_rotate_free( angle, smooth );
+			if ( j == 0 ) canvas_undo_chores();
+			else
+			{
+				if ( j == -5 ) alert_box(_("Error"),
+					_("The image is too large for this rotation."),
+					_("OK"), NULL, NULL);
+				else memory_errors(j);
+			}
 		}
 	}
 	else
@@ -1032,6 +1043,13 @@ void bac_form( int type )
 		startv = 45;
 		min = -360;
 		max = 360;
+	}
+	if (type == 5)
+	{
+		title = _("Set Key Frame");
+		startv = ani_frame1;
+		min = ani_frame1;
+		max = ani_frame2;
 	}
 
 	bacteria_window = add_a_window(GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE);
@@ -1307,8 +1325,8 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 	}
 	if ( mem_image_bpp == 3 )
 	{
-		gtk_widget_queue_draw_area( drawing_canvas, 0, 0,
-			mem_width*can_zoom, mem_height*can_zoom );
+		gtk_widget_queue_draw_area( drawing_canvas, margin_main_x, margin_main_y,
+			mem_width*can_zoom+margin_main_x, mem_height*can_zoom+margin_main_y );
 	}
 
 	return FALSE;
@@ -1670,6 +1688,14 @@ gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
+static int scale_mode = 7;
+
+static void scale_mode_changed(GtkWidget *widget, gpointer name)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
+	scale_mode = (int) name;
+}
+
 gint click_sisca_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	gtk_widget_destroy(sisca_window);
@@ -1687,11 +1713,12 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
 	if ( nw != mem_width || nh != mem_height )
 	{
+		// Needed in Windows to stop GTK+ lowering the main window below window underneath
+		gtk_window_set_transient_for( GTK_WINDOW(sisca_window), NULL );
+
 		if ( sisca_scale )
 		{
-			if ( mem_image_bpp == 3 )
-				if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[1])))
-					scale_type = 1;
+			if ( mem_image_bpp == 3 ) scale_type = scale_mode;
 			res = mem_image_scale( nw, nh, scale_type );
 		}
 		else 
@@ -1737,6 +1764,18 @@ gint click_sisca_centre( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 void sisca_init( char *title )
 {
+	gchar* scale_fnames[] = {
+		_("Nearest Neighbour"),
+		_("Bilinear / Area Mapping"),
+		_("Bicubic"),
+		_("Bicubic edged"),
+		_("Bicubic better"),
+		_("Bicubic sharper"),
+		_("Lanczos3"),
+		_("Blackman-Harris"),
+		NULL
+	};
+
 	GtkWidget *button_ok, *button_cancel, *button_centre, *sisca_vbox, *sisca_hbox;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
@@ -1799,7 +1838,23 @@ void sisca_init( char *title )
 	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
 		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
 	if ( mem_image_bpp == 3 && sisca_scale )
-		sisca_toggles[1] = add_a_toggle( _("Smooth"), sisca_vbox, TRUE );
+	{
+		GtkWidget *btn = NULL;
+		int i;
+
+		add_hseparator( sisca_vbox, -2, 10 );
+		for (i = 0; scale_fnames[i]; i++)
+		{
+			btn = add_radio_button(scale_fnames[i], NULL, btn,
+				sisca_vbox, i + 1);
+			if (scale_mode == i)
+				gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(btn), TRUE);
+			gtk_signal_connect(GTK_OBJECT(btn), "toggled",
+				GTK_SIGNAL_FUNC(scale_mode_changed),
+				(gpointer)(i));
+		}
+		if (scale_mode >= i) scale_mode = 0;
+	}
 
 	add_hseparator( sisca_vbox, -2, 10 );
 

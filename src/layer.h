@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -23,6 +23,9 @@
 #define LAYERS_HEADER "# mtPaint layers"
 #define LAYERS_VERSION 1
 
+#define ANIMATION_HEADER "# mtPaint animation"
+#define MAX_POS_SLOTS 100
+#define TOT_POS_ITEMS 5
 
 ///	GLOBALS
 
@@ -44,6 +47,8 @@ typedef struct
 
 	char mem_prot_mask[256];
 	int mem_prot;
+
+	int ani_pos[MAX_POS_SLOTS][5];
 } layer_image;				// All as per memory.h definitions
 
 typedef struct
@@ -66,7 +71,8 @@ int	layers_total,			// Layers currently in use
 
 char	layers_filename[256];		// Current filename for layers file
 unsigned char *layer_rgb;		// Memory containing composite layers image
-gboolean show_layers_main;		// Show all layers in main window
+gboolean show_layers_main,		// Show all layers in main window
+	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
 
 
@@ -75,11 +81,12 @@ gboolean show_layers_main;		// Show all layers in main window
 void layers_init();
 void pressed_layers( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data );
-gint delete_layers_window( GtkWidget *widget, GdkEvent *event, gpointer data );
+void delete_layers_window();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );
 gboolean layers_check_header( char *file_name );
+void layer_press_save();
 
 void layers_notify_changed();
 void layers_remove_all();
@@ -89,3 +96,6 @@ void layer_new( int w, int h, int type, int cols );	// Types 1=indexed, 2=grey, 
 void layer_choose( int l );				// Select a new layer from the list
 
 void layer_iconbar_click(GtkWidget *widget, gpointer data);
+
+void string_chop( char *txt );
+int read_file_num(FILE *fp, char *txt);

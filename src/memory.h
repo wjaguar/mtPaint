@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -54,6 +54,10 @@ typedef struct
 	png_color pal[256];
 	int cols, width, height, bpp;
 } undo_item;
+
+/// Tint tool - contributed by Dmitry Groshev, January 2006
+
+int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 /// IMAGE
 
@@ -139,8 +143,14 @@ int mem_histogram[256];
 
 /// Procedures
 
-int mem_count_all_cols();			// Count all colours - very memory greedy
-int mem_cols_used(int max_count);		// Count colours used in RGB image
+int mem_count_all_cols();			// Count all colours - Using main image
+int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy
+
+int mem_cols_used(int max_count);		// Count colours used in main RGB image
+int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog);
+			// Count colours used in RGB chunk and dump to found table
+void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready for DL code
+
 
 int get_next_line(char *input, int length, FILE *fp);		// Get next length chars of text file
 int mt_round( float n );			// Round a float to nearest whole number
@@ -152,7 +162,7 @@ char get_hex( int in );				// Turn 0..15 into hex
 int read_hex_dub( char *in );			// Read hex double
 void clear_file_flags();		// Reset various file flags, e.g. XPM/XBM after new/load gif etc
 
-char *grab_memory( int size, char *text, char byte );	// Malloc memory, reset all bytes
+char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
 int mem_new( int width, int height, int bpp );	// Allocate space for new image, removing old if needed
 int valid_file( char *filename );		// Can this file be opened for reading?
 void mem_init();				// Initialise memory
@@ -228,6 +238,7 @@ int undo_next_core( int handle, int new_width, int new_height, int x_start, int 
 //// Drawing Primitives
 
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
+int mem_clip_scale_alpha();				// Extract alpha info from RGB clipboard
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
@@ -271,7 +282,7 @@ void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse 
 #define PNG_2_INT(var) (var.red << 16) + (var.green << 8) + (var.blue)
 #define MEM_2_INT(mem,off) (mem[off] << 16) + (mem[off+1] << 8) + mem[off+2]
 
-#define PUT_PIXEL(x,y) if (mem_prot_mask[mem_image[x + (y)*mem_width]] == 0) mem_image[x + (y)*mem_width] = mem_col_pat[((x) % 8) + 8*((y) % 8)];
+#define PUT_PIXEL(x,y) put_pixel(x,y);
 
 #define PUT_PIXEL24(x,y) put_pixel24(x,y);
 
@@ -282,6 +293,7 @@ void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse 
 #define POSTERIZE_MACRO res = 0.49 + ( ((1 << posty) - 1) * ((float) res)/255);\
 			res = 0.49 + 255 * ( ((float) res) / ((1 << posty) - 1) );
 
+void put_pixel( int x, int y );					// paletted version
 png_color get_pixel24( int x, int y );				// RGB version
 void put_pixel24( int x, int y );				// RGB version
 

@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -17,7 +17,7 @@
 	along with mtPaint in the file COPYING.
 */
 
-int help_page_count = 13
+int help_page_count = 14
 ;
 char *help_page_titles[] = {
 _("General"),
@@ -28,6 +28,7 @@ _("Tools"),
 _("Selections"),
 _("The Clipboard"),
 _("Layers"),
+_("Animation"),
 _("Keyboard shortcuts"),
 _("Mouse shortcuts"),
 _("Limitations"),
@@ -37,7 +38,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 2.20 - Copyright (C) 2004, 2005 Mark Tyler\n"
+"mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler\n"
 "\n"
 "mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.\n"
 "\n"
@@ -51,7 +52,7 @@ _("\n"
 _("\n"
 "mtPaint can handle the following file formats:\n"
 "\n"
-"PNG	Load/Save indexed palette and 24 bit RGB\n"
+"PNG	Load/Save indexed palette and 24 bit RGB with optional transparency index\n"
 "\n"
 "JPEG	Load 24 bit RGB & Greyscale. Save 24 bit RGB - Quality set by Preferences window\n"
 "\n"
@@ -59,22 +60,13 @@ _("\n"
 "\n"
 "XBM	Load/Save - Including hotspot via Preferences->Files\n"
 "\n"
-"GIF	Load/Save single image indexed palette\n"
+"GIF	Load/Save single image indexed palette with optional transparency index. If you have Gifsicle installed you can also load and save animated GIF files.\n"
 "\n"
 "TIFF	Load/Save 24 bit RGB\n"
 "\n"
 "BMP	Load/Save uncompressed 1, 4, 8 bit indexed palette or 24 bit RGB\n"
 "\n"
-"When loading a file, mtPaint will automatically determine what the file format is and load it accordingly.  When saving, mtPaint assumes you want to save a PNG format file unless the extension is one of the following (case insensitive):\n"
-"\n"
-"JPEG\n"
-".JPG\n"
-"TIFF\n"
-".TIF\n"
-".GIF\n"
-".BMP\n"
-".XPM\n"
-".XBM\n"
+"When loading a file, mtPaint will automatically determine what the file format is and load it accordingly.\n"
 "\n"
 "When loading an image file which contains meta data (e.g. image author or comments), mtPaint does not save this data so if this is important to you then you will need to save a new file to avoid losing data that is in the original file.\n"
 "\n"
@@ -90,9 +82,10 @@ _("\n"
 "	2) Image -> Greyscale\n"
 "	3) Effects -> Contrast : Ensure that the image has a strong contrast between black and white areas\n"
 "	4) Palette -> Set Palette Size : to 16\n"
-"	5) Palette -> Create Scale : using default numbers\n"
-"	6) Image -> Convert To Indexed : using 16 colours and Quantize to palette\n"
-"	7) File -> Export ASCII Art : to ~/a.txt\n"
+"	5) Set A as colour 0 (black) and B as colour 15 (white)\n"
+"	6) Palette -> Create Scale\n"
+"	7) Image -> Convert To Indexed : using 16 colours and Quantize to palette\n"
+"	8) File -> Export ASCII Art : to ~/a.txt\n"
 "\n"
 "~/a.txt will then contain an ASCII version of the image that should be viewed in an editor or console with a dark background and light text.  If you use a light background with dark text, simply invert the image after step 2).\n"
 ),
@@ -119,7 +112,7 @@ _("\n"
 "\n"
 "This option removes any palette colours that do not have pixels on the canvas, and updates the canvas to reflect any index changes.\n"
 "\n"
-"It is possible to generate scales within the whole palette.  To do this selection the 'Create Scale' from the Palette menu.  You then set the start index and RGB values and then the end index and RGB values.  mtPaint will then calculate the in between values.\n"
+"It is possible to generate scales within the whole palette.  To do this selection the first colour as A and the second colour as B and the select 'Create Scale' from the Palette menu.  mtPaint will then calculate the in between values.\n"
 "\n"
 "It is possible to move a colour entry from one index to another in the palette list.  To do this, try the following:\n"
 "\n"
@@ -164,6 +157,8 @@ _("\n"
 "The clone tool is used to copy chunks from one part of the image to the other.  After selecting the clone tool you must set the tool size, e.g. 25, then move the mouse cursor over the canvas area.  Then if you hold the Ctrl key down and move the mouse you will see the tool perimeter (black and white) move away from the clone perimeter (black and red).  After releasing Ctrl you can then press the left mouse button to copy from the red/black box to the white/black box.  When editing an RGB image you can also use variable opacity - this behaviour is governed by whether you are using 'Opacity Undo Mode' or not fom the Edit menu.\n"
 "\n"
 "If you have configured a pressure sensitive graphics tablet you can use this device in mtPaint.  To configure this input you use the Tablet section of the preferences window where you must choose the device and then determine which variables the pressure will vary.\n"
+"\n"
+"The tint mode is used by the painting tools to adjust the canvas pixel relative to the current painting pattern and colour.  In RGB mode this means adjusting each RGB channel, and in indexed mode the pixel index is changed.  When using the normal paint brushes the left mouse button tints by adding, and the right mouse button tints by subtracting.  For lines, rectangles, ellipses and polygons you set the +- toggle to determine the direction.\n"
 ),
 _("\n"
 "In order to make a selection you press the 'Make Selection' icon on the toolbar or press Ctrl-A to select the whole image.  You then click the left mouse button on the canvas and drag the rectangle to the area you want to select.  To clear this selection press Escape, the right mouse button, Ctrl+Shift-A or use the Edit menu.  The selection box can be moved around pixel by pixel by using the arrow keys.  Pressing Shift and the arrow keys causes the selection box to be moved a set number of pixels determined by the Preferences window.  After you have made a selection you can click and drag the corners to new positions.  With the tool mouse cursor option switched on you will see the relevant corner arrow to indicate this new behaviour.\n"
@@ -242,6 +237,37 @@ _("\n"
 "When using layers, the undo memory limit set in the preferences window must be divided by the number of layers to determine the limit per layer.  For example, with a 32MB limit and 4 layers there is an 8MB limit per layer for the undo.\n"
 "\n"
 "To see examples of layers, try \"mtpaint ./src/graphics/*.txt\" from the sources tarball.\n"
+),
+_("\n"
+"If you have created a composite image with 2 or more layers you can use mtPaint to automatically move these layers in a sequence.  The results can be previewed and then output to a series of image files ready for packing into an animation, such as a GIF or MPEG file.\n"
+"\n"
+"The first step is to create the image layers and save the layers file.  Once you have done this you need to plan and coordinate what layers will move at what moment in time.  Once this is clear in your mind you can use the Frames menu to set up and configure your animation.\n"
+"\n"
+"Initially you must set up general issues like frame numbers, file names and so on.  You must then set the layer positions for each of the frames.  A quick way to set this is to use the \"Set key frame\" menu operation.\n"
+"\n"
+"The positions tab will show you each of the current layers in a list on the left.  If you click on one of these you can then edit the text box on the right to set the positions for this layer.  You are able to define up to 100 positions for each layer, with a separate line for each position.  5 numbers should be entered into each line, with a tab separating each number.  The syntax is as follows:\n"
+"\n"
+"  frame	x	y	opacity	effect\n"
+"\n"
+"For this to work properly each successive line must have a frame number that is greater than or equal to the previous line.\n"
+"\n"
+"There is also a cycles tab which is used to determine which layers are visible at any particular time.  Up to 100 lines can be entered in the following format:\n"
+"\n"
+"  frame1	frame2	layer1, layer2, layer3, ... , layer50\n"
+"\n"
+"Up to 50 layers can be listed on each line.  Between the 2 frames of the animation only one of the sequence will be visible, with the others being switched off.  As the frame increments, the next layer in the sequence will be shown, and the previous one hidden.\n"
+"\n"
+"For example:\n"
+"\n"
+"  1	10	1, 2, 3\n"
+"\n"
+"Will cycle the visibility of layers 1, 2, 3 between frames 1 and 10.\n"
+"\n"
+"Normally frame2 will be greater than frame1, but if they are equal you can then manually set which layers are visible or invisible at that frame.  For example:\n"
+"\n"
+"  15	15	10, 11, 12, -1, -2, -3\n"
+"\n"
+"Will show layers 10, 11, 12 and hide layers 1, 2, 3 at frame 15.\n"
 ),
 _("\n"
 "  Ctrl-N            Create new image\n"
@@ -432,6 +458,7 @@ _("\n"
 "Alexandre Prokoudine - Feedback/ideas\n"
 "Antonio Andrea Bianco - Feedback/ideas\n"
 "Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c for more information\n"
+"Dmitry Groshev - Wrote the code for tint mode and image scaling\n"
 "Ed Jason - Feedback/ideas\n"
 "Guadalinex Team (Junta de Andalucia) - Feedback/ideas, man page, Launchpad/Rosetta registration\n"
 "Lou Afonso - Feedback/ideas\n"
@@ -450,5 +477,7 @@ _("\n"
 "French - Nicolas Velin, Pascal Billard\n"
 "Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia)\n"
+"\n"
+"Animated GIF file support is provided by Gifsicle which was written by Eddie Kohler - http://www.lcdf.org/gifsicle/\n"
 ),
 NULL };

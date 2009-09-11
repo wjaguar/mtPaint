@@ -27,7 +27,7 @@ mtPaint can accept one of the following options:
 
 mtPaint can handle the following file formats:
 
-PNG	Load/Save indexed palette and 24 bit RGB
+PNG	Load/Save indexed palette and 24 bit RGB with optional transparency index
 
 JPEG	Load 24 bit RGB & Greyscale. Save 24 bit RGB - Quality set by Preferences window
 
@@ -35,22 +35,13 @@ XPM	Load/Save indexed palette - Including transparency index via Preferences->Fi
 
 XBM	Load/Save - Including hotspot via Preferences->Files
 
-GIF	Load/Save single image indexed palette
+GIF	Load/Save single image indexed palette with optional transparency index. If you have Gifsicle installed you can also load and save animated GIF files.
 
 TIFF	Load/Save 24 bit RGB
 
 BMP	Load/Save uncompressed 1, 4, 8 bit indexed palette or 24 bit RGB
 
-When loading a file, mtPaint will automatically determine what the file format is and load it accordingly.  When saving, mtPaint assumes you want to save a PNG format file unless the extension is one of the following (case insensitive):
-
-JPEG
-.JPG
-TIFF
-.TIF
-.GIF
-.BMP
-.XPM
-.XBM
+When loading a file, mtPaint will automatically determine what the file format is and load it accordingly.
 
 When loading an image file which contains meta data (e.g. image author or comments), mtPaint does not save this data so if this is important to you then you will need to save a new file to avoid losing data that is in the original file.
 
@@ -66,9 +57,10 @@ mtPaint can export an indexed image with 16 or fewer colours to an ASCII Art tex
 	2) Image -> Greyscale
 	3) Effects -> Contrast : Ensure that the image has a strong contrast between black and white areas
 	4) Palette -> Set Palette Size : to 16
-	5) Palette -> Create Scale : using default numbers
-	6) Image -> Convert To Indexed : using 16 colours and Quantize to palette
-	7) File -> Export ASCII Art : to ~/a.txt
+	5) Set A as colour 0 (black) and B as colour 15 (white)
+	6) Palette -> Create Scale
+	7) Image -> Convert To Indexed : using 16 colours and Quantize to palette
+	8) File -> Export ASCII Art : to ~/a.txt
 
 ~/a.txt will then contain an ASCII version of the image that should be viewed in an editor or console with a dark background and light text.  If you use a light background with dark text, simply invert the image after step 2).
 
@@ -96,7 +88,7 @@ This option will find identical palette colours and then scan the canvas to ensu
 
 This option removes any palette colours that do not have pixels on the canvas, and updates the canvas to reflect any index changes.
 
-It is possible to generate scales within the whole palette.  To do this selection the 'Create Scale' from the Palette menu.  You then set the start index and RGB values and then the end index and RGB values.  mtPaint will then calculate the in between values.
+It is possible to generate scales within the whole palette.  To do this selection the first colour as A and the second colour as B and the select 'Create Scale' from the Palette menu.  mtPaint will then calculate the in between values.
 
 It is possible to move a colour entry from one index to another in the palette list.  To do this, try the following:
 
@@ -143,6 +135,8 @@ If you are editing an image at a high zoom and you would like to see what the no
 The clone tool is used to copy chunks from one part of the image to the other.  After selecting the clone tool you must set the tool size, e.g. 25, then move the mouse cursor over the canvas area.  Then if you hold the Ctrl key down and move the mouse you will see the tool perimeter (black and white) move away from the clone perimeter (black and red).  After releasing Ctrl you can then press the left mouse button to copy from the red/black box to the white/black box.  When editing an RGB image you can also use variable opacity - this behaviour is governed by whether you are using 'Opacity Undo Mode' or not fom the Edit menu.
 
 If you have configured a pressure sensitive graphics tablet you can use this device in mtPaint.  To configure this input you use the Tablet section of the preferences window where you must choose the device and then determine which variables the pressure will vary.
+
+The tint mode is used by the painting tools to adjust the canvas pixel relative to the current painting pattern and colour.  In RGB mode this means adjusting each RGB channel, and in indexed mode the pixel index is changed.  When using the normal paint brushes the left mouse button tints by adding, and the right mouse button tints by subtracting.  For lines, rectangles, ellipses and polygons you set the +- toggle to determine the direction.
 
 =head2 Selections
 
@@ -224,6 +218,38 @@ After saving the layers text file you must not move it anywhere else unless you 
 When using layers, the undo memory limit set in the preferences window must be divided by the number of layers to determine the limit per layer.  For example, with a 32MB limit and 4 layers there is an 8MB limit per layer for the undo.
 
 To see examples of layers, try "mtpaint ./src/graphics/*.txt" from the sources tarball.
+
+=head2 Animation
+
+If you have created a composite image with 2 or more layers you can use mtPaint to automatically move these layers in a sequence.  The results can be previewed and then output to a series of image files ready for packing into an animation, such as a GIF or MPEG file.
+
+The first step is to create the image layers and save the layers file.  Once you have done this you need to plan and coordinate what layers will move at what moment in time.  Once this is clear in your mind you can use the Frames menu to set up and configure your animation.
+
+Initially you must set up general issues like frame numbers, file names and so on.  You must then set the layer positions for each of the frames.  A quick way to set this is to use the "Set key frame" menu operation.
+
+The positions tab will show you each of the current layers in a list on the left.  If you click on one of these you can then edit the text box on the right to set the positions for this layer.  You are able to define up to 100 positions for each layer, with a separate line for each position.  5 numbers should be entered into each line, with a tab separating each number.  The syntax is as follows:
+
+  frame	x	y	opacity	effect
+
+For this to work properly each successive line must have a frame number that is greater than or equal to the previous line.
+
+There is also a cycles tab which is used to determine which layers are visible at any particular time.  Up to 100 lines can be entered in the following format:
+
+  frame1	frame2	layer1, layer2, layer3, ... , layer50
+
+Up to 50 layers can be listed on each line.  Between the 2 frames of the animation only one of the sequence will be visible, with the others being switched off.  As the frame increments, the next layer in the sequence will be shown, and the previous one hidden.
+
+For example:
+
+  1	10	1, 2, 3
+
+Will cycle the visibility of layers 1, 2, 3 between frames 1 and 10.
+
+Normally frame2 will be greater than frame1, but if they are equal you can then manually set which layers are visible or invisible at that frame.  For example:
+
+  15	15	10, 11, 12, -1, -2, -3
+
+Will show layers 10, 11, 12 and hide layers 1, 2, 3 at frame 15.
 
 =head2 Keyboard shortcuts
 

@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -228,7 +228,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 		label2 = gtk_label_new (help_page_contents[i]);
 #if GTK_MAJOR_VERSION == 2
-		if ( i == 8 || i == 9 )	// Keyboard/Mouse shortcuts tab only
+		if ( i == 10 || i == 9 )	// Keyboard/Mouse shortcuts tab only
 		{
 			style = gtk_style_copy (gtk_widget_get_style (label2));
 			style->font_desc = pango_font_description_from_string("Monospace 9");
@@ -537,7 +537,7 @@ void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
 	mtMAX(pan_w, pan_w, 1)
 	mtMAX(pan_h, pan_h, 1)
 
-	pan_rgb = grab_memory( 3*pan_w*pan_h, "Pan window RGB", 0 );
+	pan_rgb = grab_memory( 3*pan_w*pan_h, 0 );
 
 	pan_thumbnail();
 
@@ -593,7 +593,9 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 		dox = 0, doy = 0,	// Destination offsets from 0,0 of rgb memory
 		sox, soy,		// Source offsets from 0,0 of layer
 		bw, bh,			// Background image width/height
-		canz = zoom, q;
+		canz = zoom, q,
+		px2, py2
+		;
 
 	if ( zoom < 1 ) canz = mt_round(1/zoom);
 
@@ -630,30 +632,7 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 		pw2 = pw;
 		ph2 = ph;
 
-		if ( l==0 )
-		{
-			if ( px>=0 )
-				sox = px;
-			else
-			{
-				sox = 0;
-				dox = -px;
-				pw2 = pw2 + px;		// Gap 1y
-			}
-			if ( py>=0 )
-				soy = py;
-			else
-			{
-				soy = 0;
-				doy = -py;
-				ph2 = ph2 + py;		// Gap 1y
-			}
-
-			if ( (sox+pw2) >= lw*zoom ) pw2 = lw*zoom - sox;
-			if ( (soy+ph2) >= lh*zoom ) ph2 = lh*zoom - soy;
-					// Update image only not space beyond
-		}
-		else
+		if ( l>0 )
 		{
 			visible = layer_table[l].visible;
 			lx = layer_table[l].x;
@@ -663,66 +642,74 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 
 			use_trans = layer_table[l].use_trans;
 			trans = layer_table[l].trans;
+		}
 
-			if ( zoom<1 )
-			{
-				q = lx - px*canz;
-				if ( q>=0 ) q = q/canz;
-				else q = (q - canz + 1)/canz;
-			} else q = lx*zoom - px;
+		if ( zoom<1 )
+		{
+			q = lx - px*canz;
+			if ( q>=0 ) q = q/canz;
+			else q = (q - canz + 1)/canz;
+		} else q = lx*zoom - px;
 
-			if ( q<0 )
-			{
-				sox = -q;
-				dox = 0;
-			}
-			else
-			{
-				sox = 0;
-				dox = q;
-				pw2 = pw2 - q;		// Gap 1
-			}
-			if ( (px+pw) > (lx+lw)*zoom )
-				pw2 = pw2 - ( (px+pw) - (lx+lw)*zoom );	// Gap 2
+		if ( q<0 )
+		{
+			sox = -q;
+			dox = 0;
+		}
+		else
+		{
+			sox = 0;
+			dox = q;
+			pw2 = pw2 - q;		// Gap 1
+		}
+		if ( (px+pw) > (lx+lw)*zoom )
+			pw2 = pw2 - ( (px+pw) - (lx+lw)*zoom );	// Gap 2
 
 			
-			if ( zoom<1 )
-			{
-				q = ly - py*canz;
-				if ( q>=0 ) q = q/canz;
-				else q = (q - canz + 1)/canz;
-			} else q = ly*zoom - py;
+		if ( zoom<1 )
+		{
+			q = ly - py*canz;
+			if ( q>=0 ) q = q/canz;
+			else q = (q - canz + 1)/canz;
+		} else q = ly*zoom - py;
 
-			if ( q<0 )
-			{
-				soy = -q;
-				doy = 0;
-			}
-			else
-			{
-				soy = 0;
-				doy = q;
-				ph2 = ph2 - q;		// Gap 1y
-			}
-			if ( (py+ph) > (ly+lh)*zoom )
-				ph2 = ph2 - ( (py+ph) - (ly+lh)*zoom );	// Gap 2y
+		if ( q<0 )
+		{
+			soy = -q;
+			doy = 0;
 		}
-/*		if ( (px+dox+pw2) > bw )
-			pw2 = pw2 - ( px+dox+pw2-bw );		// Pastry cut
-		if ( (py+doy+ph2) > bh )
-			ph2 = ph2 - ( py+doy+ph2-bh );		// Pastry cut
-*/
+		else
+		{
+			soy = 0;
+			doy = q;
+			ph2 = ph2 - q;		// Gap 1y
+		}
+		if ( (py+ph) > (ly+lh)*zoom )
+			ph2 = ph2 - ( (py+ph) - (ly+lh)*zoom );	// Gap 2y
+
+		px2 = 0;
+		py2 = 0;
+
+		if ( layers_pastry_cut && l>0 )	// Useful for animation previewing
+		{
+			if ( (px+dox+pw2) > bw ) pw2 = pw2 - ( px+dox+pw2-bw );	// To right
+			if ( (py+doy+ph2) > bh ) ph2 = ph2 - ( py+doy+ph2-bh );	// Below
+
+			if ( (px+dox)<0 ) px2 = -(px+dox);	// To left of background
+			if ( (py+doy)<0 ) py2 = -(py+doy);	// Above
+		}
+//printf("xy = %i %i\n", px2, py2);
 		if ( rgb>0 && visible )
 		{
 			if ( bpp == 1 && zoom<1 )		// Indexed image --100%
 			{
-				for ( iy=0; iy<ph2; iy++ )
+				for ( iy=py2; iy<ph2; iy++ )
 				{
 					offd = 3*((iy + doy)*pw + dox);
 					offs = ((iy + soy)*canz)*lw;
 
 					if ( use_trans )	// Transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						pix = source[offs + (sox+ix)*canz];
 
@@ -734,7 +721,7 @@ rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 1
 						}
 					}
 					else			// No transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						pix = source[offs + (sox+ix)*canz];
 
@@ -746,13 +733,13 @@ rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 1
 			}
 			if ( bpp == 1 && zoom>=1 )		// Indexed image 100%++
 			{
-				for ( iy=0; iy<ph2; iy++ )
+				for ( iy=py2; iy<ph2; iy++ )
 				{
 					offd = 3*((iy + doy)*pw + dox);
 					offs = (iy + soy)/canz*lw;
 
 					if ( use_trans )	// Transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						pix = source[offs + (sox+ix)/canz];
 
@@ -764,7 +751,7 @@ rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 1
 						}
 					}
 					else			// No transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						pix = source[offs + (sox+ix)/canz];
 
@@ -776,12 +763,12 @@ rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 1
 			}
 			if ( bpp == 3 && zoom<1 )		// RGB image --100%
 			{
-				for ( iy=0; iy<ph2; iy++ )
+				for ( iy=py2; iy<ph2; iy++ )
 				{
 					offd = 3*((iy + doy)*pw + dox);
 					offs = 3*( (iy + soy)*canz*lw );
 					if ( use_trans )	// Transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						offs2 = 3*((sox+ix)*canz);
 						if ( pix24 != MEM_2_INT(source, (offs + offs2)) )
@@ -792,7 +779,7 @@ rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 +
 						}
 					}
 					else			// No transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						offs2 = 3*((sox+ix)*canz);
 rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
@@ -803,12 +790,12 @@ rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 +
 			}
 			if ( bpp == 3 && zoom>=1 )		// RGB image 100%++
 			{
-				for ( iy=0; iy<ph2; iy++ )
+				for ( iy=py2; iy<ph2; iy++ )
 				{
 					offd = 3*((iy + doy)*pw + dox);
 					offs = 3*( (iy + soy)/canz*lw );
 					if ( use_trans )	// Transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						offs2 = 3*((sox+ix)/canz);
 						if ( pix24 != MEM_2_INT(source, (offs + offs2)) )
@@ -819,7 +806,7 @@ rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 +
 						}
 					}
 					else			// No transparent colour in use
-					for ( ix=0; ix<pw2; ix++ )
+					for ( ix=px2; ix<pw2; ix++ )
 					{
 						offs2 = 3*((sox+ix)/canz);
 rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
@@ -907,10 +894,43 @@ static void vw_focus( GtkWidget *widget, gpointer *data )
 	vw_focus_view();
 }
 
-void vw_repaint( int px, int py, int pw, int ph )
+
+gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 {
-	unsigned char *rgb;
+	int ww = widget->allocation.width, wh = widget->allocation.height
+		, new_margin_x = margin_view_x, new_margin_y = margin_view_y
+		;
+
+	if ( canvas_image_centre )
+	{
+		if ( ww > vw_width ) new_margin_x = (ww - vw_width) / 2;
+		else new_margin_x = 0;
+
+		if ( wh > vw_height ) new_margin_y = (wh - vw_height) / 2;
+		else new_margin_y = 0;
+	}
+	else
+	{
+		new_margin_x = 0;
+		new_margin_y = 0;
+	}
+
+	if ( new_margin_x != margin_view_x || new_margin_y != margin_view_y )
+	{
+		gtk_widget_queue_draw(vw_drawing);
+			// Force redraw of whole canvas as the margin has shifted
+		margin_view_x = new_margin_x;
+		margin_view_y = new_margin_y;
+	}
+
+	return TRUE;
+}
+
+void vw_align_size( float new_zoom )
+{
 	int sw = mem_width, sh = mem_height;
+
+	vw_zoom = new_zoom;
 
 	if ( layers_total>0 && layer_selected!=0 )
 	{
@@ -925,20 +945,25 @@ void vw_repaint( int px, int py, int pw, int ph )
 	{
 		vw_width = sw;
 		vw_height = sh;
-		vw_focus_view();
 		gtk_widget_set_usize( vw_drawing, vw_width, vw_height );
 	}
+	vw_focus_view();
+}
+
+void vw_repaint( int px, int py, int pw, int ph )
+{
+	unsigned char *rgb;
 
 	mtMAX(px, px, 0)
 	mtMAX(py, py, 0)
 	if ( pw<=0 || ph<=0 ) return;
 
-	rgb = grab_memory( pw*ph*3, "screen RGB redraw", mem_background );
+	rgb = grab_memory( pw*ph*3, mem_background );
 
 	if ( rgb != NULL )
 	{
 
-		view_render_rgb( rgb, px, py, pw, ph, vw_zoom );
+		view_render_rgb( rgb, px - margin_view_x, py - margin_view_y, pw, ph, vw_zoom );
 		gdk_draw_rgb_image ( vw_drawing->window, vw_drawing->style->black_gc,
 			px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
 
@@ -970,7 +995,8 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 		y += layer_table[layer_selected].y;
 	}
 
-	gtk_widget_queue_draw_area( vw_drawing, x*vw_zoom, y*vw_zoom,
+	gtk_widget_queue_draw_area( vw_drawing,
+		x*vw_zoom + margin_view_x, y*vw_zoom + margin_view_y,
 		mt_round(w*vw_zoom), mt_round(h*vw_zoom) );
 }
 
@@ -980,8 +1006,8 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 	int dx, dy, i, lx, ly, lw, lh, bpp, pix24;
 	png_color pcol, *pal;
 
-	x /= vw_zoom;
-	y /= vw_zoom;
+	x = (x - margin_view_x) / vw_zoom;
+	y = (y - margin_view_y) / vw_zoom;
 
 	if ( button != 0 && layers_total>0 )
 	{
@@ -1129,6 +1155,8 @@ void init_view( GtkWidget *canvas, GtkWidget *scroll )
 	vw_scrolledwindow = scroll;
 	vw_drawing = canvas;
 
+	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "configure_event",
+		GTK_SIGNAL_FUNC (vw_configure), GTK_OBJECT(vw_drawing) );
 	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "expose_event",
 		GTK_SIGNAL_FUNC (vw_expose), GTK_OBJECT(vw_drawing) );
 
@@ -1220,9 +1248,6 @@ gint render_text( GtkWidget *widget )
 
 #if GTK_MINOR_VERSION >= 6
 	degs = inifile_get_gfloat( "fontAngle", 0.0 );
-#ifdef WIN32
-	degs = -degs;
-#endif
 	angle = G_PI*degs/180;
 
 	if ( antialias[2] )		// Rotation Toggle
@@ -1240,10 +1265,6 @@ gint render_text( GtkWidget *widget )
 	{
 		w2 = abs(width * cos(angle)) + abs(height * sin(angle));
 		h2 = abs(width * sin(angle)) + abs(height * cos(angle));
-#ifdef WIN32
-		tx = tx + ( height * sin(angle) );
-		ty = ty - ( width * sin(angle) );
-#endif
 		width = w2;
 		height = h2;
 	}
@@ -1566,7 +1587,8 @@ void setzoom_view_change( GtkWidget *widget, gpointer data )
 	if ( i<9 ) new_zoom = 1 / (float) (10-i);
 	else new_zoom = i-8;
 
-	vw_zoom = new_zoom;
+	vw_align_size( new_zoom );
+//	vw_zoom = new_zoom;
 
 	if ( view_showing ) gtk_widget_queue_draw( vw_drawing );
 }

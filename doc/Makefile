@@ -13,5 +13,8 @@ install:
 	mkdir -p $(MT_MAN_DEST)
 	cp $(MAN_PAGE).gz $(MT_MAN_DEST)
 
+uninstall:
+	rm $(MT_MAN_DEST)/$(MAN_PAGE).gz
+
 clean:
 	rm *.gz

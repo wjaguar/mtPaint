@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -39,7 +39,6 @@ int main( int argc, char *argv[] )
 {
 	gboolean new_empty = TRUE, get_screenshot = FALSE;
 	char ppath[256];
-	int nw, nh, nc, nt, bpp = 1;
 
 	if (argc > 1)
 	{
@@ -85,13 +84,19 @@ int main( int argc, char *argv[] )
 	if (argc > 1)		// Argument received, so assume user is trying to load a file
 	{
 		file_arg_start = 1;
-		if ( strcmp(argv[1], "-v") == 0 )
+		if ( strcmp(argv[1], "-g") == 0 )	// Loading GIF animation frames
+		{
+			file_arg_start+=2;
+			files_passed-=2;
+			sscanf(argv[2], "%i", &preserved_gif_delay);
+		}
+		if ( strcmp(argv[1], "-v") == 0 )	// Viewer mode
 		{
 			file_arg_start++;
 			files_passed--;
 			viewer_mode = TRUE;
 		}
-		if ( strcmp(argv[1], "-s") == 0 )
+		if ( strcmp(argv[1], "-s") == 0 )	// Screenshot
 		{
 			file_arg_start++;
 			files_passed--;
@@ -128,12 +133,7 @@ int main( int argc, char *argv[] )
 
 	if ( new_empty )		// If no file was loaded, start with a blank canvas
 	{
-		nw = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH );
-		nh = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT );
-		nc = inifile_get_gint32("lastnewCols", 256 );
-		nt = inifile_get_gint32("lastnewType", 2 );
-		if ( nt == 0 || nt>2 ) bpp = 3;
-		do_new_one( nw, nh, nc, nt, bpp );
+		create_default_image();
 	}
 	update_menus();
 

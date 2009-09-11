@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -46,6 +46,7 @@
 
 #define FILE_LIB_ERROR 123456
 #define FILE_MEM_ERROR 123457
+#define FILE_GIF_ANIM 123458
 
 
 //	File extension codes
@@ -68,6 +69,11 @@
 	#define DIR_SEP '/'
 #endif
 
+
+char preserved_gif_filename[256];
+int preserved_gif_delay;
+
+
 int file_extension_get( char *file_name );	// Get the file type from the extension
 
 int save_image( char *file_name );	// Save current canvas to file - sense extension to set type
@@ -75,8 +81,11 @@ int save_image( char *file_name );	// Save current canvas to file - sense extens
 int load_png( char *file_name, int stype );
 int save_png( char *file_name, int stype );
 
-int load_gif( char *file_name );
+int load_gif( char *file_name, int *delay );
 int save_gif( char *file_name );
+int save_gif_real( char *file_name,
+	unsigned char *im, png_color *pal, int w, int h, int trans, int skip );
+
 int load_xpm( char *file_name );
 int save_xpm( char *file_name );
 int load_xbm( char *file_name );

@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -30,6 +30,7 @@
 #include "global.h"
 #include "viewer.h"
 #include "png.h"
+#include "ani.h"
 
 
 int	layers_total = 0,		// Layers currently being used
@@ -39,7 +40,9 @@ int	layers_total = 0,		// Layers currently being used
 
 char	layers_filename[256];		// Current filename for layers file
 unsigned char *layer_rgb;		// Memory containing composite layers image
-gboolean show_layers_main = FALSE;	// Show all layers in main window
+gboolean show_layers_main = FALSE,	// Show all layers in main window
+	layers_pastry_cut = FALSE;	// Pastry cut layers in view area (for animation previews)
+
 
 layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
 
@@ -68,8 +71,9 @@ void repaint_layer(int l)			// Repaint layer in view/main window
 		lw = vw_zoom * layer_table[l].image->mem_width + 1;
 		lh = vw_zoom * layer_table[l].image->mem_height + 1;
 	}
-//	if ( view_window != NULL ) gtk_widget_queue_draw_area( vw_drawing, lx, ly, lw+1, lh+1 );
-	if ( vw_drawing != NULL ) gtk_widget_queue_draw_area( vw_drawing, lx, ly, lw+1, lh+1 );
+	if ( vw_drawing != NULL )
+		gtk_widget_queue_draw_area( vw_drawing, lx + margin_view_x, ly + margin_view_y,
+						lw+1, lh+1 );
 
 	if ( show_layers_main )
 	{
@@ -107,7 +111,8 @@ void repaint_layer(int l)			// Repaint layer in view/main window
 		}
 		lx *= can_zoom;
 		ly *= can_zoom;
-		gtk_widget_queue_draw_area( drawing_canvas, lx, ly, lw, lh );
+		gtk_widget_queue_draw_area( drawing_canvas, lx + margin_main_x, ly + margin_main_y,
+						lw, lh );
 	}
 }
 
@@ -391,6 +396,8 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	layer_table[l].image->mem_xpm_trans = -1;
 	layer_table[l].image->mem_xbm_hot_x = -1;
 	layer_table[l].image->mem_xbm_hot_y = -1;
+
+	layer_table[l].image->ani_pos[0][0] = 0;
 }
 
 void layer_new_chores2( int l )
@@ -431,7 +438,10 @@ void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3
 
 	if ( layers_total>=MAX_LAYERS ) return;
 
-	if ( layers_total == 0 ) layer_table[0].image = malloc( sizeof(layer_image) );
+	if ( layers_total == 0 )
+	{
+		layer_table[0].image = malloc( sizeof(layer_image) );
+	}
 	layer_copy_from_main( layer_selected );
 
 	if ( type == 2 ) bpp = 1;	// Type 2 = greyscale indexed
@@ -455,6 +465,9 @@ void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3
 	layer_new_chores( layers_total, w, h, type, cols, rgb, lim );
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
+	men_item_state( menu_frames, TRUE );
+
+	if ( layers_total == 1 ) ani_init();		// Start with fresh animation data if new
 }
 
 static gint layer_press_new()
@@ -514,6 +527,11 @@ static gint layer_press_duplicate()
 	sprintf( layer_table[layers_total].image->mem_filename,
 		layer_table[layer_selected].image->mem_filename );
 
+	for ( i=0; i<MAX_POS_SLOTS; i++ ) for ( j=0; j<5; j++ )
+		layer_table[layers_total].image->ani_pos[i][j] =
+			layer_table[layer_selected].image->ani_pos[i][j];
+				// Copy across position data
+
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
 
@@ -549,6 +567,8 @@ static void layer_delete(int item)
 
 	layers_notify_changed();
 	update_all_views();
+
+	if ( layers_total < 1 ) men_item_state( menu_frames, FALSE );
 }
 
 
@@ -849,10 +869,13 @@ int load_layers( char *file_name )
 	}
 	else layer_refresh_list();
 
+	ani_read_file(fp);		// Read in animation data
+
 	fclose(fp);
 	layer_update_filename( file_name );
 
 	update_cols();		// Update status bar info
+	if ( layers_total>0 ) men_item_state( menu_frames, TRUE );
 
 	gtk_widget_show( drawing_canvas );
 
@@ -930,6 +953,8 @@ int save_layers( char *file_name )
 			layer_table[i].opacity);
 	}
 
+	ani_write_file(fp);			// Write animation data
+
 	fclose(fp);
 	layer_update_filename( file_name );
 	register_file( file_name );		// Recently used file list / last directory
@@ -971,7 +996,7 @@ int check_layers_all_saved()
 {
 	if ( layers_unsaved_tot() > 0 )
 	{
-		alert_box( _("Warning"), "One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future.", _("OK"), NULL, NULL );
+		alert_box( _("Warning"), _("One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."), _("OK"), NULL, NULL );
 		return 1;
 	}
 
@@ -987,7 +1012,7 @@ static gint layer_press_save_as()
 	return FALSE;
 }
 
-static gint layer_press_save()
+void layer_press_save()
 {
 	if ( strcmp( layers_filename, _("Untitled") ) == 0 )
 	{
@@ -998,8 +1023,6 @@ static gint layer_press_save()
 		check_layers_all_saved();
 		save_layers( layers_filename );
 	}
-
-	return FALSE;
 }
 
 static void update_main_with_new_layer()
@@ -1228,7 +1251,7 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	return FALSE;
 }
 
-gint delete_layers_window( GtkWidget *widget, GdkEvent *event, gpointer data )
+void delete_layers_window()
 {
 	int x, y, width, height;
 
@@ -1243,8 +1266,6 @@ gint delete_layers_window( GtkWidget *widget, GdkEvent *event, gpointer data )
 	gtk_widget_destroy(layers_window);
 	men_item_state(menu_layer, TRUE);
 	layers_window = NULL;
-
-	return FALSE;
 }
 
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
@@ -1284,10 +1305,11 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 			f_rectangle( 0, 0, mem_width, mem_height );
 			marq_x1=0;
 			marq_y1=0;
+			marq_x2=mem_width-1;
+			marq_y2=mem_height-1;
 			commit_paste(FALSE);					// Paste
 			if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 			if ( !view_showing ) view_show();
-//			if ( view_window == NULL ) pressed_view( NULL, NULL );
 
 		}
 		if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
@@ -1310,13 +1332,12 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	}
 	layers_notify_changed();
 
-//	if ( view_window != NULL )
 	if ( vw_drawing != NULL )
 	{
 		mtMIN(lx, lx, lx+change_x)
 		mtMIN(ly, ly, ly+change_y)
 		gtk_widget_queue_draw_area( vw_drawing,
-			lx*vw_zoom, ly*vw_zoom,
+			lx*vw_zoom + margin_view_x, ly*vw_zoom + margin_view_y,
 			(lw + abs(change_x))*vw_zoom+1, (lh + abs(change_y) )*vw_zoom+1 );
 	}
 	if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
@@ -1369,10 +1390,11 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_container_add( GTK_CONTAINER(layer_list_data[i][0]), hbox );
 		gtk_widget_show( layer_list_data[i][0] );
 
-		sprintf(txt, "%s %i   ", _("Layer"), i);
+		sprintf(txt, "%i", i);
 		label = gtk_label_new( txt );
+		gtk_widget_set_usize (label, 40, -2);
 		gtk_widget_show( label );
-		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
+		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
 		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 0 );
 
 		label = gtk_label_new( "" );

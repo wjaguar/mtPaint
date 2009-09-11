@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -37,6 +37,7 @@
 #include "layer.h"
 #include "info.h"
 #include "prefs.h"
+#include "ani.h"
 
 #include "graphics/icon.xpm"
 
@@ -135,7 +136,7 @@ GtkWidget
 		*menu_help[2], *menu_continuous[5], *menu_only_24[20], *menu_only_indexed[10],
 		*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15], *menu_opac[15],
 		*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-		*menu_prefs[2]
+		*menu_prefs[2], *menu_frames[2], *menu_alphablend[2]
 		;
 
 GtkWidget *main_hidden[4];
@@ -166,7 +167,8 @@ gboolean q_quit;			// Does q key quit the program?
 
 static void clear_perim_real( int ox, int oy )
 {
-	int x = (perim_x + ox)*can_zoom, y = (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
+	int	x = margin_main_x + (perim_x + ox)*can_zoom,
+		y = margin_main_y + (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
 
 	repaint_canvas( x, y, 1, s );
 	repaint_canvas(	x+s-1, y, 1, s );
@@ -238,7 +240,14 @@ void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_opacity_mode( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_tint_mode( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	int state = GTK_CHECK_MENU_ITEM(menu_item)->active;
+
+	tint_mode[item] = state;
+}
+
+static void pressed_opacity_mode( GtkMenuItem *menu_item, gpointer user_data )
 {
 	mem_undo_opacity = GTK_CHECK_MENU_ITEM(menu_item)->active;
 	inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
@@ -469,20 +478,27 @@ void pressed_mask_none( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_queue_draw( drawing_palette );
 }
 
-void pressed_export_undo( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_export_undo( GtkMenuItem *menu_item, gpointer user_data )
 {
 	if ( mem_undo_done>0 ) file_selector( FS_EXPORT_UNDO );
 }
 
-void pressed_export_undo2( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_export_undo2( GtkMenuItem *menu_item, gpointer user_data )
 {
 	if ( mem_undo_done>0 ) file_selector( FS_EXPORT_UNDO2 );
 }
 
-void pressed_export_ascii( GtkMenuItem *menu_item, gpointer user_data )
+static void pressed_export_ascii( GtkMenuItem *menu_item, gpointer user_data )
 {
 	if ( mem_cols <= 16 ) file_selector( FS_EXPORT_ASCII );
 	else alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."),
+		_("OK"), NULL, NULL );
+}
+
+static void pressed_export_gif( GtkMenuItem *menu_item, gpointer user_data )
+{
+	if ( strcmp( mem_filename, _("Untitled") ) ) file_selector( FS_EXPORT_GIF );
+	else alert_box( _("Error"), _("You must save at least one frame to create an animated GIF."),
 		_("OK"), NULL, NULL );
 }
 
@@ -1021,7 +1037,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 				yh = maxy - miny + 1;
 
 				gtk_widget_queue_draw_area( drawing_canvas,
-					minx*can_zoom, miny*can_zoom,
+					minx*can_zoom + margin_main_x, miny*can_zoom + margin_main_y,
 					mt_round(xw*can_zoom), mt_round(yh*can_zoom) );
 				vw_update_area( minx, miny, xw+1, yh+1 );
 			}
@@ -1077,8 +1093,9 @@ gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 		inifile_set_gint32("window_w", width );
 		inifile_set_gint32("window_h", height );
 
+		inifile_set_gboolean( "imageCentre", canvas_image_centre );
+
 		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
-//		if (view_window != NULL) delete_view( NULL, NULL, NULL );
 		if (layers_window != NULL) delete_layers_window( NULL, NULL, NULL );
 			// Get rid of extra windows + remember positions
 
@@ -1107,6 +1124,7 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 
 gint canvas_release( GtkWidget *widget, GdkEventButton *event )
 {
+	tint_mode[2] = 0;
 	pen_down = 0;
 	if ( col_reverse )
 	{
@@ -1215,6 +1233,7 @@ static gint main_scroll_changed()
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 {
+	int x, y;
 	gdouble pressure = 1.0;
 
 #if GTK_MAJOR_VERSION == 1
@@ -1227,7 +1246,11 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 #endif
 
 	if ( mem_image != NULL )
-		mouse_event( event->x, event->y, event->state, event->button, pressure );
+	{
+		x = event->x - margin_main_x;
+		y = event->y - margin_main_y;
+		mouse_event( x, y, event->state, event->button, pressure );
+	}
 
 	return TRUE;
 }
@@ -1265,7 +1288,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	int ix, iy, mx, my, offset, i, j, k, ipix, lx=0, ly=0;
 
 	if ( pw<=0 || ph<=0 ) return;
-	rgb = grab_memory( pw*ph*3, "paste RGB redraw", mem_background );
+	rgb = grab_memory( pw*ph*3, mem_background );
 	if ( rgb == NULL ) return;
 
 	while ( (px1/can_zoom) < marq_x1 )
@@ -1280,7 +1303,8 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	if ( mem_clip_mask != NULL || (tool_opacity<100 && mem_image_bpp==3) )
 	{
 		if ( layers_total == 0 || !show_layers_main )
-			main_render_rgb( rgb, px1, py1, pw, ph, can_zoom );
+			main_render_rgb( rgb, margin_main_x + px1, margin_main_y + py1,
+				pw, ph, can_zoom );
 		else
 		{
 			if ( layer_selected > 0 )
@@ -1288,7 +1312,8 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 				lx = can_zoom * layer_table[layer_selected].x;
 				ly = can_zoom * layer_table[layer_selected].y;
 			}
-			view_render_rgb( rgb, px1+lx, py1+ly, pw, ph, can_zoom );
+			view_render_rgb( rgb, margin_main_x + px1+lx, margin_main_y + py1+ly,
+				pw, ph, can_zoom );
 		}
 	}
 
@@ -1419,49 +1444,55 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	}
 
 	gdk_draw_rgb_image ( the_canvas, drawing_canvas->style->black_gc,
-			px1, py1, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
+			margin_main_x + px1, margin_main_y + py1,
+			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
 	free( rgb );
 }
 
 void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float zoom )
 {
 	unsigned char pix[3] = {0,0,0}, greyz[2] = { 102, 153 };
-	int ix, iy, pw2, ph2, offset, off24, canz = zoom, trgb = 0;
+	int ix, iy, pw2, ph2, offset, off24, canz = zoom, trgb = 0,
+		px2 = px - margin_main_x, py2 = py - margin_main_y,
+		nix=0, niy=0;
 
 	if ( mem_xpm_trans > -1 ) trgb = PNG_2_INT(mem_pal[mem_xpm_trans]);
 	if ( zoom < 1 ) canz = mt_round(1/zoom);
 
 	pw2 = pw;
 	ph2 = ph;
-	if ( (px+pw2) >= mem_width*zoom )	// Update image + blank space outside
-		pw2 = mem_width*zoom - px;
-	if ( (py+ph2) >= mem_height*zoom )	// Update image + blank space outside
-		ph2 = mem_height*zoom - py;
 
+	if ( px2<0 ) nix = -px2;
+	if ( py2<0 ) niy = -py2;
+
+	if ( (px2+pw2) >= mem_width*zoom )	// Update image + blank space outside
+		pw2 = mem_width*zoom - px2;
+	if ( (py2+ph2) >= mem_height*zoom )	// Update image + blank space outside
+		ph2 = mem_height*zoom - py2;
 
 	if ( mem_image_bpp == 1 )
 	{
 		if ( zoom>=1 )
 		{
 			if ( mem_xpm_trans == -1 )
-			for ( iy=0; iy<ph2; iy++ )
+			for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					pix[0] = mem_image[(px+ix)/canz
-						+ (py+iy)/canz*mem_width];
+					pix[0] = mem_image[(px2+ix)/canz
+						+ (py2+iy)/canz*mem_width];
 					offset = 3*(iy*pw + ix);
 					rgb[offset] = mem_pal[pix[0]].red;
 					rgb[offset + 1] = mem_pal[pix[0]].green;
 					rgb[offset + 2] = mem_pal[pix[0]].blue;
 				}
 			}
-			else for ( iy=0; iy<ph2; iy++ )
+			else for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					pix[0] = mem_image[(px+ix)/canz
-						+ (py+iy)/canz*mem_width];
+					pix[0] = mem_image[(px2+ix)/canz
+						+ (py2+iy)/canz*mem_width];
 					offset = 3*(iy*pw + ix);
 					if ( pix[0] == mem_xpm_trans )
 					{
@@ -1481,24 +1512,24 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 		else
 		{
 			if ( mem_xpm_trans == -1 )
-			for ( iy=0; iy<ph2; iy++ )
+			for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					pix[0] = mem_image[(px+ix)*canz
-						+ (py+iy)*canz*mem_width];
+					pix[0] = mem_image[(px2+ix)*canz
+						+ (py2+iy)*canz*mem_width];
 					offset = 3*(iy*pw + ix);
 					rgb[offset] = mem_pal[pix[0]].red;
 					rgb[offset + 1] = mem_pal[pix[0]].green;
 					rgb[offset + 2] = mem_pal[pix[0]].blue;
 				}
 			}
-			else for ( iy=0; iy<ph2; iy++ )
+			else for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					pix[0] = mem_image[(px+ix)*canz
-						+ (py+iy)*canz*mem_width];
+					pix[0] = mem_image[(px2+ix)*canz
+						+ (py2+iy)*canz*mem_width];
 					offset = 3*(iy*pw + ix);
 					if ( pix[0] == mem_xpm_trans )
 					{
@@ -1521,25 +1552,24 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 		if ( zoom>=1 )
 		{
 			if ( mem_xpm_trans == -1 )
-			for ( iy=0; iy<ph2; iy++ )
+			for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					off24 = 3 * ( (px+ix)/canz +
-							(py+iy)/canz*mem_width );
+					off24 = 3 * ( (px2+ix)/canz +
+							(py2+iy)/canz*mem_width );
 					offset = 3*(iy*pw + ix);
-
 					rgb[offset] = mem_image[ off24 ];
 					rgb[offset + 1] = mem_image[1 + off24];
 					rgb[offset + 2] = mem_image[2 + off24];
 				}
 			}
-			else for ( iy=0; iy<ph2; iy++ )
+			else for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					off24 = 3 * ( (px+ix)/canz +
-							(py+iy)/canz*mem_width );
+					off24 = 3 * ( (px2+ix)/canz +
+							(py2+iy)/canz*mem_width );
 					offset = 3*(iy*pw + ix);
 
 					if ( trgb == ( MEM_2_INT(mem_image, off24) ) )
@@ -1560,12 +1590,12 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 		else
 		{
 			if ( mem_xpm_trans == -1 )
-			for ( iy=0; iy<ph2; iy++ )
+			for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					off24 = 3 * ( (px+ix)*canz +
-							(py+iy)*canz*mem_width );
+					off24 = 3 * ( (px2+ix)*canz +
+							(py2+iy)*canz*mem_width );
 					offset = 3*(iy*pw + ix);
 
 					rgb[offset] = mem_image[ off24 ];
@@ -1573,12 +1603,12 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 					rgb[offset + 2] = mem_image[2 + off24];
 				}
 			}
-			else for ( iy=0; iy<ph2; iy++ )
+			else for ( iy=niy; iy<ph2; iy++ )
 			{
-				for ( ix=0; ix<pw2; ix++ )
+				for ( ix=nix; ix<pw2; ix++ )
 				{
-					off24 = 3 * ( (px+ix)*canz +
-							(py+iy)*canz*mem_width );
+					off24 = 3 * ( (px2+ix)*canz +
+							(py2+iy)*canz*mem_width );
 					offset = 3*(iy*pw + ix);
 
 					if ( trgb == ( MEM_2_INT(mem_image, off24) ) )
@@ -1606,8 +1636,10 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on r
 
 	if ( gap>=mem_grid_min && mem_show_grid )
 	{
-		i = y % gap;
+		i = (y - margin_main_y) % gap;
+		while ( i<0 ) i=i+gap;
 		if (i != 0 ) i = gap - i;			// Calculate y offset at start
+
 		while ( i<h )
 		{
 			t_rgb = rgb + i*w*3;
@@ -1620,8 +1652,11 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on r
 			}
 			i = i + gap;
 		}
-		i = x % gap;
+
+		i = (x - margin_main_x) % gap;
+		while ( i<0 ) i=i+gap;
 		if (i != 0 ) i = gap - i;			// Calculate x offset at start
+
 		while ( i<w )
 		{
 			t_rgb = rgb + i*3;
@@ -1642,7 +1677,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	unsigned char *rgb;
 	int iy, pw2, ph2, lx = 0, ly = 0,
 		rx1, ry1, rx2, ry2,
-		ax1, ay1, ax2, ay2;
+		ax1, ay1, ax2, ay2,
+		rpx, rpy;
 
 	if (zoom_flag == 1) return;		// Stops excess jerking in GTK+1 when zooming
 
@@ -1650,7 +1686,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	mtMAX(py, py, 0)
 
 	if ( pw<=0 || ph<=0 ) return;
-	rgb = grab_memory( pw*ph*3, "screen RGB redraw", mem_background );
+	rgb = grab_memory( pw*ph*3, mem_background );
 	if ( rgb == NULL ) return;
 
 	if ( layers_total == 0 || !show_layers_main )
@@ -1662,27 +1698,30 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			lx = can_zoom * layer_table[layer_selected].x;
 			ly = can_zoom * layer_table[layer_selected].y;
 		}
-		view_render_rgb( rgb, px+lx, py+ly, pw, ph, can_zoom );
+		view_render_rgb( rgb, px+lx - margin_main_x, py+ly - margin_main_y, pw, ph, can_zoom );
 	}
 
 	pw2 = pw;
 	ph2 = ph;
-	if ( (px+pw2) >= mem_width*can_zoom )	// Update image + blank space outside
-		pw2 = mem_width*can_zoom - px;
-	if ( (py+ph2) >= mem_height*can_zoom )	// Update image + blank space outside
-		ph2 = mem_height*can_zoom - py;
+	if ( (px+pw2 - margin_main_x) >= mem_width*can_zoom )	// Update image + blank space outside
+		pw2 = mem_width*can_zoom - px + margin_main_x;
+	if ( (py+ph2 - margin_main_y) >= mem_height*can_zoom )	// Update image + blank space outside
+		ph2 = mem_height*can_zoom - py + margin_main_y;
+
+	mtMAX(rpx, px, margin_main_x)
+	mtMAX(rpy, py, margin_main_y)
 
 	if ( mem_preview > 0 && mem_image_bpp == 3 )
 	{
-		for ( iy=0; iy<ph2; iy++ )	// Don't touch grey area, just RGB
+		for ( iy=rpy-py; iy<ph2; iy++ )			// Don't touch grey area, just RGB
 		{
 			if ( mem_prev_bcsp[4] != 100 )
-				mem_gamma_chunk( rgb + pw*iy*3, pw2 );
+				mem_gamma_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
 			if ( mem_prev_bcsp[0] != 0 || mem_prev_bcsp[1] != 0 ||
 				mem_prev_bcsp[2] != 0)
-					mem_brcosa_chunk( rgb + pw*iy*3, pw2 );
+					mem_brcosa_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
 			if ( mem_prev_bcsp[3] != 8 )
-				mem_posterize_chunk( rgb + pw*iy*3, pw2 );
+				mem_posterize_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
 		}
 	}
 
@@ -1695,17 +1734,20 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	if ( marq_status >= MARQUEE_PASTE && show_paste )
 	{	// Add clipboard image to redraw if needed
-		rx1 = px/can_zoom;
-		ry1 = py/can_zoom;
-		rx2 = (px + pw2 - 1)/can_zoom;
-		ry2 = (py + ph2 - 1)/can_zoom;
+		pw2 -= rpx-px;
+		ph2 -= rpy-py;
+
+		rx1 = (rpx - margin_main_x)/can_zoom;
+		ry1 = (rpy - margin_main_y)/can_zoom;
+		rx2 = (rpx - margin_main_x + pw2 - 1)/can_zoom;
+		ry2 = (rpy - margin_main_y + ph2 - 1)/can_zoom;
 		if ( !(marq_x1<rx1 && marq_x2<rx1) && !(marq_x1>rx2 && marq_x2>rx2) &&
 			!(marq_y1<ry1 && marq_y2<ry1) && !(marq_y1>ry2 && marq_y2>ry2) )
 		{
-			mtMAX( ax1, px, marq_x1*can_zoom )
-			mtMAX( ay1, py, marq_y1*can_zoom )
-			mtMIN( ax2, (px + pw2 - 1), (can_zoom*(marq_x2 + 1) - 1 ) )
-			mtMIN( ay2, (py + ph2 - 1), (can_zoom*(marq_y2 + 1) - 1 ) )
+			mtMAX( ax1, rpx - margin_main_x, marq_x1*can_zoom )
+			mtMAX( ay1, rpy - margin_main_y, marq_y1*can_zoom )
+			mtMIN( ax2, (rpx - margin_main_x + pw2 - 1), (can_zoom*(marq_x2 + 1) - 1 ) )
+			mtMIN( ay2, (rpy - margin_main_y + ph2 - 1), (can_zoom*(marq_y2 + 1) - 1 ) )
 			repaint_paste( ax1, ay1, ax2, ay2 );
 		}
 	}
@@ -1726,11 +1768,12 @@ void clear_perim()
 
 void repaint_perim_real( int r, int g, int b, int ox, int oy )
 {
-	int x = (perim_x + ox)*can_zoom, y = (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
+	int	x = margin_main_x + (perim_x + ox)*can_zoom,
+		y = margin_main_y + (perim_y + oy)*can_zoom, s = perim_s*can_zoom;
 	int i;
 	char *rgb;
 
-	rgb = grab_memory( s*3, "screen RGB redraw", 255 );
+	rgb = grab_memory( s*3, 255 );
 	for ( i=0; i<s; i++ )
 	{
 		rgb[ 0 + 3*i ] = r * ((i/3) % 2);
@@ -1776,6 +1819,10 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 	guint button = 0;
 	gdouble pressure = 1.0;
 
+	mtMIN( tox, tox, mem_width-1 )
+	mtMIN( toy, toy, mem_height-1 )
+	mtMAX( tox, tox, 0 )
+	mtMAX( toy, toy, 0 )
 
 	if ( mem_image != NULL )		// Only do this if we have an image
 	{
@@ -1808,6 +1855,10 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 		if (state & GDK_BUTTON3_MASK) button = 3;
 		if (state & GDK_BUTTON1_MASK) button = 1;
 		if ( (state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK) ) button = 13;
+		x = x - margin_main_x;
+		y = y - margin_main_y;
+//		mtMAX( x, x, 0 )
+//		mtMAX( y, y, 0 )
 		mouse_event( x, y, state, button, pressure );
 
 		x = x / can_zoom;
@@ -1946,6 +1997,44 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 	}
 
 	return TRUE;
+}
+
+static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
+{
+	int ww = widget->allocation.width, wh = widget->allocation.height
+		, new_margin_x = margin_main_x, new_margin_y = margin_main_y
+		;
+
+	if ( canvas_image_centre )
+	{
+		if ( ww > (mem_width*can_zoom) ) new_margin_x = (ww - mem_width*can_zoom) / 2;
+		else new_margin_x = 0;
+
+		if ( wh > (mem_height*can_zoom) ) new_margin_y = (wh - mem_height*can_zoom) / 2;
+		else new_margin_y = 0;
+	}
+	else
+	{
+		new_margin_x = 0;
+		new_margin_y = 0;
+	}
+
+	if ( new_margin_x != margin_main_x || new_margin_y != margin_main_y )
+	{
+		gtk_widget_queue_draw(drawing_canvas);
+			// Force redraw of whole canvas as the margin has shifted
+		margin_main_x = new_margin_x;
+		margin_main_y = new_margin_y;
+	}
+	vw_align_size( vw_zoom );		// Update the view window as needed
+
+	return TRUE;
+}
+
+void force_main_configure()
+{
+	configure_canvas( drawing_canvas, NULL );
+	vw_configure( vw_drawing, NULL );
 }
 
 static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
@@ -2204,7 +2293,6 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 	}
 }
 
-
 void toolbar_icon_event (GtkWidget *widget, gpointer data)
 {
 	gint i = tool_type, j = (gint) data;
@@ -2346,7 +2434,7 @@ void main_init()
 		_("Copy"), _("Paste"), _("Undo"), _("Redo"),
 		_("Ellipse Outline"), _("Filled Ellipse"), _("Outline Selection"), _("Fill Selection"),
 		_("Flip Selection Vertically"), _("Flip Selection Horizontally"),
-		_("Rotate Selection Clockwise"), _("Rotate Selection Anti-Clockwise"),
+		_("Rotate Selection Clockwise"), _("Rotate Selection Anti-Clockwise")
 		 };
 	char *hint_text[TOTAL_ICONS_TOOLBAR] = {
 		_("Choose Brush"), _("Paint"), _("Shuffle"), _("Flood Fill"),
@@ -2361,6 +2449,7 @@ void main_init()
 	GdkPixmap *icon, *mask;
 	GtkWidget *iconw;
 	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
+	GtkRequisition req;
 
 	GtkWidget *vw_drawing, *vw_scrolledwindow;
 
@@ -2382,6 +2471,7 @@ void main_init()
 		{ _("/File/Export Undo Images ..."), NULL,	pressed_export_undo,0, NULL },
 		{ _("/File/Export Undo Images (reversed) ..."), NULL, pressed_export_undo2,0, NULL },
 		{ _("/File/Export ASCII Art ..."), NULL, 	pressed_export_ascii,0, NULL },
+		{ _("/File/Export Animated GIF ..."), NULL, 	pressed_export_gif,0, NULL },
 		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/File/1"),  		"<shift><control>F1", pressed_load_recent,0, NULL },
 		{ _("/File/2"),  		"<shift><control>F2", pressed_load_recent,0, NULL },
@@ -2453,6 +2543,8 @@ void main_init()
 		{ _("/Edit/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Edit/Continuous Painting"),	"F11",	pressed_continuous, 0, "<CheckItem>" },
 		{ _("/Edit/Opacity Undo Mode"),		"F12",	pressed_opacity_mode, 0, "<CheckItem>" },
+		{ _("/Edit/Tint Mode"),			NULL,	pressed_tint_mode, 0, "<CheckItem>" },
+		{ _("/Edit/Tint +-"),			NULL,	pressed_tint_mode, 1, "<CheckItem>" },
 
 		{ _("/_View"),			NULL,		NULL,0, "<Branch>" },
 		{ _("/View/tear"),		NULL,		NULL,0, "<Tearoff>" },
@@ -2512,6 +2604,7 @@ void main_init()
 		{ _("/Selection/Rotate Clockwise"),	NULL,	pressed_rotate_sel_clock, 0, NULL },
 		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel_anti, 0, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
+		{ _("/Selection/Alpha Blend A,B"),	NULL,	pressed_clip_alpha_scale,0, NULL },
 		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask,0, NULL },
 		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_unmask,0, NULL },
 		{ _("/Selection/Mask All Colours"),	NULL,	pressed_clip_mask_all,0, NULL },
@@ -2576,6 +2669,14 @@ void main_init()
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Bacteria ..."),	NULL,		pressed_bacteria, 0, NULL },
 
+		{ _("/Frames"),			NULL,		NULL, 0, "<Branch>" },
+		{ _("/Frames/tear"),		NULL,		NULL, 0, "<Tearoff>" },
+		{ _("/Frames/Configure Animation ..."), NULL, pressed_animate_window,0, NULL },
+		{ _("/Frames/Preview Animation ..."), NULL,	ani_but_preview, 0, NULL },
+		{ _("/Frames/sep1"),		NULL,		NULL,0, "<Separator>" },
+		{ _("/Frames/Set key frame ..."), NULL,		pressed_set_key_frame, 0, NULL },
+		{ _("/Frames/Remove all key frames ..."), NULL,	pressed_remove_key_frames, 0, NULL },
+
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
 		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
 	};
@@ -2610,7 +2711,7 @@ char
 			NULL },
 	*item_only_indexed[] = { _("/Image/Convert To RGB"), _("/Effects/Bacteria ..."),
 			_("/Palette/Merge Duplicate Colours"), _("/Palette/Remove Unused Colours"),
-			_("/File/Export ASCII Art ..."),
+			_("/File/Export ASCII Art ..."), _("/File/Export Animated GIF ..."),
 			NULL },
 	*item_continuous[] = {_("/Edit/Continuous Painting"), _("/Edit/Opacity Undo Mode"),
 			_("/View/Show zoom grid"),
@@ -2628,7 +2729,9 @@ char
 	*item_lasso[] = {_("/Selection/Lasso Selection"), _("/Selection/Lasso Selection Cut"),
 			_("/Edit/Cut"), _("/Edit/Copy"),
 			_("/Selection/Fill Selection"), _("/Selection/Outline Selection"),
-			NULL}
+			NULL},
+	*item_frames[] = {_("/Frames"), NULL},
+	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL}
 	;
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
@@ -2640,6 +2743,7 @@ char
 	mem_background = inifile_get_gint32("backgroundGrey", 180 );
 	mem_undo_limit = inifile_get_gint32("undoMBlimit", 32 );
 	mem_nudge = inifile_get_gint32("pixelNudge", 8 );
+	canvas_image_centre = inifile_get_gboolean("imageCentre", TRUE);
 
 	accel_group = gtk_accel_group_new ();
 	item_factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR,"<main>", accel_group);
@@ -2663,6 +2767,7 @@ char
 	pop_men_dis( item_factory, item_continuous, menu_continuous );
 	pop_men_dis( item_factory, item_help, menu_help );
 	pop_men_dis( item_factory, item_prefs, menu_prefs );
+	pop_men_dis( item_factory, item_frames, menu_frames );
 	pop_men_dis( item_factory, item_only_24, menu_only_24 );
 	pop_men_dis( item_factory, item_only_indexed, menu_only_indexed );
 	pop_men_dis( item_factory, item_cline, menu_cline );
@@ -2670,6 +2775,7 @@ char
 	pop_men_dis( item_factory, item_iso, menu_iso );
 	pop_men_dis( item_factory, item_layer, menu_layer );
 	pop_men_dis( item_factory, item_lasso, menu_lasso );
+	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
 
 	menu_clip_load[0] = NULL;
 	menu_clip_save[0] = NULL;
@@ -2805,7 +2911,13 @@ char
 		iconw = gtk_pixmap_new ( icon, mask );
 		gdk_pixmap_unref( icon );
 		gdk_pixmap_unref( mask );
-
+/*
+		if ( i == TOTAL_ICONS_TOOLBAR )
+		{
+			child_type = GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
+			previous = NULL;
+		}
+		else*/
 		if ( i<1 || i>8 )
 		{
 			child_type = GTK_TOOLBAR_CHILD_BUTTON;
@@ -2985,6 +3097,8 @@ char
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow_canvas),
 		drawing_canvas);
 
+	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "configure_event",
+		GTK_SIGNAL_FUNC (configure_canvas), GTK_OBJECT(drawing_canvas) );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "expose_event",
 		GTK_SIGNAL_FUNC (expose_canvas), GTK_OBJECT(drawing_canvas) );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_canvas), "button_press_event",
@@ -3055,6 +3169,11 @@ char
 	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar5, FALSE, FALSE, 0);
 	gtk_misc_set_alignment (GTK_MISC (label_bar5), 0, 0);
 
+	/* To prevent statusbar wobbling */
+	gtk_widget_size_request(hbox_bar, &req);
+	gtk_widget_set_usize(hbox_bar, -1, req.height);
+
+
 /////////	End of main window widget setup
 
 	gtk_signal_connect_object (GTK_OBJECT (main_window), "delete_event",
@@ -3064,6 +3183,7 @@ char
 
 //	gtk_container_set_border_width (GTK_CONTAINER (main_window), 2);
 
+	men_item_state( menu_frames, FALSE );
 	men_item_state( menu_undo, FALSE );
 	men_item_state( menu_redo, FALSE );
 	men_item_state( menu_need_marquee, FALSE );

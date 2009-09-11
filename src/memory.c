@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -31,7 +31,12 @@
 #include "mygtk.h"
 #include "layer.h"
 #include "inifile.h"
+#include "canvas.h"
 
+
+/// Tint tool - contributed by Dmitry Groshev, January 2006
+
+int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 /// IMAGE
 
@@ -625,19 +630,14 @@ int valid_file( char *filename )		// Can this file be opened for reading?
 }
 
 
-char *grab_memory( int size, char *text, char byte )	// Malloc memory, reset all bytes
+char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
 {
 	char *chunk;
 	int i;
 
 	chunk = malloc( size );
 	
-	if (chunk == NULL)
-	{
-//		printf("Unable to allocate memory for %s - crashing out\n\n", text);
-//		exit(1);
-	}
-	else for ( i=0; i<size; i++ ) chunk[i] = byte;
+	if (chunk != NULL) for ( i=0; i<size; i++ ) chunk[i] = byte;
 
 	return chunk;
 }
@@ -670,12 +670,12 @@ void mem_init()					// Initialise memory
 	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
-	mem_pats = grab_memory( 3*PATTERN_WIDTH*PATTERN_HEIGHT, "screen RGB patterns", 0 );
-	mem_col_pat = grab_memory( 8*8, "colourised index pattern", 0 );
-	mem_col_pat24 = grab_memory( 3*8*8, "colourised RGB pattern", 0 );
-	mem_pals = grab_memory( 3*PALETTE_WIDTH*PALETTE_HEIGHT, "screen RGB palette", 0 );
-	mem_prev = grab_memory( 3*PREVIEW_WIDTH*PREVIEW_HEIGHT, "screen RGB preview", 0 );
-	mem_brushes = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, "brushes", 0 );
+	mem_pats = grab_memory( 3*PATTERN_WIDTH*PATTERN_HEIGHT, 0 );
+	mem_col_pat = grab_memory( 8*8, 0 );
+	mem_col_pat24 = grab_memory( 3*8*8, 0 );
+	mem_pals = grab_memory( 3*PALETTE_WIDTH*PALETTE_HEIGHT, 0 );
+	mem_prev = grab_memory( 3*PREVIEW_WIDTH*PREVIEW_HEIGHT, 0 );
+	mem_brushes = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, 0 );
 
 	for ( i=0; i<256; i++ )		// Load up normal palette defaults
 	{
@@ -2283,10 +2283,148 @@ void f_circle( int x, int y, int r )				// Draw a filled circle
 	}
 }
 
+/*
+ * This code uses midpoint ellipse algorithm modified for uncentered ellipses,
+ * with floating-point arithmetics to prevent overflows. (C) Dmitry Groshev
+ */
+static int xc2, yc2;
+static void put4pix(int dx, int dy)
+{
+	int x0, x1, y0, y1;
+
+	x0 = (xc2 - dx) >> 1;
+	x1 = (xc2 + dx) >> 1;
+	y0 = (yc2 - dy) >> 1;
+	y1 = (yc2 + dy) >> 1;
+	if (mem_image_bpp == 1)
+	{
+		PUT_PIXEL(x0, y0);
+		if (x0 != x1) PUT_PIXEL(x1, y0);
+		if (y0 == y1) return;
+		PUT_PIXEL(x0, y1);
+		if (x0 != x1) PUT_PIXEL(x1, y1);
+	}
+	else
+	{
+		PUT_PIXEL24(x0, y0);
+		if (x0 != x1) PUT_PIXEL24(x1, y0);
+		if (y0 == y1) return;
+		PUT_PIXEL24(x0, y1);
+		if (x0 != x1) PUT_PIXEL24(x1, y1);
+	}
+}
+
+void trace_ellipse(int w, int h, int *left, int *right)
+{
+	int dx, dy;
+	double err, stx, sty, w2, h2;
+
+	h2 = h * h;
+	w2 = w * w;
+	dx = w & 1;
+	dy = h;
+	stx = h2 * dx;
+	sty = w2 * dy;
+	err = h2 * (dx * 5 + 4) + w2 * (1 - h - h);
+
+	while (1) /* Have to force first step */
+	{
+		if (left[dy >> 1] > dx) left[dy >> 1] = dx;
+		if (right[dy >> 1] < dx) right[dy >> 1] = dx;
+		if (err >= 0.0)
+		{
+			dy -= 2;
+			sty -= w2 + w2;
+			err -= 4.0 * sty;
+		}
+		dx += 2;
+		stx += h2 + h2;
+		err += 4.0 * (h2 + stx);
+		if ((dy < 2) || (stx >= sty)) break;
+	}
+
+	err += 3.0 * (w2 - h2) - 2.0 * (stx + sty);
+
+	while (dy > 1)
+	{
+		if (left[dy >> 1] > dx) left[dy >> 1] = dx;
+		if (right[dy >> 1] < dx) right[dy >> 1] = dx;
+		if (err < 0.0)
+		{
+			dx += 2;
+			stx += h2 + h2;
+			err += 4.0 * stx;
+		}
+		dy -= 2;
+		sty -= w2 + w2;
+		err += 4.0 * (w2 - sty);
+	}
+
+	if (left[dy >> 1] > w) left[dy >> 1] = w;
+	if (right[dy >> 1] < w) right[dy >> 1] = w;
+
+	/* For too-flat ellipses */
+	if (left[(dy >> 1) + 1] > dx) left[(dy >> 1) + 1] = dx;
+	if (right[(dy >> 1) + 1] < w - 2) right[(dy >> 1) + 1] = w - 2;
+}
+
+void wjellipse(int xs, int ys, int w, int h, int type, int thick)
+{
+	int i, j, k, *left, *right;
+
+	/* Prepare */
+	yc2 = --h + ys + ys;
+	xc2 = --w + xs + xs;
+	k = type ? w + 1 : w & 1;
+	j = h / 2 + 1;
+	left = malloc(2 * j * sizeof(int));
+	if (!left) return;
+	right = left + j;
+	for (i = 0; i < j; i++)
+	{
+		left[i] = k;
+		right[i] = 0;
+	}
+
+	/* Plot outer */
+	trace_ellipse(w, h, left, right);
+
+	/* Plot inner */
+	if (type && (thick > 1))
+	{
+		/* Determine possible height */
+		thick += thick - 2;
+		for (i = h; i >= 0; i -= 2)
+		{
+			if (left[i >> 1] > thick + 1) break;
+		}
+		i = i >= h - thick ? h - thick : i + 2;
+
+		/* Determine possible width */
+		j = left[thick >> 1];
+		if (j > w - thick) j = w - thick;
+		if (j < 2) i = h & 1;
+
+		/* Do the plotting */
+		for (k = i >> 1; k <= h >> 1; k++) left[k] = w & 1;
+		if (i > 1) trace_ellipse(j, i, left, right);
+	}
+
+	/* Draw result */
+	for (i = h & 1; i <= h; i += 2)
+	{
+		for (j = left[i >> 1]; j <= right[i >> 1]; j += 2)
+		{
+			put4pix(j, i);
+		}
+	}
+
+	free(left);
+}
+
 void mem_ellipse( int x1, int y1, int x2, int y2, int thick, int type )		// 0=filled, 1=outline
 {
-	int i, j, k, xs, ys, xl, yl, p, p2, xo, xo2, jj[2][2];
-	float r1, r2, r3, r4, kon;
+	int xs, ys, xl, yl;
 
 	mtMIN( xs, x1, x2 )
 	mtMIN( ys, y1, y2 )
@@ -2299,167 +2437,7 @@ void mem_ellipse( int x1, int y1, int x2, int y2, int thick, int type )		// 0=fi
 		return;
 	}
 
-	if ( type == 0 )
-	{
-		jj[0][0] = 0;		// Fill whole ellipse in one go from top to bottom
-		if ( xl>yl ) jj[0][1] = xl;
-		else jj[0][1] = yl;
-	}
-	else
-	{
-		jj[0][0] = 0;
-		jj[0][1] = thick;	// Fill top & bottom sections of ellipse outline
-		if ( xl>yl )
-		{
-			jj[1][0] = xl-thick;
-			jj[1][1] = xl;
-		}
-		else
-		{
-			jj[1][0] = yl-thick;
-			jj[1][1] = yl;
-		}
-	}
-
-	for ( k=0; k<=type; k++ )
-	{
-		if ( xl>yl )
-		{
-			for ( j=jj[k][0]; j<jj[k][1]; j++ )
-			{
-				kon = 0.25 + 0.5*((float) j) / (xl - 1);
-				r1 = 2*(kon + (float) j) / xl - 1;
-
-				r2 = sqrt( 1 - r1*r1 );
-				p = mt_round( r2 * (yl-1) );
-				xo = mt_round( (yl - p) / 2 );
-				if ( mem_image_bpp == 1 )
-				{
-					for ( i=0; i<=p/2; i++ )
-					{
-						PUT_PIXEL( xs+j, ys+i+xo )
-						PUT_PIXEL( xs+j, ys+yl-i-1-xo )
-					}
-				}
-				if ( mem_image_bpp == 3 )
-				{
-					for ( i=0; i<=p/2; i++ )
-					{
-						PUT_PIXEL24( xs+j, ys+i+xo )
-						PUT_PIXEL24( xs+j, ys+yl-i-1-xo )
-					}
-				}
-			}
-		}
-		else
-		{
-			for ( j=jj[k][0]; j<jj[k][1]; j++ )
-			{
-				kon = 0.25 + 0.5*((float) j) / (yl - 1);
-				r1 = 2*(kon + (float) j) / yl - 1;
-
-				r2 = sqrt( 1 - r1*r1 );
-				p = mt_round( r2 * (xl-1) );
-				xo = mt_round( (xl - p) / 2 );
-				if ( mem_image_bpp == 1 )
-				{
-					for ( i=0; i<=p/2; i++ )
-					{
-						PUT_PIXEL( xs+i+xo, ys+j )
-						PUT_PIXEL( xs+xl-i-1-xo, ys+j )
-					}
-				}
-				if ( mem_image_bpp == 3 )
-				{
-					for ( i=0; i<=p/2; i++ )
-					{
-						PUT_PIXEL24( xs+i+xo, ys+j )
-						PUT_PIXEL24( xs+xl-i-1-xo, ys+j )
-					}
-				}
-			}
-		}
-	}
-
-	if ( type == 1 )			// Draw middle section of ellipse outline
-	{
-		if ( xl>yl )
-		{
-		for ( j=thick; j<(xl-thick); j++ )
-		{
-			kon = 0.25 + 0.5*((float) j) / (xl - 1);
-			r1 = 2*(kon + (float) j) / xl - 1;			// Outer
-
-			r2 = sqrt( 1 - r1*r1 );
-			p = mt_round( r2 * (yl-1) );
-			xo = mt_round( (yl - p) / 2 );
-
-			kon = 0.25 + 0.5*((float) j) / (xl - 1);
-			r3 = 2*(kon + (float) j-thick) / (xl-2*thick) - 1;	// Inner
-
-			r4 = sqrt( 1 - r3*r3 );
-			p2 = mt_round( r4 * (yl-2*thick-1) );
-			xo2 = thick + mt_round( (yl - 2*thick - p2) / 2 ) - 1;
-
-			if ( xo2<xo ) xo2 = xo;
-
-			if ( mem_image_bpp == 1 )
-			{
-				for ( i=0; i<=(xo2 - xo); i++ )
-				{
-					PUT_PIXEL( xs+j, ys+i+xo )
-					PUT_PIXEL( xs+j, ys+yl-i-1-xo )
-				}
-			}
-			if ( mem_image_bpp == 3 )
-			{
-				for ( i=0; i<=(xo2 - xo); i++ )
-				{
-					PUT_PIXEL24( xs+j, ys+i+xo )
-					PUT_PIXEL24( xs+j, ys+yl-i-1-xo )
-				}
-			}
-		}
-		}
-		else
-		{
-		for ( j=thick; j<(yl-thick); j++ )
-		{
-			kon = 0.25 + 0.5*((float) j) / (yl - 1);
-			r1 = 2*(kon + (float) j) / yl - 1;			// Outer
-
-			r2 = sqrt( 1 - r1*r1 );
-			p = mt_round( r2 * (xl-1) );
-			xo = mt_round( (xl - p) / 2 );
-
-			kon = 0.25 + 0.5*((float) j) / (yl - 1);
-			r3 = 2*(kon + (float) j-thick) / (yl-2*thick) - 1;	// Inner
-
-			r4 = sqrt( 1 - r3*r3 );
-			p2 = mt_round( r4 * (xl-2*thick-1) );
-			xo2 = thick + mt_round( (xl - 2*thick - p2) / 2 ) - 1;
-
-			if ( xo2<xo ) xo2 = xo;
-
-			if ( mem_image_bpp == 1 )
-			{
-				for ( i=0; i<=(xo2 - xo); i++ )
-				{
-					PUT_PIXEL( xs+i+xo, ys+j )
-					PUT_PIXEL( xs+xl-i-1-xo, ys+j )
-				}
-			}
-			if ( mem_image_bpp == 3 )
-			{
-				for ( i=0; i<=(xo2 - xo); i++ )
-				{
-					PUT_PIXEL24( xs+i+xo, ys+j )
-					PUT_PIXEL24( xs+xl-i-1-xo, ys+j )
-				}
-			}
-		}
-		}
-	}
+	wjellipse(xs, ys, xl, yl, type, thick);
 }
 
 void o_ellipse( int x1, int y1, int x2, int y2, int thick )	// Draw an ellipse outline
@@ -2943,16 +2921,217 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 	return 0;
 }
 
+
+
+///	Code for scaling contributed by Dmitry Groshev, January 2006
+
+typedef struct {
+	int idx;
+	float k;
+} fstep;
+
+
+fstep *make_filter(int l0, int l1, int type)
+{
+	fstep *res, *buf;
+	double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
+	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
+	double A = 0.0, kk = 1.0, sum;
+	int pic_tile = FALSE; /* Allow to enable tiling mode later */
+	int i, j, k;
+
+
+	/* To correct scale-shift */
+	delta = 0.5 / scale - 0.5;
+
+	if (type == 0) type = -1;
+	if (scale < 1.0)
+	{
+		kk = scale;
+		if (type == 1) type = 0;
+	}
+
+	switch (type)
+	{
+	case 0: fwidth = 1.0 + scale; /* Area-mapping */
+		break;
+	case 1: fwidth = 2.0; /* Bilinear */
+		break;
+	case 2:	case 3: case 4: case 5:	/* Bicubic, all flavors */
+		fwidth = 4.0;
+		A = Aarray[type - 2];
+		break;
+	case 6: case 7:		/* Windowed sinc, all flavors */
+		fwidth = 6.0;
+		break;
+	default:	 /* Bug */
+		fwidth = 0.0;
+		break;
+	}
+	fwidth /= kk;
+
+	i = (int)floor(fwidth) + 2;
+	res = buf = calloc(l1 * (i + 1), sizeof(fstep));
+
+	for (i = 0; i < l1; i++)
+	{
+		basept = (double)i / scale + delta;
+		k = (int)floor(basept + fwidth / 2.0);
+		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
+		{
+			if (j < 0) buf->idx = pic_tile ? l0 + j : -j;
+			else if (j < l0) buf->idx = j;
+			else buf->idx = pic_tile ? j - l0 : 2 * (l0 - 1) - j;
+			x = fabs(((double)j - basept) * kk);
+			y = 0;
+			switch (type)
+			{
+			case 0: /* Area mapping */
+				if (x <= 0.5 - scale / 2.0) y = 1.0;
+				else y = 0.5 - (x - 0.5) / scale;
+				break;
+			case 1: /* Bilinear */
+				y = 1.0 - x;
+				break;
+			case 2: case 3: case 4: case 5: /* Bicubic */
+				if (x < 1.0) y = ((A + 2.0) * x - (A + 3)) * x * x + 1.0;
+				else y = A * (((x - 5.0) * x + 8.0) * x - 4.0);
+				break;
+			case 6: /* Lanczos3 */
+				if (x < 1e-7) y = 1.0;
+				else y = sin(M_PI * x) * sin((M_PI / 3.0) * x) /
+					((M_PI * M_PI / 3.0) * x * x);
+				break;
+			case 7: /* Blackman-Harris */
+				if (x < 1e-7) y = 1.0;
+				else y = (sin(M_PI * x) / (M_PI * x)) * (0.42323 +
+					0.49755 * cos(x * (M_PI * 2.0 / 6.0)) +
+					0.07922 * cos(x * (M_PI * 4.0 / 6.0)));
+				break;
+			default: /* Bug */
+				break;
+			}
+			buf->k = y * kk;
+			if (buf->k != 0.0) buf++;
+		}
+		buf->idx = -1;
+		buf++;
+	}
+	(buf - 1)->idx = -2;
+
+	/* Normalization pass. Damn the filters that require it. */
+	sum = 0.0;
+	for (buf = res, i = 0; ; i++)
+	{
+		if (buf[i].idx >= 0) sum += buf[i].k;
+		else
+		{
+			if ((sum != 0.0) && (sum != 1.0))
+			{
+				sum = 1.0 / sum;
+				for (j = 0; j < i; j++)
+					buf[j].k *= sum;
+			}
+			if (buf[i].idx < -1) break;
+			sum = 0.0; buf += i + 1; i = -1;
+		}
+	}
+
+	return (res);
+}
+
+float *work_area;
+fstep *hfilter, *vfilter;
+
+#define N_CHANNELS 3
+int prepare_scale(int nw, int nh, int type)
+{
+	work_area = NULL;
+	hfilter = vfilter = NULL;
+	work_area = malloc(mem_width * N_CHANNELS * sizeof(float));
+	hfilter = make_filter(mem_width, nw, type);
+	vfilter = make_filter(mem_height, nh, type);
+	if (!work_area || !hfilter || !vfilter)
+	{
+		free(work_area);
+		free(hfilter);
+		free(vfilter);
+		return FALSE;
+	}
+	else return TRUE;
+}
+
+void do_scale(char *new_image, int nw, int nh)
+{
+	unsigned char *img;
+	fstep *tmp, *tmpx;
+	float *wrk;
+	double sum[N_CHANNELS], kk;
+	int i, j, n;
+
+	/* For each destination line */
+	tmp = vfilter;
+	for (i = 0; i < nh; i++, tmp++)
+	{
+		memset(work_area, 0, mem_width * N_CHANNELS * sizeof(float));
+
+		/* Build one vertically-scaled row */
+		for (; tmp->idx >= 0; tmp++)
+		{
+			img = mem_image + tmp->idx * mem_width * N_CHANNELS;
+			wrk = work_area;
+			kk = tmp->k;
+			for (j = 0; j < mem_width; j++)
+			{
+		/* WARNING: this for N_CHANNELS == 3 !!! */
+				wrk[0] += kk * img[0];
+				wrk[1] += kk * img[1];
+				wrk[2] += kk * img[2];
+				wrk += N_CHANNELS;
+				img += N_CHANNELS;
+			}
+		}
+
+		/* Scale it horizontally */
+		img = new_image + i * nw * N_CHANNELS;
+		/* WARNING: this for N_CHANNELS == 3 !!! */
+		sum[0] = sum[1] = sum[2] = 0.0;
+		for (tmpx = hfilter; ; tmpx++)
+		{
+			if (tmpx->idx >= 0)
+			{
+				kk = tmpx->k;
+				wrk = work_area + tmpx->idx * N_CHANNELS;
+		/* WARNING: this for N_CHANNELS == 3 !!! */
+				sum[0] += kk * wrk[0];
+				sum[1] += kk * wrk[1];
+				sum[2] += kk * wrk[2];
+			}
+			else
+			{
+				for (n = 0; n < N_CHANNELS; n++)
+				{
+					j = (int)rint(sum[n]);
+					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					sum[n] = 0.0;
+				}
+				if (tmpx->idx < -1) break;
+			}
+		}
+
+		if ((i * 10) % nh >= nh - 10) progress_update((float)(i + 1) / nh);
+		if (tmp->idx < -1) break;
+	}
+
+	free(hfilter);
+	free(vfilter);
+	free(work_area);
+}
+
 int mem_image_scale( int nw, int nh, int type )				// Scale image
 {
 	char *new_image = NULL;
 	int i, j, oi, oj, res;
-
-	int k, oi1, oj1, oi2, oj2;
-	float foi, foj, foi1, foj1, foi2, foj2, ab, ac, xf1, xf2, yf1, yf2, av_tot, pf1, pf2;
-	int a[3], b[3], c[3], d[3], e[3];
-	float ff[3];
-	int xlen, ylen, avi, avj;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
@@ -2961,6 +3140,10 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 
 	new_image = malloc( nw * nh * mem_image_bpp );		// Grab new memory chunk
 	if ( new_image == NULL ) return 1;			// Not enough memory
+	if (type && (mem_image_bpp == 3))
+	{
+		if (!prepare_scale(nw, nh, type)) return 1;	// Not enough memory
+	}
 
 	progress_init(_("Scaling Image"),0);
 	if ( mem_image_bpp == 1 )
@@ -2974,106 +3157,12 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 				new_image[ i + nw*j ] = mem_image[ oi + mem_width*oj ];
 			}
 		}
-	if ( mem_image_bpp == 3 )
+	else if ( mem_image_bpp == 3 )
 	{
-		if ( type == 1 )
+		if (type == 0)
 		{
 		    for ( j=0; j<nh; j++ )
 		    {
-			progress_update( ((float) j)/nh );
-			foj = ((float) mem_height - 1) * ((float) j)/(nh-1);
-			for ( i=0; i<nw; i++ )
-			{
-				foi = ((float) mem_width - 1) * ((float) i)/(nw-1);
-
-				oi  = foi;
-				oj  = foj;
-
-				if ( nw>=mem_width )		// Expanding X axis
-				{
-					oi2 = foi + 0.9999;
-					ab = foi - ((int) foi);
-					for ( k=0; k<3; k++ )
-					{
-						a[k] = mem_image[ k + 3*(oi + mem_width*oj) ];
-						b[k] = mem_image[ k + 3*(oi2 + mem_width*oj) ];
-					}
-				}
-				else ab = 0.0;
-
-				if ( nh>=mem_height )		// Expanding Y axis
-				{
-					oi2 = foi + 0.9999;
-					oj2 = foj + 0.9999;
-					ac = foj - ((int) foj);
-					for ( k=0; k<3; k++ )
-					{
-						c[k] = mem_image[ k + 3*(oi + mem_width*oj2) ];
-						d[k] = mem_image[ k + 3*(oi2 + mem_width*oj2) ];
-					}
-
-				}
-				else ac = 0.0;
-
-				if ( nw<mem_width || nh<mem_height )		// Shrinking
-				{
-				 av_tot = 0;
-				 ff[0] = 0; ff[1] = 0; ff[2] = 0;
-
-				 foi1 = ((float) mem_width) * ((float) i)/nw;
-				 foj1 = ((float) mem_height) * ((float) j)/nh;
-				 foi2 = ((float) mem_width) * ((float) i+1)/nw;
-				 foj2 = ((float) mem_height) * ((float) j+1)/nh;
-				 oi1 = foi1;
-				 oj1 = foj1;
-				 oi2 = foi2;
-				 oj2 = foj2;
-
-				 if ( (foi2 - oi2) < 0.00001 ) oi2 = oi2 - 1;
-				 if ( (foj2 - oj2) < 0.00001 ) oj2 = oj2 - 1;
-
-				 xf1 = 1 - (foi1-oi1);	// X Fraction of 1st pixel to sample from original
-				 yf1 = 1 - (foj1-oj1);	// Y Fraction of 1st pixel to sample from original
-				 xf2 = foi2 - oi2;  // X Fraction of last pixel to sample from original
-				 yf2 = foj2 - oj2;  // Y Fraction of last pixel to sample from original
-				 xlen = oi2 - oi1;	// X pixels to sample from original
-				 ylen = oj2 - oj1;	// Y pixels to sample from original
-
-				 if ( xlen == 0 ) xf1 = 1.0;
-				 if ( ylen == 0 ) yf1 = 1.0;
-
-				 for ( avj=0; avj<=ylen; avj++ )
-				 {
-				   pf1 = 1.0;
-				   if ( avj==0 ) pf1 = yf1;
-				   else if ( avj==ylen ) pf1 = yf2;
-				   for ( avi=0; avi<=xlen; avi++ )
-				   {
-				      pf2 = pf1;
-				      if ( avi==0 ) pf2 = pf1 * xf1;
-				      else if ( avi==xlen ) pf2 = pf1 * xf2;
-				      for ( k=0; k<3; k++ )
-				        ff[k] = ff[k] + pf2 * (
-				          mem_image[ k + 3*(oi1 + avi + mem_width*(oj1 + avj)) ]);
-				      av_tot = av_tot + pf2;
-				   }
-				 }
-				 
-				 for ( k=0; k<3; k++ ) a[k] = mt_round(ff[k] / av_tot);	// Average colour
-				}
-
-				for ( k=0; k<3; k++ )
-					e[k] = (1-ac) * ((1-ab)*a[k] + ab*b[k]) +
-						ac    * ((1-ab)*c[k] + ab*d[k]);
-
-				new_image[ 3*(i + nw*j) ] = e[0];
-				new_image[ 1 + 3*(i + nw*j) ] = e[1];
-				new_image[ 2 + 3*(i + nw*j) ] = e[2];
-			}
-		    }
-		}
-		else for ( j=0; j<nh; j++ )
-		{
 			progress_update( ((float) j)/nh );
 			oj = mem_height * ((float) j)/nh;
 			for ( i=0; i<nw; i++ )
@@ -3083,7 +3172,9 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 				new_image[ 1 + 3*(i + nw*j) ] = mem_image[ 1 + 3*(oi + mem_width*oj) ];
 				new_image[ 2 + 3*(i + nw*j) ] = mem_image[ 2 + 3*(oi + mem_width*oj) ];
 			}
+		    }
 		}
+		else do_scale(new_image, nw, nh);
 	}
 	progress_end();
 
@@ -3274,9 +3365,31 @@ int mem_protected_RGB(int intcol)		// Is this intcol in list?
 	return 0;
 }
 
+void put_pixel( int x, int y )				// paletted version
+{
+	unsigned char *old_image, newc;
+	int offset = x + mem_width*y;
+
+	if (mem_prot_mask[mem_image[x + (y)*mem_width]] == 0)
+	{
+		newc = mem_col_pat[((x) % 8) + 8*((y) % 8)];
+		if (tint_mode[0])
+		{
+			if ( mem_undo_opacity ) old_image = mem_undo_previous();
+			else old_image = mem_image;
+
+			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+				newc = old_image[offset] > mem_cols - 1 - newc ? mem_cols-1 : old_image[offset] + newc;
+			else
+				newc = old_image[offset] > newc ? old_image[offset] - newc : 0;
+
+		}
+		mem_image[offset] = newc;
+	}
+}
 void put_pixel24( int x, int y )				// RGB version
 {
-	unsigned char *old_image = NULL, r, g, b;
+	unsigned char *old_image = NULL, r, g, b, nr, ng, nb;
 	int offset = 3*(x + mem_width*y), curpix;
 
 	if ( mem_prot>0 )		// Have any pixel colours been protected?
@@ -3285,27 +3398,44 @@ void put_pixel24( int x, int y )				// RGB version
 		if ( mem_protected_RGB(curpix) ) return; // Bailout if we are on a protected pixel
 	}
 
+	nr = mem_col_pat24[ 3*(((x) % 8) + 8*((y) % 8)) ];
+	ng = mem_col_pat24[ 1 + 3*(((x) % 8) + 8*((y) % 8)) ];
+	nb = mem_col_pat24[ 2 + 3*(((x) % 8) + 8*((y) % 8)) ];
+
+	if ( mem_undo_opacity ) old_image = mem_undo_previous();
+	else old_image = mem_image;
+
+	if (tint_mode[0])
+	{
+		if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+		{
+			nr = old_image[offset] > 255 - nr ? 255 : old_image[offset] + nr;
+			ng = old_image[1 + offset] > 255 - ng ? 255 : old_image[1 + offset] + ng;
+			nb = old_image[2 + offset] > 255 - nb ? 255 : old_image[2 + offset] + nb;
+		}
+		else
+		{
+			nr = old_image[offset] > nr ? old_image[offset] - nr : 0;
+			ng = old_image[1 + offset] > ng ? old_image[1 + offset] - ng : 0;
+			nb = old_image[2 + offset] > nb ? old_image[2 + offset] - nb : 0;
+		}
+	}
+
 	if ( tool_opacity == 100 )
 	{
-		mem_image[ offset ] = mem_col_pat24[ 3*(((x) % 8) + 8*((y) % 8)) ];
-		mem_image[ 1 + offset ] = mem_col_pat24[ 1 + 3*(((x) % 8) + 8*((y) % 8)) ];
-		mem_image[ 2 + offset ] = mem_col_pat24[ 2 + 3*(((x) % 8) + 8*((y) % 8)) ];
+		mem_image[ offset ] = nr;
+		mem_image[ 1 + offset ] = ng;
+		mem_image[ 2 + offset ] = nb;
 	}
 	else
 	{
-		if ( mem_undo_opacity ) old_image = mem_undo_previous();
-		else old_image = mem_image;
-
 		r = old_image[ offset ];
 		g = old_image[ 1 + offset ];
 		b = old_image[ 2 + offset ];
 
-		mem_image[offset] = ( mem_col_pat24[ 3*(((x) % 8) + 8*((y) % 8)) ]*tool_opacity +
-				r*(100-tool_opacity) ) / 100;
-		mem_image[1 + offset] = ( mem_col_pat24[ 1 + 3*(((x) % 8) + 8*((y) % 8)) ]*tool_opacity
-				+ g*(100-tool_opacity) ) / 100;
-		mem_image[2 + offset] = ( mem_col_pat24[ 2 + 3*(((x) % 8) + 8*((y) % 8)) ]*tool_opacity
-				+ b*(100-tool_opacity) ) / 100;
+		mem_image[offset] = ( nr*tool_opacity +	r*(100-tool_opacity) ) / 100;
+		mem_image[1 + offset] = ( ng*tool_opacity + g*(100-tool_opacity) ) / 100;
+		mem_image[2 + offset] = ( nb*tool_opacity + b*(100-tool_opacity) ) / 100;
 	}
 }
 
@@ -3316,9 +3446,14 @@ int png_cmp( png_color a, png_color b )			// Compare 2 colours
 			// Return TRUE if different
 }
 
-int mem_count_all_cols()				// Count all colours - very memory greedy
+int mem_count_all_cols()				// Count all colours - Using main image
 {
-	unsigned char *im, *tab, c;
+	return mem_count_all_cols_real(mem_image, mem_width, mem_height);
+}
+
+int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colours - very memory greedy
+{
+	unsigned char *tab, c;
 	int i, j, k, o;
 
 	tab = malloc( 256*256*32 );			// HUGE colour cube
@@ -3327,8 +3462,7 @@ int mem_count_all_cols()				// Count all colours - very memory greedy
 	j = 256*256*32;
 	for ( i=0; i<j; i++ ) tab[i] = 0;		// Flush table
 
-	j = mem_width*mem_height;
-	im = mem_image;
+	j = w*h;
 	for ( i=0; i<j; i++ )				// Scan each pixel
 	{
 		o = im[0] + 256*im[1] + 256*256*( im[2] >> 3 );
@@ -3352,41 +3486,57 @@ int mem_count_all_cols()				// Count all colours - very memory greedy
 	return k;
 }
 
-int mem_cols_used(int max_count)			// Count colours used in RGB image
+int mem_cols_used(int max_count)			// Count colours used in main RGB image
 {
-	int i = 3, j = mem_width*mem_height*3, res = 1, k, f;
-
 	if ( mem_image_bpp == 1 ) return -1;			// RGB only
 
-	found[0][0] = mem_image[0];
-	found[0][1] = mem_image[1];
-	found[0][2] = mem_image[2];
-	progress_init(_("Counting Unique RGB Pixels"),0);
+	return mem_cols_used_real(mem_image, mem_width, mem_height, max_count, 1);
+}
+
+void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
+{
+	int i, j;
+
+	for ( i=0; i<256; i++ )
+		for ( j=0; j<3; j++ )
+			userpal[j][i] = found[i][j];
+}
+
+int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
+			// Count colours used in RGB chunk
+{
+	int i = 3, j = w*h*3, res = 1, k, f;
+
+
+	found[0][0] = im[0];
+	found[0][1] = im[1];
+	found[0][2] = im[2];
+	if ( prog == 1 ) progress_init(_("Counting Unique RGB Pixels"),0);
 	while ( i<j && res<max_count )				// Skim all pixels
 	{
 		k = 0;
 		f = 0;
 		while ( k<res && f==0 )
 		{
-			if (	mem_image[i]   == found[k][0] &&
-				mem_image[i+1] == found[k][1] &&
-				mem_image[i+2] == found[k][2]
+			if (	im[i]   == found[k][0] &&
+				im[i+1] == found[k][1] &&
+				im[i+2] == found[k][2]
 				) f = 1;
 			k++;
 		}
 		if ( f == 0 )					// New colour so add to list
 		{
-			found[res][0] = mem_image[i];
-			found[res][1] = mem_image[i+1];
-			found[res][2] = mem_image[i+2];
+			found[res][0] = im[i];
+			found[res][1] = im[i+1];
+			found[res][2] = im[i+2];
 			res++;
-			if ( res % 16 == 0 )
+			if ( res % 16 == 0 && prog == 1 )
 				if ( progress_update( ((float) res)/1024 ) ) goto stop;
 		}
 		i = i + 3;
 	}
 stop:
-	progress_end();
+	if ( prog == 1 ) progress_end();
 
 	return res;
 }
@@ -3400,7 +3550,7 @@ void do_effect( int type, int param )		// 0=edge detect 1=blur 2=emboss
 	int offset, pixels = mem_width*mem_height*3, i, j, k, l=0, diffs[4][3];
 	float blur = ((float) param) / 200, b2, b3;
 
-	rgb = grab_memory( pixels, "Effect", 0 );
+	rgb = grab_memory( pixels, 0 );
 	if (rgb == NULL) return;
 
 	if ( type != 1 ) progress_init(_("Applying Effect"),1);
@@ -3538,6 +3688,66 @@ void mem_clip_mask_clear()		// Clear/remove the clipboard mask
 		free(mem_clip_mask);
 		mem_clip_mask = NULL;
 	}
+}
+
+int mem_clip_scale_alpha()	// Extract alpha information from RGB clipboard - alpha if pixel is in scale of A->B. Result 0=ok 1=problem
+{
+	int i, ii, j, k, AA[3], BB[3], CC[3], chan, ok;
+	float p;
+
+	AA[0] = mem_col_A24.red;
+	AA[1] = mem_col_A24.green;
+	AA[2] = mem_col_A24.blue;
+	BB[0] = mem_col_B24.red;
+	BB[1] = mem_col_B24.green;
+	BB[2] = mem_col_B24.blue;
+
+	chan = 0;	// Find the channel with the widest range - gives most accurate result later
+	if ( abs(AA[1] - BB[1]) > abs(AA[0] - BB[0]) ) chan = 1;
+	if ( abs(AA[2] - BB[2]) > abs(AA[chan] - BB[chan]) ) chan = 2;
+	if ( (AA[chan] - BB[chan]) == 0 ) return 1;	// A == B so bail out - nothing to do
+
+	if ( mem_clipboard == NULL || mem_clip_bpp != 3 ) return 1;
+
+	if ( mem_clip_mask == NULL ) mem_clip_mask_init(0);	// Create new alpha memory if needed
+	if ( mem_clip_mask == NULL ) return 1;			// Bail out if not available
+
+	ii = 0;
+	j = mem_clip_w * mem_clip_h * 3;
+	for ( i=0; i<j; i+=3 )
+	{
+		ok = TRUE;		// Ensure pixel lies between A and B for each channel
+		for ( k=0; k<3; k++ )
+		{
+			if ( mem_clipboard[i+k] < AA[k] && mem_clipboard[i+k] < BB[k] ) ok = FALSE;
+			if ( mem_clipboard[i+k] > AA[k] && mem_clipboard[i+k] > BB[k] ) ok = FALSE;
+		}
+		if ( mem_clip_mask[ii] > 0 ) ok = FALSE;	// Already semi-opaque so don't touch
+
+		if ( ok )
+		{
+			p = ((float) (mem_clipboard[i+chan] - AA[chan])) / (BB[chan] - AA[chan]);
+
+				// Check delta for all channels is roughly the same ...
+				// ... if it isn't, ignore this pixel as its not in A->B scale
+			for ( k=0; k<3; k++ )
+			{
+				CC[k] = 0.5 + (1-p)*AA[k] + p*BB[k];
+				if ( abs(CC[k] - mem_clipboard[i+k]) > 2 ) ok = FALSE;
+			}
+
+			if ( ok )	// Pixel is a shade of A/B so set alpha & clipboard values
+			{
+				mem_clipboard[i]   = AA[0];
+				mem_clipboard[i+1] = AA[1];
+				mem_clipboard[i+2] = AA[2];
+				mem_clip_mask[ii] = 0.5 + p*255;
+			}
+		}
+		ii++;
+	}
+
+	return 0;
 }
 
 
