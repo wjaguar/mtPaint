@@ -8,10 +8,14 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 	* Actions section added to File menu
 	* Slovak translation added by Jozef Riha
+	* French translation updated by Sylvain Cresto
+	* Sharper image reduction toggle added to 'Scale Canvas'
 	* Spacing for non-continuous tools is now configurable - right click the continuous mode toggle
 	* Clipboard alpha is now used as clipboard mask when pasting to image without alpha channel
+	* "Filtered" drawing mode added
 	* BUGFIX - Negative values in Transform Colour and Resize Canvas dialogs are read correctly again
 	* BUGFIX - Drawing a 2 pixels high filled ellipse doesn't cause crash
+	* Lanczos3 rescaling filter removed due to unfavourable results
 
 3.10	2007-1-22
 

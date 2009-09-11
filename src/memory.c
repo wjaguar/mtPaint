@@ -58,8 +58,13 @@ const unsigned char bayer[16] = {
 int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
+int mem_filtmode;
 int mem_unmask;
 int mem_gradient;
+
+/// COMPONENT FILTER SETTINGS
+
+unsigned char filter_HSV = 1, filter_RGB = 7;
 
 /// FLOOD FILL SETTINGS
 
@@ -4027,10 +4032,137 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
+static void component_filter(unsigned char *dest, unsigned char *src)
+{
+	static const unsigned char hhsv[8 * 3] =
+		{0, 1, 2, /* #0: B..M */
+		 2, 1, 0, /* #1: M+..R- */
+		 0, 1, 2, /* #2: B..M alt */
+		 1, 0, 2, /* #3: C+..B- */
+		 2, 0, 1, /* #4: G..C */
+		 0, 2, 1, /* #5: Y+..G- */
+		 1, 2, 0, /* #6: R..Y */
+		 1, 2, 0  /* #7: W */ };
+	unsigned char *new, *old;
+	int nhex, ohex;
+
+	/* Backward transfer if passing two components */
+	if (filter_HSV & (filter_HSV - 1)) new = src , old = dest;
+	else new = dest , old = src;
+
+	nhex = ((((0x200 + new[0]) - new[1]) ^ ((0x400 + new[1]) - new[2]) ^
+		 ((0x100 + new[2]) - new[0])) >> 8) * 3;
+	ohex = ((((0x200 + old[0]) - old[1]) ^ ((0x400 + old[1]) - old[2]) ^
+		 ((0x100 + old[2]) - old[0])) >> 8) * 3;
+
+	switch (filter_HSV)
+	{
+	case 6: /* Value + Saturation */
+	case 1: /* Hue only */
+	{
+		int i, nsi, nvi;
+		unsigned char os, ov;
+
+		ov = old[hhsv[ohex + 2]];
+
+		if (nhex == 7 * 3) /* New is white */
+		{
+			dest[0] = dest[1] = dest[2] = ov;
+			break;
+		}
+
+		os = old[hhsv[ohex + 1]];
+		nsi = hhsv[nhex + 1];
+		nvi = hhsv[nhex + 2];
+
+		i = new[nvi] - new[nsi];
+		dest[hhsv[nhex]] = (i + (ov - os) * 2 *
+			(new[hhsv[nhex]] - new[nsi])) / (i + i) + os;
+		dest[nsi] = os;
+		dest[nvi] = ov;
+		break;
+	}
+	case 5: /* Value + Hue */
+	case 2: /* Saturation only */
+	{
+		int i, osi, ovi;
+		unsigned char ov, os, ns, nv;
+
+		if (ohex == 7 * 3) /* Old is white - leave it so */
+		{
+			dest[0] = old[0]; dest[1] = old[1]; dest[2] = old[2];
+			break;
+		}
+
+		ovi = hhsv[ohex + 2];
+		ov = old[ovi];
+
+		if (nhex == 7 * 3) /* New is white */
+		{
+			dest[0] = dest[1] = dest[2] = ov;
+			break;
+		}
+
+		osi = hhsv[ohex + 1];
+		os = old[osi];
+
+		nv = new[hhsv[nhex + 2]];
+		ns = (new[hhsv[nhex + 1]] * ov * 2 + nv) / (nv + nv);
+
+		i = ov - os;
+		dest[hhsv[ohex]] = (i + (ov - ns) * 2 *
+			(old[hhsv[ohex]] - os)) / (i + i) + ns;
+		dest[osi] = ns;
+		dest[ovi] = ov;
+		break;
+	}
+	case 3: /* Hue + Saturation */
+	case 4: /* Value only */
+	{
+		int osi, ovi;
+		unsigned char ov, nv;
+
+		nv = new[hhsv[nhex + 2]];
+
+		if (ohex == 7 * 3) /* Old is white */
+		{
+			dest[0] = dest[1] = dest[2] = nv;
+			break;
+		}
+
+		ov = old[hhsv[ohex + 2]];
+		osi = hhsv[ohex + 1];
+		ovi = hhsv[ohex + 2];
+
+		dest[hhsv[ohex]] = (old[hhsv[ohex]] * nv * 2 + ov) / (ov + ov);
+		dest[osi] = (old[osi] * nv * 2 + ov) / (ov + ov);
+		dest[ovi] = nv;
+		break;
+	}
+	case 7: /* Do nothing */
+	default: break;
+	}
+
+	switch (filter_RGB)
+	{
+	case 7: /* Do nothing */
+	default: return;
+	case 1: dest[1] = src[1]; /* Red */
+	case 3: dest[2] = src[2]; /* Red + Green */
+		break;
+	case 2: dest[2] = src[2]; /* Green */
+	case 6: dest[0] = src[0]; /* Green + Blue */
+		break;
+	case 4: dest[0] = src[0]; /* Blue */
+	case 5: dest[1] = src[1]; /* Blue + Red */
+		break;
+	}
+}
+
 void put_pixel( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
-	unsigned char r, g, b, nr, ng, nb, cset[NUM_CHANNELS + 3];
+	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
 	int i, j, offset, ofs3, opacity = 0, op = tool_opacity, tint;
 
 	j = pixel_protected(x, y);
@@ -4118,45 +4250,41 @@ void put_pixel( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
-		nr = cset[0];
-		ng = cset[1];
-		nb = cset[2];
-
 		if (tint)
 		{
 			if (tint < 0)
 			{
-				nr = old_image[ofs3] > 255 - nr ? 255 : old_image[ofs3] + nr;
-				ng = old_image[ofs3 + 1] > 255 - ng ? 255 : old_image[ofs3 + 1] + ng;
-				nb = old_image[ofs3 + 2] > 255 - nb ? 255 : old_image[ofs3 + 2] + nb;
+				cset[0] = old_image[ofs3] > 255 - cset[0] ? 255 : old_image[ofs3] + cset[0];
+				cset[1] = old_image[ofs3 + 1] > 255 - cset[1] ? 255 : old_image[ofs3 + 1] + cset[1];
+				cset[2] = old_image[ofs3 + 2] > 255 - cset[2] ? 255 : old_image[ofs3 + 2] + cset[2];
 			}
 			else
 			{
-				nr = old_image[ofs3] > nr ? old_image[ofs3] - nr : 0;
-				ng = old_image[ofs3 + 1] > ng ? old_image[ofs3 + 1] - ng : 0;
-				nb = old_image[ofs3 + 2] > nb ? old_image[ofs3 + 2] - nb : 0;
+				cset[0] = old_image[ofs3] > cset[0] ? old_image[ofs3] - cset[0] : 0;
+				cset[1] = old_image[ofs3 + 1] > cset[1] ? old_image[ofs3 + 1] - cset[1] : 0;
+				cset[2] = old_image[ofs3 + 2] > cset[2] ? old_image[ofs3 + 2] - cset[2] : 0;
 			}
 		}
 
-		if (opacity == 255)
-		{
-			new_image[ofs3] = nr;
-			new_image[ofs3 + 1] = ng;
-			new_image[ofs3 + 2] = nb;
-		}
-		else
+		if (opacity < 255)
 		{
 			r = old_image[ofs3];
 			g = old_image[ofs3 + 1];
 			b = old_image[ofs3 + 2];
 
-			i = r * 255 + (nr - r) * opacity;
-			new_image[ofs3] = (i + (i >> 8) + 1) >> 8;
-			i = g * 255 + (ng - g) * opacity;
-			new_image[ofs3 + 1] = (i + (i >> 8) + 1) >> 8;
-			i = b * 255 + (nb - b) * opacity;
-			new_image[ofs3 + 2] = (i + (i >> 8) + 1) >> 8;
+			i = r * 255 + (cset[0] - r) * opacity;
+			cset[0] = (i + (i >> 8) + 1) >> 8;
+			i = g * 255 + (cset[1] - g) * opacity;
+			cset[1] = (i + (i >> 8) + 1) >> 8;
+			i = b * 255 + (cset[2] - b) * opacity;
+			cset[2] = (i + (i >> 8) + 1) >> 8;
 		}
+
+		if (mem_filtmode) component_filter(cset, old_image + ofs3);
+
+		new_image[ofs3] = cset[0];
+		new_image[ofs3 + 1] = cset[1];
+		new_image[ofs3 + 2] = cset[2];
 	}
 }
 
@@ -4256,7 +4384,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	int opacity, int sourcebpp)
 {
 	unsigned char newc, oldc;
-	unsigned char r, g, b, nr, ng, nb;
+	unsigned char r, g, b, nrgb[3];
 	int i, j, ofs3, tint;
 
 	cnt = start + step * cnt;
@@ -4292,15 +4420,15 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			ofs3 = i * 3;
 			if (sourcebpp == 3) /* RGB-to-RGB paste */
 			{
-				nr = img[ofs3 + 0];
-				ng = img[ofs3 + 1];
-				nb = img[ofs3 + 2];
+				nrgb[0] = img[ofs3 + 0];
+				nrgb[1] = img[ofs3 + 1];
+				nrgb[2] = img[ofs3 + 2];
 			}
 			else /* Indexed-to-RGB paste */
 			{
-				nr = mem_pal[img[i]].red;
-				ng = mem_pal[img[i]].green;
-				nb = mem_pal[img[i]].blue;
+				nrgb[0] = mem_pal[img[i]].red;
+				nrgb[1] = mem_pal[img[i]].green;
+				nrgb[2] = mem_pal[img[i]].blue;
 			}
 			if (tint)
 			{
@@ -4309,33 +4437,33 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				b = img0[ofs3 + 2];
 				if (tint < 0)
 				{
-					nr = r > 255 - nr ? 255 : r + nr;
-					ng = g > 255 - ng ? 255 : g + ng;
-					nb = b > 255 - nb ? 255 : b + nb;
+					nrgb[0] = r > 255 - nrgb[0] ? 255 : r + nrgb[0];
+					nrgb[1] = g > 255 - nrgb[1] ? 255 : g + nrgb[1];
+					nrgb[2] = b > 255 - nrgb[2] ? 255 : b + nrgb[2];
 				}
 				else
 				{
-					nr = r > nr ? r - nr : 0;
-					ng = g > ng ? g - ng : 0;
-					nb = b > nb ? b - nb : 0;
+					nrgb[0] = r > nrgb[0] ? r - nrgb[0] : 0;
+					nrgb[1] = g > nrgb[1] ? g - nrgb[1] : 0;
+					nrgb[2] = b > nrgb[2] ? b - nrgb[2] : 0;
 				}
 			}
-			if (opacity == 255)
+			if (opacity < 255)
 			{
-				imgr[ofs3 + 0] = nr;
-				imgr[ofs3 + 1] = ng;
-				imgr[ofs3 + 2] = nb;
-				continue;
+				r = img0[ofs3 + 0];
+				g = img0[ofs3 + 1];
+				b = img0[ofs3 + 2];
+				j = r * 255 + (nrgb[0] - r) * opacity;
+				nrgb[0] = (j + (j >> 8) + 1) >> 8;
+				j = g * 255 + (nrgb[1] - g) * opacity;
+				nrgb[1] = (j + (j >> 8) + 1) >> 8;
+				j = b * 255 + (nrgb[2] - b) * opacity;
+				nrgb[2] = (j + (j >> 8) + 1) >> 8;
 			}
-			r = img0[ofs3 + 0];
-			g = img0[ofs3 + 1];
-			b = img0[ofs3 + 2];
-			j = r * 255 + (nr - r) * opacity;
-			imgr[ofs3 + 0] = (j + (j >> 8) + 1) >> 8;
-			j = g * 255 + (ng - g) * opacity;
-			imgr[ofs3 + 1] = (j + (j >> 8) + 1) >> 8;
-			j = b * 255 + (nb - b) * opacity;
-			imgr[ofs3 + 2] = (j + (j >> 8) + 1) >> 8;
+			if (mem_filtmode) component_filter(nrgb, img0 + ofs3);
+			imgr[ofs3 + 0] = nrgb[0];
+			imgr[ofs3 + 1] = nrgb[1];
+			imgr[ofs3 + 2] = nrgb[2];
 		}
 	}	
 }

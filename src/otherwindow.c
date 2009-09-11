@@ -486,7 +486,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 	filter_func = filt;
 	filter_data = fdata;
 	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
-	gtk_widget_set_usize(filter_win, 300, -2);
+	gtk_window_set_default_size(GTK_WINDOW(filter_win), 300, -1);
 
 	vbox6 = gtk_vbox_new(FALSE, 0);
 	gtk_widget_show(vbox6);

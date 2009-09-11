@@ -83,10 +83,11 @@
 #define SETB_TINT 2
 #define SETB_TSUB 3
 #define SETB_CSEL 4
-#define SETB_MASK 5
-#define TOTAL_ICONS_SETTINGS 6
-#define SETB_GRAD 6
-#define TOTAL_SETTINGS 7
+#define SETB_FILT 5
+#define SETB_MASK 6
+#define TOTAL_ICONS_SETTINGS 7
+#define SETB_GRAD 7
+#define TOTAL_SETTINGS 8
 
 //	GLOBAL VARIABLES
 

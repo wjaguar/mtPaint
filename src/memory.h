@@ -149,8 +149,13 @@ const unsigned char bayer[16];
 int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
+int mem_filtmode;
 int mem_unmask;
 int mem_gradient;
+
+/// COMPONENT FILTER SETTINGS
+
+unsigned char filter_HSV, filter_RGB;
 
 /// FLOOD FILL SETTINGS
 
