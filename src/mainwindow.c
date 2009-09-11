@@ -2950,7 +2950,7 @@ void main_init()
 		{ _("/Layers/Save"),		"<shift><control>S", layer_press_save, 0, NULL },
 		{ _("/Layers/Save As ..."),	NULL,		layer_press_save_as, 0, NULL },
 		{ _("/Layers/Save Composite Image ..."), NULL,	layer_press_save_composite, 0, NULL },
-		{ _("/Layers/Remove All Layers ..."), NULL,	layers_remove_all, 0, NULL },
+		{ _("/Layers/Remove All Layers ..."), NULL,	layer_press_remove_all, 0, NULL },
 		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
 		{ _("/Layers/Configure Animation ..."),		NULL, pressed_animate_window,0, NULL },
 		{ _("/Layers/Preview Animation ..."), NULL,	ani_but_preview, 0, NULL },

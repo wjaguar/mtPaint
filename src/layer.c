@@ -722,6 +722,8 @@ int read_file_num(FILE *fp, char *txt)
 	return i;
 }
 
+static void layers_remove_all(); /* Forward declaration */
+
 int load_layers( char *file_name )
 {
 	char tin[300], load_prefix[300], load_name[300], *c;
@@ -1021,17 +1023,9 @@ static void update_main_with_new_layer()
 			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 }
 
-void layers_remove_all()
+static void layers_remove_all()
 {
 	int i;
-
-	i = check_layers_for_changes();
-	if ( i == 2 || i < 0 )
-	{
-		if ( i<0 ) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
-		if ( i!=2 ) return;
-	} else return;
-
 
 	gtk_widget_set_sensitive( main_window, FALSE);		// Stop any user input
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
@@ -1064,6 +1058,14 @@ void layers_remove_all()
 	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
 }
 
+void layer_press_remove_all()
+{
+	int i;
+
+	i = check_layers_for_changes();
+	if (i < 0) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
+	if (i == 2) layers_remove_all();
+}
 
 static gint layer_tog_visible( GtkWidget *widget, GdkEvent *event, gpointer data )
 {

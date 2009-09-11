@@ -48,7 +48,6 @@ float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_x=0, margin_main_y=0,		// Top left of image from top left of canvas
 	margin_view_x=0, margin_view_y=0;
 int zoom_flag = 0;
-int fs_type = 0;
 int perim_status = 0, perim_x = 0, perim_y = 0, perim_s = 2;		// Tool perimeter
 int marq_status = MARQUEE_NONE,
 	marq_x1 = -1, marq_y1 = -1, marq_x2 = -1, marq_y2 = -1;		// Selection marquee

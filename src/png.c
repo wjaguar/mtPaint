@@ -2831,9 +2831,9 @@ int detect_image_format(char *name)
 int show_html(char *browser, char *docs)
 {
 	char buf[300], buf2[300];
+	int i;
 #ifdef WIN32
 	char *r;
-	int i;
 
 	if (!docs || !docs[0])
 	{
@@ -2873,7 +2873,7 @@ int show_html(char *browser, char *docs)
 	if (!browser) browser = HANDBOOK_BROWSER;
 
 	snprintf(buf, 260, "%s %s", browser, docs);
-	i = system(txt);
+	i = system(buf);
 #endif
 	if (i) alert_box( _("Error"),
 		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),

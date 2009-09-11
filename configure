@@ -3,7 +3,7 @@
 
 echo
 
-MT_V="3.08.19"
+MT_V="3.08.20"
 MT_DATE="2006-10-18"
 
 MT_VERSION="mtPaint $MT_V"
@@ -103,15 +103,18 @@ do
 		"intl" )	MT_LANG=YES;;
 		"merge" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
 				cd po
+				NEW_DIR=trans_
+				mkdir $NEW_DIR`date +%d-%m-%Y-%H-%M-%S`
 				ls *.po | while read file
 				do
-					NEWfile=$file-`date +%d-%m-%Y-%H-%M-%S`
-					echo $NEWfile
-					mv $file $NEWfile
-					mv $NEWfile ~
-					msgmerge -N ~/$NEWfile mtpaint.pot > $file
+					echo New file = $file-a
+					mv $file $file-a
+					msgmerge -N $file-a mtpaint.pot > $file-b
+					perl xtend.pl $file-b $file
+					mv $file-* $NEW_DIR*
 				done
 				rm mtpaint.pot
+				mv $NEW_DIR* ../../old_trans
 				exit;;
 		"newpo" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
 				exit;;
@@ -176,6 +179,7 @@ do
 				cd ..
 				./configure flush
 
+				cd "$I_DIR"
 				chown mark *
 				chgrp users *
 				exit;;
