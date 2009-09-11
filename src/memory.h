@@ -151,7 +151,6 @@ unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 int tool_type, tool_size, tool_flow;	// Currently selected tool
 int tool_opacity;			// Opacity - 255 = solid
 int tool_pat;				// Tool pattern number
-int tool_fixx, tool_fixy;		// Fixate on axis
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
 int mem_continuous;			// Area we painting the static shapes continuously?
@@ -261,8 +260,6 @@ void mem_canvas_index_move( int c1, int c2 );	// Similar to palette item move bu
 void set_zoom_centre( int x, int y );
 void mem_boundary( int *x, int *y, int *w, int *h );		// Check/amend boundaries
 
-int png_cmp( png_color a, png_color b );			// Compare 2 colours
-
 // Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255
 void rgb2hsv(int *rgb, double *hsv);
 
@@ -370,7 +367,6 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 int pixel_protected(int x, int y);				// generic
 void row_protected(int x, int y, int len, unsigned char *mask);
 void put_pixel( int x, int y );					// generic
-png_color get_pixel24( int x, int y );				// RGB version
 int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image

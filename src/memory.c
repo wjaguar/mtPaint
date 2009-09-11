@@ -106,7 +106,6 @@ int tool_type = TOOL_SQUARE;		// Currently selected tool
 int tool_size = 1, tool_flow = 1;
 int tool_opacity = 255;			// Opacity - 255 = solid
 int tool_pat;				// Tool pattern number
-int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
 int mem_continuous;			// Area we painting the static shapes continuously?
@@ -1862,18 +1861,28 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 void mem_greyscale()
 {
 	unsigned char *mask, *img = mem_img[CHN_IMAGE];
-	int i, j, k, v, ch;
+	int i, j, k, v, ch, gcor;
 	double value;
 
-	/* !!! Would it be worth it to use real phosphors' brightness and
-	 * (optional) gamma correction in here instead? - WJ */
+	gcor = inifile_get_gboolean("defaultGamma", FALSE);
 	if ( mem_img_bpp == 1)
 	{
 		for (i = 0; i < 256; i++)
 		{
-			value = 0.299 * mem_pal[i].red +
-				0.587 * mem_pal[i].green + 0.114 * mem_pal[i].blue;
-			v = (int)rint(value);
+			if (gcor) /* Gamma correction + Helmholtz-Kohlrausch effect */
+			{
+				value = rgb2B(gamma256[mem_pal[i].red],
+					gamma256[mem_pal[i].green],
+					gamma256[mem_pal[i].blue]);
+				v = UNGAMMA256(value);
+			}
+			else /* Usual braindead formula */
+			{
+				value = 0.299 * mem_pal[i].red +
+					0.587 * mem_pal[i].green +
+					0.114 * mem_pal[i].blue;
+				v = (int)rint(value);
+			}
 			mem_pal[i].red = v;
 			mem_pal[i].green = v;
 			mem_pal[i].blue = v;
@@ -1890,9 +1899,20 @@ void mem_greyscale()
 			row_protected(0, i, mem_width, mask);
 			for (j = 0; j < mem_width; j++)
 			{
-				value = 0.299 * img[0] + 0.587 * img[1] +
-					0.114 * img[2];
-				v = (int)rint(value) * (255 - mask[j]);
+				if (gcor) /* Gamma + H-K effect */
+				{
+					value = rgb2B(gamma256[img[0]],
+						gamma256[img[1]],
+						gamma256[img[2]]);
+					v = UNGAMMA256(value);
+				}
+				else /* Usual */
+				{
+					value = 0.299 * img[0] + 0.587 * img[1] +
+						0.114 * img[2];
+					v = (int)rint(value);
+				}
+				v *= 255 - mask[j];
 				k = *img * mask[j] + v;
 				*img++ = (k + (k >> 8) + 1) >> 8;
 				k = *img * mask[j] + v;
@@ -1901,6 +1921,7 @@ void mem_greyscale()
 				*img++ = (k + (k >> 8) + 1) >> 8;
 			}
 		}
+		mem_channel = ch;
 		free(mask);
 	}
 }
@@ -3940,19 +3961,6 @@ void mem_threshold(int channel, int level)		// Threshold channel values
 	}
 }
 
-png_color get_pixel24( int x, int y )	/* RGB */
-{
-	unsigned char *img = mem_img[CHN_IMAGE];
-	png_color pix;
-
-	x = (mem_width * y + x) * 3;
-	pix.red = img[x];
-	pix.green = img[x + 1];
-	pix.blue = img[x + 2];
-
-	return pix;
-}
-
 int get_pixel( int x, int y )	/* Mixed */
 {
 	x = mem_width * y + x;
@@ -4388,13 +4396,6 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	dest = mem_img[mem_channel] + ofs * bpp;
 
 	process_img(0, 1, len, mask, dest, old_image, img, opacity);
-}
-
-int png_cmp( png_color a, png_color b )			// Compare 2 colours
-{
-	if ( a.red == b.red && a.green == b.green && a.blue == b.blue ) return 0;
-	else return -1;
-			// Return TRUE if different
 }
 
 int mem_count_all_cols()				// Count all colours - Using main image

@@ -1026,10 +1026,11 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 			pressed_select_none(NULL, NULL);
 		else if (tool_type == TOOL_LINE) stop_line();
-		else if ((tool_type == TOOL_GRADIENT) && (grad_status != GRAD_NONE))
+		else if ((tool_type == TOOL_GRADIENT) &&
+			(gradient[mem_channel].status != GRAD_NONE))
 		{
 			repaint_grad(0);
-			grad_status = GRAD_NONE;
+			gradient[mem_channel].status = GRAD_NONE;
 		}
 		return TRUE;
 	case ACT_SCALE:
@@ -1246,6 +1247,7 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 int grad_tool(int event, int x, int y, guint state, guint button)
 {
 	int i, j, *xx, *yy;
+	grad_info *grad = gradient + mem_channel;
 
 	if (tool_type != TOOL_GRADIENT) return (FALSE);
 
@@ -1253,69 +1255,69 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	if ((event == GDK_BUTTON_PRESS) && (button == 1))
 	{
 		/* Start anew */
-		if (grad_status == GRAD_NONE)
+		if (grad->status == GRAD_NONE)
 		{
-			grad_x1 = grad_x2 = x;
-			grad_y1 = grad_y2 = y;
-			grad_status = GRAD_END;
+			grad->x1 = grad->x2 = x;
+			grad->y1 = grad->y2 = y;
+			grad->status = GRAD_END;
 			repaint_grad(1);
 		}
 		/* Place starting point */
-		else if (grad_status == GRAD_START)
+		else if (grad->status == GRAD_START)
 		{
-			grad_x1 = x;
-			grad_y1 = y;
-			grad_status = GRAD_DONE;
+			grad->x1 = x;
+			grad->y1 = y;
+			grad->status = GRAD_DONE;
 		}
 		/* Place end point */
-		else if (grad_status == GRAD_END)
+		else if (grad->status == GRAD_END)
 		{
-			grad_x2 = x;
-			grad_y2 = y;
-			grad_status = GRAD_DONE;
+			grad->x2 = x;
+			grad->y2 = y;
+			grad->status = GRAD_DONE;
 		}
 		/* Pick up nearest end */
-		else if (grad_status == GRAD_DONE)
+		else if (grad->status == GRAD_DONE)
 		{
 			repaint_grad(0);
-			i = (x - grad_x1) * (x - grad_x1) +
-				(y - grad_y1) * (y - grad_y1);
-			j = (x - grad_x2) * (x - grad_x2) +
-				(y - grad_y2) * (y - grad_y2);
+			i = (x - grad->x1) * (x - grad->x1) +
+				(y - grad->y1) * (y - grad->y1);
+			j = (x - grad->x2) * (x - grad->x2) +
+				(y - grad->y2) * (y - grad->y2);
 			if (i < j)
 			{
-				grad_x1 = x;
-				grad_y1 = y;
-				grad_status = GRAD_START;
+				grad->x1 = x;
+				grad->y1 = y;
+				grad->status = GRAD_START;
 			}
-			else				
+			else
 			{
-				grad_x2 = x;
-				grad_y2 = y;
-				grad_status = GRAD_END;
+				grad->x2 = x;
+				grad->y2 = y;
+				grad->status = GRAD_END;
 			}
 			repaint_grad(1);
 		}
 	}
 
 	/* Everything but left click is irrelevant when no gradient */
-	else if (grad_status == GRAD_NONE);
+	else if (grad->status == GRAD_NONE);
 
 	/* Right click deletes the gradient */
 	else if (event == GDK_BUTTON_PRESS) /* button != 1 */
 	{
 		repaint_grad(0);
-		grad_status = GRAD_NONE;
+		grad->status = GRAD_NONE;
 	}
 
 	/* Motion is irrelevant with gradient in place */
-	else if (grad_status == GRAD_DONE);
+	else if (grad->status == GRAD_DONE);
 
 	/* Motion drags points around */
 	else if (event == GDK_MOTION_NOTIFY)
 	{
-		if (grad_status == GRAD_START) xx = &grad_x1 , yy = &grad_y1;
-		else xx = &grad_x2 , yy = &grad_y2;
+		if (grad->status == GRAD_START) xx = &(grad->x1) , yy = &(grad->y1);
+		else xx = &(grad->x2) , yy = &(grad->y2);
 		if ((*xx != x) || (*yy != y))
 		{
 			repaint_grad(0);
@@ -1330,20 +1332,20 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	return (TRUE);
 }
 
+/* Mouse event from button/motion on the canvas */
 static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	gdouble pressure, int mflag)
-{	// Mouse event from button/motion on the canvas
+{
+	static int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
 	GdkCursor *temp_cursor = NULL;
 	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
-	unsigned char pixel;
-	png_color pixel24;
 	int new_cursor;
-	int x, y, ox, oy, i, tox = tool_ox, toy = tool_oy;
+	int i, pixel, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
 
 
-	x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
-	y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
+	ox = x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
+	oy = y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
 
 	/* ****** Release-event-specific code ****** */
 	if (event == GDK_BUTTON_RELEASE)
@@ -1384,90 +1386,99 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		return;
 	}
 
-	if ((state & _CS) == _C)	// Set colour A/B
+	/* ****** Common click/motion handling code ****** */
+
+	if (!mflag) /* Coordinate fixation */
 	{
+		if ((tool_fixy < 0) && ((state & _CS) == _CS))
+		{
+			tool_fixx = -1;
+			tool_fixy = y;
+		}
+		if ((tool_fixx < 0) && ((state & _CS) == _S))
+			tool_fixx = x;
+		if (!(state & _S)) tool_fixx = tool_fixy = -1;
+		if (!(state & _C)) tool_fixy = -1;
+	}
+	/* No use when moving cursor by keyboard */
+	else if (event == GDK_MOTION_NOTIFY) tool_fixx = tool_fixy = -1;
+
+	if (tool_fixx > 0) x = x0 = tool_fixx;
+	if (tool_fixy > 0) y = y0 = tool_fixy;
+
+	while ((state & _CS) == _C)	// Set colour A/B
+	{
+		if ((button != 1) && (button != 3)) break;
+		pixel = get_pixel(ox, oy);
 		if (mem_channel != CHN_IMAGE)
 		{
-			pixel = get_pixel( x, y );
-			if ((button == 1) && (channel_col_A[mem_channel] != pixel))
-				pressed_opacity(pixel);
-			if ((button == 3) && (channel_col_B[mem_channel] != pixel))
+			if (button == 1)
 			{
+				if (channel_col_A[mem_channel] == pixel) break;
+				pressed_opacity(pixel);
+			}
+			else /* button == 3 */
+			{
+				if (channel_col_B[mem_channel] == pixel) break;
 				channel_col_B[mem_channel] = pixel;
 				/* To update displayed value */
 				pressed_opacity(channel_col_A[mem_channel]);
 			}
+			break;
 		}
-		else if (mem_img_bpp == 1)
+		if (mem_img_bpp == 1)
 		{
-			pixel = get_pixel( x, y );
-			if (button == 1 && mem_col_A != pixel)
+			if (button == 1)
 			{
+				if (mem_col_A == pixel) break;
 				mem_col_A = pixel;
 				mem_col_A24 = mem_pal[pixel];
-				repaint_top_swatch();
-				update_cols();
 			}
-			if (button == 3 && mem_col_B != pixel)
+			else /* button == 3 */
 			{
+				if (mem_col_B == pixel) break;
 				mem_col_B = pixel;
 				mem_col_B24 = mem_pal[pixel];
-				repaint_top_swatch();
-				update_cols();
 			}
 		}
 		else
 		{
-			pixel24 = get_pixel24( x, y );
-			if (button == 1 && png_cmp( mem_col_A24, pixel24 ) )
+			if (button == 1)
 			{
-				mem_col_A24 = pixel24;
-				repaint_top_swatch();
-				update_cols();
+				if (PNG_2_INT(mem_col_A24) == pixel) break;
+				mem_col_A24.red = INT_2_R(pixel);
+				mem_col_A24.green = INT_2_G(pixel);
+				mem_col_A24.blue = INT_2_B(pixel);
 			}
-			if (button == 3 && png_cmp( mem_col_B24, pixel24 ) )
+			else /* button == 3 */
 			{
-				mem_col_B24 = pixel24;
-				repaint_top_swatch();
-				update_cols();
+				if (PNG_2_INT(mem_col_B24) == pixel) break;
+				mem_col_B24.red = INT_2_R(pixel);
+				mem_col_B24.green = INT_2_G(pixel);
+				mem_col_B24.blue = INT_2_B(pixel);
 			}
 		}
+		repaint_top_swatch();
+		update_cols();
+		break;
 	}
-	else
-	{
-		if (!mflag)
-		{
-			if ((tool_fixy < 0) && ((state & _CS) == _CS))
-			{
-				tool_fixx = -1;
-				tool_fixy = y;
-			}
-			if ((tool_fixx < 0) && ((state & _CS) == _S))
-				tool_fixx = x;
-			if (!(state & _S)) tool_fixx = tool_fixy = -1;
-			if (!(state & _C)) tool_fixy = -1;
-		}
 
-		if ((button == 3) && (state & _S)) set_zoom_centre(x, y);
+	if ((state & _CS) == _C); /* Done above */
 
-		else if (grad_tool(event, x, y, state, button)) return;
+	else if ((button == 2) || ((button == 3) && (state & _S)))
+		set_zoom_centre(ox, oy);
 
-		else if ( button == 1 || button >= 3 )
-			tool_action(event, x, y, button, pressure);
-		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-			update_sel_bar();
-	}
-	if ( button == 2 ) set_zoom_centre( x, y );
+	else if (grad_tool(event, x, y, state, button));
+
+	/* Pure moves are handled elsewhere */
+	else if (button) tool_action(event, x, y, button, pressure);
+
+	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+		update_sel_bar();
 
 	/* ****** Now to mouse-move-specific part ****** */
 
 	if (event != GDK_MOTION_NOTIFY) return;
-
-	/* No use when moving cursor by keyboard */
-	if (mflag) tool_fixx = tool_fixy = -1;
-
-	if (tool_fixx > 0) x = x0 = tool_fixx;
-	if (tool_fixy > 0) y = y0 = tool_fixy;
 
 	if ( tool_type == TOOL_CLONE )
 	{
@@ -1475,15 +1486,10 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		tool_oy = y;
 	}
 
-	ox = x; oy = y;
-
 	if ( poly_status == POLY_SELECTING && button == 0 )
 	{
-		stretch_poly_line(ox, oy);
+		stretch_poly_line(x, y);
 	}
-
-	if ((x0 < 0) || (x0 >= mem_width)) x = -1;
-	if ((y0 < 0) || (y0 >= mem_height)) y = -1;
 
 	if ( tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON )
 	{
@@ -1491,7 +1497,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		{
 			if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
 			{
-				i = close_to(ox, oy);
+				i = close_to(x, y);
 				if ( i!=cursor_corner ) // Stops excessive CPU/flickering
 				{
 					 cursor_corner = i;
@@ -1505,7 +1511,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		if ( marq_status >= MARQUEE_PASTE )
 		{
 			new_cursor = 0;		// Cursor = normal
-			if ( ox>=marq_x1 && ox<=marq_x2 && oy>=marq_y1 && oy<=marq_y2 )
+			if ( x>=marq_x1 && x<=marq_x2 && y>=marq_y1 && y<=marq_y2 )
 				new_cursor = 1;		// Cursor = 4 way arrow
 
 			if ( new_cursor != cursor_corner ) // Stops flickering on slow hardware
@@ -1523,35 +1529,31 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 ///	TOOL PERIMETER BOX UPDATES
 
-	if ( perim_status > 0 ) clear_perim();	// Remove old perimeter box
+	if (perim_status > 0) clear_perim();	// Remove old perimeter box
 
 	if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
 	{
-		clone_x += (tox-ox);
-		clone_y += (toy-oy);
+		clone_x += tox - x;
+		clone_y += toy - y;
 	}
 
 	if (tool_size * can_zoom > 4)
 	{
-		perim_x = ox - (tool_size >> 1);
-		perim_y = oy - (tool_size >> 1);
+		perim_x = x - (tool_size >> 1);
+		perim_y = y - (tool_size >> 1);
 		perim_s = tool_size;
 		repaint_perim();			// Repaint 4 sides
 	}
 
 ///	LINE UPDATES
 
-	if (grad_tool(event, ox, oy, state, button)) return;
-
-	if ( tool_type == TOOL_LINE && line_status != LINE_NONE )
+	if ((tool_type == TOOL_LINE) && (line_status != LINE_NONE) &&
+		((line_x1 != x) || (line_y1 != y)))
 	{
-		if ( line_x1 != ox || line_y1 != oy )
-		{
-			repaint_line(0);
-			line_x1 = ox;
-			line_y1 = oy;
-			repaint_line(1);
-		}
+		repaint_line(0);
+		line_x1 = x;
+		line_y1 = y;
+		repaint_line(1);
 	}
 }
 
@@ -2427,13 +2429,15 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	/* Draw perimeter/marquee/gradient as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
-	if (grad_status == GRAD_DONE)
+	if (gradient[mem_channel].status == GRAD_DONE)
 	{
+		grad_info *grad = gradient + mem_channel;
+
 		/* Canvas-space endpoints */
-		if (grad_x1 < grad_x2) rx1 = grad_x1 , rx2 = grad_x2;
-		else rx1 = grad_x2 , rx2 = grad_x1;
-		if (grad_y1 < grad_y2) ry1 = grad_y1 , ry2 = grad_y2;
-		else ry1 = grad_y2 , ry2 = grad_y1;
+		if (grad->x1 < grad->x2) rx1 = grad->x1 , rx2 = grad->x2;
+		else rx1 = grad->x2 , rx2 = grad->x1;
+		if (grad->y1 < grad->y2) ry1 = grad->y1 , ry2 = grad->y2;
+		else ry1 = grad->y2 , ry2 = grad->y1;
 		rx1 = (rx1 * scale + zoom - 1) / zoom;
 		ry1 = (ry1 * scale + zoom - 1) / zoom;
 		rx2 = (rx2 * scale) / zoom + scale - 1;
@@ -2446,7 +2450,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			{
 				float ty1, ty2, dy;
 
-				if ((grad_x1 < grad_x2) ^ (grad_y1 < grad_y2))
+				if ((grad->x1 < grad->x2) ^ (grad->y1 < grad->y2))
 					i = ry2 , j = ry1;
 				else i = ry1 , j = ry2;
 

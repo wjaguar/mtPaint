@@ -55,7 +55,8 @@ int line_status = LINE_NONE,
 	line_x1, line_y1, line_x2, line_y2;				// Line tool
 int poly_status = POLY_NONE;						// Polygon selection tool
 int clone_x, clone_y;							// Clone offsets
-int grad_status, grad_x1, grad_y1, grad_x2, grad_y2;			// Gradient placement tool
+
+grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
 
 int recent_files;					// Current recent files setting
 
@@ -174,56 +175,38 @@ static void chan_txt_cat(char *txt, int chan, int x, int y)
 void update_xy_bar(int x, int y)
 {
 	char txt[96];
-	unsigned char pixel;
-	png_color pixel24;
-	int r, g, b;
+	int pixel;
 
-	if ( x>=0 && y>= 0 )
+	if (status_on[STATUS_CURSORXY])
 	{
-		if ( status_on[STATUS_CURSORXY] )
-		{
-			snprintf(txt, 60, "%i,%i", x, y);
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
-		}
+		snprintf(txt, 60, "%i,%i", x, y);
+		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_CURSORXY]), txt);
+	}
 
-		if ( status_on[STATUS_PIXELRGB] )
-		{
-			if ( mem_img_bpp == 1 )
-			{
-				pixel = GET_PIXEL( x, y );
-				r = mem_pal[pixel].red;
-				g = mem_pal[pixel].green;
-				b = mem_pal[pixel].blue;
-				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
-			}
-			else
-			{
-				pixel24 = get_pixel24( x, y );
-				r = pixel24.red;
-				g = pixel24.green;
-				b = pixel24.blue;
-				snprintf(txt, 60, "{%i,%i,%i}", r, g, b);
-			}
-			if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
-			{
-				strcat(txt, " + {");
-				chan_txt_cat(txt, CHN_ALPHA, x, y);
-				strcat(txt, ",");
-				chan_txt_cat(txt, CHN_SEL, x, y);
-				strcat(txt, ",");
-				chan_txt_cat(txt, CHN_MASK, x, y);
-				strcat(txt, "}");
-			}
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt );
-		}
-	}
-	else
+	if (!status_on[STATUS_PIXELRGB]) return;
+	if ((x >= 0) && (x < mem_width) && (y >= 0) && (y < mem_height))
 	{
-		if ( status_on[STATUS_CURSORXY] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-		if ( status_on[STATUS_PIXELRGB] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+		pixel = get_pixel_img(x, y);
+		if (mem_img_bpp == 1)
+			snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel,
+				mem_pal[pixel].red, mem_pal[pixel].green,
+				mem_pal[pixel].blue);
+		else
+			snprintf(txt, 60, "{%i,%i,%i}", INT_2_R(pixel),
+				INT_2_G(pixel), INT_2_B(pixel));
+		if (mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK])
+		{
+			strcat(txt, " + {");
+			chan_txt_cat(txt, CHN_ALPHA, x, y);
+			strcat(txt, ",");
+			chan_txt_cat(txt, CHN_SEL, x, y);
+			strcat(txt, ",");
+			chan_txt_cat(txt, CHN_MASK, x, y);
+			strcat(txt, "}");
+		}
+		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt);
 	}
+	else gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), "");
 }
 
 static void update_undo_bar()
@@ -2248,9 +2231,6 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	float rat;
 	gboolean first_point = FALSE, paint_action = FALSE;
 
-	if ( tool_fixx > -1 ) x = tool_fixx;
-	if ( tool_fixy > -1 ) y = tool_fixy;
-
 	if ( (button == 1 || button == 3) && (tool_type <= TOOL_SPRAY) )
 		paint_action = TRUE;
 
@@ -3032,15 +3012,16 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 
 void repaint_grad(int mode)
 {
-	int oldgrad = grad_status;
+	grad_info *grad = gradient + mem_channel;
+	int oldgrad = grad->status;
 
 	if (mode) mode = 3;
-	else grad_status = GRAD_NONE; /* To avoid hitting repaint */
+	else grad->status = GRAD_NONE; /* To avoid hitting repaint */
 
 	get_visible();
-	trace_line(mode, grad_x1, grad_y1, grad_x2, grad_y2,
+	trace_line(mode, grad->x1, grad->y1, grad->x2, grad->y2,
 		vc_x1, vc_y1, vc_x2, vc_y2);
-	grad_status = oldgrad;
+	grad->status = oldgrad;
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

@@ -110,22 +110,22 @@ Mark Tyler - Original author and maintainer up to version 3.00, occasional contr
 Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information.
 
 
-General Contributions
+General Contributions (Feedback and Ideas for improvements unless otherwise stated)
 
 Abdulla Al Muhairi - Website redesign April 2005
-Alan Horkan - Feedback/ideas
-Alexandre Prokoudine - Feedback/ideas
-Antonio Andrea Bianco - Feedback/ideas
-Ed Jason - Feedback/ideas
+Alan Horkan
+Alexandre Prokoudine
+Antonio Andrea Bianco
+Ed Jason
 Eddie Kohler - Created Gifsicle which is needed for the creation and viewing of animated GIF files http://www.lcdf.org/gifsicle/
-Guadalinex Team (Junta de Andalucia) - Feedback/ideas, man page, Launchpad/Rosetta registration
-Lou Afonso - Feedback/ideas
-Magnus Hjorth - Feedback/ideas
-Martin Zelaia - Feedback/ideas
-Pavel Ruzicka - Feedback/ideas
-Puppy Linux (Barry Kauler) - Feedback/ideas
-Vlastimil Krejcir - Feedback/ideas
-William Kern - Feedback/ideas
+Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta registration
+Lou Afonso
+Magnus Hjorth
+Martin Zelaia
+Pavel Ruzicka
+Puppy Linux (Barry Kauler)
+Vlastimil Krejcir
+William Kern
 
 
 Translations
@@ -137,4 +137,5 @@ German - Oliver Frommel
 Polish - Simek
 Portuguese - Israel G. Lugo
 Spanish - Guadalinex Team (Junta de Andalucia), Antonio San
+Turkish - Muhammet Kara, Tutku Dalmaz
 

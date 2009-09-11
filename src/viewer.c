@@ -956,18 +956,16 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 	if (vw_zoom < 1.0) zoom = rint(1.0 / vw_zoom);
 	else scale = rint(vw_zoom);
 
-	x = ((x - margin_view_x) / scale) * zoom;
-	y = ((y - margin_view_y) / scale) * zoom;
+	dx = vw_last_x;
+	dy = vw_last_y;
+	vw_last_x = x = ((x - margin_view_x) / scale) * zoom;
+	vw_last_y = y = ((y - margin_view_y) / scale) * zoom;
 
 	vw_mouse_status |= 1;
 	if (i & 1)
 	{
-		if ( vw_move_layer > 0 )
-		{
-			dx = x - vw_last_x;
-			dy = y - vw_last_y;
-			move_layer_relative(vw_move_layer, dx, dy);
-		}
+		if (vw_move_layer > 0)
+			move_layer_relative(vw_move_layer, x - dx, y - dy);
 	}
 	else
 	{
@@ -1024,8 +1022,6 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 		if (i > 0) vw_move_layer = i;
 		layer_choose(i);
 	}
-	vw_last_x = x;
-	vw_last_y = y;
 }
 
 static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )

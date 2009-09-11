@@ -37,6 +37,8 @@
 // #define DISTORT_LXN
 
 #define CIENUM 8192
+#define EXPNUM 1024
+#define EXPLOW (-0.1875)
 
 csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
@@ -45,6 +47,7 @@ double gamma256[256], gamma64[64];
 double midgamma256[256], midgamma64[64];
 
 static float CIE[CIENUM + 2];
+static float EXP[EXPNUM];
 
 /* This nightmarish code does conversion from CIE XYZ into my own perceptually
  * uniform colour space L*X*N*. To produce it, I combined McAdam's colour space
@@ -87,13 +90,23 @@ static void xyz2XN(double *XN, double x, double y, double z)
 
 static double CIElum(double x)
 {
-	int n = floor(x * CIENUM);
-	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x * CIENUM - n));
+	x *= CIENUM;
+	int n = floor(x);
+	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x - n));
 }
 
-#ifndef cbrt
+static double exp10(double x)
+{
+	x = (x - EXPLOW) * (EXPNUM + EXPNUM);
+	int n = floor(x);
+	return (EXP[n] + (EXP[n + 1] - EXP[n]) * (x - n));
+}
+
+/* MinGW has cube root function, glibc hasn't */
+#ifndef WIN32
 #define cbrt(X) pow((X), 1.0 / 3.0)
 #endif
+
 #define XX1 (16.0 / 116.0)
 #define XX2 ((116.0 * 116.0) / (24.0 * 24.0 * 3.0))
 #define XX3 ((24.0 * 24.0 * 24.0) / (116.0 * 116.0 * 116.0))
@@ -102,7 +115,7 @@ static double CIEpow(double x)
 	return ((x > XX3) ? cbrt(x) : x * XX2 + XX1);
 }
 
-static double rxyz[3], gxyz[3], bxyz[3];
+static double rxyz[3], gxyz[3], bxyz[3], wy;
 void rgb2LXN(double *tmp, double r, double g, double b)
 {
 	double x = r * rxyz[0] + g * gxyz[0] + b * bxyz[0];
@@ -122,6 +135,22 @@ void rgb2LXN(double *tmp, double r, double g, double b)
 #endif
 	tmp[1] = (XN[0] - wXN[0]) * L * 13.0;
 	tmp[2] = (XN[1] - wXN[1]) * L * 13.0;
+}
+
+/* Get subjective brightness measure, by using Ware-Cowan formula */
+double rgb2B(double r, double g, double b)
+{
+	double x = r * rxyz[0] + g * gxyz[0] + b * bxyz[0];
+	double y = r * rxyz[1] + g * gxyz[1] + b * bxyz[1];
+	double z = r * rxyz[2] + g * gxyz[2] + b * bxyz[2];
+	z += x + y;
+	if (z <= 0.0) return (y);
+	z = 1.0 / z;
+	x *= z;
+	z *= y; /* It's not Z now, but y */
+	z = 0.256 + (-0.184 + (-2.527 + 4.656 * x * x + 4.657 * z * z * z) * x) * z;
+	y *= exp10(z) * wy;
+	return (y > 1.0 ? 1.0 : y);
 }
 
 #define RED_X 0.640
@@ -159,6 +188,9 @@ static void make_rgb_xyz(void)
 	bxyz[1] = BLUE_Y * wb;
 	bxyz[2] = (1.0 - BLUE_X - BLUE_Y) * wb;
 	xyz2XN(wXN, WHITE_X / WHITE_Y, 1.0, (1 - WHITE_X - WHITE_Y) / WHITE_Y);
+	/* Normalize brightness of white */
+	wy = 1.0 / exp10(0.256 + (-0.184 + (-2.527 + 4.656 * WHITE_X * WHITE_X +
+		4.657 * WHITE_Y * WHITE_Y * WHITE_Y) * WHITE_X) * WHITE_Y);
 }
 
 #ifdef SRGB
@@ -232,6 +264,16 @@ static void make_CIE(void)
 	CIE[CIENUM] = CIE[CIENUM + 1] = 100.0;
 }
 
+static void make_EXP(void)
+{
+	int i;
+
+	for (i = 0; i < EXPNUM; i++)
+	{
+		EXP[i] = exp(M_LN10 * (i * (0.5 / EXPNUM) + EXPLOW));
+	}
+}
+
 void init_cols(void)
 {
 	make_gamma(gamma256, 256);
@@ -239,6 +281,7 @@ void init_cols(void)
 	make_ungamma(gamma256, midgamma256, ungamma256, kgamma256, 256);
 	make_ungamma(gamma64, midgamma64, ungamma64, kgamma64, 64);
 	make_CIE();
+	make_EXP();
 	make_rgb_xyz();
 }
 

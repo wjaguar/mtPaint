@@ -47,6 +47,7 @@ extern unsigned char ungamma256[], ungamma64[];
 #define UNGAMMA256(X) (ungamma256[(int)((X) * kgamma256)] - \
 	((X) < midgamma256[ungamma256[(int)((X) * kgamma256)]]))
 
+double rgb2B(double r, double g, double b);
 void rgb2LXN(double *tmp, double r, double g, double b);
 void init_cols();
 void get_lxn(double *lxn, int col);

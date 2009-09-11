@@ -28,8 +28,14 @@ int marq_drag_x, marq_drag_y;				// Marquee dragging offset
 int line_status, line_x1, line_y1, line_x2, line_y2;	// Line tool
 int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
-int grad_status, grad_x1, grad_y1, grad_x2, grad_y2;	// Gradient placement tool
 int recent_files;					// Current recent files setting
+
+typedef struct {
+	int status, x1, y1, x2, y2;	// Gradient placement tool
+	int type, len, ofs, mode;	// Selected gradient
+} grad_info;
+
+grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
 
 #define MAX_RECENT 20
 

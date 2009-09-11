@@ -6,6 +6,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.10	2006-?-?
 
+	* Turkish translation added by Muhammet Kara, Tutku Dalmaz
 	* Image tiling mode added to "Resize Canvas"
 	* Greyscale effect now respects masking
 	* Gaussian blur effect replaces the old blur effect
