@@ -42,7 +42,6 @@
 #include "memory.h"
 #include "png.h"
 #include "canvas.h"
-#include "otherwindow.h"
 #include "layer.h"
 #include "ani.h"
 #include "inifile.h"
@@ -50,13 +49,14 @@
 
 char preserved_gif_filename[256];
 int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
+int tga_RLE, tga_565, tga_defdir;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_ZCOMP },
+		| FF_TRANS | FF_COMPZ },
 #ifdef U_JPEG
-	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_JCOMP },
+	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPJ },
 #else
 	{ "", "", "", 0},
 #endif
@@ -79,12 +79,13 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
 /* !!! Ideal state */
-//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_TRANS },
+//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
+//		| FF_TRANS | FF_COMPR },
+/* !!! Current state */
+	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS | FF_COMPR },
 /* !!! Not supported yet */
-//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS },
 //	{ "PCX", "pcx", "", FF_256 | FF_RGB },
-/* !!! Placeholders */
-	{ "", "", "", 0},
+/* !!! Placeholder */
 	{ "", "", "", 0},
 	{ "GPL", "gpl", "", FF_PALETTE },
 	{ "TXT", "txt", "", FF_PALETTE },
@@ -850,9 +851,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	if (cinfo.output_components == 1) /* Greyscale */
 	{
 		settings->colors = 256;
-		for (i = 0; i < 256; i++)
-			settings->pal[i].red = settings->pal[i].green =
-				settings->pal[i].blue = i;
+		mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
 		bpp = 1;
 	}
 	settings->width = width = cinfo.output_width;
@@ -1296,12 +1295,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		{
 			settings->colors = j--;
 			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
-			for (i = 0; i <= j; i++)
-			{
-				settings->pal[i].red = settings->pal[i].green =
-					settings->pal[i].blue =
-					rint(255.0 * (i ^ k) / (double)j);
-			}
+			mem_scale_pal(settings->pal, k, 0,0,0, j ^ k, 255,255,255);
 		}
 		res = 1;
 	}
@@ -2672,6 +2666,610 @@ static int save_lss(char *file_name, ls_settings *settings)
 	return 0;
 }
 
+/* *** PREFACE ***
+ * No other format has suffered so much at the hands of inept coders. With TGA,
+ * exceptions are the rule, and files perfectly following the specification are
+ * impossible to find. While I did my best to handle the format's perversions
+ * that I'm aware of, there surely exist other kinds of weird TGAs that will
+ * load wrong, or not at all. If you encounter one such, send a bugreport with
+ * the file attached to it. */
+
+/* TGA header */
+#define TGA_IDLEN     0 /*  8b */
+#define TGA_PALTYPE   1 /*  8b */
+#define TGA_IMGTYPE   2 /*  8b */
+#define TGA_PALSTART  3 /* 16b */
+#define TGA_PALCOUNT  5 /* 16b */
+#define TGA_PALBITS   7 /*  8b */
+#define TGA_X0        8 /* 16b */
+#define TGA_Y0       10 /* 16b */
+#define TGA_WIDTH    12 /* 16b */
+#define TGA_HEIGHT   14 /* 16b */
+#define TGA_BPP      16 /*  8b */
+#define TGA_DESC     17 /*  8b */
+#define TGA_HSIZE    18
+
+/* Image descriptor bits */
+#define TGA_ALPHA 0x0F
+#define TGA_R2L   0x10
+#define TGA_T2B   0x20
+#define TGA_IL    0xC0 /* Interleave mode - obsoleted in TGA 2.0 */
+
+/* TGA footer */
+#define TGA_EXTOFS 0 /* 32b */
+#define TGA_DEVOFS 4 /* 32b */
+#define TGA_SIGN   8
+#define TGA_FSIZE  26
+
+/* TGA extension area */
+#define TGA_EXTLEN  0   /* 16b */
+#define TGA_SOFTID  426 /* 41 bytes */
+#define TGA_SOFTV   467 /* 16b */
+#define TGA_ATYPE   494 /* 8b */
+#define TGA_EXTSIZE 495
+
+static int load_tga(char *file_name, ls_settings *settings)
+{
+	unsigned char hdr[TGA_HSIZE], ftr[TGA_FSIZE], ext[TGA_EXTSIZE];
+	unsigned char pal[256 * 4], xlat5[32], xlat67[128];
+	unsigned char *buf = NULL, *dest, *dsta, *src = NULL, *srca = NULL;
+	FILE *fp;
+	int i, k, w, h, bpp, ftype, ptype, ibpp, rbits, abits;
+	int rle, real_alpha = FALSE, assoc_alpha = FALSE, wmode = 0, res = -1;
+	int fl, fofs, iofs, buflen;
+	int ix, ishift, imask, ax, ashift, amask;
+	int start, xstep, xstepb, ystep, bstart, bstop, ccnt, rcnt, strl, y;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+
+	/* Read the header */
+	k = fread(hdr, 1, TGA_HSIZE, fp);
+	if (k < TGA_HSIZE) goto fail;
+
+	/* TGA has no signature as such - so check fields one by one */
+	ftype = hdr[TGA_IMGTYPE];
+	if (!(ftype & 3) || (ftype & 0xF4)) goto fail; /* Invalid type */
+	/* Fail on interleave, because of lack of example files */
+	if (hdr[TGA_DESC] & TGA_IL) goto fail;
+	rle = ftype & 8;
+
+	iofs = TGA_HSIZE + hdr[TGA_IDLEN];
+
+	rbits = hdr[TGA_BPP];
+	if (!rbits) goto fail; /* Zero bpp */
+	abits = hdr[TGA_DESC] & TGA_ALPHA;
+	if (abits > rbits) goto fail; /* Weird alpha */
+	/* Workaround for a rather frequent bug */
+	if (abits == rbits) abits = 0;
+	ibpp = (rbits + 7) >> 3;
+	rbits -= abits;
+
+	ptype = hdr[TGA_PALTYPE];
+	switch (ftype & 3)
+	{
+	case 1: /* Paletted */
+	{
+		int pbpp, i, j, k, tmp, mask;
+		png_color *pptr;
+
+		if (ptype != 1) goto fail; /* Invalid palette */
+		/* Don't want to bother with overlong palette without even
+		 * having one example where such a thing exists - WJ */
+		if (rbits > 8) goto fail;
+
+		k = GET16(hdr + TGA_PALSTART);
+		if (k >= 1 << rbits) goto fail; /* Weird palette start */
+		j = GET16(hdr + TGA_PALCOUNT);
+		if (!j || (k + j > 1 << rbits)) goto fail; /* Weird size */
+		ptype = hdr[TGA_PALBITS];
+		/* The options are quite limited here in practice */
+		if (!ptype || (ptype > 32) || ((ptype & 7) && (ptype != 15)))
+			goto fail;
+		pbpp = (ptype + 7) >> 3;
+
+		/* Read the palette */
+		fseek(fp, iofs, SEEK_SET);
+		i = fread(pal + k * pbpp, 1, j * pbpp, fp);
+		if (i < j * pbpp) goto fail;
+		iofs += j * pbpp;
+
+		/* Store the palette */
+		settings->colors = j + k;
+		memset(settings->pal, 0, 256 * 3);
+		if (pbpp == 2) set_xlate(xlat5, 5);
+		pptr = settings->pal + k;
+		for (i = 0; i < j; i++)
+		{
+			switch (pbpp)
+			{
+			case 1: /* 8-bit greyscale */
+				pptr[i].red = pptr[i].green = pptr[i].blue = pal[i];
+				break;
+			case 2: /* 5:5:5 BGR */
+				pptr[i].blue = xlat5[pal[i + i] & 0x1F];
+				pptr[i].green = xlat5[(((pal[i + i + 1] << 8) +
+					pal[i + i]) >> 5) & 0x1F];
+				pptr[i].red = xlat5[(pal[i + i + 1] >> 2) & 0x1F];
+				break;
+			case 3: case 4: /* 8:8:8 BGR */
+				pptr[i].blue = pal[i * pbpp + 0];
+				pptr[i].green = pal[i * pbpp + 1];
+				pptr[i].red = pal[i * pbpp + 2];
+				break;
+			}
+		}
+
+		/* Cannot have transparent color at all? */
+		if ((j <= 1) || ((ptype != 15) && (ptype != 32))) break;
+
+		/* Test if there are different alphas */
+		mask = ptype == 15 ? 0x80 : 0xFF;
+		tmp = pal[pbpp - 1] & mask;
+		for (i = 1; (i < j) && ((pal[i * pbpp - 1] & mask) == tmp); i++);
+		if (i >= j) break;
+		/* For 15 bpp, assume the less frequent value is transparent */
+		tmp = 0;
+		if (ptype == 15)
+		{
+			for (i = 0; i < j; i++) tmp += pal[i + i - 1] & mask;
+			if (tmp >> 7 < j >> 1) tmp = 0x80; /* Transparent if set */
+		}
+		/* Search for first transparent color */
+		for (i = 0; (i < j) && ((pal[i * pbpp - 1] & mask) != tmp); i++);
+		if (i >= j) break; /* If 32-bit and not one alpha is zero */
+		settings->xpm_trans = i + k;
+		break;
+	}
+	case 2: /* RGB */
+		/* Options are very limited - and bugs abound. Presence or
+		 * absence of attribute bits can't be relied upon. */
+		switch (rbits)
+		{
+		case 16: /* 5:5:5 BGR or 5:6:5 BGR or 5:5:5:1 BGRA */
+			if (abits) goto fail;
+			if (tga_565)
+			{
+				set_xlate(xlat5, 5);
+				set_xlate(xlat67, 6);
+				wmode = 4;
+				break;
+			}
+			rbits = 15;
+			/* Fallthrough */
+		case 15: /* 5:5:5 BGR or 5:5:5:1 BGRA */
+			if (abits > 1) goto fail;
+			abits = 1; /* Here it's unreliable to uselessness */
+			set_xlate(xlat5, 5);
+			wmode = 2;
+			break;
+		case 32: /* 8:8:8 BGR or 8:8:8:8 BGRA */
+			if (abits) goto fail;
+			rbits = 24; abits = 8;
+			wmode = 6;
+			break;
+		case 24: /* 8:8:8 BGR or 8:8:8:8 BGRA */
+			if (abits && (abits != 8)) goto fail;
+			wmode = 6;
+			break;
+		default: goto fail;
+		}
+		break;
+	case 3: /* Greyscale */
+		/* Not enough examples - easier to handle all possibilities */
+		/* Create palette */
+		settings->colors = rbits > 8 ? 256 : 1 << rbits;
+		mem_scale_pal(settings->pal, 0, 0,0,0,
+			settings->colors - 1, 255,255,255);
+		break;
+	}
+	/* Prepare for reading bitfields */
+	i = abits > 8 ? abits - 8 : 0;
+	abits -= i; i += rbits;
+	ax = i >> 3;
+	ashift = i & 7;
+	amask = (1 << abits) - 1;
+	i = rbits > 8 ? rbits - 8 : 0;
+	rbits -= i;
+	ix = i >> 3;
+	ishift = i & 7;
+	imask = (1 << rbits) - 1;
+
+	/* Now read the footer if one is available */
+	fseek(fp, 0, SEEK_END);
+	fl = ftell(fp);
+	while (fl >= iofs + TGA_FSIZE)
+	{
+		fseek(fp, fl - TGA_FSIZE, SEEK_SET);
+		k = fread(ftr, 1, TGA_FSIZE, fp);
+		if (k < TGA_FSIZE) break;
+		if (strcmp(ftr + TGA_SIGN, "TRUEVISION-XFILE.")) break;
+		fofs = GET32(ftr + TGA_EXTOFS);
+		if ((fofs < iofs) || (fofs + TGA_EXTSIZE + TGA_FSIZE > fl))
+			break; /* Invalid location */
+		fseek(fp, fofs, SEEK_SET);
+		k = fread(ext, 1, TGA_EXTSIZE, fp);
+		if ((k < TGA_EXTSIZE) ||
+			/* !!! 3D Studio writes 494 into this field */
+			(GET16(ext + TGA_EXTLEN) < TGA_EXTSIZE - 1))
+			break; /* Invalid size */
+		if ((ftype & 3) != 1) /* Premultiplied alpha? */
+			assoc_alpha = ext[TGA_ATYPE] == 4;
+		/* Can believe alpha bits contain alpha if this field says so */
+		real_alpha |= assoc_alpha | (ext[TGA_ATYPE] == 3);
+/* !!! No private extensions for now */
+#if 0
+		if (strcmp(ext + TGA_SOFTID, "mtPaint")) break;
+		if (GET16(ext + TGA_SOFTV) <= 310) break;
+		/* !!! Read and interpret developer directory */
+#endif
+		break;
+	}
+
+	/* Allocate buffer and image */
+	settings->width = w = GET16(hdr + TGA_WIDTH);
+	settings->height = h = GET16(hdr + TGA_HEIGHT);
+	settings->bpp = bpp = (ftype & 3) == 2 ? 3 : 1;
+	buflen = ibpp * w;
+	if (rle && (w < 129)) buflen = ibpp * 129;
+	buf = malloc(buflen + 1); /* One extra byte for bitparser */
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail2;
+	if ((res = allocate_image(settings, abits ? CMASK_RGBA : CMASK_IMAGE)))
+		goto fail2;
+	/* Don't even try reading alpha if nowhere to store it */
+	if (abits && settings->img[CHN_ALPHA]) wmode |= 1;
+	res = -1;
+
+	if (!settings->silent) progress_init(_("Loading TGA image"), 0);
+
+	fseek(fp, iofs, SEEK_SET); /* Seek to data */
+	/* Prepare loops */
+	start = 0; xstep = 1; ystep = 0;
+	if (hdr[TGA_DESC] & TGA_R2L)
+	{
+		/* Right-to-left */
+		start = w - 1;
+		xstep = -1;
+		ystep = 2 * w;
+	}
+	if (!(hdr[TGA_DESC] & TGA_T2B))
+	{
+		/* Bottom-to-top */
+		start += (h - 1) * w;
+		ystep -= 2 * w;
+	}
+	xstepb = xstep * bpp;
+	res = FILE_LIB_ERROR;
+
+	dest = settings->img[CHN_IMAGE] + start * bpp;
+	dsta = settings->img[CHN_ALPHA] + start;
+	y = ccnt = rcnt = 0;
+	bstart = bstop = buflen;
+	strl = w;
+	while (TRUE)
+	{
+		int j;
+
+		j = bstop - bstart;
+		if (j < ibpp)
+		{
+			if (bstop < buflen) goto fail3; /* Truncated file */
+			memcpy(buf, buf + bstart, j);
+			bstart = 0;
+			bstop = j + fread(buf + j, 1, buflen - j, fp);
+			if (!rle) /* Uncompressed */
+			{
+				if (bstop < buflen) goto fail3; /* Truncated file */
+				rcnt = w; /* "Copy block" a row long */
+			}
+		}
+		while (TRUE)
+		{
+			/* Read pixels */
+			if (rcnt)
+			{
+				int l;
+
+				l = rcnt < strl ? rcnt : strl;
+				if (bstart + ibpp * l > bstop)
+					l = (bstop - bstart) / ibpp;
+				rcnt -= l; strl -= l;
+				while (l--)
+				{
+					switch (wmode)
+					{
+					case 1: /* Generic alpha */
+						*dsta = (((buf[bstart + ax + 1] << 8) +
+							buf[bstart + ax]) >> ashift) & amask;
+					case 0: /* Generic single channel */
+						*dest = (((buf[bstart + ix + 1] << 8) +
+							buf[bstart + ix]) >> ishift) & imask;
+						break;
+					case 3: /* One-bit alpha for 16 bpp */
+						*dsta = buf[bstart + 1] >> 7;
+					case 2: /* 5:5:5 BGR */
+						dest[0] = xlat5[(buf[bstart + 1] >> 2) & 0x1F];
+						dest[1] = xlat5[(((buf[bstart + 1] << 8) +
+							buf[bstart]) >> 5) & 0x1F];
+						dest[2] = xlat5[buf[bstart] & 0x1F];
+						break;
+					case 5: /* Cannot happen */
+					case 4: /* 5:6:5 BGR */
+						dest[0] = xlat5[buf[bstart + 1] >> 3];
+						dest[1] = xlat67[(((buf[bstart + 1] << 8) +
+							buf[bstart]) >> 5) & 0x3F];
+						dest[2] = xlat5[buf[bstart] & 0x1F];
+						break;
+					case 7: /* One-byte alpha for 32 bpp */
+						*dsta = buf[bstart + 3];
+					case 6: /* 8:8:8 BGR */
+						dest[0] = buf[bstart + 2];
+						dest[1] = buf[bstart + 1];
+						dest[2] = buf[bstart + 0];
+						break;
+					}
+					dest += xstepb;
+					dsta += xstep;
+					bstart += ibpp;
+				}
+				if (!strl || rcnt) break; /* Row end or buffer end */
+			}
+			/* Copy pixels */
+			if (ccnt)
+			{
+				int i, l;
+
+				l = ccnt < strl ? ccnt : strl;
+				ccnt -= l; strl -= l;
+				for (i = 0; i < l; i++ , dest += xstepb)
+				{
+					dest[0] = src[0];
+					if (bpp == 1) continue;
+					dest[1] = src[1];
+					dest[2] = src[2];
+				}
+				if (wmode & 1) memset(xstep < 0 ?
+					dsta - l + 1 : dsta, *srca, l);
+				dsta += xstep * l;
+				if (!strl || ccnt) break; /* Row end or buffer end */
+			}
+			/* Read block header */
+			if (bstart >= bstop) break; /* Nothing in buffer */
+			rcnt = buf[bstart++];
+			if (rcnt > 0x7F) /* Repeat block - one read + some copies */
+			{
+				ccnt = rcnt & 0x7F;
+				rcnt = 1;
+				src = dest;
+				srca = dsta;
+			}
+			else ++rcnt; /* Copy block - several reads */
+		}
+		if (strl) continue; /* It was buffer end */
+		if (!settings->silent && ((y * 10) % h >= h - 10))
+			progress_update((float)y / h);
+		if (++y >= h) break; /* All done */
+		dest += ystep * bpp;
+		if (dsta) dsta += ystep;
+		strl = w;
+	}
+	res = 1;
+
+	/* Check if alpha channel is valid */
+	if (!real_alpha && settings->img[CHN_ALPHA])
+	{
+		unsigned char *tmp = settings->img[CHN_ALPHA];
+		int i, j = w * h, k = tmp[0];
+
+		for (i = 1; (tmp[i] == k) && (i < j); i++);
+		/* Delete flat "alpha" */
+		if (i >= j) deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
+	}
+
+	/* Check if alpha in 16-bpp BGRA is inverse */
+	if (settings->img[CHN_ALPHA] && (wmode == 3) && !assoc_alpha)
+	{
+		unsigned char *timg, *talpha;
+		int i, j = w * h, k = 0, l;
+
+		timg = settings->img[CHN_IMAGE];
+		talpha = settings->img[CHN_ALPHA];
+		for (i = 0; i < j; i++)
+		{
+			l = 5;
+			if (!(timg[0] | timg[1] | timg[2])) l = 1;
+			else if ((timg[0] & timg[1] & timg[2]) == 255) l = 4;
+			k |= l << talpha[i];
+			if (k == 0xF) break; /* Colors independent of alpha */
+			timg += 3;
+		}
+		/* If 0-covered parts more colorful than 1-covered, invert alpha */
+		if ((k & 5) > ((k >> 1) & 5))
+		{
+			for (i = 0; i < j; i++) talpha[i] ^= 1;
+		}
+	}
+
+	/* Rescale alpha */
+	if (settings->img[CHN_ALPHA] && (abits < 8))
+	{
+		unsigned char *tmp = settings->img[CHN_ALPHA];
+		int i, j = w * h;
+
+		set_xlate(xlat67, abits);
+		for (i = 0; i < j; i++) tmp[i] = xlat67[tmp[i]];
+	}
+
+	/* Unassociate alpha */
+	if (settings->img[CHN_ALPHA] && assoc_alpha && (abits > 1))
+	{
+		mem_demultiply(settings->img[CHN_IMAGE],
+			settings->img[CHN_ALPHA], w * h, bpp);
+	}
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	free(buf);
+fail:	fclose(fp);
+	return (res);
+}
+
+static int save_tga(char *file_name, ls_settings *settings)
+{
+	unsigned char hdr[TGA_HSIZE], ftr[TGA_FSIZE], pal[256 * 4];
+	unsigned char *buf, *src, *srca, *dest;
+	FILE *fp;
+	int i, j, y0, y1, vstep, pbpp = 3;
+	int w = settings->width, h = settings->height, bpp = settings->bpp;
+	int rle = settings->tga_RLE;
+
+	/* Indexed images not supposed to have alpha in TGA standard */
+	if ((bpp == 3) && settings->img[CHN_ALPHA]) bpp = 4;
+	i = w * bpp;
+	if (rle) i += i + (w >> 7) + 3;
+	buf = malloc(i);
+	if (!buf) return -1;
+
+	if (!(fp = fopen(file_name, "wb")))
+	{
+		free(buf);
+		return -1;
+	}
+
+	/* Prepare header */
+	memset(hdr, 0, TGA_HSIZE);
+	switch (bpp)
+	{
+	case 1: /* Indexed */
+		hdr[TGA_PALTYPE] = 1;
+		hdr[TGA_IMGTYPE] = 1;
+		PUT16(hdr + TGA_PALCOUNT, settings->colors);
+		if ((settings->xpm_trans >= 0) &&
+			(settings->xpm_trans < settings->colors)) pbpp = 4;
+		hdr[TGA_PALBITS] = pbpp * 8;
+		break;
+	case 4: /* RGBA */
+		hdr[TGA_DESC] = 8;
+	case 3: /* RGB */
+		hdr[TGA_IMGTYPE] = 2;
+		break;
+	}
+	hdr[TGA_BPP] = bpp * 8;
+	PUT16(hdr + TGA_WIDTH, w);
+	PUT16(hdr + TGA_HEIGHT, h);
+	if (rle) hdr[TGA_IMGTYPE] |= 8;
+	if (!tga_defdir) hdr[TGA_DESC] |= TGA_T2B;
+	fwrite(hdr, 1, TGA_HSIZE, fp);
+
+	/* Write palette */
+	if (bpp == 1)
+	{
+		dest = pal;
+		for (i = 0; i < settings->colors; i++ , dest += pbpp)
+		{
+			dest[0] = settings->pal[i].blue;
+			dest[1] = settings->pal[i].green;
+			dest[2] = settings->pal[i].red;
+			if (pbpp > 3) dest[3] = 255;
+		}
+		/* Mark transparent color */
+		if (pbpp > 3) pal[settings->xpm_trans * 4 + 3] = 0;
+		fwrite(pal, 1, dest - pal, fp);
+	}
+
+	/* Write rows */
+	if (!settings->silent) progress_init(_("Saving TGA image"), 0);
+	if (tga_defdir)
+	{
+		y0 = h - 1; y1 = -1; vstep = -1;
+	}
+	else
+	{
+		y0 = 0; y1 = h; vstep = 1;
+	}
+	for (i = y0; i != y1; i += vstep)
+	{
+		src = settings->img[CHN_IMAGE] + i * w * settings->bpp;
+		/* Fill uncompressed row */
+		if (bpp == 1) memcpy(buf, src, w);
+		else
+		{
+			srca = settings->img[CHN_ALPHA] + i * w;
+			dest = buf;
+			for (j = 0; j < w; j++ , dest += bpp)
+			{
+				dest[0] = src[2];
+				dest[1] = src[1];
+				dest[2] = src[0];
+				src += 3;
+				if (bpp > 3) dest[3] = *srca++;
+			}
+		}
+		src = buf;
+		dest = buf + w * bpp;
+		if (rle) /* Compress */
+		{
+			unsigned char *tmp;
+			int k, l;
+
+			for (j = 1; j <= w; j++)
+			{
+				tmp = srca = src;
+				src += bpp;
+				/* Scan row for repeats */
+				for (; j < w; j++ , src += bpp)
+				{
+					switch (bpp)
+					{
+					case 4: if (src[3] != srca[3]) break;
+					case 3: if (src[2] != srca[2]) break;
+					case 2: if (src[1] != srca[1]) break;
+					case 1: if (src[0] != srca[0]) break;
+					default: continue;
+					}
+					/* Useful repeat? */
+					if (src - srca > bpp + 2) break;
+					srca = src;
+				}
+				/* Avoid too-short repeats at row ends */
+				if (src - srca <= bpp + 2) srca = src;
+				/* Create copy blocks */
+				for (k = (srca - tmp) / bpp; k > 0; k -= 128)
+				{
+					l = k > 128 ? 128 : k;
+					*dest++ = l - 1;
+					memcpy(dest, tmp, l *= bpp);
+					dest += l; tmp += l;
+				}
+				/* Create repeat blocks */
+				for (k = (src - srca) / bpp; k > 0; k -= 128)
+				{
+					l = k > 128 ? 128 : k;
+					*dest++ = l + 127;
+					memcpy(dest, srca, bpp);
+					dest += bpp;
+				}
+			}
+		}
+		fwrite(src, 1, dest - src, fp);
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)(h - i) / h);
+	}
+
+	/* Write footer */
+	memcpy(ftr + TGA_SIGN, "TRUEVISION-XFILE.", TGA_FSIZE - TGA_SIGN);
+/* !!! No private extensions for now */
+	memset(ftr, 0, TGA_SIGN);
+	fwrite(ftr, 1, TGA_FSIZE, fp);
+
+	fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return 0;
+}
+
 int save_image(char *file_name, ls_settings *settings)
 {
 	png_color greypal[256];
@@ -2702,8 +3300,8 @@ int save_image(char *file_name, ls_settings *settings)
 	case FT_XPM: res = save_xpm(file_name, settings); break;
 	case FT_XBM: res = save_xbm(file_name, settings); break;
 	case FT_LSS: res = save_lss(file_name, settings); break;
+	case FT_TGA: res = save_tga(file_name, settings); break;
 /* !!! Not implemented yet */
-//	case FT_TGA:
 //	case FT_PCX:
 	}
 
@@ -2769,8 +3367,8 @@ int load_image(char *file_name, int mode, int ftype)
 	case FT_XPM: res = load_xpm(file_name, &settings); break;
 	case FT_XBM: res = load_xbm(file_name, &settings); break;
 	case FT_LSS: res = load_lss(file_name, &settings); break;
+	case FT_TGA: res = load_tga(file_name, &settings); break;
 /* !!! Not implemented yet */
-//	case FT_TGA:
 //	case FT_PCX:
 	}
 
@@ -3023,10 +3621,10 @@ int detect_image_format(char *name)
 		if (!strncasecmp(stop + 1, "tga", 4)) break;
 		return (FT_PCX);
 	}
+#endif
 	/* Check if this is TGA */
 	if ((buf[1] < 2) && (buf[2] < 12) && ((1 << buf[2]) & 0x0E0F))
 		return (FT_TGA);
-#endif
 
 	/* Simple check for XPM */
 	stop = strstr(buf, "XPM");

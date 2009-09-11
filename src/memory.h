@@ -319,8 +319,8 @@ int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
 int mem_remove_unused_check();		// Check to see if we can remove unused palette colours
 int mem_remove_unused();		// Remove unused palette colours
-void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int b2 );
-					// Generate a scaled palette
+void mem_scale_pal(png_color *pal, int i1, int r1, int g1, int b1,
+	int i2, int r2, int g2, int b2); // Generate a scaled palette
 //	Create colour-transformed palette
 void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2);
 void mem_pal_sort( int a, int i1, int i2, int rev );

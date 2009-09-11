@@ -276,7 +276,6 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 			chanlist temp_img, layer_image *lim )
 {
 	int bpp = type, i, j;
-	png_color temp_pal[256];
 
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
@@ -304,18 +303,15 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 #endif
 	memset(temp_img[CHN_IMAGE], i, j);
 
+	mem_pal_copy(lim->mem_pal, mem_pal_def); // Default
 	if ( type == 2 )	// Greyscale
 	{
-		mem_pal_copy( temp_pal, mem_pal );		// Save current
 #ifdef U_GUADALINEX
-		mem_scale_pal( 0, 255,255,255, cols-1, 0,0,0 );
+		mem_scale_pal(lim->mem_pal, 0, 255,255,255, cols - 1, 0,0,0);
 #else
-		mem_scale_pal( 0, 0,0,0, cols-1, 255,255,255 );
+		mem_scale_pal(lim->mem_pal, 0, 0,0,0, cols - 1, 255,255,255);
 #endif
-		mem_pal_copy( lim->mem_pal, mem_pal );
-		mem_pal_copy( temp_pal, mem_pal );		// Restore
 	}
-	else mem_pal_copy( lim->mem_pal, mem_pal_def );
 
 	sprintf( lim->mem_filename, _("Untitled") );
 

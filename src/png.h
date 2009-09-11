@@ -70,8 +70,10 @@
 #define FF_ALPHA   0x0060 /* Alpha channel for all images */
 #define FF_MULTI   0x0080 /* Multiple channels */
 #define FF_TRANS   0x0100 /* Indexed transparency */
-#define FF_JCOMP   0x0200 /* JPEG compression */
-#define FF_ZCOMP   0x0400 /* zlib compression */
+#define FF_COMP    0x0600 /* Configurable compression */
+#define FF_COMPJ   0x0200 /* JPEG compression */
+#define FF_COMPZ   0x0400 /* zlib compression */
+#define FF_COMPR   0x0600 /* RLE compression */
 #define FF_SPOT    0x0800 /* "Hot spot" */
 #define FF_LAYER   0x1000 /* Layered images */
 #define FF_PALETTE 0x2000 /* Palette file (not image) */
@@ -96,6 +98,7 @@ typedef struct {
 	int hot_x, hot_y;
 	int jpeg_quality;
 	int png_compression;
+	int tga_RLE;
 	int gif_delay;
 	int rgb_trans;
 	int silent;
@@ -107,7 +110,7 @@ typedef struct {
 
 char preserved_gif_filename[256];
 int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
-
+int tga_RLE, tga_565, tga_defdir;
 
 int file_type_by_ext(char *name, guint32 mask);
 

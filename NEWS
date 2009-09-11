@@ -18,6 +18,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* PNG compression level made configurable
 	* TIFF files with alpha saved by Photoshop now load properly
 	* "Unassociate Alpha" operation added to Channels menu
+	* TGA file format save/load added
+	* Bash-specific idioms in configure script replaced by POSIXy equivalents
 	* BUGFIX - Negative values in "Transform Colour" and "Resize Canvas" dialogs are read correctly again
 	* BUGFIX - Drawing a 2 pixels high filled ellipse doesn't cause crash
 	* BUGFIX - Tool cursor now doesn't revert to default one after showing or hiding view window

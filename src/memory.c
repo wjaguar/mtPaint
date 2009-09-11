@@ -1399,7 +1399,8 @@ int mem_remove_unused()
 	return found;
 }
 
-void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int b2 )
+void mem_scale_pal(png_color *pal, int i1, int r1, int g1, int b1,
+	int i2, int r2, int g2, int b2)
 {
 	double r0, g0, b0, dr, dg, db, d = i2 - i1;
 	int i, step = i2 > i1 ? 1 : -1;
@@ -1413,11 +1414,11 @@ void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int 
 	db = (b2 - b1) / d;
 	b0 = b1 - db * i1;
 
-	for (i = i1; i != i2; i += step)
+	for (i = i1; i != i2 + step; i += step)
 	{
-		mem_pal[i].red = rint(r0 + dr * i);
-		mem_pal[i].green = rint(g0 + dg * i);
-		mem_pal[i].blue = rint(b0 + db * i);
+		pal[i].red = rint(r0 + dr * i);
+		pal[i].green = rint(g0 + dg * i);
+		pal[i].blue = rint(b0 + db * i);
 	}
 }
 

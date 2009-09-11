@@ -3533,6 +3533,9 @@ void main_init()
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 	jpeg_quality = inifile_get_gint32( "jpegQuality", 85 );
 	png_compression = inifile_get_gint32( "pngCompression", 9 );
+	tga_RLE = inifile_get_gint32( "tgaRLE", 0 );
+	tga_565 = inifile_get_gboolean("tga565", FALSE);
+	tga_defdir = inifile_get_gboolean("tgaDefdir", FALSE);
 	q_quit = inifile_get_gboolean( "quitToggle", TRUE );
 	chequers_optimize = inifile_get_gboolean( "optimizeChequers", TRUE );
 

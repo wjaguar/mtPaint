@@ -1317,15 +1317,17 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 
 static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 {
-	static int flags[] = {FF_TRANS, FF_JCOMP, FF_ZCOMP, FF_SPOT, FF_SPOT, 0};
+	static int flags[] = {FF_TRANS, FF_COMPJ, FF_COMPZ, FF_COMPR,
+		FF_SPOT, FF_SPOT, 0};
 	GList *chain = GTK_BOX(box)->children->next->next;
-	int i, ftype;
+	int i, j, ftype;
 
 	ftype = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
 	/* Hide/show name/value widget pairs */
 	for (i = 0; flags[i]; i++)
 	{
-		if (file_formats[ftype].flags & flags[i])
+		j = flags[i] & FF_COMP ? FF_COMP : flags[i];
+		if ((file_formats[ftype].flags & j) == flags[i])
 		{
 			gtk_widget_show(((GtkBoxChild*)chain->data)->widget);
 			gtk_widget_show(((GtkBoxChild*)chain->next->data)->widget);
@@ -1341,10 +1343,12 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 
 static void image_widgets(GtkWidget *box, char *name, int mode)
 {
-	char *spinnames[5] = { _("Transparency index"), _("JPEG Save Quality (100=High)"),
-		_("PNG Compression (0=None)"), _("Hotspot at X ="), _("Y =") };
-	int spindata[5][3] = { {mem_xpm_trans, -1, mem_cols - 1}, {jpeg_quality, 0, 100},
-		{png_compression, 0, 9}, {mem_xbm_hot_x, -1, mem_width - 1},
+	char *spinnames[6] = { _("Transparency index"), _("JPEG Save Quality (100=High)"),
+		_("PNG Compression (0=None)"), _("TGA RLE Compression"),
+		_("Hotspot at X ="), _("Y =") };
+	int spindata[6][3] = { {mem_xpm_trans, -1, mem_cols - 1}, {jpeg_quality, 0, 100},
+		{png_compression, 0, 9}, {tga_RLE, 0, 1},
+		{mem_xbm_hot_x, -1, mem_width - 1},
 		{mem_xbm_hot_y, -1, mem_height - 1} };
 	GtkWidget *opt, *menu, *item, *label, *spin;
 	int i, j, k, mask = FF_256;
@@ -1365,7 +1369,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
 	opt = gtk_option_menu_new();
 	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 5);
-	for (i = 0; i < 5; i++)
+	for (i = 0; i < 6; i++)
 	{
 		label = gtk_label_new(spinnames[i]);
 		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
@@ -1493,6 +1497,7 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 	settings->hot_y = mem_xbm_hot_y;
 	settings->jpeg_quality = jpeg_quality;
 	settings->png_compression = png_compression;
+	settings->tga_RLE = tga_RLE;
 	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
@@ -1509,8 +1514,9 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 			settings->xpm_trans = read_spin(BOX_CHILD(box, 3));
 			settings->jpeg_quality = read_spin(BOX_CHILD(box, 5));
 			settings->png_compression = read_spin(BOX_CHILD(box, 7));
-			settings->hot_x = read_spin(BOX_CHILD(box, 9));
-			settings->hot_y = read_spin(BOX_CHILD(box, 11));
+			settings->tga_RLE = read_spin(BOX_CHILD(box, 9));
+			settings->hot_x = read_spin(BOX_CHILD(box, 11));
+			settings->hot_y = read_spin(BOX_CHILD(box, 13));
 			break;
 		case FS_LAYER_SAVE: /* Nothing to do yet */
 			break;
@@ -1548,15 +1554,21 @@ static void store_ls_settings(ls_settings *settings)
 			mem_xbm_hot_x = settings->hot_x;
 			mem_xbm_hot_y = settings->hot_y;
 		}
-		if (fflags & FF_JCOMP)
+		fflags &= FF_COMP;
+		if (fflags == FF_COMPJ)
 		{
 			jpeg_quality = settings->jpeg_quality;
 			inifile_set_gint32("jpegQuality", jpeg_quality);
 		}
-		if (fflags & FF_ZCOMP)
+		else if (fflags == FF_COMPZ)
 		{
 			png_compression = settings->png_compression;
 			inifile_set_gint32("pngCompression", png_compression);
+		}
+		else if (fflags == FF_COMPR)
+		{
+			tga_RLE = settings->tga_RLE;
+			inifile_set_gint32("tgaRLE", tga_RLE);
 		}
 		break;
 	case FS_EXPORT_GIF:

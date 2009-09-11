@@ -82,20 +82,17 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 {
 	int res;
 
-	if ( nt != 1) mem_pal_copy( mem_pal, mem_pal_def );
+	mem_pal_copy(mem_pal, mem_pal_def);
 #ifdef U_GUADALINEX
-	else mem_scale_pal( 0, 255,255,255, nc-1, 0,0,0 );
+	if (nt == 1) mem_scale_pal(mem_pal, 0, 255,255,255, nc - 1, 0,0,0);
 #else
-	else mem_scale_pal( 0, 0,0,0, nc-1, 255,255,255 );
+	if (nt == 1) mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
 #endif
 
-	mtMIN( nw, nw, MAX_WIDTH )
-	mtMAX( nw, nw, MIN_WIDTH )
-	mtMIN( nh, nh, MAX_HEIGHT )
-	mtMAX( nh, nh, MIN_HEIGHT )
-	mtMAX( nc, nc, 2 )
+	nw = nw < MIN_WIDTH ? MIN_WIDTH : nw > MAX_WIDTH ? MAX_WIDTH : nw;
+	nh = nh < MIN_HEIGHT ? MIN_HEIGHT : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
 
-	mem_cols = nc;
+	mem_cols = nc < 2 ? 2 : nc > 256 ? 256 : nc;
 	res = mem_new( nw, nh, bpp, CMASK_IMAGE );
 	if ( res!= 0 )			// Not enough memory!
 	{
@@ -1834,7 +1831,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	if (cs_type == COLSEL_EDIT_ALL)
 	{
 		char *fromto[] = { _("From"), _("To") };
-		char *scales[] = { "RGB", "HSV", _("Gradient") };
+		char *scales[] = { _("RGB"), _("HSV"), _("Gradient") };
 
 		mem_pal_copy( brcosa_pal, mem_pal );	// Remember old settings
 		ctable = malloc(mem_cols * sizeof(RGBA16));
@@ -2625,7 +2622,8 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	if (!grad_mode) /* RGB */
 	{
-		char *interp[] = {"RGB", "HSV",	_("Backward HSV"), _("Constant")};
+		char *interp[] = {_("RGB"), _("HSV"), _("Backward HSV"),
+			_("Constant")};
 
 		grad_ed_cs = cs = pack(mainbox, gtk_color_selection_new());
 #if GTK_MAJOR_VERSION == 1

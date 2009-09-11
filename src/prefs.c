@@ -35,6 +35,8 @@ GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg,
 	*spinbutton_png, *spinbutton_recent, *spinbutton_silence;
+static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef;
+
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
@@ -296,6 +298,12 @@ static void prefs_apply(GtkWidget *widget)
 	inifile_set_gint32( "pngCompression", png_compression );
 	inifile_set_gint32( "recentFiles", recent_files );
 	inifile_set_gint32( "silence_limit", silence_limit );
+	inifile_set_gint32( "tgaRLE", tga_RLE = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(checkbutton_tgaRLE)) ? 1 : 0);
+	inifile_set_gboolean( "tga565", tga_565 = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(checkbutton_tga565)));
+	inifile_set_gboolean( "tgaDefdir", tga_565 = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(checkbutton_tgadef)));
 
 	inifile_set_gboolean( "pasteToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste)) );
@@ -500,6 +508,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	spinbutton_png     = spin_to_table(table4, 4, 1, 4, png_compression, 0, 9);
 	spinbutton_recent  = spin_to_table(table4, 5, 1, 4, recent_files, 0, MAX_RECENT);
 	spinbutton_silence = spin_to_table(table4, 6, 1, 4, silence_limit, 0, 28);
+	checkbutton_tgaRLE = add_a_toggle(_("TGA RLE Compression"), page, tga_RLE);
+	checkbutton_tga565 = add_a_toggle(_("Read 16-bit TGAs as 5:6:5 BGR"), page, tga_565);
+	checkbutton_tgadef = add_a_toggle(_("Write TGAs in bottom-up row order"), page, tga_defdir);
 
 ///	---- TAB3 - PATHS
 
