@@ -3854,7 +3854,8 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 	}
 	free(buf);
 
-	*(Pixmap *)&mf->buf = GDK_WINDOW_XWINDOW(exported[0]);
+	/* !!! '(void *)' is there to make GCC 4 shut up - WJ */
+	*(Pixmap *)(void *)&mf->buf = GDK_WINDOW_XWINDOW(exported[0]);
 	mf->top = sizeof(Pixmap);
 	return (0);
 }

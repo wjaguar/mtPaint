@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.29RC1"
-MT_DATE="2008-12-25"
+MT_V="3.29"
+MT_DATE="2008-12-30"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -42,7 +42,14 @@ OPTS=YES
 DEBUG=NO
 HELP=1
 
-CC=gcc
+if [ "$CROSSCC" ]
+then
+	CC=$CROSSCC
+elif [ -z "$CC" ]
+then
+	CC=gcc
+fi
+LD=`which \`$CC -print-prog-name=ld\``
 CROSSPF=
 
 L_EX=
@@ -52,28 +59,32 @@ LIB_NAME ()
 {
 	if [ "$IMAGE_LIBDIR" ]
 	then
-		L_EX="$L_EX ${IMAGE_LIBDIR}/lib$1"
+		L_TNM="${IMAGE_LIBDIR}/lib$1"
 		if [ "$2" ]
 		then
-			L_EX="${L_EX}.a"
+			L_TNM="${L_TNM}.a"
 		else
-			L_EX="${L_EX}.so"
+			L_TNM="${L_TNM}.so"
+		fi
+		if [ -r $L_TNM ]
+		then
+			L_EX="$L_EX $L_TNM"
+			return
+		fi
+	fi
+	if [ "$2" ]
+	then
+		if [ -z "$STATIC_LAST" ]
+		then
+			L_EX="$L_EX -Wl,-dn"
 		fi
 	else
-		if [ "$2" ]
+		if [ "$STATIC_LAST" ]
 		then
-			if [ -z "$STATIC_LAST" ]
-			then
-				L_EX="$L_EX -Wl,-dn"
-			fi
-		else
-			if [ "$STATIC_LAST" ]
-			then
-				L_EX="$L_EX -Wl,-dy"
-			fi
+			L_EX="$L_EX -Wl,-dy"
 		fi
-		L_EX="$L_EX -l$1"
 	fi
+	L_EX="$L_EX -l$1"
 	STATIC_LAST=$2
 }
 
@@ -83,22 +94,21 @@ then
 	GTK=2
 	IS_LIB()
 	{
-		redir -e /dev/null ld -$1 -o _conf.tmp -L/lib > /dev/null 2>&1
+		redir -e /dev/null $LD -$1 -o _conf.tmp -L/lib > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		redir -e /dev/null gcc _conf.c -o _conf.tmp -L/lib > /dev/null 2>&1
+		redir -e /dev/null $CC _conf.c -o _conf.tmp -L/lib > /dev/null 2>&1
 	}
 elif [ "$CROSSCC" ]
 then
 	OS="MinGW/GNU/Linux"
 	GTK=2
-	CROSSPF="/usr/$CROSSCC"
-	CC=/usr/$CROSSCC/bin/$CROSSCC-gcc
+	CROSSPF=`echo $CROSSCC | sed -e 's/[^/]\+\/[^/]*\$//'`
 	IS_LIB()
 	{
-		$CROSSPF/bin/$CROSSCC-ld -$1 -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
+		$LD -$1 -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
@@ -116,12 +126,12 @@ else
 	CROSSPF="/usr"
 	IS_LIB()
 	{
-		ld -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		$LD -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		gcc _conf.c -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		$CC _conf.c -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 fi
 
@@ -268,13 +278,14 @@ do
 				MT_MAN_DEST="$MT_PREFIX/man/man1";;
 		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
 		"build" )	./configure flush
-				I_DIR=/home/mark/sf
+				I_DIR=/home/wj/sf
+				export CC=gcc-3.4.6
 				cd ..
 				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V*/
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man release asneeded staticgif nojp2
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man release asneeded staticgif nojp2 --libdir=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -287,7 +298,7 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 release asneeded staticgif nojp2
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 release asneeded staticgif nojp2 --libdir=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -317,8 +328,7 @@ do
 				export EMAIL="mtpaint-user@lists.sourceforge.net"
 				alien -d --version=$MT_V --description="`cat alien-desc`" mtpaint-$MT_V.tgz
 				rename -2_all _i386 *.deb
-				chown mark *
-				chgrp users *
+				chown wj:users *
 				exit;;
 	esac
 done

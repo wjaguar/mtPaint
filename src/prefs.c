@@ -525,7 +525,7 @@ void pressed_preferences()
 	spinbutton_hotx    = spin_to_table(table4, 1, 1, 4, mem_xbm_hot_x, -1, mem_width - 1);
 	spinbutton_hoty    = spin_to_table(table4, 2, 1, 4, mem_xbm_hot_y, -1, mem_height - 1);
 	spinbutton_jpeg    = spin_to_table(table4, 3, 1, 4, jpeg_quality, 0, 100);
-	spinbutton_jp2     = spin_to_table(table4, 4, 1, 4, jp2_rate, 1, 100);
+	spinbutton_jp2     = spin_to_table(table4, 4, 1, 4, jp2_rate, 0, 100);
 	spinbutton_png     = spin_to_table(table4, 5, 1, 4, png_compression, 0, 9);
 	spinbutton_recent  = spin_to_table(table4, 6, 1, 4, recent_files, 0, MAX_RECENT);
 	spinbutton_silence = spin_to_table(table4, 7, 1, 4, silence_limit, 0, 28);
