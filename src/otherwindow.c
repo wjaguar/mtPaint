@@ -1322,7 +1322,7 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 	if ( mem_img_bpp == 3 )
 	{
 		gtk_widget_queue_draw_area( drawing_canvas, margin_main_x, margin_main_y,
-			mem_width*can_zoom+margin_main_x, mem_height*can_zoom+margin_main_y );
+			mem_width*can_zoom + 1, mem_height*can_zoom + 1);
 	}
 
 	return FALSE;

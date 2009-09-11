@@ -596,22 +596,10 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	/* Align on selected layer if needed */
 	if (layers_total && layer_selected && (zoom > 1))
 	{
-		dx = layer_table[layer_selected].x;
-		dy = layer_table[layer_selected].y;
-		i = czoom * dx;
-		j = czoom * dy;
-		dx -= i * zoom;
-		dy -= j * zoom;
-		if (dx < 0)
-		{
-			px--;
-			dx += zoom;
-		}
-		if (dy < 0)
-		{
-			py--;
-			dy += zoom;
-		}
+		dx = layer_table[layer_selected].x % zoom;
+		if (dx < 0) dx += zoom;
+		dy = layer_table[layer_selected].y % zoom;
+		if (dy < 0) dy += zoom;
 	}
 
 	/* Apply background bounds if needed */
@@ -905,99 +893,140 @@ static gint vw_expose( GtkWidget *widget, GdkEventExpose *event )
 
 void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of current image
 {
+	int zoom, scale, dx = 0, dy = 0;
+
 	if ( vw_drawing == NULL ) return;
 	
 	if ( layer_selected > 0 )
 	{
-		x += layer_table[layer_selected].x;
-		y += layer_table[layer_selected].y;
+		x += (dx = layer_table[layer_selected].x);
+		y += (dy = layer_table[layer_selected].y);
 	}
 
-	gtk_widget_queue_draw_area( vw_drawing,
-		x*vw_zoom + margin_view_x, y*vw_zoom + margin_view_y,
-		mt_round(w*vw_zoom), mt_round(h*vw_zoom) );
+	if (vw_zoom < 1.0)
+	{
+		zoom = rint(1.0 / vw_zoom);
+		dx %= zoom;
+		x -= dx + (dx < 0 ? zoom : 0);
+		dy %= zoom;
+		y -= dy + (dy < 0 ? zoom : 0);
+		w += x - 1;
+		h += y - 1;
+		w = w < 0 ? -((zoom - w - 1) / zoom) : w / zoom;
+		h = h < 0 ? -((zoom - h - 1) / zoom) : h / zoom;
+		x = x < 0 ? -(-x / zoom) : (x + zoom - 1) / zoom;
+		y = y < 0 ? -(-y / zoom) : (y + zoom - 1) / zoom;
+		w -= x - 1;
+		h -= y - 1;
+		if ((w <= 0) || (h <= 0)) return;
+	}
+	else
+	{
+		scale = rint(vw_zoom);
+		x *= scale;
+		y *= scale;
+		w *= scale;
+		h *= scale;
+	}
+
+	gtk_widget_queue_draw_area(vw_drawing, x, y, w, h);
 }
 
 static void vw_mouse_event(int x, int y, guint state, guint button)
 {
 	unsigned char *rgb, **img;
 	int dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
+	int zoom = 1, scale = 1;
 	png_color *pal;
 
-	x = (x - margin_view_x) / vw_zoom;
-	y = (y - margin_view_y) / vw_zoom;
-
-	if ( button != 0 && layers_total>0 )
+	if (!button || !layers_total)
 	{
-		if ( !view_first_move )
-		{
-			if ( vw_move_layer > 0 )
-			{
-				dx = x - vw_last_x;
-				dy = y - vw_last_y;
-				move_layer_relative(vw_move_layer, dx, dy);
-			}
-		}
-		else
-		{
-			vw_move_layer = -1;		// Which layer has the user clicked?
-			for (i = layers_total; i > 0; i--)
-			{
-				lx = layer_table[i].x;
-				ly = layer_table[i].y;
-				if ( i == layer_selected )
-				{
-					lw = mem_width;
-					lh = mem_height;
-					bpp = mem_img_bpp;
-					img = mem_img;
-					pal = mem_pal;
-				}
-				else
-				{
-					lw = layer_table[i].image->mem_width;
-					lh = layer_table[i].image->mem_height;
-					bpp = layer_table[i].image->mem_img_bpp;
-					img = layer_table[i].image->mem_img;
-					pal = layer_table[i].image->mem_pal;
-				}
-				rgb = img[CHN_IMAGE];
-
-				/* Is click within layer box? */
-				if ( x>=lx && x<(lx + lw) && y>=ly && y<(ly + lh) &&
-					layer_table[i].visible )
-				{
-					ofs = (x-lx) + lw*(y-ly);
-					/* Is click on a non transparent pixel? */
-					if (img[CHN_ALPHA])
-					{
-						if (img[CHN_ALPHA][ofs] < (bpp == 1 ? 255 : 1))
-							continue;
-					}
-					if ( layer_table[i].use_trans )
-					{
-						tpix = layer_table[i].trans;
-						if (bpp == 1) ppix = rgb[ofs];
-						else
-						{
-							tpix = PNG_2_INT(pal[tpix]);
-							ppix = MEM_2_INT(rgb, ofs * 3);
-						}
-						if (tpix == ppix) continue;
-					}
-					vw_move_layer = i;
-					break;
-				}
-			}
-			ppix = vw_move_layer;
-			if (ppix < 0) ppix = 0; /* Select background */
-			layer_choose(ppix);
-		}
-		view_first_move = FALSE;
-		vw_last_x = x;
-		vw_last_y = y;
+		view_first_move = TRUE;
+		return;
 	}
-	else	view_first_move = TRUE;
+
+	if (vw_zoom < 1.0) zoom = rint(1.0 / vw_zoom);
+	else scale = rint(vw_zoom);
+
+	x = ((x - margin_view_x) / scale) * zoom;
+	y = ((y - margin_view_y) / scale) * zoom;
+
+	/* Align on selected layer if needed */
+	if (layer_selected && (zoom > 1))
+	{
+		dx = layer_table[layer_selected].x % zoom;
+		dy = layer_table[layer_selected].y % zoom;
+		x -= dx + (dx < 0 ? zoom : 0);
+		y -= dy + (dy < 0 ? zoom : 0);
+	}
+
+	if ( !view_first_move )
+	{
+		if ( vw_move_layer > 0 )
+		{
+			dx = x - vw_last_x;
+			dy = y - vw_last_y;
+			move_layer_relative(vw_move_layer, dx, dy);
+		}
+	}
+	else
+	{
+		vw_move_layer = -1;		// Which layer has the user clicked?
+		for (i = layers_total; i > 0; i--)
+		{
+			lx = layer_table[i].x;
+			ly = layer_table[i].y;
+			if ( i == layer_selected )
+			{
+				lw = mem_width;
+				lh = mem_height;
+				bpp = mem_img_bpp;
+				img = mem_img;
+				pal = mem_pal;
+			}
+			else
+			{
+				lw = layer_table[i].image->mem_width;
+				lh = layer_table[i].image->mem_height;
+				bpp = layer_table[i].image->mem_img_bpp;
+				img = layer_table[i].image->mem_img;
+				pal = layer_table[i].image->mem_pal;
+			}
+			rgb = img[CHN_IMAGE];
+
+			/* Is click within layer box? */
+			if ( x>=lx && x<(lx + lw) && y>=ly && y<(ly + lh) &&
+				layer_table[i].visible )
+			{
+				ofs = (x-lx) + lw*(y-ly);
+				/* Is click on a non transparent pixel? */
+				if (img[CHN_ALPHA])
+				{
+					if (img[CHN_ALPHA][ofs] < (bpp == 1 ? 255 : 1))
+						continue;
+				}
+				if ( layer_table[i].use_trans )
+				{
+					tpix = layer_table[i].trans;
+					if (bpp == 1) ppix = rgb[ofs];
+					else
+					{
+						tpix = PNG_2_INT(pal[tpix]);
+						ppix = MEM_2_INT(rgb, ofs * 3);
+					}
+					if (tpix == ppix) continue;
+				}
+				vw_move_layer = i;
+				break;
+			}
+		}
+		ppix = vw_move_layer;
+		if (ppix < 0) ppix = 0; /* Select background */
+		layer_choose(ppix);
+	}
+	view_first_move = FALSE;
+	vw_last_x = x;
+	vw_last_y = y;
 }
 
 static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )

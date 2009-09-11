@@ -109,7 +109,7 @@ void commit_paste( gboolean undo )
 	vw_update_area( fx, fy, fw, fh );
 	gtk_widget_queue_draw_area( drawing_canvas,
 			fx*can_zoom + margin_main_x, fy*can_zoom + margin_main_y,
-			fw*can_zoom, fh*can_zoom );
+			fw*can_zoom + 1, fh*can_zoom + 1);
 }
 
 void paste_prepare()
@@ -2329,7 +2329,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 		{
 			gtk_widget_queue_draw_area( drawing_canvas,
 				margin_main_x + minx*can_zoom, margin_main_y + miny*can_zoom,
-				mt_round(xw*can_zoom), mt_round(yh*can_zoom) );
+				xw*can_zoom + 1, yh*can_zoom + 1);
 			vw_update_area( minx, miny, xw+1, yh+1 );
 		}
 	}

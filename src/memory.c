@@ -556,7 +556,13 @@ int undo_next_core(int handle, int new_width, int new_height,
 		else mtMIN(mem_undo_done, mem_undo_done + 1, MAX_UNDO - 1);
 
 		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
-		memcpy(mem_undo_im_[mem_undo_pointer].img, holder, sizeof(chanlist));
+		undo = &mem_undo_im_[mem_undo_pointer];
+		memcpy(undo->img, holder, sizeof(chanlist));
+		undo->cols = mem_cols;
+		mem_pal_copy(undo->pal, mem_pal);
+		undo->width = mem_width;
+		undo->height = mem_height;
+		undo->bpp = mem_img_bpp;
 //printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 

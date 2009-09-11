@@ -19,6 +19,7 @@
 
 #include <gdk/gdkkeysyms.h>
 #include <string.h>
+#include <math.h>
 
 #include "memory.h"
 #include "layer.h"
@@ -1318,11 +1319,22 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 
 void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & update window labels
 {
-	int lx = layer_table[l].x, ly = layer_table[l].y, lw = mem_width, lh = mem_height;
+	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh;
+	int zoom = 1, scale = 1;
+
+	if (vw_zoom < 1.0) zoom = rint(1.0 / vw_zoom);
+	else scale = rint(vw_zoom);
 
 	layer_table[l].x += change_x;
 	layer_table[l].y += change_y;
-	if ( l==layer_selected ) layer_show_position();
+	if (change_x < 0) lx += change_x;
+	if (change_y < 0) ly += change_y;
+	if (l == layer_selected)
+	{
+		lw = mem_width;
+		lh = mem_height;
+		layer_show_position();
+	}
 	else
 	{
 		lw = layer_table[l].image->mem_width;
@@ -1332,11 +1344,12 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 
 	if ( vw_drawing != NULL )
 	{
-		mtMIN(lx, lx, lx+change_x)
-		mtMIN(ly, ly, ly+change_y)
-		gtk_widget_queue_draw_area( vw_drawing,
-			lx*vw_zoom + margin_view_x, ly*vw_zoom + margin_view_y,
-			(lw + abs(change_x))*vw_zoom+1, (lh + abs(change_y) )*vw_zoom+1 );
+		lw += abs(change_x);
+		lh += abs(change_y);
+		if (zoom == 1) gtk_widget_queue_draw_area( vw_drawing,
+			lx * scale + margin_view_x, ly * scale + margin_view_y,
+			lw * scale, lh * scale);
+		else gtk_widget_queue_draw(vw_drawing);
 	}
 	if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
 }

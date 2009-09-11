@@ -887,7 +887,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 
 				gtk_widget_queue_draw_area( drawing_canvas,
 					minx*can_zoom + margin_main_x, miny*can_zoom + margin_main_y,
-					mt_round(xw*can_zoom), mt_round(yh*can_zoom) );
+					xw*can_zoom + 1, yh*can_zoom + 1);
 				vw_update_area( minx, miny, xw+1, yh+1 );
 			}
 		}
@@ -1503,8 +1503,20 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	{
 		if (layer_selected)
 		{
-			lx = can_zoom * layer_table[layer_selected].x;
-			ly = can_zoom * layer_table[layer_selected].y;
+			lx = layer_table[layer_selected].x;
+			ly = layer_table[layer_selected].y;
+			if (zoom > 1)
+			{
+				i = lx / zoom;
+				lx = i * zoom > lx ? i - 1 : i;
+				j = ly / zoom;
+				ly = j * zoom > ly ? j - 1 : j;
+			}
+			else
+			{
+				lx *= scale;
+				ly *= scale;
+			}
 			xpm = layer_table[layer_selected].use_trans ?
 				layer_table[layer_selected].trans : -1;
 			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
@@ -1662,6 +1674,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		rx1, ry1, rx2, ry2,
 		ax1, ay1, ax2, ay2,
 		rpx, rpy;
+	int i, j, zoom = 1, scale = 1;
 
 	if (zoom_flag == 1) return;		// Stops excess jerking in GTK+1 when zooming
 
@@ -1672,14 +1685,29 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	rgb = grab_memory( pw*ph*3, mem_background );
 	if ( rgb == NULL ) return;
 
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
 	if ( layers_total == 0 || !show_layers_main )
 		main_render_rgb( rgb, px, py, pw, ph, can_zoom );
 	else
 	{
 		if ( layer_selected > 0 )
 		{
-			lx = can_zoom * layer_table[layer_selected].x;
-			ly = can_zoom * layer_table[layer_selected].y;
+			lx = layer_table[layer_selected].x;
+			ly = layer_table[layer_selected].y;
+			if (zoom > 1)
+			{
+				i = lx / zoom;
+				lx = i * zoom > lx ? i - 1 : i;
+				j = ly / zoom;
+				ly = j * zoom > ly ? j - 1 : j;
+			}
+			else
+			{
+				lx *= scale;
+				ly *= scale;
+			}
 		}
 		view_render_rgb( rgb, px+lx - margin_main_x, py+ly - margin_main_y, pw, ph, can_zoom );
 	}
