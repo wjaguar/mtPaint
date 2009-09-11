@@ -34,7 +34,7 @@ int	ani_frame1, ani_frame2, ani_gif_delay;
 
 void ani_init();			// Initialize variables/arrays etc.
 
-void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_animate_window();
 void pressed_set_key_frame();
 void pressed_remove_key_frames();
 

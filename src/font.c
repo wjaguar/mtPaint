@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1095,7 +1095,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	read_font_controls(fp);
 	ft_render_text();
-	if ( mem_clipboard != NULL ) pressed_paste_centre( NULL, NULL );
+	if (mem_clipboard) pressed_paste_centre();
 
 	delete_text( widget, data );
 
@@ -1768,7 +1768,7 @@ static void font_entry_changed(GtkWidget *widget, gpointer user)	// A GUI entry 
 #endif		// U_FREETYPE
 
 
-void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_mt_text()
 {
 #ifdef U_FREETYPE
 	int		i;

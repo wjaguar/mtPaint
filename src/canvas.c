@@ -304,11 +304,9 @@ void paste_prepare()
 	}
 }
 
-void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void iso_trans(int mode)
 {
-	int i;
-
-	i = mem_isometrics(item);
+	int i = mem_isometrics(mode);
 
 	if (!i) canvas_undo_chores();
 	else if (i == -5) alert_box( _("Error"),
@@ -316,7 +314,7 @@ void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	else memory_errors(i);
 }
 
-void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_invert()
 {
 	spot_undo(UNDO_INV);
 
@@ -327,7 +325,7 @@ void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
-void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_edge_detect()
 {
 	spot_undo(UNDO_FILT);
 	do_effect(0, 0);
@@ -347,19 +345,19 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_sharpen()
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
 	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3), FALSE);
 }
 
-void pressed_soften( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_soften()
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
 	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4), FALSE);
 }
 
-void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_emboss()
 {
 	spot_undo(UNDO_FILT);
 	do_effect(2, 0);
@@ -396,7 +394,7 @@ static void gauss_xy_click(GtkButton *button, GtkWidget *spin)
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button)));
 }
 
-void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
+void pressed_gauss()
 {
 	int i;
 	GtkWidget *box, *spin, *check;
@@ -441,7 +439,7 @@ int do_unsharp(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_unsharp(GtkMenuItem *menu_item, gpointer user_data)
+void pressed_unsharp()
 {
 	GtkWidget *box, *table, *spin;
 
@@ -489,7 +487,7 @@ int do_dog(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_dog(GtkMenuItem *menu_item, gpointer user_data)
+void pressed_dog()
 {
 	GtkWidget *box, *table, *spin;
 
@@ -510,11 +508,9 @@ void pressed_dog(GtkMenuItem *menu_item, gpointer user_data)
 	filter_window(_("Difference of Gaussians"), box, do_dog, NULL, FALSE);
 }
 
-void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_convert_rgb()
 {
-	int i;
-
-	i = mem_convert_rgb();
+	int i = mem_convert_rgb();
 
 	if (i) memory_errors(i);
 	else
@@ -524,20 +520,20 @@ void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_greyscale(int mode)
 {
 	spot_undo(UNDO_COL);
 
-	mem_greyscale(item);
+	mem_greyscale(mode);
 	mem_undo_prepare();
 
 	init_pal();
 	update_all_views();
 }
 
-void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_rotate_image(int dir)
 {
-	int i = mem_image_rot(item);
+	int i = mem_image_rot(dir);
 	if (i) memory_errors(i);
 	else
 	{
@@ -546,9 +542,9 @@ void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item
 	}
 }
 
-void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_rotate_sel(int dir)
 {
-	if (mem_sel_rot(item)) memory_errors(1);
+	if (mem_sel_rot(dir)) memory_errors(1);
 	else
 	{
 		check_marquee();
@@ -585,7 +581,7 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_rotate_free()
 {
 	GtkWidget *box, *spin;
 
@@ -603,20 +599,20 @@ void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
 }
 
 
-void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_clip_mask(int val)
 {
 	int i;
 
 	if ( mem_clip_mask == NULL )
 	{
-		i = mem_clip_mask_init(item ^ 255);
+		i = mem_clip_mask_init(val ^ 255);
 		if (i)
 		{
 			memory_errors(1);	// Not enough memory
 			return;
 		}
 	}
-	mem_clip_mask_set(item);
+	mem_clip_mask_set(val);
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
@@ -662,27 +658,19 @@ void pressed_clip_alpha_scale()
 
 void pressed_clip_mask_all()
 {
-	int i;
-
-	i = mem_clip_mask_init(0);
-	if (i)
-	{
+	if (mem_clip_mask_init(0))
 		memory_errors(1);	// Not enough memory
-		return;
-	}
-	gtk_widget_queue_draw( drawing_canvas );
+	else gtk_widget_queue_draw(drawing_canvas);
 }
 
 void pressed_clip_mask_clear()
 {
-	if ( mem_clip_mask != NULL )
-	{
-		mem_clip_mask_clear();
-		gtk_widget_queue_draw( drawing_canvas );
-	}
+	if (!mem_clip_mask) return;
+	mem_clip_mask_clear();
+	gtk_widget_queue_draw(drawing_canvas);
 }
 
-void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_flip_image_v()
 {
 	int i;
 	unsigned char *temp;
@@ -700,7 +688,7 @@ void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
-void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_flip_image_h()
 {
 	int i;
 
@@ -714,7 +702,7 @@ void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
-void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_flip_sel_v()
 {
 	unsigned char *temp;
 	int i, bpp = mem_clip_bpp;
@@ -729,7 +717,7 @@ void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
-void pressed_flip_sel_h( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_flip_sel_h()
 {
 	int i, bpp = mem_clip_bpp;
 	for (i = 0; i < NUM_CHANNELS; i++ , bpp = 1)
@@ -749,7 +737,7 @@ void paste_init()
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
-void pressed_paste( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_paste()
 {
 	paste_prepare();
 	marq_x1 = mem_clip_x;
@@ -759,7 +747,7 @@ void pressed_paste( GtkMenuItem *menu_item, gpointer user_data )
 	paste_init();
 }
 
-void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_paste_centre()
 {
 	int w, h;
 	GtkAdjustment *hori, *vert;
@@ -783,7 +771,7 @@ void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data )
 	paste_init();
 }
 
-void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_rectangle(int filled)
 {
 	int x, y, w, h, sb, l2;
 
@@ -806,7 +794,7 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 				poly_max_y + l2 : mem_height) - sb_xywh[1];
 			sb = init_sb();
 		}
-		if (!item) poly_outline();
+		if (!filled) poly_outline();
 		else poly_paint();
 	}
 	else
@@ -823,7 +811,7 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 			sb = init_sb();
 		}
 
-		if (item || (2 * tool_size >= w) || (2 * tool_size >= h))
+		if (filled || (2 * tool_size >= w) || (2 * tool_size >= h))
 			f_rectangle(x, y, w, h);
 		else
 		{
@@ -841,10 +829,10 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	update_all_views();
 }
 
-void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_ellipse(int filled)
 {
 	spot_undo(UNDO_DRAW);
-	mem_ellipse(marq_x1, marq_y1, marq_x2, marq_y2, item ? 0 : tool_size);
+	mem_ellipse(marq_x1, marq_y1, marq_x2, marq_y2, filled ? 0 : tool_size);
 	mem_undo_prepare();
 	update_all_views();
 }
@@ -1008,9 +996,9 @@ static void trim_clip()
 	mem_clip_y += miny;
 }
 
-void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_copy(int cut)
 {
-	if (!item && (tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+	if (!cut && (tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
 	{
 		mem_clip_x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
 		mem_clip_y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
@@ -1020,7 +1008,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	if (!copy_clip(FALSE)) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	channel_mask();
-	if (item) cut_clip();
+	if (cut) cut_clip();
 	update_all_views();
 	update_menus();
 }
@@ -1049,7 +1037,7 @@ int api_copy_polygon()
 }
 #endif
 
-void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_lasso(int cut)
 {
 	if (!copy_clip(FALSE)) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
@@ -1057,8 +1045,8 @@ void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	poly_lasso();
 	channel_mask();
 	trim_clip();
-	if (item) cut_clip();
-	pressed_paste_centre( NULL, NULL );
+	if (cut) cut_clip();
+	pressed_paste_centre();
 }
 
 void update_menus()			// Update edit/undo menu
@@ -1135,17 +1123,17 @@ void check_undo_paste_bpp()
 	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE;
 
 	if ((marq_status >= MARQUEE_PASTE) && (mem_clip_bpp > MEM_BPP))
-		pressed_select_none(NULL, NULL);
+		pressed_select_none();
 }
 
-void main_undo( GtkMenuItem *menu_item, gpointer user_data )
+void main_undo()
 {
 	mem_undo_backward();
 	check_undo_paste_bpp();
 	canvas_undo_chores();
 }
 
-void main_redo( GtkMenuItem *menu_item, gpointer user_data )
+void main_redo()
 {
 	mem_undo_forward();
 	check_undo_paste_bpp();
@@ -1332,14 +1320,14 @@ int do_a_load( char *fname )
 	}
 	else /* A whole bunch of layers */
 	{
-//		if ( layers_window == NULL ) pressed_layers( NULL, NULL );
-		if ( !view_showing ) view_show();
+//		if (!layers_window) pressed_layers();
+		if (!view_showing) view_show();
 			// We have just loaded a layers file so display view & layers window if not up
 	}
 
 	if (!undo_load) // No reason to reset tools in undoable mode
 	{
-		pressed_select_none(NULL, NULL); // To prevent automatic paste
+		pressed_select_none(); // To prevent automatic paste
 		reset_tools();
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
 			icon_buttons[DEFAULT_TOOL_ICON]),TRUE);
@@ -1954,15 +1942,24 @@ void file_selector(int action_type)
 		title = _("Save Palette File");
 		break;
 	case FS_EXPORT_UNDO:
+		if (!mem_undo_done) return;
 		title = _("Export Undo Images");
 		break;
 	case FS_EXPORT_UNDO2:
+		if (!mem_undo_done) return;
 		title = _("Export Undo Images (reversed)");
 		break;
 	case FS_EXPORT_ASCII:
+		if (mem_cols > 16)
+		{
+			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."),
+				_("OK"), NULL, NULL );
+			return;
+		}
 		title = _("Export ASCII Art");
 		break;
 	case FS_LAYER_SAVE:
+		check_layers_all_saved();
 		title = _("Save Layer Files");
 		break;
 	case FS_GIF_EXPLODE:
@@ -1970,6 +1967,12 @@ void file_selector(int action_type)
 		fpick_flags = FPICK_DIRS_ONLY;
 		break;
 	case FS_EXPORT_GIF:
+		if (!mem_filename[0])
+		{
+			alert_box( _("Error"), _("You must save at least one frame to create an animated GIF."),
+				_("OK"), NULL, NULL );
+			return;
+		}
 		title = _("Export GIF animation");
 		break;
 	case FS_CHANNEL_LOAD:
@@ -2391,7 +2394,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( tool_type == TOOL_SELECT && button == 3 && (marq_status == MARQUEE_DONE ) )
 		{
-			pressed_select_none(NULL, NULL);
+			pressed_select_none();
 			set_cursor();
 		}
 		if ( tool_type == TOOL_SELECT && button == 1 && (marq_status == MARQUEE_NONE ||

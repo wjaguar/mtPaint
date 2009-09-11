@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -219,7 +219,7 @@ static int faction_current_row;
 static char *faction_ini[3] = { "fact%dName", "fact%dCommand", "fact%dDir" };
 
 
-void pressed_file_action( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_file_action(int item)
 {
 	char *comm, *dir, txt[64];
 

@@ -17,4 +17,4 @@
 	along with mtPaint in the file COPYING.
 */
 
-void pressed_information( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_information();

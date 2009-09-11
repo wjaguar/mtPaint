@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1058,7 +1058,7 @@ static GtkWidget *ani_text(GtkWidget **textptr)
 	return (scroll);
 }
 
-void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_animate_window()
 {
 	GtkWidget *table, *label, *button, *notebook1, *scrolledwindow;
 	GtkWidget *ani_toggle_gif, *ani_list_layers, *list_data;

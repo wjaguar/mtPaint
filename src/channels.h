@@ -1,5 +1,5 @@
 /*	channels.h
-	Copyright (C) 2006-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -32,14 +32,11 @@ unsigned char channel_col_[2][NUM_CHANNELS];
 
 int channel_dis[NUM_CHANNELS];
 
-void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_channel_config_overlay();
-void pressed_channel_load();
-void pressed_channel_save();
+void pressed_channel_create(int channel);
+void pressed_channel_delete();
+void pressed_channel_edit(int state, int channel);
+void pressed_channel_disable(int state, int channel);
+void pressed_threshold();
+void pressed_unassociate();
+void pressed_channel_toggle(int state, int what);
+void pressed_RGBA_toggle(int state);

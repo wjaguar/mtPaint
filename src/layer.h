@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005-2006 Mark Tyler
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -65,20 +65,19 @@ int	show_layers_main,		// Show all layers in main window
 ///	PROCEDURES
 
 void layers_init();
-void pressed_layers( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_layers();
+void pressed_paste_layer();
 gint delete_layers_window();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );
 void layer_press_save();
-void layer_press_save_as();
-void layer_press_save_composite();
 int layer_save_composite(char *fname, ls_settings *settings);
 
 void layers_notify_changed();
 void layer_press_remove_all();
 int check_layers_for_changes();
+int check_layers_all_saved();
 void move_layer_relative(int l, int change_x, int change_y);	// Move a layer & update window labels
 void layer_new( int w, int h, int type, int cols, int cmask );	// Types 1=indexed, 2=grey, 3=RGB
 void layer_choose( int l );				// Select a new layer from the list

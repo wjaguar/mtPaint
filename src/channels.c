@@ -1,5 +1,5 @@
 /*	channels.c
-	Copyright (C) 2006-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -234,7 +234,7 @@ dofail:
 	click_newchan_cancel();
 }
 
-void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_channel_create(int channel)
 {
 	gchar *names2[] = {
 		_("Cleared"),
@@ -254,12 +254,12 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	GtkWidget *vbox, *vbox2, *hbox;
 
 
-	chan_new_type = item < CHN_ALPHA ? CHN_ALPHA : item;
+	chan_new_type = channel < CHN_ALPHA ? CHN_ALPHA : channel;
 	chan_new_state = 0;
 
 	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
 			GTK_WIN_POS_CENTER, TRUE );
-	gtk_object_set_user_data(GTK_OBJECT(newchan_window), (gpointer)item);
+	gtk_object_set_user_data(GTK_OBJECT(newchan_window), (gpointer)channel);
 
 	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox);
@@ -268,7 +268,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
 	add_with_frame(vbox, _("Channel Type"), hbox, 5);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	if (item >= 0) gtk_widget_set_sensitive(hbox, FALSE);
+	if (channel >= 0) gtk_widget_set_sensitive(hbox, FALSE);
 
 	vbox2 = gtk_vbox_new(FALSE, 0);
 	gtk_widget_show(vbox2);
@@ -312,7 +312,7 @@ static void click_delete_ok(GtkWidget *window)
 	gtk_widget_destroy(window);
 }
 
-void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint item)
+void pressed_channel_delete()
 {
 	GtkWidget *window, *vbox, *check;
 	int i;
@@ -345,30 +345,28 @@ void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint ite
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */
-void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_channel_edit(int state, int channel)
 {
 	/* Prevent spurious calls */
-	if (menu_item && !GTK_CHECK_MENU_ITEM(menu_item)->active) return;
-	if (newchan_window) return;
-	if (item == mem_channel) return;
+	if (!state || newchan_window || (channel == mem_channel)) return;
 
 	if ( marq_status >= MARQUEE_PASTE && mem_clip_bpp == 3)
-		pressed_select_none( NULL, NULL );
+		pressed_select_none();
 	// Stop pasting if with RGB paste
 
-	if (!mem_img[item])
+	if (!mem_img[channel])
 	{
-		pressed_channel_create(menu_item, user_data, item);
+		pressed_channel_create(channel);
 		return;
 	}
 
-	activate_channel(item);
+	activate_channel(channel);
 	canvas_undo_chores();
 }
 
-void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_channel_disable(int state, int channel)
 {
-	channel_dis[item] = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	channel_dis[channel] = state;
 	update_all_views();
 }
 
@@ -384,13 +382,13 @@ int do_threshold(GtkWidget *spin, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_threshold()
 {
 	GtkWidget *spin = add_a_spin(128, 0, 255);
 	filter_window(_("Threshold Channel"), spin, do_threshold, NULL, FALSE);
 }
 
-void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_unassociate()
 {
 	if (mem_img_bpp == 1) return;
 	spot_undo(UNDO_COL);
@@ -399,32 +397,16 @@ void pressed_unassociate( GtkMenuItem *menu_item, gpointer user_data, gint item 
 	update_all_views();
 }
 
-void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_channel_toggle(int state, int what)
 {
-	int *toggle = item ? &hide_image : &overlay_alpha;
-	if (*toggle == GTK_CHECK_MENU_ITEM(menu_item)->active) return;
-	*toggle = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	int *toggle = what ? &hide_image : &overlay_alpha;
+	if (*toggle == state) return;
+	*toggle = state;
 	update_all_views();
 }
 
-void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_RGBA_toggle(int state)
 {
-	RGBA_mode = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	RGBA_mode = state;
 	update_all_views();
 }
-
-void pressed_channel_config_overlay()
-{
-	colour_selector( COLSEL_OVERLAYS );
-}
-
-void pressed_channel_load()
-{
-	file_selector( FS_CHANNEL_LOAD );
-}
-
-void pressed_channel_save()
-{
-	file_selector( FS_CHANNEL_SAVE );
-}
-

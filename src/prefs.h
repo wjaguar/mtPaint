@@ -1,5 +1,5 @@
 /*	prefs.h
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -25,5 +25,5 @@
 int tablet_working, tablet_tool_use[3];		// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity
 
-void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_preferences();
 void init_tablet();				// Set up variables

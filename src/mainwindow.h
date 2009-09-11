@@ -52,18 +52,21 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_LOAD_CLIP,
 	ACT_SAVE_CLIP,
 	ACT_TBAR,
+	ACT_DOCK,
 	ACT_CENTER,
 	ACT_GRID,
 	ACT_VWWIN,
 	ACT_VWSPLIT,
 	ACT_VWFOCUS,
-	ACT_FLIP,
+	ACT_FLIP_V,
+	ACT_FLIP_H,
 	ACT_ROTATE,
 	ACT_SELECT,
 	ACT_LASSO,
 	ACT_OUTLINE,
 	ACT_ELLIPSE,
-	ACT_SEL_FLIP,
+	ACT_SEL_FLIP_V,
+	ACT_SEL_FLIP_H,
 	ACT_SEL_ROT,
 	ACT_RAMP,
 	ACT_SEL_ALPHA_AB,
@@ -78,7 +81,7 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_ISOMETRY,
 	ACT_CHN_DIS,
 	ACT_SET_RGBA,
-	ACT_ALPHA_OVERLAY,
+	ACT_SET_OVERLAY,
 	ACT_LR_SAVE,
 	ACT_LR_KILLALL,
 	ACT_DOCS,
@@ -102,7 +105,6 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_PREFS,
 	DLG_COLORS,
 	DLG_PAL_SIZE,
-	DLG_QUANT,
 	DLG_PAL_SORT,
 	DLG_PAL_SHIFTER,
 	DLG_FILTER,
@@ -114,8 +116,8 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_ABOUT,
 
 	FILT_2RGB,
-	FILT_GREY,
 	FILT_INVERT,
+	FILT_GREY,
 	FILT_EDGE,
 	FILT_DOG,
 	FILT_SHARPEN,
@@ -273,11 +275,8 @@ int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 //	Try to save file + warn if error + return < 0 if fail
 int gui_save(char *filename, ls_settings *settings);
 
-void pressed_select_none( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_select_none();
 void pressed_opacity( int opacity );
-
-void pressed_choose_patterns( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data );
 
 gint check_zoom_keys(int act_m);
 gint check_zoom_keys_real(int act_m);

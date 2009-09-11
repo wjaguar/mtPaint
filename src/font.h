@@ -40,6 +40,6 @@ unsigned char *mt_text_render(		// NULL return = failure, otherwise points to 8b
 		int	*height		// Resulting height of memory chunk allocated
 		);
 
-void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_mt_text();
 void ft_render_text();			// FreeType equivalent of render_text()
 

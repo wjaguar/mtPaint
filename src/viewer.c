@@ -109,7 +109,7 @@ void create_cline_area( GtkWidget *vbox1 )
 		GTK_SIGNAL_FUNC(viewer_keypress), NULL);
 }
 
-void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_cline()
 {
 	GtkWidget *vbox1, *button_close;
 	GtkAccelGroup* ag = gtk_accel_group_new();
@@ -161,7 +161,7 @@ gboolean click_help_end( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_help()
 {
 	GtkAccelGroup* ag;
 	GtkWidget *help_window, *table, *notebook, *frame, *label, *button,
@@ -514,7 +514,7 @@ static gint expose_pan( GtkWidget *widget, GdkEventExpose *event )
 	return FALSE;
 }
 
-void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_pan()
 {
 	float rat_x, rat_y;
 
@@ -1106,23 +1106,17 @@ void view_hide()
 }
 
 
-void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_centralize(int state)
 {
-	canvas_image_centre = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	canvas_image_centre = state;
 	force_main_configure();		// Force configure of main window - for centalizing code
 	update_all_views();
 }
 
-void pressed_view_focus( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_view_focus(int state)
 {
-	vw_focus_on = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	vw_focus_on = state;
 	vw_focus_view();
-}
-
-void pressed_view( GtkMenuItem *menu_item, gpointer user_data )
-{
-	if ( GTK_CHECK_MENU_ITEM(menu_item)->active ) view_show();
-	else view_hide();
 }
 
 void init_view()
@@ -1465,7 +1459,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gboolean( "fontAntialias2", antialias[2] );
 
 	render_text( widget );
-	if (mem_clipboard) pressed_paste_centre( NULL, NULL );
+	if (mem_clipboard) pressed_paste_centre();
 
 	delete_text( widget, event, data );
 
@@ -1474,7 +1468,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_text()
 {
 	GtkWidget *vbox, *hbox;
 

@@ -169,7 +169,7 @@ static void create_new(GtkWidget *widget)
 		inifile_set_gint32("lastnewType", im_type );
 
 		/* Lose a selection marquee */
-		pressed_select_none(NULL, NULL);
+		pressed_select_none();
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 
@@ -225,11 +225,6 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 	gtk_window_set_transient_for( GTK_WINDOW(new_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (new_window);
-}
-
-void pressed_new( GtkMenuItem *menu_item, gpointer user_data )
-{
-	generic_new_window(0);
 }
 
 
@@ -369,7 +364,7 @@ static void click_col_add_ok(GtkWidget *widget)
 }
 
 
-void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_add_cols()
 {
 	GtkWidget *vbox5;
 
@@ -456,7 +451,7 @@ int do_bacteria(GtkWidget *spin, gpointer fdata)
 	return FALSE;
 }
 
-void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
+void pressed_bacteria()
 {
 	GtkWidget *spin = add_a_spin(10, 1, 100);
 	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL, FALSE);
@@ -498,7 +493,7 @@ gint click_spal_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_sort_pal()
 {
 	char *rad_txt[] = {
 		_("Hue"), _("Saturation"), _("Luminance"), _("Distance to A"),
@@ -759,7 +754,7 @@ static gint click_brcosa_reset()
 	return FALSE;
 }
 
-void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_brcosa()
 {
 	GtkWidget *vbox, *vbox5, *table2, *hbox, *label, *button;
 
@@ -1144,16 +1139,10 @@ void sisca_init( char *title )
 	gtk_widget_show_all(sisca_window);
 }
 
-void pressed_scale( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_scale_size(int mode)
 {
-	sisca_scale = TRUE;
-	sisca_init(_("Scale Canvas"));
-}
-
-void pressed_size( GtkMenuItem *menu_item, gpointer user_data )
-{
-	sisca_scale = FALSE;
-	sisca_init(_("Resize Canvas"));
+	sisca_scale = mode;
+	sisca_init(mode ? _("Scale Canvas") : _("Resize Canvas"));
 }
 
 
@@ -1922,16 +1911,6 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	}
 }
 
-void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
-{
-	colour_selector( COLSEL_EDIT_ALL );
-}
-
-void choose_colours()
-{
-	colour_selector(COLSEL_EDIT_AB);
-}
-
 ///	QUANTIZE WINDOW
 
 #define DITH_NONE	0
@@ -2090,7 +2069,7 @@ static void toggle_selective(GtkWidget *btn, gpointer user_data)
 	dither_sel = (int)user_data;
 }
 
-void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
+void pressed_quantize(int palette)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
 	GtkWidget *vbox, *hbox;

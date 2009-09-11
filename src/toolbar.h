@@ -138,7 +138,7 @@ void toolbar_zoom_update();			// Update the zoom combos to reflect current zoom
 void toolbar_viewzoom(gboolean visible);	// Show/hide the view zoom combo
 void toolbar_update_settings();			// Update details in the settings toolbar
 
-void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_toolbar_toggle(int state, int which);
 						// Menu toggle for toolbars
 
 

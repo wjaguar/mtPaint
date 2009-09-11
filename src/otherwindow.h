@@ -1,5 +1,5 @@
 /*	otherwindow.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -32,21 +32,17 @@ png_color brcosa_pal[256];
 int sharper_reduce;
 int spal_mode;
 
-void pressed_new( GtkMenuItem *menu_item, gpointer user_data );
 void generic_new_window(int type);
 
-void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_bacteria( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_scale( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_size( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_add_cols();
+void pressed_brcosa();
+void pressed_bacteria();
+void pressed_scale_size(int mode);
 
-void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette);
+void pressed_sort_pal();
+void pressed_quantize(int palette);
 
 void choose_pattern(int typ);				// Bring up pattern chooser
-void choose_colours();					// Bring up A/B colour editor
 
 void colour_selector( int cs_type );			// Bring up GTK+ colour wheel
 

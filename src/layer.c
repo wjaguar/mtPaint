@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -224,7 +224,7 @@ static void layer_new_chores(int l, layer_image *lim)
 {
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
-		pressed_select_none(NULL, NULL);
+		pressed_select_none();
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
 			icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
@@ -699,11 +699,6 @@ static void parse_filename(char *dest, char *prefix, char *file, int len)
 	}
 }
 
-void layer_press_save_composite()		// Create, save, free the composite image
-{
-	file_selector( FS_COMPOSITE_SAVE );
-}
-
 int layer_save_composite(char *fname, ls_settings *settings)
 {
 	image_info *image;
@@ -792,16 +787,9 @@ int check_layers_all_saved()
 	return 0;
 }
 
-void layer_press_save_as()
-{
-	check_layers_all_saved();
-	file_selector( FS_LAYER_SAVE );
-// Use standard file_selector which in turn calls save_layers( char *file_name );
-}
-
 void layer_press_save()
 {
-	if (!layers_filename[0]) layer_press_save_as();
+	if (!layers_filename[0]) file_selector( FS_LAYER_SAVE );
 	else
 	{
 		check_layers_all_saved();
@@ -862,9 +850,7 @@ static void layers_remove_all()
 
 void layer_press_remove_all()
 {
-	int i;
-
-	i = check_layers_for_changes();
+	int i = check_layers_for_changes();
 	if (i < 0) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
 	if (i == 2) layers_remove_all();
 }
@@ -933,7 +919,7 @@ void layer_choose( int l )				// Select a new layer from the list
 					// Copy image info to layer table before we change
 			layer_selected = l;
 			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-				pressed_select_none( NULL, NULL );
+				pressed_select_none();
 
 			layer_copy_to_main( layer_selected );
 			update_main_with_new_layer();
@@ -965,7 +951,7 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 		if ( !dont_update ) /* Move data before doing anything else */
 		{
 //			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-//				pressed_select_none( NULL, NULL );
+//				pressed_select_none();
 			layer_copy_from_main( layer_selected );
 			layer_copy_to_main( layer_selected = j );
 			update_main_with_new_layer();
@@ -1024,7 +1010,7 @@ gint delete_layers_window()
 	return FALSE;
 }
 
-void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_paste_layer()
 {
 	int ol = layer_selected, new_type = CMASK_IMAGE, i, j, k;
 	unsigned char *dest;
@@ -1098,8 +1084,8 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 				}
 			}
 
-//			if ( layers_window == NULL ) pressed_layers( NULL, NULL );
-			if ( !view_showing ) view_show();
+//			if (!layers_window) pressed_layers();
+			if (!view_showing) view_show();
 
 		}
 		if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
@@ -1140,7 +1126,7 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
 }
 
-void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_layers()
 {
 	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
 	GtkAccelGroup* ag = gtk_accel_group_new();

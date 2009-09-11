@@ -128,7 +128,7 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 		if ( event->y > 31 ) choose_pattern(0);
 		else
 		{
-			if ( event->x < 48 ) choose_colours();
+			if ( event->x < 48 ) colour_selector(COLSEL_EDIT_AB);
 			else choose_pattern(1);
 		}
 	}
@@ -380,7 +380,7 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		gradient_setup(0);
 		break;
 	case (TTB_0 + TTB_TEXT): /* FreeType text paste */
-		pressed_mt_text(NULL, NULL);
+		pressed_mt_text();
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);
@@ -1082,9 +1082,9 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 }
 
 
-void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+void pressed_toolbar_toggle(int state, int which)
 {						// Menu toggle for toolbars
-	toolbar_status[item] = GTK_CHECK_MENU_ITEM(menu_item)->active;;
+	toolbar_status[which] = state;
 	toolbar_showhide();
 }
 

@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -283,7 +283,7 @@ gint delete_info( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_information()
 {
 	char txt[256];
 	int i, j, orphans = 0, maxi;

@@ -27,20 +27,19 @@ GtkWidget *cline_window, *vw_drawing;
 gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data );
 
 void create_cline_area( GtkWidget *vbox1 );
-void pressed_cline( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_cline();
 
-void pressed_pan( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_pan();
 
-void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
-void pressed_view( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
-void pressed_view_focus( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked
+void pressed_centralize(int state);
+void pressed_view_focus(int state);
 void init_view();			// Initial setup
 void view_show();
 void view_hide();
 
 int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp);
-void pressed_help( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_text( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_help();
+void pressed_text();
 void render_text( GtkWidget *widget );
 
 void vw_align_size( float new_zoom );				// Set new zoom

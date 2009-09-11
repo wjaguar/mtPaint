@@ -418,7 +418,7 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
-void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_preferences()
 {
 	int i;
 #ifdef U_NLS

@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -101,8 +101,8 @@ void init_pal();			// Initialise palette after loading/palette changes
 void update_cols();
 void set_new_filename( char *fname );
 
-void main_undo( GtkMenuItem *menu_item, gpointer user_data );
-void main_redo( GtkMenuItem *menu_item, gpointer user_data );
+void main_undo();
+void main_redo();
 
 void choose_pattern();					// Bring up pattern chooser
 void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!
@@ -120,41 +120,40 @@ void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar
 void init_status_bar();			// Initialize status bar
 
-void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_lasso(int cut);
+void pressed_copy(int cut);
+void pressed_paste();
+void pressed_paste_centre();
+void pressed_greyscale(int mode);
+void pressed_convert_rgb();
+void pressed_invert();
+void pressed_rectangle(int filled);
+void pressed_ellipse(int filled);
 
-void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_paste( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_invert( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item );
-
-void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_soften( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_gauss( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_unsharp( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_dog( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_edge_detect();
+void pressed_sharpen();
+void pressed_soften();
+void pressed_emboss();
+void pressed_gauss();
+void pressed_unsharp();
+void pressed_dog();
 
 void pressed_clip_alpha_scale();
 void pressed_clip_alphamask();
-void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_clip_mask(int val);
 void pressed_clip_mask_all();
 void pressed_clip_mask_clear();
 
-void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_flip_sel_h( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_flip_image_v();
+void pressed_flip_image_h();
+void pressed_flip_sel_v();
+void pressed_flip_sel_h();
 
-void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item );
-void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_rotate_image(int dir);
+void pressed_rotate_sel(int dir);
+void pressed_rotate_free();
 
-void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void iso_trans(int mode);
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();

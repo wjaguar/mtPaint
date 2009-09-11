@@ -29,7 +29,7 @@ int spawn_expansion(char *cline, char *directory);
 		// Replace %f with "current filename", then run via shell
 
 void pressed_file_configure();
-void pressed_file_action( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_file_action(int item);
 void init_factions();					// Initialize file action menu
 
 void spawn_quit();	// Delete temp files
