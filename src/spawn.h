@@ -33,3 +33,12 @@ void pressed_file_action(int item);
 void init_factions();					// Initialize file action menu
 
 void spawn_quit();	// Delete temp files
+
+// Default action codes
+#define DA_GIF_CREATE  0
+#define DA_GIF_EXPLODE 1
+#define DA_GIF_PLAY    2
+#define DA_GIF_EDIT    3
+
+//	Run some default action
+int run_def_action(int action, char *sname, char *dname, int delay);

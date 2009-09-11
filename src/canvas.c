@@ -34,6 +34,7 @@
 #include "wu.h"
 #include "prefs.h"
 #include "ani.h"
+#include "spawn.h"
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
@@ -1853,18 +1854,14 @@ static void fs_ok(GtkWidget *fs)
 		c = strrchr( preserved_gif_filename, DIR_SEP );
 		if (!c) c = preserved_gif_filename;
 		else c++;
-		tmp = g_strdup_printf("gifsicle -U --explode \"%s\" -o \"%s%c%s\"",
-			preserved_gif_filename, fname, DIR_SEP, c);
-		gifsicle(tmp);
-		g_free(tmp);
-		gif = g_strdup_printf("%s%c%s.???", fname, DIR_SEP, c);
+		tmp = g_strdup_printf("%s%c%s", fname, DIR_SEP, c);
+		run_def_action(DA_GIF_EXPLODE, preserved_gif_filename, tmp, 0);
+		gif = g_strconcat(tmp, ".???", NULL);
 		gif2 = quote_spaces(gif);
-		tmp = g_strdup_printf("mtpaint -g %i %s &",
-			preserved_gif_delay, gif2);
-		gifsicle(tmp);
 		g_free(tmp);
-		free(gif2);
 		g_free(gif);
+		run_def_action(DA_GIF_EDIT, gif2, NULL, preserved_gif_delay);
+		free(gif2);
 		break;
 	case FS_EXPORT_GIF:
 		if (check_file(fname)) goto redo;
@@ -1875,19 +1872,9 @@ static void fs_ok(GtkWidget *fs)
 			if (gif2[i] == DIR_SEP) break;
 			if ((unsigned char)(gif2[i] - '0') <= 9) gif2[i] = '?';
 		}
-						
-		tmp = g_strdup_printf("%s -d %i %s -o \"%s\"",
-			GIFSICLE_CREATE, settings.gif_delay, gif2, fname);
-		gifsicle(tmp);
-		g_free(tmp);
+		run_def_action(DA_GIF_CREATE, gif2, fname, settings.gif_delay);
+		run_def_action(DA_GIF_PLAY, fname, NULL, 0);
 		free(gif2);
-
-#ifndef WIN32
-		tmp = g_strdup_printf("gifview -a \"%s\" &", fname);
-		gifsicle(tmp);
-		g_free(tmp);
-#endif
-
 		break;
 	case FS_CHANNEL_LOAD:
 		if (populate_channel(fname)) goto redo;

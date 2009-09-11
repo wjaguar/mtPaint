@@ -962,7 +962,7 @@ static void fpick_file_dialog(fpicker *fp, char *fname)
 	}
 	g_free(snm);
 	if (tmp) alert_box(_("Error"), tmp, _("OK"), NULL, NULL);
-	else fpick_scan_directory(fp, fp->txt_directory, FALSE);
+	else if (res > 1) fpick_scan_directory(fp, fp->txt_directory, FALSE);
 }
 
 static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,

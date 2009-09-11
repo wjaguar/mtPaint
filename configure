@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.24.36"
-MT_DATE="2008-12-17"
+MT_V="3.29RC1"
+MT_DATE="2008-12-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -16,6 +16,7 @@ MT_MAN_DEST=/usr/local/man/man1
 MT_PREFIX=/usr
 MT_CPICK=mtpaint
 MT_FPICK=mtpaint
+MT_ANIM=Gifsicle
 LIN_BIN_INSTALL=/usr/local/bin
 WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
 BIN_INSTALL=
@@ -210,6 +211,7 @@ do
 		"gtk2" )	GTK=2;;
 		"gtkfilesel" )	MT_FPICK=gtkfilesel;;
 		"gtkcolsel" )	MT_CPICK=gtkcolsel;;
+		"imagick" )	MT_ANIM=ImageMagick;;
 		"win" )		OS="MinGW/MSYS"
 				GTK=2;;
 		"intl" )	MT_LANG=YES;;
@@ -335,6 +337,7 @@ gtk1 ............ Configure for GTK+1
 gtk2 ............ Configure for GTK+2
 gtkfilesel ...... Use GtkFileSelection file picker
 gtkcolsel ....... Use GtkColorSelection colour picker
+imagick ......... Use ImageMagick for GIF animation tasks
 mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0
 noxft ........... Don't use Xft in MTK
 
@@ -517,6 +520,12 @@ else
 		I_EX="$I_EX -DU_CPICK_GTK"
 	fi
 
+	if [ "$MT_ANIM" = ImageMagick ]
+	then
+		I_EX="$I_EX -DU_ANIM_IMAGICK"
+	fi
+
+
 	if [ "$DEBUG" = NO ]
 	then
 		GTK_LIB="$GTK_LIB -s"
@@ -608,6 +617,7 @@ else
 fi
 	echo "    File Picker         $MT_FPICK"
 	echo "    Colour Picker       $MT_CPICK"
+	echo "    Animation Package   $MT_ANIM"
 if [ "$API_CHECKS" ]
 then
 	echo "    API checks          $API_CHECKS"

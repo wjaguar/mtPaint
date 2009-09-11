@@ -49,7 +49,7 @@
 #include "canvas.h"
 #include "toolbar.h"
 #include "layer.h"
-#include "ani.h"
+#include "spawn.h"
 #include "inifile.h"
 
 
@@ -4135,12 +4135,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			strncpy(preserved_gif_filename, file_name, PATHBUF);
 			file_selector(FS_GIF_EXPLODE);
 		}
-		else if (i == 3)
-		{
-			char *tmp = g_strdup_printf("gifview -a \"%s\" &", file_name);
-			gifsicle(tmp);
-			g_free(tmp);
-		}
+		else if (i == 3) run_def_action(DA_GIF_PLAY, file_name, NULL, 0);
 	}
 
 	switch (settings.mode)

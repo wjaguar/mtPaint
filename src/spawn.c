@@ -543,3 +543,80 @@ int spawn_process(char *argv[], char *directory)
 }
 
 #endif
+
+// Wrapper for animated GIF handling, or other builtin actions
+
+#ifdef U_ANIM_IMAGICK
+	/* Use Image Magick for animated GIF processing; not really recommended,
+	 * because it is many times slower than Gifsicle, and less efficient */
+	/* !!! Image Magick version prior to 6.2.6-3 won't work properly */
+#define CMD_GIF_CREATE \
+	"convert %s -layers optimize -set delay %d -loop 0 \"%s\""
+#define CMD_GIF_EXPLODE \
+	"convert \"%s\" -scene 0 -coalesce +adjoin \"gif:%s.%%03d\""
+#define CMD_GIF_PLAY "animate \"%s\" &"
+
+#else	/* Use Gifsicle; the default choice for animated GIFs */
+
+/*	global colourmaps, suppress warning, high optimizations, background
+ *	removal method, infinite loops, ensure result works with Java & MS IE */
+#define CMD_GIF_CREATE \
+	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful %s -d %d -o \"%s\""
+#define CMD_GIF_EXPLODE \
+	"gifsicle -U --explode \"%s\" -o \"%s\""
+#define CMD_GIF_PLAY "gifview -a \"%s\" &"
+
+#endif
+
+#ifdef WIN32
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(A) ((A) & 0xFF)
+#endif
+#endif
+
+int run_def_action(int action, char *sname, char *dname, int delay)
+{
+	char *msg, *c8, *command = NULL;
+	int res, code;
+
+	switch (action)
+	{
+	case DA_GIF_CREATE:
+		command = g_strdup_printf(CMD_GIF_CREATE, sname, delay, dname);
+		break;
+	case DA_GIF_EXPLODE:
+		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);
+		break;
+	case DA_GIF_PLAY:
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+		/* 'gifviev' and 'animate' both are X-only */
+		command = g_strdup_printf(CMD_GIF_PLAY, sname);
+		break;
+#else
+		return (-1);
+#endif
+	case DA_GIF_EDIT:
+#ifndef WIN32
+		command = g_strdup_printf("mtpaint -g %d %s &", delay, sname);
+#else /* Windows shell does not know "&", nor needs it to run mtPaint detached */
+		command = g_strdup_printf("mtpaint -g %d %s", delay, sname);
+#endif
+		break;
+	}
+
+	res = system(command);
+	if (res)
+	{
+		if (res > 0) code = WEXITSTATUS(res);
+		else code = res;
+		c8 = gtkuncpy(NULL, command, 0);
+		msg = g_strdup_printf(_("Error %i reported when trying to run %s"),
+			code, c8);
+		alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+		g_free(msg);
+		g_free(c8);
+	}
+	g_free(command);
+
+	return (res);
+}

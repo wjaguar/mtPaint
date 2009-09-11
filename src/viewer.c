@@ -77,7 +77,9 @@ void create_cline_area( GtkWidget *vbox1 )
 
 	col_list = gtk_clist_new(1);
 	gtk_clist_set_column_auto_resize( GTK_CLIST(col_list), 0, TRUE );
-	gtk_clist_set_selection_mode( GTK_CLIST(col_list), GTK_SELECTION_SINGLE );
+// !!! Which mode is better?
+//	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_SINGLE);
+	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_BROWSE);
 
 	item[0] = txt2;
 	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )

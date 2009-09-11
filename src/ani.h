@@ -25,9 +25,6 @@
 
 #define ANI_PREFIX_LEN 16
 
-#define GIFSICLE_CREATE "gifsicle --colors 256 -w -O2 -D 2 -l0 --careful"
-	// global colourmaps, suppress warning, high optimizations, background removal method, infinite loops, ensure result works with Java & MS IE
-
 
 int	ani_frame1, ani_frame2, ani_gif_delay;
 
@@ -42,5 +39,3 @@ void ani_read_file( FILE *fp );		// Read data from layers file already opened
 void ani_write_file( FILE *fp );	// Write data to layers file already opened
 
 void ani_but_preview();			// Preview the animation
-
-int gifsicle( char *command );	// Execute Gifsicle/Gifview

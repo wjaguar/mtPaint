@@ -17,11 +17,10 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-
-#include <stdio.h>
 
 #include "global.h"
 
@@ -33,18 +32,11 @@
 #include "otherwindow.h"
 #include "canvas.h"
 #include "viewer.h"
-#include "inifile.h"
 #include "layer.h"
+#include "spawn.h"
+#include "inifile.h"
 #include "mtlib.h"
 #include "wu.h"
-
-#ifdef WIN32
-#ifndef WEXITSTATUS
-#define WEXITSTATUS(A) ((A) & 0xFF)
-#endif
-#else
-#include <sys/wait.h>
-#endif
 
 ///	GLOBALS
 
@@ -880,23 +872,13 @@ static void create_frames_ani()
 			l, layers_filename, ani_output_path, DIR_SEP,
 			ani_file_prefix);
 		wild_path = quote_spaces(output_path);
-
-		command = g_strdup_printf("%s -d %i %s -o \"%.*s%s%c%s.gif\"",
-			GIFSICLE_CREATE,
-			ani_gif_delay, wild_path,
+		snprintf(output_path, PATHBUF, "%.*s%s%c%s.gif",
 			l, layers_filename, ani_output_path, DIR_SEP,
 			ani_file_prefix);
-		gifsicle(command);
-		g_free(command);
+
+		run_def_action(DA_GIF_CREATE, wild_path, output_path, ani_gif_delay);
+		run_def_action(DA_GIF_PLAY, output_path, NULL, 0);
 		free(wild_path);
-
-#ifndef WIN32
-		command = g_strdup_printf("gifview -a \"%.*s%s%c%s.gif\" &",
-			l, layers_filename, ani_output_path, DIR_SEP,
-			ani_file_prefix);
-		gifsicle(command);
-		g_free(command);
-#endif
 	}
 
 failure2:
@@ -1346,25 +1328,3 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 		}
 	}
 }
-
-
-int gifsicle( char *command )	// Execute Gifsicle/Gifview
-{
-	int res = system(command), code;
-	char *msg, *c8;
-
-	if ( res != 0 )
-	{
-		if ( res>0 ) code = WEXITSTATUS(res);
-		else code = res;
-		c8 = gtkuncpy(NULL, command, 0);
-		msg = g_strdup_printf(_("Error %i reported when trying to run %s"),
-			code, c8);
-		alert_box( _("Error"), msg, _("OK"), NULL, NULL );
-		g_free(msg);
-		g_free(c8);
-	}
-
-	return res;
-}
-
