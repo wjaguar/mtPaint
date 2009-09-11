@@ -160,38 +160,22 @@ static void ft_draw_bitmap(
 		int		ppb
 		)
 {
-	unsigned char *dest;
-	int i, j, p, q, x_max = x + bitmap->width, y_max = y + bitmap->rows;
+	unsigned char *dest = mem + y * w + x, *src = bitmap->buffer;
+	int i, j;
 
-	if ( ppb==1 )			// 8 bits per pixel greyscale
+	for (j = 0; j < bitmap->rows; j++)
 	{
-		for ( j = y, q = 0; j < y_max; j++, q++ )
+		if (ppb == 1)		// 8 bits per pixel greyscale
 		{
-			dest = mem + j*w;
-			for ( i = x, p = 0; i < x_max; i+=ppb, p++ )
-			{
-				dest[i] |= bitmap->buffer[q * bitmap->pitch + p];
-			}
+//			memcpy(dest, src, bitmap->width);
+			for (i = 0; i < bitmap->width; i++) dest[i] |= src[i];
 		}
-	}
-	if ( ppb==8 )			// 1 bit per pixel mono
-	{
-		int sh;
-
-		for ( j = y, q = 0; j < y_max; j++, q++ )
+		else if (ppb == 8)	// 1 bit per pixel mono
 		{
-			dest = mem + j*w;
-			for ( i = x, p = 0; i < x_max; i+=ppb, p++ )
-			{
-				for ( sh=0; sh<8; sh++ )
-				{
-					if ( sh+p >= bitmap->width ) break;
-
-					if (bitmap->buffer[q * bitmap->pitch + p] & (1<<(7-sh)) )
-						dest[i+sh] |= 255;
-				}
-			}
-		}
+			for (i = 0; i < bitmap->width; i++) dest[i] |=
+				(((int)src[i >> 3] >> (~i & 7)) & 1) * 255;
+		}			
+		dest += w; src += bitmap->pitch;
 	}
 }
 

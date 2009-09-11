@@ -42,8 +42,8 @@ typedef struct
 typedef struct
 {
 	char name[LAYER_NAMELEN];	// Layer text name
-	int x, y, trans, opacity;	// Position of layer, transparency colour, opacity %
-	gboolean visible, use_trans;	// Show layer, use transparency
+	int x, y, opacity;		// Position of layer, opacity %
+	int visible;			// Show layer
 	layer_image *image;		// Pointer to image data - malloc'd when created, free'd after
 } layer_node;
 

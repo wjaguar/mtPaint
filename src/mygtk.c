@@ -2096,14 +2096,24 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 
 // Clipboard
 
+#ifdef GDK_WINDOWING_WIN32
+
+/* Detect if current clipboard belongs to something in the program itself;
+ * on Windows, GDK is purposely lying to us about it, so use WinAPI instead */
+int internal_clipboard(int which)
+{
+	DWORD pid;
+
+	if (which) return (TRUE); // No "PRIMARY" clipboard exists on Windows
+	GetWindowThreadProcessId(GetClipboardOwner(), &pid);
+	return (pid == GetCurrentProcessId());
+}
+
+#else
+
 /* Detect if current clipboard belongs to something in the program itself */
 int internal_clipboard(int which)
 {
-// !!! Need a different check in Windoze, likely through WinAPI - because of
-// gdk_selection_owner_get_for_display() in win32/gdkselection-win32.c doing
-// another smart-ass trick and purposely lying to us
-// One possible way: GetWindowThreadProcessId(GetClipboardOwner()) and compare
-// to GetCurrentProcessId()
 	gpointer widget = NULL;
 	GdkWindow *win = gdk_selection_owner_get(
 		gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE));
@@ -2111,6 +2121,8 @@ int internal_clipboard(int which)
 	gdk_window_get_user_data(win, &widget);
 	return (!!widget); // Real widget or foreign window?
 }
+
+#endif
 
 /* While GTK+2 allows for synchronous clipboard handling, it's implemented
  * through copying the entire clipboard data - and when the data might be

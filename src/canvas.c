@@ -298,10 +298,7 @@ void paste_prepare()
 		clear_perim();
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
-	else
-	{
-		if ( marq_status != MARQUEE_NONE ) paint_marquee(0, marq_x1, marq_y1);
-	}
+	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0);
 }
 
 void iso_trans(int mode)
@@ -2418,14 +2415,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( marq_status == MARQUEE_PASTE_DRAG && ( button == 1 || button == 13 || button == 2 ) )
 		{	// User wants to drag the paste box
-			ox = marq_x1;
-			oy = marq_y1;
-			paint_marquee(0, x - marq_drag_x, y - marq_drag_y);
-			marq_x1 = x - marq_drag_x;
-			marq_y1 = y - marq_drag_y;
-			marq_x2 = marq_x1 + mem_clip_w - 1;
-			marq_y2 = marq_y1 + mem_clip_h - 1;
-			paint_marquee(1, ox, oy);
+			paint_marquee(2, x - marq_drag_x, y - marq_drag_y);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
 			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
@@ -2442,7 +2432,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		{
 			if ( marq_status == MARQUEE_DONE )
 			{
-				paint_marquee(0, marq_x1-mem_width, marq_y1-mem_height);
+				paint_marquee(0, 0, 0);
 				i = close_to(x, y);
 				if (!(i & 1) ^ (marq_x1 > marq_x2))
 					marq_x1 = marq_x2;
@@ -2458,17 +2448,12 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			marq_x2 = x;
 			marq_y2 = y;
 			marq_status = MARQUEE_SELECTING;
-			paint_marquee(1, marq_x1-mem_width, marq_y1-mem_height);
+			paint_marquee(1, 0, 0);
 		}
 		else
 		{
-			if ( marq_status == MARQUEE_SELECTING )		// Continuing to make a selection
-			{
-				paint_marquee(0, marq_x1-mem_width, marq_y1-mem_height);
-				marq_x2 = x;
-				marq_y2 = y;
-				paint_marquee(1, marq_x1-mem_width, marq_y1-mem_height);
-			}
+			if (marq_status == MARQUEE_SELECTING)	// Continuing to make a selection
+				paint_marquee(3, x, y);
 		}
 
 		if ( tool_type == TOOL_POLYGON )
@@ -2762,20 +2747,13 @@ static void repaint_clipped(int x0, int y0, int x1, int y1, const int *vxy)
 			rxy[2] - rxy[0], rxy[3] - rxy[1]);
 }
 
-static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
-	rgbcontext *ctx)
+static void locate_marquee(int *xy)
 {
-	unsigned char *rgb;
-	int x1, y1, x2, y2, w, h, new_x2, new_y2, mst, zoom = 1, scale = 1;
-	int i, j, r, g, b, ry1, ry2, rw, rh, rxy[4], offx, offy;
-
+	int x1, y1, x2, y2, w, h, zoom = 1, scale = 1;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
-
-	new_x2 = new_x + marq_x2 - marq_x1;
-	new_y2 = new_y + marq_y2 - marq_y1;
 
 	/* Get onscreen coords */
 	check_marquee();
@@ -2785,115 +2763,132 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 	y2 = (marq_y2 * scale) / zoom;
 	w = abs(x2 - x1) + scale;
 	h = abs(y2 - y1) + scale;
-	if (x2 < x1) x1 = x2;
-	if (y2 < y1) y1 = y2;
-	x2 = x1 + w; y2 = y1 + h;
+	xy[2] = (xy[0] = x1 < x2 ? x1 : x2) + w;
+	xy[3] = (xy[1] = y1 < y2 ? y1 : y2) + h;
+}
 
-	if (action == 0) /* Clear (always in void context) */
+// Actions: 0 - hide, 1 - show, 2 - move, 3 - resize
+static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
+	rgbcontext *ctx)
+{
+	unsigned char *rgb;
+	int xy[4], nxy[4], rxy[4], clips[4 * 3];
+	int i, j, nc, r, g, b, rw, rh, offx, offy, mst = marq_status;
+
+	locate_marquee(xy);
+	memcpy(nxy, xy, sizeof(xy));
+	memcpy(clips, xy, sizeof(xy));
+	nc = action == 1 ? 0 : 4; // No clear if showing anew
+
+	/* Determine which parts moved outside */
+	while (action > 1)
 	{
-		mst = marq_status;
-		marq_status = 0;
-		/* Redraw inner area if displaying the clipboard */
-		if (show_paste && (mst >= MARQUEE_PASTE))
+		if (action == 2) // Move
 		{
-			/* Do nothing if not moved anywhere */
-			if ((new_x == marq_x1) && (new_y == marq_y1));
-			/* Full redraw if no intersection */
-			else if ((new_x2 < marq_x1) || (new_x > marq_x2) ||
-				(new_y2 < marq_y1) || (new_y > marq_y2))
-				repaint_clipped(x1, y1, x2, y2, vxy);
-			/* Partial redraw */
-			else
-			{
-				int xx[4] = { x1, (new_x * scale) / zoom,
-					(new_x2 * scale) / zoom + scale, x2 };
-				int xv = new_x < marq_x1;
-
-				if (new_x != marq_x1) /* Horizontal shift */
-					repaint_clipped(xx[xv + xv + 0], y1,
-						xx[xv + xv + 1], y2, vxy);
-				if (new_y != marq_y1) /* Vertical shift */
-				{
-					if (new_y < marq_y1) /* Move up */
-					{
-						ry1 = (new_y2 * scale) / zoom + scale;
-						ry2 = y2;
-					}
-					else /* Move down */
-					{
-						ry1 = y1;
-						ry2 = (new_y * scale) / zoom;
-					}
-					repaint_clipped(xx[1 - xv], ry1,
-						xx[3 - xv], ry2, vxy);
-				}
-			}
+			marq_x2 += new_x - marq_x1;
+			marq_x1 = new_x;
+			marq_y2 += new_y - marq_y1;
+			marq_y1 = new_y;
 		}
+		else marq_x2 = new_x , marq_y2 = new_y; // Resize
+		locate_marquee(nxy);
+
+		/* No intersection? */
+		if (!clip(rxy, xy[0], xy[1], xy[2], xy[3], nxy)) break;
+
+		/* Horizontal slab */
+		if (rxy[1] > xy[1]) clips[3] = rxy[1]; // Top
+		else if (rxy[3] < xy[3]) clips[1] = rxy[3]; // Bottom
+		else nc = 0; // None
+
+		/* Inside area, if left unfilled */
+		if (!(show_paste && (mst >= MARQUEE_PASTE)))
+		{
+			clips[nc + 0] = nxy[0] + 1;
+			clips[nc + 1] = nxy[1] + 1;
+			clips[nc + 2] = nxy[2] - 1;
+			clips[nc + 3] = nxy[3] - 1;
+			nc += 4;
+		}
+
+		/* Vertical block */
+		if (rxy[0] > xy[0]) // Left
+			clips[nc + 0] = xy[0] , clips[nc + 2] = rxy[0];
+		else if (rxy[2] < xy[2]) // Right
+			clips[nc + 0] = rxy[2] , clips[nc + 2] = xy[2];
+		else break; // None
+		clips[nc + 1] = rxy[1]; clips[nc + 3] = rxy[3];
+		nc += 4;
+		break;
+	}
+
+	/* Clear - only happens in void context */
+	marq_status = 0;
+	for (i = 0; i < nc; i += 4)
+	{
+		/* Clip to visible portion */
+		if (!clip(rxy, clips[i + 0], clips[i + 1],
+			clips[i + 2], clips[i + 3], vxy)) continue;
+		/* Redraw entire area */
+		if (show_paste && (mst >= MARQUEE_PASTE))
+			repaint_clipped(xy[0], xy[1], xy[2], xy[3], rxy);
 		/* Redraw only borders themselves */
 		else
 		{
-			repaint_clipped(x1, y1 + 1, x1 + 1, y2 - 1, vxy);
-			repaint_clipped(x2 - 1, y1 + 1, x2, y2 - 1, vxy);
-			repaint_clipped(x1, y1, x2, y1 + 1, vxy);
-			repaint_clipped(x1, y2 - 1, x2, y2, vxy);
+			repaint_clipped(xy[0], xy[1] + 1, xy[0] + 1, xy[3] - 1, rxy);
+			repaint_clipped(xy[2] - 1, xy[1] + 1, xy[2], xy[3] - 1, rxy);
+			repaint_clipped(xy[0], xy[1], xy[2], xy[1] + 1, rxy);
+			repaint_clipped(xy[0], xy[3] - 1, xy[2], xy[3], rxy);
 		}
-		marq_status = mst;
 	}
+	marq_status = mst;
+	if (action == 0) return; // All done for clear
+
+	/* Determine visible area */
+	if (!clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], vxy)) return;
+	rw = rxy[2] - rxy[0]; rh = rxy[3] - rxy[1];
 
 	/* Draw */
-	else /* if (action == 1) */
+	r = 255; g = b = 0; /* Draw in red */
+	if (marq_status >= MARQUEE_PASTE)
 	{
-		r = 255; g = b = 0; /* Draw in red */
-		if (marq_status >= MARQUEE_PASTE)
-		{
-			/* Display paste RGB, only if not being called from repaint_canvas */
-			/* Only do something if there is a change in position */
-			if (show_paste && !ctx &&
-				((new_x != marq_x1) || (new_y != marq_y1)))
-				repaint_clipped(marq_x1 < 0 ? 0 : x1 + 1,
-					marq_y1 < 0 ? 0 : y1 + 1,
-					x2 - 1, y2 - 1, vxy);
-
-			r = g = 0; b = 255; /* Draw in blue */
-		}
-
-		/* Determine visible area */
-		if (!clip(rxy, x1, y1, x2, y2, vxy)) return;
-		rw = rxy[2] - rxy[0]; rh = rxy[3] - rxy[1];
-
-		offx = ((rxy[0] - x1) % 6) * 3;
-		offy = ((rxy[1] - y1) % 6) * 3;
-
-		/* Create pattern */
-		j = (rw > rh ? rw : rh) * 3 + 6 * 3; /* 6 pixels for offset */
-		rgb = malloc(j + 2 * 3); /* 2 extra pixels reserved for loop */
-		if (!rgb) return;
-		memset(rgb, 255, j);
-		for (i = 0; i < j; i += 6 * 3)
-		{
-			rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
-			rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
-			rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
-		}
-
-		if ((x1 >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
-			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
-				1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
-
-		if ((x2 <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
-			draw_rgb(margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
-				1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
-
-		if ((y1 >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
-			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
-				rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
-
-		if ((y2 <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
-			draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
-				rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
-
-		free(rgb);
+		/* Display paste RGB, only if not being called from repaint_canvas */
+		if (show_paste && !ctx) repaint_clipped(marq_x1 < 0 ? 0 : nxy[0] + 1,
+			marq_y1 < 0 ? 0 : nxy[1] + 1, nxy[2] - 1, nxy[3] - 1, vxy);
+		r = g = 0; b = 255; /* Draw in blue */
 	}
+
+	/* Create pattern */
+	offx = ((rxy[0] - nxy[0]) % 6) * 3;
+	offy = ((rxy[1] - nxy[1]) % 6) * 3;
+	j = (rw > rh ? rw : rh) * 3 + 6 * 3; /* 6 pixels for offset */
+	rgb = malloc(j + 2 * 3); /* 2 extra pixels reserved for loop */
+	if (!rgb) return;
+	memset(rgb, 255, j);
+	for (i = 0; i < j; i += 6 * 3)
+	{
+		rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
+		rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
+		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
+	}
+
+	if ((nxy[0] >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
+		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
+			1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
+
+	if ((nxy[2] <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
+		draw_rgb(margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
+			1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
+
+	if ((nxy[1] >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
+		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
+			rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
+
+	if ((nxy[3] <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
+		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
+			rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
+
+	free(rgb);
 }
 
 void paint_marquee(int action, int new_x, int new_y)
@@ -2903,9 +2898,10 @@ void paint_marquee(int action, int new_x, int new_y)
 	cxy[0] = cxy[1] = 0;
 	canvas_size(cxy + 2, cxy + 3);
 	get_visible(vxy);
-	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x + 1, vxy[3] - margin_main_y + 1, cxy))
-		trace_marquee(action, new_x, new_y, vxy, NULL);
+	clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+		vxy[2] - margin_main_x + 1, vxy[3] - margin_main_y + 1, cxy);
+	/* Have to call in any case, to update location */
+	trace_marquee(action, new_x, new_y, vxy, NULL);
 }
 
 void refresh_marquee(rgbcontext *ctx)
@@ -2920,7 +2916,7 @@ void refresh_marquee(rgbcontext *ctx)
 		(ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y,
 		(ctx->x1 < vxy[2] ? ctx->x1 : vxy[2]) - margin_main_x,
 		(ctx->y1 < vxy[3] ? ctx->y1 : vxy[3]) - margin_main_y, cxy))
-		trace_marquee(1, marq_x1, marq_y1, vxy, ctx);
+		trace_marquee(1, 0, 0, vxy, ctx);
 }
 
 

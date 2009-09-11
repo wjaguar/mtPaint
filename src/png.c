@@ -3751,6 +3751,11 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 		settings->pal = greypal;
 	}
 
+	/* Validate transparent color (for now, forbid out-of-palette RGB
+	 * transparency altogether) */
+	if (settings->xpm_trans >= settings->colors)
+		settings->xpm_trans = settings->rgb_trans = -1;
+
 	switch (settings->ftype)
 	{
 	default:

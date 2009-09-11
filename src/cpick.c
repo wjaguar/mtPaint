@@ -1062,7 +1062,7 @@ static void cpicker_init( cpicker *cp )
 			gtk_signal_connect_after(GTK_OBJECT(cp->inputs[i]),
 				"size_request", GTK_SIGNAL_FUNC(hex_size_req), NULL);
 #else /* #if GTK_MAJOR_VERSION == 2 */
-			gtk_entry_set_width_chars(GTK_ENTRY(cp->inputs[i]), 8);
+			gtk_entry_set_width_chars(GTK_ENTRY(cp->inputs[i]), 9);
 #endif
 			obj = GTK_OBJECT(cp->inputs[i]);
 

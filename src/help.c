@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2007 Mark Tyler
+	Copyright (C) 2004-2008 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -73,6 +73,8 @@ _("  Ctrl-R            Redo an undone action\n"),
 _("  C                 Command Line Window"),
 _("  V                 View Window"),
 _("  L                 Layers Window\n"),
+_("  A                 Draw open arrow head when using the line tool (size set by flow setting)"),
+_("  S                 Draw closed arrow head when using the line tool (size set by flow setting)\n"),
 _("  +,=               Main edit window - Zoom in"),
 _("  -                 Main edit window - Zoom out"),
 _("  Shift +,=         View window - Zoom in"),
@@ -115,7 +117,7 @@ _("  Middle button        Selects the point which will be the centre of the imag
 _("  Right button         Commit paste to canvas / Stop drawing current line / Cancel selection\n"),
 _("  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window\n"),
 _("  Ctrl+Left button     Choose colour A from under mouse pointer"),
-_("  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour in A (RGB images only)"),
+_("  Ctrl+Middle button   Create colour A/B and dither pattern based on the RGB colour in A (RGB images only)"),
 _("  Ctrl+Right button    Choose colour B from under mouse pointer"),
 _("  Ctrl+Scroll Wheel    Scroll the main edit window left or right\n"),
 _("  Shift+Right button   Selects the point which will be the centre of the image after the next zoom\n\n"),
@@ -154,7 +156,7 @@ _("Czech - Pavel Ruzicka"),
 _("French - Nicolas Velin, Pascal Billard, Sylvain Cresto"),
 _("German - Oliver Frommel"),
 _("Japanese - Norihiro YONEDA"),
-_("Polish - Simek, Groszek150(LucaS)"),
+_("Polish - Simek, LucaS"),
 _("Portuguese - Israel G. Lugo, Tiago Silva"),
 _("Simplified Chinese - puppychinese(Cecc)"),
 _("Slovak - Jozef Riha"),
@@ -162,7 +164,7 @@ _("Spanish - Guadalinex Team (Junta de Andalucia), Antonio San"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };
-#define HELP_PAGE_MAX 70
+#define HELP_PAGE_MAX 72
 
 static char **help_pages[HELP_PAGE_COUNT] = {
 	help_page0, help_page1, help_page2, help_page3

@@ -87,17 +87,17 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 	return (NULL);
 }
 
-static void repaint_layer(int l)	// Repaint layer in view/main window
+static void repaint_layer(int l, int mainw)	// Repaint layer in view/main window
 {
+	layer_node *t = layer_table + l;
 	image_info *image;
 	int lx, ly, lw, lh;
 
-	lx = layer_table[l].x;
-	ly = layer_table[l].y;
-	image = l == layer_selected ? &mem_image :
-		&layer_table[l].image->image_;
+	image = l == layer_selected ? &mem_image : &t->image->image_;
 	lw = image->width;
 	lh = image->height;
+	lx = t->x;
+	ly = t->y;
 	if (layer_selected)
 	{
 		lx -= layer_table[layer_selected].x;
@@ -105,9 +105,7 @@ static void repaint_layer(int l)	// Repaint layer in view/main window
 	}
 
 	vw_update_area(lx, ly, lw, lh);
-	if (!show_layers_main) return;
-
-	main_update_area(lx, ly, lw, lh);
+	if (mainw | show_layers_main) main_update_area(lx, ly, lw, lh);
 }
 
 
@@ -119,9 +117,8 @@ typedef struct {
 	GtkWidget *item, *name, *toggle;
 } layer_item;
 
-static GtkWidget *layer_list, *entry_layer_name,
-	*layer_tools[TOTAL_ICONS_LAYER], *layer_spin, *layer_slider,
-	*layer_label_position, *layer_trans_toggle;
+static GtkWidget *layer_list, *entry_layer_name, *layer_x, *layer_y,
+	*layer_tools[TOTAL_ICONS_LAYER], *layer_spin, *layer_slider;
 static layer_item layer_list_data[MAX_LAYERS + 1];
 
 static int layers_initialized;		// Indicates if initializing is complete
@@ -250,7 +247,7 @@ static void shift_layer(int val)
 		vw_realign();
 		if (view_showing) gtk_widget_queue_draw(vw_drawing);
 	}
-	else repaint_layer(layer_selected);	// Regular layer shifted
+	else repaint_layer(layer_selected, FALSE);	// Regular layer shifted
 }
 
 void layer_show_new()
@@ -445,17 +442,15 @@ static void layer_press_delete()
 
 static void layer_show_position()
 {
-	char txt[35];
+	layer_node *t = layer_table + layer_selected;
+	int oldinit = layers_initialized;
 
 	if (!layers_window) return;
 
-	if (layer_selected)
-	{
-		sprintf(txt, "%i , %i", layer_table[layer_selected].x,
-			layer_table[layer_selected].y);
-		gtk_label_set_text(GTK_LABEL(layer_label_position), txt);
-	}
-	else gtk_label_set_text(GTK_LABEL(layer_label_position), _("Background"));
+	layers_initialized = FALSE;
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_x), t->x);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_y), t->y);
+	layers_initialized = oldinit;
 }
 
 static void layer_press_centre()
@@ -559,9 +554,10 @@ int read_file_num(FILE *fp, char *txt)
 
 int load_layers( char *file_name )
 {
-	char tin[300], load_name[PATHBUF], *c;
+	layer_node *t;
 	layer_image *lim2;
-	int i, j, k, sens;
+	char tin[300], load_name[PATHBUF], *c;
+	int i, j, k, kk, sens;
 	int layers_to_read = -1, layer_file_version = -1, lfail = 0, lplen = 0;
 	FILE *fp;
 
@@ -606,28 +602,27 @@ int load_layers( char *file_name )
 		}
 
 		/* Update image variables after load */
-		lim2 = layer_table[layers_total].image;
+		t = layer_table + layers_total;
+		lim2 = t->image;
 		strncpy(lim2->state_.filename, load_name, PATHBUF);
 		init_istate(&lim2->state_, &lim2->image_);
 
 		fgets(tin, 256, fp);
 		string_chop(tin);
-		strncpy0(layer_table[layers_total].name, tin, LAYER_NAMELEN);
+		strncpy0(t->name, tin, LAYER_NAMELEN);
 
 		k = read_file_num(fp, tin);
-		layer_table[layers_total].visible = k > 0;
+		t->visible = k > 0;
 
-		layer_table[layers_total].x = read_file_num(fp, tin);
-		layer_table[layers_total].y = read_file_num(fp, tin);
+		t->x = read_file_num(fp, tin);
+		t->y = read_file_num(fp, tin);
+
+		kk = read_file_num(fp, tin);
+		k = read_file_num(fp, tin);
+		lim2->state_.xpm_trans = kk <= 0 ? -1 : k < 0 ? 0 : k > 255 ? 255 : k;
 
 		k = read_file_num(fp, tin);
-		layer_table[layers_total].use_trans = k > 0;
-
-		k = read_file_num(fp, tin);
-		layer_table[layers_total].trans = k < 0 ? 0 : k > 255 ? 255 : k;
-
-		k = read_file_num(fp, tin);
-		layer_table[layers_total].opacity = k < 1 ? 1 : k > 100 ? 100 : k;
+		t->opacity = k < 1 ? 1 : k > 100 ? 100 : k;
 
 		layers_total++;
 	}
@@ -722,9 +717,13 @@ int layer_save_composite(char *fname, ls_settings *settings)
 
 int save_layers( char *file_name )
 {
+	layer_node *t;
 	char comp_name[PATHBUF], *c, *msg;
-	int i, l = 0;
+	int i, l = 0, xpm;
 	FILE *fp;
+
+
+	layer_copy_from_main(layer_selected);
 
 	c = strrchr(file_name, DIR_SEP);
 	if (c) l = c - file_name + 1;
@@ -735,15 +734,13 @@ int save_layers( char *file_name )
 	fprintf( fp, "%s\n%i\n%i\n", LAYERS_HEADER, LAYERS_VERSION, layers_total );
 	for ( i=0; i<=layers_total; i++ )
 	{
-		c = layer_selected == i ? mem_filename :
-			layer_table[i].image->state_.filename;
-		parse_filename(comp_name, file_name, c, l);
+		t = layer_table + i;
+		parse_filename(comp_name, file_name, t->image->state_.filename, l);
 		fprintf( fp, "%s\n", comp_name );
 
-		fprintf( fp, "%s\n%i\n%i\n%i\n%i\n%i\n%i\n",
-			layer_table[i].name, layer_table[i].visible, layer_table[i].x,
-			layer_table[i].y, layer_table[i].use_trans, layer_table[i].trans,
-			layer_table[i].opacity);
+		xpm = t->image->state_.xpm_trans;
+		fprintf(fp, "%s\n%i\n%i\n%i\n%i\n%i\n%i\n", t->name,
+			t->visible, t->x, t->y, xpm >= 0, xpm, t->opacity);
 	}
 
 	ani_write_file(fp);			// Write animation data
@@ -814,7 +811,7 @@ static void layer_tog_visible(GtkToggleButton *togglebutton, gpointer user_data)
 
 	layer_table[j].visible = gtk_toggle_button_get_active(togglebutton);
 	layers_notify_changed();
-	repaint_layer(j);
+	repaint_layer(j, FALSE);
 }
 
 static void layer_main_toggled(GtkToggleButton *togglebutton, gpointer user_data)
@@ -823,28 +820,38 @@ static void layer_main_toggled(GtkToggleButton *togglebutton, gpointer user_data
 	gtk_widget_queue_draw(drawing_canvas);
 }
 
-static void layer_inputs_changed()
+static void layer_inputs_changed(GtkObject *thing, gpointer user_data)
 {
 	layer_node *t = layer_table + layer_selected;
 	const char *nname;
-	gboolean txt_changed = FALSE;
+	int dx, dy;
 
 	if (!layers_initialized) return;
 
 	layers_notify_changed();
 
-	t->trans = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(layer_spin));
-	t->opacity = mt_spinslide_get_value(layer_slider);
-
-	nname = gtk_entry_get_text(GTK_ENTRY(entry_layer_name));
-	if (strncmp(t->name, nname, LAYER_NAMELEN - 1)) txt_changed = TRUE;
-
-	strncpy0(t->name, nname, LAYER_NAMELEN);
-	gtk_label_set_text(GTK_LABEL(layer_list_data[layer_selected].name), t->name );
-	t->use_trans = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(layer_trans_toggle));
-
-	// Update layer image if not just changing text
-	if (!txt_changed) repaint_layer(layer_selected);
+	switch ((int)user_data)
+	{
+	case 0: // Name entry
+		nname = gtk_entry_get_text(GTK_ENTRY(entry_layer_name));
+		strncpy0(t->name, nname, LAYER_NAMELEN);
+		gtk_label_set_text(GTK_LABEL(layer_list_data[layer_selected].name), t->name);
+		break; // No need to redraw
+	case 1: // Position spin
+		dx = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(layer_x)) - t->x;
+		dy = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(layer_y)) - t->y;
+		if (dx | dy) move_layer_relative(layer_selected, dx, dy);
+		break;
+	case 2: // Opacity slider
+		t->opacity = mt_spinslide_get_value(layer_slider);
+		repaint_layer(layer_selected, FALSE);
+		break;
+	case 3: // Transparency spin
+		mem_xpm_trans = gtk_spin_button_get_value_as_int(
+			GTK_SPIN_BUTTON(layer_spin));
+		repaint_layer(layer_selected, TRUE);
+		break;
+	}
 }
 
 void layer_choose(int l)	// Select a new layer from the list
@@ -881,15 +888,14 @@ static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 	gtk_widget_set_sensitive(layer_tools[LTB_LOWER], j);
 	gtk_widget_set_sensitive(layer_tools[LTB_DEL], j);
 	gtk_widget_set_sensitive(layer_tools[LTB_CENTER], j);
-	gtk_widget_set_sensitive(layer_trans_toggle, j);
 	gtk_widget_set_sensitive(layer_spin, j);
 	gtk_widget_set_sensitive(layer_slider, j);
+	gtk_widget_set_sensitive(layer_x, j);
+	gtk_widget_set_sensitive(layer_y, j);
 
 	mt_spinslide_set_value(layer_slider, j ? t->opacity : 100);
 	layer_show_position();
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(layer_trans_toggle),
-		j && t->use_trans);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_spin), j ? t->trans : 0);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_spin), j ? mem_xpm_trans : -1);
 
 // !!! May cause list to be stuck in drag mode (release handled before press?)
 //	while (gtk_events_pending()) gtk_main_iteration();
@@ -1154,40 +1160,38 @@ void pressed_layers()
 		gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE);
 	}
 
-	table = add_a_table( 3, 2, 5, vbox );
+	table = add_a_table( 4, 3, 5, vbox );
 	gtk_table_set_row_spacings (GTK_TABLE (table), 5);
 	gtk_table_set_col_spacings (GTK_TABLE (table), 5);
 
 	add_to_table( _("Layer Name"), table, 0, 0, 0 );
 	add_to_table( _("Position"), table, 1, 0, 0 );
 	add_to_table( _("Opacity"), table, 2, 0, 0 );
+	add_to_table( _("Transparent Colour"), table, 3, 0, 0 );
 
 	entry_layer_name = gtk_entry_new_with_max_length(LAYER_NAMELEN - 1);
 	gtk_widget_set_usize(entry_layer_name, 100, -2);
 	gtk_widget_show (entry_layer_name);
-	gtk_table_attach (GTK_TABLE (table), entry_layer_name, 1, 2, 0, 1,
+	gtk_table_attach (GTK_TABLE (table), entry_layer_name, 1, 3, 0, 1,
 		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (0), 0, 0);
-	gtk_signal_connect( GTK_OBJECT(entry_layer_name),
-			"changed", GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
+	gtk_signal_connect(GTK_OBJECT(entry_layer_name), "changed",
+		GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)0);
 
-	layer_label_position = add_to_table( "-320, 200", table, 1, 1, 1 );
+	layer_x = spin_to_table(table, 1, 1, 0, 0, -MAX_WIDTH, MAX_WIDTH);
+	layer_y = spin_to_table(table, 1, 2, 0, 0, -MAX_HEIGHT, MAX_HEIGHT);
+	spin_connect(layer_x, GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)1);
+	spin_connect(layer_y, GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)1);
 
 	layer_slider = mt_spinslide_new(-2, -2);
 	mt_spinslide_set_range(layer_slider, 0, 100);
-	gtk_table_attach(GTK_TABLE(table), layer_slider, 1, 2, 2, 3,
+	gtk_table_attach(GTK_TABLE(table), layer_slider, 1, 3, 2, 3,
 		GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-	mt_spinslide_connect(layer_slider, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
+	mt_spinslide_connect(layer_slider, GTK_SIGNAL_FUNC(layer_inputs_changed),
+		(gpointer)2);
 	mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
 
-	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-
-	layer_trans_toggle = add_a_toggle( _("Transparent Colour"), hbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(layer_trans_toggle), "toggled",
-		GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
-
-	layer_spin = pack(hbox, add_a_spin(0, 0, 255));
-	spin_connect(layer_spin, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
+	layer_spin = spin_to_table(table, 3, 1, 0, 0, -1, 255);
+	spin_connect(layer_spin, GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)3);
 
 	pack(vbox, sig_toggle(_("Show all layers in main window"),
 		show_layers_main, NULL, GTK_SIGNAL_FUNC(layer_main_toggled)));

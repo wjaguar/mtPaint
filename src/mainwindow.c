@@ -228,7 +228,7 @@ void pressed_select(int all)
 	{
 		i = 1;
 		if (marq_status >= MARQUEE_PASTE) i = 3;
-		else paint_marquee(0, marq_x1 - mem_width, marq_y1 - mem_height);
+		else paint_marquee(0, 0, 0);
 		marq_status = MARQUEE_NONE;
 		marq_x1 = marq_y1 = marq_x2 = marq_y2 = -1;
 	}
@@ -258,7 +258,7 @@ void pressed_select(int all)
 		}
 		marq_status = MARQUEE_DONE;
 		if (i & 2) break; // Full redraw will draw marquee too
-		paint_marquee(1, marq_x1 - mem_width, marq_y1 - mem_height);
+		paint_marquee(1, 0, 0);
 		break;
 	}
 	if (i & 1) // Interface update
@@ -722,42 +722,6 @@ static void quit_all(int mode)
 	if (mode || q_quit) delete_event( NULL, NULL, NULL );
 }
 
-int move_arrows( int *c1, int *c2, int value )
-{
-	int ox1 = marq_x1, oy1 = marq_y1, ox2 = marq_x2, oy2 = marq_y2;
-	int nx1, ny1, nx2, ny2;
-
-	*c1 = *c1 + value;
-	*c2 = *c2 + value;
-
-	nx1 = marq_x1;
-	ny1 = marq_y1;
-	nx2 = marq_x2;
-	ny2 = marq_y2;
-
-	marq_x1 = ox1;
-	marq_y1 = oy1;
-	marq_x2 = ox2;
-	marq_y2 = oy2;
-
-	paint_marquee(0, nx1, ny1);
-	*c1 = *c1 + value;
-	*c2 = *c2 + value;
-	paint_marquee(1, ox1, oy1);
-
-	return 1;
-}
-
-static void resize_marquee( int dx, int dy )
-{
-	paint_marquee(0, marq_x1, marq_y1);
-
-	marq_x2 += dx;
-	marq_y2 += dy;
-
-	paint_marquee(1, marq_x1, marq_y1);
-}
-
 /* Forward declaration */
 static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	gdouble pressure, int mflag);
@@ -842,15 +806,16 @@ int check_arrows(int act_m)
 	/* User is selecting so allow CTRL+arrow keys to resize the marquee */
 	if ((marq_status == MARQUEE_DONE) && (action == ACT_LR_MOVE))
 	{
-		resize_marquee(mv * arrow_dx[mode], mv * arrow_dy[mode]);
+		paint_marquee(3, marq_x2 + mv * arrow_dx[mode],
+			marq_y2 + mv * arrow_dy[mode]);
 		return (1);
 	}
 
 	if (action == ACT_SEL_MOVE)
 	{
-		if (arrow_dx[mode]) return (move_arrows(&marq_x1, &marq_x2,
-			mv * arrow_dx[mode]));
-		return (move_arrows(&marq_y1, &marq_y2, mv * arrow_dy[mode]));
+		paint_marquee(2, marq_x1 + mv * arrow_dx[mode],
+			marq_y1 + mv * arrow_dy[mode]);
+		return (1);
 	}
 
 	return (0);
@@ -2544,15 +2509,12 @@ static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	if (!channel_dis[CHN_MASK]) r.mask0 = mem_img[CHN_MASK];
 	if (!mem_img[CHN_ALPHA] || channel_dis[CHN_ALPHA]) alpha_blend = FALSE;
 
-	r.xpm = mem_xpm_trans; r.lop = 255;
+	r.xpm = mem_xpm_trans;
+	r.lop = 255;
 	if (layers_total && show_layers_main)
 	{
 		if (layer_selected)
-		{
-			r.xpm = layer_table[layer_selected].use_trans ?
-				layer_table[layer_selected].trans : -1;
 			r.lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
-		}
 	}
 	else if (alpha_blend || (mem_xpm_trans >= 0))
 		render_background(rgb, r.px2, r.py2, r.pw2, r.ph2, pw * 3);
@@ -3330,8 +3292,7 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			&& (marq_x2 >= 0) && (marq_y2 >= 0))
 		{
 			marq_status = MARQUEE_DONE;
-			check_marquee();
-			paint_marquee(1, marq_x1, marq_y1);
+			paint_marquee(1, 0, 0);
 		}
 		if ((tool_type == TOOL_GRADIENT) &&
 			(gradient[mem_channel].status == GRAD_DONE))
@@ -3423,12 +3384,33 @@ static void parse_drag( char *txt )
 	set_image(TRUE);
 }
 
+
+static const GtkTargetEntry uri_list = { "text/uri-list", 0, 1 };
+
+static gboolean drag_n_drop_tried(GtkWidget *widget, GdkDragContext *context,
+	gint x, gint y, guint time, gpointer user_data)
+{
+	GdkAtom target = gdk_atom_intern("text/uri-list", FALSE);
+	gpointer tp = GUINT_TO_POINTER(target);
+	GList *src;
+
+	/* Check if drop could provide a supported format */
+	for (src = context->targets; src && (src->data != tp); src = src->next);
+	if (!src) return (FALSE);
+	/* Trigger "drag_data_received" event */
+	gtk_drag_get_data(widget, context, target, time);
+	return (TRUE);
+}
+
 static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context,
 	gint x, gint y, GtkSelectionData *data, guint info, guint time)
 {
-	if ((data->length > 0) && (data->format == 8))
+	int success;
+
+	if ((success = ((data->length >= 0) && (data->format == 8))))
 		parse_drag((gchar *)data->data);
-// !!! When GTK_DEST_DEFAULT_DROP is set, GTK+ calls gtk_drag_finish() for us
+	/* Accept move as a copy (disallow deleting source) */
+	gtk_drag_finish(context, success, FALSE, time);
 }
 
 
@@ -4507,7 +4489,6 @@ static menu_item main_menu[] = {
 
 void main_init()
 {
-	static const GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 	GtkAdjustment *adj;
@@ -4536,10 +4517,15 @@ void main_init()
 	win_restore_pos(main_window, "window", 0, 0, 630, 400);
 	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
 
-	gtk_drag_dest_set (main_window, GTK_DEST_DEFAULT_ALL, target_table, 1,
-		GDK_ACTION_COPY);
-	gtk_signal_connect (GTK_OBJECT (main_window), "drag_data_received",
-		GTK_SIGNAL_FUNC (drag_n_drop_received), NULL);		// Drag 'n' Drop guff
+	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
+	 * move as a move, so have to do some non-default processing - WJ */
+	gtk_drag_dest_set(main_window, GTK_DEST_DEFAULT_HIGHLIGHT |
+		GTK_DEST_DEFAULT_MOTION, &uri_list, 1, GDK_ACTION_COPY |
+		GDK_ACTION_MOVE);
+	gtk_signal_connect(GTK_OBJECT(main_window), "drag_data_received",
+		GTK_SIGNAL_FUNC(drag_n_drop_received), NULL);
+	gtk_signal_connect(GTK_OBJECT(main_window), "drag_drop",
+		GTK_SIGNAL_FUNC(drag_n_drop_tried), NULL);
 
 	vbox_main = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_main);
