@@ -2099,6 +2099,11 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 /* Detect if current clipboard belongs to something in the program itself */
 int internal_clipboard()
 {
+// !!! Need a different check in Windoze, likely through WinAPI - because of
+// gdk_selection_owner_get_for_display() in win32/gdkselection-win32.c doing
+// another smart-ass trick and purposely lying to us
+// One possible way: GetWindowThreadProcessId(GetClipboardOwner()) and compare
+// to GetCurrentProcessId()
 	gpointer widget = NULL;
 	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("CLIPBOARD", FALSE));
 //	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("PRIMARY", FALSE));
@@ -2144,6 +2149,59 @@ int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
 	return (res.flag);
 }
 
+static void selection_get_callback(GtkWidget *widget, GtkSelectionData *data,
+	guint info, guint time, gpointer user_data)
+{
+	clip_function cf = g_dataset_get_data(main_window,
+		gdk_atom_name(data->selection));
+	if (cf) cf(data, (gpointer)(int)info);
+}
+
+static void selection_clear_callback((GtkWidget *widget, GdkEventSelection *event,
+	gpointer user_data)
+{
+	clip_function cf = g_dataset_get_data(main_window,
+		gdk_atom_name(event->selection));
+	if (cf) cf(NULL, (gpointer)0);
+}
+
+int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler)
+{
+	static int connected;
+	GtkSelectionTargetList *slist;
+	GList *list, *tmp;
+	GdkAtom sel = gdk_atom_intern("CLIPBOARD", FALSE);
+
+	if (!gtk_selection_owner_set(main_window, sel, GDK_CURRENT_TIME))
+		return (FALSE);
+
+	/* Don't have gtk_selection_clear_targets() in GTK+1 - have to
+	 * reimplement */
+	list = gtk_object_get_data(GTK_OBJECT(main_window), "gtk-selection-handlers");
+	for (tmp = list; tmp; tmp = tmp->next)
+	{
+		if ((slist = tmp->data)->selection != sel) continue;
+		list = g_list_delete_link(list, tmp);
+		gtk_target_list_unref(slist->list);
+		g_free(slist);
+		break;
+	}
+	g_object_set_data(G_OBJECT(main_window), "gtk-selection-handlers", list);
+
+	/* !!! Have to resort to this to allow for multiple clipboards in X */
+	g_dataset_set_data(main_window, "CLIPBOARD", (gpointer)handler);
+	if (!connected)
+	{
+		gtk_signal_connect(GTK_OBJECT(main_window), "selection_get",
+			GTK_SIGNAL_FUNC(selection_get_callback), NULL);
+		gtk_signal_connect(GTK_OBJECT(main_window), "selection_clear_event",
+			GTK_SIGNAL_FUNC(selection_clear_callback), NULL);
+		connected = TRUE;
+	}
+
+	gtk_selection_add_targets(main_window, sel, targets, ntargets);
+}
+
 #else /* #if GTK_MAJOR_VERSION == 2 */
 
 static void clipboard_callback(GtkClipboard *clipboard,
@@ -2166,6 +2224,33 @@ int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
 	return (res.flag);
 }
 
+static void clipboard_get_callback(GtkClipboard *clipboard,
+	GtkSelectionData *selection_data, guint info, gpointer user_data)
+{
+	((clip_function)user_data)(selection_data, (gpointer)(int)info);
+}
+
+static void clipboard_clear_callback(GtkClipboard *clipboard, gpointer user_data)
+{
+	((clip_function)user_data)(NULL, (gpointer)0);
+}
+
+int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler)
+{
+	int i;
+
+	/* Two attempts, for GTK+2 function can fail for strange reasons */
+	for (i = 0; i < 2; i++)
+	{
+		if (gtk_clipboard_set_with_data(
+			gtk_clipboard_get(GDK_SELECTION_CLIPBOARD),
+			targets, ntargets, clipboard_get_callback,
+			clipboard_clear_callback, (gpointer)handler))
+			return (TRUE);
+	}
+	return (FALSE);
+}
+
 #endif
 
 /* This ugly code imports XA_PIXMAP and XA_BITMAP selection types, native to
@@ -2177,25 +2262,28 @@ int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
 int import_clip_Xpixmap(GtkSelectionData *data)
 {
 	GdkPixmap *pm;
-	unsigned char *buf;
-	int w, h, d;
+	unsigned char *buf = NULL;
+	int w, h, d, dd;
 
+	gdk_error_trap_push(); // No guarantee that we got a valid pixmap
 	pm = gdk_pixmap_foreign_new(*(Pixmap *)data->data);
+	gdk_error_trap_pop(); // The above call returns NULL on failure anyway
 	if (!pm) return (FALSE);
+	dd = gdk_visual_get_system()->depth;
 #if GTK_MAJOR_VERSION == 1
 	gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
-	buf = wj_get_rgb_image(d == 1 ? NULL : (GdkWindow *)&gdk_root_parent,
-		pm, NULL, 0, 0, w, h);
+	if ((d == 1) || (d == dd)) buf = wj_get_rgb_image(d == 1 ? NULL :
+		(GdkWindow *)&gdk_root_parent, pm, NULL, 0, 0, w, h);
 	/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
-	 * implement freeing all the rest of it here instead */
+	 * implement freeing the GdkPixmap structure here instead */
 	gdk_xid_table_remove(((GdkWindowPrivate *)pm)->xwindow);
 	g_dataset_destroy(pm);
 	g_free(pm);
 #else /* #if GTK_MAJOR_VERSION == 2 */
 	gdk_drawable_get_size(pm, &w, &h);
 	d = gdk_drawable_get_depth(pm);
-	buf = wj_get_rgb_image(d == 1 ? NULL : gdk_get_default_root_window(),
-		pm, NULL, 0, 0, w, h);
+	if ((d == 1) || (d == dd)) buf = wj_get_rgb_image(d == 1 ? NULL :
+		gdk_get_default_root_window(), pm, NULL, 0, 0, w, h);
 	gdk_pixmap_unref(pm);
 #endif
 	if (!buf) return (FALSE);

@@ -76,6 +76,7 @@
 #define FF_PALETTE 0x04000 /* Palette file (not image) */
 #define FF_RMEM    0x08000 /* Can be read from memory */
 #define FF_WMEM    0x10000 /* Can be written to memory */
+#define FF_MEM     0x18000 /* Both of the above */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -115,6 +116,7 @@ int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
 int file_type_by_ext(char *name, guint32 mask);
 
 int save_image(char *file_name, ls_settings *settings);
+int save_mem_image(unsigned char **buf, int *len, ls_settings *settings);
 
 int load_image(char *file_name, int mode, int ftype);
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype);

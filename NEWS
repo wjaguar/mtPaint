@@ -14,7 +14,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Horizontal and vertical ramps can be created using the Selection menu
 	* Shapeburst gradient now used for filling gradients when no placement exists (see handbook section 3.5.6.5)
 	* Workaround for bug in libpng versions 1.2.17 - 1.2.24 added (was losing extra channels when loading)
-	* BUGFIX - canvas, view and palette area borders now can't be messed up by theme engines
+	* BUGFIX - Canvas, view and palette area borders now can't be messed up by theme engines
+	* BUGFIX - Polygon line selection now clearer in Windows version
 
 3.20	2007-12-27
 

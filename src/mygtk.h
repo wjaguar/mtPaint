@@ -257,6 +257,7 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 
 int internal_clipboard();
 int process_clipboard(char *what, GtkSignalFunc handler, gpointer data);
+int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler);
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 int import_clip_Xpixmap(GtkSelectionData *data); // X special
 #endif

@@ -59,7 +59,7 @@ int tga_RLE, tga_565, tga_defdir, jp2_rate, undo_load;
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_COMPZ | FF_RMEM },
+		| FF_TRANS | FF_COMPZ | FF_MEM },
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPJ },
 #else
@@ -86,7 +86,7 @@ fformat file_formats[NUM_FTYPES] = {
 #else
 	{ "", "", "", 0},
 #endif
-	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR | FF_RMEM },
+	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR | FF_MEM },
 	{ "XPM", "xpm", "", FF_256 | FF_RGB | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
@@ -255,10 +255,22 @@ typedef struct {
 	int here; // current position
 	int top;  // end of data
 	int size; // currently allocated
-	int step; // allocation increment
 } memFILE;
 
-size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
+static int mfextend(memFILE *mf, size_t length)
+{
+	size_t l = mf->here + length, l2 = mf->size * 2;
+	unsigned char *tmp = NULL;
+
+	if (l2 > l) tmp = realloc(mf->buf, l2);
+	if (!tmp) tmp = realloc(mf->buf, l2 = l);
+	if (!tmp) return (FALSE);
+	mf->buf = tmp;
+	mf->size = l2;
+	return (TRUE);
+}
+
+static size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 {
 	size_t l, m;
 
@@ -272,9 +284,24 @@ size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 	return (nmemb);
 }
 
-int mfseek(memFILE *mf, long offset, int mode)
+static size_t mfwrite(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 {
-// !!! For operating on tarballs, adjust fseek() params here accordingly
+	size_t l, m;
+
+	if (mf->file) return (fwrite(ptr, size, nmemb, mf->file));
+
+	if (mf->here < 0) return (0);
+	l = size * nmemb; m = mf->size - mf->here;
+	if ((l > m) && !mfextend(mf, l)) l = m , nmemb = m / size;
+	memcpy(mf->buf + mf->here, ptr, l);
+// !!! Nothing in here does fseek() when writing, so no need to track mf->top
+	mf->top = mf->here += l;
+	return (nmemb);
+}
+
+static int mfseek(memFILE *mf, long offset, int mode)
+{
+// !!! For operating on tarballs, adjust fseek() params here
 	if (mf->file) return (fseek(mf->file, offset, mode));
 
 	if (mode == SEEK_SET);
@@ -309,6 +336,25 @@ static void png_memread(png_structp png_ptr, png_bytep data, png_size_t length)
 	memcpy(data, mf->buf + mf->here, l);
 	mf->here += l;
 	if (l < length) png_error(png_ptr, "Read Error");
+}
+
+static void png_memwrite(png_structp png_ptr, png_bytep data, png_size_t length)
+{
+	memFILE *mf = (memFILE *)png_get_io_ptr(png_ptr);
+//	memFILE *mf = (memFILE *)png_ptr->io_ptr;
+
+	if ((mf->here + length > mf->size) && !mfextend(mf, length))
+		png_error(png_ptr, "Write Error");
+	else
+	{
+		memcpy(mf->buf + mf->here, data, length);
+		mf->top = mf->here += length;
+	}
+}
+
+static void png_memflush(png_structp png_ptr)
+{
+	/* Does nothing */
 }
 
 #define PNG_BYTES_TO_CHECK 8
@@ -572,12 +618,12 @@ fail:	if (fp) fclose(fp);
 #define PNG_AFTER_IDAT 8
 #endif
 
-static int save_png(char *file_name, ls_settings *settings)
+static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	png_unknown_chunk unknown0;
 	png_structp png_ptr;
 	png_infop info_ptr;
-	FILE *fp;
+	FILE *fp = NULL;
 	int i, j, h = settings->height, w = settings->width, res = -1;
 	int chunks = 0;
 	long dest_len;
@@ -611,7 +657,7 @@ static int save_png(char *file_name, ls_settings *settings)
 	}
 	if (settings->silent) mess = NULL;
 
-	if ((fp = fopen(file_name, "wb")) == NULL) goto exit0;
+	if (!mf && ((fp = fopen(file_name, "wb")) == NULL)) goto exit0;
 
 	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, (png_voidp)NULL, NULL, NULL);
 
@@ -621,7 +667,9 @@ static int save_png(char *file_name, ls_settings *settings)
 	if (!info_ptr) goto exit2;
 
 	res = 0;
-	png_init_io(png_ptr, fp);
+
+	if (!mf) png_init_io(png_ptr, fp);
+	else png_set_write_fn(png_ptr, mf, png_memwrite, png_memflush);
 	png_set_compression_level(png_ptr, settings->png_compression);
 
 	if (settings->bpp == 1)
@@ -727,7 +775,7 @@ static int save_png(char *file_name, ls_settings *settings)
 
 	/* Tidy up */
 exit2:	png_destroy_write_struct(&png_ptr, &info_ptr);
-exit1:	fclose(fp);
+exit1:	if (fp) fclose(fp);
 exit0:	free(rgba_row);
 	return (res);
 }
@@ -2076,22 +2124,28 @@ fail:	if (fp) fclose(fp);
 /* Use BMP4 instead of BMP3 for images with alpha */
 /* #define USE_BMP4 */ /* Most programs just use 32-bit RGB BMP3 for RGBA */
 
-static int save_bmp(char *file_name, ls_settings *settings)
+static int save_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	unsigned char *buf, *tmp, *src;
-	FILE *fp;
+	memFILE fake_mf;
+	FILE *fp = NULL;
 	int i, j, ll, hsz0, hsz, dsz, fsz;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 
 	i = w > BMP_MAXHSIZE / 4 ? w * 4 : BMP_MAXHSIZE;
 	buf = malloc(i);
-	if (!buf) return -1;
+	if (!buf) return (-1);
 	memset(buf, 0, i);
 
-	if (!(fp = fopen(file_name, "wb")))
+	if (!mf)
 	{
-		free(buf);
-		return -1;
+		if (!(fp = fopen(file_name, "wb")))
+		{
+			free(buf);
+			return (-1);
+		}
+		memset(mf = &fake_mf, 0, sizeof(fake_mf));
+		fake_mf.file = fp;
 	}
 
 	/* Sizes of BMP parts */
@@ -2143,7 +2197,7 @@ static int save_bmp(char *file_name, ls_settings *settings)
 		tmp[1] = settings->pal[i].green;
 		tmp[2] = settings->pal[i].red;
 	}
-	fwrite(buf, 1, tmp - buf, fp);
+	mfwrite(buf, 1, tmp - buf, mf);
 
 	/* Write rows */
 	if (!settings->silent) ls_init("BMP", 1);
@@ -2176,11 +2230,11 @@ static int save_bmp(char *file_name, ls_settings *settings)
 				src += 3; tmp++;
 			}
 		}
-		fwrite(buf, 1, ll, fp);
+		mfwrite(buf, 1, ll, mf);
 		if (!settings->silent && ((i * 20) % h >= h - 20))
 			progress_update((float)(h - i) / h);
 	}
-	fclose(fp);
+	if (fp) fclose(fp);
 
 	if (!settings->silent) progress_end();
 
@@ -3682,7 +3736,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 	return 0;
 }
 
-int save_image(char *file_name, ls_settings *settings)
+static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	png_color greypal[256];
 	int i, res;
@@ -3698,7 +3752,7 @@ int save_image(char *file_name, ls_settings *settings)
 	switch (settings->ftype)
 	{
 	default:
-	case FT_PNG: res = save_png(file_name, settings); break;
+	case FT_PNG: res = save_png(file_name, settings, mf); break;
 #ifdef U_JPEG
 	case FT_JPEG: res = save_jpeg(file_name, settings); break;
 #endif
@@ -3712,7 +3766,7 @@ int save_image(char *file_name, ls_settings *settings)
 #ifdef U_GIF
 	case FT_GIF: res = save_gif(file_name, settings); break;
 #endif
-	case FT_BMP: res = save_bmp(file_name, settings); break;
+	case FT_BMP: res = save_bmp(file_name, settings, mf); break;
 	case FT_XPM: res = save_xpm(file_name, settings); break;
 	case FT_XBM: res = save_xbm(file_name, settings); break;
 	case FT_LSS: res = save_lss(file_name, settings); break;
@@ -3723,6 +3777,28 @@ int save_image(char *file_name, ls_settings *settings)
 
 	if (settings->pal == greypal) settings->pal = NULL;
 	return res;
+}
+
+int save_image(char *file_name, ls_settings *settings)
+{
+	return (save_image_x(file_name, settings, NULL));
+}
+
+int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
+{
+	memFILE mf;
+	int res;
+
+	if (!(file_formats[settings->ftype].flags & FF_WMEM)) return (-1);
+
+	memset(&mf, 0, sizeof(mf));
+	mf.buf = malloc(mf.size = 0x4000 - 64);
+	/* Be silent when saving to memory */
+	settings->silent = TRUE;
+	res = save_image_x(NULL, settings, &mf);
+	if (res) free(mf.buf);
+	else *buf = mf.buf , *len = mf.top;
+	return (res);
 }
 
 static void store_image_extras(ls_settings *settings)

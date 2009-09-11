@@ -349,62 +349,54 @@ static void pressed_mask(int val)
 
 // System clipboard import
 
-typedef struct {
-	char *target;
-	int ftype;
-	GdkAtom atom;
-} clipformat;
-
-static clipformat clip_formats[] = {
-	{ NULL, FT_NONE },
-	{ "image/png", FT_PNG },
-	{ "image/bmp", FT_BMP },
-	{ "image/x-bmp", FT_BMP },
-	{ "image/x-MS-bmp", FT_BMP },
+static GtkTargetEntry clip_formats[] = {
+	{ NULL, 0, FT_NONE },
+	{ "image/png", 0, FT_PNG },
+	{ "image/bmp", 0, FT_BMP },
+	{ "image/x-bmp", 0, FT_BMP },
+	{ "image/x-MS-bmp", 0, FT_BMP },
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 	/* These two don't make sense without X */
-	{ "PIXMAP", -1 },
-	{ "BITMAP", -1 },
+	{ "PIXMAP", 0, (guint)(-1) },
+	{ "BITMAP", 0, (guint)(-1) },
 #endif
-// Here will be other things (likely, X bitmap & pixmap), arranged in the order
-// of preference
-// For identifying X-things, fake FT_xxx values will be needed - they aren't
-// real files and don't deserve slots in file_formats[]
-// And seems it'll be better to prefer BMP when talking to the likes of GIMP -
-// they send PNGs really slowly (likely, compressed to the max); question is,
-// how to detect it's a slow PNG writer on the other end - because if another
-// mtPaint is there instead, PNG is the best choice
 };
+#define CLIP_TARGETS (sizeof(clip_formats) / sizeof(GtkTargetEntry))
+static GdkAtom clip_atoms[CLIP_TARGETS];
+
+/* Seems it'll be better to prefer BMP when talking to the likes of GIMP -
+ * they send PNGs really slowly (likely, compressed to the max); but then,
+ * we'll need a mtPaint-specific clipboard type, with highest precedence, for
+ * exchanges between instances of mtPaint - like one Krita has.
+ * And another question with BMPs is, not everyone supports alpha in them. */
 
 static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
 {
 	GdkAtom *targets, tst;
-	int i, j, k, l, n = data->length / sizeof(GdkAtom);
+	int i, j, k, n = data->length / sizeof(GdkAtom);
 
 	if ((n <= 0) || (data->format != 32) ||
 		(data->type != GDK_SELECTION_TYPE_ATOM)) return (FALSE);
-	l = sizeof(clip_formats) / sizeof(clipformat);
 
 	/* Convert names to atoms if not done already */
-	if (!clip_formats[1].atom)
+	if (!clip_atoms[1])
 	{
-		for (i = 1; i < l; i++) clip_formats[i].atom =
+		for (i = 1; i < CLIP_TARGETS; i++) clip_atoms[i] =
 			gdk_atom_intern(clip_formats[i].target, FALSE);
 	}
 
 	/* Search for best match */
 	targets = (GdkAtom *)data->data;
-	for (i = 0 , k = l; i < n; i++)
+	for (i = 0 , k = CLIP_TARGETS; i < n; i++)
 	{
 		tst = *targets++;
 //g_print("\"%s\" ", gdk_atom_name(tst));
-		for (j = 1; j < k; j++)
-			if (tst == clip_formats[j].atom) break;
+		for (j = 1; (j < k) && (tst != clip_atoms[j]); j++);
 		k = j;
 	}
 //g_print(": %d\n", k);
 	*(int *)user_data = k;
-	return (k < l);
+	return (k < CLIP_TARGETS);
 }
 
 static int check_clipboard()
@@ -433,7 +425,65 @@ static int import_clipboard(int format)
 	if (internal_clipboard()) return (FALSE); // nothing to import
 	return (process_clipboard(clip_formats[format].target,
 		GTK_SIGNAL_FUNC(clipboard_import_fn),
-		(gpointer)clip_formats[format].ftype));
+		(gpointer)(int)clip_formats[format].info));
+}
+
+static void setup_clip_save(ls_settings *settings, int type)
+{
+	init_ls_settings(settings, NULL);
+	settings->mode = FS_CLIP_FILE;
+	settings->ftype = type;
+	memcpy(settings->img, mem_clip.img, sizeof(chanlist));
+	settings->pal = mem_pal;
+	settings->width = mem_clip_w;
+	settings->height = mem_clip_h;
+	settings->bpp = mem_clip_bpp;
+	settings->colors = mem_cols;
+}
+
+static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
+{
+	ls_settings settings;
+	unsigned char *buf;
+	int res, len, type = (int)user_data;
+
+//g_print("Entered! %X %d\n", data, type);
+	if (!data) return (FALSE); // Someone else stole system clipboard
+	if (!mem_clipboard) return (FALSE); // Our own clipboard got emptied
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+// !!! Pixmaps and bitmaps not supported yet
+	if (type == -1) return (FALSE);
+#endif
+
+	/* Prepare settings */
+	setup_clip_save(&settings, type);
+	settings.png_compression = 1; // Speed is of the essence
+
+	res = save_mem_image(&buf, &len, &settings);
+//g_print("Save returned %d\n", res);
+	if (res) return (FALSE); // No luck creating in-memory image
+
+/* !!! Should allocation for data copying fail, GTK+ will die horribly - so
+ * maybe it'll be better to hack up the function and pass the original data
+ * instead; but to do so, I'd need to use g_try_*() allocation functions in
+ * memFILE writing path - WJ */
+	gtk_selection_data_set(data, data->type, 8, // !!! 32 for pixmaps!
+		buf, len);
+	free(buf);
+	return (TRUE);
+}
+
+static int export_clipboard()
+{
+	if (!mem_clipboard) return (FALSE);
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+// !!! Pixmaps and bitmaps not supported yet
+	return (offer_clipboard(clip_formats + 1, CLIP_TARGETS - 3,
+#else
+	return (offer_clipboard(clip_formats + 1, CLIP_TARGETS - 1,
+#endif
+		GTK_SIGNAL_FUNC(clipboard_export_fn)));
 }
 
 int gui_save(char *filename, ls_settings *settings)
@@ -550,16 +600,14 @@ static void save_clip(int item)
 	char clip[PATHBUF];
 	int i;
 
+	if (item == -1) // Exporting clipboard
+	{
+		export_clipboard();
+		return;
+	}
+
 	/* Prepare settings */
-	init_ls_settings(&settings, NULL);
-	settings.mode = FS_CLIP_FILE;
-	settings.ftype = FT_PNG;
-	memcpy(settings.img, mem_clip.img, sizeof(chanlist));
-	settings.pal = mem_pal;
-	settings.width = mem_clip_w;
-	settings.height = mem_clip_h;
-	settings.bpp = mem_clip_bpp;
-	settings.colors = mem_cols;
+	setup_clip_save(&settings, FT_PNG);
 
 	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
 	i = save_image(clip, &settings);
@@ -4245,6 +4293,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Save Clipboard/11"), -1, 0, NEED_CLIP, "<control>F11", ACT_SAVE_CLIP, 11 },
 	{ _("/Edit/Save Clipboard/12"), -1, 0, NEED_CLIP, "<control>F12", ACT_SAVE_CLIP, 12 },
 	{ _("/Edit/Import Clipboard"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
+	{ _("/Edit/Export Clipboard"), -1, 0, 0, NULL, ACT_SAVE_CLIP, -1 },
 	{ _("/Edit/sep3"), -4 },
 	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
 	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
