@@ -24,10 +24,8 @@ extern char
 	*xpm_brcosa_xpm[],
 	*xpm_case_xpm[],
 	*xpm_centre_xpm[],
-	*xpm_cline_xpm[],
 	*xpm_clone_xpm[],
 	*xpm_close_xpm[],
-	*xpm_config_xpm[],
 	*xpm_copy_xpm[],
 	*xpm_cut_xpm[],
 	*xpm_down_xpm[],
@@ -40,7 +38,6 @@ extern char
 	*xpm_hidden_xpm[],
 	*xpm_home_xpm[],
 	*xpm_lasso_xpm[],
-	*xpm_layers_xpm[],
 	*xpm_line_xpm[],
 	*xpm_mode_blend_xpm[],
 	*xpm_mode_cont_xpm[],
@@ -67,8 +64,11 @@ extern char
 	*xpm_smudge_xpm[],
 	*xpm_text_xpm[],
 	*xpm_undo_xpm[],
-	*xpm_up_xpm[]
-	;
+	*xpm_up_xpm[];
+//extern char
+//	*xpm_cline_xpm[],
+//	*xpm_config_xpm[],
+//	*xpm_layers_xpm[];
 
 
 
@@ -108,8 +108,7 @@ extern unsigned char
 	xbm_square_bits[],
 	xbm_square_mask_bits[],
 	xbm_vertical_bits[],
-	xbm_vertical_mask_bits[]
-	;
+	xbm_vertical_mask_bits[];
 
 #define xbm_ring4_width 9
 #define xbm_ring4_height 9

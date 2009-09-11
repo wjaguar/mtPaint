@@ -60,10 +60,8 @@
 #include "graphics/xpm_brcosa.xpm"
 #include "graphics/xpm_case.xpm"
 #include "graphics/xpm_centre.xpm"
-#include "graphics/xpm_cline.xpm"
 #include "graphics/xpm_clone.xpm"
 #include "graphics/xpm_close.xpm"
-#include "graphics/xpm_config.xpm"
 #include "graphics/xpm_copy.xpm"
 #include "graphics/xpm_cut.xpm"
 #include "graphics/xpm_down.xpm"
@@ -76,7 +74,6 @@
 #include "graphics/xpm_hidden.xpm"
 #include "graphics/xpm_home.xpm"
 #include "graphics/xpm_lasso.xpm"
-#include "graphics/xpm_layers.xpm"
 #include "graphics/xpm_line.xpm"
 #include "graphics/xpm_mode_blend.xpm"
 #include "graphics/xpm_mode_cont.xpm"
@@ -104,5 +101,8 @@
 #include "graphics/xpm_text.xpm"
 #include "graphics/xpm_undo.xpm"
 #include "graphics/xpm_up.xpm"
+//#include "graphics/xpm_cline.xpm"
+//#include "graphics/xpm_config.xpm"
+//#include "graphics/xpm_layers.xpm"
 
 #undef static

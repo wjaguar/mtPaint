@@ -91,7 +91,6 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_LR_CENTER,
 
 	DLG_BRCOSA,
-	DLG_CMDLINE,
 	DLG_PATTERN,
 	DLG_BRUSH,
 	DLG_SCALE,
@@ -222,7 +221,6 @@ enum {
 	MENU_SHOWGRID,
 	MENU_VIEW,
 	MENU_VWFOCUS,
-	MENU_CLINE,
 	MENU_LAYER,
 	MENU_PREFS,
 	MENU_CHAN0,
@@ -276,7 +274,7 @@ GtkWidget *main_window, *main_split,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_widgets[TOTAL_MENU_IDS],
-	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
+	*dock_pane, *dock_area;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit;

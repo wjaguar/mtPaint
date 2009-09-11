@@ -31,7 +31,7 @@
 #include "toolbar.h"
 #include "font.h"
 
-int view_showing, allow_cline, view_update_pending;
+int view_showing, view_update_pending;
 float vw_zoom = 1;
 
 int opaque_view;
@@ -47,19 +47,6 @@ static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
 
 ////	COMMAND LINE WINDOW
 
-
-GtkWidget *cline_window = NULL;
-
-gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	win_store_pos(cline_window, "cline");
-	gtk_widget_destroy(cline_window);
-	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], TRUE);
-	cline_window = NULL;
-	allow_cline = TRUE;
-
-	return FALSE;
-}
 
 void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
 {
@@ -101,49 +88,13 @@ void create_cline_area( GtkWidget *vbox1 )
 	}
 	gtk_container_add ( GTK_CONTAINER(scrolledwindow), col_list );
 	gtk_widget_show(col_list);
-	gtk_signal_connect(GTK_OBJECT(col_list), "select_row", GTK_SIGNAL_FUNC(cline_select), NULL);
+	gtk_signal_connect(GTK_OBJECT(col_list), "select_row",
+		GTK_SIGNAL_FUNC(cline_select), NULL);
 
 	gtk_widget_grab_focus(col_list);
 
 	gtk_signal_connect(GTK_OBJECT(col_list), "key_press_event",
 		GTK_SIGNAL_FUNC(viewer_keypress), NULL);
-}
-
-void pressed_cline()
-{
-	GtkWidget *vbox1, *button_close;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-	char txt[128];
-
-	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
-	allow_cline = FALSE;
-
-	snprintf(txt, 120, _("%i Files on Command Line"), files_passed );
-	cline_window = add_a_window( GTK_WINDOW_TOPLEVEL, txt, GTK_WIN_POS_NONE, FALSE );
-	gtk_widget_set_usize(cline_window, 100, 100);
-	win_restore_pos(cline_window, "cline", 0, 0, 250, 400);
-
-	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox1);
-	gtk_container_add (GTK_CONTAINER (cline_window), vbox1);
-
-
-	create_cline_area( vbox1 );
-
-
-	button_close = add_a_button(_("Close"), 5, vbox1, FALSE);
-	gtk_signal_connect_object( GTK_OBJECT(button_close), "clicked",
-			GTK_SIGNAL_FUNC(delete_cline), GTK_OBJECT(cline_window));
-	gtk_widget_add_accelerator (button_close, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	gtk_signal_connect_object (GTK_OBJECT (cline_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_cline), NULL);
-//	gtk_signal_connect_object (GTK_OBJECT (cline_window), "key_press_event",
-//		GTK_SIGNAL_FUNC (viewer_keypress), GTK_OBJECT (cline_window));
-
-	gtk_widget_show(cline_window);
-	gtk_window_add_accel_group(GTK_WINDOW (cline_window), ag);
-	gtk_window_set_transient_for( GTK_WINDOW(cline_window), GTK_WINDOW(main_window) );
 }
 
 

@@ -120,7 +120,7 @@ GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_widgets[TOTAL_MENU_IDS],
-	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
+	*dock_pane, *dock_area;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit;
@@ -758,8 +758,8 @@ int check_zoom_keys(int act_m)
 	if ((action == ACT_DOCK) || (action == ACT_QUIT) ||
 		(action == DLG_BRCOSA) || (action == ACT_PAN) ||
 		(action == ACT_CROP) || (action == ACT_SWAP_AB) ||
-		(action == DLG_CMDLINE) || (action == DLG_PATTERN) ||
-		(action == DLG_BRUSH) || (action == ACT_TOOL))
+		(action == DLG_PATTERN) || (action == DLG_BRUSH) ||
+		(action == ACT_TOOL))
 		action_dispatch(action, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
 	else return (FALSE);
 
@@ -819,7 +819,6 @@ static key_action main_keys[] = {
 	{ ACT_PAN,	0,		GDK_End,	MOD_cs  },
 	{ ACT_CROP,	0,		GDK_Delete,	MOD_cs  },
 	{ ACT_SWAP_AB,	0,		GDK_x,		MOD_csa },
-	{ DLG_CMDLINE,	0,		GDK_c,		MOD_csa },
 	{ DLG_PATTERN,	0,		GDK_F2,		MOD_csa },
 	{ DLG_BRUSH,	0,		GDK_F3,		MOD_csa },
 	{ ACT_TOOL,	TTB_PAINT,	GDK_F4,		MOD_csa },
@@ -1126,7 +1125,6 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 		win_store_pos(main_window, "window");
 
 		// Get rid of extra windows + remember positions
-		if (cline_window) delete_cline( NULL, NULL, NULL );
 		delete_layers_window();
 
 		toolbar_exit();			// Remember the toolbar settings
@@ -3535,6 +3533,8 @@ static int check_smart_menu_keys(GdkEventKey *event)
 	guint lowkey;
 	int i;
 
+	/* View mode - do nothing */
+	if (view_image_only) return (0);
 	/* No overflow - nothing to do */
 	if (r_menu_state == 0) return (0);
 	/* Alt+key only */
@@ -3890,8 +3890,14 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_TBAR:
 		pressed_toolbar_toggle(state, mode); break;
 	case ACT_DOCK:
-		if (kbd) state = !show_dock;
-		toggle_dock(show_dock = state, FALSE); break;
+		if (kbd)
+		{
+			if (GTK_WIDGET_SENSITIVE(menu_widgets[MENU_DOCK]))
+				gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+					menu_widgets[MENU_DOCK]), !show_dock);
+		}
+		else toggle_dock(show_dock = state, FALSE);
+		break;
 	case ACT_CENTER:
 		pressed_centralize(state); break;
 	case ACT_GRID:
@@ -3980,8 +3986,6 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		layer_press_centre(); break;
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
-	case DLG_CMDLINE:
-		if (allow_cline) pressed_cline(); break;
 	case DLG_PATTERN:
 		choose_pattern(0); break;
 	case DLG_BRUSH:
@@ -4303,12 +4307,16 @@ static void pressed_pal_paste()
 
 static void toggle_dock(int state, int internal)
 {
+#if 0 /* !!! Only commandline pane for now */
 	static char **tab_buttons[DOCK_TOTAL] =
 		{ xpm_cline_xpm, xpm_config_xpm, xpm_layers_xpm };
-	GtkWidget *vbox, *notebook, *iconw, *pane = dock_pane;
+	GtkWidget *notebook, *iconw, *dock_page[DOCK_TOTAL];
 	GdkPixmap *pix;
 	GdkBitmap *mask;
-	int i, w2;
+	int i;
+#endif
+	GtkWidget *vbox, *pane = dock_pane;
+	int w2;
 
 	if (!pane ^ state) return;
 	gdk_window_get_size(main_window->window, &w2, NULL);
@@ -4327,9 +4335,9 @@ static void toggle_dock(int state, int internal)
 		vbox = gtk_vbox_new(FALSE, 0);	// New vbox for pane on the right
 		gtk_paned_pack2(GTK_PANED(pane), vbox, FALSE, TRUE);
 
+#if 0 /* !!! Only commandline pane for now */
 		notebook = xpack(vbox, gtk_notebook_new());
 		gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_TOP);
-		gtk_widget_show_all(pane);
 
 		for (i = 0; i < DOCK_TOTAL; i++)
 		{
@@ -4337,14 +4345,14 @@ static void toggle_dock(int state, int internal)
 			pix = gdk_pixmap_create_from_xpm_d(main_window->window,
 				&mask, NULL, tab_buttons[i]);
 			iconw = gtk_pixmap_new(pix, mask);
-			gtk_widget_show(iconw);
-			dock_vbox[i] = gtk_vbox_new(FALSE, 0);
-			gtk_widget_show(dock_vbox[i]);
+			dock_page[i] = gtk_vbox_new(FALSE, 0);
 			gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
-				dock_vbox[i], iconw);
+				dock_page[i], iconw);
 		}
+#endif
 
-		if (files_passed > 1) create_cline_area(dock_vbox[DOCK_CLINE]);
+		gtk_widget_show_all(pane);
+		/* if (files_passed > 1) */ create_cline_area(vbox);
 
 		/* Now, let's juggle the widgets */
 		gtk_container_remove(GTK_CONTAINER(main_window), vbox_main);
@@ -4546,7 +4554,6 @@ static menu_item main_menu[] = {
 	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, ACT_VWFOCUS, 0 },
 	{ _("/View/sep3"), -4 },
 	{ _("/View/Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, xpm_pan_xpm },
-	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", DLG_CMDLINE, 0 },
 	{ _("/View/Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
 
 	{ _("/_Image"), -2 -16 },
@@ -4897,8 +4904,6 @@ void main_init()
 
 	mapped_item_state(0);
 
-	show_dock |= (files_passed > 1);
-
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 	toolbar_boxes[TOOLBAR_STATUS] = hbox_bar;	// Hide status bar
@@ -4907,9 +4912,15 @@ void main_init()
 	view_hide();					// Hide paned view initially
 
 	// Display dock area if requested
-	toggle_dock(show_dock, TRUE);
-	gtk_check_menu_item_set_active(
-		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_DOCK]), show_dock);
+	show_dock = (files_passed > 1);
+	if (show_dock)
+	{
+		toggle_dock(show_dock, TRUE);
+		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+			menu_widgets[MENU_DOCK]), show_dock);
+	}
+	/* !!! Dock has no other function for now */
+	else gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], FALSE);
 
 	gtk_widget_show(main_window);
 
@@ -4929,8 +4940,6 @@ void main_init()
 
 	snprintf(txt, PATHBUF, "%s%c.clipboard", get_home_directory(), DIR_SEP);
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
-
-	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], files_passed > 1);
 
 	change_to_tool(DEFAULT_TOOL_ICON);
 

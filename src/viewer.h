@@ -18,16 +18,13 @@
 */
 
 float vw_zoom;
-int view_showing, allow_cline, vw_focus_on;
+int view_showing, vw_focus_on;
 int opaque_view;
 int max_pan;
 
-GtkWidget *cline_window, *vw_drawing;
-
-gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data );
+GtkWidget *vw_drawing;
 
 void create_cline_area( GtkWidget *vbox1 );
-void pressed_cline();
 
 void pressed_pan();
 
