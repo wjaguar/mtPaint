@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -429,10 +429,6 @@ int gui_save(char *filename, ls_settings *settings)
 		if ( res == NOT_JPEG )
 		{
 			alert_box( _("Error"), _("You are trying to save an indexed canvas to a JPEG file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
-		}
-		if ( res == NOT_TIFF )
-		{
-			alert_box( _("Error"), _("You are trying to save an indexed canvas to a TIFF file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
 		}
 		if ( res == -1 )
 		{

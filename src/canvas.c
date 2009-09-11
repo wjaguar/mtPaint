@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1412,6 +1412,8 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 
 	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
 
+	FIX_OPTION_MENU_SIZE(opt);
+
 	gtk_signal_emit_by_name(GTK_OBJECT(g_list_nth_data(
 		GTK_MENU_SHELL(menu)->children, j)), "activate", (gpointer)box);
 }
@@ -1443,10 +1445,12 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 		k++;
   	}
+	gtk_widget_show_all(box);
+	gtk_widget_show_all(menu);
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
 
-	gtk_widget_show_all(box);
+	FIX_OPTION_MENU_SIZE(opt);
 }
 
 static GtkWidget *ls_settings_box(char *name, int mode)

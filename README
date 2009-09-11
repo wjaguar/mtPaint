@@ -1,5 +1,5 @@
 --------------------------------------------------
-mtPaint 3.10 - Copyright (C) 2004-2006 The Authors
+mtPaint 3.10 - Copyright (C) 2004-2007 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
@@ -43,7 +43,7 @@ su -c "make uninstall"
 
 There are various configure options that may be useful for some people.  Use "./configure --help" to find out what options are available.  If your are compiling mtPaint on an older system without gtk-config, you may need to adjust the configure script so that the GTK+1 settings are done manually.  I have provided an example in the configure script to demonstrate.
 
-Assuming compilation was successful you can test the program by typing "mtpaint src/graphics/testcard.png".  You can call mtpaint with the -v option and the program will start in viewer mode so there will be no palette, menu bar, etc.  You can restore these items by pressing the "Home" key.  After installation you can create a symlink to add a viewer command, e.g.
+You can call mtpaint with the -v option and the program will start in viewer mode so there will be no palette, menu bar, etc.  You can restore these items by pressing the "Home" key.  After installation you can create a symlink to add a viewer command, e.g.
 
 su -c "ln -s mtpaint /usr/local/bin/mtv"
 
@@ -83,7 +83,7 @@ For some reason I needed to move c:/msys/bin/msgfmt & xgettext to c:/msys/local/
 
 3) Download the latest mtPaint sources and unpack them to c:/msys. 
 
-4) To compile the code you must then use MSYS to "./configure win", then "make" and "make install" 
+4) To compile the code you must then use MSYS to "./configure", then "make" and "make install" 
 
 5) If all goes well, you should have mtpaint.exe which you can run using the same method described above.  You may have compiled mtPaint using more recent versions of libraries so you may need to change the filenames, such as libpng12.dll -> libpng13.dll and libungif.dll -> libungif4.dll.
  

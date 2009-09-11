@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -504,6 +504,17 @@ static void wj_option(GtkMenuItem *menuitem, gpointer user_data)
 	*(int *)user_data = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
 }
 
+#if GTK_MAJOR_VERSION == 2
+
+/* Cause the size to be properly reevaluated */
+void wj_option_realize(GtkWidget *widget, gpointer user_data)
+{
+	gtk_signal_emit_by_name(GTK_OBJECT(gtk_option_menu_get_menu(
+		GTK_OPTION_MENU(widget))), "selection_done");
+}
+
+#endif
+
 /* void handler(GtkMenuItem *menuitem, gpointer user_data); */
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler)
@@ -530,6 +541,9 @@ GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	gtk_widget_show(opt); /* !!! Show now - or size won't be set properly */
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), idx);
+
+	FIX_OPTION_MENU_SIZE(opt);
+
 	return (opt);
 }
 

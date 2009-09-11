@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1551,6 +1551,7 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt,
 	while (gtk_events_pending()) gtk_main_iteration();
 	gtk_list_select_item( GTK_LIST(col_list), 0 );
 		// grubby hack needed to start with proper opacity in GTK+1
+	gtk_widget_queue_resize(allcol_window); /* Reset shortened sliders */
 #endif
 }
 
@@ -1951,12 +1952,21 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		button = add_a_button(_("Create"), 4, extbox, TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(make_cscale), (gpointer)opt);
+		/* Protect sliders from option menu in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+		extbox = widget_align_minsize(extbox, 0, 0);
+#endif
 		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
 		colour_window(win, extbox, mem_cols, NULL, FALSE, select_colour,
 			GTK_SIGNAL_FUNC(click_colour));
+
+		/* Protect sliders from option menu in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+		gtk_container_set_resize_mode(GTK_CONTAINER(extbox), GTK_RESIZE_QUEUE);
+#endif
 	}
 
 	if (cs_type == COLSEL_OVERLAYS)
@@ -2969,18 +2979,34 @@ void gradient_setup(int mode)
 	table = add_a_table(3, 4, 5, mainbox);
 	add_to_table(_("Length"), table, 0, 0, 5);
 	grad_spin_len = spin_to_table(table, 0, 1, 5, 0, 0, MAX_GRAD);
-	add_to_table(_("Gradient type"), table, 0, 2, 5);
-	grad_opt_type = wj_option_menu(gtypes, 4, 0, NULL, NULL);
-	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,
-		GTK_EXPAND | GTK_FILL, 0, 0, 5);
 	add_to_table(_("Repeat length"), table, 1, 0, 5);
 	grad_spin_rep = spin_to_table(table, 1, 1, 5, 0, 0, MAX_GRAD);
-	add_to_table(_("Extension type"), table, 1, 2, 5);
-	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
-	gtk_table_attach(GTK_TABLE(table), grad_opt_bound, 3, 4, 1, 2,
-		GTK_EXPAND | GTK_FILL, 0, 0, 5);
 	add_to_table(_("Offset"), table, 2, 0, 5);
 	grad_spin_ofs = spin_to_table(table, 2, 1, 5, 0, -MAX_GRAD, MAX_GRAD);
+	add_to_table(_("Gradient type"), table, 0, 2, 5);
+	grad_opt_type = wj_option_menu(gtypes, 4, 0, NULL, NULL);
+	add_to_table(_("Extension type"), table, 1, 2, 5);
+	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
+	/* Protect spinslider from option menus in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+	GtkWidget *hbox1, *hbox2;
+
+	align = widget_align_minsize(grad_opt_type, 0, 0);
+	hbox1 = gtk_hbox_new(FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(hbox1), align, TRUE, TRUE, 0);
+	gtk_table_attach(GTK_TABLE(table), hbox1, 3, 4, 0, 1,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	align = widget_align_minsize(grad_opt_bound, 0, 0);
+	hbox2 = gtk_hbox_new(FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(hbox2), align, TRUE, TRUE, 0);
+	gtk_table_attach(GTK_TABLE(table), hbox2, 3, 4, 1, 2,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+#else
+	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	gtk_table_attach(GTK_TABLE(table), grad_opt_bound, 3, 4, 1, 2,
+		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+#endif
 	add_to_table(_("Preview opacity"), table, 2, 2, 5);
 	grad_ss_pre = mt_spinslide_new(-1, -1);
 	mt_spinslide_set_range(grad_ss_pre, 0, 255);
@@ -2999,10 +3025,10 @@ void gradient_setup(int mode)
 
 	/* Cancel / Apply / OK */
 
-	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
+	align = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
-	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply), 1);
-	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+	OK_box_add(align, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply), 1);
+	gtk_box_pack_start(GTK_BOX(mainbox), align, FALSE, FALSE, 0);
 
 	/* Fill in values */
 
@@ -3011,4 +3037,12 @@ void gradient_setup(int mode)
 
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_widget_show(win);
+
+	/* Properly set up slider & option menus in GTK1 */
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_queue_resize(win);
+	gtk_container_set_resize_mode(GTK_CONTAINER(hbox), GTK_RESIZE_QUEUE);
+	gtk_container_set_resize_mode(GTK_CONTAINER(hbox1), GTK_RESIZE_QUEUE);
+	gtk_container_set_resize_mode(GTK_CONTAINER(hbox2), GTK_RESIZE_QUEUE);
+#endif
 }

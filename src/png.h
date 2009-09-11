@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -27,7 +27,6 @@
 #define NOT_XBM -12
 #define NOT_JPEG -13
 #define NOT_XPM -14
-#define NOT_TIFF -15
 #define NOT_GIF -16
 
 #define FILE_LIB_ERROR 123456

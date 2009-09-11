@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -89,6 +89,16 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int bor
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler);
 int wj_option_menu_get_history(GtkWidget *optmenu);
+
+// Workaround for broken option menu sizing in GTK2
+#if GTK_MAJOR_VERSION == 2
+void wj_option_realize(GtkWidget *widget, gpointer user_data);
+#define FIX_OPTION_MENU_SIZE(opt) \
+	gtk_signal_connect_after(GTK_OBJECT(opt), "realize", \
+		GTK_SIGNAL_FUNC(wj_option_realize), NULL)
+#else
+#define FIX_OPTION_MENU_SIZE(opt)
+#endif
 
 // Pixmap-backed drawing area
 
