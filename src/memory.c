@@ -2663,6 +2663,11 @@ void trace_ellipse(int w, int h, int *left, int *right)
 	int dx, dy;
 	double err, stx, sty, w2, h2;
 
+	if (left[0] > w) left[0] = w;
+	if (right[0] < w) right[0] = w;
+
+	if (h <= 1) return; /* Too small */
+
 	h2 = h * h;
 	w2 = w * w;
 	dx = w & 1;
@@ -2704,12 +2709,9 @@ void trace_ellipse(int w, int h, int *left, int *right)
 		err += 4.0 * (w2 - sty);
 	}
 
-	if (left[dy >> 1] > w) left[dy >> 1] = w;
-	if (right[dy >> 1] < w) right[dy >> 1] = w;
-
 	/* For too-flat ellipses */
-	if (left[(dy >> 1) + 1] > dx) left[(dy >> 1) + 1] = dx;
-	if (right[(dy >> 1) + 1] < w - 2) right[(dy >> 1) + 1] = w - 2;
+	if (left[1] > dx) left[1] = dx;
+	if (right[1] < w - 2) right[1] = w - 2;
 }
 
 void wjellipse(int xs, int ys, int w, int h, int type, int thick)
@@ -2775,7 +2777,7 @@ void mem_ellipse( int x1, int y1, int x2, int y2, int thick, int type )		// 0=fi
 	xl = abs( x2 - x1 ) + 1;
 	yl = abs( y2 - y1 ) + 1;
 
-	if ( xl < 2 || yl < 2 )
+	if ( xl <= 2 || yl <= 2 )
 	{
 		f_rectangle( xs, ys, xl, yl );		// Too small so draw rectangle instead
 		return;

@@ -748,7 +748,8 @@ void ani_but_preview()
 		GTK_SIGNAL_FUNC(ani_but_playstop)));
 	ani_play_state = FALSE;			// Stopped
 
-	ani_prev_slider = xpack(hbox3, mt_spinslide_new(200, -2));
+	ani_prev_slider = mt_spinslide_new(-2, -2);
+	xpack(hbox3, widget_align_minsize(ani_prev_slider, 200, -2));
 	mt_spinslide_set_range(ani_prev_slider, ani_frame1, ani_frame2);
 	mt_spinslide_set_value(ani_prev_slider, ani_frame1);
 	mt_spinslide_connect(ani_prev_slider,

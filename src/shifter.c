@@ -117,11 +117,9 @@ static void shift_play_stop()
 }
 
 
-static void shift_but_playstop( GtkWidget *widget )
+static void shift_but_playstop(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	gboolean play = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-
-	if ( play ) shift_play_start();
+	if (gtk_toggle_button_get_active(togglebutton)) shift_play_start();
 	else shift_play_stop();
 }
 
@@ -316,8 +314,8 @@ void pressed_shifter()
 	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show (hbox);
 
-	button = add_a_toggle(_("Play"), hbox, FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(shift_but_playstop), NULL);
+	button = pack(hbox, sig_toggle_button(_("Play"), FALSE, NULL,
+		GTK_SIGNAL_FUNC(shift_but_playstop)));
 	shift_play_state = FALSE;			// Stopped
 
 	shifter_label = xpack(hbox, gtk_label_new(""));

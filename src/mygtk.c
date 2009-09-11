@@ -636,6 +636,7 @@ void widget_set_minsize(GtkWidget *widget, int width, int height)
 GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 {
 	GtkWidget *align = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+	gtk_widget_show(align);
 	gtk_container_add(GTK_CONTAINER(align), widget);
 	widget_set_minsize(align, width, height);
 	return (align);
