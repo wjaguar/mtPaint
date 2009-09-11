@@ -1592,8 +1592,10 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
 			inifile_get_gboolean( "fontAntialias", FALSE ) );
 
-	if ( mem_img_bpp == 1 || GTK_MAJOR_VERSION == 1 )
-		gtk_widget_hide( text_toggle[0] );
+#if defined(U_MTK) || GTK_MAJOR_VERSION == 2
+	if (mem_img_bpp == 1)
+#endif
+		gtk_widget_hide(text_toggle[0]);
 
 	if (mem_channel != CHN_IMAGE)
 	{

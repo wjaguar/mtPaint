@@ -32,6 +32,9 @@
 #ifdef U_JPEG
 #include <jpeglib.h>
 #endif
+#ifdef U_JP2
+#include <openjpeg.h>
+#endif
 #ifdef U_TIFF
 #include <tiffio.h>
 #endif
@@ -49,7 +52,7 @@
 
 char preserved_gif_filename[256];
 int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir;
+int tga_RLE, tga_565, tga_defdir, jp2_rate;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
@@ -58,6 +61,13 @@ fformat file_formats[NUM_FTYPES] = {
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPJ },
 #else
+	{ "", "", "", 0},
+#endif
+#ifdef U_JP2
+	{ "JPEG2000", "jp2", "", FF_RGB | FF_COMPJ2 },
+	{ "J2K", "j2k", "", FF_RGB | FF_COMPJ2 },
+#else
+	{ "", "", "", 0},
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
@@ -245,6 +255,15 @@ static void deallocate_image(ls_settings *settings, int cmask)
 		default: break;
 		}
 	}
+}
+
+/* Build bitdepth translation table */
+static void set_xlate(unsigned char *xlat, int bpp)
+{
+	int i, n = (1 << bpp) - 1;
+	double d = 255.0 / (double)n;
+
+	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
 }
 
 static void ls_init(char *what, int save)
@@ -762,7 +781,8 @@ static int save_gif(char *file_name, ls_settings *settings)
 	int i, w = settings->width, h = settings->height, msg = -1;
 
 
-	if (settings->bpp != 1) return NOT_GIF;	// GIF save must be on indexed image
+	/* GIF save must be on indexed image */
+	if (settings->bpp != 1) return WRONG_FORMAT;
 
 	gif_map = MakeMapObject(256, NULL);
 	if (!gif_map) return -1;
@@ -895,7 +915,7 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 	int i;
 
 
-	if (settings->bpp == 1) return NOT_JPEG;
+	if (settings->bpp == 1) return WRONG_FORMAT;
 
 	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
 
@@ -940,6 +960,193 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 }
 #endif
 
+#ifdef U_JP2
+
+/* *** PREFACE ***
+ * OpenJPEG version 1.1.1 is wasteful in the extreme, with memory overhead of
+ * several times the unpacked image size. So it can fail to handle even such
+ * resolutions that fit into available memory with lots of room to spare. */
+
+static int load_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_dparameters_t par;
+	opj_dinfo_t *dinfo;
+	opj_cio_t *cio = NULL;
+	opj_image_t *image = NULL;
+	opj_image_comp_t *comp;
+	unsigned char xtb[256], *dest, *buf = NULL;
+	FILE *fp;
+	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
+	int *src, cmask = CMASK_IMAGE, codec = CODEC_JP2, res;
+
+
+	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
+
+	/* Read in the entire file */
+	fseek(fp, 0, SEEK_END);
+	l = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	buf = malloc(l);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto ffail;
+	res = FILE_LIB_ERROR;
+	i = fread(buf, 1, l, fp);
+	if (i < l) goto ffail;
+	fclose(fp);
+	if ((buf[0] == 0xFF) && (buf[1] == 0x4F)) codec = CODEC_J2K;
+
+	/* Decompress it */
+	dinfo = opj_create_decompress(codec);
+	if (!dinfo) goto lfail;
+	opj_set_default_decoder_parameters(&par);
+	opj_setup_decoder(dinfo, &par);
+	cio = opj_cio_open((opj_common_ptr)dinfo, buf, l);
+	if (!cio) goto lfail;
+	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
+	image = opj_decode(dinfo, cio);
+	opj_cio_close(cio);
+	opj_destroy_decompress(dinfo);
+	free(buf);
+	if (!image) goto ifail;
+	
+	/* Analyze what we got */
+// !!! OpenJPEG 1.1.1 does *NOT* properly set image->color_space !!!
+	if (image->numcomps < 3) /* Guess this is paletted */
+	{
+		settings->bpp = 1;
+		settings->colors = 256;
+		mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
+	}
+	else settings->bpp = 3;
+	if ((nc = settings->bpp) < image->numcomps) nc++ , cmask = CMASK_RGBA;
+	comp = image->comps;
+	settings->width = w = (comp->w + (1 << comp->factor) - 1) >> comp->factor;
+	settings->height = h = (comp->h + (1 << comp->factor) - 1) >> comp->factor;
+	for (i = 1; i < nc; i++) /* Check if all components are the same size */
+	{
+		comp++;
+		if ((w != (comp->w + (1 << comp->factor) - 1) >> comp->factor) ||
+			(h != (comp->h + (1 << comp->factor) - 1) >> comp->factor))
+			goto ifail;
+	}
+	if ((res = allocate_image(settings, cmask))) goto ifail;
+
+	/* Unpack data */
+	for (i = 0 , comp = image->comps; i < nc; i++ , comp++)
+	{
+		if (i < settings->bpp) /* Image */
+		{
+			dest = settings->img[CHN_IMAGE] + i;
+			step = settings->bpp;
+		}
+		else /* Alpha */
+		{
+			dest = settings->img[CHN_ALPHA];
+			if (!dest) break; /* No alpha allocated */
+			step = 1;
+		}
+		w0 = comp->w;
+		delta = comp->sgnd ? 1 << (comp->prec - 1) : 0;
+		shift = comp->prec > 8 ? comp->prec - 8 : 0;
+		set_xlate(xtb, comp->prec - shift);
+		for (j = 0; j < h; j++)
+		{
+			src = comp->data + j * w0;
+			for (k = 0; k < w; k++)
+			{
+				*dest = xtb[(src[k] + delta) >> shift];
+				dest += step;
+			}
+		}
+	}
+	res = 1;
+ifail:	if (pr) progress_end();
+	opj_image_destroy(image);
+	return (res);
+lfail:	opj_destroy_decompress(dinfo);
+	free(buf);
+	return (res);
+ffail:	free(buf);
+	fclose(fp);
+	return (res);
+}
+
+static int save_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_cparameters_t par;
+	opj_cinfo_t *cinfo;
+	opj_image_cmptparm_t channels[4];
+	opj_cio_t *cio = NULL;
+	opj_image_t *image;
+	unsigned char *src;
+	FILE *fp;
+	int i, j, k, nc, step;
+	int *dest, w = settings->width, h = settings->height, res = -1;
+
+
+	if (settings->bpp == 1) return WRONG_FORMAT;
+
+	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
+
+	/* Create intermediate structure */
+	nc = settings->img[CHN_ALPHA] ? 4 : 3;
+	memset(channels, 0, sizeof(channels));
+	for (i = 0; i < nc; i++)
+	{
+		channels[i].prec = channels[i].bpp = 8;
+		channels[i].dx = channels[i].dy = 1;
+		channels[i].w = settings->width;
+		channels[i].h = settings->height;
+	}
+	image = opj_image_create(nc, channels, CLRSPC_SRGB);
+	if (!image) goto ffail;
+	image->x0 = image->y0 = 0;
+	image->x1 = w; image->y1 = h;
+
+	/* Fill it */
+	if (!settings->silent) ls_init("JPEG2000", 1);
+	k = w * h;
+	for (i = 0; i < nc; i++)
+	{
+		if (i < 3)
+		{
+			src = settings->img[CHN_IMAGE] + i;
+			step = 3;
+		}
+		else
+		{
+			src = settings->img[CHN_ALPHA];
+			step = 1;
+		}
+		dest = image->comps[i].data;
+		for (j = 0; j < k; j++ , src += step) dest[j] = *src;
+	}
+
+	/* Compress it */
+	cinfo = opj_create_compress(settings->ftype == FT_JP2 ? CODEC_JP2 : CODEC_J2K);
+	if (!cinfo) goto fail;
+	opj_set_default_encoder_parameters(&par);
+	par.tcp_numlayers = 1;
+	par.tcp_rates[0] = jp2_rate;
+	par.cp_disto_alloc = 1;
+	opj_setup_encoder(cinfo, &par, image);
+	cio = opj_cio_open((opj_common_ptr)cinfo, NULL, 0);
+	if (!cio) goto fail;
+	if (!opj_encode(cinfo, cio, image, NULL)) goto fail;
+
+	/* Write it */
+	k = cio_tell(cio);
+	if (fwrite(cio->buffer, 1, k, fp) == k) res = 0;
+
+fail:	if (cio) opj_cio_close(cio);
+	opj_destroy_compress(cinfo);
+	opj_image_destroy(image);
+	if (!settings->silent) progress_end();
+ffail:	fclose(fp);
+	return (res);
+}
+#endif
+
 /* Slow-but-sure universal bitstream parsers; may read extra byte at the end */
 static void stream_MSB(unsigned char *src, unsigned char *dest, int cnt,
 	int bits, int bit0, int bitstep, int step)
@@ -971,15 +1178,6 @@ static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
 		bit0 += bitstep;
 		dest += step;
 	}
-}
-
-/* Build bitdepth translation table */
-static void set_xlate(unsigned char *xlat, int bpp)
-{
-	int i, n = (1 << bpp) - 1;
-	double d = 255.0 / (double)n;
-
-	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
 }
 
 #ifdef U_TIFF
@@ -2233,7 +2431,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	int i, j, cpp, w = settings->width, h = settings->height;
 
 
-	if (settings->bpp != 1) return NOT_XPM;
+	if (settings->bpp != 1) return WRONG_FORMAT;
 
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
@@ -2434,7 +2632,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	FILE *fp;
 	int i, j, k, l, w = settings->width, h = settings->height;
 
-	if ((settings->bpp != 1) || (settings->colors > 2)) return NOT_XBM;
+	if ((settings->bpp != 1) || (settings->colors > 2)) return WRONG_FORMAT;
 
 	/* Extract valid C identifier from name */
 	tmp = strrchr(file_name, DIR_SEP);
@@ -2601,7 +2799,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 	int w = settings->width, h = settings->height;
 
 
-	if ((settings->bpp != 1) || (settings->colors > 16)) return NOT_LSS;
+	if ((settings->bpp != 1) || (settings->colors > 16)) return WRONG_FORMAT;
 
 	i = w > LSS_HSIZE ? w : LSS_HSIZE;
 	buf = malloc(i);
@@ -3304,6 +3502,10 @@ int save_image(char *file_name, ls_settings *settings)
 #ifdef U_JPEG
 	case FT_JPEG: res = save_jpeg(file_name, settings); break;
 #endif
+#ifdef U_JP2
+	case FT_JP2:
+	case FT_J2K: res = save_jpeg2000(file_name, settings); break;
+#endif
 #ifdef U_TIFF
 	case FT_TIFF: res = save_tiff(file_name, settings); break;
 #endif
@@ -3354,7 +3556,7 @@ int load_image(char *file_name, int mode, int ftype)
 
 	init_ls_settings(&settings, NULL);
 	settings.mode = mode;
-	settings.ftype = FT_PNG;
+	settings.ftype = ftype;
 	settings.pal = pal;
 	/* Clear hotspot & transparency */
 	settings.hot_x = settings.hot_y = -1;
@@ -3373,6 +3575,10 @@ int load_image(char *file_name, int mode, int ftype)
 #endif
 #ifdef U_JPEG
 	case FT_JPEG: res = load_jpeg(file_name, &settings); break;
+#endif
+#ifdef U_JP2
+	case FT_JP2:
+	case FT_J2K: res = load_jpeg2000(file_name, &settings); break;
 #endif
 #ifdef U_TIFF
 	case FT_TIFF: res = load_tiff(file_name, &settings); break;
@@ -3585,31 +3791,43 @@ int detect_image_format(char *name)
 	fclose(fp);
 
 	/* Check all unambiguous signatures */
-	if (!strncmp(buf, "\x89PNG", 4)) return (FT_PNG);
-	if (!strncmp(buf, "\xFF\xD8", 2))
+	if (!memcmp(buf, "\x89PNG", 4)) return (FT_PNG);
+	if (!memcmp(buf, "\xFF\xD8", 2))
 #ifdef U_JPEG
 		return (FT_JPEG);
 #else
 		return (FT_NONE);
 #endif
-	if (!strncmp(buf, "II", 2) || !strncmp(buf, "MM", 2))
+	if (!memcmp(buf, "\0\0\0\x0C\x6A\x50\x20\x20\x0D\x0A\x87\x0A", 12))
+#ifdef U_JP2
+		return (FT_JP2);
+#else
+		return (FT_NONE);
+#endif
+	if (!memcmp(buf, "\xFF\x4F", 2))
+#ifdef U_JP2
+		return (FT_J2K);
+#else
+		return (FT_NONE);
+#endif
+	if (!memcmp(buf, "II", 2) || !memcmp(buf, "MM", 2))
 #ifdef U_TIFF
 		return (FT_TIFF);
 #else
 		return (FT_NONE);
 #endif
-	if (!strncmp(buf, "GIF8", 4))
+	if (!memcmp(buf, "GIF8", 4))
 #ifdef U_GIF
 		return (FT_GIF);
 #else
 		return (FT_NONE);
 #endif
-	if (!strncmp(buf, "BM", 2)) return (FT_BMP);
+	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
 
-	if (!strncmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
+	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
 
 	/* Check layers signature and version */
-	if (!strncmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
+	if (!memcmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
 	{
 		stop = strchr(buf, '\n');
 		if (!stop || (stop - buf > 32)) return (FT_NONE);

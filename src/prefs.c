@@ -34,7 +34,7 @@
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg,
-	*spinbutton_png, *spinbutton_recent, *spinbutton_silence;
+	*spinbutton_jp2, *spinbutton_png, *spinbutton_recent, *spinbutton_silence;
 static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef;
 
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
@@ -261,6 +261,7 @@ static void prefs_apply(GtkWidget *widget)
 	mem_xbm_hot_x = read_spin(spinbutton_hotx);
 	mem_xbm_hot_y = read_spin(spinbutton_hoty);
 	jpeg_quality = read_spin(spinbutton_jpeg);
+	jp2_rate = read_spin(spinbutton_jp2);
 	png_compression = read_spin(spinbutton_png);
 	recent_files = read_spin(spinbutton_recent);
 	silence_limit = read_spin(spinbutton_silence);
@@ -415,9 +416,10 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
-//		_("JPEG Save Quality (100=High)   "), _("PNG Compression (0=None)"),
-		_("JPEG Save Quality (100=High)"), _("PNG Compression (0=None)"),
-		_("Recently Used Files"), _("Progress bar silence limit") };
+//		_("JPEG Save Quality (100=High)   "),
+		_("JPEG Save Quality (100=High)"), _("JPEG2000 Compression (0=Lossless)"),
+		_("PNG Compression (0=None)"), _("Recently Used Files"),
+		_("Progress bar silence limit") };
 	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
 		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
@@ -473,17 +475,19 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 ///	---- TAB2 - FILES
 
 	page = add_new_page(notebook1, _("Files"));
-	table4 = add_a_table(6, 2, 10, page);
+	table4 = add_a_table(7, 2, 10, page);
 
-	for (i = 0; i < 7; i++) add_to_table(tab_tex2[i], table4, i, 0, 4);
+	for (i = 0; i < 8; i++) add_to_table(tab_tex2[i], table4, i, 0, 4);
 
+// !!! TODO: Change this into table-driven & see if code size decreases !!!
 	spinbutton_trans   = spin_to_table(table4, 0, 1, 4, mem_xpm_trans, -1, mem_cols - 1);
 	spinbutton_hotx    = spin_to_table(table4, 1, 1, 4, mem_xbm_hot_x, -1, mem_width - 1);
 	spinbutton_hoty    = spin_to_table(table4, 2, 1, 4, mem_xbm_hot_y, -1, mem_height - 1);
 	spinbutton_jpeg    = spin_to_table(table4, 3, 1, 4, jpeg_quality, 0, 100);
-	spinbutton_png     = spin_to_table(table4, 4, 1, 4, png_compression, 0, 9);
-	spinbutton_recent  = spin_to_table(table4, 5, 1, 4, recent_files, 0, MAX_RECENT);
-	spinbutton_silence = spin_to_table(table4, 6, 1, 4, silence_limit, 0, 28);
+	spinbutton_jp2     = spin_to_table(table4, 4, 1, 4, jp2_rate, 1, 100);
+	spinbutton_png     = spin_to_table(table4, 5, 1, 4, png_compression, 0, 9);
+	spinbutton_recent  = spin_to_table(table4, 6, 1, 4, recent_files, 0, MAX_RECENT);
+	spinbutton_silence = spin_to_table(table4, 7, 1, 4, silence_limit, 0, 28);
 	checkbutton_tgaRLE = add_a_toggle(_("TGA RLE Compression"), page, tga_RLE);
 	checkbutton_tga565 = add_a_toggle(_("Read 16-bit TGAs as 5:6:5 BGR"), page, tga_565);
 	checkbutton_tgadef = add_a_toggle(_("Write TGAs in bottom-up row order"), page, tga_defdir);

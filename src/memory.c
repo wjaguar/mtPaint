@@ -1613,43 +1613,52 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
  * and any kind of dithering is imprecise by definition anyway - WJ */
 
 typedef struct {
-	double xyz256[768];
+	double xyz256[768], gamma[256 * 2], lin[256 * 2];
 	int cspace, cdist, ncols;
-	unsigned char cmap[64 * 64 * 64], xcmap[64 * 64 * 8];
+	guint32 xcmap[64 * 64 * 2 + 128 * 2]; /* Cache bitmap */
+	guint32 lcmap[64 * 64 * 2]; /* Extension bitmap */
+	unsigned char cmap[64 * 64 * 64 + 128 * 64]; /* Index cache */
 } ctable;
 
 static ctable *ctp;
 
 static int lookup_srgb(double *srgb)
 {
-	int i, j, k, col[3];
+	int i, j, k, n = 0, col[3];
 	double d, td, td2, tmp[3];
 
-	/* Convert to 6-bit RGB coords */
-	col[0] = UNGAMMA64(srgb[0]);
-	col[1] = UNGAMMA64(srgb[1]);
-	col[2] = UNGAMMA64(srgb[2]);
+	/* Convert to 8-bit RGB coords */
+	col[0] = UNGAMMA256(srgb[0]);
+	col[1] = UNGAMMA256(srgb[1]);
+	col[2] = UNGAMMA256(srgb[2]);
+
+	/* Check if there is extended precision */
+	k = ((col[0] & 0xFC) << 10) + ((col[1] & 0xFC) << 4) + (col[2] >> 2);
+	if (ctp->lcmap[k >> 5] & (1 << (k & 31))) k = 64 * 64 * 64 +
+		ctp->cmap[k] * 64 + ((col[0] & 3) << 4) +
+		((col[1] & 3) << 2) + (col[2] & 3);
+	else n = 256; /* Use posterized values for 6-bit part */
 
 	/* Use colour cache if possible */
-	k = (col[0] << 12) + (col[1] << 6) + col[2];
-	if (ctp->xcmap[k >> 3] & (1 << (k & 7))) return (ctp->cmap[k]);
+	if (ctp->xcmap[k >> 5] & (1 << (k & 31))) return (ctp->cmap[k]);
 	
 	/* Prepare colour coords */
 	switch (ctp->cspace)
 	{
 	default:
 	case 0: /* RGB */
-		tmp[0] = col[0] * (1.0 / 63.0);
-		tmp[1] = col[1] * (1.0 / 63.0);
-		tmp[2] = col[2] * (1.0 / 63.0);
+		tmp[0] = ctp->lin[n + col[0]];
+		tmp[1] = ctp->lin[n + col[1]];
+		tmp[2] = ctp->lin[n + col[2]];
 		break;
 	case 1: /* sRGB */
-		tmp[0] = gamma64[col[0]];
-		tmp[1] = gamma64[col[1]];
-		tmp[2] = gamma64[col[2]];
+		tmp[0] = ctp->gamma[n + col[0]];
+		tmp[1] = ctp->gamma[n + col[1]];
+		tmp[2] = ctp->gamma[n + col[2]];
 		break;
 	case 2: /* L*X*N* */
-		rgb2LXN(tmp, gamma64[col[0]], gamma64[col[1]], gamma64[col[2]]);
+		rgb2LXN(tmp, ctp->gamma[n + col[0]], ctp->gamma[n + col[1]],
+			ctp->gamma[n + col[2]]);
 		break;
 	}
 
@@ -1686,7 +1695,7 @@ static int lookup_srgb(double *srgb)
 	}
 
 	/* Store & return result */
-	ctp->xcmap[k >> 3] |= 1 << (k & 7);
+	ctp->xcmap[k >> 5] |= 1 << (k & 31);
 	ctp->cmap[k] = j;
 	return (j);
 }
@@ -1700,7 +1709,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1;
 	unsigned char *ddata1, *ddata2, *src, *dest;
 	double *row0, *row1, *row2, *tmp;
-	double err, intd, extd, gamma6[256], lin6[256];
+	double err, intd, extd, *gamma6, *lin6;
 	double tc0[3], tc1[3], color0[3], color1[3];
 	double fdiv = 0, gamut[6] = {1, 1, 1, 0, 0, 0};
 
@@ -1720,23 +1729,48 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	row2 = row1 + rlen;
 	ctp = ALIGNTO(ddata2, double);
 
-	/* Prepare tables */
-	if (rgb8b) /* Keep all 8 bits of input */
+	/* Preprocess palette to find whether to extend precision and where */
+	for (i = 0; i < ncols; i++)
 	{
-		memcpy(gamma6, gamma256, sizeof(gamma6));
-		for (i = 0; i < 256; i++)
-			lin6[i] = i * (1.0 / 255.0);
-	}
-	else /* Posterize to 6 bits */
-	{
-		for (i = 0; i < 256; i++)
+		j = ((mem_pal[i].red & 0xFC) << 10) +
+			((mem_pal[i].green & 0xFC) << 4) +
+			(mem_pal[i].blue >> 2);
+		if (!(l = ctp->cmap[j]))
 		{
-			j = 63 * i;
-			j = (j + (j >> 8) + 0x80) >> 8;
-			gamma6[i] = gamma64[j];
-			lin6[i] = j * (1.0 / 63.0);
+			ctp->cmap[j] = l = i + 1;
+			ctp->xcmap[l * 4 + 2] = j;
 		}
+		k = ((mem_pal[i].red & 3) << 4) +
+			((mem_pal[i].green & 3) << 2) +
+			(mem_pal[i].blue & 3);
+		ctp->xcmap[l * 4 + (k & 1)] |= 1 << (k >> 1);
 	}
+	memset(ctp->cmap, 0, 64 * 64 * 64);
+	for (k = 0 , i = 4; i < 256 * 4; i += 4)
+	{
+		guint32 v = ctp->xcmap[i] | ctp->xcmap[i + 1];
+		/* Are 2+ colors there somewhere? */
+		if (!((v & (v - 1)) | (ctp->xcmap[i] & ctp->xcmap[i + 1])))
+			continue;
+		rgb8b = TRUE; /* Force 8-bit precision */
+		j = ctp->xcmap[i + 2];
+		ctp->lcmap[j >> 5] |= 1 << (j & 31);
+		ctp->cmap[j] = k++;
+	}
+	memset(ctp->xcmap, 0, 257 * 4 * sizeof(guint32));
+
+	/* Prepare tables */
+	for (i = 0; i < 256; i++)
+	{
+		j = (i & 0xFC) + (i >> 6);
+		ctp->gamma[i] = gamma256[i];
+		ctp->gamma[i + 256] = gamma256[j];
+		ctp->lin[i] = i * (1.0 / 255.0);
+		ctp->lin[i + 256] = j * (1.0 / 255.0);
+	}
+	/* Keep all 8 bits of input or posterize to 6 bits? */
+	i = rgb8b ? 0 : 256;
+	gamma6 = ctp->gamma + i; lin6 = ctp->lin + i;
 	tmp = ctp->xyz256;
 	for (i = 0; i < ncols; i++ , tmp += 3)
 	{

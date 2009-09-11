@@ -80,6 +80,7 @@ static inilist ini_int[] = {
 	{ "jpegQuality",	&jpeg_quality,		85  },
 	{ "pngCompression",	&png_compression,	9   },
 	{ "tgaRLE",		&tga_RLE,		0   },
+	{ "jpeg2000Rate",	&jp2_rate,		1   },
 	{ "silence_limit",	&silence_limit,		18  },
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },

@@ -19,13 +19,8 @@
 
 //	Loading/Saving errors
 
-#define NOT_INDEXED -10
+#define WRONG_FORMAT -10
 #define TOO_BIG -11
-#define NOT_XBM -12
-#define NOT_JPEG -13
-#define NOT_XPM -14
-#define NOT_LSS -15
-#define NOT_GIF -16
 
 #define FILE_LIB_ERROR 123456
 #define FILE_MEM_ERROR 123457
@@ -42,20 +37,22 @@
 #define FT_NONE     0
 #define FT_PNG      1
 #define FT_JPEG     2
-#define FT_TIFF     3
-#define FT_GIF      4
-#define FT_BMP      5
-#define FT_XPM      6
-#define FT_XBM      7
-#define FT_LSS      8
-#define FT_TGA      9
-#define FT_PCX      10
-#define FT_GPL      11
-#define FT_TXT      12
-#define FT_PAL      13
-#define FT_LAYERS1  14
-#define FT_LAYERS2  15
-#define NUM_FTYPES  16
+#define FT_JP2      3
+#define FT_J2K      4
+#define FT_TIFF     5
+#define FT_GIF      6
+#define FT_BMP      7
+#define FT_XPM      8
+#define FT_XBM      9
+#define FT_LSS      10
+#define FT_TGA      11
+#define FT_PCX      12
+#define FT_GPL      13
+#define FT_TXT      14
+#define FT_PAL      15
+#define FT_LAYERS1  16
+#define FT_LAYERS2  17
+#define NUM_FTYPES  18
 
 /* Features supported by file formats */
 #define FF_BW      0x0001 /* Black and white */
@@ -70,13 +67,14 @@
 #define FF_ALPHA   0x0060 /* Alpha channel for all images */
 #define FF_MULTI   0x0080 /* Multiple channels */
 #define FF_TRANS   0x0100 /* Indexed transparency */
-#define FF_COMP    0x0600 /* Configurable compression */
+#define FF_COMP    0x0E00 /* Configurable compression */
 #define FF_COMPJ   0x0200 /* JPEG compression */
 #define FF_COMPZ   0x0400 /* zlib compression */
 #define FF_COMPR   0x0600 /* RLE compression */
-#define FF_SPOT    0x0800 /* "Hot spot" */
-#define FF_LAYER   0x1000 /* Layered images */
-#define FF_PALETTE 0x2000 /* Palette file (not image) */
+#define FF_COMPJ2  0x0800 /* JPEG2000 compression */
+#define FF_SPOT    0x1000 /* "Hot spot" */
+#define FF_LAYER   0x2000 /* Layered images */
+#define FF_PALETTE 0x4000 /* Palette file (not image) */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -99,6 +97,7 @@ typedef struct {
 	int jpeg_quality;
 	int png_compression;
 	int tga_RLE;
+	int jp2_rate;
 	int gif_delay;
 	int rgb_trans;
 	int silent;
@@ -110,7 +109,7 @@ typedef struct {
 
 char preserved_gif_filename[256];
 int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
-int tga_RLE, tga_565, tga_defdir;
+int tga_RLE, tga_565, tga_defdir, jp2_rate;
 
 int file_type_by_ext(char *name, guint32 mask);
 

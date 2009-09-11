@@ -6,6 +6,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.15	2007-?-?
 
+	* Polish translation updated by Groszek150(LucaS)
 	* Actions section added to File menu
 	* Sharper image reduction toggle added to "Scale Canvas"
 	* Spacing for non-continuous tools is now configurable - right click the continuous mode toggle
@@ -13,6 +14,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* PNG compression level made configurable
 	* "Unassociate Alpha" operation added to Channels menu
 	* TGA file format save/load added
+	* JPEG2000 file format save/load added
 	* Max-min quantizer added - creates small palettes with higher saturation and contrast
 	* Full error precision toggle added to settings page of 'Convert To Indexed' window
 	* Lanczos3 rescaling filter removed due to unfavourable results

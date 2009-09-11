@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.14.27"
-MT_DATE="2007-03-30"
+MT_V="3.14.28"
+MT_DATE="2007-04-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -21,6 +21,7 @@ ICON_SET=icons1
 
 STATIC_PNG=
 STATIC_JPEG=
+STATIC_JP2=
 STATIC_TIFF=
 STATIC_GIF=
 AS_NEEDED=
@@ -72,7 +73,7 @@ then
 	GTK=2
 	IS_LIB()
 	{
-		redir -e /dev/null ld -$1 -o ____3742.tmp -L/lib > /dev/null 2>&1
+		redir -e /dev/null ld -$1 -o _conf.tmp -L/lib > /dev/null 2>&1
 	}
 else
 	OS="GNU/Linux"
@@ -84,7 +85,7 @@ else
 	fi
 	IS_LIB()
 	{
-		ld -$1 -o /dev/null -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		ld -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 fi
 
@@ -107,12 +108,21 @@ else
 	NJPEG=NO
 fi
 
+if IS_LIB "lopenjpeg"
+then
+	NJP2=YES
+else
+	NJP2=NO
+fi
+
 if IS_LIB "ltiff"
 then
 	NTIFF=YES
 else
 	NTIFF=NO
 fi
+
+rm _conf.tmp
 
 for A in "$@"
 do
@@ -135,6 +145,9 @@ do
 		"jpeg" )	NJPEG=YES;;
 		"nojpeg" )	NJPEG=NO;;
 		"staticjpeg" )	STATIC_JPEG=JPEG;;
+		"jp2" )		NJP2=YES;;
+		"nojp2" )	NJP2=NO;;
+		"staticjp2" )	STATIC_JP2=JPEG2000;;
 		"tiff" )	NTIFF=YES;;
 		"notiff" )	NTIFF=NO;;
 		"statictiff" )	STATIC_TIFF=TIFF;;
@@ -167,6 +180,17 @@ do
 		"man" )		MT_MAN=YES;;
 		"pod" )		MT_POD=YES;;
 		"--help" )	HELP=0;;
+		"mtk="* )	MTK_DIR="`echo "$A" | sed -e "s/mtk=//"`"
+				mkdir $MTK_DIR/mtpaint-$MT_V
+				cp -ar $MTK_DIR/locale $MTK_DIR/mtpaint-$MT_V
+				MT_LANG_DEST="$MTK_DIR/mtpaint-$MT_V/locale"
+				MT_PO_DEST="locale"
+				LIN_BIN_INSTALL="$MTK_DIR/mtpaint-$MT_V"
+				WIN_BIN_INSTALL=$LIN_BIN_INSTALL
+				MTK_XFT=YES
+				;;
+		"noxft" )	MTK_XFT=NO
+				;;
 		"--bindir="* )	LIN_BIN_INSTALL="`echo "$A" | sed -e "s/--bindir=//"`"
 				WIN_BIN_INSTALL=$LIN_BIN_INSTALL;;
 		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
@@ -258,6 +282,8 @@ then
 	echo "win ............. Configure for Windows MinGW / MSYS"
 	echo "gtk1 ............ Configure for GTK+1"
 	echo "gtk2 ............ Configure for GTK+2"
+	echo "mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0"
+	echo "noxft ........... Don't use Xft in MTK"
 	echo
 	echo "cflags .......... Use CFLAGS environment variable"
 	echo "--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64"
@@ -276,6 +302,9 @@ then
 	echo "jpeg ............ Use libjpeg"
 	echo "nojpeg .......... Don't use libjpeg"
 	echo "staticjpeg ...... Statically link JPEG library"
+	echo "jp2 ............. Use libopenjpeg"
+	echo "nojp2 ........... Don't use libopenjpeg"
+	echo "staticjp2 ....... Statically link JPEG 2000 library"
 	echo "tiff ............ Use libtiff"
 	echo "notiff .......... Don't use libtiff"
 	echo "statictiff ...... Statically link TIFF library"
@@ -307,6 +336,16 @@ else
 	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
 	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
 
+	if [ "$MTK_DIR" ]
+	then
+		BIN_INSTALL=$LIN_BIN_INSTALL
+		GTK_INCLUDE="-I$MTK_DIR/include -I$MTK_DIR/include/glib -I/usr/include/X11 -DU_MTK"
+		GTK_LIB="-L/usr/lib -L/usr/X11R6/lib $MTK_DIR/lib/libgtk.a $MTK_DIR/lib/libgdk.a $MTK_DIR/lib/libgmodule.a $MTK_DIR/lib/libglib.a -ldl -lXi -lXext -lX11 -lm"
+		if [ "$MTK_XFT" = "YES" ]
+		then
+			GTK_LIB="$GTK_LIB -lXft"
+		fi
+	else
 	if [ "$OS" = "GNU/Linux" ]
 	then
 		BIN_INSTALL=$LIN_BIN_INSTALL
@@ -345,6 +384,7 @@ else
 			GTK_LIB="-L/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 -lm -mwindows"
 		fi
 	fi
+	fi	# MTK
 
 	if [ "$IMAGE_LIBDIR" ]
 	then
@@ -367,6 +407,15 @@ else
 	then
 		LIB_NAME jpeg "$STATIC_JPEG"
 		I_EX="$I_EX -DU_JPEG"
+	fi
+	if [ "$NJP2" = "YES" ]
+	then
+		LIB_NAME openjpeg "$STATIC_JP2"
+		I_EX="$I_EX -DU_JP2"
+		if [ "$STATIC_JP2" ] || [ "$OS" = "MinGW/MSYS" ]
+		then
+			I_EX="$I_EX -DOPJ_STATIC"
+		fi
 	fi
 	if [ "$NTIFF" = "YES" ]
 	then
@@ -435,11 +484,6 @@ else
 		cd ..
 	fi
 
-	if [ "$OSTYPE" = "msys" ]
-	then
-		rm ____3742.tmp
-	fi
-
 	echo
 	echo
 	echo --------------------------
@@ -448,7 +492,15 @@ else
 	echo
 	echo "System              $OS"
 	echo
-	echo "GTK+ version        $GTK"
+	echo -n "Toolkit             "
+if [ "$MTK_DIR" ]
+then
+	echo "MTK - $MTK_DIR"
+	echo
+	echo "Use Xft             $MTK_XFT"
+else
+	echo "GTK+$GTK"
+fi
 	echo
 if [ "$CFLAG" ]
 then
@@ -467,6 +519,8 @@ fi
 	echo "Use GIF             $NGIF"
 	echo
 	echo "Use JPEG            $NJPEG"
+	echo
+	echo "Use JPEG 2000       $NJP2"
 	echo
 	echo "Use TIFF            $NTIFF"
 	echo
@@ -493,7 +547,7 @@ then
 	echo "Customized for      $MT_CUSTOM"
 	echo
 fi
-if [ "$STATIC_PNG" ] || [ "$STATIC_GIF" ] || [ "$STATIC_JPEG" ] || [ "$STATIC_TIFF" ]
+if [ "$STATIC_PNG" ] || [ "$STATIC_GIF" ] || [ "$STATIC_JPEG" ] || [ "$STATIC_JP2" ] || [ "$STATIC_TIFF" ]
 then
 	echo -n "Static libraries    "
 	if [ "$STATIC_PNG" ]
@@ -507,6 +561,10 @@ then
 	if [ "$STATIC_JPEG" ]
 	then
 		echo -n "$STATIC_JPEG "
+	fi
+	if [ "$STATIC_JP2" ]
+	then
+		echo -n "$STATIC_JP2 "
 	fi
 	if [ "$STATIC_TIFF" ]
 	then
