@@ -382,7 +382,7 @@ int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colou
 int mem_cols_used(int max_count);		// Count colours used in main RGB image
 int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog);
 			// Count colours used in RGB chunk and dump to found table
-void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready for DL code
+void mem_cols_found(png_color *userpal);	// Convert colours list into palette
 
 
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
@@ -420,6 +420,7 @@ void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
 void mem_gauss(double radiusX, double radiusY, int gcor);
 void mem_unsharp(double radius, double amount, int threshold, int gcor);
 void mem_dog(double radiusW, double radiusN, int norm, int gcor);
+void mem_kuwahara(int r, int gcor);
 
 
 /// PALETTE PROCS
@@ -433,13 +434,13 @@ int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 	png_color *pal2 );
 void mem_greyscale(int gcor);		// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
-int mem_convert_indexed(int img);	// Convert image to Indexed Palette
+int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
-	unsigned char userpal[3][256]);
+	png_color *userpal);
 //	Quantize image using PNN algorithm
 int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
-	unsigned char userpal[3][256]);
+	png_color *userpal);
 //	Convert RGB->indexed using error diffusion with variety of options
 int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int dist, int limit, int selc, int serpent, int rgb8b, double emult);

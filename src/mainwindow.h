@@ -136,7 +136,8 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_EMBOSS,
 	FILT_BACT,
 	FILT_THRES,
-	FILT_UALPHA
+	FILT_UALPHA,
+	FILT_KUWAHARA
 };
 
 // New layer sources for ACT_LR_ADD

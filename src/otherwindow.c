@@ -2106,7 +2106,8 @@ static void click_quantize_radio(GtkWidget *widget, gpointer data)
 static void click_quantize_ok(GtkWidget *widget, gpointer data)
 {
 	int i, dither, new_cols, err = 0;
-	unsigned char *old_image = mem_img[CHN_IMAGE], newpal[3][256];
+	png_color newpal[256];
+	unsigned char *old_image = mem_img[CHN_IMAGE];
 	double efrac = 0.0;
 
 	/* Dithering filters */
@@ -2148,7 +2149,8 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	{
 	case 0:	/* Use image colours */
 		new_cols = quantize_cols;
-		err = mem_convert_indexed(dither_mode >= 0);
+		mem_cols_found(newpal);
+		if (dither_mode >= 0) err = mem_convert_indexed();
 		dither = DITH_MAX;
 		break;
 	default:
@@ -2165,17 +2167,13 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		break;
 	}
 
-	if (quantize_mode > 1)
+	if (err) dither = DITH_MAX;
+	else if (quantize_mode != 1)
 	{
-		for (i = 0; i < new_cols; i++)
-		{
-			mem_pal[i].red = newpal[0][i];
-			mem_pal[i].green = newpal[1][i];
-			mem_pal[i].blue = newpal[2][i];
-		}
+		memcpy(mem_pal, newpal, new_cols * sizeof(*mem_pal));
+		mem_cols = new_cols;
 	}
 
-	if (err) dither = DITH_MAX;
 	switch (dither)
 	{
 	case DITH_NONE:
@@ -2213,7 +2211,6 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		check_undo_paste_bpp();
 	}
 
-	mem_cols = new_cols;
 	canvas_undo_chores();
 }
 

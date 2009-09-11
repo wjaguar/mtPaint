@@ -735,7 +735,7 @@ static void create_frames_ani()
 	image_state *state;
 	ls_settings settings;
 	png_color pngpal[256], *trans;
-	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256];
+	unsigned char *layer_rgb, *irgb = NULL;
 	char output_path[PATHBUF], *command, *wild_path;
 	int a, b, k, i, cols, layer_w, layer_h, npt, l = 0;
 
@@ -842,19 +842,12 @@ static void create_frames_ani()
 							// Count colours in image
 
 			if ( cols <= 256 )	// If <=256 convert directly
-				mem_cols_found_dl(newpal);	// Get palette
+				mem_cols_found(pngpal);	// Get palette
 			else			// If >256 use Wu to quantize
 			{
 				cols = 256;
 				if (wu_quant(layer_rgb, layer_w, layer_h, cols,
-					newpal)) goto failure2;
-			}
-
-			for ( i=0; i<256; i++ )		// Assemble palette for GIF export
-			{
-				pngpal[i].red	= newpal[0][i];
-				pngpal[i].green	= newpal[1][i];
-				pngpal[i].blue	= newpal[2][i];
+					pngpal)) goto failure2;
 			}
 
 			// Create new indexed image
@@ -868,8 +861,7 @@ static void create_frames_ani()
 				npt = PNG_2_INT(*trans);
 				for (i = 0; i < cols; i++)
 				{	// Does it exist in the composite frame?
-					if (RGB_2_INT(newpal[0][i], newpal[1][i],
-						newpal[2][i]) != npt) continue;
+					if (PNG_2_INT(pngpal[i]) != npt) continue;
 					// Transparency found so note it
 					settings.xpm_trans = i;
 					break;

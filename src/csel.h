@@ -1,5 +1,5 @@
 /*	csel.h
-	Copyright (C) 2006 Dmitry Groshev
+	Copyright (C) 2006-2008 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -39,6 +39,13 @@ double gamma256[256], gamma64[64];
 double midgamma256[256], midgamma64[64];
 double kgamma256, kgamma64;
 extern unsigned char ungamma256[], ungamma64[];
+
+/* This gamma table is for when we need numeric stability */
+#ifdef NATIVE_DOUBLES
+#define Fgamma256 gamma256
+#else
+float Fgamma256[256];
+#endif
 
 #define UNGAMMA64(X) (ungamma64[(int)((X) * kgamma64)] - \
 	((X) < midgamma64[ungamma64[(int)((X) * kgamma64)]]))

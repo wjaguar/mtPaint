@@ -327,7 +327,7 @@ void pressed_edge_detect()
 	update_all_views();
 }
 
-int do_fx(GtkWidget *spin, gpointer fdata)
+static int do_fx(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
@@ -359,7 +359,7 @@ void pressed_emboss()
 	update_all_views();
 }
 
-int do_gauss(GtkWidget *box, gpointer fdata)
+static int do_gauss(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *spinX, *spinY, *toggleXY;
 	double radiusX, radiusY;
@@ -407,7 +407,7 @@ void pressed_gauss()
 	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, FALSE);
 }
 
-int do_unsharp(GtkWidget *box, gpointer fdata)
+static int do_unsharp(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *table, *spinR, *spinA, *spinT;
 	double radius, amount;
@@ -449,7 +449,7 @@ void pressed_unsharp()
 	filter_window(_("Unsharp Mask"), box, do_unsharp, NULL, FALSE);
 }
 
-int do_dog(GtkWidget *box, gpointer fdata)
+static int do_dog(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *table, *spinW, *spinN;
 	double radW, radN;
@@ -493,6 +493,32 @@ void pressed_dog()
 	filter_window(_("Difference of Gaussians"), box, do_dog, NULL, FALSE);
 }
 
+static int do_kuwahara(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *spin = BOX_CHILD_0(box), *gamma = BOX_CHILD_1(box);
+	int r, gcor;
+
+	r = read_spin(spin);
+	gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gamma));
+
+	spot_undo(UNDO_COL); // Always processes RGB image channel
+	mem_kuwahara(r, gcor);
+	mem_undo_prepare();
+
+	return (TRUE);
+}
+
+void pressed_kuwahara()
+{
+	GtkWidget *box;
+
+	box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	pack(box, add_a_spin(1, 1, 127));
+	pack(box, gamma_toggle());
+	filter_window(_("Kuwahara-Nagao Blur"), box, do_kuwahara, NULL, FALSE);
+}
+
 void pressed_convert_rgb()
 {
 	int i = mem_convert_rgb();
@@ -533,7 +559,7 @@ void pressed_rotate_sel(int dir)
 	}
 }
 
-int do_rotate_free(GtkWidget *box, gpointer fdata)
+static int do_rotate_free(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *spin = BOX_CHILD_0(box);
 	int j, smooth = 0, gcor = 0;
@@ -564,12 +590,11 @@ int do_rotate_free(GtkWidget *box, gpointer fdata)
 
 void pressed_rotate_free()
 {
-	GtkWidget *box, *spin;
+	GtkWidget *box;
 
 	box = gtk_vbox_new(FALSE, 5);
 	gtk_widget_show(box);
-	spin = pack(box, add_a_spin(45, -360, 360));
-	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
+	pack(box, add_float_spin(45, -360, 360));
 	if (mem_img_bpp == 3)
 	{
 		pack(box, gamma_toggle());

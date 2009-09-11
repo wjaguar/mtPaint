@@ -139,6 +139,7 @@ void pressed_emboss();
 void pressed_gauss();
 void pressed_unsharp();
 void pressed_dog();
+void pressed_kuwahara();
 
 void pressed_clip_alpha_scale();
 void pressed_clip_alphamask();

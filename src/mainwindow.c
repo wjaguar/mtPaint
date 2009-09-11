@@ -66,6 +66,7 @@ static inilist ini_bool[] = {
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "colorGrid",		&color_grid,		FALSE },
+	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -102,10 +103,12 @@ static inilist ini_int[] = {
 	{ "lastspalType",	&spal_mode,		2   },
 	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
-	{ "gridRGB",		grid_rgb + 0,		RGB_2_INT( 50,  50,  50) },
-	{ "gridBorder",		grid_rgb + 1,		RGB_2_INT(  0, 219,   0) },
-	{ "gridTrans",		grid_rgb + 2,		RGB_2_INT(  0, 109, 109) },
-	{ "gridTile",		grid_rgb + 3,		RGB_2_INT(170, 170, 170) },
+	{ "tileWidth",		&tgrid_dx,		32  },
+	{ "tileHeight",		&tgrid_dy,		32  },
+	{ "gridRGB",		grid_rgb + 0,	RGB_2_INT( 50,  50,  50) },
+	{ "gridBorder",		grid_rgb + 1,	RGB_2_INT(  0, 219,   0) },
+	{ "gridTrans",		grid_rgb + 2,	RGB_2_INT(  0, 109, 109) },
+	{ "gridTile",		grid_rgb + 3,	RGB_2_INT(170, 170, 170) },
 	{ NULL,			NULL }
 };
 
@@ -3983,6 +3986,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_threshold(); break;
 	case FILT_UALPHA:
 		pressed_unassociate(); break;
+	case FILT_KUWAHARA:
+		pressed_kuwahara(); break;
 	}
 }
 
@@ -4546,6 +4551,7 @@ static menu_item main_menu[] = {
 	{ _("/Effects/Unsharp Mask ..."), -1, 0, NEED_NOIDX, NULL, FILT_UNSHARP, 0 },
 	{ _("/Effects/Soften ..."), -1, 0, NEED_NOIDX, NULL, FILT_SOFTEN, 0 },
 	{ _("/Effects/Gaussian Blur ..."), -1, 0, NEED_NOIDX, NULL, FILT_GAUSS, 0 },
+	{ _("/Effects/Kuwahara-Nagao Blur ..."), -1, 0, NEED_24, NULL, FILT_KUWAHARA, 0 },
 	{ _("/Effects/Emboss"), -1, 0, NEED_NOIDX, NULL, FILT_EMBOSS, 0 },
 	{ _("/Effects/sep2"), -4 },
 	{ _("/Effects/Bacteria ..."), -1, 0, NEED_IDX, NULL, FILT_BACT, 0 },

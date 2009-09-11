@@ -1,5 +1,5 @@
 /*	csel.c
-	Copyright (C) 2006 Dmitry Groshev
+	Copyright (C) 2006-2008 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -46,6 +46,10 @@ int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
 double gamma256[256], gamma64[64];
 double midgamma256[256], midgamma64[64];
+
+#ifndef NATIVE_DOUBLES
+float Fgamma256[256];
+#endif
 
 static float CIE[CIENUM + 2];
 static float EXP[EXPNUM];
@@ -288,6 +292,13 @@ void init_cols(void)
 	make_CIE();
 	make_EXP();
 	make_rgb_xyz();
+#ifndef NATIVE_DOUBLES
+	/* Fill reduced-precision gamma table */
+	{
+		int i;
+		for (i = 0; i < 256; i++) Fgamma256[i] = gamma256[i];
+	}
+#endif
 }
 
 /* Get L*X*N* triple */

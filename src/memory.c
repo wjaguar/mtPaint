@@ -2106,21 +2106,25 @@ int mem_convert_rgb()			// Convert image to RGB
 	return 0;
 }
 
-// Convert RGB image to Indexed Palette - call after mem_cols_used
-int mem_convert_indexed(int img)
+// Convert colours list into palette
+void mem_cols_found(png_color *userpal)
 {
-	unsigned char *old_image, *new_image;
-	int i, j, k, pix;
+	int i, j;
 
 	for (i = 0; i < 256; i++)
 	{
 		j = found[i];
-		mem_pal[i].red = INT_2_R(j);
-		mem_pal[i].green = INT_2_G(j);
-		mem_pal[i].blue = INT_2_B(j);
+		userpal[i].red = INT_2_R(j);
+		userpal[i].green = INT_2_G(j);
+		userpal[i].blue = INT_2_B(j);
 	}
+}
 
-	if (!img) return (0);
+// Convert RGB image to Indexed Palette - call after mem_cols_used
+int mem_convert_indexed()
+{
+	unsigned char *old_image, *new_image;
+	int i, j, k, pix;
 
 	old_image = mem_undo_previous(CHN_IMAGE);
 	new_image = mem_img[CHN_IMAGE];
@@ -2145,7 +2149,7 @@ int mem_convert_indexed(int img)
 
 #define HISTSIZE (64 * 64 * 64)
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
-	unsigned char userpal[3][256])
+	png_color *userpal)
 {
 	int i, j, k, ii, r, g, b, dr, dg, db, l = width * height, *hist;
 
@@ -2170,9 +2174,9 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	}
 
 	/* Make it first */
-	userpal[0][0] = r = j >> 12;
-	userpal[1][0] = g = (j >> 6) & 0x3F;
-	userpal[2][0] = b = j & 0x3F;
+	userpal[0].red = r = j >> 12;
+	userpal[0].green = g = (j >> 6) & 0x3F;
+	userpal[0].blue = b = j & 0x3F;
 
 	/* Find distances from all others to it */
 	if (quant_to > 1)
@@ -2201,9 +2205,9 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 		if (j < 0) break;
 
 		/* Store into palette */
-		userpal[0][ii] = r = j >> 12;
-		userpal[1][ii] = g = (j >> 6) & 0x3F;
-		userpal[2][ii] = b = j & 0x3F;
+		userpal[ii].red = r = j >> 12;
+		userpal[ii].green = g = (j >> 6) & 0x3F;
+		userpal[ii].blue = b = j & 0x3F;
 
 		/* Update distances */
 		for (i = 0; i < HISTSIZE; i++)
@@ -2220,14 +2224,14 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	/* Upconvert colors */
 	for (i = 0; i < ii; i++)
 	{
-		userpal[0][i] = (userpal[0][i] << 2) + (userpal[0][i] >> 4);
-		userpal[1][i] = (userpal[1][i] << 2) + (userpal[1][i] >> 4);
-		userpal[2][i] = (userpal[2][i] << 2) + (userpal[2][i] >> 4);
+		userpal[i].red = (userpal[i].red << 2) + (userpal[i].red >> 4);
+		userpal[i].green = (userpal[i].green << 2) + (userpal[i].green >> 4);
+		userpal[i].blue = (userpal[i].blue << 2) + (userpal[i].blue >> 4);
 	}
 
 	/* Clear empty slots */
 	for (i = ii; i < quant_to; i++)
-		userpal[0][i] = userpal[1][i] = userpal[2][i] = 0;
+		userpal[i].red = userpal[i].green = userpal[i].blue = 0;
 
 	free(hist);
 	return (0);
@@ -2267,7 +2271,7 @@ static void find_nn(pnnbin *bins, int idx)
 }
 
 int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
-	unsigned char userpal[3][256])
+	png_color *userpal)
 {
 	unsigned short heap[32769];
 	pnnbin *bins, *tb, *nb;
@@ -2388,15 +2392,15 @@ int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
 	i = j = 0;
 	while (TRUE)
 	{
-		userpal[0][j] = rint(bins[i].rc);
-		userpal[1][j] = rint(bins[i].gc);
-		userpal[2][j++] = rint(bins[i].bc);
+		userpal[j].red = rint(bins[i].rc);
+		userpal[j].green = rint(bins[i].gc);
+		userpal[j++].blue = rint(bins[i].bc);
 		if (!(i = bins[i].fw)) break;
 	}
 
 	/* Clear empty slots */
 	for (; j < quant_to; j++)
-		userpal[0][j] = userpal[1][j] = userpal[2][j] = 0;
+		userpal[j].red = userpal[j].green = userpal[j].blue = 0;
 	res = 0;
 
 quit:	progress_end();
@@ -6150,19 +6154,6 @@ int mem_cols_used(int max_count)			// Count colours used in main RGB image
 		max_count, 1));
 }
 
-void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
-{
-	int i, j;
-
-	for (i = 0; i < 256; i++)
-	{
-		j = found[i];
-		userpal[0][i] = INT_2_R(j);
-		userpal[1][i] = INT_2_G(j);
-		userpal[2][i] = INT_2_B(j);
-	}
-}
-
 int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			// Count colours used in RGB chunk
 {
@@ -6991,6 +6982,275 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 	dog_filter(&gd, mem_channel, norm, gcor);
 	progress_end();
 	free(gd.tmp);
+}
+
+
+/* !!! Kuwahara-Nagao filter's radius is limited to 255, to use byte offsets */
+typedef struct {
+	int *idx;	// Index array
+	double *rs;	// Sum of gamma-corrected RGB if using gamma
+	int *avg;	// Sum of pixel values (for average)
+	int *dis;	// Sum of pixel values squared (for variance)
+	unsigned char *min;	// Offset to minimum-variance square
+	double r2i;	// 1/r^2 to multiply things with
+	int w, r;	// Row width & filter radius
+	int gcor;	// Gamma correction toggle
+	int l, rl;	// Row array lengths
+} kuwahara_info;
+
+/* This function uses running sums, which gives x87 FPU's "precision jitter"
+ * a chance to accumulate; to avoid, reduced-precision gamma is used - WJ */
+static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *info)
+{
+	double rs[3] = { 0.0, 0.0, 0.0 };
+	int avg[3] = { 0, 0, 0 }, dis[3] = { 0, 0, 0 };
+	int i, w, r = info->r, gc = info->gcor, *idx = info->idx;
+
+	w = info->w + r++;
+	for (i = -r; i < w; i++)
+	{
+		unsigned char *tvv;
+		int tv, i3;
+
+		tvv = src + idx[i];
+		avg[0] += (tv = tvv[0]);
+		dis[0] += tv * tv;
+		avg[1] += (tv = tvv[1]);
+		dis[1] += tv * tv;
+		avg[2] += (tv = tvv[2]);
+		dis[2] += tv * tv;
+		if (gc)
+		{
+			rs[0] += Fgamma256[tvv[0]];
+			rs[1] += Fgamma256[tvv[1]];
+			rs[2] += Fgamma256[tvv[2]];
+		}
+		if (i < 0) continue;
+
+		tvv = src + idx[i - r];
+		avg[0] -= (tv = tvv[0]);
+		dis[0] -= tv * tv;
+		avg[1] -= (tv = tvv[1]);
+		dis[1] -= tv * tv;
+		avg[2] -= (tv = tvv[2]);
+		dis[2] -= tv * tv;
+		i3 = (base + i) * 3;
+		if (add)
+		{
+			info->avg[i3 + 0] += avg[0];
+			info->avg[i3 + 1] += avg[1];
+			info->avg[i3 + 2] += avg[2];
+			info->dis[i3 + 0] += dis[0];
+			info->dis[i3 + 1] += dis[1];
+			info->dis[i3 + 2] += dis[2];
+		}
+		else
+		{
+			info->avg[i3 + 0] -= avg[0];
+			info->avg[i3 + 1] -= avg[1];
+			info->avg[i3 + 2] -= avg[2];
+			info->dis[i3 + 0] -= dis[0];
+			info->dis[i3 + 1] -= dis[1];
+			info->dis[i3 + 2] -= dis[2];
+		}
+		if (!gc) continue;
+		rs[0] -= Fgamma256[tvv[0]];
+		rs[1] -= Fgamma256[tvv[1]];
+		rs[2] -= Fgamma256[tvv[2]];
+		if (add)
+		{
+			info->rs[i3 + 0] += rs[0];
+			info->rs[i3 + 1] += rs[1];
+			info->rs[i3 + 2] += rs[2];
+		}
+		else
+		{
+			info->rs[i3 + 0] -= rs[0];
+			info->rs[i3 + 1] -= rs[1];
+			info->rs[i3 + 2] -= rs[2];
+		}
+	}
+}
+
+static void kuwahara_copy(int dest, int src, kuwahara_info *info)
+{
+	src *= 3; dest *= 3;
+	memcpy(info->rs + dest, info->rs + src, info->rl * 3 * sizeof(double));
+	memcpy(info->avg + dest, info->avg + src, info->l * 3 * sizeof(int));
+	memcpy(info->dis + dest, info->dis + src, info->l * 3 * sizeof(int));
+}
+
+static double kuwahara_square(int idx, kuwahara_info *info)
+{
+	double r2i = info->r2i;
+	int *dp = info->dis + idx * 3, *ap = info->avg + idx * 3;
+	// !!! Multiplication is done this way to avoid integer overflow
+	return (dp[0] + dp[1] + dp[2] - ((r2i * ap[0]) * ap[0] +
+		(r2i * ap[1]) * ap[1] + (r2i * ap[2]) * ap[2]));
+}
+
+/* For each X, locate the square with minimum variance & store its offset */
+static void kuwahara_min(int base, kuwahara_info *info)
+{
+	double da[256];
+	int i, j, j1, w = info->w, r = info->r, min = -1;
+
+	for (i = 0; i < r; i++) da[i] = kuwahara_square(base + i, info);
+	for (i = 0; i < w; i++)
+	{
+		j1 = (i + r) & 255;
+		da[j1] = kuwahara_square(base + (i + r), info);
+		if (min > i) // Old minimum still valid
+		{
+			if (da[j1] <= da[min & 255]) min = i + r;
+		}
+		else // Forced to find a new one
+		{
+			min = i;
+			for (j = 1; j <= r; j++)
+				if (da[(i + j) & 255] <= da[min & 255])
+					min = i + j;
+		}
+		info->min[base + i] = min - i;
+	}
+}
+
+/* Convert virtual row to row index (mirror boundary) */
+static int idx2row(int idx)
+{
+	int j, k;
+
+	if (mem_height == 1) return (0);
+	k = mem_height + mem_height - 2;
+	j = abs(idx) % k;
+	if (j >= mem_height) j = k - j;
+	return (j);
+}
+
+/* RGB only - cannot be generalized without speed loss */
+void mem_kuwahara(int r, int gcor)
+{
+	kuwahara_info info;
+	unsigned char *mem, *src, *dest, *mask, *tms, *tmp;
+	int i, j, k, l, ir, len, rl, r1 = r + 1;
+	int w = mem_width * 3, ch = mem_channel;
+	double r2i = 1.0 / (double)(r1 * r1);
+
+
+	if (mem_img_bpp != 3) return; // Sanity check
+
+	len = mem_width + r + r + 1;
+	info.l = l = mem_width + r;
+	info.rl = rl = gcor ? l : 0;
+	mem = multialloc(TRUE,
+		&info.rs, rl * r1 * 3 * sizeof(double),
+		&info.avg, l * r1 * 3 * sizeof(int),
+		&info.dis, l * r1 * 3 * sizeof(int),
+		&info.idx, len * sizeof(int),
+		&info.min, l * r1,
+		&mask, mem_width, NULL);
+	if (!mem)
+	{
+		memory_errors(1);
+		return;
+	}
+	info.r2i = r2i; info.w = mem_width; info.r = r; info.gcor = gcor;
+
+	progress_init(_("Kuwahara-Nagao Filter"), 1);
+	info.idx += r1;
+	if (mem_width > 1) // All indices remain zero otherwise
+	{
+		k = mem_width + mem_width - 2;
+		for (i = -(r + 1); i < mem_width + r; i++)
+		{
+			j = abs(i) % k;
+			if (j >= mem_width) j = k - j;
+			info.idx[i] = j * 3;
+		}
+	}
+
+	mem_channel = CHN_IMAGE; // For row_protected()
+	src = mem_undo_previous(CHN_IMAGE);
+	dest = mem_img[CHN_IMAGE];
+	/* Initialize the bottom sum */
+	for (i = -r; i <= 0; i++)
+		kuwahara_row(src + idx2row(i) * w, 0, TRUE, &info);
+	kuwahara_min(0, &info);
+	/* Initialize the rest of sums */
+	for (i = 1; i <= r; i++)
+	{
+		int j = l * i;
+		kuwahara_copy(j, j - l, &info);
+		kuwahara_row(src + idx2row(i - r1) * w, j, FALSE, &info);
+		kuwahara_row(src + idx2row(i) * w, j, TRUE, &info);
+		kuwahara_min(j, &info);
+	}
+	/* Actually process image */
+	ir = i = 0;
+	while (TRUE)
+	{
+		int j, k, jp;
+
+		if ((i * 10) % mem_height >= mem_height - 10)
+			if (progress_update((float)(i + 1) / mem_height)) break;
+
+		/* Process a pixel row */
+		row_protected(0, i, mem_width, tms = mask);
+		tmp = dest + i * w;
+		for (j = 0; j < mem_width; j++ , tmp += 3)
+		{
+			double dis;
+			int rr, gg, bb, jj, jk, op = *tms++;
+
+			if (op == 255) continue;
+			/* Select minimum variance square from covered rows */
+			jj = j + l;
+			jk = j + info.min[j];
+			dis = kuwahara_square(jk, &info);
+// !!! Only the all-or-nothing mode for now - weighted mode not implemented yet
+			for (k = 1; k < r1; k++ , jj += l)
+			{
+				int jv = jj + info.min[jj];
+				double dv = kuwahara_square(jv, &info);
+				if (dv < dis) jk = jv , dis = dv;
+			}
+			/* Calculate & store new RGB */
+			jk *= 3;
+			if (gcor)
+			{
+				double *wr = info.rs + jk;
+				rr = UNGAMMA256(wr[0] * r2i);
+				gg = UNGAMMA256(wr[1] * r2i);
+				bb = UNGAMMA256(wr[2] * r2i);
+			}
+			else
+			{
+				int *ar = info.avg + jk;
+				rr = rint(*ar++ * r2i);
+				gg = rint(*ar++ * r2i);
+				bb = rint(*ar * r2i);
+			}
+			rr = 255 * rr + (*tmp - rr) * op;
+			tmp[0] = (rr + (rr >> 8) + 1) >> 8;
+			gg = 255 * gg + (*tmp - gg) * op;
+			tmp[1] = (gg + (gg >> 8) + 1) >> 8;
+			bb = 255 * bb + (*tmp - bb) * op;
+			tmp[2] = (bb + (bb >> 8) + 1) >> 8;
+		}
+		if (++i >= mem_height) break;
+
+		/* Update sums for a new row */
+		jp = ir * l;
+		kuwahara_copy(jp, ((ir + r) % r1) * l, &info);
+		kuwahara_row(src + idx2row(i - 1) * w, jp, FALSE, &info);
+		kuwahara_row(src + idx2row(i + r) * w, jp, TRUE, &info);
+		kuwahara_min(jp, &info);
+		ir = (ir + 1) % r1;
+	}
+	mem_channel = ch;
+
+	progress_end();
+	free(mem);
 }
 
 ///	CLIPBOARD MASK

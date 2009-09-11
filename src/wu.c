@@ -9,9 +9,13 @@
 	but the colour selection algorithm remains the same.
 
 	Mark Tyler, September 2005.
+
+	I updated the integration code to use mtPaint 3.30 interfaces.
+	Dmitry Groshev, July 2008.
 */
 
-
+#include "mygtk.h"
+#include "memory.h"
 
 /*
 Having received many constructive comments and bug reports about my previous
@@ -41,9 +45,6 @@ additional documentation and a cure to a previous bug.
 
 Free to distribute, comments and suggestions are appreciated.
 **********************************************************************/	
-
-#include <stdio.h>
-#include <stdlib.h>
 
 #define MAXCOLOR	256
 #define	RED	2
@@ -375,44 +376,9 @@ static void Mark(struct box *cube, int label, unsigned char *tag)
 				tag[(r<<10) + (r<<6) + r + (g<<5) + g + b] = label;
 }
 
-static void lose_memory()
+int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, png_color *pal)
 {
-	if ( m2 != NULL ) free(m2);
-	if ( wt != NULL ) free(wt);
-	if ( mr != NULL ) free(mr);
-	if ( mg != NULL ) free(mg);
-	if ( mb != NULL ) free(mb);
-}
-
-static int setup_memory()
-{
-	float f;
-	int i;
-
-	i = 33*33*33;
-	m2 = malloc( i*sizeof(f) );
-	wt = malloc( i*sizeof(i) );
-	mr = malloc( i*sizeof(i) );
-	mg = malloc( i*sizeof(i) );
-	mb = malloc( i*sizeof(i) );
-
-	if ( m2 == NULL || wt == NULL || mr == NULL || mg == NULL || mb == NULL )
-	{
-		lose_memory();
-		return -1;
-	}
-
-	for (i=0; i<33*33*33; i++)
-	{
-		wt[i] = mr[i] = mg[i] = mb[i] = 0;
-		m2[i] = 0.;
-	}
-
-	return 0;
-}
-
-int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, unsigned char userpal[3][256])
-{
+	void *mem;
 	struct box	cube[MAXCOLOR];
 	unsigned char	*tag;
 	long int	next;
@@ -422,7 +388,14 @@ int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, unsigned
 	K = quant_to;
 	size = width*height;
 
-	if ( setup_memory() < 0 ) goto fail;
+	mem = multialloc(FALSE,
+		&m2, 33*33*33 * sizeof(float),
+		&wt, 33*33*33 * sizeof(int),
+		&mr, 33*33*33 * sizeof(int),
+		&mg, 33*33*33 * sizeof(int),
+		&mb, 33*33*33 * sizeof(int),
+		&tag, 33*33*33, NULL);
+	if (!mem) return (-1);
 
 	Hist3d(inbuf, wt, mr, mg, mb);
 	M3d(wt, mr, mg, mb);
@@ -458,26 +431,19 @@ int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, unsigned
 		}
 	}
 
-	tag = malloc(33*33*33);
-	if (tag == NULL) goto fail;
-
 	for(k=0; k<K; ++k)
 	{
 		Mark(&cube[k], k, tag);
 		weight = Vol(&cube[k], wt);
 		if (weight)
 		{
-			userpal[0][k] = Vol(&cube[k], mr) / weight;
-			userpal[1][k] = Vol(&cube[k], mg) / weight;
-			userpal[2][k] = Vol(&cube[k], mb) / weight;
+			pal[k].red = Vol(&cube[k], mr) / weight;
+			pal[k].green = Vol(&cube[k], mg) / weight;
+			pal[k].blue = Vol(&cube[k], mb) / weight;
 		}
-		else	userpal[0][k] = userpal[1][k] = userpal[2][k] = 0;		// Bogus box
+		else pal[k].red = pal[k].green = pal[k].blue = 0;	// Bogus box
 	}
-	free(tag);
 
-	lose_memory();
-	return 0;
-fail:
-	lose_memory();
-	return -1;
+	free(mem);
+	return (0);
 }

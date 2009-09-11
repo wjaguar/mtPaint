@@ -29,6 +29,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* View->Configure Grid sets grid colour preferences
 	* "Smart Grid" toggle shows layer boundaries around transparent pixels
 	* Gaussian blur effect for images with alpha now is about 40% faster and uses less memory
+	* Kuwahara-Nagao blur effect added (edge-preserving blur)
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste preview eliminated
 	* BUGFIX - "Remove All Layers" wilh layers window closed doesn't cause crash
