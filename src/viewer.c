@@ -1153,38 +1153,6 @@ void init_view()
 
 
 
-////	TAKE SCREENSHOT
-
-#if GTK_MAJOR_VERSION == 1
-#include <gdk/gdkx.h>
-#endif
-
-int grab_screen()
-{
-	int width = gdk_screen_width(), height = gdk_screen_height();
-	unsigned char *buf = malloc(width * height * 3), *res;
-
-	if (!buf) return (FALSE);
-#if GTK_MAJOR_VERSION == 1
-	res = wj_get_rgb_image((GdkWindow *)&gdk_root_parent, NULL,
-		buf, 0, 0, width, height);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	res = wj_get_rgb_image(gdk_get_default_root_window(), NULL,
-		buf, 0, 0, width, height);
-#endif
-	if (!res)
-	{
-		free(buf);
-		return (FALSE);
-	}
-	mem_pal_load_def();
-	mem_new(width, height, 3, 0); /* No allocation - cannot fail */
-	mem_img[CHN_IMAGE] = buf;
-	update_undo(&mem_image);
-	return (TRUE);
-}
-
-
 ////	TEXT TOOL
 
 GtkWidget *text_window, *text_font_window, *text_toggle[3], *text_spin[2];

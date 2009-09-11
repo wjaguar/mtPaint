@@ -194,10 +194,11 @@ static void layer_select_slot(int slot)
 	if (!layers_window) return;
 
 	item = layer_list_data[slot].item;
-	fw = GTK_CONTAINER(layer_list)->focus_child;
+	fw = GTK_WINDOW(layers_window)->focus_widget;
 
-	/* Focus is on list - move it, selection will follow  */
-	if (fw && GTK_WIDGET_HAS_FOCUS(fw)) gtk_widget_grab_focus(item);
+	/* Focus is somewhere in list - move it, selection will follow */
+	if (fw && gtk_widget_is_ancestor(fw, layer_list))
+		gtk_widget_grab_focus(item);
 	else /* Focus is elsewhere - move whatever remains, then */
 	{
 	/* !!! For simplicity, an undocumented field is used; a bit less hacky
@@ -322,11 +323,10 @@ void layer_new(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 static void layer_press_duplicate()
 {
 	layer_image *lim, *ls;
-	int w = mem_width, h = mem_height, bpp = mem_img_bpp;
 
 	if (layers_total >= MAX_LAYERS) return;
 
-	lim = alloc_layer(w, h, bpp, 0, mem_img);
+	lim = alloc_layer(mem_width, mem_height, mem_img_bpp, 0, mem_img);
 	if (!lim)
 	{
 		memory_errors(1);

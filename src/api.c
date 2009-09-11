@@ -83,7 +83,8 @@ void mtpaint_quit()			// Finish memory & inifile
 
 int mtpaint_new_image(int w, int h, int pal_cols, int pal_type, int bpp)
 {
-	return do_new_one(w, h, pal_cols, pal_type == 1 ? NULL : mem_pal_def, bpp);
+	return do_new_one(w, h, pal_cols, pal_type == 1 ? NULL : mem_pal_def,
+		bpp, FALSE);
 }
 
 void mtpaint_refresh()			// Update canvases, menus, palette, etc.
@@ -409,7 +410,7 @@ int mtpaint_animated_gif(char *input, char *output, int delay)		// Create animat
 
 int mtpaint_screenshot()			// Grab a screenshot
 {
-	return grab_screen();
+	return (load_image(NULL, FS_PNG_LOAD, FT_PIXMAP) == 1);
 }
 
 void mtpaint_opacity(int c)			// Set paint opacity 0-255

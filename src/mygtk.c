@@ -2273,43 +2273,7 @@ int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 
 #endif
 
-/* This ugly code imports XA_PIXMAP and XA_BITMAP selection types, native to
- * X Window System; it's of no use elsewhere, but allows mtPaint to receive
- * images from programs such as XPaint */
-
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-
-unsigned char *import_clip_Xpixmap(GtkSelectionData *data, int *width, int *height)
-{
-	GdkPixmap *pm;
-	unsigned char *buf = NULL;
-	int w, h, d, dd;
-
-	gdk_error_trap_push(); // No guarantee that we got a valid pixmap
-	pm = gdk_pixmap_foreign_new(*(Pixmap *)data->data);
-	gdk_error_trap_pop(); // The above call returns NULL on failure anyway
-	if (!pm) return (NULL);
-	dd = gdk_visual_get_system()->depth;
-#if GTK_MAJOR_VERSION == 1
-	gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
-	if ((d == 1) || (d == dd)) buf = wj_get_rgb_image(d == 1 ? NULL :
-		(GdkWindow *)&gdk_root_parent, pm, NULL, 0, 0, w, h);
-	/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
-	 * implement freeing the GdkPixmap structure here instead */
-	gdk_xid_table_remove(((GdkWindowPrivate *)pm)->xwindow);
-	g_dataset_destroy(pm);
-	g_free(pm);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	gdk_drawable_get_size(pm, &w, &h);
-	d = gdk_drawable_get_depth(pm);
-	if ((d == 1) || (d == dd)) buf = wj_get_rgb_image(d == 1 ? NULL :
-		gdk_get_default_root_window(), pm, NULL, 0, 0, w, h);
-	gdk_pixmap_unref(pm);
-#endif
-	if (!buf) return (NULL);
-	*width = w; *height = h;
-	return (buf);
-}
 
 /* It's unclear who should free clipboard pixmaps and when, so I do the same
  * thing Qt does, destroying the next-to-last allocated pixmap each time a new

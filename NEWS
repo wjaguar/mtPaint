@@ -11,14 +11,17 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Some menu items can have an icon (if set in the preferences)
 	* Dock area added which can hold the command line window
 	* Layers window handling reworked to make it more responsive
-	* Layer window: position now editable via spin buttons
-	* Layer window: transparent colour toggle removed
+	* Layers window: position now editable via spin buttons
+	* Layers window: transparent colour toggle removed
 	* "Composite to New Layer" operation added to Layers menu
 	* Palette can be copied to or from the canvas using the Edit menu
 	* System clipboard can be imported or exported using the Edit menu
 	* Horizontal and vertical ramps can be created using the Selection menu
 	* Shapeburst gradient now used for filling gradients when no placement exists (see handbook section 3.5.6.5)
 	* Angular and conical gradients added
+	* New image creation can now be made undoable
+	* New image or layer can now be created from system clipboard or internal clipboard
+	* Screenshots can now be grabbed into a new layer
 	* Workaround for bug in libpng versions 1.2.17 - 1.2.24 added (was losing extra channels when loading)
 	* BUGFIX - Canvas, view and palette area borders now can't be messed up by theme engines
 	* BUGFIX - Polygon line selection now clearer in Windows version

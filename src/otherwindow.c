@@ -45,7 +45,7 @@
 
 int im_type, new_window_type = 0;
 GtkWidget *new_window;
-GtkWidget *spinbutton_height, *spinbutton_width, *spinbutton_cols;
+GtkWidget *spinbutton_height, *spinbutton_width, *spinbutton_cols, *tog_undo;
 
 
 gint delete_new( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -75,79 +75,101 @@ void reset_tools()
 	update_menus();
 }
 
-void do_new_chores()
+void do_new_chores(int undo)
 {
-	reset_tools();
+	check_undo_paste_bpp(); // Safer to do it first thing
+	if (!undo) // No reason to reset tools in undoable mode
+	{
+		pressed_select(FALSE); // To prevent automatic paste
+		reset_tools();
+		change_to_tool(DEFAULT_TOOL_ICON);
+	}
 	set_new_filename("");
-	update_all_views();
-	gtk_widget_queue_draw(drawing_col_prev);
+	if (layers_total) layers_notify_changed();
+	canvas_undo_chores();
 }
 
-int do_new_one( int nw, int nh, int nc, png_color *pal, int bpp )
+int do_new_one(int nw, int nh, int nc, png_color *pal, int bpp, int undo)
 {
-	int res;
-
-	if (pal) mem_pal_copy(mem_pal, pal);
-	else mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
+	int res = 0;
 
 	nw = nw < MIN_WIDTH ? MIN_WIDTH : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < MIN_HEIGHT ? MIN_HEIGHT : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
-
 	mem_cols = nc < 2 ? 2 : nc > 256 ? 256 : nc;
-	res = mem_new( nw, nh, bpp, CMASK_IMAGE );
-	if ( res!= 0 )			// Not enough memory!
-	{
-		memory_errors(1);
-	}
-	do_new_chores();
 
-	return res;
+	/* Check memory for undo */
+	if (undo) undo = !undo_next_core(UC_CREATE | UC_GETMEM, nw, nh, bpp, CMASK_IMAGE);
+	/* Create undo frame if requested */
+	if (undo)
+	{
+		undo_next_core(UC_DELETE, nw, nh, bpp, CMASK_ALL);
+		undo = !!(mem_img[CHN_IMAGE] = calloc(1, nw * nh * bpp));
+	}
+	/* Create image anew if all else fails */
+	if (!undo)
+	{
+		res = mem_new( nw, nh, bpp, CMASK_IMAGE );
+		if (res) memory_errors(1);	// Not enough memory!
+	}
+	/* *Now* prepare and update palette */
+	if (pal) mem_pal_copy(mem_pal, pal);
+	else mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
+	update_undo(&mem_image);
+
+	do_new_chores(undo);
+
+	return (res);
+}
+
+static int clip_to_layer(int layer)
+{
+	image_info *img;
+	image_state *state;
+	int cmask, undo = undo_load;
+
+	cmask = cmask_from(mem_clip.img);
+	if (layer == layer_selected)
+	{
+		if (undo) undo = !undo_next_core(UC_CREATE | UC_GETMEM,
+			mem_clip_w, mem_clip_h, mem_clip_bpp, cmask);
+		if (undo) undo_next_core(UC_DELETE, mem_clip_w, mem_clip_h,
+			mem_clip_bpp, CMASK_ALL);
+		else mem_free_image(&mem_image, FREE_IMAGE);
+		img = &mem_image;
+		state = &mem_state;
+	}
+	else
+	{
+		img = &layer_table[layer].image->image_;
+		state = &layer_table[layer].image->state_;
+		*state = mem_state;
+		mem_free_image(img, FREE_IMAGE);
+		mem_pal_copy(img->pal, mem_pal);
+		img->cols = mem_cols;
+	}
+	if (mem_alloc_image(AI_COPY, img, mem_clip_w, mem_clip_h,
+		mem_clip_bpp, cmask, mem_clip.img))
+	{
+		update_undo(img);
+		state->channel = CHN_IMAGE;
+		return (1);
+	}
+	return (0);
 }
 
 static void create_new(GtkWidget *widget)
 {
 	png_color *pal = im_type == 1 ? NULL : mem_pal_def;
-	int nw, nh, nc, err, bpp = 1;
+	int nw, nh, nc, err = 1, bpp;
 
 	nw = read_spin(spinbutton_width);
 	nh = read_spin(spinbutton_height);
 	nc = read_spin(spinbutton_cols);
+	if (!new_window_type) undo_load = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(tog_undo));
 
-	switch (im_type)
+	if (im_type == 4) /* Screenshot */
 	{
-	case 0: bpp = 3; // RGB
-	case 1: // Greyscale
-	case 2: // Indexed
-		if (new_window_type == 1) // Layer
-			layer_new(nw, nh, bpp, nc, pal, CMASK_IMAGE);
-		else // Image
-		{
-			err = do_new_one(nw, nh, nc, pal, bpp);
-			if (err > 0)
-			{
-				/* System was unable to allocate memory for
-				 * image, using 8x8 instead */
-				nw = mem_width;
-				nh = mem_height;  
-			}
-			if (layers_total) layers_notify_changed();
-
-			inifile_set_gint32("lastnewWidth", nw );
-			inifile_set_gint32("lastnewHeight", nh );
-			inifile_set_gint32("lastnewCols", nc );
-			inifile_set_gint32("lastnewType", im_type );
-
-			/* Lose a selection marquee */
-			pressed_select(FALSE);
-			change_to_tool(DEFAULT_TOOL_ICON);
-		}
-		break;
-	case 3: /* Clipboard */
-
-// !!! Not implemented yet
-
-		break;
-	case 4: /* Screenshot */
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_lower( main_window->window );
 		gdk_window_lower( new_window->window );
@@ -156,12 +178,6 @@ static void create_new(GtkWidget *widget)
 		while (gtk_events_pending()) gtk_main_iteration();	// Wait for minimize
 
 		sleep(1);			// Wait a second for screen to redraw
-
-		grab_screen();
-		do_new_chores();
-		notify_changed();
-
-		gdk_window_raise( main_window->window );
 #else /* #if GTK_MAJOR_VERSION == 2 */
 		gtk_window_set_transient_for( GTK_WINDOW(new_window), NULL );
 		gdk_window_iconify( new_window->window );
@@ -171,15 +187,81 @@ static void create_new(GtkWidget *widget)
 		while (gtk_events_pending()) gtk_main_iteration();	// Wait for minimize
 
 		g_usleep(400000);		// Wait 0.4 of a second for screen to redraw
-
-		grab_screen();
-		do_new_chores();
-		notify_changed();
-
-		gdk_window_deiconify( main_window->window );
-		gdk_window_raise( main_window->window );
 #endif
-		break;
+
+		// Use current layer
+		if (!new_window_type)
+		{
+			err = load_image(NULL, FS_PNG_LOAD, FT_PIXMAP);
+			if (err == 1)
+			{
+				do_new_chores(undo_load);
+				notify_changed();
+			}
+		}
+		// Add new layer
+		else if (layer_add(0, 0, 1, 0, mem_pal_def, 0))
+		{
+			err = load_image(NULL, FS_LAYER_LOAD, FT_PIXMAP);
+			if (err == 1) layer_show_new();
+			else layer_delete(layers_total);
+		}
+
+#if GTK_MAJOR_VERSION == 2
+		gdk_window_deiconify( main_window->window );
+#endif
+		gdk_window_raise( main_window->window );
+	}
+
+	if (im_type == 3) /* Clipboard */
+	{
+		// Use current layer
+		if (!new_window_type)
+		{
+			err = import_clipboard(FS_PNG_LOAD);
+			if ((err != 1) && mem_clipboard)
+				err = clip_to_layer(layer_selected);
+			if (err == 1)
+			{
+				do_new_chores(undo_load);
+				notify_changed();
+			}
+		}
+		// Add new layer
+		else if (layer_add(0, 0, 1, 0, mem_pal_def, 0))
+		{
+			err = import_clipboard(FS_LAYER_LOAD);
+			if ((err != 1) && mem_clipboard)
+				err = clip_to_layer(layers_total);
+			if (err == 1) layer_show_new();
+			else layer_delete(layers_total);
+		}
+	}
+
+	/* Fallthrough if error */
+	if (err != 1) im_type = 0;
+
+	/* RGB / Greyscale / Indexed */
+	bpp = im_type == 0 ? 3 : 1;
+	if (im_type > 2); // Successfully done above
+	else if (new_window_type == 1) // Layer
+		layer_new(nw, nh, bpp, nc, pal, CMASK_IMAGE);
+	else // Image
+	{
+		/* Nothing to undo if image got deleted already */
+		err = do_new_one(nw, nh, nc, pal, bpp, undo_load && mem_img[CHN_IMAGE]);
+		if (err > 0)
+		{
+			/* System was unable to allocate memory for
+			 * image, using 8x8 instead */
+			nw = mem_width;
+			nh = mem_height;  
+		}
+
+		inifile_set_gint32("lastnewWidth", nw );
+		inifile_set_gint32("lastnewHeight", nh );
+		inifile_set_gint32("lastnewCols", nc );
+		inifile_set_gint32("lastnewType", im_type );
 	}
 
 	gtk_widget_destroy(new_window);
@@ -193,13 +275,10 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	GtkWidget *vbox1, *table1;
 	int w = mem_width, h = mem_height, c = mem_cols;
 
-// !!! Disabled for now
-rad_txt[3] = "";
+
+	if (!type && (check_for_changes() == 1)) return;
 
 	new_window_type = type;
-
-	if ( type == 0 && check_for_changes() == 1 ) return;
-
 	new_window = add_a_window( GTK_WINDOW_TOPLEVEL, title_txt[type], GTK_WIN_POS_CENTER, TRUE );
 
 	vbox1 = gtk_vbox_new (FALSE, 0);
@@ -208,7 +287,7 @@ rad_txt[3] = "";
 
 	table1 = add_a_table( 3, 2, 5, vbox1 );
 
-	if ( type == 0 )
+	if (!type)
 	{
 		w = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH);
 		h = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT);
@@ -226,8 +305,8 @@ rad_txt[3] = "";
 	add_to_table( _("Height"), table1, 1, 0, 5 );
 	add_to_table( _("Colours"), table1, 2, 0, 5 );
 
-// !!! Cannot load a single new layer for now - imports disabled
-	xpack(vbox1, wj_radio_pack(rad_txt, type ? 3 : 5, 0, im_type, &im_type, NULL));
+	xpack(vbox1, wj_radio_pack(rad_txt, 5, 0, im_type, &im_type, NULL));
+	tog_undo = type ? NULL : add_a_toggle(_("Undoable"), vbox1, undo_load);
 
 	add_hseparator( vbox1, 200, 10 );
 

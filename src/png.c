@@ -108,6 +108,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "LAYERS", "txt", "", FF_LAYER },
 /* !!! No 2nd layers format yet */
 	{ "", "", "", 0},
+/* An X pixmap - not a file at all */
+	{ "PIXMAP", "", "", FF_RGB | FF_NOSAVE },
 };
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -3738,6 +3740,71 @@ static int save_tga(char *file_name, ls_settings *settings)
 	return 0;
 }
 
+/* Put screenshots and X pixmaps on an equal footing with regular files */
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+#include <X11/Xlib.h>
+#include <gdk/gdkx.h>
+#endif
+
+static int load_pixmap(char *pixmap_id, ls_settings *settings)
+{
+#if GTK_MAJOR_VERSION == 1
+	GdkWindow *mainwin = (GdkWindow *)&gdk_root_parent;
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	GdkWindow *mainwin = gdk_get_default_root_window();
+#endif
+	int w, h, res = -1;
+
+	if (pixmap_id) // Pixmap by ID
+	{
+/* This ugly code imports X Window System's pixmaps; this allows mtPaint to
+ * receive images from programs such as XPaint */
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+		GdkPixmap *pm;
+		int d, dd;
+
+		gdk_error_trap_push(); // No guarantee that we got a valid pixmap
+		pm = gdk_pixmap_foreign_new(*(Pixmap *)pixmap_id);
+		gdk_error_trap_pop(); // The above call returns NULL on failure anyway
+		if (!pm) return (-1);
+		dd = gdk_visual_get_system()->depth;
+#if GTK_MAJOR_VERSION == 1
+		gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		gdk_drawable_get_size(pm, &w, &h);
+		d = gdk_drawable_get_depth(pm);
+#endif
+		settings->width = w;
+		settings->height = h;
+		settings->bpp = 3;
+		if ((d == 1) || (d == dd))
+			res = allocate_image(settings, CMASK_IMAGE);
+		if (!res) res = wj_get_rgb_image(d == 1 ? NULL : mainwin, pm,
+			settings->img[CHN_IMAGE], 0, 0, w, h) ? 1 : -1;
+#if GTK_MAJOR_VERSION == 1
+		/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
+		 * implement freeing the GdkPixmap structure here instead */
+		gdk_xid_table_remove(((GdkWindowPrivate *)pm)->xwindow);
+		g_dataset_destroy(pm);
+		g_free(pm);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		gdk_pixmap_unref(pm);
+#endif
+#endif
+	}
+	else // NULL means a screenshot
+	{
+		w = settings->width = gdk_screen_width();
+		h = settings->height = gdk_screen_height();
+		settings->bpp = 3;
+		res = allocate_image(settings, CMASK_IMAGE);
+		if (!res) res = wj_get_rgb_image(mainwin, NULL,
+			settings->img[CHN_IMAGE], 0, 0, w, h) ? 1 : -1;
+	}
+	return (res);
+}
+
 static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	png_color greypal[256];
@@ -3903,6 +3970,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_TGA: res = load_tga(file_name, &settings); break;
 /* !!! Not implemented yet */
 //	case FT_PCX:
+	case FT_PIXMAP: res = load_pixmap(file_name, &settings); break;
 	}
 
 	/* Animated GIF was loaded so tell user */
@@ -4037,6 +4105,9 @@ int load_image(char *file_name, int mode, int ftype)
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 {
 	memFILE mf;
+
+	if (ftype == FT_PIXMAP) // Special case: buf points to a pixmap ID
+		return (load_image_x(buf, NULL, FS_CLIP_FILE, FT_PIXMAP));
 
 	if (!(file_formats[ftype].flags & FF_RMEM)) return (-1);
 

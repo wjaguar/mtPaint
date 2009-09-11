@@ -1385,6 +1385,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		{jp2_rate, 0, 100},
 		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
 	GtkWidget *opt, *menu, *item, *label, *spin;
+	fformat *ff;
 	int i, j, k, l, ft_sort[NUM_FTYPES][2], mask = FF_256;
 	char *ext = strrchr(name, '.');
 
@@ -1412,9 +1413,10 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	menu = gtk_menu_new();
 	for (i = k = 0; i < NUM_FTYPES; i++)		// Populate sorted filetype list
 	{
-		if (!(file_formats[i].flags & mask)) continue;
-		l = (file_formats[i].name[0] << 16) + (file_formats[i].name[1] << 8) +
-				file_formats[i].name[2];
+		ff = file_formats + i;
+		if (ff->flags & FF_NOSAVE) continue;
+		if (!(ff->flags & mask)) continue;
+		l = (ff->name[0] << 16) + (ff->name[1] << 8) + ff->name[2];
 		for (j = k; j > 0; j--)
 		{
 			if (ft_sort[j - 1][0] < l) break;
@@ -1429,12 +1431,11 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	for ( l=0; l<k; l++ )				// Populate the option menu list
 	{
 		i = ft_sort[l][1];
-		if ( j<0 && i==FT_PNG ) j = l;		// Default to PNG type if not saved yet
-		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
-			(file_formats[i].ext2[0] &&
-			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
-			j = l;
-		item = gtk_menu_item_new_with_label(file_formats[i].name);
+		if ((j < 0) && (i == FT_PNG)) j = l;	// Default to PNG type if not saved yet
+		ff = file_formats + i;
+		if (!strncasecmp(ext, ff->ext, LONGEST_EXT) || (ff->ext2[0] &&
+			!strncasecmp(ext, ff->ext2, LONGEST_EXT))) j = l;
+		item = gtk_menu_item_new_with_label(ff->name);
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
 		gtk_signal_connect(GTK_OBJECT(item), "activate",
 			GTK_SIGNAL_FUNC(change_image_format), (gpointer)box);
@@ -1454,6 +1455,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 static void ftype_widgets(GtkWidget *box, char *name, int mode)
 {
 	GtkWidget *opt, *menu, *item, *label;
+	fformat *ff;
 	int i, j, k, mask;
 	char *ext = strrchr(name, '.');
 
@@ -1468,12 +1470,12 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	menu = gtk_menu_new();
 	for (i = j = k = 0; i < NUM_FTYPES; i++)
 	{
-		if (!(file_formats[i].flags & mask)) continue;
-		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
-			(file_formats[i].ext2[0] &&
-			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
-			j = k;
-		item = gtk_menu_item_new_with_label(file_formats[i].name);
+		ff = file_formats + i;
+		if (ff->flags & FF_NOSAVE) continue;
+		if (!(ff->flags & mask)) continue;
+		if (!strncasecmp(ext, ff->ext, LONGEST_EXT) || (ff->ext2[0] &&
+			!strncasecmp(ext, ff->ext2, LONGEST_EXT))) j = k;
+		item = gtk_menu_item_new_with_label(ff->name);
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
 		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 		k++;
@@ -3124,5 +3126,5 @@ void create_default_image()			// Create default new image
 		nt = inifile_get_gint32("lastnewType", 2 );
 
 	do_new_one(nw, nh, nc, nt == 1 ? NULL : mem_pal_def,
-		(nt == 0) || (nt > 2) ? 3 : 1);
+		(nt == 0) || (nt > 2) ? 3 : 1, FALSE);
 }

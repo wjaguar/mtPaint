@@ -87,6 +87,7 @@ void move_layer_relative(int l, int change_x, int change_y);	// Move a layer & u
 void layer_new(int w, int h, int bpp, int cols, png_color *pal, int cmask);
 //	*Silently* add layer, return success
 int layer_add(int w, int h, int bpp, int cols, png_color *pal, int cmask);
+void layer_show_new();			// Show the last added layer
 void layer_delete(int item);		// *Silently* delete layer
 void layer_choose( int l );		// Select a new layer from the list
 void layer_add_composite();		// Composite layers to new (invisible) layer

@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -106,16 +106,16 @@ int main( int argc, char *argv[] )
 
 	if ( get_screenshot )
 	{
-		if ( grab_screen() )
-			new_empty = FALSE;		// Successfully grabbed so no new empty
-		else
-			get_screenshot = FALSE;		// Screenshot failed
+		/* !!! Use 0th layer load being non-undoable */
+		if (load_image(NULL, FS_LAYER_LOAD, FT_PIXMAP) == 1)
+			new_empty = FALSE;	// Successfully grabbed so no new empty
+		else get_screenshot = FALSE;	// Screenshot failed
 	}
 	main_init();					// Create main window
 
 	if ( get_screenshot )
 	{
-		do_new_chores();
+		do_new_chores(FALSE);
 		notify_changed();
 	}
 	else

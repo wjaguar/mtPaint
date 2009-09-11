@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -51,7 +51,8 @@
 #define FT_PAL      15
 #define FT_LAYERS1  16
 #define FT_LAYERS2  17
-#define NUM_FTYPES  18
+#define FT_PIXMAP   18
+#define NUM_FTYPES  19
 
 /* Features supported by file formats */
 #define FF_BW      0x00001 /* Black and white */
@@ -77,6 +78,7 @@
 #define FF_RMEM    0x08000 /* Can be read from memory */
 #define FF_WMEM    0x10000 /* Can be written to memory */
 #define FF_MEM     0x18000 /* Both of the above */
+#define FF_NOSAVE  0x20000 /* Can be read but not written */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)

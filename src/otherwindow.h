@@ -46,8 +46,8 @@ void choose_pattern(int typ);				// Bring up pattern chooser
 
 void colour_selector( int cs_type );			// Bring up GTK+ colour wheel
 
-int do_new_one( int nw, int nh, int nc, png_color *pal, int bpp );
-void do_new_chores();
+int do_new_one(int nw, int nh, int nc, png_color *pal, int bpp, int undo);
+void do_new_chores(int undo);
 void reset_tools();
 
 void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool);

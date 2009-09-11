@@ -260,7 +260,6 @@ int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer dat
 int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 	GtkSignalFunc handler);
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* X special */
-unsigned char *import_clip_Xpixmap(GtkSelectionData *data, int *width, int *height);
 int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height);
 #endif
 

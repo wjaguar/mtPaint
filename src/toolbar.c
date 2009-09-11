@@ -97,7 +97,7 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 	return FALSE;
 }
 
-static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
+static GtkWidget *toolbar_add_zoom(GtkWidget *tbar)	// Add zoom combo box
 {
 	int i;
 	static char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%",
@@ -106,7 +106,7 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 	GList *combo_list = NULL;
 
 
-	combo = pack(box, gtk_combo_new());
+	combo = gtk_combo_new();
 	gtk_combo_set_value_in_list (GTK_COMBO (combo), FALSE, FALSE);
 	gtk_widget_show (combo);
 	combo_entry = GTK_COMBO (combo)->entry;
@@ -128,6 +128,9 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 	gtk_combo_set_popdown_strings( GTK_COMBO(combo), combo_list );
 	g_list_free( combo_list );
 	gtk_entry_set_text( GTK_ENTRY(combo_entry), "100%" );
+
+	gtk_toolbar_append_element(GTK_TOOLBAR(tbar), GTK_TOOLBAR_CHILD_WIDGET,
+		combo, NULL, NULL, NULL, NULL, NULL, NULL);
 
 	return combo;
 }
@@ -605,10 +608,15 @@ void toolbar_init(GtkWidget *vbox_main)
 	static unsigned char cursor_tip[TOTAL_CURSORS][2] = { {0, 0}, {0, 0},
 		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 19},
 		{10, 10}, {0, 0}, {0, 0}, {10, 10}, {0, 0}, {0, 0} };
-	GtkWidget *toolbar_main, *toolbar_tools, *hbox;
+	GtkWidget *toolbar_main, *toolbar_tools, *box;
 	char txt[32];
 	int i;
 
+
+	for (i=0; i<TOTAL_CURSORS; i++)
+		m_cursor[i] = make_cursor(xbm_list[i], xbm_mask_list[i],
+			20, 20, cursor_tip[i][0], cursor_tip[i][1]);
+	move_cursor = make_cursor(xbm_move_bits, xbm_move_mask_bits, 20, 20, 10, 10);
 
 	for ( i=1; i<TOOLBAR_MAX; i++ )
 	{
@@ -622,20 +630,22 @@ void toolbar_init(GtkWidget *vbox_main)
 
 ///	MAIN TOOLBAR
 
-	toolbar_boxes[TOOLBAR_MAIN] = hbox = pack(vbox_main, gtk_hbox_new(FALSE, 0));
-	if (toolbar_status[TOOLBAR_MAIN]) gtk_widget_show(hbox); // Only show if user wants
+	toolbar_boxes[TOOLBAR_MAIN] = box = pack(vbox_main, gtk_alignment_new(0, 0, 0, 1));
+	if (toolbar_status[TOOLBAR_MAIN]) gtk_widget_show(box); // Only show if user wants
 
 #if GTK_MAJOR_VERSION == 1
-	toolbar_main = pack(hbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
-		GTK_TOOLBAR_ICONS));
+	toolbar_main = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	toolbar_main = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_main), GTK_TOOLBAR_ICONS);
 #endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar_main = pack(hbox, gtk_toolbar_new());
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_main), GTK_TOOLBAR_ICONS );
-#endif
+	gtk_container_add(GTK_CONTAINER(box), toolbar_main);
 
-	toolbar_zoom_main = toolbar_add_zoom(hbox);
-	toolbar_zoom_view = toolbar_add_zoom(hbox);
+	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
+		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
+
+	toolbar_zoom_main = toolbar_add_zoom(toolbar_main);
+	toolbar_zoom_view = toolbar_add_zoom(toolbar_main);
 	/* In GTK1, combo box entry is updated continuously */
 #if GTK_MAJOR_VERSION == 1
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->popwin),
@@ -651,30 +661,21 @@ void toolbar_init(GtkWidget *vbox_main)
 #endif
 	toolbar_viewzoom(FALSE);
 
-	for (i=0; i<TOTAL_CURSORS; i++)
-		m_cursor[i] = make_cursor(xbm_list[i], xbm_mask_list[i],
-			20, 20, cursor_tip[i][0], cursor_tip[i][1]);
-	move_cursor = make_cursor(xbm_move_bits, xbm_move_mask_bits, 20, 20, 10, 10);
-
-	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
-		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
-
 	gtk_widget_show(toolbar_main);
 
 
 ///	TOOLS TOOLBAR
 
-	toolbar_boxes[TOOLBAR_TOOLS] = hbox = pack(vbox_main, gtk_hbox_new(FALSE, 0));
-	if (toolbar_status[TOOLBAR_TOOLS]) gtk_widget_show(hbox); // Only show if user wants
+	toolbar_boxes[TOOLBAR_TOOLS] = box = pack(vbox_main, gtk_alignment_new(0, 0, 0, 1));
+	if (toolbar_status[TOOLBAR_TOOLS]) gtk_widget_show(box); // Only show if user wants
 
 #if GTK_MAJOR_VERSION == 1
-	toolbar_tools = pack(hbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
-		GTK_TOOLBAR_ICONS));
+	toolbar_tools = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	toolbar_tools = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_tools), GTK_TOOLBAR_ICONS);
 #endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar_tools = pack(hbox, gtk_toolbar_new());
-	gtk_toolbar_set_style( GTK_TOOLBAR(toolbar_tools), GTK_TOOLBAR_ICONS );
-#endif
+	gtk_container_add(GTK_CONTAINER(box), toolbar_tools);
 
 	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar,
 		GTK_SIGNAL_FUNC(toolbar_icon_event), 0,

@@ -53,4 +53,3 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align);
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event );
-int grab_screen();

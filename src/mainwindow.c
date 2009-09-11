@@ -345,8 +345,8 @@ static GtkTargetEntry clip_formats[] = {
 	{ "image/x-MS-bmp", 0, FT_BMP },
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 	/* These two don't make sense without X */
-	{ "PIXMAP", 0, (guint)(-1) },
-	{ "BITMAP", 0, (guint)(-1) },
+	{ "PIXMAP", 0, FT_PIXMAP },
+	{ "BITMAP", 0, FT_PIXMAP },
 #endif
 };
 #define CLIP_TARGETS (sizeof(clip_formats) / sizeof(GtkTargetEntry))
@@ -401,28 +401,25 @@ static int check_clipboard(int which)
 static int clipboard_import_fn(GtkSelectionData *data, gpointer user_data)
 {
 //g_print("!!! %X %d\n", data->data, data->length);
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	if ((int)user_data == -1) /* Got an X-something */
-	{
-		unsigned char *buf;
-		int w, h;
-
-		if (!(buf = import_clip_Xpixmap(data, &w, &h))) return (FALSE);
-		mem_clip_new(w, h, 3, 0, FALSE);
-		mem_clipboard = buf;
-		return (TRUE);
-	}
-#endif
 	return (load_mem_image((unsigned char *)data->data, data->length,
-		FS_CLIP_FILE, (int)user_data) == 1);
+		((int *)user_data)[0], ((int *)user_data)[1]) == 1);
 }
 
-static int import_clipboard(int which, int format)
+int import_clipboard(int mode)
 {
-	if (internal_clipboard(which)) return (FALSE); // nothing to import
-	return (process_clipboard(which, clip_formats[format].target,
-		GTK_SIGNAL_FUNC(clipboard_import_fn),
-		(gpointer)(int)clip_formats[format].info));
+	int i = 0, n = 0, udata[2] = { mode };
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	// If no luck with CLIPBOARD, check PRIMARY too
+	for (; !i && (n < 2); n++)
+#endif
+	if ((i = check_clipboard(n)))
+	{
+		udata[1] = (int)clip_formats[i].info;
+		i = process_clipboard(n, clip_formats[i].target,
+			GTK_SIGNAL_FUNC(clipboard_import_fn), udata);
+	}
+	return (i);
 }
 
 static void setup_clip_save(ls_settings *settings, int type)
@@ -449,7 +446,7 @@ static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
 	if (!mem_clipboard) return (FALSE); // Our own clipboard got emptied
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	if (type == -1)
+	if (type == FT_PIXMAP)
 	{
 // !!! Indexed clipboard will have to be converted to RGB buffer, later
 		if (mem_clip_bpp == 1) return (FALSE);
@@ -501,15 +498,16 @@ int gui_save(char *filename, ls_settings *settings)
 	char *mess = NULL, *f8;
 
 	/* Mismatched format - raise an error right here */
-	if (!(fflags & FF_SAVE_MASK))
+	if ((fflags & FF_NOSAVE) || !(fflags & FF_SAVE_MASK))
 	{
 		int maxc = 0;
 		char *fform = NULL, *fname = file_formats[settings->ftype].name;
 
-		/* RGB to indexed */
+		/* RGB to indexed (or to unsaveable) */
 		if (mem_img_bpp == 3) fform = _("RGB");
-		/* Indexed to RGB */
-		else if (!(fflags & FF_IDX)) fform = _("indexed");
+		/* Indexed to RGB, or to unsaveable format */
+		else if (!(fflags & FF_IDX) || (fflags & FF_NOSAVE))
+			fform = _("indexed");
 		/* More than 16 colors */
 		else if (fflags & FF_16) maxc = 16;
 		/* More than 2 colors */
@@ -581,17 +579,7 @@ static void load_clip(int item)
 	int i;
 
 	if (item == -1) // System clipboard
-	{
-		i = check_clipboard(0);
-		if (i) i = import_clipboard(0, i);
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-		if (!i) // If no luck with CLIPBOARD, check PRIMARY too
-		{
-			i = check_clipboard(1);
-			if (i) i = import_clipboard(1, i);
-		}
-#endif
-	}
+		i = import_clipboard(FS_CLIP_FILE);
 	else // Disk file
 	{
 		snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
@@ -3236,6 +3224,7 @@ static void parse_drag( char *txt )
 
 	layer_refresh_list();
 	layer_choose(layers_total);
+	layers_notify_changed();
 	if (layers_total) view_show();
 	set_image(TRUE);
 }
@@ -3642,8 +3631,6 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 		if (mode) pressed_paste_centre();
 		else pressed_paste();
 		break;
-	case ACT_PASTE_LR:
-		pressed_paste_layer(); break;
 	case ACT_COPY_PAL:
 		pressed_pal_copy(); break;
 	case ACT_PASTE_PAL:
@@ -3723,8 +3710,11 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_LR_SAVE:
 		layer_press_save(); break;
 	case ACT_LR_ADD:
-		/* !!! Later, add 'New' & 'Duplicate' too as modes */
-		layer_add_composite(); break;
+		if (mode == LR_NEW) generic_new_window(1);
+		else if (mode == LR_PASTE) pressed_paste_layer();
+	/* !!! Handle LR_DUP here too when such need arises */
+		else layer_add_composite();
+		break;
 	case ACT_LR_KILLALL:
 		layer_press_remove_all(); break;
 	case ACT_DOCS:
@@ -4223,7 +4213,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, xpm_copy_xpm },
 	{ _("/Edit/Copy to Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
 	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, xpm_paste_xpm },
-	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", ACT_PASTE_LR, 0 },
+	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
 	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, xpm_text_xpm },
 #ifdef U_FREETYPE
@@ -4402,10 +4392,11 @@ static menu_item main_menu[] = {
 
 	{ _("/_Layers"), -2 -16 },
 	{ _("/Layers/tear"), -3 },
+	{ _("/Layers/New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_NEW, xpm_new_xpm },
 	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, xpm_save_xpm },
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
-	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, 0 },
+	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },
 	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, ACT_LR_KILLALL, 0 },
 	{ _("/Layers/sep1"), -4 },
 	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },
@@ -4707,11 +4698,13 @@ void setup_language()			// Change language
 
 void update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[PATHTXT], *extra = "-";
+	char txt[300], txt2[PATHTXT], *extra;
+
+
+	if (!main_window) return;
 
 	gtkuncpy(txt2, mem_filename, PATHTXT);
-
-	if ( mem_changed == 1 ) extra = _("(Modified)");
+	extra = mem_changed ? _("(Modified)") : "-";
 
 	snprintf( txt, 290, "%s %s %s", VERSION, extra, txt2[0] ? txt2 :
 		_("Untitled"));

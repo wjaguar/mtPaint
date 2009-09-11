@@ -46,7 +46,6 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_REDO,
 	ACT_COPY,
 	ACT_PASTE,
-	ACT_PASTE_LR,
 	ACT_COPY_PAL,
 	ACT_PASTE_PAL,
 	ACT_LOAD_CLIP,
@@ -130,6 +129,12 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_THRES,
 	FILT_UALPHA
 };
+
+// New layer sources for ACT_LR_ADD
+#define LR_NEW   0
+#define LR_DUP   1
+#define LR_PASTE 2
+#define LR_COMP  3
 
 int wtf_pressed(GdkEventKey *event);
 
@@ -272,6 +277,9 @@ int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 
 //	Try to save file + warn if error + return < 0 if fail
 int gui_save(char *filename, ls_settings *settings);
+
+//	Load system clipboard like a file, return TRUE if successful
+int import_clipboard(int mode);
 
 void pressed_select(int all);
 void pressed_opacity( int opacity );
