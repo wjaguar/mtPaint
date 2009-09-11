@@ -89,11 +89,9 @@ int mtpaint_new_image(int w, int h, int pal_cols, int pal_type, int bpp)
 
 void mtpaint_refresh()			// Update canvases, menus, palette, etc.
 {
-	update_all_views();
 	update_menus();
-	repaint_top_swatch();
 	init_pal();
-	gtk_widget_queue_draw(drawing_col_prev);	// Update widget
+	update_all_views();
 }
 
 

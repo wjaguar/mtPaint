@@ -321,8 +321,7 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 
 /// PATTERNS
 
-char mem_patterns[81][8][8];		// Pattern bitmaps
-unsigned char *mem_pattern;		// Original 0-1 pattern
+unsigned char mem_pattern[8 * 8];	// Current pattern
 unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
 unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 
@@ -399,6 +398,8 @@ void mem_bacteria( int val );			// Apply bacteria effect val times the canvas ar
 void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
 void mem_gauss(double radiusX, double radiusY, int gcor);
 void mem_unsharp(double radius, double amount, int threshold, int gcor);
+void mem_dog(double radiusW, double radiusN, int norm, int gcor);
+
 
 /// PALETTE PROCS
 
@@ -418,8 +419,10 @@ int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 //	Convert RGB->indexed using error diffusion with variety of options
 int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int dist, int limit, int selc, int serpent, int rgb8b, double emult);
+//	Set up colors A, B, and pattern for dithering a given RGB color
+void mem_find_dither(int red, int green, int blue); 
+//	Convert image to Indexed Palette using quantize
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
-					// Convert image to Indexed Palette using quantize
 void mem_invert();			// Invert the palette
 
 void mem_mask_setall(char val);		// Clear/set all masks

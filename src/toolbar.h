@@ -20,6 +20,9 @@
 
 //	DEFINITIONS
 
+#define PATTERN_GRID_W 10
+#define PATTERN_GRID_H 10
+
 /* !!! Must match order of menu item IDs (MENU_TBMAIN etc.) */
 #define TOOLBAR_MAIN 1
 #define TOOLBAR_TOOLS 2
@@ -127,8 +130,8 @@ void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
-void repaint_top_swatch();		// Update selected colours A & B, 
+void update_top_swatch();		// Update selected colours A & B
 
 GtkWidget *layer_toolbar(GtkWidget **wlist);	// Create toolbar for layers window
 
-
+unsigned char *render_patterns();	// Create RGB dump of patterns to display

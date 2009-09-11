@@ -813,16 +813,17 @@ static void update_main_with_new_layer()
 {
 	int w, h;
 
+
+	update_titlebar();
+	update_menus();
+
+	init_pal();		// Update Palette, pattern & mask area + widgets
+
 	canvas_size(&w, &h);
 	gtk_widget_set_usize(drawing_canvas, w, h);
 	vw_focus_view();
 	update_all_views();
 
-	init_pal();		// Update Palette, pattern & mask area + widgets
-	gtk_widget_queue_draw(drawing_col_prev);
-
-	update_titlebar();
-	update_menus();
 	if ((tool_type == TOOL_SMUDGE) && (MEM_BPP == 1))
 		gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );

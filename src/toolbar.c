@@ -1071,9 +1071,7 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 			mem_col_B24 = mem_pal[mem_col_B];
 		}
 
-		repaint_top_swatch();
 		init_pal();
-		gtk_widget_queue_draw(drawing_col_prev);	// Update widget
 	}
 	else /* if (px >= PALETTE_CROSS_X) */		// Mask changed
 	{
@@ -1230,24 +1228,71 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 	if ( drawing_col_prev ) gtk_widget_queue_draw( drawing_col_prev );
 }
 
+#include "graphics/xbm_patterns.xbm"
+#if (PATTERN_GRID_W * 8 != xbm_patterns_width) || (PATTERN_GRID_H * 8 != xbm_patterns_height)
+#error "Mismatched patterns bitmap"
+#endif
+
+/* Create RGB dump of patterns to display, with each pattern repeated 4x4 */
+unsigned char *render_patterns()
+{
+	png_color *p;
+	unsigned char *buf, *dest;
+	int i = 0, j, x, y, h, b;
+
+#define PAT_ROW_L (PATTERN_GRID_W * (8 * 4 + 4) * 3)
+#define PAT_8ROW_L (8 * PAT_ROW_L)
+	buf = calloc(1, PATTERN_GRID_H * (8 * 4 + 4) * PAT_ROW_L);
+	dest = buf + 2 * PAT_ROW_L + 2 * 3;
+	for (y = 0; y < PATTERN_GRID_H; y++ , dest += (8 * 3 + 4) * PAT_ROW_L)
+	{
+		for (h = 0; h < 8; h++)
+		for (x = 0; x < PATTERN_GRID_W; x++ , dest += (8 * 3 + 4) * 3)
+		{
+			b = xbm_patterns_bits[i++];
+			for (j = 0; j < 8; j++ , b >>= 1)
+			{
+				p = mem_col_24 + (b & 1);
+				*dest++ = p->red;
+				*dest++ = p->green;
+				*dest++ = p->blue;
+			}
+			memcpy(dest, dest - 8 * 3, 8 * 3);
+			memcpy(dest + 8 * 3, dest - 8 * 3, 2 * 8 * 3);
+		}
+		memcpy(dest, dest - PAT_8ROW_L, PAT_8ROW_L);
+		memcpy(dest + PAT_8ROW_L, dest - PAT_8ROW_L, 2 * PAT_8ROW_L);
+	}
+#undef PAT_8ROW_L
+#undef PAT_ROW_L
+	return (buf);
+}
+
 void mem_pat_update()			// Update indexed and then RGB pattern preview
 {
-	int i, j, k, l;
+	int i, j, k, l, ii, b;
 
 	if ( mem_img_bpp == 1 )
 	{
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];
 	}
-	mem_pattern = (unsigned char *)mem_patterns[mem_tool_pat];
 
-	for (i = 0; i < 8 * 8; i++)
+	/* Pattern bitmap starts here */
+	l = mem_tool_pat * 8 - (mem_tool_pat % PATTERN_GRID_W) * 7;
+
+	/* Set up pattern maps from XBM */
+	for (i = ii = 0; i < 8; i++)
 	{
-		j = mem_pattern[i] ^ 1;
-		mem_col_pat[i] = mem_col_[j];
-		mem_col_pat24[i * 3 + 0] = mem_col_24[j].red;
-		mem_col_pat24[i * 3 + 1] = mem_col_24[j].green;
-		mem_col_pat24[i * 3 + 2] = mem_col_24[j].blue;
+		b = xbm_patterns_bits[l + i * PATTERN_GRID_W];
+		for (k = 0; k < 8; k++ , ii++ , b >>= 1)
+		{
+			mem_pattern[ii] = j = b & 1;
+			mem_col_pat[ii] = mem_col_[j];
+			mem_col_pat24[ii * 3 + 0] = mem_col_24[j].red;
+			mem_col_pat24[ii * 3 + 1] = mem_col_24[j].green;
+			mem_col_pat24[ii * 3 + 2] = mem_col_24[j].blue;
+		}
 	}
 
 	k = PREVIEW_WIDTH * 32 * 3;
@@ -1267,37 +1312,32 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 		gtk_widget_queue_draw(drawing_canvas);
 }
 
-void repaint_top_swatch()			// Update selected colours A & B
+void update_top_swatch()			// Update selected colours A & B
 {
-	int i, j, r[2], g[2], b[2], nx, ny;
+	unsigned char AA[3], BB[3], *tmp;
+	int i, j;
 
-	if ( mem_img_bpp == 1 )
-	{
-		mem_col_A24 = mem_pal[mem_col_A];
-		mem_col_B24 = mem_pal[mem_col_B];
-	}
-	r[0] = mem_col_A24.red;
-	g[0] = mem_col_A24.green;
-	b[0] = mem_col_A24.blue;
-	r[1] = mem_col_B24.red;
-	g[1] = mem_col_B24.green;
-	b[1] = mem_col_B24.blue;
+	AA[0] = mem_col_A24.red;
+	AA[1] = mem_col_A24.green;
+	AA[2] = mem_col_A24.blue;
+	BB[0] = mem_col_B24.red;
+	BB[1] = mem_col_B24.green;
+	BB[2] = mem_col_B24.blue;
 
-	for ( j=0; j<20; j++ )
+#define dAB (10 * PREVIEW_WIDTH * 3 + 10 * 3)
+	for (j = 1; j <= 20; j++)
 	{
-		for ( i=0; i<20; i++ )
+		tmp = (mem_prev + 1 * 3) + j * (PREVIEW_WIDTH * 3);
+		for (i = 0; i < 20; i++ , tmp += 3)
 		{
-			nx = i+1; ny = j+1;
-			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[0];
-			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[0];
-			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[0];
+			tmp[0] = AA[0];
+			tmp[1] = AA[1];
+			tmp[2] = AA[2];
 
-			nx = i+11; ny = j+11;
-			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[1];
-			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[1];
-			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[1];
+			tmp[dAB + 0] = BB[0];
+			tmp[dAB + 1] = BB[1];
+			tmp[dAB + 2] = BB[2];
 		}
 	}
-
-	if ( drawing_col_prev ) gtk_widget_queue_draw( drawing_col_prev );
+#undef dAB
 }

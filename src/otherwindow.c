@@ -241,12 +241,12 @@ static unsigned char *mem_patch = NULL;
 
 static gint delete_pat( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
+	gtk_widget_destroy(pat_window);
 	if ( pat_brush == 0 )
 	{
-		if ( mem_patch != NULL ) free(mem_patch);
+		free(mem_patch);
 		mem_patch = NULL;
 	}
-	gtk_widget_destroy(pat_window);
 
 	return FALSE;
 }
@@ -256,119 +256,86 @@ static gint key_pat( GtkWidget *widget, GdkEventKey *event )
 	/* xine-ui sends bogus keypresses so don't delete on this */
 	if (!XINE_FAKERY(event->keyval)) delete_pat( widget, NULL, NULL );
 
-	return FALSE;
+	return (TRUE);
 }
 
 static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 {
-	int pat_no = 0, mx, my;
+	int pat_no, mx, my;
+
+	if (event->button != 1) return (FALSE);
 
 	mx = event->x;
 	my = event->y;
 
-	pat_no = mx / (PATCH_WIDTH/9) + 9*( my / (PATCH_HEIGHT/9) );
-	mtMAX(pat_no, pat_no, 0)
-	mtMIN(pat_no, pat_no, 80)
-
-	if ( event->button == 1 )
+	if (pat_brush == 0) /* Patterns */
 	{
-		if ( pat_brush == 0 )
-		{
-			mem_tool_pat = pat_no;
-			update_cols();
-		}
-		else
-		{
-			mem_set_brush(pat_no);
-			brush_tool_type = tool_type;
-			toolbar_update_settings();	// Update spin buttons
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-				icon_buttons[PAINT_TOOL_ICON]), TRUE);	// Update toolbar
-			set_cursor();
-		}
+		pat_no = mx / (8 * 4 + 4) + PATTERN_GRID_W * (my / (8 * 4 + 4));
+		pat_no = pat_no < 0 ? 0 : pat_no >= PATTERN_GRID_W * PATTERN_GRID_H ?
+			PATTERN_GRID_W * PATTERN_GRID_H - 1 : pat_no;
+		mem_tool_pat = pat_no;
+		update_cols();
+	}
+	else /* Brushes */
+	{
+		pat_no = mx / (PATCH_WIDTH/9) + 9*( my / (PATCH_HEIGHT/9) );
+		pat_no = pat_no < 0 ? 0 : pat_no > 80 ? 80 : pat_no;
+		mem_set_brush(pat_no);
+		brush_tool_type = tool_type;
+		toolbar_update_settings();	// Update spin buttons
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+			icon_buttons[PAINT_TOOL_ICON]), TRUE);	// Update toolbar
+		set_cursor();
 	}
 
-	return FALSE;
+	return (TRUE);
 }
 
-static gint expose_pat( GtkWidget *widget, GdkEventExpose *event )
+static gint expose_pat(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
+	int w = (int)user_data;
 	gdk_draw_rgb_image( draw_pat->window, draw_pat->style->black_gc,
-				event->area.x, event->area.y, event->area.width, event->area.height,
-				GDK_RGB_DITHER_NONE,
-				mem_patch + 3*( event->area.x + PATCH_WIDTH*event->area.y ),
-				PATCH_WIDTH*3
-				);
-	return FALSE;
+		event->area.x, event->area.y, event->area.width, event->area.height,
+		GDK_RGB_DITHER_NONE,
+		mem_patch + 3 * (event->area.x + w * event->area.y), w * 3);
+	return (TRUE);
 }
 
-void choose_pattern(int typ)			// Bring up pattern chooser (0) or brush (1)
+void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 {
-	int pattern, pixel, r, g, b, row, column, sx, sy, ex, ey;
+	int w;
 
 	pat_brush = typ;
+	pat_window = add_a_window(GTK_WINDOW_POPUP, _("Pattern Chooser"),
+		GTK_WIN_POS_MOUSE, TRUE);
+	gtk_container_set_border_width(GTK_CONTAINER(pat_window), 4);
 
-	if ( typ == 0 )
+	draw_pat = gtk_drawing_area_new();
+
+	if (typ == 0)
 	{
-		mem_patch = calloc(1, PATCH_WIDTH * PATCH_HEIGHT * 3);
-
-		for ( pattern = 0; pattern < 81; pattern++ )
-		{
-			sy = 2 + (pattern / 9) * 36;		// Start y pixel on main image
-			sx = 2 + (pattern % 9) * 36;		// Start x pixel on main image
-			for ( column = 0; column < 8; column++ )
-			{
-				for ( row = 0; row < 8; row++ )
-				{
-					pixel = mem_patterns[pattern][column][row];
-					if ( pixel == 1 )
-					{
-						r = mem_col_A24.red;
-						g = mem_col_A24.green;
-						b = mem_col_A24.blue;
-					}
-					else
-					{
-						r = mem_col_B24.red;
-						g = mem_col_B24.green;
-						b = mem_col_B24.blue;
-					}
-					for ( ey=0; ey<4; ey++ )
-					{
-					 for ( ex=0; ex<4; ex++ )
-					 {
-					  mem_patch[ 0+3*( sx+row+8*ex + PATCH_WIDTH*(sy+column+8*ey) ) ] = r;
-					  mem_patch[ 1+3*( sx+row+8*ex + PATCH_WIDTH*(sy+column+8*ey) ) ] = g;
-					  mem_patch[ 2+3*( sx+row+8*ex + PATCH_WIDTH*(sy+column+8*ey) ) ] = b;
-					 }
-					}
-				}
-			}
-		}
+		mem_patch = render_patterns();
+		gtk_widget_set_usize(draw_pat, w = PATTERN_GRID_W * (8 * 4 + 4),
+			PATTERN_GRID_H * (8 * 4 + 4));
 	}
 	else
 	{
 		mem_patch = mem_brushes;
+		gtk_widget_set_usize(draw_pat, w = PATCH_WIDTH, PATCH_HEIGHT);
 	}
 
-	pat_window = add_a_window( GTK_WINDOW_POPUP, _("Pattern Chooser"), GTK_WIN_POS_MOUSE, TRUE );
-	gtk_container_set_border_width (GTK_CONTAINER (pat_window), 4);
+	gtk_container_add(GTK_CONTAINER(pat_window), draw_pat);
+	gtk_signal_connect(GTK_OBJECT(draw_pat), "expose_event",
+		GTK_SIGNAL_FUNC(expose_pat), (gpointer)w);
+	gtk_signal_connect(GTK_OBJECT(draw_pat), "button_press_event",
+		GTK_SIGNAL_FUNC(click_pat), NULL);
+	gtk_signal_connect(GTK_OBJECT(draw_pat), "button_release_event",
+		GTK_SIGNAL_FUNC(delete_pat), NULL);
+	gtk_signal_connect(GTK_OBJECT(pat_window), "key_press_event",
+		GTK_SIGNAL_FUNC(key_pat), NULL);
+	gtk_widget_set_events(draw_pat, GDK_ALL_EVENTS_MASK);
 
-	draw_pat = gtk_drawing_area_new ();
-	gtk_widget_set_usize( draw_pat, PATCH_WIDTH, PATCH_HEIGHT );
-	gtk_container_add (GTK_CONTAINER (pat_window), draw_pat);
-	gtk_widget_show( draw_pat );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pat), "expose_event",
-		GTK_SIGNAL_FUNC (expose_pat), GTK_OBJECT(draw_pat) );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pat), "button_press_event",
-		GTK_SIGNAL_FUNC (click_pat), GTK_OBJECT(draw_pat) );
-	gtk_signal_connect_object( GTK_OBJECT(draw_pat), "button_release_event",
-		GTK_SIGNAL_FUNC (delete_pat), NULL );
-	gtk_signal_connect_object (GTK_OBJECT (pat_window), "key_press_event",
-		GTK_SIGNAL_FUNC (key_pat), NULL);
-	gtk_widget_set_events (draw_pat, GDK_ALL_EVENTS_MASK);
-
-	gtk_widget_show (pat_window);
+	gtk_widget_show_all(pat_window);
 }
 
 
@@ -438,9 +405,8 @@ void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 
 void pal_refresher()
 {
-	update_all_views();
 	init_pal();
-	gtk_widget_queue_draw(drawing_col_prev);
+	update_all_views();
 }
 
 
@@ -529,7 +495,6 @@ gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	mem_undo_prepare();
 	init_pal();
 	update_all_views();
-	gtk_widget_queue_draw( drawing_col_prev );
 
 	return FALSE;
 }
@@ -1478,7 +1443,6 @@ static void do_allcol()
 
 	init_pal();
 	update_all_views();
-	gtk_widget_queue_draw( drawing_col_prev );
 }
 
 static void do_allover()
@@ -2152,8 +2116,8 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	{
 		mem_col_A = mem_cols > 1 ? 1 : 0;
 		mem_col_B = 0;
+		update_cols();
 		update_all_views();
-		gtk_widget_queue_draw(drawing_col_prev);
 	}
 }
 

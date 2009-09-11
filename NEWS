@@ -14,21 +14,23 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Sharper image reduction toggle added to "Scale Canvas"
 	* Spacing for non-continuous tools is now configurable - right click the continuous mode toggle
 	* "Blend" drawing mode added
-	* PNG compression level made configurable
 	* "Unassociate Alpha" operation added to Channels menu
+	* PNG compression level made configurable
 	* TGA file format save/load added
 	* JPEG2000 file format save/load added
+	* XPM files with up to 4096 colours can now be saved and loaded as RGB images
+	* Palette->Dither A sets colour A/B and the pattern based on the current A colour and the palette
 	* Max-min quantizer added - creates small palettes with higher saturation and contrast
 	* Full error precision toggle added to settings page of 'Convert To Indexed' window
 	* Eliminated flicker when scrolling canvas in GTK+1 and GTK+2/Windows
 	* Dragging the main/view window divider made to behave in GTK+1
+	* Main menu now rearranges itself to fit in window
 	* Tile based undo system introduced to save memory when changes affect only small areas of the canvas
 	* Max undo levels now configurable (from 10 to 1000)
 	* Image loading now can be made undoable
 	* mtPaint can now be compiled as a library (libmtpaint)
-	* Main menu now rearranges itself to fit in window
 	* Image rotation now sharper and faster
-	* XPM files with up to 4096 colours can now be saved and loaded as RGB images
+	* Difference of Gaussians effect added
 	* BUGFIX - Colour selective mode with zoom < 100% doesn't cause crash
 	* BUGFIX - Gradient preview now properly shows effect of mask channel
 	* BUGFIX - "Resize Canvas" with negative offset now works correctly

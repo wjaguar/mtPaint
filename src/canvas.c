@@ -328,7 +328,6 @@ void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 
 	init_pal();
 	update_all_views();
-	gtk_widget_queue_draw( drawing_col_prev );
 }
 
 void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
@@ -469,6 +468,51 @@ void pressed_unsharp(GtkMenuItem *menu_item, gpointer user_data)
 	filter_window(_("Unsharp Mask"), box, do_unsharp, NULL, FALSE);
 }
 
+int do_dog(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *table, *spinW, *spinN;
+	double radW, radN;
+	int norm, gcor = FALSE;
+
+	table = BOX_CHILD(box, 0);
+	spinW = table_slot(table, 0, 1);
+	spinN = table_slot(table, 1, 1);
+	norm = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(BOX_CHILD(box, 1)));
+	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
+		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 2)));
+
+	radW = read_float_spin(spinW);
+	radN = read_float_spin(spinN);
+	if (radW <= radN) return (FALSE); /* Invalid parameters */
+
+	spot_undo(UNDO_FILT);
+	mem_dog(radW, radN, norm, gcor);
+	mem_undo_prepare();
+
+	return TRUE;
+}
+
+void pressed_dog(GtkMenuItem *menu_item, gpointer user_data)
+{
+	GtkWidget *box, *table, *spin;
+
+	box = gtk_vbox_new(FALSE, 5);
+	table = add_a_table(3, 2, 0, box);
+	gtk_widget_show_all(box);
+	spin = add_float_spin(3, 0, 200);
+	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
+		0, 1, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	spin = add_float_spin(1, 0, 200);
+	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
+		1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	add_to_table(_("Outer radius"), table, 0, 0, 5);
+	add_to_table(_("Inner radius"), table, 1, 0, 5);
+	add_a_toggle(_("Normalize"), box, TRUE);
+	if (mem_channel == CHN_IMAGE) add_a_toggle(_("Gamma corrected"), box,
+		inifile_get_gboolean("defaultGamma", FALSE));
+	filter_window(_("Difference of Gaussians"), box, do_dog, NULL, FALSE);
+}
+
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
@@ -484,8 +528,7 @@ void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 
 		update_menus();
 		init_pal();
-		gtk_widget_queue_draw( drawing_canvas );
-		gtk_widget_queue_draw( drawing_col_prev );
+		update_all_views();
 	}
 }
 
@@ -498,7 +541,6 @@ void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
 
 	init_pal();
 	update_all_views();
-	gtk_widget_queue_draw( drawing_col_prev );
 }
 
 void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item )
@@ -1061,10 +1103,9 @@ void canvas_undo_chores()
 
 	canvas_size(&w, &h);
 	gtk_widget_set_usize(drawing_canvas, w, h);
-	update_all_views();			// redraw canvas widget
 	update_menus();
 	init_pal();
-	gtk_widget_queue_draw(drawing_col_prev);
+	update_all_views();			// redraw canvas widget
 }
 
 void check_undo_paste_bpp()
@@ -1136,9 +1177,8 @@ int load_pal(char *file_name)			// Load palette file
 	mem_pal_copy( mem_pal, new_mem_pal );
 	mem_cols = i;
 
-	update_all_views();
 	init_pal();
-	gtk_widget_queue_draw(drawing_col_prev);
+	update_all_views();
 
 	return 0;
 }
@@ -1148,7 +1188,12 @@ void update_cols()
 {
 	if (!mem_img[CHN_IMAGE]) return;	// Only do this if we have an image
 
-	mem_pat_update(); /* !!! The order is significant for gradient sample */
+	mem_pat_update();
+	/* !!! Depends on mem_pat_update() for setting colors */
+	update_top_swatch();
+	gtk_widget_queue_draw(drawing_col_prev);
+
+	/* !!! Renders gradient bar, which depends on mem_pat_update() */
 	update_image_bar();
 
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
@@ -1159,8 +1204,6 @@ void update_cols()
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}
-
-	gtk_widget_queue_draw( drawing_col_prev );
 }
 
 void init_pal()					// Initialise palette after loading
@@ -1169,9 +1212,9 @@ void init_pal()					// Initialise palette after loading
 	mem_pal_init();			// Update palette RGB on screen
 	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
 		mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
+	gtk_widget_queue_draw( drawing_palette );
 
 	update_cols();
-	gtk_widget_queue_draw( drawing_palette );
 }
 
 void set_new_filename( char *fname )

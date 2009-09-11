@@ -156,12 +156,7 @@ static void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] )
 static void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 {
 	mem_swap_cols();
-	if (mem_channel == CHN_IMAGE)
-	{
-		repaint_top_swatch();
-		init_pal();
-		gtk_widget_queue_draw( drawing_col_prev );
-	}
+	if (mem_channel == CHN_IMAGE) update_cols();
 	else pressed_opacity(channel_col_A[mem_channel]);
 }
 
@@ -275,8 +270,7 @@ static void pressed_remove_unused( GtkMenuItem *menu_item, gpointer user_data )
 		if ( mem_col_A >= mem_cols ) mem_col_A = 0;
 		if ( mem_col_B >= mem_cols ) mem_col_B = 0;
 		init_pal();
-		gtk_widget_queue_draw( drawing_canvas );
-		gtk_widget_queue_draw(drawing_col_prev);
+		update_all_views();
 	}
 }
 
@@ -287,7 +281,6 @@ static void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 	mem_cols = mem_pal_def_i;
 	init_pal();
 	update_all_views();
-	gtk_widget_queue_draw(drawing_col_prev);
 }
 
 static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
@@ -326,8 +319,7 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 					remove_duplicates();
 					mem_undo_prepare();
 					init_pal();
-					gtk_widget_queue_draw( drawing_canvas );
-					gtk_widget_queue_draw(drawing_col_prev);
+					update_all_views();
 				}
 				g_free(mess);
 			}
@@ -335,55 +327,10 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 	}
 }
 
-static void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
-{	// Create a pattern.c file from the current image
-
-	int row, column, pattern, sx, sy, pixel;
-	FILE *fp;
-
-//printf("w = %i h = %i c = %i\n\n", mem_width, mem_height, mem_cols );
-
-	if ( mem_width == 94 && mem_height == 94 && mem_cols == 3 )
-	{
-		fp = fopen("pattern_user.c", "w");
-		if ( fp == NULL ) alert_box( _("Error"),
-				_("patterns_user.c could not be opened in current directory"),
-				_("OK"), NULL, NULL );
-		else
-		{
-			fprintf( fp, "char mem_patterns[81][8][8] = \n{\n" );
-			pattern = 0;
-			while ( pattern < 81 )
-			{
-				fprintf( fp, "{ " );
-				sy = 2 + (pattern / 9) * 10;		// Start y pixel on main image
-				sx = 3 + (pattern % 9) * 10;		// Start x pixel on main image
-				for ( column = 0; column < 8; column++ )
-				{
-					fprintf( fp, "{" );
-					for ( row = 0; row < 8; row++ )
-					{
-						pixel = mem_img[CHN_IMAGE][ sx+row + 94*(sy+column) ];
-						fprintf( fp, "%i", pixel % 2 );
-						if ( row < 10 ) fprintf( fp, "," );
-					}
-					if ( column < 10 ) fprintf( fp, "},\n" );
-					else  fprintf( fp, "}\n" );
-				}
-				if ( pattern < 80 ) fprintf( fp, "},\n" );
-				else  fprintf( fp, "}\n" );
-				pattern++;
-			}
-			fprintf( fp, "};\n" );
-			alert_box( _("Done"), _("patterns_user.c created in current directory"),
-				_("OK"), NULL, NULL );
-			fclose( fp );
-		}
-	}
-	else
-	{
-		alert_box( _("Error"), _("Current image is not 94x94x3 so I cannot create patterns_user.c"), _("OK"), NULL, NULL );
-	}
+static void pressed_dither_A()
+{
+	mem_find_dither(mem_col_A24.red, mem_col_A24.green, mem_col_A24.blue);
+	update_cols();
 }
 
 static void pressed_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
@@ -986,8 +933,6 @@ static key_action main_keys[] = {
 	{"",		ACT_VWZOOM_IN, GDK_KP_Add, _CS, _S},
 	{"VWZOOM_OUT",	ACT_VWZOOM_OUT, GDK_minus, _CS, _S},
 	{"",		ACT_VWZOOM_OUT, GDK_KP_Subtract, _CS, _S},
-// !!! Select another key
-	{"GET_PAIR",	ACT_GET_PAIR, GDK_space, 0, 0},
 	{NULL,		0, 0, 0, 0}
 };
 
@@ -1259,68 +1204,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		}
 		return (TRUE);
 
-	case ACT_GET_PAIR:
-	if (mem_channel != CHN_IMAGE) return (TRUE);
-	{
-		int pat = 4, dp = 3;
-		int i, ix1, ix2, pn, tpn, pp2 = pat * pat * 2;
-		double r, g, b, r1, g1, b1, dr0, dg0, db0, dr, dg, db;
-		double l, l2, tl, t;
-
-		r = gamma256[mem_col_A24.red];
-		g = gamma256[mem_col_A24.green];
-		b = gamma256[mem_col_A24.blue];
-		l = 16.0; ix1 = -1;
-
-		for (i = 0; i < mem_cols; i++)
-		{
-			dr = r - gamma256[mem_pal[i].red];
-			dg = g - gamma256[mem_pal[i].green];
-			db = b - gamma256[mem_pal[i].blue];
-			tl = dr * dr + dg * dg + db * db;
-			if (tl >= l) continue;
-			l = tl;
-			ix1 = i;
-		}
-
-		r1 = gamma256[mem_pal[ix1].red];
-		g1 = gamma256[mem_pal[ix1].green];
-		b1 = gamma256[mem_pal[ix1].blue];
-		dr0 = r - r1;
-		dg0 = g - g1;
-		db0 = b - b1;
-
-		l2 = l; ix2 = ix1; pn = 0;
-
-		for (i = 0; i < mem_cols; i++)
-		{
-			if (i == ix1) continue;
-			dr = gamma256[mem_pal[i].red] - r1;
-			dg = gamma256[mem_pal[i].green] - g1;
-			db = gamma256[mem_pal[i].blue] - b1;
-			t = pp2 * (dr0 * dr + dg0 * dg + db0 * db) /
-				(dr * dr + dg * dg + db * db);
-			if ((t <= dp) || (t >= pp2 - dp)) continue;
-			t = (tpn = rint(0.5 * t)) / (double)(pp2 >> 1);
-			dr = dr * t - dr0;
-			dg = dg * t - dg0;
-			db = db * t - db0;
-			tl = dr * dr + dg * dg + db * db;
-			if (tl >= l2) continue;
-			l2 = tl;
-			ix2 = i;
-			pn = tpn;
-		}
-
-		mem_col_A = ix1;
-		mem_col_B = ix2;
-/* !!! A mix with less than half of nearest color cannot be better than it, so
- * !!! patterns less dense than 50:50 won't be needed */
-		mem_tool_pat = pat == 4 ? pn : pn * 4;
-
-		break;
-	}
-
 	default:
 		return (TRUE);
 	}
@@ -1329,7 +1212,7 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	{
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];
-		init_pal();
+		update_cols();
 	}
 	else pressed_opacity(channel_col_A[mem_channel]);
 	return TRUE;
@@ -1674,6 +1557,12 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 	while ((state & _CS) == _C)	// Set colour A/B
 	{
+		if (button == 2) /* Auto-dither */
+		{
+			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
+				pressed_dither_A();
+			break;
+		}
 		if ((button != 1) && (button != 3)) break;
 		pixel = get_pixel(ox, oy);
 		if (mem_channel != CHN_IMAGE)
@@ -1724,7 +1613,6 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 				mem_col_B24.blue = INT_2_B(pixel);
 			}
 		}
-		repaint_top_swatch();
 		update_cols();
 		break;
 	}
@@ -3834,7 +3722,6 @@ static menu_item main_menu[] = {
 	{ _("/Edit/sep3"), -4 },
 	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", pressed_choose_patterns, 0 },
 	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", pressed_choose_brush, 0 },
-	{ _("/Edit/Create Patterns"), -1, 0, 0, NULL, pressed_create_patterns, 0 },
 
 	{ _("/_View"), -2 -16 },
 	{ _("/View/tear"), -3 },
@@ -3909,6 +3796,7 @@ static menu_item main_menu[] = {
 	{ _("/Palette/sep2"), -4 },
 	{ _("/Palette/Swap A & B"), -1, 0, 0, "X", pressed_swap_AB, 0 },
 	{ _("/Palette/Edit Colour A & B ..."), -1, 0, 0, "<control>E", pressed_edit_AB, 0 },
+	{ _("/Palette/Dither A"), -1, 0, NEED_24, NULL, pressed_dither_A, 0 },
 	{ _("/Palette/Palette Editor ..."), -1, 0, 0, "<control>W", pressed_allcol, 0 },
 	{ _("/Palette/Set Palette Size ..."), -1, 0, 0, NULL, pressed_add_cols, 0 },
 	{ _("/Palette/Merge Duplicate Colours"), -1, 0, NEED_IDX, NULL, pressed_remove_duplicates, 0 },
@@ -3933,6 +3821,7 @@ static menu_item main_menu[] = {
 	{ _("/Effects/Isometric Transformation/Bottom Side Right"), -1, 0, 0, NULL, iso_trans, 3 },
 	{ _("/Effects/sep1"), -4 },
 	{ _("/Effects/Edge Detect"), -1, 0, NEED_NOIDX, NULL, pressed_edge_detect, 0 },
+	{ _("/Effects/Difference of Gaussians ..."), -1, 0, NEED_NOIDX, NULL, pressed_dog, 0 },
 	{ _("/Effects/Sharpen ..."), -1, 0, NEED_NOIDX, NULL, pressed_sharpen, 0 },
 	{ _("/Effects/Unsharp Mask ..."), -1, 0, NEED_NOIDX, NULL, pressed_unsharp, 0 },
 	{ _("/Effects/Soften ..."), -1, 0, NEED_NOIDX, NULL, pressed_soften, 0 },
