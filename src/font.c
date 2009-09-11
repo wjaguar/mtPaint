@@ -1796,7 +1796,7 @@ void pressed_mt_text()
 
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	add_with_frame(vbox, _("Text"), hbox, 5);
+	add_with_frame(vbox, _("Text"), hbox);
 	mem->entry[TX_ENTRY_TEXT] = xpack(hbox, gtk_entry_new());
 	gtk_entry_set_text (GTK_ENTRY (mem->entry[TX_ENTRY_TEXT]),
 		inifile_get( "textString", _("Enter Text Here") ) );

@@ -4955,13 +4955,11 @@ static double BH(double x)
 
 static const double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
 
-static fstep *make_filter(int l0, int l1, int type, int sharp)
+static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 {
 	fstep *res, *buf;
 	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
 	double A = 0.0, kk = 1.0, sum;
-	int pic_tile = FALSE; /* Allow to enable tiling mode later */
-	int pic_skip = FALSE; /* Allow to enable skip mode later */
 	int i, j, k, ix;
 
 
@@ -5006,8 +5004,8 @@ static fstep *make_filter(int l0, int l1, int type, int sharp)
 			ix = j;
 			if ((j < 0) || (j >= l0))
 			{
-				if (pic_skip) continue;
-				if (pic_tile)
+				if (bound == BOUND_VOID) continue;
+				if (bound == BOUND_TILE)
 				{
 					if (ix < 0) ix = l0 - (-ix % l0);
 					ix %= l0;
@@ -5084,14 +5082,15 @@ static void clear_scale(scale_context *ctx)
 	free(ctx->vfilter);
 }
 
-static int prepare_scale(scale_context *ctx, int ow, int oh, int nw, int nh, int type, int sharp)
+static int prepare_scale(scale_context *ctx, int ow, int oh, int nw, int nh,
+	int type, int sharp, int bound)
 {
 	ctx->workarea = NULL;
 	ctx->hfilter = ctx->vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
 	ctx->workarea = malloc((7 * ow + 1) * sizeof(double));
-	ctx->hfilter = make_filter(ow, nw, type, sharp);
-	ctx->vfilter = make_filter(oh, nh, type, sharp);
+	ctx->hfilter = make_filter(ow, nw, type, sharp, bound);
+	ctx->vfilter = make_filter(oh, nh, type, sharp, bound);
 	if (!ctx->workarea || !ctx->hfilter || !ctx->vfilter)
 	{
 		clear_scale(ctx);
@@ -5334,7 +5333,7 @@ int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp,
 	scale_context ctx;
 
 
-	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp))
+	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp, BOUND_MIRROR))
 		return 1;	// Not enough memory
 
 	do_scale_internal(&ctx, old_img, new_img, bpp, type, ow, oh,
@@ -5343,7 +5342,7 @@ int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp,
 	return 0;
 }
 
-int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale image
+int mem_image_scale(int nw, int nh, int type, int gcor, int sharp, int bound)	// Scale image
 {
 	scale_context ctx;
 	chanlist old_img;
@@ -5352,7 +5351,7 @@ int mem_image_scale(int nw, int nh, int type, int gcor, int sharp)	// Scale imag
 	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
 
-	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp))
+	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp, bound))
 		return 1;	// Not enough memory
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
@@ -7283,12 +7282,33 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	free(gd.tmp);
 }	
 
+static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
+	unsigned char *upper, unsigned char *alpha, int len, int bpp)
+{
+	int j, k, mv;
+
+	for (j = 0; j < len;)
+	{
+		mv = *alpha++;
+		k = lower[j];
+		k = k * 255 + (upper[j] - k) * mv;
+		dest[j++] = (k + (k >> 8) + 1) >> 8;
+		if (bpp == 1) continue;
+		k = lower[j];
+		k = k * 255 + (upper[j] - k) * mv;
+		dest[j++] = (k + (k >> 8) + 1) >> 8;
+		k = lower[j];
+		k = k * 255 + (upper[j] - k) * mv;
+		dest[j++] = (k + (k >> 8) + 1) >> 8;
+	}
+}
+
 /* Retroactive masking - by blending with undo frame */
 void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 {
 	chanlist tlist;
-	unsigned char *src, *dest, *tm, *mask0 = NULL;
-	int i, j, k, k1, k2, mv, ofs, bpp = BPP(channel), w = mem_width * bpp;
+	unsigned char *dest, *mask0 = NULL;
+	int i, ofs, bpp = BPP(channel), w = mem_width * bpp;
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	tlist[channel] = old;
@@ -7302,23 +7322,8 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 		ofs = i * mem_width;
 		prep_mask(0, 1, mem_width, mask, mask0 ? mask0 + ofs : NULL,
 			tlist[CHN_IMAGE] + ofs * mem_img_bpp);
-		src = old + ofs * bpp;
 		dest = mem_img[channel] + ofs * bpp;
-		tm = mask;
-		for (j = 0; j < w; j += bpp , tm++)
-		{
-			mv = *tm;
-			k = dest[j];
-			k = k * 255 + (src[j] - k) * mv;
-			dest[j] = (k + (k >> 8) + 1) >> 8;
-			if (bpp == 1) continue;
-			k1 = dest[j + 1];
-			k1 = k1 * 255 + (src[j + 1] - k1) * mv;
-			dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
-			k2 = dest[j + 2];
-			k2 = k2 * 255 + (src[j + 2] - k2) * mv;
-			dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
-		}
+		do_alpha_blend(dest, dest, old + ofs * bpp, mask, w, bpp);
 	}
 }
 
@@ -7466,84 +7471,6 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 }
 
 
-static void mem_nearest_rgb(unsigned char *dest, unsigned char *src,
-	unsigned char *map, int w, int h, int r, int gcor)
-{
-	unsigned char *found;
-	int x0, x1, y0, y1, x, y;
-
-
-	for (y = 0; y < h; y++)
-	{
-		y0 = y - r < 0 ? 0 : y - r;
-		y1 = y + r > h ? h : y + r;
-		for (x = 0; x < w; x++)
-		{
-			x0 = x - r < 0 ? 0 : x - r;
-			x1 = x + r > w ? w : x + r;
-
-			found = NULL;
-			if (gcor) /* Gamma corrected */
-			{
-				unsigned char *tmp;
-				double d, rr, gg, bb;
-				int i, j;
-
-				d = 100.0; // More than 3*1.0^2
-				rr = gamma256[src[0]];
-				gg = gamma256[src[1]];
-				bb = gamma256[src[2]];
-				src += 3;
-
-				for (i = y0; i < y1; i++)
-				{
-					tmp = map + (i * w + x0) * 3;
-					for (j = x0; j < x1; j++ , tmp += 3)
-					{
-						double d2, dr, dg, db;
-
-						dr = gamma256[tmp[0]] - rr;
-						dg = gamma256[tmp[1]] - gg;
-						db = gamma256[tmp[2]] - bb;
-						d2 = dr * dr + dg * dg + db * db;
-						if (d2 >= d) continue;
-						found = tmp; d = d2;
-					}
-				}
-			}
-			else /* Raw RGB */
-			{
-				unsigned char *tmp;
-				int i, j, d, d2, rr, gg, bb;
-
-				d = 1000000; // More than 3*255^2
-				rr = src[0];
-				gg = src[1];
-				bb = src[2];
-				src += 3;
-
-				for (i = y0; i < y1; i++)
-				{
-					tmp = map + (i * w + x0) * 3;
-					for (j = x0; j < x1; j++ , tmp += 3)
-					{
-						d2 = (rr - tmp[0]) * (rr - tmp[0]) +
-							(gg - tmp[1]) * (gg - tmp[1]) +
-							(bb - tmp[2]) * (bb - tmp[2]);
-						if (d2 >= d) continue;
-						found = tmp; d = d2;
-					}
-				}
-			}
-
-			dest[0] = found[0];
-			dest[1] = found[1];
-			dest[2] = found[2];
-			dest += 3;
-		}
-	}
-}
-
 /* !!! Kuwahara-Nagao filter's radius is limited to 255, to use byte offsets */
 typedef struct {
 	int *idx;	// Index array
@@ -7674,6 +7601,79 @@ static void kuwahara_min(int base, kuwahara_info *info)
 	}
 }
 
+/* Replace each pixel in image row by nearest color in 3x3 Kuwahara'ed region */
+static void kuwahara_detailed(unsigned char *buf, unsigned char *mask, int y,
+	int gcor)
+{
+	unsigned char *tmp;
+	int l, w = mem_width * 3;
+#define REGION_SIZE 9
+	int steps[REGION_SIZE] = { 3, 3, w, 3, 3, w, 3, 3, w };
+
+#if 0 /* Make scanning order the same as with flat image */
+	l = (y + 2) % 3;
+	buf += (w + 6) * l;
+	steps [8 - 3 * l] -= (w + 6) * 3;
+#endif
+
+	row_protected(0, y, mem_width, mask);
+	tmp = mem_img[CHN_IMAGE] + y * w;
+	for (l = 0; l < mem_width; l++ , tmp += 3)
+	{
+		unsigned char *tb, *found;
+		int rr, gg, bb, op = *mask++;
+
+		if (op == 255) continue;
+		/* Find the nearest color pixel */
+		rr = tmp[0]; gg = tmp[1]; bb = tmp[2];
+		found = tb = buf + l * 3;
+		if (gcor) // Gamma corrected
+		{
+			double d, r2, g2, b2;
+			int i;
+
+			d = 100.0; // More than 3*1.0^2
+			r2 = gamma256[rr];
+			g2 = gamma256[gg];
+			b2 = gamma256[bb];
+			for (i = 0; i < REGION_SIZE; tb += steps[i++])
+			{
+				double d2, dr, dg, db;
+
+				dr = gamma256[tb[0]] - r2;
+				dg = gamma256[tb[1]] - g2;
+				db = gamma256[tb[2]] - b2;
+				d2 = dr * dr + dg * dg + db * db;
+				if (d2 >= d) continue;
+				found = tb; d = d2;
+			}
+		}
+		else // Raw RGB
+		{
+			int i, d, d2;
+
+			d = 1000000; // More than 3*255^2
+			for (i = 0; i < REGION_SIZE; tb += steps[i++])
+			{
+				d2 = (rr - tb[0]) * (rr - tb[0]) +
+					(gg - tb[1]) * (gg - tb[1]) +
+					(bb - tb[2]) * (bb - tb[2]);
+				if (d2 >= d) continue;
+				found = tb; d = d2;
+			}
+		}
+		/* Mask-merge it into image */
+		rr = found[0]; gg = found[1]; bb = found[2];
+		rr = 255 * rr + (*tmp - rr) * op;
+		tmp[0] = (rr + (rr >> 8) + 1) >> 8;
+		gg = 255 * gg + (*tmp - gg) * op;
+		tmp[1] = (gg + (gg >> 8) + 1) >> 8;
+		bb = 255 * bb + (*tmp - bb) * op;
+		tmp[2] = (bb + (bb >> 8) + 1) >> 8;
+	}
+#undef REGION_SIZE
+}
+
 /* Convert virtual row to row index (mirror boundary) */
 static int idx2row(int idx)
 {
@@ -7690,9 +7690,9 @@ static int idx2row(int idx)
 void mem_kuwahara(int r, int gcor, int detail)
 {
 	kuwahara_info info;
-	unsigned char *mem, *src, *dest, *mask, *tms, *tmp, *timg;
+	unsigned char *mem, *src, *buf, *mask, *tmp, *timg;
 	int i, j, k, l, ir, len, rl, r1 = r + 1;
-	int w = mem_width * 3, ch = mem_channel;
+	int w = mem_width * 3, wbuf = w + 3 * 2, ch = mem_channel;
 	double r2i = 1.0 / (double)(r1 * r1);
 
 
@@ -7708,7 +7708,7 @@ void mem_kuwahara(int r, int gcor, int detail)
 		&info.idx, len * sizeof(int),
 		&info.min, l * r1,
 		&mask, mem_width,
-		&timg, detail ? mem_height * w : 0,
+		&timg, wbuf * 3,
 		NULL);
 	if (!mem)
 	{
@@ -7732,7 +7732,6 @@ void mem_kuwahara(int r, int gcor, int detail)
 
 	mem_channel = CHN_IMAGE; // For row_protected()
 	src = mem_undo_previous(CHN_IMAGE);
-	dest = detail ? timg : mem_img[CHN_IMAGE];
 	/* Initialize the bottom sum */
 	for (i = -r; i <= 0; i++)
 		kuwahara_row(src + idx2row(i) * w, 0, TRUE, &info);
@@ -7756,14 +7755,15 @@ void mem_kuwahara(int r, int gcor, int detail)
 			if (progress_update((float)(i + 1) / mem_height)) break;
 
 		/* Process a pixel row */
-		row_protected(0, i, mem_width, tms = mask);
-		tmp = dest + i * w;
-		for (j = 0; j < mem_width; j++ , tmp += 3)
+		if (!detail) row_protected(0, i, mem_width, mask);
+		tmp = buf = timg + wbuf * (i % 3);
+		for (j = 0; j < mem_width; j++)
 		{
 			double dis;
-			int rr, gg, bb, jj, jk, op = *tms++;
+			int jj, jk;
 
-			if (op == 255) continue;
+			tmp += 3;
+			if (!detail && (mask[j] == 255)) continue;
 			/* Select minimum variance square from covered rows */
 			jj = j + l;
 			jk = j + info.min[j];
@@ -7780,38 +7780,57 @@ void mem_kuwahara(int r, int gcor, int detail)
 			if (gcor)
 			{
 				double *wr = info.rs + jk;
-				rr = UNGAMMA256(wr[0] * r2i);
-				gg = UNGAMMA256(wr[1] * r2i);
-				bb = UNGAMMA256(wr[2] * r2i);
+				tmp[0] = UNGAMMA256(wr[0] * r2i);
+				tmp[1] = UNGAMMA256(wr[1] * r2i);
+				tmp[2] = UNGAMMA256(wr[2] * r2i);
 			}
 			else
 			{
 				int *ar = info.avg + jk;
-				rr = rint(*ar++ * r2i);
-				gg = rint(*ar++ * r2i);
-				bb = rint(*ar * r2i);
+				tmp[0] = rint(*ar++ * r2i);
+				tmp[1] = rint(*ar++ * r2i);
+				tmp[2] = rint(*ar * r2i);
 			}
-			rr = 255 * rr + (*tmp - rr) * op;
-			tmp[0] = (rr + (rr >> 8) + 1) >> 8;
-			gg = 255 * gg + (*tmp - gg) * op;
-			tmp[1] = (gg + (gg >> 8) + 1) >> 8;
-			bb = 255 * bb + (*tmp - bb) * op;
-			tmp[2] = (bb + (bb >> 8) + 1) >> 8;
 		}
-		if (++i >= mem_height) break;
 
-		/* Update sums for a new row */
-		jp = ir * l;
-		kuwahara_copy(jp, ((ir + r) % r1) * l, &info);
-		kuwahara_row(src + idx2row(i - 1) * w, jp, FALSE, &info);
-		kuwahara_row(src + idx2row(i + r) * w, jp, TRUE, &info);
-		kuwahara_min(jp, &info);
-		ir = (ir + 1) % r1;
+		if (detail)
+		{
+			/* Copy-extend the row on both ends */
+			memcpy(buf, buf + 3, 3);
+			memcpy(tmp + 3, tmp, 3);
+			/* Copy-extend the top row */
+			if (!i) memcpy(timg + wbuf * 2, buf, wbuf);
+			/* Build and mask-merge the previous row */
+			else kuwahara_detailed(timg, mask, i - 1, gcor);
+		}
+		else
+		{
+			/* Mask-merge current row */
+			tmp = mem_img[CHN_IMAGE] + i * w;
+			do_alpha_blend(tmp, buf + 3, tmp, mask, w, 3);
+		}
+
+		if (++i < mem_height)
+		{
+			/* Update sums for a new row */
+			jp = ir * l;
+			kuwahara_copy(jp, ((ir + r) % r1) * l, &info);
+			kuwahara_row(src + idx2row(i - 1) * w, jp, FALSE, &info);
+			kuwahara_row(src + idx2row(i + r) * w, jp, TRUE, &info);
+			kuwahara_min(jp, &info);
+			ir = (ir + 1) % r1;
+			continue;
+		}
+
+		if (detail)
+		{
+			/* Copy-extend the bottom row */
+			memcpy(timg + wbuf * (i % 3), buf, wbuf);
+			/* Build and mask-merge it */
+			kuwahara_detailed(timg, mask, i - 1, gcor);
+		}
+		break;
 	}
-
-	/* Find nearest RGB in 3x3 square */
-	if (detail) mem_nearest_rgb(mem_img[CHN_IMAGE], src, dest,
-		mem_width, mem_height, 1, gcor);
 
 	mem_channel = ch;
 

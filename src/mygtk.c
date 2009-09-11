@@ -627,9 +627,9 @@ GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
 	return (frame);
 }
 
-GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border)
+GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget)
 {
-	return (add_with_frame_x(box, text, widget, border, FALSE));
+	return (add_with_frame_x(box, text, widget, 5, FALSE));
 }
 
 // Option menu
@@ -818,7 +818,7 @@ GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
 	gtk_widget_show(hbox);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 
-	add_with_frame(box, name, hbox, 5);
+	add_with_frame(box, name, hbox);
 	entry = xpack5(hbox, gtk_entry_new());
 	gtk_widget_show(entry);
 	button = add_a_button(_("Browse"), 2, hbox, FALSE);

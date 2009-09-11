@@ -1378,12 +1378,34 @@ static int anim_file_dialog(int ftype)
 	return (i - 2);
 }
 
+static void handle_file_error(int res)
+{
+	char mess[256], *txt = NULL;
+
+	/* Image was too large for OS */
+	if (res == FILE_MEM_ERROR) memory_errors(1);
+	else if (res == TOO_BIG)
+		snprintf(txt = mess, 250, _("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
+	else if (res == EXPLODE_FAILED)
+		txt = _("Unable to explode frames");
+	else if (res <= 0)
+		txt = _("Unable to load file");
+	else if (res == FILE_LIB_ERROR)
+		txt = _("The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again.");
+	else if (res == FILE_TOO_LONG)
+		txt = _("The animation is too long to load all of it into layers.");
+	else if (res == FILE_EXP_BREAK)
+		txt = _("Could not explode all the frames in the animation.");
+	if (txt) alert_box(_("Error"), txt, NULL);
+}
+
 static GtkWidget *file_selector_create(int action_type);
 #define FS_XNAME_KEY "mtPaint.fs_xname"
+#define FS_XTYPE_KEY "mtPaint.fs_xtype"
 
 int do_a_load(char *fname, int undo)
 {
-	char mess[256], real_fname[PATHBUF];
+	char real_fname[PATHBUF];
 	int res, i = 0, ftype, mult = 0;
 
 
@@ -1413,31 +1435,9 @@ int do_a_load(char *fname, int undo)
 	if (ftype == FT_LAYERS1) mult = res = load_layers(real_fname);
 	else res = load_image(real_fname, FS_PNG_LOAD, undo ? ftype | FTM_UNDO : ftype);
 
-loaded:	if ( res<=0 )				// Error loading file
-	{
-		if (res == TOO_BIG)
-		{
-			snprintf(mess, 250, _("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
-			alert_box(_("Error"), mess, NULL);
-		}
-		else
-		{
-			alert_box(_("Error"), _("Unable to load file"), NULL);
-		}
-		goto fail;
-	}
-
-	else if (res == FILE_LIB_ERROR)
-		alert_box(_("Error"), _("The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again."), NULL);
-
-	else if (res == FILE_TOO_LONG)
-		alert_box(_("Error"), _("The animation is too long to load all of it into layers."), NULL);
-
-	/* Image was too large for OS */
-	else if (res == FILE_MEM_ERROR) memory_errors(1);
-
+loaded:
 	/* Multiframe file was loaded so tell user */
-	else if (res == FILE_HAS_FRAMES)
+	if (res == FILE_HAS_FRAMES)
 	{
 		int i;
 
@@ -1469,10 +1469,23 @@ loaded:	if ( res<=0 )				// Error loading file
 				gtk_object_set_data_full(GTK_OBJECT(fs),
 					FS_XNAME_KEY, g_strdup(real_fname),
 					(GtkDestroyNotify)g_free);
+				gtk_object_set_data(GTK_OBJECT(fs),
+					FS_XTYPE_KEY, (gpointer)ftype);
 				fs_setup(fs, FS_EXPLODE_FRAMES);
 			}
 		}
 		else if (i == 2) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
+	}
+
+	/* An error happened */
+	else if (res != 1)
+	{
+		handle_file_error(res);
+		if (res <= 0) // Hard error
+		{
+			set_image(TRUE);
+			return (1);
+		}
 	}
 
 	/* Whether we loaded something or failed to, old image is gone anyway */
@@ -1503,8 +1516,8 @@ loaded:	if ( res<=0 )				// Error loading file
 		update_stuff(UPD_ALL);
 	}
 
-fail:	set_image(TRUE);
-	return (res <= 0);
+	set_image(TRUE);
+	return (0);
 }
 
 
@@ -1826,8 +1839,8 @@ static void fs_ok(GtkWidget *fs)
 	ls_settings settings;
 	GtkWidget *xtra, *entry;
 	char fname[PATHTXT], *msg, *f8;
-	char *c, *ext, *ext2, *tmp, *gif, *gif2;
-	int i, j;
+	char *c, *ext, *ext2, *gif, *gif2;
+	int i, j, res;
 
 	/* Pick up extra info */
 	xtra = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(fs)));
@@ -1958,15 +1971,10 @@ static void fs_ok(GtkWidget *fs)
 		break;
 	case FS_EXPLODE_FRAMES:
 		gif = gtk_object_get_data(GTK_OBJECT(fs), FS_XNAME_KEY);
-		c = strrchr(gif, DIR_SEP);
-		if (!c) c = gif;
-		else c++;
-		tmp = g_strdup_printf("%s%c%s", fname, DIR_SEP, c);
-		run_def_action(DA_GIF_EXPLODE, gif, tmp, 0);
-		gif = g_strconcat(tmp, ".???", NULL);
-		g_free(tmp);
-		run_def_action(DA_GIF_EDIT, gif, NULL, preserved_gif_delay);
-		g_free(gif);
+		res = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
+		res = explode_frames(fname, anim_mode, gif, res);
+		if (res != 1) handle_file_error(res);
+		if (res <= 0) goto redo;
 		break;
 	case FS_EXPORT_GIF:
 		if (check_file(fname)) goto redo;

@@ -417,7 +417,7 @@ void pressed_file_configure()
 	{
 		hbox = gtk_hbox_new(FALSE, 0);
 		gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-		add_with_frame(vbox, !j ? _("Action") : _("Command"), hbox, 5);
+		add_with_frame(vbox, !j ? _("Action") : _("Command"), hbox);
 		faction_entry[j] = entry = xpack5(hbox, gtk_entry_new());
 		gtk_signal_connect(GTK_OBJECT(entry), "changed",
 			GTK_SIGNAL_FUNC(faction_changed), (gpointer)j);
@@ -591,7 +591,7 @@ static char *quote_spaces(const char *src)
 	/* !!! Image Magick version prior to 6.2.6-3 won't work properly */
 #define CMD_GIF_CREATE \
 	"convert %2$s -layers optimize -set delay %1$d -loop 0 \"%3$s\""
-#define CMD_GIF_EXPLODE \
+//#define CMD_GIF_EXPLODE \
 	"convert \"%s\" -scene 0 -coalesce +adjoin \"gif:%s.%%03d\""
 #define CMD_GIF_PLAY "animate \"%s\" &"
 
@@ -601,7 +601,7 @@ static char *quote_spaces(const char *src)
  *	removal method, infinite loops, ensure result works with Java & MS IE */
 #define CMD_GIF_CREATE \
 	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful -d %d %s -o \"%s\""
-#define CMD_GIF_EXPLODE \
+//#define CMD_GIF_EXPLODE \
 	"gifsicle -U --explode \"%s\" -o \"%s\""
 #define CMD_GIF_PLAY "gifview -a \"%s\" &"
 
@@ -625,9 +625,9 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		command = g_strdup_printf(CMD_GIF_CREATE, delay, c8, dname);
 		free(c8);
 		break;
-	case DA_GIF_EXPLODE:
-		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);
-		break;
+//	case DA_GIF_EXPLODE:
+//		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);
+//		break;
 	case DA_GIF_PLAY:
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 		/* 'gifviev' and 'animate' both are X-only */

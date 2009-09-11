@@ -121,23 +121,32 @@ fformat file_formats[NUM_FTYPES] = {
 
 int file_type_by_ext(char *name, guint32 mask)
 {
-	int i;
-	char *ext = strrchr(name, '.');
+	char *ext;
+	int i, l = LONGEST_EXT;
 
+
+	ext = strrchr(name, '.');
 	if (!ext || !ext[0]) return (FT_NONE);
+
+	/* Special case for exploded frames (*.gif.000 etc.) */
+	if (!ext[strspn(ext, ".0123456789")] && memchr(name, '.', ext - name))
+	{
+		char *tmp = ext;
+
+		while (*(--ext) != '.');
+		if (tmp - ext - 1 < LONGEST_EXT) l = tmp - ext - 1;
+	}
+
+	ext++;
 	for (i = 0; i < NUM_FTYPES; i++)
 	{
 		if (!(file_formats[i].flags & mask)) continue;
-		if (!strncasecmp(ext + 1, file_formats[i].ext, LONGEST_EXT))
+		if (!strncasecmp(ext, file_formats[i].ext, l))
 			return (i);
 		if (!file_formats[i].ext2[0]) continue;
-		if (!strncasecmp(ext + 1, file_formats[i].ext2, LONGEST_EXT))
+		if (!strncasecmp(ext, file_formats[i].ext2, l))
 			return (i);
 	}
-
-	/* Special case for Gifsicle's victims */
-	if ((mask & FF_256) && (ext - name > 4) &&
-		!strncasecmp(ext - 4, ".gif", 4)) return (FT_GIF);
 
 	return (FT_NONE);
 }
@@ -148,6 +157,8 @@ static int check_next_frame(frameset *fset, int mode)
 	int lim = mode == FS_LAYER_LOAD ? MAX_LAYERS - 1 : FRAMES_MAX;
 	return (fset->cnt < lim);
 }
+
+static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_set);
 
 /* Receives struct with image parameters, and channel flags;
  * returns 0 for success, or an error code;
@@ -164,7 +175,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		return (TOO_BIG);
 
 	/* Don't show progress bar where there's no need */
-	if (settings->width * settings->height <= (1<<silence_limit))
+	if (settings->width * settings->height <= (1 << silence_limit))
 		settings->silent = TRUE;
 
 	/* Reduce cmask according to mode */
@@ -871,18 +882,14 @@ typedef struct {
 	int prev_idx; // Frame index+1, so that 0 means None
 	int defw, defh, bk_rect[4];
 	int mode;
+	/* Extra fields for paletted images */
+	int global_cols, newcols, newtrans;
+	png_color global_pal[256], newpal[256];
+	unsigned char xlat[513];
 } ani_status;
 
-/* GIF animation state (animation + palette) */
-typedef struct {
-	ani_status ani;
-	unsigned char xlat[513];
-	png_color global_pal[256], newpal[256];
-	int global_cols, newcols, newtrans;
-} gif_status;
-
 /* Calculate new frame dimensions, and point-in-area bitmap */
-static void ani_map_frame(ani_status *ani, ls_settings *settings)
+static void ani_map_frame(ani_status *stat, ls_settings *settings)
 {
 	unsigned char *lmap;
 	int i, j, w, h;
@@ -891,41 +898,41 @@ static void ani_map_frame(ani_status *ani, ls_settings *settings)
 	/* Calculate the new dimensions */
 // !!! Offsets considered nonnegative (as in GIF)
 	w = settings->x + settings->width;
-	if (ani->defw < w) ani->defw = w;
+	if (stat->defw < w) stat->defw = w;
 	h = settings->y + settings->height;
-	if (ani->defh < h) ani->defh = h;
+	if (stat->defh < h) stat->defh = h;
 
 	/* The bitmap works this way: "Xth byte & (Yth byte >> 4)" tells which
 	 * area(s) the pixel (X,Y) is in: bit 0 is for image (the new one),
 	 * bit 1 is for underlayer (the previous composited frame), and bit 2
 	 * is for hole in it (if "restore to background" was last) */
-	j = ani->defw > ani->defh ? ani->defw : ani->defh;
-	memset(lmap = ani->lmap, 0, j);
+	j = stat->defw > stat->defh ? stat->defw : stat->defh;
+	memset(lmap = stat->lmap, 0, j);
 	// Mark new frame
 	for (i = settings->x , j = i + settings->width; i < j; i++)
 		lmap[i] |= 0x01; // Image bit
 	for (i = settings->y , j = i + settings->height; i < j; i++)
 		lmap[i] |= 0x10; // Image mask bit
 	// Mark previous frame
-	if (ani->prev_idx)
+	if (stat->prev_idx)
 	{
-		for (i = ani->prev.x , j = i + ani->prev.width; i < j; i++)
+		for (i = stat->prev.x , j = i + stat->prev.width; i < j; i++)
 			lmap[i] |= 0x02; // Underlayer bit
-		for (i = ani->prev.y , j = i + ani->prev.height; i < j; i++)
+		for (i = stat->prev.y , j = i + stat->prev.height; i < j; i++)
 			lmap[i] |= 0x20; // Underlayer mask bit
 	}
 	// Mark disposal area
-	if ((ani->bk_rect[0] < ani->bk_rect[2]) &&
-		(ani->bk_rect[1] < ani->bk_rect[3])) // Add bkg rectangle
+	if ((stat->bk_rect[0] < stat->bk_rect[2]) &&
+		(stat->bk_rect[1] < stat->bk_rect[3])) // Add bkg rectangle
 	{
-		for (i = ani->bk_rect[0] , j = ani->bk_rect[2]; i < j; i++)
+		for (i = stat->bk_rect[0] , j = stat->bk_rect[2]; i < j; i++)
 			lmap[i] |= 0x04; // Background bit
-		for (i = ani->bk_rect[1] , j = ani->bk_rect[3]; i < j; i++)
+		for (i = stat->bk_rect[1] , j = stat->bk_rect[3]; i < j; i++)
 			lmap[i] |= 0x40; // Background mask bit
 	}
 }
 
-static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int disposal)
+static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
 {
 	unsigned char cmap[513], *lmap, *fg, *bg;
 	png_color *pal, *prev;
@@ -948,21 +955,21 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 	stat->newtrans = settings->xpm_trans;
 
 	/* Prepare for new frame */
-	if (stat->ani.mode == ANM_RAW) // Raw frame mode
+	if (stat->mode == ANM_RAW) // Raw frame mode
 	{
-		stat->ani.defw = settings->width;
-		stat->ani.defh = settings->height;
+		stat->defw = settings->width;
+		stat->defh = settings->height;
 		return (0);
 	}
-	ani_map_frame(&stat->ani, settings);
-	same_size = !((stat->ani.defw ^ settings->width) |
-		(stat->ani.defh ^ settings->height));
+	ani_map_frame(stat, settings);
+	same_size = !((stat->defw ^ settings->width) |
+		(stat->defh ^ settings->height));
 
 	for (i = 0; i < 256; i++) stat->xlat[i] = stat->xlat[i + 256] = i;
 	stat->xlat[512] = stat->newtrans;
 
 	/* First frame is exceptional */
-	if (!stat->ani.prev_idx)
+	if (!stat->prev_idx)
 	{
 		// Trivial if no background gets drawn
 		if (same_size) return (0);
@@ -978,12 +985,12 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 	fgw = settings->width;
 	fg = settings->img[CHN_IMAGE] - (settings->y * fgw + settings->x);
 	// Set underlayer pointer & step (ignore bpp!)
-	bgw = stat->ani.prev.width;
-	bg = stat->ani.prev.img[CHN_IMAGE] - (stat->ani.prev.y * bgw + stat->ani.prev.x);
-	lmap = stat->ani.lmap;
-	for (y = 0; y < stat->ani.defh; y++)
+	bgw = stat->prev.width;
+	bg = stat->prev.img[CHN_IMAGE] - (stat->prev.y * bgw + stat->prev.x);
+	lmap = stat->lmap;
+	for (y = 0; y < stat->defh; y++)
 	{
-		int ww = stat->ani.defw, tp = settings->xpm_trans;
+		int ww = stat->defw, tp = settings->xpm_trans;
 		int bmask = lmap[y] >> 4;
 
 		for (x = 0; x < ww; x++)
@@ -1002,12 +1009,12 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 
 	/* If we have underlayer */
 	show_under = 0;
-	if (stat->ani.prev_idx)
+	if (stat->prev_idx)
 	{
 		// Use per-frame palette if underlayer has it
-		prev = stat->ani.prev.pal;
-		lprev = stat->ani.prev.cols;
-		prevtr = stat->ani.prev.trans;
+		prev = stat->prev.pal;
+		lprev = stat->prev.cols;
+		prevtr = stat->prev.trans;
 		// Move underlayer transparency to "transparent"
 		if (prevtr >= 0)
 		{
@@ -1017,7 +1024,7 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 		// Check if underlayer is at all visible
 		show_under = !!memchr(cmap, 1, 256);
 		// Visible RGB/RGBA underlayer means RGB/RGBA frame
-		if (show_under && (stat->ani.prev.bpp == 3)) goto RGB;
+		if (show_under && (stat->prev.bpp == 3)) goto RGB;
 	}
 
 	/* Now, check if either frame's palette is enough */
@@ -1116,7 +1123,7 @@ RGB:	if (stat->global_cols > 0) // Use default palette if present
 	}
 	stat->newtrans = -1; // No color-key transparency
 	// RGBA if underlayer with alpha, or transparent backround, is visible
-	if ((show_under && stat->ani.prev.img[CHN_ALPHA]) || cmap[512])
+	if ((show_under && stat->prev.img[CHN_ALPHA]) || cmap[512])
 		return (4);
 	// RGB otherwise
 	return (3);
@@ -1137,22 +1144,25 @@ static unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
 	return (rgb);
 }
 
-static void composite_gif_frame(frameset *fset, gif_status *stat,
-	ls_settings *settings, int disposal)
+static void composite_gif_frame(frameset *fset, ani_status *stat,
+	ls_settings *settings)
 {
-	unsigned char *dest, *fg0, *bg0 = NULL, *lmap = stat->ani.lmap;
-	image_frame *frame = fset->frames + (fset->cnt - 1), *bkf = &stat->ani.prev;
-	int w, fgw, bgw = 0, urgb = 0, tp = settings->xpm_trans;
+	unsigned char *dest, *fg0, *bg0 = NULL, *lmap = stat->lmap;
+	image_frame *frame = fset->frames + (fset->cnt - 1), *bkf = &stat->prev;
+	int disposal, w, fgw, bgw = 0, urgb = 0, tp = settings->xpm_trans;
 
 
 	frame->trans = stat->newtrans;
 	/* In raw mode, just store the offsets */
-	if (stat->ani.mode == ANM_RAW)
+	if (stat->mode == ANM_RAW)
 	{
 		frame->x = settings->x;
 		frame->y = settings->y;
-		return;
+		goto done;
 	}
+	/* Read & clear disposal mode */
+	disposal = frame->flags & FM_DISPOSAL;
+	frame->flags ^= disposal ^ FM_DISP_REMOVE;
 
 	w = frame->width;
 	dest = frame->img[CHN_IMAGE];
@@ -1254,39 +1264,36 @@ static void composite_gif_frame(frameset *fset, gif_status *stat,
 	}
 
 	/* Prepare the disposal action */
-	memset(&stat->ani.bk_rect, 0, sizeof(stat->ani.bk_rect)); // Clear old
+	memset(&stat->bk_rect, 0, sizeof(stat->bk_rect)); // Clear old
 	switch (disposal)
 	{
-	case 2: // Dispose to background
+	case FM_DISP_REMOVE: // Dispose to background
 		// Image-sized hole in underlayer
-		stat->ani.bk_rect[2] = (stat->ani.bk_rect[0] = settings->x) +
+		stat->bk_rect[2] = (stat->bk_rect[0] = settings->x) +
 			settings->width;
-		stat->ani.bk_rect[3] = (stat->ani.bk_rect[1] = settings->y) +
+		stat->bk_rect[3] = (stat->bk_rect[1] = settings->y) +
 			settings->height;
 		// Fallthrough
-	case 0: case 1: default: // Don't dispose
-		stat->ani.prev = *frame; // Current frame becomes underlayer
-		if (!stat->ani.prev.pal) stat->ani.prev.pal = fset->pal;
-		if ((stat->ani.mode == ANM_NOZERO) && stat->ani.prev_idx &&
-			!fset->frames[stat->ani.prev_idx - 1].delay)
-		{
-			/* Remove the zero-delay frame which just got unref'd */
-			mem_remove_frame(fset, stat->ani.prev_idx - 1);
-		}
-		stat->ani.prev_idx = fset->cnt;
+	case FM_DISP_LEAVE: // Don't dispose
+		stat->prev = *frame; // Current frame becomes underlayer
+		if (!stat->prev.pal) stat->prev.pal = fset->pal;
+		if (stat->prev_idx &&
+			(fset->frames[stat->prev_idx - 1].flags & FM_NUKE))
+			/* Remove the unref'd frame */
+			mem_remove_frame(fset, stat->prev_idx - 1);
+		stat->prev_idx = fset->cnt;
 		break;
-	case 3: // Dispose to previous
-	case 4: /* Handling (reserved) "4" same as "3" is what Mozilla does */
+	case FM_DISP_RESTORE: // Dispose to previous
 		// Underlayer stays unchanged
 		break;
 	}
-	if ((stat->ani.mode == ANM_NOZERO) && (stat->ani.prev_idx != fset->cnt - 1) &&
-		(fset->cnt > 1) && !fset->frames[fset->cnt - 2].delay)
+done:	if ((fset->cnt > 1) && (stat->prev_idx != fset->cnt - 1) &&
+		(fset->frames[fset->cnt - 2].flags & FM_NUKE))
 	{
-		/* Remove the next-to-last zero-delay frame if not ref'd */
+		/* Remove the next-to-last frame */
 		mem_remove_frame(fset, fset->cnt - 2);
-		if (stat->ani.prev_idx > fset->cnt)
-			stat->ani.prev_idx = fset->cnt;
+		if (stat->prev_idx > fset->cnt)
+			stat->prev_idx = fset->cnt;
 	}
 }
 
@@ -1354,23 +1361,29 @@ fail:	if (!settings->silent) progress_end();
 
 static int load_gif_frames(char *file_name, ani_settings *ani)
 {
+	/* GIF disposal codes mapping */
+	static const unsigned short gif_disposal[8] = {
+		FM_DISP_LEAVE, FM_DISP_LEAVE, FM_DISP_REMOVE, FM_DISP_RESTORE,
+		/* Handling (reserved) "4" same as "3" is what Mozilla does */
+		FM_DISP_RESTORE, FM_DISP_LEAVE, FM_DISP_LEAVE, FM_DISP_LEAVE
+	};
 	GifFileType *giffy;
 	GifRecordType gif_rec;
 	GifByteType *byte_ext;
 	png_color w_pal[256];
-	gif_status stat;
+	ani_status stat;
 	image_frame *frame;
 	ls_settings w_set, init_set;
-	int res, val, disposal, bpp, cmask;
+	int res, val, disposal, bpp, cmask, lastzero = FALSE;
 
 
 	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
 
 	/* Init state structure */
 	memset(&stat, 0, sizeof(stat));
-	stat.ani.mode = ani->mode;
-	stat.ani.defw = giffy->SWidth;
-	stat.ani.defh = giffy->SHeight;
+	stat.mode = ani->mode;
+	stat.defw = giffy->SWidth;
+	stat.defh = giffy->SHeight;
 	stat.global_cols = convert_gif_palette(stat.global_pal, giffy->SColorMap);
 
 	/* Init temp container */
@@ -1379,7 +1392,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	init_set.pal = w_pal;
 	init_set.xpm_trans = -1;
 	init_set.gif_delay = 0;
-	disposal = 0;
+	disposal = FM_DISP_LEAVE;
 
 	/* Init frameset */
 	if (stat.global_cols > 0) // Set default palette
@@ -1408,7 +1421,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 						byte_ext[4] : -1;
 					init_set.gif_delay = byte_ext[2] +
 						(byte_ext[3] << 8);
-					disposal = (byte_ext[1] >> 2) & 7;
+					disposal = gif_disposal[(byte_ext[1] >> 2) & 7];
 				}
 				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
 			}
@@ -1422,32 +1435,44 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 			res = load_gif_frame(giffy, &w_set);
 			if (res != 1) goto fail;
 			/* Analyze how we can merge the frames */
-			bpp = analyze_gif_frame(&stat, &w_set, disposal);
+			bpp = analyze_gif_frame(&stat, &w_set);
 			cmask = !bpp ? CMASK_NONE : bpp > 3 ? CMASK_RGBA : CMASK_IMAGE;
 			/* Allocate a new frame */
 // !!! Currently, frames are allocated without checking any limits
 			res = FILE_MEM_ERROR;
-			if (!mem_add_frame(&ani->fset, stat.ani.defw, stat.ani.defh,
+			if (!mem_add_frame(&ani->fset, stat.defw, stat.defh,
 				bpp > 1 ? 3 : 1, cmask, stat.newpal)) goto fail;
 			frame = ani->fset.frames + (ani->fset.cnt - 1);
 			frame->cols = stat.newcols;
 			frame->delay = w_set.gif_delay;
+			frame->flags = disposal; // Pass to compositing
+			/* Tag zero-delay frame for deletion if requested */
+			if ((lastzero = (stat.mode == ANM_NOZERO) &&
+				!w_set.gif_delay)) frame->flags |= FM_NUKE;
 			if (!bpp) // Same bpp & dimensions - reassign the chanlist
 			{
 				memcpy(frame->img, w_set.img, sizeof(chanlist));
 				memset(w_set.img, 0, sizeof(chanlist));
 			}
 			/* Do actual compositing, remember disposal method */
-			composite_gif_frame(&ani->fset, &stat, &w_set, disposal);
+			composite_gif_frame(&ani->fset, &stat, &w_set);
 			// !!! "frame" pointer may be invalid past this point
 			mem_free_chanlist(w_set.img);
 			memset(w_set.img, 0, sizeof(chanlist));
-
-// !!! Handle FS_EXPLODE_FRAMES at this point
-
+			/* Write out those frames worthy to be stored */
+			if ((ani->settings.mode == FS_EXPLODE_FRAMES) && !lastzero)
+			{
+				res = write_out_frame(file_name, ani, NULL);
+				if (res) goto fail;
+			}
 		}
 	}
-// !!! Here (maybe) unify all frames - resize to full area, & promote to RGB/RGBA
+	/* Write out the final frame if not written before */
+	if ((ani->settings.mode == FS_EXPLODE_FRAMES) && lastzero)
+	{
+		res = write_out_frame(file_name, ani, NULL);
+		if (res) goto fail;
+	}
 	res = 1;
 fail:	mem_free_chanlist(w_set.img);
 	DGifCloseFile(giffy);
@@ -2335,21 +2360,26 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 		w_set = ani->settings;
 		res = load_tiff_frame(tif, &w_set);
 		if (res != 1) goto fail;
-
-// !!! Handle FS_EXPLODE_FRAMES at this point, as alternative branch
-
-		/* Store a new frame */
+		if (ani->settings.mode == FS_EXPLODE_FRAMES)
+		{
+			res = write_out_frame(file_name, ani, &w_set);
+			if (res) goto fail;
+		}
+		else
+		{
+			/* Store a new frame */
 // !!! Currently, frames are allocated without checking any limits
-		res = FILE_MEM_ERROR;
-		if (!mem_add_frame(&ani->fset, w_set.width, w_set.height,
-			w_set.bpp, CMASK_NONE, w_set.pal)) goto fail;
-		frame = ani->fset.frames + (ani->fset.cnt - 1);
-		frame->cols = w_set.colors;
-		frame->trans = w_set.xpm_trans;
-		frame->delay = 0;
-		frame->x = w_set.x;
-		frame->y = w_set.y;
-		memcpy(frame->img, w_set.img, sizeof(chanlist));
+			res = FILE_MEM_ERROR;
+			if (!mem_add_frame(&ani->fset, w_set.width, w_set.height,
+				w_set.bpp, CMASK_NONE, w_set.pal)) goto fail;
+			frame = ani->fset.frames + (ani->fset.cnt - 1);
+			frame->cols = w_set.colors;
+			frame->trans = w_set.xpm_trans;
+			frame->delay = 0;
+			frame->x = w_set.x;
+			frame->y = w_set.y;
+			memcpy(frame->img, w_set.img, sizeof(chanlist));
+		}
 		/* Try to get next frame */
 		if (!TIFFReadDirectory(tif)) break;
 	}
@@ -4941,6 +4971,8 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	/* Clear hotspot & transparency */
 	ani->settings.hot_x = ani->settings.hot_y = -1;
 	ani->settings.xpm_trans = ani->settings.rgb_trans = -1;
+	/* No load progressbar when exploding frames */
+	if (ani_mode == FS_EXPLODE_FRAMES) ani->settings.silent = TRUE;
 
 	/* !!! Use default palette - for now */
 	mem_pal_copy(pal, mem_pal_def);
@@ -4980,6 +5012,62 @@ int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	return (res);
 }
 
+/* Write out the last frame to indexed sequence, and delete it */
+static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_set)
+{
+	ls_settings w_set;
+	image_frame *frame = ani->fset.frames + ani->fset.cnt - 1;
+	char new_name[PATHBUF + 32], *tmp;
+	int n, deftype = ani->settings.ftype, res;
+
+
+	/* Show progress, for unknown final count */
+	n = ani->cnt;
+	n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16; n++;
+	if (n < 16) n = 16;
+	progress_update((float)ani->cnt / n);
+
+	tmp = strrchr(file_name, DIR_SEP);
+	if (!tmp) tmp = file_name;
+	else tmp++;
+	snprintf(new_name, PATHBUF, "%s%c%s.", ani->destdir, DIR_SEP, tmp);
+	tmp = new_name + strlen(new_name);
+	sprintf(tmp, "%03d", ani->cnt);
+
+	if (f_set) w_set = *f_set;
+	else
+	{
+		memset(&w_set, 0, sizeof(w_set));
+		memcpy(w_set.img, frame->img, sizeof(chanlist));
+		w_set.width = frame->width;
+		w_set.height = frame->height;
+		w_set.pal = frame->pal ? frame->pal : ani->fset.pal;
+		w_set.bpp = frame->bpp;
+		w_set.colors = frame->cols;
+		w_set.xpm_trans = frame->trans;
+	}
+	w_set.ftype = deftype;
+	w_set.silent = TRUE;
+	if (!(file_formats[deftype].flags & FF_SAVE_MASK_FOR(w_set)))
+	{
+		w_set.ftype = FT_PNG;
+		ani->miss++;
+	}
+	w_set.mode = ani->mode; // Only FS_EXPLODE_FRAMES for now
+
+	res = ani->error = save_image(new_name, &w_set);
+	if (!res) ani->cnt++;
+
+	if (f_set) // Delete
+	{
+		mem_free_chanlist(f_set->img);
+		memset(f_set->img, 0, sizeof(chanlist));
+	}
+	// Set for deletion
+	else frame->flags |= FM_NUKE;
+	return (res);
+}
+
 static void warn_miss(int miss, int total, int ftype)
 {
 	char *txt = g_strdup_printf(_("%d out of %d frames could not be saved as %s - saved as PNG instead"),
@@ -4993,12 +5081,22 @@ int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype)
 	ani_settings ani;
 	int res;
 
+	progress_init(_("Explode frames"), 0);
+	progress_update(0.0);
 	res = load_frames_x(&ani, ani_mode, file_name, FS_EXPLODE_FRAMES,
 		ftype, dest_path);
-
-	if (!res) res = ani.error;
-	if (ani.miss && !res) warn_miss(ani.miss, ani.cnt, ftype & FTM_FTYPE);
+	progress_update(1.0);
+	if (res == 1); // Everything went OK
+	else if (res == FILE_MEM_ERROR); // Report memory problem
+	else if (ani.error) // Sequence write failure - soft or hard?
+		res = ani.cnt ? FILE_EXP_BREAK : EXPLODE_FAILED;
+	else if (ani.cnt) // Failed to read some middle frame
+		res = FILE_LIB_ERROR;
 	mem_free_frames(&ani.fset);
+	progress_end();
+
+	if (ani.miss && (res == 1))
+		warn_miss(ani.miss, ani.cnt, ftype & FTM_FTYPE);
 
 	return (res);
 }

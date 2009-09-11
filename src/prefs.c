@@ -474,7 +474,7 @@ void pressed_preferences()
 	pack(vbox_2, wj_option_menu(pref_langs, PREF_LANGS, i, &pref_lang, NULL));
 
 	gtk_widget_show_all(vbox_2);
-	add_with_frame(page, _("Language"), vbox_2, 5);
+	add_with_frame(page, _("Language"), vbox_2);
 #endif
 
 ///	---- TAB2 - INTERFACE
@@ -578,7 +578,7 @@ void pressed_preferences()
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	add_with_frame(page, _("Device Settings"), vbox_2, 5);
+	add_with_frame(page, _("Device Settings"), vbox_2);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	label_tablet_device = pack(vbox_2, gtk_label_new(""));
@@ -620,7 +620,7 @@ void pressed_preferences()
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);
-	add_with_frame(page, _("Test Area"), vbox_2, 5);
+	add_with_frame(page, _("Test Area"), vbox_2);
 	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
 
 	drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());

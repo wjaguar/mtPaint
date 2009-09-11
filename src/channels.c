@@ -259,14 +259,14 @@ void pressed_channel_create(int channel)
 	vbox = add_vbox(newchan_window);
 
 	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
-	add_with_frame(vbox, _("Channel Type"), hbox, 5);
+	add_with_frame(vbox, _("Channel Type"), hbox);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	if (channel >= 0) gtk_widget_set_sensitive(hbox, FALSE);
 
 	vbox2 = gtk_vbox_new(FALSE, 0);
 	gtk_widget_show(vbox2);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
-	add_with_frame(vbox, _("Initial Channel State"), vbox2, 5);
+	add_with_frame(vbox, _("Initial Channel State"), vbox2);
 	pack(vbox2, wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL));
 
 	add_hseparator(vbox2, -2, 10);

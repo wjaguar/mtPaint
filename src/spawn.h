@@ -36,7 +36,7 @@ void spawn_quit();	// Delete temp files
 
 // Default action codes
 #define DA_GIF_CREATE  0
-#define DA_GIF_EXPLODE 1
+//#define DA_GIF_EXPLODE 1
 #define DA_GIF_PLAY    2
 #define DA_GIF_EDIT    3
 

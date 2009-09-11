@@ -1021,6 +1021,7 @@ static void alert_same_geometry()
 
 static int scale_mode = 6;
 static int resize_mode = 0;
+static int boundary_mode = BOUND_MIRROR;
 int sharper_reduce;
 
 static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
@@ -1049,7 +1050,8 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 			scale_type = scale_mode;
 			gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_gc));
 		}
-		res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce);
+		res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce,
+			boundary_mode);
 	}
 	else res = mem_image_resize(nw, nh, ox, oy, resize_mode);
 
@@ -1101,13 +1103,6 @@ static GtkWidget *filter_pack(int am, int idx, int *var)
 
 void sisca_init( char *title )
 {
-	gchar* resize_modes[] = {
-		_("Clear"),
-		_("Tile"),
-		_("Mirror tile"),
-		NULL
-	};
-
 	GtkWidget *button_centre, *sisca_vbox, *sisca_hbox;
 	GtkWidget *wvbox, *wvbox2, *notebook, *page0, *page1, *button;
 
@@ -1159,11 +1154,19 @@ void sisca_init( char *title )
 
 	/* Resize */
 	if (!sisca_scale)
-		sisca_hbox = wj_radio_pack(resize_modes, -1, 0, resize_mode, &resize_mode, NULL);
+	{
+		char *resize_modes[] = { _("Clear"), _("Tile"),
+			_("Mirror tile"), NULL };
+
+		sisca_hbox = wj_radio_pack(resize_modes, -1, 0, resize_mode,
+			&resize_mode, NULL);
+	}
 
 	/* RGB rescale */
 	else if (mem_img_bpp == 3)
 	{
+		char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
+
 		sisca_hbox = pack(sisca_vbox, gtk_hbox_new(FALSE, 0));
 		wvbox = pack(sisca_hbox, gtk_vbox_new(FALSE, 0));
 
@@ -1175,8 +1178,10 @@ void sisca_init( char *title )
 		pack(wvbox2, button);
 
 		add_hseparator(page1, -2, 10);
-		button = pack(page1, sig_toggle(_("Sharper image reduction"),
+		pack(page1, sig_toggle(_("Sharper image reduction"),
 			sharper_reduce, &sharper_reduce, NULL));
+		add_with_frame(page1, _("Boundary extension"), wj_radio_pack(
+			bound_modes, 3, 0, boundary_mode, &boundary_mode, NULL));
 
 		sisca_hbox = filter_pack(TRUE, scale_mode, &scale_mode);
 	}
@@ -2367,7 +2372,7 @@ void pressed_quantize(int palette)
 	quantize_book = pack(vbox, plain_book(pages, 3));
 	pack(pages[1], sig_toggle(_("Truncate palette"), quantize_tp, &quantize_tp, NULL));
 	pack(pages[2], sig_toggle(_("Diameter based weighting"), quan_sqrt, &quan_sqrt, NULL));
-	add_with_frame(page0, _("Palette"), vbox, 5);
+	add_with_frame(page0, _("Palette"), vbox);
 
 	/* Main page - Dither frame */
 
@@ -2380,18 +2385,18 @@ void pressed_quantize(int palette)
 			&dither_mode, NULL);
 // !!! If want to make both columns same width
 //		gtk_box_set_homogeneous(GTK_BOX(hbox), TRUE);
-		quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
+		quantize_dither = add_with_frame(page0, _("Dither"), hbox);
 
 		/* Settings page */
 
 		hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
-		add_with_frame(page1, _("Colour space"), hbox, 5);
+		add_with_frame(page1, _("Colour space"), hbox);
 
 		hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
-		add_with_frame(page1, _("Difference measure"), hbox, 5);
+		add_with_frame(page1, _("Difference measure"), hbox);
 
 		hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
-		add_with_frame(page1, _("Reduce colour bleed"), hbox, 5);
+		add_with_frame(page1, _("Reduce colour bleed"), hbox);
 
 		dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
 
@@ -3012,7 +3017,7 @@ void gradient_setup(int mode)
 
 	hbox = wj_radio_pack(allchannames, 4, 1, mem_channel, NULL,
 		GTK_SIGNAL_FUNC(grad_channel_changed));
-	add_with_frame(mainbox, _("Channel"), hbox, 5);
+	add_with_frame(mainbox, _("Channel"), hbox);
 
 	/* Setup block */
 

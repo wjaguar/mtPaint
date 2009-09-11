@@ -21,11 +21,13 @@
 
 #define WRONG_FORMAT -10
 #define TOO_BIG -11
+#define EXPLODE_FAILED -12
 
-#define FILE_LIB_ERROR  123456
-#define FILE_MEM_ERROR  123457
-#define FILE_HAS_FRAMES 123458
-#define FILE_TOO_LONG   123459
+#define FILE_LIB_ERROR  0xBAD01
+#define FILE_MEM_ERROR  0xBAD02
+#define FILE_HAS_FRAMES 0xBAD03
+#define FILE_TOO_LONG   0xBAD04
+#define FILE_EXP_BREAK  0xBAD05
 
 #ifdef WIN32
 	#define DIR_SEP '\\'
@@ -88,6 +90,8 @@
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
+#define FF_SAVE_MASK_FOR(X) ((X).bpp == 3 ? FF_RGB : (X).colors > 16 ? FF_256 : \
+	(X).colors > 2 ? FF_16 | FF_256 : FF_IDX)
 
 /* Animation loading modes */
 #define ANM_RAW    0 /* Raw frames (as written) */

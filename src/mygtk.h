@@ -136,7 +136,7 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col);
 
 GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
 	int border, int expand);
-GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border);
+GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget);
 
 // Entry + Browse
 

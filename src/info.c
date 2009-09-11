@@ -301,7 +301,7 @@ void pressed_information()
 
 	table4 = gtk_table_new (3, 2, FALSE);
 	gtk_widget_show (table4);
-	add_with_frame(vbox4, _("Memory"), table4, 5);
+	add_with_frame(vbox4, _("Memory"), table4);
 	gtk_container_set_border_width (GTK_CONTAINER (table4), 5);
 
 	add_to_table( _("Total memory for main + undo images"), table4, 0, 0, 5 );
@@ -361,7 +361,7 @@ void pressed_information()
 
 	vbox5 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox5);
-	add_with_frame(vbox4, _("Colour Histogram"), vbox5, 4);
+	add_with_frame_x(vbox4, _("Colour Histogram"), vbox5, 4, FALSE);
 
 	hs_norm = FALSE;
 	hs_rgb_mem = malloc( HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp );
