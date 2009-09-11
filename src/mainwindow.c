@@ -1522,7 +1522,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
 		}
 		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom, 0,
-			layer_selected - 1);
+			layer_selected - 1, 1);
 	}
 	else render_background(rgb, px1, py1, pw, ph, pw, can_zoom);
 
@@ -1567,7 +1567,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 
 	if (layers_total && show_layers_main)
 		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom,
-			layer_selected + 1, layers_total);
+			layer_selected + 1, layers_total, 1);
 
 	gdk_draw_rgb_image(the_canvas, drawing_canvas->style->black_gc,
 			margin_main_x + px1, margin_main_y + py1,
@@ -1709,7 +1709,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 				ly *= scale;
 			}
 		}
-		view_render_rgb( rgb, px+lx - margin_main_x, py+ly - margin_main_y, pw, ph, can_zoom );
+		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
+			pw, ph, can_zoom, 0, layers_total, 1);
 	}
 
 	pw2 = pw;

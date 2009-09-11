@@ -580,7 +580,7 @@ static GtkWidget *vw_scrolledwindow;
 static gboolean view_first_move = TRUE;
 
 void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
-	double czoom, int lr0, int lr1 )
+	double czoom, int lr0, int lr1, int align)
 {
 	chanlist tlist;
 	png_color *pal;
@@ -594,7 +594,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	else scale = rint(czoom);
 
 	/* Align on selected layer if needed */
-	if (layers_total && layer_selected && (zoom > 1))
+	if (align && layers_total && layer_selected && (zoom > 1))
 	{
 		dx = layer_table[layer_selected].x % zoom;
 		if (dx < 0) dx += zoom;
@@ -730,7 +730,8 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
 {
 	if (!rgb) return; /* Paranoia */
-	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total);
+	/* Always align on background layer */
+	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
 }
 
 void vw_focus_view()						// Focus view window to main window
@@ -893,23 +894,19 @@ static gint vw_expose( GtkWidget *widget, GdkEventExpose *event )
 
 void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of current image
 {
-	int zoom, scale, dx = 0, dy = 0;
+	int zoom, scale;
 
 	if ( vw_drawing == NULL ) return;
 	
 	if ( layer_selected > 0 )
 	{
-		x += (dx = layer_table[layer_selected].x);
-		y += (dy = layer_table[layer_selected].y);
+		x += layer_table[layer_selected].x;
+		y += layer_table[layer_selected].y;
 	}
 
 	if (vw_zoom < 1.0)
 	{
 		zoom = rint(1.0 / vw_zoom);
-		dx %= zoom;
-		x -= dx + (dx < 0 ? zoom : 0);
-		dy %= zoom;
-		y -= dy + (dy < 0 ? zoom : 0);
 		w += x - 1;
 		h += y - 1;
 		w = w < 0 ? -((zoom - w - 1) / zoom) : w / zoom;
@@ -929,7 +926,8 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 		h *= scale;
 	}
 
-	gtk_widget_queue_draw_area(vw_drawing, x, y, w, h);
+	gtk_widget_queue_draw_area(vw_drawing,
+		x + margin_view_x, y + margin_view_y, w, h);
 }
 
 static void vw_mouse_event(int x, int y, guint state, guint button)
@@ -950,15 +948,6 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 
 	x = ((x - margin_view_x) / scale) * zoom;
 	y = ((y - margin_view_y) / scale) * zoom;
-
-	/* Align on selected layer if needed */
-	if (layer_selected && (zoom > 1))
-	{
-		dx = layer_table[layer_selected].x % zoom;
-		dy = layer_table[layer_selected].y % zoom;
-		x -= dx + (dx < 0 ? zoom : 0);
-		y -= dy + (dy < 0 ? zoom : 0);
-	}
 
 	if ( !view_first_move )
 	{

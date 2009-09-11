@@ -1342,15 +1342,14 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	}
 	layers_notify_changed();
 
-	if ( vw_drawing != NULL )
+	lw += abs(change_x);
+	lh += abs(change_y);
+	if (layer_selected)
 	{
-		lw += abs(change_x);
-		lh += abs(change_y);
-		if (zoom == 1) gtk_widget_queue_draw_area( vw_drawing,
-			lx * scale + margin_view_x, ly * scale + margin_view_y,
-			lw * scale, lh * scale);
-		else gtk_widget_queue_draw(vw_drawing);
+		lx -= layer_table[layer_selected].x;
+		ly -= layer_table[layer_selected].y;
 	}
+	vw_update_area(lx, ly, lw, lh);
 	if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
 }
 
