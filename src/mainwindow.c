@@ -1313,6 +1313,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			grad->x1 = grad->x2 = x;
 			grad->y1 = grad->y2 = y;
 			grad->status = GRAD_END;
+			grad_update(grad);
 			repaint_grad(1);
 		}
 		/* Place starting point */
@@ -1321,6 +1322,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			grad->x1 = x;
 			grad->y1 = y;
 			grad->status = GRAD_DONE;
+			grad_update(grad);
 		}
 		/* Place end point */
 		else if (grad->status == GRAD_END)
@@ -1328,6 +1330,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			grad->x2 = x;
 			grad->y2 = y;
 			grad->status = GRAD_DONE;
+			grad_update(grad);
 		}
 		/* Pick up nearest end */
 		else if (grad->status == GRAD_DONE)
@@ -1349,6 +1352,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 				grad->y2 = y;
 				grad->status = GRAD_END;
 			}
+			grad_update(grad);
 			repaint_grad(1);
 		}
 	}
@@ -1361,6 +1365,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	{
 		repaint_grad(0);
 		grad->status = GRAD_NONE;
+		grad_update(grad);
 	}
 
 	/* Motion is irrelevant with gradient in place */
@@ -1375,6 +1380,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 		{
 			repaint_grad(0);
 			*xx = x; *yy = y;
+			grad_update(grad);
 			repaint_grad(1);
 		}
 	}
@@ -1651,11 +1657,17 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 // Mouse enters the canvas
 static gint canvas_enter(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
 {
+	/* !!! Have to skip grab/ungrab related events if doing something */
+//	if (event->mode != GDK_CROSSING_NORMAL) return (TRUE);
+
 	return TRUE;
 }
 
 static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
 {
+	/* Skip grab/ungrab related events */
+	if (event->mode != GDK_CROSSING_NORMAL) return (FALSE);
+
 	/* Only do this if we have an image */
 	if (!mem_img[CHN_IMAGE]) return (FALSE);
 	if ( status_on[STATUS_CURSORXY] )

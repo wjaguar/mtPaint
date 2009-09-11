@@ -30,15 +30,6 @@ int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
 int recent_files;					// Current recent files setting
 
-typedef struct {
-	int status, x1, y1, x2, y2;	// Gradient placement tool
-	int gtype, otype;	// Main and opacity gradients
-	int len, ofs;		// Gradient length and offset
-	int gmode, rmode;	// Gradient mode and repeat mode
-} grad_info;
-
-grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
-
 #define MAX_RECENT 20
 
 #define STATUS_ITEMS 5

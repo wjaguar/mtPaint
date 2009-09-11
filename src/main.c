@@ -106,7 +106,7 @@ int main( int argc, char *argv[] )
 grad_info zad = {
   0, 0, 0, 0, 0, /* tool */
   (GRAD_DEF_RGB | GRAD_FLAG_DEFAULT), (GRAD_DEF_CONST | GRAD_FLAG_DEFAULT),
-  0, 0, /* length & offset */
+  0, 0, 0, /* length, repeat, offset */
   GRAD_MODE_LINEAR, GRAD_BOUND_STOP };
 gradient[0] = gradient[1] = gradient[2] = gradient[3] = zad;
 

@@ -87,10 +87,24 @@ typedef struct
 
 /// GRADIENTS
 
+typedef struct {
+	/* Base values */
+	int status, x1, y1, x2, y2;	// Gradient placement tool
+	int gtype, otype;	// Main and opacity gradients
+	int len, rep, ofs;	// Gradient length, repeat, and offset
+	int gmode, rmode;	// Gradient mode and repeat mode
+	/* Derived values */
+	double wrep, wil1, wil2, xv, yv;
+	int wmode;
+} grad_info;
+
+grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
+
 /* Gradient modes */
-#define GRAD_MODE_LINEAR   0
-#define GRAD_MODE_BILINEAR 1
-#define GRAD_MODE_RADIAL   2
+#define GRAD_MODE_NONE     0
+#define GRAD_MODE_LINEAR   1
+#define GRAD_MODE_BILINEAR 2
+#define GRAD_MODE_RADIAL   3
 
 /* Boundary conditions */
 #define GRAD_BOUND_STOP    0
@@ -403,6 +417,7 @@ int get_pixel_img( int x, int y );				// from image
 
 int grad_color(unsigned char *dest, double x, int frac);
 int grad_pixel(unsigned char *dest, int x, int y);
+void grad_update(grad_info *grad);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

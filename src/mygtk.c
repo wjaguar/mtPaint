@@ -535,13 +535,13 @@ int move_mouse_relative(int dx, int dy)
 guint real_key(GdkEventKey *event)
 {
 	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
-		event->keyval);
+		event->keyval));
 }
 
 guint keyval_key(guint keyval)
 {
 	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
-		keyval);
+		keyval));
 }
 
 #else /* Use GDK */

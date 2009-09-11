@@ -91,14 +91,14 @@ static void xyz2XN(double *XN, double x, double y, double z)
 static double CIElum(double x)
 {
 	x *= CIENUM;
-	int n = floor(x);
+	int n = x;
 	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x - n));
 }
 
 static double exp10(double x)
 {
 	x = (x - EXPLOW) * (EXPNUM + EXPNUM);
-	int n = floor(x);
+	int n = x;
 	return (EXP[n] + (EXP[n + 1] - EXP[n]) * (x - n));
 }
 
@@ -221,7 +221,7 @@ static void make_gamma(double *Gamma, int cnt)
 	int i, k;
 	double mult = 1.0 / (double)(cnt - 1);
 
-	k = floor(GAMMA_SPLIT * (cnt - 1)) + 1;
+	k = (int)(GAMMA_SPLIT * (cnt - 1)) + 1;
 
 	for (i = k; i < cnt; i++)
 	{
@@ -506,7 +506,7 @@ void csel_reset(csel_info *info)
 		info->range2 = info->range;
 		break;
 	case 2: /* RGB cubic */
-		info->irange = info->range2 = floor(info->range);
+		info->irange = info->range2 = (int)(info->range);
 		break;
 	}
 	if (info->center_a < info->limit_a)

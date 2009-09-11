@@ -1721,7 +1721,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 			ss = vv - vv * (s0 + ds * i);
 			hh = h0 + dh * i;
 			if (hh < 0.0) hh += 6.0;
-			t = floor(hh);
+			t = hh;
 			hh = (hh - t) * (vv - ss);
 			if (t & 1) { vv -= hh; hh += vv; }
 			else hh += ss;

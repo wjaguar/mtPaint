@@ -41,6 +41,7 @@
 
 char *channames[NUM_CHANNELS + 1];
 
+grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
 
 /// Bayer ordered dithering
 
@@ -5569,7 +5570,7 @@ int grad_color(unsigned char *dest, double x, int frac)
 			hsv[2] *= 256;
 			hsv[1] = hsv[2] * (1.0 - hsv[1]);
 			if (hsv[0] < 0.0) hsv[0] += 6.0;
-			i3 = floor(hsv[0]);
+			i3 = hsv[0];
 			hsv[0] = (hsv[0] - i3) * (hsv[2] - hsv[1]);
 			if (i3 & 1) { hsv[2] -= hsv[0]; hsv[0] += hsv[2]; }
 			else hsv[0] += hsv[1];
@@ -5641,26 +5642,23 @@ int grad_pixel(unsigned char *dest, int x, int y)
 {
 	int dither;
 	grad_info *grad = gradient + mem_channel;
-	double len, len1, dist, l2;
+	double dist, len1, l2;
 	
+	/* Disabled because of unusable settings? */
+	if (grad->wmode == GRAD_MODE_NONE) return (0);
+
 	/* Distance for gradient mode */
 	while (1)
 	{
 		 /* Stroke gradient */
 		if (grad->status == GRAD_NONE)
 		{
-			len = grad->len > 0 ? grad->len : grad->ofs > 0 ?
-				grad->ofs + 1 : 1;
 // !!! Do nothing for now - no way to measure strokes yet
 			return (0);
 		}
 
-		/* Placement length */
-		len = sqrt((grad->x2 - grad->x1) * (grad->x2 - grad->x1) +
-			(grad->y2 - grad->y1) * (grad->y2 - grad->y1));
-
 		/* Radial gradient */
-		if (grad->gmode == GRAD_MODE_RADIAL)
+		if (grad->wmode == GRAD_MODE_RADIAL)
 		{
 			dist = sqrt((x - grad->x1) * (x - grad->x1) +
 				(y - grad->y1) * (y - grad->y1));
@@ -5668,28 +5666,27 @@ int grad_pixel(unsigned char *dest, int x, int y)
 		}
 
 		/* Linear/bilinear gradient */
-		dist = ((x - grad->x1) * (grad->x2 - grad->x1) +
-			(y - grad->y1) * (grad->y2 - grad->y1)) / len;
-		if (grad->gmode == GRAD_MODE_LINEAR) break;
+		dist = (x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv;
+		if (grad->wmode == GRAD_MODE_LINEAR) break;
 		dist = fabs(dist); /* Bilinear */
+		break;
 	}
 	dist += grad->ofs;
 
-	/* Base length (one repeat) */
-	len1 = grad->len > 0 ? grad->len : len - grad->ofs;
-	if (len1 < 1.0) len1 = 1.0;
-
 	/* Apply repeat mode */
+	len1 = grad->wrep;
 	switch (grad->rmode)
 	{
 	case GRAD_BOUND_MIRROR: /* Mirror repeat */
 		l2 = len1 + len1;
-		dist -= l2 * floor(dist / l2);
+		dist -= l2 * (int)(dist * grad->wil2);
+		if (dist < 0.0) dist += l2;
 		if (dist > len1) dist = l2 - dist;
 		break;
 	case GRAD_BOUND_REPEAT: /* Repeat */
 		l2 = len1 + 1.0; /* Repeat period is 1 pixel longer */
-		dist -= l2 * floor((dist + 0.5) / l2);
+		dist -= l2 * (int)((dist + 0.5) * grad->wil2);
+		if (dist < -0.5) dist += l2;
 		break;
 	case GRAD_BOUND_STOP: /* Nothing is outside bounds */
 		if ((dist < -0.5) || (dist >= len1 + 0.5)) return (0);
@@ -5699,11 +5696,59 @@ int grad_pixel(unsigned char *dest, int x, int y)
 	}
 
 	/* Rescale to 0..1, enforce boundaries */
-	dist = dist < 0.0 ? 0.0 : dist > len1 ? 1.0 : dist / len1;
+	dist = dist <= 0.0 ? 0.0 : dist >= len1 ? 1.0 : dist * grad->wil1;
 
 	/* Value from Bayer dither matrix */
 	dither = BAYER(x, y);
 
 	/* Get opacity */
 	return (grad_color(dest, dist, dither));
+}
+
+/* Reevaluate gradient placement functions */
+void grad_update(grad_info *grad)
+{
+	double len, len1, l2;
+	
+	/* Distance for gradient mode */
+	grad->wmode = grad->gmode;
+	len = grad->len;
+	while (1)
+	{
+		 /* Stroke gradient */
+		if (grad->status == GRAD_NONE)
+		{
+			if (!grad->len) len = grad->rep + grad->ofs;
+			if (len <= 0.0) grad->wmode = GRAD_MODE_NONE;
+			break;
+		}
+
+		/* Placement length */
+		l2 = sqrt((grad->x2 - grad->x1) * (grad->x2 - grad->x1) +
+			(grad->y2 - grad->y1) * (grad->y2 - grad->y1));
+		if (!grad->len) len = l2;
+
+		if (l2 == 0.0)
+		{
+			grad->wmode = GRAD_MODE_RADIAL;
+			break;
+		}
+		grad->xv = (grad->x2 - grad->x1) / l2;
+		grad->yv = (grad->y2 - grad->y1) / l2;
+		break;
+	}
+
+	/* Base length (one repeat) */
+	len1 = grad->rep > 0 ? grad->rep : len - grad->ofs;
+	if (len1 < 1.0) len1 = 1.0;
+	grad->wrep = len1;
+	grad->wil1 = 1.0 / len1;
+
+	/* Inverse period */
+	l2 = 1.0;
+	if (grad->rmode == GRAD_BOUND_MIRROR) /* Mirror repeat */
+		l2 = len1 + len1;
+	else if (grad->rmode == GRAD_BOUND_REPEAT) /* Repeat */
+		l2 = len1 + 1.0;
+	grad->wil2 = 1.0 / l2;
 }

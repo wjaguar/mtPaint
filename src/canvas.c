@@ -56,8 +56,6 @@ int line_status = LINE_NONE,
 int poly_status = POLY_NONE;						// Polygon selection tool
 int clone_x, clone_y;							// Clone offsets
 
-grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
-
 int recent_files;					// Current recent files setting
 
 gboolean show_paste,					// Show contents of clipboard while pasting
@@ -139,13 +137,12 @@ void update_sel_bar()			// Update selection stats on status bar
 
 	else if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
-		w = abs(grad->x2 - grad->x1) + 1;
-		h = abs(grad->y2 - grad->y1) + 1;
-		lang = (180.0 / M_PI) * atan2(grad->x2 - grad->x1,
-			grad->y1 - grad->y2);
+		w = grad->x2 - grad->x1;
+		h = grad->y2 - grad->y1;
+		lang = (180.0 / M_PI) * atan2(w, -h);
 		llen = sqrt(w * w + h * h);
-		snprintf(txt, 60, "  %i,%i - %i,%i   %.1f' %.1f\"",
-			grad->x1, grad->y1, grad->x2, grad->y2, lang, llen);
+		snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
+			grad->x1, grad->y1, w, h, lang, llen);
 	}
 
 	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
