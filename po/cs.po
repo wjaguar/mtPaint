@@ -740,8 +740,8 @@ msgid "Credits"
 msgstr "Poděkování"
 
 #: src/help.c:32
-msgid "mtPaint 3.30 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.30 - Copyright (C) 2004-2009 Autoři\n"
+msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.31 - Copyright (C) 2004-2009 Autoři\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1356,9 +1356,9 @@ msgid "Dutch - Hans Strijards"
 msgstr "Holandština - Hans Strijards"
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
 msgstr ""
-"Francouzština - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
+"Francouzština - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
@@ -1405,7 +1405,7 @@ msgstr ""
 "Miguel Anxo Bouzada, Francisco Jose Rey"
 
 #: src/help.c:169
-msgid "Swedish - Daniel Nylander"
+msgid "Swedish - Daniel Nylander, Fredrik Forsmo"
 msgstr ""
 
 #: src/help.c:170

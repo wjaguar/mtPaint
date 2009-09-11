@@ -4,7 +4,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: mtpaint 3.30\n"
+"Project-Id-Version: mtpaint 3.31\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2009-02-04 02:14+0300\n"
 "PO-Revision-Date: 2008-07-09 10:36+0800\n"
@@ -733,8 +733,8 @@ msgid "Credits"
 msgstr "致谢"
 
 #: src/help.c:32
-msgid "mtPaint 3.30 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.30 -版权(C) 2004-2009作者群\n"
+msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.31 -版权(C) 2004-2009作者群\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1305,8 +1305,8 @@ msgid "Dutch - Hans Strijards"
 msgstr ""
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
-msgstr "法语 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+msgstr "法语 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
@@ -1353,7 +1353,7 @@ msgstr ""
 "Miguel Anxo Bouzada, Francisco Jose Rey"
 
 #: src/help.c:169
-msgid "Swedish - Daniel Nylander"
+msgid "Swedish - Daniel Nylander, Fredrik Forsmo"
 msgstr ""
 
 #: src/help.c:170

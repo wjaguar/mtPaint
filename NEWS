@@ -4,10 +4,10 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.31	2009-4-?
+3.31	2009-4-15
 
 	* Japanese translation updated by Norihiro YONEDA
-	* Swedish translation updated by Daniel Nylander
+	* Swedish translation updated by Daniel Nylander and Fredrik Forsmo
 	* French translation updated by Plume
 	* Builtin file selector uses stock file and directory icons on GTK+2
 	* Default settings are loaded from file /etc/mtpaint/mtpaintrc if it exists
