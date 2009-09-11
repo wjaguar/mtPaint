@@ -16,6 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* New advanced dithering modes with many configuration options
 	* Optional gamma correction for image scaling and Gaussian blur
 	* Smudge tool can be configured to ignore opacity mode
+	* Library detection in configure script improved
 	...and more still remains to do... ;-)
 
 3.01	2006-7-15

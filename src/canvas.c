@@ -225,22 +225,16 @@ int do_fx(GtkWidget *spin, gpointer fdata)
 	return TRUE;
 }
 
-void pressed_blur( GtkMenuItem *menu_item, gpointer user_data )
-{
-	GtkWidget *spin = add_a_spin(10, 1, 100);
-	filter_window(_("Blur Effect"), spin, do_fx, (gpointer)(1));
-}
-
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3));
+	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3), GTK_WIN_POS_CENTER);
 }
 
 void pressed_soften( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4));
+	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4), GTK_WIN_POS_CENTER);
 }
 
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
@@ -300,7 +294,7 @@ void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
 		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
 	check = add_a_toggle(_("Gamma corrected"), box, FALSE);
 	if (mem_channel != CHN_IMAGE) gtk_widget_hide(check);
-	filter_window(_("Gaussian Blur"), box, do_gauss, NULL);
+	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, GTK_WIN_POS_CENTER);
 }
 
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
@@ -402,7 +396,7 @@ void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
 	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 	if (mem_img_bpp == 3) add_a_toggle(_("Smooth"), box, TRUE);
-	filter_window(_("Free Rotate"), box, do_rotate_free, NULL);
+	filter_window(_("Free Rotate"), box, do_rotate_free, NULL, GTK_WIN_POS_CENTER);
 }
 
 

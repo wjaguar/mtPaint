@@ -54,5 +54,5 @@ int do_new_one( int nw, int nh, int nc, int nt, int bpp );
 void do_new_chores();
 void reset_tools();
 
-void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata);
+void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, GtkWindowPosition pos);
 void memory_errors(int type);

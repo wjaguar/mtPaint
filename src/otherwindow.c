@@ -539,7 +539,7 @@ void run_filter(GtkButton *button, gpointer user_data)
 	update_all_views();
 }
 
-void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata)
+void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, GtkWindowPosition pos)
 {
 	GtkWidget *hbox7, *button_cancel, *button_apply, *vbox6;
 	GtkAccelGroup* ag = gtk_accel_group_new();
@@ -547,7 +547,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 	filter_cont = content;
 	filter_func = filt;
 	filter_data = fdata;
-	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE);
+	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
 	gtk_widget_set_usize(filter_win, 300, -2);
 
 	vbox6 = gtk_vbox_new(FALSE, 0);
@@ -601,7 +601,7 @@ int do_bacteria(GtkWidget *spin, gpointer fdata)
 void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
 {
 	GtkWidget *spin = add_a_spin(10, 1, 100);
-	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL);
+	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL, GTK_WIN_POS_CENTER);
 }
 
 
@@ -2489,7 +2489,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	button_cancel = add_a_button(_("Cancel"), 5, hbox, TRUE);
 	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), quantize_window);
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(quantize_window));
 	gtk_widget_add_accelerator(button_cancel, "clicked", ag, GDK_Escape, 0,
 		(GtkAccelFlags)0);
 

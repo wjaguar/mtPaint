@@ -415,13 +415,13 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 		add_a_toggle(_("RGB Cube"), box, flood_cube);
 		add_a_toggle(_("By image channel"), box, flood_img);
 		add_a_toggle(_("Gradient-driven"), box, flood_slide);
-		filter_window(_("Fill settings"), box, set_flood, NULL);
+		filter_window(_("Fill settings"), box, set_flood, NULL, GTK_WIN_POS_MOUSE);
 		break;
 	case (TTB_0 + TTB_SMUDGE): /* Smudge opacity mode */
 		box = gtk_vbox_new(FALSE, 5);
 		gtk_widget_show(box);
 		add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
-		filter_window(_("Smudge settings"), box, set_smudge, NULL);
+		filter_window(_("Smudge settings"), box, set_smudge, NULL, GTK_WIN_POS_MOUSE);
 		break;
 	default: /* For other buttons, do nothing */
 		return (FALSE);

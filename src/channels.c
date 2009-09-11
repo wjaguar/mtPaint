@@ -366,7 +366,7 @@ int do_threshold(GtkWidget *spin, gpointer fdata)
 void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	GtkWidget *spin = add_a_spin(128, 0, 255);
-	filter_window(_("Threshold Channel"), spin, do_threshold, NULL);
+	filter_window(_("Threshold Channel"), spin, do_threshold, NULL, GTK_WIN_POS_CENTER);
 }
 
 void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )

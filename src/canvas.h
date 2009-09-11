@@ -127,7 +127,6 @@ void pressed_fill_ellipse( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_soften( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_blur( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_gauss( GtkMenuItem *menu_item, gpointer user_data );
 

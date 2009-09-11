@@ -4441,61 +4441,28 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 
 ////	EFFECTS
 
-/* Braindead GCC botched optimization when this was inside do_effect() */
-static void effect_mask(unsigned char *src, unsigned char *dest)
-{
-	int i, j, k, ms, bpp = MEM_BPP;
-	unsigned char *tmp, *mask = NULL;
 
-	tmp = mem_undo_previous(mem_channel);
-	if (tmp != src) /* Apply masking if possible */
-	{
-		if ((mem_channel <= CHN_ALPHA) && !channel_dis[CHN_MASK])
-			mask = mem_img[CHN_MASK];
-		j = mem_width * mem_height;
-		prep_mask(0, 1, j, dest, mask, mem_undo_previous(CHN_IMAGE));
-		for (i = 0; i < j; i++ , src += bpp , tmp += bpp)
-		{
-			ms = dest[i];
-			if (!ms) continue;
-			k = src[0] * 255 + (tmp[0] - src[0]) * ms;
-			src[0] = (k + (k >> 8) + 1) >> 8;
-			if (bpp == 1) continue;
-			k = src[1] * 255 + (tmp[1] - src[1]) * ms;
-			src[1] = (k + (k >> 8) + 1) >> 8;
-			k = src[2] * 255 + (tmp[2] - src[2]) * ms;
-			src[2] = (k + (k >> 8) + 1) >> 8;
-		}
-	}
-}
-
-void do_effect( int type, int param )		// 0=edge detect 1=blur 2=emboss
+void do_effect( int type, int param )		// 0=edge detect 1=UNUSED 2=emboss
 {
 	unsigned char *src, *dest, *tmp = "\0", *mask = NULL;
 	int i, j, k = 0, ix, bpp, ll, dxp1, dxm1, dyp1, dym1;
-	int cnt = param, op, md, ms = 0;
+	int op, md, ms;
 	double blur = (double)param / 200.0;
 
 	bpp = MEM_BPP;
 	ll = mem_width * bpp;
+	ms = bpp == 3 ? 1 : 4;
 
-	if (type == 1) /* Blur is applied repeatedly */
+	src = mem_undo_previous(mem_channel);
+	dest = mem_img[mem_channel];
+	mask = malloc(mem_width);
+	if (!mask)
 	{
-		blur = (double)(25 + param / 2) * (1.0 / 800.0);
-		src = mem_img[mem_channel];
-		dest = malloc(ll * mem_height);
-		if (!dest) return;
-		progress_init(_("Image Blur Effect"), 1);
+		memory_errors(1);
+		return;
 	}
-	else
-	{
-		src = mem_undo_previous(mem_channel);
-		dest = mem_img[mem_channel];
-		progress_init(_("Applying Effect"), 1);
-		mask = malloc(mem_width);
-	}
-	if (mask) ms = bpp == 3 ? 1 : 4;
-blurr:
+	progress_init(_("Applying Effect"), 1);
+
 	for (ix = i = 0; i < mem_height; i++)
 	{
 		if (mask) row_protected(0, i, mem_width, tmp = mask);
@@ -4504,7 +4471,7 @@ blurr:
 		for (md = j = 0; j < ll; j++ , ix++)
 		{
 			op = *tmp;
-			/* One step for 1 or 3 bytes, or never */
+			/* One step for 1 or 3 bytes */
 			md += ms + (md >> 1);
 			tmp += md >> 2;
 			md &= 3;
@@ -4517,11 +4484,6 @@ blurr:
 				k = src[ix];
 				k = abs(k - src[ix + dym1]) + abs(k - src[ix + dyp1]) +
 					abs(k - src[ix + dxm1]) + abs(k - src[ix + dxp1]);
-				break;
-			case 1:	/* Blur */
-				k = src[ix + dym1] + src[ix + dyp1] +
-					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
-				k = src[ix] + (int)rint(k * blur);
 				break;
 			case 2:	/* Emboss */
 				k = src[ix + dym1] + src[ix + dxm1] +
@@ -4546,18 +4508,7 @@ blurr:
 		if ((type != 1) && ((i * 10) % mem_height >= mem_height - 10))
 			if (progress_update((float)(i + 1) / mem_height)) break;
 	}
-	if (type == 1) /* Swap pages & repeat */
-	{
-		unsigned char *tt;
-		tt = src; src = dest; dest = tt;
-		if (--cnt && !progress_update((float)(param - cnt) / param))
-			goto blurr;
-		mem_undo_im_[mem_undo_pointer].img[mem_channel] =
-			mem_img[mem_channel] = src;
-		effect_mask(src, dest);
-		free(dest);
-	}
-	else free(mask);
+	free(mask);
 	progress_end();
 }
 

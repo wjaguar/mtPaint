@@ -1153,7 +1153,7 @@ int do_set_key_frame(GtkWidget *spin, gpointer fdata)
 void pressed_set_key_frame()
 {
 	GtkWidget *spin = add_a_spin(ani_frame1, ani_frame1, ani_frame2);
-	filter_window(_("Set Key Frame"), spin, do_set_key_frame, NULL);
+	filter_window(_("Set Key Frame"), spin, do_set_key_frame, NULL, GTK_WIN_POS_CENTER);
 }
 
 void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
