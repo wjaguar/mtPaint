@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2011,7 +2011,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 
 	/* Paranoia */
 	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
-	if ((dither_mode < 0) && (quantize_mode < 2)) return;
+	if ((dither_mode < 0) && (quantize_mode == 1)) return;
 
 	if (dither_mode < 0) i = mem_undo_next(UNDO_PAL);
 	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
@@ -2025,7 +2025,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	{
 	case 0:	/* Use image colours */
 		new_cols = quantize_cols;
-		err = mem_convert_indexed();
+		err = mem_convert_indexed(dither_mode >= 0);
 		dither = DITH_MAX;
 		break;
 	default:
@@ -2163,7 +2163,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 
 	/* No exact transfer if too many colours */
 	if (quantize_cols > 256) rad_txt[0] = "";
-	if (palette) rad_txt[0] = rad_txt[1] = "";
+	if (palette) rad_txt[1] = "";
 	vbox = wj_radio_pack(rad_txt, -1, 0, palette || (quantize_cols > 256) ?
 		3 : 0, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
 	add_with_frame(page0, _("Palette"), vbox, 5);

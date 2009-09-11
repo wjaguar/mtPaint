@@ -2341,10 +2341,12 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	if (!j) goto fail;
 	fgetsC(lbuf, 0, fp); /* Reset reader */
 
-	/* Read & validate the "intro sequence" */
+	/* Read the "intro sequence" */
 	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
-	if (!j) goto fail;
+	/* !!! Skip validation; libXpm doesn't do it, and some weird tools
+	 * write this line differently - WJ */
+//	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
+//	if (!j) goto fail;
 
 	/* Read the values section */
 	if (!fgetsC(lbuf, 4096, fp)) goto fail;
@@ -4104,15 +4106,22 @@ int show_html(char *browser, char *docs)
 		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
 	else i = 0;
 #else
+	argv[1] = docs;
+	argv[2] = NULL;
 	/* Try to use default browser */
-	if (!browser || !browser[0]) browser = getenv("BROWSER");
+	if (!browser || !browser[0])
+	{
+		argv[0] = "xdg-open";
+		i = spawn_process(argv, NULL);
+		if (!i) return (0); // System has xdg-utils installed
+		// No xdg-utils - try "BROWSER" variable then
+		browser = getenv("BROWSER");
+	}
 	else browser = gtkncpy(buf2, browser, PATHBUF);
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 
 	argv[0] = browser;
-	argv[1] = docs;
-	argv[2] = NULL;
 	i = spawn_process(argv, NULL);
 #endif
 	if (i) alert_box( _("Error"),

@@ -4,11 +4,18 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.21	2008-03-31
+3.21	2008-06-??
 
+	* Use 'xdg-open' if available to open HTML help in default browser on Linux
+	* Relaxed sanity checking in XPM loader to accept files with malformed headers
+	* "Exact Conversion" option added to Palette->Create Quantized
+	* Counting used colours now about twice faster
 	* Workaround for bug in libpng versions 1.2.17 - 1.2.24 added (was losing extra channels when loading)
-	* BUGFIX - canvas, view and palette area borders now can't be messed up by theme engines
+	* BUGFIX - Canvas, view and palette area borders now can't be messed up by theme engines
         * BUGFIX - Persistent rectangle selection now doesn't steal arrow keys from gradient placement tool
+	* BUGFIX - FreeType text rendering quality improved on Windows
+	* BUGFIX - Text in active menu items no longer becomes invisible on Windows Vista (fixed in GTK+)
+	* BUGFIX - Removable drives are now visible in fileselector on Windows (fixed in GTK+)
 
 3.20	2007-12-27
 
