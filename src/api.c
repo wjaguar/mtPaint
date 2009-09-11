@@ -285,6 +285,9 @@ void mtpaint_text(char *text, char *font, float angle, int antialias)
 	inifile_set_gboolean( "fontAntialias2", rang );
 	inifile_set_gboolean( "fontAntialias", antialias );
 	render_text( drawing_canvas );
+#if GTK_MAJOR_VERSION == 1
+	mem_rotate_clip(angle, 1, 0);
+#endif
 }
 
 
@@ -299,6 +302,11 @@ void mtpaint_selection(int x1, int y1, int x2, int y2)	// Set the rectangle sele
 int mtpaint_selection_copy()		// Copy the rectangle selection area to the clipboard
 {
 	return api_copy_rectangle();
+}
+
+int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction)
+{
+	return mem_rotate_clip(angle, smooth, gamma_correction);
 }
 
 void mtpaint_clipboard_alpha2mask()		// Move alpha to clipboard mask

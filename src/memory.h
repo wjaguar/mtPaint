@@ -208,6 +208,9 @@ int mem_width, mem_height;		// Current image geometry
 float mem_icx, mem_icy;			// Current centre x,y
 int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
 
+chanlist mem_clip_real_img;		// Unrotated clipboard
+int mem_clip_real_w, mem_clip_real_h;	// mem_clip_real_w=0 => no unrotated clipboard
+
 unsigned char *mem_clipboard;		// Pointer to clipboard data
 unsigned char *mem_clip_mask;		// Pointer to clipboard mask
 unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
@@ -397,6 +400,8 @@ void mem_undo_forward();		// REDO requested by user
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 
 
+void mem_clip_real_clear();				// Empty the non rotated clipboard
+
 //// Drawing Primitives
 
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
@@ -425,6 +430,8 @@ int mem_image_rot( int dir );					// Rotate canvas 90 degrees
 int mem_rotate_free(double angle, int type, int gcor);		// Rotate canvas by any angle (degrees)
 int mem_image_scale(int nw, int nh, int type, int gcor, int sharp);	// Scale image
 int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
+
+int mem_rotate_clip(double angle, int type, int gcor);	// Rotate clipboard by any angle (degrees)
 
 int mem_isometrics(int type);
 

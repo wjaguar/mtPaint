@@ -184,6 +184,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 			/* Allocate the clipboard image */
 			if (i == CHN_IMAGE)
 			{
+				mem_clip_real_clear();
 				free(mem_clipboard);
 				free(mem_clip_alpha);
 				mem_clipboard = mem_clip_alpha = NULL;

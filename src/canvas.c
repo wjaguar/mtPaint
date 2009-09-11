@@ -823,6 +823,7 @@ static int copy_clip(gboolean api)
 				_("OK"), NULL, NULL );
 		return (FALSE);
 	}
+	mem_clip_real_clear();		// Lose un-rotated clipboard
 
 	mem_clip_bpp = bpp;
 	mem_clip_x = x;

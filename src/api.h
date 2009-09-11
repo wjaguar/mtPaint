@@ -59,7 +59,9 @@ int mtpaint_file_save(char *filename, int type, int arg);	// Save a file.  retur
 
 int mtpaint_clipboard_load(char *filename);	// Load clipboard from an image file, return<0=fail
 int mtpaint_clipboard_save(char *filename, int type, int arg);	// Save clipboard to an image file, return<0=fail
-void mtpaint_clipboard_alpha2mask();		// Move alpha to clipboard mask
+void mtpaint_clipboard_alpha2mask();				// Move alpha to clipboard mask
+int mtpaint_clipboard_rotate(float angle, int smooth, int gamma_correction);
+
 
 void mtpaint_selection(int x1, int y1, int x2, int y2);	// Set the rectangle selection
 void mtpaint_selection_copy();		// Copy the rectangle selection area to the clipboard

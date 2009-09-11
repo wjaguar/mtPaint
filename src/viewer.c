@@ -1403,6 +1403,7 @@ gint render_text( GtkWidget *widget )
 
 	if ( t_image != NULL )
 	{
+		mem_clip_real_clear();	// Lose old un-rotated clipboard
 		free( mem_clipboard );	// Lose old clipboard
 		free( mem_clip_alpha );	// Lose old clipboard alpha
 		mem_clip_alpha = NULL;
