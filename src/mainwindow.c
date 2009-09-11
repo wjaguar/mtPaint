@@ -749,9 +749,9 @@ gint check_zoom_keys_real(int action)
 	switch (action)
 	{
 	case ACT_ZOOM_IN:
-		zoom_in(); return TRUE;
+		zoom_in(); break;
 	case ACT_ZOOM_OUT:
-		zoom_out(); return TRUE;
+		zoom_out(); break;
 	case ACT_ZOOM_01:
 	case ACT_ZOOM_025:
 	case ACT_ZOOM_05:
@@ -762,12 +762,21 @@ gint check_zoom_keys_real(int action)
 	case ACT_ZOOM_16:
 	case ACT_ZOOM_20:
 		align_size(zals[action - ACT_ZOOM_01]);
-		return TRUE;
+		break;
 	case ACT_VIEW:
 		toggle_view( NULL, NULL );
-		return TRUE;
+		break;
+	case ACT_VWZOOM_IN:
+		if (vw_zoom >= 1) vw_align_size(vw_zoom + 1);
+		else vw_align_size(1.0 / (rint(1.0 / vw_zoom) - 1));
+		break;
+	case ACT_VWZOOM_OUT:
+		if (vw_zoom > 1) vw_align_size(vw_zoom - 1);
+		else vw_align_size(1.0 / (rint(1.0 / vw_zoom) + 1));
+		break;
+	default: return FALSE;
 	}
-	return FALSE;
+	return TRUE;
 }
 
 gint check_zoom_keys(int action)
@@ -837,9 +846,9 @@ key_action main_keys[] = {
 	{"PAN",		ACT_PAN, GDK_End, _CS, 0},
 	{"CROP",	ACT_CROP, GDK_Delete, _CS, 0},
 	{"SWAP_AB",	ACT_SWAP_AB, GDK_x, _CSA, 0},
-	{"",		ACT_SWAP_AB, GDK_X, _CSA, 0}, // !!! Naturally, this doesn't work
+//	{"",		ACT_SWAP_AB, GDK_X, _CSA, 0}, // !!! Naturally, this doesn't work
 	{"CMDLINE",	ACT_CMDLINE, GDK_c, _CSA, 0},
-	{"",		ACT_CMDLINE, GDK_C, _CSA, 0}, // !!! And this, too
+//	{"",		ACT_CMDLINE, GDK_C, _CSA, 0}, // !!! And this, too
 #if GTK_MAJOR_VERSION == 2
 	{"PATTERN",	ACT_PATTERN, GDK_F2, _CSA, 0},
 	{"BRUSH",	ACT_BRUSH, GDK_F3, _CSA, 0},
@@ -863,31 +872,31 @@ key_action main_keys[] = {
 	{"",		ACT_SEL_DOWN, GDK_KP_Down, _CS, 0},
 	{"SEL_UP",	ACT_SEL_UP, GDK_Up, _CS, 0},
 	{"",		ACT_SEL_UP, GDK_KP_Up, _CS, 0},
-	{"OPAC_01",	ACT_OPAC_01, GDK_KP_1, _C, _C},
-	{"",		ACT_OPAC_01, GDK_1, _C, _C},
-	{"OPAC_02",	ACT_OPAC_02, GDK_KP_2, _C, _C},
-	{"",		ACT_OPAC_02, GDK_2, _C, _C},
-	{"OPAC_03",	ACT_OPAC_03, GDK_KP_3, _C, _C},
-	{"",		ACT_OPAC_03, GDK_3, _C, _C},
-	{"OPAC_04",	ACT_OPAC_04, GDK_KP_4, _C, _C},
-	{"",		ACT_OPAC_04, GDK_4, _C, _C},
-	{"OPAC_05",	ACT_OPAC_05, GDK_KP_5, _C, _C},
-	{"",		ACT_OPAC_05, GDK_5, _C, _C},
-	{"OPAC_06",	ACT_OPAC_06, GDK_KP_6, _C, _C},
-	{"",		ACT_OPAC_06, GDK_6, _C, _C},
-	{"OPAC_07",	ACT_OPAC_07, GDK_KP_7, _C, _C},
-	{"",		ACT_OPAC_07, GDK_7, _C, _C},
-	{"OPAC_08",	ACT_OPAC_08, GDK_KP_8, _C, _C},
-	{"",		ACT_OPAC_08, GDK_8, _C, _C},
-	{"OPAC_09",	ACT_OPAC_09, GDK_KP_9, _C, _C},
-	{"",		ACT_OPAC_09, GDK_9, _C, _C},
-	{"OPAC_1",	ACT_OPAC_1, GDK_KP_0, _C, _C},
-	{"",		ACT_OPAC_1, GDK_0, _C, _C},
-	{"OPAC_P",	ACT_OPAC_P, GDK_plus, _C, _C},
-	{"",		ACT_OPAC_P, GDK_KP_Add, _C, _C},
-	{"",		ACT_OPAC_P, GDK_equal, _C, _C},
-	{"OPAC_M",	ACT_OPAC_M, GDK_minus, _C, _C},
-	{"",		ACT_OPAC_M, GDK_KP_Subtract, _C, _C},
+	{"OPAC_01",	ACT_OPAC_01, GDK_KP_1, _CS, _C},
+	{"",		ACT_OPAC_01, GDK_1, _CS, _C},
+	{"OPAC_02",	ACT_OPAC_02, GDK_KP_2, _CS, _C},
+	{"",		ACT_OPAC_02, GDK_2, _CS, _C},
+	{"OPAC_03",	ACT_OPAC_03, GDK_KP_3, _CS, _C},
+	{"",		ACT_OPAC_03, GDK_3, _CS, _C},
+	{"OPAC_04",	ACT_OPAC_04, GDK_KP_4, _CS, _C},
+	{"",		ACT_OPAC_04, GDK_4, _CS, _C},
+	{"OPAC_05",	ACT_OPAC_05, GDK_KP_5, _CS, _C},
+	{"",		ACT_OPAC_05, GDK_5, _CS, _C},
+	{"OPAC_06",	ACT_OPAC_06, GDK_KP_6, _CS, _C},
+	{"",		ACT_OPAC_06, GDK_6, _CS, _C},
+	{"OPAC_07",	ACT_OPAC_07, GDK_KP_7, _CS, _C},
+	{"",		ACT_OPAC_07, GDK_7, _CS, _C},
+	{"OPAC_08",	ACT_OPAC_08, GDK_KP_8, _CS, _C},
+	{"",		ACT_OPAC_08, GDK_8, _CS, _C},
+	{"OPAC_09",	ACT_OPAC_09, GDK_KP_9, _CS, _C},
+	{"",		ACT_OPAC_09, GDK_9, _CS, _C},
+	{"OPAC_1",	ACT_OPAC_1, GDK_KP_0, _CS, _C},
+	{"",		ACT_OPAC_1, GDK_0, _CS, _C},
+	{"OPAC_P",	ACT_OPAC_P, GDK_plus, _CS, _C},
+	{"",		ACT_OPAC_P, GDK_KP_Add, _CS, _C},
+	{"",		ACT_OPAC_P, GDK_equal, _CS, _C},
+	{"OPAC_M",	ACT_OPAC_M, GDK_minus, _CS, _C},
+	{"",		ACT_OPAC_M, GDK_KP_Subtract, _CS, _C},
 	{"LR_2LEFT",	ACT_LR_2LEFT, GDK_Left, _CS, _CS},
 	{"",		ACT_LR_2LEFT, GDK_KP_Left, _CS, _CS},
 	{"LR_2RIGHT",	ACT_LR_2RIGHT, GDK_Right, _CS, _CS},
@@ -911,21 +920,44 @@ key_action main_keys[] = {
 	{"",		ACT_COMMIT, GDK_KP_Enter, 0, 0},
 	{"RCLICK",	ACT_RCLICK, GDK_BackSpace, 0, 0},
 	{"ARROW",	ACT_ARROW, GDK_a, _C, 0},
-	{"",		ACT_ARROW, GDK_A, _C, 0},
+//	{"",		ACT_ARROW, GDK_A, _C, 0},
 	{"ARROW3",	ACT_ARROW3, GDK_s, _C, 0},
-	{"",		ACT_ARROW3, GDK_S, _C, 0},
-	{"A_PREV",	ACT_A_PREV, GDK_bracketleft, _C, 0},
-	{"A_NEXT",	ACT_A_NEXT, GDK_bracketright, _C, 0},
-	{"B_PREV",	ACT_B_PREV, GDK_braceleft, _C, 0},
-	{"B_NEXT",	ACT_B_NEXT, GDK_braceright, _C, 0},
+//	{"",		ACT_ARROW3, GDK_S, _C, 0},
+	{"A_PREV",	ACT_A_PREV, GDK_bracketleft, _CS, 0},
+	{"A_NEXT",	ACT_A_NEXT, GDK_bracketright, _CS, 0},
+	{"B_PREV",	ACT_B_PREV, GDK_bracketleft, _CS, _S},
+	{"",		ACT_B_PREV, GDK_braceleft, _CS, _S},
+	{"B_NEXT",	ACT_B_NEXT, GDK_bracketright, _CS, _S},
+	{"",		ACT_B_NEXT, GDK_braceright, _CS, _S},
+	{"TO_IMAGE",	ACT_TO_IMAGE, GDK_KP_1, _CS, _S},
+	{"",		ACT_TO_IMAGE, GDK_1, _CS, _S},
+	{"",		ACT_TO_IMAGE, GDK_exclam, _CS, _S},
+	{"TO_ALPHA",	ACT_TO_ALPHA, GDK_KP_2, _CS, _S},
+	{"",		ACT_TO_ALPHA, GDK_2, _CS, _S},
+	{"",		ACT_TO_ALPHA, GDK_at, _CS, _S},
+	{"TO_SEL",	ACT_TO_SEL, GDK_KP_3, _CS, _S},
+	{"",		ACT_TO_SEL, GDK_3, _CS, _S},
+	{"",		ACT_TO_SEL, GDK_numbersign, _CS, _S},
+	{"TO_MASK",	ACT_TO_MASK, GDK_KP_4, _CS, _S},
+	{"",		ACT_TO_MASK, GDK_4, _CS, _S},
+	{"",		ACT_TO_MASK, GDK_dollar, _CS, _S},
+	{"VWZOOM_IN",	ACT_VWZOOM_IN, GDK_plus, _CS, _S},
+	{"",		ACT_VWZOOM_IN, GDK_KP_Add, _CS, _S},
+	{"",		ACT_VWZOOM_IN, GDK_equal, _CS, _S},
+	{"VWZOOM_OUT",	ACT_VWZOOM_OUT, GDK_minus, _CS, _S},
+	{"",		ACT_VWZOOM_OUT, GDK_KP_Subtract, _CS, _S},
+	{"",		ACT_VWZOOM_OUT, GDK_underscore, _CS, _S},
 	{NULL,		0, 0, 0, 0}
 };
 
 int wtf_pressed(GdkEventKey *event, key_action *keys)
 {
+	/* Only affects letters, but still somewhat useful */
+	guint lowkey = gdk_keyval_to_lower(event->keyval);
+
 	while (keys->action)
 	{
-		if ((event->keyval == keys->key) &&
+		if ((lowkey == keys->key) &&
 			((event->state & keys->kmask) == keys->kflags))
 			return (keys->action);
 		keys++;
@@ -982,6 +1014,13 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 	case ACT_SEL_UP: change = 1;
 	case ACT_SEL_2UP:
 		move_mouse(0, -change, 0);
+		return (TRUE);
+	// Channel keys, i.e. SHIFT + keypad
+	case ACT_TO_IMAGE:
+	case ACT_TO_ALPHA:
+	case ACT_TO_SEL:
+	case ACT_TO_MASK:
+		pressed_channel_edit(NULL, NULL, action - ACT_TO_IMAGE + CHN_IMAGE);
 		return (TRUE);
 	// Opacity keys, i.e. CTRL + keypad
 	case ACT_OPAC_01:
@@ -1473,8 +1512,8 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	/* Pure moves are handled elsewhere */
 	else if (button) tool_action(event, x, y, button, pressure);
 
-	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-		update_sel_bar();
+	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON) ||
+		(tool_type == TOOL_GRADIENT)) update_sel_bar();
 
 	/* ****** Now to mouse-move-specific part ****** */
 
@@ -2429,7 +2468,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	/* Draw perimeter/marquee/gradient as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
-	if (gradient[mem_channel].status == GRAD_DONE)
+	while (gradient[mem_channel].status == GRAD_DONE)
 	{
 		grad_info *grad = gradient + mem_channel;
 
@@ -2438,32 +2477,32 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		else rx1 = grad->x2 , rx2 = grad->x1;
 		if (grad->y1 < grad->y2) ry1 = grad->y1 , ry2 = grad->y2;
 		else ry1 = grad->y2 , ry2 = grad->y1;
-		rx1 = (rx1 * scale + zoom - 1) / zoom;
-		ry1 = (ry1 * scale + zoom - 1) / zoom;
+		rx1 = (rx1 * scale) / zoom;
+		ry1 = (ry1 * scale) / zoom;
 		rx2 = (rx2 * scale) / zoom + scale - 1;
 		ry2 = (ry2 * scale) / zoom + scale - 1;
 
 		/* Check intersection - coarse */
-		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
+		if ((rx1 > pw2) || (rx2 < rpx) || (ry1 > ph2) || (ry2 < rpy))
+			break;
+		if (rx1 != rx2) /* Check intersection - fine */
 		{
-			if (rx1 != rx2) /* Check intersection - fine */
-			{
-				float ty1, ty2, dy;
+			float ty1, ty2, dy;
 
-				if ((grad->x1 < grad->x2) ^ (grad->y1 < grad->y2))
-					i = ry2 , j = ry1;
-				else i = ry1 , j = ry2;
+			if ((grad->x1 < grad->x2) ^ (grad->y1 < grad->y2))
+				i = ry2 , j = ry1;
+			else i = ry1 , j = ry2;
 
-				dy = (j - i) / (float)(rx2 - rx1);
-				ty1 = rx1 >= rpx ? i : i + (rpx - rx1) * dy;
-				ty2 = rx2 <= pw2 ? j : i + (pw2 - rx1) * dy;
+			dy = (j - i) / (float)(rx2 - rx1);
+			ty1 = rx1 >= rpx ? i : i + (rpx - rx1 - 0.5) * dy;
+			ty2 = rx2 <= pw2 ? j : i + (pw2 - rx1 + 0.5) * dy;
 
-				if (!((ty1 < rpy - scale) && (ty2 < rpy - scale)) &&
-					!((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
-					repaint_grad(1);
-			}
-			else repaint_grad(1); /* Automatic intersect */
+			if (((ty1 < rpy - scale) && (ty2 < rpy - scale)) ||
+				((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
+				break;
 		}
+		refresh_grad(px, py, pw, ph);
+		break;
 	}
 	if (marq_status != MARQUEE_NONE) paint_marquee(11, marq_x1, marq_y1);
 	if (perim_status > 0) repaint_perim();
@@ -3106,7 +3145,8 @@ void main_init()
 		{ _("/Effects/tear"),		NULL,	 	NULL, 0, "<Tearoff>" },
 		{ _("/Effects/Transform Colour ..."), "<control><shift>C", pressed_brcosa,0, NULL },
 		{ _("/Effects/Invert"),		"<control><shift>I", pressed_invert,0, NULL },
-		{ _("/Effects/Greyscale"),	"<control>G",	pressed_greyscale,0, NULL },
+		{ _("/Effects/Greyscale"),	"<control>G",	pressed_greyscale, 0, NULL },
+		{ _("/Effects/Greyscale (Gamma corrected)"), "<control><shift>G", pressed_greyscale, 1, NULL },
 		{ _("/Effects/Isometric Transformation"), NULL, NULL, 0, "<Branch>" },
 		{ _("/Effects/Isometric Transformation/tear"), NULL, NULL, 0, "<Tearoff>" },
 		{ _("/Effects/Isometric Transformation/Left Side Down"), NULL, iso_trans, 0, NULL },

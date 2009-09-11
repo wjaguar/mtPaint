@@ -310,11 +310,7 @@ static int load_png(char *file_name, ls_settings *settings)
 			break;
 		}
 	}
-	if (msg)
-	{
-		progress_init(msg, 0);
-		progress_update(0.0);
-	}
+	if (msg) progress_init(msg, 0);
 
 	/* RGB PNG file */
 	if (settings->bpp == 3)
@@ -1047,10 +1043,7 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	res = -1;
 
 	if ((pr = !settings->silent))
-	{
 		progress_init(_("Loading TIFF image"), 0);
-		progress_update(0.0);
-	}
 
 	/* Read it as ARGB if can't understand it ourselves */
 	if (argb)
@@ -2217,10 +2210,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	}
 
 	if (!settings->silent)
-	{
 		progress_init(_("Saving XPM image"), 0);
-		progress_update(0);
-	}
 
 	fprintf(fp, "/* XPM */\n" );
 	fprintf(fp, "static char *%.*s_xpm[] = {\n", i, tmp);

@@ -32,7 +32,9 @@ int recent_files;					// Current recent files setting
 
 typedef struct {
 	int status, x1, y1, x2, y2;	// Gradient placement tool
-	int type, len, ofs, mode;	// Selected gradient
+	int gtype, otype;	// Main and opacity gradients
+	int len, ofs;		// Gradient length and offset
+	int gmode, rmode;	// Gradient mode and repeat mode
 } grad_info;
 
 grad_info gradient[NUM_CHANNELS];		// Per-channel gradients
@@ -126,7 +128,7 @@ void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_paste( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item );
@@ -173,6 +175,7 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	int vx1, int vy1, int vx2, int vy2);
 void repaint_line(int mode);			// Repaint or clear line on canvas
 void repaint_grad(int mode);			// Same for gradient line
+void refresh_grad(int px, int py, int pw, int ph);	// Refresh a part of gradient line
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
 

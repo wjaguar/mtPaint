@@ -348,7 +348,7 @@ void pressed_channel_delete(GtkMenuItem *menu_item, gpointer user_data, gint ite
 void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	/* Prevent spurious calls */
-	if (!GTK_CHECK_MENU_ITEM(menu_item)->active) return;
+	if (menu_item && !GTK_CHECK_MENU_ITEM(menu_item)->active) return;
 	if (newchan_window) return;
 	if (item == mem_channel) return;
 

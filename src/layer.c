@@ -95,9 +95,14 @@ void repaint_layer(int l)		// Repaint layer in view/main window
 
 GtkWidget *layers_window = NULL;
 
+typedef struct {
+	GtkWidget *item, *name, *toggle;
+} layer_item;
+
 static GtkWidget *layer_list, *entry_layer_name,
-	*layer_buttons[10], *layer_spin, *layer_slider, *layer_list_data[MAX_LAYERS+1][3],
+	*layer_buttons[10], *layer_spin, *layer_slider,
 	*layer_label_position, *layer_trans_toggle, *layer_show_toggle;
+static layer_item layer_list_data[MAX_LAYERS + 1];
 
 gboolean layers_initialized;		// Indicates if initializing is complete
 
@@ -232,12 +237,12 @@ static void shift_layer(int val)
 	mtMAX(k, layer_selected, layer_selected-val)
 	for ( i=j; i<=k; i++ )
 	{
-		gtk_label_set_text( GTK_LABEL(layer_list_data[i][1]), layer_table[i].name );
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i][2] ),
+		gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
 				layer_table[i].visible);
 	}
 
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected][0] );
+	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
 	layers_notify_changed();
 	if ( layer_selected == layers_total )
 		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
@@ -369,14 +374,14 @@ void layer_new_chores2( int l )
 {
 	if ( layers_window != NULL )
 	{
-		gtk_widget_show( layer_list_data[l][0] );
-		gtk_widget_set_sensitive( layer_list_data[l][0], TRUE );	// Enable list item
+		gtk_widget_show( layer_list_data[l].item );
+		gtk_widget_set_sensitive( layer_list_data[l].item, TRUE );	// Enable list item
 
-		gtk_label_set_text( GTK_LABEL(layer_list_data[l][1]), layer_table[l].name );
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[l][2] ),
+		gtk_label_set_text( GTK_LABEL(layer_list_data[l].name), layer_table[l].name );
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[l].toggle ),
 			layer_table[l].visible);
 
-		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[l][0] );
+		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[l].item );
 		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
 		if ( l == 1 )
 			gtk_widget_set_sensitive( layer_buttons[2], FALSE );	// Lower button
@@ -519,7 +524,7 @@ static gint layer_press_duplicate()
 end:
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
 	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected][0] );
+	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
 
 	return FALSE;
 }
@@ -561,15 +566,15 @@ static void layer_refresh_list()
 	{
 		if ( layers_total<i )		// Disable item
 		{
-			gtk_widget_hide( layer_list_data[i][0] );
-			gtk_widget_set_sensitive( layer_list_data[i][0], FALSE );
+			gtk_widget_hide( layer_list_data[i].item );
+			gtk_widget_set_sensitive( layer_list_data[i].item, FALSE );
 		}
 		else
 		{
-			gtk_widget_show( layer_list_data[i][0] );
-			gtk_widget_set_sensitive( layer_list_data[i][0], TRUE );
-			gtk_label_set_text( GTK_LABEL(layer_list_data[i][1]), layer_table[i].name );
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i][2] ),
+			gtk_widget_show( layer_list_data[i].item );
+			gtk_widget_set_sensitive( layer_list_data[i].item, TRUE );
+			gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
 					layer_table[i].visible);
 		}
 	}
@@ -594,7 +599,7 @@ static gint layer_press_delete()
 		if ( i==2 || i==10 || i<10 )
 		{
 			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[layer_selected-1][0] );
+				layer_list_data[layer_selected-1].item );
 			while (gtk_events_pending()) gtk_main_iteration();
 
 			layer_delete( to_go );
@@ -809,7 +814,7 @@ int load_layers( char *file_name )
 		layer_refresh_list();
 		if ( layers_window != NULL )
 			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[layer_selected][0] );
+				layer_list_data[layer_selected].item );
 	}
 	else layer_refresh_list();
 
@@ -1016,7 +1021,7 @@ static void layers_remove_all()
 
 	if ( layers_window !=0 )
 	{
-		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[0][0] );
+		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[0].item );
 		while (gtk_events_pending()) gtk_main_iteration();
 	}
 	else
@@ -1053,16 +1058,16 @@ void layer_press_remove_all()
 
 static gint layer_tog_visible( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int i, j=-1;
-	gboolean k=gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+	int j;
 
 	if ( !layers_initialized ) return TRUE;
 
-	for ( i=1; i<=layers_total; i++ ) if ( widget == layer_list_data[i][2] ) j = i;
+	j = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
 
-	if ( j>0 )
+	if (j)
 	{
-		layer_table[j].visible = k;
+		layer_table[j].visible =
+			gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 		layers_notify_changed();
 		repaint_layer(j);
 	}
@@ -1097,7 +1102,7 @@ static gint layer_inputs_changed( GtkWidget *widget, GdkEvent *event, gpointer d
 
 	strncpy( layer_table[layer_selected].name,
 		gtk_entry_get_text( GTK_ENTRY(entry_layer_name) ), 35);
-	gtk_label_set_text( GTK_LABEL(layer_list_data[layer_selected][1]),
+	gtk_label_set_text( GTK_LABEL(layer_list_data[layer_selected].name),
 		layer_table[layer_selected].name );
 	layer_table[layer_selected].use_trans = gtk_toggle_button_get_active(
 		GTK_TOGGLE_BUTTON(layer_trans_toggle));
@@ -1126,7 +1131,7 @@ void layer_choose( int l )				// Select a new layer from the list
 		else
 		{
 			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[l][0] );
+				layer_list_data[l].item );
 		}
 	}
 }
@@ -1134,33 +1139,32 @@ void layer_choose( int l )				// Select a new layer from the list
 static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 {
 	gboolean dont_update = FALSE;
-	int i, j=-1;
+	int j;
 
 	if ( !layers_initialized ) return TRUE;
 
 	layers_initialized = FALSE;
 
-	for ( i=0; i<(MAX_LAYERS+1); i++ )
-	{
-		if ( widget == layer_list_data[i][0] ) j=i;
-	}
+	j = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
 
 	if ( j==layer_selected )
 		dont_update=TRUE;	// Already selected e.g. raise, lower, startup
 
-	if ( j>-1 && entry_layer_name != NULL && j<=layers_total )
+	if (entry_layer_name && (j <= layers_total))
 	{
-		if ( !dont_update ) layer_copy_from_main( layer_selected );
-					// Copy image info to layer table before we change
+		if ( !dont_update ) /* Move data before doing anything else */
+		{
+//			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
+//				pressed_select_none( NULL, NULL );
+			layer_copy_from_main( layer_selected );
+			layer_copy_to_main( layer_selected = j );
+			update_main_with_new_layer();
+		}
 
 		gtk_entry_set_text( GTK_ENTRY(entry_layer_name), layer_table[j].name );
-		layer_selected = j;
 		if ( j==0 )		// Background layer selected
 		{
-			if ( layers_total>0 )
-			 gtk_widget_set_sensitive( layer_buttons[1], TRUE );	// Raise button
-			else
-			 gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
+			gtk_widget_set_sensitive( layer_buttons[1], layers_total > 0);	// Raise button
 			gtk_widget_set_sensitive( layer_buttons[2], FALSE );	// Lower button
 			gtk_widget_set_sensitive( layer_buttons[5], FALSE );	// Delete button
 			gtk_widget_set_sensitive( layer_buttons[6], FALSE );	// Centre button
@@ -1198,15 +1202,6 @@ static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 
 	while (gtk_events_pending()) gtk_main_iteration();
 	layers_initialized = TRUE;
-
-	if ( !dont_update )
-	{
-		if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-			pressed_select_none( NULL, NULL );
-
-		layer_copy_to_main( layer_selected );
-		update_main_with_new_layer();
-	}
 
 	return FALSE;
 }
@@ -1359,7 +1354,7 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 
 void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow;
+	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	char txt[256];
 	int i;
@@ -1396,31 +1391,29 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 
 	for ( i=MAX_LAYERS; i>=0; i-- )
 	{
-		hbox = gtk_hbox_new( FALSE, 3 );
-		gtk_widget_show( hbox );
+		hbox = gtk_hbox_new(FALSE, 3);
 
-		layer_list_data[i][0] = gtk_list_item_new();
-		gtk_container_add( GTK_CONTAINER(layer_list), layer_list_data[i][0] );
-		gtk_container_add( GTK_CONTAINER(layer_list_data[i][0]), hbox );
-		gtk_widget_show( layer_list_data[i][0] );
+		layer_list_data[i].item = item = gtk_list_item_new();
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_container_add(GTK_CONTAINER(layer_list), item);
+		gtk_container_add(GTK_CONTAINER(item), hbox);
 
 		sprintf(txt, "%i", i);
 		label = gtk_label_new( txt );
 		gtk_widget_set_usize (label, 40, -2);
-		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
 		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 0 );
 
 		label = gtk_label_new( "" );
-		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 		gtk_box_pack_start( GTK_BOX(hbox), label, TRUE, TRUE, 0 );
-		layer_list_data[i][1] = label;
+		layer_list_data[i].name = label;
 
 		tog = gtk_check_button_new_with_label("");
-		gtk_widget_show( tog );
+		gtk_object_set_user_data(GTK_OBJECT(tog), (gpointer)i);
 		gtk_box_pack_start (GTK_BOX(hbox), tog, FALSE, FALSE, 0);
-		layer_list_data[i][2] = tog;
+		layer_list_data[i].toggle = tog;
+		gtk_widget_show_all(item);
 		if ( i == 0 ) gtk_widget_hide(tog);
 		else gtk_signal_connect(GTK_OBJECT(tog), "clicked",
 			GTK_SIGNAL_FUNC(layer_tog_visible), NULL);
@@ -1430,14 +1423,14 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	{
 		if ( i<=layers_total )
 		{
-			gtk_label_set_text( GTK_LABEL(layer_list_data[i][1]), layer_table[i].name );
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i][2] ),
+			gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
 				layer_table[i].visible);
 		}
 		else
 		{
-			gtk_widget_hide( layer_list_data[i][0] );
-			gtk_widget_set_sensitive( layer_list_data[i][0], FALSE );
+			gtk_widget_hide( layer_list_data[i].item );
+			gtk_widget_set_sensitive( layer_list_data[i].item, FALSE );
 			layer_table[i].image = NULL;		// Needed for checks later
 		}
 	}
@@ -1509,7 +1502,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_window_add_accel_group(GTK_WINDOW (layers_window), ag);
 
 	layers_initialized = TRUE;
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected][0] );
+	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
 
 	layers_update_titlebar();
 }

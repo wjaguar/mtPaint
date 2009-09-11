@@ -334,10 +334,10 @@ static void toolbar_zoom_view_change()
 	if ( new > 0 ) vw_align_size( new );
 }
 
-static int *vars_settings[TOTAL_ICONS_SETTINGS] = {
+static int *vars_settings[TOTAL_SETTINGS] = {
 	&mem_continuous, &mem_undo_opacity,
 	&tint_mode[0], &tint_mode[1],
-	&mem_cselect, &mem_unmask
+	&mem_cselect, &mem_unmask, &mem_gradient
 };
 
 void toolbar_mode_change(GtkWidget *widget, gpointer data)
@@ -408,6 +408,11 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	{
 	case SETB_CSEL:
 		colour_selector(COLSEL_EDIT_CSEL);
+		break;
+	case SETB_GRAD:
+
+// !!! Open gradient selection dialog here
+
 		break;
 	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
 		spin = add_a_spin(0, 0, 200);
@@ -550,6 +555,10 @@ static void tool_dis_add(toolbar_item *items)
 	}
 }
 
+#define GP_WIDTH 256
+#define GP_HEIGHT 16
+static GtkWidget *grad_view;
+
 static void toolbar_settings_init()
 {
 	int i, vals[] = {tool_size, tool_flow, tool_opacity};
@@ -565,6 +574,8 @@ static void toolbar_settings_init()
 		{ 0, 0, 0, 0, 0, NULL, NULL }};
 
 	GtkWidget *label, *vbox, *table, *toolbar_settings, *labels[3];
+	GtkWidget *button;
+	GdkPixmap *pmap;
 
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
@@ -608,6 +619,29 @@ static void toolbar_settings_init()
 	gtk_box_pack_start ( GTK_BOX (vbox), toolbar_settings, FALSE, FALSE, 0 );
 	gtk_widget_show(toolbar_settings);
 
+	/* Gradient mode button+preview */
+	button = gtk_toggle_button_new();
+	gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
+	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
+	grad_view = gtk_pixmap_new(pmap, NULL);
+	gdk_pixmap_unref(pmap);
+	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(grad_view), FALSE);
+	gtk_container_add(GTK_CONTAINER(button), grad_view);
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
+#endif
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), !!mem_gradient);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(toolbar_mode_change), (gpointer)SETB_GRAD);
+	gtk_signal_connect(GTK_OBJECT(button), "button_press_event",
+		GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)SETB_GRAD);
+	gtk_widget_show_all(button);
+	gtk_widget_realize(grad_view);
+	/* Parasite gradient tooltip on settings toolbar */
+	gtk_tooltips_set_tip(GTK_TOOLBAR(toolbar_settings)->tooltips,
+		button, _("Gradient Mode"), "Private");
+
+	/* Colors A & B */
 	label = gtk_label_new("");
 	toolbar_labels[0] = label;
 	gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
@@ -636,8 +670,8 @@ static void toolbar_settings_init()
 	}
 	tb_label_opacity = labels[2];
 
-	gtk_signal_connect_object (GTK_OBJECT (toolbar_boxes[TOOLBAR_SETTINGS]), "delete_event",
-		GTK_SIGNAL_FUNC (toolbar_settings_exit), NULL);
+	gtk_signal_connect(GTK_OBJECT(toolbar_boxes[TOOLBAR_SETTINGS]),
+		"delete_event", GTK_SIGNAL_FUNC(toolbar_settings_exit), NULL);
 	gtk_window_set_transient_for( GTK_WINDOW(toolbar_boxes[TOOLBAR_SETTINGS]),
 		GTK_WINDOW(main_window) );
 
@@ -790,6 +824,69 @@ void toolbar_init(GtkWidget *vbox_main)
 	gtk_widget_show ( toolbar_tools );
 }
 
+void ts_update_gradient()
+{
+	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3], cset[NUM_CHANNELS + 3];
+	unsigned char pal[256 * 3], *tmp = NULL, *dest;
+	int i, j, k, op, idx = 255;
+	double x;
+	GdkPixmap *pmap;
+
+	if (!grad_view) return;
+
+	if (mem_channel != CHN_IMAGE) /* Create pseudo palette */
+	{
+		for (j = 0; j < 3; j++)
+		for (i = 0; i < 256; i++)
+		{
+			k = mem_background * 255 + (channel_rgb[mem_channel][j] -
+				mem_background) * i + 127;
+			pal[i * 3 + j] = (k + (k >> 8) + 1) >> 8;
+		}
+	}
+	else if (mem_img_bpp == 1) /* Read in current palette */
+	{
+		memset(pal, 0, sizeof(pal));
+		for (i = 0; i < 256; i++)
+		{
+			pal[i * 3 + 0] = mem_pal[i].red;
+			pal[i * 3 + 1] = mem_pal[i].green;
+			pal[i * 3 + 2] = mem_pal[i].blue;
+		}
+	}
+	else tmp = cset; /* Use gradient colors */
+	if ((mem_img_bpp == 3) && (mem_channel <= CHN_ALPHA))
+		idx = 0; /* Allow intermediate opacities */
+
+	/* Draw the preview */
+	memset(rgb, mem_background, sizeof(rgb));
+	for (i = 0; i < GP_WIDTH; i++)
+	{
+		x = i * (1.0 / (double)(GP_WIDTH - 1));
+		dest = rgb + i * 3;
+		for (j = 0; j < GP_HEIGHT; j++ , dest += GP_WIDTH * 3)
+		{
+			op = grad_color(cset, x, BAYER(i, j));
+			if (!op) continue;
+			op |= idx;
+			if (tmp != cset) tmp = pal + 3 * cset[mem_channel + 3];
+			k = dest[0] * 255 + (tmp[0] - dest[0]) * op;
+			dest[0] = (k + (k >> 8) + 1) >> 8;
+			k = dest[1] * 255 + (tmp[1] - dest[1]) * op;
+			dest[1] = (k + (k >> 8) + 1) >> 8;
+			k = dest[2] * 255 + (tmp[2] - dest[2]) * op;
+			dest[2] = (k + (k >> 8) + 1) >> 8;
+		}
+	}
+
+	/* Show it */
+	gtk_pixmap_get(GTK_PIXMAP(grad_view), &pmap, NULL);
+	gdk_draw_rgb_image(pmap, grad_view->style->black_gc,
+		0, 0, GP_WIDTH, GP_HEIGHT,
+		GDK_RGB_DITHER_NONE, rgb, GP_WIDTH * 3);
+	gtk_widget_queue_draw(grad_view);
+}
+
 void toolbar_update_settings()
 {
 	char txt[32];
@@ -797,6 +894,7 @@ void toolbar_update_settings()
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
 
 	ts_update_spinslides();		// Update tool settings
+	ts_update_gradient();
 
 	if ( mem_img_bpp == 1 )
 		snprintf(txt, 30, "A [%i] = {%i,%i,%i}", mem_col_A, mem_pal[mem_col_A].red,

@@ -77,7 +77,7 @@
 #define DEFAULT_TOOL_ICON TTB_SELECT
 #define PAINT_TOOL_ICON TTB_PAINT
 
-#define TTB_0 TOTAL_ICONS_SETTINGS
+#define TTB_0 TOTAL_SETTINGS
 #define TOTAL_ICONS_TOOLS 19
 
 //	Settings toolbar buttons
@@ -87,8 +87,9 @@
 #define SETB_TSUB 3
 #define SETB_CSEL 4
 #define SETB_MASK 5
-
 #define TOTAL_ICONS_SETTINGS 6
+#define SETB_GRAD 6
+#define TOTAL_SETTINGS 7
 
 //	GLOBAL VARIABLES
 

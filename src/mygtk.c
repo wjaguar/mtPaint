@@ -24,6 +24,7 @@
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
+#include "mygtk.h"
 
 
 ///	GENERIC WIDGET PRIMITIVES
@@ -140,14 +141,14 @@ void add_hseparator( GtkWidget *widget, int xs, int ys )
 GtkWidget *progress_window = NULL, *progress_bar;
 int prog_stop;
 
-gint do_cancel_progress( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint do_cancel_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	prog_stop = 1;
 
 	return FALSE;
 }
 
-gint delete_progress( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint delete_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	return TRUE;			// This stops the user closing the window via the window manager
 }
@@ -171,7 +172,6 @@ void progress_init(char *text, int canc)		// Initialise progress window
 
 	progress_bar = gtk_progress_bar_new ();
 	gtk_box_pack_start( GTK_BOX (vbox6), progress_bar, FALSE, FALSE, 0 );
-	gtk_progress_set_percentage( GTK_PROGRESS (progress_bar), 0.0 );
 	gtk_progress_set_format_string( GTK_PROGRESS (progress_bar), text );
 	gtk_progress_set_show_text( GTK_PROGRESS (progress_bar), TRUE );
 	gtk_container_set_border_width (GTK_CONTAINER (vbox6), 10);
@@ -190,6 +190,7 @@ void progress_init(char *text, int canc)		// Initialise progress window
 
 	prog_stop = 0;
 	gtk_widget_show( progress_window );
+	progress_update(0.0);
 }
 
 int progress_update(float val)		// Update progress window

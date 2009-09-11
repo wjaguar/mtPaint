@@ -1687,34 +1687,32 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 	}
 	else /* HSV */
 	{
-		int rgb[3], rgb1[3], t;
-		double h0, dh, s0, ds, v0, dv, hsv[3], hsv1[3], hh, ss, vv, d;
+		unsigned char rgb[6];
+		int t;
+		double h0, dh, s0, ds, v0, dv, hsv[6], hh, ss, vv, d;
 
 		rgb[0] = (ctable[start].r + 128) / 257;
 		rgb[1] = (ctable[start].g + 128) / 257;
 		rgb[2] = (ctable[start].b + 128) / 257;
-		rgb1[0] = (ctable[stop].r + 128) / 257;
-		rgb1[1] = (ctable[stop].g + 128) / 257;
-		rgb1[2] = (ctable[stop].b + 128) / 257;
-		rgb2hsv(rgb, hsv);
-		rgb2hsv(rgb1, hsv1);
+		rgb[3] = (ctable[stop].r + 128) / 257;
+		rgb[4] = (ctable[stop].g + 128) / 257;
+		rgb[5] = (ctable[stop].b + 128) / 257;
+		rgb2hsv(rgb + 0, hsv + 0);
+		rgb2hsv(rgb + 3, hsv + 3);
 		/* Grey has no hue */
-		if (hsv[1] == 0.0) hsv[0] = hsv1[0];
-		if (hsv1[1] == 0.0) hsv1[0] = hsv[0];
+		if (hsv[1] == 0.0) hsv[0] = hsv[3];
+		if (hsv[4] == 0.0) hsv[3] = hsv[0];
 
 		/* Always go from 1st to 2nd hue in ascending order */
-		if (start == start0)
-		{
-			if (hsv[0] > hsv1[0]) hsv[0] -= 6.0;
-		}
-		else if (hsv1[0] > hsv[0]) hsv1[0] -= 6.0;
+		t = start == start0 ? 0 : 3;
+		if (hsv[t] > hsv[t ^ 3]) hsv[t] -= 6.0;
 
 		d = stop - start;
-		dh = (hsv1[0] - hsv[0]) / d;
+		dh = (hsv[3] - hsv[0]) / d;
 		h0 = hsv[0] - dh * start;
-		ds = (hsv1[1] - hsv[1]) / d;
+		ds = (hsv[4] - hsv[1]) / d;
 		s0 = hsv[1] - ds * start;
-		dv = (hsv1[2] - hsv[2]) / d;
+		dv = (hsv[5] - hsv[2]) / d;
 		v0 = hsv[2] - dv * start;
 
 		for (i = start + 1; i < stop; i++)

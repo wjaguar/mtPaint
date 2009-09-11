@@ -82,6 +82,13 @@
 #define ACT_A_NEXT	59
 #define ACT_B_PREV	60
 #define ACT_B_NEXT	61
+#define ACT_TO_IMAGE	62
+#define ACT_TO_ALPHA	63
+#define ACT_TO_SEL	64
+#define ACT_TO_MASK	65
+#define ACT_VWZOOM_IN	66
+#define ACT_VWZOOM_OUT	67
+
 
 typedef struct
 {

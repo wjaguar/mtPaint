@@ -108,57 +108,47 @@ void update_image_bar()
 
 void update_sel_bar()			// Update selection stats on status bar
 {
-	char txt[64];
-	int x1, y1, x2, y2;
-	float lang = 0, llen = 1;
+	char txt[64] = "";
+	int x1, y1, w, h;
+	float lang, llen;
+	grad_info *grad = gradient + mem_channel;
 
-	if ( (tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON) )
+
+	if (!status_on[STATUS_SELEGEOM]) return;
+
+	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 	{
 		if ( marq_status > MARQUEE_NONE )
 		{
-			mtMIN( x1, marq_x1, marq_x2 )
-			mtMIN( y1, marq_y1, marq_y2 )
-			mtMAX( x2, marq_x1, marq_x2 )
-			mtMAX( y2, marq_y1, marq_y2 )
-			if ( status_on[STATUS_SELEGEOM] )
-			{
-				if ( x1==x2 )
-				{
-					if ( marq_y1 < marq_y2 ) lang = 180;
-				}
-				else
-				{
-					lang = 90 + 180*atan( ((float) marq_y1 - marq_y2) /
-						(marq_x1 - marq_x2) ) / M_PI;
-					if ( marq_x1 > marq_x2 )
-						lang = lang - 180;
-				}
-
-				llen = sqrt( (x2-x1+1)*(x2-x1+1) + (y2-y1+1)*(y2-y1+1) );
-
-				snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
-					x1, y1, x2-x1+1, y2-y1+1, lang, llen);
-				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
-			}
+			x1 = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+			y1 = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+			w = abs(marq_x2 - marq_x1) + 1;
+			h = abs(marq_y2 - marq_y1) + 1;
+			lang = (180.0 / M_PI) * atan2(marq_x2 - marq_x1,
+				marq_y1 - marq_y2);
+			llen = sqrt(w * w + h * h);
+			snprintf(txt, 60, "  %i,%i : %i x %i   %.1f' %.1f\"",
+				x1, y1, w, h, lang, llen);
 		}
-		else
+		else if (tool_type == TOOL_POLYGON)
 		{
-			if ( tool_type == TOOL_POLYGON )
-			{
-				snprintf(txt, 60, "  (%i)", poly_points);
-				if ( poly_status != POLY_DONE ) strcat(txt, "+");
-				if ( status_on[STATUS_SELEGEOM] )
-					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt );
-			}
-			else if ( status_on[STATUS_SELEGEOM] )
-					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
+			snprintf(txt, 60, "  (%i)%c", poly_points,
+				poly_status != POLY_DONE ? '+' : '\0');
 		}
 	}
 
-// !!! Add gradient tool display to here, too
+	else if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
+	{
+		w = abs(grad->x2 - grad->x1) + 1;
+		h = abs(grad->y2 - grad->y1) + 1;
+		lang = (180.0 / M_PI) * atan2(grad->x2 - grad->x1,
+			grad->y1 - grad->y2);
+		llen = sqrt(w * w + h * h);
+		snprintf(txt, 60, "  %i,%i - %i,%i   %.1f' %.1f\"",
+			grad->x1, grad->y1, grad->x2, grad->y2, lang, llen);
+	}
 
-	else if ( status_on[STATUS_SELEGEOM] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
+	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
 }
 
 static void chan_txt_cat(char *txt, int chan, int x, int y)
@@ -545,11 +535,11 @@ void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	spot_undo(UNDO_COL);
 
-	mem_greyscale();
+	mem_greyscale(item);
 
 	init_pal();
 	update_all_views();
@@ -2680,7 +2670,7 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 
 static int vc_x1, vc_y1, vc_x2, vc_y2;	// Visible canvas
 
-void get_visible()
+static void get_visible()
 {
 	GtkAdjustment *hori, *vert;
 
@@ -2693,8 +2683,10 @@ void get_visible()
 	vc_y2 = vert->value + vert->page_size - 1;
 }
 
-void clip_area( int *rx, int *ry, int *rw, int *rh )		// Clip area to visible canvas
+/* Clip area to visible canvas */
+static void clip_area( int *rx, int *ry, int *rw, int *rh )
 {
+// !!! This assumes that if there's clipping, then there aren't margins
 	if ( *rx<vc_x1 )
 	{
 		*rw = *rw + (*rx - vc_x1);
@@ -2932,6 +2924,7 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	if (can_zoom < 1.0)
 	{
 		zoom = rint(1.0 / can_zoom);
+// !!! Gradient placement can have negative coords - adjust these divisions!
 		lx1 /= zoom; ly1 /= zoom;
 		lx2 /= zoom; ly2 /= zoom;
  	}
@@ -3007,6 +3000,7 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 {
 	get_visible();
 	trace_line(mode, line_x1, line_y1, line_x2, line_y2,
+// !!! This assumes that if there's clipping, then there aren't margins
 		vc_x1, vc_y1, vc_x2, vc_y2);
 }
 
@@ -3020,8 +3014,22 @@ void repaint_grad(int mode)
 
 	get_visible();
 	trace_line(mode, grad->x1, grad->y1, grad->x2, grad->y2,
-		vc_x1, vc_y1, vc_x2, vc_y2);
+		vc_x1 - margin_main_x, vc_y1 - margin_main_y,
+		vc_x2 - margin_main_x, vc_y2 - margin_main_y);
 	grad->status = oldgrad;
+}
+
+void refresh_grad(int px, int py, int pw, int ph)
+{
+	grad_info *grad = gradient + mem_channel;
+
+	pw += px - 1; ph += py - 1;
+	get_visible();
+	trace_line(3, grad->x1, grad->y1, grad->x2, grad->y2,
+		(px > vc_x1 ? px : vc_x1) - margin_main_x,
+		(py > vc_y1 ? py : vc_y1) - margin_main_y,
+		(pw < vc_x2 ? pw : vc_x2) - margin_main_x,
+		(ph < vc_y2 ? ph : vc_y2) - margin_main_y);
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

@@ -85,12 +85,42 @@ typedef struct
 	int cols, width, height, bpp;
 } undo_item;
 
+/// GRADIENTS
+
+/* Gradient modes */
+#define GRAD_MODE_LINEAR   0
+#define GRAD_MODE_BILINEAR 1
+#define GRAD_MODE_RADIAL   2
+
+/* Boundary conditions */
+#define GRAD_BOUND_STOP    0
+#define GRAD_BOUND_LEVEL   1
+#define GRAD_BOUND_REPEAT  2
+#define GRAD_BOUND_MIRROR  3
+
+/* Gradient modes */
+#define GRAD_FLAG_REVERSE  0x10000
+#define GRAD_FLAG_DEFAULT  0x20000
+#define GRAD_INDEX_MASK    0x0FFFF
+#define GRAD_DEF_RGB       0
+#define GRAD_DEF_HSV       1
+#define GRAD_DEF_BK_HSV    2
+#define GRAD_DEF_CONST     3
+
+/// Bayer ordered dithering
+
+const unsigned char bayer[16];
+
+#define BAYER_MASK 15 /* Use 16x16 matrix */
+#define BAYER(x,y) (bayer[((x) ^ (y)) & BAYER_MASK] * 2 + bayer[(y) & BAYER_MASK])
+
 /// Tint tool - contributed by Dmitry Groshev, January 2006
 
 int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
 int mem_unmask;
+int mem_gradient;
 
 /// FLOOD FILL SETTINGS
 
@@ -225,7 +255,7 @@ void mem_pal_load_def();		// Load default palette
 void mem_pal_init();			// Initialise whole of palette RGB
 int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 	png_color *pal2 );
-void mem_greyscale();			// Convert image to greyscale
+void mem_greyscale(int gcor);		// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Convert RGB->indexed using error diffusion with variety of options
@@ -261,7 +291,7 @@ void set_zoom_centre( int x, int y );
 void mem_boundary( int *x, int *y, int *w, int *h );		// Check/amend boundaries
 
 // Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255
-void rgb2hsv(int *rgb, double *hsv);
+void rgb2hsv(unsigned char *rgb, double *hsv);
 
 //// UNDO
 
@@ -370,6 +400,9 @@ void put_pixel( int x, int y );					// generic
 int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image
+
+int grad_color(unsigned char *dest, double x, int frac);
+int grad_pixel(unsigned char *dest, int x, int y);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

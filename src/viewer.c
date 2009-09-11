@@ -838,6 +838,7 @@ void vw_align_size( float new_zoom )
 {
 	int sw = mem_width, sh = mem_height, i;
 
+	if (!vw_drawing) return;
 	vw_zoom = new_zoom;
 
 	if ( layers_total>0 && layer_selected!=0 )
@@ -865,6 +866,7 @@ void vw_align_size( float new_zoom )
 		gtk_widget_set_usize(vw_drawing, vw_width, vw_height);
 	}
 	vw_focus_view();
+	toolbar_zoom_update();
 }
 
 void vw_repaint( int px, int py, int pw, int ph )

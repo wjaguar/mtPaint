@@ -42,12 +42,19 @@
 char *channames[NUM_CHANNELS + 1];
 
 
+/// Bayer ordered dithering
+
+const unsigned char bayer[16] = {
+	0x00, 0x40, 0x10, 0x50, 0x04, 0x44, 0x14, 0x54,
+	0x01, 0x41, 0x11, 0x51, 0x05, 0x45, 0x15, 0x55 };
+
 /// Tint tool - contributed by Dmitry Groshev, January 2006
 
 int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
 int mem_cselect;
 int mem_unmask;
+int mem_gradient;
 
 /// FLOOD FILL SETTINGS
 
@@ -1858,13 +1865,12 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 }
 
 /* Convert image to greyscale */
-void mem_greyscale()
+void mem_greyscale(int gcor)
 {
 	unsigned char *mask, *img = mem_img[CHN_IMAGE];
-	int i, j, k, v, ch, gcor;
+	int i, j, k, v, ch;
 	double value;
 
-	gcor = inifile_get_gboolean("defaultGamma", FALSE);
 	if ( mem_img_bpp == 1)
 	{
 		for (i = 0; i < 256; i++)
@@ -1930,7 +1936,7 @@ void mem_greyscale()
 #define MOD3(x) ((((x) * 5 + 1) >> 2) & 3)
 
 /* Nonclassical HSV: H is 0..6, S is 0..1, V is 0..255 */
-void rgb2hsv(int *rgb, double *hsv)
+void rgb2hsv(unsigned char *rgb, double *hsv)
 {
 	int c0, c1, c2;
 
@@ -1953,7 +1959,7 @@ void rgb2hsv(int *rgb, double *hsv)
 static double rgb_hsl(int t, png_color col)
 {
 	double hsv[3];
-	int rgb[3] = {col.red, col.green, col.blue};
+	unsigned char rgb[3] = {col.red, col.green, col.blue};
 
 	if (t == 2) return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]);
 	rgb2hsv(rgb, hsv);
@@ -2974,11 +2980,8 @@ void mem_bacteria( int val )			// Apply bacteria effect val times the canvas are
 	}
 
 	cancel = (w * h * val > PROGRESS_LIM);
-	if (cancel)
-	{
-		progress_init(_("Bacteria Effect"), 1);
-		progress_update(0.0);
-	}
+	if (cancel) progress_init(_("Bacteria Effect"), 1);
+
 	for ( i=0; i<val; i++ )
 	{
 		if (cancel && ((i * 20) % val >= val - 20))
@@ -4079,14 +4082,34 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 void put_pixel( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
-	unsigned char r, g, b, nr, ng, nb;
-	int i, j, offset, ofs3, opacity = 0, tint;
+	unsigned char r, g, b, nr, ng, nb, cset[NUM_CHANNELS + 3];
+	int i, j, offset, ofs3, opacity = 0, op = tool_opacity, tint;
 
 	j = pixel_protected(x, y);
 	if (mem_img_bpp == 1 ? j : j == 255) return;
 
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
+
+	if (mem_gradient) /* Gradient mode */
+	{
+
+// !!! Do nothing because there's no stroke gradient support yet
+if (gradient[mem_channel].status == GRAD_NONE) return;
+
+		if (!(op = grad_pixel(cset, x, y))) return;
+	}
+	else /* Default mode - init "colorset" */
+	{
+		i = ((x & 7) + 8 * (y & 7));
+		cset[mem_channel + 3] = channel_col_[mem_pattern[i] ^ 1][mem_channel];
+		cset[CHN_ALPHA + 3] = channel_col_[mem_pattern[i] ^ 1][CHN_ALPHA];
+		cset[CHN_IMAGE + 3] = mem_col_pat[i]; /* !!! This must be last! */
+		i *= 3;
+		cset[0] = mem_col_pat24[i + 0];
+		cset[1] = mem_col_pat24[i + 1];
+		cset[2] = mem_col_pat24[i + 2];
+	}
 
 	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
 	else old_image = mem_img[mem_channel];
@@ -4100,17 +4123,16 @@ void put_pixel( int x, int y )	/* Combined */
 		}
 		if (mem_img_bpp == 3)
 		{
-			j = (255 - j) * tool_opacity;
+			j = (255 - j) * op;
 			opacity = (j + (j >> 8) + 1) >> 8;
 		}
 	}
 	offset = x + mem_width * y;
-	i = ((x & 7) + 8 * (y & 7));
 
 	/* Alpha channel */
 	if (old_alpha && mem_img[CHN_ALPHA])
 	{
-		newc = channel_col_[mem_pattern[i] ^ 1][CHN_ALPHA];
+		newc = cset[CHN_ALPHA + 3];
 		oldc = old_alpha[offset];
 		if (tint)
 		{
@@ -4132,9 +4154,7 @@ void put_pixel( int x, int y )	/* Combined */
 	/* Indexed image or utility channel */
 	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
-		newc = mem_col_pat[i];
-		if (mem_channel != CHN_IMAGE)
-			newc = channel_col_[mem_pattern[i] ^ 1][mem_channel];
+		newc = cset[mem_channel + 3];
 		if (tint)
 		{
 			if (tint < 0)
@@ -4154,10 +4174,9 @@ void put_pixel( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
-		i *= 3;
-		nr = mem_col_pat24[i + 0];
-		ng = mem_col_pat24[i + 1];
-		nb = mem_col_pat24[i + 2];
+		nr = cset[0];
+		ng = cset[1];
+		nb = cset[2];
 
 		if (tint)
 		{
@@ -5040,7 +5059,6 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 
 	/* Run filter */
 	progress_init(_("Gaussian Blur"), 1);
-	progress_update(0.0);
 	if (!rgba) /* One channel */
 		gauss_filter(&gd, mem_channel, gcor);
 	else if (rgbb) /* Coupled RGBA */
@@ -5187,7 +5205,6 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 
 	/* Run filter */
 	progress_init(_("Unsharp Mask"), 1);
-	progress_update(0.0);
 	unsharp_filter(&gd, amount, threshold, mem_channel, gcor);
 	progress_end();
 	free(gd.abuf);
@@ -5475,4 +5492,217 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 			dest[offs] = (k + (k >> 8) + 1) >> 8;
 		}
 	}
+}
+
+
+/* Evaluate RGBA/indexed gradient at coordinate, return opacity */
+/* Coordinate 0 is center of 1st pixel, 1 center of last */
+int grad_color(unsigned char *dest, double x, int frac)
+{
+	int i, k, i3, len, op;
+	unsigned char *gdata, *gmap, gtemp[8];
+	grad_info *grad = gradient + mem_channel;
+	double xx, hsv[6];
+
+	/* Get opacity */
+// !!! Only defaults are there for now
+//	if (grad->otype & GRAD_FLAG_DEFAULT)
+	{
+		gdata = gtemp; gmap = gtemp + 6; len = 2;
+		gtemp[0] = tool_opacity;
+		/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
+		gtemp[1] = 0;
+		gtemp[6] = (unsigned char)grad->otype;
+	}
+// !!! Only defaults are there for now
+//	else len = grad_line(&gdata, &gmap, grad->otype);
+	xx = (grad->otype & GRAD_FLAG_REVERSE ? 1.0 - x : x) * (len - 1);
+	i = xx;
+	if (i > len - 2) i = len - 2;
+	k = gmap[i] == GRAD_DEF_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
+	op = ((gdata[i] << 8) + k * (gdata[i + 1] - gdata[i]) + frac) >> 8;
+	if (!op) return (0); /* Stop if zero opacity */
+
+	/* Get channel value */
+// !!! Only defaults are there for now
+//	if (grad->gtype & GRAD_FLAG_DEFAULT)
+	{
+		gdata = gtemp; gmap = gtemp + 6; len = 2;
+		gtemp[6] = (unsigned char)grad->gtype;
+	}
+// !!! Only defaults are there for now
+//	else len = grad_line(&gdata, &gmap, grad->gtype);
+	xx = (grad->gtype & GRAD_FLAG_REVERSE ? 1.0 - x : x) * (len - 1);
+	i = xx;
+	if (i > len - 2) i = len - 2;
+	k = gmap[i] == GRAD_DEF_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
+	if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3)) /* RGB */
+	{
+// !!! Only defaults are there for now
+//		if (grad->gtype & GRAD_FLAG_DEFAULT)
+		{
+			gtemp[0] = mem_col_A24.red;
+			gtemp[1] = mem_col_A24.green;
+			gtemp[2] = mem_col_A24.blue;
+			gtemp[3] = mem_col_B24.red;
+			gtemp[4] = mem_col_B24.green;
+			gtemp[5] = mem_col_B24.blue;
+		}
+		i3 = i * 3;
+		/* HSV interpolation */
+		if ((gmap[i] == GRAD_DEF_HSV) || (gmap[i] == GRAD_DEF_BK_HSV))
+		{
+			/* Convert */
+			rgb2hsv(gdata + i3 + 0, hsv + 0);
+			rgb2hsv(gdata + i3 + 3, hsv + 3);
+			/* Grey has no hue */
+			if (hsv[1] == 0.0) hsv[0] = hsv[3];
+			if (hsv[4] == 0.0) hsv[3] = hsv[0];
+			/* Prevent wraparound */
+			i3 = gmap[i] == GRAD_DEF_HSV ? 0 : 3;
+			if (hsv[i3] > hsv[i3 ^ 3]) hsv[i3] -= 6.0;
+			/* Interpolate */
+			hsv[0] += (xx - i) * (hsv[3] - hsv[0]);
+			hsv[1] += (xx - i) * (hsv[4] - hsv[1]);
+			hsv[2] += (xx - i) * (hsv[5] - hsv[2]);
+			/* Convert back */
+			hsv[2] *= 256;
+			hsv[1] = hsv[2] * (1.0 - hsv[1]);
+			if (hsv[0] < 0.0) hsv[0] += 6.0;
+			i3 = floor(hsv[0]);
+			hsv[0] = (hsv[0] - i3) * (hsv[2] - hsv[1]);
+			if (i3 & 1) { hsv[2] -= hsv[0]; hsv[0] += hsv[2]; }
+			else hsv[0] += hsv[1];
+			i3 >>= 1;
+			dest[i3] = ((int)rint(hsv[2]) + frac) >> 8;
+			dest[MOD3(i3 + 1)] = ((int)rint(hsv[0]) + frac) >> 8;
+			dest[MOD3(i3 + 2)] = ((int)rint(hsv[1]) + frac) >> 8;
+		}
+		/* RGB interpolation */
+		else
+		{
+			dest[0] = ((gdata[i3 + 0] << 8) +
+				k * (gdata[i3 + 3] - gdata[i3 + 0]) + frac) >> 8;
+			dest[1] = ((gdata[i3 + 1] << 8) +
+				k * (gdata[i3 + 4] - gdata[i3 + 1]) + frac) >> 8;
+			dest[2] = ((gdata[i3 + 2] << 8) +
+				k * (gdata[i3 + 5] - gdata[i3 + 2]) + frac) >> 8;
+		}
+	}
+	else if (mem_channel == CHN_IMAGE) /* Indexed */
+	{
+// !!! Only defaults are there for now
+//		if (grad->gtype & GRAD_FLAG_DEFAULT)
+		{
+			gtemp[0] = mem_col_A;
+			gtemp[1] = mem_col_B;
+		}
+		dest[CHN_IMAGE + 3] = gdata[i + ((k + frac) >> 8)];
+	}
+	else /* Utility */
+	{
+// !!! Only defaults are there for now
+//		if (grad->gtype & GRAD_FLAG_DEFAULT)
+		{
+			gtemp[0] = channel_col_A[mem_channel];
+			gtemp[1] = channel_col_B[mem_channel];
+		}
+		dest[mem_channel + 3] = ((gdata[i] << 8) +
+			k * (gdata[i + 1] - gdata[i]) + frac) >> 8;
+	}
+
+	/* Get coupled alpha */
+	if (RGBA_mode && (mem_channel == CHN_IMAGE))
+	{
+		grad = gradient + CHN_ALPHA;
+// !!! Only defaults are there for now
+//		if (grad->gtype & GRAD_FLAG_DEFAULT)
+		{
+			gdata = gtemp; gmap = gtemp + 6; len = 2;
+			gtemp[0] = channel_col_A[CHN_ALPHA];
+			gtemp[1] = channel_col_B[CHN_ALPHA];
+			gtemp[6] = (unsigned char)grad->gtype;
+		}
+// !!! Only defaults are there for now
+//		else len = grad_line(&gdata, &gmap, grad->gtype);
+		xx = (grad->gtype & GRAD_FLAG_REVERSE ? 1.0 - x : x) * (len - 1);
+		i = xx;
+		if (i > len - 2) i = len - 2;
+		k = gmap[i] == GRAD_DEF_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
+		dest[CHN_ALPHA + 3] = ((gdata[i] << 8) +
+			k * (gdata[i + 1] - gdata[i]) + frac) >> 8;
+	}
+
+	return (op);
+}
+
+/* Evaluate RGBA/indexed gradient at point, return opacity */
+int grad_pixel(unsigned char *dest, int x, int y)
+{
+	int dither;
+	grad_info *grad = gradient + mem_channel;
+	double len, len1, dist, l2;
+	
+	/* Distance for gradient mode */
+	while (1)
+	{
+		 /* Stroke gradient */
+		if (grad->status == GRAD_NONE)
+		{
+			len = grad->len > 0 ? grad->len : grad->ofs > 0 ?
+				grad->ofs + 1 : 1;
+// !!! Do nothing for now - no way to measure strokes yet
+			return (0);
+		}
+
+		/* Placement length */
+		len = sqrt((grad->x2 - grad->x1) * (grad->x2 - grad->x1) +
+			(grad->y2 - grad->y1) * (grad->y2 - grad->y1));
+
+		/* Radial gradient */
+		if (grad->gmode == GRAD_MODE_RADIAL)
+		{
+			dist = sqrt((x - grad->x1) * (x - grad->x1) +
+				(y - grad->y1) * (y - grad->y1));
+			break;
+		}
+
+		/* Linear/bilinear gradient */
+		dist = ((x - grad->x1) * (grad->x2 - grad->x1) +
+			(y - grad->y1) * (grad->y2 - grad->y1)) / len;
+		if (grad->gmode == GRAD_MODE_LINEAR) break;
+		dist = fabs(dist); /* Bilinear */
+	}
+	dist += grad->ofs;
+
+	/* Base length (one repeat) */
+	len1 = grad->len > 0 ? grad->len : len - grad->ofs;
+
+	/* Apply repeat mode */
+	switch (grad->rmode)
+	{
+	case GRAD_BOUND_MIRROR: /* Mirror repeat */
+		l2 = len1 + len1;
+		dist -= l2 * floor(dist / l2);
+		if (dist > len1) dist = l2 - dist;
+		break;
+	case GRAD_BOUND_REPEAT: /* Repeat */
+		l2 = len1 + 1.0; /* Repeat period is 1 pixel longer */
+		dist -= l2 * floor((dist + 0.5) / l2);
+		break;
+	case GRAD_BOUND_STOP: /* Nothing is outside bounds */
+		if ((dist < -0.5) || (dist >= len1 + 0.5)) return (0);
+	case GRAD_BOUND_LEVEL: /* Constant extension */
+	default:
+		break;
+	}
+
+	/* Rescale to 0..1, enforce boundaries */
+	dist = dist < 0.0 ? 0.0 : dist > len1 ? 1.0 : dist / len1;
+
+	/* Value from Bayer dither matrix */
+	dither = BAYER(x, y);
+
+	/* Get opacity */
+	return (grad_color(dest, dist, dither));
 }
