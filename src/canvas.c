@@ -74,7 +74,7 @@ void commit_paste( gboolean undo )
 {
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
 	int mx = 0, my = 0;			// Mem coords
-	int i, ofs;
+	int i, ofs, ua;
 	unsigned char *image, *mask, *alpha = NULL;
 
 	if ( marq_x1 < 0 ) mx = -marq_x1;
@@ -88,14 +88,18 @@ void commit_paste( gboolean undo )
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
 
+	ua = channel_dis[CHN_ALPHA];	// Ignore clipboard alpha if disabled
+
 	mask = malloc(fw);
 	if (!mask) return;	/* !!! Not enough memory */
-	if ((mem_channel == CHN_IMAGE) && RGBA_mode && !mem_clip_alpha && mem_img[CHN_ALPHA])
+	if ((mem_channel == CHN_IMAGE) && RGBA_mode && !mem_clip_alpha &&
+		!ua && mem_img[CHN_ALPHA])
 	{
 		alpha = malloc(fw);
 		if (!alpha) return;
 		memset(alpha, channel_col_A[CHN_ALPHA], fw);
 	}
+	ua |= !mem_clip_alpha;
 
 	if ( undo ) mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
 	update_menus();				// Update menu undo issues
@@ -106,8 +110,8 @@ void commit_paste( gboolean undo )
 	for (i = 0; i < fh; i++)
 	{
 		row_protected(fx, fy + i, fw, mask);
-		paste_pixels(fx, fy + i, fw, mask, image, mem_clip_alpha ?
-			mem_clip_alpha + ofs : alpha, mem_clip_mask ?
+		paste_pixels(fx, fy + i, fw, mask, image, ua ?
+			alpha : mem_clip_alpha + ofs, mem_clip_mask ?
 			mem_clip_mask + ofs : NULL, tool_opacity);
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;
@@ -552,15 +556,15 @@ void do_the_copy(int op)
 	if ( op == 1 )		// COPY
 	{
 		bpp = MEM_BPP;
-		if (mem_clipboard) free(mem_clipboard);		// Lose old clipboard
-		if (mem_clip_alpha) free(mem_clip_alpha);	// Lose old clipboard alpha
-		mem_clip_mask_clear();				// Lose old clipboard mask
+		free(mem_clipboard);		// Lose old clipboard
+		free(mem_clip_alpha);		// Lose old clipboard alpha
+		mem_clip_mask_clear();		// Lose old clipboard mask
 		mem_clip_alpha = NULL;
 		if (mem_channel == CHN_IMAGE)
 		{
-			if (mem_img[CHN_ALPHA] && !mem_img_dis[CHN_ALPHA])
+			if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
 				mem_clip_alpha = malloc(w * h);
-			if (mem_img[CHN_SEL] && !mem_img_dis[CHN_SEL])
+			if (mem_img[CHN_SEL] && !channel_dis[CHN_SEL])
 				mem_clip_mask = malloc(w * h);
 		}
 		mem_clipboard = malloc(w * h * bpp);
@@ -568,7 +572,7 @@ void do_the_copy(int op)
 	
 		if (!mem_clipboard)
 		{
-			if (mem_clip_alpha) free(mem_clip_alpha);
+			free(mem_clip_alpha);
 			mem_clip_mask_clear();
 			alert_box( _("Error"), _("Not enough memory to create clipboard"),
 					_("OK"), NULL, NULL );
@@ -2217,8 +2221,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 						off1 = rx + ry * mem_width;
 						off2 = sx + sy * mem_width;
 						if ((mem_channel == CHN_IMAGE) &&
-							RGBA_mode && mem_img[CHN_ALPHA] &&
-							!mem_img_dis[CHN_ALPHA])
+							RGBA_mode && mem_img[CHN_ALPHA])
 						{
 							px = mem_img[CHN_ALPHA][off1];
 							py = mem_img[CHN_ALPHA][off2];
@@ -2309,10 +2312,13 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			{
 				if ( tool_size > 1 )
 				{
+					int oldmode = mem_undo_opacity;
+					mem_undo_opacity = TRUE;
 					f_circle( line_x1, line_y1, tool_size );
 					f_circle( line_x2, line_y2, tool_size );
 					// Draw tool_size thickness line from 1-2
 					tline( line_x1, line_y1, line_x2, line_y2, tool_size );
+					mem_undo_opacity = oldmode;
 				}
 				else sline( line_x1, line_y1, line_x2, line_y2 );
 

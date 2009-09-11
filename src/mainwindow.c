@@ -967,6 +967,8 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		{
 			if ( ! (line_x1 == line_x2 && line_y1 == line_y2) )
 			{
+				int oldmode = mem_undo_opacity;
+
 					// Calculate 2 coords for arrow corners
 				llen = sqrt( (line_x1-line_x2) * (line_x1-line_x2) +
 						(line_y1-line_y2) * (line_y1-line_y2) );
@@ -986,6 +988,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 				update_menus();
 
 					// Draw arrow lines & circles
+				mem_undo_opacity = TRUE;
 				f_circle( aco[1][0], aco[1][1], tool_size );
 				f_circle( aco[2][0], aco[2][1], tool_size );
 				tline( aco[1][0], aco[1][1], line_x1, line_y1, tool_size );
@@ -1003,6 +1006,7 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 					poly_paint();
 					poly_points = 0;
 				}
+				mem_undo_opacity = oldmode;
 
 					// Update screen areas
 				mtMIN( minx, aco[1][0]-tool_size/2-1, aco[2][0]-tool_size/2-1 )
@@ -1427,13 +1431,12 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	int i, j, k, ii, ds = rr_zoom * 3, da = 0;
 	int w_bpp = rr_bpp, w_xpm = rr_xpm;
 
-	if ( mem_img_dis[CHN_ALPHA] ) alpha_blend = FALSE;
-
 	if (xtra_img)
 	{
 		src = xtra_img[CHN_IMAGE];
 		alpha = xtra_img[CHN_ALPHA];
 	}
+	if (channel_dis[CHN_ALPHA]) alpha = &beta; /* Ignore alpha if disabled */
 	if (!src) src = base_img[CHN_IMAGE] + (rr_mw * y + x) * rr_bpp;
 	if (!alpha) alpha = base_img[CHN_ALPHA] ? base_img[CHN_ALPHA] +
 		rr_mw * y + x : &beta;
@@ -1604,13 +1607,10 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	/* Prepare channel weights (256-based) */
 	k = hide_image ? 256 : 256 - channel_opacity[CHN_IMAGE] -
 		(channel_opacity[CHN_IMAGE] >> 7);
-	opA = alpha && overlay_alpha ? channel_opacity[CHN_ALPHA] : 0;
-	opS = sel ? channel_opacity[CHN_SEL] : 0;
-	opM = mask ? channel_opacity[CHN_MASK] : 0;
-
-	if ( mem_img_dis[CHN_ALPHA] ) opA = 0;
-	if ( mem_img_dis[CHN_SEL] ) opS = 0;
-	if ( mem_img_dis[CHN_MASK] ) opM = 0;
+	opA = alpha && overlay_alpha && !channel_dis[CHN_ALPHA] ?
+		channel_opacity[CHN_ALPHA] : 0;
+	opS = sel && !channel_dis[CHN_SEL] ? channel_opacity[CHN_SEL] : 0;
+	opM = mask && !channel_dis[CHN_MASK] ? channel_opacity[CHN_MASK] : 0;
 
 	/* Nothing to do - don't waste time then */
 	j = opA + opS + opM;
@@ -1770,7 +1770,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	tlist[mem_channel] = pix;
 	clip_image = mem_clipboard;
 	clip_alpha = NULL;
-	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
+	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
 	{
 		clip_alpha = mem_clip_alpha;
 		if (!clip_alpha && RGBA_mode)
@@ -1796,7 +1796,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	opac = tool_opacity;
 	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1)) opac = 0;
 	mask0 = NULL;
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK])
 		mask0 = mem_img[CHN_MASK];
 
 	if (layers_total && show_layers_main)
@@ -1883,13 +1883,11 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 {
 	chanlist tlist;
-	unsigned char *mask0, *pvi = NULL, *pvm = NULL, *pvx = NULL;
+	unsigned char *mask0 = NULL, *pvi = NULL, *pvm = NULL, *pvx = NULL;
 	int alpha_blend = !overlay_alpha;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
 	int j, jj, j0, l, dx, pww, zoom = 1, scale = 1, nix = 0, niy = 0;
 	int lop = 255, xpm = mem_xpm_trans;
-
-	if ( mem_img_dis[CHN_ALPHA] ) alpha_blend = FALSE;
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
@@ -1911,7 +1909,8 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 
 	if ((pw2 < 1) || (ph2 < 1)) return;
 
-	if (!mem_img[CHN_ALPHA] && (xpm < 0)) alpha_blend = FALSE;
+	if ((!mem_img[CHN_ALPHA] || channel_dis[CHN_ALPHA]) && (xpm < 0))
+		alpha_blend = FALSE;
 	if (layers_total && show_layers_main)
 	{
 		if (layer_selected)
@@ -1925,7 +1924,7 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 
 	dx = (px2 * zoom) / scale;
 	memset(tlist, 0, sizeof(chanlist));
-	mask0 = mem_img[CHN_MASK];
+	if (!channel_dis[CHN_MASK]) mask0 = mem_img[CHN_MASK];
 	pww = pw2;
 	if (scale > 1) l = pww = (px2 + pw2 - 1) / scale - dx + 1;
 	else l = (pw2 - 1) * zoom + 1;

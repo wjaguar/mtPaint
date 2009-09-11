@@ -32,6 +32,7 @@
 #include "viewer.h"
 #include "png.h"
 #include "ani.h"
+#include "channels.h"
 #include "toolbar.h"
 
 
@@ -1283,8 +1284,11 @@ gint delete_layers_window()
 
 void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 {
-	int ol = layer_selected, new_type = CMASK_IMAGE, i, j;
-	unsigned char *src;
+	int ol = layer_selected, new_type = CMASK_IMAGE, i, j, k;
+	unsigned char *dest;
+
+	/* No way to put RGB clipboard into utility channel */
+	if ((mem_clip_bpp == 3) && (mem_channel != CHN_IMAGE)) return;
 
 	if ( layers_total<MAX_LAYERS )
 	{
@@ -1292,7 +1296,9 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 		if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
 				// This stops a nasty segfault if users does 2 quick paste layers
 
-		if ( mem_clip_alpha || mem_clip_mask ) new_type = CMASK_RGBA;
+		if ((mem_clip_alpha || mem_clip_mask) && !channel_dis[CHN_ALPHA])
+			new_type = CMASK_RGBA;
+		new_type |= CMASK_FOR(mem_channel);
 		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, new_type);
 
 		if ( layer_selected != ol )	// If == then new layer wasn't created
@@ -1317,30 +1323,44 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 			layer_copy_to_main( layer_selected );
 			update_main_with_new_layer();
 
-			j = mem_clip_w*mem_clip_h;
-			memcpy(mem_img[CHN_IMAGE], mem_clipboard, j*mem_clip_bpp);
-					// Copy image data
+			j = mem_clip_w * mem_clip_h;
+			memcpy(mem_img[mem_channel], mem_clipboard, j * mem_clip_bpp);
 
-			if ( (mem_clip_mask || mem_clip_alpha) && mem_img[CHN_ALPHA] )
+			/* Image channel with alpha */
+			if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
 			{
-				if ( mem_clip_mask && mem_clip_alpha )
-				{
-					for ( i=0; i<j; i++ )
-					{
-						mem_img[CHN_ALPHA][i] = (
-							mem_clip_alpha[i]*(255-mem_clip_mask[i])
-							) / 255;
-					}
-				}
-				else	// Simple copy from clipboard mask or alpha
-				{
-					src = mem_clip_mask ? mem_clip_mask : mem_clip_alpha;
-					memcpy(mem_img[CHN_ALPHA], src, j);
+				/* Fill alpha channel */
+				if (mem_clip_alpha)
+					memcpy(mem_img[CHN_ALPHA], mem_clip_alpha, j);
+				else memset(mem_img[CHN_ALPHA], 255, j);
+			}
 
-					if ( mem_clip_mask )
-					{
-						for ( i=0; i<j; i++ ) mem_img[CHN_ALPHA][i] ^= 255;
-					}	// Remember to flip values if its the mask
+			/* Image channel with mask */
+			if ((mem_channel == CHN_IMAGE) && mem_clip_mask)
+			{
+				/* Mask image - fill unselected part with color A */
+				dest = mem_img[CHN_IMAGE];
+				k = mem_clip_bpp == 1 ? mem_col_A : mem_col_A24.red;
+				for (i = 0; i < j; i++ , dest += mem_clip_bpp)
+				{
+					if (mem_clip_mask[i] != 255) continue;
+					dest[0] = k;
+					if (mem_clip_bpp == 1) continue;
+					dest[1] = mem_col_A24.green;
+					dest[2] = mem_col_A24.blue;
+				}
+			}
+
+			/* Utility channel with mask */
+			dest = mem_img[CHN_ALPHA];
+			if (mem_channel != CHN_IMAGE) dest = mem_img[mem_channel];
+			if (dest && mem_clip_mask)
+			{
+				/* Mask the channel */
+				for (i = 0; i < j; i++)
+				{
+					k = dest[i] * (255 - mem_clip_mask[i]);
+					dest[i] = (k + (k >> 8) + 1) >> 8;
 				}
 			}
 

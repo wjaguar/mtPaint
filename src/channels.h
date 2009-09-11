@@ -31,6 +31,8 @@ unsigned char channel_fill[NUM_CHANNELS];
 unsigned char channel_col_A[NUM_CHANNELS];
 unsigned char channel_col_B[NUM_CHANNELS];
 
+int channel_dis[NUM_CHANNELS];
+
 void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item );

@@ -58,7 +58,6 @@ int flood_cube, flood_img, flood_slide;
 
 char mem_filename[256];			// File name of file loaded/saved
 chanlist mem_img;			// Array of pointers to image channels
-int mem_img_dis[NUM_CHANNELS] = {0, 0, 0, 0};	// Disabled channels
 int mem_channel = CHN_IMAGE;		// Current active channel
 int mem_img_bpp;			// Bytes per pixel = 1 or 3
 int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
@@ -636,7 +635,7 @@ int mem_undo_next(int mode)
 		break;
 	case UNDO_PASTE: /* Paste to current channel / RGBA */
 		wmode = 8;	/* !!! Workaround for move-with-RMB-pressed */
-		cmask = (mem_channel == CHN_IMAGE) &&
+		cmask = (mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA] &&
 			(mem_clip_alpha || RGBA_mode) ? CMASK_RGBA : CMASK_CURR;
 		break;
 	}
@@ -2856,7 +2855,7 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 			if (cc == CHN_IMAGE)
 			{
 				alpha = NULL;
-				if (mem_img[CHN_ALPHA])
+				if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
 					alpha = mem_img[CHN_ALPHA] + ny * nw;
 				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
 				for (nx = 0; nx < nw; nx++)
@@ -2919,9 +2918,10 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				}
 				continue;
 			}
-			/* Alpha channel already done */
-			if (cc == CHN_ALPHA) continue;
-			/* Selection/mask channel bilinear */
+			/* Alpha channel already done... maybe */
+			if ((cc == CHN_ALPHA) && !channel_dis[CHN_ALPHA])
+				continue;
+			/* Utility channel bilinear */
 			dest = mem_img[cc] + ny * nw;
 			for (nx = 0; nx < nw; nx++)
 			{
@@ -3142,7 +3142,8 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 		{
 			if (!new_img[cc]) continue;
 			/* If RGBA, wait for alpha */
-			if ((cc == CHN_IMAGE) && new_img[CHN_ALPHA]) continue;
+			if ((cc == CHN_IMAGE) && new_img[CHN_ALPHA] &&
+				!channel_dis[CHN_ALPHA]) continue;
 			bpp = cc == CHN_IMAGE ? 3 : 1;
 			tmp = tmpy;
 			memset(work_area, 0, ow * bpp * sizeof(double));
@@ -3179,8 +3180,9 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 				}
 				if (tmpx->idx < -1) break;
 			}
-			/* Process RGB after alpha */
-			if (cc != CHN_ALPHA) continue;
+			/* Process RGB after alpha... maybe */
+			if ((cc != CHN_ALPHA) || channel_dis[CHN_ALPHA])
+				continue;
 			for (j = 0; j < ow; j++)
 			{
 				/* Make zero alphas slightly non-zero */
@@ -3523,7 +3525,7 @@ int pixel_protected(int x, int y)
 		return (255);
 
 	/* Mask channel */
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !mem_img_dis[CHN_MASK])
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK])
 		return (mem_img[CHN_MASK][offset]);
 
 	return (0);
@@ -3543,7 +3545,7 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	}
 
 	/* Clear mask or copy mask channel into it */
-	if (mask0 && !mem_img_dis[CHN_MASK]) memcpy(mask, mask0, cnt);
+	if (mask0) memcpy(mask, mask0, cnt);
 	else memset(mask, 0, cnt);
 
 	/* Add colour protection to it */
@@ -3573,7 +3575,7 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	int ofs = y * mem_width + x;
 
 	/* Clear mask or copy mask channel into it */
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK])
 		mask0 = mem_img[CHN_MASK] + ofs;
 
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
@@ -3626,7 +3628,8 @@ void put_pixel( int x, int y )	/* Combined */
 		{
 			j = oldc * 255 + (newc - oldc) * opacity;
 			mem_img[CHN_ALPHA][offset] = (j + (j >> 8) + 1) >> 8;
-			if (j) opacity = (255 * opacity * newc) / j;
+			if (j && !channel_dis[CHN_ALPHA])
+				opacity = (255 * opacity * newc) / j;
 		}
 		else mem_img[CHN_ALPHA][offset] = newc;
 		if (mem_channel == CHN_ALPHA) return;
@@ -4006,7 +4009,8 @@ static void effect_mask(unsigned char *src, unsigned char *dest)
 	tmp = mem_undo_previous(mem_channel);
 	if (tmp != src) /* Apply masking if possible */
 	{
-		if (mem_channel <= CHN_ALPHA) mask = mem_img[CHN_MASK];
+		if ((mem_channel <= CHN_ALPHA) && !channel_dis[CHN_MASK])
+			mask = mem_img[CHN_MASK];
 		j = mem_width * mem_height;
 		prep_mask(0, 1, j, dest, mask, mem_undo_previous(CHN_IMAGE));
 		for (i = 0; i < j; i++ , src += bpp , tmp += bpp)
@@ -4333,7 +4337,8 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity)
 				k = srca[offs];
 				k = k * 255 + (srca[offs - delta1] - k) * opw;
 				dsta[offs] = (k + (k >> 8) + 1) >> 8;
-				if (k) opw = (255 * opw * srca[offs - delta1]) / k;
+				if (k && !channel_dis[CHN_ALPHA])
+					opw = (255 * opw * srca[offs - delta1]) / k;
 			}
 			op2 = 255 - opw;
 			offs *= bpp;

@@ -83,7 +83,6 @@ int flood_cube, flood_img, flood_slide;
 
 char mem_filename[256];			// File name of file loaded/saved
 chanlist mem_img;			// Array of pointers to image channels
-int mem_img_dis[NUM_CHANNELS];		// Disabled channels
 int mem_channel;			// Current active channel
 int mem_img_bpp;			// Bytes per pixel = 1 or 3
 int mem_changed;			// Changed since last load/save flag 0=no, 1=changed

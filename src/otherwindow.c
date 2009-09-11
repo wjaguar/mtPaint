@@ -963,7 +963,8 @@ static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer dat
 			mask = malloc(mem_width);
 			if (mask)
 			{
-				mask0 = mem_img[CHN_MASK];
+				mask0 = NULL;
+				if (!channel_dis[CHN_MASK]) mask0 = mem_img[CHN_MASK];
 				tmp = mem_img[CHN_IMAGE];
 				for (i = 0; i < mem_height; i++)
 				{

@@ -54,6 +54,9 @@ unsigned char channel_fill[NUM_CHANNELS] = {0, 255, 0, 0};
 unsigned char channel_col_A[NUM_CHANNELS] = {255, 255, 255, 255};
 unsigned char channel_col_B[NUM_CHANNELS] = {0, 0, 0, 0};
 
+/* Channel disable flags */
+int channel_dis[NUM_CHANNELS] = {0, 0, 0, 0};
+
 static GtkWidget *newchan_window;
 static int chan_new_type, chan_new_state;
 
@@ -387,7 +390,7 @@ void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item
 
 void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	mem_img_dis[item] = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	channel_dis[item] = GTK_CHECK_MENU_ITEM(menu_item)->active;
 	update_all_views();
 }
 

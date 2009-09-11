@@ -75,6 +75,7 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 {
 	int i, i2, j, j2, j3, cuts, maxx = mem_width, maxy = mem_height;
 	int poly_lines[MAX_POLY][2][2], poly_cuts[MAX_POLY];
+	int oldmode = mem_undo_opacity;
 	float ratio;
 
 	if ( type==0 )
@@ -83,6 +84,7 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 		if ( mem_clip_mask == NULL ) return;	// Failed to get memory
 	}
 
+	mem_undo_opacity = TRUE;
 	for ( i=0; i<poly_points; i++ )		// Populate poly_lines - smallest Y is first point
 	{
 		i2 = i+1;
@@ -112,7 +114,11 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 			// Outline is needed to properly edge the polygon
 	}
 
-	if ( type>10 ) return;				// If drawing outline only, finish now
+	if ( type>10 )		// If drawing outline only, finish now
+	{
+		mem_undo_opacity = oldmode;
+		return;
+	}
 
 	if ( poly_min_y < 0 ) poly_min_y = 0;		// Vertical clipping
 	if ( poly_max_y >= maxy ) poly_max_y = maxy-1;
@@ -178,6 +184,7 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 			}
 		}
 	}
+	mem_undo_opacity = oldmode;
 }
 
 void poly_mask()		// Paint polygon onto clipboard mask

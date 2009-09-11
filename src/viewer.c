@@ -587,7 +587,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 {
 	png_color *pal;
 	unsigned char *tmp, **img;
-	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp, thid;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp, thid, tdis;
 	int ddx, ddy, mx, mw, my, mh;
 	int pw2 = pw, ph2 = ph, dx = 0, dy = 0, pw3 = pw * 3;
 	int zoom = 1, scale = 1;
@@ -650,6 +650,8 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	/* No point in doing that here */
 	thid = hide_image;
 	hide_image = FALSE;
+	tdis = channel_dis[CHN_ALPHA];
+	channel_dis[CHN_ALPHA] = FALSE;
 
 	for (ll = lr0; ll <= lr1; ll++)
 	{
@@ -729,6 +731,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 		}
 	}
 	hide_image = thid;
+	channel_dis[CHN_ALPHA] = tdis;
 }
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
@@ -1278,8 +1281,8 @@ gint render_text( GtkWidget *widget )
 
 	if ( t_image != NULL )
 	{
-		if ( mem_clipboard != NULL ) free( mem_clipboard );	// Lose old clipboard
-		if ( mem_clip_alpha != NULL ) free( mem_clip_alpha );	// Lose old clipboard alpha
+		free( mem_clipboard );	// Lose old clipboard
+		free( mem_clip_alpha );	// Lose old clipboard alpha
 		mem_clip_alpha = NULL;
 		mem_clipboard = malloc( width * height * clip_bpp );
 		mem_clip_w = width;
