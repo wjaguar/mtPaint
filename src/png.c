@@ -2878,6 +2878,59 @@ int detect_image_format(char *name)
 #define HANDBOOK_BROWSER "firefox"
 #define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
 
+#include <unistd.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+
+
+static int spawn_process(char *prog, char *docs)
+{
+	pid_t child, grandchild;
+	int res = -1, err, fd_flags, fds[2], status;
+
+
+	child = fork();
+	if ( child < 0 ) return 1;
+
+	if (child == 0)				// Child
+	{
+		if (pipe(fds) == -1) _exit(1);		// Set up the pipe
+
+		grandchild = fork();
+
+		if (grandchild == 0)		// Grandchild
+		{
+			if (close(fds[0]) != -1)	// Close the read pipe
+				/* Make the write end close-on-exec */
+			if ((fd_flags = fcntl(fds[1], F_GETFD)) != -1)
+				if (fcntl(fds[1], F_SETFD, fd_flags | FD_CLOEXEC) != -1)
+					execlp(prog, prog, docs, NULL); /* Run program */
+
+			/* If we are here, an error occurred */
+			/* Send the error code to the parent */
+			err = errno;
+			write(fds[1], &err, sizeof(err));
+			_exit(1);
+		}
+		/* Close the write pipe - has to be done BEFORE read */
+		close(fds[1]);
+
+		/* Get the error code from the grandchild */
+		if (grandchild > 0) res = read(fds[0], &err, sizeof(err));
+
+		close(fds[0]);		// Close the read pipe
+
+		_exit(res);
+	}
+
+	waitpid(child, &status, 0);	// Wait for child to die
+	res = WEXITSTATUS(status);	// Find out the childs exit value
+
+	return (res);
+}
+
 #endif
 
 int show_html(char *browser, char *docs)
@@ -2898,7 +2951,6 @@ int show_html(char *browser, char *docs)
 		docs = buf;
 	}
 #else /* Linux */
-	char buf3[300];
 	if (!docs || !docs[0]) docs = HANDBOOK_LOCATION;
 #endif
 	else docs = gtkncpy(buf, docs, 260);
@@ -2925,8 +2977,7 @@ int show_html(char *browser, char *docs)
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 
-	snprintf(buf3, 260, "%s %s &", browser, docs);
-	i = system(buf3);
+	i = spawn_process(browser, docs);
 #endif
 	if (i) alert_box( _("Error"),
 		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),

@@ -440,7 +440,7 @@ int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image
 
-int grad_value(int *dest, double x);
+int grad_value(int *dest, int slot, double x);
 int grad_pixel(unsigned char *dest, int x, int y);
 void grad_update(grad_info *grad);
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot);

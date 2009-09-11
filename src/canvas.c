@@ -1642,8 +1642,16 @@ static gint fs_ok(GtkWidget *fs)
 				ext2 = file_formats[settings.ftype].ext2;
 				if (ext2[0] && !strncasecmp(c + 1, ext2, 256))
 					break;
-				/* Truncate */
-				*c = '\0';
+				/* Another file type? */
+				for (i = 0; i < NUM_FTYPES; i++)
+				{
+					if (strncasecmp(c + 1, file_formats[i].ext, 256) &&
+						strncasecmp(c + 1, file_formats[i].ext2, 256))
+						continue;
+					/* Truncate */
+					*c = '\0';
+					break;
+				}
 			}
 			i = strlen(fname);
 			j = strlen(ext);

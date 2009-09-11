@@ -1561,7 +1561,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 		return FALSE;
 #endif
 
-#if GTK_MAJOR_VERSION >= 2 && GTK_MINOR_VERSION >= 6
+#if GTK_CHECK_VERSION(2,6,0)
 	gtk_spin_button_update( GTK_SPIN_BUTTON(text_spin[1]) );
 	inifile_set_gfloat( "fontAngle",
 		gtk_spin_button_get_value_as_float( GTK_SPIN_BUTTON(text_spin[1]) ) );
@@ -1588,8 +1588,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *button, *vbox, *hbox;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *vbox, *hbox;
 
 	text_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Paste Text"), GTK_WIN_POS_CENTER, TRUE );
 	gtk_window_set_default_size( GTK_WINDOW(text_window), 400, 400 );
@@ -1633,7 +1632,7 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
-#if GTK_MAJOR_VERSION == 2 && GTK_MINOR_VERSION >= 6
+#if GTK_CHECK_VERSION(2,6,0)
 	text_spin[1] = add_float_spin(inifile_get_gfloat("fontAngle", 0), -360, 360);
 	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, TRUE, 5);
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
@@ -1644,28 +1643,11 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, 200, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
+	hbox = OK_box(0, text_window, _("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(delete_text));
 	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, TRUE, 5);
 
-	button = add_a_button(_("Cancel"), 5, hbox, TRUE);
-	gtk_widget_set_usize (button, 120, -2);
-	gtk_signal_connect_object( GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(delete_text), GTK_OBJECT(text_window));
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button = add_a_button(_("Paste Text"), 5, hbox, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(paste_text_ok), GTK_OBJECT(text_window));
-	gtk_widget_set_usize (button, 120, -2);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-
-	gtk_signal_connect_object (GTK_OBJECT (text_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_text), NULL);
-
 	gtk_widget_show(text_window);
-	gtk_window_add_accel_group(GTK_WINDOW (text_window), ag);
 	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );
 
 	gtk_font_selection_set_font_name( GTK_FONT_SELECTION(text_font_window),

@@ -58,8 +58,7 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
-// !!! Not needed yet
-// GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx);
+GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx);
 
 // Easier way with spinbuttons
 

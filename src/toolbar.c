@@ -847,11 +847,12 @@ void ts_update_gradient()
 {
 	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3], cset[3];
 	unsigned char pal[256 * 3], *tmp = NULL, *dest;
-	int i, j, k, op, op2, frac, idx = 255, wrk[NUM_CHANNELS + 3];
+	int i, j, k, op, op2, frac, slot, idx = 255, wrk[NUM_CHANNELS + 3];
 	GdkPixmap *pmap;
 
 	if (!grad_view) return;
 
+	slot = mem_channel + 1;
 	if (mem_channel != CHN_IMAGE) /* Create pseudo palette */
 	{
 		for (j = 0; j < 3; j++)
@@ -872,7 +873,7 @@ void ts_update_gradient()
 			pal[i * 3 + 2] = mem_pal[i].blue;
 		}
 	}
-	else tmp = cset; /* Use gradient colors */
+	else tmp = cset , --slot; /* Use gradient colors */
 	if ((mem_img_bpp == 3) && (mem_channel <= CHN_ALPHA))
 		idx = 0; /* Allow intermediate opacities */
 
@@ -882,7 +883,7 @@ void ts_update_gradient()
 	{
 		dest = rgb + i * 3;
 		wrk[CHN_IMAGE + 3] = 0;
-		op = grad_value(wrk, i * (1.0 / (double)(GP_WIDTH - 1)));
+		op = grad_value(wrk, slot, i * (1.0 / (double)(GP_WIDTH - 1)));
 		if (!op) continue;
 		for (j = 0; j < GP_HEIGHT; j++ , dest += GP_WIDTH * 3)
 		{

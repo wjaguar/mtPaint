@@ -139,14 +139,12 @@ gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint delete_prefs( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void delete_prefs(GtkWidget *widget)
 {
 	if ( inputd != NULL ) delete_inputd( NULL, NULL, NULL );
 	gtk_widget_destroy(prefs_window);
 	men_item_state( menu_prefs, TRUE );
 	clipboard_entry = NULL;
-
-	return FALSE;
 }
 
 static void tablet_update_pressure( double pressure )
@@ -256,7 +254,7 @@ gint conf_tablet( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 
 
-gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void prefs_apply(GtkWidget *widget)
 {
 	int i, j;
 	char txt[64];
@@ -353,16 +351,12 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	update_recent_files();
 	init_status_bar();
-
-	return FALSE;
 }
 
-gint prefs_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void prefs_ok(GtkWidget *widget)
 {
-	prefs_apply( NULL, NULL, NULL );
-	delete_prefs( NULL, NULL, NULL );
-
-	return FALSE;
+	prefs_apply(NULL);
+	delete_prefs(NULL);
 }
 
 static gint tablet_preview_button (GtkWidget *widget, GdkEventButton *event)
@@ -449,8 +443,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 
 	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet;
-	GtkWidget *button1, *button2, *notebook1, *vbox_1, *vbox_2, *vbox_3, *label;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *button1, *notebook1, *vbox_1, *vbox_2, *vbox_3, *label;
 
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
@@ -737,29 +730,13 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	Bottom of Prefs window
 
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
+	hbox4 = OK_box(0, prefs_window, _("OK"), GTK_SIGNAL_FUNC(prefs_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(delete_prefs));
+	OK_box_add(hbox4, _("Apply"), GTK_SIGNAL_FUNC(prefs_apply), 1);
 	gtk_box_pack_start (GTK_BOX (vbox3), hbox4, FALSE, FALSE, 0);
-
-	button1 = add_a_button(_("Cancel"), 5, hbox4, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked", GTK_SIGNAL_FUNC(delete_prefs), NULL);
-	gtk_widget_add_accelerator (button1, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button1 = add_a_button(_("Apply"), 5, hbox4, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked", GTK_SIGNAL_FUNC(prefs_apply), NULL);
-
-	button2 = add_a_button(_("OK"), 5, hbox4, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button2), "clicked", GTK_SIGNAL_FUNC(prefs_ok), NULL);
-	gtk_widget_add_accelerator (button2, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button2, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-
-
-	gtk_signal_connect_object (GTK_OBJECT (prefs_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_prefs), NULL);
 
 	gtk_window_set_transient_for( GTK_WINDOW(prefs_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (prefs_window);
-	gtk_window_add_accel_group(GTK_WINDOW (prefs_window), ag);
 
 	if ( tablet_working )
 	{

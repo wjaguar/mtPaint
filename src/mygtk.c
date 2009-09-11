@@ -397,13 +397,11 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
  
 	gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 	gtk_signal_connect(GTK_OBJECT(window), "delete_event", Cancel, NULL);
-// !!! Not needed yet
-//	gtk_object_set_user_data(GTK_OBJECT(hbox), (gpointer)window);
+	gtk_object_set_user_data(GTK_OBJECT(hbox), (gpointer)window);
 	gtk_widget_show_all(hbox);
 	return (hbox);
 }
 
-#if 0 /* !!! Not needed yet */
 GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx)
 {
 	GtkWidget *button;
@@ -417,7 +415,6 @@ GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx
 	gtk_widget_show(button);
 	return (button);
 }
-#endif
 
 // Easier way with spinbuttons
 
@@ -529,8 +526,9 @@ GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 			handler, var);
 		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
   	}
+	gtk_widget_show_all(menu);
+	gtk_widget_show(opt); /* !!! Show now - or size won't be set properly */
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
-	gtk_widget_show_all(opt);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), idx);
 	return (opt);
 }

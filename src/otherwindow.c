@@ -578,8 +578,7 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 			_("Frequency")};
 
 
-	GtkWidget *vbox1, *hbox3, *table1, *button;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *vbox1, *hbox3, *table1;
 
 	spal_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Sort Palette Colours"),
 		GTK_WIN_POS_CENTER, TRUE );
@@ -606,28 +605,14 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox1, 200, 10 );
 
-	hbox3 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox3);
+	/* Cancel / Apply / OK */
+
+	hbox3 = OK_box(5, spal_window, _("OK"), GTK_SIGNAL_FUNC(click_spal_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	OK_box_add(hbox3, _("Apply"), GTK_SIGNAL_FUNC(click_spal_apply), 1);
 	gtk_box_pack_start (GTK_BOX (vbox1), hbox3, FALSE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (hbox3), 5);
-
-	button = add_a_button(_("Cancel"), 5, hbox3, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(spal_window));
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button = add_a_button(_("Apply"), 5, hbox3, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(click_spal_apply), GTK_OBJECT(spal_window));
-
-	button = add_a_button(_("OK"), 5, hbox3, TRUE);
-	gtk_signal_connect_object( GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(click_spal_ok), GTK_OBJECT(spal_window));
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 
 	gtk_widget_show (spal_window);
-	gtk_window_add_accel_group(GTK_WINDOW (spal_window), ag);
 }
 
 
@@ -1440,8 +1425,8 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	allcol_hook(3);
 }
 
-void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, char **cnames,
-	int alpha, colour_hook chook)
+static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt,
+	char **cnames, int alpha, colour_hook chook, GtkSignalFunc lhook)
 {
 	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
@@ -1500,6 +1485,8 @@ void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, char **cnames,
 	{
 		l_item = gtk_list_item_new();
 		gtk_object_set_user_data( GTK_OBJECT(l_item), (gpointer)(&ctable[i]));
+		if (lhook) gtk_signal_connect(GTK_OBJECT(l_item),
+			"button_press_event", lhook, (gpointer)i);
 		gtk_container_add( GTK_CONTAINER(col_list), l_item );
 		gtk_widget_show( l_item );
 
@@ -1649,6 +1636,22 @@ static void select_colour(int what)
 	}
 }
 
+static gint click_colour(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+	/* Middle click sets "from" */
+	if ((event->type == GDK_BUTTON_PRESS) && (event->button == 2))
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(range_spins[0]),
+			(int)user_data);
+
+	/* Right click sets "to" */
+	if ((event->type == GDK_BUTTON_PRESS) && (event->button == 3))
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(range_spins[1]),
+			(int)user_data);
+
+	/* Let click processing continue */
+	return (FALSE);
+}
+
 static void set_range_spin(GtkButton *button, GtkWidget *spin)
 {
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), allcol_idx);
@@ -1656,27 +1659,39 @@ static void set_range_spin(GtkButton *button, GtkWidget *spin)
 
 static void make_cscale(GtkButton *button, gpointer user_data)
 {
-	int i, start, stop, start0;
+	int i, start, stop, start0, mode;
+	unsigned char rgb[6];
+	double d;
 
+	mode = wj_option_menu_get_history(GTK_WIDGET(user_data));
 	start = start0 = read_spin(range_spins[0]);
 	stop = read_spin(range_spins[1]);
-	if (start > stop) { i = start; start = stop; stop = i; }
-	if (stop < start + 2) return;
 
-	if ((int)user_data) /* RGB */
+	if (mode <= 1) /* RGB/HSV */
 	{
-		double r0, g0, b0, dr, dg, db, d;
+		if (start > stop) { i = start; start = stop; stop = i; }
+		if (stop < start + 2) return;
+	}
+	else if (stop == start) return; /* Gradient */
 
-		d = stop - start;
-		r0 = (ctable[start].r + 128) / 257;
-		dr = ((ctable[stop].r + 128) / 257 - r0) / d;
-		r0 -= dr * start;
-		g0 = (ctable[start].g + 128) / 257;
-		dg = ((ctable[stop].g + 128) / 257 - g0) / d;
-		g0 -= dg * start;
-		b0 = (ctable[start].b + 128) / 257;
-		db = ((ctable[stop].b + 128) / 257 - b0) / d;
-		b0 -= db * start;
+	rgb[0] = (ctable[start].r + 128) / 257;
+	rgb[1] = (ctable[start].g + 128) / 257;
+	rgb[2] = (ctable[start].b + 128) / 257;
+	rgb[3] = (ctable[stop].r + 128) / 257;
+	rgb[4] = (ctable[stop].g + 128) / 257;
+	rgb[5] = (ctable[stop].b + 128) / 257;
+	d = stop - start;
+
+	if (mode == 0) /* RGB */
+	{
+		double r0, g0, b0, dr, dg, db;
+
+		dr = ((int)rgb[3] - rgb[0]) / d;
+		r0 = rgb[0] - dr * start;
+		dg = ((int)rgb[4] - rgb[1]) / d;
+		g0 = rgb[1] - dg * start;
+		db = ((int)rgb[5] - rgb[2]) / d;
+		b0 = rgb[2] - db * start;
 
 		for (i = start + 1; i < stop; i++)
 		{
@@ -1685,18 +1700,11 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 			ctable[i].b = rint(b0 + db * i) * 257;
 		}
 	}
-	else /* HSV */
+	else if (mode == 1) /* HSV */
 	{
-		unsigned char rgb[6];
 		int t;
-		double h0, dh, s0, ds, v0, dv, hsv[6], hh, ss, vv, d;
+		double h0, dh, s0, ds, v0, dv, hsv[6], hh, ss, vv;
 
-		rgb[0] = (ctable[start].r + 128) / 257;
-		rgb[1] = (ctable[start].g + 128) / 257;
-		rgb[2] = (ctable[start].b + 128) / 257;
-		rgb[3] = (ctable[stop].r + 128) / 257;
-		rgb[4] = (ctable[stop].g + 128) / 257;
-		rgb[5] = (ctable[stop].b + 128) / 257;
 		rgb2hsv(rgb + 0, hsv + 0);
 		rgb2hsv(rgb + 3, hsv + 3);
 		/* Grey has no hue */
@@ -1707,7 +1715,6 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		t = start == start0 ? 0 : 3;
 		if (hsv[t] > hsv[t ^ 3]) hsv[t] -= 6.0;
 
-		d = stop - start;
 		dh = (hsv[3] - hsv[0]) / d;
 		h0 = hsv[0] - dh * start;
 		ds = (hsv[4] - hsv[1]) / d;
@@ -1732,6 +1739,24 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 			ctable[i].r = rgb[0] * 257;
 			ctable[i].g = rgb[1] * 257;
 			ctable[i].b = rgb[2] * 257;
+		}
+	}
+	else /* Gradient */
+	{
+		int j, op, c[NUM_CHANNELS + 3];
+
+		j = start < stop ? 1 : -1;
+		for (i = start; i != stop + j; i += j)
+		{
+			op = grad_value(c, 0, (i - start) / d);
+			/* Zero opacity - empty slot */
+			if (!op) ctable[i].r = ctable[i].g = ctable[i].b = 0;
+			else
+			{
+				ctable[i].r = ((c[0] + 128) >> 8) * 257;
+				ctable[i].g = ((c[1] + 128) >> 8) * 257;
+				ctable[i].b = ((c[2] + 128) >> 8) * 257;
+			}
 		}
 	}
 	color_refresh();
@@ -1889,12 +1914,13 @@ static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
-	GtkWidget *win, *extbox, *button, *spin;
+	GtkWidget *win, *extbox, *button, *spin, *opt;
 	int i, j;
 
 	if (cs_type == COLSEL_EDIT_ALL)
 	{
 		char *fromto[] = { _("From"), _("To") };
+		char *scales[] = { "RGB", "HSV", _("Gradient") };
 
 		mem_pal_copy( brcosa_pal, mem_pal );	// Remember old settings
 		ctable = malloc(mem_cols * sizeof(RGBA16));
@@ -1919,17 +1945,18 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			gtk_signal_connect(GTK_OBJECT(button), "clicked",
 				GTK_SIGNAL_FUNC(set_range_spin), spin);
 		}
-		button = add_a_button("HSV", 4, extbox, TRUE);
+		opt = wj_option_menu(scales, 3, 0, NULL, NULL);
+		gtk_container_set_border_width(GTK_CONTAINER(opt), 4);
+		gtk_box_pack_start(GTK_BOX(extbox), opt, TRUE, TRUE, 0);
+		button = add_a_button(_("Create"), 4, extbox, TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(make_cscale), (gpointer)0);
-		button = add_a_button("RGB", 4, extbox, TRUE);
-		gtk_signal_connect(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(make_cscale), (gpointer)1);
+			GTK_SIGNAL_FUNC(make_cscale), (gpointer)opt);
 		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, extbox, mem_cols, NULL, FALSE, select_colour);
+		colour_window(win, extbox, mem_cols, NULL, FALSE, select_colour,
+			GTK_SIGNAL_FUNC(click_colour));
 	}
 
 	if (cs_type == COLSEL_OVERLAYS)
@@ -1949,7 +1976,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
 			GTK_WIN_POS_CENTER, TRUE);
 		colour_window(win, NULL, NUM_CHANNELS, allchannames,
-			TRUE, select_overlay);
+			TRUE, select_overlay, NULL);
 	}
 
 	if (cs_type == COLSEL_EDIT_AB)
@@ -2008,7 +2035,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, extbox, 2, AB_txt, FALSE, select_AB);
+		colour_window(win, extbox, 2, AB_txt, FALSE, select_AB, NULL);
 	}
 	if (cs_type == COLSEL_EDIT_CSEL)
 	{
@@ -2057,8 +2084,8 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour-Selective Mode"),
 			GTK_WIN_POS_CENTER, TRUE);
 /* !!! Alpha ranges not implemented yet !!! */
-//		colour_window(win, extbox, 3, csel_txt, TRUE, select_csel);
-		colour_window(win, extbox, 3, csel_txt, FALSE, select_csel);
+//		colour_window(win, extbox, 3, csel_txt, TRUE, select_csel, NULL);
+		colour_window(win, extbox, 3, csel_txt, FALSE, select_csel, NULL);
 	}
 }
 
@@ -2846,7 +2873,7 @@ static void show_channel_gradient(int channel)
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_orev), gmap->orev);
 }
 
-static void click_grad_ok(GtkWidget *widget)
+static void click_grad_apply(GtkWidget *widget)
 {
 	int i;
 
@@ -2864,7 +2891,11 @@ static void click_grad_ok(GtkWidget *widget)
 	toolbar_update_settings();
 	if ((tool_type == TOOL_GRADIENT) && grad_opacity)
 		gtk_widget_queue_draw(drawing_canvas);
+}
 
+static void click_grad_ok(GtkWidget *widget)
+{
+	click_grad_apply(widget);
 	gtk_widget_destroy(widget);
 }
 
@@ -2966,10 +2997,11 @@ void gradient_setup(int mode)
 	grad_selector_box(hbox, gradtypes, 0);
 	grad_selector_box(hbox, optypes, 1);
 
-	/* OK / Cancel */
+	/* Cancel / Apply / OK */
 
 	hbox = OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy));
+	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply), 1);
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
 
 	/* Fill in values */
