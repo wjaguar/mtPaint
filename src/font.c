@@ -1823,8 +1823,8 @@ void pressed_mt_text()
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow), mem->preview_area);
 	gtk_widget_show( mem->preview_area );
 
-	gtk_signal_connect (GTK_OBJECT (mem->preview_area), "expose_event",
-		(GtkSignalFunc) preview_expose_event, NULL);
+	gtk_signal_connect(GTK_OBJECT(mem->preview_area), "expose_event",
+		GTK_SIGNAL_FUNC(preview_expose_event), NULL);
 
 //	TOGGLES
 
@@ -1861,7 +1861,7 @@ void pressed_mt_text()
 		inifile_get_gboolean( "fontAntialias2", FALSE ) );
 
 	for ( i=0; i<TX_TOGGS; i++ )
-		gtk_signal_connect(GTK_OBJECT(mem->toggle[i]), "clicked",
+		gtk_signal_connect(GTK_OBJECT(mem->toggle[i]), "toggled",
 			GTK_SIGNAL_FUNC(font_entry_changed), (gpointer)mem);
 	for ( i=0; i<TX_SPINS; i++ )
 		if (mem->spin[i]) spin_connect(mem->spin[i],

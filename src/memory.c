@@ -347,6 +347,7 @@ int init_undo(undo_stack *ustack, int depth)
 	if (!(ustack->items = calloc(depth, sizeof(undo_item)))) return (FALSE);
 	ustack->max = depth;
 	ustack->pointer = ustack->done = ustack->redo = 0;
+	ustack->size = 0;
 	return (TRUE);
 }
 
@@ -446,7 +447,6 @@ void update_undo_depth()
 			&layer_table[l].image->image_;
 		if (image->undo_.max == mem_undo_depth) continue;
 		resize_undo(&image->undo_, mem_undo_depth);
-		image->size = 0; // Invalidate
 	}
 }
 
@@ -1351,16 +1351,16 @@ size_t mem_used_layers()
 	size_t total = 0;
 	int l;
 
-	for (l = 0; l <= layers_total; l++ , total += image->size)
+	for (l = 0; l <= layers_total; l++ , total += image->undo_.size)
 	{
 		if (l == layer_selected) image = &mem_image;
 		else
 		{
 			image = &layer_table[l].image->image_;
-			if (image->size) continue;
+			if (image->undo_.size) continue;
 		}
 		update_undo(image); // safety net
-		image->size = mem_undo_size(&image->undo_);
+		image->undo_.size = mem_undo_size(&image->undo_);
 	}
 
 	return (total);
@@ -8795,34 +8795,36 @@ int mem_skew(double xskew, double yskew, int type, int gcor)
 }
 
 // Get gamma-corrected average of RGB pixels in an area, or -1 if out of bounds
-int average_pixels(unsigned char *rgb, int w, int h, int x0, int y0, int x1, int y1)
+int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int h)
 {
 	unsigned char *tmp;
 	double rr, gg, bb, dd;
 	int i, j;
 
 
-	if (x0 < 0) x0 = 0;
-	if (x1 > w) x1 = w;
-	if (y0 < 0) y0 = 0;
-	if (y1 > h) y1 = h;
-	/* Outside of image */
-	if ((x0 >= x1) || (y0 >= y1)) return (-1);
+	/* Clip to image */
+	w += x; h += y;
+	if (x < 0) x = 0;
+	if (w > iw) w = iw;
+	if (y < 0) y = 0;
+	if (h > ih) h = ih;
+	/* Nothing remained */
+	if ((x >= w) || (y >= h)) return (-1);
 
 	/* Average (gamma corrected) area */
-	x1 -= x0;
+	w -= x;
 	rr = gg = bb = 0.0;
-	for (i = y0; i < y1; i++)
+	for (i = y; i < h; i++)
 	{
-		tmp = rgb + (i * w + x0) * 3;
-		for (j = 0; j < x1; j++ , tmp += 3)
+		tmp = rgb + (i * iw + x) * 3;
+		for (j = 0; j < w; j++ , tmp += 3)
 		{
 			rr += gamma256[tmp[0]];
 			gg += gamma256[tmp[1]];
 			bb += gamma256[tmp[2]];
 		}
 	}
-	dd = 1.0 / (x1 * (y1 - y0));
+	dd = 1.0 / (w * (h - y));
 	rr *= dd; gg *= dd; bb *= dd;
 	return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
 }

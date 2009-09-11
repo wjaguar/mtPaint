@@ -215,7 +215,7 @@ int spawn_expansion(char *cline, char *directory)
 // Front End stuff
 
 static GtkWidget *faction_list, *faction_entry[3];
-static int faction_current_row;
+static int faction_current_row, faction_block;
 static char *faction_ini[3] = { "fact%dName", "fact%dCommand", "fact%dDir" };
 
 
@@ -233,31 +233,9 @@ void pressed_file_action(int item)
 
 static void faction_changed(GtkEditable *entry, gpointer user_data)
 {
+	if (faction_block) return;
 	gtk_clist_set_text(GTK_CLIST(faction_list), faction_current_row,
 		(int)user_data, gtk_entry_get_text(GTK_ENTRY(entry)));
-}
-
-/* Block/unblock entry update events */
-static void faction_block_events()
-{
-	int i;
-
-	for (i = 0; i < 3; i++)
-	{
-		gtk_signal_handler_block_by_func(GTK_OBJECT(faction_entry[i]),
-			(GtkSignalFunc)faction_changed, (gpointer)i);
-	}
-}
-
-static void faction_unblock_events()
-{
-	int i;
-
-	for (i = 0; i < 3; i++)
-	{
-		gtk_signal_handler_unblock_by_func(GTK_OBJECT(faction_entry[i]),
-			(GtkSignalFunc)faction_changed, (gpointer)i);
-	}
 }
 
 static void faction_select_row(GtkCList *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
@@ -266,13 +244,13 @@ static void faction_select_row(GtkCList *clist, gint row, gint col, GdkEvent *ev
 	int i, j;
 
 	faction_current_row = row;
-	faction_block_events();
+	faction_block = TRUE;
 	for (i = 0; i < 3; i++)
 	{
 		j = gtk_clist_get_text(GTK_CLIST(faction_list), row, i, &celltext);
 		gtk_entry_set_text(GTK_ENTRY(faction_entry[i]), j ? celltext : "");
 	}
-	faction_unblock_events();
+	faction_block = FALSE;
 }
 
 static void faction_moved(GtkCList *clist, gint src, gint dest, gpointer user_data)

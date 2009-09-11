@@ -261,7 +261,7 @@ void pressed_help()
 	GTK_WIDGET_SET_FLAGS (button, GTK_CAN_DEFAULT);
 
 	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		(GtkSignalFunc)click_help_end, GTK_OBJECT(help_window));
+		GTK_SIGNAL_FUNC(click_help_end), GTK_OBJECT(help_window));
 	gtk_signal_connect(GTK_OBJECT(help_window), "delete_event",
 		GTK_SIGNAL_FUNC(click_help_end), NULL);
 
@@ -864,6 +864,7 @@ void vw_realign()
 	float old_zoom = vw_zoom;
 	vw_zoom = -1; /* Force resize */
 	vw_align_size(old_zoom);	// Update the view window as needed
+	vw_zoom = old_zoom; // !!! The call may have aborted early
 }
 
 void vw_repaint(int px, int py, int pw, int ph)

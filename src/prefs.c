@@ -450,7 +450,7 @@ void pressed_preferences()
 	spinbutton_maxundo = spin_to_table(table3, 1, 1, 5, mem_undo_depth & ~1,
 		MIN_UNDO & ~1, MAX_UNDO & ~1);
 	spinbutton_greys = spin_to_table(table3, 2, 1, 5, mem_background, 0, 255);
-	spinbutton_nudge = spin_to_table(table3, 3, 1, 5, mem_nudge, 2, 512);
+	spinbutton_nudge = spin_to_table(table3, 3, 1, 5, mem_nudge, 2, MAX_WIDTH);
 	spinbutton_pan = spin_to_table(table3, 4, 1, 5, max_pan, 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),

@@ -25,11 +25,11 @@ clean:
 	rm -f *.o $(BIN)* $(LIBNAME) $(LIBNAME2) $(SLIBNAME)
 
 install:
-	mkdir -p $(BIN_INSTALL)
-	cp $(BIN) $(BIN_INSTALL)
+	mkdir -p $(DESTDIR)$(BIN_INSTALL)
+	cp $(BIN) $(DESTDIR)$(BIN_INSTALL)
 
 uninstall:
-	rm $(BIN_INSTALL)/$(BIN)
+	rm $(DESTDIR)$(BIN_INSTALL)/$(BIN)
 
 libs:	main.o api.o $(OBJS)
 	$(CC) api.o $(OBJS) -o $(LIBNAME) $(LDFLAGS) -shared -Wl,-soname,$(LIBNAME)

@@ -181,7 +181,7 @@ void layer_copy_from_main( int l )	// Copy info from main image to layer
 
 	lp->image_ = mem_image;
 	lp->state_ = mem_state;
-	lp->image_.size = 0; // Invalidate
+	lp->image_.undo_.size = 0; // Invalidate
 }
 
 void layer_copy_to_main( int l )		// Copy info from layer to main image

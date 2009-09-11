@@ -109,6 +109,7 @@ typedef struct {
 	int done;		// Undo images that we have behind current image (i.e. possible UNDO)
 	int redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
 	int max;		// Total number of undo slots
+	size_t size;		// Total used memory (0 means count it anew)
 } undo_stack;
 
 typedef struct {
@@ -117,7 +118,6 @@ typedef struct {
 	int cols;	// Number of colours in the palette: 1..256 or 0 for no image
 	int bpp;		// Bytes per pixel = 1 or 3
 	int width, height;	// Image geometry
-	size_t size;
 	undo_stack undo_;	// Image's undo stack
 } image_info;
 
@@ -656,7 +656,7 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 
 int mem_skew(double xskew, double yskew, int type, int gcor);
 
-int average_pixels(unsigned char *rgb, int w, int h, int x0, int y0, int x1, int y1);
+int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int h);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

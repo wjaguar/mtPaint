@@ -332,8 +332,8 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
-	g_signal_handlers_disconnect_by_func( GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
+	g_signal_handlers_block_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
+			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 #endif
 	empty_text_widget(ani_text_cyc);	// Clear the text in the widget
 
@@ -359,8 +359,8 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 	}
 
 #if GTK_MAJOR_VERSION == 2
-	g_signal_connect( GTK_TEXT_VIEW(ani_text_cyc)->buffer, "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
+	g_signal_handlers_unblock_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
+			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 	// We have to switch off then back on or it looks like the user changed it
 #endif
 }
@@ -373,8 +373,8 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
-	g_signal_handlers_disconnect_by_func( GTK_TEXT_VIEW(ani_text_pos)->buffer,
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
+	g_signal_handlers_block_by_func(GTK_TEXT_VIEW(ani_text_pos)->buffer,
+		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 #endif
 
 	empty_text_widget(ani_text_pos);	// Clear the text in the widget
@@ -400,8 +400,8 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 		}
 	}
 #if GTK_MAJOR_VERSION == 2
-	g_signal_connect( GTK_TEXT_VIEW(ani_text_pos)->buffer, "changed",
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
+	g_signal_handlers_unblock_by_func(GTK_TEXT_VIEW(ani_text_pos)->buffer,
+		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 	// We have to switch off then back on or it looks like the user changed it
 #endif
 }

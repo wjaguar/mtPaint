@@ -33,11 +33,15 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Kuwahara-Nagao blur effect added (edge-preserving blur)
 	* Dilation and erosion effects added
 	* Seven new edge detection filters added - Sobel, Prewitt, Kirsch, Gradient, Roberts, Laplace, Morphological
-	* Drawing operations on utility channels now respect tool opacity
+        * Invert effect now respects masking
+ 	* Drawing operations on utility channels now respect tool opacity
 	* Drawing in image channel with coupled alpha now ignores drawing modes for alpha channel
 	* Smudge tool now works about two times faster
 	* 12 new blend modes added
-	* Invert effect now respects masking
+	* Ctrl+Double click selects average colour underneath brush square or selection marquee
+	* "Convert to indexed" using current palette now does not truncate the palette to the number of colours used
+	* Canvas, view and palette window now do not lose mouse button release events in GTK+1
+	* Makefiles now honor DESTDIR
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste and gradient previews eliminated
 	* BUGFIX - "Remove All Layers" with layers window closed doesn't cause crash

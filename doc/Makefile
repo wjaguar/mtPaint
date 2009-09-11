@@ -10,15 +10,15 @@ pod:
 	pod2man "--release=$(MT_VERSION)" "--date=$(MT_DATE)" "--center=Mark Tyler's Painting Program" mtpaint.pod > _mtpaint.1
 
 install:
-	mkdir -p $(MT_MAN_DEST) $(MT_PREFIX)/share/applications $(MT_PREFIX)/share/pixmaps
-	cp $(MAN_PAGE).gz $(MT_MAN_DEST)
-	cp mtpaint.desktop $(MT_PREFIX)/share/applications
-	cp mtpaint.png $(MT_PREFIX)/share/pixmaps
+	mkdir -p $(DESTDIR)$(MT_MAN_DEST) $(DESTDIR)$(MT_PREFIX)/share/applications $(DESTDIR)$(MT_PREFIX)/share/pixmaps
+	cp $(MAN_PAGE).gz $(DESTDIR)$(MT_MAN_DEST)
+	cp mtpaint.desktop $(DESTDIR)$(MT_PREFIX)/share/applications
+	cp mtpaint.png $(DESTDIR)$(MT_PREFIX)/share/pixmaps
 
 uninstall:
-	rm $(MT_MAN_DEST)/$(MAN_PAGE).gz
-	rm $(MT_PREFIX)/share/applications/mtpaint.desktop
-	rm $(MT_PREFIX)/share/pixmaps/mtpaint.png
+	rm $(DESTDIR)$(MT_MAN_DEST)/$(MAN_PAGE).gz
+	rm $(DESTDIR)$(MT_PREFIX)/share/applications/mtpaint.desktop
+	rm $(DESTDIR)$(MT_PREFIX)/share/pixmaps/mtpaint.png
 
 clean:
 	rm *.gz

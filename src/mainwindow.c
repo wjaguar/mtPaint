@@ -1415,14 +1415,34 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			break;
 		}
 		if ((button != 1) && (button != 3)) break;
+		/* Pick color from tracing image if possible */
 		pixel = get_bkg(xc + dx * scale, yc + dy * scale, event == GDK_2BUTTON_PRESS);
-		if ((pixel < 0) && (event == GDK_2BUTTON_PRESS) &&
-			(MEM_BPP == 3) && (tool_size > 1) && !NO_PERIM(tool_type))
+		/* Otherwise, average brush or selection area on Ctrl+double click */
+		while ((pixel < 0) && (event == GDK_2BUTTON_PRESS) && (MEM_BPP == 3))
 		{
-			int ts2 = tool_size >> 1, tr2 = tool_size - ts2 - 1;
-			pixel = average_pixels(mem_img[CHN_IMAGE], mem_width, mem_height,
-				ox - ts2, oy - ts2, ox + tr2, oy + tr2);
+			int x, y, w, h;
+
+			/* Have brush square */
+			if (!NO_PERIM(tool_type))
+			{
+				int ts2 = tool_size >> 1;
+				x = ox - ts2; y = oy - ts2;
+				w = h = tool_size;
+			}
+			/* Have selection marquee */
+			else if ((marq_status > MARQUEE_NONE) && (marq_status < MARQUEE_PASTE))
+			{
+				x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+				y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+				w = abs(marq_x2 - marq_x1) + 1;
+				h = abs(marq_y2 - marq_y1) + 1;
+			}
+			else break;
+			pixel = average_pixels(mem_img[CHN_IMAGE],
+				mem_width, mem_height, x, y, w, h);
+			break;
 		}
+		/* Failing that, just pick color from image */
 		if (pixel < 0) pixel = get_pixel(ox, oy);
 
 		if (mem_channel != CHN_IMAGE)
@@ -1788,10 +1808,8 @@ static int get_bkg(int xc, int yc, int dclick)
 	xi = floor_div(xc - margin_main_x, scale);
 	yi = floor_div(yc - margin_main_y, scale);
 	/* Inside image */
-	while ((xi >= 0) && (xi < mem_width) && (yi >= 0) && (yi < mem_height))
+	if ((xi >= 0) && (xi < mem_width) && (yi >= 0) && (yi < mem_height))
 	{
-		int x0, y0, x1, y1;
-
 		/* Pixel must be transparent */
 		x = mem_width * yi + xi;
 		if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] &&
@@ -1800,11 +1818,10 @@ static int get_bkg(int xc, int yc, int dclick)
 		else if (x *= 3 , MEM_2_INT(mem_img[CHN_IMAGE], x) !=
 			PNG_2_INT(mem_pal[mem_xpm_trans])) return (-1);
 
-		/* Single clicks for single pixels */
-		if (!dclick) break;
-		x1 = (x0 = xi * bkg_scale - bkg_x) + bkg_scale;
-		y1 = (y0 = yi * bkg_scale - bkg_y) + bkg_scale;
-		return (average_pixels(bkg_rgb, bkg_w, bkg_h, x0, y0, x1, y1));
+		/* Double click averages background under image pixel */
+		if (dclick) return (average_pixels(bkg_rgb, bkg_w, bkg_h,
+			xi * bkg_scale - bkg_x, yi * bkg_scale - bkg_y,
+			bkg_scale, bkg_scale));
 	}
 	xb = floor_div((xc - margin_main_x) * bkg_scale, scale) - bkg_x;
 	yb = floor_div((yc - margin_main_y) * bkg_scale, scale) - bkg_y;

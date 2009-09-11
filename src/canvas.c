@@ -761,16 +761,14 @@ void pressed_paste(int centre)
 
 		marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
 		marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
-		marq_x2 = marq_x1 + mem_clip_w - 1;
-		marq_y2 = marq_y1 + mem_clip_h - 1;
 	}
 	else
 	{	
 		marq_x1 = mem_clip_x;
 		marq_y1 = mem_clip_y;
-		marq_x2 = mem_clip_x + mem_clip_w - 1;
-		marq_y2 = mem_clip_y + mem_clip_h - 1;
 	}
+	marq_x2 = marq_x1 + mem_clip_w - 1;
+	marq_y2 = marq_y1 + mem_clip_h - 1;
 	marq_status = MARQUEE_PASTE;
 	cursor_corner = -1;
 	update_stuff(UPD_PASTE);
