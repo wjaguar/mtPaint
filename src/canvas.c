@@ -520,17 +520,13 @@ static int do_dog(GtkWidget *box, gpointer fdata)
 
 void pressed_dog()
 {
-	GtkWidget *box, *table, *spin;
+	GtkWidget *box, *table;
 
 	box = gtk_vbox_new(FALSE, 5);
 	table = add_a_table(3, 2, 0, box);
 	gtk_widget_show_all(box);
-	spin = add_float_spin(3, 0, 200);
-	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
-		0, 1, GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	spin = add_float_spin(1, 0, 200);
-	gtk_table_attach(GTK_TABLE(table), spin, 1, 2,
-		1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	float_spin_to_table(table, 0, 1, 5, 3, 0, 200);
+	float_spin_to_table(table, 1, 1, 5, 1, 0, 200);
 	add_to_table(_("Outer radius"), table, 0, 0, 5);
 	add_to_table(_("Inner radius"), table, 1, 0, 5);
 	add_a_toggle(_("Normalize"), box, TRUE);
@@ -1711,12 +1707,10 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static gboolean fs_destroy(GtkWidget *fs)
+static void fs_destroy(GtkWidget *fs)
 {
 	win_store_pos(fs, "fs_window");
 	fpick_destroy(fs);
-
-	return FALSE;
 }
 
 static void fs_ok(GtkWidget *fs)

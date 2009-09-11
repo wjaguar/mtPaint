@@ -987,21 +987,19 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 }
 
 
-static gint delete_text( GtkWidget *widget, gpointer data )
+static void delete_text( GtkWidget *widget, gpointer data )
 {
 	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
 
 
 	if ( !fp ) fp = data;
-	if ( !fp ) return FALSE;
+	if ( !fp ) return;
 
 	win_store_pos(fp->window, "paste_text_window");
 	gtk_widget_destroy( fp->window );
 
 	if (fp->preview_rgb) free(fp->preview_rgb);
 	free(fp);
-
-	return FALSE;
 }
 
 #endif		// U_FREETYPE

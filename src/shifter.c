@@ -226,13 +226,14 @@ static void click_shift_fix()			// Button to fix palette pressed
 	update_stuff(UPD_PAL);
 }
 
-static void click_shift_close()			// Palette Shifter window closed by user or WM
+static gboolean click_shift_close()	// Palette Shifter window closed by user or WM
 {
 	shift_play_stop();
 	mem_pal_copy( mem_pal, sh_old_pal );
 	update_stuff(UPD_PAL);
 
 	gtk_widget_destroy( shifter_window );
+	return (FALSE);
 }
 
 static void click_shift_clear()		// Button to clear all of the values

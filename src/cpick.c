@@ -930,7 +930,8 @@ static void hex_size_req(GtkWidget *widget, GtkRequisition *requisition,
 	gpointer user_data)
 {
 	int l = gdk_string_width(widget->style->font, "#DDDDDDD");
-	if (l > MIN_ENTRY_WIDTH) requisition->width += l - MIN_ENTRY_WIDTH;
+//	if (l > MIN_ENTRY_WIDTH) requisition->width += l - MIN_ENTRY_WIDTH;
+	requisition->width = l + 30; /* Set requisition to a sane value */
 }
 
 #endif

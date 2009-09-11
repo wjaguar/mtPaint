@@ -354,10 +354,11 @@ static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 }
 
 
-static void toolbar_settings_exit()
+static gboolean toolbar_settings_exit()
 {
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
+	return (FALSE);
 }
 
 static void toolbar_click(GtkWidget *widget, gpointer user_data)

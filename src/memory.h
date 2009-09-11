@@ -255,6 +255,7 @@ double flood_step;
 int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
+int posterize_mode;	// bitwise/truncated/rounded
 
 /// QUANTIZATION SETTINGS
 

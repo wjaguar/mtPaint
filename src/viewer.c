@@ -102,7 +102,7 @@ void create_cline_area( GtkWidget *vbox1 )
 
 #include "help.c"
 
-gboolean click_help_end( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gboolean click_help_end(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	// Make sure the user can only open 1 help window
 	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], TRUE);
@@ -1345,13 +1345,7 @@ void render_text( GtkWidget *widget )
 	else alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
 }
 
-static gint delete_text( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	gtk_widget_destroy( text_window );
-	return FALSE;
-}
-
-static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void paste_text_ok(GtkWidget *widget)
 {
 	gboolean antialias[3] = { gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(text_toggle[0])),
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(text_toggle[1])),
@@ -1362,8 +1356,8 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 		*t_font_name = gtk_font_selection_get_font_name( GTK_FONT_SELECTION(text_font_window) );
 
 #if GTK_MAJOR_VERSION == 1
-	if ( gtk_font_selection_get_font( GTK_FONT_SELECTION(text_font_window) ) == NULL )
-		return FALSE;
+	if (!gtk_font_selection_get_font(GTK_FONT_SELECTION(text_font_window)))
+		return;
 #endif
 
 #if GTK_CHECK_VERSION(2,6,0)
@@ -1385,11 +1379,9 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	update_stuff(UPD_XCOPY);
 	if (mem_clipboard) pressed_paste(TRUE);
 
-	delete_text( widget, event, data );
+	gtk_widget_destroy(widget);
 
 	if (t_font_name) g_free(t_font_name);
-
-	return FALSE;
 }
 
 void pressed_text()
@@ -1450,7 +1442,7 @@ void pressed_text()
 
 	hbox = pack5(vbox, OK_box(0, text_window,
 		_("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(delete_text)));
+		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
 	gtk_widget_show(text_window);
 	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );

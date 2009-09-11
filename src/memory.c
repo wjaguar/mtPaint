@@ -69,6 +69,7 @@ double flood_step;
 int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
+int posterize_mode;	// bitwise/truncated/rounded
 
 /// QUANTIZATION SETTINGS
 
@@ -1832,14 +1833,11 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0)
 {
 	static int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
-	static int posm[9] = {0, 0xFF00, 0x5500, 0x2480, 0x1100,
-				 0x0840, 0x0410, 0x0204, 0};
-	static unsigned char gamma_table[256], bc_table[256];
-	static int last_gamma, last_br, last_co;
-	int do_gamma, do_bc, do_sa;
-	double w;
+	static unsigned char gamma_table[256], bc_table[256], ps_table[256];
+	static int last_gamma, last_br, last_co, last_ps;
+	int do_gamma, do_bc, do_sa, do_ps;
 	unsigned char rgb[3];
-	int br, co, sa, ps, pmul;
+	int br, co, sa;
 	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
 	int i, j, r, g, b, ofs3, opacity, op0 = 0, op1 = 0, op2 = 0, ops;
 
@@ -1857,16 +1855,41 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	co = (255 * co) / 100;
 	sa = (255 * mem_prev_bcsp[2]) / 100;
 	dH = sH = mem_prev_bcsp[5];
-	ps = 8 - mem_prev_bcsp[3];
-	pmul = posm[mem_prev_bcsp[3]];
+
+	// Map bitwise to truncated
+	do_ps = posterize_mode ? mem_prev_bcsp[3] : 1 << mem_prev_bcsp[3];
+	// Disable if 1:1, else separate truncated from rounded
+	if (do_ps &= 255) do_ps += (posterize_mode > 1) << 8;
 
 	do_gamma = mem_prev_bcsp[4] - 100;
 	do_bc = br | (co - 255);
 	do_sa = sa - 255;
 
+	/* Prepare posterize table */
+	if (do_ps && (do_ps != last_ps))
+	{
+		int mul = do_ps & 255, div = 256, add = 0, div2 = mul - 1;
+		int i, j;
+
+		last_ps = do_ps;
+		if (do_ps > 255) // Rounded
+		{
+			mul += mul - 2;
+			div = 255 * 2;
+			add = 255;
+		}
+		for (i = 0; i < 256; i++)
+		{
+			j = (i * mul + add) / div;
+			ps_table[i] = (j * 255) / div2;
+		}
+	}
 	/* Prepare gamma table */
 	if (do_gamma && (do_gamma != last_gamma))
 	{
+		double w;
+		int i;
+
 		last_gamma = do_gamma;
 		w = 100.0 / (double)mem_prev_bcsp[4];
 		for (i = 0; i < 256; i++)
@@ -1877,6 +1900,8 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	/* Prepare brightness-contrast table */
 	if (do_bc && ((br != last_br) || (co != last_co)))
 	{
+		int i, j;
+
 		last_br = br; last_co = co;
 		for (i = 0; i < 256; i++)
 		{
@@ -1976,11 +2001,11 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 			b = (b + (b >> 8) + 1) >> 8;
 		}
 		/* If we do posterize transform */
-		if (ps)
+		if (do_ps)
 		{
-			r = ((r >> ps) * pmul) >> 8;
-			g = ((g >> ps) * pmul) >> 8;
-			b = ((b >> ps) * pmul) >> 8;
+			r = ps_table[r];
+			g = ps_table[g];
+			b = ps_table[b];
 		}
 		/* If we do partial masking */
 		if (ops || opacity)

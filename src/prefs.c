@@ -604,13 +604,11 @@ void pressed_preferences()
 
 	for ( i=0; i<3; i++ )
 	{
-		check_tablet[i] = gtk_check_button_new_with_label (tablet_txt[i]);
+		check_tablet[i] = gtk_check_button_new_with_label(tablet_txt[i]);
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_tablet[i]),
-			tablet_tool_use[i] );
-		gtk_widget_show (check_tablet[i]);
-		gtk_table_attach (GTK_TABLE (table3), check_tablet[i], 0, 1, i+1, i+2,
-			(GtkAttachOptions) (GTK_FILL),
-			(GtkAttachOptions) (0), 0, 0);
+			tablet_tool_use[i]);
+		gtk_widget_show(check_tablet[i]);
+		to_table_l(check_tablet[i], table3, i + 1, 0, 1, 0);
 
 //	Size/Flow/Opacity sliders
 

@@ -39,6 +39,11 @@ GtkWidget *add_a_spin( int value, int min, int max );
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
+GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
+	int l, int spacing);
+GtkWidget *to_table(GtkWidget *widget, GtkWidget *table, int row, int column, int spacing);
+GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
+	int l, int spacing);
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
 GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
@@ -57,11 +62,11 @@ GtkWidget *add_new_page(GtkWidget *notebook, char *name);
 
 // Slider-spin combo (practically a new widget class)
 
-GtkWidget *mt_spinslide_new(gint swidth, gint sheight);
-void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv);
-gint mt_spinslide_get_value(GtkWidget *spinslide);
-gint mt_spinslide_read_value(GtkWidget *spinslide);
-void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
+GtkWidget *mt_spinslide_new(int swidth, int sheight);
+void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv);
+int mt_spinslide_get_value(GtkWidget *spinslide);
+int mt_spinslide_read_value(GtkWidget *spinslide);
+void mt_spinslide_set_value(GtkWidget *spinslide, int value);
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	gpointer user_data);
@@ -73,6 +78,10 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 	GtkSignalFunc handler);
+
+// Convert window close into a button click ("Cancel" or whatever)
+
+void delete_to_click(GtkWidget *window, GtkWidget *button);
 
 // Buttons for standard dialogs
 

@@ -443,7 +443,7 @@ static void ani_but_save()
 	layer_press_save();
 }
 
-static void delete_ani()
+static gboolean delete_ani()
 {
 	win_store_pos(animate_window, "ani");
 	ani_win_read_widgets();
@@ -454,6 +454,7 @@ static void delete_ani()
 
 	show_layers_main = ani_show_main_state;
 	update_all_views();
+	return (FALSE);
 }
 
 
@@ -634,7 +635,7 @@ static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data
 	vw_update_area(x, y, w, h);	// Update only the area we need
 }
 
-static void ani_but_preview_close()
+static gboolean ani_but_preview_close()
 {
 	ani_play_stop();				// Stop animation playing if necessary
 
@@ -652,6 +653,7 @@ static void ani_but_preview_close()
 		layers_pastry_cut = FALSE;
 		update_all_views();
 	}
+	return (FALSE);
 }
 
 void ani_but_preview()
@@ -1084,16 +1086,12 @@ void pressed_animate_window()
 	ani_spin[2] = spin_to_table(table, 2, 1, 5, ani_gif_delay, 1, MAX_DELAY);	// Delay
 
 	ani_entry_path = gtk_entry_new_with_max_length(PATHBUF);
-	gtk_table_attach (GTK_TABLE (table), ani_entry_path, 1, 2, 3, 4,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	to_table(ani_entry_path, table, 3, 1, 0);
 	gtkuncpy(txt, ani_output_path, PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(ani_entry_path), txt);
 
 	ani_entry_prefix = gtk_entry_new_with_max_length(ANI_PREFIX_LEN);
-	gtk_table_attach (GTK_TABLE (table), ani_entry_prefix, 1, 2, 4, 5,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	to_table(ani_entry_prefix, table, 4, 1, 0);
 	gtkuncpy(txt, ani_file_prefix, PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(ani_entry_prefix), txt);
 

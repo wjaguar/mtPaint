@@ -1143,14 +1143,13 @@ void create_layers_box()
 
 	label = gtk_label_new(_("Transparent Colour"));
 	gtk_widget_show(label);
-	gtk_table_attach(GTK_TABLE(table), label, 0, 2, 3, 4, GTK_FILL, 0, 0, 0);
+	to_table_l(label, table, 3, 0, 2, 0);
 	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
 
 	entry_layer_name = gtk_entry_new_with_max_length(LAYER_NAMELEN - 1);
 	gtk_widget_set_usize(entry_layer_name, 100, -2);
 	gtk_widget_show(entry_layer_name);
-	gtk_table_attach(GTK_TABLE(table), entry_layer_name, 1, 3, 0, 1,
-		GTK_FILL, 0, 0, 0);
+	to_table_l(entry_layer_name, table, 0, 1, 2, 0);
 	gtk_signal_connect(GTK_OBJECT(entry_layer_name), "changed",
 		GTK_SIGNAL_FUNC(layer_inputs_changed), (gpointer)0);
 

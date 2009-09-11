@@ -237,7 +237,7 @@ static void hs_populate_rgb()				// Populate RGB tables
 	}
 }
 
-static gint hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
+static gboolean hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
 {
 	int x = event->area.x, y = event->area.y;
 	int w = event->area.width, h = event->area.height;
@@ -268,9 +268,9 @@ static gint hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
 
 ////	INFORMATION WINDOW
 
-GtkWidget *info_window;
+static GtkWidget *info_window;
 
-gint delete_info( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gboolean delete_info(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	gtk_widget_destroy(info_window);
 

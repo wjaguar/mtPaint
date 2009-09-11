@@ -614,6 +614,9 @@ void pressed_sort_pal()
 ///	BRIGHTNESS-CONTRAST-SATURATION WINDOW
 
 #define BRCOSA_ITEMS 6
+#define BRCOSA_POSTERIZE 3
+#define BRCOSA_INDEX(i) (((i) == BRCOSA_POSTERIZE) && posterize_mode ? \
+	BRCOSA_ITEMS : (i))
 
 static GtkWidget *brcosa_window,
 		*brcosa_toggles[6],
@@ -621,7 +624,7 @@ static GtkWidget *brcosa_window,
 		*brcosa_buttons[5];
 
 static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2],
-	brcosa_values_default[BRCOSA_ITEMS] = {0, 0, 0, 8, 100, 0};
+	brcosa_values_default[BRCOSA_ITEMS + 1] = {0, 0, 0, 8, 100, 0, 256};
 int mem_preview, brcosa_auto;
 png_color brcosa_pal[256];
 
@@ -633,11 +636,11 @@ static void brcosa_buttons_sensitive()
 	if (!brcosa_buttons[0]) return;
 
 	for (state = i = 0; i < BRCOSA_ITEMS; i++)
-		state |= brcosa_values[i] != brcosa_values_default[i];
+		state |= brcosa_values[i] != brcosa_values_default[BRCOSA_INDEX(i)];
 	for (i = 2; i < 5; i++) gtk_widget_set_sensitive(brcosa_buttons[i], state);
 }
 
-static void click_brcosa_preview(GtkWidget *widget, gpointer data)
+static void click_brcosa_preview(GtkWidget *widget)
 {
 	int i, j, update = 0;
 	int do_pal = FALSE;	// RGB palette processing
@@ -675,26 +678,26 @@ static void brcosa_pal_lim_change()
 		brcosa_pal_lim[i] = gtk_spin_button_get_value_as_int(
 			GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS + i]));
 
-	click_brcosa_preview(NULL, NULL);	// Update everything
+	click_brcosa_preview(NULL);	// Update everything
 }
 
-static void click_brcosa_preview_toggle(GtkWidget *widget, gpointer data)
+static void click_brcosa_preview_toggle(GtkWidget *widget)
 {
 	if (!brcosa_buttons[1]) return;		// Traps call during initialisation
 
 	brcosa_auto = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_toggles[0]));
 	if (brcosa_auto)
 	{
-		click_brcosa_preview(widget, NULL);
+		click_brcosa_preview(widget);
 		gtk_widget_hide(brcosa_buttons[1]);
 	}
 	else gtk_widget_show(brcosa_buttons[1]);
 }
 
-static void click_brcosa_RGB_toggle(GtkWidget *widget, gpointer data)
+static void click_brcosa_RGB_toggle(GtkWidget *widget)
 {
 	mem_preview = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_toggles[5]));
-	click_brcosa_preview(widget, NULL);
+	click_brcosa_preview(widget);
 }
 
 static void brcosa_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
@@ -702,7 +705,7 @@ static void brcosa_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 	brcosa_values[(int)user_data] = ADJ2INT(adj);
 	brcosa_buttons_sensitive();
 
-	if (brcosa_auto) click_brcosa_preview(NULL, NULL);
+	if (brcosa_auto) click_brcosa_preview(NULL);
 }
 
 static void delete_brcosa()
@@ -711,11 +714,12 @@ static void delete_brcosa()
 	gtk_widget_destroy(brcosa_window);
 }
 
-static void click_brcosa_cancel(GtkWidget *widget)
+static gboolean click_brcosa_cancel()
 {
 	mem_pal_copy(mem_pal, brcosa_pal);
 	delete_brcosa();
 	update_stuff(mem_img_bpp == 3 ? UPD_PAL | UPD_RENDER : UPD_PAL);
+	return (FALSE);
 }
 
 static void click_brcosa_apply(GtkWidget *widget)
@@ -726,12 +730,12 @@ static void click_brcosa_apply(GtkWidget *widget)
 	mem_pal_copy(mem_pal, brcosa_pal);
 
 	for (i = j = 0; i < BRCOSA_ITEMS; i++)
-		j |= brcosa_values[i] ^ brcosa_values_default[0];
+		j |= brcosa_values[i] ^ brcosa_values_default[BRCOSA_INDEX(i)];
 	if (!j) return; // Nothing changed from default state
 
 	spot_undo(UNDO_COL);
 
-	click_brcosa_preview(NULL, NULL); // This modifies palette
+	click_brcosa_preview(NULL); // This modifies palette
 	if (mem_preview && (mem_img_bpp == 3))
 	{
 		mask = malloc(mem_width);
@@ -758,7 +762,7 @@ static void click_brcosa_apply(GtkWidget *widget)
 	{
 		// Reload palette and redo preview
 		mem_pal_copy(brcosa_pal, mem_pal);
-		click_brcosa_preview(NULL, NULL);
+		click_brcosa_preview(NULL);
 	}
 }
 
@@ -789,22 +793,47 @@ static void click_brcosa_reset()
 	mem_pal_copy(mem_pal, brcosa_pal);
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mt_spinslide_set_value(brcosa_spins[i], brcosa_values_default[i]);
+	{
+		mt_spinslide_set_value(brcosa_spins[i],
+			brcosa_values_default[BRCOSA_INDEX(i)]);
+	}
 	update_stuff(mem_img_bpp == 3 ? UPD_PAL | UPD_RENDER : UPD_PAL);
+}
+
+static void brcosa_posterize_changed(GtkMenuItem *menuitem, gpointer user_data)
+{
+	GtkWidget *spin = brcosa_spins[BRCOSA_POSTERIZE];
+	int i, v, oldv = posterize_mode;
+
+	posterize_mode = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+	if (!oldv ^ !posterize_mode) // From/to bitwise
+	{
+		v = mt_spinslide_read_value(spin);
+		if (oldv)// To bitwise
+		{
+			for (i = 0 , v -= 1; v ; i++ , v >>= 1);
+			v = i;
+		}
+		else v = 1 << v; // From bitwise
+		mt_spinslide_set_range(spin, oldv ? 1 : 2, oldv ? 8 : 256);
+		mt_spinslide_set_value(spin, v);
+	}
+	else if (brcosa_auto) click_brcosa_preview(NULL);
 }
 
 void pressed_brcosa()
 {
-	static int mins[] = {-255, -100, -100, 1, 20, -1529},
-		maxs[] = {255, 100, 100, 8, 500, 1529},
+	static int mins[] = {-255, -100, -100, 1, 20, -1529, 2},
+		maxs[] = {255, 100, 100, 8, 500, 1529, 256},
 		order[] = {1, 2, 3, 5, 0, 4};
 	char *tog_txt[] = { _("Auto-Preview"), _("Red"), _("Green"), _("Blue"),
 		_("Palette"), _("Image") };
 	char *tab_txt[] = { _("Brightness"), _("Contrast"), _("Saturation"),
 		_("Posterize"), _("Gamma"), _("Hue") };
-	GtkWidget *vbox, *vbox5, *table2, *hbox, *label, *button;
+	char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
+	GtkWidget *vbox, *table, *table2, *hbox, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	int i;
+	int i, j;
 
 
 	mem_pal_copy(brcosa_pal, mem_pal);	// Remember original palette
@@ -830,14 +859,15 @@ void pressed_brcosa()
 	table2 = add_a_table(6, 2, 10, vbox );
 	for (i = 0; i < BRCOSA_ITEMS; i++)
 	{
+		j = BRCOSA_INDEX(i);
 		add_to_table(tab_txt[i], table2, order[i], 0, 0);
-		brcosa_values[i] = brcosa_values_default[i];
+		brcosa_values[i] = brcosa_values_default[j];
 		brcosa_spins[i] = mt_spinslide_new(255, 20);
 		gtk_table_attach(GTK_TABLE(table2), brcosa_spins[i], 1, 2,
 			order[i], order[i] + 1, GTK_EXPAND | GTK_FILL,
 			GTK_FILL, 0, 0);
-		mt_spinslide_set_range(brcosa_spins[i], mins[i], maxs[i]);
-		mt_spinslide_set_value(brcosa_spins[i], brcosa_values_default[i]);
+		mt_spinslide_set_range(brcosa_spins[i], mins[j], maxs[j]);
+		mt_spinslide_set_value(brcosa_spins[i], brcosa_values[i]);
 		mt_spinslide_connect(brcosa_spins[i],
 			GTK_SIGNAL_FUNC(brcosa_spinslide_moved), (gpointer)i);
 	}
@@ -851,14 +881,12 @@ void pressed_brcosa()
 	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show(hbox);
 
-	vbox5 = pack(vbox, gtk_vbox_new(FALSE, 0));
-	if (inifile_get_gboolean("transcol_show", FALSE))
-		gtk_widget_show(vbox5);
-
-	button = add_a_toggle(_("Show Detail"), hbox,
-		inifile_get_gboolean("transcol_show", FALSE));
+	table = add_a_table(3, 8, 0, vbox);
+	button = add_a_toggle(_("Show Detail"), hbox, TRUE);
 	gtk_signal_connect(GTK_OBJECT(button), "toggled",
-		GTK_SIGNAL_FUNC(click_brcosa_show_toggle), vbox5);
+		GTK_SIGNAL_FUNC(click_brcosa_show_toggle), table);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),
+		inifile_get_gboolean("transcol_show", FALSE));
 #if 0
 	button = gtk_button_new_with_label(_("Store Values"));
 	gtk_widget_show (button);
@@ -870,42 +898,40 @@ void pressed_brcosa()
 
 ///	OPTIONAL SECTION
 
-	hbox = pack(vbox5, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
+	add_to_table_l(_("Posterize type"), table, 0, 0, 2, 5);
+	to_table_l(wj_option_menu(pos_txt, 3, posterize_mode, &posterize_mode,
+		GTK_SIGNAL_FUNC(brcosa_posterize_changed)), table, 0, 2, 4, 0);
 
 	if ( mem_img_bpp == 1 )
 	{
-		label = pack5(hbox, gtk_label_new(_("Palette")));
-		gtk_widget_show(label);
+		add_to_table_l(_("Palette"), table, 1, 0, 2, 5);
 	}
 	else
 	{
 		for (i = 5; i > 3; i--)
 		{
-			brcosa_toggles[i] = add_a_toggle(tog_txt[i], hbox, TRUE);
-			gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "toggled",
-				GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle), NULL);
+			brcosa_toggles[i] = sig_toggle(tog_txt[i], TRUE, NULL,
+				GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle));
+			to_table_l(brcosa_toggles[i], table, 1, 5 - i, 1, 0);
 		}
 	}
 	brcosa_pal_lim[0] = 0;
 	brcosa_pal_lim[1] = mem_cols - 1;
 	for (i = 0; i < 2; i++)
 	{
-		brcosa_spins[BRCOSA_ITEMS + i] = pack(hbox,
-			add_a_spin(brcosa_pal_lim[i], 0, mem_cols - 1));
+		brcosa_spins[BRCOSA_ITEMS + i] = to_table_l(
+			add_a_spin(brcosa_pal_lim[i], 0, mem_cols - 1),
+			table, 1, 2 + i * 3, 3, 0);
 		spin_connect(brcosa_spins[BRCOSA_ITEMS + i],
 			GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
 	}
 
-	hbox = pack(vbox5, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-
 	for (i = 0; i < 4; i++)
 	{
-		brcosa_toggles[i] = add_a_toggle(tog_txt[i], hbox, TRUE);
-		gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "toggled",
+		brcosa_toggles[i] = sig_toggle(tog_txt[i], TRUE, NULL,
 			i ? GTK_SIGNAL_FUNC(click_brcosa_preview) :
-			GTK_SIGNAL_FUNC(click_brcosa_preview_toggle), NULL);
+			GTK_SIGNAL_FUNC(click_brcosa_preview_toggle));
+		to_table_l(brcosa_toggles[i], table, 2, i * 2, 2, 0);
 	}
 
 	if (mem_img_bpp == 3)
@@ -961,8 +987,8 @@ void pressed_brcosa()
 	gtk_widget_queue_resize(brcosa_window);
 #endif
 
-	click_brcosa_preview_toggle(NULL, NULL);	// Show/hide preview button
-	brcosa_buttons_sensitive();			// Disable buttons
+	click_brcosa_preview_toggle(NULL);	// Show/hide preview button
+	brcosa_buttons_sensitive();		// Disable buttons
 	gtk_window_set_transient_for(GTK_WINDOW(brcosa_window), GTK_WINDOW(main_window));
 }
 
@@ -1556,7 +1582,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 	start = start0 = read_spin(range_spins[0]);
 	stop = read_spin(range_spins[1]);
 
-	if (mode <= 1) /* RGB/HSV */
+	if (mode <= 2) /* RGB/sRGB/HSV */
 	{
 		if (start > stop) { i = start; start = stop; stop = i; }
 		if (stop < start + 2) return;
@@ -1567,7 +1593,9 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 	c1 = ctable_[CHN_IMAGE] + stop * 3;
 	d = n = stop - start;
 
-	if (mode == 0) /* RGB */
+	switch (mode)
+	{
+	case 0: /* RGB */
 	{
 		double r0, g0, b0, dr, dg, db;
 
@@ -1578,14 +1606,34 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		db = ((int)c1[2] - c0[2]) / d;
 		b0 = c0[2];
 
-		for (i = 1; i < n; i++)
+		for (i = 1; i < n; i++ , lc += 3)
 		{
-			lc[i * 3 + 0] = rint(r0 + dr * i);
-			lc[i * 3 + 1] = rint(g0 + dg * i);
-			lc[i * 3 + 2] = rint(b0 + db * i);
+			lc[0] = rint(r0 + dr * i);
+			lc[1] = rint(g0 + dg * i);
+			lc[2] = rint(b0 + db * i);
 		}
+		break;
 	}
-	else if (mode == 1) /* HSV */
+	case 1: /* sRGB */
+	{
+		double r0, g0, b0, dr, dg, db, rr, gg, bb;
+
+		dr = (gamma256[c1[0]] - (r0 = gamma256[c0[0]])) / d;
+		dg = (gamma256[c1[1]] - (g0 = gamma256[c0[1]])) / d;
+		db = (gamma256[c1[2]] - (b0 = gamma256[c0[2]])) / d;
+
+		for (i = 1; i < n; i++ , lc += 3)
+		{
+			rr = r0 + dr * i;
+			lc[0] = UNGAMMA256(rr);
+			gg = g0 + dg * i;
+			lc[1] = UNGAMMA256(gg);
+			bb = b0 + db * i;
+			lc[2] = UNGAMMA256(bb);
+		}
+		break;
+	}
+	case 2: /* HSV */
 	{
 		int t;
 		double h0, dh, s0, ds, v0, dv, hsv[6], hh, ss, vv;
@@ -1607,7 +1655,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		dv = (hsv[5] - hsv[2]) / d;
 		v0 = hsv[2];
 
-		for (i = 1; i < n; i++)
+		for (i = 1; i < n; i++ , lc += 3)
 		{
 			vv = v0 + dv * i;
 			ss = vv - vv * (s0 + ds * i);
@@ -1618,12 +1666,13 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 			if (t & 1) { vv -= hh; hh += vv; }
 			else hh += ss;
 			t >>= 1;
-			lc[i * 3 + t] = rint(vv);
-			lc[i * 3 + (t + 1) % 3] = rint(hh);
-			lc[i * 3 + (t + 2) % 3] = rint(ss);
+			lc[t] = rint(vv);
+			lc[(t + 1) % 3] = rint(hh);
+			lc[(t + 2) % 3] = rint(ss);
 		}
+		break;
 	}
-	else /* Gradient */
+	default: /* Gradient */
 	{
 		int j, op, c[NUM_CHANNELS + 3];
 
@@ -1640,6 +1689,8 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 				lc[2] = (c[2] + 128) >> 8;
 			}
 		}
+		break;
+	}
 	}
 	color_refresh();
 	select_colour(CHOOK_SET);
@@ -1881,7 +1932,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	if (cs_type >= COLSEL_EDIT_ALL)
 	{
 		char *fromto[] = { _("From"), _("To") };
-		char *scales[] = { _("RGB"), _("HSV"), _("Gradient") };
+		char *scales[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
 
 		if (!alloc_ctable(256)) return;
 		lc = ctable_[CHN_IMAGE];
@@ -1904,7 +1955,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			gtk_signal_connect(GTK_OBJECT(button), "clicked",
 				GTK_SIGNAL_FUNC(set_range_spin), spin);
 		}
-		opt = xpack(extbox, wj_option_menu(scales, 3, 0, NULL, NULL));
+		opt = xpack(extbox, wj_option_menu(scales, 4, 0, NULL, NULL));
 		gtk_container_set_border_width(GTK_CONTAINER(opt), 4);
 		button = add_a_button(_("Create"), 4, extbox, TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
@@ -1976,8 +2027,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		{
 			j = i - CHN_ALPHA;
 			spin = gtk_label_new(allchannames[i]);
-			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
-				1, 2, GTK_EXPAND | GTK_FILL, 0, 0, 0);
+			to_table(spin, extbox, 1, j, 0);
 			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
 			spin = AB_spins[i] = mt_spinslide_new(-1, -1);
 			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
@@ -2065,9 +2115,9 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		extbox = gtk_table_new(6, 2, FALSE);
 		gw = bound_malloc(extbox, sizeof(grid_widgets));
 		gw->ctoggle = sig_toggle(_("Smart grid"), color_grid, NULL, NULL);
-		gtk_table_attach(GTK_TABLE(extbox), gw->ctoggle, 0, 1, 0, 1, GTK_FILL, 0, 0, 0);
+		to_table_l(gw->ctoggle, extbox, 0, 0, 1, 0);
 		gw->ttoggle = sig_toggle(_("Tile grid"), show_tile_grid, NULL, NULL);
-		gtk_table_attach(GTK_TABLE(extbox), gw->ttoggle, 1, 3, 0, 1, GTK_FILL, 0, 0, 0);
+		to_table_l(gw->ttoggle, extbox, 0, 1, 2, 0);
 		add_to_table(_("Minimum grid zoom"), extbox, 1, 0, 5);
 		gw->szspin = spin_to_table(extbox, 1, 1, 0, mem_grid_min, 2, 12);
 		add_to_table(_("Tile width"), extbox, 1, 2, 5);
@@ -2114,9 +2164,10 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 static GtkWidget *quantize_window, *quantize_spin, *quantize_dither, *quantize_book;
 static GtkWidget *dither_serpent, *dither_spin, *dither_err;
-static int quantize_cols, quantize_mode, dither_mode;
+static int quantize_cols;
 
 /* Quantization & dither settings - persistent */
+static int quantize_mode = -1, dither_mode = -1;
 static int quantize_tp;
 static int dither_cspace = 1, dither_dist = 2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
@@ -2124,22 +2175,25 @@ static double dither_fract[2] = {1.0, 0.0};
 
 static void click_quantize_radio(GtkWidget *widget, gpointer data)
 {
-	int n = (int)data;
+	int c0 = 1, c1 = 256, n = (int)data;
 
 	if (widget && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
+
 	quantize_mode = n;
 	gtk_notebook_set_page(GTK_NOTEBOOK(quantize_book),
 		(n == QUAN_PNN) || (n == QUAN_WU) ? 2 : n == QUAN_CURRENT ? 1 : 0);
 
-	if (dither_mode < 0) return; /* No image */
+	if (n == QUAN_EXACT) c0 = c1 = quantize_cols;
+	else if (n == QUAN_CURRENT) c1 = mem_cols;
+	spin_set_range(quantize_spin, c0, c1);
 
 	/* No dither for exact conversion */
-	gtk_widget_set_sensitive(quantize_dither, n != QUAN_EXACT);
+	if (quantize_dither) gtk_widget_set_sensitive(quantize_dither, n != QUAN_EXACT);
 }
 
 static void click_quantize_ok(GtkWidget *widget, gpointer data)
 {
-	int i, dither, new_cols, err = 0;
+	int i, dither, new_cols, have_image = !!quantize_dither, err = 0;
 	png_color newpal[256];
 	unsigned char *old_image = mem_img[CHN_IMAGE];
 	double efrac = 0.0;
@@ -2154,8 +2208,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 
 	dither = quantize_mode != QUAN_EXACT ? dither_mode : DITH_NONE;
 	new_cols = read_spin(quantize_spin);
-	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
-	if (dither_mode >= 0) /* Work on image */
+	if (have_image) /* Work on image */
 	{
 		dither_scan = gtk_toggle_button_get_active(
 			GTK_TOGGLE_BUTTON(dither_serpent));
@@ -2169,9 +2222,9 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 
 	/* Paranoia */
 	if ((quantize_mode >= QUAN_MAX) || (dither >= DITH_MAX)) return;
-	if ((dither_mode < 0) && (quantize_mode == QUAN_CURRENT)) return;
+	if (!have_image && (quantize_mode == QUAN_CURRENT)) return;
 
-	if (dither_mode < 0) i = mem_undo_next(UNDO_PAL);
+	if (!have_image) i = mem_undo_next(UNDO_PAL);
 	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
 	if (i)
 	{
@@ -2184,7 +2237,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	case QUAN_EXACT: /* Use image colours */
 		new_cols = quantize_cols;
 		mem_cols_found(newpal);
-		if (dither_mode >= 0) err = mem_convert_indexed();
+		if (have_image) err = mem_convert_indexed();
 		dither = DITH_MAX;
 		break;
 	default:
@@ -2239,7 +2292,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	}
 	if (err) memory_errors(1);
 
-	if (dither_mode >= 0) /* Image was converted */
+	if (have_image) /* Image was converted */
 	{
 		mem_col_A = mem_cols > 1 ? 1 : 0;
 		mem_col_B = 0;
@@ -2302,8 +2355,7 @@ void pressed_quantize(int palette)
 	topbox = pack(mainbox, gtk_hbox_new(FALSE, 5));
 	gtk_container_set_border_width(GTK_CONTAINER(topbox), 10);
 	pack(topbox, gtk_label_new(_("Indexed Colours To Use")));
-	quantize_spin = xpack(topbox, add_a_spin(quantize_cols > 256 ?
-		mem_cols : quantize_cols, 1, 256));
+	quantize_spin = xpack(topbox, add_a_spin(quantize_cols, 1, 256));
 
 	/* Notebook */
 
@@ -2320,8 +2372,13 @@ void pressed_quantize(int palette)
 	/* No exact transfer if too many colours */
 	if (quantize_cols > 256) rad_txt[QUAN_EXACT] = "";
 	if (palette) rad_txt[QUAN_CURRENT] = "";
-	vbox = wj_radio_pack(rad_txt, -1, 0, palette || (quantize_cols > 256) ?
-		QUAN_WU : QUAN_EXACT, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
+	if ((quantize_mode < 0) || !rad_txt[quantize_mode][0]) // Use default mode
+	{
+		quantize_mode = palette || (quantize_cols > 256) ? QUAN_WU : QUAN_EXACT;
+		if (!palette) dither_mode = -1; // Reset dither too
+	}
+	vbox = wj_radio_pack(rad_txt, -1, 0, quantize_mode, &quantize_mode,
+		GTK_SIGNAL_FUNC(click_quantize_radio));
 	/* Settings subnotebook */
 	quantize_book = pack(vbox, plain_book(pages, 3));
 	pack(pages[1], sig_toggle(_("Truncate palette"), quantize_tp, &quantize_tp, NULL));
@@ -2330,10 +2387,13 @@ void pressed_quantize(int palette)
 
 	/* Main page - Dither frame */
 
+	quantize_dither = NULL;
 	if (!palette)
 	{
-		hbox = wj_radio_pack(rad_txt2, -1, DITH_MAX / 2,
-			quantize_cols > 256 ? DITH_DUMBFS : DITH_NONE, &dither_mode, NULL);
+		if (dither_mode < 0) dither_mode = quantize_cols > 256 ?
+			DITH_DUMBFS : DITH_NONE;
+		hbox = wj_radio_pack(rad_txt2, -1, DITH_MAX / 2, dither_mode,
+			&dither_mode, NULL);
 // !!! If want to make both columns same width
 //		gtk_box_set_homogeneous(GTK_BOX(hbox), TRUE);
 		quantize_dither = add_with_frame(page0, _("Dither"), hbox, 5);
@@ -2359,12 +2419,10 @@ void pressed_quantize(int palette)
 			(dither_sel ? dither_fract[1] : dither_fract[0]) * 100.0);
 		hbox = wj_option_menu(err_txt, -1, dither_sel, &dither_sel,
 			GTK_SIGNAL_FUNC(choose_selective));
-		gtk_table_attach(GTK_TABLE(table), hbox, 1, 2, 1, 2,
-			(GtkAttachOptions)(GTK_EXPAND | GTK_FILL), 0, 0, 0);
+		to_table(hbox, table, 1, 1, 0);
 
 		dither_err = add_a_toggle(_("Full error precision"), page1, dither_8b);
 	}
-	else dither_mode = -1;
 
 	/* OK / Cancel */
 
@@ -2983,20 +3041,17 @@ void gradient_setup(int mode)
 	grad_spin_ofs = spin_to_table(table, 2, 1, 5, 0, -MAX_GRAD, MAX_GRAD);
 	add_to_table(_("Gradient type"), table, 0, 2, 5);
 	grad_opt_type = wj_option_menu(gtypes, 6, 0, NULL, NULL);
+	to_table(grad_opt_type, table, 0, 3, 5);
 	add_to_table(_("Extension type"), table, 1, 2, 5);
 	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
-	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,
-		GTK_EXPAND | GTK_FILL, 0, 0, 5);
-	gtk_table_attach(GTK_TABLE(table), grad_opt_bound, 3, 4, 1, 2,
-		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	to_table(grad_opt_bound, table, 1, 3, 5);
 	add_to_table(_("Preview opacity"), table, 2, 2, 5);
 	grad_ss_pre = mt_spinslide_new(-1, -1);
 	mt_spinslide_set_range(grad_ss_pre, 0, 255);
 	mt_spinslide_set_value(grad_ss_pre, grad_opacity);
 	/* !!! Box derivatives can't have their "natural" size set directly */
 	align = widget_align_minsize(grad_ss_pre, 200, -2);
-	gtk_table_attach(GTK_TABLE(table), align, 3, 4, 2, 3,
-		GTK_EXPAND | GTK_FILL, 0, 0, 5);
+	to_table(align, table, 2, 3, 5);
 
 	/* Select page */
 
@@ -3226,7 +3281,7 @@ void bkg_setup()
 	add_to_table(_("Origin"), table, 2, 0, 5);
 	add_to_table(_("Relative scale"), table, 3, 0, 5);
 	bw->opt = wj_option_menu(srcs, 4, 0, bw, GTK_SIGNAL_FUNC(click_bkg_option));
-	gtk_table_attach(GTK_TABLE(table), bw->opt, 1, 3, 0, 1, GTK_FILL, 0, 0, 5);
+	to_table_l(bw->opt, table, 0, 1, 2, 5);
 	bw->wspin = spin_to_table(table, 1, 1, 5, 0, 0, 0);
 	bw->hspin = spin_to_table(table, 1, 2, 5, 0, 0, 0);
 	GTK_WIDGET_UNSET_FLAGS(bw->wspin, GTK_CAN_FOCUS);

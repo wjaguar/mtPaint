@@ -83,19 +83,40 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 	return (pack(box, sig_toggle(label, value, NULL, NULL)));
 }
 
-GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
+GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
+	int l, int spacing)
 {
 	GtkWidget *label;
 
-	label = gtk_label_new ( text );
-	gtk_widget_show (label);
-	gtk_table_attach (GTK_TABLE (table), label, column, column+1, row, row+1,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (0), spacing, spacing);
+	label = gtk_label_new(text);
+	gtk_widget_show(label);
+	gtk_table_attach(GTK_TABLE(table), label, column, column + l, row, row + 1,
+		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (0), spacing, spacing);
 	gtk_label_set_justify(GTK_LABEL (label), GTK_JUSTIFY_LEFT);
 	gtk_misc_set_alignment(GTK_MISC (label), 0.0, 0.5);
 
-	return label;
+	return (label);
+}
+
+GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
+{
+	return (add_to_table_l(text, table, row, column, 1, spacing));
+}
+
+GtkWidget *to_table(GtkWidget *widget, GtkWidget *table, int row, int column, int spacing)
+{
+	gtk_table_attach(GTK_TABLE(table), widget, column, column + 1, row, row + 1,
+		(GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
+		(GtkAttachOptions) (0), 0, spacing);
+	return (widget);
+}
+
+GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
+	int l, int spacing)
+{
+	gtk_table_attach(GTK_TABLE(table), widget, column, column + l, row, row + 1,
+		(GtkAttachOptions)(GTK_FILL), (GtkAttachOptions) (0), 0, spacing);
+	return (widget);
 }
 
 GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
@@ -129,17 +150,15 @@ void add_hseparator( GtkWidget *widget, int xs, int ys )
 
 ////	PROGRESS WINDOW
 
-GtkWidget *progress_window = NULL, *progress_bar;
-int prog_stop;
+static GtkWidget *progress_window, *progress_bar;
+static int prog_stop;
 
-static gint do_cancel_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
+static void do_cancel_progress()
 {
 	prog_stop = 1;
-
-	return FALSE;
 }
 
-static gint delete_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
+static gboolean delete_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	return TRUE;			// This stops the user closing the window via the window manager
 }
@@ -279,7 +298,7 @@ GtkWidget *add_new_page(GtkWidget *notebook, char *name)
 
 // Slider-spin combo (practically a new widget class)
 
-GtkWidget *mt_spinslide_new(gint swidth, gint sheight)
+GtkWidget *mt_spinslide_new(int swidth, int sheight)
 {
 	GtkWidget *box, *slider, *spin;
 	GtkObject *adj;
@@ -300,7 +319,7 @@ GtkWidget *mt_spinslide_new(gint swidth, gint sheight)
 	return (box);
 }
 
-void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv)
+void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv)
 {
 	GtkAdjustment *adj;
 	
@@ -310,7 +329,7 @@ void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv)
 	gtk_adjustment_changed(adj);
 }
 
-gint mt_spinslide_get_value(GtkWidget *spinslide)
+int mt_spinslide_get_value(GtkWidget *spinslide)
 {
 	GtkSpinButton *spin;
 
@@ -320,7 +339,7 @@ gint mt_spinslide_get_value(GtkWidget *spinslide)
 }
 
 /* Different in that this doesn't force slider to integer-value position */
-gint mt_spinslide_read_value(GtkWidget *spinslide)
+int mt_spinslide_read_value(GtkWidget *spinslide)
 {
 	GtkSpinButton *spin;
 
@@ -328,7 +347,7 @@ gint mt_spinslide_read_value(GtkWidget *spinslide)
 	return (gtk_spin_button_get_value_as_int(spin));
 }
 
-void mt_spinslide_set_value(GtkWidget *spinslide, gint value)
+void mt_spinslide_set_value(GtkWidget *spinslide, int value)
 {
 	GtkSpinButton *spin;
 
@@ -389,34 +408,48 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 	return (box);
 }
 
+// Convert window close into a button click ("Cancel" or whatever)
+
+static gboolean do_delete_to_click(GtkWidget *widget, GdkEvent *event, gpointer data)
+{
+	gtk_signal_emit_by_name(GTK_OBJECT(data), "clicked");
+	return (TRUE); // Click handler can delete window, or let it be
+}
+
+void delete_to_click(GtkWidget *window, GtkWidget *button)
+{
+	gtk_signal_connect(GTK_OBJECT(window), "delete_event",
+		GTK_SIGNAL_FUNC(do_delete_to_click), button);
+}
+
 // Buttons for standard dialogs
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel)
 {
-	GtkWidget *hbox, *button;
+	GtkWidget *hbox, *ok_button, *cancel_button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	hbox = gtk_hbox_new(TRUE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
-	button = xpack(hbox, gtk_button_new_with_label(nCancel));
-	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+	cancel_button = xpack(hbox, gtk_button_new_with_label(nCancel));
+	gtk_container_set_border_width(GTK_CONTAINER(cancel_button), 5);
+	gtk_signal_connect_object(GTK_OBJECT(cancel_button), "clicked",
 		Cancel, GTK_OBJECT(window));
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0,
+	gtk_widget_add_accelerator(cancel_button, "clicked", ag, GDK_Escape, 0,
 		(GtkAccelFlags)0);
 
-	button = xpack(hbox, gtk_button_new_with_label(nOK));
-	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+	ok_button = xpack(hbox, gtk_button_new_with_label(nOK));
+	gtk_container_set_border_width(GTK_CONTAINER(ok_button), 5);
+	gtk_signal_connect_object(GTK_OBJECT(ok_button), "clicked",
 		OK, GTK_OBJECT(window));
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0,
+	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_Return, 0,
 		(GtkAccelFlags)0);
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0,
+	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_KP_Enter, 0,
 		(GtkAccelFlags)0);
  
 	gtk_window_add_accel_group(GTK_WINDOW(window), ag);
-	gtk_signal_connect(GTK_OBJECT(window), "delete_event", Cancel, NULL);
+	delete_to_click(window, cancel_button);
 	gtk_object_set_user_data(GTK_OBJECT(hbox), (gpointer)window);
 	gtk_widget_show_all(hbox);
 	return (hbox);

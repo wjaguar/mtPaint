@@ -104,6 +104,7 @@ static inilist ini_int[] = {
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },
 	{ "lastspalType",	&spal_mode,		2   },
+	{ "posterizeMode",	&posterize_mode,	0   },
 	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
 	{ "tileWidth",		&tgrid_dx,		32  },

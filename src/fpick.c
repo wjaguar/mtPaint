@@ -1467,8 +1467,7 @@ void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 		"clicked", ok_fn, GTK_OBJECT(fp));
 	gtk_signal_connect_object(GTK_OBJECT(fpick->cancel_button),
 		"clicked", cancel_fn, GTK_OBJECT(fp));
-	gtk_signal_connect_object(GTK_OBJECT(fpick->window),
-		"delete_event", cancel_fn, GTK_OBJECT(fp));
+	delete_to_click(fpick->window, fpick->cancel_button);
 	pack(fpick->main_vbox, xtra);
 }
 
@@ -1531,8 +1530,7 @@ void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fp)->cancel_button),
 		"clicked", cancel_fn, GTK_OBJECT(fp));
 
-	gtk_signal_connect_object(GTK_OBJECT(fp),
-		"delete_event", cancel_fn, GTK_OBJECT(fp));
+	delete_to_click(fp, GTK_FILE_SELECTION(fp)->cancel_button);
 
 	pack(GTK_FILE_SELECTION(fp)->main_vbox, xtra);
 
