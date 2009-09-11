@@ -1516,6 +1516,99 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 	return 0;
 }
 
+/* Max-Min quantization algorithm - good for preserving saturated colors,
+ * and because of that, bad when used without dithering - WJ */
+
+#define HISTSIZE (64 * 64 * 64)
+int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
+	unsigned char userpal[3][256])
+{
+	int i, j, k, ii, r, g, b, dr, dg, db, l = width * height, *hist;
+
+	/* Allocate histogram */
+	hist = calloc(1, HISTSIZE * sizeof(int));
+	if (!hist) return (-1);
+
+	/* Fill histogram */
+	for (i = 0; i < l; i++)
+	{
+		++hist[((inbuf[0] & 0xFC) << 10) + ((inbuf[1] & 0xFC) << 4) +
+			(inbuf[2] >> 2)];
+		inbuf += 3;
+	}
+
+	/* Find the most frequent color */
+	j = k = -1;
+	for (i = 0; i < HISTSIZE; i++)
+	{
+		if (hist[i] <= k) continue;
+		j = i; k = hist[i];
+	}
+
+	/* Make it first */
+	userpal[0][0] = r = j >> 12;
+	userpal[1][0] = g = (j >> 6) & 0x3F;
+	userpal[2][0] = b = j & 0x3F;
+
+	/* Find distances from all others to it */
+	if (quant_to > 1)
+	{
+		for (i = 0; i < HISTSIZE; i++)
+		{
+			if (!hist[i]) continue;
+			dr = (i >> 12) - r;
+			dg = ((i >> 6) & 0x3F) - g;
+			db = (i & 0x3F) - b;
+			hist[i] = dr * dr + dg * dg + db * db;
+		}
+	}
+
+	/* Add more colors */
+	for (ii = 1; ii < quant_to; ii++)
+	{
+		/* Find farthest color */
+		j = -1;
+		for (i = k = 0; i < HISTSIZE; i++)
+		{
+			if (hist[i] <= k) continue;
+			j = i; k = hist[i];
+		}
+		/* No more colors? */
+		if (j < 0) break;
+
+		/* Store into palette */
+		userpal[0][ii] = r = j >> 12;
+		userpal[1][ii] = g = (j >> 6) & 0x3F;
+		userpal[2][ii] = b = j & 0x3F;
+
+		/* Update distances */
+		for (i = 0; i < HISTSIZE; i++)
+		{
+			if (!hist[i]) continue;
+			dr = (i >> 12) - r;
+			dg = ((i >> 6) & 0x3F) - g;
+			db = (i & 0x3F) - b;
+			k = dr * dr + dg * dg + db * db;
+			if (k < hist[i]) hist[i] = k;
+		}
+	}
+
+	/* Upconvert colors */
+	for (i = 0; i < ii; i++)
+	{
+		userpal[0][i] = (userpal[0][i] << 2) + (userpal[0][i] >> 4);
+		userpal[1][i] = (userpal[1][i] << 2) + (userpal[1][i] >> 4);
+		userpal[2][i] = (userpal[2][i] << 2) + (userpal[2][i] >> 4);
+	}
+
+	/* Clear empty slots */
+	for (i = ii; i < quant_to; i++)
+		userpal[0][i] = userpal[1][i] = userpal[2][i] = 0;
+
+	free(hist);
+	return (0);
+}
+
 /* Dithering works with 6-bit colours, because hardware VGA palette is 6-bit,
  * and any kind of dithering is imprecise by definition anyway - WJ */
 
@@ -1601,8 +1694,8 @@ static int lookup_srgb(double *srgb)
 // !!! No support for transparency yet !!!
 /* Damping functions roughly resemble old GIMP's behaviour, but may need some
  * tuning because linear sRGB is just too different from normal RGB */
-int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dist,
-	int limit, int selc, int serpent, double emult)
+int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
+	int dist, int limit, int selc, int serpent, int rgb8b, double emult)
 {
 	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1;
 	unsigned char *ddata1, *ddata2, *src, *dest;
@@ -1628,12 +1721,21 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dis
 	ctp = ALIGNTO(ddata2, double);
 
 	/* Prepare tables */
-	for (i = 0; i < 256; i++)
+	if (rgb8b) /* Keep all 8 bits of input */
 	{
-		j = 63 * i;
-		j = (j + (j >> 8) + 0x80) >> 8;
-		gamma6[i] = gamma64[j];
-		lin6[i] = j * (1.0 / 63.0);
+		memcpy(gamma6, gamma256, sizeof(gamma6));
+		for (i = 0; i < 256; i++)
+			lin6[i] = i * (1.0 / 255.0);
+	}
+	else /* Posterize to 6 bits */
+	{
+		for (i = 0; i < 256; i++)
+		{
+			j = 63 * i;
+			j = (j + (j >> 8) + 0x80) >> 8;
+			gamma6[i] = gamma64[j];
+			lin6[i] = j * (1.0 / 63.0);
+		}
 	}
 	tmp = ctp->xyz256;
 	for (i = 0; i < ncols; i++ , tmp += 3)

@@ -299,9 +299,12 @@ int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 void mem_greyscale(int gcor);		// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
+//	Quantize image using Max-Min algorithm
+int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
+	unsigned char userpal[3][256]);
 //	Convert RGB->indexed using error diffusion with variety of options
-int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dist,
-	int limit, int selc, int serpent, double emult);
+int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
+	int dist, int limit, int selc, int serpent, int rgb8b, double emult);
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 					// Convert image to Indexed Palette using quantize
 void mem_invert();			// Invert the palette

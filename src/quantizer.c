@@ -7,6 +7,9 @@
 	During January 2005 I made numerous changes to the code in order to get it to interface with mtPaint and to compile on gcc-2.95, but the core palette reduction algorithm is the same as the original.
 
 	Mark Tyler, January 2005
+
+	I improved speed of DL3 quantizer by some 30%.
+	Dmitry Groshev, March 2007
 */
 
 #include <stdlib.h>
@@ -73,6 +76,7 @@ typedef struct {
 	ulong pixel_count;
 	ulong err;
 	slong cc;
+	uchar rr, gg, bb;
 } CUBE3;
 
 static CUBE3 *rgb_table3;
@@ -443,6 +447,14 @@ static int init_table(void)
 	return 1;
 }
 
+static void setrgb(CUBE3 *rec)
+{
+	int v = rec->pixel_count, v2 = v >> 1;
+	rec->rr = (rec->r + v2) / v;
+	rec->gg = (rec->g + v2) / v;
+	rec->bb = (rec->b + v2) / v;
+}
+
 static void build_table3(uchar *image, int size)
 {
 	int i, index;
@@ -460,48 +472,39 @@ static void build_table3(uchar *image, int size)
 
 	tot_colors = 0;
 	for (i = 0; i < 32768; i++)
-		if (rgb_table3[i].pixel_count) rgb_table3[tot_colors++] = rgb_table3[i];
+		if (rgb_table3[i].pixel_count)
+		{
+			setrgb(rgb_table3 + i);
+			rgb_table3[tot_colors++] = rgb_table3[i];
+		}
 }
 
 static ulong calc_err(int c1, int c2)
 {
-	ulong dist1, dist2, P1, P2, P3, R1, G1, B1, R2, G2, B2, R3, G3, B3;
-	slong r_dist, g_dist, b_dist;
+	ulong dist1, dist2, P1, P2, P3;
+	int R1, G1, B1, R2, G2, B2, R3, G3, B3;
 
-	R1 = rgb_table3[c1].r;
-	G1 = rgb_table3[c1].g;
-	B1 = rgb_table3[c1].b;
 	P1 = rgb_table3[c1].pixel_count;
-
-	R2 = rgb_table3[c2].r;
-	G2 = rgb_table3[c2].g;
-	B2 = rgb_table3[c2].b;
 	P2 = rgb_table3[c2].pixel_count;
-
 	P3 = P1 + P2;
-	R3 = (R1 + R2 + (P3 >> 1)) / P3;
-	G3 = (G1 + G2 + (P3 >> 1)) / P3;
-	B3 = (B1 + B2 + (P3 >> 1)) / P3;
 
-	R1 = (R1 + (P1 >> 1)) / P1;
-	G1 = (G1 + (P1 >> 1)) / P1;
-	B1 = (B1 + (P1 >> 1)) / P1;
+	R3 = (rgb_table3[c1].r + rgb_table3[c2].r + (P3 >> 1)) / P3;
+	G3 = (rgb_table3[c1].g + rgb_table3[c2].g + (P3 >> 1)) / P3;
+	B3 = (rgb_table3[c1].b + rgb_table3[c2].b + (P3 >> 1)) / P3;
 
-	R2 = (R2 + (P2 >> 1)) / P2;
-	G2 = (G2 + (P2 >> 1)) / P2;
-	B2 = (B2 + (P2 >> 1)) / P2;
+	R1 = rgb_table3[c1].rr;
+	G1 = rgb_table3[c1].gg;
+	B1 = rgb_table3[c1].bb;
 
-	r_dist = R3 - R1;
-	g_dist = G3 - G1;
-	b_dist = B3 - B1;
-	dist1 = squares3[r_dist] + squares3[g_dist] + squares3[b_dist];
-	dist1 = (ulong)(sqrt(dist1) * P1);
+	R2 = rgb_table3[c2].rr;
+	G2 = rgb_table3[c2].gg;
+	B2 = rgb_table3[c2].bb;
 
-	r_dist = R2 - R3;
-	g_dist = G2 - G3;
-	b_dist = B2 - B3;
-	dist2 = squares3[r_dist] + squares3[g_dist] + squares3[b_dist];
-	dist2 = (ulong)(sqrt(dist2) * P2);
+	dist1 = squares3[R3 - R1] + squares3[G3 - G1] + squares3[B3 - B1];
+	dist1 = (unsigned int)(sqrt(dist1) * P1);
+
+	dist2 = squares3[R2 - R3] + squares3[G2 - G3] + squares3[B2 - B3];
+	dist2 = (unsigned int)(sqrt(dist2) * P2);
 
 	return (dist1 + dist2);
 }
@@ -558,6 +561,7 @@ static int reduce_table3(int num_colors)
 		rgb_table3[c2].g += rgb_table3[c1].g;
 		rgb_table3[c2].b += rgb_table3[c1].b;
 		rgb_table3[c2].pixel_count += rgb_table3[c1].pixel_count;
+		setrgb(rgb_table3 + c2);
 		tot_colors--;
 
 		rgb_table3[c1] = rgb_table3[tot_colors];
@@ -688,9 +692,9 @@ static void set_palette3(void)
 	for (i = 0; i < tot_colors; i++)
 	{
 		sum = rgb_table3[i].pixel_count;
-		palette[0][i] = (rgb_table3[i].r / CScale + (sum >> 1)) / sum;
-		palette[1][i] = (rgb_table3[i].g + (sum >> 1)) / sum;
-		palette[2][i] = (rgb_table3[i].b + (sum >> 1)) / sum;
+		palette[0][i] = rgb_table3[i].rr;
+		palette[1][i] = rgb_table3[i].gg;
+		palette[2][i] = rgb_table3[i].bb;
 	}
 	free(rgb_table3);
 }

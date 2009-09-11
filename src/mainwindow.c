@@ -3126,8 +3126,11 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			clone_y = tool_size;
 		}
 		/* Persistent selection frame */
-		if ((tool_type == TOOL_SELECT) && (marq_x1 >= 0) &&
-			(marq_y1 >= 0) && (marq_x2 >= 0) && (marq_y2 >= 0))
+// !!! To NOT show selection frame while placing gradient
+//		if ((tool_type == TOOL_SELECT)
+		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_GRADIENT))
+			&& (marq_x1 >= 0) && (marq_y1 >= 0)
+			&& (marq_x2 >= 0) && (marq_y2 >= 0))
 		{
 			marq_status = MARQUEE_DONE;
 			check_marquee();

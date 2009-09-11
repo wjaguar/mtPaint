@@ -2016,14 +2016,14 @@ void choose_colours()
 #define DITH_OLDSCATTER	6
 #define DITH_MAX	7
 
-GtkWidget *quantize_window, *quantize_spin, *quantize_dither;
-GtkWidget *dither_serpent, *dither_spin;
-int quantize_cols, quantize_mode, dither_mode;
+static GtkWidget *quantize_window, *quantize_spin, *quantize_dither;
+static GtkWidget *dither_serpent, *dither_spin, *dither_err;
+static int quantize_cols, quantize_mode, dither_mode;
 
 /* Dither settings - persistent */
-int dither_cspace = 1, dither_dist = 2, dither_limit = 0;
-int dither_scan = TRUE, dither_sel = 0;
-double dither_fract[2] = {1.0, 0.0};
+static int dither_cspace = 1, dither_dist = 2, dither_limit;
+static int dither_scan = TRUE, dither_8b, dither_sel;
+static double dither_fract[2] = {1.0, 0.0};
 
 static void click_quantize_radio(GtkWidget *widget, gpointer data)
 {
@@ -2052,13 +2052,14 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	new_cols = read_spin(quantize_spin);
 	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
 	dither_scan = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_serpent));
+	dither_8b = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_err));
 	efrac = 0.01 * read_spin(dither_spin);
 	dither_fract[dither_sel ? 1 : 0] = efrac;
 
 	gtk_widget_destroy(quantize_window);
 
 	/* Paranoia */
-	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
+	if ((quantize_mode >= 6) || (dither >= DITH_MAX)) return;
 
 	i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
 	if (i)
@@ -2092,6 +2093,9 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	case 4: /* Wu quantizer */
 		err = wu_quant(old_image, mem_width, mem_height, new_cols, newpal);
 		break;
+	case 5: /* Max-Min quantizer */
+		err = maxminquan(old_image, mem_width, mem_height, new_cols, newpal);
+		break;
 	}
 
 	if (quantize_mode > 1)
@@ -2113,7 +2117,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		mem_dither(old_image, new_cols, dither == DITH_NONE ? NULL :
 			dither == DITH_FS ? fs_dither : s_dither,
 			dither_cspace, dither_dist, dither_limit, dither_sel,
-			dither_scan, efrac);
+			dither_scan, dither_8b, efrac);
 		break;
 
 // !!! No code yet - temporarily disabled !!!
@@ -2170,7 +2174,8 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
 		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
-		_("Wu Quantize (best method for small palettes)"), NULL
+		_("Wu Quantize (best method for small palettes)"),
+		_("Max-Min Quantize (best with dithering)"), NULL
 		};
 
 	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Stucki"),
@@ -2248,6 +2253,8 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	hbox = wj_radio_pack(err_txt, -1, 3, dither_sel, &dither_sel,
 		GTK_SIGNAL_FUNC(toggle_selective));
 	add_with_frame(page1, _("Selective error propagation"), hbox, 5);
+
+	dither_err = add_a_toggle(_("Full error precision"), page1, dither_8b);
 
 	/* OK / Cancel */
 
