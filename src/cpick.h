@@ -1,5 +1,5 @@
 /*	cpick.h
-	Copyright (C) 2008 Mark Tyler
+	Copyright (C) 2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -19,11 +19,9 @@
 
 GtkWidget *cpick_create();
 
-void cpick_get_colour( GtkWidget *w, int *r, int *g, int *b, int *opacity );
+int cpick_get_colour(GtkWidget *w, int *opacity);
 
-void cpick_set_colour( GtkWidget *w, int r, int g, int b, int opacity );
-void cpick_set_colour_previous( GtkWidget *w, int r, int g, int b, int opacity );
+void cpick_set_colour(GtkWidget *w, int rgb, int opacity);
+void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity);
 
-void cpick_set_palette_visibility( GtkWidget *w, int visible );
 void cpick_set_opacity_visibility( GtkWidget *w, int visible );
-

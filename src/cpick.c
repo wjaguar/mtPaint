@@ -40,7 +40,6 @@
 
 
 #define CPICK_KEY "mtPaint.cpicker"
-#define CPICK_SIGNAL_NAME "color_changed"
 
 #define CPICK_PAL_STRIPS_MIN	1
 #define CPICK_PAL_STRIPS_DEFAULT 2
@@ -92,11 +91,11 @@ typedef struct
 typedef struct
 {
 	GtkVBoxClass parent_class;
-	void (* cpicker) (cpicker *cp);
+	void (*color_changed)(cpicker *cp);
 } cpickerClass;
 
 enum {
-	CPICKER_SIGNAL,
+	COLOR_CHANGED,
 	LAST_SIGNAL
 };
 
@@ -104,24 +103,18 @@ static void cpicker_class_init	(cpickerClass	*klass);
 static void cpicker_init	(cpicker	*cp);
 
 static gint cpicker_signals[LAST_SIGNAL] = { 0 };
-static guint cpicker_type = 0;
+static GtkType cpicker_type;
 
-static guint cpicker_get_type ()
+static GtkType cpicker_get_type()
 {
 	if (!cpicker_type)
 	{
-		GtkTypeInfo cpicker_info =
-		{
-		"cpicker",
-		sizeof (cpicker),
-		sizeof (cpickerClass),
-		(GtkClassInitFunc) cpicker_class_init,
-		(GtkObjectInitFunc) cpicker_init,
-		NULL,
-		NULL
-		};
-
-		cpicker_type = gtk_type_unique( gtk_hbox_get_type (), &cpicker_info );
+		static const GtkTypeInfo cpicker_info = {
+			"cpicker", sizeof (cpicker), sizeof(cpickerClass),
+			(GtkClassInitFunc)cpicker_class_init,
+			(GtkObjectInitFunc)cpicker_init,
+			NULL, NULL, NULL };
+		cpicker_type = gtk_type_unique(GTK_TYPE_HBOX, &cpicker_info);
 	}
 
 	return cpicker_type;
@@ -129,22 +122,18 @@ static guint cpicker_get_type ()
 
 static void cpicker_class_init( cpickerClass *class )
 {
-	GtkObjectClass *object_class;
+	GTK_WIDGET_CLASS(class)->show_all = gtk_widget_show;
 
-	object_class = (GtkObjectClass*) class;
-
-	cpicker_signals[CPICKER_SIGNAL] = gtk_signal_new (CPICK_SIGNAL_NAME,
-				GTK_RUN_FIRST,
-				cpicker_type,
-				GTK_SIGNAL_OFFSET (cpickerClass, cpicker),
-				gtk_signal_default_marshaller,
-				GTK_TYPE_NONE, 0);
+	cpicker_signals[COLOR_CHANGED] = gtk_signal_new ("color_changed",
+		GTK_RUN_FIRST, cpicker_type,
+		GTK_SIGNAL_OFFSET(cpickerClass, color_changed),
+		gtk_signal_default_marshaller, GTK_TYPE_NONE, 0);
 
 #if GTK_MAJOR_VERSION == 1
-	gtk_object_class_add_signals (object_class, cpicker_signals, LAST_SIGNAL);
+	gtk_object_class_add_signals(GTK_OBJECT_CLASS(class), cpicker_signals,
+		LAST_SIGNAL);
 #endif
-
-	class->cpicker = NULL;
+	class->color_changed = NULL;
 }
 
 
@@ -300,7 +289,7 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 		cpick_populate_inputs( cp );		// Update input
 		cpick_area_precur_create( cp, CPICK_AREA_CURRENT );		// Update current colour
 
-		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 	}
 	else if ( idx == CPICK_AREA_HUE )
 	{
@@ -320,8 +309,7 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 	else if ( idx == CPICK_AREA_PALETTE )
 	{
 		char txt[128];
-		unsigned char new[3], col, ppc;
-		int ini_col;
+		int col, ppc, ini_col;
 
 		ppc = ah / CPICK_PAL_STRIP_ITEMS;
 		col = (ry / ppc) + CPICK_PAL_STRIP_ITEMS * (rx / ppc);
@@ -329,17 +317,14 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 		snprintf(txt, 128, "cpick_pal_%i", col);
 		ini_col = inifile_get_gint32(txt, RGB_2_INT(mem_pal_def[col].red,
 				mem_pal_def[col].green, mem_pal_def[col].blue ) );
-		new[0] = INT_2_R(ini_col);
-		new[1] = INT_2_G(ini_col);
-		new[2] = INT_2_B(ini_col);
-
-		if ((new[0] ^ cp->input_vals[CPICK_INPUT_RED]) |
-			(new[1] ^ cp->input_vals[CPICK_INPUT_GREEN]) |
-			(new[2] ^ cp->input_vals[CPICK_INPUT_BLUE]))
+		if (ini_col != RGB_2_INT(cp->input_vals[CPICK_INPUT_RED],
+			cp->input_vals[CPICK_INPUT_GREEN],
+			cp->input_vals[CPICK_INPUT_BLUE]))
 		{
-					// Only update if colour is different
-			cpick_set_colour( GTK_WIDGET(cp), new[0], new[1], new[2], -1 );
-			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+			// Only update if colour is different
+			cpick_set_colour(GTK_WIDGET(cp), ini_col,
+				cp->input_vals[CPICK_INPUT_OPACITY]);
+			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 		}
 	}
 
@@ -350,7 +335,7 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 		cpick_populate_inputs( cp );		// Update all inputs in dialog
 		cpick_area_precur_create( cp, CPICK_AREA_CURRENT );		// Update current colour
 
-		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 	}
 }
 
@@ -562,7 +547,7 @@ static void cpick_update(cpicker *cp, int what)
 	// Update current colour
 	cpick_area_precur_create(cp, CPICK_AREA_CURRENT);
 
-	gtk_signal_emit(GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL]);
+	gtk_signal_emit(GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED]);
 }
 
 static gboolean cpick_hex_change(GtkWidget *widget, GdkEventFocus *event,
@@ -634,8 +619,9 @@ static void dropper_grab_colour(GtkWidget *widget, gint x, gint y,
 	/* Ungrab before sending signal - better safe than sorry */
 	dropper_terminate(widget, user_data);
 
-	cpick_set_colour( GTK_WIDGET(cp), rgb[0], rgb[1], rgb[2], -1 );
-	gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+	cpick_set_colour(GTK_WIDGET(cp), MEM_2_INT(rgb, 0),
+		cp->input_vals[CPICK_INPUT_OPACITY]);
+	gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 }
 
 static gboolean dropper_key_press(GtkWidget *widget, GdkEventKey *event,
@@ -747,7 +733,7 @@ static gboolean cpick_area_key(GtkWidget *widget, GdkEventKey *event, cpicker *c
 			cpick_get_rgb(cp);				// Update RGB values
 			cpick_area_update_cursors(cp);			// Update cursors
 			cpick_refresh_inputs_areas(cp);			// Update inputs
-			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 		}
 	}
 	else if (!dy); // X isn't used anywhere else
@@ -762,7 +748,7 @@ static gboolean cpick_area_key(GtkWidget *widget, GdkEventKey *event, cpicker *c
 			cpick_area_update_cursors(cp);
 			cpick_populate_inputs( cp );		// Update all inputs in dialog
 			cpick_area_precur_create( cp, CPICK_AREA_CURRENT );
-			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 		}
 	}
 	else if (widget == cp->areas[CPICK_AREA_HUE])
@@ -773,12 +759,12 @@ static gboolean cpick_area_key(GtkWidget *widget, GdkEventKey *event, cpicker *c
 
 		if ( new_hue != cp->input_vals[CPICK_INPUT_HUE] )
 		{
-			cp->input_vals[CPICK_INPUT_HUE] = new_hue;	// Change hue
-			cpick_get_rgb(cp);				// Update RGB values
-			cpick_area_update_cursors(cp);			// Update cursors
-			cpick_area_picker_create(cp);			// Repaint picker
-			cpick_refresh_inputs_areas(cp);			// Update inputs
-			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[CPICKER_SIGNAL] );
+			cp->input_vals[CPICK_INPUT_HUE] = new_hue; // Change hue
+			cpick_get_rgb(cp);		// Update RGB values
+			cpick_area_update_cursors(cp);	// Update cursors
+			cpick_area_picker_create(cp);	// Repaint picker
+			cpick_refresh_inputs_areas(cp);	// Update inputs
+			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 		}
 	}
 
@@ -807,8 +793,9 @@ static void cpicker_init( cpicker *cp )
 	cp->size = inifile_get_gint32( "cpickerSize", CPICK_SIZE_DEFAULT );
 	if ( cp->size < CPICK_SIZE_MIN || cp->size > CPICK_SIZE_MAX )
 		cp->size = CPICK_SIZE_DEFAULT;
+	/* Ensure palette swatches are identical in size by adjusting size of
+	 * whole area */
 	cp->size = cp->size - (cp->size % CPICK_PAL_STRIP_ITEMS);
-		// Ensure palette swatches are identical in size by adjusting size of whole area
 
 	cp->pal_strips = inifile_get_gint32( "cpickerStrips", CPICK_PAL_STRIPS_DEFAULT );
 	if ( cp->pal_strips < CPICK_PAL_STRIPS_MIN || cp->pal_strips > CPICK_PAL_STRIPS_MAX )
@@ -838,26 +825,25 @@ static void cpicker_init( cpicker *cp )
 
 	table = add_a_table( 2, 4, 0, hbox );
 
-	for ( i=0; i<CPICK_AREA_TOT; i++ )
+	for (i = 0; i < CPICK_AREA_TOT; i++)
 	{
-		cp->areas[i] = wj_fpixmap( cp->area_size[i][0], cp->area_size[i][1] );
-		gtk_signal_connect( GTK_OBJECT(cp->areas[i]), "realize",
-			GTK_SIGNAL_FUNC(cpick_realize_area), (gpointer)(cp));
-		gtk_signal_connect( GTK_OBJECT(cp->areas[i]), "button_press_event",
-			GTK_SIGNAL_FUNC(cpick_click_area), (gpointer)(cp));
-		if ( i == CPICK_AREA_PICKER || i == CPICK_AREA_HUE || i == CPICK_AREA_OPACITY )
-		{
-			gtk_signal_connect( GTK_OBJECT(cp->areas[i]), "motion_notify_event",
-				GTK_SIGNAL_FUNC(cpick_motion_area), (gpointer)(cp));
-			gtk_signal_connect( GTK_OBJECT(cp->areas[i]), "key_press_event",
-				GTK_SIGNAL_FUNC(cpick_area_key), (gpointer)(cp));
-		}
+		cp->areas[i] = wj_fpixmap(cp->area_size[i][0], cp->area_size[i][1]);
+		gtk_table_attach(GTK_TABLE(table), cp->areas[i],
+			pos[i][1], pos[i][1] + 1, pos[i][0], pos[i][0] + 1,
+			(GtkAttachOptions)0, (GtkAttachOptions)0, 0, 0);
+		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "realize",
+			GTK_SIGNAL_FUNC(cpick_realize_area), (gpointer)cp);
+		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "button_press_event",
+			GTK_SIGNAL_FUNC(cpick_click_area), (gpointer)cp);
 
 // FIXME - add drag n drop for palette & previous/current colour areas
 
-		gtk_table_attach (GTK_TABLE (table), cp->areas[i],
-			pos[i][1], pos[i][1]+1, pos[i][0], pos[i][0]+1,
-			(GtkAttachOptions) (0), (GtkAttachOptions) (0), 0, 0);
+		if ((i != CPICK_AREA_PICKER) && (i != CPICK_AREA_HUE) &&
+			(i != CPICK_AREA_OPACITY)) continue;
+		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "motion_notify_event",
+			GTK_SIGNAL_FUNC(cpick_motion_area), (gpointer)cp);
+		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "key_press_event",
+			GTK_SIGNAL_FUNC(cpick_area_key), (gpointer)cp);
 	}
 
 	button = gtk_button_new();
@@ -874,7 +860,7 @@ static void cpicker_init( cpicker *cp )
 	gdk_pixmap_unref( mask );
 	gtk_container_add( GTK_CONTAINER (button), iconw );
 
-	gtk_table_attach (GTK_TABLE (table), button, 2, 2+1, 1, 1+1,
+	gtk_table_attach (GTK_TABLE (table), button, 2, 3, 1, 2,
 		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (GTK_FILL),
 		2, 2);
 	gtk_widget_show(button);
@@ -915,7 +901,7 @@ static void cpicker_init( cpicker *cp )
 		gtk_object_set_data( obj, CPICK_KEY, cp );
 		gtk_widget_show (cp->inputs[i]);
 		gtk_table_attach (GTK_TABLE (table), cp->inputs[i],
-				1, 2, i, i+1,
+				1, 2, i, i + 1,
 				(GtkAttachOptions) (GTK_FILL),
 				(GtkAttachOptions) (0), 0, 0);
 	}
@@ -923,25 +909,11 @@ static void cpicker_init( cpicker *cp )
 
 GtkWidget *cpick_create()
 {
-	GtkWidget *cp = GTK_WIDGET( gtk_type_new(cpicker_get_type()) );
-
-	return cp;
-}
-
-void cpick_get_colour( GtkWidget *w, int *r, int *g, int *b, int *opacity )
-{
-	cpicker *cp = CPICKER(w);
-
-	if (!IS_CPICKER(cp)) return;
-
-	if ( r ) *r = cp->input_vals[CPICK_INPUT_RED];
-	if ( g ) *g = cp->input_vals[CPICK_INPUT_GREEN];
-	if ( b ) *b = cp->input_vals[CPICK_INPUT_BLUE];
-	if ( opacity ) *opacity = cp->input_vals[CPICK_INPUT_OPACITY];
+	return (gtk_widget_new(cpicker_get_type(), NULL));
 }
 
 /* These formulas perfectly reverse ones in cpick_area_mouse() when possible;
- * still, for sizes > 255 it's impossible in principle - WJ */
+ * however, for sizes > 255 it's impossible in principle - WJ */
 static void cpick_area_update_cursors(cpicker *cp)
 {
 	int x, y, l;
@@ -963,81 +935,70 @@ static void cpick_area_update_cursors(cpicker *cp)
 	wj_fpixmap_move_cursor(cp->areas[CPICK_AREA_OPACITY], x, y);
 }
 
-static void cpick_refresh_inputs_areas(cpicker *cp)	// Update whole dialog according to values
+/* Update whole dialog according to values */
+static void cpick_refresh_inputs_areas(cpicker *cp)
 {
 	cpick_populate_inputs( cp );		// Update all inputs in dialog
 
-	cpick_area_precur_create( cp, CPICK_AREA_CURRENT );		// Update current colour
+	cpick_area_precur_create( cp, CPICK_AREA_CURRENT );	// Update current colour
 	cpick_area_picker_create( cp );		// Update picker colours
 	cpick_area_update_cursors( cp );	// Update area cursors
 }
 
-void cpick_set_colour( GtkWidget *w, int r, int g, int b, int opacity )
+int cpick_get_colour(GtkWidget *w, int *opacity)
+{
+	cpicker *cp = CPICKER(w);
+
+	if (!IS_CPICKER(cp)) return (0);
+
+	if (opacity) *opacity = cp->input_vals[CPICK_INPUT_OPACITY];
+	return (RGB_2_INT(cp->input_vals[CPICK_INPUT_RED],
+		cp->input_vals[CPICK_INPUT_GREEN],
+		cp->input_vals[CPICK_INPUT_BLUE]));
+}
+
+void cpick_set_colour(GtkWidget *w, int rgb, int opacity)
 {
 	cpicker *cp = CPICKER(w);
 
 	if (!IS_CPICKER(cp)) return;
 
-//printf("cpick_set_colour %i %i %i %i\n", r, g, b, opacity);
-	if ( r>-1 ) cp->input_vals[CPICK_INPUT_RED] = r;
-	if ( g>-1 ) cp->input_vals[CPICK_INPUT_GREEN] = g;
-	if ( b>-1 ) cp->input_vals[CPICK_INPUT_BLUE] = b;
-	if ( opacity>-1 ) cp->input_vals[CPICK_INPUT_OPACITY] = opacity;
+	cp->input_vals[CPICK_INPUT_RED] = INT_2_R(rgb);
+	cp->input_vals[CPICK_INPUT_GREEN] = INT_2_G(rgb);
+	cp->input_vals[CPICK_INPUT_BLUE] = INT_2_B(rgb);
+	cp->input_vals[CPICK_INPUT_OPACITY] = opacity & 0xFF;
 
 	cpick_get_hsv(cp);
 
 	cpick_refresh_inputs_areas(cp);		// Update everything
 }
 
-void cpick_set_colour_previous( GtkWidget *w, int r, int g, int b, int opacity )
+void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 {
 	cpicker *cp = CPICKER(w);
 
 	if (!IS_CPICKER(cp)) return;
 
-	if ( r>-1 ) cp->rgb_previous[0] = r;
-	if ( g>-1 ) cp->rgb_previous[1] = g;
-	if ( b>-1 ) cp->rgb_previous[2] = b;
-	if ( opacity>-1 ) cp->rgb_previous[3] = opacity;
+	cp->rgb_previous[0] = INT_2_R(rgb);
+	cp->rgb_previous[1] = INT_2_G(rgb);
+	cp->rgb_previous[2] = INT_2_B(rgb);
+	cp->rgb_previous[3] = opacity & 0xFF;
 
-	cpick_refresh_inputs_areas(cp);		// Update everything
-	cpick_area_precur_create( cp, CPICK_AREA_PREVIOUS );	// Update previous colour
-}
-
-void cpick_set_palette_visibility( GtkWidget *w, int visible )
-{
-	cpicker *cp = CPICKER(w);
-
-	if (!IS_CPICKER(cp)) return;
-
-	if ( visible )
-	{
-		gtk_widget_show( cp->inputs[CPICK_AREA_PALETTE] );
-	}
-	else
-	{
-		gtk_widget_hide( cp->inputs[CPICK_AREA_PALETTE] );
-	}
+	// Update previous colour
+	cpick_area_precur_create(cp, CPICK_AREA_PREVIOUS);
 }
 
 void cpick_set_opacity_visibility( GtkWidget *w, int visible )
 {
+	void (*showhide)(GtkWidget *w);
 	cpicker *cp = CPICKER(w);
 
 	if (!IS_CPICKER(cp)) return;
+	showhide = visible ? gtk_widget_show : gtk_widget_hide;
 
-	if ( visible )
-	{
-		gtk_widget_show( cp->areas[CPICK_AREA_OPACITY] );
-		gtk_widget_show( cp->inputs[CPICK_INPUT_OPACITY] );
-		gtk_widget_show( cp->opacity_label );
-	}
-	else
-	{
-		gtk_widget_hide( cp->areas[CPICK_AREA_OPACITY] );
-		gtk_widget_hide( cp->inputs[CPICK_INPUT_OPACITY] );
-		gtk_widget_hide( cp->opacity_label );
-	}
+	showhide(cp->areas[CPICK_AREA_OPACITY]);
+	showhide(cp->inputs[CPICK_INPUT_OPACITY]);
+	showhide(cp->opacity_label);
 }
 
 
@@ -1049,63 +1010,59 @@ void cpick_set_opacity_visibility( GtkWidget *w, int visible )
 
 GtkWidget *cpick_create()
 {
-	return gtk_color_selection_new();
+	GtkWidget *w = gtk_color_selection_new();
+#if GTK_MAJOR_VERSION == 2
+	gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(w), TRUE);
+#endif
+	return (w);
 }
 
-void cpick_get_colour( GtkWidget *w, int *r, int *g, int *b, int *opacity )
+int cpick_get_colour(GtkWidget *w, int *opacity)
 {
 	gdouble color[4];
 
-	gtk_color_selection_get_color( GTK_COLOR_SELECTION(w), color );
-	*r = rint( 255 * color[0] );
-	*g = rint( 255 * color[1] );
-	*b = rint( 255 * color[2] );
-	*opacity = rint( 255 * color[3] );
+	gtk_color_selection_get_color(GTK_COLOR_SELECTION(w), color);
+	if (opacity) *opacity = rint(255 * color[3]);
+	return (RGB_2_INT(rint(255 * color[0]), rint(255 * color[1]),
+		rint(255 * color[2])));
 }
 
-void cpick_set_colour( GtkWidget *w, int r, int g, int b, int opacity )
+void cpick_set_colour(GtkWidget *w, int rgb, int opacity)
 {
 	GtkColorSelection *cs = GTK_COLOR_SELECTION(w);
-	gdouble current[4] = { (gdouble) r / 255.0, (gdouble) g / 255.0,
-		(gdouble) b / 255.0, (gdouble) opacity / 255.0 };
+	gdouble current[4] = { (gdouble)INT_2_R(rgb) / 255.0,
+		(gdouble)INT_2_G(rgb) / 255.0, (gdouble)INT_2_B(rgb) / 255.0,
+		(gdouble)opacity / 255.0 };
 
 #if GTK_MAJOR_VERSION == 1
 	gdouble previous[4];
-	int i;
 
-	for ( i=0; i<4; i++ ) previous[i] = cs->old_values[i+3];
-	gtk_color_selection_set_color( cs, previous );	// Set current without losing previous
+	// Set current without losing previous
+	memcpy(previous, cs->old_values + 3, sizeof(previous));
+	gtk_color_selection_set_color( cs, previous );
 #endif
 	gtk_color_selection_set_color( cs, current );
 }
 
-void cpick_set_colour_previous( GtkWidget *w, int r, int g, int b, int opacity )
+void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 {
 #if GTK_MAJOR_VERSION == 1
-	gdouble current[4], previous[4] = { (gdouble) r / 255.0, (gdouble) g / 255.0,
-		(gdouble) b / 255.0, (gdouble) opacity / 255.0 };
-	int i;
+	gdouble current[4], previous[4] = { (gdouble)INT_2_R(rgb) / 255.0,
+		(gdouble)INT_2_G(rgb) / 255.0, (gdouble)INT_2_B(rgb) / 255.0,
+		(gdouble)opacity / 255.0 };
 	GtkColorSelection *cs = GTK_COLOR_SELECTION(w);
 
-	for ( i=0; i<4; i++ ) current[i] = cs->values[i+3];
-
-	gtk_color_selection_set_color( cs, previous );	// Set previous without losing current
+	// Set previous without losing current
+	memcpy(current, cs->values + 3, sizeof(current));
+	gtk_color_selection_set_color( cs, previous );
 	gtk_color_selection_set_color( cs, current );
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 	GdkColor c;
 
-	c.pixel = 0;
-	c.red = r * 257; c.green = g * 257; c.blue = b * 257;
+	c.pixel = 0; c.red = INT_2_R(rgb) * 257; c.green = INT_2_G(rgb) * 257;
+	c.blue = INT_2_B(rgb) * 257;
 	gtk_color_selection_set_previous_color(GTK_COLOR_SELECTION(w), &c);
 	gtk_color_selection_set_previous_alpha(GTK_COLOR_SELECTION(w), opacity * 257);
-#endif
-}
-
-void cpick_set_palette_visibility( GtkWidget *w, int visible )
-{
-#if GTK_MAJOR_VERSION == 2
-	gtk_color_selection_set_has_palette (GTK_COLOR_SELECTION(w), visible);
 #endif
 }
 
@@ -1113,8 +1070,7 @@ void cpick_set_opacity_visibility( GtkWidget *w, int visible )
 {
 #if GTK_MAJOR_VERSION == 1
 	gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(w), visible);
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 	gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(w), visible);
 #endif
 }
