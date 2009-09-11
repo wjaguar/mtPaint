@@ -2372,7 +2372,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int qtail[QLEVELS + 1], ntail = 0;
 	int borders[4] = {0, mem_width, 0, mem_height};
 	int corners[4], levels[4], coords[4];
-	int i, j, k, kk, lvl, tx, ty, fmode = 0, lastr[3], thisr[3];
+	int i, j, k, kk, lvl, tx, ty, imgc = 0, fmode = 0, lastr[3], thisr[3];
 	int bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
@@ -2416,6 +2416,12 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 			csel_reset(flood_data);
 			fmode = 1;
 		}
+	}
+	/* Configure by-image flood fill */
+	else if (!flood_step && flood_img && (mem_channel != CHN_IMAGE))
+	{
+		imgc = get_pixel_img(x, y);
+		fmode = -1;
 	}
 
 	while (1)
@@ -2466,16 +2472,16 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 					if (bmap[bidx] & bbit) continue;
 				}
 				/* Sliding mode */
-				if (fmode == 3)
+				switch (fmode)
 				{
+				case 3: /* Sliding L*X*N* */
 					get_lxn(thisc, get_pixel_RGB(tx, ty));
 					dist2 = (thisc[0] - lastc[0]) * (thisc[0] - lastc[0]) +
 						(thisc[1] - lastc[1]) * (thisc[1] - lastc[1]) +
 						(thisc[2] - lastc[2]) * (thisc[2] - lastc[2]);
 					if (dist2 > mdist2) continue;
-				}
-				else if (fmode == 2)
-				{
+					break;
+				case 2: /* Sliding RGB */
 					k = get_pixel_RGB(tx, ty);
 					thisr[0] = INT_2_R(k);
 					thisr[1] = INT_2_G(k);
@@ -2484,16 +2490,19 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 						(abs(thisr[1] - lastr[1]) > flood_step) ||
 						(abs(thisr[2] - lastr[2]) > flood_step))
 						continue;
-				}
-				/* Centered mode */
-				else if (fmode)
-				{
+					break;
+				case 1: /* Centered mode */
 					if (!csel_scan(ty * mem_width + tx, 1, 1,
 						NULL, mem_img[CHN_IMAGE], flood_data))
 						continue;
+					break;
+				case 0: /* Normal mode */
+					if (get_pixel(tx, ty) != col) continue;
+					break;
+				default: /* (-1) - By-image mode */
+					if (get_pixel_img(tx, ty) != imgc) continue;
+					break;
 				}
-				/* Normal mode */
-				else if (get_pixel(tx, ty) != col) continue;
 				/* Is pixel writable? */
 				if (bmap)
 				{
@@ -2548,17 +2557,19 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	free(tmp);
 }
 
-/* Regular flood fill */
+/* Flood fill - may use temporary area (1 bit per pixel) */
 void flood_fill(int x, int y, unsigned int target)
-{
-	wjfloodfill(x, y, target, NULL, 0);
-}
-
-/* Pattern flood fill - uses temporary area (1 bit per pixel) */
-void flood_fill_pat(int x, int y, unsigned int target)
 {
 	unsigned char *pat, *temp;
 	int i, j, k, lw = (mem_width + 7) >> 3;
+
+	/* Regular fill? */
+	if (!tool_pat && (tool_opacity == 255) && !flood_step &&
+		(!flood_img || (mem_channel == CHN_IMAGE)))
+	{
+		wjfloodfill(x, y, target, NULL, 0);
+		return;
+	}
 
 	j = lw * mem_height;
 	pat = temp = malloc(j);
@@ -3954,6 +3965,14 @@ int get_pixel_RGB( int x, int y )	/* RGB */
 	x = mem_width * y + x;
 	if (mem_img_bpp == 1)
 		return (PNG_2_INT(mem_pal[mem_img[CHN_IMAGE][x]]));
+	x *= 3;
+	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
+}
+
+int get_pixel_img( int x, int y )	/* RGB or indexed */
+{
+	x = mem_width * y + x;
+	if (mem_img_bpp == 1) return (mem_img[CHN_IMAGE][x]);
 	x *= 3;
 	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
 }

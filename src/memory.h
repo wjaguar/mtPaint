@@ -320,7 +320,6 @@ int mem_isometrics(int type);
 void mem_threshold(int channel, int level);			// Threshold channel values
 
 void flood_fill( int x, int y, unsigned int target );
-void flood_fill_pat( int x, int y, unsigned int target );
 
 void sline( int x1, int y1, int x2, int y2 );			// Draw single thickness straight line
 void tline( int x1, int y1, int x2, int y2, int size );		// Draw size thickness straight line
@@ -365,7 +364,7 @@ void put_pixel( int x, int y );					// generic
 png_color get_pixel24( int x, int y );				// RGB version
 int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
-void put_pixel24( int x, int y );				// RGB version
+int get_pixel_img( int x, int y );				// from image
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

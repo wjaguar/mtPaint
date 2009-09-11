@@ -38,7 +38,7 @@ static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbut
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
-GtkWidget *clipboard_entry = NULL;
+GtkWidget *clipboard_entry;
 static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 

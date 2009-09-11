@@ -459,7 +459,7 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	int i;
 
 	snprintf(clip, 251, "%s%i", mem_clip_file, item);
-	i = load_png(clip, FS_CLIP_FILE);
+	i = load_image(clip, FS_CLIP_FILE, FT_PNG);
 
 	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
 	else text_paste = FALSE;

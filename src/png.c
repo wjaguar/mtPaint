@@ -18,11 +18,13 @@
 */
 
 #define PNG_READ_PACK_SUPPORTED
-#include <png.h>
-#include <zlib.h>
+
+#include <math.h>
 #include <stdlib.h>
 #include <ctype.h>
 
+#include <png.h>
+#include <zlib.h>
 #ifdef U_GIF
 #include <gif_lib.h>
 #endif
@@ -43,6 +45,7 @@
 #include "otherwindow.h"
 #include "mygtk.h"
 #include "layer.h"
+#include "ani.h"
 
 
 char preserved_gif_filename[256];
@@ -62,7 +65,7 @@ fformat file_formats[NUM_FTYPES] = {
 //	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
 //		/* | FF_TRANS | FF_LAYER */ },
 /* !!! Current state */
-	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB },
+	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA },
 #else
 	{ "", "", "", 0},
 #endif
@@ -125,6 +128,10 @@ static int allocate_image(ls_settings *settings, int cmask)
 	if ((settings->width > MAX_WIDTH) || (settings->height > MAX_HEIGHT))
 		return (TOO_BIG);
 
+	/* Don't show progress bar where there's no need */
+	if (settings->width * settings->height <= SILENCE_LIMIT)
+		settings->silent = TRUE;
+
 /* !!! Currently allocations are created committed, have to rollback on error */
 
 	for (i = 0; i < NUM_CHANNELS; i++)
@@ -178,7 +185,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 				settings->img[i] = malloc(settings->width *
 					settings->height);
 				if (!settings->img[i]) return (FILE_MEM_ERROR);
-				(i == CHN_ALPHA ? mem_clip_alpha : mem_clip_mask) =
+				*(i == CHN_ALPHA ? &mem_clip_alpha : &mem_clip_mask) =
 					settings->img[i];
 			}
 			break;
@@ -208,7 +215,19 @@ static int allocate_image(ls_settings *settings, int cmask)
 
 static char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
 
-static int do_load_png(char *file_name, ls_settings *settings)
+/* Description of PNG interlacing passes as X0, DX, Y0, DY */
+static unsigned char png_interlace[8][4] = {
+	{0, 1, 0, 1}, /* One pass for non-interlaced */
+	{0, 8, 0, 8}, /* Seven passes for Adam7 interlaced */
+	{4, 8, 0, 8},
+	{0, 4, 4, 8},
+	{2, 4, 0, 4},
+	{0, 2, 2, 4},
+	{1, 2, 0, 2},
+	{0, 1, 1, 2}
+};
+
+static int load_png(char *file_name, ls_settings *settings)
 {
 	png_structp png_ptr;
 	png_infop info_ptr;
@@ -221,7 +240,8 @@ static int do_load_png(char *file_name, ls_settings *settings)
 	unsigned char *src, *dest, *dsta;
 	long dest_len;
 	FILE *fp;
-	int i, j, bit_depth, color_type, interlace_type, num_uk, res = -1;
+	int i, j, k, bit_depth, color_type, interlace_type, num_uk, res = -1;
+	int maxpass, x0, dx, y0, dy, n, nx, height, width;
 
 	if ((fp = fopen(file_name, "rb")) == NULL) return -1;
 	i = fread(buf, 1, PNG_BYTES_TO_CHECK, fp);
@@ -254,8 +274,8 @@ static int do_load_png(char *file_name, ls_settings *settings)
 	if ((pwidth > MAX_WIDTH) || (pheight > MAX_HEIGHT)) goto fail2;
 
 	/* Call allocator for image data */
-	settings->width = (int)pwidth;
-	settings->height = (int)pheight;
+	settings->width = width = (int)pwidth;
+	settings->height = height = (int)pheight;
 	settings->bpp = 1;
 	if ((color_type != PNG_COLOR_TYPE_PALETTE) || (bit_depth > 8))
 		settings->bpp = 3;
@@ -265,8 +285,8 @@ static int do_load_png(char *file_name, ls_settings *settings)
 	if ((res = allocate_image(settings, i))) goto fail2;
 	res = -1;
 
-	i = sizeof(png_bytep) * (int)pheight;
-	row_pointers = malloc(i + (int)pwidth * 4);
+	i = sizeof(png_bytep) * height;
+	row_pointers = malloc(i + width * 4);
 	if (!row_pointers) goto fail2;
 	row_pointers[0] = (char *)row_pointers + i;
 
@@ -287,7 +307,6 @@ static int do_load_png(char *file_name, ls_settings *settings)
 		progress_init(msg, 0);
 		progress_update(0.0);
 	}
-	res = 1;
 
 	/* RGB PNG file */
 	if (settings->bpp == 3)
@@ -316,34 +335,50 @@ static int do_load_png(char *file_name, ls_settings *settings)
 
 		if (settings->img[CHN_ALPHA]) /* RGBA */
 		{
-			/* !!! Currently can't handle interlaced RGBA files */
-			if (interlace_type != PNG_INTERLACE_NONE) goto fail2;
-
-			for (i = 0; i < (int)pheight; i++)
+			nx = height;
+			/* Have to do deinterlacing myself */
+			if (interlace_type == PNG_INTERLACE_NONE)
 			{
-				png_read_rows(png_ptr, &row_pointers[0], NULL, 1);
-				src = row_pointers[0];
-				dest = settings->img[CHN_IMAGE] + i * (int)pwidth * 3;
-				dsta = settings->img[CHN_ALPHA] + i * (int)pwidth;
-				for (j = 0; j < (int)pwidth; j++)
+				k = 0; maxpass = 1;
+			}
+			else if (interlace_type == PNG_INTERLACE_ADAM7)
+			{
+				k = 1; maxpass = 8;
+				nx = (nx + 7) & ~7; nx += 7 * (nx >> 3);
+			}
+			else goto fail2; /* Unknown type */
+
+			for (n = 0; k < maxpass; k++)
+			{
+				x0 = png_interlace[k][0];
+				dx = png_interlace[k][1];
+				y0 = png_interlace[k][2];
+				dy = png_interlace[k][3];
+				for (i = y0; i < height; i += dy , n++)
 				{
-					dest[0] = src[0];
-					dest[1] = src[1];
-					dest[2] = src[2];
-					dsta[j] = src[3];
-					src += 4; dest += 3;
+					png_read_rows(png_ptr, &row_pointers[0], NULL, 1);
+					src = row_pointers[0];
+					dest = settings->img[CHN_IMAGE] + (i * width + x0) * 3;
+					dsta = settings->img[CHN_ALPHA] + i * width;
+					for (j = x0; j < width; j += dx)
+					{
+						dest[0] = src[0];
+						dest[1] = src[1];
+						dest[2] = src[2];
+						dsta[j] = src[3];
+						src += 4; dest += 3 * dx;
+					}
+					if (msg && ((n * 20) % nx >= nx - 20))
+						progress_update((float)n / nx);
 				}
-				if (msg && ((i * 20) % (int)pheight >= (int)pheight - 20))
-					progress_update((float)i / (int)pheight);
 			}
 		}
 		else /* RGB */
 		{
 			png_set_strip_alpha(png_ptr);
-			for (i = 0; i < (int)pheight; i++)
+			for (i = 0; i < height; i++)
 			{
-				row_pointers[i] = settings->img[CHN_IMAGE] +
-					i * (int)pwidth * 3;
+				row_pointers[i] = settings->img[CHN_IMAGE] + i * width * 3;
 			}
 			png_read_image(png_ptr, row_pointers);
 		}
@@ -371,16 +406,16 @@ static int do_load_png(char *file_name, ls_settings *settings)
 		png_set_packing(png_ptr);
 		if ((color_type == PNG_COLOR_TYPE_GRAY) && (bit_depth < 8))
 			png_set_gray_1_2_4_to_8(png_ptr);
-		for (i = 0; i < (int)pheight; i++)
+		for (i = 0; i < height; i++)
 		{
-			row_pointers[i] = settings->img[CHN_IMAGE] +
-				i * (int)pwidth;
+			row_pointers[i] = settings->img[CHN_IMAGE] + i * width;
 		}
 		png_read_image(png_ptr, row_pointers);
 	}
 	if (msg) progress_update(1.0);
 
 	png_read_end(png_ptr, info_ptr);
+	res = 1;
 
 	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
 	if (num_uk)	/* File contains mtPaint's private chunks */
@@ -398,7 +433,7 @@ static int do_load_png(char *file_name, ls_settings *settings)
 			/* Skip if not allocated */
 			if (!settings->img[j]) continue;
 
-			dest_len = (int)pwidth * (int)pheight;
+			dest_len = width * height;
 			uncompress(settings->img[j], &dest_len, uk_p[i].data,
 				uk_p[i].size);
 		}
@@ -411,125 +446,6 @@ fail2:	if (msg) progress_end();
 	free(row_pointers);
 	png_destroy_read_struct(&png_ptr, NULL, NULL);
 fail:	fclose(fp);
-	return (res);
-}
-
-static void store_image_extras(ls_settings *settings)
-{
-	/* Stuff RGB transparency into color 255 */
-	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
-	{
-		settings->pal[255].red = INT_2_R(settings->rgb_trans);
-		settings->pal[255].green = INT_2_G(settings->rgb_trans);
-		settings->pal[255].blue = INT_2_B(settings->rgb_trans);
-		settings->xpm_trans = 255;
-		settings->colors = 256;
-	}
-
-	/* Accept vars */
-	mem_xpm_trans = settings->xpm_trans;
-	mem_jpeg_quality = settings->jpeg_quality;
-	mem_xbm_hot_x = settings->hot_x;
-	mem_xbm_hot_y = settings->hot_y;
-	preserved_gif_delay = settings->gif_delay;
-
-	/* Accept palette */
-	mem_pal_copy(mem_pal, settings->pal);
-	mem_cols = settings->colors;
-}
-
-int load_png(char *file_name, int mode)
-{
-	png_color pal[256];
-	ls_settings settings;
-	int i, tr, res;
-
-	init_ls_settings(&settings, NULL);
-	settings.mode = mode;
-	settings.ftype = FT_PNG;
-	settings.pal = pal;
-
-	/* !!! Use default palette - for now */
-	mem_pal_copy(pal, mem_pal_def);
-	settings.colors = mem_pal_def_i;
-
-	res = do_load_png(file_name, &settings);
-
-	switch (settings.mode)
-	{
-	case FS_PNG_LOAD: /* Image */
-		/* Success - accept data */
-		if (res == 1)
-		{
-			/* !!! Image data and dimensions committed already */
-
-			store_image_extras(&settings);
-		}
-		/* Failure needing rollback */
-		else if (settings.img[CHN_IMAGE])
-		{
-			/* !!! Too late to restore previous image */
-			create_default_image();
-		}
-		break;
-	case FS_CLIP_FILE: /* Clipboard */
-		/* Convert color transparency to alpha */
-		tr = settings.bpp == 3 ? settings.rgb_trans : settings.xpm_trans;
-		if ((res == 1) && (tr >= 0))
-		{
-			/* Add alpha channel if no alpha yet */
-			if (!settings.img[CHN_ALPHA])
-			{
-				i = settings.width * settings.height;
-				/* !!! Create committed */
-				mem_clip_alpha = malloc(i);
-				if (mem_clip_alpha)
-				{
-					settings.img[CHN_ALPHA] = mem_clip_alpha;
-					memset(mem_clip_alpha, 255, i);
-				}
-			}
-			if (!settings.img[CHN_ALPHA]) res = FILE_MEM_ERROR;
-			else mem_mask_colors(settings.img[CHN_ALPHA],
-				settings.img[CHN_IMAGE], 0, settings.width,
-				settings.height, settings.bpp, tr, tr);
-		}
-		/* Success - accept data */
-		if (res == 1)
-		{
-			/* !!! Clipboard data committed already */
-
-			/* Accept dimensions */
-			mem_clip_w = settings.width;
-			mem_clip_h = settings.height;
-			mem_clip_bpp = settings.bpp;
-		}
-		/* Failure needing rollback */
-		else if (settings.img[CHN_IMAGE])
-		{
-			/* !!! Too late to restore previous clipboard */
-			free(mem_clipboard);
-			free(mem_clip_alpha);
-			mem_clip_mask_clear();
-		}
-		break;
-	case FS_CHANNEL_LOAD:
-		/* Success - accept data */
-		if (res == 1)
-		{
-			/* Add frame & stuff data into it */
-			undo_next_core(4, mem_width, mem_height, mem_img_bpp,
-				CMASK_CURR);
-			mem_undo_im_[mem_undo_pointer].img[mem_channel] =
-				mem_img[mem_channel] = settings.img[CHN_IMAGE];
-
-			if (mem_channel == CHN_IMAGE)
-				store_image_extras(&settings);
-		}
-		/* Failure needing rollback */
-		else if (settings.img[CHN_IMAGE]) free(settings.img[CHN_IMAGE]);
-		break;
-	}
 	return (res);
 }
 
@@ -695,144 +611,105 @@ exit0:	free(rgba_row);
 	return (res);
 }
 
-
-int load_gif( char *file_name, int *delay )
-{
 #ifdef U_GIF
-	ColorMapObject *cmap = NULL;
+static int load_gif(char *file_name, ls_settings *settings)
+{
+	/* GIF interlace pattern: Y0, DY, ... */
+	static unsigned char interlace[10] = {0, 1, 0, 8, 4, 8, 2, 4, 1, 2};
 	GifFileType *giffy;
 	GifRecordType gif_rec;
 	GifByteType *byte_ext;
+	ColorMapObject *cmap = NULL;
+	int i, j, k, kx, n, w, h, dy, res = -1, frame = 0, val;
+	int delay = settings->gif_delay, trans = -1, disposal = 0;
 
-	GifByteType *CodeBlock;
-	int CodeSize;
 
-	int width = -1, height = -1, cols = -1, i, j, k, val, transparency =-1;
-	int interlaced_offset[] = { 0, 4, 2, 1 }, interlaced_jumps[] = { 8, 8, 4, 2 };
-	int do_prog = 0, frames = 0, res = 1;
+	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
 
-	giffy = DGifOpenFileName( file_name );
-
-	if ( giffy == NULL ) return -1;
-
-	do
+	while (TRUE)
 	{
-		if ( DGifGetRecordType(giffy, &gif_rec) == GIF_ERROR) goto fail;
-		if ( gif_rec == IMAGE_DESC_RECORD_TYPE )
-		{
-//printf("Frames = %i\n", frames);
-			frames++;
-			if ( DGifGetImageDesc(giffy) == GIF_ERROR ) goto fail;
-			if ( frames == 1 )	// Only read the first frame in
-			{
-
-				if ( giffy->SColorMap != NULL ) cmap = giffy->SColorMap;
-				else if ( giffy->Image.ColorMap != NULL ) cmap = giffy->Image.ColorMap;
-
-				if ( cmap == NULL ) goto fail;
-
-				cols = cmap->ColorCount;
-				if ( cols > 256 || cols < 2 )
-				{
-					DGifCloseFile(giffy);
-					return NOT_INDEXED;
-				}
-				mem_cols = cols;
-
-				for ( i=0; i<mem_cols; i++ )
-				{
-					mem_pal[i].red = cmap->Colors[i].Red;
-					mem_pal[i].green = cmap->Colors[i].Green;
-					mem_pal[i].blue = cmap->Colors[i].Blue;
-				}
-
-//				width = giffy->SWidth;
-//				height = giffy->SHeight;
-				width = giffy->Image.Width;
-				height = giffy->Image.Height;
-
-				if ( width > MAX_WIDTH || height > MAX_HEIGHT )
-				{
-					DGifCloseFile(giffy);
-					return TOO_BIG;
-				}
-				if ( width*height > FILE_PROGRESS ) do_prog = 1;
-				if (mem_new(width, height, 1, CMASK_IMAGE))
-					goto fail_too_huge;
-
-				if ( do_prog ) progress_init(_("Loading GIF image"),0);
-				if ( giffy->Image.Interlace )
-				{
-				 for ( k=0; k<4; k++ )
-				 {
-				  for ( j=interlaced_offset[k]; j<mem_height; j=j+interlaced_jumps[k] )
-				  {
-				   if ( j%16 == 0 && do_prog )
-				    progress_update( ((float) j) / mem_height );
-				   DGifGetLine( giffy, mem_img[CHN_IMAGE] + j*mem_width, mem_width );
-				  }
-				 }
-				}
-				else for ( j=0; j<mem_height; j++ )
-					{
-						if ( j%16 == 0 && do_prog )
-							progress_update( ((float) j) / mem_height );
-						DGifGetLine( giffy, mem_img[CHN_IMAGE] + j*mem_width, mem_width );
-					}
-
-				if ( do_prog ) progress_end();
-			}
-			else	// Subsequent frames not read in
-			{
-				if ( DGifGetCode(giffy, &CodeSize, &CodeBlock) == GIF_ERROR )
-					goto fail;
-				while (CodeBlock != NULL)
-				{
-					if ( DGifGetCodeNext(giffy, &CodeBlock) == GIF_ERROR )
-						goto fail;
-				}
-			}
-		}
-
-		if ( gif_rec == EXTENSION_RECORD_TYPE )
+		if (DGifGetRecordType(giffy, &gif_rec) == GIF_ERROR) goto fail;
+		if (gif_rec == TERMINATE_RECORD_TYPE) break;
+		else if (gif_rec == EXTENSION_RECORD_TYPE)
 		{
 			if (DGifGetExtension(giffy, &val, &byte_ext) == GIF_ERROR) goto fail;
-			while (byte_ext != NULL)
+			while (byte_ext)
 			{
-				if ( val == GRAPHICS_EXT_FUNC_CODE )
+				if (val == GRAPHICS_EXT_FUNC_CODE)
 				{
-					if ( byte_ext[1] % 2 == 1 && frames <= 1 )
-					{
-						transparency = byte_ext[4];
-						*delay = byte_ext[2] + (byte_ext[3]<<8);
-					}
+					trans = byte_ext[1] & 1 ? byte_ext[4] : -1;
+					delay = byte_ext[2] + (byte_ext[3] << 8);
+					disposal = (byte_ext[1] >> 2) & 7;
 				}
 				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
 			}
 		}
+		else if (gif_rec == IMAGE_DESC_RECORD_TYPE)
+		{
+			if (frame++) /* Multipage GIF - notify user */
+			{
+				res = FILE_GIF_ANIM;
+				goto fail;
+			}
+
+			if (DGifGetImageDesc(giffy) == GIF_ERROR) goto fail;
+
+			/* Get palette */
+			cmap = giffy->SColorMap ? giffy->SColorMap :
+				giffy->Image.ColorMap;
+			if (!cmap) goto fail;
+			settings->colors = j = cmap->ColorCount;
+			if ((j > 256) || (j < 1)) goto fail;
+			for (i = 0; i < j; i++)
+			{
+				settings->pal[i].red = cmap->Colors[i].Red;
+				settings->pal[i].green = cmap->Colors[i].Green;
+				settings->pal[i].blue = cmap->Colors[i].Blue;
+			}
+
+			/* Store actual image parameters */
+			settings->gif_delay = delay;
+			settings->xpm_trans = trans;
+			settings->width = w = giffy->Image.Width;
+			settings->height = h = giffy->Image.Height;
+			settings->bpp = 1;
+
+			if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
+			res = -1;
+
+			if (!settings->silent)
+				progress_init(_("Loading GIF image"), 0);
+
+			if (giffy->Image.Interlace)
+			{
+				k = 2; kx = 10;
+			}
+			else
+			{
+				k = 0; kx = 2;
+			}
+
+			for (n = 0; k < kx; k += 2)
+			{
+				dy = interlace[k + 1];
+				for (i = interlace[k]; i < h; n++ , i += dy)
+				{
+					if (DGifGetLine(giffy, settings->img[CHN_IMAGE] +
+						i * w, w) == GIF_ERROR) goto fail2;
+					if (!settings->silent && ((n * 10) % h >= h - 10))
+						progress_update((float)n / h);
+				}
+			}
+			res = 1;
+fail2:			if (!settings->silent) progress_end();
+			if (res < 0) break;
+		}
 	}
-	while ( gif_rec != TERMINATE_RECORD_TYPE );
 
-//printf("Total frames = %i\n", frames);
-	if ( frames > 1 ) res = FILE_GIF_ANIM;
-
-	mem_xpm_trans = transparency;
-
-	DGifCloseFile(giffy);
-	return res;
-
-fail:
-	DGifCloseFile(giffy);
-	return -1;
-fail_too_huge:
-	DGifCloseFile(giffy);
-	return FILE_MEM_ERROR;
-#else
-	return -1;
-#endif
+fail:	DGifCloseFile(giffy);
+	return (res);
 }
 
-#ifdef U_GIF
 static int save_gif(char *file_name, ls_settings *settings)
 {
 	ColorMapObject *gif_map;
@@ -910,105 +787,61 @@ METHODDEF(void) my_error_exit (j_common_ptr cinfo)
 }
 struct my_error_mgr jerr;
 
-#endif
-
-int load_jpeg( char *file_name )
+static int load_jpeg(char *file_name, ls_settings *settings)
 {
-#ifdef U_JPEG
 	struct jpeg_decompress_struct cinfo;
-	FILE *fp;
-	int width, height, i, do_prog;
 	unsigned char *memp;
+	FILE *fp;
+	int i, width, height, bpp = 3, res = -1, pr = 0;
+
+
+	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
 
 	jpeg_create_decompress(&cinfo);
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
 	if (setjmp(jerr.setjmp_buffer))
 	{
-		jpeg_destroy_decompress(&cinfo);
-		return -1;
+		res = FILE_LIB_ERROR;
+		goto fail;
 	}
+	jpeg_stdio_src(&cinfo, fp);
 
-	if (( fp = fopen(file_name, "rb") ) == NULL)
-		return -1;
-
-	jpeg_stdio_src( &cinfo, fp );
-
-	if (setjmp(jerr.setjmp_buffer))
+	jpeg_read_header(&cinfo, TRUE);
+	jpeg_start_decompress(&cinfo);
+	if (cinfo.output_components == 1) /* Greyscale */
 	{
-		jpeg_destroy_decompress( &cinfo );
-		fclose(fp);
-		return -1;
+		settings->colors = 256;
+		for (i = 0; i < 256; i++)
+			settings->pal[i].red = settings->pal[i].green =
+				settings->pal[i].blue = i;
+		bpp = 1;
 	}
+	settings->width = width = cinfo.output_width;
+	settings->height = height = cinfo.output_height;
+	settings->bpp = bpp;
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
+	res = -1;
+	pr = !settings->silent;
 
-	jpeg_read_header( &cinfo, TRUE );
+	if (pr) progress_init(_("Loading JPEG image"), 0);
 
-	jpeg_start_decompress( &cinfo );
-	width = cinfo.output_width;
-	height = cinfo.output_height;
-
-	if ( width > MAX_WIDTH || height > MAX_HEIGHT )
+	for (i = 0; i < height; i++)
 	{
-		jpeg_finish_decompress( &cinfo );
-		jpeg_destroy_decompress( &cinfo );
-		return TOO_BIG;
+		memp = settings->img[CHN_IMAGE] + width * i * bpp;
+		jpeg_read_scanlines(&cinfo, &memp, 1);
+		if (pr && ((i * 20) % height >= height - 20))
+			progress_update((float)i / height);
 	}
+	jpeg_finish_decompress(&cinfo);
+	res = 1;
 
-	if ( width*height > FILE_PROGRESS ) do_prog = 1;
-	else do_prog = 0;
-
-	if ( cinfo.output_components == 1 )
-	{
-		mem_cols = 256;
-		mem_scale_pal( 0, 0,0,0, 255, 255, 255, 255 );
-		if (mem_new(width, height, 1, CMASK_IMAGE))
-			goto fail_too_huge;		// Greyscale
-	}
-	else
-	{
-		mem_pal_load_def();
-		if (mem_new(width, height, 3, CMASK_IMAGE))
-			goto fail_too_huge;		// RGB
-	}
-	memp = mem_img[CHN_IMAGE];
-
-	if (setjmp(jerr.setjmp_buffer))			// If libjpeg causes errors now its too late
-	{
-		if ( do_prog ) progress_end();
-
-		jpeg_destroy_decompress( &cinfo );
-		fclose(fp);
-
-		return FILE_LIB_ERROR;
-	}
-
-	if ( do_prog ) progress_init(_("Loading JPEG image"),0);
-
-	for ( i=0; i<height; i++ )
-	{
-		if ( i%16 == 0 && do_prog ) progress_update( ((float) i) / height );
-		jpeg_read_scanlines( &cinfo, &memp, 1 );
-		memp = memp + width*mem_img_bpp;
-	}
-	if ( do_prog ) progress_end();
-
-	jpeg_finish_decompress( &cinfo );
-	jpeg_destroy_decompress( &cinfo );
+fail:	if (pr) progress_end();
+	jpeg_destroy_decompress(&cinfo);
 	fclose(fp);
-
-	return 1;
-fail_too_huge:
-	jpeg_finish_decompress( &cinfo );
-	jpeg_destroy_decompress( &cinfo );
-	fclose(fp);
-
-	return FILE_MEM_ERROR;
-#else
-	return -1;
-#endif
+	return (res);
 }
 
-#ifdef U_JPEG
 static int save_jpeg(char *file_name, ls_settings *settings)
 {
 	struct jpeg_compress_struct cinfo;
@@ -1062,80 +895,373 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 }
 #endif
 
-
-int load_tiff( char *file_name )
-{
 #ifdef U_TIFF
-	unsigned int width, height, i, j;
-	unsigned char red, green, blue, *wrk_image;
-	uint32 *raster = NULL;
-	int do_prog = 0;
-	TIFF *tif;
 
-	TIFFSetErrorHandler(NULL);		// We don't want any echoing to the output
+/* *** PREFACE ***
+ * TIFF is a bitch, and libtiff is a joke. An unstable and buggy joke, at that.
+ * It's a fact of life - and when some TIFFs don't load or are mangled, that
+ * also is a fact of life. Installing latest libtiff may help - or not; sending
+ * a bugreport with the offending file attached may help too - but again, it's
+ * not guaranteed. But the common varieties of TIFF format should load OK. */
+
+/* Slow-but-sure universal bitstream parser; may read extra byte at the end */
+static void stream_bits(unsigned char *src, unsigned char *dest, int cnt,
+	int bits, int bit0, int bitstep, int step)
+{
+	int i, j, v, mask = (1 << bits) - 1;
+
+	for (i = 0; i < cnt; i++)
+	{
+		j = bit0 >> 3;
+		v = (src[j] << 8) | src[j + 1];
+		v >>= 16 - bits - (bit0 & 7);
+		*dest = (unsigned char)(v & mask);
+		bit0 += bitstep;
+		dest += step;
+	}
+}
+
+static int load_tiff(char *file_name, ls_settings *settings)
+{
+	char cbuf[1024];
+	TIFF *tif;
+	uint16 bpsamp, sampp, xsamp, pmetric, planar, orient, sform;
+	uint16 *sampinfo, *red16, *green16, *blue16;
+	uint32 width, height, tw = 0, th = 0, rps = 0;
+	uint32 *tr, *raster = NULL;
+	unsigned char *tmp, *src, *buf = NULL;
+	double d, d1;
+	int i, j, k, x0, y0, bsz, xstep, ystep, plane, nplanes, mirror;
+	int x, w, h, dx, bpr, bits1, bit0, db, n, nx;
+	int res = -1, bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
+
+	/* We don't want any echoing to the output */
+	TIFFSetErrorHandler(NULL);
 	TIFFSetWarningHandler(NULL);
 
-	tif = TIFFOpen( file_name, "r" );
-	if ( tif == NULL ) return -1;
+	if (!(tif = TIFFOpen(file_name, "r"))) return (-1);
 
+	/* Let's learn what we've got */
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &sampp);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_EXTRASAMPLES, &xsamp, &sampinfo);
+	if (!TIFFGetField(tif, TIFFTAG_PHOTOMETRIC, &pmetric))
+	{
+		/* Defaults like in libtiff */
+		if (sampp - xsamp == 1) pmetric = PHOTOMETRIC_MINISBLACK;
+		else if (sampp - xsamp == 3) pmetric = PHOTOMETRIC_RGB;
+		else goto fail;
+	}
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sform);
 	TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
 	TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height);
-
-	if ( width > MAX_WIDTH || height > MAX_HEIGHT )
+	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bpsamp);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG, &planar);
+	planar = planar != PLANARCONFIG_CONTIG;
+	TIFFGetFieldDefaulted(tif, TIFFTAG_ORIENTATION, &orient);
+	switch (orient)
 	{
-		_TIFFfree(raster);
-		TIFFClose(tif);
-		return TOO_BIG;
+	case ORIENTATION_TOPLEFT:
+	case ORIENTATION_LEFTTOP: mirror = 0; break;
+	case ORIENTATION_TOPRIGHT:
+	case ORIENTATION_RIGHTTOP: mirror = 1; break;
+	default:
+	case ORIENTATION_BOTLEFT:
+	case ORIENTATION_LEFTBOT: mirror = 2; break;
+	case ORIENTATION_BOTRIGHT:
+	case ORIENTATION_RIGHTBOT: mirror = 3; break;
+	}
+	if (TIFFIsTiled(tif))
+	{
+		TIFFGetField(tif, TIFFTAG_TILEWIDTH, &tw);
+		TIFFGetField(tif, TIFFTAG_TILELENGTH, &th);
+	}
+	else
+	{
+		TIFFGetFieldDefaulted(tif, TIFFTAG_ROWSPERSTRIP, &rps);
 	}
 
-	if ( width*height > FILE_PROGRESS ) do_prog = 1;
-
-	mem_pal_load_def();
-	if (mem_new(width, height, 3, CMASK_IMAGE))		// RGB
-	{
-		_TIFFfree(raster);
-		TIFFClose(tif);
-		return FILE_MEM_ERROR;
-	}
-	wrk_image = mem_img[CHN_IMAGE];
-
-	raster = (uint32 *) _TIFFmalloc ( width * height * sizeof (uint32));
-
-	if ( raster == NULL ) goto fail;		// Not enough memory
-
-	if ( TIFFReadRGBAImage(tif, width, height, raster, 0) )
-	{
-		if ( do_prog ) progress_init(_("Loading TIFF image"),0);
-		for ( j=0; j<height; j++ )
+	/* Let's decide how to store it */
+	if ((width > MAX_WIDTH) || (height > MAX_HEIGHT)) goto fail;
+	settings->width = width;
+	settings->height = height;
+	if ((sform != SAMPLEFORMAT_UINT) && (sform != SAMPLEFORMAT_INT) &&
+		(sform != SAMPLEFORMAT_VOID)) argb = TRUE;
+	else	switch (pmetric)
 		{
-			if ( j%16 == 0 && do_prog ) progress_update( ((float) j) / height );
-			for ( i=0; i<width; i++ )
+		case PHOTOMETRIC_PALETTE:
+			if (bpsamp > 8)
 			{
-				red = TIFFGetR( raster[(height-j-1) * width + i] );
-				green = TIFFGetG( raster[(height-j-1) * width + i] );
-				blue = TIFFGetB( raster[(height-j-1) * width + i] );
-				wrk_image[ 3*(i + width*j) ] = red;
-				wrk_image[ 1 + 3*(i + width*j) ] = green;
-				wrk_image[ 2 + 3*(i + width*j) ] = blue;
+				argb = TRUE;
+				break;
+			}
+			if (!TIFFGetField(tif, TIFFTAG_COLORMAP,
+				&red16, &green16, &blue16)) goto fail;
+		case PHOTOMETRIC_MINISWHITE:
+		case PHOTOMETRIC_MINISBLACK:
+			bpp = 1; break;
+		case PHOTOMETRIC_RGB:
+			break;
+		default:
+			argb = TRUE;
+		}
+
+	/* libtiff can't handle this and neither can we */
+	if (argb && !TIFFRGBAImageOK(tif, cbuf)) goto fail;
+
+	settings->bpp = bpp;
+	if (xsamp && ((sampinfo[0] == EXTRASAMPLE_ASSOCALPHA) ||
+		(sampinfo[0] == EXTRASAMPLE_UNASSALPHA) || (sampp > 3)))
+		cmask = CMASK_RGBA;
+
+	/* !!! No alpha support for RGB mode yet */
+	if (argb) cmask = CMASK_IMAGE;
+
+	if ((res = allocate_image(settings, cmask))) goto fail;
+	res = -1;
+
+	if ((pr = !settings->silent))
+	{
+		progress_init(_("Loading TIFF image"), 0);
+		progress_update(0.0);
+	}
+
+	/* Read it as ARGB if can't understand it ourselves */
+	if (argb)
+	{
+		/* libtiff is too much of a moving target if finer control is
+		 * needed, so let's trade memory for stability */
+		raster = (uint32 *)_TIFFmalloc(width * height * sizeof(uint32));
+		res = FILE_MEM_ERROR;
+		if (!raster) goto fail2;
+		res = FILE_LIB_ERROR;
+		if (!TIFFReadRGBAImage(tif, width, height, raster, 0)) goto fail2;
+		res = -1;
+
+		/* Parse the RGB part only - alpha might be eaten by bugs */
+		tr = raster;
+		for (i = height - 1; i >= 0; i--)
+		{
+			tmp = settings->img[CHN_IMAGE] + width * i * bpp;
+			for (j = 0; j < width; j++)
+			{
+				tmp[0] = TIFFGetR(tr[j]);
+				tmp[1] = TIFFGetG(tr[j]);
+				tmp[2] = TIFFGetB(tr[j]);
+				tmp += 3;
+			}
+			tr += width;
+			if (pr && ((i * 10) % height >= height - 10))
+				progress_update((float)(height - i) / height);
+		}
+
+		_TIFFfree(raster);
+		raster = NULL;
+
+/* !!! Now it would be good to read in alpha ourselves - but not yet... */
+
+		res = 1;
+	}
+
+	/* Read & interpret it ourselves */
+	else
+	{
+		xstep = tw ? tw : width;
+		ystep = th ? th : rps;
+		nplanes = !planar ? 1 :	(pmetric == PHOTOMETRIC_RGB ? 3 : 1) +
+			(settings->img[CHN_ALPHA] ? 1 : 0);
+		bits1 = bpsamp > 8 ? 8 : bpsamp;
+		*(uint32 *)cbuf = 1; /* Test endianness */
+
+		/* !!! Assume 16-, 32- and 64-bit data follow machine's
+		 * endianness, and everything else is packed big-endian way -
+		 * like TIFF 6.0 spec says; but TIFF 5.0 and before specs said
+		 * differently, so let's wait for examples to see if I'm right
+		 * or not; as for 24- and 128-bit, even different libtiff
+		 * versions handle them differently, so I leave them alone
+		 * for now - WJ */
+
+		bit0 = cbuf[0] && ((bpsamp == 16) || (bpsamp == 32) ||
+			(bpsamp == 64)) ? bpsamp - 8 : 0;
+		db = (planar ? 1 : sampp) * bpsamp;
+		bsz = (tw ? TIFFTileSize(tif) : TIFFStripSize(tif)) + 1;
+		bpr = tw ? TIFFTileRowSize(tif) : TIFFScanlineSize(tif);
+
+		buf = _TIFFmalloc(bsz);
+		res = FILE_MEM_ERROR;
+		if (!buf) goto fail2;
+		res = FILE_LIB_ERROR;
+
+		/* Progress steps */
+		nx = ((width + xstep - 1) / xstep) * nplanes * height;
+
+		/* Read image tile by tile - considering strip a wide tile */
+		for (n = y0 = 0; y0 < height; y0 += ystep)
+		for (x0 = 0; x0 < width; x0 += xstep)
+		for (plane = 0; plane < nplanes; plane++)
+		{
+			/* Read one piece */
+			if (tw)
+			{
+				if (TIFFReadTile(tif, buf, x0, y0, 0, plane) < 0)
+					goto fail2;
+			}
+			else
+			{
+				if (TIFFReadEncodedStrip(tif,
+					TIFFComputeStrip(tif, y0, plane),
+					buf, bsz) < 0) goto fail2;
+			}
+
+			/* Prepare decoding loops */
+			if (mirror & 1) /* X mirror */
+			{
+				x = width - x0 - 1;
+				w = x < xstep ? x : xstep;
+				x -= w - 1;
+			}
+			else
+			{
+				x = x0;
+				w = x + xstep > width ? width - x : xstep;
+			}
+			if (mirror & 2) /* Y mirror */
+			{
+				h = height - y0 - 1;
+				if (h > ystep) h = ystep;
+			}
+			else h = y0 + ystep > height ? height - y0 : ystep;
+			src = buf;
+
+			/* Decode it */
+			for (j = y0; j < y0 + h; j++ , n++ , src += bpr)
+			{
+				i = (mirror & 2 ? height - j + 1 : j) * width + x;
+				if (plane > bpp)
+				{
+					dx = mirror & 1 ? -1 : 1;
+					tmp = settings->img[CHN_ALPHA] + i;
+				}
+				else
+				{
+					dx = mirror & 1 ? -bpp : bpp;
+					tmp = settings->img[CHN_IMAGE] + i * bpp + plane;
+				}
+				stream_bits(src, tmp, w, bits1, bit0, db, dx);
+				if (planar) continue;
+				if (bpp == 3)
+				{
+					stream_bits(src, tmp + 1, w, bits1,
+						bit0 + bpsamp, db, dx);
+					stream_bits(src, tmp + 2, w, bits1,
+						bit0 + bpsamp * 2, db, dx);
+				}
+				if (settings->img[CHN_ALPHA])
+				{
+					dx = mirror & 1 ? -1 : 1;
+					tmp = settings->img[CHN_ALPHA] + i;
+					stream_bits(src, tmp, w, bits1,
+						bit0 + bpsamp * bpp, db, dx);
+				}
+				if (pr && ((n * 10) % nx >= nx - 10))
+					progress_update((float)n / nx);
 			}
 		}
-		if ( do_prog ) progress_end();
-		_TIFFfree(raster);
-		TIFFClose(tif);
-		return 1;
+
+		/* Un-associate alpha & rescale image data */
+		d1 = 255.0 / (double)((1 << bits1) - 1);
+		j = width * height;
+		tmp = settings->img[CHN_IMAGE];
+		src = settings->img[CHN_ALPHA];
+		if (src && (pmetric != PHOTOMETRIC_PALETTE) &&
+			(sampinfo[0] != EXTRASAMPLE_UNASSALPHA))
+		{
+			for (i = 0; i < j; i++ , tmp += bpp)
+			{
+				if (!src[i]) continue;
+				d = 255.0 / (double)src[i];
+				src[i] = rint(d1 * src[i]);
+				k = rint(d * tmp[0]);
+				tmp[0] = k > 255 ? 255 : k;
+				if (bpp == 1) continue;
+				k = rint(d * tmp[1]);
+				tmp[1] = k > 255 ? 255 : k;
+				k = rint(d * tmp[2]);
+				tmp[2] = k > 255 ? 255 : k;
+			}
+			bits1 = 8;
+		}
+
+		/* Rescale alpha */
+		if (src && (bits1 < 8))
+		{
+			for (i = 0; i < j; i++)
+			{
+				src[i] = rint(d1 * src[i]);
+			}
+		}
+
+		/* Rescale RGB */
+		if ((bpp == 3) && (bits1 < 8))
+		{
+			for (i = 0; i < j * 3; i++)
+			{
+				tmp[i] = rint(d1 * tmp[i]);
+			}
+		}
+
+		/* Load palette */
+		j = 1 << bits1;
+		if (pmetric == PHOTOMETRIC_PALETTE)
+		{
+			settings->colors = j;
+			/* Analyze palette */
+			for (k = i = 0; i < j; i++)
+			{
+				k |= red16[i] | green16[i] | blue16[i];
+			}
+			if (k < 256) /* Old palette format */
+			{
+				for (i = 0; i < j; i++)
+				{
+					settings->pal[i].red = red16[i];
+					settings->pal[i].green = green16[i];
+					settings->pal[i].blue = blue16[i];
+				}
+			}
+			else /* New palette format */
+			{
+				for (i = 0; i < j; i++)
+				{
+					settings->pal[i].red = (red16[i] + 128) / 257;
+					settings->pal[i].green = (green16[i] + 128) / 257;
+					settings->pal[i].blue = (blue16[i] + 128) / 257;
+				}
+			}
+		}
+
+		else if (bpp == 1)
+		{
+			settings->colors = j--;
+			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
+			for (i = 0; i <= j; i++)
+			{
+				settings->pal[i].red = settings->pal[i].green =
+					settings->pal[i].blue =
+					rint(255.0 * (i ^ k) / (double)j);
+			}
+		}
+		res = 1;
 	}
-fail:
-	_TIFFfree(raster);
-	TIFFClose(tif);
-	return -1;
-#else
-	return -1;
-#endif
+
+fail2:	if (pr) progress_end();
+	if (raster) _TIFFfree(raster);
+	if (buf) _TIFFfree(buf);
+fail:	TIFFClose(tif);
+	return (res);
 }
 
 #define TIFFX_VERSION 0 // mtPaint's TIFF extensions version
 
-#ifdef U_TIFF
 static int save_tiff(char *file_name, ls_settings *settings)
 {
 /* !!! No private exts for now */
@@ -1143,19 +1269,16 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 	unsigned char *src, *row = NULL;
 	uint16 rgb[256 * 3], xs[NUM_CHANNELS];
-/* !!! No extra channels for now */
-//	int i, j, k, dt, xsamp = 0, cmask = CMASK_IMAGE, res = 0;
-
-int i, xsamp = 0, res = 0;
-
+	int i, j, k, dt, xsamp = 0, cmask = CMASK_IMAGE, res = 0;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
 
-/* !!! No extra channels for now */
-#if 0
 	/* Find out number of utility channels */
 	memset(xs, 0, sizeof(xs));
-	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+
+/* !!! Only alpha channel as extra, for now */
+	for (i = CHN_ALPHA; i <= CHN_ALPHA; i++)
+//	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 	{
 		if (!settings->img[i]) continue;
 		cmask |= CMASK_FOR(i);
@@ -1167,7 +1290,6 @@ int i, xsamp = 0, res = 0;
 		row = malloc(w * (bpp + xsamp));
 		if (!row) return -1;
 	}
-#endif
 
 	TIFFSetErrorHandler(NULL);		// We don't want any echoing to the output
 	TIFFSetWarningHandler(NULL);
@@ -1218,8 +1340,6 @@ int i, xsamp = 0, res = 0;
 	for (i = 0; i < h; i++)
 	{
 		src = settings->img[CHN_IMAGE] + w * i * bpp;
-/* !!! No extra channels for now */
-#if 0
 		if (row) /* Interlace the channels */
 		{
 			for (dt = k = 0; k < w * bpp; k += bpp , dt += xsamp)
@@ -1240,7 +1360,6 @@ int i, xsamp = 0, res = 0;
 				dt -= w * xsamp - 1;
 			}
 		}
-#endif
 		if (TIFFWriteScanline(tif, row ? row : src, i, 0) == -1)
 		{
 			res = -1;
@@ -2039,6 +2158,170 @@ int save_image(char *file_name, ls_settings *settings)
 
 	if (settings->pal == greypal) settings->pal = NULL;
 	return res;
+}
+
+static void store_image_extras(ls_settings *settings)
+{
+	/* Stuff RGB transparency into color 255 */
+	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
+	{
+		settings->pal[255].red = INT_2_R(settings->rgb_trans);
+		settings->pal[255].green = INT_2_G(settings->rgb_trans);
+		settings->pal[255].blue = INT_2_B(settings->rgb_trans);
+		settings->xpm_trans = 255;
+		settings->colors = 256;
+	}
+
+	/* Accept vars */
+	mem_xpm_trans = settings->xpm_trans;
+	mem_jpeg_quality = settings->jpeg_quality;
+	mem_xbm_hot_x = settings->hot_x;
+	mem_xbm_hot_y = settings->hot_y;
+	preserved_gif_delay = settings->gif_delay;
+
+	/* Accept palette */
+	mem_pal_copy(mem_pal, settings->pal);
+	mem_cols = settings->colors;
+}
+
+int load_image(char *file_name, int mode, int ftype)
+{
+	png_color pal[256];
+	ls_settings settings;
+	int i, tr, res;
+
+	init_ls_settings(&settings, NULL);
+	settings.mode = mode;
+	settings.ftype = FT_PNG;
+	settings.pal = pal;
+
+	/* !!! Use default palette - for now */
+	mem_pal_copy(pal, mem_pal_def);
+	settings.colors = mem_pal_def_i;
+
+	switch (ftype)
+	{
+	default:
+	case FT_PNG: res = load_png(file_name, &settings); break;
+#ifdef U_GIF
+	case FT_GIF: res = load_gif(file_name, &settings); break;
+#endif
+#ifdef U_JPEG
+	case FT_JPEG: res = load_jpeg(file_name, &settings); break;
+#endif
+#ifdef U_TIFF
+	case FT_TIFF: res = load_tiff(file_name, &settings); break;
+#endif
+	}
+
+	/* Animated GIF was loaded so tell user */
+	if (res == FILE_GIF_ANIM)
+	{
+		i = alert_box(_("Warning"), _("This is an animated GIF file.  What do you want to do?"),
+			_("Cancel"), _("Edit Frames"),
+#ifndef WIN32
+			_("View Animation")
+#else
+			NULL
+#endif
+			);
+
+		if (i == 2) /* Ask for directory to explode frames to */
+		{
+			/* Needed when starting new mtpaint process later */
+			preserved_gif_delay = settings.gif_delay;
+			strncpy(preserved_gif_filename, file_name, 250);
+			file_selector(FS_GIF_EXPLODE);
+		}
+		else if (i == 3)
+		{
+			char mess[512];
+
+			snprintf(mess, 500, "gifview -a \"%s\" &", file_name);
+			gifsicle(mess);
+		}
+		/* Have empty image again to avoid destroying old animation */
+		create_default_image();
+		mem_pal_copy(pal, mem_pal);
+		res = 1;
+	}
+
+	switch (settings.mode)
+	{
+	case FS_PNG_LOAD: /* Image */
+		/* Success OR LIB FAILURE - accept data */
+		if ((res == 1) || (res == FILE_LIB_ERROR))
+		{
+			/* !!! Image data and dimensions committed already */
+
+			store_image_extras(&settings);
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE])
+		{
+			/* !!! Too late to restore previous image */
+			create_default_image();
+		}
+		break;
+	case FS_CLIP_FILE: /* Clipboard */
+		/* Convert color transparency to alpha */
+		tr = settings.bpp == 3 ? settings.rgb_trans : settings.xpm_trans;
+		if ((res == 1) && (tr >= 0))
+		{
+			/* Add alpha channel if no alpha yet */
+			if (!settings.img[CHN_ALPHA])
+			{
+				i = settings.width * settings.height;
+				/* !!! Create committed */
+				mem_clip_alpha = malloc(i);
+				if (mem_clip_alpha)
+				{
+					settings.img[CHN_ALPHA] = mem_clip_alpha;
+					memset(mem_clip_alpha, 255, i);
+				}
+			}
+			if (!settings.img[CHN_ALPHA]) res = FILE_MEM_ERROR;
+			else mem_mask_colors(settings.img[CHN_ALPHA],
+				settings.img[CHN_IMAGE], 0, settings.width,
+				settings.height, settings.bpp, tr, tr);
+		}
+		/* Success - accept data */
+		if (res == 1)
+		{
+			/* !!! Clipboard data committed already */
+
+			/* Accept dimensions */
+			mem_clip_w = settings.width;
+			mem_clip_h = settings.height;
+			mem_clip_bpp = settings.bpp;
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE])
+		{
+			/* !!! Too late to restore previous clipboard */
+			free(mem_clipboard);
+			free(mem_clip_alpha);
+			mem_clip_mask_clear();
+		}
+		break;
+	case FS_CHANNEL_LOAD:
+		/* Success - accept data */
+		if (res == 1)
+		{
+			/* Add frame & stuff data into it */
+			undo_next_core(4, mem_width, mem_height, mem_img_bpp,
+				CMASK_CURR);
+			mem_undo_im_[mem_undo_pointer].img[mem_channel] =
+				mem_img[mem_channel] = settings.img[CHN_IMAGE];
+
+			if (mem_channel == CHN_IMAGE)
+				store_image_extras(&settings);
+		}
+		/* Failure needing rollback */
+		else if (settings.img[CHN_IMAGE]) free(settings.img[CHN_IMAGE]);
+		break;
+	}
+	return (res);
 }
 
 int export_undo(char *file_name, ls_settings *settings)

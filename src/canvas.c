@@ -1211,7 +1211,7 @@ static int populate_channel(char *filename)
 	if (ftype < 0) return (-1); /* Silently fail if no file */
 
 	/* !!! No other formats for now */
-	if (ftype == FT_PNG) res = load_png(filename, FS_CHANNEL_LOAD);
+	if (ftype == FT_PNG) res = load_image(filename, FS_CHANNEL_LOAD, ftype);
 
 	/* Successful */
 	if (res == 1) canvas_undo_chores();
@@ -1228,7 +1228,7 @@ static int populate_channel(char *filename)
 int do_a_load( char *fname )
 {
 	char mess[512], real_fname[300];
-	int res, i, gif_delay, ftype;
+	int res, i, ftype;
 
 
 	if ((fname[0] != DIR_SEP)
@@ -1257,10 +1257,12 @@ int do_a_load( char *fname )
 
 	switch (ftype)
 	{
-	case FT_PNG: res = load_png(real_fname, FS_PNG_LOAD); break;
-	case FT_JPEG: res = load_jpeg( real_fname ); break;
-	case FT_TIFF: res = load_tiff( real_fname ); break;
-	case FT_GIF: res = load_gif( real_fname, &gif_delay ); break;
+	case FT_PNG:
+	case FT_GIF:
+	case FT_JPEG:
+	case FT_TIFF:
+		res = load_image(real_fname, FS_PNG_LOAD, ftype);
+		break;
 	case FT_BMP: res = load_bmp( real_fname ); break;
 	case FT_XPM: res = load_xpm( real_fname ); break;
 	case FT_XBM: res = load_xbm( real_fname ); break;
@@ -1317,33 +1319,6 @@ int do_a_load( char *fname )
 
 	if ( res>0 )
 	{
-		if ( res == FILE_GIF_ANIM )		// Animated GIF was loaded so tell user
-		{
-			res = alert_box( _("Warning"), _("This is an animated GIF file.  What do you want to do?"), _("Cancel"), _("Edit Frames"),
-#ifdef WIN32
-			NULL
-#else
-			_("View Animation")
-#endif
-			);
-
-			if ( res == 2 )			// Ask for directory to explode frames to
-			{
-				preserved_gif_delay = gif_delay;
-					// Needed when starting new mtpaint process later
-				strncpy( preserved_gif_filename, mem_filename, 250 );
-
-				file_selector( FS_GIF_EXPLODE );
-			}
-			if ( res == 3 )
-			{
-				snprintf(mess, 500, "gifview -a \"%s\" &", fname );
-				gifsicle(mess);
-			}
-
-			create_default_image();		// Have empty image again to avoid destroying old animation
-		}
-
 		update_all_views();					// Show new image
 		update_image_bar();
 
@@ -2467,11 +2442,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				if (j != k) /* And never start on colour A */
 				{
 					spot_undo(UNDO_DRAW);
-					/* Regular fill */
-					if (!tool_pat && (tool_opacity == 255) && !flood_step)
-						flood_fill(x, y, j);
-					/* Fill using temp buffer */
-					else flood_fill_pat(x, y, j);
+					flood_fill(x, y, j);
 					update_all_views();
 				}
 			}
