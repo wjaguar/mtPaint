@@ -4149,9 +4149,8 @@ void setup_language()			// Change language
 
 	setlocale(LC_ALL, txt);
 #endif
-#if GTK_MAJOR_VERSION == 2
+	/* !!! Slow or not, but NLS is *really* broken on GTK+1 without it - WJ */
 	gtk_set_locale();	// GTK+1 hates this - it really slows things down
-#endif
 }
 #endif
 

@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2007 Mark Tyler
+	Copyright (C) 2004-2008 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -29,7 +29,7 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.20 - Copyright (C) 2004-2007 The Authors\n"),
+_("mtPaint 3.21 - Copyright (C) 2004-2008 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
@@ -73,6 +73,8 @@ _("  Ctrl-R            Redo an undone action\n"),
 _("  C                 Command Line Window"),
 _("  V                 View Window"),
 _("  L                 Layers Window\n"),
+_("  A                 Draw open arrow head when using the line tool (size set by flow setting)"),
+_("  S                 Draw closed arrow head when using the line tool (size set by flow setting)\n"),
 _("  +,=               Main edit window - Zoom in"),
 _("  -                 Main edit window - Zoom out"),
 _("  Shift +,=         View window - Zoom in"),
@@ -152,17 +154,19 @@ _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan"),
 _("Czech - Pavel Ruzicka"),
 _("French - Nicolas Velin, Pascal Billard, Sylvain Cresto"),
+_("Galician - Miguel Anxo Bouzada"),
 _("German - Oliver Frommel"),
 _("Japanese - Norihiro YONEDA"),
-_("Polish - Simek, Groszek150(LucaS)"),
+_("Polish - Simek, LucaS"),
 _("Portuguese - Israel G. Lugo, Tiago Silva"),
+_("Russian - Sergey Irupin, Dmitry Groshev"),
 _("Simplified Chinese - puppychinese(Cecc)"),
 _("Slovak - Jozef Riha"),
-_("Spanish - Guadalinex Team (Junta de Andalucia), Antonio San"),
+_("Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };
-#define HELP_PAGE_MAX 70
+#define HELP_PAGE_MAX 72
 
 static char **help_pages[HELP_PAGE_COUNT] = {
 	help_page0, help_page1, help_page2, help_page3
