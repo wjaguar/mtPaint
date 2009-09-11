@@ -181,12 +181,12 @@ void progress_end()			// Close progress window
 
 ////	ALERT BOX
 
-gint alert_result = 0;
+static int alert_result;
 
-gint alert_reply( GtkWidget *widget, gpointer data )
+static gboolean alert_reply(GtkWidget *widget, gpointer data)
 {
-	if ( alert_result == 0 ) alert_result = (gint) data;
-	if ( alert_result == 10 ) gtk_widget_destroy( widget );
+	if ( alert_result == 0 ) alert_result = (int)data;
+	if ( alert_result == 10 ) gtk_widget_destroy(widget);
 	
 	return FALSE;
 }
@@ -213,12 +213,10 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 
 	for ( i=0; i<=2; i++ )
 	{
-		if ( butxt[i] )
-		{
-			buttons[i] = add_a_button( butxt[i], 2, GTK_DIALOG(alert)->action_area, TRUE );
-			gtk_signal_connect( GTK_OBJECT(buttons[i]), "clicked",
-				GTK_SIGNAL_FUNC(alert_reply), (gpointer) (i+1) );
-		}
+		if (!butxt[i]) continue;
+		buttons[i] = add_a_button(butxt[i], 2, GTK_DIALOG(alert)->action_area, TRUE);
+		gtk_signal_connect(GTK_OBJECT(buttons[i]), "clicked",
+			GTK_SIGNAL_FUNC(alert_reply), (gpointer)(i + 1));
 	}
 	gtk_widget_add_accelerator (buttons[0], "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
 
@@ -899,9 +897,10 @@ void fix_scroll(GtkWidget *scroll)
 #endif
 }
 
-// Init-time bugfixes for GTK+1
+// Init-time bugfixes
 
-/* Bugs: GtkViewport size request; GtkHScale breakage in Smooth Theme Engine */
+/* Bugs: GtkViewport size request in GTK+1; GtkHScale breakage in Smooth Theme
+ * Engine in GTK+1; mixing up keys in GTK+2/Windows */
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -972,7 +971,8 @@ void gtk_init_bugfixes()
 
 	/* Detect if Smooth Engine is active, and fix its bugs */
 	st = gtk_rc_get_style(hs = gtk_hscale_new(NULL));
-	if (st->engine) engine = ((GtkThemeEnginePrivate *)(st->engine))->name;
+	if (st && st->engine)
+		engine = ((GtkThemeEnginePrivate *)(st->engine))->name;
 	if (!strcmp(engine, "smooth"))
 	{
 		wc = gtk_type_class(GTK_TYPE_HSCALE);
@@ -980,6 +980,32 @@ void gtk_init_bugfixes()
 		wc->size_request = gtk_hscale_size_request_smooth_fixed;
 	}
 	gtk_object_sink(GTK_OBJECT(hs)); /* Destroy a floating-ref thing */
+}
+
+#elif defined GDK_WINDOWING_WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+static int win_last_vk;
+static guint32 win_last_lp;
+
+/* Event filter to look at WM_KEYDOWN and WM_SYSKEYDOWN */
+static GdkFilterReturn win_keys_peek(GdkXEvent *xevent, GdkEvent *event, gpointer data)
+{
+	MSG *msg = xevent;
+
+	if ((msg->message == WM_KEYDOWN) || (msg->message == WM_SYSKEYDOWN))
+	{
+		win_last_vk = msg->wParam;
+		win_last_lp = msg->lParam;
+	}
+	return (GDK_FILTER_CONTINUE);
+}
+
+void gtk_init_bugfixes()
+{
+	gdk_window_add_filter(NULL, (GdkFilterFunc)win_keys_peek, NULL);
 }
 
 #endif
@@ -999,9 +1025,6 @@ int move_mouse_relative(int dx, int dy)
 }
 
 #elif defined GDK_WINDOWING_WIN32 /* Call GDI */
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
 
 int move_mouse_relative(int dx, int dy)
 {
@@ -1046,6 +1069,11 @@ guint real_key(GdkEventKey *event)
 		event->keyval));
 }
 
+guint low_key(GdkEventKey *event)
+{
+	return (gdk_keyval_to_lower(event->keyval));
+}
+
 guint keyval_key(guint keyval)
 {
 	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
@@ -1059,6 +1087,59 @@ guint real_key(GdkEventKey *event)
 	return (event->hardware_keycode);
 }
 
+#ifdef GDK_WINDOWING_WIN32
+
+/* Keypad translation helpers */
+static unsigned char keypad_vk[] = {
+	VK_CLEAR, VK_PRIOR, VK_NEXT, VK_END, VK_HOME,
+	VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN, VK_INSERT, VK_DELETE,
+	VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4,
+	VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9,
+	VK_DECIMAL, 0
+};
+static unsigned short keypad_wgtk[] = {
+	GDK_Clear, GDK_Page_Up, GDK_Page_Down, GDK_End, GDK_Home,
+	GDK_Left, GDK_Up, GDK_Right, GDK_Down, GDK_Insert, GDK_Delete,
+	GDK_0, GDK_1, GDK_2, GDK_3, GDK_4,
+	GDK_5, GDK_6, GDK_7, GDK_8, GDK_9,
+	GDK_period, 0
+};
+static unsigned short keypad_xgtk[] = {
+	GDK_KP_Begin, GDK_KP_Page_Up, GDK_KP_Page_Down, GDK_KP_End, GDK_KP_Home,
+	GDK_KP_Left, GDK_KP_Up, GDK_KP_Right, GDK_KP_Down, GDK_KP_Insert, GDK_KP_Delete,
+	GDK_KP_0, GDK_KP_1, GDK_KP_2, GDK_KP_3, GDK_KP_4,
+	GDK_KP_5, GDK_KP_6, GDK_KP_7, GDK_KP_8, GDK_KP_9,
+	GDK_KP_Decimal, 0
+};
+
+guint low_key(GdkEventKey *event)
+{
+	/* Augment braindead GDK translation by recognizing keypad keys */
+	if (win_last_vk == event->hardware_keycode) /* Paranoia */
+	{
+		if (win_last_lp & 0x01000000) /* Extended key */
+		{
+			if (event->keyval == GDK_Return) return (GDK_KP_Enter);
+		}
+		else /* Normal key */
+		{
+			unsigned char *cp = strchr(keypad_vk, event->hardware_keycode);
+			if (cp && (event->keyval == keypad_wgtk[cp - keypad_vk]))
+				return (keypad_xgtk[cp - keypad_vk]);
+		}
+	}
+	return (gdk_keyval_to_lower(event->keyval));
+}
+
+#else /* X11 */
+
+guint low_key(GdkEventKey *event)
+{
+	return (gdk_keyval_to_lower(event->keyval));
+}
+
+#endif
+
 guint keyval_key(guint keyval)
 {
 	GdkDisplay *display = gtk_widget_get_display(drawing_canvas);
@@ -1069,9 +1150,10 @@ guint keyval_key(guint keyval)
 	if (!gdk_keymap_get_entries_for_keyval(keymap, keyval, &key, &nkeys))
 	{
 #ifdef GDK_WINDOWING_WIN32
-		/* Keypad numbers need specialcasing on Windows */
-		if ((keyval >= GDK_KP_0) && (keyval <= GDK_KP_9))
-			return(keyval - GDK_KP_0 + VK_NUMPAD0);
+		/* Keypad keys need specialcasing on Windows */
+		for (nkeys = 0; keypad_xgtk[nkeys] &&
+			(keyval != keypad_xgtk[nkeys]); nkeys++);
+		return (keypad_vk[nkeys]);
 #endif
 		return (0);
 	}

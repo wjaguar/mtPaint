@@ -387,11 +387,8 @@ static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
 		gtk_adjustment_value_changed(hori);
 		gtk_adjustment_value_changed(vert);
 
-		/* Sequence events if vw_focus_view() isn't doing that */
-		if (!(view_showing && vw_focus_on))
-		{
-			while (gtk_events_pending()) gtk_main_iteration();
-		}
+		/* Process events */
+		while (gtk_events_pending()) gtk_main_iteration();
 		if (in_pan < 2) break;
 
 		/* Do delayed update */
@@ -735,14 +732,16 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 	overlay_alpha = tmp;
 }
 
+static guint idle_focus;
+
 void vw_focus_view()						// Focus view window to main window
 {
-	static int in_focus;
-	static float wait_h, wait_v;
 	int w, h;
 	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
 	GtkAdjustment *hori, *vert;
 
+	if (idle_focus) gtk_idle_remove(idle_focus);
+	idle_focus = 0;
 	if (!view_showing) return;		// Bail out if not visible
 	if (!vw_focus_on) return;		// Only focus if user wants to
 
@@ -795,34 +794,25 @@ void vw_focus_view()						// Focus view window to main window
 	}
 	else nv_v = 0.0;
 
-	if (in_focus) /* Delay reaction */
-	{
-		wait_h = nv_h; wait_v = nv_v;
-		in_focus |= 2;
-		return;
-	}
+	/* Do nothing if nothing changed */
+	if ((hori->value == nv_h) && (vert->value == nv_v)) return;
 
 	hori->value = nv_h;
 	vert->value = nv_v;
 
-	while (TRUE)
-	{
-		in_focus = 1;
-
-		/* Update position of view window scrollbars */
-		gtk_adjustment_value_changed(hori);
-		gtk_adjustment_value_changed(vert);
-
-		while (gtk_events_pending()) gtk_main_iteration();
-		if (in_focus < 2) break;
-
-		/* Do delayed update */
-		hori->value = wait_h;
-		vert->value = wait_v;
-	}
-	in_focus = 0;
+	/* Update position of view window scrollbars */
+	gtk_adjustment_value_changed(hori);
+	gtk_adjustment_value_changed(vert);
 }
 
+void vw_focus_idle()
+{
+	if (idle_focus) return;
+	if (!view_showing) return;
+	if (!vw_focus_on) return;
+	idle_focus = gtk_idle_add_priority(GTK_PRIORITY_REDRAW + 5,
+		(GtkFunction)vw_focus_view, NULL);
+}
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 {

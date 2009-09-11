@@ -1280,12 +1280,6 @@ int do_a_load( char *fname )
 	update_all_views();
 	update_image_bar();
 
-	/* These 2 are needed to synchronize the scrollbars & image view */
-	gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-	gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-
 fail:	set_image(TRUE);
 	return (res <= 0);
 }

@@ -4160,31 +4160,31 @@ int pixel_protected(int x, int y)
 void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *mask0, unsigned char *img0)
 {
-	int i;
+	int i, j;
 
-	cnt = start + step * (cnt - 1) + 1;
+	j = start + step * (cnt - 1) + 1;
 
 	if (mem_unmask)
 	{
-		memset(mask, 0, cnt);
+		memset(mask, 0, j);
 		return;
 	}
 
 	/* Clear mask or copy mask channel into it */
-	if (mask0) memcpy(mask, mask0, cnt);
-	else memset(mask, 0, cnt);
+	if (mask0) memcpy(mask, mask0, j);
+	else memset(mask, 0, j);
 
 	/* Add colour protection to it */
 	if (mem_img_bpp == 1)
 	{
-		for (i = start; i < cnt; i += step)
+		for (i = start; i < j; i += step)
 		{
 			mask[i] |= mem_prot_mask[img0[i]];
 		}
 	}
 	else if (mem_prot)
 	{
-		for (i = start; i < cnt; i += step)
+		for (i = start; i < j; i += step)
 		{
 			mask[i] |= mem_protected_RGB(MEM_2_INT(img0, i * 3));
 		}

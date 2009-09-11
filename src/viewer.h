@@ -44,6 +44,7 @@ void vw_align_size( float new_zoom );				// Set new zoom
 void vw_repaint( int px, int py, int pw, int ph );
 void vw_update_area( int x, int y, int w, int h );		// Update x,y,w,h area of current image
 void vw_focus_view();						// Focus view window to main window
+void vw_focus_idle();						// Same but done in idle cycles
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom );
 void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align);

@@ -172,14 +172,6 @@ static void create_new(GtkWidget *widget)
 	}
 
 	if (new_window_type == 1) layer_new(nw, nh, 3 - im_type, nc, CMASK_IMAGE);
-	else
-	{
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-		gtk_adjustment_value_changed( gtk_scrolled_window_get_vadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas) ) );
-		// These 2 are needed to synchronize the scrollbars & image view
-	}
 
 	gtk_widget_destroy(new_window);
 }

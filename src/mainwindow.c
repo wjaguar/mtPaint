@@ -1001,7 +1001,7 @@ int wtf_pressed(GdkEventKey *event)
 {
 	int i, cmatch = 0;
 	guint realkey = real_key(event);
-	guint lowkey = gdk_keyval_to_lower(event->keyval);
+	guint lowkey = low_key(event);
 
 	for (i = 0; main_keys[i].action; i++)
 	{
@@ -1731,13 +1731,6 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 		line_y1 = y;
 		repaint_line(1);
 	}
-}
-
-static gint main_scroll_changed()
-{
-	vw_focus_view();	// The user has adjusted a scrollbar so we may need to change view window
-
-	return TRUE;
 }
 
 static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
@@ -2653,6 +2646,7 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 		unsigned char *dest;
 		int l;
 
+		if ((w <= 0) || (h <= 0)) return;
 		w += x; h += y;
 		if ((x >= ctx->x1) || (y >= ctx->y1) ||
 			(w <= ctx->x0) || (h <= ctx->y0)) return;
@@ -3610,17 +3604,15 @@ static menu_item main_menu[] = {
 
 void main_init()
 {
-	gint i;
-	char txt[256];
-	float f=0;
-
-	GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
-	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
+	static const GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
+	static const GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
-
+	GtkAdjustment *adj;
 	GtkWidget *menubar1, *vbox_main, *hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
+	char txt[256];
+	int i;
 
 
 	gdk_rgb_init();
@@ -3725,22 +3717,25 @@ void main_init()
 	scrolledwindow_canvas = xpack(vbox_right, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_canvas);
 
+	/* Handle "changed" signal only in GTK+2, because in GTK+1 resizes are
+	 * tracked by configure handler, and forced realign from there looks
+	 * better than idle-time realign from here - WJ */
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_signal_connect_object(
-		GTK_OBJECT(
-			GTK_HSCROLLBAR(
-				GTK_SCROLLED_WINDOW(scrolledwindow_canvas)->hscrollbar
-			)->scrollbar.range.adjustment
-		),
-		"value_changed", GTK_SIGNAL_FUNC (main_scroll_changed), NULL );
-	gtk_signal_connect_object(
-		GTK_OBJECT(
-			GTK_VSCROLLBAR(
-				GTK_SCROLLED_WINDOW(scrolledwindow_canvas)->vscrollbar
-			)->scrollbar.range.adjustment
-		),
-		"value_changed", GTK_SIGNAL_FUNC (main_scroll_changed), NULL );
+	adj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+#if GTK_MAJOR_VERSION == 2
+	gtk_signal_connect(GTK_OBJECT(adj), "changed",
+		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
+#endif
+	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
+		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
+	adj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+#if GTK_MAJOR_VERSION == 2
+	gtk_signal_connect(GTK_OBJECT(adj), "changed",
+		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
+#endif
+	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
+		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
 
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow_canvas),
 		drawing_canvas);
@@ -3775,13 +3770,12 @@ void main_init()
 	gtk_box_pack_end (GTK_BOX (vbox_right), hbox_bar, FALSE, FALSE, 0);
 
 
-	for ( i=0; i<STATUS_ITEMS; i++ )
+	for (i = 0; i < STATUS_ITEMS; i++)
 	{
 		label_bar[i] = gtk_label_new("");
-		gtk_widget_show (label_bar[i]);
-		if ( i==STATUS_GEOMETRY || i==STATUS_PIXELRGB || i==STATUS_SELEGEOM ) f = 0;	// LEFT
-		if ( i==STATUS_CURSORXY || i==STATUS_UNDOREDO ) f = 0.5;	// MIDDLE
-		gtk_misc_set_alignment (GTK_MISC (label_bar[i]), f, 0);
+		gtk_misc_set_alignment(GTK_MISC(label_bar[i]),
+			(i == STATUS_CURSORXY) || (i == STATUS_UNDOREDO) ? 0.5 : 0.0, 0.0);
+		gtk_widget_show(label_bar[i]);
 	}
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{

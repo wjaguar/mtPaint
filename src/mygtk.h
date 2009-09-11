@@ -170,9 +170,9 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 
 void fix_scroll(GtkWidget *scroll);
 
-// Init-time bugfixes for GTK+1
+// Init-time bugfixes for GTK+1 and GTK+2/Win32
 
-#if GTK_MAJOR_VERSION == 1
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_WIN32
 void gtk_init_bugfixes();
 #else
 #define gtk_init_bugfixes()
@@ -185,6 +185,7 @@ int move_mouse_relative(int dx, int dy);
 // Mapping keyval to key
 
 guint real_key(GdkEventKey *event);
+guint low_key(GdkEventKey *event);
 guint keyval_key(guint keyval);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
