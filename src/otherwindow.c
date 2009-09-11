@@ -74,7 +74,7 @@ void reset_tools()
 void do_new_chores()
 {
 	reset_tools();
-	set_new_filename( _("Untitled") );
+	set_new_filename("");
 	update_all_views();
 	gtk_widget_queue_draw(drawing_col_prev);
 }

@@ -69,37 +69,29 @@ int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
 
 void update_image_bar()
 {
-	char txt[64], txt2[16];
+	char txt[128], txt2[16], *tmp = "RGB";
 
 	toolbar_update_settings();		// Update A/B labels in settings toolbar
 
-	if ( mem_img_bpp == 1 )
-		sprintf(txt2, "%i", mem_cols);
-	else
-		sprintf(txt2, "RGB");
+	if (mem_img_bpp == 1) sprintf(tmp = txt2, "%i", mem_cols);
 
-	snprintf(txt, 50, "%s %i x %i x %s", channames[mem_channel],
-		mem_width, mem_height, txt2);
+	tmp = txt + snprintf(txt, 80, "%s %i x %i x %s",
+		channames[mem_channel], mem_width, mem_height, tmp);
 
 	if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
 	{
-		strcat(txt, " + ");
-		if ( mem_img[CHN_ALPHA] ) strcat(txt, "A");
-		if ( mem_img[CHN_SEL] ) strcat(txt, "S");
-		if ( mem_img[CHN_MASK] ) strcat(txt, "M");
+		strcpy(tmp, " + "); tmp += 3;
+		if (mem_img[CHN_ALPHA]) *tmp++ = 'A';
+		if (mem_img[CHN_SEL])   *tmp++ = 'S';
+		if (mem_img[CHN_MASK])  *tmp++ = 'M';
+	// !!! String not NUL-terminated at this point
 	}
 
 	if ( layers_total>0 )
-	{
-		sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
-		strcat(txt, txt2);
-	}
+		tmp += sprintf(tmp, "  (%i/%i)", layer_selected, layers_total);
 	if ( mem_xpm_trans>=0 )
-	{
-		sprintf(txt2, "  (T=%i)", mem_xpm_trans);
-		strcat(txt, txt2);
-	}
-	strcat(txt, "  ");
+		tmp += sprintf(tmp, "  (T=%i)", mem_xpm_trans);
+	strcpy(tmp, "  ");
 	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), txt );
 }
 
@@ -147,20 +139,15 @@ void update_sel_bar()			// Update selection stats on status bar
 	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
 }
 
-static void chan_txt_cat(char *txt, int chan, int x, int y)
+static char *chan_txt_cat(char *txt, int chan, int x, int y)
 {
-	char txt2[8];
-
-	if ( mem_img[chan] )
-	{
-		snprintf( txt2, 8, "%i", mem_img[chan][x + mem_width*y] );
-		strcat(txt, txt2);
-	}
+	if (!mem_img[chan]) return (txt);
+	return (txt + sprintf(txt, "%i", mem_img[chan][x + mem_width*y]));
 }
 
 void update_xy_bar(int x, int y)
 {
-	char txt[96];
+	char txt[96], *tmp = txt;
 	int pixel;
 
 	if (status_on[STATUS_CURSORXY])
@@ -174,21 +161,21 @@ void update_xy_bar(int x, int y)
 	{
 		pixel = get_pixel_img(x, y);
 		if (mem_img_bpp == 1)
-			snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel,
+			tmp += sprintf(tmp, "[%u] = {%i,%i,%i}", pixel,
 				mem_pal[pixel].red, mem_pal[pixel].green,
 				mem_pal[pixel].blue);
 		else
-			snprintf(txt, 60, "{%i,%i,%i}", INT_2_R(pixel),
+			tmp += sprintf(txt, "{%i,%i,%i}", INT_2_R(pixel),
 				INT_2_G(pixel), INT_2_B(pixel));
 		if (mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK])
 		{
-			strcat(txt, " + {");
-			chan_txt_cat(txt, CHN_ALPHA, x, y);
-			strcat(txt, ",");
-			chan_txt_cat(txt, CHN_SEL, x, y);
-			strcat(txt, ",");
-			chan_txt_cat(txt, CHN_MASK, x, y);
-			strcat(txt, "}");
+			strcpy(tmp, " + {"); tmp += 4;
+			tmp = chan_txt_cat(tmp, CHN_ALPHA, x, y);
+			*tmp++ = ',';
+			tmp = chan_txt_cat(tmp, CHN_SEL, x, y);
+			*tmp++ = ',';
+			tmp = chan_txt_cat(tmp, CHN_MASK, x, y);
+			strcpy(tmp, "}");
 		}
 		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt);
 	}
@@ -1188,7 +1175,7 @@ void init_pal()					// Initialise palette after loading
 
 void set_new_filename( char *fname )
 {
-	strncpy( mem_filename, fname, 250 );
+	strncpy(mem_filename, fname, PATHBUF);
 	update_titlebar();
 }
 
@@ -1217,8 +1204,8 @@ static int populate_channel(char *filename)
 
 int do_a_load( char *fname )
 {
-	char mess[512], real_fname[300];
-	int res, i, ftype;
+	char mess[256], real_fname[PATHBUF];
+	int res, i = 0, ftype;
 
 
 	if ((fname[0] != DIR_SEP)
@@ -1227,13 +1214,12 @@ int do_a_load( char *fname )
 #endif
 	)
 	{
-		getcwd(real_fname, 256);
+		getcwd(real_fname, PATHBUF - 1);
 		i = strlen(real_fname);
-		real_fname[i] = DIR_SEP;
-		real_fname[i + 1] = 0;
-		strncat(real_fname, fname, 256);
+		real_fname[i++] = DIR_SEP;
 	}
-	else strncpy(real_fname, fname, 256);
+	real_fname[i] = 0;
+	strnncat(real_fname, fname, PATHBUF);
 
 	ftype = detect_image_format(real_fname);
 	if ((ftype < 0) || (ftype == FT_NONE))
@@ -1252,7 +1238,7 @@ int do_a_load( char *fname )
 	{
 		if (res == TOO_BIG)
 		{
-			snprintf(mess, 500, _("File is too big, must be <= to width=%i height=%i : %s"), MAX_WIDTH, MAX_HEIGHT, fname);
+			snprintf(mess, 250, _("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
 			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 		}
 		else
@@ -1303,15 +1289,19 @@ fail:	set_image(TRUE);
 
 int check_file( char *fname )		// Does file already exist?  Ask if OK to overwrite
 {
-	char mess[512];
+	char *msg, *f8;
+	int res = 0;
 
 	if ( valid_file(fname) == 0 )
 	{
-		snprintf(mess, 500, _("File: %s already exists. Do you want to overwrite it?"), fname);
-		if ( alert_box( _("File Found"), mess, _("NO"), _("YES"), NULL ) != 2 ) return 1;
+		f8 = gtkuncpy(NULL, fname, 0);
+		msg = g_strdup_printf(_("File: %s already exists. Do you want to overwrite it?"), f8);
+		res = alert_box(_("File Found"), msg, _("NO"), _("YES"), NULL) != 2;
+		g_free(msg);
+		g_free(f8);
 	}
 
-	return 0;
+	return (res);
 }
 
 #define FORMAT_SPINS 7
@@ -1603,7 +1593,8 @@ static void fs_ok(GtkWidget *fs)
 {
 	ls_settings settings;
 	GtkWidget *xtra, *entry;
-	char fname[256], mess[512], gif_nam[256], gif_nam2[320], *c, *ext, *ext2;
+	char fname[PATHTXT], *msg, *f8;
+	char *c, *ext, *ext2, *tmp, *gif, *gif2;
 	int i, j;
 
 	/* Pick up extra info */
@@ -1618,8 +1609,8 @@ static void fs_ok(GtkWidget *fs)
 	gtk_widget_hide(fs);
 
 	/* File extension */
-	strncpy(fname, gtk_entry_get_text(GTK_ENTRY(
-		GTK_FILE_SELECTION(fs)->selection_entry)), 256);
+	strncpy0(fname, gtk_entry_get_text(GTK_ENTRY(
+		GTK_FILE_SELECTION(fs)->selection_entry)), PATHTXT);
 	c = strrchr(fname, '.');
 	while (TRUE)
 	{
@@ -1658,7 +1649,7 @@ static void fs_ok(GtkWidget *fs)
 			}
 			i = strlen(fname);
 			j = strlen(ext);
-			if (i + j + 1 > 250) break; /* Too long */
+			if (i + j >= PATHTXT - 1) break; /* Too long */
 			fname[i] = '.';
 			strncpy(fname + i + 1, ext, j + 1);
 		}
@@ -1667,8 +1658,13 @@ static void fs_ok(GtkWidget *fs)
 		break;
 	}
 
-	/* Get filename the proper way */
-	gtkncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), 250);
+	/* Get filename the proper way (convert it from UTF8 in GTK2/Windows,
+	 * leave it in system filename encoding on Unix) */
+#ifdef WIN32
+	gtkncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), PATHBUF);
+#else
+	strncpy0(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), PATHBUF);
+#endif
 
 	switch (settings.mode)
 	{
@@ -1691,8 +1687,11 @@ static void fs_ok(GtkWidget *fs)
 	case FS_PALETTE_LOAD:
 		if (load_pal(fname))
 		{
-			snprintf(mess, 500, _("File: %s invalid - palette not updated"), fname);
-			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			f8 = gtkuncpy(NULL, fname, 0);
+			msg = g_strdup_printf(_("File: %s invalid - palette not updated"), f8);
+			alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+			g_free(msg);
+			g_free(f8);
 			goto redo;
 		}
 		else notify_changed();
@@ -1707,7 +1706,12 @@ static void fs_ok(GtkWidget *fs)
 	case FS_SELECT_FILE:
 	case FS_SELECT_DIR:
 		entry = gtk_object_get_data(GTK_OBJECT(fs), FS_ENTRY_KEY);
-		if (entry) gtk_entry_set_text(GTK_ENTRY(entry), fname);
+		if (entry)
+		{
+			f8 = gtkuncpy(NULL, fname, 0);
+			gtk_entry_set_text(GTK_ENTRY(entry), f8);
+			g_free(f8);
+		}
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
@@ -1727,41 +1731,41 @@ static void fs_ok(GtkWidget *fs)
 		break;
 	case FS_GIF_EXPLODE:
 		c = strrchr( preserved_gif_filename, DIR_SEP );
-		if ( c == NULL ) c = preserved_gif_filename;
+		if (!c) c = preserved_gif_filename;
 		else c++;
-		snprintf(gif_nam, 250, "%s%c%s", fname, DIR_SEP, c);
-		snprintf(mess, 500,
-			"gifsicle -U --explode \"%s\" -o \"%s\"",
-			preserved_gif_filename, gif_nam );
-//printf("%s\n", mess);
-		gifsicle(mess);
-		strncat( gif_nam, ".???", 250 );
-		wild_space_change( gif_nam, gif_nam2, 315 );
-		snprintf(mess, 500,
-			"mtpaint -g %i %s &",
-			preserved_gif_delay, gif_nam2 );
-//printf("%s\n", mess);
-		gifsicle(mess);
+		tmp = g_strdup_printf("gifsicle -U --explode \"%s\" -o \"%s%c%s\"",
+			preserved_gif_filename, fname, DIR_SEP, c);
+		gifsicle(tmp);
+		g_free(tmp);
+		gif = g_strdup_printf("%s%c%s.???", fname, DIR_SEP, c);
+		gif2 = quote_spaces(gif);
+		tmp = g_strdup_printf("mtpaint -g %i %s &",
+			preserved_gif_delay, gif2);
+		gifsicle(tmp);
+		g_free(tmp);
+		free(gif2);
+		g_free(gif);
 		break;
 	case FS_EXPORT_GIF:
 		if (check_file(fname)) goto redo;
 		store_ls_settings(&settings);	// Update data in memory
-		snprintf(gif_nam, 250, "%s", mem_filename);
-		wild_space_change( gif_nam, gif_nam2, 315 );
-		for (i = strlen(gif_nam2) - 1; (i >= 0) && (gif_nam2[i] != DIR_SEP); i--)
+		gif2 = quote_spaces(mem_filename);
+		for (i = strlen(gif2) - 1; i >= 0; i--)
 		{
-			if ((unsigned char)(gif_nam2[i] - '0') <= 9) gif_nam2[i] = '?';
+			if (gif2[i] == DIR_SEP) break;
+			if ((unsigned char)(gif2[i] - '0') <= 9) gif2[i] = '?';
 		}
 						
-		snprintf(mess, 500, "%s -d %i %s -o \"%s\"",
-			GIFSICLE_CREATE, settings.gif_delay, gif_nam2, fname);
-//printf("%s\n", mess);
-		gifsicle(mess);
+		tmp = g_strdup_printf("%s -d %i %s -o \"%s\"",
+			GIFSICLE_CREATE, settings.gif_delay, gif2, fname);
+		gifsicle(tmp);
+		g_free(tmp);
+		free(gif2);
 
 #ifndef WIN32
-		snprintf(mess, 500, "gifview -a \"%s\" &", fname );
-		gifsicle(mess);
-//printf("%s\n", mess);
+		tmp = g_strdup_printf("gifview -a \"%s\" &", fname);
+		gifsicle(tmp);
+		g_free(tmp);
 #endif
 
 		break;
@@ -1798,8 +1802,11 @@ static void fs_ok(GtkWidget *fs)
 	destroy_dialog(fs);
 	return;
 redo_name:
-	snprintf(mess, 500, _("Unable to save file: %s"), fname);
-	alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+	f8 = gtkuncpy(NULL, fname, 0);
+	msg = g_strdup_printf(_("Unable to save file: %s"), f8);
+	alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+	g_free(msg);
+	g_free(f8);
 redo:
 	gtk_widget_show(fs);
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
@@ -1807,7 +1814,7 @@ redo:
 
 void fs_setup(GtkWidget *fs, int action_type)
 {
-	char txt[260], txt2[520];
+	char txt[PATHBUF], *txt2 = txt;
 	GtkWidget *xtra;
 #if GTK_MAJOR_VERSION == 1
 	GtkAccelGroup* ag = gtk_accel_group_new();
@@ -1832,29 +1839,30 @@ void fs_setup(GtkWidget *fs, int action_type)
 	gtk_signal_connect_object(GTK_OBJECT(fs),
 		"delete_event", GTK_SIGNAL_FUNC(fs_destroy), GTK_OBJECT(fs));
 
-	if ((action_type == FS_PNG_SAVE) && strcmp(mem_filename, _("Untitled")))
-		strncpy( txt, mem_filename, 256 );	// If we have a filename and saving
-	else if ((action_type == FS_LAYER_SAVE) &&
-		strcmp(layers_filename, _("Untitled")))
-		strncpy(txt, layers_filename, 256);
+	if ((action_type == FS_PNG_SAVE) && mem_filename[0])
+		strncpy(txt, mem_filename, PATHBUF);	// If we have a filename and saving
+	else if ((action_type == FS_LAYER_SAVE) && layers_filename[0])
+		strncpy(txt, layers_filename, PATHBUF);
 	else if (action_type == FS_LAYER_SAVE)
 	{
-		snprintf(txt, 256, "%s%clayers.txt",
+		snprintf(txt, PATHBUF, "%s%clayers.txt",
 			inifile_get("last_dir", get_home_directory()),
 			DIR_SEP );
 	}
 	else
 	{
-		snprintf(txt, 256, "%s%c",
+		snprintf(txt, PATHBUF, "%s%c",
 			inifile_get("last_dir", get_home_directory()),
 			DIR_SEP );		// Default
 	}
 
-	gtkuncpy(txt2, txt, 512);
+#ifdef WIN32 /* Convert from codepage to UTF8 in GTK2/Windows */
+	txt2 = gtkuncpy(NULL, txt, 0);
+#endif
 	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
 
 	xtra = pack(GTK_FILE_SELECTION(fs)->main_vbox,
-		ls_settings_box(txt2, action_type));
+		ls_settings_box(txt, action_type));
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
 #if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
@@ -2958,7 +2966,7 @@ void men_item_visible( GtkWidget *menu_items[], gboolean state )
 
 void update_recent_files()			// Update the menu items
 {
-	char txt[64], *t, txt2[520];
+	char txt[64], *t, txt2[PATHTXT];
 	int i, count = 0;
 
 	for (i = 0; i < recent_files; i++)	// Display recent filenames
@@ -2971,7 +2979,7 @@ void update_recent_files()			// Update the menu items
 			gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
 			continue;
 		}
-		gtkuncpy(txt2, t, 512);
+		gtkuncpy(txt2, t, PATHTXT);
 		gtk_label_set_text(GTK_LABEL(GTK_MENU_ITEM(
 			menu_widgets[MENU_RECENT1 + i])->item.bin.child), txt2);
 		gtk_widget_show(menu_widgets[MENU_RECENT1 + i]);
@@ -2987,16 +2995,16 @@ void update_recent_files()			// Update the menu items
 
 void register_file( char *filename )		// Called after successful load/save
 {
-	char txt[280], *c;
+	char txt[64], txt1[64], *c;
 	int i, f;
 
 	c = strrchr( filename, DIR_SEP );
 	if (c)
 	{
-		txt[0] = *c;
+		i = *c;
 		*c = '\0';		// Strip off filename
 		inifile_set("last_dir", filename);
-		*c = txt[0];
+		*c = i;
 	}
 
 	// Is it already in used file list?  If so shift relevant filenames down and put at top.
@@ -3014,10 +3022,8 @@ void register_file( char *filename )		// Called after successful load/save
 		while ( i>1 )
 		{
 			sprintf( txt, "file%i", i-1 );
-			sprintf( txt+100, "file%i", i );
-			inifile_set( txt+100,
-				inifile_get( txt, "" )
-				);
+			sprintf( txt1, "file%i", i );
+			inifile_set(txt1, inifile_get(txt, ""));
 
 			i--;
 		}

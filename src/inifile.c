@@ -474,11 +474,13 @@ int ini_setstr(inifile *inip, int section, char *key, char *value)
 	inislot *slot;
 
 	if (!(slot = key_slot(inip, section, key, INI_STR))) return (FALSE);
-/* NULLs are stored as empty strings, for less hazardous handling */
 	slot->value = "";
+/* NULLs are stored as empty strings, for less hazardous handling */
+	if (!value);
 /* Uncomment this instead if want NULLs to remain NULLs */
-//	slot->value = NULL;
-	if (value)
+//	if (!value) slot->value = NULL;
+	else if (!*value);
+	else
 	{
 		value = strdup(value);
 		if (!value) return (FALSE);
@@ -510,6 +512,10 @@ char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 {
 	inislot *slot;
 	char *tail;
+
+/* NULLs are stored as empty strings, for less hazardous handling */
+	if (!defv) defv = "";
+/* Comment out the above if want NULLs to remain NULLs */
 
 	/* Read existing */
 	slot = key_slot(inip, section, key, INI_NONE);
@@ -544,9 +550,13 @@ char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 		if (slot->type != INI_NONE)
 			g_printerr("INI key '%s' wrong type\n", key);
 #endif
-		slot->value = defv;
-		if (defv) slot->value = strdup(defv);
-		if (slot->value) slot->flags |= INI_MALLOC;
+		if (!defv) slot->value = NULL;
+		else if (!*defv) slot->value = "";
+		else
+		{
+			slot->value = strdup(defv);
+			if (slot->value) slot->flags |= INI_MALLOC;
+		}
 	}
 	slot->type = INI_STR;
 	return (slot->value);
@@ -708,11 +718,11 @@ gchar *get_home_directory(void)
 /* Compatibility functions */
 
 static inifile main_ini;
-static char main_ininame[530];
+static char *main_ininame;
 
 void inifile_init(char *ini_filename)
 {
-	snprintf(main_ininame, 512, "%s%s", get_home_directory(), ini_filename);
+	main_ininame = g_strdup_printf("%s%s", get_home_directory(), ini_filename);
 	if (!read_ini(&main_ini, main_ininame)) new_ini(&main_ini);
 }
 
@@ -721,6 +731,7 @@ void inifile_quit()
 	write_ini(&main_ini, main_ininame,
 	  "# Remove this file to restore default settings.\n");
 	forget_ini(&main_ini);
+	g_free(main_ininame);
 }
 
 char *inifile_get(char *setting, char *defaultValue)

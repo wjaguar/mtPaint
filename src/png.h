@@ -26,7 +26,6 @@
 #define FILE_MEM_ERROR 123457
 #define FILE_GIF_ANIM 123458
 
-
 #ifdef WIN32
 	#define DIR_SEP '\\'
 #else
@@ -107,7 +106,7 @@ typedef struct {
 	int width, height, bpp, colors;
 } ls_settings;
 
-char preserved_gif_filename[256];
+extern char preserved_gif_filename[];
 int preserved_gif_delay, silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
 

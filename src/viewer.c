@@ -82,12 +82,12 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	GtkWidget *vbox1, *button_close, *scrolledwindow, *col_list;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	gchar *item[1];
-	char txt[64], txt2[520];
+	char txt[128], txt2[PATHTXT];
 
 	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
 	allow_cline = FALSE;
 
-	snprintf(txt, 60, _("%i Files on Command Line"), files_passed );
+	snprintf(txt, 120, _("%i Files on Command Line"), files_passed );
 	cline_window = add_a_window( GTK_WINDOW_TOPLEVEL, txt, GTK_WIN_POS_NONE, FALSE );
 	gtk_widget_set_usize(cline_window, 100, 100);
 	win_restore_pos(cline_window, "cline", 0, 0, 250, 400);
@@ -108,7 +108,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	item[0] = txt2;
 	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )
 	{
-		gtkuncpy(txt2, global_argv[i], 512);
+		gtkuncpy(txt2, global_argv[i], PATHTXT);
 		gtk_clist_set_selectable ( GTK_CLIST(col_list),
 			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
 	}
@@ -152,7 +152,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 	GtkWidget *help_window, *table, *notebook, *frame, *label, *button,
 		*box1, *box2, *scrolled_window1, *viewport1, *label2;
 	int i, j;
-	char txt[64], **tmp, *res, *strs[HELP_PAGE_MAX + 1];
+	char txt[128], **tmp, *res, *strs[HELP_PAGE_MAX + 1];
 
 
 	ag = gtk_accel_group_new();
@@ -164,7 +164,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_container_set_border_width (GTK_CONTAINER (help_window), 4);
 	gtk_window_set_position (GTK_WINDOW (help_window), GTK_WIN_POS_CENTER);
-	snprintf(txt, 60, "%s - %s", VERSION, _("About"));
+	snprintf(txt, 120, "%s - %s", VERSION, _("About"));
 	gtk_window_set_title (GTK_WINDOW (help_window), txt);
 	gtk_widget_set_usize (help_window, -2, 400);
 

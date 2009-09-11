@@ -477,6 +477,46 @@ void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data)
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
 }
 
+// Copy string quoting space chars
+
+char *quote_spaces(const char *src)
+{
+	char *tmp, *dest;
+	int n = 0;
+
+	for (*(const char **)&tmp = src; *tmp; tmp++)
+	{
+		if (*tmp == ' ')
+#ifdef WIN32
+			n += 2;
+#else
+			n++;
+#endif
+		n++;
+	}
+
+	dest = malloc(n + 1);
+	if (!dest) return ("");
+
+	for (tmp = dest; *src; src++)
+	{
+		if (*src == ' ')
+		{
+#ifdef WIN32
+			*tmp++ = '"';
+			*tmp++ = ' ';
+			*tmp++ = '"';
+#else
+			*tmp++ = '\\';
+			*tmp++ = ' ';
+#endif
+		}
+		else *tmp++ = *src;
+	}
+	*tmp = 0;
+	return (dest);
+}
+
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt)
@@ -485,14 +525,17 @@ char *gtkncpy(char *dest, const char *src, int cnt)
 	char *c = g_locale_from_utf8((gchar *)src, -1, NULL, NULL, NULL);
 	if (c)
 	{
+		if (!dest) return (c);
 		strncpy(dest, c, cnt);
 		g_free(c);
 	}
 	else
 #endif
-	strncpy(dest, src, cnt);
-	dest[cnt-1] = 0;
-
+	{
+		if (!dest) return (g_strdup(src));
+		strncpy(dest, src, cnt);
+		dest[cnt - 1] = 0;
+	}
 	return (dest);
 }
 
@@ -504,14 +547,27 @@ char *gtkuncpy(char *dest, const char *src, int cnt)
 	char *c = g_locale_to_utf8((gchar *)src, -1, NULL, NULL, NULL);
 	if (c)
 	{
+		if (!dest) return (c);
 		strncpy(dest, c, cnt);
 		g_free(c);
 	}
 	else
 #endif
-	strncpy(dest, src, cnt);
-	dest[cnt-1] = 0;
+	{
+		if (!dest) return (g_strdup(src));
+		strncpy(dest, src, cnt);
+		dest[cnt - 1] = 0;
+	}
+	return (dest);
+}
 
+// A more sane replacement for strncat()
+
+char *strnncat(char *dest, const char *src, int max)
+{
+	int l = strlen(dest);
+	if (max > l) strncpy(dest + l, src, max - l - 1);
+	dest[max - 1] = 0;
 	return (dest);
 }
 

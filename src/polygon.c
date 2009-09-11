@@ -23,6 +23,7 @@
 #include <gtk/gtk.h>
 
 #include "polygon.h"
+#include "mygtk.h"
 #include "memory.h"
 
 /* !!! Currently, poly_points should be set to 0 when there's no polygonal

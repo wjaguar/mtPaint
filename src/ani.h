@@ -43,7 +43,4 @@ void ani_write_file( FILE *fp );	// Write data to layers file already opened
 
 void ani_but_preview();			// Preview the animation
 
-void wild_space_change( char *in, char *out, int length );
-					// Copy string but replace " " with "\ " or "\" \"" - needed for filenames with spaces
-
 int gifsicle( char *command );	// Execute Gifsicle/Gifview

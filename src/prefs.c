@@ -247,6 +247,7 @@ gint conf_tablet( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 static void prefs_apply(GtkWidget *widget)
 {
+	char path[PATHBUF];
 	int i, j;
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
@@ -319,11 +320,14 @@ static void prefs_apply(GtkWidget *widget)
 	string_init();				// Translate static strings
 #endif
 
-	strncpy(mem_clip_file, gtk_entry_get_text(GTK_ENTRY(clipboard_entry)), 250);
+	gtkncpy(mem_clip_file, gtk_entry_get_text(GTK_ENTRY(clipboard_entry)), PATHBUF);
 	inifile_set("clipFilename", mem_clip_file);
 
-	inifile_set(HANDBOOK_BROWSER_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[0])) );
-	inifile_set(HANDBOOK_LOCATION_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])) );
+	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_handbook[0])), PATHBUF);
+	inifile_set(HANDBOOK_BROWSER_INI, path);
+
+	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])), PATHBUF);
+	inifile_set(HANDBOOK_LOCATION_INI, path);
 
 	update_all_views();		// Update canvas for changes
 	set_cursor();
@@ -412,7 +416,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
 		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
 		*tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
-	char txt[64];
+	char txt[PATHTXT];
 
 
 	// Make sure the user can only open 1 prefs window
@@ -486,17 +490,18 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	clipboard_entry = mt_path_box(_("Clipboard Files"), page,
 		_("Select Clipboard File"), FS_CLIP_FILE);
-	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
+	gtkuncpy(txt, mem_clip_file, PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), txt);
 
 	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), page,
 		_("Select Browser Program"), FS_SELECT_FILE);
-	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
-		inifile_get(HANDBOOK_BROWSER_INI, ""));
+	gtkuncpy(txt, inifile_get(HANDBOOK_BROWSER_INI, ""), PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]), txt);
 
 	entry_handbook[1] = mt_path_box(_("Location of Handbook index"), page,
 		_("Select Handbook Index File"), FS_SELECT_FILE);
-	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
-		inifile_get(HANDBOOK_LOCATION_INI, ""));
+	gtkuncpy(txt, inifile_get(HANDBOOK_LOCATION_INI, ""), PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]), txt);
 
 ///	---- TAB4 - STATUS BAR
 
@@ -659,7 +664,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 void init_tablet()				// Set up variables
 {
 	int i;
-	char *devname, txt[32];
+	char *devname, txt[64];
 
 	GList *dlist;
 

@@ -78,6 +78,7 @@ void mtpaint_init()			// Initialise memory & inifile
 
 void mtpaint_quit()			// Finish memory & inifile
 {
+	spawn_quit();
 	inifile_quit();
 }
 

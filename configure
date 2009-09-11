@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.14.50"
-MT_DATE="2007-09-24"
+MT_V="3.14.51"
+MT_DATE="2007-10-03"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -27,6 +27,7 @@ STATIC_TIFF=
 STATIC_GIF=
 AS_NEEDED=
 IMAGE_LIBDIR=
+HAVE_FUNCS=
 
 GTK_FILE=_conf.txt
 
@@ -76,6 +77,11 @@ then
 	{
 		redir -e /dev/null ld -$1 -o _conf.tmp -L/lib > /dev/null 2>&1
 	}
+	HAVE_FUNC()
+	{
+		echo "main() { $1(); }" > _conf.c
+		redir -e /dev/null gcc _conf.c -o _conf.tmp -L/lib > /dev/null 2>&1
+	}
 else
 	OS="GNU/Linux"
 	if pkg-config gtk+-2.0 --cflags > /dev/null
@@ -88,6 +94,16 @@ else
 	{
 		ld -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
+	HAVE_FUNC()
+	{
+		echo "main() { $1(); }" > _conf.c
+		gcc _conf.c -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+	}
+fi
+
+if HAVE_FUNC "mkdtemp"
+then
+	HAVE_FUNCS="$HAVE_FUNCS -DHAVE_MKDTEMP"
 fi
 
 if IS_LIB "lgif"
@@ -130,7 +146,7 @@ else
 	NFT=NO
 fi
 
-rm _conf.tmp
+rm _conf.c _conf.tmp
 
 for A in "$@"
 do
@@ -409,7 +425,7 @@ else
 	fi
 
 	L_EX=$AS_NEEDED
-	I_EX=
+	I_EX=$HAVE_FUNCS
 	if [ "$NGIF" != "NO" ]
 	then
 		if [ "$NGIF" = "GIF" ]

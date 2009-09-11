@@ -190,7 +190,7 @@ char **global_argv;
 
 GdkGC *dash_gc;
 
-char mem_clip_file[256];
+extern char mem_clip_file[];
 
 void var_init();			// Load INI variables
 void string_init();			// Translate static strings

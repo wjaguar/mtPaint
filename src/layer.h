@@ -24,6 +24,8 @@
 #define ANIMATION_HEADER "# mtPaint animation"
 #define MAX_POS_SLOTS 100
 
+#define LAYER_NAMELEN 35
+
 ///	GLOBALS
 
 typedef struct {
@@ -39,7 +41,7 @@ typedef struct
 
 typedef struct
 {
-	char name[35];			// Layer text name
+	char name[LAYER_NAMELEN];	// Layer text name
 	int x, y, trans, opacity;	// Position of layer, transparency colour, opacity %
 	gboolean visible, use_trans;	// Show layer, use transparency
 	layer_image *image;		// Pointer to image data - malloc'd when created, free'd after
@@ -54,7 +56,7 @@ int	layers_total,			// Layers currently in use
 	layer_selected,			// Layer currently selected in the layers window
 	layers_changed;			// 0=Unchanged
 
-char	layers_filename[256];		// Current filename for layers file
+char layers_filename[PATHBUF];	// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
 	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 

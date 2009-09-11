@@ -17,6 +17,9 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #include "global.h"
 
 #include "mygtk.h"
@@ -27,12 +30,154 @@
 #include "mainwindow.h"
 #include "spawn.h"
 
+static char *mt_temp_dir;
+
+static char *get_tempdir()
+{
+	char *env;
+
+	env = getenv("TMPDIR");
+	if (!env) env = getenv("TMP");
+	if (!env) env = getenv("TEMP");
+#ifdef P_tmpdir
+	if (!env) env = P_tmpdir;
+#endif
+#ifdef WIN32
+	if (!env) env = "\\";
+#else
+	if (!env) env = "/tmp";
+#endif
+	return (env);
+}
+
+static char *new_temp_dir()
+{
+	char buf[PATHBUF], *base = get_tempdir();
+	int l = strlen(base);
+
+	l -= base[l - 1] == DIR_SEP;
+#ifdef HAVE_MKDTEMP
+	snprintf(buf, PATHBUF, "%.*s%cmtpaintXXXXXX", l, base, DIR_SEP);
+	if (!mkdtemp(buf)) return (NULL);
+	chmod(buf, 0755);
+	return (strdup(buf));
+#else
+	strncpy0(buf, base, l); /* Cut off path separator */
+	base = tempnam(buf, "mttmp");
+	if (!base) return (NULL);
+#ifdef WIN32 /* No mkdtemp() in MinGW */
+	/* tempnam() may use Unix path separator */
+	for (l = 0; base[l]; l++) if (base[l] == '/') base[l] = '\\';
+	if (mkdir(base)) return (NULL);
+#else
+	if (mkdir(base, 0755)) return (NULL);
+#endif
+	return (base);
+#endif
+}
+
+/* Store index for name, or fetch it (when idx < 0) */
+static int last_temp_index(char *name, int len, int idx)
+{
+// !!! For now, use simplest model - same index regardless of name
+	static int index;
+	if (idx >= 0) index = idx;
+	return (index);
+}
+
+/* I'm lazy today, so using off-the-shelf list - WJ */
+static GList *namelist;
+
+static char *remember_temp_file(char *name)
+{
+	namelist = g_list_prepend(namelist, name = strdup(name));
+	return (name);
+}
+
+void spawn_quit()
+{
+	g_list_foreach(namelist, (GFunc)unlink, NULL);
+	if (mt_temp_dir) rmdir(mt_temp_dir);
+}
+
+static char *new_temp_file()
+{
+	ls_settings settings;
+	char buf[PATHBUF], ids[32], *c, *f = "tmp.png", *ext = "png";
+	int fd, l, cnt, idx, res, type = FT_PNG;
+
+	/* Prepare temp directory */
+	if (!mt_temp_dir) mt_temp_dir = new_temp_dir();
+	if (!mt_temp_dir) return (NULL); /* Temp dir creation failed */
+
+	/* Analyze name */
+	if (mem_filename[0])
+	{
+		f = strrchr(mem_filename, DIR_SEP);
+		if (!f) f = mem_filename;
+		type = file_type_by_ext(f, FF_SAVE_MASK);
+		if (type == FT_NONE) type = FT_PNG;
+		else ext = strrchr(f, '.') + 1;
+	}
+	c = strrchr(f, '.');
+	if (c == f) c = (f = "tmp.png") + 3; /* If extension w/o name */
+	l = c ? c - f : strlen(f);
+
+	/* Create temp file */
+	while (TRUE)
+	{
+		idx = last_temp_index(f, l, -1);
+		ids[0] = 0;
+		for (cnt = 0; cnt < 256; cnt++ , idx++)
+		{
+			if (idx) sprintf(ids, "%d", idx);
+			snprintf(buf, PATHBUF, "%s%c%.*s%s.%s",
+				mt_temp_dir, DIR_SEP, l, f, ids, ext);
+			fd = open(buf, O_WRONLY | O_CREAT | O_EXCL, 0644);
+			if (fd >= 0) break;
+		}
+		last_temp_index(f, l, idx);
+		if (fd >= 0) break;
+		if (!strncmp(f, "tmp.png", l)) return (NULL); /* Utter failure */
+		f = "tmp.png"; l = 3; /* Try again with "tmp" */
+	}
+	close(fd);
+	
+	/* Save image */
+	init_ls_settings(&settings, NULL);
+	memcpy(settings.img, mem_img, sizeof(chanlist));
+	settings.pal = mem_pal;
+	settings.width = mem_width;
+	settings.height = mem_height;
+	settings.bpp = mem_img_bpp;
+	settings.colors = mem_cols;
+	settings.ftype = type;
+	res = save_image(buf, &settings);
+	if (res) return (NULL); /* Failed to save */
+
+	return (remember_temp_file(buf));
+}
+
+static char *insert_temp_file(char *pattern, int where, int skip)
+{
+	char *fname = mem_filename;
+
+	if (mem_changed || !fname[0]) /* If not saved */
+	{
+		if (!mem_tempname) mem_tempname = new_temp_file();
+		if (!mem_tempname) return (NULL); /* Temp save failed */
+		fname = mem_tempname;
+	}
+
+	return (g_strdup_printf("%.*s\"%s\"%s", where, pattern, fname,
+		pattern + where + skip));
+}
 
 int spawn_expansion(char *cline, char *directory)
 	// Replace %f with "current filename", then run via shell
 {
-	int res = -1, max;
-	char *s1, *s2;
+	int res = -1;
+	char *s1;
 #ifdef WIN32
 	char *argv[4] = { getenv("COMSPEC"), "/C", cline, NULL };
 #else
@@ -42,15 +187,12 @@ int spawn_expansion(char *cline, char *directory)
 	s1 = strstr( cline, "%f" );	// Has user included the current filename?
 	if (s1)
 	{
-		max = strlen(cline) + strlen(mem_filename) + 5;
-		s2 = malloc(max);
-		if (s2)
+		s1 = insert_temp_file(cline, s1 - cline, 2);
+		if (s1)
 		{
-			strncpy(s2, cline, s1-cline);		// Text before %f
-			sprintf(s2 + (s1 - cline), "\"%s\"%s", mem_filename, s1+2);
-			argv[2] = s2;
+			argv[2] = s1;
 			res = spawn_process(argv, directory);
-			free(s2);
+			g_free(s1);
 		}
 		else return -1;
 	}
@@ -213,7 +355,7 @@ void init_factions()
 
 static void faction_ok(GtkWidget *widget, gpointer user_data)
 {
-	char txt[64];
+	char txt[64], path[PATHBUF];
 	gchar *celltext;
 	int i, j, k;
 
@@ -221,10 +363,16 @@ static void faction_ok(GtkWidget *widget, gpointer user_data)
 	{
 		for (j = 0; j < 3; j++)
 		{
+			sprintf(txt, faction_ini[j], i + 1);
 			k = gtk_clist_get_text(GTK_CLIST(faction_list), i, j,
 				&celltext);
-			sprintf(txt, faction_ini[j], i + 1);
-			inifile_set(txt, k ? celltext : "");
+			if (!k) celltext = "";
+			else if (j)
+			{
+				gtkncpy(path, celltext, PATHBUF);
+				celltext = path;
+			}
+			inifile_set(txt, celltext);
 		}
 	}
 	update_faction_menu();
@@ -242,7 +390,7 @@ void pressed_file_configure()
 	gchar *clist_titles[3] = { _("Action"), _("Command"), "" };
 	GtkWidget *vbox, *hbox, *win, *sw, *clist, *entry;
 	gchar *row_text[3];
-	char txt[64];
+	char txt[64], paths[2][PATHTXT];
 	int i, j;
 
 
@@ -274,6 +422,9 @@ void pressed_file_configure()
 		{
 			sprintf(txt, faction_ini[j], i);
 			row_text[j] = inifile_get(txt, "");
+			if (!j) continue;
+			gtkuncpy(paths[j - 1], row_text[j], PATHTXT);
+			row_text[j] = paths[j - 1];
 		}
 		gtk_clist_append(GTK_CLIST(clist), row_text);
 	}
@@ -367,7 +518,6 @@ int spawn_process(char *argv[], char *directory)
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <fcntl.h>
 
 int spawn_process(char *argv[], char *directory)
 {

@@ -50,7 +50,7 @@
 #include "inifile.h"
 
 
-char preserved_gif_filename[256];
+char preserved_gif_filename[PATHBUF];
 int preserved_gif_delay = 10, silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
 
@@ -1119,7 +1119,7 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	if (!cinfo) goto fail;
 	opj_set_default_encoder_parameters(&par);
 	par.tcp_numlayers = 1;
-	par.tcp_rates[0] = jp2_rate;
+	par.tcp_rates[0] = settings->jp2_rate;
 	par.cp_disto_alloc = 1;
 	opj_setup_encoder(cinfo, &par, image);
 	cio = opj_cio_open((opj_common_ptr)cinfo, NULL, 0);
@@ -3600,15 +3600,14 @@ int load_image(char *file_name, int mode, int ftype)
 		{
 			/* Needed when starting new mtpaint process later */
 			preserved_gif_delay = settings.gif_delay;
-			strncpy(preserved_gif_filename, file_name, 250);
+			strncpy(preserved_gif_filename, file_name, PATHBUF);
 			file_selector(FS_GIF_EXPLODE);
 		}
 		else if (i == 3)
 		{
-			char mess[512];
-
-			snprintf(mess, 500, "gifview -a \"%s\" &", file_name);
-			gifsicle(mess);
+			char *tmp = g_strdup_printf("gifview -a \"%s\" &", file_name);
+			gifsicle(tmp);
+			g_free(tmp);
 		}
 		/* Have empty image again to avoid destroying old animation */
 		create_default_image();
@@ -3695,11 +3694,11 @@ int load_image(char *file_name, int mode, int ftype)
 
 int export_undo(char *file_name, ls_settings *settings)
 {
-	char new_name[300];
+	char new_name[PATHBUF + 32];
 	int start = mem_undo_done, res = 0, lenny, i, j;
 	int deftype = settings->ftype, miss = 0;
 
-	strncpy( new_name, file_name, 256);
+	strncpy( new_name, file_name, PATHBUF);
 	lenny = strlen( file_name );
 
 	ls_init("UNDO", 1);
@@ -3896,7 +3895,7 @@ int valid_file( char *filename )		// Can this file be opened for reading?
 
 int show_html(char *browser, char *docs)
 {
-	char buf[300], buf2[300];
+	char buf[PATHBUF], buf2[PATHBUF];
 	int i=-1;
 #ifdef WIN32
 	char *r;
@@ -3904,11 +3903,12 @@ int show_html(char *browser, char *docs)
 	if (!docs || !docs[0])
 	{
 		/* Use default path relative to installdir */
-		i = GetModuleFileNameA(NULL, buf, 260);
+		i = GetModuleFileNameA(NULL, buf, PATHBUF);
 		if (!i) return (-1);
 		r = strrchr(buf, '\\');
 		if (!r) return (-1);
-		strcpy(r + 1, HANDBOOK_LOCATION_WIN);
+		r[1] = 0;
+		strnncat(buf, HANDBOOK_LOCATION_WIN, PATHBUF);
 		docs = buf;
 	}
 #else /* Linux */
@@ -3920,7 +3920,7 @@ int show_html(char *browser, char *docs)
 		if (valid_file(docs) < 0) docs = HANDBOOK_LOCATION2;
 	}
 #endif
-	else docs = gtkncpy(buf, docs, 260);
+	else docs = gtkncpy(buf, docs, PATHBUF);
 
 	if ((valid_file(docs) < 0))
 	{
@@ -3932,7 +3932,7 @@ int show_html(char *browser, char *docs)
 
 #ifdef WIN32
 	if (browser && !browser[0]) browser = NULL;
-	if (browser) browser = gtkncpy(buf2, browser, 260);
+	if (browser) browser = gtkncpy(buf2, browser, PATHBUF);
 
 	if ((unsigned int)ShellExecuteA(NULL, "open", browser ? browser : docs,
 		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
@@ -3940,7 +3940,7 @@ int show_html(char *browser, char *docs)
 #else
 	/* Try to use default browser */
 	if (!browser || !browser[0]) browser = getenv("BROWSER");
-	else browser = gtkncpy(buf2, browser, 260);
+	else browser = gtkncpy(buf2, browser, PATHBUF);
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 

@@ -94,6 +94,10 @@ void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
 
+// Copy string quoting space chars
+
+char *quote_spaces(const char *src);
+
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt);
@@ -101,6 +105,14 @@ char *gtkncpy(char *dest, const char *src, int cnt);
 // Wrapper for C->utf8 translation
 
 char *gtkuncpy(char *dest, const char *src, int cnt);
+
+// Generic wrapper for strncpy(), ensuring NUL termination
+
+#define strncpy0(A,B,C) (strncpy((A), (B), (C))[(C) - 1] = 0)
+
+// A more sane replacement for strncat()
+
+char *strnncat(char *dest, const char *src, int max);
 
 // Extracting widget from GtkTable
 
@@ -240,4 +252,28 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 #define GTK_RADIO_BUTTON_0(X) (GtkRadioButton *)(X)
 #else
 #define GTK_RADIO_BUTTON_0(X) GTK_RADIO_BUTTON(X)
+#endif
+
+// Path string sizes
+/* If path is longer than this, it is user's own problem */
+#define SANE_PATH_LEN 2048
+
+#ifdef WIN32
+#define PATHBUF 260 /* MinGW defines PATH_MAX to not include terminating NUL */
+#elif defined MAXPATHLEN
+#define PATHBUF MAXPATHLEN /* MAXPATHLEN includes the NUL */
+#elif defined PATH_MAX
+#define PATHBUF PATH_MAX /* POSIXly correct PATH_MAX does too */
+#else
+#define PATHBUF SANE_PATH_LEN /* Arbitrary limit for GNU Hurd and the like */
+#endif
+#if PATHBUF > SANE_PATH_LEN /* Force a sane limit */
+#undef PATHBUF
+#define PATHBUF SANE_PATH_LEN
+#endif
+
+#if GTK_VERSION_MAJOR == 1 /* Same encoding in GTK+1 */
+#define PATHTXT PATHBUF
+#else /* Allow for expansion when converting from codepage to UTF8 */
+#define PATHTXT (PATHBUF * 2)
 #endif

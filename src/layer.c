@@ -36,7 +36,7 @@ int	layers_total = 0,		// Layers currently being used
 	layer_selected = 0,		// Layer currently selected in the layers window
 	layers_changed = 0;		// 0=Unchanged
 
-char	layers_filename[256];		// Current filename for layers file
+char layers_filename[PATHBUF];		// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
 	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
 
@@ -46,8 +46,7 @@ layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
 
 void layers_init()
 {
-	sprintf( layers_filename, _("Untitled") );
-	sprintf( layer_table[0].name, _("Background") );
+	strncpy0(layer_table[0].name, _("Background"), LAYER_NAMELEN);
 	layer_table[0].visible = TRUE;
 	layer_table[0].use_trans = FALSE;
 	layer_table[0].x = 0;
@@ -114,15 +113,16 @@ gboolean layers_initialized;		// Indicates if initializing is complete
 
 static void layers_update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[520], *extra = "-";
+	char txt[300], txt2[PATHTXT], *extra = "-";
 
 	if ( layers_window == NULL ) return;		// Don't bother if window is not showing
 
-	gtkuncpy(txt2, layers_filename, 512);
+	gtkuncpy(txt2, layers_filename, PATHTXT);
 
 	if ( layers_changed == 1 ) extra = _("(Modified)");
 
-	snprintf( txt, 290, "%s %s %s", _("Layers"), extra, txt2 );
+	snprintf( txt, 290, "%s %s %s", _("Layers"), extra, txt2[0] ? txt2 :
+		_("Untitled"));
 
 	gtk_window_set_title (GTK_WINDOW (layers_window), txt );
 }
@@ -236,8 +236,6 @@ static void layer_new_chores(int l, layer_image *lim)
 	layer_table[l].opacity = 100;
 	layer_table[l].visible = TRUE;
 	layer_table[l].use_trans = FALSE;
-
-	strcpy(lim->state_.filename, _("Untitled"));
 
 	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
@@ -423,10 +421,11 @@ static void layer_refresh_list()
 
 static gint layer_press_delete()
 {
-	char txt[128];
+	char txt[256];
 	int i, to_go = layer_selected;
 
-	sprintf(txt, _("Do you really want to delete layer %i (%s) ?"), layer_selected, layer_table[layer_selected].name );
+	snprintf(txt, 256, _("Do you really want to delete layer %i (%s) ?"),
+		layer_selected, layer_table[layer_selected].name );
 
 	i = alert_box( _("Warning"), txt, _("No"), _("Yes"), NULL );
 
@@ -473,14 +472,11 @@ static gint layer_press_centre()
 int layers_unsaved_tot()			// Return number of layers with no filenames
 {
 	int j = 0, k;
-	char *t;
 
 	for ( k=0; k<=layers_total; k++ )	// Check each layer for proper filename
 	{
-		t = k == layer_selected ? mem_filename :
-			layer_table[k].image->state_.filename;
-
-		if ( strcmp( t, _("Untitled") ) == 0 ) j++;
+		j += !(k == layer_selected ? mem_filename[0] :
+			layer_table[k].image->state_.filename[0]);
 	}
 
 	return j;
@@ -496,7 +492,7 @@ int layers_changed_tot()			// Return number of layers with changes
 		state = k == layer_selected ? &mem_state :
 			&layer_table[k].image->state_;
 		j += state->changed;
-		if (!strcmp(state->filename, _("Untitled"))) j++;
+		j += !state->filename[0];
 	}
 
 	return j;
@@ -515,9 +511,9 @@ int check_layers_for_changes()			// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 	return i;
 }
 
-void layer_update_filename( char *name )
+static void layer_update_filename( char *name )
 {
-	strncpy(layers_filename, name, 250);
+	strncpy(layers_filename, name, PATHBUF);
 	layers_changed = 1;		// Forces update of titlebar
 	layers_notify_unchanged();
 }
@@ -544,15 +540,14 @@ static void layers_remove_all(); /* Forward declaration */
 
 int load_layers( char *file_name )
 {
-	char tin[300], load_prefix[300], load_name[300], *c;
+	char tin[300], load_name[PATHBUF], *c;
 	layer_image *lim2;
 	int i, j, k, layers_to_read = -1, layer_file_version = -1, lfail = 0;
+	int lplen = 0;
 	FILE *fp;
 
-	strncpy( load_prefix, file_name, 256 );
-	c = strrchr( load_prefix, DIR_SEP );
-	if ( c!=NULL ) c[1]=0;
-	else load_prefix[0]=0;
+	c = strrchr(file_name, DIR_SEP);
+	if (c) lplen = c - file_name + 1;
 
 		// Try to save text file, return -1 if failure
 	if ((fp = fopen(file_name, "r")) == NULL) goto fail;
@@ -577,7 +572,7 @@ int load_layers( char *file_name )
 		// Read filename, strip end chars & try to load (if name length > 0)
 		fgets(tin, 256, fp);
 		string_chop(tin);
-		snprintf(load_name, 260, "%s%s", load_prefix, tin);
+		snprintf(load_name, PATHBUF, "%.*s%s", lplen, file_name, tin);
 		k = 1;
 		j = detect_image_format(load_name);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
@@ -607,7 +602,7 @@ int load_layers( char *file_name )
 
 		fgets(tin, 256, fp);
 		string_chop(tin);
-		strncpy(layer_table[layers_total].name, tin, 32); // Layer text name
+		strncpy0(layer_table[layers_total].name, tin, LAYER_NAMELEN);
 
 		k = read_file_num(fp, tin);
 		layer_table[layers_total].visible = k > 0;
@@ -654,7 +649,9 @@ int load_layers( char *file_name )
 	}
 	else layer_refresh_list();
 
-	ani_read_file(fp);		// Read in animation data
+	/* Read in animation data - only if all layers loaded OK
+	 * (to do otherwise is likely to result in SIGSEGV) */
+	if (!lfail) ani_read_file(fp);
 
 	fclose(fp);
 	layer_update_filename( file_name );
@@ -674,35 +671,29 @@ fail:
 	return -1;
 }
 
-void parse_filename( char *dest, char *prefix, char *file )
-{	// Convert absolute filename 'file' into one relative to prefix
-	int i = 0, j = strlen(prefix), k;
+/* Convert absolute filename 'file' into one relative to prefix */
+static void parse_filename(char *dest, char *prefix, char *file, int len)
+{
+	int i, k;
 
-	while ( i<j && prefix[i] == file[i] ) i++;	// # of chars that match at start
+	/* # of chars that match at start */
+	for (i = 0; (i < len) && (prefix[i] == file[i]); i++);
 
-	if ( i>0 )
+	if (!i || (i == len)) /* Complete match, or no match at all */
+		strncpy(dest, file + i, PATHBUF);
+	else	/* Partial match */
 	{
-		if ( i==j )				// File is at prefix level or below
-			strncpy( dest, file+i, 256 );
-		else					// File is below prefix level
-		{
-			dest[0]=0;
-			k = i;
-			while ( k<j )
-			{
-				if ( prefix[k] == DIR_SEP ) strncat( dest, "../", 256 );
-				k++;
-			} // Count number of DIR_SEP encountered on and after point i in 'prefix', add a '../' for each found
-			k = i;
-			while ( k>-1 && file[k]!=DIR_SEP )
-			{
-				k--;
-			} // nip backwards on 'file' from i to previous DIR_SEP or beginning and ..
-
-			strncat( dest, file+k+1, 256 );	// ... add rest of 'file'
-		}
+		dest[0] = 0;
+		/* Count number of DIR_SEP encountered on and after point i in
+		 * 'prefix', add a '../' for each found */
+		for (k = i; k < len; k++)
+			if (prefix[k] == DIR_SEP) strnncat( dest, "../", PATHBUF);
+		/* nip backwards on 'file' from i to previous DIR_SEP or
+		 * beginning and ... */
+		for (k = i; (k >= 0) && (file[k] != DIR_SEP); k--);
+		/* ... add rest of 'file' */
+		strnncat(dest, file + k + 1, PATHBUF);
 	}
-	else	strncpy( dest, file, 256 );		// Prefix not in file at all, so copy all
 }
 
 void layer_press_save_composite()		// Create, save, free the composite image
@@ -745,14 +736,12 @@ int layer_save_composite(char *fname, ls_settings *settings)
 
 int save_layers( char *file_name )
 {
-	char mess[300], comp_name[300], save_prefix[300], *c;
-	int i;
+	char comp_name[PATHBUF], *c, *msg;
+	int i, l = 0;
 	FILE *fp;
 
-	strncpy( save_prefix, file_name, 256 );
-	c = strrchr( save_prefix, DIR_SEP );
-	if (c) c[1] = 0;
-	else save_prefix[0] = 0;
+	c = strrchr(file_name, DIR_SEP);
+	if (c) l = c - file_name + 1;
 
 		// Try to save text file, return -1 if failure
 	if ((fp = fopen(file_name, "w")) == NULL) goto fail;
@@ -762,7 +751,7 @@ int save_layers( char *file_name )
 	{
 		c = layer_selected == i ? mem_filename :
 			layer_table[i].image->state_.filename;
-		parse_filename(comp_name, save_prefix, c);
+		parse_filename(comp_name, file_name, c, l);
 		fprintf( fp, "%s\n", comp_name );
 
 		fprintf( fp, "%s\n%i\n%i\n%i\n%i\n%i\n%i\n",
@@ -779,8 +768,11 @@ int save_layers( char *file_name )
 
 	return 1;		// Success
 fail:
-	snprintf(mess, 260, _("Unable to save file: %s"), layers_filename);
-	alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+	c = gtkuncpy(NULL, layers_filename, 0);
+	msg = g_strdup_printf(_("Unable to save file: %s"), c);
+	alert_box(_("Error"), msg, _("OK"), NULL, NULL);
+	g_free(msg);
+	g_free(c);
 
 	return -1;
 }
@@ -806,10 +798,7 @@ void layer_press_save_as()
 
 void layer_press_save()
 {
-	if ( strcmp( layers_filename, _("Untitled") ) == 0 )
-	{
-		layer_press_save_as();
-	}
+	if (!layers_filename[0]) layer_press_save_as();
 	else
 	{
 		check_layers_all_saved();
@@ -863,7 +852,7 @@ static void layers_remove_all()
 		layer_delete(i);
 	}
 	layer_refresh_list();
-	sprintf(layers_filename, _("Untitled"));
+	layers_filename[0] = 0;
 	layers_notify_unchanged();
 
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
@@ -909,6 +898,7 @@ static gint layer_main_toggled( GtkWidget *widget, GdkEvent *event, gpointer dat
 
 static void layer_inputs_changed()
 {
+	const char *nname;
 	gboolean txt_changed = FALSE;
 
 	if (!layers_initialized) return;
@@ -919,11 +909,11 @@ static void layer_inputs_changed()
 			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(layer_spin) );
 	layer_table[layer_selected].opacity = mt_spinslide_get_value(layer_slider);
 
-	if ( strncmp( layer_table[layer_selected].name,
-		gtk_entry_get_text( GTK_ENTRY(entry_layer_name) ), 35) ) txt_changed = TRUE;
+	nname = gtk_entry_get_text(GTK_ENTRY(entry_layer_name));
+	if (strncmp(layer_table[layer_selected].name, nname, LAYER_NAMELEN - 1))
+		txt_changed = TRUE;
 
-	strncpy( layer_table[layer_selected].name,
-		gtk_entry_get_text( GTK_ENTRY(entry_layer_name) ), 35);
+	strncpy0(layer_table[layer_selected].name, nname, LAYER_NAMELEN);
 	gtk_label_set_text( GTK_LABEL(layer_list_data[layer_selected].name),
 		layer_table[layer_selected].name );
 	layer_table[layer_selected].use_trans = gtk_toggle_button_get_active(
@@ -1154,7 +1144,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 {
 	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	char txt[256];
+	char txt[32];
 	int i;
 
 	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], FALSE);
@@ -1242,7 +1232,7 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("Position"), table, 1, 0, 0 );
 	add_to_table( _("Opacity"), table, 2, 0, 0 );
 
-	entry_layer_name = gtk_entry_new_with_max_length (32);
+	entry_layer_name = gtk_entry_new_with_max_length(LAYER_NAMELEN - 1);
 	gtk_widget_set_usize(entry_layer_name, 100, -2);
 	gtk_widget_show (entry_layer_name);
 	gtk_table_attach (GTK_TABLE (table), entry_layer_name, 1, 2, 0, 1,

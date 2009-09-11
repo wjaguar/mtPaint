@@ -73,7 +73,7 @@ static ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 static int
 	ani_layer_data[MAX_LAYERS + 1][4],	// x, y, opacity, visible
 	ani_currently_selected_layer;
-static char ani_output_path[260], ani_file_prefix[ANI_PREFIX_LEN+2];
+static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
 static gboolean ani_use_gif, ani_show_main_state;
 
 
@@ -329,7 +329,7 @@ static void empty_text_widget(GtkWidget *w)	// Empty the text widget
 static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 {
 	int i, j, k;
-	char txt[256], *tmp;
+	char txt[128 + MAX_CYC_ITEMS * 6], *tmp;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
@@ -423,8 +423,8 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 			layer_table[j].image->ani_pos[0].frame = 0;
 	}
 
-	sprintf(ani_output_path, "frames");
-	sprintf(ani_file_prefix, "f");
+	strcpy(ani_output_path, "frames");
+	strcpy(ani_file_prefix, "f");
 
 	ani_use_gif = TRUE;
 }
@@ -576,12 +576,10 @@ static void ani_win_read_widgets()		// Read all widgets and set up relevant vari
 	ani_pos_refresh_txt();		// Update 2 text widgets
 	ani_cyc_refresh_txt();
 
-	mtMIN(ani_frame1, a, b);
-	mtMAX(ani_frame2, a, b);
-	snprintf(ani_output_path, 256, "%s",
-			gtk_entry_get_text( GTK_ENTRY(ani_entry_path) ) );
-	snprintf(ani_file_prefix, ANI_PREFIX_LEN, "%s",
-			gtk_entry_get_text( GTK_ENTRY(ani_entry_prefix) ) );
+	ani_frame1 = a < b ? a : b;
+	ani_frame2 = a < b ? b : a;
+	gtkncpy(ani_output_path, gtk_entry_get_text(GTK_ENTRY(ani_entry_path)), PATHBUF);
+	gtkncpy(ani_file_prefix, gtk_entry_get_text(GTK_ENTRY(ani_entry_prefix)), ANI_PREFIX_LEN + 1);
 	// GIF toggle is automatically set by callback
 }
 
@@ -732,46 +730,15 @@ void ani_but_preview()
 	gtk_adjustment_value_changed(SPINSLIDE_ADJUSTMENT(ani_prev_slider));
 }
 
-void wild_space_change( char *in, char *out, int length )
-{					// Copy string but replace " " with "\ "
-	int ip = 0, op = 0;
-
-	while ( op<length && in[ip] != 0 )
-	{
-		if ( in[ip] == ' ' )
-		{
-#ifndef WIN32
-			out[op++] = '\\';
-			if ( op>= length ) break;
-			out[op++] = ' ';
-#endif
-#ifdef WIN32
-			out[op++] = '"';
-			if ( op>= length ) break;
-			out[op++] = ' ';
-			if ( op>= length ) break;
-			out[op++] = '"';
-#endif
-			ip++;
-		} else out[op++] = in[ip++];
-	}
-
-	if ( op >= length ) op = length - 1;
-	out[op] = 0;
-}
-
 static void create_frames_ani()
 {
 	image_info *image;
 	image_state *state;
 	ls_settings settings;
-	png_color pngpal[256];
-	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256], npt[3];
-	char output_path[300], *txt, command[512], wild_path[300];
-	int a, b, k, i, cols, trans, layer_w, layer_h;
-#ifndef WIN32
-	mode_t mode = 0777;
-#endif
+	png_color pngpal[256], *trans;
+	unsigned char *layer_rgb, *irgb = NULL, newpal[3][256];
+	char output_path[PATHBUF], *command, *wild_path;
+	int a, b, k, i, cols, layer_w, layer_h, npt, l = 0;
 
 
 	ani_win_read_widgets();
@@ -782,26 +749,21 @@ static void create_frames_ani()
 	ani_write_layer_data();
 	layer_press_save();		// Save layers data file
 
-	strncpy( output_path, layers_filename, 250 );
+	layers_filename[0] = 0;
+	command = strrchr(layers_filename, DIR_SEP);
+	if (command) l = command - layers_filename + 1;
+//	strncpy0(output_path, layers_filename, l + 1);
 
-	txt = strrchr( output_path, DIR_SEP );
-	if ( txt == NULL ) txt = output_path;		// This should never happen, but just in case
-	else
+	if (ani_output_path[0])	// Output path used?
 	{
-		txt = txt + 1;
-		txt[0] = 0;
-	}
+		snprintf(output_path, PATHBUF, "%.*s%s",
+			l, layers_filename, ani_output_path);
 
-	if ( strlen(ani_output_path) > 0 )	// Output path used?
-	{
-		strncpy( txt, ani_output_path, 50 );
-
-		i = mkdir(output_path
-#ifndef WIN32
-			, mode
+#ifdef WIN32
+		if (mkdir(output_path))
+#else
+		if (mkdir(output_path, 0777))
 #endif
-			);
-		if ( i != 0 )
 		{
 			if ( errno != EEXIST )
 			{
@@ -871,30 +833,27 @@ static void create_frames_ani()
 		ani_set_frame_state(k);		// Change layer positions
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
 
-		if ( ani_use_gif )		// Create RGB PNG file
-		{
-			sprintf(txt, "%s%c%s%05d.gif", ani_output_path, DIR_SEP, ani_file_prefix, k);
+		snprintf(output_path, PATHBUF, "%.*s%s%c%s%05d.%s", 
+			l, layers_filename, ani_output_path, DIR_SEP,
+			ani_file_prefix, k, ani_use_gif ? "gif" : "png");
 
+		if ( ani_use_gif )	// Prepare palette
+		{
 			cols = mem_cols_used_real(layer_rgb, layer_w, layer_h, 258, 0);
 							// Count colours in image
 
 			if ( cols <= 256 )	// If <=256 convert directly
-			{
 				mem_cols_found_dl(newpal);	// Get palette
-				i = dl3floste(layer_rgb, irgb, layer_w, layer_h, cols, FALSE, newpal);
-							// Create new indexed image
-			}
 			else			// If >256 use Wu to quantize
 			{
 				cols = 256;
-				i = wu_quant(layer_rgb, layer_w, layer_h, cols, newpal);
-				if ( i==0 )
-				{
-					i = dl3floste(layer_rgb, irgb, layer_w, layer_h,
-						cols, FALSE, newpal);  // Create new indexed image
-				}
+				if (wu_quant(layer_rgb, layer_w, layer_h, cols,
+					newpal)) goto failure2;
 			}
-			if ( i != 0 ) goto failure2;	// Some sort of memory error
+
+			// Create new indexed image
+			if (dl3floste(layer_rgb, irgb, layer_w, layer_h, cols,
+				FALSE, newpal)) goto failure2;	// Some sort of memory error
 
 			for ( i=0; i<256; i++ )		// Assemble palette for GIF export
 			{
@@ -903,64 +862,51 @@ static void create_frames_ani()
 				pngpal[i].blue	= newpal[2][i];
 			}
 
-			trans = state->xpm_trans;
-			if (trans >= 0)		// Background has transparency
+			settings.xpm_trans = -1;	// Default is no transparency
+			if (state->xpm_trans >= 0)	// Background has transparency
 			{
-				npt[0] = image->pal[trans].red;
-				npt[1] = image->pal[trans].green;
-				npt[2] = image->pal[trans].blue;
-
-				for ( i=0; i<cols; i++ )
-				{		// Does it exist in the composite frame?
-					if (	newpal[0][i] == npt[0] &&
-						newpal[1][i] == npt[1] &&
-						newpal[2][i] == npt[2] )
-					{
-						trans = i;	// Transparency found so note it
-						break;
-					}
+				trans = image->pal + state->xpm_trans;
+				npt = PNG_2_INT(*trans);
+				for (i = 0; i < cols; i++)
+				{	// Does it exist in the composite frame?
+					if (RGB_2_INT(newpal[0][i], newpal[1][i],
+						newpal[2][i]) != npt) continue;
+					// Transparency found so note it
+					settings.xpm_trans = i;
+					break;
 				}
-				if ( i>=cols ) trans = -1;	// Not in final image so ignore
 			}
-
-			/* Save GIF file */
-			settings.xpm_trans = trans;
-			i = save_image(output_path, &settings);
-			if ( i != 0 ) goto failure2;	// Some sort of i/o error
 		}
-		else				// Create Indexed GIF file
+
+		if (save_image(output_path, &settings) < 0)
 		{
-			sprintf(txt, "%s%c%s%05d.png", ani_output_path, DIR_SEP, ani_file_prefix, k);
-			if (save_image(output_path, &settings) < 0)	// Save to PNG
-			{
-				alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
-				goto failure2;
-			}
+			alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
+			goto failure2;
 		}
 	}
 
 	if ( ani_use_gif )	// all GIF files created OK so lets give them to gifsicle
 	{
-		txt[0] = 0;
-		snprintf(txt, 290, "%s%c%s?????.gif",
-			ani_output_path, DIR_SEP, ani_file_prefix);
-		wild_space_change(output_path, wild_path, 290);
+		snprintf(output_path, PATHBUF, "%.*s%s%c%s?????.gif",
+			l, layers_filename, ani_output_path, DIR_SEP,
+			ani_file_prefix);
+		wild_path = quote_spaces(output_path);
 
-		txt[0] = 0;
-		snprintf(command, 500,
-			"%s -d %i %s -o \"%s%s%c%s.gif\"",
+		command = g_strdup_printf("%s -d %i %s -o \"%.*s%s%c%s.gif\"",
 			GIFSICLE_CREATE,
 			ani_gif_delay, wild_path,
-			output_path, ani_output_path, DIR_SEP, ani_file_prefix
-			);
+			l, layers_filename, ani_output_path, DIR_SEP,
+			ani_file_prefix);
 		gifsicle(command);
+		g_free(command);
+		free(wild_path);
 
 #ifndef WIN32
-		snprintf(command, 500,
-			"gifview -a \"%s%s%c%s.gif\" &",
-			output_path, ani_output_path, DIR_SEP, ani_file_prefix
-			);
+		command = g_strdup_printf("gifview -a \"%.*s%s%c%s.gif\" &",
+			l, layers_filename, ani_output_path, DIR_SEP,
+			ani_file_prefix);
 		gifsicle(command);
+		g_free(command);
 #endif
 	}
 
@@ -1119,7 +1065,7 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	GtkWidget *ani_toggle_gif, *ani_list_layers, *list_data;
 	GtkWidget *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	char txt[256];
+	char txt[PATHTXT];
 	int i;
 
 
@@ -1130,7 +1076,7 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 		return;
 	}
 
-	if ( strcmp( layers_filename, _("Untitled") ) == 0 )
+	if (!layers_filename[0])
 	{
 		alert_box(_("Error"), _("You must save your layers file before creating an animation"),
 			_("OK"), NULL, NULL );
@@ -1173,19 +1119,21 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	spin_connect(ani_spin[1], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 	spin_connect(ani_spin[2], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	ani_entry_path = gtk_entry_new_with_max_length (256);
+	ani_entry_path = gtk_entry_new_with_max_length(PATHBUF);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_path, 1, 2, 3, 4,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, 0);
-	gtk_entry_set_text (GTK_ENTRY (ani_entry_path), ani_output_path);
+	gtkuncpy(txt, ani_output_path, PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(ani_entry_path), txt);
 	gtk_signal_connect( GTK_OBJECT(ani_entry_path), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	ani_entry_prefix = gtk_entry_new_with_max_length (ANI_PREFIX_LEN);
+	ani_entry_prefix = gtk_entry_new_with_max_length(ANI_PREFIX_LEN);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_prefix, 1, 2, 4, 5,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, 0);
-	gtk_entry_set_text (GTK_ENTRY (ani_entry_prefix), ani_file_prefix);
+	gtkuncpy(txt, ani_file_prefix, PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(ani_entry_prefix), txt);
 	gtk_signal_connect( GTK_OBJECT(ani_entry_prefix), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
@@ -1297,11 +1245,11 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 
 	if (!fgets(tin, 2000, fp)) return;		// BAILOUT - invalid line
 	string_chop( tin );
-	strcpy( ani_output_path, tin );
+	strncpy0(ani_output_path, tin, PATHBUF);
 
 	if (!fgets(tin, 2000, fp)) return;		// BAILOUT - invalid #
 	string_chop( tin );
-	strcpy( ani_file_prefix, tin );
+	strncpy0(ani_file_prefix, tin, ANI_PREFIX_LEN + 1);
 
 	i = read_file_num(fp, tin);
 	if ( i<0 )
@@ -1415,15 +1363,18 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 int gifsicle( char *command )	// Execute Gifsicle/Gifview
 {
 	int res = system(command), code;
-	char mess[512];
+	char *msg, *c8;
 
 	if ( res != 0 )
 	{
 		if ( res>0 ) code = WEXITSTATUS(res);
 		else code = res;
-
-		snprintf( mess, 500, _("Error %i reported when trying to run %s"), code, command);
-		alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+		c8 = gtkuncpy(NULL, command, 0);
+		msg = g_strdup_printf(_("Error %i reported when trying to run %s"),
+			code, c8);
+		alert_box( _("Error"), msg, _("OK"), NULL, NULL );
+		g_free(msg);
+		g_free(c8);
 	}
 
 	return res;

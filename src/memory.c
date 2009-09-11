@@ -407,9 +407,9 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 	}
 	if (res && image->undo_.items)
 	{
-		j = image->undo_.pointer;
-		if (!image->undo_.items[j].pal_)
-			res = (void *)(image->undo_.items[j].pal_ =
+		int k = image->undo_.pointer;
+		if (!image->undo_.items[k].pal_)
+			res = (void *)(image->undo_.items[k].pal_ =
 				malloc(SIZEOF_PALETTE));
 	}
 	if (!res) /* Not enough memory */
@@ -1240,7 +1240,7 @@ void mem_init()					// Initialise memory
 	static const unsigned char lookup[8] =
 		{ 0, 36, 73, 109, 146, 182, 219, 255 };
 	unsigned char *dest;
-	char txt[300];
+	char txt[PATHBUF];
 	int i, j, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
@@ -1253,7 +1253,7 @@ void mem_init()					// Initialise memory
 	}
 	mem_pal_copy( temp_pal, mem_pal_def );
 
-	snprintf( txt, 290, "%s/mtpaint.gpl", get_home_directory() );
+	snprintf(txt, PATHBUF, "%s/mtpaint.gpl", get_home_directory());
 	i = valid_file(txt);
 	if ( i == 0 )
 	{

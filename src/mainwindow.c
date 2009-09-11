@@ -108,7 +108,7 @@ GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*menu_widgets[TOTAL_MENU_IDS];
 
 int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
-int files_passed, file_arg_start = -1, drag_index_vals[2], cursor_corner;
+int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
 char **global_argv;
 
 GdkGC *dash_gc;
@@ -165,11 +165,10 @@ static void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 static void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int change;
-	char txt[64], *c, old_file[256];
+	char txt[64], *c;
 
 	sprintf( txt, "file%i", item );
 	c = inifile_get( txt, "." );
-	strncpy( old_file, c, 250 );
 
 	if ( layers_total==0 )
 		change = check_for_changes();
@@ -177,7 +176,7 @@ static void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gin
 		change = check_layers_for_changes();
 
 	if ( change == 2 || change == -10 )
-		do_a_load(old_file);		// Load requested file
+		do_a_load(c);		// Load requested file
 }
 
 static void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
@@ -291,7 +290,7 @@ static void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int dups;
-	char mess[256];
+	char mess[512];
 
 	if ( mem_cols < 3 )
 	{
@@ -316,7 +315,7 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 			}
 			else
 			{
-				snprintf(mess, 250, _("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups );
+				snprintf(mess, 500, _("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups );
 				if ( alert_box( _("Warning"), mess, _("Yes"), _("No"), NULL ) == 1 )
 				{
 					spot_undo(UNDO_XPAL);
@@ -412,7 +411,7 @@ static void pressed_export_ascii( GtkMenuItem *menu_item, gpointer user_data )
 
 static void pressed_export_gif( GtkMenuItem *menu_item, gpointer user_data )
 {
-	if ( strcmp( mem_filename, _("Untitled") ) ) file_selector( FS_EXPORT_GIF );
+	if (mem_filename[0]) file_selector( FS_EXPORT_GIF );
 	else alert_box( _("Error"), _("You must save at least one frame to create an animated GIF."),
 		_("OK"), NULL, NULL );
 }
@@ -432,7 +431,7 @@ void pressed_save_file_as( GtkMenuItem *menu_item, gpointer user_data )
 int gui_save(char *filename, ls_settings *settings)
 {
 	int res = -2, fflags = file_formats[settings->ftype].flags;
-	char mess[512];
+	char mess[512], *f8;
 
 	mess[0] = 0;
 	/* Mismatched format - raise an error right here */
@@ -471,7 +470,9 @@ int gui_save(char *filename, ls_settings *settings)
 	{
 		if (res == -1)
 		{
-			snprintf(mess, 500, _("Unable to save file: %s"), filename);
+			f8 = gtkuncpy(NULL, filename, 0);
+			snprintf(mess, 500, _("Unable to save file: %s"), f8);
+			g_free(f8);
 		}
 		if (mess[0]) alert_box( _("Error"), mess, _("OK"), NULL, NULL );
 	}
@@ -488,7 +489,7 @@ static void pressed_save_file(GtkMenuItem *menu_item, gpointer user_data)
 {
 	ls_settings settings;
 
-	while (strcmp(mem_filename, _("Untitled")))
+	while (mem_filename[0])
 	{
 		init_ls_settings(&settings, NULL);
 		settings.ftype = file_type_by_ext(mem_filename, FF_IMAGE);
@@ -500,14 +501,14 @@ static void pressed_save_file(GtkMenuItem *menu_item, gpointer user_data)
 	file_selector(FS_PNG_SAVE);
 }
 
-char mem_clip_file[256];
+char mem_clip_file[PATHBUF];
 
 void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	char clip[256];
+	char clip[PATHBUF];
 	int i;
 
-	snprintf(clip, 251, "%s%i", mem_clip_file, item);
+	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
 	i = load_image(clip, FS_CLIP_FILE, FT_PNG);
 
 	if ( i!=1 ) alert_box( _("Error"), _("Unable to load clipboard"), _("OK"), NULL, NULL );
@@ -527,7 +528,7 @@ void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	ls_settings settings;
-	char clip[256];
+	char clip[PATHBUF];
 	int i;
 
 	/* Prepare settings */
@@ -541,7 +542,7 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	settings.bpp = mem_clip_bpp;
 	settings.colors = mem_cols;
 
-	snprintf(clip, 251, "%s%i", mem_clip_file, item);
+	snprintf(clip, PATHBUF, "%s%i", mem_clip_file, item);
 	i = save_image(clip, &settings);
 
 	if ( i!=0 ) alert_box( _("Error"), _("Unable to save clipboard"), _("OK"), NULL, NULL );
@@ -3259,7 +3260,7 @@ void set_image(gboolean state)
 static void parse_drag( char *txt )
 {
 	gboolean nlayer = TRUE;
-	char fname[300], *tp, *tp2;
+	char fname[PATHBUF], *tp, *tp2;
 	int i, j;
 
 	if ( layers_window == NULL ) pressed_layers( NULL, NULL );
@@ -3280,12 +3281,12 @@ static void parse_drag( char *txt )
 #endif
 		i = 0;
 		j = 0;
-		while ( tp[j] > 30 && j<295 )	// Copy filename
+		while ((tp[j] > 31) && (j < PATHBUF - 1))	// Copy filename
 		{
 			if ( tp[j] == '%' )	// Weed out those ghastly % substitutions
 			{
 				fname[i++] = read_hex_dub( tp+j+1 );
-				j=j+2;
+				j += 2;
 			}
 			else fname[i++] = tp[j];
 			j++;
@@ -3936,7 +3937,7 @@ void main_init()
 	GtkAdjustment *adj;
 	GtkWidget *menubar1, *vbox_main, *hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
-	char txt[256];
+	char txt[PATHBUF];
 	int i;
 
 
@@ -4154,8 +4155,8 @@ void main_init()
 	init_status_bar();
 	init_factions();				// Initialize file action menu
 
-	snprintf(txt, 250, "%s%c.clipboard", get_home_directory(), DIR_SEP);
-	snprintf(mem_clip_file, 250, "%s", inifile_get("clipFilename", txt));
+	snprintf(txt, PATHBUF, "%s%c.clipboard", get_home_directory(), DIR_SEP);
+	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
 
 	if (files_passed > 1) pressed_cline(NULL, NULL);
 	else gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
@@ -4204,19 +4205,21 @@ void setup_language()			// Change language
 
 void update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[520], *extra = "-";
+	char txt[300], txt2[PATHTXT], *extra = "-";
 
-	gtkuncpy(txt2, mem_filename, 512);
+	gtkuncpy(txt2, mem_filename, PATHTXT);
 
 	if ( mem_changed == 1 ) extra = _("(Modified)");
 
-	snprintf( txt, 290, "%s %s %s", VERSION, extra, txt2 );
+	snprintf( txt, 290, "%s %s %s", VERSION, extra, txt2[0] ? txt2 :
+		_("Untitled"));
 
 	gtk_window_set_title (GTK_WINDOW (main_window), txt );
 }
 
 void notify_changed()		// Image/palette has just changed - update vars as needed
 {
+	mem_tempname = NULL;
 	if ( mem_changed != 1 )
 	{
 		mem_changed = 1;

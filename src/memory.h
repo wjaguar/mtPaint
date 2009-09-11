@@ -125,7 +125,8 @@ typedef struct {
 } image_info;
 
 typedef struct {
-	char filename[256];		// File name of file loaded/saved
+	char filename[PATHBUF];		// File name of file loaded/saved
+	char *tempname;			// File name of up-to-date temp file
 	int channel;			// Current active channel
 	int changed;			// Changed since last load/save flag
 	int ics;			// Has the centre been set by the user?
@@ -272,6 +273,7 @@ image_info mem_clip;			// Current clipboard
 image_state mem_state;			// Current edit settings
 
 #define mem_filename		mem_state.filename
+#define mem_tempname		mem_state.tempname
 #define mem_channel		mem_state.channel
 #define mem_changed		mem_state.changed
 #define mem_icx			mem_state.icx
@@ -518,7 +520,7 @@ void mem_ellipse( int x1, int y1, int x2, int y2, int thick );	// Thickness 0 me
 void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
 
 //	A couple of shorthands to get an int representation of an RGB colour
-#define PNG_2_INT(var) ((var.red << 16) + (var.green << 8) + (var.blue))
+#define PNG_2_INT(P) (((P).red << 16) + ((P).green << 8) + ((P).blue))
 #define MEM_2_INT(M,I) (((M)[(I)] << 16) + ((M)[(I) + 1] << 8) + (M)[(I) + 2])
 #define INT_2_R(A) ((A) >> 16)
 #define INT_2_G(A) (((A) >> 8) & 0xFF)

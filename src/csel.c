@@ -23,6 +23,7 @@
 
 #include "global.h"
 
+#include "mygtk.h"
 #include "memory.h"
 #include "otherwindow.h"
 #include "channels.h"

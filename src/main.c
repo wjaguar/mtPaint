@@ -32,12 +32,12 @@
 #include "canvas.h"
 #include "layer.h"
 #include "csel.h"
+#include "spawn.h"
 
 
 int main( int argc, char *argv[] )
 {
 	gboolean new_empty = TRUE, get_screenshot = FALSE;
-	char ppath[256];
 
 	if (argc > 1)
 	{
@@ -76,30 +76,27 @@ int main( int argc, char *argv[] )
 #endif
 #endif
 
-	files_passed = argc - 1;
+	file_arg_start = 1;
 	if (argc > 1)		// Argument received, so assume user is trying to load a file
 	{
-		file_arg_start = 1;
 		if ( strcmp(argv[1], "-g") == 0 )	// Loading GIF animation frames
 		{
 			file_arg_start+=2;
-			files_passed-=2;
 			sscanf(argv[2], "%i", &preserved_gif_delay);
 		}
 		if ( strcmp(argv[1], "-v") == 0 )	// Viewer mode
 		{
 			file_arg_start++;
-			files_passed--;
 			viewer_mode = TRUE;
 		}
 		if ( strcmp(argv[1], "-s") == 0 )	// Screenshot
 		{
 			file_arg_start++;
-			files_passed--;
 			get_screenshot = TRUE;
 		}
 		if ( strstr(argv[0], "mtv") != NULL ) viewer_mode = TRUE;
 	}
+	files_passed = argc - file_arg_start;
 
 	string_init();				// Translate static strings
 	var_init();				// Load INI variables
@@ -123,11 +120,8 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		if (files_passed >0)
-		{
-			strncpy( ppath, argv[file_arg_start], 250 );
-			if ( do_a_load( ppath ) == 0 ) new_empty = FALSE;
-		}
+		if ((files_passed > 0) && !do_a_load(argv[file_arg_start]))
+			new_empty = FALSE;
 	}
 
 	if ( new_empty )		// If no file was loaded, start with a blank canvas
@@ -137,6 +131,7 @@ int main( int argc, char *argv[] )
 	update_menus();
 
 	gtk_main();
+	spawn_quit();
 	inifile_quit();
 
 	return 0;

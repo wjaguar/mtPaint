@@ -638,11 +638,7 @@ static void trim_tab( char *buf, char *txt)
 	char *st;
 
 	buf[0] = 0;
-	if (txt)
-	{
-		strncpy(buf, txt, MAXLEN);
-		buf[MAXLEN-1] = 0;	// strncpy may not zero terminate
-	}
+	if (txt) strncpy0(buf, txt, MAXLEN);
 	for ( st=buf; st[0]!=0; st++ ) if ( st[0]=='\t' ) st[0]=' ';
 	if ( buf[0] == 0 ) snprintf(buf, MAXLEN, "_None");
 }
@@ -655,7 +651,7 @@ static int font_index_create(char *filename, char **dir_in)
 	DIR		*dp;
 	struct dirent	*ep;
 	struct stat	buf;
-	char		full_name[MAXLEN], size_type[MAXLEN], tmp[2][MAXLEN];
+	char		full_name[PATHBUF], size_type[MAXLEN], tmp[2][MAXLEN];
 	int		i, res=-1, face_index;
 	FILE		*fp;
 
@@ -674,7 +670,8 @@ static int font_index_create(char *filename, char **dir_in)
 
 		while ( (ep = readdir(dp)) )
 		{
-			snprintf(full_name, MAXLEN, "%s%c%s", dir_in[i], DIR_SEP, ep->d_name);
+			snprintf(full_name, PATHBUF, "%s%c%s", dir_in[i],
+				DIR_SEP, ep->d_name);
 
 			if ( stat(full_name, &buf)<0 ) continue;	// Get file details
 
@@ -1011,13 +1008,11 @@ static void font_preview_update(mtfontsel *fp)		// Re-render the preview text an
 
 static void font_gui_create_index(char *filename) // Create index file with settings from ~/.mtpaint
 {
-	char buf[128], **dirs;
+	char buf[128], *dirs[TX_MAX_DIRS + 1];
 	int i, j = inifile_get_gint32("font_dirs", 0 );
 
 
-	dirs = calloc(1, (TX_MAX_DIRS + 1)*sizeof(char *));
-	if (!dirs) return;
-
+	memset(dirs, 0, sizeof(dirs));
 	for ( i=0; i<j; i++ )
 	{
 		snprintf(buf, 128, "font_dir%i", i);
@@ -1029,8 +1024,6 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 	while (gtk_events_pending()) gtk_main_iteration();
 	font_index_create( filename, dirs );
 	progress_end();
-
-	free(dirs);
 }
 
 
@@ -1342,7 +1335,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 static gint click_add_font_dir( GtkWidget *widget, gpointer user )
 {
 	int i = inifile_get_gint32("font_dirs", 0 );
-	char txt[512], buf[32];
+	char txt[PATHBUF], buf[32];
 	gchar *row_text[FONTSEL_CLISTS_MAXCOL] = {NULL, NULL, NULL};
 	mtfontsel *fp = user;
 
@@ -1350,7 +1343,7 @@ static gint click_add_font_dir( GtkWidget *widget, gpointer user )
 	if ( !fp ) return FALSE;
 
 	row_text[1] = (gchar *)gtk_entry_get_text( GTK_ENTRY(fp->entry[TX_ENTRY_DIRECTORY]) );
-	gtkncpy( txt, row_text[1], 512 );
+	gtkncpy( txt, row_text[1], PATHBUF);
 
 	if ( strlen(txt)>0 && i<TX_MAX_DIRS )
 	{
@@ -1416,9 +1409,10 @@ static gint click_create_font_index( GtkWidget *widget, gpointer user )
 	if ( inifile_get_gint32("font_dirs", 0 ) > 0 )
 	{
 		int i;
-		char txt[512];
+		char txt[PATHBUF];
 
-		snprintf(txt, 512, "%s%c%s", get_home_directory(), DIR_SEP, FONT_INDEX_FILENAME);
+		snprintf(txt, PATHBUF, "%s%c%s", get_home_directory(),
+			DIR_SEP, FONT_INDEX_FILENAME);
 		font_gui_create_index(txt);			// Create new index file
 
 		for (i=0; i<=CLIST_FONTFILE; i++ )		// Empty all clists
@@ -1672,9 +1666,9 @@ static void add_font_clist(int i, GtkWidget *hbox, mtfontsel *mem, int padding)
 
 static void init_font_lists()		//	LIST INITIALIZATION
 {
-	char *root = get_home_directory(), txt[512];
+	char *root = get_home_directory(), txt[PATHBUF];
 
-	snprintf(txt, 512, "%s%c%s", root, DIR_SEP, FONT_INDEX_FILENAME);
+	snprintf(txt, PATHBUF, "%s%c%s", root, DIR_SEP, FONT_INDEX_FILENAME);
 
 	font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
 
@@ -1687,11 +1681,11 @@ static void init_font_lists()		//	LIST INITIALIZATION
 			int new_dirs = 0;
 #ifdef WIN32
 			static char *windir = NULL;
-			char buf[128];
+			char buf[PATHBUF];
 
 			windir = getenv("WINDIR");
-			if (!windir) windir = "C:\\WINDOWS";			// Fallback
-			snprintf(buf, 512, "%s%c%s", windir, DIR_SEP, "Fonts");
+			if (!windir) windir = "C:\\WINDOWS";	// Fallback
+			snprintf(buf, PATHBUF, "%s%c%s", windir, DIR_SEP, "Fonts");
 
 			inifile_set( "font_dir0", buf );
 
