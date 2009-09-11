@@ -116,3 +116,10 @@ guint keyval_key(guint keyval);
 #define XINE_FAKERY(key) (((key) == GDK_Shift_L) || ((key) == GDK_Control_L) \
 	|| ((key) == GDK_Scroll_Lock) || ((key) == GDK_Num_Lock))
 #endif
+
+// Workaround for stupid GTK1 typecasts
+#if GTK_MAJOR_VERSION == 1
+#define GTK_RADIO_BUTTON_0(X) (GtkRadioButton *)(X)
+#else
+#define GTK_RADIO_BUTTON_0(X) GTK_RADIO_BUTTON(X)
+#endif

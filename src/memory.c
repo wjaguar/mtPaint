@@ -5441,7 +5441,7 @@ int grad_value(int *dest, double x)
 	xx = (gradmap->orev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : (int)((xx - i) * 0x10000 + 0.5);
 	op = (gdata[i] << 8) + ((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 	if (!op) return (0); /* Stop if zero opacity */
 
@@ -5450,7 +5450,7 @@ int grad_value(int *dest, double x)
 	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : (int)((xx - i) * 0x10000 + 0.5);
 	if (!ix) /* RGB */
 	{
 		i3 = i * 3;
@@ -5523,7 +5523,7 @@ static void grad_alpha(int *dest, double x)
 	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : (int)((xx - i) * 0x10000 + 0.5);
 	dest[CHN_ALPHA + 3] = (gdata[i] << 8) +
 		((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 }
@@ -5549,6 +5549,15 @@ int grad_pixel(unsigned char *dest, int x, int y)
 			break;
 		}
 
+		/* Linear/bilinear gradient */
+		if (grad->wmode <= GRAD_MODE_BILINEAR)
+		{
+			dist = (x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv;
+			if (grad->wmode == GRAD_MODE_LINEAR) break;
+			dist = fabs(dist); /* Bilinear */
+			break;
+		}
+
 		/* Radial gradient */
 		if (grad->wmode == GRAD_MODE_RADIAL)
 		{
@@ -5557,10 +5566,12 @@ int grad_pixel(unsigned char *dest, int x, int y)
 			break;
 		}
 
-		/* Linear/bilinear gradient */
-		dist = (x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv;
-		if (grad->wmode == GRAD_MODE_LINEAR) break;
-		dist = fabs(dist); /* Bilinear */
+		/* Square gradient */
+		/* !!! Here is code duplication with linear/bilinear path - but
+		 * merged paths actually LOSE in both time and space, at least
+		 * with GCC - WJ */
+		dist = fabs((x - grad->x1) * grad->xv + (y - grad->y1) * grad->yv) +
+			fabs((x - grad->x1) * grad->yv - (y - grad->y1) * grad->xv);
 		break;
 	}
 	dist -= grad->ofs;

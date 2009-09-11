@@ -2898,6 +2898,7 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 
 static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 {
+	float old_zoom;
 	int w, h, new_margin_x = 0, new_margin_y = 0;
 
 	if ( canvas_image_centre )
@@ -2918,7 +2919,7 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 		gtk_widget_queue_draw(drawing_canvas);
 			// Force redraw of whole canvas as the margin has shifted
 	}
-	float old_zoom = vw_zoom;
+	old_zoom = vw_zoom;
 	vw_zoom = -1; /* Force resize */
 	vw_align_size(old_zoom);		// Update the view window as needed
 

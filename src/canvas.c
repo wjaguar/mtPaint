@@ -1573,17 +1573,22 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static gboolean fs_destroy(GtkWidget *fs)
+static void fs_save_loc(GdkWindow *window)
 {
 	int x, y, width, height;
 
-	gdk_window_get_size(fs->window, &width, &height);
-	gdk_window_get_root_origin(fs->window, &x, &y);
+	gdk_window_get_size(window, &width, &height);
+	gdk_window_get_root_origin(window, &x, &y);
 
 	inifile_set_gint32("fs_window_x", x);
 	inifile_set_gint32("fs_window_y", y);
 	inifile_set_gint32("fs_window_w", width);
 	inifile_set_gint32("fs_window_h", height);
+}
+
+static gboolean fs_destroy(GtkWidget *fs)
+{
+	fs_save_loc(fs->window);
 
 	gtk_window_set_transient_for(GTK_WINDOW(fs), NULL);
 	gtk_widget_destroy(fs);
@@ -1605,7 +1610,8 @@ static gint fs_ok(GtkWidget *fs)
 	/* Needed to show progress in Windows GTK+2 */
 	gtk_window_set_modal(GTK_WINDOW(fs), FALSE);
 
-	/* Better aesthetics? */
+	/* Looks better if no dialog under progressbar */
+	fs_save_loc(fs->window); /* Save the location */
 	gtk_widget_hide(fs);
 
 	/* File extension */
@@ -1785,7 +1791,8 @@ static gint fs_ok(GtkWidget *fs)
 
 	update_menus();
 
-	fs_destroy(fs);
+	gtk_window_set_transient_for(GTK_WINDOW(fs), NULL);
+	gtk_widget_destroy(fs);
 
 	return FALSE;
 redo_name:

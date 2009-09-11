@@ -349,7 +349,7 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 	{
 		if (!names[i][0]) continue;
 		button = gtk_radio_button_new_with_label_from_widget(
-			GTK_RADIO_BUTTON(button), names[i]);
+			GTK_RADIO_BUTTON_0(button), names[i]);
 		if ((vnum > 1) && !(j % vnum))
 		{
 			wbox = gtk_vbox_new(FALSE, 0);
@@ -627,9 +627,11 @@ static void widget_size_req(GtkWidget *widget, GtkRequisition *requisition,
  * requisition value. */
 void widget_set_minsize(GtkWidget *widget, int width, int height)
 {
+	guint32 hw;
+
 	if ((width <= 0) && (height <= 0)) return;
 
-	guint32 hw = (height < 0 ? 0 : height & 0xFFFF) << 16 |
+	hw = (height < 0 ? 0 : height & 0xFFFF) << 16 |
 		(width < 0 ? 0 : width & 0xFFFF);
 	gtk_signal_connect_after(GTK_OBJECT(widget), "size_request",
 		GTK_SIGNAL_FUNC(widget_size_req), (gpointer)hw);

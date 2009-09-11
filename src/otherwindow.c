@@ -2753,7 +2753,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 	for (i = 0; i < 16; i++)
 	{
 		grad_ed_bar[i] = btn = gtk_radio_button_new_from_widget(
-			GTK_RADIO_BUTTON(btn));
+			GTK_RADIO_BUTTON_0(btn));
 		gtk_box_pack_start(GTK_BOX(hbox), btn, TRUE, TRUE, 0);
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
@@ -2913,7 +2913,7 @@ static void grad_selector_box(GtkWidget *box, char **mtext, int op)
 
 void gradient_setup(int mode)
 {
-	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial")};
+	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial"), _("Square")};
 	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
 	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (HSV)"),
 		_("A to B (backward HSV)"), _("A only"), _("Custom")};
@@ -2945,7 +2945,7 @@ void gradient_setup(int mode)
 	add_to_table(_("Length"), table, 0, 0, 5);
 	grad_spin_len = spin_to_table(table, 0, 1, 5, 0, 0, MAX_GRAD);
 	add_to_table(_("Gradient type"), table, 0, 2, 5);
-	grad_opt_type = wj_option_menu(gtypes, 3, 0, NULL, NULL);
+	grad_opt_type = wj_option_menu(gtypes, 4, 0, NULL, NULL);
 	gtk_table_attach(GTK_TABLE(table), grad_opt_type, 3, 4, 0, 1,
 		GTK_EXPAND | GTK_FILL, 0, 0, 5);
 	add_to_table(_("Repeat length"), table, 1, 0, 5);

@@ -122,6 +122,7 @@ int grad_opacity;			// Preview opacity
 #define GRAD_MODE_LINEAR   1
 #define GRAD_MODE_BILINEAR 2
 #define GRAD_MODE_RADIAL   3
+#define GRAD_MODE_SQUARE   4
 
 /* Boundary conditions */
 #define GRAD_BOUND_STOP    0

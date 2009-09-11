@@ -20,8 +20,6 @@
 #include <gtk/gtk.h>
 
 
-#define FILE_PROGRESS 1048576
-
 //	Loading/Saving errors
 
 #define NOT_INDEXED -10

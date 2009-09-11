@@ -90,15 +90,19 @@ static void xyz2XN(double *XN, double x, double y, double z)
 
 static double CIElum(double x)
 {
+	int n;
+
 	x *= CIENUM;
-	int n = x;
+	n = x;
 	return (CIE[n] + (CIE[n + 1] - CIE[n]) * (x - n));
 }
 
 static double exp10(double x)
 {
+	int n;
+
 	x = (x - EXPLOW) * (EXPNUM + EXPNUM);
-	int n = x;
+	n = x;
 	return (EXP[n] + (EXP[n + 1] - EXP[n]) * (x - n));
 }
 

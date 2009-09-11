@@ -413,6 +413,29 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
+static GtkWidget *path_box(char *name, GtkWidget *box, int fsmode)
+{
+	GtkWidget *hbox, *label, *entry, *button;
+ 
+	label = gtk_label_new(name);
+	gtk_widget_show(label);
+	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 2);
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(hbox);
+	gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 2);
+
+	entry = gtk_entry_new();
+	gtk_widget_show(entry);
+	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+
+	button = add_a_button(_("Browse"), 2, hbox, FALSE);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
+
+	return (entry);
+}
+
 void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
@@ -519,71 +542,25 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
-
-	label = gtk_label_new( _("Clipboard Files") );
-	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
-
-	clipboard_entry = gtk_entry_new();
-	gtk_widget_show( clipboard_entry );
-	gtk_box_pack_start( GTK_BOX(hbox4), clipboard_entry, TRUE, TRUE, 5 );
+	clipboard_entry = path_box(_("Clipboard Files"), vbox_2, FS_CLIP_FILE);
 	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
-
-	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_CLIP_FILE);
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
-
-	label = gtk_label_new( _("HTML Browser Program") );
-	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
-
-	entry_handbook[0] = gtk_entry_new();
-	gtk_widget_show( entry_handbook[0] );
-	gtk_box_pack_start( GTK_BOX(hbox4), entry_handbook[0], TRUE, TRUE, 5 );
+	entry_handbook[0] = path_box(_("HTML Browser Program"), vbox_2, FS_BROWSER_PROG);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
 		inifile_get(HANDBOOK_BROWSER_INI, ""));
 
-	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_BROWSER_PROG);
-
-
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
-
-	label = gtk_label_new( _("Location of Handbook index") );
-	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
-
-	entry_handbook[1] = gtk_entry_new();
-	gtk_widget_show( entry_handbook[1] );
-	gtk_box_pack_start( GTK_BOX(hbox4), entry_handbook[1], TRUE, TRUE, 5 );
+	entry_handbook[1] = path_box(_("Location of Handbook index"), vbox_2,
+		FS_HANDBOOK_INDEX);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
 		inifile_get(HANDBOOK_LOCATION_INI, ""));
 
-	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_HANDBOOK_INDEX);
-
 ///	---- TAB3 - STATUS BAR
-
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_container_add (GTK_CONTAINER (notebook1), hbox4);
 
 	vbox_3 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_3);
-	gtk_box_pack_start (GTK_BOX (hbox4), vbox_3, FALSE, FALSE, 0);
+	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
 
 	label = gtk_label_new( _("Status Bar") );
 	gtk_widget_show (label);
@@ -598,13 +575,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	---- TAB4 - ZOOM
 
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_container_add (GTK_CONTAINER (notebook1), hbox4);
-
 	vbox_3 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_3);
-	gtk_box_pack_start (GTK_BOX (hbox4), vbox_3, FALSE, FALSE, 0);
+	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
 
 	label = gtk_label_new( _("Zoom") );
 	gtk_widget_show (label);
@@ -638,13 +611,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	---- TAB5 - TABLET
 
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_container_add (GTK_CONTAINER (notebook1), hbox4);
-
 	vbox_3 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_3);
-	gtk_box_pack_start (GTK_BOX (hbox4), vbox_3, FALSE, FALSE, 0);
+	gtk_container_add (GTK_CONTAINER (notebook1), vbox_3);
 
 	label = gtk_label_new( _("Tablet") );
 	gtk_widget_show (label);
