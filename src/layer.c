@@ -114,11 +114,7 @@ static void layers_update_titlebar()		// Update filename in titlebar
 
 	if ( layers_window == NULL ) return;		// Don't bother if window is not showing
 
-#if GTK_MAJOR_VERSION == 2
-	cleanse_txt( txt2, layers_filename );		// Clean up non ASCII chars
-#else
-	strcpy( txt2, layers_filename );
-#endif
+	gtkuncpy(txt2, layers_filename, 512);
 
 	if ( layers_changed == 1 ) extra = _("(Modified)");
 
@@ -442,7 +438,6 @@ void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed
 	layer_new_chores( layers_total, w, h, type, cols, temp_img, lim );
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
-	men_item_state( menu_frames, TRUE );
 
 	if ( layers_total == 1 ) ani_init();		// Start with fresh animation data if new
 }
@@ -550,8 +545,6 @@ static void layer_delete(int item)
 
 	layers_notify_changed();
 	update_all_views();
-
-	if ( layers_total < 1 ) men_item_state( menu_frames, FALSE );
 }
 
 
@@ -823,7 +816,6 @@ int load_layers( char *file_name )
 	layer_update_filename( file_name );
 
 	update_cols();		// Update status bar info
-	if ( layers_total>0 ) men_item_state( menu_frames, TRUE );
 
 	if (lfail) /* There were failures */
 	{

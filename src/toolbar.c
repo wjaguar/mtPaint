@@ -18,6 +18,7 @@
 */
 
 #include <gtk/gtk.h>
+#include <math.h>
 
 
 #include "global.h"
@@ -508,7 +509,7 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			"None", _(items->tooltip), "Private", iconw, lclick,
+			NULL, _(items->tooltip), "Private", iconw, lclick,
 			(gpointer)(items->ID + lbase));
 		if (items->radio > 0) radio[items->radio] = items->widget;
 		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
@@ -530,16 +531,15 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 #define NEED_LAYER 0x0400
 #define NEED_LASSO 0x0800
 #define NEED_PREFS 0x1000
-#define NEED_FRAME 0x2000
-#define NEED_ALPHA 0x4000
-#define NEED_CHAN  0x8000
+#define NEED_ALPHA 0x2000
+#define NEED_CHAN  0x4000
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 
 static GtkWidget **need_lists[] = {
 	menu_undo, menu_redo, menu_crop, menu_need_marquee,
 	menu_need_selection, menu_need_clipboard, menu_help, menu_only_24,
 	menu_only_indexed, menu_cline, menu_layer, menu_lasso, menu_prefs,
-	menu_frames, menu_alphablend, menu_chan_del };
+	menu_alphablend, menu_chan_del };
 
 static void tool_dis_add(toolbar_item *items)
 {

@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2007 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -28,7 +28,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 3.10 - Copyright (C) 2004-2007 The Authors\n"
+"mtPaint 3.11 - Copyright (C) 2004-2007 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -190,10 +190,11 @@ _("\n"
 "\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
-"French - Nicolas Velin, Pascal Billard\n"
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto\n"
 "German - Oliver Frommel\n"
 "Polish - Simek\n"
 "Portuguese - Israel G. Lugo\n"
+"Slovak - Jozef Riha\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio San\n"
 "Taiwanese Chinese - Wei-Lun Chao\n"
 "Turkish - Muhammet Kara, Tutku Dalmaz\n"

@@ -2775,7 +2775,7 @@ void mem_ellipse( int x1, int y1, int x2, int y2, int thick, int type )		// 0=fi
 	xl = abs( x2 - x1 ) + 1;
 	yl = abs( y2 - y1 ) + 1;
 
-	if ( xl < 2 || yl < 2 )
+	if ( xl <= 2 || yl <= 2 )
 	{
 		f_rectangle( xs, ys, xl, yl );		// Too small so draw rectangle instead
 		return;
@@ -3736,152 +3736,208 @@ int mem_isometrics(int type)
 	return 0;
 }
 
-/* This code assumes that source image is in bounds when enlarging */
 /* Modes: 0 - clear, 1 - tile, 2 - mirror tile */
 int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 {
 	chanlist old_img;
 	char *src, *dest;
-	int i, j, k, cc, bpp, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
-	int oww = mem_width, ohh = mem_height, mirr = 0, tw = mem_width;
+	int i, h, ow = mem_width, oh = mem_height, hmode = mode;
+	int res, hstep, vstep, vstep2 = 0, oxo = 0, oyo = 0, nxo = 0, nyo = 0;
+	int rspan1 = 0, span1 = 0, rspan2 = 0, span2 = 0, rep = 0, tail = 0;
 
 	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
-	if ((nw <= oww) && (nh <= ohh)) mode = 0;
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
-	if (res) return 1;			// Not enough memory
+	if (res) return (1);			// Not enough memory
 
-	if ( ox < 0 ) oxo = -ox;
-	else nxo = ox;
-	if ( oy < 0 ) oyo = -oy;
-	else nyo = oy;
+	/* Special mode for simplest, one-piece-covering case */
+	if ((ox >= 0) && (ox + nw <= ow)) hmode = -1;
+	if ((oy >= 0) && (oy + nh <= oh)) mode = -1;
 
-	if (!mode) /* Clear */
-	{
-		j = nw * nh;
+	/* Clear */
+	if (!mode || !hmode)
+	{			
+		int i, l, cc;
+
+		l = nw * nh;
 		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
 			if (!mem_img[cc]) continue;
 			dest = mem_img[cc];
 			if ((cc != CHN_IMAGE) || (mem_img_bpp == 1))
 			{
-				memset(dest, cc == CHN_IMAGE ? mem_col_A : 0, j);
+				memset(dest, cc == CHN_IMAGE ? mem_col_A : 0, l);
 				continue;
 			}
-			for (i = 0; i < j; i++)	// Background is current colour A
+			for (i = 0; i < l; i++)	// Background is current colour A
 			{
 				*dest++ = mem_col_A24.red;
 				*dest++ = mem_col_A24.green;
 				*dest++ = mem_col_A24.blue;
 			}
 		}
-		ow = oww < nw ? oww : nw;
+		/* All done if source out of bounds */
+		if ((ox >= nw) || (ox + ow <= 0) || (oy >= nh) ||
+			(oy + oh <= 0)) return (0);
 	}
-	else /* Tile - prepare for horizontal pass */
-	{
-		mirr = (mode == 2) && (oww > 2) ? 1 : 0;
-		ow = nw;
-		tw -= mirr;
-		i = (nxo + tw - 1) / tw;
-		if (i & 1) mirr = -mirr;
-		oxo = i * tw - nxo;
-		nxo = 0;
-	}
-	oh = ohh < nh ? ohh : nh;
 
-	/* Do horizontal tiling */
-	for (; ow; ow -= res)
-	{	
-		res = tw - oxo < ow ? tw - oxo : ow;
+	/* Tiled vertically */
+	if (mode > 0)
+	{
+		/* No mirror when height < 3 */
+		if (oh < 3) mode = 1;
+		/* Period length */
+		if (mode == 2) vstep = 2 * (vstep2 = oh - 1);
+		else vstep = oh;
+		/* Normalize offset */
+		oyo = oy <= 0 ? -oy % vstep : vstep - 1 - (oy - 1) % vstep;
+		h = nh;
+	}
+	/* Single vertical span */
+	else
+	{
+		/* No periodicity */
+		vstep = nh + oh;
+		/* Normalize offset */
+		if (oy < 0) oyo = -oy;
+		else nyo = oy;
+		h = oh + oy;
+		if (h > nh) h = nh;
+	}
+
+	/* Tiled horizontally */
+	if (hmode > 0)
+	{
+		/* No mirror when width < 3 */
+		if (ow < 3) hmode = 1;
+		/* Period length */
+		if (hmode == 2) hstep = ow + ow - 2;
+		else hstep = ow;
+		/* Normalize offset */
+		oxo = ox <= 0 ? -ox % hstep : hstep - 1 - (ox - 1) % hstep;
+		/* Single direct span? */
+		if ((oxo <= 0) && (oxo + ow >= nw)) hmode = -1;
+		if (hmode == 2) /* Mirror tiling */
+		{
+			if (oxo < ow - 1) span1 = ow - 1 - oxo;
+			res = nw - span1;
+			rspan1 = hstep - oxo - span1;
+			if (rspan1 > res) rspan1 = res;
+			span2 = (res = res - rspan1);
+			if (span2 > ow - 1 - span1) span2 = ow - 1 - span1;
+			rspan2 = res - span2;
+			if (rspan2 > ow - 1 - rspan1) rspan2 = ow - 1 - rspan1;
+		}
+		else /* Normal tiling */
+		{
+			span1 = ow - oxo;
+			span2 = nw - span1;
+			if (span2 > oxo) span2 = oxo;
+		}
+		rep = nw / hstep;
+		if (rep) tail = nw % hstep;
+	}
+	/* Single horizontal span */
+	else
+	{
+		/* No periodicity */
+		hstep = nw;
+		/* Normalize offset */
+		if (ox < 0) oxo = -ox;
+		else nxo = ox;
+		/* First direct span */
+		span1 = nw - nxo;
+		if (span1 > ow - oxo) span1 = ow - oxo;
+	}
+
+	/* Row loop */
+	for (i = nyo; i < h; i++)
+	{
+		int j, k, l, bpp, cc;
+
+		/* Main period */
+		k = i - vstep;
+		/* Mirror period */
+		if ((k < 0) && (vstep2 > 1)) k = i - ((i + oyo) % vstep2) * 2;
+		/* The row is there - copy it */
+		if ((k >= 0) && (k < i))
+		{
+			for (cc = 0; cc < NUM_CHANNELS; cc++)
+			{
+				if (!mem_img[cc]) continue;
+				l = nw * BPP(cc);
+				src = mem_img[cc] + k * l;
+				dest = mem_img[cc] + i * l;
+				memcpy(dest, src, l);
+			}
+			continue;
+		}
+		/* First encounter - have to build the row anew */
+		k = (i - nyo + oyo) % vstep;
+		if (k >= oh) k = vstep - k;
 		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
 			if (!mem_img[cc]) continue;
 			bpp = BPP(cc);
-			j = res * bpp;
-			for (i = 0; i < oh; i++)
+			dest = mem_img[cc] + (i * nw + nxo) * bpp;
+			/* First direct span */
+			if (span1)
 			{
-				src = old_img[cc] + (oxo + oww * (i + oyo)) * bpp;
-				dest = mem_img[cc] + (nxo + nw * (i + nyo)) * bpp;
-				/* Normal copy */
-				if (mirr >= 0)
+				src = old_img[cc] + (k * ow + oxo) * bpp;
+				memcpy(dest, src, span1 * bpp);
+				if (hmode < 1) continue; /* Single-span mode */
+				dest += span1 * bpp;
+			}
+			/* First reverse span */
+			if (rspan1)
+			{
+				src = old_img[cc] + (k * ow + hstep - oxo -
+					span1) * bpp;
+				for (j = 0; j < rspan1; j++ , src -= bpp)
 				{
-					memcpy(dest, src, j);
-					continue;
-				}
-				/* Reverse copy */
-				src += (oww - oxo - oxo - 1) * bpp;
-				for (k = 0; k < j; k += bpp , src -= bpp)
-				{
-					dest[k] = src[0];
+					*dest++ = src[0];
 					if (bpp == 1) continue;
-					dest[k + 1] = src[1];
-					dest[k + 2] = src[2];
+					*dest++ = src[1];
+					*dest++ = src[2];
 				}
 			}
-		}
-		nxo += res;
-		oxo = 0;
-		mirr = -mirr;
-	}
-
-	/* Only one stripe? */
-	if (!mode || (nh <= ohh)) return (0);
-
-	/* Tile up & down */
-	if (ohh < 3) mirr = 0;
-	for (cc = 0; cc < NUM_CHANNELS; cc++)
-	{
-		if (!mem_img[cc]) continue;
-		bpp = nw * BPP(cc);
-		i = nyo - 1;
-		dest = mem_img[cc] + i * bpp;
-		if (mirr) /* Reverse copy up */
-		{
-			j = i - (ohh - 2);
-			if (j < -1) j = -1;
-			src = dest + 2 * bpp;
-			for (; i > j; i--)
+			/* Second direct span */
+			if (span2)
 			{
-				memcpy(dest, src, bpp);
-				dest -= bpp;
-				src += bpp;
+				src = old_img[cc] + k * ow * bpp;
+				memcpy(dest, src, span2 * bpp);
+				dest += span2 * bpp;
 			}
-		}
-		/* Forward copy up */
-		src = mem_img[cc] + (nyo + ohh - 1) * bpp;
-		for (; i >= 0; i--)
-		{
-			memcpy(dest, src, bpp);
-			dest -= bpp;
-			src -= bpp;
-		}
-		i = nyo + ohh;
-		dest = mem_img[cc] + i * bpp;
-		if (mirr) /* Reverse copy down */
-		{
-			j = i + ohh - 2;
-			if (j > nh) j = nh;
-			src = dest - 2 * bpp;
-			for (; i < j; i++)
+			/* Second reverse span */
+			if (rspan2)
 			{
-				memcpy(dest, src, bpp);
-				dest += bpp;
-				src -= bpp;
+				src = old_img[cc] + (k * ow + ow - 1) * bpp;
+				for (j = 0; j < rspan2; j++ , src -= bpp)
+				{
+					*dest++ = src[0];
+					if (bpp == 1) continue;
+					*dest++ = src[1];
+					*dest++ = src[2];
+				}
 			}
-		}
-		/* Forward copy down */
-		src = mem_img[cc] + nyo * bpp;
-		for (; i < nh; i++)
-		{
-			memcpy(dest, src, bpp);
-			dest += bpp;
-			src += bpp;
+			/* Repeats */
+			if (rep)
+			{
+				src = mem_img[cc] + i * nw * bpp;
+				l = hstep * bpp;
+				for (j = 1; j < rep; j++)
+				{
+					memcpy(dest, src, l);
+					dest += l;
+				}
+				memcpy(dest, src, tail * bpp);
+			}
 		}
 	}
 
-	return 0;
+	return (0);
 }
 
 void mem_threshold(int channel, int level)		// Threshold channel values
@@ -4148,7 +4204,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
 	unsigned char *trans, int opacity, int noalpha)
 {
-	unsigned char newc, oldc;
+	unsigned char *xalpha = NULL;
 	int i, j, k, tint;
 
 	cnt = start + step * cnt;
@@ -4156,11 +4212,20 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
+	/* Use alpha as selection when pasting RGBA to RGB */
+	if (alpha && !alphar)
+	{
+		*(trans ? &xalpha : &trans) = alpha;
+		alpha = NULL;
+	}
+
 	/* Opacity mode */
 	if (opacity)
 	{
 		for (i = start; i < cnt; i += step)
 		{
+			unsigned char newc, oldc;
+
 			k = (255 - mask[i]) * opacity;
 			if (!k)
 			{
@@ -4169,9 +4234,13 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			}
 			k = (k + (k >> 8) + 1) >> 8;
 
-			if (trans)
+			if (trans) /* Have transparency mask */
 			{
-				/* Have transparency mask */
+				if (xalpha) /* Have two :-) */
+				{
+					k *= xalpha[i];
+					k = (k + (k >> 8) + 1) >> 8;
+				}
 				k *= trans[i];
 				k = (k + (k >> 8) + 1) >> 8;
 			}
@@ -4199,7 +4268,14 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	{
 		for (i = start; i < cnt; i += step)
 		{
-			if (trans) mask[i] |= trans[i] ^ 255;
+			unsigned char newc, oldc;
+
+			if (trans)
+			{
+				oldc = trans[i];
+				if (xalpha) oldc &= xalpha[i];
+				mask[i] |= oldc ^ 255;
+			}
 			if (!alpha || mask[i]) continue;
 			/* Have alpha channel - process it */
 			newc = alpha[i];
@@ -4324,8 +4400,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	}
 
 	/* Prepare alpha */
-	if (!mem_img[CHN_ALPHA]) alpha = NULL;
-	if (alpha)
+	if (alpha && mem_img[CHN_ALPHA])
 	{
 		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);
 		else old_alpha = mem_img[CHN_ALPHA];

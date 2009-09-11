@@ -4,6 +4,21 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.11	2007-?-?
+
+	* Slovak translation added by Jozef Riha
+	* French translation updated by Sylvain Cresto
+	* LSS16 file format load/save added to support syslinux bootup splash screens
+	* Clipboard alpha is now used as clipboard mask when pasting to image without alpha channel
+	* "Resize Canvas" can now be used to offset an image, with or without changing its size
+	* TIFF files with alpha saved by Photoshop now load properly
+	* Bash-specific idioms in configure script replaced by POSIXy equivalents
+	* BUGFIX - Negative values in "Transform Colour" and "Resize Canvas" dialogs are read correctly again
+	* BUGFIX - Drawing a 2 pixels high filled ellipse doesn't cause crash
+	* BUGFIX - Tool cursor now doesn't revert to default one after showing or hiding view window
+	* BUGFIX - Keyboard shortcut for swapping colours A & B now works in GTK+1
+	* BUGFIX - Clicking the palette grid in gradient editor now works properly in GTK+1
+
 3.10	2007-1-22
 
 	* Gradient drawing mode added

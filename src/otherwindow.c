@@ -493,7 +493,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 	filter_func = filt;
 	filter_data = fdata;
 	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
-	gtk_widget_set_usize(filter_win, 300, -2);
+	gtk_window_set_default_size(GTK_WINDOW(filter_win), 300, -1);
 
 	vbox6 = gtk_vbox_new(FALSE, 0);
 	gtk_widget_show(vbox6);
@@ -1025,100 +1025,30 @@ GtkWidget *sisca_spins[6], *sisca_toggles[2], *sisca_gc;
 gboolean sisca_scale;
 
 
-void sisca_off_lim( int spin, int dim )
+static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
 {
-	int nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[spin-2]) );
-	int min, max, val;
-	gboolean state = TRUE;
-	GtkAdjustment *adj;
+	int w, h, nw, idx = (int)user_data;
 
-	if ( sisca_scale ) return;			// Only do this if we are resizing
 
-	adj = gtk_spin_button_get_adjustment( GTK_SPIN_BUTTON(sisca_spins[spin]) );
-	val = adj -> value;
-	if ( nw == dim )
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])))
+		return;
+	w = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[0]));
+	h = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[1]));
+	if (idx)
 	{
-		state = FALSE;
-		min = 0;
-		max = 0;
-		val = 0;
+		nw = rint(h * mem_width / (float)mem_height);
+		nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
+		if (nw == w) return;
 	}
 	else
 	{
-		if ( nw<dim )			// Size is shrinking
-		{
-			max = 0;
-			min = nw - dim;
-		}
-		else					// Size is expanding
-		{
-			max = nw - dim;
-			min = 0;
-		}
+		nw = rint(w * mem_height / (float)mem_width);
+		nw = nw < 1 ? 1 : nw > MAX_HEIGHT ? MAX_HEIGHT : nw;
+		if (nw == h) return;
 	}
-	mtMIN( val, val, max )
-	mtMAX( val, val, min )
-
-	adj -> lower = min;
-	adj -> upper = max;
-	adj -> value = val;
-
-	gtk_adjustment_value_changed( adj );
-	gtk_adjustment_changed( adj );
-	gtk_widget_set_sensitive( sisca_spins[spin], state );
-	gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[spin]) );
-}
-
-void sisca_reset_offset_y()
-{	sisca_off_lim( 3, mem_height ); }
-
-void sisca_reset_offset_x()
-{	sisca_off_lim( 2, mem_width ); }
-
-gint sisca_width_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int nw, nh, oh;
-
-	sisca_reset_offset_x();
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])) )
-	{
-		nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-		oh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
-		nh = mt_round( nw * ((float) mem_height) / ((float) mem_width) );
-		mtMIN( nh, nh, MAX_HEIGHT )
-		mtMAX( nh, nh, 1 )
-		if ( nh != oh )
-		{
-			gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[1]) );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[1]), nh );
-			sisca_reset_offset_y();
-		}
-	}
-
-	return FALSE;
-}
-
-gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int nw, nh, ow;
-
-	sisca_reset_offset_y();
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])) )
-	{
-		ow = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-		nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
-		nw = mt_round( nh * ((float) mem_width) / ((float) mem_height) );
-		mtMIN( nw, nw, MAX_WIDTH )
-		mtMAX( nw, nw, 1 )
-		if ( nw != ow )
-		{
-			gtk_spin_button_update( GTK_SPIN_BUTTON(sisca_spins[0]) );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[0]), nw );
-			sisca_reset_offset_x();
-		}
-	}
-
-	return FALSE;
+	idx ^= 1; /* Other coordinate */
+	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[idx]));
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(sisca_spins[idx]), nw);
 }
 
 static int scale_mode = 7;
@@ -1126,40 +1056,38 @@ static int resize_mode = 0;
 
 static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
-	int nw, nh, ox, oy, res = 1, scale_type = 0, gcor = FALSE;
+	int nw, nh, ox = 0, oy = 0, res = 1, scale_type = 0, gcor = FALSE;
 
 	nw = read_spin(sisca_spins[0]);
 	nh = read_spin(sisca_spins[1]);
-	if ( nw != mem_width || nh != mem_height )
+	if (!sisca_scale)
 	{
+		ox = read_spin(sisca_spins[2]);
+		oy = read_spin(sisca_spins[3]);
+	}
+
+	if ((nw == mem_width) && (nh == mem_height) && !ox && !oy)
+	{
+		alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
+			_("OK"), NULL, NULL);
+		return;
+	}
+
+	if (sisca_scale)
+	{
+		if (mem_img_bpp == 3) scale_type = scale_mode;
+		res = mem_image_scale(nw, nh, scale_type, gcor);
+	}
+	else res = mem_image_resize(nw, nh, ox, oy, resize_mode);
+
+	if (!res)
+	{
+		canvas_undo_chores();
 		// Needed in Windows to stop GTK+ lowering the main window below window underneath
 		gtk_window_set_transient_for( GTK_WINDOW(sisca_window), NULL );
-
-		if ( sisca_scale )
-		{
-			if (mem_img_bpp == 3)
-			{
-				scale_type = scale_mode;
-				gcor = gtk_toggle_button_get_active(
-					GTK_TOGGLE_BUTTON(sisca_gc));
-			}
-			res = mem_image_scale(nw, nh, scale_type, gcor);
-		}
-		else 
-		{
-			ox = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[2]) );
-			oy = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[3]) );
-			res = mem_image_resize(nw, nh, ox, oy, resize_mode);
-		}
-		if ( res == 0 )
-		{
-			canvas_undo_chores();
-			gtk_widget_destroy(sisca_window);
-		}
-		else	memory_errors(res);
+		gtk_widget_destroy(sisca_window);
 	}
-	else alert_box(_("Error"), _("New geometry is the same as now - nothing to do."),
-			_("OK"), NULL, NULL);
+	else memory_errors(res);
 }
 
 void memory_errors(int type)
@@ -1227,28 +1155,20 @@ void sisca_init( char *title )
 	sisca_spins[0] = spin_to_table(sisca_table, 2, 1, 5, mem_width, 1, MAX_WIDTH);
 	sisca_spins[1] = spin_to_table(sisca_table, 2, 2, 5, mem_height, 1, MAX_HEIGHT);
 
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[0])->entry ),
-		"value_changed", GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[1])->entry ),
-		"value_changed", GTK_SIGNAL_FUNC(sisca_height_moved), NULL);
-#else
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[0])->entry ),
-		"changed", GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(sisca_spins[1])->entry ),
-		"changed", GTK_SIGNAL_FUNC(sisca_height_moved), NULL);
-#endif
-	// Interesting variation between GTK+1/2 here.  I want to update each of the spinbuttons
-	// when either:
-	// i)  Up/down button clicked
-	// ii) Manual changed followed by a tab keypress
-	// MT 19-10-2004
+	gtk_signal_connect(GTK_OBJECT(gtk_spin_button_get_adjustment(
+		GTK_SPIN_BUTTON(sisca_spins[0]))), "value_changed",
+		GTK_SIGNAL_FUNC(sisca_moved), (gpointer)0);
+	gtk_signal_connect(GTK_OBJECT(gtk_spin_button_get_adjustment(
+		GTK_SPIN_BUTTON(sisca_spins[1]))), "value_changed",
+		GTK_SIGNAL_FUNC(sisca_moved), (gpointer)1);
 
 	if ( !sisca_scale )
 	{
 		add_to_table( _("Offset"), sisca_table, 3, 0, 0 );
-		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0, 0, 0);
-		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0, 0, 0);
+		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0,
+			-MAX_WIDTH, MAX_WIDTH);
+		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0,
+			-MAX_HEIGHT, MAX_HEIGHT);
 
 		button_centre = gtk_button_new_with_label(_("Centre"));
 
@@ -1262,8 +1182,8 @@ void sisca_init( char *title )
 	add_hseparator( sisca_vbox, -2, 10 );
 
 	sisca_toggles[0] = add_a_toggle( _("Fix Aspect Ratio"), sisca_vbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
-		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
+	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "toggled",
+		GTK_SIGNAL_FUNC(sisca_moved), (gpointer)0);
 
 	sisca_hbox = sisca_gc = NULL;
 
@@ -1292,9 +1212,6 @@ void sisca_init( char *title )
 
 	gtk_window_set_transient_for( GTK_WINDOW(sisca_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (sisca_window);
-
-	sisca_reset_offset_x();
-	sisca_reset_offset_y();
 }
 
 void pressed_scale( GtkMenuItem *menu_item, gpointer user_data )
@@ -1404,6 +1321,9 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	GtkColorSelection *cs = GTK_COLOR_SELECTION(user_data);
 	RGBA16 *cc = gtk_object_get_user_data(GTK_OBJECT(widget));
 	gdouble color[4];
+#if GTK_MAJOR_VERSION == 2
+	GdkColor c = {0, cc->r, cc->g, cc->b};
+#endif
 
 	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
 	color[0] = ((gdouble)(cc->r)) / 65535.0;
@@ -1419,7 +1339,6 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 	gtk_color_selection_set_color( cs, color);
 #endif
 #if GTK_MAJOR_VERSION == 2
-	GdkColor c = {0, cc->r, cc->g, cc->b};
 	gtk_color_selection_set_previous_color(cs, &c);
 	gtk_color_selection_set_previous_alpha(cs, cc->a);
 #endif
@@ -2476,6 +2395,7 @@ static gboolean palette_pad_draw(GtkWidget *widget, GdkEventConfigure *event,
 	return (TRUE);
 }
 
+static void grad_edit_set_rgb(GtkColorSelection *selection, gpointer user_data);
 static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -2497,7 +2417,18 @@ static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 			(gdouble)mem_pal[i].green / 255.0,
 			(gdouble)mem_pal[i].blue / 255.0, 1.0};
 
+#if GTK_MAJOR_VERSION == 1
+		GtkColorSelection *cs = GTK_COLOR_SELECTION(grad_ed_cs);
+		gdouble oldcolor[4];
+
+		/* Preserve old color, invoke "color_changed" handler */
+		memcpy(oldcolor, cs->old_values + 3, sizeof(oldcolor));
+		gtk_color_selection_set_color(cs, oldcolor);
+		gtk_color_selection_set_color(cs, color);
+		grad_edit_set_rgb(cs, NULL);
+#else
 		gtk_color_selection_set_color(GTK_COLOR_SELECTION(grad_ed_cs), color);
+#endif
 	}
 	return (TRUE);
 }
@@ -2527,6 +2458,9 @@ static void grad_load_slot(int slot)
 {
 	gdouble color[4];
 	int i;
+#if GTK_MAJOR_VERSION == 2
+	GdkColor c;
+#endif
 
 	if (slot >= grad_cnt) /* Empty slot */
 	{
@@ -2547,8 +2481,6 @@ static void grad_load_slot(int slot)
 		gtk_color_selection_set_color(cs, color);
 #endif
 #if GTK_MAJOR_VERSION == 2
-		GdkColor c;
-
 		c.red = grad_pad[slot * 3 + 0] * 257;
 		c.green = grad_pad[slot * 3 + 1] * 257;
 		c.blue = grad_pad[slot * 3 + 2] * 257;

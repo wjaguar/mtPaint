@@ -131,11 +131,7 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	item[0] = txt2;
 	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )
 	{
-#if GTK_MAJOR_VERSION == 2
-		cleanse_txt( txt2, global_argv[i] );			// Clean up non ASCII chars
-#else
-		strcpy( txt2, global_argv[i] );
-#endif
+		gtkuncpy(txt2, global_argv[i], 512);
 		gtk_clist_set_selectable ( GTK_CLIST(col_list),
 			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
 	}
@@ -1078,6 +1074,7 @@ void view_show()
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	view_showing = TRUE;
+	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE);
 	vw_focus_view();
 }
@@ -1095,6 +1092,7 @@ void view_hide()
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
 	view_showing = FALSE;
+	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE);
 }
 

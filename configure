@@ -1,10 +1,11 @@
+#!/bin/sh
 # Mini configure script
 # 1-10-2004
 
 echo
 
-MT_V="3.10"
-MT_DATE="2007-01-22"
+MT_V="3.10.90"
+MT_DATE="2007-03-07"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -36,7 +37,7 @@ HELP=1
 L_EX=
 STATIC_LAST=
 # Called with lib ID & static mode
-function LIB_NAME ()
+LIB_NAME ()
 {
 	if [ "$IMAGE_LIBDIR" ]
 	then
@@ -65,13 +66,13 @@ function LIB_NAME ()
 	STATIC_LAST=$2
 }
 
-if [ "$OSTYPE" == "msys" ]
+if [ "$OSTYPE" = "msys" ]
 then
 	OS="MinGW/MSYS"
 	GTK=2
-	function IS_LIB
+	IS_LIB()
 	{
-		redir -e /dev/null ld -$1 -o ____3742.tmp -L/lib >& /dev/null
+		redir -e /dev/null ld -$1 -o ____3742.tmp -L/lib > /dev/null 2>&1
 	}
 else
 	OS="GNU/Linux"
@@ -81,9 +82,9 @@ else
 	else
 		GTK=1
 	fi
-	function IS_LIB
+	IS_LIB()
 	{
-		ld -$1 -o /dev/null -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm >& /dev/null
+		ld -$1 -o /dev/null -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 fi
 
@@ -248,7 +249,7 @@ do
 done
 
 
-if [ "$HELP" == 0 ]
+if [ "$HELP" = 0 ]
 then
 	echo "Usage: ./configure [OPTION] ... "
 	echo
@@ -306,10 +307,10 @@ else
 	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
 	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
 
-	if [ "$OS" == "GNU/Linux" ]
+	if [ "$OS" = "GNU/Linux" ]
 	then
 		BIN_INSTALL=$LIN_BIN_INSTALL
-		if [ "$GTK" == "1" ]
+		if [ "$GTK" = "1" ]
 		then
 			if gtk-config --cflags > /dev/null
 			then
@@ -335,7 +336,7 @@ else
 		BIN_INSTALL=$WIN_BIN_INSTALL
 		MT_LANG_DEST=locale
 		MT_PO_DEST=locale
-		if [ "$GTK" == "1" ]
+		if [ "$GTK" = "1" ]
 		then
 			GTK_INCLUDE="-I/include -I/include/glib-2.0 -I/lib/gtk+/include -I/lib/glib-2.0/include -mms-bitfields"
 			GTK_LIB="-L/lib -lgtk -lgdk -lglib-2.0 -lm -mwindows"
@@ -354,7 +355,7 @@ else
 	I_EX=
 	if [ "$NGIF" != "NO" ]
 	then
-		if [ "$NGIF" == "GIF" ]
+		if [ "$NGIF" = "GIF" ]
 		then
 			LIB_NAME gif "$STATIC_GIF"
 		else
@@ -362,12 +363,12 @@ else
 		fi
 		I_EX="$I_EX -DU_GIF"
 	fi
-	if [ "$NJPEG" == "YES" ]
+	if [ "$NJPEG" = "YES" ]
 	then
 		LIB_NAME jpeg "$STATIC_JPEG"
 		I_EX="$I_EX -DU_JPEG"
 	fi
-	if [ "$NTIFF" == "YES" ]
+	if [ "$NTIFF" = "YES" ]
 	then
 		LIB_NAME tiff "$STATIC_TIFF"
 		I_EX="$I_EX -DU_TIFF"
@@ -379,7 +380,7 @@ else
 		L_EX="$L_EX -Wl,-dy"
 	fi
 
-	if [ "$DEBUG" == NO ]
+	if [ "$DEBUG" = NO ]
 	then
 		GTK_LIB="$GTK_LIB -s"
 	fi
@@ -389,11 +390,11 @@ else
 		I_EX="$I_EX -DU_$MT_CUSTOM"
 	fi
 
-	if [ "$MT_LANG" == YES ]
+	if [ "$MT_LANG" = YES ]
 	then
 		I_EX="$I_EX -DU_NLS -DMT_LANG_DEST=\"\\\"$MT_PO_DEST\"\\\""
 		MAKE_DIRS="$MAKE_DIRS po"
-		if [ "$OS" == "MinGW/MSYS" ]
+		if [ "$OS" = "MinGW/MSYS" ]
 		then
 			L_EX="$L_EX -lintl"
 			echo "MT_LANG_DEST=\"$BIN_INSTALL/$MT_LANG_DEST\"" >> $GTK_FILE
@@ -401,7 +402,7 @@ else
 			echo "MT_LANG_DEST=\"$MT_LANG_DEST\"" >> $GTK_FILE
 		fi
 	fi
-	if [ "$MT_MAN" == YES ]
+	if [ "$MT_MAN" = YES ]
 	then
 		MAKE_DIRS="$MAKE_DIRS doc"
 		echo "MT_MAN_DEST=\"$MT_MAN_DEST\"" >> $GTK_FILE
@@ -415,7 +416,7 @@ else
 	then
 		echo "CFLAG = $CFLAG $GTK_INCLUDE" >> $GTK_FILE
 	else
-		if [ "$OPTS" == "YES" ]
+		if [ "$OPTS" = "YES" ]
 		then
 			echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
 		else
@@ -427,14 +428,14 @@ else
 	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE
 
 
-	if [ "$MT_POD" == "YES" ]
+	if [ "$MT_POD" = "YES" ]
 	then
 		cd doc
 		make pod
 		cd ..
 	fi
 
-	if [ "$OSTYPE" == "msys" ]
+	if [ "$OSTYPE" = "msys" ]
 	then
 		rm ____3742.tmp
 	fi
@@ -473,7 +474,7 @@ fi
 	echo
 	echo "Internationalized   $MT_LANG"
 	echo
-if [ "$MT_LANG" == YES ]
+if [ "$MT_LANG" = YES ]
 then
 	echo "Locale install      $MT_LANG_DEST"
 	echo
@@ -482,7 +483,7 @@ then
 fi
 	echo "Install man page    $MT_MAN"
 	echo
-if [ "$MT_MAN" == YES ]
+if [ "$MT_MAN" = YES ]
 then
 	echo "Man page install    $MT_MAN_DEST"
 	echo

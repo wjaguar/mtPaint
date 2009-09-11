@@ -464,6 +464,23 @@ char *gtkncpy(char *dest, const char *src, int cnt)
 	return (dest);
 }
 
+// Wrapper for C->utf8 translation
+
+char *gtkuncpy(char *dest, const char *src, int cnt)
+{
+#if GTK_MAJOR_VERSION == 2
+	char *c = g_locale_to_utf8((gchar *)src, -1, NULL, NULL, NULL);
+	if (c)
+	{
+		strncpy(dest, c, cnt);
+		g_free(c);
+	}
+	else
+#endif
+	strncpy(dest, src, cnt);
+	return (dest);
+}
+
 // Extracting widget from GtkTable
 
 GtkWidget *table_slot(GtkWidget *table, int row, int col)
@@ -652,6 +669,7 @@ void widget_set_minsize(GtkWidget *widget, int width, int height)
 GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 {
 	GtkWidget *align = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+	gtk_widget_show(align);
 	gtk_container_add(GTK_CONTAINER(align), widget);
 	widget_set_minsize(align, width, height);
 	return (align);
