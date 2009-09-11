@@ -40,6 +40,10 @@ grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
 grad_store gradbytes;			// Storage space for custom gradients
 int grad_opacity;			// Preview opacity
 
+/// Vectorized low-level drawing function
+
+void (*put_pixel)(int x, int y) = put_pixel_def;
+
 /// Bayer ordered dithering
 
 const unsigned char bayer[16] = {
@@ -3205,6 +3209,42 @@ void mem_invert()			// Invert the palette
 	}
 }
 
+/* Intersect outer & inner rectangle, write out 1 to 5 rectangles the outer one
+ * separates into, return number of outer rectangles */
+int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi)
+{
+	int *p = xywh04 + 4;
+	int xo1 = xo + wo, yo1 = yo + ho, xi1 = xi + wi, yi1 = yi + hi;
+
+	// Whole outer rectangle
+	p[0] = xo; p[1] = yo; p[2] = wo; p[3] = ho;
+	// No intersection
+	if ((xi >= xo1) || (yi >= yo1) || (xo >= xi1) || (yo >= yi1))
+	{
+		xywh04[0] = xi; xywh04[1] = yi; xywh04[2] = xywh04[3] = 0;
+		return (1);
+	}
+	if (yi > yo) // Top rectangle
+		p[3] = yi - yo , p += 4;
+	else yi = yo;
+	if (yi1 < yo1) // Bottom rectangle
+		*p++ = xo , *p++ = yi1 , *p++ = wo , *p++ = yo1 - yi1;
+	else yi1 = yo1;
+	hi = yi1 - yi;
+	if (xi > xo) // Left rectangle
+		*p++ = xo , *p++ = yi , *p++ = xi - xo , *p++ = hi;
+	else xi = xo;
+	if (xi1 < xo1) // Right rectangle
+		*p++ = xi1 , *p++ = yi , *p++ = xo1 - xi1 , *p++ = hi;
+	else xi1 = xo1;
+	wi = xi1 - xi;
+	// Clipped inner rectangle
+	xywh04[0] = xi; xywh04[1] = yi; xywh04[2] = wi; xywh04[3] = hi;
+
+	// Number of outer rectangles
+	return ((p - xywh04 - 4) >> 2);
+}
+
 void line_init(linedata line, int x0, int y0, int x1, int y1)
 {
 	line[0] = x0;
@@ -3349,6 +3389,112 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv )
 	draw_quad(line1, line2, line3, line4);
 }
 
+/* Shapeburst engine */
+
+int sb_xywh[4];
+static unsigned short *sb_buf;
+
+static void put_pixel_sb(int x, int y)
+{
+	int j, x1, y1;
+
+	x1 = x - sb_xywh[0];
+	y1 = y - sb_xywh[1];
+	if ((x1 < 0) || (x1 >= sb_xywh[2]) || (y1 < 0) || (y1 >= sb_xywh[3]))
+		return;
+
+	j = pixel_protected(x, y);
+	if (mem_img_bpp == 1 ? j : j == 255) return;
+
+	sb_buf[y1 * sb_xywh[2] + x1] = 0xFFFF;
+}
+
+/* Distance transform of binary image map;
+ * for now, uses hardcoded L1 distance metric */
+static int shapeburst(int w, int h, unsigned short *dmap)
+{
+	unsigned short *r0;
+	int i, j, k, l, dx, dy, maxd;
+
+
+	/* Calculate distance */
+	r0 = dmap; dx = 1; dy = w; /* Forward pass */
+	while (TRUE)
+	{
+		/* First row */
+		for (i = 0; i < w; i++ , r0 += dx) if (*r0) *r0 = 1;
+		/* Other rows */
+		for (j = 1; j < h; j++)
+		{
+			/* 1st pixel */
+			if (*r0) *r0 = 1; r0 += dx;
+			/* Other pixels */
+			for (i = w - 1; i > 0; i-- , r0 += dx)
+			{
+				k = *(r0 - dx); l = *(r0 - dy);
+				if (k > l) k = l;
+				if (*r0 > k) *r0 = k + 1;
+			}
+		}
+		if (dx < 0) break; /* Both passes done */
+		r0 = dmap + w * h - 1; dx = -1; dy = -w; /* Backward pass */
+	}
+
+	/* Find largest */
+	maxd = 0; r0 = dmap;
+	for (k = w * h; k; k-- , r0++) if (maxd < *r0) maxd = *r0;
+	return (maxd);
+}
+
+int init_sb()
+{
+	sb_buf = calloc(sb_xywh[2] * sb_xywh[3], sizeof(unsigned short));
+	if (!sb_buf)
+	{
+		memory_errors(1);
+		return (FALSE);
+	}
+	put_pixel = put_pixel_sb;
+	return (TRUE);
+}
+
+void render_sb()
+{
+	grad_info svgrad, *grad = gradient + mem_channel;
+	unsigned short *tmp;
+	double svpath;
+	int i, j, k, x1, y1, maxd;
+
+	if (!sb_buf) return; /* Uninitialized */
+	put_pixel = put_pixel_def;
+	maxd = shapeburst(sb_xywh[2], sb_xywh[3], sb_buf);
+	if (maxd) /* Have something to draw */
+	{
+		svpath = grad_path;
+		svgrad = *grad;
+		grad->gmode = GRAD_MODE_BURST;
+		if (!grad->len) grad->len = maxd - (maxd > 1);
+		grad_update(grad);
+
+		tmp = sb_buf;
+		x1 = sb_xywh[0] + sb_xywh[2];
+		y1 = sb_xywh[1] + sb_xywh[3];
+		for (i = sb_xywh[1]; i < y1; i++)
+		{
+			for (j = sb_xywh[0]; j < x1; j++ , tmp++)
+			{
+				if (!(k = *tmp)) continue;
+				grad_path = k - 1;
+				put_pixel(j, i);
+			}
+		}
+		*grad = svgrad;
+		grad_path = svpath;
+	}
+	free(sb_buf);
+	sb_buf = NULL;
+}
+
 /*
  * This flood fill algorithm processes image in quadtree order, and thus has
  * guaranteed upper bound on memory consumption, of order O(width + height).
@@ -3357,7 +3503,7 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv )
 #define QLEVELS 11
 #define QMINSIZE 32
 #define QMINLEVEL 5
-void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
+static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 {
 	short *nearq, *farq;
 	int qtail[QLEVELS + 1], ntail = 0;
@@ -3372,10 +3518,10 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
 		(get_pixel(x, y) != col) || (pixel_protected(x, y) == 255))
-		return;
+		return (FALSE);
 	i = ((mem_width + mem_height) * 3 + QMINSIZE * QMINSIZE) * 2 * sizeof(short);
 	nearq = malloc(i); // Exact limit is less, but it's too complicated 
-	if (!nearq) return;
+	if (!nearq) return (FALSE);
 	farq = nearq + QMINSIZE * QMINSIZE;
 	memset(qtail, 0, sizeof(qtail));
 
@@ -3388,7 +3534,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 		{
 			/* Can't draw */
 			free(nearq);
-			return;
+			return (FALSE);
 		}
 	}
 
@@ -3546,16 +3692,59 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	}
 	free(nearq);
 	free(tmp);
+	return (TRUE);
+}
+
+/* Determine bitmap boundaries */
+static int bitmap_bounds(int *xywh, unsigned char *pat, int lw)
+{
+	unsigned char buf[MAX_WIDTH / 8], *tmp;
+	int i, j, k, x0, x1, y0, y1, w, h;
+
+	/* Find top row */
+	k = lw * xywh[3];
+	tmp = pat; i = k;
+	while (!*tmp++ && i--);
+	if (i <= 0) return (0); /* Nothing there */
+	y0 = y1 = (tmp - pat - 1) / lw;
+
+	/* Find bottom row */
+	for (j = y0 + 1; j < xywh[3]; j++)
+	{
+		tmp = pat + j * lw; i = lw;
+		while (!*tmp++ && i--);
+		if (i > 0) y1 = j;
+	}
+	y1++;
+
+	/* Find left & right extents (8 pixels granular) */
+	memcpy(buf, tmp = pat + y0 * lw, lw); tmp += lw;
+	for (j = y0 + 1; j < y1; j++)
+	{
+		for (i = 0; i < lw; i++) buf[i] |= *tmp++;
+	}
+	for (x0 = 0; !buf[x0] && (x0 < lw); x0++);
+	for (x1 = lw - 1; !buf[x1] && (x1 > x0); x1--);
+	x0 *= 8; x1 = x1 * 8 + 8;
+	if (x1 > xywh[2]) x1 = xywh[2];
+
+	/* Set up boundaries */
+	xywh[0] += x0; xywh[1] += y0;
+	xywh[2] = w = x1 - x0; xywh[3] = h = y1 - y0;
+	return (w * h);
 }
 
 /* Flood fill - may use temporary area (1 bit per pixel) */
 void flood_fill(int x, int y, unsigned int target)
 {
 	unsigned char *pat, *temp;
-	int i, j, k, lw = (mem_width + 7) >> 3;
+	int i, j, k, l, sb, lw = (mem_width + 7) >> 3;
+
+	/* Shapeburst mode */
+	sb = mem_gradient && (gradient[mem_channel].status == GRAD_NONE);
 
 	/* Regular fill? */
-	if (!mem_tool_pat && (tool_opacity == 255) && !flood_step &&
+	if (!sb && !mem_tool_pat && (tool_opacity == 255) && !flood_step &&
 		(!flood_img || (mem_channel == CHN_IMAGE)))
 	{
 		wjfloodfill(x, y, target, NULL, 0);
@@ -3570,24 +3759,40 @@ void flood_fill(int x, int y, unsigned int target)
 		return;
 	}
 	memset(pat, 0, j);
-	wjfloodfill(x, y, target, pat, lw);
-	for (i = 0; i < mem_height; i++)
+	while (wjfloodfill(x, y, target, pat, lw))
 	{
-		for (j = 0; j < mem_width; )
+		if (sb) /* Shapeburst - setup rendering backbuffer */
 		{
-			k = *temp++;
-			if (!k)
-			{
-				j += 8;
-				continue;
-			}
-			for (; k; k >>= 1)
-			{
-				if (k & 1) put_pixel(j, i);
-				j++;
-			}
-			j = (j + 7) & ~(7);
+			sb_xywh[0] = sb_xywh[1] = 0;
+			sb_xywh[2] = mem_width;
+			sb_xywh[3] = mem_height;
+			l = bitmap_bounds(sb_xywh, pat, lw);
+			if (!l) break; /* Nothing to draw */
+			if (!init_sb()) break; /* Not enough memory */
 		}
+
+		for (i = 0; i < mem_height; i++)
+		{
+			for (j = 0; j < mem_width; )
+			{
+				k = *temp++;
+				if (!k)
+				{
+					j += 8;
+					continue;
+				}
+				for (; k; k >>= 1)
+				{
+					if (k & 1) put_pixel(j, i);
+					j++;
+				}
+				j = (j + 7) & ~(7);
+			}
+		}
+
+		if (sb) render_sb(); /* Finalize */
+
+		break;
 	}
 	free(pat);
 }
@@ -3745,17 +3950,27 @@ static void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 /* Thickness 0 means filled */
 void mem_ellipse(int x1, int y1, int x2, int y2, int thick)
 {
-	int xs, ys, xl, yl;
+	int xs, ys, xl, yl, sb = FALSE;
 
 	xs = x1 < x2 ? x1 : x2;
 	ys = y1 < y2 ? y1 : y2;
 	xl = abs(x2 - x1) + 1;
 	yl = abs(y2 - y1) + 1;
 
+	/* Shapeburst mode */
+	if (mem_gradient && (gradient[mem_channel].status == GRAD_NONE))
+	{
+		sb_xywh[0] = xs; sb_xywh[1] = ys;
+		sb_xywh[2] = xl; sb_xywh[3] = yl;
+		sb = init_sb();
+	}
+
 	/* Draw rectangle instead if too small */
 	if ((xl <= 2) || (yl <= 2)) f_rectangle(xs, ys, xl, yl);
 	else wjellipse(xs, ys, xl, yl, thick && (thick * 2 < xl) &&
 		(thick * 2 < yl), thick);
+
+	if (sb) render_sb();
 }
 
 static int circ_r, circ_trace[128];
@@ -5432,7 +5647,7 @@ static void blend_rgb(unsigned char *dest, const unsigned char *src, int tint)
 	}
 }
 
-void put_pixel( int x, int y )	/* Combined */
+void put_pixel_def( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
 	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
@@ -7169,8 +7384,11 @@ int grad_pixel(unsigned char *dest, int x, int y)
 		 /* Stroke gradient */
 		if (grad->status == GRAD_NONE)
 		{
-			dist = (x - grad_x0) * grad->xv +
-				(y - grad_y0) * grad->yv + grad_path;
+			dist = grad_path;
+			/* Shapeburst gradient */
+			if (grad->wmode == GRAD_MODE_BURST) break;
+			dist += (x - grad_x0) * grad->xv +
+				(y - grad_y0) * grad->yv;
 			break;
 		}
 

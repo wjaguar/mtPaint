@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007 Dmitry Groshev
+	Copyright (C) 2007-2008 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -344,7 +344,7 @@ int read_ini(inifile *inip, char *fname)
 		if (*tmp == '[') /* Section */
 		{
 			if (!(w2 = strchr(tmp + 1, ']'))) goto error;
-			for (l = i = 0; tmp[i + 1] == '/'; i++);
+			for (l = i = 0; tmp[i + 1] == '>'; i++);
 			if (i) /* Nested section */
 			{
 				if (!sec || ((j = i + ini.slots[sec - 1].type) > 0))
@@ -368,15 +368,17 @@ int read_ini(inifile *inip, char *fname)
 			sec = slot - ini.slots + 1; /* Activate */
 			continue;
 		}
-		/* Variable */
-		wrk = strpbrk(tmp, "=\t ");
-		if (!wrk || (*(w2 = wrk + strspn(wrk, "\t ")) != '='))
+		/* Variable (spaces in name allowed) */
+		w2 = strchr(tmp, '=');
+		if (!w2)
 		{
 error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 			continue;
 		}
+		for (wrk = w2 - 1; wrk - tmp >= 0; wrk--)
+			if ((*wrk != ' ') && (*wrk != '\t')) break;
+		wrk[1] = '\0';
 		w2 += 1 + strspn(w2 + 1, "\t ");
-		*wrk = '\0';
 //		for (wrk = str - 1; *wrk && ((*wrk == '\t') || (*wrk == ' '); *wrk-- = '\0');
 		/* Hash this pair */
 		slot = cuckoo_find(&ini, sec, tmp);
@@ -429,7 +431,7 @@ int write_ini(inifile *inip, char *fname, char *header)
 			{
 				if (slotp->defv <= i) continue; /* It's empty */
 				fputc('[', fp);
-				for (j = -1; j > slotp->type; j--) fputc('/', fp);
+				for (j = -1; j > slotp->type; j--) fputc('>', fp);
 				fprintf(fp, "%s]\n", name);
 				sec = i + 1; max = slotp->defv; var = 0;
 				continue;

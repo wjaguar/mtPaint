@@ -4,6 +4,17 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.30	2008
+
+	* New colour picker (old one available as configure option)
+	* New file picker (old one available as configure option)
+	* Some menu items can have an icon (if set in the preferences)
+	* Dock area added which can hold the command line window
+	* Palette can be copied to or from the canvas using the Edit menu
+	* Horizontal and vertical ramps can be created using the Selection menu
+	* Workaround for bug in libpng versions 1.2.17 - 1.2.24 added (was losing extra channels when loading)
+	* BUGFIX - canvas, view and palette area borders now can't be messed up by theme engines
+
 3.20	2007-12-27
 
 	* mtPaint is now licensed as GPL version 3 (or later)

@@ -911,6 +911,75 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
 }
 
+// Ensure viewport frames are always drawn as they should
+
+#if GTK_MAJOR_VERSION == 1
+
+/* GTK1 is not as flexible as GTK2, so we need small "theme engine" of our own
+ * to force viewport border to 1 pixel wide without messing up things - WJ */
+static void viewport_shadow(GtkStyle *style, GdkWindow *window,
+	GtkStateType state_type, GtkShadowType shadow_type, GdkRectangle *area,
+	GtkWidget *widget, gchar *detail, gint x, gint y, gint w, gint h)
+{
+	GdkGC *light, *dark;
+	int x1, y1;
+
+	if (!style || !window) return;
+	if ((w == -1) || (h == -1)) gdk_window_get_size(window,
+		w == -1 ? &w : NULL, h == -1 ? &h : NULL);
+
+	/* State, shadow, and widget type are hardcoded */
+	light = style->light_gc[GTK_STATE_NORMAL];
+	dark = style->dark_gc[GTK_STATE_NORMAL];
+	gdk_gc_set_clip_rectangle(light, area);
+	gdk_gc_set_clip_rectangle(dark, area);
+
+	x1 = x + w - 1; y1 = y + h - 1;
+	gdk_draw_line(window, light, x, y1, x1, y1);
+	gdk_draw_line(window, light, x1, y, x1, y1);
+	gdk_draw_line(window, dark, x, y, x1, y);
+	gdk_draw_line(window, dark, x, y, x, y1);
+
+	gdk_gc_set_clip_rectangle(light, NULL);
+	gdk_gc_set_clip_rectangle(dark, NULL);
+}
+
+void viewport_style(GtkWidget *widget)
+{
+	static GtkStyle *defstyle;
+	GtkStyleClass *class;
+
+	if (!defstyle)
+	{
+		defstyle = gtk_style_new();
+		class = g_malloc(sizeof(GtkStyleClass));
+		memcpy(class, defstyle->klass, sizeof(GtkStyleClass));
+		defstyle->klass = class;
+		class->xthickness = class->ythickness = 1;
+		class->draw_shadow = viewport_shadow;
+	}
+	gtk_widget_set_style(widget, defstyle);
+}
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+void viewport_style(GtkWidget *widget)
+{
+	static GtkStyle *defstyle;
+	GdkColor *col;
+
+	if (!defstyle)
+	{
+		defstyle = gtk_style_new();
+		col = &defstyle->bg[GTK_STATE_NORMAL];
+		col->red = col->green = col->blue = 0xD6D6;
+		defstyle->xthickness = defstyle->ythickness = 1;
+	}
+	gtk_widget_set_style(widget, defstyle);
+}
+
+#endif
+
 // Eliminate flicker when scrolling
 
 /* This code serves a very important role - it disables background clear,
@@ -928,6 +997,8 @@ static void realize_trick(GtkWidget *widget, gpointer user_data)
 void fix_scroll(GtkWidget *scroll)
 {
 	scroll = GTK_BIN(scroll)->child;
+	/* Stop theme engines from messing up viewport's frame */
+	viewport_style(scroll);
 	gtk_signal_connect_after(GTK_OBJECT(scroll), "realize",
 		GTK_SIGNAL_FUNC(realize_trick), NULL);
 #if GTK_MAJOR_VERSION == 2
@@ -1332,23 +1403,14 @@ static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
 	gdk_window_set_back_pixmap(widget->window, NULL, TRUE);
 	if (draw_pmap) // To prevent blinking, clear just the outside part
 	{
-		cdest = *area;
-		if ((cdest.height = pdest.y - cdest.y))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest.y = pdest.y + pdest.height;
-		if ((cdest.height = area->y + area->height - cdest.y))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest = pdest;
-		cdest.x = area->x;
-		if ((cdest.width = pdest.x - cdest.x))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
-		cdest.x = pdest.x + pdest.width;
-		if ((cdest.width = area->x + area->width - cdest.x))
-			gdk_window_clear_area(widget->window,
-				cdest.x, cdest.y, cdest.width, cdest.height);
+		int n, xywh04[5 * 4], *p = xywh04;
+		n = clip4(xywh04, area->x, area->y, area->width, area->height,
+			pdest.x, pdest.y, pdest.width, pdest.height);
+		while (n--)
+		{
+			p += 4;
+			gdk_window_clear_area(widget->window, p[0], p[1], p[2], p[3]);
+		}
 	}
 	else gdk_window_clear_area(widget->window,
 		area->x, area->y, area->width, area->height);

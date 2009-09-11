@@ -836,9 +836,11 @@ void toolbar_update_settings()
 static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
+	int x2 = event->area.x + event->area.width;
 	int y2 = event->area.y + event->area.height;
 
-	if (y2 > PALETTE_HEIGHT) /* Better safe than sorry */
+	/* With theme engines lurking out there, weirdest things can happen */
+	if (y2 > PALETTE_HEIGHT)
 	{
 		gdk_draw_rectangle(widget->window, widget->style->black_gc,
 			TRUE, event->area.x, PALETTE_HEIGHT,
@@ -846,10 +848,18 @@ static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 		if (event->area.y >= PALETTE_HEIGHT) return (TRUE);
 		y2 = PALETTE_HEIGHT;
 	}
+	if (x2 > PALETTE_WIDTH)
+	{
+		gdk_draw_rectangle(widget->window, widget->style->black_gc,
+			TRUE, PALETTE_WIDTH, event->area.y,
+			x2 - PALETTE_WIDTH, y2);
+		if (event->area.x >= PALETTE_WIDTH) return (TRUE);
+		x2 = PALETTE_WIDTH;
+	}
 
 	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
 		event->area.x, event->area.y,
-		event->area.width, y2 - event->area.y,
+		x2 - event->area.x, y2 - event->area.y,
 		GDK_RGB_DITHER_NONE, mem_pals + event->area.y * PALETTE_W3 +
 		event->area.x * 3, PALETTE_W3);
 

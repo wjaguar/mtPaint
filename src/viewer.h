@@ -1,5 +1,5 @@
 /*	viewer.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -26,7 +26,9 @@ GtkWidget *cline_window, *vw_drawing;
 
 gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data );
 
+void create_cline_area( GtkWidget *vbox1 );
 void pressed_cline( GtkMenuItem *menu_item, gpointer user_data );
+
 void pressed_pan( GtkMenuItem *menu_item, gpointer user_data );
 
 void pressed_centralize( GtkMenuItem *menu_item, gpointer user_data );	// Menu clicked

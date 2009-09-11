@@ -1341,7 +1341,7 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 		pack(hbox, swindow);
 		vbox = xpack(hbox, gtk_vbox_new(FALSE, 5));
 		gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
-		xpack(vbox, cs);
+		gtk_box_pack_start (GTK_BOX (vbox), cs, TRUE, FALSE, 0);
 	}
 	else
 	{

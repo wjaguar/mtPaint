@@ -168,11 +168,19 @@ void mapped_dis_add(GtkWidget *widget, int actmap);
 #define MENU_DCHAN3    57
 #define MENU_RGBA      58
 #define MENU_HELP      59
-#define TOTAL_MENU_IDS 60
+#define MENU_DOCK      60
+#define TOTAL_MENU_IDS 61
 
 #define MAX_RECENT 20
 
 const unsigned char greyz[2]; // For opacity squares
+
+#define DOCK_CLINE		0
+#define DOCK_TOOL_SETTINGS	1
+#define DOCK_LAYERS		2
+
+#define DOCK_TOTAL		3
+
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 
@@ -184,10 +192,11 @@ GtkWidget *main_window, *main_split,
 	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
 	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
-	*menu_widgets[TOTAL_MENU_IDS];
+	*menu_widgets[TOTAL_MENU_IDS],
+	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
 
-int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
-int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
+int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
+int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
 GdkGC *dash_gc;
@@ -249,3 +258,5 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data);
 void toolbar_icon_event (GtkWidget *widget, gpointer data);
 
 void set_image(gboolean state);	// Toggle image access (nestable)
+
+int dock_focused();		// Check if focus is inside dock window

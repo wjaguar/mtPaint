@@ -1,5 +1,5 @@
 /*	icons.h
-	Copyright (C) 2007 Mark Tyler
+	Copyright (C) 2007-2008 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -20,11 +20,14 @@
 
 
 extern char
+	*icon_xpm[],
 	*xpm_brcosa_xpm[],
+	*xpm_case_xpm[],
 	*xpm_centre_xpm[],
+	*xpm_cline_xpm[],
 	*xpm_clone_xpm[],
 	*xpm_close_xpm[],
-	*xpm_case_xpm[],
+	*xpm_config_xpm[],
 	*xpm_copy_xpm[],
 	*xpm_cut_xpm[],
 	*xpm_down_xpm[],
@@ -37,6 +40,7 @@ extern char
 	*xpm_hidden_xpm[],
 	*xpm_home_xpm[],
 	*xpm_lasso_xpm[],
+	*xpm_layers_xpm[],
 	*xpm_line_xpm[],
 	*xpm_mode_blend_xpm[],
 	*xpm_mode_cont_xpm[],

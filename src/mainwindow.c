@@ -65,6 +65,7 @@ static inilist ini_bool[] = {
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
+	{ "showDock",		&show_dock,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -104,9 +105,8 @@ static inilist ini_int[] = {
 	{ NULL,			NULL }
 };
 
-#include "graphics/icon.xpm"
 
-GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
+GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
@@ -114,10 +114,11 @@ GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
 	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
 	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
-	*menu_widgets[TOTAL_MENU_IDS];
+	*menu_widgets[TOTAL_MENU_IDS],
+	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
 
-int view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
-int files_passed, file_arg_start, drag_index_vals[2], cursor_corner;
+int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool, show_menu_icons;
+int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
 char **global_argv;
 
 GdkGC *dash_gc;
@@ -984,6 +985,12 @@ int wtf_pressed(GdkEventKey *event)
 	return (cmatch);
 }
 
+int dock_focused()
+{
+	GtkWidget *focus = GTK_WINDOW(main_window)->focus_widget;
+	return (focus && dock_area && gtk_widget_is_ancestor(focus, dock_area));
+}
+
 static int check_smart_menu_keys(GdkEventKey *event);
 
 static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
@@ -991,9 +998,20 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 {
 	int change, action;
 
-	action = wtf_pressed(event);
-	if (!action) action = check_smart_menu_keys(event);
-	if (!action) return (FALSE);
+	if (dock_focused())
+	{
+		/* Builtin key handling disabled while dock has focus;
+		 * pressing Escape moves focus out of dock - to nowhere */
+		if (event->keyval != GDK_Escape) return (FALSE);
+		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+		action = ACT_DUMMY;
+	}
+	else
+	{
+		action = wtf_pressed(event);
+		if (!action) action = check_smart_menu_keys(event);
+		if (!action) return (FALSE);
+	}
 
 #if GTK_MAJOR_VERSION == 1
 	/* Return value alone doesn't stop GTK1 from running other handlers */
@@ -1264,6 +1282,8 @@ void string_init()
 	channames[CHN_IMAGE] = "";
 }
 
+static void toggle_dock(int state, int internal);
+
 static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	inilist *ilp;
@@ -1286,6 +1306,7 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 
 	if ( i==2 )
 	{
+		toggle_dock(FALSE, TRUE);
 		win_store_pos(main_window, "window");
 
 		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
@@ -1721,6 +1742,13 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 
 	if (pflag) /* For button press events only */
 	{
+		/* Steal focus from dock window */
+		if (dock_focused())
+		{
+			gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+			return (TRUE);
+		}
+
 		if (!mem_img[CHN_IMAGE]) return (TRUE);
 
 		if (tablet_working)
@@ -2712,39 +2740,23 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	/* With paste - zero to four areas */
 	else
 	{
-		int y0, y1, x0, x1, h1, w1;
+		int n, x0, y0, w0, h0, xywh04[5 * 4], *p = xywh04;
 		unsigned char *r;
 
-		/* Areas _do_ intersect - cut intersection out */
-		/* Top rectangle */
-		y0 = marq_y1 > 0 ? marq_y1 : 0;
-		y0 = margin_main_y + y0 * scale;
-		h1 = y0 - py;
-		if (h1 <= 0) y0 = py;
-		else draw_grid(rgb, px, py, pw, h1, pw);
+		w0 = (marq_x2 < mem_width ? marq_x2 + 1 : mem_width) * scale;
+		x0 = marq_x1 > 0 ? marq_x1 * scale : 0;
+		w0 -= x0; x0 += margin_main_x;
+		h0 = (marq_y2 < mem_height ? marq_y2 + 1 : mem_height) * scale;
+		y0 = marq_y1 > 0 ? marq_y1 * scale : 0;
+		h0 -= y0; y0 += margin_main_y;
 
-		/* Bottom rectangle */
-		y1 = marq_y2 < mem_height ? marq_y2 + 1 : mem_height;
-		y1 = margin_main_y + y1 * scale;
-		h1 = py + ph - y1;
-		if (h1 <= 0) y1 = py + ph;
-		else draw_grid(rgb + (y1 - py) * pw * 3, px, y1, pw, h1, pw);
-
-		/* Middle rectangles */
-		h1 = y1 - y0;
-		r = rgb + (y0 - py) * pw * 3;
-
-		/* Left rectangle */
-		x0 = marq_x1 > 0 ? marq_x1 : 0;
-		x0 = margin_main_x + x0 * scale;
-		w1 = x0 - px;
-		if (w1 > 0) draw_grid(r, px, y0, w1, h1, pw);
-		
-		/* Right rectangle */
-		x1 = marq_x2 < mem_width ? marq_x2 + 1 : mem_width;
-		x1 = margin_main_x + x1 * scale;
-		w1 = px + pw - x1;
-		if (w1 > 0) draw_grid(r + (x1 - px) * 3, x1, y0, w1, h1, pw);
+		n = clip4(xywh04, px, py, pw, ph, x0, y0, w0, h0);
+		while (n--)
+		{
+			p += 4;
+			r = rgb + ((p[1] - py) * pw + (p[0] - px)) * 3;
+			draw_grid(r, p[0], p[1], p[2], p[3], pw);
+		}
 	}
 
 	async_bk = FALSE;
@@ -3736,6 +3748,83 @@ static void pressed_pal_copypaste( GtkMenuItem *menu_item, gpointer user_data, g
 	}
 }
 
+///	DOCK AREA
+
+static void toggle_dock(int state, int internal)
+{
+	static char **tab_buttons[DOCK_TOTAL] =
+		{ xpm_cline_xpm, xpm_config_xpm, xpm_layers_xpm };
+	GtkWidget *vbox, *notebook, *iconw, *pane = dock_pane;
+	GdkPixmap *pix;
+	GdkBitmap *mask;
+	int i, w2;
+
+	if (!pane ^ state) return;
+	gdk_window_get_size(main_window->window, &w2, NULL);
+	gtk_widget_ref(vbox_main);
+	if (state)
+	{
+		/* First, create the dock pane */
+		pane = gtk_hpaned_new();
+		paned_mouse_fix(pane);
+		/* Window size isn't yet valid */
+		if (internal) gtk_object_get(GTK_OBJECT(main_window),
+			"default_width", &w2, NULL);
+		w2 -= inifile_get_gint32("dockSize", 200);
+		gtk_paned_set_position(GTK_PANED(pane), w2);
+
+		vbox = gtk_vbox_new(FALSE, 0);	// New vbox for pane on the right
+		gtk_paned_pack2(GTK_PANED(pane), vbox, FALSE, TRUE);
+
+		notebook = xpack(vbox, gtk_notebook_new());
+		gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook), GTK_POS_TOP);
+		gtk_widget_show_all(pane);
+
+		for (i = 0; i < DOCK_TOTAL; i++)
+		{
+			if ((i == DOCK_CLINE) && (files_passed <= 1)) continue;
+			pix = gdk_pixmap_create_from_xpm_d(main_window->window,
+				&mask, NULL, tab_buttons[i]);
+			iconw = gtk_pixmap_new(pix, mask);
+			gtk_widget_show(iconw);
+			dock_vbox[i] = gtk_vbox_new(FALSE, 0);
+			gtk_widget_show(dock_vbox[i]);
+			gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+				dock_vbox[i], iconw);
+		}
+
+		if (files_passed > 1) create_cline_area(dock_vbox[DOCK_CLINE]);
+
+		/* Now, let's juggle the widgets */
+		gtk_container_remove(GTK_CONTAINER(main_window), vbox_main);
+		gtk_paned_pack1(GTK_PANED(pane), vbox_main, FALSE, TRUE);
+		dock_pane = pane;
+		dock_area = vbox;
+		gtk_container_add(GTK_CONTAINER(main_window), pane);
+	}
+	else
+	{
+		/* Destroy dock pane */
+		inifile_set_gint32("dockSize", w2 - GTK_PANED(pane)->child1_size);
+		if (!internal) /* Else, don't bother destroying */
+		{
+			dock_pane = dock_area = NULL;
+			gtk_widget_ref(pane);
+			gtk_container_remove(GTK_CONTAINER(main_window), pane);
+			gtk_container_remove(GTK_CONTAINER(pane), vbox_main);
+			gtk_widget_unref(pane);
+			gtk_container_add(GTK_CONTAINER(main_window), vbox_main);
+		}
+	}
+	set_cursor(); /* Because canvas window is now a new one */
+	gtk_widget_unref(vbox_main);
+}
+
+static void pressed_dock_toggle(GtkMenuItem *menu_item, gpointer user_data, gint item)
+{
+	toggle_dock(show_dock = GTK_CHECK_MENU_ITEM(menu_item)->active, FALSE);
+}
+
 static void pressed_sel_ramp( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	unsigned char rgb[2][3], *dest;
@@ -3919,6 +4008,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", pressed_toolbar_toggle, TOOLBAR_MAIN },
 	{ _("/View/Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", pressed_toolbar_toggle, TOOLBAR_TOOLS },
 	{ _("/View/Show Settings Toolbar"), 0, MENU_TBSET, 0, "F7", pressed_toolbar_toggle, TOOLBAR_SETTINGS },
+	{ _("/View/Show Dock"), 0, MENU_DOCK, 0, NULL, pressed_dock_toggle, 0 },
 	{ _("/View/Show Palette"), 0, MENU_SHOWPAL, 0, "F8", pressed_toolbar_toggle, TOOLBAR_PALETTE },
 	{ _("/View/Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, pressed_toolbar_toggle, TOOLBAR_STATUS },
 	{ _("/View/sep1"), -4 },
@@ -4081,7 +4171,7 @@ void main_init()
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 	GtkAdjustment *adj;
-	GtkWidget *menubar1, *vbox_main, *hbox_bar, *hbox_bottom;
+	GtkWidget *menubar1, *hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
 	char txt[PATHBUF];
 	int i;
@@ -4118,6 +4208,8 @@ void main_init()
 // items on the toolbar & menus in the context of it
 	gtk_widget_realize( main_window );
 
+///	MENU
+
 	menubar1 = fill_menu(main_menu, accel_group);
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_RGBA]), RGBA_mode);
@@ -4133,8 +4225,9 @@ void main_init()
 	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
 	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
-	toolbar_init(vbox_main);
+///	TOOLBARS
 
+	toolbar_init(vbox_main);
 
 ///	PALETTE
 
@@ -4277,6 +4370,8 @@ void main_init()
 	men_item_state( menu_need_selection, FALSE );
 	men_item_state( menu_need_clipboard, FALSE );
 
+	show_dock |= (files_passed > 1);
+
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 	toolbar_boxes[TOOLBAR_STATUS] = hbox_bar;	// Hide status bar
@@ -4284,7 +4379,12 @@ void main_init()
 
 	view_hide();					// Hide paned view initially
 
-	gtk_widget_show (main_window);
+	// Display dock area if requested
+	toggle_dock(show_dock, TRUE);
+	gtk_check_menu_item_set_active(
+		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_DOCK]), show_dock);
+
+	gtk_widget_show(main_window);
 
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
 	fill_keycodes(main_keys);
@@ -4303,8 +4403,7 @@ void main_init()
 	snprintf(txt, PATHBUF, "%s%c.clipboard", get_home_directory(), DIR_SEP);
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
 
-	if (files_passed > 1) pressed_cline(NULL, NULL);
-	else gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], files_passed > 1);
 
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 

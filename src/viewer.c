@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -37,18 +37,18 @@ float vw_zoom = 1;
 int opaque_view;
 
 
-////	COMMAND LINE WINDOW
-
-
-GtkWidget *cline_window = NULL;
-
-
 static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
-{							// Used by command line window
+{					// Used by command line window too
 	if (check_zoom_keys(wtf_pressed(event))) return TRUE;	// Check HOME/zoom keys
 
 	return FALSE;
 }
+
+
+////	COMMAND LINE WINDOW
+
+
+GtkWidget *cline_window = NULL;
 
 gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
@@ -76,25 +76,12 @@ void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointe
 	}
 }
 
-void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
+void create_cline_area( GtkWidget *vbox1 )
 {
 	int i;
-	GtkWidget *vbox1, *button_close, *scrolledwindow, *col_list;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	char txt2[PATHTXT];
+	GtkWidget *scrolledwindow, *col_list;
 	gchar *item[1];
-	char txt[128], txt2[PATHTXT];
-
-	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
-	allow_cline = FALSE;
-
-	snprintf(txt, 120, _("%i Files on Command Line"), files_passed );
-	cline_window = add_a_window( GTK_WINDOW_TOPLEVEL, txt, GTK_WIN_POS_NONE, FALSE );
-	gtk_widget_set_usize(cline_window, 100, 100);
-	win_restore_pos(cline_window, "cline", 0, 0, 250, 400);
-
-	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox1);
-	gtk_container_add (GTK_CONTAINER (cline_window), vbox1);
 
 	scrolledwindow = xpack(vbox1, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show(scrolledwindow);
@@ -116,6 +103,34 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show(col_list);
 	gtk_signal_connect(GTK_OBJECT(col_list), "select_row", GTK_SIGNAL_FUNC(cline_select), NULL);
 
+	gtk_widget_grab_focus(col_list);
+
+	gtk_signal_connect(GTK_OBJECT(col_list), "key_press_event",
+		GTK_SIGNAL_FUNC(viewer_keypress), NULL);
+}
+
+void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
+{
+	GtkWidget *vbox1, *button_close;
+	GtkAccelGroup* ag = gtk_accel_group_new();
+	char txt[128];
+
+	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], FALSE);
+	allow_cline = FALSE;
+
+	snprintf(txt, 120, _("%i Files on Command Line"), files_passed );
+	cline_window = add_a_window( GTK_WINDOW_TOPLEVEL, txt, GTK_WIN_POS_NONE, FALSE );
+	gtk_widget_set_usize(cline_window, 100, 100);
+	win_restore_pos(cline_window, "cline", 0, 0, 250, 400);
+
+	vbox1 = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show (vbox1);
+	gtk_container_add (GTK_CONTAINER (cline_window), vbox1);
+
+
+	create_cline_area( vbox1 );
+
+
 	button_close = add_a_button(_("Close"), 5, vbox1, FALSE);
 	gtk_signal_connect_object( GTK_OBJECT(button_close), "clicked",
 			GTK_SIGNAL_FUNC(delete_cline), GTK_OBJECT(cline_window));
@@ -123,8 +138,8 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_signal_connect_object (GTK_OBJECT (cline_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_cline), NULL);
-	gtk_signal_connect_object (GTK_OBJECT (cline_window), "key_press_event",
-		GTK_SIGNAL_FUNC (viewer_keypress), GTK_OBJECT (cline_window));
+//	gtk_signal_connect_object (GTK_OBJECT (cline_window), "key_press_event",
+//		GTK_SIGNAL_FUNC (viewer_keypress), GTK_OBJECT (cline_window));
 
 	gtk_widget_show(cline_window);
 	gtk_window_add_accel_group(GTK_WINDOW (cline_window), ag);
@@ -1027,6 +1042,13 @@ static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )
 static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 {
 	int pflag = event->type != GDK_BUTTON_RELEASE;
+
+	/* Steal focus from dock window */
+	if (pflag && dock_focused())
+	{
+		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+		return (TRUE);
+	}
 
 	vw_mouse_event(event->type, event->x, event->y, event->state, event->button);
 

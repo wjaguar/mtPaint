@@ -179,10 +179,11 @@ int grad_opacity;			// Preview opacity
 
 /* Gradient modes */
 #define GRAD_MODE_NONE     0
-#define GRAD_MODE_LINEAR   1
-#define GRAD_MODE_BILINEAR 2
-#define GRAD_MODE_RADIAL   3
-#define GRAD_MODE_SQUARE   4
+#define GRAD_MODE_BURST    1
+#define GRAD_MODE_LINEAR   2
+#define GRAD_MODE_BILINEAR 3
+#define GRAD_MODE_RADIAL   4
+#define GRAD_MODE_SQUARE   5
 
 /* Boundary conditions */
 #define GRAD_BOUND_STOP    0
@@ -344,6 +345,13 @@ extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 int mem_background;			// Non paintable area
 int mem_histogram[256];
 
+/// Vectorized low-level drawing function
+
+void (*put_pixel)(int x, int y);
+
+	// Intersect outer & inner rectangle, write out what it separates into
+int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi);
+
 /// Line iterator
 
 /* Indices 0 and 1 are current X and Y, 2 is number of pixels remaining */
@@ -493,8 +501,11 @@ void update_undo(image_info *image);	// Copy image state into current undo frame
 //	Try to allocate a memory block, releasing undo frames if needed
 void *mem_try_malloc(size_t size);
 
-
 //// Drawing Primitives
+
+int sb_xywh[4];				// Backbuffer placement
+int init_sb();				// Create shapeburst backbuffer
+void render_sb();			// Render from shapeburst backbuffer
 
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
 //	Extract alpha info from RGB clipboard
@@ -580,7 +591,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 
 int pixel_protected(int x, int y);				// generic
 void row_protected(int x, int y, int len, unsigned char *mask);
-void put_pixel( int x, int y );					// generic
+void put_pixel_def( int x, int y );				// generic
 int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image

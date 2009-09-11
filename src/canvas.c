@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -785,12 +785,27 @@ void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	int x, y, w, h;
+	int x, y, w, h, sb, l2;
 
 	spot_undo(UNDO_DRAW);
 
+	/* Shapeburst mode */
+	sb = mem_gradient && (gradient[mem_channel].status == GRAD_NONE);
+
 	if ( tool_type == TOOL_POLYGON )
 	{
+		if (sb)
+		{
+			poly_init();
+			l2 = tool_size >> 1;
+			sb_xywh[0] = poly_min_x > l2 ? poly_min_x - l2 : 0;
+			sb_xywh[1] = poly_min_y > l2 ? poly_min_y - l2 : 0;
+			sb_xywh[2] = (poly_max_x + l2 > mem_width ?
+				poly_max_x + l2 : mem_width) - sb_xywh[0];
+			sb_xywh[3] = (poly_max_y + l2 > mem_height ?
+				poly_max_y + l2 : mem_height) - sb_xywh[1];
+			sb = init_sb();
+		}
 		if (!item) poly_outline();
 		else poly_paint();
 	}
@@ -800,6 +815,13 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
 		w = abs(marq_x1 - marq_x2) + 1;
 		h = abs(marq_y1 - marq_y2) + 1;
+
+		if (sb)
+		{
+			sb_xywh[0] = x; sb_xywh[1] = y;
+			sb_xywh[2] = w; sb_xywh[3] = h;
+			sb = init_sb();
+		}
 
 		if (item || (2 * tool_size >= w) || (2 * tool_size >= h))
 			f_rectangle(x, y, w, h);
@@ -812,6 +834,8 @@ void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 				tool_size, h - 2 * tool_size);
 		}
 	}
+
+	if (sb) render_sb();
 
 	mem_undo_prepare();
 	update_all_views();

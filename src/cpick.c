@@ -775,6 +775,18 @@ static gboolean cpick_area_key(GtkWidget *widget, GdkEventKey *event, cpicker *c
 	return (TRUE);
 }
 
+#if GTK_MAJOR_VERSION == 1
+
+#define MIN_ENTRY_WIDTH 150
+static void hex_size_req(GtkWidget *widget, GtkRequisition *requisition,
+	gpointer user_data)
+{
+	int l = gdk_string_width(widget->style->font, "#DDDDDDD");
+	if (l > MIN_ENTRY_WIDTH) requisition->width += l - MIN_ENTRY_WIDTH;
+}
+
+#endif
+
 static void cpicker_init( cpicker *cp )
 {
 	static const unsigned char pos[CPICK_AREA_TOT][2] = {
@@ -881,8 +893,13 @@ static void cpicker_init( cpicker *cp )
 		if ( i == CPICK_INPUT_HEX )
 		{
 			cp->inputs[i] = gtk_entry_new();
-			gtk_widget_set_usize(cp->inputs[i], 64, -1);
 
+#if GTK_MAJOR_VERSION == 1
+			gtk_signal_connect_after(GTK_OBJECT(cp->inputs[i]),
+				"size_request", GTK_SIGNAL_FUNC(hex_size_req), NULL);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+			gtk_entry_set_width_chars(GTK_ENTRY(cp->inputs[i]), 8);
+#endif
 			obj = GTK_OBJECT(cp->inputs[i]);
 
 			gtk_signal_connect(obj, "focus_out_event",

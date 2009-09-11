@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -181,6 +181,10 @@ GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget);
 void win_store_pos(GtkWidget *window, char *inikey);
 void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	int defw, int defh);
+
+// Ensure viewport frames are always drawn as they should
+
+void viewport_style(GtkWidget *widget);
 
 // Eliminate flicker when scrolling
 
