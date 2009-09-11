@@ -56,7 +56,7 @@ int preserved_gif_delay = 10, silence_limit;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
-	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
+	{ "PNG", "png", "", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
 		| FF_TRANS },
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPR },
@@ -65,25 +65,24 @@ fformat file_formats[NUM_FTYPES] = {
 #endif
 #ifdef U_TIFF
 /* !!! Ideal state */
-//	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
+//	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
 //		/* | FF_TRANS | FF_LAYER */ },
 /* !!! Current state */
-	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA },
+	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA },
 #else
 	{ "", "", "", 0},
 #endif
 #ifdef U_GIF
-	{ "GIF", "gif", "", FF_256 | FF_ANIM | FF_TRANS },
+	{ "GIF", "gif", "", FF_IDX | FF_ANIM | FF_TRANS },
 #else
 	{ "", "", "", 0},
 #endif
-	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR },
-	{ "XPM", "xpm", "", FF_256 | FF_TRANS | FF_SPOT },
+	{ "BMP", "bmp", "", FF_IDX | FF_RGB | FF_ALPHAR },
+	{ "XPM", "xpm", "", FF_IDX | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
-	{ "LSS16", "lss", "", FF_16 },
 /* !!! Not supported yet */
-//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR },
-//	{ "PCX", "pcx", "", FF_256 | FF_RGB },
+//	{ "TGA", "tga", "", FF_IDX | FF_RGB | FF_ALPHAR },
+//	{ "PCX", "pcx", "", FF_IDX | FF_RGB },
 /* !!! Placeholders */
 	{ "", "", "", 0},
 	{ "", "", "", 0},
@@ -115,7 +114,7 @@ int file_type_by_ext(char *name, guint32 mask)
 	}
 
 	/* Special case for Gifsicle's victims */
-	if ((mask & FF_256) && (ext - name > 4) &&
+	if ((mask & FF_IDX) && (ext - name > 4) &&
 		!strncasecmp(ext - 4, ".gif", 4)) return (FT_GIF);
 
 	return (FT_NONE);
@@ -1064,8 +1063,9 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	if (argb && !TIFFRGBAImageOK(tif, cbuf)) goto fail;
 
 	settings->bpp = bpp;
-	/* Photoshop writes alpha as EXTRASAMPLE_UNSPECIFIED anyway */
-	if (xsamp) cmask = CMASK_RGBA;
+	if (xsamp && ((sampinfo[0] == EXTRASAMPLE_ASSOCALPHA) ||
+		(sampinfo[0] == EXTRASAMPLE_UNASSALPHA) || (sampp > 3)))
+		cmask = CMASK_RGBA;
 
 	/* !!! No alpha support for RGB mode yet */
 	if (argb) cmask = CMASK_IMAGE;
@@ -1231,36 +1231,32 @@ static int load_tiff(char *file_name, ls_settings *settings)
 		j = width * height;
 		tmp = settings->img[CHN_IMAGE];
 		src = settings->img[CHN_ALPHA];
-		while (src) /* Have alpha */
+		if (src && (pmetric != PHOTOMETRIC_PALETTE) &&
+			(sampinfo[0] != EXTRASAMPLE_UNASSALPHA))
 		{
-			/* Unassociate alpha */
-			if ((pmetric != PHOTOMETRIC_PALETTE) &&
-				(sampinfo[0] == EXTRASAMPLE_ASSOCALPHA))
+			for (i = 0; i < j; i++ , tmp += bpp)
 			{
-				for (i = 0; i < j; i++ , tmp += bpp)
-				{
-					if (!src[i]) continue;
-					d = 255.0 / (double)src[i];
-					src[i] = xtable[src[i]];
-					k = rint(d * tmp[0]);
-					tmp[0] = k > 255 ? 255 : k;
-					if (bpp == 1) continue;
-					k = rint(d * tmp[1]);
-					tmp[1] = k > 255 ? 255 : k;
-					k = rint(d * tmp[2]);
-					tmp[2] = k > 255 ? 255 : k;
-				}
-				if (bits1 >= 8) break;
-				bits1 = 8;
+				if (!src[i]) continue;
+				d = 255.0 / (double)src[i];
+				src[i] = xtable[src[i]];
+				k = rint(d * tmp[0]);
+				tmp[0] = k > 255 ? 255 : k;
+				if (bpp == 1) continue;
+				k = rint(d * tmp[1]);
+				tmp[1] = k > 255 ? 255 : k;
+				k = rint(d * tmp[2]);
+				tmp[2] = k > 255 ? 255 : k;
 			}
-			else if (bits1 >= 8) break;
+			bits1 = 8;
+		}
 
-			/* Rescale alpha */
+		/* Rescale alpha */
+		if (src && (bits1 < 8))
+		{
 			for (i = 0; i < j; i++)
 			{
 				src[i] = xtable[src[i]];
 			}
-			break;
 		}
 
 		/* Rescale RGB */
@@ -2160,42 +2156,34 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		if (j >= XPM_COL_DEFS) goto fail2;
 	}
 
-	/* Build cuckoo hash of colors */
-	while (TRUE) /* Until done */
+	/* Build cuckoo hash of colors - simply dump all and rehash */
+	memset(cuckoo, 0, sizeof(cuckoo));
+	for (i = 0; i < cols; i++) cuckoo[i] = i + 1;
+	/* Until done */
+	while (TRUE)
 	{
-		memset(cuckoo, 0, sizeof(cuckoo));
-		/* [Re]insert items */
-		for (i = 0; i < cols; i++)
+		/* Re-insert items */
+		for (ii = 0; ii < HSIZE; ii++)
 		{
-			key = hashf(seed, ckeys[i], cpp);
-
-			/* Trivial case */
-			k = (key & HMASK) * 2;
-			idx = cuckoo[k];
-			cuckoo[k] = i + 1;
-			if (!idx) continue;
-
-			/* Remove duplicates */
-			if (!strncmp(ckeys[idx - 1], ckeys[i], cpp)) continue;
-			j = ((key >> 16) & HMASK) * 2 + 1;
-			if (cuckoo[j] && !strncmp(ckeys[cuckoo[j] - 1],
-				ckeys[i], cpp)) cuckoo[j] = 0;
-
+			idx = cuckoo[ii];
+			cuckoo[ii] = 0;
 			/* Normal cuckoo process */
-			for (ii = 1; ii < MAXLOOP; ii++)
+			for (i = 0; idx && (i < MAXLOOP); i++)
 			{
 				key = hashf(seed, ckeys[idx - 1], cpp);
-				key >>= (ii & 1) << 4;
-				j = (key & HMASK) * 2 + (ii & 1);
+				key >>= (i & 1) << 4;
+				j = (key & HMASK) * 2 + (i & 1);
 				k = cuckoo[j];
 				cuckoo[j] = idx;
 				idx = k;
-				if (!idx) break;
 			}
 			if (idx) break;
 		}
-		if (i >= cols) break;
-		/* Failed insertion - mutate seed */
+		if (!idx) break;
+		/* Failed insertion - drop key somewhere */
+		for (i = 0; cuckoo[i] && (i < HSIZE); i++);
+		cuckoo[i] = idx;
+		/* Mutate seed */
 		seed = HASH_RND(seed);
 	}
 	
@@ -2509,190 +2497,6 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	return 0;
 }
 
-/*
- * Those who don't understand PCX are condemned to reinvent it, poorly. :-)
- */
-
-#define LSS_WIDTH   4 /* 16b */
-#define LSS_HEIGHT  6 /* 16b */
-#define LSS_PALETTE 8 /* 16 * 3 * 8b */
-#define LSS_HSIZE   56
-
-static int load_lss(char *file_name, ls_settings *settings)
-{
-	unsigned char hdr[LSS_HSIZE], *dest, *tmp, *buf = NULL;
-	FILE *fp;
-	int i, j, k, w, h, bl, idx, last, cnt, res = -1;
-
-
-	if (!(fp = fopen(file_name, "rb"))) return (-1);
-
-	/* Read the header */
-	k = fread(hdr, 1, LSS_HSIZE, fp);
-
-	/* Check general validity */
-	if (k < LSS_HSIZE) goto fail; /* Least supported header size */
-	if (strncmp(hdr, "\x3D\xF3\x13\x14", 4)) goto fail; /* Signature */
-
-	w = GET16(hdr + LSS_WIDTH);
-	h = GET16(hdr + LSS_HEIGHT);
-	settings->width = w;
-	settings->height = h;
-	settings->bpp = 1;
-	settings->colors = 16;
-
-	/* Read palette */
-	tmp = hdr + LSS_PALETTE;
-	for (i = 0; i < 16; i++)
-	{
-		settings->pal[i].red = tmp[0] << 2 | tmp[0] >> 4;
-		settings->pal[i].green = tmp[1] << 2 | tmp[1] >> 4;
-		settings->pal[i].blue = tmp[2] << 2 | tmp[2] >> 4;
-		tmp += 3;
-	}
-
-	/* Load all image at once */
-	fseek(fp, 0, SEEK_END);
-	bl = ftell(fp) - LSS_HSIZE;
-	fseek(fp, LSS_HSIZE, SEEK_SET);
-	i = (w * h * 3) >> 1;
-	if (bl > i) bl = i; /* Cannot possibly be longer */
-	buf = malloc(bl);
-	res = FILE_MEM_ERROR;
-	if (!buf) goto fail2;
-	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
-
-	if (!settings->silent) progress_init(_("Loading LSS16 image"), 0);
-
-	res = FILE_LIB_ERROR;
-	j = fread(buf, 1, bl, fp);
-	if (j < bl) goto fail3;
-
-	dest = settings->img[CHN_IMAGE];
-	idx = 0; bl += bl;
-	for (i = 0; i < h; i++)
-	{
-		last = 0; idx = (idx + 1) & ~1;
-		for (j = 0; j < w; )
-		{
-			if (idx >= bl) goto fail3;
-			k = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
-			if (k != last)
-			{
-				dest[j++] = last = k;
-				continue;
-			}
-			if (idx >= bl) goto fail3;
-			cnt = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
-			if (!cnt)
-			{
-				if (idx >= bl) goto fail3;
-				cnt = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
-				if (idx >= bl) goto fail3;
-				k = (buf[idx >> 1] >> ((idx & 1) << 2)) & 0xF; ++idx;
-				cnt = (k << 4) + cnt + 16;
-			}
-			if (cnt > w - j) cnt = w - j;
-			memset(dest + j, last, cnt);
-			j += cnt;
-		}
-		dest += w;
-	}
-	res = 1;
-
-fail3:	if (!settings->silent) progress_end();
-fail2:	free(buf);
-fail:	fclose(fp);
-	return (res);
-}
-
-static int save_lss(char *file_name, ls_settings *settings)
-{
-	unsigned char *buf, *tmp, *src;
-	FILE *fp;
-	int i, j, k, last, cnt, idx;
-	int w = settings->width, h = settings->height;
-
-
-	if ((settings->bpp != 1) || (settings->colors > 16)) return NOT_LSS;
-
-	i = w > LSS_HSIZE ? w : LSS_HSIZE;
-	buf = malloc(i);
-	if (!buf) return -1;
-	memset(buf, 0, i);
-
-	if (!(fp = fopen(file_name, "wb")))
-	{
-		free(buf);
-		return -1;
-	}
-
-	/* Prepare header */
-	buf[0] = 0x3D; buf[1] = 0xF3; buf[2] = 0x13; buf[3] = 0x14;
-	PUT16(buf + LSS_WIDTH, w);
-	PUT16(buf + LSS_HEIGHT, h);
-	j = settings->colors > 16 ? 16 : settings->colors;
-	tmp = buf + LSS_PALETTE;
-	for (i = 0; i < j; i++)
-	{
-		tmp[0] = settings->pal[i].red >> 2;
-		tmp[1] = settings->pal[i].green >> 2;
-		tmp[2] = settings->pal[i].blue >> 2;
-		tmp += 3;
-	}
-	fwrite(buf, 1, LSS_HSIZE, fp);
-
-	/* Write rows */
-	if (!settings->silent) progress_init(_("Saving LSS16 image"), 0);
-	src = settings->img[CHN_IMAGE];
-	for (i = 0; i < h; i++)
-	{
-		memset(buf, 0, w);
-		last = cnt = idx = 0;
-		for (j = 0; j < w; )
-		{
-			for (; j < w; j++)
-			{
-				k = *src++ & 0xF;
-				if ((k != last) || (cnt >= 255 + 16)) break;
-				cnt++;
-			}
-			if (cnt)
-			{
-				buf[idx >> 1] |= last << ((idx & 1) << 2); ++idx;
-				if (cnt >= 16)
-				{
-					++idx; /* Insert zero */
-					cnt -= 16;
-					buf[idx >> 1] |= (cnt & 0xF) <<
-						((idx & 1) << 2); ++idx;
-					cnt >>= 4;
-				}
-				buf[idx >> 1] |= cnt << ((idx & 1) << 2); ++idx;
-			}
-			if (j++ >= w) break; /* Final repeat */
-			if (k == last)
-			{
-				cnt = 1;
-				continue; /* Chain of repeats */
-			}
-			cnt = 0;
-			buf[idx >> 1] |= k << ((idx & 1) << 2); ++idx;
-			last = k;
-		}			
-		idx = (idx + 1) & ~1;
-		fwrite(buf, 1, idx >> 1, fp);
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)(h - i) / h);
-	}
-	fclose(fp);
-
-	if (!settings->silent) progress_end();
-
-	free(buf);
-	return 0;
-}
-
 int save_image(char *file_name, ls_settings *settings)
 {
 	png_color greypal[256];
@@ -2722,7 +2526,6 @@ int save_image(char *file_name, ls_settings *settings)
 	case FT_BMP: res = save_bmp(file_name, settings); break;
 	case FT_XPM: res = save_xpm(file_name, settings); break;
 	case FT_XBM: res = save_xbm(file_name, settings); break;
-	case FT_LSS: res = save_lss(file_name, settings); break;
 /* !!! Not implemented yet */
 //	case FT_TGA:
 //	case FT_PCX:
@@ -2744,8 +2547,9 @@ static void store_image_extras(ls_settings *settings)
 		settings->colors = 256;
 	}
 
-	/* Accept vars which make sense */
+	/* Accept vars */
 	mem_xpm_trans = settings->xpm_trans;
+	mem_jpeg_quality = settings->jpeg_quality;
 	mem_xbm_hot_x = settings->hot_x;
 	mem_xbm_hot_y = settings->hot_y;
 	preserved_gif_delay = settings->gif_delay;
@@ -2789,7 +2593,6 @@ int load_image(char *file_name, int mode, int ftype)
 	case FT_BMP: res = load_bmp(file_name, &settings); break;
 	case FT_XPM: res = load_xpm(file_name, &settings); break;
 	case FT_XBM: res = load_xbm(file_name, &settings); break;
-	case FT_LSS: res = load_lss(file_name, &settings); break;
 /* !!! Not implemented yet */
 //	case FT_TGA:
 //	case FT_PCX:
@@ -2925,7 +2728,9 @@ int export_undo(char *file_name, ls_settings *settings)
 			{
 				progress_update((float)i / (start + 1));
 				settings->ftype = deftype;
-				if (!(file_formats[deftype].flags & FF_SAVE_MASK))
+				if (!(file_formats[deftype].flags &
+					(mem_img_bpp == 3 ? FF_RGB :
+					mem_cols > 2 ? FF_IDX : FF_IDX | FF_BW)))
 				{
 					settings->ftype = FT_PNG;
 					miss++;
@@ -3014,9 +2819,6 @@ int detect_image_format(char *name)
 		return (FT_NONE);
 #endif
 	if (!strncmp(buf, "BM", 2)) return (FT_BMP);
-
-	if (!strncmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
-
 	/* Check layers signature and version */
 	if (!strncmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
 	{
@@ -3077,65 +2879,15 @@ int detect_image_format(char *name)
 #define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
 #define HANDBOOK_LOCATION2 "/usr/share/doc/mtpaint/index.html"
 
-#include <unistd.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <fcntl.h>
+#include "spawn.h"
 
-
-static int spawn_process(char *prog, char *docs)
-{
-	pid_t child, grandchild;
-	int res = -1, err, fd_flags, fds[2], status;
-
-
-	child = fork();
-	if ( child < 0 ) return 1;
-
-	if (child == 0)				// Child
-	{
-		if (pipe(fds) == -1) _exit(1);		// Set up the pipe
-
-		grandchild = fork();
-
-		if (grandchild == 0)		// Grandchild
-		{
-			if (close(fds[0]) != -1)	// Close the read pipe
-				/* Make the write end close-on-exec */
-			if ((fd_flags = fcntl(fds[1], F_GETFD)) != -1)
-				if (fcntl(fds[1], F_SETFD, fd_flags | FD_CLOEXEC) != -1)
-					execlp(prog, prog, docs, NULL); /* Run program */
-
-			/* If we are here, an error occurred */
-			/* Send the error code to the parent */
-			err = errno;
-			write(fds[1], &err, sizeof(err));
-			_exit(1);
-		}
-		/* Close the write pipe - has to be done BEFORE read */
-		close(fds[1]);
-
-		/* Get the error code from the grandchild */
-		if (grandchild > 0) res = read(fds[0], &err, sizeof(err));
-
-		close(fds[0]);		// Close the read pipe
-
-		_exit(res);
-	}
-
-	waitpid(child, &status, 0);	// Wait for child to die
-	res = WEXITSTATUS(status);	// Find out the childs exit value
-
-	return (res);
-}
 
 #endif
 
 int show_html(char *browser, char *docs)
 {
 	char buf[300], buf2[300];
-	int i;
+	int i=-1;
 #ifdef WIN32
 	char *r;
 
@@ -3150,6 +2902,8 @@ int show_html(char *browser, char *docs)
 		docs = buf;
 	}
 #else /* Linux */
+	char *argv[5];
+
 	if (!docs || !docs[0])
 	{
 		docs = HANDBOOK_LOCATION;
@@ -3180,7 +2934,19 @@ int show_html(char *browser, char *docs)
 
 	if (!browser) browser = HANDBOOK_BROWSER;
 
-	i = spawn_process(browser, docs);
+	argv[0] = browser;
+	argv[1] = docs;
+	argv[2] = NULL;
+//	i = spawn_process(argv, NULL, FALSE);
+
+//	spawn_expansion("mtpaint *.jpg", "/home/mark/_/w/Worm 65/Photos/Kilmington - July 2004/Sunny Day");	// Example
+//	i = spawn_expansion("exiif %f", NULL, TRUE);		// Example
+//	i = spawn_expansion("exif %f", NULL, TRUE);		// Example
+	i = spawn_expansion("identify -verbose %f", NULL, TRUE);		// Example
+//printf("i=%i\n", i);
+//	spawn_expansion("ls %f -l", NULL, FALSE);		// Example
+//	spawn_expansion("gqview %f", NULL, FALSE);		// Example
+
 #endif
 	if (i) alert_box( _("Error"),
 		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),

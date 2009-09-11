@@ -7,83 +7,82 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2007-03-31 21:43+0100\n"
-"PO-Revision-Date: 2007-03-18 23:39+0000\n"
+"POT-Creation-Date: 2006-12-29 12:24+0000\n"
+"PO-Revision-Date: 2006-11-04 23:24+0000\n"
 "Last-Translator: Tutku Dalmaz <tutkudalmaz@gmail.com>\n"
 "Language-Team: Turkish <tr@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Rosetta-Export-Date: 2007-03-31 14:38+0000\n"
 
 #: src/ani.c:741
 msgid "Animation Preview"
-msgstr "Animasyon Önizleme"
+msgstr ""
 
 #: src/ani.c:752 src/shifter.c:325
 msgid "Play"
-msgstr "Yürüt"
+msgstr ""
 
 #: src/ani.c:770
 msgid "Fix"
-msgstr "Onar"
+msgstr ""
 
-#: src/ani.c:775 src/ani.c:1421 src/shifter.c:366 src/viewer.c:142
-#: src/viewer.c:263
+#: src/ani.c:775 src/ani.c:1421 src/shifter.c:366 src/viewer.c:146
+#: src/viewer.c:267
 msgid "Close"
 msgstr "Kapat"
 
 #: src/ani.c:867 src/ani.c:1025 src/ani.c:1202 src/ani.c:1209 src/ani.c:1611
 #: src/canvas.c:319 src/canvas.c:544 src/canvas.c:554 src/canvas.c:578
-#: src/canvas.c:835 src/canvas.c:1197 src/canvas.c:1225 src/canvas.c:1240
-#: src/canvas.c:1244 src/canvas.c:1251 src/canvas.c:1677 src/canvas.c:1703
-#: src/canvas.c:1709 src/canvas.c:1793 src/layer.c:823 src/layer.c:950
-#: src/layer.c:1309 src/mainwindow.c:235 src/mainwindow.c:268
+#: src/canvas.c:835 src/canvas.c:1215 src/canvas.c:1243 src/canvas.c:1258
+#: src/canvas.c:1262 src/canvas.c:1269 src/canvas.c:1692 src/canvas.c:1718
+#: src/canvas.c:1724 src/canvas.c:1808 src/layer.c:831 src/layer.c:958
+#: src/layer.c:1317 src/mainwindow.c:235 src/mainwindow.c:268
 #: src/mainwindow.c:277 src/mainwindow.c:284 src/mainwindow.c:315
 #: src/mainwindow.c:351 src/mainwindow.c:378 src/mainwindow.c:385
 #: src/mainwindow.c:419 src/mainwindow.c:423 src/mainwindow.c:427
 #: src/mainwindow.c:431 src/mainwindow.c:435 src/mainwindow.c:440
-#: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1071
-#: src/otherwindow.c:1096 src/otherwindow.c:1098 src/png.c:3163 src/png.c:3185
-#: src/viewer.c:1425
+#: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1157
+#: src/otherwindow.c:1164 src/otherwindow.c:1166 src/png.c:2960 src/png.c:2982
+#: src/viewer.c:1414
 msgid "Error"
 msgstr "Hata"
 
 #: src/ani.c:867
 msgid "Unable to create output directory"
-msgstr "Çıktı dizini oluşturulamıyor"
+msgstr ""
 
 #: src/ani.c:868 src/ani.c:1025 src/ani.c:1203 src/ani.c:1210 src/ani.c:1611
 #: src/canvas.c:320 src/canvas.c:544 src/canvas.c:554 src/canvas.c:580
-#: src/canvas.c:836 src/canvas.c:1197 src/canvas.c:1226 src/canvas.c:1240
-#: src/canvas.c:1245 src/canvas.c:1251 src/canvas.c:1677 src/canvas.c:1704
-#: src/canvas.c:1710 src/canvas.c:1793 src/channels.c:282 src/channels.c:344
-#: src/info.c:445 src/layer.c:823 src/layer.c:950 src/layer.c:960
-#: src/layer.c:1309 src/mainwindow.c:236 src/mainwindow.c:269
+#: src/canvas.c:836 src/canvas.c:1215 src/canvas.c:1244 src/canvas.c:1258
+#: src/canvas.c:1263 src/canvas.c:1269 src/canvas.c:1692 src/canvas.c:1719
+#: src/canvas.c:1725 src/canvas.c:1808 src/channels.c:282 src/channels.c:344
+#: src/info.c:445 src/layer.c:831 src/layer.c:958 src/layer.c:968
+#: src/layer.c:1317 src/mainwindow.c:236 src/mainwindow.c:269
 #: src/mainwindow.c:277 src/mainwindow.c:284 src/mainwindow.c:317
 #: src/mainwindow.c:345 src/mainwindow.c:351 src/mainwindow.c:379
 #: src/mainwindow.c:386 src/mainwindow.c:419 src/mainwindow.c:423
 #: src/mainwindow.c:427 src/mainwindow.c:431 src/mainwindow.c:435
 #: src/mainwindow.c:440 src/mainwindow.c:478 src/mainwindow.c:514
 #: src/otherwindow.c:458 src/otherwindow.c:610 src/otherwindow.c:1001
-#: src/otherwindow.c:1072 src/otherwindow.c:1096 src/otherwindow.c:1098
-#: src/otherwindow.c:1209 src/otherwindow.c:1444 src/otherwindow.c:2304
-#: src/otherwindow.c:2745 src/otherwindow.c:2974 src/png.c:2957 src/png.c:3165
-#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1426
+#: src/otherwindow.c:1158 src/otherwindow.c:1164 src/otherwindow.c:1166
+#: src/otherwindow.c:1285 src/otherwindow.c:1521 src/otherwindow.c:2371
+#: src/otherwindow.c:2795 src/otherwindow.c:3002 src/png.c:2762 src/png.c:2962
+#: src/png.c:2984 src/prefs.c:733 src/viewer.c:1415
 msgid "OK"
 msgstr "TAMAM"
 
 #: src/ani.c:939
 msgid "Creating Animation Frames"
-msgstr "Animasyon Çerçeveleri Oluşturuluyor"
+msgstr ""
 
 #: src/ani.c:1025
 msgid "Unable to save image"
-msgstr "Resim kaydedilemiyor"
+msgstr "Resim kaydedilemedi"
 
-#: src/ani.c:1070 src/layer.c:586 src/layer.c:671 src/layer.c:960
-#: src/layer.c:1046 src/mainwindow.c:290 src/mainwindow.c:1260 src/png.c:2801
-#: src/png.c:2957
+#: src/ani.c:1070 src/layer.c:593 src/layer.c:678 src/layer.c:968
+#: src/layer.c:1054 src/mainwindow.c:290 src/mainwindow.c:1254 src/png.c:2604
+#: src/png.c:2762
 msgid "Warning"
 msgstr "Uyarı"
 
@@ -92,14 +91,12 @@ msgid ""
 "Do you really want to clear all of the position and cycle data for all of "
 "the layers?"
 msgstr ""
-"Tüm katmanlara ait konumları ve çevrim verilerini gerçekten temizlemek "
-"istiyor musunuz?"
 
-#: src/ani.c:1070 src/layer.c:586 src/layer.c:1046 src/mainwindow.c:290
+#: src/ani.c:1070 src/layer.c:593 src/layer.c:1054 src/mainwindow.c:290
 msgid "No"
 msgstr "Hayır"
 
-#: src/ani.c:1070 src/layer.c:586 src/layer.c:1046 src/mainwindow.c:290
+#: src/ani.c:1070 src/layer.c:593 src/layer.c:1054 src/mainwindow.c:290
 msgid "Yes"
 msgstr "Evet"
 
@@ -109,11 +106,11 @@ msgstr ""
 
 #: src/ani.c:1202
 msgid "You must have at least 2 layers to create an animation"
-msgstr "Bir animasyon oluşturmak için en az 2 katman gerekir."
+msgstr ""
 
-#: src/ani.c:1207 src/canvas.c:1891 src/canvas.c:1894 src/layer.c:53
-#: src/layer.c:322 src/layer.c:636 src/layer.c:651 src/layer.c:656
-#: src/layer.c:976 src/layer.c:1033 src/mainwindow.c:384 src/mainwindow.c:456
+#: src/ani.c:1207 src/canvas.c:1900 src/canvas.c:1903 src/layer.c:53
+#: src/layer.c:326 src/layer.c:643 src/layer.c:658 src/layer.c:663
+#: src/layer.c:984 src/layer.c:1041 src/mainwindow.c:384 src/mainwindow.c:456
 #: src/otherwindow.c:80
 #, c-format
 msgid "Untitled"
@@ -121,15 +118,15 @@ msgstr "Adsız"
 
 #: src/ani.c:1209
 msgid "You must save your layers file before creating an animation"
-msgstr "Animasyon yaratmadan önce tüm katman dosyalarınızı kaydetmelisiniz"
+msgstr ""
 
 #: src/ani.c:1221
 msgid "Configure Animation"
-msgstr "Animasyonu Yapıladır"
+msgstr ""
 
 #: src/ani.c:1232
 msgid "Output Files"
-msgstr "Çıktı Dosyaları"
+msgstr ""
 
 #: src/ani.c:1239
 msgid "Start frame"
@@ -141,44 +138,44 @@ msgstr ""
 
 #: src/ani.c:1242 src/shifter.c:297
 msgid "Delay"
-msgstr "Gecikme"
+msgstr ""
 
 #: src/ani.c:1243
 msgid "Output path"
-msgstr "Çıktı dizini"
+msgstr ""
 
 #: src/ani.c:1244
 msgid "File prefix"
-msgstr "Dosya öneki"
+msgstr ""
 
 #: src/ani.c:1278
 msgid "Create GIF frames"
-msgstr "GIF çerçeveleri oluştur"
+msgstr ""
 
-#: src/ani.c:1286 src/info.c:362 src/layer.c:121
+#: src/ani.c:1286 src/info.c:362 src/layer.c:125
 msgid "Layers"
 msgstr "Katmanlar"
 
 #: src/ani.c:1368
 msgid "Positions"
-msgstr "Konumlar"
+msgstr ""
 
 #: src/ani.c:1409
 msgid "Cycling"
-msgstr "Çevrim"
+msgstr ""
 
 #: src/ani.c:1425
 msgid "Save"
-msgstr "Kaydet"
+msgstr ""
 
-#: src/ani.c:1428 src/otherwindow.c:986 src/otherwindow.c:1453
-#: src/otherwindow.c:1975
+#: src/ani.c:1428 src/otherwindow.c:986 src/otherwindow.c:1530
+#: src/otherwindow.c:2042
 msgid "Preview"
 msgstr "Ön İzleme"
 
 #: src/ani.c:1431 src/shifter.c:360
 msgid "Create Frames"
-msgstr "Çerçeveleri Oluştur"
+msgstr ""
 
 #: src/ani.c:1610
 #, c-format
@@ -201,37 +198,37 @@ msgstr ""
 msgid "Different X/Y"
 msgstr ""
 
-#: src/canvas.c:450 src/canvas.c:501 src/canvas.c:596 src/otherwindow.c:1197
+#: src/canvas.c:450 src/canvas.c:501 src/canvas.c:596 src/otherwindow.c:1273
 msgid "Gamma corrected"
 msgstr ""
 
-#: src/canvas.c:452 src/memory.c:5064
+#: src/canvas.c:452 src/memory.c:4989
 msgid "Gaussian Blur"
-msgstr "Gauss Bulanıklaştırması"
+msgstr ""
 
 #: src/canvas.c:498
 msgid "Radius"
-msgstr "Yarıçap"
+msgstr ""
 
 #: src/canvas.c:499
 msgid "Amount"
-msgstr "Miktar"
+msgstr ""
 
 #: src/canvas.c:500
 msgid "Threshold "
 msgstr ""
 
-#: src/canvas.c:503 src/memory.c:5210
+#: src/canvas.c:503 src/memory.c:5135
 msgid "Unsharp Mask"
 msgstr ""
 
 #: src/canvas.c:544
 msgid "Not enough memory to rotate image"
-msgstr "Resmi çevirecek için yeterli bellek yok"
+msgstr "Resmi çevirmek için yeterli bellek yok"
 
 #: src/canvas.c:554
 msgid "Not enough memory to rotate clipboard"
-msgstr "Panoyu çevirmek için yeterli bellek yok."
+msgstr "Panoyu çevirecek yeterli bellek yok."
 
 #: src/canvas.c:579
 msgid "The image is too large for this rotation."
@@ -239,38 +236,38 @@ msgstr "Resim bu çevrim için çok büyük"
 
 #: src/canvas.c:598
 msgid "Smooth"
-msgstr "Pürüzsüz"
+msgstr ""
 
 #: src/canvas.c:600
 msgid "Free Rotate"
 msgstr ""
 
-#: src/canvas.c:835 src/viewer.c:1425
+#: src/canvas.c:835 src/viewer.c:1414
 msgid "Not enough memory to create clipboard"
 msgstr "Pano yaratmak için yeterli bellek yok"
 
-#: src/canvas.c:1197
+#: src/canvas.c:1215
 msgid "Invalid channel file."
-msgstr "Geçersiz kanal dosyası."
+msgstr ""
 
-#: src/canvas.c:1225
+#: src/canvas.c:1243
 msgid "Cannot open file"
-msgstr "Dosya açılamıyor"
+msgstr ""
 
-#: src/canvas.c:1226
+#: src/canvas.c:1244
 msgid "Unsupported file format"
-msgstr "Desteklenmeyen dosya biçimi"
+msgstr ""
 
-#: src/canvas.c:1239
+#: src/canvas.c:1257
 #, c-format
 msgid "File is too big, must be <= to width=%i height=%i : %s"
 msgstr ""
 
-#: src/canvas.c:1244
+#: src/canvas.c:1262
 msgid "Unable to load file"
 msgstr "Dosya yüklenemedi"
 
-#: src/canvas.c:1251
+#: src/canvas.c:1269
 msgid ""
 "The file import library had to terminate due to a problem with the file "
 "(possibly corrupt image data or a truncated file). I have managed to load "
@@ -278,136 +275,136 @@ msgid ""
 "to a new file to ensure this does not happen again."
 msgstr ""
 
-#: src/canvas.c:1300
+#: src/canvas.c:1318
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
 msgstr "%s zaten var. Üzerine yazmak ister misiniz?"
 
-#: src/canvas.c:1301
+#: src/canvas.c:1319
 msgid "File Found"
 msgstr "Dosya Bulundu"
 
-#: src/canvas.c:1301 src/mainwindow.c:1281
+#: src/canvas.c:1319 src/mainwindow.c:1275
 msgid "NO"
 msgstr "HAYIR"
 
-#: src/canvas.c:1301 src/mainwindow.c:1281
+#: src/canvas.c:1319 src/mainwindow.c:1275
 msgid "YES"
 msgstr "EVET"
 
-#: src/canvas.c:1349 src/canvas.c:1411
+#: src/canvas.c:1368 src/canvas.c:1428
 msgid "File Format"
 msgstr "Dosya Biçimi"
 
-#: src/canvas.c:1354 src/prefs.c:450
+#: src/canvas.c:1373 src/prefs.c:450
 msgid "Transparency index"
-msgstr "Şeffalık Dizini"
+msgstr ""
 
-#: src/canvas.c:1359
+#: src/canvas.c:1378
 msgid "JPEG Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:1364
+#: src/canvas.c:1383
 msgid "Hotspot at X ="
 msgstr ""
 
-#: src/canvas.c:1369
+#: src/canvas.c:1388
 msgid "Y ="
 msgstr "Y ="
 
-#: src/canvas.c:1454
+#: src/canvas.c:1469
 msgid "Animation delay"
-msgstr "Animasyon gecikmesi"
+msgstr ""
 
-#: src/canvas.c:1676
+#: src/canvas.c:1691
 #, c-format
 msgid "File: %s invalid - palette not updated"
 msgstr "%s dosyası geçersiz- palet güncellenmedi"
 
-#: src/canvas.c:1703
+#: src/canvas.c:1718
 msgid "Unable to export undo images"
 msgstr ""
 
-#: src/canvas.c:1709
+#: src/canvas.c:1724
 msgid "Unable to export ASCII file"
 msgstr "ASCII dosyası dışa aktarılamıyor"
 
-#: src/canvas.c:1792 src/layer.c:949 src/mainwindow.c:439
+#: src/canvas.c:1807 src/layer.c:957 src/mainwindow.c:439
 #, c-format
 msgid "Unable to save file: %s"
 msgstr "Dosya kaydedilemedi: %s"
 
-#: src/canvas.c:1811 src/toolbar.c:704
+#: src/canvas.c:1824 src/toolbar.c:701
 msgid "Load Image File"
-msgstr "Resim Dosyası Yükle"
+msgstr "Resim Dosyasını Yükle"
 
-#: src/canvas.c:1819 src/toolbar.c:705
+#: src/canvas.c:1832 src/toolbar.c:702
 msgid "Save Image File"
 msgstr "Resim Dosyasını Kaydet"
 
-#: src/canvas.c:1822
+#: src/canvas.c:1835
 msgid "Load Palette File"
 msgstr "Palet Dosyası Yükle"
 
-#: src/canvas.c:1825
+#: src/canvas.c:1838
 msgid "Save Palette File"
 msgstr "Palet Dosyasını Kaydet"
 
-#: src/canvas.c:1828
+#: src/canvas.c:1841
 msgid "Select Clipboard File"
 msgstr "Pano Dosyasını Seçin"
 
-#: src/canvas.c:1831
+#: src/canvas.c:1844
 msgid "Select Browser Program"
-msgstr "Tarayıcı Programı Seç"
+msgstr ""
 
-#: src/canvas.c:1834
+#: src/canvas.c:1847
 msgid "Select Handbook Index File"
-msgstr "Elkitabı Dizin Dosyası Seç"
+msgstr ""
 
-#: src/canvas.c:1837
+#: src/canvas.c:1850
 msgid "Export Undo Images"
 msgstr ""
 
-#: src/canvas.c:1840
+#: src/canvas.c:1853
 msgid "Export Undo Images (reversed)"
 msgstr ""
 
-#: src/canvas.c:1843
+#: src/canvas.c:1856
 msgid "Export ASCII Art"
 msgstr ""
 
-#: src/canvas.c:1846
+#: src/canvas.c:1859
 msgid "Save Layer Files"
 msgstr "Katman Dosyalarını Kaydet"
 
-#: src/canvas.c:1849
+#: src/canvas.c:1862
 msgid "Import GIF animation - Choose frames directory"
 msgstr ""
 
-#: src/canvas.c:1852
+#: src/canvas.c:1865
 msgid "Export GIF animation"
-msgstr "GIF animasyonunu dışa aktar"
+msgstr ""
 
-#: src/canvas.c:1855
+#: src/canvas.c:1868
 msgid "Load Channel"
-msgstr "Kanal Yükle"
+msgstr ""
 
-#: src/canvas.c:1858
+#: src/canvas.c:1871
 msgid "Save Channel"
-msgstr "Kanalı Kaydet"
+msgstr ""
 
-#: src/canvas.c:1861
+#: src/canvas.c:1874
 msgid "Save Composite Image"
 msgstr ""
 
 #: src/channels.c:238
 msgid "Cleared"
-msgstr "Temizlendi"
+msgstr ""
 
 #: src/channels.c:239
 msgid "Set"
-msgstr "Ayarla"
+msgstr ""
 
 #: src/channels.c:240
 msgid "Set colour A radius B"
@@ -431,23 +428,23 @@ msgstr ""
 
 #: src/channels.c:246 src/memory.c:783
 msgid "Alpha"
-msgstr "Alfa"
+msgstr ""
 
 #: src/channels.c:247 src/memory.c:783
 msgid "Selection"
-msgstr "Seçim"
+msgstr ""
 
 #: src/channels.c:248 src/memory.c:783
 msgid "Mask"
-msgstr "Maske"
+msgstr ""
 
 #: src/channels.c:258
 msgid "Create Channel"
-msgstr "Kanal Oluştur"
+msgstr ""
 
 #: src/channels.c:267
 msgid "Channel Type"
-msgstr "Kanal Tipi"
+msgstr ""
 
 #: src/channels.c:274
 msgid "Initial Channel State"
@@ -459,15 +456,15 @@ msgstr ""
 
 #: src/channels.c:283 src/channels.c:345 src/otherwindow.c:239
 #: src/otherwindow.c:459 src/otherwindow.c:509 src/otherwindow.c:611
-#: src/otherwindow.c:978 src/otherwindow.c:1210 src/otherwindow.c:1460
-#: src/otherwindow.c:2305 src/otherwindow.c:2746 src/otherwindow.c:2975
-#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1658
+#: src/otherwindow.c:978 src/otherwindow.c:1286 src/otherwindow.c:1537
+#: src/otherwindow.c:2372 src/otherwindow.c:2796 src/otherwindow.c:3003
+#: src/png.c:2605 src/prefs.c:734 src/viewer.c:1647
 msgid "Cancel"
 msgstr "İptal"
 
 #: src/channels.c:327
 msgid "Delete Channels"
-msgstr "Kanalları Sil"
+msgstr ""
 
 #: src/channels.c:393
 msgid "Threshold Channel"
@@ -492,7 +489,7 @@ msgstr "Katkıda Bulunanlar"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.11 - Copyright (C) 2004-2007 The Authors\n"
+"mtPaint 3.10 - Copyright (C) 2004-2006 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -652,7 +649,7 @@ msgid ""
 "\n"
 "mtPaint is maintained by Dmitry Groshev.\n"
 "\n"
-"wjaguar@users.sourceforge.net\n"
+"wjaguar@mail.ru\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
 "The following people (in alphabetical order) have contributed directly to "
@@ -698,11 +695,10 @@ msgid ""
 "\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
-"French - Nicolas Velin, Pascal Billard, Sylvain Cresto\n"
+"French - Nicolas Velin, Pascal Billard\n"
 "German - Oliver Frommel\n"
 "Polish - Simek\n"
-"Portuguese - Israel G. Lugo, Tiago Silva\n"
-"Slovak - Jozef Riha\n"
+"Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio San\n"
 "Taiwanese Chinese - Wei-Lun Chao\n"
 "Turkish - Muhammet Kara, Tutku Dalmaz\n"
@@ -795,21 +791,21 @@ msgid ""
 "Could not find home directory. Using current directory as home directory."
 msgstr "Ev dizini bulunamıyor. Şuanki dizin ev dizini olarak kullanılıyor."
 
-#: src/layer.c:54 src/layer.c:1163
+#: src/layer.c:54 src/layer.c:1171
 #, c-format
 msgid "Background"
 msgstr "Arkaplan"
 
-#: src/layer.c:119 src/mainwindow.c:3866
+#: src/layer.c:123 src/mainwindow.c:3864
 msgid "(Modified)"
-msgstr "(Değiştirildi)"
+msgstr ""
 
-#: src/layer.c:584
+#: src/layer.c:591
 #, c-format
 msgid "Do you really want to delete layer %i (%s) ?"
-msgstr "Katmanı %i(%s) gerçekten silmek istiyor musunuz?"
+msgstr ""
 
-#: src/layer.c:666
+#: src/layer.c:673
 msgid ""
 "One or more of the layers contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -817,52 +813,52 @@ msgstr ""
 "Bir veya daha fazla katmanın içerdiği değişiklikler kaydedilmemiş. Bu "
 "değişiklikleri kaybetmek istiyor musunuz?"
 
-#: src/layer.c:671 src/mainwindow.c:1260
+#: src/layer.c:678 src/mainwindow.c:1254
 msgid "Cancel Operation"
 msgstr "Çalışmayı İptal Et"
 
-#: src/layer.c:671 src/mainwindow.c:1260
+#: src/layer.c:678 src/mainwindow.c:1254
 msgid "Lose Changes"
 msgstr "Değişiklikleri Kaybet"
 
-#: src/layer.c:822
+#: src/layer.c:830
 #, c-format
 msgid "%d layers failed to load"
-msgstr "%d katmanının yüklenmesi başarısız oldu"
+msgstr ""
 
-#: src/layer.c:960
+#: src/layer.c:968
 msgid ""
 "One or more of the image layers has not been saved.  You must save each "
 "image individually before saving the layers text file in order to load this "
 "composite image in the future."
 msgstr ""
 
-#: src/layer.c:1046
+#: src/layer.c:1054
 msgid "Do you really want to delete all of the layers?"
 msgstr "Tüm katmanları silmek istiyor musunuz?"
 
-#: src/layer.c:1309
+#: src/layer.c:1317
 msgid "You cannot add any more layers."
 msgstr "Daha fazla katman ekleyemezsiniz"
 
-#: src/layer.c:1439
+#: src/layer.c:1447
 msgid "Layer Name"
 msgstr "Katman Adı"
 
-#: src/layer.c:1440
+#: src/layer.c:1448
 msgid "Position"
 msgstr "Konum"
 
-#: src/layer.c:1441 src/otherwindow.c:2872 src/prefs.c:456 src/toolbar.c:587
-#: src/toolbar.c:959
+#: src/layer.c:1449 src/otherwindow.c:2917 src/prefs.c:456 src/toolbar.c:587
+#: src/toolbar.c:947
 msgid "Opacity"
 msgstr "Donukluk"
 
-#: src/layer.c:1464
+#: src/layer.c:1472
 msgid "Transparent Colour"
-msgstr "Şeffaf Renk"
+msgstr ""
 
-#: src/layer.c:1479
+#: src/layer.c:1487
 msgid "Show all layers in main window"
 msgstr "Tüm katmanları ana pencerede göster"
 
@@ -904,18 +900,14 @@ msgstr "patterns_user.c şuanki dizinde yaratıldı"
 #: src/mainwindow.c:351
 msgid "Current image is not 94x94x3 so I cannot create patterns_user.c"
 msgstr ""
-"Şuanki resim 94x94x3 boyutlarında değil bu yüzden patterns_user.c dosyasını "
-"oluşturamıyorum"
 
 #: src/mainwindow.c:378
 msgid "You must have 16 or fewer palette colours to export ASCII art."
 msgstr ""
-"ASCII resmini içe aktarmak için 16 ya da daha az renk paletine gerek "
-"duyuluyor."
 
 #: src/mainwindow.c:385
 msgid "You must save at least one frame to create an animated GIF."
-msgstr "GIF animasyonu oluşturmak için en az bir çerçeveye gerek duyuluyor."
+msgstr ""
 
 #: src/mainwindow.c:419
 msgid ""
@@ -943,8 +935,8 @@ msgstr ""
 
 #: src/mainwindow.c:435
 msgid ""
-"You are trying to save an LSS16 file with a palette of more than 16 "
-"colours.  Either use another format or reduce the palette to 16 colours."
+"You are trying to save an indexed canvas to a TIFF file which is not "
+"possible.  I would suggest you save with a PNG extension."
 msgstr ""
 
 #: src/mainwindow.c:478
@@ -955,7 +947,7 @@ msgstr "Pano yüklenemiyor"
 msgid "Unable to save clipboard"
 msgstr "Pano kaydedilemiyor"
 
-#: src/mainwindow.c:1257
+#: src/mainwindow.c:1251
 msgid ""
 "This canvas/palette contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -963,822 +955,826 @@ msgstr ""
 "Bu tuval/palet kaydedilmemiş değişiklikler içeriyor. Bu değişiklikleri "
 "kaybetmek iştiyor musunuz?"
 
-#: src/mainwindow.c:1281
+#: src/mainwindow.c:1275
 msgid "Do you really want to quit?"
 msgstr "Gerçekten çıkmak istiyor musunuz?"
 
-#: src/mainwindow.c:3227
+#: src/mainwindow.c:3218
 msgid "/_File"
 msgstr "/_Dosya"
 
-#: src/mainwindow.c:3228
+#: src/mainwindow.c:3219
 msgid "/File/tear"
 msgstr "/Dosya/yırt"
 
-#: src/mainwindow.c:3229
+#: src/mainwindow.c:3220
 msgid "/File/New"
 msgstr "/Dosya/Yeni"
 
-#: src/mainwindow.c:3230
+#: src/mainwindow.c:3221
 msgid "/File/Open ..."
 msgstr "/Dosya/Aç ..."
 
-#: src/mainwindow.c:3231
+#: src/mainwindow.c:3222
 msgid "/File/Save"
 msgstr "/Dosya/Kaydet"
 
-#: src/mainwindow.c:3232
+#: src/mainwindow.c:3223
 msgid "/File/Save As ..."
 msgstr "/Dosya/Farklı Kaydet ..."
 
-#: src/mainwindow.c:3233 src/mainwindow.c:3259
+#: src/mainwindow.c:3224 src/mainwindow.c:3250
 msgid "/File/sep1"
 msgstr "/Dosya/sep1"
 
-#: src/mainwindow.c:3234 src/mainwindow.c:3457
+#: src/mainwindow.c:3225 src/mainwindow.c:3448
 msgid "/File/Export Undo Images ..."
 msgstr "/Dosya/Export Undo Images ..."
 
-#: src/mainwindow.c:3235 src/mainwindow.c:3458
+#: src/mainwindow.c:3226 src/mainwindow.c:3449
 msgid "/File/Export Undo Images (reversed) ..."
 msgstr "/Dosya/Export Undo Images (reversed) ..."
 
-#: src/mainwindow.c:3236 src/mainwindow.c:3489
+#: src/mainwindow.c:3227 src/mainwindow.c:3480
 msgid "/File/Export ASCII Art ..."
 msgstr "/Dosya/Export ASCII Art ..."
 
-#: src/mainwindow.c:3237 src/mainwindow.c:3489
+#: src/mainwindow.c:3228 src/mainwindow.c:3480
 msgid "/File/Export Animated GIF ..."
 msgstr "/Dosya/Export Animated GIF ..."
 
-#: src/mainwindow.c:3238 src/mainwindow.c:3535
+#: src/mainwindow.c:3229 src/mainwindow.c:3527
 msgid "/File/sep2"
 msgstr "/Dosya/sep2"
 
-#: src/mainwindow.c:3239
+#: src/mainwindow.c:3230
 msgid "/File/1"
 msgstr "/Dosya/1"
 
-#: src/mainwindow.c:3240
+#: src/mainwindow.c:3231
 msgid "/File/2"
 msgstr "/Dosya/2"
 
-#: src/mainwindow.c:3241
+#: src/mainwindow.c:3232
 msgid "/File/3"
 msgstr "/Dosya/3"
 
-#: src/mainwindow.c:3242
+#: src/mainwindow.c:3233
 msgid "/File/4"
 msgstr "/Dosya/4"
 
-#: src/mainwindow.c:3243
+#: src/mainwindow.c:3234
 msgid "/File/5"
 msgstr "/Dosya/5"
 
-#: src/mainwindow.c:3244
+#: src/mainwindow.c:3235
 msgid "/File/6"
 msgstr "/Dosya/6"
 
-#: src/mainwindow.c:3245
+#: src/mainwindow.c:3236
 msgid "/File/7"
 msgstr "/Dosya/7"
 
-#: src/mainwindow.c:3246
+#: src/mainwindow.c:3237
 msgid "/File/8"
 msgstr "/Dosya/8"
 
-#: src/mainwindow.c:3247
+#: src/mainwindow.c:3238
 msgid "/File/9"
 msgstr "/Dosya/9"
 
-#: src/mainwindow.c:3248
+#: src/mainwindow.c:3239
 msgid "/File/10"
 msgstr "/Dosya/10"
 
-#: src/mainwindow.c:3249
+#: src/mainwindow.c:3240
 msgid "/File/11"
 msgstr "/Dosya/11"
 
-#: src/mainwindow.c:3250
+#: src/mainwindow.c:3241
 msgid "/File/12"
 msgstr "/Dosya/12"
 
-#: src/mainwindow.c:3251
+#: src/mainwindow.c:3242
 msgid "/File/13"
 msgstr "/Dosya/13"
 
-#: src/mainwindow.c:3252
+#: src/mainwindow.c:3243
 msgid "/File/14"
 msgstr "/Dosya/14"
 
-#: src/mainwindow.c:3253
+#: src/mainwindow.c:3244
 msgid "/File/15"
 msgstr "/Dosya/15"
 
-#: src/mainwindow.c:3254
+#: src/mainwindow.c:3245
 msgid "/File/16"
 msgstr "/Dosya/16"
 
-#: src/mainwindow.c:3255
+#: src/mainwindow.c:3246
 msgid "/File/17"
 msgstr "/Dosya/17"
 
-#: src/mainwindow.c:3256
+#: src/mainwindow.c:3247
 msgid "/File/18"
 msgstr "/Dosya/18"
 
-#: src/mainwindow.c:3257
+#: src/mainwindow.c:3248
 msgid "/File/19"
 msgstr "/Dosya/19"
 
-#: src/mainwindow.c:3258
+#: src/mainwindow.c:3249
 msgid "/File/20"
 msgstr "/Dosya/20"
 
-#: src/mainwindow.c:3260
+#: src/mainwindow.c:3251
 msgid "/File/Quit"
 msgstr "/Dosya/Çıkış"
 
-#: src/mainwindow.c:3262
+#: src/mainwindow.c:3253
 msgid "/_Edit"
 msgstr "/_Düzenle"
 
-#: src/mainwindow.c:3263
+#: src/mainwindow.c:3254
 msgid "/Edit/tear"
 msgstr "/Düzenle/yırt"
 
-#: src/mainwindow.c:3264 src/mainwindow.c:3457
+#: src/mainwindow.c:3255 src/mainwindow.c:3448
 msgid "/Edit/Undo"
 msgstr "/Düzenle/Geri al"
 
-#: src/mainwindow.c:3265 src/mainwindow.c:3460
+#: src/mainwindow.c:3256 src/mainwindow.c:3451
 msgid "/Edit/Redo"
 msgstr "/Düzenle/Yinele"
 
-#: src/mainwindow.c:3266 src/mainwindow.c:3273 src/mainwindow.c:3302
+#: src/mainwindow.c:3257 src/mainwindow.c:3264 src/mainwindow.c:3293
 msgid "/Edit/sep1"
 msgstr "/Düzenle/sep1"
 
-#: src/mainwindow.c:3267 src/mainwindow.c:3464 src/mainwindow.c:3498
+#: src/mainwindow.c:3258 src/mainwindow.c:3455 src/mainwindow.c:3489
 msgid "/Edit/Cut"
 msgstr "/Düzenle/Kes"
 
-#: src/mainwindow.c:3268 src/mainwindow.c:3464 src/mainwindow.c:3498
+#: src/mainwindow.c:3259 src/mainwindow.c:3455 src/mainwindow.c:3489
 msgid "/Edit/Copy"
 msgstr "/Düzenle/Kopyala"
 
-#: src/mainwindow.c:3269 src/mainwindow.c:3470
+#: src/mainwindow.c:3260 src/mainwindow.c:3461
 msgid "/Edit/Paste To Centre"
 msgstr "/Düzenle/Merkeze Yapıştır"
 
-#: src/mainwindow.c:3270 src/mainwindow.c:3471
+#: src/mainwindow.c:3261 src/mainwindow.c:3462
 msgid "/Edit/Paste To New Layer"
 msgstr "/Düzenle/Yeni Katmana Yapıştır"
 
-#: src/mainwindow.c:3271 src/mainwindow.c:3470
+#: src/mainwindow.c:3262 src/mainwindow.c:3461
 msgid "/Edit/Paste"
 msgstr "/Düzenle/Yapıştır"
 
-#: src/mainwindow.c:3272
+#: src/mainwindow.c:3263
 msgid "/Edit/Paste Text"
 msgstr "/Düzenle/Metni Yapıştır"
 
-#: src/mainwindow.c:3274
+#: src/mainwindow.c:3265
 msgid "/Edit/Load Clipboard"
 msgstr "/Düzenle/Panoyu Yükle"
 
-#: src/mainwindow.c:3275
+#: src/mainwindow.c:3266
 msgid "/Edit/Load Clipboard/tear"
 msgstr "/Düzenle/Panoyu Yükle/yırt"
 
-#: src/mainwindow.c:3276
+#: src/mainwindow.c:3267
 msgid "/Edit/Load Clipboard/1"
 msgstr "/Düzenle/Panoyu Yükle/1"
 
-#: src/mainwindow.c:3277
+#: src/mainwindow.c:3268
 msgid "/Edit/Load Clipboard/2"
 msgstr "/Düzenle/Panoyu Yükle/2"
 
-#: src/mainwindow.c:3278
+#: src/mainwindow.c:3269
 msgid "/Edit/Load Clipboard/3"
 msgstr "/Düzenle/Panoyu Yükle/3"
 
-#: src/mainwindow.c:3279
+#: src/mainwindow.c:3270
 msgid "/Edit/Load Clipboard/4"
-msgstr "/Düzenle/Panoyu Yükle/4"
+msgstr "/Düzenle/Load Clipboard/4"
 
-#: src/mainwindow.c:3280
+#: src/mainwindow.c:3271
 msgid "/Edit/Load Clipboard/5"
 msgstr "/Düzenle/Panoyu Yükle/5"
 
-#: src/mainwindow.c:3281
+#: src/mainwindow.c:3272
 msgid "/Edit/Load Clipboard/6"
 msgstr "/Düzenle/Panoyu Yükle/6"
 
-#: src/mainwindow.c:3282
+#: src/mainwindow.c:3273
 msgid "/Edit/Load Clipboard/7"
 msgstr "/Düzenle/Panoyu Yükle/7"
 
-#: src/mainwindow.c:3283
+#: src/mainwindow.c:3274
 msgid "/Edit/Load Clipboard/8"
 msgstr "/Düzenle/Panoyu Yükle/8"
 
-#: src/mainwindow.c:3284
+#: src/mainwindow.c:3275
 msgid "/Edit/Load Clipboard/9"
 msgstr "/Düzenle/Panoyu Yükle/9"
 
-#: src/mainwindow.c:3285
+#: src/mainwindow.c:3276
 msgid "/Edit/Load Clipboard/10"
 msgstr "/Düzenle/Panoyu Yükle/10"
 
-#: src/mainwindow.c:3286
+#: src/mainwindow.c:3277
 msgid "/Edit/Load Clipboard/11"
 msgstr "/Düzenle/Panoyu Yükle/11"
 
-#: src/mainwindow.c:3287
+#: src/mainwindow.c:3278
 msgid "/Edit/Load Clipboard/12"
 msgstr "/Düzenle/Panoyu Yükle/12"
 
-#: src/mainwindow.c:3288 src/mainwindow.c:3565
+#: src/mainwindow.c:3279 src/mainwindow.c:3558
 msgid "/Edit/Save Clipboard"
 msgstr "/Düzenle/Panoyu Kaydet"
 
-#: src/mainwindow.c:3289
+#: src/mainwindow.c:3280
 msgid "/Edit/Save Clipboard/tear"
 msgstr "/Düzenle/Panoyu Kaydet/yırt"
 
-#: src/mainwindow.c:3290
+#: src/mainwindow.c:3281
 msgid "/Edit/Save Clipboard/1"
 msgstr "/Düzenle/Panoyu Kaydet/1"
 
-#: src/mainwindow.c:3291
+#: src/mainwindow.c:3282
 msgid "/Edit/Save Clipboard/2"
 msgstr "/Düzenle/Panoyu Kaydet/2"
 
-#: src/mainwindow.c:3292
+#: src/mainwindow.c:3283
 msgid "/Edit/Save Clipboard/3"
 msgstr "/Düzenle/Panoyu Kaydet/3"
 
-#: src/mainwindow.c:3293
+#: src/mainwindow.c:3284
 msgid "/Edit/Save Clipboard/4"
 msgstr "/Düzenle/Panoyu Kaydet/4"
 
-#: src/mainwindow.c:3294
+#: src/mainwindow.c:3285
 msgid "/Edit/Save Clipboard/5"
 msgstr "/Düzenle/Panoyu Kaydet/5"
 
-#: src/mainwindow.c:3295
+#: src/mainwindow.c:3286
 msgid "/Edit/Save Clipboard/6"
 msgstr "/Düzenle/Panoyu Kaydet/6"
 
-#: src/mainwindow.c:3296
+#: src/mainwindow.c:3287
 msgid "/Edit/Save Clipboard/7"
 msgstr "/Düzenle/Panoyu Kaydet/7"
 
-#: src/mainwindow.c:3297
+#: src/mainwindow.c:3288
 msgid "/Edit/Save Clipboard/8"
 msgstr "/Düzenle/Panoyu Kaydet/8"
 
-#: src/mainwindow.c:3298
+#: src/mainwindow.c:3289
 msgid "/Edit/Save Clipboard/9"
 msgstr "/Düzenle/Panoyu Kaydet/9"
 
-#: src/mainwindow.c:3299
+#: src/mainwindow.c:3290
 msgid "/Edit/Save Clipboard/10"
-msgstr "/Düzenle/Panoyu Kaydet/10"
+msgstr "/Düzenle/Save Clipboard/10"
 
-#: src/mainwindow.c:3300
+#: src/mainwindow.c:3291
 msgid "/Edit/Save Clipboard/11"
 msgstr "/Düzenle/Panoyu Kaydet/11"
 
-#: src/mainwindow.c:3301
+#: src/mainwindow.c:3292
 msgid "/Edit/Save Clipboard/12"
 msgstr "/Düzenle/Panoyu Kaydet/12"
 
-#: src/mainwindow.c:3303
+#: src/mainwindow.c:3294
 msgid "/Edit/Choose Pattern ..."
 msgstr "/Düzenle/Choose Pattern ..."
 
-#: src/mainwindow.c:3304
+#: src/mainwindow.c:3295
 msgid "/Edit/Choose Brush ..."
 msgstr "/Düzenle/Fırça Seç ..."
 
-#: src/mainwindow.c:3305
+#: src/mainwindow.c:3296
 msgid "/Edit/Create Patterns"
 msgstr "/Düzenle/Create Patterns"
 
-#: src/mainwindow.c:3307
+#: src/mainwindow.c:3298
 msgid "/_View"
 msgstr "/_Görünüm"
 
-#: src/mainwindow.c:3308
+#: src/mainwindow.c:3299
 msgid "/View/tear"
 msgstr "/Görünüm/yırt"
 
-#: src/mainwindow.c:3309 src/mainwindow.c:3583
+#: src/mainwindow.c:3300 src/mainwindow.c:3576
 msgid "/View/Show Main Toolbar"
 msgstr "/Görünüm/Show Main Toolbar"
 
-#: src/mainwindow.c:3310 src/mainwindow.c:3585
+#: src/mainwindow.c:3301 src/mainwindow.c:3578
 msgid "/View/Show Tools Toolbar"
 msgstr "/Görünüm/Show Tools Toolbar"
 
-#: src/mainwindow.c:3311 src/mainwindow.c:3587
+#: src/mainwindow.c:3302 src/mainwindow.c:3580
 msgid "/View/Show Settings Toolbar"
 msgstr "/Görünüm/Show Settings Toolbar"
 
-#: src/mainwindow.c:3312 src/mainwindow.c:3589
+#: src/mainwindow.c:3303 src/mainwindow.c:3582
 msgid "/View/Show Palette"
 msgstr "/Görünüm/Show Palette"
 
-#: src/mainwindow.c:3313 src/mainwindow.c:3591
+#: src/mainwindow.c:3304 src/mainwindow.c:3584
 msgid "/View/Show Status Bar"
 msgstr "/Görünüm/Show Status Bar"
 
-#: src/mainwindow.c:3314 src/mainwindow.c:3318 src/mainwindow.c:3322
+#: src/mainwindow.c:3305 src/mainwindow.c:3309 src/mainwindow.c:3313
 msgid "/View/sep1"
 msgstr "/Görünüm/sep1"
 
-#: src/mainwindow.c:3315
+#: src/mainwindow.c:3306
 msgid "/View/Toggle Image View (Home)"
 msgstr "/Görünüm/Toggle Image View (Home)"
 
-#: src/mainwindow.c:3316 src/mainwindow.c:3579
+#: src/mainwindow.c:3307 src/mainwindow.c:3572
 msgid "/View/Centralize Image"
 msgstr "/Görünüm/Centralize Image"
 
-#: src/mainwindow.c:3317 src/mainwindow.c:3599
+#: src/mainwindow.c:3308 src/mainwindow.c:3592
 msgid "/View/Show zoom grid"
 msgstr "/Görünüm/Show zoom grid"
 
-#: src/mainwindow.c:3319 src/mainwindow.c:3493
+#: src/mainwindow.c:3310 src/mainwindow.c:3484
 msgid "/View/View Window"
 msgstr "/Görünüm/View Window"
 
-#: src/mainwindow.c:3320
+#: src/mainwindow.c:3311
 msgid "/View/Horizontal Split"
 msgstr "/Görünüm/Horizontal Split"
 
-#: src/mainwindow.c:3321 src/mainwindow.c:3574
+#: src/mainwindow.c:3312 src/mainwindow.c:3567
 msgid "/View/Focus View Window"
 msgstr "/Görünüm/Focus View Window"
 
-#: src/mainwindow.c:3323
+#: src/mainwindow.c:3314
 msgid "/View/Pan Window (End)"
 msgstr "/Görünüm/Pan Window (End)"
 
-#: src/mainwindow.c:3324 src/mainwindow.c:3491
+#: src/mainwindow.c:3315 src/mainwindow.c:3482
 msgid "/View/Command Line Window"
 msgstr "/Görünüm/Komut Satırı Penceresi"
 
-#: src/mainwindow.c:3325 src/mainwindow.c:3495
+#: src/mainwindow.c:3316 src/mainwindow.c:3486
 msgid "/View/Layers Window"
 msgstr "/Görünüm/Layers Window"
 
-#: src/mainwindow.c:3327
+#: src/mainwindow.c:3318
 msgid "/_Image"
 msgstr "/_Resim"
 
-#: src/mainwindow.c:3328
+#: src/mainwindow.c:3319
 msgid "/Image/tear"
 msgstr "/Resim/tear"
 
-#: src/mainwindow.c:3329 src/mainwindow.c:3487
+#: src/mainwindow.c:3320 src/mainwindow.c:3478
 msgid "/Image/Convert To RGB"
 msgstr "/Resim/Convert To RGB"
 
-#: src/mainwindow.c:3330 src/mainwindow.c:3480
+#: src/mainwindow.c:3321 src/mainwindow.c:3471
 msgid "/Image/Convert To Indexed"
 msgstr "/Resim/Convert To Indexed"
 
-#: src/mainwindow.c:3331 src/mainwindow.c:3335 src/mainwindow.c:3341
+#: src/mainwindow.c:3322 src/mainwindow.c:3326 src/mainwindow.c:3332
 msgid "/Image/sep1"
 msgstr "/Resim/sep1"
 
-#: src/mainwindow.c:3332
+#: src/mainwindow.c:3323
 msgid "/Image/Scale Canvas ..."
 msgstr "/Resim/Tuvali Ölçekle ..."
 
-#: src/mainwindow.c:3333
+#: src/mainwindow.c:3324
 msgid "/Image/Resize Canvas ..."
 msgstr "/Resim/Tuvali Yeniden Boyutlandır ..."
 
-#: src/mainwindow.c:3334 src/mainwindow.c:3468
+#: src/mainwindow.c:3325 src/mainwindow.c:3459
 msgid "/Image/Crop"
 msgstr "/Resim/Kırp"
 
-#: src/mainwindow.c:3336
+#: src/mainwindow.c:3327
 msgid "/Image/Flip Vertically"
 msgstr "/Resim/Flip Vertically"
 
-#: src/mainwindow.c:3337
+#: src/mainwindow.c:3328
 msgid "/Image/Flip Horizontally"
 msgstr "/Resim/Flip Horizontally"
 
-#: src/mainwindow.c:3338
+#: src/mainwindow.c:3329
 msgid "/Image/Rotate Clockwise"
 msgstr "/Resim/Saat Yönünde Döndür"
 
-#: src/mainwindow.c:3339
+#: src/mainwindow.c:3330
 msgid "/Image/Rotate Anti-Clockwise"
 msgstr "/Resim/Saat Yönünün Tersine Çevir"
 
-#: src/mainwindow.c:3340
+#: src/mainwindow.c:3331
 msgid "/Image/Free Rotate ..."
 msgstr "/Resim/Free Rotate ..."
 
-#: src/mainwindow.c:3342
+#: src/mainwindow.c:3333
 msgid "/Image/Information ..."
 msgstr "/Resim/Bilgi"
 
-#: src/mainwindow.c:3343 src/mainwindow.c:3479
+#: src/mainwindow.c:3334 src/mainwindow.c:3470
 msgid "/Image/Preferences ..."
 msgstr "/Resim/Preferences ..."
 
-#: src/mainwindow.c:3345
+#: src/mainwindow.c:3336
 msgid "/_Selection"
 msgstr "/_Seçim"
 
-#: src/mainwindow.c:3346
+#: src/mainwindow.c:3337
 msgid "/Selection/tear"
 msgstr "/Seçim/yırt"
 
-#: src/mainwindow.c:3347
+#: src/mainwindow.c:3338
 msgid "/Selection/Select All"
 msgstr "/Seçim/Tümünü Seç"
 
-#: src/mainwindow.c:3348 src/mainwindow.c:3462
+#: src/mainwindow.c:3339 src/mainwindow.c:3453
 msgid "/Selection/Select None (Esc)"
 msgstr "/Seçim/Select None (Esc)"
 
-#: src/mainwindow.c:3349 src/mainwindow.c:3497
+#: src/mainwindow.c:3340 src/mainwindow.c:3488
 msgid "/Selection/Lasso Selection"
 msgstr "/Seçim/Lasso Selection"
 
-#: src/mainwindow.c:3350 src/mainwindow.c:3497
+#: src/mainwindow.c:3341 src/mainwindow.c:3488
 msgid "/Selection/Lasso Selection Cut"
 msgstr "/Seçim/Lasso Selection Cut"
 
-#: src/mainwindow.c:3351 src/mainwindow.c:3356 src/mainwindow.c:3361
+#: src/mainwindow.c:3342 src/mainwindow.c:3347 src/mainwindow.c:3352
 msgid "/Selection/sep1"
 msgstr "/Seçim/sep1"
 
-#: src/mainwindow.c:3352 src/mainwindow.c:3465 src/mainwindow.c:3499
+#: src/mainwindow.c:3343 src/mainwindow.c:3456 src/mainwindow.c:3490
 msgid "/Selection/Outline Selection"
 msgstr "/Seçim/Outline Selection"
 
-#: src/mainwindow.c:3353 src/mainwindow.c:3464 src/mainwindow.c:3499
+#: src/mainwindow.c:3344 src/mainwindow.c:3455 src/mainwindow.c:3490
 msgid "/Selection/Fill Selection"
 msgstr "/Seçim/Seçimi Doldur"
 
-#: src/mainwindow.c:3354 src/mainwindow.c:3466
+#: src/mainwindow.c:3345 src/mainwindow.c:3457
 msgid "/Selection/Outline Ellipse"
 msgstr "/Seçim/Outline Ellipse"
 
-#: src/mainwindow.c:3355 src/mainwindow.c:3465
+#: src/mainwindow.c:3346 src/mainwindow.c:3456
 msgid "/Selection/Fill Ellipse"
 msgstr "/Seçim/İçi Dolu Elips"
 
-#: src/mainwindow.c:3357 src/mainwindow.c:3472
+#: src/mainwindow.c:3348 src/mainwindow.c:3463
 msgid "/Selection/Flip Vertically"
 msgstr "/Seçim/Flip Vertically"
 
-#: src/mainwindow.c:3358 src/mainwindow.c:3472
+#: src/mainwindow.c:3349 src/mainwindow.c:3463
 msgid "/Selection/Flip Horizontally"
 msgstr "/Seçim/Flip Horizontally"
 
-#: src/mainwindow.c:3359 src/mainwindow.c:3473
+#: src/mainwindow.c:3350 src/mainwindow.c:3464
 msgid "/Selection/Rotate Clockwise"
 msgstr "/Seçim/Saat Yönünde Döndür"
 
-#: src/mainwindow.c:3360 src/mainwindow.c:3473
+#: src/mainwindow.c:3351 src/mainwindow.c:3464
 msgid "/Selection/Rotate Anti-Clockwise"
 msgstr "/Seçim/Saat Yönünün Tersine Döndür"
 
-#: src/mainwindow.c:3362 src/mainwindow.c:3501
+#: src/mainwindow.c:3353 src/mainwindow.c:3493
 msgid "/Selection/Alpha Blend A,B"
 msgstr "/Seçim/Alpha Blend A,B"
 
-#: src/mainwindow.c:3363 src/mainwindow.c:3474
+#: src/mainwindow.c:3354 src/mainwindow.c:3465
 msgid "/Selection/Move Alpha to Mask"
 msgstr "/Seçim/Move Alpha to Mask"
 
-#: src/mainwindow.c:3364 src/mainwindow.c:3475
+#: src/mainwindow.c:3355 src/mainwindow.c:3466
 msgid "/Selection/Mask Colour A,B"
 msgstr "/Seçim/Mask Colour A,B"
 
-#: src/mainwindow.c:3365 src/mainwindow.c:3476
+#: src/mainwindow.c:3356 src/mainwindow.c:3467
 msgid "/Selection/Unmask Colour A,B"
 msgstr "/Seçim/Unmask Colour A,B"
 
-#: src/mainwindow.c:3366 src/mainwindow.c:3476
+#: src/mainwindow.c:3357 src/mainwindow.c:3467
 msgid "/Selection/Mask All Colours"
 msgstr "/Seçim/Mask All Colours"
 
-#: src/mainwindow.c:3367 src/mainwindow.c:3475
+#: src/mainwindow.c:3358 src/mainwindow.c:3466
 msgid "/Selection/Clear Mask"
 msgstr "/Seçim/Clear Mask"
 
-#: src/mainwindow.c:3369
+#: src/mainwindow.c:3360
 msgid "/_Palette"
 msgstr "/_Palet"
 
-#: src/mainwindow.c:3370
+#: src/mainwindow.c:3361
 msgid "/Palette/tear"
 msgstr "/Palet/yırt"
 
-#: src/mainwindow.c:3371
+#: src/mainwindow.c:3362
 msgid "/Palette/Open ..."
 msgstr "/Palet/Aç ..."
 
-#: src/mainwindow.c:3372
+#: src/mainwindow.c:3363
 msgid "/Palette/Save As ..."
 msgstr "/Palet/Farklı Kaydet ..."
 
-#: src/mainwindow.c:3373
+#: src/mainwindow.c:3364
 msgid "/Palette/Load Default"
 msgstr "/Palet/Varsayılanı Yükle"
 
-#: src/mainwindow.c:3374 src/mainwindow.c:3377 src/mainwindow.c:3384
-#: src/mainwindow.c:3388
+#: src/mainwindow.c:3365 src/mainwindow.c:3368 src/mainwindow.c:3375
+#: src/mainwindow.c:3379
 msgid "/Palette/sep1"
 msgstr "/Palet/sep1"
 
-#: src/mainwindow.c:3375
+#: src/mainwindow.c:3366
 msgid "/Palette/Mask All"
 msgstr "/Palet/Mask All"
 
-#: src/mainwindow.c:3376
+#: src/mainwindow.c:3367
 msgid "/Palette/Mask None"
 msgstr "/Palet/Mask None"
 
-#: src/mainwindow.c:3378
+#: src/mainwindow.c:3369
 msgid "/Palette/Swap A & B"
 msgstr "/Palet/Swap A & B"
 
-#: src/mainwindow.c:3379
+#: src/mainwindow.c:3370
 msgid "/Palette/Edit Colour A & B ..."
 msgstr "/Palet/Renk Düzenle A & B ..."
 
-#: src/mainwindow.c:3380
+#: src/mainwindow.c:3371
 msgid "/Palette/Palette Editor ..."
 msgstr "/Palet/Palette Editor ..."
 
-#: src/mainwindow.c:3381
+#: src/mainwindow.c:3372
 msgid "/Palette/Set Palette Size ..."
 msgstr "/Palet/Palet Boyutunu Ayarla ..."
 
-#: src/mainwindow.c:3382 src/mainwindow.c:3488
+#: src/mainwindow.c:3373 src/mainwindow.c:3479
 msgid "/Palette/Merge Duplicate Colours"
 msgstr "/Palet/Çoklu Renkleri Birleştir"
 
-#: src/mainwindow.c:3383 src/mainwindow.c:3488
+#: src/mainwindow.c:3374 src/mainwindow.c:3479
 msgid "/Palette/Remove Unused Colours"
 msgstr "/Palet/Kullanılmayan Renkleri Kaldır"
 
-#: src/mainwindow.c:3385 src/mainwindow.c:3480
+#: src/mainwindow.c:3376 src/mainwindow.c:3471
 msgid "/Palette/Create Quantized (DL1)"
 msgstr "/Palet/Create Quantized (DL1)"
 
-#: src/mainwindow.c:3386 src/mainwindow.c:3481
+#: src/mainwindow.c:3377 src/mainwindow.c:3472
 msgid "/Palette/Create Quantized (DL3)"
 msgstr "/Palet/Create Quantized (DL3)"
 
-#: src/mainwindow.c:3387 src/mainwindow.c:3481
+#: src/mainwindow.c:3378 src/mainwindow.c:3472
 msgid "/Palette/Create Quantized (Wu)"
 msgstr "/Palet/Create Quantized (Wu)"
 
-#: src/mainwindow.c:3389
+#: src/mainwindow.c:3380
 msgid "/Palette/Sort Colours ..."
 msgstr "/Palet/Renkleri Sırala ..."
 
-#: src/mainwindow.c:3390
+#: src/mainwindow.c:3381
 msgid "/Palette/Palette Shifter ..."
 msgstr "/Palet/Palette Shifter ..."
 
-#: src/mainwindow.c:3392
+#: src/mainwindow.c:3383
 msgid "/Effe_cts"
 msgstr "/Efektler"
 
-#: src/mainwindow.c:3393
+#: src/mainwindow.c:3384
 msgid "/Effects/tear"
 msgstr "/Efektler/yırt"
 
-#: src/mainwindow.c:3394
+#: src/mainwindow.c:3385
 msgid "/Effects/Transform Colour ..."
 msgstr "/Efektler/Transform Colour ..."
 
-#: src/mainwindow.c:3395
+#: src/mainwindow.c:3386
 msgid "/Effects/Invert"
 msgstr "/Efektler/Invert"
 
-#: src/mainwindow.c:3396
+#: src/mainwindow.c:3387
 msgid "/Effects/Greyscale"
 msgstr "/Efektler/Greyscale"
 
-#: src/mainwindow.c:3397
+#: src/mainwindow.c:3388
 msgid "/Effects/Greyscale (Gamma corrected)"
 msgstr "/Efektler/Greyscale (Gamma corrected)"
 
-#: src/mainwindow.c:3398
+#: src/mainwindow.c:3389
 msgid "/Effects/Isometric Transformation"
 msgstr "/Efektler/Isometric Transformation"
 
-#: src/mainwindow.c:3399
+#: src/mainwindow.c:3390
 msgid "/Effects/Isometric Transformation/tear"
 msgstr "/Efektler/Isometric Transformation/tear"
 
-#: src/mainwindow.c:3400
+#: src/mainwindow.c:3391
 msgid "/Effects/Isometric Transformation/Left Side Down"
 msgstr "/Efektler/Isometric Transformation/Left Side Down"
 
-#: src/mainwindow.c:3401
+#: src/mainwindow.c:3392
 msgid "/Effects/Isometric Transformation/Right Side Down"
 msgstr "/Efektler/Isometric Transformation/Right Side Down"
 
-#: src/mainwindow.c:3402
+#: src/mainwindow.c:3393
 msgid "/Effects/Isometric Transformation/Top Side Right"
 msgstr "/Efektler/Isometric Transformation/Top Side Right"
 
-#: src/mainwindow.c:3403
+#: src/mainwindow.c:3394
 msgid "/Effects/Isometric Transformation/Bottom Side Right"
 msgstr "/Efektler/Isometric Transformation/Bottom Side Right"
 
-#: src/mainwindow.c:3404 src/mainwindow.c:3411
+#: src/mainwindow.c:3395 src/mainwindow.c:3402
 msgid "/Effects/sep1"
 msgstr "/Efektler/sep1"
 
-#: src/mainwindow.c:3405 src/mainwindow.c:3483
+#: src/mainwindow.c:3396 src/mainwindow.c:3474
 msgid "/Effects/Edge Detect"
 msgstr "/Efektler/Edge Detect"
 
-#: src/mainwindow.c:3406 src/mainwindow.c:3484
+#: src/mainwindow.c:3397 src/mainwindow.c:3475
 msgid "/Effects/Sharpen ..."
 msgstr "/Efektler/Sharpen ..."
 
-#: src/mainwindow.c:3407 src/mainwindow.c:3484
+#: src/mainwindow.c:3398 src/mainwindow.c:3475
 msgid "/Effects/Unsharp Mask ..."
 msgstr "/Efektler/Unsharp Mask ..."
 
-#: src/mainwindow.c:3408 src/mainwindow.c:3485
+#: src/mainwindow.c:3399 src/mainwindow.c:3476
 msgid "/Effects/Soften ..."
 msgstr "/Efektler/Soften ..."
 
-#: src/mainwindow.c:3409 src/mainwindow.c:3485
+#: src/mainwindow.c:3400 src/mainwindow.c:3476
 msgid "/Effects/Gaussian Blur ..."
 msgstr "/Efektler/Gaussian Blur ..."
 
-#: src/mainwindow.c:3410 src/mainwindow.c:3483
+#: src/mainwindow.c:3401 src/mainwindow.c:3474
 msgid "/Effects/Emboss"
 msgstr "/Efektler/Emboss"
 
-#: src/mainwindow.c:3412 src/mainwindow.c:3487
+#: src/mainwindow.c:3403 src/mainwindow.c:3478
 msgid "/Effects/Bacteria ..."
 msgstr "/Efektler/Bacteria ..."
 
-#: src/mainwindow.c:3414
+#: src/mainwindow.c:3405
 msgid "/Cha_nnels"
-msgstr "/Ka_nallar"
+msgstr ""
 
-#: src/mainwindow.c:3415
+#: src/mainwindow.c:3406
 msgid "/Channels/tear"
-msgstr "/Kanallar/tear"
+msgstr ""
 
-#: src/mainwindow.c:3416
+#: src/mainwindow.c:3407
 msgid "/Channels/New ..."
-msgstr "/Kanallar/Yeni..."
+msgstr ""
 
-#: src/mainwindow.c:3417
+#: src/mainwindow.c:3408
 msgid "/Channels/Load ..."
-msgstr "/Kanallar/Yükle ..."
+msgstr ""
 
-#: src/mainwindow.c:3418
+#: src/mainwindow.c:3409
 msgid "/Channels/Save As ..."
-msgstr "/Kanallar/Farkıl Kaydet ..."
+msgstr ""
 
-#: src/mainwindow.c:3419 src/mainwindow.c:3505
+#: src/mainwindow.c:3410 src/mainwindow.c:3497
 msgid "/Channels/Delete ..."
-msgstr "/Kanallar/Sil..."
+msgstr ""
 
-#: src/mainwindow.c:3420 src/mainwindow.c:3425 src/mainwindow.c:3430
-#: src/mainwindow.c:3433
+#: src/mainwindow.c:3411 src/mainwindow.c:3416 src/mainwindow.c:3421
+#: src/mainwindow.c:3424
 msgid "/Channels/sep1"
-msgstr "/Kanallar/sep1"
+msgstr ""
 
-#: src/mainwindow.c:3421 src/mainwindow.c:3422 src/mainwindow.c:3423
-#: src/mainwindow.c:3424 src/mainwindow.c:3502
+#: src/mainwindow.c:3412 src/mainwindow.c:3413 src/mainwindow.c:3414
+#: src/mainwindow.c:3415 src/mainwindow.c:3494
 msgid "/Channels/Edit Image"
-msgstr "/Kanallar/Resmi Düzenle"
+msgstr ""
 
-#: src/mainwindow.c:3422 src/mainwindow.c:3502
+#: src/mainwindow.c:3413 src/mainwindow.c:3494
 msgid "/Channels/Edit Alpha"
-msgstr "/Kanallar/Edit Alpha"
+msgstr ""
 
-#: src/mainwindow.c:3423 src/mainwindow.c:3503
+#: src/mainwindow.c:3414 src/mainwindow.c:3495
 msgid "/Channels/Edit Selection"
-msgstr "/Kanallar/Seçimi Düzenle"
+msgstr ""
 
-#: src/mainwindow.c:3424 src/mainwindow.c:3503
+#: src/mainwindow.c:3415 src/mainwindow.c:3495
 msgid "/Channels/Edit Mask"
-msgstr "/Kanallar/Maskeyi Düzenle"
+msgstr ""
 
-#: src/mainwindow.c:3426 src/mainwindow.c:3506
+#: src/mainwindow.c:3417 src/mainwindow.c:3498
 msgid "/Channels/Hide Image"
-msgstr "/Kanallar/Resmi Gizle"
+msgstr ""
 
-#: src/mainwindow.c:3427 src/mainwindow.c:3506
+#: src/mainwindow.c:3418 src/mainwindow.c:3498
 msgid "/Channels/Disable Alpha"
-msgstr "/Kanallar/Alfayı Etkisiz Kıl"
+msgstr ""
 
-#: src/mainwindow.c:3428 src/mainwindow.c:3507
+#: src/mainwindow.c:3419 src/mainwindow.c:3499
 msgid "/Channels/Disable Selection"
-msgstr "/Kanallar/Seçimi Etkisiz Kıl"
+msgstr ""
 
-#: src/mainwindow.c:3429 src/mainwindow.c:3507
+#: src/mainwindow.c:3420 src/mainwindow.c:3499
 msgid "/Channels/Disable Mask"
-msgstr "/Kanallar/Maskeyi Etkisiz Kıl"
+msgstr ""
 
-#: src/mainwindow.c:3431 src/mainwindow.c:3570
+#: src/mainwindow.c:3422 src/mainwindow.c:3563
 msgid "/Channels/Couple RGBA Operations"
-msgstr "/Kanallar/Couple RGBA Operations"
+msgstr ""
+
+#: src/mainwindow.c:3423
+msgid "/Channels/Threshold ..."
+msgstr ""
+
+#: src/mainwindow.c:3425
+msgid "/Channels/View Alpha as an Overlay"
+msgstr ""
+
+#: src/mainwindow.c:3426
+msgid "/Channels/Configure Overlays ..."
+msgstr ""
+
+#: src/mainwindow.c:3428
+msgid "/_Layers"
+msgstr ""
+
+#: src/mainwindow.c:3429
+msgid "/Layers/tear"
+msgstr ""
+
+#: src/mainwindow.c:3430
+msgid "/Layers/Save"
+msgstr ""
+
+#: src/mainwindow.c:3431
+msgid "/Layers/Save As ..."
+msgstr ""
 
 #: src/mainwindow.c:3432
-msgid "/Channels/Threshold ..."
-msgstr "/Kanallar/Threshold ..."
+msgid "/Layers/Save Composite Image ..."
+msgstr ""
+
+#: src/mainwindow.c:3433
+msgid "/Layers/Remove All Layers ..."
+msgstr ""
 
 #: src/mainwindow.c:3434
-msgid "/Channels/View Alpha as an Overlay"
-msgstr "/Kanallar/View Alpha as an Overlay"
+msgid "/Layers/sep1"
+msgstr ""
 
 #: src/mainwindow.c:3435
-msgid "/Channels/Configure Overlays ..."
-msgstr "/Kanallar/Configure Overlays ..."
+msgid "/Layers/Configure Animation ..."
+msgstr ""
+
+#: src/mainwindow.c:3436
+msgid "/Layers/Preview Animation ..."
+msgstr ""
 
 #: src/mainwindow.c:3437
-msgid "/_Layers"
-msgstr "/Katmanlar"
+msgid "/Layers/Set key frame ..."
+msgstr ""
 
 #: src/mainwindow.c:3438
-msgid "/Layers/tear"
-msgstr "/Katmanlar/tear"
-
-#: src/mainwindow.c:3439
-msgid "/Layers/Save"
-msgstr "/Katmanlar/Kaydet"
+msgid "/Layers/Remove all key frames ..."
+msgstr ""
 
 #: src/mainwindow.c:3440
-msgid "/Layers/Save As ..."
-msgstr "/Katmanlar/Farklı Kaydet..."
-
-#: src/mainwindow.c:3441
-msgid "/Layers/Save Composite Image ..."
-msgstr "/Katmanlar/Save Composite Image ..."
-
-#: src/mainwindow.c:3442
-msgid "/Layers/Remove All Layers ..."
-msgstr "/Katmanlar/Tüm Katmanları Kaldır ..."
-
-#: src/mainwindow.c:3443
-msgid "/Layers/sep1"
-msgstr "/Katmanlar/sep1"
-
-#: src/mainwindow.c:3444
-msgid "/Layers/Configure Animation ..."
-msgstr "/Katmanlar/Animasyonu Yapılandır ..."
-
-#: src/mainwindow.c:3445
-msgid "/Layers/Preview Animation ..."
-msgstr "/Katmanlar/Animasyonu Önizle ..."
-
-#: src/mainwindow.c:3446
-msgid "/Layers/Set key frame ..."
-msgstr "/Katmanlar/Set key frame ..."
-
-#: src/mainwindow.c:3447
-msgid "/Layers/Remove all key frames ..."
-msgstr "/Katmanlar/Remove all key frames ..."
-
-#: src/mainwindow.c:3449
 msgid "/_Help"
 msgstr "/_Yardım"
 
-#: src/mainwindow.c:3450
+#: src/mainwindow.c:3441
 msgid "/Help/Documentation"
 msgstr "/Yardım/Documentation"
 
-#: src/mainwindow.c:3451 src/mainwindow.c:3478
+#: src/mainwindow.c:3442 src/mainwindow.c:3469
 msgid "/Help/About"
 msgstr "/Yardım/Hakkında"
 
-#: src/mainwindow.c:3452
+#: src/mainwindow.c:3443
 msgid "/Help/sep1"
 msgstr "/Yardım/sep1"
 
-#: src/mainwindow.c:3453
+#: src/mainwindow.c:3444
 msgid "/Help/Rebind Shortcut Keycodes"
 msgstr "/Yardım/Rebind Shortcut Keycodes"
 
-#: src/mainwindow.c:3538
+#: src/mainwindow.c:3492
+msgid "/Frames"
+msgstr ""
+
+#: src/mainwindow.c:3530
 #, c-format
 msgid "/File/%i"
 msgstr "/Dosya/%i"
@@ -1807,19 +1803,19 @@ msgstr ""
 msgid "Scaling Image"
 msgstr "Resmi Boyutlandırma"
 
-#: src/memory.c:4490
+#: src/memory.c:4415
 msgid "Counting Unique RGB Pixels"
 msgstr ""
 
-#: src/memory.c:4536
+#: src/memory.c:4461
 msgid "Applying Effect"
 msgstr ""
 
-#: src/mygtk.c:135
+#: src/mygtk.c:141
 msgid "Please Wait ..."
 msgstr "Lütfen Bekleyiniz ..."
 
-#: src/mygtk.c:158
+#: src/mygtk.c:164
 msgid "STOP"
 msgstr "DUR"
 
@@ -1829,7 +1825,7 @@ msgstr "24 bit RGB"
 
 #: src/otherwindow.c:196
 msgid "Greyscale"
-msgstr "Gri tonlama"
+msgstr ""
 
 #: src/otherwindow.c:196
 msgid "Indexed Palette"
@@ -1839,11 +1835,11 @@ msgstr "İndisli Palet"
 msgid "Grab Screenshot"
 msgstr ""
 
-#: src/otherwindow.c:197 src/toolbar.c:703
+#: src/otherwindow.c:197 src/toolbar.c:700
 msgid "New Image"
 msgstr "Yeni Resim"
 
-#: src/otherwindow.c:197 src/toolbar.c:163
+#: src/otherwindow.c:197 src/toolbar.c:162
 msgid "New Layer"
 msgstr "Yeni Katman"
 
@@ -1859,7 +1855,7 @@ msgstr "Yükseklik"
 msgid "Colours"
 msgstr "Renkler"
 
-#: src/otherwindow.c:238 src/otherwindow.c:1875
+#: src/otherwindow.c:238 src/otherwindow.c:1951
 msgid "Create"
 msgstr "Yarat"
 
@@ -1872,7 +1868,7 @@ msgid "Set Palette Size"
 msgstr "Palet Boyutunu Ayarla"
 
 #: src/otherwindow.c:508 src/otherwindow.c:612 src/otherwindow.c:996
-#: src/otherwindow.c:2976 src/prefs.c:735
+#: src/otherwindow.c:3004 src/prefs.c:735
 msgid "Apply"
 msgstr "Uygula"
 
@@ -1890,11 +1886,11 @@ msgstr ""
 
 #: src/otherwindow.c:575
 msgid "Distance to A"
-msgstr "A'ya uzaklık"
+msgstr ""
 
 #: src/otherwindow.c:576
 msgid "Distance to A+B"
-msgstr "A+B'ye uzaklık"
+msgstr ""
 
 #: src/otherwindow.c:577 src/otherwindow.c:841
 msgid "Red"
@@ -1922,11 +1918,11 @@ msgstr "Palet Renklerini Sırala"
 
 #: src/otherwindow.c:595
 msgid "Start Index"
-msgstr "Dizini Başlat"
+msgstr ""
 
 #: src/otherwindow.c:596
 msgid "End Index"
-msgstr "Dizini Sonlandır"
+msgstr ""
 
 #: src/otherwindow.c:603
 msgid "Reverse Order"
@@ -1936,7 +1932,7 @@ msgstr ""
 msgid "Auto-Preview"
 msgstr "Otomatik-Ön İzleme"
 
-#: src/otherwindow.c:841 src/otherwindow.c:917 src/otherwindow.c:2264
+#: src/otherwindow.c:841 src/otherwindow.c:917 src/otherwindow.c:2331
 msgid "Palette"
 msgstr "Palet"
 
@@ -1946,9 +1942,9 @@ msgstr "Parlaklık"
 
 #: src/otherwindow.c:843
 msgid "Contrast"
-msgstr "Parlaklık"
+msgstr ""
 
-#: src/otherwindow.c:843 src/otherwindow.c:1942
+#: src/otherwindow.c:843 src/otherwindow.c:2009
 msgid "Posterize"
 msgstr ""
 
@@ -1956,27 +1952,27 @@ msgstr ""
 msgid "Gamma"
 msgstr ""
 
-#: src/otherwindow.c:858 src/toolbar.c:711
+#: src/otherwindow.c:858 src/toolbar.c:708
 msgid "Transform Colour"
 msgstr ""
 
 #: src/otherwindow.c:897
 msgid "Show Detail"
-msgstr "Ayrıntı Göster"
+msgstr ""
 
 #: src/otherwindow.c:991
 msgid "Reset"
 msgstr "Sıfırla"
 
-#: src/otherwindow.c:1071
+#: src/otherwindow.c:1157
 msgid "New geometry is the same as now - nothing to do."
 msgstr ""
 
-#: src/otherwindow.c:1096
+#: src/otherwindow.c:1164
 msgid "The operating system cannot allocate the memory for this operation."
 msgstr "İşletim sistemi bu çalışma için belleği paylaştıramadı."
 
-#: src/otherwindow.c:1098
+#: src/otherwindow.c:1166
 msgid ""
 "You have not allocated enough memory in the Preferences window for this "
 "operation."
@@ -1984,419 +1980,419 @@ msgstr ""
 "Bu çalışma için Tercihler penceresine yeteri kadar bellek "
 "paylaştırmamışsınız."
 
-#: src/otherwindow.c:1118
+#: src/otherwindow.c:1186
 msgid "Nearest Neighbour"
 msgstr ""
 
-#: src/otherwindow.c:1119
+#: src/otherwindow.c:1187
 msgid "Bilinear / Area Mapping"
 msgstr ""
 
-#: src/otherwindow.c:1120
+#: src/otherwindow.c:1188
 msgid "Bicubic"
 msgstr ""
 
-#: src/otherwindow.c:1121
+#: src/otherwindow.c:1189
 msgid "Bicubic edged"
 msgstr ""
 
-#: src/otherwindow.c:1122
+#: src/otherwindow.c:1190
 msgid "Bicubic better"
 msgstr ""
 
-#: src/otherwindow.c:1123
+#: src/otherwindow.c:1191
 msgid "Bicubic sharper"
 msgstr ""
 
-#: src/otherwindow.c:1124
+#: src/otherwindow.c:1192
 msgid "Lanczos3"
 msgstr ""
 
-#: src/otherwindow.c:1125
+#: src/otherwindow.c:1193
 msgid "Blackman-Harris"
 msgstr ""
 
-#: src/otherwindow.c:1129 src/shifter.c:348
+#: src/otherwindow.c:1197 src/shifter.c:348
 msgid "Clear"
-msgstr "Temizle"
+msgstr ""
 
-#: src/otherwindow.c:1130
+#: src/otherwindow.c:1198
 msgid "Tile"
-msgstr "Döşe"
+msgstr ""
 
-#: src/otherwindow.c:1131
+#: src/otherwindow.c:1199
 msgid "Mirror tile"
 msgstr ""
 
-#: src/otherwindow.c:1145
+#: src/otherwindow.c:1213
 msgid "Width     "
 msgstr "Genişlik     "
 
-#: src/otherwindow.c:1146
+#: src/otherwindow.c:1214
 msgid "Height    "
 msgstr "Yükseklik    "
 
-#: src/otherwindow.c:1148
+#: src/otherwindow.c:1216
 msgid "Original      "
 msgstr "Özgün      "
 
-#: src/otherwindow.c:1154
+#: src/otherwindow.c:1222
 msgid "New"
 msgstr "Yeni"
 
-#: src/otherwindow.c:1167 src/otherwindow.c:2931
+#: src/otherwindow.c:1245 src/otherwindow.c:2982
 msgid "Offset"
-msgstr "Başlangıç Noktası"
+msgstr ""
 
-#: src/otherwindow.c:1173 src/otherwindow.c:1975
+#: src/otherwindow.c:1249 src/otherwindow.c:2042
 msgid "Centre"
 msgstr "Merkez"
 
-#: src/otherwindow.c:1184
+#: src/otherwindow.c:1260
 msgid "Fix Aspect Ratio"
 msgstr ""
 
-#: src/otherwindow.c:1220
+#: src/otherwindow.c:1299
 msgid "Scale Canvas"
 msgstr "Tuvali Ölçeklendir"
 
-#: src/otherwindow.c:1226
+#: src/otherwindow.c:1305
 msgid "Resize Canvas"
 msgstr "Tuvali Yeniden Boyutlandır"
 
-#: src/otherwindow.c:1846
+#: src/otherwindow.c:1922
 msgid "From"
-msgstr "Başlangıç"
+msgstr ""
 
-#: src/otherwindow.c:1846
+#: src/otherwindow.c:1922
 msgid "To"
 msgstr ""
 
-#: src/otherwindow.c:1847 src/otherwindow.c:2872
+#: src/otherwindow.c:1923 src/otherwindow.c:2917
 msgid "Gradient"
 msgstr ""
 
-#: src/otherwindow.c:1862
+#: src/otherwindow.c:1938
 msgid "Scale"
-msgstr "Ölçeklendirme"
+msgstr ""
 
-#: src/otherwindow.c:1884
+#: src/otherwindow.c:1956
 msgid "Palette Editor"
-msgstr "Palet Düzenleyici"
+msgstr ""
 
-#: src/otherwindow.c:1909
+#: src/otherwindow.c:1976
 msgid "Configure Overlays"
 msgstr ""
 
-#: src/otherwindow.c:1969
+#: src/otherwindow.c:2036
 msgid "Colour Editor"
 msgstr "Renk Editörü"
 
-#: src/otherwindow.c:1975
+#: src/otherwindow.c:2042
 msgid "Limit"
-msgstr "Sınır"
+msgstr ""
 
-#: src/otherwindow.c:1976
+#: src/otherwindow.c:2043
 msgid "Sphere"
-msgstr "Küre"
+msgstr ""
 
-#: src/otherwindow.c:1976
+#: src/otherwindow.c:2043
 msgid "Angle"
-msgstr "Açı"
+msgstr ""
 
-#: src/otherwindow.c:1976
+#: src/otherwindow.c:2043
 msgid "Cube"
-msgstr "Küp"
+msgstr ""
 
-#: src/otherwindow.c:2005
+#: src/otherwindow.c:2072
 msgid "Range"
 msgstr ""
 
-#: src/otherwindow.c:2011
+#: src/otherwindow.c:2078
 msgid "Inverse"
 msgstr ""
 
-#: src/otherwindow.c:2017 src/toolbar.c:577
+#: src/otherwindow.c:2084 src/toolbar.c:577
 msgid "Colour-Selective Mode"
 msgstr ""
 
-#: src/otherwindow.c:2204
+#: src/otherwindow.c:2271
 msgid "Exact Conversion"
 msgstr ""
 
-#: src/otherwindow.c:2204
+#: src/otherwindow.c:2271
 msgid "Use Current Palette"
 msgstr "Şuanki Paleti Kullan"
 
-#: src/otherwindow.c:2205
+#: src/otherwindow.c:2272
 msgid "DL1 Quantize (fastest)"
 msgstr ""
 
-#: src/otherwindow.c:2205
+#: src/otherwindow.c:2272
 msgid "DL3 Quantize (very slow, better quality)"
 msgstr ""
 
-#: src/otherwindow.c:2206
+#: src/otherwindow.c:2273
 msgid "Wu Quantize (best method for small palettes)"
 msgstr ""
 
-#: src/otherwindow.c:2209 src/otherwindow.c:2897
+#: src/otherwindow.c:2276 src/otherwindow.c:2942
 msgid "None"
 msgstr ""
 
-#: src/otherwindow.c:2209
+#: src/otherwindow.c:2276
 msgid "Floyd-Steinberg"
 msgstr ""
 
-#: src/otherwindow.c:2209
+#: src/otherwindow.c:2276
 msgid "Stucki"
 msgstr ""
 
-#: src/otherwindow.c:2212
+#: src/otherwindow.c:2279
 msgid "Floyd-Steinberg (quick)"
 msgstr ""
 
-#: src/otherwindow.c:2212
+#: src/otherwindow.c:2279
 msgid "Dithered (effect)"
 msgstr ""
 
-#: src/otherwindow.c:2213
+#: src/otherwindow.c:2280
 msgid "Scattered (effect)"
 msgstr ""
 
-#: src/otherwindow.c:2216
+#: src/otherwindow.c:2283
 msgid "Largest (Linf)"
 msgstr ""
 
-#: src/otherwindow.c:2216
+#: src/otherwindow.c:2283
 msgid "Sum (L1)"
 msgstr ""
 
-#: src/otherwindow.c:2216
+#: src/otherwindow.c:2283
 msgid "Euclidean (L2)"
 msgstr ""
 
-#: src/otherwindow.c:2217
+#: src/otherwindow.c:2284
 msgid "Gamut"
 msgstr ""
 
-#: src/otherwindow.c:2217
+#: src/otherwindow.c:2284
 msgid "Weakly"
-msgstr "Zayıfca"
+msgstr ""
 
-#: src/otherwindow.c:2217
+#: src/otherwindow.c:2284
 msgid "Strongly"
 msgstr ""
 
-#: src/otherwindow.c:2218
+#: src/otherwindow.c:2285
 msgid "Off"
 msgstr ""
 
-#: src/otherwindow.c:2218
+#: src/otherwindow.c:2285
 msgid "Separate/Sum"
 msgstr ""
 
-#: src/otherwindow.c:2218
+#: src/otherwindow.c:2285
 msgid "Separate/Split"
 msgstr ""
 
-#: src/otherwindow.c:2219
+#: src/otherwindow.c:2286
 msgid "Length/Sum"
 msgstr ""
 
-#: src/otherwindow.c:2219
+#: src/otherwindow.c:2286
 msgid "Length/Split"
 msgstr ""
 
-#: src/otherwindow.c:2225
+#: src/otherwindow.c:2292
 msgid "Convert To Indexed"
 msgstr ""
 
-#: src/otherwindow.c:2235
+#: src/otherwindow.c:2302
 msgid "Indexed Colours To Use"
 msgstr ""
 
-#: src/otherwindow.c:2251
+#: src/otherwindow.c:2318
 msgid "Settings"
-msgstr "Ayarlar"
+msgstr ""
 
-#: src/otherwindow.c:2270
+#: src/otherwindow.c:2337
 msgid "Dither"
 msgstr ""
 
-#: src/otherwindow.c:2277
+#: src/otherwindow.c:2344
 msgid "Colour space"
 msgstr ""
 
-#: src/otherwindow.c:2280
+#: src/otherwindow.c:2347
 msgid "Difference measure"
 msgstr ""
 
-#: src/otherwindow.c:2283
+#: src/otherwindow.c:2350
 msgid "Reduce colour bleed"
 msgstr ""
 
-#: src/otherwindow.c:2285
+#: src/otherwindow.c:2352
 msgid "Serpentine scan"
 msgstr ""
 
-#: src/otherwindow.c:2291
+#: src/otherwindow.c:2358
 msgid "Error propagation, %"
 msgstr ""
 
-#: src/otherwindow.c:2300
+#: src/otherwindow.c:2367
 msgid "Selective error propagation"
 msgstr ""
 
-#: src/otherwindow.c:2649
+#: src/otherwindow.c:2703
 msgid "Edit Gradient"
 msgstr ""
 
-#: src/otherwindow.c:2672
+#: src/otherwindow.c:2726
 msgid "Backward HSV"
 msgstr ""
 
-#: src/otherwindow.c:2672 src/otherwindow.c:2699
+#: src/otherwindow.c:2726 src/otherwindow.c:2749
 msgid "Constant"
-msgstr "Sabit"
+msgstr ""
 
-#: src/otherwindow.c:2707
+#: src/otherwindow.c:2757
 msgid "Points:"
-msgstr "Nokta"
+msgstr ""
 
-#: src/otherwindow.c:2878
+#: src/otherwindow.c:2923
 msgid "Reverse"
 msgstr ""
 
-#: src/otherwindow.c:2879
+#: src/otherwindow.c:2924
 msgid "Edit Custom"
 msgstr ""
 
-#: src/otherwindow.c:2896
+#: src/otherwindow.c:2941
 msgid "Linear"
-msgstr "Çizgisel"
+msgstr ""
 
-#: src/otherwindow.c:2896
+#: src/otherwindow.c:2941
 msgid "Bilinear"
-msgstr "İkili doğrusal"
+msgstr ""
 
-#: src/otherwindow.c:2896
+#: src/otherwindow.c:2941
 msgid "Radial"
 msgstr ""
 
-#: src/otherwindow.c:2896
+#: src/otherwindow.c:2941
 msgid "Square"
 msgstr ""
 
-#: src/otherwindow.c:2897
+#: src/otherwindow.c:2942
 msgid "Level"
-msgstr "Seviye"
+msgstr ""
 
-#: src/otherwindow.c:2897
+#: src/otherwindow.c:2942
 msgid "Repeat"
-msgstr "Yinele"
+msgstr ""
 
-#: src/otherwindow.c:2897
+#: src/otherwindow.c:2942
 msgid "Mirror"
 msgstr ""
 
-#: src/otherwindow.c:2898
+#: src/otherwindow.c:2943
 msgid "A to B"
-msgstr "A'dan B'ye"
+msgstr ""
 
-#: src/otherwindow.c:2898
+#: src/otherwindow.c:2943
 msgid "A to B (RGB)"
 msgstr ""
 
-#: src/otherwindow.c:2898
+#: src/otherwindow.c:2943
 msgid "A to B (HSV)"
 msgstr ""
 
-#: src/otherwindow.c:2899
+#: src/otherwindow.c:2944
 msgid "A to B (backward HSV)"
 msgstr ""
 
-#: src/otherwindow.c:2899
+#: src/otherwindow.c:2944
 msgid "A only"
-msgstr "Sadece A"
+msgstr ""
 
-#: src/otherwindow.c:2899 src/otherwindow.c:2900
+#: src/otherwindow.c:2944 src/otherwindow.c:2945
 msgid "Custom"
-msgstr "Özel tanımlı"
+msgstr ""
 
-#: src/otherwindow.c:2900
+#: src/otherwindow.c:2945
 msgid "Current to 0"
 msgstr ""
 
-#: src/otherwindow.c:2900
+#: src/otherwindow.c:2945
 msgid "Current only"
 msgstr ""
 
-#: src/otherwindow.c:2914
+#: src/otherwindow.c:2957
 msgid "Configure Gradient"
 msgstr ""
 
-#: src/otherwindow.c:2922
+#: src/otherwindow.c:2965
 msgid "Channel"
-msgstr "Kanal"
+msgstr ""
 
-#: src/otherwindow.c:2927
+#: src/otherwindow.c:2970
 msgid "Length"
-msgstr "Uzunluk"
+msgstr ""
 
-#: src/otherwindow.c:2929
-msgid "Repeat length"
-msgstr "Tekrar uzunluğu"
-
-#: src/otherwindow.c:2933
+#: src/otherwindow.c:2972
 msgid "Gradient type"
 msgstr ""
 
-#: src/otherwindow.c:2935
+#: src/otherwindow.c:2976
+msgid "Repeat length"
+msgstr ""
+
+#: src/otherwindow.c:2978
 msgid "Extension type"
 msgstr ""
 
-#: src/otherwindow.c:2956
+#: src/otherwindow.c:2984
 msgid "Preview opacity"
 msgstr ""
 
-#: src/png.c:338
+#: src/png.c:337
 msgid "Loading PNG image"
 msgstr "PNG resmi yükleniyor"
 
-#: src/png.c:341
+#: src/png.c:340
 msgid "Loading clipboard image"
 msgstr "Pano resmi yükleniyor"
 
-#: src/png.c:514
+#: src/png.c:513
 msgid "Saving PNG image"
 msgstr "PNG resmi kaydediliyor"
 
-#: src/png.c:517
+#: src/png.c:516
 msgid "Saving Clipboard image"
 msgstr "Pano resmi kaydediliyor"
 
-#: src/png.c:520
+#: src/png.c:519
 msgid "Saving Layer image"
 msgstr "Katman resmi kaydediliyor"
 
-#: src/png.c:523
+#: src/png.c:522
 msgid "Saving Channel image"
 msgstr ""
 
-#: src/png.c:717
+#: src/png.c:716
 msgid "Loading GIF image"
 msgstr "GIF resmi yükleniyor"
 
-#: src/png.c:792
+#: src/png.c:791
 msgid "Saving GIF image"
 msgstr "GIF resmi kaydediliyor"
 
-#: src/png.c:866
+#: src/png.c:865
 msgid "Loading JPEG image"
 msgstr "JPEG resmi yükleniyor"
 
-#: src/png.c:917
+#: src/png.c:916
 msgid "Saving JPEG image"
 msgstr "JPEG resmi kaydediliyor"
 
@@ -2404,77 +2400,67 @@ msgstr "JPEG resmi kaydediliyor"
 msgid "Loading TIFF image"
 msgstr "TIFF resmi yükleniyor"
 
-#: src/png.c:1401
+#: src/png.c:1397
 msgid "Saving TIFF image"
 msgstr "TIFF resmi kaydediliyor"
 
-#: src/png.c:1622
+#: src/png.c:1618
 msgid "Loading BMP image"
 msgstr "BMP resmi yükleniyor"
 
-#: src/png.c:1876
+#: src/png.c:1872
 msgid "Saving BMP image"
 msgstr "BMP resmi kaydediliyor"
 
-#: src/png.c:2203
+#: src/png.c:2191
 msgid "Loading XPM image"
 msgstr "XPM resmi yükleniyor"
 
-#: src/png.c:2268
+#: src/png.c:2256
 msgid "Saving XPM image"
 msgstr "XPM resmi kaydediliyor"
 
-#: src/png.c:2401
+#: src/png.c:2389
 msgid "Loading XBM image"
 msgstr "XBM resmi yükleniyor"
 
-#: src/png.c:2470
+#: src/png.c:2458
 msgid "Saving XBM image"
 msgstr "XBM resmi kaydediliyor"
 
-#: src/png.c:2565
-msgid "Loading LSS16 image"
-msgstr "LSS16 resmi yükleniyor"
-
-#: src/png.c:2646
-msgid "Saving LSS16 image"
-msgstr "LSS16 resmi kaydediliyor"
-
-#: src/png.c:2801
+#: src/png.c:2604
 msgid "This is an animated GIF file.  What do you want to do?"
-msgstr "Bu bir animasyonlu GIF dosyasıdır. Ne yapmak istiyorsunuz?"
+msgstr ""
 
-#: src/png.c:2802
+#: src/png.c:2605
 msgid "Edit Frames"
-msgstr "Çerçeveleri Düzenle"
+msgstr ""
 
-#: src/png.c:2804
+#: src/png.c:2607
 msgid "View Animation"
-msgstr "Animasyonu Göster"
+msgstr ""
 
-#: src/png.c:2917
+#: src/png.c:2720
 msgid "Saving UNDO images"
 msgstr ""
 
-#: src/png.c:2955
+#: src/png.c:2760
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
 msgstr ""
 
-#: src/png.c:3164
+#: src/png.c:2961
 msgid ""
 "I am unable to find the documentation.  Either you need to download the "
 "mtPaint Handbook from the web site and install it, or you need to set the "
 "correct location in the Preferences window."
 msgstr ""
 
-#: src/png.c:3186
+#: src/png.c:2983
 msgid ""
 "There was a problem running the HTML browser.  You need to set the correct "
 "program name in the Preferences window."
 msgstr ""
-"HTML taracıyısını çalıştırmada problem var. Tercihler penceresinde doğru "
-"program adını ayarlamaya ihtiyaç var."
 
 #: src/prefs.c:154
 msgid "Pressure"
@@ -2510,11 +2496,11 @@ msgstr "Fransızca"
 
 #: src/prefs.c:439
 msgid "German"
-msgstr "Almanca"
+msgstr ""
 
 #: src/prefs.c:439
 msgid "Polish"
-msgstr "Polonya dili"
+msgstr ""
 
 #: src/prefs.c:439
 msgid "Portuguese"
@@ -2525,16 +2511,12 @@ msgid "Portuguese (Brazilian)"
 msgstr "Portekizce (Brezilya)"
 
 #: src/prefs.c:440
-msgid "Slovak"
-msgstr "Slovakça"
-
-#: src/prefs.c:440
 msgid "Spanish"
 msgstr "İspanyolca"
 
 #: src/prefs.c:440
 msgid "Turkish"
-msgstr "Türkçe"
+msgstr ""
 
 #: src/prefs.c:448
 msgid "Max memory used for undo (MB)"
@@ -2574,7 +2556,7 @@ msgstr ""
 
 #: src/prefs.c:453
 msgid "Minimum grid zoom"
-msgstr "En az ızgara yakınlaştırması"
+msgstr ""
 
 #: src/prefs.c:453
 msgid "Grid colour RGB"
@@ -2586,7 +2568,7 @@ msgstr "Tuval Geometrisi"
 
 #: src/prefs.c:454
 msgid "Cursor X,Y"
-msgstr "İmleç X,Y"
+msgstr ""
 
 #: src/prefs.c:455
 msgid "Pixel [I] {RGB}"
@@ -2606,7 +2588,7 @@ msgstr "Boyut"
 
 #: src/prefs.c:456 src/toolbar.c:587
 msgid "Flow"
-msgstr "Akış"
+msgstr ""
 
 #: src/prefs.c:462
 msgid "Preferences"
@@ -2618,7 +2600,7 @@ msgstr "Yapıştırma boyunca panoyu göster"
 
 #: src/prefs.c:500
 msgid "Mouse cursor = Tool"
-msgstr "Fare imleci = Araç"
+msgstr ""
 
 #: src/prefs.c:502
 msgid "Confirm Exit"
@@ -2650,11 +2632,11 @@ msgstr "Pano Dosyaları"
 
 #: src/prefs.c:543
 msgid "HTML Browser Program"
-msgstr "HTML Tarayıcı Programı"
+msgstr ""
 
 #: src/prefs.c:547
 msgid "Location of Handbook index"
-msgstr "Elkitabı Dizini konumu"
+msgstr ""
 
 #: src/prefs.c:558
 msgid "Status Bar"
@@ -2682,7 +2664,7 @@ msgstr ""
 
 #: src/prefs.c:611
 msgid "Tablet"
-msgstr "Tablet"
+msgstr ""
 
 #: src/prefs.c:620
 msgid "Device Settings"
@@ -2694,7 +2676,7 @@ msgstr "Aygıtı Ayarla"
 
 #: src/prefs.c:636
 msgid "Tool Variable"
-msgstr "Araç Değişkeni"
+msgstr ""
 
 #: src/prefs.c:638
 msgid "Factor"
@@ -2722,7 +2704,7 @@ msgstr ""
 
 #: src/shifter.c:217
 msgid "Frames"
-msgstr "Çerçeveler"
+msgstr ""
 
 #: src/shifter.c:283
 msgid "Palette Shifter"
@@ -2730,61 +2712,61 @@ msgstr ""
 
 #: src/shifter.c:293
 msgid "Start"
-msgstr "Başlat"
+msgstr ""
 
 #: src/shifter.c:295
 msgid "Finish"
-msgstr "Bitir"
+msgstr ""
 
 #: src/shifter.c:354
 msgid "Fix Palette"
 msgstr ""
 
-#: src/toolbar.c:163
+#: src/toolbar.c:162
 msgid "Raise"
 msgstr "Yükselt"
 
-#: src/toolbar.c:163
+#: src/toolbar.c:162
 msgid "Lower"
 msgstr ""
 
-#: src/toolbar.c:163
+#: src/toolbar.c:162
 msgid "Duplicate Layer"
 msgstr "Kamanı Çoğalt"
 
-#: src/toolbar.c:163
+#: src/toolbar.c:162
 msgid "Centralise Layer"
 msgstr ""
 
-#: src/toolbar.c:164
+#: src/toolbar.c:163
 msgid "Delete Layer"
 msgstr "Katmanı Sil"
 
-#: src/toolbar.c:164
+#: src/toolbar.c:163
 msgid "Close Layers Window"
 msgstr "Katmanlar Penceresini Kapat"
 
-#: src/toolbar.c:429
+#: src/toolbar.c:428
 msgid "RGB Cube"
 msgstr ""
 
-#: src/toolbar.c:430
+#: src/toolbar.c:429
 msgid "By image channel"
-msgstr "Resim kanalı tarafından"
+msgstr ""
 
-#: src/toolbar.c:431
+#: src/toolbar.c:430
 msgid "Gradient-driven"
 msgstr ""
 
-#: src/toolbar.c:432
+#: src/toolbar.c:431
 msgid "Fill settings"
-msgstr "Doldurma ayarları"
+msgstr ""
 
-#: src/toolbar.c:437
+#: src/toolbar.c:436
 msgid "Respect opacity mode"
 msgstr ""
 
-#: src/toolbar.c:438
+#: src/toolbar.c:437
 msgid "Smudge settings"
 msgstr ""
 
@@ -2806,113 +2788,113 @@ msgstr ""
 
 #: src/toolbar.c:578
 msgid "Disable All Masks"
-msgstr "Tüm Maskeleri Etkisiz Kıl"
+msgstr ""
 
-#: src/toolbar.c:623
+#: src/toolbar.c:620
 msgid "Settings Toolbar"
-msgstr "Ayar Araç Çubuğu"
+msgstr ""
 
-#: src/toolbar.c:658
+#: src/toolbar.c:655
 msgid "Gradient Mode"
 msgstr ""
 
-#: src/toolbar.c:706
+#: src/toolbar.c:703
 msgid "Cut"
 msgstr "Kes"
 
-#: src/toolbar.c:707
+#: src/toolbar.c:704
 msgid "Copy"
 msgstr "Kopyala"
 
-#: src/toolbar.c:708
+#: src/toolbar.c:705
 msgid "Paste"
 msgstr "Yapıştır"
 
-#: src/toolbar.c:709
+#: src/toolbar.c:706
 msgid "Undo"
 msgstr "Geri Al"
 
-#: src/toolbar.c:710
+#: src/toolbar.c:707
 msgid "Redo"
 msgstr "Yinele"
 
-#: src/toolbar.c:712 src/viewer.c:546
+#: src/toolbar.c:709 src/viewer.c:550
 msgid "Pan Window"
 msgstr ""
 
-#: src/toolbar.c:716
+#: src/toolbar.c:713
 msgid "Paint"
 msgstr "Boya"
 
-#: src/toolbar.c:717
+#: src/toolbar.c:714
 msgid "Shuffle"
-msgstr "Karışık"
+msgstr ""
 
-#: src/toolbar.c:718
+#: src/toolbar.c:715
 msgid "Flood Fill"
-msgstr "Su Dolgusu"
+msgstr ""
 
-#: src/toolbar.c:719
+#: src/toolbar.c:716
 msgid "Straight Line"
 msgstr "Düz Çizgi"
 
-#: src/toolbar.c:720
+#: src/toolbar.c:717
 msgid "Smudge"
 msgstr "Lekeleme"
 
-#: src/toolbar.c:721
+#: src/toolbar.c:718
 msgid "Clone"
 msgstr "Kopyala"
 
-#: src/toolbar.c:722
+#: src/toolbar.c:719
 msgid "Make Selection"
 msgstr "Seçim Yap"
 
-#: src/toolbar.c:723
+#: src/toolbar.c:720
 msgid "Polygon Selection"
 msgstr "Çokgen Seçimi"
 
-#: src/toolbar.c:724
+#: src/toolbar.c:721
 msgid "Place Gradient"
 msgstr ""
 
-#: src/toolbar.c:725
+#: src/toolbar.c:722
 msgid "Lasso Selection"
 msgstr ""
 
-#: src/toolbar.c:726 src/viewer.c:1604 src/viewer.c:1657
+#: src/toolbar.c:723 src/viewer.c:1593 src/viewer.c:1646
 msgid "Paste Text"
 msgstr "Metni Yapıştır"
 
-#: src/toolbar.c:727
+#: src/toolbar.c:724
 msgid "Ellipse Outline"
 msgstr ""
 
-#: src/toolbar.c:728
+#: src/toolbar.c:725
 msgid "Filled Ellipse"
 msgstr "İçi Dolu Elips"
 
-#: src/toolbar.c:729
+#: src/toolbar.c:726
 msgid "Outline Selection"
-msgstr "Dış Çeper Seçimi"
+msgstr ""
 
-#: src/toolbar.c:730
+#: src/toolbar.c:727
 msgid "Fill Selection"
 msgstr "Seçimi Doldur"
 
-#: src/toolbar.c:731
+#: src/toolbar.c:728
 msgid "Flip Selection Vertically"
-msgstr "Seçimi Dikey Olarak Döndür"
+msgstr ""
 
-#: src/toolbar.c:732
+#: src/toolbar.c:729
 msgid "Flip Selection Horizontally"
 msgstr ""
 
-#: src/toolbar.c:733
+#: src/toolbar.c:730
 msgid "Rotate Selection Clockwise"
 msgstr "Seçimi Saat Yönünde Çevir"
 
-#: src/toolbar.c:734
+#: src/toolbar.c:731
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "Seçimi Saat Yönünün Tersine Çevir"
 
@@ -2921,26 +2903,26 @@ msgstr "Seçimi Saat Yönünün Tersine Çevir"
 msgid "%i Files on Command Line"
 msgstr ""
 
-#: src/viewer.c:193
+#: src/viewer.c:197
 msgid "About"
-msgstr "Hakkında"
+msgstr ""
 
-#: src/viewer.c:1623
+#: src/viewer.c:1612
 msgid "Antialias"
 msgstr ""
 
-#: src/viewer.c:1631
+#: src/viewer.c:1620
 msgid "Invert"
 msgstr ""
 
-#: src/viewer.c:1636
+#: src/viewer.c:1625
 msgid "Background colour ="
 msgstr "ArkaPlan rengi="
 
-#: src/viewer.c:1644
+#: src/viewer.c:1633
 msgid "Angle of rotation ="
 msgstr "Çevirme açısı="
 
-#: src/viewer.c:1667
+#: src/viewer.c:1656
 msgid "Enter Text Here"
 msgstr "Metni Buraya Girin"

@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -18,7 +18,6 @@
 */
 
 #include <gtk/gtk.h>
-#include <math.h>
 
 
 #include "global.h"
@@ -246,8 +245,8 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 {
 	int i;
-	static char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%",
-		"200%", "300%", "400%", "800%", "1200%", "1600%", "2000%", NULL };
+	char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%", "200%", "300%",
+		"400%", "800%", "1200%", "1600%", "2000%", NULL };
 	GtkWidget *combo, *combo_entry;
 	GList *combo_list = NULL;
 
@@ -509,7 +508,7 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			NULL, _(items->tooltip), "Private", iconw, lclick,
+			"None", _(items->tooltip), "Private", iconw, lclick,
 			(gpointer)(items->ID + lbase));
 		if (items->radio > 0) radio[items->radio] = items->widget;
 		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
@@ -531,15 +530,16 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 #define NEED_LAYER 0x0400
 #define NEED_LASSO 0x0800
 #define NEED_PREFS 0x1000
-#define NEED_ALPHA 0x2000
-#define NEED_CHAN  0x4000
+#define NEED_FRAME 0x2000
+#define NEED_ALPHA 0x4000
+#define NEED_CHAN  0x8000
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 
 static GtkWidget **need_lists[] = {
 	menu_undo, menu_redo, menu_crop, menu_need_marquee,
 	menu_need_selection, menu_need_clipboard, menu_help, menu_only_24,
 	menu_only_indexed, menu_cline, menu_layer, menu_lasso, menu_prefs,
-	menu_alphablend, menu_chan_del };
+	menu_frames, menu_alphablend, menu_chan_del };
 
 static void tool_dis_add(toolbar_item *items)
 {
@@ -594,9 +594,6 @@ static void toolbar_settings_init()
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
 	{
 		gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );	// Used when Home key is pressed
-#if GTK_MAJOR_VERSION == 1
-		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Reset shortened sliders */
-#endif
 		return;
 	}
 
@@ -792,21 +789,12 @@ void toolbar_init(GtkWidget *vbox_main)
 
 	gtk_box_pack_start ( GTK_BOX (hbox), toolbar_main, FALSE, FALSE, 0 );
 
-	toolbar_zoom_main = toolbar_add_zoom(hbox);
-	toolbar_zoom_view = toolbar_add_zoom(hbox);
-	/* In GTK1, combo box entry is updated continuously */
-#if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->popwin),
-		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->popwin),
-		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->entry),
-		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->entry),
-		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
-#endif
+	toolbar_zoom_main = toolbar_add_zoom( hbox );
+	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_main)->entry), "changed",
+		GTK_SIGNAL_FUNC (toolbar_zoom_main_change), NULL);
+	toolbar_zoom_view = toolbar_add_zoom( hbox );
+	gtk_signal_connect_object (GTK_OBJECT (GTK_COMBO (toolbar_zoom_view)->entry), "changed",
+		GTK_SIGNAL_FUNC (toolbar_zoom_view_change), NULL);
 	toolbar_viewzoom(FALSE);
 
 	for (i=0; i<TOTAL_CURSORS; i++)

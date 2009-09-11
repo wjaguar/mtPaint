@@ -27,7 +27,6 @@
 #define NOT_XBM -12
 #define NOT_JPEG -13
 #define NOT_XPM -14
-#define NOT_LSS -15
 #define NOT_GIF -16
 
 #define FILE_LIB_ERROR 123456
@@ -50,39 +49,30 @@
 #define FT_BMP      5
 #define FT_XPM      6
 #define FT_XBM      7
-#define FT_LSS      8
-#define FT_TGA      9
-#define FT_PCX      10
-#define FT_GPL      11
-#define FT_TXT      12
-#define FT_PAL      13
-#define FT_LAYERS1  14
-#define FT_LAYERS2  15
-#define NUM_FTYPES  16
+#define FT_TGA      8
+#define FT_PCX      9
+#define FT_GPL      10
+#define FT_TXT      11
+#define FT_PAL      12
+#define FT_LAYERS1  13
+#define FT_LAYERS2  14
+#define NUM_FTYPES  15
 
 /* Features supported by file formats */
 #define FF_BW      0x0001 /* Black and white */
-#define FF_16      0x0002 /* 16 colors */
-#define FF_256     0x0004 /* 256 colors */
-#define FF_IDX     0x0007 /* Indexed image */
-#define FF_RGB     0x0008 /* Truecolor */
-#define FF_IMAGE   0x000F /* Image of any kind */
-#define FF_ANIM    0x0010 /* Animation */
-#define FF_ALPHAI  0x0020 /* Alpha channel for indexed images */
-#define FF_ALPHAR  0x0040 /* Alpha channel for RGB images */
-#define FF_ALPHA   0x0060 /* Alpha channel for all images */
-#define FF_MULTI   0x0080 /* Multiple channels */
-#define FF_TRANS   0x0100 /* Indexed transparency */
-#define FF_COMP    0x0600 /* Configurable compression */
-#define FF_COMPJ   0x0200 /* JPEG compression */
-#define FF_COMPZ   0x0400 /* zlib compression */
-#define FF_COMPR   0x0600 /* RLE compression */
-#define FF_SPOT    0x0800 /* "Hot spot" */
-#define FF_LAYER   0x1000 /* Layered images */
-#define FF_PALETTE 0x2000 /* Palette file (not image) */
-
-#define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
-	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
+#define FF_IDX     0x0002 /* Indexed color */
+#define FF_RGB     0x0004 /* Truecolor */
+#define FF_IMAGE   0x0007 /* Image of any kind */
+#define FF_ANIM    0x0008 /* Animation */
+#define FF_ALPHAI  0x0010 /* Alpha channel for indexed images */
+#define FF_ALPHAR  0x0020 /* Alpha channel for RGB images */
+#define FF_ALPHA   0x0030 /* Alpha channel for all images */
+#define FF_MULTI   0x0040 /* Multiple channels */
+#define FF_TRANS   0x0080 /* Indexed transparency */
+#define FF_COMPR   0x0100 /* Compression levels */
+#define FF_SPOT    0x0200 /* "Hot spot" */
+#define FF_LAYER   0x0400 /* Layered images */
+#define FF_PALETTE 0x0800 /* Palette file (not image) */
 
 #define LONGEST_EXT 5
 

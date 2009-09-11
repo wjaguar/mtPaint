@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -131,7 +131,11 @@ void pressed_cline( GtkMenuItem *menu_item, gpointer user_data )
 	item[0] = txt2;
 	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )
 	{
-		gtkuncpy(txt2, global_argv[i], 512);
+#if GTK_MAJOR_VERSION == 2
+		cleanse_txt( txt2, global_argv[i] );			// Clean up non ASCII chars
+#else
+		strcpy( txt2, global_argv[i] );
+#endif
 		gtk_clist_set_selectable ( GTK_CLIST(col_list),
 			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
 	}
@@ -1074,17 +1078,8 @@ void view_show()
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	view_showing = TRUE;
-	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), TRUE);
 	vw_focus_view();
-#if GTK_MAJOR_VERSION == 1 /* GTK+1 mishandles the change in width */
-	gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
-	if (!vw_focus_on) gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(vw_scrolledwindow)));
-#endif
 }
 
 void view_hide()
@@ -1100,13 +1095,7 @@ void view_hide()
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
 	view_showing = FALSE;
-	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_view[0]), FALSE);
-#if GTK_MAJOR_VERSION == 1 /* GTK+1 mishandles the change in width */
-	gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
-#endif
 }
 
 

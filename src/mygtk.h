@@ -47,7 +47,7 @@ void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	gpointer user_data);
-#define ADJ2INT(a) ((int)rint((a)->value))
+#define ADJ2INT(a) ((int)((a)->value + 0.5))
 
 // Self-contained package of radio buttons
 
@@ -73,10 +73,6 @@ void spin_connect(GtkWidget *spin, GtkSignalFunc handler, gpointer user_data);
 // Wrapper for utf8->C translation
 
 char *gtkncpy(char *dest, const char *src, int cnt);
-
-// Wrapper for C->utf8 translation
-
-char *gtkuncpy(char *dest, const char *src, int cnt);
 
 // Extracting widget from GtkTable
 

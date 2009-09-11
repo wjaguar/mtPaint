@@ -42,6 +42,7 @@
 #include "toolbar.h"
 #include "csel.h"
 #include "shifter.h"
+#include "spawn.h"
 
 
 #include "graphics/icon.xpm"
@@ -57,7 +58,7 @@ GtkWidget
 	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
 	*menu_help[2], *menu_only_24[10], *menu_not_indexed[10], *menu_only_indexed[10],
 	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
-	*menu_lasso[15], *menu_prefs[2], *menu_alphablend[2],
+	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
 	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[2],
 	*menu_chan_dis[NUM_CHANNELS+1]
 	;
@@ -429,10 +430,6 @@ int gui_save(char *filename, ls_settings *settings)
 		if ( res == NOT_JPEG )
 		{
 			alert_box( _("Error"), _("You are trying to save an indexed canvas to a JPEG file which is not possible.  I would suggest you save with a PNG extension."), _("OK"), NULL, NULL );
-		}
-		if ( res == NOT_LSS )
-		{
-			alert_box( _("Error"), _("You are trying to save an LSS16 file with a palette of more than 16 colours.  Either use another format or reduce the palette to 16 colours."), _("OK"), NULL, NULL );
 		}
 		if ( res == -1 )
 		{
@@ -1001,18 +998,12 @@ int wtf_pressed(GdkEventKey *event)
 	return (cmatch);
 }
 
-static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
+gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 {
 	int change, action;
 
 	action = wtf_pressed(event);
 	if (!action) return (FALSE);
-
-#if GTK_MAJOR_VERSION == 1
-	/* Return value alone doesn't stop GTK1 from running other handlers */
-	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
-#endif
 
 	if (check_zoom_keys(action)) return TRUE;		// Check HOME/zoom keys
 
@@ -2255,10 +2246,10 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	tlist[mem_channel] = pix;
 	clip_image = mem_clipboard;
 	clip_alpha = NULL;
-	if ((mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA])
+	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
 	{
 		clip_alpha = mem_clip_alpha;
-		if (mem_img[CHN_ALPHA] && !clip_alpha && RGBA_mode)
+		if (!clip_alpha && RGBA_mode)
 		{
 			t_alpha = malloc(l);
 			if (!t_alpha)
@@ -2275,7 +2266,6 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		clip_image = NULL;
 		clip_alpha = mem_clipboard;
 	}
-	if (!mem_img[CHN_ALPHA]) alpha = NULL;
 	if (clip_alpha || t_alpha) tlist[CHN_ALPHA] = alpha;
 
 	/* Setup opacity mode & mask */
@@ -2971,7 +2961,6 @@ static void pressed_docs()
 
 void set_cursor()			// Set mouse cursor
 {
-	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
 	if ( inifile_get_gboolean( "cursorToggle", TRUE ) )
 		gdk_window_set_cursor( drawing_canvas->window, m_cursor[tool_type] );
 	else
@@ -3138,7 +3127,6 @@ void set_image(gboolean state)
 
 	(state ? gtk_widget_show_all : gtk_widget_hide)(view_showing ? main_split :
 		scrolledwindow_canvas);
-	if (state) set_cursor(); /* Canvas window is now a new one */
 }
 
 static void parse_drag( char *txt )
@@ -3235,6 +3223,21 @@ void main_init()
 		{ _("/File/Export Undo Images (reversed) ..."), NULL, pressed_export_undo2,0, NULL },
 		{ _("/File/Export ASCII Art ..."), NULL, 	pressed_export_ascii,0, NULL },
 		{ _("/File/Export Animated GIF ..."), NULL, 	pressed_export_gif,0, NULL },
+		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
+		{ _("/File/Actions"),		NULL, 		NULL, 0, "<Branch>" },
+		{ _("/File/Actions/tear"),	NULL, 		NULL, 0, "<Tearoff>" },
+		{ _("/File/Actions/1"),		NULL, 		pressed_file_action, 1, NULL },
+		{ _("/File/Actions/2"),		NULL,		pressed_file_action, 2, NULL },
+		{ _("/File/Actions/3"),		NULL,		pressed_file_action, 3, NULL },
+		{ _("/File/Actions/4"),		NULL,		pressed_file_action, 4, NULL },
+		{ _("/File/Actions/5"),		NULL,		pressed_file_action, 5, NULL },
+		{ _("/File/Actions/6"),		NULL,		pressed_file_action, 6, NULL },
+		{ _("/File/Actions/7"),		NULL,		pressed_file_action, 7, NULL },
+		{ _("/File/Actions/8"),		NULL,		pressed_file_action, 8, NULL },
+		{ _("/File/Actions/9"),		NULL,		pressed_file_action, 9, NULL },
+		{ _("/File/Actions/10"),	NULL,		pressed_file_action, 10, NULL },
+		{ _("/File/Actions/sep2"),	NULL,		NULL,0, "<Separator>" },
+		{ _("/File/Actions/Configure"),	NULL,		pressed_file_configure, 0, NULL },
 		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/File/1"),  		"<shift><control>F1", pressed_load_recent, 1, NULL },
 		{ _("/File/2"),  		"<shift><control>F2", pressed_load_recent, 2, NULL },
@@ -3498,6 +3501,7 @@ void main_init()
 			_("/Edit/Cut"), _("/Edit/Copy"),
 			_("/Selection/Fill Selection"), _("/Selection/Outline Selection"),
 			NULL},
+	*item_frames[] = {_("/Frames"), NULL},
 	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL},
 	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
@@ -3548,6 +3552,7 @@ void main_init()
 	pop_men_dis( item_factory, item_crop, menu_crop );
 	pop_men_dis( item_factory, item_help, menu_help );
 	pop_men_dis( item_factory, item_prefs, menu_prefs );
+	pop_men_dis( item_factory, item_frames, menu_frames );
 	pop_men_dis( item_factory, item_only_24, menu_only_24 );
 	pop_men_dis( item_factory, item_not_indexed, menu_not_indexed );
 	pop_men_dis( item_factory, item_only_indexed, menu_only_indexed );
@@ -3768,11 +3773,12 @@ void main_init()
 
 /////////	End of main window widget setup
 
-	gtk_signal_connect( GTK_OBJECT (main_window), "delete_event",
+	gtk_signal_connect_object (GTK_OBJECT (main_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_event), NULL);
-	gtk_signal_connect( GTK_OBJECT (main_window), "key_press_event",
+	gtk_signal_connect_object (GTK_OBJECT (main_window), "key_press_event",
 		GTK_SIGNAL_FUNC (handle_keypress), NULL);
 
+	men_item_state( menu_frames, FALSE );
 	men_item_state( menu_undo, FALSE );
 	men_item_state( menu_redo, FALSE );
 	men_item_state( menu_need_marquee, FALSE );
@@ -3861,7 +3867,11 @@ void update_titlebar()		// Update filename in titlebar
 {
 	char txt[300], txt2[600], *extra = "-";
 
-	gtkuncpy(txt2, mem_filename, 512);
+#if GTK_MAJOR_VERSION == 2
+	cleanse_txt( txt2, mem_filename );		// Clean up non ASCII chars
+#else
+	strcpy( txt2, mem_filename );
+#endif
 
 	if ( mem_changed == 1 ) extra = _("(Modified)");
 

@@ -1170,6 +1170,24 @@ void init_pal()					// Initialise palette after loading
 	gtk_widget_queue_draw( drawing_palette );
 }
 
+#if GTK_MAJOR_VERSION == 2
+void cleanse_txt( char *out, char *in )		// Cleans up non ASCII chars for GTK+2
+{
+	char *c;
+
+	c = g_locale_to_utf8( (gchar *) in, -1, NULL, NULL, NULL );
+	if ( c == NULL )
+	{
+		sprintf(out, "Error in cleanse_txt using g_*_to_utf8");
+	}
+	else
+	{
+		strcpy( out, c );
+		g_free(c);
+	}
+}
+#endif
+
 void set_new_filename( char *fname )
 {
 	strncpy( mem_filename, fname, 250 );
@@ -1184,7 +1202,7 @@ static int populate_channel(char *filename)
 	if (ftype < 0) return (-1); /* Silently fail if no file */
 
 	/* Don't bother with mismatched formats */
-	if (file_formats[ftype].flags & (MEM_BPP == 1 ? FF_IDX : FF_RGB))
+	if (file_formats[ftype].flags & (MEM_BPP == 1 ? FF_IDX | FF_BW : FF_RGB))
 		res = load_image(filename, FS_CHANNEL_LOAD, ftype);
 
 	/* Successful */
@@ -1332,7 +1350,7 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
 static void image_widgets(GtkWidget *box, char *name, int mode)
 {
 	GtkWidget *opt, *menu, *item, *label, *spin;
-	int i, j, k, mask = FF_256;
+	int i, j, k, mask = FF_IDX;
 	char *ext = strrchr(name, '.');
 
 	ext = ext ? ext + 1 : "";
@@ -1340,7 +1358,8 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	{
 	default: return;
 	case FS_CHANNEL_SAVE: if (mem_channel != CHN_IMAGE) break;
-	case FS_PNG_SAVE: mask = FF_SAVE_MASK;
+	case FS_PNG_SAVE: mask = mem_img_bpp == 3 ? FF_RGB : mem_cols <= 2 ?
+		FF_BW | FF_IDX : FF_IDX;
 		break;
 	case FS_COMPOSITE_SAVE: mask = FF_RGB;
 	}
@@ -1405,7 +1424,7 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	int i, j, k, mask;
 	char *ext = strrchr(name, '.');
 
-	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_IMAGE;
+	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_BW | FF_IDX | FF_RGB;
 	ext = ext ? ext + 1 : "";
 
 	label = gtk_label_new(_("File Format"));
@@ -1801,9 +1820,7 @@ void file_selector(int action_type)
 {
 	char *title = NULL, txt[300], txt2[300];
 	GtkWidget *fs, *xtra;
-#if GTK_MAJOR_VERSION == 1
-	GtkAccelGroup* ag = gtk_accel_group_new();
-#endif
+
 
 	switch (action_type)
 	{
@@ -1873,11 +1890,7 @@ void file_selector(int action_type)
 		inifile_get_gint32("fs_window_y", 0));
 
 	if (action_type ==  FS_GIF_EXPLODE)
-	{
 		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fs)->selection_entry));
-		gtk_widget_set_sensitive(GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list),
-			FALSE);		// Don't let the user select files
-	}
 
 	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fs)->ok_button),
 		"clicked", GTK_SIGNAL_FUNC(fs_ok), GTK_OBJECT(fs));
@@ -1906,7 +1919,11 @@ void file_selector(int action_type)
 			DIR_SEP );		// Default
 	}
 
-	gtkuncpy(txt2, txt, 512);
+#if GTK_MAJOR_VERSION == 2
+	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
+#else
+	strcpy( txt2, txt );
+#endif
 	gtk_file_selection_set_filename(GTK_FILE_SELECTION(fs), txt2);
 
 	xtra = ls_settings_box(txt2, action_type);
@@ -1914,11 +1931,6 @@ void file_selector(int action_type)
 		FALSE, TRUE, 0);
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
-#if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
-	gtk_widget_add_accelerator(GTK_FILE_SELECTION(fs)->cancel_button,
-		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
-	gtk_window_add_accel_group(GTK_WINDOW(fs), ag);
-#endif
 	gtk_widget_show(fs);
 	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
 	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
@@ -2925,7 +2937,11 @@ void update_recent_files()			// Update the menu items
 				gtk_widget_hide( menu_recent[i] );	// Hide if empty
 			else
 			{
-				gtkuncpy(txt2, t, 512);
+#if GTK_MAJOR_VERSION == 2
+				cleanse_txt( txt2, t );		// Clean up non ASCII chars
+#else
+				strcpy( txt2, t );
+#endif
 				gtk_label_set_text( GTK_LABEL( GTK_MENU_ITEM(
 					menu_recent[i] )->item.bin.child ) , txt2 );
 				count++;

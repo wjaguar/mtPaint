@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2007 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -65,10 +65,10 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 12
+#define PREF_LANGS 11
 
 char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_TW.utf8", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
-		"pl_PL", "pt_PT", "pt_BR", "sk_SK", "es_ES", "tr_TR" };
+		"pl_PL", "pt_PT", "pt_BR", "es_ES", "tr_TR" };
 
 int pref_lang;
 
@@ -437,7 +437,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Taiwanese)"),
 		_("Czech"), _("English (UK)"),
 		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
-		_("Slovak"), _("Spanish"), _("Turkish")
+		_("Spanish"), _("Turkish")
 					};
 #endif
 
