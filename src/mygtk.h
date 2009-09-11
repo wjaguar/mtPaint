@@ -58,6 +58,8 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
+// !!! Not needed yet
+// GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx);
 
 // Easier way with spinbuttons
 
@@ -87,6 +89,15 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int bor
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler);
 int wj_option_menu_get_history(GtkWidget *optmenu);
+
+// Pixmap-backed drawing area
+
+GtkWidget *wj_pixmap(int width, int height);
+
+// Set minimum size for a widget
+
+void widget_set_minsize(GtkWidget *widget, int width, int height);
+GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 
 // Moving mouse cursor
 

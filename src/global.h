@@ -21,6 +21,8 @@
 #ifdef U_NLS
 	#include <libintl.h>
 	#define _(text) gettext(text)
+	#define __(text) gettext(text)
 #else
 	#define _(text) text
+	#define __(text) text
 #endif

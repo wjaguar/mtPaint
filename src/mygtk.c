@@ -378,7 +378,7 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	GtkWidget *hbox, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
-	hbox = gtk_hbox_new(FALSE, 0);
+	hbox = gtk_hbox_new(TRUE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
 	button = gtk_button_new_with_label(nCancel);
 	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 0);
@@ -400,9 +400,27 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
  
 	gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 	gtk_signal_connect(GTK_OBJECT(window), "delete_event", Cancel, NULL);
+// !!! Not needed yet
+//	gtk_object_set_user_data(GTK_OBJECT(hbox), (gpointer)window);
 	gtk_widget_show_all(hbox);
 	return (hbox);
 }
+
+#if 0 /* !!! Not needed yet */
+GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx)
+{
+	GtkWidget *button;
+
+	button = gtk_button_new_with_label(name);
+	gtk_box_pack_start(GTK_BOX(box), button, TRUE, TRUE, 0);
+	gtk_box_reorder_child(GTK_BOX(box), button, idx);
+	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		Handler, GTK_OBJECT(gtk_object_get_user_data(GTK_OBJECT(box))));
+	gtk_widget_show(button);
+	return (button);
+}
+#endif
 
 // Easier way with spinbuttons
 
@@ -517,6 +535,108 @@ int wj_option_menu_get_history(GtkWidget *optmenu)
 	optmenu = gtk_menu_get_active(GTK_MENU(optmenu));
 	return ((int)gtk_object_get_user_data(GTK_OBJECT(optmenu)));
 }
+
+// Pixmap-backed drawing area
+
+static gboolean wj_pixmap_configure(GtkWidget *widget, GdkEventConfigure *event,
+	gpointer user_data)
+{
+	GdkPixmap *pix, *oldpix = gtk_object_get_user_data(GTK_OBJECT(widget));
+	GdkGC *gc;
+	gint oldw, oldh;
+
+	if (oldpix)
+	{
+		gdk_window_get_size(oldpix, &oldw, &oldh);
+		if ((oldw == widget->allocation.width) &&
+			(oldh == widget->allocation.height)) return (TRUE);
+	}
+
+	pix = gdk_pixmap_new(widget->window, widget->allocation.width,
+		widget->allocation.height, -1);
+	if (oldpix)
+	{
+		gc = gdk_gc_new(pix);
+		gdk_draw_pixmap(pix, gc, oldpix, 0, 0, 0, 0, -1, -1);
+		gdk_gc_destroy(gc);
+		gdk_pixmap_unref(oldpix);
+	}
+	gtk_object_set_user_data(GTK_OBJECT(widget), (gpointer)pix);
+
+	if (oldpix && (oldw >= widget->allocation.width) &&
+		(oldh >= widget->allocation.height)) return (TRUE);
+
+	return (FALSE); /* NOW call user configure handler to [re]draw things */
+}
+
+static gboolean wj_pixmap_expose(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
+{
+	GdkPixmap *pix = gtk_object_get_user_data(GTK_OBJECT(widget));
+
+	if (!pix) return (TRUE);
+	gdk_draw_pixmap(widget->window, widget->style->black_gc, pix,
+		event->area.x, event->area.y, event->area.x, event->area.y,
+		event->area.width, event->area.height);
+	return (TRUE);
+}
+
+static void wj_pixmap_destroy(GtkObject *object, gpointer user_data)
+{
+	GdkPixmap *pix = gtk_object_get_user_data(object);
+	if (pix) gdk_pixmap_unref(pix);
+}
+
+GtkWidget *wj_pixmap(int width, int height)
+{
+	GtkWidget *area = gtk_drawing_area_new();
+	gtk_widget_set_events(area, GDK_ALL_EVENTS_MASK);
+	gtk_widget_set_usize(area, width, height);
+	gtk_widget_show(area);
+	gtk_signal_connect(GTK_OBJECT(area), "configure_event",
+		GTK_SIGNAL_FUNC(wj_pixmap_configure), NULL);
+	gtk_signal_connect(GTK_OBJECT(area), "expose_event",
+		GTK_SIGNAL_FUNC(wj_pixmap_expose), NULL);
+	gtk_signal_connect(GTK_OBJECT(area), "destroy",
+		GTK_SIGNAL_FUNC(wj_pixmap_destroy), NULL);
+	return (area);
+}
+
+// Set minimum size for a widget
+
+static void widget_size_req(GtkWidget *widget, GtkRequisition *requisition,
+	gpointer user_data)
+{
+	int h = (guint32)user_data >> 16, w = (guint32)user_data & 0xFFFF;
+
+	if (h && (requisition->height < h)) requisition->height = h;
+	if (w && (requisition->width < w)) requisition->width = w;
+}
+
+/* !!! Warning: this function can't extend box containers in their "natural"
+ * direction, because GTK+ takes shortcuts with their allocation, abusing
+ * requisition value. */
+void widget_set_minsize(GtkWidget *widget, int width, int height)
+{
+	if ((width <= 0) && (height <= 0)) return;
+
+	guint32 hw = (height < 0 ? 0 : height & 0xFFFF) << 16 |
+		(width < 0 ? 0 : width & 0xFFFF);
+	gtk_signal_connect_after(GTK_OBJECT(widget), "size_request",
+		GTK_SIGNAL_FUNC(widget_size_req), (gpointer)hw);
+}
+
+/* This function is a workaround for boxes and the like, wrapping a widget in a
+ * GtkAlignment and setting size on that - or it can be seen as GtkAlignment
+ * widget with extended functionality - WJ */
+GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
+{
+	GtkWidget *align = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+	gtk_container_add(GTK_CONTAINER(align), widget);
+	widget_set_minsize(align, width, height);
+	return (align);
+}
+
 
 // Whatever is needed to move mouse pointer 
 

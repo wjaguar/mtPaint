@@ -508,7 +508,7 @@ static void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			"None", items->tooltip, "Private", iconw, lclick,
+			"None", _(items->tooltip), "Private", iconw, lclick,
 			(gpointer)(items->ID + lbase));
 		if (items->radio > 0) radio[items->radio] = items->widget;
 		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
@@ -566,19 +566,25 @@ static void tool_dis_add(toolbar_item *items)
 #define GP_HEIGHT 16
 static GtkWidget *grad_view;
 
+#undef _
+#define _(X) X
+
+static toolbar_item settings_bar[] = {
+	{ SETB_CONT, 0, 0, 0, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
+	{ SETB_OPAC, 0, 0, 0, 0, _("Opacity Mode"), xpm_mode_opac_xpm },
+	{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
+	{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },
+	{ SETB_CSEL, 0, 0, 1, 0, _("Colour-Selective Mode"), xpm_mode_csel_xpm },
+	{ SETB_MASK, 0, 0, 0, 0, _("Disable All Masks"), xpm_mode_mask_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+#undef _
+#define _(X) __(X)
+
 static void toolbar_settings_init()
 {
 	int i, vals[] = {tool_size, tool_flow, tool_opacity};
 	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") };
-
-	toolbar_item settings_bar[] = {
-		{ SETB_CONT, 0, 0, 0, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
-		{ SETB_OPAC, 0, 0, 0, 0, _("Opacity Mode"), xpm_mode_opac_xpm },
-		{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
-		{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },
-		{ SETB_CSEL, 0, 0, 1, 0, _("Colour-Selective Mode"), xpm_mode_csel_xpm },
-		{ SETB_MASK, 0, 0, 0, 0, _("Disable All Masks"), xpm_mode_mask_xpm },
-		{ 0, 0, 0, 0, 0, NULL, NULL }};
 
 	GtkWidget *label, *vbox, *table, *toolbar_settings, *labels[3];
 	GtkWidget *button;
@@ -687,6 +693,47 @@ static void toolbar_settings_init()
 	gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );
 }
 
+#undef _
+#define _(X) X
+
+static toolbar_item main_bar[] = {
+	{ MTB_NEW, -1, 0, 0, 0, _("New Image"), xpm_new_xpm },
+	{ MTB_OPEN, -1, 0, 0, 0, _("Load Image File"), xpm_open_xpm },
+	{ MTB_SAVE, -1, 1, 0, 0, _("Save Image File"), xpm_save_xpm },
+	{ MTB_CUT, -1, 0, 0, NEED_SEL2, _("Cut"), xpm_cut_xpm },
+	{ MTB_COPY, -1, 0, 0, NEED_SEL2, _("Copy"), xpm_copy_xpm },
+	{ MTB_PASTE, -1, 1, 0, NEED_CLIP, _("Paste"), xpm_paste_xpm },
+	{ MTB_UNDO, -1, 0, 0, NEED_UNDO, _("Undo"), xpm_undo_xpm },
+	{ MTB_REDO, -1, 1, 0, NEED_REDO, _("Redo"), xpm_redo_xpm },
+	{ MTB_BRCOSA, -1, 0, 0, 0, _("Transform Colour"), xpm_brcosa_xpm },
+	{ MTB_PAN, -1, 0, 0, 0, _("Pan Window"), xpm_pan_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+static toolbar_item tools_bar[] = {
+	{ TTB_PAINT, 1, 0, 0, 0, _("Paint"), xpm_paint_xpm },
+	{ TTB_SHUFFLE, 1, 0, 0, 0, _("Shuffle"), xpm_shuffle_xpm },
+	{ TTB_FLOOD, 1, 0, 1, 0, _("Flood Fill"), xpm_flood_xpm },
+	{ TTB_LINE, 1, 0, 0, 0, _("Straight Line"), xpm_line_xpm },
+	{ TTB_SMUDGE, 1, 0, 1, NEED_24, _("Smudge"), xpm_smudge_xpm },
+	{ TTB_CLONE, 1, 0, 0, 0, _("Clone"), xpm_clone_xpm },
+	{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
+	{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
+	{ TTB_GRAD, 1, 1, 1, 0, _("Place Gradient"), xpm_grad_place_xpm },
+	{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
+	{ TTB_TEXT, -1, 1, 0, 0, _("Paste Text"), xpm_text_xpm },
+	{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
+	{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },
+	{ TTB_OUTLINE, -1, 0, 0, NEED_SEL2, _("Outline Selection"), xpm_rect1_xpm },
+	{ TTB_FILL, -1, 1, 0, NEED_SEL2, _("Fill Selection"), xpm_rect2_xpm },
+	{ TTB_SELFV, -1, 0, 0, NEED_CLIP, _("Flip Selection Vertically"), xpm_flip_vs_xpm },
+	{ TTB_SELFH, -1, 0, 0, NEED_CLIP, _("Flip Selection Horizontally"), xpm_flip_hs_xpm },
+	{ TTB_SELRCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Clockwise"), xpm_rotate_cs_xpm },
+	{ TTB_SELRCCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Anti-Clockwise"), xpm_rotate_as_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+#undef _
+#define _(X) __(X)
+
 void toolbar_init(GtkWidget *vbox_main)
 {
 	char txt[32];
@@ -695,41 +742,6 @@ void toolbar_init(GtkWidget *vbox_main)
 	GdkPixmap *icon, *mask;
 	GtkWidget *toolbar_main, *toolbar_tools, *hbox;
 	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
-
-	toolbar_item main_bar[] = {
-		{ MTB_NEW, -1, 0, 0, 0, _("New Image"), xpm_new_xpm },
-		{ MTB_OPEN, -1, 0, 0, 0, _("Load Image File"), xpm_open_xpm },
-		{ MTB_SAVE, -1, 1, 0, 0, _("Save Image File"), xpm_save_xpm },
-		{ MTB_CUT, -1, 0, 0, NEED_SEL2, _("Cut"), xpm_cut_xpm },
-		{ MTB_COPY, -1, 0, 0, NEED_SEL2, _("Copy"), xpm_copy_xpm },
-		{ MTB_PASTE, -1, 1, 0, NEED_CLIP, _("Paste"), xpm_paste_xpm },
-		{ MTB_UNDO, -1, 0, 0, NEED_UNDO, _("Undo"), xpm_undo_xpm },
-		{ MTB_REDO, -1, 1, 0, NEED_REDO, _("Redo"), xpm_redo_xpm },
-		{ MTB_BRCOSA, -1, 0, 0, 0, _("Transform Colour"), xpm_brcosa_xpm },
-		{ MTB_PAN, -1, 0, 0, 0, _("Pan Window"), xpm_pan_xpm },
-		{ 0, 0, 0, 0, 0, NULL, NULL }};
-
-	toolbar_item tools_bar[] = {
-		{ TTB_PAINT, 1, 0, 0, 0, _("Paint"), xpm_paint_xpm },
-		{ TTB_SHUFFLE, 1, 0, 0, 0, _("Shuffle"), xpm_shuffle_xpm },
-		{ TTB_FLOOD, 1, 0, 1, 0, _("Flood Fill"), xpm_flood_xpm },
-		{ TTB_LINE, 1, 0, 0, 0, _("Straight Line"), xpm_line_xpm },
-		{ TTB_SMUDGE, 1, 0, 1, NEED_24, _("Smudge"), xpm_smudge_xpm },
-		{ TTB_CLONE, 1, 0, 0, 0, _("Clone"), xpm_clone_xpm },
-		{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
-		{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
-		{ TTB_GRAD, 1, 1, 1, 0, _("Place Gradient"), xpm_grad_place_xpm },
-		{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
-		{ TTB_TEXT, -1, 1, 0, 0, _("Paste Text"), xpm_text_xpm },
-		{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
-		{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },
-		{ TTB_OUTLINE, -1, 0, 0, NEED_SEL2, _("Outline Selection"), xpm_rect1_xpm },
-		{ TTB_FILL, -1, 1, 0, NEED_SEL2, _("Fill Selection"), xpm_rect2_xpm },
-		{ TTB_SELFV, -1, 0, 0, NEED_CLIP, _("Flip Selection Vertically"), xpm_flip_vs_xpm },
-		{ TTB_SELFH, -1, 0, 0, NEED_CLIP, _("Flip Selection Horizontally"), xpm_flip_hs_xpm },
-		{ TTB_SELRCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Clockwise"), xpm_rotate_cs_xpm },
-		{ TTB_SELRCCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Anti-Clockwise"), xpm_rotate_as_xpm },
-		{ 0, 0, 0, 0, 0, NULL, NULL }};
 
 	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
