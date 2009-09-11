@@ -1,5 +1,5 @@
 --------------------------------------------------
-mtPaint 3.21 - Copyright (C) 2004-2008 The Authors
+mtPaint 3.30 - Copyright (C) 2004-2008 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
@@ -42,6 +42,8 @@ If you want to uninstall these files from your system, you should type:
 su -c "make uninstall"
 
 There are various configure options that may be useful for some people.  Use "./configure --help" to find out what options are available.  If you are compiling a binary for distribution to other peoples systems, the option 'asneeded' is particularly useful (if the gcc option -Wl,--as-needed is available, i.e. binutils >=2.17), as it only creates links to libraries which are absolutely necessary to mtPaint.  For example, without this option if you compile mtPaint against GTK+2.10 you will find it will not run on GTK+2.6 systems because Cairo doesn't exist on the older system.
+
+Use "./configure release" to compile mtPaint with the same optimizations we use for distribution packages; this includes the "asneeded" option. To enable internationalization, add the "intl" option.
 
 If you are compiling mtPaint on an older system without gtk-config, you may need to adjust the configure script so that the GTK+1 settings are done manually.  I have provided an example in the configure script to demonstrate.
 
@@ -138,7 +140,7 @@ Japanese - Norihiro YONEDA
 Polish - Simek, LucaS
 Portuguese - Israel G. Lugo, Tiago Silva
 Russian - Sergey Irupin, Dmitry Groshev
-Simplified Chinese - puppychinese(Cecc)
+Simplified Chinese - Cecc
 Slovak - Jozef Riha
 Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon
 Taiwanese Chinese - Wei-Lun Chao

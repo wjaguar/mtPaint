@@ -432,8 +432,7 @@ void pressed_preferences()
 ///	SETUP NOTEBOOK
 
 	notebook1 = xpack(vbox3, gtk_notebook_new());
-	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_RIGHT);
-//	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
+	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
 //	gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook1), TRUE);
 	gtk_widget_show(notebook1);
 
@@ -455,6 +454,29 @@ void pressed_preferences()
 
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
 		page, inifile_get_gboolean("defaultGamma", FALSE));
+	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
+		page, chequers_optimize );
+	checkbutton_zoom[3] = add_a_toggle( _("Disable view window transparencies"),
+		page, opaque_view );
+
+///	LANGUAGE SWITCHBOX
+#ifdef U_NLS
+	vbox_2 = gtk_vbox_new(FALSE, 5);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox_2), 5);
+
+	label = pack(vbox_2, gtk_label_new( _("Select preferred language translation\n\n"
+		"You will need to restart mtPaint\nfor this to take full effect")));
+
+	for (i = 0; i < PREF_LANGS; i++)
+	{
+		if (!strcmp(pref_lang_ini_code[i],
+			inifile_get("languageSETTING", "system"))) break;
+	}
+	pack(vbox_2, wj_option_menu(pref_langs, PREF_LANGS, i, &pref_lang, NULL));
+
+	gtk_widget_show_all(vbox_2);
+	add_with_frame(page, _("Language"), vbox_2, 5);
+#endif
 
 ///	---- TAB2 - INTERFACE
 
@@ -483,7 +505,11 @@ void pressed_preferences()
 		page, paste_commit);
 	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
 		page, inifile_get_gboolean("centerSettings", TRUE));
+	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
+		page, inifile_get_gboolean("zoomToggle", FALSE) );
 #if GTK_MAJOR_VERSION == 2
+	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
+		page, inifile_get_gboolean("scrollwheelZOOM", FALSE) );
 	checkbutton_menuicons = add_a_toggle(_("Use menu icons"), page, show_menu_icons);
 #endif
 
@@ -547,24 +573,7 @@ void pressed_preferences()
 		prefs_status[i] = add_a_toggle( stat_tex[i], page, status_on[i] );
 	}
 
-///	---- TAB6 - ZOOM
-
-	page = add_new_page(notebook1, _("Zoom"));
-
-	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
-		page, inifile_get_gboolean("zoomToggle", FALSE) );
-#if GTK_MAJOR_VERSION == 2
-	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
-		page, inifile_get_gboolean("scrollwheelZOOM", FALSE) );
-#endif
-	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
-		page, chequers_optimize );
-	checkbutton_zoom[3] = add_a_toggle( _("Disable view window transparencies"),
-		page, opaque_view );
-
-
-
-///	---- TAB7 - TABLET
+///	---- TAB6 - TABLET
 
 	page = add_new_page(notebook1, _("Tablet"));
 
@@ -641,31 +650,6 @@ void pressed_preferences()
 	label_tablet_pressure = pack(vbox_2, gtk_label_new(""));
 	gtk_widget_show (label_tablet_pressure);
 	gtk_misc_set_alignment (GTK_MISC (label_tablet_pressure), 0, 0.5);
-
-
-
-///	---- TAB8 - LANGUAGE
-
-#ifdef U_NLS
-
-	page = add_new_page(notebook1, _("Language"));
-	gtk_container_set_border_width(GTK_CONTAINER(page), 10);
-
-	add_hseparator( page, 200, 10 );
-	label = pack(page, gtk_label_new( _("Select preferred language translation\n\n"
-				"You will need to restart mtPaint\nfor this to take full effect")));
-	gtk_widget_show (label);
-	add_hseparator( page, 200, 10 );
-
-	for (i = 0; i < PREF_LANGS; i++)
-	{
-		if (!strcmp(pref_lang_ini_code[i],
-			inifile_get("languageSETTING", "system"))) break;
-	}
-	xpack(page, wj_radio_pack(pref_langs, PREF_LANGS, (PREF_LANGS + 1) / 2,
-		i, &pref_lang, NULL));
-
-#endif
 
 
 

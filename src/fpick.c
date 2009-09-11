@@ -413,11 +413,24 @@ static char *isort_key(char *src)
 
 #endif
 
-static void fpick_cleanse_path(char *txt)		// Clean up null terminated path
+/* !!! Expects that "txt" points to PATHBUF-sized buffer */
+static void fpick_cleanse_path(char *txt)	// Clean up null terminated path
 {
 	static const char dds[] = { DIR_SEP, DIR_SEP, 0 };
 	char *src, *dest;
 
+#ifdef WIN32
+	// Unify path separators
+	src = txt;
+	while ((src = strchr(src, '/'))) *src = DIR_SEP;
+#endif
+	// Expand home directory
+	if ((txt[0] == '~') && (txt[1] == DIR_SEP))
+	{
+		src = g_strconcat(get_home_directory(), txt + 1, NULL);
+		strncpy0(txt, src, PATHBUF - 1);
+		g_free(src);
+	}
 	// Remove multiple consecutive occurences of DIR_SEP
 	if ((dest = src = strstr(txt, dds)))
 	{
@@ -849,10 +862,114 @@ static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 	fpick_enter_dirname(fp, gtk_entry_get_text(GTK_ENTRY(fp->combo_entry)));
 }
 
+static void fpick_dialog_fn(char *key)
+{
+	*(key - *key) = *key;
+}
+
+static void fpick_file_dialog(fpicker *fp, char *fname)
+{
+	char fnm[PATHBUF], keys[] = { 0, 1, 2, 3, 4 }, *snm = NULL, *tmp;
+	GtkWidget *win, *button, *label, *entry;
+	GtkAccelGroup *ag = gtk_accel_group_new();
+	int l, res;
+
+
+	win = gtk_dialog_new();
+	if (fname) sprintf(tmp = fnm, "%s / %s", _("Delete"), _("Rename"));
+	else tmp = _("Create Directory");
+	gtk_window_set_title(GTK_WINDOW(win), tmp);
+	gtk_window_set_modal(GTK_WINDOW(win), TRUE);
+	gtk_window_set_position(GTK_WINDOW(win), GTK_WIN_POS_CENTER);
+	gtk_container_set_border_width(GTK_CONTAINER(win), 6);
+	gtk_signal_connect_object(GTK_OBJECT(win), "destroy",
+		GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + 1));
+	label = gtk_label_new(fname ? _("Enter the new filename") :
+		_("Enter the name of the new directory"));
+	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(win)->vbox), label, TRUE, FALSE, 8);
+
+	entry = xpack5(GTK_DIALOG(win)->vbox, gtk_entry_new_with_max_length(PATHBUF));
+	if (fname) gtk_entry_set_text(GTK_ENTRY(entry), fname);
+
+	button = add_a_button(_("Cancel"), 2, GTK_DIALOG(win)->action_area, TRUE);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(win));
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
+
+	if (fname)
+	{
+		button = add_a_button(_("Delete"), 2, GTK_DIALOG(win)->action_area, TRUE);
+		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + 2));
+	}
+
+	button = add_a_button(fname ? _("Rename") : _("Create"), 2,
+		GTK_DIALOG(win)->action_area, TRUE );
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + (fname ? 3 : 4)));
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags)0);
+	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags)0);
+
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_widget_show_all(win);
+	gdk_window_raise(win->window);
+	gtk_widget_grab_focus(entry);
+
+	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
+
+	while (!keys[0]) gtk_main_iteration();
+
+	res = keys[0];
+	if (res > 1)
+	{
+		strncpy(fnm, fp->txt_directory, PATHBUF);
+		l = strlen(fnm);
+		gtkncpy(fnm + l, gtk_entry_get_text(GTK_ENTRY(entry)), PATHBUF - l);
+		gtk_widget_destroy(win);
+		if (fname)
+		{
+			// The source name SHOULD NOT get truncated, ever
+			char *ts = gtkncpy(NULL, fname, 0);
+			snm = g_strconcat(fp->txt_directory, ts, NULL);
+			g_free(ts);
+		}
+	}
+
+	tmp = NULL;
+	if (res == 2) // Delete file or directory
+	{
+		char *ts = g_strdup_printf(_("Do you really want to delete \"%s\" ?"), fname);
+		l = alert_box(_("Warning"), ts, _("No"), _("Yes"), NULL);
+		g_free(ts);
+		if (l == 2)
+		{
+			if (remove(snm)) tmp = _("Unable to delete");
+		}
+	}
+	else if (res == 3) // Rename file or directory
+	{
+		if (rename(snm, fnm)) tmp = _("Unable to rename");
+	}
+	else if (res == 4) // Create directory
+	{
+#ifdef WIN32
+		if (mkdir(fnm))
+#else
+		if (mkdir(fnm, 0777))
+#endif
+			tmp = _("Unable to create directory");
+	}
+	g_free(snm);
+	if (tmp) alert_box(_("Error"), tmp, _("OK"), NULL, NULL);
+	else fpick_scan_directory(fp, fp->txt_directory, FALSE);
+}
+
 static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
 	fpicker *fp = user_data;
+	GtkCList *clist = GTK_CLIST(fp->clist);
 	GList *list;
 	char *txt_name, *txt_size;
 	int row = 0;
@@ -860,30 +977,49 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 	switch (event->keyval)
 	{
 	case GDK_End: case GDK_KP_End:
-		row = GTK_CLIST(fp->clist)->rows - 1;
+		row = clist->rows - 1;
 	case GDK_Home: case GDK_KP_Home:
-		GTK_CLIST(fp->clist)->focus_row = row;
-		gtk_clist_select_row(GTK_CLIST(fp->clist), row, 0);
-		gtk_clist_moveto(GTK_CLIST(fp->clist), row, 0, 0.5, 0.5);
+		clist->focus_row = row;
+		gtk_clist_select_row(clist, row, 0);
+		gtk_clist_moveto(clist, row, 0, 0.5, 0.5);
 		return (TRUE);
 	case GDK_Return: case GDK_KP_Enter:
 		break;
 	default: return (FALSE);
 	}
 
-	if (!(list = GTK_CLIST(fp->clist)->selection)) return (FALSE);
+	if (!(list = clist->selection)) return (FALSE);
 
 	row = GPOINTER_TO_INT(list->data);
 
-	txt_name = get_fname(GTK_CLIST(widget), row);
+	txt_name = get_fname(clist, row);
 	if (!txt_name) return (TRUE);
 	
-	gtk_clist_get_text(GTK_CLIST(widget), row, FPICK_CLIST_SIZE, &txt_size);
+	gtk_clist_get_text(clist, row, FPICK_CLIST_SIZE, &txt_size);
 
 	/* Directory selected */
 	if (!txt_size[0]) fpick_enter_dir_via_list(fp, txt_name);
 	/* File selected */
-	else gtk_button_clicked (GTK_BUTTON (fp->ok_button));
+	else gtk_button_clicked(GTK_BUTTON(fp->ok_button));
+
+	return (TRUE);
+}
+
+static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	fpicker *fp = user_data;
+	char *fname;
+
+	if ((event->button != 3) || (event->type != GDK_BUTTON_PRESS))
+		return (FALSE);
+	fname = get_fname(GTK_CLIST(fp->clist), GTK_CLIST(fp->clist)->focus_row);
+	if (!strcmp(fname, "..")) return (TRUE); // Up-dir
+#ifdef WIN32
+	if (fname[1] == ':') return (TRUE); // Drive
+#endif
+
+	fpick_file_dialog(fp, fname);
 
 	return (TRUE);
 }
@@ -1104,6 +1240,8 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 		GTK_SIGNAL_FUNC(fpick_select_row), res);
 	gtk_signal_connect(GTK_OBJECT(res->clist), "key_press_event",
 		GTK_SIGNAL_FUNC(fpick_key_event), res);
+	gtk_signal_connect(GTK_OBJECT(res->clist), "button_press_event",
+		GTK_SIGNAL_FUNC(fpick_click_event), res);
 
 
 	// ------- Extra widget section -------
@@ -1248,85 +1386,6 @@ void fpick_destroy(GtkWidget *fp)			// Destroy structures and release memory
 	destroy_dialog(fp);
 }
 
-static void fpick_newdir_destroy( GtkWidget *widget, int *data )
-{
-	*data = 10;
-	gtk_widget_destroy(widget);
-}
-
-static void fpick_newdir_cancel( GtkWidget *widget, int *data )
-{
-	*data = 2;
-}
-
-static void fpick_newdir_ok( GtkWidget *widget, int *data )
-{
-	*data = 1;
-}
-
-static void fpick_create_newdir(fpicker *fp)
-{
-	char fnm[PATHBUF];
-	GtkWidget *win, *button, *label, *entry;
-	GtkAccelGroup *ag = gtk_accel_group_new();
-	int l, res=0;
-
-	win = gtk_dialog_new();
-	gtk_window_set_title( GTK_WINDOW(win), _("Create Directory") );
-	gtk_window_set_modal( GTK_WINDOW(win), TRUE );
-	gtk_window_set_position( GTK_WINDOW(win), GTK_WIN_POS_CENTER );
-	gtk_container_set_border_width( GTK_CONTAINER(win), 6 );
-	gtk_signal_connect(GTK_OBJECT(win), "destroy",
-		GTK_SIGNAL_FUNC(fpick_newdir_destroy), &res);
-
-	label = gtk_label_new( _("Enter the name of the new directory") );
-	gtk_label_set_line_wrap( GTK_LABEL(label), TRUE );
-	gtk_box_pack_start( GTK_BOX(GTK_DIALOG(win)->vbox), label, TRUE, FALSE, 8 );
-
-	entry = xpack5(GTK_DIALOG(win)->vbox, gtk_entry_new_with_max_length(100));
-
-	button = add_a_button( _("Cancel"), 2, GTK_DIALOG(win)->action_area, TRUE );
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(fpick_newdir_cancel), &res);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button = add_a_button( _("OK"), 2, GTK_DIALOG(win)->action_area, TRUE );
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(fpick_newdir_ok), &res);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-
-	gtk_window_set_transient_for( GTK_WINDOW(win), GTK_WINDOW(main_window) );
-	gtk_widget_show_all(win);
-	gdk_window_raise(win->window);
-	gtk_widget_grab_focus(entry);
-
-	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
-
-	while (!res) gtk_main_iteration();
-
-	if (res == 2) gtk_widget_destroy(win);
-	else if (res == 1)
-	{
-		strncpy(fnm, fp->txt_directory, PATHBUF);
-		l = strlen(fnm);
-		gtkncpy(fnm + l, gtk_entry_get_text(GTK_ENTRY(entry)), PATHBUF - l);
-
-		gtk_widget_destroy( win );
-
-#ifdef WIN32
-		if (mkdir(fnm))
-#else
-		if (mkdir(fnm, 0777))
-#endif
-		{
-			alert_box(_("Error"), _("Unable to create directory"),
-				_("OK"), NULL, NULL);
-		}
-		else fpick_scan_directory(fp, fp->txt_directory, FALSE);
-	}
-}
-
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 {
 	toolbar_item *item = user_data;
@@ -1346,7 +1405,7 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 		fpick_set_filename(fp->window, fnm, FALSE);
 		break;
 	case FPICK_ICON_DIR:
-		fpick_create_newdir(fp);
+		fpick_file_dialog(fp, NULL);
 		break;
 	case FPICK_ICON_HIDDEN:
 		fp->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));

@@ -37,7 +37,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Drawing operations on utility channels now respect tool opacity
 	* Drawing in image channel with coupled alpha now ignores drawing modes for alpha channel
 	* Smudge tool now works about two times faster
-	* 12 new blend modes added
+	* 12 new blend modes added - Multiply, Divide, Screen, Dodge, Burn, Hard Light, Soft Light, Difference, Darken, Lighten, Grain Extract, Grain Merge
 	* Ctrl+Double click selects average colour underneath brush square or selection marquee
 	* "Convert to indexed" using current palette now truncates the palette only if requested
 	* "Convert to indexed" PNN and Wu quantizers now have diameter based weighting option
@@ -45,7 +45,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Brush preview area border now can't be messed up by theme engines
 	* Makefiles now honor DESTDIR
 	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.8)
-	* Communal memory space now implemented for layers - see handbook section 8.4.3
+	* Communal memory space now implemented for layers (see handbook section 8.4.3)
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste and gradient previews eliminated
 	* BUGFIX - "Remove All Layers" with layers window closed doesn't cause crash

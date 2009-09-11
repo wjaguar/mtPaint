@@ -685,6 +685,7 @@ void toolbar_init(GtkWidget *vbox_main)
 	gtk_container_add(GTK_CONTAINER(box), toolbar_tools);
 
 	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar, icon_buttons, NULL, NULL);
+	/* !!! If hardcoded default tool isn't the default brush, this will crash */
 	change_to_tool(TTB_PAINT);
 
 	gtk_widget_show(toolbar_tools);

@@ -1560,7 +1560,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	}
 }
 
-static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
+static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
 {
 	int pflag = event->type != GDK_BUTTON_RELEASE;
 	gdouble pressure = 1.0;

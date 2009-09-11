@@ -202,12 +202,9 @@ void progress_end()			// Close progress window
 
 static int alert_result;
 
-static gboolean alert_reply(GtkWidget *widget, gpointer data)
+static void alert_reply(gpointer data)
 {
-	if ( alert_result == 0 ) alert_result = (int)data;
-	if ( alert_result == 10 ) gtk_widget_destroy(widget);
-	
-	return FALSE;
+	if (!alert_result) alert_result = (int)data;
 }
 
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 )
@@ -222,8 +219,8 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	gtk_window_set_modal( GTK_WINDOW(alert), TRUE );
 	gtk_window_set_position( GTK_WINDOW(alert), GTK_WIN_POS_CENTER );
 	gtk_container_set_border_width( GTK_CONTAINER(alert), 6 );
-	gtk_signal_connect( GTK_OBJECT(alert), "destroy",
-			GTK_SIGNAL_FUNC(alert_reply), (gpointer) 10 );
+	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
+		GTK_SIGNAL_FUNC(alert_reply), (gpointer)10);
 	
 	label = gtk_label_new( message );
 	gtk_label_set_line_wrap( GTK_LABEL(label), TRUE );
@@ -234,7 +231,7 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	{
 		if (!butxt[i]) continue;
 		buttons[i] = add_a_button(butxt[i], 2, GTK_DIALOG(alert)->action_area, TRUE);
-		gtk_signal_connect(GTK_OBJECT(buttons[i]), "clicked",
+		gtk_signal_connect_object(GTK_OBJECT(buttons[i]), "clicked",
 			GTK_SIGNAL_FUNC(alert_reply), (gpointer)(i + 1));
 	}
 	gtk_widget_add_accelerator (buttons[0], "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
