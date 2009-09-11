@@ -487,43 +487,47 @@ void pal_refresher()
 
 /* Generic code to handle UI needs of common image transform tasks */
 
-GtkWidget *filter_win, *filter_cont;
-filter_hook filter_func;
-gpointer filter_data;
+typedef struct {
+	GtkWidget *cont;
+	filter_hook func;
+	gpointer data;
+} filter_wrap;
 
-void run_filter(GtkButton *button, gpointer user_data)
+void run_filter(GtkWidget *widget, gpointer user_data)
 {
-	if (filter_func(filter_cont, filter_data))
-		gtk_widget_destroy(filter_win);
+	filter_wrap *fw = gtk_object_get_user_data(GTK_OBJECT(widget));
+	if (fw->func(fw->cont, fw->data)) gtk_widget_destroy(widget);
 	update_all_views();
 }
 
 void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool)
 {
-	GtkWidget *vbox6;
+	filter_wrap *fw;
+	GtkWidget *win, *vbox;
 	GtkWindowPosition pos = istool && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
-	filter_cont = content;
-	filter_func = filt;
-	filter_data = fdata;
-	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
-	gtk_window_set_default_size(GTK_WINDOW(filter_win), 300, -1);
+	win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
+	fw = bound_malloc(win, sizeof(filter_wrap));
+	gtk_object_set_user_data(GTK_OBJECT(win), (gpointer)fw);
+	gtk_window_set_default_size(GTK_WINDOW(win), 300, -1);
 
-	vbox6 = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox6);
-	gtk_container_add(GTK_CONTAINER(filter_win), vbox6);
+	fw->cont = content;
+	fw->func = filt;
+	fw->data = fdata;
 
-	add_hseparator(vbox6, -2, 10);
+	vbox = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(vbox);
+	gtk_container_add(GTK_CONTAINER(win), vbox);
 
-	pack5(vbox6, content);
+	add_hseparator(vbox, -2, 10);
+	pack5(vbox, content);
+	add_hseparator(vbox, -2, 10);
 
-	add_hseparator(vbox6, -2, 10);
-
-	pack(vbox6, OK_box(0, filter_win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
+	pack(vbox, OK_box(0, win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
-	gtk_widget_show(filter_win);
+	gtk_widget_show(win);
 }
 
 ///	BACTERIA EFFECT

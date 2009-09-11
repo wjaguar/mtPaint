@@ -187,6 +187,7 @@ static void toolbar_zoom_view_change()
 	if ( new > 0 ) vw_align_size( new );
 }
 
+static GtkWidget *settings_buttons[TOTAL_SETTINGS];
 static int *vars_settings[TOTAL_SETTINGS] = {
 	&mem_continuous, &mem_undo_opacity,
 	&tint_mode[0], &tint_mode[1],
@@ -194,13 +195,14 @@ static int *vars_settings[TOTAL_SETTINGS] = {
 	&mem_unmask, &mem_gradient
 };
 
-void toolbar_mode_change(GtkWidget *widget, gpointer data)
+void mode_change(int setting, int state)
 {
-	gint j = (gint) data;
+	if (!GTK_TOGGLE_BUTTON(settings_buttons[setting])->active != !state) // Toggle the button
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_buttons[setting]), state);
 
-	*(vars_settings[j]) = !!GTK_TOGGLE_BUTTON(widget)->active;
-
-	switch (j)
+	if (!state == !*vars_settings[setting]) return; // No change, or changed already
+	*(vars_settings[setting]) = state;
+	switch (setting)
 	{
 	case SETB_CSEL:
 		if (mem_cselect && !csel_data)
@@ -238,6 +240,17 @@ static int set_flood(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
+void flood_settings() /* Flood fill step */
+{
+	GtkWidget *box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	pack(box, add_float_spin(flood_step, 0, 200));
+	add_a_toggle(_("RGB Cube"), box, flood_cube);
+	add_a_toggle(_("By image channel"), box, flood_img);
+	add_a_toggle(_("Gradient-driven"), box, flood_slide);
+	filter_window(_("Fill settings"), box, set_flood, NULL, TRUE);
+}
+
 static int set_smudge(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *toggle;
@@ -246,6 +259,14 @@ static int set_smudge(GtkWidget *box, gpointer fdata)
 	smudge_mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
 
 	return TRUE;
+}
+
+void smudge_settings() /* Smudge opacity mode */
+{
+	GtkWidget *box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
+	filter_window(_("Smudge settings"), box, set_smudge, NULL, TRUE);
 }
 
 static int set_brush_step(GtkWidget *box, gpointer fdata)
@@ -258,11 +279,21 @@ static int set_brush_step(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
-static int blendtemp[5];
+void step_settings() /* Brush spacing */
+{
+	GtkWidget *box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	pack(box, add_a_spin(brush_spacing, 0, MAX_WIDTH));
+// !!! Not implemented yet
+//	add_a_toggle(_("Flat gradient strokes"), box, ???);
+	filter_window(_("Brush spacing"), box, set_brush_step, NULL, TRUE);
+}
+
+#define BLENDTEMP_SIZE 5
 
 static int set_blend(GtkWidget *box, gpointer fdata)
 {
-	int i, j;
+	int i, j, *blendtemp = fdata;
 
 	i = blendtemp[0] < 0 ? BLEND_NORMAL : blendtemp[0];
 	j = !blendtemp[2] + (!blendtemp[3] << 1) + (!blendtemp[4] << 2);
@@ -276,80 +307,32 @@ static int set_blend(GtkWidget *box, gpointer fdata)
 	return (TRUE);
 }
 
-static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
+void blend_settings() /* Blend mode */
 {
 	char *rgbnames[3] = { _("Red"), _("Green"), _("Blue") };
 	char *blends[BLEND_NMODES] = {
 		_("Normal"), _("Hue"), _("Saturation"), _("Value"),
 		_("Colour"), _("Saturate More") };
 	GtkWidget *box, *hbox;
-	int i, k;
+	int i, *blendtemp;
 
-	/* Handle only right clicks */
-	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
-		return (FALSE);
-
-	switch ((gint)user_data)
+	box = gtk_vbox_new(FALSE, 5);
+	blendtemp = bound_malloc(box, BLENDTEMP_SIZE * sizeof(int));
+	gtk_container_set_border_width(GTK_CONTAINER(box), 5);
+	pack(box, wj_combo_box(blends, BLEND_NMODES,
+		blend_mode & BLEND_MMASK, blendtemp + 0, NULL));
+	pack(box, sig_toggle(_("Reverse"), blend_mode & BLEND_REVERSE,
+		blendtemp + 1, NULL));
+	add_hseparator(box, -2, 10);
+	hbox = pack(box, gtk_hbox_new(TRUE, 5));
+	for (i = 0; i < 3; i++)
 	{
-	case SETB_CONT: /* Brush spacing */
-		box = gtk_vbox_new(FALSE, 5);
-		gtk_widget_show(box);
-		pack(box, add_a_spin(brush_spacing, 0, MAX_WIDTH));
-// !!! Not implemented yet
-//		add_a_toggle(_("Flat gradient strokes"), box, ???);
-		filter_window(_("Brush spacing"), box, set_brush_step, NULL, TRUE);
-		break;
-	case SETB_CSEL:
-		colour_selector(COLSEL_EDIT_CSEL);
-		break;
-	case SETB_GRAD: /* Gradient selector */
-		gradient_setup(1);
-		break;
-	case SETB_FILT: /* Blend mode */
-		box = gtk_vbox_new(FALSE, 5);
-		gtk_container_set_border_width(GTK_CONTAINER(box), 5);
-		k = 0;
-		pack(box, wj_combo_box(blends, BLEND_NMODES,
-			blend_mode & BLEND_MMASK, blendtemp + 0, NULL));
-		pack(box, sig_toggle(_("Reverse"), blend_mode & BLEND_REVERSE,
-			blendtemp + 1, NULL));
-		add_hseparator(box, -2, 10);
-		hbox = pack(box, gtk_hbox_new(TRUE, 5));
-		for (i = 0; i < 3; i++)
-		{
-			pack(hbox, sig_toggle(rgbnames[i],
-				~blend_mode & ((1 << BLEND_RGBSHIFT) << i),
-				blendtemp + 2 + i, NULL));
-		}
-		gtk_widget_show_all(box);
-		filter_window(_("Blend mode"), box, set_blend, NULL, TRUE);
-		break;
-	case (TTB_0 + TTB_FLOOD): /* Flood fill step */
-		box = gtk_vbox_new(FALSE, 5);
-		gtk_widget_show(box);
-		pack(box, add_float_spin(flood_step, 0, 200));
-		add_a_toggle(_("RGB Cube"), box, flood_cube);
-		add_a_toggle(_("By image channel"), box, flood_img);
-		add_a_toggle(_("Gradient-driven"), box, flood_slide);
-		filter_window(_("Fill settings"), box, set_flood, NULL, TRUE);
-		break;
-	case (TTB_0 + TTB_SMUDGE): /* Smudge opacity mode */
-		box = gtk_vbox_new(FALSE, 5);
-		gtk_widget_show(box);
-		add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
-		filter_window(_("Smudge settings"), box, set_smudge, NULL, TRUE);
-		break;
-	case (TTB_0 + TTB_GRAD): /* Gradient config */
-		gradient_setup(0);
-		break;
-	case (TTB_0 + TTB_TEXT): /* FreeType text paste */
-		pressed_mt_text();
-		break;
-	default: /* For other buttons, do nothing */
-		return (FALSE);
+		pack(hbox, sig_toggle(rgbnames[i],
+			~blend_mode & ((1 << BLEND_RGBSHIFT) << i),
+			blendtemp + 2 + i, NULL));
 	}
-	return (TRUE);
+	gtk_widget_show_all(box);
+	filter_window(_("Blend mode"), box, set_blend, (gpointer)blendtemp, TRUE);
 }
 
 
@@ -389,32 +372,60 @@ static void toolbar_settings_exit()
 	toolbar_exit();
 }
 
-void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
-	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase)
+static void toolbar_click(GtkWidget *widget, gpointer user_data)
 {
-	GtkWidget *iconw, *radio[32];
+	toolbar_item *item = user_data;
+
+	action_dispatch(item->action, item->mode, item->radio < 0 ? TRUE :
+		GTK_TOGGLE_BUTTON(widget)->active, FALSE);
+}
+
+static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	toolbar_item *item = user_data;
+
+	/* Handle only right clicks */
+	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
+		return (FALSE);
+	action_dispatch(item->action2, item->mode2, TRUE, FALSE);
+	return (TRUE);
+}
+
+void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
+	GtkSignalFunc lclick, GtkSignalFunc rclick)
+{
+	GtkWidget *item, *iconw, *radio[32];
 	GdkPixmap *icon, *mask;
 
+	if (!lclick) lclick = GTK_SIGNAL_FUNC(toolbar_click);
+	if (!rclick) rclick = GTK_SIGNAL_FUNC(toolbar_rclick);
+
 	memset(radio, 0, sizeof(radio));
-	for (; items->xpm; items++)
+	for (; items->tooltip; items++)
 	{
+		if (!items->xpm) // This is a separator
+		{
+			gtk_toolbar_append_space(bar);
+			continue;
+		}
 		icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
 			NULL, items->xpm);
 		iconw = gtk_pixmap_new(icon, mask);
 		gdk_pixmap_unref(icon);
 		gdk_pixmap_unref(mask);
-		items->widget = gtk_toolbar_append_element(bar,
+		item = gtk_toolbar_append_element(bar,
 			items->radio < 0 ? GTK_TOOLBAR_CHILD_BUTTON :
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
 			NULL, _(items->tooltip), "Private", iconw, lclick,
-			(gpointer)(items->ID + lbase));
-		if (items->radio > 0) radio[items->radio] = items->widget;
-		if (items->rclick) gtk_signal_connect(GTK_OBJECT(items->widget),
-			"button_press_event", rclick, (gpointer)(items->ID + rbase));
-		if (items->sep) gtk_toolbar_append_space(bar);
-		mapped_dis_add(items->widget, items->actmap);
+			(gpointer)items);
+		if (items->radio > 0) radio[items->radio] = item;
+		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
+			"button_press_event", rclick, (gpointer)items);
+		mapped_dis_add(item, items->actmap);
+		if (wlist) wlist[items->ID] = item;
 	}
 }
 
@@ -426,14 +437,17 @@ static GtkWidget *grad_view;
 #define _(X) X
 
 static toolbar_item settings_bar[] = {
-	{ SETB_CONT, 0, 0, 1, 0, _("Continuous Mode"), xpm_mode_cont_xpm },
-	{ SETB_OPAC, 0, 0, 0, 0, _("Opacity Mode"), xpm_mode_opac_xpm },
-	{ SETB_TINT, 0, 0, 0, 0, _("Tint Mode"), xpm_mode_tint_xpm },
-	{ SETB_TSUB, 0, 0, 0, 0, _("Tint +-"), xpm_mode_tint2_xpm },
-	{ SETB_CSEL, 0, 0, 1, 0, _("Colour-Selective Mode"), xpm_mode_csel_xpm },
-	{ SETB_FILT, 0, 0, 1, 0, _("Blend Mode"), xpm_mode_blend_xpm },
-	{ SETB_MASK, 0, 0, 0, 0, _("Disable All Masks"), xpm_mode_mask_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ _("Continuous Mode"), 0, SETB_CONT, 0, xpm_mode_cont_xpm, ACT_MODE, SETB_CONT, DLG_STEP, 0 },
+	{ _("Opacity Mode"), 0, SETB_OPAC, 0, xpm_mode_opac_xpm, ACT_MODE, SETB_OPAC },
+	{ _("Tint Mode"), 0, SETB_TINT, 0, xpm_mode_tint_xpm, ACT_MODE, SETB_TINT },
+	{ _("Tint +-"), 0, SETB_TSUB, 0, xpm_mode_tint2_xpm, ACT_MODE, SETB_TSUB },
+	{ _("Colour-Selective Mode"), 0, SETB_CSEL, 0, xpm_mode_csel_xpm, ACT_MODE, SETB_CSEL, DLG_COLORS, COLSEL_EDIT_CSEL },
+	{ _("Blend Mode"), 0, SETB_FILT, 0, xpm_mode_blend_xpm, ACT_MODE, SETB_FILT, DLG_FILT, 0 },
+	{ _("Disable All Masks"), 0, SETB_MASK, 0, xpm_mode_mask_xpm, ACT_MODE, SETB_MASK },
+	{ NULL }};
+
+static toolbar_item gradient_button =
+	{ _("Gradient Mode"), 0, SETB_GRAD, 0, NULL, ACT_MODE, SETB_GRAD, DLG_GRAD, 1 };
 
 #undef _
 #define _(X) __(X)
@@ -480,19 +494,11 @@ static void toolbar_settings_init()
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS);
 #endif
 
-	fill_toolbar(GTK_TOOLBAR(toolbar_settings), settings_bar,
-		GTK_SIGNAL_FUNC(toolbar_mode_change), 0,
-		GTK_SIGNAL_FUNC(toolbar_rclick), 0);
-
-	for (i = 0; i < TOTAL_ICONS_SETTINGS; i++)
-	{
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_bar[i].widget),
-			!!*(vars_settings[i]));
-	}
-
+	fill_toolbar(GTK_TOOLBAR(toolbar_settings), settings_bar, settings_buttons, NULL, NULL);
 	gtk_widget_show(toolbar_settings);
 
 	/* Gradient mode button+preview */
+	settings_buttons[SETB_GRAD] = button = pack(vbox, gtk_toggle_button_new());
 	button = pack(vbox, gtk_toggle_button_new());
 	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
 	grad_view = gtk_pixmap_new(pmap, NULL);
@@ -502,16 +508,21 @@ static void toolbar_settings_init()
 #if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
 	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
 #endif
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), !!mem_gradient);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(toolbar_mode_change), (gpointer)SETB_GRAD);
+		GTK_SIGNAL_FUNC(toolbar_click), (gpointer)&gradient_button);
 	gtk_signal_connect(GTK_OBJECT(button), "button_press_event",
-		GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)SETB_GRAD);
+		GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)&gradient_button);
 	gtk_widget_show_all(button);
 	gtk_widget_realize(grad_view);
 	/* Parasite gradient tooltip on settings toolbar */
 	gtk_tooltips_set_tip(GTK_TOOLBAR(toolbar_settings)->tooltips,
-		button, _("Gradient Mode"), "Private");
+		button, gradient_button.tooltip, "Private");
+
+	for (i = 0; i < TOTAL_SETTINGS; i++) // Initialize buttons' state
+	{
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_buttons[i]),
+			!!*(vars_settings[i]));
+	}
 
 	/* Colors A & B */
 	label = pack(vbox, gtk_label_new(""));
@@ -554,39 +565,45 @@ static void toolbar_settings_init()
 #define _(X) X
 
 static toolbar_item main_bar[] = {
-	{ MTB_NEW, -1, 0, 0, 0, _("New Image"), xpm_new_xpm },
-	{ MTB_OPEN, -1, 0, 0, 0, _("Load Image File"), xpm_open_xpm },
-	{ MTB_SAVE, -1, 1, 0, 0, _("Save Image File"), xpm_save_xpm },
-	{ MTB_CUT, -1, 0, 0, NEED_SEL2, _("Cut"), xpm_cut_xpm },
-	{ MTB_COPY, -1, 0, 0, NEED_SEL2, _("Copy"), xpm_copy_xpm },
-	{ MTB_PASTE, -1, 1, 0, NEED_CLIP, _("Paste"), xpm_paste_xpm },
-	{ MTB_UNDO, -1, 0, 0, NEED_UNDO, _("Undo"), xpm_undo_xpm },
-	{ MTB_REDO, -1, 1, 0, NEED_REDO, _("Redo"), xpm_redo_xpm },
-	{ MTB_BRCOSA, -1, 0, 0, 0, _("Transform Colour"), xpm_brcosa_xpm },
-	{ MTB_PAN, -1, 0, 0, 0, _("Pan Window"), xpm_pan_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ _("New Image"), -1, MTB_NEW, 0, xpm_new_xpm, DLG_NEW, 0 },
+	{ _("Load Image File"), -1, MTB_OPEN, 0, xpm_open_xpm, DLG_FSEL, FS_PNG_LOAD },
+	{ _("Save Image File"), -1, MTB_SAVE, 0, xpm_save_xpm, ACT_SAVE, 0 },
+	{""},
+	{ _("Cut"), -1, MTB_CUT, NEED_SEL2, xpm_cut_xpm, ACT_COPY, 1 },
+	{ _("Copy"), -1, MTB_COPY, NEED_SEL2, xpm_copy_xpm, ACT_COPY, 0 },
+	{ _("Paste"), -1, MTB_PASTE, NEED_CLIP, xpm_paste_xpm, ACT_PASTE, 0 },
+	{""},
+	{ _("Undo"), -1, MTB_UNDO, NEED_UNDO, xpm_undo_xpm, ACT_UNDO, 0 },
+	{ _("Redo"), -1, MTB_REDO, NEED_REDO, xpm_redo_xpm, ACT_REDO, 0 },
+	{""},
+	{ _("Transform Colour"), -1, MTB_BRCOSA, 0, xpm_brcosa_xpm, DLG_BRCOSA, 0 },
+	{ _("Pan Window"), -1, MTB_PAN, 0, xpm_pan_xpm, ACT_PAN, 0 },
+	{ NULL }};
 
 static toolbar_item tools_bar[] = {
-	{ TTB_PAINT, 1, 0, 0, 0, _("Paint"), xpm_paint_xpm },
-	{ TTB_SHUFFLE, 1, 0, 0, 0, _("Shuffle"), xpm_shuffle_xpm },
-	{ TTB_FLOOD, 1, 0, 1, 0, _("Flood Fill"), xpm_flood_xpm },
-	{ TTB_LINE, 1, 0, 0, 0, _("Straight Line"), xpm_line_xpm },
-	{ TTB_SMUDGE, 1, 0, 1, NEED_24, _("Smudge"), xpm_smudge_xpm },
-	{ TTB_CLONE, 1, 0, 0, 0, _("Clone"), xpm_clone_xpm },
-	{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
-	{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
-	{ TTB_GRAD, 1, 1, 1, 0, _("Place Gradient"), xpm_grad_place_xpm },
-	{ TTB_LASSO, -1, 0, 0, NEED_LAS2, _("Lasso Selection"), xpm_lasso_xpm },
-	{ TTB_TEXT, -1, 1, 1, 0, _("Paste Text"), xpm_text_xpm },
-	{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
-	{ TTB_FELLIPSE, -1, 0, 0, NEED_SEL, _("Filled Ellipse"), xpm_ellipse_xpm },
-	{ TTB_OUTLINE, -1, 0, 0, NEED_SEL2, _("Outline Selection"), xpm_rect1_xpm },
-	{ TTB_FILL, -1, 1, 0, NEED_SEL2, _("Fill Selection"), xpm_rect2_xpm },
-	{ TTB_SELFV, -1, 0, 0, NEED_CLIP, _("Flip Selection Vertically"), xpm_flip_vs_xpm },
-	{ TTB_SELFH, -1, 0, 0, NEED_CLIP, _("Flip Selection Horizontally"), xpm_flip_hs_xpm },
-	{ TTB_SELRCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Clockwise"), xpm_rotate_cs_xpm },
-	{ TTB_SELRCCW, -1, 0, 0, NEED_CLIP, _("Rotate Selection Anti-Clockwise"), xpm_rotate_as_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ _("Paint"), 1, TTB_PAINT, 0, xpm_paint_xpm, ACT_TOOL, TTB_PAINT },
+	{ _("Shuffle"), 1, TTB_SHUFFLE, 0, xpm_shuffle_xpm, ACT_TOOL, TTB_SHUFFLE },
+	{ _("Flood Fill"), 1, TTB_FLOOD, 0, xpm_flood_xpm, ACT_TOOL, TTB_FLOOD, DLG_FLOOD, 0 },
+	{ _("Straight Line"), 1, TTB_LINE, 0, xpm_line_xpm, ACT_TOOL, TTB_LINE },
+	{ _("Smudge"), 1, TTB_SMUDGE, NEED_24, xpm_smudge_xpm, ACT_TOOL, TTB_SMUDGE, DLG_SMUDGE, 0 },
+	{ _("Clone"), 1, TTB_CLONE, 0, xpm_clone_xpm, ACT_TOOL, TTB_CLONE },
+	{ _("Make Selection"), 1, TTB_SELECT, 0, xpm_select_xpm, ACT_TOOL, TTB_SELECT },
+	{ _("Polygon Selection"), 1, TTB_POLY, 0, xpm_polygon_xpm, ACT_TOOL, TTB_POLY },
+	{ _("Place Gradient"), 1, TTB_GRAD, 0, xpm_grad_place_xpm, ACT_TOOL, TTB_GRAD, DLG_GRAD, 0 },
+	{""},
+	{ _("Lasso Selection"), -1, TTB_LASSO, NEED_LAS2, xpm_lasso_xpm, ACT_LASSO, 0 },
+	{ _("Paste Text"), -1, TTB_TEXT, 0, xpm_text_xpm, DLG_TEXT, 0, DLG_TEXT_FT, 0 },
+	{""},
+	{ _("Ellipse Outline"), -1, TTB_ELLIPSE, NEED_SEL, xpm_ellipse2_xpm, ACT_ELLIPSE, 0 },
+	{ _("Filled Ellipse"), -1, TTB_FELLIPSE, NEED_SEL, xpm_ellipse_xpm, ACT_ELLIPSE, 1 },
+	{ _("Outline Selection"), -1, TTB_OUTLINE, NEED_SEL2, xpm_rect1_xpm, ACT_OUTLINE, 0 },
+	{ _("Fill Selection"), -1, TTB_FILL, NEED_SEL2, xpm_rect2_xpm, ACT_OUTLINE, 1 },
+	{""},
+	{ _("Flip Selection Vertically"), -1, TTB_SELFV, NEED_CLIP, xpm_flip_vs_xpm, ACT_SEL_FLIP_V, 0 },
+	{ _("Flip Selection Horizontally"), -1, TTB_SELFH, NEED_CLIP, xpm_flip_hs_xpm, ACT_SEL_FLIP_H, 0 },
+	{ _("Rotate Selection Clockwise"), -1, TTB_SELRCW, NEED_CLIP, xpm_rotate_cs_xpm, ACT_SEL_ROT, 0 },
+	{ _("Rotate Selection Anti-Clockwise"), -1, TTB_SELRCCW, NEED_CLIP, xpm_rotate_as_xpm, ACT_SEL_ROT, 1 },
+	{ NULL }};
 
 #undef _
 #define _(X) __(X)
@@ -641,8 +658,7 @@ void toolbar_init(GtkWidget *vbox_main)
 #endif
 	gtk_container_add(GTK_CONTAINER(box), toolbar_main);
 
-	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar,
-		GTK_SIGNAL_FUNC(toolbar_icon_event2), 0, NULL, 0);
+	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar, NULL, NULL, NULL);
 
 	toolbar_zoom_main = toolbar_add_zoom(toolbar_main);
 	toolbar_zoom_view = toolbar_add_zoom(toolbar_main);
@@ -677,13 +693,7 @@ void toolbar_init(GtkWidget *vbox_main)
 #endif
 	gtk_container_add(GTK_CONTAINER(box), toolbar_tools);
 
-	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar,
-		GTK_SIGNAL_FUNC(toolbar_icon_event), 0,
-		GTK_SIGNAL_FUNC(toolbar_rclick), TTB_0);
-	for (i = 0; tools_bar[i].xpm; i++)
-	{
-		icon_buttons[tools_bar[i].ID] = tools_bar[i].widget;
-	}
+	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar, icon_buttons, NULL, NULL);
 	change_to_tool(TTB_PAINT);
 
 	gtk_widget_show(toolbar_tools);

@@ -2320,9 +2320,9 @@ int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, i
 
 void *bound_malloc(GtkWidget *widget, int size)
 {
-	void *mem = calloc(1, size);
+	void *mem = g_malloc0(size);
 	if (mem) gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
-		GTK_SIGNAL_FUNC(free), (gpointer)mem);
+		GTK_SIGNAL_FUNC(g_free), (gpointer)mem);
 	return (mem);
 }
 
@@ -2331,7 +2331,7 @@ void *bound_malloc(GtkWidget *widget, int size)
 GtkWidget *gamma_toggle()
 {
 	return (sig_toggle(_("Gamma corrected"),
-			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
+		inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
 }
 
 // Maybe this will be needed someday...

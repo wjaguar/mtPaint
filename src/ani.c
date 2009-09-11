@@ -1082,7 +1082,7 @@ void pressed_animate_window()
 		return;
 	}
 
-	if (layers_window) delete_layers_window();	// Lose the layers window if its up
+	delete_layers_window();	// Lose the layers window if its up
 
 	ani_read_layer_data();
 

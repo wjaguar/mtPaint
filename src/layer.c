@@ -208,16 +208,18 @@ static void layer_select_slot(int slot)
 	}
 }
 
-static void shift_layer(int val)
+void shift_layer(int val)
 {
-	layer_node temp = layer_table[layer_selected];
-	int i, j, x, y, newbkg;
+	layer_node temp;
+	int i, j, x, y, newbkg, lv = layer_selected + val;
 
+	if ((lv < 0) || (lv > layers_total)) return; // Cannot move
 	layer_copy_from_main(layer_selected);
-	layer_table[layer_selected] = layer_table[layer_selected + val];
-	layer_table[layer_selected + val] = temp;
-	newbkg = (layer_selected == 0) || (layer_selected + val == 0);
-	layer_selected += val;
+	temp = layer_table[layer_selected];
+	layer_table[layer_selected] = layer_table[lv];
+	layer_table[lv] = temp;
+	newbkg = (layer_selected == 0) || (lv == 0);
+	layer_selected = lv;
 
 	/* Background layer changed - shift the entire stack */
 	if (newbkg)
@@ -320,7 +322,7 @@ void layer_new(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 }
 
 /* !!! Same as above: modify structures, *then* show results - WJ */
-static void layer_press_duplicate()
+void layer_press_duplicate()
 {
 	layer_image *lim, *ls;
 
@@ -413,7 +415,7 @@ void layer_refresh_list()
 	in_refresh = 0;
 }
 
-static void layer_press_delete()
+void layer_press_delete()
 {
 	char txt[256];
 	int i;
@@ -448,8 +450,9 @@ static void layer_show_position()
 	layers_initialized = oldinit;
 }
 
-static void layer_press_centre()
+void layer_press_centre()
 {
+	if (!layer_selected) return; // Nothing to do
 	layer_table[layer_selected].x = layer_table[0].image->image_.width / 2 -
 		mem_width / 2;
 	layer_table[layer_selected].y = layer_table[0].image->image_.height / 2 -
@@ -921,18 +924,22 @@ static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 	layers_initialized = TRUE;
 }
 
-gint delete_layers_window()
+gboolean delete_layers_window()
 {
-	if ( !GTK_WIDGET_SENSITIVE(layers_window) ) return TRUE;
-		// Stop user prematurely exiting while drag 'n' drop loading
+	// No deletion if no window, or inside a sensitive action
+	if (!layers_window || !layers_initialized) return (TRUE);
+	// Stop user prematurely exiting while drag 'n' drop loading
+	if (!GTK_WIDGET_SENSITIVE(layers_window)) return (TRUE);
 
+	layers_initialized = FALSE;
 	win_store_pos(layers_window, "layers");
 
 	gtk_widget_destroy(layers_window);
 	layers_window = NULL;
-	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], TRUE);
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+		menu_widgets[MENU_LAYER]), FALSE); // Ensure it's unchecked
 
-	return FALSE;
+	return (FALSE);
 }
 
 void pressed_paste_layer()
@@ -1008,8 +1015,8 @@ void pressed_paste_layer()
 	update_undo(&lim->image_);
 
 	layer_show_new();
-//	if (!layers_window) pressed_layers();
-	if (!view_showing) view_show();
+//	pressed_layers();
+	view_show();
 }
 
 void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & update window labels
@@ -1040,43 +1047,21 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 #define _(X) X
 
 static toolbar_item layer_bar[] = {
-	{ LTB_NEW,    -1, 0, 0, 0, _("New Layer"), xpm_new_xpm },
-	{ LTB_RAISE,  -1, 0, 0, 0, _("Raise"), xpm_up_xpm },
-	{ LTB_LOWER,  -1, 0, 0, 0, _("Lower"), xpm_down_xpm },
-	{ LTB_DUP,    -1, 0, 0, 0, _("Duplicate Layer"), xpm_copy_xpm },
-	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
-	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
-	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ _("New Layer"), -1, LTB_NEW, 0, xpm_new_xpm, ACT_LR_ADD, LR_NEW },
+	{ _("Raise"), -1, LTB_RAISE, 0, xpm_up_xpm, ACT_LR_SHIFT, 1 },
+	{ _("Lower"), -1, LTB_LOWER, 0, xpm_down_xpm, ACT_LR_SHIFT, -1 },
+	{ _("Duplicate Layer"), -1, LTB_DUP, 0, xpm_copy_xpm, ACT_LR_ADD, LR_DUP },
+	{ _("Centralise Layer"), -1, LTB_CENTER, 0, xpm_centre_xpm, ACT_LR_CENTER, 0 },
+	{ _("Delete Layer"), -1, LTB_DEL, 0, xpm_cut_xpm, ACT_LR_DEL, 0 },
+	{ _("Close Layers Window"), -1, LTB_CLOSE, 0, xpm_close_xpm, DLG_LAYERS, 1 },
+	{ NULL }};
 
 #undef _
 #define _(X) __(X)
 
-static void layer_iconbar_click(GtkWidget *widget, gpointer data)
-{
-	switch ((int)data)
-	{
-	case LTB_NEW:
-		generic_new_window(1); break;
-	case LTB_RAISE:
-		shift_layer(1); break;
-	case LTB_LOWER:
-		shift_layer(-1); break;
-	case LTB_DUP:
-		layer_press_duplicate(); break;
-	case LTB_CENTER:
-		layer_press_centre(); break;
-	case LTB_DEL:
-		layer_press_delete(); break;
-	case LTB_CLOSE:
-		delete_layers_window(); break;
-	}
-}
-
 /* Create toolbar for layers window */
 static GtkWidget *layer_toolbar(GtkWidget **wlist)
 {		
-	int i;
 	GtkWidget *toolbar;
 
 #if GTK_MAJOR_VERSION == 1
@@ -1086,12 +1071,8 @@ static GtkWidget *layer_toolbar(GtkWidget **wlist)
 	toolbar = gtk_toolbar_new();
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
 #endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar,
-		GTK_SIGNAL_FUNC(layer_iconbar_click), 0, NULL, 0);
+	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar, wlist, NULL, NULL);
 	gtk_widget_show(toolbar);
-
-	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
-		wlist[i] = layer_bar[i].widget;
 
 	return toolbar;
 }
@@ -1104,8 +1085,8 @@ void pressed_layers()
 	int i;
 
 
+	if (layers_window) return; // Already have one
 	layers_initialized = FALSE;
-	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], FALSE);
 
 	layers_window = add_a_window( GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE );
 	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);

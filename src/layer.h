@@ -68,7 +68,7 @@ void layers_init();
 layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src);
 void pressed_layers();
 void pressed_paste_layer();
-gint delete_layers_window();
+gboolean delete_layers_window();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );
@@ -91,6 +91,10 @@ void layer_show_new();			// Show the last added layer
 void layer_delete(int item);		// *Silently* delete layer
 void layer_choose( int l );		// Select a new layer from the list
 void layer_add_composite();		// Composite layers to new (invisible) layer
+void shift_layer(int val);		// Move layer up or down
+void layer_press_duplicate();
+void layer_press_centre();		// Center layer on background
+void layer_press_delete();		// Delete current layer
 
 void string_chop( char *txt );
 int read_file_num(FILE *fp, char *txt);

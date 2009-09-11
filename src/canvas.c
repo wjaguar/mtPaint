@@ -1323,9 +1323,9 @@ int do_a_load( char *fname )
 	}
 	else /* A whole bunch of layers */
 	{
-//		if (!layers_window) pressed_layers();
-		if (!view_showing) view_show();
-			// We have just loaded a layers file so display view & layers window if not up
+//		pressed_layers();
+		// We have just loaded a layers file so ensure view window is open
+		view_show();
 	}
 
 	if (!undo_load) // No reason to reset tools in undoable mode

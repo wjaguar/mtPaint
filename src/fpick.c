@@ -576,21 +576,20 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 #define _(X) X
 
 static toolbar_item fpick_bar[] = {
-	{ FPICK_ICON_UP,	-1, 0, 0, 0, _("Up"), xpm_up_xpm },
-	{ FPICK_ICON_HOME,	-1, 0, 0, 0, _("Home"), xpm_home_xpm },
-	{ FPICK_ICON_DIR,	-1, 0, 0, 0, _("Create New Directory"), xpm_newdir_xpm },
-	{ FPICK_ICON_HIDDEN,	 0, 0, 0, 0, _("Show Hidden Files"), xpm_hidden_xpm },
-	{ FPICK_ICON_CASE,	 0, 0, 0, 0, _("Case Insensitive Sort"), xpm_case_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
+	{ _("Up"),			-1, FPICK_ICON_UP, 0, xpm_up_xpm },
+	{ _("Home"),			-1, FPICK_ICON_HOME, 0, xpm_home_xpm },
+	{ _("Create New Directory"),	-1, FPICK_ICON_DIR, 0, xpm_newdir_xpm },
+	{ _("Show Hidden Files"),	 0, FPICK_ICON_HIDDEN, 0, xpm_hidden_xpm },
+	{ _("Case Insensitive Sort"),	 0, FPICK_ICON_CASE, 0, xpm_case_xpm },
+	{ NULL }};
 
 #undef _
 #define _(X) __(X)
 
-static void fpick_iconbar_click(GtkWidget *widget, gpointer data);
+static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data);
 
 static GtkWidget *fpick_toolbar(GtkWidget **wlist)
 {		
-	int i;
 	GtkWidget *toolbar;
 
 #if GTK_MAJOR_VERSION == 1
@@ -600,12 +599,9 @@ static GtkWidget *fpick_toolbar(GtkWidget **wlist)
 	toolbar = gtk_toolbar_new();
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
 #endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar,
-		GTK_SIGNAL_FUNC(fpick_iconbar_click), 0, NULL, 0);
+	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar, wlist,
+		GTK_SIGNAL_FUNC(fpick_iconbar_click), NULL);
 	gtk_widget_show(toolbar);
-
-	for (i = 0; i < FPICK_ICON_TOT; i++)
-		wlist[i] = fpick_bar[i].widget;
 
 	return toolbar;
 }
@@ -947,15 +943,15 @@ static void fpick_create_newdir(fpicker *fp)
 	}
 }
 
-static void fpick_iconbar_click(GtkWidget *widget, gpointer data)
+static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 {
+	toolbar_item *item = user_data;
 	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
 	char nm[PATHBUF], fnm[PATHBUF];
-	int j = (int)data;
 
 	if (!fp) return;
 
-	switch (j)
+	switch (item->ID)
 	{
 	case FPICK_ICON_UP:
 		fpick_enter_dir_via_list(fp, "..");

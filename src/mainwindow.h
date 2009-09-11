@@ -83,9 +83,12 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_SET_OVERLAY,
 	ACT_LR_SAVE,
 	ACT_LR_ADD,
-	ACT_LR_KILLALL,
+	ACT_LR_DEL,
 	ACT_DOCS,
 	ACT_REBIND_KEYS,
+	ACT_MODE,
+	ACT_LR_SHIFT,
+	ACT_LR_CENTER,
 
 	DLG_BRCOSA,
 	DLG_CMDLINE,
@@ -115,6 +118,11 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_ANI_KILLKEY,
 	DLG_ABOUT,
 	DLG_SKEW,
+	DLG_FLOOD,
+	DLG_SMUDGE,
+	DLG_GRAD,
+	DLG_STEP,
+	DLG_FILT,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -138,6 +146,7 @@ enum { // To let constants renumber themselves when adding new ones
 #define LR_COMP  3
 
 int wtf_pressed(GdkEventKey *event);
+void action_dispatch(int action, int mode, int state, int kbd);
 
 /* Widget dependence flags */
 #define NEED_UNDO  0x0001
@@ -162,67 +171,70 @@ void mapped_dis_add(GtkWidget *widget, int actmap);
 void mapped_item_state(int statemap);	// Change state of preset menu items
 
 /* Notable menu items */
-#define MENU_FACTION1  1
-#define MENU_FACTION2  2
-#define MENU_FACTION3  3
-#define MENU_FACTION4  4
-#define MENU_FACTION5  5
-#define MENU_FACTION6  6
-#define MENU_FACTION7  7
-#define MENU_FACTION8  8
-#define MENU_FACTION9  9
-#define MENU_FACTION10 10
-#define MENU_FACTION11 11
-#define MENU_FACTION12 12
-#define MENU_FACTION13 13
-#define MENU_FACTION14 14
-#define MENU_FACTION15 15
-#define MENU_FACTION_S 16
-#define MENU_RECENT_S  17
-#define MENU_RECENT1   18
-#define MENU_RECENT2   19
-#define MENU_RECENT3   20
-#define MENU_RECENT4   21
-#define MENU_RECENT5   22
-#define MENU_RECENT6   23
-#define MENU_RECENT7   24
-#define MENU_RECENT8   25
-#define MENU_RECENT9   26
-#define MENU_RECENT10  27
-#define MENU_RECENT11  28
-#define MENU_RECENT12  29
-#define MENU_RECENT13  30
-#define MENU_RECENT14  31
-#define MENU_RECENT15  32
-#define MENU_RECENT16  33
-#define MENU_RECENT17  34
-#define MENU_RECENT18  35
-#define MENU_RECENT19  36
-#define MENU_RECENT20  37
-#define MENU_TBMAIN    38
-#define MENU_TBTOOLS   39
-#define MENU_TBSET     40
-#define MENU_SHOWPAL   41
-#define MENU_SHOWSTAT  42
-#define MENU_CENTER    43
-#define MENU_SHOWGRID  44
-#define MENU_VIEW      45
-#define MENU_VWFOCUS   46
-#define MENU_CLINE     47
-#define MENU_LAYER     48
-#define MENU_PREFS     49
-#define MENU_CHAN0     50
-#define MENU_CHAN1     51
-#define MENU_CHAN2     52
-#define MENU_CHAN3     53
-#define MENU_DCHAN0    54
-#define MENU_DCHAN1    55
-#define MENU_DCHAN2    56
-#define MENU_DCHAN3    57
-#define MENU_RGBA      58
-#define MENU_HELP      59
-#define MENU_DOCK      60
-#define TOTAL_MENU_IDS 61
+enum {
+	MENU_FACTION1 = 1,
+	MENU_FACTION2,
+	MENU_FACTION3,
+	MENU_FACTION4,
+	MENU_FACTION5,
+	MENU_FACTION6,
+	MENU_FACTION7,
+	MENU_FACTION8,
+	MENU_FACTION9,
+	MENU_FACTION10,
+	MENU_FACTION11,
+	MENU_FACTION12,
+	MENU_FACTION13,
+	MENU_FACTION14,
+	MENU_FACTION15,
+	MENU_FACTION_S,
+	MENU_RECENT_S,
+	MENU_RECENT1,
+	MENU_RECENT2,
+	MENU_RECENT3,
+	MENU_RECENT4,
+	MENU_RECENT5,
+	MENU_RECENT6,
+	MENU_RECENT7,
+	MENU_RECENT8,
+	MENU_RECENT9,
+	MENU_RECENT10,
+	MENU_RECENT11,
+	MENU_RECENT12,
+	MENU_RECENT13,
+	MENU_RECENT14,
+	MENU_RECENT15,
+	MENU_RECENT16,
+	MENU_RECENT17,
+	MENU_RECENT18,
+	MENU_RECENT19,
+	MENU_RECENT20,
+	MENU_TBMAIN,
+	MENU_TBTOOLS,
+	MENU_TBSET,
+	MENU_SHOWPAL,
+	MENU_SHOWSTAT,
+	MENU_CENTER,
+	MENU_SHOWGRID,
+	MENU_VIEW,
+	MENU_VWFOCUS,
+	MENU_CLINE,
+	MENU_LAYER,
+	MENU_PREFS,
+	MENU_CHAN0,
+	MENU_CHAN1,
+	MENU_CHAN2,
+	MENU_CHAN3,
+	MENU_DCHAN0,
+	MENU_DCHAN1,
+	MENU_DCHAN2,
+	MENU_DCHAN3,
+	MENU_RGBA,
+	MENU_HELP,
+	MENU_DOCK,
+
+	TOTAL_MENU_IDS
+};
 
 #define MAX_RECENT 20
 
@@ -300,9 +312,6 @@ void update_titlebar();		// Update filename in titlebar
 
 void force_main_configure();	// Force reconfigure of main drawing area - for centralizing code
 
-
-void toolbar_icon_event2(GtkWidget *widget, gpointer data);
-void toolbar_icon_event (GtkWidget *widget, gpointer data);
 
 void set_image(gboolean state);	// Toggle image access (nestable)
 

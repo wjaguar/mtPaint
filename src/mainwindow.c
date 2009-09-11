@@ -762,13 +762,6 @@ void stop_line()
 	line_status = LINE_NONE;
 }
 
-void change_to_tool(int icon)
-{
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[icon]), TRUE);
-}
-
-static void action_dispatch(int action, int mode, int state, int kbd);
-
 int check_zoom_keys_real(int act_m)
 {
 	int action = act_m >> 16;
@@ -1152,9 +1145,9 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 		toggle_dock(FALSE, TRUE);
 		win_store_pos(main_window, "window");
 
-		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
-		if (layers_window) delete_layers_window();
-			// Get rid of extra windows + remember positions
+		// Get rid of extra windows + remember positions
+		if (cline_window) delete_cline( NULL, NULL, NULL );
+		delete_layers_window();
 
 		toolbar_exit();			// Remember the toolbar settings
 
@@ -3012,40 +3005,15 @@ void set_cursor()			// Set mouse cursor
 
 
 
-void toolbar_icon_event2(GtkWidget *widget, gpointer data)
+void change_to_tool(int icon)
 {
-	gint j = (gint) data;
+	int i, t;
 
-	switch (j)
-	{
-	case MTB_NEW:
-		generic_new_window(0); break;
-	case MTB_OPEN:
-		file_selector(FS_PNG_LOAD); break;
-	case MTB_SAVE:
-		pressed_save_file(); break;
-	case MTB_CUT:
-		pressed_copy(1); break;
-	case MTB_COPY:
-		pressed_copy(0); break;
-	case MTB_PASTE:
-		pressed_paste_centre(); break;
-	case MTB_UNDO:
-		main_undo(); break;
-	case MTB_REDO:
-		main_redo(); break;
-	case MTB_BRCOSA:
-		pressed_brcosa(); break;
-	case MTB_PAN:
-		pressed_pan(); break;
-	}
-}
+	if (!GTK_WIDGET_SENSITIVE(icon_buttons[icon])) return; // Blocked
+	if (!GTK_TOGGLE_BUTTON(icon_buttons[icon])->active) // Toggle the button
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[icon]), TRUE);
 
-void toolbar_icon_event (GtkWidget *widget, gpointer data)
-{
-	int i, t = tool_type;
-
-	switch ((gint)data)
+	switch (icon)
 	{
 	case TTB_PAINT:
 		t = brush_tool_type; break;
@@ -3065,29 +3033,10 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 		t = TOOL_POLYGON; break;
 	case TTB_GRAD:
 		t = TOOL_GRADIENT; break;
-	case TTB_LASSO:
-		pressed_lasso(0); break;
-	case TTB_TEXT:
-		pressed_text(); break;
-	case TTB_ELLIPSE:
-		pressed_ellipse(FALSE); break;
-	case TTB_FELLIPSE:
-		pressed_ellipse(TRUE); break;
-	case TTB_OUTLINE:
-		pressed_rectangle(FALSE); break;
-	case TTB_FILL:
-		pressed_rectangle(TRUE); break;
-	case TTB_SELFV:
-		pressed_flip_sel_v(); break;
-	case TTB_SELFH:
-		pressed_flip_sel_h(); break;
-	case TTB_SELRCW:
-		pressed_rotate_sel(0); break;
-	case TTB_SELRCCW:
-		pressed_rotate_sel(1); break;
+	default: return;
 	}
 
-	/* User hasn't changed tool (i.e., radiobutton is DEactivating) */
+	/* Tool hasn't changed (likely, recursion changed it from under us) */
 	if (t == tool_type) return;
 
 	if (perim_status) clear_perim();
@@ -3502,7 +3451,7 @@ static void pressed_sel_ramp(int vert);
 static const signed char arrow_dx[4] = { 0, -1, 1, 0 },
 	arrow_dy[4] = { 1, 0, 0, -1 };
 
-static void action_dispatch(int action, int mode, int state, int kbd)
+void action_dispatch(int action, int mode, int state, int kbd)
 {
 	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
 
@@ -3524,7 +3473,8 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_SWAP_AB:
 		pressed_swap_AB(); break;
 	case ACT_TOOL:
-		change_to_tool(mode); break;
+		if (state) change_to_tool(mode); // Ignore DEactivating buttons
+		break;
 	case ACT_SEL_MOVE:
 		/* Gradient tool has precedence over selection */
 		if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
@@ -3710,18 +3660,26 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 		layer_press_save(); break;
 	case ACT_LR_ADD:
 		if (mode == LR_NEW) generic_new_window(1);
+		else if (mode == LR_DUP) layer_press_duplicate();
 		else if (mode == LR_PASTE) pressed_paste_layer();
-	/* !!! Handle LR_DUP here too when such need arises */
-		else layer_add_composite();
+		else /* if (mode == LR_COMP) */ layer_add_composite();
 		break;
-	case ACT_LR_KILLALL:
-		layer_press_remove_all(); break;
+	case ACT_LR_DEL:
+		if (!mode) layer_press_delete();
+		else layer_press_remove_all();
+		break;
 	case ACT_DOCS:
 		show_html(inifile_get(HANDBOOK_BROWSER_INI, NULL),
 			inifile_get(HANDBOOK_LOCATION_INI, NULL));
 		break;
 	case ACT_REBIND_KEYS:
 		rebind_keys(); break;
+	case ACT_MODE:
+		mode_change(mode, state); break;
+	case ACT_LR_SHIFT:
+		shift_layer(mode); break;
+	case ACT_LR_CENTER:
+		layer_press_centre(); break;
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
 	case DLG_CMDLINE:
@@ -3745,7 +3703,11 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_TEXT_FT:
 		pressed_mt_text(); break;
 	case DLG_LAYERS:
-		pressed_layers(); break;
+		if (mode) gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+			menu_widgets[MENU_LAYER]), FALSE); // Closed by toolbar
+		else if (state) pressed_layers();
+		else delete_layers_window();
+		break;
 	case DLG_INDEXED:
 		pressed_quantize(mode); break;
 	case DLG_ROTATE:
@@ -3776,6 +3738,16 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_help(); break;
 	case DLG_SKEW:
 		pressed_skew(); break;
+	case DLG_FLOOD:
+		flood_settings(); break;
+	case DLG_SMUDGE:
+		smudge_settings(); break;
+	case DLG_GRAD:
+		gradient_setup(mode); break;
+	case DLG_STEP:
+		step_settings(); break;
+	case DLG_FILT:
+		blend_settings(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4275,7 +4247,7 @@ static menu_item main_menu[] = {
 	{ _("/View/sep3"), -4 },
 	{ _("/View/Pan Window (End)"), -1, 0, 0, NULL, ACT_PAN, 0, xpm_pan_xpm },
 	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", DLG_CMDLINE, 0 },
-	{ _("/View/Layers Window"), -1, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
+	{ _("/View/Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
 
 	{ _("/_Image"), -2 -16 },
 	{ _("/Image/tear"), -3 },
@@ -4399,7 +4371,7 @@ static menu_item main_menu[] = {
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
 	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },
-	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, ACT_LR_KILLALL, 0 },
+	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, ACT_LR_DEL, 1 },
 	{ _("/Layers/sep1"), -4 },
 	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },
 	{ _("/Layers/Preview Animation ..."), -1, 0, 0, NULL, DLG_ANI_VIEW, 0 },

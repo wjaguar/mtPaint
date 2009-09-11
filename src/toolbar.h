@@ -92,12 +92,12 @@
 
 typedef struct
 {
-	unsigned char ID;
+	char *tooltip;
 	signed char radio;
-	unsigned char sep, rclick;
+	unsigned short ID;
 	int actmap;
-	char *tooltip, **xpm;
-	GtkWidget *widget;
+	char **xpm;
+	short action, mode, action2, mode2;
 } toolbar_item;
 
 //	GLOBAL VARIABLES
@@ -115,8 +115,8 @@ GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 
 //	GLOBAL PROCEDURES
 
-void fill_toolbar(GtkToolbar *bar, toolbar_item *items,
-	GtkSignalFunc lclick, int lbase, GtkSignalFunc rclick, int rbase);
+void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
+	GtkSignalFunc lclick, GtkSignalFunc rclick);
 
 void toolbar_init(GtkWidget *vbox_main);	// Set up the widgets to the vbox
 void toolbar_palette_init(GtkWidget *box);	// Set up the palette area
@@ -136,3 +136,9 @@ void update_top_swatch();		// Update selected colours A & B
 
 unsigned char *render_patterns();	// Create RGB dump of patterns to display
 void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns
+
+void mode_change(int setting, int state);	// Drawing mode variables
+void flood_settings();			// Flood fill step
+void smudge_settings();			// Smudge opacity mode
+void step_settings();			// Brush spacing
+void blend_settings();			// Blend mode
