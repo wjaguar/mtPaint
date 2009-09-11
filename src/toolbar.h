@@ -47,6 +47,14 @@
 #define DEFAULT_TOOL_ICON 6
 #define PAINT_TOOL_ICON 0
 
+//	Settings toolbar buttons
+#define SETB_CONT 0
+#define SETB_OPAC 1
+#define SETB_TINT 2
+#define SETB_TSUB 3
+#define SETB_CSEL 4
+#define SETB_MASK 5
+
 
 //	GLOBAL VARIABLES
 

@@ -321,22 +321,26 @@ static void toolbar_zoom_view_change()
 	if ( new > 0 ) vw_align_size( new );
 }
 
+static int *vars_settings[TOTAL_ICONS_SETTINGS] = {
+	&mem_continuous, &mem_undo_opacity,
+	&tint_mode[0], &tint_mode[1],
+	&mem_cselect, &mem_unmask
+};
+
 void toolbar_mode_change(GtkWidget *widget, gpointer data)
 {
 	gint j = (gint) data;
 
+	*(vars_settings[j]) = GTK_TOGGLE_BUTTON(widget)->active;
+
 	switch (j)
 	{
-		case 0: mem_continuous = GTK_TOGGLE_BUTTON(widget)->active;
-			inifile_set_gboolean( "continuousPainting", mem_continuous );
-			break;
-		case 1:	mem_undo_opacity = GTK_TOGGLE_BUTTON(widget)->active;
-			inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
-			break;
-		case 2:	tint_mode[0] = GTK_TOGGLE_BUTTON(widget)->active;
-			break;
-		case 3:	tint_mode[1] = GTK_TOGGLE_BUTTON(widget)->active;
-			break;
+	case SETB_CONT:
+		inifile_set_gboolean( "continuousPainting", mem_continuous );
+		break;
+	case SETB_OPAC:
+		inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
+		break;
 	}
 }
 
@@ -416,7 +420,7 @@ static void toolbar_settings_init()
 		},
 	*hint_text_settings[TOTAL_ICONS_SETTINGS] = {
 		_("Continuous Mode"),  _("Opacity Mode"), _("Tint Mode"), _("Tint +-"),
-		_("Colour-Selective Mode"), _("Mask Mode")
+		_("Colour-Selective Mode"), _("Disable All Masks")
 		};
 
 	GtkWidget *iconw, *label, *vbox, *table, *toolbar_settings, *but;
@@ -452,14 +456,7 @@ static void toolbar_settings_init()
 			GTK_SIGNAL_FUNC(toolbar_mode_change),
 			(gpointer) i);
 
-		if ( i==0 && mem_continuous )
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(but), TRUE );
-		if ( i==1 && mem_undo_opacity )
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(but), TRUE );
-		if ( i==2 && tint_mode[0] )
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(but), TRUE );
-		if ( i==3 && tint_mode[1] )
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(but), TRUE );
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(but), !!*(vars_settings[i]));
 	}
 
 
@@ -858,8 +855,7 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 		}
 		if ( px>=53 )			// Mask changed
 		{
-			if ( mem_prot_mask[pindex] == 0 ) mem_prot_mask[pindex] = 1;
-			else mem_prot_mask[pindex] = 0;
+			mem_prot_mask[pindex] ^= 255;
 
 			repaint_swatch(pindex);				// Update swatch
 			gtk_widget_queue_draw_area( widget, 0, event->y-16,

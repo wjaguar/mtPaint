@@ -71,6 +71,9 @@ typedef struct
 
 int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
+int mem_cselect;
+int mem_unmask;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved

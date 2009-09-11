@@ -56,7 +56,8 @@ GtkWidget
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
 	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
 	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS]
+	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS+1],
+	*menu_chan_del[2], *menu_chan_dis[NUM_CHANNELS+1]
 	;
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
@@ -346,16 +347,9 @@ void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
-void pressed_mask_all( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	mem_mask_setall( 1 );
-	mem_pal_init();
-	gtk_widget_queue_draw( drawing_palette );
-}
-
-void pressed_mask_none( GtkMenuItem *menu_item, gpointer user_data )
-{
-	mem_mask_setall( 0 );
+	mem_mask_setall(item);
 	mem_pal_init();
 	gtk_widget_queue_draw( drawing_palette );
 }
@@ -499,13 +493,7 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_opacity( int opacity )
 {
-	if (mem_channel == CHN_MASK) /* Only the two extremes */
-	{
-		opacity -= channel_col_A[CHN_MASK];
-		if (opacity < 0) channel_col_A[mem_channel] = 0;
-		else if (opacity) channel_col_A[mem_channel] = 255;
-	}
-	else if (mem_channel != CHN_IMAGE)
+	if (mem_channel != CHN_IMAGE)
 	{
 		channel_col_A[mem_channel] =
 			opacity < 0 ? 0 : opacity > 255 ? 255 : opacity;
@@ -2349,10 +2337,18 @@ void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_edit_AB( GtkMenuItem *menu_item, gpointer user_data )
 {	choose_colours();	}
 
+
+#ifndef WIN32
 static void pressed_docs()
 {
-	system("mtpaint-handbook");
+	int r = system("mtpaint-handbook");
+
+	if ( r != 0 ) alert_box( _("Error"),
+			_("You do not seem to have the mtPaint handbook installed.  Please visit the web site to download the documentation."),
+			_("OK"), NULL, NULL );
 }
+#endif
+
 
 void set_cursor()			// Set mouse cursor
 {
@@ -2442,6 +2438,62 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 	}
 }
 
+static void parse_drag( char *txt )
+{
+	gboolean nlayer = TRUE;
+	char fname[300], *tp, *tp2;
+	int i, j;
+
+	if ( layers_window == NULL ) pressed_layers( NULL, NULL );
+		// For some reason the layers window must be initialized, or bugs happen??
+
+	tp = txt;
+	while ( layers_total<MAX_LAYERS && (tp2 = strpbrk( tp, "file:" )) != NULL )
+	{
+		tp = tp2 + 5;
+		while ( tp[0] == '/' ) tp++;
+#ifndef WIN32
+		// If not windows keep a leading slash
+		tp--;
+		// If windows strip away all leading slashes
+#endif
+		i = 0;
+		j = 0;
+		while ( tp[j] > 30 && j<295 )	// Copy filename
+		{
+			if ( tp[j] == '%' )	// Weed out those ghastly % substitutions
+			{
+				fname[i++] = read_hex_dub( tp+j+1 );
+				j=j+2;
+			}
+			else fname[i++] = tp[j];
+			j++;
+		}
+		fname[i] = 0;
+		tp = tp + j;
+//printf(">%s<\n", fname);
+		if ( nlayer )
+		{
+			layer_new( 8, 8, 3, 16, CMASK_IMAGE );		// Add a new layer if needed
+			nlayer = FALSE;
+		}
+		if ( do_a_load( fname ) == 0 ) nlayer = TRUE;		// Load the file
+	}
+}
+
+static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
+					GtkSelectionData *data, guint info, guint time)
+{
+	if ((data->length >= 0) && (data->format == 8))
+	{
+		parse_drag( (gchar *)data->data );
+//printf("%s\n", (gchar *)data->data);
+		gtk_drag_finish (context, TRUE, FALSE, time);
+		return;
+	}
+
+	gtk_drag_finish (context, FALSE, FALSE, time);
+}
 
 
 void main_init()
@@ -2450,6 +2502,7 @@ void main_init()
 	char txt[64];
 	float f=0;
 
+	GtkTargetEntry target_table[1] = { { "text/uri-list", 0, 1 } };
 	GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
@@ -2608,8 +2661,8 @@ void main_init()
 		{ _("/Palette/Create Scale A->B"),	NULL,	pressed_create_pscale,0, NULL },
 		{ _("/Palette/Load Default"),		NULL, 	pressed_default_pal,0, NULL },
 		{ _("/Palette/sep1"),			NULL, 	NULL,0, "<Separator>" },
-		{ _("/Palette/Mask All"),		NULL, 	pressed_mask_all,0, NULL },
-		{ _("/Palette/Mask None"),		NULL, 	pressed_mask_none,0, NULL },
+		{ _("/Palette/Mask All"),		NULL, 	pressed_mask, 255, NULL },
+		{ _("/Palette/Mask None"),		NULL, 	pressed_mask, 0, NULL },
 		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Palette/Swap A & B"),		"X",	pressed_swap_AB,0, NULL },
 		{ _("/Palette/Edit Colour A & B ..."), "<control>E", pressed_edit_AB,0, NULL },
@@ -2646,8 +2699,10 @@ void main_init()
 
 		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
 		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Channels/Create Channel ..."), NULL, pressed_channel_create, -1, NULL },
-		{ _("/Channels/Delete Channel ..."), NULL, pressed_channel_delete, -1, NULL },
+		{ _("/Channels/New ..."),	NULL, pressed_channel_create, -1, NULL },
+		{ _("/Channels/Load ..."),	NULL, NULL, -1, NULL },
+		{ _("/Channels/Save As ..."),	NULL, NULL, -1, NULL },
+		{ _("/Channels/Delete"),	NULL, pressed_channel_delete, -1, NULL },
 		{ _("/Channels/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Channels/Edit Image"), 	NULL, pressed_channel_edit, CHN_IMAGE, "<RadioItem>" },
 		{ _("/Channels/Edit Alpha"), 	NULL, pressed_channel_edit, CHN_ALPHA, _("/Channels/Edit Image") },
@@ -2736,7 +2791,10 @@ void main_init()
 	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL},
 	*item_chann_x[] = {_("/Channels/Edit Image"), _("/Channels/Edit Alpha"),
 			_("/Channels/Edit Selection"), _("/Channels/Edit Mask"),
-			NULL}
+			NULL},
+	*item_chan_del[] = {  _("/Channels/Delete"), NULL },
+	*item_chan_dis[] = { _("/Channels/Hide Image"), _("/Channels/Disable Alpha"),
+			_("/Channels/Disable Selection"), _("/Channels/Disable Mask"), NULL }
 	;
 
 
@@ -2790,6 +2848,8 @@ void main_init()
 	pop_men_dis( item_factory, item_lasso, menu_lasso );
 	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
 	pop_men_dis( item_factory, item_chann_x, menu_chann_x );
+	pop_men_dis( item_factory, item_chan_del, menu_chan_del );
+	pop_men_dis( item_factory, item_chan_dis, menu_chan_dis );
 
 	menu_clip_load[0] = NULL;
 	menu_clip_save[0] = NULL;
@@ -2849,6 +2909,10 @@ void main_init()
 	gtk_widget_set_uposition( main_window,
 		inifile_get_gint32("window_x", 0 ), inifile_get_gint32("window_y", 0 ) );
 	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
+
+	gtk_drag_dest_set (main_window, GTK_DEST_DEFAULT_ALL, target_table, 1, GDK_ACTION_MOVE);
+	gtk_signal_connect (GTK_OBJECT (main_window), "drag_data_received",
+		GTK_SIGNAL_FUNC (drag_n_drop_received), NULL);		// Drag 'n' Drop guff
 
 	vbox_main = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_main);

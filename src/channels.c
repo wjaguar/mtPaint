@@ -30,7 +30,6 @@
 #include "inifile.h"
 #include "mygtk.h"
 
-/* !!! Maybe store it in config? !!! */
 int overlay_alpha = FALSE;
 int hide_image = FALSE;
 int RGBA_mode = FALSE;
@@ -61,6 +60,9 @@ static int chan_new_type, chan_new_state;
 
 static void click_newchan_cancel()
 {
+	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
+		// Stops cancelled new channel showing as selected in the menu
+
 	gtk_widget_destroy( newchan_window );
 	newchan_window = NULL;
 }
@@ -177,7 +179,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		_("Image Red"),
 		_("Image Green"),
 		_("Image Blue"),
-		_("Alpha"),
+		_("Alpha"),		// Used as index 7
 		_("Selection"),
 		_("Mask"),
 		NULL
@@ -194,6 +196,9 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
 			GTK_WIN_POS_CENTER, TRUE );
+
+	gtk_signal_connect_object (GTK_OBJECT (newchan_window), "delete_event",
+		GTK_SIGNAL_FUNC (click_newchan_cancel), NULL);
 
 	vbox = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox);
@@ -239,6 +244,11 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		gtk_signal_connect(GTK_OBJECT(radio), "toggled",
 				GTK_SIGNAL_FUNC(chan_state_changed),
 				(gpointer)(i));
+		if (	(i==7 && !mem_img[CHN_ALPHA]) ||
+			(i==8 && !mem_img[CHN_SEL]) ||
+			(i==9 && !mem_img[CHN_MASK])
+			)
+			gtk_widget_set_sensitive(radio, FALSE);
 	}
 
 	hbox = gtk_hbox_new (FALSE, 0);
@@ -269,9 +279,23 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 void pressed_channel_delete( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
+	int i;
+	char txt[128];
 
-/* !!! Need a frontend !!! */
+	if ( mem_channel == CHN_IMAGE ) return;		// Don't allow deletion of image channel
 
+	snprintf(txt, 120, _("Do you really want to delete the %s channel?"), channames[mem_channel] );
+	i = alert_box( _("Warning"), txt, _("No"), _("Yes"), NULL );
+
+	if ( i==2 )
+	{
+		undo_next_core(4, mem_width, mem_height, mem_img_bpp, CMASK_CURR);
+		mem_channel = CHN_IMAGE;
+
+		update_all_views();		// Update images
+		init_status_bar();
+		update_menus();
+	}
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */

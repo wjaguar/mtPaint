@@ -754,6 +754,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data )
 /* !!! Add support for channel-specific option sets !!! */
 void update_menus()			// Update edit/undo menu
 {
+	int i;
 	char txt[32];
 
 	sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
@@ -830,6 +831,13 @@ void update_menus()			// Update edit/undo menu
 	else  men_item_state( menu_redo, TRUE );
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
+	if ( mem_channel == CHN_IMAGE ) men_item_state( menu_chan_del, FALSE );
+	else men_item_state( menu_chan_del, TRUE );
+
+	for (i = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
+	{
+		gtk_widget_set_sensitive(menu_chan_dis[i], !!mem_img[i]);
+	}
 }
 
 void canvas_undo_chores()
@@ -2210,6 +2218,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 				sy = y - tool_size/2 + rand() % tool_size;
 				IF_IN_RANGE( rx, ry ) IF_IN_RANGE( sx, sy )
 				{
+			/* !!! Or do something for partial mask too? !!! */
 					if (!pixel_protected(rx, ry) &&
 						!pixel_protected(sx, sy))
 					{
@@ -2239,7 +2248,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 		if ( tool_type == TOOL_FLOOD && button == 1 )
 		{
 			/* Flood fill shouldn't start on masked points */
-			if (!pixel_protected(x, y))
+			if (pixel_protected(x, y) < 255)
 			{
 				j = get_pixel(x, y);
 				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :

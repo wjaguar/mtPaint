@@ -44,6 +44,9 @@ char *channames[5];
 
 int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (none, left, middle, right : 0-3)
 
+int mem_cselect;
+int mem_unmask;
+
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
@@ -493,7 +496,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		}
 
 		mem_req = 0;
-		if (cmask)
+		if (cmask && !(mode & 4))
 		{
 			for (i = j = 0; i < NUM_CHANNELS; i++)
 			{
@@ -1043,7 +1046,7 @@ void mem_mask_init()			// Initialise RGB protection mask array
 	mem_prot = 0;
 	for (i=0; i<mem_cols; i++)
 	{
-		if ( mem_prot_mask[i] == 1 )
+		if (mem_prot_mask[i])
 		{
 			mem_prot_RGB[mem_prot] = PNG_2_INT( mem_pal[i] );
 			mem_prot++;
@@ -1053,9 +1056,7 @@ void mem_mask_init()			// Initialise RGB protection mask array
 
 void mem_mask_setall(char val)
 {
-	int i;
-
-	for (i=0; i<256; i++) mem_prot_mask[i] = val;
+	memset(mem_prot_mask, val, 256);
 }
 
 void mem_get_histogram(int channel)	// Calculate how many of each colour index is on the canvas
@@ -2056,7 +2057,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
-		(get_pixel(x, y) != col) || pixel_protected(x, y))
+		(get_pixel(x, y) != col) || (pixel_protected(x, y) == 255))
 		return;
 	i = ((mem_width + mem_height) * 3 + QMINSIZE * QMINSIZE) * 2 * sizeof(short);
 	nearq = malloc(i); // Exact limit is less, but it's too complicated 
@@ -2114,7 +2115,8 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 					j = ty * lw + (tx >> 3);
 					k = 1 << (tx & 7);
 					if (bmap[j] & k) continue;
-					if (pixel_protected(tx, ty)) continue;
+					if (pixel_protected(tx, ty) == 255)
+						continue;
 					bmap[j] |= k;
 				}
 				else
@@ -2850,14 +2852,6 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				}
 				*dest++ = rint(aa1 + aa2 + aa3 + aa4);
 			}
-			/* Mask channel requires thresholding */
-			if (cc != CHN_MASK) continue;
-			dest = mem_img[CHN_MASK] + ny * nw;
-			for (nx = 0; nx < nw; nx++)
-			{
-				*dest = *dest < 127 ? 0: 255;
-				dest++;
-			}
 		}
 	}
 	progress_end();
@@ -3084,13 +3078,6 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 					sum[n] = 0.0;
 				}
 				if (tmpx->idx < -1) break;
-			}
-			/* Mask channel requires thresholding */
-			if (cc == CHN_MASK)
-			{
-				img = new_img[CHN_MASK] + i * nw;
-				for (j = 0; j < nw; j++)
-					img[j] = img[j] < 127 ? 0: 255;
 			}
 			/* Process RGB after alpha */
 			if (cc != CHN_ALPHA) continue;
@@ -3403,32 +3390,35 @@ int mem_protected_RGB(int intcol)		// Is this intcol in list?
 {
 	int i;
 
-	if ( mem_prot==0 ) return 0;
-	for ( i=0; i<mem_prot; i++ ) if ( intcol == mem_prot_RGB[i] ) return 1;
+	if (!mem_prot) return (0);
+	for (i = 0; i < mem_prot; i++)
+		if (intcol == mem_prot_RGB[i]) return (255);
 
-	return 0;
+	return (0);
 }
 
 int pixel_protected(int x, int y)
 {
 	int offset = y * mem_width + x;
 
+	if (mem_unmask) return (0);
+
 	/* Colour protection */
 	if (mem_img_bpp == 1)
 	{
-		if (mem_prot_mask[mem_img[CHN_IMAGE][offset]]) return (TRUE);
+		if (mem_prot_mask[mem_img[CHN_IMAGE][offset]]) return (255);
 	}
 	else
 	{
 		if (mem_prot && mem_protected_RGB(MEM_2_INT(mem_img[CHN_IMAGE],
-			offset * 3))) return (TRUE);
+			offset * 3))) return (255);
 	}
 
 	/* Mask channel */
-	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] &&
-		mem_img[CHN_MASK][offset]) return (TRUE);
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+		return (mem_img[CHN_MASK][offset]);
 
-	return (FALSE);
+	return (0);
 }
 
 void prep_mask(int start, int step, int cnt, unsigned char *mask,
@@ -3437,6 +3427,12 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	int i;
 
 	cnt = start + step * (cnt - 1) + 1;
+
+	if (mem_unmask)
+	{
+		memset(mask, 0, cnt);
+		return;
+	}
 
 	/* Clear mask or copy mask channel into it */
 	if (mask0) memcpy(mask, mask0, cnt);
@@ -3478,7 +3474,8 @@ void put_pixel( int x, int y )	/* Combined */
 	unsigned char r, g, b, nr, ng, nb;
 	int i, j, offset, ofs3, opacity = 0, tint;
 
-	if (pixel_protected(x, y)) return;
+	j = pixel_protected(x, y);
+	if (mem_img_bpp == 1 ? j : j == 255) return;
 
 	tint = tint_mode[0] ? 1 : 0;
 	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
@@ -3493,7 +3490,11 @@ void put_pixel( int x, int y )	/* Combined */
 				old_alpha = mem_undo_previous(CHN_ALPHA);
 			else old_alpha = mem_img[CHN_ALPHA];
 		}
-		if (mem_img_bpp == 3) opacity = tool_opacity;
+		if (mem_img_bpp == 3)
+		{
+			j = (255 - j) * tool_opacity;
+			opacity = (j + (j >> 8) + 1) >> 8;
+		}
 	}
 	offset = x + mem_width * y;
 	i = ((x & 7) + 8 * (y & 7));
@@ -3606,17 +3607,18 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	{
 		for (i = start; i < cnt; i += step)
 		{
-			if (mask[i])
+			k = (255 - mask[i]) * opacity;
+			if (!k)
 			{
 				mask[i] = 0;
 				continue;
 			}
+			k = (k + (k >> 8) + 1) >> 8;
 
-			k = opacity;
 			if (trans)
 			{
 				/* Have transparency mask */
-				k = (255 - trans[i]) * opacity;
+				k *= 255 - trans[i];
 				k = (k + (k >> 8) + 1) >> 8;
 			}
 			mask[i] = k;
@@ -4130,9 +4132,6 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity)
 	delta1 = yv * mem_width + xv;
 	delta = delta1 * bpp;
 
-	opw = opacity;
-	op2 = 255 - opacity;
-
 	if (xv > 0)
 	{
 		x0 = w - 1; x1 = -1; dx = -1;
@@ -4158,24 +4157,27 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity)
 		{
 			rx = ax + xv + i;
 			if ((rx < 0) || (rx >= mem_width)) continue;
-			if (pixel_protected(rx, ry)) continue;
+			k = pixel_protected(rx, ry);
 			offs = mem_width * ry + rx;
 			if (!opacity)
 			{
+				if (k) continue;
 				dest[offs] = src[offs - delta];
 				if (!dsta) continue;
 				dsta[offs] = srca[offs - delta];
 				continue;
 			}
+			opw = (255 - k) * opacity;
+			if (opw < 255) continue;
+			opw = (opw + (opw >> 8) + 1) >> 8;
 			if (dsta)
 			{
 				k = srca[offs];
-				k = k * 255 + (srca[offs - delta1] - k) * opacity;
+				k = k * 255 + (srca[offs - delta1] - k) * opw;
 				dsta[offs] = (k + (k >> 8) + 1) >> 8;
-				opw = k ? (255 * opacity * srca[offs - delta1]) / k :
-					opacity;
-				op2 = 255 - opw;
+				if (k) opw = (255 * opw * srca[offs - delta1]) / k;
 			}
+			op2 = 255 - opw;
 			offs *= bpp;
 			k = src[offs - delta] * opw + src[offs] * op2;
 			dest[offs] = (k + (k >> 8) + 1) >> 8;
