@@ -1940,7 +1940,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0;
 	unsigned char *clip_alpha, *clip_image, *t_alpha = NULL;
 	int pw = (px2 - px1 + 1), ph = (py2 - py1 + 1);
-	int i, j, l, pw3, lop = 255, lx = 0, ly = 0;
+	int i, j, l, pw3, lop = 255, lx = 0, ly = 0, bpp = MEM_BPP;
 	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
 
 	if ( pw<=0 || ph<=0 ) return;
@@ -1981,14 +1981,14 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		pww = l;
 	}
 
-	i = l * (mem_clip_bpp + 2);
+	i = l * (bpp + 2);
 	pix = malloc(i);
 	if (!pix)
 	{
 		free(rgb);
 		return;
 	}
-	alpha = pix + l * mem_clip_bpp;
+	alpha = pix + l * bpp;
 	mask = alpha + l;
 
 	memset(tlist, 0, sizeof(chanlist));
@@ -2075,11 +2075,11 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 			if (clip_image)
 			{
 				if (mem_img[mem_channel])
-					memcpy(pix, mem_img[mem_channel] + di *
-						mem_clip_bpp, l * mem_clip_bpp);
-				else memset(pix, 0, l * mem_clip_bpp);
+					memcpy(pix, mem_img[mem_channel] +
+						di * bpp, l * bpp);
+				else memset(pix, 0, l * bpp);
 				process_img(0, zoom, pww, mask, pix,
-					mem_img[mem_channel] + di * mem_clip_bpp,
+					mem_img[mem_channel] + di * bpp,
 					mem_clipboard + dc * mem_clip_bpp, opac);
 			}
 		}
@@ -2496,18 +2496,11 @@ void pressed_choose_brush( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_edit_AB( GtkMenuItem *menu_item, gpointer user_data )
 {	choose_colours();	}
 
-
-#ifndef WIN32
 static void pressed_docs()
 {
-	int r = system("mtpaint-handbook");
-
-	if ( r != 0 ) alert_box( _("Error"),
-			_("You do not seem to have the mtPaint handbook installed.  Please visit the web site to download the documentation."),
-			_("OK"), NULL, NULL );
+	show_html(inifile_get(HANDBOOK_BROWSER_INI, NULL),
+		inifile_get(HANDBOOK_LOCATION_INI, NULL));
 }
-#endif
-
 
 void set_cursor()			// Set mouse cursor
 {
@@ -2532,9 +2525,9 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 	case MTB_SAVE:
 		pressed_save_file( NULL, NULL ); break;
 	case MTB_CUT:
-		pressed_cut( NULL, NULL ); break;
+		pressed_copy(NULL, NULL, 1); break;
 	case MTB_COPY:
-		pressed_copy( NULL, NULL ); break;
+		pressed_copy(NULL, NULL, 0); break;
 	case MTB_PASTE:
 		pressed_paste_centre( NULL, NULL ); break;
 	case MTB_UNDO:
@@ -2571,17 +2564,17 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 	case TTB_POLY:
 		tool_type = TOOL_POLYGON; break;
 	case TTB_LASSO:
-		pressed_lasso( NULL, NULL ); break;
+		pressed_lasso(NULL, NULL, 0); break;
 	case TTB_TEXT:
 		pressed_text( NULL, NULL ); break;
 	case TTB_ELLIPSE:
-		pressed_outline_ellipse( NULL, NULL ); break;
+		pressed_ellipse(NULL, NULL, 0); break;
 	case TTB_FELLIPSE:
-		pressed_fill_ellipse( NULL, NULL ); break;
+		pressed_ellipse(NULL, NULL, 1); break;
 	case TTB_OUTLINE:
-		pressed_outline_rectangle( NULL, NULL ); break;
+		pressed_rectangle(NULL, NULL, 0); break;
 	case TTB_FILL:
-		pressed_fill_rectangle( NULL, NULL ); break;
+		pressed_rectangle(NULL, NULL, 1); break;
 	case TTB_SELFV:
 		pressed_flip_sel_v( NULL, NULL ); break;
 	case TTB_SELFH:
@@ -2785,7 +2778,7 @@ void main_init()
 		{ _("/Edit/Undo"),		"<control>Z",	main_undo,0, NULL },
 		{ _("/Edit/Redo"),		"<control>R",	main_redo,0, NULL },
 		{ _("/Edit/sep1"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/Edit/Cut"),		"<control>X",	pressed_cut, 0, NULL },
+		{ _("/Edit/Cut"),		"<control>X",	pressed_copy, 1, NULL },
 		{ _("/Edit/Copy"),		"<control>C",	pressed_copy, 0, NULL },
 		{ _("/Edit/Paste To Centre"),	"<control>V",	pressed_paste_centre, 0, NULL },
 		{ _("/Edit/Paste To New Layer"), "<control><shift>V", pressed_paste_layer, 0, NULL },
@@ -2868,12 +2861,12 @@ void main_init()
 		{ _("/Selection/Select All"),		"<control>A",   pressed_select_all, 0, NULL },
 		{ _("/Selection/Select None (Esc)"), "<shift><control>A", pressed_select_none,0, NULL },
 		{ _("/Selection/Lasso Selection"),	NULL,	pressed_lasso, 0, NULL },
-		{ _("/Selection/Lasso Selection Cut"),	NULL,	pressed_lasso_cut, 0, NULL },
+		{ _("/Selection/Lasso Selection Cut"),	NULL,	pressed_lasso, 1, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Selection/Outline Selection"), "<control>T", pressed_outline_rectangle, 0, NULL },
-		{ _("/Selection/Fill Selection"), "<shift><control>T", pressed_fill_rectangle, 0, NULL },
-		{ _("/Selection/Outline Ellipse"), "<control>L", pressed_outline_ellipse, 0, NULL },
-		{ _("/Selection/Fill Ellipse"), "<shift><control>L", pressed_fill_ellipse, 0, NULL },
+		{ _("/Selection/Outline Selection"), "<control>T", pressed_rectangle, 0, NULL },
+		{ _("/Selection/Fill Selection"), "<shift><control>T", pressed_rectangle, 1, NULL },
+		{ _("/Selection/Outline Ellipse"), "<control>L", pressed_ellipse, 0, NULL },
+		{ _("/Selection/Fill Ellipse"), "<shift><control>L", pressed_ellipse, 1, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Selection/Flip Vertically"),	NULL,	pressed_flip_sel_v,0, NULL },
 		{ _("/Selection/Flip Horizontally"),	NULL,	pressed_flip_sel_h,0, NULL },
@@ -2965,9 +2958,7 @@ void main_init()
 		{ _("/Layers/Remove all key frames ..."), NULL, pressed_remove_key_frames, 0, NULL },
 
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
-#ifndef WIN32
 		{ _("/Help/Documentation"),	NULL,		pressed_docs,0, NULL },
-#endif
 		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
 	};
 
@@ -3319,7 +3310,7 @@ void main_init()
 	set_cursor();
 	init_status_bar();
 
-	snprintf(txt, 250, "%s/.clipboard", get_home_directory());
+	snprintf(txt, 250, "%s%c.clipboard", get_home_directory(), DIR_SEP);
 	snprintf(mem_clip_file, 250, "%s", inifile_get("clipFilename", txt));
 
 	if (files_passed > 1)

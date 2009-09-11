@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006 Mark Tyler
+	Copyright (C) 2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

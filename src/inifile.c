@@ -18,6 +18,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -121,24 +122,29 @@ gboolean file_exists(char *filename)
 
 gchar *get_home_directory(void)
 {
+	static gchar *homedir = NULL;
+
+	if (homedir) return homedir;
 #ifndef WIN32
-     static gchar *homedir = NULL;
-     struct passwd *p;
-     if (!homedir)
-	  homedir = getenv("HOME");
-     if (!homedir) {
-	  p = getpwuid(getuid());
-	  if (p) homedir = p->pw_dir;
-     }
-     if (!homedir) {
-	  g_warning(_("Could not find home directory. Using current directory as "
-		    "home directory."));
-	  homedir = ".";
-     }
-     return homedir;
+	homedir = getenv("HOME");
+	if (!homedir)
+	{
+		struct passwd *p;
+
+		p = getpwuid(getuid());
+		if (p) homedir = p->pw_dir;
+	}
+	if (!homedir)
+	{
+		g_warning(_("Could not find home directory. Using current directory as "
+			"home directory."));
+		homedir = ".";
+	}
 #else
-     return "";
+	homedir = getenv("USERPROFILE");	// Gets the current users home directory in WinXP
+	if (!homedir) homedir = "";		// And this, in Win9x :-)
 #endif
+	return homedir;
 }
 
 
@@ -199,10 +205,12 @@ void inifile_init( char *ini_filename )
 	  }
 	  d++;
 	  d = skipspace(d);
+#if 0 /* Empty values are legal too - WJ */
 	  if (*d==0) {
 	       g_printerr("%s: Expected value: %s\n",ininame,c);
 	       break;
 	  }
+#endif
 	  valuestart = d;
 	  current_setting = g_malloc(sizeof(struct inifile_setting));
 	  current_setting->name = g_strdup(namestart);

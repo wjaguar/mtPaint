@@ -37,5 +37,3 @@ void poly_mask();		// Paint polygon onto clipboard mask
 void poly_paint();		// Paint polygon onto image
 void poly_outline();		// Paint polygon outline onto image
 void poly_lasso();		// Lasso around current clipboard
-void poly_lasso_cut();		// Cut out area that was just lasso'd
-

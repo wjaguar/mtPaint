@@ -29,6 +29,8 @@
 #include "viewer.h"
 #include "mainwindow.h"
 
+#include "prefs.h"
+
 
 ///	PREFERENCES WINDOW
 
@@ -39,7 +41,7 @@ static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *ch
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
 GtkWidget *clipboard_entry;
-static GtkWidget *spinbutton_grid[4];
+static GtkWidget *spinbutton_grid[4], *entry_handbook[2];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
@@ -337,6 +339,9 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	strncpy(mem_clip_file, gtk_entry_get_text(GTK_ENTRY(clipboard_entry)), 250);
 	inifile_set("clipFilename", mem_clip_file);
 
+	inifile_set(HANDBOOK_BROWSER_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[0])) );
+	inifile_set(HANDBOOK_LOCATION_INI, (gchar *)gtk_entry_get_text(GTK_ENTRY(entry_handbook[1])) );
+
 	show_paste = inifile_get_gboolean( "pasteToggle", TRUE );
 
 	update_all_views();		// Update canvas for changes
@@ -518,6 +523,27 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	button1 = add_a_button( _("Browse"), 4, vbox_2, FALSE );
 	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
 		GTK_SIGNAL_FUNC(clip_file_browse), NULL);
+
+	add_hseparator( vbox_2, -2, 10 );
+	label = gtk_label_new( _("HTML Browser Program") );
+	gtk_widget_show( label );
+	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 5 );
+
+	entry_handbook[0] = gtk_entry_new();
+	gtk_widget_show( entry_handbook[0] );
+	gtk_box_pack_start( GTK_BOX(vbox_2), entry_handbook[0], FALSE, FALSE, 5 );
+	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
+		inifile_get(HANDBOOK_BROWSER_INI, ""));
+
+	label = gtk_label_new( _("Location of Handbook index") );
+	gtk_widget_show( label );
+	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 5 );
+
+	entry_handbook[1] = gtk_entry_new();
+	gtk_widget_show( entry_handbook[1] );
+	gtk_box_pack_start( GTK_BOX(vbox_2), entry_handbook[1], FALSE, FALSE, 5 );
+	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
+		inifile_get(HANDBOOK_LOCATION_INI, ""));
 
 ///	---- TAB3 - STATUS BAR
 

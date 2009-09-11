@@ -19,6 +19,10 @@
 
 #include <gtk/gtk.h>
 
+
+#define HANDBOOK_BROWSER_INI "docsBrowser"
+#define HANDBOOK_LOCATION_INI "docsLocation"
+
 GtkWidget *clipboard_entry;
 
 gboolean tablet_working, tablet_tool_use[3];	// Size, flow, opacity

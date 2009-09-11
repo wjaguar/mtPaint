@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -110,20 +110,16 @@ void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar
 void init_status_bar();			// Initialize status bar
 
-void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_lasso_cut( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item );
 
-void pressed_copy( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_cut( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_paste( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_outline_rectangle( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_fill_rectangle( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_outline_ellipse( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_fill_ellipse( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item );
 
 void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data );

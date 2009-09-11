@@ -23,7 +23,8 @@
 #include "memory.h"
 #include "otherwindow.h"
 
-
+/* !!! Currently, poly_points should be set to 0 when there's no polygonal
+ * selection, because poly_lasso() depends on that - WJ */
 int poly_mem[MAX_POLY][2], poly_points=0, poly_min_x, poly_max_x, poly_min_y, poly_max_y;
 				// Coords in poly_mem are raw coords as plotted over image
 
@@ -78,10 +79,10 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 	int oldmode = mem_undo_opacity;
 	float ratio;
 
-	if ( type==0 )
+	if (type == 0)
 	{
-		mem_clip_mask_init(0);		// Setup & Clear mask
-		if ( mem_clip_mask == NULL ) return;	// Failed to get memory
+		mem_clip_mask_init(0);		/* Clear mask */
+		if (!mem_clip_mask) return;	/* Failed to get memory */
 	}
 
 	mem_undo_opacity = TRUE;
@@ -309,13 +310,17 @@ void flood_fill24_poly( int x, int y, int target )
 
 void poly_lasso()		// Lasso around current clipboard
 {
-	int i, j, x = poly_mem[0][0] - poly_min_x, y = poly_mem[0][1] - poly_min_y,
-		minx = mem_clip_w-1, miny = mem_clip_h - 1, maxx = 0, maxy = 0,
-		offs, offd, nw, nh;
-	unsigned char *t_clip, *t_mask, *t_alpha = NULL;
+	int i, j, x = 0, y = 0;
 
-	poly_mask();	// Initialize mask to all clear - 0 & Polygon on clipboard mask to 255
-	if ( mem_clip_mask == NULL ) return;	// Failed to get memory
+	if (!mem_clip_mask) return;	/* Nothing to do */
+
+	/* Fill seed is the first point of polygon, if any,
+	 * or top left corner of the clipboard by default */
+	if (poly_points)
+	{
+		x = poly_mem[0][0] - poly_min_x;
+		y = poly_mem[0][1] - poly_min_y;
+	}
 
 	if ( mem_clip_bpp == 1 )
 	{
@@ -333,76 +338,4 @@ void poly_lasso()		// Lasso around current clipboard
 	for ( i=0; i<j; i++ )
 		if ( mem_clip_mask[i] == 1 ) mem_clip_mask[i] = 0;
 			// Turn flood (1) into clear (0)
-
-	for ( j=0; j<mem_clip_h; j++ )			// Find max & min values for shrink wrapping
-	{
-		offs = j*mem_clip_w;
-		for ( i=0; i<mem_clip_w; i++ )
-		{
-			if (mem_clip_mask[offs + i])
-			{
-				mtMAX( maxx, maxx, i )
-				mtMAX( maxy, maxy, j )
-				mtMIN( minx, minx, i )
-				mtMIN( miny, miny, j )
-			}
-		}
-	}
-	if ( minx>maxx ) return;	// No live pixels found so bail out
-
-	nw = maxx - minx + 1;
-	nh = maxy - miny + 1;
-
-	/* No decrease so no resize either */
-	if ((nw == mem_clip_w) && (nh == mem_clip_h)) return;
-
-	/* Try to malloc memory for smaller clipboard */
-	t_clip = malloc(nw * nh * mem_clip_bpp);
-	t_mask = malloc(nw * nh);
-	if (mem_clip_alpha) t_alpha = malloc(nw * nh);
-	if (!t_clip || !t_mask || (!t_alpha && mem_clip_alpha))
-	{
-		free(t_clip); free(t_mask); free(t_alpha);
-		memory_errors(1);
-		return;
-	}
-	for (j = miny; j <= maxy; j++)	// Copy the data
-	{
-		offs = j * mem_clip_w + minx;
-		offd = (j - miny) * nw;
-		memcpy(t_mask + offd, mem_clip_mask + offs, nw);
-		if (mem_clip_alpha)
-			memcpy(t_alpha + offd, mem_clip_alpha + offs, nw);
-		memcpy(t_clip + offd * mem_clip_bpp,
-			mem_clipboard + offs * mem_clip_bpp, nw * mem_clip_bpp);
-	}
-
-	free(mem_clipboard);		// Free old clipboard
-	free(mem_clip_mask);		// Free old mask
-	free(mem_clip_alpha);		// Free old mask
-	mem_clipboard = t_clip;
-	mem_clip_mask = t_mask;
-	mem_clip_alpha = t_alpha;
-	mem_clip_w = nw;
-	mem_clip_h = nh;
-	mem_clip_x += minx;
-	mem_clip_y += miny;
-}
-
-void poly_lasso_cut()		// Cut out area that was just lasso'd
-{				// Pre-requisite - Must have clipboard mask from poly_lasso()
-	int i, j, offm;
-
-		// Check geometry within limits, i.e. (mem_clip_x+mem_clip_w)<=mem_width + y
-	if ( 	(mem_clip_x + mem_clip_w) > mem_width ||
-		(mem_clip_y + mem_clip_h) > mem_height) return;
-
-	for ( j=mem_clip_y; j<(mem_clip_y + mem_clip_h); j++ )		// Cut out area
-	{
-		offm = (j - mem_clip_y) * mem_clip_w;
-		for ( i=mem_clip_x; i<(mem_clip_x + mem_clip_w); i++ )
-		{
-			if (mem_clip_mask[offm++]) put_pixel(i, j);
-		}
-	}
 }

@@ -49,7 +49,7 @@ su -c "ln -s mtpaint /usr/local/bin/mtv"
 
 Then you can open some graphics files with "mtv *.jpg".  This is a shortcut to writing "mtpaint -v *.jpg".  mtPaint can only edit one image at a time, but when you have more than one filename in the command line a window will appear with all of the filenames in a list.  If you select one of the names, it will be loaded.  I find this is helpful for editing several icons or digital photos.
 
-After running mtPaint for the first time, a new file is created to store your preferred settings and previously used files etc.  This file is named ".mtpaint" and stored in the user's home directory on GNU/Linux systems and the root of the drive being used in Windows, e.g. C:/ or D:/  If you rename or remove this file then the next time mtPaint is run it will use the default settings.
+After running mtPaint for the first time, a new file is created to store your preferred settings and previously used files etc.  This file is named ".mtpaint" and stored in the user's home directory.  If you rename or remove this file then the next time mtPaint is run it will use the default settings.
 
 It is also possible to compile mtPaint on a Windows system using MinGW/MSYS with the relevant header and library files.  If you want to do this you must first download the normal setup program and install the files to "C:/Program Files/mtPaint/" and then:
 
@@ -106,7 +106,7 @@ Authors
 Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c for more information.
 Dmitry Groshev - Wrote the code for tint mode and image scaling. Rewrote much of the code for version 3 in order to support channels, and also applied many other improvements to the code.
 Magnus Hjorth - Wrote inifile.c/h, from mhWaveEdit 1.3.0.
-Mark Tyler - Original author.
+Mark Tyler - Original author and maintainer up to version 3.00, occasional contributor thereafter.
 Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information.
 
 
@@ -134,7 +134,7 @@ Brazilian Portuguese - Paulo Trevizan
 Czech - Pavel Ruzicka
 French - Nicolas Velin, Pascal Billard
 German - Oliver Frommel
-Portuguese - Israel G. Lugo
 Polish - Simek
+Portuguese - Israel G. Lugo
 Spanish - Guadalinex Team (Junta de Andalucia), Antonio San
 

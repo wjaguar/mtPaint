@@ -48,6 +48,7 @@
 #include "mygtk.h"
 #include "layer.h"
 #include "ani.h"
+#include "inifile.h"
 
 
 char preserved_gif_filename[256];
@@ -233,14 +234,16 @@ static unsigned char png_interlace[8][4] = {
 
 static int load_png(char *file_name, ls_settings *settings)
 {
+	static png_bytep *row_pointers;
+	static char *msg;
 	png_structp png_ptr;
 	png_infop info_ptr;
 	png_color_16p trans_rgb;
 	png_unknown_chunkp uk_p;
-	png_bytep *row_pointers = NULL, trans;
+	png_bytep trans;
 	png_colorp png_palette;
 	png_uint_32 pwidth, pheight;
-	char buf[PNG_BYTES_TO_CHECK + 1], *msg = NULL;
+	char buf[PNG_BYTES_TO_CHECK + 1];
 	unsigned char *src, *dest, *dsta;
 	long dest_len;
 	FILE *fp;
@@ -255,6 +258,7 @@ static int load_png(char *file_name, ls_settings *settings)
 	png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 	if (!png_ptr) goto fail;
 
+	row_pointers = NULL; msg = NULL;
 	info_ptr = png_create_info_struct(png_ptr);
 	if (!info_ptr) goto fail2;
 
@@ -793,14 +797,16 @@ struct my_error_mgr jerr;
 
 static int load_jpeg(char *file_name, ls_settings *settings)
 {
+	static int pr;
 	struct jpeg_decompress_struct cinfo;
 	unsigned char *memp;
 	FILE *fp;
-	int i, width, height, bpp = 3, res = -1, pr = 0;
+	int i, width, height, bpp, res = -1;
 
 
 	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
 
+	pr = 0;
 	jpeg_create_decompress(&cinfo);
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
@@ -813,6 +819,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 
 	jpeg_read_header(&cinfo, TRUE);
 	jpeg_start_decompress(&cinfo);
+	bpp = 3;
 	if (cinfo.output_components == 1) /* Greyscale */
 	{
 		settings->colors = 256;
@@ -2096,7 +2103,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			GdkColor col;
 
 			if (!cdefs[j]) continue;
-			if (!stricmp(cdefs[j], "none")) /* Transparent */
+			if (!strcasecmp(cdefs[j], "none")) /* Transparent */
 			{
 				settings->xpm_trans = i;
 				settings->pal[i].red = settings->pal[i].green = 115;
@@ -2806,4 +2813,70 @@ int detect_image_format(char *name)
 		if (ISCNTRL(buf[i])) return (FT_NONE);
 	}
 	return (FT_XBM);
+}
+
+#ifdef WIN32
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#define HANDBOOK_LOCATION_WIN "..\\docs\\index.html"
+
+#else /* Linux */
+
+#define HANDBOOK_BROWSER "firefox"
+#define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
+
+#endif
+
+int show_html(char *browser, char *docs)
+{
+	char buf[300], buf2[300];
+#ifdef WIN32
+	char *r;
+	int i;
+
+	if (!docs || !docs[0])
+	{
+		/* Use default path relative to installdir */
+		i = GetModuleFileNameA(NULL, buf, 260);
+		if (!i) return (-1);
+		r = strrchr(buf, '\\');
+		if (!r) return (-1);
+		strcpy(r + 1, HANDBOOK_LOCATION_WIN);
+		docs = buf;
+	}
+#else /* Linux */
+	if (!docs || !docs[0]) docs = HANDBOOK_LOCATION;
+#endif
+	else docs = gtkncpy(buf, docs, 260);
+
+	if (!file_exists(docs))
+	{
+		alert_box( _("Error"),
+			_("I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."),
+ 			_("OK"), NULL, NULL );
+		return (-1);
+	}
+
+#ifdef WIN32
+	if (browser && !browser[0]) browser = NULL;
+	if (browser) browser = gtkncpy(buf2, browser, 260);
+
+	if ((unsigned int)ShellExecuteA(NULL, "open", browser ? browser : docs,
+		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
+	else i = 0;
+#else
+	/* Try to use default browser */
+	if (!browser || !browser[0]) browser = getenv("BROWSER");
+	else browser = gtkncpy(buf2, browser, 260);
+
+	if (!browser) browser = HANDBOOK_BROWSER;
+
+	snprintf(buf, 260, "%s %s", browser, docs);
+	i = system(txt);
+#endif
+	if (i) alert_box( _("Error"),
+		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."),
+		_("OK"), NULL, NULL );
+	return (i);
 }

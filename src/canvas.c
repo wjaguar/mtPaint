@@ -779,209 +779,239 @@ void pressed_paste_centre( GtkMenuItem *menu_item, gpointer user_data )
 	paste_init();
 }
 
-void do_the_copy(int op)
+void pressed_rectangle( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	int x1 = marq_x1, y1 = marq_y1;
-	int x2 = marq_x2, y2 = marq_y2;
-	int x, y, w, h, bpp, ofs, delta, len;
-	int i;
-
-	mtMIN( x, x1, x2 )
-	mtMIN( y, y1, y2 )
-
-	w = x1 - x2;
-	h = y1 - y2;
-
-	if ( w < 0 ) w = -w;
-	if ( h < 0 ) h = -h;
-
-	w++; h++;
-
-	if ( op == 1 )		// COPY
-	{
-		bpp = MEM_BPP;
-		free(mem_clipboard);		// Lose old clipboard
-		free(mem_clip_alpha);		// Lose old clipboard alpha
-		mem_clip_mask_clear();		// Lose old clipboard mask
-		mem_clip_alpha = NULL;
-		if (mem_channel == CHN_IMAGE)
-		{
-			if (mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])
-				mem_clip_alpha = malloc(w * h);
-			if (mem_img[CHN_SEL] && !channel_dis[CHN_SEL])
-				mem_clip_mask = malloc(w * h);
-		}
-		mem_clipboard = malloc(w * h * bpp);
-		text_paste = FALSE;
-	
-		if (!mem_clipboard)
-		{
-			free(mem_clip_alpha);
-			mem_clip_mask_clear();
-			alert_box( _("Error"), _("Not enough memory to create clipboard"),
-					_("OK"), NULL, NULL );
-		}
-		else
-		{
-			mem_clip_bpp = bpp;
-			mem_clip_x = x;
-			mem_clip_y = y;
-			mem_clip_w = w;
-			mem_clip_h = h;
-
-			/* Current channel */
-			ofs = (y * mem_width + x) * bpp;
-			delta = 0;
-			len = w * bpp;
-			for (i = 0; i < h; i++)
-			{
-				memcpy(mem_clipboard + delta,
-					mem_img[mem_channel] + ofs, len);
-				ofs += mem_width * bpp;
-				delta += len;
-			}
-
-			/* Utility channels */
-			if (mem_clip_alpha)
-			{
-				ofs = y * mem_width + x;
-				delta = 0;
-				for (i = 0; i < h; i++)
-				{
-					memcpy(mem_clip_alpha + delta,
-						mem_img[CHN_ALPHA] + ofs, w);
-					ofs += mem_width;
-					delta += w;
-				}
-			}
-
-			/* Selection channel */
-			if (mem_clip_mask)
-			{
-				ofs = y * mem_width + x;
-				delta = 0;
-				for (i = 0; i < h; i++)
-				{
-					memcpy(mem_clip_mask + delta,
-						mem_img[CHN_SEL] + ofs, w);
-					ofs += mem_width;
-					delta += w;
-				}
-			}
-		}
-	}
-	if ( op == 2 )		// CLEAR area
-	{
-		f_rectangle( x, y, w, h );
-	}
-	if ( op == 3 )		// Remember new coords for copy while pasting
-	{
-		mem_clip_x = x;
-		mem_clip_y = y;
-	}
-
-	update_menus();
-}
-
-void pressed_outline_rectangle( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int x, y, w, h, x2, y2;
+	int x, y, w, h;
 
 	spot_undo(UNDO_DRAW);
 
 	if ( tool_type == TOOL_POLYGON )
 	{
-		poly_outline();
+		if (!item) poly_outline();
+		else poly_paint();
 	}
 	else
 	{
-		mtMIN( x, marq_x1, marq_x2 )
-		mtMIN( y, marq_y1, marq_y2 )
-		mtMAX( x2, marq_x1, marq_x2 )
-		mtMAX( y2, marq_y1, marq_y2 )
+		x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
 		w = abs(marq_x1 - marq_x2) + 1;
 		h = abs(marq_y1 - marq_y2) + 1;
 
-		if ( 2*tool_size >= w || 2*tool_size >= h )
-			f_rectangle( x, y, w, h );
+		if (item || (2 * tool_size >= w) || (2 * tool_size >= h))
+			f_rectangle(x, y, w, h);
 		else
 		{
-			f_rectangle( x, y, w, tool_size );				// TOP
-			f_rectangle( x, y + tool_size, tool_size, h - 2*tool_size );	// LEFT
-			f_rectangle( x, y2 - tool_size + 1, w, tool_size );		// BOTTOM
-			f_rectangle( x2 - tool_size + 1,
-				y + tool_size, tool_size, h - 2*tool_size );		// RIGHT
+			f_rectangle(x, y, w, tool_size);
+			f_rectangle(x, y + tool_size, tool_size, h - 2 * tool_size);
+			f_rectangle(x, y + h - tool_size, w, tool_size);
+			f_rectangle(x + w - tool_size, y + tool_size,
+				tool_size, h - 2 * tool_size);
 		}
 	}
 
 	update_all_views();
 }
 
-void pressed_fill_ellipse( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_ellipse( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	spot_undo(UNDO_DRAW);
-	f_ellipse( marq_x1, marq_y1, marq_x2, marq_y2 );
+	if (!item) o_ellipse( marq_x1, marq_y1, marq_x2, marq_y2, tool_size );
+	else f_ellipse( marq_x1, marq_y1, marq_x2, marq_y2 );
 	update_all_views();
 }
 
-void pressed_outline_ellipse( GtkMenuItem *menu_item, gpointer user_data )
+static int copy_clip()
 {
-	spot_undo(UNDO_DRAW);
-	o_ellipse( marq_x1, marq_y1, marq_x2, marq_y2, tool_size );
-	update_all_views();
-}
+	int i, x, y, w, h, bpp, ofs, delta, len;
 
-void pressed_fill_rectangle( GtkMenuItem *menu_item, gpointer user_data )
-{
-	spot_undo(UNDO_DRAW);
-	if ( tool_type == TOOL_SELECT ) do_the_copy(2);
-	if ( tool_type == TOOL_POLYGON ) poly_paint();
-	update_all_views();
-}
 
-void pressed_cut( GtkMenuItem *menu_item, gpointer user_data )
-{			// Copy current selection to clipboard and then fill area with current pattern
-	do_the_copy(1);
-	spot_undo(UNDO_DRAW);
-	if ( tool_type == TOOL_SELECT ) do_the_copy(2);
-	if ( tool_type == TOOL_POLYGON )
+	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+	y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+	w = abs(marq_x1 - marq_x2) + 1;
+	h = abs(marq_y1 - marq_y2) + 1;
+
+	bpp = MEM_BPP;
+	free(mem_clipboard);		// Lose old clipboard
+	free(mem_clip_alpha);		// Lose old clipboard alpha
+	mem_clip_mask_clear();		// Lose old clipboard mask
+	mem_clip_alpha = NULL;
+	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
+		 !channel_dis[CHN_ALPHA]) mem_clip_alpha = malloc(w * h);
+	mem_clipboard = malloc(w * h * bpp);
+	text_paste = FALSE;
+
+	if (!mem_clipboard)
 	{
-		poly_mask();
-		poly_paint();
+		free(mem_clip_alpha);
+		alert_box( _("Error"), _("Not enough memory to create clipboard"),
+			_("OK"), NULL, NULL );
+		return (FALSE);
 	}
 
-	update_all_views();
+	mem_clip_bpp = bpp;
+	mem_clip_x = x;
+	mem_clip_y = y;
+	mem_clip_w = w;
+	mem_clip_h = h;
+
+	/* Current channel */
+	ofs = (y * mem_width + x) * bpp;
+	delta = 0;
+	len = w * bpp;
+	for (i = 0; i < h; i++)
+	{
+		memcpy(mem_clipboard + delta, mem_img[mem_channel] + ofs, len);
+		ofs += mem_width * bpp;
+		delta += len;
+	}
+
+	/* Alpha channel */
+	if (mem_clip_alpha)
+	{
+		ofs = y * mem_width + x;
+		delta = 0;
+		for (i = 0; i < h; i++)
+		{
+			memcpy(mem_clip_alpha + delta, mem_img[CHN_ALPHA] + ofs, w);
+			ofs += mem_width;
+			delta += w;
+		}
+	}
+
+	return (TRUE);
 }
 
-void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data )
+static void channel_mask()
 {
-	do_the_copy(1);
-	if ( mem_clipboard == NULL ) return;		// No memory so bail out
-	poly_mask();
+	int i, j, ofs, delta;
+
+	if (!mem_img[CHN_SEL]) return;
+	if (mem_channel > CHN_ALPHA) return;
+
+	if (!mem_clip_mask) mem_clip_mask_init(255);
+	if (!mem_clip_mask) return;
+
+	ofs = mem_clip_y * mem_width + mem_clip_x;
+	delta = 0;
+	for (i = 0; i < mem_clip_h; i++)
+	{
+		for (j = 0; j < mem_clip_w; j++)
+			mem_clip_mask[delta + j] &= mem_img[CHN_SEL][ofs + j];
+		ofs += mem_width;
+		delta += mem_clip_w;
+	}
+}
+
+static void cut_clip()
+{
+	int i, j, k, kk, step, to;
+	unsigned char *sel, fix = 255;
+
+	spot_undo(UNDO_DRAW);
+	step = mem_clip_mask ? 1 : 0;
+	to = tool_opacity;
+	kk = mem_channel <= CHN_ALPHA ? tool_opacity : 255;
+
+	for (i = 0; i < mem_clip_h; i++)
+	{
+		sel = mem_clip_mask ? mem_clip_mask + i * mem_clip_w : &fix;
+		for (j = 0; j < mem_clip_w; j++ , sel += step)
+		{
+			k = *sel * kk;
+			tool_opacity = (k + (k >> 8) + 1) >> 8;
+			if (!tool_opacity) continue;
+			put_pixel(mem_clip_x + j, mem_clip_y + i);
+		}
+	}
+	tool_opacity = to;
+}
+
+static void trim_clip()
+{
+	int i, j, offs, offd, maxx, maxy, minx, miny, nw, nh;
+	unsigned char *tmp;
+
+	minx = MAX_WIDTH; miny = MAX_HEIGHT; maxx = maxy = 0;
+
+	/* Find max & min values for shrink wrapping */
+	for (j = 0; j < mem_clip_h; j++)
+	{
+		offs = mem_clip_w * j;
+		for (i = 0; i < mem_clip_w; i++)
+		{
+			if (!mem_clip_mask[offs + i]) continue;
+			if (i < minx) minx = i;
+			if (i > maxx) maxx = i;
+			if (j < miny) miny = j;
+			if (j > maxy) maxy = j;
+		}
+	}
+
+	/* No live pixels found */
+	if (minx > maxx) return;
+
+	nw = maxx - minx + 1;
+	nh = maxy - miny + 1;
+
+	/* No decrease so no resize either */
+	if ((nw == mem_clip_w) && (nh == mem_clip_h)) return;
+
+	/* Pack data to front */
+	for (j = miny; j <= maxy; j++)
+	{
+		offs = j * mem_clip_w + minx;
+		offd = (j - miny) * nw;
+		memmove(mem_clip_mask + offd, mem_clip_mask + offs, nw);
+		if (mem_clip_alpha)
+			memmove(mem_clip_alpha + offd, mem_clip_alpha + offs, nw);
+		memmove(mem_clipboard + offd * mem_clip_bpp,
+			mem_clipboard + offs * mem_clip_bpp, nw * mem_clip_bpp);
+	}
+
+	/* Try to realloc memory for smaller clipboard */
+	tmp = realloc(mem_clipboard, nw * nh * mem_clip_bpp);
+	if (tmp) mem_clipboard = tmp;
+	tmp = realloc(mem_clip_mask, nw * nh);
+	if (tmp) mem_clip_mask = tmp;
+	if (mem_clip_alpha)
+	{
+		tmp = realloc(mem_clip_alpha, nw * nh);
+		if (tmp) mem_clip_alpha = tmp;
+	}
+
+	mem_clip_w = nw;
+	mem_clip_h = nh;
+	mem_clip_x += minx;
+	mem_clip_y += miny;
+}
+
+void pressed_copy( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	if (!item && (tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+	{
+		mem_clip_x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+		mem_clip_y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+		return;
+	}
+
+	if (!copy_clip()) return;
+	if (tool_type == TOOL_POLYGON) poly_mask();
+	channel_mask();
+	if (item) cut_clip();
+	update_all_views();
+	update_menus();
+}
+
+void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	if (!copy_clip()) return;
+	if (tool_type == TOOL_POLYGON) poly_mask();
+	else mem_clip_mask_init(255);
 	poly_lasso();
+	channel_mask();
+	trim_clip();
+	if (item) cut_clip();
 	pressed_paste_centre( NULL, NULL );
-}
-
-void pressed_lasso_cut( GtkMenuItem *menu_item, gpointer user_data )
-{
-	pressed_lasso( menu_item, user_data );
-	if ( mem_clipboard == NULL ) return;		// No memory so bail out
-	spot_undo(UNDO_DRAW);
-	poly_lasso_cut();
-}
-
-void pressed_copy( GtkMenuItem *menu_item, gpointer user_data )
-{			// Copy current selection to clipboard
-	if ( tool_type == TOOL_POLYGON )
-	{
-		do_the_copy(1);
-		poly_mask();
-	}
-	if ( tool_type == TOOL_SELECT )
-	{
-		if ( marq_status >= MARQUEE_PASTE ) do_the_copy(3);
-		else do_the_copy(1);
-	}
 }
 
 /* !!! Add support for channel-specific option sets !!! */
@@ -991,70 +1021,38 @@ void update_menus()			// Update edit/undo menu
 
 	update_undo_bar();
 
-	if ( mem_img_bpp == 1 )
-	{
-		men_item_state( menu_only_indexed, TRUE );
-		men_item_state( menu_only_24, FALSE );
-	}
-	if ( mem_img_bpp == 3 )
-	{
-		men_item_state( menu_only_indexed, FALSE );
-		men_item_state( menu_only_24, TRUE );
-	}
+	men_item_state(menu_only_indexed, mem_img_bpp == 1);
+	men_item_state(menu_only_24, mem_img_bpp == 3);
 
-	if ( mem_img_bpp == 3 && mem_clipboard != NULL && mem_clip_bpp )
-		men_item_state( menu_alphablend, TRUE );
-	else	men_item_state( menu_alphablend, FALSE );
+	men_item_state(menu_alphablend, mem_clipboard && (mem_clip_bpp == 3));
 
 	if ( marq_status == MARQUEE_NONE )
 	{
-		men_item_state( menu_need_selection, FALSE );
-		men_item_state( menu_crop, FALSE );
-		if ( poly_status == POLY_DONE )
-		{
-			men_item_state( menu_lasso, TRUE );
-			men_item_state( menu_need_marquee, TRUE );
-		}
-		else
-		{
-			men_item_state( menu_lasso, FALSE );
-			men_item_state( menu_need_marquee, FALSE );
-		}
+		men_item_state(menu_need_selection, FALSE);
+		men_item_state(menu_crop, FALSE);
+		men_item_state(menu_lasso, poly_status == POLY_DONE);
+		men_item_state(menu_need_marquee, poly_status == POLY_DONE);
 	}
 	else
 	{
-		if ( poly_status != POLY_DONE ) men_item_state( menu_lasso, FALSE );
+		men_item_state(menu_need_marquee, TRUE);
 
-		men_item_state( menu_need_marquee, TRUE );
+		men_item_state(menu_lasso, marq_status <= MARQUEE_DONE);
 
-		if ( marq_status >= MARQUEE_PASTE )	// If we are pasting disallow copy/cut/crop
-		{
-			men_item_state( menu_need_selection, FALSE );
-			men_item_state( menu_crop, FALSE );
-		}
-		else	men_item_state( menu_need_selection, TRUE );
+		/* If we are pasting disallow copy/cut/crop */
+		men_item_state(menu_need_selection, marq_status < MARQUEE_PASTE);
 
-		// Only offer the crop option if the user hasn't selected everything
-		if ((marq_status <= MARQUEE_DONE) &&
+		/* Only offer the crop option if the user hasn't selected everything */
+		men_item_state(menu_crop, (marq_status <= MARQUEE_DONE) &&
 			((abs(marq_x1 - marq_x2) < mem_width - 1) ||
-			(abs(marq_y1 - marq_y2) < mem_height - 1)))
-			men_item_state( menu_crop, TRUE );
-		else men_item_state( menu_crop, FALSE );
+			(abs(marq_y1 - marq_y2) < mem_height - 1)));
 	}
 
-	if ( mem_clipboard == NULL ) men_item_state( menu_need_clipboard, FALSE );
-	else
-	{
-		if (mem_clip_bpp == MEM_BPP) men_item_state( menu_need_clipboard, TRUE );
-		else men_item_state( menu_need_clipboard, FALSE );
-			// Only allow pasting if the image is the same type as the clipboard
-	}
+	/* Forbid RGB-to-indexed paste, but allow indexed-to-RGB */
+	men_item_state(menu_need_clipboard, mem_clipboard && (mem_clip_bpp <= MEM_BPP));
 
-	if ( mem_undo_done == 0 ) men_item_state( menu_undo, FALSE );
-	else men_item_state( menu_undo, TRUE );
-
-	if ( mem_undo_redo == 0 ) men_item_state( menu_redo, FALSE );
-	else  men_item_state( menu_redo, TRUE );
+	men_item_state(menu_undo, !!mem_undo_done);
+	men_item_state(menu_redo, !!mem_undo_redo);
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_chann_x[mem_channel]), TRUE);
 
@@ -1063,8 +1061,7 @@ void update_menus()			// Update edit/undo menu
 		if (mem_img[i]) j++;
 		gtk_widget_set_sensitive(menu_chan_dis[i], !!mem_img[i]);
 	}
-	if (j > 1) men_item_state(menu_chan_del, TRUE);
-	else men_item_state(menu_chan_del, FALSE);
+	men_item_state(menu_chan_del, j > 1);
 }
 
 void canvas_undo_chores()
@@ -1663,18 +1660,7 @@ static gint fs_ok(GtkWidget *fs)
 	}
 
 	/* Get filename the proper way */
-#if GTK_MAJOR_VERSION == 2
-	c = g_locale_from_utf8((gchar *)gtk_file_selection_get_filename(
-		GTK_FILE_SELECTION(fs)), -1, NULL, NULL, NULL);
-	if (c)
-	{
-		strncpy(fname, c, 250);
-		g_free(c);
-	}
-	else
-#endif
-	strncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), 250);
-
+	gtkncpy(fname, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fs)), 250);
 
 	switch (settings.mode)
 	{
@@ -1904,10 +1890,16 @@ void file_selector(int action_type)
 		strncpy(txt, layers_filename, 256);
 	else if (action_type == FS_LAYER_SAVE)
 	{
-		strncpy(txt, inifile_get("last_dir", "/"), 256);
-		strncat(txt, "layers.txt", 256);
+		snprintf(txt, 256, "%s%clayers.txt",
+			inifile_get("last_dir", get_home_directory()),
+			DIR_SEP );
 	}
-	else strncpy(txt, inifile_get("last_dir", "/"), 256);	// Default
+	else
+	{
+		snprintf(txt, 256, "%s%c",
+			inifile_get("last_dir", get_home_directory()),
+			DIR_SEP );		// Default
+	}
 
 #if GTK_MAJOR_VERSION == 2
 	cleanse_txt( txt2, txt );		// Clean up non ASCII chars
@@ -3100,13 +3092,13 @@ void register_file( char *filename )		// Called after successful load/save
 	int i, f;
 
 	c = strrchr( filename, DIR_SEP );
-	if (c != NULL)
+	if (c)
 	{
-		txt[0] = c[1];
-		c[1] = 0;
+		txt[0] = *c;
+		*c = '\0';		// Strip off filename
+		inifile_set("last_dir", filename);
+		*c = txt[0];
 	}
-	inifile_set("last_dir", filename);		// Strip off filename
-	if (c != NULL) c[1] = txt[0];
 
 	// Is it already in used file list?  If so shift relevant filenames down and put at top.
 	i = 1;

@@ -4281,9 +4281,18 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			opacity = mask[i];
 			if (!opacity) continue;
 			ofs3 = i * 3;
-			nr = img[ofs3 + 0];
-			ng = img[ofs3 + 1];
-			nb = img[ofs3 + 2];
+			if (mem_clip_bpp == 3) /* RGB-to-RGB paste */
+			{
+				nr = img[ofs3 + 0];
+				ng = img[ofs3 + 1];
+				nb = img[ofs3 + 2];
+			}
+			else /* Indexed-to-RGB paste */
+			{
+				nr = mem_pal[img[i]].red;
+				ng = mem_pal[img[i]].green;
+				nb = mem_pal[img[i]].blue;
+			}
 			if (tint)
 			{
 				r = img0[ofs3 + 0];

@@ -21,11 +21,14 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Enter now simulates left mouse click, and Backspace, right click
 	* '[' ']' and '{' '}' keys now used to change colour A/B
 	* Selection marquee now persists through tool changes
+	* Lasso tool now works for rectangular selections too
+	* Indexed clipboard can now be pasted into RGB image
 	* Image save/load completely rewritten, now with better support for TIFF, BMP, XPM and XBM formats
 	* Channels and composite images can now be saved to any suitable supported file format
 	* Image channel can now be saved and loaded just like other channels
 	* Paint tool in tint mode now respects both Tint +/- toggle and left/right mouse button
 	* "By image channel" flood fill option now works in non-fuzzy mode too
+	* BUGFIX - Polygonal selections now respect selection channel
 	...and more still remains to do... ;-)
 
 3.02	2006-10-14

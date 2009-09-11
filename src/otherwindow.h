@@ -1,5 +1,5 @@
 /*	otherwindow.h
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

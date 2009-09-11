@@ -1116,7 +1116,7 @@ msgstr "/Editar/Carregar Área de Transferência"
 
 #: src/mainwindow.c:2675
 msgid "/Edit/Load Clipboard/tear"
-msgstr "Editar/Carregar Área de Transferência/tear"
+msgstr "/Editar/Carregar Área de Transferência/tear"
 
 #: src/mainwindow.c:2676
 msgid "/Edit/Load Clipboard/1"

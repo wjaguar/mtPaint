@@ -69,6 +69,10 @@ int read_spin(GtkWidget *spin);
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
 
+// Wrapper for utf8->C translation
+
+char *gtkncpy(char *dest, const char *src, int cnt);
+
 // Moving mouse cursor
 
 int move_mouse_relative(int dx, int dy);

@@ -418,6 +418,23 @@ int read_spin(GtkWidget *spin)
 	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
 }
 
+// Wrapper for utf8->C translation
+
+char *gtkncpy(char *dest, const char *src, int cnt)
+{
+#if GTK_MAJOR_VERSION == 2
+	char *c = g_locale_from_utf8((gchar *)src, -1, NULL, NULL, NULL);
+	if (c)
+	{
+		strncpy(dest, c, cnt);
+		g_free(c);
+	}
+	else
+#endif
+	strncpy(dest, src, cnt);
+	return (dest);
+}
+
 // Whatever is needed to move mouse pointer 
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */

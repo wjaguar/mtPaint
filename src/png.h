@@ -115,3 +115,5 @@ int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );
 
 int detect_image_format(char *name);
+
+int show_html(char *browser, char *docs);
