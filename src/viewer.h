@@ -43,6 +43,7 @@ void pressed_text();
 void render_text( GtkWidget *widget );
 
 void vw_align_size( float new_zoom );				// Set new zoom
+void vw_realign();						// Reapply old zoom
 void vw_repaint( int px, int py, int pw, int ph );
 void vw_update_area( int x, int y, int w, int h );		// Update x,y,w,h area of current image
 void vw_focus_view();						// Focus view window to main window

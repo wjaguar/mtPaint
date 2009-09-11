@@ -66,8 +66,8 @@ typedef struct
 			show_hidden
 			;
 
-	char		combo_items[FPICK_COMBO_ITEMS][PATHTXT],
-							// Stored as UTF8 in GTK+2
+	char		combo_items[FPICK_COMBO_ITEMS][PATHTXT],	// UTF8 in GTK+2
+			/* Must be DIR_SEP terminated at all times */
 			txt_directory[PATHBUF],	// Current directory - Normal C string
 			txt_file[PATHTXT]	// Full filename - Normal C string except on Windows
 			;
@@ -99,7 +99,7 @@ typedef struct
  * sorting outside of strict ASCII, and don't expect anything sane out of
  * case-sensitive sorting at all. - WJ */
 
-#if GTK_MAJOR_VERSION == 1 // !!! Untested !!!
+#if GTK_MAJOR_VERSION == 1
 
 /* Returns a string which can be used as key for case-insensitive sort;
  * input string is in locale encoding in GTK+1, in UTF-8 in GTK+2 */
@@ -139,24 +139,17 @@ static int case_insensitive;
 static void fpick_cleanse_path(char *txt)		// Clean up null terminated path
 {
 	static const char dds[] = { DIR_SEP, DIR_SEP, 0 };
-	char *c;
-	int l;
+	char *src, *dest;
 
 	// Remove multiple consecutive occurences of DIR_SEP
-	while ( (c = strstr(txt, dds)) )
+	if ((dest = src = strstr(txt, dds)))
 	{
-		do
+		while (*src)
 		{
-			c[0] = c[1];
-			c++;
-		} while ( c[0] );	// strcpy disallows overlapping so here is my replacement
-	}
-
-	// Remove trailing directory separator if at least 2 exist:
-	if ( strchr(txt, DIR_SEP) != strrchr(txt, DIR_SEP) )
-	{
-		l = strlen(txt) - 1;
-		if ( txt[l] == DIR_SEP ) txt[l] = 0;
+			if (*src == DIR_SEP) while (src[1] == DIR_SEP) src++;
+			*dest++ = *src++;
+		}
+		*dest++ = '\0';
 	}
 }
 
@@ -278,55 +271,97 @@ static void fpick_directory_new(fpicker *win, char *name)	// Register directory 
 	gtk_entry_set_text( GTK_ENTRY(win->combo_entry), txt );
 }
 
+#ifdef WIN32
+
+#include <ctype.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
+{
+	static char *empty_row[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
+		{ "", "", "", "", "", "" }, ws[4] = "C:\\";
+	char *cp, buf[128]; // More than enough for 26 4-char strings
+	GdkPixmap *icon;
+	GdkBitmap *mask;
+	int row;
+
+	fp->txt_directory[0] = '\0';
+	gtk_entry_set_text(GTK_ENTRY(fp->combo_entry), ""); // Just clear it
+	GetLogicalDriveStrings(sizeof(buf), buf);
+	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
+		NULL, xpm_open_xpm);
+	gtk_clist_clear(GTK_CLIST(fp->clist));
+	gtk_clist_freeze(GTK_CLIST(fp->clist));
+	for (cp = buf; *cp; cp += strlen(cp) + 1)
+	{
+		ws[0] = toupper(cp[0]);
+		row = gtk_clist_append(GTK_CLIST(fp->clist), empty_row);
+		gtk_clist_set_pixtext(GTK_CLIST(fp->clist), row,
+			FPICK_CLIST_NAME, ws, 4, icon, mask);
+	}
+	fpick_sort_files(fp);
+	gtk_clist_select_row(GTK_CLIST(fp->clist), 0, 0);
+	gtk_clist_thaw(GTK_CLIST(fp->clist));
+	gdk_pixmap_unref(icon);
+	gdk_pixmap_unref(mask);
+
+	return (TRUE);
+}
+
+#endif
+
 static const char root_dir[] = { DIR_SEP, 0 };
 
 static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, populate widgets
 {
-	static const char updir[] = { DIR_SEP, ' ', '.', '.', 0 };
+	static char updir[] = { DIR_SEP, ' ', '.', '.', 0 };
 	static char nothing[] = "";
 	DIR	*dp;
 	struct	dirent *ep;
 	struct	stat buf;
 	char	*cp, *src, *dest, full_name[PATHBUF],
 		*row_txt[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN],
-		txt_name[PATHTXT + 2], txt_size[64], txt_date[64],
-		tmp_txt[PATHBUF + 2];
+		txt_name[PATHTXT], txt_size[64], txt_date[64], tmp_txt[64];
 	GdkPixmap *icons[2];
 	GdkBitmap *masks[2];
-	int i, l, row;
+	int i, l, len, row;
 
 	icons[1] = gdk_pixmap_create_from_xpm_d(main_window->window, &masks[1],
 		NULL, xpm_open_xpm);
 	icons[0] = gdk_pixmap_create_from_xpm_d(main_window->window, &masks[0],
 		NULL, xpm_new_xpm);
 
-	row_txt[FPICK_CLIST_NAME] = txt_name;
 	row_txt[FPICK_CLIST_SIZE] = txt_size;
 	row_txt[FPICK_CLIST_DATE] = txt_date;
 
-// In Windows, the root directory may be C:, but opendir() can handle that
-	dp = opendir(name[0] ? name : root_dir);
+	strncpy0(full_name, name, PATHBUF - 1);
+	len = strlen(full_name);
+	/* Ensure the invariant */
+	if (!len || (full_name[len - 1] != DIR_SEP))
+		full_name[len++] = DIR_SEP , full_name[len] = 0;
+	dp = opendir(full_name);
 	if (!dp) return FALSE;				// Directory doesn't exist so fail
 
-	fpick_directory_new(win, name);			// Register directory in combo
-	strncpy0(win->txt_directory, name, PATHBUF);
+	strncpy(win->txt_directory, full_name, PATHBUF);
+	fpick_directory_new(win, full_name);		// Register directory in combo
 
 	gtk_clist_clear( GTK_CLIST(win->clist) );	// Empty the list
 	gtk_clist_freeze( GTK_CLIST(win->clist) );
 
-	cp = strchr(name, DIR_SEP);
-	if ( cp && cp[1]!=0 )
-	{		// Clist entry to move to parent directory
-		strcpy(txt_name, updir);
-		row_txt[FPICK_CLIST_TYPE] = row_txt[FPICK_CLIST_H_UC] = "";
-		row_txt[FPICK_CLIST_H_C] = txt_name;
+	if (strcmp(full_name, root_dir)) // Have a parent dir to move to?
+	{
+		row_txt[FPICK_CLIST_NAME] = updir;
+		row_txt[FPICK_CLIST_TYPE] = row_txt[FPICK_CLIST_H_UC] =
+			row_txt[FPICK_CLIST_H_C] = "";
 		txt_size[0] = txt_date[0] = '\0';
 		gtk_clist_append( GTK_CLIST(win->clist), row_txt );
 	}
 
 	while ( (ep = readdir(dp)) )
 	{
-		snprintf(full_name, PATHBUF, "%s%c%s", name, DIR_SEP, ep->d_name);
+		full_name[len] = 0;
+		strnncat(full_name, ep->d_name, PATHBUF);
 
 		// Error getting file details
 		if (stat(full_name, &buf) < 0) continue;
@@ -347,16 +382,14 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 			if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
 				continue;
 
-			snprintf(tmp_txt, PATHBUF + 2, "%c %s", DIR_SEP, ep->d_name);
-			gtkuncpy(txt_name, tmp_txt, PATHTXT + 2);
+			gtkuncpy(txt_name, ep->d_name, PATHTXT);
 			txt_size[0] = '\0';
 		}
 		else
 		{		// File
 			if (!win->allow_files) continue;
 
-			snprintf(tmp_txt, PATHBUF + 2, "  %s", ep->d_name);
-			gtkuncpy(txt_name, tmp_txt, PATHTXT + 2);
+			gtkuncpy(txt_name, ep->d_name, PATHTXT);
 #ifdef WIN32
 			l = snprintf(tmp_txt, 64, "%I64u", (unsigned long long)buf.st_size);
 #else
@@ -373,11 +406,11 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 			}
 			while (src - tmp_txt >= 0) *dest-- = *src--;
 
-			if ((cp = strrchr(txt_name, '.')))
+			cp = strrchr(txt_name, '.');
+			if (cp && (cp != txt_name))
 			{
 #if GTK_MAJOR_VERSION == 1
-				row_txt[FPICK_CLIST_TYPE] = g_strdup(cp + 1);
-				g_strup(row_txt[FPICK_CLIST_TYPE]);
+				g_strup(row_txt[FPICK_CLIST_TYPE] = g_strdup(cp + 1));
 #else
 				row_txt[FPICK_CLIST_TYPE] =
 					g_utf8_strup(cp + 1, -1);
@@ -385,17 +418,18 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 			}
 		}
 #if GTK_MAJOR_VERSION == 1
-		row_txt[FPICK_CLIST_H_C] = tmp_txt;
+		row_txt[FPICK_CLIST_H_C] = txt_name;
 #else /* if GTK_MAJOR_VERSION == 2 */
 		row_txt[FPICK_CLIST_H_C] = g_utf8_collate_key(txt_name, -1);
 #endif
 		row_txt[FPICK_CLIST_H_UC] = isort_key(txt_name);
+		row_txt[FPICK_CLIST_NAME] = ""; // No use to set name just to reset again
 		row = gtk_clist_append( GTK_CLIST(win->clist), row_txt );
 		g_free(row_txt[FPICK_CLIST_H_UC]);
 
-		i = txt_name[0] == DIR_SEP;
-		gtk_clist_set_pixtext(GTK_CLIST(win->clist), row, FPICK_CLIST_NAME,
-			row_txt[FPICK_CLIST_NAME] + 2, 4, icons[i], masks[i]);
+		i = !txt_size[0];
+		gtk_clist_set_pixtext(GTK_CLIST(win->clist), row,
+			FPICK_CLIST_NAME, txt_name, 4, icons[i], masks[i]);
 
 		if (row_txt[FPICK_CLIST_TYPE] != nothing)
 			g_free(row_txt[FPICK_CLIST_TYPE]);
@@ -417,20 +451,27 @@ static int fpick_scan_directory(fpicker *win, char *name)	// Scan directory, pop
 
 static void fpick_enter_dir_via_list(fpicker *fp, char *name)
 {
-	char ndir[PATHBUF], *dir = fp->txt_directory, *c;
+	char ndir[PATHBUF], *c;
+	int l;
 
+	strncpy(ndir, fp->txt_directory, PATHBUF);
+	l = strlen(ndir);
 	if (!strcmp(name, ".."))	// Go to parent directory
 	{
-		c = strrchr(dir, DIR_SEP);
-		if (!c || (c == dir)) strcpy(ndir, root_dir);
-		else strncpy0(ndir, dir, c - dir+1);
+		if (l && (ndir[l - 1] == DIR_SEP)) ndir[--l] = '\0';
+		c = strrchr(ndir, DIR_SEP);
+		if (c) *c = '\0';
+		else
+#ifndef WIN32
+			 strcpy(ndir, root_dir);
+#else
+		{
+			fpick_scan_drives(fp);
+			return;
+		}
+#endif
 	}
-	else
-	{
-		c = gtkncpy(NULL, name, PATHBUF);
-		snprintf(ndir, PATHBUF, "%s%c%s", dir, DIR_SEP, c);
-		g_free(c);
-	}
+	else gtkncpy(ndir + l, name, PATHBUF - l);
 	fpick_cleanse_path(ndir);
 	fpick_scan_directory(fp, ndir);	// Enter new directory
 }
@@ -438,17 +479,10 @@ static void fpick_enter_dir_via_list(fpicker *fp, char *name)
 static char *get_fname(GtkCList *clist, int row)
 {
 	char *txt = NULL;
-	GtkCellType cell_type;
 
-	cell_type = gtk_clist_get_cell_type(clist, row, FPICK_CLIST_NAME);
-	if (cell_type == GTK_CELL_PIXTEXT)
-		gtk_clist_get_pixtext(clist, row, FPICK_CLIST_NAME, &txt,
-			NULL, NULL, NULL);
-	else /* if ( cell_type == GTK_CELL_TEXT ) */
-	{
-		gtk_clist_get_text(clist, row, FPICK_CLIST_NAME, &txt);
-		txt += 2;	// This is the non icon '/ ..' so add 2 to get real name
-	}
+	if (gtk_clist_get_cell_type(clist, row, FPICK_CLIST_NAME) == GTK_CELL_TEXT)
+		return ("..");
+	gtk_clist_get_pixtext(clist, row, FPICK_CLIST_NAME, &txt, NULL, NULL, NULL);
 	return (txt);
 }
 
@@ -456,15 +490,15 @@ static void fpick_select_row(GtkCList *clist, gint row, gint col,
 	GdkEventButton *event, gpointer user_data)
 {
 	fpicker *fp = user_data;
-	char *txt_name, *txt_dir;
+	char *txt_name, *txt_size;
 	int dclick = event && (event->type == GDK_2BUTTON_PRESS);
 
 	txt_name = get_fname(clist, row);
 	
-	gtk_clist_get_text(clist, row, FPICK_CLIST_H_C, &txt_dir);
+	gtk_clist_get_text(clist, row, FPICK_CLIST_SIZE, &txt_size);
 	if ( !txt_name ) return;
 
-	if ( txt_dir[0] == DIR_SEP )		// Directory selected
+	if (!txt_size[0])		// Directory selected
 	{
 		// Double click on directory so try to enter it
 		if (dclick) fpick_enter_dir_via_list(fp, txt_name);
@@ -486,7 +520,7 @@ static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 	ctxt = (char *)gtk_entry_get_text(GTK_ENTRY(fp->combo_entry));
 	gtkncpy(txt, ctxt, PATHBUF);
 
-	fpick_cleanse_path(txt);
+	fpick_cleanse_path(txt); // Path might have been entered manually
 
 	// Only do something if the directory is new
 	if (!strcmp(txt, fp->txt_directory)) return;
@@ -504,7 +538,7 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 {
 	fpicker *fp = user_data;
 	GList *list;
-	char *txt_name, *txt_dir;
+	char *txt_name, *txt_size;
 	int row = 0;
 
 	switch (event->keyval)
@@ -528,10 +562,10 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 	txt_name = get_fname(GTK_CLIST(widget), row);
 	if (!txt_name) return (TRUE);
 	
-	gtk_clist_get_text(GTK_CLIST(widget), row, FPICK_CLIST_H_C, &txt_dir);
+	gtk_clist_get_text(GTK_CLIST(widget), row, FPICK_CLIST_SIZE, &txt_size);
 
 	/* Directory selected */
-	if (txt_dir[0] == DIR_SEP) fpick_enter_dir_via_list(fp, txt_name);
+	if (!txt_size[0]) fpick_enter_dir_via_list(fp, txt_name);
 	/* File selected */
 	else gtk_button_clicked (GTK_BUTTON (fp->ok_button));
 
@@ -584,7 +618,7 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	GtkWidget *vbox1, *hbox1, *scrolledwindow1, *temp_hbox;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	fpicker *res = calloc(1, sizeof(fpicker));
-	int i;
+	int i, w, l;
 
 	if (!res) return NULL;
 
@@ -682,13 +716,6 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	}
 	gtk_widget_show( res->sort_arrows[0] );		// Show first arrow
 
-	for ( i=0; i<FPICK_CLIST_COLS; i++ )
-	{
-		sprintf(txt, "fpick_col%i", i+1);
-		gtk_clist_set_column_width (GTK_CLIST(res->clist), i,
-			inifile_get_gint32(txt, col_width[i] ) );
-	}
-
 	gtk_clist_column_titles_show( GTK_CLIST(res->clist) );
 	gtk_clist_set_selection_mode( GTK_CLIST(res->clist), GTK_SELECTION_BROWSE );
 
@@ -709,7 +736,6 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 
 	// ------- Entry Box -------
 
-// !!! What the box is for?
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
 	res->file_entry = xpack5(hbox1, gtk_entry_new_with_max_length(100));
 	gtk_widget_show_all(hbox1);
@@ -748,6 +774,25 @@ GtkWidget *fpick_create(char *title, int flags)			// Initialize file picker
 	gtk_clist_set_row_height(GTK_CLIST(res->clist), 0);
 	if (GTK_CLIST(res->clist)->row_height < 16)
 		gtk_clist_set_row_height(GTK_CLIST(res->clist), 16);
+
+	/* Ensure width */
+	for (i = 0; i < FPICK_CLIST_COLS; i++)
+	{
+		sprintf(txt, "fpick_col%i", i + 1);
+		w = inifile_get_gint32(txt, col_width[i]);
+//		if ((i == FPICK_CLIST_SIZE) || (i == FPICK_CLIST_DATE))
+		if (i == FPICK_CLIST_SIZE)
+		{
+#if GTK_MAJOR_VERSION == 1
+			l = gdk_string_width(res->clist->style->font,
+#else /* if GTK_MAJOR_VERSION == 2 */
+			l = gdk_string_width(gtk_style_get_font(res->clist->style),
+#endif
+				"8,888,888,888");
+			if (w < l) w = l;
+		}
+		gtk_clist_set_column_width(GTK_CLIST(res->clist), i, w);
+	}
 
 	return (res->window);
 }
@@ -841,10 +886,10 @@ static void fpick_newdir_ok( GtkWidget *widget, int *data )
 
 static void fpick_create_newdir(fpicker *fp)
 {
-	char nm[PATHBUF], fnm[PATHBUF];
+	char fnm[PATHBUF];
 	GtkWidget *win, *button, *label, *entry;
 	GtkAccelGroup *ag = gtk_accel_group_new();
-	int res=0;
+	int l, res=0;
 
 	win = gtk_dialog_new();
 	gtk_window_set_title( GTK_WINDOW(win), _("Create Directory") );
@@ -883,8 +928,9 @@ static void fpick_create_newdir(fpicker *fp)
 	if (res == 2) gtk_widget_destroy(win);
 	else if (res == 1)
 	{
-		gtkncpy(nm, gtk_entry_get_text(GTK_ENTRY(entry)), PATHBUF);
-		snprintf(fnm, PATHBUF, "%s%c%s", fp->txt_directory, DIR_SEP, nm);
+		strncpy(fnm, fp->txt_directory, PATHBUF);
+		l = strlen(fnm);
+		gtkncpy(fnm + l, gtk_entry_get_text(GTK_ENTRY(entry)), PATHBUF - l);
 
 		gtk_widget_destroy( win );
 
@@ -901,20 +947,6 @@ static void fpick_create_newdir(fpicker *fp)
 	}
 }
 
-static void fpick_up_directory(fpicker *fp)
-{
-	char *st = strrchr( fp->txt_directory, DIR_SEP );
-
-// !!! Have to handle Windows drives too
-	if (st)
-	{
-		if (!fp->txt_directory[1]) return; // In root dir already
-		// Let root dir remain "/" on Unix
-		st[st == fp->txt_directory] = 0;
-		fpick_scan_directory(fp, fp->txt_directory);
-	}
-}
-
 static void fpick_iconbar_click(GtkWidget *widget, gpointer data)
 {
 	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
@@ -926,7 +958,7 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer data)
 	switch (j)
 	{
 	case FPICK_ICON_UP:
-		fpick_up_directory(fp);
+		fpick_enter_dir_via_list(fp, "..");
 		break;
 	case FPICK_ICON_HOME:
 		gtkncpy(nm, gtk_entry_get_text(GTK_ENTRY(fp->file_entry)), PATHBUF);
@@ -969,14 +1001,14 @@ const char *fpick_get_filename(GtkWidget *fp, int raw)
 
 	if (raw) return (txt);
 #if GTK_MAJOR_VERSION == 1 /* Same encoding everywhere */
-	snprintf(fpick->txt_file, PATHTXT, "%s%c%s", dir, DIR_SEP, txt);
+	snprintf(fpick->txt_file, PATHTXT, "%s%s", dir, txt);
 #elif defined WIN32 /* Upconvert dir to UTF8 */
 	dir = gtkuncpy(NULL, dir, PATHTXT);
-	snprintf(fpick->txt_file, PATHTXT, "%s%c%s", dir, DIR_SEP, txt);
+	snprintf(fpick->txt_file, PATHTXT, "%s%s", dir, txt);
 	g_free(dir);
 #else /* Convert filename to locale */
 	txt = gtkncpy(NULL, txt, PATHBUF);
-	snprintf(fpick->txt_file, PATHBUF, "%s%c%s", dir, DIR_SEP, txt);
+	snprintf(fpick->txt_file, PATHBUF, "%s%s", dir, txt);
 	g_free(txt);
 #endif
 	return (fpick->txt_file);

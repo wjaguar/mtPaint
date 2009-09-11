@@ -749,7 +749,7 @@ void vw_focus_view()						// Focus view window to main window
 		main_v = (vert->value + vert->page_size * 0.5) / h;
 
 	/* If we are editing a layer above the background make adjustments */
-	if ((layers_total > 0) && layer_selected)
+	if (layers_total && layer_selected)
 	{
 		w0 = layer_table[0].image->image_.width;
 		h0 = layer_table[0].image->image_.height;
@@ -864,6 +864,15 @@ void vw_align_size( float new_zoom )
 	}
 	vw_focus_view();
 	toolbar_zoom_update();
+}
+
+void vw_realign()
+{
+	float old_zoom;
+	old_zoom = vw_zoom;
+	vw_zoom = -1; /* Force resize */
+	vw_align_size(old_zoom);		// Update the view window as needed
+	vw_zoom = old_zoom;
 }
 
 void vw_repaint(int px, int py, int pw, int ph)

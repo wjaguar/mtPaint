@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.24.12"
-MT_DATE="2008-02-23"
+MT_V="3.24.13"
+MT_DATE="2008-03-02"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -28,6 +28,7 @@ STATIC_JPEG=
 STATIC_JP2=
 STATIC_TIFF=
 STATIC_GIF=
+STATIC_FT=
 AS_NEEDED=
 IMAGE_LIBDIR=
 HAVE_FUNCS=
@@ -199,6 +200,7 @@ do
 		"notiff" )	NTIFF=NO;;
 		"statictiff" )	STATIC_TIFF=TIFF;;
 		"noft" )	NFT=NO;;
+		"staticft" )	STATIC_FT=FreeType;;
 		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
 		"slow" )	OPTS=NO;;
 		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
@@ -366,6 +368,7 @@ tiff ............ Use libtiff
 notiff .......... Don't use libtiff
 statictiff ...... Statically link TIFF library
 noft ............ Don't use FreeType
+staticft ........ Statically link FreeType library
 --libdir=DIR .... DIR = location of image library files to use for cross-compilation
 
 flush ........... Flush directories to initial state
@@ -491,6 +494,7 @@ else
 	fi
 	LIB_NAME png "$STATIC_PNG"
 	LIB_NAME z "$STATIC_PNG"
+	LIB_NAME freetype "$STATIC_FT"
 	if [ "$STATIC_LAST" ] && [ -z "$IMAGE_LIBDIR" ]
 	then
 		L_EX="$L_EX -Wl,-dy"
@@ -661,6 +665,10 @@ then
 	if [ "$STATIC_TIFF" ]
 	then
 		echo -n "$STATIC_TIFF "
+	fi
+	if [ "$STATIC_FT" ]
+	then
+		echo -n "$STATIC_FT "
 	fi
 	echo
 fi

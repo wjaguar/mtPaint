@@ -28,13 +28,8 @@
 /* !!! If MAX_WIDTH * MAX_HEIGHT * max bpp won't fit into int, lots of code
  * !!! will have to be modified to use size_t instead */
 
-#ifdef U_GUADALINEX
-	#define DEFAULT_WIDTH 800
-	#define DEFAULT_HEIGHT 600
-#else
-	#define DEFAULT_WIDTH 640
-	#define DEFAULT_HEIGHT 480
-#endif
+#define DEFAULT_WIDTH 640
+#define DEFAULT_HEIGHT 480
 
 /* Palette area layout */
 
@@ -364,7 +359,7 @@ int line_clip(linedata line, int *vxy, int *step);
 
 /// Procedures
 
-void init_istate();		// Set initial state of image variables
+void init_istate(image_state *state, image_info *image);	// Set initial state of image variables
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
 void update_undo_depth();	// Resize all undo stacks
 
@@ -389,9 +384,13 @@ int read_hex_dub( char *in );			// Read hex double
 
 //	Clear/remove image data
 void mem_free_image(image_info *image, int mode);
+
+#define AI_COPY   1 /* Duplicate source channels, not insert them */
+#define AI_NOINIT 2 /* Do not initialize source-less channels */
+
 //	Allocate new image data
-int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
-	chanlist src);
+int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
+	int cmask, chanlist src);
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
 //	Allocate new clipboard, removing or preserving old as needed

@@ -30,11 +30,23 @@
 #include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
+#include "icons.h"
+
+//	Layer toolbar buttons
+#define LTB_NEW    0
+#define LTB_RAISE  1
+#define LTB_LOWER  2
+#define LTB_DUP    3
+#define LTB_CENTER 4
+#define LTB_DEL    5
+#define LTB_CLOSE  6
+
+#define TOTAL_ICONS_LAYER 7
 
 
-int	layers_total = 0,		// Layers currently being used
-	layer_selected = 0,		// Layer currently selected in the layers window
-	layers_changed = 0;		// 0=Unchanged
+int	layers_total,		// Layers currently being used
+	layer_selected,		// Layer currently selected in the layers window
+	layers_changed;		// 0=Unchanged
 
 char layers_filename[PATHBUF];		// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
@@ -44,27 +56,31 @@ int	show_layers_main,		// Show all layers in main window
 layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
 
 
+static void layer_clear_slot(int l, int visible)
+{
+	memset(layer_table + l, 0, sizeof(layer_node));
+	layer_table[l].opacity = 100;
+	layer_table[l].visible = visible;
+}
+
 void layers_init()
 {
+	layer_clear_slot(0, TRUE);
 	strncpy0(layer_table[0].name, _("Background"), LAYER_NAMELEN);
-	layer_table[0].visible = TRUE;
-	layer_table[0].use_trans = FALSE;
-	layer_table[0].x = 0;
-	layer_table[0].y = 0;
-	layer_table[0].trans = 0;
-	layer_table[0].opacity = 100;
+	layer_table[0].image = calloc(1, sizeof(layer_image));
 }
 
 /* Allocate layer image, its channels and undo stack
  * !!! Must be followed by update_undo() after setting up image is done */
-static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
+layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
 {
 	layer_image *lim;
 
+	if (src) cmask = cmask_from(src);
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
 	if (init_undo(&lim->image_.undo_, mem_undo_depth) &&
-		mem_alloc_image(&lim->image_, w, h, bpp, cmask, src))
+		mem_alloc_image(AI_COPY, &lim->image_, w, h, bpp, cmask, src))
 		return (lim);
 	free(lim->image_.undo_.items);
 	free(lim);
@@ -105,12 +121,21 @@ typedef struct {
 
 static GtkWidget *layer_list, *entry_layer_name,
 	*layer_tools[TOTAL_ICONS_LAYER], *layer_spin, *layer_slider,
-	*layer_label_position, *layer_trans_toggle, *layer_show_toggle;
+	*layer_label_position, *layer_trans_toggle;
 static layer_item layer_list_data[MAX_LAYERS + 1];
 
-gboolean layers_initialized;		// Indicates if initializing is complete
+static int layers_initialized;		// Indicates if initializing is complete
 
 
+static int layers_sensitive(int state)
+{
+	int res;
+
+	if (!layers_window) return (TRUE);
+	res = GTK_WIDGET_SENSITIVE(layers_window);
+	gtk_widget_set_sensitive(layers_window, state);
+	return (res);
+}
 
 static void layers_update_titlebar()		// Update filename in titlebar
 {
@@ -147,7 +172,7 @@ static void layers_notify_unchanged()		// Layers have just been unchanged (saved
 }
 
 
-static void layer_copy_from_main( int l )	// Copy info from main image to layer
+void layer_copy_from_main( int l )	// Copy info from main image to layer
 {
 	layer_image *lp = layer_table[l].image;
 
@@ -156,7 +181,7 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 	lp->image_.size = 0; // Invalidate
 }
 
-static void layer_copy_to_main( int l )		// Copy info from layer to main image
+void layer_copy_to_main( int l )		// Copy info from layer to main image
 {
 	layer_image *lp = layer_table[l].image;
 
@@ -164,131 +189,106 @@ static void layer_copy_to_main( int l )		// Copy info from layer to main image
 	mem_state = lp->state_;
 }
 
+/* !!! An evil hack for reliably moving focus around in GtkList */
+static void layer_select_slot(int slot)
+{
+	GtkWidget *item, *fw;
+
+	if (!layers_window) return;
+
+	item = layer_list_data[slot].item;
+	fw = GTK_CONTAINER(layer_list)->focus_child;
+
+	/* Focus is on list - move it, selection will follow  */
+	if (fw && GTK_WIDGET_HAS_FOCUS(fw)) gtk_widget_grab_focus(item);
+	else /* Focus is elsewhere - move whatever remains, then */
+	{
+	/* !!! For simplicity, an undocumented field is used; a bit less hacky
+	 * but longer is to set focus child to item, NULL, and item again - WJ */
+		gtk_container_set_focus_child(GTK_CONTAINER(layer_list), item);
+		GTK_LIST(layer_list)->last_focus_child = item;
+	}
+}
+
 static void shift_layer(int val)
 {
 	layer_node temp = layer_table[layer_selected];
-	int i, j, k;
+	int i, j, x, y, newbkg;
 
-	layer_table[layer_selected] = layer_table[layer_selected+val];
-	layer_table[layer_selected+val] = temp;
-
+	layer_copy_from_main(layer_selected);
+	layer_table[layer_selected] = layer_table[layer_selected + val];
+	layer_table[layer_selected + val] = temp;
+	newbkg = (layer_selected == 0) || (layer_selected + val == 0);
 	layer_selected += val;
 
-		// Updated 2 list items - Text name + visible toggle
-	mtMIN(j, layer_selected, layer_selected-val)
-	mtMAX(k, layer_selected, layer_selected-val)
-	for ( i=j; i<=k; i++ )
+	/* Background layer changed - shift the entire stack */
+	if (newbkg)
 	{
-		gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
-				layer_table[i].visible);
+		x = layer_table[0].x;
+		y = layer_table[0].y;
+		for (i = 0; i <= layers_total; i++)
+		{
+			layer_table[i].x -= x;
+			layer_table[i].y -= y;
+		}
 	}
 
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
+	// Updated 2 list items - Text name + visible toggle
+	for (i = layer_selected , j = 0; j < 2; i -= val , j++)
+	{
+		gtk_label_set_text(GTK_LABEL(layer_list_data[i].name), layer_table[i].name);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(layer_list_data[i].toggle),
+			layer_table[i].visible);
+	}
+
+	layer_select_slot(layer_selected);
 	layers_notify_changed();
-	if ( layer_selected == layers_total )
-		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
-	if ( layer_selected == 0 )
-		gtk_widget_set_sensitive(layer_tools[LTB_LOWER], FALSE);
 
-	if ( val==1 ) gtk_widget_set_sensitive(layer_tools[LTB_LOWER], TRUE);
-	if ( val==-1 ) gtk_widget_set_sensitive(layer_tools[LTB_RAISE], TRUE);
-
-	update_cols();				// Update status bar info
-
-	if ((layer_selected == 0) || (layer_selected == val))
-	{
-		if (view_showing) gtk_widget_queue_draw(vw_drawing);
+	if (newbkg)
+	{	// Background layer changed
 		if (show_layers_main) gtk_widget_queue_draw(drawing_canvas);
+		vw_realign();
+		if (view_showing) gtk_widget_queue_draw(vw_drawing);
 	}
-	else
+	else repaint_layer(layer_selected);	// Regular layer shifted
+}
+
+void layer_show_new()
+{
+	layer_copy_from_main(layer_selected);
+	layer_copy_to_main(layer_selected = layers_total);
+	update_main_with_new_layer();
+	layers_notify_changed();
+
+	if (layers_window)
 	{
-		repaint_layer(layer_selected);			// Update View window
-	}
-}
+		layer_item *l = layer_list_data + layers_total;
+		layer_node *t = layer_table + layers_total;
 
-static gint layer_press_raise()
-{
-	shift_layer(1);
-	return FALSE;
-}
-
-static gint layer_press_lower()
-{
-	shift_layer(-1);
-	return FALSE;
-}
-
-
-static void layer_new_chores(int l, layer_image *lim)
-{
-	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
-	{
-		pressed_select(FALSE);
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-			icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-	}
-
-	layer_table[l].image = lim;		// Image info memory pointer
-
-	layer_table[l].name[0] = 0;
-	layer_table[l].x = 0;
-	layer_table[l].y = 0;
-	layer_table[l].trans = 0;
-	layer_table[l].opacity = 100;
-	layer_table[l].visible = TRUE;
-	layer_table[l].use_trans = FALSE;
-
-	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
-
-	lim->state_.col_[0] = 1;
-	lim->state_.col_[1] = 0;
-	lim->state_.col_24[0] = lim->image_.pal[1];
-	lim->state_.col_24[1] = lim->image_.pal[0];
-
-	lim->state_.xpm_trans = -1;
-	lim->state_.xbm_hot_x = -1;
-	lim->state_.xbm_hot_y = -1;
-}
-
-static void layer_new_chores2( int l )
-{
-	if ( layers_window != NULL )
-	{
-		gtk_widget_show( layer_list_data[l].item );
-		gtk_widget_set_sensitive( layer_list_data[l].item, TRUE );	// Enable list item
-
-		gtk_label_set_text( GTK_LABEL(layer_list_data[l].name), layer_table[l].name );
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[l].toggle ),
-			layer_table[l].visible);
-
-		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[l].item );
-		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
-		gtk_widget_set_sensitive(layer_tools[LTB_LOWER], l != 1);
-
-		if ( l == MAX_LAYERS )		// Hide new/duplicate if we have max layers
+		// Disable new/duplicate if we have max layers
+		if (layers_total >= MAX_LAYERS)
 		{
 			gtk_widget_set_sensitive(layer_tools[LTB_NEW], FALSE);
 			gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE);
 		}
-	}
 
-	layers_notify_changed();
+		gtk_widget_show(l->item);
+		gtk_widget_set_sensitive(l->item, TRUE); // Enable list item
+
+		gtk_label_set_text(GTK_LABEL(l->name), t->name );
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(l->toggle), t->visible);
+
+		layer_select_slot(layers_total);
+	}
 }
 
-
-void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed, 2=grey, 3=RGB
+// Types 1=indexed, 2=grey, 3=RGB
+int layer_add(int w, int h, int type, int cols, int cmask)
 {
 	int bpp;
 	layer_image *lim;
 
-	if ( layers_total>=MAX_LAYERS ) return;
-
-	if ( layers_total == 0 )
-	{
-		layer_table[0].image = malloc( sizeof(layer_image) );
-	}
-	layer_copy_from_main( layer_selected );
+	if (layers_total >= MAX_LAYERS) return (FALSE);
 
 	bpp = type == 2 ? 1 : type;	// Type 2 = greyscale indexed
 
@@ -296,59 +296,55 @@ void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed
 	if (!lim)
 	{
 		memory_errors(1);
-		return;
+		return (FALSE);
 	}
+	lim->state_.xpm_trans = lim->state_.xbm_hot_x = lim->state_.xbm_hot_y = -1;
+	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
 	lim->image_.cols = cols;
 	mem_pal_copy(lim->image_.pal, mem_pal_def); // Default
-	if ( type == 2 )	// Greyscale
-	{
-#ifdef U_GUADALINEX
-		mem_scale_pal(lim->image_.pal, 0, 255,255,255, cols - 1, 0,0,0);
-#else
+	if (type == 2)	// Greyscale
 		mem_scale_pal(lim->image_.pal, 0, 0,0,0, cols - 1, 255,255,255);
-#endif
-	}
+
+	init_istate(&lim->state_, &lim->image_);
 	update_undo(&lim->image_);
 
 	layers_total++;
-	layer_new_chores(layers_total, lim);
-	layer_new_chores2(layers_total);
-	layer_selected = layers_total;
+	layer_clear_slot(layers_total, TRUE);
+	layer_table[layers_total].image = lim;
 
-	if ( layers_total == 1 ) ani_init();		// Start with fresh animation data if new
+	/* Start with fresh animation data if new */
+	if (layers_total == 1) ani_init();
+
+	return (TRUE);
 }
 
-static gint layer_press_new()
+/* !!! No calling GTK+ until after updating the structures - we don't need a
+ * recursive call in the middle of it (possible on a slow machine) - WJ */
+void layer_new( int w, int h, int type, int cols, int cmask )
 {
-	generic_new_window(1);	// Call image new routine which will in turn call layer_new if needed
-
-	return FALSE;
+	if (layer_add(w, h, type, cols, cmask)) layer_show_new();
 }
 
-static gint layer_press_duplicate()
+/* !!! Same as above: modify structures, *then* show results - WJ */
+static void layer_press_duplicate()
 {
 	layer_image *lim, *ls;
 	int w = mem_width, h = mem_height, bpp = mem_img_bpp;
 
-	if ( layers_total>=MAX_LAYERS ) return FALSE;
-
-	gtk_widget_set_sensitive( main_window, FALSE);		// Stop any user input
-	if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
-			// This stops a nasty segfault if users does 2 quick duplicates
-
-	if ( layers_total == 0 ) layer_table[0].image = malloc( sizeof(layer_image) );
-	layer_copy_from_main( layer_selected );
+	if (layers_total >= MAX_LAYERS) return;
 
 	lim = alloc_layer(w, h, bpp, 0, mem_img);
 	if (!lim)
 	{
 		memory_errors(1);
-		goto end;
+		return;
 	}
-	layers_total++;
 
-	layer_table[layers_total] = layer_table[layer_selected];		// Copy layer info
+	// Copy layer info
+	layer_copy_from_main(layer_selected);
+	layers_total++;
+	layer_table[layers_total] = layer_table[layer_selected];
 	layer_table[layers_total].image = lim;
 	ls = layer_table[layer_selected].image;
 
@@ -360,18 +356,10 @@ static gint layer_press_duplicate()
 	// Copy across position data
 	memcpy(lim->ani_pos, ls->ani_pos, sizeof(lim->ani_pos));
 
-	layer_new_chores2( layers_total );
-	layer_selected = layers_total;
-
-end:
-	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
-	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
-
-	return FALSE;
+	layer_show_new();
 }
 
-static void layer_delete(int item)
+void layer_delete(int item)
 {
 	layer_image *lp = layer_table[item].image;
 	int i;
@@ -379,87 +367,98 @@ static void layer_delete(int item)
 	mem_free_image(&lp->image_, FREE_ALL);
 	free(lp);
 
-	if (item < layers_total)	// If deleted item is not at the end shuffle rest down
-		for ( i=item; i<layers_total; i++ )
-			layer_table[i] = layer_table[i+1];
-
+	// If deleted item is not at the end shuffle rest down
+	for (i = item; i < layers_total; i++)
+		layer_table[i] = layer_table[i + 1];
+	memset(layer_table + layers_total, 0, sizeof(layer_node));
 	layers_total--;
-	if ( layers_total == 0 )
-	{
-		free( layer_table[0].image );
-	}
-
-	layers_notify_changed();
-	update_all_views();
 }
 
-
-static void layer_refresh_list()
+void layer_refresh_list()
 {
+	static int in_refresh;
 	int i;
 
-	if ( layers_window == NULL ) return;
+	if (!layers_window) return;
 
-	for ( i=0; i<=MAX_LAYERS; i++ )
+	// As befits a refresh, this should show the final state
+	if (in_refresh)
 	{
-		if ( layers_total<i )		// Disable item
-		{
-			gtk_widget_hide( layer_list_data[i].item );
-			gtk_widget_set_sensitive( layer_list_data[i].item, FALSE );
-		}
-		else
-		{
-			gtk_widget_show( layer_list_data[i].item );
-			gtk_widget_set_sensitive( layer_list_data[i].item, TRUE );
-			gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
-					layer_table[i].visible);
-		}
+		in_refresh |= 2;
+		return;
 	}
-	if ( layer_selected == layers_total )
-		gtk_widget_set_sensitive(layer_tools[LTB_RAISE], FALSE);
-	gtk_widget_set_sensitive(layer_tools[LTB_NEW], TRUE);
-	gtk_widget_set_sensitive(layer_tools[LTB_DUP], TRUE);
+
+	while (TRUE)
+	{
+		in_refresh = 1;
+		for (i = 0; i <= layers_total; i++)
+		{
+			layer_item *l = layer_list_data + i;
+			layer_node *t = layer_table + i;
+
+			gtk_widget_show(l->item);
+			gtk_widget_set_sensitive(l->item, TRUE);
+			gtk_label_set_text(GTK_LABEL(l->name), t->name);
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(l->toggle),
+				t->visible);
+		}
+		for (; i <= MAX_LAYERS; i++)	// Disable items
+		{
+			layer_item *l = layer_list_data + i;
+
+			gtk_widget_hide(l->item);
+			gtk_widget_set_sensitive(l->item, FALSE);
+		}
+
+		gtk_widget_set_sensitive(layer_tools[LTB_RAISE],
+			layer_selected < layers_total);
+		gtk_widget_set_sensitive(layer_tools[LTB_NEW],
+			layers_total < MAX_LAYERS);
+		gtk_widget_set_sensitive(layer_tools[LTB_DUP],
+			layers_total < MAX_LAYERS);
+		if (in_refresh < 2) break;
+	}
+	in_refresh = 0;
 }
 
-static gint layer_press_delete()
+static void layer_press_delete()
 {
 	char txt[256];
-	int i, to_go = layer_selected;
+	int i;
 
+	if (!layer_selected) return; // Deleting background is forbidden
 	snprintf(txt, 256, _("Do you really want to delete layer %i (%s) ?"),
 		layer_selected, layer_table[layer_selected].name );
 
 	i = alert_box( _("Warning"), txt, _("No"), _("Yes"), NULL );
+	if ((i != 2) || (check_for_changes() == 1)) return;
 
-	if ( i==2 )
-	{
-		i = check_for_changes();
-		if ( i==2 || i==10 || i<10 )
-		{
-			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[layer_selected-1].item );
-			while (gtk_events_pending()) gtk_main_iteration();
+	layer_copy_from_main(layer_selected);
+	layer_copy_to_main(--layer_selected);
+	layer_delete(layer_selected + 1);
 
-			layer_delete( to_go );
-			layer_refresh_list();
-		}
-	}
-
-	return FALSE;
+	layer_select_slot(layer_selected);
+	layer_refresh_list();
+	layers_notify_changed();
+	update_main_with_new_layer();
 }
 
 static void layer_show_position()
 {
 	char txt[35];
 
-	if ( layers_window == NULL ) return;
+	if (!layers_window) return;
 
-	sprintf(txt, "%i , %i", layer_table[layer_selected].x, layer_table[layer_selected].y);
-	gtk_label_set_text( GTK_LABEL(layer_label_position), txt );
+	if (layer_selected)
+	{
+		sprintf(txt, "%i , %i", layer_table[layer_selected].x,
+			layer_table[layer_selected].y);
+		gtk_label_set_text(GTK_LABEL(layer_label_position), txt);
+	}
+	else gtk_label_set_text(GTK_LABEL(layer_label_position), _("Background"));
 }
 
-static gint layer_press_centre()
+static void layer_press_centre()
 {
 	layer_table[layer_selected].x = layer_table[0].image->image_.width / 2 -
 		mem_width / 2;
@@ -468,11 +467,9 @@ static gint layer_press_centre()
 	layer_show_position();
 	layers_notify_changed();
 	update_all_views();
-
-	return FALSE;
 }
 
-int layers_unsaved_tot()			// Return number of layers with no filenames
+static int layers_unsaved_tot()	// Return number of layers with no filenames
 {
 	int j = 0, k;
 
@@ -485,7 +482,7 @@ int layers_unsaved_tot()			// Return number of layers with no filenames
 	return j;
 }
 
-int layers_changed_tot()			// Return number of layers with changes
+static int layers_changed_tot()	// Return number of layers with changes
 {
 	image_state *state;
 	int j, k;
@@ -521,12 +518,33 @@ static void layer_update_filename( char *name )
 	layers_notify_unchanged();
 }
 
+static void layers_free_all()
+{
+	layer_node *t;
+
+	if (layers_total && layer_selected)	// Copy over layer 0
+	{
+		layer_copy_to_main(0);
+		layer_selected = 0;
+	}
+
+	for (t = layer_table + layers_total; t != layer_table; t--)
+	{
+		mem_free_image(&t->image->image_, FREE_ALL);
+		free(t->image);
+	}
+	memset(layer_table + 1, 0, sizeof(layer_node) * MAX_LAYERS);
+	layers_total = 0;
+	layers_filename[0] = 0;
+	layers_changed = 0;
+}
+
 void string_chop( char *txt )
 {
-	if ( strlen(txt) > 0 )		// Chop off unwanted non ASCII characters at end
-	{
-		while ( strlen(txt)>0 && txt[strlen(txt)-1]<32 ) txt[strlen(txt)-1] = 0;
-	}
+	char *cp = txt + strlen(txt) - 1;
+
+	// Chop off unwanted non ASCII characters at end
+	while ((cp - txt >= 0) && ((unsigned char)*cp < 32)) *cp-- = 0;
 }
 
 int read_file_num(FILE *fp, char *txt)
@@ -539,14 +557,12 @@ int read_file_num(FILE *fp, char *txt)
 	return i;
 }
 
-static void layers_remove_all(); /* Forward declaration */
-
 int load_layers( char *file_name )
 {
 	char tin[300], load_name[PATHBUF], *c;
 	layer_image *lim2;
-	int i, j, k, layers_to_read = -1, layer_file_version = -1, lfail = 0;
-	int lplen = 0;
+	int i, j, k, sens;
+	int layers_to_read = -1, layer_file_version = -1, lfail = 0, lplen = 0;
 	FILE *fp;
 
 	c = strrchr(file_name, DIR_SEP);
@@ -569,7 +585,8 @@ int load_layers( char *file_name )
 	if ( i==-987654321 ) goto fail2;
 	layers_to_read = i < MAX_LAYERS ? i : MAX_LAYERS;
 
-	if ( layers_total>0 ) layers_remove_all();	// Remove all current layers if any
+	sens = layers_sensitive(FALSE);
+	if (layers_total) layers_free_all();	// Remove all current layers if any
 	for ( i=0; i<=layers_to_read; i++ )
 	{
 		// Read filename, strip end chars & try to load (if name length > 0)
@@ -588,20 +605,10 @@ int load_layers( char *file_name )
 			continue;
 		}
 
-		/* Load was successful */
-		set_new_filename(load_name);
-
-		lim2 = malloc( sizeof(layer_image) );
-		if (!lim2)
-		{
-			memory_errors(1);	// We have run out of memory!
-			layers_remove_all();	// Remove all layers - total meltdown!
-			goto fail2;
-		}
-		layer_table[layers_total].image = lim2;
-
-		init_istate(); /* Update image variables after load */
-		layer_copy_from_main( layers_total );
+		/* Update image variables after load */
+		lim2 = layer_table[layers_total].image;
+		strncpy(lim2->state_.filename, load_name, PATHBUF);
+		init_istate(&lim2->state_, &lim2->image_);
 
 		fgets(tin, 256, fp);
 		string_chop(tin);
@@ -623,40 +630,21 @@ int load_layers( char *file_name )
 		layer_table[layers_total].opacity = k < 1 ? 1 : k > 100 ? 100 : k;
 
 		layers_total++;
-
-// !!! A brittle hack - have to find other way to stop mem_free_image() in loader
-		// Bogus 1x1 image used
-		mem_width = 1;
-		mem_height = 1;
-		memset(mem_img, 0, sizeof(chanlist));
-		init_undo(&mem_image.undo_, mem_undo_depth);
-		mem_undo_im_[0].img[CHN_IMAGE] = mem_img[CHN_IMAGE] = malloc(3);
 	}
-	if ( layers_total>0 )
+	if (layers_total)
 	{
-		layers_total--;
-
-		/* Free unused mem_image */
-		mem_free_image(&mem_image, FREE_ALL);
-
-		layer_copy_to_main(layers_total);
-		if ( layers_total == 0 )
-		{	// You will need to free the memory holding first layer if just 1 was loaded
-			free( layer_table[0].image );
-		}
+		layer_copy_to_main(--layers_total);
 		layer_selected = layers_total;
-		layer_refresh_list();
-		if ( layers_window != NULL )
-			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[layer_selected].item );
 	}
-	else layer_refresh_list();
+	layer_refresh_list();
+	layer_select_slot(layer_selected);
 
 	/* Read in animation data - only if all layers loaded OK
 	 * (to do otherwise is likely to result in SIGSEGV) */
 	if (!lfail) ani_read_file(fp);
 
 	fclose(fp);
+	layers_sensitive(sens);
 	layer_update_filename( file_name );
 
 	update_cols();		// Update status bar info
@@ -797,93 +785,47 @@ void layer_press_save()
 	}
 }
 
-static void update_main_with_new_layer()
+void update_main_with_new_layer()
 {
-	int w, h;
-
-
 	update_titlebar();
-	update_menus();
-
-	init_pal();		// Update Palette, pattern & mask area + widgets
-
-	canvas_size(&w, &h);
-	gtk_widget_set_usize(drawing_canvas, w, h);
+	check_undo_paste_bpp();
+	canvas_undo_chores();
 	vw_focus_view();
-	update_all_views();
-}
-
-static void layers_remove_all()
-{
-	int i;
-
-	gtk_widget_set_sensitive( main_window, FALSE);		// Stop any user input
-	if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
-
-	if ( layers_window !=0 )
-	{
-		gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[0].item );
-		while (gtk_events_pending()) gtk_main_iteration();
-	}
-	else
-	{
-		if ( layers_total>0 && layer_selected!=0 )	// Copy over layer 0
-		{
-			layer_copy_to_main(0);
-			layer_selected = 0;
-			update_main_with_new_layer();
-		}
-	}
-
-	for ( i=layers_total; i>0; i-- )
-	{
-		layer_delete(i);
-	}
-	layer_refresh_list();
-	layers_filename[0] = 0;
-	layers_notify_unchanged();
-
-	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
-	update_image_bar();					// Update status bar
-	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
 }
 
 void layer_press_remove_all()
 {
 	int i = check_layers_for_changes();
 	if (i < 0) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
-	if (i == 2) layers_remove_all();
+	if (i != 2) return;
+
+	layers_free_all();
+
+	layer_select_slot(0);
+	layer_refresh_list();
+	update_main_with_new_layer();
 }
 
-static gint layer_tog_visible( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void layer_tog_visible(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	int j;
+	int j = (int)user_data;
 
-	if ( !layers_initialized ) return TRUE;
+	if (!layers_initialized) return;
 
-	j = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
-
-	if (j)
-	{
-		layer_table[j].visible =
-			gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-		layers_notify_changed();
-		repaint_layer(j);
-	}
-
-	return FALSE;
+	layer_table[j].visible = gtk_toggle_button_get_active(togglebutton);
+	layers_notify_changed();
+	repaint_layer(j);
 }
 
-static gint layer_main_toggled( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void layer_main_toggled(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	show_layers_main = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(layer_show_toggle) );
+	show_layers_main = gtk_toggle_button_get_active(togglebutton);
 	gtk_widget_queue_draw(drawing_canvas);
-
-	return FALSE;
 }
 
 static void layer_inputs_changed()
 {
+	layer_node *t = layer_table + layer_selected;
 	const char *nname;
 	gboolean txt_changed = FALSE;
 
@@ -891,109 +833,67 @@ static void layer_inputs_changed()
 
 	layers_notify_changed();
 
-	layer_table[layer_selected].trans =
-			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(layer_spin) );
-	layer_table[layer_selected].opacity = mt_spinslide_get_value(layer_slider);
+	t->trans = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(layer_spin));
+	t->opacity = mt_spinslide_get_value(layer_slider);
 
 	nname = gtk_entry_get_text(GTK_ENTRY(entry_layer_name));
-	if (strncmp(layer_table[layer_selected].name, nname, LAYER_NAMELEN - 1))
-		txt_changed = TRUE;
+	if (strncmp(t->name, nname, LAYER_NAMELEN - 1)) txt_changed = TRUE;
 
-	strncpy0(layer_table[layer_selected].name, nname, LAYER_NAMELEN);
-	gtk_label_set_text( GTK_LABEL(layer_list_data[layer_selected].name),
-		layer_table[layer_selected].name );
-	layer_table[layer_selected].use_trans = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(layer_trans_toggle));
+	strncpy0(t->name, nname, LAYER_NAMELEN);
+	gtk_label_set_text(GTK_LABEL(layer_list_data[layer_selected].name), t->name );
+	t->use_trans = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(layer_trans_toggle));
 
-	if ( !txt_changed ) repaint_layer( layer_selected );
-		// Update layer image if not just changing text
+	// Update layer image if not just changing text
+	if (!txt_changed) repaint_layer(layer_selected);
 }
 
-void layer_choose( int l )				// Select a new layer from the list
+void layer_choose(int l)	// Select a new layer from the list
 {
-	if ( l<=layers_total && l>=0 && l != layer_selected )	// Change selected layer if different
-	{
-		if ( layers_window == NULL )
-		{
-			layer_copy_from_main( layer_selected );
-					// Copy image info to layer table before we change
-			layer_selected = l;
-			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-				pressed_select(FALSE);
-
-			layer_copy_to_main( layer_selected );
-			update_main_with_new_layer();
-		}
-		else
-		{
-			gtk_list_select_child( GTK_LIST(layer_list),
-				layer_list_data[l].item );
-		}
-	}
+	if ((l > layers_total) || (l < 0) || (l == layer_selected)) return;
+	// Copy image info to layer table before we change
+	layer_copy_from_main(layer_selected);
+	layer_copy_to_main(layer_selected = l);
+	update_main_with_new_layer();
+	layer_select_slot(l);
 }
 
-static gint layer_select( GtkList *list, GtkWidget *widget, gpointer user_data )
+static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 {
-	gboolean dont_update = FALSE;
+	layer_node *t;
 	int j;
 
-	if ( !layers_initialized ) return TRUE;
-
-	layers_initialized = FALSE;
+	if (!layers_initialized) return;
 
 	j = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+	if (j > layers_total) return;
 
-	if ( j==layer_selected )
-		dont_update=TRUE;	// Already selected e.g. raise, lower, startup
-
-	if (entry_layer_name && (j <= layers_total))
+	layers_initialized = FALSE;
+	if (j != layer_selected) /* Move data before doing anything else */
 	{
-		if ( !dont_update ) /* Move data before doing anything else */
-		{
-//			if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-//				pressed_select(FALSE);
-			layer_copy_from_main( layer_selected );
-			layer_copy_to_main( layer_selected = j );
-			update_main_with_new_layer();
-		}
-
-		gtk_entry_set_text( GTK_ENTRY(entry_layer_name), layer_table[j].name );
-		if ( j==0 )		// Background layer selected
-		{
-			gtk_widget_set_sensitive(layer_tools[LTB_RAISE], layers_total > 0);
-			gtk_widget_set_sensitive(layer_tools[LTB_LOWER], FALSE);
-			gtk_widget_set_sensitive(layer_tools[LTB_DEL], FALSE);
-			gtk_widget_set_sensitive(layer_tools[LTB_CENTER], FALSE);
-			gtk_widget_set_sensitive( layer_trans_toggle, FALSE );
-			gtk_widget_set_sensitive( layer_spin, FALSE );
-			gtk_label_set_text( GTK_LABEL(layer_label_position), _("Background") );
-
-			gtk_widget_set_sensitive( layer_slider, FALSE );
-		}
-		else
-		{
-			gtk_widget_set_sensitive( layer_slider, TRUE );
-			mt_spinslide_set_value(layer_slider, layer_table[layer_selected].opacity);
-			layer_show_position();
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_trans_toggle ),
-				layer_table[layer_selected].use_trans);
-
-			gtk_widget_set_sensitive(layer_tools[LTB_RAISE], j != layers_total);
-			gtk_widget_set_sensitive(layer_tools[LTB_LOWER], TRUE);
-			gtk_widget_set_sensitive(layer_tools[LTB_DEL], TRUE);
-			gtk_widget_set_sensitive(layer_tools[LTB_CENTER], TRUE);
-			gtk_widget_set_sensitive( layer_trans_toggle, TRUE );
-
-			gtk_widget_set_sensitive( layer_spin, TRUE );
-			gtk_spin_button_set_value( GTK_SPIN_BUTTON(layer_spin), layer_table[j].trans);
-		}
-		
+		layer_copy_from_main(layer_selected);
+		layer_copy_to_main(layer_selected = j);
+		update_main_with_new_layer();
 	}
 
-	while (gtk_events_pending()) gtk_main_iteration();
-	layers_initialized = TRUE;
+	t = layer_table + j;
+	gtk_entry_set_text(GTK_ENTRY(entry_layer_name), t->name );
+	gtk_widget_set_sensitive(layer_tools[LTB_RAISE], j < layers_total);
+	gtk_widget_set_sensitive(layer_tools[LTB_LOWER], j);
+	gtk_widget_set_sensitive(layer_tools[LTB_DEL], j);
+	gtk_widget_set_sensitive(layer_tools[LTB_CENTER], j);
+	gtk_widget_set_sensitive(layer_trans_toggle, j);
+	gtk_widget_set_sensitive(layer_spin, j);
+	gtk_widget_set_sensitive(layer_slider, j);
 
-	return FALSE;
+	mt_spinslide_set_value(layer_slider, j ? t->opacity : 100);
+	layer_show_position();
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(layer_trans_toggle),
+		j && t->use_trans);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_spin), j ? t->trans : 0);
+
+// !!! May cause list to be stuck in drag mode (release handled before press?)
+//	while (gtk_events_pending()) gtk_main_iteration();
+	layers_initialized = TRUE;
 }
 
 gint delete_layers_window()
@@ -1004,126 +904,172 @@ gint delete_layers_window()
 	win_store_pos(layers_window, "layers");
 
 	gtk_widget_destroy(layers_window);
-	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], TRUE);
 	layers_window = NULL;
+	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], TRUE);
 
 	return FALSE;
 }
 
 void pressed_paste_layer()
 {
-	int ol = layer_selected, new_type = CMASK_IMAGE, i, j, k;
+	layer_image *lim;
 	unsigned char *dest;
+	int i, j, k, cmask = CMASK_IMAGE;
 
 	/* No way to put RGB clipboard into utility channel */
 	if ((mem_clip_bpp == 3) && (mem_channel != CHN_IMAGE)) return;
 
-	if ( layers_total<MAX_LAYERS )
+	if (layers_total >= MAX_LAYERS)
 	{
-		gtk_widget_set_sensitive( main_window, FALSE);		// Stop any user input
-		if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
-				// This stops a nasty segfault if users does 2 quick paste layers
-
-		if ((mem_clip_alpha || mem_clip_mask) && !channel_dis[CHN_ALPHA])
-			new_type = CMASK_RGBA;
-		new_type |= CMASK_FOR(mem_channel);
-		layer_new(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, new_type);
-
-		if ( layer_selected != ol )	// If == then new layer wasn't created
-		{
-			layer_table[layer_selected].x = mem_clip_x;
-			layer_table[layer_selected].y = mem_clip_y;
-
-			mem_pal_copy(layer_table[layer_selected].image->image_.pal,
-				layer_table[ol].image->image_.pal);	// Copy palette
-
-			layer_table[layer_selected].image->state_ =
-				layer_table[ol].image->state_;
-
-			layer_copy_to_main( layer_selected );
-			update_main_with_new_layer();
-
-			j = mem_clip_w * mem_clip_h;
-			memcpy(mem_img[mem_channel], mem_clipboard, j * mem_clip_bpp);
-
-			/* Image channel with alpha */
-			if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
-			{
-				/* Fill alpha channel */
-				if (mem_clip_alpha)
-					memcpy(mem_img[CHN_ALPHA], mem_clip_alpha, j);
-				else memset(mem_img[CHN_ALPHA], 255, j);
-			}
-
-			/* Image channel with mask */
-			if ((mem_channel == CHN_IMAGE) && mem_clip_mask)
-			{
-				/* Mask image - fill unselected part with color A */
-				dest = mem_img[CHN_IMAGE];
-				k = mem_clip_bpp == 1 ? mem_col_A : mem_col_A24.red;
-				for (i = 0; i < j; i++ , dest += mem_clip_bpp)
-				{
-					if (mem_clip_mask[i]) continue;
-					dest[0] = k;
-					if (mem_clip_bpp == 1) continue;
-					dest[1] = mem_col_A24.green;
-					dest[2] = mem_col_A24.blue;
-				}
-			}
-
-			/* Utility channel with mask */
-			dest = mem_img[CHN_ALPHA];
-			if (mem_channel != CHN_IMAGE) dest = mem_img[mem_channel];
-			if (dest && mem_clip_mask)
-			{
-				/* Mask the channel */
-				for (i = 0; i < j; i++)
-				{
-					k = dest[i] * mem_clip_mask[i];
-					dest[i] = (k + (k >> 8) + 1) >> 8;
-				}
-			}
-
-//			if (!layers_window) pressed_layers();
-			if (!view_showing) view_show();
-
-		}
-		if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
-		gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
+		alert_box(_("Error"), _("You cannot add any more layers."),
+			_("OK"), NULL, NULL);
+		return;
 	}
-	else alert_box( _("Error"), _("You cannot add any more layers."), _("OK"), NULL, NULL );
+
+	if ((mem_clip_alpha || mem_clip_mask) && !channel_dis[CHN_ALPHA])
+		cmask = CMASK_RGBA;
+	cmask |= CMASK_FOR(mem_channel);
+
+	if (!layer_add(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, cmask))
+		return; // Failed
+
+	layer_table[layers_total].x = mem_clip_x;
+	layer_table[layers_total].y = mem_clip_y;
+	lim = layer_table[layers_total].image;
+
+	mem_pal_copy(lim->image_.pal, mem_pal);
+	lim->state_ = mem_state;
+
+	j = mem_clip_w * mem_clip_h;
+	memcpy(lim->image_.img[mem_channel], mem_clipboard, j * mem_clip_bpp);
+
+	/* Image channel with alpha */
+	dest = lim->image_.img[CHN_ALPHA];
+	if (dest && (mem_channel == CHN_IMAGE))
+	{
+		/* Fill alpha channel */
+		if (mem_clip_alpha) memcpy(dest, mem_clip_alpha, j);
+		else memset(dest, 255, j);
+	}
+
+	/* Image channel with mask */
+	if (mem_clip_mask && (mem_channel == CHN_IMAGE))
+	{
+		/* Mask image - fill unselected part with color A */
+		dest = lim->image_.img[CHN_IMAGE];
+		k = mem_clip_bpp == 1 ? mem_col_A : mem_col_A24.red;
+		for (i = 0; i < j; i++ , dest += mem_clip_bpp)
+		{
+			if (mem_clip_mask[i]) continue;
+			dest[0] = k;
+			if (mem_clip_bpp == 1) continue;
+			dest[1] = mem_col_A24.green;
+			dest[2] = mem_col_A24.blue;
+		}
+	}
+
+	/* Utility channel with mask */
+	dest = lim->image_.img[CHN_ALPHA];
+	if (mem_channel != CHN_IMAGE) dest = lim->image_.img[mem_channel];
+	if (dest && mem_clip_mask)
+	{
+		/* Mask the channel */
+		for (i = 0; i < j; i++)
+		{
+			k = dest[i] * mem_clip_mask[i];
+			dest[i] = (k + (k >> 8) + 1) >> 8;
+		}
+	}
+
+	update_undo(&lim->image_);
+
+	layer_show_new();
+//	if (!layers_window) pressed_layers();
+	if (!view_showing) view_show();
 }
 
 void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & update window labels
 {
+	image_info *image = l == layer_selected ? &mem_image :
+		&layer_table[l].image->image_;
 	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh;
 
 	layer_table[l].x += change_x;
 	layer_table[l].y += change_y;
 	if (change_x < 0) lx += change_x;
 	if (change_y < 0) ly += change_y;
-	if (l == layer_selected)
-	{
-		lw = mem_width;
-		lh = mem_height;
-		layer_show_position();
-	}
-	else
-	{
-		lw = layer_table[l].image->image_.width;
-		lh = layer_table[l].image->image_.height;
-	}
-	layers_notify_changed();
-
-	lw += abs(change_x);
-	lh += abs(change_y);
+	lw = image->width + abs(change_x);
+	lh = image->height + abs(change_y);
 	if (layer_selected)
 	{
 		lx -= layer_table[layer_selected].x;
 		ly -= layer_table[layer_selected].y;
 	}
+
+	layers_notify_changed();
+	if (l == layer_selected) layer_show_position();
 	vw_update_area(lx, ly, lw, lh);
-	if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
+	if (show_layers_main) main_update_area(lx, ly, lw, lh);
+}
+
+#undef _
+#define _(X) X
+
+static toolbar_item layer_bar[] = {
+	{ LTB_NEW,    -1, 0, 0, 0, _("New Layer"), xpm_new_xpm },
+	{ LTB_RAISE,  -1, 0, 0, 0, _("Raise"), xpm_up_xpm },
+	{ LTB_LOWER,  -1, 0, 0, 0, _("Lower"), xpm_down_xpm },
+	{ LTB_DUP,    -1, 0, 0, 0, _("Duplicate Layer"), xpm_copy_xpm },
+	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
+	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
+	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
+	{ 0, 0, 0, 0, 0, NULL, NULL }};
+
+#undef _
+#define _(X) __(X)
+
+static void layer_iconbar_click(GtkWidget *widget, gpointer data)
+{
+	switch ((int)data)
+	{
+	case LTB_NEW:
+		generic_new_window(1); break;
+	case LTB_RAISE:
+		shift_layer(1); break;
+	case LTB_LOWER:
+		shift_layer(-1); break;
+	case LTB_DUP:
+		layer_press_duplicate(); break;
+	case LTB_CENTER:
+		layer_press_centre(); break;
+	case LTB_DEL:
+		layer_press_delete(); break;
+	case LTB_CLOSE:
+		delete_layers_window(); break;
+	}
+}
+
+/* Create toolbar for layers window */
+static GtkWidget *layer_toolbar(GtkWidget **wlist)
+{		
+	int i;
+	GtkWidget *toolbar;
+
+#if GTK_MAJOR_VERSION == 1
+	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#endif
+#if GTK_MAJOR_VERSION == 2
+	toolbar = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
+#endif
+	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar,
+		GTK_SIGNAL_FUNC(layer_iconbar_click), 0, NULL, 0);
+	gtk_widget_show(toolbar);
+
+	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
+		wlist[i] = layer_bar[i].widget;
+
+	return toolbar;
 }
 
 void pressed_layers()
@@ -1133,11 +1079,9 @@ void pressed_layers()
 	char txt[32];
 	int i;
 
-	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], FALSE);
 
-	entry_layer_name = NULL;
 	layers_initialized = FALSE;
-
+	gtk_widget_set_sensitive(menu_widgets[MENU_LAYER], FALSE);
 
 	layers_window = add_a_window( GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE );
 	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);
@@ -1157,7 +1101,10 @@ void pressed_layers()
 			GTK_SIGNAL_FUNC(layer_select), NULL );
 	gtk_widget_show (layer_list);
 
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow), layer_list);
+	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolledwindow),
+		layer_list);
+	gtk_container_set_focus_vadjustment(GTK_CONTAINER(layer_list),
+		gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow)));
 
 	for ( i=MAX_LAYERS; i>=0; i-- )
 	{
@@ -1178,36 +1125,33 @@ void pressed_layers()
 		layer_list_data[i].name = label;
 
 		tog = pack(hbox, gtk_check_button_new_with_label(""));
-		gtk_object_set_user_data(GTK_OBJECT(tog), (gpointer)i);
 		layer_list_data[i].toggle = tog;
 		gtk_widget_show_all(item);
-		if ( i == 0 ) gtk_widget_hide(tog);
-		else gtk_signal_connect(GTK_OBJECT(tog), "clicked",
-			GTK_SIGNAL_FUNC(layer_tog_visible), NULL);
+		if (i == 0) gtk_widget_set_sensitive(tog, FALSE);
+		else gtk_signal_connect(GTK_OBJECT(tog), "toggled",
+			GTK_SIGNAL_FUNC(layer_tog_visible), (gpointer)i);
 	}
 
-	for ( i=0; i<=MAX_LAYERS; i++ )
+	for (i = 0; i <= layers_total; i++)
 	{
-		if ( i<=layers_total )
-		{
-			gtk_label_set_text( GTK_LABEL(layer_list_data[i].name), layer_table[i].name );
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( layer_list_data[i].toggle ),
-				layer_table[i].visible);
-		}
-		else
-		{
-			gtk_widget_hide( layer_list_data[i].item );
-			gtk_widget_set_sensitive( layer_list_data[i].item, FALSE );
-			layer_table[i].image = NULL;		// Needed for checks later
-		}
+		gtk_label_set_text(GTK_LABEL(layer_list_data[i].name), layer_table[i].name);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(layer_list_data[i].toggle),
+			layer_table[i].visible);
 	}
+	for (; i <= MAX_LAYERS; i++)
+	{
+		gtk_widget_hide(layer_list_data[i].item);
+		gtk_widget_set_sensitive(layer_list_data[i].item, FALSE);
+		layer_table[i].image = NULL;	// Needed for checks later
+	}
+	gtk_list_set_selection_mode(GTK_LIST(layer_list), GTK_SELECTION_BROWSE);
 
 	pack(vbox, layer_toolbar(layer_tools));
 
-	if ( layers_total == MAX_LAYERS )	// Hide new/duplicate if we have max layers
+	if (layers_total >= MAX_LAYERS) // Hide new/duplicate if we have max layers
 	{
 		gtk_widget_set_sensitive(layer_tools[LTB_NEW], FALSE);
-		gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE );
+		gtk_widget_set_sensitive(layer_tools[LTB_DUP], FALSE);
 	}
 
 	table = add_a_table( 3, 2, 5, vbox );
@@ -1239,15 +1183,14 @@ void pressed_layers()
 	gtk_widget_show(hbox);
 
 	layer_trans_toggle = add_a_toggle( _("Transparent Colour"), hbox, TRUE );
-	gtk_signal_connect(GTK_OBJECT(layer_trans_toggle), "clicked",
-			GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
+	gtk_signal_connect(GTK_OBJECT(layer_trans_toggle), "toggled",
+		GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 
 	layer_spin = pack(hbox, add_a_spin(0, 0, 255));
 	spin_connect(layer_spin, GTK_SIGNAL_FUNC(layer_inputs_changed), NULL);
 
-	layer_show_toggle = add_a_toggle( _("Show all layers in main window"), vbox, show_layers_main );
-	gtk_signal_connect(GTK_OBJECT(layer_show_toggle), "clicked",
-			GTK_SIGNAL_FUNC(layer_main_toggled), NULL);
+	pack(vbox, sig_toggle(_("Show all layers in main window"),
+		show_layers_main, NULL, GTK_SIGNAL_FUNC(layer_main_toggled)));
 
 	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
 		GDK_Escape, 0, (GtkAccelFlags) 0);
@@ -1255,29 +1198,12 @@ void pressed_layers()
 	gtk_signal_connect_object (GTK_OBJECT (layers_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_layers_window), NULL);
 
+	layers_update_titlebar();
+
+	/* !!! Select *before* show - otherwise it's nontrivial (try & see) */
+	layers_initialized = TRUE;
+	layer_select_slot(layer_selected);
 	gtk_window_set_transient_for( GTK_WINDOW(layers_window), GTK_WINDOW(main_window) );
 	gtk_widget_show(layers_window);
 	gtk_window_add_accel_group(GTK_WINDOW (layers_window), ag);
-
-	layers_initialized = TRUE;
-	gtk_list_select_child( GTK_LIST(layer_list), layer_list_data[layer_selected].item );
-
-	layers_update_titlebar();
-}
-
-
-void layer_iconbar_click(GtkWidget *widget, gpointer data)
-{
-	gint j = (gint) data;
-
-	switch (j)
-	{
-		case 0:	layer_press_new(); break;
-		case 1:	layer_press_raise(); break;
-		case 2:	layer_press_lower(); break;
-		case 3:	layer_press_duplicate(); break;
-		case 4:	layer_press_centre(); break;
-		case 5:	layer_press_delete(); break;
-		case 6:	delete_layers_window(NULL,NULL,NULL); break;
-	}
 }

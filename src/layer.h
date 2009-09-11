@@ -65,6 +65,7 @@ int	show_layers_main,		// Show all layers in main window
 ///	PROCEDURES
 
 void layers_init();
+layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src);
 void pressed_layers();
 void pressed_paste_layer();
 gint delete_layers_window();
@@ -75,14 +76,18 @@ void layer_press_save();
 int layer_save_composite(char *fname, ls_settings *settings);
 
 void layers_notify_changed();
+void layer_copy_from_main( int l );	// Copy info from main image to layer
+void layer_copy_to_main( int l );	// Copy info from layer to main image
+void update_main_with_new_layer();
+void layer_refresh_list();
 void layer_press_remove_all();
 int check_layers_for_changes();
 int check_layers_all_saved();
 void move_layer_relative(int l, int change_x, int change_y);	// Move a layer & update window labels
 void layer_new( int w, int h, int type, int cols, int cmask );	// Types 1=indexed, 2=grey, 3=RGB
-void layer_choose( int l );				// Select a new layer from the list
-
-void layer_iconbar_click(GtkWidget *widget, gpointer data);
+int layer_add(int w, int h, int type, int cols, int cmask);	// *Silently* add layer, return success
+void layer_delete(int item);		// *Silently* delete layer
+void layer_choose( int l );		// Select a new layer from the list
 
 void string_chop( char *txt );
 int read_file_num(FILE *fp, char *txt);

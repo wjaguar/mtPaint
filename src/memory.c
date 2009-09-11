@@ -178,11 +178,7 @@ png_color mem_pal_def[256]={		// Default palette entries for new image
 
 /// Primary colours = 8
 
-#ifdef U_GUADALINEX
-{7,7,7}, {0,0,0}, {7,0,0}, {0,7,0}, {7,7,0}, {0,0,7}, {7,0,7}, {0,7,7},
-#else
 {0,0,0}, {7,0,0}, {0,7,0}, {7,7,0}, {0,0,7}, {7,0,7}, {0,7,7}, {7,7,7},
-#endif
 
 /// Primary fades to black: 7 x 6 = 42
 
@@ -300,18 +296,16 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #endif
 
 /* Set initial state of image variables */
-void init_istate()
+void init_istate(image_state *state, image_info *image)
 {
-	notify_unchanged();
-
-	mem_mask_setall(0);	/* Clear all mask info */
-	mem_col_A = 1;
-	mem_col_B = 0;
-	mem_col_A24 = mem_pal[mem_col_A];
-	mem_col_B24 = mem_pal[mem_col_B];
-	memset(channel_col_A, 255, NUM_CHANNELS);
-	memset(channel_col_B, 0, NUM_CHANNELS);
-	mem_tool_pat = 0;
+	state->changed = 0;
+	memset(state->prot_mask, 0, 256);	/* Clear all mask info */
+	state->prot = 0;
+	state->col_[0] = 1;
+	state->col_[1] = 0;
+	state->col_24[0] = image->pal[1];
+	state->col_24[1] = image->pal[0];
+	state->tool_pat = 0;
 }
 
 /* Create new undo stack of a given depth */
@@ -434,6 +428,7 @@ void mem_free_image(image_info *image, int mode)
 	{
 		mem_free_chanlist(image->img);
 		memset(image->img, 0, sizeof(chanlist));
+		image->width = image->height = 0;
 	}
 
 	/* Delete undo frames if any */
@@ -452,31 +447,27 @@ void mem_free_image(image_info *image, int mode)
 }
 
 /* Allocate new image data */
-int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
-	chanlist src)
+int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
+	int cmask, chanlist src)
 {
 	unsigned char *res;
 	size_t sz = (size_t)w * h;
-	int i, noinit = FALSE;
+	int i, l, mask0 = cmask;
 
 	image->width = w;
 	image->height = h;
 	image->bpp = bpp;
 	memset(image->img, 0, sizeof(chanlist));
 
-	if (src == (void *)(-1)) /* No-init mode */
-	{
-		noinit = TRUE;
-		src = NULL;
-	}
+	if (!cmask) return (TRUE); /* Empty block requested */
 
-	if (!src && !cmask) return (TRUE); /* Empty block requested */
-
-	res = image->img[CHN_IMAGE] = malloc(sz * bpp);
-	for (i = CHN_ALPHA; res && (i < NUM_CHANNELS); i++)
+	if (src && !(mode & AI_COPY)) cmask &= ~cmask_from(src);
+	l = sz * bpp;
+	res = (void *)(-1);
+	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)
 	{
-		if (src ? !!src[i] : cmask & CMASK_FOR(i))
-			res = image->img[i] = malloc(sz);
+		if (cmask & CMASK_FOR(i)) res = image->img[i] = malloc(l);
+		l = sz;
 	}
 	if (res && image->undo_.items)
 	{
@@ -492,24 +483,35 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 		return (FALSE);
 	}
 
-	/* Initialize channels */
-	if (noinit); /* Leave alone */
-	else if (src) /* Clone */
+	if (!src); /* No source channels */
+	else if (mode & AI_COPY) /* Clone */
 	{
-		memcpy(image->img[CHN_IMAGE], src[CHN_IMAGE], sz * bpp);
-		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
-			if (src[i]) memcpy(image->img[i], src[i], sz);
-		return (TRUE);
+		l = sz * bpp;
+		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
+		{
+			if (image->img[i] && src[i])
+				memcpy(image->img[i], src[i], l);
+			l = sz;
+		}
 	}
-	else /* Init */
+	else /* Move */
 	{
-		i = 0;
-#ifdef U_GUADALINEX
-		if (bpp == 3) i = 255;
-#endif
-		memset(image->img[CHN_IMAGE], i, sz * bpp);
-		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
-			if (image->img[i]) memset(image->img[i], channel_fill[i], sz);
+		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
+		{
+			if (src[i] && (mask0 & CMASK_FOR(i)))
+				image->img[i] = src[i];
+		}
+	}
+
+	if (!(mode & AI_NOINIT)) /* Init */
+	{
+		l = sz * bpp;
+		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
+		{
+			if (image->img[i] && (!src || !src[i]))
+				memset(image->img[i], channel_fill[i], l);
+			l = sz;
+		}
 	}
 
 	return (TRUE);
@@ -521,11 +523,11 @@ int mem_new( int width, int height, int bpp, int cmask )
 	int res;
 
 	mem_free_image(&mem_image, FREE_IMAGE);
-	res = mem_alloc_image(&mem_image, width, height, bpp, cmask, NULL);
+	res = mem_alloc_image(0, &mem_image, width, height, bpp, cmask, NULL);
 	if (!res) /* Not enough memory */
 	{
 		// 8x8 is bound to work!
-		mem_alloc_image(&mem_image, 8, 8, bpp, CMASK_IMAGE, NULL);
+		mem_alloc_image(0, &mem_image, 8, 8, bpp, CMASK_IMAGE, NULL);
 	}
 
 // !!! If palette isn't set up before mem_new(), undo frame will get wrong one
@@ -574,7 +576,7 @@ int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
 	if (backup) cmask |= cmask_from(mem_clip_real_img);
 
 	/* Allocate new frame */
-	res = mem_alloc_image(&mem_clip, width, height, bpp, cmask, (void *)(-1));
+	res = mem_alloc_image(AI_NOINIT, &mem_clip, width, height, bpp, cmask, NULL);
 
 	/* Remove backup if allocation failed */
 	if (!res && HAVE_OLD_CLIP) mem_free_image(&mem_clip, FREE_ALL);

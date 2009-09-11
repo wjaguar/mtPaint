@@ -1325,8 +1325,9 @@ int do_a_load( char *fname )
 		pressed_select(FALSE); // To prevent automatic paste
 		reset_tools();
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-			icon_buttons[DEFAULT_TOOL_ICON]),TRUE);
+			icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 	}
+	else notify_unchanged();
 
 	/* Show new image */
 	check_undo_paste_bpp();

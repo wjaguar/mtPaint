@@ -165,6 +165,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 	oldmask |= cmask;
 	if (!(oldmask & CMASK_IMAGE)) return (-1);
 
+	j = TRUE; // For FS_LAYER_LOAD
 	sz = (size_t)settings->width * settings->height;
 	switch (settings->mode)
 	{
@@ -173,7 +174,8 @@ static int allocate_image(ls_settings *settings, int cmask)
 		j = undo_next_core(UC_CREATE | UC_GETMEM, settings->width,
 			settings->height, settings->bpp, oldmask);
 		/* Drop current image if not enough memory for undo */
-		if (j) mem_free_image(&mem_image, FALSE);
+		if (j) mem_free_image(&mem_image, FREE_IMAGE);
+	case FS_LAYER_LOAD: /* Layers */
 		/* Allocate, or at least try to */
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
@@ -3801,7 +3803,8 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
 	return (res);
 }
 
-static void store_image_extras(ls_settings *settings)
+static void store_image_extras(image_info *image, image_state *state,
+	ls_settings *settings)
 {
 	/* Stuff RGB transparency into color 255 */
 	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
@@ -3826,26 +3829,38 @@ static void store_image_extras(ls_settings *settings)
 	}
 
 	/* Accept vars which make sense */
-	mem_xpm_trans = settings->xpm_trans;
-	mem_xbm_hot_x = settings->hot_x;
-	mem_xbm_hot_y = settings->hot_y;
+	state->xpm_trans = settings->xpm_trans;
+	state->xbm_hot_x = settings->hot_x;
+	state->xbm_hot_y = settings->hot_y;
 	preserved_gif_delay = settings->gif_delay;
 
 	/* Accept palette */
-	mem_pal_copy(mem_pal, settings->pal);
-	mem_cols = settings->colors;
+	mem_pal_copy(image->pal, settings->pal);
+	image->cols = settings->colors;
 }
 
 static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 {
+	layer_image *lim = NULL;
 	png_color pal[256];
 	ls_settings settings;
 	int i, tr, res, undo = FALSE;
 
+	/* Prepare layer slot */
+	if (mode == FS_LAYER_LOAD)
+	{
+		lim = layer_table[layers_total].image;
+		if (!lim) lim = layer_table[layers_total].image =
+			alloc_layer(0, 0, 1, 0, NULL);
+		else if (layers_total) mem_free_image(&lim->image_, FREE_IMAGE);
+		if (!lim) return (FILE_MEM_ERROR);
+	}
+
 	init_ls_settings(&settings, NULL);
-	/* Image loads can be undoable, layer loads cannot */
+	/* Image loads can be undoable */
 	if (mode == FS_PNG_LOAD) undo = undo_load;
-	else if (mode == FS_LAYER_LOAD) mode = FS_PNG_LOAD;
+	/* 0th layer load is a non-undoable image load */
+	else if ((mode == FS_LAYER_LOAD) && !layers_total) mode = FS_PNG_LOAD;
 	settings.mode = mode;
 	settings.ftype = ftype;
 	settings.pal = pal;
@@ -3915,8 +3930,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD: /* Image */
-		/* Success OR LIB FAILURE - commit load */
-		if ((res == 1) || (res == FILE_LIB_ERROR))
+		/* Success, or lib failure with single image - commit load */
+		if ((res == 1) || (!lim && (res == FILE_LIB_ERROR)))
 		{
 			if (!mem_img[CHN_IMAGE] || !undo)
 				mem_new(settings.width, settings.height,
@@ -3924,9 +3939,10 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			else undo_next_core(UC_DELETE, settings.width,
 				settings.height, settings.bpp, CMASK_ALL);
 			memcpy(mem_img, settings.img, sizeof(chanlist));
-			store_image_extras(&settings);
+			store_image_extras(&mem_image, &mem_state, &settings);
 			update_undo(&mem_image);
 			mem_undo_prepare();
+			if (lim) layer_copy_from_main(0);
 		}
 		/* Failure */
 		else
@@ -3978,11 +3994,24 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			update_undo(&mem_image);
 // !!! This is frequently harmful
 //			if (mem_channel == CHN_IMAGE)
-//				store_image_extras(&settings);
+//				store_image_extras(&mem_image, &mem_state, &settings);
 			mem_undo_prepare();
 		}
 		/* Failure */
 		else free(settings.img[CHN_IMAGE]);
+		break;
+	case FS_LAYER_LOAD: /* Layer */
+		/* Success - commit load */
+		if (res == 1)
+		{
+			mem_alloc_image(0, &lim->image_, settings.width,
+				settings.height, settings.bpp,
+				cmask_from(settings.img), settings.img);
+			store_image_extras(&lim->image_, &lim->state_, &settings);
+			update_undo(&lim->image_);
+		}
+		/* Failure */
+		else mem_free_chanlist(settings.img);
 		break;
 	case FS_PATTERN_LOAD:
 		/* Success - rebuild patterns */

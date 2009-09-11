@@ -305,7 +305,7 @@ static void cpick_rgba_at(cpicker *cp, GtkWidget *widget, int x, int y,
 		int *irgb, *ialpha;
 		int pc = x >= cp->area_size[CPICK_AREA_PRECUR][0] >> 1;
 
-		if (pc) // Current
+		if (pc || set) // Current
 		{
 			irgb = cp->input_vals + CPICK_INPUT_RED;
 			ialpha = cp->input_vals + CPICK_INPUT_OPACITY;

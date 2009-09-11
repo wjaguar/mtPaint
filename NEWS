@@ -10,6 +10,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* New file picker (old one available as configure option)
 	* Some menu items can have an icon (if set in the preferences)
 	* Dock area added which can hold the command line window
+	* Layers window handling reworked to make it more responsive
 	* Palette can be copied to or from the canvas using the Edit menu
 	* System clipboard can be imported or exported using the Edit menu
 	* Horizontal and vertical ramps can be created using the Selection menu

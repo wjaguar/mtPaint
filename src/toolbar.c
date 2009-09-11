@@ -55,45 +55,6 @@ static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
 static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
 					// RGB colours, tool, pattern preview
 
-#undef _
-#define _(X) X
-
-static toolbar_item layer_bar[] = {
-	{ LTB_NEW,    -1, 0, 0, 0, _("New Layer"), xpm_new_xpm },
-	{ LTB_RAISE,  -1, 0, 0, 0, _("Raise"), xpm_up_xpm },
-	{ LTB_LOWER,  -1, 0, 0, 0, _("Lower"), xpm_down_xpm },
-	{ LTB_DUP,    -1, 0, 0, 0, _("Duplicate Layer"), xpm_copy_xpm },
-	{ LTB_CENTER, -1, 0, 0, 0, _("Centralise Layer"), xpm_centre_xpm },
-	{ LTB_DEL,    -1, 0, 0, 0, _("Delete Layer"), xpm_cut_xpm },
-	{ LTB_CLOSE,  -1, 0, 0, 0, _("Close Layers Window"), xpm_close_xpm },
-	{ 0, 0, 0, 0, 0, NULL, NULL }};
-
-#undef _
-#define _(X) __(X)
-
-/* Create toolbar for layers window */
-GtkWidget *layer_toolbar(GtkWidget **wlist)
-{		
-	int i;
-	GtkWidget *toolbar;
-
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
-#endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar,
-		GTK_SIGNAL_FUNC(layer_iconbar_click), 0, NULL, 0);
-	gtk_widget_show(toolbar);
-
-	for (i = 0; i < TOTAL_ICONS_LAYER; i++)
-		wlist[i] = layer_bar[i].widget;
-
-	return toolbar;
-}
-
 static gint expose_preview( GtkWidget *widget, GdkEventExpose *event )
 {
 	int rx, ry, rw, rh;

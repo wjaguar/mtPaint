@@ -91,17 +91,6 @@
 #define SETB_GRAD 7
 #define TOTAL_SETTINGS 8
 
-//	Layer toolbar buttons
-#define LTB_NEW    0
-#define LTB_RAISE  1
-#define LTB_LOWER  2
-#define LTB_DUP    3
-#define LTB_CENTER 4
-#define LTB_DEL    5
-#define LTB_CLOSE  6
-
-#define TOTAL_ICONS_LAYER 7
-
 typedef struct
 {
 	unsigned char ID;
@@ -145,8 +134,6 @@ void pressed_toolbar_toggle(int state, int which);
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
 void update_top_swatch();		// Update selected colours A & B
-
-GtkWidget *layer_toolbar(GtkWidget **wlist);	// Create toolbar for layers window
 
 unsigned char *render_patterns();	// Create RGB dump of patterns to display
 void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns

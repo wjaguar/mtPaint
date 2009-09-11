@@ -59,7 +59,8 @@ void reset_tools()
 {
 	float old_zoom = can_zoom;
 
-	init_istate();
+	init_istate(&mem_state, &mem_image);
+	update_titlebar();
 	init_pal();
 
 	can_zoom = -1;
@@ -68,6 +69,8 @@ void reset_tools()
 	else
 		align_size(old_zoom);
 
+	memset(channel_col_A, 255, NUM_CHANNELS);
+	memset(channel_col_B, 0, NUM_CHANNELS);
 	pressed_opacity( 255 );		// Set opacity to 100% to start with
 	update_menus();
 }
@@ -85,11 +88,7 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 	int res;
 
 	mem_pal_copy(mem_pal, mem_pal_def);
-#ifdef U_GUADALINEX
-	if (nt == 1) mem_scale_pal(mem_pal, 0, 255,255,255, nc - 1, 0,0,0);
-#else
 	if (nt == 1) mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
-#endif
 
 	nw = nw < MIN_WIDTH ? MIN_WIDTH : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < MIN_HEIGHT ? MIN_HEIGHT : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
@@ -107,18 +106,48 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 
 static void create_new(GtkWidget *widget)
 {
-	int nw, nh, nc, bpp = 1, err=0;
+	int nw, nh, nc, err, bpp = 1;
 
 	nw = read_spin(spinbutton_width);
 	nh = read_spin(spinbutton_height);
 	nc = read_spin(spinbutton_cols);
 
-	if (im_type == 0) bpp = 3;
-
-// !!! Type 3 (clipboard) is unhandled yet
-
-	if (im_type == 4)	// Grab Screenshot
+	switch (im_type)
 	{
+	case 0: bpp = 3; // RGB
+	case 1: // Indexed
+	case 2: // Greyscale
+		if (new_window_type == 1) // Layer
+			layer_new(nw, nh, 3 - im_type, nc, CMASK_IMAGE);
+		else // Image
+		{
+			err = do_new_one( nw, nh, nc, im_type, bpp );
+			if (err > 0)
+			{
+				/* System was unable to allocate memory for
+				 * image, using 8x8 instead */
+				nw = mem_width;
+				nh = mem_height;  
+			}
+			if (layers_total) layers_notify_changed();
+
+			inifile_set_gint32("lastnewWidth", nw );
+			inifile_set_gint32("lastnewHeight", nh );
+			inifile_set_gint32("lastnewCols", nc );
+			inifile_set_gint32("lastnewType", im_type );
+
+			/* Lose a selection marquee */
+			pressed_select(FALSE);
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+				icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+		}
+		break;
+	case 3: /* Clipboard */
+
+// !!! Not implemented yet
+
+		break;
+	case 4: /* Screenshot */
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_lower( main_window->window );
 		gdk_window_lower( new_window->window );
@@ -150,31 +179,8 @@ static void create_new(GtkWidget *widget)
 		gdk_window_deiconify( main_window->window );
 		gdk_window_raise( main_window->window );
 #endif
+		break;
 	}
-
-	if ((im_type < 3) && (new_window_type == 0))		// New image
-	{
-		err = do_new_one( nw, nh, nc, im_type, bpp );
-
-		if ( err>0 )		// System was unable to allocate memory for image, using 8x8 instead
-		{
-			nw = mem_width;
-			nh = mem_height;  
-		}
-
-		if ( layers_total>0 ) layers_notify_changed();
-
-		inifile_set_gint32("lastnewWidth", nw );
-		inifile_set_gint32("lastnewHeight", nh );
-		inifile_set_gint32("lastnewCols", nc );
-		inifile_set_gint32("lastnewType", im_type );
-
-		/* Lose a selection marquee */
-		pressed_select(FALSE);
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-	}
-
-	if (new_window_type == 1) layer_new(nw, nh, 3 - im_type, nc, CMASK_IMAGE);
 
 	gtk_widget_destroy(new_window);
 }
@@ -976,6 +982,7 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 {
 	int nw, nh, ox = 0, oy = 0, res = 1, scale_type = 0, gcor = FALSE;
 
+	read_spin(sisca_spins[1]); // For aspect ratio handling
 	nw = read_spin(sisca_spins[0]);
 	nh = read_spin(sisca_spins[1]);
 	if (!sisca_scale)
@@ -2658,7 +2665,7 @@ static void store_channel_gradient(int channel)
 	if ((channel == CHN_IMAGE) && (mem_img_bpp == 3)) gmap = grad_tmaps;
 
 	grad->len = read_spin(grad_spin_len);
-	grad->gmode = wj_option_menu_get_history(grad_opt_type) + 1;
+	grad->gmode = wj_option_menu_get_history(grad_opt_type) + GRAD_MODE_LINEAR;
 	grad->rep = read_spin(grad_spin_rep);
 	grad->rmode = wj_option_menu_get_history(grad_opt_bound);
 	grad->ofs = read_spin(grad_spin_ofs);
@@ -2679,7 +2686,8 @@ static void show_channel_gradient(int channel)
 	gmap = grad_tmaps + idx;
 
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_len), grad->len);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type), grad->gmode - 1);
+	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type),
+		grad->gmode - GRAD_MODE_LINEAR);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_rep), grad->rep);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_bound), grad->rmode);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_ofs), grad->ofs);

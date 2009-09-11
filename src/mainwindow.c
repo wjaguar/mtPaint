@@ -1331,9 +1331,6 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 	inilist *ilp;
 	int i = 2, j = 0;
 
-	if ( !GTK_WIDGET_SENSITIVE(main_window) ) return TRUE;
-		// Stop user prematurely exiting while drag 'n' drop loading
-
 	if ( layers_total == 0 )
 		j = check_for_changes();
 	else
@@ -1352,7 +1349,7 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 		win_store_pos(main_window, "window");
 
 		if (cline_window != NULL) delete_cline( NULL, NULL, NULL );
-		if (layers_window != NULL) delete_layers_window( NULL, NULL, NULL );
+		if (layers_window) delete_layers_window();
 			// Get rid of extra windows + remember positions
 
 		toolbar_exit();			// Remember the toolbar settings
@@ -3156,7 +3153,6 @@ static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer
 
 static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 {
-	float old_zoom;
 	int w, h, new_margin_x = 0, new_margin_y = 0;
 
 	if ( canvas_image_centre )
@@ -3177,12 +3173,9 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 		gtk_widget_queue_draw(drawing_canvas);
 			// Force redraw of whole canvas as the margin has shifted
 	}
-	old_zoom = vw_zoom;
-	vw_zoom = -1; /* Force resize */
-	vw_align_size(old_zoom);		// Update the view window as needed
-	vw_zoom = old_zoom;
+	vw_realign();	// Update the view window as needed
 
-	return TRUE;
+	return (TRUE);
 }
 
 void force_main_configure()
@@ -3385,15 +3378,10 @@ void set_image(gboolean state)
 
 static void parse_drag( char *txt )
 {
-	gboolean nlayer = TRUE;
 	char fname[PATHBUF], *tp, *tp2;
-	int i, j;
+	int i, j, nlayer = TRUE;
 
-	if (!layers_window) pressed_layers();
-		// For some reason the layers window must be initialized, or bugs happen??
-
-	gtk_widget_set_sensitive( layers_window, FALSE );
-	gtk_widget_set_sensitive( main_window, FALSE );
+	set_image(FALSE);
 
 	tp = txt;
 	while ((layers_total < MAX_LAYERS) && (tp2 = strstr(tp, "file:")))
@@ -3419,33 +3407,28 @@ static void parse_drag( char *txt )
 		}
 		fname[i] = 0;
 		tp = tp + j;
-//printf(">%s<\n", fname);
-		if ( nlayer )
+
+		j = detect_image_format(fname);
+		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
 		{
-			layer_new( 8, 8, 3, 16, CMASK_IMAGE );		// Add a new layer if needed
-			nlayer = FALSE;
+			if (!nlayer || layer_add(0, 0, 1, 0, 0))
+				nlayer = load_image(fname, FS_LAYER_LOAD, j) == 1;
 		}
-		if ( do_a_load( fname ) == 0 ) nlayer = TRUE;		// Load the file
 	}
+	if (!nlayer) layer_delete(layers_total);
 
-	if ( layers_total > 0 ) view_show();
-
-	gtk_widget_set_sensitive( layers_window, TRUE );
-	gtk_widget_set_sensitive( main_window, TRUE );
+	layer_refresh_list();
+	layer_choose(layers_total);
+	if (layers_total) view_show();
+	set_image(TRUE);
 }
 
-static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context, gint x, gint y,
-					GtkSelectionData *data, guint info, guint time)
+static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context,
+	gint x, gint y, GtkSelectionData *data, guint info, guint time)
 {
-	if ((data->length >= 0) && (data->format == 8))
-	{
-		parse_drag( (gchar *)data->data );
-//printf("%s\n", (gchar *)data->data);
-		gtk_drag_finish (context, TRUE, FALSE, time);
-		return;
-	}
-
-	gtk_drag_finish (context, FALSE, FALSE, time);
+	if ((data->length > 0) && (data->format == 8))
+		parse_drag((gchar *)data->data);
+// !!! When GTK_DEST_DEFAULT_DROP is set, GTK+ calls gtk_drag_finish() for us
 }
 
 
@@ -4553,7 +4536,8 @@ void main_init()
 	win_restore_pos(main_window, "window", 0, 0, 630, 400);
 	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
 
-	gtk_drag_dest_set (main_window, GTK_DEST_DEFAULT_ALL, target_table, 1, GDK_ACTION_MOVE);
+	gtk_drag_dest_set (main_window, GTK_DEST_DEFAULT_ALL, target_table, 1,
+		GDK_ACTION_COPY);
 	gtk_signal_connect (GTK_OBJECT (main_window), "drag_data_received",
 		GTK_SIGNAL_FUNC (drag_n_drop_received), NULL);		// Drag 'n' Drop guff
 
