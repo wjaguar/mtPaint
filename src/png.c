@@ -2536,6 +2536,9 @@ int load_image(char *file_name, int mode, int ftype)
 	settings.mode = mode;
 	settings.ftype = FT_PNG;
 	settings.pal = pal;
+	/* Clear hotspot & transparency */
+	settings.hot_x = settings.hot_y = -1;
+	settings.xpm_trans = settings.rgb_trans = -1;
 
 	/* !!! Use default palette - for now */
 	mem_pal_copy(pal, mem_pal_def);
@@ -2657,7 +2660,7 @@ int load_image(char *file_name, int mode, int ftype)
 		if (res == 1)
 		{
 			/* Add frame & stuff data into it */
-			undo_next_core(4, mem_width, mem_height, mem_img_bpp,
+			undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp,
 				CMASK_CURR);
 			mem_undo_im_[mem_undo_pointer].img[mem_channel] =
 				mem_img[mem_channel] = settings.img[CHN_IMAGE];
@@ -2676,6 +2679,7 @@ int export_undo(char *file_name, ls_settings *settings)
 {
 	char new_name[300];
 	int start = mem_undo_done, res = 0, lenny, i, j;
+	int deftype = settings->ftype, miss = 0;
 
 	strncpy( new_name, file_name, 256);
 	lenny = strlen( file_name );
@@ -2690,6 +2694,14 @@ int export_undo(char *file_name, ls_settings *settings)
 			if (!res && (!j ^ (settings->mode == FS_EXPORT_UNDO)))
 			{
 				progress_update((float)i / (start + 1));
+				settings->ftype = deftype;
+				if (!(file_formats[deftype].flags &
+					(mem_img_bpp == 3 ? FF_RGB :
+					mem_cols > 2 ? FF_IDX : FF_IDX | FF_BW)))
+				{
+					settings->ftype = FT_PNG;
+					miss++;
+				}
 				sprintf(new_name + lenny, "%03i.%s", i,
 					file_formats[settings->ftype].ext);
 				memcpy(settings->img, mem_img, sizeof(chanlist));
@@ -2709,6 +2721,13 @@ int export_undo(char *file_name, ls_settings *settings)
 	}
 
 	progress_end();
+
+	if (miss && !res)
+	{
+		snprintf(new_name, 300, _("%d out of %d frames could not be saved as %s - saved as PNG instead"),
+			miss, mem_undo_done, file_formats[deftype].name);
+		alert_box(_("Warning"), new_name, _("OK"), NULL, NULL);
+	}
 
 	return res;
 }

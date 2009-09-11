@@ -1206,17 +1206,21 @@ gint delete_event( GtkWidget *widget, GdkEvent *event, gpointer data )
 #if GTK_MAJOR_VERSION == 2
 gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 {
-	int x = event->x / can_zoom, y = event->y / can_zoom;
-
-	if ( !inifile_get_gboolean( "scrollwheelZOOM", TRUE ) )
-		return FALSE;		// Normal GTK+2 scrollwheel behaviour
-
-	if (event->direction == GDK_SCROLL_DOWN)
-		scroll_wheel( x, y, -1 );
-	else
-		scroll_wheel( x, y, 1 );
-
-	return TRUE;
+	if (inifile_get_gboolean( "scrollwheelZOOM", TRUE ))
+	{
+		scroll_wheel(event->x / can_zoom, event->y / can_zoom,
+			event->direction == GDK_SCROLL_DOWN ? -1 : 1);
+		return TRUE;
+	}
+	if (event->state & _C) /* Convert up-down into left-right */
+	{
+		if (event->direction == GDK_SCROLL_UP)
+			event->direction = GDK_SCROLL_LEFT;
+		else if (event->direction == GDK_SCROLL_DOWN)
+			event->direction = GDK_SCROLL_RIGHT;
+	}
+	/* Normal GTK+2 scrollwheel behaviour */
+	return FALSE;
 }
 #endif
 

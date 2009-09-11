@@ -88,7 +88,7 @@ static void click_newchan_ok(GtkButton *window, gpointer user_data)
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
 	else i = CMASK_FOR(chan_new_type);
-	i = undo_next_core(1, mem_width, mem_height, mem_img_bpp, i);
+	i = undo_next_core(UC_CREATE, mem_width, mem_height, mem_img_bpp, i);
 	if (i)
 	{
 		click_newchan_cancel();
@@ -300,7 +300,7 @@ static void click_delete_ok(GtkWidget *window)
 	}
 	if (cmask)
 	{
-		undo_next_core(4, mem_width, mem_height, mem_img_bpp, cmask);
+		undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp, cmask);
 		if (cmask & CMASK_CURR) mem_channel = CHN_IMAGE;
 
 		update_all_views();		// Update images

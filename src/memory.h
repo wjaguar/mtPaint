@@ -181,6 +181,8 @@ int mem_histogram[256];
 
 /// Procedures
 
+void init_istate();	// Set initial state of image variables
+
 int mem_count_all_cols();			// Count all colours - Using main image
 int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy
 
@@ -194,7 +196,6 @@ int get_next_line(char *input, int length, FILE *fp);		// Get next length chars 
 int mt_round( float n );			// Round a float to nearest whole number
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
-void clear_file_flags();		// Reset various file flags, e.g. XPM/XBM after new/load gif etc
 
 char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
 void mem_clear();				// Remove old image if any
@@ -280,6 +281,11 @@ unsigned char *mem_undo_previous(int channel);
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user
 
+#define UC_CREATE  1	/* Force create */
+#define UC_NOCOPY  2	/* Forbid copy */
+#define UC_DELETE  4	/* Force delete */
+#define UC_PENDOWN 8	/* Respect pen_down */
+
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 
 
@@ -295,10 +301,10 @@ void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipb
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
 void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode);
-#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), 127, \
-	smudge_mode && mem_undo_opacity)
+#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? \
+	tool_opacity / 2 : 127, smudge_mode && mem_undo_opacity)
 #define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? \
-	tool_opacity : 0, mem_undo_opacity)
+	tool_opacity : -1, mem_undo_opacity)
 
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,

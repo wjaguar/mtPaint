@@ -783,8 +783,9 @@ int load_layers( char *file_name )
 			layers_remove_all();	// Remove all layers - total meltdown!
 			goto fail2;
 		}
-
 		layer_table[layers_total].image = lim2;
+
+		init_istate(); /* Update image variables after load */
 		layer_copy_from_main( layers_total );
 
 		j = get_next_line(tin, 256, fp);

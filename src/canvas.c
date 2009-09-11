@@ -1168,7 +1168,8 @@ void update_cols()
 
 void init_pal()					// Initialise palette after loading
 {
-	mem_pal_init();				// Update palette RGB on screen
+	mem_mask_init();		// Reinit RGB masks
+	mem_pal_init();			// Update palette RGB on screen
 	gtk_widget_set_usize( drawing_palette, PALETTE_WIDTH, 4+mem_cols*16 );
 
 	update_cols();
@@ -1421,12 +1422,13 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		GTK_MENU_SHELL(menu)->children, j)), "activate", (gpointer)box);
 }
 
-static void palette_widgets(GtkWidget *box, char *name, int mode)
+static void ftype_widgets(GtkWidget *box, char *name, int mode)
 {
 	GtkWidget *opt, *menu, *item, *label;
-	int i, j, k;
+	int i, j, k, mask;
 	char *ext = strrchr(name, '.');
 
+	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_BW | FF_IDX | FF_RGB;
 	ext = ext ? ext + 1 : "";
 
 	label = gtk_label_new(_("File Format"));
@@ -1437,7 +1439,7 @@ static void palette_widgets(GtkWidget *box, char *name, int mode)
 	menu = gtk_menu_new();
 	for (i = j = k = 0; i < NUM_FTYPES; i++)
 	{
-		if (!(file_formats[i].flags & FF_PALETTE)) continue;
+		if (!(file_formats[i].flags & mask)) continue;
 		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
 			(file_formats[i].ext2[0] &&
 			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
@@ -1476,8 +1478,10 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 		label = add_a_spin(preserved_gif_delay, 1, MAX_DELAY);
 		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
 		break;
+	case FS_EXPORT_UNDO:
+	case FS_EXPORT_UNDO2:
 	case FS_PALETTE_SAVE:
-		palette_widgets(box, name, mode);
+		ftype_widgets(box, name, mode);
 		break;
 	default: /* Give a hidden empty box */
 		return (box);
@@ -1526,12 +1530,11 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 		case FS_EXPORT_GIF: /* No formats yet */
 			settings->gif_delay = read_spin(BOX_CHILD(box, 1));
 			break;
+		case FS_EXPORT_UNDO:
+		case FS_EXPORT_UNDO2:
 		case FS_PALETTE_SAVE:
 			settings->ftype = selected_file_type(box);
 			break;
-		case FS_EXPORT_UNDO:
-		case FS_EXPORT_UNDO2:
-			settings->ftype = FT_PNG;
 		default: /* Use defaults */
 			box = NULL;
 			break;

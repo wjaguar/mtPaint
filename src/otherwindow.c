@@ -61,13 +61,7 @@ void reset_tools()
 {
 	float old_zoom = can_zoom;
 
-	notify_unchanged();
-
-	mem_mask_setall(0);		// Clear all mask info
-	mem_col_A = 1, mem_col_B = 0;
-	mem_col_A24 = mem_pal[mem_col_A];
-	mem_col_B24 = mem_pal[mem_col_B];
-	tool_pat = 0;
+	init_istate();
 	init_pal();
 
 	can_zoom = -1;
@@ -2140,7 +2134,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	/* Paranoia */
 	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
 
-	i = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
+	i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
 	if (i)
 	{
 		memory_errors(2);

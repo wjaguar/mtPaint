@@ -373,6 +373,21 @@ char mem_numbers[10][7][7] = { {
 	{0,0,1,1,1,0,0}
 } };
 
+/* Set initial state of image variables */
+void init_istate()
+{
+	notify_unchanged();
+
+	mem_mask_setall(0);	/* Clear all mask info */
+	mem_col_A = 1;
+	mem_col_B = 0;
+	mem_col_A24 = mem_pal[mem_col_A];
+	mem_col_B24 = mem_pal[mem_col_B];
+	memset(channel_col_A, 255, NUM_CHANNELS);
+	memset(channel_col_B, 0, NUM_CHANNELS);
+	tool_pat = 0;
+}
+
 void undo_free_x(undo_item *undo)
 {
 	int i;
@@ -445,13 +460,7 @@ int mem_new( int width, int height, int bpp, int cmask )
 	undo->height = height;
 	mem_pal_copy(undo->pal, mem_pal);
 
-	mem_col_A = 1;
-	mem_col_B = 0;
-	mem_col_A24 = mem_pal[mem_col_A];
-	mem_col_B24 = mem_pal[mem_col_B];
-	memset(channel_col_A, 255, NUM_CHANNELS);
-
-	clear_file_flags();
+	mem_xpm_trans = mem_xbm_hot_x = mem_xbm_hot_y = -1;
 
 	return (!res);
 }
@@ -475,8 +484,6 @@ void lose_oldest()				// Lose the oldest undo image
 	mem_undo_done--;
 }
 
-/* Mode bits are: |1 - force create, |2 - forbid copy, |4 - force delete,
- * |8 - respect pen_down */
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask)
 {
 	undo_item *undo;
@@ -485,8 +492,8 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	int i, j, k, mem_req, mem_lim;
 
 	notify_changed();
-	if (pen_down && (mode & 8)) return (0);
-	pen_down = mode & 8 ? 1 : 0;
+	if (pen_down && (mode & UC_PENDOWN)) return (0);
+	pen_down = mode & UC_PENDOWN ? 1 : 0;
 //printf("Old undo # = %i\n", mem_undo_pointer);
 
 	/* Release redo data */
@@ -502,11 +509,12 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	}
 
 	mem_req = 0;
-	if (cmask && !(mode & 4))
+	if (cmask && !(mode & UC_DELETE))
 	{
 		for (i = j = 0; i < NUM_CHANNELS; i++)
 		{
-			if (mem_img[i] && (cmask & (1 << i))) j++;
+			if ((mem_img[i] || (mode & UC_CREATE))
+				&& (cmask & (1 << i))) j++;
 		}
 		if (cmask & CMASK_IMAGE) j += new_bpp - 1;
 		mem_req = (new_width * new_height + 32) * j;
@@ -519,7 +527,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		if (!mem_undo_done)
 		{
 			/* Fail if not enough memory */
-			if (!(mode & 4)) return (1);
+			if (!(mode & UC_DELETE)) return (1);
 		}
 		else lose_oldest();
 	}
@@ -544,12 +552,12 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	{
 		holder[i] = img = mem_img[i];
 		if (!(cmask & (1 << i))) continue;
-		if (mode & 4)
+		if (mode & UC_DELETE)
 		{
 			holder[i] = NULL;
 			continue;
 		}
-		if (!img && !(mode & 1)) continue;
+		if (!img && !(mode & UC_CREATE)) continue;
 		mem_lim = mem_req;
 		if (i == CHN_IMAGE) mem_lim *= new_bpp;
 		while (!((img = malloc(mem_lim))))
@@ -575,21 +583,22 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		}
 		holder[i] = img;
 		/* Copy */
-		if (!undo->img[i] || (mode & 2)) continue;
+		if (!undo->img[i] || (mode & UC_NOCOPY)) continue;
 		memcpy(img, undo->img[i], mem_lim);
 	}
+
+	/* Next undo step */
+	if (mem_undo_done >= MAX_UNDO - 1)
+		undo_free((mem_undo_pointer + 1) % MAX_UNDO);
+	else mem_undo_done++;
+	mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
 
 	/* Commit */
 	memcpy(mem_img, holder, sizeof(chanlist));
 	mem_width = new_width;
 	mem_height = new_height;
 	mem_img_bpp = new_bpp;
-		
-	if (mem_undo_done >= MAX_UNDO - 1)
-		undo_free((mem_undo_pointer + 1) % MAX_UNDO);
-	else mtMIN(mem_undo_done, mem_undo_done + 1, MAX_UNDO - 1);
 
-	mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
 	undo = &mem_undo_im_[mem_undo_pointer];
 	memcpy(undo->img, holder, sizeof(chanlist));
 	undo->cols = mem_cols;
@@ -619,7 +628,7 @@ int mem_undo_next(int mode)
 		cmask = mem_img_bpp == 3 ? CMASK_IMAGE : CMASK_NONE;
 		break;
 	case UNDO_TOOL: /* Continuous drawing */
-		wmode = 8;
+		wmode = UC_PENDOWN;
 	case UNDO_DRAW: /* Changes to current channel / RGBA */
 		cmask = (mem_channel == CHN_IMAGE) && RGBA_mode ?
 			CMASK_RGBA : CMASK_CURR;
@@ -636,7 +645,7 @@ int mem_undo_next(int mode)
 		cmask = CMASK_CURR;
 		break;
 	case UNDO_PASTE: /* Paste to current channel / RGBA */
-		wmode = 8;	/* !!! Workaround for move-with-RMB-pressed */
+		wmode = UC_PENDOWN;	/* !!! Workaround for move-with-RMB-pressed */
 		cmask = (mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA] &&
 			(mem_clip_alpha || RGBA_mode) ? CMASK_RGBA : CMASK_CURR;
 		break;
@@ -1046,19 +1055,16 @@ printf("Failed - line %i is > 30 chars\n", i);
 	return new_mem_cols;
 }
 
-void mem_pal_init()					// Initialise whole of palette RGB
+void mem_pal_init()			// Redraw whole palette
 {
 	int i;
 
-	for ( i=0; i<3*PALETTE_WIDTH*PALETTE_HEIGHT; i++ ) mem_pals[i] = 0;
-
+	memset(mem_pals, 0, 3 * PALETTE_WIDTH * PALETTE_HEIGHT);
 	repaint_top_swatch();
-	mem_mask_init();		// Prepare RGB masks
-
-	for ( i=0; i<mem_cols; i++ ) repaint_swatch( i );
+	for (i = 0; i < mem_cols; i++) repaint_swatch(i);
 }
 
-void mem_mask_init()			// Initialise RGB protection mask array
+void mem_mask_init()		// Initialise RGB protection mask array
 {
 	int i;
 
@@ -1076,6 +1082,7 @@ void mem_mask_init()			// Initialise RGB protection mask array
 void mem_mask_setall(char val)
 {
 	memset(mem_prot_mask, val, 256);
+	mem_mask_init();
 }
 
 void mem_get_histogram(int channel)	// Calculate how many of each colour index is on the canvas
@@ -1449,7 +1456,7 @@ int mem_convert_rgb()			// Convert image to RGB
 	unsigned char pix;
 	int i, j, res;
 
-	res = undo_next_core(2, mem_width, mem_height, 3, CMASK_IMAGE);
+	res = undo_next_core(UC_NOCOPY, mem_width, mem_height, 3, CMASK_IMAGE);
 	if (res) return 1;	// Not enough memory
 
 	new_image = mem_img[CHN_IMAGE];
@@ -2858,13 +2865,6 @@ int read_hex_dub( char *in )		// Read hex double
 	return 16*hi + lo;
 }
 
-void clear_file_flags()			// Reset various file flags, e.g. XPM/XBM after new/load gif etc
-{
-	mem_xpm_trans = -1;
-	mem_xbm_hot_x = -1;
-	mem_xbm_hot_y = -1;
-}
-
 void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp)
 {
 	unsigned char *src, *dest;
@@ -3066,7 +3066,7 @@ int mem_rotate_free(double angle, int type, int gcor)
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
 	if ( res == 1 ) return 2;		// No undo space
 
 	/* Centerpoints, including half-pixel offsets */
@@ -3265,7 +3265,7 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 	int i, ow = mem_width, oh = mem_height;
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	i = undo_next_core(2, oh, ow, mem_img_bpp, CMASK_ALL);
+	i = undo_next_core(UC_NOCOPY, oh, ow, mem_img_bpp, CMASK_ALL);
 	if (i) return 1;			// Not enough memory
 
 	for (i = 0; i < NUM_CHANNELS; i++)
@@ -3328,12 +3328,14 @@ static fstep *make_filter(int l0, int l1, int type)
 
 	i = (int)floor(fwidth) + 2;
 	res = buf = calloc(l1 * (i + 1), sizeof(fstep));
+	if (!res) return (NULL);
 
+	fwidth *= 0.5;
 	for (i = 0; i < l1; i++)
 	{
 		basept = (double)i / scale + delta;
-		k = (int)floor(basept + fwidth / 2.0);
-		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
+		k = (int)floor(basept + fwidth);
+		for (j = (int)ceil(basept - fwidth); j <= k; j++)
 		{
 			ix = j;
 			if ((j < 0) || (j >= l0))
@@ -3632,7 +3634,7 @@ int mem_image_scale(int nw, int nh, int type, int gcor)		// Scale image
 	if (!prepare_scale(ow, oh, nw, nh, type)) return 1;	// Not enough memory
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
 	if (res)
 	{
 		clear_scale();
@@ -3777,7 +3779,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 	if ((nw <= oww) && (nh <= ohh)) mode = 0;
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
+	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
 	if (res) return 1;			// Not enough memory
 
 	if ( ox < 0 ) oxo = -ox;
@@ -5216,6 +5218,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 		h = mem_height - ay;
 
 	if ((w < 1) || (h < 1)) return;
+	if (!opacity) return;
 
 /* !!! I modified this tool action somewhat - White Jaguar */
 	if (mode) src = mem_undo_previous(mem_channel);
@@ -5258,7 +5261,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 			if ((rx < 0) || (rx >= mem_width)) continue;
 			k = pixel_protected(rx, ry);
 			offs = mem_width * ry + rx;
-			if (!opacity)
+			if (opacity < 0)
 			{
 				if (k) continue;
 				dest[offs] = src[offs - delta];
