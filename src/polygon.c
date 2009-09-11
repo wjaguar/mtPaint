@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005-2006 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -53,22 +53,15 @@ int poly_init()			// Setup max/min -> Requires points in poly_mem
 	return 0;		// Success
 }
 
-void memline( int x1, int y1, int x2, int y2 )	// Draw single thickness straight line to clipboard mask
+/* Draw single thickness straight line to clipboard mask */
+void memline(int x1, int y1, int x2, int y2)
 {
-	int i, xdo, ydo, px, py, todo;
-	float rat;
+	linedata line;
 
-	xdo = x2 - x1;
-	ydo = y2 - y1;
-	mtMAX( todo, abs(xdo), abs(ydo) )
-	if (todo==0) todo=1;
-
-	for ( i=0; i<=todo; i++ )
+	line_init(line, x1, y1, x2, y2);
+	for (; line[2] >= 0; line_step(line))
 	{
-		rat = ((float) i ) / todo;
-		px = mt_round(x1 + (x2 - x1) * rat);
-		py = mt_round(y1 + (y2 - y1) * rat);
-		mem_clip_mask[px + py*mem_clip_w] = 255;
+		mem_clip_mask[line[0] + line[1] * mem_clip_w] = 255;
 	}
 }
 

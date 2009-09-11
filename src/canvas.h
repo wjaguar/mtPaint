@@ -134,8 +134,7 @@ void pressed_unsharp( GtkMenuItem *menu_item, gpointer user_data );
 
 void pressed_clip_alpha_scale();
 void pressed_clip_alphamask();
-void pressed_clip_mask();
-void pressed_clip_unmask();
+void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_clip_mask_all();
 void pressed_clip_mask_clear();
 
@@ -144,15 +143,11 @@ void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_flip_sel_h( GtkMenuItem *menu_item, gpointer user_data );
 
-void pressed_rotate_image_clock( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_rotate_image_anti( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_rotate_sel_clock( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_rotate_sel_anti( GtkMenuItem *menu_item, gpointer user_data );
+void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item );
+void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item );
 void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data );
 
-void pressed_create_dl1( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_create_dl3( GtkMenuItem *menu_item, gpointer user_data );
-void pressed_create_wu( GtkMenuItem *menu_item, gpointer user_data );
+void create_pal_quantized( GtkMenuItem *menu_item, gpointer user_data, gint item );
 
 void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item );
 

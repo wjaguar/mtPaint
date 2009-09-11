@@ -645,7 +645,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-	label = add_to_table( _("Factor, %"), table3, 0, 1, 0 );
+	snprintf(txt, 60, "%s, %%", _("Factor"));
+	label = add_to_table( txt, table3, 0, 1, 0 );
 	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
 	gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
 

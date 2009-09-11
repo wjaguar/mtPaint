@@ -2409,6 +2409,7 @@ static void click_grad_ok(GtkWidget *widget, gpointer data)
 static void grad_channel_changed(GtkToggleButton *widget, gpointer user_data)
 {
 	if ((int)user_data == grad_channel) return;
+	if (!gtk_toggle_button_get_active(widget)) return;
 	store_channel_gradient(grad_channel);
 	grad_channel = -1;
 	show_channel_gradient((int)user_data);
@@ -2449,7 +2450,7 @@ void gradient_setup(int mode)
 	label = gtk_label_new(_("Select"));
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page1, label);
 	gtk_widget_show_all(notebook); /* Else unable to set page */
-	gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), mode);
+	gtk_notebook_set_page(GTK_NOTEBOOK(notebook), mode);
 
 	/* Setup page */
 

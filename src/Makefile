@@ -7,7 +7,7 @@ BIN = mtpaint
 
 OBJS = main.o mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
 	viewer.o quantizer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\
-	toolbar.o channels.o csel.o
+	toolbar.o channels.o csel.o shifter.o
 
 $(BIN): $(OBJS)
 	$(CC) $(OBJS) -o $(BIN) $(LDFLAGS)

@@ -296,6 +296,16 @@ gint mt_spinslide_get_value(GtkWidget *spinslide)
 	return (gtk_spin_button_get_value_as_int(spin));
 }
 
+/* Different in that this doesn't force slider to integer-value position */
+gint mt_spinslide_read_value(GtkWidget *spinslide)
+{
+	GtkSpinButton *spin;
+
+	spin = GTK_SPIN_BUTTON(((GtkBoxChild*)GTK_BOX(spinslide)->children->
+		next->data)->widget);
+	return (gtk_spin_button_get_value_as_int(spin));
+}
+
 void mt_spinslide_set_value(GtkWidget *spinslide, gint value)
 {
 	GtkSpinButton *spin;

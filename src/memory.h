@@ -237,6 +237,7 @@ typedef int linedata[10];
 
 void line_init(linedata line, int x0, int y0, int x1, int y1);
 int line_step(linedata line);
+void line_nudge(linedata line, int x, int y);
 
 /// Procedures
 
@@ -313,7 +314,6 @@ void mem_pal_index_move( int c1, int c2 );	// Move index c1 to c2 and shuffle in
 void mem_canvas_index_move( int c1, int c2 );	// Similar to palette item move but reworks canvas pixels
 
 void set_zoom_centre( int x, int y );
-void mem_boundary( int *x, int *y, int *w, int *h );		// Check/amend boundaries
 
 // Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255
 void rgb2hsv(unsigned char *rgb, double *hsv);
@@ -384,13 +384,14 @@ void flood_fill( int x, int y, unsigned int target );
 
 void sline( int x1, int y1, int x2, int y2 );			// Draw single thickness straight line
 void tline( int x1, int y1, int x2, int y2, int size );		// Draw size thickness straight line
-void v_para( int x1, int y1, int x2, int y2, int vlen );	// Draw vertical sided parallelogram
-void h_para( int x1, int y1, int x2, int y2, int hlen );	// Draw horizontal parallelogram
 void g_para( int x1, int y1, int x2, int y2, int xv, int yv );	// Draw general parallelogram
 void f_rectangle( int x, int y, int w, int h );			// Draw a filled rectangle
 void f_circle( int x, int y, int r );				// Draw a filled circle
 void f_ellipse( int x1, int y1, int x2, int y2 );		// Draw a filled ellipse
 void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse outline
+
+// Draw whatever is bounded by two pairs of lines
+void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
 
 //	A couple of shorthands to get an int representation of an RGB colour
 #define PNG_2_INT(var) ((var.red << 16) + (var.green << 8) + (var.blue))

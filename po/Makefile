@@ -3,7 +3,7 @@ include ../_conf.txt
 langs = es cs fr pt pt_BR de_DE pl tr
 
 all:
-	for iii in $(langs); do msgfmt --statistics -o $$iii.mo $$iii.po; done
+	for iii in $(langs); do echo -n "$$iii = "; msgfmt -v -o $$iii.mo $$iii.po; done
 
 install:
 	for iii in $(langs); do mkdir -p $(MT_LANG_DEST)/$$iii/LC_MESSAGES/; done

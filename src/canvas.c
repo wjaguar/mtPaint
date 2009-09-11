@@ -322,18 +322,18 @@ void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	}
 }
 
-void create_pal_quantized(int dl)
+void create_pal_quantized( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int i = 0;
 	unsigned char newpal[3][256];
 
 	mem_undo_next(UNDO_PAL);
 
-	if ( dl==1 )
+	if ( item==1 )
 		i = dl1quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
-	if ( dl==3 )
+	if ( item==3 )
 		i = dl3quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
-	if ( dl==5 )
+	if ( item==5 )
 		i = wu_quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
 
 	if ( i!=0 ) memory_errors(i);
@@ -350,15 +350,6 @@ void create_pal_quantized(int dl)
 		init_pal();
 	}
 }
-
-void pressed_create_dl1( GtkMenuItem *menu_item, gpointer user_data )
-{	create_pal_quantized(1);	}
-
-void pressed_create_dl3( GtkMenuItem *menu_item, gpointer user_data )
-{	create_pal_quantized(3);	}
-
-void pressed_create_wu( GtkMenuItem *menu_item, gpointer user_data )
-{	create_pal_quantized(5);	}
 
 void pressed_invert( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -543,9 +534,9 @@ void pressed_greyscale( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	gtk_widget_queue_draw( drawing_col_prev );
 }
 
-void rot_im(int dir)
+void pressed_rotate_image( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	if ( mem_image_rot(dir) == 0 )
+	if ( mem_image_rot(item) == 0 )
 	{
 		check_marquee();
 		canvas_undo_chores();
@@ -553,27 +544,15 @@ void rot_im(int dir)
 	else alert_box( _("Error"), _("Not enough memory to rotate image"), _("OK"), NULL, NULL );
 }
 
-void pressed_rotate_image_clock( GtkMenuItem *menu_item, gpointer user_data )
-{	rot_im(0);	}
-
-void pressed_rotate_image_anti( GtkMenuItem *menu_item, gpointer user_data )
-{	rot_im(1);	}
-
-void rot_sel(int dir)
+void pressed_rotate_sel( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	if ( mem_sel_rot(dir) == 0 )
+	if ( mem_sel_rot(item) == 0 )
 	{
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}
 	else	alert_box( _("Error"), _("Not enough memory to rotate clipboard"), _("OK"), NULL, NULL );
 }
-
-void pressed_rotate_sel_clock( GtkMenuItem *menu_item, gpointer user_data )
-{	rot_sel(0);	}
-
-void pressed_rotate_sel_anti( GtkMenuItem *menu_item, gpointer user_data )
-{	rot_sel(1);	}
 
 int do_rotate_free(GtkWidget *box, gpointer fdata)
 {
@@ -622,28 +601,22 @@ void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
 }
 
 
-void mask_ab(int v)
+void pressed_clip_mask( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int i;
 
 	if ( mem_clip_mask == NULL )
 	{
-		i = mem_clip_mask_init(v ^ 255);
+		i = mem_clip_mask_init(item ^ 255);
 		if ( i != 0 )
 		{
 			memory_errors(1);	// Not enough memory
 			return;
 		}
 	}
-	mem_clip_mask_set(v);
+	mem_clip_mask_set(item);
 	gtk_widget_queue_draw( drawing_canvas );
 }
-
-void pressed_clip_unmask()
-{	mask_ab(255);	}
-
-void pressed_clip_mask()
-{	mask_ab(0);	}
 
 void pressed_clip_alphamask()
 {
@@ -1030,7 +1003,6 @@ void pressed_lasso( GtkMenuItem *menu_item, gpointer user_data, gint item )
 	pressed_paste_centre( NULL, NULL );
 }
 
-/* !!! Add support for channel-specific option sets !!! */
 void update_menus()			// Update edit/undo menu
 {
 	int i, j;
@@ -1989,167 +1961,56 @@ void align_size( float new_zoom )		// Set new zoom level
 	toolbar_zoom_update();
 }
 
-void square_continuous(int nx, int ny)
+/* This tool is seamless: doesn't draw pixels twice if not requested to - WJ */
+static void rec_continuous(int nx, int ny, int w, int h)
 {
-	if ( tool_size == 1 )
+	linedata line1, line2, line3, line4;
+	int ws2 = w >> 1, hs2 = h >> 1;
+	int i, j, i2, j2, *xv;
+	int dx[3] = {-ws2, w - ws2 - 1, -ws2};
+	int dy[3] = {-hs2, h - hs2 - 1, -hs2};
+
+	i = nx < tool_ox;
+	j = ny < tool_oy;
+
+	/* Redraw starting square only if need to fill in possible gap when
+	 * size changes, or to draw stroke gradient in the proper direction */
+	if (!tablet_working && !(mem_gradient &&
+		(gradient[mem_channel].status == GRAD_NONE)))
 	{
-		put_pixel( nx, ny );
+		i2 = tool_ox + dx[i + 1] + 1 - i * 2;
+		j2 = tool_oy + dy[j + 1] + 1 - j * 2;
+		xv = &line3[0];
 	}
 	else
 	{
-		// Needed to fill in possible gap when size changes - or
-		// to redraw stroke gradient in the proper direction
-		if (tablet_working || (mem_gradient &&
-			gradient[mem_channel].status == GRAD_NONE))
-		{
-			f_rectangle( tool_ox - tool_size/2, tool_oy - tool_size/2,
-					tool_size, tool_size );
-		}
-		if ( ny > tool_oy )		// Down
-		{
-			h_para( tool_ox - tool_size/2,
-				tool_oy - tool_size/2 + tool_size - 1,
-				nx - tool_size/2,
-				ny - tool_size/2 + tool_size - 1,
-				tool_size );
-		}
-		if ( nx > tool_ox )		// Right
-		{
-			v_para( tool_ox - tool_size/2 + tool_size - 1,
-				tool_oy - tool_size/2,
-				nx - tool_size/2 + tool_size -1,
-				ny - tool_size/2,
-				tool_size );
-		}
-		if ( ny < tool_oy )		// Up
-		{
-			h_para( tool_ox - tool_size/2,
-				tool_oy - tool_size/2,
-				nx - tool_size/2,
-				ny - tool_size/2,
-				tool_size );
-		}
-		if ( nx < tool_ox )		// Left
-		{
-			v_para( tool_ox - tool_size/2,
-				tool_oy - tool_size/2,
-				nx - tool_size/2,
-				ny - tool_size/2,
-				tool_size );
-		}
+		i2 = tool_ox + dx[i];
+		j2 = tool_oy + dy[j];
+		xv = &i2;
 	}
-}
 
-void vertical_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
-{
-	int	ax = tool_ox, ay = tool_oy - tool_size/2,
-		bx = nx, by = ny - tool_size/2, vlen = tool_size;
-
-	int mny, may;
-
-	if ( ax == bx )		// Simple vertical line required
+	if (tool_ox == nx)
 	{
-		mtMIN( ay, tool_oy - tool_size/2, ny - tool_size/2 )
-		mtMAX( by, tool_oy - tool_size/2 + tool_size - 1, ny - tool_size/2 + tool_size - 1 )
-		vlen = by - ay + 1;
-		if ( ay < 0 )
-		{
-			vlen = vlen + ay;
-			ay = 0;
-		}
-		if ( by >= mem_height )
-		{
-			vlen = vlen - ( mem_height - by + 1 );
-			by = mem_height - 1;
-		}
-
-		if ( vlen <= 1 )
-		{
-			ax = bx; ay = by;
-			put_pixel( bx, by );
-		}
-		else
-		{
-			sline( ax, ay, bx, by );
-
-			mtMIN( *minx, ax, bx )
-			mtMIN( *miny, ay, by )
-			*xw = abs( ax - bx ) + 1;
-			*yh = abs( ay - by ) + 1;
-		}
+		line_init(line1, tool_ox + dx[i], j2,
+			tool_ox + dx[i], ny + dy[j + 1]);
+		line_init(line3, tool_ox + dx[i + 1], j2,
+			tool_ox + dx[i + 1], ny + dy[j + 1]);
+		line2[2] = line4[2] = -1;
 	}
-	else			// Parallelogram with vertical left and right sides required
+	else
 	{
-		v_para( ax, ay, bx, by, tool_size );
-
-		mtMIN( *minx, ax, bx )
-		*xw = abs( ax - bx ) + 1;
-
-		mtMIN( mny, ay, by )
-		mtMAX( may, ay + tool_size - 1, by + tool_size - 1 )
-
-		mtMAX( mny, mny, 0 )
-		mtMIN( may, may, mem_height )
-
-		*miny = mny;
-		*yh = may - mny + 1;
+		line_init(line2, tool_ox + dx[i], tool_oy + dy[j + 1],
+			nx + dx[i], ny + dy[j + 1]);
+		line_nudge(line2, i2, j2);
+		line_init(line3, tool_ox + dx[i + 1], tool_oy + dy[j],
+			nx + dx[i + 1], ny + dy[j]);
+		line_nudge(line3, i2, j2);
+		line_init(line1, *xv, line3[1], *xv, line2[1]);
+		line_init(line4, nx + dx[i + 1], ny + dy[j],
+			nx + dx[i + 1], ny + dy[j + 1]);
 	}
-}
 
-void horizontal_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
-{
-	int ax = tool_ox - tool_size/2, ay = tool_oy,
-		bx = nx - tool_size/2, by = ny, hlen = tool_size;
-
-	int mnx, max;
-
-	if ( ay == by )		// Simple horizontal line required
-	{
-		mtMIN( ax, tool_ox - tool_size/2, nx - tool_size/2 )
-		mtMAX( bx, tool_ox - tool_size/2 + tool_size - 1, nx - tool_size/2 + tool_size - 1 )
-		hlen = bx - ax + 1;
-		if ( ax < 0 )
-		{
-			hlen = hlen + ax;
-			ax = 0;
-		}
-		if ( bx >= mem_width )
-		{
-			hlen = hlen - ( mem_width - bx + 1 );
-			bx = mem_width - 1;
-		}
-
-		if ( hlen <= 1 )
-		{
-			ax = bx; ay = by;
-			put_pixel( bx, by );
-		}
-		else
-		{
-			sline( ax, ay, bx, by );
-
-			mtMIN( *minx, ax, bx )
-			mtMIN( *miny, ay, by )
-			*xw = abs( ax - bx ) + 1;
-			*yh = abs( ay - by ) + 1;
-		}
-	}
-	else			// Parallelogram with horizontal top and bottom sides required
-	{
-		h_para( ax, ay, bx, by, tool_size );
-
-		mtMIN( *miny, ay, by )
-		*yh = abs( ay - by ) + 1;
-
-		mtMIN( mnx, ax, bx )
-		mtMAX( max, ax + tool_size - 1, bx + tool_size - 1 )
-
-		mtMAX( mnx, mnx, 0 )
-		mtMIN( max, max, mem_width )
-
-		*minx = mnx;
-		*xw = max - mnx + 1;
-	}
+	draw_quad(line1, line2, line3, line4);
 }
 
 void update_all_views()				// Update whole canvas on all views
@@ -2215,35 +2076,23 @@ static void poly_add_po( int x, int y )
 void tool_action(int event, int x, int y, int button, gdouble pressure)
 {
 	int minx = -1, miny = -1, xw = -1, yh = -1;
-	int i, j, k, rx, ry, sx, sy;
+	int i, j, k, rx, ry, sx, sy, ts2, tr2, res;
 	int ox, oy, off1, off2, o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
 	int px, py, oox, ooy;	// Continuous smudge stuff
-	gboolean first_point = FALSE, paint_action = FALSE;
-
-	if ( (button == 1 || button == 3) && (tool_type <= TOOL_SPRAY) )
-		paint_action = TRUE;
+	gboolean first_point = FALSE;
 
 	if ( tool_type <= TOOL_SHUFFLE ) tint_mode[2] = button;
 
 	if ( pen_down == 0 )
 	{
 		first_point = TRUE;
-		if ( button == 3 && paint_action && !tint_mode[0] )
+		if ((button == 3) && (tool_type <= TOOL_SPRAY) && !tint_mode[0])
 		{
 			col_reverse = TRUE;
 			mem_swap_cols();
 		}
 	}
 	else if ( tool_ox == x && tool_oy == y ) return;	// Only do something with a new point
-
-	if ( (button == 1 || paint_action) && tool_type != TOOL_FLOOD &&
-		tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON )
-	{
-		if ( !(tool_type == TOOL_LINE && line_status == LINE_NONE) )
-		{
-			mem_undo_next(UNDO_TOOL);	// Do memory stuff for undo
-		}
-	}
 
 	if ( tablet_working )
 	{
@@ -2265,198 +2114,28 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		tool_opacity = n_vs[2];
 	}
 
-	minx = x - tool_size/2;
-	miny = y - tool_size/2;
-	xw = tool_size;
-	yh = tool_size;
+	ts2 = tool_size >> 1;
+	tr2 = tool_size - ts2 - 1;
 
-	if ( paint_action && !first_point && mem_continuous && tool_size == 1 &&
-		tool_type < TOOL_SPRAY && ( abs(x - tool_ox) > 1 || abs(y - tool_oy ) > 1 ) )
-	{		// Single point continuity
-		sline( tool_ox, tool_oy, x, y );
-
-		minx = tool_ox < x ? tool_ox : x;
-		miny = tool_oy < y ? tool_oy : y;
-		xw = abs( tool_ox - x ) + 1;
-		yh = abs( tool_oy - y ) + 1;
-	}
-	else
+	/* Handle "exceptional" tools */
+	res = 1;
+	if (tool_type == TOOL_FLOOD)
 	{
-		if ( mem_continuous && !first_point && (button == 1 || button == 3) )
+		/* Left click and non-masked start point */
+		if ((button == 1) && (pixel_protected(x, y) < 255))
 		{
-			minx = tool_ox < x ? tool_ox : x;
-			xw = (tool_ox > x ? tool_ox : x) - minx + tool_size;
-			minx -= tool_size / 2;
-
-			miny = tool_oy < y ? tool_oy : y;
-			yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
-			miny -= tool_size / 2;
-
-			mem_boundary( &minx, &miny, &xw, &yh );
-		}
-		if ( tool_type == TOOL_SQUARE && paint_action )
-		{
-			if ( !mem_continuous || first_point )
-				f_rectangle( minx, miny, xw, yh );
-			else
+			j = get_pixel(x, y);
+			k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
+				mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
+			if (j != k) /* And never start on colour A */
 			{
-				square_continuous(x, y);
-			}
-		}
-		if ( tool_type == TOOL_CIRCLE  && paint_action )
-		{
-			if ( mem_continuous && !first_point )
-			{
-				tline( tool_ox, tool_oy, x, y, tool_size );
-			}
-			f_circle( x, y, tool_size );
-		}
-		if ( tool_type == TOOL_HORIZONTAL && paint_action )
-		{
-			if ( !mem_continuous || first_point || tool_size == 1 )
-			{
-				for ( j=0; j<tool_size; j++ )
-				{
-					rx = x - tool_size/2 + j;
-					ry = y;
-					IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
-				}
-			}
-			else	horizontal_continuous(x, y, &minx, &miny, &xw, &yh);
-		}
-		if ( tool_type == TOOL_VERTICAL && paint_action )
-		{
-			if ( !mem_continuous || first_point || tool_size == 1 )
-			{
-				for ( j=0; j<tool_size; j++ )
-				{
-					rx = x;
-					ry = y - tool_size/2 + j;
-					IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
-				}
-			}
-			else	vertical_continuous(x, y, &minx, &miny, &xw, &yh);
-		}
-		if ( tool_type == TOOL_SLASH && paint_action )
-		{
-			if ( mem_continuous && !first_point && tool_size > 1 )
-				g_para( x + (tool_size-1)/2, y - tool_size/2,
-					x + (tool_size-1)/2 - (tool_size - 1),
-					y - tool_size/2 + tool_size - 1,
-					tool_ox - x, tool_oy - y );
-			else for ( j=0; j<tool_size; j++ )
-			{
-				rx = x + (tool_size-1)/2 - j;
-				ry = y - tool_size/2 + j;
-				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
-			}
-		}
-		if ( tool_type == TOOL_BACKSLASH && paint_action )
-		{
-			if ( mem_continuous && !first_point && tool_size > 1 )
-				g_para( x - tool_size/2, y - tool_size/2,
-					x - tool_size/2 + tool_size - 1,
-					y - tool_size/2 + tool_size - 1,
-					tool_ox - x, tool_oy - y );
-			else for ( j=0; j<tool_size; j++ )
-			{
-				rx = x - tool_size/2 + j;
-				ry = y - tool_size/2 + j;
-				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
-			}
-		}
-		if ( tool_type == TOOL_SPRAY && paint_action )
-		{
-			for ( j=0; j<tool_flow; j++ )
-			{
-				rx = x - tool_size/2 + rand() % tool_size;
-				ry = y - tool_size/2 + rand() % tool_size;
-				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
-			}
-		}
-		if ( tool_type == TOOL_SHUFFLE && button == 1 )
-		{
-			for ( j=0; j<tool_flow; j++ )
-			{
-				rx = x - tool_size/2 + rand() % tool_size;
-				ry = y - tool_size/2 + rand() % tool_size;
-				sx = x - tool_size/2 + rand() % tool_size;
-				sy = y - tool_size/2 + rand() % tool_size;
-				IF_IN_RANGE( rx, ry ) IF_IN_RANGE( sx, sy )
-				{
-			/* !!! Or do something for partial mask too? !!! */
-					if (!pixel_protected(rx, ry) &&
-						!pixel_protected(sx, sy))
-					{
-						off1 = rx + ry * mem_width;
-						off2 = sx + sy * mem_width;
-						if ((mem_channel == CHN_IMAGE) &&
-							RGBA_mode && mem_img[CHN_ALPHA])
-						{
-							px = mem_img[CHN_ALPHA][off1];
-							py = mem_img[CHN_ALPHA][off2];
-							mem_img[CHN_ALPHA][off1] = py;
-							mem_img[CHN_ALPHA][off2] = px;
-						}
-						k = MEM_BPP;
-						off1 *= k; off2 *= k;
-						for (i = 0; i < k; i++)
-						{
-							px = mem_img[mem_channel][off1];
-							py = mem_img[mem_channel][off2];
-							mem_img[mem_channel][off1++] = py;
-							mem_img[mem_channel][off2++] = px;
-						}
-					}
-				}
-			}
-		}
-		if ( tool_type == TOOL_FLOOD && button == 1 )
-		{
-			/* Flood fill shouldn't start on masked points */
-			if (pixel_protected(x, y) < 255)
-			{
-				j = get_pixel(x, y);
-				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
-					mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
-				if (j != k) /* And never start on colour A */
-				{
-					spot_undo(UNDO_DRAW);
-					flood_fill(x, y, j);
-					update_all_views();
-				}
-			}
-		}
-		if ( tool_type == TOOL_SMUDGE && button == 1 )
-		{
-			if ( !first_point && (tool_ox!=x || tool_oy!=y) )
-			{
-				if ( mem_continuous )
-				{
-					linedata line;
-
-					line_init(line, tool_ox, tool_oy, x, y);
-					while (TRUE)
-					{
-						oox = line[0];
-						ooy = line[1];
-						if (line_step(line) < 0) break;
-						mem_smudge(oox, ooy, line[0], line[1]);
-					}
-				}
-				else mem_smudge(tool_ox, tool_oy, x, y);
-			}
-		}
-		if ( tool_type == TOOL_CLONE && button == 1 )
-		{
-			if ( first_point || (!first_point && (tool_ox!=x || tool_oy!=y)) )
-			{
-				mem_clone( x+clone_x, y+clone_y, x, y );
+				spot_undo(UNDO_DRAW);
+				flood_fill(x, y, j);
+				update_all_views();
 			}
 		}
 	}
-
-	if ( tool_type == TOOL_LINE )
+	else if (tool_type == TOOL_LINE)
 	{
 		if ( button == 1 )
 		{
@@ -2471,6 +2150,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			// Draw circle at x, y
 			if ( line_status == LINE_LINE )
 			{
+				mem_undo_next(UNDO_TOOL);
 				if ( tool_size > 1 )
 				{
 					int oldmode = mem_undo_opacity;
@@ -2483,10 +2163,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				}
 				else sline( line_x1, line_y1, line_x2, line_y2 );
 
-				mtMIN( minx, line_x1, line_x2 )
-				mtMIN( miny, line_y1, line_y2 )
-				minx = minx - tool_size/2;
-				miny = miny - tool_size/2;
+				minx = (line_x1 < line_x2 ? line_x1 : line_x2) - ts2;
+				miny = (line_y1 < line_y2 ? line_y1 : line_y2) - ts2;
 				xw = abs( line_x2 - line_x1 ) + 1 + tool_size;
 				yh = abs( line_y2 - line_y1 ) + 1 + tool_size;
 
@@ -2498,8 +2176,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		else stop_line();	// Right button pressed so stop line process
 	}
-
-	if ( tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON )
+	else if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 	{
 		if ( marq_status == MARQUEE_PASTE )		// User wants to drag the paste box
 		{
@@ -2565,37 +2242,199 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				paint_marquee(1, marq_x1-mem_width, marq_y1-mem_height);
 			}
 		}
-	}
 
-	if ( tool_type == TOOL_POLYGON )
-	{
-		if ( poly_status == POLY_NONE && marq_status == MARQUEE_NONE )
+		if ( tool_type == TOOL_POLYGON )
 		{
-			if (button)		// Start doing something
+			if ( poly_status == POLY_NONE && marq_status == MARQUEE_NONE )
 			{
-				if ( button == 1 )
-					poly_status = POLY_SELECTING;
-				else
-					poly_status = POLY_DRAGGING;
+				// Start doing something
+				if (button == 1) poly_status = POLY_SELECTING;
+				else if (button) poly_status = POLY_DRAGGING;
+			}
+			if ( poly_status == POLY_SELECTING )
+			{
+				/* Add another point to polygon */
+				if (button == 1) poly_add_po(x, y);
+				/* Stop adding points */
+				else if (button == 3) poly_conclude();
+			}
+			if ( poly_status == POLY_DRAGGING )
+			{
+				/* Stop forming polygon */
+				if (event == GDK_BUTTON_RELEASE) poly_conclude();
+				/* Add another point to polygon */
+				else poly_add_po(x, y);		
 			}
 		}
-		if ( poly_status == POLY_SELECTING )
+	}
+	else /* Some other kind of tool */
+	{
+		/* If proper button for tool */
+		if ((button == 1) || ((button == 3) && (tool_type <= TOOL_SPRAY)))
 		{
-			if ( button == 1 )
-				poly_add_po(x, y);	// Add another point to polygon
-			else if ( button == 3 )
-				poly_conclude();	// Stop adding points
-		}
-		if ( poly_status == POLY_DRAGGING )
-		{
-			if (event == GDK_BUTTON_RELEASE)
-				poly_conclude();	// Stop forming polygon
-			else poly_add_po(x, y);		// Add another point to polygon
+			mem_undo_next(UNDO_TOOL);	// Do memory stuff for undo
+			res = 0; 
 		}
 	}
 
-	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON) &&
-		(tool_type != TOOL_FLOOD) && (paint_action || (button == 1)))
+	/* Handle continuous mode */
+	while (!res && mem_continuous && !first_point)
+	{
+		minx = tool_ox < x ? tool_ox : x;
+		xw = (tool_ox > x ? tool_ox : x) - minx + tool_size;
+		minx -= ts2;
+
+		miny = tool_oy < y ? tool_oy : y;
+		yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
+		miny -= ts2;
+
+		res = 1;
+
+		if (ts2 ? tool_type == TOOL_SQUARE : tool_type < TOOL_SPRAY)
+		{
+			rec_continuous(x, y, tool_size, tool_size);
+			break;
+		}
+		if (tool_type == TOOL_CIRCLE)
+		{
+			/* Redraw stroke gradient in proper direction */
+			if (mem_gradient &&
+				(gradient[mem_channel].status == GRAD_NONE))
+				f_circle(tool_ox, tool_oy, tool_size);
+			tline(tool_ox, tool_oy, x, y, tool_size);
+			f_circle(x, y, tool_size);
+			break;
+		}
+		if (tool_type == TOOL_HORIZONTAL)
+		{
+			miny += ts2; yh -= tool_size - 1;
+			rec_continuous(x, y, tool_size, 1);
+			break;
+		}
+		if (tool_type == TOOL_VERTICAL)
+		{
+			minx += ts2; xw -= tool_size - 1;
+			rec_continuous(x, y, 1, tool_size);
+			break;
+		}
+		if (tool_type == TOOL_SLASH)
+		{
+			g_para(x + tr2, y - ts2, x - ts2, y + tr2,
+				tool_ox - x, tool_oy - y);
+			break;
+		}
+		if (tool_type == TOOL_BACKSLASH)
+		{
+			g_para(x - ts2, y - ts2, x + tr2, y + tr2,
+				tool_ox - x, tool_oy - y);
+			break;
+		}
+		if (tool_type == TOOL_SMUDGE)
+		{
+			linedata line;
+
+			if (button != 1) break; /* Do nothing on right button */
+			line_init(line, tool_ox, tool_oy, x, y);
+			while (TRUE)
+			{
+				oox = line[0];
+				ooy = line[1];
+				if (line_step(line) < 0) break;
+				mem_smudge(oox, ooy, line[0], line[1]);
+			}
+			break;
+		}
+		xw = yh = -1; /* Nothing was done */
+		res = 0; /* Non-continuous tool */
+		break;
+	}
+
+	/* Handle non-continuous mode & tools */
+	if (!res)
+	{
+		minx = x - ts2;
+		miny = y - ts2;
+		xw = tool_size;
+		yh = tool_size;
+
+		switch (tool_type)
+		{
+		case TOOL_SQUARE:
+			f_rectangle(minx, miny, xw, yh);
+			break;
+		case TOOL_CIRCLE:
+			f_circle(x, y, tool_size);
+			break;
+		case TOOL_HORIZONTAL:
+			miny = y; yh = 1;
+			sline(x - ts2, y, x + tr2, y);
+			break;
+		case TOOL_VERTICAL:
+			minx = x; xw = 1;
+			sline(x, y - ts2, x, y + tr2);
+			break;
+		case TOOL_SLASH:
+			sline(x + tr2, y - ts2, x - ts2, y + tr2);
+			break;
+		case TOOL_BACKSLASH:
+			sline(x - ts2, y - ts2, x + tr2, y + tr2);
+			break;
+		case TOOL_SPRAY:
+			for (j = 0; j < tool_flow; j++)
+			{
+				rx = x - ts2 + rand() % tool_size;
+				ry = y - ts2 + rand() % tool_size;
+				IF_IN_RANGE(rx, ry) put_pixel(rx, ry);
+			}
+			break;
+		case TOOL_SHUFFLE:
+			for (j = 0; j < tool_flow; j++)
+			{
+				rx = x - ts2 + rand() % tool_size;
+				ry = y - ts2 + rand() % tool_size;
+				sx = x - ts2 + rand() % tool_size;
+				sy = y - ts2 + rand() % tool_size;
+				IF_IN_RANGE(rx, ry) IF_IN_RANGE(sx, sy)
+				{
+			/* !!! Or do something for partial mask too? !!! */
+					if (pixel_protected(rx, ry) ||
+						pixel_protected(sx, sy))
+						continue;
+					off1 = rx + ry * mem_width;
+					off2 = sx + sy * mem_width;
+					if ((mem_channel == CHN_IMAGE) &&
+						RGBA_mode && mem_img[CHN_ALPHA])
+					{
+						px = mem_img[CHN_ALPHA][off1];
+						py = mem_img[CHN_ALPHA][off2];
+						mem_img[CHN_ALPHA][off1] = py;
+						mem_img[CHN_ALPHA][off2] = px;
+					}
+					k = MEM_BPP;
+					off1 *= k; off2 *= k;
+					for (i = 0; i < k; i++)
+					{
+						px = mem_img[mem_channel][off1];
+						py = mem_img[mem_channel][off2];
+						mem_img[mem_channel][off1++] = py;
+						mem_img[mem_channel][off2++] = px;
+					}
+				}
+			}
+			break;
+		case TOOL_SMUDGE:
+			if (!first_point) mem_smudge(tool_ox, tool_oy, x, y);
+			break;
+		case TOOL_CLONE:
+			if (first_point || (tool_ox != x) || (tool_oy != y))
+				mem_clone(x + clone_x, y + clone_y, x, y);
+			break;
+		default: xw = yh = -1; /* Nothing was done */
+			break;
+		}
+	}
+
+	if ((xw >= 0) && (yh >= 0)) /* Some drawing action */
 	{
 		if (xw + minx > mem_width) xw = mem_width - minx;
 		if (yh + miny > mem_height) yh = mem_height - miny;

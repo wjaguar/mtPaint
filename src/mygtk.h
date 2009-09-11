@@ -42,6 +42,7 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 GtkWidget *mt_spinslide_new(gint swidth, gint sheight);
 void mt_spinslide_set_range(GtkWidget *spinslide, gint minv, gint maxv);
 gint mt_spinslide_get_value(GtkWidget *spinslide);
+gint mt_spinslide_read_value(GtkWidget *spinslide);
 void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,

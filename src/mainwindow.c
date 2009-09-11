@@ -41,6 +41,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "csel.h"
+#include "shifter.h"
 
 
 #include "graphics/icon.xpm"
@@ -1325,7 +1326,8 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	if (tool_type != TOOL_GRADIENT)
 	{
 		/* Not a gradient stroke */
-		if (!mem_gradient || (grad->wmode == GRAD_MODE_NONE) ||
+		if (!mem_gradient || (grad->status != GRAD_NONE) ||
+			(grad->wmode == GRAD_MODE_NONE) ||
 			(event == GDK_BUTTON_RELEASE) || !button)
 			return (FALSE);
 		/* Standing still */
@@ -2915,9 +2917,9 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 	case TTB_SELFH:
 		pressed_flip_sel_h( NULL, NULL ); break;
 	case TTB_SELRCW:
-		pressed_rotate_sel_clock( NULL, NULL ); break;
+		pressed_rotate_sel(NULL, NULL, 0); break;
 	case TTB_SELRCCW:
-		pressed_rotate_sel_anti( NULL, NULL ); break;
+		pressed_rotate_sel(NULL, NULL, 1); break;
 	}
 
 	if ( tool_type != i )		// User has changed tool
@@ -3183,8 +3185,8 @@ void main_init()
 		{ _("/Image/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Image/Flip Vertically"),		NULL,	pressed_flip_image_v,0, NULL },
 		{ _("/Image/Flip Horizontally"), 	"<control>M", pressed_flip_image_h,0, NULL },
-		{ _("/Image/Rotate Clockwise"),  	NULL,	pressed_rotate_image_clock,0, NULL },
-		{ _("/Image/Rotate Anti-Clockwise"),	NULL,	pressed_rotate_image_anti,0, NULL },
+		{ _("/Image/Rotate Clockwise"),  	NULL,	pressed_rotate_image, 0, NULL },
+		{ _("/Image/Rotate Anti-Clockwise"),	NULL,	pressed_rotate_image, 1, NULL },
 		{ _("/Image/Free Rotate ..."),		NULL,	pressed_rotate_free,0, NULL },
 		{ _("/Image/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Image/Information ..."),		"<control>I", pressed_information,0, NULL },
@@ -3204,13 +3206,13 @@ void main_init()
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Selection/Flip Vertically"),	NULL,	pressed_flip_sel_v,0, NULL },
 		{ _("/Selection/Flip Horizontally"),	NULL,	pressed_flip_sel_h,0, NULL },
-		{ _("/Selection/Rotate Clockwise"),	NULL,	pressed_rotate_sel_clock, 0, NULL },
-		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel_anti, 0, NULL },
+		{ _("/Selection/Rotate Clockwise"),	NULL,	pressed_rotate_sel, 0, NULL },
+		{ _("/Selection/Rotate Anti-Clockwise"), NULL,	pressed_rotate_sel, 1, NULL },
 		{ _("/Selection/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Selection/Alpha Blend A,B"),	NULL,	pressed_clip_alpha_scale,0, NULL },
 		{ _("/Selection/Move Alpha to Mask"),	NULL,	pressed_clip_alphamask,0, NULL },
-		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask,0, NULL },
-		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_unmask,0, NULL },
+		{ _("/Selection/Mask Colour A,B"),	NULL,	pressed_clip_mask, 0, NULL },
+		{ _("/Selection/Unmask Colour A,B"),	NULL,	pressed_clip_mask, 255, NULL },
 		{ _("/Selection/Mask All Colours"),	NULL,	pressed_clip_mask_all,0, NULL },
 		{ _("/Selection/Clear Mask"),		NULL,	pressed_clip_mask_clear,0, NULL },
 
@@ -3230,11 +3232,12 @@ void main_init()
 		{ _("/Palette/Merge Duplicate Colours"), NULL,	pressed_remove_duplicates,0, NULL },
 		{ _("/Palette/Remove Unused Colours"),	NULL,	pressed_remove_unused,0, NULL },
 		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
-		{ _("/Palette/Create Quantized (DL1)"), NULL,	pressed_create_dl1,0, NULL },
-		{ _("/Palette/Create Quantized (DL3)"), NULL,	pressed_create_dl3,0, NULL },
-		{ _("/Palette/Create Quantized (Wu)"),  NULL,	pressed_create_wu,0, NULL },
+		{ _("/Palette/Create Quantized (DL1)"), NULL,	create_pal_quantized, 1, NULL },
+		{ _("/Palette/Create Quantized (DL3)"), NULL,	create_pal_quantized, 3, NULL },
+		{ _("/Palette/Create Quantized (Wu)"),  NULL,	create_pal_quantized, 5, NULL },
 		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Palette/Sort Colours ..."),	NULL,	pressed_sort_pal,0, NULL },
+		{ _("/Palette/Palette Shifter ..."),	NULL,	pressed_shifter,0, NULL },
 
 		{ _("/Effe_cts"),		NULL,	 	NULL, 0, "<Branch>" },
 		{ _("/Effects/tear"),		NULL,	 	NULL, 0, "<Tearoff>" },

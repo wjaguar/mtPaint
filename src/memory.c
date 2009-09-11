@@ -2148,28 +2148,6 @@ void mem_invert()			// Invert the palette
 	}
 }
 
-void mem_boundary( int *x, int *y, int *w, int *h )		// Check/amend boundaries
-{
-	if ( *x < 0 )
-	{
-		*w = *w + *x;
-		*x = 0;
-	}
-	if ( *y < 0 )
-	{
-		*h = *h + *y;
-		*y = 0;
-	}
-	if ( (*x + *w) > mem_width )
-	{
-		*w = mem_width - *x;
-	}
-	if ( (*y + *h) > mem_height )
-	{
-		*h = mem_height - *y;
-	}
-}
-
 void line_init(linedata line, int x0, int y0, int x1, int y1)
 {
 	line[0] = x0;
@@ -2211,6 +2189,33 @@ int line_step(linedata line)
 	return (--line[2]);
 }
 
+void line_nudge(linedata line, int x, int y)
+{
+	while ((line[0] != x) && (line[1] != y) && (line[2] >= 0))
+		line_step(line);
+}
+
+/* Produce a horizontal segment from two connected lines */
+static void twoline_segment(int *xx, linedata line1, linedata line2)
+{
+	xx[0] = xx[1] = line1[0];
+	while (TRUE)
+	{
+		if (!line1[7]) /* Segments longer than 1 pixel */
+		{
+			while ((line1[2] > 0) && (line1[3] > line1[4]))
+				line_step(line1);
+		}
+		if (xx[0] > line1[0]) xx[0] = line1[0];
+		if (xx[1] < line1[0]) xx[1] = line1[0];
+		if ((line1[2] > 0) || (line2[2] < 0)) break;
+		memcpy(line1, line2, sizeof(linedata));
+		line2[2] = -1;
+		if (xx[0] > line1[0]) xx[0] = line1[0];
+		if (xx[1] < line1[0]) xx[1] = line1[0];
+	}
+}
+
 void sline( int x1, int y1, int x2, int y2 )		// Draw single thickness straight line
 {
 	linedata line;
@@ -2232,216 +2237,74 @@ void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness s
 	float xuv, yuv, llen;		// x/y unit vectors, line length
 	float xv1, yv1;			// vector for shadow x/y
 
-	xdo = x2 - x1;
-	ydo = y2 - y1;
-	mtMAX( todo, abs(xdo), abs(ydo) )
-	if (todo<2) return;		// The 1st and last points are done by calling procedure
+	xdo = abs(x2 - x1);
+	ydo = abs(y2 - y1);
+	todo = xdo > ydo ? xdo : ydo;
+	if (todo < 2) return;	// The 1st and last points are done by calling procedure
 
-	if ((size < 2) || ((x1 == x2) && (y1 == y2))) sline(x1, y1, x2, y2);
+	if (size < 2) sline(x1, y1, x2, y2);
+	/* Thick long line so use less accurate g_para */
+	if ((size > 20) && (todo > 20))
+	{
+		xv = x2 - x1;
+		yv = y2 - y1;
+		llen = sqrt( xv * xv + yv * yv );
+		xuv = ((float) xv) / llen;
+		yuv = ((float) yv) / llen;
+
+		xv1 = -yuv * ((float) size - 0.5);
+		yv1 = xuv * ((float) size - 0.5);
+
+		xv2 = mt_round(xv1 / 2 + 0.5*((size+1) %2) );
+		yv2 = mt_round(yv1 / 2 + 0.5*((size+1) %2) );
+
+		xv1 = -yuv * ((float) size - 0.5);
+		yv1 = xuv * ((float) size - 0.5);
+
+		g_para( x1 - xv2, y1 - yv2, x2 - xv2, y2 - yv2,
+			mt_round(xv1), mt_round(yv1) );
+	}
+	/* Short or thin line so use more accurate but slower iterative method */
 	else
 	{
-		/* Thick long line so use less accurate g_para */
-		if ((size > 20) && (todo > 20))
+		line_init(line, x1, y1, x2, y2);
+		for (line_step(line); line[2] > 0; line_step(line))
 		{
-			xv = x2 - x1;
-			yv = y2 - y1;
-			llen = sqrt( xv * xv + yv * yv );
-			xuv = ((float) xv) / llen;
-			yuv = ((float) yv) / llen;
-
-			xv1 = -yuv * ((float) size - 0.5);
-			yv1 = xuv * ((float) size - 0.5);
-
-			xv2 = mt_round(xv1 / 2 + 0.5*((size+1) %2) );
-			yv2 = mt_round(yv1 / 2 + 0.5*((size+1) %2) );
-
-			xv1 = -yuv * ((float) size - 0.5);
-			yv1 = xuv * ((float) size - 0.5);
-
-			g_para( x1 - xv2, y1 - yv2, x2 - xv2, y2 - yv2,
-				mt_round(xv1), mt_round(yv1) );
-		}
-		/* Short or thin line so use more accurate but slower iterative method */
-		else
-		{
-			line_init(line, x1, y1, x2, y2);
-			for (line_step(line); line[2] > 0; line_step(line))
-			{
-				f_circle(line[0], line[1], size);
-			}
+			f_circle(line[0], line[1], size);
 		}
 	}
 }
 
-void g_para( int x1, int y1, int x2, int y2, int xv, int yv )		// Draw general parallelogram
-{							// warning!  y1 != y2
-	int nx1, ny1, nx2, ny2, i, j;
-	int co[4][2];			// Four points of parallelogram in correct order
-	float rat;
-	int mx, mx1, mx2, mxlen;
-
-//printf("xv,yv %i,%i\n", xv, yv);
-
-	if ( xv == 0 )		// X vector is zero so its just a v_para
-	{
-		if ( yv < 0 )
-		{
-			ny1 = y1 + yv;
-			ny2 = y2 + yv;
-		}
-		else
-		{
-			ny1 = y1;
-			ny2 = y2;
-		}
-		v_para( x1, ny1, x2, ny2, abs(yv) + 1 );
-		return;
-	}
-	if ( yv == 0 )		// Y vector is zero so its just a h_para
-	{
-		if ( xv < 0 )
-		{
-			nx1 = x1 + xv;
-			nx2 = x2 + xv;
-		}
-		else
-		{
-			nx1 = x1;
-			nx2 = x2;
-		}
-		h_para( nx1, y1, nx2, y2, abs(xv) + 1 );
-		return;
-	}
-
-	if ( yv < 0 )			// yv must be positive
-	{
-		yv = -yv;
-		xv = -xv;
-		x1 = x1 - xv;
-		y1 = y1 - yv;
-		x2 = x2 - xv;
-		y2 = y2 - yv;
-	}
-
-	if ( y1 < y2 )			// co[0] must contain the lowest 'y' coord
-	{
-		co[0][0] = x1;
-		co[0][1] = y1;
-		co[1][0] = x2;
-		co[1][1] = y2;
-	}
-	else
-	{
-		co[0][0] = x2;
-		co[0][1] = y2;
-		co[1][0] = x1;
-		co[1][1] = y1;
-	}
-
-	co[2][0] = co[0][0] + xv;
-	co[2][1] = co[0][1] + yv;
-	co[3][0] = co[1][0] + xv;
-	co[3][1] = co[1][1] + yv;
-
-	for ( j=co[0][1]; j<=co[3][1]; j++ )		// All y coords of parallelogram
-	{
-		if ( j>=0 && j<mem_height )		// Only paint on canvas
-		{
-			if ( j<co[1][1] )		// First X is between point 0 and 1
-			{
-				rat = ((float) j - co[0][1]) / ( co[1][1] - co[0][1] );
-				mx1 = mt_round( co[0][0] + rat * ( co[1][0] - co[0][0] ) );
-			}
-			else				// First X is between point 1 and 3
-			{
-				rat = ((float) j - co[1][1]) / ( co[3][1] - co[1][1] );
-				mx1 = mt_round( co[1][0] + rat * ( co[3][0] - co[1][0] ) );
-			}
-			if ( j<co[2][1] )		// Second X is between point 1 and 2
-			{
-				rat = ((float) j - co[0][1]) / ( co[2][1] - co[0][1] );
-				mx2 = mt_round( co[0][0] + rat * ( co[2][0] - co[0][0] ) );
-			}
-			else				// First X is between point 2 and 4
-			{
-				rat = ((float) j - co[2][1]) / ( co[3][1] - co[2][1] );
-				mx2 = mt_round( co[2][0] + rat * ( co[3][0] - co[2][0] ) );
-			}
-
-			mtMIN( mx, mx1, mx2 )
-			mxlen = abs( mx2 - mx1 ) + 1;
-			if ( mx < 0 )
-			{
-				mxlen = mxlen + mx;
-				mx = 0;
-			}
-			if ( (mx + mxlen) > mem_width ) mxlen = mem_width - mx;
-
-			for ( i=0; i<mxlen; i++ ) put_pixel( mx + i, j );
-		}
-	}
-}
-
-void v_para( int x1, int y1, int x2, int y2, int vlen )		// Draw vertical sided parallelogram
+/* Draw whatever is bounded by two pairs of lines */
+void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4)
 {
-	int i, j, xdo, ydo, px, py, todo, flen;
-	float rat;
-
-	xdo = x2 - x1;
-	ydo = y2 - y1;
-	mtMAX( todo, abs(xdo), abs(ydo) )
-
-	for ( i=0; i<=todo; i++ )
+	int i, x1, x2, y1, xx[4];
+	for (; line1[2] >= 0; line_step(line1) , line_step(line3))
 	{
-		rat = ((float) i ) / todo;
-		px = mt_round( x1 + (x2 - x1) * rat );
-		py = mt_round( y1 + (y2 - y1) * rat );
-		flen = vlen;
-		if ( py < 0 )
-		{
-			flen = flen + py;
-			py = 0;
-		}
-		if ( (py + flen) > mem_height )
-		{
-			flen = mem_height - py;
-		}
-		if ( px<mem_width && px>=0 )
-		{
-			for ( j=0; j<flen; j++ ) put_pixel( px, py+j );
-		}
+		y1 = line1[1];
+		twoline_segment(xx + 0, line1, line2);
+		twoline_segment(xx + 2, line3, line4);
+		if ((y1 < 0) || (y1 >= mem_height)) continue;
+		if (xx[0] > xx[2]) xx[0] = xx[2];
+		if (xx[1] < xx[3]) xx[1] = xx[3];
+		x1 = xx[0] < 0 ? 0 : xx[0];
+		x2 = xx[1] >= mem_width ? mem_width - 1 : xx[1];
+		for (i = x1; i <= x2; i++) put_pixel(i, y1);
 	}
 }
 
-void h_para( int x1, int y1, int x2, int y2, int hlen )		// Draw horizontal top/bot parallelogram
+/* Draw general parallelogram */
+void g_para( int x1, int y1, int x2, int y2, int xv, int yv )
 {
-	int i, j, xdo, ydo, px, py, todo, flen;
-	float rat;
+	linedata line1, line2, line3, line4;
+	int i, j, x[2] = {x1, x2}, y[2] = {y1, y2};
 
-	xdo = x2 - x1;
-	ydo = y2 - y1;
-	mtMAX( todo, abs(xdo), abs(ydo) )
-
-	for ( i=0; i<=todo; i++ )
-	{
-		rat = ((float) i ) / todo;
-		px = mt_round( x1 + (x2 - x1) * rat );
-		py = mt_round( y1 + (y2 - y1) * rat );
-		flen = hlen;
-		if ( px < 0 )
-		{
-			flen = flen + px;
-			px = 0;
-		}
-		if ( (px + flen) > mem_width )
-		{
-			flen = mem_width - px;
-		}
-		if ( py<mem_height && py>=0 )
-		{
-			for ( j=0; j<flen; j++ ) put_pixel( px+j, py );
-		}
-	}
+	j = (y1 < y2) ^ (yv < 0); i = j ^ 1;
+	line_init(line1, x[i], y[i], x[i] + xv, y[i] + yv);
+	line_init(line2, x[i] + xv, y[i] + yv, x[j] + xv, y[j] + yv);
+	line_init(line3, x[i], y[i], x[j], y[j]);
+	line_init(line4, x[j], y[j], x[j] + xv, y[j] + yv);
+	draw_quad(line1, line2, line3, line4);
 }
 
 /*
@@ -5742,7 +5605,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 void grad_update(grad_info *grad)
 {
 	double len, len1, l2;
-	
+
 	/* Distance for gradient mode */
 	grad->wmode = grad->gmode;
 	len = grad->len;
