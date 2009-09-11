@@ -59,13 +59,14 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 7
+#define PREF_LANGS 8
 
 char	*pref_lang_ini[PREF_LANGS * 2] = {
 		"system", NULL,
 		"cs_CZ", NULL,
 		"en_GB", NULL,
 		"fr_FR", NULL,
+		"de_DE", NULL,
 		"pt_PT", NULL,
 		"pt_BR", NULL,
 		"es_ES", NULL
@@ -713,9 +714,10 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	pref_lang_ini[3] = _("Czech");
 	pref_lang_ini[5] = _("English (UK)");
 	pref_lang_ini[7] = _("French");
-	pref_lang_ini[9] = _("Portuguese");
-	pref_lang_ini[11] = _("Portuguese (Brazilian)");
-	pref_lang_ini[13] = _("Spanish");
+	pref_lang_ini[9] = _("German");
+	pref_lang_ini[11] = _("Portuguese");
+	pref_lang_ini[13] = _("Portuguese (Brazilian)");
+	pref_lang_ini[15] = _("Spanish");
 
 	vbox_2 = gtk_vbox_new (FALSE, 0);
 	gtk_widget_show (vbox_2);

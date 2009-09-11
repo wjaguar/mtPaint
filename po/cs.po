@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: cs\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-02-25 10:28+0000\n"
+"POT-Creation-Date: 2006-05-29 16:06+0100\n"
 "PO-Revision-Date: 2006-02-21 10:48+0100\n"
 "Last-Translator: Pavel Ruzicka <pavouk@pavouk.org>\n"
 "Language-Team: \n"
@@ -66,7 +66,7 @@ msgstr "Nelze vytvoøit výstupní adresáø"
 #: src/otherwindow.c:910 src/otherwindow.c:991 src/otherwindow.c:1223
 #: src/otherwindow.c:1572 src/otherwindow.c:1738 src/otherwindow.c:1746
 #: src/otherwindow.c:1748 src/otherwindow.c:1873 src/otherwindow.c:2108
-#: src/otherwindow.c:2283 src/otherwindow.c:2365 src/prefs.c:773
+#: src/otherwindow.c:2283 src/otherwindow.c:2365 src/prefs.c:775
 #: src/viewer.c:1325
 msgid "OK"
 msgstr "OK"
@@ -230,7 +230,7 @@ msgstr "Toto je animovaný GIF.  Co s ním chcete udìlat?"
 #: src/canvas.c:1008 src/otherwindow.c:263 src/otherwindow.c:650
 #: src/otherwindow.c:904 src/otherwindow.c:1078 src/otherwindow.c:1214
 #: src/otherwindow.c:1549 src/otherwindow.c:1866 src/otherwindow.c:2124
-#: src/otherwindow.c:2361 src/prefs.c:766 src/viewer.c:1530
+#: src/otherwindow.c:2361 src/prefs.c:768 src/viewer.c:1530
 msgid "Cancel"
 msgstr "Storno"
 
@@ -349,7 +349,7 @@ msgstr "X ="
 msgid "Y ="
 msgstr "Y ="
 
-#: src/help.c:23 src/prefs.c:474
+#: src/help.c:23 src/prefs.c:475
 msgid "General"
 msgstr "Obecné"
 
@@ -404,7 +404,7 @@ msgstr "Podìkování"
 #: src/help.c:40
 msgid ""
 "\n"
-"mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler\n"
+"mtPaint 2.31 - Copyright (C) 2004-2006 Mark Tyler\n"
 "\n"
 "mtPaint is free software; you can redistribute it and/or modify it under the "
 "terms of the GNU General Public License as published by the Free Software "
@@ -432,7 +432,7 @@ msgid ""
 "\n"
 msgstr ""
 "\n"
-"mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler\n"
+"mtPaint 2.31 - Copyright (C) 2004-2006 Mark Tyler\n"
 "\n"
 "mtPaint je svobodný software; mù¾ete ho ¹íøit a/nebo modifikovat v souladu s "
 "GNU General Public Licencí jak byla publikována Free Software Foundation; "
@@ -1877,6 +1877,7 @@ msgid ""
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
 "French - Nicolas Velin, Pascal Billard\n"
+"German - Oliver Frommel\n"
 "Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia)\n"
 "\n"
@@ -1920,6 +1921,7 @@ msgstr ""
 "Brazilská Portugal¹tina - Paulo Trevizan\n"
 "Èe¹tina - Pavel Ruzicka\n"
 "Francou¾¹tina - Nicolas Velin, Pascal Billard\n"
+"German - Oliver Frommel\n"
 "Portugal¹tina - Israel G. Lugo\n"
 "©panìl¹tina - Guadalinex Team (Junta de Andalucia)\n"
 "\n"
@@ -2069,7 +2071,7 @@ msgstr "Název vrstvy"
 msgid "Position"
 msgstr "Pozice"
 
-#: src/layer.c:1445 src/prefs.c:449
+#: src/layer.c:1445 src/prefs.c:450
 msgid "Opacity"
 msgstr "Neprùsvitnost"
 
@@ -3146,11 +3148,11 @@ msgstr "/Soubor/%i"
 msgid "/Opacity/%i0%%"
 msgstr "/Neprùsvitnost/%i0%%"
 
-#: src/mainwindow.c:2985 src/prefs.c:449
+#: src/mainwindow.c:2985 src/prefs.c:450
 msgid "Size"
 msgstr "Velikost"
 
-#: src/mainwindow.c:2986 src/prefs.c:449
+#: src/mainwindow.c:2986 src/prefs.c:450
 msgid "Flow"
 msgstr "Bohatost"
 
@@ -3302,7 +3304,7 @@ msgid "Smooth"
 msgstr "Vyhladit"
 
 #: src/otherwindow.c:1084 src/otherwindow.c:1219 src/otherwindow.c:1567
-#: src/prefs.c:770
+#: src/prefs.c:772
 msgid "Apply"
 msgstr "Provést"
 
@@ -3496,283 +3498,287 @@ msgstr "Pøevod na indexovaný"
 msgid "Indexed Colours To Use"
 msgstr "Poèet indexovaných barev"
 
-#: src/png.c:123
+#: src/png.c:124
 msgid "Loading PNG image"
 msgstr "Naèítám PNG obrázek"
 
-#: src/png.c:128
+#: src/png.c:129
 msgid "Loading clipboard image"
 msgstr "Naèítám obrázek ze schránky"
 
-#: src/png.c:315
+#: src/png.c:316
 msgid "Saving PNG image"
 msgstr "Ukládám PNG obrázek"
 
-#: src/png.c:322
+#: src/png.c:323
 msgid "Saving Clipboard image"
 msgstr "Ukládám obrázek ze schránky"
 
-#: src/png.c:329
+#: src/png.c:330
 msgid "Saving Layer image"
 msgstr "Ulo¾ení obrázku vrstvy"
 
-#: src/png.c:464
+#: src/png.c:465
 msgid "Loading GIF image"
 msgstr "Naèítám GIF obrázek"
 
-#: src/png.c:581
+#: src/png.c:582
 msgid "Saving GIF image"
 msgstr "Ukládám GIF obrázek"
 
-#: src/png.c:693
+#: src/png.c:694
 msgid "Loading JPEG image"
 msgstr "Naèítám JPEG obrázek"
 
-#: src/png.c:754
+#: src/png.c:755
 msgid "Saving JPEG image"
 msgstr "Ukládám JPEG obrázek"
 
-#: src/png.c:814
+#: src/png.c:815
 msgid "Loading TIFF image"
 msgstr "Naèítám TIFF obrázek"
 
-#: src/png.c:864
+#: src/png.c:865
 msgid "Saving TIFF image"
 msgstr "Ukládám TIFF obrázek"
 
-#: src/png.c:922 src/png.c:951
+#: src/png.c:923 src/png.c:952
 msgid "Loading BMP image"
 msgstr "Naèítám BMP obrázek"
 
-#: src/png.c:1053
+#: src/png.c:1054
 msgid "Saving BMP image"
 msgstr "Ukládám BMP obrázek"
 
-#: src/png.c:1261
+#: src/png.c:1262
 msgid "Loading XPM image"
 msgstr "Naèítám XPM obrázek"
 
-#: src/png.c:1324
+#: src/png.c:1325
 msgid "Saving XPM image"
 msgstr "Ukládám XPM obrázek"
 
-#: src/png.c:1474
+#: src/png.c:1475
 msgid "Loading XBM image"
 msgstr "Naèítám XBM obrázek"
 
-#: src/png.c:1526
+#: src/png.c:1527
 msgid "Saving XBM image"
 msgstr "Ukládám XBM obrázek"
 
-#: src/png.c:1635
+#: src/png.c:1637
 msgid "Saving UNDO images"
 msgstr "Ukládám obrázky historie"
 
-#: src/prefs.c:158
+#: src/prefs.c:159
 msgid "Pressure"
 msgstr "Tlak"
 
-#: src/prefs.c:166
+#: src/prefs.c:167
 msgid "Current Device"
 msgstr "Aktuální zaøízení"
 
-#: src/prefs.c:441
+#: src/prefs.c:442
 msgid "Max memory used for undo (MB)"
 msgstr "Max pamìti pro historii (MB)"
 
-#: src/prefs.c:441
+#: src/prefs.c:442
 msgid "Greyscale backdrop"
 msgstr "Odstín ¹edivého pozadí"
 
-#: src/prefs.c:442
+#: src/prefs.c:443
 msgid "Selection nudge pixels"
 msgstr "Posun pixelù výbìru"
 
-#: src/prefs.c:442
+#: src/prefs.c:443
 msgid "Max Pan Window Size"
 msgstr "Velikost pøehledového okna"
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XPM/PNG transparency index"
 msgstr "XPM/PNG index prùhlednosti"
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XBM X hotspot"
 msgstr "XBM X aktivní bod"
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XBM Y hotspot"
 msgstr "XBM Y aktivní bod"
 
-#: src/prefs.c:444
+#: src/prefs.c:445
 msgid "JPEG Save Quality (100=High)   "
 msgstr "JPEG Kvalita ukládání (100=Nejlep¹í)   "
 
-#: src/prefs.c:444
+#: src/prefs.c:445
 msgid "Recently Used Files"
 msgstr "Naposledy pou¾ité soubory"
 
-#: src/prefs.c:445
+#: src/prefs.c:446
 msgid "Minimum grid zoom"
 msgstr "Rastr pøi zoomu alespoò"
 
-#: src/prefs.c:445
+#: src/prefs.c:446
 msgid "Grid colour RGB"
 msgstr "RGB barva rastru"
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Colour A & B"
 msgstr "Barvy A a B"
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Canvas Geometry"
 msgstr "Geometrie plátna"
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Cursor X,Y"
 msgstr "Kurzor X,Y"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Pixel [I] {RGB}"
 msgstr "Pixel [I] {RGB}"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Zoom %"
 msgstr "Zoom %"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Selection Geometry"
 msgstr "Geometrie Výbìru"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Continuous Mode"
 msgstr "Spojitý re¾im"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Undo / Redo"
 msgstr "Zpìt / Vpøed"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Opacity %"
 msgstr "Neprùsvitnost %"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Opacity Mode"
 msgstr "Re¾im neprùsvitnosti"
 
-#: src/prefs.c:455
+#: src/prefs.c:456
 msgid "Preferences"
 msgstr "Volby"
 
-#: src/prefs.c:491
+#: src/prefs.c:492
 msgid "Display clipboard while pasting"
 msgstr "Zobrazovat schránku pøi vkládání"
 
-#: src/prefs.c:493
+#: src/prefs.c:494
 msgid "Mouse cursor = Tool"
 msgstr "Kurzor my¹i = Nástroj"
 
-#: src/prefs.c:495
+#: src/prefs.c:496
 msgid "Confirm Exit"
 msgstr "Potvrdit konec"
 
-#: src/prefs.c:497
+#: src/prefs.c:498
 msgid "Q key quits mtPaint"
 msgstr "Klávesa Q ukonèí mtPaint"
 
-#: src/prefs.c:499
+#: src/prefs.c:500
 msgid "Changing tool commits paste"
 msgstr "Zmìna nástroje potvrdí vlo¾ení"
 
-#: src/prefs.c:509
+#: src/prefs.c:510
 msgid "Files"
 msgstr "Soubory"
 
-#: src/prefs.c:525
+#: src/prefs.c:526
 msgid "Clipboard Files"
 msgstr "Soubory schránky"
 
-#: src/prefs.c:535
+#: src/prefs.c:536
 msgid "Browse"
 msgstr "Procházet"
 
-#: src/prefs.c:549
+#: src/prefs.c:550
 msgid "Status Bar"
 msgstr "Stavová li¹ta"
 
-#: src/prefs.c:576 src/viewer.c:1612
+#: src/prefs.c:577 src/viewer.c:1612
 msgid "Zoom"
 msgstr "Zoom"
 
-#: src/prefs.c:591
+#: src/prefs.c:592
 msgid "New image sets zoom to 100%"
 msgstr "Nový obrázek nastaví zoom na 100%"
 
-#: src/prefs.c:594
+#: src/prefs.c:595
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "Koleèko na my¹i = Zoom"
 
-#: src/prefs.c:597
+#: src/prefs.c:598
 msgid "Centralize image"
 msgstr "Vystøedit obrázek"
 
-#: src/prefs.c:612
+#: src/prefs.c:613
 msgid "Tablet"
 msgstr "Tablet"
 
-#: src/prefs.c:619
+#: src/prefs.c:620
 msgid "Device Settings"
 msgstr "Nastavení zaøízení"
 
-#: src/prefs.c:635
+#: src/prefs.c:636
 msgid "Configure Device"
 msgstr "Konfigurace zaøízení"
 
-#: src/prefs.c:642
+#: src/prefs.c:643
 msgid "Tool Variable"
 msgstr "Variabilita nástroje"
 
-#: src/prefs.c:644
+#: src/prefs.c:645
 msgid "Factor"
 msgstr "Faktor"
 
-#: src/prefs.c:669
+#: src/prefs.c:670
 msgid "Test Area"
 msgstr "Testovací plocha"
 
-#: src/prefs.c:712
+#: src/prefs.c:713
 msgid "Default System Language"
 msgstr "Výchozí jazyk systému"
 
-#: src/prefs.c:713
+#: src/prefs.c:714
 msgid "Czech"
 msgstr "Èesky"
 
-#: src/prefs.c:714
+#: src/prefs.c:715
 msgid "English (UK)"
 msgstr "Anglicky (UK)"
 
-#: src/prefs.c:715
+#: src/prefs.c:716
 msgid "French"
 msgstr "Francouzsky"
 
-#: src/prefs.c:716
+#: src/prefs.c:717
+msgid "German"
+msgstr ""
+
+#: src/prefs.c:718
 msgid "Portuguese"
 msgstr "Portugalsky"
 
-#: src/prefs.c:717
+#: src/prefs.c:719
 msgid "Portuguese (Brazilian)"
 msgstr "Portugalsky (Brazílie)"
 
-#: src/prefs.c:718
+#: src/prefs.c:720
 msgid "Spanish"
 msgstr "©panìlsky"
 
-#: src/prefs.c:725
+#: src/prefs.c:727
 msgid "Language"
 msgstr "Jazyk"
 
-#: src/prefs.c:731
+#: src/prefs.c:733
 msgid ""
 "Select preferred language translation\n"
 "\n"

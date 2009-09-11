@@ -4,6 +4,10 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see README or 'Help -> About' for details):
 
+2.31	2006-5-31
+
+	* German translation contributed by Oliver Frommel
+
 2.30	2006-3-1
 
 	* Animation of layers is now possible - see 'Animation' in docs for info

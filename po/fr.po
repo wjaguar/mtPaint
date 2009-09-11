@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-02-25 10:28+0000\n"
+"POT-Creation-Date: 2006-05-29 16:06+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: French <fr@li.org>\n"
@@ -62,7 +62,7 @@ msgstr ""
 #: src/otherwindow.c:910 src/otherwindow.c:991 src/otherwindow.c:1223
 #: src/otherwindow.c:1572 src/otherwindow.c:1738 src/otherwindow.c:1746
 #: src/otherwindow.c:1748 src/otherwindow.c:1873 src/otherwindow.c:2108
-#: src/otherwindow.c:2283 src/otherwindow.c:2365 src/prefs.c:773
+#: src/otherwindow.c:2283 src/otherwindow.c:2365 src/prefs.c:775
 #: src/viewer.c:1325
 msgid "OK"
 msgstr "OK"
@@ -227,7 +227,7 @@ msgstr ""
 #: src/canvas.c:1008 src/otherwindow.c:263 src/otherwindow.c:650
 #: src/otherwindow.c:904 src/otherwindow.c:1078 src/otherwindow.c:1214
 #: src/otherwindow.c:1549 src/otherwindow.c:1866 src/otherwindow.c:2124
-#: src/otherwindow.c:2361 src/prefs.c:766 src/viewer.c:1530
+#: src/otherwindow.c:2361 src/prefs.c:768 src/viewer.c:1530
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -346,7 +346,7 @@ msgstr ""
 msgid "Y ="
 msgstr ""
 
-#: src/help.c:23 src/prefs.c:474
+#: src/help.c:23 src/prefs.c:475
 msgid "General"
 msgstr "Général"
 
@@ -401,7 +401,7 @@ msgstr "Crédits"
 #: src/help.c:40
 msgid ""
 "\n"
-"mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler\n"
+"mtPaint 2.31 - Copyright (C) 2004-2006 Mark Tyler\n"
 "\n"
 "mtPaint is free software; you can redistribute it and/or modify it under the "
 "terms of the GNU General Public License as published by the Free Software "
@@ -1190,6 +1190,7 @@ msgid ""
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
 "French - Nicolas Velin, Pascal Billard\n"
+"German - Oliver Frommel\n"
 "Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia)\n"
 "\n"
@@ -1339,7 +1340,7 @@ msgstr "Nom du calque"
 msgid "Position"
 msgstr "Position"
 
-#: src/layer.c:1445 src/prefs.c:449
+#: src/layer.c:1445 src/prefs.c:450
 msgid "Opacity"
 msgstr "Opacité"
 
@@ -2422,11 +2423,11 @@ msgstr "/Fichier/%i"
 msgid "/Opacity/%i0%%"
 msgstr "/Opacité/%i0%%"
 
-#: src/mainwindow.c:2985 src/prefs.c:449
+#: src/mainwindow.c:2985 src/prefs.c:450
 msgid "Size"
 msgstr "Taille"
 
-#: src/mainwindow.c:2986 src/prefs.c:449
+#: src/mainwindow.c:2986 src/prefs.c:450
 msgid "Flow"
 msgstr ""
 
@@ -2578,7 +2579,7 @@ msgid "Smooth"
 msgstr ""
 
 #: src/otherwindow.c:1084 src/otherwindow.c:1219 src/otherwindow.c:1567
-#: src/prefs.c:770
+#: src/prefs.c:772
 msgid "Apply"
 msgstr "Appliquer"
 
@@ -2776,283 +2777,287 @@ msgstr "Converti En Indexé"
 msgid "Indexed Colours To Use"
 msgstr "Couleurs Indexées à Employer"
 
-#: src/png.c:123
+#: src/png.c:124
 msgid "Loading PNG image"
 msgstr "Chargement d'une image PNG"
 
-#: src/png.c:128
+#: src/png.c:129
 msgid "Loading clipboard image"
 msgstr "Chargement de l'image du presse-papiers"
 
-#: src/png.c:315
+#: src/png.c:316
 msgid "Saving PNG image"
 msgstr "Enregistrement d'une image PNG"
 
-#: src/png.c:322
+#: src/png.c:323
 msgid "Saving Clipboard image"
 msgstr "Enregistrement de l'image du presse-papiers"
 
-#: src/png.c:329
+#: src/png.c:330
 msgid "Saving Layer image"
 msgstr "Enregistrement de l'image de calque"
 
-#: src/png.c:464
+#: src/png.c:465
 msgid "Loading GIF image"
 msgstr "Chargement d'une image GIF"
 
-#: src/png.c:581
+#: src/png.c:582
 msgid "Saving GIF image"
 msgstr "Enregistrement d'une image GIF"
 
-#: src/png.c:693
+#: src/png.c:694
 msgid "Loading JPEG image"
 msgstr "Chargement d'une image JPEG"
 
-#: src/png.c:754
+#: src/png.c:755
 msgid "Saving JPEG image"
 msgstr "Enregistrement d'une image JPEG"
 
-#: src/png.c:814
+#: src/png.c:815
 msgid "Loading TIFF image"
 msgstr "Chargement d'une image TIFF"
 
-#: src/png.c:864
+#: src/png.c:865
 msgid "Saving TIFF image"
 msgstr "Enregistrement d'une image TIFF"
 
-#: src/png.c:922 src/png.c:951
+#: src/png.c:923 src/png.c:952
 msgid "Loading BMP image"
 msgstr "Chargement d'une image BMP"
 
-#: src/png.c:1053
+#: src/png.c:1054
 msgid "Saving BMP image"
 msgstr "Enregistrement d'une image BMP"
 
-#: src/png.c:1261
+#: src/png.c:1262
 msgid "Loading XPM image"
 msgstr "Chargement d'une image XPM"
 
-#: src/png.c:1324
+#: src/png.c:1325
 msgid "Saving XPM image"
 msgstr "Enregistrement d'une image XPM"
 
-#: src/png.c:1474
+#: src/png.c:1475
 msgid "Loading XBM image"
 msgstr "Chargement d'une image XBM"
 
-#: src/png.c:1526
+#: src/png.c:1527
 msgid "Saving XBM image"
 msgstr "Enregistrement d'une image XBM"
 
-#: src/png.c:1635
+#: src/png.c:1637
 msgid "Saving UNDO images"
 msgstr "SEnregistrement des images ANNULER"
 
-#: src/prefs.c:158
+#: src/prefs.c:159
 msgid "Pressure"
 msgstr ""
 
-#: src/prefs.c:166
+#: src/prefs.c:167
 msgid "Current Device"
 msgstr ""
 
-#: src/prefs.c:441
+#: src/prefs.c:442
 msgid "Max memory used for undo (MB)"
 msgstr "Mémoire maximale utilisée pour annuler (MO)"
 
-#: src/prefs.c:441
+#: src/prefs.c:442
 msgid "Greyscale backdrop"
 msgstr ""
 
-#: src/prefs.c:442
+#: src/prefs.c:443
 msgid "Selection nudge pixels"
 msgstr ""
 
-#: src/prefs.c:442
+#: src/prefs.c:443
 msgid "Max Pan Window Size"
 msgstr ""
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XPM/PNG transparency index"
 msgstr ""
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XBM X hotspot"
 msgstr "Point chaud XBM X"
 
-#: src/prefs.c:443
+#: src/prefs.c:444
 msgid "XBM Y hotspot"
 msgstr "Point chaud XBM Y"
 
-#: src/prefs.c:444
+#: src/prefs.c:445
 msgid "JPEG Save Quality (100=High)   "
 msgstr "Qualité d'Enregistrement JPEG (100=Haute)   "
 
-#: src/prefs.c:444
+#: src/prefs.c:445
 msgid "Recently Used Files"
 msgstr "Fichiers Récemment Utilisés"
 
-#: src/prefs.c:445
+#: src/prefs.c:446
 msgid "Minimum grid zoom"
 msgstr ""
 
-#: src/prefs.c:445
+#: src/prefs.c:446
 msgid "Grid colour RGB"
 msgstr ""
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Colour A & B"
 msgstr "Couleur A & B"
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Canvas Geometry"
 msgstr ""
 
-#: src/prefs.c:446
+#: src/prefs.c:447
 msgid "Cursor X,Y"
 msgstr "Curseur X,Y"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Pixel [I] {RGB}"
 msgstr "Pixel [I] {RVB}"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Zoom %"
 msgstr "Zoom %"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Selection Geometry"
 msgstr "Géométrie de la Sélection"
 
-#: src/prefs.c:447
+#: src/prefs.c:448
 msgid "Continuous Mode"
 msgstr "Mode Continu"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Undo / Redo"
 msgstr "Annuler / Refaire"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Opacity %"
 msgstr "Opacité %"
 
-#: src/prefs.c:448
+#: src/prefs.c:449
 msgid "Opacity Mode"
 msgstr "Mode d'Opacité"
 
-#: src/prefs.c:455
+#: src/prefs.c:456
 msgid "Preferences"
 msgstr "Préférences"
 
-#: src/prefs.c:491
+#: src/prefs.c:492
 msgid "Display clipboard while pasting"
 msgstr "Affichage le presse-papiers pendant le collage"
 
-#: src/prefs.c:493
+#: src/prefs.c:494
 msgid "Mouse cursor = Tool"
 msgstr "Curseur de la souris = Outil"
 
-#: src/prefs.c:495
+#: src/prefs.c:496
 msgid "Confirm Exit"
 msgstr "Confirmez La Sortie"
 
-#: src/prefs.c:497
+#: src/prefs.c:498
 msgid "Q key quits mtPaint"
 msgstr "La toucheQ quitte mtPaint"
 
-#: src/prefs.c:499
+#: src/prefs.c:500
 msgid "Changing tool commits paste"
 msgstr ""
 
-#: src/prefs.c:509
+#: src/prefs.c:510
 msgid "Files"
 msgstr "Fichiers"
 
-#: src/prefs.c:525
+#: src/prefs.c:526
 msgid "Clipboard Files"
 msgstr "Fichiers Presse-papiers"
 
-#: src/prefs.c:535
+#: src/prefs.c:536
 msgid "Browse"
 msgstr "Parcourir"
 
-#: src/prefs.c:549
+#: src/prefs.c:550
 msgid "Status Bar"
 msgstr "Barre d'état"
 
-#: src/prefs.c:576 src/viewer.c:1612
+#: src/prefs.c:577 src/viewer.c:1612
 msgid "Zoom"
 msgstr ""
 
-#: src/prefs.c:591
+#: src/prefs.c:592
 msgid "New image sets zoom to 100%"
 msgstr "Nouvelle image initialise le zomm à 100%"
 
-#: src/prefs.c:594
+#: src/prefs.c:595
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "Défilement de molette de souris = Zoom"
 
-#: src/prefs.c:597
+#: src/prefs.c:598
 msgid "Centralize image"
 msgstr ""
 
-#: src/prefs.c:612
+#: src/prefs.c:613
 msgid "Tablet"
 msgstr ""
 
-#: src/prefs.c:619
+#: src/prefs.c:620
 msgid "Device Settings"
 msgstr ""
 
-#: src/prefs.c:635
+#: src/prefs.c:636
 msgid "Configure Device"
 msgstr ""
 
-#: src/prefs.c:642
+#: src/prefs.c:643
 msgid "Tool Variable"
 msgstr ""
 
-#: src/prefs.c:644
+#: src/prefs.c:645
 msgid "Factor"
 msgstr ""
 
-#: src/prefs.c:669
+#: src/prefs.c:670
 msgid "Test Area"
 msgstr ""
 
-#: src/prefs.c:712
+#: src/prefs.c:713
 msgid "Default System Language"
 msgstr "Langue de Système par Défaut"
 
-#: src/prefs.c:713
+#: src/prefs.c:714
 msgid "Czech"
 msgstr "Tchèque"
 
-#: src/prefs.c:714
+#: src/prefs.c:715
 msgid "English (UK)"
 msgstr "Anglais (Royaume Uni)"
 
-#: src/prefs.c:715
+#: src/prefs.c:716
 msgid "French"
 msgstr ""
 
-#: src/prefs.c:716
-msgid "Portuguese"
-msgstr ""
-
 #: src/prefs.c:717
-msgid "Portuguese (Brazilian)"
+msgid "German"
 msgstr ""
 
 #: src/prefs.c:718
+msgid "Portuguese"
+msgstr ""
+
+#: src/prefs.c:719
+msgid "Portuguese (Brazilian)"
+msgstr ""
+
+#: src/prefs.c:720
 msgid "Spanish"
 msgstr "Espagnol"
 
-#: src/prefs.c:725
+#: src/prefs.c:727
 msgid "Language"
 msgstr "Langue"
 
-#: src/prefs.c:731
+#: src/prefs.c:733
 msgid ""
 "Select preferred language translation\n"
 "\n"

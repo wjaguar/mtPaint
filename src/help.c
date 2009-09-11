@@ -38,7 +38,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler\n"
+"mtPaint 2.31 - Copyright (C) 2004-2006 Mark Tyler\n"
 "\n"
 "mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.\n"
 "\n"
@@ -475,6 +475,7 @@ _("\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
 "French - Nicolas Velin, Pascal Billard\n"
+"German - Oliver Frommel\n"
 "Portuguese - Israel G. Lugo\n"
 "Spanish - Guadalinex Team (Junta de Andalucia)\n"
 "\n"
