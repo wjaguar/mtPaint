@@ -1162,18 +1162,17 @@ static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
  * !!! This draws *pixel-synched* "transparency background" !!!
  * The synching allows to simply copy images' pixels and lines for enlargement
  */
-void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt,
-	int fwid, double czoom)
+void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
 {
 	int i, j, k, scale, dx, dy, step, ii, jj, ii0, px, py;
 	int xwid = 0, xhgt = 0, wid3 = wid * 3;
 	static unsigned char greyz[2] = {GREY_W, GREY_B};
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (czoom <= 1.0) step = 4;
+	if (can_zoom <= 1.0) step = 4;
 	else
 	{
-		scale = rint(czoom);
+		scale = rint(can_zoom);
 		step = scale < 3 ? scale * 2 : scale;
 	}
 	dx = x0 % step;
@@ -1290,7 +1289,8 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 {
 	int alpha_blend = !overlay_alpha;
 	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
-	int i, j, k, ii, ds = rr_zoom * 3, da = 0, w_bpp = rr_bpp;
+	int i, j, k, ii, ds = rr_zoom * 3, da = 0;
+	int w_bpp = rr_bpp, w_xpm = rr_xpm;
 
 	if (xtra_img)
 	{
@@ -1302,15 +1302,16 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 		rr_mw * y + x : &beta;
 	if (alpha != &beta) da = rr_zoom;
 	dest = rgb;
-	if (!da && (rr_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
 	ii = rr_dx;
 
-	if (hide_image) /* Substitute pure black */
+	if (hide_image) /* Substitute non-transparent pure black */
 	{
 		w_bpp = 3;
+		w_xpm = -1;
 		ds = 0;
 		src = "\0\0\0";
 	}
+	if (!da && (w_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
 
 	/* Indexed fully opaque */
 	if ((w_bpp == 1) && !alpha_blend)
@@ -1346,7 +1347,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 			}
 			px = *src;
 			src += rr_zoom;
-			if (!*alpha || (px == rr_xpm))
+			if (!*alpha || (px == w_xpm))
 			{
 				dest += (ii - i) * 3;
 				i = ii;
@@ -1408,7 +1409,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 				if (i > rr_width) break;
 				ii += rr_xwid;
 			}
-			if (!*alpha || (MEM_2_INT(src, 0) == rr_xpm))
+			if (!*alpha || (MEM_2_INT(src, 0) == w_xpm))
 			{
 				dest += (ii - i) * 3;
 				i = ii;
@@ -1634,7 +1635,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom, 0,
 			layer_selected - 1, 1);
 	}
-	else render_background(rgb, px1, py1, pw, ph, pw, can_zoom);
+	else render_background(rgb, px1, py1, pw, ph, pw);
 
 	setup_row(px1, pw, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
 	j0 = -1; tmp = rgb; pw3 = pw * 3;
@@ -1686,14 +1687,15 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	free(rgb);
 }
 
-void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float czoom )
+void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 {
 	int alpha_blend = !overlay_alpha;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
 	int j, jj, j0, dx, zoom = 1, scale = 1, nix = 0, niy = 0;
+	int lop = 255, xpm = mem_xpm_trans;
 
-	if (czoom < 1.0) zoom = rint(1.0 / czoom);
-	else scale = rint(czoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
 
 	pw2 = pw + px2;
 	ph2 = ph + py2;
@@ -1703,19 +1705,30 @@ void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float 
 	rgb += (pw * niy + nix) * 3;
 
 	// Update image + blank space outside
-	if (pw2 > mem_width * czoom) pw2 = mem_width * czoom;
-	if (ph2 > mem_height * czoom) ph2 = mem_height * czoom;
+	j = (mem_width * scale) / zoom;
+	jj = (mem_height * scale) / zoom;
+	if (pw2 > j) pw2 = j;
+	if (ph2 > jj) ph2 = jj;
 	px2 += nix; py2 += niy;
 	pw2 -= px2; ph2 -= py2;
 
 	if ((pw2 < 1) || (ph2 < 1)) return;
 
-	if (!mem_img[CHN_ALPHA] && (mem_xpm_trans < 0)) alpha_blend = FALSE;
-	if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw, czoom);
+	if (!mem_img[CHN_ALPHA] && (xpm < 0)) alpha_blend = FALSE;
+	if (layers_total && show_layers_main)
+	{
+		if (layer_selected)
+		{
+			xpm = layer_table[layer_selected].use_trans ?
+				layer_table[layer_selected].trans : -1;
+			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
+		}
+	}
+	else if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw);
 
 	dx = (px2 * zoom) / scale;
 
-	setup_row(px2, pw2, czoom, mem_width, mem_xpm_trans, 255, mem_img_bpp, mem_pal);
+	setup_row(px2, pw2, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
  	j0 = -1; pw *= 3; pw2 *= 3;
 	for (jj = 0; jj < ph2; jj++ , rgb += pw)
 	{
@@ -1817,7 +1830,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
 			pw, ph, can_zoom, 0, layer_selected - 1, 1);
 	}
-	main_render_rgb( rgb, px, py, pw, ph, can_zoom );
+	main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
 		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
 			pw, ph, can_zoom, layer_selected + 1, layers_total, 1);
@@ -2496,6 +2509,7 @@ void main_init()
 		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
+		{ _("/Channels/Couple Image Alpha"), NULL, NULL, 0, "<CheckItem>" },
 		{ _("/Channels/Threshold ..."), NULL, pressed_threshold, 0, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_toggle, 0, "<CheckItem>" },

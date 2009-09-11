@@ -437,11 +437,11 @@ void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed
 		return;
 	}
 	memset(temp_img, 0, sizeof(chanlist));
-	rgb = temp_img[CHN_IMAGE] = malloc(j * bpp);
+	rgb = temp_img[CHN_IMAGE] = calloc(1, j * bpp);
 	for (i = CHN_ALPHA; rgb && (cmask > CMASK_FOR(i)); i++)
 	{
 		if (!(cmask & CMASK_FOR(i))) continue;
-		rgb = temp_img[i] = malloc(j);
+		rgb = temp_img[i] = calloc(1, j);
 	}
 	if (!rgb)	// Not enough memory
 	{
