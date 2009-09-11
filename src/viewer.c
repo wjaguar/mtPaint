@@ -35,6 +35,7 @@
 #include "mygtk.h"
 #include "inifile.h"
 #include "layer.h"
+#include "channels.h"
 #include "toolbar.h"
 
 
@@ -42,6 +43,9 @@ gboolean
 	view_showing = FALSE,
 	allow_cline = FALSE, view_update_pending = FALSE;
 float vw_zoom = 1;
+
+/* !!! Needs to have controlling toggle in prefs !!! */
+int opaque_view = FALSE;
 
 
 ////	COMMAND LINE WINDOW
@@ -584,7 +588,7 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 {
 	png_color *pal;
 	unsigned char *tmp, **img;
-	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp, thid;
 	int ddx, ddy, mx, mw, my, mh;
 	int pw2 = pw, ph2 = ph, dx = 0, dy = 0, pw3 = pw * 3;
 	int zoom = 1, scale = 1;
@@ -643,6 +647,10 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	j = wy1 % scale < 0 ? 1 : 0;
 	wx1 = (wx1 / scale) * zoom + dx - i;
 	wy1 = (wy1 / scale) * zoom + dy - j;
+
+	/* No point in doing that here */
+	thid = hide_image;
+	hide_image = FALSE;
 
 	for (ll = 0; ll <= layers_total; ll++)
 	{
@@ -719,17 +727,20 @@ void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 			}
 			j = i / scale;
 			render_row(tmp, img, ddx, ddy + j, NULL);
-			if (ll != layer_selected) continue;
-			overlay_row(tmp, img, ddx, ddy + j, NULL);
 		}
 	}
+	hide_image = thid;
 }
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
 {
 	if (!rgb) return; /* Paranoia */
+	/* Control transparency separately */
+	int tmp = overlay_alpha;
+	overlay_alpha = opaque_view;
 	/* Always align on background layer */
 	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
+	overlay_alpha = tmp;
 }
 
 void vw_focus_view()						// Focus view window to main window
@@ -984,6 +995,8 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 				layer_table[i].visible )
 			{
 				ofs = (x-lx) + lw*(y-ly);
+				/* Is transparency disabled? */
+				if (opaque_view) break;
 				/* Is click on a non transparent pixel? */
 				if (img[CHN_ALPHA])
 				{
@@ -1001,13 +1014,11 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 					}
 					if (tpix == ppix) continue;
 				}
-				vw_move_layer = i;
 				break;
 			}
 		}
-		ppix = vw_move_layer;
-		if (ppix < 0) ppix = 0; /* Select background */
-		layer_choose(ppix);
+		if (i > 0) vw_move_layer = i;
+		layer_choose(i);
 	}
 	view_first_move = FALSE;
 	vw_last_x = x;

@@ -54,7 +54,7 @@ void layers_init()
 	sprintf( layers_filename, _("Untitled") );
 	sprintf( layer_table[0].name, _("Background") );
 	layer_table[0].visible = TRUE;
-	layer_table[0].use_trans = TRUE;
+	layer_table[0].use_trans = FALSE;
 	layer_table[0].x = 0;
 	layer_table[0].y = 0;
 	layer_table[0].trans = 0;
@@ -317,7 +317,7 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	layer_table[l].trans = 0;
 	layer_table[l].opacity = 100;
 	layer_table[l].visible = TRUE;
-	layer_table[l].use_trans = TRUE;
+	layer_table[l].use_trans = FALSE;
 
 	j = w * h * bpp;
 	i = 0;
@@ -407,7 +407,6 @@ void layer_new_chores2( int l )
 			gtk_widget_set_sensitive( layer_buttons[3], FALSE );
 			gtk_widget_set_sensitive( layer_buttons[4], FALSE );
 		}
-		gtk_widget_set_sensitive( layer_buttons[7], TRUE );		// Remove all
 	}
 
 	layers_notify_changed();
@@ -591,10 +590,6 @@ static void layer_refresh_list()
 		gtk_widget_set_sensitive( layer_buttons[1], FALSE );	// Raise button
 	gtk_widget_set_sensitive( layer_buttons[3], TRUE );		// New
 	gtk_widget_set_sensitive( layer_buttons[4], TRUE );		// Duplicate
-	if ( layers_total < 1 )
-		gtk_widget_set_sensitive( layer_buttons[7], FALSE );	// Remove all
-	else
-		gtk_widget_set_sensitive( layer_buttons[7], TRUE );	// Remove all
 }
 
 static gint layer_press_delete()
@@ -914,6 +909,27 @@ void parse_filename( char *dest, char *prefix, char *file )
 	else	strncpy( dest, file, 256 );		// Prefix not in file at all, so copy all
 }
 
+void layer_press_save_composite()		// Create, save, free the composite image
+{
+	char comp_name[300];
+
+	layer_press_save();		// Save text file first
+
+	if ( strcmp( layers_filename, _("Untitled") ) == 0 ) return;
+		// Bail out if user hasn't saved yet
+
+	layer_rgb = malloc( layer_w * layer_h * 3);
+	if ( layer_rgb != NULL )
+	{
+		sprintf(comp_name, "%s.png", layers_filename);			// Add .png to end
+		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
+		if ( save_png( comp_name, 3 ) < 0 )				// Save to PNG
+			alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
+		free( layer_rgb );
+	}
+	else memory_errors(1);
+}
+
 int save_layers( char *file_name )
 {
 	char mess[300], comp_name[300], save_prefix[300], *c;
@@ -964,19 +980,6 @@ int save_layers( char *file_name )
 		layer_h = mem_height;
 	}
 
-		// Create, save, free the composite image
-	layer_rgb = malloc( layer_w * layer_h * 3);
-	if ( layer_rgb != NULL )
-	{
-		sprintf(comp_name, "%s.png", file_name);			// Add .png to end
-		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
-		if ( save_png( comp_name, 3 ) < 0 )				// Save to PNG
-			alert_box( _("Error"), _("Unable to save image"), _("OK"), NULL, NULL );
-		free( layer_rgb );
-	}
-	else memory_errors(1);
-
-
 	return 1;		// Success
 fail:
 	snprintf(mess, 260, _("Unable to save file: %s"), layers_filename);
@@ -997,13 +1000,11 @@ int check_layers_all_saved()
 	return 0;
 }
 
-static gint layer_press_save_as()
+void layer_press_save_as()
 {
 	check_layers_all_saved();
 	file_selector( FS_LAYER_SAVE );
 // Use standard file_selector which in turn calls save_layers( char *file_name );
-
-	return FALSE;
 }
 
 void layer_press_save()
@@ -1038,6 +1039,14 @@ void layers_remove_all()
 {
 	int i;
 
+	i = check_layers_for_changes();
+	if ( i == 2 || i < 0 )
+	{
+		if ( i<0 ) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
+		if ( i!=2 ) return;
+	} else return;
+
+
 	gtk_widget_set_sensitive( main_window, FALSE);		// Stop any user input
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, FALSE);
 
@@ -1051,6 +1060,7 @@ void layers_remove_all()
 		if ( layers_total>0 && layer_selected!=0 )	// Copy over layer 0
 		{
 			layer_copy_to_main(0);
+			layer_selected = 0;
 			update_main_with_new_layer();
 		}
 	}
@@ -1064,24 +1074,8 @@ void layers_remove_all()
 	layers_notify_unchanged();
 
 	if ( layers_window ) gtk_widget_set_sensitive( layers_window, TRUE);
+	init_status_bar();					// Update status bar
 	gtk_widget_set_sensitive( main_window, TRUE);		// Restart user input
-}
-
-static gint layer_press_remove()
-{
-	int i;
-
-	i = check_layers_for_changes();
-	if ( i == 2 || i < 0 )
-	{
-		if ( i<0 ) i = alert_box( _("Warning"), _("Do you really want to delete all of the layers?"), _("No"), _("Yes"), NULL );
-		if ( i==2 )
-		{
-			layers_remove_all();
-		}
-	}
-
-	return FALSE;
 }
 
 
@@ -1491,8 +1485,6 @@ void pressed_layers( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect(GTK_OBJECT(layer_show_toggle), "clicked",
 			GTK_SIGNAL_FUNC(layer_main_toggled), NULL);
 
-	if ( layers_total == 0 ) gtk_widget_set_sensitive( layer_buttons[7], FALSE );
-		// Delete all layers button
 	gtk_widget_add_accelerator (layer_buttons[8], "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
 
 	gtk_signal_connect_object (GTK_OBJECT (layers_window), "delete_event",
@@ -1521,9 +1513,6 @@ void layer_iconbar_click(GtkWidget *widget, gpointer data)
 		case 3:	layer_press_duplicate(); break;
 		case 4:	layer_press_centre(); break;
 		case 5:	layer_press_delete(); break;
-		case 6:	layer_press_save(); break;
-		case 7:	layer_press_save_as(); break;
-		case 8:	layer_press_remove(); break;
-		case 9:	delete_layers_window(NULL,NULL,NULL); break;
+		case 6:	delete_layers_window(NULL,NULL,NULL); break;
 	}
 }

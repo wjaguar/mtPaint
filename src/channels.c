@@ -31,6 +31,7 @@
 
 /* !!! Maybe store it in config? !!! */
 int overlay_alpha = FALSE;
+int hide_image = FALSE;
 
 unsigned char channel_rgb[NUM_CHANNELS][3] = {
 	{0, 0, 0},	/* Image */
@@ -62,7 +63,13 @@ static void click_newchan_cancel()
 	newchan_window = NULL;
 }
 
-static void click_newchan_ok()
+static void activate_channel(int chan)
+{
+	mem_channel = chan;
+	pressed_opacity(chan == CHN_IMAGE ? tool_opacity : channel_col_A[chan]);
+}
+
+static void click_newchan_ok(GtkButton *button, gpointer user_data)
 {
 	chanlist tlist;
 	int i, j = mem_width * mem_height;
@@ -140,6 +147,7 @@ dofail:
 		memset(dest, chan_new_type == CHN_ALPHA ? 255 : 0, j);
 		break;
 	}
+	if ((gint)user_data >= CHN_ALPHA) activate_channel(chan_new_type);
 	canvas_undo_chores();
 	click_newchan_cancel();
 }
@@ -182,11 +190,12 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	chan_new_type = item < CHN_ALPHA ? CHN_ALPHA : item;
 	chan_new_state = 0;
 
-	newchan_window = gtk_dialog_new_with_buttons(_("Create Channel"),
-		GTK_WINDOW(main_window), GTK_DIALOG_DESTROY_WITH_PARENT, NULL);
-	gtk_dialog_set_has_separator(GTK_DIALOG(newchan_window), FALSE);
+	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
+			GTK_WIN_POS_CENTER, TRUE );
 
-	vbox = GTK_DIALOG(newchan_window)->vbox;
+	vbox = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show (vbox);
+	gtk_container_add (GTK_CONTAINER (newchan_window), vbox);
 
 	frame = gtk_frame_new (_("Channel Type"));
 	gtk_widget_show (frame);
@@ -230,7 +239,6 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 				(gpointer)(i));
 	}
 
-	/* "action_area" box is unusable because of non-expanding behaviour */
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
 	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
@@ -248,10 +256,11 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_box_pack_start (GTK_BOX (hbox), button, TRUE, TRUE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (button), 5);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_newchan_ok), NULL);
+		GTK_SIGNAL_FUNC(click_newchan_ok), (gpointer)item);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 
+	gtk_window_set_transient_for( GTK_WINDOW(newchan_window), GTK_WINDOW(main_window) );
 	gtk_widget_show(newchan_window);
 	gtk_window_add_accel_group(GTK_WINDOW (newchan_window), ag);
 }
@@ -274,15 +283,10 @@ void pressed_channel_edit( GtkMenuItem *menu_item, gpointer user_data, gint item
 	if (!mem_img[item])
 	{
 		pressed_channel_create(menu_item, user_data, item);
-		gtk_dialog_run(GTK_DIALOG(newchan_window));
-		if (newchan_window) click_newchan_cancel();
+		return;
 	}
 
-	if (mem_img[item])
-	{
-		mem_channel = item;
-		pressed_opacity(item == CHN_IMAGE ? tool_opacity : channel_col_A[item]);
-	}
+	activate_channel(item);
 	canvas_undo_chores();
 }
 
@@ -290,10 +294,27 @@ void pressed_channel_disable( GtkMenuItem *menu_item, gpointer user_data, gint i
 {
 }
 
-void pressed_channel_alpha_overlay( GtkMenuItem *menu_item )
+int do_threshold(GtkWidget *spin, gpointer fdata)
 {
-	if (overlay_alpha == GTK_CHECK_MENU_ITEM(menu_item)->active) return;
-	overlay_alpha = GTK_CHECK_MENU_ITEM(menu_item)->active;
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	spot_undo(UNDO_FILT);
+	mem_threshold(mem_channel, i);
+
+	return TRUE;
+}
+
+void pressed_threshold( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	GtkWidget *spin = add_a_spin(128, 0, 255);
+	filter_window(_("Threshold Channel"), spin, do_threshold, NULL);
+}
+
+void pressed_channel_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item )
+{
+	int *toggle = item ? &hide_image : &overlay_alpha;
+	if (*toggle == GTK_CHECK_MENU_ITEM(menu_item)->active) return;
+	*toggle = GTK_CHECK_MENU_ITEM(menu_item)->active;
 	update_all_views();
 }
 

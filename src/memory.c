@@ -65,7 +65,7 @@ int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
 int mem_preview;			// Preview an RGB change
-int mem_prev_bcsp[5];			// BR, CO, SA, POSTERIZE
+int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 
 undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
 
@@ -828,6 +828,19 @@ void mem_init()					// Initialise memory
 	memset(mem_img[CHN_IMAGE], 0, j);	// Clear so user doesn't see it upon load fail
 
 	mem_set_brush(36);		// Initial brush
+
+	for ( i=0; i<NUM_CHANNELS; i++ )
+	{
+		for ( j=0; j<4; j++ )
+		{
+			sprintf(txt, "overlay%i%i", i, j);
+			if ( j<3 )
+			{
+				channel_rgb[i][j] = inifile_get_gint32(txt, channel_rgb[i][j] );
+			}
+			else	channel_opacity[i] = inifile_get_gint32(txt, channel_opacity[i] );
+		}
+	}
 }
 
 void copy_dig( int index, int tx, int ty )
@@ -1188,8 +1201,7 @@ void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int 
 
 ///	BRIGHTNESS CONTRAST SATURATION
 
-void mem_brcosa_chunk( unsigned char *rgb, int len )
-// Apply BRCOSA to RGB memory
+void mem_brcosa_chunk( unsigned char *rgb, int len )		// Apply BRCOSA to RGB memory
 {	// brightness = -255..+255, contrast = 0..+4, saturation = -1..+1
 	float ch[3], grey;
 	int i, j;
@@ -1240,7 +1252,7 @@ void mem_brcosa_chunk( unsigned char *rgb, int len )
 	}
 }
 
-void mem_brcosa_pal( png_color *pal1, png_color *pal2 )
+void mem_brcosa_pal( png_color *pal1, png_color *pal2, int p1, int p2 )
 {		// Palette 1 = Palette 2 adjusting brightness/contrast/saturation
 	int i;
 	unsigned char tpal[256*3];
@@ -1255,7 +1267,7 @@ void mem_brcosa_pal( png_color *pal1, png_color *pal2 )
 	if ( mem_prev_bcsp[4] != 100 ) mem_gamma_chunk( tpal, 256 );
 	mem_brcosa_chunk( tpal, 256 );
 
-	for ( i=0; i<256; i++ )
+	for ( i=p1; i<=p2; i++ )		// Only copy over required range
 	{
 		pal1[ i ].red = tpal[ 3*i ];
 		pal1[ i ].green = tpal[ 1 + 3*i ];
@@ -2576,7 +2588,7 @@ int mem_sel_rot( int dir )					// Rotate clipboard 90 degrees
 	return 0;
 }
 
-int mem_rotate_free( float angle, int type )	// Rotate canvas by any angle (degrees)
+int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (degrees)
 {
 	chanlist old_img;
 	unsigned char *src, *dest, *alpha, A_rgb[3], fillv;
@@ -3281,6 +3293,18 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 	}
 
 	return 0;
+}
+
+void mem_threshold(int channel, int level)		// Threshold channel values
+{
+	unsigned char *wrk = mem_img[channel];
+	int i, j = mem_width * mem_height * MEM_BPP;
+
+	if (!wrk) return; /* Paranoia */
+	for (i = 0; i < j; i++)
+	{
+		wrk[i] = wrk[i] < level ? 0 : 255;
+	}
 }
 
 png_color get_pixel24( int x, int y )	/* RGB */

@@ -87,6 +87,8 @@ int load_layers( char *file_name );
 int save_layers( char *file_name );
 gboolean layers_check_header( char *file_name );
 void layer_press_save();
+void layer_press_save_as();
+void layer_press_save_composite();
 
 void layers_notify_changed();
 void layers_remove_all();

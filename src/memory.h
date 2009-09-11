@@ -94,7 +94,7 @@ int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
 int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 
 int mem_preview;			// Preview an RGB change
-int mem_prev_bcsp[5];			// BR, CO, SA, POSTERIZE, GAMMA
+int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 
 #define MAX_UNDO 101			// Maximum number of undo levels + 1
 
@@ -216,7 +216,7 @@ int mem_remove_unused_check();		// Check to see if we can remove unused palette 
 int mem_remove_unused();		// Remove unused palette colours
 void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int b2 );
 					// Generate a scaled palette
-void mem_brcosa_pal( png_color *pal1, png_color *pal2 );
+void mem_brcosa_pal( png_color *pal1, png_color *pal2, int p1, int p2 );
 					// Palette 1 = Palette 2 adjusting brightness/contrast/saturation
 void mem_pal_sort( int a, int i1, int i2, int rev );
 					// Sort colours in palette 0=luminance, 1=RGB
@@ -272,11 +272,13 @@ void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vert
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
 int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
-int mem_rotate_free( float angle, int type );			// Rotate canvas by any angle (degrees)
+int mem_rotate_free( double angle, int type );			// Rotate canvas by any angle (degrees)
 int mem_image_scale( int nw, int nh, int type );		// Scale image
 int mem_image_resize( int nw, int nh, int ox, int oy );		// Resize image
 
 int mem_isometrics(int type);
+
+void mem_threshold(int channel, int level);			// Threshold channel values
 
 void flood_fill( int x, int y, unsigned int target );
 void flood_fill_pat( int x, int y, unsigned int target );

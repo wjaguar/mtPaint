@@ -1290,7 +1290,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 {
 	int alpha_blend = !overlay_alpha;
 	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
-	int i, j, k, ii, ds, da = 0;
+	int i, j, k, ii, ds = rr_zoom * 3, da = 0, w_bpp = rr_bpp;
 
 	if (xtra_img)
 	{
@@ -1305,8 +1305,15 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	if (!da && (rr_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
 	ii = rr_dx;
 
+	if (hide_image) /* Substitute pure black */
+	{
+		w_bpp = 3;
+		ds = 0;
+		src = "\0\0\0";
+	}
+
 	/* Indexed fully opaque */
-	if ((rr_bpp == 1) && !alpha_blend)
+	if ((w_bpp == 1) && !alpha_blend)
 	{
 		for (i = 0; ; ii += rr_scale)
 		{
@@ -1328,7 +1335,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	}
 
 	/* Indexed transparent */
-	else if (rr_bpp == 1)
+	else if (w_bpp == 1)
 	{
 		for (i = 0; ; ii += rr_scale , alpha += da)
 		{
@@ -1374,7 +1381,6 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	/* RGB fully opaque */
 	else if (!alpha_blend)
 	{
-		ds = rr_zoom * 3;
 		for (i = 0; ; ii += rr_scale , src += ds)
 		{
 			if (i >= rr_width)
@@ -1395,7 +1401,6 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	/* RGB transparent */
 	else
 	{
-		ds = rr_zoom * 3;
 		for (i = 0; ; ii += rr_scale , src += ds , alpha += da)
 		{
 			if (i >= rr_width)
@@ -1457,7 +1462,8 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	if (!mask && base_img[CHN_MASK]) mask = base_img[CHN_MASK] + j;
 
 	/* Prepare channel weights (256-based) */
-	k = 256 - channel_opacity[CHN_IMAGE] - (channel_opacity[CHN_IMAGE] >> 7);
+	k = hide_image ? 256 : 256 - channel_opacity[CHN_IMAGE] -
+		(channel_opacity[CHN_IMAGE] >> 7);
 	opA = alpha && overlay_alpha ? channel_opacity[CHN_ALPHA] : 0;
 	opS = sel ? channel_opacity[CHN_SEL] : 0;
 	opM = mask ? channel_opacity[CHN_MASK] : 0;
@@ -2294,7 +2300,7 @@ void main_init()
 		{ _("/File/New"),		"<control>N",	pressed_new,0, NULL },
 		{ _("/File/Open ..."),		"<control>O",	pressed_open_file, 0, NULL },
 		{ _("/File/Save"),		"<control>S",	pressed_save_file,0, NULL },
-		{ _("/File/Save As ..."),	"<shift><control>S", pressed_save_file_as, 0, NULL },
+		{ _("/File/Save As ..."),	NULL,		pressed_save_file_as, 0, NULL },
 		{ _("/File/sep1"),		NULL, 	  NULL,0, "<Separator>" },
 		{ _("/File/Export Undo Images ..."), NULL,	pressed_export_undo,0, NULL },
 		{ _("/File/Export Undo Images (reversed) ..."), NULL, pressed_export_undo2,0, NULL },
@@ -2472,25 +2478,6 @@ void main_init()
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Bacteria ..."),	NULL,		pressed_bacteria, 0, NULL },
 
-		{ _("/Layers"),		 	NULL, 		NULL, 0, "<Branch>" },
-		{ _("/Layers/tear"),		NULL,		NULL, 0, "<Tearoff>" },
-		{ _("/Layers/New"),		NULL,		NULL, 0, NULL },
-		{ _("/Layers/Save"),		NULL,		NULL, 0, NULL },
-		{ _("/Layers/Save As ..."),	NULL,		NULL, 0, NULL },
-		{ _("/Layers/Save Composite Image ..."), NULL,	NULL, 0, NULL },
-		{ _("/Layers/Remove All Layers ..."), NULL,	NULL, 0, NULL },
-		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
-		{ _("/Layers/Undo"),		"<shift><control>Z", NULL,0, NULL },
-		{ _("/Layers/Redo"),		"<shift><control>R", NULL,0, NULL },
-		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
-		{ _("/Layers/Centralize Current Layer"), NULL,	NULL, 0, NULL },
-		{ _("/Layers/Show In Main Window"), NULL,	NULL, 0, "<CheckItem>" },
-		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
-		{ _("/Layers/Configure Animation ..."),		NULL, pressed_animate_window,0, NULL },
-		{ _("/Layers/Preview Animation ..."), NULL,	ani_but_preview, 0, NULL },
-		{ _("/Layers/Set key frame ..."), NULL,		pressed_set_key_frame, 0, NULL },
-		{ _("/Layers/Remove all key frames ..."), NULL, pressed_remove_key_frames, 0, NULL },
-
 		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
 		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
 		{ _("/Channels/Create Channel ..."), NULL, pressed_channel_create, -1, NULL },
@@ -2501,14 +2488,28 @@ void main_init()
 		{ _("/Channels/Edit Selection"), NULL, pressed_channel_edit, CHN_SEL, _("/Channels/Edit Image") },
 		{ _("/Channels/Edit Mask"), 	NULL, pressed_channel_edit, CHN_MASK, _("/Channels/Edit Image") },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
+		{ _("/Channels/Hide Image"),	NULL, pressed_channel_toggle, 1, "<CheckItem>" },
 		{ _("/Channels/Disable Alpha"), NULL, pressed_channel_disable, CHN_ALPHA, "<CheckItem>" },
 		{ _("/Channels/Disable Selection"), NULL, pressed_channel_disable, CHN_SEL, "<CheckItem>" },
 		{ _("/Channels/Disable Mask"), 	NULL, pressed_channel_disable, CHN_MASK, "<CheckItem>" },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
 		{ _("/Channels/Paste Macro"), 	NULL, NULL, 2, NULL },
+		{ _("/Channels/Threshold ..."), NULL, pressed_threshold, 0, NULL },
 		{ _("/Channels/sep1"),		NULL, NULL,0, "<Separator>" },
-		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_alpha_overlay, 0, "<CheckItem>" },
+		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_toggle, 0, "<CheckItem>" },
 		{ _("/Channels/Configure Overlays ..."), NULL, pressed_channel_config_overlay, 0, NULL },
+
+		{ _("/Layers"),		 	NULL, 		NULL, 0, "<Branch>" },
+		{ _("/Layers/tear"),		NULL,		NULL, 0, "<Tearoff>" },
+		{ _("/Layers/Save"),		"<shift><control>S", layer_press_save, 0, NULL },
+		{ _("/Layers/Save As ..."),	NULL,		layer_press_save_as, 0, NULL },
+		{ _("/Layers/Save Composite Image"), NULL,	layer_press_save_composite, 0, NULL },
+		{ _("/Layers/Remove All Layers ..."), NULL,	layers_remove_all, 0, NULL },
+		{ _("/Layers/sep1"),  	 	NULL,		NULL, 0, "<Separator>" },
+		{ _("/Layers/Configure Animation ..."),		NULL, pressed_animate_window,0, NULL },
+		{ _("/Layers/Preview Animation ..."), NULL,	ani_but_preview, 0, NULL },
+		{ _("/Layers/Set key frame ..."), NULL,		pressed_set_key_frame, 0, NULL },
+		{ _("/Layers/Remove all key frames ..."), NULL, pressed_remove_key_frames, 0, NULL },
 
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
 #ifndef WIN32

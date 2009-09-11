@@ -1069,9 +1069,20 @@ static void ani_layer_select( GtkList *list, GtkWidget *widget )
 	ani_pos_refresh_txt();				// Refresh the text in the widget
 }
 
+int do_set_key_frame(GtkWidget *spin, gpointer fdata)
+{
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	ani_set_key_frame(i);
+	layers_notify_changed();
+
+	return TRUE;
+}
+
 void pressed_set_key_frame()
 {
-	bac_form(5);
+	GtkWidget *spin = add_a_spin(ani_frame1, ani_frame1, ani_frame2);
+	filter_window(_("Set Key Frame"), spin, do_set_key_frame, NULL);
 }
 
 void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )

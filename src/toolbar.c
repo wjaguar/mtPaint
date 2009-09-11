@@ -114,8 +114,6 @@
 
 #include "graphics/xpm_up.xpm"
 #include "graphics/xpm_down.xpm"
-#include "graphics/xpm_saveas.xpm"
-#include "graphics/xpm_dustbin.xpm"
 #include "graphics/xpm_centre.xpm"
 #include "graphics/xpm_close.xpm"
 
@@ -149,18 +147,17 @@ static unsigned char *mem_prev = NULL;		// RGB colours, tool, pattern preview
 
 GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
 {		// Create iconbar for layers window
-	char **icon_list[10] = {
+	char **icon_list[7] = {
 		xpm_new_xpm, xpm_up_xpm, xpm_down_xpm, xpm_copy_xpm, xpm_centre_xpm,
-		xpm_cut_xpm, xpm_save_xpm, xpm_saveas_xpm, xpm_dustbin_xpm, xpm_close_xpm
+		xpm_cut_xpm, xpm_close_xpm
 		};
 
-	char *hint_text[10] = {
+	char *hint_text[7] = {
 		_("New Layer"), _("Raise"), _("Lower"), _("Duplicate Layer"), _("Centralise Layer"),
-		_("Delete Layer"), _("Save Layer Information & Composite Image"),
-		_("Save As ..."), _("Delete All Layers"), _("Close Layers Window")
+		_("Delete Layer"), _("Close Layers Window")
 		};
 
-	gint i, offset[10] = {3, 1, 2, 4, 6, 5, 0, 0, 7, 8};
+	gint i, offset[7] = {3, 1, 2, 4, 6, 5, 8};//0, 0, 7, 8};
 
 	GtkWidget *toolbar, *iconw;
 	GdkPixmap *icon, *mask;
@@ -179,7 +176,7 @@ GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
 
 	gtk_box_pack_start ( GTK_BOX (box), toolbar, FALSE, FALSE, 0 );
 
-	for (i=0; i<10; i++)
+	for (i=0; i<7; i++)
 	{
 		icon = gdk_pixmap_create_from_xpm_d ( main_window->window, &mask,
 			NULL, icon_list[i] );
@@ -503,8 +500,7 @@ static void toolbar_settings_init()
 	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
 	for ( i=0; i<3; i++ )
 	{
-		min = 0; max = 255;
-		if ( i==2 ) min = 0;
+		min = i == 2 ? 0 : 1; max = 255;
 		ts_scales[i] = add_slider2table( vals[i], min, max, table, i, 1, 255, 20 );
 		gtk_widget_set_usize(ts_scales[i], 150, -1);
 		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ts_scales[i])->scale.range.adjustment),

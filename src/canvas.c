@@ -204,14 +204,51 @@ void pressed_edge_detect( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
+int do_blur(GtkWidget *spin, gpointer fdata)
+{
+	int i, j;
+
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	spot_undo(UNDO_FILT);
+	progress_init(_("Image Blur Effect"), 1);
+	for (j = 0; j < i; j++)
+	{
+		if (progress_update(((float)j) / i)) break;
+		do_effect(1, 25 + i / 2);
+	}
+	progress_end();
+
+	return TRUE;
+}
+
 void pressed_blur( GtkMenuItem *menu_item, gpointer user_data )
-{	bac_form(1); }
+{
+	GtkWidget *spin = add_a_spin(10, 1, 100);
+	filter_window(_("Blur Effect"), spin, do_blur, NULL);
+}
+
+int do_fx(GtkWidget *spin, gpointer fdata)
+{
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	spot_undo(UNDO_FILT);
+	do_effect((int)fdata, i);
+
+	return TRUE;
+}
 
 void pressed_sharpen( GtkMenuItem *menu_item, gpointer user_data )
-{	bac_form(2); }
+{
+	GtkWidget *spin = add_a_spin(50, 1, 100);
+	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3));
+}
 
 void pressed_soften( GtkMenuItem *menu_item, gpointer user_data )
-{	bac_form(3); }
+{
+	GtkWidget *spin = add_a_spin(50, 1, 100);
+	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4));
+}
 
 void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -283,8 +320,44 @@ void pressed_rotate_sel_clock( GtkMenuItem *menu_item, gpointer user_data )
 void pressed_rotate_sel_anti( GtkMenuItem *menu_item, gpointer user_data )
 {	rot_sel(1);	}
 
+int do_rotate_free(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *spin = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
+	int j, smooth = 0;
+	double angle;
+
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	angle = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spin));
+
+	if (mem_img_bpp == 3)
+	{
+		GtkWidget *check = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
+			smooth = 1;
+	}
+	j = mem_rotate_free(angle, smooth);
+	if (!j) canvas_undo_chores();
+	else
+	{
+		if (j == -5) alert_box(_("Error"),
+			_("The image is too large for this rotation."),
+			_("OK"), NULL, NULL);
+		else memory_errors(j);
+	}
+
+	return TRUE;
+}
+
 void pressed_rotate_free( GtkMenuItem *menu_item, gpointer user_data )
-{	bac_form(4);	}
+{
+	GtkWidget *box, *spin = add_a_spin(45, -360, 360);
+	box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
+	if (mem_img_bpp == 3) add_a_toggle(_("Smooth"), box, TRUE);
+	filter_window(_("Free Rotate"), box, do_rotate_free, NULL);
+}
 
 
 void mask_ab(int v)
@@ -959,9 +1032,8 @@ gtk_widget_hide( drawing_canvas );
 	else
 	{
 		register_file(real_fname);		// Update recently used file list
-		if ( layers_window == NULL ) pressed_layers( NULL, NULL );
+//		if ( layers_window == NULL ) pressed_layers( NULL, NULL );
 		if ( !view_showing ) view_show();
-//		if ( view_window == NULL ) pressed_view( NULL, NULL );
 			// We have just loaded a layers file so display view & layers window if not up
 	}
 

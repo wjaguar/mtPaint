@@ -4,8 +4,9 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.00	2006
+3.00	2006-8-7
 
+	* Channels facilities added
 	* Menus & toolbars reworked to be more task oriented
 	* Toolbars can now be toggled on and off via the View menu
 	* Clicking palette numbers opens up "Edit all colours" window
@@ -13,9 +14,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Undo now less wasteful of memory when adjusting the palette
 	* Major rewrite of back end code to improve performance
 	* Most documentation has been removed from the F1 help and is now in HTML form
-	* HTML documentation available with binary distributions or separate download
+	* HTML documentation available with binary distributions or as a separate download
 	* BUGFIX - Saving a composite layer image does not occasionally leave transparent areas
 	* BUGFIX - Transforming colour of palette with preview on RGB images now works properly
+	* BUGFIX - Status bar now updated after removing all layers
 
 2.30	2006-3-1
 

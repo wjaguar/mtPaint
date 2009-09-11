@@ -947,7 +947,67 @@ void pressed_create_pscale( GtkMenuItem *menu_item, gpointer user_data )
 
 
 
+/* Generic code to handle UI needs of common image transform tasks */
+
+GtkWidget *filter_win, *filter_cont;
+filter_hook filter_func;
+gpointer filter_data;
+
+void run_filter(GtkButton *button, gpointer user_data)
+{
+	if (filter_func(filter_cont, filter_data))
+		gtk_widget_destroy(filter_win);
+	update_all_views();
+}
+
+void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata)
+{
+	GtkWidget *hbox7, *button_cancel, *button_apply, *vbox6;
+	GtkAccelGroup* ag = gtk_accel_group_new();
+
+	filter_cont = content;
+	filter_func = filt;
+	filter_data = fdata;
+	filter_win = add_a_window(GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE);
+	gtk_widget_set_usize(filter_win, 300, -2);
+
+	vbox6 = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(vbox6);
+	gtk_container_add(GTK_CONTAINER(filter_win), vbox6);
+
+	add_hseparator(vbox6, -2, 10);
+
+	gtk_box_pack_start(GTK_BOX(vbox6), content, FALSE, FALSE, 5);
+
+	add_hseparator(vbox6, -2, 10);
+
+	hbox7 = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox7);
+	gtk_box_pack_start(GTK_BOX(vbox6), hbox7, FALSE, FALSE, 0);
+
+	button_cancel = add_a_button(_("Cancel"), 5, hbox7, TRUE);
+	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(filter_win));
+	gtk_signal_connect(GTK_OBJECT(filter_win), "delete_event",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), NULL);
+	gtk_widget_add_accelerator(button_cancel, "clicked", ag, GDK_Escape,
+		0, (GtkAccelFlags) 0);
+
+	button_apply = add_a_button(_("Apply"), 5, hbox7, TRUE);
+	gtk_signal_connect(GTK_OBJECT(button_apply), "clicked",
+		GTK_SIGNAL_FUNC(run_filter), NULL);
+	gtk_widget_add_accelerator(button_apply, "clicked", ag, GDK_Return,
+		0, (GtkAccelFlags) 0);
+	gtk_widget_add_accelerator(button_apply, "clicked", ag, GDK_KP_Enter,
+		0, (GtkAccelFlags) 0);
+
+	gtk_widget_show(filter_win);
+	gtk_window_add_accel_group(GTK_WINDOW(filter_win), ag);
+}
+
 ///	BACTERIA EFFECT
+
+#if 0
 
 int bac_type;
 	// Type of form needed 0-5 = bacteria, blur, sharpen, soften, rotate, set key frame
@@ -1092,9 +1152,23 @@ void bac_form( int type )
 	gtk_widget_show (bacteria_window);
 	gtk_window_add_accel_group(GTK_WINDOW (bacteria_window), ag);
 }
+#endif
 
-void pressed_bacteria( GtkMenuItem *menu_item, gpointer user_data )
-{	bac_form(0); }
+int do_bacteria(GtkWidget *spin, gpointer fdata)
+{
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+	int i = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin));
+	spot_undo(UNDO_FILT);
+	mem_bacteria(i);
+
+	return FALSE;
+}
+
+void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
+{
+	GtkWidget *spin = add_a_spin(10, 1, 100);
+	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL);
+}
 
 
 ///	SORT PALETTE COLOURS
@@ -1236,16 +1310,17 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	BRIGHTNESS-CONTRAST-SATURATION WINDOW
 
-#define BRCOSA_ITEMS 5
+#define BRCOSA_ITEMS 6
 
-GtkWidget *brcosa_window;
-GtkWidget *brcosa_scales[BRCOSA_ITEMS], *brcosa_toggles[6], *brcosa_spins[BRCOSA_ITEMS];
-GtkWidget *brcosa_buttons[5];
+static GtkWidget *brcosa_window;
+static GtkWidget *brcosa_scales[BRCOSA_ITEMS], *brcosa_toggles[6],
+		 *brcosa_spins[BRCOSA_ITEMS+2];		// Extra 2 used for palette limits
+static GtkWidget *brcosa_buttons[5];
 
-int brcosa_values[BRCOSA_ITEMS];
+static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2];
 png_color brcosa_pal[256];
 
-void brcosa_buttons_sensitive() // Set 4 brcosa button as sensitive if the user has assigned changes
+static void brcosa_buttons_sensitive() // Set 4 brcosa button as sensitive if the user has assigned changes
 {
 	int i, vals[] = {0, 0, 0, 8, 100};
 	gboolean state = FALSE;
@@ -1256,7 +1331,7 @@ void brcosa_buttons_sensitive() // Set 4 brcosa button as sensitive if the user 
 	for ( i=2; i<5; i++ ) gtk_widget_set_sensitive( brcosa_buttons[i], state );
 }
 
-void brcosa_update_sliders()
+static void brcosa_update_sliders()
 {
 	int i;
 
@@ -1265,7 +1340,7 @@ void brcosa_update_sliders()
 			brcosa_values[i] );
 }
 
-void brcosa_update_spins()
+static void brcosa_update_spins()
 {
 	int i;
 
@@ -1276,7 +1351,7 @@ void brcosa_update_spins()
 	}
 }
 
-gint brcosa_spin_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint brcosa_spin_moved()
 {
 	int i;
 
@@ -1284,23 +1359,22 @@ gint brcosa_spin_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 		brcosa_values[i] = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(brcosa_spins[i]) );
 
 	brcosa_buttons_sensitive();
-
 	brcosa_update_sliders();
 
 	return FALSE;
 }
 
-gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int i;
+	int i, p1, p2;
 	gboolean do_pal = FALSE;	// RGB palette processing
 
+	mem_pal_copy( mem_pal, brcosa_pal );	// Get back normal palette as ...
 	if (mem_img_bpp == 3)
 	{
 		do_pal = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4]) );
 		if ( !do_pal && widget == brcosa_toggles[4] )
 		{
-			mem_pal_copy( mem_pal, brcosa_pal );	// Get back normal palette as ...
 			pal_refresher();			// ... user has just cleared toggle
 		}
 	}
@@ -1314,8 +1388,10 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	if ( mem_img_bpp == 1 || do_pal )
 	{
-		mem_brcosa_pal( mem_pal, brcosa_pal );
-		for ( i=0; i<mem_cols; i++ )
+		mtMIN( p1, brcosa_pal_lim[0], brcosa_pal_lim[1] )
+		mtMAX( p2, brcosa_pal_lim[0], brcosa_pal_lim[1] )
+		mem_brcosa_pal( mem_pal, brcosa_pal, p1, p2 );
+		for ( i=p1; i<p2; i++ )
 		{
 			if ( mem_brcosa_allow[0] )
 				mem_pal[i].red = do_posterize( mem_pal[i].red, mem_prev_bcsp[3] );
@@ -1335,8 +1411,18 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
+static void brcosa_pal_lim_change()
+{
+	int i;
 
-gint click_brcosa_preview_toggle( GtkWidget *widget, GdkEvent *event, gpointer data )
+	for ( i=0; i<2; i++ )
+		brcosa_pal_lim[i] = gtk_spin_button_get_value_as_int(
+				GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i]) );
+
+	click_brcosa_preview( NULL, NULL, NULL );	// Update everything
+}
+
+static gint click_brcosa_preview_toggle( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( brcosa_buttons[1] == NULL ) return FALSE;		// Traps call during initialisation
 
@@ -1350,7 +1436,7 @@ gint click_brcosa_preview_toggle( GtkWidget *widget, GdkEvent *event, gpointer d
 	return FALSE;
 }
 
-gint click_brcosa_RGB_toggle( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint click_brcosa_RGB_toggle( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[5]) ) )
 		mem_preview = 1;
@@ -1361,7 +1447,7 @@ gint click_brcosa_RGB_toggle( GtkWidget *widget, GdkEvent *event, gpointer data 
 	return FALSE;
 }
 
-gint brcosa_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint brcosa_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	int i;
 
@@ -1378,7 +1464,7 @@ gint brcosa_slider_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint delete_brcosa( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint delete_brcosa( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	inifile_set_gboolean( "autopreviewToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_toggles[0]) ) );
@@ -1389,7 +1475,7 @@ gint delete_brcosa( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint click_brcosa_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint click_brcosa_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	mem_pal_copy( mem_pal, brcosa_pal );
 	pal_refresher();
@@ -1398,7 +1484,7 @@ gint click_brcosa_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	mem_pal_copy( mem_pal, brcosa_pal );
 
@@ -1435,7 +1521,23 @@ gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint click_brcosa_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void click_brcosa_show_toggle( GtkWidget *widget, GtkWidget *data )
+{
+	gboolean toggle = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+	inifile_set_gboolean( "transcol_show", toggle );
+	if ( toggle ) gtk_widget_show( GTK_WIDGET(data) );
+	else
+	{
+		gtk_widget_hide( GTK_WIDGET(data) );
+	}
+}
+
+static void click_brcosa_store()
+{
+}
+
+static gint click_brcosa_ok()
 {
 	click_brcosa_apply( NULL, NULL, NULL );
 	delete_brcosa( NULL, NULL, NULL );
@@ -1443,7 +1545,7 @@ gint click_brcosa_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-gint click_brcosa_reset( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint click_brcosa_reset()
 {
 	int i;
 
@@ -1451,7 +1553,7 @@ gint click_brcosa_reset( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	for ( i=0; i<BRCOSA_ITEMS; i++ )
 	{
-		if (i<3) brcosa_values[i] = 0;
+		if (i<3 || i==5) brcosa_values[i] = 0;
 		if (i==3) brcosa_values[i] = 8;
 		if (i==4) brcosa_values[i] = 100;
 		gtk_adjustment_set_value( GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment,
@@ -1466,17 +1568,17 @@ gint click_brcosa_reset( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *vbox2, *table2;
-	GtkWidget *hbox;
-	GtkWidget *button;
+	GtkWidget *vbox, *vbox5, *table2, *hbox, *label, *button;
 
-	int	mins[] = {-255, -100, -100, 1, 20},
-		maxs[] = {255, 100, 100, 8, 500},
-		vals[] = {0, 0, 0, 8, 100}, i, j;
+	int	mins[] = {-255, -100, -100, 1, 20, -1529},
+		maxs[] = {255, 100, 100, 8, 500, 1529},
+		vals[] = {0, 0, 0, 8, 100, 0},
+		order[] = {1, 2, 3, 5, 0, 4},
+		i;
 	char	*tog_txt[] = {	_("Auto-Preview"), _("Red"), _("Green"), _("Blue"), _("Palette"),
 				_("Image") },
 		*tab_txt[] = {	_("Brightness"), _("Contrast"), _("Saturation"), _("Posterize"),
-				_("Gamma") };
+				_("Gamma"), _("Hue") };
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
@@ -1492,23 +1594,26 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	brcosa_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Transform Colour"),
 		GTK_WIN_POS_MOUSE, TRUE );
 
-	vbox2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox2);
-	gtk_container_add (GTK_CONTAINER (brcosa_window), vbox2);
+	gtk_window_set_policy( GTK_WINDOW(brcosa_window), FALSE, FALSE, TRUE );
+			// Automatically grow/shrink window
 
-	table2 = add_a_table( 4, 3, 10, vbox2 );
+	vbox = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show (vbox);
+	gtk_container_add (GTK_CONTAINER (brcosa_window), vbox);
+
+	table2 = add_a_table( 4, 3, 10, vbox );
 
 	for ( i=0; i<BRCOSA_ITEMS; i++ )
-		add_to_table( tab_txt[i], table2, (i+1)%5, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
+		add_to_table( tab_txt[i], table2, order[i], 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
 
 	for ( i=0; i<BRCOSA_ITEMS; i++ )
 	{
 		brcosa_values[i] = vals[i];
-		brcosa_scales[i] = add_slider2table( vals[i], mins[i], maxs[i], table2, (i+1)%5, 1, 255, 20 );
+		brcosa_scales[i] = add_slider2table( vals[i], mins[i], maxs[i],
+						table2, order[i], 1, 255, 20 );
 		gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(brcosa_scales[i])->scale.range.adjustment),
 			"value_changed", GTK_SIGNAL_FUNC(brcosa_slider_moved), NULL);
-		spin_to_table( table2, &brcosa_spins[i], (i+1)%5, 2, 1, vals[i], mins[i], maxs[i] );
-//		GTK_WIDGET_UNSET_FLAGS (brcosa_spins[i], GTK_CAN_FOCUS);
+		spin_to_table( table2, &brcosa_spins[i], order[i], 2, 1, vals[i], mins[i], maxs[i] );
 
 #if GTK_MAJOR_VERSION == 2
 		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[i])->entry ),
@@ -1519,36 +1624,99 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 #endif
 	}
 
-	add_hseparator( vbox2, -2, 10 );
+
+
+///	MIDDLE SECTION
+
+	add_hseparator( vbox, -2, 10 );
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox2), hbox, FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
 
-	if ( mem_img_bpp == 1 ) j=4;
-	else j=6;
+	vbox5 = gtk_vbox_new (FALSE, 0);
+	if ( inifile_get_gboolean( "transcol_show", FALSE ) ) gtk_widget_show (vbox5);
+	gtk_box_pack_start (GTK_BOX (vbox), vbox5, FALSE, FALSE, 0);
 
-	for ( i=0; i<j; i++ )
+	button = add_a_toggle( _("Show Detail"), hbox, inifile_get_gboolean( "transcol_show", FALSE ) );
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+			GTK_SIGNAL_FUNC(click_brcosa_show_toggle), vbox5);
+
+	button = gtk_button_new_with_label(_("Store Values"));
+	gtk_widget_show (button);
+	gtk_box_pack_end (GTK_BOX (hbox), button, FALSE, FALSE, 4);
+
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_brcosa_store), NULL);
+
+
+///	OPTIONAL SECTION
+
+	hbox = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox);
+	gtk_box_pack_start (GTK_BOX (vbox5), hbox, FALSE, FALSE, 0);
+
+	if ( mem_img_bpp == 1 )
+	{
+		label = gtk_label_new( _("Palette") );
+		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 5 );
+		gtk_widget_show( label );
+	}
+	else
+	{
+		for ( i=5; i>3; i-- )
+		{
+			brcosa_toggles[i] = add_a_toggle( tog_txt[i], hbox, TRUE );
+			gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "clicked",
+				GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle), NULL);
+		}
+	}
+	brcosa_pal_lim[0] = 0;
+	brcosa_pal_lim[1] = mem_cols-1;
+	brcosa_spins[BRCOSA_ITEMS] = add_a_spin( 0, 0, mem_cols-1 );
+	brcosa_spins[BRCOSA_ITEMS+1] = add_a_spin( mem_cols-1, 0, mem_cols-1 );
+	gtk_box_pack_start (GTK_BOX (hbox), brcosa_spins[BRCOSA_ITEMS], FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (hbox), brcosa_spins[BRCOSA_ITEMS+1], FALSE, FALSE, 0);
+
+	for ( i=0; i<2; i++ )
+	{
+#if GTK_MAJOR_VERSION == 2
+		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i])->entry ),
+			"value_changed", GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
+#else
+		gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(brcosa_spins[BRCOSA_ITEMS+i])->entry ),
+			"changed", GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
+#endif
+	}
+
+	hbox = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox);
+	gtk_box_pack_start (GTK_BOX (vbox5), hbox, FALSE, FALSE, 0);
+
+	for ( i=0; i<4; i++ )
 	{
 		brcosa_toggles[i] = add_a_toggle( tog_txt[i], hbox, TRUE );
 		if ( i == 0 ) gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "clicked",
 			GTK_SIGNAL_FUNC(click_brcosa_preview_toggle), NULL);
-		if ( i>0 && i<4) gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "clicked",
+		if ( i>0 ) gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "clicked",
 			GTK_SIGNAL_FUNC(click_brcosa_preview), NULL);
-		if ( i>=4 ) gtk_signal_connect(GTK_OBJECT(brcosa_toggles[i]), "clicked",
-			GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle), NULL);
 	}
 
-	if ( j==6 ) gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( brcosa_toggles[4] ), FALSE);
+	if ( mem_img_bpp == 3 )
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( brcosa_toggles[4] ), FALSE);
 
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( brcosa_toggles[0] ),
 		inifile_get_gboolean("autopreviewToggle", TRUE));
 
-	add_hseparator( vbox2, -2, 10 );
+
+
+///	BOTTOM AREA
+
+	add_hseparator( vbox, -2, 10 );
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox2), hbox, FALSE, FALSE, 0);
+	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (hbox), 5);
 
 	button = add_a_button(_("Cancel"), 4, hbox, TRUE);
@@ -1906,7 +2074,7 @@ void pressed_size( GtkMenuItem *menu_item, gpointer user_data )
 
 static GtkWidget *allcol_window;
 static GdkColor *ctable;
-static int col_sel_type, col_sel_opac[3];
+static int col_sel_type, col_sel_opac[3], cs_old_overlay[NUM_CHANNELS][4];
 
 
 static gint delete_allcol( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -1935,6 +2103,9 @@ static void do_allcol()
 
 static void do_allover()
 {
+	char txt[64];
+	int i, j;
+
 	channel_rgb[CHN_ALPHA][0] = (ctable[0].red + 128) / 257;
 	channel_rgb[CHN_ALPHA][1] = (ctable[0].green + 128) / 257;
 	channel_rgb[CHN_ALPHA][2] = (ctable[0].blue + 128) / 257;
@@ -1949,6 +2120,19 @@ static void do_allover()
 	channel_opacity[CHN_MASK] = (col_sel_opac[2] + 128) / 257;
 	update_all_views();
 //	gtk_widget_queue_draw( drawing_col_prev );
+
+	for ( i=0; i<NUM_CHANNELS; i++ )	// Save all settings to ini file
+	{
+		for ( j=0; j<4; j++ )
+		{
+			sprintf(txt, "overlay%i%i", i, j);
+			if ( j<3 )
+			{
+				inifile_set_gint32(txt, channel_rgb[i][j] );
+			}
+			else	inifile_set_gint32(txt, channel_opacity[i] );
+		}
+	}
 }
 
 static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -1972,16 +2156,31 @@ static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 static gint allcol_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	if ( col_sel_type == COLSEL_EDIT_ALL ) do_allcol();
+	if ( col_sel_type == COLSEL_OVERLAYS ) do_allover();
 
 	return FALSE;
 }
 
 static gint allcol_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
+	int i, j;
+
 	if ( col_sel_type == COLSEL_EDIT_ALL )
 	{
 		mem_pal_copy( mem_pal, brcosa_pal );
 		pal_refresher();
+	}
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		for ( i=0; i<NUM_CHANNELS; i++ )		// Restore original values
+		{
+			for ( j=0; j<4; j++ )
+			{
+				if ( j<3 ) channel_rgb[i][j] = cs_old_overlay[i][j];
+				else channel_opacity[i] = cs_old_overlay[i][j];
+			}
+		}
+		update_all_views();
 	}
 
 	delete_allcol( NULL, NULL, NULL );
@@ -2126,6 +2325,15 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 
 	if ( col_sel_type == COLSEL_OVERLAYS )
 	{
+		for ( i=0; i<NUM_CHANNELS; i++ )		// Needed if Cancel is pressed
+		{
+			for ( j=0; j<4; j++ )
+			{
+				if ( j<3 ) cs_old_overlay[i][j] = channel_rgb[i][j];
+				else cs_old_overlay[i][j] = channel_opacity[i];
+			}
+		}
+
 		ctable = malloc( 3*sizeof(GdkColor) );
 		ctable[0].red   = channel_rgb[CHN_ALPHA][0] * 257;
 		ctable[0].green = channel_rgb[CHN_ALPHA][1] * 257;
@@ -2191,7 +2399,7 @@ void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
 	gtk_widget_show (swindow);
 	gtk_box_pack_start (GTK_BOX (hbox), swindow, FALSE, TRUE, 0);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (swindow),
-		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
+		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
 	viewport = gtk_viewport_new (NULL, NULL);
 	gtk_widget_show(viewport);

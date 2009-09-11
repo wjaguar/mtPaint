@@ -24,6 +24,7 @@
 #define COLSEL_EDIT_ALL 0
 #define COLSEL_OVERLAYS 1
 
+typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 
 GtkWidget *clipboard_entry;
 png_color brcosa_pal[256];
@@ -51,5 +52,5 @@ int do_new_one( int nw, int nh, int nc, int nt, int bpp );
 void do_new_chores();
 void reset_tools();
 
-void bac_form( int type );
+void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata);
 void memory_errors(int type);
