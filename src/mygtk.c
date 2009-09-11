@@ -61,7 +61,7 @@ GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
 
 GtkWidget *add_a_spin( int value, int min, int max )
 {
-	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 10), 0));
+	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 0), 0));
 }
 
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box )
@@ -477,7 +477,7 @@ static GtkWidget *spin_new_x(GtkObject *adj, int fpart)
 
 GtkWidget *add_float_spin(double value, double min, double max)
 {
-	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 10), 2));
+	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 0), 2));
 }
 
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */

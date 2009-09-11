@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -37,7 +37,7 @@
 
 int main( int argc, char *argv[] )
 {
-	gboolean new_empty = TRUE, get_screenshot = FALSE;
+	int tmp_undo_load, new_empty = TRUE, get_screenshot = FALSE;
 
 	if (argc > 1)
 	{
@@ -115,10 +115,13 @@ int main( int argc, char *argv[] )
 	layers_init();
 	init_cols();
 
+	/* Don't let undoable loads take effect just yet */
+	tmp_undo_load = undo_load;
+	undo_load = FALSE;
+
 	if ( get_screenshot )
 	{
-		/* !!! Use 0th layer load being non-undoable */
-		if (load_image(NULL, FS_LAYER_LOAD, FT_PIXMAP) == 1)
+		if (load_image(NULL, FS_PNG_LOAD, FT_PIXMAP) == 1)
 			new_empty = FALSE;	// Successfully grabbed so no new empty
 		else get_screenshot = FALSE;	// Screenshot failed
 	}
@@ -139,6 +142,10 @@ int main( int argc, char *argv[] )
 	{
 		create_default_image();
 	}
+
+	/* Let undoable loads take effect */
+	undo_load = tmp_undo_load;
+
 	update_menus();
 
 	gtk_main();

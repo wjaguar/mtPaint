@@ -3063,20 +3063,21 @@ static void render_line(int mode, linedata line, int ofs, rgbcontext *ctx)
 		if (clip(rxy, x, y, x + scale, y + scale, cxy))
 		{
 			unsigned char *dest, *tmp;
-			int i, h;
+			int i, h, l;
 
 			tmp = dest = ctx->rgb + (rxy[1] - cxy[1]) * w3 +
 				(rxy[0] - cxy[0]) * 3;
 			*tmp++ = INT_2_R(rgb);
 			*tmp++ = INT_2_G(rgb);
 			*tmp++ = INT_2_B(rgb);
-			for (i = (rxy[2] - rxy[0] - 1) * 3; i; i-- , tmp++)
+			l = (rxy[2] - rxy[0]) * 3;
+			for (i = l - 3; i; i-- , tmp++)
 				*tmp = *(tmp - 3);
 			tmp = dest;
 			for (h = rxy[3] - rxy[1] - 1; h; h--)
 			{
-				dest += w3;
-				memcpy(dest, tmp, w3);
+				tmp += w3;
+				memcpy(tmp, dest, l);
 			}
 		}
 	}

@@ -6,8 +6,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.35	2009-?-?
 
-	Eliminated flicker when positioning line, polygon side, or gradient in Windows version
-	Dock area now holds settings toolbar and layers dialog when their windows are closed
+	* Eliminated flicker when positioning line, polygon side, or gradient in Windows version
+	* Dock area now holds settings toolbar and layers dialog when their windows are closed
+	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
 
 3.31	2009-4-15
 
