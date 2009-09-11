@@ -3508,7 +3508,7 @@ void put_pixel( int x, int y )	/* Combined */
 		{
 			j = oldc * 255 + (newc - oldc) * opacity;
 			mem_img[CHN_ALPHA][offset] = (j + (j >> 8) + 1) >> 8;
-			opacity = j ? (255 * opacity * newc) / j : 127;
+			if (j) opacity = (255 * opacity * newc) / j;
 		}
 		else mem_img[CHN_ALPHA][offset] = newc;
 		if (mem_channel == CHN_ALPHA) return;
@@ -3627,8 +3627,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			}
 			j = oldc * 255 + (newc - oldc) * k;
 			alphar[i] = (j + (j >> 8) + 1) >> 8;
-			k *= newc;
-			mask[i] = j ? (255 * k) / j : 127;
+			if (j) mask[i] = (255 * k * newc) / j;
 		}
 	}
 
@@ -3754,6 +3753,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	}
 
 	/* Prepare alpha */
+	if (!mem_img[CHN_ALPHA]) alpha = NULL;
 	if (alpha)
 	{
 		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);

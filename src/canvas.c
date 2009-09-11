@@ -73,7 +73,7 @@ void commit_paste( gboolean undo )
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
 	int mx = 0, my = 0;			// Mem coords
 	int i, ofs;
-	unsigned char *image, *mask;
+	unsigned char *image, *mask, *alpha = NULL;
 
 	if ( marq_x1 < 0 ) mx = -marq_x1;
 	if ( marq_y1 < 0 ) my = -marq_y1;
@@ -88,6 +88,12 @@ void commit_paste( gboolean undo )
 
 	mask = malloc(fw);
 	if (!mask) return;	/* !!! Not enough memory */
+	if ((mem_channel == CHN_IMAGE) && RGBA_mode && !mem_clip_alpha && mem_img[CHN_ALPHA])
+	{
+		alpha = malloc(fw);
+		if (!alpha) return;
+		memset(alpha, channel_col_A[CHN_ALPHA], fw);
+	}
 
 	if ( undo ) mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
 	update_menus();				// Update menu undo issues
@@ -99,13 +105,14 @@ void commit_paste( gboolean undo )
 	{
 		row_protected(fx, fy + i, fw, mask);
 		paste_pixels(fx, fy + i, fw, mask, image, mem_clip_alpha ?
-			mem_clip_alpha + ofs : NULL, mem_clip_mask ?
+			mem_clip_alpha + ofs : alpha, mem_clip_mask ?
 			mem_clip_mask + ofs : NULL, tool_opacity);
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;
 	}
 
 	free(mask);
+	free(alpha);
 
 	vw_update_area( fx, fy, fw, fh );
 	gtk_widget_queue_draw_area( drawing_canvas,

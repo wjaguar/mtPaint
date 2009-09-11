@@ -1554,7 +1554,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 {
 	chanlist tlist;
 	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0;
-	unsigned char *clip_alpha, *clip_image;
+	unsigned char *clip_alpha, *clip_image, *t_alpha = NULL;
 	int pw = (px2 - px1 + 1), ph = (py2 - py1 + 1);
 	int i, j, l, pw3, lop = 255, lx = 0, ly = 0;
 	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
@@ -1611,17 +1611,27 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	tlist[mem_channel] = pix;
 	clip_image = mem_clipboard;
 	clip_alpha = NULL;
-	if ((mem_channel == CHN_IMAGE) && mem_clip_alpha)
+	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
 	{
-		tlist[CHN_ALPHA] = alpha;
 		clip_alpha = mem_clip_alpha;
+		if (!clip_alpha && RGBA_mode)
+		{
+			t_alpha = malloc(l);
+			if (!t_alpha)
+			{
+				free(pix);
+				free(rgb);
+				return;
+			}
+			memset(t_alpha, channel_col_A[CHN_ALPHA], l);
+		}
 	}
 	if (mem_channel == CHN_ALPHA)
 	{
-		tlist[CHN_ALPHA] = alpha;
 		clip_image = NULL;
 		clip_alpha = mem_clipboard;
 	}
+	if (clip_alpha || t_alpha) tlist[CHN_ALPHA] = alpha;
 
 	/* Setup opacity mode & mask */
 	opac = tool_opacity;
@@ -1670,17 +1680,12 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 		j0 = j;
 		di = mem_width * j + dx;
 		dc = mem_clip_w * (j - marq_y1) + dx - marq_x1;
-		if (clip_alpha)
-		{
-			if (mem_img[CHN_ALPHA])
-				memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
-			else memset(alpha, 255, l);
-		}
+		if (tlist[CHN_ALPHA])
+			memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
 		prep_mask(0, zoom, pww, mask, mask0 ? mask0 + di : NULL,
 			mem_img[CHN_IMAGE] + di * mem_img_bpp);
-		process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] ?
-			mem_img[CHN_ALPHA] + di : alpha, clip_alpha ?
-			clip_alpha + dc : NULL, mem_clip_mask ?
+		process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] + di,
+			clip_alpha ? clip_alpha + dc : t_alpha, mem_clip_mask ?
 			mem_clip_mask + dc : NULL, opac);
 		if (clip_image)
 		{
@@ -1705,6 +1710,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw3);
 	free(pix);
 	free(rgb);
+	free(t_alpha);
 }
 
 void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)

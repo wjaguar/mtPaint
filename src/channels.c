@@ -325,6 +325,7 @@ void pressed_RGBA_toggle( GtkMenuItem *menu_item, gpointer user_data, gint item 
 {
 	RGBA_mode = GTK_CHECK_MENU_ITEM(menu_item)->active;
 	inifile_set_gboolean("couple_RGBA", RGBA_mode );
+	update_all_views();
 }
 
 void pressed_channel_config_overlay()
