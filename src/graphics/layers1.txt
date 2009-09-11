@@ -1,0 +1,67 @@
+# mtPaint layers
+1
+7
+Room.png
+Background
+1
+0
+0
+1
+0
+100
+Table.png
+Table 1
+1
+121
+29
+1
+0
+100
+Chair.png
+Chair 1
+1
+207
+67
+1
+0
+100
+Laptop.png
+Laptop 1
+1
+150
+38
+1
+0
+100
+Table.png
+Table 2
+1
+4
+83
+1
+0
+40
+Chair.png
+Chair 2
+1
+94
+127
+1
+0
+40
+mtPaint.png
+mtPaint
+0
+16
+110
+1
+4
+48
+Laptop.png
+Laptop 2
+1
+188
+22
+1
+0
+40

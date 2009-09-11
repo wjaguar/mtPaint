@@ -1,0 +1,355 @@
+# Mini configure script
+# 1-10-2004
+
+echo
+
+MT_V="2.20"
+MT_DATE="2006-1-1"
+
+MT_VERSION="mtPaint $MT_V"
+MT_LANG=NO
+MT_MAN=NO
+MT_LANG_DEST=/usr/share/locale
+MT_PO_DEST=$MT_LANG_DEST
+MT_MAN_DEST=/usr/local/man/man1
+LIN_BIN_INSTALL=/usr/local/bin
+WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
+BIN_INSTALL=
+MAKE_DIRS=src
+ICON_SET=icons1
+
+GTK_FILE=_conf.txt
+
+GIFPATH=/usr/include/gif_lib.h
+JPEGPATH=/usr/include/jpeglib.h
+TIFFPATH=/usr/include/tiffio.h
+CPU=i586
+OPTS=YES
+DEBUG=NO
+HELP=1
+OS="GNU/Linux"
+
+if ls $GIFPATH > /dev/null
+then
+	NGIF=YES
+else
+	NGIF=NO
+fi
+if ls $JPEGPATH > /dev/null
+then
+	NJPEG=YES
+else
+	NJPEG=NO
+fi
+if ls $TIFFPATH > /dev/null
+then
+	NTIFF=YES
+else
+	NTIFF=NO
+fi
+if pkg-config gtk+-2.0 --cflags > /dev/null
+then
+	GTK=2
+else
+	GTK=1
+fi
+
+for A in "$@"
+do
+	case "$A" in
+		"flush" )	echo Clearing out directory to original state
+				echo
+				make clean
+				echo
+				rm _conf.txt
+				rm po/mtpaint.pot
+				rm src/graphics/*.xpm src/graphics/*.xbm
+				rm -rf slack
+				rm -f *.tgz
+				exit;;
+		"gif" )		NGIF=YES;;
+		"nogif" )	NGIF=NO;;
+		"jpeg" )	NJPEG=YES;;
+		"nojpeg" )	NJPEG=NO;;
+		"tiff" )	NTIFF=YES;;
+		"notiff" )	NTIFF=NO;;
+		"slow" )	OPTS=NO;;
+		"debug" )	DEBUG=YES;;
+		"gtk1" )	GTK=1;;
+		"gtk2" )	GTK=2;;
+		"win" )		OS="MinGW/MSYS"
+				GTK=2;;
+		"intl" )	MT_LANG=YES;;
+		"merge" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+				cd po
+				ls *.po | while read file
+				do
+					NEWfile=$file-`date +%d-%m-%Y-%H-%M-%S`
+					echo $NEWfile
+					mv $file $NEWfile
+					mv $NEWfile ~
+					msgmerge -N ~/$NEWfile mtpaint.pot > $file
+				done
+				rm mtpaint.pot
+				exit;;
+		"newpo" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+				exit;;
+		"man" )		MT_MAN=YES;;
+		"pod" )		MT_POD=YES;;
+		"--help" )	HELP=0;;
+		"--bindir="* )	LIN_BIN_INSTALL="`echo "$A" | sed -e "s/--bindir=//"`"
+				WIN_BIN_INSTALL=$LIN_BIN_INSTALL;;
+		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
+				MT_PO_DEST=$MT_LANG_DEST;;
+		"--mandir="* )	MT_MAN_DEST="`echo "$A" | sed -e "s/--mandir=//"`";;
+		"--cpu="* )	CPU="`echo "$A" | sed -e "s/--cpu=//"`";;
+		"icons"* )	ICON_SET=$A;;
+		"386" )		CPU=i386;;
+		"486" )		CPU=i486;;
+		"686" )		CPU=i686;;
+		"--prefix="* )	MT_PREFIX="`echo "$A" | sed -e "s/--prefix=//"`"
+				WIN_BIN_INSTALL="$MT_PREFIX/bin"
+				LIN_BIN_INSTALL="$MT_PREFIX/bin"
+				MT_LANG_DEST="$MT_PREFIX/share/locale"
+				MT_PO_DEST=$MT_LANG_DEST
+				MT_MAN_DEST="$MT_PREFIX/man/man1";;
+		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
+		"guada" )	CPU=i386
+				MT_LANG=YES
+				MT_MAN=YES
+				MT_POD=YES
+				LIN_BIN_INSTALL=/usr/bin
+				MT_CUSTOM=GUADALINEX;;
+		"build" )	./configure flush
+				cd ..
+				zip -r /home/mark/sf/mtpaint-$MT_V.zip mtpaint-$MT_V/
+				tar cjvf /home/mark/sf/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V/
+				cd mtpaint-$MT_V
+				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man
+				make
+				mkdir -p slack/install/
+				make install
+				cp doc/slack-desc slack/install/
+				cd slack
+				makepkg --chown n /home/mark/sf/mtpaint-$MT_V-i586-1.tgz
+				cd ..
+				chown mark /home/mark/sf/mtpaint-*
+				chgrp users /home/mark/sf/mtpaint-*
+				./configure flush
+				exit;;
+	esac
+done
+
+
+if [ "$HELP" == 0 ]
+then
+	echo "Usage: ./configure [OPTION] ... "
+	echo
+	echo "Options:"
+	echo
+	echo "win ............. Configure for Windows MinGW / MSYS"
+	echo "gtk1 ............ Configure for GTK+1"
+	echo "gtk2 ............ Configure for GTK+2"
+	echo
+	echo "--cpu=CPU ....... Target a specific CPU, e.g. athlon-xp, x86-64"
+	echo "686 ............. Target 686 machines"
+	echo "486 ............. Target 486 machines"
+	echo "386 ............. Target 386 machines"
+	echo "slow ............ Don't use compiler optimizations"
+	echo
+	echo "gif ............. Use libungif"
+	echo "nogif ........... Don't use libungif"
+	echo "jpeg ............ Use libjpeg"
+	echo "nojpeg .......... Don't use libjpeg"
+	echo "tiff ............ Use libtiff"
+	echo "notiff .......... Don't use libtiff"
+	echo
+	echo "flush ........... Flush directories to initial state"
+	echo "debug ........... Include debugging info in binary"
+	echo "--bindir=DIR .... DIR = location of bin file to install, /usr/local/bin by default"
+	echo
+	echo "intl ............ Use internationalized po files"
+	echo "newpo ........... Create ./po/mtpaint.pot"
+	echo "merge ........... Update all po files with new strings - developers only"
+	echo "--locale=DIR .... DIR = location of locale files to install, /usr/share/locale by default"
+	echo
+	echo "man ............. Install the mtPaint man page"
+	echo "pod ............. Compile new man page - see ./doc/README for details"
+	echo "--mandir=DIR .... DIR = location of man page to install, /usr/local/man/man1 by default"
+	echo
+	echo "--prefix=DIR .... DIR = prefix location of all installs, e.g. /usr or /usr/local"
+	echo
+	echo "icons ........... Compile with alternative icon set - see ./src/icons1/README for details"
+	echo
+	echo "Default settings: 586 CPU, GNU/Linux system, O2 optimizations, English only version"
+	echo "$GIFPATH is checked to determine GIF availability"
+	echo "$JPEGPATH is checked to determine JPEG availability"
+	echo "$TIFFPATH is checked to determine TIFF availability"
+	echo "pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux"
+else
+	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
+
+	echo CC = gcc -Wall > $GTK_FILE
+	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
+	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
+
+	if [ "$OS" == "GNU/Linux" ]
+	then
+		BIN_INSTALL=$LIN_BIN_INSTALL
+		if [ "$GTK" == "1" ]
+		then
+			if gtk-config --cflags > /dev/null
+			then
+				GTK_INCLUDE=`gtk-config --cflags`
+				GTK_LIB=`gtk-config --libs`
+				GTK_LIB="$GTK_LIB -lgdk_imlib"
+			else
+				echo
+				echo I have not been able to find gtk-config so I am assuming the following:
+				echo
+				GTK_INCLUDE="-I/opt/gnome/include/gtk-1.2 -I/opt/gnome/include/glib-1.2 -I/opt/gnome/lib/glib/include -I/usr/X11R6/include"
+				GTK_LIB="-L/usr/lib -L/usr/X11R6/lib -L/opt/gnome/lib -lgtk -lgdk -rdynamic -lgmodule -lglib -ldl -lXext -lX11 -lm -lgdk_imlib"
+				echo GTK_INCLUDE = $GTK_INCLUDE
+				echo GTK_LIB = $GTK_LIB
+				echo
+				echo If these values are not right for your system, edit the configure script
+				echo
+			fi
+		else
+			GTK_INCLUDE=`pkg-config gtk+-2.0 --cflags`
+			GTK_LIB=`pkg-config gtk+-2.0 --libs`
+		fi
+	else
+		BIN_INSTALL=$WIN_BIN_INSTALL
+		MT_LANG_DEST=locale
+		MT_PO_DEST=locale
+		if [ "$GTK" == "1" ]
+		then
+			GTK_INCLUDE="-I/include -I/include/glib-2.0 -I/lib/gtk+/include -I/lib/glib-2.0/include -mms-bitfields"
+			GTK_LIB="-L/lib -lgtk -lgdk -lglib-2.0 -lm -mwindows"
+		else
+			GTK_INCLUDE="-I/include/gtk-2.0 -I/lib/gtk-2.0/include -I/include/atk-1.0 -I/include/pango-1.0 -I/usr/include/freetype2 -I/include/glib-2.0 -I/usr/lib/glib-2.0/include -I/include -mms-bitfields"
+			GTK_LIB="-L/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 -lm -mwindows"
+		fi
+	fi
+
+	L_EX=
+	I_EX=
+	if [ "$NGIF" == "YES" ]
+	then
+		L_EX="$L_EX -lungif"
+		I_EX="$I_EX -DU_GIF"
+	fi
+	if [ "$NJPEG" == "YES" ]
+	then
+		L_EX="$L_EX -ljpeg"
+		I_EX="$I_EX -DU_JPEG"
+	fi
+	if [ "$NTIFF" == "YES" ]
+	then
+		L_EX="$L_EX -ltiff"
+		I_EX="$I_EX -DU_TIFF"
+	fi
+
+	if [ "$DEBUG" == NO ]
+	then
+		GTK_LIB="$GTK_LIB -s"
+	fi
+
+	if [ "$MT_CUSTOM" ]
+	then
+		I_EX="$I_EX -DU_$MT_CUSTOM"
+	fi
+
+	if [ "$MT_LANG" == YES ]
+	then
+		I_EX="$I_EX -DU_NLS -DMT_LANG_DEST=\"\\\"$MT_PO_DEST\"\\\""
+		MAKE_DIRS="$MAKE_DIRS po"
+		if [ "$OS" == "MinGW/MSYS" ]
+		then
+			L_EX="$L_EX -lintl"
+			echo "MT_LANG_DEST=\"$BIN_INSTALL/$MT_LANG_DEST\"" >> $GTK_FILE
+		else
+			echo "MT_LANG_DEST=\"$MT_LANG_DEST\"" >> $GTK_FILE
+		fi
+	fi
+	if [ "$MT_MAN" == YES ]
+	then
+		MAKE_DIRS="$MAKE_DIRS doc"
+		echo "MT_MAN_DEST=\"$MT_MAN_DEST\"" >> $GTK_FILE
+	fi
+
+	I_EX="$I_EX -DVERSION=\"\\\"$MT_VERSION\"\\\""
+	GTK_INCLUDE="$GTK_INCLUDE $I_EX"
+	echo "LDFLAG = $L_EX $GTK_LIB" >> $GTK_FILE
+
+	if [ "$OPTS" == "YES" ]
+	then
+		echo "CFLAG = -O2 -march=$CPU $GTK_INCLUDE" >> $GTK_FILE
+	else
+		echo "CFLAG = -march=$CPU $GTK_INCLUDE" >> $GTK_FILE
+	fi
+
+	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
+	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE
+
+
+	if [ "$MT_POD" == "YES" ]
+	then
+		cd doc
+		make pod
+		cd ..
+	fi
+
+	echo
+	echo
+	echo --------------------------
+	echo $MT_VERSION configuration
+	echo --------------------------
+	echo
+	echo "System              $OS"
+	echo
+	echo "GTK+ version        $GTK"
+	echo
+	echo "CPU target          $CPU"
+	echo
+	echo "Optimizations       $OPTS"
+	echo
+	echo "Debug info          $DEBUG"
+	echo
+	echo "Use GIF             $NGIF"
+	echo
+	echo "Use JPEG            $NJPEG"
+	echo
+	echo "Use TIFF            $NTIFF"
+	echo
+	echo "Binary install      $BIN_INSTALL"
+	echo
+	echo "Internationalized   $MT_LANG"
+	echo
+if [ "$MT_LANG" == YES ]
+then
+	echo "Locale install      $MT_LANG_DEST"
+	echo
+	echo "Locale program      $MT_PO_DEST"
+	echo
+fi
+	echo "Install man page    $MT_MAN"
+	echo
+if [ "$MT_MAN" == YES ]
+then
+	echo "Man page install    $MT_MAN_DEST"
+	echo
+fi
+if [ "$MT_CUSTOM" ]
+then
+	echo "Customized for      $MT_CUSTOM"
+	echo
+fi
+	echo "Icon set            $ICON_SET"
+	echo
+
+
+fi
+
+echo

@@ -1,0 +1,537 @@
+--------------------------------------------------
+mtPaint 2.20 - Copyright (C) 2004, 2005 Mark Tyler
+--------------------------------------------------
+
+mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
+
+mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+
+mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. Its main file format is PNG, although it can also handle JPEG, GIF, TIFF, BMP, XPM, and XBM files. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
+
+If you find a bug feel free to contact me about this so I can try to help - the address is in the section "Credits".  Before you send me any reports I would suggest you read the section "Limitations" as there are some issues that I have not been able to resolve.  If you are a developer and you have improved any part of mtPaint, please let me know what you have done so I can share this with other mtPaint users.
+
+
+--------
+Contents
+--------
+
+	1.	Compilation
+	2.	File Formats
+	3.	The Palette
+	4.	Patterns
+	5.	Tools
+	6.	Selections
+	7.	The Clipboard
+	8.	Layers
+	9.	Keyboard Shortcuts
+	10.	Mouse Shortcuts
+	11.	Limitations
+	12.	Tips
+	13.	Credits
+
+
+-----------
+Compilation
+-----------
+
+In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you are targetting GTK+1 you will also need imlib as well.  If you want to load or save GIF, JPEG and TIFF files you will also need libungif, libjpeg and libtiff.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
+
+For GTK+2
+=========
+
+./configure
+make
+su -c "make install"
+
+For GTK+1
+=========
+
+./configure gtk1
+make
+su -c "make install"
+
+
+There are various configure options that may be useful for some people.  Use "./configure --help" to find out what options are available.  If your are compiling mtPaint on an older system without gtk-config, you may need to adjust the configure script so that the GTK+1 settings are done manually.  I have provided an example in the configure script to demonstrate.
+
+Assuming compilation was successful you can test the program by typing "mtpaint src/graphics/testcard.png".  You can call mtpaint with the -v option and the program will start in viewer mode so there will be no palette, menu bar, etc.  You can restore these items by pressing the "Home" key.  After installation you can create a symlink to add a viewer command, e.g.
+
+su -c "ln -s mtpaint /usr/local/bin/mtv"
+
+Then you can open some graphics files with "mtv *.jpg".  This is a shortcut to writing "mtpaint -v *.jpg".  mtPaint can only edit one image at a time, but when you have more than one filename in the command line a window will appear with all of the filenames in a list.  If you select one of the names, it will be loaded.  I find this is helpful for editing several icons or digital photos.
+
+After running mtPaint for the first time, a new file is created to store your preferred settings and previously used files etc.  This file is named ".mtpaint" and stored in the user's home directory on GNU/Linux systems and the root of the drive being used in Windows, e.g. C:/ or D:/  If you rename or remove this file then the next time mtPaint is run it will use the default settings.
+
+It is also possible to compile mtPaint on a Windows system using MinGW/MSYS with the relevant header and library files.  If you want to do this you must first download the normal setup program and install the files to "C:/Program Files/mtPaint/" and then:
+
+1) Install MinGW and MSYS - http://www.mingw.org/ 
+
+2) Install the GTK+2 developer packages (and dependencies like libpng) - http://www.gimp.org/~tml/gimp/win32/downloads.html and http://gnuwin32.sourceforge.net/packages.html 
+
+For GTK+2 you will need to download and extract the following zip files to c:\msys: 
+gtk+-dev-2.6.4.zip
+pango-dev-1.8.0.zip
+atk-dev-1.9.0.zip
+
+You will also need to download and extract the following zip files to c:\msys: 
+glib-dev-2.6.4.zip
+libpng-1.2.7-lib.zip
+zlib-1.2.1-1-lib.zip
+libungif-4.1.0b1-lib.zip
+copy gif_lib.h from libungif-4.1.0b1-src.zip to c:\msys\include
+jpeg-6b-3-lib.zip
+tiff-3.6.1-2-lib.zip
+
+If you want to compile the internationlized version you will need to download and extract the following zip files to c:\msys: 
+gettext-0.14.1-bin.zip
+gettext-0.14.1-dep.zip
+gettext-0.14.1-lib.zip
+libiconv-1.8-1-bin.zip
+libintl-0.11.5-2-bin.zip
+
+For some reason I needed to move c:\msys\bin\msgfmt & xgettext to c:\msys\local\bin\ in order to get it to run properly. If you have trouble running msgfmt you may need to do the same. 
+
+3) Download the latest mtPaint sources and unpack them to c:\msys. 
+
+4) To compile the code you must then use MSYS to "./configure win", then "make" and "make install" 
+
+5) If all goes well, you should have mtpaint.exe which you can run using the same method described above. Because I very rarely use Windows, I am sadly unable to support GTK+1 or older versions of GTK+2 on this system anymore due to a lack of time.
+
+------------
+File Formats
+------------
+
+mtPaint can handle the following file formats:
+
+PNG	Load/Save indexed palette and 24 bit RGB
+
+JPEG	Load 24 bit RGB & Greyscale. Save 24 bit RGB - Quality set by Preferences window
+
+XPM	Load/Save indexed palette - Including transparency index via Preferences->Files
+
+XBM	Load/Save - Including hotspot via Preferences->Files
+
+GIF	Load/Save single image indexed palette
+
+TIFF	Load/Save 24 bit RGB
+
+BMP	Load/Save uncompressed 1, 4, 8 bit indexed palette or 24 bit RGB
+
+When loading a file, mtPaint will automatically determine what the file format is and load it accordingly.  When saving, mtPaint assumes you want to save a PNG format file unless the extension is one of the following (case insensitive):
+
+JPEG
+.JPG
+TIFF
+.TIF
+.GIF
+.BMP
+.XPM
+.XBM
+
+When loading an image file which contains meta data (e.g. image author or comments), mtPaint does not save this data so if this is important to you then you will need to save a new file to avoid losing data that is in the original file.
+
+It is possible to save all of the current undo images to a sequence of PNG files.  Go to the File menu and select the "Export Undo Images" option.  Choose which directory you want to save the files to and then enter the file prefix in the filename box, e.g. "out".  The undo files will then be saved to out001.png, out002.png etc.
+
+Once you have done this you can have fun animating these images and see how your artwork developed to its final state.  The easiest way to do this is to use the ImageMagick command:
+
+animate -delay 10 out*.png
+
+mtPaint can export an indexed image with 16 or fewer colours to an ASCII Art text file (File -> Export ASCII Art).  mtPaint presumes that this is a greyscale image with 16 levels of intensity (0=black), so to convert a 24 bit RGB photo image to ASCII art you could try the following:
+
+	1) Reduce the image to a width of about 80 pixels using scale or crop
+	2) Image -> Greyscale
+	3) Effects -> Contrast : Ensure that the image has a strong contrast between black and white areas
+	4) Palette -> Set Palette Size : to 16
+	5) Palette -> Create Scale : using default numbers
+	6) Image -> Convert To Indexed : using 16 colours and Quantize to palette
+	7) File -> Export ASCII Art : to ~/a.txt
+
+~/a.txt will then contain an ASCII version of the image that should be viewed in an editor or console with a dark background and light text.  If you use a light background with dark text, simply invert the image after step 2).
+
+-----------
+The Palette
+-----------
+
+An indexed palette image can have between 2 and 256 colours.  At any time you can change the RGB values of a colour by doing one of the following:
+
+	* Click on the current colour A or B in the top left corner
+	* Press Ctrl-E or Ctrl-W
+	* Access the Palette menu
+	
+You can then adjust the colour values.  If you then confirm the change, this will adjust that colour index and also any pixels on the canvas which have that index.
+
+There is a colour protection mask feature which stops certain colours from being painted over on the canvas.  This is very useful when you have drawn an outline and then want to fill in between these lines with other colours without affecting the outline.  To protect a colour from being painted on, simply left click to the right of its colour in the palette window - a cross should then appear.  Click again and the mask will be removed and this colour can be edited on the canvas as normal.  The palette menu allows you to set or clear the mask for all colours.  This protection affects all basic tools like normal painting or pasting (RGB & Indexed images) but does not affect the global functions like colour transformations.
+
+Each colour in the palette is defined by 3 channels - Red, Green and Blue.  For each channel there are 8 bits assigned to define its intensity - 0 for nothing, 255 for maximum.  While editing a colour you can simulate other bit levels per channel to rationalize the palette from the potential 16777216 colours available.  For example, if you use the posterize feature at 3 bits per channel, this will result in a choice of 512 colours, i.e. 8x8x8 or 2^3 x 2^3 x 2^3.  I find this setting helpful when recreating artwork from previous generations of home computers - the Atari ST in this case.
+
+Sometimes when you posterize an image, you will end up with duplicate palette entries.  To merge these together and tidy up the palette you choose the following menu items:
+
+	1) Merge duplicate colours
+
+This option will find identical palette colours and then scan the canvas to ensure that only one palette index is used.
+
+	2) Remove unused colours
+
+This option removes any palette colours that do not have pixels on the canvas, and updates the canvas to reflect any index changes.
+
+It is possible to generate scales within the whole palette.  To do this selection the 'Create Scale' from the Palette menu.  You then set the start index and RGB values and then the end index and RGB values.  mtPaint will then calculate the in between values.
+
+It is possible to move a colour entry from one index to another in the palette list.  To do this, try the following:
+
+	1) Move the mouse pointer to the colour you want to move
+	2) Press and hold the shift key
+	3) Press and hold the left mouse button
+	4) Drag the pointer to the desired index
+	5) Release the mouse pointer to commit the operation
+
+When doing this with an indexed image, the canvas colours will be adjusted to accommodate the change.  The RGB canvas remains unchanged.  A more generic sort is possible by accessing the 'Palette' menu.
+
+When you are editing a 24 bit RGB image the palette behaves slightly differently.  For example, when you change a colour in the palette the canvas remains unchanged.
+
+--------
+Patterns
+--------
+
+There are several different patterns that you can use to paint onto the canvas.  To choose one you must do one of the following:
+
+	* Click on the current pattern in the top left corner
+	* Press F2
+	* Access the Edit menu
+
+After selecting your desired pattern you must then choose which 2 colours will be used with this pattern.  Left click a colour in the palette area to set colour A, and right click to set colour B.  The preview area will show you what the final pattern will look like.  You can also press Ctrl+Left Button to select colour B if you are using a single button stylus/tablet.  While using a painting tool, you can press an arrow key to change colour A or B.
+
+If you want to create your own custom patterns you can either edit "patterns.c" in a text editor or edit ./src/graphics/patterns.png with mtPaint.  You create your own c file by executing "Edit->Create Patterns".  Rename the files accordingly, recompile mtPaint and you should now be able to use your own patterns.
+
+-----
+Tools
+-----
+
+The most basic tool is the Paint tool which paints pixels onto the canvas.  To pick a brush for the paint tool press F3, access the Edit menu, press the brush icon or press the preview area.  Each brush can be configured by setting the size spin button.  The spray also requires the user to set the flow.  The higher the number the more pixels will be splattered onto the canvas.
+
+If at any time you make a mistake, you can always use the undo/redo functions.  Memory permitting, this is for up to 100 actions.  You can change the maximum memory limit for the undo feature in the preferences window.
+
+By pressing F11 or using the Edit menu you can set painting mode to "Continuous".  A "CON" will then appear on the status bar for a visual reminder.  This mode means that mtPaint will fill in the area between static shapes while the tool is being used.  This is very useful for drawing outlines or using the slash/backslash for calligraphy style effects.
+
+When you are editing an RGB image it is possible to change the opacity of certain tool operations.  For example if you press Ctrl+3 you will set opacity to 30% which means that if you draw a rectangle over an area, it will paint the current pattern with 30% transparency so you will still see some of what was on the canvas originally.  Opacity works with static tool shapes, spray, straight line and pasting.  It does not affect flood fill or pixel shuffling.  Tool opacity behaviour can be altered by pressing F12 or accessing the Edit menu to toggle the opacity drawing mode ("OP" should appear on the status bar as a reminder).  By setting this toggle to off you can get some very interesting results with the spray or by dragging and pasting at the same time.  In different situations you may want either behaviour so it is probably best to experiment to learn what the possibilities are.
+
+The line tool is used by clicking on the 'Straight Line' ruler icon on the toolbar or F8.  You click and release the left mouse button on the canvas where you want to start the straight line.  You then move the pointer to the end point and click again to draw the line.  Pressing escape or the right button will cancel the operation and stop line drawing until you press the left button again.  You can also add an arrowhead to the end of the line by pressing the 'A' (open head) or 'S' (closed head) keys.  The size of the arrowhead is determined by the tool flow value.
+
+The text tool can be used to add basic text strings to an image.  Firstly you choose the colours and pattern you want, then click on the 'T' icon or use the 'Edit->Paste Text' menu option.  Type the text you want and then choose the font.  Once this is done you can drag the text around the image as it becomes a normal paste box.  If you are using GTK+2 and editing an RGB image you also have the option of having antialiased text for smoother edges around the text.  GTK+2.6 users have the luxury of rotating the text to any angle.  All versions support rotating by 90 degree steps with the rotate selection icons or the Selection menu.  While pasting text you can also change the colour or pattern on the fly.
+
+If you are editing a large image or are zoomed in heavily you may find the pan window useful to navigate around quickly.  The pan window can be invoked by pressing the 'End' key, using the View menu or pressing the icon on the toolbar.  This will then bring up a thumbnail of the whole image with a rectangle showing what portion is currently being viewed.  Left clicking or dragging the mouse will move the centre of the image to where you click.  The arrow keys can be used to move the view in the appropriate direction.  Any other keypress (including the 'End' key) or the right button will close the pan window .  While using the pan window, the zoom keys (0-9, +, -) and the Home key work as normal.  The size of the pan window can be set with the preferences window.
+
+If you are editing an image at a high zoom and you would like to see what the normal sized image looks like at the same time, you may find the View Window useful.  Press 'V' or use the View menu to call this window up.
+
+The clone tool is used to copy chunks from one part of the image to the other.  After selecting the clone tool you must set the tool size, e.g. 25, then move the mouse cursor over the canvas area.  Then if you hold the Ctrl key down and move the mouse you will see the tool perimeter (black and white) move away from the clone perimeter (black and red).  After releasing Ctrl you can then press the left mouse button to copy from the red/black box to the white/black box.  When editing an RGB image you can also use variable opacity - this behaviour is governed by whether you are using 'Opacity Undo Mode' or not fom the Edit menu.
+
+If you have configured a pressure sensitive graphics tablet you can use this device in mtPaint.  To configure this input you use the Tablet section of the preferences window where you must choose the device and then determine which variables the pressure will vary.
+
+----------
+Selections
+----------
+
+In order to make a selection you press the 'Make Selection' icon on the toolbar or press Ctrl-A to select the whole image.  You then click the left mouse button on the canvas and drag the rectangle to the area you want to select.  To clear this selection press Escape, the right mouse button, Ctrl+Shift-A or use the Edit menu.  The selection box can be moved around pixel by pixel by using the arrow keys.  Pressing Shift and the arrow keys causes the selection box to be moved a set number of pixels determined by the Preferences window.  After you have made a selection you can click and drag the corners to new positions.  With the tool mouse cursor option switched on you will see the relevant corner arrow to indicate this new behaviour.
+
+Once a selection has been made you can select 'Crop' from the Image menu, or press the delete key which will reduce the canvas size to the selected area.  Cropping will not be possible if the whole canvas is selected.
+
+Pressing Ctrl-C causes the selection area to be copied to the clipboard ready for pasting.
+
+Pressing Ctrl-X causes the selection area to be copied to the clipboard and then this area of the canvas is filled with the current pattern - apart from pixels that have been protected with the colour mask.
+
+Pressing Ctrl-V pastes the clipboard onto the canvas at the centre of the view.
+Pressing Ctrl-K pastes the clipboard onto the canvas at the position from which it was copied.
+
+While pasting, the arrow keys can be used to position the box before committing the operation.  Escape cancels the operation and removes the paste box.  Also, if you have selected to show tool shaped cursors in "Image->Preferences", by moving the mouse over the paste box the cursor will change to a four way arrow.  While doing this, you can press the left mouse button and you will be able to drag the paste box.
+
+In order to commit the paste operation, press the right mouse button or the Enter/Return key.  By pressing both mouse buttons down and dragging you can use the clipboard image as a brush.  When you are editing an image with a colour protection mask, you stop these colours being changed on the canvas.
+
+When you are pasting it is possible to use a colour transparency mask to enable the pasting of non rectangular shapes.  The easiest way to understand this is to try the following example:
+
+	1) Type "mtpaint src/graphics/testcard.png"
+	2) Press Ctrl-A, then Ctrl-C, then Ctrl-V.
+	3) You will then be able to move the paste clipboard as normal.
+	4) If you then select "Selection -> Mask Colours A,B" from the menu you will make red and black colours on the clipboard transparent.
+	5) To return to normal, select "Selection -> Clear Mask"
+	6) Further colours can be masked on a cumulative basis by selecting them via the palette and using "Selection -> Mask Colours A,B" again.
+
+I have put an option into the preferences window so that you can choose not to have the clipboard image displayed while moving the paste box.  In other words, you will simply see the blue/white outline until you commit the operation.
+
+The selection tool is also used to direct several other painting functions.  These are located under the "Selection" menu.  For example, you can fill the current selection rectangle or draw an ellipse.
+
+As well as rectangle selections, you can use the polygon selection tool to create polygon shapes in order to fill, outline, copy, cut and paste.  After selecting this tool you click the left mouse button on the canvas where you want to start forming the polgon shape.  You can then either hold the left button down for a freehand shape or release it to have a long straight edge.  To finish press the right button.
+
+You can also create an polygon by holding down the right mouse button and then dragging.  In this case, releasing the right button completes the polygon.
+
+To cancel the shape press the Escape key.
+
+Once a polygon selection has been made you can use the lasso tool to shrink wrap the edges of the selection with the same colour.  For example if you have a black background with a red circle, a rough freehand polygon around it followed by pressing the lasso icon will create a paste of just the red circle with the black area removed.  Using the Selection menu you can also 'lasso cut' an area which fills the lasso selected area on the canvas.
+
+-------------
+The Clipboard
+-------------
+
+mtPaint allows the user to store up to 12 images in a multiple image clipboard.  This works by saving a PNG file containing each clipboard image and then using the Edit menu to load these images as required.
+
+To save image data to the clipboard try the following example:
+
+	1) Make a selection on the canvas
+	2) Copy the selection - Ctrl-C
+	3) Save this selection to clipboard 3 - Ctrl-F3
+
+To load this clipboard image at any time simply press Shift-F3.  The benefit of using a multiple image clipboard in this way is that it gives the user more flexibility.  For example, you can have two independent mtPaint programs running and be able to load and save clipboard data between the two at the touch of a button.  Also, as long as the files are not deleted you will have access to these clipboard images after closing and restarting mtPaint (or even rebooting the system).
+
+It is only possible to paste an RGB clipboard onto an RGB image and an Indexed Palette clipboard onto an Indexed Palette image.
+
+As the clipboard files are standard PNG files, the user can also open them in another mtPaint process and edit them.  The clipboard files are stored in the location set in the Preferences window.
+
+------
+Layers
+------
+
+For some types of painting and image manipulation it is convenient to use multiple layers of images rather than a single image.  For example you may want to overlay text or drawings over a photograph and then be able to move or edit each layer independently.
+
+To use layers with mtPaint you must first load the image you want to be the background.  This is the most important step as all the other layers sit on top of this image (also, the size of the background image determines the size of the final composite image).  Next you must create a new layer by using the Layers window ('L' key or View menu).  You can then edit, manipulate, load to, or save this new layer just like any other image.  The only difference is that this image can have a transparent colour which will show the pixels used on the background image (or lower layers if there are any).
+
+You can move any layer around by clicking and dragging it in the the view window, or by pressing CTRL and using the arrow keys (+SHIFT nudges like pasting).  There is also a button on the layers window which puts the layer back to the centre of the background image.  The layers window allows you to name each layer for convenience and to temporarily hide it by unchecking the toggle button to the right of the layers name.
+
+When you decide you want to save this composite image you press the 'Save' button which saves 2 files:
+
+  1) A small text file containing information about each layer.
+  2) The composite image which is a normal RGB PNG file.
+
+You can then load these layers back into mtPaint by loading the text file back into mtPaint.
+
+Please note that when you save the composite image and text file you are not saving each individual layer.  As mentioned earlier, each layer is considered to be its own file and must be saved with the 'File' menu or Ctrl-S as normal.  The benefit of treating the layers separately is as follows:
+
+  1) Less disk space is required as the layers are not clumped together into a new file.
+  2) Image layers can be edited with any other image editor.
+  3) If you are using a standard image for several composite images (e.g. a standard logo or piece of text for watermarking photos), you only need to edit one image and all of the other composite images will be updated automatically the next time you save them.
+
+After saving the layers text file you must not move it anywhere else unless you also move the image files with it as these file references are relative.  The simplest method is to keep all original images and text files in a single directory.
+
+When using layers, the undo memory limit set in the preferences window must be divided by the number of layers to determine the limit per layer.  For example, with a 32MB limit and 4 layers there is an 8MB limit per layer for the undo.
+
+To see examples of layers, try "mtpaint ./src/graphics/*.txt" from the sources tarball.
+
+------------------
+Keyboard shortcuts
+------------------
+
+  Ctrl-N            Create new image
+  Ctrl-O            Open Image
+  Ctrl-S            Save Image
+  Ctrl-Q            Quit program
+
+  Ctrl-A            Select whole image
+  Escape            Select nothing, cancel paste box
+  Ctrl-C            Copy selection to clipboard
+  Ctrl-X            Copy selection to clipboard, and then paint current pattern to selection area
+  Ctrl-V            Paste clipboard to centre of current view
+  Ctrl-K            Paste clipboard to location it was copied from
+  Enter/Return      Commit paste to canvas
+
+  Arrow keys        Paint Mode - Change colour A or B
+  Arrow keys        Selection Mode - Nudge selection box or paste box by one pixel
+  Shift+Arrow keys  Nudge selection box or paste box by x pixels - x is defined by the Preferences window
+
+  Delete            Crop image to selection
+  Insert            Transform colours - i.e. Brightness, Contrast, Saturation, Posterize, Gamma
+  Ctrl-G            Greyscale the image
+
+  Ctrl-T            Draw a rectangle around the selection area with the current fill
+  Ctrl-Shift-T      Fill in the selection area with the current fill
+  Ctrl-L            Draw an ellipse spanning the selection area
+  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area
+
+  Ctrl-E            Edit the RGB values for colours A & B
+  Ctrl-W            Edit all palette colours
+
+  Ctrl-P            Preferences
+  Ctrl-I            Information
+
+  Ctrl-Z            Undo last action
+  Ctrl-R            Redo an undone action
+
+  C                 Command Line Window
+  V                 View Window
+  L                 Layers Window
+  Z                 Set zoom
+
+  +,=               Zoom in
+  -                 Zoom out
+
+  1                 10% zoom
+  2                 25% zoom
+  3                 50% zoom
+  4                 100% zoom
+  5                 400% zoom
+  6                 800% zoom
+  7                 1200% zoom
+  8                 1600% zoom
+  9                 2000% zoom
+
+  F1                Help
+  F2                Choose Pattern
+  F3                Choose Brush
+  F4                Paint Tool
+  F5                Pixel Shuffle
+  F6                Flood Fill
+  F7                Straight Line
+  F8                Smudge
+  F9                Selection Tool
+  F11               Toggle normal or continuous painting mode
+  F12               Toggle undo opacity mode
+
+  Ctrl + F1 - F12   Save current clipboard to file 1-12
+  Shift + F1 - F12  Load clipboard from file 1-12
+
+  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad numbers)
+  Ctrl + + or =     Increase opacity by 1%
+  Ctrl + -          Decrease opacity by 1%
+
+  Home              Show or hide main window menu/toolbar/status bar/palette
+  Page Up           Scale Image
+  Page Down         Resize Image canvas
+  End               Pan Window
+
+---------------
+Mouse shortcuts
+---------------
+
+  Left button          Paint to canvas using the current tool
+  Middle button        Set the centre for the next zoom
+  Right button         Commit paste to canvas / Stop drawing current line / Cancel selection
+
+  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window
+
+  Ctrl+Left button     Choose colour A from under mouse pointer
+  Ctrl+Right button    Choose colour B from under mouse pointer
+
+  Shift+Right button   Set the centre for the next zoom
+
+
+You can fixate the X/Y co-ordinates while moving the mouse:
+
+  Shift                Constrain mouse movements to vertical line
+  Shift+Ctrl           Constrain mouse movements to horizontal line
+
+-----------
+Limitations
+-----------
+
+I have set the maximum image geometry to 16384x16384.  The minimum geometry is 1x1.
+
+After loading a new palette, the canvas may contain references to colours that are not defined.  I call these orphan pixels.  If you examine the image information via the Image menu you will see how many pixels have been orphaned.  You can retrieve the pixels by expanding the palette to 256 items and then "Palette->Remove Unused Colours".
+
+When using the colour A/B editor, if colour A = colour B, you must edit colour B to change its RGB.
+
+On some systems there are problems when editing large images at high zoom levels, e.g. 2048x2048 @ 1600%
+
+Some key combinations may not work under certain window managers, e.g. Shift+F1-F12 or Ctrl+Mouse button.
+
+Using the status bar items "Cursor X,Y" and "Pixel [I] {RGB}" can cause high CPU usage on older hardware when moving the cursor vigorously.
+
+mtPaint does not support alpha channels so if you load a PNG file with an alpha channel, the image may not look correct.  However, mtPaint is capable of loading and saving a PNG file with a single colour transparency on both RGB and Indexed Palette images.
+
+The maximum number of layers is 100.
+
+Text rotation does not work in Windows ME/95.
+
+The polygon line selection in Windows is not as clear as the GNU/Linux version.
+
+----
+Tips
+----
+
+Palette
+
+If you are editing an RGB image and you want to populate the palette with colours from the image, the easiest way to do this is to call up the "Edit all colours" window and then use the eye dropper tool to select the colours you want.  Moreover, you can use this method to grab any colours on your current desktop.  This feature is only available with GTK+2.  If you want a more approximate method you could try:
+
+	1) Use "Palette->Set Palette Size" to set the size of the palette
+	2) Use "Palette->Create Quantized" to approximate the palette to the image
+
+
+Effects
+
+When I emboss an image I usually like to emphasise the effect by using the "Transform Colour" window to reduce the saturation to greyscale and increase the contrast to highlight the edges.
+
+
+Files
+
+If you are using several clipboards and you want to have more control over the images (e.g. rotate them to any angle or apply effects), open all of the clipboards in a new mtPaint process with:
+
+mtpaint ~/.clip*
+
+You can then edit/save the clipboards in one mtPaint window and then apply them to your main image in another mtPaint window.
+
+It is possible to use mtPaint to create fade frames for use in animations.  To fade an image you must:
+
+	1) Load the relevant frame you want to fade
+	2) Open the transform window and set brightness to -32
+	3) Click apply 8 times
+	4) Save undo images for fading out and save undo images (reverse) for fading in
+
+
+Quantizing
+
+If you want to quantize an RGB photo down to just a few colours (e.g. 32) and get the best quality without waiting for a full DL3 quantize you could try the following:
+
+	1) Use DL1 to reduce the image to 256 colours
+	2) Convert to RGB
+	3) Use DL3 to reduce the image to 32 colours
+
+This example illustrates the fact that DL3 takes time proportionate to the number of unique colours in the image.  You could also reduce the number of colours in the image by posterizing to a level of 3 or 4 and then trying DL3.
+
+
+Text
+
+mtPaint has support for adding basic text strings to an image, but if you want more advanced text features like justification, you can always type some text into your favourite editor/wordprocessor, grab a screenshot and then paste the result.  If you paste with the background colour as a transparency, the text can flow around the image.
+
+
+Screenshots
+
+mtPaint can be used to grab a screenshot with either File->New or using "mtpaint -s" from the command line.  If you are an IceWM user you can assign the key "Print Screen" to grab a screenshot by editing the file ~/.icewm/keys to include:
+
+key "Print" mtpaint -s
+
+
+Brushes
+
+If you have a particular preference for certain types of brushes, such as circles or sprays, you can manually edit the sources to cater for your needs.  Edit memory.c and find mem_brush_list which defines all of the brushes.  Each entry is defined by a tool type, tool size and flow.
+
+-------
+Credits
+-------
+
+mtPaint was written by Mark Tyler
+
+marktyler_5@hotmail.com
+http://mtpaint.sourceforge.net/
+
+mtPaint was only possible after I used and studied an excellent program called mhWaveEdit by Magnus Hjorth.  As a respectful tribute to this mtPaint uses a slightly modified version of inifile.c/h from mhWaveEdit 1.3.0.
+
+Several people have helped me with the mtPaint project, so I would like to thank them all (in alphabetical order):
+
+Abdulla Al Muhairi - Website redesign April 2005
+Alan Horkan - Feedback/ideas
+Alexandre Prokoudine - Feedback/ideas
+Antonio Andrea Bianco - Feedback/ideas
+Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c for more information
+Ed Jason - Feedback/ideas
+Guadalinex Team (Junta de Andalucia) - Feedback/ideas, man page, Launchpad/Rosetta registration
+Lou Afonso - Feedback/ideas
+Magnus Hjorth - Feedback/ideas
+Martin Zelaia - Feedback/ideas
+Pavel Ruzicka - Feedback/ideas
+Puppy Linux (Barry Kauler) - Feedback/ideas
+Vlastimil Krejcir - Feedback/ideas
+William Kern - Feedback/ideas
+Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information
+
+Translations have been provided for certain languages by the following people:
+
+Brazilian Portuguese - Paulo Trevizan
+Czech - Pavel Ruzicka
+French - Nicolas Velin, Pascal Billard
+Portuguese - Israel G. Lugo
+Spanish - Guadalinex Team (Junta de Andalucia)
+

@@ -1,0 +1,17 @@
+This directory contains the mtPaint man page.
+
+Users of mtPaint should not need to edit or make anything here - just use the configure script as normal.
+
+Package maintainers may wish to put their details into the man page for their users.  Put these lines near the end of mtpaint.pod, just before the '=cut' at the end:
+
+=head1 MAINTAINER
+
+Your Name E<lt>your.name@email.addressE<gt>
+
+
+Then from the command line:
+
+./configure pod ...
+make
+
+etc.

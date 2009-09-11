@@ -1,0 +1,6 @@
+This directory contains icons and mouse pointers that are compiled into mtPaint.  It is possible to create custom icon sets to suit personal taste.  For example in order to create and build a new set try:
+
+1) cp -r icons1 icons-new
+2) Edit the icons and pointers in icons-new as required
+3) ./configure icons-new
+4) make
