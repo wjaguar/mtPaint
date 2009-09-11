@@ -1,5 +1,5 @@
 /*	otherwindow.h
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -20,6 +20,11 @@
 #include <gtk/gtk.h>
 #include <png.h>
 
+
+#define COLSEL_EDIT_ALL 0
+#define COLSEL_OVERLAYS 1
+
+
 GtkWidget *clipboard_entry;
 png_color brcosa_pal[256];
 
@@ -39,6 +44,8 @@ void pressed_quantize( GtkMenuItem *menu_item, gpointer user_data );
 
 void choose_pattern(int typ);				// Bring up pattern chooser
 void choose_colours();					// Bring up A/B colour editor
+
+void colour_selector( int cs_type );			// Bring up GTK+ colour wheel
 
 int do_new_one( int nw, int nh, int nc, int nt, int bpp );
 void do_new_chores();

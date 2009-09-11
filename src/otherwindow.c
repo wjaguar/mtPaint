@@ -1897,11 +1897,12 @@ void pressed_size( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	EDIT ALL COLOURS WINDOW
 
-GtkWidget *allcol_window;
-GdkColor *ctable;
+static GtkWidget *allcol_window;
+static GdkColor *ctable;
+static int col_sel_type, col_sel_opac[3];
 
 
-gint delete_allcol( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint delete_allcol( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	gtk_widget_destroy(allcol_window);
 	free( ctable );
@@ -1909,7 +1910,7 @@ gint delete_allcol( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-void do_allcol()
+static void do_allcol()
 {
 	int i;
 
@@ -1925,33 +1926,42 @@ void do_allcol()
 	gtk_widget_queue_draw( drawing_col_prev );
 }
 
-gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
+static gint allcol_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	mem_pal_copy( mem_pal, brcosa_pal );
-	pal_refresher();
+	if ( col_sel_type == COLSEL_EDIT_ALL )
+	{
+		mem_pal_copy( mem_pal, brcosa_pal );
+		pal_refresher();
+		spot_undo(UNDO_PAL);
+		do_allcol();
+	}
 
-	spot_undo(UNDO_PAL);
-	do_allcol();
-	delete_allcol( NULL, NULL, NULL );
-	return FALSE;
-}
-
-gint allcol_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	do_allcol();
-	return FALSE;
-}
-
-gint allcol_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	mem_pal_copy( mem_pal, brcosa_pal );
-	pal_refresher();
 	delete_allcol( NULL, NULL, NULL );
 
 	return FALSE;
 }
 
-gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_data )
+static gint allcol_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
+{
+	if ( col_sel_type == COLSEL_EDIT_ALL ) do_allcol();
+
+	return FALSE;
+}
+
+static gint allcol_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
+{
+	if ( col_sel_type == COLSEL_EDIT_ALL )
+	{
+		mem_pal_copy( mem_pal, brcosa_pal );
+		pal_refresher();
+	}
+
+	delete_allcol( NULL, NULL, NULL );
+
+	return FALSE;
+}
+
+static gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_data )
 {
 	GdkColor *c = (GdkColor *)user_data;
 	unsigned char r = c->red/257, g = c->green/257, b = c->blue/257, *rgb = NULL;
@@ -1974,31 +1984,13 @@ gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_d
 	return FALSE;
 }
 
-void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
-{
-	GtkColorSelection *cs = GTK_COLOR_SELECTION(user_data);
-	GdkColor *c = (GdkColor *)gtk_object_get_user_data(GTK_OBJECT(widget));
-	gdouble color[4];
 
-	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
-	color[0] = ((gdouble)(c->red))/65535.0;
-	color[1] = ((gdouble)(c->green))/65535.0;
-	color[2] = ((gdouble)(c->blue))/65535.0;
-	color[3] = 1.0;
-	gtk_color_selection_set_color( cs, color );
-#if GTK_MAJOR_VERSION == 1
-	gtk_color_selection_set_color( cs, color);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	gtk_color_selection_set_previous_color( cs, c );
-#endif
-}
-
-void color_set( GtkColorSelection *selection, gpointer user_data )
+static void color_set( GtkColorSelection *selection, gpointer user_data )
 {
 	gdouble color[4];
 	GtkWidget *widget;
 	GdkColor *c;
+	int i, cur_opac, sel_col = -1;
 
 	gtk_color_selection_get_color( selection, color );
 	widget = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(selection)));
@@ -2008,41 +2000,155 @@ void color_set( GtkColorSelection *selection, gpointer user_data )
 	c->blue = mt_round( color[2]*65535.0 );
 	gdk_colormap_alloc_color( gdk_colormap_get_system(), c, FALSE, TRUE );
 	gtk_widget_queue_draw(widget);
+
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		for ( i=0; i<3; i++ ) if ( c == &ctable[i] ) sel_col = i;
+			// Get index of overlay selected
+
+#if GTK_MAJOR_VERSION == 1
+		cur_opac = mt_round(color[3]*65535);
+#endif
+#if GTK_MAJOR_VERSION == 2
+		cur_opac = gtk_color_selection_get_current_alpha( selection );
+#endif
+
+		col_sel_opac[ sel_col ] = cur_opac;		// Save it for later use
+
+	}
+}
+
+static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
+{
+	GtkColorSelection *cs = GTK_COLOR_SELECTION(user_data);
+	GdkColor *c = (GdkColor *)gtk_object_get_user_data(GTK_OBJECT(widget));
+	gdouble color[4];
+	int i, sel_col=-1;
+
+	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
+	color[0] = ((gdouble)(c->red))/65535.0;
+	color[1] = ((gdouble)(c->green))/65535.0;
+	color[2] = ((gdouble)(c->blue))/65535.0;
+	color[3] = 1.0;
+
+	gtk_signal_disconnect_by_func(GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL);
+
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		for ( i=0; i<3; i++ ) if ( c == &ctable[i] ) sel_col = i;
+			// Get index of overlay selected
+		color[3] = ((gdouble) col_sel_opac[sel_col]) / 65535;
+	}
+
+	gtk_color_selection_set_color( cs, color );
+#if GTK_MAJOR_VERSION == 1
+	gtk_color_selection_set_color( cs, color);
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		gtk_color_selection_set_opacity( cs, col_sel_opac[sel_col] );
+	}
+#endif
+
+#if GTK_MAJOR_VERSION == 2
+	gtk_color_selection_set_previous_color( cs, c );
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		gtk_color_selection_set_current_alpha( cs, col_sel_opac[sel_col] );
+		gtk_color_selection_set_previous_alpha( cs, col_sel_opac[sel_col] );
+	}
+#endif
+
+	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 }
 
 void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
 {
+	colour_selector( COLSEL_EDIT_ALL );
+}
+
+
+void colour_selector( int cs_type )			// Bring up GTK+ colour wheel
+{
 	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
 	GtkWidget *cs;
-	char txt[64];
-	int i;
+	png_color ovl[3];	// Overlay colours
+	char txt[64], *ovl_txt[] = { _("Alpha"), _("Selection"), _("Mask") };
+	int i, j=0;
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
+
+	ovl[0].red = 0;		// Just for testing - real values should come from back end
+	ovl[0].green = 0;
+	ovl[0].blue = 255;
+	ovl[1].red = 255;
+	ovl[1].green = 255;
+	ovl[1].blue = 0;
+	ovl[2].red = 255;
+	ovl[2].green = 0;
+	ovl[2].blue = 0;
+	col_sel_opac[0] = 128 * 257;
+	col_sel_opac[1] = 128 * 257;
+	col_sel_opac[2] = 128 * 257;
+
+	col_sel_type = cs_type;
+
 	mem_pal_copy( brcosa_pal, mem_pal );			// Remember old settings
 
-	ctable = malloc( mem_cols*sizeof(GdkColor) );
-	for ( i=0; i<mem_cols; i++ )
+	if ( col_sel_type == COLSEL_EDIT_ALL )
 	{
-		ctable[i].red = mem_pal[i].red*257;
-		ctable[i].green = mem_pal[i].green*257;
-		ctable[i].blue = mem_pal[i].blue*257;
-		ctable[i].pixel =	mem_pal[i].blue +
-					(mem_pal[i].green << 8) +
-					(mem_pal[i].red << 16);
+		ctable = malloc( mem_cols*sizeof(GdkColor) );
+		for ( i=0; i<mem_cols; i++ )
+		{
+			ctable[i].red   = mem_pal[i].red*257;
+			ctable[i].green = mem_pal[i].green*257;
+			ctable[i].blue  = mem_pal[i].blue*257;
+			ctable[i].pixel =	mem_pal[i].blue +
+						(mem_pal[i].green << 8) +
+						(mem_pal[i].red << 16);
+		}
+	}
+
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		ctable = malloc( 3*sizeof(GdkColor) );
+		for ( i=0; i<3; i++ )
+		{
+			ctable[i].red   = ovl[i].red*257;
+			ctable[i].green = ovl[i].green*257;
+			ctable[i].blue  = ovl[i].blue*257;
+			ctable[i].pixel = ovl[i].blue +
+						(ovl[i].green << 8) +
+						(ovl[i].red << 16);
+		}
 	}
 
 	cs = gtk_color_selection_new();
 
 #if GTK_MAJOR_VERSION == 2
-	gtk_color_selection_set_has_opacity_control (GTK_COLOR_SELECTION(cs), FALSE);
+	if ( col_sel_type == COLSEL_EDIT_ALL )
+		gtk_color_selection_set_has_opacity_control (GTK_COLOR_SELECTION(cs), FALSE);
+	else
+		gtk_color_selection_set_has_opacity_control (GTK_COLOR_SELECTION(cs), TRUE);
+
 	gtk_color_selection_set_has_palette (GTK_COLOR_SELECTION(cs), TRUE);
 #endif
 	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
 
-	allcol_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Edit All Colours"),
-		GTK_WIN_POS_MOUSE, TRUE );
+	if ( col_sel_type == COLSEL_EDIT_ALL )
+	{
+		allcol_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Edit All Colours"),
+			GTK_WIN_POS_MOUSE, TRUE );
+	}
+
+	if ( col_sel_type == COLSEL_OVERLAYS )
+	{
+		allcol_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
+			GTK_WIN_POS_CENTER, TRUE );
+	}
+
+
 	gtk_signal_connect_object( GTK_OBJECT(allcol_window),"delete_event",
 		GTK_SIGNAL_FUNC(allcol_cancel), NULL );
 
@@ -2071,7 +2177,10 @@ void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_add ( GTK_CONTAINER(viewport), col_list );
 	gtk_widget_show( col_list );
 
-	for ( i=0; i<mem_cols; i++ )
+	if ( col_sel_type == COLSEL_EDIT_ALL ) j = mem_cols;
+	if ( col_sel_type == COLSEL_OVERLAYS ) j = 3;
+
+	for ( i=0; i<j; i++ )
 	{
 		l_item = gtk_list_item_new();
 		gtk_object_set_user_data( GTK_OBJECT(l_item), (gpointer)(&ctable[i]));
@@ -2090,7 +2199,8 @@ void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_box_pack_start( GTK_BOX(hbox2), drw, FALSE, FALSE, 0 );
 		gtk_widget_show( drw );
 
-		sprintf( txt, "%i", i );
+		if ( col_sel_type == COLSEL_EDIT_ALL ) sprintf( txt, "%i", i );
+		if ( col_sel_type == COLSEL_OVERLAYS ) sprintf( txt, "%s", ovl_txt[i] );
 		label = gtk_label_new( txt );
 		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.0, 1.0 );
@@ -2131,6 +2241,12 @@ void pressed_allcol( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_window_set_transient_for( GTK_WINDOW(allcol_window), GTK_WINDOW(main_window) );
 	gtk_widget_show( allcol_window );
 	gtk_window_add_accel_group( GTK_WINDOW(allcol_window), ag );
+
+#if GTK_MAJOR_VERSION == 1
+	while (gtk_events_pending()) gtk_main_iteration();
+	gtk_list_select_item( GTK_LIST(col_list), 0 );
+		// grubby hack needed to start with proper opacity in GTK+1
+#endif
 }
 
 

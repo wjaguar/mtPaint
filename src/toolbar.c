@@ -123,6 +123,7 @@
 #include "graphics/xpm_mode_tint.xpm"
 #include "graphics/xpm_mode_tint2.xpm"
 #include "graphics/xpm_mode_csel.xpm"
+#include "graphics/xpm_mode_mask.xpm"
 
 
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS], *icon_buttons2[TOTAL_ICONS_MAIN];
@@ -409,11 +410,11 @@ static void toolbar_settings_init()
 	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") },
 	**icon_list_settings[TOTAL_ICONS_SETTINGS] = {
 		xpm_mode_cont_xpm, xpm_mode_opac_xpm, xpm_mode_tint_xpm, xpm_mode_tint2_xpm,
-		xpm_mode_csel_xpm
+		xpm_mode_csel_xpm, xpm_mode_mask_xpm
 		},
 	*hint_text_settings[TOTAL_ICONS_SETTINGS] = {
 		_("Continuous Mode"),  _("Opacity Mode"), _("Tint Mode"), _("Tint +-"),
-		_("Colour-Selective Mode")
+		_("Colour-Selective Mode"), _("Mask Mode")
 		};
 
 	GtkWidget *iconw, *label, *vbox, *table, *toolbar_settings, *but;

@@ -1,5 +1,5 @@
 /*	channels.c
-	Copyright (C) 2006 Dmitry Groshev and Mark Tyler
+	Copyright (C) 2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -25,6 +25,7 @@
 
 #include "memory.h"
 #include "mainwindow.h"
+#include "otherwindow.h"
 #include "mygtk.h"
 
 
@@ -175,4 +176,5 @@ void pressed_channel_alpha_overlay( GtkMenuItem *menu_item )
 
 void pressed_channel_config_overlay()
 {
+	colour_selector( COLSEL_OVERLAYS );
 }

@@ -1,5 +1,5 @@
 /*	channels.h
-	Copyright (C) 2006 Dmitry Groshev and Mark Tyler
+	Copyright (C) 2006 Mark Tyler
 
 	This file is part of mtPaint.
 
