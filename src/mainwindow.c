@@ -855,10 +855,8 @@ typedef struct {
 
 static key_action main_keys[] = {
 	{"QUIT",	ACT_QUIT, GDK_q, 0, 0},
-//	{"",		ACT_QUIT, GDK_Q, 0, 0},
 	{"ZOOM_IN",	ACT_ZOOM_IN, GDK_plus, _CS, 0},
 	{"",		ACT_ZOOM_IN, GDK_KP_Add, _CS, 0},
-//	{"",		ACT_ZOOM_IN, GDK_equal, _CS, 0},
 	{"ZOOM_OUT",	ACT_ZOOM_OUT, GDK_minus, _CS, 0},
 	{"",		ACT_ZOOM_OUT, GDK_KP_Subtract, _CS, 0},
 	{"ZOOM_01",	ACT_ZOOM_01, GDK_KP_1, _CS, 0},
@@ -884,14 +882,12 @@ static key_action main_keys[] = {
 	{"PAN",		ACT_PAN, GDK_End, _CS, 0},
 	{"CROP",	ACT_CROP, GDK_Delete, _CS, 0},
 	{"SWAP_AB",	ACT_SWAP_AB, GDK_x, _CSA, 0},
-//	{"",		ACT_SWAP_AB, GDK_X, _CSA, 0}, // !!! Naturally, this doesn't work
 	{"CMDLINE",	ACT_CMDLINE, GDK_c, _CSA, 0},
-//	{"",		ACT_CMDLINE, GDK_C, _CSA, 0}, // !!! And this, too
 #if GTK_MAJOR_VERSION == 2
 	{"PATTERN",	ACT_PATTERN, GDK_F2, _CSA, 0},
 	{"BRUSH",	ACT_BRUSH, GDK_F3, _CSA, 0},
 #endif
-// GTK+1 creates a segfault if you use F2/F3 here - This doesn't matter as only GTK+2 needs it here as in full screen mode GTK+2 does not handle menu keyboard shortcuts
+// Only GTK+2 needs it here as in full screen mode GTK+2 does not handle menu keyboard shortcuts
 	{"PAINT",	ACT_PAINT, GDK_F4, _CSA, 0},
 	{"SELECT",	ACT_SELECT, GDK_F9, _CSA, 0},
 	{"SEL_2LEFT",	ACT_SEL_2LEFT, GDK_Left, _CS, _S},
@@ -932,7 +928,6 @@ static key_action main_keys[] = {
 	{"",		ACT_OPAC_1, GDK_0, _CS, _C},
 	{"OPAC_P",	ACT_OPAC_P, GDK_plus, _CS, _C},
 	{"",		ACT_OPAC_P, GDK_KP_Add, _CS, _C},
-//	{"",		ACT_OPAC_P, GDK_equal, _CS, _C},
 	{"OPAC_M",	ACT_OPAC_M, GDK_minus, _CS, _C},
 	{"",		ACT_OPAC_M, GDK_KP_Subtract, _CS, _C},
 	{"LR_2LEFT",	ACT_LR_2LEFT, GDK_Left, _CS, _CS},
@@ -958,9 +953,7 @@ static key_action main_keys[] = {
 	{"",		ACT_COMMIT, GDK_KP_Enter, 0, 0},
 	{"RCLICK",	ACT_RCLICK, GDK_BackSpace, 0, 0},
 	{"ARROW",	ACT_ARROW, GDK_a, _C, 0},
-//	{"",		ACT_ARROW, GDK_A, _C, 0},
 	{"ARROW3",	ACT_ARROW3, GDK_s, _C, 0},
-//	{"",		ACT_ARROW3, GDK_S, _C, 0},
 	{"A_PREV",	ACT_A_PREV, GDK_bracketleft, _CS, 0},
 	{"A_NEXT",	ACT_A_NEXT, GDK_bracketright, _CS, 0},
 	{"B_PREV",	ACT_B_PREV, GDK_bracketleft, _CS, _S},
@@ -969,22 +962,16 @@ static key_action main_keys[] = {
 	{"",		ACT_B_NEXT, GDK_braceright, _CS, _S},
 	{"TO_IMAGE",	ACT_TO_IMAGE, GDK_KP_1, _CS, _S},
 	{"",		ACT_TO_IMAGE, GDK_1, _CS, _S},
-//	{"",		ACT_TO_IMAGE, GDK_exclam, _CS, _S},
 	{"TO_ALPHA",	ACT_TO_ALPHA, GDK_KP_2, _CS, _S},
 	{"",		ACT_TO_ALPHA, GDK_2, _CS, _S},
-//	{"",		ACT_TO_ALPHA, GDK_at, _CS, _S},
 	{"TO_SEL",	ACT_TO_SEL, GDK_KP_3, _CS, _S},
 	{"",		ACT_TO_SEL, GDK_3, _CS, _S},
-//	{"",		ACT_TO_SEL, GDK_numbersign, _CS, _S},
 	{"TO_MASK",	ACT_TO_MASK, GDK_KP_4, _CS, _S},
 	{"",		ACT_TO_MASK, GDK_4, _CS, _S},
-//	{"",		ACT_TO_MASK, GDK_dollar, _CS, _S},
 	{"VWZOOM_IN",	ACT_VWZOOM_IN, GDK_plus, _CS, _S},
 	{"",		ACT_VWZOOM_IN, GDK_KP_Add, _CS, _S},
-//	{"",		ACT_VWZOOM_IN, GDK_equal, _CS, _S},
 	{"VWZOOM_OUT",	ACT_VWZOOM_OUT, GDK_minus, _CS, _S},
 	{"",		ACT_VWZOOM_OUT, GDK_KP_Subtract, _CS, _S},
-//	{"",		ACT_VWZOOM_OUT, GDK_underscore, _CS, _S},
 	{NULL,		0, 0, 0, 0}
 };
 
@@ -2966,14 +2953,15 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 	old_zoom = vw_zoom;
 	vw_zoom = -1; /* Force resize */
 	vw_align_size(old_zoom);		// Update the view window as needed
+	vw_zoom = old_zoom;
 
 	return TRUE;
 }
 
 void force_main_configure()
 {
-	if ( drawing_canvas ) configure_canvas( drawing_canvas, NULL );
-	if ( vw_drawing ) vw_configure( vw_drawing, NULL );
+	if (drawing_canvas) configure_canvas(drawing_canvas, NULL);
+	if (view_showing && vw_drawing) vw_configure(vw_drawing, NULL);
 }
 
 static gint expose_canvas( GtkWidget *widget, GdkEventExpose *event )
@@ -3423,7 +3411,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Show Palette"), 0, MENU_SHOWPAL, 0, "F8", pressed_toolbar_toggle, TOOLBAR_PALETTE },
 	{ _("/View/Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, pressed_toolbar_toggle, TOOLBAR_STATUS },
 	{ _("/View/sep1"), -4 },
-	{ _("/View/Toggle Image View (Home)"), -1, 0, 0, NULL, toggle_view, 0 },
+	{ _("/View/Toggle Image View"), -1, 0, 0, "Home", toggle_view, 0 },
 	{ _("/View/Centralize Image"), 0, MENU_CENTER, 0, NULL, pressed_centralize, 0 },
 	{ _("/View/Show zoom grid"), 0, MENU_SHOWGRID, 0, NULL, zoom_grid, 0 },
 	{ _("/View/sep2"), -4 },
@@ -3581,8 +3569,7 @@ void main_init()
 	GtkRequisition req;
 	GdkPixmap *icon_pix = NULL;
 
-	GtkWidget *vw_drawing, *menubar1, *vbox_main,
-			*hbox_bar, *hbox_bottom;
+	GtkWidget *menubar1, *vbox_main, *hbox_bar, *hbox_bottom;
 	GtkAccelGroup *accel_group;
 
 
@@ -3676,7 +3663,7 @@ void main_init()
 	gtk_widget_show( vw_drawing );
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(vw_scrolledwindow), vw_drawing);
 
-	init_view(vw_drawing);
+	init_view();
 
 //	MAIN WINDOW
 

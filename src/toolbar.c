@@ -594,6 +594,9 @@ static void toolbar_settings_init()
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
 	{
 		gtk_widget_show( toolbar_boxes[TOOLBAR_SETTINGS] );	// Used when Home key is pressed
+#if GTK_MAJOR_VERSION == 1
+		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Reset shortened sliders */
+#endif
 		return;
 	}
 

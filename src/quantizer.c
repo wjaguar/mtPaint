@@ -509,10 +509,50 @@ static ulong calc_err(int c1, int c2)
 	return (dist1 + dist2);
 }
 
+static void recount_next(int i)
+{
+	int j, c2 = 0;
+	ulong err, cur_err;
+
+	err = ~0L;
+	for (j = i + 1; j < tot_colors; j++)
+	{
+		cur_err = calc_err(i, j);
+		if (cur_err < err)
+		{
+			err = cur_err;
+			c2 = j;
+		}
+	}
+	rgb_table3[i].err = err;
+	rgb_table3[i].cc = c2;
+}
+
+static void recount_dist(int c1)
+{
+	int i;
+	ulong cur_err;
+
+	recount_next(c1);
+	for (i = 0; i < c1; i++)
+	{
+		if (rgb_table3[i].cc == c1) recount_next(i);
+		else
+		{
+			cur_err = calc_err(i, c1);
+			if (cur_err < rgb_table3[i].err)
+			{
+				rgb_table3[i].err = cur_err;
+				rgb_table3[i].cc = c1;
+			}
+		}
+	}
+}
+
 static int reduce_table3(int num_colors)
 {
-	int i, j, c1=0, c2=0, c3=0, grand_total, bailout = FALSE;
-	ulong err, cur_err;
+	int i, c1=0, c2=0, grand_total, bailout = FALSE;
+	ulong err;
 
 	progress_init("Quantize Pass 1", 1);
 	for (i = 0; i < (tot_colors - 1); i++)
@@ -520,18 +560,7 @@ static int reduce_table3(int num_colors)
 		if ( i%16 == 0 ) bailout = progress_update( ((float) i) / (tot_colors-1) );
 		if (bailout) goto stop;
 
-		err = ~0L;
-		for (j = i + 1; j < tot_colors; j++)
-		{
-			cur_err = calc_err(i, j);
-			if (cur_err < err)
-			{
-				err = cur_err;
-				c2 = j;
-			}
-		}
-		rgb_table3[i].err = err;
-		rgb_table3[i].cc = c2;
+		recount_next(i);
 	}
 	progress_end();
 
@@ -575,108 +604,11 @@ static int reduce_table3(int num_colors)
 
 		for (i = c1 + 1; i < tot_colors; i++)
 		{
-			if (rgb_table3[i].cc == tot_colors)
-			{
-				err = ~0L;
-				for (j = i + 1; j < tot_colors; j++)
-				{
-					cur_err = calc_err(i, j);
-					if (cur_err < err)
-					{
-						err = cur_err;
-						c3 = j;
-					}
-				}
-				rgb_table3[i].err = err;
-				rgb_table3[i].cc = c3;
-			}
+			if (rgb_table3[i].cc == tot_colors) recount_next(i);
 		}
 
-		err = ~0L;
-		for (i = c1 + 1; i < tot_colors; i++)
-		{
-			cur_err = calc_err(i, c1);
-			if (cur_err < err)
-			{
-				err = cur_err;
-				c3 = i;
-			}
-		}
-		rgb_table3[c1].err = err;
-		rgb_table3[c1].cc = c3;
-
-		for (i = 0; i < c1; i++)
-		{
-			if (rgb_table3[i].cc == c1)
-			{
-				err = ~0L;
-				for (j = i + 1; j < tot_colors; j++)
-				{
-					cur_err = calc_err(i, j);
-					if (cur_err < err)
-					{
-						err = cur_err;
-						c3 = j;
-					}
-				}
-				rgb_table3[i].err = err;
-				rgb_table3[i].cc = c3;
-			}
-		}
-
-		for (i = 0; i < c1; i++)
-		{
-			cur_err = calc_err(i, c1);
-			if (cur_err < rgb_table3[i].err)
-			{
-				rgb_table3[i].err = cur_err;
-				rgb_table3[i].cc = c1;
-			}
-		}
-
-		if (c2 != tot_colors)
-		{
-			err = ~0L;
-			for (i = c2 + 1; i < tot_colors; i++)
-			{
-				cur_err = calc_err(c2, i);
-				if (cur_err < err)
-				{
-					err = cur_err;
-					c3 = i;
-				}
-			}
-			rgb_table3[c2].err = err;
-			rgb_table3[c2].cc = c3;
-			for (i = 0; i < c2; i++)
-			{
-				if (rgb_table3[i].cc == c2)
-				{
-					err = ~0L;
-					for (j = i + 1; j < tot_colors; j++)
-					{
-						cur_err = calc_err(i, j);
-						if (cur_err < err)
-						{
-							err = cur_err;
-							c3 = j;
-						}
-					}
-					rgb_table3[i].err = err;
-					rgb_table3[i].cc = c3;
-				}
-			}
-
-			for (i = 0; i < c2; i++)
-			{
-				cur_err = calc_err(i, c2);
-				if (cur_err < rgb_table3[i].err)
-				{
-					rgb_table3[i].err = cur_err;
-					rgb_table3[i].cc = c2;
-				}
-			}
-		}
+		recount_dist(c1);
+		if (c2 != tot_colors) recount_dist(c2);
 	}
 stop:
 	progress_end();

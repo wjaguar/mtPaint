@@ -244,10 +244,10 @@ static void shift_layer(int val)
 
 	update_cols();				// Update status bar info
 
-	if ( layer_selected == 0 || (layer_selected-val) == 0 )
+	if ((layer_selected == 0) || (layer_selected == val))
 	{
-		if ( vw_drawing != NULL ) gtk_widget_queue_draw( vw_drawing );	// Update Whole window
-		if ( show_layers_main ) gtk_widget_queue_draw(drawing_canvas);
+		if (view_showing) gtk_widget_queue_draw(vw_drawing);
+		if (show_layers_main) gtk_widget_queue_draw(drawing_canvas);
 	}
 	else
 	{

@@ -719,7 +719,7 @@ void vw_focus_view()						// Focus view window to main window
 	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
 	GtkAdjustment *hori, *vert;
 
-	if (!vw_drawing) return;		// Bail out if not visible
+	if (!view_showing) return;		// Bail out if not visible
 	if (!vw_focus_on) return;		// Only focus if user wants to
 
 	if (vw_mouse_status)	/* Dragging in progress - delay focus */
@@ -808,7 +808,7 @@ void vw_align_size( float new_zoom )
 {
 	int sw = mem_width, sh = mem_height, i;
 
-	if (!vw_drawing) return;
+	if (!view_showing) return;
 
 	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
 	if (new_zoom > MAX_ZOOM) new_zoom = MAX_ZOOM;
@@ -883,7 +883,7 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 {
 	int zoom, scale;
 
-	if ( vw_drawing == NULL ) return;
+	if (!view_showing) return;
 	
 	if ( layer_selected > 0 )
 	{
@@ -1042,21 +1042,30 @@ void view_show()
 	gtk_container_remove(GTK_CONTAINER(vbox_right), scrolledwindow_canvas);
 	gtk_paned_pack1 (GTK_PANED (main_split), scrolledwindow_canvas, FALSE, TRUE);
 	gtk_paned_pack2 (GTK_PANED (main_split), vw_scrolledwindow, FALSE, TRUE);
+	view_showing = TRUE;
 	gtk_box_pack_start (GTK_BOX (vbox_right), main_split, TRUE, TRUE, 0);
 	gtk_widget_unref(scrolledwindow_canvas);
 	gtk_widget_unref(vw_scrolledwindow);
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
-	view_showing = TRUE;
 	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), TRUE);
 	vw_focus_view();
+#if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
+	gtk_adjustment_value_changed(
+		gtk_scrolled_window_get_hadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
+	if (!vw_focus_on) gtk_adjustment_value_changed(
+		gtk_scrolled_window_get_hadjustment(
+		GTK_SCROLLED_WINDOW(vw_scrolledwindow)));
+#endif
 }
 
 void view_hide()
 {
 	if (!view_showing) return;
+	view_showing = FALSE;
 	gtk_widget_ref(scrolledwindow_canvas);
 	gtk_widget_ref(vw_scrolledwindow);
 	gtk_widget_ref(main_split);
@@ -1066,10 +1075,14 @@ void view_hide()
 	gtk_box_pack_start (GTK_BOX (vbox_right), scrolledwindow_canvas, TRUE, TRUE, 0);
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
-	view_showing = FALSE;
 	set_cursor(); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), FALSE);
+#if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
+	gtk_adjustment_value_changed(
+		gtk_scrolled_window_get_hadjustment(
+		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
+#endif
 }
 
 
@@ -1092,13 +1105,12 @@ void pressed_view( GtkMenuItem *menu_item, gpointer user_data )
 	else view_hide();
 }
 
-void init_view( GtkWidget *canvas )
+void init_view()
 {
 	vw_width = 1;
 	vw_height = 1;
 
 	view_showing = FALSE;
-	vw_drawing = canvas;
 
 	gtk_signal_connect( GTK_OBJECT(vw_drawing), "configure_event",
 		GTK_SIGNAL_FUNC (vw_configure), NULL );

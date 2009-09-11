@@ -4188,7 +4188,7 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
-static void component_filter(unsigned char *dest, unsigned char *src)
+static void component_filter(unsigned char *dest, const unsigned char *src, int tint)
 {
 	static const unsigned char hhsv[8 * 3] =
 		{0, 1, 2, /* #0: B..M */
@@ -4199,7 +4199,8 @@ static void component_filter(unsigned char *dest, unsigned char *src)
 		 0, 2, 1, /* #5: Y+..G- */
 		 1, 2, 0, /* #6: R..Y */
 		 1, 2, 0  /* #7: W */ };
-	unsigned char *new, *old;
+	static const unsigned char zero[3] = {0, 0, 0};
+	const unsigned char *new, *old;
 	int nhex, ohex;
 
 	/* Backward transfer if passing two components */
@@ -4299,6 +4300,7 @@ static void component_filter(unsigned char *dest, unsigned char *src)
 	default: break;
 	}
 
+	if (tint) src = zero;
 	switch (filter_RGB)
 	{
 	case 7: /* Do nothing */
@@ -4406,6 +4408,8 @@ void put_pixel( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
+		if (mem_filtmode) component_filter(cset, old_image + ofs3, tint);
+
 		if (tint)
 		{
 			if (tint < 0)
@@ -4435,8 +4439,6 @@ void put_pixel( int x, int y )	/* Combined */
 			i = b * 255 + (cset[2] - b) * opacity;
 			cset[2] = (i + (i >> 8) + 1) >> 8;
 		}
-
-		if (mem_filtmode) component_filter(cset, old_image + ofs3);
 
 		new_image[ofs3] = cset[0];
 		new_image[ofs3 + 1] = cset[1];
@@ -4586,6 +4588,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				nrgb[1] = mem_pal[img[i]].green;
 				nrgb[2] = mem_pal[img[i]].blue;
 			}
+			if (mem_filtmode) component_filter(nrgb, img0 + ofs3, tint);
 			if (tint)
 			{
 				r = img0[ofs3 + 0];
@@ -4616,7 +4619,6 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				j = b * 255 + (nrgb[2] - b) * opacity;
 				nrgb[2] = (j + (j >> 8) + 1) >> 8;
 			}
-			if (mem_filtmode) component_filter(nrgb, img0 + ofs3);
 			imgr[ofs3 + 0] = nrgb[0];
 			imgr[ofs3 + 1] = nrgb[1];
 			imgr[ofs3 + 2] = nrgb[2];
