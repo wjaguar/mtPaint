@@ -1551,7 +1551,7 @@ typedef struct {
 
 static GtkWidget *allcol_window, *allcol_list;
 static RGBA16 *ctable;
-static int allcol_idx, cs_old_overlay[NUM_CHANNELS][4];
+static int allcol_idx;
 static colour_hook allcol_hook;
 
 
@@ -1807,18 +1807,15 @@ static void do_allcol()
 
 static void do_allover()
 {
-	channel_rgb[CHN_ALPHA][0] = (ctable[0].r + 128) / 257;
-	channel_rgb[CHN_ALPHA][1] = (ctable[0].g + 128) / 257;
-	channel_rgb[CHN_ALPHA][2] = (ctable[0].b + 128) / 257;
-	channel_opacity[CHN_ALPHA] = (ctable[0].a + 128) / 257;
-	channel_rgb[CHN_SEL][0] = (ctable[1].r + 128) / 257;
-	channel_rgb[CHN_SEL][1] = (ctable[1].g + 128) / 257;
-	channel_rgb[CHN_SEL][2] = (ctable[1].b + 128) / 257;
-	channel_opacity[CHN_SEL] = (ctable[1].a + 128) / 257;
-	channel_rgb[CHN_MASK][0] = (ctable[2].r + 128) / 257;
-	channel_rgb[CHN_MASK][1] = (ctable[2].g + 128) / 257;
-	channel_rgb[CHN_MASK][2] = (ctable[2].b + 128) / 257;
-	channel_opacity[CHN_MASK] = (ctable[2].a + 128) / 257;
+	int i;
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		channel_rgb[i][0] = (ctable[i].r + 128) / 257;
+		channel_rgb[i][1] = (ctable[i].g + 128) / 257;
+		channel_rgb[i][2] = (ctable[i].b + 128) / 257;
+		channel_opacity[i] = (ctable[i].a + 128) / 257;
+	}
 	update_all_views();
 }
 
@@ -1882,14 +1879,8 @@ static void select_overlay(int what)
 	case 0: /* Cancel */
 		for (i = 0; i < NUM_CHANNELS; i++)	// Restore original values
 		{
-			for (j = 0; j < 3; j++)
-			{
-				channel_rgb[i][j] = cs_old_overlay[i][j];
-			}
-			channel_opacity[i] = cs_old_overlay[i][3];
+			ctable[i] = ctable[i + NUM_CHANNELS];
 		}
-		update_all_views();
-		break;
 	case 1: /* Preview */
 		do_allover();
 		break;
@@ -2010,12 +2001,13 @@ static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 {
 	GtkWidget *win, *extbox, *button, *spin;
-	int i, j;
+	int i;
 
 	if (cs_type == COLSEL_EDIT_ALL)
 	{
 		mem_pal_copy( brcosa_pal, mem_pal );	// Remember old settings
 		ctable = malloc(mem_cols * sizeof(RGBA16));
+		if (!ctable) return;
 		for (i = 0; i < mem_cols; i++)
 		{
 			ctable[i].r = mem_pal[i].red * 257;
@@ -2030,33 +2022,24 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 	if (cs_type == COLSEL_OVERLAYS)
 	{
-		char *ovl_txt[] = { _("Alpha"), _("Selection"), _("Mask") };
-		for (i = 0; i < NUM_CHANNELS; i++)	// Needed if Cancel is pressed
-		{
-			for (j = 0; j < 3; j++)
-			{
-				cs_old_overlay[i][j] = channel_rgb[i][j];
-			}
-			cs_old_overlay[i][3] = channel_opacity[i];
-		}
+		char *ovl_txt[NUM_CHANNELS] =
+			{ _("Image"), _("Alpha"), _("Selection"), _("Mask") };
 
-		ctable = malloc(3 * sizeof(RGBA16));
-		ctable[0].r = channel_rgb[CHN_ALPHA][0] * 257;
-		ctable[0].g = channel_rgb[CHN_ALPHA][1] * 257;
-		ctable[0].b = channel_rgb[CHN_ALPHA][2] * 257;
-		ctable[0].a = channel_opacity[CHN_ALPHA] * 257;
-		ctable[1].r = channel_rgb[CHN_SEL][0] * 257;
-		ctable[1].g = channel_rgb[CHN_SEL][1] * 257;
-		ctable[1].b = channel_rgb[CHN_SEL][2] * 257;
-		ctable[1].a = channel_opacity[CHN_SEL] * 257;
-		ctable[2].r = channel_rgb[CHN_MASK][0] * 257;
-		ctable[2].g = channel_rgb[CHN_MASK][1] * 257;
-		ctable[2].b = channel_rgb[CHN_MASK][2] * 257;
-		ctable[2].a = channel_opacity[CHN_MASK] * 257;
+		ctable = malloc(NUM_CHANNELS * 2 * sizeof(RGBA16));
+		if (!ctable) return;
+		for (i = 0; i < NUM_CHANNELS; i++)
+		{
+			ctable[i].r = channel_rgb[i][0] * 257;
+			ctable[i].g = channel_rgb[i][1] * 257;
+			ctable[i].b = channel_rgb[i][2] * 257;
+			ctable[i].a = channel_opacity[i] * 257;
+			/* Save old value in the same array */
+			ctable[i + NUM_CHANNELS] = ctable[i];
+		}
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
 			GTK_WIN_POS_CENTER, TRUE);
-		colour_window(win, NULL, 3, ovl_txt, TRUE, select_overlay);
+		colour_window(win, NULL, NUM_CHANNELS, ovl_txt, TRUE, select_overlay);
 	}
 
 	if (cs_type == COLSEL_EDIT_AB)
@@ -2067,6 +2050,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
 
 		ctable = malloc(4 * sizeof(RGBA16));
+		if (!ctable) return;
 		ctable[0].r = A0->red * 257;
 		ctable[0].g = A0->green * 257;
 		ctable[0].b = A0->blue * 257;
@@ -2108,6 +2092,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		csel_preview_a0 = csel_preview_a;
 
 		ctable = malloc(3 * sizeof(RGBA16));
+		if (!ctable) return;
 		ctable[0].r = INT_2_R(csel_data->center) * 257;
 		ctable[0].g = INT_2_G(csel_data->center) * 257;
 		ctable[0].b = INT_2_B(csel_data->center) * 257;

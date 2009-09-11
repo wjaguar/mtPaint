@@ -18,6 +18,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Major rewrite of back end code to improve performance
 	* Colour A/B editor now uses GTK+ colour dialog
 	* Ctrl+Arrows resizes selection area
+	* Flood fill has fuzzy mode - right click icon for controls
 	* Most documentation has been removed from the F1 help and is now in HTML form
 	* HTML documentation available as a separate download package
 	* mtPaint mailing lists set up - http://sourceforge.net/mail/?group_id=155874

@@ -1287,8 +1287,8 @@ void pressed_paste_layer( GtkMenuItem *menu_item, gpointer user_data )
 		{
 			layer_table[layer_selected].x = mem_clip_x;
 			layer_table[layer_selected].y = mem_clip_y;
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
-				TRUE );			// Change tool
+//			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
+//				TRUE );			// Change tool
 
 			mem_pal_copy(layer_table[layer_selected].image->mem_pal,
 				layer_table[ol].image->mem_pal);		// Copy palette

@@ -76,8 +76,8 @@ static void activate_channel(int chan)
 static void click_newchan_ok(GtkButton *button, gpointer user_data)
 {
 	chanlist tlist;
-	int i, ii, k, j = mem_width * mem_height, range, sq256[256], rgb[3];
-	unsigned char *src, *dest, *tmp;
+	int i, ii, k, j = mem_width * mem_height, range, rgb[3];
+	unsigned char sq1024[1024], *src, *dest, *tmp;
 	double r2;
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
@@ -113,10 +113,10 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 		r2 = 255.0 * 255.0;
 		if (range) r2 /= (double)range;
 		/* Prepare fast-square-root table */
-		for (i = ii = 0; i < 16; i++)
+		for (i = ii = 0; i < 32; i++)
 		{
 			k = (i + 1) * (i + 1);
-			for (; ii < k; ii++) sq256[ii] = i;
+			for (; ii < k; ii++) sq1024[ii] = i;
 		}
 		src = mem_img[CHN_IMAGE];
 		if (mem_img_bpp == 1)
@@ -134,15 +134,11 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 				k = r2 * (double)range;
 				/* Fast square root */
 				if (k >= (255 * 255)) ii = 255;
-				else if (k < 256) ii = sq256[k];
+				else if (k < 1024) ii = sq1024[k];
 				else
 				{
-					if (k < 736) ii = 17 + (k + 9 - 256) / 47;
-					else
-					{
-						ii = sq256[k >> 8] << 4;
-						ii += (k - ii * ii) / (ii + ii + 16) + 1;
-					}
+					ii = sq1024[k >> 6] << 3;
+					ii += (k - ii * ii) / (ii + ii);
 					ii -= ((k - ii * ii) >> 17) & 1;
 				}
 				p2l[i] = ii ^ 255;
@@ -162,15 +158,11 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 				k = r2 * (double)range;
 				/* Fast square root */
 				if (k >= (255 * 255)) ii = 255;
-				else if (k < 256) ii = sq256[k];
+				else if (k < 1024) ii = sq1024[k];
 				else
 				{
-					if (k < 736) ii = 17 + (k + 9 - 256) / 47;
-					else
-					{
-						ii = sq256[k >> 8] << 4;
-						ii += (k - ii * ii) / (ii + ii + 16) + 1;
-					}
+					ii = sq1024[k >> 6] << 3;
+					ii += (k - ii * ii) / (ii + ii);
 					ii -= ((k - ii * ii) >> 17) & 1;
 				}
 				dest[i] = ii ^ 255;

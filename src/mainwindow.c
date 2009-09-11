@@ -1439,12 +1439,12 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	dest = rgb;
 	ii = rr_dx;
 
-	if (hide_image) /* Substitute non-transparent pure black */
+	if (hide_image) /* Substitute non-transparent "image overlay" colour */
 	{
 		w_bpp = 3;
 		w_xpm = -1;
 		ds = 0;
-		src = "\0\0\0";
+		src = channel_rgb[CHN_IMAGE];
 	}
 	if (!da && (w_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
 
