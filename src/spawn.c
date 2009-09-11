@@ -376,8 +376,7 @@ void pressed_file_configure()
 	win = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure File Actions"), GTK_WIN_POS_CENTER, TRUE );
 	gtk_window_set_default_size( GTK_WINDOW(win), 500, 400 );
 
-	vbox = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(win), vbox);
+	vbox = add_vbox(win);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
 	sw = xpack5(vbox, gtk_scrolled_window_new(NULL, NULL));

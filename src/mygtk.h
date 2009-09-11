@@ -207,6 +207,10 @@ GtkWidget *pack5(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget);
 GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget);
 
+// Put vbox into container
+
+GtkWidget *add_vbox(GtkWidget *cont);
+
 // Save/restore window positions
 
 void win_store_pos(GtkWidget *window, char *inikey);

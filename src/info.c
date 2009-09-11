@@ -297,9 +297,7 @@ void pressed_information()
 	if ( mem_img_bpp == 1 )
 		gtk_widget_set_usize (GTK_WIDGET (info_window), -2, 400);
 
-	vbox4 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox4);
-	gtk_container_add (GTK_CONTAINER (info_window), vbox4);
+	vbox4 = add_vbox(info_window);
 
 	table4 = gtk_table_new (3, 2, FALSE);
 	gtk_widget_show (table4);

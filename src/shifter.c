@@ -269,13 +269,10 @@ void pressed_shifter()
 	char txt[32];
 
 
-	shifter_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Palette Shifter"),
-			GTK_WIN_POS_CENTER, TRUE );
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox);
-	gtk_container_add (GTK_CONTAINER (shifter_window), vbox);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox), 5);
+	shifter_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Shifter"),
+		GTK_WIN_POS_CENTER, TRUE);
+	vbox = add_vbox(shifter_window);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
 	table = add_a_table(9, 4, 5, vbox);
 

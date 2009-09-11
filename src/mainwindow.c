@@ -4771,9 +4771,7 @@ void main_init()
 	gtk_signal_connect(GTK_OBJECT(main_window), "drag_drop",
 		GTK_SIGNAL_FUNC(drag_n_drop_tried), NULL);
 
-	vbox_main = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_main);
-	gtk_container_add (GTK_CONTAINER (main_window), vbox_main);
+	vbox_main = add_vbox(main_window);
 
 // we need to realize the window because we use pixmaps for 
 // items on the toolbar & menus in the context of it

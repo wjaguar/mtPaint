@@ -175,10 +175,7 @@ void progress_init(char *text, int canc)		// Initialise progress window
 	gtk_widget_show(viewport);
 	gtk_container_add( GTK_CONTAINER( progress_window ), viewport );
 	gtk_viewport_set_shadow_type( GTK_VIEWPORT(viewport), GTK_SHADOW_ETCHED_OUT );
-
-	vbox6 = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox6);
-	gtk_container_add(GTK_CONTAINER(viewport), vbox6);
+	vbox6 = add_vbox(viewport);
 
 	progress_bar = pack(vbox6, gtk_progress_bar_new());
 	gtk_progress_set_format_string( GTK_PROGRESS (progress_bar), text );
@@ -1028,6 +1025,16 @@ GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget)
 {
 	gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, 5);
 	return (widget);
+}
+
+// Put vbox into container
+
+GtkWidget *add_vbox(GtkWidget *cont)
+{
+	GtkWidget *box = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(box);
+	gtk_container_add(GTK_CONTAINER(cont), box);
+	return (box);
 }
 
 // Save/restore window positions

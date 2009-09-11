@@ -1188,8 +1188,7 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 
 	win_restore_pos(res->window, "fs_window", 0, 0, 550, 500);
 
-	vbox1 = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(res->window), vbox1);
+	vbox1 = add_vbox(res->window);
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
 
 	// ------- Combo Box -------

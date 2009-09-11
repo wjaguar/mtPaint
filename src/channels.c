@@ -256,10 +256,7 @@ void pressed_channel_create(int channel)
 	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
 			GTK_WIN_POS_CENTER, TRUE );
 	gtk_object_set_user_data(GTK_OBJECT(newchan_window), (gpointer)channel);
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox);
-	gtk_container_add (GTK_CONTAINER (newchan_window), vbox);
+	vbox = add_vbox(newchan_window);
 
 	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
 	add_with_frame(vbox, _("Channel Type"), hbox, 5);
@@ -319,8 +316,7 @@ void pressed_channel_delete()
 	window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Delete Channels"),
 		GTK_WIN_POS_CENTER, TRUE);
 
-	vbox = cdel_box = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(window), vbox);
+	vbox = cdel_box = add_vbox(window);
 	cdel_count = 0;
 	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 	{

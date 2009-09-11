@@ -133,9 +133,7 @@ void pressed_help()
 	gtk_window_set_title (GTK_WINDOW (help_window), txt);
 	gtk_widget_set_usize (help_window, -2, 400);
 
-	box1 = gtk_vbox_new (FALSE, 0);
-	gtk_container_add (GTK_CONTAINER (help_window), box1);
-	gtk_widget_show (box1);
+	box1 = add_vbox(help_window);
 
 	box2 = xpack(box1, gtk_vbox_new(FALSE, 10));
 	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
@@ -1390,10 +1388,7 @@ void pressed_text()
 
 	text_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Paste Text"), GTK_WIN_POS_CENTER, TRUE );
 	gtk_window_set_default_size( GTK_WINDOW(text_window), 400, 400 );
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox);
-	gtk_container_add (GTK_CONTAINER (text_window), vbox);
+	vbox = add_vbox(text_window);
 
 	text_font_window = xpack(vbox, gtk_font_selection_new());
 	gtk_widget_show(text_font_window);

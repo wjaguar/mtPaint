@@ -16,7 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* sRGB colour scale generation added to palette editor
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
-	* Animated GIF files now can be loaded into layers (one frame per layer)
+	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should

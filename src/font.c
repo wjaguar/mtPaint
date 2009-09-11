@@ -1874,10 +1874,7 @@ void pressed_mt_text()
 //	TAB 2 - DIRECTORIES
 
 	page = add_new_page(notebook, _("Font Directories"));
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox);
-	gtk_container_add (GTK_CONTAINER (page), vbox);
+	vbox = add_vbox(page);
 
 	add_font_clist(CLIST_DIRECTORIES, vbox, mem, 5);
 

@@ -1060,8 +1060,7 @@ void pressed_animate_window()
 
 	ani_win_set_pos();
 
-	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_container_add (GTK_CONTAINER (animate_window), vbox1);
+	vbox1 = add_vbox(animate_window);
 
 	notebook1 = xpack(vbox1, gtk_notebook_new());
 	gtk_container_set_border_width(GTK_CONTAINER(notebook1), 5);

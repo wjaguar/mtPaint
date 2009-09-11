@@ -1307,67 +1307,73 @@ static void anim_dialog_fn(char *key)
 	*(key - *key) = *key;
 }
 
-static int anim_file_dialog()
+static int anim_file_dialog(int ftype)
 {
 	char *modes[] = { _("Raw frames"), _("Composited frames"),
 		_("Composited frames with nonzero delay") };
-	char *opts[] = { _("Cancel"), _("Edit Frames"),
+	char *opts[] = { _("Load First Frame"), _("Explode Frames"),
 #ifndef WIN32
 		_("View Animation"),
 #endif
 		NULL };
 	char keys[] = { 0, 1, 2, 3, 4, 5 };
-	GtkWidget *alert, *vbox, *button, *label;
+	char *tmp;
+	GtkWidget *win, *vbox, *hbox, *label, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	int i;
+	int i, is_anim;
 
 
-	/* This function must be immune to pointer grabs */
+	/* This function is better be immune to pointer grabs */
 	release_grab();
 
-	alert = gtk_dialog_new();
-	gtk_window_set_title(GTK_WINDOW(alert), _("Warning"));
-	gtk_window_set_modal(GTK_WINDOW(alert), TRUE);
-	gtk_window_set_position(GTK_WINDOW(alert), GTK_WIN_POS_CENTER);
-	gtk_container_set_border_width(GTK_CONTAINER(alert), 6);
-	vbox = GTK_DIALOG(alert)->vbox;
+	ftype &= FTM_FTYPE;
+	is_anim = file_formats[ftype].flags & FF_ANIM;
+	if (!is_anim) opts[2] = NULL; // No view if not animated
+
+	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Load Frames"),
+		GTK_WIN_POS_CENTER, TRUE);
+	vbox = add_vbox(win);
 	
-	label = gtk_label_new(_("This is an animated GIF file.  What do you want to do?"));
-	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, FALSE, 8);
-#if 0
-	add_with_frame(vbox, NULL, wj_radio_pack(modes, 3, 0, anim_mode,
-		&anim_mode, NULL), 5);
-	button = add_a_button(_("Load into Layers"), 2, vbox, FALSE);
-#else
-	pack(vbox, gtk_hseparator_new());
-	button = add_a_button(_("Load into Layers"), 2, vbox, FALSE);
-	pack(vbox, wj_radio_pack(modes, 3, 0, anim_mode, &anim_mode, NULL));
-#endif
+	tmp = g_strdup_printf(is_anim ? _("This is an animated %s file.") :
+		_("This is a multipage %s file."), file_formats[ftype].name);
+	label = pack5(vbox, gtk_label_new(tmp));
+	gtk_misc_set_padding(GTK_MISC(label), 0, 5);
+	g_free(tmp);
+
+//	add_hseparator(vbox, -2, 10);
+	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
+        gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+	button = add_a_button(_("Load into Layers"), 5, hbox, TRUE);
 	gtk_widget_grab_focus(button);
 	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 5));
-	gtk_widget_show_all(vbox);
+	if (is_anim) pack(vbox, wj_radio_pack(modes, 3, 0, anim_mode,
+		&anim_mode, NULL));
 
+	add_hseparator(vbox, -2, 10);
+	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
+        gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	for (i = 0; opts[i]; i++)
 	{
-		button = add_a_button(opts[i], 2, GTK_DIALOG(alert)->action_area, TRUE);
+		button = add_a_button(opts[i], 5, hbox, TRUE);
 		if (!i) gtk_widget_add_accelerator(button, "clicked", ag,
 			GDK_Escape, 0, (GtkAccelFlags)0);
 		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
 			GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + i + 2));
 	}
-	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
+	gtk_signal_connect_object(GTK_OBJECT(win), "destroy",
 		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 1));
 
-	gtk_window_set_transient_for(GTK_WINDOW(alert), GTK_WINDOW(main_window));
-	gtk_widget_show(alert);
-	gdk_window_raise(alert->window);
-	gtk_window_add_accel_group(GTK_WINDOW(alert), ag);
+	gtk_widget_show_all(vbox);
+
+//	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
+	gtk_widget_show(win);
+	gdk_window_raise(win->window);
 
 	while (!keys[0]) gtk_main_iteration();
 	i = keys[0]; // !!! To save it from "destroy" event handler
-	if (i > 1) gtk_widget_destroy(alert);
+	if (i > 1) gtk_widget_destroy(win);
 	else i = 2;
 
 	return (i - 2);
@@ -1428,10 +1434,15 @@ loaded:	if ( res<=0 )				// Error loading file
 	/* Image was too large for OS */
 	else if (res == FILE_MEM_ERROR) memory_errors(1);
 
-	/* Animated GIF was loaded so tell user */
-	else if (res == FILE_GIF_ANIM)
+	/* Multiframe file was loaded so tell user */
+	else if (res == FILE_HAS_FRAMES)
 	{
-		int i = anim_file_dialog();
+		int i;
+
+		/* Don't ask user in viewer mode */
+// !!! When implemented, load as frameset & run animation in that case instead
+		if (viewer_mode && view_image_only) i = 0;
+		else i = anim_file_dialog(ftype);
 
 		if (i == 3)
 		{
@@ -1460,7 +1471,11 @@ loaded:	if ( res<=0 )				// Error loading file
 	register_file(real_fname);
 	if (!mult) /* A single image */
 	{
-		set_new_filename(layer_selected, real_fname);
+		/* To prevent 1st frame overwriting a multiframe file */
+		char *nm = g_strconcat(real_fname, res == FILE_HAS_FRAMES ?
+			".000" : NULL, NULL);
+		set_new_filename(layer_selected, nm);
+		g_free(nm);
 
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change

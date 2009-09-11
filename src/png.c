@@ -78,10 +78,10 @@ fformat file_formats[NUM_FTYPES] = {
 #endif
 #ifdef U_TIFF
 /* !!! Ideal state */
-//	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-//		/* | FF_TRANS | FF_LAYER */ },
+//	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_LAYER
+//		/* | FF_TRANS */ },
 /* !!! Current state */
-	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA },
+	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_LAYER },
 #else
 	{ "", "", "", 0},
 #endif
@@ -137,6 +137,13 @@ int file_type_by_ext(char *name, guint32 mask)
 		!strncasecmp(ext - 4, ".gif", 4)) return (FT_GIF);
 
 	return (FT_NONE);
+}
+
+static int check_next_frame(frameset *fset, int mode)
+{
+// !!! TODO: check image type to decide if need "-1" (it's only for animated)
+	int lim = mode == FS_LAYER_LOAD ? MAX_LAYERS - 1 : FRAMES_MAX;
+	return (fset->cnt < lim);
 }
 
 /* Receives struct with image parameters, and channel flags;
@@ -959,6 +966,9 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 		if (settings->xpm_trans >= 0) return (1);
 	}
 
+	/* Disable transparency by default, enable when needed */
+	stat->newtrans = -1;
+
 	/* Now scan the dest area, filling colors bitmap */
 	memset(cmap, 0, sizeof(cmap));
 	fgw = settings->width;
@@ -1027,7 +1037,6 @@ static int analyze_gif_frame(gif_status *stat, ls_settings *settings, int dispos
 	}
 	while (ul) // Place transparency
 	{
-		stat->newtrans = -1;
 		if (cmap[512]) // Need transparency
 		{
 			int i, l = prevtr, nc = stat->newcols;
@@ -1339,12 +1348,6 @@ fail:	if (!settings->silent) progress_end();
 	return (res);
 }
 
-static int check_next_frame(frameset *fset, int mode)
-{
-	int lim = mode == FS_LAYER_LOAD ? MAX_LAYERS - 1 : FRAMES_MAX;
-	return (fset->cnt < lim);
-}
-
 static int load_gif_frames(char *file_name, ani_settings *ani)
 {
 	GifFileType *giffy;
@@ -1439,16 +1442,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	}
 // !!! Here (maybe) unify all frames - resize to full area, & promote to RGB/RGBA
 	res = 1;
-fail:
-	/* Treat out-of-memory error as fatal, to avoid worse things later */
-	if ((res == FILE_MEM_ERROR) || !ani->fset.cnt)
-		mem_free_frames(&ani->fset);
-	/* Pass too-many-frames error along */
-	else if (res == FILE_TOO_LONG);
-	/* Consider all other errors partial failures */
-	else if (res != 1) res = FILE_LIB_ERROR;
-
-	mem_free_chanlist(w_set.img);
+fail:	mem_free_chanlist(w_set.img);
 	DGifCloseFile(giffy);
 	return (res);
 }
@@ -1490,7 +1484,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 		{
 			if (frame++) /* Multipage GIF - notify user */
 			{
-				res = FILE_GIF_ANIM;
+				res = FILE_HAS_FRAMES;
 				goto fail;
 			}
 			settings->gif_delay = delay;
@@ -1977,10 +1971,9 @@ static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
  * a bugreport with the offending file attached may help too - but again, it's
  * not guaranteed. But the common varieties of TIFF format should load OK. */
 
-static int load_tiff(char *file_name, ls_settings *settings)
+static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 {
 	char cbuf[1024];
-	TIFF *tif;
 	uint16 bpsamp, sampp, xsamp, pmetric, planar, orient, sform;
 	uint16 *sampinfo, *red16, *green16, *blue16;
 	uint32 width, height, tw = 0, th = 0, rps = 0;
@@ -1990,11 +1983,6 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	int x, w, h, dx, bpr, bits1, bit0, db, n, nx;
 	int res = -1, bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
 
-	/* We don't want any echoing to the output */
-	TIFFSetErrorHandler(NULL);
-	TIFFSetWarningHandler(NULL);
-
-	if (!(tif = TIFFOpen(file_name, "r"))) return (-1);
 
 	/* Let's learn what we've got */
 	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &sampp);
@@ -2033,6 +2021,25 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	else
 	{
 		TIFFGetFieldDefaulted(tif, TIFFTAG_ROWSPERSTRIP, &rps);
+	}
+
+	/* Extract position from it */
+	settings->x = settings->y = 0;
+	while (TRUE)
+	{
+		float xres, yres, dxu = 0, dyu = 0;
+
+		if (!TIFFGetField(tif, TIFFTAG_XPOSITION, &dxu) &&
+			!TIFFGetField(tif, TIFFTAG_YPOSITION, &dyu)) break;
+		// Have position, now need resolution
+		if (!TIFFGetField(tif, TIFFTAG_XRESOLUTION, &xres)) break;
+		// X resolution we have, what about Y?
+		yres = xres; // Default
+		TIFFGetField(tif, TIFFTAG_YRESOLUTION, &yres);
+		// Convert ResolutionUnits (whatever they are) to pixels
+		settings->x = rint(dxu * xres);
+		settings->y = rint(dyu * yres);
+		break;
 	}
 
 	/* Let's decide how to store it */
@@ -2296,7 +2303,65 @@ static int load_tiff(char *file_name, ls_settings *settings)
 fail2:	if (pr) progress_end();
 	if (raster) _TIFFfree(raster);
 	if (buf) _TIFFfree(buf);
+fail:	return (res);
+}
+
+static int load_tiff_frames(char *file_name, ani_settings *ani)
+{
+	TIFF *tif;
+	ls_settings w_set;
+	image_frame *frame;
+	int res;
+
+
+	/* We don't want any echoing to the output */
+	TIFFSetErrorHandler(NULL);
+	TIFFSetWarningHandler(NULL);
+
+	if (!(tif = TIFFOpen(file_name, "r"))) return (-1);
+
+	while (TRUE)
+	{
+		res = FILE_TOO_LONG;
+		if (!check_next_frame(&ani->fset, ani->settings.mode))
+			goto fail;
+		w_set = ani->settings;
+		res = load_tiff_frame(tif, &w_set);
+		if (res != 1) goto fail;
+		/* Store a new frame */
+// !!! Currently, frames are allocated without checking any limits
+		res = FILE_MEM_ERROR;
+		if (!mem_add_frame(&ani->fset, w_set.width, w_set.height,
+			w_set.bpp, CMASK_NONE, w_set.pal)) goto fail;
+		frame = ani->fset.frames + (ani->fset.cnt - 1);
+		frame->cols = w_set.colors;
+		frame->trans = w_set.xpm_trans;
+		frame->delay = 0;
+		frame->x = w_set.x;
+		frame->y = w_set.y;
+		memcpy(frame->img, w_set.img, sizeof(chanlist));
+		/* Try to get next frame */
+		if (!TIFFReadDirectory(tif)) break;
+	}
+	res = 1;
 fail:	TIFFClose(tif);
+	return (res);
+}
+
+static int load_tiff(char *file_name, ls_settings *settings)
+{
+	TIFF *tif;
+	int res;
+
+
+	/* We don't want any echoing to the output */
+	TIFFSetErrorHandler(NULL);
+	TIFFSetWarningHandler(NULL);
+
+	if (!(tif = TIFFOpen(file_name, "r"))) return (-1);
+	res = load_tiff_frame(tif, settings);
+	if ((res == 1) && TIFFReadDirectory(tif)) res = FILE_HAS_FRAMES;
+	TIFFClose(tif);
 	return (res);
 }
 
@@ -4719,7 +4784,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	}
 
 	/* Consider animated GIF a success */
-	res = res0 == FILE_GIF_ANIM ? 1 : res0;
+	res = res0 == FILE_HAS_FRAMES ? 1 : res0;
 
 	switch (settings.mode)
 	{
@@ -4861,7 +4926,6 @@ int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	memset(&ani, 0, sizeof(ani));
 	ani.mode = ani_mode;
 	init_ls_settings(&ani.settings, NULL);
-	/* 0th layer load is just an image load */
 	ani.settings.mode = mode;
 	ani.settings.ftype = ftype;
 	ani.settings.pal = pal;
@@ -4881,9 +4945,17 @@ int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	case FT_GIF: res = load_gif_frames(file_name, &ani); break;
 #endif
 #ifdef U_TIFF
-//	case FT_TIFF: res = load_tiff_frames(file_name, &ani); break;
+	case FT_TIFF: res = load_tiff_frames(file_name, &ani); break;
 #endif
 	}
+
+	/* Treat out-of-memory error as fatal, to avoid worse things later */
+	if ((res == FILE_MEM_ERROR) || !ani.fset.cnt)
+		mem_free_frames(&ani.fset);
+	/* Pass too-many-frames error along */
+	else if (res == FILE_TOO_LONG);
+	/* Consider all other errors partial failures */
+	else if (res != 1) res = FILE_LIB_ERROR;
 
 	/* Just pass the frameset to the outside, for now */
 	*frames = ani.fset;

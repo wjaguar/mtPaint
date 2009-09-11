@@ -1,5 +1,5 @@
 /*	csel.c
-	Copyright (C) 2006-2008 Dmitry Groshev
+	Copyright (C) 2006-2009 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -158,6 +158,8 @@ double rgb2B(double r, double g, double b)
 	return (y > 1.0 ? 1.0 : y);
 }
 
+/* ITU-R 709 */
+
 #define RED_X 0.640
 #define RED_Y 0.330
 #define GREEN_X 0.300
@@ -165,10 +167,12 @@ double rgb2B(double r, double g, double b)
 #define BLUE_X 0.150
 #define BLUE_Y 0.060
 
-#if 1 // 6500K whitepoint
+#if 1 /* 6500K whitepoint (D65) */
 #define WHITE_X 0.3127
-#define WHITE_Y 0.329
-#else // 9300K whitepoint
+#define WHITE_Y 0.3290
+/* Some, like lcms, use y=0.3291, but that isn't how ITU-R BT.709-5 defines D65,
+ * but instead how SMPTE 240M does - WJ */
+#else /* 9300K whitepoint */
 #define WHITE_X 0.2848
 #define WHITE_Y 0.2932
 #endif

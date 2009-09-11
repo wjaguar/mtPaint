@@ -426,10 +426,7 @@ void pressed_preferences()
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
 
 	prefs_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Preferences"), GTK_WIN_POS_CENTER, FALSE );
-
-	vbox3 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox3);
-	gtk_container_add (GTK_CONTAINER (prefs_window), vbox3);
+	vbox3 = add_vbox(prefs_window);
 
 ///	SETUP NOTEBOOK
 

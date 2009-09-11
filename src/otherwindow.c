@@ -273,10 +273,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 	new_window_type = type;
 	new_window = add_a_window( GTK_WINDOW_TOPLEVEL, title_txt[type], GTK_WIN_POS_CENTER, TRUE );
-
-	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox1);
-	gtk_container_add (GTK_CONTAINER (new_window), vbox1);
+	vbox1 = add_vbox(new_window);
 
 	table1 = add_a_table( 3, 2, 5, vbox1 );
 
@@ -453,9 +450,7 @@ void pressed_add_cols()
 
 	gtk_widget_set_usize (add_col_window, 320, -2);
 
-	vbox5 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox5);
-	gtk_container_add (GTK_CONTAINER (add_col_window), vbox5);
+	vbox5 = add_vbox(add_col_window);
 
 	add_hseparator( vbox5, -2, 10 );
 
@@ -501,9 +496,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 	fw->func = filt;
 	fw->data = fdata;
 
-	vbox = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_add(GTK_CONTAINER(win), vbox);
+	vbox = add_vbox(win);
 
 	add_hseparator(vbox, -2, 10);
 	pack5(vbox, content);
@@ -579,10 +572,7 @@ void pressed_sort_pal()
 
 	spal_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Sort Palette Colours"),
 		GTK_WIN_POS_CENTER, TRUE );
-
-	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox1);
-	gtk_container_add (GTK_CONTAINER (spal_window), vbox1);
+	vbox1 = add_vbox(spal_window);
 
 	table1 = add_a_table(2, 2, 5, vbox1);
 
@@ -852,9 +842,7 @@ void pressed_brcosa()
 	gtk_window_set_policy(GTK_WINDOW(brcosa_window), FALSE, FALSE, TRUE);
 			// Automatically grow/shrink window
 
-	vbox = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_add(GTK_CONTAINER (brcosa_window), vbox);
+	vbox = add_vbox(brcosa_window);
 
 	table2 = add_a_table(6, 2, 10, vbox );
 	for (i = 0; i < BRCOSA_ITEMS; i++)
@@ -1124,10 +1112,7 @@ void sisca_init( char *title )
 	GtkWidget *wvbox, *wvbox2, *notebook, *page0, *page1, *button;
 
 	sisca_window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE );
-
-	sisca_vbox = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(sisca_vbox);
-	gtk_container_add(GTK_CONTAINER (sisca_window), sisca_vbox);
+	sisca_vbox = add_vbox(sisca_window);
 
 	sisca_table = add_a_table(3, 3, 5, sisca_vbox);
 
@@ -2347,8 +2332,7 @@ void pressed_quantize(int palette)
 	quantize_window = add_a_window(GTK_WINDOW_TOPLEVEL, palette ?
 		_("Create Quantized") : _("Convert To Indexed"),
 		GTK_WIN_POS_CENTER, TRUE);
-	mainbox = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(quantize_window), mainbox);
+	mainbox = add_vbox(quantize_window);
 
 	/* Colours spin */
 
@@ -3021,8 +3005,7 @@ void gradient_setup(int mode)
 
 	grad_window = win = add_a_window(GTK_WINDOW_TOPLEVEL,
 		_("Configure Gradient"), pos, TRUE);
-	mainbox = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(win), mainbox);
+	mainbox = add_vbox(win);
 
 	/* Channel box */
 
@@ -3164,10 +3147,7 @@ void pressed_skew()
 	skew_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Skew"), GTK_WIN_POS_CENTER, TRUE);
 	sw = bound_malloc(skew_window, sizeof(skew_widgets));
 	gtk_object_set_user_data(GTK_OBJECT(skew_window), (gpointer)sw);
-
-	vbox = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_add(GTK_CONTAINER(skew_window), vbox);
+	vbox = add_vbox(skew_window);
 
 	table = add_a_table(3, 4, 5, vbox);
 	add_to_table(_("Angle"), table, 0, 1, 0);
@@ -3271,8 +3251,7 @@ void bkg_setup()
 	bw->src = 0;
 	bw->state = bkg_flag;
 
-	vbox = gtk_vbox_new(FALSE, 0);
-	gtk_container_add(GTK_CONTAINER(win), vbox);
+	vbox = add_vbox(win);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
 	table = add_a_table(4, 3, 5, vbox);

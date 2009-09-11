@@ -673,6 +673,9 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	{
 		frm = fset.frames;
 
+/* !!! TODO: If image type is layered and NOT animated, use background layer
+ * !!! for frame 0, make all layers visible, and do not make animation cycle */
+
 		/* Create an empty indexed background of 0th frame's size */
 		do_new_one(frm->width, frm->height, 256, mem_pal_def, 1, FALSE);
 
