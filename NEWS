@@ -6,10 +6,12 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.00	2006
 
-	* View menu reworked
+	* Menus & toolbars reworked to be more task oriented
 	* Toolbars can now be toggled on and off via the View menu
 	* Clicking palette numbers opens up "Edit all colours" window
-	* BUGFIX - Saving a composite layer image does not occasionally leave transpent areas
+	* Most documentation has been removed from the F1 help and is now in HTML form
+	* HTML documentation available with binary distributions or separate download
+	* BUGFIX - Saving a composite layer image does not occasionally leave transparent areas
 
 2.30	2006-3-1
 

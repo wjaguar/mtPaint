@@ -22,7 +22,7 @@
 
 GtkWidget
 	*main_window, *main_vsplit,
-	*drawing_palette, *drawing_pat_prev, *drawing_col_prev, *drawing_canvas,
+	*drawing_palette, *drawing_canvas,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],

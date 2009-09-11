@@ -831,12 +831,11 @@ void update_cols()
 
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
 	{
-		render_text( drawing_pat_prev );
+		render_text( drawing_col_prev );
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}
 
-	gtk_widget_queue_draw( drawing_pat_prev );	// Update widget
 	gtk_widget_queue_draw( drawing_col_prev );
 }
 

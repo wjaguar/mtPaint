@@ -722,7 +722,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
 			if ( marq_status >= MARQUEE_PASTE && text_paste )
 			{
-				render_text( drawing_pat_prev );
+				render_text( drawing_col_prev );
 				check_marquee();
 				gtk_widget_queue_draw( drawing_canvas );
 			}
@@ -734,7 +734,6 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 			toolbar_update_settings();	// Update spin buttons
 			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
 					TRUE );			// Update toolbar
-			gtk_widget_queue_draw( drawing_pat_prev );	// Update brush preview area
 			set_cursor();
 		}
 	}

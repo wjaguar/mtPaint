@@ -48,7 +48,7 @@
 
 GtkWidget
 	*main_window, *main_vsplit,
-	*drawing_palette, *drawing_pat_prev, *drawing_col_prev, *drawing_canvas,
+	*drawing_palette, *drawing_canvas,
 	*scrolledwindow_canvas, *main_hidden[4],
 
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],
@@ -2246,8 +2246,10 @@ void main_init()
 		{ _("/Channels/Configure Overlays ..."), NULL, pressed_channel_config_overlay, 0, NULL },
 
 		{ _("/_Help"),			NULL,		NULL,0, "<LastBranch>" },
-		{ _("/Help/Documentation"),	"F1",		pressed_docs,0, NULL },
-		{ _("/Help/About"),		NULL,		pressed_help,0, NULL }
+#ifndef WIN32
+		{ _("/Help/Documentation"),	NULL,		pressed_docs,0, NULL },
+#endif
+		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
 	};
 
 char
@@ -2299,7 +2301,6 @@ char
 	*item_frames[] = {_("/Frames"), NULL},
 	*item_alphablend[] = {_("/Selection/Alpha Blend A,B"), NULL}
 	;
-
 
 
 

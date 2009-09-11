@@ -34,12 +34,8 @@
 
 #define TOOLBAR_MAX 6
 
-
-#define PATTERN_WIDTH 32
-#define PATTERN_HEIGHT 32
-
 #define PREVIEW_WIDTH 72
-#define PREVIEW_HEIGHT 24
+#define PREVIEW_HEIGHT 48
 
 
 #define TOTAL_CURSORS 14
@@ -61,7 +57,8 @@ GdkCursor *move_cursor;
 
 gboolean toolbar_status[TOOLBAR_MAX];		// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
-	*toolbar_menu_widgets[TOOLBAR_MAX];	// Menu widgets
+	*toolbar_menu_widgets[TOOLBAR_MAX],	// Menu widgets
+	*drawing_col_prev;
 
 
 
@@ -83,7 +80,7 @@ void toolbar_preview_init();		// Initialize memory for preview area
 
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
-void repaint_top_swatch();		// Update selected colours A & B
+void repaint_top_swatch();		// Update selected colours A & B, 
 
 
 

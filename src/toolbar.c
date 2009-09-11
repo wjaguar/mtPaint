@@ -130,7 +130,8 @@ GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS], *icon_buttons2[TOTAL_ICONS_MAIN];
 gboolean toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX]			// Used for showing/hiding
 		= {NULL, NULL, NULL, NULL, NULL, NULL},
-	*toolbar_menu_widgets[TOOLBAR_MAX];		// Menu widgets
+	*toolbar_menu_widgets[TOOLBAR_MAX],		// Menu widgets
+	*drawing_col_prev = NULL;
 
 GdkCursor *move_cursor;
 GdkCursor *m_cursor[32];		// My mouse cursors
@@ -141,8 +142,7 @@ static GtkWidget *toolbar_zoom_main = NULL, *toolbar_zoom_view,
 	*toolbar_labels[2],		// Colour A & B details
 	*ts_scales[3], *ts_spins[3]	// Size, flow, opacity
 	;
-static unsigned char *mem_pats = NULL,		// RGB screen memory holding current patterns
-		*mem_prev = NULL;		// RGB colours preview
+static unsigned char *mem_prev = NULL;		// RGB colours, tool, pattern preview
 
 
 GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
@@ -195,32 +195,6 @@ GtkWidget *layer_iconbar(GtkWidget *window, GtkWidget *box, GtkWidget **icons)
 	return toolbar;
 }
 
-
-static gint expose_pattern( GtkWidget *widget, GdkEventExpose *event )
-{
-	int rx, ry, rw, rh;
-
-	rx = event->area.x;
-	ry = event->area.y;
-	rw = event->area.width;
-	rh = event->area.height;
-
-	if ( ry < PATTERN_HEIGHT )
-	{
-		if ( (ry+rh) >= PATTERN_HEIGHT )
-		{
-			rh = PATTERN_HEIGHT - ry;
-		}
-		gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				rx, ry, rw, rh,
-				GDK_RGB_DITHER_NONE,
-				mem_pats + 3*( rx + PATTERN_WIDTH*ry ),
-				PATTERN_WIDTH*3
-				);
-	}
-	return FALSE;
-}
-
 static gint expose_preview( GtkWidget *widget, GdkEventExpose *event )
 {
 	int rx, ry, rw, rh;
@@ -252,17 +226,12 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 {
 	if ( mem_image != NULL )
 	{
-		if ( event->x < 48 ) choose_colours(); else choose_pattern(0);
-	}
-
-	return FALSE;
-}
-
-static gint click_pattern( GtkWidget *widget, GdkEventButton *event )
-{
-	if ( mem_image != NULL )
-	{
-		choose_pattern(1);
+		if ( event->y > 31 ) choose_pattern(0);
+		else
+		{
+			if ( event->x < 48 ) choose_colours();
+			else choose_pattern(1);
+		}
 	}
 
 	return FALSE;
@@ -284,6 +253,7 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 	combo_entry = GTK_COMBO (combo)->entry;
 	GTK_WIDGET_UNSET_FLAGS (combo_entry, GTK_CAN_FOCUS);
 	gtk_widget_set_usize(combo, 90, -1);
+	gtk_widget_set_usize(GTK_COMBO(combo)->button, 18, -1);
 
 	gtk_entry_set_editable( GTK_ENTRY(combo_entry), FALSE );
 
@@ -734,18 +704,6 @@ void toolbar_init(GtkWidget *vbox_main)
 	if ( toolbar_status[TOOLBAR_TOOLS] ) gtk_widget_show (hbox);	// Only show if user wants
 	gtk_box_pack_start ( GTK_BOX (vbox_main), hbox, FALSE, FALSE, 0 );
 
-///	PREVIEW AREA
-
-	drawing_pat_prev = gtk_drawing_area_new ();
-	gtk_widget_set_usize( drawing_pat_prev, PATTERN_WIDTH, PATTERN_HEIGHT );
-	gtk_box_pack_start( GTK_BOX(hbox), drawing_pat_prev, FALSE, FALSE, 0 );
-	gtk_widget_show( drawing_pat_prev );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_pat_prev), "expose_event",
-		GTK_SIGNAL_FUNC (expose_pattern), GTK_OBJECT(drawing_pat_prev) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_pat_prev), "button_release_event",
-		GTK_SIGNAL_FUNC (click_pattern), GTK_OBJECT(drawing_pat_prev) );
-	gtk_widget_set_events (drawing_pat_prev, GDK_ALL_EVENTS_MASK);
-
 	gtk_box_pack_start ( GTK_BOX (hbox), toolbar_tools, FALSE, FALSE, 0 );
 	gtk_widget_show ( toolbar_tools );
 }
@@ -918,6 +876,7 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_widget_show (hbox);
 	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
 
+
 	drawing_col_prev = gtk_drawing_area_new ();
 #if GTK_MAJOR_VERSION == 2
 	viewport_palette = gtk_viewport_new (NULL, NULL);
@@ -933,11 +892,11 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_widget_set_usize( drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT );
 
 	gtk_widget_show( drawing_col_prev );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_press_event",
+	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_release_event",
 		GTK_SIGNAL_FUNC (click_colours), GTK_OBJECT(drawing_col_prev) );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "expose_event",
 		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
-	gtk_widget_set_events (drawing_col_prev, GDK_BUTTON_PRESS_MASK);
+	gtk_widget_set_events (drawing_col_prev, GDK_ALL_EVENTS_MASK);
 
 	scrolledwindow_palette = gtk_scrolled_window_new (NULL, NULL);
 	gtk_widget_show (scrolledwindow_palette);
@@ -1030,7 +989,6 @@ void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 void toolbar_preview_init()		// Initialize memory for preview area
 {
-	mem_pats = grab_memory( 3*PATTERN_WIDTH*PATTERN_HEIGHT, 0 );
 	mem_prev = grab_memory( 3*PREVIEW_WIDTH*PREVIEW_HEIGHT, 0 );
 }
 
@@ -1047,14 +1005,16 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 			// Offset in brush RGB
 	for ( j=0; j<32; j++ )
 	{
-		o = 3*PATTERN_WIDTH*j;	// Preview offset
-		o2 = offset + 3*PATCH_WIDTH*j;				// Offset in brush RGB
+		o = 3*(40 + PREVIEW_WIDTH*j);		// Preview offset
+		o2 = offset + 3*PATCH_WIDTH*j;		// Offset in brush RGB
 		for ( i=0; i<32; i++ )
 		{
 			for ( k=0; k<3; k++ )
-				mem_pats[o + 3*i + k] = mem_brushes[o2 + 3*i + k];
+				mem_prev[o + 3*i + k] = mem_brushes[o2 + 3*i + k];
 		}
 	}
+
+	if ( drawing_col_prev ) gtk_widget_queue_draw( drawing_col_prev );
 }
 
 void mem_pat_update()			// Update indexed and then RGB pattern preview
@@ -1089,11 +1049,11 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 			mem_col_pat24[ 1 + 3*(i + j*8) ] = c24.green;
 			mem_col_pat24[ 2 + 3*(i + j*8) ] = c24.blue;
 
-			for ( j2=0; j2<3; j2++ )
+			for ( j2=0; j2<2; j2++ )		// 16 pixels high (8x2)
 			{
-				for ( i2=0; i2<3; i2++ )
+				for ( i2=0; i2<(PREVIEW_WIDTH / 8); i2++ )
 				{
-					offset = 3*(48 + i+i2*8 + (j+j2*8)*PREVIEW_WIDTH);
+					offset = 3*(i+i2*8 + (j+j2*8+32)*PREVIEW_WIDTH);
 					mem_prev[ 0 + offset ] = c24.red;
 					mem_prev[ 1 + offset ] = c24.green;
 					mem_prev[ 2 + offset ] = c24.blue;
@@ -1119,19 +1079,21 @@ void repaint_top_swatch()			// Update selected colours A & B
 	g[1] = mem_col_B24.green;
 	b[1] = mem_col_B24.blue;
 
-	for ( j=0; j<PREVIEW_HEIGHT; j++ )
+	for ( j=0; j<20; j++ )
 	{
-		for ( i=0; i<24; i++ )
+		for ( i=0; i<20; i++ )
 		{
-			nx = i; ny = j;
+			nx = i+1; ny = j+1;
 			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[0];
 			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[0];
 			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[0];
 
-			nx = i+24; ny = j;
+			nx = i+11; ny = j+11;
 			mem_prev[ 0 + 3*( nx + ny*PREVIEW_WIDTH) ] = r[1];
 			mem_prev[ 1 + 3*( nx + ny*PREVIEW_WIDTH) ] = g[1];
 			mem_prev[ 2 + 3*( nx + ny*PREVIEW_WIDTH) ] = b[1];
 		}
 	}
+
+	if ( drawing_col_prev ) gtk_widget_queue_draw( drawing_col_prev );
 }
