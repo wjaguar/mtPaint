@@ -57,6 +57,7 @@
 #define CMASK_CURR  (1 << mem_channel)
 #define CMASK_FOR(A) (1 << (A))
 
+char *channames[5];
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 typedef struct

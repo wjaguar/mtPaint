@@ -22,6 +22,7 @@
 int overlay_alpha;
 int hide_image;
 int RGBA_mode;
+
 unsigned char channel_rgb[NUM_CHANNELS][3];
 unsigned char channel_opacity[NUM_CHANNELS];
 unsigned char channel_inv[NUM_CHANNELS];

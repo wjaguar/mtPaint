@@ -2335,7 +2335,7 @@ void main_init()
 	GtkAccelGroup *accel_group;
 	GtkItemFactory *item_factory;
 
-	static GtkItemFactoryEntry menu_items[] = {
+	GtkItemFactoryEntry menu_items[] = {
 		{ _("/_File"),			NULL,		NULL,0, "<Branch>" },
 		{ _("/File/tear"),		NULL,		NULL,0, "<Tearoff>" },
 		{ _("/File/New"),		"<control>N",	pressed_new,0, NULL },
@@ -2560,7 +2560,7 @@ void main_init()
 		{ _("/Help/About"),		"F1",		pressed_help,0, NULL }
 	};
 
-static char
+	char
 	*item_undo[] = {_("/Edit/Undo"), _("/File/Export Undo Images ..."),
 			_("/File/Export Undo Images (reversed) ..."),
 			NULL},

@@ -58,7 +58,6 @@ unsigned char channel_col_B[NUM_CHANNELS] = {0, 0, 0, 0};
 static GtkWidget *newchan_window;
 static int chan_new_type, chan_new_state;
 
-static gchar *channames[] = { NULL, _("Alpha"), _("Selection"), _("Mask"), NULL };
 
 static void click_newchan_cancel()
 {
@@ -170,7 +169,7 @@ static void chan_state_changed(GtkWidget *widget, gpointer name)
 
 void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	static gchar *names2[] = {
+	gchar *names2[] = {
 		_("Cleared"),
 		_("Set"),
 		_("Set colour A radius B"),

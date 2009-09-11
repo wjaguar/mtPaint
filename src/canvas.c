@@ -890,9 +890,20 @@ void update_status_bar1()
 	toolbar_update_settings();		// Update A/B labels in settings toolbar
 
 	if ( mem_img_bpp == 1 )
-		snprintf(txt, 30, "%i x %i x %i", mem_width, mem_height, mem_cols);
+		sprintf(txt2, "%i", mem_cols);
 	else
-		snprintf(txt, 30, "%i x %i x RGB", mem_width, mem_height);
+		sprintf(txt2, "RGB");
+
+	snprintf(txt, 50, "%s %i x %i x %s", channames[mem_channel], mem_width, mem_height, txt2);
+
+	if ( mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK] )
+	{
+		strcat(txt, " + ");
+		if ( mem_img[CHN_ALPHA] ) strcat(txt, "A");
+		if ( mem_img[CHN_SEL] ) strcat(txt, "S");
+		if ( mem_img[CHN_MASK] ) strcat(txt, "M");
+	}
+
 	if ( layers_total>0 )
 	{
 		sprintf(txt2, "  (%i/%i)", layer_selected, layers_total);
@@ -2131,9 +2142,18 @@ void tool_action( int x, int y, int button, gdouble pressure )
 					if (!pixel_protected(rx, ry) &&
 						!pixel_protected(sx, sy))
 					{
+						off1 = rx + ry * mem_width;
+						off2 = sx + sy * mem_width;
+						if ((mem_channel == CHN_IMAGE) &&
+							RGBA_mode && mem_img[CHN_ALPHA])
+						{
+							px = mem_img[CHN_ALPHA][off1];
+							py = mem_img[CHN_ALPHA][off2];
+							mem_img[CHN_ALPHA][off1] = py;
+							mem_img[CHN_ALPHA][off2] = px;
+						}
 						k = MEM_BPP;
-						off1 = (rx + ry * mem_width) * k;
-						off2 = (sx + sy * mem_width) * k;
+						off1 *= k; off2 *= k;
 						for (i = 0; i < k; i++)
 						{
 							px = mem_img[mem_channel][off1];
@@ -2142,12 +2162,6 @@ void tool_action( int x, int y, int button, gdouble pressure )
 							mem_img[mem_channel][off2++] = px;
 						}
 					}
-#if 0 /* !!! Maybe this would be the better way? */
-	off1 = get_pixel(rx, ry);
-	off2 = get_pixel(sx, sy);
-	put_pixel_x(rx, ry, off2);
-	put_pixel_x(rx, ry, off1);
-#endif
 				}
 			}
 		}
