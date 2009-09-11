@@ -1147,8 +1147,8 @@ void update_cols()
 {
 	if (!mem_img[CHN_IMAGE]) return;	// Only do this if we have an image
 
+	mem_pat_update(); /* !!! The order is significant for gradient sample */
 	update_image_bar();
-	mem_pat_update();
 
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
 	{
@@ -2776,8 +2776,8 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 				}
 				else if (mode == 3) /* Gradient */
 				{
-/* !!! Temporary substitute !!! */
-					col[0] = col[2] = 0; col[1] = 255;
+					col[1] = ((line[2] >> 2) & 1) * 255;
+					col[0] = col[2] = 0;
 				}
 				for (j = 0; j < scale * 3; j += 3)
 				{

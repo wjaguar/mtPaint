@@ -2456,12 +2456,15 @@ static void click_grad_ok(GtkWidget *widget, gpointer data)
 	memcpy(graddata, grad_tmaps, sizeof(grad_tmaps));
 	memcpy(gradbytes, grad_tbytes, sizeof(grad_tbytes));
 
-// !!! Store preview opacity
-//	??? = mt_spinslide_get_value(grad_ss_pre);
+	grad_opacity = mt_spinslide_get_value(grad_ss_pre);
+	inifile_set_gint32("gradientOpacity", grad_opacity);
 
 	for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
 	for (i = 0; i <= NUM_CHANNELS; i++) gmap_setup(graddata + i, gradbytes, i);
+	grad_def_update();
 	toolbar_update_settings();
+	if ((tool_type == TOOL_GRADIENT) && grad_opacity)
+		gtk_widget_queue_draw(drawing_canvas);
 
 	gtk_widget_destroy(widget);
 }
@@ -2539,9 +2542,7 @@ void gradient_setup(int mode)
 	mt_spinslide_set_range(grad_ss_pre, 0, 255);
 	gtk_table_attach(GTK_TABLE(table), grad_ss_pre, 3, 4, 2, 3,
 		GTK_EXPAND | GTK_FILL, 0, 0, 5);
-
-// !!! Show preview opacity
-//	mt_spinslide_set_value(grad_ss_pre, ???);
+	mt_spinslide_set_value(grad_ss_pre, grad_opacity);
 
 	/* Select page */
 

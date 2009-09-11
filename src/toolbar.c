@@ -361,6 +361,11 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 			mem_cselect = !!csel_data;
 		}
 		break;
+	case SETB_GRAD:
+		if ((gradient[mem_channel].status == GRAD_DONE) &&
+			(tool_type != TOOL_GRADIENT))
+			repaint_grad(mem_gradient);
+		break;
 	}
 }
 
@@ -1245,6 +1250,10 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 			mem_prev[k + 2] = mem_col_pat24[l + 2];
 		}
 	}
+
+	grad_def_update();
+	if ((tool_type == TOOL_GRADIENT) && grad_opacity)
+		gtk_widget_queue_draw(drawing_canvas);
 }
 
 void repaint_top_swatch()			// Update selected colours A & B

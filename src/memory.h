@@ -115,6 +115,7 @@ grad_info gradient[NUM_CHANNELS];	// Per-channel gradient placement
 double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
 grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
 grad_store gradbytes;			// Storage space for custom gradients
+int grad_opacity;			// Preview opacity
 
 /* Gradient modes */
 #define GRAD_MODE_NONE     0
@@ -424,10 +425,10 @@ void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *mask0, unsigned char *img0);
 void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
-	unsigned char *trans, int opacity);
+	unsigned char *trans, int opacity, int noalpha);
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int opacity);
+	int opacity, int sourcebpp);
 void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
 	unsigned char *alpha, unsigned char *trans, int opacity);
 
@@ -442,6 +443,16 @@ int grad_value(int *dest, double x);
 int grad_pixel(unsigned char *dest, int x, int y);
 void grad_update(grad_info *grad);
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot);
+void grad_def_update();
+void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
+	unsigned char *op0, unsigned char *img0, unsigned char *alpha0);
+
+void blend_channel(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *dest, unsigned char *src, int opacity);
+void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
+	unsigned char *img0, unsigned char *img,
+	unsigned char *alpha0, unsigned char *alpha, int opacity);
+
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

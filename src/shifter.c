@@ -37,7 +37,7 @@
 
 static GtkWidget *shifter_window, *shifter_spin[8][3], *shifter_slider, *shifter_label;
 static png_color sh_old_pal[256];
-static int shifter_in[8][3], shifter_pos, shifter_max, shift_play_state, shift_timer_state=0;
+static int shifter_in[8][3], shifter_pos, shifter_max, shift_play_state, shift_timer_state;
 
 
 
@@ -247,6 +247,14 @@ static void click_shift_close()			// Palette Shifter window closed by user or WM
 	gtk_widget_destroy( shifter_window );
 }
 
+static void click_shift_clear()		// Button to clear all of the values
+{
+	int i, j;
+
+	for ( i=0; i<8; i++ ) for ( j=0; j<3; j++ )
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(shifter_spin[i][j]),0);
+}
+
 static void click_shift_create()		// Button to create a sequence of undo images
 {
 	int i;
@@ -296,8 +304,9 @@ void pressed_shifter()
 
 		for ( j=0; j<3; j++ )
 		{
-			if ( j==2 ) max=255; else max=mem_cols;
-			shifter_spin[i][j] = spin_to_table( table, i+1, j+1, 2, 0, 0, max );
+			if ( j==2 ) max=255; else max=mem_cols-1;
+			shifter_spin[i][j] = spin_to_table( table, i+1, j+1, 2,
+						shifter_in[i][j], 0, max );
 #if GTK_MAJOR_VERSION == 2
 			gtk_signal_connect( GTK_OBJECT( &GTK_SPIN_BUTTON(shifter_spin[i][j])->entry ),
 				"value_changed", GTK_SIGNAL_FUNC(shifter_moved), NULL);
@@ -335,6 +344,12 @@ void pressed_shifter()
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);
 	gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+
+	button = gtk_button_new_with_label(_("Clear"));
+	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
+	gtk_widget_show(button);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_shift_clear), NULL);
 
 	button = gtk_button_new_with_label(_("Fix Palette"));
 	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);

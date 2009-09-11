@@ -45,6 +45,7 @@ grad_info gradient[NUM_CHANNELS];	// Per-channel gradients
 double grad_path, grad_x0, grad_y0;	// Stroke gradient temporaries
 grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
 grad_store gradbytes;			// Storage space for custom gradients
+int grad_opacity;			// Preview opacity
 
 /// Bayer ordered dithering
 
@@ -901,15 +902,15 @@ void mem_init()					// Initialise memory
 		grad->rmode = GRAD_BOUND_STOP;
 		grad_update(grad);
 	}
-
 	for (i = 0; i <= NUM_CHANNELS; i++)
 	{
-		grad_map *gmap = graddata + i;
-
-		gmap->gtype = GRAD_TYPE_RGB;
-		gmap->otype = GRAD_TYPE_CONST;
-		gmap_setup(gmap, gradbytes, i);
+		graddata[i].gtype = GRAD_TYPE_RGB;
+		graddata[i].otype = GRAD_TYPE_CONST;
 	}
+	grad_def_update();
+	for (i = 0; i <= NUM_CHANNELS; i++)
+		gmap_setup(graddata + i, gradbytes, i);
+	grad_opacity = inifile_get_gint32("gradientOpacity", 128);
 }
 
 void copy_dig( int index, int tx, int ty )
@@ -4143,7 +4144,7 @@ void put_pixel( int x, int y )	/* Combined */
 
 void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
-	unsigned char *trans, int opacity)
+	unsigned char *trans, int opacity, int noalpha)
 {
 	unsigned char newc, oldc;
 	int i, j, k, tint;
@@ -4186,6 +4187,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			}
 			j = oldc * 255 + (newc - oldc) * k;
 			alphar[i] = (j + (j >> 8) + 1) >> 8;
+			if (noalpha) continue;
 			if (j) mask[i] = (255 * k * newc) / j;
 		}
 	}
@@ -4213,7 +4215,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int opacity)
+	int opacity, int sourcebpp)
 {
 	unsigned char newc, oldc;
 	unsigned char r, g, b, nr, ng, nb;
@@ -4250,7 +4252,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			opacity = mask[i];
 			if (!opacity) continue;
 			ofs3 = i * 3;
-			if (mem_clip_bpp == 3) /* RGB-to-RGB paste */
+			if (sourcebpp == 3) /* RGB-to-RGB paste */
 			{
 				nr = img[ofs3 + 0];
 				ng = img[ofs3 + 1];
@@ -4329,7 +4331,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 		dest = mem_img[CHN_ALPHA] + ofs;
 	}
 
-	process_mask(0, 1, len, mask, dest, old_alpha, alpha, trans, opacity);
+	process_mask(0, 1, len, mask, dest, old_alpha, alpha, trans, opacity, 0);
 
 	/* Stop if we have alpha without image */
 	if (!img) return;
@@ -4339,7 +4341,7 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	old_image += ofs * bpp;
 	dest = mem_img[mem_channel] + ofs * bpp;
 
-	process_img(0, 1, len, mask, dest, old_image, img, opacity);
+	process_img(0, 1, len, mask, dest, old_image, img, opacity, mem_clip_bpp);
 }
 
 int mem_count_all_cols()				// Count all colours - Using main image
@@ -5437,11 +5439,6 @@ int grad_value(int *dest, double x)
 	gradmap = graddata + ix;
 
 	/* Get opacity */
-/* !!! Defaults are set anew each time for now */
-	gtemp[0] = tool_opacity;
-	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
-	gtemp[1] = 0;
-	gtemp[2] = gradmap->otype;
 	gdata = gradmap->op; gmap = gradmap->opmap; len = gradmap->oplen;
 	xx = (gradmap->orev ? 1.0 - x : x) * (len - 1);
 	i = xx;
@@ -5451,8 +5448,6 @@ int grad_value(int *dest, double x)
 	if (!op) return (0); /* Stop if zero opacity */
 
 	/* Get channel value */
-/* !!! Defaults are set anew each time for now */
-	gtemp[10 + ix * 4] = gradmap->gtype;
 	gdata = gradmap->vs; gmap = gradmap->vsmap; len = gradmap->vslen;
 	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 	i = xx;
@@ -5460,13 +5455,6 @@ int grad_value(int *dest, double x)
 	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
 	if (!ix) /* RGB */
 	{
-/* !!! Defaults are set anew each time for now */
-		gtemp[4] = mem_col_A24.red;
-		gtemp[5] = mem_col_A24.green;
-		gtemp[6] = mem_col_A24.blue;
-		gtemp[7] = mem_col_B24.red;
-		gtemp[8] = mem_col_B24.green;
-		gtemp[9] = mem_col_B24.blue;
 		i3 = i * 3;
 		/* HSV interpolation */
 		if ((gmap[i] == GRAD_TYPE_HSV) || (gmap[i] == GRAD_TYPE_BK_HSV))
@@ -5510,18 +5498,12 @@ int grad_value(int *dest, double x)
 	}
 	else if (ix == CHN_IMAGE + 1) /* Indexed */
 	{
-/* !!! Defaults are set anew each time for now */
-		gtemp[12] = mem_col_A;
-		gtemp[13] = mem_col_B;
 		dest[0] = gdata[i];
 		dest[1] = gdata[i + ((k + 255) >> 8)];
 		dest[CHN_IMAGE + 3] = k;
 	}
 	else /* Utility */
 	{
-/* !!! Defaults are set anew each time for now */
-		gtemp[8 + ix * 4] = channel_col_A[ix - 1];
-		gtemp[9 + ix * 4] = channel_col_B[ix - 1];
 		dest[ix + 2] = (gdata[i] << 8) +
 			k * (gdata[i + 1] - gdata[i]);
 	}
@@ -5530,10 +5512,6 @@ int grad_value(int *dest, double x)
 	if (RGBA_mode && (ix <= CHN_IMAGE + 1))
 	{
 		gradmap = graddata + CHN_ALPHA + 1;
-/* !!! Defaults are set anew each time for now */
-		gtemp[12 + CHN_ALPHA * 4] = channel_col_A[CHN_ALPHA];
-		gtemp[13 + CHN_ALPHA * 4] = channel_col_B[CHN_ALPHA];
-		gtemp[14 + CHN_ALPHA * 4] = gradmap->gtype;
 		gdata = gradmap->vs; gmap = gradmap->vsmap; len = gradmap->vslen;
 		xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 		i = xx;
@@ -5581,7 +5559,7 @@ int grad_pixel(unsigned char *dest, int x, int y)
 		dist = fabs(dist); /* Bilinear */
 		break;
 	}
-	dist += grad->ofs;
+	dist -= grad->ofs;
 
 	/* Apply repeat mode */
 	len1 = grad->wrep;
@@ -5686,31 +5664,171 @@ void gmap_setup(grad_map *gmap, grad_store gstore, int slot)
 {
 	int i = GRAD_POINTS * (slot * 4 + 2), k = slot ? i : 0;
 
+	gmap->vs = gtemp + (slot ? 8 + slot * 4 : 4);
+	gmap->vsmap = gtemp + 10 + slot * 4;
+	gmap->vslen = 2;
 	if (gmap->gtype == GRAD_TYPE_CUSTOM)
 	{
+		if (gmap->cvslen > 1) gmap->vslen = gmap->cvslen;
+		else
+		{
+			memcpy(gstore + k, gmap->vs, slot ? 2 : 6);
+			gstore[i + GRAD_POINTS] = gmap->vsmap[0];
+		}
 		gmap->vs = gstore + k;
 		gmap->vsmap = gstore + i + GRAD_POINTS;
-		gmap->vslen = gmap->cvslen;
 	}
-	else
-	{
-		gmap->vs = gtemp + (slot ? 8 + slot * 4 : 4);
-		gmap->vsmap = gtemp + 10 + slot * 4;
-		gmap->vslen = 2;
-		gtemp[10 + slot * 4] = (unsigned char)gmap->gtype;
-	}
+	else gtemp[10 + slot * 4] = (unsigned char)gmap->gtype;
 
+	gmap->oplen = 2;
 	if (gmap->otype == GRAD_TYPE_CUSTOM)
 	{
+		if (gmap->coplen > 1) gmap->oplen = gmap->coplen;
+		else
+		{
+			gstore[i + GRAD_POINTS * 2] = gtemp[0];
+			gstore[i + GRAD_POINTS * 2 + 1] = gtemp[1];
+			gstore[i + GRAD_POINTS * 3] = gtemp[2];
+		}
 		gmap->op = gstore + i + GRAD_POINTS * 2;
 		gmap->opmap = gstore + i + GRAD_POINTS * 3;
-		gmap->oplen = gmap->coplen;
 	}
 	else
 	{
 		gmap->op = gtemp;
 		gmap->opmap = gtemp + 2;
-		gmap->oplen = 2;
 		gtemp[2] = gmap->otype;
+	}
+}
+
+/* Store default gradient */
+void grad_def_update()
+{
+	int ix;
+	grad_map *gradmap;
+
+	/* Gradient slot (first RGB, then 1-bpp channels) */
+	ix = mem_channel + ((0x81 + mem_channel + mem_channel - mem_img_bpp) >> 7);
+	gradmap = graddata + ix;
+
+	gtemp[0] = tool_opacity;
+	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
+	gtemp[1] = 0;
+	gtemp[2] = gradmap->otype;
+
+	gtemp[10 + ix * 4] = gradmap->gtype;
+	if (ix)
+	{
+		gtemp[8 + ix * 4] = channel_col_A[ix - 1];
+		gtemp[9 + ix * 4] = channel_col_B[ix - 1];
+		gtemp[12] = mem_col_A;
+		gtemp[13] = mem_col_B;
+	}
+	else
+	{
+		gtemp[4] = mem_col_A24.red;
+		gtemp[5] = mem_col_A24.green;
+		gtemp[6] = mem_col_A24.blue;
+		gtemp[7] = mem_col_B24.red;
+		gtemp[8] = mem_col_B24.green;
+		gtemp[9] = mem_col_B24.blue;
+	}
+
+	gradmap = graddata + CHN_ALPHA + 1;
+	gtemp[12 + CHN_ALPHA * 4] = channel_col_A[CHN_ALPHA];
+	gtemp[13 + CHN_ALPHA * 4] = channel_col_B[CHN_ALPHA];
+	gtemp[14 + CHN_ALPHA * 4] = gradmap->gtype;
+}
+
+/* !!! For now, works only in (slower) exact mode */
+void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
+	unsigned char *op0, unsigned char *img0, unsigned char *alpha0)
+{
+	unsigned char cset[NUM_CHANNELS + 3];
+	int i, j, op, rgbmode, mmask = 255, ix = 0;
+
+	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1))
+		mmask = 1 , ix = 255; /* On/off opacity */
+	rgbmode = (mem_channel == CHN_IMAGE) && (mem_img_bpp == 3);
+
+	cnt = start + step * cnt;
+	for (i = start; i < cnt; i += step)
+	{
+		if (mask[i] >= mmask) continue;
+		op0[i] = op = grad_pixel(cset, x + i, y);
+		if (!op) continue;
+		op0[i] |= ix;
+		if (rgbmode)
+		{
+			j = i * 3;
+			img0[j + 0] = cset[0];
+			img0[j + 1] = cset[1];
+			img0[j + 2] = cset[2];
+		}
+		else img0[i] = cset[mem_channel + 3];
+		if (alpha0) alpha0[i] = cset[CHN_ALPHA + 3];
+	}
+}
+
+/* Blend selection or mask channel for preview */
+void blend_channel(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *dest, unsigned char *src, int opacity)
+{
+	int i, j;
+
+	if (opacity == 255) return;
+	cnt = start + step * cnt;
+	for (i = start; i < cnt; i += step)
+	{
+		if (mask[i]) continue;
+		j = src[i] * 255 + opacity * (dest[i] - src[i]);
+		dest[i] = (j + (j >> 8) + 1) >> 8;
+	}
+}
+
+/* Convert to RGB & blend indexed/indexed+alpha for preview */
+void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
+	unsigned char *img0, unsigned char *img,
+	unsigned char *alpha0, unsigned char *alpha, int opacity)
+{
+	int i, j, k, i3;
+
+	cnt = start + step * cnt;
+	for (i = start; i < cnt; i += step)
+	{
+		j = opacity;
+		if (alpha)
+		{
+			if (alpha[i])
+			{
+				if (alpha0[i]) /* Opaque both */
+					alpha[i] = 255;
+				else /* Opaque new */
+				{
+					alpha[i] = opacity;
+					j = 255;
+				}
+			}
+			else if (alpha0[i]) /* Opaque old */
+			{
+				alpha[i] = opacity ^ 255;
+				j = 0;
+			}
+			else /* Transparent both */
+			{
+				alpha[i] = 0;
+				continue;
+			}
+		}
+		i3 = i * 3;
+		k = mem_pal[img0[i]].red * 255 + j * (mem_pal[img[i]].red -
+			mem_pal[img0[i]].red);
+		rgb[i3 + 0] = (k + (k >> 8) + 1) >> 8;
+		k = mem_pal[img0[i]].green * 255 + j * (mem_pal[img[i]].green -
+			mem_pal[img0[i]].green);
+		rgb[i3 + 1] = (k + (k >> 8) + 1) >> 8;
+		k = mem_pal[img0[i]].blue * 255 + j * (mem_pal[img[i]].blue -
+			mem_pal[img0[i]].blue);
+		rgb[i3 + 2] = (k + (k >> 8) + 1) >> 8;
 	}
 }
