@@ -19,8 +19,6 @@
 
 #include <gtk/gtk.h>
 
-GdkWindow *the_canvas;					// Pointer to the canvas we will be drawing on
-
 float can_zoom;						// Zoom factor 1..MAX_ZOOM
 int margin_main_x, margin_main_y,			// Top left of image from top left of canvas
 	margin_view_x, margin_view_y;

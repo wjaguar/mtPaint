@@ -23,7 +23,6 @@
 
 #if GTK_MAJOR_VERSION == 1
 	#include <gdk/gdkx.h>
-	#include <gdk_imlib.h>
 #endif
 
 #include "global.h"
@@ -1140,19 +1139,128 @@ void screen_copy_pixels( unsigned char *rgb, int w, int h )
 	memcpy(mem_img[CHN_IMAGE], rgb, w * h * 3);
 }
 
+#if GTK_MAJOR_VERSION == 1
+static void gdk_get_rgb_image( GdkDrawable *drawable, GdkColormap *colormap,
+		gint x, gint y, gint width, gint height,
+		guchar *rgb_buf, gint rowstride )
+{
+/*
+ * Code from gdkgetrgb.c
+ * by Gary Wong <gtw@gnu.org>, 2000.
+ */
+
+    GdkImage *image;
+    gint xpix, ypix;
+    guchar *p;
+    guint32 pixel;
+    GdkVisual *visual;
+    int r = 0, g = 0 , b = 0, dwidth, dheight;
+
+#if GTK_CHECK_VERSION(1,3,0)
+    gdk_drawable_get_size( drawable, &dwidth, &dheight );
+#else
+    gdk_window_get_geometry( drawable, NULL, NULL, &dwidth, &dheight, NULL );
+#endif
+    
+    if( x <= -width || x >= dwidth )
+	return;
+    else if( x < 0 ) {
+	rgb_buf -= 3 * x;
+	width += x;
+	x = 0;
+    } else if( x + width > dwidth )
+	width = dwidth - x;
+
+    if( y <= -height || y >= dheight )
+	return;
+    else if( y < 0 ) {
+	rgb_buf -= rowstride * y;
+	height += y;
+	y = 0;
+    } else if( y + height > dheight )
+	height = dheight - y;
+    
+    visual = gdk_colormap_get_visual( colormap );
+
+    if( visual->type == GDK_VISUAL_TRUE_COLOR ) {
+	r = visual->red_shift + visual->red_prec - 8;
+	g = visual->green_shift + visual->green_prec - 8;
+	b = visual->blue_shift + visual->blue_prec - 8;
+    }
+
+    gdk_error_trap_push();
+    image = gdk_image_get( drawable, x, y, width, height );
+    if( gdk_error_trap_pop() ) {
+	/* Assume an X BadMatch occurred -- GDK doesn't provide a portable
+	   way to check what the error was. */
+	GdkPixmap *ppm = gdk_pixmap_new( drawable, width, height, -1 );
+	GdkGC *pgc = gdk_gc_new( drawable );
+	
+	gdk_draw_pixmap( ppm, pgc, drawable, x, y, 0, 0, width, height );
+
+	image = gdk_image_get( ppm, 0, 0, width, height );
+
+	gdk_gc_unref( pgc );
+	gdk_pixmap_unref( ppm );
+    }
+    
+    for( ypix = 0; ypix < height; ypix++ ) {
+	p = rgb_buf;
+	
+	for( xpix = 0; xpix < width; xpix++ ) {
+	    pixel = gdk_image_get_pixel( image, xpix, ypix );
+
+	    switch( visual->type ) {
+	    case GDK_VISUAL_STATIC_GRAY:
+	    case GDK_VISUAL_GRAYSCALE:
+	    case GDK_VISUAL_STATIC_COLOR:
+	    case GDK_VISUAL_PSEUDO_COLOR:
+		*p++ = colormap->colors[ pixel ].red >> 8;
+		*p++ = colormap->colors[ pixel ].green >> 8;
+		*p++ = colormap->colors[ pixel ].blue >> 8;
+		break;
+		
+	    case GDK_VISUAL_TRUE_COLOR:
+		*p++ = r > 0 ? ( pixel & visual->red_mask ) >> r :
+		    ( pixel & visual->red_mask ) << -r;
+		*p++ = g > 0 ? ( pixel & visual->green_mask ) >> g :
+		    ( pixel & visual->green_mask ) << -g;
+		*p++ = b > 0 ? ( pixel & visual->blue_mask ) >> b :
+		    ( pixel & visual->blue_mask ) << -b;
+		break;
+		
+	    case GDK_VISUAL_DIRECT_COLOR:
+		*p++ = colormap->colors[ ( pixel & visual->red_mask )
+				       >> visual->red_shift ].red >> 8;
+		*p++ = colormap->colors[ ( pixel & visual->green_mask )
+				       >> visual->green_shift ].green >> 8;
+		*p++ = colormap->colors[ ( pixel & visual->blue_mask )
+				       >> visual->blue_shift ].blue >> 8;
+		break;
+	    }
+	}
+
+	rgb_buf += rowstride;
+    }
+
+    gdk_image_destroy( image );
+}
+#endif
+
 gboolean grab_screen()
 {
 	int width = gdk_screen_width(), height = gdk_screen_height();
 
 #if GTK_MAJOR_VERSION == 1
-	GdkImlibImage *screenshot = NULL;
+	guchar *screenshot = malloc( width*height*3 );
+	GdkWindow *win = (GdkWindow *)&gdk_root_parent;
 
-	screenshot = gdk_imlib_create_image_from_drawable( (GdkWindow *)&gdk_root_parent,
-			NULL, 0, 0, width, height );
 	if ( screenshot != NULL )
 	{
-		screen_copy_pixels( screenshot->rgb_data, width, height );
-		gdk_imlib_kill_image( screenshot );
+		gdk_get_rgb_image( win, gdk_window_get_colormap(win), 0, 0,
+					width, height, screenshot, width*3 );
+		screen_copy_pixels( screenshot, width, height );
+		free(screenshot);
 #endif
 #if GTK_MAJOR_VERSION == 2
 	GdkPixbuf *screenshot = NULL;

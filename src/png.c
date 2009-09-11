@@ -62,7 +62,7 @@ fformat file_formats[NUM_FTYPES] = {
 //	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB | FF_ALPHA | FF_MULTI
 //		/* | FF_TRANS | FF_LAYER */ },
 /* !!! Current state */
-	{ "TIFF", "tif", "tiff", FF_RGB },
+	{ "TIFF", "tif", "tiff", FF_IDX | FF_RGB },
 #else
 	{ "", "", "", 0},
 #endif
@@ -438,7 +438,7 @@ file_too_huge:
 #define PNG_AFTER_IDAT 8
 #endif
 
-int save_png(char *file_name, ls_settings *settings)
+static int save_png(char *file_name, ls_settings *settings)
 {
 	static char *chunk_names[] = { "", "alPh", "seLc", "maSk" };
 	png_unknown_chunk unknown0;
@@ -734,74 +734,67 @@ fail_too_huge:
 #endif
 }
 
-int save_gif( char *file_name )
-{
-	if ( mem_img_bpp != 1 ) return NOT_GIF;		// GIF save must be on indexed image
-
-	return save_gif_real( file_name, mem_img[CHN_IMAGE], mem_pal, mem_width, mem_height, mem_xpm_trans, 1 );
-}
-
-
-int save_gif_real( char *file_name,
-	unsigned char *im, png_color *pal, int w, int h, int trans, int skip )
-{
 #ifdef U_GIF
+static int save_gif(char *file_name, ls_settings *settings)
+{
+	ColorMapObject *gif_map;
 	GifFileType *giffy;
-
-	ColorMapObject *gif_map = NULL;
-	GifColorType gif_pal[256];
-
 	unsigned char gif_ext_data[8];
-	int i, j;
+	int i, w = settings->width, h = settings->height, msg = -1;
 
 
-	gif_map = MakeMapObject(256, gif_pal);
-	for ( i=0; i<256; i++ )					// Prepare GIF palette
-	{
-		gif_map->Colors[i].Red	 = pal[i].red;
-		gif_map->Colors[i].Green = pal[i].green;
-		gif_map->Colors[i].Blue	 = pal[i].blue;
-	}
+	if (settings->bpp != 1) return NOT_GIF;	// GIF save must be on indexed image
+
+	gif_map = MakeMapObject(256, NULL);
+	if (!gif_map) return -1;
 
 	giffy = EGifOpenFileName(file_name, FALSE);
-	if ( giffy==NULL ) goto fail;
+	if (!giffy) goto fail0;
 
-	if ( EGifPutScreenDesc( giffy, w, h, 256, 0, gif_map )  == GIF_ERROR )
+	for (i = 0; i < settings->colors; i++)
+	{
+		gif_map->Colors[i].Red	 = settings->pal[i].red;
+		gif_map->Colors[i].Green = settings->pal[i].green;
+		gif_map->Colors[i].Blue	 = settings->pal[i].blue;
+	}
+	for (; i < 256; i++)
+	{
+		gif_map->Colors[i].Red = gif_map->Colors[i].Green = 
+			gif_map->Colors[i].Blue	= 0;
+	}
+
+	if (EGifPutScreenDesc(giffy, w, h, 256, 0, gif_map) == GIF_ERROR)
 		goto fail;
-	if ( trans > -1 )
+
+	if (settings->xpm_trans >= 0)
 	{
 		gif_ext_data[0] = 1;
 		gif_ext_data[1] = 0;
 		gif_ext_data[2] = 0;
-		gif_ext_data[3] = trans;
-		EGifPutExtension( giffy, GRAPHICS_EXT_FUNC_CODE, 4, gif_ext_data );
+		gif_ext_data[3] = settings->xpm_trans;
+		EGifPutExtension(giffy, GRAPHICS_EXT_FUNC_CODE, 4, gif_ext_data);
 	}
-	if ( EGifPutImageDesc( giffy, 0, 0, w, h, FALSE, NULL )  == GIF_ERROR )
+
+	if (EGifPutImageDesc(giffy, 0, 0, w, h, FALSE, NULL) == GIF_ERROR)
 		goto fail;
 
-	if ( skip == 1 ) progress_init(_("Saving GIF image"),0);
+	if (!settings->silent) progress_init(_("Saving GIF image"), 0);
 
-	for ( j=0; j<h; j++ )
+	for (i = 0; i < h; i++)
 	{
-		if ( j%16 == 0 && skip == 1 ) progress_update( ((float) j) / h );
-		EGifPutLine( giffy, im + j*w, w );
+		EGifPutLine(giffy, settings->img[CHN_IMAGE] + i * w, w);
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)i / h);
 	}
-	if ( skip == 1 ) progress_end();
+	if (!settings->silent) progress_end();
+	msg = 0;
 
-	FreeMapObject( gif_map );
-	EGifCloseFile(giffy);
+fail:	EGifCloseFile(giffy);
+fail0:	FreeMapObject(gif_map);
 
-	return 0;
-
-fail:
-	FreeMapObject( gif_map );
-	EGifCloseFile(giffy);
-
-	return -1;
-#else
-	return -1;
-#endif
+	return (msg);
 }
+#endif
 
 #ifdef U_JPEG
 struct my_error_mgr
@@ -917,58 +910,59 @@ fail_too_huge:
 #endif
 }
 
-
-int save_jpeg( char *file_name )
-{
 #ifdef U_JPEG
+static int save_jpeg(char *file_name, ls_settings *settings)
+{
 	struct jpeg_compress_struct cinfo;
-	JSAMPROW row_pointer[1];
-
+	JSAMPROW row_pointer;
 	FILE *fp;
 	int i;
 
-	if ( mem_img_bpp == 1 ) return NOT_JPEG;		// JPEG save must be on RGB image
+
+	if (settings->bpp == 1) return NOT_JPEG;
+
+	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
 
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
 	if (setjmp(jerr.setjmp_buffer))
 	{
 		jpeg_destroy_compress(&cinfo);
+		fclose(fp);
 		return -1;
 	}
 
 	jpeg_create_compress(&cinfo);
 
-	if (( fp = fopen(file_name, "wb") ) == NULL)
-		return -1;
-
 	jpeg_stdio_dest( &cinfo, fp );
-	cinfo.image_width = mem_width;
-	cinfo.image_height = mem_height;
+	cinfo.image_width = settings->width;
+	cinfo.image_height = settings->height;
 	cinfo.input_components = 3;
 	cinfo.in_color_space = JCS_RGB;
 	jpeg_set_defaults(&cinfo);
-	jpeg_set_quality(&cinfo, mem_jpeg_quality, TRUE );
+	jpeg_set_quality(&cinfo, settings->jpeg_quality, TRUE );
 	jpeg_start_compress( &cinfo, TRUE );
 
-	row_pointer[0] = mem_img[CHN_IMAGE];
-	progress_init(_("Saving JPEG image"),0);
-	for ( i=0; i<mem_height; i++ )
+	row_pointer = settings->img[CHN_IMAGE];
+	if (!settings->silent) progress_init(_("Saving JPEG image"), 0);
+	for (i = 0; i < settings->height; i++ )
 	{
-		if (i%16 == 0) progress_update( ((float) i) / mem_height );
-		jpeg_write_scanlines(&cinfo, row_pointer, 1);
-		row_pointer[0] = row_pointer[0] + 3*mem_width;
+		jpeg_write_scanlines(&cinfo, &row_pointer, 1);
+		row_pointer += 3 * settings->width;
+		if (!settings->silent &&
+			((i * 20) % settings->height >= settings->height - 20))
+			progress_update((float)i / settings->height);
 	}
-	progress_end();
-
 	jpeg_finish_compress( &cinfo );
+
+	if (!settings->silent) progress_end();
+
 	jpeg_destroy_compress( &cinfo );
+	fclose(fp);
 
 	return 0;
-#else
-	return -1;
-#endif
 }
+#endif
 
 
 int load_tiff( char *file_name )
@@ -1041,45 +1035,130 @@ fail:
 #endif
 }
 
-int save_tiff( char *file_name )
-{
+#define TIFFX_VERSION 0 // mtPaint's TIFF extensions version
+
 #ifdef U_TIFF
-	int j;
+static int save_tiff(char *file_name, ls_settings *settings)
+{
+/* !!! No private exts for now */
+//	char buf[512];
+
+	unsigned char *src, *row = NULL;
+	uint16 rgb[256 * 3], xs[NUM_CHANNELS];
+/* !!! No extra channels for now */
+//	int i, j, k, dt, xsamp = 0, cmask = CMASK_IMAGE, res = 0;
+
+int i, xsamp = 0, res = 0;
+
+	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
 
-	if ( mem_img_bpp == 1 ) return NOT_TIFF;		// TIFF save must be on RGB image
+/* !!! No extra channels for now */
+#if 0
+	/* Find out number of utility channels */
+	memset(xs, 0, sizeof(xs));
+	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
+	{
+		if (!settings->img[i]) continue;
+		cmask |= CMASK_FOR(i);
+		xs[xsamp++] = i == CHN_ALPHA ? EXTRASAMPLE_UNASSALPHA :
+			EXTRASAMPLE_UNSPECIFIED;
+	}
+	if (xsamp)
+	{
+		row = malloc(w * (bpp + xsamp));
+		if (!row) return -1;
+	}
+#endif
 
 	TIFFSetErrorHandler(NULL);		// We don't want any echoing to the output
 	TIFFSetWarningHandler(NULL);
-	tif = TIFFOpen( file_name, "w" );
-
-	if ( tif == NULL ) return -1;
-
-	TIFFSetField( tif, TIFFTAG_IMAGEWIDTH, mem_width );
-	TIFFSetField( tif, TIFFTAG_IMAGELENGTH, mem_height );
-	TIFFSetField( tif, TIFFTAG_SAMPLESPERPIXEL, 3 );
-	TIFFSetField( tif, TIFFTAG_BITSPERSAMPLE, 8 );
-	TIFFSetField( tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE );
-	TIFFSetField( tif, TIFFTAG_PLANARCONFIG, 1 );
-	TIFFSetField( tif, TIFFTAG_PHOTOMETRIC, 2 );
-
-	progress_init(_("Saving TIFF image"),0);
-	for ( j=0; j<mem_height; j++ )
+	if (!(tif = TIFFOpen( file_name, "w" )))
 	{
-		if (j%16 == 0) progress_update( ((float) j) / mem_height );
-		if ( TIFFWriteScanline( tif, mem_img[CHN_IMAGE] + j*3*mem_width, j, 0 ) == -1 ) goto fail;
+		free(row);
+		return -1;
 	}
-	progress_end();
-	TIFFClose(tif);
-	return 0;
-fail:
-	progress_end();
-	TIFFClose(tif);
-	return -1;
-#else
-	return -1;
+
+/* !!! No private exts for now */
+#if 0
+	/* Write private extension info in comments */
+	TIFFSetField(tif, TIFFTAG_SOFTWARE, "mtPaint 3");
+	// Extensions' version, then everything useful but lacking a TIFF tag
+	i = sprintf(buf, "VERSION=%d\n", TIFFX_VERSION);
+	i += sprintf(buf + i, "CHANNELS=%d\n", cmask);
+	i += sprintf(buf + i, "COLORS=%d\n", settings->colors);
+	i += sprintf(buf + i, "TRANSPARENCY=%d\n",
+		bpp == 1 ? settings->xpm_trans : settings->rgb_trans);
+	TIFFSetField(tif, TIFFTAG_IMAGEDESCRIPTION, buf);
 #endif
+
+	/* Write regular tags */
+	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
+	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, bpp + xsamp);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
+	TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+	if (bpp == 1)
+	{
+		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_PALETTE);
+		memset(rgb, 0, sizeof(rgb));
+		for (i = 0; i < settings->colors; i++)
+		{
+			rgb[i] = settings->pal[i].red * 257;
+			rgb[i + 256] = settings->pal[i].green * 257;
+			rgb[i + 512] = settings->pal[i].blue * 257;
+		}
+		TIFFSetField(tif, TIFFTAG_COLORMAP, rgb, rgb + 256, rgb + 512);
+	}
+	else TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+	if (xsamp) TIFFSetField(tif, TIFFTAG_EXTRASAMPLES, xsamp, xs);
+
+	/* Actually write the image */
+	if (!settings->silent) progress_init(_("Saving TIFF image"), 0);
+	xsamp += bpp;
+	for (i = 0; i < h; i++)
+	{
+		src = settings->img[CHN_IMAGE] + w * i * bpp;
+/* !!! No extra channels for now */
+#if 0
+		if (row) /* Interlace the channels */
+		{
+			for (dt = k = 0; k < w * bpp; k += bpp , dt += xsamp)
+			{
+				row[dt] = src[k];
+				if (bpp == 1) continue;
+				row[dt + 1] = src[k + 1];
+				row[dt + 2] = src[k + 2];
+			}
+			for (dt = bpp , j = CHN_ALPHA; j < NUM_CHANNELS; j++)
+			{
+				if (!settings->img[j]) continue;
+				src = settings->img[j] + w * i;
+				for (k = 0; k < w; k++ , dt += xsamp)
+				{
+					row[dt] = src[k];
+				}
+				dt -= w * xsamp - 1;
+			}
+		}
+#endif
+		if (TIFFWriteScanline(tif, row ? row : src, i, 0) == -1)
+		{
+			res = -1;
+			break;
+		}
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)i / h);
+	}
+	TIFFClose(tif);
+
+	if (!settings->silent) progress_end();
+
+	free(row);
+	return (res);
 }
+#endif
 
 int load_bmp( char *file_name )
 {
@@ -1205,100 +1284,115 @@ file_too_huge:
 	return FILE_MEM_ERROR;
 }
 
-int save_bmp( char *file_name )
+/* Macros for writing values in Intel byte order */
+#define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
+#define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
+	(buf)[2] = ((v) >> 16) & 0xFF; (buf)[3] = (v) >> 24;
+
+#define BMP_FILESIZE  2		/* 32b */
+#define BMP_DATAOFS  10		/* 32b */
+#define BMP_HDR2SIZE 14		/* 32b */
+#define BMP_WIDTH    18		/* 32b */
+#define BMP_HEIGHT   22		/* 32b */
+#define BMP_PLANES   26		/* 16b */
+#define BMP_BPP      28		/* 16b */
+#define BMP_COMPRESS 30		/* 32b */
+#define BMP_DATASIZE 34		/* 32b */
+#define BMP_COLORS   46		/* 32b */
+#define BMP_ICOLORS  50		/* 32b */
+#define BMP_HSIZE    54
+#define BMP_H2SIZE   (BMP_HSIZE - BMP_HDR2SIZE)
+#define BMP_MAXHSIZE (BMP_HSIZE + 256 * 4)
+
+static int save_bmp(char *file_name, ls_settings *settings)
 {
-	unsigned char buff[MAX_WIDTH*4], *wrk_image = mem_img[CHN_IMAGE];
-	int written, i, j, bpl = mem_width * mem_img_bpp, filesize, headsize;
+	unsigned char *buf, *tmp, *src;
 	FILE *fp;
+	int i, j, ll, hsz, dsz, fsz;
+	int w = settings->width, h = settings->height, bpp = settings->bpp;
 
-	if ( bpl % 4 != 0 ) bpl = bpl + 4 - (bpl % 4);		// Adhere to 4 byte boundaries
-	filesize = 54 + bpl * mem_height;
-	if ( mem_img_bpp == 1 ) filesize = filesize + mem_cols*4;
-	headsize = filesize - bpl * mem_height;
+	i = w > BMP_MAXHSIZE / 4 ? w * 4 : BMP_MAXHSIZE;
+	buf = malloc(i);
+	if (!buf) return -1;
+	memset(buf, 0, i);
 
-	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
-
-	for ( i=0; i<54; i++ ) buff[i] = 0;	// Flush
-
-	buff[0] = 'B'; buff[1] = 'M';		// Signature
-
-	buff[2] = filesize % 256;
-	buff[3] = (filesize >> 8) % 256;
-	buff[4] = (filesize >> 16) % 256;
-	buff[5] = (filesize >> 24) % 256;
-
-	buff[10] = headsize % 256;
-	buff[11] = headsize / 256;
-
-	buff[14] = 40; buff[26] = 1;
-
-	buff[18] = mem_width % 256; buff[19] = mem_width / 256;	buff[20] = 0; buff[21] = 0;
-	buff[22] = mem_height % 256; buff[23] = mem_height / 256; buff[24] = 0; buff[25] = 0;
-
-	buff[28] = mem_img_bpp*8; buff[29] = 0;			// Bits per pixel
-	buff[30] = 0; buff[31] = 0; buff[32] = 0; buff[33] = 0;		// No compression
-
-	buff[34] = bpl*mem_height % 256;
-	buff[35] = (bpl*mem_height >> 8) % 256;
-	buff[36] = (bpl*mem_height >> 16) % 256;
-	buff[37] = (bpl*mem_height >> 24) % 256;
-
-	buff[38] = 18; buff[39] = 11;
-	buff[42] = 18; buff[43] = 11;
-
-	if ( mem_img_bpp != 3 )
+	if (!(fp = fopen(file_name, "wb")))
 	{
-		buff[46] = mem_cols % 256; buff[47] = mem_cols / 256;
-		buff[50] = buff[46]; buff[51] = buff[47];
+		free(buf);
+		return -1;
 	}
-	
 
-	written = fwrite(buff, 1, 54, fp);
-	if ( written < 54 ) goto fail;		// Some sort of botch up occured
+	/* Sizes of BMP parts */
+	if ((bpp == 3) && settings->img[CHN_ALPHA]) bpp = 4;
+	ll = (bpp * w + 3) & ~3;
+	j = bpp == 1 ? settings->colors : 0;
+	hsz = BMP_HSIZE + j * 4;
+	dsz = ll * h;
+	fsz = hsz + dsz;
 
-	progress_init(_("Saving BMP image"), 0);
-	if ( mem_img_bpp == 3 )		// RGB image
+	/* Prepare header */
+	buf[0] = 'B'; buf[1] = 'M';
+	PUT32(buf + BMP_FILESIZE, fsz);
+	PUT32(buf + BMP_DATAOFS, hsz);
+	PUT32(buf + BMP_HDR2SIZE, BMP_H2SIZE);
+	PUT32(buf + BMP_WIDTH, w);
+	PUT32(buf + BMP_HEIGHT, h);
+	PUT16(buf + BMP_PLANES, 1);
+	PUT16(buf + BMP_BPP, bpp * 8);
+	PUT32(buf + BMP_COMPRESS, 0); /* No compression */
+	PUT32(buf + BMP_DATASIZE, dsz);
+	PUT32(buf + BMP_COLORS, j);
+	PUT32(buf + BMP_ICOLORS, j);
+	tmp = buf + BMP_HSIZE;
+	for (i = 0; i < j; i++ , tmp += 4)
 	{
-		for ( j=mem_height-1; j>=0; j-- )
+		tmp[0] = settings->pal[i].blue;
+		tmp[1] = settings->pal[i].green;
+		tmp[2] = settings->pal[i].red;
+	}
+	fwrite(buf, 1, tmp - buf, fp);
+
+	/* Write rows */
+	if (!settings->silent) progress_init(_("Saving BMP image"), 0);
+	memset(buf + ll - 4, 0, 4);
+	for (i = h - 1; i >= 0; i--)
+	{
+		src = settings->img[CHN_IMAGE] + i * w * settings->bpp;
+		if (bpp == 1) /* Indexed */
 		{
-			if (j%16 == 0) progress_update( ((float) mem_height - j) / mem_height );
-			for ( i=0; i<mem_width; i++ )
+			memcpy(buf, src, w);
+		}
+		else if (bpp == 3) /* RGB */
+		{
+			for (j = 0; j < w * 3; j += 3)
 			{
-				buff[ 3*i ] = wrk_image[ 2 + 3*(i + mem_width*j) ];
-				buff[ 3*i + 1 ] = wrk_image[ 1 + 3*(i + mem_width*j) ];
-				buff[ 3*i + 2 ] = wrk_image[ 3*(i + mem_width*j) ];
+				buf[j + 0] = src[j + 2];
+				buf[j + 1] = src[j + 1];
+				buf[j + 2] = src[j + 0];
 			}
-			fwrite(buff, 1, bpl, fp);
 		}
-	}
-	else				// Indexed palette image
-	{
-		memset(buff, 0, mem_cols * 4);
-		for ( i=0; i<mem_cols; i++ )
+		else /* if (bpp == 4) */ /* RGBA */
 		{
-			buff[2 + 4*i] = mem_pal[i].red;
-			buff[1 + 4*i] = mem_pal[i].green;
-			buff[4*i] = mem_pal[i].blue;
+			tmp = settings->img[CHN_ALPHA] + i * w;
+			for (j = 0; j < w * 4; j += 4)
+			{
+				buf[j + 0] = src[2];
+				buf[j + 1] = src[1];
+				buf[j + 2] = src[0];
+				buf[j + 3] = tmp[0];
+				src += 3; tmp++;
+			}
 		}
-		fwrite(buff, 1, mem_cols*4, fp);		// Write colour table
-
-		for ( j=mem_height-1; j>=0; j-- )
-		{
-			if (j%16 == 0) progress_update( ((float) mem_height - j) / mem_height );
-
-			for ( i=0; i<mem_width; i++ )
-				buff[i] = wrk_image[ i + mem_width*j ];
-
-			fwrite(buff, 1, bpl, fp);	// Read in line of pixels
-		}
+		fwrite(buf, 1, ll, fp);
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)(h - i) / h);
 	}
-	progress_end();
+	fclose(fp);
 
-	fclose(fp);
-	return 0;	// Success
-fail:
-	fclose(fp);
-	return -1;
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return 0;
 }
 
 int load_xpm( char *file_name )
@@ -1337,7 +1431,8 @@ int load_xpm( char *file_name )
 		return NOT_INDEXED;
 	}
 
-	if ( fw < 4 || fh < 4 ) goto fail;
+// !!! WTF??? A bug!!!
+//	if ( fw < 4 || fh < 4 ) goto fail;
 
 	if ( fw > MAX_WIDTH || fh > MAX_HEIGHT )
 	{
@@ -1508,91 +1603,129 @@ fail2:
 	return 1;
 }
 
-int save_xpm( char *file_name )
+/* Partial ctype implementation for C locale;
+ * space 1, digit 2, alpha 4, punctuation 8 */
+static unsigned char ctypes[256] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 8, 8, 8, 8, 8, 8,
+	8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 8, 8, 8, 4,
+	8, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
+	4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 8, 8, 8, 8, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#define ISSPACE(x) (ctypes[(unsigned char)(x)] & 1)
+#define ISALPHA(x) (ctypes[(unsigned char)(x)] & 2)
+#define ISALNUM(x) (ctypes[(unsigned char)(x)] & 6)
+#define ISCNTRL(x) (!ctypes[(unsigned char)(x)])
+
+static char base64[] =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+	hex[] = "0123456789ABCDEF";
+
+static int save_xpm(char *file_name, ls_settings *settings)
 {
-	unsigned char pix;
-	char tin[4110], col_tab[257][3], *po;
+	unsigned char *src;
+	char ctb[256 * 2 + 1], *buf, *tmp;
 	FILE *fp;
-	int fcpp, i, j;
+	int i, j, cpp, w = settings->width, h = settings->height;
 
-	if ( mem_img_bpp != 1 ) return NOT_XPM;
 
-	if ((fp = fopen(file_name, "w")) == NULL) return -1;
+	if (settings->bpp != 1) return NOT_XPM;
 
-	if ( mem_cols < 16 ) fcpp = 1;
-	else fcpp = 2;
+	/* Extract valid C identifier from name */
+	tmp = strrchr(file_name, DIR_SEP);
+	tmp = tmp ? tmp + 1 : file_name;
+	for (; *tmp && ISALPHA(*tmp); tmp++);
+	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
+	if (!i) return -1;
 
-	po = file_name + strlen(file_name) - 1;
-	while ( po>=file_name && po[0] != '/' && po[0] != '\\' ) po--;
-	po++;
+	cpp = settings->colors > 64 ? 2 : 1;
+	buf = malloc(w * cpp + 16);
+	if (!buf) return -1;
 
-	if ( strlen(po) < 5 ) goto fail;	// name = '.xpm' = wrong
-
-	progress_init(_("Saving XPM image"),0);
-
-	po[strlen(po) - 4] = 0;			// Chop off '.xpm'
-
-	fprintf( fp, "/* XPM */\n" );
-	fprintf( fp, "static char *%s_xpm[] = {\n", po );
-	fprintf( fp, "\"%i %i %i %i\",\n", mem_width, mem_height, mem_cols, fcpp );
-
-	po[strlen(po)] = '.';			// Restore full file name
-
-	for ( i=0; i<mem_cols; i++ )
+	if (!(fp = fopen(file_name, "w")))
 	{
-		if ( fcpp == 1 )
+		free(buf);
+		return -1;
+	}
+
+	if (!settings->silent)
+	{
+		progress_init(_("Saving XPM image"), 0);
+		progress_update(0);
+	}
+
+	fprintf(fp, "/* XPM */\n" );
+	fprintf(fp, "static char *%.*s_xpm[] = {\n", i, tmp);
+
+	if ((settings->hot_x >= 0) && (settings->hot_y >= 0))
+		fprintf(fp, "\"%d %d %d %d %d %d\",\n", w, h, settings->colors,
+			cpp, settings->hot_x, settings->hot_y);
+	else fprintf(fp, "\"%d %d %d %d\",\n", w, h, settings->colors, cpp);
+
+	/* Create colortable */
+	tmp = settings->colors > 16 ? base64 : hex;
+	memset(ctb, 0, sizeof(ctb));
+	for (i = 0; i < settings->colors; i++)
+	{
+		if (i == settings->xpm_trans)
 		{
-			col_tab[i][0] = get_hex( i % 16 );
-			col_tab[i][1] = 0;
-			if ( i == mem_xpm_trans ) col_tab[i][0] = ' ';
+			if (cpp == 1) ctb[i] = ' ';
+			else ctb[2 * i] = ctb[2 * i + 1] = ' ';
+			fprintf(fp, "\"%s\tc None\",\n", ctb + i * cpp);
+			continue;
 		}
+		if (cpp == 1) ctb[i] = tmp[i];
 		else
 		{
-			col_tab[i][0] = get_hex( i / 16 );
-			col_tab[i][1] = get_hex( i % 16 );
-			col_tab[i][2] = 0;
-			if ( i == mem_xpm_trans )
-			{
-				col_tab[i][0] = ' ';
-				col_tab[i][1] = ' ';
-			}
+			ctb[2 * i] = hex[i >> 4];
+			ctb[2 * i + 1] = hex[i & 0xF];
 		}
-		if ( i == mem_xpm_trans )
-			fprintf( fp, "\"%s\tc None\",\n", col_tab[i] );
-		else
+		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ctb + i * cpp,
+			settings->pal[i].red, settings->pal[i].green,
+			settings->pal[i].blue);
+	}
+	if (cpp == 1) memset(ctb + i, ctb[0], 256 - i);
+	else
+	{
+		for (; i < 256; i++)
 		{
-			tin[0] = '#';
-			tin[1] = get_hex( mem_pal[i].red / 16 );
-			tin[2] = get_hex( mem_pal[i].red % 16 );
-			tin[3] = get_hex( mem_pal[i].green / 16 );
-			tin[4] = get_hex( mem_pal[i].green % 16 );
-			tin[5] = get_hex( mem_pal[i].blue / 16 );
-			tin[6] = get_hex( mem_pal[i].blue % 16 );
-			tin[7] = 0;
-			fprintf( fp, "\"%s\tc %s\",\n", col_tab[i], tin );
+			ctb[2 * i] = ctb[0];
+			ctb[2 * i + 1] = ctb[1];
 		}
 	}
 
-	for ( j=0; j<mem_height; j++ )
+	for (i = 0; i < h; i++)
 	{
-		if (j%16 == 0) progress_update( ((float) j) / mem_height );
-		fprintf( fp, "\"" );
-		for ( i=0; i<mem_width; i++ )
+		src = settings->img[CHN_IMAGE] + i * w;
+		tmp = buf;
+		*tmp++ = '"';
+		for (j = 0; j < w; j++)
 		{
-			pix = mem_img[CHN_IMAGE][ i + j*mem_width ];
-			if ( pix>=mem_cols ) pix = 0;
-			fprintf( fp, "%s", col_tab[pix] );
+			*tmp++ = ctb[cpp * src[j]];
+			if (cpp == 1) continue;
+			*tmp++ = ctb[2 * src[j] + 1];
 		}
-		if ( j<(mem_height-1) ) fprintf( fp, "\",\n" );
-		else fprintf( fp, "\"\n};\n" );
+		strcpy(tmp, i < h - 1 ? "\",\n" : "\"\n};\n");
+		fputs(buf, fp);
+		if (!settings->silent && ((i * 10) % h >= h - 10))
+			progress_update((float)i / h);
 	}
-
-	progress_end();
 	fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
 	return 0;
-fail:
-	fclose(fp);
-	return -1;
 }
 
 int grab_val( char *tin, char *txt, FILE *fp )
@@ -1700,66 +1833,76 @@ fail:
 	return -1;
 }
 
-int save_xbm( char *file_name )
+#define BPL 12 /* Bytes per line */
+#define CPB 6  /* Chars per byte */
+static int save_xbm(char *file_name, ls_settings *settings)
 {
-	unsigned char pix;
-	char *po;
-	int i, j, k, l, bits;
+	unsigned char *src;
+	unsigned char row[MAX_WIDTH / 8];
+	char buf[CPB * BPL + 16], *tmp;
 	FILE *fp;
+	int i, j, k, l, w = settings->width, h = settings->height;
 
-	if ( mem_img_bpp != 1 || mem_cols != 2 ) return NOT_XBM;
+	if ((settings->bpp != 1) || (settings->colors > 2)) return NOT_XBM;
 
-	if ((fp = fopen(file_name, "w")) == NULL) return -1;
+	/* Extract valid C identifier from name */
+	tmp = strrchr(file_name, DIR_SEP);
+	tmp = tmp ? tmp + 1 : file_name;
+	for (; *tmp && ISALPHA(*tmp); tmp++);
+	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
+	if (!i) return -1;
 
-	po = file_name + strlen(file_name) - 1;
-	while ( po>=file_name && po[0] != '/' && po[0] != '\\' ) po--;
-	po++;
+	if (!(fp = fopen(file_name, "w"))) return -1;
 
-	if ( strlen(po) < 5 ) goto fail;	// name = '.xbm' = wrong
-
-	po[strlen(po) - 4] = 0;			// Chop off '.xbm'
-
-	fprintf( fp, "#define %s_width %i\n", po, mem_width );
-	fprintf( fp, "#define %s_height %i\n", po, mem_height );
-	if ( mem_xbm_hot_x>=0 && mem_xbm_hot_y>=0 )
+	fprintf(fp, "#define %.*s_width %i\n", i, tmp, w);
+	fprintf(fp, "#define %.*s_height %i\n", i, tmp, h);
+	if ((settings->hot_x >= 0) && (settings->hot_y >= 0))
 	{
-		fprintf( fp, "#define %s_x_hot %i\n", po, mem_xbm_hot_x );
-		fprintf( fp, "#define %s_y_hot %i\n", po, mem_xbm_hot_y );
+		fprintf(fp, "#define %.*s_x_hot %i\n", i, tmp, settings->hot_x);
+		fprintf(fp, "#define %.*s_y_hot %i\n", i, tmp, settings->hot_y);
 	}
-	fprintf( fp, "static unsigned char %s_bits[] = {\n", po );
+	fprintf(fp, "static unsigned char %.*s_bits[] = {\n", i, tmp);
 
-	po[strlen(po)] = '.';			// Restore full file name
+	if (!settings->silent) progress_init(_("Saving XBM image"), 0);
 
-	progress_init(_("Saving XBM image"),0);
-	l=0;
-	for ( j=0; j<mem_height; j++ )
+	j = k = (w + 7) >> 3; i = l = 0;
+	while (TRUE)
 	{
-		if (j%16 == 0) progress_update( ((float) j) / mem_height );
-		for ( i=0; i<mem_width; i=i+8 )
+		if (j >= k)
 		{
-			bits = 0;
-			for ( k=0; k<8; k++ )
-				if ( (i+k) < mem_width )
-				{
-					pix = mem_img[CHN_IMAGE][ i+k + mem_width*j ];
-					if ( pix > 1 ) pix = 0;
-					bits = bits + (pix << k);
-				}
-			fprintf( fp, " 0x%c%c", get_hex(bits / 16), get_hex(bits % 16) );
-			if ( !(j == (mem_height-1) && (i+8)>=mem_width ) )
-				fprintf( fp, "," );
-			l++;
-			if ( l%12 == 0 ) fprintf( fp, "\n" );
+			if (i >= h) break;
+			src = settings->img[CHN_IMAGE] + i * w;
+			memset(row, 0, k);
+			for (j = 0; j < w; j++)
+			{
+				if (src[j] == 1) row[j >> 3] |= 1 << (j & 7);
+			}
+			j = 0;
+			if (!settings->silent && ((i * 10) % h >= h - 10))
+				progress_update((float)i / h);
+			i++;
+		}
+		for (; (l < BPL) && (j < k); l++ , j++)
+		{
+			tmp = buf + l * CPB;
+			tmp[0] = ' '; tmp[1] = '0'; tmp[2] = 'x';
+			tmp[3] = hex[row[j] >> 4]; tmp[4] = hex[row[j] & 0xF];
+			tmp[5] = ',';
+		}
+		if ((l == BPL) && (j < k))
+		{
+			buf[BPL * CPB] = '\n'; buf[BPL * CPB + 1] = '\0';
+			fputs(buf, fp);
+			l = 0;
 		}
 	}
-	progress_end();
-	fprintf( fp, " };\n" );
+	strcpy(buf + l * CPB - 1, " };\n");
+	fputs(buf, fp);
+	fclose(fp);
 
-	fclose(fp);
-	return 1;
-fail:
-	fclose(fp);
-	return -1;
+	if (!settings->silent) progress_end();
+
+	return 0;
 }
 
 int save_image(char *file_name, ls_settings *settings)
@@ -1775,20 +1918,22 @@ int save_image(char *file_name, ls_settings *settings)
 		settings->pal = greypal;
 	}
 
-/* !!! Data fields mostly aren't used yet, so redirect */
-	if (settings->mode != FS_PNG_SAVE) settings->ftype = FT_PNG;
-
-
 	switch (settings->ftype)
 	{
 	default:
 	case FT_PNG: res = save_png(file_name, settings); break;
-	case FT_JPEG: res = save_jpeg( file_name ); break;
-	case FT_TIFF: res = save_tiff( file_name ); break;
-	case FT_GIF: res = save_gif( file_name ); break;
-	case FT_BMP: res = save_bmp( file_name ); break;
-	case FT_XPM: res = save_xpm( file_name ); break;
-	case FT_XBM: res = save_xbm( file_name ); break;
+#ifdef U_JPEG
+	case FT_JPEG: res = save_jpeg(file_name, settings); break;
+#endif
+#ifdef U_TIFF
+	case FT_TIFF: res = save_tiff(file_name, settings); break;
+#endif
+#ifdef U_GIF
+	case FT_GIF: res = save_gif(file_name, settings); break;
+#endif
+	case FT_BMP: res = save_bmp(file_name, settings); break;
+	case FT_XPM: res = save_xpm(file_name, settings); break;
+	case FT_XBM: res = save_xbm(file_name, settings); break;
 /* !!! Not implemented yet */
 //	case FT_TGA:
 //	case FT_PCX:

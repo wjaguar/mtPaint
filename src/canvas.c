@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1461,7 +1461,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	{
 		if (!(file_formats[i].flags & mask)) continue;
 		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
-			(file_formats[i].ext2 &&
+			(file_formats[i].ext2[0] &&
 			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
 			j = k;
 		item = gtk_menu_item_new_with_label(file_formats[i].name);
@@ -1498,7 +1498,7 @@ static void palette_widgets(GtkWidget *box, char *name, int mode)
 	{
 		if (!(file_formats[i].flags & FF_PALETTE)) continue;
 		if (!strncasecmp(ext, file_formats[i].ext, LONGEST_EXT) ||
-			(file_formats[i].ext2 &&
+			(file_formats[i].ext2[0] &&
 			!strncasecmp(ext, file_formats[i].ext2, LONGEST_EXT)))
 			j = k;
 		item = gtk_menu_item_new_with_label(file_formats[i].name);
@@ -1522,9 +1522,8 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 	switch (mode) /* Only save operations need settings */
 	{
 	case FS_PNG_SAVE:
-/* !!! Doesn't work yet */
-//	case FS_CHANNEL_SAVE:
-//	case FS_COMPOSITE_SAVE:
+	case FS_CHANNEL_SAVE:
+	case FS_COMPOSITE_SAVE:
 		image_widgets(box, name, mode);
 		break;
 	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
@@ -1573,9 +1572,8 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 		switch (xmode)
 		{
 		case FS_PNG_SAVE:
-/* !!! Doesn't work yet */
-//		case FS_CHANNEL_SAVE:
-//		case FS_COMPOSITE_SAVE:
+		case FS_CHANNEL_SAVE:
+		case FS_COMPOSITE_SAVE:
 			settings->ftype = selected_file_type(box);
 			settings->xpm_trans = read_spin(BOX_CHILD(box, 3));
 			settings->jpeg_quality = read_spin(BOX_CHILD(box, 5));
@@ -1590,10 +1588,6 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 		case FS_PALETTE_SAVE:
 			settings->ftype = selected_file_type(box);
 			break;
-/* !!! Placeholder */
-		case FS_CHANNEL_SAVE:
-		case FS_COMPOSITE_SAVE:
-/* !!! */
 		case FS_EXPORT_UNDO:
 		case FS_EXPORT_UNDO2:
 			settings->ftype = FT_PNG;

@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2006 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1019,11 +1019,7 @@ static void create_frames_ani()
 
 			/* Save GIF file */
 			settings.xpm_trans = trans;
-// !!!			i = save_image(output_path, &settings);
-
-			i = save_gif_real( output_path, irgb, pngpal, layer_w, layer_h,
-				trans, 0 ); // Save GIF file
-
+			i = save_image(output_path, &settings);
 			if ( i != 0 ) goto failure2;	// Some sort of i/o error
 		}
 		else				// Create Indexed GIF file

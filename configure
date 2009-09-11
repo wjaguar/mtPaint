@@ -3,8 +3,8 @@
 
 echo
 
-MT_V="3.08.14"
-MT_DATE="2006-9-22"
+MT_V="3.08.15"
+MT_DATE="2006-9-24"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -44,7 +44,7 @@ else
 	fi
 	function IS_LIB
 	{
-		ld -$1 -o /dev/null -L/lib >& /dev/null
+		ld -$1 -o /dev/null -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm >& /dev/null
 	}
 fi
 
@@ -144,9 +144,10 @@ do
 				LIN_BIN_INSTALL=/usr/bin
 				MT_CUSTOM=GUADALINEX;;
 		"build" )	./configure flush
+				I_DIR=/home/mark/sf
 				cd ..
-				zip -r /home/mark/sf/mtpaint-$MT_V.zip mtpaint-$MT_V/
-				tar cjvf /home/mark/sf/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V/
+				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V/
+				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V/
 				cd mtpaint-$MT_V
 				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man
 				make
@@ -155,10 +156,8 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk2
-				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
+				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
-				chown mark /home/mark/sf/mtpaint-*
-				chgrp users /home/mark/sf/mtpaint-*
 				./configure flush
 				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1
 				make
@@ -167,11 +166,17 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
-				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
+				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
-				chown mark /home/mark/sf/mtpaint-*
-				chgrp users /home/mark/sf/mtpaint-*
 				./configure flush
+
+				cd "$I_DIR"
+				alien --to-deb *.tgz
+				rename _1-2_all -1 *.deb
+				alien --to-rpm *.tgz
+				rename 1-2.noarch 1 *.rpm
+				chown mark *
+				chgrp users *
 				exit;;
 	esac
 done
@@ -238,13 +243,12 @@ else
 			then
 				GTK_INCLUDE=`gtk-config --cflags`
 				GTK_LIB=`gtk-config --libs`
-				GTK_LIB="$GTK_LIB -lgdk_imlib"
 			else
 				echo
 				echo I have not been able to find gtk-config so I am assuming the following:
 				echo
 				GTK_INCLUDE="-I/opt/gnome/include/gtk-1.2 -I/opt/gnome/include/glib-1.2 -I/opt/gnome/lib/glib/include -I/usr/X11R6/include"
-				GTK_LIB="-L/usr/lib -L/usr/X11R6/lib -L/opt/gnome/lib -lgtk -lgdk -rdynamic -lgmodule -lglib -ldl -lXext -lX11 -lm -lgdk_imlib"
+				GTK_LIB="-L/usr/lib -L/usr/X11R6/lib -L/opt/gnome/lib -lgtk -lgdk -rdynamic -lgmodule -lglib -ldl -lXext -lX11 -lm"
 				echo GTK_INCLUDE = $GTK_INCLUDE
 				echo GTK_LIB = $GTK_LIB
 				echo

@@ -112,20 +112,12 @@ int save_image(char *file_name, ls_settings *settings);
 int load_png( char *file_name, int stype );
 
 int load_gif( char *file_name, int *delay );
-int save_gif( char *file_name );
-int save_gif_real( char *file_name,
-	unsigned char *im, png_color *pal, int w, int h, int trans, int skip );
 
 int load_xpm( char *file_name );
-int save_xpm( char *file_name );
 int load_xbm( char *file_name );
-int save_xbm( char *file_name );
 int load_jpeg( char *file_name );
-int save_jpeg( char *file_name );
 int load_tiff( char *file_name );
-int save_tiff( char *file_name );
 int load_bmp( char *file_name );
-int save_bmp( char *file_name );
 
 int load_channel( char *filename, unsigned char *image, int w, int h );
 

@@ -20,7 +20,7 @@ http://sourceforge.net/mail/?group_id=155874
 Compilation
 -----------
 
-In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you are targetting GTK+1 you will also need imlib as well.  If you want to load or save GIF, JPEG and TIFF files you will also need libungif, libjpeg and libtiff.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
+In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you want to load or save GIF, JPEG and TIFF files you will also need libungif, libjpeg and libtiff.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
 
 For GTK+2
 =========

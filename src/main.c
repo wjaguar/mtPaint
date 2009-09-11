@@ -20,10 +20,6 @@
 #include <stdlib.h>
 #include <gtk/gtk.h>
 
-#if GTK_MAJOR_VERSION == 1
-	#include <gdk_imlib.h>
-#endif
-
 #include "global.h"
 #include "memory.h"
 #include "png.h"
@@ -67,10 +63,6 @@ int main( int argc, char *argv[] )
 	inifile_init("/.mtpaint");
 
 	gtk_init( &argc, &argv );
-
-#if GTK_MAJOR_VERSION == 1
-	gdk_imlib_init();			// Needed for screenshot grabbing
-#endif
 
 #ifdef U_NLS
 	setup_language();

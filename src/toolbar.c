@@ -241,7 +241,7 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 static GtkWidget *toolbar_add_zoom(GtkWidget *box)		// Add zoom combo box
 {
 	int i;
-	char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%", "200%",
+	char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%", "200%", "300%",
 		"400%", "800%", "1200%", "1600%", "2000%", NULL };
 	GtkWidget *combo, *combo_entry;
 	GList *combo_list = NULL;
