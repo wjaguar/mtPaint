@@ -4353,30 +4353,29 @@ int mem_count_all_cols()				// Count all colours - Using main image
 
 int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colours - very memory greedy
 {
-	unsigned char *tab;
+	guint32 *tab, v;
 	int i, j, k, ix;
 
-	j = 0x200000;
-	tab = malloc(j);			// HUGE colour cube
+	j = 0x80000;
+	tab = calloc(j, sizeof(guint32));	// HUGE colour cube
 	if (!tab) return -1;			// Not enough memory Mr Greedy ;-)
-
-	memset(tab, 0, j);			// Flush table
 
 	k = w * h;
 	for (i = 0; i < k; i++)			// Scan each pixel
 	{
-		ix = (im[0] >> 3) + (im[1] << 5) + (im[2] << 13);
-		tab[ix] |= 1 << (im[0] & 7);
+		ix = (im[0] >> 5) + (im[1] << 3) + (im[2] << 11);
+		tab[ix] |= 1 << (im[0] & 31);
 		im += 3;
 	}
 
-	k = 0;
-	for (i = 0; i < j; i++)			// Count each colour
+	for (i = k = 0; i < j; i++)			// Count each colour
 	{
-		ix = tab[i];
-		ix = (ix & 0x55) + ((ix & 0xAA) >> 1);
-		ix = (ix & 0x33) + ((ix & 0xCC) >> 2);
-		k += (ix & 0xF) + (ix >> 4);
+		v = tab[i];
+		v = (v & 0x55555555) + ((v >> 1) & 0x55555555);
+		v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+		v = (v & 0x0F0F0F0F) + ((v >> 4) & 0x0F0F0F0F);
+		v = (v & 0x00FF00FF) + ((v >> 8) & 0x00FF00FF);
+		k += (v & 0xFFFF) + (v >> 16);
 	}
 
 	free(tab);
