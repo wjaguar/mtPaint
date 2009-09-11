@@ -239,6 +239,20 @@ int alert_box( char *title, char *message, char *text1, char *text2, char *text3
 	return alert_result;
 }
 
+// Add page to notebook
+
+GtkWidget *add_new_page(GtkWidget *notebook, char *name)
+{
+	GtkWidget *page, *label;
+
+	page = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(page);
+	label = gtk_label_new(name);
+	gtk_widget_show(label);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page, label);
+	return (page);
+}
+
 // Slider-spin combo (practically a new widget class)
 
 GtkWidget *mt_spinslide_new(gint swidth, gint sheight)

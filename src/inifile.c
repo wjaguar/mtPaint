@@ -23,9 +23,9 @@
  *  Allocations are done in slabs, because no slot is ever deallocated or
  * reordered; only modified string values are allocated singly, since it is
  * probable they will keep being modified.
- *  Implementation allows no more than 16K ini entries, because of using one
- * 32-bit hash function as two 16-bit ones, but this is more than enough for
- * our purposes. - WJ */
+ *  Implementation uses one 32-bit hash function as two 16-bit ones while
+ * possible, but with 40000 keys or more, has to evaluate two 32-bit functions
+ * instead. But such loads are expected to be rare. - WJ */
 
 #include <math.h>
 #include <stdlib.h>
@@ -42,7 +42,7 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 #define SLAB_INCREMENT 16384
 #define SLAB_RESERVED  64 /* Reserved for allocator overhead */
 
-#define INI_LIMIT 16384 /* Limit imposed by hashing scheme */
+#define INI_LIMIT 0x40000000 /* Limit imposed by hashing scheme */
 #define HASHFILL(X) ((X) * 3) /* Hash occupancy no more than 1/3 */
 #define HASHSEED 0x811C9DC5
 #define HASH_RND(X) ((X) * 0x10450405 + 1)
@@ -87,21 +87,25 @@ static guint32 hashf(guint32 seed, int section, char *key)
 
 static int cuckoo_insert(inifile *inip, inislot *slotp)
 {
-	short idx, tmp;
+	static const unsigned char shift[4] = { 0, 16, 0, 0 };
+	gint32 idx, tmp;
 	guint32 key;
-	int i, j;
+	int i, j, d;
 
 	/* Update section's last slot index */
 	i = slotp->sec;
 	j = slotp - inip->slots;
 	if (i && (inip->slots[i - 1].defv < j)) inip->slots[i - 1].defv = j;
 
+	/* Decide if using one-key mode */
+	d = inip->seed[0] == inip->seed[1] ? 0 : 2;
+
 	/* Normal cuckoo process */
 	idx = (slotp - inip->slots) + 1;
 	for (i = 0; i < inip->maxloop; i++)
 	{
-		key = hashf(inip->seed, slotp->sec, SLOT_NAME(inip, slotp));
-		key >>= (i & 1) << 4;
+		key = hashf(inip->seed[i & 1], slotp->sec, SLOT_NAME(inip, slotp));
+		key >>= shift[(i & 1) + d];
 		j = (key & inip->hmask) * 2 + (i & 1);
 		tmp = inip->hash[j];
 		inip->hash[j] = idx;
@@ -126,7 +130,7 @@ static int resize_hash(inifile *inip, int cnt)
 	len++;
 	if (len <= inip->hmask * 2 + 2) return (0); /* Large enough */
 	free(inip->hash);
-	inip->hash = calloc(1, len * sizeof(short));
+	inip->hash = calloc(1, len * sizeof(gint32));
 	if (!inip->hash) return (-1); /* Failure */
 	inip->hmask = (len >> 1) - 1;
 	inip->maxloop = ceil(3.0 * log(len / 2) /
@@ -145,9 +149,11 @@ static int rehash(inifile *inip)
 	{
 		if (!flag) /* No size change */
 		{
-			inip->seed = HASH_RND(inip->seed);
-			memset(inip->hash, 0, (inip->hmask + 1) * 2 * sizeof(short));
+			inip->seed[0] = inip->seed[1] = HASH_RND(inip->seed[0]);
+			memset(inip->hash, 0, (inip->hmask + 1) * 2 * sizeof(gint32));
 		}
+		/* Enter two-key mode */
+		if (inip->hmask > 0xFFFF) inip->seed[1] = HASH_RND(inip->seed[0]);
 		/* Re-insert items */
 		for (i = 0; (i < inip->count) &&
 			(flag = cuckoo_insert(inip, inip->slots + i)); i++);
@@ -159,9 +165,10 @@ static inislot *cuckoo_find(inifile *inip, int section, char *name)
 {
 	inislot *slotp;
 	guint32 key;
-	int i, j = 0;
+	gint32 i;
+	int j = 0;
 
-	key = hashf(inip->seed, section, name);
+	key = hashf(inip->seed[0], section, name);
 	while (TRUE)
 	{
 		i = inip->hash[(key & inip->hmask) * 2 + j];
@@ -173,7 +180,8 @@ static inislot *cuckoo_find(inifile *inip, int section, char *name)
 				return (slotp);
 		}
 		if (j++) return (NULL);
-		key >>= 16;
+		if (inip->seed[0] == inip->seed[1]) key >>= 16;
+		else key = hashf(inip->seed[1], section, name);
 	}
 }
 
@@ -265,7 +273,7 @@ int new_ini(inifile *inip)
 	inip->sblock[1][0] = 0;
 	inip->slen = 1;
 	inip->slots = malloc(SLAB_INCREMENT - SLAB_RESERVED);
-	inip->seed = HASHSEED;
+	inip->seed[0] = inip->seed[1] = HASHSEED;
 	return (inip->slots && (resize_hash(inip, HASH_MIN) > 0));
 }
 

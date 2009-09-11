@@ -26,10 +26,9 @@ typedef struct {
 typedef struct {
 	char *sblock[2];
 	inislot *slots;
-	short *hash;
-	int hmask, maxloop;
-	int count, slen;
-	guint32 seed;
+	gint32 *hash;
+	int count, slen, maxloop;
+	guint32 hmask, seed[2];
 } inifile;
 
 /* Core functions */

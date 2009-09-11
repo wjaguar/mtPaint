@@ -42,7 +42,6 @@ void ani_read_file( FILE *fp );		// Read data from layers file already opened
 void ani_write_file( FILE *fp );	// Write data to layers file already opened
 
 void ani_but_preview();			// Preview the animation
-void ani_set_key_frame(int key);	// Set key frame postions & cycles as per current layers
 
 void wild_space_change( char *in, char *out, int length );
 					// Copy string but replace " " with "\ " or "\" \"" - needed for filenames with spaces

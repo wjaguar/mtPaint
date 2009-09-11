@@ -329,7 +329,7 @@ static void empty_text_widget(GtkWidget *w)	// Empty the text widget
 static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 {
 	int i, j, k;
-	char txt[256], *tmp = txt;
+	char txt[256], *tmp;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
@@ -341,7 +341,7 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
 		if (!ani_cycle_table[i].frame0) break;
-		tmp += sprintf(tmp, "%i\t%i\t%i", ani_cycle_table[i].frame0,
+		tmp = txt + sprintf(txt, "%i\t%i\t%i", ani_cycle_table[i].frame0,
 			ani_cycle_table[i].frame1, ani_cycle_table[i].layers[0]);
 		for (j = 1; j < MAX_CYC_ITEMS; j++)
 		{
@@ -354,12 +354,8 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 		gtk_text_insert (GTK_TEXT (ani_text_cyc), NULL, NULL, NULL, txt, -1);
 #endif
 #if GTK_MAJOR_VERSION == 2
-		g_signal_handlers_disconnect_by_func( GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-				GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
-
 		gtk_text_buffer_get_end_iter( GTK_TEXT_VIEW(ani_text_cyc)->buffer, &iter );
 		gtk_text_buffer_insert( GTK_TEXT_VIEW(ani_text_cyc)->buffer, &iter, txt, -1 );
-
 #endif
 	}
 
@@ -1020,7 +1016,7 @@ void pressed_remove_key_frames()
 	}
 }
 
-void ani_set_key_frame(int key)		// Set key frame postions & cycles as per current layers
+static void ani_set_key_frame(int key)		// Set key frame postions & cycles as per current layers
 {
 	ani_slot *ani;
 	int i, j, k, l;
@@ -1098,7 +1094,7 @@ static void ani_layer_select( GtkList *list, GtkWidget *widget )
 	ani_pos_refresh_txt();				// Refresh the text in the widget
 }
 
-int do_set_key_frame(GtkWidget *spin, gpointer fdata)
+static int do_set_key_frame(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
@@ -1115,19 +1111,43 @@ void pressed_set_key_frame()
 	filter_window(_("Set Key Frame"), spin, do_set_key_frame, NULL, FALSE);
 }
 
+static GtkWidget *ani_text(GtkWidget **textptr)
+{
+	GtkWidget *scroll, *text;
+
+#if GTK_MAJOR_VERSION == 1
+	text = gtk_text_new(NULL, NULL);
+	gtk_text_set_editable(GTK_TEXT(text), TRUE);
+
+	gtk_signal_connect(GTK_OBJECT(text), "changed",
+			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+
+	scroll = gtk_scrolled_window_new(NULL, GTK_TEXT(text)->vadj);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	GtkTextBuffer *texbuf = gtk_text_buffer_new(NULL);
+
+	text = gtk_text_view_new_with_buffer(texbuf);
+
+	g_signal_connect(texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+
+	scroll = gtk_scrolled_window_new(GTK_TEXT_VIEW(text)->hadjustment,
+		GTK_TEXT_VIEW(text)->vadjustment);
+#endif
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_container_add(GTK_CONTAINER(scroll), text);
+
+	*textptr = text;
+	return (scroll);
+}
+
 void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 {
-	GtkWidget *frame, *table, *label, *button, *notebook1, *scrolledwindow;
+	GtkWidget *table, *label, *button, *notebook1, *scrolledwindow;
 	GtkWidget *ani_toggle_gif, *ani_list_layers, *list_data;
-	GtkWidget *hbox3, *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
-
-#if GTK_MAJOR_VERSION == 2
-	GtkTextBuffer *texbuf;
-#endif
-
+	GtkWidget *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-
-	char txt[256], *ttxt;
+	char txt[256];
 	int i;
 
 
@@ -1158,16 +1178,13 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	ani_win_set_pos();
 
 	vbox1 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (animate_window), vbox1);
 
-	vbox4 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox4);
-	frame = add_with_frame(vbox1, _("Output Files"), vbox4, 5);
-	gtk_frame_set_label_align (GTK_FRAME (frame), 0.0, 0.5);
+	notebook1 = xpack(vbox1, gtk_notebook_new());
+	gtk_container_set_border_width(GTK_CONTAINER(notebook1), 5);
 
+	vbox4 = add_new_page(notebook1, _("Output Files"));
 	table = xpack(vbox4, gtk_table_new(5, 3, FALSE));
-	gtk_widget_show(table);
 
 	label = add_to_table( _("Start frame"), table, 0, 0, 5 );
 	add_to_table( _("End frame"), table, 1, 0, 5 );
@@ -1180,18 +1197,11 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	ani_spin[1] = spin_to_table(table, 1, 1, 5, ani_frame2, 1, MAX_FRAME);	// End
 	ani_spin[2] = spin_to_table(table, 2, 1, 5, ani_gif_delay, 1, MAX_DELAY);	// Delay
 
-#if GTK_MAJOR_VERSION == 1
-	ttxt = "changed";
-#endif
-#if GTK_MAJOR_VERSION == 2
-	ttxt = "value_changed";
-#endif
-	gtk_signal_connect( GTK_OBJECT(ani_spin[0]), ttxt, GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	gtk_signal_connect( GTK_OBJECT(ani_spin[1]), ttxt, GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	gtk_signal_connect( GTK_OBJECT(ani_spin[2]), ttxt, GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+	spin_connect(ani_spin[0], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+	spin_connect(ani_spin[1], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+	spin_connect(ani_spin[2], GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
 	ani_entry_path = gtk_entry_new_with_max_length (256);
-	gtk_widget_show (ani_entry_path);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_path, 1, 2, 3, 4,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, 0);
@@ -1200,7 +1210,6 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
 	ani_entry_prefix = gtk_entry_new_with_max_length (ANI_PREFIX_LEN);
-	gtk_widget_show (ani_entry_prefix);
 	gtk_table_attach (GTK_TABLE (table), ani_entry_prefix, 1, 2, 4, 5,
 		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
 		(GtkAttachOptions) (0), 0, 0);
@@ -1213,20 +1222,11 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	LAYERS TABLES
 
-	hbox3 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox3);
-	add_with_frame_x(vbox1, _("Layers"), hbox3, 5, TRUE);
-
-	notebook1 = xpack(hbox3, gtk_notebook_new());
-	gtk_widget_show (notebook1);
-	gtk_container_set_border_width (GTK_CONTAINER (notebook1), 5);
-
-	hbox4 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox4);
-	gtk_container_add (GTK_CONTAINER (notebook1), hbox4);
+	hbox4 = gtk_hbox_new(FALSE, 0);
+	label = gtk_label_new(_("Positions"));
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook1), hbox4, label);
 
 	scrolledwindow = pack(hbox4, gtk_scrolled_window_new(NULL, NULL));
-	gtk_widget_show (scrolledwindow);
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 			GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
@@ -1234,7 +1234,6 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(ani_list_layers), "select_child",
 			GTK_SIGNAL_FUNC(ani_layer_select), NULL );
 	gtk_scrolled_window_add_with_viewport (GTK_SCROLLED_WINDOW (scrolledwindow), ani_list_layers);
-	gtk_widget_show (ani_list_layers);
 
 	gtk_widget_set_usize (ani_list_layers, 150, -2);
 	gtk_container_set_border_width (GTK_CONTAINER (ani_list_layers), 5);
@@ -1242,109 +1241,33 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	for ( i=layers_total; i>0; i-- )
 	{
 		hbox2 = gtk_hbox_new( FALSE, 3 );
-		gtk_widget_show( hbox2 );
 
 		list_data = gtk_list_item_new();
 		gtk_container_add( GTK_CONTAINER(ani_list_layers), list_data );
 		gtk_container_add( GTK_CONTAINER(list_data), hbox2 );
-		gtk_widget_show( list_data );
 
 		sprintf(txt, "%i", i);					// Layer number
 		label = pack(hbox2, gtk_label_new(txt));
 		gtk_widget_set_usize (label, 40, -2);
-		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
 
 		label = xpack(hbox2, gtk_label_new(layer_table[i].name)); // Layer name
-		gtk_widget_show( label );
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 	}
 
 	vbox3 = xpack(hbox4, gtk_vbox_new(FALSE, 0));
-	gtk_widget_show (vbox3);
-
-#if GTK_MAJOR_VERSION == 1
-	ani_text_pos = gtk_text_new (NULL, NULL);
-	gtk_text_set_editable (GTK_TEXT (ani_text_pos), TRUE);
-	gtk_text_insert (GTK_TEXT (ani_text_pos), NULL, NULL, NULL, "", -1);
-
-	gtk_signal_connect( GTK_OBJECT(ani_text_pos), "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-
-	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(NULL,
-		GTK_TEXT(ani_text_pos)->vadj));
-#endif
-#if GTK_MAJOR_VERSION == 2
-	texbuf = gtk_text_buffer_new( NULL );
-	ani_text_pos = gtk_text_view_new_with_buffer(texbuf);
-	gtk_text_buffer_set_text( GTK_TEXT_VIEW(ani_text_pos)->buffer, "", -1 );
-
-	g_signal_connect( texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
-
-	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(
-			GTK_TEXT_VIEW(ani_text_pos)->hadjustment,
-			GTK_TEXT_VIEW(ani_text_pos)->vadjustment));
-#endif
-	gtk_widget_show (scrolledwindow);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
-			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_container_add (GTK_CONTAINER (scrolledwindow), ani_text_pos);
-
-	gtk_widget_show (ani_text_pos);
-
-
-	label = gtk_label_new (_("Positions"));
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label (GTK_NOTEBOOK (notebook1),
-		gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 0), label);
-
+	xpack(vbox3, ani_text(&ani_text_pos));
 
 ///	CYCLES TAB
 
-	vbox3 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox3);
-	gtk_container_add (GTK_CONTAINER (notebook1), vbox3);
-
-#if GTK_MAJOR_VERSION == 1
-	ani_text_cyc = gtk_text_new (NULL, NULL);
-	gtk_text_set_editable (GTK_TEXT (ani_text_cyc), TRUE);
-
-	gtk_signal_connect( GTK_OBJECT(ani_text_cyc), "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-
-	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(NULL,
-		GTK_TEXT(ani_text_cyc)->vadj));
-#endif
-#if GTK_MAJOR_VERSION == 2
-	texbuf = gtk_text_buffer_new( NULL );
-	ani_text_cyc = gtk_text_view_new_with_buffer(texbuf);
-
-	g_signal_connect( texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL );
-
-	scrolledwindow = xpack(vbox3, gtk_scrolled_window_new(
-		GTK_TEXT_VIEW(ani_text_cyc)->hadjustment,
-		GTK_TEXT_VIEW(ani_text_cyc)->vadjustment));
-#endif
-	gtk_widget_show (scrolledwindow);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
-			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_container_add (GTK_CONTAINER (scrolledwindow), ani_text_cyc);
+	vbox3 = add_new_page(notebook1, _("Cycling"));
+	xpack(vbox3, ani_text(&ani_text_cyc));
 
 	ani_cyc_refresh_txt();
-
-	gtk_widget_show (ani_text_cyc);
-
-
-	label = gtk_label_new (_("Cycling"));
-	gtk_widget_show (label);
-	gtk_notebook_set_tab_label (GTK_NOTEBOOK (notebook1),
-			gtk_notebook_get_nth_page (GTK_NOTEBOOK (notebook1), 1), label);
-
 
 ///	MAIN BUTTONS
 
 	hbox2 = pack(vbox1, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show (hbox2);
 
 	button = add_a_button(_("Close"), 5, hbox2, TRUE);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(delete_ani), NULL);
@@ -1369,7 +1292,7 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 
 	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
 
-	gtk_widget_show (animate_window);
+	gtk_widget_show_all(animate_window);
 	gtk_window_add_accel_group(GTK_WINDOW (animate_window), ag);
 
 	layers_pastry_cut = TRUE;

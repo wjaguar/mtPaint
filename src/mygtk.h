@@ -48,6 +48,10 @@ void progress_end();					// Close progress window
 
 int alert_box( char *title, char *message, char *text1, char *text2, char *text3 );
 
+// Add page to notebook
+
+GtkWidget *add_new_page(GtkWidget *notebook, char *name);
+
 // Slider-spin combo (practically a new widget class)
 
 GtkWidget *mt_spinslide_new(gint swidth, gint sheight);
@@ -127,10 +131,6 @@ void wj_option_realize(GtkWidget *widget, gpointer user_data);
 #else
 #define FIX_OPTION_MENU_SIZE(opt)
 #endif
-
-// Pixmap-backed drawing area
-
-GtkWidget *wj_pixmap(int width, int height);
 
 // Set minimum size for a widget
 

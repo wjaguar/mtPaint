@@ -386,19 +386,6 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
-static GtkWidget *add_new_page(GtkWidget *notebook, char *name)
-{
-	GtkWidget *page, *label;
-
-	page = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(page);
-	label = gtk_label_new(name);
-	gtk_widget_show(label);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page, label);
-	return (page);
-}
-
-
 void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
