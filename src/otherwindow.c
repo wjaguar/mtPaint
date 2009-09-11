@@ -2609,7 +2609,7 @@ static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
 	{
 	default: /* Error */
 	case -2: /* Empty */
-		rgb[0] = rgb[1] = rgb[2] = 255;
+		rgb[0] = rgb[1] = rgb[2] = 178;
 		break;
 	case -1: /* Opacity */
 		rgb[0] = rgb[1] = rgb[2] = grad_pad[n];
@@ -2642,7 +2642,7 @@ static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
 	}
 	for (i = 3; i < SLOT_SIZE * 2 * 3; i++) rgb[i] = rgb[i - 3];
 	if (mode == -2) /* Empty slot - show that */
-		memset(rgb, 0, SLOT_SIZE * 3);
+		memset(rgb, 128, SLOT_SIZE * 3);
 
 	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
 		0, 0, SLOT_SIZE, SLOT_SIZE, GDK_RGB_DITHER_NONE,

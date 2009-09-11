@@ -52,7 +52,7 @@
 
 
 char preserved_gif_filename[256];
-int preserved_gif_delay = 10;
+int preserved_gif_delay = 10, silence_limit;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
@@ -134,7 +134,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		return (TOO_BIG);
 
 	/* Don't show progress bar where there's no need */
-	if (settings->width * settings->height <= SILENCE_LIMIT)
+	if (settings->width * settings->height <= (1<<silence_limit))
 		settings->silent = TRUE;
 
 /* !!! Currently allocations are created committed, have to rollback on error */

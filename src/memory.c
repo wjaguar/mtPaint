@@ -5441,8 +5441,8 @@ int grad_value(int *dest, double x)
 	xx = (gradmap->orev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
-	op = (gdata[i] << 8) + k * (gdata[i + 1] - gdata[i]);
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
+	op = (gdata[i] << 8) + ((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 	if (!op) return (0); /* Stop if zero opacity */
 
 	/* Get channel value */
@@ -5450,7 +5450,7 @@ int grad_value(int *dest, double x)
 	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
 	if (!ix) /* RGB */
 	{
 		i3 = i * 3;
@@ -5487,23 +5487,23 @@ int grad_value(int *dest, double x)
 		else
 		{
 			dest[0] = (gdata[i3 + 0] << 8) +
-				k * (gdata[i3 + 3] - gdata[i3 + 0]);
+				((k * (gdata[i3 + 3] - gdata[i3 + 0]) + 127) >> 8);
 			dest[1] = (gdata[i3 + 1] << 8) +
-				k * (gdata[i3 + 4] - gdata[i3 + 1]);
+				((k * (gdata[i3 + 4] - gdata[i3 + 1]) + 127) >> 8);
 			dest[2] = (gdata[i3 + 2] << 8) +
-				k * (gdata[i3 + 5] - gdata[i3 + 2]);
+				((k * (gdata[i3 + 5] - gdata[i3 + 2]) + 127) >> 8);
 		}
 	}
 	else if (ix == CHN_IMAGE + 1) /* Indexed */
 	{
 		dest[0] = gdata[i];
-		dest[1] = gdata[i + ((k + 255) >> 8)];
-		dest[CHN_IMAGE + 3] = k;
+		dest[1] = gdata[i + ((k + 0xFFFF) >> 16)];
+		dest[CHN_IMAGE + 3] = (k + 127) >> 8;
 	}
 	else /* Utility */
 	{
 		dest[ix + 2] = (gdata[i] << 8) +
-			k * (gdata[i + 1] - gdata[i]);
+			((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 	}
 
 	return (op);
@@ -5523,8 +5523,9 @@ static void grad_alpha(int *dest, double x)
 	xx = (gradmap->grev ? 1.0 - x : x) * (len - 1);
 	i = xx;
 	if (i > len - 2) i = len - 2;
-	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 512) + 1) >> 1;
-	dest[CHN_ALPHA + 3] = (gdata[i] << 8) + k * (gdata[i + 1] - gdata[i]);
+	k = gmap[i] == GRAD_TYPE_CONST ? 0 : ((int)((xx - i) * 0x20000) + 1) >> 1;
+	dest[CHN_ALPHA + 3] = (gdata[i] << 8) +
+		((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 }
 
 /* Evaluate RGBA/indexed gradient at point, return opacity */

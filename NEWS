@@ -9,6 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Gradient drawing mode added
 	* Palette shifting feature added to Palette menu
 	* Turkish translation added by Muhammet Kara, Tutku Dalmaz
+	* Taiwanese Chinese translation added by Wei-Lun Chao
 	* Image tiling mode added to "Resize Canvas"
 	* Greyscale effect now respects masking
 	* Gamma corrected greyscale effect added

@@ -19,7 +19,6 @@
 
 #include <gtk/gtk.h>
 
-#define SILENCE_LIMIT (512 * 512)
 
 #define FILE_PROGRESS 1048576
 
@@ -102,7 +101,7 @@ typedef struct {
 } ls_settings;
 
 char preserved_gif_filename[256];
-int preserved_gif_delay;
+int preserved_gif_delay, silence_limit;
 
 
 int file_type_by_ext(char *name, guint32 mask);

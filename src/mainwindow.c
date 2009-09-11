@@ -3772,6 +3772,8 @@ void main_init()
 	men_item_state( menu_need_selection, FALSE );
 	men_item_state( menu_need_clipboard, FALSE );
 
+	silence_limit = inifile_get_gint32( "silence_limit", 18 );
+
 	recent_files = inifile_get_gint32( "recentFiles", 10 );
 	mtMIN( recent_files, recent_files, 20 )
 	mtMAX( recent_files, recent_files, 0 )

@@ -1690,6 +1690,14 @@ static gint fs_ok(GtkWidget *fs)
 		if (clipboard_entry)
 			gtk_entry_set_text(GTK_ENTRY(clipboard_entry), fname);
 		break;
+	case FS_BROWSER_PROG:
+		if (entry_handbook[0])
+			gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]), fname);
+		break;
+	case FS_HANDBOOK_INDEX:
+		if (entry_handbook[1])
+			gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]), fname);
+		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
 		if (export_undo(fname, &settings))
@@ -1816,6 +1824,12 @@ void file_selector(int action_type)
 		break;
 	case FS_CLIP_FILE:
 		title = _("Select Clipboard File");
+		break;
+	case FS_BROWSER_PROG:
+		title = _("Select Browser Program");
+		break;
+	case FS_HANDBOOK_INDEX:
+		title = _("Select Handbook Index File");
 		break;
 	case FS_EXPORT_UNDO:
 		title = _("Export Undo Images");

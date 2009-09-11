@@ -37,12 +37,13 @@
 
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
-static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg, *spinbutton_recent;
+static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty, *spinbutton_jpeg,
+	*spinbutton_recent, *spinbutton_silence;
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
-GtkWidget *clipboard_entry;
-static GtkWidget *spinbutton_grid[4], *entry_handbook[2];
+GtkWidget *clipboard_entry, *entry_handbook[2];
+static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
@@ -64,9 +65,9 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 10
+#define PREF_LANGS 11
 
-char	*pref_lang_ini_code[PREF_LANGS] = { "system", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
+char	*pref_lang_ini_code[PREF_LANGS] = { "system", "zh_TW.utf8", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
 		"pl_PL", "pt_PT", "pt_BR", "es_ES", "tr_TR" };
 
 int pref_lang;
@@ -92,11 +93,9 @@ static gint expose_tablet_preview( GtkWidget *widget, GdkEventExpose *event )
 	return FALSE;
 }
 
-gint clip_file_browse( GtkWidget *widget, GdkEvent *event, gpointer data )
+void click_file_browse( GtkWidget *widget, gpointer data )
 {
-	file_selector( FS_CLIP_FILE );
-
-	return FALSE;
+	file_selector( (int) data );
 }
 
 
@@ -278,6 +277,8 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	mem_xbm_hot_y = read_spin(spinbutton_hoty);
 	mem_jpeg_quality = read_spin(spinbutton_jpeg);
 	recent_files = read_spin(spinbutton_recent);
+	silence_limit = read_spin(spinbutton_silence);
+
 	mem_grid_min = read_spin(spinbutton_grid[0]);
 	for ( i=0; i<3; i++ )
 		mem_grid_rgb[i] = read_spin(spinbutton_grid[i + 1]);
@@ -303,6 +304,7 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	inifile_set_gint32( "pixelNudge", mem_nudge );
 	inifile_set_gint32( "jpegQuality", mem_jpeg_quality );
 	inifile_set_gint32( "recentFiles", recent_files );
+	inifile_set_gint32( "silence_limit", silence_limit );
 
 	inifile_set_gboolean( "pasteToggle",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste)) );
@@ -415,7 +417,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
 #ifdef U_NLS
-	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Czech"), _("English (UK)"),
+	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Chinese (Taiwanese)"),
+		_("Czech"), _("English (UK)"),
 		_("French"), _("German"), _("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
 		_("Spanish"), _("Turkish")
 					};
@@ -429,7 +432,8 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	char *tab_tex[] = { _("Max memory used for undo (MB)"), _("Greyscale backdrop"),
 		_("Selection nudge pixels"), _("Max Pan Window Size") };
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
-		_("JPEG Save Quality (100=High)   "), _("Recently Used Files") };
+		_("JPEG Save Quality (100=High)   "), _("Recently Used Files"),
+		_("Progress bar silence limit") };
 	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
 		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
@@ -485,7 +489,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		vbox_1, inifile_get_gboolean("quitToggle", TRUE) );
 	checkbutton_commit = add_a_toggle( _("Changing tool commits paste"),
 		vbox_1, inifile_get_gboolean("pasteCommit", FALSE) );
-	checkbutton_center = add_a_toggle(_("Center tool settings dialogs"),
+	checkbutton_center = add_a_toggle(_("Centre tool settings dialogs"),
 		vbox_1, inifile_get_gboolean("centerSettings", TRUE));
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
 		vbox_1, inifile_get_gboolean("defaultGamma", FALSE));
@@ -504,48 +508,72 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 	table4 = add_a_table( 5, 2, 10, vbox_2 );
 
-	for ( i=0; i<5; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0 );
+	for ( i=0; i<6; i++ ) add_to_table( tab_tex2[i], table4, i, 0, 0 );
 
-	spinbutton_trans = spin_to_table(table4, 0, 1, 5, mem_xpm_trans, -1, mem_cols - 1);
-	spinbutton_hotx = spin_to_table(table4, 1, 1, 5, mem_xbm_hot_x, -1, mem_width - 1);
-	spinbutton_hoty = spin_to_table(table4, 2, 1, 5, mem_xbm_hot_y, -1, mem_height - 1);
-	spinbutton_jpeg = spin_to_table(table4, 3, 1, 5, mem_jpeg_quality, 0, 100);
-	spinbutton_recent = spin_to_table(table4, 4, 1, 5, recent_files, 0, MAX_RECENT);
+	spinbutton_trans   = spin_to_table(table4, 0, 1, 4, mem_xpm_trans, -1, mem_cols - 1);
+	spinbutton_hotx    = spin_to_table(table4, 1, 1, 4, mem_xbm_hot_x, -1, mem_width - 1);
+	spinbutton_hoty    = spin_to_table(table4, 2, 1, 4, mem_xbm_hot_y, -1, mem_height - 1);
+	spinbutton_jpeg    = spin_to_table(table4, 3, 1, 4, mem_jpeg_quality, 0, 100);
+	spinbutton_recent  = spin_to_table(table4, 4, 1, 4, recent_files, 0, MAX_RECENT);
+	spinbutton_silence = spin_to_table(table4, 5, 1, 4, silence_limit, 0, 28);
 
-	add_hseparator( vbox_2, -2, 10 );
+//	add_hseparator( vbox_2, -2, 10 );
+
+	hbox4 = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox4);
+	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
+
 	label = gtk_label_new( _("Clipboard Files") );
 	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 0 );
+	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
 
 	clipboard_entry = gtk_entry_new();
 	gtk_widget_show( clipboard_entry );
-	gtk_box_pack_start( GTK_BOX(vbox_2), clipboard_entry, FALSE, FALSE, 0 );
+	gtk_box_pack_start( GTK_BOX(hbox4), clipboard_entry, TRUE, TRUE, 5 );
 	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
 
-	button1 = add_a_button( _("Browse"), 4, vbox_2, FALSE );
+	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
 	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-		GTK_SIGNAL_FUNC(clip_file_browse), NULL);
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_CLIP_FILE);
 
-	add_hseparator( vbox_2, -2, 10 );
+//	add_hseparator( vbox_2, -2, 10 );
+
+	hbox4 = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox4);
+	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
+
 	label = gtk_label_new( _("HTML Browser Program") );
 	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 5 );
+	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
 
 	entry_handbook[0] = gtk_entry_new();
 	gtk_widget_show( entry_handbook[0] );
-	gtk_box_pack_start( GTK_BOX(vbox_2), entry_handbook[0], FALSE, FALSE, 5 );
+	gtk_box_pack_start( GTK_BOX(hbox4), entry_handbook[0], TRUE, TRUE, 5 );
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
 		inifile_get(HANDBOOK_BROWSER_INI, ""));
 
+	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
+	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_BROWSER_PROG);
+
+
+	hbox4 = gtk_hbox_new (FALSE, 0);
+	gtk_widget_show (hbox4);
+	gtk_box_pack_start( GTK_BOX(vbox_2), hbox4, FALSE, FALSE, 2 );
+
 	label = gtk_label_new( _("Location of Handbook index") );
 	gtk_widget_show( label );
-	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 5 );
+	gtk_box_pack_start( GTK_BOX(hbox4), label, FALSE, FALSE, 5 );
 
 	entry_handbook[1] = gtk_entry_new();
 	gtk_widget_show( entry_handbook[1] );
-	gtk_box_pack_start( GTK_BOX(vbox_2), entry_handbook[1], FALSE, FALSE, 5 );
+	gtk_box_pack_start( GTK_BOX(hbox4), entry_handbook[1], TRUE, TRUE, 5 );
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
 		inifile_get(HANDBOOK_LOCATION_INI, ""));
+
+	button1 = add_a_button( _("Browse"), 2, hbox4, FALSE );
+	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer) FS_HANDBOOK_INDEX);
 
 ///	---- TAB3 - STATUS BAR
 

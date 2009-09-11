@@ -86,6 +86,8 @@ gboolean col_reverse,					// Painting with right button
 #define FS_CHANNEL_LOAD 12
 #define FS_CHANNEL_SAVE 13
 #define FS_COMPOSITE_SAVE 14
+#define FS_BROWSER_PROG 15
+#define FS_HANDBOOK_INDEX 16
 
 int do_a_load( char *fname );
 void align_size( float new_zoom );
