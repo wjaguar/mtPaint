@@ -44,9 +44,23 @@
 
 #define PROGRESS_LIM 262144
 
+#define CHN_IMAGE 0
+#define CHN_ALPHA 1
+#define CHN_SEL   2
+#define CHN_MASK  3
+#define NUM_CHANNELS 4
+
+#define CMASK_NONE  0
+#define CMASK_IMAGE (1 << CHN_IMAGE)
+#define CMASK_RGBA  ((1 << CHN_IMAGE) | (1 << CHN_ALPHA))
+#define CMASK_ALL   ((1 << NUM_CHANNELS) - 1)
+#define CMASK_CURR  (1 << mem_channel)
+
+typedef unsigned char *chanlist[NUM_CHANNELS];
+
 typedef struct
 {
-	unsigned char *image;
+	chanlist img;
 	png_color pal[256];
 	int cols, width, height, bpp;
 } undo_item;
@@ -58,8 +72,9 @@ int tint_mode[3];			// [0] = off/on, [1] = add/subtract, [2] = button (none, lef
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
-unsigned char *mem_image;		// Pointer to malloc'd memory with byte by byte image data
-int mem_image_bpp;			// Bytes per pixel = 1 or 3
+chanlist mem_img;			// Array of pointers to image channels
+int mem_channel;			// Current active channel
+int mem_img_bpp;			// Bytes per pixel = 1 or 3
 int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
 int mem_width, mem_height;		// Current image geometry
 float mem_icx, mem_icy;			// Current centre x,y
@@ -67,6 +82,7 @@ int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
 
 unsigned char *mem_clipboard;		// Pointer to clipboard data
 unsigned char *mem_clip_mask;		// Pointer to clipboard mask
+unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
 unsigned char *mem_brushes;		// Preset brushes image
 int brush_tool_type;			// Last brush tool type
 int mem_brush_list[81][3];		// Preset brushes parameters
@@ -81,7 +97,8 @@ int mem_prev_bcsp[5];			// BR, CO, SA, POSTERIZE, GAMMA
 
 #define MAX_UNDO 101			// Maximum number of undo levels + 1
 
-undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
+undo_item mem_undo_im_[MAX_UNDO];	// Pointers to undo images + current image being edited
+// undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
 
 int mem_undo_pointer;		// Pointer to currently used image on canvas/screen
 int mem_undo_done;		// Undo images that we have behind current image (i.e. possible UNDO)
@@ -103,7 +120,7 @@ unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 /// PREVIEW/TOOLS
 
 int tool_type, tool_size, tool_flow;	// Currently selected tool
-int tool_opacity;			// Transparency - 100=solid
+int tool_opacity;			// Opacity - 255 = solid
 int tool_pat;				// Tool pattern number
 int tool_fixx, tool_fixy;		// Fixate on axis
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
@@ -147,7 +164,6 @@ void mem_cols_found_dl(unsigned char userpal[3][256]);		// Convert results ready
 
 int get_next_line(char *input, int length, FILE *fp);		// Get next length chars of text file
 int mt_round( float n );			// Round a float to nearest whole number
-int lo_case( int c );				// Convert character to lower case
 int check_str( int max, char *a, char *b );	// Compare up to max characters of 2 strings
 						// Case insensitive
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
@@ -156,6 +172,7 @@ int read_hex_dub( char *in );			// Read hex double
 void clear_file_flags();		// Reset various file flags, e.g. XPM/XBM after new/load gif etc
 
 char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
+void mem_clear();				// Remove old image if any
 int mem_new( int width, int height, int bpp );	// Allocate space for new image, removing old if needed
 int valid_file( char *filename );		// Can this file be opened for reading?
 void mem_init();				// Initialise memory
@@ -189,7 +206,7 @@ int mem_protected_RGB(int intcol);	// Is this intcol in list?
 
 void mem_swap_cols();			// Swaps colours and update memory
 void repaint_swatch( int index );	// Update a palette swatch
-void mem_get_histogram();		// Calculate how many of each colour index is on the canvas
+void mem_get_histogram(int channel);	// Calculate how many of each colour index is on the canvas
 int do_posterize(int val, int posty);	// Posterize a number
 int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
@@ -222,13 +239,16 @@ void pal_hsl( png_color col, float *hh, float *ss, float *ll );	// Turn RGB into
 #define UNDO_XFORM 5	/* Changes to all channels */
 #define UNDO_FILT  6	/* Changes to current channel */
 
-void mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
+
+void undo_free_x(undo_item *undo);
+int mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
 unsigned char *mem_undo_previous();	// Get address of previous image (or current if none)
 
 void mem_undo_backward();		// UNDO requested by user
 void mem_undo_forward();		// REDO requested by user
 
-int undo_next_core( int handle, int new_width, int new_height, int x_start, int y_start, int new_bpp );
+int undo_next_core(int handle, int new_width, int new_height,
+	int x_start, int y_start, int new_bpp, int cmask);
 
 
 //// Drawing Primitives
@@ -245,7 +265,7 @@ void mem_brcosa_chunk( unsigned char *rgb, int len );		// Apply BRCOSA to RGB me
 void mem_posterize_chunk( unsigned char *rgb, int len );	// Apply posterize to RGB memory
 void mem_gamma_chunk( unsigned char *rgb, int len );		// Apply gamma to RGB memory
 
-void mem_flip_v( char *mem, int w, int h, int bpp );		// Flip image vertically
+void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vertically
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
 int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
@@ -256,11 +276,9 @@ int mem_image_resize( int nw, int nh, int ox, int oy );		// Resize image
 int mem_isometrics(int type);
 
 void flood_fill( int x, int y, unsigned int target );		// Recursively flood fill an area Indexed
-void flood_fill24( int x, int y, png_color target24 );		// Recursively flood fill an area RGB
 
 //	Flood fill using patterns - pat_mem points to width*height area of memory blanked to zero
 void flood_fill_pat( int x, int y, unsigned int target, unsigned char *pat_mem );
-void flood_fill24_pat( int x, int y, png_color target24, unsigned char *pat_mem );
 
 void mem_paint_mask( unsigned char *pat_mem );			// Paint fill on image using mask
 
@@ -275,22 +293,36 @@ void f_ellipse( int x1, int y1, int x2, int y2 );		// Draw a filled ellipse
 void o_ellipse( int x1, int y1, int x2, int y2, int thick );	// Draw an ellipse outline
 
 //	A couple of shorthands to get an int representation of an RGB colour
-#define PNG_2_INT(var) (var.red << 16) + (var.green << 8) + (var.blue)
-#define MEM_2_INT(mem,off) (mem[off] << 16) + (mem[off+1] << 8) + mem[off+2]
+#define PNG_2_INT(var) ((var.red << 16) + (var.green << 8) + (var.blue))
+#define MEM_2_INT(M,I) (((M)[(I)] << 16) + ((M)[(I) + 1] << 8) + (M)[(I) + 2])
+#define INT_2_R(A) ((A) >> 16)
+#define INT_2_G(A) (((A) >> 8) & 0xFF)
+#define INT_2_B(A) ((A) & 0xFF)
 
-#define PUT_PIXEL(x,y) put_pixel(x,y);
+#define MEM_BPP (mem_channel == CHN_IMAGE ? mem_img_bpp : 1)
+#define BPP(x) ((x) == CHN_IMAGE ? mem_img_bpp : 1)
 
-#define PUT_PIXEL24(x,y) put_pixel24(x,y);
-
-#define PUT_PIXEL_C(x,y,c) if (mem_prot_mask[mem_image[x + (y)*mem_width]] == 0) mem_image[x + (y)*mem_width] = c;
-
-#define GET_PIXEL(x,y) ( mem_image[ x + (y)*mem_width ])
+#define GET_PIXEL(x,y) (mem_img[CHN_IMAGE][(x) + (y) * mem_width])
 
 #define POSTERIZE_MACRO res = 0.49 + ( ((1 << posty) - 1) * ((float) res)/255);\
 			res = 0.49 + 255 * ( ((float) res) / ((1 << posty) - 1) );
 
-void put_pixel( int x, int y );					// paletted version
+void prep_mask(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *mask0, unsigned char *img0);
+void process_mask(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
+	unsigned char *trans, int opacity);
+void process_img(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0, unsigned char *img,
+	int opacity);
+void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
+	unsigned char *alpha, unsigned char *trans, int opacity);
+
+int pixel_protected(int x, int y);				// generic
+void row_protected(int x, int y, int len, unsigned char *mask);
+void put_pixel( int x, int y );					// generic
 png_color get_pixel24( int x, int y );				// RGB version
+int get_pixel( int x, int y );					// generic
 void put_pixel24( int x, int y );				// RGB version
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )

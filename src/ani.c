@@ -29,6 +29,7 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "ani.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
@@ -37,7 +38,6 @@
 #include "png.h"
 #include "inifile.h"
 #include "mygtk.h"
-#include "memory.h"
 #include "layer.h"
 #include "mtlib.h"
 #include "quantizer.h"

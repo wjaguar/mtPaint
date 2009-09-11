@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -28,9 +28,9 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "mainwindow.h"
 #include "viewer.h"
-#include "memory.h"
 #include "canvas.h"
 #include "mygtk.h"
 #include "inifile.h"
@@ -293,7 +293,7 @@ unsigned char *pan_rgb;
 void draw_pan_thumb(int x1, int y1, int x2, int y2)
 {
 	int i, j, k, ix, iy;
-	unsigned char pix;
+	unsigned char pix, *wrk_image = mem_img[CHN_IMAGE];
 
 	if ( pan_rgb == NULL ) return;		// Needed to stop segfault
 
@@ -303,14 +303,14 @@ void draw_pan_thumb(int x1, int y1, int x2, int y2)
 		for ( i=0; i<pan_w; i++ )
 		{
 			ix = ((float) i)/pan_w * mem_width;
-			if (mem_image_bpp == 3)
+			if (mem_img_bpp == 3)
 			{
 			   for ( k=0; k<3; k++ )
-				pan_rgb[ k + 3*(i + j*pan_w) ] = mem_image[ k + 3*(ix + iy*mem_width) ];
+				pan_rgb[ k + 3*(i + j*pan_w) ] = wrk_image[ k + 3*(ix + iy*mem_width) ];
 			}
 			else
 			{
-				pix = mem_image[ ix + iy*mem_width ];
+				pix = wrk_image[ ix + iy*mem_width ];
 				pan_rgb[ 0 + 3*(i + j*pan_w) ] = mem_pal[pix].red;
 				pan_rgb[ 1 + 3*(i + j*pan_w) ] = mem_pal[pix].green;
 				pan_rgb[ 2 + 3*(i + j*pan_w) ] = mem_pal[pix].blue;
@@ -579,245 +579,170 @@ gboolean vw_focus_on = FALSE;
 static GtkWidget *vw_scrolledwindow;
 static gboolean view_first_move = TRUE;
 
-void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float zoom )
+void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
+	double czoom, int lr0, int lr1 )
 {
-	png_color *pal = mem_pal;
-	unsigned char pix = 0, *source = mem_image;
-	gboolean use_trans = FALSE, visible = TRUE;
-	int bpp = mem_image_bpp,
-		offs, offd,		// Offset in memory for source/destination image
-		offs2,
-		l, trans=0, pix24, opac = 255, opac2 = 0,
-		lx = 0, ly = 0, lw = mem_width, lh = mem_height,	// Layer geometry
-		ix, iy,			// Redrawing loop, current coords
-		pw2, ph2,		// Redrawing loop limits ( <=pw, <=py )
-		dox = 0, doy = 0,	// Destination offsets from 0,0 of rgb memory
-		sox, soy,		// Source offsets from 0,0 of layer
-		bw, bh,			// Background image width/height
-		canz = zoom, q,
-		px2, py2
-		;
+	chanlist tlist;
+	png_color *pal;
+	unsigned char *tmp, **img;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, bpp;
+	int ddx, ddy, mx, mw, my, mh;
+	int pw2 = pw, ph2 = ph, dx = 0, dy = 0, pw3 = pw * 3;
+	int zoom = 1, scale = 1;
 
-	if ( zoom < 1 ) canz = mt_round(1/zoom);
+	if (czoom < 1.0) zoom = rint(1.0 / czoom);
+	else scale = rint(czoom);
 
-	if ( layers_total>0 && layer_selected != 0 )
+	/* Align on selected layer if needed */
+	if (layers_total && layer_selected && (zoom > 1))
 	{
-		bw = layer_table[0].image->mem_width * zoom;
-		bh = layer_table[0].image->mem_height * zoom;
-	}
-	else
-	{
-		bw = mem_width * zoom;
-		bh = mem_height * zoom;
-	}
-	for ( l=0; l<=layers_total; l++ )
-	{
-		if ( layer_selected == l )
+		dx = layer_table[layer_selected].x;
+		dy = layer_table[layer_selected].y;
+		i = czoom * dx;
+		j = czoom * dy;
+		dx -= i * zoom;
+		dy -= j * zoom;
+		if (dx < 0)
 		{
-			source = mem_image;
-			bpp = mem_image_bpp;
-			lw = mem_width;
-			lh = mem_height;
+			px--;
+			dx += zoom;
+		}
+		if (dy < 0)
+		{
+			py--;
+			dy += zoom;
+		}
+	}
+
+	/* Apply background bounds if needed */
+	if (layers_pastry_cut)
+	{
+		if (px < 0)
+		{
+			rgb -= px * 3;
+			pw2 += px;
+			px = 0;
+		}
+		if (py < 0)
+		{
+			rgb -= py * pw3;
+			ph2 += py;
+			py = 0;
+		}
+		i = mem_width;
+		j = mem_height;
+		if (layers_total && layer_selected)
+		{
+			i = layer_table[0].image->mem_width;
+			j = layer_table[0].image->mem_height;
+		}
+		i = ((i - dx) / zoom) * scale;
+		j = ((j - dy) / zoom) * scale;
+		if (pw2 > i) pw2 = i;
+		if (ph2 > j) ph2 = j;
+		if ((pw2 <= 0) || (ph2 <= 0)) return;
+	}
+	xof = px % scale;
+	if (xof < 0) xof += scale;
+	memset(tlist, 0, sizeof(chanlist));
+
+	/* Get image-space bounds */
+	i = px % scale < 0 ? 1 : 0;
+	j = py % scale < 0 ? 1 : 0;
+	wx0 = (px / scale) * zoom + dx - i;
+	wy0 = (py / scale) * zoom + dy - j;
+	wx1 = px + pw2 - 1;
+	wy1 = py + ph2 - 1;
+	i = wx1 % scale < 0 ? 1 : 0;
+	j = wy1 % scale < 0 ? 1 : 0;
+	wx1 = (wx1 / scale) * zoom + dx - i;
+	wy1 = (wy1 / scale) * zoom + dy - j;
+
+	for (ll = 0; ll <= layers_total; ll++)
+	{
+		if (ll && !layer_table[ll].visible) continue;
+		i = layer_table[ll].x;
+		j = layer_table[ll].y;
+		if (!ll) i = j = 0;
+		if (ll == layer_selected)
+		{
+			ii = i + mem_width;
+			jj = j + mem_height;
+		}
+		else
+		{
+			ii = i + layer_table[ll].image->mem_width;
+			jj = j + layer_table[ll].image->mem_height;
+		}
+		if ((i > wx1) || (j > wy1) || (ii <= wx0) || (jj <= wy0))
+			continue;
+		ddx = ddy = mx = my = 0;
+		if (zoom > 1)
+		{
+			if (i > wx0) mx = (i - wx0 + zoom - 1) / zoom;
+			if (j > wy0) my = (j - wy0 + zoom - 1) / zoom;
+			ddx = wx0 + mx * zoom - i;
+			ddy = wy0 + my * zoom - j;
+			if (ii - 1 >= wx1) mw = pw2 - mx;
+			else mw = (ii - i - ddx) / zoom;
+			if (jj - 1 >= wy1) mh = ph2 - my;
+			else mh = (jj - j - ddy) / zoom;
+			if ((mw <= 0) || (mh <= 0)) continue;
+		}
+		else
+		{
+			if (i > wx0) mx = i * scale - px;
+			else ddx = wx0 - i;
+			if (j > wy0) my = j * scale - py;
+			else ddy = wy0 - j;
+			if (ii - 1 >= wx1) mw = pw2 - mx;
+			else mw = ii * scale - px - mx;
+			if (jj - 1 >= wy1) mh = ph2 - my;
+			else mh = jj * scale - py - my;
+		}
+		tmp = rgb + (my * pw + mx) * 3;
+		xpm = -1;
+		opac = 255;
+		if (ll)
+		{
+			opac = (layer_table[ll].opacity * 255 + 50) / 100;
+			if (layer_table[ll].use_trans) xpm = layer_table[ll].trans;
+		}
+		if (ll == layer_selected)
+		{
+			bpp = mem_img_bpp;
 			pal = mem_pal;
+			img = mem_img;
 		}
 		else
 		{
-			source = layer_table[l].image->mem_image;
-			bpp = layer_table[l].image->mem_image_bpp;
-			lw = layer_table[l].image->mem_width;
-			lh = layer_table[l].image->mem_height;
-			pal = layer_table[l].image->mem_pal;
+			bpp = layer_table[ll].image->mem_img_bpp;
+			pal = layer_table[ll].image->mem_pal;
+			img = layer_table[ll].image->mem_img;
 		}
-		pix24 = PNG_2_INT(pal[layer_table[l].trans]);		// Needed for 24 bpp images
-
-		pw2 = pw;
-		ph2 = ph;
-
-		if ( l>0 )
+		setup_row(xof + mx, mw, czoom, ii - i, xpm, opac, bpp, pal);
+		i = (py + my) % scale;
+		if (i < 0) i += scale;
+		mh = mh * zoom + i;
+		for (j = -1; i < mh; i += zoom , tmp += pw3)
 		{
-			visible = layer_table[l].visible;
-			lx = layer_table[l].x;
-			ly = layer_table[l].y;
-			opac = mt_round( ((float) layer_table[l].opacity) / 100 * 255);
-			opac2 = 255 - opac;
-
-			use_trans = layer_table[l].use_trans;
-			trans = layer_table[l].trans;
-		}
-
-		if ( zoom<1 )
-		{
-			q = lx - px*canz;
-			if ( q>=0 ) q = q/canz;
-			else q = (q - canz + 1)/canz;
-		} else q = lx*zoom - px;
-
-		if ( q<0 )
-		{
-			sox = -q;
-			dox = 0;
-		}
-		else
-		{
-			sox = 0;
-			dox = q;
-			pw2 = pw2 - q;		// Gap 1
-		}
-		if ( (px+pw) > (lx+lw)*zoom )
-			pw2 = pw2 - ( (px+pw) - (lx+lw)*zoom );	// Gap 2
-
-			
-		if ( zoom<1 )
-		{
-			q = ly - py*canz;
-			if ( q>=0 ) q = q/canz;
-			else q = (q - canz + 1)/canz;
-		} else q = ly*zoom - py;
-
-		if ( q<0 )
-		{
-			soy = -q;
-			doy = 0;
-		}
-		else
-		{
-			soy = 0;
-			doy = q;
-			ph2 = ph2 - q;		// Gap 1y
-		}
-		if ( (py+ph) > (ly+lh)*zoom )
-			ph2 = ph2 - ( (py+ph) - (ly+lh)*zoom );	// Gap 2y
-
-		px2 = 0;
-		py2 = 0;
-
-		if ( layers_pastry_cut && l>0 )	// Useful for animation previewing
-		{
-			if ( (px+dox+pw2) > bw ) pw2 = pw2 - ( px+dox+pw2-bw );	// To right
-			if ( (py+doy+ph2) > bh ) ph2 = ph2 - ( py+doy+ph2-bh );	// Below
-
-			if ( (px+dox)<0 ) px2 = -(px+dox);	// To left of background
-			if ( (py+doy)<0 ) py2 = -(py+doy);	// Above
-		}
-//printf("xy = %i %i\n", px2, py2);
-		if ( rgb>0 && visible )
-		{
-			if ( bpp == 1 && zoom<1 )		// Indexed image --100%
+			if (i / scale == j)
 			{
-				for ( iy=py2; iy<ph2; iy++ )
-				{
-					offd = 3*((iy + doy)*pw + dox);
-					offs = ((iy + soy)*canz)*lw;
-
-					if ( use_trans )	// Transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						pix = source[offs + (sox+ix)*canz];
-
-						if ( pix != trans )
-						{
-rgb[    offd + 3*ix] = (pal[pix].red   * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1 + offd + 3*ix] = (pal[pix].green * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-						}
-					}
-					else			// No transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						pix = source[offs + (sox+ix)*canz];
-
-rgb[    offd + 3*ix] = (pal[pix].red   * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1 + offd + 3*ix] = (pal[pix].green * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-					}
-				}
+				memcpy(tmp, tmp - pw3, mw * 3);
+				continue;
 			}
-			if ( bpp == 1 && zoom>=1 )		// Indexed image 100%++
-			{
-				for ( iy=py2; iy<ph2; iy++ )
-				{
-					offd = 3*((iy + doy)*pw + dox);
-					offs = (iy + soy)/canz*lw;
-
-					if ( use_trans )	// Transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						pix = source[offs + (sox+ix)/canz];
-
-						if ( pix != trans )
-						{
-rgb[    offd + 3*ix] = (pal[pix].red   * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1 + offd + 3*ix] = (pal[pix].green * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-						}
-					}
-					else			// No transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						pix = source[offs + (sox+ix)/canz];
-
-rgb[    offd + 3*ix] = (pal[pix].red   * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1 + offd + 3*ix] = (pal[pix].green * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2 + offd + 3*ix] = (pal[pix].blue  * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-					}
-				}
-			}
-			if ( bpp == 3 && zoom<1 )		// RGB image --100%
-			{
-				for ( iy=py2; iy<ph2; iy++ )
-				{
-					offd = 3*((iy + doy)*pw + dox);
-					offs = 3*( (iy + soy)*canz*lw );
-					if ( use_trans )	// Transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						offs2 = 3*((sox+ix)*canz);
-						if ( pix24 != MEM_2_INT(source, (offs + offs2)) )
-						{
-rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1+offd+3*ix] = (source[1+offs+offs2] * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-						}
-					}
-					else			// No transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						offs2 = 3*((sox+ix)*canz);
-rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1+offd+3*ix] = (source[1+offs+offs2] * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-					}
-				}
-			}
-			if ( bpp == 3 && zoom>=1 )		// RGB image 100%++
-			{
-				for ( iy=py2; iy<ph2; iy++ )
-				{
-					offd = 3*((iy + doy)*pw + dox);
-					offs = 3*( (iy + soy)/canz*lw );
-					if ( use_trans )	// Transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						offs2 = 3*((sox+ix)/canz);
-						if ( pix24 != MEM_2_INT(source, (offs + offs2)) )
-						{
-rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1+offd+3*ix] = (source[1+offs+offs2] * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-						}
-					}
-					else			// No transparent colour in use
-					for ( ix=px2; ix<pw2; ix++ )
-					{
-						offs2 = 3*((sox+ix)/canz);
-rgb[  offd+3*ix] = (source[  offs+offs2] * opac + rgb[    offd + 3*ix] * opac2 + 128) / 255;
-rgb[1+offd+3*ix] = (source[1+offs+offs2] * opac + rgb[1 + offd + 3*ix] * opac2 + 128) / 255;
-rgb[2+offd+3*ix] = (source[2+offs+offs2] * opac + rgb[2 + offd + 3*ix] * opac2 + 128) / 255;
-					}
-				}
-			}
+			j = i / scale;
+			render_row(tmp, img, ddx, ddy + j, tlist);
+			if (ll != layer_selected) continue;
+			overlay_row(tmp, img, ddx, ddy + j, tlist);
 		}
 	}
+}
+
+void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
+{
+	if (!rgb) return; /* Paranoia */
+	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total);
 }
 
 void vw_focus_view()						// Focus view window to main window
@@ -995,9 +920,9 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 
 static void vw_mouse_event(int x, int y, guint state, guint button)
 {
-	unsigned char *rgb, pix;
-	int dx, dy, i, lx, ly, lw, lh, bpp, pix24;
-	png_color pcol, *pal;
+	unsigned char *rgb, **img;
+	int dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
+	png_color *pal;
 
 	x = (x - margin_view_x) / vw_zoom;
 	y = (y - margin_view_y) / vw_zoom;
@@ -1016,7 +941,7 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 		else
 		{
 			vw_move_layer = -1;		// Which layer has the user clicked?
-			for ( i=1; i<=layers_total; i++ )
+			for (i = layers_total; i > 0; i--)
 			{
 				lx = layer_table[i].x;
 				ly = layer_table[i].y;
@@ -1024,44 +949,49 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 				{
 					lw = mem_width;
 					lh = mem_height;
-					bpp = mem_image_bpp;
-					rgb = mem_image;
+					bpp = mem_img_bpp;
+					img = mem_img;
 					pal = mem_pal;
 				}
 				else
 				{
 					lw = layer_table[i].image->mem_width;
 					lh = layer_table[i].image->mem_height;
-					bpp = layer_table[i].image->mem_image_bpp;
-					rgb = layer_table[i].image->mem_image;
+					bpp = layer_table[i].image->mem_img_bpp;
+					img = layer_table[i].image->mem_img;
 					pal = layer_table[i].image->mem_pal;
 				}
+				rgb = img[CHN_IMAGE];
 
+				/* Is click within layer box? */
 				if ( x>=lx && x<(lx + lw) && y>=ly && y<(ly + lh) &&
 					layer_table[i].visible )
-				{		// Is click within layer box?
+				{
+					ofs = (x-lx) + lw*(y-ly);
+					/* Is click on a non transparent pixel? */
+					if (img[CHN_ALPHA])
+					{
+						if (img[CHN_ALPHA][ofs] < (bpp == 1 ? 255 : 1))
+							continue;
+					}
 					if ( layer_table[i].use_trans )
-					{	// Is click on a non transparent pixel?
-						if ( bpp == 1 )
-						{
-							pix = rgb[(x-lx) + lw*(y-ly)];
-							if ( pix != layer_table[i].trans )
-								vw_move_layer = i;
-						}
+					{
+						tpix = layer_table[i].trans;
+						if (bpp == 1) ppix = rgb[ofs];
 						else
 						{
-							pcol = pal[layer_table[i].trans];
-							pix24 = MEM_2_INT(rgb, 3*((x-lx) + lw*(y-ly)));
-							if ( pix24 != (PNG_2_INT(pcol)) )
-								vw_move_layer = i;
+							tpix = PNG_2_INT(pal[tpix]);
+							ppix = MEM_2_INT(rgb, ofs * 3);
 						}
+						if (tpix == ppix) continue;
 					}
-					else vw_move_layer = i;
+					vw_move_layer = i;
+					break;
 				}
 			}
-			if ( vw_move_layer == -1 ) pix24 = 0;	// Select background layer
-			else pix24 = vw_move_layer;
-			layer_choose( pix24 );			// Select layer for editing
+			ppix = vw_move_layer;
+			if (ppix < 0) ppix = 0; /* Select background */
+			layer_choose(ppix);
 		}
 		view_first_move = FALSE;
 		vw_last_x = x;
@@ -1183,10 +1113,9 @@ void init_view( GtkWidget *canvas, GtkWidget *scroll )
 
 void screen_copy_pixels( unsigned char *rgb, int w, int h )
 {
-	int i, j = 3*w*h;
-
 	mem_pal_load_def();
-	if ( mem_new( w, h, 3 ) == 0 ) for ( i=0; i<j; i++ ) mem_image[i] = rgb[i];
+	if (mem_new( w, h, 3 )) return;
+	memcpy(mem_img[CHN_IMAGE], rgb, w * h * 3);
 }
 
 gboolean grab_screen()
@@ -1322,10 +1251,10 @@ gint render_text( GtkWidget *widget )
 	if ( t_image != NULL )
 	{
 		if ( mem_clipboard != NULL ) free( mem_clipboard );	// Lose old clipboard
-		mem_clipboard = malloc( width * height * mem_image_bpp );
+		mem_clipboard = malloc( width * height * mem_img_bpp );
 		mem_clip_w = width;
 		mem_clip_h = height;
-		mem_clip_bpp = mem_image_bpp;
+		mem_clip_bpp = mem_img_bpp;
 		if ( !antialias[1] ) mem_clip_mask_init(0);
 		else mem_clip_mask_clear();
 	
@@ -1343,9 +1272,9 @@ gint render_text( GtkWidget *widget )
 			for ( j=0; j<height; j++ )
 			{
 				source = (unsigned char *) (t_image->mem) + j * t_image->bpl;
-				dest = mem_clipboard + width*mem_image_bpp*j;
+				dest = mem_clipboard + width * j * mem_img_bpp;
 				dest2 = mem_clip_mask + width*j;
-				if ( mem_image_bpp == 3 )
+				if ( mem_img_bpp == 3 )
 				{
 					pat_off = mem_col_pat24 + (j%8)*8*3;
 					if ( antialias[0] )
@@ -1404,7 +1333,7 @@ gint render_text( GtkWidget *widget )
 					 }
 					}
 				}
-				if ( mem_image_bpp == 1 )
+				if ( mem_img_bpp == 1 )
 				{
 					pat_off = mem_col_pat + (j%8)*8;
 					for ( i=0; i<width; i++ )
@@ -1528,7 +1457,7 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 	}
 	else	gtk_widget_hide( text_toggle[2] );
 
-	if ( mem_image_bpp == 1 || GTK_MAJOR_VERSION == 1 )
+	if ( mem_img_bpp == 1 || GTK_MAJOR_VERSION == 1 )
 		gtk_widget_hide( text_toggle[0] );
 
 	add_hseparator( vbox, 200, 10 );

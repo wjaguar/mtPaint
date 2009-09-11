@@ -121,7 +121,7 @@ int load_png( char *file_name, int stype )
 	if ( stype == 0 )
 	{
 		mess = _("Loading PNG image");
-		rgb = mem_image;
+		rgb = mem_img[CHN_IMAGE];
 	}
 	if ( stype == 1 )
 	{
@@ -142,7 +142,7 @@ int load_png( char *file_name, int stype )
 		{
 			mem_pal_load_def();
 			if ( mem_new( width, height, 3 ) != 0 ) goto file_too_huge;
-			rgb = mem_image;
+			rgb = mem_img[CHN_IMAGE];
 			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 			{
 				// Image has a transparent index
@@ -250,7 +250,7 @@ force_RGB:
 			png_get_PLTE(png_ptr, info_ptr, &png_palette, &mem_cols);
 			for ( i=0; i<mem_cols; i++ ) mem_pal[i] = png_palette[i];
 			if ( mem_new( width, height, 1 ) != 0 ) goto file_too_huge;
-			rgb = mem_image;
+			rgb = mem_img[CHN_IMAGE];
 			if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 			{
 				// Image has a transparent index
@@ -311,7 +311,7 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=laye
 	{
 		h = mem_height;
 		w = mem_width;
-		rgb = mem_image;
+		rgb = mem_img[CHN_IMAGE];
 		if ( stype == 0 ) mess = _("Saving PNG image");
 	}
 	if ( stype == 1 )
@@ -350,7 +350,7 @@ int save_png( char *file_name, int stype )	// 0=canvas 1=clipboard 2=undo 3=laye
 	png_init_io(png_ptr, fp);
 	png_set_compression_level(png_ptr, Z_BEST_COMPRESSION);
 
-	if ( stype<3 && mem_image_bpp == 1 )
+	if ( stype<3 && mem_img_bpp == 1 )
 	{
 		png_set_IHDR(png_ptr, info_ptr, w, h,
 			8, PNG_COLOR_TYPE_PALETTE, PNG_INTERLACE_NONE,
@@ -470,7 +470,7 @@ int load_gif( char *file_name, int *delay )
 				  {
 				   if ( j%16 == 0 && do_prog )
 				    progress_update( ((float) j) / mem_height );
-				   DGifGetLine( giffy, mem_image + j*mem_width, mem_width );
+				   DGifGetLine( giffy, mem_img[CHN_IMAGE] + j*mem_width, mem_width );
 				  }
 				 }
 				}
@@ -478,7 +478,7 @@ int load_gif( char *file_name, int *delay )
 					{
 						if ( j%16 == 0 && do_prog )
 							progress_update( ((float) j) / mem_height );
-						DGifGetLine( giffy, mem_image + j*mem_width, mem_width );
+						DGifGetLine( giffy, mem_img[CHN_IMAGE] + j*mem_width, mem_width );
 					}
 
 				if ( do_prog ) progress_end();
@@ -535,9 +535,9 @@ fail_too_huge:
 
 int save_gif( char *file_name )
 {
-	if ( mem_image_bpp != 1 ) return NOT_GIF;		// GIF save must be on indexed image
+	if ( mem_img_bpp != 1 ) return NOT_GIF;		// GIF save must be on indexed image
 
-	return save_gif_real( file_name, mem_image, mem_pal, mem_width, mem_height, mem_xpm_trans, 1 );
+	return save_gif_real( file_name, mem_img[CHN_IMAGE], mem_pal, mem_width, mem_height, mem_xpm_trans, 1 );
 }
 
 
@@ -678,7 +678,7 @@ int load_jpeg( char *file_name )
 		if ( mem_new( width, height, 3 ) != 0 )
 			goto fail_too_huge;		// RGB
 	}
-	memp = mem_image;
+	memp = mem_img[CHN_IMAGE];
 
 	if (setjmp(jerr.setjmp_buffer))			// If libjpeg causes errors now its too late
 	{
@@ -696,7 +696,7 @@ int load_jpeg( char *file_name )
 	{
 		if ( i%16 == 0 && do_prog ) progress_update( ((float) i) / height );
 		jpeg_read_scanlines( &cinfo, &memp, 1 );
-		memp = memp + width*mem_image_bpp;
+		memp = memp + width*mem_img_bpp;
 	}
 	if ( do_prog ) progress_end();
 
@@ -726,7 +726,7 @@ int save_jpeg( char *file_name )
 	FILE *fp;
 	int i;
 
-	if ( mem_image_bpp == 1 ) return NOT_JPEG;		// JPEG save must be on RGB image
+	if ( mem_img_bpp == 1 ) return NOT_JPEG;		// JPEG save must be on RGB image
 
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = my_error_exit;
@@ -750,7 +750,7 @@ int save_jpeg( char *file_name )
 	jpeg_set_quality(&cinfo, mem_jpeg_quality, TRUE );
 	jpeg_start_compress( &cinfo, TRUE );
 
-	row_pointer[0] = mem_image;
+	row_pointer[0] = mem_img[CHN_IMAGE];
 	progress_init(_("Saving JPEG image"),0);
 	for ( i=0; i<mem_height; i++ )
 	{
@@ -774,7 +774,7 @@ int load_tiff( char *file_name )
 {
 #ifdef U_TIFF
 	unsigned int width, height, i, j;
-	unsigned char red, green, blue;
+	unsigned char red, green, blue, *wrk_image;
 	uint32 *raster = NULL;
 	int do_prog = 0;
 	TIFF *tif;
@@ -804,6 +804,7 @@ int load_tiff( char *file_name )
 		TIFFClose(tif);
 		return FILE_MEM_ERROR;
 	}
+	wrk_image = mem_img[CHN_IMAGE];
 
 	raster = (uint32 *) _TIFFmalloc ( width * height * sizeof (uint32));
 
@@ -820,9 +821,9 @@ int load_tiff( char *file_name )
 				red = TIFFGetR( raster[(height-j-1) * width + i] );
 				green = TIFFGetG( raster[(height-j-1) * width + i] );
 				blue = TIFFGetB( raster[(height-j-1) * width + i] );
-				mem_image[ 3*(i + width*j) ] = red;
-				mem_image[ 1 + 3*(i + width*j) ] = green;
-				mem_image[ 2 + 3*(i + width*j) ] = blue;
+				wrk_image[ 3*(i + width*j) ] = red;
+				wrk_image[ 1 + 3*(i + width*j) ] = green;
+				wrk_image[ 2 + 3*(i + width*j) ] = blue;
 			}
 		}
 		if ( do_prog ) progress_end();
@@ -845,7 +846,7 @@ int save_tiff( char *file_name )
 	int j;
 	TIFF *tif;
 
-	if ( mem_image_bpp == 1 ) return NOT_TIFF;		// TIFF save must be on RGB image
+	if ( mem_img_bpp == 1 ) return NOT_TIFF;		// TIFF save must be on RGB image
 
 	TIFFSetErrorHandler(NULL);		// We don't want any echoing to the output
 	TIFFSetWarningHandler(NULL);
@@ -865,7 +866,7 @@ int save_tiff( char *file_name )
 	for ( j=0; j<mem_height; j++ )
 	{
 		if (j%16 == 0) progress_update( ((float) j) / mem_height );
-		if ( TIFFWriteScanline( tif, mem_image + j*3*mem_width, j, 0 ) == -1 ) goto fail;
+		if ( TIFFWriteScanline( tif, mem_img[CHN_IMAGE] + j*3*mem_width, j, 0 ) == -1 ) goto fail;
 	}
 	progress_end();
 	TIFFClose(tif);
@@ -881,7 +882,7 @@ fail:
 
 int load_bmp( char *file_name )
 {
-	unsigned char buff[MAX_WIDTH*4], pix;
+	unsigned char buff[MAX_WIDTH*4], pix, *wrk_image;
 	int width, height, readin, bitcount, compression, cols, i, j, k, bpl=0;
 	FILE *fp;
 
@@ -919,6 +920,7 @@ int load_bmp( char *file_name )
 	{
 		mem_pal_load_def();
 		if ( mem_new( width, height, 3 ) != 0 ) goto file_too_huge;
+		wrk_image = mem_img[CHN_IMAGE];
 		progress_init(_("Loading BMP image"),0);
 		for ( j=0; j<height; j++ )
 		{
@@ -926,9 +928,9 @@ int load_bmp( char *file_name )
 			readin = fread(buff, 1, bpl, fp);	// Read in line of pixels
 			for ( i=0; i<width; i++ )
 			{
-				mem_image[ 2 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i ];
-				mem_image[ 1 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 1 ];
-				mem_image[ 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 2 ];
+				wrk_image[ 2 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i ];
+				wrk_image[ 1 + 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 1 ];
+				wrk_image[ 3*(i + width*(height - 1 - j)) ] = buff[ 3*i + 2 ];
 			}
 		}
 		progress_end();
@@ -947,6 +949,7 @@ int load_bmp( char *file_name )
 			mem_pal[i].blue = buff[4*i];
 		}
 		if ( mem_new( width, height, 1 ) != 0 ) goto file_too_huge;
+		wrk_image = mem_img[CHN_IMAGE];
 
 		progress_init(_("Loading BMP image"),0);
 		for ( j=0; j<height; j++ )
@@ -959,7 +962,7 @@ int load_bmp( char *file_name )
 				for ( i=0; i<width; i++ )
 				{
 					pix = buff[i];
-					mem_image[ i + width*(height - 1 - j) ] = pix;
+					wrk_image[ i + width*(height - 1 - j) ] = pix;
 				}
 			}
 			if ( bitcount == 4 )
@@ -967,9 +970,9 @@ int load_bmp( char *file_name )
 				for ( i=0; i<width; i=i+2 )
 				{
 					pix = buff[i/2];
-					mem_image[ i + width*(height - 1 - j) ] = pix / 16;
+					wrk_image[ i + width*(height - 1 - j) ] = pix / 16;
 					if ( (i+1)<width )
-						mem_image[ 1 + i + width*(height - 1 - j) ] = pix % 16;
+						wrk_image[ 1 + i + width*(height - 1 - j) ] = pix % 16;
 				}
 			}
 			if ( bitcount == 1 )
@@ -980,7 +983,7 @@ int load_bmp( char *file_name )
 					k = 0;
 					while ( (k<8) && (i+k)<width )
 					{
-						mem_image[ i+k + width*(height - 1 - j) ]
+						wrk_image[ i+k + width*(height - 1 - j) ]
 							= pix / (1 << (7-k)) % 2;
 						k++;
 					}
@@ -1001,13 +1004,13 @@ file_too_huge:
 
 int save_bmp( char *file_name )
 {
-	unsigned char buff[MAX_WIDTH*4];
-	int written, i, j, bpl = mem_width * mem_image_bpp, filesize, headsize;
+	unsigned char buff[MAX_WIDTH*4], *wrk_image = mem_img[CHN_IMAGE];
+	int written, i, j, bpl = mem_width * mem_img_bpp, filesize, headsize;
 	FILE *fp;
 
 	if ( bpl % 4 != 0 ) bpl = bpl + 4 - (bpl % 4);		// Adhere to 4 byte boundaries
 	filesize = 54 + bpl * mem_height;
-	if ( mem_image_bpp == 1 ) filesize = filesize + mem_cols*4;
+	if ( mem_img_bpp == 1 ) filesize = filesize + mem_cols*4;
 	headsize = filesize - bpl * mem_height;
 
 	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
@@ -1029,7 +1032,7 @@ int save_bmp( char *file_name )
 	buff[18] = mem_width % 256; buff[19] = mem_width / 256;	buff[20] = 0; buff[21] = 0;
 	buff[22] = mem_height % 256; buff[23] = mem_height / 256; buff[24] = 0; buff[25] = 0;
 
-	buff[28] = mem_image_bpp*8; buff[29] = 0;			// Bits per pixel
+	buff[28] = mem_img_bpp*8; buff[29] = 0;			// Bits per pixel
 	buff[30] = 0; buff[31] = 0; buff[32] = 0; buff[33] = 0;		// No compression
 
 	buff[34] = bpl*mem_height % 256;
@@ -1040,7 +1043,7 @@ int save_bmp( char *file_name )
 	buff[38] = 18; buff[39] = 11;
 	buff[42] = 18; buff[43] = 11;
 
-	if ( mem_image_bpp != 3 )
+	if ( mem_img_bpp != 3 )
 	{
 		buff[46] = mem_cols % 256; buff[47] = mem_cols / 256;
 		buff[50] = buff[46]; buff[51] = buff[47];
@@ -1051,16 +1054,16 @@ int save_bmp( char *file_name )
 	if ( written < 54 ) goto fail;		// Some sort of botch up occured
 
 	progress_init(_("Saving BMP image"), 0);
-	if ( mem_image_bpp == 3 )		// RGB image
+	if ( mem_img_bpp == 3 )		// RGB image
 	{
 		for ( j=mem_height-1; j>=0; j-- )
 		{
 			if (j%16 == 0) progress_update( ((float) mem_height - j) / mem_height );
 			for ( i=0; i<mem_width; i++ )
 			{
-				buff[ 3*i ] = mem_image[ 2 + 3*(i + mem_width*j) ];
-				buff[ 3*i + 1 ] = mem_image[ 1 + 3*(i + mem_width*j) ];
-				buff[ 3*i + 2 ] = mem_image[ 3*(i + mem_width*j) ];
+				buff[ 3*i ] = wrk_image[ 2 + 3*(i + mem_width*j) ];
+				buff[ 3*i + 1 ] = wrk_image[ 1 + 3*(i + mem_width*j) ];
+				buff[ 3*i + 2 ] = wrk_image[ 3*(i + mem_width*j) ];
 			}
 			fwrite(buff, 1, bpl, fp);
 		}
@@ -1081,7 +1084,7 @@ int save_bmp( char *file_name )
 			if (j%16 == 0) progress_update( ((float) mem_height - j) / mem_height );
 
 			for ( i=0; i<mem_width; i++ )
-				buff[i] = mem_image[ i + mem_width*j ];
+				buff[i] = wrk_image[ i + mem_width*j ];
 
 			fwrite(buff, 1, bpl, fp);	// Read in line of pixels
 		}
@@ -1256,7 +1259,7 @@ int load_xpm( char *file_name )
 		fclose(fp);
 		return FILE_MEM_ERROR;
 	}
-	if (mem_image == NULL) goto fail;
+	if (mem_img[CHN_IMAGE] == NULL) goto fail;
 	mem_xpm_trans = trans;
 
 	progress_init(_("Loading XPM image"),0);
@@ -1283,7 +1286,7 @@ int load_xpm( char *file_name )
 			}
 			if ( k>=fc ) goto fail2;	// Pixel reference was not in palette
 
-			mem_image[ i + fw*j ] = k;
+			mem_img[CHN_IMAGE][ i + fw*j ] = k;
 
 			po = po + fcpp;
 		}
@@ -1309,7 +1312,7 @@ int save_xpm( char *file_name )
 	FILE *fp;
 	int fcpp, i, j;
 
-	if ( mem_image_bpp != 1 ) return NOT_XPM;
+	if ( mem_img_bpp != 1 ) return NOT_XPM;
 
 	if ((fp = fopen(file_name, "w")) == NULL) return -1;
 
@@ -1373,7 +1376,7 @@ int save_xpm( char *file_name )
 		fprintf( fp, "\"" );
 		for ( i=0; i<mem_width; i++ )
 		{
-			pix = mem_image[ i + j*mem_width ];
+			pix = mem_img[CHN_IMAGE][ i + j*mem_width ];
 			if ( pix>=mem_cols ) pix = 0;
 			fprintf( fp, "%s", col_tab[pix] );
 		}
@@ -1465,7 +1468,7 @@ int load_xbm( char *file_name )
 		fclose(fp);
 		return FILE_MEM_ERROR;
 	}
-	if (mem_image == NULL) goto fail;
+	if (mem_img[CHN_IMAGE] == NULL) goto fail;
 
 	mem_xbm_hot_x = xh;
 	mem_xbm_hot_y = yh;
@@ -1482,7 +1485,7 @@ int load_xbm( char *file_name )
 			if ( bits<0 ) goto fail2;
 			for ( k=0; k<8; k++ )
 				if ( (i+k) < mem_width )
-					mem_image[ i+k + mem_width*j ] = (bits & (1 << k)) >> k;
+					mem_img[CHN_IMAGE][ i+k + mem_width*j ] = (bits & (1 << k)) >> k;
 		}
 	}
 fail2:
@@ -1501,7 +1504,7 @@ int save_xbm( char *file_name )
 	int i, j, k, l, bits;
 	FILE *fp;
 
-	if ( mem_image_bpp != 1 || mem_cols != 2 ) return NOT_XBM;
+	if ( mem_img_bpp != 1 || mem_cols != 2 ) return NOT_XBM;
 
 	if ((fp = fopen(file_name, "w")) == NULL) return -1;
 
@@ -1535,7 +1538,7 @@ int save_xbm( char *file_name )
 			for ( k=0; k<8; k++ )
 				if ( (i+k) < mem_width )
 				{
-					pix = mem_image[ i+k + mem_width*j ];
+					pix = mem_img[CHN_IMAGE][ i+k + mem_width*j ];
 					if ( pix > 1 ) pix = 0;
 					bits = bits + (pix << k);
 				}
@@ -1581,36 +1584,25 @@ int file_extension_get( char *file_name )
 
 int save_image( char *file_name )	// Save current canvas to file - sense extension to set type
 {
-	char loname[260],
-		*ftypes[9] = {".xpm", ".xbm", ".jpg", "jpeg", ".gif", ".tif", "tiff", ".bmp", ".png" },
-		*ff1, *ff2 = NULL, *pbest;
+	char	*ftypes[9] = {".xpm", ".xbm", ".jpg", "jpeg", ".gif", ".tif", "tiff", ".bmp", ".png" },
+		*ff1, *pbest = file_name;
 	int i, j, res = 0;
 
-	strncpy( loname, file_name, 256 );
-	for ( i=0; i<256; i++ )			// Get lower case of filename
-	{
-		loname[i] = tolower( file_name[i] );
-		if ( file_name[i] == 0 ) break;
-	}
-
-	pbest = NULL;
 	j = 8;					// Default = PNG
 	for ( i=0; i<9; i++ )			// Get rightmost match of this file extension
 	{
-		ff1 = strstr( loname, ftypes[i] );	// Get 1st occurrence
-		while ( ff1 != NULL )			// Get rightmost
+		ff1 = file_name + strlen(file_name) - 4;
+		while ( ff1 >= file_name )			// Get rightmost match
 		{
-			ff2 = ff1;
-			ff1 = strstr( ff2+1, ftypes[i] );
+			if ( strncasecmp( ff1, ftypes[i], 4 ) == 0 ) break;
+			ff1--;
 		}
-		if ( ff2 > pbest )
+		if ( ff1 > pbest )
 		{
-			pbest = ff2;
+			pbest = ff1;
 			j = i;
-//printf("found match = %i\n", j);
 		}
 	}
-//printf("best match = %i\n", j);
 	// We have to check the whole filename in case its the Gifsicle filename *.gif.???
 
 	if ( j==0 ) res = save_xpm( file_name );
@@ -1682,7 +1674,7 @@ int export_ascii ( char *file_name )
 	{
 		for ( i=0; i<mem_width; i++ )
 		{
-			pix = mem_image[ i + mem_width*j ];
+			pix = mem_img[CHN_IMAGE][ i + mem_width*j ];
 			fprintf(fp, "%c", ch[pix % 16]);
 		}
 		fprintf(fp, "\n");

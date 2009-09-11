@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -25,6 +25,7 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "mainwindow.h"
 #include "viewer.h"
 #include "mygtk.h"
@@ -32,7 +33,6 @@
 #include "inifile.h"
 #include "png.h"
 #include "canvas.h"
-#include "memory.h"
 #include "polygon.h"
 #include "layer.h"
 #include "info.h"
@@ -319,7 +319,7 @@ void pressed_create_patterns( GtkMenuItem *menu_item, gpointer user_data )
 					fprintf( fp, "{" );
 					for ( row = 0; row < 8; row++ )
 					{
-						pixel = mem_image[ sx+row + 94*(sy+column) ];
+						pixel = mem_img[CHN_IMAGE][ sx+row + 94*(sy+column) ];
 						fprintf( fp, "%i", pixel % 2 );
 						if ( row < 10 ) fprintf( fp, "," );
 					}
@@ -459,7 +459,7 @@ void load_clipboard( int item )
 	if ( tool_type == TOOL_POLYGON && poly_status >= POLY_NONE )
 		pressed_select_none( NULL, NULL );
 
-	if ( mem_image_bpp == mem_clip_bpp ) pressed_paste_centre( NULL, NULL );
+	if ( MEM_BPP == mem_clip_bpp ) pressed_paste_centre( NULL, NULL );
 }
 
 void load_clip( GtkMenuItem *menu_item, gpointer user_data )
@@ -495,7 +495,7 @@ void save_clip( GtkMenuItem *menu_item, gpointer user_data )
 
 void pressed_opacity( int opacity )
 {
-	if ( mem_image_bpp == 3 )
+	if ( mem_img_bpp == 3 )
 	{
 		mtMIN( tool_opacity, opacity, 255 )
 		mtMAX( tool_opacity, tool_opacity, 1 )
@@ -726,13 +726,13 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		{
 			i = event->keyval - GDK_KP_0;
 			if ( i<1 ) i=10;
-			pressed_opacity( i*255/10 );
+			pressed_opacity( (255 * i) / 10 );
 		}
 		if ( event->keyval >= GDK_0 && event->keyval <= GDK_9 )
 		{
 			i = event->keyval - GDK_0;
 			if ( i<1 ) i=10;
-			pressed_opacity( i*255/10 );
+			pressed_opacity( (255 * i) / 10 );
 		}
 		if ( event->keyval == GDK_plus || event->keyval == GDK_equal ||
 			event->keyval == GDK_KP_Add )
@@ -1017,9 +1017,9 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 
 	if ( (state & GDK_CONTROL_MASK) && !(state & GDK_SHIFT_MASK) )		// Set colour A/B
 	{
-		if ( mem_image_bpp == 1 )
+		if ( mem_img_bpp == 1 )
 		{
-			pixel = GET_PIXEL( x, y );
+			pixel = get_pixel( x, y );
 			if (button == 1 && mem_col_A != pixel)
 			{
 				mem_col_A = pixel;
@@ -1035,7 +1035,7 @@ void mouse_event( int x, int y, guint state, guint button, gdouble pressure )
 				update_cols();
 			}
 		}
-		if ( mem_image_bpp == 3 )
+		if ( mem_img_bpp == 3 )
 		{
 			pixel24 = get_pixel24( x, y );
 			if (button == 1 && png_cmp( mem_col_A24, pixel24 ) )
@@ -1094,7 +1094,7 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 		gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
 #endif
 
-	if ( mem_image != NULL )
+	if (mem_img[CHN_IMAGE])
 	{
 		x = event->x - margin_main_x;
 		y = event->y - margin_main_y;
@@ -1111,7 +1111,7 @@ static gint canvas_enter( GtkWidget *widget, GdkEventMotion *event )	// Mouse en
 
 static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
 {
-	if ( mem_image != NULL )		// Only do this if we have an image
+	if (mem_img[CHN_IMAGE])		// Only do this if we have an image
 	{
 		if ( status_on[STATUS_CURSORXY] )
 			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
@@ -1129,351 +1129,486 @@ static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
 	return FALSE;
 }
 
+#define GREY_W 153
+#define GREY_B 102
+/*
+ * !!! This draws *pixel-synched* "transparency background" !!!
+ * The synching allows to simply copy images' pixels and lines for enlargement
+ */
+void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt,
+	int fwid, double czoom)
+{
+	int i, j, k, scale, dx, dy, step, ii, jj, ii0, px, py;
+	int xwid = 0, xhgt = 0, wid3 = wid * 3;
+	static unsigned char greyz[2] = {GREY_W, GREY_B};
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (czoom <= 1.0) step = 4;
+	else
+	{
+		scale = rint(czoom);
+		step = scale < 3 ? scale * 2 : scale;
+	}
+	dx = x0 % step;
+	dy = y0 % step;
+	
+	py = (x0 / step + y0 / step) & 1;
+	if (hgt + dy > step)
+	{
+		jj = step - dy;
+		xhgt = (hgt + dy) % step;
+		if (!xhgt) xhgt = step;
+		hgt -= xhgt;
+		xhgt -= step;
+	}
+	else jj = hgt--;
+	if (wid + dx > step)
+	{
+		ii0 = step - dx;
+		xwid = (wid + dx) % step;
+		if (!xwid) xwid = step;
+		wid -= xwid;
+		xwid -= step;
+	}
+	else ii0 = wid--;
+	fwid *= 3;
+
+	for (j = 0; ; jj += step)
+	{
+		if (j >= hgt)
+		{
+			if (j > hgt) break;
+			jj += xhgt;
+		}
+		px = py;
+		ii = ii0;
+		for (i = 0; ; ii += step)
+		{
+			if (i >= wid)
+			{
+				if (i > wid) break;
+				ii += xwid;
+			}
+			k = (ii - i) * 3;
+			memset(rgb, greyz[px], k);
+			rgb += k;
+			px ^= 1;
+			i = ii;
+		}
+		rgb += fwid - wid3;
+		for(j++; j < jj; j++)
+		{
+			memcpy(rgb, rgb - fwid, wid3);
+			rgb += fwid;
+		}
+		py ^= 1;
+	}
+}
+
+/* This is for a faster way to pass parameters into render_row() */
+static int rr_dx;
+static int rr_width;
+static int rr_xwid;
+static int rr_zoom;
+static int rr_scale;
+static int rr_mw;
+static int rr_opac;
+static int rr_xpm;
+static int rr_bpp;
+static png_color *rr_pal;
+
+void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
+	int bpp, png_color *pal)
+{
+	/* Horizontal zoom */
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (czoom <= 1.0)
+	{
+		rr_zoom = rint(1.0 / czoom);
+		rr_scale = 1;
+		x0 = 0;
+	}
+	else
+	{
+		rr_zoom = 1;
+		rr_scale = rint(czoom);
+		x0 %= rr_scale;
+	}
+	if (width + x0 > rr_scale)
+	{
+		rr_dx = rr_scale - x0;
+		x0 = (width + x0) % rr_scale;
+		if (!x0) x0 = rr_scale;
+		width -= x0;
+		rr_xwid = x0 - rr_scale;
+	}
+	else
+	{
+		rr_dx = width--;
+		rr_xwid = 0;
+	}
+	rr_width = width;
+	rr_mw = mw;
+
+	if ((xpm > -1) && (bpp == 3)) xpm = PNG_2_INT(pal[xpm]);
+	rr_xpm = xpm;
+	rr_opac = opac;
+
+	rr_bpp = bpp;
+	rr_pal = pal;
+}
+
+void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
+	chanlist xtra_img)
+{
+/* !!! This var has to be set up from config !!! */
+	int alpha_blend = TRUE;
+	unsigned char *src, *dest, *alpha, px, beta = 255;
+	int i, j, k, ii, ds, da = 0;
+
+	src = xtra_img[CHN_IMAGE];
+	if (!src) src = base_img[CHN_IMAGE] + (rr_mw * y + x) * rr_bpp;
+	alpha = xtra_img[CHN_ALPHA];
+	if (!alpha) alpha = base_img[CHN_ALPHA] ? base_img[CHN_ALPHA] +
+		rr_mw * y + x : &beta;
+	if (alpha != &beta) da = rr_zoom;
+	dest = rgb;
+	if (!da && (rr_xpm < 0) && (rr_opac == 255)) alpha_blend = FALSE;
+	ii = rr_dx;
+
+	/* Indexed fully opaque */
+	if ((rr_bpp == 1) && !alpha_blend)
+	{
+		for (i = 0; ; ii += rr_scale)
+		{
+			if (i >= rr_width)
+			{
+				if (i > rr_width) break;
+				ii += rr_xwid;
+			}
+			px = *src;
+			src += rr_zoom;
+			for(; i < ii; i++)
+			{
+				dest[0] = rr_pal[px].red;
+				dest[1] = rr_pal[px].green;
+				dest[2] = rr_pal[px].blue;
+				dest += 3;
+			}
+		}
+	}
+
+	/* Indexed transparent */
+	else if (rr_bpp == 1)
+	{
+		for (i = 0; ; ii += rr_scale , alpha += da)
+		{
+			if (i >= rr_width)
+			{
+				if (i > rr_width) break;
+				ii += rr_xwid;
+			}
+			px = *src;
+			src += rr_zoom;
+			if (!*alpha || (px == rr_xpm))
+			{
+				dest += (ii - i) * 3;
+				i = ii;
+				continue;
+			}
+			if (rr_opac == 255)
+			{
+				dest[0] = rr_pal[px].red;
+				dest[1] = rr_pal[px].green;
+				dest[2] = rr_pal[px].blue;
+			}
+			else
+			{
+				j = 255 * dest[0] + rr_opac * (rr_pal[px].red - dest[0]);
+				dest[0] = (j + (j >> 8) + 1) >> 8;
+				j = 255 * dest[1] + rr_opac * (rr_pal[px].green - dest[1]);
+				dest[1] = (j + (j >> 8) + 1) >> 8;
+				j = 255 * dest[2] + rr_opac * (rr_pal[px].blue - dest[2]);
+				dest[2] = (j + (j >> 8) + 1) >> 8;
+			}
+			dest += 3;
+			for(i++; i < ii; i++)
+			{
+				dest[0] = *(dest - 3);
+				dest[1] = *(dest - 2);
+				dest[2] = *(dest - 1);
+				dest += 3;
+			}
+		}
+	}
+
+	/* RGB fully opaque */
+	else if (!alpha_blend)
+	{
+		ds = rr_zoom * 3;
+		for (i = 0; ; ii += rr_scale , src += ds)
+		{
+			if (i >= rr_width)
+			{
+				if (i > rr_width) break;
+				ii += rr_xwid;
+			}
+			for(; i < ii; i++)
+			{
+				dest[0] = src[0];
+				dest[1] = src[1];
+				dest[2] = src[2];
+				dest += 3;
+			}
+		}
+	}
+
+	/* RGB transparent */
+	else
+	{
+		ds = rr_zoom * 3;
+		for (i = 0; ; ii += rr_scale , src += ds , alpha += da)
+		{
+			if (i >= rr_width)
+			{
+				if (i > rr_width) break;
+				ii += rr_xwid;
+			}
+			if (!*alpha || (MEM_2_INT(src, 0) == rr_xpm))
+			{
+				dest += (ii - i) * 3;
+				i = ii;
+				continue;
+			}
+			k = rr_opac * alpha[0];
+			k = (k + (k >> 8) + 1) >> 8;
+			if (k == 255)
+			{
+				dest[0] = src[0];
+				dest[1] = src[1];
+				dest[2] = src[2];
+			}
+			else
+			{
+				j = 255 * dest[0] + k * (src[0] - dest[0]);
+				dest[0] = (j + (j >> 8) + 1) >> 8;
+				j = 255 * dest[1] + k * (src[1] - dest[1]);
+				dest[1] = (j + (j >> 8) + 1) >> 8;
+				j = 255 * dest[2] + k * (src[2] - dest[2]);
+				dest[2] = (j + (j >> 8) + 1) >> 8;
+			}
+			dest += 3;
+			for(i++; i < ii; i++)
+			{
+				dest[0] = *(dest - 3);
+				dest[1] = *(dest - 2);
+				dest[2] = *(dest - 1);
+				dest += 3;
+			}
+		}
+	}
+}
+
+void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
+	chanlist xtra_img)
+{
+
+/*
+ * !!! Render channel overlays here; xtra_img[] has precedence over base_img[]
+ * as it was before for current layer's image and alpha channels
+ */
+
+}
+
 void repaint_paste( int px1, int py1, int px2, int py2 )
 {
-	unsigned char *rgb, pix, mask, pixel[3];
+	chanlist tlist;
+	unsigned char *rgb, *tmp, *pix, *mask, *alpha, *mask0;
+	unsigned char *clip_alpha, *clip_image;
 	int pw = (px2 - px1 + 1), ph = (py2 - py1 + 1);
-	int ix, iy, mx, my, offset, i, j, k, ipix, lx=0, ly=0;
+	int i, j, l, pw3, lop = 255, lx = 0, ly = 0;
+	int zoom, scale, pww, j0, jj, dx, di, dc, xpm = mem_xpm_trans, opac;
 
+	if ( pw<=0 || ph<=0 ) return;
+
+	// Its a grimy hack, but it avoids a nasty segfault
+	i = ceil(marq_x1 * can_zoom);
+	if (px1 < i)
+	{
+		pw += px1 - i;
+		px1 = i;
+	}
+	j = ceil(marq_y1 * can_zoom);
+	if (py1 < j)
+	{
+		ph += py1 - j;
+		py1 = j;
+	}
 	if ( pw<=0 || ph<=0 ) return;
 	rgb = grab_memory( pw*ph*3, mem_background );
 	if ( rgb == NULL ) return;
 
-	while ( (px1/can_zoom) < marq_x1 )
+	/* Horizontal zoom */
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom <= 1.0)
 	{
-		px1++; pw--;		// Its a grimy hack, but it avoids a nasty segfault
+		zoom = rint(1.0 / can_zoom);
+		scale = 1;
+		dx = px1 * zoom;
+		l = (pw - 1) * zoom + 1;
+		pww = pw;
 	}
-	while ( (py1/can_zoom) < marq_y1 )
+	else
 	{
-		py1++; ph--;
-	}
-
-	if ( mem_clip_mask != NULL || (tool_opacity<100 && mem_image_bpp==3) )
-	{
-		if ( layers_total == 0 || !show_layers_main )
-			main_render_rgb( rgb, margin_main_x + px1, margin_main_y + py1,
-				pw, ph, can_zoom );
-		else
-		{
-			if ( layer_selected > 0 )
-			{
-				lx = can_zoom * layer_table[layer_selected].x;
-				ly = can_zoom * layer_table[layer_selected].y;
-			}
-			view_render_rgb( rgb, margin_main_x + px1+lx, margin_main_y + py1+ly,
-				pw, ph, can_zoom );
-		}
+		zoom = 1;
+		scale = rint(can_zoom);
+		dx = px1 / scale;
+		l = (px1 + pw - 1) / scale - dx + 1;
+		pww = l;
 	}
 
-	if ( mem_image_bpp == 1 )
+	i = l * (mem_clip_bpp + 2);
+	pix = malloc(i);
+	if (!pix)
 	{
-		for ( j=0; j<ph; j++ )
-		{
-			if ( mem_clip_mask == NULL )
-			{
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					pix = mem_clipboard[ mx + my*mem_clip_w ];
-					offset = 3*(j*pw + i);
-					rgb[offset] = mem_pal[pix].red;
-					rgb[offset + 1] = mem_pal[pix].green;
-					rgb[offset + 2] = mem_pal[pix].blue;
-				}
-			}
-			else
-			{
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					mask = mem_clip_mask[mx + my*mem_clip_w];
-					offset = 3*(j*pw + i);
-					if ( mask == 0 )
-					{
-						pix = mem_clipboard[ mx + my*mem_clip_w ];
-						rgb[offset] = mem_pal[pix].red;
-						rgb[offset + 1] = mem_pal[pix].green;
-						rgb[offset + 2] = mem_pal[pix].blue;
-					}
-				}
-			}
-		}
+		free(rgb);
+		return;
 	}
-	if ( mem_image_bpp == 3 )
+	alpha = pix + l * mem_clip_bpp;
+	mask = alpha + l;
+
+	memset(tlist, 0, sizeof(chanlist));
+	tlist[mem_channel] = pix;
+	clip_image = mem_clipboard;
+	clip_alpha = NULL;
+	if ((mem_channel == CHN_IMAGE) && mem_clip_alpha)
 	{
-		for ( j=0; j<ph; j++ )
-		{
-			if ( mem_clip_mask == NULL )
-			{
-			  if ( tool_opacity == 100 )	// No transparency, no mask
-			  {
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					offset = 3*(j*pw + i);
-					rgb[offset]     = mem_clipboard[ 3*(mx + my*mem_clip_w) ];
-					rgb[offset + 1] = mem_clipboard[ 1 + 3*(mx + my*mem_clip_w) ];
-					rgb[offset + 2] = mem_clipboard[ 2 + 3*(mx + my*mem_clip_w) ];
-				}
-			  }
-			  else				// Transparency, no mask
-			  {
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					offset = 3*(j*pw + i);
-					for ( k=0; k<3; k++ )
-					{
-					 ipix = tool_opacity *
-						mem_clipboard[ k + 3*(mx + my*mem_clip_w) ] +
-						(100 - tool_opacity) *
-						rgb[offset + k];
-					 rgb[offset + k] = ipix / 100;
-					}
-				}
-			  }
-			}
-			else
-			{
-			  if ( tool_opacity == 100 )	// No transparency, mask
-			  {
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					offset = 3*(j*pw + i);
-					mask = mem_clip_mask[mx + my*mem_clip_w];
-					for ( k=0; k<3; k++ )
-					{
-					  rgb[offset+k] = (
-					    mask * rgb[offset + k]
-					    + (255-mask) * mem_clipboard[ k + 3*(mx + my*mem_clip_w) ]
-					    ) / 255;
-					}
-				}
-			  }
-			  else				// Transparency, mask
-			  {
-				for ( i=0; i<pw; i++ )
-				{
-					ix = (px1 + i)/can_zoom;	// Image coords
-					iy = (py1 + j)/can_zoom;
-					mx = ix - marq_x1;		// Clipboard coords
-					my = iy - marq_y1;
-					offset = 3*(j*pw + i);
-					mask = mem_clip_mask[mx + my*mem_clip_w];
-					for ( k=0; k<3; k++ )
-					{
-					    pixel[0] = mem_clipboard[ k + 3*(mx + my*mem_clip_w) ];
-					    pixel[1] = rgb[offset + k];
-					    pixel[2] = ((255-mask) * pixel[0] + mask * pixel[1] ) / 255;
-					    rgb[ k + offset ] = ( pixel[2] * tool_opacity +
-					    	pixel[1] * (100-tool_opacity)
-					    	) / 100;
-					}
-				}
-			  }
-			}
-		}
+		tlist[CHN_ALPHA] = alpha;
+		clip_alpha = mem_clip_alpha;
+	}
+	if (mem_channel == CHN_ALPHA)
+	{
+		clip_image = NULL;
+		clip_alpha = mem_clipboard;
 	}
 
-	gdk_draw_rgb_image ( the_canvas, drawing_canvas->style->black_gc,
+	/* Setup opacity mode & mask */
+	opac = tool_opacity;
+	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1)) opac = 0;
+	mask0 = NULL;
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+		mask0 = mem_img[CHN_MASK];
+
+	if (layers_total && show_layers_main)
+	{
+		if (layer_selected)
+		{
+			lx = can_zoom * layer_table[layer_selected].x;
+			ly = can_zoom * layer_table[layer_selected].y;
+			xpm = layer_table[layer_selected].use_trans ?
+				layer_table[layer_selected].trans : -1;
+			lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
+		}
+		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom, 0,
+			layer_selected - 1);
+	}
+	else render_background(rgb, px1, py1, pw, ph, pw, can_zoom);
+
+	setup_row(px1, pw, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
+	j0 = -1; tmp = rgb; pw3 = pw * 3;
+	for (jj = 0; jj < ph; jj++ , tmp += pw3)
+	{
+		j = ((py1 + jj) * zoom) / scale;
+		if (j == j0)
+		{
+			memcpy(tmp, tmp - pw3, pw3);
+			continue;
+		}
+		j0 = j;
+		di = mem_width * j + dx;
+		dc = mem_clip_w * (j - marq_y1) + dx - marq_x1;
+		if (clip_alpha)
+		{
+			if (mem_img[CHN_ALPHA])
+				memcpy(alpha, mem_img[CHN_ALPHA] + di, l);
+			else memset(alpha, 255, l);
+		}
+		prep_mask(0, zoom, pww, mask, mask0 ? mask0 + di : NULL,
+			mem_img[CHN_IMAGE] + di * mem_img_bpp);
+		process_mask(0, zoom, pww, mask, alpha, mem_img[CHN_ALPHA] ?
+			mem_img[CHN_ALPHA] + di : alpha, clip_alpha ?
+			clip_alpha + dc : NULL, mem_clip_mask ?
+			mem_clip_mask + dc : NULL, opac);
+		if (clip_image)
+		{
+			if (mem_img[mem_channel])
+				memcpy(pix, mem_img[mem_channel] + di * mem_clip_bpp,
+					l * mem_clip_bpp);
+			else memset(pix, 0, l * mem_clip_bpp);
+			process_img(0, zoom, pww, mask, pix,
+				mem_img[mem_channel] + di * mem_clip_bpp,
+				mem_clipboard + dc * mem_clip_bpp, opac);
+		}
+		render_row(tmp, mem_img, dx, j, tlist);
+		overlay_row(tmp, mem_img, dx, j, tlist);
+	}
+
+	if (layers_total && show_layers_main)
+		render_layers(rgb, lx + px1, ly + py1, pw, ph, can_zoom,
+			layer_selected + 1, layers_total);
+
+	gdk_draw_rgb_image(the_canvas, drawing_canvas->style->black_gc,
 			margin_main_x + px1, margin_main_y + py1,
-			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
-	free( rgb );
+			pw, ph, GDK_RGB_DITHER_NONE, rgb, pw3);
+	free(pix);
+	free(rgb);
 }
 
-void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float zoom )
+void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float czoom )
 {
-	unsigned char pix[3] = {0,0,0}, greyz[2] = { 102, 153 };
-	int ix, iy, pw2, ph2, offset, off24, canz = zoom, trgb = 0,
-		px2 = px - margin_main_x, py2 = py - margin_main_y,
-		nix=0, niy=0;
+/* !!! This var has to be set up from config !!! */
+	int alpha_blend = TRUE;
+	chanlist tlist;
+	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
+	int j, jj, j0, dx, zoom = 1, scale = 1, nix = 0, niy = 0;
 
-	if ( mem_xpm_trans > -1 ) trgb = PNG_2_INT(mem_pal[mem_xpm_trans]);
-	if ( zoom < 1 ) canz = mt_round(1/zoom);
+	if (czoom < 1.0) zoom = rint(1.0 / czoom);
+	else scale = rint(czoom);
 
-	pw2 = pw;
-	ph2 = ph;
+	pw2 = pw + px2;
+	ph2 = ph + py2;
 
-	if ( px2<0 ) nix = -px2;
-	if ( py2<0 ) niy = -py2;
+	if (px2 < 0) nix = -px2;
+	if (py2 < 0) niy = -py2;
+	rgb += (pw * niy + nix) * 3;
 
-	if ( (px2+pw2) >= mem_width*zoom )	// Update image + blank space outside
-		pw2 = mem_width*zoom - px2;
-	if ( (py2+ph2) >= mem_height*zoom )	// Update image + blank space outside
-		ph2 = mem_height*zoom - py2;
+	// Update image + blank space outside
+	if (pw2 > mem_width * czoom) pw2 = mem_width * czoom;
+	if (ph2 > mem_height * czoom) ph2 = mem_height * czoom;
+	px2 += nix; py2 += niy;
+	pw2 -= px2; ph2 -= py2;
 
-	if ( mem_image_bpp == 1 )
+	if ((pw2 < 1) || (ph2 < 1)) return;
+
+	memset(tlist, 0, sizeof(chanlist));
+	if (!mem_img[CHN_ALPHA] && (mem_xpm_trans < 0)) alpha_blend = FALSE;
+	if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw, czoom);
+
+	dx = (px2 * zoom) / scale;
+
+	setup_row(px2, pw2, czoom, mem_width, mem_xpm_trans, 255, mem_img_bpp, mem_pal);
+ 	j0 = -1; pw *= 3; pw2 *= 3;
+	for (jj = 0; jj < ph2; jj++ , rgb += pw)
 	{
-		if ( zoom>=1 )
+		j = ((py2 + jj) * zoom) / scale;
+		if (j == j0)
 		{
-			if ( mem_xpm_trans == -1 )
-			for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					pix[0] = mem_image[(px2+ix)/canz
-						+ (py2+iy)/canz*mem_width];
-					offset = 3*(iy*pw + ix);
-					rgb[offset] = mem_pal[pix[0]].red;
-					rgb[offset + 1] = mem_pal[pix[0]].green;
-					rgb[offset + 2] = mem_pal[pix[0]].blue;
-				}
-			}
-			else for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					pix[0] = mem_image[(px2+ix)/canz
-						+ (py2+iy)/canz*mem_width];
-					offset = 3*(iy*pw + ix);
-					if ( pix[0] == mem_xpm_trans )
-					{
-						rgb[offset] = greyz[ ((px+ix)/8 + (py+iy)/8) % 2 ];
-						rgb[offset + 1] = rgb[offset];
-						rgb[offset + 2] = rgb[offset];
-					}
-					else
-					{
-						rgb[offset] = mem_pal[pix[0]].red;
-						rgb[offset + 1] = mem_pal[pix[0]].green;
-						rgb[offset + 2] = mem_pal[pix[0]].blue;
-					}
-				}
-			}
+			memcpy(rgb, rgb - pw, pw2);
+			continue;
 		}
-		else
-		{
-			if ( mem_xpm_trans == -1 )
-			for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					pix[0] = mem_image[(px2+ix)*canz
-						+ (py2+iy)*canz*mem_width];
-					offset = 3*(iy*pw + ix);
-					rgb[offset] = mem_pal[pix[0]].red;
-					rgb[offset + 1] = mem_pal[pix[0]].green;
-					rgb[offset + 2] = mem_pal[pix[0]].blue;
-				}
-			}
-			else for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					pix[0] = mem_image[(px2+ix)*canz
-						+ (py2+iy)*canz*mem_width];
-					offset = 3*(iy*pw + ix);
-					if ( pix[0] == mem_xpm_trans )
-					{
-						rgb[offset] = greyz[ ((px+ix)/8 + (py+iy)/8) % 2 ];
-						rgb[offset + 1] = rgb[offset];
-						rgb[offset + 2] = rgb[offset];
-					}
-					else
-					{
-						rgb[offset] = mem_pal[pix[0]].red;
-						rgb[offset + 1] = mem_pal[pix[0]].green;
-						rgb[offset + 2] = mem_pal[pix[0]].blue;
-					}
-				}
-			}
-		}
-	}
-	if ( mem_image_bpp == 3 )
-	{
-		if ( zoom>=1 )
-		{
-			if ( mem_xpm_trans == -1 )
-			for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					off24 = 3 * ( (px2+ix)/canz +
-							(py2+iy)/canz*mem_width );
-					offset = 3*(iy*pw + ix);
-					rgb[offset] = mem_image[ off24 ];
-					rgb[offset + 1] = mem_image[1 + off24];
-					rgb[offset + 2] = mem_image[2 + off24];
-				}
-			}
-			else for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					off24 = 3 * ( (px2+ix)/canz +
-							(py2+iy)/canz*mem_width );
-					offset = 3*(iy*pw + ix);
-
-					if ( trgb == ( MEM_2_INT(mem_image, off24) ) )
-					{
-						rgb[offset] = greyz[ ((px+ix)/8 + (py+iy)/8) % 2 ];
-						rgb[offset + 1] = rgb[offset];
-						rgb[offset + 2] = rgb[offset];
-					}
-					else
-					{
-						rgb[offset] = mem_image[ off24 ];
-						rgb[offset + 1] = mem_image[1 + off24];
-						rgb[offset + 2] = mem_image[2 + off24];
-					}
-				}
-			}
-		}
-		else
-		{
-			if ( mem_xpm_trans == -1 )
-			for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					off24 = 3 * ( (px2+ix)*canz +
-							(py2+iy)*canz*mem_width );
-					offset = 3*(iy*pw + ix);
-
-					rgb[offset] = mem_image[ off24 ];
-					rgb[offset + 1] = mem_image[1 + off24];
-					rgb[offset + 2] = mem_image[2 + off24];
-				}
-			}
-			else for ( iy=niy; iy<ph2; iy++ )
-			{
-				for ( ix=nix; ix<pw2; ix++ )
-				{
-					off24 = 3 * ( (px2+ix)*canz +
-							(py2+iy)*canz*mem_width );
-					offset = 3*(iy*pw + ix);
-
-					if ( trgb == ( MEM_2_INT(mem_image, off24) ) )
-					{
-						rgb[offset] = greyz[ ((px+ix)/8 + (py+iy)/8) % 2 ];
-						rgb[offset + 1] = rgb[offset];
-						rgb[offset + 2] = rgb[offset];
-					}
-					else
-					{
-						rgb[offset] = mem_image[ off24 ];
-						rgb[offset + 1] = mem_image[1 + off24];
-						rgb[offset + 2] = mem_image[2 + off24];
-					}
-				}
-			}
-		}
+		j0 = j;
+		render_row(rgb, mem_img, dx, j, tlist);
+		overlay_row(rgb, mem_img, dx, j, tlist);
 	}
 }
 
@@ -1559,7 +1694,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	mtMAX(rpx, px, margin_main_x)
 	mtMAX(rpy, py, margin_main_y)
 
-	if ( mem_preview > 0 && mem_image_bpp == 3 )
+	if ( mem_preview > 0 && mem_img_bpp == 3 )
 	{
 		for ( iy=rpy-py; iy<ph2; iy++ )			// Don't touch grey area, just RGB
 		{
@@ -1672,7 +1807,7 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 	mtMAX( tox, tox, 0 )
 	mtMAX( toy, toy, 0 )
 
-	if ( mem_image != NULL )		// Only do this if we have an image
+	if (mem_img[CHN_IMAGE])		// Only do this if we have an image
 	{
 #if GTK_MAJOR_VERSION == 1
 		if (event->is_hint)
@@ -1777,7 +1912,7 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 				snprintf(txt, 60, "%i,%i", x, y);
 				gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), txt );
 			}
-			if ( mem_image_bpp == 1 )
+			if ( mem_img_bpp == 1 )
 			{
 				pixel = GET_PIXEL( x, y );
 				r = mem_pal[pixel].red;
@@ -1785,7 +1920,7 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 				b = mem_pal[pixel].blue;
 				snprintf(txt, 60, "[%u] = {%i,%i,%i}", pixel, r, g, b);
 			}
-			if ( mem_image_bpp == 3 )
+			else
 			{
 				pixel24 = get_pixel24( x, y );
 				r = pixel24.red;

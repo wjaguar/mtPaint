@@ -52,6 +52,12 @@ void men_item_state( GtkWidget *menu_items[], gboolean state );
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void repaint_perim();			// Draw perimeter around mouse cursor
 void clear_perim();			// Clear perimeter around mouse cursor
+void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
+	int bpp, png_color *pal);
+void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
+	chanlist xtra_img);
+void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
+	chanlist xtra_img);
 void repaint_paste( int px1, int py1, int px2, int py2 );
 void main_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, float zoom );
 

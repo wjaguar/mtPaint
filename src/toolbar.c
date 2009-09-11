@@ -22,10 +22,10 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "inifile.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
-#include "memory.h"
 #include "canvas.h"
 #include "mygtk.h"
 #include "toolbar.h"
@@ -224,7 +224,7 @@ static gint expose_preview( GtkWidget *widget, GdkEventExpose *event )
 
 static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 {
-	if ( mem_image != NULL )
+	if (mem_img[CHN_IMAGE])
 	{
 		if ( event->y > 31 ) choose_pattern(0);
 		else
@@ -725,19 +725,17 @@ void toolbar_update_settings()
 
 	ts_update_spins();		// Update tool settings
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		snprintf(txt, 30, "A [%i] = {%i,%i,%i}", mem_col_A, mem_pal[mem_col_A].red,
 			mem_pal[mem_col_A].green, mem_pal[mem_col_A].blue );
-	if ( mem_image_bpp == 3 )
-		snprintf(txt, 30, "A = {%i,%i,%i}", mem_col_A24.red,
+	else	snprintf(txt, 30, "A = {%i,%i,%i}", mem_col_A24.red,
 			mem_col_A24.green, mem_col_A24.blue );
 	gtk_label_set_text( GTK_LABEL(toolbar_labels[0]), txt );
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		snprintf(txt, 30, "B [%i] = {%i,%i,%i}", mem_col_B, mem_pal[mem_col_B].red,
 			mem_pal[mem_col_B].green, mem_pal[mem_col_B].blue );
-	if ( mem_image_bpp == 3 )
-		snprintf(txt, 30, "B = {%i,%i,%i}", mem_col_B24.red,
+	else	snprintf(txt, 30, "B = {%i,%i,%i}", mem_col_B24.red,
 			mem_col_B24.green, mem_col_B24.blue );
 	gtk_label_set_text( GTK_LABEL(toolbar_labels[1]), txt );
 }
@@ -799,7 +797,7 @@ static gint release_palette( GtkWidget *widget, GdkEventButton *event )
 			pen_down = 0;
 			mem_pal_index_move( drag_index_vals[0], drag_index_vals[1] );
 
-			if ( mem_image_bpp == 1 )
+			if ( mem_img_bpp == 1 )
 				mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
 
 			canvas_undo_chores();
@@ -1031,7 +1029,7 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 	int i, j, i2, j2, c, offset;
 	png_color c24;
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];
@@ -1076,7 +1074,7 @@ void repaint_top_swatch()			// Update selected colours A & B
 {
 	int i, j, r[2], g[2], b[2], nx, ny;
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
 		mem_col_A24 = mem_pal[mem_col_A];
 		mem_col_B24 = mem_pal[mem_col_B];

@@ -25,12 +25,12 @@
 #endif
 
 #include "global.h"
+#include "memory.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "viewer.h"
 #include "inifile.h"
 #include "canvas.h"
-#include "memory.h"
 #include "png.h"
 #include "layer.h"
 

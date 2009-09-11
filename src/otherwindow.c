@@ -25,6 +25,7 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "otherwindow.h"
 #include "mygtk.h"
 #include "mainwindow.h"
@@ -32,7 +33,6 @@
 #include "inifile.h"
 #include "canvas.h"
 #include "png.h"
-#include "memory.h"
 #include "quantizer.h"
 #include "layer.h"
 #include "wu.h"
@@ -73,7 +73,7 @@ void do_new_chores()
 		align_size(old_zoom);
 
 	set_new_filename( _("Untitled") );
-	pressed_opacity( 100 );		// Set opacity to 100% to start with
+	pressed_opacity( 255 );		// Set opacity to 100% to start with
 
 	update_all_views();
 	gtk_widget_queue_draw(drawing_col_prev);
@@ -205,7 +205,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 {
 	char *rad_txt[] = {_("24 bit RGB"), _("Greyscale"), _("Indexed Palette"), _("Grab Screenshot")},
 		*title_txt[] = {_("New Image"), _("New Layer")};
-	int w = mem_width, h = mem_height, c = mem_cols, im_type = 3 - mem_image_bpp;
+	int w = mem_width, h = mem_height, c = mem_cols, im_type = 3 - mem_img_bpp;
 	GSList *group;
 
 	GtkWidget *vbox1, *hbox3;
@@ -416,7 +416,7 @@ void pal_refresher()
 
 void implement_cols(png_color A, png_color B)
 {
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
 		mem_pal[mem_col_A] = A;
 		mem_pal[mem_col_B] = B;
@@ -500,7 +500,7 @@ void choose_colours()
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
 		a_old = mem_pal[mem_col_A];
 		b_old = mem_pal[mem_col_B];
@@ -521,7 +521,7 @@ void choose_colours()
 
 	table2 = add_a_table( 6, 4, 5, vbox2 );
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		snprintf(txt, 60, "A [%i]", mem_col_A);
 	else
 		sprintf(txt, "A");
@@ -533,7 +533,7 @@ void choose_colours()
 	label_A_RGB_2 = add_to_table( txt, table2, 2, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5);
 	gtk_widget_set_usize (label_A_RGB_2, 80, -2);
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		snprintf(txt, 60, "B [%i]", mem_col_B);
 	else
 		sprintf(txt, "B");
@@ -857,7 +857,7 @@ gint click_col_add_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 			}
 
 		mem_cols = to_add;
-		if ( mem_image_bpp == 1 )
+		if ( mem_img_bpp == 1 )
 		{
 			if ( mem_col_A >= mem_cols ) mem_col_A = 0;
 			if ( mem_col_B >= mem_cols ) mem_col_B = 0;
@@ -973,7 +973,7 @@ gint bacteria_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 		}
 		if ( bac_type == 4 )
 		{
-			if ( mem_image_bpp == 3 )
+			if ( mem_img_bpp == 3 )
 			{
 				if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(bac_toggles[0])) )
 					smooth = 1;
@@ -992,17 +992,16 @@ gint bacteria_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	}
 	else
 	{
-		spot_undo(UNDO_DRAW);
+		spot_undo(UNDO_FILT);
 		if (bac_type == 0) mem_bacteria( i );
 		if (bac_type == 1)
 		{
 			progress_init(_("Image Blur Effect"),1);
 			for ( j=0; j<i; j++ )
 			{
-				if (progress_update( ((float) j)/i )) goto stop;
+				if (progress_update( ((float) j)/i )) break;
 				do_effect(1, 25 + i/2);
 			}
-stop:
 			progress_end();
 		}
 		if (bac_type == 2) do_effect(3, i);
@@ -1061,7 +1060,7 @@ void bac_form( int type )
 	spin_bacteria = add_a_spin( startv, min, max );
 	gtk_box_pack_start (GTK_BOX (vbox6), spin_bacteria, FALSE, FALSE, 5);
 
-	if ( mem_image_bpp == 3 && type == 4 )
+	if ( mem_img_bpp == 3 && type == 4 )
 		bac_toggles[0] = add_a_toggle( _("Smooth"), vbox6, TRUE );
 
 	if (type == 4) gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin_bacteria), 2);
@@ -1193,7 +1192,7 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 		spal_radio[i] = add_radio_button( rad_txt[i], NULL,  spal_radio[1], vbox[1], i );
 
 	i = inifile_get_gint32("lastspalType", 2);
-	if ( mem_image_bpp == 3 )
+	if ( mem_img_bpp == 3 )
 	{
 		if ( i == 7 ) i--;
 		gtk_widget_set_sensitive( spal_radio[7], FALSE );
@@ -1289,7 +1288,7 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 	int i;
 	gboolean do_pal = FALSE;	// RGB palette processing
 
-	if (mem_image_bpp == 3)
+	if (mem_img_bpp == 3)
 	{
 		do_pal = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4]) );
 		if ( !do_pal && widget == brcosa_toggles[4] )
@@ -1306,7 +1305,7 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 			gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[i+1]) );
 	}
 
-	if ( mem_image_bpp == 1 || do_pal )
+	if ( mem_img_bpp == 1 || do_pal )
 	{
 		mem_brcosa_pal( mem_pal, brcosa_pal );
 		for ( i=0; i<mem_cols; i++ )
@@ -1320,7 +1319,7 @@ gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer data )
 		}
 		pal_refresher();
 	}
-	if ( mem_image_bpp == 3 )
+	if ( mem_img_bpp == 3 )
 	{
 		gtk_widget_queue_draw_area( drawing_canvas, margin_main_x, margin_main_y,
 			mem_width*can_zoom+margin_main_x, mem_height*can_zoom+margin_main_y );
@@ -1403,17 +1402,17 @@ gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 		click_brcosa_preview( NULL, NULL, NULL );
 		update_all_views();
-		if ( mem_image_bpp == 3 && mem_preview == 1 )	// Only do if toggle set
+		if ( mem_img_bpp == 3 && mem_preview == 1 )	// Only do if toggle set
 		{
 			if ( brcosa_values[4] != 100 )
-				mem_gamma_chunk( mem_image, mem_width*mem_height );
+				mem_gamma_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
 			if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 || brcosa_values[2] != 0 )
-				mem_brcosa_chunk( mem_image, mem_width*mem_height );
+				mem_brcosa_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
 			if ( brcosa_values[3] != 8 )
-				mem_posterize_chunk( mem_image, mem_width*mem_height );
+				mem_posterize_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
 		}
 
-		if ( mem_image_bpp == 1 ) mem_pal_copy( brcosa_pal, mem_pal );
+		if ( mem_img_bpp == 1 ) mem_pal_copy( brcosa_pal, mem_pal );
 		else
 		{
 			if ( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(brcosa_toggles[4])) )
@@ -1517,7 +1516,7 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (hbox);
 	gtk_box_pack_start (GTK_BOX (vbox2), hbox, FALSE, FALSE, 0);
 
-	if ( mem_image_bpp == 1 ) j=4;
+	if ( mem_img_bpp == 1 ) j=4;
 	else j=6;
 
 	for ( i=0; i<j; i++ )
@@ -1715,7 +1714,7 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 		if ( sisca_scale )
 		{
-			if ( mem_image_bpp == 3 ) scale_type = scale_mode;
+			if ( mem_img_bpp == 3 ) scale_type = scale_mode;
 			res = mem_image_scale( nw, nh, scale_type );
 		}
 		else 
@@ -1834,7 +1833,7 @@ void sisca_init( char *title )
 	sisca_toggles[0] = add_a_toggle( _("Fix Aspect Ratio"), sisca_vbox, TRUE );
 	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
 		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	if ( mem_image_bpp == 3 && sisca_scale )
+	if ( mem_img_bpp == 3 && sisca_scale )
 	{
 		GtkWidget *btn = NULL;
 		int i;
@@ -2171,7 +2170,7 @@ gint click_quantize_radio( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 gint click_quantize_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	unsigned char *old_image = mem_image, newpal[3][256];
+	unsigned char *old_image = mem_img[CHN_IMAGE], newpal[3][256];
 	int rad1=0, rad2=0, i, k, new_cols, dither;
 
 	for ( i=0; i<5; i++ )
@@ -2199,7 +2198,7 @@ gint click_quantize_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	else
 	{
 		pen_down = 0;
-		i = undo_next_core( 2, mem_width, mem_height, 0, 0, 1 );
+		i = undo_next_core(2, mem_width, mem_height, 0, 0, 1, CMASK_IMAGE);
 		pen_down = 0;
 		if ( i == 1 ) i=2;
 
@@ -2228,8 +2227,8 @@ gint click_quantize_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 			if ( i == 0 )
 			{
 				dither = rad2 % 2;
-				if ( rad2 < 2 ) i = dl3floste(old_image, mem_image, mem_width,
-							mem_height, new_cols, dither, newpal);
+				if ( rad2 < 2 ) i = dl3floste(old_image, mem_img[CHN_IMAGE],
+					mem_width, mem_height, new_cols, dither, newpal);
 						// Floyd-Steinberg
 				if ( rad2 > 1 && rad2 < 4 )
 					i = mem_quantize( old_image, new_cols, rad2 );

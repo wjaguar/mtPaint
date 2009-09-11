@@ -32,11 +32,11 @@
 typedef struct
 {
 	char mem_filename[256];
-	unsigned char *mem_image;
-	int mem_image_bpp, mem_changed, mem_width, mem_height, mem_ics;
+	chanlist mem_img;
+	int mem_img_bpp, mem_changed, mem_width, mem_height, mem_ics;
 	float mem_icx, mem_icy;
 
-	undo_item mem_undo_im[MAX_UNDO];
+	undo_item mem_undo_im_[MAX_UNDO];
 	int mem_undo_pointer, mem_undo_done, mem_undo_redo;
 
 	png_color mem_pal[256];

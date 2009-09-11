@@ -170,88 +170,76 @@ static void layers_notify_unchanged()		// Layers have just been unchanged (saved
 
 static void layer_copy_from_main( int l )	// Copy info from main image to layer
 {
-	int i;
+	layer_image *lp = layer_table[l].image;
 
-	for ( i=0; i<256; i++ )
-	{
-		layer_table[l].image->mem_filename[i]	= mem_filename[i];
-		layer_table[l].image->mem_pal[i]	= mem_pal[i];
-		layer_table[l].image->mem_prot_RGB[i]	= mem_prot_RGB[i];
-		layer_table[l].image->mem_prot_mask[i]	= mem_prot_mask[i];
-	}
-	for ( i=0; i<MAX_UNDO; i++ )
-	{
-		layer_table[l].image->mem_undo_im[i]	= mem_undo_im[i];
-	}
+	memcpy(lp->mem_filename, mem_filename, 256);
+	memcpy(lp->mem_pal, mem_pal, sizeof(mem_pal));
+	memcpy(lp->mem_prot_RGB, mem_prot_RGB, sizeof(mem_prot_RGB));
+	memcpy(lp->mem_prot_mask, mem_prot_mask, sizeof(mem_prot_mask));
+	memcpy(lp->mem_undo_im_, mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
+	memcpy(lp->mem_img, mem_img, sizeof(chanlist));
 
-	layer_table[l].image->mem_image		= mem_image;
-	layer_table[l].image->mem_image_bpp	= mem_image_bpp;
-	layer_table[l].image->mem_changed	= mem_changed;
-	layer_table[l].image->mem_width		= mem_width;
-	layer_table[l].image->mem_height	= mem_height;
-	layer_table[l].image->mem_ics		= mem_ics;
-	layer_table[l].image->mem_icx		= mem_icx;
-	layer_table[l].image->mem_icy		= mem_icy;
+	lp->mem_img_bpp		= mem_img_bpp;
+	lp->mem_changed		= mem_changed;
+	lp->mem_width		= mem_width;
+	lp->mem_height		= mem_height;
+	lp->mem_ics		= mem_ics;
+	lp->mem_icx		= mem_icx;
+	lp->mem_icy		= mem_icy;
 
-	layer_table[l].image->mem_undo_pointer	= mem_undo_pointer;
-	layer_table[l].image->mem_undo_done	= mem_undo_done;
-	layer_table[l].image->mem_undo_redo	= mem_undo_redo;
+	lp->mem_undo_pointer	= mem_undo_pointer;
+	lp->mem_undo_done	= mem_undo_done;
+	lp->mem_undo_redo	= mem_undo_redo;
 
-	layer_table[l].image->mem_cols		= mem_cols;
-	layer_table[l].image->tool_pat		= tool_pat;
-	layer_table[l].image->mem_col_A		= mem_col_A;
-	layer_table[l].image->mem_col_B		= mem_col_B;
-	layer_table[l].image->mem_col_A24	= mem_col_A24;
-	layer_table[l].image->mem_col_B24	= mem_col_B24;
+	lp->mem_cols		= mem_cols;
+	lp->tool_pat		= tool_pat;
+	lp->mem_col_A		= mem_col_A;
+	lp->mem_col_B		= mem_col_B;
+	lp->mem_col_A24		= mem_col_A24;
+	lp->mem_col_B24		= mem_col_B24;
 
-	layer_table[l].image->mem_xpm_trans	= mem_xpm_trans;
-	layer_table[l].image->mem_xbm_hot_x	= mem_xbm_hot_x;
-	layer_table[l].image->mem_xbm_hot_y	= mem_xbm_hot_y;
+	lp->mem_xpm_trans	= mem_xpm_trans;
+	lp->mem_xbm_hot_x	= mem_xbm_hot_x;
+	lp->mem_xbm_hot_y	= mem_xbm_hot_y;
 
-	layer_table[l].image->mem_prot		= mem_prot;
+	lp->mem_prot		= mem_prot;
 }
 
 static void layer_copy_to_main( int l )		// Copy info from layer to main image
 {
-	int i;
+	layer_image *lp = layer_table[l].image;
 
-	for ( i=0; i<256; i++ )
-	{
-		mem_filename[i] = layer_table[l].image->mem_filename[i];
-		mem_pal[i] = layer_table[l].image->mem_pal[i];
-		mem_prot_RGB[i] = layer_table[l].image->mem_prot_RGB[i];
-		mem_prot_mask[i] = layer_table[l].image->mem_prot_mask[i];
-	}
-	for ( i=0; i<MAX_UNDO; i++ )
-	{
-		mem_undo_im[i] = layer_table[l].image->mem_undo_im[i];
-	}
+	memcpy(mem_filename, lp->mem_filename, 256);
+	memcpy(mem_pal, lp->mem_pal, sizeof(mem_pal));
+	memcpy(mem_prot_RGB, lp->mem_prot_RGB, sizeof(mem_prot_RGB));
+	memcpy(mem_prot_mask, lp->mem_prot_mask, sizeof(mem_prot_mask));
+	memcpy(mem_undo_im_, lp->mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
+	memcpy(mem_img, lp->mem_img, sizeof(chanlist));
 
-	mem_image	= layer_table[l].image->mem_image;
-	mem_image_bpp	= layer_table[l].image->mem_image_bpp;
-	mem_changed	= layer_table[l].image->mem_changed;
-	mem_width	= layer_table[l].image->mem_width;
-	mem_height	= layer_table[l].image->mem_height;
-	mem_ics 	= layer_table[l].image->mem_ics;
-	mem_icx 	= layer_table[l].image->mem_icx;
-	mem_icy 	= layer_table[l].image->mem_icy;
+	mem_img_bpp	= lp->mem_img_bpp;
+	mem_changed	= lp->mem_changed;
+	mem_width	= lp->mem_width;
+	mem_height	= lp->mem_height;
+	mem_ics 	= lp->mem_ics;
+	mem_icx 	= lp->mem_icx;
+	mem_icy 	= lp->mem_icy;
 
-	mem_undo_pointer = layer_table[l].image->mem_undo_pointer;
-	mem_undo_done	= layer_table[l].image->mem_undo_done;
-	mem_undo_redo	= layer_table[l].image->mem_undo_redo;
+	mem_undo_pointer = lp->mem_undo_pointer;
+	mem_undo_done	= lp->mem_undo_done;
+	mem_undo_redo	= lp->mem_undo_redo;
 
-	mem_cols	= layer_table[l].image->mem_cols;
-	tool_pat	= layer_table[l].image->tool_pat;
-	mem_col_A	= layer_table[l].image->mem_col_A;
-	mem_col_B	= layer_table[l].image->mem_col_B;
-	mem_col_A24	= layer_table[l].image->mem_col_A24;
-	mem_col_B24	= layer_table[l].image->mem_col_B24;
+	mem_cols	= lp->mem_cols;
+	tool_pat	= lp->tool_pat;
+	mem_col_A	= lp->mem_col_A;
+	mem_col_B	= lp->mem_col_B;
+	mem_col_A24	= lp->mem_col_A24;
+	mem_col_B24	= lp->mem_col_B24;
 
-	mem_xpm_trans	= layer_table[l].image->mem_xpm_trans;
-	mem_xbm_hot_x	= layer_table[l].image->mem_xbm_hot_x;
-	mem_xbm_hot_y	= layer_table[l].image->mem_xbm_hot_y;
+	mem_xpm_trans	= lp->mem_xpm_trans;
+	mem_xbm_hot_x	= lp->mem_xbm_hot_x;
+	mem_xbm_hot_y	= lp->mem_xbm_hot_y;
 
-	mem_prot	= layer_table[l].image->mem_prot;
+	mem_prot	= lp->mem_prot;
 }
 
 static void shift_layer(int val)
@@ -312,9 +300,9 @@ static gint layer_press_lower()
 
 
 void layer_new_chores( int l, int w, int h, int type, int cols,
-			unsigned char *rgb, layer_image *lim )
+			chanlist temp_img, layer_image *lim )
 {
-	int bpp = type, i, j, k;
+	int bpp = type, i, j;
 	png_color temp_pal[256];
 
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
@@ -334,14 +322,13 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	layer_table[l].opacity = 100;
 	layer_table[l].visible = TRUE;
 	layer_table[l].use_trans = TRUE;
-	layer_table[l].image = lim;
 
 	j = w * h * bpp;
 	i = 0;
 #ifdef U_GUADALINEX
 	if ( bpp == 3 ) i = 255;
 #endif
-	for ( k=0; k<j; k++ ) rgb[k] = i;
+	memset(temp_img[CHN_IMAGE], i, j);
 
 	if ( type == 2 )	// Greyscale
 	{
@@ -351,54 +338,54 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 #else
 		mem_scale_pal( 0, 0,0,0, cols-1, 255,255,255 );
 #endif
-		mem_pal_copy( layer_table[l].image->mem_pal, mem_pal );
+		mem_pal_copy( lim->mem_pal, mem_pal );
 		mem_pal_copy( temp_pal, mem_pal );		// Restore
 	}
-	else mem_pal_copy( layer_table[l].image->mem_pal, mem_pal_def );
+	else mem_pal_copy( lim->mem_pal, mem_pal_def );
 
-	sprintf( layer_table[l].image->mem_filename, _("Untitled") );
+	sprintf( lim->mem_filename, _("Untitled") );
 
-	layer_table[l].image->mem_image = rgb;
-	layer_table[l].image->mem_image_bpp = bpp;
-	layer_table[l].image->mem_changed = 0;
-	layer_table[l].image->mem_width = w;
-	layer_table[l].image->mem_height = h;
-	layer_table[l].image->mem_ics = 0;
-	layer_table[l].image->mem_icx = 0;
-	layer_table[l].image->mem_icy = 0;
+	memset(lim->mem_img, 0, sizeof(chanlist));
+	memcpy(lim->mem_img, temp_img, sizeof(chanlist));
+	lim->mem_img_bpp = bpp;
+	lim->mem_changed = 0;
+	lim->mem_width = w;
+	lim->mem_height = h;
+	lim->mem_ics = 0;
+	lim->mem_icx = 0;
+	lim->mem_icy = 0;
 
-	layer_table[l].image->mem_undo_pointer = 0;
-	layer_table[l].image->mem_undo_done = 0;
-	layer_table[l].image->mem_undo_redo = 0;
+	lim->mem_undo_pointer = 0;
+	lim->mem_undo_done = 0;
+	lim->mem_undo_redo = 0;
 
-	for ( i=1; i<MAX_UNDO; i++ )
-		layer_table[l].image->mem_undo_im[i].image = NULL;
+	memset(lim->mem_undo_im_, 0, sizeof(undo_item) * MAX_UNDO);
 
-	layer_table[l].image->mem_undo_im[0].image = rgb;
-	layer_table[l].image->mem_undo_im[0].cols = cols;
-	layer_table[l].image->mem_undo_im[0].bpp = bpp;
-	layer_table[l].image->mem_undo_im[0].width = w;
-	layer_table[l].image->mem_undo_im[0].height = h;
-	mem_pal_copy( layer_table[l].image->mem_undo_im[0].pal, layer_table[l].image->mem_pal );
+	memcpy(lim->mem_undo_im_[0].img, temp_img, sizeof(chanlist));
+	lim->mem_undo_im_[0].cols = cols;
+	lim->mem_undo_im_[0].bpp = bpp;
+	lim->mem_undo_im_[0].width = w;
+	lim->mem_undo_im_[0].height = h;
+	mem_pal_copy(lim->mem_undo_im_[0].pal, lim->mem_pal);
 
-	layer_table[l].image->mem_cols = cols;
-	layer_table[l].image->tool_pat = 0;
-	layer_table[l].image->mem_col_A = 1;
-	layer_table[l].image->mem_col_B = 0;
-	layer_table[l].image->mem_col_A24 = layer_table[l].image->mem_pal[1];
-	layer_table[l].image->mem_col_B24 = layer_table[l].image->mem_pal[0];
+	lim->mem_cols = cols;
+	lim->tool_pat = 0;
+	lim->mem_col_A = 1;
+	lim->mem_col_B = 0;
+	lim->mem_col_A24 = lim->mem_pal[1];
+	lim->mem_col_B24 = lim->mem_pal[0];
 	for ( i=0; i<256; i++ )
 	{
-		layer_table[l].image->mem_prot_RGB[i] = 0;
-		layer_table[l].image->mem_prot_mask[i] = 0;
+		lim->mem_prot_RGB[i] = 0;
+		lim->mem_prot_mask[i] = 0;
 	}
-	layer_table[l].image->mem_prot = 0;
+	lim->mem_prot = 0;
 
-	layer_table[l].image->mem_xpm_trans = -1;
-	layer_table[l].image->mem_xbm_hot_x = -1;
-	layer_table[l].image->mem_xbm_hot_y = -1;
+	lim->mem_xpm_trans = -1;
+	lim->mem_xbm_hot_x = -1;
+	lim->mem_xbm_hot_y = -1;
 
-	layer_table[l].image->ani_pos[0][0] = 0;
+	lim->ani_pos[0][0] = 0;
 }
 
 void layer_new_chores2( int l )
@@ -434,6 +421,7 @@ void layer_new_chores2( int l )
 void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3=RGB
 {
 	int bpp=type;
+	chanlist temp_img;
 	layer_image *lim;
 	unsigned char *rgb;
 
@@ -461,9 +449,11 @@ void layer_new( int w, int h, int type, int cols )	// Types 1=indexed, 2=grey, 3
 		memory_errors(1);
 		return;
 	}
+	memset(temp_img, 0, sizeof(chanlist));
+	temp_img[CHN_IMAGE] = rgb;
 	layers_total++;
 
-	layer_new_chores( layers_total, w, h, type, cols, rgb, lim );
+	layer_new_chores( layers_total, w, h, type, cols, temp_img, lim );
 	layer_new_chores2( layers_total );
 	layer_selected = layers_total;
 	men_item_state( menu_frames, TRUE );
@@ -481,8 +471,8 @@ static gint layer_press_new()
 static gint layer_press_duplicate()
 {
 	layer_image *lim;
-	unsigned char *rgb, *rgb_o = mem_image;
-	int w = mem_width, h = mem_height, bpp = mem_image_bpp, cols = mem_cols, i, j;
+	chanlist temp_img;
+	int w = mem_width, h = mem_height, bpp = mem_img_bpp, cols = mem_cols, i, j;
 
 	if ( layers_total>=MAX_LAYERS ) return FALSE;
 
@@ -493,22 +483,26 @@ static gint layer_press_duplicate()
 	if ( layers_total == 0 ) layer_table[0].image = malloc( sizeof(layer_image) );
 	layer_copy_from_main( layer_selected );
 
-	rgb = malloc( w*h*bpp );
-	if ( rgb == NULL )
+	lim = malloc( sizeof(layer_image) );
+	if (!lim)
 	{
 		memory_errors(1);
 		goto end;
 	}
-	lim = malloc( sizeof(layer_image) );
-	if ( lim == NULL )
+	memset(temp_img, 0, sizeof(chanlist));
+	j = mem_width * mem_height;
+	for (i = 0; i < NUM_CHANNELS; i++)
 	{
-		free(rgb);
+		if (!mem_img[i]) continue;
+		if ((temp_img[i] = malloc(j * BPP(i)))) continue;
+		free(lim);
+		for (j = 0; j < i; j++) free(temp_img[j]);
 		memory_errors(1);
 		goto end;
 	}
 	layers_total++;
 
-	layer_new_chores( layers_total, w, h, bpp, cols, rgb, lim);
+	layer_new_chores( layers_total, w, h, bpp, cols, temp_img, lim);
 
 	layer_table[layers_total] = layer_table[layer_selected];		// Copy layer info
 	layer_table[layers_total].image = lim;
@@ -523,8 +517,12 @@ static gint layer_press_duplicate()
 			layer_table[layer_selected].image->mem_prot_mask[i];
 	}
 
-	j = w*h*bpp;
-	for ( i=0; i<j; i++ ) rgb[i] = rgb_o[i];		// Copy image pixels
+	j = mem_width * mem_height;
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!mem_img[i]) continue;
+		memcpy(temp_img[i], mem_img[i], j * BPP(i));
+	}
 	sprintf( layer_table[layers_total].image->mem_filename,
 		layer_table[layer_selected].image->mem_filename );
 
@@ -546,17 +544,15 @@ end:
 
 static void layer_delete(int item)
 {
+	layer_image *lp = layer_table[item].image;
 	int i;
 
 	for (i=0; i<MAX_UNDO; i++)		// Release old UNDO images
-		if ( layer_table[item].image->mem_undo_im[i].image!=NULL )
-		{
-			free( layer_table[item].image->mem_undo_im[i].image );
-		}
+		undo_free_x(&lp->mem_undo_im_[i]);
 
 	free( layer_table[item].image );
 
-	if ( item<layers_total )		// If deleted item is not at the end shuffle rest down
+	if (item < layers_total)	// If deleted item is not at the end shuffle rest down
 		for ( i=item; i<layers_total; i++ )
 			layer_table[i] = layer_table[i+1];
 
@@ -757,7 +753,6 @@ fail:
 int load_layers( char *file_name )
 {
 	char tin[300], load_prefix[300], load_name[300], *c;
-	unsigned char *lim;
 	layer_image *lim2;
 	int i, j, k=0, layers_to_read = -1, layer_file_version = -1;
 	FILE *fp;
@@ -840,10 +835,13 @@ int load_layers( char *file_name )
 
 				layers_total++;
 
+				// Bogus 1x1 image used
 				mem_width = 1;
 				mem_height = 1;
-				mem_image = malloc(3);
-				mem_undo_im[0].image = mem_image;	// Bogus 1x1 image used
+				memset(mem_img, 0, sizeof(chanlist));
+				memset(&mem_undo_im_[0].img, 0, sizeof(chanlist));
+				mem_undo_im_[0].img[CHN_IMAGE] =
+					mem_img[CHN_IMAGE] = malloc(3);
 			}
 		}
 		else		// Failed to load file
@@ -855,9 +853,8 @@ int load_layers( char *file_name )
 	{
 		layers_total--;
 
-		lim = mem_image;
+		mem_clear();	// Lose excess bogus memory
 		layer_copy_to_main(layers_total);
-		free( lim );				// Lose excess bogus memory
 		if ( layers_total == 0 )
 		{	// You will need to free the memory holding first layer if just 1 was loaded
 			free( layer_table[0].image );
@@ -1036,7 +1033,7 @@ static void update_main_with_new_layer()
 
 	update_titlebar();
 	update_menus();
-	if ( tool_type == TOOL_SMUDGE && mem_image_bpp == 1 )
+	if ((tool_type == TOOL_SMUDGE) && (MEM_BPP == 1))
 		gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 }

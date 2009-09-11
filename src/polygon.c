@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -170,12 +170,11 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 					for ( i2=poly_cuts[i]-poly_min_x; i2<=poly_cuts[i+1]-poly_min_x; 	i2++ )
 						mem_clip_mask[ i2 + j3  ] = 0;
 				}
-				if ( type == 1 )
+				else
+				{
 					for ( i2=poly_cuts[i]; i2<=poly_cuts[i+1]; i2++ )
-						PUT_PIXEL( i2, j )
-				if ( type == 3 )
-					for ( i2=poly_cuts[i]; i2<=poly_cuts[i+1]; i2++ )
-						PUT_PIXEL24( i2, j )
+						put_pixel( i2, j );
+				}
 			}
 		}
 	}
@@ -188,12 +187,12 @@ void poly_mask()		// Paint polygon onto clipboard mask
 
 void poly_paint()		// Paint polygon onto image - poly_init() must have been called
 {
-	poly_draw(mem_image_bpp);
+	poly_draw(MEM_BPP);
 }
 
 void poly_outline()		// Paint polygon outline onto image
 {
-	poly_draw(mem_image_bpp+10);
+	poly_draw(MEM_BPP + 10);
 }
 
 void poly_add(int x, int y)	// Add point to list
@@ -411,21 +410,10 @@ void poly_lasso_cut()		// Cut out area that was just lasso'd
 	for ( j=mem_clip_y; j<(mem_clip_y + mem_clip_h); j++ )		// Cut out area
 	{
 		offm = (j - mem_clip_y) * mem_clip_w;
-		if ( mem_image_bpp == 1 )
+		for ( i=mem_clip_x; i<(mem_clip_x + mem_clip_w); i++ )
 		{
-			for ( i=mem_clip_x; i<(mem_clip_x + mem_clip_w); i++ )
-			{
-				if ( mem_clip_mask[offm++] != 255 )
-					PUT_PIXEL(i, j)
-			}
-		}
-		if ( mem_image_bpp == 3 )
-		{
-			for ( i=mem_clip_x; i<(mem_clip_x + mem_clip_w); i++ )
-			{
-				if ( mem_clip_mask[offm++] != 255 )
-					PUT_PIXEL24(i, j)
-			}
+			if ( mem_clip_mask[offm++] != 255 )
+				put_pixel(i, j);
 		}
 	}
 }

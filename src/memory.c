@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2006 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -19,6 +19,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include <png.h>
 
 #include "global.h"
@@ -42,34 +43,36 @@ int tint_mode[3] = {0,0,0};		// [0] = off/on, [1] = add/subtract, [2] = button (
 /// IMAGE
 
 char mem_filename[256];			// File name of file loaded/saved
-unsigned char *mem_image = NULL;	// Pointer to malloc'd memory with byte by byte image data
-int mem_image_bpp = 0;			// Bytes per pixel = 1 or 3
-int mem_changed = 0;			// Changed since last load/save flag 0=no, 1=changed
-int mem_width = 0, mem_height = 0;
+chanlist mem_img;			// Array of pointers to image channels
+int mem_channel = CHN_IMAGE;		// Current active channel
+int mem_img_bpp;			// Bytes per pixel = 1 or 3
+int mem_changed;			// Changed since last load/save flag 0=no, 1=changed
+int mem_width, mem_height;
 float mem_icx = 0.5, mem_icy = 0.5;	// Current centre x,y
-int mem_ics = 0;			// Has the centre been set by the user? 0=no 1=yes
+int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
 int mem_background = 180;		// Non paintable area
 
-unsigned char *mem_clipboard = NULL;	// Pointer to clipboard data
-unsigned char *mem_clip_mask = NULL;	// Pointer to clipboard mask
-unsigned char *mem_brushes = NULL;	// Preset brushes screen memory
+unsigned char *mem_clipboard;		// Pointer to clipboard data
+unsigned char *mem_clip_mask;		// Pointer to clipboard mask
+unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
+unsigned char *mem_brushes;		// Preset brushes screen memory
 int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
 char mem_clip_file[2][256];		// 0=Current filename, 1=temp filename
-int mem_clip_bpp = 0;			// Bytes per pixel
+int mem_clip_bpp;			// Bytes per pixel
 int mem_clip_w = -1, mem_clip_h = -1;	// Clipboard geometry
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-int mem_preview = 0;			// Preview an RGB change
+int mem_preview;			// Preview an RGB change
 int mem_prev_bcsp[5];			// BR, CO, SA, POSTERIZE
 
 undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
 
-int mem_undo_pointer = 0;		// Pointer to currently used image on canas/screen
-int mem_undo_done = 0;		// Undo images that we have behind current image (i.e. possible UNDO)
-int mem_undo_redo = 0;		// Undo images that we have ahead of current image (i.e. possible REDO)
+int mem_undo_pointer;		// Pointer to currently used image on canas/screen
+int mem_undo_done;		// Undo images that we have behind current image (i.e. possible UNDO)
+int mem_undo_redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
 int mem_undo_limit = 32;	// Max MB memory allocation limit
-int mem_undo_opacity = 0;	// Use previous image for opacity calculations?
+int mem_undo_opacity;		// Use previous image for opacity calculations?
 
 /// GRID
 
@@ -85,12 +88,12 @@ unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
 
 int tool_type = TOOL_SQUARE;		// Currently selected tool
 int tool_size = 1, tool_flow = 1;
-int tool_opacity = 100;			// Transparency - 100=solid
-int tool_pat = 0;			// Tool pattern number
+int tool_opacity = 255;			// Opacity - 255 = solid
+int tool_pat;				// Tool pattern number
 int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
-int pen_down = 0;			// Are we drawing? - Used to see if we need to do an UNDO
-int tool_ox = 0, tool_oy = 0;		// Previous tool coords - used by continuous mode
-int mem_continuous = 0;			// Area we painting the static shapes continuously?
+int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
+int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
+int mem_continuous;			// Area we painting the static shapes continuously?
 
 int mem_brcosa_allow[3];		// BRCOSA RGB
 
@@ -105,7 +108,7 @@ int mem_jpeg_quality = 85;		// JPEG quality setting
 /// PALETTE
 
 png_color mem_pal[256];			// RGB entries for all 256 palette colours
-int mem_cols = 0;			// Number of colours in the palette: 2..256 or 0 for no image
+int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
 int mem_col_A = 1, mem_col_B = 0;	// Index for colour A & B
 png_color mem_col_A24, mem_col_B24;	// RGB for colour A & B
 char *mem_pals = NULL;			// RGB screen memory holding current palette
@@ -354,50 +357,74 @@ char mem_numbers[10][7][7] = { {
 	{0,0,1,1,1,0,0}
 } };
 
+void undo_free_x(undo_item *undo)
+{
+	int i;
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!undo->img[i]) continue;
+		if (undo->img[i] != (void *)(-1)) free(undo->img[i]);
+		undo->img[i] = NULL;
+	}
+}
+
+void undo_free(int idx)
+{
+	undo_free_x(&mem_undo_im_[idx]);
+}
+
+void mem_clear()
+{
+	int i;
+
+	for (i = 0; i < MAX_UNDO; i++)		// Release old UNDO images
+		undo_free(i);
+	memset(mem_img, 0, sizeof(chanlist));	// Already freed along with UNDO
+}
 
 int mem_new( int width, int height, int bpp )	// Allocate space for new image, removing old if needed
 {
-	int i, j, k, res=0;
+	undo_item *undo = &mem_undo_im_[0];
+	int i, j, res = 0;
 
-	for (i=0; i<MAX_UNDO; i++)		// Release old UNDO images
-		if ( mem_undo_im[i].image!=NULL )
-		{
-			free( mem_undo_im[i].image );
-			mem_undo_im[i].image = NULL;
-		}
-
-	mem_image = malloc( width*height*bpp );
-	if ( mem_image == NULL )		// System was unable to allocate as requested
-	{
-		width = 8;
-		height = 8;			// 8x8 is bound to work!
-		res = 1;
-		mem_image = malloc( width*height*bpp );
-	}
+	mem_clear();
 
 	j = width * height * bpp;
+	mem_img[CHN_IMAGE] = malloc(j);
+	if (!mem_img[CHN_IMAGE])	// Not enough memory
+	{
+		width = 8;
+		height = 8;		// 8x8 is bound to work!
+		res = 1;
+		j = width * height * bpp;
+		mem_img[CHN_IMAGE] = malloc(j);
+	}
+
 	i = 0;
 #ifdef U_GUADALINEX
 	if ( bpp == 3 ) i = 255;
 #endif
-	for ( k=0; k<j; k++ ) mem_image[k] = i;
+	memset(mem_img[CHN_IMAGE], i, j);
 
 	mem_width = width;
 	mem_height = height;
-	mem_image_bpp = bpp;
+	mem_img_bpp = bpp;
+	mem_channel = CHN_IMAGE;
 
 	mem_undo_pointer = 0;
 	mem_undo_done = 0;
 	mem_undo_redo = 0;
 
-	mem_undo_im[0].image = mem_image;
-	mem_undo_im[0].cols = mem_cols;
-	mem_undo_im[0].bpp = mem_image_bpp;
-	mem_undo_im[0].width = width;
-	mem_undo_im[0].height = height;
-	mem_pal_copy( mem_undo_im[0].pal, mem_pal );
+	memcpy(undo->img, mem_img, sizeof(chanlist));
+	undo->cols = mem_cols;
+	undo->bpp = mem_img_bpp;
+	undo->width = width;
+	undo->height = height;
+	mem_pal_copy(undo->pal, mem_pal);
 
-	mem_col_A = 1, mem_col_B = 0;
+	mem_col_A = 1;
+	mem_col_B = 0;
 	mem_col_A24 = mem_pal[mem_col_A];
 	mem_col_B24 = mem_pal[mem_col_B];
 
@@ -408,31 +435,29 @@ int mem_new( int width, int height, int bpp )	// Allocate space for new image, r
 
 unsigned char *mem_undo_previous()	// Get address of previous image (or current if none)
 {
-	int i = mem_undo_pointer - 1;
+	unsigned char *res;
+	int i;
 
-	if ( mem_undo_done < 1 ) return mem_image;	// No undo so use current
-	if ( i<0 ) i=i + MAX_UNDO;
-
-	return mem_undo_im[i].image;
+	i = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
+	res = mem_undo_im_[i].img[mem_channel];
+	if (!res || (res == (void *)(-1)))
+		res = mem_img[mem_channel];	// No undo so use current
+	return (res);
 }
 
 void lose_oldest()				// Lose the oldest undo image
 {						// Pre-requisite: mem_undo_done > 0
-	int t_po = (mem_undo_pointer - mem_undo_done + MAX_UNDO) % MAX_UNDO;
-		// Lose oldest image in an attempt to get under the limit
-	if ( mem_undo_im[t_po].image != NULL )
-	{
-		free(mem_undo_im[t_po].image);
-		mem_undo_im[t_po].image = NULL;
-	}
-
+	undo_free((mem_undo_pointer - mem_undo_done + MAX_UNDO) % MAX_UNDO);
 	mem_undo_done--;
 }
 
-int undo_next_core( int handle, int new_width, int new_height, int x_start, int y_start, int new_bpp )
+int undo_next_core(int handle, int new_width, int new_height,
+	int x_start, int y_start, int new_bpp, int cmask)
 {
-	char *old_image, *new_image;
-	int i, j, t_po;
+	undo_item *undo;
+	unsigned char *img;
+	chanlist holder;
+	int i, j, k, mem_req, mem_lim;
 
 	notify_changed();
 	if ( pen_down == 0 )
@@ -440,140 +465,182 @@ int undo_next_core( int handle, int new_width, int new_height, int x_start, int 
 		pen_down = 1;
 //printf("Old undo # = %i\n", mem_undo_pointer);
 
-		if ( mem_undo_redo > 0 )		// Release any redundant redo images
+		/* Release redo data */
+		if (mem_undo_redo)
 		{
-			t_po = (mem_undo_pointer + 1) % MAX_UNDO;
-			for ( i=1; i<=mem_undo_redo; i++ )
+			k = mem_undo_pointer;
+			for (i = 0; i < mem_undo_redo; i++)
 			{
-				if ( mem_undo_im[t_po].image != NULL )
-				{
-					free(mem_undo_im[t_po].image);
-					mem_undo_im[t_po].image = NULL;
-				}
-				t_po = (t_po + 1) % MAX_UNDO;
+				k = (k + 1) % MAX_UNDO;
+				undo_free(k);
 			}
 			mem_undo_redo = 0;
 		}
 
-		while ( (mem_used() + new_width*new_height*new_bpp ) >
-			(mem_undo_limit*1024*1024/(layers_total+1)) )
-		{		// We have exceeded MB limit, release any excess images
-			if ( mem_undo_done == 0 ) return 1;
-				// Return with no undo done as this image is just too big
+		mem_req = 0;
+		if (cmask)
+		{
+			for (i = j = 0; i < NUM_CHANNELS; i++)
+			{
+				if (mem_img[i] && (cmask & (1 << i))) j++;
+			}
+			if (cmask & CMASK_IMAGE) j += new_bpp - 1;
+			mem_req = (new_width * new_height + 32) * j;
+		}
+		mem_lim = (mem_undo_limit * (1024 * 1024)) / (layers_total + 1);
+
+		/* Mem limit exceeded - drop oldest */
+		while (mem_used() + mem_req > mem_lim)
+		{
+			/* Fail if not enough memory */
+			if (!mem_undo_done) return (1);
 			lose_oldest();
 		}
 
-		old_image = mem_undo_im[mem_undo_pointer].image;
-
-		mem_undo_im[mem_undo_pointer].cols = mem_cols;
-		mem_pal_copy( mem_undo_im[mem_undo_pointer].pal, mem_pal );	// Copy palette to undo
-
-		if (mem_undo_done >= (MAX_UNDO-1))
-		{				// Maximum undo reached, so lose the MAX_UNDO'th image
-			t_po = (mem_undo_pointer + 1) % MAX_UNDO;
-			if ( mem_undo_im[t_po].image != NULL )
-			{
-				free(mem_undo_im[t_po].image);
-				mem_undo_im[t_po].image = NULL;
-			}
-		}
-		else	mtMIN(mem_undo_done, mem_undo_done+1, MAX_UNDO-1);
-
-		new_image = malloc( new_bpp*new_width*new_height );			// Grab memory
-		while ( new_image == NULL )
+		/* Fill undo frame */
+		undo = &mem_undo_im_[mem_undo_pointer];
+		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-			if ( mem_undo_done == 0 )
-			{
-//				if ( handle == 0 )
-//				{
-//					printf("The system has no spare memory to give the mem_undo_next procedure for a canvas - bailing out\n");
-//					exit(1);
-//				}
-//				else
-					return 2;
-			}
-			lose_oldest();
-			new_image = malloc( new_bpp*new_width*new_height );	// Grab memory
+			img = mem_img[i];
+			if (img && !(cmask & (1 << i))) img = (void *)(-1);
+			undo->img[i] = img;
 		}
+		undo->cols = mem_cols;
+		mem_pal_copy(undo->pal, mem_pal);
+		undo->width = mem_width;
+		undo->height = mem_height;
+		undo->bpp = mem_img_bpp;
 
-		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;		// New pointer
-
-		mem_image = new_image;
-		mem_undo_im[mem_undo_pointer].image = mem_image;
-		mem_undo_im[mem_undo_pointer].width = new_width;
-		mem_undo_im[mem_undo_pointer].height = new_height;
-		mem_undo_im[mem_undo_pointer].cols = mem_cols;
-		mem_undo_im[mem_undo_pointer].bpp = new_bpp;
-		mem_pal_copy( mem_undo_im[mem_undo_pointer].pal, mem_pal );
-
-		if ( handle == 0 )
-			for ( i=0; i<(new_width*new_height*new_bpp); i++ ) new_image[i] = old_image[i];
-				// Copy image
-
-		if ( handle == 1 )		// Cropping
+		/* Duplicate affected channels */
+		mem_req = new_width * new_height;
+		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-			if ( mem_image_bpp == 1 )
-				for ( j=0; j<new_height; j++ )
-					for ( i=0; i<new_width; i++ )
-						new_image[i + j*new_width] =
-							old_image[ x_start + i
-							+ mem_width*(j + y_start) ];
-			if ( mem_image_bpp == 3 )
-				for ( j=0; j<new_height; j++ )
-					for ( i=0; i<new_width; i++ )
+			holder[i] = img = mem_img[i];
+			if (!img || (undo->img[i] != img)) continue;
+			mem_lim = mem_req;
+			if (i == CHN_IMAGE) mem_lim *= new_bpp;
+			while (!((img = malloc(mem_lim))))
+			{
+				if (!mem_undo_done)
+				{
+#if 0
+					if (handle == 0)
 					{
-						new_image[ 3*(i + j*new_width) ] =
-							old_image[ 3*(x_start + i
-							+ mem_width*(j + y_start)) ];
-						new_image[ 1 + 3*(i + j*new_width) ] =
-							old_image[ 1 + 3*(x_start + i
-							+ mem_width*(j + y_start)) ];
-						new_image[ 2 + 3*(i + j*new_width) ] =
-							old_image[ 2 + 3*(x_start + i
-							+ mem_width*(j + y_start)) ];
+						printf("No memory for undo!\n");
+						exit(1);
 					}
+#endif
+					/* Release memory and fail */
+					for (j = 0; j < i; j++)
+					{
+						if (holder[j] != mem_img[j])
+							free(holder[j]);
+					}
+					return (2);
+				}
+				lose_oldest();
+			}
+			holder[i] = img;
+			/* Copy */
+			if (!handle) memcpy(img, undo->img[i], mem_lim);
 		}
 
-		if ( handle == 2 )		// Dummy Handle used when not cropping
-		{
-		}
-
+		/* Commit */
+		memcpy(mem_img, holder, sizeof(chanlist));
 		mem_width = new_width;
 		mem_height = new_height;
-		mem_image_bpp = new_bpp;
+		mem_img_bpp = new_bpp;
+		
+		if (mem_undo_done >= MAX_UNDO - 1)
+			undo_free((mem_undo_pointer + 1) % MAX_UNDO);
+		else mtMIN(mem_undo_done, mem_undo_done + 1, MAX_UNDO - 1);
+
+		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
+		memcpy(mem_undo_im_[mem_undo_pointer].img, holder, sizeof(chanlist));
 //printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 
-	return 0;
+	return (0);
 }
 
-void mem_undo_next(int mode)	// Call this after a draw event but before any changes to image
+// Call this after a draw event but before any changes to image
+int mem_undo_next(int mode)
 {
-	undo_next_core( 0, mem_width, mem_height, 0, 0, mem_image_bpp );
+	int cmask = CMASK_ALL;
+
+	switch (mode)
+	{
+	case UNDO_PAL: /* Palette changes */
+		cmask = CMASK_NONE;
+		break;
+	case UNDO_XPAL: /* Palette and indexed image changes */
+		cmask = mem_img_bpp == 1 ? CMASK_IMAGE : CMASK_NONE;
+		break;
+	case UNDO_COL: /* Palette and/or RGB image changes */
+		cmask = mem_img_bpp == 3 ? CMASK_IMAGE : CMASK_NONE;
+		break;
+	case UNDO_DRAW: /* Changes to current channel / RGBA */
+		cmask = mem_channel == CHN_IMAGE ? CMASK_RGBA : CMASK_CURR;
+		break;
+	case UNDO_INV: /* "Invert" operation */
+		if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
+			cmask = CMASK_NONE;
+		else cmask = CMASK_CURR;
+		break;
+	case UNDO_XFORM: /* Changes to all channels */
+		cmask = CMASK_ALL;
+		break;
+	case UNDO_FILT: /* Changes to current channel */
+		cmask = CMASK_CURR;
+		break;
+	}
+	return (undo_next_core(0, mem_width, mem_height, 0, 0, mem_img_bpp, cmask));
+}
+
+void mem_undo_swap(int old, int new)
+{
+	undo_item *curr, *prev;
+	int i;
+
+	curr = &mem_undo_im_[old];
+	prev = &mem_undo_im_[new];
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		curr->img[i] = mem_img[i];
+		if (prev->img[i] == (void *)(-1)) curr->img[i] = (void *)(-1);
+		else mem_img[i] = prev->img[i];
+	}
+
+	curr->width = mem_width;
+	curr->height = mem_height;
+	curr->cols = mem_cols;
+	curr->bpp = mem_img_bpp;
+	mem_pal_copy(curr->pal, mem_pal);
+
+	mem_width = prev->width;
+	mem_height = prev->height;
+	mem_cols = prev->cols;
+	mem_img_bpp = prev->bpp;
+	mem_pal_copy(mem_pal, prev->pal);
+
+	if ( mem_col_A >= mem_cols ) mem_col_A = 0;
+	if ( mem_col_B >= mem_cols ) mem_col_B = 0;
 }
 
 void mem_undo_backward()		// UNDO requested by user
 {
+	int i;
+
 	if ( mem_undo_done > 0 )
 	{
 //printf("UNDO!!! Old undo # = %i\n", mem_undo_pointer);
-		mem_undo_im[mem_undo_pointer].cols = mem_cols;
-		mem_pal_copy( mem_undo_im[mem_undo_pointer].pal, mem_pal );
-
+		i = mem_undo_pointer;
 		mem_undo_pointer = (mem_undo_pointer - 1 + MAX_UNDO) % MAX_UNDO;	// New pointer
-
-		mem_image = mem_undo_im[mem_undo_pointer].image;
-		mem_width = mem_undo_im[mem_undo_pointer].width;
-		mem_height = mem_undo_im[mem_undo_pointer].height;
-		mem_cols = mem_undo_im[mem_undo_pointer].cols;
-		mem_image_bpp = mem_undo_im[mem_undo_pointer].bpp;
-		mem_pal_copy( mem_pal, mem_undo_im[mem_undo_pointer].pal );
+		mem_undo_swap(i, mem_undo_pointer);
 
 		mem_undo_done--;
 		mem_undo_redo++;
-
-		if ( mem_col_A >= mem_cols ) mem_col_A = 0;
-		if ( mem_col_B >= mem_cols ) mem_col_B = 0;
 //printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 	pen_down = 0;
@@ -581,29 +648,39 @@ void mem_undo_backward()		// UNDO requested by user
 
 void mem_undo_forward()			// REDO requested by user
 {
+	int i;
+
 	if ( mem_undo_redo > 0 )
 	{
 //printf("REDO!!! Old undo # = %i\n", mem_undo_pointer);
-		mem_undo_im[mem_undo_pointer].cols = mem_cols;
-		mem_pal_copy( mem_undo_im[mem_undo_pointer].pal, mem_pal );
-
+		i = mem_undo_pointer;
 		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;		// New pointer
-
-		mem_image = mem_undo_im[mem_undo_pointer].image;
-		mem_width = mem_undo_im[mem_undo_pointer].width;
-		mem_height = mem_undo_im[mem_undo_pointer].height;
-		mem_cols = mem_undo_im[mem_undo_pointer].cols;
-		mem_image_bpp = mem_undo_im[mem_undo_pointer].bpp;
-		mem_pal_copy( mem_pal, mem_undo_im[mem_undo_pointer].pal );
+		mem_undo_swap(i, mem_undo_pointer);
 
 		mem_undo_done++;
 		mem_undo_redo--;
-
-		if ( mem_col_A >= mem_cols ) mem_col_A = 0;
-		if ( mem_col_B >= mem_cols ) mem_col_B = 0;
 //printf("New undo # = %i\n\n", mem_undo_pointer);
 	}
 	pen_down = 0;
+}
+
+int mem_undo_size(undo_item *undo)
+{
+	int i, j, k, total = 0;
+
+	for (i = 0; i < MAX_UNDO; i++)
+	{
+		k = undo->width * undo->height + 32;
+		for (j = 0; j < NUM_CHANNELS; j++)
+		{
+			if (!undo->img[j] || (undo->img[j] == (void *)(-1)))
+				continue;
+			total += j == CHN_IMAGE ? k * undo->bpp : k;
+		}
+		undo++;
+	}
+
+	return total;
 }
 
 int valid_file( char *filename )		// Can this file be opened for reading?
@@ -623,17 +700,17 @@ int valid_file( char *filename )		// Can this file be opened for reading?
 char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
 {
 	char *chunk;
-	int i;
 
 	chunk = malloc( size );
 	
-	if (chunk != NULL) for ( i=0; i<size; i++ ) chunk[i] = byte;
+	if (chunk) memset(chunk, byte, size);
 
 	return chunk;
 }
 
 void mem_init()					// Initialise memory
 {
+	unsigned char *dest;
 	char txt[300];
 	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
@@ -691,12 +768,13 @@ void mem_init()					// Initialise memory
 	mem_col_A24.blue = ( (255 - mem_col_B24.blue) >> 7 ) * 255;
 */
 
-	j = mem_width*mem_height*3;
-	for ( i=0; i<j; i=i+3 )
+	j = mem_width * mem_height;
+	dest = mem_img[CHN_IMAGE];
+	for (i = 0; i < j; i++)
 	{
-		mem_image[i] = mem_col_B24.red;
-		mem_image[i+1] = mem_col_B24.green;
-		mem_image[i+2] = mem_col_B24.blue;
+		*dest++ = mem_col_B24.red;
+		*dest++ = mem_col_B24.green;
+		*dest++ = mem_col_B24.blue;
 	}
 
 	mem_pat_update();
@@ -713,19 +791,16 @@ void mem_init()					// Initialise memory
 		if ( bt == TOOL_CIRCLE ) f_circle( ix, iy, bs );
 		if ( bt == TOOL_VERTICAL ) f_rectangle( ix, iy - bs/2, 1, bs );
 		if ( bt == TOOL_HORIZONTAL ) f_rectangle( ix - bs/2, iy, bs, 1 );
-		if ( bt == TOOL_SLASH ) for ( j=0; j<bs; j++ ) PUT_PIXEL24( ix-bs/2+j, iy+bs/2-j )
-		if ( bt == TOOL_BACKSLASH ) for ( j=0; j<bs; j++ ) PUT_PIXEL24( ix+bs/2-j, iy+bs/2-j )
+		if ( bt == TOOL_SLASH ) for ( j=0; j<bs; j++ ) put_pixel( ix-bs/2+j, iy+bs/2-j );
+		if ( bt == TOOL_BACKSLASH ) for ( j=0; j<bs; j++ ) put_pixel( ix+bs/2-j, iy+bs/2-j );
 		if ( bt == TOOL_SPRAY )
 			for ( j=0; j<bf*3; j++ )
-				PUT_PIXEL24( ix-bs/2 + rand() % bs, iy-bs/2 + rand() % bs )
+				put_pixel( ix-bs/2 + rand() % bs, iy-bs/2 + rand() % bs );
 	}
 
 	j = 3*PATCH_WIDTH*PATCH_HEIGHT;
-	for ( i=0; i<j; i++ )
-	{
-		mem_brushes[i] = mem_image[i];		// Store image for later use
-		mem_image[i] = 0;			// Clear so user doesn't see it upon load fail
-	}
+	memcpy(mem_brushes, mem_img[CHN_IMAGE], j);	// Store image for later use
+	memset(mem_img[CHN_IMAGE], 0, j);	// Clear so user doesn't see it upon load fail
 
 	mem_set_brush(36);		// Initial brush
 }
@@ -923,13 +998,14 @@ void mem_mask_setall(char val)
 	for (i=0; i<256; i++) mem_prot_mask[i] = val;
 }
 
-void mem_get_histogram()		// Calculate how many of each colour index is on the canvas
+void mem_get_histogram(int channel)	// Calculate how many of each colour index is on the canvas
 {
-	int i, j = mem_width*mem_height;
+	int i, j = mem_width * mem_height;
+	unsigned char *img = mem_img[channel];
 
-	for ( i=0; i<256; i++ ) mem_histogram[i] = 0;
+	memset(mem_histogram, 0, sizeof(mem_histogram));
 
-	for ( i=0; i<j; i++ ) mem_histogram[ mem_image[i] ]++;
+	for (i = 0; i < j; i++) mem_histogram[*img++]++;
 }
 
 void mem_gamma_chunk( unsigned char *rgb, int len )		// Apply gamma to RGB memory
@@ -971,31 +1047,27 @@ int do_posterize(int val, int posty)	// Posterize a number
 	return res;
 }
 
-int pal_dupes[256];
+unsigned char pal_dupes[256];
 
 int scan_duplicates()			// Find duplicate palette colours, return number found
 {
-	int i, j, found = 0, ended;
+	int i, j, found = 0;
 
 	if ( mem_cols < 3 ) return 0;
 
-	for ( i = mem_cols - 1; i > 0; i-- )
+	for (i = mem_cols - 1; i > 0; i--)
 	{
-		pal_dupes[i] = -1;			// Start with a clean sheet
-		j = 0;
-		ended = 0;
-		while ( ended == 0 )
+		pal_dupes[i] = i;			// Start with a clean sheet
+		for (j = 0; j < i; j++)
 		{
 			if (	mem_pal[i].red == mem_pal[j].red &&
 				mem_pal[i].green == mem_pal[j].green &&
 				mem_pal[i].blue == mem_pal[j].blue )
 			{
-				ended = 1;
 				found++;
 				pal_dupes[i] = j;	// Point to first duplicate in the palette
+				break;
 			}
-			j++;
-			if ( j == i ) ended = 1;
 		}
 	}
 
@@ -1004,14 +1076,13 @@ int scan_duplicates()			// Find duplicate palette colours, return number found
 
 void remove_duplicates()		// Remove duplicate palette colours - call AFTER scan_duplicates
 {
-	int i;
-	unsigned char pix;
+	int i, j = mem_width * mem_height;
+	unsigned char *img = mem_img[CHN_IMAGE];
 
-	for ( i = 0; i < mem_width*mem_height; i++ )		// Scan canvas for duplicates
+	for (i = 0; i < j; i++)		// Scan canvas for duplicates
 	{
-		pix = mem_image[i];
-		if ( pal_dupes[pix] >= 0 )			// Duplicate found
-			mem_image[i] = pal_dupes[pix];
+		*img = pal_dupes[*img];
+		img++;
 	}
 }
 
@@ -1019,37 +1090,41 @@ int mem_remove_unused_check()
 {
 	int i, found = 0;
 
-	mem_get_histogram();
-	for ( i=0; i<mem_cols; i++ ) if ( mem_histogram[i] == 0 ) found++;
+	mem_get_histogram(CHN_IMAGE);
+	for (i = 0; i < mem_cols; i++)
+		if (!mem_histogram[i]) found++;
 
-	if ( found == 0 ) return 0;			// All palette colours are used on the canvas
-	if ( (mem_cols - found) < 2 ) return -1;	// Canvas is all one colour
+	if (!found) return 0;		// All palette colours are used on the canvas
+	if (mem_cols - found < 2) return -1;	// Canvas is all one colour
 
 	return found;
 }
 
 int mem_remove_unused()
 {
-	unsigned char conv[256];
+	unsigned char conv[256], *img;
 	int i, j, found = mem_remove_unused_check();
 
 	if ( found <= 0 ) return found;
 
-	j = 0;
-	for ( i=0; i<256; i++ )				// Create conversion table
+	for (i = j = 0; i < 256; i++)	// Create conversion table
 	{
-		if ( mem_histogram[i] > 0 )
+		if (mem_histogram[i])
 		{
-			conv[i] = j;
 			mem_pal[j] = mem_pal[i];
-			j++;
+			conv[i] = j++;
 		}
 	}
 
-	for ( i=0; i<(mem_width*mem_height); i++ ) mem_image[i] = conv[mem_image[i]];
-							// Convert canvas pixels as required
+	j = mem_width * mem_height;
+	img = mem_img[CHN_IMAGE];
+	for (i = 0; i < j; i++)	// Convert canvas pixels as required
+	{
+		*img = conv[*img];
+		img++;
+	}
 
-	mem_cols = mem_cols - found;
+	mem_cols -= found;
 
 	return found;
 }
@@ -1193,31 +1268,19 @@ int mem_pal_cmp( png_color *pal1, png_color *pal2 )	// Count itentical palette e
 
 int mem_used()				// Return the number of bytes used in image + undo
 {
-	int i, total = 0;
-
-	for ( i=0; i<MAX_UNDO; i++ )
-		if ( mem_undo_im[i].image != NULL )
-			total = total + mem_undo_im[i].width * mem_undo_im[i].height
-				* mem_undo_im[i].bpp;
-
-	return total;
+	return mem_undo_size(mem_undo_im_);
 }
 
 int mem_used_layers()		// Return the number of bytes used in image + undo in all layers
 {
-	int i, total = 0, l=0;
-	undo_item *mundo;
+	undo_item *undo;
+	int l, total = 0;
 
-	for ( l=0; l<=layers_total; l++ )
+	for (l = 0; l <= layers_total; l++)
 	{
-		if ( l==layer_selected ) mundo = mem_undo_im;
-		else mundo = layer_table[l].image->mem_undo_im;
-
-		for ( i=0; i<MAX_UNDO; i++ )
-		{
-			if ( mundo[i].image != NULL )
-				total = total + mundo[i].width * mundo[i].height * mundo[i].bpp;
-		}
+		if (l == layer_selected) undo = mem_undo_im_;
+		else undo = layer_table[l].image->mem_undo_im_;
+		total += mem_undo_size(undo);
 	}
 
 	return total;
@@ -1225,24 +1288,24 @@ int mem_used_layers()		// Return the number of bytes used in image + undo in all
 
 int mem_convert_rgb()			// Convert image to RGB
 {
-	char *old_image = mem_image, *new_image;
+	char *old_image = mem_img[CHN_IMAGE], *new_image;
 	unsigned char pix;
 	int i, j, res;
 
-	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 3 );
+	pen_down = 0;		// Ensure next tool action is treated separately
+	res = undo_next_core(2, mem_width, mem_height, 0, 0, 3, CMASK_IMAGE);
 	pen_down = 0;
 
 	if (res) return 1;	// Not enough memory
 
-	new_image = mem_image;
+	new_image = mem_img[CHN_IMAGE];
 	j = mem_width * mem_height;
-	for ( i=0; i<j; i++ )
+	for (i = 0; i < j; i++)
 	{
-		pix = old_image[i];
-		new_image[ 3*i ] = mem_pal[pix].red;
-		new_image[ 1 + 3*i ] = mem_pal[pix].green;
-		new_image[ 2 + 3*i ] = mem_pal[pix].blue;
+		pix = *old_image++;
+		*new_image++ = mem_pal[pix].red;
+		*new_image++ = mem_pal[pix].green;
+		*new_image++ = mem_pal[pix].blue;
 	}
 
 	return 0;
@@ -1250,28 +1313,27 @@ int mem_convert_rgb()			// Convert image to RGB
 
 int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after mem_cols_used
 {
-	unsigned char *old_image = mem_image;
-	int i, j, k, res, f;
+	unsigned char *old_image = mem_img[CHN_IMAGE], *new_image;
+	int i, j, k, res;
 
-	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 1 );
+	pen_down = 0;		// Ensure next tool action is treated separately
+	res = undo_next_core(2, mem_width, mem_height, 0, 0, 1, CMASK_IMAGE);
 	pen_down = 0;
 	if ( res ) return 2;
 
+	new_image = mem_img[CHN_IMAGE];
 	j = mem_width * mem_height;
-	for ( i=0; i<j; i++ )
+	for (i = 0; i < j; i++)
 	{
-		k = 0;
-		f = 0;
-		while ( k<256 && f==0 )		// Find index of this RGB
+		for (k = 0; k < 256; k++)	// Find index of this RGB
 		{
-			if (	found[k][0] == old_image[ 3*i ] &&
-				found[k][1] == old_image[ 1 + 3*i ] &&
-				found[k][2] == old_image[ 2 + 3*i ] ) f = 1;
-			else k++;
+			if (	found[k][0] == old_image[0] &&
+				found[k][1] == old_image[1] &&
+				found[k][2] == old_image[2] ) break;
 		}
-		if ( k>255 ) return 1;		// No index found - BAD ERROR!!
-		mem_image[i] = k;
+		if (k > 255) return 1;		// No index found - BAD ERROR!!
+		*new_image++ = k;
+		old_image += 3;
 	}
 
 	for ( i=0; i<256; i++ )
@@ -1289,6 +1351,7 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 	// type = 1:flat, 2:dither, 3:scatter
 {
+	unsigned char *new_img = mem_img[CHN_IMAGE];
 	int i, j, k;//, res=0;
 	int closest[3][2];
 	png_color pcol;
@@ -1305,7 +1368,7 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 	for ( j=0; j<mem_height; j++ )		// Convert RGB to indexed
 	{
 		if ( j%16 == 0)
-			if (progress_update( ((float) j)/(mem_height) )) goto stop;
+			if (progress_update( ((float) j)/(mem_height) )) break;
 		for ( i=0; i<mem_width; i++ )
 		{
 			pcol.red = old_mem_image[ 3*(i + mem_width*j) ];
@@ -1365,10 +1428,9 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 				  }
 				}
 			}
-			mem_image[ i + mem_width*j ] = k;
+			*new_img++ = k;
 		}
 	}
-stop:
 	mem_col_A = 1;
 	mem_col_B = 0;
 	progress_end();
@@ -1378,42 +1440,33 @@ stop:
 
 void mem_greyscale()			// Convert image to greyscale
 {
-	int i, j, k, l, v;
+	unsigned char *img = mem_img[CHN_IMAGE];
+	int i, j, v;
 	float value;
 
-	if ( mem_image_bpp == 1)
-		for ( i=0; i<256; i++ )
-		{
-			value = 0.49 + 0.3 * mem_pal[i].red +
-				0.58 * mem_pal[i].green + 0.12 * mem_pal[i].blue;
-			v = mt_round( value );
-			mem_pal[i].red = value;
-			mem_pal[i].green = value;
-			mem_pal[i].blue = value;
-		}
-	if ( mem_image_bpp == 3)
+	if ( mem_img_bpp == 1)
 	{
-		j = mem_width * mem_height * 3;
-		progress_init(_("Converting to Greyscale"),1);
-		i = 0; l = 0;
-		while ( i<j )
+		for (i = 0; i < 256; i++)
 		{
-			if ( l%16 == 0) if (progress_update( ((float) l)/(mem_height) )) goto stop;
-			for ( k=0; k<mem_width; k++ )
-			{
-				value = 0.49 + 0.3 * ( mem_image[i]) +
-					0.58 * ( mem_image[i+1]) +
-					0.12 * ( mem_image[i+2]);
-				v = mt_round( value );
-				mem_image[i] = value;
-				mem_image[i+1] = value;
-				mem_image[i+2] = value;
-				i=i+3;
-			}
-			l++;
+			value = 0.299 * mem_pal[i].red +
+				0.587 * mem_pal[i].green + 0.114 * mem_pal[i].blue;
+			v = (int)rint(value);
+			mem_pal[i].red = v;
+			mem_pal[i].green = v;
+			mem_pal[i].blue = v;
 		}
-stop:
-		progress_end();
+	}
+	else
+	{
+		j = mem_width * mem_height;
+		for (i = 0; i < j; i++)
+		{
+			value = 0.299 * img[0] + 0.587 * img[1] + 0.114 * img[2];
+			v = (int)rint(value);
+			*img++ = v;
+			*img++ = v;
+			*img++ = v;
+		}
 	}
 }
 
@@ -1480,65 +1533,43 @@ float rgb_hsl( int t, png_color col )
 
 void mem_pal_index_move( int c1, int c2 )	// Move index c1 to c2 and shuffle in between up/down
 {
-	int direct, i;
 	png_color temp;
+	int i, j;
 
-	if ( c1==c2 ) return;
+	if (c1 == c2) return;
 
-	direct = 1;
-	if ( c1 > c2 ) direct = -1;
-
-	i = c1;
-	do
-	{
-		i = i + direct;
-		temp = mem_pal[i];		// do swap
-		mem_pal[i] = mem_pal[i - direct];
-		mem_pal[i - direct] = temp;
-	} while (i != c2);
+	j = c1 < c2 ? 1 : -1;
+	temp = mem_pal[c1];
+	for (i = c1; i != c2; i += j) mem_pal[i] = mem_pal[i + j];
+	mem_pal[c2] = temp;
 }
 
 void mem_canvas_index_move( int c1, int c2 )	// Similar to palette item move but reworks canvas pixels
 {
-	unsigned char table[256], pix;
-	int direct, i, j = mem_width*mem_height;
+	unsigned char table[256], *img = mem_img[CHN_IMAGE];
+	int i, j = mem_width * mem_height;
 
-	if ( c1==c2 ) return;
+	if (c1 == c2) return;
 
-	direct = 1;
-	i = 0;
-	if ( c1 > c2 )
+	for (i = 0; i < 256; i++)
 	{
-		direct = -1;
-		i = 255;
+		table[i] = i + (i > c2) - (i > c1);
 	}
+	table[c1] = c2;
+	table[c2] += (c1 > c2);
 
-	while ( i>=0 && i<=255 )
+	for (i = 0; i < j; i++)		// Change pixel index to new palette
 	{
-		if ( (i<c1 && i<c2) || (i>c1 && i>c2) )		// Not in range so unchanged
-		{
-			table[i] = i;
-		}
-		else
-		{
-			if ( i == c1 ) table[i] = c2;
-			else table[i] = i - direct;
-		}
-		i = i + direct;
-	}
-
-	for ( i=0; i<j; i++ )		// Change pixel index to new palette
-	{
-		pix = mem_image[i];
-		mem_image[i] = table[pix];
+		*img = table[*img];
+		img++;
 	}
 }
 
 void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 {
-	int tab[257][3], i, j;
+	int tab0[256], tab1[256], tmp, i, j;
 	png_color old_pal[256];
-	unsigned char pix;
+	unsigned char *img;
 
 	if ( i2 == i1 || i1>mem_cols || i2>mem_cols ) return;
 	if ( i2 < i1 )
@@ -1548,91 +1579,92 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		i2 = i;
 	}
 
-	if ( a == 6 ) mem_get_histogram();
+	if ( a == 6 ) mem_get_histogram(CHN_IMAGE);
 	
-	for ( i=i1; i<=i2; i++ )
+	for (i = 0; i < 256; i++)
+		tab0[i] = i;
+	for (i = i1; i <= i2; i++)
 	{
-		tab[i][0] = i;
-		tab[i][2] = i;
-		if ( a==0 ) tab[i][1] = mt_round( 1000*rgb_hsl( 0, mem_pal[i] ) );
-		if ( a==1 ) tab[i][1] = mt_round( 1000*rgb_hsl( 1, mem_pal[i] ) );
-		if ( a==2 ) tab[i][1] = mt_round( rgb_hsl( 2, mem_pal[i] ) );
-
-		if ( a==3 ) tab[i][1] = mem_pal[i].red;
-		if ( a==4 ) tab[i][1] = mem_pal[i].green;
-		if ( a==5 ) tab[i][1] = mem_pal[i].blue;
-
-		if ( a==6 ) tab[i][1] = mem_histogram[i];
+		switch (a)
+		{
+		case 0: tab1[i] = mt_round( 1000*rgb_hsl( 0, mem_pal[i] ) );
+			break;
+		case 1: tab1[i] = mt_round( 1000*rgb_hsl( 1, mem_pal[i] ) );
+			break;
+		case 2: tab1[i] = mt_round( rgb_hsl( 2, mem_pal[i] ) );
+			break;
+		case 3: tab1[i] = mem_pal[i].red;
+			break;
+		case 4: tab1[i] = mem_pal[i].green;
+			break;
+		case 5: tab1[i] = mem_pal[i].blue;
+			break;
+		case 6: tab1[i] = mem_histogram[i];
+			break;
+		}
 	}
 
+	rev = rev ? 1 : 0;
 	for ( j=i2; j>i1; j-- )			// The venerable bubble sort
 		for ( i=i1; i<j; i++ )
 		{
-			if ( (!rev && tab[i][1] > tab[i+1][1]) || (rev && tab[i][1] < tab[i+1][1]) )
+			if (tab1[i + 1 - rev] < tab1[i + rev])
 			{
-				tab[256][0] = tab[i][0];
-				tab[256][1] = tab[i][1];
+				tmp = tab0[i];
+				tab0[i] = tab0[i + 1];
+				tab0[i + 1] = tmp;
 
-				tab[i][0] = tab[i+1][0];
-				tab[i][1] = tab[i+1][1];
-				tab[ tab[i][0] ][2] = i;
-
-				tab[i+1][0] = tab[256][0];
-				tab[i+1][1] = tab[256][1];
-				tab[ tab[i+1][0] ][2] = i+1;
+				tmp = tab1[i];
+				tab1[i] = tab1[i + 1];
+				tab1[i + 1] = tmp;
 			}
 		}
 
 	mem_pal_copy( old_pal, mem_pal );
 	for ( i=i1; i<=i2; i++ )
 	{
-		mem_pal[i] = old_pal[ tab[i][0] ];
+		mem_pal[i] = old_pal[tab0[i]];
 	}
 
-	if ( mem_image_bpp == 1 )		// Adjust canvas pixels if in indexed palette mode
-		for ( i=0; i<mem_width*mem_height; i++ )
-		{
-			pix = mem_image[i];
-			if ( pix >= i1 && pix <= i2 )		// Only change as needed
-				mem_image[i] = tab[pix][2];
-		}
+	if (mem_img_bpp != 1) return;
+
+	// Adjust canvas pixels if in indexed palette mode
+	for (i = 0; i < 256; i++)
+		tab1[tab0[i]] = i;
+	img = mem_img[CHN_IMAGE];
+	j = mem_width * mem_height;
+	for (i = 0; i < j; i++)
+	{
+		*img = tab1[*img];
+		img++;
+	}
 }
 
 void mem_invert()			// Invert the palette
 {
-	int i, j, k, l, v;
-	png_color temp;
+	int i, j;
+	png_color *col = mem_pal;
+	unsigned char *img;
 
-	if ( mem_image_bpp == 1 )
+	if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
+	{
 		for ( i=0; i<256; i++ )
 		{
-			temp = mem_pal[i];
-			mem_pal[i].red = 255 - temp.red;
-			mem_pal[i].green = 255 - temp.green;
-			mem_pal[i].blue = 255 - temp.blue;
+			col->red = 255 - col->red;
+			col->green = 255 - col->green;
+			col->blue = 255 - col->blue;
+			col++;
 		}
-	if ( mem_image_bpp == 3)
+	}
+	else
 	{
-		j = mem_width * mem_height * 3;
-		progress_init(_("Inverting Image"),1);
-		i = 0; l = 0;
-		while ( i<j )
+		j = mem_width * mem_height;
+		if (mem_channel == CHN_IMAGE) j *= 3;
+		img = mem_img[mem_channel];
+		for (i = 0; i < j; i++)
 		{
-			if ( l%16 == 0) if (progress_update( ((float) l)/(mem_height) )) goto stop;
-			for ( k=0; k<mem_width; k++ )
-			{
-				v = mem_image[i];
-				mem_image[i] = 255 - v;
-				v = mem_image[i+1];
-				mem_image[i+1] = 255 - v;
-				v = mem_image[i+2];
-				mem_image[i+2] = 255 - v;
-				i=i+3;
-			}
-			l++;
+			*img++ ^= 255;
 		}
-stop:
-		progress_end();
 	}
 }
 
@@ -1673,8 +1705,7 @@ void sline( int x1, int y1, int x2, int y2 )		// Draw single thickness straight 
 		rat = ((float) i ) / todo;
 		px = mt_round(x1 + (x2 - x1) * rat);
 		py = mt_round(y1 + (y2 - y1) * rat);
-		if ( mem_image_bpp == 1 ) IF_IN_RANGE( px, py ) PUT_PIXEL( px, py )
-		if ( mem_image_bpp == 3 ) IF_IN_RANGE( px, py ) PUT_PIXEL24( px, py )
+		IF_IN_RANGE( px, py ) put_pixel( px, py );
 	}
 }
 
@@ -1833,8 +1864,7 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv )		// Draw general p
 			}
 			if ( (mx + mxlen) > mem_width ) mxlen = mem_width - mx;
 
-			if ( mem_image_bpp == 1 ) for ( i=0; i<mxlen; i++ ) PUT_PIXEL( mx + i, j )
-			if ( mem_image_bpp == 3 ) for ( i=0; i<mxlen; i++ ) PUT_PIXEL24( mx + i, j )
+			for ( i=0; i<mxlen; i++ ) put_pixel( mx + i, j );
 		}
 	}
 }
@@ -1865,8 +1895,7 @@ void v_para( int x1, int y1, int x2, int y2, int vlen )		// Draw vertical sided 
 		}
 		if ( px<mem_width && px>=0 )
 		{
-			if ( mem_image_bpp == 1 ) for ( j=0; j<flen; j++ ) PUT_PIXEL( px, py+j )
-			if ( mem_image_bpp == 3 ) for ( j=0; j<flen; j++ ) PUT_PIXEL24( px, py+j )
+			for ( j=0; j<flen; j++ ) put_pixel( px, py+j );
 		}
 	}
 }
@@ -1897,199 +1926,85 @@ void h_para( int x1, int y1, int x2, int y2, int hlen )		// Draw horizontal top/
 		}
 		if ( py<mem_height && py>=0 )
 		{
-			if ( mem_image_bpp == 1 ) for ( j=0; j<flen; j++ ) PUT_PIXEL( px+j, py )
-			if ( mem_image_bpp == 3 ) for ( j=0; j<flen; j++ ) PUT_PIXEL24( px+j, py )
+			for ( j=0; j<flen; j++ ) put_pixel( px+j, py );
 		}
 	}
 }
 
 void flood_fill( int x, int y, unsigned int target )	// Recursively flood fill an area
 {
-	int minx = x, maxx = x, ended = 0, newx = 0;
+	int minx = x, maxx = x, newx;
 
-	PUT_PIXEL( x, y )
-	while ( ended == 0 )				// Search left for target pixels
+	put_pixel(x, y);
+	while (--minx >= 0)		// Search left for target pixels
 	{
-		minx--;
-		if ( minx < 0 ) ended = 1;
-		else
-		{
-			if ( GET_PIXEL( minx, y ) == target ) { PUT_PIXEL( minx, y ) }
-			else ended = 1;
-		}
+		if (get_pixel(minx, y) != target) break;
+		put_pixel(minx, y);
 	}
 	minx++;
 
-	ended = 0;
-	while ( ended == 0 )				// Search right for target pixels
+	while (++maxx < mem_width)	// Search right for target pixels
 	{
-		maxx++;
-		if ( maxx >= mem_width ) ended = 1;
-		else
-		{
-			if ( GET_PIXEL( maxx, y ) == target ) { PUT_PIXEL( maxx, y ) }
-			else ended = 1;
-		}
+		if (get_pixel(maxx, y) != target) break;
+		put_pixel(maxx, y);
 	}
 	maxx--;
 
-	if ( (y-1) >= 0 )				// Recurse upwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( GET_PIXEL(newx, y-1) == target ) flood_fill( newx, y-1, target );
+	if (y > 0)				// Recurse upwards
+		for (newx = minx; newx <= maxx; newx++)
+			if (get_pixel(newx, y - 1) == target)
+				flood_fill(newx, y - 1, target);
 
-	if ( (y+1) < mem_height )			// Recurse downwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( GET_PIXEL(newx, y+1) == target ) flood_fill( newx, y+1, target );
-}
-
-void flood_fill24( int x, int y, png_color target24 )	// Recursively flood fill an area
-{
-	int minx = x, maxx = x, ended = 0, newx = 0;
-
-	PUT_PIXEL24( x, y )
-	while ( ended == 0 )				// Search left for target pixels
-	{
-		minx--;
-		if ( minx < 0 ) ended = 1;
-		else
-		{
-			if ( !png_cmp( get_pixel24( minx, y ), target24) )
-				{ PUT_PIXEL24( minx, y ) }
-			else ended = 1;
-		}
-	}
-	minx++;
-
-	ended = 0;
-	while ( ended == 0 )				// Search right for target pixels
-	{
-		maxx++;
-		if ( maxx >= mem_width ) ended = 1;
-		else
-		{
-			if ( !png_cmp( get_pixel24( maxx, y ), target24) )
-				{ PUT_PIXEL24( maxx, y ) }
-			else ended = 1;
-		}
-	}
-	maxx--;
-
-	if ( (y-1) >= 0 )				// Recurse upwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( png_cmp( get_pixel24(newx, y-1), target24 ) == 0 )
-				flood_fill24( newx, y-1, target24 );
-
-	if ( (y+1) < mem_height )			// Recurse downwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( png_cmp( get_pixel24(newx, y+1), target24 ) == 0 )
-				flood_fill24( newx, y+1, target24 );
+	if (y < mem_height - 1)			// Recurse downwards
+		for (newx = minx; newx <= maxx; newx++)
+			if (get_pixel(newx, y + 1) == target)
+				flood_fill(newx, y + 1, target);
 }
 
 /*
-By using the next 2 procedures you can flood fill using patterns without problems.
+By using the next procedure you can flood fill using patterns without problems.
 The only snag is that a chunk of memory must be allocated as a mask - the same size as the image.
-This is very wasteful which is why I still use the old procedures above for flat filling.
+This is very wasteful which is why I still use the old procedure above for flat filling.
 M.Tyler 26-3-2005
 */
 
 void flood_fill_pat( int x, int y, unsigned int target, unsigned char *pat_mem )
 {	// Recursively flood fill an area with a pattern
-	int minx = x, maxx = x, ended = 0, newx = 0;
+	int minx = x, maxx = x, newx;
 
 	pat_mem[ x + y*mem_width ] = 1;
-	while ( ended == 0 )				// Search left for target pixels
+	while (--minx >= 0)		// Search left for target pixels
 	{
-		minx--;
-		if ( minx < 0 ) ended = 1;
-		else
-		{
-			if ( GET_PIXEL( minx, y ) == target ) pat_mem[ minx + y*mem_width ] = 1;
-			else ended = 1;
-		}
+		if (get_pixel(minx, y) != target) break;
+		pat_mem[ minx + y*mem_width ] = 1;
 	}
 	minx++;
 
-	ended = 0;
-	while ( ended == 0 )				// Search right for target pixels
+	while (++maxx < mem_width)	// Search right for target pixels
 	{
-		maxx++;
-		if ( maxx >= mem_width ) ended = 1;
-		else
-		{
-			if ( GET_PIXEL( maxx, y ) == target ) pat_mem[ maxx + y*mem_width ] = 1;
-			else ended = 1;
-		}
+		if (get_pixel(maxx, y) != target) break;
+		pat_mem[ maxx + y*mem_width ] = 1;
 	}
 	maxx--;
 
-	if ( (y-1) >= 0 )				// Recurse upwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( GET_PIXEL(newx, y-1) == target && pat_mem[newx + mem_width*(y-1)] == 0 )
-				flood_fill_pat( newx, y-1, target, pat_mem );
+	if (y > 0)				// Recurse upwards
+		for (newx = minx; newx <= maxx; newx++)
+			if ((get_pixel(newx, y - 1) == target) && !pat_mem[newx + mem_width * (y - 1)])
+				flood_fill_pat(newx, y - 1, target, pat_mem);
 
-	if ( (y+1) < mem_height )			// Recurse downwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( GET_PIXEL(newx, y+1) == target && pat_mem[newx + mem_width*(y+1)] == 0 )
-				flood_fill_pat( newx, y+1, target, pat_mem );
-}
-
-void flood_fill24_pat( int x, int y, png_color target24, unsigned char *pat_mem )
-{	// Recursively flood fill an area with a pattern
-	int minx = x, maxx = x, ended = 0, newx = 0;
-
-	PUT_PIXEL24( x, y )
-	pat_mem[ x + y*mem_width ] = 1;
-	while ( ended == 0 )				// Search left for target pixels
-	{
-		minx--;
-		if ( minx < 0 ) ended = 1;
-		else
-		{
-			if ( !png_cmp( get_pixel24( minx, y ), target24) )
-				pat_mem[ minx + y*mem_width ] = 1;
-			else ended = 1;
-		}
-	}
-	minx++;
-
-	ended = 0;
-	while ( ended == 0 )				// Search right for target pixels
-	{
-		maxx++;
-		if ( maxx >= mem_width ) ended = 1;
-		else
-		{
-			if ( !png_cmp( get_pixel24( maxx, y ), target24) )
-				pat_mem[ maxx + y*mem_width ] = 1;
-			else ended = 1;
-		}
-	}
-	maxx--;
-
-	if ( (y-1) >= 0 )				// Recurse upwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( png_cmp( get_pixel24(newx, y-1), target24 ) == 0
-				&& pat_mem[newx + mem_width*(y-1)] == 0 )
-					flood_fill24_pat( newx, y-1, target24, pat_mem );
-
-	if ( (y+1) < mem_height )			// Recurse downwards
-		for ( newx = minx; newx <= maxx; newx++ )
-			if ( png_cmp( get_pixel24(newx, y+1), target24 ) == 0
-				&& pat_mem[newx + mem_width*(y+1)] == 0 )
-					flood_fill24_pat( newx, y+1, target24, pat_mem );
+	if (y < mem_height - 1)			// Recurse downwards
+		for (newx = minx; newx <= maxx; newx++)
+			if ((get_pixel(newx, y + 1) == target) && !pat_mem[newx + mem_width * (y + 1)])
+				flood_fill_pat(newx, y + 1, target, pat_mem);
 }
 
 void mem_paint_mask( unsigned char *pat_mem )		// Paint over image using mask
 {
-	int i, j = mem_width * mem_height;
+	int i, j;
 
-	if ( mem_image_bpp == 1 )
-		for ( i=0; i<j; i++ )
-			if ( pat_mem[i] == 1 ) PUT_PIXEL( i % mem_width, i / mem_width );
-
-	if ( mem_image_bpp == 3 )
-		for ( i=0; i<j; i++ )
-			if ( pat_mem[i] == 1 ) PUT_PIXEL24( i % mem_width, i / mem_width );
+	for (i = 0; i < mem_height; i++)
+		for (j = 0; j < mem_width; j++)
+			if (*pat_mem++) put_pixel(j, i);
 }
 
 void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
@@ -2111,10 +2026,7 @@ void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
 
 	for ( j=0; j<h; j++ )
 	{
-		if ( mem_image_bpp == 1 )
-			for ( i=0; i<w; i++ ) PUT_PIXEL( x + i, y + j )
-		if ( mem_image_bpp == 3 )
-			for ( i=0; i<w; i++ ) PUT_PIXEL24( x + i, y + j )
+		for ( i=0; i<w; i++ ) put_pixel( x + i, y + j );
 	}
 }
 
@@ -2144,19 +2056,9 @@ void f_circle( int x, int y, int r )				// Draw a filled circle
 		}
 		ry = oy + j;
 		rx = ox + (r-r4)/2;
-		if ( mem_image_bpp == 1 )
+		for ( i=0; i<=r4; i++)
 		{
-			for ( i=0; i<=r4; i++)
-			{
-				IF_IN_RANGE( rx+i, ry ) PUT_PIXEL( rx+i, ry )
-			}
-		}
-		if ( mem_image_bpp == 3 )
-		{
-			for ( i=0; i<=r4; i++)
-			{
-				IF_IN_RANGE( rx+i, ry ) PUT_PIXEL24( rx+i, ry )
-			}
+			IF_IN_RANGE( rx+i, ry ) put_pixel( rx+i, ry );
 		}
 	}
 }
@@ -2174,22 +2076,12 @@ static void put4pix(int dx, int dy)
 	x1 = (xc2 + dx) >> 1;
 	y0 = (yc2 - dy) >> 1;
 	y1 = (yc2 + dy) >> 1;
-	if (mem_image_bpp == 1)
-	{
-		PUT_PIXEL(x0, y0);
-		if (x0 != x1) PUT_PIXEL(x1, y0);
-		if (y0 == y1) return;
-		PUT_PIXEL(x0, y1);
-		if (x0 != x1) PUT_PIXEL(x1, y1);
-	}
-	else
-	{
-		PUT_PIXEL24(x0, y0);
-		if (x0 != x1) PUT_PIXEL24(x1, y0);
-		if (y0 == y1) return;
-		PUT_PIXEL24(x0, y1);
-		if (x0 != x1) PUT_PIXEL24(x1, y1);
-	}
+
+	put_pixel(x0, y0);
+	if (x0 != x1) put_pixel(x1, y0);
+	if (y0 == y1) return;
+	put_pixel(x0, y1);
+	if (x0 != x1) put_pixel(x1, y1);
 }
 
 void trace_ellipse(int w, int h, int *left, int *right)
@@ -2348,31 +2240,10 @@ int get_next_line(char *input, int length, FILE *fp)
 }
 
 
-int lo_case( int c )				// Convert character to lower case
-{
-	int r = c;
-
-	if ( c>= 'A' && c<='Z' ) r = c - 'A' + 'a';
-
-	return r;
-}
-
 int check_str( int max, char *a, char *b )	// Compare up to max characters of 2 strings
 						// Case insensitive
 {
-	int ca, cb, i;
-
-	i=0;
-	while ( i<max )
-	{
-		ca = lo_case( a[i] );
-		cb = lo_case( b[i] );
-		if ( ca != cb ) return 0;	// Different char found
-		if ( a[i] == 0 ) return 1;	// End of both strings - identical
-		i++;
-	}
-
-	return 1;			// Same
+	return (strncasecmp(a, b, max) == 0);
 }
 
 char get_hex( int in )				// Turn 0..15 into hex
@@ -2414,155 +2285,144 @@ void clear_file_flags()			// Reset various file flags, e.g. XPM/XBM after new/lo
 	mem_xbm_hot_y = -1;
 }
 
-void mem_flip_v( char *mem, int w, int h, int bpp )
+void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp)
 {
-	unsigned char pix;
-	int i, j, k, lim=4*PROGRESS_LIM;
+	unsigned char *src, *dest;
+	int i, k;
 
-	if ( w*h > lim ) progress_init(_("Flipping vertically"),0);
-	for ( i=0; i<h/2; i++ )
+	k = w * bpp;
+	src = mem;
+	dest = mem + (h - 1) * k;
+	h /= 2;
+
+	for (i = 0; i < h; i++)
 	{
-		if ( w*h > lim && i%16 == 0) progress_update( ((float) i)/(h/2) );
-		if ( bpp == 1 )
-			for ( j=0; j<w; j++ )
-			{
-				pix = mem[ j + w*i ];
-				mem[ j + w*i ] = mem[ j + w*(h - i - 1) ];
-				mem[ j + w*(h - i - 1) ] = pix;
-			}
-		if ( bpp == 3 )
-			for ( j=0; j<w; j++ )
-			{
-				for ( k=0; k<3; k++ )
-				{
-					pix = mem[ k + 3*(j + w*i) ];
-					mem[ k + 3*(j + w*i) ] = mem[ k + 3*(j + w*(h - i - 1)) ];
-					mem[ k + 3*(j + w*(h - i - 1)) ] = pix;
-				}
-			}
+		memcpy(tmp, src, k);
+		memcpy(src, dest, k);
+		memcpy(dest, tmp, k);
+		src += k;
+		dest -= k;
 	}
-	if ( w*h > lim ) progress_end();
 }
 
 void mem_flip_h( char *mem, int w, int h, int bpp )
 {
-	unsigned char pix;
-	int i, j, k, lim=4*PROGRESS_LIM;
+	unsigned char tmp, *src, *dest;
+	int i, j, k;
 
-	if ( w*h > lim ) progress_init(_("Flipping horizontally"),0);
-	for ( i=0; i<w/2; i++ )
+	k = w * bpp;
+	w /= 2;
+	for (i = 0; i < h; i++)
 	{
-		if ( w*h > lim && i%16 == 0) progress_update( ((float) i)/(w/2) );
-		if ( bpp == 1 )
-			for ( j=0; j<h; j++ )
+		src = mem + i * k;
+		dest = src + k - bpp;
+		if (bpp == 1)
+		{
+			for (j = 0; j < w; j++)
 			{
-				pix = mem[ i + w*j ];
-				mem[ i + w*j ] = mem[ w - 1 - i + w*j ];
-				mem[ w - 1 - i + w*j ] = pix;
+				tmp = *src;
+				*src++ = *dest;
+				*dest-- = tmp;
 			}
-		if ( bpp == 3 )
-			for ( j=0; j<h; j++ )
+		}
+		else
+		{
+			for (j = 0; j < w; j++)
 			{
-				for ( k=0; k<3; k++ )
-				{
-					pix = mem[ k + 3*(i + w*j) ];
-					mem[ k + 3*(i + w*j) ] = mem[ k + 3*(w - 1 - i + w*j) ];
-					mem[ k + 3*(w - 1 - i + w*j) ] = pix;
-				}
+				tmp = src[0];
+				src[0] = dest[0];
+				dest[0] = tmp;
+				tmp = src[1];
+				src[1] = dest[1];
+				dest[1] = tmp;
+				tmp = src[2];
+				src[2] = dest[2];
+				dest[2] = tmp;
+				src += 3;
+				dest -= 3;
 			}
+		}
 	}
-	if ( w*h > lim ) progress_end();
 }
 
 void mem_bacteria( int val )			// Apply bacteria effect val times the canvas area
 {						// Ode to 1994 and my Acorn A3000
-	int i, j, k, x, y, w = mem_width-2, h = mem_height-2, tot = w*h, np, cancel = 0;
+	int i, j, x, y, w = mem_width-2, h = mem_height-2, tot = w*h, np, cancel;
 	unsigned int pixy;
+	unsigned char *img;
 
 	while ( tot > PROGRESS_LIM )	// Ensure the user gets a regular opportunity to cancel
 	{
-		tot = tot / 2;
-		val = val * 2;
+		tot /= 2;
+		val *= 2;
 	}
 
-	if ( (w*h*val) > PROGRESS_LIM )
-		progress_init(_("Bacteria Effect"),1);
+	cancel = (w * h * val > PROGRESS_LIM);
+	if (cancel)
+	{
+		progress_init(_("Bacteria Effect"), 1);
+		progress_update(0.0);
+	}
 	for ( i=0; i<val; i++ )
 	{
-		if ( (w*h*val) > PROGRESS_LIM )
-			cancel = progress_update( ((float) i)/val );
-		if ( cancel == 1 ) goto stop;
+		if (cancel && ((i * 20) % val >= val - 20))
+			if (progress_update((float)i / val)) break;
 
 		for ( j=0; j<tot; j++ )
 		{
-			x = 1 + rand() % w;
-			y = 1 + rand() % h;
-			pixy = 0;
-			for ( k=0; k<9; k++ )
-				pixy = pixy + mem_image[ x + k%3 - 1 +
-					mem_width*(y + k/3 - 1) ];
-			np = (mt_round( ((float) pixy) / 9 ) + 1) % mem_cols;
-			mem_image[ x + mem_width*y ] = (unsigned char) np;
+			x = rand() % w;
+			y = rand() % h;
+			img = mem_img[CHN_IMAGE] + x + mem_width * y;
+			pixy = img[0] + img[1] + img[2];
+			img += mem_width;
+			pixy += img[0] + img[1] + img[2];
+			img += mem_width;
+			pixy += img[0] + img[1] + img[2];
+			np = ((pixy + pixy + 9) / 18 + 1) % mem_cols;
+			*(img - mem_width + 1) = (unsigned char)np;
 		}
 	}
-stop:
-	if ( (w*h*val) > PROGRESS_LIM )
-		progress_end();
+	if (cancel) progress_end();
 }
 
 void mem_rotate( char *new, char *old, int old_w, int old_h, int dir, int bpp )
 {
-	unsigned char pix;
-	int i, j, k, lim=PROGRESS_LIM*4;
+	unsigned char *src;
+	int i, j, k, l, flag;
 
-	if ( old_w*old_h > lim ) progress_init(_("Rotating"),1);
-	if ( dir == 0 )				// Clockwise
+	flag = (old_w * old_h > PROGRESS_LIM * 4);
+	j = old_w * bpp;
+	l = dir ? -bpp : bpp;
+	k = -old_w * l;
+	old += dir ? j - bpp: (old_h - 1) * j;
+
+	if (flag) progress_init(_("Rotating"), 1);
+	for (i = 0; i < old_w; i++)
 	{
-		for ( j=0; j<old_h; j++ )
+		if (flag && ((i * 5) % old_w >= old_w - 5))
+				progress_update((float)i / old_w);
+		src = old;
+		if (bpp == 1)
 		{
-			if ( old_w*old_h > lim && j%16 == 0 )
-				progress_update( ((float) j)/old_h );
-			if ( bpp == 1 )
-				for ( i=0; i<old_w; i++ )
-				{
-					pix = old[ i + j * old_w ];
-					new[ (old_h - 1 - j) + old_h*i ] = pix;
-				}
-			if ( bpp == 3 )
-				for ( i=0; i<old_w; i++ )
-				{
-					for ( k = 0; k<3; k++ )
-					{
-						pix = old[ k + 3*(i + j * old_w) ];
-						new[ k + 3*((old_h - 1 - j) + old_h*i) ] = pix;
-					}
-				}
+			for (j = 0; j < old_h; j++)
+			{
+				*new++ = *src;
+				src += k;
+			}
 		}
-	}
-	else					// Anti-Clockwise
-	{
-		for ( j=0; j<old_h; j++ )
+		else
 		{
-			if ( old_w*old_h > lim && j%16 == 0 )
-				progress_update( ((float) j)/old_h );
-			if ( bpp == 1 )
-				for ( i=0; i<old_w; i++ )
-				{
-					pix = old[ i + j * old_w ];
-					new[ j + old_h*(old_w - 1 - i) ] = pix;
-				}
-			if ( bpp == 3 )
-				for ( i=0; i<old_w; i++ )
-				{
-					for ( k = 0; k<3; k++ )
-					{
-						pix = old[ k + 3*(i + j * old_w) ];
-						new[ k + 3*(j + old_h*(old_w - 1 - i)) ] = pix;
-					}
-				}
+			for (j = 0; j < old_h; j++)
+			{
+				*new++ = src[0];
+				*new++ = src[1];
+				*new++ = src[2];
+				src += k;
+			}
 		}
+		old += l;
 	}
-	if ( old_w*old_h > lim ) progress_end();
+	if (flag) progress_end();
 }
 
 int mem_sel_rot( int dir )					// Rotate clipboard 90 degrees
@@ -2599,172 +2459,205 @@ int mem_sel_rot( int dir )					// Rotate clipboard 90 degrees
 	return 0;
 }
 
-void spinco( float angle, float x, float y, float cx, float cy, float *res_x, float *res_y )
-{		// Spin x/y around centre by angle (radians) and put results into res_x/y
-	*res_x = cx + (x - cx) * sin(angle + M_PI/2) + (y - cy) * sin(angle);
-	*res_y = cy + (x - cx) * cos(angle + M_PI/2) + (y - cy) * cos(angle);
-}
-
-float get_smla( float a, float b, float c, float d, int type )		// Get smallest/largest
-{
-	float res;
-
-	if ( type == 0 )
-	{
-		mtMIN( res, a, b )
-		mtMIN( res, res, c )
-		mtMIN( res, res, d )
-	}
-	else
-	{
-		mtMAX( res, a, b )
-		mtMAX( res, res, c )
-		mtMAX( res, res, d )
-	}
-
-	return res;
-}
-
 int mem_rotate_free( float angle, int type )	// Rotate canvas by any angle (degrees)
 {
-	unsigned char *old_image = mem_image, pix[4][3];
+	chanlist old_img;
+	unsigned char *src, *dest, *alpha, A_rgb[3], fillv;
+	unsigned char *pix1, *pix2, *pix3, *pix4;
 	int ow = mem_width, oh = mem_height, nw, nh, res;
-	int nx, ny, ox, oy, ki1, ki2, ki3, i, xa, ya;
-	float centre[2][2];			// Centre - 0=old, 1=new
-	float corner[4][2];			// 4 corners of new image
-	float rangle = M_PI*angle/180;		// Radians
-	float maxx, minx, maxy, miny;
-	float s1, s2, c1, c2;			// Trig values
-	float k1, k2, k3, k4;			// Quick look up values
-	float sfact[2], fox, foy, pfact[4];	// Smoothing factors for X/Y
+	int nx, ny, ox, oy, cc;
+	double rangle = (M_PI / 180.0) * angle;	// Radians
+	double s1, s2, c1, c2;			// Trig values
+	double cx0, cy0, cx1, cy1;
+	double x00, y00, x0y, y0y;		// Quick look up values
+	double fox, foy, k1, k2, k3, k4;	// Pixel weights
+	double aa1, aa2, aa3, aa4, aa;
+	double rr, gg, bb;
 
-	s1 = sin(rangle + M_PI/2);
-	s2 = sin(rangle);
-	c1 = cos(rangle + M_PI/2);
 	c2 = cos(rangle);
+	s2 = sin(rangle);
+	c1 = -s2;
+	s1 = c2;
 
-	centre[0][0] = ow;
-	centre[0][1] = oh;
-	centre[0][0] /= 2;
-	centre[0][1] /= 2;
-
-	spinco( rangle, 0, 0, centre[0][0], centre[0][1], &corner[0][0], &corner[0][1] );
-	spinco( rangle, ow, 0, centre[0][0], centre[0][1], &corner[1][0], &corner[1][1] );
-	spinco( rangle, ow, oh, centre[0][0], centre[0][1], &corner[2][0], &corner[2][1] );
-	spinco( rangle, 0, oh, centre[0][0], centre[0][1], &corner[3][0], &corner[3][1] );
-
-	minx = get_smla( corner[0][0], corner[1][0], corner[2][0], corner[3][0], 0 );
-	maxx = get_smla( corner[0][0], corner[1][0], corner[2][0], corner[3][0], 1 );
-	miny = get_smla( corner[0][1], corner[1][1], corner[2][1], corner[3][1], 0 );
-	maxy = get_smla( corner[0][1], corner[1][1], corner[2][1], corner[3][1], 1 );
-
-	nw = mt_round(maxx - minx + 0.99);
-	nh = mt_round(maxy - miny + 0.99);
+	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
+	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
 
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 
-	centre[1][0] = nw;
-	centre[1][1] = nh;
-	centre[1][0] /= 2;
-	centre[1][1] /= 2;
-
-	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
+	memcpy(old_img, mem_img, sizeof(chanlist));
+	pen_down = 0;		// Ensure next tool action is treated separately
+	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 	if ( res == 1 ) return 2;		// No undo space
 
-	k3 = (-centre[1][0])*s1 + centre[0][0] + (-centre[1][1])*s2;
-	k4 = (-centre[1][0])*c1 + centre[0][1] + (-centre[1][1])*c2;
+	/* Centerpoints, including half-pixel offsets */
+	cx0 = (ow - 1) / 2.0;
+	cy0 = (oh - 1) / 2.0;
+	cx1 = (nw - 1) / 2.0;
+	cy1 = (nh - 1) / 2.0;
+
+	x00 = cx0 - cx1 * s1 - cy1 * s2;
+	y00 = cy0 - cx1 * c1 - cy1 * c2;
+	A_rgb[0] = mem_col_A24.red;
+	A_rgb[1] = mem_col_A24.green;
+	A_rgb[2] = mem_col_A24.blue;
 
 	progress_init(_("Free Rotation"),0);
-	for ( ny=0; ny<nh; ny++ )
+	for (ny = 0; ny < nh; ny++)
 	{
-		k1 = ny*s2 + k3;
-		k2 = ny*c2 + k4;
-		ki1 = ny*nw;
-		if ( ny%16 == 0 ) progress_update( ((float) ny)/nh );
-		if ( type == 0 )	// Non-Smooth Indexed/RGB
-		{
-			if ( mem_image_bpp == 1 )
-				for ( nx=0; nx<nw; nx++ )
-				{
-					ox = nx*s1 + k1;
-					oy = nx*c1 + k2;
+		if ((ny * 10) % nh >= nh - 10)
+			progress_update((float)ny / nh);
+		x0y = ny * s2 + x00;
+		y0y = ny * c2 + y00;
 
-					if ( ox<0 || ox>=ow || oy<0 || oy>=oh )
-						mem_image[nx + ki1] = mem_col_A;
-					else
-						mem_image[nx + ki1] = old_image[ox + oy*ow];
-				}
-			if ( mem_image_bpp == 3 )
-				for ( nx=0; nx<nw; nx++ )
-				{
-					ox = nx*s1 + k1;
-					oy = nx*c1 + k2;
-					ki3 = 3*(nx + ki1);
-					if ( ox<0 || ox>=ow || oy<0 || oy>=oh )
-					{
-						mem_image[ki3] = mem_col_A24.red;
-						mem_image[1 + ki3] = mem_col_A24.green;
-						mem_image[2 + ki3] = mem_col_A24.blue;
-					}
-					else
-					{
-						ki2 = 3*(ox + oy*ow);
-						mem_image[ki3] = old_image[ki2];
-						mem_image[1 + ki3] = old_image[1 + ki2];
-						mem_image[2 + ki3] = old_image[2 + ki2];
-					}
-				}
-		}
-		if ( type == 1 )	// Smooth RGB
+		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
-			for ( nx=0; nx<nw; nx++ )
+			if (!mem_img[cc]) continue;
+			/* RGB nearest neighbour */
+			if (!type && (cc == CHN_IMAGE) && (mem_img_bpp == 3))
 			{
-				ki3 = 3*(nx + ki1);
-				fox = nx*s1 + k1;
-				foy = nx*c1 + k2;
-
-				if (fox>=0) ox = fox;
-				else ox = fox-1;
-				if (foy>=0) oy = foy;
-				else oy = foy-1;
-
-				sfact[0] = fox - ox;
-				sfact[1] = foy - oy;
-
-				pfact[0] = (1-sfact[0]) * (1-sfact[1]);
-				pfact[1] = sfact[0] * (1-sfact[1]);
-				pfact[2] = (1-sfact[0]) * sfact[1];
-				pfact[3] = sfact[0] * sfact[1];
-
-				for ( i=0; i<4; i++ )	// Get main pixels
+				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
+				for (nx = 0; nx < nw; nx++)
 				{
-					xa = ox + i%2;
-					ya = oy + i/2;
-					if ( xa<0 || xa>=ow || ya<0 || ya>=oh )
-					{
-						pix[i][0] = mem_col_A24.red;
-						pix[i][1] = mem_col_A24.green;
-						pix[i][2] = mem_col_A24.blue;
-					}
-					else
-					{
-						ki2 = 3*(xa + ya*ow);
-						pix[i][0] = old_image[ki2];
-						pix[i][1] = old_image[1 + ki2];
-						pix[i][2] = old_image[2 + ki2];
-					}
+					ox = nx * s1 + x0y;
+					oy = nx * c1 + y0y;
+					src = A_rgb;
+					if ((ox >= 0) && (ox < ow) &&
+						(oy >= 0) && (oy < oh))
+						src = old_img[CHN_IMAGE] +
+							(oy * ow + ox) * 3;
+					*dest++ = src[0];
+					*dest++ = src[1];
+					*dest++ = src[2];
 				}
-
-				for ( i=0; i<3; i++ )
-					mem_image[i + ki3] = mt_round
-						(
-						pfact[0] * pix[0][i] +
-						pfact[1] * pix[1][i] +
-						pfact[2] * pix[2][i] +
-						pfact[3] * pix[3][i]
-						);
+				continue;
+			}
+			/* One-bpp nearest neighbour */
+			if (!type)
+			{
+				fillv = cc == CHN_IMAGE ? mem_col_A : 0;
+				dest = mem_img[cc] + ny * nw;
+				for (nx = 0; nx < nw; nx++)
+				{
+					ox = nx * s1 + x0y;
+					oy = nx * c1 + y0y;
+					if ((ox >= 0) && (ox < ow) &&
+						(oy >= 0) && (oy < oh))
+						*dest++ = old_img[cc][oy * ow + ox];
+					else *dest++ = fillv;
+				}
+				continue;
+			}
+			/* RGB/RGBA bilinear */
+			if (cc == CHN_IMAGE)
+			{
+				alpha = NULL;
+				if (mem_img[CHN_ALPHA])
+					alpha = mem_img[CHN_ALPHA] + ny * nw;
+				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
+				for (nx = 0; nx < nw; nx++)
+				{
+					fox = nx * s1 + x0y;
+					foy = nx * c1 + y0y;
+					ox = floor(fox);
+					oy = floor(foy);
+					if ((ox < -1) || (ox >= ow) ||
+						(oy < -1) || (oy >= oh))
+					{
+						*dest++ = A_rgb[0];
+						*dest++ = A_rgb[1];
+						*dest++ = A_rgb[2];
+						if (!alpha) continue;
+						*alpha++ = 0;
+						continue;
+					}
+					fox -= ox;
+					foy -= oy;
+					k4 = fox * foy;
+					k3 = foy - k4;
+					k2 = fox - k4;
+					k1 = 1.0 - fox - foy + k4;
+					pix1 = old_img[CHN_IMAGE] + (oy * ow + ox) * 3;
+					pix2 = pix1 + 3;
+					pix3 = pix1 + ow * 3;
+					pix4 = pix3 + 3;
+					if (ox > ow - 2) pix2 = pix4 = A_rgb;
+					else if (ox < 0) pix1 = pix3 = A_rgb;
+					if (oy > oh - 2) pix3 = pix4 = A_rgb;
+					else if (oy < 0) pix1 = pix2 = A_rgb;
+					if (alpha)
+					{
+						aa1 = aa2 = aa3 = aa4 = 0.0;
+						src = old_img[CHN_ALPHA] + oy * ow + ox;
+						if (pix1 != A_rgb) aa1 = src[0] * k1;
+						if (pix2 != A_rgb) aa2 = src[1] * k2;
+						if (pix3 != A_rgb) aa3 = src[ow] * k3;
+						if (pix4 != A_rgb) aa4 = src[ow + 1] * k4;
+						aa = aa1 + aa2 + aa3 + aa4;
+						if ((*alpha++ = rint(aa)))
+						{
+							aa = 1.0 / aa;
+							k1 = aa1 * aa;
+							k2 = aa2 * aa;
+							k3 = aa3 * aa;
+							k4 = aa4 * aa;
+						}
+					}
+					rr = pix1[0] * k1 + pix2[0] * k2 +
+						pix3[0] * k3 + pix4[0] * k4;
+					gg = pix1[1] * k1 + pix2[1] * k2 +
+						pix3[1] * k3 + pix4[1] * k4;
+					bb = pix1[2] * k1 + pix2[2] * k2 +
+						pix3[2] * k3 + pix4[2] * k4;
+					*dest++ = rint(rr);
+					*dest++ = rint(gg);
+					*dest++ = rint(bb);
+				}
+				continue;
+			}
+			/* Alpha channel already done */
+			if (cc == CHN_ALPHA) continue;
+			/* Selection/mask channel bilinear */
+			dest = mem_img[cc] + ny * nw;
+			for (nx = 0; nx < nw; nx++)
+			{
+				fox = nx * s1 + x0y;
+				foy = nx * c1 + y0y;
+				ox = floor(fox);
+				oy = floor(foy);
+				if ((ox < -1) || (ox >= ow) ||
+					(oy < -1) || (oy >= oh))
+				{
+					*dest++ = 0;
+					continue;
+				}
+				fox -= ox;
+				foy -= oy;
+				k4 = fox * foy;
+				k3 = foy - k4;
+				k2 = fox - k4;
+				k1 = 1.0 - fox - foy + k4;
+				src = old_img[cc] + oy * ow + ox;
+				aa1 = aa2 = aa3 = aa4 = 0.0;
+				if (ox < ow - 1)
+				{
+					if (oy < oh - 1) aa4 = src[ow + 1] * k4;
+					if (oy >= 0) aa2 = src[1] * k2;
+				}
+				if (ox >= 0)
+				{
+					if (oy < oh - 1) aa3 = src[ow] * k3;
+					if (oy >= 0) aa1 = src[0] * k1;
+				}
+				*dest++ = rint(aa1 + aa2 + aa3 + aa4);
+			}
+			/* Mask channel requires thresholding */
+			if (cc != CHN_MASK) continue;
+			dest = mem_img[CHN_MASK] + ny * nw;
+			for (nx = 0; nx < nw; nx++)
+			{
+				*dest = *dest < 127 ? 0: 255;
+				dest++;
 			}
 		}
 	}
@@ -2775,17 +2668,21 @@ int mem_rotate_free( float angle, int type )	// Rotate canvas by any angle (degr
 
 int mem_image_rot( int dir )					// Rotate image 90 degrees
 {
-	char *old_image = mem_image;
+	chanlist old_img;
 	int i, ow = mem_width, oh = mem_height;
 
-	pen_down = 0;				// Ensure next tool action is treated separately
-	i = undo_next_core( 2, mem_height, mem_width, 0, 0, mem_image_bpp );
-	pen_down = 0;				// Ensure next tool action is treated separately
+	memcpy(old_img, mem_img, sizeof(chanlist));
+	pen_down = 0;		// Ensure next tool action is treated separately
+	i = undo_next_core(2, oh, ow, 0, 0, mem_img_bpp, CMASK_ALL);
+	pen_down = 0;		// Ensure next tool action is treated separately
 
 	if (i) return 1;			// Not enough memory
 
-	mem_rotate( mem_image, old_image, ow, oh, dir, mem_image_bpp );
-
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!mem_img[i]) continue;
+		mem_rotate(mem_img[i], old_img[i], ow, oh, dir, BPP(i));
+	}
 	return 0;
 }
 
@@ -2806,6 +2703,7 @@ fstep *make_filter(int l0, int l1, int type)
 	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
 	double A = 0.0, kk = 1.0, sum;
 	int pic_tile = FALSE; /* Allow to enable tiling mode later */
+	int pic_skip = FALSE; /* Allow to enable skip mode later */
 	int i, j, k;
 
 
@@ -2847,6 +2745,7 @@ fstep *make_filter(int l0, int l1, int type)
 		k = (int)floor(basept + fwidth / 2.0);
 		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
 		{
+			if (pic_skip && ((j < 0) || (j >= l0))) continue;
 			if (j < 0) buf->idx = pic_tile ? l0 + j : -j;
 			else if (j < l0) buf->idx = j;
 			else buf->idx = pic_tile ? j - l0 : 2 * (l0 - 1) - j;
@@ -2887,7 +2786,7 @@ fstep *make_filter(int l0, int l1, int type)
 	}
 	(buf - 1)->idx = -2;
 
-	/* Normalization pass. Damn the filters that require it. */
+	/* Normalization pass */
 	sum = 0.0;
 	for (buf = res, i = 0; ; i++)
 	{
@@ -2908,10 +2807,9 @@ fstep *make_filter(int l0, int l1, int type)
 	return (res);
 }
 
-float *work_area;
+double *work_area;
 fstep *hfilter, *vfilter;
 
-#define N_CHANNELS 3
 void clear_scale()
 {
 	free(work_area);
@@ -2923,8 +2821,8 @@ int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
 	work_area = NULL;
 	hfilter = vfilter = NULL;
-	if (!type || (mem_image_bpp == 1)) return TRUE;
-	work_area = malloc(ow * N_CHANNELS * sizeof(float));
+	if (!type || (mem_img_bpp == 1)) return TRUE;
+	work_area = malloc(5 * ow * sizeof(double));
 	hfilter = make_filter(ow, nw, type);
 	vfilter = make_filter(oh, nh, type);
 	if (!work_area || !hfilter || !vfilter)
@@ -2935,55 +2833,52 @@ int prepare_scale(int ow, int oh, int nw, int nh, int type)
 	return TRUE;
 }
 
-void do_scale(char *old_image, char *new_image, int ow, int oh, int nw, int nh)
+void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh)
 {
-	unsigned char *img;
-	fstep *tmp, *tmpx;
-	float *wrk;
-	double sum[N_CHANNELS], kk;
-	int i, j, n;
+	unsigned char *src, *img, *imga, alpha;
+	fstep *tmp = NULL, *tmpx, *tmpy;
+	double *wrk, *wrka;
+	double sum[4], kk;
+	int i, j, n, cc, bpp;
 
 	/* For each destination line */
-	tmp = vfilter;
-	for (i = 0; i < nh; i++, tmp++)
+	tmpy = vfilter;
+	for (i = 0; i < nh; i++, tmpy++)
 	{
-		memset(work_area, 0, ow * N_CHANNELS * sizeof(float));
-
-		/* Build one vertically-scaled row */
-		for (; tmp->idx >= 0; tmp++)
+		for (cc = 0; cc < NUM_CHANNELS; cc++)
 		{
-			img = old_image + tmp->idx * ow * N_CHANNELS;
-			wrk = work_area;
-			kk = tmp->k;
-			for (j = 0; j < ow; j++)
+			if (!new_img[cc]) continue;
+			/* If RGBA, wait for alpha */
+			if ((cc == CHN_IMAGE) && new_img[CHN_ALPHA]) continue;
+			bpp = cc == CHN_IMAGE ? 3 : 1;
+			tmp = tmpy;
+			memset(work_area, 0, ow * bpp * sizeof(double));
+			src = old_img[cc];
+			/* Build one vertically-scaled row */
+			for (; tmp->idx >= 0; tmp++)
 			{
-		/* WARNING: this for N_CHANNELS == 3 !!! */
-				wrk[0] += kk * img[0];
-				wrk[1] += kk * img[1];
-				wrk[2] += kk * img[2];
-				wrk += N_CHANNELS;
-				img += N_CHANNELS;
+				img = src + tmp->idx * ow * bpp;
+				wrk = work_area;
+				kk = tmp->k;
+				for (j = 0; j < ow * bpp; j++)
+					*wrk++ += *img++ * kk;
 			}
-		}
-
-		/* Scale it horizontally */
-		img = new_image + i * nw * N_CHANNELS;
-		/* WARNING: this for N_CHANNELS == 3 !!! */
-		sum[0] = sum[1] = sum[2] = 0.0;
-		for (tmpx = hfilter; ; tmpx++)
-		{
-			if (tmpx->idx >= 0)
+			/* Scale it horizontally */
+			img = new_img[cc] + i * nw * bpp;
+			sum[0] = sum[1] = sum[2] = 0.0;
+			for (tmpx = hfilter; ; tmpx++)
 			{
-				kk = tmpx->k;
-				wrk = work_area + tmpx->idx * N_CHANNELS;
-		/* WARNING: this for N_CHANNELS == 3 !!! */
-				sum[0] += kk * wrk[0];
-				sum[1] += kk * wrk[1];
-				sum[2] += kk * wrk[2];
-			}
-			else
-			{
-				for (n = 0; n < N_CHANNELS; n++)
+				if (tmpx->idx >= 0)
+				{
+					wrk = work_area + tmpx->idx * bpp;
+					kk = tmpx->k;
+					sum[0] += wrk[0] * kk;
+					if (bpp == 1) continue;
+					sum[1] += wrk[1] * kk;
+					sum[2] += wrk[2] * kk;
+					continue;
+				}
+				for (n = 0; n < bpp; n++)
 				{
 					j = (int)rint(sum[n]);
 					*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
@@ -2991,10 +2886,79 @@ void do_scale(char *old_image, char *new_image, int ow, int oh, int nw, int nh)
 				}
 				if (tmpx->idx < -1) break;
 			}
+			/* Mask channel requires thresholding */
+			if (cc == CHN_MASK)
+			{
+				img = new_img[CHN_MASK] + i * nw;
+				for (j = 0; j < nw; j++)
+					img[j] = img[j] < 127 ? 0: 255;
+			}
+			/* Process RGB after alpha */
+			if (cc != CHN_ALPHA) continue;
+			for (j = 0; j < ow; j++)
+			{
+				/* Make zero alphas slightly non-zero */
+				if (work_area[j] < (1.0 / 65536.0))
+					work_area[j] = (1.0 / 65536.0);
+				/* Prepare inverse alphas */
+				work_area[j + ow] = 1.0 / work_area[j];
+			}
+			tmp = tmpy;
+			wrk = work_area + 2 * ow;
+			memset(wrk, 0, ow * 3 * sizeof(double));
+			/* Build one vertically-scaled row */
+			for (; tmp->idx >= 0; tmp++)
+			{
+				img = old_img[CHN_IMAGE] + tmp->idx * ow * 3;
+				imga = old_img[CHN_ALPHA] + tmp->idx * ow;
+				wrk = work_area + 2 * ow;
+				for (j = 0; j < ow; j++)
+				{
+					kk = tmp->k * (work_area[j] < 0.5 ?
+						work_area[j] : imga[j]);
+					*wrk++ += *img++ * kk;
+					*wrk++ += *img++ * kk;
+					*wrk++ += *img++ * kk;
+				}
+			}
+			/* Scale it horizontally */
+			img = new_img[CHN_IMAGE] + i * nw * 3;
+			imga = new_img[CHN_ALPHA] + i * nw;
+			wrk = work_area + 2 * ow;
+			alpha = *imga++;
+			sum[0] = sum[1] = sum[2] = sum[3] = 0.0;
+			for (tmpx = hfilter; ; tmpx++)
+			{
+				if (tmpx->idx >= 0)
+				{
+					wrka = wrk + tmpx->idx * 3;
+					kk = tmpx->k;
+					if (!alpha) kk *= work_area[ow + tmpx->idx];
+					sum[0] += kk * wrka[0];
+					sum[1] += kk * wrka[1];
+					sum[2] += kk * wrka[2];
+					sum[3] += kk * work_area[tmpx->idx];
+				}
+				else
+				{
+					kk = 1.0 / sum[3];
+					sum[0] *= kk;
+					sum[1] *= kk;
+					sum[2] *= kk;
+					for (n = 0; n < 3; n++)
+					{
+						j = (int)rint(sum[n]);
+						*img++ = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+					}
+					if (tmpx->idx < -1) break;
+					alpha = *imga++;
+					sum[0] = sum[1] = sum[2] = sum[3] = 0.0;
+				}
+			}
 		}
-
 		if ((i * 10) % nh >= nh - 10) progress_update((float)(i + 1) / nh);
 		if (tmp->idx < -1) break;
+		tmpy = tmp;
 	}
 
 	clear_scale();
@@ -3002,8 +2966,9 @@ void do_scale(char *old_image, char *new_image, int ow, int oh, int nw, int nh)
 
 int mem_image_scale( int nw, int nh, int type )				// Scale image
 {
-	char *old_image = mem_image, *new_image, *src, *dest;
-	int i, j, oi, oj, res, ow = mem_width, oh = mem_height;
+	chanlist old_img;
+	char *src, *dest;
+	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
@@ -3012,8 +2977,9 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 
 	if (!prepare_scale(ow, oh, nw, nh, type)) return 1;	// Not enough memory
 
-	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
+	memcpy(old_img, mem_img, sizeof(chanlist));
+	pen_down = 0;		// Ensure next tool action is treated separately
+	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 
 	if (res)
@@ -3022,43 +2988,32 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 		return 1;			// Not enough memory
 	}
 
-	dest = new_image = mem_image;
 	progress_init(_("Scaling Image"),0);
-	if ( mem_image_bpp == 1 )
+	if (type && (mem_img_bpp == 3))
+		do_scale(old_img, mem_img, ow, oh, nw, nh);
+	else
 	{
-		for ( j=0; j<nh; j++ )
+		for (j = 0; j < nh; j++)
 		{
-			oj = (oh * j) / nh;
-			src = old_image + ow * oj;
-			for ( i=0; i<nw; i++ )
+			for (cc = 0; cc < NUM_CHANNELS; cc++)
 			{
-				oi = (ow * i) / nw;
-				*dest++ = src[oi];
+				if (!mem_img[cc]) continue;
+				bpp = BPP(cc);
+				dest = mem_img[cc] + nw * j * bpp;
+				oj = (oh * j) / nh;
+				src = old_img[cc] + ow * oj * bpp;
+				for (i = 0; i < nw; i++)
+				{
+					oi = ((ow * i) / nw) * bpp;
+					*dest++ = src[oi];
+					if (bpp == 1) continue;
+					*dest++ = src[oi + 1];
+					*dest++ = src[oi + 2];
+				}
 			}
 			if ((j * 10) % nh >= nh - 10)
 				progress_update((float)(j + 1) / nh);
 		}
-	}
-	else
-	{
-		if (!type)
-		{
-		    for ( j=0; j<nh; j++ )
-		    {
-				oj = (oh * j) / nh;
-				src = old_image + ow * oj * 3;
-			for ( i=0; i<nw; i++ )
-			{
-					oi = ((ow * i) / nw) * 3;
-					*dest++ = src[oi];
-					*dest++ = src[oi + 1];
-					*dest++ = src[oi + 2];
-			}
-				if ((j * 10) % nh >= nh - 10)
-					progress_update((float)(j + 1) / nh);
-		    }
-		}
-		else do_scale(old_image, new_image, ow, oh, nw, nh);
 	}
 	progress_end();
 
@@ -3067,7 +3022,8 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 
 int mem_isometrics(int type)
 {
-	int i, j, ow = mem_width, oh = mem_height, offset;
+	unsigned char *wrk, *src, *dest, *fill;
+	int i, j, k, l, cc, step, bpp, ow = mem_width, oh = mem_height;
 
 	if ( type<2 )
 	{
@@ -3082,63 +3038,68 @@ int mem_isometrics(int type)
 
 	if ( i<0 ) return i;
 
-	if ( type < 2 )			// Left/Right side down
+	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
-		for ( i=2*type; i<(ow-2*(1-type)); i++ )
+		if (!mem_img[cc]) continue;
+		bpp = BPP(cc);
+		if ( type < 2 )		// Left/Right side down
 		{
-			if ( type == 1 ) offset = i/2;
-			else offset = (ow-1-i)/2;
-			if ( mem_image_bpp == 1 )
+			fill = mem_img[cc] + (mem_height - 1) * ow * bpp;
+			step = ow * bpp;
+			if (type) step = -step;
+			else fill += (2 - (ow & 1)) * bpp;
+			for (i = mem_height - 1; i >= 0; i--)
 			{
-			 for ( j=(oh-1+offset); j>=offset; j-- )
-			  mem_image[ i + j*mem_width ] = mem_image[ i + (j-offset)*mem_width ];
-			 for ( j=0; j<offset; j++ )
-			  mem_image[ i + j*mem_width ] = mem_col_A;
-			}
-			else
-			{
-			 for ( j=(oh-1+offset); j>=offset; j-- )
-			 {
-			  mem_image[ 3*(i+j*mem_width) ] = mem_image[ 3*(i+(j-offset)*mem_width) ];
-			  mem_image[ 1+3*(i+j*mem_width) ] = mem_image[ 1+3*(i+(j-offset)*mem_width) ];
-			  mem_image[ 2+3*(i+j*mem_width) ] = mem_image[ 2+3*(i+(j-offset)*mem_width) ];
-			 }
-			 for ( j=0; j<offset; j++ )
-			 {
-			  mem_image[ 3*(i+j*mem_width) ] = mem_col_A24.red;
-			  mem_image[ 1+3*(i+j*mem_width) ] = mem_col_A24.green;
-			  mem_image[ 2+3*(i+j*mem_width) ] = mem_col_A24.blue;
-			 }
+				k = i + i + 2;
+				if (k > ow) k = ow;
+				l = k;
+				j = 0;
+				dest = mem_img[cc] + i * ow * bpp;
+				src = dest - step;
+				if (!type)
+				{
+					j = ow - k;
+					dest += j * bpp;
+					src += (j - ow * ((ow - j - 1) >> 1)) * bpp;
+					j = j ? 0 : ow & 1;
+					k += j;
+					if (j) src += step;
+				}
+				for (; j < k; j++)
+				{
+					if (!(j & 1)) src += step;
+					*dest++ = *src++;
+					if (bpp == 1) continue;
+					*dest++ = *src++;
+					*dest++ = *src++;
+				}
+				if (l < ow)
+				{
+					if (!type) dest = mem_img[cc] + i * ow * bpp;
+					memcpy(dest, fill, (ow - l) * bpp);
+				}
 			}
 		}
-	}
-	else				// Top/Bottom side right
-	{
-		for ( j=(type-2); j<(oh-(3-type)); j++ )
+		else			// Top/Bottom side right
 		{
-			if ( type == 2 ) offset = oh-1-j;
-			else offset = j;
-			if ( mem_image_bpp == 1 )
+			step = mem_width * bpp;
+			fill = mem_img[cc] + ow * bpp;
+			k = (oh - 1) * mem_width * bpp;
+			if (type == 2)
 			{
-			 for ( i=(ow-1+offset); i>=offset; i-- )
-			  mem_image[i + mem_width*j] = mem_image[i - offset + mem_width*j];
-			 for ( i=0; i<offset; i++ )
-			  mem_image[i + mem_width*j] = mem_col_A;
+				fill += k;
+				step = -step;
 			}
-			else
+			wrk = fill + step - 1;
+			k = ow * bpp;
+			for (i = 1; i < oh; i++)
 			{
-			 for ( i=(ow-1+offset); i>=offset; i-- )
-			 {
-			  mem_image[3*(i+mem_width*j)] = mem_image[3*(i-offset+mem_width*j)];
-			  mem_image[1+3*(i+mem_width*j)] = mem_image[1+3*(i-offset+mem_width*j)];
-			  mem_image[2+3*(i+mem_width*j)] = mem_image[2+3*(i-offset+mem_width*j)];
-			 }
-			 for ( i=0; i<offset; i++ )
-			 {
-			  mem_image[3*(i + mem_width*j)] = mem_col_A24.red;
-			  mem_image[1 + 3*(i + mem_width*j)] = mem_col_A24.green;
-			  mem_image[2 + 3*(i + mem_width*j)] = mem_col_A24.blue;
-			 }
+				src = wrk;
+				dest = wrk + i * bpp;
+				for (j = 0; j < k; j++)
+					*dest-- = *src--;
+				memcpy(src + 1, fill, i * bpp);
+				wrk += step;
 			}
 		}
 	}
@@ -3148,8 +3109,9 @@ int mem_isometrics(int type)
 
 int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 {
-	char *old_image = mem_image, *new_image, *src, *dest;
-	int i, j, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
+	chanlist old_img;
+	char *src, *dest;
+	int i, j, cc, bpp, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
 	int oww = mem_width, ohh = mem_height;
 
 	mtMIN( nw, nw, MAX_WIDTH )
@@ -3157,26 +3119,29 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 	mtMIN( nh, nh, MAX_HEIGHT )
 	mtMAX( nh, nh, 1 )
 
+	memcpy(old_img, mem_img, sizeof(chanlist));
 	pen_down = 0;				// Ensure next tool action is treated separately
-	res = undo_next_core( 2, nw, nh, 0, 0, mem_image_bpp );
+	res = undo_next_core(2, nw, nh, 0, 0, mem_img_bpp, CMASK_ALL);
 	pen_down = 0;
 	if (res) return 1;			// Not enough memory
 
 	j = nw * nh;
-	dest = new_image = mem_image;
-	if ( mem_image_bpp == 1 )
-		{
-		memset(dest, mem_col_A, j);
-	}
-	else
+	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
+		if (!mem_img[cc]) continue;
+		dest = mem_img[cc];
+		if ((cc != CHN_IMAGE) || (mem_img_bpp == 1))
+		{
+			memset(dest, cc == CHN_IMAGE ? mem_col_A : 0, j);
+			continue;
+		}
 		for (i = 0; i < j; i++)		// Background is current colour A
 		{
 			*dest++ = mem_col_A24.red;
 			*dest++ = mem_col_A24.green;
 			*dest++ = mem_col_A24.blue;
 		}
-		}
+	}
 
 	if ( ox < 0 ) oxo = -ox;
 	else nxo = ox;
@@ -3186,25 +3151,41 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 	mtMIN( ow, oww, nw )
 	mtMIN( oh, ohh, nh )
 
-		for ( j=0; j<oh; j++ )
-			{
-		src = old_image + (oxo + oww * (j + oyo)) * mem_image_bpp;
-		dest = new_image + (nxo + nw * (j + nyo)) * mem_image_bpp;
-		memcpy(dest, src, ow * mem_image_bpp);
+	for (cc = 0; cc < NUM_CHANNELS; cc++)
+	{
+		if (!mem_img[cc]) continue;
+		bpp = BPP(cc);
+		for (j = 0; j < oh; j++)
+		{
+			src = old_img[cc] + (oxo + oww * (j + oyo)) * bpp;
+			dest = mem_img[cc] + (nxo + nw * (j + nyo)) * bpp;
+			memcpy(dest, src, ow * bpp);
+		}
 	}
 
 	return 0;
 }
 
-png_color get_pixel24( int x, int y )				// RGB version
+png_color get_pixel24( int x, int y )	/* RGB */
 {
-	png_color pix = {
-			mem_image[ 3*(x + mem_width*y) ],
-			mem_image[ 1 + 3*(x + mem_width*y) ],
-			mem_image[ 2 + 3*(x + mem_width*y) ]
-			};
+	unsigned char *img = mem_img[CHN_IMAGE];
+	png_color pix;
+
+	x = (mem_width * y + x) * 3;
+	pix.red = img[x];
+	pix.green = img[x + 1];
+	pix.blue = img[x + 2];
 
 	return pix;
+}
+
+int get_pixel( int x, int y )	/* Mixed */
+{
+	x = mem_width * y + x;
+	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
+		return (mem_img[mem_channel][x]);
+	x *= 3;
+	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
 }
 
 int mem_protected_RGB(int intcol)		// Is this intcol in list?
@@ -3217,78 +3198,340 @@ int mem_protected_RGB(int intcol)		// Is this intcol in list?
 	return 0;
 }
 
-void put_pixel( int x, int y )				// paletted version
+int pixel_protected(int x, int y)
 {
-	unsigned char *old_image, newc;
-	int offset = x + mem_width*y;
+	int offset = y * mem_width + x;
 
-	if (mem_prot_mask[mem_image[x + (y)*mem_width]] == 0)
+	/* Colour protection */
+	if (mem_img_bpp == 1)
+	{
+		if (mem_prot_mask[mem_img[CHN_IMAGE][offset]]) return (TRUE);
+	}
+	else
+	{
+		if (mem_prot && mem_protected_RGB(MEM_2_INT(mem_img[CHN_IMAGE],
+			offset * 3))) return (TRUE);
+	}
+
+	/* Mask channel */
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] &&
+		mem_img[CHN_MASK][offset]) return (TRUE);
+
+	return (FALSE);
+}
+
+void prep_mask(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *mask0, unsigned char *img0)
+{
+	int i;
+
+	cnt = start + step * (cnt - 1) + 1;
+
+	/* Clear mask or copy mask channel into it */
+	if (mask0) memcpy(mask, mask0, cnt);
+	else memset(mask, 0, cnt);
+
+	/* Add colour protection to it */
+	if (mem_img_bpp == 1)
+	{
+		for (i = start; i < cnt; i += step)
+		{
+			mask[i] |= mem_prot_mask[img0[i]];
+		}
+	}
+	else if (mem_prot)
+	{
+		for (i = start; i < cnt; i += step)
+		{
+			mask[i] |= mem_protected_RGB(MEM_2_INT(img0, i * 3));
+		}
+	}
+}
+
+/* Prepare mask array - for each pixel >0 if masked, 0 if not */
+void row_protected(int x, int y, int len, unsigned char *mask)
+{
+	unsigned char *mask0 = NULL;
+	int ofs = y * mem_width + x;
+
+	/* Clear mask or copy mask channel into it */
+	if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK])
+		mask0 = mem_img[CHN_MASK] + ofs;
+
+	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
+}
+
+void put_pixel( int x, int y )	/* Combined */
+{
+	unsigned char *old_image, *new_image, newc;
+	unsigned char r, g, b, nr, ng, nb;
+	int i, offset, ofs3;
+
+	if (pixel_protected(x, y)) return;
+
+	if ( mem_undo_opacity ) old_image = mem_undo_previous();
+	else old_image = mem_img[mem_channel];
+	offset = x + mem_width * y;
+
+	/* Indexed image or utility channel */
+	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
 		newc = mem_col_pat[((x) % 8) + 8*((y) % 8)];
 		if (tint_mode[0])
 		{
-			if ( mem_undo_opacity ) old_image = mem_undo_previous();
-			else old_image = mem_image;
-
 			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
 				newc = old_image[offset] > mem_cols - 1 - newc ? mem_cols-1 : old_image[offset] + newc;
 			else
 				newc = old_image[offset] > newc ? old_image[offset] - newc : 0;
 
 		}
-		mem_image[offset] = newc;
+		mem_img[mem_channel][offset] = newc;
 	}
-}
-void put_pixel24( int x, int y )				// RGB version
-{
-	unsigned char *old_image = NULL, r, g, b, nr, ng, nb;
-	int offset = 3*(x + mem_width*y), curpix;
-
-	if ( mem_prot>0 )		// Have any pixel colours been protected?
+	/* RGB image channel */
+	else
 	{
-		curpix = MEM_2_INT(mem_image, offset);
-		if ( mem_protected_RGB(curpix) ) return; // Bailout if we are on a protected pixel
-	}
+		ofs3 = offset * 3;
+		new_image = mem_img[CHN_IMAGE];
 
-	nr = mem_col_pat24[ 3*(((x) % 8) + 8*((y) % 8)) ];
-	ng = mem_col_pat24[ 1 + 3*(((x) % 8) + 8*((y) % 8)) ];
-	nb = mem_col_pat24[ 2 + 3*(((x) % 8) + 8*((y) % 8)) ];
+		i = ((x & 7) + 8 * (y & 7)) * 3;
+		nr = mem_col_pat24[i + 0];
+		ng = mem_col_pat24[i + 1];
+		nb = mem_col_pat24[i + 2];
 
-	if ( mem_undo_opacity ) old_image = mem_undo_previous();
-	else old_image = mem_image;
-
-	if (tint_mode[0])
-	{
-		if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+		if (tint_mode[0])
 		{
-			nr = old_image[offset] > 255 - nr ? 255 : old_image[offset] + nr;
-			ng = old_image[1 + offset] > 255 - ng ? 255 : old_image[1 + offset] + ng;
-			nb = old_image[2 + offset] > 255 - nb ? 255 : old_image[2 + offset] + nb;
+			if ( tint_mode[2] == 1 || (tint_mode[2] == 0 && tint_mode[1] == 0) )
+			{
+				nr = old_image[ofs3] > 255 - nr ? 255 : old_image[ofs3] + nr;
+				ng = old_image[ofs3 + 1] > 255 - ng ? 255 : old_image[ofs3 + 1] + ng;
+				nb = old_image[ofs3 + 2] > 255 - nb ? 255 : old_image[ofs3 + 2] + nb;
+			}
+			else
+			{
+				nr = old_image[ofs3] > nr ? old_image[ofs3] - nr : 0;
+				ng = old_image[ofs3 + 1] > ng ? old_image[ofs3 + 1] - ng : 0;
+				nb = old_image[ofs3 + 2] > nb ? old_image[ofs3 + 2] - nb : 0;
+			}
+		}
+
+		if ( tool_opacity == 255 )
+		{
+			new_image[ofs3] = nr;
+			new_image[ofs3 + 1] = ng;
+			new_image[ofs3 + 2] = nb;
 		}
 		else
 		{
-			nr = old_image[offset] > nr ? old_image[offset] - nr : 0;
-			ng = old_image[1 + offset] > ng ? old_image[1 + offset] - ng : 0;
-			nb = old_image[2 + offset] > nb ? old_image[2 + offset] - nb : 0;
+			r = old_image[ofs3];
+			g = old_image[ofs3 + 1];
+			b = old_image[ofs3 + 2];
+
+			i = r * 255 + (nr - r) * tool_opacity;
+			new_image[ofs3] = (i + (i >> 8) + 1) >> 8;
+			i = g * 255 + (ng - g) * tool_opacity;
+			new_image[ofs3 + 1] = (i + (i >> 8) + 1) >> 8;
+			i = b * 255 + (nb - b) * tool_opacity;
+			new_image[ofs3 + 2] = (i + (i >> 8) + 1) >> 8;
+		}
+	}
+}
+
+void process_mask(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
+	unsigned char *trans, int opacity)
+{
+	unsigned char newc, oldc;
+	int i, j, k, tint;
+
+	cnt = start + step * cnt;
+
+	tint = tint_mode[0] ? 1 : 0;
+	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+
+	/* Opacity mode */
+	if (opacity)
+	{
+		for (i = start; i < cnt; i += step)
+		{
+			if (mask[i])
+			{
+				mask[i] = 0;
+				continue;
+			}
+
+			k = opacity;
+			if (trans)
+			{
+				/* Have transparency mask */
+				k = (255 - trans[i]) * opacity;
+				k = (k + (k >> 8) + 1) >> 8;
+			}
+			mask[i] = k;
+
+			if (!alpha || !k) continue;
+			/* Have alpha channel - process it */
+			newc = alpha[i];
+			oldc = alpha0[i];
+			if (tint)
+			{
+				if (tint < 0) newc = oldc > 255 - newc ?
+					255 : oldc + newc;
+				else newc = oldc > newc ? oldc - newc : 0;
+			}
+			j = oldc * 255 + (newc - oldc) * k;
+			alphar[i] = (j + (j >> 8) + 1) >> 8;
+			k *= newc;
+			mask[i] = j ? (255 * k) / j : 127;
 		}
 	}
 
-	if ( tool_opacity == 100 )
+	/* Indexed mode with transparency mask and/or alpha */
+	else if (trans || alpha)
 	{
-		mem_image[ offset ] = nr;
-		mem_image[ 1 + offset ] = ng;
-		mem_image[ 2 + offset ] = nb;
+		if (!trans) trans = mask;
+		for (i = start; i < cnt; i += step)
+		{
+			mask[i] |= trans[i];
+			if (!alpha || mask[i]) continue;
+			/* Have alpha channel - process it */
+			newc = alpha[i];
+			if (tint)
+			{
+				oldc = alpha0[i];
+				if (tint < 0) newc = oldc > 255 - newc ?
+					255 : oldc + newc;
+				else newc = oldc > newc ? oldc - newc : 0;
+			}
+			alphar[i] = newc;
+		}
 	}
+}
+
+void process_img(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0, unsigned char *img,
+	int opacity)
+{
+	unsigned char newc, oldc;
+	unsigned char r, g, b, nr, ng, nb;
+	int i, j, ofs3, tint;
+
+	cnt = start + step * cnt;
+
+	tint = tint_mode[0] ? 1 : 0;
+	if ((tint_mode[2] == 1) || !(tint_mode[2] || tint_mode[1])) tint = -tint;
+
+	/* Indexed image or utility channel */
+	if (!opacity)
+	{
+		for (i = start; i < cnt; i += step)
+		{
+			if (mask[i]) continue;
+			newc = img[i];
+			if (tint)
+			{
+				oldc = img0[i];
+				if (tint < 0) newc = oldc >= mem_cols - newc ?
+					mem_cols - 1 : oldc + newc;
+				else newc = oldc > newc ? oldc - newc : 0;
+			}
+			imgr[i] = newc;
+		}
+	}
+
+	/* RGB image */
 	else
 	{
-		r = old_image[ offset ];
-		g = old_image[ 1 + offset ];
-		b = old_image[ 2 + offset ];
+		for (i = start; i < cnt; i += step)
+		{
+			opacity = mask[i];
+			if (!opacity) continue;
+			ofs3 = i * 3;
+			nr = img[ofs3 + 0];
+			ng = img[ofs3 + 1];
+			nb = img[ofs3 + 2];
+			if (tint)
+			{
+				r = img0[ofs3 + 0];
+				g = img0[ofs3 + 1];
+				b = img0[ofs3 + 2];
+				if (tint < 0)
+				{
+					nr = r > 255 - nr ? 255 : r + nr;
+					ng = g > 255 - ng ? 255 : g + ng;
+					nb = b > 255 - nb ? 255 : b + nb;
+				}
+				else
+				{
+					nr = r > nr ? r - nr : 0;
+					ng = g > ng ? g - ng : 0;
+					nb = b > nb ? b - nb : 0;
+				}
+			}
+			if (opacity == 255)
+			{
+				imgr[ofs3 + 0] = nr;
+				imgr[ofs3 + 1] = ng;
+				imgr[ofs3 + 2] = nb;
+				continue;
+			}
+			r = img0[ofs3 + 0];
+			g = img0[ofs3 + 1];
+			b = img0[ofs3 + 2];
+			j = r * 255 + (nr - r) * opacity;
+			imgr[ofs3 + 0] = (j + (j >> 8) + 1) >> 8;
+			j = g * 255 + (ng - g) * opacity;
+			imgr[ofs3 + 1] = (j + (j >> 8) + 1) >> 8;
+			j = b * 255 + (nb - b) * opacity;
+			imgr[ofs3 + 2] = (j + (j >> 8) + 1) >> 8;
+		}
+	}	
+}
 
-		mem_image[offset] = ( nr*tool_opacity +	r*(100-tool_opacity) ) / 100;
-		mem_image[1 + offset] = ( ng*tool_opacity + g*(100-tool_opacity) ) / 100;
-		mem_image[2 + offset] = ( nb*tool_opacity + b*(100-tool_opacity) ) / 100;
+/* Separate function for faster paste */
+void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
+	unsigned char *alpha, unsigned char *trans, int opacity)
+{
+	unsigned char *old_image, *old_alpha = NULL, *dest = NULL;
+	int i, bpp, ofs = x + mem_width * y;
+
+	bpp = MEM_BPP;
+
+	/* Setup opacity mode */
+	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1)) opacity = 0;
+
+	/* Alpha channel is special */
+	if (mem_channel == CHN_ALPHA)
+	{
+		alpha = img;
+		img = NULL;
 	}
+
+	/* Prepare alpha */
+	if (alpha)
+	{
+		if (mem_undo_opacity)
+		{
+			i = mem_channel;
+			mem_channel = CHN_ALPHA;
+			old_alpha = mem_undo_previous();
+			mem_channel = i;
+		}
+		else old_alpha = mem_img[CHN_ALPHA];
+		old_alpha += ofs;
+		dest = mem_img[CHN_ALPHA] + ofs;
+	}
+
+	process_mask(0, 1, len, mask, dest, old_alpha, alpha, trans, opacity);
+
+	/* Stop if we have alpha without image */
+	if (!img) return;
+
+	if (mem_undo_opacity) old_image = mem_undo_previous();
+	else old_image = mem_img[mem_channel];
+	old_image += ofs * bpp;
+	dest = mem_img[mem_channel] + ofs * bpp;
+
+	process_img(0, 1, len, mask, dest, old_image, img, opacity);
 }
 
 int png_cmp( png_color a, png_color b )			// Compare 2 colours
@@ -3300,37 +3543,35 @@ int png_cmp( png_color a, png_color b )			// Compare 2 colours
 
 int mem_count_all_cols()				// Count all colours - Using main image
 {
-	return mem_count_all_cols_real(mem_image, mem_width, mem_height);
+	return mem_count_all_cols_real(mem_img[CHN_IMAGE], mem_width, mem_height);
 }
 
 int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colours - very memory greedy
 {
-	unsigned char *tab, c;
-	int i, j, k, o;
+	unsigned char *tab;
+	int i, j, k, ix;
 
-	tab = malloc( 256*256*32 );			// HUGE colour cube
-	if ( tab == NULL ) return -1;			// Not enough memory Mr Greedy ;-)
+	j = 0x200000;
+	tab = malloc(j);			// HUGE colour cube
+	if (!tab) return -1;			// Not enough memory Mr Greedy ;-)
 
-	j = 256*256*32;
-	for ( i=0; i<j; i++ ) tab[i] = 0;		// Flush table
+	memset(tab, 0, j);			// Flush table
 
-	j = w*h;
-	for ( i=0; i<j; i++ )				// Scan each pixel
+	k = w * h;
+	for (i = 0; i < k; i++)			// Scan each pixel
 	{
-		o = im[0] + 256*im[1] + 256*256*( im[2] >> 3 );
-		c = tab[o];
-		c = c | ( 1 << (im[2] % 8) );
-		tab[o] = c;
-
+		ix = (im[0] >> 3) + (im[1] << 5) + (im[2] << 13);
+		tab[ix] |= 1 << (im[0] & 7);
 		im += 3;
 	}
 
-	j = 256*256*32;
 	k = 0;
-	for ( i=0; i<j; i++ )		// Count each colour
+	for (i = 0; i < j; i++)			// Count each colour
 	{
-		k = k + ((tab[i]>>0) % 2) + ((tab[i]>>1) % 2) + ((tab[i]>>2) % 2) + ((tab[i]>>3) % 2) +
-		  ((tab[i]>>4) % 2) + ((tab[i]>>5) % 2) + ((tab[i]>>6) % 2) + ((tab[i]>>7) % 2);
+		ix = tab[i];
+		ix = (ix & 0x55) + ((ix & 0xAA) >> 1);
+		ix = (ix & 0x33) + ((ix & 0xCC) >> 2);
+		k += (ix & 0xF) + (ix >> 4);
 	}
 
 	free(tab);
@@ -3340,9 +3581,10 @@ int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colour
 
 int mem_cols_used(int max_count)			// Count colours used in main RGB image
 {
-	if ( mem_image_bpp == 1 ) return -1;			// RGB only
+	if ( mem_img_bpp == 1 ) return -1;			// RGB only
 
-	return mem_cols_used_real(mem_image, mem_width, mem_height, max_count, 1);
+	return (mem_cols_used_real(mem_img[CHN_IMAGE], mem_width, mem_height,
+		max_count, 1));
 }
 
 void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
@@ -3383,11 +3625,10 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			found[res][2] = im[i+2];
 			res++;
 			if ( res % 16 == 0 && prog == 1 )
-				if ( progress_update( ((float) res)/1024 ) ) goto stop;
+				if ( progress_update( ((float) res)/1024 ) ) break;
 		}
 		i = i + 3;
 	}
-stop:
 	if ( prog == 1 ) progress_end();
 
 	return res;
@@ -3398,94 +3639,74 @@ stop:
 
 void do_effect( int type, int param )		// 0=edge detect 1=blur 2=emboss
 {
-	unsigned char *rgb, pix[3];
-	int offset, pixels = mem_width*mem_height*3, i, j, k, l=0, diffs[4][3];
-	float blur = ((float) param) / 200, b2, b3;
+	unsigned char *src, *dest;
+	int i, j, k = 0, ix, bpp, ll, dxp1, dxm1, dyp1, dym1;
+	double blur = (double)param / 200.0;
 
-	rgb = grab_memory( pixels, 0 );
-	if (rgb == NULL) return;
+	bpp = MEM_BPP;
+	ll = mem_width * bpp;
 
-	if ( type != 1 ) progress_init(_("Applying Effect"),1);
-	for ( j=1; j<(mem_height-1); j++ )
+	if (type == 1) /* Blur is applied repeatedly */
 	{
-		if ( j%16 == 0 && type != 1 ) if (progress_update( ((float) j)/(mem_height) )) goto stop;
-		for ( i=1; i<(mem_width-1); i++ )
-		{
-			offset = 3*(i + j*mem_width);
-			for ( k=0; k<3; k++ )
-			{
-				pix[k] = mem_image[k + offset];
-				diffs[0][k] = mem_image[k + offset - 3*mem_width];
-				diffs[1][k] = mem_image[k + offset - 3];
-				diffs[2][k] = mem_image[k + offset + 3];
-				diffs[3][k] = mem_image[k + offset + 3*mem_width];
-				if ( type==0 )	// Edge detect
-				{
-					diffs[0][k] = abs( pix[k] - diffs[0][k] );
-					diffs[1][k] = abs( pix[k] - diffs[1][k] );
-					diffs[2][k] = abs( pix[k] - diffs[2][k] );
-					diffs[3][k] = abs( pix[k] - diffs[3][k] );
-					l = diffs[0][k] + diffs[1][k] + diffs[2][k] + diffs[3][k];
-				}
-				if ( type==1 )	// Blur
-				{
-					b2 = diffs[0][k] + diffs[1][k] + diffs[2][k] + diffs[3][k];
-					b2 = b2 / 4;
-					b3 = pix[k];
-					l = 0.4999 + b2*blur + b3*(1-blur);
-				}
-				if ( type==2 )	// Emboss
-				{
-					diffs[2][k] = mem_image[k + offset - 3 - 3*mem_width];
-					diffs[3][k] = mem_image[k + offset + 3 - 3*mem_width];
-					l = (diffs[0][k] + diffs[1][k] + diffs[2][k] + diffs[3][k])/4;
-					l = l - pix[k] + 127;
-				}
-				if ( type==3 )	// Edge sharpen
-				{
-					l = diffs[0][k] + diffs[1][k] + diffs[2][k] + diffs[3][k];
-					l = l - 4*pix[k];
-					l = pix[k] - blur*l;
-				}
-				if ( type==4 )	// Edge soften
-				{
-					l = diffs[0][k] + diffs[1][k] + diffs[2][k] + diffs[3][k];
-					l = l - 4*pix[k];
-					l = pix[k] + 5*((float) l)/(125 - param);
-				}
-				mtMIN( l, l, 255 )
-				mtMAX( l, l, 0 )
-				rgb[k + offset] = l;
-			}
-		}
+		blur *= 0.25;
+		src = mem_img[mem_channel];
+		dest = malloc(ll * mem_height);
+		if (!dest) return;
 	}
-stop:
-	if ( type != 1 ) progress_end();
-	if ( type == 1 || type == 3 || type == 4 )		// Reinstate border pixels
+	else
 	{
-		offset = 3*mem_width*(mem_height-1);
-		for ( i=0; i<mem_width; i++ )
-		{
-			for ( k=0; k<3; k++ )
-			{
-				rgb[k + 3*i] = mem_image[k + 3*i];			// Top
-				rgb[k + 3*i + offset ] = mem_image[k + 3*i + offset];	// Bottom
-			}
-		}
-		offset = 3*mem_width;
-		for ( j=0; j<mem_height; j++ )
-		{
-			for ( k=0; k<3; k++ )
-			{
-				rgb[k + j*offset] = mem_image[k + j*offset];			// Left
-				rgb[k + (j+1)*offset - 3 ] = mem_image[k + (j+1)*offset - 3];	// Right
-			}
-		}
+		src = mem_undo_previous();
+		dest = mem_img[mem_channel];
+		progress_init(_("Applying Effect"), 1);
 	}
-
-	for ( i=0; i<pixels; i++ ) mem_image[i] = rgb[i];
-
-	free(rgb);
+	for (ix = i = 0; i < mem_height; i++)
+	{
+		dyp1 = i < mem_height - 1 ? ll : -ll;
+		dym1 = i ? -ll : ll;
+		for (j = 0; j < ll; j++)
+		{
+			dxp1 = j < ll - bpp ? bpp : -bpp;
+			dxm1 = j >= bpp ? -bpp : bpp;
+			switch (type)
+			{
+			case 0:	/* Edge detect */
+				k = src[ix];
+				k = abs(k - src[ix + dym1]) + abs(k - src[ix + dyp1]) +
+					abs(k - src[ix + dxm1]) + abs(k - src[ix + dxp1]);
+				break;
+			case 1:	/* Blur */
+				k = src[ix + dym1] + src[ix + dyp1] +
+					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
+				k = src[ix] + (int)rint(k * blur);
+				break;
+			case 2:	/* Emboss */
+				k = src[ix + dym1] + src[ix + dxm1] +
+					src[ix + dxm1 + dym1] + src[ix + dxp1 + dym1];
+				k = k / 4 - src[ix] + 127;
+				break;
+			case 3:	/* Edge sharpen */
+				k = src[ix + dym1] + src[ix + dyp1] +
+					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
+				k = src[ix] - blur * k;
+				break;
+			case 4:	/* Edge soften */
+				k = src[ix + dym1] + src[ix + dyp1] +
+					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
+				k = src[ix] + (5 * k) / (125 - param);
+				break;
+			}
+			dest[ix++] = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
+		}
+		if ((type != 1) && ((i * 10) % mem_height >= mem_height - 10))
+			if (progress_update((float)(i + 1) / mem_height)) break;
+	}
+	if (type == 1) /* Swap pages for blur */
+	{
+		free(mem_img[mem_channel]);
+		mem_undo_im_[mem_undo_pointer].img[mem_channel] =
+			mem_img[mem_channel] = dest;
+	}
+	else progress_end();
 }
 
 
@@ -3493,21 +3714,21 @@ stop:
 
 int mem_clip_mask_init(unsigned char val)		// Initialise the clipboard mask
 {
-	int i, j = mem_clip_w*mem_clip_h;
+	int j = mem_clip_w*mem_clip_h;
 
 	if ( mem_clipboard != NULL ) mem_clip_mask_clear();	// Remove old mask
 
 	mem_clip_mask = malloc(j);
-	if ( mem_clip_mask == NULL ) return 1;			// Not alble to allocate memory
+	if (!mem_clip_mask) return 1;			// Not able to allocate memory
 
-	for ( i=0; i<j; i++ ) mem_clip_mask[i] = val;		// Start with fully opaque/clear mask
+	memset(mem_clip_mask, val, j);		// Start with fully opaque/clear mask
 
 	return 0;
 }
 
 void mem_clip_mask_set(unsigned char val)		// (un)Mask colours A and B on the clipboard
 {
-	int i, j = mem_clip_w*mem_clip_h;
+	int i, j = mem_clip_w * mem_clip_h, k, aa, bb;
 
 	if ( mem_clip_bpp == 1 )
 	{
@@ -3519,16 +3740,13 @@ void mem_clip_mask_set(unsigned char val)		// (un)Mask colours A and B on the cl
 	}
 	if ( mem_clip_bpp == 3 )
 	{
+		aa = PNG_2_INT(mem_col_A24);
+		bb = PNG_2_INT(mem_col_B24);
 		for ( i=0; i<j; i++ )
 		{
-			if (	mem_clipboard[3*i] == mem_col_A24.red &&
-				mem_clipboard[1+3*i] == mem_col_A24.green &&
-				mem_clipboard[2+3*i] == mem_col_A24.blue )
-					mem_clip_mask[i] = val;
-			if (	mem_clipboard[3*i] == mem_col_B24.red &&
-				mem_clipboard[1+3*i] == mem_col_B24.green &&
-				mem_clipboard[2+3*i] == mem_col_B24.blue )
-					mem_clip_mask[i] = val;
+			k = MEM_2_INT(mem_clipboard, i * 3);
+			if ((k == aa) || (k == bb))
+				mem_clip_mask[i] = val;
 		}
 	}
 }
@@ -3605,10 +3823,11 @@ int mem_clip_scale_alpha()	// Extract alpha information from RGB clipboard - alp
 
 void mem_smudge(int ox, int oy, int nx, int ny)		// Smudge from old to new @ tool_size, RGB only
 {
-	unsigned char *rgb;
+	unsigned char *src, *dest;
 	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
 	int xv = nx - ox, yv = ny - oy;		// Vector
-	int i, j, k, rx, ry, pixy, offs;
+	int i, j, bpp, rx, ry, offs, delta;
+	int x0, x1, dx, y0, y1, dy;
 
 	if ( ax<0 )		// Ensure original area is within image
 	{
@@ -3625,56 +3844,60 @@ void mem_smudge(int ox, int oy, int nx, int ny)		// Smudge from old to new @ too
 	if ( (ay+h)>mem_height )
 		h = mem_height - ay;
 
-	rgb = malloc( w*h*3 );
-	for ( j=0; j<h; j++ )		// Grab old area of canvas
+	if ((w < 1) || (h < 1)) return;
+
+/* !!! I modified this tool action somewhat - White Jaguar */
+	if ( mem_undo_opacity ) src = mem_undo_previous();
+	else src = mem_img[mem_channel];
+	dest = mem_img[mem_channel];
+	bpp = MEM_BPP;
+	delta = (yv * mem_width + xv) * bpp;
+
+	if (xv > 0)
 	{
-		ry = ay + j;
-		for ( i=0; i<w; i++ )
-		{
-			rx = ax + i;
-			for ( k=0; k<3; k++ )
-			{
-				rgb[ k + 3*(i + w*j) ] = mem_image[ k + 3*(rx + mem_width*ry) ];
-			}
-		}
+		x0 = w - 1; x1 = -1; dx = -1;
+	}
+	else
+	{
+		x0 = 0; x1 = w; dx = 1;
+	}
+	if (yv > 0)
+	{
+		y0 = h - 1; y1 = -1; dy = -1;
+	}
+	else
+	{
+		y0 = 0; y1 = h; dy = 1;
 	}
 
-	for ( j=0; j<h; j++ )		// Blend old area with new area
+	for (j = y0; j != y1; j += dy)	// Blend old area with new area
 	{
 		ry = ay + yv + j;
-		if (ry>=0 && ry<mem_height) for ( i=0; i<w; i++ )
+		if ((ry < 0) || (ry >= mem_height)) continue;
+		for (i = x0; i != x1; i += dx)
 		{
 			rx = ax + xv + i;
-			if (rx>=0 && rx<mem_width)
-			{
-				offs = 3*(rx + mem_width*ry);
-				pixy = MEM_2_INT(mem_image, offs);
-
-				if ( !mem_protected_RGB(pixy) )
-				{
-					for ( k=0; k<3; k++ )
-					{
-						mem_image[ k + offs ] = (rgb[ k + 3*(i + w*j) ] +
-							mem_image[ k + offs ]) / 2;
-					}
-				}
-			}
+			if ((rx < 0) || (rx >= mem_width)) continue;
+			if (pixel_protected(rx, ry)) continue;
+			offs = (mem_width * ry + rx) * bpp;
+			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
+			if (bpp == 1) continue;
+			offs++;
+			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
+			offs++;
+			dest[offs] = (src[offs - delta] + dest[offs]) / 2;
 		}
 	}
-	free(rgb);
 }
 
 void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_size
 {
-	unsigned char *rgb,
-			*orgb = mem_image;		// Used for <100% opacity
+	unsigned char *src, *dest;
 	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
 	int xv = nx - ox, yv = ny - oy;		// Vector
-	int i, j, k, rx, ry, pixy, offs;
-	int opac = mt_round( ((float) tool_opacity) / 100 * 255), opac2 = 255 - opac;
-
-	if ( mem_image_bpp == 3 && mem_undo_opacity )
-		orgb = mem_undo_previous();
+	int i, j, k, rx, ry, offs, delta, bpp;
+	int x0, x1, dx, y0, y1, dy;
+	int opac = 0, opac2;
 
 	if ( ax<0 )		// Ensure original area is within image
 	{
@@ -3691,72 +3914,61 @@ void mem_clone(int ox, int oy, int nx, int ny)		// Clone from old to new @ tool_
 	if ( (ay+h)>mem_height )
 		h = mem_height - ay;
 
-	if ( w<1 || h<1 )
-	{
-		return;
-	}
-//printf("w=%i h=%i x=%i y=%i\n",w,h,ox,oy);
+	if ((w < 1) || (h < 1)) return;
 
-	rgb = malloc( w*h*mem_image_bpp );
-	for ( j=0; j<h; j++ )		// Grab old area of canvas
+/* !!! I modified this tool action somewhat - White Jaguar */
+	if ( mem_undo_opacity ) src = mem_undo_previous();
+	else src = mem_img[mem_channel];
+	dest = mem_img[mem_channel];
+	bpp = MEM_BPP;
+	delta = (yv * mem_width + xv) * bpp;
+
+	/* Tool opacity functions only for RGB - for now, at least */
+	if (bpp == 3) opac = tool_opacity;
+	opac2 = 255 - opac;
+
+	if (xv > 0)
 	{
-		ry = ay + j;
-		if ( mem_image_bpp == 1 )
-		{
-			for ( i=0; i<w; i++ )
-			{
-				rx = ax + i;
-				rgb[ i + w*j ] = mem_image[ rx + mem_width*ry ];
-			}
-		}
-		if ( mem_image_bpp == 3 )
-		{
-			for ( i=0; i<w; i++ )
-			{
-				rx = ax + i;
-				for ( k=0; k<3; k++ )
-				{
-					rgb[ k + 3*(i + w*j) ] =
-						orgb[ k + 3*(rx + mem_width*ry) ];
-				}
-			}
-		}
+		x0 = w - 1; x1 = -1; dx = -1;
+	}
+	else
+	{
+		x0 = 0; x1 = w; dx = 1;
+	}
+	if (yv > 0)
+	{
+		y0 = h - 1; y1 = -1; dy = -1;
+	}
+	else
+	{
+		y0 = 0; y1 = h; dy = 1;
 	}
 
-	for ( j=0; j<h; j++ )		// Blend old area with new area
+	for (j = y0; j != y1; j += dy)	// Blend old area with new area
 	{
 		ry = ay + yv + j;
-		if (ry>=0 && ry<mem_height && mem_image_bpp==1) for ( i=0; i<w; i++ )
+		if ((ry < 0) || (ry >= mem_height)) continue;
+		for (i = x0; i != x1; i += dx)
 		{
 			rx = ax + xv + i;
-			if (rx>=0 && rx<mem_width)
+			if ((rx < 0) || (rx >= mem_width)) continue;
+			if (pixel_protected(rx, ry)) continue;
+			offs = (mem_width * ry + rx) * bpp;
+			if (!opac)
 			{
-				offs = rx + mem_width*ry;
-				if ( mem_prot_mask[mem_image[offs]] == 0 )
-					mem_image[offs] = rgb[ i + w*j ];
+				dest[offs] = src[offs - delta];
+				continue;
 			}
-		}
-		if (ry>=0 && ry<mem_height && mem_image_bpp==3) for ( i=0; i<w; i++ )
-		{
-			rx = ax + xv + i;
-			if (rx>=0 && rx<mem_width)
-			{
-				offs = 3*(rx + mem_width*ry);
-				pixy = MEM_2_INT(mem_image, offs);
-
-				if ( !mem_protected_RGB(pixy) )
-				{
-					for ( k=0; k<3; k++ )
-					{
-						mem_image[ k + offs ] =(
-							opac * rgb[ k + 3*(i + w*j) ] +
-							opac2 * orgb[ k + offs ] + 128
-							) / 255;
-					}
-				}
-			}
+			k = src[offs - delta] * opac + src[offs] * opac2;
+			dest[offs] = (k + (k >> 8) + 1) >> 8;
+			if (bpp == 1) continue;
+			offs++;
+			k = src[offs - delta] * opac + src[offs] * opac2;
+			dest[offs] = (k + (k >> 8) + 1) >> 8;
+			offs++;
+			k = src[offs - delta] * opac + src[offs] * opac2;
+			dest[offs] = (k + (k >> 8) + 1) >> 8;
 		}
 	}
-	free(rgb);
 }
 

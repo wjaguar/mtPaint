@@ -24,13 +24,13 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "mygtk.h"
 #include "inifile.h"
 #include "canvas.h"
 #include "png.h"
-#include "memory.h"
 #include "quantizer.h"
 #include "viewer.h"
 #include "layer.h"
@@ -71,9 +71,8 @@ void commit_paste( gboolean undo )
 {
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
 	int mx = 0, my = 0;			// Mem coords
-	int i, j, k, offs;
-	unsigned char pixel[3], mask;
-	unsigned char *old_image = NULL;	// Used for <100% opacity
+	int i, ofs;
+	unsigned char *image, *mask;
 
 	if ( marq_x1 < 0 ) mx = -marq_x1;
 	if ( marq_y1 < 0 ) my = -marq_y1;
@@ -86,83 +85,27 @@ void commit_paste( gboolean undo )
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
 
+	mask = malloc(fw);
+	if (!mask) return;	/* !!! Not enough memory */
+
 	if ( undo ) mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
 	update_menus();				// Update menu undo issues
 
-	if ( mem_image_bpp == 1 )
-	{
-		for ( j=0; j<fh; j++ )
-		{
-			if ( mem_clip_mask == NULL )
-			{
-				for ( i=0; i<fw; i++ )
-				{
-					pixel[0] = mem_clipboard[ i+mx + mem_clip_w*(j+my) ];
-					PUT_PIXEL_C( fx+i, fy+j, pixel[0] )
-				}
-			}
-			else
-			{
-				for ( i=0; i<fw; i++ )
-				{
-					pixel[0] = mem_clipboard[ i+mx + mem_clip_w*(j+my) ];
-					mask = mem_clip_mask[ i+mx + mem_clip_w*(j+my) ];
-					if ( mask == 0 ) PUT_PIXEL_C( fx+i, fy+j, pixel[0] )
-				}
-			}
-		}
-	}
-	if ( mem_image_bpp == 3 )
-	{
-		if ( mem_undo_opacity )
-			old_image = mem_undo_previous();
-		else
-			old_image = mem_image;
+	ofs = my * mem_clip_w + mx;
+	image = mem_clipboard + ofs * mem_clip_bpp;
 
-		for ( j=0; j<fh; j++ )
-		{
-			if ( mem_clip_mask == NULL )
-			{
-			    for ( i=0; i<fw; i++ )
-			    {
-				offs = 3*(fx+i + mem_width*(fy+j));
-				k = MEM_2_INT(mem_image, offs);
-				if ( !mem_protected_RGB(k) )
-				{
-				 for ( k=0; k<3; k++ )
-				 {
-				  pixel[0] = mem_clipboard[ k + 3*(i+mx + mem_clip_w*(j+my)) ];
-				  pixel[1] = old_image[ k + offs ];
-				  pixel[2] = (pixel[0]*tool_opacity + pixel[1]*(100-tool_opacity)+50) / 100;
-				  mem_image[ k + offs ] = pixel[2];
-				 }
-				}
-			    }
-			}
-			else
-			{
-			    for ( i=0; i<fw; i++ )
-			    {
-				offs = 3*(fx+i + mem_width*(fy+j));
-				k = MEM_2_INT(mem_image, offs);
-				if ( !mem_protected_RGB(k) )
-				{
-				  mask = mem_clip_mask[ i+mx + mem_clip_w*(j+my) ];
-				  if ( mask != 255 ) for ( k=0; k<3; k++ )
-				  {
-				    pixel[0] = mem_clipboard[ k + 3*(i+mx + mem_clip_w*(j+my)) ];
-				    pixel[1] = old_image[ k + offs ];
-				    pixel[2] = ((255-mask) * pixel[0] + mask * pixel[1] ) / 255;
-				    mem_image[ k + offs ] = ( pixel[2] * tool_opacity +
-				    	pixel[1] * (100-tool_opacity)
-				    	) / 100;
-
-				  }
-				}
-			    }
-			}
-		}
+	for (i = 0; i < fh; i++)
+	{
+		row_protected(fx, fy + i, fw, mask);
+		paste_pixels(fx, fy + i, fw, mask, image, mem_clip_alpha ?
+			mem_clip_alpha + ofs : NULL, mem_clip_mask ?
+			mem_clip_mask + ofs : NULL, tool_opacity);
+		image += mem_clip_w * mem_clip_bpp;
+		ofs += mem_clip_w;
 	}
+
+	free(mask);
+
 	vw_update_area( fx, fy, fw, fh );
 	gtk_widget_queue_draw_area( drawing_canvas,
 			fx*can_zoom + margin_main_x, fy*can_zoom + margin_main_y,
@@ -212,11 +155,11 @@ void create_pal_quantized(int dl)
 	pen_down = 0;
 
 	if ( dl==1 )
-		i = dl1quant(mem_image, mem_width, mem_height, mem_cols, newpal);
+		i = dl1quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
 	if ( dl==3 )
-		i = dl3quant(mem_image, mem_width, mem_height, mem_cols, newpal);
+		i = dl3quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
 	if ( dl==5 )
-		i = wu_quant(mem_image, mem_width, mem_height, mem_cols, newpal);
+		i = wu_quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
 
 	if ( i!=0 ) memory_errors(i);
 	else
@@ -400,29 +343,51 @@ void pressed_clip_mask_clear()
 
 void pressed_flip_image_v( GtkMenuItem *menu_item, gpointer user_data )
 {
+	int i;
+	unsigned char *temp;
+
+	temp = malloc(mem_width * mem_img_bpp);
+	if (!temp) return; /* Not enough memory for temp buffer */
 	spot_undo(UNDO_XFORM);
-	mem_flip_v( mem_image, mem_width, mem_height, mem_image_bpp );
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!mem_img[i]) continue;
+		mem_flip_v(mem_img[i], temp, mem_width, mem_height, BPP(i));
+	}
+	free(temp);
 	update_all_views();
 }
 
 void pressed_flip_image_h( GtkMenuItem *menu_item, gpointer user_data )
 {
+	int i;
+
 	spot_undo(UNDO_XFORM);
-	mem_flip_h( mem_image, mem_width, mem_height, mem_image_bpp );
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		if (!mem_img[i]) continue;
+		mem_flip_h(mem_img[i], mem_width, mem_height, BPP(i));
+	}
 	update_all_views();
 }
 
 void pressed_flip_sel_v( GtkMenuItem *menu_item, gpointer user_data )
 {
-	mem_flip_v( mem_clipboard, mem_clip_w, mem_clip_h, mem_image_bpp );
-	if ( mem_clip_mask != NULL ) mem_flip_v( mem_clip_mask, mem_clip_w, mem_clip_h, 1 );
+	unsigned char *temp;
+
+	temp = malloc(mem_clip_w * mem_clip_bpp);
+	if (!temp) return; /* Not enough memory for temp buffer */
+	mem_flip_v(mem_clipboard, temp, mem_clip_w, mem_clip_h, mem_clip_bpp);
+	if (mem_clip_mask) mem_flip_v(mem_clip_mask, temp, mem_clip_w, mem_clip_h, 1);
+	if (mem_clip_alpha) mem_flip_v(mem_clip_alpha, temp, mem_clip_w, mem_clip_h, 1);
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
 void pressed_flip_sel_h( GtkMenuItem *menu_item, gpointer user_data )
 {
-	mem_flip_h( mem_clipboard, mem_clip_w, mem_clip_h, mem_image_bpp );
-	if ( mem_clip_mask != NULL ) mem_flip_h( mem_clip_mask, mem_clip_w, mem_clip_h, 1 );
+	mem_flip_h(mem_clipboard, mem_clip_w, mem_clip_h, mem_clip_bpp);
+	if (mem_clip_mask) mem_flip_h(mem_clip_mask, mem_clip_w, mem_clip_h, 1);
+	if (mem_clip_alpha) mem_flip_h(mem_clip_alpha, mem_clip_w, mem_clip_h, 1);
 	gtk_widget_queue_draw( drawing_canvas );
 }
 
@@ -474,8 +439,9 @@ void do_the_copy(int op)
 {
 	int x1 = marq_x1, y1 = marq_y1;
 	int x2 = marq_x2, y2 = marq_y2;
-	int x, y, w, h;
+	int x, y, w, h, bpp, ofs, delta, len;
 	int i, j;
+	unsigned char *src, *dest;
 
 	mtMIN( x, x1, x2 )
 	mtMIN( y, y1, y2 )
@@ -490,39 +456,72 @@ void do_the_copy(int op)
 
 	if ( op == 1 )		// COPY
 	{
-		if ( mem_clipboard != NULL ) free( mem_clipboard );	// Lose old clipboard
-		mem_clip_mask_clear();					// Lose old clipboard mask
-		mem_clipboard = malloc( w * h * mem_image_bpp );
+		bpp = MEM_BPP;
+		if (mem_clipboard) free(mem_clipboard);		// Lose old clipboard
+		if (mem_clip_alpha) free(mem_clip_alpha);	// Lose old clipboard alpha
+		mem_clip_mask_clear();				// Lose old clipboard mask
+		mem_clip_alpha = NULL;
+		if (mem_channel == CHN_IMAGE)
+		{
+			if (mem_img[CHN_ALPHA]) mem_clip_alpha = malloc(w * h);
+			if (mem_img[CHN_SEL]) mem_clip_mask = malloc(w * h);
+		}
+		mem_clipboard = malloc(w * h * bpp);
 		text_paste = FALSE;
 	
-		if ( mem_clipboard == NULL )
+		if (!mem_clipboard)
 		{
+			if (mem_clip_alpha) free(mem_clip_alpha);
+			mem_clip_mask_clear();
 			alert_box( _("Error"), _("Not enough memory to create clipboard"),
 					_("OK"), NULL, NULL );
 		}
 		else
 		{
-			mem_clip_bpp = mem_image_bpp;
+			mem_clip_bpp = bpp;
 			mem_clip_x = x;
 			mem_clip_y = y;
 			mem_clip_w = w;
 			mem_clip_h = h;
-			if ( mem_image_bpp == 1 )
-				for ( j=0; j<h; j++ )
-					for ( i=0; i<w; i++ )
-						mem_clipboard[ i + w*j ] =
-							mem_image[ x+i + mem_width*(y+j) ];
-			if ( mem_image_bpp == 3 )
-				for ( j=0; j<h; j++ )
-					for ( i=0; i<w; i++ )
-					{
-						mem_clipboard[ 3*(i + w*j) ] =
-							mem_image[ 3*(x+i + mem_width*(y+j)) ];
-						mem_clipboard[ 1 + 3*(i + w*j) ] =
-							mem_image[ 1 + 3*(x+i + mem_width*(y+j)) ];
-						mem_clipboard[ 2 + 3*(i + w*j) ] =
-							mem_image[ 2 + 3*(x+i + mem_width*(y+j)) ];
-					}
+
+			/* Current channel */
+			ofs = (y * mem_width + x) * bpp;
+			delta = 0;
+			len = w * bpp;
+			for (i = 0; i < h; i++)
+			{
+				memcpy(mem_clipboard + delta,
+					mem_img[mem_channel] + ofs, len);
+				ofs += mem_width * bpp;
+				delta += len;
+			}
+
+			/* Utility channels */
+			if (mem_clip_alpha)
+			{
+				ofs = y * mem_width + x;
+				delta = 0;
+				for (i = 0; i < h; i++)
+				{
+					memcpy(mem_clip_alpha + delta,
+						mem_img[CHN_ALPHA] + ofs, w);
+					ofs += mem_width;
+					delta += w;
+				}
+			}
+
+			/* Selection channel */
+			if (mem_clip_mask)
+			{
+				src = mem_img[CHN_SEL] + y * mem_width + x;
+				dest = mem_clip_mask;
+				for (i = 0; i < h; i++)
+				{
+					for (j = 0; j < w; j++)
+						*dest++ = 255 - *src++;
+					src += mem_width - w;
+				}
+			}
 		}
 	}
 	if ( op == 2 )		// CLEAR area
@@ -639,6 +638,7 @@ void pressed_copy( GtkMenuItem *menu_item, gpointer user_data )
 	}
 }
 
+/* !!! Add support for channel-specific option sets !!! */
 void update_menus()			// Update edit/undo menu
 {
 	char txt[32];
@@ -648,18 +648,18 @@ void update_menus()			// Update edit/undo menu
 	if ( status_on[STATUS_UNDOREDO] )
 		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt );
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
 		men_item_state( menu_only_indexed, TRUE );
 		men_item_state( menu_only_24, FALSE );
 	}
-	if ( mem_image_bpp == 3 )
+	if ( mem_img_bpp == 3 )
 	{
 		men_item_state( menu_only_indexed, FALSE );
 		men_item_state( menu_only_24, TRUE );
 	}
 
-	if ( mem_image_bpp == 3 && mem_clipboard != NULL && mem_clip_bpp )
+	if ( mem_img_bpp == 3 && mem_clipboard != NULL && mem_clip_bpp )
 		men_item_state( menu_alphablend, TRUE );
 	else	men_item_state( menu_alphablend, FALSE );
 
@@ -705,7 +705,7 @@ void update_menus()			// Update edit/undo menu
 	if ( mem_clipboard == NULL ) men_item_state( menu_need_clipboard, FALSE );
 	else
 	{
-		if ( mem_clip_bpp == mem_image_bpp ) men_item_state( menu_need_clipboard, TRUE );
+		if (mem_clip_bpp == MEM_BPP) men_item_state( menu_need_clipboard, TRUE );
 		else men_item_state( menu_need_clipboard, FALSE );
 			// Only allow pasting if the image is the same type as the clipboard
 	}
@@ -728,10 +728,10 @@ void canvas_undo_chores()
 
 void check_undo_paste_bpp()
 {
-	if ( marq_status >= MARQUEE_PASTE && mem_image_bpp != mem_clip_bpp)
+	if (marq_status >= MARQUEE_PASTE && (mem_clip_bpp != MEM_BPP))
 		pressed_select_none( NULL, NULL );
 
-	if ( tool_type == TOOL_SMUDGE && mem_image_bpp == 1 )
+	if ( tool_type == TOOL_SMUDGE && mem_img_bpp == 1 )
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		// User is smudging and undo/redo to an indexed image - reset tool
 }
@@ -804,7 +804,7 @@ void update_status_bar1()
 
 	toolbar_update_settings();		// Update A/B labels in settings toolbar
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		snprintf(txt, 30, "%i x %i x %i", mem_width, mem_height, mem_cols);
 	else
 		snprintf(txt, 30, "%i x %i x RGB", mem_width, mem_height);
@@ -824,7 +824,7 @@ void update_status_bar1()
 
 void update_cols()
 {
-	if ( mem_image == NULL ) return;	// Only do this if we have an image
+	if (!mem_img[CHN_IMAGE]) return;	// Only do this if we have an image
 
 	update_status_bar1();
 	mem_pat_update();
@@ -964,7 +964,7 @@ gtk_widget_hide( drawing_canvas );
 			// Set tool to square for new image - easy way to lose a selection marquee
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		update_menus();
-		pressed_opacity( 100 );		// Set opacity to 100% to start with
+		pressed_opacity( 255 );		// Set opacity to 100% to start with
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change
 	}
@@ -1523,7 +1523,7 @@ void file_selector( int action_type )
 			i = file_extension_get( mem_filename );
 			k = 4;
 			if ( i == EXT_BMP ) temp_txt = "BMP";
-			if ( mem_image_bpp == 3 )
+			if ( mem_img_bpp == 3 )
 			{
 				j = 0;
 				if ( i == EXT_JPEG ) temp_txt = "JPEG";
@@ -1662,8 +1662,7 @@ void square_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh )
 {
 	if ( tool_size == 1 )
 	{
-		if ( mem_image_bpp == 1 ) PUT_PIXEL( nx, ny )
-		if ( mem_image_bpp == 3 ) PUT_PIXEL24( nx, ny )
+		put_pixel( nx, ny );
 	}
 	else
 	{
@@ -1733,8 +1732,7 @@ void vertical_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *yh
 		if ( vlen <= 1 )
 		{
 			ax = bx; ay = by;
-			if ( mem_image_bpp == 1 ) PUT_PIXEL( bx, by )
-			if ( mem_image_bpp == 3 ) PUT_PIXEL24( bx, by )
+			put_pixel( bx, by );
 		}
 		else
 		{
@@ -1790,8 +1788,7 @@ void horizontal_continuous( int nx, int ny, int *minx, int *miny, int *xw, int *
 		if ( hlen <= 1 )
 		{
 			ax = bx; ay = by;
-			if ( mem_image_bpp == 1 ) PUT_PIXEL( bx, by )
-			if ( mem_image_bpp == 3 ) PUT_PIXEL24( bx, by )
+			put_pixel( bx, by );
 		}
 		else
 		{
@@ -1906,9 +1903,8 @@ void tool_action( int x, int y, int button, gdouble pressure )
 	int ox, oy, off1, off2, o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
 	int xdo, ydo, px, py, todo, oox, ooy;	// Continuous smudge stuff
 	float rat;
-	unsigned char rpix = 0, spix, *pat_fill;
+	unsigned char *pat_fill;
 	gboolean first_point = FALSE, paint_action = FALSE;
-	png_color fstart = {0,0,0};
 
 	if ( tool_fixx > -1 ) x = tool_fixx;
 	if ( tool_fixy > -1 ) y = tool_fixy;
@@ -2019,10 +2015,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 				{
 					rx = x - tool_size/2 + j;
 					ry = y;
-					if ( mem_image_bpp == 1 )
-						IF_IN_RANGE( rx, ry ) PUT_PIXEL( rx, ry )
-					if ( mem_image_bpp == 3 )
-						IF_IN_RANGE( rx, ry ) PUT_PIXEL24( rx, ry )
+					IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
 				}
 			}
 			else	horizontal_continuous(x, y, &minx, &miny, &xw, &yh);
@@ -2035,10 +2028,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 				{
 					rx = x;
 					ry = y - tool_size/2 + j;
-					if ( mem_image_bpp == 1 )
-						IF_IN_RANGE( rx, ry ) PUT_PIXEL( rx, ry )
-					if ( mem_image_bpp == 3 )
-						IF_IN_RANGE( rx, ry ) PUT_PIXEL24( rx, ry )
+					IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
 				}
 			}
 			else	vertical_continuous(x, y, &minx, &miny, &xw, &yh);
@@ -2054,10 +2044,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 			{
 				rx = x + (tool_size-1)/2 - j;
 				ry = y - tool_size/2 + j;
-				if ( mem_image_bpp == 1 )
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL( rx, ry )
-				if ( mem_image_bpp == 3 )
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL24( rx, ry )
+				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
 			}
 		}
 		if ( tool_type == TOOL_BACKSLASH && paint_action )
@@ -2071,28 +2058,17 @@ void tool_action( int x, int y, int button, gdouble pressure )
 			{
 				rx = x - tool_size/2 + j;
 				ry = y - tool_size/2 + j;
-				if ( mem_image_bpp == 1 )
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL( rx, ry )
-				if ( mem_image_bpp == 3 )
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL24( rx, ry )
+				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
 			}
 		}
 		if ( tool_type == TOOL_SPRAY && paint_action )
 		{
-			if ( mem_image_bpp == 1 )
-				for ( j=0; j<tool_flow; j++ )
-				{
-					rx = x - tool_size/2 + rand() % tool_size;
-					ry = y - tool_size/2 + rand() % tool_size;
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL( rx, ry )
-				}
-			if ( mem_image_bpp == 3 )
-				for ( j=0; j<tool_flow; j++ )
-				{
-					rx = x - tool_size/2 + rand() % tool_size;
-					ry = y - tool_size/2 + rand() % tool_size;
-					IF_IN_RANGE( rx, ry ) PUT_PIXEL24( rx, ry )
-				}
+			for ( j=0; j<tool_flow; j++ )
+			{
+				rx = x - tool_size/2 + rand() % tool_size;
+				ry = y - tool_size/2 + rand() % tool_size;
+				IF_IN_RANGE( rx, ry ) put_pixel( rx, ry );
+			}
 		}
 		if ( tool_type == TOOL_SHUFFLE && button == 1 )
 		{
@@ -2104,98 +2080,56 @@ void tool_action( int x, int y, int button, gdouble pressure )
 				sy = y - tool_size/2 + rand() % tool_size;
 				IF_IN_RANGE( rx, ry ) IF_IN_RANGE( sx, sy )
 				{
-					if ( mem_image_bpp == 1 )
+					if (!pixel_protected(rx, ry) &&
+						!pixel_protected(sx, sy))
 					{
-						rpix = mem_image[ rx + ry*mem_width ];
-						spix = mem_image[ sx + sy*mem_width ];
-						if ( mem_prot_mask[rpix] == 0 &&
-							mem_prot_mask[spix] == 0 )
+						k = MEM_BPP;
+						off1 = (rx + ry * mem_width) * k;
+						off2 = (sx + sy * mem_width) * k;
+						for (i = 0; i < k; i++)
 						{
-							mem_image[ rx + ry*mem_width ] = spix;
-							mem_image[ sx + sy*mem_width ] = rpix;
+							px = mem_img[mem_channel][off1];
+							py = mem_img[mem_channel][off2];
+							mem_img[mem_channel][off1++] = py;
+							mem_img[mem_channel][off2++] = px;
 						}
 					}
-					if ( mem_image_bpp == 3 )
-					{
-						off1 = 3*(rx + ry*mem_width);
-						off2 = 3*(sx + sy*mem_width);
-
-						px = MEM_2_INT(mem_image, off1);
-						py = MEM_2_INT(mem_image, off2);
-
-						if ( !mem_protected_RGB(px) && !mem_protected_RGB(py) )
-						{
-							for ( i=0; i<3; i++ )
-							{
-								rpix = mem_image[ i + off1 ];
-								spix = mem_image[ i + off2 ];
-								mem_image[ i + off1 ] = spix;
-								mem_image[ i + off2 ] = rpix;
-							}
-						}
-					}
+#if 0 /* !!! Maybe this would be the better way? */
+	off1 = get_pixel(rx, ry);
+	off2 = get_pixel(sx, sy);
+	put_pixel_x(rx, ry, off2);
+	put_pixel_x(rx, ry, off1);
+#endif
 				}
 			}
 		}
 		if ( tool_type == TOOL_FLOOD && button == 1 )
 		{
-			if ( mem_image_bpp == 1 )
+			j = get_pixel(x, y);
+			if (mem_img_bpp == 1 ? !mem_prot_mask[j] : !mem_protected_RGB(j))
 			{
-				rpix = GET_PIXEL(x,y);
-				if ( mem_prot_mask[rpix] == 0 )
+				i = tool_opacity;
+				tool_opacity = 255; // 100% pure colour for flood filling
+				k = mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
+				if (!tool_pat && (j != k))	// Pure colour fill
 				{
-					if ( tool_pat == 0 && rpix != mem_col_A ) // Pure colour fill
+					spot_undo(UNDO_DRAW);
+					flood_fill(x, y, j);
+					update_all_views();
+				}
+				if (tool_pat)			// Patteren fill
+				{
+					pat_fill = pattern_fill_allocate();
+					if (pat_fill)
 					{
-					 spot_undo(UNDO_DRAW);
-					 flood_fill( x, y, rpix );
-					 update_all_views();
-					}
-					if ( tool_pat !=0 )		// Patteren fill
-					{
-					  pat_fill = pattern_fill_allocate();
-					  if ( pat_fill != NULL )
-					  {
 						spot_undo(UNDO_DRAW);
-						flood_fill_pat( x, y, rpix, pat_fill );
-						mem_paint_mask( pat_fill );
+						flood_fill_pat(x, y, j, pat_fill);
+						mem_paint_mask(pat_fill);
 						update_all_views();
-						free( pat_fill );
-					  }
+						free(pat_fill);
 					}
 				}
-			}
-			if ( mem_image_bpp == 3 )
-			{
-				fstart = get_pixel24(x, y);
-				j = PNG_2_INT(fstart);
-
-				if ( mem_protected_RGB(j) == 0 )
-				{
-					k = PNG_2_INT(mem_col_A24);
-					i = tool_opacity;
-					tool_opacity = 100;
-						// 100% pure colour for flood filling
-
-					if ( tool_pat == 0 && j != k)	// Pure colour fill
-					{
-						spot_undo(UNDO_DRAW);
-						flood_fill24( x, y, fstart );
-						update_all_views();
-					}
-					if ( tool_pat !=0 )		// Patteren fill
-					{
-					  pat_fill = pattern_fill_allocate();
-					  if ( pat_fill != NULL )
-					  {
-						spot_undo(UNDO_DRAW);
-						flood_fill24_pat( x, y, fstart, pat_fill );
-						mem_paint_mask( pat_fill );
-						update_all_views();
-						free( pat_fill );
-					  }
-					}
-					tool_opacity = i;
-				}
+				tool_opacity = i;
 			}
 		}
 		if ( tool_type == TOOL_SMUDGE && button == 1 )

@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004, 2005 Mark Tyler
+	Copyright (C) 2004-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -21,6 +21,7 @@
 #include <gdk/gdkkeysyms.h>
 
 #include "global.h"
+#include "memory.h"
 #include "mainwindow.h"
 
 

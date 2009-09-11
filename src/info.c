@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -23,8 +23,8 @@
 
 #include "global.h"
 
-#include "mainwindow.h"
 #include "memory.h"
+#include "mainwindow.h"
 #include "canvas.h"
 #include "mygtk.h"
 #include "inifile.h"
@@ -62,7 +62,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 	if ( im != NULL )
 	{
 			// Flush background to palette 0 colour
-		j = HS_GRAPH_W * HS_GRAPH_H * mem_image_bpp;
+		j = HS_GRAPH_W * HS_GRAPH_H * mem_img_bpp;
 		for ( i=0; i<j; i++ )
 		{
 			im[0] = col1[0];
@@ -72,7 +72,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 		}
 
 			// Draw axis in negative of palette 0 colour for 3 channels
-		for ( j=HS_GRAPH_H*mem_image_bpp-1; j>0; j=j-HS_GRAPH_H/2 )
+		for ( j=HS_GRAPH_H*mem_img_bpp-1; j>0; j=j-HS_GRAPH_H/2 )
 		{
 			im = hs_rgb_mem + j*HS_GRAPH_W*3;
 			for ( i=0; i<HS_GRAPH_W; i++ )			// Horizontal lines
@@ -86,7 +86,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 		for ( j=HS_GRAPH_W*0.75; j>0; j=j-HS_GRAPH_W/4 )
 		{
 			im = hs_rgb_mem + j*3;
-			for ( i=0; i<HS_GRAPH_H*mem_image_bpp; i++ )		// Vertical lines
+			for ( i=0; i<HS_GRAPH_H*mem_img_bpp; i++ )		// Vertical lines
 			{
 				im[0] = col2[0];
 				im[1] = col2[1];
@@ -115,7 +115,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 			// Calculate bar values - either linear or normalized
 		if ( hs_norm )
 		{
-			for ( k=0; k<mem_image_bpp; k++ )
+			for ( k=0; k<mem_img_bpp; k++ )
 			{
 				for ( i=0; i<256; i++ )			// Normalize
 				{
@@ -139,7 +139,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 		}
 		else
 		{
-			for ( k=0; k<mem_image_bpp; k++ )
+			for ( k=0; k<mem_img_bpp; k++ )
 			{
 				for ( i=0; i<256; i++ )			// Linear
 				{
@@ -150,13 +150,13 @@ static void hs_plot_graph()				// Plot RGB graphs
 		}
 
 			// Draw 3 graphs in red, green and blue
-		for ( k=0; k<mem_image_bpp; k++ )
+		for ( k=0; k<mem_img_bpp; k++ )
 		{
 			col1[0] = 0;
 			col1[1] = 0;
 			col1[2] = 0;
 			col1[k] = 255;			// Pure red/green/blue coloured bars
-			if ( mem_image_bpp == 1 )
+			if ( mem_img_bpp == 1 )
 			{
 				col1[0] = 128;
 				col1[1] = 128;
@@ -197,13 +197,13 @@ static gint hs_click_normalize( GtkWidget *widget )
 static void hs_populate_rgb()				// Populate RGB tables
 {
 	int i, j, k, t;
-	unsigned char *im = mem_image;
+	unsigned char *im = mem_img[CHN_IMAGE];
 
-	for ( j=0; j<3; j++ ) for ( i=0; i<256; i++ ) hs_rgb[i][j] = 0;		// Flush array
+	memset(&hs_rgb[0][0], 0, sizeof(hs_rgb));
 
 	j = mem_width * mem_height;
 
-	if ( mem_image_bpp == 3 )
+	if ( mem_img_bpp == 3 )
 	{
 		for ( i=0; i<j; i++ )			// Populate table with RGB frequencies
 		{
@@ -251,7 +251,7 @@ static gint hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
 	int w = event->area.width, h = event->area.height;
 
 	if ( hs_rgb_mem == NULL ) return FALSE;
-	if ( x >= HS_GRAPH_W || y >= HS_GRAPH_H*mem_image_bpp ) return FALSE;
+	if ( x >= HS_GRAPH_W || y >= HS_GRAPH_H*mem_img_bpp ) return FALSE;
 
 	mtMIN( w, w, HS_GRAPH_W-x )
 	mtMIN( h, h, HS_GRAPH_H*3-y )
@@ -302,7 +302,7 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 
 	info_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Information"), GTK_WIN_POS_CENTER, TRUE );
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 		gtk_widget_set_usize (GTK_WIDGET (info_window), -2, 400);
 
 	vbox4 = gtk_vbox_new (FALSE, 0);
@@ -327,7 +327,7 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 
 	mtMIN( maxi,
 		mt_round( ((double) mem_undo_limit*1024*1024) /
-			( mem_width * mem_height * mem_image_bpp * (layers_total+1) ) - 1.25),
+			( mem_width * mem_height * mem_img_bpp * (layers_total+1) ) - 1.25),
 			MAX_UNDO-1 )
 
 	mtMAX( maxi, maxi, 0 )
@@ -353,7 +353,7 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 		add_to_table( txt, table4, 2, 1, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 	}
 
-	if ( mem_image_bpp == 3)		// RGB image so count different colours
+	if ( mem_img_bpp == 3)		// RGB image so count different colours
 	{
 		add_to_table( _("Unique RGB pixels"), table4, 3, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 		i = mem_count_all_cols();
@@ -387,14 +387,14 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_add (GTK_CONTAINER (frame), vbox5);
 
 	hs_norm = FALSE;
-	hs_rgb_mem = malloc( HS_GRAPH_W * HS_GRAPH_H * 3 * mem_image_bpp );
+	hs_rgb_mem = malloc( HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp );
 	hs_populate_rgb();
 	hs_plot_graph();
 
 	hs_drawingarea = gtk_drawing_area_new ();
 	gtk_widget_show (hs_drawingarea);
 	gtk_box_pack_start (GTK_BOX (vbox5), hs_drawingarea, FALSE, FALSE, 0);
-	gtk_widget_set_usize (hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H*mem_image_bpp);
+	gtk_widget_set_usize (hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H*mem_img_bpp);
 	gtk_signal_connect_object( GTK_OBJECT(hs_drawingarea), "expose_event",
 		GTK_SIGNAL_FUNC (hs_expose_graph), NULL );
 
@@ -404,9 +404,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect(GTK_OBJECT(hs_normalize_check), "clicked",
 		GTK_SIGNAL_FUNC(hs_click_normalize), NULL);
 
-	if ( mem_image_bpp == 1 )
+	if ( mem_img_bpp == 1 )
 	{
-		mem_get_histogram();
+		mem_get_histogram(CHN_IMAGE);
 
 		j = 0;
 		for ( i=0; i<mem_cols; i++ ) if ( mem_histogram[i] > 0 ) j++;

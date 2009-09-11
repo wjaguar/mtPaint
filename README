@@ -1,16 +1,16 @@
--------------------------------------------------
-mtPaint 2.30 - Copyright (C) 2004-2006 Mark Tyler
--------------------------------------------------
+-------------------------------------------------------------------------
+mtPaint 3.00 - Copyright (C) 2004-2006 The Authors (see Credits for list)
+-------------------------------------------------------------------------
 
 mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
 mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. Its main file format is PNG, although it can also handle JPEG, GIF, TIFF, BMP, XPM, and XBM files. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
+mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
 
 There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.
 
-If you are a developer and you have improved any part of mtPaint, please let me know what you have done so I can share this with other mtPaint users.
+If you are a developer and you have improved any part of mtPaint, you are very welcome to contact the maintainer to have these improvements merged into mtPaint for the benefit of all users.
 
 
 -----------
@@ -87,22 +87,32 @@ For some reason I needed to move c:/msys/bin/msgfmt & xgettext to c:/msys/local/
 Credits
 -------
 
-mtPaint was written by Mark Tyler
+mtPaint is maintained by Mark Tyler.
 
 marktyler_5@hotmail.com
 http://mtpaint.sourceforge.net/
 
-mtPaint was only possible after I used and studied an excellent program called mhWaveEdit by Magnus Hjorth.  As a respectful tribute to this mtPaint uses a slightly modified version of inifile.c/h from mhWaveEdit 1.3.0.
 
-Several people have helped me with the mtPaint project, so I would like to thank them all (in alphabetical order):
+The following people (in alphabetical order) have contributed directly to the project, and are therefore worthy of gracious thanks for their generosity and hard work:
+
+
+Authors
+
+Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c for more information.
+Dmitry Groshev - Wrote the code for tint mode and image scaling. Rewrote much of the code for version 3 in order to support channels, and also applied many other improvements to the code.
+Magnus Hjorth - Wrote inifile.c/h, from mhWaveEdit 1.3.0.
+Mark Tyler - Original author.
+Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information.
+
+
+General Contributions
 
 Abdulla Al Muhairi - Website redesign April 2005
 Alan Horkan - Feedback/ideas
 Alexandre Prokoudine - Feedback/ideas
 Antonio Andrea Bianco - Feedback/ideas
-Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c for more information
-Dmitry Groshev - Wrote the code for tint mode and image scaling
 Ed Jason - Feedback/ideas
+Eddie Kohler - Created Gifsicle which is needed for the creation and viewing of animated GIF files http://www.lcdf.org/gifsicle/
 Guadalinex Team (Junta de Andalucia) - Feedback/ideas, man page, Launchpad/Rosetta registration
 Lou Afonso - Feedback/ideas
 Magnus Hjorth - Feedback/ideas
@@ -111,15 +121,13 @@ Pavel Ruzicka - Feedback/ideas
 Puppy Linux (Barry Kauler) - Feedback/ideas
 Vlastimil Krejcir - Feedback/ideas
 William Kern - Feedback/ideas
-Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information
 
-Translations have been provided for certain languages by the following people:
 
-Brazilian Portuguese - Paulo Trevizan
-Czech - Pavel Ruzicka
-French - Nicolas Velin, Pascal Billard
-Portuguese - Israel G. Lugo
-Spanish - Guadalinex Team (Junta de Andalucia)
+Translations
 
-Animated GIF file support is provided by Gifsicle which was written by Eddie Kohler - http://www.lcdf.org/gifsicle/
+Guadalinex Team (Junta de Andalucia) - Spanish
+Israel G. Lugo - Portuguese
+Nicolas Velin, Pascal Billard - French
+Paulo Trevizan - Brazilian Portuguese
+Pavel Ruzicka - Czech
 

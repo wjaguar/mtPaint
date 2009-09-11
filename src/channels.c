@@ -23,6 +23,7 @@
 
 #include "global.h"
 
+#include "memory.h"
 #include "mainwindow.h"
 #include "mygtk.h"
 
