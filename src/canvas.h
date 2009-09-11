@@ -153,7 +153,7 @@ void pressed_create_dl1( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_create_dl3( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_create_wu( GtkMenuItem *menu_item, gpointer user_data );
 
-void iso_trans( GtkMenuItem *menu_item, gpointer user_data );
+void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item );
 
 void update_paste_chunk( int x1, int y1, int x2, int y2 );
 void check_marquee();

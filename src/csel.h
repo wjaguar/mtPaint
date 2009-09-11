@@ -37,7 +37,9 @@ typedef struct
 
 csel_info *csel_data;
 int csel_preview, csel_preview_a, csel_overlay;
+double gamma256[256], gamma64[64];
 
+void rgb2LXN(double *tmp, double r, double g, double b);
 void init_cols();
 void get_lxn(double *lxn, int col);
 

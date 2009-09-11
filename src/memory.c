@@ -126,7 +126,7 @@ int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
 int mem_col_A = 1, mem_col_B = 0;	// Index for colour A & B
 png_color mem_col_A24, mem_col_B24;	// RGB for colour A & B
 char *mem_pals = NULL;			// RGB screen memory holding current palette
-int found[1024][3];			// Used by mem_cols_used() & mem_convert_indexed
+static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
 char mem_prot_mask[256];		// 256 bytes used for indexed images
 int mem_prot_RGB[256];			// Up to 256 RGB colours protected
 int mem_prot;				// 0..256 : Number of protected colours in mem_prot_RGB
@@ -1471,37 +1471,316 @@ int mem_convert_rgb()			// Convert image to RGB
 
 int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after mem_cols_used
 {
-	unsigned char *old_image = mem_img[CHN_IMAGE], *new_image;
-	int i, j, k, res;
+	unsigned char *old_image, *new_image;
+	int i, j, k, pix;
 
-	res = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
-	if ( res ) return 2;
-
+	old_image = mem_undo_previous(CHN_IMAGE);
 	new_image = mem_img[CHN_IMAGE];
 	j = mem_width * mem_height;
 	for (i = 0; i < j; i++)
 	{
+		pix = MEM_2_INT(old_image, 0);
 		for (k = 0; k < 256; k++)	// Find index of this RGB
 		{
-			if (	found[k][0] == old_image[0] &&
-				found[k][1] == old_image[1] &&
-				found[k][2] == old_image[2] ) break;
+			if (MEM_2_INT(found, k * 3) == pix) break;
 		}
 		if (k > 255) return 1;		// No index found - BAD ERROR!!
 		*new_image++ = k;
 		old_image += 3;
 	}
 
-	for ( i=0; i<256; i++ )
+	for (i = 0; i < 256; i++)
 	{
-		mem_pal[i].red = found[i][0];
-		mem_pal[i].green = found[i][1];
-		mem_pal[i].blue = found[i][2];
+		mem_pal[i].red = found[i * 3];
+		mem_pal[i].green = found[i * 3 + 1];
+		mem_pal[i].blue = found[i * 3 + 2];
 	}
-	mem_col_A = 1;
-	mem_col_B = 0;
 
 	return 0;
+}
+
+/* Dithering works with 6-bit colours, because hardware VGA palette is 6-bit,
+ * and any kind of dithering is imprecise by definition anyway - WJ */
+
+typedef struct {
+	double midgamma[64], xyz256[768];
+	int cspace, cdist, ncols;
+	unsigned char cmap[64 * 64 * 64], xcmap[64 * 64 * 8], ungamma[301];
+} ctable;
+
+static ctable *ctp;
+
+static int lookup_srgb(double *srgb)
+{
+	int i, j, k, col[3];
+	double d, td, td2, tmp[3];
+
+	/* Convert to 6-bit RGB coords */
+	j = ctp->ungamma[(int)(srgb[0] * 300.0)];
+	col[0] = j - (srgb[0] < ctp->midgamma[j]);
+	j = ctp->ungamma[(int)(srgb[1] * 300.0)];
+	col[1] = j - (srgb[1] < ctp->midgamma[j]);
+	j = ctp->ungamma[(int)(srgb[2] * 300.0)];
+	col[2] = j - (srgb[2] < ctp->midgamma[j]);
+
+	/* Use colour cache if possible */
+	k = (col[0] << 12) + (col[1] << 6) + col[2];
+	if (ctp->xcmap[k >> 3] & (1 << (k & 7))) return (ctp->cmap[k]);
+	
+	/* Prepare colour coords */
+	switch (ctp->cspace)
+	{
+	default:
+	case 0: /* RGB */
+		tmp[0] = col[0] * (1.0 / 63.0);
+		tmp[1] = col[1] * (1.0 / 63.0);
+		tmp[2] = col[2] * (1.0 / 63.0);
+		break;
+	case 1: /* sRGB */
+		tmp[0] = gamma64[col[0]];
+		tmp[1] = gamma64[col[1]];
+		tmp[2] = gamma64[col[2]];
+		break;
+	case 2: /* L*X*N* */
+		rgb2LXN(tmp, gamma64[col[0]], gamma64[col[1]], gamma64[col[2]]);
+		break;
+	}
+
+	/* Find nearest colour */
+	d = 1000000000.0;
+	for (i = 0; i < ctp->ncols; i++)
+	{
+		switch (ctp->cdist)
+		{
+		case 0: /* Largest absolute difference (Linf measure) */
+			td = fabs(tmp[0] - ctp->xyz256[i * 3]);
+			td2 = fabs(tmp[1] - ctp->xyz256[i * 3 + 1]);
+			if (td < td2) td = td2;
+			td2 = fabs(tmp[2] - ctp->xyz256[i * 3 + 2]);
+			if (td < td2) td = td2;
+			break;
+		case 1: /* Sum of absolute differences (L1 measure) */
+			td = fabs(tmp[0] - ctp->xyz256[i * 3]) +
+				fabs(tmp[1] - ctp->xyz256[i * 3 + 1]) +
+				fabs(tmp[2] - ctp->xyz256[i * 3 + 2]);
+			break;
+		default:
+		case 2: /* Euclidean distance (L2 measure) */
+			td = sqrt((tmp[0] - ctp->xyz256[i * 3]) *
+				(tmp[0] - ctp->xyz256[i * 3]) +
+				(tmp[1] - ctp->xyz256[i * 3 + 1]) *
+				(tmp[1] - ctp->xyz256[i * 3 + 1]) +
+				(tmp[2] - ctp->xyz256[i * 3 + 2]) *
+				(tmp[2] - ctp->xyz256[i * 3 + 2]));
+			break;
+		}
+		if (td >= d) continue;
+		j = i; d = td;
+	}
+
+	/* Store & return result */
+	ctp->xcmap[k >> 3] |= 1 << (k & 7);
+	ctp->cmap[k] = j;
+	return (j);
+}
+
+// !!! No support for transparency yet !!!
+/* Damping functions roughly resemble old GIMP's behaviour, but may need some
+ * tuning because linear sRGB is just too different from normal RGB */
+int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dist,
+	int limit, int selc, int serpent, double emult)
+{
+	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1;
+	unsigned char *ddata1, *ddata2, *src, *dest;
+	double *row0, *row1, *row2, *tmp;
+	double err, intd, extd, gamma6[256], lin6[256];
+	double tc0[3], tc1[3], color0[3], color1[3];
+	double fdiv = 0, gamut[6] = {1, 1, 1, 0, 0, 0};
+
+	/* Allocate working space */
+	rlen = (mem_width + 4) * 3;
+	k = (rlen * 3 + 1) * sizeof(double);
+	ddata1 = calloc(1, k);
+	ddata2 = calloc(1, sizeof(ctable) + sizeof(double));
+	if (!ddata1 || !ddata2)
+	{
+		free(ddata1);
+		free(ddata2);
+		return (1);
+	}
+	row0 = ALIGNTO(ddata1, double);
+	row1 = row0 + rlen;
+	row2 = row1 + rlen;
+	ctp = ALIGNTO(ddata2, double);
+
+	/* Prepare tables */
+	for (i = 0; i < 256; i++)
+	{
+		j = 63 * i;
+		j = (j + (j >> 8) + 0x80) >> 8;
+		gamma6[i] = gamma64[j];
+		lin6[i] = j * (1.0 / 63.0);
+	}
+	ctp->midgamma[0] = 0.0;
+	for (k = 0 , i = 1; i < 64; i++)
+	{
+		ctp->midgamma[i] = (gamma64[i - 1] + gamma64[i]) / 2.0;
+		j = ctp->midgamma[i] * 300.0;
+		for (; k < j; k++) ctp->ungamma[k] = i - 1;
+	}
+	for (; k <= 300; k++) ctp->ungamma[k] = 63;
+	tmp = ctp->xyz256;
+	for (i = 0; i < ncols; i++ , tmp += 3)
+	{
+		/* Update gamut limits */
+		tmp[0] = gamma6[mem_pal[i].red];
+		tmp[1] = gamma6[mem_pal[i].green];
+		tmp[2] = gamma6[mem_pal[i].blue];
+		for (j = 0; j < 3; j++)
+		{
+			if (tmp[j] < gamut[j]) gamut[j] = tmp[j];
+			if (tmp[j] > gamut[j + 3]) gamut[j + 3] = tmp[j];
+		}
+		/* Store colour coords */
+		switch (cspace)
+		{
+		default:
+		case 0: /* RGB */
+			tmp[0] = lin6[mem_pal[i].red];
+			tmp[1] = lin6[mem_pal[i].green];
+			tmp[2] = lin6[mem_pal[i].blue];
+			break;
+		case 1: /* sRGB - done already */
+			break;
+		case 2: /* L*X*N* */
+			rgb2LXN(tmp, tmp[0], tmp[1], tmp[2]);
+			break;
+		}
+	}
+	ctp->cspace = cspace; ctp->cdist = dist; ctp->ncols = ncols;
+	serpent = serpent ? 0 : 2;
+	if (dither) fdiv = 1.0 / *dither++;
+
+	/* Process image */
+	for (i = 0; i < mem_height; i++)
+	{
+		src = old + i * mem_width * 3;
+		dest = mem_img[CHN_IMAGE] + i * mem_width;
+		memset(row2, 0, rlen * sizeof(double));
+		if (serpent ^= 1)
+		{
+			j0 = 0; j1 = mem_width * 3; dj = 1;
+		}
+		else
+		{
+			j0 = (mem_width - 1) * 3; j1 = -3; dj = -1;
+			dest += mem_width - 1;
+		}
+		for (j = j0; j != j1; j += dj * 3)
+		{
+			for (k = 0; k < 3; k++)
+			{
+				/* Posterize to 6 bits as natural for palette */
+				color0[k] = gamma6[src[j + k]];
+				/* Add in error, maybe limiting it */
+				err = row0[j + k + 6];
+				if (limit == 1) /* To half of SRGB range */
+				{
+					err = err < -0.5 ? -0.5 :
+						err > 0.5 ? 0.5 : err;
+				}
+				else if (limit == 2) /* To 1/4, with damping */
+				{
+					err = err < -0.1 ? (err < -0.25 ?
+						-0.25 : 0.5 * err - 0.05) :
+						err > 0.1 ? (err > 0.25 ?
+						0.25 : 0.5 * err + 0.05) : err;
+				}
+				color1[k] = color0[k] + err;
+				/* Limit result to palette gamut */
+				if (color1[k] < gamut[k]) color1[k] = gamut[k];
+				if (color1[k] > gamut[k + 3]) color1[k] = gamut[k + 3];
+			}
+			/* Output best colour */
+			col1 = lookup_srgb(color1);
+			*dest = col1;
+			dest += dj;
+			if (!dither) continue;
+			/* Evaluate new error */
+			tc1[0] = gamma6[mem_pal[col1].red];
+			tc1[1] = gamma6[mem_pal[col1].green];
+			tc1[2] = gamma6[mem_pal[col1].blue];
+			if (selc) /* Selective error damping */
+			{
+				col0 = lookup_srgb(color0);
+				tc0[0] = gamma6[mem_pal[col0].red];
+				tc0[1] = gamma6[mem_pal[col0].green];
+				tc0[2] = gamma6[mem_pal[col0].blue];
+				/* Split error the obvious way */
+				if (!(selc & 1) && (col0 == col1))
+				{
+					color1[0] = (color1[0] - color0[0]) * emult +
+						color0[0] - tc0[0];
+					color1[1] = (color1[1] - color0[1]) * emult +
+						color0[1] - tc0[1];
+					color1[2] = (color1[2] - color0[2]) * emult +
+						color0[2] - tc0[2];
+				}
+				/* Weigh component errors separately */
+				else if (selc < 3)
+				{
+					for (k = 0; k < 3; k++)
+					{
+						intd = fabs(color0[k] - tc0[k]);
+						extd = fabs(color0[k] - color1[k]);
+						if (intd + extd == 0.0) err = 1.0;
+						else err = (intd + emult * extd) / (intd + extd);
+						color1[k] = err * (color1[k] - tc1[k]);
+					}
+				}
+				/* Weigh errors by vector length */
+				else
+				{
+					intd = sqrt((color0[0] - tc0[0]) * (color0[0] - tc0[0]) +
+						(color0[1] - tc0[1]) * (color0[1] - tc0[1]) +
+						(color0[2] - tc0[2]) * (color0[2] - tc0[2]));
+					extd = sqrt((color0[0] - color1[0]) * (color0[0] - color1[0]) +
+						(color0[1] - color1[1]) * (color0[1] - color1[1]) +
+						(color0[2] - color1[2]) * (color0[2] - color1[2]));
+					if (intd + extd == 0.0) err = 1.0;
+					else err = (intd + emult * extd) / (intd + extd);
+					color1[0] = err * (color1[0] - tc1[0]);
+					color1[1] = err * (color1[1] - tc1[1]);
+					color1[2] = err * (color1[2] - tc1[2]);
+				}
+			}
+			else /* Indiscriminate error damping */
+			{
+				color1[0] = (color1[0] - tc1[0]) * emult;
+				color1[1] = (color1[1] - tc1[1]) * emult;
+				color1[2] = (color1[2] - tc1[2]) * emult;
+			}
+			/* Distribute the error */
+			color1[0] *= fdiv;
+			color1[1] *= fdiv;
+			color1[2] *= fdiv;
+			for (k = 0; k < 5; k++)
+			{
+				kk = j + (k - 2) * dj * 3 + 6;
+				for (l = 0; l < 3; l++ , kk++)
+				{
+					row0[kk] += color1[l] * dither[k];
+					row1[kk] += color1[l] * dither[k + 5];
+					row2[kk] += color1[l] * dither[k + 10];
+				}
+			}
+		}
+		tmp = row0; row0 = row1; row1 = row2; row2 = tmp;
+	}
+
+	free(ddata1);
+	free(ddata2);
+	return (0);
 }
 
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
@@ -1513,9 +1792,6 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 	png_color pcol;
 
 	j = mem_width * mem_height;
-
-//	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 1 );
-//	if ( res == 1 ) return 2;
 
 	progress_init(_("Converting to Indexed Palette"),1);
 
@@ -1585,8 +1861,6 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 			*new_img++ = k;
 		}
 	}
-	mem_col_A = 1;
-	mem_col_B = 0;
 	progress_end();
 
 	return 0;
@@ -1624,65 +1898,38 @@ void mem_greyscale()			// Convert image to greyscale
 	}
 }
 
-void pal_hsl( png_color col, float *hh, float *ss, float *ll )
+/* Valid for x=0..5, which is enough here */
+#define MOD3(x) ((((x) * 5 + 1) >> 2) & 3)
+
+/* Nonclassical HSV: H is 0..6, S is 0..1, V is 0..255 */
+void rgb2hsv(int *rgb, double *hsv)
 {
-	float	h = 0.0, s = 0.0, v = 0.0,
-		r = col.red, g = col.green, b = col.blue,
-		mini, maxi, delta;
-	int order = 0;
+	int c0, c1, c2;
 
-	r = r / 255;
-	g = g / 255;
-	b = b / 255;
-
-	mini = r;
-	maxi = r;
-
-	if (g > maxi) { maxi = g; order = 1; }
-	if (b > maxi) { maxi = b; order = 2; }
-	if (g < mini) mini = g;
-	if (b < mini) mini = b;
-
-	delta = maxi - mini;
-	v = maxi;
-	if ( maxi != 0 )
+	if (!((rgb[0] ^ rgb[1]) | (rgb[0] ^ rgb[2])))
 	{
-		s = delta / maxi;
-
-		switch (order)
-		{
-			case 0: { h = ( g - b ) / delta; break; }		// yel < h < mag
-			case 1: { h = 2 + ( b - r ) / delta; break; }		// cyan < h < yel
-			case 2: { h = 4 + ( r - g ) / delta; break; }		// mag < h < cyan
-		}
-		h = h*60;
-		if( h < 0 ) h = h + 360;
+		hsv[0] = hsv[1] = 0.0;
+		hsv[2] = rgb[0];
+		return;
 	}
-	else
-	{
-		s = 0;
-		h = 0;
-	}
-
-	mtMAX( h, h, 0 )
-	mtMIN( h, h, 360 )
-
-	*hh = h;
-	*ss = s;
-	*ll = 255*( 0.30*r + 0.58*g + 0.12*b );
+	c2 = rgb[2] < rgb[0] ? 1 : 0;
+	if (rgb[c2] >= rgb[c2 + 1]) c2++;
+	c0 = MOD3(c2 + 1);
+	c1 = MOD3(c2 + 2);
+	hsv[2] = rgb[c0] > rgb[c1] ? rgb[c0] : rgb[c1];
+	hsv[1] = hsv[2] - rgb[c2];
+	hsv[0] = c0 * 2 + 1 + (rgb[c1] - rgb[c0]) / hsv[1];
+	hsv[1] /= hsv[2];
 }
 
-float rgb_hsl( int t, png_color col )
+static double rgb_hsl(int t, png_color col)
 {
-	float h, s, l;
+	double hsv[3];
+	int rgb[3] = {col.red, col.green, col.blue};
 
-	pal_hsl( col, &h, &s, &l );
-
-	if ( t == 0 ) return h;
-	if ( t == 1 ) return s;
-	if ( t == 2 ) return l;
-
-	return -1;
+	if (t == 2) return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]);
+	rgb2hsv(rgb, hsv);
+	return (hsv[t]);
 }
 
 void mem_pal_index_move( int c1, int c2 )	// Move index c1 to c2 and shuffle in between up/down
@@ -1736,8 +1983,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 
 	switch (a)
 	{
-	case 6: case 7:
-		init_cols();
+	case 3: case 4:
 		get_lxn(lxnA, PNG_2_INT(mem_col_A24));
 		get_lxn(lxnB, PNG_2_INT(mem_col_B24));
 		break;
@@ -1754,30 +2000,21 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		/* Hue */
 		case 0: tab1[i] = rint(1000 * rgb_hsl(0, mem_pal[i]));
 			break;
-		/* Red */
-		case 1: tab1[i] = mem_pal[i].red;
-			break;
 		/* Saturation */
-		case 2: tab1[i] = rint(1000 * rgb_hsl(1, mem_pal[i]));
-			break;
-		/* Green */
-		case 3: tab1[i] = mem_pal[i].green;
+		case 1: tab1[i] = rint(1000 * rgb_hsl(1, mem_pal[i]));
 			break;
 		/* Value */
-		case 4: tab1[i] = rint(rgb_hsl(2, mem_pal[i]));
-			break;
-		/* Blue */
-		case 5: tab1[i] = mem_pal[i].blue;
+		case 2: tab1[i] = rint(1000 * rgb_hsl(2, mem_pal[i]));
 			break;
 		/* Distance to A */
-		case 6: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
+		case 3: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
 			tab1[i] = rint(1000 * ((lxn[0] - lxnA[0]) *
 				(lxn[0] - lxnA[0]) + (lxn[1] - lxnA[1]) *
 				(lxn[1] - lxnA[1]) + (lxn[2] - lxnA[2]) *
 				(lxn[2] - lxnA[2])));
 			break;
 		/* Distance to A+B */
-		case 7: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
+		case 4: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
 			tab1[i] = rint(1000 *
 				(sqrt((lxn[0] - lxnA[0]) * (lxn[0] - lxnA[0]) +
 				(lxn[1] - lxnA[1]) * (lxn[1] - lxnA[1]) +
@@ -1785,6 +2022,15 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 				sqrt((lxn[0] - lxnB[0]) * (lxn[0] - lxnB[0]) +
 				(lxn[1] - lxnB[1]) * (lxn[1] - lxnB[1]) +
 				(lxn[2] - lxnB[2]) * (lxn[2] - lxnB[2]))));
+			break;
+		/* Red */
+		case 5: tab1[i] = mem_pal[i].red;
+			break;
+		/* Green */
+		case 6: tab1[i] = mem_pal[i].green;
+			break;
+		/* Blue */
+		case 7: tab1[i] = mem_pal[i].blue;
 			break;
 		/* Projection on A->B */
 		case 8: tab1[i] = mem_pal[i].red * (mem_col_B24.red - mem_col_A24.red) +
@@ -4106,49 +4352,46 @@ int mem_cols_used(int max_count)			// Count colours used in main RGB image
 
 void mem_cols_found_dl(unsigned char userpal[3][256])		// Convert results ready for DL code
 {
-	int i, j;
+	int i;
 
-	for ( i=0; i<256; i++ )
-		for ( j=0; j<3; j++ )
-			userpal[j][i] = found[i][j];
+	for (i = 0; i < 256; i++)
+	{
+		userpal[0][i] = found[i * 3];
+		userpal[1][i] = found[i * 3 + 1];
+		userpal[2][i] = found[i * 3 + 2];
+	}
 }
 
 int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			// Count colours used in RGB chunk
 {
-	int i = 3, j = w*h*3, res = 1, k, f;
+	int i, j = w * h * 3, k, res, pix;
 
-
-	found[0][0] = im[0];
-	found[0][1] = im[1];
-	found[0][2] = im[2];
-	if ( prog == 1 ) progress_init(_("Counting Unique RGB Pixels"),0);
-	while ( i<j && res<max_count )				// Skim all pixels
+	max_count *= 3;
+	found[0] = im[0];
+	found[1] = im[1];
+	found[2] = im[2];
+	if (prog) progress_init(_("Counting Unique RGB Pixels"), 0);
+	for (i = res = 3; (i < j) && (res < max_count); i += 3)	// Skim all pixels
 	{
-		k = 0;
-		f = 0;
-		while ( k<res && f==0 )
+		pix = MEM_2_INT(im, i);
+		for (k = 0; k < res; k += 3)
 		{
-			if (	im[i]   == found[k][0] &&
-				im[i+1] == found[k][1] &&
-				im[i+2] == found[k][2]
-				) f = 1;
-			k++;
+			if (MEM_2_INT(found, k) == pix) break;
 		}
-		if ( f == 0 )					// New colour so add to list
+		if (k >= res)	// New colour so add to list
 		{
-			found[res][0] = im[i];
-			found[res][1] = im[i+1];
-			found[res][2] = im[i+2];
-			res++;
-			if ( res % 16 == 0 && prog == 1 )
-				if ( progress_update( ((float) res)/1024 ) ) break;
+			found[res] = im[i];
+			found[res + 1] = im[i + 1];
+			found[res + 2] = im[i + 2];
+			res += 3;
+			if (!prog || (res & 15)) continue;
+			if (progress_update((float)res / max_count)) break;
 		}
-		i = i + 3;
 	}
-	if ( prog == 1 ) progress_end();
+	if (prog) progress_end();
 
-	return res;
+	return (res / 3);
 }
 
 

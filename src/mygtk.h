@@ -30,7 +30,6 @@ GtkWidget *add_slider2table(int val, int min, int max, GtkWidget *table,
 			int row, int column, int width, int height);
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing,
 	int a, int b, int c );
-GtkWidget *add_radio_button( char *label, GSList *group, GtkWidget *last, GtkWidget *box, int i );
 void spin_to_table( GtkWidget *table, GtkWidget **spin, int row, int column, int spacing,
 	int value, int min, int max );
 void add_hseparator( GtkWidget *widget, int xs, int ys );
@@ -51,3 +50,8 @@ void mt_spinslide_set_value(GtkWidget *spinslide, gint value);
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	gpointer user_data);
 #define ADJ2INT(a) ((int)((a)->value + 0.5))
+
+// Self-contained package of radio buttons
+
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
+	GtkSignalFunc handler);

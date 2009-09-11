@@ -132,20 +132,6 @@ void add_hseparator( GtkWidget *widget, int xs, int ys )
 	gtk_widget_set_usize (sep, xs, ys);
 }
 
-GtkWidget *add_radio_button( char *label, GSList *group, GtkWidget *last, GtkWidget *box, int i )
-{
-	GtkWidget *radio;
-
-	if ( i<2 ) radio = gtk_radio_button_new_with_label( group, label );
-	else radio = gtk_radio_button_new_with_label_from_widget( GTK_RADIO_BUTTON(last), label );
-
-	gtk_container_set_border_width (GTK_CONTAINER (radio), 5);
-	gtk_box_pack_start( GTK_BOX(box), radio, TRUE, TRUE, 0 );
-	gtk_widget_show( radio );
-
-	return radio;
-}
-
 
 
 ////	PROGRESS WINDOW
@@ -342,4 +328,48 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	adj = gtk_range_get_adjustment(GTK_RANGE(((GtkBoxChild*)
 		GTK_BOX(spinslide)->children->data)->widget));
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
+}
+
+// Managing batches of radio buttons with minimum of fuss
+
+static void wj_radio_toggle(GtkWidget *btn, gpointer idx)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
+	*(int *)gtk_object_get_user_data(GTK_OBJECT(btn->parent)) = (int)idx;
+}
+
+/* void handler(GtkWidget *btn, gpointer user_data); */
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
+	GtkSignalFunc handler)
+{
+	int i, j;
+	GtkWidget *box, *wbox, *button = NULL;
+
+	if (!handler) handler = GTK_SIGNAL_FUNC(wj_radio_toggle);
+	box = wbox = vnum > 0 ? gtk_hbox_new(FALSE, 0) : gtk_vbox_new(FALSE, 0);
+	if (vnum < 2) gtk_object_set_user_data(GTK_OBJECT(wbox), var);
+
+	for (i = j = 0; (i != cnt) && names[i]; i++)
+	{
+		if (!names[i][0]) continue;
+		button = gtk_radio_button_new_with_label_from_widget(
+			GTK_RADIO_BUTTON(button), names[i]);
+		if ((vnum > 1) && !(j % vnum))
+		{
+			wbox = gtk_vbox_new(FALSE, 0);
+			gtk_box_pack_start(GTK_BOX(box), wbox, TRUE, TRUE, 0);
+			gtk_object_set_user_data(GTK_OBJECT(wbox), var);
+		}
+		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+		gtk_box_pack_start(GTK_BOX(wbox), button, FALSE, TRUE, 0);
+		if (i == idx) gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(button), TRUE);
+		gtk_signal_connect(GTK_OBJECT(button), "toggled", handler,
+			(gpointer)(i));
+		j++;
+	}
+	gtk_widget_show_all(box);
+
+	if (var) *var = idx < i ? idx : 0;
+	return (box);
 }

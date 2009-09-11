@@ -142,13 +142,11 @@ void paste_prepare()
 	}
 }
 
-void iso_trans( GtkMenuItem *menu_item, gpointer user_data )
+void iso_trans( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	int i, j = 0;
+	int i;
 
-	for ( i=0; i<4; i++ ) if ( menu_iso[i] == GTK_WIDGET(menu_item) ) j=i;
-
-	i = mem_isometrics(j);
+	i = mem_isometrics(item);
 
 	if ( i==0 ) canvas_undo_chores();
 	else
@@ -2804,27 +2802,8 @@ void paint_marquee(int action, int new_x, int new_y)
 
 int close_to( int x1, int y1 )		// Which corner of selection is coordinate closest to?
 {
-	int distance, xx[2], yy[2], i, closest[2];
-
-	mtMIN( xx[0], marq_x1, marq_x2 )
-	mtMAX( xx[1], marq_x1, marq_x2 )
-	mtMIN( yy[0], marq_y1, marq_y2 )
-	mtMAX( yy[1], marq_y1, marq_y2 )
-
-	closest[0] = 0;
-	closest[1] = (x1 - xx[0]) * (x1 - xx[0]) + (y1 - yy[0]) * (y1 - yy[0]);
-	for ( i=1; i<4; i++ )
-	{
-		distance =	( x1 - xx[i % 2] ) * ( x1 - xx[i % 2] ) + 
-				( y1 - yy[i / 2] ) * ( y1 - yy[i / 2] );
-		if ( distance < closest[1] )
-		{
-			closest[0] = i;
-			closest[1] = distance;
-		}
-	}
-
-	return closest[0];
+	return ((x1 + x1 <= marq_x1 + marq_x2 ? 0 : 1) +
+		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
 void update_sel_bar()			// Update selection stats on status bar
@@ -3124,7 +3103,8 @@ void register_file( char *filename )		// Called after successful load/save
 
 void scroll_wheel( int x, int y, int d )		// Scroll wheel action from mouse
 {
-	if ( d == 1 ) zoom_in( NULL, NULL ); else zoom_out( NULL, NULL );
+	if (d == 1) zoom_in();
+	else zoom_out();
 }
 
 void create_default_image()			// Create default new image

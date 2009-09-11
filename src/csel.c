@@ -28,12 +28,16 @@
 #include "channels.h"
 #include "csel.h"
 
-#define CIENUM 1024
+/* Use sRGB gamma if defined, ITU-R 709 gamma otherwise */
+/* From my point of view, ITU-R 709 is a better model of a real CRT */
+// #define SRGB
+
+#define CIENUM 8192
 
 csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
-static double gamma256[256], gamma64[64];
+double gamma256[256], gamma64[64];
 static float CIE[CIENUM + 2];
 
 /* This nightmarish code does conversion from CIE XYZ into my own perceptually
@@ -108,8 +112,15 @@ void rgb2LXN(double *tmp, double r, double g, double b)
 #define GREEN_Y 0.600
 #define BLUE_X 0.150
 #define BLUE_Y 0.060
+
+#if 1 // 6500K whitepoint
 #define WHITE_X 0.3127
 #define WHITE_Y 0.329
+#else // 9300K whitepoint
+#define WHITE_X 0.2848
+#define WHITE_Y 0.2932
+#endif
+
 static double det(double x1, double y1, double x2, double y2, double x3, double y3)
 {
 	return ((y1 - y2) * x3 + (y2 - y3) * x1 + (y3 - y1) * x2);
@@ -132,18 +143,40 @@ static void make_rgb_xyz(void)
 	xyz2XN(wXN, WHITE_X / WHITE_Y, 1.0, (1 - WHITE_X - WHITE_Y) / WHITE_Y);
 }
 
+#ifdef SRGB
+
+#define GAMMA_POW 2.4
+#define GAMMA_OFS 0.055
+#if 1 /* Standard */
+#define GAMMA_SPLIT 0.04045
+#define GAMMA_DIV 12.92
+#else /* C1 continuous */
+#define GAMMA_SPLIT 0.03928
+#define GAMMA_DIV 12.92321
+#endif
+
+#else /* ITU-R 709 */
+
+#define GAMMA_POW (1.0 / 0.45)
+#define GAMMA_OFS 0.099
+#define GAMMA_SPLIT 0.081
+#define GAMMA_DIV 4.5
+
+#endif
+
 static void make_gamma(double *Gamma, int cnt)
 {
 	int i, k;
 	double mult = 1.0 / (double)(cnt - 1);
 
-	k = floor(0.081 * (cnt - 1)) + 1;
+	k = floor(GAMMA_SPLIT * (cnt - 1)) + 1;
 
 	for (i = k; i < cnt; i++)
 	{
-		Gamma[i] = pow(((double)i * mult + 0.099) / 1.099, 1.0 / 0.45);
+		Gamma[i] = pow(((double)i * mult + GAMMA_OFS) /
+			(1.0 + GAMMA_OFS), GAMMA_POW);
 	}
-	mult /= 4.5;
+	mult /= GAMMA_DIV;
 	for (i = 0; i < k; i++)
 	{
 		Gamma[i] = (double)i * mult;
@@ -163,7 +196,6 @@ static void make_CIE(void)
 
 void init_cols(void)
 {
-	if (gamma256[255]) return; /* Done already */
 	make_gamma(gamma256, 256);
 	make_gamma(gamma64, 64);
 	make_CIE();
@@ -417,7 +449,6 @@ void csel_init()
 		memory_errors(1);
 		return;
 	}
-	init_cols();
 	info->center = PNG_2_INT(mem_col_A24);
 	info->limit = PNG_2_INT(mem_col_B24);
 	info->center_a = channel_col_A[CHN_ALPHA];

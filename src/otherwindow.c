@@ -45,8 +45,8 @@
 
 ///	NEW IMAGE WINDOW
 
-int new_window_type = 0;
-GtkWidget *new_window, *new_radio[4];
+int im_type, new_window_type = 0;
+GtkWidget *new_window;
 GtkWidget *spinbutton_height, *spinbutton_width, *spinbutton_cols;
 
 
@@ -118,14 +118,7 @@ int do_new_one(int nw, int nh, int nc, int nt, int bpp)
 
 gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int nw, nh, nc, nt = 2, i, j=4, bpp = 1, err=0;
-
-	if ( new_window_type == 1 ) j=3;
-
-	for ( i=0; i<j; i++ )
-		if ( gtk_toggle_button_get_active(
-			&(GTK_RADIO_BUTTON( new_radio[i] )->check_button.toggle_button)
-			) ) nt = i;
+	int nw, nh, nc, bpp = 1, err=0;
 
 	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_width) );
 	gtk_spin_button_update( GTK_SPIN_BUTTON(spinbutton_height) );	// All needed in GTK+2 for late changes
@@ -135,9 +128,9 @@ gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 	nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_height) );
 	nc = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(spinbutton_cols) );
 
-	if ( nt == 0 ) bpp = 3;
+	if (im_type == 0) bpp = 3;
 
-	if ( nt == 3 )		// Grab Screenshot
+	if (im_type == 3)	// Grab Screenshot
 	{
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_lower( main_window->window );
@@ -173,9 +166,9 @@ gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 #endif
 	}
 
-	if ( nt < 3 && new_window_type == 0 )		// New image
+	if ((im_type < 3) && (new_window_type == 0))		// New image
 	{
-		err = do_new_one( nw, nh, nc, nt, bpp );
+		err = do_new_one( nw, nh, nc, im_type, bpp );
 
 		if ( err>0 )		// System was unable to allocate memory for image, using 8x8 instead
 		{
@@ -188,14 +181,14 @@ gint create_new( GtkWidget *widget, GdkEvent *event, gpointer data )
 		inifile_set_gint32("lastnewWidth", nw );
 		inifile_set_gint32("lastnewHeight", nh );
 		inifile_set_gint32("lastnewCols", nc );
-		inifile_set_gint32("lastnewType", nt );
+		inifile_set_gint32("lastnewType", im_type );
 
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
 			// Set tool to square for new image - easy way to lose a selection marquee
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 
-	if ( new_window_type == 1 ) layer_new( nw, nh, 3-nt, nc, CMASK_IMAGE);
+	if (new_window_type == 1) layer_new(nw, nh, 3 - im_type, nc, CMASK_IMAGE);
 	else
 	{
 		gtk_adjustment_value_changed( gtk_scrolled_window_get_hadjustment(
@@ -214,8 +207,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 {
 	char *rad_txt[] = {_("24 bit RGB"), _("Greyscale"), _("Indexed Palette"), _("Grab Screenshot")},
 		*title_txt[] = {_("New Image"), _("New Layer")};
-	int w = mem_width, h = mem_height, c = mem_cols, im_type = 3 - mem_img_bpp;
-	GSList *group;
+	int w = mem_width, h = mem_height, c = mem_cols;
 
 	GtkWidget *vbox1, *hbox3;
 	GtkWidget *table1;
@@ -243,6 +235,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 		im_type = inifile_get_gint32("lastnewType", 2);
 		if ( im_type<0 || im_type>2 ) im_type = 0;
 	}
+	else im_type = 3 - mem_img_bpp;
 
 	spin_to_table( table1, &spinbutton_width, 0, 1, 5, w, MIN_WIDTH, MAX_WIDTH );
 	spin_to_table( table1, &spinbutton_height, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT );
@@ -252,14 +245,8 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	add_to_table( _("Height"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 	add_to_table( _("Colours"), table1, 2, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
-	new_radio[0] = add_radio_button( rad_txt[0], NULL,  NULL, vbox1, 0 );
-	group = gtk_radio_button_group( GTK_RADIO_BUTTON(new_radio[0]) );
-	new_radio[1] = add_radio_button( rad_txt[1], group, NULL, vbox1, 1 );
-	new_radio[2] = add_radio_button( rad_txt[2], NULL,  new_radio[1], vbox1, 2 );
-	if ( type == 0 )
-		new_radio[3] = add_radio_button( rad_txt[3], NULL,  new_radio[1], vbox1, 3 );
-
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( new_radio[im_type]), TRUE );
+	hbox3 = wj_radio_pack(rad_txt, type ? 3 : 4, 0, im_type, &im_type, NULL);
+	gtk_box_pack_start(GTK_BOX(vbox1), hbox3, TRUE, TRUE, 0);
 
 	add_hseparator( vbox1, 200, 10 );
 
@@ -658,21 +645,14 @@ gint click_spal_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
-static void spal_mode_changed(GtkWidget *widget, gpointer mode)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
-	spal_mode = (int)mode;
-}
-
 void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 {
 	char *rad_txt[] = {
-		_("Hue"),		_("Red"),
-		_("Saturation"),	_("Green"),
-		_("Luminance"),		_("Blue"),
-		_("Distance to A"),	_("Distance to A+B"),
-		_("Projection to A->B"),_("Frequency")};
-	int i;
+		_("Hue"), _("Saturation"), _("Luminance"), _("Distance to A"),
+			_("Distance to A+B"),
+		_("Red"), _("Green"), _("Blue"), _("Projection to A->B"),
+			_("Frequency")};
+
 
 	GtkWidget *vbox1, *hbox3, *table1, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
@@ -692,24 +672,10 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("Start Index"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 	add_to_table( _("End Index"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
-	table1 = add_a_table(5, 2, 5, vbox1);
-	spal_mode = inifile_get_gint32("lastspalType", 4);
-	button = gtk_radio_button_new_with_label(NULL, rad_txt[0]);
-	for (i = 0; ; i++)
-	{
-		if (spal_mode == i) gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(button), TRUE);
-		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-		gtk_widget_show(button);
-		gtk_table_attach(GTK_TABLE(table1), button, i & 1, (i & 1) + 1,
-			i / 2, i / 2 + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-		gtk_signal_connect(GTK_OBJECT(button), "toggled",
-				GTK_SIGNAL_FUNC(spal_mode_changed), (gpointer)(i));
-		if (i >= 9) break;
-		button = gtk_radio_button_new_with_label_from_widget(
-			GTK_RADIO_BUTTON(button), rad_txt[i + 1]);
-	}
-	if (mem_img_bpp == 3) gtk_widget_set_sensitive(button, FALSE);
+	table1 = wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
+		inifile_get_gint32("lastspalType", 2), &spal_mode, NULL);
+	gtk_box_pack_start(GTK_BOX(vbox1), table1, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(table1), 5);
 
 	spal_rev = add_a_toggle(_("Reverse Order"), vbox1,
 		inifile_get_gboolean("palrevSort", FALSE));
@@ -1249,31 +1215,6 @@ gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 static int scale_mode = 7;
 static int resize_mode = 0;
 
-static int sz_mode;
-static void sz_mode_changed(GtkWidget *widget, gpointer name)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
-	sz_mode = (int) name;
-}
-
-static void add_modes(GtkWidget *box, gchar **names, int mode)
-{
-	GtkWidget *btn = NULL;
-	int i;
-
-	sz_mode = mode;
-	add_hseparator(box, -2, 10);
-	for (i = 0; names[i]; i++)
-	{
-		btn = add_radio_button(names[i], NULL, btn, box, i + 1);
-		if (sz_mode == i)
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(btn), TRUE);
-		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
-			GTK_SIGNAL_FUNC(sz_mode_changed), (gpointer)(i));
-	}
-	if (sz_mode >= i) sz_mode = 0;
-}
-
 gint click_sisca_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
 	gtk_widget_destroy(sisca_window);
@@ -1296,12 +1237,11 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 		if ( sisca_scale )
 		{
-			if ( mem_img_bpp == 3 ) scale_type = scale_mode = sz_mode;
+			if (mem_img_bpp == 3) scale_type = scale_mode;
 			res = mem_image_scale( nw, nh, scale_type );
 		}
 		else 
 		{
-			resize_mode = sz_mode;
 			ox = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[2]) );
 			oy = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[3]) );
 			res = mem_image_resize(nw, nh, ox, oy, resize_mode);
@@ -1423,12 +1363,21 @@ void sisca_init( char *title )
 	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
 		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
 
+	sisca_hbox = NULL;
+
 	/* Resize */
-	if (!sisca_scale) add_modes(sisca_vbox, resize_modes, resize_mode);
+	if (!sisca_scale)
+		sisca_hbox = wj_radio_pack(resize_modes, -1, 0, resize_mode, &resize_mode, NULL);
 
 	/* RGB rescale */
-	else if (mem_img_bpp == 3) add_modes(sisca_vbox, scale_fnames, scale_mode);
+	else if (mem_img_bpp == 3)
+		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 
+	if (sisca_hbox)
+	{
+		add_hseparator(sisca_vbox, -2, 10);
+		gtk_box_pack_start(GTK_BOX(sisca_vbox), sisca_hbox, TRUE, TRUE, 0);
+	}
 	add_hseparator( sisca_vbox, -2, 10 );
 
 	sisca_hbox = gtk_hbox_new (FALSE, 0);
@@ -1801,27 +1750,6 @@ static void select_colour(int what)
 static void set_range_spin(GtkButton *button, GtkWidget *spin)
 {
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), allcol_idx);
-}
-
-/* Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255 */
-static void rgb2hsv(int *rgb, double *hsv)
-{
-	int c0, c1, c2;
-
-	if (!((rgb[0] ^ rgb[1]) | (rgb[0] ^ rgb[2])))
-	{
-		hsv[0] = hsv[1] = 0.0;
-		hsv[2] = rgb[0];
-		return;
-	}
-	c2 = rgb[2] < rgb[0] ? 1 : 0;
-	if (rgb[c2] >= rgb[c2 + 1]) c2++;
-	c0 = (c2 + 1) % 3;
-	c1 = (c2 + 2) % 3;
-	hsv[2] = rgb[c0] > rgb[c1] ? rgb[c0] : rgb[c1];
-	hsv[1] = hsv[2] - rgb[c2];
-	hsv[0] = c0 * 2 + 1 + (rgb[c1] - rgb[c0]) / hsv[1];
-	hsv[1] /= hsv[2];
 }
 
 static void make_cscale(GtkButton *button, gpointer user_data)
@@ -2221,20 +2149,9 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
 		gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), csel_data->range);
 		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_data->invert);
-		i = 0;
-		button = gtk_radio_button_new_with_label(NULL, csel_modes[0]);
-		while (1)
-		{
-			gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-			gtk_box_pack_start(GTK_BOX(extbox), button, FALSE, FALSE, 0);
-			if (i == csel_data->mode) gtk_toggle_button_set_active(
-				GTK_TOGGLE_BUTTON(button), TRUE);
-			gtk_signal_connect(GTK_OBJECT(button), "toggled",
-				GTK_SIGNAL_FUNC(csel_mode_changed), (gpointer)i);
-			if (!csel_modes[++i]) break;
-			button = gtk_radio_button_new_with_label_from_widget(
-				GTK_RADIO_BUTTON(button), csel_modes[i]);
-		}
+		win = wj_radio_pack(csel_modes, -1, 1, csel_data->mode, NULL,
+			GTK_SIGNAL_FUNC(csel_mode_changed));
+		gtk_box_pack_start(GTK_BOX(extbox), win, FALSE, FALSE, 0);
 		gtk_widget_show_all(extbox);
 
 		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour-Selective Mode"),
@@ -2257,235 +2174,338 @@ void choose_colours()
 
 ///	QUANTIZE WINDOW
 
-GtkWidget *quantize_window, *quantize_spin, *quantize_radio[5], *quantize_radio2[4];
-int quantize_cols;
+#define DITH_NONE	0
+#define DITH_FS		1
+#define DITH_JARVIS	2
+#define DITH_STUCKI	3
+#define DITH_ATKINSON	4
+#define DITH_ORDERED	5
+#define DITH_OLDFS	6
+#define DITH_OLDDITHER	7
+#define DITH_OLDSCATTER	8
+#define DITH_MAX	9
 
+GtkWidget *quantize_window, *quantize_spin, *quantize_dither;
+GtkWidget *dither_serpent, *dither_spin;
+int quantize_cols, quantize_mode, dither_mode;
 
-gint delete_quantize( GtkWidget *widget, GdkEvent *event, gpointer data )
+/* Dither settings - persistent */
+int dither_cspace = 1, dither_dist = 2, dither_limit = 0;
+int dither_scan = TRUE, dither_sel = 0;
+double dither_fract[2] = {1.0, 0.0};
+
+static void click_quantize_radio(GtkWidget *widget, gpointer data)
 {
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
+	quantize_mode = (int)data;
+
+	/* No dither for exact conversion */
+	gtk_widget_set_sensitive(quantize_dither, quantize_mode != 0);
+}
+
+static void click_quantize_ok(GtkWidget *widget, gpointer data)
+{
+	int i, dither, new_cols, err = 0;
+	unsigned char *old_image = mem_img[CHN_IMAGE], newpal[3][256];
+	double efrac;
+
+	/* Dithering filters */
+	static short dithers[4][16] = {
+		/* Floyd-Steinberg */
+		{ 16,  0, 0, 0, 7, 0,  0, 3, 5, 1, 0,  0, 0, 0, 0, 0 },
+		/* Jarvis */
+		{ 48,  0, 0, 0, 7, 5,  3, 5, 7, 5, 3,  1, 3, 5, 3, 1 },
+		/* Stucki */
+		{ 42,  0, 0, 0, 8, 4,  2, 4, 8, 4, 2,  1, 2, 4, 2, 1 },
+		/* Atkinson */
+		{  8,  0, 0, 0, 1, 1,  0, 1, 1, 1, 0,  0, 0, 1, 0, 0 }};
+
+/* Jarvis dither looks consistently worse than Stucki; candidate for deletion.
+ * Atkinson is rather good in RGB space, but damped-to-0.75 Stucki does even
+ * better, and in other colour spaces Atkinson dither is no good at all; seems
+ * deletable too. */
+
+	dither = quantize_mode ? dither_mode : DITH_NONE;
+	gtk_spin_button_update(GTK_SPIN_BUTTON(quantize_spin));
+	new_cols = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(quantize_spin));
+	new_cols = new_cols < 1 ? 1 : new_cols > 256 ? 256 : new_cols;
+	dither_scan = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(dither_serpent));
+	gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
+	efrac = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
+	dither_fract[dither_sel ? 1 : 0] = efrac;
+
 	gtk_widget_destroy(quantize_window);
 
-	return FALSE;
-}
+	/* Paranoia */
+	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
 
-gint click_quantize_radio( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	int i;
-	gboolean value = FALSE;
-
-	if ( gtk_toggle_button_get_active(
-		&(GTK_RADIO_BUTTON( quantize_radio[0] )->check_button.toggle_button) ) )
-		value = FALSE;
-	else
-		value = TRUE;
-
-	if ( !value )
-		// If the user wants an exact transfer, don't allow user to choose dither/floyd etc
+	i = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
+	if (i)
 	{
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(quantize_radio2[0]), TRUE );
-	}
-
-	for ( i=1; i<4; i++ ) gtk_widget_set_sensitive(quantize_radio2[i], value);
-
-	return FALSE;
-}
-
-gint click_quantize_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	unsigned char *old_image = mem_img[CHN_IMAGE], newpal[3][256];
-	int rad1=0, rad2=0, i, k, new_cols, dither;
-
-	for ( i=0; i<5; i++ )
-		if ( gtk_toggle_button_get_active(
-			&(GTK_RADIO_BUTTON( quantize_radio[i] )->check_button.toggle_button)
-				) ) rad1 = i;
-
-	for ( i=0; i<4; i++ )
-		if ( gtk_toggle_button_get_active(
-			&(GTK_RADIO_BUTTON( quantize_radio2[i] )->check_button.toggle_button)
-				) ) rad2 = i;
-
-	gtk_spin_button_update( GTK_SPIN_BUTTON(quantize_spin) );
-	new_cols = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(quantize_spin) );
-	mtMAX( new_cols, new_cols, 2 )
-	mtMIN( new_cols, new_cols, 256 )
-
-	delete_quantize( NULL, NULL, NULL );
-
-	if ( rad1 == 0 )			// Reduce to indexed using exact canvas pixels
-	{
-		new_cols = quantize_cols;
-		i = mem_convert_indexed();
-	}
-	else
-	{
-		i = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
-		if ( i == 1 ) i=2;
-
-		if ( i == 0 )
-		{
-			if ( rad1 == 1 )
-				for ( k=0; k<new_cols; k++ )
-				{
-					newpal[0][k] = mem_pal[k].red;
-					newpal[1][k] = mem_pal[k].green;
-					newpal[2][k] = mem_pal[k].blue;
-				}
-
-			if ( rad1 == 2 ) i = dl1quant(old_image, mem_width, mem_height,
-						new_cols, newpal);
-			if ( rad1 == 3 ) i = dl3quant(old_image, mem_width, mem_height,
-						new_cols, newpal);
-			if ( rad1 == 4 ) i = wu_quant(old_image, mem_width, mem_height,
-						new_cols, newpal);
-			for ( k=0; k<new_cols; k++ )
-			{
-				mem_pal[k].red = newpal[0][k];
-				mem_pal[k].green = newpal[1][k];
-				mem_pal[k].blue = newpal[2][k];
-			}
-			if ( i == 0 )
-			{
-				dither = rad2 % 2;
-				if ( rad2 < 2 ) i = dl3floste(old_image, mem_img[CHN_IMAGE],
-					mem_width, mem_height, new_cols, dither, newpal);
-						// Floyd-Steinberg
-				if ( rad2 > 1 && rad2 < 4 )
-					i = mem_quantize( old_image, new_cols, rad2 );
-						// Dither/scatter
-			}
-		}
-	}
-
-	if ( i!=0 ) memory_errors(i);
-	else
-	{
-		if ( tool_type == TOOL_SELECT && marq_status >= MARQUEE_PASTE )
-			pressed_select_none( NULL, NULL );
-		if ( tool_type == TOOL_SMUDGE )
-			gtk_toggle_button_set_active(
-				GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-					// If the user is pasting or smudging, lose it!
-
-		mem_cols = new_cols;
-		update_menus();
-		init_pal();
-		update_all_views();
-		gtk_widget_queue_draw( drawing_col_prev );
-	}
-
-	return FALSE;
-}
-
-void pressed_quantize( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int i = mem_cols_used(257), j = i;
-	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
-		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
-		_("Wu Quantize (best method for small palettes)")
-		};
-
-	char *rad_txt2[] = {_("Flat Colour"), _("Floyd-Steinberg"),
-		_("Dithered"), _("Scattered"),
-		};
-
-	GSList *group;
-	GtkWidget *vbox4, *vbox5, *hbox6, *table3, *frame;
-	GtkWidget *button_cancel, *button_ok;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-
-	if ( i<2 )
-	{
-		alert_box( _("Error"), _("You don't have enough unique RGB pixels to reduce to indexed - you must have at least 2."), _("OK"), NULL, NULL );
+		memory_errors(2);
 		return;
 	}
 
-	quantize_cols = j;
-	if ( j>256 ) j = mem_cols;
-
-	quantize_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Convert To Indexed"),
-		GTK_WIN_POS_CENTER, TRUE );
-
-	vbox5 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox5);
-	gtk_container_add (GTK_CONTAINER (quantize_window), vbox5);
-
-	table3 = add_a_table( 2, 2, 10, vbox5 );
-	add_to_table( _("Indexed Colours To Use"), table3, 1, 0, 0, GTK_JUSTIFY_LEFT, 0, 0.5 );
-	spin_to_table( table3, &quantize_spin, 1, 1, 5, j, 2, 256 );
-
-///	Palette FRAME
-
-	frame = gtk_frame_new (_("Palette"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox5), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
-	vbox4 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox4);
-	gtk_container_add (GTK_CONTAINER (frame), vbox4);
-
-	quantize_radio[0] = add_radio_button( rad_txt[0], NULL,  NULL, vbox4, 0 );
-	gtk_signal_connect(GTK_OBJECT(quantize_radio[0]), "clicked",
-			GTK_SIGNAL_FUNC(click_quantize_radio), NULL);
-	group = gtk_radio_button_group( GTK_RADIO_BUTTON(quantize_radio[0]) );
-	quantize_radio[1] = add_radio_button( rad_txt[1], group, NULL, vbox4, 1 );
-	gtk_signal_connect(GTK_OBJECT(quantize_radio[1]), "clicked",
-			GTK_SIGNAL_FUNC(click_quantize_radio), NULL);
-
-	for ( i=2; i<5; i++ )
+	switch (quantize_mode)
 	{
-		quantize_radio[i] = add_radio_button( rad_txt[i], NULL,  quantize_radio[1], vbox4, i );
-		gtk_signal_connect(GTK_OBJECT(quantize_radio[i]), "clicked",
-			GTK_SIGNAL_FUNC(click_quantize_radio), NULL);
+	case 0:	/* Use image colours */
+		new_cols = quantize_cols;
+		err = mem_convert_indexed();
+		dither = DITH_MAX;
+		break;
+	default:
+	case 1: /* Use current palette */
+		for (i = 0; i < new_cols; i++)
+		{
+			newpal[0][i] = mem_pal[i].red;
+			newpal[1][i] = mem_pal[i].green;
+			newpal[2][i] = mem_pal[i].blue;
+		}
+		break;
+	case 2: /* DL1 quantizer */
+		err = dl1quant(old_image, mem_width, mem_height, new_cols, newpal);
+		break;
+	case 3: /* DL3 quantizer */
+		err = dl3quant(old_image, mem_width, mem_height, new_cols, newpal);
+		break;
+	case 4: /* Wu quantizer */
+		err = wu_quant(old_image, mem_width, mem_height, new_cols, newpal);
+		break;
 	}
 
-///	Image FRAME
-
-	frame = gtk_frame_new (_("Image"));
-	gtk_widget_show (frame);
-	gtk_box_pack_start (GTK_BOX (vbox5), frame, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
-
-	vbox4 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox4);
-	gtk_container_add (GTK_CONTAINER (frame), vbox4);
-
-	quantize_radio2[0] = add_radio_button( rad_txt2[0], NULL,  NULL, vbox4, 0 );
-	group = gtk_radio_button_group( GTK_RADIO_BUTTON(quantize_radio2[0]) );
-	quantize_radio2[1] = add_radio_button( rad_txt2[1], group, NULL, vbox4, 1 );
-
-	for ( i=2; i<4; i++ )
+	if (quantize_mode > 1)
 	{
-		quantize_radio2[i] = add_radio_button( rad_txt2[i], NULL,  quantize_radio2[1],
-						vbox4, i );
+		for (i = 0; i < new_cols; i++)
+		{
+			mem_pal[i].red = newpal[0][i];
+			mem_pal[i].green = newpal[1][i];
+			mem_pal[i].blue = newpal[2][i];
+		}
 	}
 
-
-	if ( quantize_cols > 256 )
+	if (err) dither = DITH_MAX;
+	switch (dither)
 	{
-		gtk_widget_hide (quantize_radio[0]);
-		gtk_widget_set_sensitive( quantize_radio[0], FALSE );
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(quantize_radio[4]), TRUE );
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(quantize_radio2[1]), TRUE );
+	case DITH_NONE:
+	case DITH_FS:
+	case DITH_JARVIS:
+	case DITH_STUCKI:
+	case DITH_ATKINSON:
+		mem_dither(old_image, new_cols, dither == DITH_NONE ? NULL :
+			dithers[dither - DITH_FS], dither_cspace, dither_dist,
+			dither_limit, dither_sel, dither_scan, efrac);
+		break;
+
+// !!! No code yet - temporarily disabled !!!
+//	case DITH_ORDERED:
+
+	case DITH_OLDFS:
+		err = dl3floste(old_image, mem_img[CHN_IMAGE],
+			mem_width, mem_height, new_cols, 1, newpal);
+		break;
+	case DITH_OLDDITHER:
+		err = mem_quantize(old_image, new_cols, 2);
+		break;
+	case DITH_OLDSCATTER:
+		err = mem_quantize(old_image, new_cols, 3);
+		break;
+	default:
+	case DITH_MAX: break;
 	}
 
-	hbox6 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox6);
-	gtk_box_pack_start (GTK_BOX (vbox5), hbox6, FALSE, FALSE, 0);
+	// If the user is pasting or smudging, lose it!
+	if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+		pressed_select_none(NULL, NULL);
+	if (tool_type == TOOL_SMUDGE)
+		gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
 
-	button_cancel = add_a_button(_("Cancel"), 5, hbox6, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_cancel), "clicked", GTK_SIGNAL_FUNC(delete_quantize), NULL);
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
+	mem_cols = new_cols;
+	mem_col_A = mem_cols > 1 ? 1 : 0;
+	mem_col_B = 0;
+	update_menus();
+	init_pal();
+	update_all_views();
+	gtk_widget_queue_draw(drawing_col_prev);
+}
 
-	button_ok = add_a_button(_("OK"), 5, hbox6, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked", GTK_SIGNAL_FUNC(click_quantize_ok), NULL);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
+static void toggle_quantize(GtkToggleButton *button, GtkNotebook *book)
+{
+	int i = gtk_toggle_button_get_active(button);
+	gtk_notebook_set_page(book, i ? 1 : 0);
+}
 
-	gtk_window_set_transient_for( GTK_WINDOW(quantize_window), GTK_WINDOW(main_window) );
-	gtk_widget_show (quantize_window);
-	gtk_window_add_accel_group(GTK_WINDOW (quantize_window), ag);
+static void toggle_selective(GtkWidget *btn, gpointer user_data)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
 
-	click_quantize_radio( NULL, NULL, NULL );	// Grey out radio buttons if needed
+	/* Selectivity state toggled */
+	if ((dither_sel == 0) ^ ((int)user_data == 0))
+	{
+		gtk_spin_button_update(GTK_SPIN_BUTTON(dither_spin));
+		dither_fract[dither_sel ? 1 : 0] =
+			gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(dither_spin));
+		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin),
+			(int)user_data ? dither_fract[1] : dither_fract[0]);
+	}
+	dither_sel = (int)user_data;
+}
+
+void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
+{
+	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
+	GtkWidget *label, *frame, *vbox, *hbox;
+	GtkWidget *button_cancel, *button_ok;
+	GtkAccelGroup* ag = gtk_accel_group_new();
+
+	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
+		_("DL1 Quantize (fastest)"), _("DL3 Quantize (very slow, better quality)"),
+		_("Wu Quantize (best method for small palettes)"), NULL
+		};
+
+	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Jarvis"),
+// !!! "Ordered" not done yet !!!
+		_("Stucki"), _("Atkinson"), /* _("Ordered") */ "",
+		_("Floyd-Steinberg (quick)"), _("Dithered (effect)"),
+		_("Scattered (effect)"), NULL
+		};
+
+	char *dist_txt[] = {_("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2)")};
+	char *clamp_txt[] = {_("Gamut"), _("Weakly"), _("Strongly")};
+	char *err_txt[] = {_("Off"), _("Separate/Sum"), _("Separate/Split"),
+		_("Length/Sum"), _("Length/Split"), NULL};
+	static char *csp_txt[] = {"RGB", "sRGB", "LXN"};
+
+
+	quantize_cols = mem_cols_used(257);
+
+	quantize_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Convert To Indexed"),
+		GTK_WIN_POS_CENTER, TRUE);
+	mainbox = gtk_vbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(quantize_window), mainbox);
+
+	/* Colours spin */
+
+	topbox = gtk_hbox_new(FALSE, 5);
+	gtk_box_pack_start(GTK_BOX(mainbox), topbox, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(topbox), 10);
+	label = gtk_label_new(_("Indexed Colours To Use"));
+	gtk_box_pack_start(GTK_BOX(topbox), label, FALSE, FALSE, 0);
+	quantize_spin = add_a_spin(quantize_cols > 256 ? mem_cols :
+		quantize_cols, 1, 256);
+	gtk_box_pack_start(GTK_BOX(topbox), quantize_spin, TRUE, TRUE, 0);
+
+	/* Notebook */
+
+	notebook = gtk_notebook_new();
+	gtk_box_pack_start(GTK_BOX(mainbox), notebook, TRUE, TRUE, 0);
+	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
+	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
+	page0 = gtk_vbox_new(FALSE, 0);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page0, NULL);
+	page1 = gtk_vbox_new(FALSE, 0);
+	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page1, NULL);
+	button = gtk_toggle_button_new_with_label(_("Settings"));
+	gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), FALSE);
+	gtk_signal_connect(GTK_OBJECT(button), "toggled",
+		GTK_SIGNAL_FUNC(toggle_quantize), GTK_NOTEBOOK(notebook));
+
+	/* Main page - Palette frame */
+
+	frame = gtk_frame_new(_("Palette"));
+	gtk_box_pack_start(GTK_BOX(page0), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	/* No exact transfer if too many colours */
+	if (quantize_cols > 256) rad_txt[0] = "";
+	vbox = wj_radio_pack(rad_txt, -1, 0, quantize_cols > 256 ? 4 : 0,
+		&quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
+	gtk_container_add(GTK_CONTAINER(frame), vbox);
+
+	/* Main page - Dither frame */
+
+	quantize_dither = frame = gtk_frame_new(_("Dither"));
+	gtk_box_pack_start(GTK_BOX(page0), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	hbox = wj_radio_pack(rad_txt2, -1, 6, quantize_cols > 256 ?
+		DITH_OLDFS : DITH_NONE, &dither_mode, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	if (quantize_cols <= 256)
+		gtk_widget_set_sensitive(quantize_dither, FALSE);
+
+	/* Settings page */
+
+	frame = gtk_frame_new(_("Colour space"));
+	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+
+	frame = gtk_frame_new(_("Difference measure"));
+	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+
+	frame = gtk_frame_new(_("Reduce colour bleed"));
+	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+
+	dither_serpent = gtk_check_button_new_with_label(_("Serpentine scan"));
+	gtk_widget_show(dither_serpent);
+	gtk_box_pack_start(GTK_BOX(page1), dither_serpent, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(dither_serpent), 5);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dither_serpent), dither_scan);
+
+	hbox = gtk_hbox_new(FALSE, 5);
+	gtk_widget_show(hbox);
+	gtk_box_pack_start(GTK_BOX(page1), hbox, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+	label = gtk_label_new(_("Error propagation level"));
+	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
+	dither_spin = add_a_spin(1, 0, 1);
+	gtk_box_pack_start(GTK_BOX(hbox), dither_spin, TRUE, TRUE, 0);
+	gtk_spin_button_set_digits(GTK_SPIN_BUTTON(dither_spin), 2);
+	gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin), dither_sel ?
+		dither_fract[1] : dither_fract[0]);
+
+	frame = gtk_frame_new(_("Selective error propagation"));
+	gtk_box_pack_start(GTK_BOX(page1), frame, FALSE, FALSE, 0);
+	gtk_container_set_border_width(GTK_CONTAINER(frame), 5);
+
+	hbox = wj_radio_pack(err_txt, -1, 3, dither_sel, &dither_sel,
+		GTK_SIGNAL_FUNC(toggle_selective));
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+
+	/* OK / Cancel */
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
+
+	button_cancel = add_a_button(_("Cancel"), 5, hbox, TRUE);
+	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), quantize_window);
+	gtk_widget_add_accelerator(button_cancel, "clicked", ag, GDK_Escape, 0,
+		(GtkAccelFlags)0);
+
+	button_ok = add_a_button(_("OK"), 5, hbox, TRUE);
+	gtk_signal_connect(GTK_OBJECT(button_ok), "clicked",
+		GTK_SIGNAL_FUNC(click_quantize_ok), NULL);
+	gtk_widget_add_accelerator(button_ok, "clicked", ag, GDK_Return, 0,
+		(GtkAccelFlags)0);
+	gtk_widget_add_accelerator(button_ok, "clicked", ag, GDK_KP_Enter, 0,
+		(GtkAccelFlags)0);
+
+	gtk_window_set_transient_for(GTK_WINDOW(quantize_window),
+		GTK_WINDOW(main_window));
+	gtk_widget_show_all(quantize_window);
+	gtk_window_add_accel_group(GTK_WINDOW(quantize_window), ag);
 }

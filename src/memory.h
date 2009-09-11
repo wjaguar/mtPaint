@@ -207,6 +207,9 @@ int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 void mem_greyscale();			// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
+//	Convert RGB->indexed using error diffusion with variety of options
+int mem_dither(unsigned char *old, int ncols, short *dither, int cspace, int dist,
+	int limit, int selc, int serpent, double emult);
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 					// Convert image to Indexed Palette using quantize
 void mem_invert();			// Invert the palette
@@ -238,7 +241,8 @@ void mem_boundary( int *x, int *y, int *w, int *h );		// Check/amend boundaries
 
 int png_cmp( png_color a, png_color b );			// Compare 2 colours
 
-void pal_hsl( png_color col, float *hh, float *ss, float *ll );	// Turn RGB into HSL
+// Nonclassical HSV: H is 0..6, S is 0.. 1, V is 0..255
+void rgb2hsv(int *rgb, double *hsv);
 
 //// UNDO
 

@@ -3,8 +3,8 @@
 
 echo
 
-MT_V="3.08.04"
-MT_DATE="2006-7-7"
+MT_V="3.08.05"
+MT_DATE="2006-8-16"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -23,6 +23,7 @@ GTK_FILE=_conf.txt
 GIFPATH=/usr/include/gif_lib.h
 JPEGPATH=/usr/include/jpeglib.h
 TIFFPATH=/usr/include/tiffio.h
+CFLAG=
 MARCH=
 OPTS=YES
 DEBUG=NO
@@ -67,6 +68,7 @@ do
 				rm -rf slack
 				rm -f *.tgz
 				exit;;
+		"GIF" )		NGIF=GIF;;
 		"gif" )		NGIF=YES;;
 		"nogif" )	NGIF=NO;;
 		"jpeg" )	NJPEG=YES;;
@@ -102,6 +104,7 @@ do
 		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
 				MT_PO_DEST=$MT_LANG_DEST;;
 		"--mandir="* )	MT_MAN_DEST="`echo "$A" | sed -e "s/--mandir=//"`";;
+		"cflags" )	CFLAG=${CFLAGS};;
 		"--cpu="* )	MARCH='-march='"`echo "$A" | sed -e "s/--cpu=//"`";;
 		"icons"* )	ICON_SET=$A;;
 		"386" )		MARCH='-march=i386';;
@@ -165,6 +168,7 @@ then
 	echo "gtk1 ............ Configure for GTK+1"
 	echo "gtk2 ............ Configure for GTK+2"
 	echo
+	echo "cflags .......... Use CFLAGS environment variable"
 	echo "--cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64"
 	echo "686 ............. Target 686 machines"
 	echo "586 ............. Target 586 machines"
@@ -172,8 +176,9 @@ then
 	echo "386 ............. Target 386 machines"
 	echo "slow ............ Don't use compiler optimizations"
 	echo
+	echo "GIF ............. Use libgif"
 	echo "gif ............. Use libungif"
-	echo "nogif ........... Don't use libungif"
+	echo "nogif ........... Don't use libgif and libungif"
 	echo "jpeg ............ Use libjpeg"
 	echo "nojpeg .......... Don't use libjpeg"
 	echo "tiff ............ Use libtiff"
@@ -250,9 +255,14 @@ else
 
 	L_EX=
 	I_EX=
-	if [ "$NGIF" == "YES" ]
+	if [ "$NGIF" != "NO" ]
 	then
-		L_EX="$L_EX -lungif"
+		if [ "$NGIF" == "GIF" ]
+		then
+			L_EX="$L_EX -lgif"
+		else
+			L_EX="$L_EX -lungif"
+		fi
 		I_EX="$I_EX -DU_GIF"
 	fi
 	if [ "$NJPEG" == "YES" ]
@@ -298,11 +308,16 @@ else
 	GTK_INCLUDE="$GTK_INCLUDE $I_EX"
 	echo "LDFLAG = $L_EX $GTK_LIB" >> $GTK_FILE
 
-	if [ "$OPTS" == "YES" ]
+	if [ "$CFLAG" ]
 	then
-		echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
+		echo "CFLAG = $CFLAG $GTK_INCLUDE" >> $GTK_FILE
 	else
-		echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
+		if [ "$OPTS" == "YES" ]
+		then
+			echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
+		else
+			echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
+		fi
 	fi
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
@@ -326,12 +341,17 @@ else
 	echo
 	echo "GTK+ version        $GTK"
 	echo
+if [ "$CFLAG" ]
+then
+	echo "CFLAGS              $CFLAG"
+else
 if [ "$MARCH" ]
 then
 	echo "MARCH target        $MARCH"
 	echo
 fi
 	echo "Optimizations       $OPTS"
+fi
 	echo
 	echo "Debug info          $DEBUG"
 	echo

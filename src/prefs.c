@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2006 Mark Tyler
+	Copyright (C) 2005-2006 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -65,7 +65,7 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 char	*pref_lang_ini_code[PREF_LANGS] = { "system", "cs_CZ", "en_GB", "fr_FR", "de_DE", 
 		"pt_PT", "pt_BR", "es_ES" };
 
-GtkWidget *pref_lang_label, *pref_lang_radio[PREF_LANGS];
+int pref_lang;
 
 #endif
 
@@ -254,7 +254,7 @@ gint conf_tablet( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int i, type;
+	int i;
 	char txt[64];
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
@@ -337,15 +337,8 @@ gint prefs_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	q_quit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_quit));
 	inifile_set_gboolean( "quitToggle", q_quit );
 
-	type = 0;
 #ifdef U_NLS
-	for ( i=0; i<PREF_LANGS; i++ )
-	{
-		if ( gtk_toggle_button_get_active(
-				&(GTK_RADIO_BUTTON( pref_lang_radio[i] )->check_button.toggle_button)
-					) ) type = i;
-	}
-	inifile_set( "languageSETTING", pref_lang_ini_code[type] );
+	inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
 	setup_language();
 #endif
 
@@ -424,11 +417,9 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;
 #ifdef U_NLS
-	int j;
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"), _("Czech"), _("English (UK)"),
 		_("French"), _("German"), _("Portuguese"), _("Portuguese (Brazilian)"), _("Spanish")
 					};
-	GSList *radio_group;
 #endif
 
 
@@ -715,28 +706,17 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 	add_hseparator( vbox_2, 200, 10 );
 	label = gtk_label_new( _("Select preferred language translation\n\n"
 				"You will need to restart mtPaint\nfor this to take full effect") );
-	pref_lang_label = label;
 	gtk_widget_show (label);
 	gtk_box_pack_start( GTK_BOX(vbox_2), label, FALSE, FALSE, 0 );
 	add_hseparator( vbox_2, 200, 10 );
 
-	pref_lang_radio[0] = add_radio_button( pref_langs[0], NULL,  NULL, vbox_2, 0 );
-	radio_group = gtk_radio_button_group( GTK_RADIO_BUTTON(pref_lang_radio[0]) );
-	pref_lang_radio[1] = add_radio_button( pref_langs[1], radio_group, NULL, vbox_2, 1 );
-	for ( i=2; i<PREF_LANGS; i++ )
-		pref_lang_radio[i] = add_radio_button(
-					pref_langs[i], NULL, pref_lang_radio[1], vbox_2, i );
-
-	for ( i=0; i<PREF_LANGS; i++ )
-		gtk_container_set_border_width( GTK_CONTAINER(pref_lang_radio[i]), 5 );
-
-	j = 0;
-	for ( i = PREF_LANGS - 1; i>0; i-- )
+	for (i = 0; i < PREF_LANGS; i++)
 	{
-		if ( strcmp( pref_lang_ini_code[i], inifile_get( "languageSETTING", "system" ) ) == 0 )
-			j = i;
+		if (!strcmp(pref_lang_ini_code[i],
+			inifile_get("languageSETTING", "system"))) break;
 	}
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(pref_lang_radio[j]), TRUE );
+	hbox4 = wj_radio_pack(pref_langs, PREF_LANGS, 8, i, &pref_lang, NULL);
+	gtk_box_pack_start(GTK_BOX(vbox_2), hbox4, TRUE, TRUE, 0);
 
 #endif
 

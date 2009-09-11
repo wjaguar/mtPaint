@@ -33,6 +33,7 @@
 #include "canvas.h"
 #include "png.h"
 #include "layer.h"
+#include "csel.h"
 
 
 int main( int argc, char *argv[] )
@@ -107,6 +108,7 @@ int main( int argc, char *argv[] )
 
 	mem_init();					// Set up memory & back end
 	layers_init();
+	init_cols();
 
 	if ( get_screenshot )
 	{

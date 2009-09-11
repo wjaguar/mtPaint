@@ -55,10 +55,9 @@ GtkWidget
 	*menu_undo[5], *menu_redo[5], *menu_crop[5],
 	*menu_need_marquee[10], *menu_need_selection[20], *menu_need_clipboard[30],
 	*menu_help[2], *menu_only_24[20], *menu_only_indexed[10],
-	*menu_recent[23], *menu_clip_load[15], *menu_clip_save[15],
-	*menu_cline[2], *menu_view[2], *menu_iso[5], *menu_layer[2], *menu_lasso[15],
-	*menu_prefs[2], *menu_frames[2], *menu_alphablend[2], *menu_chann_x[NUM_CHANNELS+1],
-	*menu_chan_del[5], *menu_chan_dis[NUM_CHANNELS+1]
+	*menu_recent[23], *menu_cline[2], *menu_view[2], *menu_layer[2],
+	*menu_lasso[15], *menu_prefs[2], *menu_frames[2], *menu_alphablend[2],
+	*menu_chann_x[NUM_CHANNELS+1], *menu_chan_del[5], *menu_chan_dis[NUM_CHANNELS+1]
 	;
 
 gboolean view_image_only = FALSE, viewer_mode = FALSE, drag_index = FALSE, q_quit;
@@ -122,30 +121,22 @@ void pressed_swap_AB( GtkMenuItem *menu_item, gpointer user_data )
 	else pressed_opacity(channel_col_A[mem_channel]);
 }
 
-void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data )
+void pressed_load_recent( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
-	int i=1, change;
+	int change;
 	char txt[64], *c, old_file[256];
 
-	while ( i<=MAX_RECENT )
-	{
-		if ( GTK_WIDGET(menu_item) == menu_recent[i] )
-		{
-			sprintf( txt, "file%i", i );
-			c = inifile_get( txt, "." );
-			strncpy( old_file, c, 250 );
+	sprintf( txt, "file%i", item );
+	c = inifile_get( txt, "." );
+	strncpy( old_file, c, 250 );
 
-			if ( layers_total==0 )
-				change = check_for_changes();
-			else
-				change = check_layers_for_changes();
+	if ( layers_total==0 )
+		change = check_for_changes();
+	else
+		change = check_layers_for_changes();
 
-			if ( change == 2 || change == -10 )
-				do_a_load(old_file);				// Load requested file
-			return;
-		}
-		else i++;
-	}
+	if ( change == 2 || change == -10 )
+		do_a_load(old_file);		// Load requested file
 }
 
 void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
@@ -440,7 +431,7 @@ void pressed_save_file( GtkMenuItem *menu_item, gpointer user_data )
 	else pressed_save_file_as( menu_item, user_data );
 }
 
-void load_clipboard( int item )
+void load_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int i;
 
@@ -461,18 +452,7 @@ void load_clipboard( int item )
 	if ( MEM_BPP == mem_clip_bpp ) pressed_paste_centre( NULL, NULL );
 }
 
-void load_clip( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int i, j=0;
-
-	for ( i=0; i<12; i++ )
-		if ( menu_clip_load[i] == GTK_WIDGET(menu_item) ) j=i;
-
-	load_clipboard(j+1);
-}
-
-
-void save_clipboard( int item )
+void save_clip( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	int i;
 
@@ -480,16 +460,6 @@ void save_clipboard( int item )
 	i = save_png( mem_clip_file[1], 1 );
 
 	if ( i!=0 ) alert_box( _("Error"), _("Unable to save clipboard"), _("OK"), NULL, NULL );
-}
-
-void save_clip( GtkMenuItem *menu_item, gpointer user_data )
-{
-	int i, j=0;
-
-	for ( i=0; i<12; i++ )
-		if ( menu_clip_save[i] == GTK_WIDGET(menu_item) ) j=i;
-
-	save_clipboard(j+1);
 }
 
 void pressed_opacity( int opacity )
@@ -530,29 +500,16 @@ void toggle_view( GtkMenuItem *menu_item, gpointer user_data )
 	if ( !view_image_only ) toolbar_showhide();	// Switch toolbar/status/palette on if needed
 }
 
-void zoom_in( GtkMenuItem *menu_item, gpointer user_data )
+void zoom_in()
 {
-	int i;
-
-	if (can_zoom>=1) align_size( can_zoom + 1 );
-	else
-	{
-		i = mt_round(1/can_zoom);
-		align_size( 1.0/(((float) i) - 1) );
-	}
+	if (can_zoom >= 1) align_size(can_zoom + 1);
+	else align_size(1.0 / (rint(1.0 / can_zoom) - 1));
 }
 
-void zoom_out( GtkMenuItem *menu_item, gpointer user_data )
+void zoom_out()
 {
-	int i;
-
-	if (can_zoom>1) align_size( can_zoom - 1 );
-	else
-	{
-		i = mt_round(1/can_zoom);
-		if (i>9) i=9;
-		align_size( 1.0/(((float) i) + 1) );
-	}
+	if (can_zoom > 1) align_size(can_zoom - 1);
+	else align_size(1.0 / (rint(1.0 / can_zoom) + 1));
 }
 
 void zoom_grid( GtkMenuItem *menu_item, gpointer user_data )
@@ -669,9 +626,9 @@ gint check_zoom_keys_real(int action)
 	switch (action)
 	{
 	case ACT_ZOOM_IN:
-		zoom_in(NULL, NULL); return TRUE;
+		zoom_in(); return TRUE;
 	case ACT_ZOOM_OUT:
-		zoom_out(NULL, NULL); return TRUE;
+		zoom_out(); return TRUE;
 	case ACT_ZOOM_01:
 	case ACT_ZOOM_025:
 	case ACT_ZOOM_05:
@@ -2636,26 +2593,26 @@ void main_init()
 		{ _("/File/Export ASCII Art ..."), NULL, 	pressed_export_ascii,0, NULL },
 		{ _("/File/Export Animated GIF ..."), NULL, 	pressed_export_gif,0, NULL },
 		{ _("/File/sep2"),		NULL,		NULL,0, "<Separator>" },
-		{ _("/File/1"),  		"<shift><control>F1", pressed_load_recent,0, NULL },
-		{ _("/File/2"),  		"<shift><control>F2", pressed_load_recent,0, NULL },
-		{ _("/File/3"),  		"<shift><control>F3", pressed_load_recent,0, NULL },
-		{ _("/File/4"),  		"<shift><control>F4", pressed_load_recent,0, NULL },
-		{ _("/File/5"),  		"<shift><control>F5", pressed_load_recent,0, NULL },
-		{ _("/File/6"),  		"<shift><control>F6", pressed_load_recent,0, NULL },
-		{ _("/File/7"),  		"<shift><control>F7", pressed_load_recent,0, NULL },
-		{ _("/File/8"),  		"<shift><control>F8", pressed_load_recent,0, NULL },
-		{ _("/File/9"),  		"<shift><control>F9", pressed_load_recent,0, NULL },
-		{ _("/File/10"), 		"<shift><control>F10", pressed_load_recent,0, NULL },
-		{ _("/File/11"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/12"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/13"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/14"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/15"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/16"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/17"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/18"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/19"), 		NULL,		pressed_load_recent,0, NULL },
-		{ _("/File/20"),		NULL,		pressed_load_recent,0, NULL },
+		{ _("/File/1"),  		"<shift><control>F1", pressed_load_recent, 1, NULL },
+		{ _("/File/2"),  		"<shift><control>F2", pressed_load_recent, 2, NULL },
+		{ _("/File/3"),  		"<shift><control>F3", pressed_load_recent, 3, NULL },
+		{ _("/File/4"),  		"<shift><control>F4", pressed_load_recent, 4, NULL },
+		{ _("/File/5"),  		"<shift><control>F5", pressed_load_recent, 5, NULL },
+		{ _("/File/6"),  		"<shift><control>F6", pressed_load_recent, 6, NULL },
+		{ _("/File/7"),  		"<shift><control>F7", pressed_load_recent, 7, NULL },
+		{ _("/File/8"),  		"<shift><control>F8", pressed_load_recent, 8, NULL },
+		{ _("/File/9"),  		"<shift><control>F9", pressed_load_recent, 9, NULL },
+		{ _("/File/10"), 		"<shift><control>F10", pressed_load_recent, 10, NULL },
+		{ _("/File/11"), 		NULL,		pressed_load_recent, 11, NULL },
+		{ _("/File/12"), 		NULL,		pressed_load_recent, 12, NULL },
+		{ _("/File/13"), 		NULL,		pressed_load_recent, 13, NULL },
+		{ _("/File/14"), 		NULL,		pressed_load_recent, 14, NULL },
+		{ _("/File/15"), 		NULL,		pressed_load_recent, 15, NULL },
+		{ _("/File/16"), 		NULL,		pressed_load_recent, 16, NULL },
+		{ _("/File/17"), 		NULL,		pressed_load_recent, 17, NULL },
+		{ _("/File/18"), 		NULL,		pressed_load_recent, 18, NULL },
+		{ _("/File/19"), 		NULL,		pressed_load_recent, 19, NULL },
+		{ _("/File/20"),		NULL,		pressed_load_recent, 20, NULL },
 		{ _("/File/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/File/Quit"),		"<control>Q",	quit_all,	0, NULL },
 
@@ -2673,32 +2630,32 @@ void main_init()
 		{ _("/Edit/sep1"),			NULL, 	  NULL,0, "<Separator>" },
 		{ _("/Edit/Load Clipboard"),		NULL, 	  NULL, 0, "<Branch>" },
 		{ _("/Edit/Load Clipboard/tear"),	NULL, 	  NULL, 0, "<Tearoff>" },
-		{ _("/Edit/Load Clipboard/1"),		"<shift>F1",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/2"),		"<shift>F2",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/3"),		"<shift>F3",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/4"),		"<shift>F4",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/5"),		"<shift>F5",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/6"),		"<shift>F6",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/7"),		"<shift>F7",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/8"),		"<shift>F8",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/9"),		"<shift>F9",    load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/10"),		"<shift>F10",   load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/11"),		"<shift>F11",   load_clip, 0, NULL },
-		{ _("/Edit/Load Clipboard/12"),		"<shift>F12",   load_clip, 0, NULL },
+		{ _("/Edit/Load Clipboard/1"),		"<shift>F1",    load_clip, 1, NULL },
+		{ _("/Edit/Load Clipboard/2"),		"<shift>F2",    load_clip, 2, NULL },
+		{ _("/Edit/Load Clipboard/3"),		"<shift>F3",    load_clip, 3, NULL },
+		{ _("/Edit/Load Clipboard/4"),		"<shift>F4",    load_clip, 4, NULL },
+		{ _("/Edit/Load Clipboard/5"),		"<shift>F5",    load_clip, 5, NULL },
+		{ _("/Edit/Load Clipboard/6"),		"<shift>F6",    load_clip, 6, NULL },
+		{ _("/Edit/Load Clipboard/7"),		"<shift>F7",    load_clip, 7, NULL },
+		{ _("/Edit/Load Clipboard/8"),		"<shift>F8",    load_clip, 8, NULL },
+		{ _("/Edit/Load Clipboard/9"),		"<shift>F9",    load_clip, 9, NULL },
+		{ _("/Edit/Load Clipboard/10"),		"<shift>F10",   load_clip, 10, NULL },
+		{ _("/Edit/Load Clipboard/11"),		"<shift>F11",   load_clip, 11, NULL },
+		{ _("/Edit/Load Clipboard/12"),		"<shift>F12",   load_clip, 12, NULL },
 		{ _("/Edit/Save Clipboard"),		NULL, 	  NULL, 0, "<Branch>" },
 		{ _("/Edit/Save Clipboard/tear"),	NULL, 	  NULL, 0, "<Tearoff>" },
-		{ _("/Edit/Save Clipboard/1"),		"<control>F1",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/2"),		"<control>F2",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/3"),		"<control>F3",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/4"),		"<control>F4",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/5"),		"<control>F5",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/6"),		"<control>F6",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/7"),		"<control>F7",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/8"),		"<control>F8",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/9"),		"<control>F9",  save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/10"),  	"<control>F10", save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/11"),  	"<control>F11", save_clip, 0, NULL },
-		{ _("/Edit/Save Clipboard/12"),  	"<control>F12", save_clip, 0, NULL },
+		{ _("/Edit/Save Clipboard/1"),		"<control>F1",  save_clip, 1, NULL },
+		{ _("/Edit/Save Clipboard/2"),		"<control>F2",  save_clip, 2, NULL },
+		{ _("/Edit/Save Clipboard/3"),		"<control>F3",  save_clip, 3, NULL },
+		{ _("/Edit/Save Clipboard/4"),		"<control>F4",  save_clip, 4, NULL },
+		{ _("/Edit/Save Clipboard/5"),		"<control>F5",  save_clip, 5, NULL },
+		{ _("/Edit/Save Clipboard/6"),		"<control>F6",  save_clip, 6, NULL },
+		{ _("/Edit/Save Clipboard/7"),		"<control>F7",  save_clip, 7, NULL },
+		{ _("/Edit/Save Clipboard/8"),		"<control>F8",  save_clip, 8, NULL },
+		{ _("/Edit/Save Clipboard/9"),		"<control>F9",  save_clip, 9, NULL },
+		{ _("/Edit/Save Clipboard/10"),  	"<control>F10", save_clip, 10, NULL },
+		{ _("/Edit/Save Clipboard/11"),  	"<control>F11", save_clip, 11, NULL },
+		{ _("/Edit/Save Clipboard/12"),  	"<control>F12", save_clip, 12, NULL },
 		{ _("/Edit/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Edit/Choose Pattern ..."),	"F2",	pressed_choose_patterns,0, NULL },
 		{ _("/Edit/Choose Brush ..."),		"F3",	pressed_choose_brush,0, NULL },
@@ -2795,9 +2752,9 @@ void main_init()
 		{ _("/Effects/Isometric Transformation"), NULL, NULL, 0, "<Branch>" },
 		{ _("/Effects/Isometric Transformation/tear"), NULL, NULL, 0, "<Tearoff>" },
 		{ _("/Effects/Isometric Transformation/Left Side Down"), NULL, iso_trans, 0, NULL },
-		{ _("/Effects/Isometric Transformation/Right Side Down"), NULL, iso_trans, 0, NULL },
-		{ _("/Effects/Isometric Transformation/Top Side Right"), NULL, iso_trans, 0, NULL },
-		{ _("/Effects/Isometric Transformation/Bottom Side Right"), NULL, iso_trans, 0, NULL },
+		{ _("/Effects/Isometric Transformation/Right Side Down"), NULL, iso_trans, 1, NULL },
+		{ _("/Effects/Isometric Transformation/Top Side Right"), NULL, iso_trans, 2, NULL },
+		{ _("/Effects/Isometric Transformation/Bottom Side Right"), NULL, iso_trans, 3, NULL },
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Edge Detect"),	NULL,		pressed_edge_detect,0, NULL },
 		{ _("/Effects/Sharpen ..."),	NULL,		pressed_sharpen,0, NULL },
@@ -2888,10 +2845,6 @@ void main_init()
 			NULL},
 	*item_view[] = {_("/View/View Window"),
 			NULL},
-	*item_iso[] = {_("/Effects/Isometric Transformation/Left Side Down"),
-			_("/Effects/Isometric Transformation/Right Side Down"),
-			_("/Effects/Isometric Transformation/Top Side Right"),
-			_("/Effects/Isometric Transformation/Bottom Side Right"), NULL},
 	*item_layer[] = {_("/View/Layers Window"),
 			NULL},
 	*item_lasso[] = {_("/Selection/Lasso Selection"), _("/Selection/Lasso Selection Cut"),
@@ -2955,7 +2908,6 @@ void main_init()
 	pop_men_dis( item_factory, item_only_indexed, menu_only_indexed );
 	pop_men_dis( item_factory, item_cline, menu_cline );
 	pop_men_dis( item_factory, item_view, menu_view );
-	pop_men_dis( item_factory, item_iso, menu_iso );
 	pop_men_dis( item_factory, item_layer, menu_layer );
 	pop_men_dis( item_factory, item_lasso, menu_lasso );
 	pop_men_dis( item_factory, item_alphablend, menu_alphablend );
@@ -2963,14 +2915,9 @@ void main_init()
 	pop_men_dis( item_factory, item_chan_del, menu_chan_del );
 	pop_men_dis( item_factory, item_chan_dis, menu_chan_dis );
 
-	menu_clip_load[0] = NULL;
-	menu_clip_save[0] = NULL;
-	for ( i=1; i<=12; i++ )		// Set up load/save clipboard stuff
+	for (i = 1; i <= 12; i++)	// Set up save clipboard slots
 	{
-		snprintf( txt, 60, "%s/%i", _("/Edit/Load Clipboard"), i );
-		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_clip_load );
 		snprintf( txt, 60, "%s/%i", _("/Edit/Save Clipboard"), i );
-		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_clip_save );
 		men_dis_add( gtk_item_factory_get_item(item_factory, txt), menu_need_clipboard );
 	}
 

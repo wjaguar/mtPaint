@@ -188,7 +188,7 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 
 static void ani_set_frame_state( int frame )
 {
-	int i, k, e, a, b;
+	int i, k, e, a, b, done;
 
 	for ( k=1; k<=layers_total; k++ )	// Set x, y, opacity for each layer
 	{
@@ -262,14 +262,19 @@ static void ani_set_frame_state( int frame )
 		}
 		if ( a<b && a<=frame && frame<=b )	// Frame is between these points so act
 		{
+			done = -1;
 			for ( k=2; k<TOT_CYC_ITEMS; k++ )
 			{
 				e = ani_cycle_table[i][k];
 				if ( e==0 ) break;		// End delimeter encountered so stop
-				if ( e>0 && e<=layers_total )
+				if ( e>0 && e<=layers_total && e!=done )
 				{
 					if ( (frame - a) % ani_cyc_len[i] == (k-2) )
+					{
 						layer_table[e].visible = TRUE;
+						done = e;
+						// Don't switch this off later in loop
+					}
 					else
 						layer_table[e].visible = FALSE;
 					// Switch layer on or off according to frame position in cycle

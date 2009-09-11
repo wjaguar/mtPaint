@@ -11,9 +11,12 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* More palette sort modes
 	* Controls for alpha/selection/mask A/B added to "Edit colour A & B"
 	* RGB and HSV colour scales generation integrated into palette editor
+	* Saving compressed GIF files now supported (using libgif)
+	* sRGB model made default for gamma correction
+	* New advanced dithering modes with many configuration options
 	...and more still remains to do... ;-)
 
-3.01	2006-7-10
+3.01	2006-7-15
 
 	* German translation updated for version 3
 	* BUGFIX - Memory alignment problems on Windows fixed (might affect speed)

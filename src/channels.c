@@ -223,19 +223,6 @@ dofail:
 	click_newchan_cancel();
 }
 
-static void chan_type_changed(GtkWidget *widget, gpointer name)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
-	chan_new_type = (int) name;
-}
-
-static void chan_state_changed(GtkWidget *widget, gpointer name)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
-	chan_new_state = (int) name;
-}
-
-
 void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint item )
 {
 	gchar *names2[] = {
@@ -246,16 +233,15 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		_("Image Red"),
 		_("Image Green"),
 		_("Image Blue"),
-		_("Alpha"),		// Used as index 7
-		_("Selection"),
-		_("Mask"),
+	/* I still do not agree that we need to hide these ;-) - WJ */
+		mem_img[CHN_ALPHA] ? _("Alpha") : "",
+		mem_img[CHN_SEL] ? _("Selection") : "",
+		mem_img[CHN_MASK] ? _("Mask") : "",
 		NULL
 		};
 
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	GtkWidget *frame, *vbox, *vbox2, *hbox, *button, *radio;
-
-	int i;
+	GtkWidget *frame, *vbox, *vbox2, *hbox, *button;
 
 
 	chan_new_type = item < CHN_ALPHA ? CHN_ALPHA : item;
@@ -276,21 +262,9 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, FALSE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_container_add (GTK_CONTAINER (frame), hbox);
-	gtk_container_set_border_width (GTK_CONTAINER (hbox), 5);
-
-	radio = NULL;
-	for (i = 1; channames[i]; i++)
-	{
-		radio = add_radio_button(channames[i], NULL, radio, hbox, i);
-		if (chan_new_type == i)
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio), TRUE);
-		gtk_signal_connect(GTK_OBJECT(radio), "toggled",
-				GTK_SIGNAL_FUNC(chan_type_changed),
-				(gpointer)(i));
-	}
+	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), hbox);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	if (item >= 0) gtk_widget_set_sensitive(hbox, FALSE);
 
 	frame = gtk_frame_new (_("Initial Channel State"));
@@ -298,26 +272,9 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_box_pack_start (GTK_BOX (vbox), frame, FALSE, FALSE, 0);
 	gtk_container_set_border_width (GTK_CONTAINER (frame), 5);
 
-	vbox2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox2);
-	gtk_container_add (GTK_CONTAINER (frame), vbox2);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox2), 5);
-
-	radio = NULL;
-	for (i = 0; names2[i]; i++)
-	{
-		radio = add_radio_button(names2[i], NULL, radio, vbox2, i + 1);
-		if (chan_new_state == i) gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(radio), TRUE);
-		gtk_signal_connect(GTK_OBJECT(radio), "toggled",
-				GTK_SIGNAL_FUNC(chan_state_changed),
-				(gpointer)(i));
-	/* !!! I disagree with this stuff being here - WJ */
-		if (	(i==7 && !mem_img[CHN_ALPHA]) ||
-			(i==8 && !mem_img[CHN_SEL]) ||
-			(i==9 && !mem_img[CHN_MASK])
-			)
-			gtk_widget_set_sensitive(radio, FALSE);
-	}
+	vbox2 = wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL);
+	gtk_container_add(GTK_CONTAINER(frame), vbox2);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
 
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_widget_show (hbox);

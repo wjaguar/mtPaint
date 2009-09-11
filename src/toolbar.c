@@ -368,7 +368,6 @@ int set_flood(GtkWidget *box, gpointer fdata)
 	spin = ((GtkBoxChild*)chain->data)->widget;
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
 	flood_step = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spin));
-	if (flood_step) init_cols();
 	chain = chain->next;
 	toggle = ((GtkBoxChild*)chain->data)->widget;
 	flood_cube = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
