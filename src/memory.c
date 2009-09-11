@@ -3001,7 +3001,7 @@ fstep *make_filter(int l0, int l1, int type)
 	double A = 0.0, kk = 1.0, sum;
 	int pic_tile = FALSE; /* Allow to enable tiling mode later */
 	int pic_skip = FALSE; /* Allow to enable skip mode later */
-	int i, j, k;
+	int i, j, k, ix;
 
 
 	/* To correct scale-shift */
@@ -3042,10 +3042,23 @@ fstep *make_filter(int l0, int l1, int type)
 		k = (int)floor(basept + fwidth / 2.0);
 		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
 		{
-			if (pic_skip && ((j < 0) || (j >= l0))) continue;
-			if (j < 0) buf->idx = pic_tile ? l0 + j : -j;
-			else if (j < l0) buf->idx = j;
-			else buf->idx = pic_tile ? j - l0 : 2 * (l0 - 1) - j;
+			ix = j;
+			if ((j < 0) || (j >= l0))
+			{
+				if (pic_skip) continue;
+				if (pic_tile)
+				{
+					if (ix < 0) ix = l0 - (-ix % l0);
+					ix %= l0;
+				}
+				else if (l0 == 1) ix = 0;
+				else 
+				{
+					ix = abs(ix) % (l0 + l0 - 2);
+					if (ix >= l0) ix = l0 + l0 - 2 - ix;
+				}
+			}
+			buf->idx = ix;
 			x = fabs(((double)j - basept) * kk);
 			y = 0;
 			switch (type)

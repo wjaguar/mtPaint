@@ -53,7 +53,8 @@
 
 ///	GLOBALS
 
-int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10;
+int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10, ani_play_state = FALSE,
+	ani_timer_state = 0;
 
 
 
@@ -63,7 +64,8 @@ static GtkWidget *animate_window = NULL, *ani_prev_win, *ani_progressbar,
 	*ani_entry_path, *ani_entry_prefix,
 	*ani_spin[5],			// start, end, delay
 	*ani_frames[5],			// Main frames: files, progress, layers, buttons, preview
-	*ani_text_pos, *ani_text_cyc	// Text input widgets
+	*ani_text_pos, *ani_text_cyc,	// Text input widgets
+	*ani_prev_slider		// Slider widget on preview area
 	;
 
 static int
@@ -620,6 +622,55 @@ static void ani_win_read_widgets()		// Read all widgets and set up relevant vari
 	// GIF toggle is automatically set by callback
 }
 
+
+static gboolean ani_play_timer_call()
+{
+	int i;
+
+	if ( ani_play_state == 0 )
+	{
+		ani_timer_state = 0;
+		return FALSE;			// Stop animating
+	}
+	else
+	{
+		i = GTK_ADJUSTMENT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment)->value + 1;
+		if ( i>ani_frame2 ) i = ani_frame1;
+		GTK_ADJUSTMENT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment)->value = i;
+		gtk_adjustment_value_changed( GTK_HSCALE(ani_prev_slider)->scale.range.adjustment );
+//printf("[%i - %i] animating frame %i\n", ani_frame1, ani_frame2, i);
+		return TRUE;
+	}
+}
+
+static void ani_play_start()
+{
+	if ( ani_play_state == 0 )
+	{
+		ani_play_state = 1;
+		if ( ani_timer_state == 0 )
+			ani_timer_state = g_timeout_add( ani_gif_delay*10, ani_play_timer_call, NULL );
+	}
+}
+
+static void ani_play_stop()
+{
+	ani_play_state = 0;
+}
+
+
+///	PREVIEW WINDOW CALLBACKS
+
+static void ani_but_playstop( GtkWidget *widget )
+{
+	gboolean play = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+
+	if ( play ) ani_play_start();
+	else ani_play_stop();
+
+//printf("state = %i\n", ani_play_state);
+}
+
 static void ani_frame_slider_moved( GtkWidget *widget )
 {
 	int i = GTK_ADJUSTMENT(widget)->value, w = mem_width, h = mem_height;
@@ -639,6 +690,8 @@ static void ani_frame_slider_moved( GtkWidget *widget )
 static void ani_but_preview_close()
 {
 	int x, y, width, height;
+
+	ani_play_stop();				// Stop animation playing if necessary
 
 	gdk_window_get_size( ani_prev_win->window, &width, &height );
 	gdk_window_get_root_origin( ani_prev_win->window, &x, &y );
@@ -664,7 +717,7 @@ static void ani_but_preview_close()
 
 void ani_but_preview()
 {
-	GtkWidget *hbox3, *ani_preview_hscale, *button;
+	GtkWidget *hbox3, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
@@ -675,7 +728,7 @@ void ani_but_preview()
 	}
 	else	ani_read_layer_data();
 
-	ani_cyc_len_init();		// Prepare the cycle index for the animation
+	ani_cyc_len_init();			// Prepare the cycle index for the animation
 
 	if ( !view_showing ) view_show();	// If not showing, show the view window
 
@@ -691,17 +744,21 @@ void ani_but_preview()
 	gtk_widget_show (hbox3);
 	gtk_container_add (GTK_CONTAINER (ani_prev_win), hbox3);
 
-	ani_preview_hscale = gtk_hscale_new (
+	button = add_a_toggle(_("Play"), hbox3, FALSE);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_but_playstop), NULL);
+	ani_play_state = FALSE;			// Stopped
+
+	ani_prev_slider = gtk_hscale_new (
 		GTK_ADJUSTMENT( gtk_adjustment_new (ani_frame1, ani_frame1, ani_frame2, 1, 10, 0) ) );
-	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ani_preview_hscale)->scale.range.adjustment),
+	gtk_signal_connect( GTK_OBJECT(GTK_HSCALE(ani_prev_slider)->scale.range.adjustment),
 		"value_changed", GTK_SIGNAL_FUNC(ani_frame_slider_moved), NULL);
 
 
-	gtk_widget_set_usize( ani_preview_hscale, 200, -2 );
+	gtk_widget_set_usize( ani_prev_slider, 200, -2 );
 
-	gtk_widget_show (ani_preview_hscale);
-	gtk_box_pack_start (GTK_BOX (hbox3), ani_preview_hscale, TRUE, TRUE, 0);
-	gtk_scale_set_digits (GTK_SCALE (ani_preview_hscale), 0);
+	gtk_widget_show (ani_prev_slider);
+	gtk_box_pack_start (GTK_BOX (hbox3), ani_prev_slider, TRUE, TRUE, 0);
+	gtk_scale_set_digits (GTK_SCALE (ani_prev_slider), 0);
 
 	if ( animate_window == NULL )	// If called via the menu have a fix button
 	{
@@ -728,7 +785,7 @@ void ani_but_preview()
 		update_all_views();
 	}
 
-	gtk_adjustment_value_changed( GTK_HSCALE(ani_preview_hscale)->scale.range.adjustment );
+	gtk_adjustment_value_changed( GTK_HSCALE(ani_prev_slider)->scale.range.adjustment );
 }
 
 void wild_space_change( char *in, char *out, int length )

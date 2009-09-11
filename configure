@@ -3,8 +3,8 @@
 
 echo
 
-MT_V="2.90"
-MT_DATE="2006-7-4"
+MT_V="3.00"
+MT_DATE="2006-6-21"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -133,7 +133,7 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk2
-				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
+				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
 				chown mark /home/mark/sf/mtpaint-*
 				chgrp users /home/mark/sf/mtpaint-*
@@ -145,7 +145,7 @@ do
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
-				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i586-1.tgz
+				makepkg --chown n /home/mark/sf/mtpaint-$MT_V$GTK_V-i486-1.tgz
 				cd ..
 				chown mark /home/mark/sf/mtpaint-*
 				chgrp users /home/mark/sf/mtpaint-*
