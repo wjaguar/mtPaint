@@ -93,11 +93,6 @@ static gint expose_tablet_preview( GtkWidget *widget, GdkEventExpose *event )
 	return FALSE;
 }
 
-void click_file_browse( GtkWidget *widget, gpointer data )
-{
-	file_selector( (int) data );
-}
-
 
 static GtkWidget *inputd = NULL;
 
@@ -407,28 +402,6 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
-static GtkWidget *path_box(char *name, GtkWidget *box, int fsmode)
-{
-	GtkWidget *hbox, *label, *entry, *button;
- 
-	label = gtk_label_new(name);
-	gtk_widget_show(label);
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 2);
-
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(hbox);
-	gtk_box_pack_start(GTK_BOX(box), hbox, FALSE, FALSE, 2);
-
-	entry = gtk_entry_new();
-	gtk_widget_show(entry);
-	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
-
-	button = add_a_button(_("Browse"), 2, hbox, FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
-
-	return (entry);
-}
 
 void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 {
@@ -535,16 +508,16 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	clipboard_entry = path_box(_("Clipboard Files"), vbox_2, FS_CLIP_FILE);
+	clipboard_entry = mt_path_box(_("Clipboard Files"), vbox_2, FS_CLIP_FILE);
 	gtk_entry_set_text(GTK_ENTRY(clipboard_entry), mem_clip_file);
 
 //	add_hseparator( vbox_2, -2, 10 );
 
-	entry_handbook[0] = path_box(_("HTML Browser Program"), vbox_2, FS_BROWSER_PROG);
+	entry_handbook[0] = mt_path_box(_("HTML Browser Program"), vbox_2, FS_BROWSER_PROG);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[0]),
 		inifile_get(HANDBOOK_BROWSER_INI, ""));
 
-	entry_handbook[1] = path_box(_("Location of Handbook index"), vbox_2,
+	entry_handbook[1] = mt_path_box(_("Location of Handbook index"), vbox_2,
 		FS_HANDBOOK_INDEX);
 	gtk_entry_set_text(GTK_ENTRY(entry_handbook[1]),
 		inifile_get(HANDBOOK_LOCATION_INI, ""));

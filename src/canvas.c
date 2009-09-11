@@ -1926,7 +1926,7 @@ void file_selector(int action_type)
 			DIR_SEP );		// Default
 	}
 
-	if ( action_type == FS_SPAWN_DIR || FS_GIF_EXPLODE )
+	if ( action_type == FS_SPAWN_DIR || action_type == FS_GIF_EXPLODE )
 	{
 		gtk_widget_set_sensitive( GTK_WIDGET(GTK_FILE_SELECTION(fs)->file_list),
 			FALSE );		// Don't let the user select files

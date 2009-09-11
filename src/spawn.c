@@ -327,11 +327,6 @@ void init_factions()
 	update_faction_menu();			// Prepare menus
 }
 
-void click_faction_browse()
-{
-	file_selector(FS_SPAWN_DIR);
-}
-
 void pressed_file_configure()
 {
 	int i, j;
@@ -415,18 +410,9 @@ void pressed_file_configure()
 	gtk_signal_connect( GTK_OBJECT(faction_entry[1]), "changed",
 			GTK_SIGNAL_FUNC(faction_command_changed), clist);
 
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	add_with_frame(vbox, _("Directory"), hbox, 5);
-	entry = gtk_entry_new();
-	faction_entry[2] = entry;
-	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	faction_entry[2] = mt_path_box(_("Directory"), vbox, FS_SPAWN_DIR);
 	gtk_signal_connect( GTK_OBJECT(faction_entry[2]), "changed",
 			GTK_SIGNAL_FUNC(faction_directory_changed), clist);
-	button = add_a_button(_("Browse"), 2, hbox, FALSE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_faction_browse), NULL);
-
 
 	faction_block_events(clist);
 

@@ -84,6 +84,9 @@ GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
 	int border, int expand);
 GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget, int border);
 
+// Entry + Browse
+GtkWidget *mt_path_box(char *name, GtkWidget *box, int fsmode);
+
 // Option menu
 
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,

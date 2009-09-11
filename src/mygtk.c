@@ -25,6 +25,7 @@
 #include "png.h"
 #include "mainwindow.h"
 #include "mygtk.h"
+#include "canvas.h"
 
 
 ///	GENERIC WIDGET PRIMITIVES
@@ -783,3 +784,28 @@ guint keyval_key(guint keyval)
 }
 
 #endif
+
+
+static void click_file_browse( GtkWidget *widget, gpointer data )
+{
+	file_selector( (int) data );
+}
+
+GtkWidget *mt_path_box(char *name, GtkWidget *box, int fsmode)
+{
+	GtkWidget *hbox, *entry, *button;
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(hbox);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+
+	add_with_frame(box, name, hbox, 5);
+	entry = gtk_entry_new();
+	gtk_widget_show(entry);
+	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	button = add_a_button(_("Browse"), 2, hbox, FALSE);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
+
+	return (entry);
+}
