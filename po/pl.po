@@ -2421,11 +2421,11 @@ msgstr "Zapisywanie obrazku XBM"
 
 #: src/png.c:2565
 msgid "Loading LSS16 image"
-msgstr ""
+msgstr "Otwieranie obrazku LSS16"
 
 #: src/png.c:2646
 msgid "Saving LSS16 image"
-msgstr ""
+msgstr "Zapisywanie obrazku LSS16"
 
 #: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"

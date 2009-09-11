@@ -976,6 +976,8 @@ msgid ""
 "You are trying to save an LSS16 file with a palette of more than 16 "
 "colours.  Either use another format or reduce the palette to 16 colours."
 msgstr ""
+"您正試著儲存 LSS16 檔案，它的調色板有超過 16 種顏色。若非使用其他格式，就縮小調"
+"色板到 16 種顏色。"
 
 #: src/mainwindow.c:478
 msgid "Unable to load clipboard"
@@ -2460,11 +2462,11 @@ msgstr "儲存 XBM 圖像"
 
 #: src/png.c:2565
 msgid "Loading LSS16 image"
-msgstr ""
+msgstr "載入 LSS16 圖像"
 
 #: src/png.c:2646
 msgid "Saving LSS16 image"
-msgstr ""
+msgstr "儲存 LSS16 圖像"
 
 #: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"

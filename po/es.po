@@ -213,11 +213,11 @@ msgstr "Radio"
 
 #: src/canvas.c:499
 msgid "Amount"
-msgstr "Cantidad"
+msgstr "Cantidad "
 
 #: src/canvas.c:500
 msgid "Threshold "
-msgstr ""
+msgstr "Umbral"
 
 #: src/canvas.c:503 src/memory.c:5210
 msgid "Unsharp Mask"
@@ -533,7 +533,7 @@ msgstr ""
 "Ver la sección de 'Créditos' para el listado de autores.\n"
 "\n"
 "mtPaint es software libre; tu puedes residtribuirlo y/o modificarlo bajo "
-"lostérminos de la GNU General Public License publicada por la Free Software "
+"los términos de la GNU General Public License publicada por la Free Software "
 "Foundation; con la versión 2 de la licencia, o cualquier versión posterior\n"
 "mtPaint se distribuye con la esperanza de que sea útil, pero SIN NINGUNA "
 "GARANTÍA. Ver la GNU General Public License para más detalles. \n"
@@ -726,8 +726,8 @@ msgstr ""
 "  Ctrl + + or =     Incrementar opacidad en 1%\n"
 "  Ctrl + -          Disminuir opacidad en 1%\n"
 "\n"
-"  Home              Mostrar o esconder la ventana principal menu/barra/"
-"estadopaleta\n"
+"  Home              Mostrar o esconder la ventana principal menu/barra de"
+"estado/paleta\n"
 "  Page Up           Escalar Imagen\n"
 "  Page Down         Redimensionar Lienzo\n"
 "  End               Quitar ventana\n"
@@ -1147,6 +1147,8 @@ msgid ""
 "You are trying to save an LSS16 file with a palette of more than 16 "
 "colours.  Either use another format or reduce the palette to 16 colours."
 msgstr ""
+"Está intentando guardar un fichero LSS16 con una paleta de mas de 16 colores. "
+"Reduzca la paleta a 16 colores o use otro formato."
 
 #: src/mainwindow.c:478
 msgid "Unable to load clipboard"
@@ -2635,11 +2637,11 @@ msgstr "Guardar imagen XBM"
 
 #: src/png.c:2565
 msgid "Loading LSS16 image"
-msgstr ""
+msgstr "Cargar imagen LSS16"
 
 #: src/png.c:2646
 msgid "Saving LSS16 image"
-msgstr ""
+msgstr "Guardar imagen LSS16"
 
 #: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"
@@ -2678,7 +2680,7 @@ msgid ""
 "program name in the Preferences window."
 msgstr ""
 "Hay un problema arrancando el navegador HTML. Necesitas establecer un "
-"programade navegación en la ventana de preferencias."
+"programa de navegación en la ventana de preferencias."
 
 #: src/prefs.c:154
 msgid "Pressure"

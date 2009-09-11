@@ -1103,11 +1103,11 @@ msgstr "/Düzenle/yırt"
 
 #: src/mainwindow.c:3264 src/mainwindow.c:3457
 msgid "/Edit/Undo"
-msgstr "/Düzen/Geri al"
+msgstr "/Düzenle/Geri al"
 
 #: src/mainwindow.c:3265 src/mainwindow.c:3460
 msgid "/Edit/Redo"
-msgstr "/Düzen/Yinele"
+msgstr "/Düzenle/Yinele"
 
 #: src/mainwindow.c:3266 src/mainwindow.c:3273 src/mainwindow.c:3302
 msgid "/Edit/sep1"
@@ -1115,27 +1115,27 @@ msgstr "/Düzenle/sep1"
 
 #: src/mainwindow.c:3267 src/mainwindow.c:3464 src/mainwindow.c:3498
 msgid "/Edit/Cut"
-msgstr "/Düzen/Kes"
+msgstr "/Düzenle/Kes"
 
 #: src/mainwindow.c:3268 src/mainwindow.c:3464 src/mainwindow.c:3498
 msgid "/Edit/Copy"
-msgstr "/Düzen/Kopyala"
+msgstr "/Düzenle/Kopyala"
 
 #: src/mainwindow.c:3269 src/mainwindow.c:3470
 msgid "/Edit/Paste To Centre"
-msgstr "/Düzen/Merkeze Yapıştır"
+msgstr "/Düzenle/Merkeze Yapıştır"
 
 #: src/mainwindow.c:3270 src/mainwindow.c:3471
 msgid "/Edit/Paste To New Layer"
-msgstr "/Düzen/Yeni Katmana Yapıştır"
+msgstr "/Düzenle/Yeni Katmana Yapıştır"
 
 #: src/mainwindow.c:3271 src/mainwindow.c:3470
 msgid "/Edit/Paste"
-msgstr "/Düzen/Yapıştır"
+msgstr "/Düzenle/Yapıştır"
 
 #: src/mainwindow.c:3272
 msgid "/Edit/Paste Text"
-msgstr "/Düzen/Metni Yapıştır"
+msgstr "/Düzenle/Metni Yapıştır"
 
 #: src/mainwindow.c:3274
 msgid "/Edit/Load Clipboard"
@@ -1167,35 +1167,35 @@ msgstr "/Düzenle/Panoyu Yükle/5"
 
 #: src/mainwindow.c:3281
 msgid "/Edit/Load Clipboard/6"
-msgstr "/Düzen/Panoyu Yükle/6"
+msgstr "/Düzenle/Panoyu Yükle/6"
 
 #: src/mainwindow.c:3282
 msgid "/Edit/Load Clipboard/7"
-msgstr "/Düzen/Panoyu Yükle/7"
+msgstr "/Düzenle/Panoyu Yükle/7"
 
 #: src/mainwindow.c:3283
 msgid "/Edit/Load Clipboard/8"
-msgstr "/Düzen/Panoyu Yükle/8"
+msgstr "/Düzenle/Panoyu Yükle/8"
 
 #: src/mainwindow.c:3284
 msgid "/Edit/Load Clipboard/9"
-msgstr "/Düzen/Panoyu Yükle/9"
+msgstr "/Düzenle/Panoyu Yükle/9"
 
 #: src/mainwindow.c:3285
 msgid "/Edit/Load Clipboard/10"
-msgstr "/Düzen/Panoyu Yükle/10"
+msgstr "/Düzenle/Panoyu Yükle/10"
 
 #: src/mainwindow.c:3286
 msgid "/Edit/Load Clipboard/11"
-msgstr "/Düzen/Panoyu Yükle/11"
+msgstr "/Düzenle/Panoyu Yükle/11"
 
 #: src/mainwindow.c:3287
 msgid "/Edit/Load Clipboard/12"
-msgstr "/Düzen/Panoyu Yükle/12"
+msgstr "/Düzenle/Panoyu Yükle/12"
 
 #: src/mainwindow.c:3288 src/mainwindow.c:3565
 msgid "/Edit/Save Clipboard"
-msgstr "/Düzen/Panoyu Kaydet"
+msgstr "/Düzenle/Panoyu Kaydet"
 
 #: src/mainwindow.c:3289
 msgid "/Edit/Save Clipboard/tear"
@@ -1203,7 +1203,7 @@ msgstr "/Düzenle/Panoyu Kaydet/yırt"
 
 #: src/mainwindow.c:3290
 msgid "/Edit/Save Clipboard/1"
-msgstr "/Düzen/Panoyu Kaydet/1"
+msgstr "/Düzenle/Panoyu Kaydet/1"
 
 #: src/mainwindow.c:3291
 msgid "/Edit/Save Clipboard/2"
@@ -1243,11 +1243,11 @@ msgstr "/Düzenle/Save Clipboard/10"
 
 #: src/mainwindow.c:3300
 msgid "/Edit/Save Clipboard/11"
-msgstr "/Düzen/Panoyu Kaydet/11"
+msgstr "/Düzenle/Panoyu Kaydet/11"
 
 #: src/mainwindow.c:3301
 msgid "/Edit/Save Clipboard/12"
-msgstr "/Düzen/Panoyu Kaydet/12"
+msgstr "/Düzenle/Panoyu Kaydet/12"
 
 #: src/mainwindow.c:3303
 msgid "/Edit/Choose Pattern ..."
@@ -1255,7 +1255,7 @@ msgstr "/Düzenle/Choose Pattern ..."
 
 #: src/mainwindow.c:3304
 msgid "/Edit/Choose Brush ..."
-msgstr "/Düzen/Fırça Seç ..."
+msgstr "/Düzenle/Fırça Seç ..."
 
 #: src/mainwindow.c:3305
 msgid "/Edit/Create Patterns"
@@ -1556,7 +1556,7 @@ msgstr ""
 
 #: src/mainwindow.c:3393
 msgid "/Effects/tear"
-msgstr "/Efektler/yırt"
+msgstr ""
 
 #: src/mainwindow.c:3394
 msgid "/Effects/Transform Colour ..."
@@ -2428,11 +2428,11 @@ msgstr "XBM resmi kaydediliyor"
 
 #: src/png.c:2565
 msgid "Loading LSS16 image"
-msgstr ""
+msgstr "LSS16 resmi yükleniyor"
 
 #: src/png.c:2646
 msgid "Saving LSS16 image"
-msgstr ""
+msgstr "LSS16 resmi kaydediliyor"
 
 #: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"

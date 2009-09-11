@@ -29,6 +29,8 @@
 
 ///	GENERIC WIDGET PRIMITIVES
 
+static GtkWidget *spin_new_x(GtkObject *adj, int fpart);
+
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal )
 {
 	GtkWidget *win = gtk_window_new(type);
@@ -51,15 +53,7 @@ GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
 
 GtkWidget *add_a_spin( int value, int min, int max )
 {
-	GtkWidget *spin;
-	GtkObject *adj;
-
-	adj = gtk_adjustment_new( value, min, max, 1, 10, 10 );
-	spin = gtk_spin_button_new( GTK_ADJUSTMENT (adj), 1, 0 );
-	gtk_widget_show(spin);
-	gtk_spin_button_set_numeric (GTK_SPIN_BUTTON (spin), TRUE);
-
-	return spin;
+	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 10), 0));
 }
 
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box )
@@ -264,9 +258,8 @@ GtkWidget *mt_spinslide_new(gint swidth, gint sheight)
 	gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
 	gtk_scale_set_digits(GTK_SCALE(slider), 0);
 
-	spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 0);
+	spin = spin_new_x(adj, 0);
 	gtk_box_pack_start(GTK_BOX(box), spin, swidth >= 0, TRUE, 2);
-	gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
 
 	gtk_widget_show_all(box);
 	return (box);
@@ -425,17 +418,45 @@ int read_spin(GtkWidget *spin)
 	return (gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(spin)));
 }
 
-GtkWidget *add_float_spin(double value, double min, double max)
-{
-	GtkWidget *spin;
-	GtkObject *adj;
+#if (GTK_MAJOR_VERSION == 1) && !U_MTK
 
-	adj = gtk_adjustment_new(value, min, max, 1, 10, 10);
-	spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, 2);
+#define MIN_SPIN_BUTTON_WIDTH 30
+
+/* More-or-less correctly evaluate spinbutton size */
+static void spin_size_req(GtkWidget *widget, GtkRequisition *requisition,
+	gpointer user_data)
+{
+	GtkSpinButton *spin = GTK_SPIN_BUTTON(widget);
+	char num[128];
+	int l1, l2;
+
+	num[0] = '0';
+	sprintf(num + 1, "%.*f", spin->digits, spin->adjustment->lower);
+	l1 = gdk_string_width(widget->style->font, num);
+	sprintf(num + 1, "%.*f", spin->digits, spin->adjustment->upper);
+	l2 = gdk_string_width(widget->style->font, num);
+	if (l1 < l2) l1 = l2;
+	if (l1 > MIN_SPIN_BUTTON_WIDTH)
+		requisition->width += l1 - MIN_SPIN_BUTTON_WIDTH;
+}
+
+#endif
+
+static GtkWidget *spin_new_x(GtkObject *adj, int fpart)
+{
+	GtkWidget *spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, fpart);
+#if (GTK_MAJOR_VERSION == 1) && !U_MTK
+	gtk_signal_connect_after(GTK_OBJECT(spin), "size_request",
+		GTK_SIGNAL_FUNC(spin_size_req), NULL);
+#endif
 	gtk_widget_show(spin);
 	gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(spin), TRUE);
-
 	return (spin);
+}
+
+GtkWidget *add_float_spin(double value, double min, double max)
+{
+	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 10), 2));
 }
 
 /* void handler(GtkAdjustment *adjustment, gpointer user_data); */
