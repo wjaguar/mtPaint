@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.29"
-MT_DATE="2008-12-30"
+MT_V="3.30"
+MT_DATE="2009-02-12"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -51,6 +51,8 @@ then
 fi
 LD=`which \`$CC -print-prog-name=ld\``
 CROSSPF=
+
+GCCVER=$($CC -dumpversion | tr -d '.' | cut -c 1-2)
 
 L_EX=
 STATIC_LAST=
@@ -268,7 +270,14 @@ do
 		"486" )		MARCH='-march=i486';;
 		"586" )		MARCH='-march=i586';;
 		"686" )		MARCH='-march=i686';;
-		"release" )	CFLAG='-O2 -fweb -march=i386'
+		"release" )	CFLAG='-O2 -march=i386'
+				if [ "$GCCVER" \< "40" ]
+				then
+					CFLAG="$CFLAG -fweb"
+				else
+					CFLAG="$CFLAG -fweb -fomit-frame-pointer -fmodulo-sched"
+				fi
+				AS_NEEDED=-Wl,--as-needed
 				HAVE_FUNCS="$HAVE_FUNCS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS";;
 		"--prefix="* )	MT_PREFIX="`echo "$A" | sed -e "s/--prefix=//"`"
 				WIN_BIN_INSTALL="$MT_PREFIX/bin"
@@ -279,18 +288,17 @@ do
 		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
 		"build" )	./configure flush
 				I_DIR=/home/wj/sf
-				export CC=gcc-3.4.6
 				cd ..
 				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V*/
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl pod man release asneeded staticgif nojp2 --libdir=$I_DIR/libpng0
+				./configure --mandir=/usr/man/man1 intl pod man release staticgif nojp2 --libdir=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
 				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-				make install
+				make install DESTDIR=`pwd`/slack
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk2
@@ -298,12 +306,12 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/local/bin --po=/usr/share/locale intl man gtk1 release asneeded staticgif nojp2 --libdir=$I_DIR/libpng0
+				./configure --mandir=/usr/man/man1 intl man gtk1 release staticgif nojp2 --libdir=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
 				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-				make install
+				make install DESTDIR=`pwd`/slack
 				cp doc/slack-desc slack/install/
 				cd slack
 				GTK_V=gtk1
@@ -311,12 +319,12 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=`pwd`/slack/usr --bindir=`pwd`/slack/usr/bin --po=/usr/share/locale intl man release GIF staticgif nojp2 --libdir=$I_DIR/ubuntulib
+				./configure --prefix=/usr intl man release GIF staticgif nojp2 --libdir=$I_DIR/ubuntulibs
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/share/doc/mtpaint/
 				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/share/doc/mtpaint/
-				make install
+				make install DESTDIR=`pwd`/slack
 				cp doc/slack-desc slack/install/
 				cd slack
 				makepkg --chown y $I_DIR/mtpaint-$MT_V.tgz
@@ -403,7 +411,12 @@ EOF
 else
 	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
 
-	echo CC = $CC -Wall > $GTK_FILE
+	if [ "$GCCVER" \< "40" ]
+	then
+		echo CC = $CC -Wall > $GTK_FILE
+	else # Tell gcc 4.x to shut up
+		echo CC = $CC -Wall -Wno-pointer-sign > $GTK_FILE
+	fi
 	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
 	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
 	echo "MT_PREFIX=\"$MT_PREFIX\"" >> $GTK_FILE

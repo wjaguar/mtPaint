@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -385,8 +385,7 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
 	GtkSignalFunc lclick, GtkSignalFunc rclick)
 {
-	GtkWidget *item, *iconw, *radio[32];
-	GdkPixmap *icon, *mask;
+	GtkWidget *item, *radio[32];
 
 	if (!lclick) lclick = GTK_SIGNAL_FUNC(toolbar_click);
 	if (!rclick) rclick = GTK_SIGNAL_FUNC(toolbar_rclick);
@@ -399,18 +398,13 @@ void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
 			gtk_toolbar_append_space(bar);
 			continue;
 		}
-		icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
-			NULL, items->xpm);
-		iconw = gtk_pixmap_new(icon, mask);
-		gdk_pixmap_unref(icon);
-		gdk_pixmap_unref(mask);
 		item = gtk_toolbar_append_element(bar,
 			items->radio < 0 ? GTK_TOOLBAR_CHILD_BUTTON :
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			NULL, _(items->tooltip), "Private", iconw, lclick,
-			(gpointer)items);
+			NULL, _(items->tooltip), "Private",
+			xpm_image(items->xpm), lclick, (gpointer)items);
 		if (items->radio > 0) radio[items->radio] = item;
 		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
 			"button_press_event", rclick, (gpointer)items);
@@ -1045,7 +1039,7 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 {
 	int offset, i, j, k, o, o2;
 
-	tool_type = mem_brush_list[val][0];
+	brush_tool_type = mem_brush_list[val][0];
 	tool_size = mem_brush_list[val][1];
 	if ( mem_brush_list[val][2]>0 ) tool_flow = mem_brush_list[val][2];
 
@@ -1153,8 +1147,6 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 			mem_prev[k + 2] = mem_col_pat24[l + 2];
 		}
 	}
-
-	grad_def_update();
 }
 
 void update_top_swatch()			// Update selected colours A & B

@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -360,7 +360,6 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		pat_no = mx / (PATCH_WIDTH/9) + 9*( my / (PATCH_HEIGHT/9) );
 		pat_no = pat_no < 0 ? 0 : pat_no > 80 ? 80 : pat_no;
 		mem_set_brush(pat_no);
-		brush_tool_type = tool_type;
 		change_to_tool(TTB_PAINT);
 		update_stuff(UPD_BRUSH);
 	}
@@ -2005,7 +2004,8 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 	else if (cs_type == COLSEL_GRID)
 	{
 		char *grid_txt[4] = { _("Opaque"), _("Border"),
-			_("Transparent"), _("Tile") };
+			_("Transparent"), _("Tile ") };
+/* !!! "Tile " has a trailing space to be distinct from "Tile" in "Resize Canvas" */
 		grid_widgets *gw;
 
 		if (!alloc_ctable(4)) return;

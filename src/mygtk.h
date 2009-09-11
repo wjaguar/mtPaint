@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -277,6 +277,10 @@ void *bound_malloc(GtkWidget *widget, int size);
 // Gamma correction toggle
 
 GtkWidget *gamma_toggle();
+
+// Image widget
+
+GtkWidget *xpm_image(char **xpm);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

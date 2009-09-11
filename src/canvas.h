@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -182,7 +182,7 @@ void create_default_image();			// Create default new image
 #define CF_GEOM   0x00000002 /* Image geometry */
 #define CF_CGEOM  0x00000004 /* Clipboard geometry */
 #define CF_PAL    0x00000008 /* Palette */
-#define CF_CAB    0x00000010 /* Current channel's A & B */
+#define CF_CAB    0x00000010 /* Current channel's A & B (w/redraw) */
 #define CF_AB     0x00000020 /* Colors A & B */
 #define CF_GRAD   0x00000040 /* Gradients */
 #define CF_MENU   0x00000080 /* Menus and controls */
@@ -218,7 +218,7 @@ void create_default_image();			// Create default new image
 //	Changed color or value A or B
 #define UPD_CAB    CF_CAB
 //	Changed color A or B
-#define UPD_AB     (CF_AB | CF_SET | CF_GMODE | CF_TDRAW)
+#define UPD_AB     (CF_AB | CF_GRAD | CF_SET | CF_GMODE | CF_TDRAW)
 //	Changed pattern
 #define UPD_PAT    (CF_AB | CF_TDRAW)
 //	Changed A, B, and pattern
@@ -255,6 +255,8 @@ void create_default_image();			// Create default new image
 #define UPD_PSEL   (CF_MENU | CF_SELBAR)
 //	Changed selection
 #define UPD_SEL    (UPD_PSEL | CF_CURSOR)
+//	Changed selection geometry
+#define UPD_SGEOM  UPD_PSEL
 //	Initiated pasting something
 #define UPD_PASTE  (UPD_SEL | CF_DRAW)
 //	Changed filename

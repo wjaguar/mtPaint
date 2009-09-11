@@ -4,9 +4,19 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.30	2009-?-?
+3.30	2009-2-12
 
 	* Chinese (Simplified) translation updated by Cecc
+	* Dutch translation added by Hans Strijards
+	* Italian translation added by Angelo Gemmi
+	* Swedish translation added by Daniel Nylander
+	* Spanish translation updated by Miguel Anxo Bouzada, Francisco Jose Rey
+	* Galician translation updated by Miguel Anxo Bouzada
+	* Czech translation updated by Martin Petricek
+	* French translation updated by Johan Serre
+	* Portuguese translation updated by Tiago Silva
+	* Turkish translation updated by Tutku Dalmaz
+	* Russian translation updated
 	* New colour picker (old one available as configure option)
 	* New file picker (old one available as configure option)
 	* Some menu items can have an icon (if set in the preferences)
@@ -45,8 +55,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Brush preview area border now can't be messed up by theme engines
 	* Makefiles now honor DESTDIR
 	* Configure script now honors CC
-	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.8)
-	* Communal memory space now implemented for layers (see handbook section 8.4.3)
+	* Shift+Enter while pasting swaps clipboard with canvas (see handbook section 4.9)
+	* Communal memory space now implemented for layers (see handbook section 8.2.1)
 	* Support using ImageMagick for GIF animation, instead of Gifsicle - "./configure imagick"
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste and gradient previews eliminated
@@ -57,6 +67,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Directory for animation frames is created relative to layers file, as it should be
 	* BUGFIX - Saving animation frames in PNG format doesn't cause crash
 	* BUGFIX - When pasting to a new layer it is created untitled, as it should
+	* BUGFIX - CMYK JPEG files now load properly as RGB
+	* BUGFIX - Drawing with A to B gradient in utility channels now respects left/right button
+	* BUGFIX - Saving PNG images with more than one utility channel now works properly
 
 3.21	2008-6-8
 

@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -700,7 +700,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	FILE *fp = NULL;
 	int h = settings->height, w = settings->width, bpp = settings->bpp;
 	int i, chunks = 0, res = -1;
-	long dest_len;
+	long dest_len, res_len;
 	char *mess;
 	unsigned char trans[256], *tmp, *rgba_row = NULL;
 	png_color_16 trans_rgb;
@@ -816,11 +816,12 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 			if (!tmp) break;
 			res = 0;
 		}
-		if (compress2(tmp, &dest_len, settings->img[i], w,
+		res_len = dest_len;
+		if (compress2(tmp, &res_len, settings->img[i], w,
 			settings->png_compression) != Z_OK) continue;
 		strncpy(unknown0.name, chunk_names[i], 5);
 		unknown0.data = tmp;
-		unknown0.size = dest_len;
+		unknown0.size = res_len;
 		png_set_unknown_chunks(png_ptr, info_ptr, &unknown0, 1);
 		png_set_unknown_chunk_location(png_ptr, info_ptr,
 			chunks++, PNG_AFTER_IDAT);
@@ -941,7 +942,7 @@ static int save_gif(char *file_name, ls_settings *settings)
 	ColorMapObject *gif_map;
 	GifFileType *giffy;
 	unsigned char gif_ext_data[8];
-	int i, w = settings->width, h = settings->height, msg = -1;
+	int i, nc, w = settings->width, h = settings->height, msg = -1;
 #ifndef WIN32
 	mode_t mode;
 #endif
@@ -950,7 +951,12 @@ static int save_gif(char *file_name, ls_settings *settings)
 	/* GIF save must be on indexed image */
 	if (settings->bpp != 1) return WRONG_FORMAT;
 
-	gif_map = MakeMapObject(256, NULL);
+	/* Get the next power of 2 for colormap size */
+	nc = settings->colors - 1;
+	nc |= nc >> 1; nc |= nc >> 2; nc |= nc >> 4;
+	nc += !nc + 1; // No less than 2 colors
+
+	gif_map = MakeMapObject(nc, NULL);
 	if (!gif_map) return -1;
 
 	giffy = EGifOpenFileName(file_name, FALSE);
@@ -962,13 +968,13 @@ static int save_gif(char *file_name, ls_settings *settings)
 		gif_map->Colors[i].Green = settings->pal[i].green;
 		gif_map->Colors[i].Blue	 = settings->pal[i].blue;
 	}
-	for (; i < 256; i++)
+	for (; i < nc; i++)
 	{
 		gif_map->Colors[i].Red = gif_map->Colors[i].Green = 
 			gif_map->Colors[i].Blue	= 0;
 	}
 
-	if (EGifPutScreenDesc(giffy, w, h, 256, 0, gif_map) == GIF_ERROR)
+	if (EGifPutScreenDesc(giffy, w, h, nc, 0, gif_map) == GIF_ERROR)
 		goto fail;
 
 	if (settings->xpm_trans >= 0)
@@ -1027,7 +1033,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 {
 	static int pr;
 	struct jpeg_decompress_struct cinfo;
-	unsigned char *memp;
+	unsigned char xb = 0, *memp, *memx = NULL;
 	FILE *fp;
 	int i, width, height, bpp, res = -1;
 
@@ -1047,13 +1053,25 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 
 	jpeg_read_header(&cinfo, TRUE);
 	jpeg_start_decompress(&cinfo);
+
 	bpp = 3;
-	if (cinfo.output_components == 1) /* Greyscale */
+	switch (cinfo.out_color_space)
 	{
+	case JCS_RGB: break;
+	case JCS_GRAYSCALE:
 		settings->colors = 256;
 		mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
 		bpp = 1;
+		break;
+	case JCS_CMYK:
+		/* Photoshop writes CMYK data inverted */
+		xb = cinfo.saw_Adobe_marker ? 0 : 255;
+		if ((memx = malloc(cinfo.output_width * 4))) break;
+		res = FILE_MEM_ERROR;
+		// Fallthrough
+	default: goto fail; /* Unsupported colorspace */
 	}
+
 	settings->width = width = cinfo.output_width;
 	settings->height = height = cinfo.output_height;
 	settings->bpp = bpp;
@@ -1066,7 +1084,23 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	for (i = 0; i < height; i++)
 	{
 		memp = settings->img[CHN_IMAGE] + width * i * bpp;
-		jpeg_read_scanlines(&cinfo, &memp, 1);
+		jpeg_read_scanlines(&cinfo, memx ? &memx : &memp, 1);
+		if (memx) /* Simple CMYK->RGB conversion */
+		{
+			unsigned char *src = memx, *dest = memp;
+			int j, k, r, g, b;
+
+			for (j = 0; j < width; j++ , src += 4 , dest += 3)
+			{
+				k = src[3] ^ xb;
+				r = (src[0] ^ xb) * k;
+				dest[0] = (r + (r >> 8) + 1) >> 8;
+				g = (src[1] ^ xb) * k;
+				dest[1] = (g + (g >> 8) + 1) >> 8;
+				b = (src[2] ^ xb) * k;
+				dest[2] = (b + (b >> 8) + 1) >> 8;
+			}
+		}
 		if (pr && ((i * 20) % height >= height - 20))
 			progress_update((float)i / height);
 	}
@@ -1076,6 +1110,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 fail:	if (pr) progress_end();
 	jpeg_destroy_decompress(&cinfo);
 	fclose(fp);
+	free(memx);
 	return (res);
 }
 

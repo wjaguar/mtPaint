@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -551,7 +551,7 @@ int spawn_process(char *argv[], char *directory)
 	 * because it is many times slower than Gifsicle, and less efficient */
 	/* !!! Image Magick version prior to 6.2.6-3 won't work properly */
 #define CMD_GIF_CREATE \
-	"convert %s -layers optimize -set delay %d -loop 0 \"%s\""
+	"convert %2$s -layers optimize -set delay %1$d -loop 0 \"%3$s\""
 #define CMD_GIF_EXPLODE \
 	"convert \"%s\" -scene 0 -coalesce +adjoin \"gif:%s.%%03d\""
 #define CMD_GIF_PLAY "animate \"%s\" &"
@@ -561,7 +561,7 @@ int spawn_process(char *argv[], char *directory)
 /*	global colourmaps, suppress warning, high optimizations, background
  *	removal method, infinite loops, ensure result works with Java & MS IE */
 #define CMD_GIF_CREATE \
-	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful %s -d %d -o \"%s\""
+	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful -d %d %s -o \"%s\""
 #define CMD_GIF_EXPLODE \
 	"gifsicle -U --explode \"%s\" -o \"%s\""
 #define CMD_GIF_PLAY "gifview -a \"%s\" &"
@@ -582,7 +582,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 	switch (action)
 	{
 	case DA_GIF_CREATE:
-		command = g_strdup_printf(CMD_GIF_CREATE, sname, delay, dname);
+		command = g_strdup_printf(CMD_GIF_CREATE, delay, sname, dname);
 		break;
 	case DA_GIF_EXPLODE:
 		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);

@@ -1,5 +1,5 @@
 /*	font.h
-	Copyright (C) 2007 Mark Tyler
+	Copyright (C) 2007-2008 Mark Tyler
 
 	This file is part of mtPaint.
 

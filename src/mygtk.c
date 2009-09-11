@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2323,6 +2323,24 @@ GtkWidget *gamma_toggle()
 {
 	return (sig_toggle(_("Gamma corrected"),
 		inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
+}
+
+// Image widget
+
+/* !!! GtkImage is broken on GTK+ 2.12.9 at least - background gets corrupted
+ * when widget is made insensitive, so GtkPixmap is the only choice - WJ */
+GtkWidget *xpm_image(char **xpm)
+{
+	GdkPixmap *icon, *mask;
+	GtkWidget *widget;
+
+	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, xpm);
+	widget = gtk_pixmap_new(icon, mask);
+	gdk_pixmap_unref(icon);
+	gdk_pixmap_unref(mask);
+	gtk_widget_show(widget);
+
+	return (widget);
 }
 
 // Maybe this will be needed someday...

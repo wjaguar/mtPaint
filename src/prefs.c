@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -67,14 +67,15 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 16
+#define PREF_LANGS 19
 
 char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"zh_CN.utf8", "zh_TW.utf8",
-	"cs_CZ", "en_GB", "fr_FR", "gl_ES",
-	"de_DE", "ja_JP.utf8", "pl_PL", "pt_PT",
-	"pt_BR", "ru_RU", "sk_SK",
-	"es_ES", "tr_TR" };
+	"cs_CZ", "nl_NL", "en_GB", "fr_FR",
+	"gl_ES", "de_DE", "it_IT", "ja_JP.utf8",
+	"pl_PL", "pt_PT", "pt_BR",
+	"ru_RU", "sk_SK", "es_ES", "sv_SE",
+	"tr_TR" };
 
 int pref_lang;
 
@@ -400,10 +401,11 @@ void pressed_preferences()
 #ifdef U_NLS
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 		_("Chinese (Simplified)"), _("Chinese (Taiwanese)"),
-		_("Czech"), _("English (UK)"), _("French"), _("Galician"),
-		_("German"), _("Japanese"), _("Polish"), _("Portuguese"),
-		_("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
-		_("Spanish"), _("Turkish") };
+		_("Czech"), _("Dutch"), _("English (UK)"), _("French"),
+		_("Galician"), _("German"), _("Italian"), _("Japanese"),
+		_("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
+		_("Russian"), _("Slovak"), _("Spanish"), _("Swedish"),
+		_("Turkish") };
 #endif
 
 

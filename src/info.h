@@ -1,5 +1,5 @@
 /*	info.h
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2008 Mark Tyler
 
 	This file is part of mtPaint.
 

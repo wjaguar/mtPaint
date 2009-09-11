@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1158,7 +1158,7 @@ void update_stuff(int flags)
 	}
 	if (flags & CF_AB)
 	{
-		mem_pat_update(); // Also updates gradient (CF_GRAD)
+		mem_pat_update();
 		if (text_paste && (marq_status >= MARQUEE_PASTE))
 		{
 			if (text_paste == TEXT_PASTE_FT) ft_render_text();
@@ -1525,7 +1525,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 
 static void ftype_widgets(GtkWidget *box, char *name, int mode)
 {
-	GtkWidget *opt, *menu, *item, *label;
+	GtkWidget *opt, *menu, *item;
 	fformat *ff;
 	int i, j, k, mask;
 	char *ext = strrchr(name, '.');
@@ -1533,10 +1533,8 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_IMAGE;
 	ext = ext ? ext + 1 : "";
 
-	label = gtk_label_new(_("File Format"));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
-	opt = gtk_option_menu_new();
-	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 10);
+	pack5(box, gtk_label_new(_("File Format")));
+	opt = pack5(box, gtk_option_menu_new());
 
 	menu = gtk_menu_new();
 	for (i = j = k = 0; i < NUM_FTYPES; i++)
@@ -1582,10 +1580,9 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
 		break;
 	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
-		label = pack(box, gtk_label_new(_("Animation delay")));
+		label = pack5(box, gtk_label_new(_("Animation delay")));
 		gtk_widget_show(label);
-		label = add_a_spin(preserved_gif_delay, 1, MAX_DELAY);
-		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 10);
+		pack5(box, add_a_spin(preserved_gif_delay, 1, MAX_DELAY));
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
@@ -1651,7 +1648,8 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 			break;
 		case FS_LAYER_SAVE: /* Nothing to do yet */
 			break;
-		case FS_EXPORT_GIF: /* No formats yet */
+		case FS_EXPORT_GIF: /* Hardcoded GIF format for now */
+			settings->ftype = FT_GIF;
 			settings->gif_delay = read_spin(BOX_CHILD(box, 1));
 			break;
 		case FS_EXPORT_UNDO:
@@ -2376,7 +2374,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		if ((button == 3) && rmb_tool && !tint_mode[0])
 		{
 			col_reverse = TRUE;
-			mem_swap_cols();
+			mem_swap_cols(FALSE);
 		}
 	}
 	else if ( tool_ox == x && tool_oy == y ) return;	// Only do something with a new point
@@ -2556,7 +2554,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		if (!pen_down && col_reverse)
 		{
 			col_reverse = FALSE;
-			mem_swap_cols();
+			mem_swap_cols(FALSE);
 		}
 		res = 1;
 	}

@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1628,9 +1628,9 @@ void mem_init()					// Initialise memory
 		gmap_setup(graddata + i, gradbytes, i);
 }
 
-void mem_swap_cols()
+void mem_swap_cols(int redraw)
 {
-	int oc;
+	int oc, flags;
 	png_color o24;
 
 	if (mem_channel != CHN_IMAGE)
@@ -1638,25 +1638,27 @@ void mem_swap_cols()
 		oc = channel_col_A[mem_channel];
 		channel_col_A[mem_channel] = channel_col_B[mem_channel];
 		channel_col_B[mem_channel] = oc;
-		return;
+		flags = redraw ? UPD_GRAD : CF_GRAD;
 	}
-
-	oc = mem_col_A;
-	mem_col_A = mem_col_B;
-	mem_col_B = oc;
-
-	o24 = mem_col_A24;
-	mem_col_A24 = mem_col_B24;
-	mem_col_B24 = o24;
-
-	if (RGBA_mode)
+	else
 	{
-		oc = channel_col_A[CHN_ALPHA];
-		channel_col_A[CHN_ALPHA] = channel_col_B[CHN_ALPHA];
-		channel_col_B[CHN_ALPHA] = oc;
-	}
+		oc = mem_col_A;
+		mem_col_A = mem_col_B;
+		mem_col_B = oc;
 
-	mem_pat_update();
+		o24 = mem_col_A24;
+		mem_col_A24 = mem_col_B24;
+		mem_col_B24 = o24;
+
+		if (RGBA_mode)
+		{
+			oc = channel_col_A[CHN_ALPHA];
+			channel_col_A[CHN_ALPHA] = channel_col_B[CHN_ALPHA];
+			channel_col_B[CHN_ALPHA] = oc;
+		}
+		flags = redraw ? UPD_AB : CF_AB | CF_GRAD;
+	}
+	update_stuff(flags);
 }
 
 #define PALETTE_TEXT_GREY 200
@@ -2304,18 +2306,23 @@ static void find_nn(pnnbin *bins, int idx)
 {
 	pnnbin *bin1, *bin2;
 	int i, nn = 0;
-	double n1, n2, dr, dg, db, nerr, err = 1e100;
+	double n1, wr, wg, wb, err = 1e100;
 
 	bin1 = bins + idx;
 	n1 = bin1->cnt;
+	wr = bin1->rc;
+	wg = bin1->gc;
+	wb = bin1->bc;
 	for (i = bin1->fw; i; i = bin2->fw)
 	{
+		double nerr, n2;
+
 		bin2 = bins + i;
+		nerr = (bin2->rc - wr) * (bin2->rc - wr) +
+			(bin2->gc - wg) * (bin2->gc - wg) +
+			(bin2->bc - wb) * (bin2->bc - wb);
 		n2 = bin2->cnt;
-		dr = bin2->rc - bin1->rc;
-		dg = bin2->gc - bin1->gc;
-		db = bin2->bc - bin1->bc;
-		nerr = (((dr * dr + dg * dg + db * db) / (n1 + n2)) * n1 * n2);
+		nerr *= (n1 * n2) / (n1 + n2);
 		if (nerr >= err) continue;
 		err = nerr;
 		nn = i;

@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1352,7 +1352,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		if ( col_reverse )
 		{
 			col_reverse = FALSE;
-			mem_swap_cols();
+			mem_swap_cols(FALSE);
 		}
 
 		if (grad_tool(event, x0, y0, state, button)) return;
@@ -3763,11 +3763,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_CROP:
 		pressed_crop(); break;
 	case ACT_SWAP_AB:
-		mem_swap_cols();
-		update_stuff(UPD_CAB);
-		break;
+		mem_swap_cols(TRUE); break;
 	case ACT_TOOL:
-		if (state) change_to_tool(mode); // Ignore DEactivating buttons
+		if (state || kbd) change_to_tool(mode); // Ignore DEactivating buttons
 		break;
 	case ACT_SEL_MOVE:
 		/* Gradient tool has precedence over selection */
@@ -3775,7 +3773,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		{
 			paint_marquee(2, marq_x1 + change * arrow_dx[dir],
 				marq_y1 + change * arrow_dy[dir]);
-			update_sel_bar();
+			update_stuff(UPD_SGEOM);
 		}
 		else move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
 		break;
@@ -3790,7 +3788,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		{
 			paint_marquee(3, marq_x2 + change * arrow_dx[dir],
 				marq_y2 + change * arrow_dy[dir]);
-			update_sel_bar();
+			update_stuff(UPD_SGEOM);
 		}
 		else if (layer_selected) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
@@ -3888,13 +3886,10 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_TBAR:
 		pressed_toolbar_toggle(state, mode); break;
 	case ACT_DOCK:
-		if (kbd)
-		{
-			if (GTK_WIDGET_SENSITIVE(menu_widgets[MENU_DOCK]))
-				gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-					menu_widgets[MENU_DOCK]), !show_dock);
-		}
-		else toggle_dock(show_dock = state, FALSE);
+		if (!kbd) toggle_dock(show_dock = state, FALSE);
+		else if (GTK_WIDGET_SENSITIVE(menu_widgets[MENU_DOCK]))
+			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+				menu_widgets[MENU_DOCK]), !show_dock);
 		break;
 	case ACT_CENTER:
 		pressed_centralize(state); break;
@@ -4098,10 +4093,6 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	GtkWidget *widget, *wrap, *rwidgets[MENU_RESIZE_MAX];
 	char *radio[32], *rnames[MENU_RESIZE_MAX];
 	int i, j, rn = 0;
-#if GTK_MAJOR_VERSION == 2
-	GdkPixmap *icon, *mask;
-	GtkWidget *image;
-#endif
 #if GTK_MAJOR_VERSION == 1
 	GSList *en;
 #endif
@@ -4131,12 +4122,8 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 			widget = gtk_item_factory_get_item(factory,
 				((GtkItemFactoryItem *)factory->items->data)->path);
 
-			icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, items->xpm_icon_image);
-			image = gtk_image_new_from_pixmap( icon, mask );
-			gdk_pixmap_unref(icon);
-			gdk_pixmap_unref(mask);
-
-			gtk_image_menu_item_set_image( GTK_IMAGE_MENU_ITEM(widget), image );
+			gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(widget),
+				xpm_image(items->xpm_icon_image));
 		}
 		else
 #endif
@@ -4308,9 +4295,7 @@ static void toggle_dock(int state, int internal)
 #if 0 /* !!! Only commandline pane for now */
 	static char **tab_buttons[DOCK_TOTAL] =
 		{ xpm_cline_xpm, xpm_config_xpm, xpm_layers_xpm };
-	GtkWidget *notebook, *iconw, *dock_page[DOCK_TOTAL];
-	GdkPixmap *pix;
-	GdkBitmap *mask;
+	GtkWidget *notebook, *dock_page[DOCK_TOTAL];
 	int i;
 #endif
 	GtkWidget *vbox, *pane = dock_pane;
@@ -4340,12 +4325,9 @@ static void toggle_dock(int state, int internal)
 		for (i = 0; i < DOCK_TOTAL; i++)
 		{
 			if ((i == DOCK_CLINE) && (files_passed <= 1)) continue;
-			pix = gdk_pixmap_create_from_xpm_d(main_window->window,
-				&mask, NULL, tab_buttons[i]);
-			iconw = gtk_pixmap_new(pix, mask);
 			dock_page[i] = gtk_vbox_new(FALSE, 0);
 			gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
-				dock_page[i], iconw);
+				dock_page[i], xpm_image(tab_buttons[i]));
 		}
 #endif
 
@@ -4490,7 +4472,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, xpm_copy_xpm },
 	{ _("/Edit/Copy To Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
 	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, xpm_paste_xpm },
-	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
+	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_PCLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
 	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, xpm_text_xpm },
 #ifdef U_FREETYPE
@@ -4568,7 +4550,7 @@ static menu_item main_menu[] = {
 	{ _("/Image/Rotate Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 0 },
 	{ _("/Image/Rotate Anti-Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 1 },
 	{ _("/Image/Free Rotate ..."), -1, 0, 0, NULL, DLG_ROTATE, 0 },
-	{ _("/Image/Skew..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
+	{ _("/Image/Skew ..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
 	{ _("/Image/sep3"), -4 },
 	{ _("/Image/Information ..."), -1, 0, 0, "<control>I", DLG_INFO, 0 },
 	{ _("/Image/Preferences ..."), -1, MENU_PREFS, 0, "<control>P", DLG_PREFS, 0 },

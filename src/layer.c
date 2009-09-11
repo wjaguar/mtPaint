@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -944,10 +944,7 @@ void pressed_paste_layer()
 {
 	layer_image *lim;
 	unsigned char *dest;
-	int i, j, k, cmask = CMASK_IMAGE;
-
-	/* No way to put RGB clipboard into utility channel */
-	if ((mem_clip_bpp == 3) && (mem_channel != CHN_IMAGE)) return;
+	int i, j, k, chan = mem_channel, cmask = CMASK_IMAGE;
 
 	if (layers_total >= MAX_LAYERS)
 	{
@@ -956,9 +953,12 @@ void pressed_paste_layer()
 		return;
 	}
 
+	/* No way to put RGB clipboard into utility channel */
+	if (mem_clip_bpp == 3) chan = CHN_IMAGE;
+
 	if ((mem_clip_alpha || mem_clip_mask) && !channel_dis[CHN_ALPHA])
 		cmask = CMASK_RGBA;
-	cmask |= CMASK_FOR(mem_channel);
+	cmask |= CMASK_FOR(chan);
 
 	if (!layer_add(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, mem_pal,
 		cmask)) return; // Failed
@@ -968,13 +968,14 @@ void pressed_paste_layer()
 	lim = layer_table[layers_total].image;
 
 	lim->state_ = mem_state;
+	lim->state_.channel = chan;
 
 	j = mem_clip_w * mem_clip_h;
-	memcpy(lim->image_.img[mem_channel], mem_clipboard, j * mem_clip_bpp);
+	memcpy(lim->image_.img[chan], mem_clipboard, j * mem_clip_bpp);
 
 	/* Image channel with alpha */
 	dest = lim->image_.img[CHN_ALPHA];
-	if (dest && (mem_channel == CHN_IMAGE))
+	if (dest && (chan == CHN_IMAGE))
 	{
 		/* Fill alpha channel */
 		if (mem_clip_alpha) memcpy(dest, mem_clip_alpha, j);
@@ -982,7 +983,7 @@ void pressed_paste_layer()
 	}
 
 	/* Image channel with mask */
-	if (mem_clip_mask && (mem_channel == CHN_IMAGE))
+	if (mem_clip_mask && (chan == CHN_IMAGE))
 	{
 		/* Mask image - fill unselected part with color A */
 		dest = lim->image_.img[CHN_IMAGE];
@@ -999,7 +1000,7 @@ void pressed_paste_layer()
 
 	/* Utility channel with mask */
 	dest = lim->image_.img[CHN_ALPHA];
-	if (mem_channel != CHN_IMAGE) dest = lim->image_.img[mem_channel];
+	if (chan != CHN_IMAGE) dest = lim->image_.img[chan];
 	if (dest && mem_clip_mask)
 	{
 		/* Mask the channel */

@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2008 Mark Tyler
+	Copyright (C) 2004-2009 Mark Tyler
 
 	This file is part of mtPaint.
 
@@ -29,7 +29,7 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.30 - Copyright (C) 2004-2008 The Authors\n"),
+_("mtPaint 3.30 - Copyright (C) 2004-2009 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
@@ -153,17 +153,20 @@ _("Vlastimil Krejcir"),
 _("William Kern\n\n"),
 _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan"),
-_("Czech - Pavel Ruzicka"),
-_("French - Nicolas Velin, Pascal Billard, Sylvain Cresto"),
+_("Czech - Pavel Ruzicka, Martin Petricek"),
+_("Dutch - Hans Strijards"),
+_("French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre"),
 _("Galician - Miguel Anxo Bouzada"),
 _("German - Oliver Frommel"),
+_("Italian - Angelo Gemmi"),
 _("Japanese - Norihiro YONEDA"),
 _("Polish - Simek, LucaS"),
 _("Portuguese - Israel G. Lugo, Tiago Silva"),
 _("Russian - Sergey Irupin, Dmitry Groshev"),
 _("Simplified Chinese - Cecc"),
 _("Slovak - Jozef Riha"),
-_("Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon"),
+_("Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel Anxo Bouzada, Francisco Jose Rey"),
+_("Swedish - Daniel Nylander"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };

@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -493,7 +493,7 @@ void mem_mask_setall(char val);		// Clear/set all masks
 void mem_mask_init();			// Initialise RGB protection mask
 int mem_protected_RGB(int intcol);	// Is this intcol in list?
 
-void mem_swap_cols();			// Swaps colours and update memory
+void mem_swap_cols(int redraw);		// Swaps colours and update memory
 void mem_get_histogram(int channel);	// Calculate how many of each colour index is on the canvas
 int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
