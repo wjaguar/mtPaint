@@ -5456,21 +5456,21 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 			if (dsta)
 			{
 				k = srca[offs];
-				k = k * 255 + (srca[offs - delta1] - k) * opw;
+				k = k * 255 + (srca[offs - delta1] - k) * opw + 127;
 				dsta[offs] = (k + (k >> 8) + 1) >> 8;
 				if (k && !channel_dis[CHN_ALPHA])
 					opw = (255 * opw * srca[offs - delta1]) / k;
 			}
 			op2 = 255 - opw;
 			offs *= bpp;
-			k = src[offs - delta] * opw + src[offs] * op2;
+			k = src[offs - delta] * opw + src[offs] * op2 + 127;
 			dest[offs] = (k + (k >> 8) + 1) >> 8;
 			if (bpp == 1) continue;
 			offs++;
-			k = src[offs - delta] * opw + src[offs] * op2;
+			k = src[offs - delta] * opw + src[offs] * op2 + 127;
 			dest[offs] = (k + (k >> 8) + 1) >> 8;
 			offs++;
-			k = src[offs - delta] * opw + src[offs] * op2;
+			k = src[offs - delta] * opw + src[offs] * op2 + 127;
 			dest[offs] = (k + (k >> 8) + 1) >> 8;
 		}
 	}

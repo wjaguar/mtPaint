@@ -38,8 +38,6 @@
 #define PREVIEW_HEIGHT 48
 
 
-#define TOTAL_CURSORS 14
-
 //	Main toolbar buttons
 #define MTB_NEW    0
 #define MTB_OPEN   1
@@ -64,22 +62,23 @@
 #define TTB_CLONE    5
 #define TTB_SELECT   6
 #define TTB_POLY     7
-#define TTB_LASSO    8
-#define TTB_TEXT     9
-#define TTB_ELLIPSE  10
-#define TTB_FELLIPSE 11
-#define TTB_OUTLINE  12
-#define TTB_FILL     13
-#define TTB_SELFV    14
-#define TTB_SELFH    15
-#define TTB_SELRCW   16
-#define TTB_SELRCCW  17
+#define TTB_GRAD     8
+#define TTB_LASSO    9
+#define TTB_TEXT     10
+#define TTB_ELLIPSE  11
+#define TTB_FELLIPSE 12
+#define TTB_OUTLINE  13
+#define TTB_FILL     14
+#define TTB_SELFV    15
+#define TTB_SELFH    16
+#define TTB_SELRCW   17
+#define TTB_SELRCCW  18
 
 #define DEFAULT_TOOL_ICON TTB_SELECT
 #define PAINT_TOOL_ICON TTB_PAINT
 
 #define TTB_0 TOTAL_ICONS_SETTINGS
-#define TOTAL_ICONS_TOOLS 18
+#define TOTAL_ICONS_TOOLS 19
 
 //	Settings toolbar buttons
 #define SETB_CONT 0

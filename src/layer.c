@@ -282,8 +282,9 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
+		pressed_select_none(NULL, NULL);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+			icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 
 	if ( type == 2 ) bpp = 1;	// Type 2 = greyscale indexed
@@ -993,6 +994,7 @@ static void update_main_with_new_layer()
 
 	canvas_size(&w, &h);
 	gtk_widget_set_usize(drawing_canvas, w, h);
+	vw_focus_view();
 	update_all_views();
 
 	init_pal();		// Update Palette, pattern & mask area + widgets

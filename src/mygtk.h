@@ -80,3 +80,11 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col);
 // Moving mouse cursor
 
 int move_mouse_relative(int dx, int dy);
+
+// Filtering bogus xine-ui "keypresses" (Linux only)
+#ifdef WIN32
+#define XINE_FAKERY(key) 0
+#else
+#define XINE_FAKERY(key) (((key) == GDK_Shift_L) || ((key) == GDK_Control_L) \
+	|| ((key) == GDK_Scroll_Lock) || ((key) == GDK_Num_Lock))
+#endif

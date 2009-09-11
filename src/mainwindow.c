@@ -76,7 +76,7 @@ static void clear_perim_real( int ox, int oy )
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
@@ -166,10 +166,9 @@ void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 
 	if ( res == 0 )
 	{
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
+		pressed_select_none(NULL, NULL);
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 		canvas_undo_chores();
-		pressed_select_none(NULL, NULL);
 	}
 	else memory_errors(3-res);
 }
@@ -631,7 +630,7 @@ static void move_mouse(int dx, int dy, int button)
 	if (!mem_img[CHN_IMAGE]) return;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
@@ -648,11 +647,11 @@ static void move_mouse(int dx, int dy, int button)
 		return;
 	}
 
-	if ((state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK))
-		button = 13;
-	else if (state & GDK_BUTTON2_MASK) button = 2;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
+	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
+		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
 	else if (state & GDK_BUTTON1_MASK) button = 1;
+	else if (state & GDK_BUTTON3_MASK) button = 3;
+	else if (state & GDK_BUTTON2_MASK) button = 2;
 
 	if (zoom > 1) /* Fine control required */
 	{
@@ -1027,6 +1026,11 @@ gint handle_keypress( GtkWidget *widget, GdkEventKey *event )
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 			pressed_select_none(NULL, NULL);
 		else if (tool_type == TOOL_LINE) stop_line();
+		else if ((tool_type == TOOL_GRADIENT) && (grad_status != GRAD_NONE))
+		{
+			repaint_grad(0);
+			grad_status = GRAD_NONE;
+		}
 		return TRUE;
 	case ACT_SCALE:
 		pressed_scale(NULL, NULL); return TRUE;
@@ -1238,6 +1242,94 @@ gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 }
 #endif
 
+
+int grad_tool(int event, int x, int y, guint state, guint button)
+{
+	int i, j, *xx, *yy;
+
+	if (tool_type != TOOL_GRADIENT) return (FALSE);
+
+	/* Left click sets points and picks them up again */
+	if ((event == GDK_BUTTON_PRESS) && (button == 1))
+	{
+		/* Start anew */
+		if (grad_status == GRAD_NONE)
+		{
+			grad_x1 = grad_x2 = x;
+			grad_y1 = grad_y2 = y;
+			grad_status = GRAD_END;
+			repaint_grad(1);
+		}
+		/* Place starting point */
+		else if (grad_status == GRAD_START)
+		{
+			grad_x1 = x;
+			grad_y1 = y;
+			grad_status = GRAD_DONE;
+		}
+		/* Place end point */
+		else if (grad_status == GRAD_END)
+		{
+			grad_x2 = x;
+			grad_y2 = y;
+			grad_status = GRAD_DONE;
+		}
+		/* Pick up nearest end */
+		else if (grad_status == GRAD_DONE)
+		{
+			repaint_grad(0);
+			i = (x - grad_x1) * (x - grad_x1) +
+				(y - grad_y1) * (y - grad_y1);
+			j = (x - grad_x2) * (x - grad_x2) +
+				(y - grad_y2) * (y - grad_y2);
+			if (i < j)
+			{
+				grad_x1 = x;
+				grad_y1 = y;
+				grad_status = GRAD_START;
+			}
+			else				
+			{
+				grad_x2 = x;
+				grad_y2 = y;
+				grad_status = GRAD_END;
+			}
+			repaint_grad(1);
+		}
+	}
+
+	/* Everything but left click is irrelevant when no gradient */
+	else if (grad_status == GRAD_NONE);
+
+	/* Right click deletes the gradient */
+	else if (event == GDK_BUTTON_PRESS) /* button != 1 */
+	{
+		repaint_grad(0);
+		grad_status = GRAD_NONE;
+	}
+
+	/* Motion is irrelevant with gradient in place */
+	else if (grad_status == GRAD_DONE);
+
+	/* Motion drags points around */
+	else if (event == GDK_MOTION_NOTIFY)
+	{
+		if (grad_status == GRAD_START) xx = &grad_x1 , yy = &grad_y1;
+		else xx = &grad_x2 , yy = &grad_y2;
+		if ((*xx != x) || (*yy != y))
+		{
+			repaint_grad(0);
+			*xx = x; *yy = y;
+			repaint_grad(1);
+		}
+	}
+
+	/* Leave hides the dragged line */
+	else if (event == GDK_LEAVE_NOTIFY) repaint_grad(0);
+
+	return (TRUE);
+}
+
 static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	gdouble pressure, int mflag)
 {	// Mouse event from button/motion on the canvas
@@ -1263,6 +1355,8 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 			col_reverse = FALSE;
 			mem_swap_cols();
 		}
+
+		if (grad_tool(event, x, y, state, button)) return;
 
 		if ((tool_type == TOOL_LINE) && (button == 1) &&
 			(line_status == LINE_START))
@@ -1354,8 +1448,10 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 			if (!(state & _C)) tool_fixy = -1;
 		}
 
-		if ((button == 3) && (state & _S))
-			set_zoom_centre( x, y );
+		if ((button == 3) && (state & _S)) set_zoom_centre(x, y);
+
+		else if (grad_tool(event, x, y, state, button)) return;
+
 		else if ( button == 1 || button >= 3 )
 			tool_action(event, x, y, button, pressure);
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
@@ -1445,6 +1541,8 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 
 ///	LINE UPDATES
 
+	if (grad_tool(event, ox, oy, state, button)) return;
+
 	if ( tool_type == TOOL_LINE && line_status != LINE_NONE )
 	{
 		if ( line_x1 != ox || line_y1 != oy )
@@ -1484,7 +1582,7 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 	}
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	x = ((int)(event->x - margin_main_x) * zoom) / scale;
@@ -1495,25 +1593,29 @@ static gint canvas_button( GtkWidget *widget, GdkEventButton *event )
 	return (pflag);
 }
 
-static gint canvas_enter( GtkWidget *widget, GdkEventMotion *event )	// Mouse enters the canvas
+// Mouse enters the canvas
+static gint canvas_enter(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
 {
 	return TRUE;
 }
 
-static gint canvas_left( GtkWidget *widget, GdkEventMotion *event )
+static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
 {
-	if (mem_img[CHN_IMAGE])		// Only do this if we have an image
-	{
-		if ( status_on[STATUS_CURSORXY] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-		if ( status_on[STATUS_PIXELRGB] )
-			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-		if (perim_status > 0) clear_perim();
-		if ( tool_type == TOOL_LINE && line_status != LINE_NONE ) repaint_line(0);
-		if ( tool_type == TOOL_POLYGON && poly_status == POLY_SELECTING ) repaint_line(0);
-	}
+	/* Only do this if we have an image */
+	if (!mem_img[CHN_IMAGE]) return (FALSE);
+	if ( status_on[STATUS_CURSORXY] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
+	if ( status_on[STATUS_PIXELRGB] )
+		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+	if (perim_status > 0) clear_perim();
 
-	return FALSE;
+	if (grad_tool(GDK_LEAVE_NOTIFY, 0, 0, 0, 0)) return (FALSE);
+
+	if (((tool_type == TOOL_LINE) && (line_status != LINE_NONE)) ||
+		((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)))
+		repaint_line(0);
+
+	return (FALSE);
 }
 
 int async_bk = FALSE;
@@ -1528,7 +1630,7 @@ void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (async_bk) step = 8;
-	else if (can_zoom <= 1.0) step = 6;
+	else if (can_zoom < 1.0) step = 6;
 	else
 	{
 		scale = rint(can_zoom);
@@ -1946,7 +2048,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	zoom = scale = 1;
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	/* Check bounds */
@@ -1967,7 +2069,7 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 	memset(rgb, mem_background, i);
 
 	/* Horizontal zoom */
-	if (zoom >= 1)
+	if (scale == 1)
 	{
 		dx = px1 * zoom;
 		l = (pw - 1) * zoom + 1;
@@ -2261,6 +2363,11 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
+	rpx = px - margin_main_x;
+	rpy = py - margin_main_y;
+	pw2 = rpx + pw - 1;
+	ph2 = rpy + ph - 1;
+
 	if (layers_total && show_layers_main)
 	{
 		if ( layer_selected > 0 )
@@ -2280,13 +2387,13 @@ void repaint_canvas( int px, int py, int pw, int ph )
 				ly *= scale;
 			}
 		}
-		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
+		render_layers(rgb, rpx + lx, rpy + ly,
 			pw, ph, can_zoom, 0, layer_selected - 1, 1);
 	}
 	else async_bk = !chequers_optimize; /* Only w/o layers */
 	main_render_rgb(rgb, px, py, pw, ph);
 	if (layers_total && show_layers_main)
-		render_layers(rgb, px + lx - margin_main_x, py + ly - margin_main_y,
+		render_layers(rgb, rpx + lx, rpy + ly,
 			pw, ph, can_zoom, layer_selected + 1, layers_total, 1);
 
 	draw_grid(rgb, px, py, pw, ph);
@@ -2301,10 +2408,6 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	if (show_paste && (marq_status >= MARQUEE_PASTE))
 	{
 		/* Enforce image bounds */
-		rpx = px - margin_main_x;
-		rpy = py - margin_main_y;
-		pw2 = rpx + pw - 1;
-		ph2 = rpy + ph - 1;
 		if (rpx < 0) rpx = 0;
 		if (rpy < 0) rpy = 0;
 		i = ((mem_width + zoom - 1) * scale) / zoom;
@@ -2322,8 +2425,42 @@ void repaint_canvas( int px, int py, int pw, int ph )
 			repaint_paste(rpx, rpy, pw2, ph2);
 	}
 
-	/* Draw perimeter/marquee/line as we may have drawn over them */
+	/* Draw perimeter/marquee/gradient as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
+	if (grad_status == GRAD_DONE)
+	{
+		/* Canvas-space endpoints */
+		if (grad_x1 < grad_x2) rx1 = grad_x1 , rx2 = grad_x2;
+		else rx1 = grad_x2 , rx2 = grad_x1;
+		if (grad_y1 < grad_y2) ry1 = grad_y1 , ry2 = grad_y2;
+		else ry1 = grad_y2 , ry2 = grad_y1;
+		rx1 = (rx1 * scale + zoom - 1) / zoom;
+		ry1 = (ry1 * scale + zoom - 1) / zoom;
+		rx2 = (rx2 * scale) / zoom + scale - 1;
+		ry2 = (ry2 * scale) / zoom + scale - 1;
+
+		/* Check intersection - coarse */
+		if ((rx1 <= pw2) && (rx2 >= rpx) && (ry1 <= ph2) && (ry2 >= rpy))
+		{
+			if (rx1 != rx2) /* Check intersection - fine */
+			{
+				float ty1, ty2, dy;
+
+				if ((grad_x1 < grad_x2) ^ (grad_y1 < grad_y2))
+					i = ry2 , j = ry1;
+				else i = ry1 , j = ry2;
+
+				dy = (j - i) / (float)(rx2 - rx1);
+				ty1 = rx1 >= rpx ? i : i + (rpx - rx1) * dy;
+				ty2 = rx2 <= pw2 ? j : i + (pw2 - rx1) * dy;
+
+				if (!((ty1 < rpy - scale) && (ty2 < rpy - scale)) &&
+					!((ty1 > ph2 + scale) && (ty2 > ph2 + scale)))
+					repaint_grad(1);
+			}
+			else repaint_grad(1); /* Automatic intersect */
+		}
+	}
 	if (marq_status != MARQUEE_NONE) paint_marquee(11, marq_x1, marq_y1);
 	if (perim_status > 0) repaint_perim();
 }
@@ -2380,11 +2517,10 @@ void canvas_size(int *w, int *h)
 void clear_perim()
 {
 	perim_status = 0; /* Cleared */
-	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON && tool_type != TOOL_FLOOD )
-	{		// Don't bother if we are selecting or filling
-		clear_perim_real(0, 0);
-		if ( tool_type == TOOL_CLONE ) clear_perim_real(clone_x, clone_y);
-	}
+	/* Don't bother if tool has no perimeter */
+	if (NO_PERIM(tool_type)) return;
+	clear_perim_real(0, 0);
+	if ( tool_type == TOOL_CLONE ) clear_perim_real(clone_x, clone_y);
 }
 
 void repaint_perim_real( int r, int g, int b, int ox, int oy )
@@ -2394,7 +2530,7 @@ void repaint_perim_real( int r, int g, int b, int ox, int oy )
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
@@ -2428,14 +2564,12 @@ void repaint_perim_real( int r, int g, int b, int ox, int oy )
 
 void repaint_perim()
 {
-	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON && tool_type != TOOL_FLOOD )
-					// Don't bother if we are selecting or filling
-	{
-		repaint_perim_real( 255, 255, 255, 0, 0 );
-		if ( tool_type == TOOL_CLONE )
-			repaint_perim_real( 255, 0, 0, clone_x, clone_y );
-		perim_status = 1; /* Drawn */
-	}
+	/* Don't bother if tool has no perimeter */
+	if (NO_PERIM(tool_type)) return;
+	repaint_perim_real( 255, 255, 255, 0, 0 );
+	if ( tool_type == TOOL_CLONE )
+		repaint_perim_real( 255, 0, 0, clone_x, clone_y );
+	perim_status = 1; /* Drawn */
 }
 
 static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
@@ -2482,14 +2616,14 @@ static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
 		GDK_AXIS_PRESSURE, &pressure);
 #endif
 
-	if (state & GDK_BUTTON2_MASK) button = 2;
 	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
 		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON1_MASK) button = 1;
+	else if (state & GDK_BUTTON3_MASK) button = 3;
+	else if (state & GDK_BUTTON2_MASK) button = 2;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	x = ((x - margin_main_x) * zoom) / scale;
@@ -2624,6 +2758,8 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 		tool_type = TOOL_SELECT; break;
 	case TTB_POLY:
 		tool_type = TOOL_POLYGON; break;
+	case TTB_GRAD:
+		tool_type = TOOL_GRADIENT; break;
 	case TTB_LASSO:
 		pressed_lasso(NULL, NULL, 0); break;
 	case TTB_TEXT:
@@ -2659,14 +2795,12 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			}
 
 			marq_status = MARQUEE_NONE;			// Marquee is on so lose it!
-			update_sel_bar();
 			gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
 		}
 		if ( poly_status != POLY_NONE)
 		{
 			poly_status = POLY_NONE;			// Marquee is on so lose it!
 			poly_points = 0;
-			update_sel_bar();
 			gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
 		}
 		if ( tool_type == TOOL_CLONE )
@@ -2682,6 +2816,7 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 			check_marquee();
 			paint_marquee(1, marq_x1, marq_y1);
 		}
+		update_sel_bar();
 		update_menus();
 		set_cursor();
 	}

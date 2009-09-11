@@ -45,16 +45,17 @@ GtkWidget *label_bar[STATUS_ITEMS];
 
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
-int margin_main_x=0, margin_main_y=0,		// Top left of image from top left of canvas
-	margin_view_x=0, margin_view_y=0;
-int zoom_flag = 0;
+int margin_main_x, margin_main_y,		// Top left of image from top left of canvas
+	margin_view_x, margin_view_y;
+int zoom_flag;
 int marq_status = MARQUEE_NONE,
 	marq_x1 = -1, marq_y1 = -1, marq_x2 = -1, marq_y2 = -1;		// Selection marquee
-int marq_drag_x = 0, marq_drag_y = 0;					// Marquee dragging offset
+int marq_drag_x, marq_drag_y;						// Marquee dragging offset
 int line_status = LINE_NONE,
-	line_x1 = 0, line_y1 = 0, line_x2 = 0, line_y2 = 0;		// Line tool
+	line_x1, line_y1, line_x2, line_y2;				// Line tool
 int poly_status = POLY_NONE;						// Polygon selection tool
 int clone_x, clone_y;							// Clone offsets
+int grad_status, grad_x1, grad_y1, grad_x2, grad_y2;			// Gradient placement tool
 
 int recent_files;					// Current recent files setting
 
@@ -152,6 +153,9 @@ void update_sel_bar()			// Update selection stats on status bar
 					gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
 		}
 	}
+
+// !!! Add gradient tool display to here, too
+
 	else if ( status_on[STATUS_SELEGEOM] )
 			gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
 }
@@ -2773,7 +2777,7 @@ void paint_marquee(int action, int new_x, int new_y)
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	new_x2 = new_x + marq_x2 - marq_x1;
@@ -2937,21 +2941,19 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 }
 
 #define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
-void repaint_line(int mode)			// Repaint or clear line on canvas
+void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
+	int vx1, int vy1, int vx2, int vy2)
 {
-	int lx1 = line_x1, ly1 = line_y1, lx2 = line_x2, ly2 = line_y2;
 	int i, j, l, x, y, tx, ty, aw, ah, ax = -1, ay = -1, zoom = 1, scale = 1;
 	unsigned char rgb[MAX_ZOOM * 3], col[3];
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0)
+	if (can_zoom < 1.0)
 	{
 		zoom = rint(1.0 / can_zoom);
-		lx1 /= zoom;
-		ly1 /= zoom;
-		lx2 = (lx2 + zoom - 1) / zoom;
-		ly2 = (ly2 + zoom - 1) / zoom;
+		lx1 /= zoom; ly1 /= zoom;
+		lx2 /= zoom; ly2 /= zoom;
  	}
 	else scale = rint(can_zoom);
 
@@ -2962,7 +2964,6 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 	/* !!! This is for incorrect, and thus temporary, line algorithm !!! */
 	int kk = l ? l : 1;
 
-	get_visible();
 	for (i = 0; i <= l; i++)
 	{
 		/* !!! Incorrect algorithm - must be exactly as in sline() !!! */
@@ -2970,8 +2971,8 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 		x = (tx = mt_round(lx1 + rat * (lx2 - lx1))) * scale;
 		y = (ty = mt_round(ly1 + rat * (ly2 - ly1))) * scale;
 
-		if ((x + scale > vc_x1) && (y + scale > vc_y1) &&
-			(x <= vc_x2) && (y <= vc_y2))
+		if ((x + scale > vx1) && (y + scale > vy1) &&
+			(x <= vx2) && (y <= vy2))
 		{
 			if (mode != 0) /* Show a line */
 			{
@@ -2987,7 +2988,11 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 					col[0] = col[1] = col[2] =
 						(((l - i) >> 2) & 1) * 255;
 				}
-/* !!! Put gradient placement mode in here */
+				else if (mode == 3) /* Gradient */
+				{
+/* !!! Temporary substitute !!! */
+					col[0] = col[2] = 0; col[1] = 255;
+				}
 				for (j = 0; j < scale * 3; j += 3)
 				{
 					rgb[j + 0] = col[0];
@@ -3016,6 +3021,26 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 			margin_main_y + (ay < y ? ay : y), aw, ah);
 		ax = -1;
 	}
+}
+
+void repaint_line(int mode)			// Repaint or clear line on canvas
+{
+	get_visible();
+	trace_line(mode, line_x1, line_y1, line_x2, line_y2,
+		vc_x1, vc_y1, vc_x2, vc_y2);
+}
+
+void repaint_grad(int mode)
+{
+	int oldgrad = grad_status;
+
+	if (mode) mode = 3;
+	else grad_status = GRAD_NONE; /* To avoid hitting repaint */
+
+	get_visible();
+	trace_line(mode, grad_x1, grad_y1, grad_x2, grad_y2,
+		vc_x1, vc_y1, vc_x2, vc_y2);
+	grad_status = oldgrad;
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

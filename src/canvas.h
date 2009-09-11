@@ -28,6 +28,7 @@ int marq_drag_x, marq_drag_y;				// Marquee dragging offset
 int line_status, line_x1, line_y1, line_x2, line_y2;	// Line tool
 int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
+int grad_status, grad_x1, grad_y1, grad_x2, grad_y2;	// Gradient placement tool
 int recent_files;					// Current recent files setting
 
 #define MAX_RECENT 20
@@ -63,6 +64,11 @@ gboolean col_reverse,					// Painting with right button
 #define POLY_SELECTING 1
 #define POLY_DRAGGING 2
 #define POLY_DONE 3
+
+#define GRAD_NONE 0
+#define GRAD_START 1
+#define GRAD_END 2
+#define GRAD_DONE 3
 
 #define MIN_ZOOM 0.1
 #define MAX_ZOOM 20
@@ -157,7 +163,10 @@ void paste_prepare();
 void commit_paste(gboolean undo);
 void canvas_undo_chores();
 
+void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
+	int vx1, int vy1, int vx2, int vy2);
 void repaint_line(int mode);			// Repaint or clear line on canvas
+void repaint_grad(int mode);			// Same for gradient line
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
 

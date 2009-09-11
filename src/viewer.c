@@ -330,7 +330,7 @@ void draw_pan_thumb(int x1, int y1, int x2, int y2)
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom <= 1.0) zoom = rint(1.0 / can_zoom);
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	/* Canvas coords to image coords */
@@ -413,10 +413,9 @@ gint key_pan( GtkWidget *widget, GdkEventKey *event )
 			case GDK_Down:		arrow_key = 4; break;
 		}
 
-		if ( arrow_key == 0 && event->keyval!=65505 && event->keyval!=65507 )
-		{		// Xine sends 6550x key values so don't delete on this
+		/* xine-ui sends bogus keypresses so don't delete on this */
+		if (!arrow_key && !XINE_FAKERY(event->keyval))
 			delete_pan(NULL, NULL, NULL);
-		}
 		else
 		{
 			hori = gtk_scrolled_window_get_hadjustment(
@@ -575,11 +574,10 @@ void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
 ////	VIEW WINDOW
 
 static int vw_width, vw_height, vw_last_x, vw_last_y, vw_move_layer;
+static int vw_mouse_status;
 
-GtkWidget *vw_drawing = NULL;
-gboolean vw_focus_on = FALSE;
-
-static gboolean view_first_move = TRUE;
+GtkWidget *vw_drawing;
+gboolean vw_focus_on;
 
 void render_layers( unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
@@ -754,6 +752,12 @@ void vw_focus_view()						// Focus view window to main window
 	if (!vw_drawing) return;		// Bail out if not visible
 	if (!vw_focus_on) return;		// Only focus if user wants to
 
+	if (vw_mouse_status)	/* Dragging in progress - delay focus */
+	{
+		vw_mouse_status |= 2;
+		return;
+	}
+
 	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 
@@ -771,7 +775,7 @@ void vw_focus_view()						// Focus view window to main window
 		px = px < 0.0 ? 0.0 : px >= layer_table[0].image->mem_width ?
 			layer_table[0].image->mem_width - 1 : px;
 		py = py < 0.0 ? 0.0 : py >= layer_table[0].image->mem_height ?
-			layer_table[0].image->mem_height - 1 : px;
+			layer_table[0].image->mem_height - 1 : py;
 		main_h = px / layer_table[0].image->mem_width;
 		main_v = py / layer_table[0].image->mem_height;
 	}
@@ -812,8 +816,8 @@ gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 
 	if (canvas_image_centre)
 	{
-		ww = widget->allocation.width - vw_width;
-		wh = widget->allocation.height - vw_height;
+		ww = vw_drawing->allocation.width - vw_width;
+		wh = vw_drawing->allocation.height - vw_height;
 
 		if (ww > 0) new_margin_x = ww >> 1;
 		if (wh > 0) new_margin_y = wh >> 1;
@@ -934,16 +938,18 @@ void vw_update_area( int x, int y, int w, int h )	// Update x,y,w,h area of curr
 		x + margin_view_x, y + margin_view_y, w, h);
 }
 
-static void vw_mouse_event(int x, int y, guint state, guint button)
+static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 {
 	unsigned char *rgb, **img;
 	int dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
 	int zoom = 1, scale = 1;
 	png_color *pal;
 
-	if (!button || !layers_total)
+	i = vw_mouse_status;
+	if (!button || !layers_total || (event == GDK_BUTTON_RELEASE))
 	{
-		view_first_move = TRUE;
+		vw_mouse_status = 0;
+		if (i & 2) vw_focus_view(); /* Delayed focus event */
 		return;
 	}
 
@@ -953,7 +959,8 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 	x = ((x - margin_view_x) / scale) * zoom;
 	y = ((y - margin_view_y) / scale) * zoom;
 
-	if ( !view_first_move )
+	vw_mouse_status |= 1;
+	if (i & 1)
 	{
 		if ( vw_move_layer > 0 )
 		{
@@ -1017,7 +1024,6 @@ static void vw_mouse_event(int x, int y, guint state, guint button)
 		if (i > 0) vw_move_layer = i;
 		layer_choose(i);
 	}
-	view_first_move = FALSE;
 	vw_last_x = x;
 	vw_last_y = y;
 }
@@ -1036,20 +1042,24 @@ static gint view_window_motion( GtkWidget *widget, GdkEventMotion *event )
 		state = event->state;
 	}
 
-	if (state & GDK_BUTTON2_MASK) button = 2;
-	if (state & GDK_BUTTON3_MASK) button = 3;
-	if (state & GDK_BUTTON1_MASK) button = 1;
-	if ( (state & GDK_BUTTON1_MASK) && (state & GDK_BUTTON3_MASK) ) button = 13;
-	vw_mouse_event( x, y, state, button );
+	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
+		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
+	else if (state & GDK_BUTTON1_MASK) button = 1;
+	else if (state & GDK_BUTTON3_MASK) button = 3;
+	else if (state & GDK_BUTTON2_MASK) button = 2;
+
+	vw_mouse_event(event->type, x, y, state, button);
 
 	return TRUE;
 }
 
-static gint view_window_click( GtkWidget *widget, GdkEventButton *event )
+static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 {
-	vw_mouse_event( event->x, event->y, event->state, event->button );
+	int pflag = event->type != GDK_BUTTON_RELEASE;
 
-	return TRUE;
+	vw_mouse_event(event->type, event->x, event->y, event->state, event->button);
+
+	return (pflag);
 }
 
 void view_show()
@@ -1116,14 +1126,16 @@ void init_view( GtkWidget *canvas )
 	view_showing = FALSE;
 	vw_drawing = canvas;
 
-	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "configure_event",
-		GTK_SIGNAL_FUNC (vw_configure), GTK_OBJECT(vw_drawing) );
-	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "expose_event",
-		GTK_SIGNAL_FUNC (vw_expose), GTK_OBJECT(vw_drawing) );
+	gtk_signal_connect( GTK_OBJECT(vw_drawing), "configure_event",
+		GTK_SIGNAL_FUNC (vw_configure), NULL );
+	gtk_signal_connect( GTK_OBJECT(vw_drawing), "expose_event",
+		GTK_SIGNAL_FUNC (vw_expose), NULL );
 
-	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "button_press_event",
-		GTK_SIGNAL_FUNC (view_window_click), NULL );
-	gtk_signal_connect_object( GTK_OBJECT(vw_drawing), "motion_notify_event",
+	gtk_signal_connect( GTK_OBJECT(vw_drawing), "button_press_event",
+		GTK_SIGNAL_FUNC (view_window_button), NULL );
+	gtk_signal_connect( GTK_OBJECT(vw_drawing), "button_release_event",
+		GTK_SIGNAL_FUNC (view_window_button), NULL );
+	gtk_signal_connect( GTK_OBJECT(vw_drawing), "motion_notify_event",
 		GTK_SIGNAL_FUNC (view_window_motion), NULL );
 	gtk_widget_set_events (vw_drawing, GDK_ALL_EVENTS_MASK);
 }

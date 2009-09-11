@@ -125,6 +125,10 @@
 #include "graphics/xpm_mode_csel.xpm"
 #include "graphics/xpm_mode_mask.xpm"
 
+#include "graphics/xpm_grad_place.xpm"
+#include "graphics/xbm_grad.xbm"
+#include "graphics/xbm_grad_mask.xbm"
+
 
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
@@ -672,7 +676,8 @@ void toolbar_init(GtkWidget *vbox_main)
 		{ TTB_SMUDGE, 1, 0, 1, NEED_24, _("Smudge"), xpm_smudge_xpm },
 		{ TTB_CLONE, 1, 0, 0, 0, _("Clone"), xpm_clone_xpm },
 		{ TTB_SELECT, 1, 0, 0, 0, _("Make Selection"), xpm_select_xpm },
-		{ TTB_POLY, 1, 1, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
+		{ TTB_POLY, 1, 0, 0, 0, _("Polygon Selection"), xpm_polygon_xpm },
+		{ TTB_GRAD, 1, 1, 0, 0, _("Place Gradient"), xpm_grad_place_xpm },
 		{ TTB_LASSO, -1, 0, 0, NEED_LASSO, _("Lasso Selection"), xpm_lasso_xpm },
 		{ TTB_TEXT, -1, 1, 0, 0, _("Paste Text"), xpm_text_xpm },
 		{ TTB_ELLIPSE, -1, 0, 0, NEED_SEL, _("Ellipse Outline"), xpm_ellipse2_xpm },
@@ -688,14 +693,18 @@ void toolbar_init(GtkWidget *vbox_main)
 	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
 		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
-		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits
+		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits, xbm_grad_bits
 		},
 	*xbm_mask_list[TOTAL_CURSORS] = { xbm_square_mask_bits, xbm_circle_mask_bits,
 		xbm_horizontal_mask_bits, xbm_vertical_mask_bits, xbm_slash_mask_bits,
 		xbm_backslash_mask_bits, xbm_spray_mask_bits, xbm_shuffle_mask_bits,
 		xbm_flood_mask_bits, xbm_select_mask_bits, xbm_line_mask_bits,
-		xbm_smudge_mask_bits, xbm_polygon_mask_bits, xbm_clone_mask_bits
+		xbm_smudge_mask_bits, xbm_polygon_mask_bits, xbm_clone_mask_bits,
+		xbm_grad_mask_bits
 		};
+	static unsigned char cursor_tip[TOTAL_CURSORS][2] = { {0, 0}, {0, 0},
+		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 19},
+		{10, 10}, {0, 0}, {0, 0}, {10, 10}, {0, 0}, {0, 0} };
 
 	for ( i=1; i<TOOLBAR_MAX; i++ )
 	{
@@ -740,15 +749,8 @@ void toolbar_init(GtkWidget *vbox_main)
 		icon = gdk_bitmap_create_from_data (NULL, xbm_list[i], 20, 20);
 		mask = gdk_bitmap_create_from_data (NULL, xbm_mask_list[i], 20, 20);
 
-		if ( i <= TOOL_SHUFFLE || i == TOOL_LINE || i == TOOL_SMUDGE || i == TOOL_CLONE )
-			m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 0, 0);
-		else
-		{
-			if ( i == TOOL_FLOOD)
-				m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 2, 19);
-			else
-				m_cursor[i] = gdk_cursor_new_from_pixmap (icon, mask, &cfg, &cbg, 10, 10);
-		}
+		m_cursor[i] = gdk_cursor_new_from_pixmap(icon, mask, &cfg, &cbg,
+			cursor_tip[i][0], cursor_tip[i][1]);
 
 		gdk_pixmap_unref( icon );
 		gdk_pixmap_unref( mask );

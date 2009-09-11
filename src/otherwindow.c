@@ -173,8 +173,8 @@ static void create_new(GtkWidget *widget)
 		inifile_set_gint32("lastnewCols", nc );
 		inifile_set_gint32("lastnewType", im_type );
 
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE );
-			// Set tool to square for new image - easy way to lose a selection marquee
+		/* Lose a selection marquee */
+		pressed_select_none(NULL, NULL);
 		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
 	}
 
@@ -270,8 +270,8 @@ static gint delete_pat( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 static gint key_pat( GtkWidget *widget, GdkEventKey *event )
 {
-	if ( event->keyval!=65505 && event->keyval!=65507 ) delete_pat( widget, NULL, NULL );
-		// Xine sends 6550x key values so don't delete on this
+	/* xine-ui sends bogus keypresses so don't delete on this */
+	if (!XINE_FAKERY(event->keyval)) delete_pat( widget, NULL, NULL );
 
 	return FALSE;
 }

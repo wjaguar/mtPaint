@@ -53,7 +53,12 @@
 #define TOOL_SMUDGE 11
 #define TOOL_POLYGON 12
 #define TOOL_CLONE 13
+#define TOOL_GRADIENT 14
 
+#define TOTAL_CURSORS 15
+
+#define NO_PERIM(T) (((T) == TOOL_FLOOD) || ((T) == TOOL_SELECT) || \
+	((T) == TOOL_POLYGON) || ((T) == TOOL_GRADIENT))
 
 #define PROGRESS_LIM 262144
 
