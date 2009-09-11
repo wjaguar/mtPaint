@@ -469,7 +469,8 @@ void lose_oldest()				// Lose the oldest undo image
 	mem_undo_done--;
 }
 
-/* Mode bits are: |1 - force create, |2 - forbid copy, |4 - force delete */
+/* Mode bits are: |1 - force create, |2 - forbid copy, |4 - force delete,
+ * |8 - respect pen_down */
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask)
 {
 	undo_item *undo;
@@ -478,118 +479,116 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	int i, j, k, mem_req, mem_lim;
 
 	notify_changed();
-	if ( pen_down == 0 )
-	{
-		pen_down = 1;
+	if (pen_down && (mode & 8)) return (0);
+	pen_down = mode & 8 ? 1 : 0;
 //printf("Old undo # = %i\n", mem_undo_pointer);
 
-		/* Release redo data */
-		if (mem_undo_redo)
+	/* Release redo data */
+	if (mem_undo_redo)
+	{
+		k = mem_undo_pointer;
+		for (i = 0; i < mem_undo_redo; i++)
 		{
-			k = mem_undo_pointer;
-			for (i = 0; i < mem_undo_redo; i++)
-			{
-				k = (k + 1) % MAX_UNDO;
-				undo_free(k);
-			}
-			mem_undo_redo = 0;
+			k = (k + 1) % MAX_UNDO;
+			undo_free(k);
 		}
+		mem_undo_redo = 0;
+	}
 
-		mem_req = 0;
-		if (cmask && !(mode & 4))
+	mem_req = 0;
+	if (cmask && !(mode & 4))
+	{
+		for (i = j = 0; i < NUM_CHANNELS; i++)
 		{
-			for (i = j = 0; i < NUM_CHANNELS; i++)
-			{
-				if (mem_img[i] && (cmask & (1 << i))) j++;
-			}
-			if (cmask & CMASK_IMAGE) j += new_bpp - 1;
-			mem_req = (new_width * new_height + 32) * j;
+			if (mem_img[i] && (cmask & (1 << i))) j++;
 		}
-		mem_lim = (mem_undo_limit * (1024 * 1024)) / (layers_total + 1);
+		if (cmask & CMASK_IMAGE) j += new_bpp - 1;
+		mem_req = (new_width * new_height + 32) * j;
+	}
+	mem_lim = (mem_undo_limit * (1024 * 1024)) / (layers_total + 1);
 
-		/* Mem limit exceeded - drop oldest */
-		while (mem_used() + mem_req > mem_lim)
+	/* Mem limit exceeded - drop oldest */
+	while (mem_used() + mem_req > mem_lim)
+	{
+		/* Fail if not enough memory */
+		if (!mem_undo_done) return (1);
+		lose_oldest();
+	}
+
+	/* Fill undo frame */
+	undo = &mem_undo_im_[mem_undo_pointer];
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		img = mem_img[i];
+		if (img && !(cmask & (1 << i))) img = (void *)(-1);
+		undo->img[i] = img;
+	}
+	undo->cols = mem_cols;
+	mem_pal_copy(undo->pal, mem_pal);
+	undo->width = mem_width;
+	undo->height = mem_height;
+	undo->bpp = mem_img_bpp;
+
+	/* Duplicate affected channels */
+	mem_req = new_width * new_height;
+	for (i = 0; i < NUM_CHANNELS; i++)
+	{
+		holder[i] = img = mem_img[i];
+		if (!(cmask & (1 << i))) continue;
+		if (mode & 4)
 		{
-			/* Fail if not enough memory */
-			if (!mem_undo_done) return (1);
+			holder[i] = NULL;
+			continue;
+		}
+		if (!img && !(mode & 1)) continue;
+		mem_lim = mem_req;
+		if (i == CHN_IMAGE) mem_lim *= new_bpp;
+		while (!((img = malloc(mem_lim))))
+		{
+			if (!mem_undo_done)
+			{
+#if 0
+				if (handle == 0)
+				{
+					printf("No memory for undo!\n");
+					exit(1);
+				}
+#endif
+				/* Release memory and fail */
+				for (j = 0; j < i; j++)
+				{
+					if (holder[j] != mem_img[j])
+						free(holder[j]);
+				}
+				return (2);
+			}
 			lose_oldest();
 		}
-
-		/* Fill undo frame */
-		undo = &mem_undo_im_[mem_undo_pointer];
-		for (i = 0; i < NUM_CHANNELS; i++)
-		{
-			img = mem_img[i];
-			if (img && !(cmask & (1 << i))) img = (void *)(-1);
-			undo->img[i] = img;
-		}
-		undo->cols = mem_cols;
-		mem_pal_copy(undo->pal, mem_pal);
-		undo->width = mem_width;
-		undo->height = mem_height;
-		undo->bpp = mem_img_bpp;
-
-		/* Duplicate affected channels */
-		mem_req = new_width * new_height;
-		for (i = 0; i < NUM_CHANNELS; i++)
-		{
-			holder[i] = img = mem_img[i];
-			if (!(cmask & (1 << i))) continue;
-			if (mode & 4)
-			{
-				holder[i] = NULL;
-				continue;
-			}
-			if (!img && !(mode & 1)) continue;
-			mem_lim = mem_req;
-			if (i == CHN_IMAGE) mem_lim *= new_bpp;
-			while (!((img = malloc(mem_lim))))
-			{
-				if (!mem_undo_done)
-				{
-#if 0
-					if (handle == 0)
-					{
-						printf("No memory for undo!\n");
-						exit(1);
-					}
-#endif
-					/* Release memory and fail */
-					for (j = 0; j < i; j++)
-					{
-						if (holder[j] != mem_img[j])
-							free(holder[j]);
-					}
-					return (2);
-				}
-				lose_oldest();
-			}
-			holder[i] = img;
-			/* Copy */
-			if (!undo->img[i] || (mode & 2)) continue;
-			memcpy(img, undo->img[i], mem_lim);
-		}
-
-		/* Commit */
-		memcpy(mem_img, holder, sizeof(chanlist));
-		mem_width = new_width;
-		mem_height = new_height;
-		mem_img_bpp = new_bpp;
-		
-		if (mem_undo_done >= MAX_UNDO - 1)
-			undo_free((mem_undo_pointer + 1) % MAX_UNDO);
-		else mtMIN(mem_undo_done, mem_undo_done + 1, MAX_UNDO - 1);
-
-		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
-		undo = &mem_undo_im_[mem_undo_pointer];
-		memcpy(undo->img, holder, sizeof(chanlist));
-		undo->cols = mem_cols;
-		mem_pal_copy(undo->pal, mem_pal);
-		undo->width = mem_width;
-		undo->height = mem_height;
-		undo->bpp = mem_img_bpp;
-//printf("New undo # = %i\n\n", mem_undo_pointer);
+		holder[i] = img;
+		/* Copy */
+		if (!undo->img[i] || (mode & 2)) continue;
+		memcpy(img, undo->img[i], mem_lim);
 	}
+
+	/* Commit */
+	memcpy(mem_img, holder, sizeof(chanlist));
+	mem_width = new_width;
+	mem_height = new_height;
+	mem_img_bpp = new_bpp;
+		
+	if (mem_undo_done >= MAX_UNDO - 1)
+		undo_free((mem_undo_pointer + 1) % MAX_UNDO);
+	else mtMIN(mem_undo_done, mem_undo_done + 1, MAX_UNDO - 1);
+
+	mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
+	undo = &mem_undo_im_[mem_undo_pointer];
+	memcpy(undo->img, holder, sizeof(chanlist));
+	undo->cols = mem_cols;
+	mem_pal_copy(undo->pal, mem_pal);
+	undo->width = mem_width;
+	undo->height = mem_height;
+	undo->bpp = mem_img_bpp;
+//printf("New undo # = %i\n\n", mem_undo_pointer);
 
 	return (0);
 }
@@ -597,7 +596,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 // Call this after a draw event but before any changes to image
 int mem_undo_next(int mode)
 {
-	int cmask = CMASK_ALL;
+	int cmask = CMASK_ALL, wmode = 0;
 
 	switch (mode)
 	{
@@ -610,8 +609,11 @@ int mem_undo_next(int mode)
 	case UNDO_COL: /* Palette and/or RGB image changes */
 		cmask = mem_img_bpp == 3 ? CMASK_IMAGE : CMASK_NONE;
 		break;
+	case UNDO_TOOL: /* Continuous drawing */
+		wmode = 8;
 	case UNDO_DRAW: /* Changes to current channel / RGBA */
-		cmask = mem_channel == CHN_IMAGE ? CMASK_RGBA : CMASK_CURR;
+		cmask = (mem_channel == CHN_IMAGE) && RGBA_mode ?
+			CMASK_RGBA : CMASK_CURR;
 		break;
 	case UNDO_INV: /* "Invert" operation */
 		if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
@@ -624,8 +626,13 @@ int mem_undo_next(int mode)
 	case UNDO_FILT: /* Changes to current channel */
 		cmask = CMASK_CURR;
 		break;
+	case UNDO_PASTE: /* Paste to current channel / RGBA */
+		wmode = 8;	/* !!! Workaround for move-with-RMB-pressed */
+		cmask = (mem_channel == CHN_IMAGE) &&
+			(mem_clip_alpha || RGBA_mode) ? CMASK_RGBA : CMASK_CURR;
+		break;
 	}
-	return (undo_next_core(0, mem_width, mem_height, mem_img_bpp, cmask));
+	return (undo_next_core(wmode, mem_width, mem_height, mem_img_bpp, cmask));
 }
 
 void mem_undo_swap(int old, int new)
@@ -1400,10 +1407,7 @@ int mem_convert_rgb()			// Convert image to RGB
 	unsigned char pix;
 	int i, j, res;
 
-	pen_down = 0;		// Ensure next tool action is treated separately
 	res = undo_next_core(2, mem_width, mem_height, 3, CMASK_IMAGE);
-	pen_down = 0;
-
 	if (res) return 1;	// Not enough memory
 
 	new_image = mem_img[CHN_IMAGE];
@@ -1424,9 +1428,7 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 	unsigned char *old_image = mem_img[CHN_IMAGE], *new_image;
 	int i, j, k, res;
 
-	pen_down = 0;		// Ensure next tool action is treated separately
 	res = undo_next_core(2, mem_width, mem_height, 1, CMASK_IMAGE);
-	pen_down = 0;
 	if ( res ) return 2;
 
 	new_image = mem_img[CHN_IMAGE];
@@ -1466,9 +1468,7 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 
 	j = mem_width * mem_height;
 
-//	pen_down = 0;				// Ensure next tool action is treated separately
 //	res = undo_next_core( 2, mem_width, mem_height, 0, 0, 1 );
-//	pen_down = 0;
 //	if ( res == 1 ) return 2;
 
 	progress_init(_("Converting to Indexed Palette"),1);
@@ -2686,9 +2686,7 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	pen_down = 0;		// Ensure next tool action is treated separately
 	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
-	pen_down = 0;
 	if ( res == 1 ) return 2;		// No undo space
 
 	/* Centerpoints, including half-pixel offsets */
@@ -2865,10 +2863,7 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 	int i, ow = mem_width, oh = mem_height;
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	pen_down = 0;		// Ensure next tool action is treated separately
 	i = undo_next_core(2, oh, ow, mem_img_bpp, CMASK_ALL);
-	pen_down = 0;		// Ensure next tool action is treated separately
-
 	if (i) return 1;			// Not enough memory
 
 	for (i = 0; i < NUM_CHANNELS; i++)
@@ -3164,10 +3159,7 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 	if (!prepare_scale(ow, oh, nw, nh, type)) return 1;	// Not enough memory
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	pen_down = 0;		// Ensure next tool action is treated separately
 	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
-	pen_down = 0;
-
 	if (res)
 	{
 		clear_scale();
@@ -3306,9 +3298,7 @@ int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
 	mtMAX( nh, nh, 1 )
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
-	pen_down = 0;				// Ensure next tool action is treated separately
 	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
-	pen_down = 0;
 	if (res) return 1;			// Not enough memory
 
 	j = nw * nh;

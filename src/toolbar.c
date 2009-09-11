@@ -793,9 +793,7 @@ static gint release_palette( GtkWidget *widget, GdkEventButton *event )
 		if ( drag_index_vals[0] != drag_index_vals[1] )
 		{
 			mem_pal_copy( mem_pal, brcosa_pal );		// Get old values back
-			pen_down = 0;
 			mem_undo_next(UNDO_XPAL);			// Do undo stuff
-			pen_down = 0;
 			mem_pal_index_move( drag_index_vals[0], drag_index_vals[1] );
 
 			if ( mem_img_bpp == 1 )

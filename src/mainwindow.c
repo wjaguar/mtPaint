@@ -3109,10 +3109,8 @@ void main_init()
 
 void spot_undo(int mode)
 {
-	pen_down = 0;			// Ensure previous tool action is treated separately
 	mem_undo_next(mode);		// Do memory stuff for undo
 	update_menus();			// Update menu undo issues
-	pen_down = 0;			// Ensure next tool action is treated separately
 }
 
 #ifdef U_NLS

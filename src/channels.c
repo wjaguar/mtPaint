@@ -82,9 +82,7 @@ static void click_newchan_ok(GtkButton *button, gpointer user_data)
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
 	else i = CMASK_FOR(chan_new_type);
-	pen_down = 0; /* Ensure next tool action is treated separately */
 	i = undo_next_core(1, mem_width, mem_height, mem_img_bpp, i);
-	pen_down = 0;
 	if (i)
 	{
 		click_newchan_cancel();
@@ -244,6 +242,7 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 		gtk_signal_connect(GTK_OBJECT(radio), "toggled",
 				GTK_SIGNAL_FUNC(chan_state_changed),
 				(gpointer)(i));
+	/* !!! I disagree with this stuff being here - WJ */
 		if (	(i==7 && !mem_img[CHN_ALPHA]) ||
 			(i==8 && !mem_img[CHN_SEL]) ||
 			(i==9 && !mem_img[CHN_MASK])

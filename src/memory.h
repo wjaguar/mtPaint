@@ -244,6 +244,8 @@ void pal_hsl( png_color col, float *hh, float *ss, float *ll );	// Turn RGB into
 #define UNDO_INV   4	/* "Invert" operation */
 #define UNDO_XFORM 5	/* Changes to all channels */
 #define UNDO_FILT  6	/* Changes to current channel */
+#define UNDO_PASTE 7	/* Paste operation (current / RGBA) */
+#define UNDO_TOOL  8	/* Same as UNDO_DRAW but respects pen_down */
 
 
 void undo_free_x(undo_item *undo);

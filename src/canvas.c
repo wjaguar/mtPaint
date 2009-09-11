@@ -97,7 +97,7 @@ void commit_paste( gboolean undo )
 		memset(alpha, channel_col_A[CHN_ALPHA], fw);
 	}
 
-	if ( undo ) mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
+	if ( undo ) mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
 	update_menus();				// Update menu undo issues
 
 	ofs = my * mem_clip_w + mx;
@@ -160,9 +160,7 @@ void create_pal_quantized(int dl)
 	int i = 0;
 	unsigned char newpal[3][256];
 
-	pen_down = 0;
 	mem_undo_next(UNDO_PAL);
-	pen_down = 0;
 
 	if ( dl==1 )
 		i = dl1quant(mem_img[CHN_IMAGE], mem_width, mem_height, mem_cols, newpal);
@@ -2068,7 +2066,7 @@ void tool_action( int x, int y, int button, gdouble pressure )
 	{
 		if ( !(tool_type == TOOL_LINE && line_status == LINE_NONE) )
 		{
-			mem_undo_next(UNDO_DRAW);	// Do memory stuff for undo
+			mem_undo_next(UNDO_TOOL);	// Do memory stuff for undo
 		}
 	}
 
