@@ -4,6 +4,18 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.02	2006-10-14
+
+	* Polish translation added by Simek
+	* Spanish translation updated for version 3
+	* All menu items on all translations updated
+	* Saving compressed GIF files now supported (using libgif)
+	* Library detection in configure script improved
+	* BUGFIX - Image scaling and rotation in nearest-neighbour mode now work correctly
+	* BUGFIX - Lasso tool now properly handles clipboard alpha
+	* BUGFIX - Clipboard save path now can be changed in Preferences
+	* BUGFIX - XPM files smaller than 4*4 pixels can now be loaded
+
 3.01	2006-7-15
 
 	* German translation updated for version 3

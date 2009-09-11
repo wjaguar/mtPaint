@@ -312,7 +312,7 @@ void poly_lasso()		// Lasso around current clipboard
 	int i, j, x = poly_mem[0][0] - poly_min_x, y = poly_mem[0][1] - poly_min_y,
 		minx = mem_clip_w-1, miny = mem_clip_h - 1, maxx = 0, maxy = 0,
 		offs, offd, nw, nh;
-	unsigned char *t_clip, *t_mask;
+	unsigned char *t_clip, *t_mask, *t_alpha = NULL;
 
 	poly_mask();	// Initialize mask to all clear - 255 & Polygon on clipboard mask to 0
 	if ( mem_clip_mask == NULL ) return;	// Failed to get memory
@@ -353,53 +353,36 @@ void poly_lasso()		// Lasso around current clipboard
 	nw = maxx - minx + 1;
 	nh = maxy - miny + 1;
 
-//printf("minx = %i maxx = %i miny = %i maxy = %i\n", minx, maxx, miny, maxy);
+	/* No decrease so no resize either */
+	if ((nw == mem_clip_w) && (nh == mem_clip_h)) return;
 
-
-	t_mask = malloc(nw*nh);		// Try to malloc memory for smaller mask - return if fail
-	if ( t_mask == NULL )
+	/* Try to malloc memory for smaller clipboard */
+	t_clip = malloc(nw * nh * mem_clip_bpp);
+	t_mask = malloc(nw * nh);
+	if (mem_clip_alpha) t_alpha = malloc(nw * nh);
+	if (!t_clip || !t_mask || (!t_alpha && mem_clip_alpha))
 	{
+		free(t_clip); free(t_mask); free(t_alpha);
 		memory_errors(1);
 		return;
 	}
-	for ( j=miny; j<=maxy; j++ )		// Copy the mask data required
+	for (j = miny; j <= maxy; j++)	// Copy the data
 	{
-		offs = j*mem_clip_w + minx;
-		offd = (j-miny)*nw;
-		for ( i=minx; i<=maxx; i++ ) t_mask[offd++] = mem_clip_mask[offs++];
-	}
-
-	t_clip = malloc(nw*nh*mem_clip_bpp);	// Try to malloc memory for smaller clipboard
-	if ( t_clip == NULL )
-	{
-		free(t_mask);
-		memory_errors(1);
-		return;
-	}
-	for ( j=miny; j<=maxy; j++ )		// Copy the clipboard data required
-	{
-		offs = (j*mem_clip_w + minx)*mem_clip_bpp;
-		offd = (j-miny)*nw*mem_clip_bpp;
-
-		if ( mem_clip_bpp == 1 )
-		{
-			for ( i=minx; i<=maxx; i++ ) t_clip[offd++] = mem_clipboard[offs++];
-		}
-		if ( mem_clip_bpp == 3 )
-		{
-			for ( i=minx; i<=maxx; i++ )
-			{
-				t_clip[offd++] = mem_clipboard[offs++];
-				t_clip[offd++] = mem_clipboard[offs++];
-				t_clip[offd++] = mem_clipboard[offs++];
-			}
-		}
+		offs = j * mem_clip_w + minx;
+		offd = (j - miny) * nw;
+		memcpy(t_mask + offd, mem_clip_mask + offs, nw);
+		if (mem_clip_alpha)
+			memcpy(t_alpha + offd, mem_clip_alpha + offs, nw);
+		memcpy(t_clip + offd * mem_clip_bpp,
+			mem_clipboard + offs * mem_clip_bpp, nw * mem_clip_bpp);
 	}
 
 	free(mem_clipboard);		// Free old clipboard
 	free(mem_clip_mask);		// Free old mask
+	free(mem_clip_alpha);		// Free old mask
 	mem_clipboard = t_clip;
 	mem_clip_mask = t_mask;
+	mem_clip_alpha = t_alpha;
 	mem_clip_w = nw;
 	mem_clip_h = nh;
 	mem_clip_x += minx;

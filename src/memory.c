@@ -2828,8 +2828,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[CHN_IMAGE] + ny * nw * 3;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = nx * s1 + x0y;
-					oy = nx * c1 + y0y;
+					ox = rint(nx * s1 + x0y);
+					oy = rint(nx * c1 + y0y);
 					src = A_rgb;
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
@@ -2848,8 +2848,8 @@ int mem_rotate_free( double angle, int type )	// Rotate canvas by any angle (deg
 				dest = mem_img[cc] + ny * nw;
 				for (nx = 0; nx < nw; nx++)
 				{
-					ox = nx * s1 + x0y;
-					oy = nx * c1 + y0y;
+					ox = rint(nx * s1 + x0y);
+					oy = rint(nx * c1 + y0y);
 					if ((ox >= 0) && (ox < ow) &&
 						(oy >= 0) && (oy < oh))
 						*dest++ = old_img[cc][oy * ow + ox];
@@ -3278,6 +3278,7 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 	chanlist old_img;
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp, res, ow = mem_width, oh = mem_height;
+	double scalex, scaley, deltax, deltay;
 
 	mtMIN( nw, nw, MAX_WIDTH )
 	mtMAX( nw, nw, 1 )
@@ -3299,6 +3300,11 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 		do_scale(old_img, mem_img, ow, oh, nw, nh);
 	else
 	{
+		scalex = (double)ow / (double)nw;
+		scaley = (double)oh / (double)nh;
+		deltax = 0.5 * scalex - 0.5;
+		deltay = 0.5 * scaley - 0.5;
+
 		for (j = 0; j < nh; j++)
 		{
 			for (cc = 0; cc < NUM_CHANNELS; cc++)
@@ -3306,11 +3312,11 @@ int mem_image_scale( int nw, int nh, int type )				// Scale image
 				if (!mem_img[cc]) continue;
 				bpp = BPP(cc);
 				dest = mem_img[cc] + nw * j * bpp;
-				oj = (oh * j) / nh;
+				oj = rint(scaley * j + deltay);
 				src = old_img[cc] + ow * oj * bpp;
 				for (i = 0; i < nw; i++)
 				{
-					oi = ((ow * i) / nw) * bpp;
+					oi = (int)rint(scalex * i + deltax) * bpp;
 					*dest++ = src[oi];
 					if (bpp == 1) continue;
 					*dest++ = src[oi + 1];

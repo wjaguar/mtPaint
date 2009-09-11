@@ -1,10 +1,8 @@
 --------------------------------------------------
-mtPaint 3.01 - Copyright (C) 2004-2006 The Authors
+mtPaint 3.02 - Copyright (C) 2004-2006 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
-
-http://mtpaint.sourceforge.net/
 
 mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
 
@@ -22,7 +20,7 @@ http://sourceforge.net/mail/?group_id=155874
 Compilation
 -----------
 
-In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you are targetting GTK+1 you will also need imlib as well.  If you want to load or save GIF, JPEG and TIFF files you will also need libungif, libjpeg and libtiff.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
+In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you want to load or save GIF, JPEG and TIFF files you will also need libungif, libjpeg and libtiff.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
 
 For GTK+2
 =========
@@ -95,6 +93,11 @@ Because I very rarely use Windows, I am sadly unable to support GTK+1 or older v
 Credits
 -------
 
+mtPaint is maintained by Dmitry Groshev.
+
+wjaguar@mail.ru
+http://mtpaint.sourceforge.net/
+
 The following people (in alphabetical order) have contributed directly to the project, and are therefore worthy of gracious thanks for their generosity and hard work:
 
 
@@ -132,5 +135,6 @@ Czech - Pavel Ruzicka
 French - Nicolas Velin, Pascal Billard
 German - Oliver Frommel
 Portuguese - Israel G. Lugo
+Polish - Simek
 Spanish - Guadalinex Team (Junta de Andalucia)
 

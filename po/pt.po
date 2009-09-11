@@ -477,7 +477,7 @@ msgstr "Créditos"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.01 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.02 - Copyright (C) 2004-2006 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"

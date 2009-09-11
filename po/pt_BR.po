@@ -476,7 +476,7 @@ msgstr "Créditos"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.01 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.02 - Copyright (C) 2004-2006 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -976,7 +976,7 @@ msgstr "/Arquivo/Exportar Arte ASCII ..."
 
 #: src/mainwindow.c:2637 src/mainwindow.c:2884
 msgid "/File/Export Animated GIF ..."
-msgstr ""
+msgstr "/Arquivo/Export Animated GIF ..."
 
 #: src/mainwindow.c:2638 src/mainwindow.c:2936
 msgid "/File/sep2"
@@ -1244,23 +1244,23 @@ msgstr "/Ver/tear"
 
 #: src/mainwindow.c:2709 src/mainwindow.c:2990
 msgid "/View/Show Main Toolbar"
-msgstr ""
+msgstr "/Ver/Show Main Toolbar"
 
 #: src/mainwindow.c:2710 src/mainwindow.c:2992
 msgid "/View/Show Tools Toolbar"
-msgstr ""
+msgstr "/Ver/Show Tools Toolbar"
 
 #: src/mainwindow.c:2711 src/mainwindow.c:2994
 msgid "/View/Show Settings Toolbar"
-msgstr ""
+msgstr "/Ver/Show Settings Toolbar"
 
 #: src/mainwindow.c:2712 src/mainwindow.c:2996
 msgid "/View/Show Palette"
-msgstr ""
+msgstr "/Ver/Show Palette"
 
 #: src/mainwindow.c:2713 src/mainwindow.c:2998
 msgid "/View/Show Status Bar"
-msgstr ""
+msgstr "/Ver/Show Status Bar"
 
 #: src/mainwindow.c:2714 src/mainwindow.c:2718 src/mainwindow.c:2721
 msgid "/View/sep1"
@@ -1272,7 +1272,7 @@ msgstr "/Ver/Toggle Image View (Home)"
 
 #: src/mainwindow.c:2716 src/mainwindow.c:2986
 msgid "/View/Centralize Image"
-msgstr ""
+msgstr "/Ver/Centralize Image"
 
 #: src/mainwindow.c:2717 src/mainwindow.c:3005
 msgid "/View/Show zoom grid"
@@ -1284,7 +1284,7 @@ msgstr "/Ver/Ver Janela"
 
 #: src/mainwindow.c:2720 src/mainwindow.c:2981
 msgid "/View/Focus View Window"
-msgstr ""
+msgstr "/Ver/Focus View Window"
 
 #: src/mainwindow.c:2722
 msgid "/View/Pan Window (End)"
@@ -1420,11 +1420,11 @@ msgstr "/Seleção/Rotacionar Sentido Anti-Horário"
 
 #: src/mainwindow.c:2761 src/mainwindow.c:2901
 msgid "/Selection/Alpha Blend A,B"
-msgstr ""
+msgstr "/Seleção/Alpha Blend A,B"
 
 #: src/mainwindow.c:2762 src/mainwindow.c:2871
 msgid "/Selection/Move Alpha to Mask"
-msgstr ""
+msgstr "/Seleção/Move Alpha to Mask"
 
 #: src/mainwindow.c:2763 src/mainwindow.c:2872
 msgid "/Selection/Mask Colour A,B"
@@ -1489,7 +1489,7 @@ msgstr "/Paleta/Editar Cor A & B"
 
 #: src/mainwindow.c:2780
 msgid "/Palette/Palette Editor ..."
-msgstr ""
+msgstr "/Paleta/Palette Editor ..."
 
 #: src/mainwindow.c:2781
 msgid "/Palette/Set Palette Size ..."
@@ -1719,7 +1719,7 @@ msgstr "/_Ajuda"
 
 #: src/mainwindow.c:2848
 msgid "/Help/Documentation"
-msgstr ""
+msgstr "/Ajuda/Documentation"
 
 #: src/mainwindow.c:2850 src/mainwindow.c:2875
 msgid "/Help/About"

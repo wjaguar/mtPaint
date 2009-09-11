@@ -1293,7 +1293,7 @@ int load_xpm( char *file_name )
 		return NOT_INDEXED;
 	}
 
-	if ( fw < 4 || fh < 4 ) goto fail;
+	if ( fw < 1 || fh < 1 ) goto fail;
 
 	if ( fw > MAX_WIDTH || fh > MAX_HEIGHT )
 	{
