@@ -1807,9 +1807,11 @@ void repaint_paste( int px1, int py1, int px2, int py2 )
 
 void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 {
+	chanlist tlist;
+	unsigned char *mask0, *pvi = NULL, *pvm = NULL;
 	int alpha_blend = !overlay_alpha;
 	int pw2, ph2, px2 = px - margin_main_x, py2 = py - margin_main_y;
-	int j, jj, j0, dx, zoom = 1, scale = 1, nix = 0, niy = 0;
+	int j, jj, j0, l, dx, pww = 0, zoom = 1, scale = 1, nix = 0, niy = 0;
 	int lop = 255, xpm = mem_xpm_trans;
 
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -1845,21 +1847,47 @@ void main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	else if (alpha_blend) render_background(rgb, px2, py2, pw2, ph2, pw);
 
 	dx = (px2 * zoom) / scale;
+	memset(tlist, 0, sizeof(chanlist));
+	mask0 = mem_img[CHN_MASK];
+	if (mem_preview && (mem_img_bpp == 3))
+	{
+		pww = pw2;
+		if (scale > 1) l = pww = (px2 + pw2 - 1) / scale - dx + 1;
+		else l = (pw2 - 1) * zoom + 1;
+		pvm = malloc(l * 4);
+		if (pvm)
+		{
+			pvi = pvm + l;
+			tlist[CHN_IMAGE] = pvi;
+		}
+	}
 
 	setup_row(px2, pw2, can_zoom, mem_width, xpm, lop, mem_img_bpp, mem_pal);
  	j0 = -1; pw *= 3; pw2 *= 3;
 	for (jj = 0; jj < ph2; jj++ , rgb += pw)
 	{
 		j = ((py2 + jj) * zoom) / scale;
-		if (!async_bk && (j == j0))
+		if (j != j0)
+		{
+			j0 = j;
+			if (pvm)
+			{
+				l = mem_width * j + dx;
+				prep_mask(0, zoom, pww, pvm, mask0 ? mask0 + l : NULL,
+					mem_img[CHN_IMAGE] + l * 3);
+				do_transform(0, zoom, pww, pvm, pvi,
+					mem_img[CHN_IMAGE] + l * 3);
+			}
+		}
+		else if (!async_bk)
 		{
 			memcpy(rgb, rgb - pw, pw2);
 			continue;
 		}
-		j0 = j;
-		render_row(rgb, mem_img, dx, j, NULL);
-		overlay_row(rgb, mem_img, dx, j, NULL);
+		render_row(rgb, mem_img, dx, j, tlist);
+		overlay_row(rgb, mem_img, dx, j, tlist);
 	}
+	free(pvm);
 }
 
 void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on rgb memory
@@ -1908,7 +1936,7 @@ void draw_grid(unsigned char *rgb, int x, int y, int w, int h)	// Draw grid on r
 void repaint_canvas( int px, int py, int pw, int ph )
 {
 	unsigned char *rgb;
-	int iy, pw2, ph2, lx = 0, ly = 0,
+	int pw2, ph2, lx = 0, ly = 0,
 		rx1, ry1, rx2, ry2,
 		ax1, ay1, ax2, ay2,
 		rpx, rpy;
@@ -1961,23 +1989,6 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	if ( (py+ph2 - margin_main_y) >= mem_height*can_zoom )	// Update image + blank space outside
 		ph2 = mem_height*can_zoom - py + margin_main_y;
 
-	mtMAX(rpx, px, margin_main_x)
-	mtMAX(rpy, py, margin_main_y)
-
-	if ( mem_preview > 0 && mem_img_bpp == 3 )
-	{
-		for ( iy=rpy-py; iy<ph2; iy++ )			// Don't touch grey area, just RGB
-		{
-			if ( mem_prev_bcsp[4] != 100 )
-				mem_gamma_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
-			if ( mem_prev_bcsp[0] != 0 || mem_prev_bcsp[1] != 0 ||
-				mem_prev_bcsp[2] != 0 || mem_prev_bcsp[5] != 0 )
-					mem_brcosa_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
-			if ( mem_prev_bcsp[3] != 8 )
-				mem_posterize_chunk( rgb + (pw*iy + rpx-px)*3, pw2-rpx+px );
-		}
-	}
-
 	draw_grid(rgb, px, py, pw, ph);
 
 	gdk_draw_rgb_image ( the_canvas, drawing_canvas->style->black_gc,
@@ -1988,6 +1999,9 @@ void repaint_canvas( int px, int py, int pw, int ph )
 
 	if ( marq_status >= MARQUEE_PASTE && show_paste )
 	{	// Add clipboard image to redraw if needed
+		mtMAX(rpx, px, margin_main_x)
+		mtMAX(rpy, py, margin_main_y)
+
 		pw2 -= rpx-px;
 		ph2 -= rpy-py;
 
@@ -2676,7 +2690,7 @@ void main_init()
 		{ _("/Palette/sep1"),			NULL,	NULL,0, "<Separator>" },
 		{ _("/Palette/Swap A & B"),		"X",	pressed_swap_AB,0, NULL },
 		{ _("/Palette/Edit Colour A & B ..."), "<control>E", pressed_edit_AB,0, NULL },
-		{ _("/Palette/Edit All Colours ..."), "<control>W", pressed_allcol,0, NULL },
+		{ _("/Palette/Palette Editor ..."), "<control>W", pressed_allcol,0, NULL },
 		{ _("/Palette/Set Palette Size ..."),	NULL,	pressed_add_cols,0, NULL },
 		{ _("/Palette/Merge Duplicate Colours"), NULL,	pressed_remove_duplicates,0, NULL },
 		{ _("/Palette/Remove Unused Colours"),	NULL,	pressed_remove_unused,0, NULL },

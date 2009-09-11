@@ -1076,35 +1076,174 @@ void mem_get_histogram(int channel)	// Calculate how many of each colour index i
 	for (i = 0; i < j; i++) mem_histogram[*img++]++;
 }
 
-void mem_gamma_chunk( unsigned char *rgb, int len )		// Apply gamma to RGB memory
+static unsigned char gamma_table[256], bc_table[256];
+static int last_gamma, last_br, last_co;
+
+void do_transform(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0)
 {
-	double trans = 100/((double) mem_prev_bcsp[4]);
-	int i, j;
-	unsigned char table[256];
+	static int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
+	static int posm[9] = {0, 0xFF00, 0x5500, 0x2480, 0x1100,
+				 0x0840, 0x0410, 0x0204, 0};
+	int do_gamma, do_bc, do_sa;
+	double w;
+	unsigned char rgb[3];
+	int br, co, sa, ps, pmul;
+	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
+	int i, j, r, g, b, ofs3, opacity, op0 = 0, op1 = 0, op2 = 0, ops;
 
-	for ( i=0; i<256; i++ ) table[i] = mt_round( 255*pow( ((double) i)/255, trans ) );
+	cnt = start + step * cnt;
 
-	for ( i=0; i<len; i++ )
-		for ( j=0; j<3; j++ )
-			if ( mem_brcosa_allow[j] )
-				rgb[3*i + j] = table[ rgb[3*i + j] ];
-}
+	if (!mem_brcosa_allow[0]) op0 = 255;
+	if (!mem_brcosa_allow[1]) op1 = 255;
+	if (!mem_brcosa_allow[2]) op2 = 255;
+	ops = op0 + op1 + op2;
 
-void mem_posterize_chunk( unsigned char *rgb, int len )		// Apply posterize to RGB memory
-{
-	int i, j, res, posty = mem_prev_bcsp[3];
+	br = mem_prev_bcsp[0] * 255;
+	co = mem_prev_bcsp[1];
+	if (co > 0) co *= 3;
+	co += 100;
+	co = (255 * co) / 100;
+	sa = (255 * mem_prev_bcsp[2]) / 100;
+	dH = sH = mem_prev_bcsp[5];
+	ps = 8 - mem_prev_bcsp[3];
+	pmul = posm[mem_prev_bcsp[3]];
 
-	for ( i=0; i<len; i++ )
+	do_gamma = mem_prev_bcsp[4] - 100;
+	do_bc = br | (co - 255);
+	do_sa = sa - 255;
+
+	/* Prepare gamma table */
+	if (do_gamma && (do_gamma != last_gamma))
 	{
-		for ( j=0; j<3; j++ )
+		last_gamma = do_gamma;
+		w = 100.0 / (double)mem_prev_bcsp[4];
+		for (i = 0; i < 256; i++)
 		{
-			if ( mem_brcosa_allow[j] )
+			gamma_table[i] = rint(255.0 * pow((double)i / 255.0, w));
+		}
+	}
+	/* Prepare brightness-contrast table */
+	if (do_bc && ((br != last_br) || (co != last_co)))
+	{
+		last_br = br; last_co = co;
+		for (i = 0; i < 256; i++)
+		{
+			j = ((i + i - 255) * co + (255 * 255)) / 2 + br;
+			j = j < 0 ? 0 : j > (255 * 255) ? (255 * 255) : j;
+			bc_table[i] = (j + (j >> 8) + 1) >> 8;
+		}
+	}
+	if (dH)
+	{
+		if (dH < 0) dH += 1530;
+		dc = (dH / 510) * 2; dH -= dc * 255;
+		if ((sH = dH > 255))
+		{
+			dH = 510 - dH;
+			dc = dc < 4 ? dc + 2 : 0;
+		}
+	}
+	ix0 = ixx[dc]; ix1 = ixx[dc + 1]; ix2 = ixx[dc + 2];
+
+	for (i = start; i < cnt; i += step)
+	{
+		ofs3 = i * 3;
+		rgb[0] = img0[ofs3 + 0];
+		rgb[1] = img0[ofs3 + 1];
+		rgb[2] = img0[ofs3 + 2];
+		opacity = mask[i];
+		if (opacity == 255)
+		{
+			imgr[ofs3 + 0] = rgb[0];
+			imgr[ofs3 + 1] = rgb[1];
+			imgr[ofs3 + 2] = rgb[2];
+			continue;
+		}
+		/* If we do gamma transform */
+		if (do_gamma)
+		{
+			rgb[0] = gamma_table[rgb[0]];
+			rgb[1] = gamma_table[rgb[1]];
+			rgb[2] = gamma_table[rgb[2]];
+		}
+		/* If we do hue transform & colour has a hue */
+		if (dH && ((rgb[0] ^ rgb[1]) | (rgb[0] ^ rgb[2])))
+		{
+			/* Min. component */
+			c2 = dc;
+			if (rgb[ix2] < rgb[ix0]) c2++;
+			if (rgb[ixx[c2]] >= rgb[ixx[c2 + 1]]) c2++;
+			/* Actual indices */
+			c2 = ixx[c2];
+			c0 = ixx[c2 + 1];
+			c1 = ixx[c2 + 2];
+
+			/* Max. component & edge dir */
+			if ((tH = rgb[c0] <= rgb[c1]))
 			{
-				res = rgb[3*i + j];
-				POSTERIZE_MACRO
-				rgb[3*i + j] = res;
+				c0 = ixx[c2 + 2];
+				c1 = ixx[c2 + 1];
+			}
+			/* Do adjustment */
+			j = dH * (rgb[c0] - rgb[c2]) + 127; /* Round up (?) */
+			j = (j + (j >> 8) + 1) >> 8;
+			r = rgb[c0]; g = rgb[c1]; b = rgb[c2];
+			if (tH ^ sH) /* Falling edge */
+			{
+				rgb[c1] = r = g > j + b ? g - j : b;
+				rgb[c2] += j + r - g;
+			}
+			else /* Rising edge */
+			{
+				rgb[c1] = b = g < r - j ? g + j : r;
+				rgb[c0] -= j + g - b;
 			}
 		}
+		r = rgb[ix0];
+		g = rgb[ix1];
+		b = rgb[ix2];
+		/* If we do brightness/contrast transform */
+		if (do_bc)
+		{
+			r = bc_table[r];
+			g = bc_table[g];
+			b = bc_table[b];
+		}
+		/* If we do saturation transform */
+		if (sa)
+		{
+			j = 0.299 * r + 0.587 * g + 0.114 * b;
+			r = r * 255 + (r - j) * sa;
+			r = r < 0 ? 0 : r > (255 * 255) ? (255 * 255) : r;
+			r = (r + (r >> 8) + 1) >> 8;
+			g = g * 255 + (g - j) * sa;
+			g = g < 0 ? 0 : g > (255 * 255) ? (255 * 255) : g;
+			g = (g + (g >> 8) + 1) >> 8;
+			b = b * 255 + (b - j) * sa;
+			b = b < 0 ? 0 : b > (255 * 255) ? (255 * 255) : b;
+			b = (b + (b >> 8) + 1) >> 8;
+		}
+		/* If we do posterize transform */
+		if (ps)
+		{
+			r = ((r >> ps) * pmul) >> 8;
+			g = ((g >> ps) * pmul) >> 8;
+			b = ((b >> ps) * pmul) >> 8;
+		}
+		/* If we do partial masking */
+		if (ops || opacity)
+		{
+			r = r * 255 + (img0[ofs3 + 0] - r) * (opacity | op0);
+			r = (r + (r >> 8) + 1) >> 8;
+			g = g * 255 + (img0[ofs3 + 1] - g) * (opacity | op1);
+			g = (g + (g >> 8) + 1) >> 8;
+			b = b * 255 + (img0[ofs3 + 2] - b) * (opacity | op2);
+			b = (b + (b >> 8) + 1) >> 8;
+		}
+		imgr[ofs3 + 0] = r;
+		imgr[ofs3 + 1] = g;
+		imgr[ofs3 + 2] = b;
 	}
 }
 
@@ -1228,128 +1367,26 @@ void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int 
 	}
 }
 
-
-///	BRIGHTNESS CONTRAST SATURATION
-
-void mem_brcosa_chunk( unsigned char *rgb, int len )		// Apply BRCOSA to RGB memory
-{	// brightness = -255..+255, contrast = 0..+4, saturation = -1..+1
-	// Hue: -1529..+1529 (Red->Green->Blue->Red)
-	double ch[3], grey;
-	int i, j, Rr, Gg, Bb, dc;
-	int dH = mem_prev_bcsp[5], sH, tH;
-	static unsigned char ixx[7] = {0, 1, 2, 0, 1, 2, 0};
-	int ix0, ix1, ix2, c0, c1, c2;
-
-	int	br = mem_prev_bcsp[0];
-	double	co = mem_prev_bcsp[1] / 100.0,
-		sa = mem_prev_bcsp[2] / 100.0;
-
-	mtMIN( br, br, 255 )
-	mtMAX( br, br, -255 )
-	mtMIN( co, co, 1 )
-	mtMAX( co, co, -1 )
-	mtMIN( sa, sa, 1 )
-	mtMAX( sa, sa, -1 )
-
-	if ( co > 0 ) co = co*3 + 1;
-	else co = co + 1;
-
-	if (dH < 0) dH += 1530;
-	dc = (dH / 510) * 2; dH -= dc * 255;
-	if ((sH = dH > 255))
-	{
-		dH = 510 - dH;
-		dc = dc < 4 ? dc + 2 : 0;
-	}
-	ix0 = ixx[dc]; ix1 = ixx[dc + 1]; ix2 = ixx[dc + 2];
-
-	for ( i=0; i<len; i++ , rgb += 3)
-	{
-		Rr = rgb[ix0];
-		Gg = rgb[ix1];
-		Bb = rgb[ix2];
-
-		/* If we do hue transform & colour has a hue */
-		if (dH && ((Rr ^ Gg) | (Rr ^ Bb)))
-		{
-			/* Min. component */
-			c2 = Bb < Rr ? (Gg < Bb ? 1 : 2) :
-				(Rr < Gg ? 0 : 1);
-			/* Actual indices */
-			c2 = ixx[dc + c2];
-			c0 = ixx[c2 + 1];
-			c1 = ixx[c2 + 2];
-			/* Max. component & edge dir */
-			if ((tH = rgb[c0] <= rgb[c1]))
-			{
-				c0 = ixx[c2 + 2];
-				c1 = ixx[c2 + 1];
-			}
-			/* Do adjustment */
-			j = dH * (rgb[c0] - rgb[c2]) + 127; /* Round up (?) */
-			j = (j + (j >> 8) + 1) >> 8;
-			Rr = rgb[c0]; Gg = rgb[c1]; Bb = rgb[c2];
-			if (tH ^ sH) /* Falling edge */
-			{
-				rgb[c1] = Rr = Gg > j + Bb ? Gg - j : Bb;
-				rgb[c2] += j + Rr - Gg;
-			}
-			else /* Rising edge */
-			{
-				rgb[c1] = Bb = Gg < Rr - j ? Gg + j : Rr;
-				rgb[c0] -= j + Gg - Bb;
-			}
-		}
-		ch[0] = rgb[ix0];
-		ch[1] = rgb[ix1];
-		ch[2] = rgb[ix2];
-
-		for ( j=0; j<3; j++ )		// Calculate brightness/contrast
-		{
-			if ( mem_brcosa_allow[j] )
-			{
-				ch[j] = (ch[j] - 127.5)*co + 127.5 + br;	// Brightness & Contrast
-				mtMIN( ch[j], ch[j], 255 )
-				mtMAX( ch[j], ch[j], 0 )
-			}
-		}
-		grey = 0.299 * ch[0] + 0.587 * ch[1] + 0.114 * ch[2];
-		for ( j=0; j<3; j++ )						// Calculate saturation
-		{
-			if ( mem_brcosa_allow[j] )
-			{
-				ch[j] += sa * (ch[j] - grey);
-				mtMIN( ch[j], ch[j], 255 )
-				mtMAX( ch[j], ch[j], 0 )
-			}
-		}
-
-		rgb[0] = rint(ch[0]);
-		rgb[1] = rint(ch[1]);
-		rgb[2] = rint(ch[2]);
-	}
-}
-
-void mem_brcosa_pal( png_color *pal1, png_color *pal2, int p1, int p2 )
-{		// Palette 1 = Palette 2 adjusting brightness/contrast/saturation
+void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2)
+{
 	int i;
-	unsigned char tpal[256*3];
+	unsigned char tmp[256 * 3], mask[256], *wrk;
 
-	for ( i=0; i<256; i++ )
+	memset(mask, 0, ++p2 - p1);
+	for (wrk = tmp , i = p1; i < p2; i++ , wrk += 3)
 	{
-		tpal[ 3*i ] = pal2[ i ].red;
-		tpal[ 1 + 3*i ] = pal2[ i ].green;
-		tpal[ 2 + 3*i ] = pal2[ i ].blue;
+		wrk[0] = pal2[i].red;
+		wrk[1] = pal2[i].green;
+		wrk[2] = pal2[i].blue;
 	}
 
-	if ( mem_prev_bcsp[4] != 100 ) mem_gamma_chunk( tpal, 256 );
-	mem_brcosa_chunk( tpal, 256 );
+	do_transform(0, 1, p2 - p1, mask, tmp, tmp);
 
-	for ( i=p1; i<=p2; i++ )		// Only copy over required range
+	for (wrk = tmp , i = p1; i < p2; i++ , wrk += 3)
 	{
-		pal1[ i ].red = tpal[ 3*i ];
-		pal1[ i ].green = tpal[ 1 + 3*i ];
-		pal1[ i ].blue = tpal[ 2 + 3*i ];
+		pal1[i].red = wrk[0];
+		pal1[i].green = wrk[1];
+		pal1[i].blue = wrk[2];
 	}
 }
 

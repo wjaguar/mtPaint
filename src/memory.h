@@ -220,8 +220,8 @@ int mem_remove_unused_check();		// Check to see if we can remove unused palette 
 int mem_remove_unused();		// Remove unused palette colours
 void mem_scale_pal( int i1, int r1, int g1, int b1, int i2, int r2, int g2, int b2 );
 					// Generate a scaled palette
-void mem_brcosa_pal( png_color *pal1, png_color *pal2, int p1, int p2 );
-					// Palette 1 = Palette 2 adjusting brightness/contrast/saturation
+//	Create colour-transformed palette
+void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2);
 void mem_pal_sort( int a, int i1, int i2, int rev );
 					// Sort colours in palette 0=luminance, 1=RGB
 
@@ -272,9 +272,9 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity);
 #define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), 127)
 #define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? tool_opacity : 0)
 
-void mem_brcosa_chunk( unsigned char *rgb, int len );		// Apply BRCOSA to RGB memory
-void mem_posterize_chunk( unsigned char *rgb, int len );	// Apply posterize to RGB memory
-void mem_gamma_chunk( unsigned char *rgb, int len );		// Apply gamma to RGB memory
+//	Apply colour transform
+void do_transform(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0);
 
 void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vertically
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally

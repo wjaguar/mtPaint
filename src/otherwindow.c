@@ -1237,16 +1237,7 @@ static gint click_brcosa_preview( GtkWidget *widget, GdkEvent *event, gpointer d
 	{
 		mtMIN( p1, brcosa_pal_lim[0], brcosa_pal_lim[1] )
 		mtMAX( p2, brcosa_pal_lim[0], brcosa_pal_lim[1] )
-		mem_brcosa_pal( mem_pal, brcosa_pal, p1, p2 );
-		for ( i=p1; i<p2; i++ )
-		{
-			if ( mem_brcosa_allow[0] )
-				mem_pal[i].red = do_posterize( mem_pal[i].red, mem_prev_bcsp[3] );
-			if ( mem_brcosa_allow[1] )
-				mem_pal[i].green = do_posterize( mem_pal[i].green, mem_prev_bcsp[3] );
-			if ( mem_brcosa_allow[2] )
-				mem_pal[i].blue = do_posterize( mem_pal[i].blue, mem_prev_bcsp[3] );
-		}
+		transform_pal(mem_pal, brcosa_pal, p1, p2);
 		pal_refresher();
 	}
 	if ( mem_img_bpp == 3 )
@@ -1333,6 +1324,9 @@ static gint click_brcosa_cancel( GtkWidget *widget, GdkEvent *event, gpointer da
 
 static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
+	unsigned char *mask, *mask0, *tmp;
+	int i;
+
 	mem_pal_copy( mem_pal, brcosa_pal );
 
 	if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 ||
@@ -1345,13 +1339,20 @@ static gint click_brcosa_apply( GtkWidget *widget, GdkEvent *event, gpointer dat
 		update_all_views();
 		if ( mem_img_bpp == 3 && mem_preview == 1 )	// Only do if toggle set
 		{
-			if ( brcosa_values[4] != 100 )
-				mem_gamma_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
-			if ( brcosa_values[0] != 0 || brcosa_values[1] != 0 || brcosa_values[2] != 0
-				|| brcosa_values[5] != 0 )
-				mem_brcosa_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
-			if ( brcosa_values[3] != 8 )
-				mem_posterize_chunk(mem_img[CHN_IMAGE], mem_width * mem_height);
+			mask = malloc(mem_width);
+			if (mask)
+			{
+				mask0 = mem_img[CHN_MASK];
+				tmp = mem_img[CHN_IMAGE];
+				for (i = 0; i < mem_height; i++)
+				{
+					prep_mask(0, 1, mem_width, mask, mask0, tmp);
+					do_transform(0, 1, mem_width, mask, tmp, tmp);
+					if (mask0) mask0 += mem_width;
+					tmp += mem_width * 3;
+				}
+				free(mask);
+			}
 		}
 
 		if ( mem_img_bpp == 1 ) mem_pal_copy( brcosa_pal, mem_pal );
@@ -1919,7 +1920,7 @@ void pressed_size( GtkMenuItem *menu_item, gpointer user_data )
 }
 
 
-///	EDIT ALL COLOURS WINDOW
+///	PALETTE EDITOR WINDOW
 
 typedef struct {
 	guint16 r, g, b, a;
@@ -2248,7 +2249,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			ctable[i].b = mem_pal[i].blue * 257;
 			ctable[i].a = 65535;
 		}
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Edit All Colours"),
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
 			GTK_WIN_POS_MOUSE, TRUE);
 		colour_window(win, mem_cols, NULL, FALSE, select_colour);
 	}
