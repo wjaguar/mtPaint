@@ -75,7 +75,8 @@ static void activate_channel(int chan)
 {
 	mem_channel = chan;
 	check_undo_paste_bpp();
-	pressed_opacity(chan == CHN_IMAGE ? tool_opacity : channel_col_A[chan]);
+	if (chan == CHN_IMAGE) pressed_opacity(tool_opacity);
+	else pressed_value(channel_col_A[chan]);
 }
 
 static void click_newchan_ok(GtkButton *window, gpointer user_data)

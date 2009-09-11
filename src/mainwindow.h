@@ -308,7 +308,8 @@ int gui_save(char *filename, ls_settings *settings);
 int import_clipboard(int mode);
 
 void pressed_select(int all);
-void pressed_opacity( int opacity );
+void pressed_opacity(int opacity);
+void pressed_value(int value);
 
 int check_zoom_keys(int act_m);
 int check_zoom_keys_real(int act_m);

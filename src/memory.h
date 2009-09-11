@@ -415,8 +415,18 @@ size_t mem_used();
 //	Return the number of bytes used in image + undo in all layers
 size_t mem_used_layers();
 
-void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
+#define FX_EDGE     0
+#define FX_EMBOSS   2
+#define FX_SHARPEN  3
+#define FX_SOFTEN   4
+#define FX_SOBEL    5
+#define FX_PREWITT  6
+#define FX_GRADIENT 7
+#define FX_ROBERTS  8
+#define FX_LAPLACE  9
+
 void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
+void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
 void mem_gauss(double radiusX, double radiusY, int gcor);
 void mem_unsharp(double radius, double amount, int threshold, int gcor);
 void mem_dog(double radiusW, double radiusN, int norm, int gcor);
@@ -430,8 +440,6 @@ void mem_pal_load_def();		// Load default palette
 
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
-int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
-	png_color *pal2 );
 void mem_greyscale(int gcor);		// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
@@ -460,7 +468,6 @@ int mem_protected_RGB(int intcol);	// Is this intcol in list?
 void mem_swap_cols();			// Swaps colours and update memory
 void repaint_swatch( int index );	// Update a palette swatch
 void mem_get_histogram(int channel);	// Calculate how many of each colour index is on the canvas
-int do_posterize(int val, int posty);	// Posterize a number
 int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
 int mem_remove_unused_check();		// Check to see if we can remove unused palette colours
@@ -528,10 +535,10 @@ void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipb
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
 void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode);
-#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? \
-	tool_opacity / 2 : 127, smudge_mode && mem_undo_opacity)
-#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), MEM_BPP == 3 ? \
-	tool_opacity : -1, mem_undo_opacity)
+#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), tool_opacity / 2, \
+	smudge_mode && mem_undo_opacity)
+#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), tool_opacity, \
+	mem_undo_opacity)
 
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,
@@ -583,8 +590,7 @@ void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
 
 #define MEM_BPP (mem_channel == CHN_IMAGE ? mem_img_bpp : 1)
 #define BPP(x) ((x) == CHN_IMAGE ? mem_img_bpp : 1)
-
-#define GET_PIXEL(x,y) (mem_img[CHN_IMAGE][(x) + (y) * mem_width])
+#define IS_INDEXED ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
 
 #define POSTERIZE_MACRO res = 0.49 + ( ((1 << posty) - 1) * ((float) res)/255);\
 			res = 0.49 + 255 * ( ((float) res) / ((1 << posty) - 1) );
@@ -596,7 +602,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha);
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int opacity, int sourcebpp);
+	int sourcebpp, int destbpp);
 void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
 	unsigned char *alpha, unsigned char *trans, int opacity);
 
@@ -620,8 +626,6 @@ void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
 #define GRAD_CUSTOM_OPAC(X) (GRAD_POINTS * ((X) * 4 + 4))
 #define GRAD_CUSTOM_OMAP(X) (GRAD_POINTS * ((X) * 4 + 5))
 
-void blend_channel(int start, int step, int cnt, unsigned char *mask,
-	unsigned char *dest, unsigned char *src, int opacity);
 void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	unsigned char *img0, unsigned char *img,
 	unsigned char *alpha0, unsigned char *alpha, int opacity);

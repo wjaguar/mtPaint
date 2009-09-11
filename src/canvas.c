@@ -319,12 +319,28 @@ void pressed_invert()
 	update_all_views();
 }
 
+static int edge_mode;
+
+static int do_edge(GtkWidget *box, gpointer fdata)
+{
+	static const unsigned char fxmap[] = { FX_EDGE, FX_SOBEL, FX_PREWITT,
+		FX_GRADIENT, FX_ROBERTS, FX_LAPLACE };
+
+	spot_undo(UNDO_FILT);
+	do_effect(fxmap[edge_mode], 0);
+	mem_undo_prepare();
+
+	return TRUE;
+}
+
 void pressed_edge_detect()
 {
-	spot_undo(UNDO_FILT);
-	do_effect(0, 0);
-	mem_undo_prepare();
-	update_all_views();
+	char *fnames[] = { _("MT"), _("Sobel"), _("Prewitt"),
+		_("Gradient"), _("Roberts"), _("Laplace"), NULL };
+	GtkWidget *box;
+
+	box = wj_radio_pack(fnames, -1, 3, edge_mode, &edge_mode, NULL);
+	filter_window(_("Edge Detect"), box, do_edge, NULL, FALSE);
 }
 
 static int do_fx(GtkWidget *spin, gpointer fdata)
@@ -342,19 +358,19 @@ static int do_fx(GtkWidget *spin, gpointer fdata)
 void pressed_sharpen()
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)(3), FALSE);
+	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)FX_SHARPEN, FALSE);
 }
 
 void pressed_soften()
 {
 	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)(4), FALSE);
+	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)FX_SOFTEN, FALSE);
 }
 
 void pressed_emboss()
 {
 	spot_undo(UNDO_FILT);
-	do_effect(2, 0);
+	do_effect(FX_EMBOSS, 0);
 	mem_undo_prepare();
 	update_all_views();
 }
@@ -925,7 +941,7 @@ static void cut_clip()
 	spot_undo(UNDO_DRAW);
 	step = mem_clip_mask ? 1 : 0;
 	to = tool_opacity;
-	kk = mem_channel <= CHN_ALPHA ? tool_opacity : 255;
+	kk = IS_INDEXED ? 255 : tool_opacity;
 
 	for (i = 0; i < mem_clip_h; i++)
 	{

@@ -1925,13 +1925,6 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	}
 }
 
-int do_posterize(int val, int posty)	// Posterize a number
-{
-	int res = val;
-	POSTERIZE_MACRO
-	return res;
-}
-
 unsigned char pal_dupes[256];
 
 int scan_duplicates()			// Find duplicate palette colours, return number found
@@ -2071,17 +2064,6 @@ void set_zoom_centre( int x, int y )
 		mem_icy = ((float) y ) / mem_height;
 		mem_ics = 1;
 	}
-}
-
-int mem_pal_cmp( png_color *pal1, png_color *pal2 )	// Count itentical palette entries
-{
-	int i, j = 0;
-
-	for ( i=0; i<256; i++ ) if ( pal1[i].red != pal2[i].red ||
-				pal1[i].green != pal2[i].green ||
-				pal1[i].blue != pal2[i].blue ) j++;
-
-	return j;
 }
 
 int mem_convert_rgb()			// Convert image to RGB
@@ -5759,7 +5741,7 @@ void put_pixel_def( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
 	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
-	int i, j, offset, ofs3, opacity = 0, op = tool_opacity, tint;
+	int i, j, offset, ofs3, opacity = 255, op = tool_opacity, tint;
 
 #ifdef U_API
 	if ( x<0 || y<0 || x>=mem_width || y>=mem_height ) return;	// Outside canvas
@@ -5787,60 +5769,58 @@ void put_pixel_def( int x, int y )	/* Combined */
 		cset[2] = mem_col_pat24[i + 2];
 	}
 
-	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
-	else old_image = mem_img[mem_channel];
-	if (mem_channel <= CHN_ALPHA)
+	old_image = mem_undo_opacity ? mem_undo_previous(mem_channel) :
+		mem_img[mem_channel];
+	if ((mem_channel == CHN_IMAGE) && RGBA_mode)
+		old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
+			mem_img[CHN_ALPHA];
+
+	if (!IS_INDEXED) // No use for opacity with indexed images
 	{
-		if (RGBA_mode || (mem_channel == CHN_ALPHA))
-		{
-			if (mem_undo_opacity)
-				old_alpha = mem_undo_previous(CHN_ALPHA);
-			else old_alpha = mem_img[CHN_ALPHA];
-		}
-		if (mem_img_bpp == 3)
-		{
-			j = (255 - j) * op;
-			opacity = (j + (j >> 8) + 1) >> 8;
-		}
+		j = (255 - j) * op;
+		opacity = (j + (j >> 8) + 1) >> 8;
 	}
+
 	offset = x + mem_width * y;
 
-	/* Alpha channel */
+	/* Coupled alpha channel */
 	if (old_alpha && mem_img[CHN_ALPHA])
 	{
 		newc = cset[CHN_ALPHA + 3];
 		oldc = old_alpha[offset];
-		if (tint)
+
+		if (!tint); // Do nothing
+		else if (tint < 0) newc = oldc + newc < 255 ? oldc + newc : 255;
+		else newc = oldc > newc ? oldc - newc : 0;
+
+		if (opacity < 255)
 		{
-			if (tint < 0) newc = oldc > 255 - newc ?
-				255 : oldc + newc;
-			else newc = oldc > newc ? oldc - newc : 0;
-		}
-		if (opacity)
-		{
-			j = oldc * 255 + (newc - oldc) * opacity;
-			mem_img[CHN_ALPHA][offset] = (j + (j >> 8) + 1) >> 8;
+			int j = oldc * 255 + (newc - oldc) * opacity;
 			if (j && !channel_dis[CHN_ALPHA])
 				opacity = (255 * opacity * newc) / j;
+			newc = (j + (j >> 8) + 1) >> 8;
 		}
-		else mem_img[CHN_ALPHA][offset] = newc;
-		if (mem_channel == CHN_ALPHA) return;
+		mem_img[CHN_ALPHA][offset] = newc;
 	}
 
 	/* Indexed image or utility channel */
 	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
 		newc = cset[mem_channel + 3];
-		if (tint)
-		{
-			if (tint < 0)
-			{
-				j = mem_channel == CHN_IMAGE ? mem_cols - 1 : 255;
-				newc = old_image[offset] > j - newc ? j : old_image[offset] + newc;
-			}
-			else
-				newc = old_image[offset] > newc ? old_image[offset] - newc : 0;
+		oldc = old_image[offset];
 
+		if (!tint); // Do nothing
+		else if (tint < 0)
+		{
+			int j = mem_channel == CHN_IMAGE ? mem_cols - 1 : 255;
+			newc = oldc + newc < j ? oldc + newc : j;
+		}
+		else newc = oldc > newc ? oldc - newc : 0;
+
+		if (opacity < 255)
+		{
+			int j = oldc * 255 + (newc - oldc) * opacity;
+			newc = (j + (j >> 8) + 1) >> 8;
 		}
 		mem_img[mem_channel][offset] = newc;
 	}
@@ -5852,20 +5832,18 @@ void put_pixel_def( int x, int y )	/* Combined */
 
 		if (mem_blend) blend_rgb(cset, old_image + ofs3, tint);
 
-		if (tint)
+		if (!tint); // Do nothing
+		else if (tint < 0)
 		{
-			if (tint < 0)
-			{
-				cset[0] = old_image[ofs3] > 255 - cset[0] ? 255 : old_image[ofs3] + cset[0];
-				cset[1] = old_image[ofs3 + 1] > 255 - cset[1] ? 255 : old_image[ofs3 + 1] + cset[1];
-				cset[2] = old_image[ofs3 + 2] > 255 - cset[2] ? 255 : old_image[ofs3 + 2] + cset[2];
-			}
-			else
-			{
-				cset[0] = old_image[ofs3] > cset[0] ? old_image[ofs3] - cset[0] : 0;
-				cset[1] = old_image[ofs3 + 1] > cset[1] ? old_image[ofs3 + 1] - cset[1] : 0;
-				cset[2] = old_image[ofs3 + 2] > cset[2] ? old_image[ofs3 + 2] - cset[2] : 0;
-			}
+			cset[0] = old_image[ofs3] > 255 - cset[0] ? 255 : old_image[ofs3] + cset[0];
+			cset[1] = old_image[ofs3 + 1] > 255 - cset[1] ? 255 : old_image[ofs3 + 1] + cset[1];
+			cset[2] = old_image[ofs3 + 2] > 255 - cset[2] ? 255 : old_image[ofs3 + 2] + cset[2];
+		}
+		else
+		{
+			cset[0] = old_image[ofs3] > cset[0] ? old_image[ofs3] - cset[0] : 0;
+			cset[1] = old_image[ofs3 + 1] > cset[1] ? old_image[ofs3 + 1] - cset[1] : 0;
+			cset[2] = old_image[ofs3 + 2] > cset[2] ? old_image[ofs3 + 2] - cset[2] : 0;
 		}
 
 		if (opacity < 255)
@@ -5893,10 +5871,11 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha)
 {
 	unsigned char *xalpha = NULL;
-	int i, j, k, tint;
+	int tint;
 
 	cnt = start + step * cnt;
 
+// !!! Or maybe modes should not affect coupled alpha at all?
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
@@ -5910,6 +5889,8 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	/* Opacity mode */
 	if (opacity)
 	{
+		int i, j, k;
+
 		for (i = start; i < cnt; i += step)
 		{
 			unsigned char newc, oldc;
@@ -5951,20 +5932,24 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 		}
 	}
 
-	/* Indexed mode with transparency mask and/or alpha */
-	else if (trans || alpha)
+	/* Indexed mode - set mask to on-off */
+	else
 	{
+		int i, k;
+
 		for (i = start; i < cnt; i += step)
 		{
 			unsigned char newc, oldc;
 
+			k = mask[i];
 			if (trans)
 			{
 				oldc = trans[i];
 				if (xalpha) oldc &= xalpha[i];
-				mask[i] |= oldc ^ 255;
+				k |= oldc ^ 255;
 			}
-			if (!alpha || mask[i]) continue;
+			mask[i] = k = k ? 0 : 255;
+			if (!alpha || !k) continue;
 			/* Have alpha channel - process it */
 			newc = alpha[i];
 			if (tint)
@@ -5981,11 +5966,11 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int opacity, int sourcebpp)
+	int sourcebpp, int destbpp)
 {
 	unsigned char newc, oldc;
 	unsigned char r, g, b, nrgb[3];
-	int i, j, ofs3, tint;
+	int tint;
 
 	cnt = start + step * cnt;
 
@@ -5993,18 +5978,26 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	/* Indexed image or utility channel */
-	if (!opacity)
+	if (destbpp < 3)
 	{
+		int i, j, mx = destbpp ? 255 : mem_cols - 1;
+
 		for (i = start; i < cnt; i += step)
 		{
-			if (mask[i]) continue;
+			j = mask[i];
+			if (!j) continue;
 			newc = img[i];
-			if (tint)
+			oldc = img0[i];
+
+			if (!tint); // Do nothing
+			else if (tint < 0) newc = oldc + newc < mx ?
+				oldc + newc : mx;
+			else newc = oldc > newc ? oldc - newc : 0;
+
+			if (j < 255)
 			{
-				oldc = img0[i];
-				if (tint < 0) newc = oldc >= mem_cols - newc ?
-					mem_cols - 1 : oldc + newc;
-				else newc = oldc > newc ? oldc - newc : 0;
+				j = oldc * 255 + (newc - oldc) * j;
+				newc = (j + (j >> 8) + 1) >> 8;
 			}
 			imgr[i] = newc;
 		}
@@ -6013,6 +6006,8 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	/* RGB image */
 	else
 	{
+		int i, j, ofs3, opacity;
+
 		for (i = start; i < cnt; i += step)
 		{
 			opacity = mask[i];
@@ -6078,16 +6073,9 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	bpp = MEM_BPP;
 
 	/* Setup opacity mode */
-	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1)) opacity = 0;
+	if (IS_INDEXED) opacity = 0;
 
-	/* Alpha channel is special */
-	if (mem_channel == CHN_ALPHA)
-	{
-		alpha = img;
-		img = NULL;
-	}
-
-	/* Prepare alpha */
+	/* Prepare coupled alpha */
 	if (alpha && mem_img[CHN_ALPHA])
 	{
 		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);
@@ -6106,7 +6094,8 @@ void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img
 	old_image += ofs * bpp;
 	dest = mem_img[mem_channel] + ofs * bpp;
 
-	process_img(0, 1, len, mask, dest, old_image, img, opacity, mem_clip_bpp);
+	process_img(0, 1, len, mask, dest, old_image, img, mem_clip_bpp,
+		opacity ? bpp : 0);
 }
 
 int mem_count_all_cols()				// Count all colours - Using main image
@@ -6184,10 +6173,10 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 ////	EFFECTS
 
 
-void do_effect( int type, int param )		// 0=edge detect 1=UNUSED 2=emboss
+void do_effect(int type, int param)
 {
 	unsigned char *src, *dest, *tmp = "\0", *mask = NULL;
-	int i, j, k = 0, ix, bpp, ll, dxp1, dxm1, dyp1, dym1;
+	int i, j, k = 0, k1, k2, bpp, ll, dxp1, dxm1, dyp1, dym1;
 	int op, md, ms;
 	double blur = (double)param / 200.0;
 
@@ -6205,12 +6194,12 @@ void do_effect( int type, int param )		// 0=edge detect 1=UNUSED 2=emboss
 	}
 	progress_init(_("Applying Effect"), 1);
 
-	for (ix = i = 0; i < mem_height; i++)
+	for (i = 0; i < mem_height; i++)
 	{
 		if (mask) row_protected(0, i, mem_width, tmp = mask);
 		dyp1 = i < mem_height - 1 ? ll : -ll;
 		dym1 = i ? -ll : ll;
-		for (md = j = 0; j < ll; j++ , ix++)
+		for (md = j = 0; j < ll; j++ , src++ , dest++)
 		{
 			op = *tmp;
 			/* One step for 1 or 3 bytes */
@@ -6222,32 +6211,78 @@ void do_effect( int type, int param )		// 0=edge detect 1=UNUSED 2=emboss
 			dxm1 = j >= bpp ? -bpp : bpp;
 			switch (type)
 			{
-			case 0:	/* Edge detect */
-				k = src[ix];
-				k = abs(k - src[ix + dym1]) + abs(k - src[ix + dyp1]) +
-					abs(k - src[ix + dxm1]) + abs(k - src[ix + dxp1]);
+			case FX_EDGE: /* Edge detect */
+				k = *src;
+				k = abs(k - src[dym1]) + abs(k - src[dyp1]) +
+					abs(k - src[dxm1]) + abs(k - src[dxp1]);
 				break;
-			case 2:	/* Emboss */
-				k = src[ix + dym1] + src[ix + dxm1] +
-					src[ix + dxm1 + dym1] + src[ix + dxp1 + dym1];
-				k = k / 4 - src[ix] + 127;
+			case FX_EMBOSS: /* Emboss */
+				k = src[dym1] + src[dxm1] +
+					src[dxm1 + dym1] + src[dxp1 + dym1];
+				k = k / 4 - *src + 127;
 				break;
-			case 3:	/* Edge sharpen */
-				k = src[ix + dym1] + src[ix + dyp1] +
-					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
-				k = src[ix] - blur * k;
+			case FX_SHARPEN: /* Edge sharpen */
+				k = src[dym1] + src[dyp1] +
+					src[dxm1] + src[dxp1] - 4 * src[0];
+				k = *src - blur * k;
 				break;
-			case 4:	/* Edge soften */
-				k = src[ix + dym1] + src[ix + dyp1] +
-					src[ix + dxm1] + src[ix + dxp1] - 4 * src[ix];
-				k = src[ix] + (5 * k) / (125 - param);
+			case FX_SOFTEN: /* Edge soften */
+				k = src[dym1] + src[dyp1] +
+					src[dxm1] + src[dxp1] - 4 * src[0];
+				k = *src + (5 * k) / (125 - param);
+				break;
+			case FX_SOBEL: /* Another edge detector */
+				k1 = (src[dxp1] - src[dxm1]) * 2 +
+					src[dym1 + dxp1] - src[dym1 + dxm1] +
+					src[dyp1 + dxp1] - src[dyp1 + dxm1];
+				k2 = (src[dyp1] - src[dym1]) * 2 +
+					src[dyp1 + dxm1] + src[dyp1 + dxp1] -
+					src[dym1 + dxm1] - src[dym1 + dxp1];
+				k = sqrt(k1 * k1 + k2 * k2);
+				break;
+			case FX_PREWITT: /* Yet another edge detector */
+/* Actually, the filter kernel used here is said to be "Robinson"; what is
+ * attributable to Prewitt is "compass filtering", which can be done with
+ * different filter kernels - WJ */
+				k = k1 = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
+					src[dxm1] - 2 * src[0] + src[dxp1] -
+					src[dyp1 + dxm1] - src[dyp1] - src[dyp1 + dxp1];
+				k1 += (src[dyp1 + dxm1] - src[dxp1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dyp1] - src[dym1 + dxp1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dyp1 + dxp1] - src[dym1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dxp1] - src[dym1 + dxm1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dym1 + dxp1] - src[dxm1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dym1] - src[dyp1 + dxm1]) * 2;
+				if (k < k1) k = k1;
+				k1 += (src[dym1 + dxm1] - src[dyp1]) * 2;
+				if (k < k1) k = k1;
+				break;
+			case FX_GRADIENT: /* Still another edge detector */
+				k1 = src[dxp1] - src[0];
+				k2 = src[dyp1] - src[0];
+				k = 4.0 * sqrt(k1 * k1 + k2 * k2);
+				break;
+			case FX_ROBERTS: /* One more edge detector */
+				k1 = src[dyp1 + dxp1] - src[0];
+				k2 = src[dxp1] - src[dyp1];
+				k = 4.0 * sqrt(k1 * k1 + k2 * k2);
+				break;
+			case FX_LAPLACE: /* The last edge detector... I hope */
+				k = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
+					src[dxm1] - 8 * src[0] + src[dxp1] +
+					src[dyp1 + dxm1] + src[dyp1] + src[dyp1 + dxp1];
 				break;
 			}
 			k = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
-			k = 255 * k + (src[ix] - k) * op;
-			dest[ix] = (k + (k >> 8) + 1) >> 8;
+			k = 255 * k + (*src - k) * op;
+			*dest = (k + (k >> 8) + 1) >> 8;
 		}
-		if ((type != 1) && ((i * 10) % mem_height >= mem_height - 10))
+		if ((i * 10) % mem_height >= mem_height - 10)
 			if (progress_update((float)(i + 1) / mem_height)) break;
 	}
 	free(mask);
@@ -7455,6 +7490,8 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 	if ((w < 1) || (h < 1)) return;
 	if (!opacity) return;
 
+	if (IS_INDEXED) opacity = -1; // No mixing for indexed image
+
 /* !!! I modified this tool action somewhat - White Jaguar */
 	if (mode) src = mem_undo_previous(mem_channel);
 	else src = mem_img[mem_channel];
@@ -7906,8 +7943,7 @@ void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
 	unsigned char cset[NUM_CHANNELS + 3];
 	int i, j, op, rgbmode, mmask = 255, ix = 0;
 
-	if ((mem_channel > CHN_ALPHA) || (mem_img_bpp == 1))
-		mmask = 1 , ix = 255; /* On/off opacity */
+	if (IS_INDEXED) mmask = 1 , ix = 255; /* On/off opacity */
 	rgbmode = (mem_channel == CHN_IMAGE) && (mem_img_bpp == 3);
 
 	cnt = start + step * cnt;
@@ -7926,22 +7962,6 @@ void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
 		}
 		else img0[i] = cset[mem_channel + 3];
 		if (alpha0) alpha0[i] = cset[CHN_ALPHA + 3];
-	}
-}
-
-/* Blend selection or mask channel for preview */
-void blend_channel(int start, int step, int cnt, unsigned char *mask,
-	unsigned char *dest, unsigned char *src, int opacity)
-{
-	int i, j;
-
-	if (opacity == 255) return;
-	cnt = start + step * cnt;
-	for (i = start; i < cnt; i += step)
-	{
-		if (mask[i]) continue;
-		j = src[i] * 255 + opacity * (dest[i] - src[i]);
-		dest[i] = (j + (j >> 8) + 1) >> 8;
 	}
 }
 

@@ -49,9 +49,9 @@ GdkCursor *m_cursor[32];		// My mouse cursors
 
 static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
 	*toolbar_labels[2],		// Colour A & B details
-	*ts_spinslides[3],		// Size, flow, opacity
-	*tb_label_opacity		// Opacity label
-	;
+	*ts_spinslides[4],		// Size, flow, opacity, value
+	*ts_label_channel;		// Channel name
+
 static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
 					// RGB colours, tool, pattern preview
 
@@ -340,25 +340,25 @@ static void ts_update_spinslides()
 {
 	mt_spinslide_set_value(ts_spinslides[0], tool_size);
 	mt_spinslide_set_value(ts_spinslides[1], tool_flow);
-	mt_spinslide_set_value(ts_spinslides[2], mem_channel == CHN_IMAGE ?
-		tool_opacity : channel_col_A[mem_channel]);
+	mt_spinslide_set_value(ts_spinslides[2], tool_opacity);
+	if (mem_channel != CHN_IMAGE)
+		mt_spinslide_set_value(ts_spinslides[3], channel_col_A[mem_channel]);
 }
 
 
 static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
 {
-	int n, i;
+	int n = ADJ2INT(adj);
 
-	n = ADJ2INT(adj);
 	switch ((int)user_data)
 	{
 	case 0: tool_size = n;
 		break;
 	case 1:	tool_flow = n;
 		break;
-	case 2:	i = mem_channel == CHN_IMAGE ? tool_opacity :
-			channel_col_A[mem_channel];
-		if (n != i) pressed_opacity(n);
+	case 2:	if (n != tool_opacity) pressed_opacity(n);
+		break;
+	case 3: if (n != channel_col_A[mem_channel]) pressed_value(n);
 		break;
 	}
 }
@@ -454,12 +454,11 @@ static toolbar_item gradient_button =
 
 static void toolbar_settings_init()
 {
-	int i, vals[] = {tool_size, tool_flow, tool_opacity};
-	char *ts_titles[] = { _("Size"), _("Flow"), _("Opacity") };
-
-	GtkWidget *label, *vbox, *table, *toolbar_settings, *labels[3];
+	char *ts_titles[4] = { _("Size"), _("Flow"), _("Opacity"), "" };
+	GtkWidget *label, *vbox, *table, *toolbar_settings;
 	GtkWidget *button;
 	GdkPixmap *pmap;
+	int i;
 
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] )
@@ -537,19 +536,21 @@ static void toolbar_settings_init()
 	gtk_widget_show (label);
 	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
 
-	if (mem_channel != CHN_IMAGE) vals[2] = channel_col_A[mem_channel];
-	table = add_a_table(3, 2, 5, vbox);
-	for (i = 0; i < 3; i++)
+	table = pack_end(vbox, gtk_table_new(4, 2, FALSE));
+	gtk_widget_show(table);
+	gtk_container_set_border_width(GTK_CONTAINER(table), 5);
+	for (i = 0; i < 4; i++)
 	{
-		labels[i] = add_to_table(ts_titles[i], table, i, 0, 0);
+		label = add_to_table(ts_titles[i], table, i, 0, 0);
 		ts_spinslides[i] = mt_spinslide_new(-1, -1);
 		gtk_table_attach(GTK_TABLE(table), ts_spinslides[i], 1, 2,
 			i, i + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-		mt_spinslide_set_range(ts_spinslides[i], i == 2 ? 0 : 1, 255);
+		mt_spinslide_set_range(ts_spinslides[i], i < 2 ? 1 : 0, 255);
 		mt_spinslide_connect(ts_spinslides[i],
 			GTK_SIGNAL_FUNC(ts_spinslide_moved), (gpointer)i);
 	}
-	tb_label_opacity = labels[2];
+// !!! Use the fact that channel value slider is the last one
+	ts_label_channel = label;
 
 	gtk_signal_connect(GTK_OBJECT(toolbar_boxes[TOOLBAR_SETTINGS]),
 		"delete_event", GTK_SIGNAL_FUNC(toolbar_settings_exit), NULL);
@@ -730,8 +731,7 @@ void ts_update_gradient()
 		}
 	}
 	else tmp = cset , --slot; /* Use gradient colors */
-	if ((mem_img_bpp == 3) && (mem_channel <= CHN_ALPHA))
-		idx = 0; /* Allow intermediate opacities */
+	if (!IS_INDEXED) idx = 0; /* Allow intermediate opacities */
 
 	/* Draw the preview, ignoring RGBA coupling */
 	memset(rgb, mem_background, sizeof(rgb));
@@ -783,9 +783,6 @@ void toolbar_update_settings()
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
 
-	ts_update_spinslides();		// Update tool settings
-	ts_update_gradient();
-
 	for (i = 0; i < 2; i++)
 	{
 		c = "AB"[i]; j = mem_col_[i];
@@ -796,10 +793,26 @@ void toolbar_update_settings()
 		gtk_label_set_text(GTK_LABEL(toolbar_labels[i]), txt);
 	}
 
-	if ( mem_channel == CHN_IMAGE )
-		gtk_label_set_text( GTK_LABEL(tb_label_opacity), _("Opacity") );
+	if (mem_channel == CHN_IMAGE)
+	{
+		gtk_widget_show(toolbar_labels[0]);
+		gtk_widget_show(toolbar_labels[1]);
+		gtk_widget_hide(ts_label_channel);
+		gtk_widget_hide(ts_spinslides[3]);
+	}
 	else
-		gtk_label_set_text( GTK_LABEL(tb_label_opacity), channames[mem_channel] );
+	{
+		gtk_label_set_text(GTK_LABEL(ts_label_channel), channames[mem_channel]);
+		gtk_widget_hide(toolbar_labels[0]);
+		gtk_widget_hide(toolbar_labels[1]);
+		gtk_widget_show(ts_label_channel);
+		gtk_widget_show(ts_spinslides[3]);
+	}
+	// Disable opacity for indexed image
+	gtk_widget_set_sensitive(ts_spinslides[2], !IS_INDEXED);
+
+	ts_update_spinslides();		// Update tool settings
+	ts_update_gradient();
 }
 
 static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
