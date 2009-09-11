@@ -899,6 +899,48 @@ void fix_scroll(GtkWidget *scroll)
 #endif
 }
 
+// Init-time bugfix for GTK+1 - GtkViewport size request
+
+#if GTK_MAJOR_VERSION == 1
+
+/* This is gtk_viewport_size_request() from GTK+ 1.2.10 with stupid bugs fixed */
+static void gtk_viewport_size_request_fixed(GtkWidget *widget,
+	GtkRequisition *requisition)
+{
+	GtkBin *bin;
+	GtkRequisition child_requisition;
+
+	g_return_if_fail(widget != NULL);
+	g_return_if_fail(GTK_IS_VIEWPORT(widget));
+	g_return_if_fail(requisition != NULL);
+
+	bin = GTK_BIN(widget);
+
+	requisition->width = requisition->height =
+		GTK_CONTAINER(widget)->border_width * 2;
+
+	if (GTK_VIEWPORT(widget)->shadow_type != GTK_SHADOW_NONE)
+	{
+		requisition->width += widget->style->klass->xthickness * 2;
+		requisition->height += widget->style->klass->ythickness * 2;
+	}
+
+	if (bin->child && GTK_WIDGET_VISIBLE(bin->child))
+	{
+		gtk_widget_size_request(bin->child, &child_requisition);
+		requisition->width += child_requisition.width;
+		requisition->height += child_requisition.height;
+	}
+}
+
+void gtk_init_bugfixes()
+{
+	((GtkWidgetClass*)gtk_type_class(GTK_TYPE_VIEWPORT))->size_request =
+		gtk_viewport_size_request_fixed;
+}
+
+#endif
+
 // Whatever is needed to move mouse pointer 
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */

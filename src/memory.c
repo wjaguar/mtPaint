@@ -83,7 +83,8 @@ int mem_background = 180;		// Non paintable area
 unsigned char *mem_clipboard;		// Pointer to clipboard data
 unsigned char *mem_clip_mask;		// Pointer to clipboard mask
 unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
-unsigned char *mem_brushes;		// Preset brushes screen memory
+unsigned char mem_brushes[PATCH_WIDTH * PATCH_HEIGHT * 3];
+					// Preset brushes screen memory
 int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
 int mem_clip_bpp;			// Bytes per pixel
 int mem_clip_w = -1, mem_clip_h = -1;	// Clipboard geometry
@@ -109,8 +110,8 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 /// PATTERNS
 
 unsigned char *mem_pattern;		// Original 0-1 pattern
-unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
-unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
+unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
+unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 
 /// PREVIEW/TOOLS
 
@@ -137,7 +138,8 @@ png_color mem_pal[256];			// RGB entries for all 256 palette colours
 int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
 int mem_col_[2] = { 1, 0 };		// Index for colour A & B
 png_color mem_col_24[2];		// RGB for colour A & B
-char *mem_pals = NULL;			// RGB screen memory holding current palette
+unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
+					// RGB screen memory holding current palette
 static unsigned char found[1024 * 3];	// Used by mem_cols_used() & mem_convert_indexed
 char mem_prot_mask[256];		// 256 bytes used for indexed images
 int mem_prot_RGB[256];			// Up to 256 RGB colours protected
@@ -291,7 +293,7 @@ png_color mem_pal_def[256]={		// Default palette entries for new image
 /// End: Primary (8) + Fades (42) + Shades (126) + Scales (66) + Misc (14) = 256
 };
 
-char mem_cross[9][9] = {
+static unsigned char mem_cross[PALETTE_CROSS_H][PALETTE_CROSS_W] = {
 	{1,1,0,0,0,0,1,1},
 	{1,1,1,0,0,1,1,1},
 	{0,1,1,1,1,1,1,0},
@@ -301,7 +303,7 @@ char mem_cross[9][9] = {
 	{1,1,1,0,0,1,1,1},
 	{1,1,0,0,0,0,1,1}
 };
-char mem_numbers[10][7][7] = { {
+static unsigned char mem_numbers[10][PALETTE_DIGIT_H][PALETTE_DIGIT_W] = { {
 	{0,0,1,1,1,1,0},
 	{0,1,1,0,0,1,1},
 	{0,1,1,0,0,1,1},
@@ -750,23 +752,14 @@ int mem_undo_size(undo_item *undo)
 	return total;
 }
 
-char *grab_memory( int size, char byte )	// Malloc memory, reset all bytes
-{
-	char *chunk;
-
-	chunk = malloc( size );
-	
-	if (chunk) memset(chunk, byte, size);
-
-	return chunk;
-}
-
 void mem_init()					// Initialise memory
 {
+	static const unsigned char lookup[8] =
+		{ 0, 36, 73, 109, 146, 182, 219, 255 };
 	unsigned char *dest;
 	char txt[300], *cnames[NUM_CHANNELS + 1] =
 		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
-	int i, j, lookup[8] = {0, 36, 73, 109, 146, 182, 219, 255}, ix, iy, bs, bf, bt;
+	int i, j, ix, iy, bs, bf, bt;
 	png_color temp_pal[256];
 
 
@@ -774,14 +767,7 @@ void mem_init()					// Initialise memory
 		allchannames[i] = channames[i] = cnames[i];
 	channames[CHN_IMAGE] = "";
 
-	toolbar_preview_init();
-
-	mem_col_pat = grab_memory( 8*8, 0 );
-	mem_col_pat24 = grab_memory( 3*8*8, 0 );
-	mem_pals = grab_memory( 3*PALETTE_WIDTH*PALETTE_HEIGHT, 0 );
-	mem_brushes = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, 0 );
-
-	for ( i=0; i<256; i++ )		// Load up normal palette defaults
+	for (i = 0; i < 256; i++)	// Load up normal palette defaults
 	{
 		mem_pal_def[i].red = lookup[mem_pal_def[i].red];
 		mem_pal_def[i].green = lookup[mem_pal_def[i].green];
@@ -857,7 +843,7 @@ void mem_init()					// Initialise memory
 				put_pixel( ix-bs/2 + rand() % bs, iy-bs/2 + rand() % bs );
 	}
 
-	j = 3*PATCH_WIDTH*PATCH_HEIGHT;
+	j = PATCH_WIDTH * PATCH_HEIGHT * 3;
 	memcpy(mem_brushes, mem_img[CHN_IMAGE], j);	// Store image for later use
 	memset(mem_img[CHN_IMAGE], 0, j);	// Clear so user doesn't see it upon load fail
 
@@ -895,34 +881,6 @@ void mem_init()					// Initialise memory
 		gmap_setup(graddata + i, gradbytes, i);
 }
 
-void copy_dig( int index, int tx, int ty )
-{
-	int i, j, r;
-
-	index = index % 10;
-
-	for ( j=0; j<7; j++ )
-	{
-		for ( i=0; i<7; i++ )
-		{
-			r = 200*mem_numbers[index][j][i];
-			mem_pals[ 0+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-			mem_pals[ 1+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-			mem_pals[ 2+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-		}
-	}
-	
-}
-
-static void copy_num( int index, int tx, int ty )
-{
-	index = index % 1000;
-
-	if ( index >= 100 ) copy_dig( index/100, tx, ty);
-	if ( index >= 10 ) copy_dig( (index/10) % 10, tx+8, ty);
-	copy_dig( index % 10, tx+16, ty);
-}
-
 void mem_swap_cols()
 {
 	int oc;
@@ -954,36 +912,72 @@ void mem_swap_cols()
 	mem_pat_update();
 }
 
-void repaint_swatch( int index )		// Update a palette colour swatch
+#define PALETTE_TEXT_GREY 200
+
+void repaint_swatch(int index)		// Update a palette colour swatch
 {
-	int tx=25, ty=35+index*16-34, i, j,
-		r=mem_pal[index].red, g=mem_pal[index].green, b=mem_pal[index].blue;
+	unsigned char *tmp, pcol[2] = { 0, 0 };
+	int i, j;
 
-	for ( j=0; j<16; j++ )
+	tmp = mem_pals + index * PALETTE_SWATCH_H * PALETTE_W3 +
+		PALETTE_SWATCH_Y * PALETTE_W3 + PALETTE_SWATCH_X * 3;
+	tmp[0] = mem_pal[index].red;
+	tmp[1] = mem_pal[index].green;
+	tmp[2] = mem_pal[index].blue;
+	for (i = 3; i < PALETTE_SWATCH_W * 3; i++) tmp[i] = tmp[i - 3];
+	for (i = 1; i < PALETTE_SWATCH_H; i++)
+		memcpy(tmp + i * PALETTE_W3, tmp, PALETTE_SWATCH_W * 3);
+
+	if (mem_prot_mask[index]) pcol[1] = PALETTE_TEXT_GREY;	// Protection mask cross
+	tmp += PALETTE_CROSS_DY * PALETTE_W3 +
+		(PALETTE_CROSS_X + PALETTE_CROSS_DX - PALETTE_SWATCH_X) * 3;
+	for (i = 0; i < PALETTE_CROSS_H; i++)
 	{
-		for ( i=0; i<26; i++ )
+		for (j = 0; j < PALETTE_CROSS_W; j++)
 		{
-			mem_pals[ 0+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-			mem_pals[ 1+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = g;
-			mem_pals[ 2+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = b;
+			tmp[0] = tmp[1] = tmp[2] = pcol[mem_cross[i][j]];
+			tmp += 3;
 		}
+		tmp += PALETTE_W3 - PALETTE_CROSS_W * 3;
 	}
+}
 
-	if ( mem_prot_mask[index] == 0 ) g = 0;		// Protection mask cross
-	else g = 1;
-	tx = 53+4; ty = 39 + index*16-34;
-	for ( j=0; j<8; j++ )
+static void copy_num(int index, int tx, int ty)
+{
+	static const unsigned char pcol[2] = { 0, PALETTE_TEXT_GREY };
+	unsigned char *tmp = mem_pals + ty * PALETTE_W3 + tx * 3;
+	int i, j, n, d, v = index;
+
+	for (d = 100; d; d /= 10 , tmp += (PALETTE_DIGIT_W + 1) * 3)
 	{
-		for ( i=0; i<8; i++ )
+		if ((index < d) && (d > 1)) continue;
+		v -= (n = v / d) * d;
+		for (i = 0; i < PALETTE_DIGIT_H; i++)
 		{
-			r = 200*g*mem_cross[j][i];
-			mem_pals[ 0+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-			mem_pals[ 1+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
-			mem_pals[ 2+3*( tx+i + PALETTE_WIDTH*(ty+j) ) ] = r;
+			for (j = 0; j < PALETTE_DIGIT_W; j++)
+			{
+				tmp[0] = tmp[1] = tmp[2] =
+					pcol[mem_numbers[n][i][j]];
+				tmp += 3;
+			}
+			tmp += PALETTE_W3 - PALETTE_DIGIT_W * 3;
 		}
+		tmp -= PALETTE_DIGIT_H * PALETTE_W3;
 	}
+}
 
-	copy_num( index, 0, 40 + index*16-34 );		// Index number
+void mem_pal_init()			// Redraw whole palette
+{
+	int i;
+
+	memset(mem_pals, 0, PALETTE_WIDTH * PALETTE_HEIGHT * 3);
+	repaint_top_swatch();
+	for (i = 0; i < mem_cols; i++)
+	{
+		repaint_swatch(i);
+		copy_num(i, PALETTE_INDEX_X, i * PALETTE_SWATCH_H +
+			PALETTE_SWATCH_Y + PALETTE_INDEX_DY);	// Index number
+	}
 }
 
 static void validate_pal( int i, int rgb[3], png_color *pal )
@@ -1067,15 +1061,6 @@ printf("Failed - line %i is > 30 chars\n", i);
 	fclose( fp );
 
 	return new_mem_cols;
-}
-
-void mem_pal_init()			// Redraw whole palette
-{
-	int i;
-
-	memset(mem_pals, 0, 3 * PALETTE_WIDTH * PALETTE_HEIGHT);
-	repaint_top_swatch();
-	for (i = 0; i < mem_cols; i++) repaint_swatch(i);
 }
 
 void mem_mask_init()		// Initialise RGB protection mask array

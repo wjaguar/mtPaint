@@ -125,8 +125,6 @@ void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 						// Menu toggle for toolbars
 
 
-void toolbar_preview_init();		// Initialize memory for preview area
-
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
 void repaint_top_swatch();		// Update selected colours A & B, 

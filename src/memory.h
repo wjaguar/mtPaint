@@ -34,8 +34,26 @@
 	#define DEFAULT_HEIGHT 480
 #endif
 
-#define PALETTE_WIDTH 74
-#define PALETTE_HEIGHT 4500
+/* Palette area layout */
+
+#define PALETTE_SWATCH_X 25
+#define PALETTE_SWATCH_Y 1
+#define PALETTE_SWATCH_W 26
+#define PALETTE_SWATCH_H 16
+#define PALETTE_INDEX_X  0
+#define PALETTE_INDEX_DY 5
+#define PALETTE_DIGIT_W  7
+#define PALETTE_DIGIT_H  7
+#define PALETTE_CROSS_X  53
+#define PALETTE_CROSS_DX 4
+#define PALETTE_CROSS_DY 4
+#define PALETTE_CROSS_W  8
+#define PALETTE_CROSS_H  8
+
+#define PALETTE_WIDTH 70
+#define PALETTE_W3 (PALETTE_WIDTH * 3)
+#define PALETTE_HEIGHT (PALETTE_SWATCH_H * 256 + PALETTE_SWATCH_Y * 2)
+
 #define PATCH_WIDTH 324
 #define PATCH_HEIGHT 324
 
@@ -178,7 +196,7 @@ int mem_ics;				// Has the centre been set by the user? 0=no 1=yes
 unsigned char *mem_clipboard;		// Pointer to clipboard data
 unsigned char *mem_clip_mask;		// Pointer to clipboard mask
 unsigned char *mem_clip_alpha;		// Pointer to clipboard alpha
-unsigned char *mem_brushes;		// Preset brushes image
+extern unsigned char mem_brushes[];	// Preset brushes image
 int brush_tool_type;			// Last brush tool type
 int mem_brush_list[81][3];		// Preset brushes parameters
 int mem_clip_bpp;			// Bytes per pixel
@@ -208,8 +226,8 @@ unsigned char mem_grid_rgb[3];		// RGB colour of grid
 
 char mem_patterns[81][8][8];		// Pattern bitmaps
 unsigned char *mem_pattern;		// Original 0-1 pattern
-unsigned char *mem_col_pat;		// Indexed 8x8 colourised pattern using colours A & B
-unsigned char *mem_col_pat24;		// RGB 8x8 colourised pattern using colours A & B
+unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
+unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 
 /// PREVIEW/TOOLS
 
@@ -233,7 +251,7 @@ png_color mem_pal[256];			// RGB entries for all 256 palette colours
 png_color mem_pal_def[256];		// Default palette entries for new image
 int mem_pal_def_i;			// Items in default palette
 int mem_cols;				// Number of colours in the palette: 2..256 or 0 for no image
-char *mem_pals;				// RGB screen memory holding current palette
+extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 char mem_prot_mask[256];		// 256 bytes used for indexed images
 int mem_prot_RGB[256];			// Up to 256 RGB colours protected
 int mem_prot;				// 0..256 : Number of protected colours in mem_prot_RGB
@@ -273,7 +291,6 @@ int get_next_line(char *input, int length, FILE *fp);		// Get next length chars 
 int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
 int read_hex_dub( char *in );			// Read hex double
 
-char *grab_memory( int size, char byte );	// Malloc memory, reset all bytes
 void mem_clear();				// Remove old image if any
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );

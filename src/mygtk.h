@@ -170,6 +170,14 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 
 void fix_scroll(GtkWidget *scroll);
 
+// Init-time bugfixes for GTK+1
+
+#if GTK_MAJOR_VERSION == 1
+void gtk_init_bugfixes();
+#else
+#define gtk_init_bugfixes()
+#endif
+
 // Moving mouse cursor
 
 int move_mouse_relative(int dx, int dy);

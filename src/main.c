@@ -65,6 +65,7 @@ int main( int argc, char *argv[] )
 	inifile_init("/.mtpaint");
 
 	gtk_init( &argc, &argv );
+	gtk_init_bugfixes();
 
 #ifdef U_NLS
 	setup_language();

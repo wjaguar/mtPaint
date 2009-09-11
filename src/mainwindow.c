@@ -2911,7 +2911,7 @@ void repaint_perim(rgbcontext *ctx)
 	perim_status = 1; /* Drawn */
 }
 
-static gint canvas_motion( GtkWidget *widget, GdkEventMotion *event )
+static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
 	int x, y, rm, zoom = 1, scale = 1, button = 0;
 	GdkModifierType state;

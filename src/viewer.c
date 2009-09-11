@@ -513,7 +513,7 @@ void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
 	mtMAX(pan_w, pan_w, 1)
 	mtMAX(pan_h, pan_h, 1)
 
-	pan_rgb = grab_memory( 3*pan_w*pan_h, 0 );
+	pan_rgb = calloc(1, pan_w * pan_h * 3);
 
 	pan_thumbnail();
 
@@ -844,24 +844,23 @@ void vw_align_size( float new_zoom )
 	toolbar_zoom_update();
 }
 
-void vw_repaint( int px, int py, int pw, int ph )
+void vw_repaint(int px, int py, int pw, int ph)
 {
 	unsigned char *rgb;
 
-	mtMAX(px, px, 0)
-	mtMAX(py, py, 0)
-	if ( pw<=0 || ph<=0 ) return;
+	if ((pw <= 0) || (ph <= 0)) return;
+	if (px < 0) px = 0;
+	if (py < 0) py = 0;
 
-	rgb = grab_memory( pw*ph*3, mem_background );
-
-	if ( rgb != NULL )
+	rgb = calloc(1, pw * ph * 3);
+	if (rgb)
 	{
-
-		view_render_rgb( rgb, px - margin_view_x, py - margin_view_y, pw, ph, vw_zoom );
-		gdk_draw_rgb_image ( vw_drawing->window, vw_drawing->style->black_gc,
-			px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw*3 );
-
-		free( rgb );
+		memset(rgb, mem_background, pw * ph * 3);
+		view_render_rgb(rgb, px - margin_view_x, py - margin_view_y,
+			pw, ph, vw_zoom);
+		gdk_draw_rgb_image (vw_drawing->window, vw_drawing->style->black_gc,
+			px, py, pw, ph, GDK_RGB_DITHER_NONE, rgb, pw * 3);
+		free(rgb);
 	}
 }
 

@@ -324,7 +324,7 @@ void choose_pattern(int typ)			// Bring up pattern chooser (0) or brush (1)
 
 	if ( typ == 0 )
 	{
-		mem_patch = grab_memory( 3*PATCH_WIDTH*PATCH_HEIGHT, 0 );
+		mem_patch = calloc(1, PATCH_WIDTH * PATCH_HEIGHT * 3);
 
 		for ( pattern = 0; pattern < 81; pattern++ )
 		{

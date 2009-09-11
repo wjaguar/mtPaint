@@ -1166,7 +1166,8 @@ void init_pal()					// Initialise palette after loading
 {
 	mem_mask_init();		// Reinit RGB masks
 	mem_pal_init();			// Update palette RGB on screen
-	gtk_widget_set_usize( drawing_palette, PALETTE_WIDTH, 4+mem_cols*16 );
+	gtk_widget_set_usize(drawing_palette, PALETTE_WIDTH,
+		mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
 
 	update_cols();
 	gtk_widget_queue_draw( drawing_palette );

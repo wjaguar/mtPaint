@@ -144,7 +144,8 @@ static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
 	*ts_spinslides[3],		// Size, flow, opacity
 	*tb_label_opacity		// Opacity label
 	;
-static unsigned char *mem_prev;		// RGB colours, tool, pattern preview
+static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
+					// RGB colours, tool, pattern preview
 
 typedef struct
 {
@@ -955,30 +956,34 @@ void toolbar_update_settings()
 		gtk_label_set_text( GTK_LABEL(tb_label_opacity), channames[mem_channel] );
 }
 
-static gint expose_palette( GtkWidget *widget, GdkEventExpose *event )
+static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
 {
-	gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				event->area.x, event->area.y, event->area.width, event->area.height,
-				GDK_RGB_DITHER_NONE,
-				mem_pals + 3*( event->area.x + PALETTE_WIDTH*event->area.y ),
-				PALETTE_WIDTH*3
-				);
+	int y2 = event->area.y + event->area.height;
 
-	return FALSE;
+	if (y2 > PALETTE_HEIGHT) /* Better safe than sorry */
+	{
+		gdk_draw_rectangle(widget->window, widget->style->black_gc,
+			TRUE, event->area.x, PALETTE_HEIGHT,
+			event->area.width, y2 - PALETTE_HEIGHT);
+		if (event->area.y >= PALETTE_HEIGHT) return (TRUE);
+		y2 = PALETTE_HEIGHT;
+	}
+
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		event->area.x, event->area.y,
+		event->area.width, y2 - event->area.y,
+		GDK_RGB_DITHER_NONE, mem_pals + event->area.y * PALETTE_W3 +
+		event->area.x * 3, PALETTE_W3);
+
+	return (TRUE);
 }
 
 
-static gint motion_palette( GtkWidget *widget, GdkEventMotion *event )
+static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
 	GdkModifierType state;
-	int x, y, px, py, pindex;
-
-	px = event->x;
-	py = event->y;
-	pindex = (py-39+34)/16;
-
-	mtMAX(pindex, pindex, 0)
-	mtMIN(pindex, pindex, mem_cols-1)
+	int x, y, pindex;
 
 	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
 	else
@@ -988,14 +993,17 @@ static gint motion_palette( GtkWidget *widget, GdkEventMotion *event )
 		state = event->state;
 	}
 
-	if ( drag_index && drag_index_vals[1] != pindex )
+	pindex = (y - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
+	pindex = pindex < 0 ? 0 : pindex >= mem_cols ? mem_cols - 1 : pindex;
+
+	if (drag_index && (drag_index_vals[1] != pindex))
 	{
-		mem_pal_index_move( drag_index_vals[1], pindex );
+		mem_pal_index_move(drag_index_vals[1], pindex);
 		init_pal();
 		drag_index_vals[1] = pindex;
 	}
 
-	return TRUE;
+	return (TRUE);
 }
 
 static gint release_palette( GtkWidget *widget, GdkEventButton *event )
@@ -1024,63 +1032,67 @@ static gint click_palette( GtkWidget *widget, GdkEventButton *event )
 {
 	int px, py, pindex;
 
+
+	/* Filter out multiple clicks */
+	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
+
 	px = event->x;
 	py = event->y;
-	pindex = (py-2)/16;
-	if (py < 2) pindex = -1;
+	if (py < PALETTE_SWATCH_Y) return (TRUE);
+	pindex = (py - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
+	if (pindex >= mem_cols) return (TRUE);
 
-	if (pindex>=0 && pindex<mem_cols)
+	if (px < PALETTE_SWATCH_X) pressed_allcol(NULL, NULL);
+	else if (px < PALETTE_CROSS_X)		// Colour A or B changed
 	{
-		if ( px<22 ) pressed_allcol( NULL, NULL );
-		if ( px>22 && px <53 )		// Colour A or B changed
+		if (event->button == 1)
 		{
-			if ( event->button == 1 )
-			{
-				if ( (event->state & GDK_CONTROL_MASK) )
-				{
-					mem_col_B = pindex;
-					mem_col_B24 = mem_pal[mem_col_B];
-				}
-				else if ( (event->state & GDK_SHIFT_MASK) )
-				{
-					mem_pal_copy( brcosa_pal, mem_pal );
-					drag_index = TRUE;
-					drag_index_vals[0] = pindex;
-					drag_index_vals[1] = pindex;
-					gdk_window_set_cursor( drawing_palette->window, move_cursor );
-				}
-				else
-				{
-					mem_col_A = pindex;
-					mem_col_A24 = mem_pal[mem_col_A];
-				}
-			}
-			if ( event->button == 3 )
+			if (event->state & GDK_CONTROL_MASK)
 			{
 				mem_col_B = pindex;
 				mem_col_B24 = mem_pal[mem_col_B];
 			}
-
-			repaint_top_swatch();
-			init_pal();
-			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
+			else if (event->state & GDK_SHIFT_MASK)
+			{
+				mem_pal_copy(brcosa_pal, mem_pal);
+				drag_index = TRUE;
+				drag_index_vals[0] = pindex;
+				drag_index_vals[1] = pindex;
+				gdk_window_set_cursor(drawing_palette->window, move_cursor);
+			}
+			else
+			{
+				mem_col_A = pindex;
+				mem_col_A24 = mem_pal[mem_col_A];
+			}
 		}
-		if ( px>=53 )			// Mask changed
+		else if (event->button == 3)
 		{
-			mem_prot_mask[pindex] ^= 255;
-
-			repaint_swatch(pindex);				// Update swatch
-			gtk_widget_queue_draw_area( widget, 0, event->y-16,
-				PALETTE_WIDTH, 32 );			// Update widget
-
-			mem_mask_init();		// Prepare RGB masks
-			/* !!! Do the same for any other kind of preview */
-			if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-				update_all_views();
+			mem_col_B = pindex;
+			mem_col_B24 = mem_pal[mem_col_B];
 		}
+
+		repaint_top_swatch();
+		init_pal();
+		gtk_widget_queue_draw(drawing_col_prev);	// Update widget
+	}
+	else /* if (px >= PALETTE_CROSS_X) */		// Mask changed
+	{
+		mem_prot_mask[pindex] ^= 255;
+
+		/* Update & redraw swatch */
+		repaint_swatch(pindex);
+		gtk_widget_queue_draw_area(widget,
+			PALETTE_CROSS_X, PALETTE_SWATCH_Y + PALETTE_SWATCH_H * pindex,
+			PALETTE_WIDTH - PALETTE_CROSS_X, PALETTE_SWATCH_H);
+
+		mem_mask_init();		// Prepare RGB masks
+		/* !!! Do the same for any other kind of preview */
+		if ((tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
+			update_all_views();
 	}
 
-	return TRUE;
+	return (TRUE);
 }
 
 void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
@@ -1095,27 +1107,21 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_widget_show (hbox);
 	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
 
+	drawing_col_prev = gtk_drawing_area_new();
+	gtk_widget_show(drawing_col_prev);
+	gtk_widget_set_usize(drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT);
 
-	drawing_col_prev = gtk_drawing_area_new ();
-#if GTK_MAJOR_VERSION == 2
-	viewport_palette = gtk_viewport_new (NULL, NULL);
-	gtk_widget_show (viewport_palette);
-	gtk_viewport_set_shadow_type( GTK_VIEWPORT(viewport_palette), GTK_SHADOW_IN );
-	gtk_box_pack_start( GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0 );
-
-	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_col_prev);
-#endif
-#if GTK_MAJOR_VERSION == 1
-	gtk_box_pack_start( GTK_BOX(hbox), drawing_col_prev, TRUE, FALSE, 0 );
-#endif
-	gtk_widget_set_usize( drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT );
-
-	gtk_widget_show( drawing_col_prev );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_release_event",
 		GTK_SIGNAL_FUNC (click_colours), GTK_OBJECT(drawing_col_prev) );
 	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "expose_event",
 		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
 	gtk_widget_set_events (drawing_col_prev, GDK_ALL_EVENTS_MASK);
+
+	viewport_palette = gtk_viewport_new (NULL, NULL);
+	gtk_widget_show (viewport_palette);
+	gtk_viewport_set_shadow_type( GTK_VIEWPORT(viewport_palette), GTK_SHADOW_IN );
+	gtk_container_add (GTK_CONTAINER (viewport_palette), drawing_col_prev);
+	gtk_box_pack_start( GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0 );
 
 	scrolledwindow_palette = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow_palette);
@@ -1200,12 +1206,6 @@ void pressed_toolbar_toggle( GtkMenuItem *menu_item, gpointer user_data, gint it
 
 
 ///	PATTERNS/TOOL PREVIEW AREA
-
-
-void toolbar_preview_init()		// Initialize memory for preview area
-{
-	mem_prev = grab_memory( 3*PREVIEW_WIDTH*PREVIEW_HEIGHT, 0 );
-}
 
 
 void mem_set_brush(int val)			// Set brush, update size/flow/preview
