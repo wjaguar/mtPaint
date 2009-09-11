@@ -20,11 +20,11 @@
 float vw_zoom;
 int view_showing, allow_cline, vw_focus_on;
 int opaque_view;
+int max_pan;
 
 GtkWidget *cline_window, *vw_drawing;
 
 gint delete_cline( GtkWidget *widget, GdkEvent *event, gpointer data );
-//gint delete_view( GtkWidget *widget, GdkEvent *event, gpointer data );
 
 void pressed_cline( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_pan( GtkMenuItem *menu_item, gpointer user_data );

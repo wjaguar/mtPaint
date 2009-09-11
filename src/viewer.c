@@ -34,7 +34,7 @@
 int view_showing, allow_cline, view_update_pending;
 float vw_zoom = 1;
 
-int opaque_view = FALSE;
+int opaque_view;
 
 
 ////	COMMAND LINE WINDOW
@@ -262,6 +262,7 @@ void pressed_help( GtkMenuItem *menu_item, gpointer user_data )
 
 ///	PAN WINDOW
 
+int max_pan;
 
 static GtkWidget *pan_window, *draw_pan;
 static int pan_w, pan_h;
@@ -500,7 +501,6 @@ static gint expose_pan( GtkWidget *widget, GdkEventExpose *event )
 
 void pressed_pan( GtkMenuItem *menu_item, gpointer user_data )
 {
-	int max_pan = inifile_get_gint32("panSize", 128 );
 	float rat_x, rat_y;
 
 	draw_pan = NULL;	// Needed by draw_pan_thumb above

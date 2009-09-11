@@ -58,6 +58,7 @@ static inilist ini_bool[] = {
 	{ "tgaDefdir",		&tga_defdir,		FALSE },
 	{ "disableTransparency", &opaque_view,		FALSE },
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
+	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -76,7 +77,6 @@ static inilist ini_bool[] = {
 	{ "status2Toggle",	status_on + 2,		TRUE  },
 	{ "status3Toggle",	status_on + 3,		TRUE  },
 	{ "status4Toggle",	status_on + 4,		TRUE  },
-	{ "undoableLoad",	&undo_load,		FALSE },
 	{ NULL,			NULL }
 };
 
@@ -93,6 +93,7 @@ static inilist ini_int[] = {
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },
 	{ "lastspalType",	&spal_mode,		2   },
+	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
 	{ NULL,			NULL }
 };
@@ -292,7 +293,7 @@ static void pressed_default_pal( GtkMenuItem *menu_item, gpointer user_data )
 static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int dups;
-	char mess[512];
+	char *mess;
 
 	if ( mem_cols < 3 )
 	{
@@ -317,7 +318,7 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 			}
 			else
 			{
-				snprintf(mess, 500, _("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups );
+				mess = g_strdup_printf(_("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
 				if ( alert_box( _("Warning"), mess, _("Yes"), _("No"), NULL ) == 1 )
 				{
 					spot_undo(UNDO_XPAL);
@@ -328,6 +329,7 @@ static void pressed_remove_duplicates( GtkMenuItem *menu_item, gpointer user_dat
 					gtk_widget_queue_draw( drawing_canvas );
 					gtk_widget_queue_draw(drawing_col_prev);
 				}
+				g_free(mess);
 			}
 		}
 	}
@@ -433,9 +435,8 @@ void pressed_save_file_as( GtkMenuItem *menu_item, gpointer user_data )
 int gui_save(char *filename, ls_settings *settings)
 {
 	int res = -2, fflags = file_formats[settings->ftype].flags;
-	char mess[512], *f8;
+	char *mess = NULL, *f8;
 
-	mess[0] = 0;
 	/* Mismatched format - raise an error right here */
 	if (!(fflags & FF_SAVE_MASK))
 	{
@@ -451,9 +452,9 @@ int gui_save(char *filename, ls_settings *settings)
 		/* More than 2 colors */
 		else maxc = 2;
 		/* Build message */
-		if (fform) snprintf(mess, 500, _("You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."),
+		if (fform) mess = g_strdup_printf(_("You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."),
 			fform, fname);
-		else snprintf(mess, 500, _("You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."),
+		else mess = g_strdup_printf(_("You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."),
 			fname, maxc, maxc);
 	}
 	else
@@ -473,12 +474,16 @@ int gui_save(char *filename, ls_settings *settings)
 		if (res == -1)
 		{
 			f8 = gtkuncpy(NULL, filename, 0);
-			snprintf(mess, 500, _("Unable to save file: %s"), f8);
+			mess = g_strdup_printf(_("Unable to save file: %s"), f8);
 			g_free(f8);
 		}
 		else if ((res == WRONG_FORMAT) && (settings->ftype == FT_XPM))
-			strncpy0(mess, _("You are trying to save an XPM file with more than 4096 colours.  Either use another format or posterize the image to 4 bits, or otherwise reduce the number of colours."), 500);
-		if (mess[0]) alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			mess = g_strdup(_("You are trying to save an XPM file with more than 4096 colours.  Either use another format or posterize the image to 4 bits, or otherwise reduce the number of colours."));
+		if (mess)
+		{
+			alert_box( _("Error"), mess, _("OK"), NULL, NULL );
+			g_free(mess);
+		}
 	}
 	else
 	{
@@ -981,6 +986,8 @@ static key_action main_keys[] = {
 	{"",		ACT_VWZOOM_IN, GDK_KP_Add, _CS, _S},
 	{"VWZOOM_OUT",	ACT_VWZOOM_OUT, GDK_minus, _CS, _S},
 	{"",		ACT_VWZOOM_OUT, GDK_KP_Subtract, _CS, _S},
+// !!! Select another key
+	{"GET_PAIR",	ACT_GET_PAIR, GDK_space, 0, 0},
 	{NULL,		0, 0, 0, 0}
 };
 
@@ -1055,18 +1062,6 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 		}
 	}
 	change = mem_nudge;
-
-/* !!! Make a pref or something later !!! */
-#if 0
-	/* The colour-change override */
-	switch (action)
-	{
-	case ACT_SEL_LEFT: action = ACT_B_PREV; break;
-	case ACT_SEL_RIGHT: action = ACT_B_NEXT; break;
-	case ACT_SEL_DOWN: action = ACT_A_NEXT; break;
-	case ACT_SEL_UP: action = ACT_A_PREV; break;
-	}
-#endif
 
 	switch (action)
 	{
@@ -1262,6 +1257,70 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 			main_update_area(minx, miny, w, h);
 			vw_update_area(minx, miny, w, h);
 		}
+		return (TRUE);
+
+	case ACT_GET_PAIR:
+	if (mem_channel != CHN_IMAGE) return (TRUE);
+	{
+		int pat = 4, dp = 3;
+		int i, ix1, ix2, pn, tpn, pp2 = pat * pat * 2;
+		double r, g, b, r1, g1, b1, dr0, dg0, db0, dr, dg, db;
+		double l, l2, tl, t;
+
+		r = gamma256[mem_col_A24.red];
+		g = gamma256[mem_col_A24.green];
+		b = gamma256[mem_col_A24.blue];
+		l = 16.0; ix1 = -1;
+
+		for (i = 0; i < mem_cols; i++)
+		{
+			dr = r - gamma256[mem_pal[i].red];
+			dg = g - gamma256[mem_pal[i].green];
+			db = b - gamma256[mem_pal[i].blue];
+			tl = dr * dr + dg * dg + db * db;
+			if (tl >= l) continue;
+			l = tl;
+			ix1 = i;
+		}
+
+		r1 = gamma256[mem_pal[ix1].red];
+		g1 = gamma256[mem_pal[ix1].green];
+		b1 = gamma256[mem_pal[ix1].blue];
+		dr0 = r - r1;
+		dg0 = g - g1;
+		db0 = b - b1;
+
+		l2 = l; ix2 = ix1; pn = 0;
+
+		for (i = 0; i < mem_cols; i++)
+		{
+			if (i == ix1) continue;
+			dr = gamma256[mem_pal[i].red] - r1;
+			dg = gamma256[mem_pal[i].green] - g1;
+			db = gamma256[mem_pal[i].blue] - b1;
+			t = pp2 * (dr0 * dr + dg0 * dg + db0 * db) /
+				(dr * dr + dg * dg + db * db);
+			if ((t <= dp) || (t >= pp2 - dp)) continue;
+			t = (tpn = rint(0.5 * t)) / (double)(pp2 >> 1);
+			dr = dr * t - dr0;
+			dg = dg * t - dg0;
+			db = db * t - db0;
+			tl = dr * dr + dg * dg + db * db;
+			if (tl >= l2) continue;
+			l2 = tl;
+			ix2 = i;
+			pn = tpn;
+		}
+
+		mem_col_A = ix1;
+		mem_col_B = ix2;
+/* !!! A mix with less than half of nearest color cannot be better than it, so
+ * !!! patterns less dense than 50:50 won't be needed */
+		mem_tool_pat = pat == 4 ? pn : pn * 4;
+
+		break;
+	}
+
 	default:
 		return (TRUE);
 	}
@@ -1361,7 +1420,7 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 #if GTK_MAJOR_VERSION == 2
 gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 {
-	if (inifile_get_gboolean( "scrollwheelZOOM", TRUE ))
+	if (inifile_get_gboolean( "scrollwheelZOOM", FALSE ))
 	{
 		scroll_wheel(event->x / can_zoom, event->y / can_zoom,
 			event->direction == GDK_SCROLL_DOWN ? -1 : 1);
@@ -3274,7 +3333,7 @@ static void parse_drag( char *txt )
 	gtk_widget_set_sensitive( main_window, FALSE );
 
 	tp = txt;
-	while ( layers_total<MAX_LAYERS && (tp2 = strpbrk( tp, "file:" )) != NULL )
+	while ((layers_total < MAX_LAYERS) && (tp2 = strstr(tp, "file:")))
 	{
 		tp = tp2 + 5;
 		while ( tp[0] == '/' ) tp++;

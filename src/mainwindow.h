@@ -87,6 +87,7 @@
 #define ACT_TO_MASK	65
 #define ACT_VWZOOM_IN	66
 #define ACT_VWZOOM_OUT	67
+#define ACT_GET_PAIR	68
 
 int wtf_pressed(GdkEventKey *event);
 

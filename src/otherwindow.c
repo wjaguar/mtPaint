@@ -275,23 +275,15 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		if ( pat_brush == 0 )
 		{
 			mem_tool_pat = pat_no;
-			mem_pat_update();				// Update memory
-			gtk_widget_queue_draw( drawing_col_prev );	// Update widget
-			if ( marq_status >= MARQUEE_PASTE && text_paste )
-			{
-				if ( text_paste == TEXT_PASTE_FT ) ft_render_text();
-				else render_text( drawing_col_prev );
-				check_marquee();
-				gtk_widget_queue_draw( drawing_canvas );
-			}
+			update_cols();
 		}
 		else
 		{
 			mem_set_brush(pat_no);
 			brush_tool_type = tool_type;
 			toolbar_update_settings();	// Update spin buttons
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]),
-					TRUE );			// Update toolbar
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
+				icon_buttons[PAINT_TOOL_ICON]), TRUE);	// Update toolbar
 			set_cursor();
 		}
 	}

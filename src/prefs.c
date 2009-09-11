@@ -262,6 +262,8 @@ static void prefs_apply(GtkWidget *widget)
 	mem_undo_depth = read_spin(spinbutton_maxundo);
 	mem_background = read_spin(spinbutton_greys);
 	mem_nudge = read_spin(spinbutton_nudge);
+	max_pan = read_spin(spinbutton_pan);
+
 	mem_xpm_trans = read_spin(spinbutton_trans);
 	mem_xbm_hot_x = read_spin(spinbutton_hotx);
 	mem_xbm_hot_y = read_spin(spinbutton_hoty);
@@ -289,7 +291,6 @@ static void prefs_apply(GtkWidget *widget)
 	inifile_set_gint32( "gridB", mem_grid_rgb[2] );
 
 
-	inifile_set_gint32( "panSize", read_spin(spinbutton_pan));
 	tga_RLE = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgaRLE)) ? 1 : 0;
 	tga_565 = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tga565));
 	tga_defdir = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgadef));
@@ -455,8 +456,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		MIN_UNDO & ~1, MAX_UNDO & ~1);
 	spinbutton_greys = spin_to_table(table3, 2, 1, 5, mem_background, 0, 255);
 	spinbutton_nudge = spin_to_table(table3, 3, 1, 5, mem_nudge, 2, 512);
-	spinbutton_pan = spin_to_table(table3, 4, 1, 5,
-		inifile_get_gint32("panSize", 128 ), 64, 256);
+	spinbutton_pan = spin_to_table(table3, 4, 1, 5, max_pan, 64, 256);
 
 	checkbutton_paste = add_a_toggle( _("Display clipboard while pasting"),
 		page, show_paste );
@@ -543,7 +543,7 @@ void pressed_preferences( GtkMenuItem *menu_item, gpointer user_data )
 		page, inifile_get_gboolean("zoomToggle", FALSE) );
 #if GTK_MAJOR_VERSION == 2
 	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
-		page, inifile_get_gboolean("scrollwheelZOOM", TRUE) );
+		page, inifile_get_gboolean("scrollwheelZOOM", FALSE) );
 #endif
 	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
 		page, chequers_optimize );

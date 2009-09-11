@@ -1154,7 +1154,8 @@ void update_cols()
 	if ( marq_status >= MARQUEE_PASTE && text_paste )
 	{
 		if ( text_paste == TEXT_PASTE_FT ) ft_render_text();
-		if ( text_paste == TEXT_PASTE_GTK ) render_text( drawing_col_prev );
+		else /* if ( text_paste == TEXT_PASTE_GTK ) */
+			render_text( drawing_col_prev );
 		check_marquee();
 		gtk_widget_queue_draw( drawing_canvas );
 	}
