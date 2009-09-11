@@ -313,9 +313,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 
 	maxi = rint(((double)mem_undo_limit * 1024 * 1024) /
 		(mem_width * mem_height * mem_img_bpp * (layers_total + 1)) - 1.25);
-	maxi = maxi < 0 ? 0 : maxi >= MAX_UNDO ? MAX_UNDO - 1 : maxi;
+	maxi = maxi < 0 ? 0 : maxi >= mem_undo_max ? mem_undo_max - 1 : maxi;
 
-	snprintf(txt, 60, "%i / %i / %i", mem_undo_done, mem_undo_redo, maxi );
+	snprintf(txt, 60, "%i / %i / %i", mem_undo_done, mem_undo_redo, maxi);
 	add_to_table( txt, table4, 1, 1, 5 );
 
 	add_to_table( _("Undo / Redo / Max levels used"), table4, 1, 0, 5 );

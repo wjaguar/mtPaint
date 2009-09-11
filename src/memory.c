@@ -105,11 +105,8 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 #define UF_FLAT  2
 #define UF_SIZED 4
 
-undo_item mem_undo_im[MAX_UNDO];	// Pointers to undo images + current image being edited
+undo_stack mem_undo;
 
-int mem_undo_pointer;		// Pointer to currently used image on canas/screen
-int mem_undo_done;		// Undo images that we have behind current image (i.e. possible UNDO)
-int mem_undo_redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
 int mem_undo_limit = 32;	// Max MB memory allocation limit
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
@@ -339,6 +336,16 @@ void init_istate()
 	tool_pat = 0;
 }
 
+/* Create new undo stack of a given depth */
+int init_undo(undo_stack *ustack, int depth)
+{
+	if (!(ustack->undo_im = calloc(depth, sizeof(undo_item))))
+		return (FALSE);
+	ustack->undo_max = depth;
+	ustack->undo_pointer = ustack->undo_done = ustack->undo_redo = 0;
+	return (TRUE);
+}
+
 int undo_free_x(undo_item *undo)
 {
 	int i, j = undo->size;
@@ -355,14 +362,14 @@ int undo_free_x(undo_item *undo)
 
 static void undo_free(int idx)
 {
-	undo_free_x(&mem_undo_im_[idx]);
+	undo_free_x(mem_undo_im_ + idx);
 }
 
 void mem_clear()
 {
 	int i;
 
-	for (i = 0; i < MAX_UNDO; i++)		// Release old UNDO images
+	for (i = 0; i < mem_undo_max; i++)	// Release old UNDO images
 		undo_free(i);
 	memset(mem_img, 0, sizeof(chanlist));	// Already freed along with UNDO
 	mem_undo_pointer = mem_undo_done = mem_undo_redo = 0;
@@ -372,7 +379,7 @@ void mem_clear()
 int mem_new( int width, int height, int bpp, int cmask )
 {
 	unsigned char *res;
-	undo_item *undo = &mem_undo_im_[0];
+	undo_item *undo = mem_undo_im_;
 	int i, j = width * height;
 
 	mem_clear();
@@ -424,7 +431,7 @@ unsigned char *mem_undo_previous(int channel)
 	unsigned char *res;
 	int i;
 
-	i = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
+	i = (mem_undo_pointer ? mem_undo_pointer : mem_undo_max) - 1;
 	res = mem_undo_im_[i].img[channel];
 	if (!res || (res == (void *)(-1)) || (mem_undo_im_[i].flags & UF_TILED))
 		res = mem_img[channel];	// No usable undo so use current
@@ -434,7 +441,7 @@ unsigned char *mem_undo_previous(int channel)
 static int lose_oldest()			// Lose the oldest undo image
 {						// Pre-requisite: mem_undo_done > 0
 	return (undo_free_x(mem_undo_im_ +
-		(mem_undo_pointer - mem_undo_done-- + MAX_UNDO) % MAX_UNDO));
+		(mem_undo_pointer - mem_undo_done-- + mem_undo_max) % mem_undo_max));
 }
 
 /* Convert tile bitmap row into a set of spans (skip/copy), terminated by
@@ -761,7 +768,7 @@ void mem_undo_prepare()
 	int k;
 
 	if (!mem_undo_done) return;
-	k = mem_undo_pointer ? mem_undo_pointer - 1 : MAX_UNDO - 1;
+	k = (mem_undo_pointer ? mem_undo_pointer : mem_undo_max) - 1;
 	/* Tile it if not processed yet */
 	if (!(mem_undo_im_[k].flags & (UF_TILED | UF_FLAT)))
 		mem_undo_tile(mem_undo_im_ + k);
@@ -784,7 +791,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		k = mem_undo_pointer;
 		for (i = 0; i < mem_undo_redo; i++)
 		{
-			k = (k + 1) % MAX_UNDO;
+			k = (k + 1) % mem_undo_max;
 			undo_free(k);
 		}
 		mem_undo_redo = 0;
@@ -819,7 +826,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	}
 
 	/* Fill undo frame */
-	undo = &mem_undo_im_[mem_undo_pointer];
+	undo = mem_undo_im_ + mem_undo_pointer;
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		img = mem_img[i];
@@ -867,10 +874,10 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	}
 
 	/* Next undo step */
-	if (mem_undo_done >= MAX_UNDO - 1)
-		undo_free((mem_undo_pointer + 1) % MAX_UNDO);
+	if (mem_undo_done >= mem_undo_max - 1)
+		undo_free((mem_undo_pointer + 1) % mem_undo_max);
 	else mem_undo_done++;
-	mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;	// New pointer
+	mem_undo_pointer = (mem_undo_pointer + 1) % mem_undo_max;
 
 	/* Commit */
 	memcpy(mem_img, holder, sizeof(chanlist));
@@ -878,7 +885,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	mem_height = new_height;
 	mem_img_bpp = new_bpp;
 
-	undo = &mem_undo_im_[mem_undo_pointer];
+	undo = mem_undo_im_ + mem_undo_pointer;
 	memcpy(undo->img, holder, sizeof(chanlist));
 	undo->cols = mem_cols;
 	mem_pal_copy(undo->pal, mem_pal);
@@ -1058,7 +1065,8 @@ void mem_undo_backward()		// UNDO requested by user
 	if ( mem_undo_done > 0 )
 	{
 		i = mem_undo_pointer;
-		mem_undo_pointer = (mem_undo_pointer - 1 + MAX_UNDO) % MAX_UNDO;	// New pointer
+		mem_undo_pointer = (mem_undo_pointer - 1 + mem_undo_max) %
+			mem_undo_max;
 		mem_undo_swap(i, mem_undo_pointer, 0);
 
 		mem_undo_done--;
@@ -1077,7 +1085,7 @@ void mem_undo_forward()			// REDO requested by user
 	if ( mem_undo_redo > 0 )
 	{
 		i = mem_undo_pointer;
-		mem_undo_pointer = (mem_undo_pointer + 1) % MAX_UNDO;		// New pointer
+		mem_undo_pointer = (mem_undo_pointer + 1) % mem_undo_max;		// New pointer
 		mem_undo_swap(i, mem_undo_pointer, 1);
 
 		mem_undo_done++;
@@ -1086,11 +1094,12 @@ void mem_undo_forward()			// REDO requested by user
 	pen_down = 0;
 }
 
-static int mem_undo_size(undo_item *undo)
+static int mem_undo_size(undo_stack *ustack)
 {
-	int i, j, k, l, total = 0;
+	undo_item *undo = ustack->undo_im;
+	int i, j, k, l, total, umax = ustack->undo_max;
 
-	for (i = 0; i < MAX_UNDO; i++ , total += (undo++)->size)
+	for (i = total = 0; i < umax; i++ , total += (undo++)->size)
 	{
 		/* Empty or already scanned? */
 		if (!undo->width || (undo->flags & UF_SIZED)) continue;
@@ -1139,7 +1148,14 @@ void mem_init()					// Initialise memory
 		}
 	}
 
-		// Create brush presets
+	/* Set up default undo stack */
+	if (!init_undo(&mem_undo, MAX_UNDO))
+	{
+		memory_errors(1);
+		exit(0);
+	}
+
+	// Create brush presets
 
 	if (mem_new(PATCH_WIDTH, PATCH_HEIGHT, 3, CMASK_IMAGE))	// Not enough memory!
 	{
@@ -1156,13 +1172,6 @@ void mem_init()					// Initialise memory
 	mem_col_B24.red = 0;
 	mem_col_B24.green = 0;
 	mem_col_B24.blue = 0;
-
-/*
-	mem_col_B24 = mem_pal[0];
-	mem_col_A24.red = ( (255 - mem_col_B24.red) >> 7 ) * 255;
-	mem_col_A24.green = ( (255 - mem_col_B24.green) >> 7 ) * 255;
-	mem_col_A24.blue = ( (255 - mem_col_B24.blue) >> 7 ) * 255;
-*/
 
 	j = mem_width * mem_height;
 	dest = mem_img[CHN_IMAGE];
@@ -1768,19 +1777,17 @@ int mem_pal_cmp( png_color *pal1, png_color *pal2 )	// Count itentical palette e
 
 int mem_used()				// Return the number of bytes used in image + undo
 {
-	return mem_undo_size(mem_undo_im_);
+	return mem_undo_size(&mem_undo);
 }
 
 int mem_used_layers()		// Return the number of bytes used in image + undo in all layers
 {
-	undo_item *undo;
 	int l, total = 0;
 
 	for (l = 0; l <= layers_total; l++)
 	{
-		if (l == layer_selected) undo = mem_undo_im_;
-		else undo = layer_table[l].image->mem_undo_im_;
-		total += mem_undo_size(undo);
+		total += mem_undo_size(l == layer_selected ? &mem_undo :
+			&(layer_table[l].image->undo_));
 	}
 
 	return total;
@@ -3692,8 +3699,8 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 
 	c2 = cos(rangle);
 	s2 = sin(rangle);
-	nw = fabs(ow * c2) + fabs(oh * s2);
-	nh = fabs(oh * c2) + fabs(ow * s2);
+	nw = ceil(fabs(ow * c2) + fabs(oh * s2));
+	nh = ceil(fabs(oh * c2) + fabs(ow * s2));
 
 	if ( nw>MAX_WIDTH || nh>MAX_HEIGHT ) return -5;		// If new image is too big return -5
 

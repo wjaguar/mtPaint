@@ -97,13 +97,20 @@ typedef unsigned char *chanlist[NUM_CHANNELS];
 
 #define UNDO_TILEMAP_SIZE 32
 
-typedef struct
-{
+typedef struct {
 	chanlist img;
 	png_color pal[256];
 	unsigned char tilemap[UNDO_TILEMAP_SIZE], *tileptr;
 	int cols, width, height, bpp, flags, size;
 } undo_item;
+
+typedef struct {
+	undo_item *undo_im;		// Pointer to undo images + current image being edited
+	int undo_pointer;		// Index of currently used image on canvas/screen
+	int undo_done;			// Undo images that we have behind current image (i.e. possible UNDO)
+	int undo_redo;			// Undo images that we have ahead of current image (i.e. possible REDO)
+	int undo_max;			// Total number of undo slots
+} undo_stack;
 
 /// GRADIENTS
 
@@ -199,6 +206,16 @@ int smudge_mode;
 
 /// IMAGE
 
+undo_stack mem_undo;
+
+#define mem_undo_im_ mem_undo.undo_im
+#define mem_undo_pointer mem_undo.undo_pointer
+#define mem_undo_done mem_undo.undo_done
+#define mem_undo_redo mem_undo.undo_redo
+#define mem_undo_max mem_undo.undo_max
+
+#define MAX_UNDO 101			// Maximum number of undo levels + 1
+
 char mem_filename[256];			// File name of file loaded/saved
 chanlist mem_img;			// Array of pointers to image channels
 int mem_channel;			// Current active channel
@@ -225,13 +242,6 @@ int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 int mem_preview;			// Preview an RGB change
 int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 
-#define MAX_UNDO 101			// Maximum number of undo levels + 1
-
-undo_item mem_undo_im_[MAX_UNDO];	// Pointers to undo images + current image being edited
-
-int mem_undo_pointer;		// Pointer to currently used image on canvas/screen
-int mem_undo_done;		// Undo images that we have behind current image (i.e. possible UNDO)
-int mem_undo_redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
 int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
@@ -295,6 +305,7 @@ void line_nudge(linedata line, int x, int y);
 /// Procedures
 
 void init_istate();	// Set initial state of image variables
+int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
 
 int mem_count_all_cols();			// Count all colours - Using main image
 int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy

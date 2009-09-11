@@ -56,7 +56,32 @@ void layers_init()
 	layer_table[0].opacity = 100;
 }
 
-void repaint_layer(int l)		// Repaint layer in view/main window
+/* Allocate layer image, its channels and undo stack */
+static layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
+{
+	layer_image *lim;
+	int i = 0, j = w * h;
+
+	lim = calloc(1, sizeof(layer_image));
+	if (!lim) return (NULL);
+	if (init_undo(&(lim->undo_), MAX_UNDO))
+	{
+		for (; ; i++)
+		{
+			if (i >= NUM_CHANNELS) return (lim);
+			if (src && !src[i]) continue;
+			if (!(cmask & CMASK_FOR(i))) continue;
+			if (!(lim->mem_img[i] =
+				calloc(1, i == CHN_IMAGE ? j * bpp : j))) break;
+		}
+	}
+	while (--i >= 0) free(lim->mem_img[i]);
+	free(lim->undo_.undo_im);
+	free(lim);
+	return (NULL);
+}
+
+static void repaint_layer(int l)	// Repaint layer in view/main window
 {
 	int lx, ly, lw, lh;
 
@@ -144,7 +169,6 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 	memcpy(lp->mem_pal, mem_pal, sizeof(mem_pal));
 	memcpy(lp->mem_prot_RGB, mem_prot_RGB, sizeof(mem_prot_RGB));
 	memcpy(lp->mem_prot_mask, mem_prot_mask, sizeof(mem_prot_mask));
-	memcpy(lp->mem_undo_im_, mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
 	memcpy(lp->mem_img, mem_img, sizeof(chanlist));
 
 	lp->mem_channel		= mem_channel;
@@ -156,9 +180,7 @@ static void layer_copy_from_main( int l )	// Copy info from main image to layer
 	lp->mem_icx		= mem_icx;
 	lp->mem_icy		= mem_icy;
 
-	lp->mem_undo_pointer	= mem_undo_pointer;
-	lp->mem_undo_done	= mem_undo_done;
-	lp->mem_undo_redo	= mem_undo_redo;
+	lp->undo_		= mem_undo;
 
 	lp->mem_cols		= mem_cols;
 	lp->tool_pat		= tool_pat;
@@ -182,7 +204,6 @@ static void layer_copy_to_main( int l )		// Copy info from layer to main image
 	memcpy(mem_pal, lp->mem_pal, sizeof(mem_pal));
 	memcpy(mem_prot_RGB, lp->mem_prot_RGB, sizeof(mem_prot_RGB));
 	memcpy(mem_prot_mask, lp->mem_prot_mask, sizeof(mem_prot_mask));
-	memcpy(mem_undo_im_, lp->mem_undo_im_, sizeof(undo_item) * MAX_UNDO);
 	memcpy(mem_img, lp->mem_img, sizeof(chanlist));
 
 	mem_channel	= lp->mem_channel;
@@ -194,9 +215,7 @@ static void layer_copy_to_main( int l )		// Copy info from layer to main image
 	mem_icx 	= lp->mem_icx;
 	mem_icy 	= lp->mem_icy;
 
-	mem_undo_pointer = lp->mem_undo_pointer;
-	mem_undo_done	= lp->mem_undo_done;
-	mem_undo_redo	= lp->mem_undo_redo;
+	mem_undo	= lp->undo_;
 
 	mem_cols	= lp->mem_cols;
 	tool_pat	= lp->tool_pat;
@@ -268,10 +287,10 @@ static gint layer_press_lower()
 }
 
 
-void layer_new_chores( int l, int w, int h, int type, int cols,
-			chanlist temp_img, layer_image *lim )
+static void layer_new_chores(int l, int w, int h, int type, int cols,
+	layer_image *lim)
 {
-	int bpp = type, i, j;
+	int bpp = type, i;
 
 	if ( marq_status > MARQUEE_NONE )	// If we are selecting or pasting - lose it!
 	{
@@ -292,13 +311,6 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	layer_table[l].visible = TRUE;
 	layer_table[l].use_trans = FALSE;
 
-	j = w * h * bpp;
-	i = 0;
-#ifdef U_GUADALINEX
-	if ( bpp == 3 ) i = 255;
-#endif
-	memset(temp_img[CHN_IMAGE], i, j);
-
 	mem_pal_copy(lim->mem_pal, mem_pal_def); // Default
 	if ( type == 2 )	// Greyscale
 	{
@@ -311,9 +323,7 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 
 	sprintf( lim->mem_filename, _("Untitled") );
 
-	memset(lim->mem_img, 0, sizeof(chanlist));
-	memcpy(lim->mem_img, temp_img, sizeof(chanlist));
-	lim->mem_channel = temp_img[mem_channel] ? mem_channel : CHN_IMAGE;
+	lim->mem_channel = lim->mem_img[mem_channel] ? mem_channel : CHN_IMAGE;
 	lim->mem_img_bpp = bpp;
 	lim->mem_changed = 0;
 	lim->mem_width = w;
@@ -322,18 +332,12 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	lim->mem_icx = 0;
 	lim->mem_icy = 0;
 
-	lim->mem_undo_pointer = 0;
-	lim->mem_undo_done = 0;
-	lim->mem_undo_redo = 0;
-
-	memset(lim->mem_undo_im_, 0, sizeof(undo_item) * MAX_UNDO);
-
-	memcpy(lim->mem_undo_im_[0].img, temp_img, sizeof(chanlist));
-	lim->mem_undo_im_[0].cols = cols;
-	lim->mem_undo_im_[0].bpp = bpp;
-	lim->mem_undo_im_[0].width = w;
-	lim->mem_undo_im_[0].height = h;
-	mem_pal_copy(lim->mem_undo_im_[0].pal, lim->mem_pal);
+	memcpy(lim->undo_.undo_im[0].img, lim->mem_img, sizeof(chanlist));
+	lim->undo_.undo_im[0].cols = cols;
+	lim->undo_.undo_im[0].bpp = bpp;
+	lim->undo_.undo_im[0].width = w;
+	lim->undo_.undo_im[0].height = h;
+	mem_pal_copy(lim->undo_.undo_im[0].pal, lim->mem_pal);
 
 	lim->mem_cols = cols;
 	lim->tool_pat = 0;
@@ -355,7 +359,7 @@ void layer_new_chores( int l, int w, int h, int type, int cols,
 	lim->ani_pos[0].frame = 0;
 }
 
-void layer_new_chores2( int l )
+static void layer_new_chores2( int l )
 {
 	if ( layers_window != NULL )
 	{
@@ -383,10 +387,8 @@ void layer_new_chores2( int l )
 
 void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed, 2=grey, 3=RGB
 {
-	int i, j = w * h, bpp=type;
-	chanlist temp_img;
+	int bpp;
 	layer_image *lim;
-	unsigned char *rgb;
 
 	if ( layers_total>=MAX_LAYERS ) return;
 
@@ -396,34 +398,22 @@ void layer_new( int w, int h, int type, int cols, int cmask )	// Types 1=indexed
 	}
 	layer_copy_from_main( layer_selected );
 
-	if ( type == 2 ) bpp = 1;	// Type 2 = greyscale indexed
+	bpp = type == 2 ? 1 : type;	// Type 2 = greyscale indexed
 
-	lim = malloc(sizeof(layer_image));
+	lim = alloc_layer(w, h, bpp, cmask, NULL);
 	if (!lim)
 	{
 		memory_errors(1);
 		return;
 	}
-	memset(temp_img, 0, sizeof(chanlist));
-	rgb = temp_img[CHN_IMAGE] = calloc(1, j * bpp);
-	for (i = CHN_ALPHA; rgb && (cmask > CMASK_FOR(i)); i++)
-	{
-		if (!(cmask & CMASK_FOR(i))) continue;
-		rgb = temp_img[i] = calloc(1, j);
-	}
-	if (!rgb)	// Not enough memory
-	{
-		free(lim);
-		for (i = 0; i < NUM_CHANNELS; i++)
-			free(temp_img[i]);
-		memory_errors(1);
-		return;
-	}
-
 	layers_total++;
 
-	layer_new_chores( layers_total, w, h, type, cols, temp_img, lim );
-	layer_new_chores2( layers_total );
+#ifdef U_GUADALINEX
+	if (bpp == 3) memset(lim->mem_img[CHN_IMAGE], 255, w * h * 3);
+#endif
+
+	layer_new_chores(layers_total, w, h, type, cols, lim);
+	layer_new_chores2(layers_total);
 	layer_selected = layers_total;
 
 	if ( layers_total == 1 ) ani_init();		// Start with fresh animation data if new
@@ -439,7 +429,6 @@ static gint layer_press_new()
 static gint layer_press_duplicate()
 {
 	layer_image *lim;
-	chanlist temp_img;
 	int w = mem_width, h = mem_height, bpp = mem_img_bpp, cols = mem_cols, i, j;
 
 	if ( layers_total>=MAX_LAYERS ) return FALSE;
@@ -451,26 +440,15 @@ static gint layer_press_duplicate()
 	if ( layers_total == 0 ) layer_table[0].image = malloc( sizeof(layer_image) );
 	layer_copy_from_main( layer_selected );
 
-	lim = malloc( sizeof(layer_image) );
+	lim = alloc_layer(w, h, bpp, 0, mem_img);
 	if (!lim)
 	{
 		memory_errors(1);
 		goto end;
 	}
-	memset(temp_img, 0, sizeof(chanlist));
-	j = mem_width * mem_height;
-	for (i = 0; i < NUM_CHANNELS; i++)
-	{
-		if (!mem_img[i]) continue;
-		if ((temp_img[i] = malloc(j * BPP(i)))) continue;
-		free(lim);
-		for (j = 0; j < i; j++) free(temp_img[j]);
-		memory_errors(1);
-		goto end;
-	}
 	layers_total++;
 
-	layer_new_chores( layers_total, w, h, bpp, cols, temp_img, lim);
+	layer_new_chores( layers_total, w, h, bpp, cols, lim);
 
 	layer_table[layers_total] = layer_table[layer_selected];		// Copy layer info
 	layer_table[layers_total].image = lim;
@@ -489,7 +467,7 @@ static gint layer_press_duplicate()
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!mem_img[i]) continue;
-		memcpy(temp_img[i], mem_img[i], j * BPP(i));
+		memcpy(lim->mem_img[i], mem_img[i], j * BPP(i));
 	}
 	sprintf( layer_table[layers_total].image->mem_filename,
 		layer_table[layer_selected].image->mem_filename );
@@ -513,12 +491,12 @@ end:
 static void layer_delete(int item)
 {
 	layer_image *lp = layer_table[item].image;
-	int i;
+	int i, m = lp->undo_.undo_max;
 
-	for (i=0; i<MAX_UNDO; i++)		// Release old UNDO images
-		undo_free_x(&lp->mem_undo_im_[i]);
-
-	free( layer_table[item].image );
+	for (i = 0; i < m; i++)		// Release old UNDO images
+		undo_free_x(lp->undo_.undo_im + i);
+	free(lp->undo_.undo_im);
+	free(lp);
 
 	if (item < layers_total)	// If deleted item is not at the end shuffle rest down
 		for ( i=item; i<layers_total; i++ )

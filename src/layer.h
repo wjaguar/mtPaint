@@ -38,8 +38,7 @@ typedef struct
 	int mem_img_bpp, mem_changed, mem_width, mem_height, mem_ics;
 	float mem_icx, mem_icy;
 
-	undo_item mem_undo_im_[MAX_UNDO];
-	int mem_undo_pointer, mem_undo_done, mem_undo_redo;
+	undo_stack undo_;
 
 	png_color mem_pal[256];
 	int mem_cols, tool_pat, mem_prot_RGB[256], mem_col_[2];
