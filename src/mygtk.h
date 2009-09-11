@@ -255,11 +255,13 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 
 // Clipboard
 
-int internal_clipboard();
-int process_clipboard(char *what, GtkSignalFunc handler, gpointer data);
-int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler);
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-int import_clip_Xpixmap(GtkSelectionData *data); // X special
+int internal_clipboard(int which);
+int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data);
+int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
+	GtkSignalFunc handler);
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* X special */
+unsigned char *import_clip_Xpixmap(GtkSelectionData *data, int *width, int *height);
+int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height);
 #endif
 
 // Filtering bogus xine-ui "keypresses" (Linux only)

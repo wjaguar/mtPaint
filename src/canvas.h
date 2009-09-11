@@ -164,8 +164,7 @@ void commit_paste(int *update);
 void canvas_undo_chores();
 void check_undo_paste_bpp();
 
-void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
-	int vx1, int vy1, int vx2, int vy2, rgbcontext *ctx);
+void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx);
 void repaint_line(int mode);			// Repaint or clear line on canvas
 void repaint_grad(int mode);			// Same for gradient line
 void refresh_grad(rgbcontext *ctx);		// Refresh a part of gradient line

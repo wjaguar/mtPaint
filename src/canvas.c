@@ -1048,45 +1048,40 @@ void pressed_lasso(int cut)
 
 void update_menus()			// Update edit/undo menu
 {
-	int i, j;
+	int i, j, statemap;
 
 	update_undo_bar();
 
-	men_item_state(menu_only_24, mem_img_bpp == 3);
-	men_item_state(menu_not_indexed, (mem_img_bpp == 3) ||
-		(mem_channel != CHN_IMAGE));
-	men_item_state(menu_only_indexed, mem_img_bpp == 1);
-	men_item_state(menu_rgba, (mem_img_bpp == 3) && mem_img[CHN_ALPHA]);
+	statemap = mem_img_bpp == 3 ? NEED_24 | NEED_NOIDX : NEED_IDX;
+	if (mem_channel != CHN_IMAGE) statemap |= NEED_NOIDX;
+	if ((mem_img_bpp == 3) && mem_img[CHN_ALPHA]) statemap |= NEED_RGBA;
 
-	men_item_state(menu_alphablend, mem_clipboard && (mem_clip_bpp == 3));
+	if (mem_clipboard && (mem_clip_bpp == 3)) statemap |= NEED_ACLIP;
 
 	if ( marq_status == MARQUEE_NONE )
 	{
-		men_item_state(menu_need_selection, FALSE);
-		men_item_state(menu_crop, FALSE);
-		men_item_state(menu_lasso, poly_status == POLY_DONE);
-		men_item_state(menu_need_marquee, poly_status == POLY_DONE);
+//		statemap &= ~(NEED_SEL | NEED_CROP);
+		if (poly_status == POLY_DONE) statemap |= NEED_MARQ | NEED_LASSO;
 	}
 	else
 	{
-		men_item_state(menu_need_marquee, TRUE);
-
-		men_item_state(menu_lasso, marq_status <= MARQUEE_DONE);
+		statemap |= NEED_MARQ;
 
 		/* If we are pasting disallow copy/cut/crop */
-		men_item_state(menu_need_selection, marq_status < MARQUEE_PASTE);
+		if (marq_status < MARQUEE_PASTE)
+			statemap |= NEED_SEL | NEED_CROP | NEED_LASSO;
 
 		/* Only offer the crop option if the user hasn't selected everything */
-		men_item_state(menu_crop, (marq_status <= MARQUEE_DONE) &&
-			((abs(marq_x1 - marq_x2) < mem_width - 1) ||
-			(abs(marq_y1 - marq_y2) < mem_height - 1)));
+		if (!((abs(marq_x1 - marq_x2) < mem_width - 1) ||
+			(abs(marq_y1 - marq_y2) < mem_height - 1)))
+			statemap &= ~NEED_CROP;
 	}
 
 	/* Forbid RGB-to-indexed paste, but allow indexed-to-RGB */
-	men_item_state(menu_need_clipboard, mem_clipboard && (mem_clip_bpp <= MEM_BPP));
+	if (mem_clipboard && (mem_clip_bpp <= MEM_BPP)) statemap |= NEED_CLIP;
 
-	men_item_state(menu_undo, !!mem_undo_done);
-	men_item_state(menu_redo, !!mem_undo_redo);
+	if (mem_undo_done) statemap |= NEED_UNDO;
+	if (mem_undo_redo) statemap |= NEED_REDO;
 
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
@@ -1096,7 +1091,9 @@ void update_menus()			// Update edit/undo menu
 		if (mem_img[i]) j++;
 		gtk_widget_set_sensitive(menu_widgets[MENU_DCHAN0 + i], !!mem_img[i]);
 	}
-	men_item_state(menu_chan_del, j > 1);
+	if (j > 1) statemap |= NEED_CHAN;
+
+	mapped_item_state(statemap);
 
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
@@ -2107,19 +2104,25 @@ static struct {
 
 static void poly_update_cache()
 {
-	int i, i0, last, dx, dy, *pxy, *ps;
+	int i, i0, last, dx, dy, *pxy, *ps, ds, zoom = 1, scale = 1;
 
 	i0 = poly_cache.c_zoom == can_zoom ? poly_cache.points : 0;
 	last = poly_points + (poly_status == POLY_DONE);
 	if (i0 >= last) return; // Up to date
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+	ds = scale >> 1;
+
 	poly_cache.c_zoom = can_zoom;
 	poly_cache.points = last;
 	/* Get locations */
 	pxy = poly_cache.xy + i0 * 2;
 	for (i = i0; i < poly_points; i++)
 	{
-		*pxy++ = margin_main_x + rint((poly_mem[i][0] + 0.5) * can_zoom);
-		*pxy++ = margin_main_y + rint((poly_mem[i][1] + 0.5) * can_zoom);
+		*pxy++ = margin_main_x + (poly_mem[i][0] * scale) / zoom + ds;
+		*pxy++ = margin_main_y + (poly_mem[i][1] * scale) / zoom + ds;
 	}
 	/* Join 1st & last point if finished */
 	if (poly_status == POLY_DONE)
@@ -2928,15 +2931,16 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 
 static int floor_div(int dd, int dr)
 {
-	return (dd < 0 ? -((dr - 1 - dd) / dr) : dd / dr);
+	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
+//	return (dd < 0 ? -((dr - 1 - dd) / dr) : dd / dr);
 }
 
 #define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
-void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
-	int vx1, int vy1, int vx2, int vy2, rgbcontext *ctx)
+void trace_line(int mode, int lx1, int ly1, int lx2, int ly2, int *vxy, rgbcontext *ctx)
 {
-	int j, x, y, tx, ty, aw, ah, ax = 0, ay = 0, cf = 0, zoom = 1, scale = 1;
-	unsigned char rgb[MAX_ZOOM * 3], col[3];
+	int vxt[4];
+	int i, j, x, y, tx, ty, aw, ah, ax = 0, ay = 0, cf = 0;
+	int rgb = 0, zoom = 1, scale = 1;
 	linedata line;
 
 
@@ -2949,52 +2953,44 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 		lx2 = floor_div(lx2, zoom);
 		ly2 = floor_div(ly2, zoom);
  	}
-	else scale = rint(can_zoom);
+	else if (can_zoom > 1.0)
+	{
+		scale = rint(can_zoom);
+		for (i = 0; i < 4; i++) vxt[i] = floor_div(vxy[i], scale);
+		vxy = vxt;
+	}
 
-	line_init(line, lx1, ly1, lx2, ly2);
-	for (; line[2] >= 0; line_step(line))
+	line_init(line, lx1, ly1, lx2, ly2); i = line[2];
+	if (line_clip(line, vxy, &j) < 0) return;
+	for (i -= j; line[2] >= 0; line_step(line) , i--)
 	{
 		x = (tx = line[0]) * scale;
 		y = (ty = line[1]) * scale;
 
-		if ((x + scale > vx1) && (y + scale > vy1) &&
-			(x <= vx2) && (y <= vy2))
+		if (mode != 0) /* Show a line */
 		{
-			if (mode != 0) /* Show a line */
+			if (mode == 1) /* Drawing */
 			{
-				if (mode == 1) /* Drawing */
-				{
-					j = ((ty & 7) * 8 + (tx & 7)) * 3;
-					col[0] = mem_col_pat24[j + 0];
-					col[1] = mem_col_pat24[j + 1];
-					col[2] = mem_col_pat24[j + 2];
-				}
-				else if (mode == 2) /* Tracking */
-				{
-					col[0] = col[1] = col[2] =
-						((line[2] >> 2) & 1) * 255;
-				}
-				else if (mode == 3) /* Gradient */
-				{
-					col[0] = col[1] = col[2] =
-						((line[2] >> 2) & 1) * 255;
-					col[1] ^= ((line[2] >> 1) & 1) * 255;
-				}
-				for (j = 0; j < scale * 3; j += 3)
-				{
-					rgb[j + 0] = col[0];
-					rgb[j + 1] = col[1];
-					rgb[j + 2] = col[2];
-				}
-				draw_rgb(margin_main_x + x, margin_main_y + y,
-					scale, scale, rgb, 0, ctx);
-				continue;
+				j = ((ty & 7) * 8 + (tx & 7)) * 3;
+				rgb = MEM_2_INT(mem_col_pat24, j);
 			}
-			/* Doing a clear */
-			if (!cf) ax = x , ay = y , cf = 1; // Start a new rectangle
+			else if (mode == 2) /* Tracking */
+			{
+				rgb = ((i >> 2) & 1) * 0xFFFFFF;
+			}
+			else if (mode == 3) /* Gradient */
+			{
+				rgb = ((i >> 2) & 1) * 0xFFFFFF ^
+					((i >> 1) & 1) * 0x00FF00;
+			}
+// !!! This is slow as molasses on Win32 (or Win98SE at least) when unbuffered
+			fill_rgb(margin_main_x + x, margin_main_y + y,
+				scale, scale, rgb, ctx);
+			continue;
 		}
-		/* Do nothing if no area to clear */
-		else if ((mode != 0) || !cf) continue;
+
+		/* Doing a clear */
+		if (!cf) ax = x , ay = y , cf = 1; // Start a new rectangle
 
 		/* Redraw now or wait some more? */
 		aw = scale + abs(x - ax);
@@ -3013,9 +3009,8 @@ void repaint_line(int mode)			// Repaint or clear line on canvas
 	int vxy[4];
 
 	get_visible(vxy);
-	trace_line(mode, line_x1, line_y1, line_x2, line_y2,
 // !!! This assumes that if there's clipping, then there aren't margins
-		vxy[0], vxy[1], vxy[2], vxy[3], NULL);
+	trace_line(mode, line_x1, line_y1, line_x2, line_y2, vxy, NULL);
 }
 
 void repaint_grad(int mode)
@@ -3027,9 +3022,9 @@ void repaint_grad(int mode)
 	else grad->status = GRAD_NONE; /* To avoid hitting repaint */
 
 	get_visible(vxy);
-	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1,
-		vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x, vxy[3] - margin_main_y, NULL);
+	vxy[0] -= margin_main_x; vxy[1] -= margin_main_y;
+	vxy[2] -= margin_main_x; vxy[3] -= margin_main_y;
+	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1, vxy, NULL);
 	grad->status = oldgrad;
 }
 
@@ -3039,11 +3034,11 @@ void refresh_grad(rgbcontext *ctx)
 	int vxy[4];
 
 	get_visible(vxy);
-	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1,
-		(ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x,
-		(ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y,
-		(ctx->x1 <= vxy[2] ? ctx->x1 - 1 : vxy[2]) - margin_main_x,
-		(ctx->y1 <= vxy[3] ? ctx->y1 - 1 : vxy[3]) - margin_main_y, ctx);
+	vxy[0] = (ctx->x0 > vxy[0] ? ctx->x0 : vxy[0]) - margin_main_x;
+	vxy[1] = (ctx->y0 > vxy[1] ? ctx->y0 : vxy[1]) - margin_main_y;
+	vxy[2] = (ctx->x1 <= vxy[2] ? ctx->x1 - 1 : vxy[2]) - margin_main_x;
+	vxy[3] = (ctx->y1 <= vxy[3] ? ctx->y1 - 1 : vxy[3]) - margin_main_y;
+	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1, vxy, ctx);
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

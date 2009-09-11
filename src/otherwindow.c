@@ -115,7 +115,9 @@ static void create_new(GtkWidget *widget)
 
 	if (im_type == 0) bpp = 3;
 
-	if (im_type == 3)	// Grab Screenshot
+// !!! Type 3 (clipboard) is unhandled yet
+
+	if (im_type == 4)	// Grab Screenshot
 	{
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_lower( main_window->window );
@@ -131,8 +133,7 @@ static void create_new(GtkWidget *widget)
 		notify_changed();
 
 		gdk_window_raise( main_window->window );
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 		gtk_window_set_transient_for( GTK_WINDOW(new_window), NULL );
 		gdk_window_iconify( new_window->window );
 		gdk_window_iconify( main_window->window );
@@ -180,11 +181,14 @@ static void create_new(GtkWidget *widget)
 
 void generic_new_window(int type)	// 0=New image, 1=New layer
 {
-	char *rad_txt[] = {_("24 bit RGB"), _("Greyscale"), _("Indexed Palette"), _("Grab Screenshot")},
+	char *rad_txt[] = {_("24 bit RGB"), _("Greyscale"), _("Indexed Palette"),
+		_("From Clipboard"), _("Grab Screenshot")},
 		*title_txt[] = {_("New Image"), _("New Layer")};
+	GtkWidget *vbox1, *table1;
 	int w = mem_width, h = mem_height, c = mem_cols;
 
-	GtkWidget *vbox1, *table1;
+// !!! Disabled for now
+rad_txt[3] = "";
 
 	new_window_type = type;
 
@@ -216,7 +220,8 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	add_to_table( _("Height"), table1, 1, 0, 5 );
 	add_to_table( _("Colours"), table1, 2, 0, 5 );
 
-	xpack(vbox1, wj_radio_pack(rad_txt, type ? 3 : 4, 0, im_type, &im_type, NULL));
+// !!! Cannot load a single new layer for now - imports disabled
+	xpack(vbox1, wj_radio_pack(rad_txt, type ? 3 : 5, 0, im_type, &im_type, NULL));
 
 	add_hseparator( vbox1, 200, 10 );
 

@@ -3247,26 +3247,16 @@ int clip4(int *xywh04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, i
 
 void line_init(linedata line, int x0, int y0, int x1, int y1)
 {
+	int i;
 	line[0] = x0;
 	line[1] = y0;
-	line[6] = line[8] = x1 < x0 ? -1 : 1;
-	line[7] = line[9] = y1 < y0 ? -1 : 1;
-	line[4] = abs(x1 - x0);
-	line[5] = abs(y1 - y0);
-	if (line[4] < line[5]) /* More vertical */
-	{
-		line[2] = line[3] = line[5];
-		line[4] *= 2;
-		line[5] *= 2;
-		line[6] = 0;
-	}
-	else /* More horizontal */
-	{
-		line[2] = line[3] = line[4];
-		line[4] = 2 * line[5];
-		line[5] = 2 * line[2];
-		line[7] = 0;
-	}
+	line[4] = (x1 - x0) * (line[6] = line[8] = x1 - x0 < 0 ? -1 : 1);
+	line[5] = (y1 - y0) * (line[7] = line[9] = y1 - y0 < 0 ? -1 : 1);
+	i = line[4] >= line[5]; /* More horizontal? */
+	line[2] = line[3] = line[5 - i];
+	line[4] = 2 * line[4 + i];
+	line[5] = 2 * line[2];
+	line[6 + i] = 0;
 }
 
 int line_step(linedata line)

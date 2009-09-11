@@ -70,6 +70,9 @@
 #define CPICK_AREA_CURRENT	1
 #define CPICK_AREA_PREVIOUS	2
 
+static const GtkTargetEntry cpick_target = { "application/x-color", 0, 0 };
+static GtkTargetList *cpick_tlist;
+
 typedef struct
 {
 	GtkVBox		vbox;				// Parent class
@@ -86,6 +89,8 @@ typedef struct
 			rgb_previous[4],		// Previous colour/opacity
 			area_size[CPICK_AREA_TOT][2],	// Width / height of each wj_fpixmap
 			lock;				// To block input handlers
+	int		drag_x, drag_y, may_drag;	// For drag & drop
+	unsigned char	drag_rgba[4];			// The color being dragged out
 } cpicker;
 
 typedef struct
@@ -102,7 +107,7 @@ enum {
 static void cpicker_class_init	(cpickerClass	*klass);
 static void cpicker_init	(cpicker	*cp);
 
-static gint cpicker_signals[LAST_SIGNAL] = { 0 };
+static gint cpicker_signals[LAST_SIGNAL];
 static GtkType cpicker_type;
 
 static GtkType cpicker_get_type()
@@ -134,6 +139,9 @@ static void cpicker_class_init( cpickerClass *class )
 		LAST_SIGNAL);
 #endif
 	class->color_changed = NULL;
+
+	/* For drag & drop */
+	cpick_tlist = gtk_target_list_new(&cpick_target, 1);
 }
 
 
@@ -262,6 +270,73 @@ static void cpick_populate_inputs( cpicker *win )
 	win->lock = FALSE;
 }
 
+static void cpick_rgba_at(cpicker *cp, GtkWidget *widget, int x, int y,
+	unsigned char *get, unsigned char *set)
+{
+	if (widget == cp->areas[CPICK_AREA_PALETTE])
+	{
+		char txt[128];
+		int col, ppc, ini_col;
+
+		ppc = cp->area_size[CPICK_AREA_PALETTE][1] / CPICK_PAL_STRIP_ITEMS;
+		x /= ppc; y /= ppc;
+		col = y + CPICK_PAL_STRIP_ITEMS * x;
+
+		snprintf(txt, 128, "cpick_pal_%i", col);
+		if (get)
+		{
+			ini_col = inifile_get_gint32(txt, col > 255 ? 0 :
+				RGB_2_INT(mem_pal_def[col].red,
+				mem_pal_def[col].green, mem_pal_def[col].blue));
+			get[0] = INT_2_R(ini_col);
+			get[1] = INT_2_G(ini_col);
+			get[2] = INT_2_B(ini_col);
+			get[3] = cp->input_vals[CPICK_INPUT_OPACITY];
+		}
+		if (set)
+		{
+			ini_col = MEM_2_INT(set, 0);
+			inifile_set_gint32(txt, ini_col);
+			wj_fpixmap_fill_rgb(widget, x * ppc, y * ppc, ppc, ppc, ini_col);
+		}
+	}
+	else if (widget == cp->areas[CPICK_AREA_PRECUR])
+	{
+		int *irgb, *ialpha;
+		int pc = x >= cp->area_size[CPICK_AREA_PRECUR][0] >> 1;
+
+		if (pc) // Current
+		{
+			irgb = cp->input_vals + CPICK_INPUT_RED;
+			ialpha = cp->input_vals + CPICK_INPUT_OPACITY;
+		}
+		else // Previous
+		{
+			irgb = cp->rgb_previous;
+			ialpha = cp->rgb_previous + 3;
+		}
+
+		if (get)
+		{
+			get[0] = irgb[0]; get[1] = irgb[1]; get[2] = irgb[2];
+			get[3] = *ialpha;
+		}
+		if (set)
+		{
+			irgb[0] = set[0]; irgb[1] = set[1]; irgb[2] = set[2];
+			*ialpha = set[3];
+			if (pc) // Current color changed - announce it
+			{
+				cpick_set_colour(GTK_WIDGET(cp),
+					MEM_2_INT(set, 0), set[3]);
+				gtk_signal_emit(GTK_OBJECT(cp),
+					cpicker_signals[COLOR_CHANGED]);
+			}
+			else cpick_area_precur_create(cp, CPICK_AREA_PREVIOUS);
+		}
+	}
+}
+
 static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int button )
 {
 	int idx, rx, ry, aw, ah, ah1;
@@ -274,22 +349,14 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 	ah = cp->area_size[idx][1];
 	ah1 = ah - 1;
 
-	wj_fpixmap_xy(widget, x, y, &rx, &ry);
+	rx = x < 0 ? 0 : x >= aw ? aw - 1 : x;
+	ry = y < 0 ? 0 : y > ah1 ? ah1 : y;
 
-	rx = rx < 0 ? 0 : rx >= aw ? aw - 1 : rx;
-	ry = ry < 0 ? 0 : ry > ah1 ? ah1 : ry;
-
-//printf("x=%i y=%i b=%i\n", rx, ry, button);
 	if ( idx == CPICK_AREA_OPACITY )
 	{
 		wj_fpixmap_move_cursor(widget, aw / 2, ry);
 
 		cp->input_vals[CPICK_INPUT_OPACITY] = 255 - (ry * 255) / ah1;
-
-		cpick_populate_inputs( cp );		// Update input
-		cpick_area_precur_create( cp, CPICK_AREA_CURRENT );		// Update current colour
-
-		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
 	}
 	else if ( idx == CPICK_AREA_HUE )
 	{
@@ -298,6 +365,7 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 		cp->input_vals[CPICK_INPUT_HUE] = 1529 - (ry * 1529) / ah1;
 
 		cpick_area_picker_create(cp);
+		cpick_get_rgb(cp);
 	}
 	else if ( idx == CPICK_AREA_PICKER )
 	{
@@ -305,87 +373,167 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 
 		cp->input_vals[CPICK_INPUT_VALUE] = (rx * 255) / (aw - 1);
 		cp->input_vals[CPICK_INPUT_SATURATION] = 255 - (ry * 255) / ah1;
+		cpick_get_rgb(cp);
 	}
 	else if ( idx == CPICK_AREA_PALETTE )
 	{
-		char txt[128];
-		int col, ppc, ini_col;
+		unsigned char rgba[4];
+		int ini_col;
 
-		ppc = ah / CPICK_PAL_STRIP_ITEMS;
-		col = (ry / ppc) + CPICK_PAL_STRIP_ITEMS * (rx / ppc);
-
-		snprintf(txt, 128, "cpick_pal_%i", col);
-		ini_col = inifile_get_gint32(txt, RGB_2_INT(mem_pal_def[col].red,
-				mem_pal_def[col].green, mem_pal_def[col].blue ) );
-		if (ini_col != RGB_2_INT(cp->input_vals[CPICK_INPUT_RED],
+		cpick_rgba_at(cp, widget, rx, ry, rgba, NULL);
+		ini_col = MEM_2_INT(rgba, 0);
+		// Only update if colour is different
+		if (ini_col == RGB_2_INT(cp->input_vals[CPICK_INPUT_RED],
 			cp->input_vals[CPICK_INPUT_GREEN],
-			cp->input_vals[CPICK_INPUT_BLUE]))
-		{
-			// Only update if colour is different
-			cpick_set_colour(GTK_WIDGET(cp), ini_col,
-				cp->input_vals[CPICK_INPUT_OPACITY]);
-			gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
-		}
+			cp->input_vals[CPICK_INPUT_BLUE])) return;
+		cpick_set_colour(GTK_WIDGET(cp), ini_col,
+			cp->input_vals[CPICK_INPUT_OPACITY]);
 	}
+	else return;
 
-	if ((idx == CPICK_AREA_HUE) || (idx == CPICK_AREA_PICKER))
+	if (idx != CPICK_AREA_PALETTE) // cpick_set_colour() does that and more
 	{
-		cpick_get_rgb( cp );
-
-		cpick_populate_inputs( cp );		// Update all inputs in dialog
-		cpick_area_precur_create( cp, CPICK_AREA_CURRENT );		// Update current colour
-
-		gtk_signal_emit( GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED] );
+		cpick_populate_inputs(cp);
+		cpick_area_precur_create(cp, CPICK_AREA_CURRENT);
 	}
+	gtk_signal_emit(GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED]);
 }
 
-static gboolean cpick_click_area(GtkWidget *widget, GdkEventButton *event, cpicker *cp)
+static void cpick_drag_get(GtkWidget *widget, GdkDragContext *drag_context,
+	GtkSelectionData *data, guint info, guint time, gpointer user_data)
 {
-	int x = event->x, y = event->y;
+	cpicker *cp = user_data;
+	guint16 vals[4];
 
-	gtk_widget_grab_focus(widget);
+	/* Source RGBA values prepared already - just export them */
+	vals[0] = cp->drag_rgba[0] * 257;
+	vals[1] = cp->drag_rgba[1] * 257;
+	vals[2] = cp->drag_rgba[2] * 257;
+	vals[3] = cp->drag_rgba[3] * 257;
 
-	if (event->button) cpick_area_mouse( widget, cp, x, y, event->button );
-
-	return TRUE;
+	gtk_selection_data_set(data, gdk_atom_intern("application/x-color", FALSE),
+		16, (guchar *)vals, 8);
 }
 
-static gboolean cpick_motion_area(GtkWidget *widget, GdkEventMotion *event, cpicker *cp)
+static void cpick_drag_set(GtkWidget *widget, GdkDragContext *drag_context,
+	gint x,	gint y,	GtkSelectionData *data,	guint info, guint time, gpointer user_data)
 {
-	int x, y, button = 0;
+	cpicker *cp = user_data;
+	unsigned char rgba[4];
+	int i, idx, rx, ry, aw, ah;
+
+	idx = widget == cp->areas[CPICK_AREA_PRECUR] ? CPICK_AREA_PRECUR :
+		CPICK_AREA_PALETTE;
+	aw = cp->area_size[idx][0];
+	ah = cp->area_size[idx][1];
+
+	wj_fpixmap_xy(widget, x, y, &rx, &ry);
+	rx = rx < 0 ? 0 : rx >= aw ? aw - 1 : rx;
+	ry = ry < 0 ? 0 : ry >= ah ? ah - 1 : ry;
+
+	/* Selection data format isn't checked because it's how GTK+2 does it,
+	 * reportedly to ignore a bug in (some versions of) KDE - WJ */
+	if (data->length != 8) return;
+
+	for (i = 0; i < 4; i++)
+		rgba[i] = (((guint16 *)data->data)[i] + 128) / 257;
+	cpick_rgba_at(cp, widget, rx, ry, NULL, rgba);
+}
+
+#define RGB_DND_W 48
+#define RGB_DND_H 32
+
+static void set_drag_icon(GdkDragContext *context, GtkWidget *src, unsigned char *rgba)
+{
+	GdkGCValues sv;
+	GdkPixmap *swatch;
+
+	if (!context) return;
+	swatch = gdk_pixmap_new(src->window, RGB_DND_W, RGB_DND_H, -1);
+	gdk_gc_get_values(src->style->black_gc, &sv);
+	gdk_rgb_gc_set_foreground(src->style->black_gc, MEM_2_INT(rgba, 0));
+	gdk_draw_rectangle(swatch, src->style->black_gc, TRUE, 0, 0,
+		RGB_DND_W, RGB_DND_H);
+	gdk_gc_set_foreground(src->style->black_gc, &sv.foreground);
+	gtk_drag_set_icon_pixmap(context, gtk_widget_get_colormap(src),
+		swatch, NULL, -2, -2);
+	gdk_pixmap_unref(swatch);
+}
+
+static gboolean cpick_area_event(GtkWidget *widget, GdkEvent *event, cpicker *cp)
+{
+	int x, y, rx, ry, button = 0;
 	GdkModifierType state;
+	int can_drag = (widget == cp->areas[CPICK_AREA_PRECUR]) ||
+		(widget == cp->areas[CPICK_AREA_PALETTE]);
 
+	if (event->type == GDK_BUTTON_PRESS)
+	{
+		x = event->button.x;
+		y = event->button.y;
+		button = event->button.button;
+		// Clicks outside pixmap are ignored
+		can_drag &= wj_fpixmap_xy(widget, x, y, &rx, &ry);
+		if (can_drag && (button == 1)) // Only left button inits drag
+		{
+			cp->drag_x = rx;
+			cp->drag_y = ry;
+			cp->may_drag = TRUE;
+		}
+		gtk_widget_grab_focus(widget);
+	}
+	else if (event->type == GDK_BUTTON_RELEASE)
+	{
+		if (event->button.button == 1) cp->may_drag = FALSE;
+	}
+	else if (event->type == GDK_MOTION_NOTIFY)
+	{
+		if (event->motion.is_hint)
+			gdk_window_get_pointer(event->motion.window, &x, &y, &state);
+		else
+		{
+			x = event->motion.x;
+			y = event->motion.y;
+			state = event->motion.state;
+		}
+		wj_fpixmap_xy(widget, x, y, &rx, &ry);
+		/* May init drag */
+		if (state & GDK_BUTTON1_MASK)
+		{
+			/* No dragging where not allowed, or without clicking
+			 * on the widget first */
+			if (can_drag && cp->may_drag &&
 #if GTK_MAJOR_VERSION == 1
-	if (event->is_hint)
-	{
-		gdk_input_window_get_pointer(event->window, event->deviceid,
-			NULL, NULL, NULL, NULL, NULL, &state);
-		gdk_window_get_pointer(event->window, &x, &y, &state);
-	}
-	else
-	{
-		x = event->x;
-		y = event->y;
-		state = event->state;
-	}
+				((abs(rx - cp->drag_x) > 3) ||
+				(abs(ry - cp->drag_y) > 3))
+#else /* if GTK_MAJOR_VERSION == 2 */
+				gtk_drag_check_threshold(widget,
+					cp->drag_x, cp->drag_y, rx, ry)
 #endif
-#if GTK_MAJOR_VERSION == 2
-	if (event->is_hint) gdk_device_get_state(event->device, event->window,
-		NULL, &state);
-	x = event->x;
-	y = event->y;
-	state = event->state;
-#endif
+			) /* Initiate drag */
+			{
+				GdkDragContext *context;
 
-	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
-		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
-	else if (state & GDK_BUTTON1_MASK) button = 1;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
-	else if (state & GDK_BUTTON2_MASK) button = 2;
+				cp->may_drag = FALSE;
+				/* Start drag at current position, not at saved one */
+				cpick_rgba_at(cp, widget, rx, ry, cp->drag_rgba, NULL);
+				context = gtk_drag_begin(widget, cpick_tlist,
+					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
+				set_drag_icon(context, widget, cp->drag_rgba);
+				return (TRUE);
+			}
+		}
+		else cp->may_drag = FALSE; // Release events can be lost
+		
+		if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
+			(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
+		else if (state & GDK_BUTTON1_MASK) button = 1;
+		else if (state & GDK_BUTTON3_MASK) button = 3;
+		else if (state & GDK_BUTTON2_MASK) button = 2;
+	}
 
-	if (button) cpick_area_mouse( widget, cp, x, y, button );
-
-	return TRUE;
+	if (button) cpick_area_mouse(widget, cp, rx, ry, button);
+	return (TRUE);
 }
 
 static void cpick_realize_area(GtkWidget *widget, cpicker *cp)
@@ -796,7 +944,7 @@ static void cpicker_init( cpicker *cp )
 		{255,0,255}, {255,0,255}, {-1,-1,-1}, {128,0,255} };
 	char *in_txt[CPICK_INPUT_TOT] = { _("Red"), _("Green"), _("Blue"), _("Hue"), _("Saturation"),
 			_("Value"), _("Hex"), _("Opacity") };
-	GtkWidget *hbox, *button, *table, *label, *iconw;
+	GtkWidget *widget, *hbox, *button, *table, *label, *iconw;
 	GtkObject *obj;
 	GdkPixmap *icon, *mask;
 	int i;
@@ -839,23 +987,39 @@ static void cpicker_init( cpicker *cp )
 
 	for (i = 0; i < CPICK_AREA_TOT; i++)
 	{
-		cp->areas[i] = wj_fpixmap(cp->area_size[i][0], cp->area_size[i][1]);
-		gtk_table_attach(GTK_TABLE(table), cp->areas[i],
+		widget = cp->areas[i] = wj_fpixmap(cp->area_size[i][0],
+			cp->area_size[i][1]);
+		gtk_table_attach(GTK_TABLE(table), widget,
 			pos[i][1], pos[i][1] + 1, pos[i][0], pos[i][0] + 1,
 			(GtkAttachOptions)0, (GtkAttachOptions)0, 0, 0);
-		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "realize",
-			GTK_SIGNAL_FUNC(cpick_realize_area), (gpointer)cp);
-		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "button_press_event",
-			GTK_SIGNAL_FUNC(cpick_click_area), (gpointer)cp);
+		gtk_signal_connect(GTK_OBJECT(widget), "realize",
+			GTK_SIGNAL_FUNC(cpick_realize_area), cp);
+		gtk_signal_connect(GTK_OBJECT(widget), "button_press_event",
+			GTK_SIGNAL_FUNC(cpick_area_event), cp);
+		gtk_signal_connect(GTK_OBJECT(widget), "button_release_event",
+			GTK_SIGNAL_FUNC(cpick_area_event), cp);
+		gtk_signal_connect(GTK_OBJECT(widget), "motion_notify_event",
+			GTK_SIGNAL_FUNC(cpick_area_event), cp);
 
-// FIXME - add drag n drop for palette & previous/current colour areas
+		if ((i == CPICK_AREA_PRECUR) || (i == CPICK_AREA_PALETTE))
+		{
+/* !!! Maybe handle "drag_motion" & "drag_drop" instead of GTK_DEST_DEFAULT_*,
+ * !!! to prevent drops on borders outside of pixmap? */
+			gtk_drag_dest_set(widget, GTK_DEST_DEFAULT_HIGHLIGHT |
+				GTK_DEST_DEFAULT_MOTION | GTK_DEST_DEFAULT_DROP,
+				&cpick_target, 1, GDK_ACTION_COPY);
+			gtk_signal_connect(GTK_OBJECT(widget), "drag_data_get",
+				GTK_SIGNAL_FUNC(cpick_drag_get), cp);
+			gtk_signal_connect(GTK_OBJECT(widget), "drag_data_received",
+				GTK_SIGNAL_FUNC(cpick_drag_set), cp);
+		}
 
-		if ((i != CPICK_AREA_PICKER) && (i != CPICK_AREA_HUE) &&
-			(i != CPICK_AREA_OPACITY)) continue;
-		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "motion_notify_event",
-			GTK_SIGNAL_FUNC(cpick_motion_area), (gpointer)cp);
-		gtk_signal_connect(GTK_OBJECT(cp->areas[i]), "key_press_event",
-			GTK_SIGNAL_FUNC(cpick_area_key), (gpointer)cp);
+		if ((i == CPICK_AREA_PICKER) || (i == CPICK_AREA_HUE) ||
+			(i == CPICK_AREA_OPACITY))
+		{
+			 gtk_signal_connect(GTK_OBJECT(widget), "key_press_event",
+				GTK_SIGNAL_FUNC(cpick_area_key), cp);
+		}
 	}
 
 	button = gtk_button_new();

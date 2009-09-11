@@ -149,6 +149,7 @@ int wtf_pressed(GdkEventKey *event);
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 
 void mapped_dis_add(GtkWidget *widget, int actmap);
+void mapped_item_state(int statemap);	// Change state of preset menu items
 
 /* Notable menu items */
 #define MENU_FACTION1  1
@@ -230,10 +231,6 @@ GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
-	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
-	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
-	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
-	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS],
 	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
 
@@ -247,10 +244,8 @@ void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
 
-void men_item_state( GtkWidget *menu_items[], gboolean state );
-	// Change state of preset menu items
-
 void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx);
+void fill_rgb(int x, int y, int w, int h, int rgb, rgbcontext *ctx);
 void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx);
 
 void canvas_size(int *w, int *h);	// Get zoomed canvas size

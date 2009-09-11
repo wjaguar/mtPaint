@@ -2097,7 +2097,7 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 // Clipboard
 
 /* Detect if current clipboard belongs to something in the program itself */
-int internal_clipboard()
+int internal_clipboard(int which)
 {
 // !!! Need a different check in Windoze, likely through WinAPI - because of
 // gdk_selection_owner_get_for_display() in win32/gdkselection-win32.c doing
@@ -2105,8 +2105,8 @@ int internal_clipboard()
 // One possible way: GetWindowThreadProcessId(GetClipboardOwner()) and compare
 // to GetCurrentProcessId()
 	gpointer widget = NULL;
-	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("CLIPBOARD", FALSE));
-//	GdkWindow *win = gdk_selection_owner_get(gdk_atom_intern("PRIMARY", FALSE));
+	GdkWindow *win = gdk_selection_owner_get(
+		gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE));
 	if (!win) return (FALSE); // Unknown window
 	gdk_window_get_user_data(win, &widget);
 	return (!!widget); // Real widget or foreign window?
@@ -2133,16 +2133,15 @@ static void selection_callback(GtkWidget *widget, GtkSelectionData *data,
 	res->flag = (data->length >= 0) && res->handler(data, res->data);
 }
 
-int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
+int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data)
 {
 	clip_info res = { -1, (clip_function)handler, data };
 
 	gtk_signal_connect(GTK_OBJECT(main_window), "selection_received",
 		GTK_SIGNAL_FUNC(selection_callback), &res);
-	gtk_selection_convert(main_window, gdk_atom_intern("CLIPBOARD", FALSE),
-//	gtk_selection_convert(main_window, gdk_atom_intern("PRIMARY", FALSE),
+	gtk_selection_convert(main_window,
+		gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE),
 		gdk_atom_intern(what, FALSE), GDK_CURRENT_TIME);
-// !!! May need gtk_main_level() / gtk_main_quit() trick - must test
 	while (res.flag == -1) gtk_main_iteration();
 	gtk_signal_disconnect_by_func(GTK_OBJECT(main_window), 
 		GTK_SIGNAL_FUNC(selection_callback), &res);
@@ -2157,7 +2156,7 @@ static void selection_get_callback(GtkWidget *widget, GtkSelectionData *data,
 	if (cf) cf(data, (gpointer)(int)info);
 }
 
-static void selection_clear_callback((GtkWidget *widget, GdkEventSelection *event,
+static void selection_clear_callback(GtkWidget *widget, GdkEventSelection *event,
 	gpointer user_data)
 {
 	clip_function cf = g_dataset_get_data(main_window,
@@ -2165,12 +2164,19 @@ static void selection_clear_callback((GtkWidget *widget, GdkEventSelection *even
 	if (cf) cf(NULL, (gpointer)0);
 }
 
-int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler)
+// !!! GTK+ 1.2 internal type (gtk/gtkselection.c)
+typedef struct {
+	GdkAtom selection;
+	GtkTargetList *list;
+} GtkSelectionTargetList;
+
+int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
+	GtkSignalFunc handler)
 {
 	static int connected;
 	GtkSelectionTargetList *slist;
 	GList *list, *tmp;
-	GdkAtom sel = gdk_atom_intern("CLIPBOARD", FALSE);
+	GdkAtom sel = gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE);
 
 	if (!gtk_selection_owner_set(main_window, sel, GDK_CURRENT_TIME))
 		return (FALSE);
@@ -2181,15 +2187,16 @@ int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler
 	for (tmp = list; tmp; tmp = tmp->next)
 	{
 		if ((slist = tmp->data)->selection != sel) continue;
-		list = g_list_delete_link(list, tmp);
+		list = g_list_remove_link(list, tmp);
 		gtk_target_list_unref(slist->list);
 		g_free(slist);
 		break;
 	}
-	g_object_set_data(G_OBJECT(main_window), "gtk-selection-handlers", list);
+	gtk_object_set_data(GTK_OBJECT(main_window), "gtk-selection-handlers", list);
 
 	/* !!! Have to resort to this to allow for multiple clipboards in X */
-	g_dataset_set_data(main_window, "CLIPBOARD", (gpointer)handler);
+	g_dataset_set_data(main_window, which ? "PRIMARY" : "CLIPBOARD",
+		(gpointer)handler);
 	if (!connected)
 	{
 		gtk_signal_connect(GTK_OBJECT(main_window), "selection_get",
@@ -2200,6 +2207,7 @@ int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler
 	}
 
 	gtk_selection_add_targets(main_window, sel, targets, ntargets);
+	return (TRUE);
 }
 
 #else /* #if GTK_MAJOR_VERSION == 2 */
@@ -2212,13 +2220,12 @@ static void clipboard_callback(GtkClipboard *clipboard,
 		res->handler(selection_data, res->data);
 }
 
-int process_clipboard(char *what, GtkSignalFunc handler, gpointer data)
+int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data)
 {
 	clip_info res = { -1, (clip_function)handler, data };
 
-	gtk_clipboard_request_contents(
-		gtk_clipboard_get(GDK_SELECTION_CLIPBOARD),
-//		gtk_clipboard_get(GDK_SELECTION_PRIMARY),
+	gtk_clipboard_request_contents(gtk_clipboard_get(which ?
+		GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD),
 		gdk_atom_intern(what, FALSE), clipboard_callback, &res);
 	while (res.flag == -1) gtk_main_iteration();
 	return (res.flag);
@@ -2235,15 +2242,16 @@ static void clipboard_clear_callback(GtkClipboard *clipboard, gpointer user_data
 	((clip_function)user_data)(NULL, (gpointer)0);
 }
 
-int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler)
+int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
+	GtkSignalFunc handler)
 {
 	int i;
 
 	/* Two attempts, for GTK+2 function can fail for strange reasons */
 	for (i = 0; i < 2; i++)
 	{
-		if (gtk_clipboard_set_with_data(
-			gtk_clipboard_get(GDK_SELECTION_CLIPBOARD),
+		if (gtk_clipboard_set_with_data(gtk_clipboard_get(which ?
+			GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD),
 			targets, ntargets, clipboard_get_callback,
 			clipboard_clear_callback, (gpointer)handler))
 			return (TRUE);
@@ -2259,7 +2267,7 @@ int offer_clipboard(GtkTargetEntry *targets, int ntargets, GtkSignalFunc handler
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 
-int import_clip_Xpixmap(GtkSelectionData *data)
+unsigned char *import_clip_Xpixmap(GtkSelectionData *data, int *width, int *height)
 {
 	GdkPixmap *pm;
 	unsigned char *buf = NULL;
@@ -2268,7 +2276,7 @@ int import_clip_Xpixmap(GtkSelectionData *data)
 	gdk_error_trap_push(); // No guarantee that we got a valid pixmap
 	pm = gdk_pixmap_foreign_new(*(Pixmap *)data->data);
 	gdk_error_trap_pop(); // The above call returns NULL on failure anyway
-	if (!pm) return (FALSE);
+	if (!pm) return (NULL);
 	dd = gdk_visual_get_system()->depth;
 #if GTK_MAJOR_VERSION == 1
 	gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
@@ -2286,9 +2294,37 @@ int import_clip_Xpixmap(GtkSelectionData *data)
 		gdk_get_default_root_window(), pm, NULL, 0, 0, w, h);
 	gdk_pixmap_unref(pm);
 #endif
-	if (!buf) return (FALSE);
-	mem_clip_new(w, h, 3, 0, FALSE);
-	mem_clipboard = buf;
+	if (!buf) return (NULL);
+	*width = w; *height = h;
+	return (buf);
+}
+
+/* It's unclear who should free clipboard pixmaps and when, so I do the same
+ * thing Qt does, destroying the next-to-last allocated pixmap each time a new
+ * one is allocated - WJ */
+
+int export_clip_Xpixmap(GtkSelectionData *data, unsigned char *rgb, int width, int height)
+{
+	static GdkPixmap *exported[2];
+	Pixmap xpixmap;
+
+	if (exported[1])
+	{
+		/* Someone might have destroyed the X pixmap already, so
+		 * get ready to live through an X error */
+		gdk_error_trap_push();
+		gdk_pixmap_unref(exported[1]);
+		gdk_error_trap_pop();
+	}
+	exported[1] = exported[0];
+	exported[0] = gdk_pixmap_new(main_window->window, width, height, -1);
+	if (!exported[0]) return (FALSE);
+
+	gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
+		0, 0, width, height, GDK_RGB_DITHER_NONE, rgb, width * 3);
+	xpixmap = GDK_WINDOW_XWINDOW(exported[0]);
+	gtk_selection_data_set(data, data->target, 32, (guchar *)&xpixmap,
+		sizeof(xpixmap));
 	return (TRUE);
 }
 

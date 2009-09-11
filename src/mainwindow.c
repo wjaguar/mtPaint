@@ -110,10 +110,6 @@ GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas, *main_hidden[4],
 
-	*menu_undo[5], *menu_redo[5], *menu_crop[5], *menu_need_marquee[10],
-	*menu_need_selection[20], *menu_need_clipboard[30], *menu_only_24[10],
-	*menu_not_indexed[10], *menu_only_indexed[10], *menu_lasso[15],
-	*menu_alphablend[2], *menu_chan_del[2], *menu_rgba[2],
 	*menu_widgets[TOTAL_MENU_IDS],
 	*dock_pane, *dock_area, *dock_vbox[DOCK_TOTAL];
 
@@ -144,18 +140,36 @@ static void clear_perim_real( int ox, int oy )
 	repaint_canvas(x0 + 1, y1, x1 - x0 - 1, 1);
 }
 
-/* Enable or disable menu items */
-void men_item_state( GtkWidget *menu_items[], gboolean state )
+typedef struct {
+	GtkWidget *widget;
+	int actmap;
+} dis_information;
+
+static dis_information *dis_array;
+static int dis_count, dis_allow;
+static int dis_miss = ~0;
+
+void mapped_dis_add(GtkWidget *widget, int actmap)
 {
-	while (*menu_items) gtk_widget_set_sensitive(*menu_items++, state);
+	if (!actmap) return;
+	if (dis_count >= dis_allow) dis_array = realloc(dis_array,
+		(dis_allow += 128) * sizeof(dis_information));
+	/* If no memory, just die of SIGSEGV */
+	dis_array[dis_count].widget = widget;
+	dis_array[dis_count].actmap = actmap;
+	dis_count++;
 }
 
-/* Add widget to disable list */
-static void men_dis_add( GtkWidget *widget, GtkWidget *menu_items[] )
+/* Enable or disable menu items */
+void mapped_item_state(int statemap)
 {
-	while (*menu_items++);
-	*(menu_items - 1) = widget;
-	*menu_items = NULL;
+	int i;
+
+	if (dis_miss == statemap) return; // Nothing changed
+	for (i = 0; i < dis_count; i++)
+		gtk_widget_set_sensitive(dis_array[i].widget,
+			!!(dis_array[i].actmap & statemap));
+	dis_miss = statemap;
 }
 
 static void pressed_swap_AB()
@@ -367,7 +381,8 @@ static GdkAtom clip_atoms[CLIP_TARGETS];
 /* Seems it'll be better to prefer BMP when talking to the likes of GIMP -
  * they send PNGs really slowly (likely, compressed to the max); but then,
  * we'll need a mtPaint-specific clipboard type, with highest precedence, for
- * exchanges between instances of mtPaint - like one Krita has.
+ * use among instances of mtPaint - like "application/x-krita-selection" which
+ * Krita uses. Our "extended PNG" would serve for the purpose well enough.
  * And another question with BMPs is, not everyone supports alpha in them. */
 
 static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
@@ -399,13 +414,13 @@ static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
 	return (k < CLIP_TARGETS);
 }
 
-static int check_clipboard()
+static int check_clipboard(int which)
 {
 	int res;
 
-	if (internal_clipboard()) return (0); // if we're who put data there
-	if (!process_clipboard("TARGETS", GTK_SIGNAL_FUNC(clipboard_check_fn), &res))
-		return (0); // no luck
+	if (internal_clipboard(which)) return (0); // if we're who put data there
+	if (!process_clipboard(which, "TARGETS",
+		GTK_SIGNAL_FUNC(clipboard_check_fn), &res)) return (0); // no luck
 	return (res);
 }
 
@@ -414,16 +429,24 @@ static int clipboard_import_fn(GtkSelectionData *data, gpointer user_data)
 //g_print("!!! %X %d\n", data->data, data->length);
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 	if ((int)user_data == -1) /* Got an X-something */
-		return (import_clip_Xpixmap(data));
+	{
+		unsigned char *buf;
+		int w, h;
+
+		if (!(buf = import_clip_Xpixmap(data, &w, &h))) return (FALSE);
+		mem_clip_new(w, h, 3, 0, FALSE);
+		mem_clipboard = buf;
+		return (TRUE);
+	}
 #endif
 	return (load_mem_image((unsigned char *)data->data, data->length,
 		FS_CLIP_FILE, (int)user_data) == 1);
 }
 
-static int import_clipboard(int format)
+static int import_clipboard(int which, int format)
 {
-	if (internal_clipboard()) return (FALSE); // nothing to import
-	return (process_clipboard(clip_formats[format].target,
+	if (internal_clipboard(which)) return (FALSE); // nothing to import
+	return (process_clipboard(which, clip_formats[format].target,
 		GTK_SIGNAL_FUNC(clipboard_import_fn),
 		(gpointer)(int)clip_formats[format].info));
 }
@@ -452,9 +475,16 @@ static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
 	if (!mem_clipboard) return (FALSE); // Our own clipboard got emptied
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-// !!! Pixmaps and bitmaps not supported yet
-	if (type == -1) return (FALSE);
+	if (type == -1)
+	{
+// !!! Indexed clipboard will have to be converted to RGB buffer, later
+		if (mem_clip_bpp == 1) return (FALSE);
+		return (export_clip_Xpixmap(data, mem_clipboard, mem_clip_w, mem_clip_h));
+	}
 #endif
+
+// !!! Later, clipboard'll have to be simplified for use with lesser software -
+// with selection channel blended into alpha or even image itself
 
 	/* Prepare settings */
 	setup_clip_save(&settings, type);
@@ -468,22 +498,27 @@ static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
  * maybe it'll be better to hack up the function and pass the original data
  * instead; but to do so, I'd need to use g_try_*() allocation functions in
  * memFILE writing path - WJ */
-	gtk_selection_data_set(data, data->type, 8, // !!! 32 for pixmaps!
-		buf, len);
+	gtk_selection_data_set(data, data->target, 8, buf, len);
 	free(buf);
 	return (TRUE);
 }
 
 static int export_clipboard()
 {
+	int res;
+
 	if (!mem_clipboard) return (FALSE);
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-// !!! Pixmaps and bitmaps not supported yet
-	return (offer_clipboard(clip_formats + 1, CLIP_TARGETS - 3,
+	/* Offer both CLIPBOARD and PRIMARY; BITMAPs not supported */
+	res = offer_clipboard(0, clip_formats + 1, CLIP_TARGETS - 2,
+		GTK_SIGNAL_FUNC(clipboard_export_fn));
+	res |= offer_clipboard(1, clip_formats + 1, CLIP_TARGETS - 2,
+		GTK_SIGNAL_FUNC(clipboard_export_fn));
 #else
-	return (offer_clipboard(clip_formats + 1, CLIP_TARGETS - 1,
+	res = offer_clipboard(0, clip_formats + 1, CLIP_TARGETS - 1,
+		GTK_SIGNAL_FUNC(clipboard_export_fn));
 #endif
-		GTK_SIGNAL_FUNC(clipboard_export_fn)));
+	return (res);
 }
 
 int gui_save(char *filename, ls_settings *settings)
@@ -573,8 +608,15 @@ static void load_clip(int item)
 
 	if (item == -1) // System clipboard
 	{
-		i = check_clipboard();
-		if (i) i = import_clipboard(i);
+		i = check_clipboard(0);
+		if (i) i = import_clipboard(0, i);
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+		if (!i) // If no luck with CLIPBOARD, check PRIMARY too
+		{
+			i = check_clipboard(1);
+			if (i) i = import_clipboard(1, i);
+		}
+#endif
 	}
 	else // Disk file
 	{
@@ -2672,6 +2714,49 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 	}
 }
 
+/* Redirectable RGB fill */
+void fill_rgb(int x, int y, int w, int h, int rgb, rgbcontext *ctx)
+{
+	if (!ctx)
+	{
+		static GdkGC *gc;
+		static int oldrgb = -1;
+
+		if (!gc) gc = gdk_gc_new(drawing_canvas->window);
+		if (rgb != oldrgb)
+			gdk_rgb_gc_set_foreground(gc, oldrgb = rgb);
+		gdk_draw_rectangle(drawing_canvas->window, gc, TRUE,
+			x, y, w, h);
+	}
+	else
+	{
+		unsigned char *dest, *tmp;
+		int i, l;
+
+		if ((w <= 0) || (h <= 0)) return;
+		w += x; h += y;
+		if ((x >= ctx->x1) || (y >= ctx->y1) ||
+			(w <= ctx->x0) || (h <= ctx->y0)) return;
+		if (x < ctx->x0) x = ctx->x0;
+		if (y < ctx->y0) y = ctx->y0;
+		if (w > ctx->x1) w = ctx->x1;
+		if (h > ctx->y1) h = ctx->y1;
+		w = (w - x) * 3;
+		l = (ctx->x1 - ctx->x0) * 3;
+		tmp = dest = ctx->rgb + (y - ctx->y0) * l + (x - ctx->x0) * 3;
+		*tmp++ = INT_2_R(rgb);
+		*tmp++ = INT_2_G(rgb);
+		*tmp++ = INT_2_B(rgb);
+		for (i = w - 3; i; i-- , tmp++) *tmp = *(tmp - 3);
+		tmp = dest;
+		for (h -= y + 1; h; h--)
+		{
+			dest += l;
+			memcpy(dest, tmp, w);
+		}
+	}
+}
+
 /* Redirectable polygon drawing */
 void draw_poly(int *xy, int cnt, int shift, rgbcontext *ctx)
 {
@@ -3374,28 +3459,6 @@ typedef struct
 	short action, mode;
 	char **xpm_icon_image;
 } menu_item;
-
-static GtkWidget **need_lists[] = {
-	menu_undo, menu_redo, menu_crop, menu_need_marquee,
-	menu_need_selection, menu_need_clipboard, menu_only_24,
-	menu_not_indexed, menu_only_indexed, menu_lasso, menu_alphablend,
-	menu_chan_del, menu_rgba };
-
-void mapped_dis_add(GtkWidget *widget, int actmap)
-{
-	int i;
-
-	while (actmap)
-	{
-		i = actmap; actmap &= actmap - 1; i = (i ^ actmap) - 1;
-		i = (i & 0x55555555) + ((i >> 1) & 0x55555555);
-		i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
-		i = (i & 0x0F0F0F0F) + ((i >> 4) & 0x0F0F0F0F);
-		i = (i & 0x00FF00FF) + ((i >> 8) & 0x00FF00FF);
-		i = (i & 0xFFFF) + (i >> 16);
-		men_dis_add(widget, need_lists[i]);
-	}
-}
 
 /* The following is main menu auto-rearrange code. If the menu is too long for
  * the window, some of its items are moved into "overflow" submenu - and moved
@@ -4292,8 +4355,8 @@ static menu_item main_menu[] = {
 	{ _("/Edit/Save Clipboard/10"), -1, 0, NEED_CLIP, "<control>F10", ACT_SAVE_CLIP, 10 },
 	{ _("/Edit/Save Clipboard/11"), -1, 0, NEED_CLIP, "<control>F11", ACT_SAVE_CLIP, 11 },
 	{ _("/Edit/Save Clipboard/12"), -1, 0, NEED_CLIP, "<control>F12", ACT_SAVE_CLIP, 12 },
-	{ _("/Edit/Import Clipboard"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
-	{ _("/Edit/Export Clipboard"), -1, 0, 0, NULL, ACT_SAVE_CLIP, -1 },
+	{ _("/Edit/Import Clipboard from System"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
+	{ _("/Edit/Export Clipboard to System"), -1, 0, NEED_CLIP, NULL, ACT_SAVE_CLIP, -1 },
 	{ _("/Edit/sep3"), -4 },
 	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
 	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
@@ -4658,11 +4721,7 @@ void main_init()
 	gtk_signal_connect( GTK_OBJECT(main_window), "key_press_event",
 		GTK_SIGNAL_FUNC (handle_keypress), NULL );
 
-	men_item_state( menu_undo, FALSE );
-	men_item_state( menu_redo, FALSE );
-	men_item_state( menu_need_marquee, FALSE );
-	men_item_state( menu_need_selection, FALSE );
-	men_item_state( menu_need_clipboard, FALSE );
+	mapped_item_state(0);
 
 	show_dock |= (files_passed > 1);
 
