@@ -2354,6 +2354,126 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	gtk_widget_show_all(quantize_window);
 }
 
+///	GRADIENT EDITOR WIDGET
+
+GtkWidget *wj_pixbox(int width, int height)
+{
+	GdkPixmap *pmap;
+	GtkWidget *box, *pix;
+
+	box = gtk_event_box_new();
+	gtk_widget_set_events(box, GDK_ALL_EVENTS_MASK);
+	pmap = gdk_pixmap_new(main_window->window, width, height, -1);
+	pix = gtk_pixmap_new(pmap, NULL);
+	gdk_pixmap_unref(pmap);
+	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(pix), FALSE);
+	gtk_container_add(GTK_CONTAINER(box), pix);
+	gtk_widget_show_all(box);
+	return (box);
+}
+
+#define GE_BOXES 16
+#define GE_W 16
+#define GE_H 16
+#define GE_LEN (GE_BOXES * GE_W + 1)
+#define GE_HGT (GE_H + 1)
+
+void render_slots(GtkWidget *pixbox, unsigned char *data, int len, int slot)
+{
+#define LL (GE_LEN * 3)
+	static const unsigned char bkgd[3] = {0, 0, 0}; /* Background */
+	static const unsigned char opac[3] = {255, 255, 255}; /* Opacity */
+	unsigned char grey[3] = {mem_background, mem_background, mem_background};
+	unsigned char rgb[LL * (GE_H + 1)], *dest;
+	const unsigned char *col0 = grey, *col1 = NULL;
+	GdkPixmap *pmap;
+	int i, j;
+
+
+	if (len > GE_BOXES) len = GE_BOXES;
+	if (slot < 0) col0 = bkgd , col1 = opac; /* Opacity */
+	else if (slot > CHN_IMAGE + 1) col1 = channel_rgb[slot - 1]; /* Utility */
+
+	/* Clear to empty */
+	for (i = 0; i < LL; i += 3)
+	{
+		rgb[i + 0] = rgb[i + 1] = rgb[i + 2] = 0;
+		rgb[i + LL + 0] = rgb[i + LL + 1] = rgb[i + LL + 2] = mem_background;
+	}
+	memcpy(rgb + LL * GE_H, rgb, i);
+	for (i = LL; i < 2 * LL; i += GE_W * 3)
+		rgb[i + 0] = rgb[i + 1] = rgb[i + 2] = 0;
+
+
+	/* Draw boxes */
+	dest = rgb + LL + 3;
+	for (i = 0; i < len; i++)
+	{
+		if (!slot) /* RGB */
+		{
+			j = i * 3;
+			dest[0] = data[j + 0];
+			dest[1] = data[j + 1];
+			dest[2] = data[j + 2];
+		}
+		else if (slot == CHN_IMAGE + 1) /* Indexed */
+		{
+			dest[0] = mem_pal[data[i]].red;
+			dest[1] = mem_pal[data[i]].green;
+			dest[2] = mem_pal[data[i]].blue;
+		}
+		else /* Utility or opacity */
+		{
+			j = col0[0] * 255 + data[i] * (col1[0] - col0[0]);
+			dest[0] = (j + (j >> 8) + 1) >> 8;
+			j = col0[1] * 255 + data[i] * (col1[1] - col0[1]);
+			dest[1] = (j + (j >> 8) + 1) >> 8;
+			j = col0[2] * 255 + data[i] * (col1[2] - col0[2]);
+			dest[2] = (j + (j >> 8) + 1) >> 8;
+		}
+
+		for (j = 3; j < (GE_W - 1) * 3; j += 3)
+		{
+			dest[j + 0] = dest[0];
+			dest[j + 1] = dest[1];
+			dest[j + 2] = dest[2];
+		}
+		dest += GE_W * 3;
+	}
+	for (i = 2; i < GE_H; i++) memcpy(rgb + LL * i, rgb + LL, LL);
+
+	/* Cross out empty boxes */
+	for (j = 1; j < GE_H; j++)
+	{
+		for (i = len; i < GE_BOXES; i++)
+		{
+			dest = rgb + (LL + 3) * j + GE_W * 3 * i;
+			dest[0] = dest[1] = dest[2] = 0;
+			dest = rgb + (LL - 3) * j + GE_W * 3 * i + GE_W * 3;
+			dest[0] = dest[1] = dest[2] = 0;
+		}
+	}
+
+	/* Draw to pixmap */
+	if (!GTK_WIDGET_REALIZED(pixbox)) gtk_widget_realize(pixbox);
+	gtk_pixmap_get(GTK_PIXMAP(GTK_BIN(pixbox)->child), &pmap, NULL);
+	gdk_draw_rgb_image(pmap, pixbox->style->black_gc,
+		0, 0, GE_LEN, GE_HGT, GDK_RGB_DITHER_NONE, rgb, LL);
+	gtk_widget_queue_draw(pixbox);
+#undef LL
+}
+
+static gboolean gradient_edit_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	/* Handle only clicks, not releases */
+	if (event->type != GDK_BUTTON_PRESS) return (FALSE);
+
+// !!! user_data NULL for gradient, not so for opacity
+
+	return (TRUE);
+}
+
 ///	GRADIENT WINDOW
 
 //static GtkWidget *grad_window;
@@ -2362,6 +2482,7 @@ static GtkWidget *grad_opt_type, *grad_opt_bound;
 static GtkWidget *grad_ss_pre;
 static GtkWidget *grad_opt_gtype, *grad_opt_otype;
 static GtkWidget *grad_check_grev, *grad_check_orev;
+static GtkWidget *grad_pix_gr, *grad_pix_op;
 static int grad_channel;
 static grad_info grad_temps[NUM_CHANNELS];
 static grad_map grad_tmaps[NUM_CHANNELS + 1];
@@ -2415,18 +2536,16 @@ static void store_channel_gradient(int channel)
 	gmap->grev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_grev));
 	gmap->otype = opmap[wj_option_menu_get_history(grad_opt_otype)];
 	gmap->orev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_orev));
-
-// !!! Store custom gradients
-
 }
 
 static void show_channel_gradient(int channel)
 {
 	grad_info *grad = grad_temps + channel;
-	grad_map *gmap = grad_tmaps + channel + 1;
-	int i, bpp = BPP(channel);
+	grad_map *gmap;
+	int i, idx = channel + 1, bpp = BPP(channel);
 
-	if (bpp == 3) gmap = grad_tmaps;
+	if (bpp == 3) --idx;
+	gmap = grad_tmaps + idx;
 
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_len), grad->len);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type), grad->gmode - 1);
@@ -2443,8 +2562,10 @@ static void show_channel_gradient(int channel)
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_otype), i);
 	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_orev), gmap->orev);
 
-// !!! Show custom gradients
-
+	render_slots(grad_pix_gr, grad_tbytes + GRAD_CUSTOM_DATA(idx),
+		gmap->cvslen, idx);
+	render_slots(grad_pix_op, grad_tbytes + GRAD_CUSTOM_OPAC(idx),
+		gmap->coplen, -1);
 }
 
 static void click_grad_ok(GtkWidget *widget, gpointer data)
@@ -2479,6 +2600,38 @@ static void grad_channel_changed(GtkToggleButton *widget, gpointer user_data)
 	grad_channel = (int)user_data;
 }
 
+static void grad_selector_box(GtkWidget *page, char **mtext, int op)
+{
+	GtkWidget *vbox, *frame, *menu, *rev, *pix;
+
+	vbox = gtk_vbox_new(FALSE, 0);
+	add_with_frame_x(page, op ? _("Opacity") : _("Gradient"), vbox, 5, TRUE);
+	menu = wj_option_menu(mtext, op ? NUM_OTYPES : NUM_GTYPES, 0, NULL, NULL);
+	gtk_container_set_border_width(GTK_CONTAINER(menu), 5);
+	gtk_box_pack_start(GTK_BOX(vbox), menu, FALSE, FALSE, 0);
+	rev = add_a_toggle(_("Reverse"), vbox, FALSE);
+	pix = wj_pixbox(GE_LEN, GE_HGT);
+	frame = add_with_frame(vbox, NULL, pix, 4);
+ 	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_IN);
+	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
+		GTK_SIGNAL_FUNC(gradient_edit_click), op ? (gpointer)1 : NULL);
+
+// !!! Add opacity editor buttons here
+
+	if (op)
+	{
+		grad_opt_otype = menu;
+		grad_check_orev = rev;
+		grad_pix_op = pix;
+	}
+	else
+	{
+		grad_opt_gtype = menu;
+		grad_check_grev = rev;
+		grad_pix_gr = pix;
+	}
+}
+
 void gradient_setup(int mode)
 {
 	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial")};
@@ -2487,7 +2640,7 @@ void gradient_setup(int mode)
 		_("A to B (backward HSV)"), _("A only"), _("Custom")};
 	char *optypes[] = {_("Current to 0"), _("Current only"), _("Custom")};
 	GtkWidget *win, *mainbox, *notebook, *page0, *page1;
-	GtkWidget *label, *hbox, *vbox, *table;
+	GtkWidget *label, *hbox, *table;
 	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?
 		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
 
@@ -2546,23 +2699,8 @@ void gradient_setup(int mode)
 
 	/* Select page */
 
-	vbox = gtk_vbox_new(FALSE, 0);
-	add_with_frame_x(page1, _("Gradient"), vbox, 5, TRUE);
-	grad_opt_gtype = wj_option_menu(gradtypes, NUM_GTYPES, 0, NULL, NULL);
-	gtk_container_set_border_width(GTK_CONTAINER(grad_opt_gtype), 5);
-	gtk_box_pack_start(GTK_BOX(vbox), grad_opt_gtype, FALSE, FALSE, 0);
-	grad_check_grev = add_a_toggle(_("Reverse"), vbox, FALSE);
-
-// !!! Add gradient editor widgets here
-
-	vbox = gtk_vbox_new(FALSE, 0);
-	add_with_frame_x(page1, _("Opacity"), vbox, 5, TRUE);
-	grad_opt_otype = wj_option_menu(optypes, NUM_OTYPES, 0, NULL, NULL);
-	gtk_container_set_border_width(GTK_CONTAINER(grad_opt_otype), 5);
-	gtk_box_pack_start(GTK_BOX(vbox), grad_opt_otype, FALSE, FALSE, 0);
-	grad_check_orev = add_a_toggle(_("Reverse"), vbox, FALSE);
-
-// !!! Add opacity editor widgets here
+	grad_selector_box(page1, gradtypes, 0);
+	grad_selector_box(page1, optypes, 1);
 
 	/* OK / Cancel */
 

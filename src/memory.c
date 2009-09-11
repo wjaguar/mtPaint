@@ -911,6 +911,18 @@ void mem_init()					// Initialise memory
 	for (i = 0; i <= NUM_CHANNELS; i++)
 		gmap_setup(graddata + i, gradbytes, i);
 	grad_opacity = inifile_get_gint32("gradientOpacity", 128);
+
+unsigned char *ttt;
+ttt = gradbytes + GRAD_CUSTOM_DATA(0);
+ttt[0] = 255; ttt[1] = 0; ttt[2] = 0; ttt[3] = 0; ttt[4] = 255; ttt[5] = 0;
+ttt = gradbytes + GRAD_CUSTOM_DMAP(0);
+ttt[0] = GRAD_TYPE_HSV;
+ttt = gradbytes + GRAD_CUSTOM_OPAC(0);
+ttt[0] = 255; ttt[1] = 128;
+ttt = gradbytes + GRAD_CUSTOM_OMAP(0);
+ttt[0] = GRAD_TYPE_RGB;
+graddata[0].cvslen = graddata[0].coplen = 2;
+
 }
 
 void copy_dig( int index, int tx, int ty )
@@ -5662,36 +5674,41 @@ void grad_update(grad_info *grad)
 /* Setup gradient mapping */
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot)
 {
-	int i = GRAD_POINTS * (slot * 4 + 2), k = slot ? i : 0;
+	unsigned char *data, *map;
 
-	gmap->vs = gtemp + (slot ? 8 + slot * 4 : 4);
-	gmap->vsmap = gtemp + 10 + slot * 4;
+	data = gtemp + (slot ? 8 + slot * 4 : 4);
+	map = gtemp + 10 + slot * 4;
 	gmap->vslen = 2;
 	if (gmap->gtype == GRAD_TYPE_CUSTOM)
 	{
+		gmap->vs = gstore + GRAD_CUSTOM_DATA(slot);
+		gmap->vsmap = gstore + GRAD_CUSTOM_DMAP(slot);
 		if (gmap->cvslen > 1) gmap->vslen = gmap->cvslen;
 		else
 		{
-			memcpy(gstore + k, gmap->vs, slot ? 2 : 6);
-			gstore[i + GRAD_POINTS] = gmap->vsmap[0];
+			memcpy(gmap->vs, data, slot ? 2 : 6);
+			gmap->vsmap[0] = map[0];
 		}
-		gmap->vs = gstore + k;
-		gmap->vsmap = gstore + i + GRAD_POINTS;
 	}
-	else gtemp[10 + slot * 4] = (unsigned char)gmap->gtype;
+	else
+	{
+		gmap->vs = data;
+		gmap->vsmap = map;
+		gtemp[10 + slot * 4] = (unsigned char)gmap->gtype;
+	}
 
 	gmap->oplen = 2;
 	if (gmap->otype == GRAD_TYPE_CUSTOM)
 	{
+		gmap->op = gstore + GRAD_CUSTOM_OPAC(slot);
+		gmap->opmap = gstore + GRAD_CUSTOM_OMAP(slot);
 		if (gmap->coplen > 1) gmap->oplen = gmap->coplen;
 		else
 		{
-			gstore[i + GRAD_POINTS * 2] = gtemp[0];
-			gstore[i + GRAD_POINTS * 2 + 1] = gtemp[1];
-			gstore[i + GRAD_POINTS * 3] = gtemp[2];
+			gmap->op[0] = gtemp[0];
+			gmap->op[1] = gtemp[1];
+			gmap->opmap[0] = gtemp[2];
 		}
-		gmap->op = gstore + i + GRAD_POINTS * 2;
-		gmap->opmap = gstore + i + GRAD_POINTS * 3;
 	}
 	else
 	{

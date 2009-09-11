@@ -350,10 +350,10 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 	{
 	case SETB_CONT:
 		inifile_set_gboolean( "continuousPainting", mem_continuous );
-		break;
+		return;
 	case SETB_OPAC:
 		inifile_set_gboolean( "opacityToggle", mem_undo_opacity );
-		break;
+		return;
 	case SETB_CSEL:
 		if (mem_cselect && !csel_data)
 		{
@@ -367,6 +367,7 @@ void toolbar_mode_change(GtkWidget *widget, gpointer data)
 			repaint_grad(mem_gradient);
 		break;
 	}
+	gtk_widget_queue_draw(drawing_canvas);
 }
 
 static int set_flood(GtkWidget *box, gpointer fdata)

@@ -447,6 +447,11 @@ void grad_def_update();
 void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
 	unsigned char *op0, unsigned char *img0, unsigned char *alpha0);
 
+#define GRAD_CUSTOM_DATA(X) ((X) ? GRAD_POINTS * ((X) * 4 + 2) : 0)
+#define GRAD_CUSTOM_DMAP(X) (GRAD_POINTS * ((X) * 4 + 3))
+#define GRAD_CUSTOM_OPAC(X) (GRAD_POINTS * ((X) * 4 + 4))
+#define GRAD_CUSTOM_OMAP(X) (GRAD_POINTS * ((X) * 4 + 5))
+
 void blend_channel(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *dest, unsigned char *src, int opacity);
 void blend_indexed(int start, int step, int cnt, unsigned char *rgb,

@@ -2732,11 +2732,16 @@ int close_to( int x1, int y1 )		// Which corner of selection is coordinate close
 		(y1 + y1 <= marq_y1 + marq_y2 ? 0 : 2));
 }
 
+static int floor_div(int dd, int dr)
+{
+	return (dd < 0 ? -((dr - 1 - dd) / dr) : dd / dr);
+}
+
 #define MIN_REDRAW 16 /* Minimum dimension for redraw rectangle */
 void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	int vx1, int vy1, int vx2, int vy2)
 {
-	int j, x, y, tx, ty, aw, ah, ax = -1, ay = -1, zoom = 1, scale = 1;
+	int j, x, y, tx, ty, aw, ah, ax = 0, ay = 0, cf = 0, zoom = 1, scale = 1;
 	unsigned char rgb[MAX_ZOOM * 3], col[3];
 	linedata line;
 
@@ -2745,9 +2750,10 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 	if (can_zoom < 1.0)
 	{
 		zoom = rint(1.0 / can_zoom);
-// !!! Gradient placement can have negative coords - adjust these divisions!
-		lx1 /= zoom; ly1 /= zoom;
-		lx2 /= zoom; ly2 /= zoom;
+		lx1 = floor_div(lx1, zoom);
+		ly1 = floor_div(ly1, zoom);
+		lx2 = floor_div(lx2, zoom);
+		ly2 = floor_div(ly2, zoom);
  	}
 	else scale = rint(can_zoom);
 
@@ -2776,8 +2782,9 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 				}
 				else if (mode == 3) /* Gradient */
 				{
-					col[1] = ((line[2] >> 2) & 1) * 255;
-					col[0] = col[2] = 0;
+					col[0] = col[1] = col[2] =
+						((line[2] >> 2) & 1) * 255;
+					col[1] ^= ((line[2] >> 1) & 1) * 255;
 				}
 				for (j = 0; j < scale * 3; j += 3)
 				{
@@ -2792,11 +2799,11 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 				continue;
 			}
 			/* Doing a clear */
-			if (ax < 0) ax = x , ay = y; // Start a new rectangle
+			if (!cf) ax = x , ay = y , cf = 1; // Start a new rectangle
 		}
 		/* Do nothing if no area to clear */
-		else if ((mode != 0) || (ax < 0)) continue;
-		
+		else if ((mode != 0) || !cf) continue;
+
 		/* Redraw now or wait some more? */
 		aw = scale + abs(x - ax);
 		ah = scale + abs(y - ay);
@@ -2805,7 +2812,7 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 		/* Commit canvas clear if >16 pixels or final pixel of this line */
 		repaint_canvas(margin_main_x + (ax < x ? ax : x),
 			margin_main_y + (ay < y ? ay : y), aw, ah);
-		ax = -1;
+		cf = 0;
 	}
 }
 
@@ -2826,7 +2833,7 @@ void repaint_grad(int mode)
 	else grad->status = GRAD_NONE; /* To avoid hitting repaint */
 
 	get_visible();
-	trace_line(mode, grad->x1, grad->y1, grad->x2, grad->y2,
+	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1,
 		vc_x1 - margin_main_x, vc_y1 - margin_main_y,
 		vc_x2 - margin_main_x, vc_y2 - margin_main_y);
 	grad->status = oldgrad;
@@ -2838,7 +2845,7 @@ void refresh_grad(int px, int py, int pw, int ph)
 
 	pw += px - 1; ph += py - 1;
 	get_visible();
-	trace_line(3, grad->x1, grad->y1, grad->x2, grad->y2,
+	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1,
 		(px > vc_x1 ? px : vc_x1) - margin_main_x,
 		(py > vc_y1 ? py : vc_y1) - margin_main_y,
 		(pw < vc_x2 ? pw : vc_x2) - margin_main_x,

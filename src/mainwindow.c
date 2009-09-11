@@ -1334,6 +1334,11 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			(grad->wmode == GRAD_MODE_NONE) ||
 			(event == GDK_BUTTON_RELEASE) || !button)
 			return (FALSE);
+
+		/* Limit coordinates to canvas */
+		x = x < 0 ? 0 : x >= mem_width ? mem_width - 1 : x;
+		y = y < 0 ? 0 : y >= mem_height ? mem_height - 1 : y;
+
 		/* Standing still */
 		if ((tool_ox == x) && (tool_oy == y)) return (FALSE);
 		if (!pen_down || (tool_type > TOOL_SPRAY)) /* Begin stroke */
@@ -1431,7 +1436,8 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			if (grad_opacity)
 			{
 				gtk_widget_queue_draw(drawing_canvas);
-				gtk_main_iteration();
+				while (gtk_events_pending())
+					gtk_main_iteration();
 			}
 			repaint_grad(1);
 		}
@@ -1498,7 +1504,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 			mem_swap_cols();
 		}
 
-		if (grad_tool(event, x, y, state, button)) return;
+		if (grad_tool(event, x0, y0, state, button)) return;
 
 		if ((tool_type == TOOL_LINE) && (button == 1) &&
 			(line_status == LINE_START))
@@ -1608,7 +1614,7 @@ static void mouse_event(int event, int x0, int y0, guint state, guint button,
 	else if ((button == 2) || ((button == 3) && (state & _S)))
 		set_zoom_centre(ox, oy);
 
-	else if (grad_tool(event, x, y, state, button));
+	else if (grad_tool(event, x0, y0, state, button));
 
 	/* Pure moves are handled elsewhere */
 	else if (button) tool_action(event, x, y, button, pressure);
