@@ -997,7 +997,8 @@ static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
 	if (action == ACT_DUMMY) return (TRUE);
 	if (check_zoom_keys(action)) return (TRUE);	// Check HOME/zoom keys
 
-	if (marq_status > MARQUEE_NONE)
+	/* Gradient tool has precedence over selection */
+	if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
 	{
 		if (check_arrows(action) == 1)
 		{
