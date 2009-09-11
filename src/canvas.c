@@ -395,26 +395,27 @@ void pressed_clip_mask()
 void pressed_clip_alphamask()
 {
 	unsigned char *old_mask = mem_clip_mask;
-	int i, j = mem_clip_w * mem_clip_h;
+	int i, j = mem_clip_w * mem_clip_h, k;
 
 	if (!mem_clipboard || !mem_clip_alpha) return;
 
-	if ( !mem_clip_mask )		// Create clipboard mask if not already there
-	{
-		mem_clip_mask = malloc( j*mem_clip_bpp );
-		if ( !mem_clip_mask )
-		{
-			memory_errors(1);
-			return;		// Bail out - not enough memory
-		}
-	}
-
-	if ( old_mask )
-		for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-(mem_clip_alpha[i]*(255-old_mask[i])) / 255;
-	else	for (i=0; i<j; i++ ) mem_clip_mask[i] = 255-mem_clip_alpha[i];	// Flip values
-
-	free( mem_clip_alpha );
+	mem_clip_mask = mem_clip_alpha;
 	mem_clip_alpha = NULL;
+
+	if (old_mask)
+	{
+		for (i = 0; i < j; i++)
+		{
+			k = (255 - old_mask[i]) * mem_clip_mask[i];
+			mem_clip_mask[i] = ((k + (k >> 8) + 1) >> 8) ^ 255;
+		}
+		free(old_mask);
+	}
+	else
+	{
+		for (i = 0; i < j; i++)
+			mem_clip_mask[i] ^= 255;	// Flip values
+	}
 
 	gtk_widget_queue_draw( drawing_canvas );
 }

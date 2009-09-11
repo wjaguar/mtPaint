@@ -807,10 +807,10 @@ key_action main_keys[] = {
 	{"SIZE",	ACT_SIZE, GDK_Page_Down, _CS, 0},
 	{"COMMIT",	ACT_COMMIT, GDK_Return, 0, 0},
 	{"",		ACT_COMMIT, GDK_KP_Enter, 0, 0},
-	{"ARROW",	ACT_ARROW, GDK_a, 0, 0},
-	{"",		ACT_ARROW, GDK_A, 0, 0},
-	{"ARROW3",	ACT_ARROW3, GDK_s, 0, 0},
-	{"",		ACT_ARROW3, GDK_S, 0, 0},
+	{"ARROW",	ACT_ARROW, GDK_a, _C, 0},
+	{"",		ACT_ARROW, GDK_A, _C, 0},
+	{"ARROW3",	ACT_ARROW3, GDK_s, _C, 0},
+	{"",		ACT_ARROW3, GDK_S, _C, 0},
 	{NULL,		0, 0, 0, 0}
 };
 

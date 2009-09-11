@@ -1190,7 +1190,7 @@ gint render_text( GtkWidget *widget )
 			inifile_get_gboolean( "fontAntialias2", FALSE )
 			};
 	unsigned char *source, *dest, *dest2, *pat_off, r, g, b, pix_and = 255, v;
-	int width, height, i, j, bpp, back;
+	int width, height, i, j, k, m, bpp, clip_bpp, back;
 
 #if GTK_MAJOR_VERSION == 2
 	int tx = PAD_SIZE, ty = PAD_SIZE;
@@ -1268,6 +1268,9 @@ gint render_text( GtkWidget *widget )
 	if ( bpp == 2 ) pix_and = 31;
 	if ( bpp < 2 ) pix_and = 1;
 
+	if (mem_channel == CHN_IMAGE) clip_bpp = mem_img_bpp;
+	else clip_bpp = 1;
+
 	back = inifile_get_gint32( "fontBackground", 0 );
 	r = mem_pal[back].red;
 	g = mem_pal[back].green;
@@ -1276,14 +1279,15 @@ gint render_text( GtkWidget *widget )
 	if ( t_image != NULL )
 	{
 		if ( mem_clipboard != NULL ) free( mem_clipboard );	// Lose old clipboard
-		mem_clipboard = malloc( width * height * mem_img_bpp );
+		mem_clipboard = malloc( width * height * clip_bpp );
 		mem_clip_w = width;
 		mem_clip_h = height;
-		mem_clip_bpp = mem_img_bpp;
-		if ( !antialias[1] ) mem_clip_mask_init(0);
+		mem_clip_bpp = clip_bpp;
+		if ( !antialias[1] && mem_channel == CHN_IMAGE ) mem_clip_mask_init(0);
 		else mem_clip_mask_clear();
 	
-		if ( mem_clipboard == NULL || ( !antialias[1] && mem_clip_mask == NULL) )
+		if ( mem_clipboard == NULL ||
+			( !antialias[1] && mem_channel == CHN_IMAGE && mem_clip_mask == NULL) )
 		{
 			alert_box( _("Error"), _("Not enough memory to create clipboard"),
 					_("OK"), NULL, NULL );
@@ -1297,12 +1301,12 @@ gint render_text( GtkWidget *widget )
 			for ( j=0; j<height; j++ )
 			{
 				source = (unsigned char *) (t_image->mem) + j * t_image->bpl;
-				dest = mem_clipboard + width * j * mem_img_bpp;
+				dest = mem_clipboard + width * j * clip_bpp;
 				dest2 = mem_clip_mask + width*j;
-				if ( mem_img_bpp == 3 )
+				if ( clip_bpp == 3 )		// RGB Clipboard
 				{
 					pat_off = mem_col_pat24 + (j%8)*8*3;
-					if ( antialias[0] )
+					if ( antialias[0] )	// Antialiased
 					{
 					  if ( antialias[1] )	// Antialiased with background
 					  {
@@ -1336,7 +1340,7 @@ gint render_text( GtkWidget *widget )
 						}
 					  }
 					}
-					else
+					else		// Not antialiased
 					{
 					 for ( i=0; i<width; i++ )
 					 {
@@ -1358,7 +1362,7 @@ gint render_text( GtkWidget *widget )
 					 }
 					}
 				}
-				if ( mem_img_bpp == 1 )
+				if ( clip_bpp == 1 && mem_channel == CHN_IMAGE )
 				{
 					pat_off = mem_col_pat + (j%8)*8;
 					for ( i=0; i<width; i++ )
@@ -1370,6 +1374,38 @@ gint render_text( GtkWidget *widget )
 						}
 						else dest[i] = pat_off[i%8];	// Text
 						source += bpp;
+					}
+				}
+				if ( clip_bpp == 1 && mem_channel != CHN_IMAGE )
+				{
+					if ( antialias[1] )	// Inverted
+					{
+						k = 0;
+						m = 1;
+					}
+					else			// Normal
+					{
+						k = 255;
+						m = -1;
+					}
+					if ( antialias[0] )	// Antialiased
+					{
+						for ( i=0; i<width; i++ )
+						{
+							v = source[0] & pix_and;
+							dest[i] = k + m * v * 255 / pix_and;
+							source += bpp;
+						}
+					}
+					else			// Not antialiased
+					{
+						for ( i=0; i<width; i++ )
+						{
+							v = source[0] & pix_and;
+							if ( v > pix_and/2 ) dest[i] = 255-k;
+							else dest[i] = k;
+							source += bpp;
+						}
 					}
 				}
 			}
@@ -1409,9 +1445,12 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 		gtk_spin_button_get_value_as_float( GTK_SPIN_BUTTON(text_spin[1]) ) );
 #endif
 
-	gtk_spin_button_update( GTK_SPIN_BUTTON(text_spin[0]) );
-	inifile_set_gint32( "fontBackground",
-		gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(text_spin[0]) ) );
+	if (mem_channel == CHN_IMAGE)
+	{
+		gtk_spin_button_update( GTK_SPIN_BUTTON(text_spin[0]) );
+		inifile_set_gint32( "fontBackground",
+			gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(text_spin[0]) ) );
+	}
 
 	inifile_set( "lastTextFont", t_font_name );
 	inifile_set( "textString", t_string );
@@ -1454,14 +1493,25 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
 			inifile_get_gboolean( "fontAntialias", FALSE ) );
-	text_toggle[1] = add_a_toggle( _("Background colour ="), hbox,
+
+	if (mem_channel != CHN_IMAGE)
+	{
+		text_toggle[1] = add_a_toggle( _("Invert"), hbox,
 			inifile_get_gboolean( "fontAntialias1", FALSE ) );
-	adj = gtk_adjustment_new( inifile_get_gint32( "fontBackground", 0 ) % mem_cols,
-		0, mem_cols-1, 1, 10, 10 );
-	text_spin[0] = gtk_spin_button_new( GTK_ADJUSTMENT (adj), 1, 0 );
-	gtk_widget_show(text_spin[0]);
-	gtk_spin_button_set_numeric (GTK_SPIN_BUTTON (text_spin[0]), TRUE);
-	gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, TRUE, 5);
+	}
+	else
+	{
+		text_toggle[1] = add_a_toggle( _("Background colour ="), hbox,
+			inifile_get_gboolean( "fontAntialias1", FALSE ) );
+
+		adj = gtk_adjustment_new( inifile_get_gint32( "fontBackground", 0 ) % mem_cols,
+			0, mem_cols-1, 1, 10, 10 );
+		text_spin[0] = gtk_spin_button_new( GTK_ADJUSTMENT (adj), 1, 0 );
+		gtk_widget_show(text_spin[0]);
+		gtk_spin_button_set_numeric (GTK_SPIN_BUTTON (text_spin[0]), TRUE);
+		gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, TRUE, 5);
+	}
+
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
 	if ( GTK_MAJOR_VERSION == 2 )

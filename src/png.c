@@ -127,7 +127,13 @@ int load_png( char *file_name, int stype )
 	{
 		mess = _("Loading clipboard image");
 		rgb = mem_clipboard;
-		if ( rgb != NULL ) free( rgb );		// Lose old clipboard
+		if ( rgb ) free( rgb );			// Lose old clipboard
+		if ( mem_clip_alpha )
+		{
+			free( mem_clip_alpha );		// Lose old alpha
+			mem_clip_alpha = NULL;
+		}
+		
 		mem_clip_mask_clear();			// Lose old clipboard mask
 	}
 
