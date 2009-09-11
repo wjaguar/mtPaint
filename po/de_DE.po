@@ -1649,7 +1649,7 @@ msgid "/Effects/Bacteria ..."
 msgstr "/Effekte/Bakterien"
 
 #: src/mainwindow.c:3404
-msgid "/Channels"
+msgid "/Cha_nnels"
 msgstr "/Kanäle"
 
 #: src/mainwindow.c:3405
@@ -1727,7 +1727,7 @@ msgid "/Channels/Configure Overlays ..."
 msgstr "/Kanäle/Overlays einstellen ..."
 
 #: src/mainwindow.c:3427
-msgid "/Layers"
+msgid "/_Layers"
 msgstr "/Ebenen"
 
 #: src/mainwindow.c:3428

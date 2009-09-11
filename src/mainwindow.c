@@ -3402,7 +3402,7 @@ void main_init()
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Bacteria ..."),	NULL,		pressed_bacteria, 0, NULL },
 
-		{ _("/Channels"),		NULL,		NULL, 0, "<Branch>" },
+		{ _("/Cha_nnels"),		NULL,		NULL, 0, "<Branch>" },
 		{ _("/Channels/tear"),		NULL,		NULL, 0, "<Tearoff>" },
 		{ _("/Channels/New ..."),	NULL,		pressed_channel_create, -1, NULL },
 		{ _("/Channels/Load ..."),	NULL,		pressed_channel_load, 0, NULL },
@@ -3425,7 +3425,7 @@ void main_init()
 		{ _("/Channels/View Alpha as an Overlay"), NULL, pressed_channel_toggle, 0, "<CheckItem>" },
 		{ _("/Channels/Configure Overlays ..."), NULL, pressed_channel_config_overlay, 0, NULL },
 
-		{ _("/Layers"),		 	NULL, 		NULL, 0, "<Branch>" },
+		{ _("/_Layers"),	 	NULL, 		NULL, 0, "<Branch>" },
 		{ _("/Layers/tear"),		NULL,		NULL, 0, "<Tearoff>" },
 		{ _("/Layers/Save"),		"<shift><control>S", layer_press_save, 0, NULL },
 		{ _("/Layers/Save As ..."),	NULL,		layer_press_save_as, 0, NULL },

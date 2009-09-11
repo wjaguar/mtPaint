@@ -1655,7 +1655,7 @@ msgid "/Effects/Bacteria ..."
 msgstr "/Efectos/Bacteriado ..."
 
 #: src/mainwindow.c:3404
-msgid "/Channels"
+msgid "/Cha_nnels"
 msgstr "/Canales"
 
 #: src/mainwindow.c:3405
@@ -1733,7 +1733,7 @@ msgid "/Channels/Configure Overlays ..."
 msgstr "/Canales/Configurar Overlays ..."
 
 #: src/mainwindow.c:3427
-msgid "/Layers"
+msgid "/_Layers"
 msgstr "/Capas"
 
 #: src/mainwindow.c:3428

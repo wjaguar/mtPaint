@@ -1662,7 +1662,7 @@ msgid "/Effects/Bacteria ..."
 msgstr "/效果(_C)/菌化…"
 
 #: src/mainwindow.c:3404
-msgid "/Channels"
+msgid "/Cha_nnels"
 msgstr "/通道"
 
 #: src/mainwindow.c:3405
@@ -1740,7 +1740,7 @@ msgid "/Channels/Configure Overlays ..."
 msgstr "/通道/配置外罩…"
 
 #: src/mainwindow.c:3427
-msgid "/Layers"
+msgid "/_Layers"
 msgstr "/圖層(_L)"
 
 #: src/mainwindow.c:3428

@@ -182,17 +182,13 @@ static void hs_plot_graph()				// Plot RGB graphs
 	}
 }
 
-static gint hs_click_normalize( GtkWidget *widget )
+static void hs_click_normalize(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	if ( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) )
-		hs_norm = TRUE;
-	else	hs_norm = FALSE;
+	hs_norm = gtk_toggle_button_get_active(togglebutton);
 
 	hs_plot_graph();
 
 	gtk_widget_queue_draw(hs_drawingarea);
-
-	return FALSE;
 }
 
 static void hs_populate_rgb()				// Populate RGB tables
@@ -388,11 +384,9 @@ void pressed_information( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect_object( GTK_OBJECT(hs_drawingarea), "expose_event",
 		GTK_SIGNAL_FUNC (hs_expose_graph), NULL );
 
-	hs_normalize_check = gtk_check_button_new_with_label (_("Normalize"));
-	gtk_widget_show (hs_normalize_check);
-	gtk_box_pack_start (GTK_BOX (vbox5), hs_normalize_check, FALSE, FALSE, 0);
-	gtk_signal_connect(GTK_OBJECT(hs_normalize_check), "clicked",
-		GTK_SIGNAL_FUNC(hs_click_normalize), NULL);
+	hs_normalize_check = sig_toggle(_("Normalize"), FALSE, NULL,
+		GTK_SIGNAL_FUNC(hs_click_normalize));
+	gtk_box_pack_start(GTK_BOX (vbox5), hs_normalize_check, FALSE, FALSE, 0);
 
 	if ( mem_img_bpp == 1 )
 	{

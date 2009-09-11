@@ -2092,16 +2092,20 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 {
 	int minx = -1, miny = -1, xw = -1, yh = -1;
 	int i, j, k, rx, ry, sx, sy, ts2, tr2, res;
-	int ox, oy, off1, off2, o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
+	int ox, oy, off1, off2;
+	int o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
 	int px, py, oox, ooy;	// Continuous smudge stuff
-	gboolean first_point = FALSE;
+	gboolean rmb_tool, first_point = FALSE;
 
-	if ( tool_type <= TOOL_SHUFFLE ) tint_mode[2] = button;
+	/* Does tool draw with color B when right button pressed? */
+	rmb_tool = (tool_type <= TOOL_SPRAY) || (tool_type == TOOL_FLOOD);
+
+	if (rmb_tool) tint_mode[2] = button; /* Swap tint +/- */
 
 	if ( pen_down == 0 )
 	{
 		first_point = TRUE;
-		if ((button == 3) && (tool_type <= TOOL_SPRAY) && !tint_mode[0])
+		if ((button == 3) && rmb_tool && !tint_mode[0])
 		{
 			col_reverse = TRUE;
 			mem_swap_cols();
@@ -2134,23 +2138,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 	/* Handle "exceptional" tools */
 	res = 1;
-	if (tool_type == TOOL_FLOOD)
-	{
-		/* Left click and non-masked start point */
-		if ((button == 1) && (pixel_protected(x, y) < 255))
-		{
-			j = get_pixel(x, y);
-			k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
-				mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
-			if (j != k) /* And never start on colour A */
-			{
-				spot_undo(UNDO_DRAW);
-				flood_fill(x, y, j);
-				update_all_views();
-			}
-		}
-	}
-	else if (tool_type == TOOL_LINE)
+	if (tool_type == TOOL_LINE)
 	{
 		if ( button == 1 )
 		{
@@ -2285,11 +2273,37 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	else /* Some other kind of tool */
 	{
 		/* If proper button for tool */
-		if ((button == 1) || ((button == 3) && (tool_type <= TOOL_SPRAY)))
+		if ((button == 1) || ((button == 3) && rmb_tool))
 		{
-			mem_undo_next(UNDO_TOOL);	// Do memory stuff for undo
+			// Do memory stuff for undo
+			if (tool_type != TOOL_FLOOD) mem_undo_next(UNDO_TOOL);	
 			res = 0; 
 		}
+	}
+
+	/* Handle floodfill here, as too irregular a non-continuous tool */
+	if (!res && (tool_type == TOOL_FLOOD))
+	{
+		/* Non-masked start point */
+		if (pixel_protected(x, y) < 255)
+		{
+			j = get_pixel(x, y);
+			k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
+				mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
+			if (j != k) /* And never start on colour A */
+			{
+				spot_undo(UNDO_TOOL);
+				flood_fill(x, y, j);
+				update_all_views();
+			}
+		}
+		/* Undo the color swap if fill failed */
+		if (!pen_down && col_reverse)
+		{
+			col_reverse = FALSE;
+			mem_swap_cols();
+		}
+		res = 1;
 	}
 
 	/* Handle continuous mode */

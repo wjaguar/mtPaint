@@ -76,11 +76,8 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 {
 	GtkWidget *tog;
 
-	tog = gtk_check_button_new_with_label( label );
-	gtk_widget_show( tog );
-	gtk_box_pack_start (GTK_BOX(box), tog, FALSE, FALSE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER ( tog ), 5);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON( tog ), value);
+	tog = sig_toggle(label, value, NULL, NULL);
+	gtk_box_pack_start(GTK_BOX(box), tog, FALSE, FALSE, 0);
 
 	return tog;
 }
@@ -646,6 +643,33 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 	gtk_container_add(GTK_CONTAINER(align), widget);
 	widget_set_minsize(align, width, height);
 	return (align);
+}
+
+// Signalled toggle
+
+static void sig_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
+{
+	*(int *)user_data = gtk_toggle_button_get_active(togglebutton);
+}
+
+GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler)
+{
+	GtkWidget *tog;
+
+	if (!handler && var)
+	{
+		*(int *)var = value;
+		handler = GTK_SIGNAL_FUNC(sig_toggle_toggled);
+	}
+
+	tog = gtk_check_button_new_with_label(label);
+	gtk_widget_show(tog);
+	gtk_container_set_border_width(GTK_CONTAINER(tog), 5);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tog), value);
+	if (handler) gtk_signal_connect(GTK_OBJECT(tog), "toggled", handler,
+		(gpointer)var);
+
+	return (tog);
 }
 
 

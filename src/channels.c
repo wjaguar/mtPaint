@@ -59,7 +59,7 @@ unsigned char channel_col_[2][NUM_CHANNELS] = {
 int channel_dis[NUM_CHANNELS] = {0, 0, 0, 0};
 
 static GtkWidget *newchan_window;
-static int chan_new_type, chan_new_state;
+static int chan_new_type, chan_new_state, chan_new_invert;
 
 
 static void click_newchan_cancel()
@@ -219,6 +219,13 @@ dofail:
 		memset(dest, chan_new_type == CHN_ALPHA ? 255 : 0, j);
 		break;
 	}
+
+	/* Invert */
+	if (chan_new_invert)
+	{
+		for (i = 0; i < j; i++) dest[i] ^= 255;
+	}
+
 	if ((int)gtk_object_get_user_data(GTK_OBJECT(window)) >= CHN_ALPHA)
 		activate_channel(chan_new_type);
 	canvas_undo_chores();
@@ -261,9 +268,16 @@ void pressed_channel_create( GtkMenuItem *menu_item, gpointer user_data, gint it
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	if (item >= 0) gtk_widget_set_sensitive(hbox, FALSE);
 
-	vbox2 = wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL);
-	add_with_frame(vbox, _("Initial Channel State"), vbox2, 5);
+	vbox2 = gtk_vbox_new(FALSE, 0);
+	gtk_widget_show(vbox2);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
+	add_with_frame(vbox, _("Initial Channel State"), vbox2, 5);
+	hbox = wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL);
+	gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0);
+
+	add_hseparator(vbox2, -2, 10);
+	hbox = sig_toggle(_("Inverted"), FALSE, &chan_new_invert, NULL);
+	gtk_box_pack_start(GTK_BOX(vbox2), hbox, FALSE, FALSE, 0);
 
 	hbox = OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(click_newchan_cancel));

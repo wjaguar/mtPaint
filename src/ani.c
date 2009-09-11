@@ -1143,9 +1143,9 @@ void ani_set_key_frame(int key)		// Set key frame postions & cycles as per curre
 
 }
 
-static void ani_tog_gif( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void ani_tog_gif(GtkToggleButton *togglebutton, gpointer user_data)
 {
-	ani_use_gif = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+	ani_use_gif = gtk_toggle_button_get_active(togglebutton);
 	ani_widget_changed();
 }
 
@@ -1275,11 +1275,9 @@ void pressed_animate_window( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_signal_connect( GTK_OBJECT(ani_entry_prefix), "changed",
 			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
 
-	ani_toggle_gif = gtk_check_button_new_with_label (_("Create GIF frames"));
-	gtk_widget_show (ani_toggle_gif);
-	gtk_box_pack_start (GTK_BOX (vbox4), ani_toggle_gif, FALSE, FALSE, 0);
-	gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (ani_toggle_gif), ani_use_gif);
-	gtk_signal_connect(GTK_OBJECT(ani_toggle_gif), "clicked", GTK_SIGNAL_FUNC(ani_tog_gif), NULL);
+	ani_toggle_gif = sig_toggle(_("Create GIF frames"), ani_use_gif, NULL,
+		GTK_SIGNAL_FUNC(ani_tog_gif));
+	gtk_box_pack_start(GTK_BOX (vbox4), ani_toggle_gif, FALSE, FALSE, 0);
 
 ///	LAYERS TABLES
 

@@ -100,6 +100,10 @@ GtkWidget *wj_pixmap(int width, int height);
 void widget_set_minsize(GtkWidget *widget, int width, int height);
 GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 
+// Signalled toggle
+
+GtkWidget *sig_toggle(char *label, int value, int *var, GtkSignalFunc handler);
+
 // Moving mouse cursor
 
 int move_mouse_relative(int dx, int dy);

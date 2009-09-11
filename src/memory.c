@@ -3107,8 +3107,9 @@ int mem_rotate_free(double angle, int type, int gcor)
 				{
 					fox = nx * s1 + x0y;
 					foy = nx * c1 + y0y;
-					ox = floor(fox);
-					oy = floor(foy);
+					/* floor() is hellishly slow - avoiding... */
+					ox = (int)(fox + 2.0) - 2;
+					oy = (int)(foy + 2.0) - 2;
 					if ((ox < -1) || (ox >= ow) ||
 						(oy < -1) || (oy >= oh))
 					{
@@ -3193,8 +3194,9 @@ int mem_rotate_free(double angle, int type, int gcor)
 			{
 				fox = nx * s1 + x0y;
 				foy = nx * c1 + y0y;
-				ox = floor(fox);
-				oy = floor(foy);
+				/* floor() is hellishly slow - avoiding... */
+				ox = (int)(fox + 2.0) - 2;
+				oy = (int)(foy + 2.0) - 2;
 				if ((ox < -1) || (ox >= ow) ||
 					(oy < -1) || (oy >= oh))
 				{

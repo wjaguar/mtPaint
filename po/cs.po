@@ -1648,7 +1648,7 @@ msgid "/Effects/Bacteria ..."
 msgstr "/Efekty/Baktérie ..."
 
 #: src/mainwindow.c:3404
-msgid "/Channels"
+msgid "/Cha_nnels"
 msgstr "/Kanály"
 
 #: src/mainwindow.c:3405
@@ -1726,7 +1726,7 @@ msgid "/Channels/Configure Overlays ..."
 msgstr "/Kanály/Konfigurovat overlaye ..."
 
 #: src/mainwindow.c:3427
-msgid "/Layers"
+msgid "/_Layers"
 msgstr "/Vrstvy"
 
 #: src/mainwindow.c:3428

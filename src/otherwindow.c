@@ -2322,11 +2322,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data)
 	hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
 	add_with_frame(page1, _("Reduce colour bleed"), hbox, 5);
 
-	dither_serpent = gtk_check_button_new_with_label(_("Serpentine scan"));
-	gtk_widget_show(dither_serpent);
-	gtk_box_pack_start(GTK_BOX(page1), dither_serpent, FALSE, FALSE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(dither_serpent), 5);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dither_serpent), dither_scan);
+	dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
 
 	hbox = gtk_hbox_new(FALSE, 5);
 	gtk_widget_show(hbox);
@@ -2723,10 +2719,8 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		mt_spinslide_set_range(ss, 0, grad_mode == CHN_IMAGE + 1 ?
 			mem_cols - 1 : 255);
 		mt_spinslide_connect(ss, GTK_SIGNAL_FUNC(grad_edit_move_slide), NULL);
-		grad_ed_tog = sw = gtk_check_button_new_with_label(_("Constant"));
-		gtk_container_set_border_width(GTK_CONTAINER(sw), 5);
-		gtk_signal_connect(GTK_OBJECT(sw), "toggled",
-			GTK_SIGNAL_FUNC(grad_edit_set_mode), NULL);
+		grad_ed_tog = sw = sig_toggle(_("Constant"), FALSE, NULL,
+			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	hbox = gtk_hbox_new(TRUE, 5);
 	gtk_box_pack_start(GTK_BOX(mainbox), hbox, FALSE, FALSE, 0);
