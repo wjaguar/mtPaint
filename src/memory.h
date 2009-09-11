@@ -218,17 +218,38 @@ int mem_gradient;
 int blend_mode;
 
 /* Blend modes */
-#define BLEND_NORMAL 0
-#define BLEND_HUE    1
-#define BLEND_SAT    2
-#define BLEND_VALUE  3
-#define BLEND_COLOR  4
-#define BLEND_SATPP  5
+enum {
+	/* RGB-only modes */
+	BLEND_NORMAL = 0,
+	BLEND_HUE,
+	BLEND_SAT,
+	BLEND_VALUE,
+	BLEND_COLOR,
+	BLEND_SATPP,
 
-#define BLEND_NMODES 6
+	/* Per-channel modes */
+	BLEND_MULT,
+	BLEND_DIV,
+	BLEND_SCREEN,
+// !!! No "Overlay" - it is a reverse "Hard Light"
+	BLEND_DODGE,
+	BLEND_BURN,
+	BLEND_HLIGHT,
+	BLEND_SLIGHT,
+	BLEND_DIFF,
+	BLEND_DARK,
+	BLEND_LIGHT,
+	BLEND_GRAINX,
+	BLEND_GRAINM,
+
+	BLEND_NMODES
+};
+#define BLEND_1BPP BLEND_MULT /* First one-byte mode */
+
 #define BLEND_MMASK    0x7F
 #define BLEND_REVERSE  0x80
 #define BLEND_RGBSHIFT 8
+
 
 /// FLOOD FILL SETTINGS
 
@@ -415,15 +436,19 @@ size_t mem_used();
 //	Return the number of bytes used in image + undo in all layers
 size_t mem_used_layers();
 
-#define FX_EDGE     0
-#define FX_EMBOSS   2
-#define FX_SHARPEN  3
-#define FX_SOFTEN   4
-#define FX_SOBEL    5
-#define FX_PREWITT  6
-#define FX_GRADIENT 7
-#define FX_ROBERTS  8
-#define FX_LAPLACE  9
+#define FX_EDGE       0
+#define FX_EMBOSS     2
+#define FX_SHARPEN    3
+#define FX_SOFTEN     4
+#define FX_SOBEL      5
+#define FX_PREWITT    6
+#define FX_GRADIENT   7
+#define FX_ROBERTS    8
+#define FX_LAPLACE    9
+#define FX_KIRSCH    10
+#define FX_ERODE     11
+#define FX_DILATE    12
+#define FX_MORPHEDGE 13
 
 void do_effect( int type, int param );		// 0=edge detect 1=UNUSED 2=emboss
 void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area

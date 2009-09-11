@@ -133,7 +133,7 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_UNSHARP,
 	FILT_SOFTEN,
 	FILT_GAUSS,
-	FILT_EMBOSS,
+	FILT_FX,
 	FILT_BACT,
 	FILT_THRES,
 	FILT_UALPHA,

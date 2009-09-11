@@ -301,8 +301,7 @@ static int set_blend(GtkWidget *box, gpointer fdata)
 	/* Don't accept stop-all or do-nothing */
 	if ((j == 7) || !(i | j)) return (FALSE);
 
-	blend_mode = i | (blendtemp[1] ? BLEND_REVERSE : 0) |
-		(j << BLEND_RGBSHIFT);
+	blend_mode = i | (blendtemp[1] ? BLEND_REVERSE : 0) | (j << BLEND_RGBSHIFT);
 
 	return (TRUE);
 }
@@ -312,7 +311,11 @@ void blend_settings() /* Blend mode */
 	char *rgbnames[3] = { _("Red"), _("Green"), _("Blue") };
 	char *blends[BLEND_NMODES] = {
 		_("Normal"), _("Hue"), _("Saturation"), _("Value"),
-		_("Colour"), _("Saturate More") };
+		_("Colour"), _("Saturate More"),
+		_("Multiply"), _("Divide"), _("Screen"), _("Dodge"),
+		_("Burn"), _("Hard Light"), _("Soft Light"), _("Difference"),
+		_("Darken"), _("Lighten"), _("Grain Extract"),
+		_("Grain Merge") };
 	GtkWidget *box, *hbox;
 	int i, *blendtemp;
 

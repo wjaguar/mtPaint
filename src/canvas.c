@@ -324,7 +324,7 @@ static int edge_mode;
 static int do_edge(GtkWidget *box, gpointer fdata)
 {
 	static const unsigned char fxmap[] = { FX_EDGE, FX_SOBEL, FX_PREWITT,
-		FX_GRADIENT, FX_ROBERTS, FX_LAPLACE };
+		FX_KIRSCH, FX_GRADIENT, FX_ROBERTS, FX_LAPLACE, FX_MORPHEDGE };
 
 	spot_undo(UNDO_FILT);
 	do_effect(fxmap[edge_mode], 0);
@@ -335,11 +335,12 @@ static int do_edge(GtkWidget *box, gpointer fdata)
 
 void pressed_edge_detect()
 {
-	char *fnames[] = { _("MT"), _("Sobel"), _("Prewitt"),
-		_("Gradient"), _("Roberts"), _("Laplace"), NULL };
+	char *fnames[] = { _("MT"), _("Sobel"), _("Prewitt"), _("Kirsch"),
+		_("Gradient"), _("Roberts"), _("Laplace"), _("Morphological"),
+		NULL };
 	GtkWidget *box;
 
-	box = wj_radio_pack(fnames, -1, 3, edge_mode, &edge_mode, NULL);
+	box = wj_radio_pack(fnames, -1, 4, edge_mode, &edge_mode, NULL);
 	filter_window(_("Edge Detect"), box, do_edge, NULL, FALSE);
 }
 
@@ -367,10 +368,10 @@ void pressed_soften()
 	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)FX_SOFTEN, FALSE);
 }
 
-void pressed_emboss()
+void pressed_fx(int what)
 {
 	spot_undo(UNDO_FILT);
-	do_effect(FX_EMBOSS, 0);
+	do_effect(what, 0);
 	mem_undo_prepare();
 	update_all_views();
 }

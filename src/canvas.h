@@ -135,7 +135,7 @@ void pressed_ellipse(int filled);
 void pressed_edge_detect();
 void pressed_sharpen();
 void pressed_soften();
-void pressed_emboss();
+void pressed_fx(int what);
 void pressed_gauss();
 void pressed_unsharp();
 void pressed_dog();

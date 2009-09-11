@@ -5564,7 +5564,10 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
-static void blend_rgb(unsigned char *dest, const unsigned char *src, int tint)
+static const unsigned char zero[3] = {0, 0, 0};
+
+static void blend_rgb(unsigned char *dest, const unsigned char *src,
+	int tint, int bpp)
 {
 	static const unsigned char hhsv[8 * 3] =
 		{0, 1, 2, /* #0: B..M */
@@ -5575,7 +5578,6 @@ static void blend_rgb(unsigned char *dest, const unsigned char *src, int tint)
 		 0, 2, 1, /* #5: Y+..G- */
 		 1, 2, 0, /* #6: R..Y */
 		 1, 2, 0  /* #7: W */ };
-	static const unsigned char zero[3] = {0, 0, 0};
 	const unsigned char *new, *old;
 	int nhex, ohex;
 
@@ -5737,6 +5739,89 @@ static void blend_rgb(unsigned char *dest, const unsigned char *src, int tint)
 	}
 }
 
+static void blend_channel(unsigned char *dest, const unsigned char *src,
+	int tint, int bpp)
+{
+	const unsigned char *np, *op;
+	int i = 0, cf = bpp == 1 ? 0 : blend_mode >> BLEND_RGBSHIFT;
+
+	/* Backward transfer? */
+	if ((blend_mode & (BLEND_MMASK | BLEND_REVERSE)) >=
+		(BLEND_1BPP + BLEND_REVERSE)) np = src , op = dest;
+	else np = dest , op = src;
+	if (tint) src = zero;
+
+rep:	if (!(cf & 1))
+	{
+		unsigned char new = np[i], old = op[i];
+		int j;
+
+		switch (blend_mode & BLEND_MMASK)
+		{
+		default: // Some RGB mode applied to 1-bpp channel - ignore it
+			*dest = old;
+			break;
+		case BLEND_SCREEN: // ~mult(~old, ~new)
+			j = (old + new) * 255 - old * new;
+			*dest = (j + (j >> 8) + 1) >> 8;
+			break;
+		case BLEND_MULT:
+			j = old * new;
+			*dest = (j + (j >> 8) + 1) >> 8;
+			break;
+		case BLEND_BURN: // ~div(~old, new)
+			j = ((unsigned char)~old << 8) / (new + 1);
+			*dest = 255 - j >= 0 ? 255 - j : 0;
+			break;
+		case BLEND_DODGE: // div(old, ~new)
+			new = ~new;
+		case BLEND_DIV:
+			j = (old << 8) / (new + 1);
+			*dest = j < 255 ? j : 255;
+			break;
+		case BLEND_HLIGHT:
+			j = old * new * 2;
+			if (new >= 128)
+				j = (old + new) * (255 * 2) - (255 * 255) - j;
+			*dest = (j + (j >> 8) + 1) >> 8;
+			break;
+		case BLEND_SLIGHT:
+// !!! This formula is equivalent to one used in Pegtop XFader and GIMP,
+// !!! and differs from one used by Photoshop and PhotoPaint
+			j = old * ((255 * 255) - (unsigned char)~old * (255 - (new << 1)));
+			// Precise division by 255^2
+			j += j >> 7;
+			*dest = (j + ((j * 3 + 0x480) >> 16)) >> 16;
+			break;
+// "Negation" : ~BLEND_DIFF(~old, new)
+		case BLEND_DIFF:
+			*dest = abs(old - new);
+//			j = *old - *new;
+//			*dest = j < 0 ? 255 - j : j;
+			break;
+		case BLEND_DARK:
+			*dest = old < new ? old : new;
+			break;
+		case BLEND_LIGHT:
+			*dest = old > new ? old : new;
+			break;
+		case BLEND_GRAINX:
+			j = old - new + 128;
+			*dest = j < 0 ? 0 : j > 255 ? 255 : j;
+			break;
+		case BLEND_GRAINM:
+			j = old + new - 128;
+			*dest = j < 0 ? 0 : j > 255 ? 255 : j;
+			break;
+// Photoshop's "Linear light" is equivalent to XFader's "Stamp" with swapped A&B
+		}
+	}
+	else *dest = src[i];
+	if (!--bpp) return;
+	i++; dest++; cf >>= 1;
+	goto rep;
+}
+
 void put_pixel_def( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
@@ -5786,16 +5871,13 @@ void put_pixel_def( int x, int y )	/* Combined */
 	/* Coupled alpha channel */
 	if (old_alpha && mem_img[CHN_ALPHA])
 	{
-		newc = cset[CHN_ALPHA + 3];
-		oldc = old_alpha[offset];
-
-		if (!tint); // Do nothing
-		else if (tint < 0) newc = oldc + newc < 255 ? oldc + newc : 255;
-		else newc = oldc > newc ? oldc - newc : 0;
+		unsigned char newc = cset[CHN_ALPHA + 3];
 
 		if (opacity < 255)
 		{
+			unsigned char oldc = old_alpha[offset];
 			int j = oldc * 255 + (newc - oldc) * opacity;
+
 			if (j && !channel_dis[CHN_ALPHA])
 				opacity = (255 * opacity * newc) / j;
 			newc = (j + (j >> 8) + 1) >> 8;
@@ -5806,6 +5888,8 @@ void put_pixel_def( int x, int y )	/* Combined */
 	/* Indexed image or utility channel */
 	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
 	{
+		if (mem_blend)
+			blend_channel(cset + mem_channel + 3, old_image + offset, tint, 1);
 		newc = cset[mem_channel + 3];
 		oldc = old_image[offset];
 
@@ -5830,7 +5914,11 @@ void put_pixel_def( int x, int y )	/* Combined */
 		ofs3 = offset * 3;
 		new_image = mem_img[CHN_IMAGE];
 
-		if (mem_blend) blend_rgb(cset, old_image + ofs3, tint);
+		if (mem_blend)
+		{
+			((blend_mode & BLEND_MMASK) < BLEND_1BPP ? blend_rgb :
+				blend_channel)(cset, old_image + ofs3, tint, 3);
+		}
 
 		if (!tint); // Do nothing
 		else if (tint < 0)
@@ -5916,15 +6004,9 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 			mask[i] = k;
 
 			if (!alpha || !k) continue;
-			/* Have alpha channel - process it */
+			/* Have coupled alpha channel - process it */
 			newc = alpha[i];
 			oldc = alpha0[i];
-			if (tint)
-			{
-				if (tint < 0) newc = oldc > 255 - newc ?
-					255 : oldc + newc;
-				else newc = oldc > newc ? oldc - newc : 0;
-			}
 			j = oldc * 255 + (newc - oldc) * k;
 			alphar[i] = (j + (j >> 8) + 1) >> 8;
 			if (noalpha) continue;
@@ -5939,27 +6021,17 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 
 		for (i = start; i < cnt; i += step)
 		{
-			unsigned char newc, oldc;
-
 			k = mask[i];
 			if (trans)
 			{
-				oldc = trans[i];
+				unsigned char oldc = trans[i];
 				if (xalpha) oldc &= xalpha[i];
 				k |= oldc ^ 255;
 			}
 			mask[i] = k = k ? 0 : 255;
 			if (!alpha || !k) continue;
-			/* Have alpha channel - process it */
-			newc = alpha[i];
-			if (tint)
-			{
-				oldc = alpha0[i];
-				if (tint < 0) newc = oldc > 255 - newc ?
-					255 : oldc + newc;
-				else newc = oldc > newc ? oldc - newc : 0;
-			}
-			alphar[i] = newc;
+			/* Have coupled alpha channel - process it */
+			alphar[i] = alpha[i];
 		}
 	}
 }
@@ -5984,10 +6056,17 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 
 		for (i = start; i < cnt; i += step)
 		{
+			unsigned char nc, oc;
+
 			j = mask[i];
 			if (!j) continue;
-			newc = img[i];
-			oldc = img0[i];
+// !!! This trickery with assignments is meant to explain to dumb compiler that
+// "newc" and "oldc" are safe to allocate on registers
+			nc = img[i];
+			oc = img0[i];
+
+			if (mem_blend) blend_channel(&nc, &oc, tint, 1);
+			newc = nc; oldc = oc;
 
 			if (!tint); // Do nothing
 			else if (tint < 0) newc = oldc + newc < mx ?
@@ -6025,7 +6104,12 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				nrgb[1] = mem_pal[img[i]].green;
 				nrgb[2] = mem_pal[img[i]].blue;
 			}
-			if (mem_blend) blend_rgb(nrgb, img0 + ofs3, tint);
+			if (mem_blend)
+			{
+				((blend_mode & BLEND_MMASK) < BLEND_1BPP ?
+					blend_rgb : blend_channel)(nrgb,
+					img0 + ofs3, tint, 3);
+			}
 			if (tint)
 			{
 				r = img0[ofs3 + 0];
@@ -6215,6 +6299,7 @@ void do_effect(int type, int param)
 				k = *src;
 				k = abs(k - src[dym1]) + abs(k - src[dyp1]) +
 					abs(k - src[dxm1]) + abs(k - src[dxp1]);
+				k += k >> 1;
 				break;
 			case FX_EMBOSS: /* Emboss */
 				k = src[dym1] + src[dxm1] +
@@ -6241,26 +6326,35 @@ void do_effect(int type, int param)
 				k = sqrt(k1 * k1 + k2 * k2);
 				break;
 			case FX_PREWITT: /* Yet another edge detector */
-/* Actually, the filter kernel used here is said to be "Robinson"; what is
- * attributable to Prewitt is "compass filtering", which can be done with
- * different filter kernels - WJ */
-				k = k1 = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
-					src[dxm1] - 2 * src[0] + src[dxp1] -
-					src[dyp1 + dxm1] - src[dyp1] - src[dyp1 + dxp1];
-				k1 += (src[dyp1 + dxm1] - src[dxp1]) * 2;
+/* Actually, the filter kernel used is "Robinson"; what is attributable to
+ * Prewitt is "compass filtering", which can be done with other filter
+ * kernels too - WJ */
+			case FX_KIRSCH: /* Compass detector with another kernel */
+/* Optimized compass detection algorithm: I calculate three values (compass,
+ * plus and minus) and then mix them according to filter type - WJ */
+				k = 0;
+				k1 = src[dyp1 + dxm1] - src[dxp1];
 				if (k < k1) k = k1;
-				k1 += (src[dyp1] - src[dym1 + dxp1]) * 2;
+				k1 += src[dyp1] - src[dym1 + dxp1];
 				if (k < k1) k = k1;
-				k1 += (src[dyp1 + dxp1] - src[dym1]) * 2;
+				k1 += src[dyp1 + dxp1] - src[dym1];
 				if (k < k1) k = k1;
-				k1 += (src[dxp1] - src[dym1 + dxm1]) * 2;
+				k1 += src[dxp1] - src[dym1 + dxm1];
 				if (k < k1) k = k1;
-				k1 += (src[dym1 + dxp1] - src[dxm1]) * 2;
+				k1 += src[dym1 + dxp1] - src[dxm1];
 				if (k < k1) k = k1;
-				k1 += (src[dym1] - src[dyp1 + dxm1]) * 2;
+				k1 += src[dym1] - src[dyp1 + dxm1];
 				if (k < k1) k = k1;
-				k1 += (src[dym1 + dxm1] - src[dyp1]) * 2;
+				k1 += src[dym1 + dxm1] - src[dyp1];
 				if (k < k1) k = k1;
+				k1 = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
+					src[dxm1] + src[dxp1];
+				k2 = src[dyp1 + dxm1] + src[dyp1] + src[dyp1 + dxp1];
+				if (type == FX_PREWITT)
+					k = k * 2 + k1 - k2 - src[0] * 2;
+				else /* if (type == FX_KIRSCH) */
+					k = (k * 8 + k1 * 3 - k2 * 5) / 4;
+					// Division is for equalizing weight of edge
 				break;
 			case FX_GRADIENT: /* Still another edge detector */
 				k1 = src[dxp1] - src[0];
@@ -6276,6 +6370,31 @@ void do_effect(int type, int param)
 				k = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
 					src[dxm1] - 8 * src[0] + src[dxp1] +
 					src[dyp1 + dxm1] + src[dyp1] + src[dyp1 + dxp1];
+				break;
+			case FX_MORPHEDGE: /* Morphological edge detection */
+			case FX_ERODE: /* Greyscale erosion */
+				k = src[0];
+				if (k > src[dym1 + dxm1]) k = src[dym1 + dxm1];
+				if (k > src[dym1]) k = src[dym1];
+				if (k > src[dym1 + dxp1]) k = src[dym1 + dxp1];
+				if (k > src[dxm1]) k = src[dxm1];
+				if (k > src[dxp1]) k = src[dxp1];
+				if (k > src[dyp1 + dxm1]) k = src[dyp1 + dxm1];
+				if (k > src[dyp1]) k = src[dyp1];
+				if (k > src[dyp1 + dxp1]) k = src[dyp1 + dxp1];
+				if (type == FX_MORPHEDGE)
+					k = (src[0] - k) * 2;
+				break;
+			case FX_DILATE: /* Greyscale dilation */
+				k = src[0];
+				if (k < src[dym1 + dxm1]) k = src[dym1 + dxm1];
+				if (k < src[dym1]) k = src[dym1];
+				if (k < src[dym1 + dxp1]) k = src[dym1 + dxp1];
+				if (k < src[dxm1]) k = src[dxm1];
+				if (k < src[dxp1]) k = src[dxp1];
+				if (k < src[dyp1 + dxm1]) k = src[dyp1 + dxm1];
+				if (k < src[dyp1]) k = src[dyp1];
+				if (k < src[dyp1 + dxp1]) k = src[dyp1 + dxp1];
 				break;
 			}
 			k = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
@@ -7466,29 +7585,34 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 
 void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 {
-	unsigned char mask[256], *src, *dest, *srca = NULL, *dsta = NULL;
-	int ax = ox - tool_size/2, ay = oy - tool_size/2, w = tool_size, h = tool_size;
+	unsigned char mask[256], img[256 * 2 * 3], alf[256 * 2];
+	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
+	int ax, ay, bx, by, w, h;
 	int xv = nx - ox, yv = ny - oy;		// Vector
-	int i, j, k, rx, ry, offs, delta, delta1, bpp;
-	int x0, x1, dx, y0, y1, dy, opw, op2;
+	int i, j, delta, delta1, bpp;
+	int y0, y1, dy, opw, op2, cpf;
 
-	if ( ax<0 )		// Ensure original area is within image
-	{
-		w = w + ax;
-		ax = 0;
-	}
-	if ( ay<0 )
-	{
-		h = h + ay;
-		ay = 0;
-	}
-	if ( (ax+w)>mem_width )
-		w = mem_width - ax;
-	if ( (ay+h)>mem_height )
-		h = mem_height - ay;
+
+	if (!opacity) return;
+
+	/* Clip source and dest areas to image bounds */
+	ax = ox - tool_size / 2;
+	bx = ax + tool_size;
+	if (ax < 0) ax = 0;
+	if (ax + xv < 0) ax = -xv;
+	if (bx > mem_width) bx = mem_width;
+	if (bx + xv > mem_width) bx = mem_width - xv;
+	w = bx - ax;
+
+	ay = oy - tool_size / 2;
+	by = ay + tool_size;
+	if (ay < 0) ay = 0;
+	if (ay + yv < 0) ay = -yv;
+	if (by > mem_height) by = mem_height;
+	if (by + yv > mem_height) by = mem_height - yv;
+	h = by - ay;
 
 	if ((w < 1) || (h < 1)) return;
-	if (!opacity) return;
 
 	if (IS_INDEXED) opacity = -1; // No mixing for indexed image
 
@@ -7506,64 +7630,67 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 	delta1 = yv * mem_width + xv;
 	delta = delta1 * bpp;
 
-	if (!yv && (xv > 0))
-	{
-		x0 = w - 1; x1 = -1; dx = -1;
-	}
-	else
-	{
-		x0 = 0; x1 = w; dx = 1;
-	}
-	if (yv > 0)
-	{
-		y0 = h - 1; y1 = -1; dy = -1;
-	}
-	else
-	{
-		y0 = 0; y1 = h; dy = 1;
-	}
+	/* Copy source if destination overwrites it */
+	cpf = !yv && (xv > 0) && (w > xv); 
+	/* Set up Y pass to prevent overwriting source */
+	if ((yv > 0) && (h > yv))
+		y0 = ay + h - 1 , y1 = ay - 1 , dy = -1; // Bottom to top
+	else y0 = ay , y1 = ay + h , dy = 1; // Top to bottom
 
 	for (j = y0; j != y1; j += dy)	// Blend old area with new area
 	{
-		ry = ay + yv + j;
-		if ((ry < 0) || (ry >= mem_height)) continue;
-		row_protected(ax + xv, ry, w, mask);
-		for (i = x0; i != x1; i += dx)
+		unsigned char *ts, *td, *tsa = NULL, *tda = NULL;
+		int offs = j * mem_width + ax;
+
+		row_protected(ax + xv, j + yv, w, mask);
+		ts = src + offs * bpp;
+		td = dest + offs * bpp + delta;
+		if (cpf)
 		{
-			rx = ax + xv + i;
-			if ((rx < 0) || (rx >= mem_width)) continue;
-			k = mask[i];
-			offs = mem_width * ry + rx;
+			memcpy(img, ts, w * bpp + delta);
+			ts = img;
+		}
+		if (dsta)
+		{
+			tsa = srca + offs;
+			tda = dsta + offs + delta1;
+			if (cpf)
+			{
+				memcpy(alf, tsa, w + delta1);
+				tsa = alf;
+			}
+		}
+
+		for (i = 0; i < w; i++ , ts += bpp , td += bpp)
+		{
+			int k = mask[i], k0, k1, k2;
+
 			if (opacity < 0)
 			{
 				if (k) continue;
-				dest[offs] = src[offs - delta];
-				if (!dsta) continue;
-				dsta[offs] = srca[offs - delta];
+				*td = *ts;
+				if (tda) tda[i] = tsa[i];
 				continue;
 			}
 			opw = (255 - k) * opacity;
-			if (opw < 255) continue;
 			opw = (opw + (opw >> 8) + 1) >> 8;
-			if (dsta)
+			if (!opw) continue;
+			if (tda)
 			{
-				k = srca[offs];
-				k = k * 255 + (srca[offs - delta1] - k) * opw + 127;
-				dsta[offs] = (k + (k >> 8) + 1) >> 8;
+				int k = tsa[i + delta1];
+				k = k * 255 + (tsa[i] - k) * opw + 127;
+				tda[i] = (k + (k >> 8) + 1) >> 8;
 				if (k && !channel_dis[CHN_ALPHA])
-					opw = (255 * opw * srca[offs - delta1]) / k;
+					opw = (255 * opw * tsa[i]) / k;
 			}
 			op2 = 255 - opw;
-			offs *= bpp;
-			k = src[offs - delta] * opw + src[offs] * op2 + 127;
-			dest[offs] = (k + (k >> 8) + 1) >> 8;
+			k0 = ts[0] * opw + ts[delta] * op2 + 127;
+			td[0] = (k0 + (k0 >> 8) + 1) >> 8;
 			if (bpp == 1) continue;
-			offs++;
-			k = src[offs - delta] * opw + src[offs] * op2 + 127;
-			dest[offs] = (k + (k >> 8) + 1) >> 8;
-			offs++;
-			k = src[offs - delta] * opw + src[offs] * op2 + 127;
-			dest[offs] = (k + (k >> 8) + 1) >> 8;
+			k1 = ts[1] * opw + ts[delta + 1] * op2 + 127;
+			td[1] = (k1 + (k1 >> 8) + 1) >> 8;
+			k2 = ts[2] * opw + ts[delta + 2] * op2 + 127;
+			td[2] = (k2 + (k2 >> 8) + 1) >> 8;
 		}
 	}
 }

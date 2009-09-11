@@ -922,8 +922,8 @@ static key_action main_keys[] = {
 	{ ACT_COMMIT,	0,		GDK_Return,	MOD_0   },
 	{ ACT_COMMIT,	0,		GDK_KP_Enter,	MOD_0   },
 	{ ACT_RCLICK,	0,		GDK_BackSpace,	MOD_0   },
-	{ ACT_ARROW,	2,		GDK_a,		MOD_c   },
-	{ ACT_ARROW,	3,		GDK_s,		MOD_c   },
+	{ ACT_ARROW,	2,		GDK_a,		MOD_csa },
+	{ ACT_ARROW,	3,		GDK_s,		MOD_csa },
 	{ ACT_A,	-1,		GDK_bracketleft, MOD_cs },
 	{ ACT_A,	1,		GDK_bracketright, MOD_cs},
 	{ ACT_B,	-1,		GDK_bracketleft, MOD_cS },
@@ -3959,8 +3959,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_soften(); break;
 	case FILT_GAUSS:
 		pressed_gauss(); break;
-	case FILT_EMBOSS:
-		pressed_emboss(); break;
+	case FILT_FX:
+		pressed_fx(mode); break;
 	case FILT_BACT:
 		pressed_bacteria(); break;
 	case FILT_THRES:
@@ -4533,7 +4533,9 @@ static menu_item main_menu[] = {
 	{ _("/Effects/Soften ..."), -1, 0, NEED_NOIDX, NULL, FILT_SOFTEN, 0 },
 	{ _("/Effects/Gaussian Blur ..."), -1, 0, NEED_NOIDX, NULL, FILT_GAUSS, 0 },
 	{ _("/Effects/Kuwahara-Nagao Blur ..."), -1, 0, NEED_24, NULL, FILT_KUWAHARA, 0 },
-	{ _("/Effects/Emboss"), -1, 0, NEED_NOIDX, NULL, FILT_EMBOSS, 0 },
+	{ _("/Effects/Emboss"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_EMBOSS },
+	{ _("/Effects/Dilate"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_DILATE },
+	{ _("/Effects/Erode"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_ERODE },
 	{ _("/Effects/sep2"), -4 },
 	{ _("/Effects/Bacteria ..."), -1, 0, NEED_IDX, NULL, FILT_BACT, 0 },
 
