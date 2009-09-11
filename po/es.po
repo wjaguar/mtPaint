@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint 0.78\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-12-29 12:24+0000\n"
+"POT-Creation-Date: 2007-03-11 12:25+0000\n"
 "PO-Revision-Date: 2005-03-18 18:08+0000\n"
 "Last-Translator: Mark Tyler\n"
 "Language-Team: Spanish <es@li.org>\n"
@@ -28,24 +28,24 @@ msgstr "Play"
 msgid "Fix"
 msgstr "Fix"
 
-#: src/ani.c:775 src/ani.c:1421 src/shifter.c:366 src/viewer.c:146
-#: src/viewer.c:267
+#: src/ani.c:775 src/ani.c:1421 src/shifter.c:366 src/viewer.c:142
+#: src/viewer.c:263
 msgid "Close"
 msgstr "Cerrar"
 
 #: src/ani.c:867 src/ani.c:1025 src/ani.c:1202 src/ani.c:1209 src/ani.c:1611
 #: src/canvas.c:319 src/canvas.c:544 src/canvas.c:554 src/canvas.c:578
-#: src/canvas.c:835 src/canvas.c:1215 src/canvas.c:1243 src/canvas.c:1258
-#: src/canvas.c:1262 src/canvas.c:1269 src/canvas.c:1692 src/canvas.c:1718
-#: src/canvas.c:1724 src/canvas.c:1808 src/layer.c:831 src/layer.c:958
-#: src/layer.c:1317 src/mainwindow.c:235 src/mainwindow.c:268
+#: src/canvas.c:835 src/canvas.c:1197 src/canvas.c:1225 src/canvas.c:1240
+#: src/canvas.c:1244 src/canvas.c:1251 src/canvas.c:1677 src/canvas.c:1703
+#: src/canvas.c:1709 src/canvas.c:1793 src/layer.c:823 src/layer.c:950
+#: src/layer.c:1309 src/mainwindow.c:235 src/mainwindow.c:268
 #: src/mainwindow.c:277 src/mainwindow.c:284 src/mainwindow.c:315
 #: src/mainwindow.c:351 src/mainwindow.c:378 src/mainwindow.c:385
 #: src/mainwindow.c:419 src/mainwindow.c:423 src/mainwindow.c:427
 #: src/mainwindow.c:431 src/mainwindow.c:435 src/mainwindow.c:440
-#: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1157
-#: src/otherwindow.c:1164 src/otherwindow.c:1166 src/png.c:2960 src/png.c:2982
-#: src/viewer.c:1414
+#: src/mainwindow.c:478 src/mainwindow.c:514 src/otherwindow.c:1071
+#: src/otherwindow.c:1096 src/otherwindow.c:1098 src/png.c:3163 src/png.c:3185
+#: src/viewer.c:1412
 msgid "Error"
 msgstr "Error"
 
@@ -55,21 +55,21 @@ msgstr "No se puede crear directorio"
 
 #: src/ani.c:868 src/ani.c:1025 src/ani.c:1203 src/ani.c:1210 src/ani.c:1611
 #: src/canvas.c:320 src/canvas.c:544 src/canvas.c:554 src/canvas.c:580
-#: src/canvas.c:836 src/canvas.c:1215 src/canvas.c:1244 src/canvas.c:1258
-#: src/canvas.c:1263 src/canvas.c:1269 src/canvas.c:1692 src/canvas.c:1719
-#: src/canvas.c:1725 src/canvas.c:1808 src/channels.c:282 src/channels.c:344
-#: src/info.c:445 src/layer.c:831 src/layer.c:958 src/layer.c:968
-#: src/layer.c:1317 src/mainwindow.c:236 src/mainwindow.c:269
+#: src/canvas.c:836 src/canvas.c:1197 src/canvas.c:1226 src/canvas.c:1240
+#: src/canvas.c:1245 src/canvas.c:1251 src/canvas.c:1677 src/canvas.c:1704
+#: src/canvas.c:1710 src/canvas.c:1793 src/channels.c:282 src/channels.c:344
+#: src/info.c:445 src/layer.c:823 src/layer.c:950 src/layer.c:960
+#: src/layer.c:1309 src/mainwindow.c:236 src/mainwindow.c:269
 #: src/mainwindow.c:277 src/mainwindow.c:284 src/mainwindow.c:317
 #: src/mainwindow.c:345 src/mainwindow.c:351 src/mainwindow.c:379
 #: src/mainwindow.c:386 src/mainwindow.c:419 src/mainwindow.c:423
 #: src/mainwindow.c:427 src/mainwindow.c:431 src/mainwindow.c:435
 #: src/mainwindow.c:440 src/mainwindow.c:478 src/mainwindow.c:514
 #: src/otherwindow.c:458 src/otherwindow.c:610 src/otherwindow.c:1001
-#: src/otherwindow.c:1158 src/otherwindow.c:1164 src/otherwindow.c:1166
-#: src/otherwindow.c:1285 src/otherwindow.c:1521 src/otherwindow.c:2371
-#: src/otherwindow.c:2795 src/otherwindow.c:3002 src/png.c:2762 src/png.c:2962
-#: src/png.c:2984 src/prefs.c:733 src/viewer.c:1415
+#: src/otherwindow.c:1072 src/otherwindow.c:1096 src/otherwindow.c:1098
+#: src/otherwindow.c:1209 src/otherwindow.c:1444 src/otherwindow.c:2304
+#: src/otherwindow.c:2745 src/otherwindow.c:2974 src/png.c:2957 src/png.c:3165
+#: src/png.c:3187 src/prefs.c:733 src/viewer.c:1413
 msgid "OK"
 msgstr "OK"
 
@@ -81,9 +81,9 @@ msgstr "Crear fotogramas"
 msgid "Unable to save image"
 msgstr "Imposible guardar la imagen"
 
-#: src/ani.c:1070 src/layer.c:593 src/layer.c:678 src/layer.c:968
-#: src/layer.c:1054 src/mainwindow.c:290 src/mainwindow.c:1254 src/png.c:2604
-#: src/png.c:2762
+#: src/ani.c:1070 src/layer.c:586 src/layer.c:671 src/layer.c:960
+#: src/layer.c:1046 src/mainwindow.c:290 src/mainwindow.c:1260 src/png.c:2801
+#: src/png.c:2957
 msgid "Warning"
 msgstr "Aviso"
 
@@ -93,11 +93,11 @@ msgid ""
 "the layers?"
 msgstr "¿Realmente quieres limpiar de todas las capas?"
 
-#: src/ani.c:1070 src/layer.c:593 src/layer.c:1054 src/mainwindow.c:290
+#: src/ani.c:1070 src/layer.c:586 src/layer.c:1046 src/mainwindow.c:290
 msgid "No"
 msgstr "No"
 
-#: src/ani.c:1070 src/layer.c:593 src/layer.c:1054 src/mainwindow.c:290
+#: src/ani.c:1070 src/layer.c:586 src/layer.c:1046 src/mainwindow.c:290
 msgid "Yes"
 msgstr "Sí"
 
@@ -109,9 +109,9 @@ msgstr "Establecer Número de Fotogramas"
 msgid "You must have at least 2 layers to create an animation"
 msgstr "Debes tener al menos 2 capas para crear una animación"
 
-#: src/ani.c:1207 src/canvas.c:1900 src/canvas.c:1903 src/layer.c:53
-#: src/layer.c:326 src/layer.c:643 src/layer.c:658 src/layer.c:663
-#: src/layer.c:984 src/layer.c:1041 src/mainwindow.c:384 src/mainwindow.c:456
+#: src/ani.c:1207 src/canvas.c:1891 src/canvas.c:1894 src/layer.c:53
+#: src/layer.c:322 src/layer.c:636 src/layer.c:651 src/layer.c:656
+#: src/layer.c:976 src/layer.c:1033 src/mainwindow.c:384 src/mainwindow.c:456
 #: src/otherwindow.c:80
 #, c-format
 msgid "Untitled"
@@ -153,7 +153,7 @@ msgstr "Prefijo del archivo"
 msgid "Create GIF frames"
 msgstr "Crear fotogramas GIF"
 
-#: src/ani.c:1286 src/info.c:362 src/layer.c:125
+#: src/ani.c:1286 src/info.c:362 src/layer.c:121
 msgid "Layers"
 msgstr "Capas"
 
@@ -169,8 +169,8 @@ msgstr "Ciclo"
 msgid "Save"
 msgstr "Guardar"
 
-#: src/ani.c:1428 src/otherwindow.c:986 src/otherwindow.c:1530
-#: src/otherwindow.c:2042
+#: src/ani.c:1428 src/otherwindow.c:986 src/otherwindow.c:1453
+#: src/otherwindow.c:1975
 msgid "Preview"
 msgstr "Vista Previa"
 
@@ -199,11 +199,11 @@ msgstr "Suavizado de Bordes"
 msgid "Different X/Y"
 msgstr "Diferente X/Y"
 
-#: src/canvas.c:450 src/canvas.c:501 src/canvas.c:596 src/otherwindow.c:1273
+#: src/canvas.c:450 src/canvas.c:501 src/canvas.c:596 src/otherwindow.c:1197
 msgid "Gamma corrected"
 msgstr "Corrección Gamma"
 
-#: src/canvas.c:452 src/memory.c:4989
+#: src/canvas.c:452 src/memory.c:5064
 msgid "Gaussian Blur"
 msgstr "Borroso Gausiano"
 
@@ -216,10 +216,10 @@ msgid "Amount"
 msgstr "Cantidad"
 
 #: src/canvas.c:500
-msgid "Threshold"
-msgstr "Umbral"
+msgid "Threshold "
+msgstr ""
 
-#: src/canvas.c:503 src/memory.c:5135
+#: src/canvas.c:503 src/memory.c:5210
 msgid "Unsharp Mask"
 msgstr "Máscara de emborronado"
 
@@ -243,33 +243,33 @@ msgstr "Alisado"
 msgid "Free Rotate"
 msgstr "Rotado Libre"
 
-#: src/canvas.c:835 src/viewer.c:1414
+#: src/canvas.c:835 src/viewer.c:1412
 msgid "Not enough memory to create clipboard"
 msgstr "No hay suficiente memoria para crear el portapapeles"
 
-#: src/canvas.c:1215
+#: src/canvas.c:1197
 msgid "Invalid channel file."
 msgstr "Canal no válido"
 
-#: src/canvas.c:1243
+#: src/canvas.c:1225
 msgid "Cannot open file"
 msgstr "No se puede abrir archivo"
 
-#: src/canvas.c:1244
+#: src/canvas.c:1226
 msgid "Unsupported file format"
 msgstr "Formato no soportado"
 
-#: src/canvas.c:1257
+#: src/canvas.c:1239
 #, c-format
 msgid "File is too big, must be <= to width=%i height=%i : %s"
 msgstr ""
 "Archivo demasiado grande, su tamaño debe ser <= anchura=%i altura=%i : %s"
 
-#: src/canvas.c:1262
+#: src/canvas.c:1244
 msgid "Unable to load file"
 msgstr "Imposible cargar el archivo"
 
-#: src/canvas.c:1269
+#: src/canvas.c:1251
 msgid ""
 "The file import library had to terminate due to a problem with the file "
 "(possibly corrupt image data or a truncated file). I have managed to load "
@@ -282,126 +282,126 @@ msgstr ""
 "correcta, pero sugiero que guarde esta imagen, a un nuevo archivo, para que "
 "esto no vuelva a ocurrir."
 
-#: src/canvas.c:1318
+#: src/canvas.c:1300
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
 msgstr "El fichero: %s ya existe. ¿Desea sobreescribirlo?"
 
-#: src/canvas.c:1319
+#: src/canvas.c:1301
 msgid "File Found"
 msgstr "Archivo encontrado"
 
-#: src/canvas.c:1319 src/mainwindow.c:1275
+#: src/canvas.c:1301 src/mainwindow.c:1281
 msgid "NO"
 msgstr "NO"
 
-#: src/canvas.c:1319 src/mainwindow.c:1275
+#: src/canvas.c:1301 src/mainwindow.c:1281
 msgid "YES"
 msgstr "SÍ"
 
-#: src/canvas.c:1368 src/canvas.c:1428
+#: src/canvas.c:1349 src/canvas.c:1411
 msgid "File Format"
 msgstr "Formato de Archivo"
 
-#: src/canvas.c:1373 src/prefs.c:450
+#: src/canvas.c:1354 src/prefs.c:450
 msgid "Transparency index"
 msgstr "Indice de Transparencia"
 
-#: src/canvas.c:1378
+#: src/canvas.c:1359
 msgid "JPEG Save Quality (100=High)"
 msgstr "Nivel de calidad JPEG (100=Alta)"
 
-#: src/canvas.c:1383
+#: src/canvas.c:1364
 msgid "Hotspot at X ="
 msgstr "Punto en X ="
 
-#: src/canvas.c:1388
+#: src/canvas.c:1369
 msgid "Y ="
 msgstr "Y ="
 
-#: src/canvas.c:1469
+#: src/canvas.c:1454
 msgid "Animation delay"
 msgstr "Retardo para la Animación"
 
-#: src/canvas.c:1691
+#: src/canvas.c:1676
 #, c-format
 msgid "File: %s invalid - palette not updated"
 msgstr "El archivo: %s no es valido - La paleta no se ha actualizado"
 
-#: src/canvas.c:1718
+#: src/canvas.c:1703
 msgid "Unable to export undo images"
 msgstr "Imposible exportar histórico de cambios"
 
-#: src/canvas.c:1724
+#: src/canvas.c:1709
 msgid "Unable to export ASCII file"
 msgstr "Imposible exportar fichero ASCII"
 
-#: src/canvas.c:1807 src/layer.c:957 src/mainwindow.c:439
+#: src/canvas.c:1792 src/layer.c:949 src/mainwindow.c:439
 #, c-format
 msgid "Unable to save file: %s"
 msgstr "Imposible guardar: %s"
 
-#: src/canvas.c:1824 src/toolbar.c:701
+#: src/canvas.c:1811 src/toolbar.c:701
 msgid "Load Image File"
 msgstr "Cargar Imagen"
 
-#: src/canvas.c:1832 src/toolbar.c:702
+#: src/canvas.c:1819 src/toolbar.c:702
 msgid "Save Image File"
 msgstr "Guardar Imagen"
 
-#: src/canvas.c:1835
+#: src/canvas.c:1822
 msgid "Load Palette File"
 msgstr "Cargar Paleta"
 
-#: src/canvas.c:1838
+#: src/canvas.c:1825
 msgid "Save Palette File"
 msgstr "Guardar Paleta"
 
-#: src/canvas.c:1841
+#: src/canvas.c:1828
 msgid "Select Clipboard File"
 msgstr "Seleccione Portapapeles"
 
-#: src/canvas.c:1844
+#: src/canvas.c:1831
 msgid "Select Browser Program"
 msgstr "Selecciona Programa de Navegación"
 
-#: src/canvas.c:1847
+#: src/canvas.c:1834
 msgid "Select Handbook Index File"
 msgstr "Selecciona el Archivo Index del Manual"
 
-#: src/canvas.c:1850
+#: src/canvas.c:1837
 msgid "Export Undo Images"
 msgstr "Exportar Histórico de cambios"
 
-#: src/canvas.c:1853
+#: src/canvas.c:1840
 msgid "Export Undo Images (reversed)"
 msgstr "Exportar Histórico de cambios (a la inversa)"
 
-#: src/canvas.c:1856
+#: src/canvas.c:1843
 msgid "Export ASCII Art"
 msgstr "Exportar Arte ASCII"
 
-#: src/canvas.c:1859
+#: src/canvas.c:1846
 msgid "Save Layer Files"
 msgstr "Grabar Capas"
 
-#: src/canvas.c:1862
+#: src/canvas.c:1849
 msgid "Import GIF animation - Choose frames directory"
 msgstr "Importar animación GIF - Elige directorio de dibujos"
 
-#: src/canvas.c:1865
+#: src/canvas.c:1852
 msgid "Export GIF animation"
 msgstr "Exportar animación GIF"
 
-#: src/canvas.c:1868
+#: src/canvas.c:1855
 msgid "Load Channel"
 msgstr "Cargar Canal"
 
-#: src/canvas.c:1871
+#: src/canvas.c:1858
 msgid "Save Channel"
 msgstr "Guardar Canal"
 
-#: src/canvas.c:1874
+#: src/canvas.c:1861
 msgid "Save Composite Image"
 msgstr "Guardar Imagen Compuesta"
 
@@ -463,9 +463,9 @@ msgstr "Invertido"
 
 #: src/channels.c:283 src/channels.c:345 src/otherwindow.c:239
 #: src/otherwindow.c:459 src/otherwindow.c:509 src/otherwindow.c:611
-#: src/otherwindow.c:978 src/otherwindow.c:1286 src/otherwindow.c:1537
-#: src/otherwindow.c:2372 src/otherwindow.c:2796 src/otherwindow.c:3003
-#: src/png.c:2605 src/prefs.c:734 src/viewer.c:1647
+#: src/otherwindow.c:978 src/otherwindow.c:1210 src/otherwindow.c:1460
+#: src/otherwindow.c:2305 src/otherwindow.c:2746 src/otherwindow.c:2975
+#: src/png.c:2802 src/prefs.c:734 src/viewer.c:1645
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -496,7 +496,7 @@ msgstr "Créditos"
 #: src/help.c:30
 msgid ""
 "\n"
-"mtPaint 3.10 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.11 - Copyright (C) 2004-2007 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -528,31 +528,27 @@ msgid ""
 "http://sourceforge.net/mail/?group_id=155874\n"
 msgstr ""
 "\n"
-"mtPaint 3.10 - Copyright (C) 2004-2006 Los Autores\n"
+"mtPaint 3.11 - Copyright (C) 2004-2007 Los Autores\n"
 "\n"
 "Ver la sección de 'Créditos' para el listado de autores.\n"
 "\n"
-"mtPaint es software libre; tu puedes residtribuirlo y/o modificarlo bajo los"
-"términos de la GNU General Public License publicada por la Free Software "
-"Foundation; con la versión 2 de la licencia, o cualquier versión posterior"
-"\n"
+"mtPaint es software libre; tu puedes residtribuirlo y/o modificarlo bajo "
+"lostérminos de la GNU General Public License publicada por la Free Software "
+"Foundation; con la versión 2 de la licencia, o cualquier versión posterior\n"
 "mtPaint se distribuye con la esperanza de que sea útil, pero SIN NINGUNA "
-"GARANTÍA. "
-"Ver la GNU General Public License para más detalles. "
+"GARANTÍA. Ver la GNU General Public License para más detalles. \n"
+"mtPaint es un simple GTK+1/2 programa de pintura diseñado para crear iconos "
+"y trabajos artísticos de pixeles. Puede editar paletas indexadas o imágenes "
+"de 24 bit RGB y ofrece herramientas básicas para pintar y manipular paletas. "
+"Tienes muchas otras características interesantes como canales, capas y "
+"animación. Debido a su simplicidad carece de dependencias y va muy en GNU/"
+"Linux y en Windows con hardware anticuado.\n"
 "\n"
-"mtPaint es un simple GTK+1/2 programa de pintura diseñado para crear iconos y "
-"trabajos artísticos de pixeles. Puede editar paletas indexadas o imágenes de 24 bit RGB y "
-"ofrece herramientas básicas para pintar y manipular paletas. Tienes muchas otras "
-"características interesantes como canales, capas y animación. Debido a su simplicidad "
-"carece de dependencias y va muy en GNU/Linux y en Windows "
-"con hardware anticuado.\n"
-"\n"
-"Hay una extensa documentación de mtPaint's en el manual.  "
-"Si no lo tienes ya, puedes descargarlo del sitio web de mtpaint"
-"\n"
-"Si te gusta mtPaint y quieres mantenerte informado sobre nuevas actualizaciones o "
-"quieres enviar algún comentario, entonces puede que te interese la lista de correo: "
-"\n"
+"Hay una extensa documentación de mtPaint's en el manual.  Si no lo tienes "
+"ya, puedes descargarlo del sitio web de mtpaint\n"
+"Si te gusta mtPaint y quieres mantenerte informado sobre nuevas "
+"actualizaciones o quieres enviar algún comentario, entonces puede que te "
+"interese la lista de correo: \n"
 "http://sourceforge.net/mail/?group_id=155874\n"
 
 #: src/help.c:47
@@ -660,29 +656,30 @@ msgstr ""
 "  Ctrl-A            Seleccionar imagen entera\n"
 "  Escape            No seleccionar nada, cancelar caja de pegado\n"
 "  Ctrl-C            Copiar selección al portapapeles\n"
-"  Ctrl-X            Copiar selección al portapapeles, y entonces pintar el actual "
-"patrón al área seleccionada\n"
+"  Ctrl-X            Copiar selección al portapapeles, y entonces pintar el "
+"actual patrón al área seleccionada\n"
 "  Ctrl-V            Pegar del portapepeles\n"
 "  Ctrl-K            Pegar del portapapeles a sitio del que fue copiado\n"
 "  Enter/Return      Pegar en el lienzo\n"
 "\n"
 "  Arrow keys        Paint Mode - Cambiar color A o B\n"
-"  Arrow keys        Selection Mode - Empujar marco de selección o pegar de uno en uno "
-"(pixeles)\n"
+"  Arrow keys        Selection Mode - Empujar marco de selección o pegar de "
+"uno en uno (pixeles)\n"
 "  Shift+Arrow keys  Empujar marco de selección o pegar en x pixeles - x está "
 "definido en la ventana de Preferencias\n"
 "  Ctrl+Arrows       Mover capa o redimensionar marco de selección\n"
 "\n"
 "  Delete            Cortar imagen\n"
-"  Insert            Transformar colores - ej. Brillo, Contraste, "
-"Saturación, Posterize, Gamma\n"
+"  Insert            Transformar colores - ej. Brillo, Contraste, Saturación, "
+"Posterize, Gamma\n"
 "  Ctrl-G            Escala de gris de la imagen\n"
 "\n"
-"  Ctrl-T            Dibujar un rectángulo alrededor del área de selección con el "
-"llenado actual\n"
+"  Ctrl-T            Dibujar un rectángulo alrededor del área de selección "
+"con el llenado actual\n"
 "  Ctrl-Shift-T      Llenar el área de selección con el actual relleno\n"
 "  Ctrl-L            Dibujar una elipse escaneando el área de selección\n"
-"  Ctrl-Shift-L      Dibujar una elipse rellenada escaneando el área de selección\n"
+"  Ctrl-Shift-L      Dibujar una elipse rellenada escaneando el área de "
+"selección\n"
 "\n"
 "  Ctrl-E            Editar los valores RGB para colores A & B\n"
 "  Ctrl-W            Editar toda la paleta de colores\n"
@@ -724,13 +721,13 @@ msgstr ""
 "  Ctrl + F1 - F12   Guardar el portapapeles actual al archivo 1-12\n"
 "  Shift + F1 - F12  Cargar portapapeles desde el archivo 1-12\n"
 "\n"
-"  Ctrl + 1, 2, ... , 0  Establecer opacidad al 10%, 20%, ... , 100% (main or keypad "
-"numbers)\n"
+"  Ctrl + 1, 2, ... , 0  Establecer opacidad al 10%, 20%, ... , 100% (main or "
+"keypad numbers)\n"
 "  Ctrl + + or =     Incrementar opacidad en 1%\n"
 "  Ctrl + -          Disminuir opacidad en 1%\n"
 "\n"
-"  Home              Mostrar o esconder la ventana principal menu/barra/estado"
-"paleta\n"
+"  Home              Mostrar o esconder la ventana principal menu/barra/"
+"estadopaleta\n"
 "  Page Up           Escalar Imagen\n"
 "  Page Down         Redimensionar Lienzo\n"
 "  End               Quitar ventana\n"
@@ -785,7 +782,7 @@ msgid ""
 "\n"
 "mtPaint is maintained by Dmitry Groshev.\n"
 "\n"
-"wjaguar@mail.ru\n"
+"wjaguar@users.sourceforge.net\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
 "The following people (in alphabetical order) have contributed directly to "
@@ -831,10 +828,11 @@ msgid ""
 "\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
-"French - Nicolas Velin, Pascal Billard\n"
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto\n"
 "German - Oliver Frommel\n"
 "Polish - Simek\n"
-"Portuguese - Israel G. Lugo\n"
+"Portuguese - Israel G. Lugo, Tiago Silva\n"
+"Slovak - Jozef Riha\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio San\n"
 "Taiwanese Chinese - Wei-Lun Chao\n"
 "Turkish - Muhammet Kara, Tutku Dalmaz\n"
@@ -842,11 +840,11 @@ msgstr ""
 "\n"
 "mtPaint es mantenido por Dmitry Groshev.\n"
 "\n"
-"wjaguar@mail.ru\n"
+"wjaguar@users.sourceforge.net\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
-"Las siguientes personas (en orden alfabético) han contribuido directamente en "
-"el projecto y, por tanto, se les agradece enormemente su generosidad y "
+"Las siguientes personas (en orden alfabético) han contribuido directamente "
+"en el projecto y, por tanto, se les agradece enormemente su generosidad y "
 "duro trabajo:\n"
 "\n"
 "\n"
@@ -863,8 +861,7 @@ msgstr ""
 "information.\n"
 "\n"
 "\n"
-"Contribuciones Generales (Feedback e Ideas de mejora) "
-"\n"
+"Contribuciones Generales (Feedback e Ideas de mejora) \n"
 "Abdulla Al Muhairi - Website redesign April 2005\n"
 "Alan Horkan\n"
 "Alexandre Prokoudine\n"
@@ -887,10 +884,10 @@ msgstr ""
 "\n"
 "Brazilian Portuguese - Paulo Trevizan\n"
 "Czech - Pavel Ruzicka\n"
-"French - Nicolas Velin, Pascal Billard\n"
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto\n"
 "German - Oliver Frommel\n"
 "Polish - Simek\n"
-"Portuguese - Israel G. Lugo\n"
+"Portuguese - Israel G. Lugo, Tiago Silva\n"
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sánchez León\n"
 "Taiwanese Chinese - Wei-Lun Chao\n"
 "Turkish - Muhammet Kara, Tutku Dalmaz\n"
@@ -984,21 +981,21 @@ msgstr ""
 "No se pudo encontrar la carpeta local. Se está usando la carpeta actual como "
 "local."
 
-#: src/layer.c:54 src/layer.c:1171
+#: src/layer.c:54 src/layer.c:1163
 #, c-format
 msgid "Background"
 msgstr "Fondo"
 
-#: src/layer.c:123 src/mainwindow.c:3864
+#: src/layer.c:119 src/mainwindow.c:3866
 msgid "(Modified)"
 msgstr "(Modificado)"
 
-#: src/layer.c:591
+#: src/layer.c:584
 #, c-format
 msgid "Do you really want to delete layer %i (%s) ?"
 msgstr "¿ Seguro que desea borrar la capa  %i (%s) ?"
 
-#: src/layer.c:673
+#: src/layer.c:666
 msgid ""
 "One or more of the layers contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -1006,54 +1003,54 @@ msgstr ""
 "Una o más capas contienen cambios que no se han guardado. ¿ Seguro que "
 "quiere perder estos cambios ?"
 
-#: src/layer.c:678 src/mainwindow.c:1254
+#: src/layer.c:671 src/mainwindow.c:1260
 msgid "Cancel Operation"
 msgstr "Cancelar Operación"
 
-#: src/layer.c:678 src/mainwindow.c:1254
+#: src/layer.c:671 src/mainwindow.c:1260
 msgid "Lose Changes"
 msgstr "Perder los cambios"
 
-#: src/layer.c:830
+#: src/layer.c:822
 #, c-format
 msgid "%d layers failed to load"
 msgstr "%d capas fallaron al cargar"
 
-#: src/layer.c:968
+#: src/layer.c:960
 msgid ""
 "One or more of the image layers has not been saved.  You must save each "
 "image individually before saving the layers text file in order to load this "
 "composite image in the future."
 msgstr ""
-"Una o más capas de la imagen no han sido guardadas. Tú debes guardar "
-"cada imagen individualmente para cargar la imagen compuesta en el futuro "
+"Una o más capas de la imagen no han sido guardadas. Tú debes guardar cada "
+"imagen individualmente para cargar la imagen compuesta en el futuro "
 
-#: src/layer.c:1054
+#: src/layer.c:1046
 msgid "Do you really want to delete all of the layers?"
 msgstr "¿ Está seguro de que desea borrar todas las capas ?"
 
-#: src/layer.c:1317
+#: src/layer.c:1309
 msgid "You cannot add any more layers."
 msgstr "Tú no puedes añadir más capas."
 
-#: src/layer.c:1447
+#: src/layer.c:1439
 msgid "Layer Name"
 msgstr "Nombre de la Capa"
 
-#: src/layer.c:1448
+#: src/layer.c:1440
 msgid "Position"
 msgstr "Posición"
 
-#: src/layer.c:1449 src/otherwindow.c:2917 src/prefs.c:456 src/toolbar.c:587
-#: src/toolbar.c:947
+#: src/layer.c:1441 src/otherwindow.c:2872 src/prefs.c:456 src/toolbar.c:587
+#: src/toolbar.c:956
 msgid "Opacity"
 msgstr "Opacidad"
 
-#: src/layer.c:1472
+#: src/layer.c:1464
 msgid "Transparent Colour"
 msgstr "Color Transparente"
 
-#: src/layer.c:1487
+#: src/layer.c:1479
 msgid "Show all layers in main window"
 msgstr "Mostrar todas las capas en la ventana principal"
 
@@ -1147,11 +1144,9 @@ msgstr ""
 
 #: src/mainwindow.c:435
 msgid ""
-"You are trying to save an indexed canvas to a TIFF file which is not "
-"possible.  I would suggest you save with a PNG extension."
+"You are trying to save an LSS16 file with a palette of more than 16 "
+"colours.  Either use another format or reduce the palette to 16 colours."
 msgstr ""
-"Está intentando guardar un lienzo a un fichero TIFF, lo cual no es posible."
-"Le sugiero que lo guarde con extensión PNG."
 
 #: src/mainwindow.c:478
 msgid "Unable to load clipboard"
@@ -1161,7 +1156,7 @@ msgstr "Incapaz de cargar el portapapeles"
 msgid "Unable to save clipboard"
 msgstr "Incapaz de guardar el portapapeles"
 
-#: src/mainwindow.c:1251
+#: src/mainwindow.c:1257
 msgid ""
 "This canvas/palette contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -1169,826 +1164,822 @@ msgstr ""
 "Este lienzo/paleta contiene cambios que no han sido guardados. ¿Seguro que "
 "quiere perderlos?"
 
-#: src/mainwindow.c:1275
+#: src/mainwindow.c:1281
 msgid "Do you really want to quit?"
 msgstr "¿Seguro que desea salir?"
 
-#: src/mainwindow.c:3218
+#: src/mainwindow.c:3227
 msgid "/_File"
 msgstr "/_Archivo"
 
-#: src/mainwindow.c:3219
+#: src/mainwindow.c:3228
 msgid "/File/tear"
 msgstr "/Archivo/rasgar"
 
-#: src/mainwindow.c:3220
+#: src/mainwindow.c:3229
 msgid "/File/New"
 msgstr "/Archivo/Nuevo"
 
-#: src/mainwindow.c:3221
+#: src/mainwindow.c:3230
 msgid "/File/Open ..."
 msgstr "/Archivo/Abrir ..."
 
-#: src/mainwindow.c:3222
+#: src/mainwindow.c:3231
 msgid "/File/Save"
 msgstr "/Archivo/Guardar"
 
-#: src/mainwindow.c:3223
+#: src/mainwindow.c:3232
 msgid "/File/Save As ..."
 msgstr "/Archivo/Guardar como ..."
 
-#: src/mainwindow.c:3224 src/mainwindow.c:3250
+#: src/mainwindow.c:3233 src/mainwindow.c:3259
 msgid "/File/sep1"
 msgstr "/Archivo/sep1"
 
-#: src/mainwindow.c:3225 src/mainwindow.c:3448
+#: src/mainwindow.c:3234 src/mainwindow.c:3457
 msgid "/File/Export Undo Images ..."
 msgstr "/Archivo/Exportar Histórico de Imagenes ..."
 
-#: src/mainwindow.c:3226 src/mainwindow.c:3449
+#: src/mainwindow.c:3235 src/mainwindow.c:3458
 msgid "/File/Export Undo Images (reversed) ..."
 msgstr "/Archivo/Exportar Histórico de Imagenes (a la inversa) ..."
 
-#: src/mainwindow.c:3227 src/mainwindow.c:3480
+#: src/mainwindow.c:3236 src/mainwindow.c:3489
 msgid "/File/Export ASCII Art ..."
 msgstr "/Archivo/Exportar en ASCII ..."
 
-#: src/mainwindow.c:3228 src/mainwindow.c:3480
+#: src/mainwindow.c:3237 src/mainwindow.c:3489
 msgid "/File/Export Animated GIF ..."
 msgstr "/Archivo/Exportar GIF Animado ..."
 
-#: src/mainwindow.c:3229 src/mainwindow.c:3527
+#: src/mainwindow.c:3238 src/mainwindow.c:3535
 msgid "/File/sep2"
 msgstr "/Archivo/sep2"
 
-#: src/mainwindow.c:3230
+#: src/mainwindow.c:3239
 msgid "/File/1"
 msgstr "/Archivo/1"
 
-#: src/mainwindow.c:3231
+#: src/mainwindow.c:3240
 msgid "/File/2"
 msgstr "/Archivo/2"
 
-#: src/mainwindow.c:3232
+#: src/mainwindow.c:3241
 msgid "/File/3"
 msgstr "/Archivo/3"
 
-#: src/mainwindow.c:3233
+#: src/mainwindow.c:3242
 msgid "/File/4"
 msgstr "/Archivo/4"
 
-#: src/mainwindow.c:3234
+#: src/mainwindow.c:3243
 msgid "/File/5"
 msgstr "/Archivo/5"
 
-#: src/mainwindow.c:3235
+#: src/mainwindow.c:3244
 msgid "/File/6"
 msgstr "/Archivo/6"
 
-#: src/mainwindow.c:3236
+#: src/mainwindow.c:3245
 msgid "/File/7"
 msgstr "/Archivo/7"
 
-#: src/mainwindow.c:3237
+#: src/mainwindow.c:3246
 msgid "/File/8"
 msgstr "/Archivo/8"
 
-#: src/mainwindow.c:3238
+#: src/mainwindow.c:3247
 msgid "/File/9"
 msgstr "/Archivo/9"
 
-#: src/mainwindow.c:3239
+#: src/mainwindow.c:3248
 msgid "/File/10"
 msgstr "/Archivo/10"
 
-#: src/mainwindow.c:3240
+#: src/mainwindow.c:3249
 msgid "/File/11"
 msgstr "/Archivo/11"
 
-#: src/mainwindow.c:3241
+#: src/mainwindow.c:3250
 msgid "/File/12"
 msgstr "/Archivo/12"
 
-#: src/mainwindow.c:3242
+#: src/mainwindow.c:3251
 msgid "/File/13"
 msgstr "/Archivo/13"
 
-#: src/mainwindow.c:3243
+#: src/mainwindow.c:3252
 msgid "/File/14"
 msgstr "/Archivo/14"
 
-#: src/mainwindow.c:3244
+#: src/mainwindow.c:3253
 msgid "/File/15"
 msgstr "/Archivo/15"
 
-#: src/mainwindow.c:3245
+#: src/mainwindow.c:3254
 msgid "/File/16"
 msgstr "/Archivo/16"
 
-#: src/mainwindow.c:3246
+#: src/mainwindow.c:3255
 msgid "/File/17"
 msgstr "/Archivo/17"
 
-#: src/mainwindow.c:3247
+#: src/mainwindow.c:3256
 msgid "/File/18"
 msgstr "/Archivo/18"
 
-#: src/mainwindow.c:3248
+#: src/mainwindow.c:3257
 msgid "/File/19"
 msgstr "/Archivo/19"
 
-#: src/mainwindow.c:3249
+#: src/mainwindow.c:3258
 msgid "/File/20"
 msgstr "/Archivo/20"
 
-#: src/mainwindow.c:3251
+#: src/mainwindow.c:3260
 msgid "/File/Quit"
 msgstr "/Archivo/Salir"
 
-#: src/mainwindow.c:3253
+#: src/mainwindow.c:3262
 msgid "/_Edit"
 msgstr "/_Editar"
 
-#: src/mainwindow.c:3254
+#: src/mainwindow.c:3263
 msgid "/Edit/tear"
 msgstr "/Editar/rasgar"
 
-#: src/mainwindow.c:3255 src/mainwindow.c:3448
+#: src/mainwindow.c:3264 src/mainwindow.c:3457
 msgid "/Edit/Undo"
 msgstr "/Editar/Deshacer"
 
-#: src/mainwindow.c:3256 src/mainwindow.c:3451
+#: src/mainwindow.c:3265 src/mainwindow.c:3460
 msgid "/Edit/Redo"
 msgstr "/Editar/Rehacer"
 
-#: src/mainwindow.c:3257 src/mainwindow.c:3264 src/mainwindow.c:3293
+#: src/mainwindow.c:3266 src/mainwindow.c:3273 src/mainwindow.c:3302
 msgid "/Edit/sep1"
 msgstr "/Editar/sep1"
 
-#: src/mainwindow.c:3258 src/mainwindow.c:3455 src/mainwindow.c:3489
+#: src/mainwindow.c:3267 src/mainwindow.c:3464 src/mainwindow.c:3498
 msgid "/Edit/Cut"
 msgstr "/Editar/Cortar"
 
-#: src/mainwindow.c:3259 src/mainwindow.c:3455 src/mainwindow.c:3489
+#: src/mainwindow.c:3268 src/mainwindow.c:3464 src/mainwindow.c:3498
 msgid "/Edit/Copy"
 msgstr "/Editar/Copiar"
 
-#: src/mainwindow.c:3260 src/mainwindow.c:3461
+#: src/mainwindow.c:3269 src/mainwindow.c:3470
 msgid "/Edit/Paste To Centre"
 msgstr "/Editar/Pegar en el centro"
 
-#: src/mainwindow.c:3261 src/mainwindow.c:3462
+#: src/mainwindow.c:3270 src/mainwindow.c:3471
 msgid "/Edit/Paste To New Layer"
 msgstr "/Editar/Pegar en una nueva capa"
 
-#: src/mainwindow.c:3262 src/mainwindow.c:3461
+#: src/mainwindow.c:3271 src/mainwindow.c:3470
 msgid "/Edit/Paste"
 msgstr "/Editar/Pegar"
 
-#: src/mainwindow.c:3263
+#: src/mainwindow.c:3272
 msgid "/Edit/Paste Text"
 msgstr "/Editar/Pegar Texto"
 
-#: src/mainwindow.c:3265
+#: src/mainwindow.c:3274
 msgid "/Edit/Load Clipboard"
 msgstr "/Editar/Cargar Portapapeles"
 
-#: src/mainwindow.c:3266
+#: src/mainwindow.c:3275
 msgid "/Edit/Load Clipboard/tear"
 msgstr "/Editar/Cargar Portapapeles/rasgar"
 
-#: src/mainwindow.c:3267
+#: src/mainwindow.c:3276
 msgid "/Edit/Load Clipboard/1"
 msgstr "/Editar/Cargar Portapapeles/1"
 
-#: src/mainwindow.c:3268
+#: src/mainwindow.c:3277
 msgid "/Edit/Load Clipboard/2"
 msgstr "/Editar/Cargar Portapapeles/2"
 
-#: src/mainwindow.c:3269
+#: src/mainwindow.c:3278
 msgid "/Edit/Load Clipboard/3"
 msgstr "/Editar/Cargar Portapapeles/3"
 
-#: src/mainwindow.c:3270
+#: src/mainwindow.c:3279
 msgid "/Edit/Load Clipboard/4"
 msgstr "/Editar/Cargar Portapapeles/4"
 
-#: src/mainwindow.c:3271
+#: src/mainwindow.c:3280
 msgid "/Edit/Load Clipboard/5"
 msgstr "/Editar/Cargar Portapapeles/5"
 
-#: src/mainwindow.c:3272
+#: src/mainwindow.c:3281
 msgid "/Edit/Load Clipboard/6"
 msgstr "/Editar/Cargar Portapapeles/6"
 
-#: src/mainwindow.c:3273
+#: src/mainwindow.c:3282
 msgid "/Edit/Load Clipboard/7"
 msgstr "/Editar/Cargar Portapapeles/7"
 
-#: src/mainwindow.c:3274
+#: src/mainwindow.c:3283
 msgid "/Edit/Load Clipboard/8"
 msgstr "/Editar/Cargar Portapapeles/8"
 
-#: src/mainwindow.c:3275
+#: src/mainwindow.c:3284
 msgid "/Edit/Load Clipboard/9"
 msgstr "/Editar/Cargar Portapapeles/9"
 
-#: src/mainwindow.c:3276
+#: src/mainwindow.c:3285
 msgid "/Edit/Load Clipboard/10"
 msgstr "/Editar/Cargar Portapapeles/10"
 
-#: src/mainwindow.c:3277
+#: src/mainwindow.c:3286
 msgid "/Edit/Load Clipboard/11"
 msgstr "/Editar/Cargar Portapapeles/11"
 
-#: src/mainwindow.c:3278
+#: src/mainwindow.c:3287
 msgid "/Edit/Load Clipboard/12"
 msgstr "/Editar/Cargar Portapapeles/12"
 
-#: src/mainwindow.c:3279 src/mainwindow.c:3558
+#: src/mainwindow.c:3288 src/mainwindow.c:3565
 msgid "/Edit/Save Clipboard"
 msgstr "/Editar/Guardar Portapapeles"
 
-#: src/mainwindow.c:3280
+#: src/mainwindow.c:3289
 msgid "/Edit/Save Clipboard/tear"
 msgstr "/Editar/Guardar Portapapeles/rasgar"
 
-#: src/mainwindow.c:3281
+#: src/mainwindow.c:3290
 msgid "/Edit/Save Clipboard/1"
 msgstr "/Editar/Guardar Portapapeles/1"
 
-#: src/mainwindow.c:3282
+#: src/mainwindow.c:3291
 msgid "/Edit/Save Clipboard/2"
 msgstr "/Editar/Guardar Portapapeles/2"
 
-#: src/mainwindow.c:3283
+#: src/mainwindow.c:3292
 msgid "/Edit/Save Clipboard/3"
 msgstr "/Editar/Guardar Portapapeles/3"
 
-#: src/mainwindow.c:3284
+#: src/mainwindow.c:3293
 msgid "/Edit/Save Clipboard/4"
 msgstr "/Editar/Guardar Portapapeles/4"
 
-#: src/mainwindow.c:3285
+#: src/mainwindow.c:3294
 msgid "/Edit/Save Clipboard/5"
 msgstr "/Editar/Guardar Portapapeles/5"
 
-#: src/mainwindow.c:3286
+#: src/mainwindow.c:3295
 msgid "/Edit/Save Clipboard/6"
 msgstr "/Editar/Guardar Portapapeles/6"
 
-#: src/mainwindow.c:3287
+#: src/mainwindow.c:3296
 msgid "/Edit/Save Clipboard/7"
 msgstr "/Editar/Guardar Portapapeles/7"
 
-#: src/mainwindow.c:3288
+#: src/mainwindow.c:3297
 msgid "/Edit/Save Clipboard/8"
 msgstr "/Editar/Guardar Portapapeles/8"
 
-#: src/mainwindow.c:3289
+#: src/mainwindow.c:3298
 msgid "/Edit/Save Clipboard/9"
 msgstr "/Editar/Guardar Portapapeles/9"
 
-#: src/mainwindow.c:3290
+#: src/mainwindow.c:3299
 msgid "/Edit/Save Clipboard/10"
 msgstr "/Editar/Guardar Portapapeles/10"
 
-#: src/mainwindow.c:3291
+#: src/mainwindow.c:3300
 msgid "/Edit/Save Clipboard/11"
 msgstr "/Editar/Guardar Portapapeles/11"
 
-#: src/mainwindow.c:3292
+#: src/mainwindow.c:3301
 msgid "/Edit/Save Clipboard/12"
 msgstr "/Editar/Guardar Portapapeles/12"
 
-#: src/mainwindow.c:3294
+#: src/mainwindow.c:3303
 msgid "/Edit/Choose Pattern ..."
 msgstr "/Editar/Escoger Patrón ..."
 
-#: src/mainwindow.c:3295
+#: src/mainwindow.c:3304
 msgid "/Edit/Choose Brush ..."
 msgstr "/Editar/Escoger Brocha ..."
 
-#: src/mainwindow.c:3296
+#: src/mainwindow.c:3305
 msgid "/Edit/Create Patterns"
 msgstr "/Editar/Crear Patrones"
 
-#: src/mainwindow.c:3298
+#: src/mainwindow.c:3307
 msgid "/_View"
 msgstr "/_Ver"
 
-#: src/mainwindow.c:3299
+#: src/mainwindow.c:3308
 msgid "/View/tear"
 msgstr "/Ver/rasgar"
 
-#: src/mainwindow.c:3300 src/mainwindow.c:3576
+#: src/mainwindow.c:3309 src/mainwindow.c:3583
 msgid "/View/Show Main Toolbar"
 msgstr "/Ver/Mostrar Barra de Herramientas Principal"
 
-#: src/mainwindow.c:3301 src/mainwindow.c:3578
+#: src/mainwindow.c:3310 src/mainwindow.c:3585
 msgid "/View/Show Tools Toolbar"
 msgstr "/Ver/Mostrar Barra de Herramientas"
 
-#: src/mainwindow.c:3302 src/mainwindow.c:3580
+#: src/mainwindow.c:3311 src/mainwindow.c:3587
 msgid "/View/Show Settings Toolbar"
 msgstr "/Ver/Mostrar Barra de Preferencias"
 
-#: src/mainwindow.c:3303 src/mainwindow.c:3582
+#: src/mainwindow.c:3312 src/mainwindow.c:3589
 msgid "/View/Show Palette"
 msgstr "/Ver/Mostrar Paleta"
 
-#: src/mainwindow.c:3304 src/mainwindow.c:3584
+#: src/mainwindow.c:3313 src/mainwindow.c:3591
 msgid "/View/Show Status Bar"
 msgstr "/Ver/Mostrar Barra de Estado"
 
-#: src/mainwindow.c:3305 src/mainwindow.c:3309 src/mainwindow.c:3313
+#: src/mainwindow.c:3314 src/mainwindow.c:3318 src/mainwindow.c:3322
 msgid "/View/sep1"
 msgstr "/Ver/sep1"
 
-#: src/mainwindow.c:3306
+#: src/mainwindow.c:3315
 msgid "/View/Toggle Image View (Home)"
 msgstr "/Ver/Cambiar a Vista Completa (Inicio)"
 
-#: src/mainwindow.c:3307 src/mainwindow.c:3572
+#: src/mainwindow.c:3316 src/mainwindow.c:3579
 msgid "/View/Centralize Image"
 msgstr "/Ver/Centrar Imagen"
 
-#: src/mainwindow.c:3308 src/mainwindow.c:3592
+#: src/mainwindow.c:3317 src/mainwindow.c:3599
 msgid "/View/Show zoom grid"
 msgstr "/Ver/Mostrar rejilla de ampliación"
 
-#: src/mainwindow.c:3310 src/mainwindow.c:3484
+#: src/mainwindow.c:3319 src/mainwindow.c:3493
 msgid "/View/View Window"
 msgstr "/Ver/Ver Ventana"
 
-#: src/mainwindow.c:3311
+#: src/mainwindow.c:3320
 msgid "/View/Horizontal Split"
 msgstr "/Ver/Horizontal Split"
 
-#: src/mainwindow.c:3312 src/mainwindow.c:3567
+#: src/mainwindow.c:3321 src/mainwindow.c:3574
 msgid "/View/Focus View Window"
 msgstr "/Ver/Ventana de Vista"
 
-#: src/mainwindow.c:3314
+#: src/mainwindow.c:3323
 msgid "/View/Pan Window (End)"
 msgstr "/Ver/Vista reducida (Fin)"
 
-#: src/mainwindow.c:3315 src/mainwindow.c:3482
+#: src/mainwindow.c:3324 src/mainwindow.c:3491
 msgid "/View/Command Line Window"
 msgstr "/Ver/Línea de comandos"
 
-#: src/mainwindow.c:3316 src/mainwindow.c:3486
+#: src/mainwindow.c:3325 src/mainwindow.c:3495
 msgid "/View/Layers Window"
 msgstr "/Ver/Ventana de Capas"
 
-#: src/mainwindow.c:3318
+#: src/mainwindow.c:3327
 msgid "/_Image"
 msgstr "/_Imagen"
 
-#: src/mainwindow.c:3319
+#: src/mainwindow.c:3328
 msgid "/Image/tear"
 msgstr "/Imagen/rasgar"
 
-#: src/mainwindow.c:3320 src/mainwindow.c:3478
+#: src/mainwindow.c:3329 src/mainwindow.c:3487
 msgid "/Image/Convert To RGB"
 msgstr "/Imagen/Convertir a RGB"
 
-#: src/mainwindow.c:3321 src/mainwindow.c:3471
+#: src/mainwindow.c:3330 src/mainwindow.c:3480
 msgid "/Image/Convert To Indexed"
 msgstr "/Imagen/Convertir a Indexado"
 
-#: src/mainwindow.c:3322 src/mainwindow.c:3326 src/mainwindow.c:3332
+#: src/mainwindow.c:3331 src/mainwindow.c:3335 src/mainwindow.c:3341
 msgid "/Image/sep1"
 msgstr "/Imagen/sep1"
 
-#: src/mainwindow.c:3323
+#: src/mainwindow.c:3332
 msgid "/Image/Scale Canvas ..."
 msgstr "/Imagen/Escalar Lienzo ..."
 
-#: src/mainwindow.c:3324
+#: src/mainwindow.c:3333
 msgid "/Image/Resize Canvas ..."
 msgstr "/Imagen/Redimensionar Lienzo ..."
 
-#: src/mainwindow.c:3325 src/mainwindow.c:3459
+#: src/mainwindow.c:3334 src/mainwindow.c:3468
 msgid "/Image/Crop"
 msgstr "/Imagen/Recortar"
 
-#: src/mainwindow.c:3327
+#: src/mainwindow.c:3336
 msgid "/Image/Flip Vertically"
 msgstr "/Imagen/Reflejo Vertical"
 
-#: src/mainwindow.c:3328
+#: src/mainwindow.c:3337
 msgid "/Image/Flip Horizontally"
 msgstr "/Imagen/Reflejo Horizontal"
 
-#: src/mainwindow.c:3329
+#: src/mainwindow.c:3338
 msgid "/Image/Rotate Clockwise"
 msgstr "/Imagen/Rotar a la derecha"
 
-#: src/mainwindow.c:3330
+#: src/mainwindow.c:3339
 msgid "/Image/Rotate Anti-Clockwise"
 msgstr "/Imagen/Rotar a la izquierda"
 
-#: src/mainwindow.c:3331
+#: src/mainwindow.c:3340
 msgid "/Image/Free Rotate ..."
 msgstr "/Imagen/Rotar libremente..."
 
-#: src/mainwindow.c:3333
+#: src/mainwindow.c:3342
 msgid "/Image/Information ..."
 msgstr "/Imagen/Información ..."
 
-#: src/mainwindow.c:3334 src/mainwindow.c:3470
+#: src/mainwindow.c:3343 src/mainwindow.c:3479
 msgid "/Image/Preferences ..."
 msgstr "/Imagen/Preferencias ..."
 
-#: src/mainwindow.c:3336
+#: src/mainwindow.c:3345
 msgid "/_Selection"
 msgstr "/_Selección"
 
-#: src/mainwindow.c:3337
+#: src/mainwindow.c:3346
 msgid "/Selection/tear"
 msgstr "/Selección/rasgar"
 
-#: src/mainwindow.c:3338
+#: src/mainwindow.c:3347
 msgid "/Selection/Select All"
 msgstr "/Selección/Seleccionar Todo"
 
-#: src/mainwindow.c:3339 src/mainwindow.c:3453
+#: src/mainwindow.c:3348 src/mainwindow.c:3462
 msgid "/Selection/Select None (Esc)"
 msgstr "/Selección/Quitar Selección (Esc)"
 
-#: src/mainwindow.c:3340 src/mainwindow.c:3488
+#: src/mainwindow.c:3349 src/mainwindow.c:3497
 msgid "/Selection/Lasso Selection"
 msgstr "/Selección/Selección de Lazo"
 
-#: src/mainwindow.c:3341 src/mainwindow.c:3488
+#: src/mainwindow.c:3350 src/mainwindow.c:3497
 msgid "/Selection/Lasso Selection Cut"
 msgstr "/Selección/Cortar selección de Lazo"
 
-#: src/mainwindow.c:3342 src/mainwindow.c:3347 src/mainwindow.c:3352
+#: src/mainwindow.c:3351 src/mainwindow.c:3356 src/mainwindow.c:3361
 msgid "/Selection/sep1"
 msgstr "/Selección/sep1"
 
-#: src/mainwindow.c:3343 src/mainwindow.c:3456 src/mainwindow.c:3490
+#: src/mainwindow.c:3352 src/mainwindow.c:3465 src/mainwindow.c:3499
 msgid "/Selection/Outline Selection"
 msgstr "/Selección/Contorno de Selección"
 
-#: src/mainwindow.c:3344 src/mainwindow.c:3455 src/mainwindow.c:3490
+#: src/mainwindow.c:3353 src/mainwindow.c:3464 src/mainwindow.c:3499
 msgid "/Selection/Fill Selection"
 msgstr "/Selección/Llenar Selección"
 
-#: src/mainwindow.c:3345 src/mainwindow.c:3457
+#: src/mainwindow.c:3354 src/mainwindow.c:3466
 msgid "/Selection/Outline Ellipse"
 msgstr "/Selección/Contorno de Elipse"
 
-#: src/mainwindow.c:3346 src/mainwindow.c:3456
+#: src/mainwindow.c:3355 src/mainwindow.c:3465
 msgid "/Selection/Fill Ellipse"
 msgstr "/Selección/Rellenar Elipse"
 
-#: src/mainwindow.c:3348 src/mainwindow.c:3463
+#: src/mainwindow.c:3357 src/mainwindow.c:3472
 msgid "/Selection/Flip Vertically"
 msgstr "/Selección/Girar Verticalmente"
 
-#: src/mainwindow.c:3349 src/mainwindow.c:3463
+#: src/mainwindow.c:3358 src/mainwindow.c:3472
 msgid "/Selection/Flip Horizontally"
 msgstr "/Selección/Girar Horizontalmente"
 
-#: src/mainwindow.c:3350 src/mainwindow.c:3464
+#: src/mainwindow.c:3359 src/mainwindow.c:3473
 msgid "/Selection/Rotate Clockwise"
 msgstr "/Selección/Rotar en Sentido Horario"
 
-#: src/mainwindow.c:3351 src/mainwindow.c:3464
+#: src/mainwindow.c:3360 src/mainwindow.c:3473
 msgid "/Selection/Rotate Anti-Clockwise"
 msgstr "/Selección/Rotar en Sentido Anti-Horario"
 
-#: src/mainwindow.c:3353 src/mainwindow.c:3493
+#: src/mainwindow.c:3362 src/mainwindow.c:3501
 msgid "/Selection/Alpha Blend A,B"
 msgstr "/Selección/Mezclar Alpha A,B"
 
-#: src/mainwindow.c:3354 src/mainwindow.c:3465
+#: src/mainwindow.c:3363 src/mainwindow.c:3474
 msgid "/Selection/Move Alpha to Mask"
 msgstr "/Selección/Mover Alpha a Máscara"
 
-#: src/mainwindow.c:3355 src/mainwindow.c:3466
+#: src/mainwindow.c:3364 src/mainwindow.c:3475
 msgid "/Selection/Mask Colour A,B"
 msgstr "/Selección/Enmascarar colores A,B"
 
-#: src/mainwindow.c:3356 src/mainwindow.c:3467
+#: src/mainwindow.c:3365 src/mainwindow.c:3476
 msgid "/Selection/Unmask Colour A,B"
 msgstr "/Selección/Desenmascarar Colores A,B"
 
-#: src/mainwindow.c:3357 src/mainwindow.c:3467
+#: src/mainwindow.c:3366 src/mainwindow.c:3476
 msgid "/Selection/Mask All Colours"
 msgstr "/Selección/Enmascarar Todos los Colores"
 
-#: src/mainwindow.c:3358 src/mainwindow.c:3466
+#: src/mainwindow.c:3367 src/mainwindow.c:3475
 msgid "/Selection/Clear Mask"
 msgstr "/Selección/Limpiar Máscara"
 
-#: src/mainwindow.c:3360
+#: src/mainwindow.c:3369
 msgid "/_Palette"
 msgstr "/_Paleta"
 
-#: src/mainwindow.c:3361
+#: src/mainwindow.c:3370
 msgid "/Palette/tear"
 msgstr "/Paleta/rasgar"
 
-#: src/mainwindow.c:3362
+#: src/mainwindow.c:3371
 msgid "/Palette/Open ..."
 msgstr "/Paleta/Cargar ..."
 
-#: src/mainwindow.c:3363
+#: src/mainwindow.c:3372
 msgid "/Palette/Save As ..."
 msgstr "/Paleta/Guardar como ..."
 
-#: src/mainwindow.c:3364
+#: src/mainwindow.c:3373
 msgid "/Palette/Load Default"
 msgstr "/Paleta/Cargar valores por defecto"
 
-#: src/mainwindow.c:3365 src/mainwindow.c:3368 src/mainwindow.c:3375
-#: src/mainwindow.c:3379
+#: src/mainwindow.c:3374 src/mainwindow.c:3377 src/mainwindow.c:3384
+#: src/mainwindow.c:3388
 msgid "/Palette/sep1"
 msgstr "/Paleta/sep1"
 
-#: src/mainwindow.c:3366
+#: src/mainwindow.c:3375
 msgid "/Palette/Mask All"
 msgstr "/Paleta/Enmascarar todo"
 
-#: src/mainwindow.c:3367
+#: src/mainwindow.c:3376
 msgid "/Palette/Mask None"
 msgstr "/Paleta/No enmascarar nada"
 
-#: src/mainwindow.c:3369
+#: src/mainwindow.c:3378
 msgid "/Palette/Swap A & B"
 msgstr "/Paleta/Intercambiar A y B"
 
-#: src/mainwindow.c:3370
+#: src/mainwindow.c:3379
 msgid "/Palette/Edit Colour A & B ..."
 msgstr "/Paleta/Editar Colores A y B ..."
 
-#: src/mainwindow.c:3371
+#: src/mainwindow.c:3380
 msgid "/Palette/Palette Editor ..."
 msgstr "/Paleta/Editar Paleta ..."
 
-#: src/mainwindow.c:3372
+#: src/mainwindow.c:3381
 msgid "/Palette/Set Palette Size ..."
 msgstr "/Paleta/Establecer el tamaño de la Paleta ..."
 
-#: src/mainwindow.c:3373 src/mainwindow.c:3479
+#: src/mainwindow.c:3382 src/mainwindow.c:3488
 msgid "/Palette/Merge Duplicate Colours"
 msgstr "/Paleta/Fusionar Duplicar Colores"
 
-#: src/mainwindow.c:3374 src/mainwindow.c:3479
+#: src/mainwindow.c:3383 src/mainwindow.c:3488
 msgid "/Palette/Remove Unused Colours"
 msgstr "/Paleta/Eliminar Colores no Usados"
 
-#: src/mainwindow.c:3376 src/mainwindow.c:3471
+#: src/mainwindow.c:3385 src/mainwindow.c:3480
 msgid "/Palette/Create Quantized (DL1)"
 msgstr "/Paleta/Crear Cantidades (DL1)"
 
-#: src/mainwindow.c:3377 src/mainwindow.c:3472
+#: src/mainwindow.c:3386 src/mainwindow.c:3481
 msgid "/Palette/Create Quantized (DL3)"
 msgstr "/Paleta/Crear Cantidades (DL3)"
 
-#: src/mainwindow.c:3378 src/mainwindow.c:3472
+#: src/mainwindow.c:3387 src/mainwindow.c:3481
 msgid "/Palette/Create Quantized (Wu)"
 msgstr "/Paleta/Crear Cuantificado (Wu)"
 
-#: src/mainwindow.c:3380
+#: src/mainwindow.c:3389
 msgid "/Palette/Sort Colours ..."
 msgstr "/Paleta/Listar Colores ..."
 
-#: src/mainwindow.c:3381
+#: src/mainwindow.c:3390
 msgid "/Palette/Palette Shifter ..."
 msgstr "/Paleta/Palette Shifter ..."
 
-#: src/mainwindow.c:3383
+#: src/mainwindow.c:3392
 msgid "/Effe_cts"
 msgstr "/Efe_ctos"
 
-#: src/mainwindow.c:3384
+#: src/mainwindow.c:3393
 msgid "/Effects/tear"
 msgstr "/Efectos/Rasgar"
 
-#: src/mainwindow.c:3385
+#: src/mainwindow.c:3394
 msgid "/Effects/Transform Colour ..."
 msgstr "/Efectos/Transformar Color ..."
 
-#: src/mainwindow.c:3386
+#: src/mainwindow.c:3395
 msgid "/Effects/Invert"
 msgstr "/Efectos/Invertir"
 
-#: src/mainwindow.c:3387
+#: src/mainwindow.c:3396
 msgid "/Effects/Greyscale"
 msgstr "/Efectos/Escala de grises"
 
-#: src/mainwindow.c:3388
+#: src/mainwindow.c:3397
 msgid "/Effects/Greyscale (Gamma corrected)"
 msgstr "/Efectos/Greyscale (Gamma corrected)"
 
-#: src/mainwindow.c:3389
+#: src/mainwindow.c:3398
 msgid "/Effects/Isometric Transformation"
 msgstr "/Efectos/Transformación Isométrica"
 
-#: src/mainwindow.c:3390
+#: src/mainwindow.c:3399
 msgid "/Effects/Isometric Transformation/tear"
 msgstr "/Efectos/Transformación Isométrica/Rasgar"
 
-#: src/mainwindow.c:3391
+#: src/mainwindow.c:3400
 msgid "/Effects/Isometric Transformation/Left Side Down"
 msgstr "/Efectos/Transformación Isométrica/Hacia Abajo Lado Izquierdo"
 
-#: src/mainwindow.c:3392
+#: src/mainwindow.c:3401
 msgid "/Effects/Isometric Transformation/Right Side Down"
 msgstr "/Efectos/Transformación Isométrica/Hacia Abajo Lado Derecho"
 
-#: src/mainwindow.c:3393
+#: src/mainwindow.c:3402
 msgid "/Effects/Isometric Transformation/Top Side Right"
 msgstr "/Efectos/Transformación Isométrica/Hacia la Derecha Parte Superior"
 
-#: src/mainwindow.c:3394
+#: src/mainwindow.c:3403
 msgid "/Effects/Isometric Transformation/Bottom Side Right"
 msgstr "/Efectos/Transformación Isométrica/Hacia la Derecha Parte Inferior"
 
-#: src/mainwindow.c:3395 src/mainwindow.c:3402
+#: src/mainwindow.c:3404 src/mainwindow.c:3411
 msgid "/Effects/sep1"
 msgstr "/Efectos/sep1"
 
-#: src/mainwindow.c:3396 src/mainwindow.c:3474
+#: src/mainwindow.c:3405 src/mainwindow.c:3483
 msgid "/Effects/Edge Detect"
 msgstr "/Efectos/Detección de Bordes"
 
-#: src/mainwindow.c:3397 src/mainwindow.c:3475
+#: src/mainwindow.c:3406 src/mainwindow.c:3484
 msgid "/Effects/Sharpen ..."
 msgstr "/Efectos/Remarcado ..."
 
-#: src/mainwindow.c:3398 src/mainwindow.c:3475
+#: src/mainwindow.c:3407 src/mainwindow.c:3484
 msgid "/Effects/Unsharp Mask ..."
 msgstr "/Efectos/Máscara de emborronado ..."
 
-#: src/mainwindow.c:3399 src/mainwindow.c:3476
+#: src/mainwindow.c:3408 src/mainwindow.c:3485
 msgid "/Effects/Soften ..."
 msgstr "/Efectos/Suavizado ..."
 
-#: src/mainwindow.c:3400 src/mainwindow.c:3476
+#: src/mainwindow.c:3409 src/mainwindow.c:3485
 msgid "/Effects/Gaussian Blur ..."
 msgstr "/Efectos/Suavizado Gausiano ..."
 
-#: src/mainwindow.c:3401 src/mainwindow.c:3474
+#: src/mainwindow.c:3410 src/mainwindow.c:3483
 msgid "/Effects/Emboss"
 msgstr "/Efectos/Realce"
 
-#: src/mainwindow.c:3403 src/mainwindow.c:3478
+#: src/mainwindow.c:3412 src/mainwindow.c:3487
 msgid "/Effects/Bacteria ..."
 msgstr "/Efectos/Bacteria ..."
 
-#: src/mainwindow.c:3405
+#: src/mainwindow.c:3414
 msgid "/Cha_nnels"
 msgstr "/Canales"
 
-#: src/mainwindow.c:3406
+#: src/mainwindow.c:3415
 msgid "/Channels/tear"
 msgstr "/Canales/rasgar"
 
-#: src/mainwindow.c:3407
+#: src/mainwindow.c:3416
 msgid "/Channels/New ..."
 msgstr "/Canales/Nuevo ..."
 
-#: src/mainwindow.c:3408
+#: src/mainwindow.c:3417
 msgid "/Channels/Load ..."
 msgstr "/Canales/Cargar ..."
 
-#: src/mainwindow.c:3409
+#: src/mainwindow.c:3418
 msgid "/Channels/Save As ..."
 msgstr "/Canales/Guardar como ..."
 
-#: src/mainwindow.c:3410 src/mainwindow.c:3497
+#: src/mainwindow.c:3419 src/mainwindow.c:3505
 msgid "/Channels/Delete ..."
 msgstr "/Canales/Delete ..."
 
-#: src/mainwindow.c:3411 src/mainwindow.c:3416 src/mainwindow.c:3421
-#: src/mainwindow.c:3424
+#: src/mainwindow.c:3420 src/mainwindow.c:3425 src/mainwindow.c:3430
+#: src/mainwindow.c:3433
 msgid "/Channels/sep1"
 msgstr "/Canales/sep1"
 
-#: src/mainwindow.c:3412 src/mainwindow.c:3413 src/mainwindow.c:3414
-#: src/mainwindow.c:3415 src/mainwindow.c:3494
+#: src/mainwindow.c:3421 src/mainwindow.c:3422 src/mainwindow.c:3423
+#: src/mainwindow.c:3424 src/mainwindow.c:3502
 msgid "/Channels/Edit Image"
 msgstr "/Canales/Editar Imagen"
 
-#: src/mainwindow.c:3413 src/mainwindow.c:3494
+#: src/mainwindow.c:3422 src/mainwindow.c:3502
 msgid "/Channels/Edit Alpha"
 msgstr "/Canales/Editar Alpha"
 
-#: src/mainwindow.c:3414 src/mainwindow.c:3495
+#: src/mainwindow.c:3423 src/mainwindow.c:3503
 msgid "/Channels/Edit Selection"
 msgstr "/Canales/Editar Selección"
 
-#: src/mainwindow.c:3415 src/mainwindow.c:3495
+#: src/mainwindow.c:3424 src/mainwindow.c:3503
 msgid "/Channels/Edit Mask"
 msgstr "/Canales/Editar Máscara"
 
-#: src/mainwindow.c:3417 src/mainwindow.c:3498
+#: src/mainwindow.c:3426 src/mainwindow.c:3506
 msgid "/Channels/Hide Image"
 msgstr "/Canales/Esconder Imagen"
 
-#: src/mainwindow.c:3418 src/mainwindow.c:3498
+#: src/mainwindow.c:3427 src/mainwindow.c:3506
 msgid "/Channels/Disable Alpha"
 msgstr "/Canales/Deshabilitar Alpha"
 
-#: src/mainwindow.c:3419 src/mainwindow.c:3499
+#: src/mainwindow.c:3428 src/mainwindow.c:3507
 msgid "/Channels/Disable Selection"
 msgstr "/Canales/Deshabilitar Selección"
 
-#: src/mainwindow.c:3420 src/mainwindow.c:3499
+#: src/mainwindow.c:3429 src/mainwindow.c:3507
 msgid "/Channels/Disable Mask"
 msgstr "/Canales/Deshabilitar Máscara"
 
-#: src/mainwindow.c:3422 src/mainwindow.c:3563
+#: src/mainwindow.c:3431 src/mainwindow.c:3570
 msgid "/Channels/Couple RGBA Operations"
 msgstr "/Canales/Unir Operaciones RGBA"
 
-#: src/mainwindow.c:3423
+#: src/mainwindow.c:3432
 msgid "/Channels/Threshold ..."
 msgstr "/Canales/Umbral ..."
 
-#: src/mainwindow.c:3425
+#: src/mainwindow.c:3434
 msgid "/Channels/View Alpha as an Overlay"
 msgstr "/Canales/Ver Alpha como un Overlay"
 
-#: src/mainwindow.c:3426
+#: src/mainwindow.c:3435
 msgid "/Channels/Configure Overlays ..."
 msgstr "/Canales/Configurar Overlays ..."
 
-#: src/mainwindow.c:3428
+#: src/mainwindow.c:3437
 msgid "/_Layers"
 msgstr "/Capas"
 
-#: src/mainwindow.c:3429
+#: src/mainwindow.c:3438
 msgid "/Layers/tear"
 msgstr "/Capas/rasgar"
 
-#: src/mainwindow.c:3430
+#: src/mainwindow.c:3439
 msgid "/Layers/Save"
 msgstr "/Capas/Guardar"
 
-#: src/mainwindow.c:3431
+#: src/mainwindow.c:3440
 msgid "/Layers/Save As ..."
 msgstr "/Capas/Guardar como ..."
 
-#: src/mainwindow.c:3432
+#: src/mainwindow.c:3441
 msgid "/Layers/Save Composite Image ..."
 msgstr "/Capas/Guardar Imagen Compuesta ..."
 
-#: src/mainwindow.c:3433
+#: src/mainwindow.c:3442
 msgid "/Layers/Remove All Layers ..."
 msgstr "/Capas/Borrar Todas las Capas ..."
 
-#: src/mainwindow.c:3434
+#: src/mainwindow.c:3443
 msgid "/Layers/sep1"
 msgstr "/Capas/sep1"
 
-#: src/mainwindow.c:3435
+#: src/mainwindow.c:3444
 msgid "/Layers/Configure Animation ..."
 msgstr "/Capas/Configurar Animación ..."
 
-#: src/mainwindow.c:3436
+#: src/mainwindow.c:3445
 msgid "/Layers/Preview Animation ..."
 msgstr "/Capas/Animación Vista Previa ..."
 
-#: src/mainwindow.c:3437
+#: src/mainwindow.c:3446
 msgid "/Layers/Set key frame ..."
 msgstr "/Capas/Establecer número de fotogramas ..."
 
-#: src/mainwindow.c:3438
+#: src/mainwindow.c:3447
 msgid "/Layers/Remove all key frames ..."
 msgstr "/Capas/Borrar todos los fotogramas ..."
 
-#: src/mainwindow.c:3440
+#: src/mainwindow.c:3449
 msgid "/_Help"
 msgstr "/_Ayuda"
 
-#: src/mainwindow.c:3441
+#: src/mainwindow.c:3450
 msgid "/Help/Documentation"
 msgstr "/Ayuda/Documentación"
 
-#: src/mainwindow.c:3442 src/mainwindow.c:3469
+#: src/mainwindow.c:3451 src/mainwindow.c:3478
 msgid "/Help/About"
 msgstr "/Ayuda/Acerca de"
 
-#: src/mainwindow.c:3443
+#: src/mainwindow.c:3452
 msgid "/Help/sep1"
 msgstr "/Ayuda/sep1"
 
-#: src/mainwindow.c:3444
+#: src/mainwindow.c:3453
 msgid "/Help/Rebind Shortcut Keycodes"
 msgstr "/Ayuda/Rebind Shortcut Keycodes"
 
-#: src/mainwindow.c:3492
-msgid "/Frames"
-msgstr "/Fotogramas"
-
-#: src/mainwindow.c:3530
+#: src/mainwindow.c:3538
 #, c-format
 msgid "/File/%i"
 msgstr "/Archivo/%i"
@@ -2017,11 +2008,11 @@ msgstr "Rotación Libre"
 msgid "Scaling Image"
 msgstr "Escalando la Imagen"
 
-#: src/memory.c:4415
+#: src/memory.c:4490
 msgid "Counting Unique RGB Pixels"
 msgstr "Contando Pixeles RGB únicos"
 
-#: src/memory.c:4461
+#: src/memory.c:4536
 msgid "Applying Effect"
 msgstr "Aplicando Efecto"
 
@@ -2053,7 +2044,7 @@ msgstr "Capturar Pantalla"
 msgid "New Image"
 msgstr "Nueva Imagen"
 
-#: src/otherwindow.c:197 src/toolbar.c:162
+#: src/otherwindow.c:197 src/toolbar.c:163
 msgid "New Layer"
 msgstr "Nueva Capa"
 
@@ -2069,7 +2060,7 @@ msgstr "Altura"
 msgid "Colours"
 msgstr "Colores"
 
-#: src/otherwindow.c:238 src/otherwindow.c:1951
+#: src/otherwindow.c:238 src/otherwindow.c:1875
 msgid "Create"
 msgstr "Crear"
 
@@ -2082,7 +2073,7 @@ msgid "Set Palette Size"
 msgstr "Establecer el Tamaño de la Paleta"
 
 #: src/otherwindow.c:508 src/otherwindow.c:612 src/otherwindow.c:996
-#: src/otherwindow.c:3004 src/prefs.c:735
+#: src/otherwindow.c:2976 src/prefs.c:735
 msgid "Apply"
 msgstr "Aplicar"
 
@@ -2146,7 +2137,7 @@ msgstr "Invertir el Orden"
 msgid "Auto-Preview"
 msgstr "Auto-Previsualización"
 
-#: src/otherwindow.c:841 src/otherwindow.c:917 src/otherwindow.c:2331
+#: src/otherwindow.c:841 src/otherwindow.c:917 src/otherwindow.c:2264
 msgid "Palette"
 msgstr "Paleta"
 
@@ -2158,7 +2149,7 @@ msgstr "Brillo"
 msgid "Contrast"
 msgstr "Contraste"
 
-#: src/otherwindow.c:843 src/otherwindow.c:2009
+#: src/otherwindow.c:843 src/otherwindow.c:1942
 msgid "Posterize"
 msgstr "Posterizar"
 
@@ -2178,15 +2169,15 @@ msgstr "Mostrar Detalle"
 msgid "Reset"
 msgstr "Reinicializar"
 
-#: src/otherwindow.c:1157
+#: src/otherwindow.c:1071
 msgid "New geometry is the same as now - nothing to do."
 msgstr "La nueva geometría es la misma que la actual - No hay nada que hacer"
 
-#: src/otherwindow.c:1164
+#: src/otherwindow.c:1096
 msgid "The operating system cannot allocate the memory for this operation."
 msgstr "El sistema operativo no puede asignar memoria para esta operación."
 
-#: src/otherwindow.c:1166
+#: src/otherwindow.c:1098
 msgid ""
 "You have not allocated enough memory in the Preferences window for this "
 "operation."
@@ -2194,419 +2185,419 @@ msgstr ""
 "No ha asignado la suficiente memoria en la ventana de Preferencias para esta "
 "operación."
 
-#: src/otherwindow.c:1186
+#: src/otherwindow.c:1118
 msgid "Nearest Neighbour"
 msgstr "El vecino más cercano"
 
-#: src/otherwindow.c:1187
+#: src/otherwindow.c:1119
 msgid "Bilinear / Area Mapping"
 msgstr "Bilinear / Area Mapping"
 
-#: src/otherwindow.c:1188
+#: src/otherwindow.c:1120
 msgid "Bicubic"
 msgstr "Bicubic"
 
-#: src/otherwindow.c:1189
+#: src/otherwindow.c:1121
 msgid "Bicubic edged"
 msgstr "Bicubic edged"
 
-#: src/otherwindow.c:1190
+#: src/otherwindow.c:1122
 msgid "Bicubic better"
 msgstr "Bicubic mejorado"
 
-#: src/otherwindow.c:1191
+#: src/otherwindow.c:1123
 msgid "Bicubic sharper"
 msgstr "Bicubic realzado"
 
-#: src/otherwindow.c:1192
+#: src/otherwindow.c:1124
 msgid "Lanczos3"
 msgstr "Lanczos3"
 
-#: src/otherwindow.c:1193
+#: src/otherwindow.c:1125
 msgid "Blackman-Harris"
 msgstr "Blackman-Harris"
 
-#: src/otherwindow.c:1197 src/shifter.c:348
+#: src/otherwindow.c:1129 src/shifter.c:348
 msgid "Clear"
 msgstr "Limpiar"
 
-#: src/otherwindow.c:1198
+#: src/otherwindow.c:1130
 msgid "Tile"
 msgstr "Teja"
 
-#: src/otherwindow.c:1199
+#: src/otherwindow.c:1131
 msgid "Mirror tile"
 msgstr "Teja Espejo"
 
-#: src/otherwindow.c:1213
+#: src/otherwindow.c:1145
 msgid "Width     "
 msgstr "Ancho     "
 
-#: src/otherwindow.c:1214
+#: src/otherwindow.c:1146
 msgid "Height    "
 msgstr "Alto    "
 
-#: src/otherwindow.c:1216
+#: src/otherwindow.c:1148
 msgid "Original      "
 msgstr "Original      "
 
-#: src/otherwindow.c:1222
+#: src/otherwindow.c:1154
 msgid "New"
 msgstr "Nuevo"
 
-#: src/otherwindow.c:1245 src/otherwindow.c:2982
+#: src/otherwindow.c:1167 src/otherwindow.c:2931
 msgid "Offset"
 msgstr "Desplazamiento"
 
-#: src/otherwindow.c:1249 src/otherwindow.c:2042
+#: src/otherwindow.c:1173 src/otherwindow.c:1975
 msgid "Centre"
 msgstr "Centrado"
 
-#: src/otherwindow.c:1260
+#: src/otherwindow.c:1184
 msgid "Fix Aspect Ratio"
 msgstr "Fijar Relación Alto/Ancho"
 
-#: src/otherwindow.c:1299
+#: src/otherwindow.c:1220
 msgid "Scale Canvas"
 msgstr "Escalar el Lienzo"
 
-#: src/otherwindow.c:1305
+#: src/otherwindow.c:1226
 msgid "Resize Canvas"
 msgstr "Redimensionar el Lienzo"
 
-#: src/otherwindow.c:1922
+#: src/otherwindow.c:1846
 msgid "From"
 msgstr "Desde"
 
-#: src/otherwindow.c:1922
+#: src/otherwindow.c:1846
 msgid "To"
 msgstr "Hacia"
 
-#: src/otherwindow.c:1923 src/otherwindow.c:2917
+#: src/otherwindow.c:1847 src/otherwindow.c:2872
 msgid "Gradient"
 msgstr "Gradiente"
 
-#: src/otherwindow.c:1938
+#: src/otherwindow.c:1862
 msgid "Scale"
 msgstr "Escala"
 
-#: src/otherwindow.c:1956
+#: src/otherwindow.c:1884
 msgid "Palette Editor"
 msgstr "Editor de Paleta"
 
-#: src/otherwindow.c:1976
+#: src/otherwindow.c:1909
 msgid "Configure Overlays"
 msgstr "Configurar Overlays"
 
-#: src/otherwindow.c:2036
+#: src/otherwindow.c:1969
 msgid "Colour Editor"
 msgstr "Editor de Colores"
 
-#: src/otherwindow.c:2042
+#: src/otherwindow.c:1975
 msgid "Limit"
 msgstr "Límite"
 
-#: src/otherwindow.c:2043
+#: src/otherwindow.c:1976
 msgid "Sphere"
 msgstr "Esfera"
 
-#: src/otherwindow.c:2043
+#: src/otherwindow.c:1976
 msgid "Angle"
 msgstr "Ángulo"
 
-#: src/otherwindow.c:2043
+#: src/otherwindow.c:1976
 msgid "Cube"
 msgstr "Cubo"
 
-#: src/otherwindow.c:2072
+#: src/otherwindow.c:2005
 msgid "Range"
 msgstr "Rango"
 
-#: src/otherwindow.c:2078
+#: src/otherwindow.c:2011
 msgid "Inverse"
 msgstr "Inverso"
 
-#: src/otherwindow.c:2084 src/toolbar.c:577
+#: src/otherwindow.c:2017 src/toolbar.c:577
 msgid "Colour-Selective Mode"
 msgstr "Color-Modo de Selección"
 
-#: src/otherwindow.c:2271
+#: src/otherwindow.c:2204
 msgid "Exact Conversion"
 msgstr "Conversión Exacta"
 
-#: src/otherwindow.c:2271
+#: src/otherwindow.c:2204
 msgid "Use Current Palette"
 msgstr "Usar Paleta Actual"
 
-#: src/otherwindow.c:2272
+#: src/otherwindow.c:2205
 msgid "DL1 Quantize (fastest)"
 msgstr "Ponderado DL1 (el más rápido)"
 
-#: src/otherwindow.c:2272
+#: src/otherwindow.c:2205
 msgid "DL3 Quantize (very slow, better quality)"
 msgstr "Ponderado DL3 (muy lento, mejor calidad)"
 
-#: src/otherwindow.c:2273
+#: src/otherwindow.c:2206
 msgid "Wu Quantize (best method for small palettes)"
 msgstr "Cuantificación Wu (el mejor método para paletas pequeñas)"
 
-#: src/otherwindow.c:2276 src/otherwindow.c:2942
+#: src/otherwindow.c:2209 src/otherwindow.c:2897
 msgid "None"
 msgstr "Ninguno"
 
-#: src/otherwindow.c:2276
+#: src/otherwindow.c:2209
 msgid "Floyd-Steinberg"
 msgstr "Floyd-Steinberg"
 
-#: src/otherwindow.c:2276
+#: src/otherwindow.c:2209
 msgid "Stucki"
 msgstr ""
 
-#: src/otherwindow.c:2279
+#: src/otherwindow.c:2212
 msgid "Floyd-Steinberg (quick)"
 msgstr "Floyd-Steinberg (rápido)"
 
-#: src/otherwindow.c:2279
+#: src/otherwindow.c:2212
 msgid "Dithered (effect)"
 msgstr "Dithered (efecto)"
 
-#: src/otherwindow.c:2280
+#: src/otherwindow.c:2213
 msgid "Scattered (effect)"
 msgstr "Scattedred (efecto)"
 
-#: src/otherwindow.c:2283
+#: src/otherwindow.c:2216
 msgid "Largest (Linf)"
 msgstr "El más grande"
 
-#: src/otherwindow.c:2283
+#: src/otherwindow.c:2216
 msgid "Sum (L1)"
 msgstr "Suma (L1)"
 
-#: src/otherwindow.c:2283
+#: src/otherwindow.c:2216
 msgid "Euclidean (L2)"
 msgstr "Euclidean (L2)"
 
-#: src/otherwindow.c:2284
+#: src/otherwindow.c:2217
 msgid "Gamut"
 msgstr "Gamut"
 
-#: src/otherwindow.c:2284
+#: src/otherwindow.c:2217
 msgid "Weakly"
 msgstr "Débil"
 
-#: src/otherwindow.c:2284
+#: src/otherwindow.c:2217
 msgid "Strongly"
 msgstr "Fuerte"
 
-#: src/otherwindow.c:2285
+#: src/otherwindow.c:2218
 msgid "Off"
 msgstr "Apagado"
 
-#: src/otherwindow.c:2285
+#: src/otherwindow.c:2218
 msgid "Separate/Sum"
 msgstr "Separar/Sumar"
 
-#: src/otherwindow.c:2285
+#: src/otherwindow.c:2218
 msgid "Separate/Split"
 msgstr "Separar/Cortar"
 
-#: src/otherwindow.c:2286
+#: src/otherwindow.c:2219
 msgid "Length/Sum"
 msgstr "Longitud/Sumar"
 
-#: src/otherwindow.c:2286
+#: src/otherwindow.c:2219
 msgid "Length/Split"
 msgstr "Longitud/Cortar"
 
-#: src/otherwindow.c:2292
+#: src/otherwindow.c:2225
 msgid "Convert To Indexed"
 msgstr "Convertir a Indexado"
 
-#: src/otherwindow.c:2302
+#: src/otherwindow.c:2235
 msgid "Indexed Colours To Use"
 msgstr "Colores Indexados a Usar"
 
-#: src/otherwindow.c:2318
+#: src/otherwindow.c:2251
 msgid "Settings"
 msgstr "Preferencias"
 
-#: src/otherwindow.c:2337
+#: src/otherwindow.c:2270
 msgid "Dither"
 msgstr ""
 
-#: src/otherwindow.c:2344
+#: src/otherwindow.c:2277
 msgid "Colour space"
 msgstr "Espacio de color"
 
-#: src/otherwindow.c:2347
+#: src/otherwindow.c:2280
 msgid "Difference measure"
 msgstr "Diferencia de medida"
 
-#: src/otherwindow.c:2350
+#: src/otherwindow.c:2283
 msgid "Reduce colour bleed"
 msgstr "Reducir color sangrado"
 
-#: src/otherwindow.c:2352
+#: src/otherwindow.c:2285
 msgid "Serpentine scan"
 msgstr ""
 
-#: src/otherwindow.c:2358
+#: src/otherwindow.c:2291
 msgid "Error propagation, %"
 msgstr "Error de propagación, %"
 
-#: src/otherwindow.c:2367
+#: src/otherwindow.c:2300
 msgid "Selective error propagation"
 msgstr "Selectivo error de propagación"
 
-#: src/otherwindow.c:2703
+#: src/otherwindow.c:2649
 msgid "Edit Gradient"
 msgstr "Editar Gradiente"
 
-#: src/otherwindow.c:2726
+#: src/otherwindow.c:2672
 msgid "Backward HSV"
 msgstr "Atrás HSV"
 
-#: src/otherwindow.c:2726 src/otherwindow.c:2749
+#: src/otherwindow.c:2672 src/otherwindow.c:2699
 msgid "Constant"
 msgstr "Constante"
 
-#: src/otherwindow.c:2757
+#: src/otherwindow.c:2707
 msgid "Points:"
 msgstr "Puntos:"
 
-#: src/otherwindow.c:2923
+#: src/otherwindow.c:2878
 msgid "Reverse"
 msgstr "Inverso"
 
-#: src/otherwindow.c:2924
+#: src/otherwindow.c:2879
 msgid "Edit Custom"
 msgstr "Editar Personalizado"
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:2896
 msgid "Linear"
 msgstr "Linear"
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:2896
 msgid "Bilinear"
 msgstr ""
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:2896
 msgid "Radial"
 msgstr ""
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:2896
 msgid "Square"
 msgstr "Cuadrado"
 
-#: src/otherwindow.c:2942
+#: src/otherwindow.c:2897
 msgid "Level"
 msgstr "Nivel"
 
-#: src/otherwindow.c:2942
+#: src/otherwindow.c:2897
 msgid "Repeat"
 msgstr "Repetir"
 
-#: src/otherwindow.c:2942
+#: src/otherwindow.c:2897
 msgid "Mirror"
 msgstr "Espejo"
 
-#: src/otherwindow.c:2943
+#: src/otherwindow.c:2898
 msgid "A to B"
 msgstr "de A a B"
 
-#: src/otherwindow.c:2943
+#: src/otherwindow.c:2898
 msgid "A to B (RGB)"
 msgstr "de A a B (RGB)"
 
-#: src/otherwindow.c:2943
+#: src/otherwindow.c:2898
 msgid "A to B (HSV)"
 msgstr "de A a B (HSV)"
 
-#: src/otherwindow.c:2944
+#: src/otherwindow.c:2899
 msgid "A to B (backward HSV)"
 msgstr "de A a B (volver HSV)"
 
-#: src/otherwindow.c:2944
+#: src/otherwindow.c:2899
 msgid "A only"
 msgstr "Uno solo"
 
-#: src/otherwindow.c:2944 src/otherwindow.c:2945
+#: src/otherwindow.c:2899 src/otherwindow.c:2900
 msgid "Custom"
 msgstr "Personalizado"
 
-#: src/otherwindow.c:2945
+#: src/otherwindow.c:2900
 msgid "Current to 0"
 msgstr "Actual a 0"
 
-#: src/otherwindow.c:2945
+#: src/otherwindow.c:2900
 msgid "Current only"
 msgstr "Actual solo"
 
-#: src/otherwindow.c:2957
+#: src/otherwindow.c:2914
 msgid "Configure Gradient"
 msgstr "Configurar Gradiente"
 
-#: src/otherwindow.c:2965
+#: src/otherwindow.c:2922
 msgid "Channel"
 msgstr "Canal"
 
-#: src/otherwindow.c:2970
+#: src/otherwindow.c:2927
 msgid "Length"
 msgstr "Longitud"
 
-#: src/otherwindow.c:2972
-msgid "Gradient type"
-msgstr "Tipo de Gradiente"
-
-#: src/otherwindow.c:2976
+#: src/otherwindow.c:2929
 msgid "Repeat length"
 msgstr "Repetir longitud"
 
-#: src/otherwindow.c:2978
+#: src/otherwindow.c:2933
+msgid "Gradient type"
+msgstr "Tipo de Gradiente"
+
+#: src/otherwindow.c:2935
 msgid "Extension type"
 msgstr "Tipo de Extensión"
 
-#: src/otherwindow.c:2984
+#: src/otherwindow.c:2956
 msgid "Preview opacity"
 msgstr "Previsualizar opacidad"
 
-#: src/png.c:337
+#: src/png.c:338
 msgid "Loading PNG image"
 msgstr "Cargar imagen PNG"
 
-#: src/png.c:340
+#: src/png.c:341
 msgid "Loading clipboard image"
 msgstr "Cargar imagen del Portapapeles"
 
-#: src/png.c:513
+#: src/png.c:514
 msgid "Saving PNG image"
 msgstr "Guardar imagen PNG"
 
-#: src/png.c:516
+#: src/png.c:517
 msgid "Saving Clipboard image"
 msgstr "Guardar imagen del Portapapeles"
 
-#: src/png.c:519
+#: src/png.c:520
 msgid "Saving Layer image"
 msgstr "Guardar imagen de la capa"
 
-#: src/png.c:522
+#: src/png.c:523
 msgid "Saving Channel image"
 msgstr "Guardar imagen de Canal"
 
-#: src/png.c:716
+#: src/png.c:717
 msgid "Loading GIF image"
 msgstr "Cargar imagen GIF"
 
-#: src/png.c:791
+#: src/png.c:792
 msgid "Saving GIF image"
 msgstr "Guardar imagen GIF"
 
-#: src/png.c:865
+#: src/png.c:866
 msgid "Loading JPEG image"
 msgstr "Cargar imagen JPEG"
 
-#: src/png.c:916
+#: src/png.c:917
 msgid "Saving JPEG image"
 msgstr "Guardar imagen JPEG"
 
@@ -2614,71 +2605,81 @@ msgstr "Guardar imagen JPEG"
 msgid "Loading TIFF image"
 msgstr "Cargar imagen TIFF"
 
-#: src/png.c:1397
+#: src/png.c:1401
 msgid "Saving TIFF image"
 msgstr "Guardar imagen TIFF"
 
-#: src/png.c:1618
+#: src/png.c:1622
 msgid "Loading BMP image"
 msgstr "Cargar imagen BMP"
 
-#: src/png.c:1872
+#: src/png.c:1876
 msgid "Saving BMP image"
 msgstr "Guardar imagen BMP"
 
-#: src/png.c:2191
+#: src/png.c:2203
 msgid "Loading XPM image"
 msgstr "Cargar imagen XPM"
 
-#: src/png.c:2256
+#: src/png.c:2268
 msgid "Saving XPM image"
 msgstr "Guardar imagen XPM"
 
-#: src/png.c:2389
+#: src/png.c:2401
 msgid "Loading XBM image"
 msgstr "Cargar imagen XBM"
 
-#: src/png.c:2458
+#: src/png.c:2470
 msgid "Saving XBM image"
 msgstr "Guardar imagen XBM"
 
-#: src/png.c:2604
+#: src/png.c:2565
+msgid "Loading LSS16 image"
+msgstr ""
+
+#: src/png.c:2646
+msgid "Saving LSS16 image"
+msgstr ""
+
+#: src/png.c:2801
 msgid "This is an animated GIF file.  What do you want to do?"
 msgstr "Esto es un GIF animado. ¿Qué quieres hacer?"
 
-#: src/png.c:2605
+#: src/png.c:2802
 msgid "Edit Frames"
 msgstr "Editar Fotogramas"
 
-#: src/png.c:2607
+#: src/png.c:2804
 msgid "View Animation"
 msgstr "Ver Animación"
 
-#: src/png.c:2720
+#: src/png.c:2917
 msgid "Saving UNDO images"
 msgstr "Guardando histórico de imagenes"
 
-#: src/png.c:2760
+#: src/png.c:2955
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
 msgstr "%d fuera de %d fotogramas no se guardaron como %s - guardados como PNG"
 
-#: src/png.c:2961
+#: src/png.c:3164
 msgid ""
 "I am unable to find the documentation.  Either you need to download the "
 "mtPaint Handbook from the web site and install it, or you need to set the "
 "correct location in the Preferences window."
 msgstr ""
-"No se puede encontrar la documentación. Necesitas descargar el manual de mtPaint "
-"e instalarlo, o establece la correcta localización en la ventana de preferencias. "
+"No se puede encontrar la documentación. Necesitas descargar el manual de "
+"mtPaint e instalarlo, o establece la correcta localización en la ventana de "
+"preferencias. "
 
-#: src/png.c:2983
+#: src/png.c:3186
 msgid ""
 "There was a problem running the HTML browser.  You need to set the correct "
 "program name in the Preferences window."
 msgstr ""
-"Hay un problema arrancando el navegador HTML. Necesitas establecer un programa"
-"de navegación en la ventana de preferencias."
+"Hay un problema arrancando el navegador HTML. Necesitas establecer un "
+"programade navegación en la ventana de preferencias."
+
 #: src/prefs.c:154
 msgid "Pressure"
 msgstr "Presión"
@@ -2726,6 +2727,10 @@ msgstr "Portugués"
 #: src/prefs.c:439
 msgid "Portuguese (Brazilian)"
 msgstr "Portugués (Brasileño)"
+
+#: src/prefs.c:440
+msgid "Slovak"
+msgstr ""
 
 #: src/prefs.c:440
 msgid "Spanish"
@@ -2939,51 +2944,51 @@ msgstr "Terminar"
 msgid "Fix Palette"
 msgstr "Pegar Paleta"
 
-#: src/toolbar.c:162
+#: src/toolbar.c:163
 msgid "Raise"
 msgstr "Elevar"
 
-#: src/toolbar.c:162
+#: src/toolbar.c:163
 msgid "Lower"
 msgstr "Bajar"
 
-#: src/toolbar.c:162
+#: src/toolbar.c:163
 msgid "Duplicate Layer"
 msgstr "Duplicar Capa"
 
-#: src/toolbar.c:162
+#: src/toolbar.c:163
 msgid "Centralise Layer"
 msgstr "Centrar Capa"
 
-#: src/toolbar.c:163
+#: src/toolbar.c:164
 msgid "Delete Layer"
 msgstr "Borrar Capa"
 
-#: src/toolbar.c:163
+#: src/toolbar.c:164
 msgid "Close Layers Window"
 msgstr "Cerrar Ventana de Capas"
 
-#: src/toolbar.c:428
+#: src/toolbar.c:429
 msgid "RGB Cube"
 msgstr "Cubo RGB"
 
-#: src/toolbar.c:429
+#: src/toolbar.c:430
 msgid "By image channel"
 msgstr "Por imagen de canal"
 
-#: src/toolbar.c:430
+#: src/toolbar.c:431
 msgid "Gradient-driven"
 msgstr "Conducir-Gradiente"
 
-#: src/toolbar.c:431
+#: src/toolbar.c:432
 msgid "Fill settings"
 msgstr "Preferencias de relleno"
 
-#: src/toolbar.c:436
+#: src/toolbar.c:437
 msgid "Respect opacity mode"
 msgstr "Respetar opacidad"
 
-#: src/toolbar.c:437
+#: src/toolbar.c:438
 msgid "Smudge settings"
 msgstr "Preferencias de emborronado"
 
@@ -3035,7 +3040,7 @@ msgstr "Deshacer"
 msgid "Redo"
 msgstr "Rehacer"
 
-#: src/toolbar.c:709 src/viewer.c:550
+#: src/toolbar.c:709 src/viewer.c:546
 msgid "Pan Window"
 msgstr "Vista preliminar"
 
@@ -3079,7 +3084,7 @@ msgstr "Situar Gradiente"
 msgid "Lasso Selection"
 msgstr "Selección libre"
 
-#: src/toolbar.c:723 src/viewer.c:1593 src/viewer.c:1646
+#: src/toolbar.c:723 src/viewer.c:1591 src/viewer.c:1644
 msgid "Paste Text"
 msgstr "Pegar Texto"
 
@@ -3120,26 +3125,26 @@ msgstr "Rotar la Selección en Sentido Antihorario"
 msgid "%i Files on Command Line"
 msgstr "%i Archivos en la Línea de Comandos"
 
-#: src/viewer.c:197
+#: src/viewer.c:193
 msgid "About"
 msgstr "Sobre"
 
-#: src/viewer.c:1612
+#: src/viewer.c:1610
 msgid "Antialias"
 msgstr "Antialias"
 
-#: src/viewer.c:1620
+#: src/viewer.c:1618
 msgid "Invert"
 msgstr "Invertir"
 
-#: src/viewer.c:1625
+#: src/viewer.c:1623
 msgid "Background colour ="
 msgstr "Color de fondo ="
 
-#: src/viewer.c:1633
+#: src/viewer.c:1631
 msgid "Angle of rotation ="
 msgstr "Ángulo de rotación ="
 
-#: src/viewer.c:1656
+#: src/viewer.c:1654
 msgid "Enter Text Here"
 msgstr "Introduzca aquí el texto"
