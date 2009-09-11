@@ -238,6 +238,14 @@ enum {
 
 #define MAX_RECENT 20
 
+/// GRID
+
+int mem_show_grid;	// Boolean show toggle
+int mem_grid_min;	// Minimum zoom to show it at
+int color_grid;		// If to use grid coloring
+int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
+			// 1 for border, 2 for transparency, 3 for tile grid
+
 const unsigned char greyz[2]; // For opacity squares
 
 #define DOCK_CLINE		0

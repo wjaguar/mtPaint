@@ -13,6 +13,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Layers window handling reworked to make it more responsive
 	* Layers window: position now editable via spin buttons
 	* Layers window: transparent colour toggle removed
+	* L key now toggles the layers window off (if the main window has focus)
 	* "Composite to New Layer" operation added to Layers menu
 	* Palette can be copied to or from the canvas using the Edit menu
 	* System clipboard can be imported or exported using the Edit menu
@@ -24,8 +25,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Screenshots can now be grabbed into a new layer
 	* Lasso tool now trims existing clipboard if no selection is present
 	* Image->Skew skews image in one or two directions
+	* "Smart Grid" toggle shows layer boundaries around transparent pixels
+	* View->Configure Grid sets grid colour preferences
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste preview eliminated
+	* BUGFIX - "Remove All Layers" wilh layers window closed doesn't cause crash
 
 3.21	2008-6-8
 

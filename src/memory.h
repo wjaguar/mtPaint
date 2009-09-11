@@ -314,11 +314,6 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
 int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
-/// GRID
-
-int mem_show_grid, mem_grid_min;	// Boolean show toggle & minimum zoom to show it at
-unsigned char mem_grid_rgb[3];		// RGB colour of grid
-
 /// PATTERNS
 
 unsigned char mem_pattern[8 * 8];	// Current pattern
@@ -623,6 +618,8 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	unsigned char *img0, unsigned char *img,
 	unsigned char *alpha0, unsigned char *alpha, int opacity);
 
+int mem_skew(double xskew, double yskew, int type, int gcor);
+
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 
@@ -639,4 +636,40 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 #define ALIGNTO(p,s) ((void *)(p))
 #endif
 
-int mem_skew(double xskew, double yskew, int type, int gcor);
+/* x87 FPU uses long doubles internally, which may cause calculation results
+ * to depend on emitted assembly code, and change in mysterious ways depending
+ * on source structure and current optimizations.
+ * http://gcc.gnu.org/bugzilla/show_bug.cgi?id=323
+ * SSE math works with doubles and floats natively, so is free from this
+ * instability, while a bit less precise.
+ * We aren't requiring C99 yet, so use GCC's define instead of the C99-standard
+ * "FLT_EVAL_METHOD" from float.h for deciding which mode is used.
+ */
+
+#undef NATIVE_DOUBLES
+#if defined(__FLT_EVAL_METHOD__) && ((__FLT_EVAL_METHOD__ == 0) || (__FLT_EVAL_METHOD__ == 1))
+#define NATIVE_DOUBLES
+#endif
+
+/*
+ * rint() function rounds halfway cases (0.5 etc.) to even, which may cause
+ * weird results in geometry calculations. And straightforward (int)(X + 0.5)
+ * may be affected by double-rounding issues on x87 FPU - and in case floor()
+ * is implemented as compiler intrinsic, the same can happen with it too.
+ * These macros are for when neither is acceptable.
+ */
+#ifndef NATIVE_DOUBLES /* Have extra precision */
+#define WJ_ROUND(I,X) \
+{						\
+	const volatile double RounD___ = (X);	\
+	(I) = (int)(RounD___ + 0.5);		\
+}
+#define WJ_FLOOR(I,X) \
+{						\
+	const volatile double RounD___ = (X);	\
+	(I) = floor(RounD___);			\
+}
+#else /* Doubles are doubles */
+#define WJ_ROUND(I,X) (I) = (int)((X) + 0.5)
+#define WJ_FLOOR(I,X) (I) = floor(X)
+#endif

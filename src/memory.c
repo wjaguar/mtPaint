@@ -101,11 +101,6 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 int mem_undo_limit = 32;	// Max MB memory allocation limit
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
-/// GRID
-
-int mem_show_grid, mem_grid_min;	// Boolean show toggle & minimum zoom to show it at
-unsigned char mem_grid_rgb[3];		// RGB colour of grid
-
 /// PATTERNS
 
 unsigned char mem_pattern[8 * 8];		// Original 0-1 pattern
@@ -4431,8 +4426,8 @@ void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 				dest = new_img[CHN_IMAGE] + (ny * nw + xl) * 3;
 				for (nx = xl; nx <= xm; nx++ , dest += 3)
 				{
-					ox = rint(nx * s1 + x0y);
-					oy = rint(nx * c1 + y0y);
+					WJ_ROUND(ox, nx * s1 + x0y);
+					WJ_ROUND(oy, nx * c1 + y0y);
 					src = old_img[CHN_IMAGE] +
 						(oy * ow + ox) * 3;
 					dest[0] = src[0];
@@ -4447,8 +4442,8 @@ void mem_rotate_free_real(chanlist old_img, chanlist new_img, int ow, int oh,
 				dest = new_img[cc] + ny * nw + xl;
 				for (nx = xl; nx <= xm; nx++)
 				{
-					ox = rint(nx * s1 + x0y);
-					oy = rint(nx * c1 + y0y);
+					WJ_ROUND(ox, nx * s1 + x0y);
+					WJ_ROUND(oy, nx * c1 + y0y);
 					*dest++ = old_img[cc][oy * ow + ox];
 				}
 				continue;
@@ -5078,11 +5073,12 @@ static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo
 				if (!neo_img[cc]) continue;
 				bpp = BPP(cc);
 				dest = neo_img[cc] + nw * j * bpp;
-				oj = rint(scaley * j + deltay);
+				WJ_ROUND(oj, scaley * j + deltay);
 				src = old_img[cc] + ow * oj * bpp;
 				for (i = 0; i < nw; i++)
 				{
-					oi = (int)rint(scalex * i + deltax) * bpp;
+					WJ_ROUND(oi, scalex * i + deltax);
+					oi *= bpp;
 					*dest++ = src[oi];
 					if (bpp == 1) continue;
 					*dest++ = src[oi + 1];
@@ -7849,7 +7845,7 @@ static void *make_skew_filter(double **filt, int **dcc, int *fw,
 		/* Specialcase NN filter, for simplicity */
 		if (!type)
 		{
-			*ofdata++ = rint(dy);
+			WJ_FLOOR(*ofdata++, dy + 0.5);
 			*fdata++ = 1.0;
 			continue;
 		}
@@ -8350,8 +8346,11 @@ static void mem_skew_nn(chanlist old_img, chanlist new_img, int ow, int oh,
 				dest = new_img[CHN_IMAGE] + (ny * nw + xl) * 3;
 				for (nx = xl; nx < xr; nx++ , dest += 3)
 				{
-					ox = rint(x0y + nx * d);
-					oy = rint(y0y - nx * yskew);
+// !!! Later, try reimplementing these calculations in row-then-column way -
+// !!! while less theoretically precise, it might cause less jitter, and better
+// !!! match what other skew-transform code does - WJ
+					WJ_ROUND(ox, x0y + nx * d);
+					WJ_ROUND(oy, y0y - nx * yskew);
 					src = old_img[CHN_IMAGE] +
 						(oy * ow + ox) * 3;
 					dest[0] = src[0];
@@ -8365,8 +8364,8 @@ static void mem_skew_nn(chanlist old_img, chanlist new_img, int ow, int oh,
 				dest = new_img[cc] + ny * nw + xl;
 				for (nx = xl; nx < xr; nx++)
 				{
-					ox = rint(x0y + nx * d);
-					oy = rint(y0y - nx * yskew);
+					WJ_ROUND(ox, x0y + nx * d);
+					WJ_ROUND(oy, y0y - nx * yskew);
 					*dest++ = old_img[cc][oy * ow + ox];
 				}
 			}
@@ -8374,16 +8373,40 @@ static void mem_skew_nn(chanlist old_img, chanlist new_img, int ow, int oh,
 	}
 }
 
+/* Skew geometry calculation is far nastier than same for rotation, and worse,
+ * the approaches don't quite match in case of 3-skew rotation - WJ */
 static void mem_skew_geometry(int ow, int oh, double xskew, double yskew,
-	int swapxy, int *nw, int *nh)
+	int rotation, int *nw, int *nh)
 {
 	double nww, nhh, ax, ay;
-	int dx, dy;
+	int dx, dy, dx0, dy0;
 
-	/* Preserve original centering */
-	dx = ow & 1; dy = oh & 1;
-	/* Exchange Y with X when told to (for 3-skew rotation) */
-	if ((dx ^ dy) && swapxy) dx ^= 1 , dy ^= 1;
+
+	/* Select new centering */
+	dx0 = ow & 1; dy0 = oh & 1;
+	/* Pure skew */
+	if (!rotation)
+	{
+		/* For certain skew factors, when the other dimension is even,
+		 * rows/columns nearest to axis fit the pixel grid better if
+		 * skew dimension is realigned to offset them half a pixel */
+		dx = dy0 ? dx0 : dx0 ^ ((int)(fabs(xskew) + 0.5) & 1);
+		dy = dx ? dy0 : dy0 ^ ((int)(fabs(yskew) + 0.5) & 1);
+	}
+	/* Rotation for 45 degrees or less */
+	else if (fabs(yskew) <= M_SQRT1_2) dx = dx0 , dy = dy0;
+	/* Rotation for more than 45 degrees */
+	else
+	{
+		// Height gets to be odd - do width realign now
+		if (dx0) dx = dy0;
+		// Leave width realign till 3rd pass
+		else if (dy0) dx = 0;
+		// Let double realign happen when possible & useful
+		else dx = (int)(fabs(xskew) + 0.5) & 1;
+		dy = dx0;
+	}
+
 	/* Calculate theoretical dimensions */
 	ax = fabs(xskew); ay = fabs(yskew);
 	nww = ow + oh * ax;

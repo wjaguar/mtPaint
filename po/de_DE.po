@@ -1843,7 +1843,7 @@ msgid "/View/Centralize Image"
 msgstr "/Ansicht/Bild zentrieren"
 
 #: src/mainwindow.c:3736
-msgid "/View/Show zoom grid"
+msgid "/View/Show Zoom Grid"
 msgstr "/Ansicht/Zoomgitter zeigen"
 
 #: src/mainwindow.c:3737
@@ -1867,7 +1867,7 @@ msgid "/View/sep3"
 msgstr "/Ansicht/sep3"
 
 #: src/mainwindow.c:3742
-msgid "/View/Pan Window (End)"
+msgid "/View/Pan Window"
 msgstr "/Ansicht/Ausschnitt verschieben"
 
 #: src/mainwindow.c:3743
@@ -2323,8 +2323,8 @@ msgid "/Layers/Save Composite Image ..."
 msgstr "/Ebenen/Kompositbild speichern ..."
 
 #: src/mainwindow.c:3862
-msgid "/Layers/Remove All Layers ..."
-msgstr "/Ebenen/Alle Ebenen entfernen ..."
+msgid "/Layers/Remove All Layers"
+msgstr "/Ebenen/Alle Ebenen entfernen"
 
 #: src/mainwindow.c:3863
 msgid "/Layers/sep1"
@@ -2339,11 +2339,11 @@ msgid "/Layers/Preview Animation ..."
 msgstr "/Ebenen/Animationsvorschau"
 
 #: src/mainwindow.c:3866
-msgid "/Layers/Set key frame ..."
+msgid "/Layers/Set Key Frame ..."
 msgstr "/Ebenen/Setze Keyframe ..."
 
 #: src/mainwindow.c:3867
-msgid "/Layers/Remove all key frames ..."
+msgid "/Layers/Remove All Key Frames ..."
 msgstr "/Ebenen/Entferne alle Keyframes ..."
 
 #: src/mainwindow.c:3869

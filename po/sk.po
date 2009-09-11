@@ -1906,7 +1906,7 @@ msgid "/View/Centralize Image"
 msgstr "/Zobrazi»/Vycentrova» obrázok"
 
 #: src/mainwindow.c:3736
-msgid "/View/Show zoom grid"
+msgid "/View/Show Zoom Grid"
 msgstr "/Zobrazi»/Raster pri zväè¹ení"
 
 #: src/mainwindow.c:3737
@@ -1930,8 +1930,8 @@ msgid "/View/sep3"
 msgstr "/Zobrazi»/sep3"
 
 #: src/mainwindow.c:3742
-msgid "/View/Pan Window (End)"
-msgstr "/Zobrazi»/Prehµadové okno (End)"
+msgid "/View/Pan Window"
+msgstr "/Zobrazi»/Prehµadové okno"
 
 #: src/mainwindow.c:3743
 msgid "/View/Command Line Window"
@@ -2386,8 +2386,8 @@ msgid "/Layers/Save Composite Image ..."
 msgstr "/Vrstvy/Ulo¾i» kompozitný obrázok ..."
 
 #: src/mainwindow.c:3862
-msgid "/Layers/Remove All Layers ..."
-msgstr "/Vrstvy/Odstráni» v¹etky vrstvy ..."
+msgid "/Layers/Remove All Layers"
+msgstr "/Vrstvy/Odstráni» v¹etky vrstvy"
 
 #: src/mainwindow.c:3863
 msgid "/Layers/sep1"
@@ -2402,11 +2402,11 @@ msgid "/Layers/Preview Animation ..."
 msgstr "/Vrstvy/Náhµad animácie ..."
 
 #: src/mainwindow.c:3866
-msgid "/Layers/Set key frame ..."
+msgid "/Layers/Set Key Frame ..."
 msgstr "/Vrstvy/Nastavi» kµúèový snímok ..."
 
 #: src/mainwindow.c:3867
-msgid "/Layers/Remove all key frames ..."
+msgid "/Layers/Remove All Key Frames ..."
 msgstr "/Vrstvy/Odstráni» v¹etky kµúèové snímky ..."
 
 #: src/mainwindow.c:3869

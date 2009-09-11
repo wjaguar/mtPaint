@@ -1896,7 +1896,7 @@ msgid "/View/Centralize Image"
 msgstr "/Ver/Centrar Imagen"
 
 #: src/mainwindow.c:3736
-msgid "/View/Show zoom grid"
+msgid "/View/Show Zoom Grid"
 msgstr "/Ver/Mostrar rejilla de ampliación"
 
 #: src/mainwindow.c:3737
@@ -1920,8 +1920,8 @@ msgid "/View/sep3"
 msgstr "/Ver/sep3"
 
 #: src/mainwindow.c:3742
-msgid "/View/Pan Window (End)"
-msgstr "/Ver/Vista reducida (Fin)"
+msgid "/View/Pan Window"
+msgstr "/Ver/Vista reducida"
 
 #: src/mainwindow.c:3743
 msgid "/View/Command Line Window"
@@ -2376,8 +2376,8 @@ msgid "/Layers/Save Composite Image ..."
 msgstr "/Capas/Guardar imagen compuesta ..."
 
 #: src/mainwindow.c:3862
-msgid "/Layers/Remove All Layers ..."
-msgstr "/Capas/Borrar todas las capas ..."
+msgid "/Layers/Remove All Layers"
+msgstr "/Capas/Borrar todas las capas"
 
 #: src/mainwindow.c:3863
 msgid "/Layers/sep1"
@@ -2392,11 +2392,11 @@ msgid "/Layers/Preview Animation ..."
 msgstr "/Capas/Vista previa de animación ..."
 
 #: src/mainwindow.c:3866
-msgid "/Layers/Set key frame ..."
+msgid "/Layers/Set Key Frame ..."
 msgstr "/Capas/Establecer número de fotogramas ..."
 
 #: src/mainwindow.c:3867
-msgid "/Layers/Remove all key frames ..."
+msgid "/Layers/Remove All Key Frames ..."
 msgstr "/Capas/Borrar todos los fotogramas ..."
 
 #: src/mainwindow.c:3869

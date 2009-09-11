@@ -47,7 +47,6 @@ static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disa
 static GtkWidget *checkbutton_menuicons;
 #endif
 static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2];
-static GtkWidget *spinbutton_grid[4];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
@@ -280,10 +279,6 @@ static void prefs_apply(GtkWidget *widget)
 	recent_files = read_spin(spinbutton_recent);
 	silence_limit = read_spin(spinbutton_silence);
 
-	mem_grid_min = read_spin(spinbutton_grid[0]);
-	for ( i=0; i<3; i++ )
-		mem_grid_rgb[i] = read_spin(spinbutton_grid[i + 1]);
-
 	for (i = 0; i < 3; i++)
 	{
 		tablet_tool_use[i] = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_tablet[i]));
@@ -292,10 +287,6 @@ static void prefs_apply(GtkWidget *widget)
 		inifile_set_gint32(tablet_ini[i], j);
 		tablet_tool_factor[i] = j / 100.0;
 	}
-
-	inifile_set_gint32( "gridR", mem_grid_rgb[0] );
-	inifile_set_gint32( "gridG", mem_grid_rgb[1] );
-	inifile_set_gint32( "gridB", mem_grid_rgb[2] );
 
 
 	tga_RLE = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgaRLE)) ? 1 : 0;
@@ -431,7 +422,7 @@ void pressed_preferences()
 #endif
 
 
-	GtkWidget *vbox3, *hbox4, *table3, *table4, *table5, *drawingarea_tablet;
+	GtkWidget *vbox3, *hbox4, *table3, *table4, *drawingarea_tablet;
 	GtkWidget *button1, *notebook1, *page, *vbox_2, *label;
 
 	char *tab_tex[] = { _("Max memory used for undo (MB)"),
@@ -441,7 +432,6 @@ void pressed_preferences()
 		_("JPEG Save Quality (100=High)"), _("JPEG2000 Compression (0=Lossless)"),
 		_("PNG Compression (0=None)"), _("Recently Used Files"),
 		_("Progress bar silence limit") };
-	char *tab_tex3[] = { _("Minimum grid zoom"), _("Grid colour RGB") };
 	char *stat_tex[] = { _("Canvas Geometry"), _("Cursor X,Y"),
 		_("Pixel [I] {RGB}"), _("Selection Geometry"), _("Undo / Redo") },
 		*tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
@@ -560,18 +550,6 @@ void pressed_preferences()
 ///	---- TAB5 - ZOOM
 
 	page = add_new_page(notebook1, _("Zoom"));
-	table5 = add_a_table( 2, 4, 10, page );
-
-///	TABLE TEXT
-	for ( i=0; i<2; i++ ) add_to_table( tab_tex3[i], table5, i, 0, 5 );
-
-///	TABLE SPINBUTTONS
-	spinbutton_grid[0] = spin_to_table(table5, 0, 1, 5, mem_grid_min, 2, 12);
-	for (i = 0; i < 3; i++)
-	{
-		spinbutton_grid[i + 1] = spin_to_table(table5, 1, i + 1, 5,
-			mem_grid_rgb[i], 0, 255);
-	}
 
 	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
 		page, inifile_get_gboolean("zoomToggle", FALSE) );

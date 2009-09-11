@@ -1936,7 +1936,7 @@ msgid "/View/Centralize Image"
 msgstr "/Affichage/Centrer l'image"
 
 #: src/mainwindow.c:3736
-msgid "/View/Show zoom grid"
+msgid "/View/Show Zoom Grid"
 msgstr "/Affichage/Grille de zoom"
 
 #: src/mainwindow.c:3737
@@ -1960,8 +1960,8 @@ msgid "/View/sep3"
 msgstr "/Affichage/sep3"
 
 #: src/mainwindow.c:3742
-msgid "/View/Pan Window (End)"
-msgstr "/Affichage/Aperçu réduit (Fin)"
+msgid "/View/Pan Window"
+msgstr "/Affichage/Aperçu réduit"
 
 #: src/mainwindow.c:3743
 msgid "/View/Command Line Window"
@@ -2416,8 +2416,8 @@ msgid "/Layers/Save Composite Image ..."
 msgstr "/Calque/Sauver l'image composée ..."
 
 #: src/mainwindow.c:3862
-msgid "/Layers/Remove All Layers ..."
-msgstr "/Calque/Supprimer tous les calques ..."
+msgid "/Layers/Remove All Layers"
+msgstr "/Calque/Supprimer tous les calques"
 
 #: src/mainwindow.c:3863
 msgid "/Layers/sep1"
@@ -2432,11 +2432,11 @@ msgid "/Layers/Preview Animation ..."
 msgstr "/Calque/Aperçu de l'animation ..."
 
 #: src/mainwindow.c:3866
-msgid "/Layers/Set key frame ..."
+msgid "/Layers/Set Key Frame ..."
 msgstr "/Calque/Définir le numéro de la trame ..."
 
 #: src/mainwindow.c:3867
-msgid "/Layers/Remove all key frames ..."
+msgid "/Layers/Remove All Key Frames ..."
 msgstr "/Calque/Supprimer tous les numéros de trame ..."
 
 #: src/mainwindow.c:3869

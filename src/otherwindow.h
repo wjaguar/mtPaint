@@ -23,6 +23,7 @@
 #define COLSEL_OVERLAYS  1
 #define COLSEL_EDIT_AB   2
 #define COLSEL_EDIT_CSEL 3
+#define COLSEL_GRID      4
 #define COLSEL_EDIT_ALL  256
 
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);

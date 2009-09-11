@@ -65,6 +65,7 @@ static inilist ini_bool[] = {
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
+	{ "colorGrid",		&color_grid,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -101,6 +102,10 @@ static inilist ini_int[] = {
 	{ "lastspalType",	&spal_mode,		2   },
 	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
+	{ "gridRGB",		grid_rgb + 0,		RGB_2_INT(50, 50, 50)  },
+	{ "gridBorder",		grid_rgb + 1,		RGB_2_INT(0, 219, 0)   },
+	{ "gridTrans",		grid_rgb + 2,		RGB_2_INT(0, 109, 109) },
+	{ "gridTile",		grid_rgb + 3,		RGB_2_INT(0, 0, 0)     },
 	{ NULL,			NULL }
 };
 
@@ -2440,38 +2445,172 @@ static int main_render_rgb(unsigned char *rgb, int px, int py, int pw, int ph)
 	return (!!ptemp); /* "There was paste" */
 }
 
+// !!! Later, make one in canvas.c global - and move it to memory.c
+// !!! Or make it an inline function in memory.h
+static int floor_div(int dd, int dr)
+{
+	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
+}
+
+/// GRID
+
+int mem_show_grid;	// Boolean show toggle
+int mem_grid_min;	// Minimum zoom to show it at
+int color_grid;		// If to use grid coloring
+int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
+			// 1 for border, 2 for transparency, 3 for tile grid
+
+/* Buffer stores interleaved transparency bits for two pixel rows; current
+ * row in bits 0, 2, etc., previous one in bits 1, 3, etc. */
+static void scan_trans(unsigned char *dest, int delta, int y, int x, int w)
+{
+	static unsigned char beta = 255;
+	unsigned char *src, *srca = &beta;
+	int i, ofs, bit, buf, xpm, da = 0, bpp = mem_img_bpp;
+
+
+	delta += delta; dest += delta >> 3; delta &= 7;
+	if (y >= mem_height) // Clear
+	{
+		for (i = 0; i < w; i++ , dest++) *dest = (*dest & 0x55) << 1;
+		return;
+	}
+
+	xpm = mem_xpm_trans < 0 ? -1 : bpp == 1 ? mem_xpm_trans :
+		PNG_2_INT(mem_pal[mem_xpm_trans]);
+	ofs = y * mem_width + x;
+	src = mem_img[CHN_IMAGE] + ofs * bpp;
+	if (mem_img[CHN_ALPHA]) srca = mem_img[CHN_ALPHA] + ofs , da = 1;
+	bit = 1 << delta;
+	buf = (*dest & 0x55) << 1;
+	for (i = 0; i < w; i++ , src += bpp , srca += da)
+	{
+		buf |= *srca && ((bpp == 1 ? *src : MEM_2_INT(src, 0)) != xpm) ?
+			bit : 0;
+		if ((bit <<= 2) < 0x100) continue;
+		*dest++ = buf; buf = (*dest & 0x55) << 1; bit = 1;
+	}
+	*dest = buf;
+}
+
 /* Draw grid on rgb memory */
 static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 {
-	int i, j, k, dx, dy, step, step3;
-	unsigned char *tmp;
+/* !!! This limit IN THEORY can be violated by a sufficiently huge screen, if
+ * clipping to image isn't enforced in some fashion; this code can be made to
+ * detect the violation and do the clipping (on X axis) for itself - really
+ * colored is only the image proper + 1 pixel to bottom & right of it */
+	unsigned char lbuf[(MAX_WIDTH * 2 + 2 + 7) / 8 + 2];
+	int dx, dy, step = can_zoom;
+	int i, j, k, yy, wx, ww, x0, xw;
 
-	step = can_zoom;
 
+	l *= 3;
 	dx = (x - margin_main_x) % step;
-	if (dx < 0) dx += step;
+	if (dx <= 0) dx += step;
 	dy = (y - margin_main_y) % step;
-	if (dy < 0) dy += step;
-	if (dx) dx = (step - dx) * 3;
-	w *= 3; l *= 3;
+	if (dy <= 0) dy += step;
 
-	for (k = dy , i = 0; i < h; i++)
+	/* Use dumb code for uncolored grid */
+	if (!color_grid || (x + w <= margin_main_x) || (y + h <= margin_main_y) ||
+		(x > margin_main_x + mem_width * step) ||
+		(y > margin_main_y + mem_height * step))
 	{
-		tmp = rgb + i * l;
-		if (!k) /* Filled line */
+		unsigned char *tmp;
+		int i, j, k, step3, tc;
+
+		tc = grid_rgb[color_grid ? 2 : 0];
+		dx = (step - dx) * 3;
+		w *= 3;
+
+		for (k = dy , i = 0; i < h; i++ , k++)
 		{
-			j = 0; step3 = 3;
+			tmp = rgb + i * l;
+			if (k == step) /* Filled line */
+			{
+				j = k = 0; step3 = 3;
+			}
+			else /* Spaced dots */
+			{
+				j = dx; step3 = step * 3;
+			}
+			for (tmp += j; j < w; j += step3 , tmp += step3)
+			{
+				tmp[0] = INT_2_R(tc);
+				tmp[1] = INT_2_G(tc);
+				tmp[2] = INT_2_B(tc);
+			}
 		}
-		else /* Spaced dots */
+		return;
+	}
+
+	wx = floor_div(x - margin_main_x - 1, step);
+	ww = (w + dx + step - 1) / step + 1;
+	memset(lbuf, 0, (ww + ww + 7 + 16) >> 3); // Init to transparent
+
+	x0 = wx < 0 ? 0 : wx;
+	xw = (wx + ww < mem_width ? wx + ww : mem_width) - x0;
+	wx = x0 - wx;
+	yy = floor_div(y - margin_main_y, step);
+
+	/* Initial row fill */
+	if (dy == step) yy--;
+	if ((yy >= 0) && (yy < mem_height)) // Else it stays cleared
+		scan_trans(lbuf, wx, yy, x0, xw);
+
+	for (k = dy , i = 0; i < h; i++ , k++)
+	{
+		unsigned char *tmp = rgb + i * l, *buf = lbuf + 2;
+
+		// Horizontal span
+		if (k == step)
 		{
-			j = dx; step3 = step * 3;
+			int nv, tc, kk;
+
+			yy++; k = 0;
+			// Fill one more row
+			if ((yy >= 0) && (yy <= mem_height + 1))
+				scan_trans(lbuf, wx, yy, x0, xw);
+			nv = (lbuf[0] + (lbuf[1] << 8)) ^ 0x2FFFF; // Invert
+			tc = grid_rgb[((nv & 3) + 1) >> 1];
+			for (kk = dx , j = 0; j < w; j++ , kk++ , tmp += 3)
+			{
+				if (kk != step) // Span
+				{
+					tmp[0] = INT_2_R(tc);
+					tmp[1] = INT_2_G(tc);
+					tmp[2] = INT_2_B(tc);
+					continue;
+				}
+				// Intersection
+				/* 0->0, 15->3, in-between remains between */
+				tc = grid_rgb[((nv & 0xF) * 9 + 0x79) >> 7];
+				tmp[0] = INT_2_R(tc);
+				tmp[1] = INT_2_G(tc);
+				tmp[2] = INT_2_B(tc);
+				nv >>= 2;
+				if (nv < 0x400)
+					nv ^= (*buf++ << 8) ^ 0x2FD00; // Invert
+				tc = grid_rgb[((nv & 3) + 1) >> 1];
+				kk = 0;
+			}
 		}
-		k = (k + 1) % step;
-		for (; j < w; j += step3)
+		// Vertical spans
+		else
 		{
-			tmp[j + 0] = mem_grid_rgb[0];
-			tmp[j + 1] = mem_grid_rgb[1];
-			tmp[j + 2] = mem_grid_rgb[2];
+			int nv = (lbuf[0] + (lbuf[1] << 8)) ^ 0x2FFFF; // Invert
+			j = step - dx; tmp += j * 3;
+			for (; j < w; j += step , tmp += step * 3)
+			{
+				/* 0->0, 5->3, in-between remains between */
+				int tc = grid_rgb[((nv & 5) + 3) >> 2];
+				tmp[0] = INT_2_R(tc);
+				tmp[1] = INT_2_G(tc);
+				tmp[2] = INT_2_B(tc);
+				nv >>= 2;
+				if (nv < 0x400)
+					nv ^= (*buf++ << 8) ^ 0x2FD00; // Invert
+			}
 		}
 	}
 }
@@ -2803,6 +2942,8 @@ void main_update_area(int x, int y, int w, int h)
 		y *= scale;
 		w *= scale;
 		h *= scale;
+		if (color_grid && mem_show_grid && (scale >= mem_grid_min))
+			w++ , h++; // Redraw grid lines bordering the area
 	}
 
 	gtk_widget_queue_draw_area(drawing_canvas,
@@ -4184,7 +4325,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/sep1"), -4 },
 	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, xpm_cut_xpm },
 	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, xpm_copy_xpm },
-	{ _("/Edit/Copy to Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
+	{ _("/Edit/Copy To Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
 	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, xpm_paste_xpm },
 	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
@@ -4239,13 +4380,14 @@ static menu_item main_menu[] = {
 	{ _("/View/sep1"), -4 },
 	{ _("/View/Toggle Image View"), -1, 0, 0, "Home", ACT_VIEW, 0 },
 	{ _("/View/Centralize Image"), 0, MENU_CENTER, 0, NULL, ACT_CENTER, 0 },
-	{ _("/View/Show zoom grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
+	{ _("/View/Show Zoom Grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
+	{ _("/View/Configure Grid ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_GRID },
 	{ _("/View/sep2"), -4 },
 	{ _("/View/View Window"), 0, MENU_VIEW, 0, "V", ACT_VWWIN, 0 },
 	{ _("/View/Horizontal Split"), 0, 0, 0, "H", ACT_VWSPLIT, 0 },
 	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, ACT_VWFOCUS, 0 },
 	{ _("/View/sep3"), -4 },
-	{ _("/View/Pan Window (End)"), -1, 0, 0, NULL, ACT_PAN, 0, xpm_pan_xpm },
+	{ _("/View/Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, xpm_pan_xpm },
 	{ _("/View/Command Line Window"), -1, MENU_CLINE, 0, "C", DLG_CMDLINE, 0 },
 	{ _("/View/Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
 
@@ -4371,12 +4513,12 @@ static menu_item main_menu[] = {
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
 	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },
-	{ _("/Layers/Remove All Layers ..."), -1, 0, 0, NULL, ACT_LR_DEL, 1 },
+	{ _("/Layers/Remove All Layers"), -1, 0, 0, NULL, ACT_LR_DEL, 1 },
 	{ _("/Layers/sep1"), -4 },
 	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },
 	{ _("/Layers/Preview Animation ..."), -1, 0, 0, NULL, DLG_ANI_VIEW, 0 },
-	{ _("/Layers/Set key frame ..."), -1, 0, 0, NULL, DLG_ANI_KEY, 0 },
-	{ _("/Layers/Remove all key frames ..."), -1, 0, 0, NULL, DLG_ANI_KILLKEY, 0 },
+	{ _("/Layers/Set Key Frame ..."), -1, 0, 0, NULL, DLG_ANI_KEY, 0 },
+	{ _("/Layers/Remove All Key Frames ..."), -1, 0, 0, NULL, DLG_ANI_KILLKEY, 0 },
 
 	{ _("/More..."), -2 -16 }, /* This will hold overflow submenu */
 
@@ -4409,10 +4551,6 @@ void main_init()
 	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
 
 	accel_group = gtk_accel_group_new ();
-
-	mem_grid_rgb[0] = inifile_get_gint32("gridR", 50 );
-	mem_grid_rgb[1] = inifile_get_gint32("gridG", 50 );
-	mem_grid_rgb[2] = inifile_get_gint32("gridB", 50 );
 
 
 ///	MAIN WINDOW

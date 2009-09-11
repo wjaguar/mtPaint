@@ -517,6 +517,7 @@ static void layers_free_all()
 
 	if (layers_total && layer_selected)	// Copy over layer 0
 	{
+		layer_copy_from_main(layer_selected);
 		layer_copy_to_main(0);
 		layer_selected = 0;
 	}

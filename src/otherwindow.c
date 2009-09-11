@@ -1829,6 +1829,39 @@ static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
 	if (old_over && drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
 }
 
+typedef struct {
+	GtkWidget *ctoggle, *szspin;
+	int color0[4], ctoggle0, size0;
+} grid_widgets;
+
+static void select_grid(int what)
+{
+	grid_widgets *gw = gtk_object_get_user_data(GTK_OBJECT(allcol_window));
+	int i;
+
+	switch (what)
+	{
+	case 0: /* Cancel */
+		for (i = 0; i < 4; i++)	// Restore original values
+			grid_rgb[i] = gw->color0[i];
+		color_grid = gw->ctoggle0;
+		mem_grid_min = gw->size0;
+		break;
+	case 1: /* Preview */
+	case 2: /* OK */
+		for (i = 0; i < 4; i++)
+		{
+			unsigned char *tmp = ctable_[CHN_IMAGE] + i * 3;
+			grid_rgb[i] = MEM_2_INT(tmp, 0);
+		}
+		color_grid = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gw->ctoggle));
+		mem_grid_min = read_spin(gw->szspin);
+		break;
+	default: return;
+	}
+	gtk_widget_queue_draw(drawing_canvas);
+}
+
 static int alloc_ctable(int nslots)
 {
 	int i, sz = nslots * (NUM_CHANNELS + 3);
@@ -1890,7 +1923,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			NULL, FALSE, select_colour, GTK_SIGNAL_FUNC(click_colour));
 	}
 
-	if (cs_type == COLSEL_OVERLAYS)
+	else if (cs_type == COLSEL_OVERLAYS)
 	{
 		if (!alloc_ctable(NUM_CHANNELS * 2)) return;
 		lc = ctable_[CHN_IMAGE];
@@ -1911,7 +1944,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 			allchannames, TRUE, select_overlay, NULL);
 	}
 
-	if (cs_type == COLSEL_EDIT_AB)
+	else if (cs_type == COLSEL_EDIT_AB)
 	{
 		static char *AB_txt[] = { "A", "B" };
 		png_color *A0, *B0;
@@ -1967,7 +2000,8 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		colour_window(win, extbox, 2, 0,
 			AB_txt, FALSE, select_AB, NULL);
 	}
-	if (cs_type == COLSEL_EDIT_CSEL)
+
+	else if (cs_type == COLSEL_EDIT_CSEL)
 	{
 		char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview") };
 		char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
@@ -2012,6 +2046,43 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 		colour_window(win, extbox, 3, 0,
 /* !!! Alpha ranges not implemented yet !!! */
 			csel_txt, FALSE /* TRUE */, select_csel, NULL);
+	}
+
+	else if (cs_type == COLSEL_GRID)
+	{
+		char *grid_txt[4] = { _("Opaque"), _("Border"),
+			_("Transparent"), _("Tile") };
+		grid_widgets *gw;
+
+		if (!alloc_ctable(4)) return;
+		lc = ctable_[CHN_IMAGE];
+		for (i = 0; i < 4; i++)
+		{
+			lc[i * 3 + 0] = INT_2_R(grid_rgb[i]);
+			lc[i * 3 + 1] = INT_2_G(grid_rgb[i]);
+			lc[i * 3 + 2] = INT_2_B(grid_rgb[i]);
+			opctable[i] = 255;
+		}
+
+		/* Prepare extra controls */
+		extbox = gtk_hbox_new(FALSE, 0);
+		gw = bound_malloc(extbox, sizeof(grid_widgets));
+		pack(extbox, gtk_label_new(_("Minimum grid zoom")));
+		gw->szspin = pack(extbox, add_a_spin(mem_grid_min, 2, 12));
+		gw->ctoggle = add_a_toggle(_("Smart grid"), extbox, color_grid);
+// !!! Later, add tile grid controls as second row
+		gtk_widget_show_all(extbox);
+
+		/* Save old values */
+		for (i = 0; i < 4; i++) gw->color0[i] = grid_rgb[i];
+		gw->ctoggle0 = color_grid;
+		gw->size0 = mem_grid_min;
+
+		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Grid"),
+			GTK_WIN_POS_CENTER, TRUE);
+		gtk_object_set_user_data(GTK_OBJECT(win), gw);
+		colour_window(win, extbox, 4, 0,
+			grid_txt, FALSE, select_grid, NULL);
 	}
 }
 

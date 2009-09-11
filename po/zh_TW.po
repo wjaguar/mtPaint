@@ -1866,7 +1866,7 @@ msgid "/View/Centralize Image"
 msgstr "/檢視(V)/圖像置中"
 
 #: src/mainwindow.c:3736
-msgid "/View/Show zoom grid"
+msgid "/View/Show Zoom Grid"
 msgstr "/檢視(V)/顯示縮放格線"
 
 #: src/mainwindow.c:3737
@@ -1890,8 +1890,8 @@ msgid "/View/sep3"
 msgstr "/檢視(V)/sep3"
 
 #: src/mainwindow.c:3742
-msgid "/View/Pan Window (End)"
-msgstr "/檢視(V)/全景視窗 (結束)"
+msgid "/View/Pan Window"
+msgstr "/檢視(V)/全景視窗"
 
 #: src/mainwindow.c:3743
 msgid "/View/Command Line Window"
@@ -2346,8 +2346,8 @@ msgid "/Layers/Save Composite Image ..."
 msgstr "/圖層(L)/儲存合成圖像…"
 
 #: src/mainwindow.c:3862
-msgid "/Layers/Remove All Layers ..."
-msgstr "/圖層(L)/移除所有圖層…"
+msgid "/Layers/Remove All Layers"
+msgstr "/圖層(L)/移除所有圖層"
 
 #: src/mainwindow.c:3863
 msgid "/Layers/sep1"
@@ -2362,11 +2362,11 @@ msgid "/Layers/Preview Animation ..."
 msgstr "/圖層(L)/預覽動畫…"
 
 #: src/mainwindow.c:3866
-msgid "/Layers/Set key frame ..."
+msgid "/Layers/Set Key Frame ..."
 msgstr "/圖層(L)/設定關鍵框架…"
 
 #: src/mainwindow.c:3867
-msgid "/Layers/Remove all key frames ..."
+msgid "/Layers/Remove All Key Frames ..."
 msgstr "/圖層(L)/移除所有關鍵圖框…"
 
 #: src/mainwindow.c:3869
