@@ -316,11 +316,10 @@ void pressed_shifter()
 	gtk_misc_set_alignment( GTK_MISC(shifter_label), 0.5, 0.5 );
 
 
-	shifter_slider = mt_spinslide_new( -1, -1 );
+	shifter_slider = xpack5(vbox, mt_spinslide_new(-1, -1));
 	mt_spinslide_set_range(shifter_slider, 0, 0);
 	mt_spinslide_set_value(shifter_slider, 0);
 	mt_spinslide_connect(shifter_slider, GTK_SIGNAL_FUNC(shifter_slider_moved), NULL);
-	gtk_box_pack_start(GTK_BOX(vbox), shifter_slider, TRUE, TRUE, 5);
 
 
 	add_hseparator( vbox, -2, 10 );
@@ -328,26 +327,22 @@ void pressed_shifter()
 	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show (hbox);
 
-	button = gtk_button_new_with_label(_("Clear"));
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
+	button = xpack5(hbox, gtk_button_new_with_label(_("Clear")));
 	gtk_widget_show(button);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_shift_clear), NULL);
 
-	button = gtk_button_new_with_label(_("Fix Palette"));
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
+	button = xpack5(hbox, gtk_button_new_with_label(_("Fix Palette")));
 	gtk_widget_show(button);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_shift_fix), NULL);
 
-	button = gtk_button_new_with_label(_("Create Frames"));
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
+	button = xpack5(hbox, gtk_button_new_with_label(_("Create Frames")));
 	gtk_widget_show(button);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_shift_create), NULL);
 
-	button = gtk_button_new_with_label(_("Close"));
-	gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
+	button = xpack5(hbox, gtk_button_new_with_label(_("Close")));
 	gtk_widget_show(button);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_shift_close), NULL );

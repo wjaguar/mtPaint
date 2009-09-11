@@ -171,6 +171,9 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
+GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget);
+GtkWidget *pack5(GtkWidget *box, GtkWidget *widget);
+GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget);
 
 // Save/restore window positions
 

@@ -1041,7 +1041,7 @@ void view_show()
 	gtk_paned_pack1 (GTK_PANED (main_split), scrolledwindow_canvas, FALSE, TRUE);
 	gtk_paned_pack2 (GTK_PANED (main_split), vw_scrolledwindow, FALSE, TRUE);
 	view_showing = TRUE;
-	gtk_box_pack_start (GTK_BOX (vbox_right), main_split, TRUE, TRUE, 0);
+	xpack(vbox_right, main_split);
 	gtk_widget_unref(scrolledwindow_canvas);
 	gtk_widget_unref(vw_scrolledwindow);
 	gtk_widget_unref(main_split);
@@ -1070,7 +1070,7 @@ void view_hide()
 	gtk_container_remove(GTK_CONTAINER(vbox_right), main_split);
 	gtk_container_remove(GTK_CONTAINER(main_split), scrolledwindow_canvas);
 	gtk_container_remove(GTK_CONTAINER(main_split), vw_scrolledwindow);
-	gtk_box_pack_start (GTK_BOX (vbox_right), scrolledwindow_canvas, TRUE, TRUE, 0);
+	xpack(vbox_right, scrolledwindow_canvas);
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
 	set_cursor(); /* Because canvas window is now a new one */
@@ -1128,151 +1128,178 @@ void init_view()
 
 ////	TAKE SCREENSHOT
 
-void screen_copy_pixels( unsigned char *rgb, int w, int h )
-{
-	mem_pal_load_def();
-	if (mem_new( w, h, 3, CMASK_IMAGE )) return;
-	memcpy(mem_img[CHN_IMAGE], rgb, w * h * 3);
-}
-
-#if GTK_MAJOR_VERSION == 1
-#include <gdk/gdkx.h>
-static void gdk_get_rgb_image( GdkDrawable *drawable, GdkColormap *colormap,
-		gint x, gint y, gint width, gint height,
-		guchar *rgb_buf, gint rowstride )
-{
-/*
- * Code from gdkgetrgb.c
- * by Gary Wong <gtw@gnu.org>, 2000.
+/* This code exists to read back both windows and pixmaps. In GTK+1 pixmap
+ * handling capabilities are next to nonexistent, so a GdkWindow must always
+ * be passed in, to serve as source of everything but actual pixels.
+ * Parsing GdkImage pixels loosely follows the example of convert_real_slow()
+ * in GTK+2 (gdk/gdkpixbuf-drawable.c) - WJ
  */
 
-    GdkImage *image;
-    gint xpix, ypix;
-    guchar *p;
-    guint32 pixel;
-    GdkVisual *visual;
-    int r = 0, g = 0 , b = 0, dwidth, dheight;
+#if GTK_MAJOR_VERSION == 1
 
-#if GTK_CHECK_VERSION(1,3,0)
-    gdk_drawable_get_size( drawable, &dwidth, &dheight );
-#else
-    gdk_window_get_geometry( drawable, NULL, NULL, &dwidth, &dheight, NULL );
-#endif
-    
-    if( x <= -width || x >= dwidth )
-	return;
-    else if( x < 0 ) {
-	rgb_buf -= 3 * x;
-	width += x;
-	x = 0;
-    } else if( x + width > dwidth )
-	width = dwidth - x;
+#include <gdk/gdkx.h>
 
-    if( y <= -height || y >= dheight )
-	return;
-    else if( y < 0 ) {
-	rgb_buf -= rowstride * y;
-	height += y;
-	y = 0;
-    } else if( y + height > dheight )
-	height = dheight - y;
-    
-    visual = gdk_colormap_get_visual( colormap );
+static unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
+	unsigned char *buf, int width, int height)
+{
+	GdkImage *img;
+	GdkColormap *cmap;
+	GdkVisual *vis;
+	GdkColor bw[2], *cols = NULL;
+	unsigned char *dest, *wbuf = NULL;
+	guint32 rmask, gmask, bmask, pix;
+	int mode, rshift, gshift, bshift;
+	int i, j;
 
-    if( visual->type == GDK_VISUAL_TRUE_COLOR ) {
-	r = visual->red_shift + visual->red_prec - 8;
-	g = visual->green_shift + visual->green_prec - 8;
-	b = visual->blue_shift + visual->blue_prec - 8;
-    }
 
-    gdk_error_trap_push();
-    image = gdk_image_get( drawable, x, y, width, height );
-    if( gdk_error_trap_pop() ) {
-	/* Assume an X BadMatch occurred -- GDK doesn't provide a portable
-	   way to check what the error was. */
-	GdkPixmap *ppm = gdk_pixmap_new( drawable, width, height, -1 );
-	GdkGC *pgc = gdk_gc_new( drawable );
-	
-	gdk_draw_pixmap( ppm, pgc, drawable, x, y, 0, 0, width, height );
-
-	image = gdk_image_get( ppm, 0, 0, width, height );
-
-	gdk_gc_unref( pgc );
-	gdk_pixmap_unref( ppm );
-    }
-    
-    for( ypix = 0; ypix < height; ypix++ ) {
-	p = rgb_buf;
-	
-	for( xpix = 0; xpix < width; xpix++ ) {
-	    pixel = gdk_image_get_pixel( image, xpix, ypix );
-
-	    switch( visual->type ) {
-	    case GDK_VISUAL_STATIC_GRAY:
-	    case GDK_VISUAL_GRAYSCALE:
-	    case GDK_VISUAL_STATIC_COLOR:
-	    case GDK_VISUAL_PSEUDO_COLOR:
-		*p++ = colormap->colors[ pixel ].red >> 8;
-		*p++ = colormap->colors[ pixel ].green >> 8;
-		*p++ = colormap->colors[ pixel ].blue >> 8;
-		break;
-		
-	    case GDK_VISUAL_TRUE_COLOR:
-		*p++ = r > 0 ? ( pixel & visual->red_mask ) >> r :
-		    ( pixel & visual->red_mask ) << -r;
-		*p++ = g > 0 ? ( pixel & visual->green_mask ) >> g :
-		    ( pixel & visual->green_mask ) << -g;
-		*p++ = b > 0 ? ( pixel & visual->blue_mask ) >> b :
-		    ( pixel & visual->blue_mask ) << -b;
-		break;
-		
-	    case GDK_VISUAL_DIRECT_COLOR:
-		*p++ = colormap->colors[ ( pixel & visual->red_mask )
-				       >> visual->red_shift ].red >> 8;
-		*p++ = colormap->colors[ ( pixel & visual->green_mask )
-				       >> visual->green_shift ].green >> 8;
-		*p++ = colormap->colors[ ( pixel & visual->blue_mask )
-				       >> visual->blue_shift ].blue >> 8;
-		break;
-	    }
+	if (window == (GdkWindow *)&gdk_root_parent) /* Not a proper window */
+	{
+		vis = gdk_visual_get_system();
+		cmap = gdk_colormap_get_system();
+	}
+	else
+	{
+		vis = gdk_window_get_visual(window);
+		cmap = gdk_window_get_colormap(window);
 	}
 
-	rgb_buf += rowstride;
-    }
+	if (!vis) return (NULL);
+	mode = vis->type;
 
-    gdk_image_destroy( image );
+	if (cmap) cols = cmap->colors;
+	else if ((mode != GDK_VISUAL_TRUE_COLOR) && (vis->depth != 1))
+		return (NULL); /* Can't handle other types w/o colormap */
+
+	if (!buf) buf = wbuf = malloc(width * height * 3);
+	if (!buf) return (NULL);
+
+	img = gdk_image_get(pixmap ? pixmap : window, 0, 0, width, height);
+	if (!img)
+	{
+		free(wbuf);
+		return (NULL);
+	}
+
+	rmask = vis->red_mask;
+	gmask = vis->green_mask;
+	bmask = vis->blue_mask;
+	rshift = vis->red_shift;
+	gshift = vis->green_shift;
+	bshift = vis->blue_shift;
+
+	if (mode == GDK_VISUAL_TRUE_COLOR)
+	{
+		/* !!! Unlikely to happen, but it's cheap to be safe */
+		if (vis->red_prec > 8) rshift += vis->red_prec - 8;
+		if (vis->green_prec > 8) gshift += vis->green_prec - 8;
+		if (vis->blue_prec > 8) bshift += vis->blue_prec - 8;
+	}
+	else if (!cmap && (vis->depth == 1)) /* Bitmap */
+	{
+		/* Make a palette for it */
+		mode = GDK_VISUAL_PSEUDO_COLOR;
+		bw[0].red = bw[0].green = bw[0].blue = 0;
+		bw[1].red = bw[1].green = bw[1].blue = 65535;
+		cols = bw;
+	}
+
+	dest = buf;
+	for (i = 0; i < height; i++)
+	for (j = 0; j < width; j++ , dest += 3)
+	{
+		pix = gdk_image_get_pixel(img, j, i);
+		if (mode == GDK_VISUAL_TRUE_COLOR)
+		{
+			dest[0] = (pix & rmask) >> rshift;
+			dest[1] = (pix & gmask) >> gshift;
+			dest[2] = (pix & bmask) >> bshift;
+		}
+		else if (mode == GDK_VISUAL_DIRECT_COLOR)
+		{
+			dest[0] = cols[(pix & rmask) >> rshift].red >> 8;
+			dest[1] = cols[(pix & gmask) >> gshift].green >> 8;
+			dest[2] = cols[(pix & bmask) >> bshift].blue >> 8;
+		}
+		else /* Paletted */
+		{
+			dest[0] = cols[pix].red >> 8;
+			dest[1] = cols[pix].green >> 8;
+			dest[2] = cols[pix].blue >> 8;
+		}
+	}
+
+	/* Now extend the precision to 8 bits where necessary */
+	if (mode == GDK_VISUAL_TRUE_COLOR)
+	{
+		unsigned char xlat[128], *dest;
+		int i, j, k, l = width * height;
+
+		for (i = 0; i < 3; i++)
+		{
+			k = !i ? vis->red_prec : i == 1 ? vis->green_prec :
+				vis->blue_prec;
+			if (k >= 8) continue;
+			set_xlate(xlat, k);
+			dest = buf + i;
+			for (j = 0; j < l; j++ , dest += 3)
+				*dest = xlat[*dest];
+		}
+	}
+
+	gdk_image_destroy(img);
+	return (buf);
 }
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+static unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
+	unsigned char *buf, int width, int height)
+{
+	GdkPixbuf *pix, *res;
+	unsigned char *wbuf = NULL;
+
+	if (!buf) buf = wbuf = malloc(width * height * 3);
+	if (!buf) return (NULL);
+
+	pix = gdk_pixbuf_new_from_data(buf, GDK_COLORSPACE_RGB,
+		FALSE, 8, width, height, width * 3, NULL, NULL);
+	if (pix)
+	{
+		res = gdk_pixbuf_get_from_drawable(pix,
+			pixmap ? pixmap : window, NULL,
+			0, 0, 0, 0, width, height);
+		g_object_unref(pix);
+		if (res) return (buf);
+	}
+	free(wbuf);
+	return (NULL);
+}
+
 #endif
 
-gboolean grab_screen()
+int grab_screen()
 {
 	int width = gdk_screen_width(), height = gdk_screen_height();
+	unsigned char *buf = malloc(width * height * 3), *res;
 
+	if (!buf) return (FALSE);
 #if GTK_MAJOR_VERSION == 1
-	guchar *screenshot = malloc( width*height*3 );
-	GdkWindow *win = (GdkWindow *)&gdk_root_parent;
-
-	if ( screenshot != NULL )
-	{
-		gdk_get_rgb_image( win, gdk_window_get_colormap(win), 0, 0,
-					width, height, screenshot, width*3 );
-		screen_copy_pixels( screenshot, width, height );
-		free(screenshot);
+	res = wj_get_rgb_image((GdkWindow *)&gdk_root_parent, NULL,
+		buf, width, height);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	res = wj_get_rgb_image(gdk_get_default_root_window(), NULL,
+		buf, width, height);
 #endif
-#if GTK_MAJOR_VERSION == 2
-	GdkPixbuf *screenshot = NULL;
-
-	screenshot = gdk_pixbuf_get_from_drawable (NULL, gdk_get_default_root_window(), NULL,
-			0, 0, 0, 0, width, height);
-
-	if ( screenshot != NULL )
+	if (!res)
 	{
-		screen_copy_pixels( gdk_pixbuf_get_pixels( screenshot ), width, height );
-		g_object_unref( screenshot );
-#endif
-	} else return FALSE;
-
-	return TRUE;
+		free(buf);
+		return (FALSE);
+	}
+	mem_pal_load_def();
+	mem_new(width, height, 3, 0); /* No allocation - cannot fail */
+	mem_img[CHN_IMAGE] = buf;
+	update_undo(&mem_image);
+	return (TRUE);
 }
 
 
@@ -1282,71 +1309,212 @@ GtkWidget *text_window, *text_font_window, *text_toggle[3], *text_spin[2];
 
 #define PAD_SIZE 4
 
-gint render_text( GtkWidget *widget )
+/* !!! This function invalidates "img" (may free or realloc it) */
+int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp)
 {
-	GdkImage *t_image = NULL;
+	unsigned char bkg[3], *src, *dest, *tmp, *pix = img, *mask = NULL;
+	int i, l = w *h;
+	int idx, masked, aa, ab, back, dest_bpp = MEM_BPP;
+
+	idx = (mem_channel == CHN_IMAGE) && (mem_img_bpp == 1);
+	/* Indexed image can't be antialiased */
+	aa = !idx && inifile_get_gboolean("fontAntialias0", FALSE);
+	ab = inifile_get_gboolean("fontAntialias1", FALSE);
+
+	back = inifile_get_gint32("fontBackground", 0);
+// !!! Bug - who said palette is unchanged?
+	bkg[0] = mem_pal[back].red;
+	bkg[1] = mem_pal[back].green;
+	bkg[2] = mem_pal[back].blue;
+
+// !!! Inconsistency - why not use mask for utility channels, too?
+	masked = !ab && (mem_channel == CHN_IMAGE);
+	if (masked)
+	{
+		if ((src_bpp == 3) && (dest_bpp == 3)) mask = calloc(1, l);
+			else mask = img , pix = NULL;
+		if (!mask) goto fail;
+	}
+
+	if (mask) /* Set up clipboard mask */
+	{ 
+		src = img; dest = mask;
+		for (i = 0; i < l; i++ , src += src_bpp)
+			*dest++ = *src; /* Image is white on black */
+		if (!aa) mem_threshold(mask, l, 128);
+	}
+
+	if ((mask == img) && (src_bpp == 3)) /* Release excess memory */
+		if ((tmp = realloc(mask, l))) mask = img = tmp;
+
+	if (!pix) pix = malloc(l * dest_bpp);
+	if (!pix)
+	{
+fail:		free(img);
+		return (FALSE);
+	}
+
+	src = img; dest = pix;
+
+	/* Utility channel - have inversion instead of masking */
+	if (mem_channel != CHN_IMAGE)
+	{ 
+		int i, j = ab ? 0 : 255;
+
+		for (i = 0; i < l; i++ , src += src_bpp)
+			*dest++ = *src ^ j; /* Image is white on black */
+		if (!aa) mem_threshold(pix, l, 128);
+	}
+
+	/* Image with mask */
+	else if (mask)
+	{
+		int i, j, k = w * dest_bpp, l8 = 8 * dest_bpp, k8 = k * 8;
+		int h8 = h < 8 ? h : 8,  w8 = w < 8 ? k : l8;
+		unsigned char *tmp = dest_bpp == 1 ? mem_col_pat : mem_col_pat24;
+
+		for (j = 0; j < h8; j++) /* First strip */
+		{
+			dest = pix + w * j * dest_bpp;
+			memcpy(dest, tmp + l8 * j, w8);
+			for (i = l8; i < k; i++ , dest++)
+				dest[l8] = *dest;
+		}
+		src = pix;
+		for (j = 8; j < h; j++ , src += k) /* Repeat strips */
+			memcpy(src + k8, src, k);
+	}
+
+	/* Indexed image */
+	else if (dest_bpp == 1)
+	{
+		int i, j;
+		unsigned char *tmp;
+
+		for (j = 0; j < h; j++)
+		{
+			tmp = mem_col_pat + (j & 7) * 8;
+			for (i = 0; i < w; i++ , src += src_bpp)
+				*dest++ = *src < 128 ? back : tmp[i & 7];
+		}
+	}
+
+	/* Non-antialiased RGB */
+	else if (!aa)
+	{
+		int i, j;
+		unsigned char *tmp;
+
+		for (j = 0; j < h; j++)
+		{
+			tmp = mem_col_pat24 + (j & 7) * (8 * 3);
+			for (i = 0; i < w; i++ , src += src_bpp , dest += 3)
+			{
+				unsigned char *t2 = *src < 128 ? bkg :
+					tmp + (i & 7) * 3;
+				dest[0] = t2[0];
+				dest[1] = t2[1];
+				dest[2] = t2[2];
+			}
+		}
+	}
+
+	/* Background-merged RGB */
+	else
+	{
+		int i, j;
+		unsigned char *tmp;
+
+		for (j = 0; j < h; j++)
+		{
+			tmp = mem_col_pat24 + (j & 7) * (8 * 3);
+			for (i = 0; i < w; i++ , src += src_bpp , dest += 3)
+			{
+				unsigned char *t2 = tmp + (i & 7) * 3;
+				int m = *src, r = t2[0], g = t2[1], b = t2[2];
+				int kk;
+
+				kk = 255 * r + m * (bkg[0] - r);
+				dest[0] = (kk + (kk >> 8) + 1) >> 8;
+				kk = 255 * g + m * (bkg[1] - g);
+				dest[1] = (kk + (kk >> 8) + 1) >> 8;
+				kk = 255 * b + m * (bkg[2] - b);
+				dest[2] = (kk + (kk >> 8) + 1) >> 8;
+			}
+		}
+	}
+
+	/* Release excess memory */
+	if ((pix == img) && (dest_bpp < src_bpp))
+		if ((tmp = realloc(pix, l * dest_bpp))) pix = img = tmp;
+	if ((img != pix) && (img != mask)) free(img);
+
+	mem_clip_new(w, h, dest_bpp, 0, FALSE);
+	mem_clipboard = pix;
+	mem_clip_mask = mask;
+
+	return (TRUE);
+}
+
+void render_text( GtkWidget *widget )
+{
 	GdkPixmap *text_pixmap;
-	gboolean antialias[3] = {
-			inifile_get_gboolean( "fontAntialias", FALSE ),
-			inifile_get_gboolean( "fontAntialias1", FALSE ),
-			inifile_get_gboolean( "fontAntialias2", FALSE )
-			};
-	unsigned char *source, *dest, *dest2, *pat_off, r, g, b, pix_and = 255, v;
-	int width, height, i, j, k, m, bpp, clip_bpp, back;
+	unsigned char *buf;
+	int width, height, have_rgb = 0;
 
 #if GTK_MAJOR_VERSION == 2
-	int tx = PAD_SIZE, ty = PAD_SIZE;
-#if GTK_MINOR_VERSION >= 6
-	int w2, h2;
-	float degs, angle;
-	PangoMatrix matrix = PANGO_MATRIX_INIT;
-#endif
+
 	PangoContext *context;
 	PangoLayout *layout;
 	PangoFontDescription *font_desc;
+	int tx = PAD_SIZE, ty = PAD_SIZE;
+#if GTK_MINOR_VERSION >= 6
+	PangoMatrix matrix = PANGO_MATRIX_INIT;
+	double degs, angle;
+	int w2, h2;
+	int rotate = inifile_get_gboolean( "fontAntialias2", FALSE );
+#endif
+
 
 	context = gtk_widget_create_pango_context (widget);
 	layout = pango_layout_new( context );
 	font_desc = pango_font_description_from_string( inifile_get( "lastTextFont", "" ) );
+	pango_layout_set_font_description( layout, font_desc );
+	pango_font_description_free( font_desc );
 
 	pango_layout_set_text( layout, inifile_get( "textString", "" ), -1 );
-	pango_layout_set_font_description( layout, font_desc );
 
 #if GTK_MINOR_VERSION >= 6
-	degs = inifile_get_gint32("fontAngle", 0) * 0.01;
-	angle = G_PI*degs/180;
-
-	if ( antialias[2] )		// Rotation Toggle
+	if (rotate)		// Rotation Toggle
 	{
+		degs = inifile_get_gint32("fontAngle", 0) * 0.01;
+		angle = G_PI*degs/180;
 		pango_matrix_rotate (&matrix, degs);
 		pango_context_set_matrix (context, &matrix);
 		pango_layout_context_changed( layout );
-	}
-#endif
-	pango_layout_get_pixel_size( layout, &width, &height );
-	pango_font_description_free( font_desc );
-
-#if GTK_MINOR_VERSION >= 6
-	if ( antialias[2] )		// Rotation Toggle
-	{
+		pango_layout_get_pixel_size( layout, &width, &height );
 		w2 = abs(width * cos(angle)) + abs(height * sin(angle));
 		h2 = abs(width * sin(angle)) + abs(height * cos(angle));
 		width = w2;
 		height = h2;
 	}
+	else
 #endif
+	pango_layout_get_pixel_size( layout, &width, &height );
+
 	width += PAD_SIZE*2;
 	height += PAD_SIZE*2;
 
 	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
 
-	gdk_draw_rectangle (text_pixmap, widget->style->white_gc, TRUE, 0, 0, width, height);
-	gdk_draw_layout( text_pixmap, widget->style->black_gc, tx, ty, layout );
+	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
+	gdk_draw_layout(text_pixmap, widget->style->white_gc, tx, ty, layout);
 
-	t_image = gdk_image_get( text_pixmap, 0, 0, width, height );
-	bpp = t_image->bpp;
-#endif
-#if GTK_MAJOR_VERSION == 1
+	g_object_unref( layout );
+	g_object_unref( context );
+
+#else /* #if GTK_MAJOR_VERSION == 1 */
+
 	GdkFont *t_font = gdk_font_load( inifile_get( "lastTextFont", "" ) );
 	int lbearing, rbearing, f_width, ascent, descent;
 
@@ -1358,165 +1526,35 @@ gint render_text( GtkWidget *widget )
 	height = ascent + descent + PAD_SIZE*2;
 
 	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
-	gdk_draw_rectangle (text_pixmap, widget->style->white_gc, TRUE, 0, 0, width, height);
+	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
+	gdk_draw_string(text_pixmap, t_font, widget->style->white_gc,
+			PAD_SIZE - lbearing, ascent + PAD_SIZE, inifile_get("textString", ""));
 
-	gdk_draw_string( text_pixmap, t_font, widget->style->black_gc,
-			PAD_SIZE - lbearing, ascent + PAD_SIZE, inifile_get( "textString", "" ) );
-
-	t_image = gdk_image_get( text_pixmap, 0, 0, width, height );
-	bpp = ((int) t_image->bpp) / 8;
 	gdk_font_unref( t_font );
+
 #endif
-	if ( bpp == 2 ) pix_and = 31;
-	if ( bpp < 2 ) pix_and = 1;
 
-	if (mem_channel == CHN_IMAGE) clip_bpp = mem_img_bpp;
-	else clip_bpp = 1;
-
-	back = inifile_get_gint32( "fontBackground", 0 );
-	r = mem_pal[back].red;
-	g = mem_pal[back].green;
-	b = mem_pal[back].blue;
-
-	while (t_image)
-	{
-		int cmask = CMASK_IMAGE;
-		if (!antialias[1] && (mem_channel == CHN_IMAGE))
-			cmask |= CMASK_FOR(CHN_SEL);
-		mem_clip_new(width, height, clip_bpp, cmask, FALSE);
-	
-		if (!mem_clipboard)
-		{
-			alert_box( _("Error"), _("Not enough memory to create clipboard"),
-					_("OK"), NULL, NULL );
-			text_paste = TEXT_PASTE_NONE;
-			break;
-		}
-		text_paste = TEXT_PASTE_GTK;
-		for ( j=0; j<height; j++ )
-		{
-			source = (unsigned char *) (t_image->mem) + j * t_image->bpl;
-			dest = mem_clipboard + width * j * clip_bpp;
-			dest2 = mem_clip_mask + width*j;
-			if ( clip_bpp == 3 )		// RGB Clipboard
-			{
-				pat_off = mem_col_pat24 + (j%8)*8*3;
-				if ( antialias[0] )	// Antialiased
-				{
-				  if ( antialias[1] )	// Antialiased with background
-				  {
-					for ( i=0; i<width; i++ )
-					{
-						v = source[0] & pix_and;
-						dest[0] = ( (pix_and-v)*pat_off[3*(i%8)] +
-							v*r ) / pix_and;
-						dest[1] = ( (pix_and-v)*pat_off[3*(i%8)+1] +
-							v*g ) / pix_and;
-						dest[2] = ( (pix_and-v)*pat_off[3*(i%8)+2] +
-							v*b ) / pix_and;
-
-						source += bpp;
-						dest += 3;
-					}
-				  }
-				  else			// Antialiased without background
-				  {
-					for ( i=0; i<width; i++ )
-					{
-						v = source[0] & pix_and;
-						dest2[i] = (v * 255 / pix_and) ^ 255;	// Alpha blend
-						dest[0] = pat_off[3*(i%8)];
-						dest[1] = pat_off[3*(i%8)+1];
-						dest[2] = pat_off[3*(i%8)+2];
-
-						source += bpp;
-						dest += 3;
-					}
-				  }
-				}
-				else		// Not antialiased
-				{
-				 for ( i=0; i<width; i++ )
-				 {
-					if ( (source[0] & pix_and) > (pix_and/2) )
-					{				// Background
-						if ( !antialias[1] ) dest2[i] = 0;
-						dest[0] = r;
-						dest[1] = g;
-						dest[2] = b;
-					}
-					else				// Text
-					{
-						dest[0] = pat_off[3*(i%8)];
-						dest[1] = pat_off[3*(i%8)+1];
-						dest[2] = pat_off[3*(i%8)+2];
-					}
-					source += bpp;
-					dest += 3;
-				 }
-				}
-			}
-			if ( clip_bpp == 1 && mem_channel == CHN_IMAGE )
-			{
-				pat_off = mem_col_pat + (j%8)*8;
-				for ( i=0; i<width; i++ )
-				{
-					if ( (source[0] & pix_and) > (pix_and/2) ) // Background
-					{
-						if ( !antialias[1] ) dest2[i] = 0;
-						dest[i] = back;
-					}
-					else dest[i] = pat_off[i%8];	// Text
-					source += bpp;
-				}
-			}
-			if ( clip_bpp == 1 && mem_channel != CHN_IMAGE )
-			{
-				if ( antialias[1] )	// Inverted
-				{
-					k = 0;
-					m = 1;
-				}
-				else			// Normal
-				{
-					k = 255;
-					m = -1;
-				}
-				if ( antialias[0] )	// Antialiased
-				{
-					for ( i=0; i<width; i++ )
-					{
-						v = source[0] & pix_and;
-						dest[i] = k + m * v * 255 / pix_and;
-						source += bpp;
-					}
-				}
-				else			// Not antialiased
-				{
-					for ( i=0; i<width; i++ )
-					{
-						v = source[0] & pix_and;
-						if ( v > pix_and/2 ) dest[i] = 255-k;
-						else dest[i] = k;
-						source += bpp;
-					}
-				}
-			}
-		}
-		break;
-	}
-	if (t_image) gdk_image_destroy(t_image);
+	buf = malloc(width * height * 3);
+	if (buf) have_rgb = !!wj_get_rgb_image(widget->window, text_pixmap,
+		buf, width, height);
 	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
-#if GTK_MAJOR_VERSION == 2
-	g_object_unref( layout );
-	g_object_unref( context );
-#endif
 
-	return TRUE;		// Success
+	text_paste = TEXT_PASTE_GTK;
+	if (!have_rgb) free(buf);
+	else have_rgb = make_text_clipboard(buf, width, height, 3);
+	if (!have_rgb)
+	{
+		alert_box( _("Error"), _("Not enough memory to create clipboard"),
+			_("OK"), NULL, NULL );
+		text_paste = TEXT_PASTE_NONE;
+	}
 }
 
 static gint delete_text( GtkWidget *widget, GdkEvent *event, gpointer data )
-{	gtk_widget_destroy( text_window ); return FALSE;	}
+{
+	gtk_widget_destroy( text_window );
+	return FALSE;
+}
 
 static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
@@ -1544,7 +1582,7 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	inifile_set( "lastTextFont", t_font_name );
 	inifile_set( "textString", t_string );
-	inifile_set_gboolean( "fontAntialias", antialias[0] );
+	inifile_set_gboolean( "fontAntialias0", antialias[0] );
 	inifile_set_gboolean( "fontAntialias1", antialias[1] );
 	inifile_set_gboolean( "fontAntialias2", antialias[2] );
 
@@ -1573,12 +1611,11 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, 200, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
+	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
 	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
-			inifile_get_gboolean( "fontAntialias", FALSE ) );
+			inifile_get_gboolean( "fontAntialias0", FALSE ) );
 
 #if defined(U_MTK) || GTK_MAJOR_VERSION == 2
 	if (mem_img_bpp == 1)
@@ -1595,16 +1632,16 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 		text_toggle[1] = add_a_toggle( _("Background colour ="), hbox,
 			inifile_get_gboolean( "fontAntialias1", FALSE ) );
 
-		text_spin[0] = add_a_spin(inifile_get_gint32("fontBackground", 0)
-			% mem_cols, 0, mem_cols - 1);
-		gtk_box_pack_start (GTK_BOX (hbox), text_spin[0], FALSE, FALSE, 5);
+		text_spin[0] = pack5(hbox, add_a_spin(
+			inifile_get_gint32("fontBackground", 0)	% mem_cols,
+			0, mem_cols - 1));
 	}
 
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
 #if GTK_CHECK_VERSION(2,6,0)
-	text_spin[1] = add_float_spin(inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360);
-	gtk_box_pack_start (GTK_BOX (hbox), text_spin[1], FALSE, FALSE, 5);
+	text_spin[1] = pack5(hbox, add_float_spin(
+		inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360));
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
 		inifile_get_gboolean( "fontAntialias2", FALSE ) );
 #else
@@ -1613,9 +1650,9 @@ void pressed_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, 200, 10 );
 
-	hbox = OK_box(0, text_window, _("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(delete_text));
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
+	hbox = pack5(vbox, OK_box(0, text_window,
+		_("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(delete_text)));
 
 	gtk_widget_show(text_window);
 	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );

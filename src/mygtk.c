@@ -352,7 +352,7 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 			gtk_object_set_user_data(GTK_OBJECT(wbox), var);
 		}
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-		gtk_box_pack_start(GTK_BOX(wbox), button, FALSE, FALSE, 0);
+		pack(wbox, button);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
 		gtk_signal_connect(GTK_OBJECT(button), "toggled", handler,
@@ -757,9 +757,8 @@ GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 
 	add_with_frame(box, name, hbox, 5);
-	entry = gtk_entry_new();
+	entry = xpack5(hbox, gtk_entry_new());
 	gtk_widget_show(entry);
-	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
 	button = add_a_button(_("Browse"), 2, hbox, FALSE);
 	gtk_object_set_user_data(GTK_OBJECT(button), title);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
@@ -843,6 +842,24 @@ GtkWidget *pack(GtkWidget *box, GtkWidget *widget)
 GtkWidget *xpack(GtkWidget *box, GtkWidget *widget)
 {
 	gtk_box_pack_start(GTK_BOX(box), widget, TRUE, TRUE, 0);
+	return (widget);
+}
+
+GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, 0);
+	return (widget);
+}
+
+GtkWidget *pack5(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_start(GTK_BOX(box), widget, FALSE, FALSE, 5);
+	return (widget);
+}
+
+GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget)
+{
+	gtk_box_pack_start(GTK_BOX(box), widget, TRUE, TRUE, 5);
 	return (widget);
 }
 

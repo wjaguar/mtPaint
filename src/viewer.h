@@ -36,9 +36,10 @@ void init_view();			// Initial setup
 void view_show();
 void view_hide();
 
+int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp);
 void pressed_help( GtkMenuItem *menu_item, gpointer user_data );
 void pressed_text( GtkMenuItem *menu_item, gpointer user_data );
-gint render_text( GtkWidget *widget );
+void render_text( GtkWidget *widget );
 
 void vw_align_size( float new_zoom );				// Set new zoom
 void vw_repaint( int px, int py, int pw, int ph );
@@ -50,4 +51,4 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align);
 
 gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event );
-gboolean grab_screen();
+int grab_screen();

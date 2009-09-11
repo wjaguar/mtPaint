@@ -392,6 +392,13 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 	unsigned char *res;
 	int i, j = w * h, noinit = FALSE;
 
+	image->width = w;
+	image->height = h;
+	image->bpp = bpp;
+	memset(image->img, 0, sizeof(chanlist));
+
+	if (!cmask) return (TRUE); /* Empty block requested */
+
 	if (src == (void *)(-1)) /* No-init mode */
 	{
 		noinit = TRUE;
@@ -401,7 +408,6 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 	res = image->img[CHN_IMAGE] = malloc(j * bpp);
 	for (i = CHN_ALPHA; res && (i < NUM_CHANNELS); i++)
 	{
-		image->img[i] = NULL;
 		if (src ? !!src[i] : cmask & CMASK_FOR(i))
 			res = image->img[i] = malloc(j);
 	}
@@ -419,10 +425,7 @@ int mem_alloc_image(image_info *image, int w, int h, int bpp, int cmask,
 		return (FALSE);
 	}
 
-	/* Initialize what we can (i.e., all but palette) */
-	image->width = w;
-	image->height = h;
-	image->bpp = bpp;
+	/* Initialize channels */
 	if (noinit); /* Leave alone */
 	else if (src) /* Clone */
 	{
@@ -4644,16 +4647,12 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 	return (0);
 }
 
-void mem_threshold(int channel, int level)		// Threshold channel values
+/* Threshold channel values */
+void mem_threshold(unsigned char *img, int len, int level)
 {
-	unsigned char *wrk = mem_img[channel];
-	int i, j = mem_width * mem_height * MEM_BPP;
-
-	if (!wrk) return; /* Paranoia */
-	for (i = 0; i < j; i++)
-	{
-		wrk[i] = wrk[i] < level ? 0 : 255;
-	}
+	if (!img) return; /* Paranoia */
+	for (; len; len-- , img++)
+		*img = *img < level ? 0 : 255;
 }
 
 /* Only supports BPP = 1 and 3 */
@@ -4674,6 +4673,15 @@ void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp)
 		k = rint(d * img[2]);
 		img[2] = k > 255 ? 255 : k;
 	}
+}
+
+/* Build bitdepth translation table */
+void set_xlate(unsigned char *xlat, int bpp)
+{
+	int i, n = (1 << bpp) - 1;
+	double d = 255.0 / (double)n;
+
+	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
 }
 
 int get_pixel( int x, int y )	/* Mixed */

@@ -401,8 +401,7 @@ void pressed_file_configure()
 	gtk_container_add(GTK_CONTAINER(win), vbox);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
-	sw = gtk_scrolled_window_new (NULL, NULL);
-	gtk_box_pack_start(GTK_BOX(vbox), sw, TRUE, TRUE, 5);
+	sw = xpack5(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (sw), GTK_POLICY_AUTOMATIC,
 			GTK_POLICY_AUTOMATIC);
 
@@ -441,8 +440,7 @@ void pressed_file_configure()
 		hbox = gtk_hbox_new(FALSE, 0);
 		gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 		add_with_frame(vbox, !j ? _("Action") : _("Command"), hbox, 5);
-		faction_entry[j] = entry = gtk_entry_new();
-		gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+		faction_entry[j] = entry = xpack5(hbox, gtk_entry_new());
 		gtk_signal_connect(GTK_OBJECT(entry), "changed",
 			GTK_SIGNAL_FUNC(faction_changed), (gpointer)j);
 	}

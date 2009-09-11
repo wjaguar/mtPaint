@@ -4092,9 +4092,8 @@ void main_init()
 
 ////	STATUS BAR
 
-	hbox_bar = gtk_hbox_new (FALSE, 0);
+	hbox_bar = pack_end(vbox_right, gtk_hbox_new(FALSE, 0));
 	if ( toolbar_status[TOOLBAR_STATUS] ) gtk_widget_show (hbox_bar);
-	gtk_box_pack_end (GTK_BOX (vbox_right), hbox_bar, FALSE, FALSE, 0);
 
 
 	for (i = 0; i < STATUS_ITEMS; i++)
@@ -4104,10 +4103,10 @@ void main_init()
 			(i == STATUS_CURSORXY) || (i == STATUS_UNDOREDO) ? 0.5 : 0.0, 0.0);
 		gtk_widget_show(label_bar[i]);
 	}
-	for ( i=0; i<STATUS_ITEMS; i++ )
+	for (i = 0; i < STATUS_ITEMS; i++)
 	{
-		if ( i<3 ) gtk_box_pack_start (GTK_BOX (hbox_bar), label_bar[i], FALSE, FALSE, 0);
-		else	gtk_box_pack_end (GTK_BOX (hbox_bar), label_bar[7-i], FALSE, FALSE, 0);
+		if (i < 3) pack(hbox_bar, label_bar[i]);
+		else pack_end(hbox_bar, label_bar[(STATUS_ITEMS - 1) + 3 - i]);
 	}
 	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
 	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 50, -2);

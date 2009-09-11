@@ -1358,16 +1358,13 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	}
 
 	/* Create controls (!!! two widgets per value - used in traversal) */
-	label = gtk_label_new(_("File Format"));
-	gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-	opt = gtk_option_menu_new();
-	gtk_box_pack_start(GTK_BOX(box), opt, FALSE, FALSE, 5);
+	label = pack5(box, gtk_label_new(_("File Format")));
+	opt = pack5(box, gtk_option_menu_new());
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
-		label = gtk_label_new(spinnames[i]);
-		gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 5);
-		spin = add_a_spin(spindata[i][0], spindata[i][1], spindata[i][2]);
-		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 5);
+		label = pack5(box, gtk_label_new(spinnames[i]));
+		spin = pack5(box, add_a_spin(spindata[i][0],
+			spindata[i][1], spindata[i][2]));
 	}
 	gtk_widget_show_all(box);
 

@@ -24,6 +24,7 @@
 #include "memory.h"
 #include "png.h"
 #include "mainwindow.h"
+#include "viewer.h"
 #include "canvas.h"
 #include "inifile.h"
 
@@ -570,49 +571,6 @@ fail2:
 
 
 #ifdef U_FREETYPE
-static int mem_text_clip_prep(int w, int h)		// Prepare new clipboard for text rendering
-{
-	unsigned char *dest, *pat_off;
-	int i, j, clip_bpp;
-
-	if ( w<1 || h<1 ) return 1;
-
-	clip_bpp = MEM_BPP;
-	mem_clip_new(w, h, clip_bpp, CMASK_IMAGE, FALSE);
-
-	if (!mem_clipboard) return (1);
-
-	if (mem_channel == CHN_IMAGE)		// Pasting to image so use the pattern
-	{
-		for ( j=0; j<h; j++ )
-		{
-			dest = mem_clipboard + mem_clip_w*j*mem_clip_bpp;
-			if ( mem_clip_bpp == 1 )
-			{
-				pat_off = mem_col_pat + (j%8)*8;
-				for ( i=0; i<w; i++ )
-				{
-					dest[i] = pat_off[i%8];
-				}
-			}
-			if ( mem_clip_bpp == 3 )
-			{
-				pat_off = mem_col_pat24 + (j%8)*8*3;
-				for ( i=0; i<w; i++ )
-				{
-					dest[3*i]   = pat_off[3*(i%8)];
-					dest[3*i+1] = pat_off[3*(i%8)+1];
-					dest[3*i+2] = pat_off[3*(i%8)+2];
-				}
-			}
-		}
-	}
-
-	return 0;
-}
-
-
-
 /*
 	-----------------------------------------------------------------
 	|			Font Indexing Code			|
@@ -834,22 +792,30 @@ fail:	return (res);
 
 static void font_index_load(char *filename)
 {
-	char *buf;
-	int res, family_s, family_e, dir, style_s, style_e, size, name_s, name_e;
+	char *buf, *tmp, *tail, *slots[SLOT_TOT];
+	int i, dir, size;
 
 
 	font_text = slurp_file(filename);
 	if (!font_text) return;
 
-	for (buf = font_text + 1; *buf; buf += name_e + 1)
+	for (buf = font_text + 1; *buf; buf = tmp)
 	{
-		res = sscanf(buf, " %n%*[^\t]%n\t%d\t%n%*[^\t]%n\t%d\t%n%*[^\r\n]%n",
-			&family_s, &family_e, &dir, &style_s, &style_e, &size,
-			&name_s, &name_e);
-		if (res < 2) break;
-		buf[family_e] = buf[style_e] = buf[name_e] = '\0';
-		if (!font_mem_add(buf + family_s, dir, buf + style_s, size,
-			buf + name_s))
+		buf += strspn(buf, "\r\n");
+		if (!*buf) break;
+		tmp = buf + strcspn(buf, "\r\n");
+		if (*tmp) *tmp++ = 0;
+		for (i = 0; i < SLOT_TOT; i++)
+		{
+			slots[i] = buf;
+			buf += strcspn(buf, "\t");
+			if (*buf) *buf++ = 0;
+		}
+		dir = strtol(slots[SLOT_DIR], &tail, 10);
+		if (*tail) break;
+		size = strtol(slots[SLOT_SIZE], &tail, 10);
+		if (*tail) break;
+		if (!font_mem_add(slots[0], dir, slots[2], size, slots[4]))
 		{	// Memory failure
 			font_mem_clear();
 			break;
@@ -1021,7 +987,6 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 	}
 
 	progress_init( _("Creating Font Index"), 0 );
-	while (gtk_events_pending()) gtk_main_iteration();
 	font_index_create( filename, dirs );
 	progress_end();
 }
@@ -1055,68 +1020,8 @@ void ft_render_text()		// FreeType equivalent of render_text()
 
 	text_1bpp = render_to_1bpp(&w, &h);
 
-	if ( text_1bpp )
-	{
-		if ( !mem_text_clip_prep(w, h) )
-		{
-			int i, j = w*h, back = inifile_get_gboolean( "fontAntialias1", FALSE );
-
-			if (mem_channel == CHN_IMAGE)		// Image Text Paste
-			{
-				if ( back )
-				{		// With background
-					int bindex = inifile_get_gint32( "fontBackground", 0 );
-					int	r = mem_pal[bindex].red,
-						g = mem_pal[bindex].green,
-						b = mem_pal[bindex].blue;
-
-					if ( mem_clip_bpp == 1 )
-					{
-						for ( i=0; i<j; i++ )
-						{
-							if ( !text_1bpp[i] )
-								mem_clipboard[i] = bindex;
-						}
-					}
-					if ( mem_clip_bpp == 3 )
-					{
-						int k;
-						unsigned char *src = mem_clipboard;
-
-						for ( i=0; i<j; i++ )
-						{
-							k = text_1bpp[i];
-							src[0] = ( (255-k)*r + k*src[0] ) / 255;
-							src[1] = ( (255-k)*g + k*src[1] ) / 255;
-							src[2] = ( (255-k)*b + k*src[2] ) / 255;
-							src += 3;
-						}
-					}
-
-					free( text_1bpp );
-				}
-				else
-				{		// No background
-					mem_clip_mask = text_1bpp;
-				}
-			}
-			else					// Channel Text Paste
-			{
-				if ( back )			// Invert
-					for ( i=0; i<j; i++ )
-						mem_clipboard[i] = text_1bpp[i] ^ 255;
-				else memcpy( mem_clipboard, text_1bpp, j );
-
-				free( text_1bpp );
-			}
-			text_paste = TEXT_PASTE_FT;
-		}
-		else
-		{
-			free(text_1bpp);	// Couldn't set up clipboard so free memory
-			text_paste = TEXT_PASTE_NONE;
-		}
-	}
+	if (text_1bpp && make_text_clipboard(text_1bpp, w, h, 1))
+		text_paste = TEXT_PASTE_FT;
 	else text_paste = TEXT_PASTE_NONE;
 #endif		// U_FREETYPE
 }
@@ -1604,9 +1509,11 @@ static void add_font_clist(int i, GtkWidget *hbox, mtfontsel *mem, int padding)
 	mem->clist[i] = gtk_clist_new( clist_text_cols[i] );
 	gtk_object_set_data( GTK_OBJECT(mem->clist[i]), "mtfontsel", mem );
 
-/*	if ( i == CLIST_FONTSIZE || i == CLIST_FONTSTYLE )
-		gtk_box_pack_start (GTK_BOX (hbox), scrolledwindow, FALSE, FALSE, 5);
-	else*/
+#if 0
+	if ( i == CLIST_FONTSIZE || i == CLIST_FONTSTYLE )
+		pack5(hbox, scrolledwindow);
+	else
+#endif
 		gtk_box_pack_start (GTK_BOX (hbox), scrolledwindow, TRUE, TRUE, padding);
 
 	if ( i == CLIST_FONTSTYLE )
@@ -1615,21 +1522,18 @@ static void add_font_clist(int i, GtkWidget *hbox, mtfontsel *mem, int padding)
 	for (j = 0; j < clist_text_cols[i]; j++)
 	{
 		temp_hbox = gtk_hbox_new( FALSE, 0 );
-		temp_label = gtk_label_new( clist_text_titles[i][j] );
-		gtk_box_pack_start( GTK_BOX(temp_hbox), temp_label, FALSE, TRUE, 0 );
+		temp_label = pack(temp_hbox, gtk_label_new(clist_text_titles[i][j]));
 
-		if ( i == CLIST_FONTNAME )
-		{
-			mem->sort_arrows[j] = gtk_arrow_new( GTK_ARROW_DOWN, GTK_SHADOW_IN );
-			gtk_box_pack_end( GTK_BOX(temp_hbox), mem->sort_arrows[j], FALSE, TRUE, 0 );
-		}
+		if (i == CLIST_FONTNAME) mem->sort_arrows[j] =
+			pack_end(temp_hbox, gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_IN));
 
 		gtk_widget_show( temp_label );
 		gtk_widget_show( temp_hbox );
 		gtk_clist_set_column_widget( GTK_CLIST( mem->clist[i] ), j, temp_hbox );
 		gtk_clist_set_column_resizeable( GTK_CLIST(mem->clist[i]), j, FALSE );
-		if (i == CLIST_FONTSIZE ) gtk_clist_set_column_justification(
-						GTK_CLIST(mem->clist[i]), j, GTK_JUSTIFY_CENTER );
+		if (i == CLIST_FONTSIZE)
+			gtk_clist_set_column_justification(
+				GTK_CLIST(mem->clist[i]), j, GTK_JUSTIFY_CENTER);
 	}
 
 	if ( i == CLIST_FONTNAME )
@@ -1871,29 +1775,22 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 	hbox = gtk_hbox_new (FALSE, 0);
 	gtk_container_add (GTK_CONTAINER (page), hbox);
 
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (hbox), vbox, FALSE, FALSE, 5);
+	vbox = pack5(hbox, gtk_vbox_new(FALSE, 0));
 
 	add_font_clist(0, vbox, mem, 5);
 
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (hbox), vbox, TRUE, TRUE, 5);
-
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, TRUE, TRUE, 5);
+	vbox = xpack5(hbox, gtk_vbox_new(FALSE, 0));
+	hbox = xpack5(vbox, gtk_hbox_new(FALSE, 0));
 
 	add_font_clist(CLIST_FONTSTYLE, hbox, mem, 5);
 
-	vbox2 = gtk_vbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (hbox), vbox2, TRUE, TRUE, 0);
+	vbox2 = xpack(hbox, gtk_vbox_new(FALSE, 0));
 	add_font_clist(CLIST_FONTSIZE, vbox2, mem, 0);
-	mem->spin[TX_SPIN_SIZE] = add_a_spin(inifile_get_gint32("fontSize", 12), 1, 500);
-
+	mem->spin[TX_SPIN_SIZE] = pack(vbox2,
+		add_a_spin(inifile_get_gint32("fontSize", 12), 1, 500));
 #if GTK_CHECK_VERSION(2,4,0)
 	gtk_entry_set_alignment( GTK_ENTRY(&(GTK_SPIN_BUTTON( mem->spin[TX_SPIN_SIZE] )->entry)), 0.5);
 #endif
-
-	gtk_box_pack_start (GTK_BOX (vbox2), mem->spin[TX_SPIN_SIZE], FALSE, FALSE, 0);
 
 	add_font_clist(CLIST_FONTFILE, hbox, mem, 5);
 
@@ -1902,8 +1799,7 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame(vbox, _("Text"), hbox, 5);
-	mem->entry[TX_ENTRY_TEXT] = gtk_entry_new();
-	gtk_box_pack_start(GTK_BOX(hbox), mem->entry[TX_ENTRY_TEXT], TRUE, TRUE, 0);
+	mem->entry[TX_ENTRY_TEXT] = xpack(hbox, gtk_entry_new());
 	gtk_entry_set_text (GTK_ENTRY (mem->entry[TX_ENTRY_TEXT]),
 		inifile_get( "textString", _("Enter Text Here") ) );
 	gtk_signal_connect(GTK_OBJECT(mem->entry[TX_ENTRY_TEXT]), "changed",
@@ -1916,10 +1812,9 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame_x(vbox, _("Preview"), hbox, 5, TRUE);
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
-	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scrolledwindow),
+	scrolledwindow = xpack(hbox, gtk_scrolled_window_new(NULL, NULL));
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledwindow),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_box_pack_start (GTK_BOX (hbox), scrolledwindow, TRUE, TRUE, 0);
 
 	mem->preview_area = gtk_drawing_area_new();
 	gtk_object_set_data( GTK_OBJECT(mem->preview_area), "mtfontsel", mem );
@@ -1932,8 +1827,7 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 
 //	TOGGLES
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 
 	mem->toggle[TX_TOGG_ANTIALIAS] = add_a_toggle( _("Antialias"), hbox,
 			inifile_get_gboolean( "fontAntialias0", TRUE ) );
@@ -1948,21 +1842,20 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 		mem->toggle[TX_TOGG_BACKGROUND] = add_a_toggle( _("Background colour ="), hbox,
 			inifile_get_gboolean( "fontAntialias1", FALSE ) );
 
-		mem->spin[TX_SPIN_BACKGROUND] = add_a_spin(inifile_get_gint32("fontBackground", 0)
-			% mem_cols, 0, mem_cols - 1);
-		gtk_box_pack_start (GTK_BOX (hbox), mem->spin[TX_SPIN_BACKGROUND], FALSE, FALSE, 5);
+		mem->spin[TX_SPIN_BACKGROUND] = pack5(hbox, add_a_spin(
+			inifile_get_gint32("fontBackground", 0)	% mem_cols,
+			0, mem_cols - 1));
 	}
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
 
 	mem->toggle[TX_TOGG_OBLIQUE] = add_a_toggle( _("Oblique"), hbox,
 		inifile_get_gboolean( "fontAntialias3", FALSE ) );
 
 	mem->toggle[TX_TOGG_ANGLE] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
-	mem->spin[TX_SPIN_ANGLE] = add_float_spin(inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360);
-	gtk_box_pack_start (GTK_BOX (hbox), mem->spin[TX_SPIN_ANGLE], FALSE, FALSE, 5);
+	mem->spin[TX_SPIN_ANGLE] = pack5(hbox, add_float_spin(
+		inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360));
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mem->toggle[TX_TOGG_ANGLE]), 
 		inifile_get_gboolean( "fontAntialias2", FALSE ) );
 
@@ -1970,19 +1863,14 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 		gtk_signal_connect(GTK_OBJECT(mem->toggle[i]), "clicked",
 			GTK_SIGNAL_FUNC(font_entry_changed), (gpointer)mem);
 	for ( i=0; i<TX_SPINS; i++ )
-		if ( mem->spin[i] )
-		{
-			gtk_signal_connect(GTK_OBJECT(
-				gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(mem->spin[i]))),
-				"value_changed", GTK_SIGNAL_FUNC(font_entry_changed), (gpointer)mem);
-		}
-
+		if (mem->spin[i]) spin_connect(mem->spin[i],
+			GTK_SIGNAL_FUNC(font_entry_changed), (gpointer)mem);
 
 	add_hseparator( vbox, 200, 10 );
 
-	hbox = OK_box(0, mem->window, _("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
-		_("Close"), GTK_SIGNAL_FUNC(delete_text));
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
+	hbox = pack5(vbox, OK_box(0, mem->window,
+		_("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
+		_("Close"), GTK_SIGNAL_FUNC(delete_text)));
 
 
 //	TAB 2 - DIRECTORIES
@@ -2000,8 +1888,7 @@ void pressed_mt_text( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox, 200, 10 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
+	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
 
 	button = add_a_button(_("Close"), 5, hbox, TRUE);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",

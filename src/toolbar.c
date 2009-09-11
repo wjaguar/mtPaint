@@ -1102,9 +1102,8 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	toolbar_boxes[TOOLBAR_PALETTE] = vbox = pack(box, gtk_vbox_new(FALSE, 0));
 	if (toolbar_status[TOOLBAR_PALETTE]) gtk_widget_show(vbox);
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox), hbox, FALSE, FALSE, 5);
+	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
 
 	drawing_col_prev = gtk_drawing_area_new();
 	gtk_widget_show(drawing_col_prev);

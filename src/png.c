@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 #define PNG_READ_PACK_SUPPORTED
 
@@ -247,15 +248,6 @@ static void deallocate_image(ls_settings *settings, int cmask)
 		default: break;
 		}
 	}
-}
-
-/* Build bitdepth translation table */
-static void set_xlate(unsigned char *xlat, int bpp)
-{
-	int i, n = (1 << bpp) - 1;
-	double d = 255.0 / (double)n;
-
-	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
 }
 
 static void ls_init(char *what, int save)
@@ -771,6 +763,9 @@ static int save_gif(char *file_name, ls_settings *settings)
 	GifFileType *giffy;
 	unsigned char gif_ext_data[8];
 	int i, w = settings->width, h = settings->height, msg = -1;
+#ifndef WIN32
+	mode_t mode;
+#endif
 
 
 	/* GIF save must be on indexed image */
@@ -821,6 +816,12 @@ static int save_gif(char *file_name, ls_settings *settings)
 	msg = 0;
 
 fail:	EGifCloseFile(giffy);
+#ifndef WIN32
+	/* giflib creates files with 0600 permissions, which is nasty - WJ */
+	mode = umask(0022);
+	umask(mode);
+	chmod(file_name, 0666 & ~mode);
+#endif
 fail0:	FreeMapObject(gif_map);
 
 	return (msg);

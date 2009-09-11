@@ -379,7 +379,7 @@ int do_threshold(GtkWidget *spin, gpointer fdata)
 
 	i = read_spin(spin);
 	spot_undo(UNDO_FILT);
-	mem_threshold(mem_channel, i);
+	mem_threshold(mem_img[mem_channel], mem_width * mem_height * MEM_BPP, i);
 	mem_undo_prepare();
 
 	return TRUE;

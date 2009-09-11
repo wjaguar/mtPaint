@@ -434,8 +434,7 @@ void pressed_add_cols( GtkMenuItem *menu_item, gpointer user_data )
 
 	add_hseparator( vbox5, -2, 10 );
 
-	spinbutton_col_add = add_a_spin( 256, 2, 256 );
-	gtk_box_pack_start (GTK_BOX (vbox5), spinbutton_col_add, FALSE, FALSE, 5);
+	spinbutton_col_add = pack5(vbox5, add_a_spin(256, 2, 256));
 
 	add_hseparator( vbox5, -2, 10 );
 
@@ -484,7 +483,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 	add_hseparator(vbox6, -2, 10);
 
-	gtk_box_pack_start(GTK_BOX(vbox6), content, FALSE, FALSE, 5);
+	pack5(vbox6, content);
 
 	add_hseparator(vbox6, -2, 10);
 
@@ -894,9 +893,8 @@ void pressed_brcosa( GtkMenuItem *menu_item, gpointer user_data )
 
 	if ( mem_img_bpp == 1 )
 	{
-		label = gtk_label_new( _("Palette") );
-		gtk_box_pack_start( GTK_BOX(hbox), label, FALSE, FALSE, 5 );
-		gtk_widget_show( label );
+		label = pack5(hbox, gtk_label_new(_("Palette")));
+		gtk_widget_show(label);
 	}
 	else
 	{
@@ -1167,15 +1165,13 @@ void sisca_init( char *title )
 		sisca_hbox = pack(sisca_vbox, gtk_hbox_new(FALSE, 0));
 		wvbox = pack(sisca_hbox, gtk_vbox_new(FALSE, 0));
 
-		sisca_gc = sig_toggle(_("Gamma corrected"),
-			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL);
-		gtk_box_pack_end(GTK_BOX(wvbox), sisca_gc, FALSE, FALSE, 0);
+		sisca_gc = pack_end(wvbox, sig_toggle(_("Gamma corrected"),
+			inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
 
 		notebook = pack(sisca_vbox, buttoned_book(&page0, &page1,
 			&button, _("Settings")));
-		wvbox2 = gtk_vbox_new(FALSE, 0);
-		gtk_box_pack_end(GTK_BOX(sisca_hbox), wvbox2, FALSE, FALSE, 0);
-		gtk_box_pack_start(GTK_BOX(wvbox2), button, FALSE, FALSE, 0);
+		wvbox2 = pack_end(sisca_hbox, gtk_vbox_new(FALSE, 0));
+		pack(wvbox2, button);
 
 		add_hseparator(page1, -2, 10);
 		button = pack(page1, sig_toggle(_("Sharper image reduction"),
@@ -1184,12 +1180,12 @@ void sisca_init( char *title )
 		sisca_hbox = wj_radio_pack(scale_fnames, -1, 0, scale_mode, &scale_mode, NULL);
 	}
 
-	gtk_box_pack_start(GTK_BOX(wvbox), sisca_toggles[0], FALSE, FALSE, 0);
+	pack(wvbox, sisca_toggles[0]);
 
 	if (sisca_hbox)
 	{
 		add_hseparator(page0, -2, 10);
-		gtk_box_pack_start(GTK_BOX(page0), sisca_hbox, TRUE, TRUE, 0);
+		xpack(page0, sisca_hbox);
 	}
 	add_hseparator(page0, -2, 10);
 
@@ -1422,9 +1418,9 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	gtk_signal_connect(GTK_OBJECT(col_list), "select_child",
 		GTK_SIGNAL_FUNC(color_select), cs);
 
-	gtk_box_pack_start( GTK_BOX(hbox), cs, TRUE, TRUE, 0 );
+	xpack(hbox, cs);
 
-	if (extbox) gtk_box_pack_start(GTK_BOX(vbox), extbox, FALSE, FALSE, 0);
+	if (extbox) pack(vbox, extbox);
 
 	hbut = pack(vbox, gtk_hbox_new(FALSE, 3));
 	gtk_widget_show(hbut);
@@ -2230,7 +2226,7 @@ void pressed_quantize(GtkMenuItem *menu_item, gpointer user_data, gint palette)
 	{
 		notebook = xpack(mainbox, buttoned_book(&page0, &page1, &button,
 			_("Settings")));
-		gtk_box_pack_end(GTK_BOX(topbox), button, FALSE, FALSE, 0);
+		pack_end(topbox, button);
 	}
 	else page0 = mainbox;
 
@@ -2711,7 +2707,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	hbox = pack(mainbox, gtk_hbox_new(TRUE, 5));
-	gtk_box_pack_start(GTK_BOX(hbox), sw, TRUE, TRUE, 0);
+	xpack(hbox, sw);
 	hbox2 = xpack(hbox, gtk_hbox_new(FALSE, 5));
 	pack(hbox2, gtk_label_new(_("Points:")));
 	grad_ed_len = sw = pack(hbox2, add_a_spin(grad_cnt, 2, GRAD_POINTS));
