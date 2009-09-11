@@ -54,12 +54,12 @@ char *get_home_directory(void);
 /* Compatibility functions */
 
 void inifile_init(char *ini_filename);
-void inifile_quit(void);
+void inifile_quit();
 
-gchar *inifile_get(gchar *setting, gchar *defaultValue);
-gint32 inifile_get_gint32(gchar *setting, gint32 defaultValue);
-gboolean inifile_get_gboolean(gchar *setting, gboolean defaultValue);
+char *inifile_get(char *setting, char *defaultValue);
+int inifile_get_gint32(char *setting, int defaultValue);
+int inifile_get_gboolean(char *setting, int defaultValue);
 
-gboolean inifile_set(gchar *setting, gchar *value);
-gboolean inifile_set_gint32(gchar *setting, gint32 value);
-gboolean inifile_set_gboolean(gchar *setting, gboolean value);
+int inifile_set(char *setting, char *value);
+int inifile_set_gint32(char *setting, int value);
+int inifile_set_gboolean(char *setting, int value);

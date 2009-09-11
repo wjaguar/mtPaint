@@ -109,6 +109,7 @@ void update_menus();					// Update undo/edit menu
 int close_to( int x1, int y1 );
 
 void paint_marquee(int action, int new_x, int new_y);	// Draw/clear marquee
+void refresh_marquee(int px, int py, int pw, int ph);	// Refresh a part of marquee
 void paint_poly_marquee();				// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
 

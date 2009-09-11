@@ -19,6 +19,7 @@
 
 /* Rewritten for version 3.10 by Dmitry Groshev */
 
+#include <stdio.h>
 #include <errno.h>
 
 #define PNG_READ_PACK_SUPPORTED

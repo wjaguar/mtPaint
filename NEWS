@@ -30,6 +30,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Tool cursor now doesn't revert to default one after showing or hiding view window
 	* BUGFIX - Keyboard shortcut for swapping colours A & B now works in GTK+1
 	* BUGFIX - Clicking the palette grid in gradient editor now works properly in GTK+1
+	* BUGFIX - All spin buttons are now wide enough in GTK+1
 
 3.10	2007-1-22
 

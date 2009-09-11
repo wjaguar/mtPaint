@@ -151,17 +151,11 @@ static void update_faction_menu()	// Populate menu
 		sprintf(txt, faction_ini[0], i);
 		nm = inifile_get(txt, "");
 
-// !!! Temporary - till the bug in inifile loader isn't fixed !!!
-		if (!nm || !nm[0] || (nm[0] == '!')) continue;
-
-//		if (!nm || !nm[0] || (nm[0] == '#')) continue;
+		if (!nm || !nm[0] || (nm[0] == '#')) continue;
 		sprintf(txt, faction_ini[1], i);
 		cm = inifile_get(txt, "");
 
-// !!! Temporary - till the bug in inifile loader isn't fixed !!!
-		if (!cm || !cm[0] || (cm[0] == '!')) continue;
-
-//		if (!cm || !cm[0] || (cm[0] == '#')) continue;
+		if (!cm || !cm[0] || (cm[0] == '#')) continue;
 		gtk_label_set_text(
 			GTK_LABEL(GTK_MENU_ITEM(item)->item.bin.child), nm);
 		gtk_widget_show(item);

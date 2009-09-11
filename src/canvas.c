@@ -2572,56 +2572,17 @@ void check_marquee()		// Check marquee boundaries are OK - may be outside limits
 	}
 }
 
-static int vc_x1, vc_y1, vc_x2, vc_y2;	// Visible canvas
-
-static void get_visible()
+static void get_visible(int *vxy)
 {
 	GtkAdjustment *hori, *vert;
 
 	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 
-	vc_x1 = hori->value;
-	vc_y1 = vert->value;
-	vc_x2 = hori->value + hori->page_size - 1;
-	vc_y2 = vert->value + vert->page_size - 1;
-}
-
-/* Clip area to visible canvas */
-static void clip_area( int *rx, int *ry, int *rw, int *rh )
-{
-// !!! This assumes that if there's clipping, then there aren't margins
-	if ( *rx<vc_x1 )
-	{
-		*rw = *rw + (*rx - vc_x1);
-		*rx = vc_x1;
-	}
-	if ( *ry<vc_y1 )
-	{
-		*rh = *rh + (*ry - vc_y1);
-		*ry = vc_y1;
-	}
-	if ( *rx + *rw > vc_x2 ) *rw = vc_x2 - *rx + 1;
-	if ( *ry + *rh > vc_y2 ) *rh = vc_y2 - *ry + 1;
-}
-
-void update_paste_chunk( int x1, int y1, int x2, int y2 )
-{
-	int ux1, uy1, ux2, uy2, w, h;
-
-	get_visible();
-	canvas_size(&w, &h);
-
-	ux1 = x1 > vc_x1 ? x1 : vc_x1;
-	uy1 = y1 > vc_y1 ? y1 : vc_y1;
-	ux2 = x2 < vc_x2 ? x2 : vc_x2;
-	uy2 = y2 < vc_y2 ? y2 : vc_y2;
-	if (ux2 >= w) ux2 = w - 1;
-	if (uy2 >= h) uy2 = h - 1;
-
-	/* Only repaint if on visible canvas */
-	if ((ux1 <= ux2) && (uy1 <= uy2))
-		repaint_paste(ux1, uy1, ux2, uy2);
+	vxy[0] = hori->value;
+	vxy[1] = vert->value;
+	vxy[2] = hori->value + hori->page_size - 1;
+	vxy[3] = vert->value + vert->page_size - 1;
 }
 
 void paint_poly_marquee()			// Paint polygon marquee
@@ -2645,11 +2606,29 @@ void paint_poly_marquee()			// Paint polygon marquee
 }
 
 
-void paint_marquee(int action, int new_x, int new_y)
+static int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
+{
+	rxy[0] = x0 < vxy[0] ? vxy[0] : x0;
+	rxy[1] = y0 < vxy[1] ? vxy[1] : y0;
+	rxy[2] = x1 > vxy[2] ? vxy[2] : x1;
+	rxy[3] = y1 > vxy[3] ? vxy[3] : y1;
+	return ((rxy[2] > rxy[0]) && (rxy[3] > rxy[1]));
+}
+
+static void repaint_clipped(int x0, int y0, int x1, int y1, const int *vxy)
+{
+	int rxy[4];
+
+	if (clip(rxy, x0, y0, x1, y1, vxy))
+		repaint_canvas(margin_main_x + rxy[0], margin_main_y + rxy[1],
+			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+}
+
+static void trace_marquee(int action, int new_x, int new_y, const int *vxy)
 {
 	unsigned char *rgb;
 	int x1, y1, x2, y2, w, h, new_x2, new_y2, mst, zoom = 1, scale = 1;
-	int i, j, r, g, b, rx, ry, rw, rh, offx, offy;
+	int i, j, r, g, b, ry1, ry2, rw, rh, rxy[4], offx, offy;
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
@@ -2669,8 +2648,7 @@ void paint_marquee(int action, int new_x, int new_y)
 	h = abs(y2 - y1) + scale;
 	if (x2 < x1) x1 = x2;
 	if (y2 < y1) y1 = y2;
-
-	get_visible();
+	x2 = x1 + w; y2 = y1 + h;
 
 	if (action == 0) /* Clear */
 	{
@@ -2684,58 +2662,41 @@ void paint_marquee(int action, int new_x, int new_y)
 			/* Full redraw if no intersection */
 			else if ((new_x2 < marq_x1) || (new_x > marq_x2) ||
 				(new_y2 < marq_y1) || (new_y > marq_y2))
-				repaint_canvas(margin_main_x + x1,
-					margin_main_y + y1, w, h);
+				repaint_clipped(x1, y1, x2, y2, vxy);
 			/* Partial redraw */
 			else
 			{
+				int xx[4] = { x1, (new_x * scale) / zoom,
+					(new_x2 * scale) / zoom + scale, x2 };
+				int xv = new_x < marq_x1;
+
 				if (new_x != marq_x1) /* Horizontal shift */
-				{
-					ry = y1; rh = h;
-					if (new_x < marq_x1) /* Move left */
-					{
-						rx = (new_x2 * scale) / zoom + scale;
-						rw = x1 + w - rx;
-					}
-					else /* Move right */
-					{
-						rx = x1;
-						rw = (new_x * scale) / zoom - x1;
-					}
-					clip_area(&rx, &ry, &rw, &rh);
-					repaint_canvas(margin_main_x + rx,
-						margin_main_y + ry, rw, rh);
-				}
+					repaint_clipped(xx[xv + xv + 0], y1,
+						xx[xv + xv + 1], y2, vxy);
 				if (new_y != marq_y1) /* Vertical shift */
 				{
-					rx = x1; rw = w;
 					if (new_y < marq_y1) /* Move up */
 					{
-						ry = (new_y2 * scale) / zoom + scale;
-						rh = y1 + h - ry;
+						ry1 = (new_y2 * scale) / zoom + scale;
+						ry2 = y2;
 					}
 					else /* Move down */
 					{
-						ry = y1;
-						rh = (new_y * scale) / zoom - y1;
+						ry1 = y1;
+						ry2 = (new_y * scale) / zoom;
 					}
-					clip_area(&rx, &ry, &rw, &rh);
-					repaint_canvas(margin_main_x + rx,
-						margin_main_y + ry, rw, rh);
+					repaint_clipped(xx[1 - xv], ry1,
+						xx[3 - xv], ry2, vxy);
 				}
 			}
 		}
 		/* Redraw only borders themselves */
 		else
 		{
-			repaint_canvas(margin_main_x + x1,
-				margin_main_y + y1 + 1, 1, h - 2);
-			repaint_canvas(margin_main_x + x1 + w - 1,
-				margin_main_y + y1 + 1, 1, h - 2);
-			repaint_canvas(margin_main_x + x1,
-				margin_main_y + y1, w, 1);
-			repaint_canvas(margin_main_x + x1,
-				margin_main_y + y1 + h - 1, w, 1);
+			repaint_clipped(x1, y1 + 1, x1 + 1, y2 - 1, vxy);
+			repaint_clipped(x2 - 1, y1 + 1, x2, y2 - 1, vxy);
+			repaint_clipped(x1, y1, x2, y1 + 1, vxy);
+			repaint_clipped(x1, y2 - 1, x2, y2, vxy);
 		}
 		marq_status = mst;
 	}
@@ -2749,20 +2710,20 @@ void paint_marquee(int action, int new_x, int new_y)
 			/* Display paste RGB, only if not being called from repaint_canvas */
 			/* Only do something if there is a change in position */
 			if (show_paste && (action == 1) &&
-				((new_x != marq_x1) || (new_y != marq_y1)))
-				update_paste_chunk(marq_x1 < 0 ? 0 : x1 + 1,
+				((new_x != marq_x1) || (new_y != marq_y1)) &&
+				clip(rxy, marq_x1 < 0 ? 0 : x1 + 1,
 					marq_y1 < 0 ? 0 : y1 + 1,
-					x1 + w - 2, y1 + h - 2);
+					x2 - 1, y2 - 1, vxy))
+				repaint_paste(rxy[0], rxy[1], rxy[2] - 1, rxy[3] - 1);
 			r = g = 0; b = 255; /* Draw in blue */
 		}
 
 		/* Determine visible area */
-		rx = x1; ry = y1; rw = w; rh = h;
-		clip_area(&rx, &ry, &rw, &rh);
-		if ((rw < 1) || (rh < 1)) return;
+		if (!clip(rxy, x1, y1, x2, y2, vxy)) return;
+		rw = rxy[2] - rxy[0]; rh = rxy[3] - rxy[1];
 
-		offx = (abs(rx - x1) % 6) * 3;
-		offy = (abs(ry - y1) % 6) * 3;
+		offx = ((rxy[0] - x1) % 6) * 3;
+		offy = ((rxy[1] - y1) % 6) * 3;
 
 		/* Create pattern */
 		j = (rw > rh ? rw : rh) * 3 + 6 * 3; /* 6 pixels for offset */
@@ -2776,37 +2737,63 @@ void paint_marquee(int action, int new_x, int new_y)
 			rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
 		}
 
-		i = ((mem_width + zoom - 1) * scale) / zoom;
-		j = ((mem_height + zoom - 1) * scale) / zoom;
-		if (rx + rw > i) rw = i - rx;
-		if (ry + rh > j) rh = j - ry;
-
-		if ((x1 >= vc_x1) && (marq_x1 >= 0) && (marq_x2 >= 0))
+		if ((x1 >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
 			gdk_draw_rgb_image(drawing_canvas->window,
 				drawing_canvas->style->black_gc,
-				margin_main_x + rx, margin_main_y + ry,
-				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3);
+				margin_main_x + rxy[0], margin_main_y + rxy[1],
+				1, rxy[3] - rxy[1], GDK_RGB_DITHER_NONE,
+				rgb + offy, 3);
 
-		if ((x1 + w - 1 <= vc_x2) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
+		if ((x2 <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
 			gdk_draw_rgb_image(drawing_canvas->window,
 				drawing_canvas->style->black_gc,
-				margin_main_x + rx + rw - 1, margin_main_y + ry,
-				1, rh, GDK_RGB_DITHER_NONE, rgb + offy, 3);
+				margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
+				1, rxy[3] - rxy[1], GDK_RGB_DITHER_NONE,
+				rgb + offy, 3);
 
-		if ((y1 >= vc_y1) && (marq_y1 >= 0) && (marq_y2 >= 0))
+		if ((y1 >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
 			gdk_draw_rgb_image(drawing_canvas->window,
 				drawing_canvas->style->black_gc,
-				margin_main_x + rx, margin_main_y + ry,
-				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 0);
+				margin_main_x + rxy[0], margin_main_y + rxy[1],
+				rxy[2] - rxy[0], 1, GDK_RGB_DITHER_NONE,
+				rgb + offx, 0);
 
-		if ((y1 + h - 1 <= vc_y2) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
+		if ((y2 <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
 			gdk_draw_rgb_image(drawing_canvas->window,
 				drawing_canvas->style->black_gc,
-				margin_main_x + rx, margin_main_y + ry + rh - 1,
-				rw, 1, GDK_RGB_DITHER_NONE, rgb + offx, 0);
+				margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
+				rxy[2] - rxy[0], 1, GDK_RGB_DITHER_NONE,
+				rgb + offx, 0);
 
 		free(rgb);
 	}
+}
+
+void paint_marquee(int action, int new_x, int new_y)
+{
+	int vxy[4], cxy[4];
+
+	cxy[0] = cxy[1] = 0;
+	canvas_size(cxy + 2, cxy + 3);
+	get_visible(vxy);
+	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+		vxy[2] - margin_main_x + 1, vxy[3] - margin_main_y + 1, cxy))
+		trace_marquee(action, new_x, new_y, vxy);
+}
+
+void refresh_marquee(int px, int py, int pw, int ph)
+{
+	int vxy[4], cxy[4];
+
+	cxy[0] = cxy[1] = 0;
+	canvas_size(cxy + 2, cxy + 3);
+	get_visible(vxy);
+	pw += px - 1; ph += py - 1;
+	if (clip(vxy, (px > vxy[0] ? px : vxy[0]) - margin_main_x,
+		(py > vxy[1] ? py : vxy[1]) - margin_main_y,
+		(pw < vxy[2] ? pw : vxy[2]) - margin_main_x + 1,
+		(ph < vxy[3] ? ph : vxy[3]) - margin_main_y + 1, cxy))
+		trace_marquee(11, marq_x1, marq_y1, vxy);
 }
 
 
@@ -2902,38 +2889,41 @@ void trace_line(int mode, int lx1, int ly1, int lx2, int ly2,
 
 void repaint_line(int mode)			// Repaint or clear line on canvas
 {
-	get_visible();
+	int vxy[4];
+
+	get_visible(vxy);
 	trace_line(mode, line_x1, line_y1, line_x2, line_y2,
 // !!! This assumes that if there's clipping, then there aren't margins
-		vc_x1, vc_y1, vc_x2, vc_y2);
+		vxy[0], vxy[1], vxy[2], vxy[3]);
 }
 
 void repaint_grad(int mode)
 {
 	grad_info *grad = gradient + mem_channel;
-	int oldgrad = grad->status;
+	int vxy[4], oldgrad = grad->status;
 
 	if (mode) mode = 3;
 	else grad->status = GRAD_NONE; /* To avoid hitting repaint */
 
-	get_visible();
+	get_visible(vxy);
 	trace_line(mode, grad->x2, grad->y2, grad->x1, grad->y1,
-		vc_x1 - margin_main_x, vc_y1 - margin_main_y,
-		vc_x2 - margin_main_x, vc_y2 - margin_main_y);
+		vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+		vxy[2] - margin_main_x, vxy[3] - margin_main_y);
 	grad->status = oldgrad;
 }
 
 void refresh_grad(int px, int py, int pw, int ph)
 {
 	grad_info *grad = gradient + mem_channel;
+	int vxy[4];
 
 	pw += px - 1; ph += py - 1;
-	get_visible();
+	get_visible(vxy);
 	trace_line(3, grad->x2, grad->y2, grad->x1, grad->y1,
-		(px > vc_x1 ? px : vc_x1) - margin_main_x,
-		(py > vc_y1 ? py : vc_y1) - margin_main_y,
-		(pw < vc_x2 ? pw : vc_x2) - margin_main_x,
-		(ph < vc_y2 ? ph : vc_y2) - margin_main_y);
+		(px > vxy[0] ? px : vxy[0]) - margin_main_x,
+		(py > vxy[1] ? py : vxy[1]) - margin_main_y,
+		(pw < vxy[2] ? pw : vxy[2]) - margin_main_x,
+		(ph < vxy[3] ? ph : vxy[3]) - margin_main_y);
 }
 
 void men_item_visible( GtkWidget *menu_items[], gboolean state )

@@ -30,6 +30,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <gtk/gtk.h>
 
 #include "global.h"
@@ -170,7 +171,7 @@ static inislot *add_slot(inifile *inip)
 	inislot *ra;
 	int i, j;
 
-	if (inip->count >= INI_LIMIT) return (FALSE); /* Too many entries */
+	if (inip->count >= INI_LIMIT) return (NULL); /* Too many entries */
 	/* Extend the slab if needed */
 	i = inip->count * sizeof(inislot) + SLAB_RESERVED + SLAB_INCREMENT - 1;
 	j = (i + sizeof(inislot)) / SLAB_INCREMENT;
@@ -603,39 +604,39 @@ void inifile_init(char *ini_filename)
 	if (!read_ini(&main_ini, main_ininame)) new_ini(&main_ini);
 }
 
-void inifile_quit(void)
+void inifile_quit()
 {
 	write_ini(&main_ini, main_ininame,
 	  "# Remove this file to restore default settings.\n");
 	forget_ini(&main_ini);
 }
 
-gchar *inifile_get(gchar *setting, gchar *defaultValue)
+char *inifile_get(char *setting, char *defaultValue)
 {
 	return (ini_getstr(&main_ini, setting, defaultValue));
 }
 
-gint32 inifile_get_gint32(gchar *setting, gint32 defaultValue)
+int inifile_get_gint32(char *setting, int defaultValue)
 {
 	return (ini_getint(&main_ini, setting, defaultValue));
 }
 
-gboolean inifile_get_gboolean(gchar *setting, gboolean defaultValue)
+int inifile_get_gboolean(char *setting, int defaultValue)
 {
 	return (ini_getbool(&main_ini, setting, defaultValue));
 }
 
-gboolean inifile_set(gchar *setting, gchar *value)
+int inifile_set(char *setting, char *value)
 {
 	return (ini_setstr(&main_ini, setting, value));
 }
 
-gboolean inifile_set_gint32(gchar *setting, gint32 value)
+int inifile_set_gint32(char *setting, int value)
 {
 	return (ini_setint(&main_ini, setting, value));
 }
 
-gboolean inifile_set_gboolean(gchar *setting, gboolean value)
+int inifile_set_gboolean(char *setting, int value)
 {
 	return (ini_setbool(&main_ini, setting, value));
 }

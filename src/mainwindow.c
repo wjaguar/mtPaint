@@ -2766,7 +2766,8 @@ void repaint_canvas( int px, int py, int pw, int ph )
 		refresh_grad(px, py, pw, ph);
 		break;
 	}
-	if (marq_status != MARQUEE_NONE) paint_marquee(11, marq_x1, marq_y1);
+	if (marq_status != MARQUEE_NONE)
+		refresh_marquee(px, py, pw, ph);
 	if (perim_status > 0) repaint_perim();
 }
 
