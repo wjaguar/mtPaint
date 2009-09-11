@@ -192,6 +192,7 @@ int mem_used_layers();			// Return the number of bytes used in image + undo in a
 
 void mem_bacteria( int val );			// Apply bacteria effect val times the canvas area
 void do_effect( int type, int param );		// 0=edge detect 1=blur 2=emboss
+void mem_gauss(double radiusX, double radiusY);
 
 /// PALETTE PROCS
 
@@ -286,7 +287,7 @@ int mem_sel_rot( int dir );					// Rotate clipboard 90 degrees
 int mem_image_rot( int dir );					// Rotate canvas 90 degrees
 int mem_rotate_free( double angle, int type );			// Rotate canvas by any angle (degrees)
 int mem_image_scale( int nw, int nh, int type );		// Scale image
-int mem_image_resize( int nw, int nh, int ox, int oy );		// Resize image
+int mem_image_resize(int nw, int nh, int ox, int oy, int mode);	// Resize image
 
 int mem_isometrics(int type);
 
@@ -344,3 +345,13 @@ void put_pixel24( int x, int y );				// RGB version
 
 #define mtMIN(a,b,c) if ( b<c ) a=b; else a=c;
 #define mtMAX(a,b,c) if ( b>c ) a=b; else a=c;
+
+/*
+ * Win32 libc (MSVCRT.DLL) violates the C standard as to malloc()'ed memory
+ * alignment; this macro serves as part of a workaround for that problem
+ */
+#ifdef WIN32
+#define ALIGNTO(p,s) ((void *)(((int)(p) + sizeof(s) - 1) & (-sizeof(s))))
+#else
+#define ALIGNTO(p,s) ((void *)(p))
+#endif

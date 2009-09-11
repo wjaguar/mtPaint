@@ -252,6 +252,63 @@ void pressed_emboss( GtkMenuItem *menu_item, gpointer user_data )
 	update_all_views();
 }
 
+int do_gauss(GtkWidget *box, gpointer fdata)
+{
+	GtkWidget *spinX, *spinY, *toggleXY;
+//	int IIR = 0;
+	double radiusX, radiusY;
+
+	spinX = ((GtkBoxChild*)GTK_BOX(box)->children->data)->widget;
+	spinY = ((GtkBoxChild*)GTK_BOX(box)->children->next->data)->widget;
+	toggleXY = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget;
+
+	gtk_spin_button_update(GTK_SPIN_BUTTON(spinX));
+	radiusX = radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinX));
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggleXY)))
+	{
+		gtk_spin_button_update(GTK_SPIN_BUTTON(spinY));
+		radiusY = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(spinY));
+	}
+
+//	GtkWidget *check = ((GtkBoxChild*)GTK_BOX(box)->children->next->next->next->data)->widget;
+//	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check))) IIR = 1;
+
+	spot_undo(UNDO_DRAW);
+	mem_gauss(radiusX, radiusY);
+
+	return TRUE;
+}
+
+static void gauss_xy_click(GtkButton *button, GtkWidget *spin)
+{
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button)))
+	{
+		gtk_widget_hide(GTK_WIDGET(button));
+		gtk_widget_show(spin);
+	}
+}
+
+void pressed_gauss(GtkMenuItem *menu_item, gpointer user_data)
+{
+	int i;
+	GtkWidget *box, *spin, *check;
+
+	box = gtk_vbox_new(FALSE, 5);
+	gtk_widget_show(box);
+	for (i = 0; i < 2; i++)
+	{
+		spin = add_a_spin(1, 0, 200);
+		gtk_box_pack_start(GTK_BOX(box), spin, FALSE, FALSE, 0);
+		gtk_spin_button_set_digits(GTK_SPIN_BUTTON(spin), 2);
+	}
+	gtk_widget_hide(spin);
+	check = add_a_toggle(_("Different X/Y"), box, FALSE);
+	gtk_signal_connect(GTK_OBJECT(check), "clicked",
+		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
+//	add_a_toggle(_("IIR"), box, FALSE);
+	filter_window(_("Gaussian Blur"), box, do_gauss, NULL);
+}
+
 void pressed_convert_rgb( GtkMenuItem *menu_item, gpointer user_data )
 {
 	int i;

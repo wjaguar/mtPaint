@@ -26,9 +26,9 @@ mtPaint can accept one of the following options:
 
 http://mtpaint.sourceforge.net/
 
-=head1 AUTHOR
+=head1 ORIGINAL AUTHOR
 
-Mark Tyler E<lt>marktyler_5@hotmail.comE<gt>
+Mark Tyler
 
 The development of mtPaint has been helped by various people from the free software community.  See "Credits" in the README or the mtPaint help system for details.
 

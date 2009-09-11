@@ -160,7 +160,7 @@ void pressed_crop( GtkMenuItem *menu_item, gpointer user_data )
 	if ( marq_status != MARQUEE_DONE ) return;
 	if ( x1==0 && x2>=(mem_width-1) && y1==0 && y2>=(mem_height-1) ) return;
 
-	res = mem_image_resize(x2 - x1 + 1, y2 - y1 + 1, -x1, -y1);
+	res = mem_image_resize(x2 - x1 + 1, y2 - y1 + 1, -x1, -y1, 0);
 
 	if ( res == 0 )
 	{
@@ -2804,6 +2804,7 @@ void main_init()
 		{ _("/Effects/Sharpen ..."),	NULL,		pressed_sharpen,0, NULL },
 		{ _("/Effects/Soften ..."),	NULL,		pressed_soften,0, NULL },
 		{ _("/Effects/Blur ..."),	NULL,		pressed_blur,0, NULL },
+		{ _("/Effects/Gaussian Blur ..."), NULL,	pressed_gauss,0, NULL },
 		{ _("/Effects/Emboss"),		NULL,		pressed_emboss,0, NULL },
 		{ _("/Effects/sep1"),		NULL,		NULL,0, "<Separator>" },
 		{ _("/Effects/Bacteria ..."),	NULL,		pressed_bacteria, 0, NULL },
@@ -2874,10 +2875,11 @@ void main_init()
 			NULL},
 	*item_help[] = {_("/Help/About"), NULL},
 	*item_prefs[] = {_("/Image/Preferences ..."), NULL},
-	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Opacity"), _("/Effects/Edge Detect"),
+	*item_only_24[] = { _("/Image/Convert To Indexed"), _("/Effects/Edge Detect"),
 			_("/Effects/Blur ..."), _("/Effects/Emboss"), _("/Effects/Sharpen ..."),
 			_("/Effects/Soften ..."), _("/Palette/Create Quantized (DL1)"),
 			_("/Palette/Create Quantized (DL3)"), _("/Palette/Create Quantized (Wu)"),
+			_("/Effects/Gaussian Blur ..."),
 			NULL },
 	*item_only_indexed[] = { _("/Image/Convert To RGB"), _("/Effects/Bacteria ..."),
 			_("/Palette/Merge Duplicate Colours"), _("/Palette/Remove Unused Colours"),

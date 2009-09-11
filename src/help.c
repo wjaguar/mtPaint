@@ -28,7 +28,7 @@ NULL };
 
 char *help_page_contents[] = {
 _("\n"
-"mtPaint 3.00 - Copyright (C) 2004-2006 The Authors\n"
+"mtPaint 3.10 - Copyright (C) 2004-2006 The Authors\n"
 "\n"
 "See 'Credits' section for a list of the authors.\n"
 "\n"
@@ -140,9 +140,9 @@ _("\n"
 "  Shift+Ctrl           Constrain mouse movements to horizontal line\n"
 ),
 _("\n"
-"mtPaint is maintained by Mark Tyler.\n"
+"mtPaint is maintained by Dmitry Groshev.\n"
 "\n"
-"marktyler_5@hotmail.com\n"
+"wjaguar@mail.ru\n"
 "http://mtpaint.sourceforge.net/\n"
 "\n"
 "\n"

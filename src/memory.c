@@ -1724,6 +1724,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 	int tab0[256], tab1[256], tmp, i, j;
 	png_color old_pal[256];
 	unsigned char *img;
+	double lxnA[3], lxnB[3], lxn[3];
 
 	if ( i2 == i1 || i1>mem_cols || i2>mem_cols ) return;
 	if ( i2 < i1 )
@@ -1733,7 +1734,16 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		i2 = i;
 	}
 
-	if ( a == 6 ) mem_get_histogram(CHN_IMAGE);
+	switch (a)
+	{
+	case 6: case 7:
+		init_cols();
+		get_lxn(lxnA, PNG_2_INT(mem_col_A24));
+		get_lxn(lxnB, PNG_2_INT(mem_col_B24));
+		break;
+	case 9:	mem_get_histogram(CHN_IMAGE);
+		break;
+	}
 	
 	for (i = 0; i < 256; i++)
 		tab0[i] = i;
@@ -1741,19 +1751,48 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 	{
 		switch (a)
 		{
-		case 0: tab1[i] = mt_round( 1000*rgb_hsl( 0, mem_pal[i] ) );
+		/* Hue */
+		case 0: tab1[i] = rint(1000 * rgb_hsl(0, mem_pal[i]));
 			break;
-		case 1: tab1[i] = mt_round( 1000*rgb_hsl( 1, mem_pal[i] ) );
+		/* Red */
+		case 1: tab1[i] = mem_pal[i].red;
 			break;
-		case 2: tab1[i] = mt_round( rgb_hsl( 2, mem_pal[i] ) );
+		/* Saturation */
+		case 2: tab1[i] = rint(1000 * rgb_hsl(1, mem_pal[i]));
 			break;
-		case 3: tab1[i] = mem_pal[i].red;
+		/* Green */
+		case 3: tab1[i] = mem_pal[i].green;
 			break;
-		case 4: tab1[i] = mem_pal[i].green;
+		/* Value */
+		case 4: tab1[i] = rint(rgb_hsl(2, mem_pal[i]));
 			break;
+		/* Blue */
 		case 5: tab1[i] = mem_pal[i].blue;
 			break;
-		case 6: tab1[i] = mem_histogram[i];
+		/* Distance to A */
+		case 6: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
+			tab1[i] = rint(1000 * ((lxn[0] - lxnA[0]) *
+				(lxn[0] - lxnA[0]) + (lxn[1] - lxnA[1]) *
+				(lxn[1] - lxnA[1]) + (lxn[2] - lxnA[2]) *
+				(lxn[2] - lxnA[2])));
+			break;
+		/* Distance to A+B */
+		case 7: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
+			tab1[i] = rint(1000 *
+				(sqrt((lxn[0] - lxnA[0]) * (lxn[0] - lxnA[0]) +
+				(lxn[1] - lxnA[1]) * (lxn[1] - lxnA[1]) +
+				(lxn[2] - lxnA[2]) * (lxn[2] - lxnA[2])) +
+				sqrt((lxn[0] - lxnB[0]) * (lxn[0] - lxnB[0]) +
+				(lxn[1] - lxnB[1]) * (lxn[1] - lxnB[1]) +
+				(lxn[2] - lxnB[2]) * (lxn[2] - lxnB[2]))));
+			break;
+		/* Projection on A->B */
+		case 8: tab1[i] = mem_pal[i].red * (mem_col_B24.red - mem_col_A24.red) +
+				mem_pal[i].green * (mem_col_B24.green - mem_col_A24.green) +
+				mem_pal[i].blue * (mem_col_B24.blue - mem_col_A24.blue);
+			break;
+		/* Frequency */
+		case 9: tab1[i] = mem_histogram[i];
 			break;
 		}
 	}
@@ -1792,6 +1831,9 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		*img = tab1[*img];
 		img++;
 	}
+	/* Modify A & B */
+	mem_col_A = tab1[mem_col_A];
+	mem_col_B = tab1[mem_col_B];
 }
 
 void mem_invert()			// Invert the palette
@@ -2103,6 +2145,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	int bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
+	char *tmp = NULL;
 
 	/* Init */
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
@@ -2131,7 +2174,8 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	if (flood_step && ((mem_channel == CHN_IMAGE) || flood_img))
 	{
 		if (flood_slide) fmode = flood_cube ? 2 : 3;
-		else flood_data = calloc(1, sizeof(csel_info));
+		else flood_data = ALIGNTO(tmp = calloc(1, sizeof(csel_info)
+			+ sizeof(double)), double);
 		if (flood_data)
 		{
 			flood_data->center = get_pixel_RGB(x, y);
@@ -2270,7 +2314,7 @@ void wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 			qtail[j] = i;
 	}
 	free(nearq);
-	free(flood_data);
+	free(tmp);
 }
 
 /* Regular flood fill */
@@ -3001,7 +3045,7 @@ fstep *make_filter(int l0, int l1, int type)
 	double A = 0.0, kk = 1.0, sum;
 	int pic_tile = FALSE; /* Allow to enable tiling mode later */
 	int pic_skip = FALSE; /* Allow to enable skip mode later */
-	int i, j, k;
+	int i, j, k, ix;
 
 
 	/* To correct scale-shift */
@@ -3042,10 +3086,23 @@ fstep *make_filter(int l0, int l1, int type)
 		k = (int)floor(basept + fwidth / 2.0);
 		for (j = (int)ceil(basept - fwidth / 2.0); j <= k; j++)
 		{
-			if (pic_skip && ((j < 0) || (j >= l0))) continue;
-			if (j < 0) buf->idx = pic_tile ? l0 + j : -j;
-			else if (j < l0) buf->idx = j;
-			else buf->idx = pic_tile ? j - l0 : 2 * (l0 - 1) - j;
+			ix = j;
+			if ((j < 0) || (j >= l0))
+			{
+				if (pic_skip) continue;
+				if (pic_tile)
+				{
+					if (ix < 0) ix = l0 - (-ix % l0);
+					ix %= l0;
+				}
+				else if (l0 == 1) ix = 0;
+				else 
+				{
+					ix = abs(ix) % (l0 + l0 - 2);
+					if (ix >= l0) ix = l0 + l0 - 2 - ix;
+				}
+			}
+			buf->idx = ix;
 			x = fabs(((double)j - basept) * kk);
 			y = 0;
 			switch (type)
@@ -3104,25 +3161,25 @@ fstep *make_filter(int l0, int l1, int type)
 	return (res);
 }
 
-double *work_area;
+char *workarea;
 fstep *hfilter, *vfilter;
 
 void clear_scale()
 {
-	free(work_area);
+	free(workarea);
 	free(hfilter);
 	free(vfilter);
 }
 
 int prepare_scale(int ow, int oh, int nw, int nh, int type)
 {
-	work_area = NULL;
+	workarea = NULL;
 	hfilter = vfilter = NULL;
 	if (!type || (mem_img_bpp == 1)) return TRUE;
-	work_area = malloc(5 * ow * sizeof(double));
+	workarea = malloc((5 * ow + 1) * sizeof(double));
 	hfilter = make_filter(ow, nw, type);
 	vfilter = make_filter(oh, nh, type);
-	if (!work_area || !hfilter || !vfilter)
+	if (!workarea || !hfilter || !vfilter)
 	{
 		clear_scale();
 		return FALSE;
@@ -3134,9 +3191,11 @@ void do_scale(chanlist old_img, chanlist new_img, int ow, int oh, int nw, int nh
 {
 	unsigned char *src, *img, *imga, alpha;
 	fstep *tmp = NULL, *tmpx, *tmpy;
-	double *wrk, *wrka;
+	double *wrk, *wrka, *work_area;
 	double sum[4], kk;
 	int i, j, n, cc, bpp;
+
+	work_area = ALIGNTO(workarea, double);
 
 	/* For each destination line */
 	tmpy = vfilter;
@@ -3317,12 +3376,12 @@ int mem_isometrics(int type)
 	if ( type<2 )
 	{
 		if ( (oh + (ow-1)/2) > MAX_HEIGHT ) return -666;
-		i = mem_image_resize( ow, oh + (ow-1)/2, 0, 0 );
+		i = mem_image_resize(ow, oh + (ow-1)/2, 0, 0, 0);
 	}
 	if ( type>1 )
 	{
 		if ( (ow+oh-1) > MAX_WIDTH ) return -666;
-		i = mem_image_resize( ow + oh - 1, oh, 0, 0 );
+		i = mem_image_resize(ow + oh - 1, oh, 0, 0, 0);
 	}
 
 	if ( i<0 ) return i;
@@ -3396,57 +3455,148 @@ int mem_isometrics(int type)
 	return 0;
 }
 
-int mem_image_resize( int nw, int nh, int ox, int oy )		// Scale image
+/* This code assumes that source image is in bounds when enlarging */
+/* Modes: 0 - clear, 1 - tile, 2 - mirror tile */
+int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 {
 	chanlist old_img;
 	char *src, *dest;
-	int i, j, cc, bpp, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
-	int oww = mem_width, ohh = mem_height;
+	int i, j, k, cc, bpp, oxo = 0, oyo = 0, nxo = 0, nyo = 0, ow, oh, res;
+	int oww = mem_width, ohh = mem_height, mirr = 0, tw = mem_width;
 
-	mtMIN( nw, nw, MAX_WIDTH )
-	mtMAX( nw, nw, 1 )
-	mtMIN( nh, nh, MAX_HEIGHT )
-	mtMAX( nh, nh, 1 )
+	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
+	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
+	if ((nw <= oww) && (nh <= ohh)) mode = 0;
 
 	memcpy(old_img, mem_img, sizeof(chanlist));
 	res = undo_next_core(2, nw, nh, mem_img_bpp, CMASK_ALL);
 	if (res) return 1;			// Not enough memory
-
-	j = nw * nh;
-	for (cc = 0; cc < NUM_CHANNELS; cc++)
-	{
-		if (!mem_img[cc]) continue;
-		dest = mem_img[cc];
-		if ((cc != CHN_IMAGE) || (mem_img_bpp == 1))
-		{
-			memset(dest, cc == CHN_IMAGE ? mem_col_A : 0, j);
-			continue;
-		}
-		for (i = 0; i < j; i++)		// Background is current colour A
-		{
-			*dest++ = mem_col_A24.red;
-			*dest++ = mem_col_A24.green;
-			*dest++ = mem_col_A24.blue;
-		}
-	}
 
 	if ( ox < 0 ) oxo = -ox;
 	else nxo = ox;
 	if ( oy < 0 ) oyo = -oy;
 	else nyo = oy;
 
-	mtMIN( ow, oww, nw )
-	mtMIN( oh, ohh, nh )
+	if (!mode) /* Clear */
+	{
+		j = nw * nh;
+		for (cc = 0; cc < NUM_CHANNELS; cc++)
+		{
+			if (!mem_img[cc]) continue;
+			dest = mem_img[cc];
+			if ((cc != CHN_IMAGE) || (mem_img_bpp == 1))
+			{
+				memset(dest, cc == CHN_IMAGE ? mem_col_A : 0, j);
+				continue;
+			}
+			for (i = 0; i < j; i++)	// Background is current colour A
+			{
+				*dest++ = mem_col_A24.red;
+				*dest++ = mem_col_A24.green;
+				*dest++ = mem_col_A24.blue;
+			}
+		}
+		ow = oww < nw ? oww : nw;
+	}
+	else /* Tile - prepare for horizontal pass */
+	{
+		mirr = (mode == 2) && (oww > 2) ? 1 : 0;
+		ow = nw;
+		tw -= mirr;
+		i = (nxo + tw - 1) / tw;
+		if (i & 1) mirr = -mirr;
+		oxo = i * tw - nxo;
+		nxo = 0;
+	}
+	oh = ohh < nh ? ohh : nh;
 
+	/* Do horizontal tiling */
+	for (; ow; ow -= res)
+	{	
+		res = tw - oxo < ow ? tw - oxo : ow;
+		for (cc = 0; cc < NUM_CHANNELS; cc++)
+		{
+			if (!mem_img[cc]) continue;
+			bpp = BPP(cc);
+			j = res * bpp;
+			for (i = 0; i < oh; i++)
+			{
+				src = old_img[cc] + (oxo + oww * (i + oyo)) * bpp;
+				dest = mem_img[cc] + (nxo + nw * (i + nyo)) * bpp;
+				/* Normal copy */
+				if (mirr >= 0)
+				{
+					memcpy(dest, src, j);
+					continue;
+				}
+				/* Reverse copy */
+				src += (oww - oxo - oxo - 1) * bpp;
+				for (k = 0; k < j; k += bpp , src -= bpp)
+				{
+					dest[k] = src[0];
+					if (bpp == 1) continue;
+					dest[k + 1] = src[1];
+					dest[k + 2] = src[2];
+				}
+			}
+		}
+		nxo += res;
+		oxo = 0;
+		mirr = -mirr;
+	}
+
+	/* Only one stripe? */
+	if (!mode || (nh <= ohh)) return (0);
+
+	/* Tile up & down */
+	if (ohh < 3) mirr = 0;
 	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
 		if (!mem_img[cc]) continue;
-		bpp = BPP(cc);
-		for (j = 0; j < oh; j++)
+		bpp = nw * BPP(cc);
+		i = nyo - 1;
+		dest = mem_img[cc] + i * bpp;
+		if (mirr) /* Reverse copy up */
 		{
-			src = old_img[cc] + (oxo + oww * (j + oyo)) * bpp;
-			dest = mem_img[cc] + (nxo + nw * (j + nyo)) * bpp;
-			memcpy(dest, src, ow * bpp);
+			j = i - (ohh - 2);
+			if (j < -1) j = -1;
+			src = dest + 2 * bpp;
+			for (; i > j; i--)
+			{
+				memcpy(dest, src, bpp);
+				dest -= bpp;
+				src += bpp;
+			}
+		}
+		/* Forward copy up */
+		src = mem_img[cc] + (nyo + ohh - 1) * bpp;
+		for (; i >= 0; i--)
+		{
+			memcpy(dest, src, bpp);
+			dest -= bpp;
+			src -= bpp;
+		}
+		i = nyo + ohh;
+		dest = mem_img[cc] + i * bpp;
+		if (mirr) /* Reverse copy down */
+		{
+			j = i + ohh - 2;
+			if (j > nh) j = nh;
+			src = dest - 2 * bpp;
+			for (; i < j; i++)
+			{
+				memcpy(dest, src, bpp);
+				dest += bpp;
+				src -= bpp;
+			}
+		}
+		/* Forward copy down */
+		src = mem_img[cc] + nyo * bpp;
+		for (; i < nh; i++)
+		{
+			memcpy(dest, src, bpp);
+			dest += bpp;
+			src += bpp;
 		}
 	}
 
@@ -4124,6 +4274,370 @@ blurr:
 	progress_end();
 }
 
+/* Most-used variables are local to inner blocks to shorten their live ranges -
+ * otherwise stupid compilers might allocate them to memory */
+static void gauss_filter(double *gaussX, int lenX, int lenY, int *idx,
+	unsigned char *mask, int channel)
+{
+	int i, wid, mh2, bpp;
+	double sum, sum1, sum2, *temp, *gaussY;
+	unsigned char *src0, *src1, *chan, *dest;
+
+	bpp = BPP(channel);
+	wid = mem_width * bpp;
+	gaussY = gaussX + lenX;
+	temp = gaussY + lenY;
+	chan = mem_undo_previous(channel);
+	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
+	for (i = 0; i < mem_height; i++)
+	{
+		/* Apply vertical filter */
+		{
+			int j, k;
+
+			src0 = chan + i * wid;
+			for (j = 0; j < wid; j++)
+			{
+				temp[j] = src0[j] * gaussY[0];
+			}
+			for (j = 1; j < lenY; j++)
+			{
+				k = (i + j) % mh2;
+				if (k >= mem_height) k = mh2 - k;
+				src0 = chan + k * wid;
+				k = abs(i - j) % mh2;
+				if (k >= mem_height) k = mh2 - k;
+				src1 = chan + k * wid;
+				for (k = 0; k < wid; k++)
+				{
+					temp[k] += (src0[k] + src1[k]) * gaussY[j];
+				}
+			}
+		}
+		row_protected(0, i, mem_width, mask);
+		dest = mem_img[channel] + i * wid;
+		if (bpp == 3) /* Run 3-bpp horizontal filter */
+		{
+			int j, jj, k, x1, x2;
+
+			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
+			{
+				if (mask[jj] == 255) continue;
+				sum = temp[j] * gaussX[0];
+				sum1 = temp[j + 1] * gaussX[0];
+				sum2 = temp[j + 2] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					x1 = idx[jj - k] * 3;
+					x2 = idx[jj + k] * 3;
+					sum += (temp[x1] + temp[x2]) * gaussX[k];
+					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gaussX[k];
+					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gaussX[k];
+				}
+				k = rint(sum);
+				k = k * 255 + (dest[j] - k) * mask[jj];
+				dest[j] = (k + (k >> 8) + 1) >> 8;
+				k = rint(sum1);
+				k = k * 255 + (dest[j + 1] - k) * mask[jj];
+				dest[j + 1] = (k + (k >> 8) + 1) >> 8;
+				k = rint(sum2);
+				k = k * 255 + (dest[j + 2] - k) * mask[jj];
+				dest[j + 2] = (k + (k >> 8) + 1) >> 8;
+			}
+		}
+		else /* Run 1-bpp horizontal filter */
+		{
+			int j, k;
+
+			for (j = 0; j < mem_width; j++)
+			{
+				if (mask[j] == 255) continue;
+				sum = temp[j] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					sum += (temp[idx[j - k]] +
+						temp[idx[j + k]]) * gaussX[k];
+				}
+				k = rint(sum);
+				k = k * 255 + (dest[j] - k) * mask[j];
+				dest[j] = (k + (k >> 8) + 1) >> 8;
+			}
+		}
+		if ((i * 10) % mem_height >= mem_height - 10)
+			if (progress_update((float)(i + 1) / mem_height)) break;
+	}
+}
+
+/* While slower, and rather complex and memory hungry, this is the only way
+ * to do *PRECISE* RGBA-coupled Gaussian blur */
+static void gauss_filter_rgba(double *gaussX, int lenX, int lenY, int *idx,
+	unsigned char *mask, unsigned short **abuf)
+{
+	int i, j, k, mh2, slide;
+	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussY;
+	unsigned char *src0, *src1, *chan, *dest;
+	unsigned char *alf0, *alf1, *alpha, *dsta;
+	unsigned short *tmp0, *tmp1;
+
+	chan = mem_undo_previous(CHN_IMAGE);
+	alpha = mem_undo_previous(CHN_ALPHA);
+	mh2 = mem_height > 1 ? 2 * mem_height - 2 : 1;
+
+	/* Set up the premultiplied row buffer */
+	tmp0 = (void *)(abuf + (mem_height + 2 * lenY - 2));
+	slide = mem_height >= 2 * lenY;
+	if (slide) /* Buffer slides over image */
+	{
+		j = 2 * lenY - 1;
+		for (i = 0; i < mem_height + j - 1; i++)
+		{
+			abuf[i] = tmp0 + (i % j) * mem_width * 3;
+		}
+		abuf += lenY - 1;
+		for (i = -lenY + 1; i < lenY - 1; i++)
+		{
+			j = abs(i) % mh2;
+			if (j >= mem_height) j = mh2 - j;
+			src0 = chan + j * mem_width * 3;
+			alf0 = alpha + j * mem_width;
+			tmp1 = abuf[i];
+			for (j = 0; j < mem_width; j++)
+			{
+				tmp1[0] = src0[0] * alf0[j];
+				tmp1[1] = src0[1] * alf0[j];
+				tmp1[2] = src0[2] * alf0[j];
+				tmp1 += 3; src0 += 3;
+			}
+		}
+	}
+	else /* Image fits into buffer */
+	{
+		abuf += lenY - 1;
+		for (i = -lenY + 1; i < mem_height + lenY; i++)
+		{
+			j = abs(i) % mh2;
+			if (j >= mem_height) j = mh2 - j;
+			abuf[i] = tmp0 + j * mem_width * 3;
+		}
+		k = mem_width * mem_height;
+		for (i = j = 0; i < k; i++ , j += 3)
+		{
+			tmp0[j] = chan[j] * alpha[i];
+			tmp0[j + 1] = chan[j + 1] * alpha[i];
+			tmp0[j + 2] = chan[j + 2] * alpha[i];
+		}
+	}
+
+	/* Set up the main row buffer and process the image */
+	gaussY = gaussX + lenX;
+	temp = gaussY + lenY;
+	tmpa = temp + mem_width * 3;
+	atmp = tmpa + mem_width * 3;
+	for (i = 0; i < mem_height; i++)
+	{
+		/* Premultiply a new row */
+		if (slide)
+		{
+			int j, k;
+
+			k = i + lenY - 1;
+			tmp0 = abuf[k];
+			if ((k %= mh2) >= mem_height) k = mh2 - k;
+			alf0 = alpha + k * mem_width;
+			src0 = chan + k * mem_width * 3;
+			for (j = k = 0; j < mem_width; j++ , k += 3)
+			{
+				tmp0[k] = src0[k] * alf0[j];
+				tmp0[k + 1] = src0[k + 1] * alf0[j];
+				tmp0[k + 2] = src0[k + 2] * alf0[j];
+			}
+		}
+		/* Apply vertical filter */
+		{
+			int j, jj, k, kk;
+
+			alf0 = alpha + i * mem_width;
+			src0 = chan + i * mem_width * 3;
+			tmp0 = abuf[i];
+			for (j = jj = 0; j < mem_width; j++ , jj += 3)
+			{
+				atmp[j] = alf0[j] * gaussY[0];
+				temp[jj] = src0[jj] * gaussY[0];
+				temp[jj + 1] = src0[jj + 1] * gaussY[0];
+				temp[jj + 2] = src0[jj + 2] * gaussY[0];
+				tmpa[jj] = tmp0[jj] * gaussY[0];
+				tmpa[jj + 1] = tmp0[jj + 1] * gaussY[0];
+				tmpa[jj + 2] = tmp0[jj + 2] * gaussY[0];
+			}
+			for (j = 1; j < lenY; j++)
+			{
+				tmp0 = abuf[i + j];
+				k = (i + j) % mh2;
+				if (k >= mem_height) k = mh2 - k;
+				alf0 = alpha + k * mem_width;
+				src0 = chan + k * mem_width * 3;
+				tmp1 = abuf[i - j];
+				k = abs(i - j) % mh2;
+				if (k >= mem_height) k = mh2 - k;
+				alf1 = alpha + k * mem_width;
+				src1 = chan + k * mem_width * 3;
+				for (k = kk = 0; k < mem_width; k++ , kk += 3)
+				{
+					atmp[k] += (alf0[k] + alf1[k]) * gaussY[j];
+					temp[kk] += (src0[kk] + src1[kk]) * gaussY[j];
+					temp[kk + 1] += (src0[kk + 1] + src1[kk + 1]) * gaussY[j];
+					temp[kk + 2] += (src0[kk + 2] + src1[kk + 2]) * gaussY[j];
+					tmpa[kk] += (tmp0[kk] + tmp1[kk]) * gaussY[j];
+					tmpa[kk + 1] += (tmp0[kk + 1] + tmp1[kk + 1]) * gaussY[j];
+					tmpa[kk + 2] += (tmp0[kk + 2] + tmp1[kk + 2]) * gaussY[j];
+				}
+			}
+		}
+		row_protected(0, i, mem_width, mask);
+		dest = mem_img[CHN_IMAGE] + i * mem_width * 3;
+		dsta = mem_img[CHN_ALPHA] + i * mem_width;
+		/* Horizontal RGBA filter */
+		{
+			int j, jj, k, kk, x1, x2;
+
+			for (j = jj = 0; j < mem_width; j++ , jj += 3)
+			{
+				if (mask[j] == 255) continue;
+				sum = atmp[j] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					sum += (atmp[idx[j - k]] + atmp[idx[j + k]]) * gaussX[k];
+				}
+				kk = mask[j];
+				k = rint(sum);
+				src = temp;
+				mult = 1.0;
+				if (k)
+				{
+					src = tmpa;
+					mult /= sum;
+				}
+				k = k * 255 + (dsta[j] - k) * kk;
+				if (k) kk = (255 * kk * dsta[j]) / k;
+				dsta[j] = (k + (k >> 8) + 1) >> 8;
+				sum = src[jj] * gaussX[0];
+				sum1 = src[jj + 1] * gaussX[0];
+				sum2 = src[jj + 2] * gaussX[0];
+				for (k = 1; k < lenX; k++)
+				{
+					x1 = idx[j - k] * 3;
+					x2 = idx[j + k] * 3;
+					sum += (src[x1] + src[x2]) * gaussX[k];
+					sum1 += (src[x1 + 1] + src[x2 + 1]) * gaussX[k];
+					sum2 += (src[x1 + 2] + src[x2 + 2]) * gaussX[k];
+				}
+				k = rint(sum * mult);
+				k = k * 255 + (dest[jj] - k) * kk;
+				dest[jj] = (k + (k >> 8) + 1) >> 8;
+				k = rint(sum1 * mult);
+				k = k * 255 + (dest[jj + 1] - k) * kk;
+				dest[jj + 1] = (k + (k >> 8) + 1) >> 8;
+				k = rint(sum2 * mult);
+				k = k * 255 + (dest[jj + 2] - k) * kk;
+				dest[jj + 2] = (k + (k >> 8) + 1) >> 8;
+			}
+		}
+		if ((i * 10) % mem_height >= mem_height - 10)
+			if (progress_update((float)(i + 1) / mem_height)) break;
+	}
+}
+
+/* Gaussian blur */
+void mem_gauss(double radiusX, double radiusY)
+{
+	int i, j, k, l, lenX, lenY, rgba, rgbb, *idxx, *idx;
+	double exkX, exkY, sum, *tmp, *gaussX, *gaussY;
+	unsigned char *mask;
+	unsigned short **abuf = NULL;
+
+	/* Cutoff point is where gaussian becomes < 1/255 */
+	lenX = ceil(radiusX) + 2;
+	lenY = ceil(radiusY) + 2;
+	exkX = -log(255.0) / ((radiusX + 1.0) * (radiusX + 1.0));
+	exkY = -log(255.0) / ((radiusY + 1.0) * (radiusY + 1.0));
+
+	/* RGBA or not? */
+	rgba = (mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] && RGBA_mode;
+	rgbb = rgba && !channel_dis[CHN_ALPHA];
+
+	/* Allocate memory */
+	if (rgbb) /* Cyclic buffer for premultiplied RGB + extra linebuffer */
+	{
+		i = mem_height + 2 * (lenY - 1); // row pointers
+		j = (mem_height < i ? mem_height : i) * mem_width * 3; // data
+		abuf = malloc(i * sizeof(short *) + j * sizeof(short));
+		if (!abuf) return;
+		i = mem_width * 7 + lenX + lenY + 1;
+	}
+	else i = mem_width * MEM_BPP + lenX + lenY + 1;
+	tmp = malloc(i * sizeof(double));
+	i = mem_width + 2 * (lenX - 1);
+	idxx = calloc(i, sizeof(int));
+	mask = malloc(mem_width);
+	if (!tmp || !idxx || !mask)
+	{
+		free(abuf);
+		free(tmp);
+		free(idxx);
+		free(mask);
+		return;
+	}
+	gaussX = ALIGNTO(tmp, double);
+
+	/* Prepare filters */
+	j = lenX; gaussY = gaussX;
+	while (1)
+	{
+		sum = gaussY[0] = 1.0;
+		for (i = 1; i < j; i++)
+		{
+			sum += 2.0 * (gaussY[i] = exp((double)(i * i) * exkX));
+		}
+		sum = 1.0 / sum;
+		for (i = 0; i < j; i++)
+		{
+			gaussY[i] *= sum;
+		}
+		if (gaussY != gaussX) break;
+		exkX = exkY; j = lenY; gaussY = gaussX + lenX;
+	}
+
+	/* Prepare horizontal indices, assuming mirror boundary */
+	l = lenX - 1;
+	idx = idxx + l; // To simplify addressing
+	if (mem_width > 1) // Else don't run horizontal pass
+	{
+		k = 2 * mem_width - 2;
+		for (i = -l; i < mem_width + l; i++)
+		{
+			j = abs(i) % k;
+			idx[i] = j < mem_width ? j : k - j;
+		}
+	}
+
+	/* Run filter */
+	progress_init(_("Gaussian Blur"), 1);
+	progress_update(0.0);
+	if (!rgba) /* One channel */
+		gauss_filter(gaussX, lenX, lenY, idx, mask, mem_channel);
+	else if (rgbb) /* Coupled RGBA */
+		gauss_filter_rgba(gaussX, lenX, lenY, idx, mask, abuf);
+	else /* RGB and alpha */
+	{
+		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_IMAGE);
+		gauss_filter(gaussX, lenX, lenY, idx, mask, CHN_ALPHA);
+	}
+	progress_end();
+	free(abuf);
+	free(tmp);
+	free(idxx);
+	free(mask);
+}	
 
 ///	CLIPBOARD MASK
 

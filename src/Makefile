@@ -12,6 +12,9 @@ OBJS = main.o mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk
 $(BIN): $(OBJS)
 	$(CC) $(OBJS) -o $(BIN) $(LDFLAGS)
 
+.c.o:
+	$(CC) $(CFLAGS) -c -o $*.o $*.c
+
 clean:
 	rm -f *.o $(BIN)*
 

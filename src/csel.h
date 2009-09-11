@@ -45,4 +45,4 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *img, csel_info *info);
 double csel_eval(int mode, int center, int limit);
 void csel_reset(csel_info *info);
-csel_info *csel_init();
+void csel_init();

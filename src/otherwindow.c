@@ -646,25 +646,17 @@ void pressed_bacteria(GtkMenuItem *menu_item, gpointer user_data)
 
 ///	SORT PALETTE COLOURS
 
-GtkWidget *spal_window, *spal_spins[2], *spal_radio[8];
-
+static GtkWidget *spal_window, *spal_spins[2], *spal_rev;
+static int spal_mode;
 
 gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	int i, type = 2, index1 = 0, index2 = 1;
+	int index1 = 0, index2 = 1;
 	gboolean reverse;
 
-	for ( i=0; i<8; i++ )
-	{
-		if ( i!=3 )
-			if ( gtk_toggle_button_get_active(
-				&(GTK_RADIO_BUTTON( spal_radio[i] )->check_button.toggle_button)
-					) ) type = i;
-	}
-	inifile_set_gint32("lastspalType", type );
-	if ( type >=3 ) type--;
+	inifile_set_gint32("lastspalType", spal_mode);
 
-	reverse = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(spal_radio[3]));
+	reverse = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(spal_rev));
 	inifile_set_gboolean( "palrevSort", reverse );
 
 	gtk_spin_button_update( GTK_SPIN_BUTTON(spal_spins[0]) );
@@ -676,7 +668,7 @@ gint click_spal_apply( GtkWidget *widget, GdkEvent *event, gpointer data )
 	if ( index1 == index2 ) return FALSE;
 
 	spot_undo(UNDO_XPAL);
-	mem_pal_sort(type, index1, index2, reverse);
+	mem_pal_sort(spal_mode, index1, index2, reverse);
 	init_pal();
 	update_all_views();
 	gtk_widget_queue_draw( drawing_col_prev );
@@ -692,14 +684,23 @@ gint click_spal_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 	return FALSE;
 }
 
+static void spal_mode_changed(GtkWidget *widget, gpointer mode)
+{
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
+	spal_mode = (int)mode;
+}
+
 void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 {
-	char *rad_txt[] = {_("Hue"), _("Saturation"), _("Luminance"), "",
-				_("Red"), _("Green"), _("Blue"), _("Frequency") };
+	char *rad_txt[] = {
+		_("Hue"),		_("Red"),
+		_("Saturation"),	_("Green"),
+		_("Luminance"),		_("Blue"),
+		_("Distance to A"),	_("Distance to A+B"),
+		_("Projection to A->B"),_("Frequency")};
 	int i;
 
-	GSList *group;
-	GtkWidget *vbox1, *hbox3, *hbox, *vbox[2], *table1, *button;
+	GtkWidget *vbox1, *hbox3, *table1, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 	spal_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Sort Palette Colours"),
@@ -709,7 +710,7 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	gtk_widget_show (vbox1);
 	gtk_container_add (GTK_CONTAINER (spal_window), vbox1);
 
-	table1 = add_a_table( 2, 2, 5, vbox1 );
+	table1 = add_a_table(2, 2, 5, vbox1);
 
 	spin_to_table( table1, &spal_spins[0], 0, 1, 5, 0, 0, mem_cols-1 );
 	spin_to_table( table1, &spal_spins[1], 1, 1, 5, mem_cols-1, 0, mem_cols-1 );
@@ -717,37 +718,27 @@ void pressed_sort_pal( GtkMenuItem *menu_item, gpointer user_data )
 	add_to_table( _("Start Index"), table1, 0, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 	add_to_table( _("End Index"), table1, 1, 0, 5, GTK_JUSTIFY_LEFT, 0, 0.5 );
 
-	hbox = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox);
-	gtk_box_pack_start (GTK_BOX (vbox1), hbox, FALSE, TRUE, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (hbox), 5);
-
-	for ( i=0; i<2; i++ )
+	table1 = add_a_table(5, 2, 5, vbox1);
+	spal_mode = inifile_get_gint32("lastspalType", 4);
+	button = gtk_radio_button_new_with_label(NULL, rad_txt[0]);
+	for (i = 0; ; i++)
 	{
-		vbox[i] = gtk_vbox_new (FALSE, 0);
-		gtk_widget_show (vbox[i]);
-		gtk_container_add (GTK_CONTAINER (hbox), vbox[i]);
+		if (spal_mode == i) gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(button), TRUE);
+		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
+		gtk_widget_show(button);
+		gtk_table_attach(GTK_TABLE(table1), button, i & 1, (i & 1) + 1,
+			i / 2, i / 2 + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+		gtk_signal_connect(GTK_OBJECT(button), "toggled",
+				GTK_SIGNAL_FUNC(spal_mode_changed), (gpointer)(i));
+		if (i >= 9) break;
+		button = gtk_radio_button_new_with_label_from_widget(
+			GTK_RADIO_BUTTON(button), rad_txt[i + 1]);
 	}
+	if (mem_img_bpp == 3) gtk_widget_set_sensitive(button, FALSE);
 
-	spal_radio[0] = add_radio_button( rad_txt[0], NULL,  NULL, vbox[0], 0 );
-	group = gtk_radio_button_group( GTK_RADIO_BUTTON(spal_radio[0]) );
-	spal_radio[1] = add_radio_button( rad_txt[1], group, NULL, vbox[0], 1 );
-	spal_radio[2] = add_radio_button( rad_txt[2], NULL,  spal_radio[1], vbox[0], 2 );
-
-	spal_radio[3] = add_a_toggle( _("Reverse Order"), vbox[0],
-		inifile_get_gboolean("palrevSort", FALSE) );
-
-	for ( i=4; i<8; i++ )
-		spal_radio[i] = add_radio_button( rad_txt[i], NULL,  spal_radio[1], vbox[1], i );
-
-	i = inifile_get_gint32("lastspalType", 2);
-	if ( mem_img_bpp == 3 )
-	{
-		if ( i == 7 ) i--;
-		gtk_widget_set_sensitive( spal_radio[7], FALSE );
-	}
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(spal_radio[i]), TRUE );
-
+	spal_rev = add_a_toggle(_("Reverse Order"), vbox1,
+		inifile_get_gboolean("palrevSort", FALSE));
 
 	add_hseparator( vbox1, 200, 10 );
 
@@ -1336,11 +1327,31 @@ gint sisca_height_moved( GtkWidget *widget, GdkEvent *event, gpointer data )
 }
 
 static int scale_mode = 7;
+static int resize_mode = 0;
 
-static void scale_mode_changed(GtkWidget *widget, gpointer name)
+static int sz_mode;
+static void sz_mode_changed(GtkWidget *widget, gpointer name)
 {
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
-	scale_mode = (int) name;
+	sz_mode = (int) name;
+}
+
+static void add_modes(GtkWidget *box, gchar **names, int mode)
+{
+	GtkWidget *btn = NULL;
+	int i;
+
+	sz_mode = mode;
+	add_hseparator(box, -2, 10);
+	for (i = 0; names[i]; i++)
+	{
+		btn = add_radio_button(names[i], NULL, btn, box, i + 1);
+		if (sz_mode == i)
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(btn), TRUE);
+		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
+			GTK_SIGNAL_FUNC(sz_mode_changed), (gpointer)(i));
+	}
+	if (sz_mode >= i) sz_mode = 0;
 }
 
 gint click_sisca_cancel( GtkWidget *widget, GdkEvent *event, gpointer data )
@@ -1365,14 +1376,15 @@ gint click_sisca_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 		if ( sisca_scale )
 		{
-			if ( mem_img_bpp == 3 ) scale_type = scale_mode;
+			if ( mem_img_bpp == 3 ) scale_type = scale_mode = sz_mode;
 			res = mem_image_scale( nw, nh, scale_type );
 		}
 		else 
 		{
+			resize_mode = sz_mode;
 			ox = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[2]) );
 			oy = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[3]) );
-			res = mem_image_resize( nw, nh, ox, oy );
+			res = mem_image_resize(nw, nh, ox, oy, resize_mode);
 		}
 		if ( res == 0 )
 		{
@@ -1420,6 +1432,12 @@ void sisca_init( char *title )
 		_("Bicubic sharper"),
 		_("Lanczos3"),
 		_("Blackman-Harris"),
+		NULL
+	};
+	gchar* resize_modes[] = {
+		_("Clear"),
+		_("Tile"),
+		_("Mirror tile"),
 		NULL
 	};
 
@@ -1484,24 +1502,12 @@ void sisca_init( char *title )
 	sisca_toggles[0] = add_a_toggle( _("Fix Aspect Ratio"), sisca_vbox, TRUE );
 	gtk_signal_connect(GTK_OBJECT(sisca_toggles[0]), "clicked",
 		GTK_SIGNAL_FUNC(sisca_width_moved), NULL);
-	if ( mem_img_bpp == 3 && sisca_scale )
-	{
-		GtkWidget *btn = NULL;
-		int i;
 
-		add_hseparator( sisca_vbox, -2, 10 );
-		for (i = 0; scale_fnames[i]; i++)
-		{
-			btn = add_radio_button(scale_fnames[i], NULL, btn,
-				sisca_vbox, i + 1);
-			if (scale_mode == i)
-				gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(btn), TRUE);
-			gtk_signal_connect(GTK_OBJECT(btn), "toggled",
-				GTK_SIGNAL_FUNC(scale_mode_changed),
-				(gpointer)(i));
-		}
-		if (scale_mode >= i) scale_mode = 0;
-	}
+	/* Resize */
+	if (!sisca_scale) add_modes(sisca_vbox, resize_modes, resize_mode);
+
+	/* RGB rescale */
+	else if (mem_img_bpp == 3) add_modes(sisca_vbox, scale_fnames, scale_mode);
 
 	add_hseparator( sisca_vbox, -2, 10 );
 
@@ -2084,7 +2090,7 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 
 		if (!csel_data)
 		{
-			csel_data = csel_init();
+			csel_init();
 			if (!csel_data) return;
 		}
 		/* Save previous values */
