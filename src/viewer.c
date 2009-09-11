@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2006 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2007 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

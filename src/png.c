@@ -2160,34 +2160,42 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		if (j >= XPM_COL_DEFS) goto fail2;
 	}
 
-	/* Build cuckoo hash of colors - simply dump all and rehash */
-	memset(cuckoo, 0, sizeof(cuckoo));
-	for (i = 0; i < cols; i++) cuckoo[i] = i + 1;
-	/* Until done */
-	while (TRUE)
+	/* Build cuckoo hash of colors */
+	while (TRUE) /* Until done */
 	{
-		/* Re-insert items */
-		for (ii = 0; ii < HSIZE; ii++)
+		memset(cuckoo, 0, sizeof(cuckoo));
+		/* [Re]insert items */
+		for (i = 0; i < cols; i++)
 		{
-			idx = cuckoo[ii];
-			cuckoo[ii] = 0;
+			key = hashf(seed, ckeys[i], cpp);
+
+			/* Trivial case */
+			k = (key & HMASK) * 2;
+			idx = cuckoo[k];
+			cuckoo[k] = i + 1;
+			if (!idx) continue;
+
+			/* Remove duplicates */
+			if (!strncmp(ckeys[idx - 1], ckeys[i], cpp)) continue;
+			j = ((key >> 16) & HMASK) * 2 + 1;
+			if (cuckoo[j] && !strncmp(ckeys[cuckoo[j] - 1],
+				ckeys[i], cpp)) cuckoo[j] = 0;
+
 			/* Normal cuckoo process */
-			for (i = 0; idx && (i < MAXLOOP); i++)
+			for (ii = 1; ii < MAXLOOP; ii++)
 			{
 				key = hashf(seed, ckeys[idx - 1], cpp);
-				key >>= (i & 1) << 4;
-				j = (key & HMASK) * 2 + (i & 1);
+				key >>= (ii & 1) << 4;
+				j = (key & HMASK) * 2 + (ii & 1);
 				k = cuckoo[j];
 				cuckoo[j] = idx;
 				idx = k;
+				if (!idx) break;
 			}
 			if (idx) break;
 		}
-		if (!idx) break;
-		/* Failed insertion - drop key somewhere */
-		for (i = 0; cuckoo[i] && (i < HSIZE); i++);
-		cuckoo[i] = idx;
-		/* Mutate seed */
+		if (i >= cols) break;
+		/* Failed insertion - mutate seed */
 		seed = HASH_RND(seed);
 	}
 	

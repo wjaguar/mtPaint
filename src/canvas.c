@@ -1801,7 +1801,9 @@ void file_selector(int action_type)
 {
 	char *title = NULL, txt[300], txt2[300];
 	GtkWidget *fs, *xtra;
-
+#if GTK_MAJOR_VERSION == 1
+	GtkAccelGroup* ag = gtk_accel_group_new();
+#endif
 
 	switch (action_type)
 	{
@@ -1912,6 +1914,11 @@ void file_selector(int action_type)
 		FALSE, TRUE, 0);
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 
+#if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
+	gtk_widget_add_accelerator(GTK_FILE_SELECTION(fs)->cancel_button,
+		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
+	gtk_window_add_accel_group(GTK_WINDOW(fs), ag);
+#endif
 	gtk_widget_show(fs);
 	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
 	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
