@@ -1,5 +1,5 @@
 /*	polygon.h
-	Copyright (C) 2005 Mark Tyler
+	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -33,6 +33,7 @@ void poly_add(int x, int y);	// Add point to polygon
 
 int poly_init();		// Setup max/min -> Requires points in poly_mem: needed for all below:
 
+void poly_draw(int filled, unsigned char *buf, int wbuf);
 void poly_mask();		// Paint polygon onto clipboard mask
 void poly_paint();		// Paint polygon onto image
 void poly_outline();		// Paint polygon outline onto image

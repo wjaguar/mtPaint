@@ -683,7 +683,7 @@ void toolbar_init(GtkWidget *vbox_main)
 	{
 		icon_buttons[tools_bar[i].ID] = tools_bar[i].widget;
 	}
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON]), TRUE);
+	change_to_tool(TTB_PAINT);
 
 	gtk_widget_show(toolbar_tools);
 }
@@ -768,25 +768,22 @@ void ts_update_gradient()
 void toolbar_update_settings()
 {
 	char txt[32];
+	int i, j, c;
 
 	if ( toolbar_boxes[TOOLBAR_SETTINGS] == NULL ) return;
 
 	ts_update_spinslides();		// Update tool settings
 	ts_update_gradient();
 
-	if ( mem_img_bpp == 1 )
-		snprintf(txt, 30, "A [%i] = {%i,%i,%i}", mem_col_A, mem_pal[mem_col_A].red,
-			mem_pal[mem_col_A].green, mem_pal[mem_col_A].blue );
-	else	snprintf(txt, 30, "A = {%i,%i,%i}", mem_col_A24.red,
-			mem_col_A24.green, mem_col_A24.blue );
-	gtk_label_set_text( GTK_LABEL(toolbar_labels[0]), txt );
-
-	if ( mem_img_bpp == 1 )
-		snprintf(txt, 30, "B [%i] = {%i,%i,%i}", mem_col_B, mem_pal[mem_col_B].red,
-			mem_pal[mem_col_B].green, mem_pal[mem_col_B].blue );
-	else	snprintf(txt, 30, "B = {%i,%i,%i}", mem_col_B24.red,
-			mem_col_B24.green, mem_col_B24.blue );
-	gtk_label_set_text( GTK_LABEL(toolbar_labels[1]), txt );
+	for (i = 0; i < 2; i++)
+	{
+		c = "AB"[i]; j = mem_col_[i];
+		if (mem_img_bpp == 1) snprintf(txt, 30, "%c [%d] = {%d,%d,%d}",
+			c, j, mem_pal[j].red, mem_pal[j].green, mem_pal[j].blue);
+		else snprintf(txt, 30, "%c = {%i,%i,%i}", c, mem_col_24[i].red,
+			mem_col_24[i].green, mem_col_24[i].blue);
+		gtk_label_set_text(GTK_LABEL(toolbar_labels[i]), txt);
+	}
 
 	if ( mem_channel == CHN_IMAGE )
 		gtk_label_set_text( GTK_LABEL(tb_label_opacity), _("Opacity") );

@@ -1902,23 +1902,18 @@ unsigned char pal_dupes[256];
 
 int scan_duplicates()			// Find duplicate palette colours, return number found
 {
-	int i, j, found = 0;
-
-	if ( mem_cols < 3 ) return 0;
+	int i, j, c, found = 0;
 
 	for (i = mem_cols - 1; i > 0; i--)
 	{
-		pal_dupes[i] = i;			// Start with a clean sheet
+		pal_dupes[i] = i;		// Start with a clean sheet
+		c = PNG_2_INT(mem_pal[i]);
 		for (j = 0; j < i; j++)
 		{
-			if (	mem_pal[i].red == mem_pal[j].red &&
-				mem_pal[i].green == mem_pal[j].green &&
-				mem_pal[i].blue == mem_pal[j].blue )
-			{
-				found++;
-				pal_dupes[i] = j;	// Point to first duplicate in the palette
-				break;
-			}
+			if (c != PNG_2_INT(mem_pal[j])) continue;
+			found++;
+			pal_dupes[i] = j;	// Point to first duplicate in the palette
+			break;
 		}
 	}
 
@@ -1945,10 +1940,9 @@ int mem_remove_unused_check()
 	for (i = 0; i < mem_cols; i++)
 		if (!mem_histogram[i]) found++;
 
-	if (!found) return 0;		// All palette colours are used on the canvas
-	if (mem_cols - found < 2) return -1;	// Canvas is all one colour
-
-	return found;
+	if (!found) return 0;	// All palette colours are used on the canvas
+	// Leave at least one colour even if canvas is 0x0
+	return (mem_cols > found ? found : mem_cols - 1);
 }
 
 int mem_remove_unused()
@@ -1956,8 +1950,9 @@ int mem_remove_unused()
 	unsigned char conv[256], *img;
 	int i, j, found = mem_remove_unused_check();
 
-	if ( found <= 0 ) return found;
+	if (found <= 0) return (0);
 
+	conv[0] = 0; // Ensure this works even with empty histogram
 	for (i = j = 0; i < 256; i++)	// Create conversion table
 	{
 		if (mem_histogram[i])
@@ -2077,10 +2072,20 @@ int mem_convert_rgb()			// Convert image to RGB
 	return 0;
 }
 
-int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after mem_cols_used
+// Convert RGB image to Indexed Palette - call after mem_cols_used
+int mem_convert_indexed(int img)
 {
 	unsigned char *old_image, *new_image;
 	int i, j, k, pix;
+
+	for (i = 0; i < 256; i++)
+	{
+		mem_pal[i].red = found[i * 3];
+		mem_pal[i].green = found[i * 3 + 1];
+		mem_pal[i].blue = found[i * 3 + 2];
+	}
+
+	if (!img) return (0);
 
 	old_image = mem_undo_previous(CHN_IMAGE);
 	new_image = mem_img[CHN_IMAGE];
@@ -2092,19 +2097,12 @@ int mem_convert_indexed()	// Convert RGB image to Indexed Palette - call after m
 		{
 			if (MEM_2_INT(found, k * 3) == pix) break;
 		}
-		if (k > 255) return 1;		// No index found - BAD ERROR!!
+		if (k > 255) return (1);	// No index found - BAD ERROR!!
 		*new_image++ = k;
 		old_image += 3;
 	}
 
-	for (i = 0; i < 256; i++)
-	{
-		mem_pal[i].red = found[i * 3];
-		mem_pal[i].green = found[i * 3 + 1];
-		mem_pal[i].blue = found[i * 3 + 2];
-	}
-
-	return 0;
+	return (0);
 }
 
 /* Max-Min quantization algorithm - good for preserving saturated colors,

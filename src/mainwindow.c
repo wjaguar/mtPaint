@@ -212,7 +212,7 @@ static void pressed_crop()
 	if (!res)
 	{
 		pressed_select(FALSE);
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
+		change_to_tool(DEFAULT_TOOL_ICON);
 		canvas_undo_chores();
 	}
 	else memory_errors(res);
@@ -249,9 +249,7 @@ void pressed_select(int all)
 		{
 			/* Switch tool, and let that & marquee persistence
 			 * do all the rest except full redraw */
-			clear_perim();
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-				icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+			change_to_tool(TTB_SELECT);
 			i &= 2;
 			break;
 		}
@@ -284,8 +282,6 @@ static void pressed_remove_unused()
 		mem_remove_unused();
 		mem_undo_prepare();
 
-		if ( mem_col_A >= mem_cols ) mem_col_A = 0;
-		if ( mem_col_B >= mem_cols ) mem_col_B = 0;
 		init_pal();
 		update_all_views();
 	}
@@ -302,46 +298,25 @@ static void pressed_default_pal()
 
 static void pressed_remove_duplicates()
 {
-	int dups;
 	char *mess;
+	int dups = scan_duplicates();
 
-	if ( mem_cols < 3 )
+	if (!dups)
 	{
-		alert_box( _("Error"), _("The palette does not contain enough colours to do a merge"),
-			_("OK"), NULL, NULL );
+		alert_box( _("Error"), _("The palette does not contain 2 colours that have identical RGB values"), _("OK"), NULL, NULL );
+		return;
 	}
-	else
+	mess = g_strdup_printf(_("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
+	if (alert_box(_("Warning"), mess, _("Yes"), _("No"), NULL) == 1)
 	{
-		dups = scan_duplicates();
+		spot_undo(UNDO_XPAL);
 
-		if ( dups == 0 )
-		{
-			alert_box( _("Error"), _("The palette does not contain 2 colours that have identical RGB values"), _("OK"), NULL, NULL );
-			return;
-		}
-		else
-		{
-			if ( dups == (mem_cols - 1) )
-			{
-				alert_box( _("Error"), _("There are too many identical palette items to be reduced."), _("OK"), NULL, NULL );
-				return;
-			}
-			else
-			{
-				mess = g_strdup_printf(_("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
-				if ( alert_box( _("Warning"), mess, _("Yes"), _("No"), NULL ) == 1 )
-				{
-					spot_undo(UNDO_XPAL);
-
-					remove_duplicates();
-					mem_undo_prepare();
-					init_pal();
-					update_all_views();
-				}
-				g_free(mess);
-			}
-		}
+		remove_duplicates();
+		mem_undo_prepare();
+		init_pal();
+		update_all_views();
 	}
+	g_free(mess);
 }
 
 static void pressed_dither_A()
@@ -801,9 +776,7 @@ void stop_line()
 
 void change_to_tool(int icon)
 {
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[PAINT_TOOL_ICON+icon]), TRUE );
-
-	if ( perim_status > 0 ) clear_perim_real(0, 0);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[icon]), TRUE);
 }
 
 static void action_dispatch(int action, int mode, int state, int kbd);
@@ -2817,7 +2790,7 @@ void repaint_canvas( int px, int py, int pw, int ph )
 	/* Draw perimeter & marquee as we may have drawn over them */
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
 	if (marq_status != MARQUEE_NONE) refresh_marquee(&ctx);
-	if ((tool_type == TOOL_POLYGON) && (poly_points >1))
+	if ((tool_type == TOOL_POLYGON) && (poly_points > 1))
 		paint_poly_marquee(&ctx, TRUE);
 	if (perim_status > 0) repaint_perim(&ctx);
 
@@ -3082,28 +3055,28 @@ void toolbar_icon_event2(GtkWidget *widget, gpointer data)
 
 void toolbar_icon_event (GtkWidget *widget, gpointer data)
 {
-	gint i = tool_type;
+	int i, t = tool_type;
 
 	switch ((gint)data)
 	{
 	case TTB_PAINT:
-		tool_type = brush_tool_type; break;
+		t = brush_tool_type; break;
 	case TTB_SHUFFLE:
-		tool_type = TOOL_SHUFFLE; break;
+		t = TOOL_SHUFFLE; break;
 	case TTB_FLOOD:
-		tool_type = TOOL_FLOOD; break;
+		t = TOOL_FLOOD; break;
 	case TTB_LINE:
-		tool_type = TOOL_LINE; break;
+		t = TOOL_LINE; break;
 	case TTB_SMUDGE:
-		tool_type = TOOL_SMUDGE; break;
+		t = TOOL_SMUDGE; break;
 	case TTB_CLONE:
-		tool_type = TOOL_CLONE; break;
+		t = TOOL_CLONE; break;
 	case TTB_SELECT:
-		tool_type = TOOL_SELECT; break;
+		t = TOOL_SELECT; break;
 	case TTB_POLY:
-		tool_type = TOOL_POLYGON; break;
+		t = TOOL_POLYGON; break;
 	case TTB_GRAD:
-		tool_type = TOOL_GRADIENT; break;
+		t = TOOL_GRADIENT; break;
 	case TTB_LASSO:
 		pressed_lasso(0); break;
 	case TTB_TEXT:
@@ -3126,63 +3099,68 @@ void toolbar_icon_event (GtkWidget *widget, gpointer data)
 		pressed_rotate_sel(1); break;
 	}
 
-	if ( tool_type != i )		// User has changed tool
-	{
-		if (i == TOOL_LINE) stop_line();
-		if ((i == TOOL_GRADIENT) &&
-			(gradient[mem_channel].status != GRAD_NONE))
-		{
-			if (gradient[mem_channel].status != GRAD_DONE)
-				gradient[mem_channel].status = GRAD_NONE;
-			else if (grad_opacity)
-				gtk_widget_queue_draw(drawing_canvas);
-			else if (!mem_gradient) repaint_grad(0);
-		}
-		if ( marq_status != MARQUEE_NONE)
-		{
-			if ( marq_status >= MARQUEE_PASTE &&
-				inifile_get_gboolean( "pasteCommit", FALSE ) )
-			{
-				commit_paste(NULL);
-				pen_down = 0;
-				mem_undo_prepare();
-			}
+	/* User hasn't changed tool (i.e., radiobutton is DEactivating) */
+	if (t == tool_type) return;
 
-			marq_status = MARQUEE_NONE;			// Marquee is on so lose it!
-			gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
-		}
-		if ( poly_status != POLY_NONE)
-		{
-			poly_status = POLY_NONE;			// Marquee is on so lose it!
-			poly_points = 0;
-			gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
-		}
-		if ( tool_type == TOOL_CLONE )
-		{
-			clone_x = -tool_size;
-			clone_y = tool_size;
-		}
-		/* Persistent selection frame */
-// !!! To NOT show selection frame while placing gradient
-//		if ((tool_type == TOOL_SELECT)
-		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_GRADIENT))
-			&& (marq_x1 >= 0) && (marq_y1 >= 0)
-			&& (marq_x2 >= 0) && (marq_y2 >= 0))
-		{
-			marq_status = MARQUEE_DONE;
-			paint_marquee(1, 0, 0);
-		}
-		if ((tool_type == TOOL_GRADIENT) &&
-			(gradient[mem_channel].status == GRAD_DONE))
-		{
-			if (grad_opacity)
-				gtk_widget_queue_draw(drawing_canvas);
-			else repaint_grad(1);
-		}
-		update_sel_bar();
-		update_menus();
-		set_cursor();
+	if (perim_status) clear_perim();
+	i = tool_type;
+	tool_type = t;
+
+	if (i == TOOL_LINE) stop_line();
+	if ((i == TOOL_GRADIENT) &&
+		(gradient[mem_channel].status != GRAD_NONE))
+	{
+		if (gradient[mem_channel].status != GRAD_DONE)
+			gradient[mem_channel].status = GRAD_NONE;
+		else if (grad_opacity)
+			gtk_widget_queue_draw(drawing_canvas);
+		else if (!mem_gradient) repaint_grad(0);
 	}
+	if ( marq_status != MARQUEE_NONE)
+	{
+		if ( marq_status >= MARQUEE_PASTE &&
+			inifile_get_gboolean( "pasteCommit", FALSE ) )
+		{
+			commit_paste(NULL);
+			pen_down = 0;
+			mem_undo_prepare();
+		}
+
+		marq_status = MARQUEE_NONE;			// Marquee is on so lose it!
+		gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
+	}
+	if ( poly_status != POLY_NONE)
+	{
+		poly_status = POLY_NONE;			// Marquee is on so lose it!
+		poly_points = 0;
+		gtk_widget_queue_draw( drawing_canvas );	// Needed to clear selection
+	}
+	if ( tool_type == TOOL_CLONE )
+	{
+		clone_x = -tool_size;
+		clone_y = tool_size;
+	}
+	/* Persistent selection frame */
+// !!! To NOT show selection frame while placing gradient
+//	if ((tool_type == TOOL_SELECT)
+	if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_GRADIENT))
+		&& (marq_x1 >= 0) && (marq_y1 >= 0)
+		&& (marq_x2 >= 0) && (marq_y2 >= 0))
+	{
+		marq_status = MARQUEE_DONE;
+		paint_marquee(1, 0, 0);
+	}
+	if ((tool_type == TOOL_GRADIENT) &&
+		(gradient[mem_channel].status == GRAD_DONE))
+	{
+		if (grad_opacity)
+			gtk_widget_queue_draw(drawing_canvas);
+		else repaint_grad(1);
+	}
+	update_sel_bar();
+	update_menus();
+	set_cursor();
+	repaint_perim(NULL);
 }
 
 static void pressed_view_hori(int state)
@@ -3528,7 +3506,8 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	gtk_widget_size_allocate(child, &child_alloc);
 }
 
-static void pressed_pal_copypaste(int copy);
+static void pressed_pal_copy();
+static void pressed_pal_paste();
 static void pressed_sel_ramp(int vert);
 
 static const signed char arrow_dx[4] = { 0, -1, 1, 0 },
@@ -3666,9 +3645,9 @@ static void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_PASTE_LR:
 		pressed_paste_layer(); break;
 	case ACT_COPY_PAL:
-		pressed_pal_copypaste(1); break;
+		pressed_pal_copy(); break;
 	case ACT_PASTE_PAL:
-		pressed_pal_copypaste(0); break;
+		pressed_pal_paste(); break;
 	case ACT_LOAD_CLIP:
 		load_clip(mode); break;
 	case ACT_SAVE_CLIP:
@@ -3949,98 +3928,113 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	return (wrap);
 }
 
-static void pressed_pal_copypaste(int copy)
+static void pressed_pal_copy()
 {
-	int	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2,
-		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2,
-		w = abs(marq_x1 - marq_x2) + 1,
-		h = abs(marq_y1 - marq_y2) + 1,
-		bpp = MEM_BPP,
-		i, k, col;
+	png_color tpal[256];
+	unsigned char *img, *tm2, *alpha = NULL, *mask = NULL, *mask2 = NULL;
+	int i, j, x, y, w, h, step, bpp, n = 0;
 
-	if (copy)				// Copy selection to palette
+	/* Source is selection */
+	if ((marq_status == MARQUEE_DONE) || (poly_status == POLY_DONE))
 	{
-		int cx, cy;
-
-		if ( mem_channel != CHN_IMAGE || bpp < 3 || tool_type != TOOL_SELECT ||
-			marq_status != MARQUEE_DONE )
-				return;		// Only do this for RGB image canvas + selection marquee
-
-		spot_undo(UNDO_PAL);
-		cx = x;
-		cy = y;
-		for ( k=0; k<mem_cols; k++ )
+		x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+		w = abs(marq_x1 - marq_x2) + 1;
+		h = abs(marq_y1 - marq_y2) + 1;
+		bpp = MEM_BPP;
+		step = mem_width;
+		i = y * step + x;
+		img = mem_img[mem_channel] + i * bpp;
+		if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
+			alpha = mem_img[CHN_ALPHA] + i;
+		if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_SEL])
+			mask = mem_img[CHN_SEL] + i;
+		if (poly_status == POLY_DONE)
 		{
-			col = get_pixel_RGB( cx, cy );
-
-			mem_pal[k].red   = INT_2_R(col);
-			mem_pal[k].green = INT_2_G(col);
-			mem_pal[k].blue  = INT_2_B(col);
-			cx++;
-			if ( cx >= (x+w) )
-			{
-				cx = x;
-				cy++;
-				if ( cy >= (y+h) ) break;		// No more pixels to copy
-			}
+			mask2 = calloc(1, w * h);
+			if (mask2) poly_draw(TRUE, mask2, w);
 		}
-
-		mem_pal_init();						// Update palette view
-		gtk_widget_queue_draw( drawing_palette );
 	}
-	else					// Paste palette
+	/* Source is clipboard */
+	else if (mem_clipboard)
 	{
-		int paste_width = 1, paste_height = mem_cols;
+		w = mem_clip_w;
+		h = mem_clip_h;
+		bpp = mem_clip_bpp;
+		step = w;
+		img = mem_clipboard;
+		alpha = mem_clip_alpha;
+		mask = mem_clip_mask;
+	}
+	/* No source available */
+	else return;
 
-		if ( tool_type == TOOL_SELECT && marq_status == MARQUEE_DONE )
+	mem_pal_copy(tpal, mem_pal);
+	tm2 = mask2;
+	for (i = 0; i < h; i++)
+	{
+		for (j = 0; j < w; j++ , img += bpp)
 		{
-				// If selection exists, use it to set the width of the clipboard
-			if ( w >= mem_cols )
-			{
-				paste_width = mem_cols;
-				paste_height = 1;
-			}
+			/* Skip empty parts */
+			if ((tm2 && !tm2[j]) || (mask && !mask[j]) ||
+				(alpha && !alpha[j])) continue;
+			if (bpp == 1) tpal[n] = mem_pal[*img];
 			else
 			{
-				paste_width = w;
-				paste_height = mem_cols / w;
-				while ( paste_width * paste_height < mem_cols ) paste_height++;
+				tpal[n].red = img[0];
+				tpal[n].green = img[1];
+				tpal[n].blue = img[2];
 			}
+			if (++n >= 256) break;
 		}
-
-		mem_clip_new(paste_width, paste_height, bpp, CMASK_IMAGE, FALSE);
-		text_paste = TEXT_PASTE_NONE;
-
-		if (!mem_clipboard)
-		{
-			alert_box( _("Error"), _("Not enough memory to create clipboard"),
-					_("OK"), NULL, NULL );
-			return;
-		}
-		else
-		{
-			unsigned char *dest = mem_clipboard;
-
-			memset(dest, 0, paste_width*paste_height*bpp);
-
-			if ( bpp == 1 )
-			{
-				for ( i=0; i<mem_cols; i++ ) *dest++ = i;
-			}
-			if ( bpp == 3 )
-			{
-				for ( i=0; i<mem_cols; i++ )
-				{
-					*dest++ = mem_pal[i].red;
-					*dest++ = mem_pal[i].green;
-					*dest++ = mem_pal[i].blue;
-				}
-			}
-
-			pressed_paste_centre();
-			update_menus();
-		}
+		if (n >= 256) break;
+		img += (step - w) * bpp;
+		if (alpha) alpha += step;
+		if (mask) mask += step;
+		if (tm2) tm2 += w;
 	}
+	if (mask2) free(mask2);
+	if (!n) return; // Empty set - ignore
+
+	spot_undo(UNDO_PAL);
+	mem_pal_copy(mem_pal, tpal);
+	mem_cols = n;
+	init_pal();
+	update_all_views();
+}
+
+static void pressed_pal_paste()
+{
+	unsigned char *dest;
+	int i, h, w = mem_cols;
+
+	// If selection exists, use it to set the width of the clipboard
+	if ((tool_type == TOOL_SELECT) && (marq_status == MARQUEE_DONE))
+	{
+		w = abs(marq_x1 - marq_x2) + 1;
+		if (w > mem_cols) w = mem_cols;
+	}
+	h = (mem_cols + w - 1) / w;
+
+	mem_clip_new(w, h, 3, CMASK_IMAGE, FALSE);
+	text_paste = TEXT_PASTE_NONE;
+	if (!mem_clipboard)
+	{
+		memory_errors(1);
+		return;
+	}
+
+	memset(dest = mem_clipboard, 0, w * h * 3);
+	for (i = 0; i < mem_cols; i++ , dest += 3)
+	{
+		dest[0] = mem_pal[i].red;
+		dest[1] = mem_pal[i].green;
+		dest[2] = mem_pal[i].blue;
+	}
+
+	if (MEM_BPP == 3) pressed_paste_centre();
+	else pressed_select(FALSE);
+	update_menus();
 }
 
 ///	DOCK AREA
@@ -4117,70 +4111,46 @@ static void toggle_dock(int state, int internal)
 
 static void pressed_sel_ramp(int vert)
 {
-	unsigned char rgb[2][3], *dest;
-	int	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2,
-		y = marq_y1 < marq_y2 ? marq_y1 : marq_y2,
-		w = abs(marq_x1 - marq_x2) + 1,
-		h = abs(marq_y1 - marq_y2) + 1,
-		bpp = MEM_BPP,
-		col, cx, cy;
+	unsigned char *c0, *c1, *img, *dest;
+	int i, j, k, l, s1, s2, x, y, w, h, bpp = MEM_BPP;
 
-	if ( mem_channel != CHN_IMAGE || bpp < 3 || tool_type != TOOL_SELECT ||
-		marq_status != MARQUEE_DONE )
-			return;		// Only do this for RGB image canvas + selection marquee
+	if (marq_status != MARQUEE_DONE) return;
 
-	spot_undo(UNDO_DRAW);
+	w = abs(marq_x1 - marq_x2) + 1;
+	h = abs(marq_y1 - marq_y2) + 1;
 
 	if (vert)		// Vertical ramp
 	{
-		for ( cx = x; cx < (x+w); cx++ )
-		{
-			col = get_pixel_RGB( cx, y );
-			rgb[0][0] = INT_2_R(col);
-			rgb[0][1] = INT_2_G(col);
-			rgb[0][2] = INT_2_B(col);
-			col = get_pixel_RGB( cx, y+h-1 );
-			rgb[1][0] = INT_2_R(col);
-			rgb[1][1] = INT_2_G(col);
-			rgb[1][2] = INT_2_B(col);
-
-			dest = mem_img[CHN_IMAGE] + (cx + (y+1)*mem_width)*bpp;
-
-			for ( cy = 1; cy < (h-1); cy++ )
-			{
-				dest[0] = ( rgb[0][0] * (h-cy-1) + rgb[1][0] * cy ) / (h-1);
-				dest[1] = ( rgb[0][1] * (h-cy-1) + rgb[1][1] * cy ) / (h-1);
-				dest[2] = ( rgb[0][2] * (h-cy-1) + rgb[1][2] * cy ) / (h-1);
-				dest += mem_width*bpp;
-			}
-		}
+		k = h - 1; l = w;
+		s1 = mem_width * bpp; s2 = bpp;
 	}
 	else			// Horizontal ramp
 	{
-		for ( cy = y; cy < (y+h); cy++ )
-		{
-			col = get_pixel_RGB( x, cy );
-			rgb[0][0] = INT_2_R(col);
-			rgb[0][1] = INT_2_G(col);
-			rgb[0][2] = INT_2_B(col);
-			col = get_pixel_RGB( x+w-1, cy );
-			rgb[1][0] = INT_2_R(col);
-			rgb[1][1] = INT_2_G(col);
-			rgb[1][2] = INT_2_B(col);
-
-			dest = mem_img[CHN_IMAGE] + (x + 1 + cy*mem_width)*bpp;
-
-			for ( cx = 1; cx < (w-1); cx++ )
-			{
-				*dest++ = ( rgb[0][0] * (w-cx-1) + rgb[1][0] * cx ) / (w-1);
-				*dest++ = ( rgb[0][1] * (w-cx-1) + rgb[1][1] * cx ) / (w-1);
-				*dest++ = ( rgb[0][2] * (w-cx-1) + rgb[1][2] * cx ) / (w-1);
-			}
-		}
+		k = w - 1; l = h;
+		s1 = bpp; s2 = mem_width * bpp;
 	}
 
-	update_all_views();
+	spot_undo(UNDO_FILT);
+	x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
+	y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
+	img = mem_img[mem_channel] + (y * mem_width + x) * bpp;
+	for (i = 0; i < l; i++)
+	{
+		c0 = img; c1 = img + k * s1;
+		dest = img;
+		for (j = 1; j < k; j++)
+		{
+			dest += s1;
+			dest[0] = (c0[0] * (k - j) + c1[0] * j) / k;
+			if (bpp == 1) continue;
+			dest[1] = (c0[1] * (k - j) + c1[1] * j) / k;
+			dest[2] = (c0[2] * (k - j) + c1[2] * j) / k;
+		}
+		img += s2;
+	}
+
 	update_menus();
+	update_all_views();
 }
 
 #undef _
@@ -4251,7 +4221,7 @@ static menu_item main_menu[] = {
 	{ _("/Edit/sep1"), -4 },
 	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, xpm_cut_xpm },
 	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, xpm_copy_xpm },
-	{ _("/Edit/Copy to Palette"), -1, 0, NEED_SEL, NULL, ACT_COPY_PAL, 0 },
+	{ _("/Edit/Copy to Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
 	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, xpm_paste_xpm },
 	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_CLIP, "<control><shift>V", ACT_PASTE_LR, 0 },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
@@ -4698,7 +4668,7 @@ void main_init()
 
 	gtk_widget_set_sensitive(menu_widgets[MENU_CLINE], files_passed > 1);
 
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
+	change_to_tool(DEFAULT_TOOL_ICON);
 
 	toolbar_showhide();
 	if (viewer_mode) toggle_view();

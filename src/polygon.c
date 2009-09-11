@@ -55,30 +55,13 @@ int poly_init()			// Setup max/min -> Requires points in poly_mem
 	return 0;		// Success
 }
 
-/* Draw single thickness straight line to clipboard mask */
-void memline(int x1, int y1, int x2, int y2)
+void poly_draw(int filled, unsigned char *buf, int wbuf)
 {
 	linedata line;
-
-	line_init(line, x1, y1, x2, y2);
-	for (; line[2] >= 0; line_step(line))
-	{
-		mem_clip_mask[line[0] + line[1] * mem_clip_w] = 255;
-	}
-}
-
-void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
-{
-	int i, i2, j, j2, j3, cuts, maxx = mem_width, maxy = mem_height;
 	int poly_lines[MAX_POLY][2][2], poly_cuts[MAX_POLY];
+	int i, i2, j, j2, j3, cuts, maxx = mem_width, maxy = mem_height;
 	int oldmode = mem_undo_opacity;
 	float ratio;
-
-	if (type == 0)
-	{
-		mem_clip_mask_init(0);		/* Clear mask */
-		if (!mem_clip_mask) return;	/* Failed to get memory */
-	}
 
 	mem_undo_opacity = TRUE;
 	for ( i=0; i<poly_points; i++ )		// Populate poly_lines - smallest Y is first point
@@ -96,21 +79,27 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 		poly_lines[i][1-j][0] = poly_mem[i2][0];
 		poly_lines[i][1-j][1] = poly_mem[i2][1];
 
-		if ( type>10 )
+		if (!filled)
 		{
-			f_circle( poly_mem[i][0], poly_mem[i][1], tool_size );
-			tline( poly_mem[i][0], poly_mem[i][1],
-				poly_mem[i2][0], poly_mem[i2][1], tool_size );
+			f_circle(poly_mem[i][0], poly_mem[i][1], tool_size);
+			tline(poly_mem[i][0], poly_mem[i][1],
+				poly_mem[i2][0], poly_mem[i2][1], tool_size);
 		}
-		if ( type==1 || type ==3 )
-			sline( poly_mem[i][0], poly_mem[i][1], poly_mem[i2][0], poly_mem[i2][1] );
-		if ( type==0 )
-			memline( poly_mem[i][0] - poly_min_x, poly_mem[i][1] - poly_min_y,
-				poly_mem[i2][0] - poly_min_x, poly_mem[i2][1] - poly_min_y );
-			// Outline is needed to properly edge the polygon
+		else if (!buf) sline(poly_mem[i][0], poly_mem[i][1],
+			poly_mem[i2][0], poly_mem[i2][1]);
+		else
+		{
+			line_init(line, poly_mem[i][0] - poly_min_x, poly_mem[i][1] - poly_min_y,
+				poly_mem[i2][0] - poly_min_x, poly_mem[i2][1] - poly_min_y);
+			for (; line[2] >= 0; line_step(line))
+			{
+				buf[line[0] + line[1] * wbuf] = 255;
+			}
+		}
+		// Outline is needed to properly edge the polygon
 	}
 
-	if ( type>10 )		// If drawing outline only, finish now
+	if (!filled)		// If drawing outline only, finish now
 	{
 		mem_undo_opacity = oldmode;
 		return;
@@ -167,11 +156,10 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 				if ( poly_cuts[i+1] < 0 ) poly_cuts[i+1] = 0;	// Horizontal Clipping
 				if ( poly_cuts[i+1] >= maxx ) poly_cuts[i+1] = maxx-1;
 
-				if ( type == 0 )
+				if (buf)
 				{
-					j3 = (j-poly_min_y)*mem_clip_w;
-					for ( i2=poly_cuts[i]-poly_min_x; i2<=poly_cuts[i+1]-poly_min_x; 	i2++ )
-						mem_clip_mask[ i2 + j3  ] = 255;
+					j3 = (j - poly_min_y) * wbuf + poly_cuts[i] - poly_min_x;
+					memset(buf + j3, 255, poly_cuts[i + 1] - poly_cuts[i] + 1);
 				}
 				else
 				{
@@ -184,19 +172,21 @@ void poly_draw(int type)	// 0=mask, 1=indexed, 3=RGB
 	mem_undo_opacity = oldmode;
 }
 
-void poly_mask()		// Paint polygon onto clipboard mask
+void poly_mask()	// Paint polygon onto clipboard mask
 {
-	poly_draw(0);
+	mem_clip_mask_init(0);		/* Clear mask */
+	if (!mem_clip_mask) return;	/* Failed to get memory */
+	poly_draw(TRUE, mem_clip_mask, mem_clip_w);
 }
 
-void poly_paint()		// Paint polygon onto image - poly_init() must have been called
+void poly_paint()	// Paint polygon onto image - poly_init() must have been called
 {
-	poly_draw(MEM_BPP);
+	poly_draw(TRUE, NULL, 0);
 }
 
-void poly_outline()		// Paint polygon outline onto image
+void poly_outline()	// Paint polygon outline onto image
 {
-	poly_draw(MEM_BPP + 10);
+	poly_draw(FALSE, NULL, 0);
 }
 
 void poly_add(int x, int y)	// Add point to list

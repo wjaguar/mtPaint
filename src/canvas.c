@@ -293,11 +293,8 @@ void paste_prepare()
 {
 	poly_status = POLY_NONE;
 	poly_points = 0;
-	if ( tool_type != TOOL_SELECT && tool_type != TOOL_POLYGON )
-	{
-		clear_perim();
-		gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE );
-	}
+	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON))
+		change_to_tool(TTB_SELECT);
 	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0);
 }
 
@@ -992,13 +989,6 @@ static void trim_clip()
 
 void pressed_copy(int cut)
 {
-	if (!cut && (tool_type == TOOL_SELECT) && (marq_status >= MARQUEE_PASTE))
-	{
-		mem_clip_x = marq_x1 < marq_x2 ? marq_x1 : marq_x2;
-		mem_clip_y = marq_y1 < marq_y2 ? marq_y1 : marq_y2;
-		return;
-	}
-
 	if (!copy_clip(FALSE)) return;
 	if (tool_type == TOOL_POLYGON) poly_mask();
 	channel_mask();
@@ -1053,6 +1043,7 @@ void update_menus()			// Update edit/undo menu
 	if (mem_channel != CHN_IMAGE) statemap |= NEED_NOIDX;
 	if ((mem_img_bpp == 3) && mem_img[CHN_ALPHA]) statemap |= NEED_RGBA;
 
+	if (mem_clipboard) statemap |= NEED_PCLIP;
 	if (mem_clipboard && (mem_clip_bpp == 3)) statemap |= NEED_ACLIP;
 
 	if ( marq_status == MARQUEE_NONE )
@@ -1095,7 +1086,7 @@ void update_menus()			// Update edit/undo menu
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
 		!GTK_WIDGET_IS_SENSITIVE(icon_buttons[SMUDGE_TOOL_ICON]))
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+		change_to_tool(DEFAULT_TOOL_ICON);
 }
 
 void canvas_undo_chores()
@@ -1321,8 +1312,7 @@ int do_a_load( char *fname )
 	{
 		pressed_select(FALSE); // To prevent automatic paste
 		reset_tools();
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-			icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+		change_to_tool(DEFAULT_TOOL_ICON);
 	}
 	else notify_unchanged();
 

@@ -139,8 +139,7 @@ static void create_new(GtkWidget *widget)
 
 			/* Lose a selection marquee */
 			pressed_select(FALSE);
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-				icon_buttons[DEFAULT_TOOL_ICON]), TRUE);
+			change_to_tool(DEFAULT_TOOL_ICON);
 		}
 		break;
 	case 3: /* Clipboard */
@@ -291,8 +290,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		mem_set_brush(pat_no);
 		brush_tool_type = tool_type;
 		toolbar_update_settings();	// Update spin buttons
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-			icon_buttons[PAINT_TOOL_ICON]), TRUE);	// Update toolbar
+		change_to_tool(TTB_PAINT);	// Update toolbar
 		set_cursor();
 	}
 
@@ -1985,7 +1983,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 
 	/* Paranoia */
 	if ((quantize_mode >= 5) || (dither >= DITH_MAX)) return;
-	if ((dither_mode < 0) && (quantize_mode < 2)) return;
+	if ((dither_mode < 0) && (quantize_mode == 1)) return;
 
 	if (dither_mode < 0) i = mem_undo_next(UNDO_PAL);
 	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
@@ -1999,7 +1997,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	{
 	case 0:	/* Use image colours */
 		new_cols = quantize_cols;
-		err = mem_convert_indexed();
+		err = mem_convert_indexed(dither_mode >= 0);
 		dither = DITH_MAX;
 		break;
 	default:
@@ -2137,7 +2135,7 @@ void pressed_quantize(int palette)
 
 	/* No exact transfer if too many colours */
 	if (quantize_cols > 256) rad_txt[0] = "";
-	if (palette) rad_txt[0] = rad_txt[1] = "";
+	if (palette) rad_txt[1] = "";
 	vbox = wj_radio_pack(rad_txt, -1, 0, palette || (quantize_cols > 256) ?
 		3 : 0, &quantize_mode, GTK_SIGNAL_FUNC(click_quantize_radio));
 	add_with_frame(page0, _("Palette"), vbox, 5);

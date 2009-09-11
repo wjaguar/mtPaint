@@ -427,7 +427,7 @@ int mem_pal_cmp( png_color *pal1,	// Count itentical palette entries
 	png_color *pal2 );
 void mem_greyscale(int gcor);		// Convert image to greyscale
 int mem_convert_rgb();			// Convert image to RGB
-int mem_convert_indexed();		// Convert image to Indexed Palette
+int mem_convert_indexed(int img);	// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	unsigned char userpal[3][256]);

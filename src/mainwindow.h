@@ -147,7 +147,9 @@ int wtf_pressed(GdkEventKey *event);
 #define NEED_ACLIP 0x0400
 #define NEED_CHAN  0x0800
 #define NEED_RGBA  0x1000
+#define NEED_PCLIP 0x2000
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
+#define NEED_PSEL  (NEED_MARQ | NEED_PCLIP)
 
 void mapped_dis_add(GtkWidget *widget, int actmap);
 void mapped_item_state(int statemap);	// Change state of preset menu items
@@ -262,6 +264,7 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	chanlist xtra_img);
 
 void stop_line();
+void change_to_tool(int icon);
 
 void spot_undo(int mode);		// Take snapshot for undo
 void set_cursor();			// Set mouse cursor

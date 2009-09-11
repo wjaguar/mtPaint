@@ -12,6 +12,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Dock area added which can hold the command line window
 	* Layers window handling reworked to make it more responsive
 	* Layer window: position now editable via spin buttons
+	* Layer window: transparent colour toggle removed
 	* "Composite to New Layer" operation added to Layers menu
 	* Palette can be copied to or from the canvas using the Edit menu
 	* System clipboard can be imported or exported using the Edit menu
@@ -22,6 +23,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Canvas, view and palette area borders now can't be messed up by theme engines
 	* BUGFIX - Polygon line selection now clearer in Windows version
 	* BUGFIX - Occasional redraw glitches in paste preview eliminated
+	* BUGFIX - Persistent rectangle selection now doesn't steal arrow keys from gradient placement tool
 
 3.20	2007-12-27
 
