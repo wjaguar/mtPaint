@@ -104,6 +104,13 @@
 #define FM_DISP_RESTORE 2 /* Restore to previous state */
 #define FM_NUKE         4 /* Delete this frame at earliest opportunity */
 
+/* Undo data types */
+#define UD_FILENAME 0 /* Filename */
+#define UD_TEMPNAME 1 /* Temp file name */
+#define NUM_UTYPES  2 /* Should be no larger than 32 */
+//	List in here all types which need freeing
+#define UD_FREE_MASK (1 << UD_FILENAME)
+
 typedef unsigned char *chanlist[NUM_CHANNELS];
 
 typedef struct {
@@ -125,9 +132,15 @@ typedef struct {
 } frameset;
 
 typedef struct {
+	unsigned int map;
+	void *store[NUM_UTYPES];
+} undo_data;
+
+typedef struct {
 	chanlist img;
 	png_color *pal_;
 	unsigned char *tileptr;
+	undo_data *dataptr;
 	int cols, width, height, bpp, flags;
 	size_t size;
 } undo_item;
@@ -148,13 +161,13 @@ typedef struct {
 	int bpp;		// Bytes per pixel = 1 or 3
 	int width, height;	// Image geometry
 	undo_stack undo_;	// Image's undo stack
+	char *filename;		// File name of file loaded/saved
+	char *tempname;		// File name of up-to-date temp file
+	int changed;		// Changed since last load/save flag
 } image_info;
 
 typedef struct {
-	char filename[PATHBUF];		// File name of file loaded/saved
-	char *tempname;			// File name of up-to-date temp file
 	int channel;			// Current active channel
-	int changed;			// Changed since last load/save flag
 	int ics;			// Has the centre been set by the user?
 	float icx, icy;			// Current centre x,y
 	int tool_pat;			// Tool pattern number
@@ -314,6 +327,10 @@ image_info mem_image;			// Current image
 #define mem_undo_redo		mem_image.undo_.redo
 #define mem_undo_max		mem_image.undo_.max
 
+#define mem_filename		mem_image.filename
+#define mem_tempname		mem_image.tempname
+#define mem_changed		mem_image.changed
+
 image_info mem_clip;			// Current clipboard
 
 #define mem_clipboard		mem_clip.img[CHN_IMAGE]
@@ -334,10 +351,7 @@ image_info mem_clip;			// Current clipboard
 
 image_state mem_state;			// Current edit settings
 
-#define mem_filename		mem_state.filename
-#define mem_tempname		mem_state.tempname
 #define mem_channel		mem_state.channel
-#define mem_changed		mem_state.changed
 #define mem_icx			mem_state.icx
 #define mem_icy			mem_state.icy
 #define mem_ics			mem_state.ics
@@ -439,6 +453,7 @@ void mem_remove_frame(frameset *fset, int frame);
 void mem_free_frames(frameset *fset);
 
 void init_istate(image_state *state, image_info *image);	// Set initial state of image variables
+void mem_replace_filename(int layer, char *fname);	// Change layer's filename
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
 void update_undo_depth();	// Resize all undo stacks
 
@@ -470,7 +485,7 @@ void mem_free_image(image_info *image, int mode);
 
 //	Allocate new image data
 int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
-	int cmask, chanlist src);
+	int cmask, image_info *src);
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
 //	Allocate new clipboard, removing or preserving old as needed
@@ -573,7 +588,7 @@ void hsv2rgb(unsigned char *rgb, double *hsv);
 #define UNDO_PASTE 7	/* Paste operation (current / RGBA) */
 #define UNDO_TOOL  8	/* Same as UNDO_DRAW but respects pen_down */
 
-int mem_undo_next(int mode);		// Call this after a draw event but before any changes to image
+void mem_undo_next(int mode);	// Call this after a draw event but before any changes to image
 //	 Get address of previous channel data (or current if none)
 unsigned char *mem_undo_previous(int channel);
 void mem_undo_prepare();	// Call this after changes to image, to compress last frame

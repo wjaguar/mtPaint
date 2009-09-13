@@ -4915,8 +4915,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		if (res == 1)
 		{
 			mem_alloc_image(0, &lim->image_, settings.width,
-				settings.height, settings.bpp,
-				cmask_from(settings.img), settings.img);
+				settings.height, settings.bpp, 0, NULL);
+			memcpy(lim->image_.img, settings.img, sizeof(chanlist));
 			store_image_extras(&lim->image_, &lim->state_, &settings);
 			update_undo(&lim->image_);
 		}

@@ -1,6 +1,10 @@
 include ../_conf.txt
 
-CFLAGS = $(CFLAG)
+ifdef HAVE_RANDSEED # Generate identical object files if possible
+  CFLAGS = $(CFLAG) -frandom-seed=$*
+else
+  CFLAGS = $(CFLAG)
+endif
 LDFLAGS = $(LDFLAG) $(GLIB_LIB)
 
 BIN = mtpaint
@@ -13,11 +17,7 @@ $(BIN): main.o $(OBJS)
 	$(CC) main.o $(OBJS) -o $(BIN) $(LDFLAGS)
 
 .c.o:
-ifdef HAVE_RANDSEED # Generate identical object files if possible
-	$(CC) $(CFLAGS) -frandom-seed=$* -c -o $*.o $*.c
-else
 	$(CC) $(CFLAGS) -c -o $*.o $*.c
-endif
 
 clean:
 	rm -f *.o $(BIN)* $(LIBNAME) $(LIBNAME2) $(SLIBNAME)

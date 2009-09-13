@@ -1206,13 +1206,13 @@ void update_stuff(int flags)
 void main_undo()
 {
 	mem_undo_backward();
-	update_stuff(UPD_ALL);
+	update_stuff(UPD_ALL | CF_NAME);
 }
 
 void main_redo()
 {
 	mem_undo_forward();
-	update_stuff(UPD_ALL);
+	update_stuff(UPD_ALL | CF_NAME);
 }
 
 /* Save palette to a file */
@@ -1268,12 +1268,8 @@ int load_pal(char *file_name)			// Load palette file
 
 void set_new_filename(int layer, char *fname)
 {
-	if (layer == layer_selected)
-	{
-		strncpy(mem_filename, fname, PATHBUF);
-		update_stuff(UPD_NAME);
-	}
-	else strncpy(layer_table[layer].image->state_.filename, fname, PATHBUF);
+	mem_replace_filename(layer, fname);
+	if (layer == layer_selected) update_stuff(UPD_NAME);
 }
 
 static int populate_channel(char *filename)
@@ -1921,7 +1917,8 @@ static void fs_ok(GtkWidget *fs)
 		if (layers_total > 0)
 		{
 			/* Filename has changed so layers file needs re-saving to be correct */
-			if (strcmp(fname, mem_filename)) layers_notify_changed();
+			if (!mem_filename || strcmp(fname, mem_filename))
+				layers_notify_changed();
 		}
 		set_new_filename(layer_selected, fname);
 		update_stuff(UPD_TRANS);
@@ -1974,12 +1971,21 @@ static void fs_ok(GtkWidget *fs)
 		res = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
 		res = explode_frames(fname, anim_mode, gif, res);
 		if (res != 1) handle_file_error(res);
-		if (res <= 0) goto redo;
+		if (res > 0) // Success or nonfatal error
+		{
+			c = strrchr(gif, DIR_SEP);
+			if (!c) c = gif;
+			else c++;
+			c = g_strdup_printf("%s%c%s.???", fname, DIR_SEP, c);
+			run_def_action(DA_GIF_EDIT, c, NULL, preserved_gif_delay);
+			g_free(c);
+		}
+		else goto redo; // Fatal error
 		break;
 	case FS_EXPORT_GIF:
 		if (check_file(fname)) goto redo;
 		store_ls_settings(&settings);	// Update data in memory
-		gif2 = g_strdup(mem_filename);
+		gif2 = g_strdup(mem_filename);	// Guaranteed to be non-NULL
 		for (i = strlen(gif2) - 1; i >= 0; i--)
 		{
 			if (gif2[i] == DIR_SEP) break;
@@ -2038,7 +2044,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 	GtkWidget *xtra;
 
 
-	if ((action_type == FS_PNG_SAVE) && mem_filename[0])
+	if ((action_type == FS_PNG_SAVE) && mem_filename)
 		strncpy(txt, mem_filename, PATHBUF);	// If we have a filename and saving
 	else if ((action_type == FS_LAYER_SAVE) && layers_filename[0])
 		strncpy(txt, layers_filename, PATHBUF);
@@ -2112,7 +2118,7 @@ static GtkWidget *file_selector_create(int action_type)
 		title = _("Export ASCII Art");
 		break;
 	case FS_LAYER_SAVE:
-		check_layers_all_saved();
+		if (check_layers_all_saved()) return (NULL);
 		title = _("Save Layer Files");
 		break;
 	case FS_EXPLODE_FRAMES:
@@ -2120,7 +2126,7 @@ static GtkWidget *file_selector_create(int action_type)
 		fpick_flags = FPICK_DIRS_ONLY;
 		break;
 	case FS_EXPORT_GIF:
-		if (!mem_filename[0])
+		if (!mem_filename)
 		{
 			alert_box(_("Error"), _("You must save at least one frame to create an animated GIF."), NULL);
 			return (NULL);
@@ -3246,8 +3252,7 @@ void update_recent_files()			// Update the menu items
 		gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
 
 	// Hide separator if not needed
-	if (count) gtk_widget_show(menu_widgets[MENU_RECENT_S]);
-		else gtk_widget_hide(menu_widgets[MENU_RECENT_S]);
+	(count ? gtk_widget_show : gtk_widget_hide)(menu_widgets[MENU_RECENT_S]);
 }
 
 void register_file( char *filename )		// Called after successful load/save

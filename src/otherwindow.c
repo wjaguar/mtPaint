@@ -74,7 +74,7 @@ void reset_tools()
 
 void do_new_chores(int undo)
 {
-	set_new_filename(layer_selected, "");
+	set_new_filename(layer_selected, NULL);
 	if (layers_total) layers_notify_changed();
 
 	// No reason to reset tools in undoable mode
@@ -140,14 +140,10 @@ static int clip_to_layer(int layer)
 		mem_pal_copy(img->pal, mem_pal);
 		img->cols = mem_cols;
 	}
-	if (mem_alloc_image(AI_COPY, img, mem_clip_w, mem_clip_h,
-		mem_clip_bpp, cmask, mem_clip.img))
-	{
-		update_undo(img);
-		state->channel = CHN_IMAGE;
-		return (1);
-	}
-	return (0);
+	if (!mem_alloc_image(AI_COPY, img, 0, 0, 0, 0, &mem_clip)) return (0);
+	update_undo(img);
+	state->channel = CHN_IMAGE;
+	return (1);
 }
 
 static void create_new(GtkWidget *widget)
@@ -2214,8 +2210,8 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	if ((quantize_mode >= QUAN_MAX) || (dither >= DITH_MAX)) return;
 	if (!have_image && (quantize_mode == QUAN_CURRENT)) return;
 
-	if (!have_image) i = mem_undo_next(UNDO_PAL);
-	else i = undo_next_core(UC_NOCOPY, mem_width, mem_height, 1, CMASK_IMAGE);
+	i = undo_next_core(UC_NOCOPY, mem_width, mem_height,
+		have_image ? 1 : mem_img_bpp, have_image ? CMASK_IMAGE : CMASK_NONE);
 	if (i)
 	{
 		memory_errors(i);

@@ -65,7 +65,7 @@ int	show_layers_main,		// Show all layers in main window
 ///	PROCEDURES
 
 void layers_init();
-layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src);
+layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src);
 void pressed_layers();
 void pressed_paste_layer();
 gboolean delete_layers_window();

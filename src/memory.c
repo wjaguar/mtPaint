@@ -101,10 +101,16 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 #define UF_TILED 1
 #define UF_FLAT  2
 #define UF_SIZED 4
+#define UF_ORIG  8 /* Unmodified state */
 
 int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
+
+#define UNDO_STORESIZE 1023 /* Leave space for memory block header */
+
+static undo_data *undo_datastore, *undo_freelist;
+static int undo_freecnt;
 
 /// PATTERNS
 
@@ -449,7 +455,6 @@ void mem_free_frames(frameset *fset)
 /* Set initial state of image variables */
 void init_istate(image_state *state, image_info *image)
 {
-	state->changed = 0;
 	memset(state->prot_mask, 0, 256);	/* Clear all mask info */
 	state->prot = 0;
 	state->col_[0] = 1;
@@ -457,6 +462,113 @@ void init_istate(image_state *state, image_info *image)
 	state->col_24[0] = image->pal[1];
 	state->col_24[1] = image->pal[0];
 	state->tool_pat = 0;
+}
+
+/* Add a new undo data node */
+int undo_add_data(undo_item *undo, int type, void *ptr)
+{
+	undo_data *node;
+	unsigned int tmap = 1 << type;
+
+
+	/* Reuse existing node */
+	if ((node = undo->dataptr))
+	{
+		if (node->map & tmap) goto fail; // Prevent duplication
+		tmap |= node->map;
+	}
+	/* Allocate a new node */
+	else if ((node = undo_freelist)) undo_freelist = node->store[0];
+	else
+	{
+		if (!undo_freecnt)
+		{
+			node = calloc(UNDO_STORESIZE, sizeof(undo_data));
+			if (!node) goto fail;
+			/* Datastores are never freed, so lose the previous ptr */
+			undo_datastore = node;
+			undo_freecnt = UNDO_STORESIZE - 1;
+		}
+		else node = undo_datastore + UNDO_STORESIZE - undo_freecnt--;
+	}
+	node->map = tmap;
+	node->store[type] = ptr;
+	undo->dataptr = node;
+	return (TRUE);
+
+fail:	/* Cannot store - delete the data right now */
+	if (tmap & UD_FREE_MASK) free(ptr);
+	return (FALSE);
+}
+
+/* Free an undo data block, and delete its data */
+void undo_free_data(undo_item *undo)
+{
+	undo_data *tmp;
+	unsigned int tmap;
+	int i;
+
+	if (!(tmp = undo->dataptr)) return;
+	for (tmap = tmp->map & UD_FREE_MASK, i = 0; tmap; tmap >>= 1 , i++)
+		if (tmap & 1) free(tmp->store[i]);
+	tmp->store[0] = undo_freelist;
+	undo_freelist = tmp;
+	undo->dataptr = NULL;
+}
+
+/* Swap undo data - move current set out, and replace by incoming set */
+void undo_swap_data(undo_item *outp, undo_item *inp)
+{
+	undo_data *tmp;
+	unsigned int tmap;
+
+
+	if (mem_tempname) undo_add_data(outp, UD_TEMPNAME, mem_tempname);
+	mem_tempname = NULL;
+// !!! Other unconditionally outgoing stuff goes here
+
+	if (!(tmp = inp->dataptr)) return;
+	tmap = tmp->map;
+	if (tmap & (1 << UD_FILENAME))
+	{
+		undo_add_data(outp, UD_FILENAME, mem_filename);
+		mem_filename = tmp->store[UD_FILENAME];
+	}
+	if (tmap & (1 << UD_TEMPNAME)) mem_tempname = tmp->store[UD_TEMPNAME];
+// !!! All stuff (swappable or incoming) goes here
+
+	/* Release the incoming node */
+	tmp->store[0] = undo_freelist;
+	undo_freelist = tmp;
+	inp->dataptr = NULL;
+}
+
+/* Change layer's filename
+ * Note: calling this with non-empty redo, for example when saving to a new
+ * name, will "reparent" its frames from the old filename to the new one - WJ */
+void mem_replace_filename(int layer, char *fname)
+{
+	image_info *image = &mem_image;
+	undo_stack *undo;
+	char *name;
+
+	if (layer != layer_selected) image = &layer_table[layer].image->image_;
+	name = image->filename;
+	if (fname && !fname[0]) fname = NULL; // Empty name is no name
+
+	/* Do nothing if "replacing" name by itself */
+	if (fname && name ? !strcmp(fname, name) : fname == name) return;
+
+	/* Store the old filename in _previous_ undo frame if possible */
+	undo = &image->undo_;
+	if (undo->done) undo_add_data(undo->items + (undo->pointer ?
+		undo->pointer : undo->max) - 1, UD_FILENAME, name);
+	else free(name);
+
+	/* Clear filename, and clear tempname too while we're at it */
+	image->filename = image->tempname = NULL;
+	/* Put a copy of new name in its place */
+	if (fname) image->filename = strdup(fname);
 }
 
 /* Create new undo stack of a given depth */
@@ -480,11 +592,12 @@ void update_undo(image_info *image)
 	mem_pal_copy(undo->pal_, image->pal);
 
 	memcpy(undo->img, image->img, sizeof(chanlist));
+	undo->dataptr = NULL;
 	undo->cols = image->cols;
 	undo->width = image->width;
 	undo->height = image->height;
 	undo->bpp = image->bpp;
-	undo->flags = 0;
+	undo->flags = image->changed ? 0 : UF_ORIG;
 }
 
 void mem_free_chanlist(chanlist img)
@@ -502,6 +615,7 @@ static size_t undo_free_x(undo_item *undo)
 {
 	int j = undo->size;
 
+	undo_free_data(undo);
 	free(undo->pal_);
 	mem_free_chanlist(undo->img);
 	memset(undo, 0, sizeof(undo_item));
@@ -579,6 +693,9 @@ void mem_free_image(image_info *image, int mode)
 		mem_free_chanlist(image->img);
 		memset(image->img, 0, sizeof(chanlist));
 		image->width = image->height = 0;
+
+		free(image->filename);
+		image->filename = image->tempname = NULL;
 	}
 
 	/* Delete undo frames if any */
@@ -597,23 +714,41 @@ void mem_free_image(image_info *image, int mode)
 }
 
 /* Allocate new image data */
+// !!! Does NOT copy palette in copy mode, as it may be invalid
 int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
-	int cmask, chanlist src)
+	int cmask, image_info *src)
 {
 	unsigned char *res;
 	size_t l, sz = (size_t)w * h;
-	int i, mask0 = cmask;
+	int i;
 
 	if (mode & AI_CLEAR) memset(image, 0, sizeof(image_info));
+	else
+	{
+		memset(image->img, 0, sizeof(chanlist));
+		image->filename = image->tempname = NULL; /* Paranoia */
+		image->changed = 0;
+	}
+
+	if (mode & AI_COPY)
+	{
+		if (src->filename && !(image->filename = strdup(src->filename)))
+			return (FALSE);
+		image->tempname = src->tempname;
+		image->changed = src->changed;
+
+		w = src->width;
+		h = src->height;
+		bpp = src->bpp;
+		cmask = cmask_from(src->img);
+	}
 
 	image->width = w;
 	image->height = h;
 	image->bpp = bpp;
-	memset(image->img, 0, sizeof(chanlist));
 
 	if (!cmask) return (TRUE); /* Empty block requested */
 
-	if (src && !(mode & AI_COPY)) cmask &= ~cmask_from(src);
 	l = sz * bpp;
 	res = (void *)(-1);
 	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)
@@ -630,38 +765,27 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	}
 	if (!res) /* Not enough memory */
 	{
+		free(image->filename);
+		image->filename = NULL;
 		while (--i >= 0) free(image->img[i]);
 		memset(image->img, 0, sizeof(chanlist));
 		return (FALSE);
 	}
 
-	if (!src); /* No source channels */
-	else if (mode & AI_COPY) /* Clone */
+	l = sz * bpp;
+	if (mode & AI_COPY) /* Clone */
 	{
-		l = sz * bpp;
 		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
 		{
-			if (image->img[i] && src[i])
-				memcpy(image->img[i], src[i], l);
+			if (image->img[i]) memcpy(image->img[i], src->img[i], l);
 			l = sz;
 		}
 	}
-	else /* Move */
+	else if (!(mode & AI_NOINIT)) /* Init */
 	{
 		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
 		{
-			if (src[i] && (mask0 & CMASK_FOR(i)))
-				image->img[i] = src[i];
-		}
-	}
-
-	if (!(mode & AI_NOINIT)) /* Init */
-	{
-		l = sz * bpp;
-		for (i = CHN_IMAGE; i < NUM_CHANNELS; i++)
-		{
-			if (image->img[i] && (!src || !src[i]))
-				memset(image->img[i], channel_fill[i], l);
+			if (image->img[i]) memset(image->img[i], channel_fill[i], l);
 			l = sz;
 		}
 	}
@@ -1246,13 +1370,21 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	png_color *newpal;
 	undo_item *undo;
 	unsigned char *img;
+	char *tempname = mem_tempname;
 	chanlist holder, frame;
 	size_t mem_req, mem_lim, wh;
-	int i, j, k;
+	int i, j, k, need_frame;
 
-	notify_changed();
+
 	if (pen_down && (mode & UC_PENDOWN)) return (0);
 	pen_down = mode & UC_PENDOWN ? 1 : 0;
+
+	/* Fill undo frame */
+	update_undo(&mem_image);
+
+	/* Postpone change notify if nothing will be done without new frame */
+	need_frame = mode & (UC_CREATE | UC_NOCOPY | UC_GETMEM);
+	if (!need_frame) notify_changed();
 
 	/* Release redo data */
 	if (mem_undo_redo)
@@ -1269,24 +1401,21 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	/* Compress last undo frame */
 	mem_undo_prepare();
 
+	/* Calculate memory requirements */
 	mem_req = SIZEOF_PALETTE + 32;
 	wh = (size_t)new_width * new_height;
-	if (cmask && !(mode & UC_DELETE))
+	if (!(mode & UC_DELETE))
 	{
 		for (i = j = 0; i < NUM_CHANNELS; i++)
 		{
-			if ((mem_img[i] || (mode & UC_CREATE))
-				&& (cmask & (1 << i))) j++;
+			if ((cmask & (1 << i)) &&
+				(mem_img[i] || (mode & UC_CREATE))) j++;
 		}
 		if (cmask & CMASK_IMAGE) j += new_bpp - 1;
 		mem_req += (wh + 32) * j;
-	}
-
-	/* Fill undo frame */
-	update_undo(&mem_image);
 // !!! Must be after update_undo() to get used memory right
-	if (!(mode & UC_DELETE))
 		if (mem_undo_space(mem_req)) return (2);
+	}
 	if (mode & UC_GETMEM) return (0); // Enough memory was freed
 
 	/* Prepare outgoing frame */
@@ -1328,25 +1457,29 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	}
 
 	/* Next undo step */
-	if (mem_undo_done >= mem_undo_max - 1)
-		undo_free_x(mem_undo_im_ + (mem_undo_pointer + 1) % mem_undo_max);
-	else mem_undo_done++;
 	mem_undo_pointer = (mem_undo_pointer + 1) % mem_undo_max;
+	if (mem_undo_done >= mem_undo_max - 1)
+		undo_free_x(mem_undo_im_ + mem_undo_pointer);
+	else mem_undo_done++;
 
 	/* Commit */
+	if (tempname) undo_add_data(undo, UD_TEMPNAME, tempname);
 	memcpy(undo->img, frame, sizeof(chanlist));
 	mem_undo_im_[mem_undo_pointer].pal_ = newpal;
 	memcpy(mem_img, holder, sizeof(chanlist));
 	mem_width = new_width;
 	mem_height = new_height;
 	mem_img_bpp = new_bpp;
-	update_undo(&mem_image);
+ 
+	/* Do postponed change notify, now that new frame is created */
+	if (need_frame) notify_changed();
 
+	update_undo(&mem_image);
 	return (0);
 }
 
 // Call this after a draw event but before any changes to image
-int mem_undo_next(int mode)
+void mem_undo_next(int mode)
 {
 	int cmask = CMASK_ALL, wmode = 0;
 
@@ -1384,7 +1517,7 @@ int mem_undo_next(int mode)
 			(mem_clip_alpha || RGBA_mode) ? CMASK_RGBA : CMASK_CURR;
 		break;
 	}
-	return (undo_next_core(wmode, mem_width, mem_height, mem_img_bpp, cmask));
+	undo_next_core(wmode, mem_width, mem_height, mem_img_bpp, cmask);
 }
 
 /* Swap image & undo tiles; in process, normal order translates to reverse and
@@ -1465,7 +1598,7 @@ static void mem_undo_swap(int old, int new, int redo)
 		curr->tileptr = prev->tileptr;
 		prev->tileptr = NULL;
 		curr->size = prev->size;
-		curr->flags = prev->flags;
+		curr->flags = prev->flags & ~UF_ORIG;
 	}
 	else
 	{
@@ -1484,7 +1617,7 @@ static void mem_undo_swap(int old, int new, int redo)
 		}
 		curr->flags = UF_FLAT;
 	}
-	prev->flags = 0;
+	prev->flags &= UF_ORIG;
 
 	mem_pal_copy(curr->pal_, mem_pal);
 	if (!prev->pal_)
@@ -1494,15 +1627,19 @@ static void mem_undo_swap(int old, int new, int redo)
 	}
 	else mem_pal_copy(mem_pal, prev->pal_);
 
+	undo_swap_data(curr, prev);
+
 	curr->width = mem_width;
 	curr->height = mem_height;
 	curr->cols = mem_cols;
 	curr->bpp = mem_img_bpp;
+	if (!mem_changed) curr->flags |= UF_ORIG;
 
 	mem_width = prev->width;
 	mem_height = prev->height;
 	mem_cols = prev->cols;
 	mem_img_bpp = prev->bpp;
+	mem_changed = !(prev->flags & UF_ORIG);
 }
 
 void mem_undo_backward()		// UNDO requested by user

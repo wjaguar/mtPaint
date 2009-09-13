@@ -104,7 +104,7 @@ void spawn_quit()
 static char *new_temp_file()
 {
 	ls_settings settings;
-	char buf[PATHBUF], ids[32], *c, *f = "tmp.png", *ext = "png";
+	char buf[PATHBUF], ids[32], *c, *f = "tmp.png";
 	int fd, l, cnt, idx, res, type = FT_PNG;
 
 	/* Prepare temp directory */
@@ -112,13 +112,12 @@ static char *new_temp_file()
 	if (!mt_temp_dir) return (NULL); /* Temp dir creation failed */
 
 	/* Analyze name */
-	if (mem_filename[0])
+	if (mem_filename)
 	{
 		f = strrchr(mem_filename, DIR_SEP);
 		if (!f) f = mem_filename;
 		type = file_type_by_ext(f, FF_SAVE_MASK);
 		if (type == FT_NONE) type = FT_PNG;
-		else ext = strrchr(f, '.') + 1;
 	}
 	c = strrchr(f, '.');
 	if (c == f) c = (f = "tmp.png") + 3; /* If extension w/o name */
@@ -133,7 +132,8 @@ static char *new_temp_file()
 		{
 			if (idx) sprintf(ids, "%d", idx);
 			snprintf(buf, PATHBUF, "%s%c%.*s%s.%s",
-				mt_temp_dir, DIR_SEP, l, f, ids, ext);
+				mt_temp_dir, DIR_SEP, l, f, ids,
+				file_formats[type].ext);
 			fd = open(buf, O_WRONLY | O_CREAT | O_EXCL, 0644);
 			if (fd >= 0) break;
 		}
@@ -163,7 +163,7 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 {
 	char *fname = mem_filename;
 
-	if (mem_changed || !fname[0]) /* If not saved */
+	if (mem_changed || !fname) /* If not saved */
 	{
 		if (!mem_tempname) mem_tempname = new_temp_file();
 		if (!mem_tempname) return (NULL); /* Temp save failed */

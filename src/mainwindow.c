@@ -542,7 +542,7 @@ static void pressed_save_file()
 {
 	ls_settings settings;
 
-	while (mem_filename[0])
+	while (mem_filename)
 	{
 		init_ls_settings(&settings, NULL);
 		settings.ftype = file_type_by_ext(mem_filename, FF_IMAGE);
@@ -5022,35 +5022,39 @@ void setup_language()			// Change language
 
 void update_titlebar()		// Update filename in titlebar
 {
-	char txt[300], txt2[PATHTXT], *extra;
+	static int changed = -1;
+	static char *name = "";
+	char txt[300], txt2[PATHTXT];
 
 
-	if (!main_window) return;
+	/* Don't send needless updates */
+	if (!main_window || ((mem_changed == changed) && (mem_filename == name)))
+		return;
+	changed = mem_changed;
+	name = mem_filename;
 
-	gtkuncpy(txt2, mem_filename, PATHTXT);
-	extra = mem_changed ? _("(Modified)") : "-";
+	snprintf(txt, 290, "%s %s %s", VERSION,
+		changed ? _("(Modified)") : "-",
+		name ? gtkuncpy(txt2, name, PATHTXT) : _("Untitled"));
 
-	snprintf( txt, 290, "%s %s %s", VERSION, extra, txt2[0] ? txt2 :
-		_("Untitled"));
-
-	gtk_window_set_title (GTK_WINDOW (main_window), txt );
+	gtk_window_set_title(GTK_WINDOW(main_window), txt);
 }
 
 void notify_changed()		// Image/palette has just changed - update vars as needed
 {
 	mem_tempname = NULL;
-	if ( mem_changed != 1 )
+	if (!mem_changed)
 	{
-		mem_changed = 1;
+		mem_changed = TRUE;
 		update_titlebar();
 	}
 }
 
 void notify_unchanged()		// Image/palette has just been unchanged (saved) - update vars as needed
 {
-	if ( mem_changed != 0 )
+	if (mem_changed)
 	{
-		mem_changed = 0;
+		mem_changed = FALSE;
 		update_titlebar();
 	}
 }

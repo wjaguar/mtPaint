@@ -73,11 +73,10 @@ void layers_init()
 
 /* Allocate layer image, its channels and undo stack
  * !!! Must be followed by update_undo() after setting up image is done */
-layer_image *alloc_layer(int w, int h, int bpp, int cmask, chanlist src)
+layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src)
 {
 	layer_image *lim;
 
-	if (src) cmask = cmask_from(src);
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
 	if (init_undo(&lim->image_.undo_, mem_undo_depth) &&
@@ -322,7 +321,7 @@ void layer_press_duplicate()
 
 	if (layers_total >= MAX_LAYERS) return;
 
-	lim = alloc_layer(mem_width, mem_height, mem_img_bpp, 0, mem_img);
+	lim = alloc_layer(0, 0, 0, 0, &mem_image);
 	if (!lim)
 	{
 		memory_errors(1);
@@ -456,33 +455,21 @@ void layer_press_centre()
 	repaint_layers();
 }
 
-static int layers_unsaved_tot()	// Return number of layers with no filenames
+/* Return 1 if some layers are modified, 2 if some are nameless, 3 if both,
+ * 0 if neither */
+static int layers_changed_tot()
 {
-	int j = 0, k;
-
-	for ( k=0; k<=layers_total; k++ )	// Check each layer for proper filename
-	{
-		j += !(k == layer_selected ? mem_filename[0] :
-			layer_table[k].image->state_.filename[0]);
-	}
-
-	return j;
-}
-
-static int layers_changed_tot()	// Return number of layers with changes
-{
-	image_state *state;
+	image_info *image;
 	int j, k;
 
-	for (j = k =0; k <= layers_total; k++)	// Check each layer for mem_changed
+	for (j = k = 0; k <= layers_total; k++) // Check each layer for mem_changed
 	{
-		state = k == layer_selected ? &mem_state :
-			&layer_table[k].image->state_;
-		j += state->changed;
-		j += !state->filename[0];
+		image = k == layer_selected ? &mem_image :
+			&layer_table[k].image->image_;
+		j |= !!image->changed + !image->filename * 2;
 	}
 
-	return j;
+	return (j);
 }
 
 int check_layers_for_changes()		// 1=STOP, 2=IGNORE, -10=NOT CHANGED
@@ -592,7 +579,8 @@ int load_layers( char *file_name )
 		/* Update image variables after load */
 		t = layer_table + layers_total;
 		lim2 = t->image;
-		strncpy(lim2->state_.filename, load_name, PATHBUF);
+		// !!! No old name so no fuss with saving it
+		lim2->image_.filename = strdup(load_name);
 		init_istate(&lim2->state_, &lim2->image_);
 
 		fgets(tin, 256, fp);
@@ -705,7 +693,8 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 
 			/* Create a name for this frame */
 			sprintf(tail, ".%03d", i - 1);
-			strncpy(state->filename, buf, PATHBUF);
+			// !!! No old name so no fuss with saving it
+			image->filename = strdup(buf);
 
 			init_istate(state, image);
 
@@ -851,7 +840,7 @@ int save_layers( char *file_name )
 	for ( i=0; i<=layers_total; i++ )
 	{
 		t = layer_table + i;
-		parse_filename(comp_name, file_name, t->image->state_.filename, l);
+		parse_filename(comp_name, file_name, t->image->image_.filename, l);
 		fprintf( fp, "%s\n", comp_name );
 
 		xpm = t->image->state_.xpm_trans;
@@ -879,23 +868,15 @@ fail:
 
 int check_layers_all_saved()
 {
-	if (layers_unsaved_tot())
-	{
-		alert_box(_("Warning"), _("One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."), NULL);
-		return 1;
-	}
-
-	return 0;
+	if (layers_changed_tot() < 2) return (0);
+	alert_box(_("Warning"), _("One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."), NULL);
+	return (1);
 }
 
 void layer_press_save()
 {
-	if (!layers_filename[0]) file_selector( FS_LAYER_SAVE );
-	else
-	{
-		check_layers_all_saved();
-		save_layers( layers_filename );
-	}
+	if (!layers_filename[0]) file_selector(FS_LAYER_SAVE);
+	else if (!check_layers_all_saved()) save_layers(layers_filename);
 }
 
 void layer_press_remove_all()
@@ -1104,7 +1085,7 @@ void pressed_paste_layer()
 		}
 	}
 
-	set_new_filename(layers_total, "");
+	set_new_filename(layers_total, NULL);
 
 	layer_show_new();
 //	pressed_layers();
