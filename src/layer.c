@@ -80,7 +80,7 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src)
 	lim = calloc(1, sizeof(layer_image));
 	if (!lim) return (NULL);
 	if (init_undo(&lim->image_.undo_, mem_undo_depth) &&
-		mem_alloc_image(AI_COPY, &lim->image_, w, h, bpp, cmask, src))
+		mem_alloc_image(src ? AI_COPY : 0, &lim->image_, w, h, bpp, cmask, src))
 		return (lim);
 	free(lim->image_.undo_.items);
 	free(lim);
@@ -636,7 +636,8 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	layer_node *t;
 	layer_image *lim;
 	frameset fset;
-	int i, j, dx, dy, sens, res, lname;
+	int anim = file_formats[ftype].flags & FF_ANIM;
+	int i, j, l, dx, dy, sens, res, res0, lname;
 
 
 	/* Create buffer for name mangling */
@@ -649,35 +650,43 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	/* Remove old layers, load new frames */
 	sens = layers_sensitive(FALSE);
 	if (layers_total) layers_free_all();	// Remove all current layers
-	res = load_frameset(&fset, ani_mode, file_name, FS_LAYER_LOAD, ftype);
+	res = res0 = load_frameset(&fset, ani_mode, file_name, FS_LAYER_LOAD, ftype);
 
 	if (!fset.cnt) /* Failure - we have no image */
 	{
 		if (res == FILE_LIB_ERROR) res = -1; // Failure is complete
-		layer_refresh_list();
-//		create_default_image();
 	}
-	else /* Got some frames - convert them into layers OVER background */
+	else /* Got some frames - convert into layers */
 	{
-		frm = fset.frames;
-
-/* !!! TODO: If image type is layered and NOT animated, use background layer
- * !!! for frame 0, make all layers visible, and do not make animation cycle */
-
-		/* Create an empty indexed background of 0th frame's size */
-		do_new_one(frm->width, frm->height, 256, mem_pal_def, 1, FALSE);
-
-		for (i = 1; i <= fset.cnt; i++ , frm++)
+		l = 0; // Start from layer 0
+		if (anim) /* Animation */
 		{
-			t = layer_table + i;
-			lim = t->image = alloc_layer(frm->width, frm->height,
-				frm->bpp, 0, NULL);
-			if (!lim)
+			/* Create an empty indexed background of 0th frame's size */
+			frm = fset.frames;
+			do_new_one(frm->width, frm->height, 256, mem_pal_def, 1, FALSE);
+			l = 1; // Frames start from layer 1
+		}
+
+		for (i = 0; i < fset.cnt; i++ , l++)
+		{
+			frm = fset.frames + i;
+
+			t = layer_table + l;
+			res = FILE_MEM_ERROR;
+			if (!l) // Layer 0 aka current image
 			{
-				res = FILE_MEM_ERROR;
-				break;
+				if (mem_new(frm->width, frm->height, frm->bpp, 0))
+					break;
+				layer_copy_from_main(0);
 			}
-			t->visible = FALSE;
+			else
+			{
+				if (!(t->image = alloc_layer(frm->width, frm->height,
+					frm->bpp, 0, NULL))) break;
+			}
+			res = res0;
+			lim = t->image;
+			t->visible = !anim;
 			t->opacity = 100;
 			image = &lim->image_; state = &lim->state_;
 
@@ -692,43 +701,48 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			update_undo(image);
 
 			/* Create a name for this frame */
-			sprintf(tail, ".%03d", i - 1);
+			sprintf(tail, ".%03d", i);
 			// !!! No old name so no fuss with saving it
 			image->filename = strdup(buf);
 
 			init_istate(state, image);
-
+			if (!l) layer_copy_to_main(0); // Update everything
 		}
-		layers_total = i - 1;
+		layers_total = l ? l - 1 : 0;
 
-// !!! These legacy things need be replaced by a per-layer field
-		preserved_gif_delay = ani_gif_delay = fset.frames[0].delay;
-
-		/* Build animation cycle for these layers */
-		memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
-		ani_frame1 = ani_cycle_table[0].frame0 = 1;
-		ani_frame2 = ani_cycle_table[0].frame1 = i - 1;
-		ani_cycle_table[0].len = i - 1;
-		for (j = 1; j < i; j++)
-			ani_cycle_table[0].layers[j - 1] = j;
-
-		/* Center the first frame over background */
-		dx = (mem_width - layer_table[1].image->image_.width) / 2;
-		dy = (mem_height - layer_table[1].image->image_.height) / 2;
-		for (j = 1; j < i; j++)
+		if (anim)
 		{
-			layer_table[j].x += dx;
-			layer_table[j].y += dy;
-		}
+// !!! These legacy things need be replaced by a per-layer field
+			preserved_gif_delay = ani_gif_delay = fset.frames[0].delay;
 
-		/* Display 1st layer in sequence */
-		layer_table[1].visible = TRUE;
-		layer_refresh_list();
-		layer_choose(1);
+			/* Build animation cycle for these layers */
+			memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
+			ani_frame1 = ani_cycle_table[0].frame0 = 1;
+			ani_frame2 = ani_cycle_table[0].frame1 = i - 1;
+			ani_cycle_table[0].len = i - 1;
+			for (j = 1; j < i; j++)
+				ani_cycle_table[0].layers[j - 1] = j;
+
+			/* Center the first frame over background */
+			dx = (mem_width - layer_table[1].image->image_.width) / 2;
+			dy = (mem_height - layer_table[1].image->image_.height) / 2;
+			for (j = 1; j < i; j++)
+			{
+				layer_table[j].x += dx;
+				layer_table[j].y += dy;
+			}
+
+			/* Display 1st layer in sequence */
+			layer_table[1].visible = TRUE;
+			layer_copy_from_main(0);
+			layer_copy_to_main(layer_selected = 1);
+		}
+		update_main_with_new_layer();
 	}
 	mem_free_frames(&fset);
 
-	layers_sensitive(sens);
+	layer_refresh_list();
+	layers_sensitive(sens); // This also selects current slot
 
 	/* Name change so that layers file would not overwrite the source */
 	strcpy(tail, ".txt");

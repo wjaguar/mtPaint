@@ -1652,7 +1652,7 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 	char *ext = strrchr(name, '.');
 
 	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_IMAGE;
-	ext = ext ? ext + 1 : "";
+	ext = mode == FS_EXPLODE_FRAMES ? name : ext ? ext + 1 : "";
 
 	pack5(box, gtk_label_new(_("File Format")));
 	opt = pack5(box, gtk_option_menu_new());
@@ -1684,9 +1684,10 @@ static void loader_widgets(GtkWidget *box, char *name, int mode)
 	gtk_widget_show_all(box);
 }
 
-static GtkWidget *ls_settings_box(char *name, int mode)
+static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 {
 	GtkWidget *box, *label;
+	int ftype;
 
 	box = gtk_hbox_new(FALSE, 0);
 	gtk_object_set_user_data(GTK_OBJECT(box), (gpointer)mode);
@@ -1704,6 +1705,10 @@ static GtkWidget *ls_settings_box(char *name, int mode)
 		label = pack5(box, gtk_label_new(_("Animation delay")));
 		gtk_widget_show(label);
 		pack5(box, add_a_spin(preserved_gif_delay, 1, MAX_DELAY));
+		break;
+	case FS_EXPLODE_FRAMES:
+		ftype = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
+		ftype_widgets(box, file_formats[ftype].ext, mode);
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
@@ -1773,6 +1778,7 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 			settings->ftype = FT_GIF;
 			settings->gif_delay = read_spin(BOX_CHILD(box, 1));
 			break;
+		case FS_EXPLODE_FRAMES:
 		case FS_EXPORT_UNDO:
 		case FS_EXPORT_UNDO2:
 		case FS_PALETTE_SAVE:
@@ -1856,6 +1862,7 @@ static void fs_ok(GtkWidget *fs)
 	{
 		/* Cut the extension off */
 		if ((settings.mode == FS_CLIP_FILE) ||
+			(settings.mode == FS_EXPLODE_FRAMES) ||
 			(settings.mode == FS_EXPORT_UNDO) ||
 			(settings.mode == FS_EXPORT_UNDO2))
 		{
@@ -1969,7 +1976,7 @@ static void fs_ok(GtkWidget *fs)
 	case FS_EXPLODE_FRAMES:
 		gif = gtk_object_get_data(GTK_OBJECT(fs), FS_XNAME_KEY);
 		res = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
-		res = explode_frames(fname, anim_mode, gif, res);
+		res = explode_frames(fname, anim_mode, gif, res, settings.ftype);
 		if (res != 1) handle_file_error(res);
 		if (res > 0) // Success or nonfatal error
 		{
@@ -2068,7 +2075,7 @@ void fs_setup(GtkWidget *fs, int action_type)
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);
 
-	xtra = ls_settings_box(txt, action_type);
+	xtra = ls_settings_box(fs, txt, action_type);
 	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
 	fpick_setup(fs, xtra, GTK_SIGNAL_FUNC(fs_ok), GTK_SIGNAL_FUNC(fs_destroy));
 	fpick_set_filename(fs, txt, FALSE);

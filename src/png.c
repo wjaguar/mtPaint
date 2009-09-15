@@ -56,6 +56,7 @@ typedef struct {
 	ls_settings settings;
 	int mode;
 	/* Explode frames mode */
+	int desttype;
 	int error, miss, cnt;
 	char *destdir;
 } ani_settings;
@@ -151,10 +152,10 @@ int file_type_by_ext(char *name, guint32 mask)
 	return (FT_NONE);
 }
 
-static int check_next_frame(frameset *fset, int mode)
+static int check_next_frame(frameset *fset, int mode, int anim)
 {
-// !!! TODO: check image type to decide if need "-1" (it's only for animated)
-	int lim = mode == FS_LAYER_LOAD ? MAX_LAYERS - 1 : FRAMES_MAX;
+	int lim = mode != FS_LAYER_LOAD ? FRAMES_MAX : anim ? MAX_LAYERS - 1 :
+		MAX_LAYERS;
 	return (fset->cnt < lim);
 }
 
@@ -1429,7 +1430,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 		else if (gif_rec == IMAGE_DESC_RECORD_TYPE)
 		{
 			res = FILE_TOO_LONG;
-			if (!check_next_frame(&ani->fset, ani->settings.mode))
+			if (!check_next_frame(&ani->fset, ani->settings.mode, TRUE))
 				goto fail;
 			w_set = init_set;
 			res = load_gif_frame(giffy, &w_set);
@@ -2355,7 +2356,7 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 	while (TRUE)
 	{
 		res = FILE_TOO_LONG;
-		if (!check_next_frame(&ani->fset, ani->settings.mode))
+		if (!check_next_frame(&ani->fset, ani->settings.mode, FALSE))
 			goto fail;
 		w_set = ani->settings;
 		res = load_tiff_frame(tif, &w_set);
@@ -4955,15 +4956,13 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 
 // !!! The only allowed modes for now are FS_LAYER_LOAD and FS_EXPLODE_FRAMES
 static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
-	int mode, int ftype, char *dest_path)
+	int mode, int ftype)
 {
 	png_color pal[256];
 
 
 	ftype &= FTM_FTYPE;
-	memset(ani, 0, sizeof(ani_settings));
 	ani->mode = ani_mode;
-	ani->destdir = dest_path;
 	init_ls_settings(&ani->settings, NULL);
 	ani->settings.mode = mode;
 	ani->settings.ftype = ftype;
@@ -4997,7 +4996,9 @@ int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,
 	ani_settings ani;
 	int res;
 
-	res = load_frames_x(&ani, ani_mode, file_name, mode, ftype, NULL);
+
+	memset(&ani, 0, sizeof(ani_settings));
+	res = load_frames_x(&ani, ani_mode, file_name, mode, ftype);
 
 	/* Treat out-of-memory error as fatal, to avoid worse things later */
 	if ((res == FILE_MEM_ERROR) || !ani.fset.cnt)
@@ -5018,7 +5019,7 @@ static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_se
 	ls_settings w_set;
 	image_frame *frame = ani->fset.frames + ani->fset.cnt - 1;
 	char new_name[PATHBUF + 32], *tmp;
-	int n, deftype = ani->settings.ftype, res;
+	int n, deftype = ani->desttype, res;
 
 
 	/* Show progress, for unknown final count */
@@ -5037,7 +5038,7 @@ static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_se
 	if (f_set) w_set = *f_set;
 	else
 	{
-		memset(&w_set, 0, sizeof(w_set));
+		init_ls_settings(&w_set, NULL);
 		memcpy(w_set.img, frame->img, sizeof(chanlist));
 		w_set.width = frame->width;
 		w_set.height = frame->height;
@@ -5076,15 +5077,20 @@ static void warn_miss(int miss, int total, int ftype)
 	g_free(txt);
 }
 
-int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype)
+int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype,
+	int desttype)
 {
 	ani_settings ani;
 	int res;
 
+
+	memset(&ani, 0, sizeof(ani_settings));
+	ani.desttype = desttype;
+	ani.destdir = dest_path;
+
 	progress_init(_("Explode frames"), 0);
 	progress_update(0.0);
-	res = load_frames_x(&ani, ani_mode, file_name, FS_EXPLODE_FRAMES,
-		ftype, dest_path);
+	res = load_frames_x(&ani, ani_mode, file_name, FS_EXPLODE_FRAMES, ftype);
 	progress_update(1.0);
 	if (res == 1); // Everything went OK
 	else if (res == FILE_MEM_ERROR); // Report memory problem
