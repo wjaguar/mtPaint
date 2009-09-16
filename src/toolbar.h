@@ -96,7 +96,7 @@ typedef struct
 	signed char radio;
 	unsigned short ID;
 	int actmap;
-	char **xpm;
+	XPM_TYPE xpm;
 	short action, mode, action2, mode2;
 } toolbar_item;
 

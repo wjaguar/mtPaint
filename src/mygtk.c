@@ -2308,27 +2308,23 @@ GtkWidget *gamma_toggle()
 		inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
 }
 
-// Image widget
-
-/* !!! GtkImage is broken on GTK+ 2.12.9 at least - background gets corrupted
- * when widget is made insensitive, so GtkPixmap is the only choice - WJ */
-GtkWidget *xpm_image(char **xpm)
-{
-	GdkPixmap *icon, *mask;
-	GtkWidget *widget;
-
-	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, xpm);
-	widget = gtk_pixmap_new(icon, mask);
-	gdk_pixmap_unref(icon);
-	gdk_pixmap_unref(mask);
-	gtk_widget_show(widget);
-
-	return (widget);
-}
-
 // Render stock icons to pixmaps
 
 #if GTK_MAJOR_VERSION == 2
+
+static GdkPixbuf *render_stock_pixbuf(GtkWidget *widget, const gchar *stock_id)
+{
+	GtkIconSet *icon_set;
+
+	/* !!! Doing this for widget itself in some cases fails (!) */
+	icon_set = gtk_style_lookup_icon_set(main_window->style, stock_id);
+	if (!icon_set) return (NULL);
+// !!! Is this "widget" here at all useful, or is "main_window" good enough?
+	gtk_widget_ensure_style(widget);
+	return (gtk_icon_set_render_icon(icon_set, widget->style,
+		gtk_widget_get_direction(widget), GTK_WIDGET_STATE(widget),
+		GTK_ICON_SIZE_SMALL_TOOLBAR, widget, NULL));
+}
 
 GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 	GdkBitmap **mask)
@@ -2336,8 +2332,7 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 	GdkPixmap *pmap;
 	GdkPixbuf *buf;
 
-	buf = gtk_widget_render_icon(widget, stock_id,
-		GTK_ICON_SIZE_SMALL_TOOLBAR, NULL);
+	buf = render_stock_pixbuf(widget, stock_id);
 	if (!buf) return (NULL);
 	gdk_pixbuf_render_pixmap_and_mask_for_colormap(buf,
 		gtk_widget_get_colormap(widget), &pmap, mask, 127);
@@ -2346,6 +2341,43 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 }
 
 #endif
+
+// Image widget
+
+/* !!! GtkImage is broken on GTK+ 2.12.9 at least, with regard to pixmaps -
+ * background gets corrupted when widget is made insensitive, so GtkPixmap is
+ * the only choice in that case - WJ */
+GtkWidget *xpm_image(XPM_TYPE xpm)
+{
+	GdkPixmap *icon, *mask;
+	GtkWidget *widget;
+#if GTK_MAJOR_VERSION == 2
+	GdkPixbuf *buf;
+	char name[256];
+
+	snprintf(name, sizeof(name), "mtpaint_%s", (char *)xpm[0]);
+	buf = render_stock_pixbuf(main_window, name);
+//g_print("Trying '%s' getting %X\n", name, buf);
+	if (buf) /* Found a themed icon - use it */
+	{
+		widget = gtk_image_new_from_pixbuf(buf);
+		g_object_unref(buf);
+		gtk_widget_show(widget);
+		return (widget);
+	}
+	/* Fall back to builtin XPM icon */
+	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL,
+		(char **)xpm[1]);
+#else /* if GTK_MAJOR_VERSION == 1 */
+	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, xpm);
+#endif
+	widget = gtk_pixmap_new(icon, mask);
+	gdk_pixmap_unref(icon);
+	gdk_pixmap_unref(mask);
+	gtk_widget_show(widget);
+
+	return (widget);
+}
 
 // Release outstanding pointer grabs
 

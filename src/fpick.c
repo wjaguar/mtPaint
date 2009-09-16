@@ -1067,11 +1067,11 @@ static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
 #define _(X) X
 
 static toolbar_item fpick_bar[] = {
-	{ _("Up"),			-1, FPICK_ICON_UP, 0, xpm_up_xpm },
-	{ _("Home"),			-1, FPICK_ICON_HOME, 0, xpm_home_xpm },
-	{ _("Create New Directory"),	-1, FPICK_ICON_DIR, 0, xpm_newdir_xpm },
-	{ _("Show Hidden Files"),	 0, FPICK_ICON_HIDDEN, 0, xpm_hidden_xpm },
-	{ _("Case Insensitive Sort"),	 0, FPICK_ICON_CASE, 0, xpm_case_xpm },
+	{ _("Up"),			-1, FPICK_ICON_UP, 0, XPM_ICON(up) },
+	{ _("Home"),			-1, FPICK_ICON_HOME, 0, XPM_ICON(home) },
+	{ _("Create New Directory"),	-1, FPICK_ICON_DIR, 0, XPM_ICON(newdir) },
+	{ _("Show Hidden Files"),	 0, FPICK_ICON_HIDDEN, 0, XPM_ICON(hidden) },
+	{ _("Case Insensitive Sort"),	 0, FPICK_ICON_CASE, 0, XPM_ICON(case) },
 	{ NULL }};
 
 #undef _

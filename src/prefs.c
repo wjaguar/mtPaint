@@ -46,7 +46,7 @@ static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disa
 #if GTK_MAJOR_VERSION == 2
 static GtkWidget *checkbutton_menuicons;
 #endif
-static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2];
+static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2], *entry_theme;
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
@@ -338,6 +338,11 @@ static void prefs_apply(GtkWidget *widget)
 		load_def_patterns(path);
 	inifile_set(DEFAULT_PAT_INI, path);
 
+#if GTK_MAJOR_VERSION == 2
+	gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(entry_theme)), PATHBUF);
+	inifile_set(DEFAULT_THEME_INI, path);
+#endif
+
 	update_stuff(UPD_PREFS);
 }
 
@@ -562,6 +567,12 @@ void pressed_preferences()
 	gtkuncpy(txt, inifile_get(DEFAULT_PAT_INI, ""), PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(entry_def[1]), txt);
 
+#if GTK_MAJOR_VERSION == 2
+	entry_theme = mt_path_box(_("Default Theme"), page,
+		_("Select Default Theme File"), FS_SELECT_FILE);
+	gtkuncpy(txt, inifile_get(DEFAULT_THEME_INI, ""), PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(entry_theme), txt);
+#endif
 
 ///	---- TAB5 - STATUS BAR
 

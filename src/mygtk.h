@@ -24,6 +24,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+///	Icon descriptor type
+
+typedef void *xpm_icon_desc[2];
+
+#if GTK_MAJOR_VERSION == 1
+#define XPM_TYPE char**
+#else /* if GTK_MAJOR_VERSION == 2 */
+#define XPM_TYPE void**
+#endif
+
 ///	Generic RGB buffer
 
 typedef struct {
@@ -293,7 +303,7 @@ GtkWidget *gamma_toggle();
 
 // Image widget
 
-GtkWidget *xpm_image(char **xpm);
+GtkWidget *xpm_image(XPM_TYPE xpm);
 
 // Render stock icons to pixmaps
 

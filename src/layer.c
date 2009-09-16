@@ -1134,13 +1134,13 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 #define _(X) X
 
 static toolbar_item layer_bar[] = {
-	{ _("New Layer"), -1, LTB_NEW, 0, xpm_new_xpm, ACT_LR_ADD, LR_NEW },
-	{ _("Raise"), -1, LTB_RAISE, 0, xpm_up_xpm, ACT_LR_SHIFT, 1 },
-	{ _("Lower"), -1, LTB_LOWER, 0, xpm_down_xpm, ACT_LR_SHIFT, -1 },
-	{ _("Duplicate Layer"), -1, LTB_DUP, 0, xpm_copy_xpm, ACT_LR_ADD, LR_DUP },
-	{ _("Centralise Layer"), -1, LTB_CENTER, 0, xpm_centre_xpm, ACT_LR_CENTER, 0 },
-	{ _("Delete Layer"), -1, LTB_DEL, 0, xpm_cut_xpm, ACT_LR_DEL, 0 },
-	{ _("Close Layers Window"), -1, LTB_CLOSE, 0, xpm_close_xpm, DLG_LAYERS, 1 },
+	{ _("New Layer"), -1, LTB_NEW, 0, XPM_ICON(new), ACT_LR_ADD, LR_NEW },
+	{ _("Raise"), -1, LTB_RAISE, 0, XPM_ICON(up), ACT_LR_SHIFT, 1 },
+	{ _("Lower"), -1, LTB_LOWER, 0, XPM_ICON(down), ACT_LR_SHIFT, -1 },
+	{ _("Duplicate Layer"), -1, LTB_DUP, 0, XPM_ICON(copy), ACT_LR_ADD, LR_DUP },
+	{ _("Centralise Layer"), -1, LTB_CENTER, 0, XPM_ICON(centre), ACT_LR_CENTER, 0 },
+	{ _("Delete Layer"), -1, LTB_DEL, 0, XPM_ICON(cut), ACT_LR_DEL, 0 },
+	{ _("Close Layers Window"), -1, LTB_CLOSE, 0, XPM_ICON(close), DLG_LAYERS, 1 },
 	{ NULL }};
 
 #undef _

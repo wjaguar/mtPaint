@@ -17,60 +17,74 @@
 	along with mtPaint in the file COPYING.
 */
 
+#if GTK_MAJOR_VERSION == 1
 
+#define XPM_ICON(X) xpm_##X##_xpm
+#define DEF_XPM_ICON(X) extern char *xpm_##X##_xpm[];
 
-extern char
-	*icon_xpm[],
-	*xpm_brcosa_xpm[],
-	*xpm_case_xpm[],
-	*xpm_centre_xpm[],
-	*xpm_clone_xpm[],
-	*xpm_close_xpm[],
-	*xpm_copy_xpm[],
-	*xpm_cut_xpm[],
-	*xpm_down_xpm[],
-	*xpm_ellipse2_xpm[],
-	*xpm_ellipse_xpm[],
-	*xpm_flip_hs_xpm[],
-	*xpm_flip_vs_xpm[],
-	*xpm_flood_xpm[],
-	*xpm_grad_place_xpm[],
-	*xpm_hidden_xpm[],
-	*xpm_home_xpm[],
-	*xpm_lasso_xpm[],
-	*xpm_line_xpm[],
-	*xpm_mode_blend_xpm[],
-	*xpm_mode_cont_xpm[],
-	*xpm_mode_csel_xpm[],
-	*xpm_mode_mask_xpm[],
-	*xpm_mode_opac_xpm[],
-	*xpm_mode_tint2_xpm[],
-	*xpm_mode_tint_xpm[],
-	*xpm_new_xpm[],
-	*xpm_newdir_xpm[],
-	*xpm_open_xpm[],
-	*xpm_paint_xpm[],
-	*xpm_pan_xpm[],
-	*xpm_paste_xpm[],
-	*xpm_polygon_xpm[],
-	*xpm_rect1_xpm[],
-	*xpm_rect2_xpm[],
-	*xpm_redo_xpm[],
-	*xpm_rotate_as_xpm[],
-	*xpm_rotate_cs_xpm[],
-	*xpm_save_xpm[],
-	*xpm_select_xpm[],
-	*xpm_shuffle_xpm[],
-	*xpm_smudge_xpm[],
-	*xpm_text_xpm[],
-	*xpm_undo_xpm[],
-	*xpm_up_xpm[],
-	*xpm_cline_xpm[],
-	*xpm_layers_xpm[];
-//extern char
-//	*xpm_config_xpm[];
+#else /* if GTK_MAJOR_VERSION == 2 */
 
+#define XPM_ICON(X) desc_##X##_xpm
+#ifdef DEFINE_ICONS
+#define DEF_XPM_ICON(X) xpm_icon_desc desc_##X##_xpm = { #X, xpm_##X##_xpm };
+#else
+#define DEF_XPM_ICON(X) extern xpm_icon_desc desc_##X##_xpm;
+#endif
 
+extern char *xpm_open_xpm[];
+extern char *xpm_new_xpm[];
+
+#endif
+
+extern char *icon_xpm[];
+
+DEF_XPM_ICON(brcosa);
+DEF_XPM_ICON(case);
+DEF_XPM_ICON(centre);
+DEF_XPM_ICON(clone);
+DEF_XPM_ICON(close);
+DEF_XPM_ICON(copy);
+DEF_XPM_ICON(cut);
+DEF_XPM_ICON(down);
+DEF_XPM_ICON(ellipse2);
+DEF_XPM_ICON(ellipse);
+DEF_XPM_ICON(flip_hs);
+DEF_XPM_ICON(flip_vs);
+DEF_XPM_ICON(flood);
+DEF_XPM_ICON(grad_place);
+DEF_XPM_ICON(hidden);
+DEF_XPM_ICON(home);
+DEF_XPM_ICON(lasso);
+DEF_XPM_ICON(line);
+DEF_XPM_ICON(mode_blend);
+DEF_XPM_ICON(mode_cont);
+DEF_XPM_ICON(mode_csel);
+DEF_XPM_ICON(mode_mask);
+DEF_XPM_ICON(mode_opac);
+DEF_XPM_ICON(mode_tint2);
+DEF_XPM_ICON(mode_tint);
+DEF_XPM_ICON(new);
+DEF_XPM_ICON(newdir);
+DEF_XPM_ICON(open);
+DEF_XPM_ICON(paint);
+DEF_XPM_ICON(pan);
+DEF_XPM_ICON(paste);
+DEF_XPM_ICON(polygon);
+DEF_XPM_ICON(rect1);
+DEF_XPM_ICON(rect2);
+DEF_XPM_ICON(redo);
+DEF_XPM_ICON(rotate_as);
+DEF_XPM_ICON(rotate_cs);
+DEF_XPM_ICON(save);
+DEF_XPM_ICON(select);
+DEF_XPM_ICON(shuffle);
+DEF_XPM_ICON(smudge);
+DEF_XPM_ICON(text);
+DEF_XPM_ICON(undo);
+DEF_XPM_ICON(up);
+DEF_XPM_ICON(cline);
+DEF_XPM_ICON(layers);
+//DEF_XPM_ICON(config);
 
 extern unsigned char
 	xbm_backslash_bits[],

@@ -3444,7 +3444,7 @@ typedef struct
 	int actmap;
 	char *shortcut; /* Text form for now */
 	short action, mode;
-	char **xpm_icon_image;
+	XPM_TYPE xpm_icon_image;
 } menu_item;
 
 /* The following is main menu auto-rearrange code. If the menu is too long for
@@ -4246,7 +4246,7 @@ static void add_dock_page1()
 		TRUE, TRUE);
 	gtk_widget_show_all(vbox);
 	gtk_notebook_append_page(GTK_NOTEBOOK(dock_book),
-		vbox, xpm_image(xpm_layers_xpm));
+		vbox, xpm_image(XPM_ICON(layers)));
 	dock_lr_pane = pane;
 	dock_pages[1] = vbox;
 }
@@ -4297,7 +4297,7 @@ static void toggle_dock(int state, int internal)
 			dock_pages[0] = gtk_vbox_new(FALSE, 0);
 			gtk_widget_show(dock_pages[0]);
 			gtk_notebook_append_page(GTK_NOTEBOOK(dock_book),
-				dock_pages[0], xpm_image(xpm_cline_xpm));
+				dock_pages[0], xpm_image(XPM_ICON(cline)));
 			create_cline_area(dock_pages[0]);
 		}
 
@@ -4488,9 +4488,9 @@ static void pressed_sel_ramp(int vert)
 static menu_item main_menu[] = {
 	{ _("/_File"), -2 -16 },
 	{ _("/File/tear"), -3 },
-	{ _("/File/New"), -1, 0, 0, "<control>N", DLG_NEW, 0, xpm_new_xpm },
-	{ _("/File/Open ..."), -1, 0, 0, "<control>O", DLG_FSEL, FS_PNG_LOAD, xpm_open_xpm },
-	{ _("/File/Save"), -1, 0, 0, "<control>S", ACT_SAVE, 0, xpm_save_xpm },
+	{ _("/File/New"), -1, 0, 0, "<control>N", DLG_NEW, 0, XPM_ICON(new) },
+	{ _("/File/Open ..."), -1, 0, 0, "<control>O", DLG_FSEL, FS_PNG_LOAD, XPM_ICON(open) },
+	{ _("/File/Save"), -1, 0, 0, "<control>S", ACT_SAVE, 0, XPM_ICON(save) },
 	{ _("/File/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PNG_SAVE },
 	{ _("/File/sep1"), -4 },
 	{ _("/File/Export Undo Images ..."), -1, 0, NEED_UNDO, NULL, DLG_FSEL, FS_EXPORT_UNDO },
@@ -4543,16 +4543,16 @@ static menu_item main_menu[] = {
 
 	{ _("/_Edit"), -2 -16 },
 	{ _("/Edit/tear"), -3 },
-	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_UNDO, 0, xpm_undo_xpm },
-	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", ACT_REDO, 0, xpm_redo_xpm },
+	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_UNDO, 0, XPM_ICON(undo) },
+	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", ACT_REDO, 0, XPM_ICON(redo) },
 	{ _("/Edit/sep1"), -4 },
-	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, xpm_cut_xpm },
-	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, xpm_copy_xpm },
+	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, XPM_ICON(cut) },
+	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, XPM_ICON(copy) },
 	{ _("/Edit/Copy To Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
-	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, xpm_paste_xpm },
+	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, XPM_ICON(paste) },
 	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_PCLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
 	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
-	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, xpm_text_xpm },
+	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, XPM_ICON(text) },
 #ifdef U_FREETYPE
 	{ _("/Edit/Paste Text (FreeType)"), -1, 0, 0, "T", DLG_TEXT_FT, 0 },
 #endif
@@ -4611,7 +4611,7 @@ static menu_item main_menu[] = {
 	{ _("/View/Horizontal Split"), 0, 0, 0, "H", ACT_VWSPLIT, 0 },
 	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, ACT_VWFOCUS, 0 },
 	{ _("/View/sep3"), -4 },
-	{ _("/View/Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, xpm_pan_xpm },
+	{ _("/View/Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, XPM_ICON(pan) },
 	{ _("/View/Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
 
 	{ _("/_Image"), -2 -16 },
@@ -4637,18 +4637,18 @@ static menu_item main_menu[] = {
 	{ _("/Selection/tear"), -3 },
 	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", ACT_SELECT, 1 },
 	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", ACT_SELECT, 0 },
-	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, xpm_lasso_xpm },
+	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, XPM_ICON(lasso) },
 	{ _("/Selection/Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 1 },
 	{ _("/Selection/sep1"), -4 },
-	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, xpm_rect1_xpm },
-	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", ACT_OUTLINE, 1, xpm_rect2_xpm },
-	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", ACT_ELLIPSE, 0, xpm_ellipse2_xpm },
-	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", ACT_ELLIPSE, 1, xpm_ellipse_xpm },
+	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, XPM_ICON(rect1) },
+	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", ACT_OUTLINE, 1, XPM_ICON(rect2) },
+	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", ACT_ELLIPSE, 0, XPM_ICON(ellipse2) },
+	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", ACT_ELLIPSE, 1, XPM_ICON(ellipse) },
 	{ _("/Selection/sep2"), -4 },
-	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_V, 0, xpm_flip_vs_xpm },
-	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_H, 0, xpm_flip_hs_xpm },
-	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 0, xpm_rotate_cs_xpm },
-	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 1, xpm_rotate_as_xpm },
+	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_V, 0, XPM_ICON(flip_vs) },
+	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_H, 0, XPM_ICON(flip_hs) },
+	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 0, XPM_ICON(rotate_cs) },
+	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 1, XPM_ICON(rotate_as) },
 	{ _("/Selection/sep3"), -4 },
 	{ _("/Selection/Horizontal Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 0 },
 	{ _("/Selection/Vertical Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 1 },
@@ -4662,8 +4662,8 @@ static menu_item main_menu[] = {
 
 	{ _("/_Palette"), -2 -16 },
 	{ _("/Palette/tear"), -3 },
-	{ _("/Palette/Open ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_LOAD, xpm_open_xpm },
-	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_SAVE, xpm_save_xpm },
+	{ _("/Palette/Open ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_LOAD, XPM_ICON(open) },
+	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_SAVE, XPM_ICON(save) },
 	{ _("/Palette/Load Default"), -1, 0, 0, NULL, ACT_PAL_DEF, 0 },
 	{ _("/Palette/sep1"), -4 },
 	{ _("/Palette/Mask All"), -1, 0, 0, NULL, ACT_PAL_MASK, 255 },
@@ -4684,7 +4684,7 @@ static menu_item main_menu[] = {
 
 	{ _("/Effe_cts"), -2 -16 },
 	{ _("/Effects/tear"), -3 },
-	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", DLG_BRCOSA, 0, xpm_brcosa_xpm },
+	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", DLG_BRCOSA, 0, XPM_ICON(brcosa) },
 	{ _("/Effects/Invert"), -1, 0, 0, "<control><shift>I", FILT_INVERT, 0 },
 	{ _("/Effects/Greyscale"), -1, 0, 0, "<control>G", FILT_GREY, 0 },
 	{ _("/Effects/Greyscale (Gamma corrected)"), -1, 0, 0, "<control><shift>G", FILT_GREY, 1 },
@@ -4711,8 +4711,8 @@ static menu_item main_menu[] = {
 	{ _("/Cha_nnels"), -2 -16 },
 	{ _("/Channels/tear"), -3 },
 	{ _("/Channels/New ..."), -1, 0, 0, NULL, ACT_CHANNEL, -1 },
-	{ _("/Channels/Load ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_LOAD, xpm_open_xpm },
-	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_SAVE, xpm_save_xpm },
+	{ _("/Channels/Load ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_LOAD, XPM_ICON(open) },
+	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_SAVE, XPM_ICON(save) },
 	{ _("/Channels/Delete ..."), -1, 0, NEED_CHAN, NULL, DLG_CHN_DEL, -1 },
 	{ _("/Channels/sep1"), -4 },
 	{ _("/Channels/Edit Image"), 1, MENU_CHAN0, 0, NULL, ACT_CHANNEL, CHN_IMAGE },
@@ -4734,8 +4734,8 @@ static menu_item main_menu[] = {
 
 	{ _("/_Layers"), -2 -16 },
 	{ _("/Layers/tear"), -3 },
-	{ _("/Layers/New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_NEW, xpm_new_xpm },
-	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, xpm_save_xpm },
+	{ _("/Layers/New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_NEW, XPM_ICON(new) },
+	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, XPM_ICON(save) },
 	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
 	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
 	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },

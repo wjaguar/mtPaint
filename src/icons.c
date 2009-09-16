@@ -17,6 +17,7 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include "mygtk.h"
 
 #define static
 
@@ -106,3 +107,9 @@
 //#include "graphics/xpm_config.xpm"
 
 #undef static
+
+#if GTK_MAJOR_VERSION == 2
+/* Create icon descriptors */
+#define DEFINE_ICONS
+#include "icons.h"
+#endif
