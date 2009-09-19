@@ -1390,322 +1390,6 @@ GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
 	return (cursor);
 }
 
-// Focusable pixmap widget
-
-#define FPIXMAP_KEY "mtPaint.fpixmap"
-
-typedef struct {
-	int xp, yp, width, height, xc, yc;
-	int focused_cursor;
-	GdkRectangle pm, cr;
-	GdkPixmap *pixmap, *cursor;
-	GdkBitmap *cmask;
-} fpixmap_data;
-
-static guint fpixmap_key;
-
-fpixmap_data *wj_fpixmap_data(GtkWidget *widget)
-{
-	return (gtk_object_get_data_by_id(GTK_OBJECT(widget), fpixmap_key));
-}
-
-static void wj_fpixmap_paint(GtkWidget *widget, GdkRectangle *area)
-{
-	GdkRectangle pdest, cdest;
-	fpixmap_data *d;
-	int draw_pmap;
-
-	if (!GTK_WIDGET_DRAWABLE(widget)) return;
-	if (!(d = wj_fpixmap_data(widget))) return;
-	draw_pmap = d->pixmap && gdk_rectangle_intersect(&d->pm, area, &pdest);
-
-#if GTK_MAJOR_VERSION == 1
-	/* Preparation */
-	gdk_window_set_back_pixmap(widget->window, NULL, TRUE);
-	if (draw_pmap) // To prevent blinking, clear just the outside part
-	{
-		int n, rect04[5 * 4], *p = rect04;
-		n = clip4(rect04, area->x, area->y, area->width, area->height,
-			pdest.x, pdest.y, pdest.width, pdest.height);
-		while (n--)
-		{
-			p += 4;
-			gdk_window_clear_area(widget->window, p[0], p[1], p[2], p[3]);
-		}
-	}
-	else gdk_window_clear_area(widget->window,
-		area->x, area->y, area->width, area->height);
-	gdk_gc_set_clip_rectangle(widget->style->black_gc, area);
-#endif
-
-	/* Frame */
-	if (d->pixmap) gdk_draw_rectangle(widget->window, widget->style->black_gc,
-		FALSE, d->pm.x - 1, d->pm.y - 1, d->pm.width + 1, d->pm.height + 1);
-
-	while (draw_pmap)
-	{
-		/* Contents pixmap */
-		gdk_draw_pixmap(widget->window, widget->style->black_gc,
-			d->pixmap, pdest.x - d->pm.x, pdest.y - d->pm.y,
-			pdest.x, pdest.y, pdest.width, pdest.height);
-
-		/* Cursor pixmap */
-		if (d->focused_cursor && !GTK_WIDGET_HAS_FOCUS(widget)) break;
-		if (!d->cursor || !gdk_rectangle_intersect(&d->cr, &pdest, &cdest))
-			break;
-		if (d->cmask)
-		{
-			gdk_gc_set_clip_mask(widget->style->black_gc, d->cmask);
-			gdk_gc_set_clip_origin(widget->style->black_gc, d->cr.x, d->cr.y);
-		}
-		gdk_draw_pixmap(widget->window, widget->style->black_gc,
-			d->cursor, cdest.x - d->cr.x, cdest.y - d->cr.y,
-			cdest.x, cdest.y, cdest.width, cdest.height);
-		if (d->cmask)
-		{
-			gdk_gc_set_clip_mask(widget->style->black_gc, NULL);
-			gdk_gc_set_clip_origin(widget->style->black_gc, 0, 0);
-		}
-		break;
-	}
-
-	/* Focus rectangle */
-	if (GTK_WIDGET_HAS_FOCUS(widget)) gtk_paint_focus(widget->style, widget->window,
-#if GTK_MAJOR_VERSION == 2
-		GTK_WIDGET_STATE(widget),
-#endif
-		area, widget, NULL, 0, 0,
-		widget->allocation.width - 1, widget->allocation.height - 1);
-
-#if GTK_MAJOR_VERSION == 1
-	/* Cleanup */
-	gdk_gc_set_clip_rectangle(widget->style->black_gc, NULL);
-#endif
-}
-
-#if GTK_MAJOR_VERSION == 1
-
-static void wj_fpixmap_draw_focus(GtkWidget *widget)
-{
-	gtk_widget_draw(widget, NULL);
-}
-
-static gboolean wj_fpixmap_focus(GtkWidget *widget, GdkEventFocus *event)
-{
-	if (event->in) GTK_WIDGET_SET_FLAGS(widget, GTK_HAS_FOCUS);
-	else GTK_WIDGET_UNSET_FLAGS(widget, GTK_HAS_FOCUS);
-	gtk_widget_draw_focus(widget);
-	return (FALSE);
-}
-
-#endif
-
-static gboolean wj_fpixmap_expose(GtkWidget *widget, GdkEventExpose *event)
-{
-	wj_fpixmap_paint(widget, &event->area);
-	return (FALSE);
-}
-
-static void wj_fpixmap_size_req(GtkWidget *widget, GtkRequisition *requisition,
-	gpointer user_data)
-{
-	fpixmap_data *d = user_data;
-	gint xp, yp;
-
-#if GTK_MAJOR_VERSION == 1
-	xp = widget->style->klass->xthickness * 2 + 4;
-	yp = widget->style->klass->ythickness * 2 + 4;
-#else
-	gtk_widget_style_get(GTK_WIDGET (widget),
-		"focus-line-width", &xp, "focus-padding", &yp, NULL);
-	yp = (xp + yp) * 2 + 2;
-	xp = widget->style->xthickness * 2 + yp;
-	yp = widget->style->ythickness * 2 + yp;
-#endif
-	requisition->width = d->width + (d->xp = xp);
-	requisition->height = d->height + (d->yp = yp);
-}
-
-static void wj_fpixmap_size_alloc(GtkWidget *widget, GtkAllocation *allocation,
-	gpointer user_data)
-{
-	fpixmap_data *d = user_data;
-	GdkRectangle opm = d->pm;
-	int w, h, x = d->xp, y = d->yp;
-
-	w = allocation->width - d->xp;
-	h = allocation->height - d->yp;
-	if (w > d->width) x = allocation->width - d->width , w = d->width;
-	if (y > d->height) y = allocation->height - d->height , h = d->height;
-	x /= 2; y /= 2;
-	w = w < 0 ? 0 : w; h = h < 0 ? 0 : h;
-	d->pm.x = x; d->pm.y = y;
-	d->pm.width = w; d->pm.height = h; 
-	d->cr.x += x - opm.x; d->cr.y += y - opm.y;
-
-// !!! Is this needed, or not?
-//	if ((opm.x != x) || (opm.y != y) || (opm.width != w) || (opm.height != h))
-//		gtk_widget_queue_draw(widget);
-}
-
-static void wj_fpixmap_destroy(GtkObject *object, gpointer user_data)
-{
-	fpixmap_data *d = user_data;
-	if (d->pixmap) gdk_pixmap_unref(d->pixmap);
-	if (d->cursor) gdk_pixmap_unref(d->cursor);
-	if (d->cmask) gdk_bitmap_unref(d->cmask);
-	free(d);
-}
-
-GtkWidget *wj_fpixmap(int width, int height)
-{
-	GtkWidget *w;
-	fpixmap_data *d;
-
-	if (!fpixmap_key) fpixmap_key = g_quark_from_static_string(FPIXMAP_KEY);
-	d = calloc(1, sizeof(fpixmap_data));
-	if (!d) return (NULL);
-	d->width = width; d->height = height;
-	w = gtk_drawing_area_new();
-	GTK_WIDGET_SET_FLAGS(w, GTK_CAN_FOCUS);
-	gtk_widget_set_events(w, GDK_ALL_EVENTS_MASK);
-	gtk_widget_show(w);
-	gtk_object_set_data_by_id(GTK_OBJECT(w), fpixmap_key, d);
-	gtk_signal_connect(GTK_OBJECT(w), "destroy",
-		GTK_SIGNAL_FUNC(wj_fpixmap_destroy), d);
-#if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect(GTK_OBJECT(w), "draw_focus",
-		GTK_SIGNAL_FUNC(wj_fpixmap_draw_focus), NULL);
-	gtk_signal_connect(GTK_OBJECT(w), "focus_in_event",
-		GTK_SIGNAL_FUNC(wj_fpixmap_focus), NULL);
-	gtk_signal_connect(GTK_OBJECT(w), "focus_out_event",
-		GTK_SIGNAL_FUNC(wj_fpixmap_focus), NULL);
-#endif
-	gtk_signal_connect(GTK_OBJECT(w), "expose_event",
-		GTK_SIGNAL_FUNC(wj_fpixmap_expose), NULL);
-	gtk_signal_connect_after(GTK_OBJECT(w), "size_request",
-		GTK_SIGNAL_FUNC(wj_fpixmap_size_req), d);
-	gtk_signal_connect(GTK_OBJECT(w), "size_allocate",
-		GTK_SIGNAL_FUNC(wj_fpixmap_size_alloc), d);
-
-	return (w);
-}
-
-/* Must be called after realize to init, and afterwards to access pixmap */
-GdkPixmap *wj_fpixmap_pixmap(GtkWidget *widget)
-{
-	fpixmap_data *d;
-
-	if (!(d = wj_fpixmap_data(widget))) return (NULL);
-	if (!d->pixmap && GTK_WIDGET_REALIZED(widget))
-		d->pixmap = gdk_pixmap_new(widget->window, d->width, d->height, -1);
-	return (d->pixmap);
-}
-
-void wj_fpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
-	unsigned char *rgb, int step)
-{
-	fpixmap_data *d;
-
-	if (!(d = wj_fpixmap_data(widget))) return;
-	if (!d->pixmap) return;
-	gdk_draw_rgb_image(d->pixmap, widget->style->black_gc,
-		x, y, w, h, GDK_RGB_DITHER_NONE, rgb, step);
-	gtk_widget_queue_draw_area(widget, x + d->pm.x, y + d->pm.y, w, h);
-}
-
-void wj_fpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
-{
-	GdkGCValues sv;
-	fpixmap_data *d;
-
-	if (!(d = wj_fpixmap_data(widget))) return;
-	if (!d->pixmap) return;
-	gdk_gc_get_values(widget->style->black_gc, &sv);
-	gdk_rgb_gc_set_foreground(widget->style->black_gc, rgb);
-	gdk_draw_rectangle(d->pixmap, widget->style->black_gc, TRUE, x, y, w, h);
-	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
-	gtk_widget_queue_draw_area(widget, x + d->pm.x, y + d->pm.y, w, h);
-}
-
-void wj_fpixmap_move_cursor(GtkWidget *widget, int x, int y)
-{
-	GdkRectangle ocr, tcr1, tcr2, *rcr = NULL;
-	fpixmap_data *d;
-
-	if (!(d = wj_fpixmap_data(widget))) return;
-	if ((x == d->xc) && (y == d->yc)) return;
-	ocr = d->cr;
-	d->cr.x += x - d->xc;
-	d->cr.y += y - d->yc;
-	d->xc = x; d->yc = y;
-
-	if (!d->pixmap || !d->cursor) return;
-	if (d->focused_cursor && !GTK_WIDGET_HAS_FOCUS(widget)) return;
-
-	/* Anything visible? */
-	if (!GTK_WIDGET_VISIBLE(widget)) return;
-	if (gdk_rectangle_intersect(&ocr, &d->pm, &tcr1)) rcr = &tcr1;
-	if (gdk_rectangle_intersect(&d->cr, &d->pm, &tcr2))
-	{
-		if (rcr) gdk_rectangle_union(&tcr1, &tcr2, rcr = &ocr);
-		else rcr = &tcr2;
-	}
-	if (!rcr) return; /* Both positions invisible */
-	gtk_widget_queue_draw_area(widget, rcr->x, rcr->y, rcr->width, rcr->height);
-}
-
-/* Must be called after realize */
-int wj_fpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
-	int width, int height, int hot_x, int hot_y, int focused)
-{
-	fpixmap_data *d;
-
-	if (!GTK_WIDGET_REALIZED(widget)) return (FALSE);
-	if (!(d = wj_fpixmap_data(widget))) return (FALSE);
-	if (d->cursor) gdk_pixmap_unref(d->cursor);
-	if (d->cmask) gdk_bitmap_unref(d->cmask);
-	d->cursor = NULL; d->cmask = NULL;
-	d->focused_cursor = focused;
-	while (image)
-	{
-		d->cursor = gdk_pixmap_create_from_data(widget->window,
-			image, width, height, -1,
-			&widget->style->white, &widget->style->black);
-		d->cr.x = d->pm.x + d->xc - hot_x;
-		d->cr.y = d->pm.y + d->yc - hot_y;
-		d->cr.width = width;
-		d->cr.height = height;
-		if (!mask) break;
-		d->cmask = gdk_bitmap_create_from_data(widget->window,
-			mask, width, height);
-		break;
-	}
-	if (!d->pixmap) return (TRUE);
-	/* Optimizing redraw in a rare operation is useless */
-	gtk_widget_queue_draw(widget);
-	return (TRUE);
-}
-
-int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr)
-{
-	fpixmap_data *d;
-	if (!(d = wj_fpixmap_data(widget))) return (FALSE);
-	if (!d->pixmap) return (FALSE);
-	x -= d->pm.x; y -= d->pm.y;
-	*xr = x; *yr = y;
-	if ((x < 0) || (x >= d->pm.width) || (y < 0) || (y >= d->pm.height))
-		return (FALSE);
-	return (TRUE);
-}
-
-void wj_fpixmap_cursor(GtkWidget *widget, int *x, int *y)
-{
-	fpixmap_data *d = wj_fpixmap_data(widget);
-	if (d && d->cursor) *x = d->xc , *y = d->yc;
-	else *x = *y = 0;
-}
-
 // Menu-like combo box
 
 /* Use GtkComboBox when available */
@@ -2357,7 +2041,6 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 
 	snprintf(name, sizeof(name), "mtpaint_%s", (char *)xpm[0]);
 	buf = render_stock_pixbuf(main_window, name);
-//g_print("Trying '%s' getting %X\n", name, buf);
 	if (buf) /* Found a themed icon - use it */
 	{
 		widget = gtk_image_new_from_pixbuf(buf);
@@ -3246,6 +2929,440 @@ int wjcanvas_scroll_in(GtkWidget *widget, int x, int y)
 	if (dx) gtk_adjustment_value_changed(canvas->adjustments[0]);
 	if (dy) gtk_adjustment_value_changed(canvas->adjustments[1]);
 	return (dx | dy);
+}
+
+// Focusable pixmap widget
+
+#define WJPIXMAP(obj)		GTK_CHECK_CAST(obj, wjpixmap_get_type(), wjpixmap)
+#define IS_WJPIXMAP(obj)	GTK_CHECK_TYPE(obj, wjpixmap_get_type())
+
+// !!! Implement 2nd cursor later !!!
+
+typedef struct
+{
+	GtkWidget widget;	// Parent class
+	GdkWindow *pixwindow;
+	int width, height;	// Requested pixmap size
+	int xc, yc;
+	int focused_cursor;
+	GdkRectangle pm, cr;
+	GdkPixmap *pixmap, *cursor;
+	GdkBitmap *cmask;
+} wjpixmap;
+
+static GtkType wjpixmap_type;
+
+static GtkType wjpixmap_get_type();
+
+static void wjpixmap_position(wjpixmap *pix)
+{
+	int x, y, w, h;
+
+	x = pix->widget.allocation.width;
+	pix->pm.width = w = pix->width <= x ? pix->width : x;
+	pix->pm.x = (x - w) / 2 + pix->widget.allocation.x;
+	y = pix->widget.allocation.height;
+	pix->pm.height = h = pix->height <= y ? pix->height : y;
+	pix->pm.y = (y - h) / 2 + pix->widget.allocation.y;
+}
+
+static void wjpixmap_realize(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkWindowAttr attrs;
+
+
+	GTK_WIDGET_SET_FLAGS(widget, GTK_REALIZED);
+
+	widget->window = gtk_widget_get_parent_window(widget);
+	gdk_window_ref(widget->window);
+
+	wjpixmap_position(pix);
+	attrs.x = pix->pm.x;
+	attrs.y = pix->pm.y;
+	attrs.width = pix->pm.width;
+	attrs.height = pix->pm.height;
+	attrs.window_type = GDK_WINDOW_CHILD;
+	attrs.wclass = GDK_INPUT_OUTPUT;
+	attrs.visual = gtk_widget_get_visual(widget);
+	attrs.colormap = gtk_widget_get_colormap(widget);
+	// Add the same events as GtkEventBox does
+	attrs.event_mask = gtk_widget_get_events(widget) | GDK_BUTTON_MOTION_MASK |
+		GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+		GDK_EXPOSURE_MASK | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK;
+	pix->pixwindow = gdk_window_new(widget->window, &attrs,
+		GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL | GDK_WA_COLORMAP);
+	gdk_window_set_user_data(pix->pixwindow, widget);
+#if GTK_MAJOR_VERSION == 1
+	fix_gdk_events(pix->pixwindow);
+#endif
+	gdk_window_set_back_pixmap(pix->pixwindow, NULL, FALSE);
+
+	widget->style = gtk_style_attach(widget->style, widget->window);
+}
+
+static void wjpixmap_unrealize(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (pix->pixwindow)
+	{
+		gdk_window_set_user_data(pix->pixwindow, NULL);
+		gdk_window_destroy(pix->pixwindow);
+		pix->pixwindow = NULL;
+	}
+
+	if (widget_class->unrealize) widget_class->unrealize(widget);
+}
+
+static void wjpixmap_map(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (widget_class->map) widget_class->map(widget);
+	if (pix->pixwindow) gdk_window_show(pix->pixwindow);
+}
+
+static void wjpixmap_unmap(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (pix->pixwindow) gdk_window_hide(pix->pixwindow);
+	if (widget_class->unmap) widget_class->unmap(widget);
+}
+
+static void wjpixmap_size_request(GtkWidget *widget, GtkRequisition *requisition)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	gint xp, yp;
+
+#if GTK_MAJOR_VERSION == 1
+	xp = widget->style->klass->xthickness * 2 + 4;
+	yp = widget->style->klass->ythickness * 2 + 4;
+#else
+	gtk_widget_style_get(GTK_WIDGET (widget),
+		"focus-line-width", &xp, "focus-padding", &yp, NULL);
+	yp = (xp + yp) * 2 + 2;
+	xp = widget->style->xthickness * 2 + yp;
+	yp = widget->style->ythickness * 2 + yp;
+#endif
+	requisition->width = pix->width + xp;
+	requisition->height = pix->height + yp;
+}
+
+static void wjpixmap_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	widget->allocation = *allocation;
+	wjpixmap_position(pix);
+
+	if (GTK_WIDGET_REALIZED(widget)) gdk_window_move_resize(pix->pixwindow,
+		pix->pm.x, pix->pm.y, pix->pm.width, pix->pm.height);
+}
+
+static void wjpixmap_paint(GtkWidget *widget, int inner, GdkRectangle *area)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkRectangle cdest;
+
+
+#if GTK_MAJOR_VERSION == 1
+	/* Preparation */
+	gdk_gc_set_clip_rectangle(widget->style->black_gc, area);
+#endif
+
+	if (!inner) // Drawing borders
+	{
+#if GTK_MAJOR_VERSION == 1
+		gdk_window_clear_area(widget->window,
+			area->x, area->y, area->width, area->height);
+#endif
+		/* Frame */
+		gdk_draw_rectangle(widget->window, widget->style->black_gc,
+			FALSE, pix->pm.x - 1, pix->pm.y - 1,
+			pix->pm.width + 1, pix->pm.height + 1);
+		/* Focus rectangle */
+		if (GTK_WIDGET_HAS_FOCUS(widget))
+			gtk_paint_focus(widget->style, widget->window,
+#if GTK_MAJOR_VERSION == 2
+			GTK_WIDGET_STATE(widget),
+#endif
+			area, widget, NULL,
+			widget->allocation.x, widget->allocation.y,
+			widget->allocation.width - 1, widget->allocation.height - 1);
+	}
+
+	while (inner) // Drawing pixmap & cursor
+	{
+		/* Contents pixmap */
+		gdk_draw_pixmap(pix->pixwindow, widget->style->black_gc,
+			pix->pixmap, area->x, area->y,
+			area->x, area->y, area->width, area->height);
+
+		/* Cursor pixmap */
+		if (!pix->cursor) break;
+		if (pix->focused_cursor && !GTK_WIDGET_HAS_FOCUS(widget)) break;
+		if (!gdk_rectangle_intersect(&pix->cr, area, &cdest)) break;
+		if (pix->cmask)
+		{
+			gdk_gc_set_clip_mask(widget->style->black_gc, pix->cmask);
+			gdk_gc_set_clip_origin(widget->style->black_gc,
+				pix->cr.x, pix->cr.y);
+		}
+		gdk_draw_pixmap(pix->pixwindow, widget->style->black_gc,
+			pix->cursor, cdest.x - pix->cr.x, cdest.y - pix->cr.y,
+			cdest.x, cdest.y, cdest.width, cdest.height);
+		if (pix->cmask)
+		{
+			gdk_gc_set_clip_mask(widget->style->black_gc, NULL);
+			gdk_gc_set_clip_origin(widget->style->black_gc, 0, 0);
+		}
+		break;
+	}
+
+#if GTK_MAJOR_VERSION == 1
+	/* Cleanup */
+	gdk_gc_set_clip_rectangle(widget->style->black_gc, NULL);
+#endif
+}
+
+static gboolean wjpixmap_expose(GtkWidget *widget, GdkEventExpose *event)
+{
+	if (GTK_WIDGET_DRAWABLE(widget)) wjpixmap_paint(widget,
+		event->window != widget->window, &event->area);
+	return (FALSE);
+}
+
+#if GTK_MAJOR_VERSION == 1
+
+static void wjpixmap_draw(GtkWidget *widget, GdkRectangle *area)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkRectangle ir;
+
+	if (!GTK_WIDGET_DRAWABLE(widget)) return;
+	/* If inner window is touched */
+	if (gdk_rectangle_intersect(area, &pix->pm, &ir))
+	{
+		ir.x -= pix->pm.x; ir.y -= pix->pm.y;
+		wjpixmap_paint(widget, TRUE, &ir);
+		/* If outer window isn't */
+		if (!((area->width - ir.width) | (area->height - ir.height)))
+			return;
+	}
+	wjpixmap_paint(widget, FALSE, area);
+}
+
+static void wjpixmap_draw_focus(GtkWidget *widget)
+{
+	gtk_widget_draw(widget, NULL);
+}
+
+static gint wjpixmap_focus_event(GtkWidget *widget, GdkEventFocus *event)
+{
+	if (event->in) GTK_WIDGET_SET_FLAGS(widget, GTK_HAS_FOCUS);
+	else GTK_WIDGET_UNSET_FLAGS(widget, GTK_HAS_FOCUS);
+	gtk_widget_draw_focus(widget);
+	return (FALSE);
+}
+
+#endif
+
+static void wjpixmap_destroy(GtkObject *object)
+{
+	wjpixmap *pix = WJPIXMAP(object);
+
+	if (pix->pixmap) gdk_pixmap_unref(pix->pixmap);
+	if (pix->cursor) gdk_pixmap_unref(pix->cursor);
+	if (pix->cmask) gdk_bitmap_unref(pix->cmask);
+	/* !!! Unlike attached handler, default handler can get called twice */
+	pix->pixmap = pix->cursor = pix->cmask = NULL;
+	GTK_OBJECT_CLASS(widget_class)->destroy(object);
+}
+
+static void wjpixmap_class_init(GtkWidgetClass *class)
+{
+	widget_class = gtk_type_class(GTK_TYPE_WIDGET);
+	GTK_OBJECT_CLASS(class)->destroy = wjpixmap_destroy;
+	class->realize = wjpixmap_realize;
+	class->unrealize = wjpixmap_unrealize;
+	class->map = wjpixmap_map;
+	class->unmap = wjpixmap_unmap;
+#if GTK_MAJOR_VERSION == 1
+	class->draw = wjpixmap_draw;
+	class->draw_focus = wjpixmap_draw_focus;
+	class->focus_in_event = class->focus_out_event = wjpixmap_focus_event;
+#endif
+	class->expose_event = wjpixmap_expose;
+	class->size_request = wjpixmap_size_request;
+	class->size_allocate = wjpixmap_size_allocate;
+}
+
+static GtkType wjpixmap_get_type()
+{
+	if (!wjpixmap_type)
+	{
+		static const GtkTypeInfo wjpixmap_info = {
+			"wjPixmap", sizeof(wjpixmap), sizeof(GtkWidgetClass),
+			(GtkClassInitFunc)wjpixmap_class_init,
+//			(GtkObjectInitFunc)wjpixmap_init,
+			NULL, /* No instance init */
+			NULL, NULL, NULL };
+		wjpixmap_type = gtk_type_unique(GTK_TYPE_WIDGET, &wjpixmap_info);
+	}
+
+	return (wjpixmap_type);
+}
+
+GtkWidget *wjpixmap_new(int width, int height)
+{
+	GtkWidget *widget = gtk_widget_new(wjpixmap_get_type(), NULL);
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	GTK_WIDGET_SET_FLAGS(widget, GTK_CAN_FOCUS | GTK_NO_WINDOW);
+	pix->width = width; pix->height = height;
+	return (widget);
+}
+
+/* Must be called first to init, and afterwards to access pixmap */
+GdkPixmap *wjpixmap_pixmap(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap)
+	{
+		GdkWindow *win = NULL;
+		int depth = -1;
+		if (GTK_WIDGET_REALIZED(widget)) win = widget->window;
+		else depth = gtk_widget_get_visual(widget)->depth;
+		pix->pixmap = gdk_pixmap_new(win, pix->width, pix->height, depth);
+	}
+	return (pix->pixmap);
+}
+
+void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap) return;
+	gdk_draw_rgb_image(pix->pixmap, widget->style->black_gc,
+		x, y, w, h, GDK_RGB_DITHER_NONE, rgb, step);
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_queue_draw_area(widget, x + pix->pm.x, y + pix->pm.y, w, h);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	if (pix->pixwindow)
+	{
+		GdkRectangle wr = { x, y, w, h };
+		gdk_window_invalidate_rect(pix->pixwindow, &wr, FALSE);
+	}
+#endif
+}
+
+void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
+{
+	GdkGCValues sv;
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap) return;
+	gdk_gc_get_values(widget->style->black_gc, &sv);
+	gdk_rgb_gc_set_foreground(widget->style->black_gc, rgb);
+	gdk_draw_rectangle(pix->pixmap, widget->style->black_gc, TRUE, x, y, w, h);
+	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_queue_draw_area(widget, x + pix->pm.x, y + pix->pm.y, w, h);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	if (pix->pixwindow)
+	{
+		GdkRectangle wr = { x, y, w, h };
+		gdk_window_invalidate_rect(pix->pixwindow, &wr, FALSE);
+	}
+#endif
+}
+
+void wjpixmap_move_cursor(GtkWidget *widget, int x, int y)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkRectangle pm, ocr, tcr1, tcr2, *rcr = NULL;
+	int dx = x - pix->xc, dy = y - pix->yc;
+
+	if (!(dx | dy)) return;
+	ocr = pix->cr;
+	pix->cr.x += dx; pix->cr.y += dy;
+	pix->xc = x; pix->yc = y;
+
+	if (!pix->pixmap || !pix->cursor) return;
+	if (pix->focused_cursor && !GTK_WIDGET_HAS_FOCUS(widget)) return;
+
+	/* Anything visible? */
+	if (!GTK_WIDGET_VISIBLE(widget)) return;
+	pm = pix->pm; pm.x = pm.y = 0;
+	if (gdk_rectangle_intersect(&ocr, &pm, &tcr1)) rcr = &tcr1;
+	if (gdk_rectangle_intersect(&pix->cr, &pm, &tcr2))
+	{
+		if (rcr) gdk_rectangle_union(&tcr1, &tcr2, rcr = &ocr);
+		else rcr = &tcr2;
+	}
+	if (!rcr) return; /* Both positions invisible */
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_queue_draw_area(widget,
+		rcr->x + pix->pm.x, rcr->y + pix->pm.y, rcr->width, rcr->height);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	if (pix->pixwindow) gdk_window_invalidate_rect(pix->pixwindow, rcr, FALSE);
+#endif
+}
+
+void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
+	int width, int height, int hot_x, int hot_y, int focused)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+
+	if (pix->cursor) gdk_pixmap_unref(pix->cursor);
+	if (pix->cmask) gdk_bitmap_unref(pix->cmask);
+	pix->cursor = pix->cmask = NULL;
+	pix->focused_cursor = focused;
+
+	if (image)
+	{
+		GdkWindow *win = NULL;
+		int depth = -1;
+		if (GTK_WIDGET_REALIZED(widget)) win = widget->window;
+		else depth = gtk_widget_get_visual(widget)->depth;
+
+		pix->cursor = gdk_pixmap_create_from_data(win, image,
+			width, height, depth,
+			&widget->style->white, &widget->style->black);
+		pix->cr.x = pix->xc - hot_x;
+		pix->cr.y = pix->yc - hot_y;
+		pix->cr.width = width;
+		pix->cr.height = height;
+		if (mask) pix->cmask = gdk_bitmap_create_from_data(win, mask,
+			width, height);
+	}
+
+	/* Optimizing redraw in a rare operation is useless */
+	if (pix->pixmap) gtk_widget_queue_draw(widget);
+}
+
+void wjpixmap_cursor(GtkWidget *widget, int *x, int *y)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	if (pix->cursor) *x = pix->xc , *y = pix->yc;
+	else *x = *y = 0;
+}
+
+/* Translate allocation-relative coords to pixmap-relative */
+int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap) return (FALSE);
+	x -= pix->pm.x - widget->allocation.x;
+	y -= pix->pm.y - widget->allocation.y;
+	*xr = x; *yr = y;
+	return ((x >= 0) && (x < pix->pm.width) && (y >= 0) && (y < pix->pm.height));
 }
 
 // Repaint expose region

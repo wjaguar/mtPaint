@@ -44,9 +44,9 @@ static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *ch
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
 	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
 #if GTK_MAJOR_VERSION == 2
-static GtkWidget *checkbutton_menuicons;
+static GtkWidget *checkbutton_menuicons, *entry_theme;
 #endif
-static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2], *entry_theme;
+static GtkWidget *clipboard_entry, *entry_handbook[2], *entry_def[2];
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },

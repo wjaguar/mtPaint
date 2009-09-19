@@ -35,7 +35,6 @@
 
 int main( int argc, char *argv[] )
 {
-	char *theme;
 	int new_empty = TRUE, get_screenshot = FALSE;
 
 	if (argc > 1)
@@ -74,8 +73,10 @@ int main( int argc, char *argv[] )
 	gtk_init( &argc, &argv );
 	gtk_init_bugfixes();
 #if GTK_MAJOR_VERSION == 2
-	theme = inifile_get(DEFAULT_THEME_INI, "");
-	if (theme[0]) gtk_rc_parse(theme);
+	{
+		char *theme = inifile_get(DEFAULT_THEME_INI, "");
+		if (theme[0]) gtk_rc_parse(theme);
+	}
 #endif
 
 #ifdef U_NLS

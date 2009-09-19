@@ -254,19 +254,6 @@ int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult);
 GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
 	int tip_x, int tip_y);
 
-// Focusable pixmap widget
-
-GtkWidget *wj_fpixmap(int width, int height);
-GdkPixmap *wj_fpixmap_pixmap(GtkWidget *widget);
-void wj_fpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
-	unsigned char *rgb, int step);
-void wj_fpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb);
-void wj_fpixmap_move_cursor(GtkWidget *widget, int x, int y);
-int wj_fpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
-	int width, int height, int hot_x, int hot_y, int focused);
-int wj_fpixmap_xy(GtkWidget *widget, int x, int y, int *xr, int *yr);
-void wj_fpixmap_cursor(GtkWidget *widget, int *x, int *y);
-
 // Menu-like combo box
 
 GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
@@ -330,6 +317,19 @@ GtkWidget *wjcanvas_new();
 void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
 int wjcanvas_scroll_in(GtkWidget *widget, int x, int y);
+
+// Focusable pixmap widget
+
+GtkWidget *wjpixmap_new(int width, int height);
+GdkPixmap *wjpixmap_pixmap(GtkWidget *widget);
+void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step);
+void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb);
+void wjpixmap_move_cursor(GtkWidget *widget, int x, int y);
+void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
+	int width, int height, int hot_x, int hot_y, int focused);
+void wjpixmap_cursor(GtkWidget *widget, int *x, int *y);
+int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr);
 
 // Repaint expose region
 

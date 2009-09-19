@@ -80,14 +80,14 @@ typedef struct
 	GtkWidget	*hbox,				// Main hbox
 			*inputs[CPICK_INPUT_TOT],	// Spin buttons / Hex input
 			*opacity_label,
-			*areas[CPICK_AREA_TOT]		// wj_fpixmap's
+			*areas[CPICK_AREA_TOT]		// wjpixmap's
 			;
 
 	int		size,				// Vertical/horizontal size of main mixer
 			pal_strips,			// Number of palette strips
 			input_vals[CPICK_INPUT_TOT],	// Current input values
 			rgb_previous[4],		// Previous colour/opacity
-			area_size[CPICK_AREA_TOT][2],	// Width / height of each wj_fpixmap
+			area_size[CPICK_AREA_TOT][2],	// Width / height of each wjpixmap
 			lock;				// To block input handlers
 	int		drag_x, drag_y, may_drag;	// For drag & drop
 	unsigned char	drag_rgba[4];			// The color being dragged out
@@ -188,7 +188,7 @@ static void cpick_area_picker_create(cpicker *win)
 		}
 	}
 
-	wj_fpixmap_draw_rgb(win->areas[CPICK_AREA_PICKER], 0, 0, w, h, rgb, w3);
+	wjpixmap_draw_rgb(win->areas[CPICK_AREA_PICKER], 0, 0, w, h, rgb, w3);
 	free(rgb);
 }
 
@@ -217,7 +217,7 @@ static void cpick_precur_paint(cpicker *win, int *col, int opacity,
 		}
 	}
 
-	wj_fpixmap_draw_rgb(win->areas[CPICK_AREA_PRECUR], dx, 0, w, h, rgb, w * 3);
+	wjpixmap_draw_rgb(win->areas[CPICK_AREA_PRECUR], dx, 0, w, h, rgb, w * 3);
 }
 
 static void cpick_area_precur_create( cpicker *win, int flag )
@@ -297,7 +297,7 @@ static void cpick_rgba_at(cpicker *cp, GtkWidget *widget, int x, int y,
 		{
 			ini_col = MEM_2_INT(set, 0);
 			inifile_set_gint32(txt, ini_col);
-			wj_fpixmap_fill_rgb(widget, x * ppc, y * ppc, ppc, ppc, ini_col);
+			wjpixmap_fill_rgb(widget, x * ppc, y * ppc, ppc, ppc, ini_col);
 		}
 	}
 	else if (widget == cp->areas[CPICK_AREA_PRECUR])
@@ -354,13 +354,13 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 
 	if ( idx == CPICK_AREA_OPACITY )
 	{
-		wj_fpixmap_move_cursor(widget, aw / 2, ry);
+		wjpixmap_move_cursor(widget, aw / 2, ry);
 
 		cp->input_vals[CPICK_INPUT_OPACITY] = 255 - (ry * 255) / ah1;
 	}
 	else if ( idx == CPICK_AREA_HUE )
 	{
-		wj_fpixmap_move_cursor(widget, aw / 2, ry);
+		wjpixmap_move_cursor(widget, aw / 2, ry);
 
 		cp->input_vals[CPICK_INPUT_HUE] = 1529 - (ry * 1529) / ah1;
 
@@ -369,7 +369,7 @@ static void cpick_area_mouse( GtkWidget *widget, cpicker *cp, int x, int y, int 
 	}
 	else if ( idx == CPICK_AREA_PICKER )
 	{
-		wj_fpixmap_move_cursor(widget, rx, ry);
+		wjpixmap_move_cursor(widget, rx, ry);
 
 		cp->input_vals[CPICK_INPUT_VALUE] = (rx * 255) / (aw - 1);
 		cp->input_vals[CPICK_INPUT_SATURATION] = 255 - (ry * 255) / ah1;
@@ -427,7 +427,7 @@ static void cpick_drag_set(GtkWidget *widget, GdkDragContext *drag_context,
 	aw = cp->area_size[idx][0];
 	ah = cp->area_size[idx][1];
 
-	wj_fpixmap_xy(widget, x, y, &rx, &ry);
+	wjpixmap_rxy(widget, x, y, &rx, &ry);
 	rx = rx < 0 ? 0 : rx >= aw ? aw - 1 : rx;
 	ry = ry < 0 ? 0 : ry >= ah ? ah - 1 : ry;
 
@@ -462,18 +462,16 @@ static void set_drag_icon(GdkDragContext *context, GtkWidget *src, unsigned char
 
 static gboolean cpick_area_event(GtkWidget *widget, GdkEvent *event, cpicker *cp)
 {
-	int x, y, rx, ry, button = 0;
+	int rx, ry, button = 0;
 	GdkModifierType state;
 	int can_drag = (widget == cp->areas[CPICK_AREA_PRECUR]) ||
 		(widget == cp->areas[CPICK_AREA_PALETTE]);
 
 	if (event->type == GDK_BUTTON_PRESS)
 	{
-		x = event->button.x;
-		y = event->button.y;
+		rx = event->button.x;
+		ry = event->button.y;
 		button = event->button.button;
-		// Clicks outside pixmap are ignored
-		can_drag &= wj_fpixmap_xy(widget, x, y, &rx, &ry);
 		if (can_drag && (button == 1)) // Only left button inits drag
 		{
 			cp->drag_x = rx;
@@ -489,14 +487,13 @@ static gboolean cpick_area_event(GtkWidget *widget, GdkEvent *event, cpicker *cp
 	else if (event->type == GDK_MOTION_NOTIFY)
 	{
 		if (event->motion.is_hint)
-			gdk_window_get_pointer(event->motion.window, &x, &y, &state);
+			gdk_window_get_pointer(event->motion.window, &rx, &ry, &state);
 		else
 		{
-			x = event->motion.x;
-			y = event->motion.y;
+			rx = event->motion.x;
+			ry = event->motion.y;
 			state = event->motion.state;
 		}
-		wj_fpixmap_xy(widget, x, y, &rx, &ry);
 		/* May init drag */
 		if (state & GDK_BUTTON1_MASK)
 		{
@@ -515,8 +512,11 @@ static gboolean cpick_area_event(GtkWidget *widget, GdkEvent *event, cpicker *cp
 				GdkDragContext *context;
 
 				cp->may_drag = FALSE;
-				/* Start drag at current position, not at saved one */
-				cpick_rgba_at(cp, widget, rx, ry, cp->drag_rgba, NULL);
+				/* While technically, drag starts at current
+				 * position, read data from the saved one -
+				 * where user had clicked to begin drag - WJ */
+				cpick_rgba_at(cp, widget, cp->drag_x, cp->drag_y,
+					cp->drag_rgba, NULL);
 				context = gtk_drag_begin(widget, cpick_tlist,
 					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
 				set_drag_icon(context, widget, cp->drag_rgba);
@@ -546,7 +546,7 @@ static void cpick_realize_area(GtkWidget *widget, cpicker *cp)
 	char txt[128];
 	int i, k, kk, w, h, w3, sz, x, y, dd, d1, hy, oy, idx;
 
-	if (!wj_fpixmap_pixmap(widget)) return;
+	if (!wjpixmap_pixmap(widget)) return;
 	if (!IS_CPICKER(cp)) return;
 
 	for (idx = 0; idx < CPICK_AREA_TOT; idx++)
@@ -561,7 +561,7 @@ static void cpick_realize_area(GtkWidget *widget, cpicker *cp)
 	{
 	case CPICK_AREA_PRECUR:
 	case CPICK_AREA_PICKER:
-		wj_fpixmap_fill_rgb(widget, 0, 0, w, h, 0);
+		wjpixmap_fill_rgb(widget, 0, 0, w, h, 0);
 		break;
 	case CPICK_AREA_HUE:
 		if (!(dest = rgb = malloc(sz))) break;
@@ -591,7 +591,7 @@ static void cpick_realize_area(GtkWidget *widget, cpicker *cp)
 			i = i < 256 ? RGB_2_INT(mem_pal_def[i].red,
 				mem_pal_def[i].green, mem_pal_def[i].blue) : 0;
 			i = inifile_get_gint32(txt, i);
-			wj_fpixmap_fill_rgb(widget, dd * kk, dd * k, dd, dd, i);
+			wjpixmap_fill_rgb(widget, dd * kk, dd * k, dd, dd, i);
 		}
 		break;
 	case CPICK_AREA_OPACITY:
@@ -611,16 +611,16 @@ static void cpick_realize_area(GtkWidget *widget, cpicker *cp)
 		break;
 	}
 
-	if (rgb) wj_fpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
+	if (rgb) wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
 	free(rgb);
 
 	if ((idx == CPICK_AREA_HUE) || (idx == CPICK_AREA_PICKER) ||
 		(idx == CPICK_AREA_OPACITY))
 	{
-		wj_fpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
+		wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
 			xbm_ring4_width, xbm_ring4_height,
 			xbm_ring4_x_hot, xbm_ring4_y_hot, FALSE);
-		wj_fpixmap_move_cursor(widget, w/2, h/2);
+		wjpixmap_move_cursor(widget, w/2, h/2);
 	}
 }
 
@@ -988,8 +988,9 @@ static void cpicker_init( cpicker *cp )
 
 	for (i = 0; i < CPICK_AREA_TOT; i++)
 	{
-		widget = cp->areas[i] = wj_fpixmap(cp->area_size[i][0],
+		widget = cp->areas[i] = wjpixmap_new(cp->area_size[i][0],
 			cp->area_size[i][1]);
+		gtk_widget_show(widget);
 		gtk_table_attach(GTK_TABLE(table), widget,
 			pos[i][1], pos[i][1] + 1, pos[i][0], pos[i][0] + 1,
 			(GtkAttachOptions)0, (GtkAttachOptions)0, 0, 0);
@@ -1104,17 +1105,17 @@ static void cpick_area_update_cursors(cpicker *cp)
 	x = (cp->input_vals[CPICK_INPUT_VALUE] * l + l - 1) / 255;
 	l = cp->area_size[CPICK_AREA_PICKER][1] - 1;
 	y = ((255 - cp->input_vals[CPICK_INPUT_SATURATION]) * l + l - 1) / 255;
-	wj_fpixmap_move_cursor(cp->areas[CPICK_AREA_PICKER], x, y);
+	wjpixmap_move_cursor(cp->areas[CPICK_AREA_PICKER], x, y);
 
 	x = cp->area_size[CPICK_AREA_HUE][0] / 2;
 	l = cp->area_size[CPICK_AREA_HUE][1] - 1;
 	y = ((1529 - cp->input_vals[CPICK_INPUT_HUE]) * l + l - 1) / 1529;
-	wj_fpixmap_move_cursor(cp->areas[CPICK_AREA_HUE], x, y);
+	wjpixmap_move_cursor(cp->areas[CPICK_AREA_HUE], x, y);
 
 	x = cp->area_size[CPICK_AREA_OPACITY][0] / 2;
 	l = cp->area_size[CPICK_AREA_OPACITY][1] - 1;
 	y = ((255 - cp->input_vals[CPICK_INPUT_OPACITY]) * l + l - 1) / 255;
-	wj_fpixmap_move_cursor(cp->areas[CPICK_AREA_OPACITY], x, y);
+	wjpixmap_move_cursor(cp->areas[CPICK_AREA_OPACITY], x, y);
 }
 
 /* Update whole dialog according to values */

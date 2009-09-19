@@ -719,7 +719,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	int cmask, image_info *src)
 {
 	unsigned char *res;
-	size_t l, sz = (size_t)w * h;
+	size_t l, sz;
 	int i;
 
 	if (mode & AI_CLEAR) memset(image, 0, sizeof(image_info));
@@ -749,6 +749,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 
 	if (!cmask) return (TRUE); /* Empty block requested */
 
+	sz = (size_t)w * h;
 	l = sz * bpp;
 	res = (void *)(-1);
 	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)

@@ -2451,7 +2451,7 @@ static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
 
 static void palette_pad_set(int value)
 {
-	wj_fpixmap_move_cursor(grad_ed_pm, (value % PPAD_XSZ) * PPAD_SLOT,
+	wjpixmap_move_cursor(grad_ed_pm, (value % PPAD_XSZ) * PPAD_SLOT,
 		(value / PPAD_XSZ) * PPAD_SLOT);
 }
 
@@ -2461,7 +2461,7 @@ static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
 	int i, j, k, w, h, col, row, cellsize = PPAD_SLOT;
 	int channel = (int)user_data;
 
-	if (!wj_fpixmap_pixmap(widget)) return;
+	if (!wjpixmap_pixmap(widget)) return;
 	w = PPAD_WIDTH(cellsize);
 	h = PPAD_HEIGHT(cellsize);
 	row = w * 3;
@@ -2504,9 +2504,9 @@ static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
 	}
 
 	palette_pad_set(0);
-	wj_fpixmap_draw_rgb(widget, 0, 0, w, h, rgb, row);
+	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, row);
 	col = (cellsize >> 1) - 1;
-	wj_fpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
+	wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
 		xbm_ring4_width, xbm_ring4_height,
 		xbm_ring4_x_hot - col, xbm_ring4_y_hot - col, TRUE);
 
@@ -2532,13 +2532,11 @@ static void palette_pad_select(int i, int mode)
 static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
-	int x, y;
+	int x = event->x, y = event->y;
 
 	gtk_widget_grab_focus(widget);
 	/* Only single clicks */
 	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
-	/* Only inside pixmap */
-	if (!wj_fpixmap_xy(widget, event->x, event->y, &x, &y)) return (TRUE);
 	x /= PPAD_SLOT; y /= PPAD_SLOT;
 	palette_pad_select(y * PPAD_XSZ + x, (int)user_data);
 	return (TRUE);
@@ -2550,7 +2548,7 @@ static gboolean palette_pad_key(GtkWidget *widget, GdkEventKey *event,
 	int x, y, dx, dy;
 
 	if (!arrow_key(event, &dx, &dy, 0)) return (FALSE);
-	wj_fpixmap_cursor(widget, &x, &y);
+	wjpixmap_cursor(widget, &x, &y);
 	x = x / PPAD_SLOT + dx; y = y / PPAD_SLOT + dy;
 	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
 	y = y * PPAD_XSZ + x;
@@ -2770,7 +2768,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	/* Palette pad */
 
-	pix = grad_ed_pm = pack(mainbox, wj_fpixmap(PPAD_WIDTH(PPAD_SLOT),
+	pix = grad_ed_pm = pack(mainbox, wjpixmap_new(PPAD_WIDTH(PPAD_SLOT),
 		PPAD_HEIGHT(PPAD_SLOT)));
 	gtk_signal_connect(GTK_OBJECT(pix), "realize",
 		GTK_SIGNAL_FUNC(palette_pad_draw),
