@@ -531,8 +531,8 @@ int gui_save(char *filename, ls_settings *settings)
 	}
 	else
 	{
-		notify_unchanged();
-		register_file( filename );
+		notify_unchanged(filename);
+		register_file(filename);
 	}
 
 	return res;
@@ -5050,10 +5050,12 @@ void notify_changed()		// Image/palette has just changed - update vars as needed
 	}
 }
 
-void notify_unchanged()		// Image/palette has just been unchanged (saved) - update vars as needed
+/* Image has just been unchanged: saved to file, or loaded if "filename" is NULL */
+void notify_unchanged(char *filename)
 {
 	if (mem_changed)
 	{
+		if (filename) mem_file_modified(filename);
 		mem_changed = FALSE;
 		update_titlebar();
 	}

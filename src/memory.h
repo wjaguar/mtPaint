@@ -454,6 +454,7 @@ void mem_free_frames(frameset *fset);
 
 void init_istate(image_state *state, image_info *image);	// Set initial state of image variables
 void mem_replace_filename(int layer, char *fname);	// Change layer's filename
+void mem_file_modified(char *fname);	// Label file's frames in current layer as changed
 int init_undo(undo_stack *ustack, int depth);	// Create new undo stack of a given depth
 void update_undo_depth();	// Resize all undo stacks
 

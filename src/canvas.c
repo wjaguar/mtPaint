@@ -1508,7 +1508,7 @@ loaded:
 	if (!undo) reset_tools();
 	else // No reason to reset tools in undoable mode
 	{
-		notify_unchanged();
+		notify_unchanged(NULL);
 		update_stuff(UPD_ALL);
 	}
 

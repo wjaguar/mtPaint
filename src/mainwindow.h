@@ -330,8 +330,10 @@ void zoom_out();
 
 void setup_language();		// Change language
 
-void notify_changed();		// Image/palette has just changed - update vars as needed
-void notify_unchanged();	// Image/palette has just been unchanged (saved) - update vars as needed
+//	Image/palette has just changed - update vars as needed
+void notify_changed();
+//	Image has just been unchanged: saved to file, or loaded if "filename" is NULL
+void notify_unchanged(char *filename);
 void update_titlebar();		// Update filename in titlebar
 
 void force_main_configure();	// Force reconfigure of main drawing area - for centralizing code

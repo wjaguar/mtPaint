@@ -571,6 +571,33 @@ void mem_replace_filename(int layer, char *fname)
 	if (fname) image->filename = strdup(fname);
 }
 
+/* Label file's frames in current layer as changed */
+void mem_file_modified(char *fname)
+{
+	char *name;
+	undo_item *undo;
+	int i, j, k, l, changed;
+
+	l = mem_undo_done;
+	for (k = -1; k <= 1; k += 2)
+	{
+		name = mem_filename;
+		changed = name && !strcmp(name, fname) ? ~UF_ORIG : ~0;
+		for (i = 1; i <= l; i++)
+		{
+			j = (mem_undo_max + mem_undo_pointer + i * k) % mem_undo_max;
+			undo = mem_undo_im_ + j;
+			if (undo->dataptr && (undo->dataptr->map & (1 << UD_FILENAME)))
+			{
+				name = undo->dataptr->store[UD_FILENAME];
+				changed = name && !strcmp(name, fname) ? ~UF_ORIG : ~0;
+			}
+			undo->flags &= changed;
+		}
+		l = mem_undo_redo;
+	}
+}
+
 /* Create new undo stack of a given depth */
 int init_undo(undo_stack *ustack, int depth)
 {
