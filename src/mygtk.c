@@ -545,46 +545,28 @@ void spin_set_range(GtkWidget *spin, int min, int max)
 
 #endif
 
-// Wrapper for utf8->C translation
+// Wrapper for utf8->C and C->utf8 translation
 
-char *gtkncpy(char *dest, const char *src, int cnt)
+char *gtkxncpy(char *dest, const char *src, int cnt, int u)
 {
 #if GTK_MAJOR_VERSION == 2
-	char *c = g_locale_from_utf8((gchar *)src, -1, NULL, NULL, NULL);
+	char *c = (u ? g_locale_to_utf8 : g_locale_from_utf8)((gchar *)src, -1,
+		NULL, NULL, NULL);
 	if (c)
 	{
 		if (!dest) return (c);
-		strncpy(dest, c, cnt);
+		g_strlcpy(dest, c, cnt);
 		g_free(c);
 	}
 	else
 #endif
 	{
 		if (!dest) return (g_strdup(src));
-		strncpy(dest, src, cnt);
-		dest[cnt - 1] = 0;
-	}
-	return (dest);
-}
-
-// Wrapper for C->utf8 translation
-
-char *gtkuncpy(char *dest, const char *src, int cnt)
-{
-#if GTK_MAJOR_VERSION == 2
-	char *c = g_locale_to_utf8((gchar *)src, -1, NULL, NULL, NULL);
-	if (c)
-	{
-		if (!dest) return (c);
-		strncpy(dest, c, cnt);
-		g_free(c);
-	}
-	else
-#endif
-	{
-		if (!dest) return (g_strdup(src));
-		strncpy(dest, src, cnt);
-		dest[cnt - 1] = 0;
+		u = strlen(src);
+		if (u >= cnt) u = cnt - 1;
+		/* Allow for overlapping buffers */
+		memmove(dest, src, u);
+		dest[u] = 0;
 	}
 	return (dest);
 }
@@ -3419,6 +3401,81 @@ void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
 // !!! Add other widget types here
 	}
 	va_end(args);
+}
+
+// Convert pathname to absolute
+
+char *resolve_path(char *buf, int buflen, char *path)
+{
+	char wbuf[PATHBUF], *tmp, *tm2, *src, *dest;
+	int ch, dot, dots;
+
+
+	/* Relative name to absolute */
+#ifdef WIN32
+	tm2 = "\\";
+	getcwd(wbuf, PATHBUF - 1);
+	if ((path[0] == '/') || (path[0] == '\\')) wbuf[2] = '\0';
+	else if (path[1] != ':');
+	else if ((path[2] != '/') && (path[2] != '\\'))
+	{
+		char tbuf[PATHBUF];
+
+		tbuf[0] = path[0]; tbuf[1] = ':'; tbuf[2] = '\0';
+		if (!chdir(tbuf)) getcwd(tbuf, PATHBUF - 1);
+		chdir(wbuf);
+		memcpy(wbuf, tbuf, PATHBUF);
+		path += 2;
+	}
+	else *(tm2 = wbuf) = '\0';
+	tmp = g_strdup_printf("%s%s%s", wbuf, tm2, path);
+#else
+	wbuf[0] = '\0';
+	if (path[0] != '/') getcwd(wbuf, PATHBUF - 1);
+	tmp = g_strdup_printf("%s%c%s", wbuf, DIR_SEP, path);
+#endif
+
+	/* Canonicalize path the way "realpath -s" does, i.e., symlinks
+	 * followed by ".." will get resolved wrong - WJ */
+	src = dest = tmp;
+	dots = dot = 0;
+	while (TRUE)
+	{
+		ch = *src++;
+#ifdef WIN32
+		if (ch == '/') ch = DIR_SEP;
+#endif
+		if (ch == '.') dots += dot;
+		else if (!ch || (ch == DIR_SEP))
+		{
+			if ((dots > 0) && (dots < 4)) /* // /./ /../ */
+			{
+				dest -= dots;
+				if (dots == 3) /* /../ */
+				{
+					*dest = '\0';
+					if ((tm2 = strrchr(tmp, DIR_SEP)))
+						dest = tm2;
+				}
+				/* Do not lose trailing separator */
+				if (!ch) *dest++ = DIR_SEP;
+			}
+			dots = dot = 1;
+		}
+		else dots = dot = 0;
+		*dest++ = ch;
+		if (!ch) break;
+	}
+
+	/* Return the result */
+	if (buf)
+	{
+		strncpy(buf, tmp, buflen);
+		buf[buflen - 1] = 0;
+		g_free(tmp);
+		tmp = buf;
+	}
+	return (tmp);
 }
 
 // Maybe this will be needed someday...

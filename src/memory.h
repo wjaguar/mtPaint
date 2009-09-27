@@ -17,6 +17,7 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include <limits.h>
 #include <png.h>
 
 /// Definitions, structures & variables
@@ -406,6 +407,40 @@ extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 
 int mem_background;			// Non paintable area
 int mem_histogram[256];
+
+/// Next power of two
+
+static inline unsigned int nextpow2(unsigned int n)
+{
+	n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16;
+#if UINT_MAX > 0xFFFFFFFFUL
+	n |= n >> 32;
+#endif
+	return (n + 1);
+}
+
+// Number of set bits
+
+static inline unsigned int bitcount(unsigned int n)
+{
+	unsigned int m;
+#if UINT_MAX > 0xFFFFFFFFUL
+	/* Limit to 64 bits - in case 128-bit ints ever appear :-) */
+	n = (n & 0x5555555555555555ULL) + ((n & 0xAAAAAAAAAAAAAAAAULL) >> 1);
+	m = n & 0x3333333333333333ULL; n = m + ((n ^ m) >> 2);
+	m = n & 0x0F0F0F0F0F0F0F0FULL; n = m + ((n ^ m) >> 4);
+	m = n & 0x00FF00FF00FF00FFULL; n = m + ((n ^ m) >> 8);
+	m = n & 0x0000FFFF0000FFFFULL; n = m + ((n ^ m) >> 16);
+	n = (n & 0x00000000FFFFFFFFULL) + (n >> 32);
+#else
+	m = n & 0x55555555; n = m + ((n ^ m) >> 1);
+	m = n & 0x33333333; n = m + ((n ^ m) >> 2);
+	m = n & 0x0F0F0F0F; n = m + ((n ^ m) >> 4);
+	m = n & 0x00FF00FF; n = m + ((n ^ m) >> 8);
+	n = (n & 0x0000FFFF) + (n >> 16);
+#endif
+	return (n);
+}
 
 /// Floored integer division
 

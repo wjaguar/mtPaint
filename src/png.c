@@ -2557,7 +2557,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 {
-	guint32 masks[4], m;
+	guint32 masks[4];
 	unsigned char hdr[BMP5_HSIZE], xlat[256], *dest, *tmp, *buf = NULL;
 	memFILE fake_mf;
 	FILE *fp = NULL;
@@ -2619,19 +2619,9 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			for (i = 0; i < 4; i++)
 			{
 				/* Bit length - just count bits */
-				j = (masks[i] & 0x55555555) +
-					((masks[i] >> 1) & 0x55555555);
-				j = (j & 0x33333333) + ((j >> 2) & 0x33333333);
-				j = (j & 0x0F0F0F0F) + ((j >> 4) & 0x0F0F0F0F);
-				j = (j & 0x00FF00FF) + ((j >> 8) & 0x00FF00FF);
-				j = (j & 0xFFFF) + (j >> 16);
-				/* Bit offset - add bits _before_ mask */
-				m = ((~masks[i] + 1) & masks[i]) - 1;
-				k = (m & 0x55555555) + ((m >> 1) & 0x55555555);
-				k = (k & 0x33333333) + ((k >> 2) & 0x33333333);
-				k = (k & 0x0F0F0F0F) + ((k >> 4) & 0x0F0F0F0F);
-				k = (k & 0x00FF00FF) + ((k >> 8) & 0x00FF00FF);
-				k = (k & 0xFFFF) + (k >> 16) + j;
+				j = bitcount(masks[i]);
+				/* Bit offset - add in bits _before_ mask */
+				k = bitcount(masks[i] - 1) + 1;
 				if (j > 8) j = 8;
 				shifts[i] = k - j;
 				bpps[i] = j;
@@ -5023,8 +5013,7 @@ static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_se
 
 
 	/* Show progress, for unknown final count */
-	n = ani->cnt;
-	n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16; n++;
+	n = nextpow2(ani->cnt);
 	if (n < 16) n = 16;
 	progress_update((float)ani->cnt / n);
 

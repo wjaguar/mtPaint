@@ -1402,22 +1402,10 @@ static GtkWidget *file_selector_create(int action_type);
 int do_a_load(char *fname, int undo)
 {
 	char real_fname[PATHBUF];
-	int res, i = 0, ftype, mult = 0;
+	int res, ftype, mult = 0;
 
 
-	if ((fname[0] != DIR_SEP)
-#ifdef WIN32
-		&& (fname[1] != ':')
-#endif
-	)
-	{
-		getcwd(real_fname, PATHBUF - 1);
-		i = strlen(real_fname);
-		real_fname[i++] = DIR_SEP;
-	}
-	real_fname[i] = 0;
-	strnncat(real_fname, fname, PATHBUF);
-
+	resolve_path(real_fname, PATHBUF, fname);
 	ftype = detect_image_format(real_fname);
 	if ((ftype < 0) || (ftype == FT_NONE))
 	{
@@ -1684,6 +1672,7 @@ static void loader_widgets(GtkWidget *box, char *name, int mode)
 	gtk_widget_show_all(box);
 }
 
+/* Note: "name" is in system encoding */
 static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 {
 	GtkWidget *box, *label;
@@ -1856,7 +1845,7 @@ static void fs_ok(GtkWidget *fs)
 	gtk_widget_hide(fs);
 
 	/* File extension */
-	strncpy0(fname, fpick_get_filename(fs, TRUE), PATHTXT);
+	fpick_get_filename(fs, fname, PATHTXT, TRUE);
 	c = strrchr(fname, '.');
 	while (TRUE)
 	{
@@ -1904,13 +1893,8 @@ static void fs_ok(GtkWidget *fs)
 		break;
 	}
 
-	/* Get filename the proper way (convert it from UTF8 in GTK2/Windows,
-	 * leave it in system filename encoding on Unix) */
-#ifdef WIN32
-	gtkncpy(fname, fpick_get_filename(fs, FALSE), PATHBUF);
-#else
-	strncpy0(fname, fpick_get_filename(fs, FALSE), PATHBUF);
-#endif
+	/* Get filename the proper way, in system filename encoding */
+	fpick_get_filename(fs, fname, PATHBUF, FALSE);
 
 	switch (settings.mode)
 	{
@@ -2067,10 +2051,6 @@ void fs_setup(GtkWidget *fs, int action_type)
 			inifile_get("last_dir", get_home_directory()),
 			DIR_SEP );		// Default
 	}
-
-#ifdef WIN32 /* Convert from codepage to UTF8 in GTK2/Windows */
-	gtkuncpy(txt, txt, PATHTXT);
-#endif
 
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
 	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);

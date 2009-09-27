@@ -342,11 +342,10 @@ void *multialloc(int align, void *ptr, int size, ...)
 static int frameset_realloc(frameset *fset)
 {
 	image_frame *tmp;
-	int n = fset->cnt;
+	int n;
 
 	/* Next power of 2 */
-	n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8;
-	n |= n >> 16; n++;
+	n = nextpow2(fset->cnt);
 	if (n < FRAMES_MIN) n = FRAMES_MIN;
 	if (n == fset->max) return (TRUE);
 	tmp = realloc(fset->frames, n * sizeof(image_frame));
@@ -4068,13 +4067,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 		corners[3] = corners[2] + QMINSIZE;
 		/* Determine queue levels */
 		for (i = 0; i < 4; i++)
-		{
-			j = (corners[i] & ~(corners[i] - 1)) - 1;
-			j = (j & 0x5555) + ((j & 0xAAAA) >> 1);
-			j = (j & 0x3333) + ((j & 0xCCCC) >> 2);
-			j = (j & 0x0F0F) + ((j & 0xF0F0) >> 4);
-			levels[i] = (j & 0xFF) + (j >> 8) - QMINLEVEL;
-		}
+			levels[i] = bitcount((corners[i] - 1) & ~corners[i]) - QMINLEVEL;
 		/* Process near points */
 		while (1)
 		{
@@ -6643,7 +6636,7 @@ int mem_count_all_cols()				// Count all colours - Using main image
 
 int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colours - very memory greedy
 {
-	guint32 *tab, v;
+	guint32 *tab;
 	int i, j, k, ix;
 
 	j = 0x80000;
@@ -6658,15 +6651,8 @@ int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colour
 		im += 3;
 	}
 
-	for (i = k = 0; i < j; i++)			// Count each colour
-	{
-		v = tab[i];
-		v = (v & 0x55555555) + ((v >> 1) & 0x55555555);
-		v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
-		v = (v & 0x0F0F0F0F) + ((v >> 4) & 0x0F0F0F0F);
-		v = (v & 0x00FF00FF) + ((v >> 8) & 0x00FF00FF);
-		k += (v & 0xFFFF) + (v >> 16);
-	}
+	// Count each colour
+	for (i = k = 0; i < j; i++) k += bitcount(tab[i]);
 
 	free(tab);
 

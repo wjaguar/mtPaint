@@ -126,9 +126,11 @@ void spin_set_range(GtkWidget *spin, int min, int max);
 
 char *gtkncpy(char *dest, const char *src, int cnt);
 
-// Wrapper for C->utf8 translation
+// Wrapper for utf8->C and C->utf8 translation
 
-char *gtkuncpy(char *dest, const char *src, int cnt);
+char *gtkxncpy(char *dest, const char *src, int cnt, int u);
+#define gtkncpy(dest, src, cnt) gtkxncpy(dest, src, cnt, FALSE)
+#define gtkuncpy(dest, src, cnt) gtkxncpy(dest, src, cnt, TRUE)
 
 // Generic wrapper for strncpy(), ensuring NUL termination
 
@@ -347,6 +349,10 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 // Track updates of multiple widgets (by whatever means necessary)
 
 void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
+
+// Convert pathname to absolute
+
+char *resolve_path(char *buf, int buflen, char *path);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

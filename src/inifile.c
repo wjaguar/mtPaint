@@ -34,6 +34,7 @@
 #include <gtk/gtk.h>
 
 #include "global.h"
+#include "memory.h"
 #include "inifile.h"
 
 /* Make code not compile where it cannot run */
@@ -125,13 +126,7 @@ static int resize_hash(inifile *inip, int cnt)
 	int len;
 
 	if (!cnt) return (0); /* Degenerate case */
-	len = HASHFILL(cnt) - 1;
-	len |= len >> 1;
-	len |= len >> 2;
-	len |= len >> 4;
-	len |= len >> 8;
-	len |= len >> 16;
-	len++;
+	len = nextpow2(HASHFILL(cnt) - 1);
 	if (len <= inip->hmask * 2 + 2) return (0); /* Large enough */
 	free(inip->hash);
 	inip->hash = calloc(1, len * sizeof(gint32));

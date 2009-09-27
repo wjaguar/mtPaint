@@ -70,7 +70,6 @@ typedef struct
 	char		combo_items[FPICK_COMBO_ITEMS][PATHTXT],	// UTF8 in GTK+2
 			/* Must be DIR_SEP terminated at all times */
 			txt_directory[PATHBUF],	// Current directory - Normal C string
-			txt_file[PATHTXT],	// Full filename - Normal C string except on Windows
 			txt_mask[PATHTXT]	// Filter mask - UTF8 in GTK+2
 			;
 
@@ -1181,7 +1180,7 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 	res->sort_direction = GTK_SORT_ASCENDING;
 	res->sort_column = 0;
 	res->allow_files = res->allow_dirs = TRUE;
-	res->txt_directory[0] = res->txt_file[0] = '\0';
+	res->txt_directory[0] = '\0';
 
 	res->window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_NONE, TRUE );
 	gtk_object_set_data(GTK_OBJECT(res->window), FP_DATA_KEY, res);
@@ -1357,42 +1356,19 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 {
 	fpicker *win = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
 	char txt[PATHTXT], *c;
-	int i = 0;
 
 	if (!raw)
 	{
 		/* Ensure that path is absolute */
-		txt[0] = '\0';
-		if ((name[0] != DIR_SEP)
-#ifdef WIN32
-			&& (name[0] != '/') && (name[1] != ':')
-#endif
-		)
-		{
-			getcwd(txt, PATHBUF - 1);
-			i = strlen(txt);
-			txt[i++] = DIR_SEP;
-		}
-
-		strnncat(txt, name, PATHTXT);
-#ifdef WIN32 /* Separators can be of both types on Windows - unify */
-		for (c = txt + i; (c = strchr(c, '/')); *c = DIR_SEP);
-#endif
-
+		resolve_path(txt, PATHBUF, name);
 		/* Separate the filename */
-		c = strrchr(txt, DIR_SEP);	// Guaranteed to be present now
-		name += c - txt - i + 1;
-		*c = '\0';
-#ifdef WIN32 /* Name is UTF8 on input there */
-		gtkncpy(txt + i, txt + i, PATHBUF - i);
-#endif
-
+		c = strrchr(txt, DIR_SEP);
+		*c++ = '\0';
 		// Scan directory, populate boxes if successful
 		if (!fpick_scan_directory(win, txt, "")) return;
 
-#ifndef WIN32 /* Name is in locale encoding on input */
-		name = gtkuncpy(txt, name, PATHTXT);
-#endif
+		/* Name is in locale encoding on input */
+		name = gtkuncpy(txt, c, PATHTXT);
 	}
 	gtk_entry_set_text(GTK_ENTRY(win->file_entry), name);
 }
@@ -1470,25 +1446,22 @@ void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 	pack(fpick->main_vbox, xtra);
 }
 
-const char *fpick_get_filename(GtkWidget *fp, int raw)
+void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 {
 	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
 	char *txt = (char *)gtk_entry_get_text(GTK_ENTRY(fpick->file_entry));
-	char *dir = fpick->txt_directory;
 
-	if (raw) return (txt);
+	if (raw) strncpy0(buf, txt, len);
 #if GTK_MAJOR_VERSION == 1 /* Same encoding everywhere */
-	snprintf(fpick->txt_file, PATHTXT, "%s%s", dir, txt);
-#elif defined WIN32 /* Upconvert dir to UTF8 */
-	dir = gtkuncpy(NULL, dir, PATHTXT);
-	snprintf(fpick->txt_file, PATHTXT, "%s%s", dir, txt);
-	g_free(dir);
+	else snprintf(buf, len, "%s%s", fpick->txt_directory, txt);
 #else /* Convert filename to locale */
-	txt = gtkncpy(NULL, txt, PATHBUF);
-	snprintf(fpick->txt_file, PATHBUF, "%s%s", dir, txt);
-	g_free(txt);
+	else
+	{
+		txt = gtkncpy(NULL, txt, PATHBUF);
+		snprintf(buf, len, "%s%s", fpick->txt_directory, txt);
+		g_free(txt);
+	}
 #endif
-	return (fpick->txt_file);
 }
 #endif				/* mtPaint fpicker */
 
@@ -1540,18 +1513,31 @@ void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 #endif
 }
 
-const char *fpick_get_filename(GtkWidget *fp, int raw)
+void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 {
-	if (raw) return (gtk_entry_get_text(GTK_ENTRY(
-		GTK_FILE_SELECTION(fp)->selection_entry)));
-	else return (gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)));
+	if (raw) strncpy0(buf, gtk_entry_get_text(GTK_ENTRY(
+		GTK_FILE_SELECTION(fp)->selection_entry)), len);
+#ifdef WIN32 /* Widget returns filename in UTF8 */
+	else gtkncpy(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
+#else
+	else strncpy0(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
+#endif
 }
 
 void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 {
 	if (raw) gtk_entry_set_text(GTK_ENTRY(
 		GTK_FILE_SELECTION(fp)->selection_entry), name);
+#ifdef WIN32 /* Widget wants filename in UTF8 */
+	else
+	{
+		name = gtkuncpy(NULL, name, 0);
+		gtk_file_selection_set_filename(GTK_FILE_SELECTION(fp), name);
+		g_free(name);
+	}
+#else
 	else gtk_file_selection_set_filename(GTK_FILE_SELECTION(fp), name);
+#endif
 }
 
 #endif		 /* GtkFileSelection based dialog */
