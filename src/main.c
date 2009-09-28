@@ -32,10 +32,231 @@
 #include "csel.h"
 #include "spawn.h"
 
+#ifndef WIN32
+#include <glob.h>
+#else
+
+/* This is Windows only, as POSIX systems have glob() implemented */
+
+#include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
+
+/* Error returns from glob() */
+#define	GLOB_NOSPACE 1 /* No memory */
+#define	GLOB_NOMATCH 3 /* No files */
+
+#define	GLOB_APPEND  0x020 /* Append to existing array */
+#define GLOB_MAGCHAR 0x100 /* Set if any wildcards in pattern */
+
+typedef struct {
+	int gl_pathc;
+	char **gl_pathv;
+	int gl_flags;
+} glob_t;
+
+static void globfree(glob_t *pglob)
+{
+	int i;
+
+	if (!pglob->gl_pathv) return;
+	for (i = 0; i < pglob->gl_pathc; i++)
+		free(pglob->gl_pathv[i]);
+	free(pglob->gl_pathv);
+}
+
+typedef struct {
+	DIR *dir;
+	char *path, *mask; // Split up the string for them
+	int lpath;
+} glob_dir_level;
+
+#define MAXDEPTH (PATHBUF / 2) /* A pattern with more cannot match anything */
+
+static int split_pattern(glob_dir_level *dirs, char *pat)
+{
+	char *tm2, *tmp, *lastpart;
+	int ch, bracket = 0, cnt = 0;
+
+
+	dirs[0].path = tmp = lastpart = pat;
+	while (tmp)
+	{
+		if (cnt >= MAXDEPTH) return (0);
+		tmp += strcspn(tmp, "?*[]");
+		ch = *tmp++;
+		if (!ch)
+		{
+			dirs[cnt].path = lastpart;
+			dirs[cnt++].mask = NULL;
+			break;
+		}
+		if (ch == '[') bracket = TRUE;
+		else if ((ch != ']') || bracket)
+		{
+			tmp = strchr(tmp, DIR_SEP);
+			if (tmp) *tmp++ = '\0';
+			tm2 = strrchr(lastpart, DIR_SEP);
+			/* 0th slot is special - path string is counted,
+			 * not terminated, and includes path separator */
+			if (!cnt)
+			{
+				if (!tm2) tm2 = strchr(lastpart, ':');
+				if (tm2) dirs[0].lpath = tm2 - lastpart + 1;
+			}
+			else if (tm2) dirs[cnt].path = lastpart;
+
+			if (tm2) *tm2++ = '\0';
+			else tm2 = lastpart;
+			dirs[cnt++].mask = tm2;
+			lastpart = tmp;
+			bracket = FALSE;
+		}
+	}
+	return (cnt);
+}
+
+static int glob_add_file(glob_t *pglob, char *buf)
+{
+	void *tmp;
+	int l = pglob->gl_pathc;
+
+	/* Use doubling array technique */
+	if (!pglob->gl_pathv || (((l + 1) & ~l) > l))
+	{
+		tmp = realloc(pglob->gl_pathv, (l + 1) * 2 * sizeof(char *));
+		if (!tmp) return (-1);
+		pglob->gl_pathv = tmp;
+	}
+	/* Add the name to array */
+	if (!(pglob->gl_pathv[l++] = strdup(buf))) return (-1);
+	pglob->gl_pathv[pglob->gl_pathc = l] = NULL;
+	return (0);
+}
+
+static int glob_compare_names(const void *s1, const void *s2)
+{
+	return (s1 == s2 ? 0 : strcoll(*(const char **)s1, *(const char **)s2));
+}
+
+/* This implementation is strictly limited to mtPaint's needs, and tuned for
+ * Win32 peculiarities; the only flag handled by it is GLOB_APPEND - WJ */
+static int glob(const char *pattern, int flags, void *nothing, glob_t *pglob)
+{
+	glob_dir_level dirs[MAXDEPTH + 1], *dp;
+	struct dirent *ep;
+	struct stat sbuf;
+	char *pat, *tmp, buf[PATHBUF];
+	int l, lv, maxdepth, prevcnt, memfail = 0;
+
+
+	pglob->gl_flags = flags;
+	if (!(flags & GLOB_APPEND))
+	{
+		pglob->gl_pathc = 0;
+		pglob->gl_pathv = NULL;
+	}
+	prevcnt = pglob->gl_pathc;
+
+	/* Prepare the pattern */
+	if (!pattern[0]) return (GLOB_NOMATCH);
+	pat = strdup(pattern);
+	if (!pat) goto mfail;
+	for (tmp = pat; (tmp = strchr(tmp, '/')); *tmp++ = DIR_SEP);
+
+	/* Split up the pattern */
+	memset(dirs, 0, sizeof(dirs));
+	if (!(maxdepth = split_pattern(dirs, pat)))
+	{
+		free(pat);
+		return (GLOB_NOMATCH);
+	}
+
+	/* Scan through dir(s) */
+	maxdepth--;
+	for (lv = 0; lv >= 0; )
+	{
+		dp = dirs + lv--; // Step back a level in advance
+		/* Start scanning directory */
+		if (!dp->dir)
+		{
+			l = dp->lpath;
+			buf[l] = '\0';
+			if (lv < 0) memcpy(buf, dp->path, l); // Level 0
+			else if (!dp->path); // No extra path part
+			else if (l + 1 + strlen(dp->path) >= PATHBUF) // Too long
+				continue;
+			else // Add path part
+			{
+				strcpy(buf + l + 1, dp->path);
+				buf[l] = DIR_SEP;
+			}
+			dp->lpath = strlen(buf);
+			if (!dp->mask)
+			{
+				if (!stat(buf, &sbuf))
+					memfail |= glob_add_file(pglob, buf);
+				continue;
+			}
+			dp->dir = opendir(buf[0] ? buf : ".");
+			if (!dp->dir) continue;
+		}
+		/* Finish scanning directory */
+		if (memfail || !(ep = readdir(dp->dir)))
+		{
+			closedir(dp->dir);
+			dp->dir = NULL;
+			continue;
+		}
+		lv++; // Undo step back
+		/* Skip "." and ".." */
+		if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
+			continue;
+		/* Filter through mask */
+		if (!wjfnmatch(dp->mask, ep->d_name, FALSE)) continue;
+		/* Combine names */
+		l = dp->lpath + !!lv;
+		if (l + strlen(ep->d_name) >= PATHBUF) // Too long
+			continue; // Should not happen, but let's make sure
+		strcpy(buf + l, ep->d_name);
+		if (lv) buf[l - 1] = DIR_SEP; // No forced separator on level 0
+		/* Filter files on lower levels */
+		if (stat(buf, &sbuf) || ((lv < maxdepth) && !S_ISDIR(sbuf.st_mode)))
+			continue;
+		/* Add to result set */
+		if (lv == maxdepth) memfail |= glob_add_file(pglob, buf);
+		/* Enter into directory */
+		else
+		{
+			dp[1].lpath = strlen(buf);
+			lv++;
+		}
+	}
+	free(pat);
+
+	/* Report the results */
+	if (memfail)
+	{
+mfail:		globfree(pglob);
+		return (GLOB_NOSPACE);
+	}
+	if (pglob->gl_pathc == prevcnt) return (GLOB_NOMATCH);
+	if (maxdepth) pglob->gl_flags |= GLOB_MAGCHAR;
+
+	/* Sort the names */
+	qsort(pglob->gl_pathv + prevcnt, pglob->gl_pathc - prevcnt,
+		sizeof(char *), glob_compare_names);
+
+	return (0);
+}
+
+#endif
+
 
 int main( int argc, char *argv[] )
 {
-	int new_empty = TRUE, get_screenshot = FALSE;
+	glob_t globdata;
+	int i, j, l, file_arg_start, new_empty = TRUE, get_screenshot = FALSE;
 
 	if (argc > 1)
 	{
@@ -58,8 +279,8 @@ int main( int argc, char *argv[] )
 		}
 	}
 
-	global_argv = argv;
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
+	putenv("GDK_NATIVE_WINDOWS=1");	// I need no experimental stuff before GTK+3
 	inifile_init("/.mtpaint");
 
 #ifdef U_NLS
@@ -111,7 +332,49 @@ int main( int argc, char *argv[] )
 		}
 		if ( strstr(argv[0], "mtv") != NULL ) viewer_mode = TRUE;
 	}
-	files_passed = argc - file_arg_start;
+
+	/* Something else got passed in */
+	l = argc - file_arg_start;
+	while (l)
+	{
+		/* First, process wildcarded args */
+		memset(&globdata, 0, sizeof(globdata));
+/* !!! I avoid GLOB_DOOFFS here, because glibc before version 2.2 mishandled it,
+ * and quite a few copycats had cloned those buggy versions, some libc
+ * implementors among them. So it is possible to encounter a broken function
+ * in the wild, and playing it safe doesn't cost all that much - WJ */
+		for (i = file_arg_start , j = 0; i < argc; i++)
+		{
+			if (strcmp(argv[i], "-w")) continue; j++;
+			if (++i >= argc) break; j++;
+			// Ignore errors - be glad for whatever gets returned
+			glob(argv[i], (j > 2 ? GLOB_APPEND : 0), NULL, &globdata);
+		}
+		files_passed = l - j + globdata.gl_pathc;
+
+		/* If no wildcarded args */
+		file_args = argv + file_arg_start;
+		if (!j) break;
+		/* If no normal args */
+		file_args = globdata.gl_pathv;
+		if (l <= j) break;
+
+		/* Allocate space for both kinds of args together */
+		file_args = calloc(files_passed + 1, sizeof(char *));
+		// !!! Die by SIGSEGV if this allocation fails
+
+		/* Copy normal args if any */
+		for (i = file_arg_start , j = 0; i < argc; i++)
+		{
+			if (!strcmp(argv[i], "-w")) i++; // Skip the pair
+			else file_args[j++] = argv[i];
+		}
+
+		/* Copy globbed args after them */
+		if (globdata.gl_pathc) memcpy(file_args + j, globdata.gl_pathv,
+			globdata.gl_pathc * sizeof(char *));
+		break;
+	}
 
 	string_init();				// Translate static strings
 	var_init();				// Load INI variables
@@ -134,7 +397,7 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		if ((files_passed > 0) && !do_a_load(argv[file_arg_start], FALSE))
+		if ((files_passed > 0) && !do_a_load(file_args[0], FALSE))
 			new_empty = FALSE;
 	}
 

@@ -354,6 +354,12 @@ void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
 
 char *resolve_path(char *buf, int buflen, char *path);
 
+// A (better) substitute for fnmatch(), in case one is needed
+
+#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4))
+int wjfnmatch(const char *mask, const char *str, int utf);
+#endif
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

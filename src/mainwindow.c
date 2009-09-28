@@ -128,8 +128,8 @@ static GtkWidget *main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit;
-int	files_passed, file_arg_start, drag_index_vals[2], cursor_corner, show_dock;
-char **global_argv;
+int	files_passed, drag_index_vals[2], cursor_corner, show_dock;
+char **file_args;
 
 static int mouse_left_canvas;
 
@@ -4367,22 +4367,20 @@ void dock_undock(int what, int state)
 	cnt = state ? state : DOCKABLE();
 	gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], cnt > 0);
 
-	if (!dock_pane) // No dock open
-	{
-		if (!state) /* Create boxes on undock request */
-		{
-			if (what == DOCK_LAYERS) create_layers_box();
-			else if (what == DOCK_SETTINGS) create_settings_box();
-		}
-		return; // Do nothing if no dock
-	}
-
-	flag = 1 << what;
-	if (!(dock_state & flag) ^ state) return; // Already that way
-
 	if (what == DOCK_LAYERS) box = layers_box;
 	else if (what == DOCK_SETTINGS) box = settings_box;
 	else return; // Nonexistent or unmovable
+
+	if (!state && !box) /* Create boxes on undock request, if needed */
+	{
+		if (what == DOCK_LAYERS) create_layers_box();
+		else if (what == DOCK_SETTINGS) create_settings_box();
+		return; // Do nothing else
+	}
+	if (!dock_pane) return; // Do nothing if no dock
+
+	flag = 1 << what;
+	if (!(dock_state & flag) ^ state) return; // Already that way
 
 	/* To prevent flicker */
 	cont = GTK_CONTAINER(dock_area);

@@ -3478,6 +3478,182 @@ char *resolve_path(char *buf, int buflen, char *path)
 	return (tmp);
 }
 
+// A (better) substitute for fnmatch(), in case one is needed
+
+/* One is necessary in case of Win32 or GTK+ 2.0/2.2 */
+#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4))
+
+#ifdef WIN32
+
+/* Convert everything to lowercase */
+static gunichar nxchar(const char **str)
+{
+	gunichar c = g_utf8_get_char(*str);
+	*str = g_utf8_next_char(*str);
+	return (g_unichar_tolower(c));
+}
+
+/* Slash isn't an escape char in Windows */
+#define UNQUOTE_CHAR(C,P)
+
+#else 
+
+static gunichar nxchar(const char **str)
+{
+	gunichar c = g_utf8_get_char(*str);
+	*str = g_utf8_next_char(*str);
+	return (c);
+}
+
+#define UNQUOTE_CHAR(C,P) if ((C) == '\\') (C) = nxchar(P)
+
+#endif
+
+static int match_char_set(const char **maskp, gunichar cs)
+{
+	const char *mask = *maskp;
+	gunichar ch, cstart, cend;
+	int inv;
+
+	ch = *mask;
+	if ((inv = (ch == '^') | (ch == '!'))) mask++;
+	ch = nxchar(&mask);
+	while (TRUE)
+	{
+		UNQUOTE_CHAR(ch, &mask);
+		if (!ch) return (0); // Failed
+		cstart = cend = ch;
+		if ((*mask == '-') && (mask[1] != ']'))
+		{
+			mask++;
+			ch = nxchar(&mask);
+			UNQUOTE_CHAR(ch, &mask);
+			if (!ch) return (0); // Failed
+			cend = ch;
+		}
+		if ((cs >= cstart) && (cs <= cend))
+		{
+			if (inv) return (-1); // Didn't match
+			while ((ch = nxchar(&mask)) != ']')
+			{
+				UNQUOTE_CHAR(ch, &mask);
+				if (!ch) return (0); // Failed
+			}
+			break;
+		}
+		ch = nxchar(&mask);
+		if (ch != ']') continue;
+		if (!inv) return (-1); // Didn't match
+		break;
+	}
+	*maskp = mask;
+	return (1); // Matched
+}
+
+/* The limiting of recursion to one level in this algorithm is based on the
+ * observation that in case of a "*X*Y" subsequence, moving a match for "X" to
+ * the right can not improve the outcome - so only the part after the last
+ * encountered star may ever need to be rematched at another position - WJ */
+
+int wjfnmatch(const char *mask, const char *str, int utf)
+{
+	char *xmask, *xstr;
+	const char *nstr, *omask, *wmask, *tstr = NULL, *tmask = NULL;
+	gunichar ch, cs, cw;
+	int res, ret = FALSE;
+
+
+	/* Convert locale to utf8 */
+	if (!utf)
+	{
+		mask = xmask = g_locale_to_utf8((gchar *)mask, -1, NULL, NULL, NULL);
+		str = xstr = g_locale_to_utf8((gchar *)str, -1, NULL, NULL, NULL);
+		// Fail the match if conversion failed
+		if (!xmask || !xstr) return (FALSE);
+	}
+
+	while (TRUE)
+	{
+		nstr = str;
+		cs = nxchar(&nstr);
+		if (!cs) break;
+
+		omask = mask;
+		ch = nxchar(&mask);
+		if ((cs == DIR_SEP) && (ch != cs)) goto nomatch;
+		if (ch == '?')
+		{
+			str = nstr;
+			continue;
+		}
+		if (ch == '[')
+		{
+			str = nstr;
+			res = match_char_set(&mask, cs);
+			if (res < 0) goto nomatch;
+			if (!res) goto fail;
+			continue;
+		}
+		if (ch == '*')
+		{
+			while (TRUE)
+			{
+				omask = mask;
+				ch = nxchar(&mask);
+				if (!ch)
+				{
+					ret = !strchr(str, DIR_SEP);
+					goto fail;
+				}
+				if (ch == '*') continue;
+				if (ch != '?') break;
+				cs = nxchar(&str);
+				if (!cs || (cs == DIR_SEP)) goto fail;
+			}
+		}
+		else
+		{
+			str = nstr;
+			UNQUOTE_CHAR(ch, &mask);
+			if (ch == cs) continue;
+nomatch:		if (!tmask) goto fail;
+			omask = mask = tmask;
+			str = tstr;
+			ch = nxchar(&mask);
+		}
+		cw = ch;
+		UNQUOTE_CHAR(ch, &mask);
+		if (!ch) goto fail; // Escape char at end of mask
+		wmask = mask;
+		while (TRUE)
+		{
+			cs = nxchar(&str);
+			if (!cs || ((cs == DIR_SEP) && (ch != cs))) goto fail;
+			if (cw == '[')
+			{
+				res = match_char_set(&mask, cs);
+				if (res > 0) break;
+				if (!res) goto fail;
+				mask = wmask;
+			}
+			else if (ch == cs) break;
+		}
+		tmask = omask;
+		tstr = str;
+	}
+	while ((ch = nxchar(&mask)) == '*');
+	ret = !ch;
+
+fail:	if (!utf)
+	{
+		g_free(xmask);
+		g_free(xstr);
+	}
+	return (ret);
+}
+
+#endif
+
 // Maybe this will be needed someday...
 
 #if 0

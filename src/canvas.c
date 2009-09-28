@@ -1967,7 +1967,7 @@ static void fs_ok(GtkWidget *fs)
 			c = strrchr(gif, DIR_SEP);
 			if (!c) c = gif;
 			else c++;
-			c = g_strdup_printf("%s%c%s.???", fname, DIR_SEP, c);
+			c = g_strdup_printf("%s%c%s", fname, DIR_SEP, c);
 			run_def_action(DA_GIF_EDIT, c, NULL, preserved_gif_delay);
 			g_free(c);
 		}

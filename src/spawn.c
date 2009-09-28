@@ -591,8 +591,6 @@ static char *quote_spaces(const char *src)
 	/* !!! Image Magick version prior to 6.2.6-3 won't work properly */
 #define CMD_GIF_CREATE \
 	"convert %2$s -layers optimize -set delay %1$d -loop 0 \"%3$s\""
-//#define CMD_GIF_EXPLODE \
-	"convert \"%s\" -scene 0 -coalesce +adjoin \"gif:%s.%%03d\""
 #define CMD_GIF_PLAY "animate \"%s\" &"
 
 #else	/* Use Gifsicle; the default choice for animated GIFs */
@@ -601,16 +599,22 @@ static char *quote_spaces(const char *src)
  *	removal method, infinite loops, ensure result works with Java & MS IE */
 #define CMD_GIF_CREATE \
 	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful -d %d %s -o \"%s\""
-//#define CMD_GIF_EXPLODE \
-	"gifsicle -U --explode \"%s\" -o \"%s\""
 #define CMD_GIF_PLAY "gifview -a \"%s\" &"
 
 #endif
 
-#ifdef WIN32
+/* Windows shell does not know "&", nor needs it to run mtPaint detached */
+#ifndef WIN32
+
+#define CMD_DETACH " &"
+
+#else /* WIN32 */
+
+#define CMD_DETACH
 #ifndef WEXITSTATUS
 #define WEXITSTATUS(A) ((A) & 0xFF)
 #endif
+
 #endif
 
 int run_def_action(int action, char *sname, char *dname, int delay)
@@ -625,9 +629,6 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		command = g_strdup_printf(CMD_GIF_CREATE, delay, c8, dname);
 		free(c8);
 		break;
-//	case DA_GIF_EXPLODE:
-//		command = g_strdup_printf(CMD_GIF_EXPLODE, sname, dname);
-//		break;
 	case DA_GIF_PLAY:
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 		/* 'gifviev' and 'animate' both are X-only */
@@ -637,13 +638,8 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		return (-1);
 #endif
 	case DA_GIF_EDIT:
-		c8 = quote_spaces(sname);
-#ifndef WIN32
-		command = g_strdup_printf("mtpaint -g %d %s &", delay, c8);
-#else /* Windows shell does not know "&", nor needs it to run mtPaint detached */
-		command = g_strdup_printf("mtpaint -g %d %s", delay, c8);
-#endif
-		free(c8);
+		command = g_strdup_printf("mtpaint -g %d -w \"%s.???\" -w \"%s.????\""
+			CMD_DETACH, delay, sname, sname);
 		break;
 	}
 

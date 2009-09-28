@@ -58,7 +58,7 @@ void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointe
 			check_for_changes()) == 1)
 			clist_reselect_row(GTK_CLIST(clist), last_row); // Go back
 		// Load requested file
-		else do_a_load(global_argv[(last_row = row) + file_arg_start], undo_load);
+		else do_a_load(file_args[last_row = row], undo_load);
 	}
 }
 
@@ -79,9 +79,9 @@ void create_cline_area( GtkWidget *vbox1 )
 	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_BROWSE);
 
 	item[0] = txt2;
-	for ( i=file_arg_start; i<(file_arg_start + files_passed); i++ )
+	for (i = 0; i < files_passed; i++)
 	{
-		gtkuncpy(txt2, global_argv[i], PATHTXT);
+		gtkuncpy(txt2, file_args[i], PATHTXT);
 		gtk_clist_set_selectable ( GTK_CLIST(col_list),
 			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
 	}
