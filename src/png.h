@@ -36,26 +36,32 @@
 #endif
 
 /* File types */
-#define FT_NONE     0
-#define FT_PNG      1
-#define FT_JPEG     2
-#define FT_JP2      3
-#define FT_J2K      4
-#define FT_TIFF     5
-#define FT_GIF      6
-#define FT_BMP      7
-#define FT_XPM      8
-#define FT_XBM      9
-#define FT_LSS      10
-#define FT_TGA      11
-#define FT_PCX      12
-#define FT_GPL      13
-#define FT_TXT      14
-#define FT_PAL      15
-#define FT_LAYERS1  16
-#define FT_LAYERS2  17
-#define FT_PIXMAP   18
-#define NUM_FTYPES  19
+enum {
+	FT_NONE = 0,
+	FT_PNG,
+	FT_JPEG,
+	FT_JP2,
+	FT_J2K,
+	FT_TIFF,
+	FT_GIF,
+	FT_BMP,
+	FT_XPM,
+	FT_XBM,
+	FT_LSS,
+	FT_TGA,
+	FT_PCX,
+	FT_PBM,
+	FT_PGM,
+	FT_PPM,
+	FT_PAM,
+	FT_GPL,
+	FT_TXT,
+	FT_PAL,
+	FT_LAYERS1,
+	FT_LAYERS2,
+	FT_PIXMAP,
+	NUM_FTYPES
+};
 
 #define FTM_FTYPE   0x00FF /* File type mask */
 #define FTM_EXTEND  0x0100 /* Allow extended format */

@@ -107,6 +107,13 @@ fformat file_formats[NUM_FTYPES] = {
 //	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 /* !!! Placeholder */
 	{ "", "", "", 0},
+	{ "PBM", "pbm", "", FF_BW | FF_LAYER },
+	{ "PGM", "pgm", "", FF_256| FF_LAYER | FF_NOSAVE },
+	{ "PPM", "ppm", "", FF_RGB | FF_LAYER },
+/* !!! Not supported yet */
+//	{ "PAM", "pam", "", FF_BW | FF_RGB | FF_ALPHA | FF_LAYER },
+/* !!! Placeholder */
+	{ "", "", "", 0},
 	{ "GPL", "gpl", "", FF_PALETTE },
 	{ "TXT", "txt", "", FF_PALETTE },
 /* !!! Not supported yet */
@@ -141,7 +148,9 @@ int file_type_by_ext(char *name, guint32 mask)
 	ext++;
 	for (i = 0; i < NUM_FTYPES; i++)
 	{
-		if (!(file_formats[i].flags & mask)) continue;
+		unsigned int flags = file_formats[i].flags;
+
+		if ((flags & FF_NOSAVE) || !(flags & mask)) continue;
 		if (!strncasecmp(ext, file_formats[i].ext, l))
 			return (i);
 		if (!file_formats[i].ext2[0]) continue;
@@ -160,6 +169,27 @@ static int check_next_frame(frameset *fset, int mode, int anim)
 }
 
 static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_set);
+
+static int process_page_frame(char *file_name, ani_settings *ani, ls_settings *w_set)
+{
+	image_frame *frame;
+
+	if (ani->settings.mode == FS_EXPLODE_FRAMES)
+		return (write_out_frame(file_name, ani, w_set));
+
+	/* Store a new frame */
+// !!! Currently, frames are allocated without checking any limits
+	if (!mem_add_frame(&ani->fset, w_set->width, w_set->height,
+		w_set->bpp, CMASK_NONE, w_set->pal)) return (FILE_MEM_ERROR);
+	frame = ani->fset.frames + (ani->fset.cnt - 1);
+	frame->cols = w_set->colors;
+	frame->trans = w_set->xpm_trans;
+	frame->delay = 0;
+	frame->x = w_set->x;
+	frame->y = w_set->y;
+	memcpy(frame->img, w_set->img, sizeof(chanlist));
+	return (0);
+}
 
 /* Receives struct with image parameters, and channel flags;
  * returns 0 for success, or an error code;
@@ -2013,8 +2043,8 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	uint32 *tr, *raster = NULL;
 	unsigned char xtable[256], *tmp, *src, *buf = NULL;
 	int i, j, k, x0, y0, bsz, xstep, ystep, plane, nplanes, mirror;
-	int x, w, h, dx, bpr, bits1, bit0, db, n, nx;
-	int res = -1, bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
+	int x, w, h, dx, bpr, bits1, bit0, db, n, nx, res;
+	int bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
 
 
 	/* Let's learn what we've got */
@@ -2025,7 +2055,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		/* Defaults like in libtiff */
 		if (sampp - xsamp == 1) pmetric = PHOTOMETRIC_MINISBLACK;
 		else if (sampp - xsamp == 3) pmetric = PHOTOMETRIC_RGB;
-		else goto fail;
+		else return (-1);
 	}
 	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &sform);
 	TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
@@ -2076,7 +2106,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	}
 
 	/* Let's decide how to store it */
-	if ((width > MAX_WIDTH) || (height > MAX_HEIGHT)) goto fail;
+	if ((width > MAX_WIDTH) || (height > MAX_HEIGHT)) return (-1);
 	settings->width = width;
 	settings->height = height;
 	if ((sform != SAMPLEFORMAT_UINT) && (sform != SAMPLEFORMAT_INT) &&
@@ -2090,7 +2120,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 				break;
 			}
 			if (!TIFFGetField(tif, TIFFTAG_COLORMAP,
-				&red16, &green16, &blue16)) goto fail;
+				&red16, &green16, &blue16)) return (-1);
 		case PHOTOMETRIC_MINISWHITE:
 		case PHOTOMETRIC_MINISBLACK:
 			bpp = 1; break;
@@ -2101,7 +2131,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		}
 
 	/* libtiff can't handle this and neither can we */
-	if (argb && !TIFFRGBAImageOK(tif, cbuf)) goto fail;
+	if (argb && !TIFFRGBAImageOK(tif, cbuf)) return (-1);
 
 	settings->bpp = bpp;
 	/* Photoshop writes alpha as EXTRASAMPLE_UNSPECIFIED anyway */
@@ -2110,7 +2140,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	/* !!! No alpha support for RGB mode yet */
 	if (argb) cmask = CMASK_IMAGE;
 
-	if ((res = allocate_image(settings, cmask))) goto fail;
+	if ((res = allocate_image(settings, cmask))) return (res);
 	res = -1;
 
 	if ((pr = !settings->silent)) ls_init("TIFF", 0);
@@ -2336,14 +2366,13 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 fail2:	if (pr) progress_end();
 	if (raster) _TIFFfree(raster);
 	if (buf) _TIFFfree(buf);
-fail:	return (res);
+	return (res);
 }
 
 static int load_tiff_frames(char *file_name, ani_settings *ani)
 {
 	TIFF *tif;
 	ls_settings w_set;
-	image_frame *frame;
 	int res;
 
 
@@ -2361,26 +2390,8 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 		w_set = ani->settings;
 		res = load_tiff_frame(tif, &w_set);
 		if (res != 1) goto fail;
-		if (ani->settings.mode == FS_EXPLODE_FRAMES)
-		{
-			res = write_out_frame(file_name, ani, &w_set);
-			if (res) goto fail;
-		}
-		else
-		{
-			/* Store a new frame */
-// !!! Currently, frames are allocated without checking any limits
-			res = FILE_MEM_ERROR;
-			if (!mem_add_frame(&ani->fset, w_set.width, w_set.height,
-				w_set.bpp, CMASK_NONE, w_set.pal)) goto fail;
-			frame = ani->fset.frames + (ani->fset.cnt - 1);
-			frame->cols = w_set.colors;
-			frame->trans = w_set.xpm_trans;
-			frame->delay = 0;
-			frame->x = w_set.x;
-			frame->y = w_set.y;
-			memcpy(frame->img, w_set.img, sizeof(chanlist));
-		}
+		res = process_page_frame(file_name, ani, &w_set);
+		if (res) goto fail;
 		/* Try to get next frame */
 		if (!TIFFReadDirectory(tif)) break;
 	}
@@ -2995,6 +3006,7 @@ static unsigned char ctypes[256] = {
 #define ISALPHA(x) (ctypes[(unsigned char)(x)] & 4)
 #define ISALNUM(x) (ctypes[(unsigned char)(x)] & 6)
 #define ISCNTRL(x) (!ctypes[(unsigned char)(x)])
+#define WHITESPACE "\t\n\v\f\r "
 
 /* Reads text and cuts out C-style comments */
 static char *fgetsC(char *buf, int len, FILE *f)
@@ -4453,6 +4465,360 @@ static int save_tga(char *file_name, ls_settings *settings)
 	return 0;
 }
 
+#define PNM_BUFSIZE 4096
+typedef struct {
+	FILE *f;
+	int ptr, end, eof, comment;
+	char buf[PNM_BUFSIZE + 2];
+} pnmbuf;
+
+/* What PBM documentation says is NOT what Netpbm actually does; skipping a
+ * comment in file header, it does not consume the newline after it - WJ */
+static void pnm_skip_comment(pnmbuf *pnm)
+{
+	pnm->comment = !pnm->buf[pnm->ptr += strcspn(pnm->buf + pnm->ptr, "\r\n")];
+}
+
+static char *pnm_gets(pnmbuf *pnm, int data)
+{
+	int k, l;
+
+	while (TRUE)
+	{
+		while (pnm->ptr < pnm->end)
+		{
+			l = pnm->ptr + strspn(pnm->buf + pnm->ptr, WHITESPACE);
+			if (pnm->buf[l] == '#')
+			{
+				if (data) return (NULL);
+				pnm->ptr = l;
+				pnm_skip_comment(pnm);
+				continue;
+			}
+			k = l + strcspn(pnm->buf + l, WHITESPACE "#");
+			if (pnm->buf[k] || pnm->eof)
+			{
+				pnm->ptr = k + 1;
+				if (pnm->buf[k] == '#')
+				{
+					if (data) return (NULL);
+					pnm_skip_comment(pnm);
+				}
+				pnm->buf[k] = '\0';
+				return (pnm->buf + l);
+			}
+			memmove(pnm->buf, pnm->buf + l, pnm->end -= l);
+			pnm->ptr = 0;
+			break;
+		}
+		if (pnm->eof) return (NULL);
+		if (pnm->ptr >= pnm->end) pnm->ptr = pnm->end = 0;
+		l = PNM_BUFSIZE - pnm->end;
+		if (l <= 0) return (NULL); // A "token" of 4096 chars means failure
+		pnm->end += k = fread(pnm->buf + pnm->end, 1, l, pnm->f);
+		pnm->eof = k < l;
+		if (pnm->comment) pnm_skip_comment(pnm);
+	}
+}
+
+static int pnm_endhdr(pnmbuf *pnm, int plain)
+{
+	while (pnm->comment)
+	{
+		pnm_skip_comment(pnm);
+		if (!pnm->comment) break;
+		if (pnm->eof) return (FALSE);
+		pnm->end = fread(pnm->buf, 1, PNM_BUFSIZE, pnm->f);
+		pnm->eof = pnm->end < PNM_BUFSIZE;
+	}
+	/* Last whitespace in header already got consumed while parsing */
+
+	/* Buffer will remain in use in plain mode */
+	if (!plain && (pnm->ptr < pnm->end))
+		fseek(pnm->f, pnm->ptr - pnm->end, SEEK_CUR);
+	return (TRUE);
+}
+
+/* PAMs have to be read separately - too different from PBM/PGM/PPM */
+static int load_pam_frame(FILE *fp, ls_settings *settings)
+{
+// !!! Not implemented yet
+	return (-1);
+}
+
+static int load_pnm_frame(FILE *fp, ls_settings *settings)
+{
+	pnmbuf pnm;
+	char *s, *tail;
+	unsigned char *dest;
+	int i, l, w, h, bpp, maxval, plain, mode, fid, res;
+
+
+	/* Identify*/
+	memset(&pnm, 0, sizeof(pnm));
+	pnm.f = fp;
+	fid = settings->ftype == FT_PBM ? 0 : settings->ftype == FT_PGM ? 1 : 2;
+	if (!(s = pnm_gets(&pnm, FALSE))) return (-1);
+	if ((s[0] != 'P') || ((s[1] != fid + '1') && (s[1] != fid + '4')))
+		 return (-1);
+	plain = s[1] < '4';
+
+	/* Read header */
+	if (!(s = pnm_gets(&pnm, FALSE))) return (-1);
+	w = strtol(s, &tail, 10);
+	if (*tail) return (-1);
+	if (!(s = pnm_gets(&pnm, FALSE))) return (-1);
+	h = strtol(s, &tail, 10);
+	if (*tail) return (-1);
+	bpp = maxval = 1;
+	if (settings->ftype == FT_PBM)
+	{
+		/* Palette is white and black */
+		png_color *cp = settings->pal;
+		cp->red = cp->green = cp->blue = 255; cp++;
+		cp->red = cp->green = cp->blue = 0;
+		settings->colors = 2;
+	}
+	else
+	{
+		if (!(s = pnm_gets(&pnm, FALSE))) return (-1);
+		maxval = strtol(s, &tail, 10);
+		if (*tail) return (-1);
+		if ((maxval <= 0) || (maxval > 65535)) return (-1);
+		if (settings->ftype == FT_PGM)
+		{
+			settings->colors = 256;
+			mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
+		}
+		else bpp = 3;
+	}
+	if (!pnm_endhdr(&pnm, plain)) return (-1);
+
+	/* Store values */
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = bpp;
+
+	/* Allocate image */
+	if ((res = allocate_image(settings, CMASK_IMAGE))) return (res);
+
+	/* Now, read the image */
+	mode = settings->ftype == FT_PBM ? plain /* 0 and 1 */ :
+		plain ? 2 : maxval < 255 ? 3 : maxval > 255 ? 4 : 5;
+	s = "";
+	if (!settings->silent) ls_init("PNM", 0);
+	res = FILE_LIB_ERROR;
+	l = w * bpp;
+	for (i = 0; i < h; i++)
+	{
+		dest = settings->img[CHN_IMAGE] + l * i;
+		switch (mode)
+		{
+		case 0: /* Raw packed bits */
+		{
+#if PNM_BUFSIZE * 8 < MAX_WIDTH
+#error "Buffer too small to read PBM row all at once"
+#endif
+			int i, j, k;
+			unsigned char *tp = pnm.buf;
+
+			k = (w + 7) >> 3;
+			j = fread(tp, 1, k, fp);
+			for (i = 0; i < w; i++)
+				*dest++ = (tp[i >> 3] >> (~i & 7)) & 1;
+			if (j < k) goto fail2;
+			break;
+		}
+		case 3: /* Raw byte values - extend later */
+		case 5: /* Raw 0..255 values - trivial */
+			if (fread(dest, 1, l, fp) < l) goto fail2;
+			break;
+		case 1: /* Chars "0" and "1" */
+		{
+			int i;
+			unsigned char ch;
+
+			for (i = 0; i < l; i++)
+			{
+				if (!s[0] && !(s = pnm_gets(&pnm, TRUE)))
+					goto fail2;
+				ch = *s++ - '0';
+				if (ch > 1) goto fail2;
+				*dest++ = ch;
+			}
+			break;
+		}
+		case 2: /* Integers in ASCII */
+		{
+			int i, m, n;
+
+			m = maxval * 2;
+			for (i = 0; i < l; i++)
+			{
+				if (!(s = pnm_gets(&pnm, TRUE))) goto fail2;
+				n = strtol(s, &tail, 10);
+				if (*tail) goto fail2;
+				if ((n < 0) || (n > maxval)) goto fail2;
+				n = (n * (255 * 2) + 255) / m;
+				*dest++ = n;
+			}
+			break;
+		}
+		case 4: /* Raw ushorts in MSB order */
+		{
+			int i, j, k, m, n, ll;
+			unsigned char *tp;
+
+			m = maxval * 2;
+			for (ll = l * 2; ll > 0; ll -= k)
+			{
+				k = PNM_BUFSIZE < ll ? PNM_BUFSIZE : ll;
+				j = fread(tp = pnm.buf, 1, k, fp);
+				for (i = 0; i < j; i += 2 , tp += 2)
+				{
+					n = (tp[0] << 8) + tp[1];
+					n = (n * (255 * 2) + maxval) / m;
+					if (n > 255) goto fail2;
+					*dest++ = n;
+				}
+				if (j < k) goto fail2;
+			}
+			break;
+		}
+		}
+		dest += l;
+		if (!settings->silent && ((i * 10) % h >= h - 10))
+			progress_update((float)i / h);
+	}
+	res = 1;
+
+	/* Check for next frame */
+	if (!plain && fread(pnm.buf, 2, 1, fp))
+	{
+		fseek(fp, -2, SEEK_CUR);
+		if ((pnm.buf[0] == 'P') && (pnm.buf[1] == fid + '4'))
+			res = FILE_HAS_FRAMES;
+	}
+
+fail2:	if (mode == 3) // Extend what we've read
+	{
+		unsigned char tb[256], *tmp;
+		int i, j, n, m = maxval * 2;
+
+		memset(tb, 0, 256);
+		for (i = 1; i <= maxval; i++)
+			tb[i] = (i * (255 * 2) + maxval) / m;
+
+		n = l * h;
+		tmp = settings->img[CHN_IMAGE];
+		for (j = 0; j < n; j++ , tmp++) *tmp = tb[*tmp];
+	}
+	if (!settings->silent) progress_end();
+
+	return (res);
+}
+
+static int load_pnm_frames(char *file_name, ani_settings *ani)
+{
+	FILE *fp;
+	ls_settings w_set;
+	int res, is_pam = ani->settings.ftype == FT_PAM, next = TRUE;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	while (next)
+	{
+		res = FILE_TOO_LONG;
+		if (!check_next_frame(&ani->fset, ani->settings.mode, FALSE))
+			goto fail;
+		w_set = ani->settings;
+		res = (is_pam ? load_pam_frame : load_pnm_frame)(fp, &w_set);
+		next = res == FILE_HAS_FRAMES;
+		if ((res != 1) && !next) goto fail;
+		res = process_page_frame(file_name, ani, &w_set);
+		if (res) goto fail;
+	}
+	res = 1;
+fail:	fclose(fp);
+	return (res);
+}
+
+static int load_pnm(char *file_name, ls_settings *settings)
+{
+	FILE *fp;
+	int res;
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	res = (settings->ftype == FT_PAM ? load_pam_frame :
+		load_pnm_frame)(fp, settings);
+	fclose(fp);
+	return (res);
+}
+
+static int save_pbm(char *file_name, ls_settings *settings)
+{
+	unsigned char buf[MAX_WIDTH / 8], *src;
+	FILE *fp;
+	int i, j, l, w = settings->width, h = settings->height;
+
+
+	if ((settings->bpp != 1) || (settings->colors > 2)) return WRONG_FORMAT;
+
+	if (!(fp = fopen(file_name, "wb"))) return (-1);
+
+	if (!settings->silent) ls_init("PBM", 1);
+	l = sprintf(buf, "P4\n%d %d\n", settings->width, settings->height);
+	fwrite(buf, l, 1, fp);
+
+	/* Write rows */
+	src = settings->img[CHN_IMAGE];
+	l = (w + 7) >> 3;
+	for (i = 0; i < h; i++)
+	{
+		memset(buf, 0, l);
+		for (j = 0; j < w; j++)
+			buf[j >> 3] |= (*src++ == 1) << (~j & 7);
+		fwrite(buf, l, 1, fp);
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)(h - i) / h);
+	}
+
+	if (!settings->silent) progress_end();
+
+	return (0);
+}
+
+static int save_ppm(char *file_name, ls_settings *settings)
+{
+	char buf[256];
+	FILE *fp;
+	int i, l, m, w = settings->width, h = settings->height;
+
+
+	if (settings->bpp != 3) return WRONG_FORMAT;
+
+	if (!(fp = fopen(file_name, "wb"))) return (-1);
+
+	if (!settings->silent) ls_init("PPM", 1);
+	l = sprintf(buf, "P6\n%d %d\n255\n", settings->width, h);
+	fwrite(buf, l, 1, fp);
+
+	/* Write rows */
+	m = (l = w * 3) * h;
+	// Write entire file at once if no progressbar
+	if (settings->silent) l = m;
+	for (i = 0; m > 0; m -= l , i++)
+	{
+		fwrite(settings->img[CHN_IMAGE] + l * i, l, 1, fp);
+		if (!settings->silent && ((i * 20) % h >= h - 20))
+			progress_update((float)(h - i) / h);
+	}
+
+	if (!settings->silent) progress_end();
+
+	return (0);
+}
+
 /* Put screenshots and X pixmaps on an equal footing with regular files */
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
@@ -4674,6 +5040,10 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_TGA: res = save_tga(file_name, &setw); break;
 /* !!! Not implemented yet */
 //	case FT_PCX:
+	case FT_PBM: res = save_pbm(file_name, &setw); break;
+	case FT_PPM: res = save_ppm(file_name, &setw); break;
+/* !!! Not implemented yet */
+//	case FT_PAM:
 	case FT_PIXMAP: res = save_pixmap(&setw, mf); break;
 	}
 
@@ -4811,6 +5181,10 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_TGA: res0 = load_tga(file_name, &settings); break;
 /* !!! Not implemented yet */
 //	case FT_PCX:
+	case FT_PBM:
+	case FT_PGM:
+	case FT_PPM:
+	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
 	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
 	}
 
@@ -4976,6 +5350,10 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 #ifdef U_TIFF
 	case FT_TIFF: return (load_tiff_frames(file_name, ani));
 #endif
+	case FT_PBM:
+	case FT_PGM:
+	case FT_PPM:
+	case FT_PAM: return (load_pnm_frames(file_name, ani));
 	}
 	return (-1);
 }
@@ -5214,6 +5592,14 @@ int detect_image_format(char *name)
 	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
+
+/* !!! Not implemented yet */
+//	if (!memcmp(buf, "P7", 2)) return (FT_PAM);
+	if ((buf[0] == 'P') && (buf[1] >= '1') && (buf[1] <= '6'))
+	{
+		static const unsigned char pnms[3] = { FT_PBM, FT_PGM, FT_PPM };
+		return (pnms[(buf[1] - '1') % 3]);
+	}
 
 	/* Check layers signature and version */
 	if (!memcmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))

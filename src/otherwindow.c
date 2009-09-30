@@ -181,7 +181,8 @@ static void create_new(GtkWidget *widget)
 		// Use current layer
 		if (!new_window_type)
 		{
-			err = load_image(NULL, FS_PNG_LOAD, FT_PIXMAP);
+			err = load_image(NULL, FS_PNG_LOAD, undo_load ?
+				FT_PIXMAP | FTM_UNDO : FT_PIXMAP);
 			if (err == 1)
 			{
 				do_new_chores(undo_load);
