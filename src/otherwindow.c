@@ -106,7 +106,7 @@ int do_new_one(int nw, int nh, int nc, png_color *pal, int bpp, int undo)
 	}
 	/* *Now* prepare and update palette */
 	if (pal) mem_pal_copy(mem_pal, pal);
-	else mem_scale_pal(mem_pal, 0, 0,0,0, nc - 1, 255,255,255);
+	else mem_bw_pal(mem_pal, 0, nc - 1);
 	update_undo(&mem_image);
 
 	do_new_chores(undo);

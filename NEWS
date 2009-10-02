@@ -20,10 +20,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle
 	* "Explode Frames" can now save frames in any suitable supported file format
-	* Netpbm file formats (PBM/PGM/PPM) save/load added
+	* Netpbm file formats (PBM/PGM/PPM/PAM) save/load added
 	* Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system
 	* Toolbar and menu icons are now themeable (Preferences->Paths->Default Theme)
+	* Command line globbing now possible using -w option, e.g. mtpaint -w "*.jpg"
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should

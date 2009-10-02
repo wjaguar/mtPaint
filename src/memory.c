@@ -2385,26 +2385,15 @@ int mem_remove_unused()
 	return found;
 }
 
-void mem_scale_pal(png_color *pal, int i1, int r1, int g1, int b1,
-	int i2, int r2, int g2, int b2)
+// Generate black-to-white palette
+void mem_bw_pal(png_color *pal, int i1, int i2)
 {
-	double r0, g0, b0, dr, dg, db, d = i2 - i1;
-	int i, step = i2 > i1 ? 1 : -1;
+	int i, j, step = i2 > i1 ? 1 : -1, d = abs(i2 - i1);
 
-	if (i2 == i1) return;
-
-	dr = (r2 - r1) / d;
-	r0 = r1 - dr * i1;
-	dg = (g2 - g1) / d;
-	g0 = g1 - dg * i1;
-	db = (b2 - b1) / d;
-	b0 = b1 - db * i1;
-
-	for (i = i1; i != i2 + step; i += step)
+	if (!d) return;
+	for (i = i1 , j = d , d += d; i != i2 + step; i += step , j += 255 * 2)
 	{
-		pal[i].red = rint(r0 + dr * i);
-		pal[i].green = rint(g0 + dg * i);
-		pal[i].blue = rint(b0 + db * i);
+		pal[i].red = pal[i].green = pal[i].blue = j / d;
 	}
 }
 
@@ -5853,10 +5842,10 @@ void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp)
 /* Build bitdepth translation table */
 void set_xlate(unsigned char *xlat, int bpp)
 {
-	int i, n = (1 << bpp) - 1;
-	double d = 255.0 / (double)n;
+	int i, j, m, n = (1 << bpp) - 1;
 
-	for (i = 0; i <= n; i++) xlat[i] = rint(d * i);
+	for (i = 0 , j = n , m = n + n; i <= n; i++ , j += 255 * 2)
+		xlat[i] = j / m;
 }
 
 /* Check if byte array is all one value */

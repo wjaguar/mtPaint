@@ -108,12 +108,9 @@ fformat file_formats[NUM_FTYPES] = {
 /* !!! Placeholder */
 	{ "", "", "", 0},
 	{ "PBM", "pbm", "", FF_BW | FF_LAYER },
-	{ "PGM", "pgm", "", FF_256| FF_LAYER | FF_NOSAVE },
-	{ "PPM", "ppm", "", FF_RGB | FF_LAYER },
-/* !!! Not supported yet */
-//	{ "PAM", "pam", "", FF_BW | FF_RGB | FF_ALPHA | FF_LAYER },
-/* !!! Placeholder */
-	{ "", "", "", 0},
+	{ "PGM", "pgm", "", FF_256 | FF_LAYER | FF_NOSAVE },
+	{ "PPM", "ppm", "pnm", FF_RGB | FF_LAYER },
+	{ "PAM", "pam", "", FF_BW | FF_RGB | FF_ALPHA | FF_LAYER },
 	{ "GPL", "gpl", "", FF_PALETTE },
 	{ "TXT", "txt", "", FF_PALETTE },
 /* !!! Not supported yet */
@@ -159,6 +156,21 @@ int file_type_by_ext(char *name, guint32 mask)
 	}
 
 	return (FT_NONE);
+}
+
+/* Set palette to white and black */
+static void set_bw(ls_settings *settings)
+{
+	static const png_color wb[2] = { { 255, 255, 255 }, { 0, 0, 0 } };
+	settings->colors = 2;
+	memcpy(settings->pal, wb, sizeof(wb));
+}
+
+/* Set palette to grayscale */
+static void set_gray(ls_settings *settings)
+{
+	settings->colors = 256;
+	mem_bw_pal(settings->pal, 0, 255);
 }
 
 static int check_next_frame(frameset *fset, int mode, int anim)
@@ -447,6 +459,14 @@ static void ls_init(char *what, int save)
 
 	sprintf(buf, save ? _("Saving %s image") : _("Loading %s image"), what);
 	progress_init(buf, 0);
+}
+
+static void ls_progress(ls_settings *settings, int n, int steps)
+{
+	int h = settings->height;
+
+	if (!settings->silent && ((n * steps) % h >= h - steps))
+		progress_update((float)n / h);
 }
 
 /* !!! libpng 1.2.17 or later loses extra chunks if there's no callback */
@@ -787,7 +807,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		mess = _("Channel");
 		break;
 	default:
-		mess = NULL;
+		settings->silent = TRUE;
 		break;
 	}
 	if (settings->silent) mess = NULL;
@@ -847,8 +867,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	{
 		tmp = prepare_row(rgba_row, settings, bpp, i);
 		png_write_row(png_ptr, (png_bytep)tmp);
-		if (mess && ((i * 20) % h >= h - 20))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 20);
 	}
 
 	/* Save private chunks into PNG file if we need to */
@@ -1146,7 +1165,7 @@ static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
 		return (same_size ? 0 : 1);
 	}
 
-	/* Tried everything in vain - fall back to RGB/RGBA*/
+	/* Tried everything in vain - fall back to RGB/RGBA */
 RGB:	if (stat->global_cols > 0) // Use default palette if present
 	{
 		mem_pal_copy(stat->newpal, stat->global_pal);
@@ -1381,8 +1400,7 @@ static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
 		{
 			if (DGifGetLine(giffy, settings->img[CHN_IMAGE] +
 				i * w, w) == GIF_ERROR) goto fail;
-			if (!settings->silent && ((n * 10) % h >= h - 10))
-				progress_update((float)n / h);
+			ls_progress(settings, n, 10);
 		}
 	}
 	res = 1;
@@ -1618,8 +1636,7 @@ static int save_gif(char *file_name, ls_settings *settings)
 	for (i = 0; i < h; i++)
 	{
 		EGifPutLine(giffy, settings->img[CHN_IMAGE] + i * w, w);
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 20);
 	}
 	if (!settings->silent) progress_end();
 	msg = 0;
@@ -1683,8 +1700,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	{
 	case JCS_RGB: break;
 	case JCS_GRAYSCALE:
-		settings->colors = 256;
-		mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
+		set_gray(settings);
 		bpp = 1;
 		break;
 	case JCS_CMYK:
@@ -1725,8 +1741,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 				dest[2] = (b + (b >> 8) + 1) >> 8;
 			}
 		}
-		if (pr && ((i * 20) % height >= height - 20))
-			progress_update((float)i / height);
+		ls_progress(settings, i, 20);
 	}
 	jpeg_finish_decompress(&cinfo);
 	res = 1;
@@ -1776,9 +1791,7 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 	{
 		jpeg_write_scanlines(&cinfo, &row_pointer, 1);
 		row_pointer += 3 * settings->width;
-		if (!settings->silent &&
-			((i * 20) % settings->height >= settings->height - 20))
-			progress_update((float)i / settings->height);
+		ls_progress(settings, i, 20);
 	}
 	jpeg_finish_compress( &cinfo );
 
@@ -1853,9 +1866,8 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 // !!! OpenJPEG 1.1.1 does *NOT* properly set image->color_space !!!
 	if (image->numcomps < 3) /* Guess this is paletted */
 	{
+		set_gray(settings);
 		settings->bpp = 1;
-		settings->colors = 256;
-		mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
 	}
 	else settings->bpp = 3;
 	if ((nc = settings->bpp) < image->numcomps) nc++ , cmask = CMASK_RGBA;
@@ -2170,8 +2182,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 				tmp += 3;
 			}
 			tr += width;
-			if (pr && ((i * 10) % height >= height - 10))
-				progress_update((float)(height - i) / height);
+			ls_progress(settings, height - i, 10);
 		}
 
 		_TIFFfree(raster);
@@ -2358,7 +2369,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		{
 			settings->colors = j--;
 			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
-			mem_scale_pal(settings->pal, k, 0,0,0, j ^ k, 255,255,255);
+			mem_bw_pal(settings->pal, k, j ^ k);
 		}
 		res = 1;
 	}
@@ -2522,8 +2533,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 			res = -1;
 			break;
 		}
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 20);
 	}
 	TIFFClose(tif);
 
@@ -2748,8 +2758,7 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 					stream_LSB(buf, settings->img[CHN_ALPHA] +
 						w * i, w, bpps[3], shifts[3], bpp, 1);
 			}
-			if (!settings->silent && ((n * 10) % h >= h - 10))
-				progress_update((float)n / h);
+			ls_progress(settings, n, 10);
 		}
 
 		/* Rescale shorter-than-byte RGBA components */
@@ -2854,8 +2863,7 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 				if (skip > 1) memset(settings->img[CHN_ALPHA] +
 					w * i + j, 0, w - j);
 				j = 0;
-				if (!settings->silent && ((i * 10) % h >= h - 10))
-					progress_update((float)(h - i - 1) / h);
+				ls_progress(settings, h - i - 1, 10);
 			}
 			/* Column skip */
 			if (skip > 1) memset(settings->img[CHN_ALPHA] +
@@ -2972,8 +2980,7 @@ static int save_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	{
 		prepare_row(buf, settings, bpp, i);
 		mfwrite(buf, 1, ll, mf);
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)(h - i) / h);
+		ls_progress(settings, h - i, 20);
 	}
 	if (fp) fclose(fp);
 
@@ -3369,8 +3376,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 				dest[2] = src[2];
 			}
 		}
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 10);
 	}
 	res = 1;
 
@@ -3503,8 +3509,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		}
 		strcpy(tmp, i < h - 1 ? "\",\n" : "\"\n};\n");
 		fputs(buf, fp);
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 10);
 	}
 	fclose(fp);
 
@@ -3566,9 +3571,7 @@ static int load_xbm(char *file_name, ls_settings *settings)
 	settings->hot_x = hx;
 	settings->hot_y = hy;
 	/* Palette is white and black */
-	settings->colors = 2;
-	settings->pal[0].red = settings->pal[0].green = settings->pal[0].blue = 255;
-	settings->pal[1].red = settings->pal[1].green = settings->pal[1].blue = 0;
+	set_bw(settings);
 
 	/* Allocate image */
 	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
@@ -3610,8 +3613,7 @@ static int load_xbm(char *file_name, ls_settings *settings)
 			*dest++ = v & 1;
 			v >>= 1;
 		}	
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 10);
 	}
 	res = 1;
 
@@ -3665,8 +3667,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 				if (src[j] == 1) row[j >> 3] |= 1 << (j & 7);
 			}
 			j = 0;
-			if (!settings->silent && ((i * 10) % h >= h - 10))
-				progress_update((float)i / h);
+			ls_progress(settings, i, 10);
 			i++;
 		}
 		for (; (l < BPL) && (j < k); l++ , j++)
@@ -3865,8 +3866,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 		}			
 		idx = (idx + 1) & ~1;
 		fwrite(buf, 1, idx >> 1, fp);
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 10);
 	}
 	fclose(fp);
 
@@ -4069,8 +4069,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 		/* Not enough examples - easier to handle all possibilities */
 		/* Create palette */
 		settings->colors = rbits > 8 ? 256 : 1 << rbits;
-		mem_scale_pal(settings->pal, 0, 0,0,0,
-			settings->colors - 1, 255,255,255);
+		mem_bw_pal(settings->pal, 0, settings->colors - 1);
 		break;
 	}
 	/* Prepare for reading bitfields */
@@ -4257,8 +4256,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 			else ++rcnt; /* Copy block - several reads */
 		}
 		if (strl) continue; /* It was buffer end */
-		if (!settings->silent && ((y * 10) % h >= h - 10))
-			progress_update((float)y / h);
+		ls_progress(settings, y, 10);
 		if (++y >= h) break; /* All done */
 		dest += ystep * bpp;
 		if (dsta) dsta += ystep;
@@ -4447,8 +4445,7 @@ static int save_tga(char *file_name, ls_settings *settings)
 			}
 		}
 		fwrite(src, 1, dest - src, fp);
-		if (!settings->silent && ((pcn * 20) % h >= h - 20))
-			progress_update((float)pcn / h);
+		ls_progress(settings, pcn, 20);
 	}
 
 	/* Write footer */
@@ -4463,6 +4460,199 @@ static int save_tga(char *file_name, ls_settings *settings)
 
 	free(buf);
 	return 0;
+}
+
+typedef void (*cvt_func)(unsigned char *dest, unsigned char *src, int len,
+	int bpp, int step, int maxval);
+
+static void convert_16b(unsigned char *dest, unsigned char *src, int len,
+	int bpp, int step, int maxval)
+{
+	int i, v, m = maxval * 2;
+
+	if (!(step -= bpp)) bpp *= len , len = 1;
+	step *= 2;
+	while (len-- > 0)
+	{
+		i = bpp;
+		while (i--)
+		{
+			v = (src[0] << 8) + src[1];
+			src += 2;
+			*dest++ = (v * (255 * 2) + maxval) / m;
+		}
+		src += step;
+	}	
+}
+
+static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
+	int bpp, int step, int maxval)
+{
+	int i;
+
+	if (!(step -= bpp)) bpp *= len , len = 1;
+	while (len-- > 0)
+	{
+		i = bpp;
+		while (i--) *dest++ = *src++;
+		src += step;
+	}	
+}
+
+static void extend_bytes(unsigned char *dest, int len, int maxval)
+{
+	unsigned char tb[256];
+	int i, j, m = maxval * 2;
+
+	memset(tb, 255, 256);
+	for (i = 0 , j = maxval; i <= maxval; i++ , j += 255 * 2)
+		tb[i] = j / m;
+
+	for (j = 0; j < len; j++ , dest++) *dest = tb[*dest];
+}
+
+static int check_next_pnm(FILE *fp, char id)
+{
+	char buf[2];
+
+	if (fread(buf, 2, 1, fp))
+	{
+		fseek(fp, -2, SEEK_CUR);
+		if ((buf[0] == 'P') && (buf[1] == id)) return (FILE_HAS_FRAMES);
+	}
+	return (1);
+}
+
+/* PAM loader does not support nonstandard types like "CMYK", "CMYK_ALPHA",
+ * "GRAYSCALEFP" and "RGBFP", because handling format variations which are
+ * unlikely to be found in the wild is a waste of code - WJ */
+
+static int load_pam_frame(FILE *fp, ls_settings *settings)
+{
+	static const char *typenames[] = {
+		"BLACKANDWHITE", "BLACKANDWHITE_ALPHA",
+		"GRAYSCALE", "GRAYSCALE_ALPHA",
+		"RGB", "RGB_ALPHA" };
+	cvt_func cvt_stream;
+	char wbuf[512], *t1, *t2, *tail;
+	unsigned char *dest, *buf = NULL;
+	int maxval = 0, w = 0, h = 0, depth = 0, ftype = -1;
+	int i, j, l, m, ll, bpp, trans, vl, res;
+
+
+	/* Read header */
+	if (!fgets(wbuf, sizeof(wbuf), fp) || strncmp(wbuf, "P7", 2))
+		return (-1);
+	while (TRUE)
+	{
+		if (!fgets(wbuf, sizeof(wbuf), fp)) return (-1);
+		if (!wbuf[0] || (wbuf[0] == '#')) continue; // Empty line or comment
+		t2 = NULL;
+		t1 = wbuf + strspn(wbuf, WHITESPACE);
+		l = strcspn(t1, WHITESPACE);
+		if (t1[l])
+		{
+			t2 = t1 + l + strspn(t1 + l, WHITESPACE);
+			t2[strcspn(t2, WHITESPACE)] = '\0';
+		}
+		t1[l] = '\0';
+		if (!strcmp(t1, "ENDHDR")) break;
+		if (!strcmp(t1, "TUPLTYPE"))
+		{
+			if (!t2) continue;
+			for (i = 1; typenames[i]; i++)
+			{
+				if (strcmp(t2, typenames[i])) continue;
+				ftype = i;
+				break;
+			}	
+			continue;
+		}
+
+		if (!t2) return (-1); // Failure - other fields are numeric
+		i = strtol(t2, &tail, 10);
+		if (*tail) return (-1);
+
+		if (!strcmp(t1, "HEIGHT")) h = i;
+		else if (!strcmp(t1, "WIDTH")) w = i;
+		else if (!strcmp(t1, "DEPTH")) depth = i;
+		else if (!strcmp(t1, "MAXVAL")) maxval = i;
+		else return (-1); // Unknown IDs not allowed
+	}
+	/* Interpret unknown content as RGB or grayscale */
+	if (ftype < 0) ftype = depth >= 3 ? 4 : 2;
+
+	/* Validate */
+	if ((depth < 1) || (depth > 16) || (maxval < 1) || (maxval > 65535))
+		return (-1);
+	bpp = ftype < 4 ? 1 : 3;
+	trans = ftype & 1;
+	if (depth < bpp + trans) return (-1);
+	vl = maxval < 256 ? 1 : 2;
+	ll = w * depth * vl;
+	if (ftype < 2) // BW
+	{
+		set_bw(settings);
+		if (maxval > 1) return (-1);
+	}
+	else if (bpp == 1) set_gray(settings); // Grayscale
+
+	/* Allocate row buffer if cannot read directly into image */
+	if (trans || (vl > 1) || (bpp != depth))
+	{
+		buf = malloc(ll);
+		if (!buf) return (FILE_MEM_ERROR);
+	}
+
+	/* Allocate image */
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = bpp;
+	res = allocate_image(settings, trans ? CMASK_RGBA : CMASK_IMAGE);
+	if (res) goto fail;
+
+	/* Read the image */
+	if (!settings->silent) ls_init("PAM", 0);
+	res = FILE_LIB_ERROR;
+	m = maxval * 2;
+	cvt_stream = vl > 1 ? convert_16b : copy_bytes;
+	for (i = 0; i < h; i++)
+	{
+		dest = buf ? buf : settings->img[CHN_IMAGE] + ll * i;
+		j = fread(dest, 1, ll, fp);
+		if (j < ll) goto fail2;
+		ls_progress(settings, i, 10);
+
+		if (!buf) continue; // Nothing else to do here
+		if (settings->img[CHN_ALPHA]) // Have alpha - parse it
+		{
+			cvt_stream(settings->img[CHN_ALPHA] + w * i,
+				buf + bpp * vl, w, 1, depth, maxval);
+		}
+		cvt_stream(settings->img[CHN_IMAGE] + w * bpp * i,
+			buf, w, bpp, depth, maxval);
+	}
+
+	/* Check for next frame */
+	res = check_next_pnm(fp, '7');
+
+fail2:	if (maxval < 255) // Extend what we've read
+	{
+		j = w * h;
+		if (settings->img[CHN_ALPHA])
+			extend_bytes(settings->img[CHN_ALPHA], j, maxval);
+		j *= bpp;
+		dest = settings->img[CHN_IMAGE];
+		if (ftype > 1) extend_bytes(dest, j, maxval);
+		else // Convert BW from 1-is-white to 1-is-black
+		{
+			for (i = 0; i < j; i++ , dest++) *dest = !*dest;
+		}
+	}
+	if (!settings->silent) progress_end();
+
+fail:	free(buf);
+	return (res);
 }
 
 #define PNM_BUFSIZE 4096
@@ -4539,19 +4729,12 @@ static int pnm_endhdr(pnmbuf *pnm, int plain)
 	return (TRUE);
 }
 
-/* PAMs have to be read separately - too different from PBM/PGM/PPM */
-static int load_pam_frame(FILE *fp, ls_settings *settings)
-{
-// !!! Not implemented yet
-	return (-1);
-}
-
 static int load_pnm_frame(FILE *fp, ls_settings *settings)
 {
 	pnmbuf pnm;
 	char *s, *tail;
 	unsigned char *dest;
-	int i, l, w, h, bpp, maxval, plain, mode, fid, res;
+	int i, l, m, w, h, bpp, maxval, plain, mode, fid, res;
 
 
 	/* Identify*/
@@ -4571,25 +4754,14 @@ static int load_pnm_frame(FILE *fp, ls_settings *settings)
 	h = strtol(s, &tail, 10);
 	if (*tail) return (-1);
 	bpp = maxval = 1;
-	if (settings->ftype == FT_PBM)
-	{
-		/* Palette is white and black */
-		png_color *cp = settings->pal;
-		cp->red = cp->green = cp->blue = 255; cp++;
-		cp->red = cp->green = cp->blue = 0;
-		settings->colors = 2;
-	}
+	if (settings->ftype == FT_PBM) set_bw(settings);
 	else
 	{
 		if (!(s = pnm_gets(&pnm, FALSE))) return (-1);
 		maxval = strtol(s, &tail, 10);
 		if (*tail) return (-1);
 		if ((maxval <= 0) || (maxval > 65535)) return (-1);
-		if (settings->ftype == FT_PGM)
-		{
-			settings->colors = 256;
-			mem_scale_pal(settings->pal, 0, 0,0,0, 255, 255,255,255);
-		}
+		if (settings->ftype == FT_PGM) set_gray(settings);
 		else bpp = 3;
 	}
 	if (!pnm_endhdr(&pnm, plain)) return (-1);
@@ -4609,6 +4781,7 @@ static int load_pnm_frame(FILE *fp, ls_settings *settings)
 	if (!settings->silent) ls_init("PNM", 0);
 	res = FILE_LIB_ERROR;
 	l = w * bpp;
+	m = maxval * 2;
 	for (i = 0; i < h; i++)
 	{
 		dest = settings->img[CHN_IMAGE] + l * i;
@@ -4650,69 +4823,44 @@ static int load_pnm_frame(FILE *fp, ls_settings *settings)
 		}
 		case 2: /* Integers in ASCII */
 		{
-			int i, m, n;
+			int i, n;
 
-			m = maxval * 2;
 			for (i = 0; i < l; i++)
 			{
 				if (!(s = pnm_gets(&pnm, TRUE))) goto fail2;
 				n = strtol(s, &tail, 10);
 				if (*tail) goto fail2;
 				if ((n < 0) || (n > maxval)) goto fail2;
-				n = (n * (255 * 2) + 255) / m;
+				n = (n * (255 * 2) + maxval) / m;
 				*dest++ = n;
 			}
 			break;
 		}
 		case 4: /* Raw ushorts in MSB order */
 		{
-			int i, j, k, m, n, ll;
-			unsigned char *tp;
+			int i, j, k, ll;
 
-			m = maxval * 2;
 			for (ll = l * 2; ll > 0; ll -= k)
 			{
 				k = PNM_BUFSIZE < ll ? PNM_BUFSIZE : ll;
-				j = fread(tp = pnm.buf, 1, k, fp);
-				for (i = 0; i < j; i += 2 , tp += 2)
-				{
-					n = (tp[0] << 8) + tp[1];
-					n = (n * (255 * 2) + maxval) / m;
-					if (n > 255) goto fail2;
-					*dest++ = n;
-				}
+				j = fread(pnm.buf, 1, k, fp);
+				i = j >> 1;
+				convert_16b(dest, pnm.buf, i, 1, 1, maxval);
+				dest += i;
 				if (j < k) goto fail2;
 			}
 			break;
 		}
 		}
-		dest += l;
-		if (!settings->silent && ((i * 10) % h >= h - 10))
-			progress_update((float)i / h);
+		ls_progress(settings, i, 10);
 	}
 	res = 1;
 
 	/* Check for next frame */
-	if (!plain && fread(pnm.buf, 2, 1, fp))
-	{
-		fseek(fp, -2, SEEK_CUR);
-		if ((pnm.buf[0] == 'P') && (pnm.buf[1] == fid + '4'))
-			res = FILE_HAS_FRAMES;
-	}
+	if (!plain) res = check_next_pnm(fp, fid + '4');
 
 fail2:	if (mode == 3) // Extend what we've read
-	{
-		unsigned char tb[256], *tmp;
-		int i, j, n, m = maxval * 2;
-
-		memset(tb, 0, 256);
-		for (i = 1; i <= maxval; i++)
-			tb[i] = (i * (255 * 2) + maxval) / m;
-
-		n = l * h;
-		tmp = settings->img[CHN_IMAGE];
-		for (j = 0; j < n; j++ , tmp++) *tmp = tb[*tmp];
-	}
+		extend_bytes(settings->img[CHN_IMAGE], l * h, maxval);
 	if (!settings->silent) progress_end();
 
 	return (res);
@@ -4767,8 +4915,7 @@ static int save_pbm(char *file_name, ls_settings *settings)
 	if (!(fp = fopen(file_name, "wb"))) return (-1);
 
 	if (!settings->silent) ls_init("PBM", 1);
-	l = sprintf(buf, "P4\n%d %d\n", settings->width, settings->height);
-	fwrite(buf, l, 1, fp);
+	fprintf(fp, "P4\n%d %d\n", w, h);
 
 	/* Write rows */
 	src = settings->img[CHN_IMAGE];
@@ -4779,9 +4926,9 @@ static int save_pbm(char *file_name, ls_settings *settings)
 		for (j = 0; j < w; j++)
 			buf[j >> 3] |= (*src++ == 1) << (~j & 7);
 		fwrite(buf, l, 1, fp);
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)(h - i) / h);
+		ls_progress(settings, i, 20);
 	}
+	fclose(fp);
 
 	if (!settings->silent) progress_end();
 
@@ -4790,7 +4937,6 @@ static int save_pbm(char *file_name, ls_settings *settings)
 
 static int save_ppm(char *file_name, ls_settings *settings)
 {
-	char buf[256];
 	FILE *fp;
 	int i, l, m, w = settings->width, h = settings->height;
 
@@ -4800,8 +4946,7 @@ static int save_ppm(char *file_name, ls_settings *settings)
 	if (!(fp = fopen(file_name, "wb"))) return (-1);
 
 	if (!settings->silent) ls_init("PPM", 1);
-	l = sprintf(buf, "P6\n%d %d\n255\n", settings->width, h);
-	fwrite(buf, l, 1, fp);
+	fprintf(fp, "P6\n%d %d\n255\n", w, h);
 
 	/* Write rows */
 	m = (l = w * 3) * h;
@@ -4810,11 +4955,72 @@ static int save_ppm(char *file_name, ls_settings *settings)
 	for (i = 0; m > 0; m -= l , i++)
 	{
 		fwrite(settings->img[CHN_IMAGE] + l * i, l, 1, fp);
-		if (!settings->silent && ((i * 20) % h >= h - 20))
-			progress_update((float)(h - i) / h);
+		ls_progress(settings, i, 20);
 	}
+	fclose(fp);
 
 	if (!settings->silent) progress_end();
+
+	return (0);
+}
+
+static int save_pam(char *file_name, ls_settings *settings)
+{
+	unsigned char xv, xa, *dest, *src, *srca, *buf = NULL;
+	FILE *fp;
+	int ibpp = settings->bpp, w = settings->width, h = settings->height;
+	int i, j, bpp;
+
+
+	if ((ibpp != 3) && (settings->colors > 2)) return WRONG_FORMAT;
+
+	bpp = ibpp + !!settings->img[CHN_ALPHA];
+	/* For BW: image XOR 1, alpha AND 1 */
+	xa = (xv = ibpp == 1) ? 1 : 255;
+	if (bpp != 3) // BW needs inversion, and alpha, interlacing
+	{
+		buf = malloc(w * bpp);
+		if (!buf) return (-1);
+	}
+
+	if (!(fp = fopen(file_name, "wb")))
+	{
+		free(buf);
+		return (-1);
+	}
+
+	if (!settings->silent) ls_init("PAM", 1);
+	fprintf(fp, "P7\nWIDTH %d\nHEIGHT %d\nDEPTH %d\nMAXVAL %d\n"
+		"TUPLTYPE %s%s\nENDHDR\n", w, h, bpp, ibpp == 1 ? 1 : 255,
+		ibpp == 1 ? "BLACKANDWHITE" : "RGB", bpp > ibpp ? "_ALPHA" : "");
+
+	for (i = 0; i < h; i++)
+	{
+		src = settings->img[CHN_IMAGE] + i * w * ibpp;
+		if ((dest = buf))
+		{
+			srca = NULL;
+			if (settings->img[CHN_ALPHA])
+				srca = settings->img[CHN_ALPHA] + i * w;
+			for (j = 0; j < w; j++)
+			{
+				*dest++ = *src++ ^ xv;
+				if (ibpp > 1)
+				{
+					*dest++ = *src++;
+					*dest++ = *src++;
+				}
+				if (srca) *dest++ = *srca++ & xa;
+			}
+			src = buf;
+		}
+		fwrite(src, 1, w * bpp, fp);
+		ls_progress(settings, i, 20);
+	}
+	fclose(fp);
+
+	if (!settings->silent) progress_end();
+	free(buf);
 
 	return (0);
 }
@@ -4990,7 +5196,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	ls_settings setw = *settings; // Make a copy to safely modify
 	png_color greypal[256];
-	int i, res;
+	int res;
 
 	/* Prepare to handle clipboard export */
 	if (setw.mode != FS_CLIPBOARD); // not export
@@ -5005,11 +5211,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 
 	/* Provide a grayscale palette if needed */
 	if ((setw.bpp == 1) && !setw.pal)
-	{
-		for (i = 0; i < 256; i++)
-			greypal[i].red = greypal[i].green = greypal[i].blue = i;
-		setw.pal = greypal;
-	}
+		mem_bw_pal(setw.pal = greypal, 0, 255);
 
 	/* Validate transparent color (for now, forbid out-of-palette RGB
 	 * transparency altogether) */
@@ -5042,8 +5244,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 //	case FT_PCX:
 	case FT_PBM: res = save_pbm(file_name, &setw); break;
 	case FT_PPM: res = save_ppm(file_name, &setw); break;
-/* !!! Not implemented yet */
-//	case FT_PAM:
+	case FT_PAM: res = save_pam(file_name, &setw); break;
 	case FT_PIXMAP: res = save_pixmap(&setw, mf); break;
 	}
 
@@ -5091,15 +5292,16 @@ static void store_image_extras(image_info *image, image_state *state,
 	{
 		int i;
 
-		for ( i=0; i<settings->colors; i++ )	// Look for transparent colour in palette
+		// Look for transparent colour in palette
+		for (i = 0; i < settings->colors; i++)
 		{
-			if ( RGB_2_INT(settings->pal[i].red, settings->pal[i].green,
-				settings->pal[i].blue) == settings->rgb_trans ) break;
+			if (PNG_2_INT(settings->pal[i]) == settings->rgb_trans)
+				break;
 		}
 
-		if ( i < settings->colors ) settings->xpm_trans = i;
+		if (i < settings->colors) settings->xpm_trans = i;
 		else
-		{		// Colour not in palette so force it into last entry
+		{	// Colour not in palette so force it into last entry
 			settings->pal[255].red = INT_2_R(settings->rgb_trans);
 			settings->pal[255].green = INT_2_G(settings->rgb_trans);
 			settings->pal[255].blue = INT_2_B(settings->rgb_trans);
@@ -5593,8 +5795,7 @@ int detect_image_format(char *name)
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
 
-/* !!! Not implemented yet */
-//	if (!memcmp(buf, "P7", 2)) return (FT_PAM);
+	if (!memcmp(buf, "P7", 2)) return (FT_PAM);
 	if ((buf[0] == 'P') && (buf[1] >= '1') && (buf[1] <= '6'))
 	{
 		static const unsigned char pnms[3] = { FT_PBM, FT_PGM, FT_PPM };

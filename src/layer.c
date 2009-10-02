@@ -292,7 +292,7 @@ int layer_add(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 
 	lim->image_.cols = cols;
 	if (pal) mem_pal_copy(lim->image_.pal, pal);
-	else mem_scale_pal(lim->image_.pal, 0, 0,0,0, cols - 1, 255,255,255);
+	else mem_bw_pal(lim->image_.pal, 0, cols - 1);
 
 	init_istate(&lim->state_, &lim->image_);
 	update_undo(&lim->image_);
