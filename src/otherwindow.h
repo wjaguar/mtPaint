@@ -29,8 +29,8 @@
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 typedef void (*colour_hook)(int what);
 
-png_color brcosa_pal[256];
-int mem_preview, brcosa_auto;
+png_color brcosa_palette[256];
+int mem_preview, mem_preview_clip, brcosa_auto;
 int sharper_reduce;
 int spal_mode;
 

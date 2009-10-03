@@ -301,38 +301,47 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #error "Mismatched palette-window font"
 #endif
 
+#define ALIGNED(P, N) ((void *)((char *)(P) + \
+	((~(unsigned)((char *)(P) - (char *)0) + 1) & ((N) - 1))))
 
 /* This allocates several memory chunks in one block - making it one single
  * point of allocation failure, and needing just a single free() later on.
- * The "align" parameter forces all chunks to be aligned at double boundary.
- * On Windows, allocations aren't guaranteed to be double-aligned, so this is
- * necessary there unless no chunks contain doubles. */
-void *multialloc(int align, void *ptr, int size, ...)
+ * On Windows, allocations aren't guaranteed to be double-aligned, so
+ * MA_ALIGN_DOUBLE flag is necessary there unless no chunks contain doubles. */
+void *multialloc(int flags, void *ptr, int size, ...)
 {
 	va_list args;
 	void *res;
 	char *tmp;
-	size_t sz = size;
+	size_t tsz, sz = size, align = 0;
+
+
+	if ((flags & MA_ALIGN_MASK) == MA_ALIGN_DOUBLE)
+		align = sizeof(double) - 1;
 
 	va_start(args, size);
 	while (va_arg(args, void *))
 	{
-		if (align) sz = (sz + (sizeof(double) - 1)) & ~(sizeof(double) - 1);
+		sz = (sz + align) & ~align;
 		sz += va_arg(args, int);
 	}
 	va_end(args);
-	if (align) sz += sizeof(double);
+	if (align) sz += align + 1;
 	tmp = res = calloc(1, sz);
 	if (res)
 	{
-		if (align) tmp = ALIGN(tmp);
-		*(void **)ptr = (void *)tmp; sz = size;
+		tmp = ALIGNED(tmp, align + 1);
+		sz = 0; tsz = size;
 		va_start(args, size);
-		while ((ptr = va_arg(args, void *)))
+		while (TRUE)
 		{
-			if (align) sz = (sz + (sizeof(double) - 1)) & ~(sizeof(double) - 1);
-			*(void **)ptr = (void *)(tmp + sz);
-			sz += va_arg(args, int);
+			if (tsz || !(flags & MA_SKIP_ZEROSIZE))
+				*(void **)ptr = (void *)(tmp + sz);
+
+			if (!(ptr = va_arg(args, void *))) break;
+
+			sz = (sz + tsz + align) & ~align;
+			tsz = va_arg(args, int);
 		}
 		va_end(args);
 	}
@@ -2109,14 +2118,15 @@ void mem_get_histogram(int channel)	// Calculate how many of each colour index i
 void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0)
 {
-	static int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
+	static const int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
 	static unsigned char gamma_table[256], bc_table[256], ps_table[256];
 	static int last_gamma, last_br, last_co, last_ps;
 	int do_gamma, do_bc, do_sa, do_ps;
-	unsigned char rgb[3];
+	unsigned char rgb[3], fmask;
 	int br, co, sa;
 	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
-	int i, j, r, g, b, ofs3, opacity, op0 = 0, op1 = 0, op2 = 0, ops;
+	int opacity, op0 = 0, op1 = 0, op2 = 0, ops;
+	int j, mstep, r, g, b, ofs3;
 
 	cnt = start + step * cnt;
 
@@ -2199,13 +2209,17 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	}
 	ix0 = ixx[dc]; ix1 = ixx[dc + 1]; ix2 = ixx[dc + 2];
 
-	for (i = start; i < cnt; i += step)
+	/* Use fake mask if no real one provided */
+	if (!mask) mask = &fmask , mstep = 0 , fmask = 0;
+	else mask += start , mstep = step;
+
+	start *= 3; step *= 3; cnt *= 3; // Step by triples
+	for (ofs3 = start; ofs3 < cnt; ofs3 += step , mask += mstep)
 	{
-		ofs3 = i * 3;
 		rgb[0] = img0[ofs3 + 0];
 		rgb[1] = img0[ofs3 + 1];
 		rgb[2] = img0[ofs3 + 2];
-		opacity = mask[i];
+		opacity = *mask;
 		if (opacity == 255)
 		{
 			imgr[ofs3 + 0] = rgb[0];
@@ -2399,24 +2413,26 @@ void mem_bw_pal(png_color *pal, int i1, int i2)
 
 void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2)
 {
-	int i;
-	unsigned char tmp[256 * 3], mask[256], *wrk;
+	int i, l = p2 - p1 + 1;
+	unsigned char tmp[256 * 3], *wrk;
 
-	memset(mask, 0, ++p2 - p1);
-	for (wrk = tmp , i = p1; i < p2; i++ , wrk += 3)
+
+	wrk = tmp; pal2 += p1;
+	for (i = 0; i < l; i++ , wrk += 3 , pal2++)
 	{
-		wrk[0] = pal2[i].red;
-		wrk[1] = pal2[i].green;
-		wrk[2] = pal2[i].blue;
+		wrk[0] = pal2->red;
+		wrk[1] = pal2->green;
+		wrk[2] = pal2->blue;
 	}
 
-	do_transform(0, 1, p2 - p1, mask, tmp, tmp);
+	do_transform(0, 1, l, NULL, tmp, tmp);
 
-	for (wrk = tmp , i = p1; i < p2; i++ , wrk += 3)
+	wrk = tmp; pal1 += p1;
+	for (i = 0; i < l; i++ , wrk += 3 , pal1++)
 	{
-		pal1[i].red = wrk[0];
-		pal1[i].green = wrk[1];
-		pal1[i].blue = wrk[2];
+		pal1->red = wrk[0];
+		pal1->green = wrk[1];
+		pal1->blue = wrk[2];
 	}
 }
 
@@ -7204,7 +7220,7 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	l = 2 * (lenX - 1);
 	w = mem_width + l;
 
-	gd->tmp = multialloc(TRUE,
+	gd->tmp = multialloc(MA_ALIGN_DOUBLE,
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
 		&gd->temp, i * w * sizeof(double),
@@ -7841,7 +7857,7 @@ void mem_kuwahara(int r, int gcor, int detail)
 	len = mem_width + r + r + 1;
 	info.l = l = mem_width + r;
 	info.rl = rl = gcor ? l : 0;
-	mem = multialloc(TRUE,
+	mem = multialloc(MA_ALIGN_DOUBLE,
 		&info.rs, rl * r1 * 3 * sizeof(double),
 		&info.avg, l * r1 * 3 * sizeof(int),
 		&info.dis, l * r1 * 3 * sizeof(int),
@@ -8751,7 +8767,7 @@ static void *make_skew_filter(double **filt, int **dcc, int *fw,
 	}
 
 	*filt = NULL; *dcc = NULL; *fw = fwidth;
-	tmp = multialloc(TRUE, filt, len * fwidth * sizeof(double),
+	tmp = multialloc(MA_ALIGN_DOUBLE, filt, len * fwidth * sizeof(double),
 		dcc, len * sizeof(int), NULL);
 	if (!tmp) return (NULL);
 	fdata = *filt; ofdata = *dcc;
@@ -9001,7 +9017,7 @@ static void mem_skew_filt(chanlist old_img, chanlist new_img, int ow, int oh,
 	fw2 = xfsz >> 1; fh2 = yfsz >> 1;
 
 	wbsz = nw * step;
-	tmem = multialloc(TRUE, &wbuf, wbsz * yfsz * sizeof(double),
+	tmem = multialloc(MA_ALIGN_DOUBLE, &wbuf, wbsz * yfsz * sizeof(double),
 		&rbuf, wbsz * sizeof(double), NULL);
 	if (!xmem || !ymem || !tmem) goto fail;
 	x0 = 0.5 * (nw - 1); y0 = 0.5 * (nh - 1);

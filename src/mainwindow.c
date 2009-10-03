@@ -2282,6 +2282,7 @@ typedef struct {
 } xform_render_state;
 
 typedef struct {
+	unsigned char *buf;	// Allocation pointer, or NULL if none
 	chanlist tlist;		// Channel overrides for rendering clipboard
 	unsigned char *clip_image;	// Pasted into current channel
 	unsigned char *clip_alpha;	// Pasted into alpha channel
@@ -2289,6 +2290,7 @@ typedef struct {
 	unsigned char *pix, *alpha;	// Destinations for the above
 	unsigned char *mask, *wmask;	// Temp mask: one we use, other we init
 	unsigned char *mask0;		// Image mask channel to use
+	unsigned char *xform;	// Buffer for color transform preview
 	int opacity, bpp;	// Just that
 	int pixf;		// Flag: need current channel override filled
 	int dx;			// Memory-space X offset
@@ -2298,12 +2300,12 @@ typedef struct {
 
 /* !!! This function copies existing override set to build its own modified
  * !!! one, so override set must not be changed after calling it */
-static unsigned char *init_paste_render(paste_render_state *p,
-	main_render_state *r, unsigned char *xmask)
+static int init_paste_render(paste_render_state *p, main_render_state *r,
+	unsigned char *xmask)
 {
-	unsigned char *temp, *tmp;
-	int i, x, y, w, h, mx, my, ddx, bpp, scale = r->scale, zoom = r->zoom;
-	int ti = 0, tm = 0, ta = 0, fa = 0;
+	int x, y, w, h, mx, my, ddx, bpp, scale = r->scale, zoom = r->zoom;
+	int temp_image, temp_mask, temp_alpha, fake_alpha, xform_buffer;
+
 
 	/* Clip paste area to update area */
 	x = (marq_x1 * scale + zoom - 1) / zoom;
@@ -2316,16 +2318,10 @@ static unsigned char *init_paste_render(paste_render_state *p,
 	w = (w < mx ? w : mx) - x;
 	my = r->py2 + r->ph2;
 	h = (h < my ? h : my) - y;
-	if ((w <= 0) || (h <= 0)) return (NULL);
+	if ((w <= 0) || (h <= 0)) return (FALSE);
 
 	memset(p, 0, sizeof(paste_render_state));
 	memcpy(p->tlist, r->tlist, sizeof(chanlist));
-
-// !!! Store area dimensions somewhere for other functions' use
-//	rect[0] = x;
-//	rect[1] = y;
-//	rect[2] = w;
-//	rect[3] = h;
 
 	/* Setup row position and size */
 	p->dx = (x * zoom) / scale;
@@ -2333,15 +2329,14 @@ static unsigned char *init_paste_render(paste_render_state *p,
 	else p->lx = p->pww = (x + w - 1) / scale - p->dx + 1;
 
 	/* Decide what goes where */
+	temp_alpha = fake_alpha = 0;
 	if ((mem_channel == CHN_IMAGE) && !channel_dis[CHN_ALPHA])
 	{
 		p->clip_alpha = mem_clip_alpha;
 		if (mem_img[CHN_ALPHA])
 		{
-			if (!mem_clip_alpha && RGBA_mode)
-				fa = 1; /* Need fake alpha */
-			if (mem_clip_alpha || fa)
-				ta = 1; /* Need temp alpha */
+			fake_alpha = !mem_clip_alpha && RGBA_mode; // Need fake alpha
+			temp_alpha = mem_clip_alpha || fake_alpha; // Need temp alpha
 		}
 	}
 	p->clip_image = mem_clipboard;
@@ -2349,47 +2344,46 @@ static unsigned char *init_paste_render(paste_render_state *p,
 
 	/* Allocate temp area */
 	bpp = p->bpp = MEM_BPP;
-	tm = !xmask; /* Need temp mask if not have one ready */
-	ti = p->clip_image && !p->tlist[mem_channel]; /* Same for temp image */
-	i = r->lx * (ti * bpp + ta) + p->lx * (tm + fa);
-	temp = tmp = malloc(i);
-	if (!temp) return (NULL);
+	temp_mask = !xmask; // Need temp mask if not have one ready
+	temp_image = p->clip_image && !p->tlist[mem_channel]; // Same for temp image
+	xform_buffer = mem_preview_clip && (bpp == 3) && (mem_clip_bpp == 3);
+
+	if (temp_image | temp_alpha | temp_mask | fake_alpha | xform_buffer)
+	{
+		p->buf = multialloc(MA_SKIP_ZEROSIZE,
+			&p->tlist[mem_channel], temp_image * r->lx * bpp,
+			&p->tlist[CHN_ALPHA], temp_alpha * r->lx,
+			&p->mask, temp_mask * p->lx,
+			&p->t_alpha, fake_alpha * p->lx,
+			&p->xform, xform_buffer * p->lx * 3,
+			NULL);
+		if (!p->buf) return (FALSE);
+	}
 
 	/* Setup "image" (current) channel override */
-	if (ti) p->tlist[mem_channel] = tmp , tmp += r->lx * bpp;
 	p->pix = p->tlist[mem_channel] + ddx * bpp;
-	p->pixf = ti; /* Need it prefilled if no override data incoming */
+	p->pixf = temp_image; /* Need it prefilled if no override data incoming */
 
 	/* Setup alpha channel override */
-	if (ta)
-	{
-		p->tlist[CHN_ALPHA] = tmp;
-		p->alpha = tmp + ddx;
-		tmp += r->lx;
-	}
+	if (temp_alpha) p->alpha = p->tlist[CHN_ALPHA] + ddx;
 
 	/* Setup mask */
 	if (mem_channel <= CHN_ALPHA) p->mask0 = r->mask0;
-	if (tm) p->mask = p->wmask = tmp , tmp += p->lx;
-	else
+	if (!(p->wmask = p->mask))
 	{
 		p->mask = xmask + ddx;
 		if (r->mask0 != p->mask0)
 		/* Mask has wrong data - reuse memory but refill values */
-			p->wmask = xmask + ddx;
+			p->wmask = p->mask;
 	}
 
 	/* Setup fake alpha */
-	if (fa)
-	{
-		p->t_alpha = tmp;
-		memset(tmp, channel_col_A[CHN_ALPHA], p->lx);
-	}
+	if (fake_alpha) memset(p->t_alpha, channel_col_A[CHN_ALPHA], p->lx);
 
 	/* Setup opacity mode */
 	if (!IS_INDEXED) p->opacity = tool_opacity;
 
-	return (temp);
+	return (TRUE);
 }
 
 static void paste_render(int start, int step, int y, paste_render_state *p)
@@ -2398,6 +2392,7 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 	int dc = mem_clip_w * (y - marq_y1) + p->dx - marq_x1;
 	int bpp = p->bpp;
 	int cnt = p->pww;
+	unsigned char *clip_src = mem_clipboard + dc * mem_clip_bpp;
 
 	if (p->wmask) prep_mask(start, step, cnt, p->wmask, p->mask0 ?
 		p->mask0 + ld : NULL, mem_img[CHN_IMAGE] + ld * mem_img_bpp);
@@ -2406,8 +2401,13 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		mem_clip_mask ? mem_clip_mask + dc : NULL, p->opacity, 0);
 	if (!p->pixf) /* Fill just the underlying part */
 		memcpy(p->pix, mem_img[mem_channel] + ld * bpp, p->lx * bpp);
+	if (p->xform) /* Apply color transform if preview requested */
+	{
+		do_transform(start, step, cnt, NULL, p->xform, clip_src);
+		clip_src = p->xform;
+	}
 	process_img(start, step, cnt, p->mask, p->pix, mem_img[mem_channel] + ld * bpp,
-		mem_clipboard + dc * mem_clip_bpp, mem_clip_bpp, p->opacity ? bpp : 0);
+		clip_src, mem_clip_bpp, p->opacity ? bpp : 0);
 }
 
 static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)
@@ -2420,7 +2420,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 	unsigned char *cstemp = NULL;
 	unsigned char *gtemp = NULL;
 	grad_render_state grstate;
-	unsigned char *ptemp = NULL;
+	int pflag = FALSE;
 	paste_render_state prstate;
 
 
@@ -2465,7 +2465,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 
 	/* Paste preview - can only coexist with transform */
 	if (show_paste && (marq_status >= MARQUEE_PASTE) && !cstemp && !gtemp)
-		ptemp = init_paste_render(&prstate, &r, xtemp ? xrstate.pvm : NULL);
+		pflag = init_paste_render(&prstate, &r, xtemp ? xrstate.pvm : NULL);
 
 	/* Start rendering */
 	setup_row(r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
@@ -2502,7 +2502,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 				r.mask0 ? r.mask0 + l : NULL, &grstate);
 
 			/* Paste preview - should be after transform */
-			if (ptemp && (j >= marq_y1) && (j <= marq_y2))
+			if (pflag && (j >= marq_y1) && (j <= marq_y2))
 			{
 				tlist = prstate.tlist; /* Paste-area override */
 				if (prstate.alpha) memcpy(tlist[CHN_ALPHA],
@@ -2525,9 +2525,9 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 	free(xtemp);
 	free(cstemp);
 	free(gtemp);
-	free(ptemp);
+	if (pflag) free(prstate.buf);
 
-	return (!!ptemp); /* "There was paste" */
+	return (pflag); /* "There was paste" */
 }
 
 /// GRID

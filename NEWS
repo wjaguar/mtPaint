@@ -16,6 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* sRGB colour scale generation added to palette editor
 	* sRGB gradients added
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
+	* Toggle to transform RGB clipboard image added to Transform Colour window
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle

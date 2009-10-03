@@ -455,7 +455,12 @@ static inline int floor_div(int dd, int dr)
 
 /// Multiblock allocator
 
-void *multialloc(int align, void *ptr, int size, ...);
+#define MA_ALIGN_MASK    0x03 /* For alignment constraints */
+#define MA_ALIGN_DEFAULT 0x00
+#define MA_ALIGN_DOUBLE  0x01
+#define MA_SKIP_ZEROSIZE 0x04 /* Leave pointers to zero-size areas unchanged */
+
+void *multialloc(int flags, void *ptr, int size, ...);
 
 /// Vectorized low-level drawing function
 

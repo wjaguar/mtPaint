@@ -893,8 +893,8 @@ static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
 		gdk_window_set_cursor( drawing_palette->window, NULL );
 		if ( drag_index_vals[0] != drag_index_vals[1] )
 		{
-			mem_pal_copy( mem_pal, brcosa_pal );		// Get old values back
-			mem_undo_next(UNDO_XPAL);			// Do undo stuff
+			mem_pal_copy(mem_pal, brcosa_palette);	// Get old values back
+			mem_undo_next(UNDO_XPAL);		// Do undo stuff
 			mem_pal_index_move( drag_index_vals[0], drag_index_vals[1] );
 
 			if ( mem_img_bpp == 1 )
@@ -928,7 +928,7 @@ static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 	{
 		if ((event->button == 1) && (event->state & GDK_SHIFT_MASK))
 		{
-			mem_pal_copy(brcosa_pal, mem_pal);
+			mem_pal_copy(brcosa_palette, mem_pal);
 			drag_index = TRUE;
 			drag_index_vals[0] = drag_index_vals[1] = pindex;
 			gdk_window_set_cursor(drawing_palette->window, move_cursor);

@@ -404,7 +404,7 @@ int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, png_colo
 	K = quant_to;
 	size = width*height;
 
-	mem = multialloc(FALSE,
+	mem = multialloc(MA_ALIGN_DEFAULT,
 		&m2, 33*33*33 * sizeof(float),
 		&wt, 33*33*33 * sizeof(int),
 		&mr, 33*33*33 * sizeof(int),
