@@ -32,6 +32,7 @@
 #include "toolbar.h"
 #include "viewer.h"
 #include "csel.h"
+#include "thread.h"
 
 
 grad_info gradient[NUM_CHANNELS];	// Per-channel gradients
@@ -300,9 +301,6 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #if (PALETTE_DIGIT_W != xbm_n7x7_width) || (PALETTE_DIGIT_H * 10 != xbm_n7x7_height)
 #error "Mismatched palette-window font"
 #endif
-
-#define ALIGNED(P, N) ((void *)((char *)(P) + \
-	((~(unsigned)((char *)(P) - (char *)0) + 1) & ((N) - 1))))
 
 /* This allocates several memory chunks in one block - making it one single
  * point of allocation failure, and needing just a single free() later on.
@@ -6899,9 +6897,14 @@ static void vert_gauss(unsigned char *chan, int w, int h, int y, double *temp,
 }
 
 typedef struct {
-	double *gaussX, *gaussY, *tmp, *temp;
+	double *gaussX, *gaussY, *temp;
 	unsigned char *mask;
-	int lenX, lenY, *idx;
+	int *idx;
+	int lenX, lenY;
+	int channel, gcor;
+	// For unsharp mask
+	int threshold;
+	double amount;
 } gaussd;
 
 /* Extend horizontal array, using precomputed indices */
@@ -6928,17 +6931,20 @@ static void gauss_extend(gaussd *gd, double *temp, int w, int bpp)
 
 /* Most-used variables are local to inner blocks to shorten their live ranges -
  * otherwise stupid compilers might allocate them to memory */
-static void gauss_filter(gaussd *gd, int channel, int gcor)
+static void gauss_filter(tcb *thread)
 {
-	int i, wid, bpp, lenX = gd->lenX;
+	gaussd *gd = thread->data;
+	int lenX = gd->lenX, gcor = gd->gcor, channel = gd->channel;
+	int i, ii, cnt, wid, bpp;
 	double sum, sum0, sum1, sum2, *temp, *gaussX = gd->gaussX;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
+	cnt = thread->nsteps;
 	bpp = BPP(channel);
 	wid = mem_width * bpp;
 	chan = mem_undo_previous(channel);
 	temp = gd->temp + (lenX - 1) * bpp;
-	for (i = 0; i < mem_height; i++)
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
 	{
 		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
 		gauss_extend(gd, temp, mem_width, bpp);
@@ -7000,19 +7006,21 @@ static void gauss_filter(gaussd *gd, int channel, int gcor)
 				dest[j] = (k0 + (k0 >> 8) + 1) >> 8;
 			}
 		}
-		if ((i * 10) % mem_height >= mem_height - 10)
-			if (progress_update((float)(i + 1) / mem_height)) break;
+		if (thread_step(thread, ii + 1, cnt, 10)) break;
 	}
+	thread_done(thread);
 }
 
 /* The inner loops are coded the way they are because one must spell everything
  * out for dumb compiler to get acceptable code out of it */
-static void gauss_filter_rgba(gaussd *gd, int gcor)
+static void gauss_filter_rgba(tcb *thread)
 {
-	int i, mh2, lenX = gd->lenX, lenY = gd->lenY;
+	gaussd *gd = thread->data;
+	int i, ii, cnt, mh2, lenX = gd->lenX, lenY = gd->lenY, gcor = gd->gcor;
 	double sum, sum1, sum2, mult, *temp, *tmpa, *atmp, *src, *gaussX, *gaussY;
 	unsigned char *chan, *dest, *alpha, *dsta, *mask = gd->mask;
 
+	cnt = thread->nsteps;
 	chan = mem_undo_previous(CHN_IMAGE);
 	alpha = mem_undo_previous(CHN_ALPHA);
 	gaussX = gd->gaussX;
@@ -7023,7 +7031,7 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 	/* Set up the main row buffer and process the image */
 	tmpa = temp + mem_width * 3 + (lenX - 1) * (3 + 3);
 	atmp = tmpa + mem_width * 3 + (lenX - 1) * (3 + 1);
-	for (i = 0; i < mem_height; i++)
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
 	{
 		/* Apply vertical filter */
 		{
@@ -7195,17 +7203,18 @@ static void gauss_filter_rgba(gaussd *gd, int gcor)
 				dest[jj + 2] = (k2 + (k2 >> 8) + 1) >> 8;
 			}
 		}
-		if ((i * 10) % mem_height >= mem_height - 10)
-			if (progress_update((float)(i + 1) / mem_height)) break;
+		if (thread_step(thread, ii + 1, cnt, 10)) break;
 	}
+	thread_done(thread);
 }
 
 /* Modes: 0 - normal, 1 - RGBA, 2 - DoG */
-static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
-	int mode)
+static threaddata *init_gauss(gaussd *gd, double radiusX, double radiusY, int mode)
 {
+	threaddata *tdata;
 	int i, j, k, l, lenX, lenY, w, bpp = MEM_BPP;
 	double sum, exkX, exkY, *gauss;
+
 
 	/* Cutoff point is where gaussian becomes < 1/255 */
 	gd->lenX = lenX = ceil(radiusX) + 2;
@@ -7220,13 +7229,15 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 	l = 2 * (lenX - 1);
 	w = mem_width + l;
 
-	gd->tmp = multialloc(MA_ALIGN_DOUBLE,
+	tdata = talloc(MA_ALIGN_DOUBLE, 0, gd, sizeof(gaussd),
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
-		&gd->temp, i * w * sizeof(double),
 		&gd->idx, l * sizeof(int),
-		&gd->mask, mem_width, NULL);
-	if (!gd->tmp) return (FALSE);
+		NULL, 
+		&gd->temp, i * w * sizeof(double),
+		&gd->mask, mem_width,
+		NULL);
+	if (!tdata) return (NULL);
 
 	/* Prepare filters */
 	j = lenX; gauss = gd->gaussX;
@@ -7261,13 +7272,14 @@ static int init_gauss(gaussd *gd, double radiusX, double radiusY, int gcor,
 
 		}
 	}
-	return (TRUE);
+	return (tdata);
 }
 
 /* Gaussian blur */
 void mem_gauss(double radiusX, double radiusY, int gcor)
 {
 	gaussd gd;
+	threaddata *tdata;
 	int rgba, rgbb;
 
 	/* RGBA or not? */
@@ -7275,40 +7287,60 @@ void mem_gauss(double radiusX, double radiusY, int gcor)
 	rgbb = rgba && !channel_dis[CHN_ALPHA];
 
 	/* Create arrays */
-	if (mem_channel != CHN_IMAGE) gcor = 0;
-	if (!init_gauss(&gd, radiusX, radiusY, gcor, rgbb))
+	if (mem_channel != CHN_IMAGE) gcor = FALSE;
+	gd.gcor = gcor;
+	gd.channel = mem_channel;
+	tdata = init_gauss(&gd, radiusX, radiusY, rgbb);
+	if (!tdata)
 	{
 		memory_errors(1);
 		return;
 	}
 
-	/* Run filter */
 	progress_init(_("Gaussian Blur"), 1);
-	if (!rgba) /* One channel */
-		gauss_filter(&gd, mem_channel, gcor);
-	else if (rgbb) /* Coupled RGBA */
-		gauss_filter_rgba(&gd, gcor);
-	else /* RGB and alpha */
+	if (rgbb) /* Coupled RGBA */
+		launch_threads(gauss_filter_rgba, tdata, NULL, mem_height);
+	else /* One channel, or maybe two */
 	{
-		gauss_filter(&gd, CHN_IMAGE, gcor);
-		gauss_filter(&gd, CHN_ALPHA, FALSE);
+		launch_threads(gauss_filter, tdata, NULL, mem_height);
+		if (rgba) /* Need to process alpha too */
+		{
+#ifdef U_THREADS
+			int i, j = tdata->count;
+
+			for (i = 0; i < j; i++)
+			{
+				gaussd *gp = tdata->threads[i]->data;
+				gp->channel = CHN_ALPHA;
+				gp->gcor = FALSE;
+			}
+#else
+			gaussd *gp = tdata->threads[0]->data;
+			gp->channel = CHN_ALPHA;
+			gp->gcor = FALSE;
+#endif
+			launch_threads(gauss_filter, tdata, NULL, mem_height);
+		}
 	}
 	progress_end();
-	free(gd.tmp);
-}	
+	free(tdata);
+}
 
-static void unsharp_filter(gaussd *gd, double amount, int threshold,
-	int channel, int gcor)
+static void unsharp_filter(tcb *thread)
 {
-	int i, wid, bpp, lenX = gd->lenX;
-	double sum, sum1, sum2, *temp, *gaussX = gd->gaussX;
+	gaussd *gd = thread->data;
+	int lenX = gd->lenX, threshold = gd->threshold, channel = gd->channel;
+	int i, ii, cnt, wid, bpp, gcor = gd->gcor;
+	double *temp, *gaussX = gd->gaussX;
+	double sum, sum1, sum2, amount = gd->amount;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
+	cnt = thread->nsteps;
 	bpp = BPP(channel);
 	wid = mem_width * bpp;
 	chan = mem_undo_previous(channel);
 	temp = gd->temp + (lenX - 1) * bpp;
-	for (i = 0; i < mem_height; i++)
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
 	{
 		vert_gauss(chan, wid, mem_height, i, temp, gd->gaussY, gd->lenY, gcor);
 		gauss_extend(gd, temp, mem_width, bpp);
@@ -7412,30 +7444,33 @@ static void unsharp_filter(gaussd *gd, double amount, int threshold,
 				dest[j] = (k + (k >> 8) + 1) >> 8;
 			}
 		}
-		if ((i * 10) % mem_height >= mem_height - 10)
-			if (progress_update((float)(i + 1) / mem_height)) break;
+		if (thread_step(thread, ii + 1, cnt, 10)) break;
 	}
+	thread_done(thread);
 }
 
 /* Unsharp mask */
 void mem_unsharp(double radius, double amount, int threshold, int gcor)
 {
 	gaussd gd;
+	threaddata *tdata;
 
 	/* Create arrays */
 	if (mem_channel != CHN_IMAGE) gcor = 0;
+	gd.gcor = gcor;
+	gd.channel = mem_channel;
+	gd.amount = amount;
+	gd.threshold = threshold;
 // !!! No RGBA mode for now
-	if (!init_gauss(&gd, radius, radius, gcor, 0))
+	tdata = init_gauss(&gd, radius, radius, 0);
+	if (!tdata)
 	{
 		memory_errors(1);
 		return;
 	}
-
 	/* Run filter */
-	progress_init(_("Unsharp Mask"), 1);
-	unsharp_filter(&gd, amount, threshold, mem_channel, gcor);
-	progress_end();
-	free(gd.tmp);
+	launch_threads(unsharp_filter, tdata, _("Unsharp Mask"), mem_height);
+	free(tdata);
 }	
 
 static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
@@ -7483,18 +7518,21 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 	}
 }
 
-static void dog_filter(gaussd *gd, int channel, int norm, int gcor)
+static void dog_filter(tcb *thread)
 {
-	int i, bpp = BPP(channel), wid = mem_width * bpp;
+	gaussd *gd = thread->data;
+	int channel = gd->channel, bpp = BPP(channel), wid = mem_width * bpp;
+	int i, ii, cnt, gcor = gd->gcor;
 	int lenW = gd->lenX, lenN = gd->lenY;
 	double sum, sum1, sum2, *tmp1, *tmp2;
 	double *gaussW = gd->gaussX, *gaussN = gd->gaussY;
 	unsigned char *chan, *dest;
 
+	cnt = thread->nsteps;
 	chan = mem_undo_previous(channel);
 	tmp1 = gd->temp + (lenW - 1) * bpp;
 	tmp2 = tmp1 + wid + (lenW - 1) * bpp * 2;
-	for (i = 0; i < mem_height; i++)
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
 	{
 		vert_gauss(chan, wid, mem_height, i, tmp1, gaussW, lenW, gcor);
 		vert_gauss(chan, wid, mem_height, i, tmp2, gaussN, lenN, gcor);
@@ -7576,44 +7614,24 @@ static void dog_filter(gaussd *gd, int channel, int norm, int gcor)
 				dest[j] = k < 0 ? 0 : k;
 			}
 		}
-		if ((i * 10) % mem_height >= mem_height - 10)
-			if (progress_update((float)(i + 1) / mem_height)) break;
+		if (thread_step(thread, ii + 1, cnt, 10)) break;
 	}
-
-	/* Normalize values (expand to full 0..255) */
-	while (norm)
-	{
-		unsigned char *tmp, xtb[256];
-		double d;
-		int i, l = mem_height * wid, mx = 0;
-
-		tmp = mem_img[channel];
-		for (i = l; i; i-- , tmp++)
-			if (*tmp > mx) mx = *tmp;
-
-		if (!mx) break;
-		d = 255.0 / (double)mx;
-		for (i = 0; i <= mx; i++) xtb[i] = rint(i * d);
-
-		tmp = mem_img[channel];
-		for (i = l; i; i-- , tmp++) *tmp = xtb[*tmp];
-
-		break;
-	}
-
-	/* Mask-merge with prior picture */
-	mask_merge(chan, channel, gd->mask);
+	thread_done(thread);
 }
 
 /* Difference of Gaussians */
 void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 {
 	gaussd gd;
+	threaddata *tdata;
 
 	/* Create arrays */
 	if (mem_channel != CHN_IMAGE) gcor = 0;
+	gd.gcor = gcor;
+	gd.channel = mem_channel;
 // !!! No RGBA mode for ever - DoG mode instead
-	if (!init_gauss(&gd, radiusW, radiusN, gcor, 2))
+	tdata = init_gauss(&gd, radiusW, radiusN, 2);
+	if (!tdata)
 	{
 		memory_errors(1);
 		return;
@@ -7621,9 +7639,35 @@ void mem_dog(double radiusW, double radiusN, int norm, int gcor)
 
 	/* Run filter */
 	progress_init(_("Difference of Gaussians"), 1);
-	dog_filter(&gd, mem_channel, norm, gcor);
+	launch_threads(dog_filter, tdata, NULL, mem_height);
+
+	/* Normalize values (expand to full 0..255) */
+	while (norm)
+	{
+		unsigned char *tmp, xtb[256];
+		double d;
+		int i, l, mx = 0;
+
+		l = mem_height * mem_width * BPP(mem_channel);
+		tmp = mem_img[mem_channel];
+		for (i = l; i; i-- , tmp++)
+			if (*tmp > mx) mx = *tmp;
+
+		if (!mx) break;
+		d = 255.0 / (double)mx;
+		for (i = 0; i <= mx; i++) xtb[i] = rint(i * d);
+
+		tmp = mem_img[mem_channel];
+		for (i = l; i; i-- , tmp++) *tmp = xtb[*tmp];
+
+		break;
+	}
+
+	/* Mask-merge with prior picture */
+	mask_merge(mem_undo_previous(mem_channel), mem_channel, gd.mask);
+
 	progress_end();
-	free(gd.tmp);
+	free(tdata);
 }
 
 

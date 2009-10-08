@@ -786,6 +786,11 @@ int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int 
 #define ALIGN(p) ((void *)(p))
 #endif
 
+/* Reasonably portable pointer alignment macro */
+
+#define ALIGNED(P, N) ((void *)((char *)(P) + \
+	((~(unsigned)((char *)(P) - (char *)0) + 1) & ((N) - 1))))
+
 /* x87 FPU uses long doubles internally, which may cause calculation results
  * to depend on emitted assembly code, and change in mysterious ways depending
  * on source structure and current optimizations.

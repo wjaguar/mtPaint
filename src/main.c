@@ -281,6 +281,11 @@ int main( int argc, char *argv[] )
 
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
 	putenv("GDK_NATIVE_WINDOWS=1");	// I need no experimental stuff before GTK+3
+
+#ifdef U_THREADS
+	/* Enable threading for GLib, but NOT for GTK+ (at least, not yet) */
+	g_thread_init(NULL);
+#endif
 	inifile_init("/.mtpaint");
 
 #ifdef U_NLS
@@ -291,6 +296,10 @@ int main( int argc, char *argv[] )
 #endif
 #endif
 
+#ifdef U_THREADS
+	/* !!! Uncomment to allow GTK+ calls from other threads */
+	/* gdk_threads_init(); */
+#endif
 	gtk_init( &argc, &argv );
 	gtk_init_bugfixes();
 #if GTK_MAJOR_VERSION == 2
@@ -408,7 +417,15 @@ int main( int argc, char *argv[] )
 
 	update_menus();
 
+#ifdef U_THREADS
+	/* !!! Uncomment to allow GTK+ calls from other threads */
+	/* gdk_threads_enter(); */
 	gtk_main();
+	/* gdk_threads_leave(); */
+#else
+	gtk_main();
+#endif
+
 	spawn_quit();
 	inifile_quit();
 

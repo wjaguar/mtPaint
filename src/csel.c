@@ -24,6 +24,7 @@
 #include "otherwindow.h"
 #include "channels.h"
 #include "csel.h"
+#include "thread.h"
 
 /* Use sRGB gamma if defined, ITU-R 709 gamma otherwise */
 /* From my point of view, ITU-R 709 is a better model of a real CRT */
@@ -395,7 +396,10 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 	unsigned char res = 0;
 	double d, dist = 0.0, lxn[3];
 	int i, j, k, l, jj, st3 = step * 3;
+	DEF_MUTEX(csel_lock); // To prevent concurrent writes to *info
 
+
+	LOCK_MUTEX(csel_lock);
 	cnt = start + step * (cnt - 1) + 1;
 	if (!mask)
 	{
@@ -521,6 +525,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 				mask[i] |= 255;
 		}
 	}
+	UNLOCK_MUTEX(csel_lock);
 	return (res);
 }
 

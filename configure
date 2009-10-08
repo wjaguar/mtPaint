@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.24"
-MT_DATE="2009-10-03"
+MT_V="3.34.25"
+MT_DATE="2009-10-08"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -22,6 +22,7 @@ WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
 BIN_INSTALL=
 MAKE_DIRS=src
 ICON_SET=icons1
+USE_THREADS=YES
 
 API_CHECKS=
 STATIC_PNG=
@@ -258,6 +259,8 @@ do
 				;;
 		"noxft" )	MTK_XFT=NO
 				;;
+		"thread" )	USE_THREADS=YES;;
+		"nothread" )	USE_THREADS=NO;;
 		"--bindir="* )	LIN_BIN_INSTALL="`echo "$A" | sed -e "s/--bindir=//"`"
 				WIN_BIN_INSTALL=$LIN_BIN_INSTALL;;
 		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
@@ -359,6 +362,9 @@ imagick ......... Use ImageMagick for GIF animation tasks
 mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0
 noxft ........... Don't use Xft in MTK
 
+thread .......... Use multithreading
+nothread ........ Don't use multithreading
+
 cflags .......... Use CFLAGS environment variable
 --cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64
 686 ............. Target 686 machines
@@ -422,6 +428,7 @@ else
 	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
 	echo "MT_PREFIX=\"$MT_PREFIX\"" >> $GTK_FILE
 
+	THREADS=
 	if [ "$MTK_DIR" ]
 	then
 		BIN_INSTALL=$LIN_BIN_INSTALL
@@ -442,10 +449,14 @@ else
 		BIN_INSTALL=$LIN_BIN_INSTALL
 		if [ "$GTK" = "1" ]
 		then
+			if [ "$USE_THREADS" = "YES" ]
+			then
+				THREADS="gthread"
+			fi
 			if gtk-config --cflags > /dev/null
 			then
-				GTK_INCLUDE=`gtk-config --cflags`
-				GTK_LIB=`gtk-config --libs`
+				GTK_INCLUDE=`gtk-config gtk $THREADS --cflags`
+				GTK_LIB=`gtk-config gtk $THREADS --libs | sed 's/-rdynamic//'`
 			else
 				echo
 				echo I have not been able to find gtk-config so I am assuming the following:
@@ -459,10 +470,18 @@ else
 				echo
 			fi
 		else
-			GTK_INCLUDE=`pkg-config gtk+-2.0 --cflags`
-			GTK_LIB=`pkg-config gtk+-2.0 --libs`
+			if [ "$USE_THREADS" = "YES" ]
+			then
+				THREADS="gthread-2.0"
+			fi
+			GTK_INCLUDE=`pkg-config gtk+-2.0 $THREADS --cflags`
+			GTK_LIB=`pkg-config gtk+-2.0 $THREADS --libs`
 		fi
 	else
+		if [ "$USE_THREADS" = "YES" ]
+		then
+			THREADS="-lgthread-2.0"
+		fi
 		BIN_INSTALL=$WIN_BIN_INSTALL
 		MT_LANG_DEST=locale
 		MT_PO_DEST=locale
@@ -472,7 +491,7 @@ else
 			GTK_LIB="-L/lib -lgtk -lgdk -lglib-2.0 -lm -mwindows"
 		else
 			GTK_INCLUDE="-I$CROSSPF/include/gtk-2.0 -I$CROSSPF/lib/gtk-2.0/include -I$CROSSPF/include/atk-1.0 -I$CROSSPF/include/pango-1.0 -I$CROSSPF/include/freetype2 -I$CROSSPF/include/glib-2.0 -I$CROSSPF/lib/glib-2.0/include -I$CROSSPF/include -mms-bitfields"
-			GTK_LIB="-L$CROSSPF/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 -lm -mwindows"
+			GTK_LIB="-L$CROSSPF/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 $THREADS -lm -mwindows"
 		fi
 	fi
 	fi	# MTK
@@ -484,6 +503,10 @@ else
 
 	L_EX=$AS_NEEDED
 	I_EX=$HAVE_FUNCS
+	if [ "$USE_THREADS" = "YES" ]
+	then
+		I_EX="$I_EX -DU_THREADS"
+	fi
 	if [ "$NGIF" != "NO" ]
 	then
 		if [ "$NGIF" = "GIF" ]
@@ -659,6 +682,7 @@ then
 fi
 	echo "    Icon set            $ICON_SET"
 	echo "    Internationalized   $MT_LANG"
+	echo "    Multithreaded       $USE_THREADS"
 
 
 	echo

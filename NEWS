@@ -12,6 +12,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* The preview button on the colour selectors is now a toggle to enable interactive previews
 	* Gaussian blur effect now faster by 20-35%
 	* "Protect details" toggle added to Kuwahara-Nagao blur
+	* Gaussian blur, Unsharp mask and Difference of Gaussians effects now use multithreading to utilize all available CPU cores
 	* Moving the pointer with the arrow keys now scrolls the canvas when moving beyond the viewport
 	* sRGB colour scale generation added to palette editor
 	* sRGB gradients added

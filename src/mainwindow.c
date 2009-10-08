@@ -39,6 +39,7 @@
 #include "spawn.h"
 #include "font.h"
 #include "icons.h"
+#include "thread.h"
 
 
 #define GREY_W 153
@@ -100,6 +101,7 @@ static inilist ini_int[] = {
 	{ "gridMin",		&mem_grid_min,		8   },
 	{ "undoMBlimit",	&mem_undo_limit,	32  },
 	{ "undoCommon",		&mem_undo_common,	25  },
+	{ "maxThreads",		&maxthreads,		0   },
 	{ "backgroundGrey",	&mem_background,	180 },
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },

@@ -11,7 +11,8 @@ BIN = mtpaint
 
 OBJS = mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
 	viewer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\
-	toolbar.o channels.o csel.o shifter.o spawn.o font.o fpick.o icons.o cpick.o
+	toolbar.o channels.o csel.o shifter.o spawn.o font.o fpick.o icons.o\
+	cpick.o thread.o
 
 $(BIN): main.o $(OBJS)
 	$(CC) main.o $(OBJS) -o $(BIN) $(LDFLAGS)

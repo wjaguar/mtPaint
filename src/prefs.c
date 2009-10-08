@@ -25,6 +25,7 @@
 #include "inifile.h"
 #include "viewer.h"
 #include "mainwindow.h"
+#include "thread.h"
 
 #include "prefs.h"
 
@@ -33,6 +34,9 @@
 
 GtkWidget *prefs_window, *prefs_status[STATUS_ITEMS];
 static GtkWidget *spinbutton_maxmem, *spinbutton_maxundo, *spinbutton_commundo;
+#ifdef U_THREADS
+static GtkWidget *spinbutton_threads;
+#endif
 static GtkWidget *spinbutton_greys, *spinbutton_nudge, *spinbutton_pan;
 static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty,
 	*spinbutton_jpeg, *spinbutton_jp2, *spinbutton_png, *spinbutton_recent,
@@ -261,6 +265,9 @@ static void prefs_apply(GtkWidget *widget)
 	mem_background = read_spin(spinbutton_greys);
 	mem_nudge = read_spin(spinbutton_nudge);
 	max_pan = read_spin(spinbutton_pan);
+#ifdef U_THREADS
+	maxthreads = read_spin(spinbutton_threads);
+#endif
 
 	mem_xpm_trans = read_spin(spinbutton_trans);
 	mem_xbm_hot_x = read_spin(spinbutton_hotx);
@@ -443,7 +450,13 @@ void pressed_preferences()
 ///	---- TAB1 - GENERAL
 
 	page = add_new_page(notebook1, _("General"));
+#ifdef U_THREADS
+	table3 = add_a_table(4, 2, 10, page);
+	add_to_table(_("Max threads (0 to autodetect)"), table3, 3, 0, 5);
+	spinbutton_threads = spin_to_table(table3, 3, 1, 5, maxthreads, 0, 256);
+#else
 	table3 = add_a_table(3, 2, 10, page);
+#endif
 
 ///	TABLE TEXT
 	add_to_table(_("Max memory used for undo (MB)"), table3, 0, 0, 5);
