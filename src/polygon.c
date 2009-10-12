@@ -121,7 +121,7 @@ void poly_draw(int filled, unsigned char *buf, int wbuf)
 	if (y < 0) y = 0;
 	for (; y < mem_height; y++)
 	{
-		unsigned char *bp, tv = 0;
+		unsigned char tv = 0;
 		int i, x, x0 = mem_width, x1 = 0;
 
 		/* Label the intersections */
@@ -151,14 +151,16 @@ void poly_draw(int filled, unsigned char *buf, int wbuf)
 
 		/* Draw the runs */
 		if (x0 >= mem_width) continue; // No pixels
-		bp = buf ? buf + y * wbuf : NULL;
 		for (i = x0; i < x1; i++)
 		{
-			if (!(tv ^= borders[i])) continue;
-			if (bp) bp[i] = 255;
-			else put_pixel(i, y);
+			tv ^= borders[i];
+// !!! "&" is for larger-than-byte char type; normally, GCC will optimize it out
+			borders[i] = (~tv + 1) & 255;
 		}
-		memset(borders + x0, 0, x1 - x0);
+		x1 -= x0;
+		if (buf) memcpy(buf + y * wbuf + x0, borders + x0, x1);
+		else put_pixel_row(x0, y, x1, borders + x0);
+		memset(borders + x0, 0, x1);
 	}	
 
 done:	mem_undo_opacity = oldmode;

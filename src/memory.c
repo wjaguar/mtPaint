@@ -41,9 +41,12 @@ grad_map graddata[NUM_CHANNELS + 1];	// RGB + per-channel gradient data
 grad_store gradbytes;			// Storage space for custom gradients
 int grad_opacity;			// Preview opacity
 
-/// Vectorized low-level drawing function
+/// Vectorized low-level drawing functions
 
 void (*put_pixel)(int x, int y) = put_pixel_def;
+void (*put_pixel_row)(int x, int y, int len, unsigned char *xsel) = put_pixel_row_def;
+
+#define ROW_BUFLEN 2048 /* Preferred length of internal row buffer */
 
 /// Bayer ordered dithering
 
@@ -3861,7 +3864,7 @@ void tline( int x1, int y1, int x2, int y2, int size )		// Draw size thickness s
 /* Draw whatever is bounded by two pairs of lines */
 void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4)
 {
-	int i, x1, x2, y1, xx[4];
+	int x1, x2, y1, xx[4];
 	for (; line1[2] >= 0; line_step(line1) , line_step(line3))
 	{
 		y1 = line1[1];
@@ -3872,7 +3875,7 @@ void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4)
 		if (xx[1] < xx[3]) xx[1] = xx[3];
 		x1 = xx[0] < 0 ? 0 : xx[0];
 		x2 = xx[1] >= mem_width ? mem_width - 1 : xx[1];
-		for (i = x1; i <= x2; i++) put_pixel(i, y1);
+		put_pixel_row(x1, y1, x2 - x1 + 1, NULL);
 	}
 }
 
@@ -3905,9 +3908,52 @@ static void put_pixel_sb(int x, int y)
 		return;
 
 	j = pixel_protected(x, y);
-	if (mem_img_bpp == 1 ? j : j == 255) return;
+	if (IS_INDEXED ? j : j == 255) return;
 
 	sb_buf[y1 * sb_rect[2] + x1] = 0xFFFF;
+}
+
+static void mask_select(unsigned char *mask, unsigned char *xsel, int l);
+
+static void put_pixel_row_sb(int x, int y, int len, unsigned char *xsel)
+{
+	unsigned char mask[ROW_BUFLEN];
+	int x1, y1, sb_ofs, offset, use_mask, masked;
+
+
+	if (len <= 0) return;
+	x1 = x - sb_rect[0];
+	y1 = y - sb_rect[1];
+	if ((x1 < 0) || (x1 >= sb_rect[2]) || (y1 < 0) || (y1 >= sb_rect[3]))
+		return;
+	if (x1 + len > sb_rect[2]) len = sb_rect[2] - x1;
+
+	sb_ofs = y1 * sb_rect[2] + x1;
+	offset = x + mem_width * y;
+	masked = IS_INDEXED ? 1 : 255;
+	use_mask = (mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK];
+
+	while (TRUE)
+	{
+		int i, l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
+
+		prep_mask(0, 1, l, mask,
+			use_mask ? mem_img[CHN_MASK] + offset : NULL,
+			mem_img[CHN_IMAGE] + offset * mem_img_bpp);
+
+		if (xsel)
+		{
+			mask_select(mask, xsel, l);
+			xsel += l;
+		}
+
+		for (i = 0; i < l; i++)
+			if (mask[i] < masked) sb_buf[sb_ofs + i] = 0xFFFF;
+
+		if (!(len -= l)) return;
+		sb_ofs += l;
+		offset += l;
+	}
 }
 
 /* Distance transform of binary image map;
@@ -3956,41 +4002,31 @@ int init_sb()
 		return (FALSE);
 	}
 	put_pixel = put_pixel_sb;
+	put_pixel_row = put_pixel_row_sb;
 	return (TRUE);
 }
 
 void render_sb()
 {
 	grad_info svgrad, *grad = gradient + mem_channel;
-	unsigned short *tmp;
-	double svpath;
-	int i, j, k, x1, y1, maxd;
+	int i, y1, maxd;
 
 	if (!sb_buf) return; /* Uninitialized */
 	put_pixel = put_pixel_def;
+	put_pixel_row = put_pixel_row_def;
 	maxd = shapeburst(sb_rect[2], sb_rect[3], sb_buf);
 	if (maxd) /* Have something to draw */
 	{
-		svpath = grad_path;
 		svgrad = *grad;
 		grad->gmode = GRAD_MODE_BURST;
 		if (!grad->len) grad->len = maxd - (maxd > 1);
 		grad_update(grad);
 
-		tmp = sb_buf;
-		x1 = sb_rect[0] + sb_rect[2];
 		y1 = sb_rect[1] + sb_rect[3];
 		for (i = sb_rect[1]; i < y1; i++)
-		{
-			for (j = sb_rect[0]; j < x1; j++ , tmp++)
-			{
-				if (!(k = *tmp)) continue;
-				grad_path = k - 1;
-				put_pixel(j, i);
-			}
-		}
+			put_pixel_row(sb_rect[0], i, sb_rect[2], NULL);
+
 		*grad = svgrad;
-		grad_path = svpath;
 	}
 	free(sb_buf);
 	sb_buf = NULL;
@@ -4231,7 +4267,7 @@ static int bitmap_bounds(int *rect, unsigned char *pat, int lw)
 /* Flood fill - may use temporary area (1 bit per pixel) */
 void flood_fill(int x, int y, unsigned int target)
 {
-	unsigned char *pat, *temp;
+	unsigned char *pat, *buf, *temp;
 	int i, j, k, l, sb, lw = (mem_width + 7) >> 3;
 
 	/* Shapeburst mode */
@@ -4245,14 +4281,13 @@ void flood_fill(int x, int y, unsigned int target)
 		return;
 	}
 
-	j = lw * mem_height;
-	pat = temp = malloc(j);
-	if (!pat)
+	buf = calloc(1, mem_width + lw * mem_height);
+	if (!buf)
 	{
 		memory_errors(1);
 		return;
 	}
-	memset(pat, 0, j);
+	pat = temp = buf + mem_width;
 	while (wjfloodfill(x, y, target, pat, lw))
 	{
 		if (sb) /* Shapeburst - setup rendering backbuffer */
@@ -4267,7 +4302,7 @@ void flood_fill(int x, int y, unsigned int target)
 
 		for (i = 0; i < mem_height; i++)
 		{
-			for (j = 0; j < mem_width; )
+			for (j = l = 0; j < mem_width; )
 			{
 				k = *temp++;
 				if (!k)
@@ -4277,60 +4312,40 @@ void flood_fill(int x, int y, unsigned int target)
 				}
 				for (; k; k >>= 1)
 				{
-					if (k & 1) put_pixel(j, i);
+					if (k & 1) l = buf[j] = 255;
 					j++;
 				}
 				j = (j + 7) & ~(7);
 			}
+			if (!l) continue; // Avoid wasting time on empty rows
+			put_pixel_row(0, i, mem_width, buf);
+			memset(buf, 0, mem_width);
 		}
 
 		if (sb) render_sb(); /* Finalize */
 
 		break;
 	}
-	free(pat);
+	free(buf);
 }
 
 
-void f_rectangle( int x, int y, int w, int h )		// Draw a filled rectangle
+void f_rectangle(int x, int y, int w, int h)	// Draw a filled rectangle
 {
-	int i, j;
-
 	w += x; h += y;
 	if (x < 0) x = 0;
 	if (y < 0) y = 0;
 	if (w > mem_width) w = mem_width;
 	if (h > mem_height) h = mem_height;
+	w -= x;
 
-	for (i = y; i < h; i++)
-	{
-		for (j = x; j < w; j++) put_pixel(j, i);
-	}
+	for (; y < h; y++) put_pixel_row(x, y, w, NULL);
 }
 
 /*
  * This code uses midpoint ellipse algorithm modified for uncentered ellipses,
  * with floating-point arithmetics to prevent overflows. (C) Dmitry Groshev
  */
-static int xc2, yc2;
-static void put4pix(int dx, int dy)
-{
-	int x0 = xc2 - dx, x1 = xc2 + dx, y0 = yc2 - dy, y1 = yc2 + dy;
-
-	if ((x1 < 0) || (y1 < 0)) return;
-	if (x0 < 0) x0 = x1;
-	x0 >>= 1; x1 >>= 1;
-	if (y0 < 0) y0 = y1;
-	y0 >>= 1; y1 >>= 1;
-	if ((x0 >= mem_width) || (y0 >= mem_height)) return;
-
-	put_pixel(x0, y0);
-	if (x0 != x1) put_pixel(x1, y0);
-	if (y0 == y1) return;
-	put_pixel(x0, y1);
-	if (x0 != x1) put_pixel(x1, y1);
-}
-
 static void trace_ellipse(int w, int h, int *left, int *right)
 {
 	int dx, dy;
@@ -4389,11 +4404,11 @@ static void trace_ellipse(int w, int h, int *left, int *right)
 
 static void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 {
-	int i, j, k, *left, *right;
+	int i, j, k, dx0, dx1, dy, *left, *right;
 
 	/* Prepare */
-	yc2 = --h + ys + ys;
-	xc2 = --w + xs + xs;
+	ys += ys + --h;
+	xs += xs + --w;
 	k = type ? w + 1 : w & 1;
 	j = h / 2 + 1;
 	left = malloc(2 * j * sizeof(int));
@@ -4411,6 +4426,8 @@ static void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 	/* Plot inner */
 	if (type && (thick > 1))
 	{
+		int i, j, k;
+
 		/* Determine possible height */
 		thick += thick - 2;
 		for (i = h; i >= 0; i -= 2)
@@ -4430,11 +4447,33 @@ static void wjellipse(int xs, int ys, int w, int h, int type, int thick)
 	}
 
 	/* Draw result */
-	for (i = h & 1; i <= h; i += 2)
+	for (dy = h & 1; dy <= h; dy += 2)
 	{
-		for (j = left[i >> 1]; j <= right[i >> 1]; j += 2)
+		int y0 = ys - dy, y1 = ys + dy;
+
+		if (y1 < 0) continue;
+		if (y0 < 0) y0 = y1;
+		y0 >>= 1; y1 >>= 1;
+		if (y0 >= mem_height) continue;
+
+		dx0 = right[dy >> 1];
+		dx1 = left[dy >> 1];
+		if (dx1 <= 1) dx1 = -dx0; // Merge two spans
+		while (TRUE)
 		{
-			put4pix(j, i);
+			int x0 = xs - dx0, x1 = xs - dx1;
+
+			if ((x1 >= 0) && (x0 < mem_width * 2))
+			{
+				x0 >>= 1; x1 >>= 1;
+				if (x0 < 0) x0 = 0;
+				if (++x1 > mem_width) x1 = mem_width;
+				x1 -= x0;
+				put_pixel_row(x0, y0, x1, NULL);
+				if (y1 != y0) put_pixel_row(x0, y1, x1, NULL);
+			}
+			if (dx1 <= 0) break;
+			x1 = -dx0; dx0 = -dx1; dx1 = x1;
 		}
 	}
 
@@ -4482,7 +4521,7 @@ static void retrace_circle(int r)
 
 void f_circle( int x, int y, int r )				// Draw a filled circle
 {
-	int i, j, x0, x1, y0, y1, r1 = r - 1, half = r1 & 1;
+	int i, x0, x1, y0, y1, r1 = r - 1, half = r1 & 1;
 
 	/* Prepare & cache circle contour */
 	if (circ_r != r) retrace_circle(r);
@@ -4495,15 +4534,12 @@ void f_circle( int x, int y, int r )				// Draw a filled circle
 		if ((y0 >= mem_height) || (y1 < 0)) continue;
 
 		x0 = x - ((circ_trace[i >> 1] + half) >> 1);
-		x1 = x + ((circ_trace[i >> 1] - half) >> 1);
+		x1 = x + ((circ_trace[i >> 1] - half) >> 1) + 1;
 		if (x0 < 0) x0 = 0;
-		if (x1 >= mem_width) x1 = mem_width - 1;
-
-		for (j = x0; j <= x1; j++)
-		{
-			if (y0 >= 0) put_pixel(j, y0);
-			if ((y1 != y0) && (y1 < mem_height)) put_pixel(j, y1);
-		}
+		if (x1 > mem_width) x1 = mem_width;
+		x1 -= x0;
+		if (y0 >= 0) put_pixel_row(x0, y0, x1, NULL);
+		if ((y1 != y0) && (y1 < mem_height)) put_pixel_row(x0, y1, x1, NULL);
 	}
 }
 
@@ -5990,15 +6026,15 @@ static const unsigned char zero[3] = {0, 0, 0};
 static void blend_rgb(unsigned char *dest, const unsigned char *src,
 	int tint, int bpp)
 {
-	static const unsigned char hhsv[8 * 3] =
-		{0, 1, 2, /* #0: B..M */
-		 2, 1, 0, /* #1: M+..R- */
-		 0, 1, 2, /* #2: B..M alt */
-		 1, 0, 2, /* #3: C+..B- */
-		 2, 0, 1, /* #4: G..C */
-		 0, 2, 1, /* #5: Y+..G- */
-		 1, 2, 0, /* #6: R..Y */
-		 1, 2, 0  /* #7: W */ };
+	static const unsigned char hhsv[8 * 3] = {
+		0, 1, 2, /* #0: B..M */
+		2, 1, 0, /* #1: M+..R- */
+		0, 1, 2, /* #2: B..M alt */
+		1, 0, 2, /* #3: C+..B- */
+		2, 0, 1, /* #4: G..C */
+		0, 2, 1, /* #5: Y+..G- */
+		1, 2, 0, /* #6: R..Y */
+		1, 2, 0  /* #7: W */ };
 	const unsigned char *new, *old;
 	int nhex, ohex;
 
@@ -6374,18 +6410,133 @@ void put_pixel_def( int x, int y )	/* Combined */
 	}
 }
 
+/* Repeat pattern in buffer */
+static void pattern_rep(unsigned char *dest, unsigned char *src,
+	int ofs, int rep, int len, int bpp)
+{
+	int l1;
+
+	ofs *= bpp; rep *= bpp; len *= bpp;
+	l1 = rep - ofs;
+	if (l1 > len) l1 = len;
+	memcpy(dest, src + ofs, l1);
+	if (!(len -= l1)) return;
+	dest += l1;
+	if ((len -= rep) > 0)
+	{
+		memcpy(dest, src, rep);
+		src = dest;
+		dest += rep;
+		while ((len -= rep) > 0)
+		{
+			memcpy(dest, src, rep);
+			dest += rep;
+			rep += rep;
+		}
+	}
+	memcpy(dest, src, len + rep);
+}
+
+/* Merge mask with selection */
+static void mask_select(unsigned char *mask, unsigned char *xsel, int l)
+{
+	int i, j, k;
+
+	for (i = 0; i < l; i++)
+	{
+		k = mask[i] * (j = xsel[i]);
+		mask[i] = ((k + (k >> 8) + 1) >> 8) + 255 - j;
+	}
+}
+
+/* Faster function for large brushes and fills */
+void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
+{
+	unsigned char mask[ROW_BUFLEN], tmp_image[ROW_BUFLEN * 3],
+		tmp_alpha[ROW_BUFLEN], tmp_opacity[ROW_BUFLEN],
+		*source_alpha = NULL, *source_opacity = NULL;
+	unsigned char *old_image, *old_alpha, *srcp, src1[8];
+	int offset, use_mask, bpp, idx;
+
+
+	if (len <= 0) return;
+
+	old_image = mem_undo_opacity ? mem_undo_previous(mem_channel) :
+		mem_img[mem_channel];
+	old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
+		mem_img[CHN_ALPHA];
+
+	offset = x + mem_width * y;
+
+	bpp = MEM_BPP; idx = IS_INDEXED;
+	use_mask = (mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK];
+	if ((mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA])
+		source_alpha = tmp_alpha;
+
+// !!! This depends on buffer length being a multiple of pattern length
+	if (!mem_gradient) /* Default mode - init buffer(s) from pattern */
+	{
+		int i, dy = 8 * (y & 7), l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
+
+		srcp = mem_pattern + dy;
+		if (source_alpha)
+		{
+			for (i = 0; i < 8; i++)
+				src1[i] = channel_col_[srcp[i]][CHN_ALPHA];
+			pattern_rep(tmp_alpha, src1, x & 7, 8, l, 1);
+		}
+		if (mem_channel != CHN_IMAGE)
+		{
+			for (i = 0; i < 8; i++)
+				src1[i] = channel_col_[srcp[i]][mem_channel];
+			srcp = src1;
+		}
+		else srcp = idx ? mem_col_pat + dy : mem_col_pat24 + dy * 3;
+		pattern_rep(tmp_image, srcp, x & 7, 8, l, bpp);
+	}
+
+	while (TRUE)
+	{
+		int l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
+
+		prep_mask(0, 1, l, mask,
+			use_mask ? mem_img[CHN_MASK] + offset : NULL,
+			mem_img[CHN_IMAGE] + offset * mem_img_bpp);
+
+		if (xsel)
+		{
+			mask_select(mask, xsel, l);
+			xsel += l;
+		}
+
+		/* Gradient mode */
+		if (mem_gradient) prep_grad(0, 1, l, x, y, mask,
+			source_opacity = tmp_opacity, tmp_image, source_alpha);
+		/* Buffers stay unchanged for default mode */
+
+		process_mask(0, 1, l, mask,
+			mem_img[CHN_ALPHA] + offset,
+			old_alpha + offset, source_alpha, source_opacity,
+			idx ? 0 : tool_opacity, channel_dis[CHN_ALPHA]);
+		process_img(0, 1, l, mask,
+			mem_img[mem_channel] + offset * bpp,
+			old_image + offset * bpp, tmp_image,
+			bpp, idx ? 0 : bpp);
+
+		if (!(len -= l)) return;
+		x += l;
+		offset += l;
+	}
+}
+
 void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *alphar, unsigned char *alpha0, unsigned char *alpha,
 	unsigned char *trans, int opacity, int noalpha)
 {
 	unsigned char *xalpha = NULL;
-	int tint;
+
 
 	cnt = start + step * cnt;
-
-// !!! Or maybe modes should not affect coupled alpha at all?
-	tint = tint_mode[0];
-	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	/* Use alpha as selection when pasting RGBA to RGB */
 	if (alpha && !alphar)
@@ -8454,12 +8605,19 @@ int grad_pixel(unsigned char *dest, int x, int y)
 	if (grad->wmode == GRAD_MODE_NONE) return (0);
 
 	/* Distance for gradient mode */
-	if (grad->status == GRAD_NONE)	/* Stroke gradient */
+	if (grad->status == GRAD_NONE)
 	{
-		dist = grad_path;
+		/* Stroke gradient */
+		if (grad->wmode != GRAD_MODE_BURST) dist = grad_path +
+			(x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
 		/* Shapeburst gradient */
-		if (grad->wmode != GRAD_MODE_BURST)
-			dist += (x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
+		else
+		{
+			int n = sb_buf[(y - sb_rect[1]) * sb_rect[2] +
+				(x - sb_rect[0])] - 1;
+			if (n < 0) return (0);
+			dist = n;
+		}
 	}
 	else
 	{

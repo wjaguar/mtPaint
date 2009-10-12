@@ -921,26 +921,14 @@ static void channel_mask()
 
 static void cut_clip()
 {
-	int i, j, k, kk, step, to;
-	unsigned char *sel, fix = 255;
+	int i;
 
 	spot_undo(UNDO_DRAW);
-	step = mem_clip_mask ? 1 : 0;
-	to = tool_opacity;
-	kk = IS_INDEXED ? 255 : tool_opacity;
-
 	for (i = 0; i < mem_clip_h; i++)
 	{
-		sel = mem_clip_mask ? mem_clip_mask + i * mem_clip_w : &fix;
-		for (j = 0; j < mem_clip_w; j++ , sel += step)
-		{
-			k = *sel * kk;
-			tool_opacity = (k + (k >> 8) + 1) >> 8;
-			if (!tool_opacity) continue;
-			put_pixel(mem_clip_x + j, mem_clip_y + i);
-		}
+		put_pixel_row(mem_clip_x, mem_clip_y + i, mem_clip_w,
+			mem_clip_mask ? mem_clip_mask + i * mem_clip_w : NULL);
 	}
-	tool_opacity = to;
 	mem_undo_prepare();
 }
 

@@ -248,7 +248,7 @@ void create_default_image();			// Create default new image
 //	Imported clipboard
 #define UPD_XCOPY  CF_MENU
 //	Converted indexed image to RGB
-#define UPD_2RGB   (CF_MENU | CF_IMGBAR | UPD_IMG)
+#define UPD_2RGB   (CF_MENU | CF_IMGBAR | UPD_IMG | UPD_AB)
 //	Converted RGB image to indexed
 #define UPD_2IDX   (UPD_2RGB | UPD_PAL)
 //	Created or loaded a new image (+)

@@ -462,9 +462,10 @@ static inline int floor_div(int dd, int dr)
 
 void *multialloc(int flags, void *ptr, int size, ...);
 
-/// Vectorized low-level drawing function
+/// Vectorized low-level drawing functions
 
 void (*put_pixel)(int x, int y);
+void (*put_pixel_row)(int x, int y, int len, unsigned char *xsel);
 
 	// Intersect two rectangles
 int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy);
@@ -745,6 +746,7 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask);
 int pixel_protected(int x, int y);				// generic
 void row_protected(int x, int y, int len, unsigned char *mask);
 void put_pixel_def( int x, int y );				// generic
+void put_pixel_row_def(int x, int y, int len, unsigned char *xsel); // generic
 int get_pixel( int x, int y );					// generic
 int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image
