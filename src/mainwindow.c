@@ -2249,7 +2249,7 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 	prep_mask(start, step, cnt, g->wmask, mask0, mem_img[CHN_IMAGE] + li);
 	if (!g->opac) memset(g->gmask, 255, g->len);
 
-	prep_grad(start, step, cnt, x, y, g->wmask, g->gmask, g->gimg, g->galpha);
+	grad_pixels(start, step, cnt, x, y, g->wmask, g->gmask, g->gimg, g->galpha);
 	if (g->walpha) memcpy(g->walpha, mem_img[CHN_ALPHA] + l, g->len);
 
 	process_mask(start, step, cnt, g->wmask, g->walpha, mem_img[CHN_ALPHA] + l,

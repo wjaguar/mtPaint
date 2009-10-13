@@ -6284,7 +6284,7 @@ rep:	if (!(cf & 1))
 void put_pixel_def( int x, int y )	/* Combined */
 {
 	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
-	unsigned char r, g, b, cset[NUM_CHANNELS + 3];
+	unsigned char r, g, b, cset[NUM_CHANNELS + 3 + 1];
 	int i, j, offset, ofs3, opacity = 255, op = tool_opacity, tint;
 
 
@@ -6294,9 +6294,14 @@ void put_pixel_def( int x, int y )	/* Combined */
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
-	if (mem_gradient) /* Gradient mode */
+	if (mem_gradient) /* Gradient mode - ask for one pixel */
 	{
-		if (!(op = grad_pixel(cset, x, y))) return;
+		cset[NUM_CHANNELS + 3] = 0; // Fake mask on input
+		grad_pixels(0, 1, 1, x, y,
+			cset + NUM_CHANNELS + 3, cset + NUM_CHANNELS + 3,
+			cset + (mem_channel + 3 > mem_img_bpp ? mem_channel + 3 : 0),
+			cset + CHN_ALPHA + 3);
+		if (!(op = cset[NUM_CHANNELS + 3])) return;
 	}
 	else /* Default mode - init "colorset" */
 	{
@@ -6510,7 +6515,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		}
 
 		/* Gradient mode */
-		if (mem_gradient) prep_grad(0, 1, l, x, y, mask,
+		if (mem_gradient) grad_pixels(0, 1, l, x, y, mask,
 			source_opacity = tmp_opacity, tmp_image, source_alpha);
 		/* Buffers stay unchanged for default mode */
 
@@ -6716,41 +6721,6 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			imgr[ofs3 + 2] = nrgb[2];
 		}
 	}	
-}
-
-/* Separate function for faster paste */
-void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
-	unsigned char *alpha, unsigned char *trans, int opacity)
-{
-	unsigned char *old_image, *old_alpha = NULL, *dest = NULL;
-	int bpp, ofs = x + mem_width * y;
-
-	bpp = MEM_BPP;
-
-	/* Setup opacity mode */
-	if (IS_INDEXED) opacity = 0;
-
-	/* Prepare coupled alpha */
-	if (alpha && mem_img[CHN_ALPHA])
-	{
-		if (mem_undo_opacity) old_alpha = mem_undo_previous(CHN_ALPHA);
-		else old_alpha = mem_img[CHN_ALPHA];
-		old_alpha += ofs;
-		dest = mem_img[CHN_ALPHA] + ofs;
-	}
-
-	process_mask(0, 1, len, mask, dest, old_alpha, alpha, trans, opacity, 0);
-
-	/* Stop if we have alpha without image */
-	if (!img) return;
-
-	if (mem_undo_opacity) old_image = mem_undo_previous(mem_channel);
-	else old_image = mem_img[mem_channel];
-	old_image += ofs * bpp;
-	dest = mem_img[mem_channel] + ofs * bpp;
-
-	process_img(0, 1, len, mask, dest, old_image, img, mem_clip_bpp,
-		opacity ? bpp : 0);
 }
 
 /* !!! This assumes dest area lies entirely within src, its bpp matches src's
@@ -8594,126 +8564,144 @@ static void grad_alpha(int *dest, double x)
 		((k * (gdata[i + 1] - gdata[i]) + 127) >> 8);
 }
 
-/* Evaluate RGBA/indexed gradient at point, return opacity */
-int grad_pixel(unsigned char *dest, int x, int y)
+/* Evaluate gradient at a sequence of points */
+/* !!! For now, works only in (slower) exact mode */
+void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask,
+	unsigned char *op0, unsigned char *img0, unsigned char *alpha0)
 {
-	int dither, op, slot, wrk[NUM_CHANNELS + 3];
 	grad_info *grad = gradient + mem_channel;
+	unsigned char *dest;
+	int i, mmask, dither, op, slot, wrk[NUM_CHANNELS + 3];
 	double dist, len1, l2;
 	
-	/* Disabled because of unusable settings? */
-	if (grad->wmode == GRAD_MODE_NONE) return (0);
 
-	/* Distance for gradient mode */
-	if (grad->status == GRAD_NONE)
+	if (!RGBA_mode) alpha0 = NULL;
+	mmask = IS_INDEXED ? 1 : 255; /* On/off opacity */
+	slot = mem_channel + ((0x81 + mem_channel + mem_channel - mem_img_bpp) >> 7);
+
+	cnt = start + step * cnt; x += start;
+	for (i = start; i < cnt; op0[i] = op , x += step , i += step)
 	{
-		/* Stroke gradient */
-		if (grad->wmode != GRAD_MODE_BURST) dist = grad_path +
-			(x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
-		/* Shapeburst gradient */
+		op = 0;
+		if (mask[i] >= mmask) continue;
+
+		/* Disabled because of unusable settings? */
+		if (grad->wmode == GRAD_MODE_NONE) continue;
+
+		/* Distance for gradient mode */
+		if (grad->status == GRAD_NONE)
+		{
+			/* Stroke gradient */
+			if (grad->wmode != GRAD_MODE_BURST) dist = grad_path +
+				(x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
+			/* Shapeburst gradient */
+			else
+			{
+				int n = sb_buf[(y - sb_rect[1]) * sb_rect[2] +
+					(x - sb_rect[0])] - 1;
+				if (n < 0) continue;
+				dist = n;
+			}
+		}
 		else
 		{
-			int n = sb_buf[(y - sb_rect[1]) * sb_rect[2] +
-				(x - sb_rect[0])] - 1;
-			if (n < 0) return (0);
-			dist = n;
-		}
-	}
-	else
-	{
-		int dx = x - grad->xy[0], dy = y - grad->xy[1];
+			int dx = x - grad->xy[0], dy = y - grad->xy[1];
 
-		switch (grad->wmode)
+			switch (grad->wmode)
+			{
+			default:
+			case GRAD_MODE_LINEAR:	/* Linear/bilinear gradient */
+			case GRAD_MODE_BILINEAR:
+				dist = dx * grad->xv + dy * grad->yv;
+				if (grad->wmode == GRAD_MODE_LINEAR) break;
+				dist = fabs(dist); /* Bilinear */
+				break;
+			case GRAD_MODE_RADIAL:	/* Radial gradient */
+				dist = sqrt(dx * dx + dy * dy);
+				break;
+			case GRAD_MODE_SQUARE:	/* Square gradient */
+				/* !!! Here is code duplication with linear/
+				 * bilinear path - but merged paths actually
+				 * LOSE in both time and space, at least
+				 * with GCC - WJ */
+				dist = fabs(dx * grad->xv + dy * grad->yv) +
+					fabs(dx * grad->yv - dy * grad->xv);
+				break;
+			case GRAD_MODE_ANGULAR:	/* Angular/conical gradient */
+			case GRAD_MODE_CONICAL:
+				dist = atan360(dx, dy) - grad->wa;
+				if (dist < 0.0) dist += 360.0;
+				if (grad->wmode == GRAD_MODE_ANGULAR) break;
+				if (dist >= 180.0) dist = 360.0 - dist;
+				break;
+			}
+		}
+		dist -= grad->ofs;
+
+		/* Apply repeat mode */
+		len1 = grad->wrep;
+		switch (grad->wrmode)
 		{
+		case GRAD_BOUND_MIRROR: /* Mirror repeat */
+			l2 = len1 + len1;
+			dist -= l2 * (int)(dist * grad->wil2);
+			if (dist < 0.0) dist += l2;
+			if (dist > len1) dist = l2 - dist;
+			break;
+		case GRAD_BOUND_REPEAT: /* Repeat */
+			l2 = len1 + 1.0; /* Repeat period is 1 pixel longer */
+			dist -= l2 * (int)((dist + 0.5) * grad->wil2);
+			if (dist < -0.5) dist += l2;
+			break;
+		case GRAD_BOUND_REP_A: /* Angular repeat */
+			dist -= len1 * (int)(dist * grad->wil2);
+			if (dist < 0.0) dist += len1;
+			break;
+		case GRAD_BOUND_STOP: /* Nothing is outside bounds */
+			if ((dist < -0.5) || (dist >= len1 + 0.5)) continue;
+			break;
+		case GRAD_BOUND_STOP_A: /* Nothing is outside angle */
+			if ((dist < 0.0) || (dist > len1)) continue;
+			break;
+		case GRAD_BOUND_LEVEL: /* Constant extension */
 		default:
-		case GRAD_MODE_LINEAR:	/* Linear/bilinear gradient */
-		case GRAD_MODE_BILINEAR:
-			dist = dx * grad->xv + dy * grad->yv;
-			if (grad->wmode == GRAD_MODE_LINEAR) break;
-			dist = fabs(dist); /* Bilinear */
-			break;
-		case GRAD_MODE_RADIAL:	/* Radial gradient */
-			dist = sqrt(dx * dx + dy * dy);
-			break;
-		case GRAD_MODE_SQUARE:	/* Square gradient */
-			/* !!! Here is code duplication with linear/bilinear
-			 * path - but merged paths actually LOSE in both time
-			 * and space, at least with GCC - WJ */
-			dist = fabs(dx * grad->xv + dy * grad->yv) +
-				fabs(dx * grad->yv - dy * grad->xv);
-			break;
-		case GRAD_MODE_ANGULAR:	/* Angular/conical gradient */
-		case GRAD_MODE_CONICAL:
-			dist = atan360(dx, dy) - grad->wa;
-			if (dist < 0.0) dist += 360.0;
-			if (grad->wmode == GRAD_MODE_ANGULAR) break;
-			if (dist >= 180.0) dist = 360.0 - dist;
 			break;
 		}
-	}
-	dist -= grad->ofs;
 
-	/* Apply repeat mode */
-	len1 = grad->wrep;
-	switch (grad->wrmode)
-	{
-	case GRAD_BOUND_MIRROR: /* Mirror repeat */
-		l2 = len1 + len1;
-		dist -= l2 * (int)(dist * grad->wil2);
-		if (dist < 0.0) dist += l2;
-		if (dist > len1) dist = l2 - dist;
-		break;
-	case GRAD_BOUND_REPEAT: /* Repeat */
-		l2 = len1 + 1.0; /* Repeat period is 1 pixel longer */
-		dist -= l2 * (int)((dist + 0.5) * grad->wil2);
-		if (dist < -0.5) dist += l2;
-		break;
-	case GRAD_BOUND_REP_A: /* Angular repeat */
-		dist -= len1 * (int)(dist * grad->wil2);
-		if (dist < 0.0) dist += len1;
-		break;
-	case GRAD_BOUND_STOP: /* Nothing is outside bounds */
-		if ((dist < -0.5) || (dist >= len1 + 0.5)) return (0);
-		break;
-	case GRAD_BOUND_STOP_A: /* Nothing is outside angle */
-		if ((dist < 0.0) || (dist > len1)) return (0);
-		break;
-	case GRAD_BOUND_LEVEL: /* Constant extension */
-	default:
-		break;
-	}
+		/* Rescale to 0..1, enforce boundaries */
+		dist = dist <= 0.0 ? 0.0 : dist >= len1 ? 1.0 : dist * grad->wil1;
 
-	/* Rescale to 0..1, enforce boundaries */
-	dist = dist <= 0.0 ? 0.0 : dist >= len1 ? 1.0 : dist * grad->wil1;
+		/* Value from Bayer dither matrix */
+		dither = BAYER(x, y);
 
-	/* Value from Bayer dither matrix */
-	dither = BAYER(x, y);
+		/* Get gradient */
+		wrk[CHN_IMAGE + 3] = 0;
+		op = (grad_value(wrk, slot, dist) + dither) >> 8;
+		if (!op) continue;
 
-	/* Get gradient */
-	wrk[CHN_IMAGE + 3] = 0;
-	slot = mem_channel + ((0x81 + mem_channel + mem_channel - mem_img_bpp) >> 7);
-	op = grad_value(wrk, slot, dist);
-	if (op + dither < 256) return (0);
-
-	if (mem_channel == CHN_IMAGE)
-	{
-		if (RGBA_mode)
+		if (mem_channel == CHN_IMAGE)
 		{
-			grad_alpha(wrk, dist);
-			dest[CHN_ALPHA + 3] = (wrk[CHN_ALPHA + 3] + dither) >> 8;
+			if (alpha0)
+			{
+				grad_alpha(wrk, dist);
+				alpha0[i] = (wrk[CHN_ALPHA + 3] + dither) >> 8;
+			}
+			if (mem_img_bpp == 3)
+			{
+				dest = img0 + i * 3;
+				dest[0] = (wrk[0] + dither) >> 8;
+				dest[1] = (wrk[1] + dither) >> 8;
+				dest[2] = (wrk[2] + dither) >> 8;
+			}
+			else
+			{
+				img0[i] = (unsigned char)wrk[(wrk[CHN_IMAGE + 3] +
+					dither) >> 8];
+				op = 255;
+			}
 		}
-		if (mem_img_bpp == 3)
-		{
-			dest[0] = (wrk[0] + dither) >> 8;
-			dest[1] = (wrk[1] + dither) >> 8;
-			dest[2] = (wrk[2] + dither) >> 8;
-		}
-		else dest[CHN_IMAGE + 3] = (unsigned char)
-			wrk[(wrk[CHN_IMAGE + 3] + dither) >> 8];
+		else img0[i] = (wrk[mem_channel + 3] + dither) >> 8;
 	}
-	else dest[mem_channel + 3] = (wrk[mem_channel + 3] + dither) >> 8;
-
-	return ((op + dither) >> 8);
 }
 
 /* Reevaluate gradient placement functions */
@@ -8861,35 +8849,6 @@ void grad_def_update()
 	grad_def[12 + CHN_ALPHA * 4] = channel_col_A[CHN_ALPHA];
 	grad_def[13 + CHN_ALPHA * 4] = channel_col_B[CHN_ALPHA];
 	grad_def[14 + CHN_ALPHA * 4] = gradmap->gtype;
-}
-
-/* !!! For now, works only in (slower) exact mode */
-void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
-	unsigned char *op0, unsigned char *img0, unsigned char *alpha0)
-{
-	unsigned char cset[NUM_CHANNELS + 3];
-	int i, j, op, rgbmode, mmask = 255, ix = 0;
-
-	if (IS_INDEXED) mmask = 1 , ix = 255; /* On/off opacity */
-	rgbmode = (mem_channel == CHN_IMAGE) && (mem_img_bpp == 3);
-
-	cnt = start + step * cnt;
-	for (i = start; i < cnt; i += step)
-	{
-		if (mask[i] >= mmask) continue;
-		op0[i] = op = grad_pixel(cset, x + i, y);
-		if (!op) continue;
-		op0[i] |= ix;
-		if (rgbmode)
-		{
-			j = i * 3;
-			img0[j + 0] = cset[0];
-			img0[j + 1] = cset[1];
-			img0[j + 2] = cset[2];
-		}
-		else img0[i] = cset[mem_channel + 3];
-		if (alpha0) alpha0[i] = cset[CHN_ALPHA + 3];
-	}
 }
 
 /* Convert to RGB & blend indexed/indexed+alpha for preview */

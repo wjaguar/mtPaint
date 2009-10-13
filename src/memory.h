@@ -736,8 +736,6 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
 	int sourcebpp, int destbpp);
-void paste_pixels(int x, int y, int len, unsigned char *mask, unsigned char *img,
-	unsigned char *alpha, unsigned char *trans, int opacity);
 void copy_area(image_info *dest, image_info *src, int x, int y);
 
 // Retroactive masking - by blending with undo frame
@@ -752,12 +750,11 @@ int get_pixel_RGB( int x, int y );				// converter
 int get_pixel_img( int x, int y );				// from image
 
 int grad_value(int *dest, int slot, double x);
-int grad_pixel(unsigned char *dest, int x, int y);
+void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask,
+	unsigned char *op0, unsigned char *img0, unsigned char *alpha0);
 void grad_update(grad_info *grad);
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot);
 void grad_def_update();
-void prep_grad(int start, int step, int cnt, int x, int y, unsigned char *mask,
-	unsigned char *op0, unsigned char *img0, unsigned char *alpha0);
 
 #define GRAD_CUSTOM_DATA(X) ((X) ? GRAD_POINTS * ((X) * 4 + 2) : 0)
 #define GRAD_CUSTOM_DMAP(X) (GRAD_POINTS * ((X) * 4 + 3))

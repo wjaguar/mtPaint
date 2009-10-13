@@ -228,9 +228,12 @@ void init_status_bar()
 void commit_paste(int swap, int *update)
 {
 	image_info ti;
-	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
-	int i, ua, cmask, op, ofs, upd = UPD_IMGP, fail = TRUE;
 	unsigned char *image, *mask, *alpha = NULL;
+	unsigned char *old_image, *old_alpha;
+	int op = 255, opacity = tool_opacity, bpp = MEM_BPP;
+	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
+	int i, ua, cmask, ofs, iofs, upd = UPD_IMGP, fail = TRUE;
+
 
 	fx = marq_x1 > 0 ? marq_x1 : 0;
 	fy = marq_y1 > 0 ? marq_y1 : 0;
@@ -240,16 +243,14 @@ void commit_paste(int swap, int *update)
 	fw = fx2 - fx + 1;
 	fh = fy2 - fy + 1;
 
-	if (!(mask = malloc(fw))) goto quit; /* !!! Not enough memory */
+	mask = multialloc(MA_SKIP_ZEROSIZE, &mask, fw, &alpha,
+		(mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA] &&
+		!mem_clip_alpha && !channel_dis[CHN_ALPHA] ? fw : 0, NULL);
+	if (!mask) goto quit; // Not enough memory
+	if (alpha) memset(alpha, channel_col_A[CHN_ALPHA], fw);
 
-	ua = channel_dis[CHN_ALPHA];	// Ignore clipboard alpha if disabled
-	if ((mem_channel == CHN_IMAGE) && RGBA_mode && !mem_clip_alpha &&
-		!ua && mem_img[CHN_ALPHA])
-	{
-		if (!(alpha = malloc(fw))) goto quit;
-		memset(alpha, channel_col_A[CHN_ALPHA], fw);
-	}
-	ua |= !mem_clip_alpha;
+	/* Ignore clipboard alpha if disabled */
+	ua = channel_dis[CHN_ALPHA] | !mem_clip_alpha;
 
 	if (swap) /* Prepare to convert image contents into new clipboard */
 	{
@@ -264,10 +265,19 @@ void commit_paste(int swap, int *update)
 	/* Offset in memory */
 	ofs = (fy - marq_y1) * mem_clip_w + (fx - marq_x1);
 	image = mem_clipboard + ofs * mem_clip_bpp;
+	iofs = fy * mem_width + fx;
 
 	mem_undo_next(UNDO_PASTE);	// Do memory stuff for undo
 
-	op = IS_INDEXED ? 0 : 255;
+	old_image = mem_img[mem_channel];
+	old_alpha = mem_img[CHN_ALPHA];
+	if (mem_undo_opacity)
+	{
+		old_image = mem_undo_previous(mem_channel);
+		old_alpha = mem_undo_previous(CHN_ALPHA);
+	}
+	if (IS_INDEXED) op = opacity = 0;
+
 	for (i = 0; i < fh; i++)
 	{
 		unsigned char *wa = ua ? alpha : mem_clip_alpha + ofs;
@@ -282,9 +292,18 @@ void commit_paste(int swap, int *update)
 			process_mask(0, 1, fw, ws, NULL, NULL,
 				ti.img[CHN_ALPHA] ? NULL : wa, wm, op, 0);
 		}
-		paste_pixels(fx, fy + i, fw, mask, image, wa, wm, tool_opacity);
+
+		process_mask(0, 1, fw, mask, mem_img[CHN_ALPHA] && wa ?
+			mem_img[CHN_ALPHA] + iofs : NULL, old_alpha + iofs,
+			wa, wm, opacity, 0);
+
+		process_img(0, 1, fw, mask, mem_img[mem_channel] + iofs * bpp,
+			old_image + iofs * bpp, image, mem_clip_bpp,
+			opacity ? bpp : 0);
+
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;
+		iofs += mem_width;
 	}
 
 	if (swap)
@@ -306,7 +325,6 @@ void commit_paste(int swap, int *update)
 
 	fail = FALSE;
 quit:	free(mask);
-	free(alpha);
 
 	if (fail) memory_errors(1); /* Warn and not update */
 	else if (!update) /* Update right now */
