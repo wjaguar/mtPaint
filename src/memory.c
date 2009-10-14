@@ -8856,6 +8856,7 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	unsigned char *img0, unsigned char *img,
 	unsigned char *alpha0, unsigned char *alpha, int opacity)
 {
+	png_color *col, *col0;
 	int i, j, k, i3;
 
 	cnt = start + step * cnt;
@@ -8885,15 +8886,14 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 				continue;
 			}
 		}
+		col = mem_pal + img[i];
+		col0 = mem_pal + img0[i];
 		i3 = i * 3;
-		k = mem_pal[img0[i]].red * 255 + j * (mem_pal[img[i]].red -
-			mem_pal[img0[i]].red);
+		k = col0->red * 255 + j * (col->red - col0->red);
 		rgb[i3 + 0] = (k + (k >> 8) + 1) >> 8;
-		k = mem_pal[img0[i]].green * 255 + j * (mem_pal[img[i]].green -
-			mem_pal[img0[i]].green);
+		k = col0->green * 255 + j * (col->green - col0->green);
 		rgb[i3 + 1] = (k + (k >> 8) + 1) >> 8;
-		k = mem_pal[img0[i]].blue * 255 + j * (mem_pal[img[i]].blue -
-			mem_pal[img0[i]].blue);
+		k = col0->blue * 255 + j * (col->blue - col0->blue);
 		rgb[i3 + 2] = (k + (k >> 8) + 1) >> 8;
 	}
 }

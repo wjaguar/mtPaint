@@ -2194,7 +2194,7 @@ op_s:
 }
 
 typedef struct {
-	unsigned char *wmask, *gmask, *walpha, *galpha, *talpha;
+	unsigned char *wmask, *gmask, *walpha, *galpha;
 	unsigned char *wimg, *gimg, *rgb;
 	int opac, len, bpp;
 } grad_render_state;
@@ -2202,41 +2202,36 @@ typedef struct {
 static unsigned char *init_grad_render(grad_render_state *g, int len,
 	chanlist tlist)
 {
-	int opac = 0, i1, i2, bpp = MEM_BPP;
-	unsigned char *gstore, *tmp;
+	unsigned char *gstore;
+	int coupled_alpha, idx2rgb, opac = 0, bpp = MEM_BPP;
+
 
 // !!! Only the "slow path" for now
 	if (gradient[mem_channel].status != GRAD_DONE) return (NULL);
 
 	if (!IS_INDEXED) opac = grad_opacity;
 
-	i1 = (mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA] ? 2 : 0;
-	i2 = !opac && (grad_opacity < 255) ? 3 : 0;
-
-	gstore = malloc((2 + 2 * bpp + i1 + i2) * len);
-	if (!gstore) return (NULL);
 	memset(g, 0, sizeof(grad_render_state));
+	coupled_alpha = (mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA];
+	idx2rgb = !opac && (grad_opacity < 255);
+	gstore = multialloc(MA_SKIP_ZEROSIZE,
+		&g->wmask, len,				/* Mask */
+		&g->gmask, len,				/* Gradient opacity */
+		&g->gimg, len * bpp,			/* Gradient image */
+		&g->wimg, len * bpp,			/* Resulting image */
+		&g->galpha, coupled_alpha * len,	/* Gradient alpha */
+		&g->walpha, coupled_alpha * len,	/* Resulting alpha */
+		&g->rgb, idx2rgb * len * 3,		/* Indexed to RGB */
+		NULL);
+	if (!gstore) return (NULL);
+
+	tlist[mem_channel] = g->wimg;
+	if (g->rgb) tlist[CHN_IMAGE] = g->rgb;
+	if (g->walpha) tlist[CHN_ALPHA] = g->walpha;
 	g->opac = opac;
 	g->len = len;
 	g->bpp = bpp;
 
-	g->wmask = gstore;			/* Mask */
-	g->gmask = tmp = gstore + len;		/* Gradient opacity */
-	g->gimg = tmp = tmp + len;		/* Gradient image */
-	g->wimg = tmp = tmp + bpp * len;	/* Resulting image */
-	tlist[mem_channel] = g->wimg;
-	if (i2) /* Indexed to RGB */
-	{
-		g->rgb = tmp + (bpp + i1) * len;
-		tlist[CHN_IMAGE] = g->rgb;
-	}
-	if (i1) /* Coupled alpha */
-	{
-		g->galpha = tmp = tmp + bpp * len;	/* Gradient alpha */
-		g->walpha = tmp + len;			/* Resulting alpha */
-		g->talpha = g->galpha;			/* Transient alpha */
-		tlist[CHN_ALPHA] = g->walpha;
-	}
 	return (gstore);
 }
 
@@ -2253,7 +2248,7 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 	if (g->walpha) memcpy(g->walpha, mem_img[CHN_ALPHA] + l, g->len);
 
 	process_mask(start, step, cnt, g->wmask, g->walpha, mem_img[CHN_ALPHA] + l,
-		g->talpha, g->gmask, g->opac, channel_dis[CHN_ALPHA]);
+		g->galpha, g->gmask, g->opac, channel_dis[CHN_ALPHA]);
 
 	memcpy(g->wimg, tmp, g->len * g->bpp);
 	process_img(start, step, cnt, g->wmask, g->wimg, tmp, g->gimg, g->bpp,
