@@ -1247,6 +1247,12 @@ static colour_hook allcol_hook;
 
 static void allcol_ok(colour_hook chook)
 {
+	/* Prod the focused spinbutton, if any, to update its value */
+#if GTK_MAJOR_VERSION == 1
+	gtk_container_focus(GTK_CONTAINER(allcol_window), GTK_DIR_TAB_FORWARD);
+#else
+	gtk_widget_child_focus(allcol_window, GTK_DIR_TAB_FORWARD);
+#endif
 	chook(CHOOK_OK);
 	gtk_widget_destroy(allcol_window);
 	free(ctable_[CHN_IMAGE]);

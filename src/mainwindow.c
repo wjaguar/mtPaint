@@ -2195,7 +2195,7 @@ op_s:
 
 typedef struct {
 	unsigned char *wmask, *gmask, *walpha, *galpha;
-	unsigned char *wimg, *gimg, *rgb;
+	unsigned char *wimg, *gimg, *rgb, *xbuf;
 	int opac, len, bpp;
 } grad_render_state;
 
@@ -2222,6 +2222,7 @@ static unsigned char *init_grad_render(grad_render_state *g, int len,
 		&g->galpha, coupled_alpha * len,	/* Gradient alpha */
 		&g->walpha, coupled_alpha * len,	/* Resulting alpha */
 		&g->rgb, idx2rgb * len * 3,		/* Indexed to RGB */
+		&g->xbuf, NEED_XBUF_DRAW * len * bpp,
 		NULL);
 	if (!gstore) return (NULL);
 
@@ -2251,8 +2252,8 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 		g->galpha, g->gmask, g->opac, channel_dis[CHN_ALPHA]);
 
 	memcpy(g->wimg, tmp, g->len * g->bpp);
-	process_img(start, step, cnt, g->wmask, g->wimg, tmp, g->gimg, g->bpp,
-		g->opac ? g->bpp : 0);
+	process_img(start, step, cnt, g->wmask, g->wimg, tmp, g->gimg,
+		g->xbuf, g->bpp, g->opac ? g->bpp : 0);
 
 	if (g->rgb) blend_indexed(start, step, cnt, g->rgb, mem_img[CHN_IMAGE] + l,
 		g->wimg ? g->wimg : mem_img[CHN_IMAGE] + l, mem_img[CHN_ALPHA] + l,
@@ -2288,6 +2289,7 @@ typedef struct {
 	unsigned char *mask, *wmask;	// Temp mask: one we use, other we init
 	unsigned char *mask0;		// Image mask channel to use
 	unsigned char *xform;	// Buffer for color transform preview
+	unsigned char *xbuf;	// Extra buffer for process_img()
 	int opacity, bpp;	// Just that
 	int pixf;		// Flag: need current channel override filled
 	int dx;			// Memory-space X offset
@@ -2301,7 +2303,7 @@ static int init_paste_render(paste_render_state *p, main_render_state *r,
 	unsigned char *xmask)
 {
 	int x, y, w, h, mx, my, ddx, bpp, scale = r->scale, zoom = r->zoom;
-	int temp_image, temp_mask, temp_alpha, fake_alpha, xform_buffer;
+	int temp_image, temp_mask, temp_alpha, fake_alpha, xform_buffer, xbuf;
 
 
 	/* Clip paste area to update area */
@@ -2344,8 +2346,9 @@ static int init_paste_render(paste_render_state *p, main_render_state *r,
 	temp_mask = !xmask; // Need temp mask if not have one ready
 	temp_image = p->clip_image && !p->tlist[mem_channel]; // Same for temp image
 	xform_buffer = mem_preview_clip && (bpp == 3) && (mem_clip_bpp == 3);
+	xbuf = NEED_XBUF_PASTE;
 
-	if (temp_image | temp_alpha | temp_mask | fake_alpha | xform_buffer)
+	if (temp_image | temp_alpha | temp_mask | fake_alpha | xform_buffer | xbuf)
 	{
 		p->buf = multialloc(MA_SKIP_ZEROSIZE,
 			&p->tlist[mem_channel], temp_image * r->lx * bpp,
@@ -2353,6 +2356,7 @@ static int init_paste_render(paste_render_state *p, main_render_state *r,
 			&p->mask, temp_mask * p->lx,
 			&p->t_alpha, fake_alpha * p->lx,
 			&p->xform, xform_buffer * p->lx * 3,
+			&p->xbuf, xbuf * p->lx * bpp,
 			NULL);
 		if (!p->buf) return (FALSE);
 	}
@@ -2404,7 +2408,7 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		clip_src = p->xform;
 	}
 	process_img(start, step, cnt, p->mask, p->pix, mem_img[mem_channel] + ld * bpp,
-		clip_src, mem_clip_bpp, p->opacity ? bpp : 0);
+		clip_src, p->xbuf, mem_clip_bpp, p->opacity ? bpp : 0);
 }
 
 static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)

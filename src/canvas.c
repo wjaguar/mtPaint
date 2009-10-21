@@ -228,7 +228,7 @@ void init_status_bar()
 void commit_paste(int swap, int *update)
 {
 	image_info ti;
-	unsigned char *image, *mask, *alpha = NULL;
+	unsigned char *image, *xbuf, *mask, *alpha = NULL;
 	unsigned char *old_image, *old_alpha;
 	int op = 255, opacity = tool_opacity, bpp = MEM_BPP;
 	int fx, fy, fw, fh, fx2, fy2;		// Screen coords
@@ -244,8 +244,9 @@ void commit_paste(int swap, int *update)
 	fh = fy2 - fy + 1;
 
 	mask = multialloc(MA_SKIP_ZEROSIZE, &mask, fw, &alpha,
-		(mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA] &&
-		!mem_clip_alpha && !channel_dis[CHN_ALPHA] ? fw : 0, NULL);
+		((mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA] &&
+		!mem_clip_alpha && !channel_dis[CHN_ALPHA]) * fw,
+		&xbuf, NEED_XBUF_PASTE * fw * bpp, NULL);
 	if (!mask) goto quit; // Not enough memory
 	if (alpha) memset(alpha, channel_col_A[CHN_ALPHA], fw);
 
@@ -298,8 +299,8 @@ void commit_paste(int swap, int *update)
 			wa, wm, opacity, 0);
 
 		process_img(0, 1, fw, mask, mem_img[mem_channel] + iofs * bpp,
-			old_image + iofs * bpp, image, mem_clip_bpp,
-			opacity ? bpp : 0);
+			old_image + iofs * bpp, image,
+			xbuf, mem_clip_bpp, opacity ? bpp : 0);
 
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;

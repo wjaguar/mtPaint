@@ -568,16 +568,19 @@ void mem_replace_filename(int layer, char *fname)
 	/* Do nothing if "replacing" name by itself */
 	if (fname && name ? !strcmp(fname, name) : fname == name) return;
 
+	/* !!! Make a copy of new filename while the old filename still exists,
+	 * because the new pointer must differ from the old one - WJ */
+	if (fname) fname = strdup(fname);
+
 	/* Store the old filename in _previous_ undo frame if possible */
 	undo = &image->undo_;
 	if (undo->done) undo_add_data(undo->items + (undo->pointer ?
 		undo->pointer : undo->max) - 1, UD_FILENAME, name);
 	else free(name);
 
-	/* Clear filename, and clear tempname too while we're at it */
-	image->filename = image->tempname = NULL;
-	/* Put a copy of new name in its place */
-	if (fname) image->filename = strdup(fname);
+	/* Replace filename, and clear tempname too while we're at it */
+	image->filename = fname;
+	image->tempname = NULL;
 }
 
 /* Label file's frames in current layer as changed */
@@ -2447,26 +2450,32 @@ void set_zoom_centre( int x, int y )
 	}
 }
 
+static void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
+	unsigned char *src)
+{
+	int i, s3 = step * 3;
+
+	dest += start * 3;
+	cnt = start + step * cnt;
+	for (i = start; i < cnt; i += step)
+	{
+		png_color *col = mem_pal + src[i];
+		dest[0] = col->red;
+		dest[1] = col->green;
+		dest[2] = col->blue;
+		dest += s3;
+	}
+}
+
 int mem_convert_rgb()			// Convert image to RGB
 {
-	char *old_image = mem_img[CHN_IMAGE], *new_image;
-	unsigned char pix;
-	int i, j, res;
+	char *old_image = mem_img[CHN_IMAGE];
+	int res;
 
 	res = undo_next_core(UC_NOCOPY, mem_width, mem_height, 3, CMASK_IMAGE);
 	if (res) return (res);	// Not enough memory
-
-	new_image = mem_img[CHN_IMAGE];
-	j = mem_width * mem_height;
-	for (i = 0; i < j; i++)
-	{
-		pix = *old_image++;
-		*new_image++ = mem_pal[pix].red;
-		*new_image++ = mem_pal[pix].green;
-		*new_image++ = mem_pal[pix].blue;
-	}
-
-	return 0;
+	do_convert_rgb(0, 1, mem_width * mem_height, mem_img[CHN_IMAGE], old_image);
+	return (0);
 }
 
 // Convert colours list into palette
@@ -6021,10 +6030,8 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
-static const unsigned char zero[3] = {0, 0, 0};
-
-static void blend_rgb(unsigned char *dest, const unsigned char *src,
-	int tint, int bpp)
+static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0, unsigned char *img, int bpp)
 {
 	static const unsigned char hhsv[8 * 3] = {
 		0, 1, 2, /* #0: B..M */
@@ -6036,272 +6043,310 @@ static void blend_rgb(unsigned char *dest, const unsigned char *src,
 		1, 2, 0, /* #6: R..Y */
 		1, 2, 0  /* #7: W */ };
 	const unsigned char *new, *old;
-	int nhex, ohex;
+	int j, step3, nhex, ohex, mode = blend_mode;
+
 
 	/* Backward transfer? */
-	if ((blend_mode & (BLEND_MMASK | BLEND_REVERSE)) > BLEND_REVERSE)
-		new = src , old = dest;
-	else new = dest , old = src;
+	if (mode & BLEND_REVERSE) new = img0 , old = img;
+	else new = img , old = img0;
+	mode &= BLEND_MMASK;
+	if (bpp == 1) mode += BLEND_NMODES;
 
-	nhex = ((((0x200 + new[0]) - new[1]) ^ ((0x400 + new[1]) - new[2]) ^
-		 ((0x100 + new[2]) - new[0])) >> 8) * 3;
-	ohex = ((((0x200 + old[0]) - old[1]) ^ ((0x400 + old[1]) - old[2]) ^
-		 ((0x100 + old[2]) - old[0])) >> 8) * 3;
-
-	switch (blend_mode & BLEND_MMASK)
+	cnt = start + step * (cnt - 1);
+	step3 = step * bpp;
+	new += (start - step) * bpp; old += (start - step) * bpp;
+	j = start - step;
+	while (j < cnt)
 	{
-	case BLEND_HUE: /* HS* Hue */
-	{
-		int i, nsi, nvi;
-		unsigned char os, ov;
+		unsigned char *dest;
+		int j0, j1, j2;
 
-		ov = old[hhsv[ohex + 2]];
+		j += step; old += step3; new += step3;
+		if (!mask[j]) continue;
 
-		if (nhex == 7 * 3) /* New is white */
+		dest = imgr + j * bpp;
+
+		if (mode < BLEND_1BPP)
 		{
-			dest[0] = dest[1] = dest[2] = ov;
-			break;
+			nhex = ((((0x200 + new[0]) - new[1]) ^ ((0x400 + new[1]) - new[2]) ^
+				 ((0x100 + new[2]) - new[0])) >> 8) * 3;
+			ohex = ((((0x200 + old[0]) - old[1]) ^ ((0x400 + old[1]) - old[2]) ^
+				 ((0x100 + old[2]) - old[0])) >> 8) * 3;
 		}
 
-		os = old[hhsv[ohex + 1]];
-		nsi = hhsv[nhex + 1];
-		nvi = hhsv[nhex + 2];
-
-		i = new[nvi] - new[nsi];
-		dest[hhsv[nhex]] = (i + (ov - os) * 2 *
-			(new[hhsv[nhex]] - new[nsi])) / (i + i) + os;
-		dest[nsi] = os;
-		dest[nvi] = ov;
-		break;
-	}
-	case BLEND_SAT: /* HSV Saturation */
-	{
-		int i, osi, ovi;
-		unsigned char ov, os, ns, nv;
-
-		if (ohex == 7 * 3) /* Old is white - leave it so */
+		switch (mode)
 		{
-			dest[0] = old[0]; dest[1] = old[1]; dest[2] = old[2];
+		case BLEND_HUE: /* HS* Hue */
+		{
+			int i, nsi, nvi;
+			unsigned char os, ov;
+
+			ov = old[hhsv[ohex + 2]];
+
+			if (nhex == 7 * 3) /* New is white */
+			{
+				dest[0] = dest[1] = dest[2] = ov;
+				break;
+			}
+
+			os = old[hhsv[ohex + 1]];
+			nsi = hhsv[nhex + 1];
+			nvi = hhsv[nhex + 2];
+
+			i = new[nvi] - new[nsi];
+			dest[hhsv[nhex]] = (i + (ov - os) * 2 *
+				(new[hhsv[nhex]] - new[nsi])) / (i + i) + os;
+			dest[nsi] = os;
+			dest[nvi] = ov;
 			break;
 		}
-
-		ovi = hhsv[ohex + 2];
-		ov = old[ovi];
-
-		if (nhex == 7 * 3) /* New is white */
+		case BLEND_SAT: /* HSV Saturation */
 		{
-			dest[0] = dest[1] = dest[2] = ov;
+			int i, osi, ovi;
+			unsigned char ov, os, ns, nv;
+
+			if (ohex == 7 * 3) /* Old is white - leave it so */
+			{
+				dest[0] = old[0]; dest[1] = old[1]; dest[2] = old[2];
+				break;
+			}
+
+			ovi = hhsv[ohex + 2];
+			ov = old[ovi];
+
+			if (nhex == 7 * 3) /* New is white */
+			{
+				dest[0] = dest[1] = dest[2] = ov;
+				break;
+			}
+
+			osi = hhsv[ohex + 1];
+			os = old[osi];
+
+			nv = new[hhsv[nhex + 2]];
+			ns = (new[hhsv[nhex + 1]] * ov * 2 + nv) / (nv + nv);
+
+			i = ov - os;
+			dest[hhsv[ohex]] = (i + (ov - ns) * 2 *
+				(old[hhsv[ohex]] - os)) / (i + i) + ns;
+			dest[osi] = ns;
+			dest[ovi] = ov;
 			break;
 		}
-
-		osi = hhsv[ohex + 1];
-		os = old[osi];
-
-		nv = new[hhsv[nhex + 2]];
-		ns = (new[hhsv[nhex + 1]] * ov * 2 + nv) / (nv + nv);
-
-		i = ov - os;
-		dest[hhsv[ohex]] = (i + (ov - ns) * 2 *
-			(old[hhsv[ohex]] - os)) / (i + i) + ns;
-		dest[osi] = ns;
-		dest[ovi] = ov;
-		break;
-	}
-	case BLEND_VALUE: /* HSV Value */
-	{
-		int osi, ovi;
-		unsigned char ov, nv;
-
-		nv = new[hhsv[nhex + 2]];
-
-		if (ohex == 7 * 3) /* Old is white */
+		case BLEND_VALUE: /* HSV Value */
 		{
-			dest[0] = dest[1] = dest[2] = nv;
+			int osi, ovi;
+			unsigned char ov, nv;
+
+			nv = new[hhsv[nhex + 2]];
+
+			if (ohex == 7 * 3) /* Old is white */
+			{
+				dest[0] = dest[1] = dest[2] = nv;
+				break;
+			}
+
+			ov = old[hhsv[ohex + 2]];
+			osi = hhsv[ohex + 1];
+			ovi = hhsv[ohex + 2];
+
+			dest[hhsv[ohex]] = (old[hhsv[ohex]] * nv * 2 + ov) / (ov + ov);
+			dest[osi] = (old[osi] * nv * 2 + ov) / (ov + ov);
+			dest[ovi] = nv;
 			break;
 		}
-
-		ov = old[hhsv[ohex + 2]];
-		osi = hhsv[ohex + 1];
-		ovi = hhsv[ohex + 2];
-
-		dest[hhsv[ohex]] = (old[hhsv[ohex]] * nv * 2 + ov) / (ov + ov);
-		dest[osi] = (old[osi] * nv * 2 + ov) / (ov + ov);
-		dest[ovi] = nv;
-		break;
-	}
-	case BLEND_COLOR: /* HSL Hue + Saturation */
-	{
-		int nsi, nvi, x0, x1, y0, y1, vsy1, vs1y;
-		unsigned char os, ov;
-
-		os = old[hhsv[ohex + 1]];
-		ov = old[hhsv[ohex + 2]];
-		x0 = os + ov;
-
-		/* New is white */
-		if (nhex == 7 * 3)
+		case BLEND_COLOR: /* HSL Hue + Saturation */
 		{
-			dest[0] = dest[1] = dest[2] = (x0 + 1) >> 1;
+			int nsi, nvi, x0, x1, y0, y1, vsy1, vs1y;
+			unsigned char os, ov;
+
+			os = old[hhsv[ohex + 1]];
+			ov = old[hhsv[ohex + 2]];
+			x0 = os + ov;
+
+			/* New is white */
+			if (nhex == 7 * 3)
+			{
+				dest[0] = dest[1] = dest[2] = (x0 + 1) >> 1;
+				break;
+			}
+
+			nsi = hhsv[nhex + 1];
+			nvi = hhsv[nhex + 2];
+			x1 = new[nvi] + new[nsi];
+
+			y1 = x1 > 255 ? 510 - x1 : x1;
+			vs1y = (x0 + 1) * y1;
+			y0 = x0 > 255 ? 510 - x0 : x0;
+			vsy1 = (new[nvi] - new[nsi]) * y0;
+			y1 += y1;
+
+			dest[hhsv[nhex]] = (vs1y + (new[hhsv[nhex]] * 2 - x1) * y0) / y1;
+			dest[nsi] = (vs1y - vsy1) / y1;
+			dest[nvi] = (vs1y + vsy1) / y1;
 			break;
 		}
-
-		nsi = hhsv[nhex + 1];
-		nvi = hhsv[nhex + 2];
-		x1 = new[nvi] + new[nsi];
-
-		y1 = x1 > 255 ? 510 - x1 : x1;
-		vs1y = (x0 + 1) * y1;
-		y0 = x0 > 255 ? 510 - x0 : x0;
-		vsy1 = (new[nvi] - new[nsi]) * y0;
-		y1 += y1;
-
-		dest[hhsv[nhex]] = (vs1y + (new[hhsv[nhex]] * 2 - x1) * y0) / y1;
-		dest[nsi] = (vs1y - vsy1) / y1;
-		dest[nvi] = (vs1y + vsy1) / y1;
-		break;
-	}
-	case BLEND_SATPP: /* Perceived saturation (a hack, but useful one) */
-	{
-		int i, xyz = old[0] + old[1] + old[2];
-
-		/* This makes difference between MIN and MAX twice larger -
-		 * somewhat like doubling HSL saturation, but without strictly
-		 * preserving L */
-		i = (old[0] * 6 - xyz + 2) / 3;
-		dest[0] = i < 0 ? 0 : i > 255 ? 255 : i;
-		i = (old[1] * 6 - xyz + 2) / 3;
-		dest[1] = i < 0 ? 0 : i > 255 ? 255 : i;
-		i = (old[2] * 6 - xyz + 2) / 3;
-		dest[2] = i < 0 ? 0 : i > 255 ? 255 : i;
-		break;
-	}
-	case BLEND_NORMAL: /* Do nothing */
-	default: break;
-	}
-
-	if (tint) src = zero;
-	switch (blend_mode >> BLEND_RGBSHIFT)
-	{
-	case 0: /* Do nothing */
-	default: return;
-	case 6: dest[1] = src[1]; /* Red */
-	case 4: dest[2] = src[2]; /* Red + Green */
-		break;
-	case 5: dest[2] = src[2]; /* Green */
-	case 1: dest[0] = src[0]; /* Green + Blue */
-		break;
-	case 3: dest[0] = src[0]; /* Blue */
-	case 2: dest[1] = src[1]; /* Blue + Red */
-		break;
-	}
-}
-
-static void blend_channel(unsigned char *dest, const unsigned char *src,
-	int tint, int bpp)
-{
-	const unsigned char *np, *op;
-	int i = 0, cf = bpp == 1 ? 0 : blend_mode >> BLEND_RGBSHIFT;
-
-	/* Backward transfer? */
-	if ((blend_mode & (BLEND_MMASK | BLEND_REVERSE)) >=
-		(BLEND_1BPP + BLEND_REVERSE)) np = src , op = dest;
-	else np = dest , op = src;
-	if (tint) src = zero;
-
-rep:	if (!(cf & 1))
-	{
-		unsigned char new = np[i], old = op[i];
-		int j;
-
-		switch (blend_mode & BLEND_MMASK)
+		case BLEND_SATPP: /* Perceived saturation (a hack, but useful one) */
 		{
-		default: // Some RGB mode applied to 1-bpp channel - ignore it
-			*dest = old;
+			int i, xyz = old[0] + old[1] + old[2];
+
+			/* This makes difference between MIN and MAX twice larger -
+			 * somewhat like doubling HSL saturation, but without strictly
+			 * preserving L */
+			i = (old[0] * 6 - xyz + 2) / 3;
+			dest[0] = i < 0 ? 0 : i > 255 ? 255 : i;
+			i = (old[1] * 6 - xyz + 2) / 3;
+			dest[1] = i < 0 ? 0 : i > 255 ? 255 : i;
+			i = (old[2] * 6 - xyz + 2) / 3;
+			dest[2] = i < 0 ? 0 : i > 255 ? 255 : i;
 			break;
-		case BLEND_NORMAL: // Passthrough
-			break;
+		}
 		case BLEND_SCREEN: // ~mult(~old, ~new)
-			j = (old + new) * 255 - old * new;
-			*dest = (j + (j >> 8) + 1) >> 8;
+			j1 = (old[1] + new[1]) * 255 - old[1] * new[1];
+			dest[1] = (j1 + (j1 >> 8) + 1) >> 8;
+			j2 = (old[2] + new[2]) * 255 - old[2] * new[2];
+			dest[2] = (j2 + (j2 >> 8) + 1) >> 8;
+		case BLEND_SCREEN + BLEND_NMODES:
+			j0 = (old[0] + new[0]) * 255 - old[0] * new[0];
+			dest[0] = (j0 + (j0 >> 8) + 1) >> 8;
 			break;
 		case BLEND_MULT:
-			j = old * new;
-			*dest = (j + (j >> 8) + 1) >> 8;
+			j1 = old[1] * new[1];
+			dest[1] = (j1 + (j1 >> 8) + 1) >> 8;
+			j2 = old[2] * new[2];
+			dest[2] = (j2 + (j2 >> 8) + 1) >> 8;
+		case BLEND_MULT + BLEND_NMODES:
+			j0 = old[0] * new[0];
+			dest[0] = (j0 + (j0 >> 8) + 1) >> 8;
 			break;
 		case BLEND_BURN: // ~div(~old, new)
-			j = ((unsigned char)~old << 8) / (new + 1);
-			*dest = 255 - j >= 0 ? 255 - j : 0;
+			j1 = ((unsigned char)~old[1] << 8) / (new[1] + 1);
+			dest[1] = 255 - j1 >= 0 ? 255 - j1 : 0;
+			j2 = ((unsigned char)~old[2] << 8) / (new[2] + 1);
+			dest[2] = 255 - j2 >= 0 ? 255 - j2 : 0;
+		case BLEND_BURN + BLEND_NMODES:
+			j0 = ((unsigned char)~old[0] << 8) / (new[0] + 1);
+			dest[0] = 255 - j0 >= 0 ? 255 - j0 : 0;
 			break;
 		case BLEND_DODGE: // div(old, ~new)
-			new = ~new;
+			j1 = (old[1] << 8) / (~new[1] + 1);
+			dest[1] = j1 < 255 ? j1 : 255;
+			j2 = (old[2] << 8) / (~new[2] + 1);
+			dest[2] = j2 < 255 ? j2 : 255;
+		case BLEND_DODGE + BLEND_NMODES:
+			j0 = (old[0] << 8) / (~new[0] + 1);
+			dest[0] = j0 < 255 ? j0 : 255;
+			break;
 		case BLEND_DIV:
-			j = (old << 8) / (new + 1);
-			*dest = j < 255 ? j : 255;
+			j1 = (old[1] << 8) / (new[1] + 1);
+			dest[1] = j1 < 255 ? j1 : 255;
+			j2 = (old[2] << 8) / (new[2] + 1);
+			dest[2] = j2 < 255 ? j2 : 255;
+		case BLEND_DIV + BLEND_NMODES:
+			j0 = (old[0] << 8) / (new[0] + 1);
+			dest[0] = j0 < 255 ? j0 : 255;
 			break;
 		case BLEND_HLIGHT:
-			j = old * new * 2;
-			if (new >= 128)
-				j = (old + new) * (255 * 2) - (255 * 255) - j;
-			*dest = (j + (j >> 8) + 1) >> 8;
+			j1 = old[1] * new[1] * 2;
+			if (new[1] >= 128)
+				j1 = (old[1] + new[1]) * (255 * 2) - (255 * 255) - j1;
+			dest[1] = (j1 + (j1 >> 8) + 1) >> 8;
+			j2 = old[2] * new[2] * 2;
+			if (new[2] >= 128)
+				j2 = (old[2] + new[2]) * (255 * 2) - (255 * 255) - j2;
+			dest[2] = (j2 + (j2 >> 8) + 1) >> 8;
+		case BLEND_HLIGHT + BLEND_NMODES:
+			j0 = old[0] * new[0] * 2;
+			if (new[0] >= 128)
+				j0 = (old[0] + new[0]) * (255 * 2) - (255 * 255) - j0;
+			dest[0] = (j0 + (j0 >> 8) + 1) >> 8;
 			break;
 		case BLEND_SLIGHT:
 // !!! This formula is equivalent to one used in Pegtop XFader and GIMP,
 // !!! and differs from one used by Photoshop and PhotoPaint
-			j = old * ((255 * 255) - (unsigned char)~old * (255 - (new << 1)));
+			j1 = old[1] * ((255 * 255) - (unsigned char)~old[1] *
+				(255 - (new[1] << 1)));
 			// Precise division by 255^2
-			j += j >> 7;
-			*dest = (j + ((j * 3 + 0x480) >> 16)) >> 16;
+			j1 += j1 >> 7;
+			dest[1] = (j1 + ((j1 * 3 + 0x480) >> 16)) >> 16;
+			j2 = old[2] * ((255 * 255) - (unsigned char)~old[2] *
+				(255 - (new[2] << 1)));
+			j2 += j2 >> 7;
+			dest[2] = (j2 + ((j2 * 3 + 0x480) >> 16)) >> 16;
+		case BLEND_SLIGHT + BLEND_NMODES:
+			j0 = old[0] * ((255 * 255) - (unsigned char)~old[0] *
+				(255 - (new[0] << 1)));
+			j0 += j0 >> 7;
+			dest[0] = (j0 + ((j0 * 3 + 0x480) >> 16)) >> 16;
 			break;
 // "Negation" : ~BLEND_DIFF(~old, new)
 		case BLEND_DIFF:
-			*dest = abs(old - new);
-//			j = *old - *new;
-//			*dest = j < 0 ? 255 - j : j;
+			dest[1] = abs(old[1] - new[1]);
+			dest[2] = abs(old[2] - new[2]);
+		case BLEND_DIFF + BLEND_NMODES:
+			dest[0] = abs(old[0] - new[0]);
 			break;
 		case BLEND_DARK:
-			*dest = old < new ? old : new;
+			dest[1] = old[1] < new[1] ? old[1] : new[1];
+			dest[2] = old[2] < new[2] ? old[2] : new[2];
+		case BLEND_DARK + BLEND_NMODES:
+			dest[0] = old[0] < new[0] ? old[0] : new[0];
 			break;
 		case BLEND_LIGHT:
-			*dest = old > new ? old : new;
+			dest[1] = old[1] > new[1] ? old[1] : new[1];
+			dest[2] = old[2] > new[2] ? old[2] : new[2];
+		case BLEND_LIGHT + BLEND_NMODES:
+			dest[0] = old[0] > new[0] ? old[0] : new[0];
 			break;
 		case BLEND_GRAINX:
-			j = old - new + 128;
-			*dest = j < 0 ? 0 : j > 255 ? 255 : j;
+			j1 = old[1] - new[1] + 128;
+			dest[1] = j1 < 0 ? 0 : j1 > 255 ? 255 : j1;
+			j2 = old[2] - new[2] + 128;
+			dest[2] = j2 < 0 ? 0 : j2 > 255 ? 255 : j2;
+		case BLEND_GRAINX + BLEND_NMODES:
+			j0 = old[0] - new[0] + 128;
+			dest[0] = j0 < 0 ? 0 : j0 > 255 ? 255 : j0;
 			break;
 		case BLEND_GRAINM:
-			j = old + new - 128;
-			*dest = j < 0 ? 0 : j > 255 ? 255 : j;
+			j1 = old[1] + new[1] - 128;
+			dest[1] = j1 < 0 ? 0 : j1 > 255 ? 255 : j1;
+			j2 = old[2] + new[2] - 128;
+			dest[2] = j2 < 0 ? 0 : j2 > 255 ? 255 : j2;
+		case BLEND_GRAINM + BLEND_NMODES:
+			j0 = old[0] + new[0] - 128;
+			dest[0] = j0 < 0 ? 0 : j0 > 255 ? 255 : j0;
 			break;
 // Photoshop's "Linear light" is equivalent to XFader's "Stamp" with swapped A&B
+		default: /* RGB mode applied to 1bpp */
+			dest[0] = img0[j];
+ 			break;
 		}
 	}
-	else *dest = src[i];
-	if (!--bpp) return;
-	i++; dest++; cf >>= 1;
-	goto rep;
+	return (TRUE);
 }
 
-void put_pixel_def( int x, int y )	/* Combined */
+void put_pixel_def(int x, int y)	/* Combined */
 {
-	unsigned char *old_image, *new_image, *old_alpha = NULL, newc, oldc;
-	unsigned char r, g, b, cset[NUM_CHANNELS + 3 + 1];
-	int i, j, offset, ofs3, opacity = 255, op = tool_opacity, tint;
+	unsigned char *ti, *old_image, *old_alpha = NULL;
+	unsigned char fmask, opacity = 255, cset[NUM_CHANNELS + 3];
+	int i, j, offset, idx, bpp, tint, op = tool_opacity;
 
 
+	idx = IS_INDEXED;
 	j = pixel_protected(x, y);
-	if (mem_img_bpp == 1 ? j : j == 255) return;
+	if (idx ? j : j == 255) return;
+	bpp = MEM_BPP;
+	ti = cset + (bpp == 3 ? 0 : mem_channel + 3);
 
 	tint = tint_mode[0];
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	if (mem_gradient) /* Gradient mode - ask for one pixel */
 	{
-		cset[NUM_CHANNELS + 3] = 0; // Fake mask on input
-		grad_pixels(0, 1, 1, x, y,
-			cset + NUM_CHANNELS + 3, cset + NUM_CHANNELS + 3,
-			cset + (mem_channel + 3 > mem_img_bpp ? mem_channel + 3 : 0),
+		fmask = 0; // Fake mask on input
+		grad_pixels(0, 1, 1, x, y, &fmask, &fmask, ti,
 			cset + CHN_ALPHA + 3);
-		if (!(op = cset[NUM_CHANNELS + 3])) return;
+		if (!(op = fmask)) return;
 	}
 	else /* Default mode - init "colorset" */
 	{
@@ -6321,7 +6366,7 @@ void put_pixel_def( int x, int y )	/* Combined */
 		old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
 			mem_img[CHN_ALPHA];
 
-	if (!IS_INDEXED) // No use for opacity with indexed images
+	if (!idx) // No use for opacity with indexed images
 	{
 		j = (255 - j) * op;
 		opacity = (j + (j >> 8) + 1) >> 8;
@@ -6346,73 +6391,10 @@ void put_pixel_def( int x, int y )	/* Combined */
 		mem_img[CHN_ALPHA][offset] = newc;
 	}
 
-	/* Indexed image or utility channel */
-	if ((mem_channel != CHN_IMAGE) || (mem_img_bpp == 1))
-	{
-		if (mem_blend)
-			blend_channel(cset + mem_channel + 3, old_image + offset, tint, 1);
-		newc = cset[mem_channel + 3];
-		oldc = old_image[offset];
-
-		if (!tint); // Do nothing
-		else if (tint < 0)
-		{
-			int j = mem_channel == CHN_IMAGE ? mem_cols - 1 : 255;
-			newc = oldc + newc < j ? oldc + newc : j;
-		}
-		else newc = oldc > newc ? oldc - newc : 0;
-
-		if (opacity < 255)
-		{
-			int j = oldc * 255 + (newc - oldc) * opacity;
-			newc = (j + (j >> 8) + 1) >> 8;
-		}
-		mem_img[mem_channel][offset] = newc;
-	}
-	/* RGB image channel */
-	else
-	{
-		ofs3 = offset * 3;
-		new_image = mem_img[CHN_IMAGE];
-
-		if (mem_blend)
-		{
-			((blend_mode & BLEND_MMASK) < BLEND_1BPP ? blend_rgb :
-				blend_channel)(cset, old_image + ofs3, tint, 3);
-		}
-
-		if (!tint); // Do nothing
-		else if (tint < 0)
-		{
-			cset[0] = old_image[ofs3] > 255 - cset[0] ? 255 : old_image[ofs3] + cset[0];
-			cset[1] = old_image[ofs3 + 1] > 255 - cset[1] ? 255 : old_image[ofs3 + 1] + cset[1];
-			cset[2] = old_image[ofs3 + 2] > 255 - cset[2] ? 255 : old_image[ofs3 + 2] + cset[2];
-		}
-		else
-		{
-			cset[0] = old_image[ofs3] > cset[0] ? old_image[ofs3] - cset[0] : 0;
-			cset[1] = old_image[ofs3 + 1] > cset[1] ? old_image[ofs3 + 1] - cset[1] : 0;
-			cset[2] = old_image[ofs3 + 2] > cset[2] ? old_image[ofs3 + 2] - cset[2] : 0;
-		}
-
-		if (opacity < 255)
-		{
-			r = old_image[ofs3];
-			g = old_image[ofs3 + 1];
-			b = old_image[ofs3 + 2];
-
-			i = r * 255 + (cset[0] - r) * opacity;
-			cset[0] = (i + (i >> 8) + 1) >> 8;
-			i = g * 255 + (cset[1] - g) * opacity;
-			cset[1] = (i + (i >> 8) + 1) >> 8;
-			i = b * 255 + (cset[2] - b) * opacity;
-			cset[2] = (i + (i >> 8) + 1) >> 8;
-		}
-
-		new_image[ofs3] = cset[0];
-		new_image[ofs3 + 1] = cset[1];
-		new_image[ofs3 + 2] = cset[2];
-	}
+	offset *= bpp;
+	process_img(0, 1, 1, &opacity,
+		mem_img[mem_channel] + offset, old_image + offset, ti,
+		ti, bpp, !idx * bpp);
 }
 
 /* Repeat pattern in buffer */
@@ -6457,7 +6439,7 @@ static void mask_select(unsigned char *mask, unsigned char *xsel, int l)
 /* Faster function for large brushes and fills */
 void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 {
-	unsigned char mask[ROW_BUFLEN], tmp_image[ROW_BUFLEN * 3],
+	unsigned char tmp_image[ROW_BUFLEN * 3], mask[ROW_BUFLEN],
 		tmp_alpha[ROW_BUFLEN], tmp_opacity[ROW_BUFLEN],
 		*source_alpha = NULL, *source_opacity = NULL;
 	unsigned char *old_image, *old_alpha, *srcp, src1[8];
@@ -6500,6 +6482,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		pattern_rep(tmp_image, srcp, x & 7, 8, l, bpp);
 	}
 
+	idx ^= 1; // 0 if indexed, now
 	while (TRUE)
 	{
 		int l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
@@ -6522,11 +6505,11 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		process_mask(0, 1, l, mask,
 			mem_img[CHN_ALPHA] + offset,
 			old_alpha + offset, source_alpha, source_opacity,
-			idx ? 0 : tool_opacity, channel_dis[CHN_ALPHA]);
+			idx * tool_opacity, channel_dis[CHN_ALPHA]);
 		process_img(0, 1, l, mask,
 			mem_img[mem_channel] + offset * bpp,
 			old_image + offset * bpp, tmp_image,
-			bpp, idx ? 0 : bpp);
+			tmp_image, bpp, idx * bpp);
 
 		if (!(len -= l)) return;
 		x += l;
@@ -6614,11 +6597,23 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int sourcebpp, int destbpp)
+	unsigned char *xbuf, int sourcebpp, int destbpp)
 {
-	unsigned char newc, oldc;
-	unsigned char r, g, b, nrgb[3];
 	int tint;
+
+
+	if (sourcebpp < destbpp)
+	{
+		/* Convert paletted source to RGB */
+		do_convert_rgb(start, step, cnt, xbuf, img);
+		img = xbuf;
+	}
+	if (mem_blend && (blend_mode & BLEND_MMASK))
+	{
+		/* Apply blend mode's transform part */
+		if (blend_pixels(start, step, cnt, mask,
+			xbuf, img0, img, destbpp < 3 ? 1 : 3)) img = xbuf;
+	}
 
 	cnt = start + step * cnt;
 
@@ -6628,21 +6623,15 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	/* Indexed image or utility channel */
 	if (destbpp < 3)
 	{
+		unsigned char newc, oldc;
 		int i, j, mx = destbpp ? 255 : mem_cols - 1;
 
 		for (i = start; i < cnt; i += step)
 		{
-			unsigned char nc, oc;
-
 			j = mask[i];
 			if (!j) continue;
-// !!! This trickery with assignments is meant to explain to dumb compiler that
-// "newc" and "oldc" are safe to allocate on registers
-			nc = img[i];
-			oc = img0[i];
-
-			if (mem_blend) blend_channel(&nc, &oc, tint, 1);
-			newc = nc; oldc = oc;
+			newc = img[i];
+			oldc = img0[i];
 
 			if (!tint); // Do nothing
 			else if (tint < 0) newc = oldc + newc < mx ?
@@ -6661,6 +6650,8 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	/* RGB image */
 	else
 	{
+		int rgbmask = mem_blend ? (blend_mode >> BLEND_RGBSHIFT) & 7 : 0;
+		unsigned char r, g, b, nrgb[3];
 		int i, j, ofs3, opacity;
 
 		for (i = start; i < cnt; i += step)
@@ -6668,24 +6659,12 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			opacity = mask[i];
 			if (!opacity) continue;
 			ofs3 = i * 3;
-			if (sourcebpp == 3) /* RGB-to-RGB paste */
-			{
-				nrgb[0] = img[ofs3 + 0];
-				nrgb[1] = img[ofs3 + 1];
-				nrgb[2] = img[ofs3 + 2];
-			}
-			else /* Indexed-to-RGB paste */
-			{
-				nrgb[0] = mem_pal[img[i]].red;
-				nrgb[1] = mem_pal[img[i]].green;
-				nrgb[2] = mem_pal[img[i]].blue;
-			}
-			if (mem_blend)
-			{
-				((blend_mode & BLEND_MMASK) < BLEND_1BPP ?
-					blend_rgb : blend_channel)(nrgb,
-					img0 + ofs3, tint, 3);
-			}
+			nrgb[0] = img[ofs3 + 0];
+			nrgb[1] = img[ofs3 + 1];
+			nrgb[2] = img[ofs3 + 2];
+
+/* !!! On x86, register pressure here is too large already, so rereading img0
+ * is preferable to lengthening r/g/b's living ranges - WJ */
 			if (tint)
 			{
 				r = img0[ofs3 + 0];
@@ -6704,6 +6683,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 					nrgb[2] = b > nrgb[2] ? b - nrgb[2] : 0;
 				}
 			}
+
 			if (opacity < 255)
 			{
 				r = img0[ofs3 + 0];
@@ -6716,6 +6696,21 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				j = b * 255 + (nrgb[2] - b) * opacity;
 				nrgb[2] = (j + (j >> 8) + 1) >> 8;
 			}
+
+			if (rgbmask)
+			switch (rgbmask)
+			{
+			case 6: nrgb[1] = img0[ofs3 + 1]; /* Red */
+			case 4: nrgb[2] = img0[ofs3 + 2]; /* Red + Green */
+				break;
+			case 5: nrgb[2] = img0[ofs3 + 2]; /* Green */
+			case 1: nrgb[0] = img0[ofs3 + 0]; /* Green + Blue */
+				break;
+			case 3: nrgb[0] = img0[ofs3 + 0]; /* Blue */
+			case 2: nrgb[1] = img0[ofs3 + 1]; /* Blue + Red */
+				break;
+			}
+
 			imgr[ofs3 + 0] = nrgb[0];
 			imgr[ofs3 + 1] = nrgb[1];
 			imgr[ofs3 + 2] = nrgb[2];

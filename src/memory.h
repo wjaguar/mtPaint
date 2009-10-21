@@ -728,6 +728,11 @@ void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
 #define BPP(x) ((x) == CHN_IMAGE ? mem_img_bpp : 1)
 #define IS_INDEXED ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
 
+/* Whether process_img() needs extra buffer passed in */
+#define NEED_XBUF_DRAW (mem_blend && (blend_mode & BLEND_MMASK))
+#define NEED_XBUF_PASTE (NEED_XBUF_DRAW || \
+	((mem_channel == CHN_IMAGE) && (mem_clip_bpp < mem_img_bpp)))
+
 void prep_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *mask0, unsigned char *img0);
 void process_mask(int start, int step, int cnt, unsigned char *mask,
@@ -735,7 +740,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha);
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	int sourcebpp, int destbpp);
+	unsigned char *xbuf, int sourcebpp, int destbpp);
 void copy_area(image_info *dest, image_info *src, int x, int y);
 
 // Retroactive masking - by blending with undo frame
