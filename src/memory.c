@@ -4044,19 +4044,29 @@ void render_sb()
 /*
  * This flood fill algorithm processes image in quadtree order, and thus has
  * guaranteed upper bound on memory consumption, of order O(width + height).
+ * This implementation takes O(max(width, height)) for simplicity - X and Y
+ * bitmaps are interleaved.
  * (C) Dmitry Groshev
  */
+
 #define QLEVELS 11
 #define QMINSIZE 32
 #define QMINLEVEL 5
+
+/* 
+ * Level bitmaps are ordered from nearest to farthest, with cells interleaved
+ * in the following order: Left-Y Right-Y Top-X Bottom-X.
+ */
+
 static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 {
-	short *nearq, *farq;
-	int qtail[QLEVELS + 1], ntail = 0;
+	short nearq[QMINSIZE * QMINSIZE * 2];
+	/* QMINSIZE bits per cell */
+	guint32 tmap, lmap[(MAX_DIM >> QMINLEVEL) * 12 + QLEVELS * 4], maps[4];
 	int borders[4] = {0, mem_width, 0, mem_height};
-	int corners[4], levels[4], coords[4];
-	int i, j, k, kk, lvl, tx, ty, imgc = 0, fmode = 0, lastr[3], thisr[3];
-	int bidx = 0, bbit = 0;
+	int corners[4], coords[4], slots[4];
+	int i, j, k, tx, ty, fmode = 0, imgc = 0, lastr[3], thisr[3];
+	int lmax, ntail, bidx = 0, bbit = 0;
 	double lastc[3], thisc[3], dist2, mdist2 = flood_step * flood_step;
 	csel_info *flood_data = NULL;
 	char *tmp = NULL;
@@ -4065,23 +4075,17 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	if ((x < 0) || (x >= mem_width) || (y < 0) || (y >= mem_height) ||
 		(get_pixel(x, y) != col) || (pixel_protected(x, y) == 255))
 		return (FALSE);
-	i = ((mem_width + mem_height) * 3 + QMINSIZE * QMINSIZE) * 2 * sizeof(short);
-	nearq = malloc(i); // Exact limit is less, but it's too complicated 
-	if (!nearq) return (FALSE);
-	farq = nearq + QMINSIZE * QMINSIZE;
-	memset(qtail, 0, sizeof(qtail));
+	/* Exact limits are less, but it's too complicated */
+	lmax = mem_width > mem_height ? mem_width : mem_height;
+	lmax = (lmax >> QMINLEVEL) * 12 + QLEVELS * 4;
+	memset(lmap, 0, lmax * sizeof(*lmap));
 
 	/* Start drawing */
 	if (bmap) bmap[y * lw + (x >> 3)] |= 1 << (x & 7);
 	else
 	{
 		put_pixel(x, y);
-		if (get_pixel(x, y) == col)
-		{
-			/* Can't draw */
-			free(nearq);
-			return (FALSE);
-		}
+		if (get_pixel(x, y) == col) return (FALSE); /* Can't draw */
 	}
 
 	/* Configure fuzzy flood fill */
@@ -4106,21 +4110,47 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 		fmode = -1;
 	}
 
+	/* Set up initial area */
+	corners[0] = x & ~(QMINSIZE - 1);
+	corners[2] = y & ~(QMINSIZE - 1);
+	nearq[0] = x; nearq[1] = y; ntail = 2; 
+
 	while (1)
 	{
-		/* Determine area */
-		corners[0] = x & ~(QMINSIZE - 1);
 		corners[1] = corners[0] + QMINSIZE;
-		corners[2] = y & ~(QMINSIZE - 1);
 		corners[3] = corners[2] + QMINSIZE;
-		/* Determine queue levels */
+
 		for (i = 0; i < 4; i++)
-			levels[i] = bitcount((corners[i] - 1) & ~corners[i]) - QMINLEVEL;
-		/* Process near points */
-		while (1)
 		{
-			coords[0] = x;
-			coords[2] = y;
+			int j, k, i2 = (i >> 1) ^ 1;
+			int wx = corners[i2 + i2], wy = corners[i];
+
+			/* Locate map slots */
+			j = ((unsigned)(wy & ~(wy - 1)) - 1) >> QMINLEVEL; // Level mask
+			j += j; k = (wx >> QMINLEVEL) & (j + 1);
+			slots[i] = k = (j + k) * 4 + i;
+
+			/* Prefill near queue */
+			if (k >= lmax) continue; // Outside image
+			k ^= 1; tmap = lmap[k]; lmap[k] = 0;
+			for (wy -= i & 1; tmap; wx++ , tmap >>= 1)
+			{
+				if (!(tmap & 1)) continue;
+				nearq[ntail++ + i2] = wx;
+				nearq[ntail++ - i2] = wy;
+			}
+		}
+
+		/* Clear the side bitmaps */
+		maps[0] = maps[1] = maps[2] = maps[3] = 0;
+//		memset(maps, 0, sizeof(maps));
+
+		/* Process near points */
+		while (ntail)
+		{
+			/* Unqueue last x & y */
+			coords[2] = y = nearq[--ntail];
+			coords[0] = x = nearq[--ntail];
 			if (fmode > 1)
 			{
 				k = get_pixel_RGB(x, y);
@@ -4192,44 +4222,40 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 					if (get_pixel(tx, ty) == col) continue;
 				}
 				/* Near queue */
-				if (coords[i] != corners[i])
+//				if (coords[i] != corners[i])
+				if (coords[i] & (QMINSIZE - 1))
 				{
 					nearq[ntail++] = tx;
 					nearq[ntail++] = ty;
 					continue;
 				}
-				/* Far queue */
-				lvl = levels[i];
-				for (j = 0; j < lvl; j++) // Slide lower levels
-				{
-					k = qtail[j];
-					qtail[j] = k + 2;
-					if (k > qtail[j + 1])
-					{
-						kk = qtail[j + 1];
-						farq[k] = farq[kk];
-						farq[k + 1] = farq[kk + 1];
-					}
-				}
-				k = qtail[lvl];
-				farq[k] = tx;
-				farq[k + 1] = ty;
-				qtail[lvl] = k + 2;
+				/* Far map */
+				j = coords[(i & 2) ^ 3] & (QMINSIZE - 1);
+				maps[i] |= 1 << j;
 			}
-			if (!ntail) break;
-			y = nearq[--ntail];
-			x = nearq[--ntail];
 		}
-		/* All done? */
-		if (!qtail[0]) break;
-		i = qtail[0] - 2;
-		x = farq[i];
-		y = farq[i + 1];
-		qtail[0] = i;
-		for (j = 1; qtail[j] > i; j++)
-			qtail[j] = i;
+
+		/* Store maps */
+		for (i = 0; i < 4; i++)
+		{
+			/* !!! Condition prevents out-of-bounds access */
+			if (maps[i]) lmap[slots[i]] |= maps[i];
+		}
+
+		/* Find what else remains */
+		for (i = 0; (i < lmax) && !lmap[i]; i++);
+		if (i >= lmax) break; // All done
+
+		/* Determine where that happens to be */
+		j = ((i >> 2) + 2) << QMINLEVEL;
+		k = nextpow2(j) >> 1; // MSB
+		x = (k >> 1) + ((i & 1) << QMINLEVEL) - QMINSIZE;
+		y = j - k;
+		i &= 2;
+		corners[i] = (corners[i] & ~(k - 1)) + x;
+		i ^= 2;
+		corners[i] = (corners[i] & ~(k - 1)) + y;
 	}
-	free(nearq);
 	free(tmp);
 	return (TRUE);
 }

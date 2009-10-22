@@ -927,7 +927,7 @@ exit0:	free(rgba_row);
 
 /* Animation state */
 typedef struct {
-	unsigned char lmap[MAX_WIDTH > MAX_HEIGHT ? MAX_WIDTH : MAX_HEIGHT];
+	unsigned char lmap[MAX_DIM];
 	image_frame prev;
 	int prev_idx; // Frame index+1, so that 0 means None
 	int defw, defh, bk_rect[4];

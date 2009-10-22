@@ -28,6 +28,7 @@
 #define MIN_HEIGHT 1
 /* !!! If MAX_WIDTH * MAX_HEIGHT * max bpp won't fit into int, lots of code
  * !!! will have to be modified to use size_t instead */
+#define MAX_DIM (MAX_WIDTH > MAX_HEIGHT ? MAX_WIDTH : MAX_HEIGHT)
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
