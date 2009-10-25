@@ -39,6 +39,9 @@
 #ifdef U_TIFF
 #include <tiffio.h>
 #endif
+#ifdef U_LCMS
+#include <lcms.h>
+#endif
 
 #include "global.h"
 
@@ -63,6 +66,7 @@ typedef struct {
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int apply_icc;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
@@ -756,6 +760,25 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		png_free_data(png_ptr, info_ptr, PNG_FREE_UNKN, -1);
 	}
 	if (!res) res = 1;
+
+#ifdef U_LCMS
+#ifdef PNG_iCCP_SUPPORTED
+	/* Extract ICC profile if it's of use */
+	if (!settings->icc_size)
+	{
+		png_charp name, icc;
+		png_uint_32 len;
+		int comp;
+
+		if (png_get_iCCP(png_ptr, info_ptr, &name, &comp, &icc, &len) &&
+			(len < INT_MAX) && (settings->icc = malloc(len)))
+		{
+			settings->icc_size = len;
+			memcpy(settings->icc, icc, len);
+		}
+	}
+#endif
+#endif
 
 fail2:	if (msg) progress_end();
 	free(row_pointers);
@@ -1677,7 +1700,10 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	unsigned char xb = 0, *memp, *memx = NULL;
 	FILE *fp;
 	int i, width, height, bpp, res = -1;
-
+#ifdef U_LCMS
+	cmsHTRANSFORM how = NULL;
+	unsigned char *icc = NULL;
+#endif
 
 	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
 
@@ -1691,6 +1717,12 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 		goto fail;
 	}
 	jpeg_stdio_src(&cinfo, fp);
+
+#ifdef U_LCMS
+	/* Request ICC profile aka APP2 data be preserved */
+	if (!settings->icc_size)
+		jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
+#endif
 
 	jpeg_read_header(&cinfo, TRUE);
 	jpeg_start_decompress(&cinfo);
@@ -1719,14 +1751,81 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	res = -1;
 	pr = !settings->silent;
 
+#ifdef U_LCMS
+#define PARTHDR 14
+	while (!settings->icc_size)
+	{
+		jpeg_saved_marker_ptr mk;
+		unsigned char *tmp, *parts[256];
+		int i, part, nparts = -1, icclen = 0, lparts[256];
+
+		/* List parts */
+		memset(parts, 0, sizeof(parts));
+		for (mk = cinfo.marker_list; mk; mk = mk->next)
+		{
+			if ((mk->marker != JPEG_APP0 + 2) ||
+				(mk->data_length < PARTHDR) ||
+				strcmp(mk->data, "ICC_PROFILE")) continue;
+			part = GETJOCTET(mk->data[13]);
+			if (nparts < 0) nparts = part;
+			if (nparts != part) break;
+			part = GETJOCTET(mk->data[12]);
+			if (!part-- || (part >= nparts) || parts[part]) break;
+			parts[part] = (unsigned char *)(mk->data + PARTHDR);
+			icclen += lparts[part] = mk->data_length - PARTHDR;
+		}
+		if (nparts < 0) break;
+
+		icc = tmp = malloc(icclen);
+		if (!icc) break;
+
+		/* Assemble parts */
+		for (i = 0; i < nparts; i++)
+		{
+			if (!parts[i]) break;
+			memcpy(tmp, parts[i], lparts[i]);
+			tmp += lparts[i];
+		}
+		if (i < nparts) break; // Sequence had a hole
+
+		if (memx) /* Profile is needed right now, for CMYK->RGB */
+		{
+			cmsHPROFILE from, to;
+
+			from = cmsOpenProfileFromMem((void *)icc, icclen);
+			if (!from) break; // Unopenable now, unopenable ever
+			to = cmsCreate_sRGBProfile();
+			if (cmsGetColorSpace(from) == icSigCmykData)
+				how = cmsCreateTransform(from, xb ? TYPE_CMYK_8 :
+					TYPE_CMYK_8_REV, to, TYPE_RGB_8,
+					INTENT_PERCEPTUAL, 0);
+			if (from) cmsCloseProfile(from);
+			cmsCloseProfile(to);
+			if (how) break; // Have transform, so drop the profile
+		}
+
+		settings->icc = icc;
+		settings->icc_size = icclen;
+		icc = NULL; // Leave the profile be
+		break;
+	}
+	free(icc);
+#undef PARTHDR
+#endif
+
 	if (pr) ls_init("JPEG", 0);
 
 	for (i = 0; i < height; i++)
 	{
 		memp = settings->img[CHN_IMAGE] + width * i * bpp;
 		jpeg_read_scanlines(&cinfo, memx ? &memx : &memp, 1);
-		if (memx) /* Simple CMYK->RGB conversion */
-		{
+#ifdef U_LCMS
+		/* Convert CMYK to RGB using LCMS if possible */
+		if (memx && how) cmsDoTransform(how, memx, memp, width);
+		else
+#endif
+		if (memx)
+		{	/* Simple CMYK->RGB conversion */
 			unsigned char *src = memx, *dest = memp;
 			int j, k, r, g, b;
 
@@ -1743,6 +1842,9 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 		}
 		ls_progress(settings, i, 20);
 	}
+#ifdef U_LCMS
+	if (how) cmsDeleteTransform(how);
+#endif
 	jpeg_finish_decompress(&cinfo);
 	res = 1;
 
@@ -2154,6 +2256,27 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 
 	if ((res = allocate_image(settings, cmask))) return (res);
 	res = -1;
+
+#ifdef U_LCMS
+#ifdef TIFFTAG_ICCPROFILE
+	/* Extract ICC profile if it's of use */
+	if (!settings->icc_size)
+	{
+		uint32 size;
+		unsigned char *data;
+
+		/* TIFFTAG_ICCPROFILE was broken beyond hope in libtiff 3.8.0
+		 * (see libtiff 3.8.1+ changelog entry for 2006-01-04) */
+		if (!strstr(TIFFGetVersion(), " 3.8.0") &&
+			TIFFGetField(tif, TIFFTAG_ICCPROFILE, &size, &data) &&
+			(size < INT_MAX) && (settings->icc = malloc(size)))
+		{
+			settings->icc_size = size;
+			memcpy(settings->icc, data, size);
+		}
+	}
+#endif
+#endif
 
 	if ((pr = !settings->silent)) ls_init("TIFF", 0);
 
@@ -5287,6 +5410,52 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
 static void store_image_extras(image_info *image, image_state *state,
 	ls_settings *settings)
 {
+#if U_LCMS
+	/* Apply ICC profile */
+	while (settings->icc && (settings->bpp == 3))
+	{
+		cmsHPROFILE from, to;
+		cmsHTRANSFORM how = NULL;
+		int l = settings->icc_size - sizeof(icHeader);
+		unsigned char *iccdata = settings->icc + sizeof(icHeader);
+
+		/* Do nothing if the profile seems to be the default sRGB one */
+		if ((l == 3016) && (hashf(HASHSEED, iccdata, l) == 0xBA0A8E52UL) &&
+			(hashf(HASH_RND(HASHSEED), iccdata, l) == 0x94C42C77UL)) break;
+
+		from = cmsOpenProfileFromMem((void *)settings->icc,
+			settings->icc_size);
+		to = cmsCreate_sRGBProfile();
+		if (from && (cmsGetColorSpace(from) == icSigRgbData))
+			how = cmsCreateTransform(from, TYPE_RGB_8,
+				to, TYPE_RGB_8, INTENT_PERCEPTUAL, 0);
+		if (how)
+		{
+			unsigned char *img = settings->img[CHN_IMAGE];
+			size_t l = settings->width, sz = l * settings->height;
+			int i, j;
+
+			if (!settings->silent)
+				progress_init(_("Applying colour profile"), 1);
+			else if (sz < UINT_MAX) l = sz;
+			j = sz / l;
+			for (i = 0; i < j; i++ , img += l * 3)
+			{
+				if (!settings->silent && ((i * 20) % j >= j - 20))
+					if (progress_update((float)i / j)) break;
+				cmsDoTransform(how, img, img, l);
+			}
+			progress_end();
+			cmsDeleteTransform(how);
+		}
+		if (from) cmsCloseProfile(from);
+		cmsCloseProfile(to);
+		break;
+	}
+#endif
+// !!! Changing any values is frequently harmful in this mode, so don't do it
+	if (settings->mode == FS_CHANNEL_LOAD) return;
+
 	/* Stuff RGB transparency into color 255 */
 	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
 	{
@@ -5344,6 +5513,12 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	}
 
 	init_ls_settings(&settings, NULL);
+#ifdef U_LCMS
+	/* Set size to -1 when we don't want color profile */
+	if (!apply_icc || ((mode == FS_CHANNEL_LOAD) ? (MEM_BPP != 3) :
+		(mode != FS_PNG_LOAD) && (mode != FS_LAYER_LOAD)))
+		settings.icc_size = -1;
+#endif
 	/* 0th layer load is just an image load */
 	if ((mode == FS_LAYER_LOAD) && !layers_total) mode = FS_PNG_LOAD;
 	settings.mode = mode;
@@ -5469,9 +5644,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 				CMASK_CURR);
 			mem_img[mem_channel] = settings.img[CHN_IMAGE];
 			update_undo(&mem_image);
-// !!! This is frequently harmful
-//			if (mem_channel == CHN_IMAGE)
-//				store_image_extras(&mem_image, &mem_state, &settings);
+			if (mem_channel == CHN_IMAGE)
+				store_image_extras(&mem_image, &mem_state, &settings);
 			mem_undo_prepare();
 		}
 		/* Failure */
@@ -5497,6 +5671,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		free(settings.img[CHN_IMAGE]);
 		break;
 	}
+	free(settings.icc);
 	return (res);
 }
 

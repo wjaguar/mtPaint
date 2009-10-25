@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.30"
-MT_DATE="2009-10-22"
+MT_V="3.34.31"
+MT_DATE="2009-10-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -31,6 +31,7 @@ STATIC_JP2=
 STATIC_TIFF=
 STATIC_GIF=
 STATIC_FT=
+STATIC_CMS=
 AS_NEEDED=
 IMAGE_LIBDIR=
 HAVE_FUNCS=
@@ -183,6 +184,13 @@ else
 	NFT=NO
 fi
 
+if IS_LIB "llcms"
+then
+	NCMS=YES
+else
+	NCMS=NO
+fi
+
 rm _conf.c _conf.tmp
 
 for A in "$@"
@@ -215,6 +223,9 @@ do
 		"statictiff" )	STATIC_TIFF=TIFF;;
 		"noft" )	NFT=NO;;
 		"staticft" )	STATIC_FT=FreeType;;
+		"lcms" )	NCMS=YES;;
+		"nolcms" )	NCMS=NO;;
+		"staticlcms" )	STATIC_CMS=LittleCMS;;
 		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
 		"slow" )	OPTS=NO;;
 		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
@@ -391,6 +402,9 @@ notiff .......... Don't use libtiff
 statictiff ...... Statically link TIFF library
 noft ............ Don't use FreeType
 staticft ........ Statically link FreeType library
+lcms ............ Use LittleCMS
+nolcms .......... Don't use LittleCMS
+staticlcms ...... Statically link LittleCMS library
 --libdir=DIR .... DIR = location of image library files to use for cross-compilation
 
 flush ........... Flush directories to initial state
@@ -536,9 +550,25 @@ else
 		LIB_NAME tiff "$STATIC_TIFF"
 		I_EX="$I_EX -DU_TIFF"
 	fi
+	if [ "$NFT" = YES ]
+	then
+		LIB_NAME freetype "$STATIC_FT"
+		if [ "$OS" = "GNU/Linux" ]
+		then
+			I_EX="$I_EX -DU_FREETYPE `freetype-config --cflags`"
+			L_EX="$L_EX `freetype-config --libs | sed 's/-lfreetype//'`"
+		else
+			I_EX="$I_EX -DU_FREETYPE"
+			L_EX="$L_EX -liconv"
+		fi
+	fi
+	if [ "$NCMS" = "YES" ]
+	then
+		LIB_NAME lcms "$STATIC_CMS"
+		I_EX="$I_EX -DU_LCMS"
+	fi
 	LIB_NAME png "$STATIC_PNG"
 	LIB_NAME z "$STATIC_PNG"
-	LIB_NAME freetype "$STATIC_FT"
 	if [ "$STATIC_LAST" ] && [ -z "$IMAGE_LIBDIR" ]
 	then
 		L_EX="$L_EX -Wl,-dy"
@@ -583,18 +613,6 @@ else
 	if [ "$MT_CUSTOM" ]
 	then
 		I_EX="$I_EX -DU_$MT_CUSTOM"
-	fi
-
-	if [ "$NFT" = YES ]
-	then
-		if [ "$OS" = "GNU/Linux" ]
-		then
-			I_EX="$I_EX -DU_FREETYPE `freetype-config --cflags`"
-			L_EX="$L_EX `freetype-config --libs`"
-		else
-			I_EX="$I_EX -DU_FREETYPE"
-			L_EX="$L_EX -lfreetype -liconv"
-		fi
 	fi
 
 	if [ "$MT_LANG" = YES ]
@@ -676,6 +694,7 @@ then
 	echo "    API checks          $API_CHECKS"
 fi
 	echo "    Use FreeType        $NFT"
+	echo "    Use LittleCMS       $NCMS"
 if [ "$MT_CUSTOM" ]
 then
 	echo "    Customized for      $MT_CUSTOM"
@@ -701,34 +720,11 @@ fi
 	echo "    Optimizations       $OPTS $AS_NEEDED"
 fi
 	echo "    Debug info          $DEBUG"
-if [ "$STATIC_PNG" ] || [ "$STATIC_GIF" ] || [ "$STATIC_JPEG" ] || [ "$STATIC_JP2" ] || [ "$STATIC_TIFF" ]
+STATICLIBS=`echo -n " $STATIC_PNG $STATIC_GIF $STATIC_JPEG $STATIC_JP2\
+ $STATIC_TIFF $STATIC_FT $STATIC_CMS" | sed 's/  */ /g'`
+if [ "$STATICLIBS" != " " ]
 then
-	echo -n "    Static libraries    "
-	if [ "$STATIC_PNG" ]
-	then
-		echo -n "$STATIC_PNG "
-	fi
-	if [ "$STATIC_GIF" ]
-	then
-		echo -n "$STATIC_GIF "
-	fi
-	if [ "$STATIC_JPEG" ]
-	then
-		echo -n "$STATIC_JPEG "
-	fi
-	if [ "$STATIC_JP2" ]
-	then
-		echo -n "$STATIC_JP2 "
-	fi
-	if [ "$STATIC_TIFF" ]
-	then
-		echo -n "$STATIC_TIFF "
-	fi
-	if [ "$STATIC_FT" ]
-	then
-		echo -n "$STATIC_FT "
-	fi
-	echo
+	echo "    Static libraries   $STATICLIBS"
 fi
 
 

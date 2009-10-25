@@ -43,6 +43,9 @@ static GtkWidget *spinbutton_trans, *spinbutton_hotx, *spinbutton_hoty,
 	*spinbutton_silence;
 static GtkWidget *checkbutton_tgaRLE, *checkbutton_tga565, *checkbutton_tgadef,
 	*checkbutton_undo;
+#ifdef U_LCMS
+static GtkWidget *checkbutton_icc;
+#endif
 
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
@@ -292,6 +295,9 @@ static void prefs_apply(GtkWidget *widget)
 	tga_565 = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tga565));
 	tga_defdir = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_tgadef));
 	undo_load = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_undo));
+#ifdef U_LCMS
+	apply_icc = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_icc));
+#endif
 
 	show_paste = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_paste));
 	cursor_tool = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_cursor));
@@ -550,6 +556,9 @@ void pressed_preferences()
 	checkbutton_tga565 = add_a_toggle(_("Read 16-bit TGAs as 5:6:5 BGR"), page, tga_565);
 	checkbutton_tgadef = add_a_toggle(_("Write TGAs in bottom-up row order"), page, tga_defdir);
 	checkbutton_undo   = add_a_toggle(_("Undoable image loading"), page, undo_load);
+#ifdef U_LCMS
+	checkbutton_icc    = add_a_toggle(_("Apply colour profile"), page, apply_icc);
+#endif
 
 ///	---- TAB4 - PATHS
 

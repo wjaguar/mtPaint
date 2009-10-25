@@ -131,10 +131,14 @@ typedef struct {
 	png_color *pal;
 	int width, height, bpp, colors;
 	int x, y;
+	/* Extra data */
+	int icc_size;
+	char *icc;
 } ls_settings;
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int apply_icc;
 
 int file_type_by_ext(char *name, guint32 mask);
 

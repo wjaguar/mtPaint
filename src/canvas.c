@@ -1675,8 +1675,21 @@ static void ftype_widgets(GtkWidget *box, char *name, int mode)
 
 static void loader_widgets(GtkWidget *box, char *name, int mode)
 {
+#ifdef U_LCMS
+	GtkWidget *undo, *icc;
+
+	undo = add_a_toggle(_("Undoable"), box, undo_load);
+	icc = add_a_toggle(_("Apply colour profile"), box, apply_icc);
+	gtk_widget_show_all(box);
+	if (mode == FS_PNG_LOAD) return;
+	/* Hide unapplicable controls for FS_CHANNEL_LOAD */
+	gtk_widget_hide(undo);
+	if (MEM_BPP != 3) gtk_widget_hide(icc);
+#else /* No CMS support */
+	if (mode != FS_PNG_LOAD) return;
 	add_a_toggle(_("Undoable"), box, undo_load);
 	gtk_widget_show_all(box);
+#endif
 }
 
 /* Note: "name" is in system encoding */
@@ -1699,8 +1712,8 @@ static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 		break;
 	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
 		label = pack5(box, gtk_label_new(_("Animation delay")));
-		gtk_widget_show(label);
 		pack5(box, add_a_spin(preserved_gif_delay, 1, MAX_DELAY));
+		gtk_widget_show_all(box);
 		break;
 	case FS_EXPLODE_FRAMES:
 		ftype = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
@@ -1711,14 +1724,13 @@ static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 	case FS_PALETTE_SAVE:
 		ftype_widgets(box, name, mode);
 		break;
+	case FS_CHANNEL_LOAD:
 	case FS_PNG_LOAD:
 		loader_widgets(box, name, mode);
 		break;
 	default: /* Give a hidden empty box */
-		return (box);
+		break;
 	}
-
-	gtk_widget_show(box);
 	return (box);
 }
 
@@ -1783,6 +1795,11 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 		case FS_PNG_LOAD:
 			undo_load = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(BOX_CHILD_0(box)));
+#ifdef U_LCMS
+		case FS_CHANNEL_LOAD:
+			apply_icc = gtk_toggle_button_get_active(
+				GTK_TOGGLE_BUTTON(BOX_CHILD_1(box)));
+#endif
 			break;
 		default: /* Use defaults */
 			break;

@@ -69,6 +69,7 @@ static inilist ini_bool[] = {
 	{ "colorGrid",		&color_grid,		FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "pasteCommit",	&paste_commit,		FALSE },
+	{ "applyICC",		&apply_icc,		FALSE },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
