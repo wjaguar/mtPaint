@@ -760,7 +760,7 @@ void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask
 	unsigned char *op0, unsigned char *img0, unsigned char *alpha0);
 void grad_update(grad_info *grad);
 void gmap_setup(grad_map *gmap, grad_store gstore, int slot);
-void grad_def_update();
+void grad_def_update(int slot);
 
 #define GRAD_CUSTOM_DATA(X) ((X) ? GRAD_POINTS * ((X) * 4 + 2) : 0)
 #define GRAD_CUSTOM_DMAP(X) (GRAD_POINTS * ((X) * 4 + 3))
@@ -770,6 +770,14 @@ void grad_def_update();
 void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	unsigned char *img0, unsigned char *img,
 	unsigned char *alpha0, unsigned char *alpha, int opacity);
+
+#define CSPACE_RGB  0
+#define CSPACE_SRGB 1
+#define CSPACE_LXN  2
+#define NUM_CSPACES 3
+
+//	Select colors nearest to A->B gradient
+int mem_pick_gradient(unsigned char *buf, int cspace, int mode);
 
 int mem_skew(double xskew, double yskew, int type, int gcor);
 

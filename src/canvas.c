@@ -70,7 +70,7 @@ GtkWidget *label_bar[STATUS_ITEMS];
 
 static void update_image_bar()
 {
-	char txt[128], txt2[16], *tmp = "RGB";
+	char txt[128], txt2[16], *tmp = cspnames[CSPACE_RGB];
 
 
 	if (!status_on[STATUS_GEOMETRY]) return;
@@ -1164,7 +1164,7 @@ void update_stuff(int flags)
 		}
 	}
 	if (flags & CF_GRAD)
-		grad_def_update();
+		grad_def_update(-1);
 	if (flags & CF_PREFS)
 	{
 		update_undo_depth();	// If undo depth was changed

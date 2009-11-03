@@ -47,6 +47,7 @@
 const unsigned char greyz[2] = {GREY_W, GREY_B}; // For opacity squares
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
+char *cspnames[NUM_CSPACES];
 
 ///	INIFILE ENTRY LISTS
 
@@ -1128,11 +1129,15 @@ void string_init()
 {
 	char *cnames[NUM_CHANNELS + 1] =
 		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
+	char *cspaces[NUM_CSPACES] =
+		{ _("RGB"), _("sRGB"), "LXN" };
 	int i;
 
 	for (i = 0; i < NUM_CHANNELS + 1; i++)
 		allchannames[i] = channames[i] = cnames[i];
 	channames[CHN_IMAGE] = "";
+	for (i = 0; i < NUM_CSPACES; i++)
+		cspnames[i] = cspaces[i];
 }
 
 static void toggle_dock(int state, int internal);
@@ -3985,6 +3990,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		blend_settings(); break;
 	case DLG_TRACE:
 		bkg_setup(); break;
+	case DLG_PICK_GRAD:
+		pressed_pick_gradient(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4681,6 +4688,7 @@ static menu_item main_menu[] = {
 	{ _("/Palette/sep4"), -4 },
 	{ _("/Palette/Sort Colours ..."), -1, 0, 0, NULL, DLG_PAL_SORT, 0 },
 	{ _("/Palette/Palette Shifter ..."), -1, 0, 0, NULL, DLG_PAL_SHIFTER, 0 },
+	{ _("/Palette/Pick Gradient ..."), -1, 0, 0, NULL, DLG_PICK_GRAD, 0 },
 
 	{ _("/Effe_cts"), -2 -16 },
 	{ _("/Effects/tear"), -3 },

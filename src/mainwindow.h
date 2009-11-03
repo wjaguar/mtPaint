@@ -123,6 +123,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_STEP,
 	DLG_FILT,
 	DLG_TRACE,
+	DLG_PICK_GRAD,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -270,6 +271,7 @@ const unsigned char greyz[2]; // For opacity squares
 
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
+char *cspnames[NUM_CSPACES];
 
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,

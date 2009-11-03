@@ -1913,7 +1913,7 @@ void mem_init()					// Initialise memory
 		graddata[i].gtype = GRAD_TYPE_RGB;
 		graddata[i].otype = GRAD_TYPE_CONST;
 	}
-	grad_def_update();
+	grad_def_update(-1);
 	for (i = 0; i <= NUM_CHANNELS; i++)
 		gmap_setup(graddata + i, gradbytes, i);
 }
@@ -2172,7 +2172,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		for (i = 0; i < 256; i++)
 		{
 			j = (i * mul + add) / div;
-			ps_table[i] = (j * 255) / div2;
+			ps_table[i] = (j * 255 * 2 + div2) / (div2 + div2);
 		}
 	}
 	/* Prepare gamma table */
@@ -2318,7 +2318,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	}
 }
 
-unsigned char pal_dupes[256];
+static unsigned char pal_dupes[256];
 
 int scan_duplicates()			// Find duplicate palette colours, return number found
 {
@@ -2967,14 +2967,14 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 		switch (cspace)
 		{
 		default:
-		case 0: /* RGB */
+		case CSPACE_RGB:
 			tmp[0] = lin6[mem_pal[i].red];
 			tmp[1] = lin6[mem_pal[i].green];
 			tmp[2] = lin6[mem_pal[i].blue];
 			break;
-		case 1: /* sRGB - done already */
-			break;
-		case 2: /* L*X*N* */
+		case CSPACE_SRGB:
+			break; /* Done already */
+		case CSPACE_LXN:
 			rgb2LXN(tmp, tmp[0], tmp[1], tmp[2]);
 			break;
 		}
@@ -8834,25 +8834,25 @@ void gmap_setup(grad_map *gmap, grad_store gstore, int slot)
 }
 
 /* Store default gradient */
-void grad_def_update()
+void grad_def_update(int slot)
 {
-	int ix;
 	grad_map *gradmap;
 
 	/* Gradient slot (first RGB, then 1-bpp channels) */
-	ix = mem_channel + ((0x81 + mem_channel + mem_channel - mem_img_bpp) >> 7);
-	gradmap = graddata + ix;
+	if (slot < 0) slot = mem_channel + ((0x81 + mem_channel + mem_channel -
+		mem_img_bpp) >> 7);
+	gradmap = graddata + slot;
 
 	grad_def[0] = tool_opacity;
 	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
 	grad_def[1] = 0;
 	grad_def[2] = gradmap->otype;
 
-	grad_def[10 + ix * 4] = gradmap->gtype;
-	if (ix)
+	grad_def[10 + slot * 4] = gradmap->gtype;
+	if (slot)
 	{
-		grad_def[8 + ix * 4] = channel_col_A[ix - 1];
-		grad_def[9 + ix * 4] = channel_col_B[ix - 1];
+		grad_def[8 + slot * 4] = channel_col_A[slot - 1];
+		grad_def[9 + slot * 4] = channel_col_B[slot - 1];
 		grad_def[12] = mem_col_A;
 		grad_def[13] = mem_col_B;
 	}
@@ -8917,6 +8917,167 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 		k = col0->blue * 255 + j * (col->blue - col0->blue);
 		rgb[i3 + 2] = (k + (k >> 8) + 1) >> 8;
 	}
+}
+
+static void grad_point(double *xyz, int cspace, int idx)
+{
+	int wrk[NUM_CHANNELS + 3];
+
+	grad_value(wrk, 0, idx * (1.0 / 4096.0));
+	switch (cspace)
+	{
+	default:
+	case CSPACE_RGB:
+		xyz[0] = wrk[0] * (1.0 / 256.0);
+		xyz[1] = wrk[1] * (1.0 / 256.0);
+		xyz[2] = wrk[2] * (1.0 / 256.0);
+		break;
+	case CSPACE_LXN:
+	case CSPACE_SRGB:
+		xyz[0] = gamma65281(wrk[0]);
+		xyz[1] = gamma65281(wrk[1]);
+		xyz[2] = gamma65281(wrk[2]);
+		if (cspace == CSPACE_LXN) rgb2LXN(xyz, xyz[0], xyz[1], xyz[2]);
+		break;
+	}
+}
+
+int mem_pick_gradient(unsigned char *buf, int cspace, int mode)
+{
+	grad_map oldgr;
+	double pal[256 * 3], near[256 * 3], dist[256], len[256], lastc[3];
+	unsigned char *tb = buf;
+	int i, j, k, l;
+
+	/* Set up new RGB gradient */
+	oldgr = graddata[0];
+	memset(graddata, 0, sizeof(grad_map));
+	graddata[0].gtype = mode;
+	graddata[0].otype = GRAD_TYPE_CONST;
+	graddata[0].grev = graddata[0].orev = FALSE;
+	grad_def_update(0);
+	gmap_setup(graddata, gradbytes, 0);
+
+	/* Map palette to colorspace, and init point/distance/position */
+	grad_point(lastc, cspace, 0);
+	for (i = 0; i < mem_cols; i++)
+	{
+		double *tmp = pal + i * 3;
+
+		switch (cspace)
+		{
+		default:
+		case CSPACE_RGB:
+			tmp[0] = mem_pal[i].red;
+			tmp[1] = mem_pal[i].green;
+			tmp[2] = mem_pal[i].blue;
+			break;
+		case CSPACE_SRGB:
+			tmp[0] = gamma256[mem_pal[i].red];
+			tmp[1] = gamma256[mem_pal[i].green];
+			tmp[2] = gamma256[mem_pal[i].blue];
+			break;
+		case CSPACE_LXN:
+			get_lxn(tmp, PNG_2_INT(mem_pal[i]));
+			break;
+		}
+		dist[i] = (tmp[0] - lastc[0]) * (tmp[0] - lastc[0]) +
+			(tmp[1] - lastc[1]) * (tmp[1] - lastc[1]) +
+			(tmp[2] - lastc[2]) * (tmp[2] - lastc[2]);
+		memcpy(near + i * 3, lastc, sizeof(lastc));
+	}
+	memset(len, 0, sizeof(len));
+
+	/* Find nearest point on gradient curve for each palette color */
+	for (i = 1; i < 4096; i++)
+	{
+		double thisc[3], dx, dy, dz, l2;
+
+		grad_point(thisc, cspace, i);
+		dx = thisc[0] - lastc[0];
+		dy = thisc[1] - lastc[1];
+		dz = thisc[2] - lastc[2];
+		l2 = dx * dx + dy * dy + dz * dz;
+		if (l2 == 0.0) continue;
+		for (j = 0; j < mem_cols; j++)
+		{
+			double a, d, newc[3], *tmp = pal + j * 3;
+			a = ((tmp[0] - lastc[0]) * dx + (tmp[1] - lastc[1]) * dy +
+				(tmp[2] - lastc[2]) * dz) / l2;
+			a = a < 0.0 ? 0.0 : a > 1.0 ? 1.0 : a;
+			newc[0] = lastc[0] + a * dx;
+			newc[1] = lastc[1] + a * dy;
+			newc[2] = lastc[2] + a * dz;
+			d = (tmp[0] - newc[0]) * (tmp[0] - newc[0]) +
+				(tmp[1] - newc[1]) * (tmp[1] - newc[1]) +
+				(tmp[2] - newc[2]) * (tmp[2] - newc[2]);
+			if (d >= dist[j]) continue;
+			dist[j] = d; // Distance from the curve
+			len[j] = a + i; // Position along the curve
+			memcpy(near + j * 3, newc, sizeof(newc)); // Point
+		}
+		memcpy(lastc, thisc, sizeof(thisc));
+	}
+
+	/* Include gradient's second end */
+	grad_point(lastc, cspace, 4096);
+	for (i = 0; i < mem_cols; i++)
+	{
+		double d, *tmp = pal + i * 3;
+		d = (tmp[0] - lastc[0]) * (tmp[0] - lastc[0]) +
+			(tmp[1] - lastc[1]) * (tmp[1] - lastc[1]) +
+			(tmp[2] - lastc[2]) * (tmp[2] - lastc[2]);
+		if (d >= dist[i]) continue;
+		dist[i] = d;
+		len[i] = 4096.0;
+		memcpy(near + i * 3, lastc, sizeof(lastc));
+	}
+
+	/* Restore old RGB gradient */
+	graddata[0] = oldgr;
+	grad_def_update(-1);
+	gmap_setup(graddata, gradbytes, 0);
+
+	/* Pick colors with *uncontested* nearest points */
+	scan_duplicates(); // Need to avoid duplicated colors
+	for (i = 0; i < mem_cols; i++)
+	{
+		double d, d0, *tmp, *xyz;
+
+		if (pal_dupes[i] != i) continue;
+		*tb++ = i; // Add to result set by default
+		d0 = dist[i];
+		xyz = near + i * 3;
+		for (j = 0 , tmp = pal; j < mem_cols; j++ , tmp += 3)
+		{
+			if (pal_dupes[j] == i) continue;
+			tmp = pal + j * 3;
+			d = (tmp[0] - xyz[0]) * (tmp[0] - xyz[0]) +
+				(tmp[1] - xyz[1]) * (tmp[1] - xyz[1]) +
+				(tmp[2] - xyz[2]) * (tmp[2] - xyz[2]);
+			if (d <= d0)
+			{
+				tb--; // Fail - remove this color
+				break;
+			}
+		}
+	}
+
+	/* Bubble-sort the result set by position */
+	l = tb - buf;
+	for (i = l - 1; i > 0; i--)
+	for (j = 0; j < i; j++)
+	{
+		k = buf[j + 1];
+		if (len[buf[j]] > len[k])
+		{
+			buf[j + 1] = buf[j];
+			buf[j] = k;
+		}
+	}
+
+	/* Return number of colors in result set */
+	return (l);
 }
 
 ///	SKEW ENGINE

@@ -43,6 +43,7 @@ void pressed_scale_size(int mode);
 
 void pressed_sort_pal();
 void pressed_quantize(int palette);
+void pressed_pick_gradient();
 
 void choose_pattern(int typ);				// Bring up pattern chooser
 

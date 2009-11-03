@@ -54,7 +54,10 @@ float Fgamma256[256];
 
 //double gamma65536(int idx);
 //int ungamma65536(double v);
-int ungamma65281(double v); // Used in gradient engine
+
+/* Used in and around gradient engine */
+double gamma65281(int idx);
+int ungamma65281(double v);
 
 double rgb2B(double r, double g, double b);
 void rgb2LXN(double *tmp, double r, double g, double b);

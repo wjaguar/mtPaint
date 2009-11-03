@@ -289,6 +289,7 @@ int ungamma65536(double v)
 	n -= v < gamma64K[n];
 	return ((int)((n + (v - gamma64K[n]) * gammaslope64K[n]) * 64.25 + 0.5));
 }
+#endif
 
 double gamma65281(int idx)
 {
@@ -298,7 +299,6 @@ double gamma65281(int idx)
 	return ((idx & 0x3F) * (1.0 / 64.0) * (gamma64K[n + 1] - gamma64K[n]) +
 		gamma64K[n]);
 }
-#endif
 
 int ungamma65281(double v)
 {

@@ -507,7 +507,7 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 ///	BACTERIA EFFECT
 
-int do_bacteria(GtkWidget *spin, gpointer fdata)
+static int do_bacteria(GtkWidget *spin, gpointer fdata)
 {
 	int i;
 
@@ -2181,7 +2181,7 @@ static int quantize_cols;
 /* Quantization & dither settings - persistent */
 static int quantize_mode = -1, dither_mode = -1;
 static int quantize_tp;
-static int dither_cspace = 1, dither_dist = 2, dither_limit;
+static int dither_cspace = CSPACE_SRGB, dither_dist = 2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
 static double dither_fract[2] = {1.0, 0.0};
 
@@ -2274,6 +2274,13 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	}
 	else if (quantize_tp) mem_cols = new_cols; // Truncate palette
 
+	if (!have_image) /* Palette only */
+	{
+		if (err < 0) memory_errors(1);
+		update_stuff(UPD_PAL | CF_MENU);
+		return;
+	}
+
 	switch (dither)
 	{
 	case DITH_NONE:
@@ -2304,13 +2311,10 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	}
 	if (err) memory_errors(1);
 
-	if (have_image) /* Image was converted */
-	{
-		mem_col_A = mem_cols > 1 ? 1 : 0;
-		mem_col_B = 0;
-		update_stuff(UPD_2IDX);
-	}
-	else update_stuff(UPD_PAL | CF_MENU);
+	/* Image was converted */
+	mem_col_A = mem_cols > 1 ? 1 : 0;
+	mem_col_B = 0;
+	update_stuff(UPD_2IDX);
 }
 
 static void choose_selective(GtkMenuItem *menuitem, gpointer user_data)
@@ -2351,7 +2355,6 @@ void pressed_quantize(int palette)
 	char *clamp_txt[] = {_("Gamut"), _("Weakly"), _("Strongly")};
 	char *err_txt[] = {_("Off"), _("Separate/Sum"), _("Separate/Split"),
 		_("Length/Sum"), _("Length/Split"), NULL};
-	static char *csp_txt[] = {"RGB", "sRGB", "LXN"};
 
 
 	quantize_cols = mem_cols_used(257);
@@ -2411,7 +2414,8 @@ void pressed_quantize(int palette)
 
 		/* Settings page */
 
-		hbox = wj_radio_pack(csp_txt, 3, 1, dither_cspace, &dither_cspace, NULL);
+		hbox = wj_radio_pack(cspnames, NUM_CSPACES, 1,
+			dither_cspace, &dither_cspace, NULL);
 		add_with_frame(page1, _("Colour space"), hbox);
 
 		hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
@@ -2585,6 +2589,14 @@ static gboolean palette_pad_key(GtkWidget *widget, GdkEventKey *event,
 	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
 #endif
 	return (TRUE);
+}
+
+static GtkWidget *grad_interp_menu(int value, int allow_const, GtkSignalFunc handler)
+{
+	char *interp[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
+		_("Constant") };
+
+	return (wj_option_menu(interp, allow_const ? 5 : 4, value, NULL, handler));
 }
 
 static void click_grad_edit_ok(GtkWidget *widget)
@@ -2809,15 +2821,12 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 
 	if (!grad_mode) /* RGB */
 	{
-		char *interp[] = {_("RGB"), _("sRGB"), _("HSV"),
-			_("Backward HSV"), _("Constant")};
-
 		grad_ed_cs = cs = pack(mainbox, cpick_create());
 		cpick_set_opacity_visibility( cs, FALSE );
 
 		gtk_signal_connect(GTK_OBJECT(cs), "color_changed",
 			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
-		grad_ed_opt = sw = wj_option_menu(interp, 5, 0, NULL,
+		grad_ed_opt = sw = grad_interp_menu(0, TRUE,
 			GTK_SIGNAL_FUNC(grad_edit_set_mode));
 	}
 	else /* Indexed / utility / opacity */
@@ -3086,6 +3095,43 @@ void gradient_setup(int mode)
 	/* Re-render sliders, adjust option menus */
 	gtk_widget_queue_resize(win);
 #endif
+}
+
+/// GRADIENT PICKER
+
+static int pickg_grad = GRAD_TYPE_RGB, pickg_cspace = CSPACE_LXN;
+
+static int do_pick_gradient(GtkWidget *table, gpointer fdata)
+{
+	unsigned char buf[256];
+	int len;
+
+	pickg_grad = wj_option_menu_get_history(table_slot(table, 0, 1));
+	pickg_cspace = wj_option_menu_get_history(table_slot(table, 1, 1));
+
+	len = mem_pick_gradient(buf, pickg_cspace, pickg_grad);
+
+	mem_clip_new(len, 1, 1, CMASK_IMAGE, FALSE);
+	if (mem_clipboard) memcpy(mem_clipboard, buf, len);
+
+	update_stuff(UPD_XCOPY);
+	pressed_paste(TRUE);
+
+	return TRUE;
+}
+
+void pressed_pick_gradient()
+{
+	GtkWidget *table = gtk_table_new(2, 2, FALSE);
+
+	gtk_container_set_border_width(GTK_CONTAINER(table), 5);
+	to_table(grad_interp_menu(pickg_grad, FALSE, NULL), table, 0, 1, 5);
+	to_table(wj_option_menu(cspnames, NUM_CSPACES, pickg_cspace, NULL, NULL),
+		table, 1, 1, 5);
+	add_to_table(_("Gradient"), table, 0, 0, 5);
+	add_to_table(_("Colour space"), table, 1, 0, 5);
+	gtk_widget_show_all(table);
+	filter_window(_("Pick Gradient"), table, do_pick_gradient, NULL, FALSE);
 }
 
 /// SKEW WINDOW
