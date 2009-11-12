@@ -31,12 +31,14 @@
 #include <gif_lib.h>
 #endif
 #ifdef U_JPEG
+#define NEED_CMYK
 #include <jpeglib.h>
 #endif
 #ifdef U_JP2
 #include <openjpeg.h>
 #endif
 #ifdef U_TIFF
+#define NEED_CMYK
 #include <tiffio.h>
 #endif
 #ifdef U_LCMS
@@ -1677,6 +1679,74 @@ fail0:	FreeMapObject(gif_map);
 }
 #endif
 
+#ifdef NEED_CMYK
+#ifdef U_LCMS
+/* Guard against cmsHTRANSFORM changing into something overlong in the future */
+typedef char cmsHTRANSFORM_Does_Not_Fit_Into_Pointer[2 * (sizeof(cmsHTRANSFORM) <= sizeof(char *)) - 1];
+
+static int init_cmyk2rgb(ls_settings *settings, unsigned char *icc, int len,
+	int inverted)
+{
+	cmsHPROFILE from, to;
+	cmsHTRANSFORM how = NULL;
+
+	from = cmsOpenProfileFromMem((void *)icc, len);
+	if (!from) return (TRUE); // Unopenable now, unopenable ever
+	to = cmsCreate_sRGBProfile();
+	if (cmsGetColorSpace(from) == icSigCmykData)
+		how = cmsCreateTransform(from, inverted ? TYPE_CMYK_8_REV :
+			TYPE_CMYK_8, to, TYPE_RGB_8, INTENT_PERCEPTUAL, 0);
+	if (from) cmsCloseProfile(from);
+	cmsCloseProfile(to);
+	if (!how) return (FALSE); // Better luck the next time
+
+	settings->icc = (char *)how;
+	settings->icc_size = -2;
+	return (TRUE);
+}
+
+static void done_cmyk2rgb(ls_settings *settings)
+{
+	if (settings->icc_size != -2) return;
+	cmsDeleteTransform((cmsHTRANSFORM)settings->icc);
+	settings->icc = NULL;
+	settings->icc_size = -1; // Not need profiles anymore
+}
+
+#else /* No LCMS */
+#define done_cmyk2rgb(X)
+#endif
+
+static void cmyk2rgb(unsigned char *dest, unsigned char *src, int cnt,
+	int inverted, ls_settings *settings)
+{
+	unsigned char xb;
+	int j, k, r, g, b;
+
+#ifdef U_LCMS
+	/* Convert CMYK to RGB using LCMS if possible */
+	if (settings->icc_size == -2)
+	{
+		cmsDoTransform((cmsHTRANSFORM)settings->icc, src, dest, cnt);
+		return;
+	}
+#endif
+	/* Simple CMYK->RGB conversion */
+	xb = inverted ? 0 : 255;
+	for (j = 0; j < cnt; j++ , src += 4 , dest += 3)
+	{
+		k = src[3] ^ xb;
+		r = (src[0] ^ xb) * k;
+		dest[0] = (r + (r >> 8) + 1) >> 8;
+		g = (src[1] ^ xb) * k;
+		dest[1] = (g + (g >> 8) + 1) >> 8;
+		b = (src[2] ^ xb) * k;
+		dest[2] = (b + (b >> 8) + 1) >> 8;
+	}
+}
+
+#endif
+
 #ifdef U_JPEG
 struct my_error_mgr
 {
@@ -1697,11 +1767,10 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 {
 	static int pr;
 	struct jpeg_decompress_struct cinfo;
-	unsigned char xb = 0, *memp, *memx = NULL;
+	unsigned char *memp, *memx = NULL;
 	FILE *fp;
-	int i, width, height, bpp, res = -1;
+	int i, width, height, bpp, res = -1, inv = 0;
 #ifdef U_LCMS
-	cmsHTRANSFORM how = NULL;
 	unsigned char *icc = NULL;
 #endif
 
@@ -1737,7 +1806,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 		break;
 	case JCS_CMYK:
 		/* Photoshop writes CMYK data inverted */
-		xb = cinfo.saw_Adobe_marker ? 0 : 255;
+		inv = cinfo.saw_Adobe_marker;
 		if ((memx = malloc(cinfo.output_width * 4))) break;
 		res = FILE_MEM_ERROR;
 		// Fallthrough
@@ -1788,21 +1857,9 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 		}
 		if (i < nparts) break; // Sequence had a hole
 
-		if (memx) /* Profile is needed right now, for CMYK->RGB */
-		{
-			cmsHPROFILE from, to;
-
-			from = cmsOpenProfileFromMem((void *)icc, icclen);
-			if (!from) break; // Unopenable now, unopenable ever
-			to = cmsCreate_sRGBProfile();
-			if (cmsGetColorSpace(from) == icSigCmykData)
-				how = cmsCreateTransform(from, xb ? TYPE_CMYK_8 :
-					TYPE_CMYK_8_REV, to, TYPE_RGB_8,
-					INTENT_PERCEPTUAL, 0);
-			if (from) cmsCloseProfile(from);
-			cmsCloseProfile(to);
-			if (how) break; // Have transform, so drop the profile
-		}
+		/* If profile is needed right now, for CMYK->RGB */
+		if (memx && init_cmyk2rgb(settings, icc, icclen, inv))
+			break; // Transform is ready, so drop the profile
 
 		settings->icc = icc;
 		settings->icc_size = icclen;
@@ -1819,32 +1876,10 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	{
 		memp = settings->img[CHN_IMAGE] + width * i * bpp;
 		jpeg_read_scanlines(&cinfo, memx ? &memx : &memp, 1);
-#ifdef U_LCMS
-		/* Convert CMYK to RGB using LCMS if possible */
-		if (memx && how) cmsDoTransform(how, memx, memp, width);
-		else
-#endif
-		if (memx)
-		{	/* Simple CMYK->RGB conversion */
-			unsigned char *src = memx, *dest = memp;
-			int j, k, r, g, b;
-
-			for (j = 0; j < width; j++ , src += 4 , dest += 3)
-			{
-				k = src[3] ^ xb;
-				r = (src[0] ^ xb) * k;
-				dest[0] = (r + (r >> 8) + 1) >> 8;
-				g = (src[1] ^ xb) * k;
-				dest[1] = (g + (g >> 8) + 1) >> 8;
-				b = (src[2] ^ xb) * k;
-				dest[2] = (b + (b >> 8) + 1) >> 8;
-			}
-		}
+		if (memx) cmyk2rgb(memp, memx, width, inv, settings);
 		ls_progress(settings, i, 20);
 	}
-#ifdef U_LCMS
-	if (how) cmsDeleteTransform(how);
-#endif
+	done_cmyk2rgb(settings);
 	jpeg_finish_decompress(&cinfo);
 	res = 1;
 
@@ -2155,10 +2190,9 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	uint16 *sampinfo, *red16, *green16, *blue16;
 	uint32 width, height, tw = 0, th = 0, rps = 0;
 	uint32 *tr, *raster = NULL;
-	unsigned char xtable[256], *tmp, *src, *buf = NULL;
-	int i, j, k, x0, y0, bsz, xstep, ystep, plane, nplanes, mirror;
-	int x, w, h, dx, bpr, bits1, bit0, db, n, nx, res;
+	unsigned char *tmp, *buf = NULL;
 	int bpp = 3, cmask = CMASK_IMAGE, argb = FALSE, pr = FALSE;
+	int i, j, mirror, res;
 
 
 	/* Let's learn what we've got */
@@ -2240,6 +2274,9 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			bpp = 1; break;
 		case PHOTOMETRIC_RGB:
 			break;
+		case PHOTOMETRIC_SEPARATED:
+			/* Leave non-CMYK separations to libtiff */
+			if (sampp - xsamp == 4) break;
 		default:
 			argb = TRUE;
 		}
@@ -2269,7 +2306,11 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		 * (see libtiff 3.8.1+ changelog entry for 2006-01-04) */
 		if (!strstr(TIFFGetVersion(), " 3.8.0") &&
 			TIFFGetField(tif, TIFFTAG_ICCPROFILE, &size, &data) &&
-			(size < INT_MAX) && (settings->icc = malloc(size)))
+			(size < INT_MAX) &&
+			/* If profile is needed right now, for CMYK->RGB */
+			!((pmetric == PHOTOMETRIC_SEPARATED) && !argb &&
+				init_cmyk2rgb(settings, data, size, FALSE)) &&
+			(settings->icc = malloc(size)))
 		{
 			settings->icc_size = size;
 			memcpy(settings->icc, data, size);
@@ -2319,11 +2360,62 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	/* Read & interpret it ourselves */
 	else
 	{
-		xstep = tw ? tw : width;
-		ystep = th ? th : rps;
-		nplanes = !planar ? 1 :	(pmetric == PHOTOMETRIC_RGB ? 3 : 1) +
-			(settings->img[CHN_ALPHA] ? 1 : 0);
+		unsigned char xtable[256], *src, *tbuf = NULL;
+		int xstep = tw ? tw : width, ystep = th ? th : rps;
+		int aalpha, tsz = 0, wbpp = bpp;
+		int bpr, bits1, bit0, db, n, nx;
+		int i, j, k, x0, y0, bsz, plane, nplanes;
+
+
+		if (pmetric == PHOTOMETRIC_SEPARATED) // Needs temp buffer
+			tsz = xstep * ystep * (wbpp = 4);
+		nplanes = planar ? wbpp + !!settings->img[CHN_ALPHA] : 1;
+
+		bsz = (tw ? TIFFTileSize(tif) : TIFFStripSize(tif)) + 1;
+		bpr = tw ? TIFFTileRowSize(tif) : TIFFScanlineSize(tif);
+
+		buf = _TIFFmalloc(bsz + tsz);
+		res = FILE_MEM_ERROR;
+		if (!buf) goto fail2;
+		res = FILE_LIB_ERROR;
+		if (tsz) tbuf = buf + bsz; // Temp buffer for CMYK->RGB
+
+		/* Flag associated alpha */
+		aalpha = settings->img[CHN_ALPHA] &&
+			(pmetric != PHOTOMETRIC_PALETTE) &&
+			(sampinfo[0] == EXTRASAMPLE_ASSOCALPHA);
+
 		bits1 = bpsamp > 8 ? 8 : bpsamp;
+
+		/* Load palette */
+		j = 1 << bits1;
+		if (pmetric == PHOTOMETRIC_PALETTE)
+		{
+			png_color *cp = settings->pal;
+			int na = 0, nd = 1; /* Old palette format */
+
+			settings->colors = j;
+			/* Analyze palette */
+			for (k = i = 0; i < j; i++)
+			{
+				k |= red16[i] | green16[i] | blue16[i];
+			}
+			if (k > 255) na = 128 , nd = 257; /* New palette format */
+
+			for (i = 0; i < j; i++ , cp++)
+			{
+				cp->red = (red16[i] + na) / nd;
+				cp->green = (green16[i] + na) / nd;
+				cp->blue = (blue16[i] + na) / nd;
+			}
+		}
+		else if (bpp == 1)
+		{
+			if (aalpha) j = 256; // Demultiplied values are 0..255
+			settings->colors = j--;
+			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
+			mem_bw_pal(settings->pal, k, j ^ k);
+		}
 
 		/* !!! Assume 16-, 32- and 64-bit data follow machine's
 		 * endianness, and everything else is packed big-endian way -
@@ -2337,13 +2429,10 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			((bpsamp == 16) || (bpsamp == 32) ||
 			(bpsamp == 64)) ? bpsamp - 8 : 0;
 		db = (planar ? 1 : sampp) * bpsamp;
-		bsz = (tw ? TIFFTileSize(tif) : TIFFStripSize(tif)) + 1;
-		bpr = tw ? TIFFTileRowSize(tif) : TIFFScanlineSize(tif);
 
-		buf = _TIFFmalloc(bsz);
-		res = FILE_MEM_ERROR;
-		if (!buf) goto fail2;
-		res = FILE_LIB_ERROR;
+		/* Prepare to rescale what we've got */
+		memset(xtable, 0, 256);
+		set_xlate(xtable, bits1);
 
 		/* Progress steps */
 		nx = ((width + xstep - 1) / xstep) * nplanes * height;
@@ -2353,6 +2442,9 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		for (x0 = 0; x0 < width; x0 += xstep)
 		for (plane = 0; plane < nplanes; plane++)
 		{
+			unsigned char *tmp, *tmpa;
+			int i, j, k, x, y, w, h, dx, dxa, dy, dys;
+
 			/* Read one piece */
 			if (tw)
 			{
@@ -2371,7 +2463,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			{
 				x = width - x0;
 				w = x < xstep ? x : xstep;
-				x--;
+				x -= w;
 			}
 			else
 			{
@@ -2380,119 +2472,119 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			}
 			if (mirror & 2) /* Y mirror */
 			{
-				h = height - y0;
-				if (h > ystep) h = ystep;
+				y = height - y0;
+				h = y < ystep ? y : ystep;
+				y -= h;
 			}
-			else h = y0 + ystep > height ? height - y0 : ystep;
+			else
+			{
+				y = y0;
+				h = y + ystep > height ? height - y : ystep;
+			}
+
+			/* Prepare pointers */
+			dx = dxa = 1; dy = width;
+			i = y * width + x;
+			tmp = tmpa = settings->img[CHN_ALPHA] + i;
+			if (plane >= wbpp); // Alpha
+			else if (tbuf) // CMYK
+			{
+				dx = 4; dy = w;
+				tmp = tbuf + plane;
+			}
+			else // RGB/indexed
+			{
+				dx = bpp;
+				tmp = settings->img[CHN_IMAGE] + plane + i * bpp;
+			}
+			dy *= dx; dys = bpr;
 			src = buf;
+			/* Account for horizontal mirroring */
+			if (mirror & 1)
+			{
+				// Write bytes backward
+				tmp += (w - 1) * dx; tmpa += w - 1;
+				dx = -dx; dxa = -1;
+			}
+			/* Account for vertical mirroring */
+			if (mirror & 2)
+			{
+				// Read rows backward
+				src += (h - 1) * dys;
+				dys = -dys;
+			}
 
 			/* Decode it */
-			for (j = y0; j < y0 + h; j++ , n++ , src += bpr)
+			for (j = 0; j < h; j++ , n++ , src += dys , tmp += dy)
 			{
-				i = (mirror & 2 ? height - 1 - j : j) * width + x;
-				if (plane > bpp)
-				{
-					dx = mirror & 1 ? -1 : 1;
-					tmp = settings->img[CHN_ALPHA] + i;
-				}
-				else
-				{
-					dx = mirror & 1 ? -bpp : bpp;
-					tmp = settings->img[CHN_IMAGE] + i * bpp + plane;
-				}
+				if (pr && ((n * 10) % nx >= nx - 10))
+					progress_update((float)n / nx);
+
 				stream_MSB(src, tmp, w, bits1, bit0, db, dx);
 				if (planar) continue;
-				if (bpp == 3)
+				for (k = 1; k < wbpp; k++)
 				{
-					stream_MSB(src, tmp + 1, w, bits1,
-						bit0 + bpsamp, db, dx);
-					stream_MSB(src, tmp + 2, w, bits1,
-						bit0 + bpsamp * 2, db, dx);
+					stream_MSB(src, tmp + k, w, bits1,
+						bit0 + bpsamp * k, db, dx);
 				}
 				if (settings->img[CHN_ALPHA])
 				{
-					dx = mirror & 1 ? -1 : 1;
-					tmp = settings->img[CHN_ALPHA] + i;
-					stream_MSB(src, tmp, w, bits1,
-						bit0 + bpsamp * bpp, db, dx);
+					stream_MSB(src, tmpa, w, bits1,
+						bit0 + bpsamp * wbpp, db, dxa);
+					tmpa += width;
 				}
-				if (pr && ((n * 10) % nx >= nx - 10))
-					progress_update((float)n / nx);
 			}
+
+			/* Convert CMYK to RGB if needed */
+			if (!tbuf || (planar && (plane != 3))) continue;
+			if (bits1 < 8)	// Rescale to 8-bit
+				do_xlate(xtable, tbuf, w * h * 4);
+			cmyk2rgb(tbuf, tbuf, w * h, FALSE, settings);
+			src = tbuf;
+			tmp = settings->img[CHN_IMAGE] + (y * width + x) * 3;
+			w *= 3;
+			for (i = 0; i < h; i++ , tmp += width * 3 , src += w)
+				memcpy(tmp, src, w);
 		}
+		done_cmyk2rgb(settings);
 
-		/* Prepare to rescale what we've got */
-		memset(xtable, 0, 256);
-		set_xlate(xtable, bits1);
-
-		/* Un-associate alpha & rescale image data */
 		j = width * height;
 		tmp = settings->img[CHN_IMAGE];
 		src = settings->img[CHN_ALPHA];
-		while (src) /* Have alpha */
-		{
-			/* Unassociate alpha */
-			if ((pmetric != PHOTOMETRIC_PALETTE) &&
-				(sampinfo[0] == EXTRASAMPLE_ASSOCALPHA))
-			{
-				mem_demultiply(tmp, src, j, bpp);
-				if (bits1 >= 8) break;
-				bits1 = 8;
-			}
-			else if (bits1 >= 8) break;
 
+		/* Unassociate alpha */
+		if (aalpha)
+		{
+			if (wbpp > 3) // Converted from CMYK
+			{
+				unsigned char *img = tmp;
+				int i, k, a;
+
+				if (bits1 < 8) do_xlate(xtable, src, j);
+				bits1 = 8; // No further rescaling needed
+
+				/* Remove white background */
+				for (i = 0; i < j; i++ , img += 3)
+				{
+					a = src[i] - 255;
+					k = a + img[0];
+					img[0] = k < 0 ? 0 : k;
+					k = a + img[1];
+					img[1] = k < 0 ? 0 : k;
+					k = a + img[2];
+					img[2] = k < 0 ? 0 : k;
+				}
+			}
+			mem_demultiply(tmp, src, j, bpp);
+			tmp = NULL; // Image is done
+		}
+
+		if (bits1 < 8)
+		{
 			/* Rescale alpha */
-			for (i = 0; i < j; i++)
-			{
-				src[i] = xtable[src[i]];
-			}
-			break;
-		}
-
-		/* Rescale RGB */
-		if ((bpp == 3) && (bits1 < 8))
-		{
-			for (i = 0; i < j * 3; i++)
-			{
-				tmp[i] = xtable[tmp[i]];
-			}
-		}
-
-		/* Load palette */
-		j = 1 << bits1;
-		if (pmetric == PHOTOMETRIC_PALETTE)
-		{
-			settings->colors = j;
-			/* Analyze palette */
-			for (k = i = 0; i < j; i++)
-			{
-				k |= red16[i] | green16[i] | blue16[i];
-			}
-			if (k < 256) /* Old palette format */
-			{
-				for (i = 0; i < j; i++)
-				{
-					settings->pal[i].red = red16[i];
-					settings->pal[i].green = green16[i];
-					settings->pal[i].blue = blue16[i];
-				}
-			}
-			else /* New palette format */
-			{
-				for (i = 0; i < j; i++)
-				{
-					settings->pal[i].red = (red16[i] + 128) / 257;
-					settings->pal[i].green = (green16[i] + 128) / 257;
-					settings->pal[i].blue = (blue16[i] + 128) / 257;
-				}
-			}
-		}
-
-		else if (bpp == 1)
-		{
-			settings->colors = j--;
-			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
-			mem_bw_pal(settings->pal, k, j ^ k);
+			if (src) do_xlate(xtable, src, j);
+			/* Rescale RGB */
+			if (tmp && (wbpp == 3)) do_xlate(xtable, tmp, j * 3);
 		}
 		res = 1;
 	}
@@ -5412,7 +5504,7 @@ static void store_image_extras(image_info *image, image_state *state,
 {
 #if U_LCMS
 	/* Apply ICC profile */
-	while (settings->icc && (settings->bpp == 3))
+	while ((settings->icc_size > 0) && (settings->bpp == 3))
 	{
 		cmsHPROFILE from, to;
 		cmsHTRANSFORM how = NULL;

@@ -2340,16 +2340,9 @@ int scan_duplicates()			// Find duplicate palette colours, return number found
 	return found;
 }
 
-void remove_duplicates()		// Remove duplicate palette colours - call AFTER scan_duplicates
+void remove_duplicates()	// Remove duplicate palette colours - call AFTER scan_duplicates
 {
-	int i, j = mem_width * mem_height;
-	unsigned char *img = mem_img[CHN_IMAGE];
-
-	for (i = 0; i < j; i++)		// Scan canvas for duplicates
-	{
-		*img = pal_dupes[*img];
-		img++;
-	}
+	do_xlate(pal_dupes, mem_img[CHN_IMAGE], mem_width * mem_height);
 }
 
 int mem_remove_unused_check()

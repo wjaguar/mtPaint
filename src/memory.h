@@ -450,6 +450,15 @@ static inline int floor_div(int dd, int dr)
 	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
 }
 
+/// Table-based translation
+
+static inline void do_xlate(unsigned char *xlat, unsigned char *data, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++) data[i] = xlat[data[i]];
+}
+
 /// Copying "x0y0x1y1" quad
 
 #define copy4(D,S) memcpy(D, S, 4 * sizeof(int))
