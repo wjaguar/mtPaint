@@ -1060,9 +1060,9 @@ void pressed_toolbar_toggle(int state, int which)
 
 void mem_set_brush(int val)			// Set brush, update size/flow/preview
 {
-	int offset, i, j, k, o, o2;
+	int offset, j, o, o2;
 
-	brush_tool_type = mem_brush_list[val][0];
+	brush_type = mem_brush_list[val][0];
 	tool_size = mem_brush_list[val][1];
 	if ( mem_brush_list[val][2]>0 ) tool_flow = mem_brush_list[val][2];
 
@@ -1072,11 +1072,7 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 	{
 		o = 3*(40 + PREVIEW_WIDTH*j);		// Preview offset
 		o2 = offset + 3*PATCH_WIDTH*j;		// Offset in brush RGB
-		for ( i=0; i<32; i++ )
-		{
-			for ( k=0; k<3; k++ )
-				mem_prev[o + 3*i + k] = mem_brushes[o2 + 3*i + k];
-		}
+		memcpy(mem_prev + o, mem_brushes + o2, 32 * 3);
 	}
 }
 

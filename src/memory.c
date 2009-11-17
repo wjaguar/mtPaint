@@ -90,7 +90,6 @@ int mem_background = 180;		// Non paintable area
 
 unsigned char mem_brushes[PATCH_WIDTH * PATCH_HEIGHT * 3];
 					// Preset brushes screen memory
-int brush_tool_type = TOOL_SQUARE;	// Last brush tool type
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
@@ -122,16 +121,17 @@ unsigned char mem_pattern[8 * 8];		// Original 0-1 pattern
 unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
 unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 
-/// PREVIEW/TOOLS
+/// TOOLS
 
-int tool_type = TOOL_SQUARE;		// Currently selected tool
-int tool_size = 1, tool_flow = 1;
-int tool_opacity = 255;			// Opacity - 255 = solid
-int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
-int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
-int mem_continuous;			// Area we painting the static shapes continuously?
+tool_info tool_state = { TOOL_SQUARE, TOOL_SQUARE, { 1, 1, 255 } };
+				// Type, brush, size/flow/opacity
+int pen_down;			// Are we drawing? - Used to see if we need to do an UNDO
+int tool_ox, tool_oy;		// Previous tool coords - used by continuous mode
+int mem_continuous;		// Area we painting the static shapes continuously?
 
-int mem_brcosa_allow[3];		// BRCOSA RGB
+/// PREVIEW
+
+int mem_brcosa_allow[3];	// BRCOSA RGB
 
 
 

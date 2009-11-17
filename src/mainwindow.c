@@ -1049,33 +1049,33 @@ static void draw_arrow(int mode)
 	// Calculate 2 coords for arrow corners
 	uvy = sqrt((line_x1 - line_x2) * (line_x1 - line_x2) +
 		(line_y1 - line_y2) * (line_y1 - line_y2));
-	uvx = (line_x2 - line_x1) / uvy;
-	uvy = (line_y2 - line_y1) / uvy;
+	uvx = (line_x1 - line_x2) / uvy;
+	uvy = (line_y1 - line_y2) / uvy;
 
-	xa1 = rint(line_x1 + tool_flow * (uvx - uvy * 0.5));
-	xa2 = rint(line_x1 + tool_flow * (uvx + uvy * 0.5));
-	ya1 = rint(line_y1 + tool_flow * (uvy + uvx * 0.5));
-	ya2 = rint(line_y1 + tool_flow * (uvy - uvx * 0.5));
+	xa1 = rint(line_x2 + tool_flow * (uvx - uvy * 0.5));
+	xa2 = rint(line_x2 + tool_flow * (uvx + uvy * 0.5));
+	ya1 = rint(line_y2 + tool_flow * (uvy + uvx * 0.5));
+	ya2 = rint(line_y2 + tool_flow * (uvy - uvx * 0.5));
 
 // !!! Call this, or let undo engine do it?
 //	mem_undo_prepare();
 	pen_down = 0;
-	tool_action(GDK_NOTHING, line_x1, line_y1, 1, 0);
+	tool_action(GDK_NOTHING, line_x2, line_y2, 1, 0);
 	line_status = LINE_LINE;
 
 	// Draw arrow lines & circles
 	mem_undo_opacity = TRUE;
 	f_circle(xa1, ya1, tool_size);
 	f_circle(xa2, ya2, tool_size);
-	tline(xa1, ya1, line_x1, line_y1, tool_size);
-	tline(xa2, ya2, line_x1, line_y1, tool_size);
+	tline(xa1, ya1, line_x2, line_y2, tool_size);
+	tline(xa2, ya2, line_x2, line_y2, tool_size);
 
 	if (mode == 3)
 	{
 		// Draw 3rd line and fill arrowhead
 		tline(xa1, ya1, xa2, ya2, tool_size );
 		poly_points = 0;
-		poly_add(line_x1, line_y1);
+		poly_add(line_x2, line_y2);
 		poly_add(xa1, ya1);
 		poly_add(xa2, ya2);
 		poly_paint();
@@ -1086,14 +1086,14 @@ static void draw_arrow(int mode)
 
 	// Update screen areas
 	minx = xa1 < xa2 ? xa1 : xa2;
-	if (minx > line_x1) minx = line_x1;
+	if (minx > line_x2) minx = line_x2;
 	maxx = xa1 > xa2 ? xa1 : xa2;
-	if (maxx < line_x1) maxx = line_x1;
+	if (maxx < line_x2) maxx = line_x2;
 
 	miny = ya1 < ya2 ? ya1 : ya2;
-	if (miny > line_y1) miny = line_y1;
+	if (miny > line_y2) miny = line_y2;
 	maxy = ya1 > ya2 ? ya1 : ya2;
-	if (maxy < line_y1) maxy = line_y1;
+	if (maxy < line_y2) maxy = line_y2;
 
 	i = (tool_size + 1) >> 1;
 	minx -= i; miny -= i; maxx += i; maxy += i;
@@ -1576,13 +1576,13 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 ///	LINE UPDATES
 
 	if ((tool_type == TOOL_LINE) && (line_status == LINE_LINE) &&
-		((line_x1 != x) || (line_y1 != y)))
+		((line_x2 != x) || (line_y2 != y)))
 	{
 		int old[4];
 
 		copy4(old, line_xy);
-		line_x1 = x;
-		line_y1 = y;
+		line_x2 = x;
+		line_y2 = y;
 		repaint_line(old);
 	}
 }
@@ -3257,7 +3257,7 @@ void change_to_tool(int icon)
 	switch (icon)
 	{
 	case TTB_PAINT:
-		t = brush_tool_type; break;
+		t = brush_type; break;
 	case TTB_SHUFFLE:
 		t = TOOL_SHUFFLE; break;
 	case TTB_FLOOD:

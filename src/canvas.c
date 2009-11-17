@@ -2332,13 +2332,13 @@ void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp li
 	int old[4];
 
 	if (!poly_points || (poly_points >= MAX_POLY)) return;
-	if ((line_x1 == x) && (line_y1 == y)) return;	// This check reduces flicker
+	if ((line_x2 == x) && (line_y2 == y)) return;	// This check reduces flicker
 
 	copy4(old, line_xy);
-	line_x1 = x;
-	line_y1 = y;
-	line_x2 = poly_mem[poly_points - 1][0];
-	line_y2 = poly_mem[poly_points - 1][1];
+	line_x2 = x;
+	line_y2 = y;
+	line_x1 = poly_mem[poly_points - 1][0];
+	line_y1 = poly_mem[poly_points - 1][1];
 	repaint_line(old);
 }
 
@@ -2498,8 +2498,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	double len1;
 	int update_area[4];
 	int minx = -1, miny = -1, xw = -1, yh = -1;
+	tool_info o_tool = tool_state;
 	int i, j, k, ts2, tr2, res, ox, oy;
-	int o_size = tool_size, o_flow = tool_flow, o_opac = tool_opacity, n_vs[3];
 	int oox, ooy;	// Continuous smudge stuff
 	gboolean rmb_tool;
 
@@ -2524,19 +2524,13 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		pressure = pressure <= 0.2 ? -1.0 : pressure >= 1.0 ? 0.0 :
 			(pressure - 1.0) * (1.0 / 0.8);
 
-		n_vs[0] = tool_size;
-		n_vs[1] = tool_flow;
-		n_vs[2] = tool_opacity;
 		for (i = 0; i < 3; i++)
 		{
 			if (!tablet_tool_use[i]) continue;
-			n_vs[i] *= (tablet_tool_factor[i] > 0 ? 1.0 : 0.0) +
+			tool_state.var[i] *= (tablet_tool_factor[i] > 0) +
 				tablet_tool_factor[i] * pressure;
-			if (n_vs[i] < 1) n_vs[i] = 1;
+			if (tool_state.var[i] < 1) tool_state.var[i] = 1;
 		}
-		tool_size = n_vs[0];
-		tool_flow = n_vs[1];
-		tool_opacity = n_vs[2];
 	}
 
 	ts2 = tool_size >> 1;
@@ -2548,12 +2542,12 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	{
 		if ( button == 1 )
 		{
-			line_x1 = x;
-			line_y1 = y;
+			line_x2 = x;
+			line_y2 = y;
 			if ( line_status == LINE_NONE )
 			{
-				line_x2 = x;
-				line_y2 = y;
+				line_x1 = x;
+				line_y1 = y;
 			}
 
 			// Draw circle at x, y
@@ -2577,8 +2571,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				xw = abs( line_x2 - line_x1 ) + 1 + tool_size;
 				yh = abs( line_y2 - line_y1 ) + 1 + tool_size;
 
-				line_x2 = line_x1;
-				line_y2 = line_y1;
+				line_x1 = line_x2;
+				line_y1 = line_y2;
 			}
 			line_status = LINE_START;
 		}
@@ -2837,12 +2831,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 	tool_ox = x;	// Remember the coords just used as they are needed in continuous mode
 	tool_oy = y;
 
-	if ( tablet_working )
-	{
-		tool_size = o_size;
-		tool_flow = o_flow;
-		tool_opacity = o_opac;
-	}
+	if (tablet_working) tool_state = o_tool;
 }
 
 void check_marquee()	// Check marquee boundaries are OK - may be outside limits via arrow keys
@@ -3101,11 +3090,11 @@ static int merge_xy(int cnt, int *xy, int step)
 }
 
 /* Only 2 line-quads for now, but will be extended to 4 for line-join drag */
-static void refresh_lines(int flip, const int xy0[4], const int xy1[4])
+static void refresh_lines(const int xy0[4], const int xy1[4])
 {
 	linedata ll1, ll2;
 	int ixy[4], getxy[8], *lines[2] = { ll1, ll2 };
-	int i, j, k, y, y1, y2, cnt, step, zoom = 1, scale = 1;
+	int i, j, y, y1, y2, cnt, step, zoom = 1, scale = 1;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -3114,8 +3103,6 @@ static void refresh_lines(int flip, const int xy0[4], const int xy1[4])
 	wjcanvas_get_vport(drawing_canvas, ixy);
 	prepare_line_clip(ixy, ixy, scale);
 
-	flip = flip ? 2 : 0;
-	k = flip ^ 2;
 	for (i = j = 0; j < 2; j++)
 	{
 		const int *xy;
@@ -3124,8 +3111,8 @@ static void refresh_lines(int flip, const int xy0[4], const int xy1[4])
 		xy = j ? xy1 : xy0;
 		if (!xy) continue;
 		line_init(lines[i],
-			floor_div(xy[flip], zoom), floor_div(xy[flip + 1], zoom),
-			floor_div(xy[k], zoom), floor_div(xy[k + 1], zoom));
+			floor_div(xy[0], zoom), floor_div(xy[1], zoom),
+			floor_div(xy[2], zoom), floor_div(xy[3], zoom));
 		if (line_clip(lines[i], ixy, &tmp) < 0) continue;
 		if (lines[i][9] < 0) line_flip(lines[i]);
 		i++;
@@ -3168,7 +3155,7 @@ static void render_line(int mode, linedata line, int ofs, rgbcontext *ctx)
 
 	copy4(cxy, ctx->xy);
 	w3 = (cxy[2] - cxy[0]) * 3;
-	for (i = ofs; line[2] >= 0; line_step(line) , i--)
+	for (i = ofs; line[2] >= 0; line_step(line) , i++)
 	{
 		x = (tx = line[0]) * scale + margin_main_x;
 		y = (ty = line[1]) * scale + margin_main_y;
@@ -3212,12 +3199,12 @@ static void render_line(int mode, linedata line, int ofs, rgbcontext *ctx)
 
 void repaint_grad(const int *old)
 {
-	refresh_lines(TRUE, gradient[mem_channel].xy, old);
+	refresh_lines(gradient[mem_channel].xy, old);
 }
 
 void repaint_line(const int *old)
 {
-	refresh_lines(FALSE, line_xy, old);
+	refresh_lines(line_xy, old);
 }
 
 /* lxy is ctx's bounds scaled to "line space" (unchanged for zoom < 0, image
@@ -3225,17 +3212,15 @@ void repaint_line(const int *old)
 void refresh_line(int mode, const int *lxy, rgbcontext *ctx)
 {
 	linedata line;
-	int *xy = line_xy;
-	int i, j, k = 0, zoom = 1;
+	int j, zoom = 1, *xy;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 
-	if (mode == 3) xy = gradient[mem_channel].xy , k = 2;
-	line_init(line, floor_div(xy[k], zoom), floor_div(xy[k + 1], zoom),
-		floor_div(xy[k ^ 2], zoom), floor_div(xy[(k ^ 2) + 1], zoom));
-	i = line[2];
-	if (line_clip(line, lxy, &j) >= 0) render_line(mode, line, i - j, ctx);
+	xy = mode == 3 ? gradient[mem_channel].xy : line_xy;
+	line_init(line, floor_div(xy[0], zoom), floor_div(xy[1], zoom),
+		floor_div(xy[2], zoom), floor_div(xy[3], zoom));
+	if (line_clip(line, lxy, &j) >= 0) render_line(mode, line, j, ctx);
 }
 
 void update_recent_files()			// Update the menu items
