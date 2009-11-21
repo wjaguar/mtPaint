@@ -588,7 +588,6 @@ void mem_kuwahara(int r, int gcor, int detail);
 
 /// PALETTE PROCS
 
-int mem_load_pal( char *file_name, png_color *pal );	// Load file into palette array >1 => cols read
 void mem_pal_load_def();		// Load default palette
 
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)

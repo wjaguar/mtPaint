@@ -1618,8 +1618,9 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		db = ((int)c1[2] - c0[2]) / d;
 		b0 = c0[2];
 
-		for (i = 1; i < n; i++ , lc += 3)
+		for (i = 1; i < n; i++)
 		{
+			lc += 3;
 			lc[0] = rint(r0 + dr * i);
 			lc[1] = rint(g0 + dg * i);
 			lc[2] = rint(b0 + db * i);
@@ -1634,8 +1635,9 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		dg = (gamma256[c1[1]] - (g0 = gamma256[c0[1]])) / d;
 		db = (gamma256[c1[2]] - (b0 = gamma256[c0[2]])) / d;
 
-		for (i = 1; i < n; i++ , lc += 3)
+		for (i = 1; i < n; i++)
 		{
+			lc += 3;
 			rr = r0 + dr * i;
 			lc[0] = UNGAMMA256(rr);
 			gg = g0 + dg * i;
@@ -1667,7 +1669,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		dv = (hsv[5] - hsv[2]) / d;
 		v0 = hsv[2];
 
-		for (i = 1; i < n; i++ , lc += 3)
+		for (i = 1; i < n; i++)
 		{
 			vv = v0 + dv * i;
 			ss = vv - vv * (s0 + ds * i);
@@ -1678,6 +1680,7 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 			if (t & 1) { vv -= hh; hh += vv; }
 			else hh += ss;
 			t >>= 1;
+			lc += 3;
 			lc[t] = rint(vv);
 			lc[(t + 1) % 3] = rint(hh);
 			lc[(t + 2) % 3] = rint(ss);

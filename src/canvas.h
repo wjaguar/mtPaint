@@ -106,6 +106,7 @@ int	col_reverse,					// Painting with right button
 #define FS_LAYER_LOAD 17
 #define FS_PATTERN_LOAD 18
 #define FS_CLIPBOARD 19
+#define FS_PALETTE_DEF 20
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 
@@ -293,6 +294,8 @@ void create_default_image();			// Create default new image
 #define UPD_MVPAL  (UPD_PAL & ~UPD_IMG)
 //	Mask covering all kinds of image redraw - for disabling them
 #define UPD_IMGMASK (UPD_MODE | CF_DRAW | CF_VDRAW)
+//	Changed palette (+undo)
+#define UPD_UPAL   (UPD_PAL | CF_MENU)
 // !!! Do not forget: CF_MENU also tracks undo stack changes
 
 void update_stuff(int flags);

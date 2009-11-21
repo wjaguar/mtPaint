@@ -216,7 +216,7 @@ static int process_page_frame(char *file_name, ani_settings *ani, ls_settings *w
 static int allocate_image(ls_settings *settings, int cmask)
 {
 	size_t sz, l;
-	int i, j, oldmask;
+	int i, j, oldmask, mode = settings->mode;
 
 	if ((settings->width < 1) || (settings->height < 1)) return (-1);
 
@@ -228,10 +228,10 @@ static int allocate_image(ls_settings *settings, int cmask)
 		settings->silent = TRUE;
 
 	/* Reduce cmask according to mode */
-	if (settings->mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
-	else if (settings->mode == FS_CLIPBOARD) cmask &= CMASK_RGBA;
-	else if ((settings->mode == FS_CHANNEL_LOAD) ||
-		(settings->mode == FS_PATTERN_LOAD)) cmask &= CMASK_IMAGE;
+	if (mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
+	else if (mode == FS_CLIPBOARD) cmask &= CMASK_RGBA;
+	else if ((mode == FS_CHANNEL_LOAD) || (mode == FS_PATTERN_LOAD))
+		cmask &= CMASK_IMAGE;
 
 	/* Overwriting is allowed */
 	oldmask = cmask_from(settings->img);
@@ -244,7 +244,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 
 	j = TRUE; // For FS_LAYER_LOAD
 	sz = (size_t)settings->width * settings->height;
-	switch (settings->mode)
+	switch (mode)
 	{
 	case FS_PNG_LOAD: /* Regular image */
 		/* Reserve memory */
@@ -305,6 +305,9 @@ static int allocate_image(ls_settings *settings, int cmask)
 		settings->img[CHN_IMAGE] = calloc(1, sz);
 		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
 		break;
+	case FS_PALETTE_LOAD: /* Palette */
+	case FS_PALETTE_DEF:
+		return (-1); // Should not arrive here if palette is present
 	}
 	return (0);
 }
@@ -581,6 +584,15 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	png_read_info(png_ptr, info_ptr);
 	png_get_IHDR(png_ptr, info_ptr, &pwidth, &pheight, &bit_depth, &color_type,
 		&interlace_type, NULL, NULL);
+	if (png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
+	{
+		png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
+		memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
+		/* If palette is all we need */
+		res = 1;
+		if ((settings->mode == FS_PALETTE_LOAD) ||
+			(settings->mode == FS_PALETTE_DEF)) goto fail3;
+	}
 
 	res = TOO_BIG;
 	if ((pwidth > MAX_WIDTH) || (pheight > MAX_HEIGHT)) goto fail2;
@@ -624,12 +636,6 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		png_set_gray_1_2_4_to_8(png_ptr);
 		png_set_palette_to_rgb(png_ptr);
 		png_set_gray_to_rgb(png_ptr);
-
-		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
-		{
-			png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
-			memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
-		}
 
 		/* Is there a transparent color? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
@@ -707,8 +713,6 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	/* Paletted PNG file */
 	else
 	{
-		png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
-		memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
 		/* Is there a transparent index? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
@@ -784,7 +788,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 
 fail2:	if (msg) progress_end();
 	free(row_pointers);
-	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+fail3:	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 fail:	if (fp) fclose(fp);
 	return (res);
 }
@@ -1402,6 +1406,9 @@ static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
 	if (giffy->Image.ColorMap)
 		settings->colors = convert_gif_palette(settings->pal, giffy->Image.ColorMap);
 	if (settings->colors < 0) return (-1); // No palette at all
+	/* If palette is all we need */
+	if ((settings->mode == FS_PALETTE_LOAD) ||
+		(settings->mode == FS_PALETTE_DEF)) return (EXPLODE_FAILED);
 
 	/* Store actual image parameters */
 	settings->x = giffy->Image.Left;
@@ -2262,6 +2269,10 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	else	switch (pmetric)
 		{
 		case PHOTOMETRIC_PALETTE:
+		{
+			png_color *cp = settings->pal;
+			int i, j, k, na = 0, nd = 1; /* Old palette format */
+
 			if (bpsamp > 8)
 			{
 				argb = TRUE;
@@ -2269,6 +2280,27 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			}
 			if (!TIFFGetField(tif, TIFFTAG_COLORMAP,
 				&red16, &green16, &blue16)) return (-1);
+
+			settings->colors = j = 1 << bpsamp;
+			/* Analyze palette */
+			for (k = i = 0; i < j; i++)
+			{
+				k |= red16[i] | green16[i] | blue16[i];
+			}
+			if (k > 255) na = 128 , nd = 257; /* New palette format */
+
+			for (i = 0; i < j; i++ , cp++)
+			{
+				cp->red = (red16[i] + na) / nd;
+				cp->green = (green16[i] + na) / nd;
+				cp->blue = (blue16[i] + na) / nd;
+			}
+			/* If palette is all we need */
+			if ((settings->mode == FS_PALETTE_LOAD) ||
+				(settings->mode == FS_PALETTE_DEF))
+				return (EXPLODE_FAILED);
+			/* Fallthrough */
+		}
 		case PHOTOMETRIC_MINISWHITE:
 		case PHOTOMETRIC_MINISBLACK:
 			bpp = 1; break;
@@ -2364,7 +2396,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		int xstep = tw ? tw : width, ystep = th ? th : rps;
 		int aalpha, tsz = 0, wbpp = bpp;
 		int bpr, bits1, bit0, db, n, nx;
-		int i, j, k, x0, y0, bsz, plane, nplanes;
+		int j, k, x0, y0, bsz, plane, nplanes;
 
 
 		if (pmetric == PHOTOMETRIC_SEPARATED) // Needs temp buffer
@@ -2387,31 +2419,11 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 
 		bits1 = bpsamp > 8 ? 8 : bpsamp;
 
-		/* Load palette */
-		j = 1 << bits1;
-		if (pmetric == PHOTOMETRIC_PALETTE)
+		/* Setup greyscale palette */
+		if ((bpp == 1) && (pmetric != PHOTOMETRIC_PALETTE))
 		{
-			png_color *cp = settings->pal;
-			int na = 0, nd = 1; /* Old palette format */
-
-			settings->colors = j;
-			/* Analyze palette */
-			for (k = i = 0; i < j; i++)
-			{
-				k |= red16[i] | green16[i] | blue16[i];
-			}
-			if (k > 255) na = 128 , nd = 257; /* New palette format */
-
-			for (i = 0; i < j; i++ , cp++)
-			{
-				cp->red = (red16[i] + na) / nd;
-				cp->green = (green16[i] + na) / nd;
-				cp->blue = (blue16[i] + na) / nd;
-			}
-		}
-		else if (bpp == 1)
-		{
-			if (aalpha) j = 256; // Demultiplied values are 0..255
+			/* Demultiplied values are 0..255 */
+			j = aalpha ? 256 : 1 << bits1;
 			settings->colors = j--;
 			k = pmetric == PHOTOMETRIC_MINISBLACK ? 0 : j;
 			mem_bw_pal(settings->pal, k, j ^ k);
@@ -2888,6 +2900,37 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	default: goto fail;
 	}
 
+	/* Load palette if needed */
+	if (bpp < 16)
+	{
+		unsigned char tbuf[1024];
+
+		j = 0;
+		if (l >= BMP_COLORS + 4) j = GET32(hdr + BMP_COLORS);
+		if (!j) j = 1 << bpp;
+		k = GET32(hdr + BMP_DATAOFS) - l;
+		k /= l < BMP3_HSIZE ? 3 : 4;
+		if (k < j) j = k;
+		if (!j || (j > 256)) goto fail; /* Wrong palette size */
+		settings->colors = j;
+		mfseek(mf, l, SEEK_SET);
+		k = l < BMP3_HSIZE ? 3 : 4;
+		i = mfread(tbuf, 1, j * k, mf);
+		if (i < j * k) goto fail; /* Cannot read palette */
+		tmp = tbuf;
+		for (i = 0; i < j; i++)
+		{
+			settings->pal[i].red = tmp[2];
+			settings->pal[i].green = tmp[1];
+			settings->pal[i].blue = tmp[0];
+			tmp += k;
+		}
+		/* If palette is all we need */
+		res = 1;
+		if ((settings->mode == FS_PALETTE_LOAD) ||
+			(settings->mode == FS_PALETTE_DEF)) goto fail;
+	}
+
 	/* Allocate buffer and image */
 	settings->width = w;
 	settings->height = abs(h);
@@ -2898,40 +2941,11 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		bl = GET32(hdr + BMP_FILESIZE) - GET32(hdr + BMP_DATAOFS);
 	/* Otherwise, only one row at a time */
 	else bl = rl;
-	/* To accommodate full palette and bitparser's extra step */
-	buf = malloc(bl < 1024 ? 1024 + 1 : bl + 1);
+	/* To accommodate bitparser's extra step */
+	buf = malloc(bl + 1);
 	res = FILE_MEM_ERROR;
-	if (!buf) goto fail2;
+	if (!buf) goto fail;
 	if ((res = allocate_image(settings, cmask))) goto fail2;
-	res = -1;
-
-	/* Load palette, if any */
-	j = 0;
-	if (bpp < 16)
-	{
-		if (l >= BMP_COLORS + 4) j = GET32(hdr + BMP_COLORS);
-		if (!j) j = 1 << bpp;
-		k = GET32(hdr + BMP_DATAOFS) - l;
-		k /= l < BMP3_HSIZE ? 3 : 4;
-		if (!k) goto fail2; /* No palette in file */
-		if (k < j) j = k;
-	}
-	if (j)
-	{
-		settings->colors = j;
-		mfseek(mf, l, SEEK_SET);
-		k = l < BMP3_HSIZE ? 3 : 4;
-		i = mfread(buf, 1, j * k, mf);
-		if (i < j * k) goto fail2; /* Cannot read palette */
-		tmp = buf;
-		for (i = 0; i < j; i++)
-		{
-			settings->pal[i].red = tmp[2];
-			settings->pal[i].green = tmp[1];
-			settings->pal[i].blue = tmp[0];
-			tmp += k;
-		}
-	}
 
 	if (!settings->silent) ls_init("BMP", 0);
 
@@ -3449,16 +3463,6 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	settings->hot_y = hy;
 	settings->xpm_trans = -1;
 
-	/* Allocate row buffer and image */
-	i = w * cpp + 4 + 1024;
-	if (i > lsz) buf = malloc(lsz = i);
-	res = FILE_MEM_ERROR;
-	if (!buf) goto fail;
-	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
-	res = -1;
-
-	if (!settings->silent) ls_init("XPM", 0);
-
 	/* Init hash */
 	memset(&cuckoo, 0, sizeof(cuckoo));
 	cuckoo.keys = ckeys;
@@ -3467,21 +3471,22 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	cuckoo.seed = HASHSEED;
 
 	/* Read colormap */
+// !!! When/if huge numbers of colors get allowed, will need a progressbar here
 	dest = pal;
 	sprintf(tstr, " \"%%n%%*%dc %%n", cpp);
 	for (i = 0; i < cols; i++ , dest += 3)
 	{
-		if (!fgetsC(lbuf, 4096, fp)) goto fail3;
+		if (!fgetsC(lbuf, 4096, fp)) goto fail;
 
 		/* Parse color ID */
 		k = 0; sscanf(lbuf, tstr, &k, &l);
-		if (!k) goto fail3;
+		if (!k) goto fail;
 
 		/* Insert color into hash */
 		ch_insert(&cuckoo, lbuf + k);
 
 		/* Parse color definitions */
-		if (!(r = strchr(lbuf + l, '"'))) goto fail3;
+		if (!(r = strchr(lbuf + l, '"'))) goto fail;
 		*r = '\0';
 		memset(cdefs, 0, sizeof(cdefs));
 		k = -1; r2 = NULL;
@@ -3497,7 +3502,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			}
 			else if (!r2) /* Color name */
 			{
-				if (k < 0) goto fail3;
+				if (k < 0) goto fail;
 				cdefs[k] = r2 = r;
 			}
 			else /* Add next part of name */
@@ -3509,7 +3514,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			}
 			r = strtok(NULL, " \t\n");
 		}
-		if (!r2) goto fail3; /* Key w/o name */
+		if (!r2) goto fail; /* Key w/o name */
 
 		/* Translate the best one */
 		for (j = 0; j < XPM_COL_DEFS; j++)
@@ -3529,7 +3534,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			break;
 		}
 		/* Not one understandable color */
-		if (j >= XPM_COL_DEFS) goto fail3;
+		if (j >= XPM_COL_DEFS) goto fail;
 	}
 
 	/* Create palette */
@@ -3548,6 +3553,10 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			settings->pal[trans].red = settings->pal[trans].green = 115;
 			settings->pal[trans].blue = 0;
 		}
+		/* If palette is all we need */
+		res = 1;
+		if ((settings->mode == FS_PALETTE_LOAD) ||
+			(settings->mode == FS_PALETTE_DEF)) goto fail;
 	}
 
 	/* Find an unused color for transparency */
@@ -3568,6 +3577,15 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		dest[1] = INT_2_G(j);
 		dest[2] = INT_2_B(j);
 	}
+
+	/* Allocate row buffer and image */
+	i = w * cpp + 4 + 1024;
+	if (i > lsz) buf = malloc(lsz = i);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail;
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+
+	if (!settings->silent) ls_init("XPM", 0);
 
 	/* Now, read the image */
 	res = FILE_LIB_ERROR;
@@ -3605,6 +3623,20 @@ static const char base64[] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
 	hex[] = "0123456789ABCDEF";
 
+/* Extract valid C identifier from filename */
+static char *extract_ident(char *fname, int *len)
+{
+	char *tmp;
+	int l;
+
+	tmp = strrchr(fname, DIR_SEP);
+	tmp = tmp ? tmp + 1 : fname;
+	for (; *tmp && !ISALPHA(*tmp); tmp++);
+	for (l = 0; (l < 256) && ISALNUM(tmp[l]); l++);
+	*len = l;
+	return (tmp);
+}
+
 static int save_xpm(char *file_name, ls_settings *settings)
 {
 	unsigned char rgbmem[XPM_MAXCOL * 4], *src;
@@ -3616,11 +3648,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	int i, j, k, l, cpp, cols, trans = -1;
 
 
-	/* Extract valid C identifier from name */
-	tmp = strrchr(file_name, DIR_SEP);
-	tmp = tmp ? tmp + 1 : file_name;
-	for (; *tmp && !ISALPHA(*tmp); tmp++);
-	for (l = 0; (l < 256) && ISALNUM(tmp[l]); l++);
+	tmp = extract_ident(file_name, &l);
 	if (!l) return -1;
 
 	/* Collect RGB colors */
@@ -3949,6 +3977,10 @@ static int load_lss(char *file_name, ls_settings *settings)
 		settings->pal[i].blue = tmp[2] << 2 | tmp[2] >> 4;
 		tmp += 3;
 	}
+	/* If palette is all we need */
+	res = 1;
+	if ((settings->mode == FS_PALETTE_LOAD) ||
+		(settings->mode == FS_PALETTE_DEF)) goto fail;
 
 	/* Load all image at once */
 	fseek(fp, 0, SEEK_END);
@@ -4175,7 +4207,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	{
 	case 1: /* Paletted */
 	{
-		int pbpp, i, j, k, tmp, mask;
+		int pbpp, i, j, k, l, tmp, mask;
 		png_color *pptr;
 
 		if (ptype != 1) goto fail; /* Invalid palette */
@@ -4192,38 +4224,42 @@ static int load_tga(char *file_name, ls_settings *settings)
 		if (!ptype || (ptype > 32) || ((ptype & 7) && (ptype != 15)))
 			goto fail;
 		pbpp = (ptype + 7) >> 3;
+		l = j * pbpp;
 
 		/* Read the palette */
 		fseek(fp, iofs, SEEK_SET);
-		i = fread(pal + k * pbpp, 1, j * pbpp, fp);
-		if (i < j * pbpp) goto fail;
-		iofs += j * pbpp;
+		if (fread(pal + k * pbpp, 1, l, fp) != l) goto fail;
+		iofs += l;
 
 		/* Store the palette */
 		settings->colors = j + k;
 		memset(settings->pal, 0, 256 * 3);
 		if (pbpp == 2) set_xlate(xlat5, 5);
 		pptr = settings->pal + k;
-		for (i = 0; i < j; i++)
+		for (i = 0; i < l; i += pbpp , pptr++)
 		{
 			switch (pbpp)
 			{
 			case 1: /* 8-bit greyscale */
-				pptr[i].red = pptr[i].green = pptr[i].blue = pal[i];
+				pptr->red = pptr->green = pptr->blue = pal[i];
 				break;
 			case 2: /* 5:5:5 BGR */
-				pptr[i].blue = xlat5[pal[i + i] & 0x1F];
-				pptr[i].green = xlat5[(((pal[i + i + 1] << 8) +
-					pal[i + i]) >> 5) & 0x1F];
-				pptr[i].red = xlat5[(pal[i + i + 1] >> 2) & 0x1F];
+				pptr->blue = xlat5[pal[i] & 0x1F];
+				pptr->green = xlat5[(((pal[i + 1] << 8) +
+					pal[i]) >> 5) & 0x1F];
+				pptr->red = xlat5[(pal[i + 1] >> 2) & 0x1F];
 				break;
 			case 3: case 4: /* 8:8:8 BGR */
-				pptr[i].blue = pal[i * pbpp + 0];
-				pptr[i].green = pal[i * pbpp + 1];
-				pptr[i].red = pal[i * pbpp + 2];
+				pptr->blue = pal[i + 0];
+				pptr->green = pal[i + 1];
+				pptr->red = pal[i + 2];
 				break;
 			}
 		}
+		/* If palette is all we need */
+		res = 1;
+		if ((settings->mode == FS_PALETTE_LOAD) ||
+			(settings->mode == FS_PALETTE_DEF)) goto fail;
 
 		/* Cannot have transparent color at all? */
 		if ((j <= 1) || ((ptype != 15) && (ptype != 32))) break;
@@ -4231,19 +4267,19 @@ static int load_tga(char *file_name, ls_settings *settings)
 		/* Test if there are different alphas */
 		mask = ptype == 15 ? 0x80 : 0xFF;
 		tmp = pal[pbpp - 1] & mask;
-		for (i = 1; (i < j) && ((pal[i * pbpp - 1] & mask) == tmp); i++);
-		if (i >= j) break;
+		for (i = 2; (i <= j) && ((pal[i * pbpp - 1] & mask) == tmp); i++);
+		if (i > j) break;
 		/* For 15 bpp, assume the less frequent value is transparent */
 		tmp = 0;
 		if (ptype == 15)
 		{
-			for (i = 0; i < j; i++) tmp += pal[i + i - 1] & mask;
+			for (i = 0; i < j; i++) tmp += pal[i + i + 1] & mask;
 			if (tmp >> 7 < j >> 1) tmp = 0x80; /* Transparent if set */
 		}
 		/* Search for first transparent color */
-		for (i = 0; (i < j) && ((pal[i * pbpp - 1] & mask) != tmp); i++);
-		if (i >= j) break; /* If 32-bit and not one alpha is zero */
-		settings->xpm_trans = i + k;
+		for (i = 1; (i <= j) && ((pal[i * pbpp - 1] & mask) != tmp); i++);
+		if (i > j) break; /* If 32-bit and not one alpha is zero */
+		settings->xpm_trans = i + k - 1;
 		break;
 	}
 	case 2: /* RGB */
@@ -5407,6 +5443,85 @@ static int load_pixmap(char *pixmap_id, ls_settings *settings)
 	return (res);
 }
 
+/* Handle textual palette file formats - GIMP's GPL and mtPaint's own TXT */
+
+static void to_pal(png_color *c, int *rgb)
+{
+	c->red = rgb[0] < 0 ? 0 : rgb[0] > 255 ? 255 : rgb[0];
+	c->green = rgb[1] < 0 ? 0 : rgb[1] > 255 ? 255 : rgb[1];
+	c->blue = rgb[2] < 0 ? 0 : rgb[2] > 255 ? 255 : rgb[2];
+}
+
+static int load_txtpal(char *file_name, ls_settings *settings)
+{
+	char lbuf[4096];
+	FILE *fp;
+	png_color *c = settings->pal;
+	int i, rgb[3], n = 0, res = -1;
+
+
+	if (!(fp = fopen(file_name, "r"))) return (-1);
+	if (!fgets(lbuf, 4096, fp)) goto fail;
+	if (settings->ftype == FT_GPL)
+	{
+		if (strstr(lbuf, "GIMP Palette") != lbuf) goto fail;
+		while (fgets(lbuf, 4096, fp) && (n < 256))
+		{
+			/* Just ignore invalid/unknown lines */
+			if (sscanf(lbuf, "%d %d %d", rgb + 0, rgb + 1, rgb + 2) != 3)
+				continue;
+			to_pal(c++, rgb);
+			n++;
+		}
+	}
+	else
+	{
+		if (sscanf(lbuf, "%i", &n) != 1) goto fail;
+		/* No further validation of anything at all */
+		n = n < 2 ? 2 : n > 256 ? 256 : n;
+		for (i = 0; i < n; i++)
+		{
+			fscanf(fp, "%i,%i,%i\n", rgb + 0, rgb + 1, rgb + 2);
+			to_pal(c++, rgb);
+		}
+	}
+	settings->colors = n;
+	if (n > 0) res = 1;
+
+fail:	fclose(fp);
+	return (res);
+}
+
+static int save_txtpal(char *file_name, ls_settings *settings)		
+{
+	FILE *fp;
+	char *tpl;
+	png_color *cp;
+	int i, l, n = settings->colors;
+
+	if ((fp = fopen(file_name, "w")) == NULL) return (-1);
+
+	if (settings->ftype == FT_GPL)	// .gpl file
+	{
+		tpl = extract_ident(file_name, &l);
+		if (!l) tpl = "mtPaint" , l = strlen("mtPaint");
+		fprintf(fp, "GIMP Palette\nName: %.*s\nColumns: 16\n#\n", l, tpl);
+		tpl = "%3i %3i %3i\tUntitled\n";
+	}
+	else // .txt file
+	{
+		fprintf(fp, "%i\n", n);
+		tpl = "%i,%i,%i\n";
+	}
+
+	cp = settings->pal;
+	for (i = 0; i < n; i++ , cp++)
+		fprintf(fp, tpl, cp->red, cp->green, cp->blue);
+
+	fclose(fp);
+	return (0);
+}
+
 static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	ls_settings setw = *settings; // Make a copy to safely modify
@@ -5461,6 +5576,11 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_PPM: res = save_ppm(file_name, &setw); break;
 	case FT_PAM: res = save_pam(file_name, &setw); break;
 	case FT_PIXMAP: res = save_pixmap(&setw, mf); break;
+	/* Palette files */
+	case FT_GPL:
+	case FT_TXT: res = save_txtpal(file_name, &setw); break;
+/* !!! Not implemented yet */
+//	case FT_PAL:
 	}
 
 	return (res);
@@ -5655,12 +5775,17 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_PPM:
 	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
 	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
+	/* Palette files */
+	case FT_GPL:
+	case FT_TXT: res0 = load_txtpal(file_name, &settings); break;
+/* !!! Not implemented yet */
+//	case FT_PAL:
 	}
 
 	/* Consider animated GIF a success */
 	res = res0 == FILE_HAS_FRAMES ? 1 : res0;
 
-	switch (settings.mode)
+	switch (mode)
 	{
 	case FS_PNG_LOAD: /* Image */
 		/* Success, or lib failure with single image - commit load */
@@ -5761,6 +5886,29 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		if ((res == 1) && (settings.colors == 2))
 			set_patterns(settings.img[CHN_IMAGE]);
 		free(settings.img[CHN_IMAGE]);
+		break;
+	case FS_PALETTE_LOAD:
+	case FS_PALETTE_DEF:
+		/* Drop image channels if any */
+		mem_free_chanlist(settings.img);
+		/* This "failure" in this context serves as shortcut */
+		if (res == EXPLODE_FAILED) res = 1;
+		/* Failure - do nothing */
+// !!! In case of _image_ format here, re-recognize as palette and retry
+		if ((res != 1) || (settings.colors <= 0));
+		/* Replace default palette */
+		else if (mode == FS_PALETTE_DEF)
+		{
+			mem_pal_copy(mem_pal_def, pal);
+			mem_pal_def_i = settings.colors;
+		}
+		/* Change current palette */
+		else
+		{
+			mem_undo_next(UNDO_PAL);
+			mem_pal_copy(mem_pal, pal);
+			mem_cols = settings.colors;
+		}
 		break;
 	}
 	free(settings.icc);
@@ -6016,15 +6164,13 @@ int export_ascii ( char *file_name )
 	return 0;
 }
 
-int detect_image_format(char *name)
+static int do_detect_format(char *name, FILE *fp)
 {
 	unsigned char buf[66], *stop;
 	int i;
-	FILE *fp;
 
-	if (!(fp = fopen(name, "rb"))) return (-1);
 	i = fread(buf, 1, 64, fp);
-	fclose(fp);
+	buf[64] = '\0';
 
 	/* Check all unambiguous signatures */
 	if (!memcmp(buf, "\x89PNG", 4)) return (FT_PNG);
@@ -6069,6 +6215,8 @@ int detect_image_format(char *name)
 		return (pnms[(buf[1] - '1') % 3]);
 	}
 
+	if (!memcmp(buf, "GIMP Palette", strlen("GIMP Palette"))) return (FT_GPL);
+
 	/* Check layers signature and version */
 	if (!memcmp(buf, LAYERS_HEADER, strlen(LAYERS_HEADER)))
 	{
@@ -6101,6 +6249,9 @@ int detect_image_format(char *name)
 	if ((buf[1] < 2) && (buf[2] < 12) && ((1 << buf[2]) & 0x0E0F))
 		return (FT_TGA);
 
+	/* Simple check for "txt" palette format */
+	if ((sscanf(buf, "%i", &i) == 1) && (i > 0) && (i <= 256)) return (FT_TXT);
+
 	/* Simple check for XPM */
 	stop = strstr(buf, "XPM");
 	if (stop)
@@ -6115,6 +6266,34 @@ int detect_image_format(char *name)
 		if (ISCNTRL(buf[i])) return (FT_NONE);
 	}
 	return (FT_XBM);
+}
+
+int detect_file_format(char *name, int need_palette)
+{
+	FILE *fp;
+	int i, f;
+
+	if (!(fp = fopen(name, "rb"))) return (-1);
+	i = do_detect_format(name, fp);
+	f = file_formats[i].flags;
+	if (need_palette)
+	{
+#if 0
+		/* Check the raw "pal" format */
+		if (!(f & (FF_16 | FF_256 | FF_PALETTE)))
+		{
+			int l;
+			fseek(fp, 0, SEEK_END);
+			l = ftell(fp);
+			i = l && (l <= 768) && !(l % 3) ? FT_PAL : FT_NONE;
+		}
+#else
+		if (!(f & (FF_16 | FF_256 | FF_PALETTE))) i = FT_NONE;
+#endif
+	}
+	else if (!(f & FF_IMAGE)) i = FT_NONE;
+	fclose(fp);
+	return (i);
 }
 
 #ifdef WIN32

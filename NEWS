@@ -26,6 +26,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Netpbm file formats (PBM/PGM/PPM/PAM) save/load added
 	* Better support for loading CMYK TIFF files as RGB/RGBA
 	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
+	* "Palette->Open" now can extract palette from indexed images in any supported file format
 	* "Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system
 	* Toolbar and menu icons are now themeable (Preferences->Paths->Default Theme)
@@ -37,6 +38,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Layers list now correctly displays selected layer after loading layers file
 	* BUGFIX - Loading TIFF files with X or Y mirroring doesn't cause crash
 	* BUGFIX - Planar TIFF files with alpha now load properly
+	* BUGFIX - Transparency in indexed TGA files is now read properly
 	* BUGFIX - Failed operations now do not flag image as modified
 	* BUGFIX - Gradient colours are now properly updated after converting indexed image to RGB
 

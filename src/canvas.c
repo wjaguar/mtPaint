@@ -1222,54 +1222,21 @@ void main_redo()
 	update_stuff(UPD_ALL | CF_NAME);
 }
 
-/* Save palette to a file */
-static int save_pal(char *file_name, ls_settings *settings)		
+static int load_pal(char *filename)		// Load palette file
 {
-	FILE *fp;
-	int i;
+	int ftype, res = -1;
 
-	if ((fp = fopen(file_name, "w")) == NULL) return -1;
+	ftype = detect_palette_format(filename);
+	if (ftype < 0) return (-1); /* Silently fail if no file */
 
-	if (settings->ftype == FT_GPL)		// .gpl file
-	{
-		fprintf(fp, "GIMP Palette\nName: mtPaint\nColumns: 16\n#\n");
-		for (i = 0; i < settings->colors; i++)
-			fprintf(fp, "%3i %3i %3i\tUntitled\n",
-				settings->pal[i].red, settings->pal[i].green,
-				settings->pal[i].blue);
-	}
+	if (ftype != FT_NONE) res = load_image(filename, FS_PALETTE_LOAD, ftype);
 
-	if (settings->ftype == FT_TXT)		// .txt file
-	{
-		fprintf(fp, "%i\n", settings->colors);
-		for (i = 0; i < settings->colors; i++)
-			fprintf(fp, "%i,%i,%i\n",
-				settings->pal[i].red, settings->pal[i].green,
-				settings->pal[i].blue);
-	}
+	/* Successful... */
+	if (res == 1) update_stuff(UPD_UPAL);
+	/* ...or not */
+	else alert_box(_("Error"), _("Invalid palette file"), NULL);
 
-	fclose( fp );
-
-	return 0;
-}
-
-int load_pal(char *file_name)			// Load palette file
-{
-	int i;
-	png_color new_mem_pal[256];
-
-	i = mem_load_pal( file_name, new_mem_pal );
-
-	if ( i < 0 ) return i;		// Failure
-
-	spot_undo(UNDO_PAL);
-
-	mem_pal_copy( mem_pal, new_mem_pal );
-	mem_cols = i;
-
-	update_stuff(UPD_PAL);
-
-	return 0;
+	return (res == 1 ? 0 : -1);
 }
 
 
@@ -1939,22 +1906,14 @@ static void fs_ok(GtkWidget *fs)
 		update_stuff(UPD_TRANS);
 		break;
 	case FS_PALETTE_LOAD:
-		if (load_pal(fname))
-		{
-			f8 = gtkuncpy(NULL, fname, 0);
-			msg = g_strdup_printf(_("File: %s invalid - palette not updated"), f8);
-			alert_box(_("Error"), msg, NULL);
-			g_free(msg);
-			g_free(f8);
-			goto redo;
-		}
-		else notify_changed();
+		if (load_pal(fname)) goto redo;
+		notify_changed();
 		break;
 	case FS_PALETTE_SAVE:
 		if (check_file(fname)) goto redo;
 		settings.pal = mem_pal;
 		settings.colors = mem_cols;
-		if (save_pal(fname, &settings) < 0) goto redo_name;
+		if (save_image(fname, &settings)) goto redo_name;
 		break;
 	case FS_CLIP_FILE:
 	case FS_SELECT_FILE:

@@ -1769,19 +1769,12 @@ static void make_ATAN()
 
 int load_def_palette(char *name)
 {
-	png_color temp_pal[256];
 	int i;
 
 	if (!name[0]) return (FALSE); // Useless
-	if (valid_file(name) != 0) return (FALSE);
-
-	mem_pal_copy(temp_pal, mem_pal_def);
-	i = mem_load_pal(name, temp_pal);
-	if (i < 1) return (FALSE);
-
-	mem_pal_copy(mem_pal_def, temp_pal);
-	mem_pal_def_i = i;
-	return (TRUE);
+	i = detect_palette_format(name);
+	if (i > FT_NONE) return (load_image(name, FS_PALETTE_DEF, i) == 1);
+	return (FALSE);
 }
 
 int load_def_patterns(char *name)
@@ -2019,73 +2012,10 @@ void mem_pal_init()			// Redraw whole palette
 	}
 }
 
-static void validate_pal( int i, int rgb[3], png_color *pal )
-{
-	int j;
-
-	for ( j=0; j<3; j++ )
-	{
-		mtMAX( rgb[j], rgb[j], 0 )
-		mtMIN( rgb[j], rgb[j], 255 )
-	}
-	pal[i].red = rgb[0];
-	pal[i].green = rgb[1];
-	pal[i].blue = rgb[2];
-}
-
 void mem_pal_load_def()					// Load default palette
 {
 	mem_pal_copy( mem_pal, mem_pal_def );
 	mem_cols = mem_pal_def_i;
-}
-
-int mem_load_pal( char *file_name, png_color *pal )	// Load file into palette array >1 => cols read
-{
-	int rgb[3], new_mem_cols=0, i;
-	FILE *fp;
-	char input[128];
-
-
-	if ((fp = fopen(file_name, "r")) == NULL) return -1;
-
-	if (!fgets(input, 30, fp))
-	{
-		fclose( fp );
-		return -1;
-	}
-
-	if ( strncmp( input, "GIMP Palette", 12 ) == 0 )
-	{
-//printf("Gimp palette file\n");
-		while (fgets(input, 120, fp) && (new_mem_cols < 256))
-		{	// Continue to read until EOF or new_mem_cols>255
-			// If line starts with a number or space assume its a palette entry
-			if ( input[0] == ' ' || (input[0]>='0' && input[0]<='9') )
-			{
-//printf("Line %3i = %s", new_mem_cols, input);
-				sscanf(input, "%i %i %i", &rgb[0], &rgb[1], &rgb[2] );
-				validate_pal( new_mem_cols, rgb, pal );
-				new_mem_cols++;
-			}
-//			else printf("NonLine = %s\n", input);
-		}
-	}
-	else
-	{
-		sscanf(input, "%i", &new_mem_cols);
-		mtMAX( new_mem_cols, new_mem_cols, 2 )
-		mtMIN( new_mem_cols, new_mem_cols, 256 )
-
-		for ( i=0; i<new_mem_cols; i++ )
-		{
-			fgets(input, 30, fp);
-			sscanf(input, "%i,%i,%i\n", &rgb[0], &rgb[1], &rgb[2] );
-			validate_pal( i, rgb, pal );
-		}
-	}
-	fclose( fp );
-
-	return new_mem_cols;
 }
 
 void mem_mask_init()		// Initialise RGB protection mask array

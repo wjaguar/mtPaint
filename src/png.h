@@ -157,7 +157,9 @@ int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype,
 int export_undo(char *file_name, ls_settings *settings);
 int export_ascii ( char *file_name );
 
-int detect_image_format(char *name);
+int detect_file_format(char *name, int need_palette);
+#define detect_image_format(X) detect_file_format(X, FALSE)
+#define detect_palette_format(X) detect_file_format(X, TRUE)
 
 int valid_file(char *filename);		// Can this file be opened for reading?
 
