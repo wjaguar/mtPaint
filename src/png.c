@@ -35,7 +35,12 @@
 #include <jpeglib.h>
 #endif
 #ifdef U_JP2
+#define HANDLE_JP2
 #include <openjpeg.h>
+#endif
+#ifdef U_JASPER
+#define HANDLE_JP2
+#include <jasper/jasper.h>
 #endif
 #ifdef U_TIFF
 #define NEED_CMYK
@@ -79,9 +84,9 @@ fformat file_formats[NUM_FTYPES] = {
 #else
 	{ "", "", "", 0},
 #endif
-#ifdef U_JP2
+#ifdef HANDLE_JP2
 	{ "JPEG2000", "jp2", "", FF_RGB | FF_ALPHA | FF_COMPJ2 },
-	{ "J2K", "j2k", "", FF_RGB | FF_ALPHA | FF_COMPJ2 },
+	{ "J2K", "j2k", "jpc", FF_RGB | FF_ALPHA | FF_COMPJ2 },
 #else
 	{ "", "", "", 0},
 	{ "", "", "", 0},
@@ -1951,9 +1956,14 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 #ifdef U_JP2
 
 /* *** PREFACE ***
- * OpenJPEG version 1.1.1 is wasteful in the extreme, with memory overhead of
- * several times the unpacked image size. So it can fail to handle even such
- * resolutions that fit into available memory with lots of room to spare. */
+ * OpenJPEG 1.x is wasteful in the extreme, with memory overhead of about
+ * 7 times the unpacked image size. So it can fail to handle even such
+ * resolutions that fit into available memory with lots of room to spare.
+ * Still, JasPer is an even worse memory hog, if a somewhat faster one.
+ * Another thing - Linux builds of OpenJPEG cannot properly encode an opacity
+ * channel (fixed in SVN on 06.11.09, revision 541)
+ * And JP2 images with 4 channels, produced by OpenJPEG, cause JasPer
+ * to die horribly - WJ */
 
 static void stupid_callback(const char *msg, void *client_data)
 {
@@ -1982,7 +1992,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	buf = malloc(l);
 	res = FILE_MEM_ERROR;
 	if (!buf) goto ffail;
-	res = FILE_LIB_ERROR;
+	res = -1;
 	i = fread(buf, 1, l, fp);
 	if (i < l) goto ffail;
 	fclose(fp);
@@ -2144,6 +2154,255 @@ fail:	if (cio) opj_cio_close(cio);
 	opj_image_destroy(image);
 	if (!settings->silent) progress_end();
 ffail:	fclose(fp);
+	return (res);
+}
+#endif
+
+#ifdef U_JASPER
+
+/* *** PREFACE ***
+ * JasPer is QUITE a memory waster, with peak memory usage nearly TEN times the
+ * unpacked image size. But what is worse, its API is 99% undocumented.
+ * And to add insult to injury, it reacts to some invalid JP2 files (4-channel
+ * ones written by OpenJPEG) by abort()ing, instead of returning error - WJ */
+
+static int jasper_init;
+
+static int load_jpeg2000(char *file_name, ls_settings *settings)
+{
+	jas_image_t *img;
+	jas_stream_t *inp;
+	jas_matrix_t *mx;
+	jas_seqent_t *src;
+	char *fmt;
+	unsigned char xtb[256], *dest;
+	int nc, cspace, mode, slots[4];
+	int bits, shift, delta, chan, step;
+	int i, j, k, n, nx, w, h, bpp, pr = 0, res = -1;
+
+
+	/* Init the dumb library */
+	if (!jasper_init) jas_init();
+	jasper_init = TRUE;
+	/* Open the file */
+	inp = jas_stream_fopen(file_name, "rb");
+	if (!inp) return (-1);
+	/* Validate format */
+	fmt = jas_image_fmttostr(jas_image_getfmt(inp));
+	if (!fmt || strcmp(fmt, settings->ftype == FT_JP2 ? "jp2" : "jpc"))
+		goto ffail;
+
+	/* Decode the file into a halfbaked pile of bytes */
+	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
+	img = jas_image_decode(inp, -1, NULL);
+	jas_stream_close(inp);
+	if (!img) goto dfail;
+	/* Analyze the pile's contents */
+	nc = jas_image_numcmpts(img);
+	mode = jas_clrspc_fam(cspace = jas_image_clrspc(img));
+	if (mode == JAS_CLRSPC_FAM_GRAY) bpp = 1;
+	else if (mode == JAS_CLRSPC_FAM_RGB) bpp = 3;
+	else goto ifail;
+	if (bpp == 3)
+	{
+		slots[0] = jas_image_getcmptbytype(img,
+			JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_R));
+		slots[1] = jas_image_getcmptbytype(img,
+			JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_G));
+		slots[2] = jas_image_getcmptbytype(img,
+			JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_B));
+		if ((slots[1] < 0) | (slots[2] < 0)) goto ifail;
+	}
+	else
+	{
+		slots[0] = jas_image_getcmptbytype(img,
+			JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_GRAY_Y));
+		set_gray(settings);
+	}
+	if (slots[0] < 0) goto ifail;
+	if (nc > bpp)
+	{
+		slots[bpp] = jas_image_getcmptbytype(img, JAS_IMAGE_CT_OPACITY);
+/* !!! JasPer has a bug - it doesn't write out component definitions if color
+ * channels are in natural order, thus losing the types of any extra components.
+ * (See where variable "needcdef" in src/libjasper/jp2/jp2_enc.c gets unset.)
+ * Then on reading, type will be replaced by component's ordinal number - WJ */
+		if (slots[bpp] < 0) slots[bpp] = jas_image_getcmptbytype(img, bpp);
+		/* Use an unlabeled extra component for alpha if no labeled one */
+		if (slots[bpp] < 0)
+			slots[bpp] = jas_image_getcmptbytype(img, JAS_IMAGE_CT_UNKNOWN);
+		nc = bpp + (slots[bpp] >= 0); // Ignore extra channels if no alpha
+	}
+	w = jas_image_cmptwidth(img, slots[0]);
+	h = jas_image_cmptheight(img, slots[0]);
+	for (i = 1; i < nc; i++) /* Check if all components are the same size */
+	{
+		if ((jas_image_cmptwidth(img, slots[i]) != w) ||
+			(jas_image_cmptheight(img, slots[i]) != h)) goto ifail;
+	}
+
+	/* Allocate "matrix" */
+	res = FILE_MEM_ERROR;
+	mx = jas_matrix_create(1, w);
+	if (!mx) goto ifail;
+	/* Allocate image */
+	settings->width = w;
+	settings->height = h;
+	settings->bpp = bpp;
+	if ((res = allocate_image(settings, nc > bpp ? CMASK_RGBA : CMASK_IMAGE)))
+		goto mfail;
+	if (!settings->img[CHN_ALPHA]) nc = bpp;
+	res = 1;
+#if U_LCMS
+	/* JasPer implements CMS internally, but without lcms, it makes no sense
+	 * to provide all the interface stuff for this one rare format - WJ */
+	while (!settings->icc_size && (bpp == 3) && (cspace != JAS_CLRSPC_SRGB))
+	{
+		jas_cmprof_t *prof;
+		jas_image_t *timg;
+
+		res = FILE_LIB_ERROR;
+		prof = jas_cmprof_createfromclrspc(JAS_CLRSPC_SRGB);
+		if (!prof) break;
+		timg = jas_image_chclrspc(img, prof, JAS_CMXFORM_INTENT_PER);
+		jas_cmprof_destroy(prof);
+		if (!timg) break;
+		jas_image_destroy(img);
+		img = timg;
+		res = 1; // Success - further code is fail-proof
+		break;
+	}
+#endif
+
+	/* Unravel the ugly thing into proper format */
+	nx = h * nc;
+	for (i = n = 0; i < nc; i++)
+	{
+		if (i < bpp) /* Image */
+		{
+			dest = settings->img[CHN_IMAGE] + i;
+			step = settings->bpp;
+		}
+		else /* Alpha */
+		{
+			dest = settings->img[CHN_ALPHA];
+			step = 1;
+		}
+		chan = slots[i];
+		bits = jas_image_cmptprec(img, chan);
+		delta = jas_image_cmptsgnd(img, chan) ? 1 << (bits - 1) : 0;
+		shift = bits > 8 ? bits - 8 : 0;
+		set_xlate(xtb, bits - shift);
+		for (j = 0; j < h; j++ , n++)
+		{
+			jas_image_readcmpt(img, chan, 0, j, w, 1, mx);
+			src = jas_matrix_getref(mx, 0, 0);
+			for (k = 0; k < w; k++)
+			{
+				*dest = xtb[(unsigned)(src[k] + delta) >> shift];
+				dest += step;
+			}
+			if (pr && ((n * 10) % nx >= nx - 10))
+				progress_update((float)n / nx);
+		}
+	}
+
+mfail:	jas_matrix_destroy(mx);
+ifail:	jas_image_destroy(img);
+dfail:	if (pr) progress_end();
+	return (res);
+ffail:	jas_stream_close(inp);
+	return (-1);
+}
+
+static int save_jpeg2000(char *file_name, ls_settings *settings)
+{
+	static const jas_image_cmpttype_t chans[4] = {
+		JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_R),
+		JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_G),
+		JAS_IMAGE_CT_COLOR(JAS_IMAGE_CT_RGB_B),
+		JAS_IMAGE_CT_OPACITY };
+	jas_image_cmptparm_t cp[4];
+	jas_image_t *img;
+	jas_stream_t *outp;
+	jas_matrix_t *mx;
+	jas_seqent_t *dest;
+	char buf[256], *opts = NULL;
+	unsigned char *src;
+	int w = settings->width, h = settings->height, res = -1;
+	int i, j, k, n, nx, nc, step, pr;
+
+
+	if (settings->bpp == 1) return WRONG_FORMAT;
+
+	/* Init the dumb library */
+	if (!jasper_init) jas_init();
+	jasper_init = TRUE;
+	/* Open the file */
+	outp = jas_stream_fopen(file_name, "wb");
+	if (!outp) return (-1);
+	/* Setup component parameters */
+	memset(cp, 0, sizeof(cp)); // Zero out all that needs zeroing
+	cp[0].hstep = cp[0].vstep = 1;
+	cp[0].width = w; cp[0].height = h;
+	cp[0].prec = 8;
+	cp[3] = cp[2] = cp[1] = cp[0];
+	/* Create image structure */
+	nc = 3 + !!settings->img[CHN_ALPHA];
+	img = jas_image_create(nc, cp, JAS_CLRSPC_SRGB);
+	if (!img) goto fail;
+	/* Allocate "matrix" */
+	mx = jas_matrix_create(1, w);
+	if (!mx) goto fail2;
+
+	if ((pr = !settings->silent)) ls_init("JPEG2000", 1);
+
+	/* Fill image structure */
+	nx = h * nc;
+	nx += nx / 10 + 1; // Show "90% done" while compressing
+	for (i = n = 0; i < nc; i++)
+	{
+	/* !!! The only workaround for JasPer losing extra components' types on
+	 * write is to reorder the RGB components - but then, dumb readers, such
+	 * as ones in Mozilla and GTK+, would read them in wrong order - WJ */
+		jas_image_setcmpttype(img, i, chans[i]);
+		if (i < 3) /* Image */
+		{
+			src = settings->img[CHN_IMAGE] + i;
+			step = settings->bpp;
+		}
+		else /* Alpha */
+		{
+			src = settings->img[CHN_ALPHA];
+			step = 1;
+		}
+		for (j = 0; j < h; j++ , n++)
+		{
+			dest = jas_matrix_getref(mx, 0, 0);
+			for (k = 0; k < w; k++)
+			{
+				dest[k] = *src;
+				src += step;
+			}
+			jas_image_writecmpt(img, i, 0, j, w, 1, mx);
+			if (pr && ((n * 10) % nx >= nx - 10))
+				if (progress_update((float)n / nx)) goto fail3;
+		}
+	}
+
+	/* Compress it */
+	if (pr) progress_update(0.9);
+	if (settings->jp2_rate) // Lossless if NO "rate" option passed
+		sprintf(opts = buf, "rate=%g", 1.0 / settings->jp2_rate);
+	if (!jas_image_encode(img, outp, jas_image_strtofmt(
+		settings->ftype == FT_JP2 ? "jp2" : "jpc"), opts)) res = 0;
+	jas_stream_flush(outp);
+	if (pr) progress_update(1.0);
+
+fail3:	if (pr) progress_end();
+	jas_matrix_destroy(mx);
+fail2:	jas_image_destroy(img);
+fail:	jas_stream_close(outp);
 	return (res);
 }
 #endif
@@ -5555,7 +5814,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 #ifdef U_JPEG
 	case FT_JPEG: res = save_jpeg(file_name, &setw); break;
 #endif
-#ifdef U_JP2
+#ifdef HANDLE_JP2
 	case FT_JP2:
 	case FT_J2K: res = save_jpeg2000(file_name, &setw); break;
 #endif
@@ -5756,7 +6015,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 #ifdef U_JPEG
 	case FT_JPEG: res0 = load_jpeg(file_name, &settings); break;
 #endif
-#ifdef U_JP2
+#ifdef HANDLE_JP2
 	case FT_JP2:
 	case FT_J2K: res0 = load_jpeg2000(file_name, &settings); break;
 #endif
@@ -6181,13 +6440,13 @@ static int do_detect_format(char *name, FILE *fp)
 		return (FT_NONE);
 #endif
 	if (!memcmp(buf, "\0\0\0\x0C\x6A\x50\x20\x20\x0D\x0A\x87\x0A", 12))
-#ifdef U_JP2
+#ifdef HANDLE_JP2
 		return (FT_JP2);
 #else
 		return (FT_NONE);
 #endif
 	if (!memcmp(buf, "\xFF\x4F", 2))
-#ifdef U_JP2
+#ifdef HANDLE_JP2
 		return (FT_J2K);
 #else
 		return (FT_NONE);

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.35"
-MT_DATE="2009-11-21"
+MT_V="3.34.36"
+MT_DATE="2009-11-24"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -165,9 +165,14 @@ fi
 
 if IS_LIB "lopenjpeg"
 then
-	NJP2=YES
+	NJP2=OpenJPEG
 else
-	NJP2=NO
+	if IS_LIB "ljasper"
+	then
+		NJP2=JasPer
+	else
+		NJP2=NO
+	fi
 fi
 
 if IS_LIB "ltiff"
@@ -215,7 +220,8 @@ do
 		"jpeg" )	NJPEG=YES;;
 		"nojpeg" )	NJPEG=NO;;
 		"staticjpeg" )	STATIC_JPEG=JPEG;;
-		"jp2" )		NJP2=YES;;
+		"jp2" )		NJP2=OpenJPEG;;
+		"jasper" )	NJP2=JasPer;;
 		"nojp2" )	NJP2=NO;;
 		"staticjp2" )	STATIC_JP2=JPEG2000;;
 		"tiff" )	NTIFF=YES;;
@@ -395,7 +401,8 @@ jpeg ............ Use libjpeg
 nojpeg .......... Don't use libjpeg
 staticjpeg ...... Statically link JPEG library
 jp2 ............. Use libopenjpeg
-nojp2 ........... Don't use libopenjpeg
+jasper........... Use libjasper
+nojp2 ........... Don't use libopenjpeg and libjasper
 staticjp2 ....... Statically link JPEG 2000 library
 tiff ............ Use libtiff
 notiff .......... Don't use libtiff
@@ -536,7 +543,7 @@ else
 		LIB_NAME jpeg "$STATIC_JPEG"
 		I_EX="$I_EX -DU_JPEG"
 	fi
-	if [ "$NJP2" = "YES" ]
+	if [ "$NJP2" = "OpenJPEG" ]
 	then
 		LIB_NAME openjpeg "$STATIC_JP2"
 		I_EX="$I_EX -I$CROSSPF/include/openjpeg -DU_JP2"
@@ -544,6 +551,11 @@ else
 		then
 			I_EX="$I_EX -DOPJ_STATIC"
 		fi
+	fi
+	if [ "$NJP2" = "JasPer" ]
+	then
+		LIB_NAME jasper "$STATIC_JP2"
+		I_EX="$I_EX -DU_JASPER"
 	fi
 	if [ "$NTIFF" = "YES" ]
 	then

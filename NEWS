@@ -26,6 +26,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Netpbm file formats (PBM/PGM/PPM/PAM) save/load added
 	* Better support for loading CMYK TIFF files as RGB/RGBA
 	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
+	* JPEG2000 file format support now can be compiled with either JasPer or OpenJPEG library
 	* "Palette->Open" now can extract palette from indexed images in any supported file format
 	* "Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system
