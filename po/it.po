@@ -301,9 +301,9 @@ msgid ""
 "to a new file to ensure this does not happen again."
 msgstr ""
 "Il processo d'importazione è stato interrotto a causa di problemi col "
-"filealcuni dati come l'intestazione sembravano integri, ma suggerirei di "
-"salvare questa immagine in un nuovo file, per esser certi che ciò non "
-"avvenga ancora."
+"file alcuni dati come l'intestazione sembravano integri, ma suggerirei di "
+"salvare questa immagine in un nuovo file, per esser certi che ciò non avvenga "
+"ancora."
 
 #: src/canvas.c:1410
 #, c-format
@@ -406,11 +406,11 @@ msgstr "Esporta immagini annullate (invertito)"
 
 #: src/canvas.c:1994
 msgid "You must have 16 or fewer palette colours to export ASCII art."
-msgstr "Devi avere 16 colori o di meno per l'esportazione arte ASCII."
+msgstr "Devi avere 16 colori o di meno per l'esportazione in ASCII art."
 
 #: src/canvas.c:1998
 msgid "Export ASCII Art"
-msgstr "Esporta Arte ASCII"
+msgstr "Esporta in ASCII Art"
 
 #: src/canvas.c:2002
 msgid "Save Layer Files"
@@ -458,15 +458,15 @@ msgstr "imposta trasparenza A a B"
 
 #: src/channels.c:240
 msgid "Image Red"
-msgstr "Immagine in rosso"
+msgstr "Canale rosso"
 
 #: src/channels.c:241
 msgid "Image Green"
-msgstr "Immagine in verde"
+msgstr "Canale verde"
 
 #: src/channels.c:242
 msgid "Image Blue"
-msgstr "Immagine in Blu"
+msgstr "Canale blu"
 
 #: src/channels.c:244 src/mainwindow.c:1093
 msgid "Alpha"
@@ -736,8 +736,8 @@ msgid "Credits"
 msgstr "Riconoscimenti"
 
 #: src/help.c:32
-msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.31 - Copyright (C) 2004-2009 Gli autori\n"
+msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.40 - Copyright (C) 2004-2009 Gli autori\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1288,7 +1288,7 @@ msgid ""
 "\n"
 msgstr ""
 "Xiaolin Wu - ha  scritto il metodo di quantizzazione Wu - vedi wu.c per "
-"ulterioriinformazioni.\n"
+"ulteriori informazioni.\n"
 "\n"
 
 #: src/help.c:138
@@ -1388,8 +1388,8 @@ msgid "Dutch - Hans Strijards"
 msgstr "Olandese - Hans Strijards"
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
-msgstr "Francese - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+msgstr "Francese - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
@@ -1408,8 +1408,8 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr "Giapponese - Norihiro YONEDA"
 
 #: src/help.c:163
-msgid "Polish - Simek, LucaS"
-msgstr "Polacco - Simek, LucaS"
+msgid "Polish - Bartosz Kaszubowski, LucaS"
+msgstr "Polacco - Bartosz Kaszubowski, LucaS"
 
 #: src/help.c:164
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
@@ -1688,7 +1688,7 @@ msgid ""
 "really want to lose these changes?"
 msgstr ""
 "Questa tela / tavolozza contiene modifiche che non sono state salvate. Vuoi "
-"davvero vuole perdere questi cambiamenti?"
+"davvero perdere questi cambiamenti?"
 
 #: src/mainwindow.c:1093 src/otherwindow.c:803 src/otherwindow.c:3163
 msgid "Image"

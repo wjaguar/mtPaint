@@ -6550,7 +6550,7 @@ int detect_file_format(char *name, int need_palette)
 		if (!(f & (FF_16 | FF_256 | FF_PALETTE))) i = FT_NONE;
 #endif
 	}
-	else if (!(f & FF_IMAGE)) i = FT_NONE;
+	else if (!(f & (FF_IMAGE | FF_LAYER))) i = FT_NONE;
 	fclose(fp);
 	return (i);
 }

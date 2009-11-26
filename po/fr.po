@@ -9,13 +9,13 @@ msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2009-02-13 21:54+0300\n"
-"PO-Revision-Date: 2009-03-29 07:47+0000\n"
-"Last-Translator: Plume <Unknown>\n"
+"PO-Revision-Date: 2009-11-25 18:17+0000\n"
+"Last-Translator: wjaguar <wjaguar@users.sourceforge.net>\n"
 "Language-Team: French <fr@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2009-03-29 14:24+0000\n"
+"X-Launchpad-Export-Date: 2009-11-25 18:32+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Rosetta-Version: 0.1\n"
 
@@ -254,7 +254,7 @@ msgstr "Normaliser"
 
 #: src/canvas.c:541 src/memory.c:7261
 msgid "Difference of Gaussians"
-msgstr ""
+msgstr "Différence de gaussiennes"
 
 #: src/canvas.c:567
 msgid "Kuwahara-Nagao Blur"
@@ -750,8 +750,8 @@ msgid "Credits"
 msgstr "Crédits"
 
 #: src/help.c:32
-msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.31 - Copyright (C) 2004-2009 Les auteurs\n"
+msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.40 - Copyright (C) 2004-2009 Les auteurs\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -994,12 +994,16 @@ msgid ""
 "  A                 Draw open arrow head when using the line tool (size set "
 "by flow setting)"
 msgstr ""
+"  A              Dessine une tête de flèche ouverte quand l'outil ligne est utilisé "
+"(taille fixée par flow setting)"
 
 #: src/help.c:76
 msgid ""
 "  S                 Draw closed arrow head when using the line tool (size "
 "set by flow setting)\n"
 msgstr ""
+"  S              Dessine une tête de flèche fermée quand l'outil ligne est utilisé "
+"(taille fixée par flow setting)\n"
 
 #: src/help.c:77
 msgid "  +,=               Main edit window - Zoom in"
@@ -1398,9 +1402,9 @@ msgid "Dutch - Hans Strijards"
 msgstr "Néerlandais - Hans Strijards"
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
 msgstr ""
-"Français - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+"Français - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
@@ -1419,8 +1423,8 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr "Japonais - Norihiro YONEDA"
 
 #: src/help.c:163
-msgid "Polish - Simek, LucaS"
-msgstr "Polonais - Simek, LucaS"
+msgid "Polish - Bartosz Kaszubowski, LucaS"
+msgstr "Polonais - Bartosz Kaszubowski, LucaS"
 
 #: src/help.c:164
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
@@ -2632,7 +2636,7 @@ msgstr "/Canal/sep3"
 
 #: src/mainwindow.c:4650
 msgid "/Channels/Couple RGBA Operations"
-msgstr "/Canal/Opérations RGBA"
+msgstr "/Canal/Opérations RVBA"
 
 #: src/mainwindow.c:4651
 msgid "/Channels/Threshold ..."
@@ -3128,7 +3132,7 @@ msgstr "Quantification Wu (rapide)"
 
 #: src/otherwindow.c:2230
 msgid "Max-Min Quantize (best for small palettes and dithering)"
-msgstr ""
+msgstr "Quantification Max-min (meilleur pour petites palettes et dithering)"
 
 #: src/otherwindow.c:2233 src/otherwindow.c:2906 src/otherwindow.c:3162
 msgid "None"
@@ -3216,7 +3220,7 @@ msgstr "Tronquer la palette"
 
 #: src/otherwindow.c:2283
 msgid "Diameter based weighting"
-msgstr ""
+msgstr "Pondération basée sur le diamètre"
 
 #: src/otherwindow.c:2294
 msgid "Dither"
@@ -3592,7 +3596,7 @@ msgstr "Nombre max d'annulations"
 
 #: src/prefs.c:449
 msgid "Communal layer undo space (%)"
-msgstr ""
+msgstr "Espace commun d'annulation de calques (%)"
 
 #: src/prefs.c:457
 msgid "Use gamma correction by default"
@@ -3680,7 +3684,7 @@ msgstr "Fichiers"
 
 #: src/prefs.c:535
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
-msgstr ""
+msgstr "Lire TGAs 16-bit comme 5:6:5 BVR"
 
 #: src/prefs.c:536
 msgid "Write TGAs in bottom-up row order"
@@ -3732,7 +3736,7 @@ msgstr "Motifs par défaut"
 
 #: src/prefs.c:564
 msgid "Select Default Patterns File"
-msgstr ""
+msgstr "Sélectionnez le fichier de motifs par défaut"
 
 #: src/prefs.c:571
 msgid "Status Bar"
