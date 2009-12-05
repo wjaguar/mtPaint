@@ -733,8 +733,8 @@ msgid "Credits"
 msgstr "致谢"
 
 #: src/help.c:32
-msgid "mtPaint 3.31 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.31 -版权(C) 2004-2009作者群\n"
+msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
+msgstr "mtPaint 3.40 -版权(C) 2004-2009作者群\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1294,27 +1294,27 @@ msgstr "翻译\n"
 
 #: src/help.c:155
 msgid "Brazilian Portuguese - Paulo Trevizan"
-msgstr "巴西葡萄牙语"
+msgstr "巴西葡萄牙语 - Paulo Trevizan"
 
 #: src/help.c:156
-msgid "Czech - Pavel Ruzicka, Martin Petricek"
-msgstr "捷克语 - Pavel Ruzicka, Martin Petricek"
+msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
+msgstr "捷克语 - Pavel Ruzicka, Martin Petricek, Roman Hornik"
 
 #: src/help.c:157
 msgid "Dutch - Hans Strijards"
 msgstr ""
 
 #: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
-msgstr "法语 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Plume"
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+msgstr "法语 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
 
 #: src/help.c:159
 msgid "Galician - Miguel Anxo Bouzada"
 msgstr "加利西亚语 - Miguel Anxo Bouzada"
 
 #: src/help.c:160
-msgid "German - Oliver Frommel"
-msgstr "德语 - Oliver Frommel"
+msgid "German - Oliver Frommel, B. Clausius"
+msgstr "德语 - Oliver Frommel, B. Clausius"
 
 #: src/help.c:161
 msgid "Italian - Angelo Gemmi"
@@ -1325,8 +1325,8 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr "日语 - Norihiro YONEDA"
 
 #: src/help.c:163
-msgid "Polish - Simek, LucaS"
-msgstr "波兰语 - Simek, LucaS"
+msgid "Polish - Bartosz Kaszubowski, LucaS"
+msgstr "波兰语 - Bartosz Kaszubowski, LucaS"
 
 #: src/help.c:164
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
@@ -1353,7 +1353,7 @@ msgstr ""
 "Miguel Anxo Bouzada, Francisco Jose Rey"
 
 #: src/help.c:169
-msgid "Swedish - Daniel Nylander, Fredrik Forsmo"
+msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr ""
 
 #: src/help.c:170

@@ -4,8 +4,13 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.35	2009-?-?
+3.40	2009-?-?
 
+	* Czech translation updated by Roman Hornik
+	* German translation updated by B. Clausius
+	* Italian translation updated by Angelo Gemmi
+	* Japanese translation updated by Norihiro YONEDA
+	* Swedish translation updated by Daniel Eriksson
 	* Eliminated flicker when positioning line, polygon side, or gradient in Windows version
 	* Scrolling made more smooth in Windows version
 	* Dock area now holds settings toolbar and layers dialog when their windows are closed
