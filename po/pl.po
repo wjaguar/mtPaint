@@ -416,8 +416,8 @@ msgid "Save Layer Files"
 msgstr "Zapisz pliki warstw"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "Importuj animacje GIF - Wybierz folder ramki"
+msgid "Choose frames directory"
+msgstr "Wybierz folder ramki"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -1624,7 +1624,7 @@ msgstr "/Plik/Nowy"
 
 #: src/mainwindow.c:4414
 msgid "/File/Open ..."
-msgstr "/Plik/Otwórz..."
+msgstr "/Plik/Otwórz ..."
 
 #: src/mainwindow.c:4415
 msgid "/File/Save"
@@ -1632,7 +1632,7 @@ msgstr "/Plik/Zapisz"
 
 #: src/mainwindow.c:4416
 msgid "/File/Save As ..."
-msgstr "/Plik/Zapisz jako..."
+msgstr "/Plik/Zapisz jako ..."
 
 #: src/mainwindow.c:4417
 msgid "/File/sep1"
@@ -2012,11 +2012,11 @@ msgstr "/Edycja/sep3"
 
 #: src/mainwindow.c:4514
 msgid "/Edit/Choose Pattern ..."
-msgstr "/Edycja/Wybierz wzór..."
+msgstr "/Edycja/Wybierz wzór ..."
 
 #: src/mainwindow.c:4515
 msgid "/Edit/Choose Brush ..."
-msgstr "/Edycja/Wybierz pędzel..."
+msgstr "/Edycja/Wybierz pędzel ..."
 
 #: src/mainwindow.c:4517
 msgid "/_View"
@@ -2116,7 +2116,7 @@ msgstr "/Obrazek/Przekształć do RGB"
 
 #: src/mainwindow.c:4542
 msgid "/Image/Convert To Indexed ..."
-msgstr "/Obrazek/Konwertuj do indeksowanych..."
+msgstr "/Obrazek/Konwertuj do indeksowanych ..."
 
 #: src/mainwindow.c:4543
 msgid "/Image/sep1"
@@ -2140,11 +2140,11 @@ msgstr "/Obrazek/sep2"
 
 #: src/mainwindow.c:4548
 msgid "/Image/Flip Vertically"
-msgstr "/Obrazek/Obróć w poziomie"
+msgstr "/Obrazek/Obróć w pionie"
 
 #: src/mainwindow.c:4549
 msgid "/Image/Flip Horizontally"
-msgstr "/Obrazek/Obróć w pionie"
+msgstr "/Obrazek/Obróć w poziomie"
 
 #: src/mainwindow.c:4550
 msgid "/Image/Rotate Clockwise"
@@ -2156,7 +2156,7 @@ msgstr "/Obrazek/Obróć w lewo"
 
 #: src/mainwindow.c:4552
 msgid "/Image/Free Rotate ..."
-msgstr "/Obrazek/Dodolna rotacja..."
+msgstr "/Obrazek/Dodolna rotacja ..."
 
 #: src/mainwindow.c:4553
 msgid "/Image/Skew ..."
@@ -2168,11 +2168,11 @@ msgstr "/Obrazek/sep3"
 
 #: src/mainwindow.c:4555
 msgid "/Image/Information ..."
-msgstr "/Obrazek/Informacje..."
+msgstr "/Obrazek/Informacje ..."
 
 #: src/mainwindow.c:4556
 msgid "/Image/Preferences ..."
-msgstr "/Obrazek/Ustawienia..."
+msgstr "/Obrazek/Ustawienia ..."
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
@@ -2288,11 +2288,11 @@ msgstr "/Paleta/tear"
 
 #: src/mainwindow.c:4587
 msgid "/Palette/Open ..."
-msgstr "/Paleta/Otwórz..."
+msgstr "/Paleta/Otwórz ..."
 
 #: src/mainwindow.c:4588
 msgid "/Palette/Save As ..."
-msgstr "/Paleta/Zapisz jako..."
+msgstr "/Paleta/Zapisz jako ..."
 
 #: src/mainwindow.c:4589
 msgid "/Palette/Load Default"
@@ -2332,7 +2332,7 @@ msgstr "/Paleta/Edytor palety ..."
 
 #: src/mainwindow.c:4598
 msgid "/Palette/Set Palette Size ..."
-msgstr "/Paleta/Ustaw rozmiar palety..."
+msgstr "/Paleta/Ustaw rozmiar palety ..."
 
 #: src/mainwindow.c:4599
 msgid "/Palette/Merge Duplicate Colours"
@@ -2356,7 +2356,7 @@ msgstr "/Paleta/sep4"
 
 #: src/mainwindow.c:4604
 msgid "/Palette/Sort Colours ..."
-msgstr "/Paleta/Sortuj kolory..."
+msgstr "/Paleta/Sortuj kolory ..."
 
 #: src/mainwindow.c:4605
 msgid "/Palette/Palette Shifter ..."
@@ -2372,7 +2372,7 @@ msgstr "/Efekty/tear"
 
 #: src/mainwindow.c:4609
 msgid "/Effects/Transform Colour ..."
-msgstr "/Efekty/Transformacja kolorów..."
+msgstr "/Efekty/Transformacja kolorów ..."
 
 #: src/mainwindow.c:4610
 msgid "/Effects/Invert"
@@ -2424,7 +2424,7 @@ msgstr "/Efekty/Difference of Gaussians ..."
 
 #: src/mainwindow.c:4622
 msgid "/Effects/Sharpen ..."
-msgstr "/Efekty/Wyostrzanie..."
+msgstr "/Efekty/Wyostrzanie ..."
 
 #: src/mainwindow.c:4623
 msgid "/Effects/Unsharp Mask ..."
@@ -2432,7 +2432,7 @@ msgstr "/Efekty/Wzmocnienie ..."
 
 #: src/mainwindow.c:4624
 msgid "/Effects/Soften ..."
-msgstr "/Efekty/Wygładzanie..."
+msgstr "/Efekty/Wygładzanie ..."
 
 #: src/mainwindow.c:4625
 msgid "/Effects/Gaussian Blur ..."
@@ -2472,19 +2472,19 @@ msgstr "/Kanały/tear"
 
 #: src/mainwindow.c:4635
 msgid "/Channels/New ..."
-msgstr "/Kanały/Nowy..."
+msgstr "/Kanały/Nowy ..."
 
 #: src/mainwindow.c:4636
 msgid "/Channels/Load ..."
-msgstr "/Kanały/Otwórz"
+msgstr "/Kanały/Otwórz ..."
 
 #: src/mainwindow.c:4637
 msgid "/Channels/Save As ..."
-msgstr "/Kanały/Zapisz jako..."
+msgstr "/Kanały/Zapisz jako ..."
 
 #: src/mainwindow.c:4638
 msgid "/Channels/Delete ..."
-msgstr "/Kanały/Usuń..."
+msgstr "/Kanały/Usuń ..."
 
 #: src/mainwindow.c:4639
 msgid "/Channels/sep1"
@@ -2536,7 +2536,7 @@ msgstr "/Kanały/Operacje RGBA"
 
 #: src/mainwindow.c:4651
 msgid "/Channels/Threshold ..."
-msgstr "/Kanały/Próg..."
+msgstr "/Kanały/Próg ..."
 
 #: src/mainwindow.c:4652
 msgid "/Channels/Unassociate Alpha"
@@ -2552,7 +2552,7 @@ msgstr "/Kanały/Pokaż alfę jako powłokę"
 
 #: src/mainwindow.c:4655
 msgid "/Channels/Configure Overlays ..."
-msgstr "/Kanały/Konfiguruj powłoki..."
+msgstr "/Kanały/Konfiguruj powłoki ..."
 
 #: src/mainwindow.c:4657
 msgid "/_Layers"
@@ -2572,11 +2572,11 @@ msgstr "/Warstwy/Zapisz"
 
 #: src/mainwindow.c:4661
 msgid "/Layers/Save As ..."
-msgstr "/Warstwy/Zapisz jako..."
+msgstr "/Warstwy/Zapisz jako ..."
 
 #: src/mainwindow.c:4662
 msgid "/Layers/Save Composite Image ..."
-msgstr "/Warstwy/Zapisz obraz złożony..."
+msgstr "/Warstwy/Zapisz obraz złożony ..."
 
 #: src/mainwindow.c:4663
 msgid "/Layers/Composite to New Layer"
@@ -2592,19 +2592,19 @@ msgstr "/Warstwy/sep1"
 
 #: src/mainwindow.c:4666
 msgid "/Layers/Configure Animation ..."
-msgstr "/Warstwy/Konfiguruj animację..."
+msgstr "/Warstwy/Konfiguruj animację ..."
 
 #: src/mainwindow.c:4667
 msgid "/Layers/Preview Animation ..."
-msgstr "/Warstwy/Podgląd animacji..."
+msgstr "/Warstwy/Podgląd animacji ..."
 
 #: src/mainwindow.c:4668
 msgid "/Layers/Set Key Frame ..."
-msgstr "/Warstwy/Ustaw klucz ramki..."
+msgstr "/Warstwy/Ustaw klucz ramki ..."
 
 #: src/mainwindow.c:4669
 msgid "/Layers/Remove All Key Frames ..."
-msgstr "/Warstwy/Usuń wszystkie klucze ramki..."
+msgstr "/Warstwy/Usuń wszystkie klucze ramki ..."
 
 #: src/mainwindow.c:4671
 msgid "/More..."

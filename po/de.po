@@ -419,8 +419,8 @@ msgid "Save Layer Files"
 msgstr "Ebenendateien speichern"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "GIF-Animation importieren - Frame-Verzeichnis auswählen"
+msgid "Choose frames directory"
+msgstr "Frame-Verzeichnis auswählen"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -1629,7 +1629,7 @@ msgstr "/Datei/Neu"
 
 #: src/mainwindow.c:4414
 msgid "/File/Open ..."
-msgstr "/Datei/Öffnen"
+msgstr "/Datei/Öffnen ..."
 
 #: src/mainwindow.c:4415
 msgid "/File/Save"
@@ -1645,19 +1645,19 @@ msgstr "/Datei/sep1"
 
 #: src/mainwindow.c:4418
 msgid "/File/Export Undo Images ..."
-msgstr "/Datei/Undo-Bilder exportieren"
+msgstr "/Datei/Undo-Bilder exportieren ..."
 
 #: src/mainwindow.c:4419
 msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/Datei/Undo-Bilder exportieren (umgekehrt)"
+msgstr "/Datei/Undo-Bilder exportieren (umgekehrt) ..."
 
 #: src/mainwindow.c:4420
 msgid "/File/Export ASCII Art ..."
-msgstr "/Datei/ASCII-Art exportieren"
+msgstr "/Datei/ASCII-Art exportieren ..."
 
 #: src/mainwindow.c:4421
 msgid "/File/Export Animated GIF ..."
-msgstr "/Datei/Animiertes GIF speichern"
+msgstr "/Datei/Animiertes GIF speichern ..."
 
 #: src/mainwindow.c:4422
 msgid "/File/sep2"
@@ -2017,11 +2017,11 @@ msgstr "/Bearbeiten/sep3"
 
 #: src/mainwindow.c:4514
 msgid "/Edit/Choose Pattern ..."
-msgstr "/Bearbeiten/Muster wählen"
+msgstr "/Bearbeiten/Muster wählen ..."
 
 #: src/mainwindow.c:4515
 msgid "/Edit/Choose Brush ..."
-msgstr "/Bearbeiten/Pinsel wählen"
+msgstr "/Bearbeiten/Pinsel wählen ..."
 
 #: src/mainwindow.c:4517
 msgid "/_View"
@@ -2121,7 +2121,7 @@ msgstr "/Bild/In RGB umwandeln"
 
 #: src/mainwindow.c:4542
 msgid "/Image/Convert To Indexed ..."
-msgstr "/Bild/In Indexiert umwandeln"
+msgstr "/Bild/In Indexiert umwandeln ..."
 
 #: src/mainwindow.c:4543
 msgid "/Image/sep1"
@@ -2129,11 +2129,11 @@ msgstr "/Bild/sep1"
 
 #: src/mainwindow.c:4544
 msgid "/Image/Scale Canvas ..."
-msgstr "/Bild/Zeichenfläche anpassen"
+msgstr "/Bild/Zeichenfläche anpassen ..."
 
 #: src/mainwindow.c:4545
 msgid "/Image/Resize Canvas ..."
-msgstr "/Bild/Größe der Zeichenfläche ändern"
+msgstr "/Bild/Größe der Zeichenfläche ändern ..."
 
 #: src/mainwindow.c:4546
 msgid "/Image/Crop"
@@ -2161,7 +2161,7 @@ msgstr "/Bild/Gegen UZS drehen"
 
 #: src/mainwindow.c:4552
 msgid "/Image/Free Rotate ..."
-msgstr "/Bild/Frei drehen"
+msgstr "/Bild/Frei drehen ..."
 
 #: src/mainwindow.c:4553
 msgid "/Image/Skew ..."
@@ -2173,11 +2173,11 @@ msgstr "/Bild/sep3"
 
 #: src/mainwindow.c:4555
 msgid "/Image/Information ..."
-msgstr "/Bild/Information"
+msgstr "/Bild/Information ..."
 
 #: src/mainwindow.c:4556
 msgid "/Image/Preferences ..."
-msgstr "/Bild/Einstellungen"
+msgstr "/Bild/Einstellungen ..."
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
@@ -2237,7 +2237,7 @@ msgstr "/Auswahl/Horizontal spiegeln"
 
 #: src/mainwindow.c:4572
 msgid "/Selection/Rotate Clockwise"
-msgstr "/Auswahl/Im UZG drehen"
+msgstr "/Auswahl/Im UZS drehen"
 
 #: src/mainwindow.c:4573
 msgid "/Selection/Rotate Anti-Clockwise"
@@ -2325,7 +2325,7 @@ msgstr "/Palette/A und B vertauschen"
 
 #: src/mainwindow.c:4595
 msgid "/Palette/Edit Colour A & B ..."
-msgstr "/Palette/Farben A und B ändern"
+msgstr "/Palette/Farben A und B ändern ..."
 
 #: src/mainwindow.c:4596
 msgid "/Palette/Dither A"
@@ -2337,7 +2337,7 @@ msgstr "/Palette/Paletteneditor ..."
 
 #: src/mainwindow.c:4598
 msgid "/Palette/Set Palette Size ..."
-msgstr "/Palette/Palettengröße festlegen"
+msgstr "/Palette/Palettengröße festlegen ..."
 
 #: src/mainwindow.c:4599
 msgid "/Palette/Merge Duplicate Colours"
@@ -2361,7 +2361,7 @@ msgstr ""
 
 #: src/mainwindow.c:4604
 msgid "/Palette/Sort Colours ..."
-msgstr "/Palette/Farben sortieren"
+msgstr "/Palette/Farben sortieren ..."
 
 #: src/mainwindow.c:4605
 msgid "/Palette/Palette Shifter ..."
@@ -2377,7 +2377,7 @@ msgstr "/Effekte/tear"
 
 #: src/mainwindow.c:4609
 msgid "/Effects/Transform Colour ..."
-msgstr "/Effekte/Farbe transformieren"
+msgstr "/Effekte/Farbe transformieren ..."
 
 #: src/mainwindow.c:4610
 msgid "/Effects/Invert"
@@ -2429,7 +2429,7 @@ msgstr "/Effekte/Difference of Gaussians ..."
 
 #: src/mainwindow.c:4622
 msgid "/Effects/Sharpen ..."
-msgstr "/Effekte/Schärfen"
+msgstr "/Effekte/Schärfen ..."
 
 #: src/mainwindow.c:4623
 msgid "/Effects/Unsharp Mask ..."
@@ -2437,7 +2437,7 @@ msgstr "/Effekte/Unsharp Mask ..."
 
 #: src/mainwindow.c:4624
 msgid "/Effects/Soften ..."
-msgstr "/Effekte/Aufweichen"
+msgstr "/Effekte/Aufweichen ..."
 
 #: src/mainwindow.c:4625
 msgid "/Effects/Gaussian Blur ..."
@@ -2465,7 +2465,7 @@ msgstr "/Effekte/sep2"
 
 #: src/mainwindow.c:4631
 msgid "/Effects/Bacteria ..."
-msgstr "/Effekte/Bakterien"
+msgstr "/Effekte/Bakterien ..."
 
 #: src/mainwindow.c:4633
 msgid "/Cha_nnels"
@@ -2601,7 +2601,7 @@ msgstr "/Ebenen/Animation einstellen ..."
 
 #: src/mainwindow.c:4667
 msgid "/Layers/Preview Animation ..."
-msgstr "/Ebenen/Animationsvorschau"
+msgstr "/Ebenen/Animationsvorschau ..."
 
 #: src/mainwindow.c:4668
 msgid "/Layers/Set Key Frame ..."

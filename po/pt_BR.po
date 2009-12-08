@@ -7,14 +7,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-02-04 02:14+0300\n"
-"PO-Revision-Date: 2008-06-19 18:05+0000\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"POT-Creation-Date: 2009-02-13 21:54+0300\n"
+"PO-Revision-Date: 2009-09-07 02:59+0000\n"
+"Last-Translator: André Gondim <andregondim@ubuntu.com>\n"
 "Language-Team: Portuguese (Brazil) <pt_BR@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2009-01-18 12:36+0000\n"
+"X-Launchpad-Export-Date: 2009-12-06 22:32+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Rosetta-Version: 0.1\n"
 
@@ -401,7 +401,7 @@ msgstr "Exportar Imagem Desfeitas"
 
 #: src/canvas.c:1989
 msgid "Export Undo Images (reversed)"
-msgstr ""
+msgstr "Exportar Imagens de Desfazer (invertidas)"
 
 #: src/canvas.c:1994
 msgid "You must have 16 or fewer palette colours to export ASCII art."
@@ -2122,11 +2122,11 @@ msgstr "/Imagem/sep2"
 
 #: src/mainwindow.c:4548
 msgid "/Image/Flip Vertically"
-msgstr "/Imagem/Girar Verticamente"
+msgstr "/Imagem/Girar Verticalmente"
 
 #: src/mainwindow.c:4549
 msgid "/Image/Flip Horizontally"
-msgstr "/Imagem/Girar Horizontamente"
+msgstr "/Imagem/Girar Horizontalmente"
 
 #: src/mainwindow.c:4550
 msgid "/Image/Rotate Clockwise"
@@ -2150,7 +2150,7 @@ msgstr "/Imagem/sep3"
 
 #: src/mainwindow.c:4555
 msgid "/Image/Information ..."
-msgstr "/Imagem/Informação"
+msgstr "/Imagem/Informação ..."
 
 #: src/mainwindow.c:4556
 msgid "/Image/Preferences ..."
@@ -2302,7 +2302,7 @@ msgstr "/Paleta/Trocar A & B"
 
 #: src/mainwindow.c:4595
 msgid "/Palette/Edit Colour A & B ..."
-msgstr "/Paleta/Editar Cor A & B"
+msgstr "/Paleta/Editar Cor A & B ..."
 
 #: src/mainwindow.c:4596
 msgid "/Palette/Dither A"
@@ -2338,7 +2338,7 @@ msgstr "/Paleta/sep4"
 
 #: src/mainwindow.c:4604
 msgid "/Palette/Sort Colours ..."
-msgstr "/Paleta/Ordenar Cores..."
+msgstr "/Paleta/Ordenar Cores ..."
 
 #: src/mainwindow.c:4605
 msgid "/Palette/Palette Shifter ..."
@@ -2406,7 +2406,7 @@ msgstr "/Efeitos/Difference of Gaussians ..."
 
 #: src/mainwindow.c:4622
 msgid "/Effects/Sharpen ..."
-msgstr "/Efeitos/Aguçar..."
+msgstr "/Efeitos/Aguçar ..."
 
 #: src/mainwindow.c:4623
 msgid "/Effects/Unsharp Mask ..."
@@ -2414,7 +2414,7 @@ msgstr "/Efeitos/Unsharp Mask ..."
 
 #: src/mainwindow.c:4624
 msgid "/Effects/Soften ..."
-msgstr "/Efeitos/Suavizar..."
+msgstr "/Efeitos/Suavizar ..."
 
 #: src/mainwindow.c:4625
 msgid "/Effects/Gaussian Blur ..."

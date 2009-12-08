@@ -419,8 +419,8 @@ msgid "Save Layer Files"
 msgstr "Spara lagerfiler"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "Importera GIF animation - Välj katalog för bildrutor"
+msgid "Choose frames directory"
+msgstr "Välj katalog för bildrutor"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -879,7 +879,7 @@ msgstr ""
 
 #: src/help.c:56
 msgid "  Ctrl+Arrows       Move layer or resize selection box\n"
-msgstr "  Ctrl+Piltangenter   Flytta lager eller ändra storlek på urvalsboxen"
+msgstr "  Ctrl+Piltangenter   Flytta lager eller ändra storlek på urvalsboxen\n"
 
 #: src/help.c:57
 msgid ""
@@ -891,7 +891,7 @@ msgstr ""
 msgid ""
 "  Shift+[ or ]      Change colour B to the next or previous palette item\n"
 msgstr ""
-"  Shift+[ eller ]   Ändra färg A till nästa eller föregående färg i paletten"
+"  Shift+[ eller ]   Ändra färg A till nästa eller föregående färg i paletten\n"
 
 #: src/help.c:59
 msgid "  Delete            Crop image to selection"
@@ -909,7 +909,7 @@ msgstr "  Ctrl-G            Ändra bilden till gråskala"
 
 #: src/help.c:62
 msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"
-msgstr "  Shift-Ctrl-G      Ändra bilden till gråskala (Tillrättad gamma)"
+msgstr "  Shift-Ctrl-G      Ändra bilden till gråskala (Tillrättad gamma)\n"
 
 #: src/help.c:63
 msgid ""
@@ -977,7 +977,7 @@ msgid ""
 "set by flow setting)\n"
 msgstr ""
 "  S                 Rita stängt pilhuvud vid användande av linjeverktyget (storlek sätts "
-"av flödesinställning)"
+"av flödesinställning)\n"
 
 #: src/help.c:77
 msgid "  +,=               Main edit window - Zoom in"
@@ -2282,11 +2282,11 @@ msgstr "/Markering/sep2"
 
 #: src/mainwindow.c:4570
 msgid "/Selection/Flip Vertically"
-msgstr "/Markering/Flip Vertically"
+msgstr "/Markering/Vänd vertikalt"
 
 #: src/mainwindow.c:4571
 msgid "/Selection/Flip Horizontally"
-msgstr "/Markering/Flip Horizontally"
+msgstr "/Markering/Vänd horisontellt"
 
 #: src/mainwindow.c:4572
 msgid "/Selection/Rotate Clockwise"

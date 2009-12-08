@@ -2132,7 +2132,7 @@ msgstr "/Resim/Saat Yönünde Döndür"
 
 #: src/mainwindow.c:4551
 msgid "/Image/Rotate Anti-Clockwise"
-msgstr "/Resim/Saat Yönünün Tersine Çevir"
+msgstr "/Resim/Saat Yönünün Tersine Döndür"
 
 #: src/mainwindow.c:4552
 msgid "/Image/Free Rotate ..."
@@ -2148,7 +2148,7 @@ msgstr "/Resim/sep3"
 
 #: src/mainwindow.c:4555
 msgid "/Image/Information ..."
-msgstr "/Resim/Bilgi"
+msgstr "/Resim/Bilgi ..."
 
 #: src/mainwindow.c:4556
 msgid "/Image/Preferences ..."
@@ -2452,7 +2452,7 @@ msgstr "/Kanallar/tear"
 
 #: src/mainwindow.c:4635
 msgid "/Channels/New ..."
-msgstr "/Kanallar/Yeni..."
+msgstr "/Kanallar/Yeni ..."
 
 #: src/mainwindow.c:4636
 msgid "/Channels/Load ..."
@@ -2460,11 +2460,11 @@ msgstr "/Kanallar/Yükle ..."
 
 #: src/mainwindow.c:4637
 msgid "/Channels/Save As ..."
-msgstr "/Kanallar/Farkıl Kaydet ..."
+msgstr "/Kanallar/Farklı Kaydet ..."
 
 #: src/mainwindow.c:4638
 msgid "/Channels/Delete ..."
-msgstr "/Kanallar/Sil..."
+msgstr "/Kanallar/Sil ..."
 
 #: src/mainwindow.c:4639
 msgid "/Channels/sep1"
@@ -2552,7 +2552,7 @@ msgstr "/Katmanlar/Kaydet"
 
 #: src/mainwindow.c:4661
 msgid "/Layers/Save As ..."
-msgstr "/Katmanlar/Farklı Kaydet..."
+msgstr "/Katmanlar/Farklı Kaydet ..."
 
 #: src/mainwindow.c:4662
 msgid "/Layers/Save Composite Image ..."

@@ -1,6 +1,6 @@
 include ../_conf.txt
 
-langs = es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv
+langs = es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv tl
 
 all:
 	for iii in $(langs); do echo -n "$$iii = "; msgfmt -v -o $$iii.mo $$iii.po; done

@@ -513,8 +513,8 @@ msgid "Save Layer Files"
 msgstr "レイヤファイルを保存"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "GIFアニメをインポート - フレームディレクトリを選択"
+msgid "Choose frames directory"
+msgstr "フレームディレクトリを選択"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -2129,11 +2129,11 @@ msgstr "/表示(V)/ズームグリッドを表示"
 
 #: src/mainwindow.c:4529
 msgid "/View/Configure Grid ..."
-msgstr "/表示(V)/グリッドを設定 ..."
+msgstr "/表示(V)/グリッドを設定…"
 
 #: src/mainwindow.c:4530
 msgid "/View/Tracing Image ..."
-msgstr "/表示(V)/イメージをトレース ..."
+msgstr "/表示(V)/イメージをトレース…"
 
 #: src/mainwindow.c:4531
 msgid "/View/sep2"
@@ -2221,7 +2221,7 @@ msgstr "/イメージ(I)/自由に回転…"
 
 #: src/mainwindow.c:4553
 msgid "/Image/Skew ..."
-msgstr "/イメージ(I)/歪み ..."
+msgstr "/イメージ(I)/歪み…"
 
 #: src/mainwindow.c:4554
 msgid "/Image/sep3"
@@ -2421,7 +2421,7 @@ msgstr "/パレット(P)/色の並び替え…"
 
 #: src/mainwindow.c:4605
 msgid "/Palette/Palette Shifter ..."
-msgstr "/パレット(P)/パレットシフタ..."
+msgstr "/パレット(P)/パレットシフタ…"
 
 #: src/mainwindow.c:4607
 msgid "/Effe_cts"
@@ -2481,7 +2481,7 @@ msgstr "/効果(C)/縁を検出…"
 
 #: src/mainwindow.c:4621
 msgid "/Effects/Difference of Gaussians ..."
-msgstr "/効果(C)/ガウスの差異 ..."
+msgstr "/効果(C)/ガウスの差異…"
 
 #: src/mainwindow.c:4622
 msgid "/Effects/Sharpen ..."
@@ -2489,7 +2489,7 @@ msgstr "/効果(C)/シャープにする…"
 
 #: src/mainwindow.c:4623
 msgid "/Effects/Unsharp Mask ..."
-msgstr "/効果(C)/マスクをぼかす ..."
+msgstr "/効果(C)/マスクをぼかす…"
 
 #: src/mainwindow.c:4624
 msgid "/Effects/Soften ..."
@@ -2497,11 +2497,11 @@ msgstr "/効果(C)/ぼかし…"
 
 #: src/mainwindow.c:4625
 msgid "/Effects/Gaussian Blur ..."
-msgstr "/効果(C)/ガウスぼかし ..."
+msgstr "/効果(C)/ガウスぼかし…"
 
 #: src/mainwindow.c:4626
 msgid "/Effects/Kuwahara-Nagao Blur ..."
-msgstr "/効果(C)/Kuwahara-Nagaoぼかし ..."
+msgstr "/効果(C)/Kuwahara-Nagaoぼかし…"
 
 #: src/mainwindow.c:4627
 msgid "/Effects/Emboss"
@@ -2545,7 +2545,7 @@ msgstr "/チャンネル(N)/名前を付けて保存…"
 
 #: src/mainwindow.c:4638
 msgid "/Channels/Delete ..."
-msgstr "/チャンネル(N)/削除 ..."
+msgstr "/チャンネル(N)/削除…"
 
 #: src/mainwindow.c:4639
 msgid "/Channels/sep1"

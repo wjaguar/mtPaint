@@ -1774,7 +1774,7 @@ msgstr "/File/Nuovo"
 
 #: src/mainwindow.c:4499
 msgid "/File/Open ..."
-msgstr "/File/Apri..."
+msgstr "/File/Apri ..."
 
 #: src/mainwindow.c:4500
 msgid "/File/Save"
@@ -1782,7 +1782,7 @@ msgstr "/File/Salva"
 
 #: src/mainwindow.c:4501
 msgid "/File/Save As ..."
-msgstr "/File/Salva come..."
+msgstr "/File/Salva come ..."
 
 #: src/mainwindow.c:4502
 msgid "/File/sep1"
@@ -1798,7 +1798,7 @@ msgstr "/File/Esporta Immagini annullate (invertito) ..."
 
 #: src/mainwindow.c:4505
 msgid "/File/Export ASCII Art ..."
-msgstr "/File/Esporta in ASCII Art..."
+msgstr "/File/Esporta in ASCII Art ..."
 
 #: src/mainwindow.c:4506
 msgid "/File/Export Animated GIF ..."

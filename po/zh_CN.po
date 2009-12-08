@@ -4,15 +4,17 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: mtpaint 3.31\n"
+"Project-Id-Version: mtpaint 3.30\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-02-04 02:14+0300\n"
-"PO-Revision-Date: 2008-07-09 10:36+0800\n"
-"Last-Translator: cecc <puppylinux@sohu.com>\n"
+"POT-Creation-Date: 2009-02-13 21:54+0300\n"
+"PO-Revision-Date: 2009-09-28 13:05+0000\n"
+"Last-Translator: zhangmiao <mymzhang@gmail.com>\n"
 "Language-Team: Chinese (simplified) <puppylinux@sohu.com>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"X-Launchpad-Export-Date: 2009-12-06 22:32+0000\n"
+"X-Generator: Launchpad (build Unknown)\n"
 "X-Rosetta-Version: 0.1\n"
 
 #: src/ani.c:676
@@ -168,7 +170,7 @@ msgstr "图像太大而无法变换。"
 
 #: src/canvas.c:369
 msgid "MT"
-msgstr ""
+msgstr "MT"
 
 #: src/canvas.c:369
 msgid "Sobel"
@@ -228,7 +230,7 @@ msgstr "数量"
 
 #: src/canvas.c:495
 msgid "Threshold "
-msgstr "阈值"
+msgstr "阈值 "
 
 #: src/canvas.c:497 src/memory.c:7078
 msgid "Unsharp Mask"
@@ -414,8 +416,8 @@ msgid "Save Layer Files"
 msgstr "储存图层文件"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "输入 GIF 动画 - 选取图框目录"
+msgid "Choose frames directory"
+msgstr "选取图框目录"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -541,7 +543,7 @@ msgstr "数值"
 
 #: src/cpick.c:946
 msgid "Hex"
-msgstr ""
+msgstr "十六进制"
 
 #: src/cpick.c:946 src/layer.c:1166 src/otherwindow.c:2883 src/prefs.c:421
 #: src/toolbar.c:441
@@ -645,19 +647,19 @@ msgstr ""
 
 #: src/fpick.c:905 src/fpick.c:928
 msgid "Delete"
-msgstr ""
+msgstr "删除"
 
 #: src/fpick.c:905 src/fpick.c:933
 msgid "Rename"
-msgstr ""
+msgstr "重命名"
 
 #: src/fpick.c:906
 msgid "Create Directory"
-msgstr ""
+msgstr "创建目录"
 
 #: src/fpick.c:913
 msgid "Enter the new filename"
-msgstr ""
+msgstr "输入新文件名"
 
 #: src/fpick.c:914
 msgid "Enter the name of the new directory"
@@ -674,15 +676,15 @@ msgstr ""
 
 #: src/fpick.c:973
 msgid "Unable to delete"
-msgstr ""
+msgstr "无法删除"
 
 #: src/fpick.c:978
 msgid "Unable to rename"
-msgstr ""
+msgstr "无法重命名"
 
 #: src/fpick.c:987
 msgid "Unable to create directory"
-msgstr ""
+msgstr "无法创建目录"
 
 #: src/fpick.c:1072
 msgid "Up"
@@ -706,11 +708,11 @@ msgstr ""
 
 #: src/fpick.c:1175
 msgid "Name"
-msgstr ""
+msgstr "名称"
 
 #: src/fpick.c:1177
 msgid "Type"
-msgstr ""
+msgstr "类型"
 
 #: src/fpick.c:1178
 msgid "Modified"
@@ -738,7 +740,7 @@ msgstr "mtPaint 3.40 -版权(C) 2004-2009作者群\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
-msgstr "作者表列请参看「致谢」区段。 \n"
+msgstr "作者表列请参看「致谢」区段。\n"
 
 #: src/help.c:34
 msgid ""
@@ -802,11 +804,11 @@ msgstr ""
 
 #: src/help.c:43
 msgid "  Ctrl-O            Open Image"
-msgstr ""
+msgstr "  Ctrl-O 打开图像"
 
 #: src/help.c:44
 msgid "  Ctrl-S            Save Image"
-msgstr ""
+msgstr "  Ctrl-S 保存图像"
 
 #: src/help.c:45
 msgid "  Ctrl-Q            Quit program\n"
@@ -1615,7 +1617,7 @@ msgstr "/文件/新建"
 
 #: src/mainwindow.c:4414
 msgid "/File/Open ..."
-msgstr "/文件/开启..."
+msgstr "/文件/开启…"
 
 #: src/mainwindow.c:4415
 msgid "/File/Save"
@@ -1623,7 +1625,7 @@ msgstr "/文件/储存"
 
 #: src/mainwindow.c:4416
 msgid "/File/Save As ..."
-msgstr "/文件/另存为..."
+msgstr "/文件/另存为…"
 
 #: src/mainwindow.c:4417
 msgid "/File/sep1"
@@ -1631,19 +1633,19 @@ msgstr "/文件/sep1"
 
 #: src/mainwindow.c:4418
 msgid "/File/Export Undo Images ..."
-msgstr "/文件/汇出复原图像..."
+msgstr "/文件/汇出复原图像…"
 
 #: src/mainwindow.c:4419
 msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/文件/汇出复原图像(反向)..."
+msgstr "/文件/汇出复原图像(反向)…"
 
 #: src/mainwindow.c:4420
 msgid "/File/Export ASCII Art ..."
-msgstr "/文件/汇出ASCII图案..."
+msgstr "/文件/汇出ASCII图案…"
 
 #: src/mainwindow.c:4421
 msgid "/File/Export Animated GIF ..."
-msgstr "/文件/输出GIF动画..."
+msgstr "/文件/输出GIF动画…"
 
 #: src/mainwindow.c:4422
 msgid "/File/sep2"
@@ -2003,11 +2005,11 @@ msgstr "/编辑(E)/sep3"
 
 #: src/mainwindow.c:4514
 msgid "/Edit/Choose Pattern ..."
-msgstr "/编辑(E)/选取式样..."
+msgstr "/编辑(E)/选取式样…"
 
 #: src/mainwindow.c:4515
 msgid "/Edit/Choose Brush ..."
-msgstr "/编辑(E)/选取笔刷..."
+msgstr "/编辑(E)/选取笔刷…"
 
 #: src/mainwindow.c:4517
 msgid "/_View"
@@ -2107,7 +2109,7 @@ msgstr "/图像(I)/转换到RGB"
 
 #: src/mainwindow.c:4542
 msgid "/Image/Convert To Indexed ..."
-msgstr "/图像(I)/转换到索引值"
+msgstr "/图像(I)/转换到索引值…"
 
 #: src/mainwindow.c:4543
 msgid "/Image/sep1"
@@ -2159,11 +2161,11 @@ msgstr "/图像(I)/sep3"
 
 #: src/mainwindow.c:4555
 msgid "/Image/Information ..."
-msgstr "/图像(I)/资料..."
+msgstr "/图像(I)/资料…"
 
 #: src/mainwindow.c:4556
 msgid "/Image/Preferences ..."
-msgstr "/图像(I)/偏好设定..."
+msgstr "/图像(I)/偏好设定…"
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
@@ -2279,11 +2281,11 @@ msgstr "/调色盘(P)/tear"
 
 #: src/mainwindow.c:4587
 msgid "/Palette/Open ..."
-msgstr "/调色盘(P)/开启..."
+msgstr "/调色盘(P)/开启…"
 
 #: src/mainwindow.c:4588
 msgid "/Palette/Save As ..."
-msgstr "/调色盘(P)/另存为..."
+msgstr "/调色盘(P)/另存为…"
 
 #: src/mainwindow.c:4589
 msgid "/Palette/Load Default"
@@ -2311,7 +2313,7 @@ msgstr "/调色盘(P)/交换A & B"
 
 #: src/mainwindow.c:4595
 msgid "/Palette/Edit Colour A & B ..."
-msgstr "/调色盘(P)/编辑颜色A & B..."
+msgstr "/调色盘(P)/编辑颜色A & B…"
 
 #: src/mainwindow.c:4596
 msgid "/Palette/Dither A"
@@ -2319,11 +2321,11 @@ msgstr "/调色盘(P)/Dither A"
 
 #: src/mainwindow.c:4597
 msgid "/Palette/Palette Editor ..."
-msgstr "/调色盘(P)/调色盘编辑器..."
+msgstr "/调色盘(P)/调色盘编辑器…"
 
 #: src/mainwindow.c:4598
 msgid "/Palette/Set Palette Size ..."
-msgstr "/调色盘(P)/设定调色盘大小..."
+msgstr "/调色盘(P)/设定调色盘大小…"
 
 #: src/mainwindow.c:4599
 msgid "/Palette/Merge Duplicate Colours"
@@ -2347,7 +2349,7 @@ msgstr "/调色盘(P)/sep4"
 
 #: src/mainwindow.c:4604
 msgid "/Palette/Sort Colours ..."
-msgstr "/调色盘(P)/排序颜色..."
+msgstr "/调色盘(P)/排序颜色…"
 
 #: src/mainwindow.c:4605
 msgid "/Palette/Palette Shifter ..."
@@ -2423,7 +2425,7 @@ msgstr "/效果(C)/Unsharp Mask ..."
 
 #: src/mainwindow.c:4624
 msgid "/Effects/Soften ..."
-msgstr "/效果(C)/柔化..."
+msgstr "/效果(C)/柔化…"
 
 #: src/mainwindow.c:4625
 msgid "/Effects/Gaussian Blur ..."
@@ -2471,11 +2473,11 @@ msgstr "/通道/载入…"
 
 #: src/mainwindow.c:4637
 msgid "/Channels/Save As ..."
-msgstr "/通道/另存为..."
+msgstr "/通道/另存为…"
 
 #: src/mainwindow.c:4638
 msgid "/Channels/Delete ..."
-msgstr "/通道/删除 ..."
+msgstr "/通道/删除…"
 
 #: src/mainwindow.c:4639
 msgid "/Channels/sep1"
@@ -2527,7 +2529,7 @@ msgstr "/通道/接合RGBA计算"
 
 #: src/mainwindow.c:4651
 msgid "/Channels/Threshold ..."
-msgstr "/通道/临界值..."
+msgstr "/通道/临界值…"
 
 #: src/mainwindow.c:4652
 msgid "/Channels/Unassociate Alpha"
@@ -2543,7 +2545,7 @@ msgstr "/通道/视Alpha为外罩"
 
 #: src/mainwindow.c:4655
 msgid "/Channels/Configure Overlays ..."
-msgstr "/通道/配置外罩..."
+msgstr "/通道/配置外罩…"
 
 #: src/mainwindow.c:4657
 msgid "/_Layers"
@@ -2563,11 +2565,11 @@ msgstr "/图层(L)/储存"
 
 #: src/mainwindow.c:4661
 msgid "/Layers/Save As ..."
-msgstr "/图层(L)/另存为..."
+msgstr "/图层(L)/另存为…"
 
 #: src/mainwindow.c:4662
 msgid "/Layers/Save Composite Image ..."
-msgstr "/图层(L)/储存合成图像..."
+msgstr "/图层(L)/储存合成图像…"
 
 #: src/mainwindow.c:4663
 msgid "/Layers/Composite to New Layer"
@@ -2583,19 +2585,19 @@ msgstr "/图层(L)/sep1"
 
 #: src/mainwindow.c:4666
 msgid "/Layers/Configure Animation ..."
-msgstr "/图层(L)/配置动画..."
+msgstr "/图层(L)/配置动画…"
 
 #: src/mainwindow.c:4667
 msgid "/Layers/Preview Animation ..."
-msgstr "/图层(L)/预览动画..."
+msgstr "/图层(L)/预览动画…"
 
 #: src/mainwindow.c:4668
 msgid "/Layers/Set Key Frame ..."
-msgstr "/图层(L)/设定关键框架..."
+msgstr "/图层(L)/设定关键框架…"
 
 #: src/mainwindow.c:4669
 msgid "/Layers/Remove All Key Frames ..."
-msgstr "/图层(L)/移除所有关键图框..."
+msgstr "/图层(L)/移除所有关键图框…"
 
 #: src/mainwindow.c:4671
 msgid "/More..."
@@ -3458,7 +3460,7 @@ msgstr "流畅"
 
 #: src/prefs.c:428
 msgid "Preferences"
-msgstr "偏好设定"
+msgstr "首选项"
 
 #: src/prefs.c:447
 msgid "Max memory used for undo (MB)"
@@ -3558,7 +3560,7 @@ msgstr "文件"
 
 #: src/prefs.c:535
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
-msgstr "读取16位 TGA 为5:6:5 BGR "
+msgstr "读取16位 TGA 为5:6:5 BGR"
 
 #: src/prefs.c:536
 msgid "Write TGAs in bottom-up row order"
@@ -3815,11 +3817,11 @@ msgstr "复制"
 
 #: src/toolbar.c:559
 msgid "Paste"
-msgstr "贴上"
+msgstr "粘贴"
 
 #: src/toolbar.c:561
 msgid "Undo"
-msgstr "复原"
+msgstr "撤消"
 
 #: src/toolbar.c:562
 msgid "Redo"

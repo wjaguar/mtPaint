@@ -74,7 +74,7 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 19
+#define PREF_LANGS 20
 
 char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"zh_CN.utf8", "zh_TW.utf8",
@@ -82,7 +82,7 @@ char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"gl_ES", "de_DE", "it_IT", "ja_JP.utf8",
 	"pl_PL", "pt_PT", "pt_BR",
 	"ru_RU", "sk_SK", "es_ES", "sv_SE",
-	"tr_TR" };
+	"tl_PH", "tr_TR" };
 
 int pref_lang;
 
@@ -423,7 +423,7 @@ void pressed_preferences()
 		_("Galician"), _("German"), _("Italian"), _("Japanese"),
 		_("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
 		_("Russian"), _("Slovak"), _("Spanish"), _("Swedish"),
-		_("Turkish") };
+		_("Tagalog"), _("Turkish") };
 #endif
 
 

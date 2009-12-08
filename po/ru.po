@@ -418,8 +418,8 @@ msgid "Save Layer Files"
 msgstr "Сохранить файлы слоев"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "Импорт GIF анимации - выберите каталог для кадров"
+msgid "Choose frames directory"
+msgstr "Выберите каталог для кадров"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -1721,11 +1721,11 @@ msgstr "/Файл/Экспорт отмененных изображений (с
 
 #: src/mainwindow.c:4420
 msgid "/File/Export ASCII Art ..."
-msgstr "/Файл/Эспорт ASCII картинки ..."
+msgstr "/Файл/Экспорт ASCII картинки ..."
 
 #: src/mainwindow.c:4421
 msgid "/File/Export Animated GIF ..."
-msgstr "/Файл/Эспорт анимированнового GIF"
+msgstr "/Файл/Экспорт анимированного GIF ..."
 
 #: src/mainwindow.c:4422
 msgid "/File/sep2"
@@ -1805,7 +1805,7 @@ msgstr "/Файл/Действия/sepC"
 
 #: src/mainwindow.c:4441
 msgid "/File/Actions/Configure"
-msgstr "/Файл/Действия/Конфигурация"
+msgstr "/Файл/Действия/Настроить"
 
 #: src/mainwindow.c:4442
 msgid "/File/sepR"

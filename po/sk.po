@@ -420,8 +420,8 @@ msgid "Save Layer Files"
 msgstr "Uloženie súboru vrstiev"
 
 #: src/canvas.c:2005
-msgid "Import GIF animation - Choose frames directory"
-msgstr "Importovať GIF animáciu - Vyberte adresár snímkov"
+msgid "Choose frames directory"
+msgstr "Vyberte adresár snímkov"
 
 #: src/canvas.c:2011
 msgid "You must save at least one frame to create an animated GIF."
@@ -1691,7 +1691,7 @@ msgstr "/Súbor/sep1"
 
 #: src/mainwindow.c:4418
 msgid "/File/Export Undo Images ..."
-msgstr "/Súbor/Export obrázkov histórie..."
+msgstr "/Súbor/Export obrázkov histórie ..."
 
 #: src/mainwindow.c:4419
 msgid "/File/Export Undo Images (reversed) ..."

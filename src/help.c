@@ -167,6 +167,7 @@ _("Simplified Chinese - Cecc"),
 _("Slovak - Jozef Riha"),
 _("Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel Anxo Bouzada, Francisco Jose Rey"),
 _("Swedish - Daniel Nylander, Daniel Eriksson"),
+_("Tagalog - Anjelo delCarmen"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };
