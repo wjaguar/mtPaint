@@ -1665,997 +1665,557 @@ msgstr "Skutočne chcete skončiť?"
 msgid "/_File"
 msgstr "/_Súbor"
 
-#: src/mainwindow.c:4412
-msgid "/File/tear"
-msgstr "/Súbor/okraj"
-
 #: src/mainwindow.c:4413
-msgid "/File/New"
-msgstr "/Súbor/Nový"
+msgid "//New"
+msgstr "//Nový"
 
 #: src/mainwindow.c:4414
-msgid "/File/Open ..."
-msgstr "/Súbor/Otvoriť ..."
+msgid "//Open ..."
+msgstr "//Otvoriť ..."
 
 #: src/mainwindow.c:4415
-msgid "/File/Save"
-msgstr "/Súbor/Uložiť"
+msgid "//Save"
+msgstr "//Uložiť"
 
 #: src/mainwindow.c:4416
-msgid "/File/Save As ..."
-msgstr "/Súbor/Uložiť ako ..."
-
-#: src/mainwindow.c:4417
-msgid "/File/sep1"
-msgstr "/Súbor/sep1"
+msgid "//Save As ..."
+msgstr "//Uložiť ako ..."
 
 #: src/mainwindow.c:4418
-msgid "/File/Export Undo Images ..."
-msgstr "/Súbor/Export obrázkov histórie ..."
+msgid "//Export Undo Images ..."
+msgstr "//Export obrázkov histórie ..."
 
 #: src/mainwindow.c:4419
-msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/Súbor/Export obrázkov histórie (reverzne) ..."
+msgid "//Export Undo Images (reversed) ..."
+msgstr "//Export obrázkov histórie (reverzne) ..."
 
 #: src/mainwindow.c:4420
-msgid "/File/Export ASCII Art ..."
-msgstr "/Súbor/Exportovať ako ASCII kresbu ..."
+msgid "//Export ASCII Art ..."
+msgstr "//Exportovať ako ASCII kresbu ..."
 
 #: src/mainwindow.c:4421
-msgid "/File/Export Animated GIF ..."
-msgstr "/Súbor/Exportovať ako animovaný GIF ..."
-
-#: src/mainwindow.c:4422
-msgid "/File/sep2"
-msgstr "/Súbor/sep2"
+msgid "//Export Animated GIF ..."
+msgstr "//Exportovať ako animovaný GIF ..."
 
 #: src/mainwindow.c:4423
-msgid "/File/Actions"
-msgstr "/Súbor/Actions"
-
-#: src/mainwindow.c:4424
-msgid "/File/Actions/tear"
-msgstr "/Súbor/Actions/tear"
-
-#: src/mainwindow.c:4425
-msgid "/File/Actions/1"
-msgstr "/Súbor/Actions/1"
-
-#: src/mainwindow.c:4426
-msgid "/File/Actions/2"
-msgstr "/Súbor/Actions/2"
-
-#: src/mainwindow.c:4427
-msgid "/File/Actions/3"
-msgstr "/Súbor/Actions/3"
-
-#: src/mainwindow.c:4428
-msgid "/File/Actions/4"
-msgstr "/Súbor/Actions/4"
-
-#: src/mainwindow.c:4429
-msgid "/File/Actions/5"
-msgstr "/Súbor/Actions/5"
-
-#: src/mainwindow.c:4430
-msgid "/File/Actions/6"
-msgstr "/Súbor/Actions/6"
-
-#: src/mainwindow.c:4431
-msgid "/File/Actions/7"
-msgstr "/Súbor/Actions/7"
-
-#: src/mainwindow.c:4432
-msgid "/File/Actions/8"
-msgstr "/Súbor/Actions/8"
-
-#: src/mainwindow.c:4433
-msgid "/File/Actions/9"
-msgstr "/Súbor/Actions/9"
-
-#: src/mainwindow.c:4434
-msgid "/File/Actions/10"
-msgstr "/Súbor/Actions/10"
-
-#: src/mainwindow.c:4435
-msgid "/File/Actions/11"
-msgstr "/Súbor/Actions/11"
-
-#: src/mainwindow.c:4436
-msgid "/File/Actions/12"
-msgstr "/Súbor/Actions/12"
-
-#: src/mainwindow.c:4437
-msgid "/File/Actions/13"
-msgstr "/Súbor/Actions/13"
-
-#: src/mainwindow.c:4438
-msgid "/File/Actions/14"
-msgstr "/Súbor/Actions/14"
-
-#: src/mainwindow.c:4439
-msgid "/File/Actions/15"
-msgstr "/Súbor/Actions/15"
-
-#: src/mainwindow.c:4440
-msgid "/File/Actions/sepC"
-msgstr "/Súbor/Actions/sepC"
+msgid "//Actions"
+msgstr ""
 
 #: src/mainwindow.c:4441
-msgid "/File/Actions/Configure"
-msgstr "/Súbor/Actions/Configure"
-
-#: src/mainwindow.c:4442
-msgid "/File/sepR"
-msgstr "/Súbor/sepR"
-
-#: src/mainwindow.c:4443
-msgid "/File/1"
-msgstr "/Súbor/1"
-
-#: src/mainwindow.c:4444
-msgid "/File/2"
-msgstr "/Súbor/2"
-
-#: src/mainwindow.c:4445
-msgid "/File/3"
-msgstr "/Súbor/3"
-
-#: src/mainwindow.c:4446
-msgid "/File/4"
-msgstr "/Súbor/4"
-
-#: src/mainwindow.c:4447
-msgid "/File/5"
-msgstr "/Súbor/5"
-
-#: src/mainwindow.c:4448
-msgid "/File/6"
-msgstr "/Súbor/6"
-
-#: src/mainwindow.c:4449
-msgid "/File/7"
-msgstr "/Súbor/7"
-
-#: src/mainwindow.c:4450
-msgid "/File/8"
-msgstr "/Súbor/8"
-
-#: src/mainwindow.c:4451
-msgid "/File/9"
-msgstr "/Súbor/9"
-
-#: src/mainwindow.c:4452
-msgid "/File/10"
-msgstr "/Súbor/10"
-
-#: src/mainwindow.c:4453
-msgid "/File/11"
-msgstr "/Súbor/11"
-
-#: src/mainwindow.c:4454
-msgid "/File/12"
-msgstr "/Súbor/12"
-
-#: src/mainwindow.c:4455
-msgid "/File/13"
-msgstr "/Súbor/13"
-
-#: src/mainwindow.c:4456
-msgid "/File/14"
-msgstr "/Súbor/14"
-
-#: src/mainwindow.c:4457
-msgid "/File/15"
-msgstr "/Súbor/15"
-
-#: src/mainwindow.c:4458
-msgid "/File/16"
-msgstr "/Súbor/16"
-
-#: src/mainwindow.c:4459
-msgid "/File/17"
-msgstr "/Súbor/17"
-
-#: src/mainwindow.c:4460
-msgid "/File/18"
-msgstr "/Súbor/18"
-
-#: src/mainwindow.c:4461
-msgid "/File/19"
-msgstr "/Súbor/19"
-
-#: src/mainwindow.c:4462
-msgid "/File/20"
-msgstr "/Súbor/20"
-
-#: src/mainwindow.c:4463
-msgid "/File/sep3"
-msgstr "/Súbor/sep3"
+msgid "///Configure"
+msgstr ""
 
 #: src/mainwindow.c:4464
-msgid "/File/Quit"
-msgstr "/Súbor/Konec"
+msgid "//Quit"
+msgstr "//Konec"
 
 #: src/mainwindow.c:4466
 msgid "/_Edit"
 msgstr "/_Upraviť"
 
-#: src/mainwindow.c:4467
-msgid "/Edit/tear"
-msgstr "/Upraviť/okraj"
-
 #: src/mainwindow.c:4468
-msgid "/Edit/Undo"
-msgstr "/Upraviť/Späť"
+msgid "//Undo"
+msgstr "//Späť"
 
 #: src/mainwindow.c:4469
-msgid "/Edit/Redo"
-msgstr "/Upraviť/Vpred"
-
-#: src/mainwindow.c:4470
-msgid "/Edit/sep1"
-msgstr "/Upraviť/sep1"
+msgid "//Redo"
+msgstr "//Vpred"
 
 #: src/mainwindow.c:4471
-msgid "/Edit/Cut"
-msgstr "/Upraviť/Vystrihnúť"
+msgid "//Cut"
+msgstr "//Vystrihnúť"
 
 #: src/mainwindow.c:4472
-msgid "/Edit/Copy"
-msgstr "/Upraviť/Kopírovať"
+msgid "//Copy"
+msgstr "//Kopírovať"
 
 #: src/mainwindow.c:4473
-msgid "/Edit/Copy To Palette"
-msgstr "/Upraviť/Copy To Palette"
+msgid "//Copy To Palette"
+msgstr ""
 
 #: src/mainwindow.c:4474
-msgid "/Edit/Paste To Centre"
-msgstr "/Upraviť/Vložiť do stredu"
+msgid "//Paste To Centre"
+msgstr "//Vložiť do stredu"
 
 #: src/mainwindow.c:4475
-msgid "/Edit/Paste To New Layer"
-msgstr "/Upraviť/Vložiť do novej vrstvy"
+msgid "//Paste To New Layer"
+msgstr "//Vložiť do novej vrstvy"
 
 #: src/mainwindow.c:4476
-msgid "/Edit/Paste"
-msgstr "/Upraviť/Vložiť"
+msgid "//Paste"
+msgstr "//Vložiť"
 
 #: src/mainwindow.c:4477
-msgid "/Edit/Paste Text"
-msgstr "/Upraviť/Vložiť text"
+msgid "//Paste Text"
+msgstr "//Vložiť text"
 
 #: src/mainwindow.c:4479
-msgid "/Edit/Paste Text (FreeType)"
-msgstr "/Upraviť/Paste Text (FreeType)"
+msgid "//Paste Text (FreeType)"
+msgstr ""
 
 #: src/mainwindow.c:4481
-msgid "/Edit/Paste Palette"
-msgstr "/Upraviť/Paste Palette"
-
-#: src/mainwindow.c:4482
-msgid "/Edit/sep2"
-msgstr "/Upraviť/sep2"
+msgid "//Paste Palette"
+msgstr ""
 
 #: src/mainwindow.c:4483
-msgid "/Edit/Load Clipboard"
-msgstr "/Upraviť/Načítať schránku"
-
-#: src/mainwindow.c:4484
-msgid "/Edit/Load Clipboard/tear"
-msgstr "/Upraviť/Načítať schránku/okraj"
-
-#: src/mainwindow.c:4485
-msgid "/Edit/Load Clipboard/1"
-msgstr "/Upraviť/Načítať schránku/1"
-
-#: src/mainwindow.c:4486
-msgid "/Edit/Load Clipboard/2"
-msgstr "/Upraviť/Načítať schránku/2"
-
-#: src/mainwindow.c:4487
-msgid "/Edit/Load Clipboard/3"
-msgstr "/Upraviť/Načítať schránku/3"
-
-#: src/mainwindow.c:4488
-msgid "/Edit/Load Clipboard/4"
-msgstr "/Upraviť/Načítať schránku/4"
-
-#: src/mainwindow.c:4489
-msgid "/Edit/Load Clipboard/5"
-msgstr "/Upraviť/Načítať schránku/5"
-
-#: src/mainwindow.c:4490
-msgid "/Edit/Load Clipboard/6"
-msgstr "/Upraviť/Načítať schránku/6"
-
-#: src/mainwindow.c:4491
-msgid "/Edit/Load Clipboard/7"
-msgstr "/Upraviť/Načítať schránku/7"
-
-#: src/mainwindow.c:4492
-msgid "/Edit/Load Clipboard/8"
-msgstr "/Upraviť/Načítať schránku/8"
-
-#: src/mainwindow.c:4493
-msgid "/Edit/Load Clipboard/9"
-msgstr "/Upraviť/Načítať schránku/9"
-
-#: src/mainwindow.c:4494
-msgid "/Edit/Load Clipboard/10"
-msgstr "/Upraviť/Načítať schránku/10"
-
-#: src/mainwindow.c:4495
-msgid "/Edit/Load Clipboard/11"
-msgstr "/Upraviť/Načítať schránku/11"
-
-#: src/mainwindow.c:4496
-msgid "/Edit/Load Clipboard/12"
-msgstr "/Upraviť/Načítať schránku/12"
+msgid "//Load Clipboard"
+msgstr "//Načítať schránku"
 
 #: src/mainwindow.c:4497
-msgid "/Edit/Save Clipboard"
-msgstr "/Upraviť/Uložiť schránku"
-
-#: src/mainwindow.c:4498
-msgid "/Edit/Save Clipboard/tear"
-msgstr "/Upraviť/Uložiť schránku/okraj"
-
-#: src/mainwindow.c:4499
-msgid "/Edit/Save Clipboard/1"
-msgstr "/Upraviť/Uložiť schránku/1"
-
-#: src/mainwindow.c:4500
-msgid "/Edit/Save Clipboard/2"
-msgstr "/Upraviť/Uložiť schránku/2"
-
-#: src/mainwindow.c:4501
-msgid "/Edit/Save Clipboard/3"
-msgstr "/Upraviť/Uložiť schránku/3"
-
-#: src/mainwindow.c:4502
-msgid "/Edit/Save Clipboard/4"
-msgstr "/Upraviť/Uložiť schránku/4"
-
-#: src/mainwindow.c:4503
-msgid "/Edit/Save Clipboard/5"
-msgstr "/Upraviť/Uložiť schránku/5"
-
-#: src/mainwindow.c:4504
-msgid "/Edit/Save Clipboard/6"
-msgstr "/Upraviť/Uložiť schránku/6"
-
-#: src/mainwindow.c:4505
-msgid "/Edit/Save Clipboard/7"
-msgstr "/Upraviť/Uložiť schránku/7"
-
-#: src/mainwindow.c:4506
-msgid "/Edit/Save Clipboard/8"
-msgstr "/Upraviť/Uložiť schránku/8"
-
-#: src/mainwindow.c:4507
-msgid "/Edit/Save Clipboard/9"
-msgstr "/Upraviť/Uložiť schránku/9"
-
-#: src/mainwindow.c:4508
-msgid "/Edit/Save Clipboard/10"
-msgstr "/Upraviť/Uložiť schránku/10"
-
-#: src/mainwindow.c:4509
-msgid "/Edit/Save Clipboard/11"
-msgstr "/Upraviť/Uložiť schránku/11"
-
-#: src/mainwindow.c:4510
-msgid "/Edit/Save Clipboard/12"
-msgstr "/Upraviť/Uložiť schránku/12"
+msgid "//Save Clipboard"
+msgstr "//Uložiť schránku"
 
 #: src/mainwindow.c:4511
-msgid "/Edit/Import Clipboard from System"
-msgstr "/Upraviť/Import Clipboard from System"
+msgid "//Import Clipboard from System"
+msgstr ""
 
 #: src/mainwindow.c:4512
-msgid "/Edit/Export Clipboard to System"
-msgstr "/Upraviť/Export Clipboard to System"
-
-#: src/mainwindow.c:4513
-msgid "/Edit/sep3"
-msgstr "/Upraviť/sep3"
+msgid "//Export Clipboard to System"
+msgstr ""
 
 #: src/mainwindow.c:4514
-msgid "/Edit/Choose Pattern ..."
-msgstr "/Upraviť/Vybrať vzor ..."
+msgid "//Choose Pattern ..."
+msgstr "//Vybrať vzor ..."
 
 #: src/mainwindow.c:4515
-msgid "/Edit/Choose Brush ..."
-msgstr "/Upraviť/Vybrať štetec ..."
+msgid "//Choose Brush ..."
+msgstr "//Vybrať štetec ..."
 
 #: src/mainwindow.c:4517
 msgid "/_View"
 msgstr "/_Zobraziť"
 
-#: src/mainwindow.c:4518
-msgid "/View/tear"
-msgstr "/Zobraziť/okraj"
-
 #: src/mainwindow.c:4519
-msgid "/View/Show Main Toolbar"
-msgstr "/Zobraziť/Hlavná lišta"
+msgid "//Show Main Toolbar"
+msgstr "//Hlavná lišta"
 
 #: src/mainwindow.c:4520
-msgid "/View/Show Tools Toolbar"
-msgstr "/Zobraziť/Nástrojová lišta"
+msgid "//Show Tools Toolbar"
+msgstr "//Nástrojová lišta"
 
 #: src/mainwindow.c:4521
-msgid "/View/Show Settings Toolbar"
-msgstr "/Zobraziť/Lišta nastavení"
+msgid "//Show Settings Toolbar"
+msgstr "//Lišta nastavení"
 
 #: src/mainwindow.c:4522
-msgid "/View/Show Dock"
-msgstr "/Zobraziť/Show Dock"
+msgid "//Show Dock"
+msgstr ""
 
 #: src/mainwindow.c:4523
-msgid "/View/Show Palette"
-msgstr "/Zobraziť/Paleta"
+msgid "//Show Palette"
+msgstr "//Paleta"
 
 #: src/mainwindow.c:4524
-msgid "/View/Show Status Bar"
-msgstr "/Zobraziť/Stavová lišta"
-
-#: src/mainwindow.c:4525
-msgid "/View/sep1"
-msgstr "/Zobraziť/sep1"
+msgid "//Show Status Bar"
+msgstr "//Stavová lišta"
 
 #: src/mainwindow.c:4526
-msgid "/View/Toggle Image View"
-msgstr "/Zobraziť/Prepnúť zobrazenie"
+msgid "//Toggle Image View"
+msgstr "//Prepnúť zobrazenie"
 
 #: src/mainwindow.c:4527
-msgid "/View/Centralize Image"
-msgstr "/Zobraziť/Vycentrovať obrázok"
+msgid "//Centralize Image"
+msgstr "//Vycentrovať obrázok"
 
 #: src/mainwindow.c:4528
-msgid "/View/Show Zoom Grid"
-msgstr "/Zobraziť/Raster pri zväčšení"
+msgid "//Show Zoom Grid"
+msgstr "//Raster pri zväčšení"
 
 #: src/mainwindow.c:4529
-msgid "/View/Configure Grid ..."
-msgstr "/Zobraziť/Configure Grid ..."
+msgid "//Configure Grid ..."
+msgstr ""
 
 #: src/mainwindow.c:4530
-msgid "/View/Tracing Image ..."
-msgstr "/Zobraziť/Tracing Image ..."
-
-#: src/mainwindow.c:4531
-msgid "/View/sep2"
-msgstr "/Zobraziť/sep2"
+msgid "//Tracing Image ..."
+msgstr ""
 
 #: src/mainwindow.c:4532
-msgid "/View/View Window"
-msgstr "/Zobraziť/Okno zobrazenia"
+msgid "//View Window"
+msgstr "//Okno zobrazenia"
 
 #: src/mainwindow.c:4533
-msgid "/View/Horizontal Split"
-msgstr "/Zobraziť/Horizontálne delenie"
+msgid "//Horizontal Split"
+msgstr "//Horizontálne delenie"
 
 #: src/mainwindow.c:4534
-msgid "/View/Focus View Window"
-msgstr "/Zobraziť/Okno priblíženia"
-
-#: src/mainwindow.c:4535
-msgid "/View/sep3"
-msgstr "/Zobraziť/sep3"
+msgid "//Focus View Window"
+msgstr "//Okno priblíženia"
 
 #: src/mainwindow.c:4536
-msgid "/View/Pan Window"
-msgstr "/Zobraziť/Prehľadové okno"
+msgid "//Pan Window"
+msgstr "//Prehľadové okno"
 
 #: src/mainwindow.c:4537
-msgid "/View/Layers Window"
-msgstr "/Zobraziť/Okno vrstiev"
+msgid "//Layers Window"
+msgstr "//Okno vrstiev"
 
 #: src/mainwindow.c:4539
 msgid "/_Image"
 msgstr "/_Obrázok"
 
-#: src/mainwindow.c:4540
-msgid "/Image/tear"
-msgstr "/Obrázok/okraj"
-
 #: src/mainwindow.c:4541
-msgid "/Image/Convert To RGB"
-msgstr "/Obrázok/Previesť na RGB"
+msgid "//Convert To RGB"
+msgstr "//Previesť na RGB"
 
 #: src/mainwindow.c:4542
-msgid "/Image/Convert To Indexed ..."
-msgstr "/Obrázok/Previesť na indexovaný ..."
-
-#: src/mainwindow.c:4543
-msgid "/Image/sep1"
-msgstr "/Obrázok/sep1"
+msgid "//Convert To Indexed ..."
+msgstr "//Previesť na indexovaný ..."
 
 #: src/mainwindow.c:4544
-msgid "/Image/Scale Canvas ..."
-msgstr "/Obrázok/Zmeniť meradlo plátna ..."
+msgid "//Scale Canvas ..."
+msgstr "//Zmeniť meradlo plátna ..."
 
 #: src/mainwindow.c:4545
-msgid "/Image/Resize Canvas ..."
-msgstr "/Obrázok/Zmeniť veľkosť plátna ..."
+msgid "//Resize Canvas ..."
+msgstr "//Zmeniť veľkosť plátna ..."
 
 #: src/mainwindow.c:4546
-msgid "/Image/Crop"
-msgstr "/Obrázok/Orezať"
-
-#: src/mainwindow.c:4547
-msgid "/Image/sep2"
-msgstr "/Obrázok/sep2"
+msgid "//Crop"
+msgstr "//Orezať"
 
 #: src/mainwindow.c:4548
-msgid "/Image/Flip Vertically"
-msgstr "/Obrázok/Otočiť vertikálne"
+msgid "//Flip Vertically"
+msgstr "//Otočiť vertikálne"
 
 #: src/mainwindow.c:4549
-msgid "/Image/Flip Horizontally"
-msgstr "/Obrázok/Otočiť horizontálne"
+msgid "//Flip Horizontally"
+msgstr "//Otočiť horizontálne"
 
 #: src/mainwindow.c:4550
-msgid "/Image/Rotate Clockwise"
-msgstr "/Obrázok/Otočiť v smere ručičiek"
+msgid "//Rotate Clockwise"
+msgstr "//Otočiť v smere ručičiek"
 
 #: src/mainwindow.c:4551
-msgid "/Image/Rotate Anti-Clockwise"
-msgstr "/Obrázok/Otočiť proti smeru ručičiek"
+msgid "//Rotate Anti-Clockwise"
+msgstr "//Otočiť proti smeru ručičiek"
 
 #: src/mainwindow.c:4552
-msgid "/Image/Free Rotate ..."
-msgstr "/Obrázok/Otočiť ľubovoľne ..."
+msgid "//Free Rotate ..."
+msgstr "//Otočiť ľubovoľne ..."
 
 #: src/mainwindow.c:4553
-msgid "/Image/Skew ..."
-msgstr "/Obrázok/Skew ..."
-
-#: src/mainwindow.c:4554
-msgid "/Image/sep3"
-msgstr "/Obrázok/sep3"
+msgid "//Skew ..."
+msgstr ""
 
 #: src/mainwindow.c:4555
-msgid "/Image/Information ..."
-msgstr "/Obrázok/Informácie ..."
+msgid "//Information ..."
+msgstr "//Informácie ..."
 
 #: src/mainwindow.c:4556
-msgid "/Image/Preferences ..."
-msgstr "/Obrázok/Voľby ..."
+msgid "//Preferences ..."
+msgstr "//Voľby ..."
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
 msgstr "/_Výber"
 
-#: src/mainwindow.c:4559
-msgid "/Selection/tear"
-msgstr "/Výber/okraj"
-
 #: src/mainwindow.c:4560
-msgid "/Selection/Select All"
-msgstr "/Výber/Vybrať všetko"
+msgid "//Select All"
+msgstr "//Vybrať všetko"
 
 #: src/mainwindow.c:4561
-msgid "/Selection/Select None (Esc)"
-msgstr "/Výber/Zrušiť výber (Esc)"
+msgid "//Select None (Esc)"
+msgstr "//Zrušiť výber (Esc)"
 
 #: src/mainwindow.c:4562
-msgid "/Selection/Lasso Selection"
-msgstr "/Výber/Výber lasom"
+msgid "//Lasso Selection"
+msgstr "//Výber lasom"
 
 #: src/mainwindow.c:4563
-msgid "/Selection/Lasso Selection Cut"
-msgstr "/Výber/Vystrihnúť lasom"
-
-#: src/mainwindow.c:4564
-msgid "/Selection/sep1"
-msgstr "/Výber/sep1"
+msgid "//Lasso Selection Cut"
+msgstr "//Vystrihnúť lasom"
 
 #: src/mainwindow.c:4565
-msgid "/Selection/Outline Selection"
-msgstr "/Výber/Orámovať výber"
+msgid "//Outline Selection"
+msgstr "//Orámovať výber"
 
 #: src/mainwindow.c:4566
-msgid "/Selection/Fill Selection"
-msgstr "/Výber/Vyplniť výber"
+msgid "//Fill Selection"
+msgstr "//Vyplniť výber"
 
 #: src/mainwindow.c:4567
-msgid "/Selection/Outline Ellipse"
-msgstr "/Výber/Orámovať elipsu"
+msgid "//Outline Ellipse"
+msgstr "//Orámovať elipsu"
 
 #: src/mainwindow.c:4568
-msgid "/Selection/Fill Ellipse"
-msgstr "/Výber/Vyplniť elipsu"
-
-#: src/mainwindow.c:4569
-msgid "/Selection/sep2"
-msgstr "/Výber/sep2"
-
-#: src/mainwindow.c:4570
-msgid "/Selection/Flip Vertically"
-msgstr "/Výber/Otočiť vertikálne"
-
-#: src/mainwindow.c:4571
-msgid "/Selection/Flip Horizontally"
-msgstr "/Výber/Otočiť horizontálne"
-
-#: src/mainwindow.c:4572
-msgid "/Selection/Rotate Clockwise"
-msgstr "/Výber/Otočiť v smere ručičiek"
-
-#: src/mainwindow.c:4573
-msgid "/Selection/Rotate Anti-Clockwise"
-msgstr "/Výber/Otočiť proti smeru ručičiek"
-
-#: src/mainwindow.c:4574
-msgid "/Selection/sep3"
-msgstr "/Výber/sep3"
+msgid "//Fill Ellipse"
+msgstr "//Vyplniť elipsu"
 
 #: src/mainwindow.c:4575
-msgid "/Selection/Horizontal Ramp"
-msgstr "/Výber/Horizontal Ramp"
+msgid "//Horizontal Ramp"
+msgstr ""
 
 #: src/mainwindow.c:4576
-msgid "/Selection/Vertical Ramp"
-msgstr "/Výber/Vertical Ramp"
-
-#: src/mainwindow.c:4577
-msgid "/Selection/sep4"
-msgstr "/Výber/sep4"
+msgid "//Vertical Ramp"
+msgstr ""
 
 #: src/mainwindow.c:4578
-msgid "/Selection/Alpha Blend A,B"
-msgstr "/Výber/Alfa prechod medzi A,B"
+msgid "//Alpha Blend A,B"
+msgstr "//Alfa prechod medzi A,B"
 
 #: src/mainwindow.c:4579
-msgid "/Selection/Move Alpha to Mask"
-msgstr "/Výber/Presun Alfa do masky"
+msgid "//Move Alpha to Mask"
+msgstr "//Presun Alfa do masky"
 
 #: src/mainwindow.c:4580
-msgid "/Selection/Mask Colour A,B"
-msgstr "/Výber/Maskovať farby A,B"
+msgid "//Mask Colour A,B"
+msgstr "//Maskovať farby A,B"
 
 #: src/mainwindow.c:4581
-msgid "/Selection/Unmask Colour A,B"
-msgstr "/Výber/Odmaskovať farby A,B"
+msgid "//Unmask Colour A,B"
+msgstr "//Odmaskovať farby A,B"
 
 #: src/mainwindow.c:4582
-msgid "/Selection/Mask All Colours"
-msgstr "/Výber/Maskovať všetky farby"
+msgid "//Mask All Colours"
+msgstr "//Maskovať všetky farby"
 
 #: src/mainwindow.c:4583
-msgid "/Selection/Clear Mask"
-msgstr "/Výber/Zrušiť masku"
+msgid "//Clear Mask"
+msgstr "//Zrušiť masku"
 
 #: src/mainwindow.c:4585
 msgid "/_Palette"
 msgstr "/_Paleta"
 
-#: src/mainwindow.c:4586
-msgid "/Palette/tear"
-msgstr "/Paleta/okraj"
-
-#: src/mainwindow.c:4587
-msgid "/Palette/Open ..."
-msgstr "/Paleta/Otvoriť ..."
-
-#: src/mainwindow.c:4588
-msgid "/Palette/Save As ..."
-msgstr "/Paleta/Uložiť ako ..."
-
 #: src/mainwindow.c:4589
-msgid "/Palette/Load Default"
-msgstr "/Paleta/Načítať východziu"
-
-#: src/mainwindow.c:4590
-msgid "/Palette/sep1"
-msgstr "/Paleta/sep1"
+msgid "//Load Default"
+msgstr "//Načítať východziu"
 
 #: src/mainwindow.c:4591
-msgid "/Palette/Mask All"
-msgstr "/Paleta/Maskovať všetky farby"
+msgid "//Mask All"
+msgstr "//Maskovať všetky farby"
 
 #: src/mainwindow.c:4592
-msgid "/Palette/Mask None"
-msgstr "/Paleta/Nemaskovať žiadnu farbu"
-
-#: src/mainwindow.c:4593
-msgid "/Palette/sep2"
-msgstr "/Paleta/sep2"
+msgid "//Mask None"
+msgstr "//Nemaskovať žiadnu farbu"
 
 #: src/mainwindow.c:4594
-msgid "/Palette/Swap A & B"
-msgstr "/Paleta/Prehodiť A a B"
+msgid "//Swap A & B"
+msgstr "//Prehodiť A a B"
 
 #: src/mainwindow.c:4595
-msgid "/Palette/Edit Colour A & B ..."
-msgstr "/Paleta/Upraviť farby A a B ..."
+msgid "//Edit Colour A & B ..."
+msgstr "//Upraviť farby A a B ..."
 
 #: src/mainwindow.c:4596
-msgid "/Palette/Dither A"
-msgstr "/Paleta/Dither A"
+msgid "//Dither A"
+msgstr ""
 
 #: src/mainwindow.c:4597
-msgid "/Palette/Palette Editor ..."
-msgstr "/Paleta/Editor farieb ..."
+msgid "//Palette Editor ..."
+msgstr "//Editor farieb ..."
 
 #: src/mainwindow.c:4598
-msgid "/Palette/Set Palette Size ..."
-msgstr "/Paleta/Nastaviť počet farieb ..."
+msgid "//Set Palette Size ..."
+msgstr "//Nastaviť počet farieb ..."
 
 #: src/mainwindow.c:4599
-msgid "/Palette/Merge Duplicate Colours"
-msgstr "/Paleta/Zlúčiť duplicitné farby"
+msgid "//Merge Duplicate Colours"
+msgstr "//Zlúčiť duplicitné farby"
 
 #: src/mainwindow.c:4600
-msgid "/Palette/Remove Unused Colours"
-msgstr "/Paleta/Odstrániť nepoužité farby"
-
-#: src/mainwindow.c:4601
-msgid "/Palette/sep3"
-msgstr "/Paleta/sep3"
+msgid "//Remove Unused Colours"
+msgstr "//Odstrániť nepoužité farby"
 
 #: src/mainwindow.c:4602
-msgid "/Palette/Create Quantized ..."
-msgstr "/Paleta/Vytvoriť kvantované ..."
-
-#: src/mainwindow.c:4603
-msgid "/Palette/sep4"
-msgstr "/Paleta/sep4"
+msgid "//Create Quantized ..."
+msgstr "//Vytvoriť kvantované ..."
 
 #: src/mainwindow.c:4604
-msgid "/Palette/Sort Colours ..."
-msgstr "/Paleta/Usporiadať farby ..."
+msgid "//Sort Colours ..."
+msgstr "//Usporiadať farby ..."
 
 #: src/mainwindow.c:4605
-msgid "/Palette/Palette Shifter ..."
-msgstr "/Paleta/Posunovač palety ..."
+msgid "//Palette Shifter ..."
+msgstr "//Posunovač palety ..."
 
 #: src/mainwindow.c:4607
 msgid "/Effe_cts"
 msgstr "/_Efekty"
 
-#: src/mainwindow.c:4608
-msgid "/Effects/tear"
-msgstr "/Efekty/okraj"
-
 #: src/mainwindow.c:4609
-msgid "/Effects/Transform Colour ..."
-msgstr "/Efekty/Transformovať farby ..."
+msgid "//Transform Colour ..."
+msgstr "//Transformovať farby ..."
 
 #: src/mainwindow.c:4610
-msgid "/Effects/Invert"
-msgstr "/Efekty/Invertovať"
+msgid "//Invert"
+msgstr "//Invertovať"
 
 #: src/mainwindow.c:4611
-msgid "/Effects/Greyscale"
-msgstr "/Efekty/Šedá škála"
+msgid "//Greyscale"
+msgstr "//Šedá škála"
 
 #: src/mainwindow.c:4612
-msgid "/Effects/Greyscale (Gamma corrected)"
-msgstr "/Efekty/Šedá škála (s Gamma korekciou)"
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//Šedá škála (s Gamma korekciou)"
 
 #: src/mainwindow.c:4613
-msgid "/Effects/Isometric Transformation"
-msgstr "/Efekty/Izometrická transformácia"
-
-#: src/mainwindow.c:4614
-msgid "/Effects/Isometric Transformation/tear"
-msgstr "/Efekty/Izometrická transformácia/okraj"
+msgid "//Isometric Transformation"
+msgstr "//Izometrická transformácia"
 
 #: src/mainwindow.c:4615
-msgid "/Effects/Isometric Transformation/Left Side Down"
-msgstr "/Efekty/Izometrická transformácia/Ľavá strana dole"
+msgid "///Left Side Down"
+msgstr "///Ľavá strana dole"
 
 #: src/mainwindow.c:4616
-msgid "/Effects/Isometric Transformation/Right Side Down"
-msgstr "/Efekty/Izometrická transformácia/Pravá strana dole"
+msgid "///Right Side Down"
+msgstr "///Pravá strana dole"
 
 #: src/mainwindow.c:4617
-msgid "/Effects/Isometric Transformation/Top Side Right"
-msgstr "/Efekty/Izometrická transformácia/Vrchná strana vpravo"
+msgid "///Top Side Right"
+msgstr "///Vrchná strana vpravo"
 
 #: src/mainwindow.c:4618
-msgid "/Effects/Isometric Transformation/Bottom Side Right"
-msgstr "/Efekty/Izometrická transformácia/Spodná strana vpravo"
-
-#: src/mainwindow.c:4619
-msgid "/Effects/sep1"
-msgstr "/Efekty/sep1"
+msgid "///Bottom Side Right"
+msgstr "///Spodná strana vpravo"
 
 #: src/mainwindow.c:4620
-msgid "/Effects/Edge Detect ..."
-msgstr "/Efekty/Detekcia hrán ..."
+msgid "//Edge Detect ..."
+msgstr "//Detekcia hrán ..."
 
 #: src/mainwindow.c:4621
-msgid "/Effects/Difference of Gaussians ..."
-msgstr "/Efekty/Difference of Gaussians ..."
+msgid "//Difference of Gaussians ..."
+msgstr ""
 
 #: src/mainwindow.c:4622
-msgid "/Effects/Sharpen ..."
-msgstr "/Efekty/Zaostriť ..."
+msgid "//Sharpen ..."
+msgstr "//Zaostriť ..."
 
 #: src/mainwindow.c:4623
-msgid "/Effects/Unsharp Mask ..."
-msgstr "/Efekty/Zaostrovacia maska ..."
+msgid "//Unsharp Mask ..."
+msgstr "//Zaostrovacia maska ..."
 
 #: src/mainwindow.c:4624
-msgid "/Effects/Soften ..."
-msgstr "/Efekty/Zjemniť ..."
+msgid "//Soften ..."
+msgstr "//Zjemniť ..."
 
 #: src/mainwindow.c:4625
-msgid "/Effects/Gaussian Blur ..."
-msgstr "/Efekty/Gaussove rozmazanie ..."
+msgid "//Gaussian Blur ..."
+msgstr "//Gaussove rozmazanie ..."
 
 #: src/mainwindow.c:4626
-msgid "/Effects/Kuwahara-Nagao Blur ..."
-msgstr "/Efekty/Kuwahara-Nagao Blur ..."
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr ""
 
 #: src/mainwindow.c:4627
-msgid "/Effects/Emboss"
-msgstr "/Efekty/Reliéfy"
+msgid "//Emboss"
+msgstr "//Reliéfy"
 
 #: src/mainwindow.c:4628
-msgid "/Effects/Dilate"
-msgstr "/Efekty/Dilate"
+msgid "//Dilate"
+msgstr ""
 
 #: src/mainwindow.c:4629
-msgid "/Effects/Erode"
-msgstr "/Efekty/Erode"
-
-#: src/mainwindow.c:4630
-msgid "/Effects/sep2"
-msgstr "/Efekty/sep2"
+msgid "//Erode"
+msgstr ""
 
 #: src/mainwindow.c:4631
-msgid "/Effects/Bacteria ..."
-msgstr "/Efekty/Baktérie ..."
+msgid "//Bacteria ..."
+msgstr "//Baktérie ..."
 
 #: src/mainwindow.c:4633
 msgid "/Cha_nnels"
 msgstr "/Kanály"
 
-#: src/mainwindow.c:4634
-msgid "/Channels/tear"
-msgstr "/Kanály/okraj"
-
 #: src/mainwindow.c:4635
-msgid "/Channels/New ..."
-msgstr "/Kanály/Nový ..."
+msgid "//New ..."
+msgstr "//Nový ..."
 
 #: src/mainwindow.c:4636
-msgid "/Channels/Load ..."
-msgstr "/Kanály/Otvoriť ..."
-
-#: src/mainwindow.c:4637
-msgid "/Channels/Save As ..."
-msgstr "/Kanály/Uložiť ako ..."
+msgid "//Load ..."
+msgstr "//Otvoriť ..."
 
 #: src/mainwindow.c:4638
-msgid "/Channels/Delete ..."
-msgstr "/Kanály/Vymazať ..."
-
-#: src/mainwindow.c:4639
-msgid "/Channels/sep1"
-msgstr "/Kanály/sep1"
+msgid "//Delete ..."
+msgstr "//Vymazať ..."
 
 #: src/mainwindow.c:4640
-msgid "/Channels/Edit Image"
-msgstr "/Kanály/Upraviť obrázok"
+msgid "//Edit Image"
+msgstr "//Upraviť obrázok"
 
 #: src/mainwindow.c:4641
-msgid "/Channels/Edit Alpha"
-msgstr "/Kanály/Upraviť alfakanál"
+msgid "//Edit Alpha"
+msgstr "//Upraviť alfakanál"
 
 #: src/mainwindow.c:4642
-msgid "/Channels/Edit Selection"
-msgstr "/Kanály/Upraviť výber"
+msgid "//Edit Selection"
+msgstr "//Upraviť výber"
 
 #: src/mainwindow.c:4643
-msgid "/Channels/Edit Mask"
-msgstr "/Kanály/Upraviť masku"
-
-#: src/mainwindow.c:4644
-msgid "/Channels/sep2"
-msgstr "/Kanály/sep2"
+msgid "//Edit Mask"
+msgstr "//Upraviť masku"
 
 #: src/mainwindow.c:4645
-msgid "/Channels/Hide Image"
-msgstr "/Kanály/Skryť obrázok"
+msgid "//Hide Image"
+msgstr "//Skryť obrázok"
 
 #: src/mainwindow.c:4646
-msgid "/Channels/Disable Alpha"
-msgstr "/Kanály/Vypnúť alfakanál"
+msgid "//Disable Alpha"
+msgstr "//Vypnúť alfakanál"
 
 #: src/mainwindow.c:4647
-msgid "/Channels/Disable Selection"
-msgstr "/Kanály/Vypnúť výber"
+msgid "//Disable Selection"
+msgstr "//Vypnúť výber"
 
 #: src/mainwindow.c:4648
-msgid "/Channels/Disable Mask"
-msgstr "/Kanály/Vypnúť masku"
-
-#: src/mainwindow.c:4649
-msgid "/Channels/sep3"
-msgstr "/Kanály/sep3"
+msgid "//Disable Mask"
+msgstr "//Vypnúť masku"
 
 #: src/mainwindow.c:4650
-msgid "/Channels/Couple RGBA Operations"
-msgstr "/Kanály/Párovať RGBA operácie"
+msgid "//Couple RGBA Operations"
+msgstr "//Párovať RGBA operácie"
 
 #: src/mainwindow.c:4651
-msgid "/Channels/Threshold ..."
-msgstr "/Kanály/Prah ..."
+msgid "//Threshold ..."
+msgstr "//Prah ..."
 
 #: src/mainwindow.c:4652
-msgid "/Channels/Unassociate Alpha"
-msgstr "/Kanály/Unassociate Alpha"
-
-#: src/mainwindow.c:4653
-msgid "/Channels/sep4"
-msgstr "/Kanály/sep4"
+msgid "//Unassociate Alpha"
+msgstr ""
 
 #: src/mainwindow.c:4654
-msgid "/Channels/View Alpha as an Overlay"
-msgstr "/Kanály/Zobraziť alfakanál ako overlay"
+msgid "//View Alpha as an Overlay"
+msgstr "//Zobraziť alfakanál ako overlay"
 
 #: src/mainwindow.c:4655
-msgid "/Channels/Configure Overlays ..."
-msgstr "/Kanály/Konfigurovať overlaye ..."
+msgid "//Configure Overlays ..."
+msgstr "//Konfigurovať overlaye ..."
 
 #: src/mainwindow.c:4657
 msgid "/_Layers"
 msgstr "/Vrstvy"
 
-#: src/mainwindow.c:4658
-msgid "/Layers/tear"
-msgstr "/Vrstvy/okraj"
-
 #: src/mainwindow.c:4659
-msgid "/Layers/New Layer"
-msgstr "/Vrstvy/New Layer"
-
-#: src/mainwindow.c:4660
-msgid "/Layers/Save"
-msgstr "/Vrstvy/Uložiť"
-
-#: src/mainwindow.c:4661
-msgid "/Layers/Save As ..."
-msgstr "/Vrstvy/Uložiť ako ..."
+msgid "//New Layer"
+msgstr ""
 
 #: src/mainwindow.c:4662
-msgid "/Layers/Save Composite Image ..."
-msgstr "/Vrstvy/Uložiť kompozitný obrázok ..."
+msgid "//Save Composite Image ..."
+msgstr "//Uložiť kompozitný obrázok ..."
 
 #: src/mainwindow.c:4663
-msgid "/Layers/Composite to New Layer"
-msgstr "/Vrstvy/Composite to New Layer"
+msgid "//Composite to New Layer"
+msgstr ""
 
 #: src/mainwindow.c:4664
-msgid "/Layers/Remove All Layers"
-msgstr "/Vrstvy/Odstrániť všetky vrstvy"
-
-#: src/mainwindow.c:4665
-msgid "/Layers/sep1"
-msgstr "/Vrstvy/sep1"
+msgid "//Remove All Layers"
+msgstr "//Odstrániť všetky vrstvy"
 
 #: src/mainwindow.c:4666
-msgid "/Layers/Configure Animation ..."
-msgstr "/Vrstvy/Nastaviť animáciu ..."
+msgid "//Configure Animation ..."
+msgstr "//Nastaviť animáciu ..."
 
 #: src/mainwindow.c:4667
-msgid "/Layers/Preview Animation ..."
-msgstr "/Vrstvy/Náhľad animácie ..."
+msgid "//Preview Animation ..."
+msgstr "//Náhľad animácie ..."
 
 #: src/mainwindow.c:4668
-msgid "/Layers/Set Key Frame ..."
-msgstr "/Vrstvy/Nastaviť kľúčový snímok ..."
+msgid "//Set Key Frame ..."
+msgstr "//Nastaviť kľúčový snímok ..."
 
 #: src/mainwindow.c:4669
-msgid "/Layers/Remove All Key Frames ..."
-msgstr "/Vrstvy/Odstrániť všetky kľúčové snímky ..."
+msgid "//Remove All Key Frames ..."
+msgstr "//Odstrániť všetky kľúčové snímky ..."
 
 #: src/mainwindow.c:4671
 msgid "/More..."
@@ -2666,20 +2226,16 @@ msgid "/_Help"
 msgstr "/Po_moc"
 
 #: src/mainwindow.c:4674
-msgid "/Help/Documentation"
-msgstr "/Pomoc/Dokumentácia"
+msgid "//Documentation"
+msgstr "//Dokumentácia"
 
 #: src/mainwindow.c:4675
-msgid "/Help/About"
-msgstr "/Pomoc/O aplikácii"
-
-#: src/mainwindow.c:4676
-msgid "/Help/sep1"
-msgstr "/Pomoc/sep1"
+msgid "//About"
+msgstr "//O aplikácii"
 
 #: src/mainwindow.c:4677
-msgid "/Help/Rebind Shortcut Keycodes"
-msgstr "/Pomoc/Previazať klávesové skratky"
+msgid "//Rebind Shortcut Keycodes"
+msgstr "//Previazať klávesové skratky"
 
 #: src/memory.c:2589 src/memory.c:2974
 msgid "Converting to Indexed Palette"

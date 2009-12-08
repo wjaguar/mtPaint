@@ -1687,997 +1687,557 @@ msgstr "Вы действительно хотите выйти?"
 msgid "/_File"
 msgstr "/_Файл"
 
-#: src/mainwindow.c:4412
-msgid "/File/tear"
-msgstr "/Файл/tear"
-
 #: src/mainwindow.c:4413
-msgid "/File/New"
-msgstr "/Файл/Новый"
+msgid "//New"
+msgstr "//Новый"
 
 #: src/mainwindow.c:4414
-msgid "/File/Open ..."
-msgstr "/Файл/Открыть ..."
+msgid "//Open ..."
+msgstr "//Открыть ..."
 
 #: src/mainwindow.c:4415
-msgid "/File/Save"
-msgstr "/Файл/Сохранить"
+msgid "//Save"
+msgstr "//Сохранить"
 
 #: src/mainwindow.c:4416
-msgid "/File/Save As ..."
-msgstr "/Файл/Сохранить как ..."
-
-#: src/mainwindow.c:4417
-msgid "/File/sep1"
-msgstr "/Файл/sep1"
+msgid "//Save As ..."
+msgstr "//Сохранить как ..."
 
 #: src/mainwindow.c:4418
-msgid "/File/Export Undo Images ..."
-msgstr "/Файл/Экспорт отмененных изображений ..."
+msgid "//Export Undo Images ..."
+msgstr "//Экспорт отмененных изображений ..."
 
 #: src/mainwindow.c:4419
-msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/Файл/Экспорт отмененных изображений (с конца) ..."
+msgid "//Export Undo Images (reversed) ..."
+msgstr "//Экспорт отмененных изображений (с конца) ..."
 
 #: src/mainwindow.c:4420
-msgid "/File/Export ASCII Art ..."
-msgstr "/Файл/Экспорт ASCII картинки ..."
+msgid "//Export ASCII Art ..."
+msgstr "//Экспорт ASCII картинки ..."
 
 #: src/mainwindow.c:4421
-msgid "/File/Export Animated GIF ..."
-msgstr "/Файл/Экспорт анимированного GIF ..."
-
-#: src/mainwindow.c:4422
-msgid "/File/sep2"
-msgstr "/Файл/sep2"
+msgid "//Export Animated GIF ..."
+msgstr "//Экспорт анимированного GIF ..."
 
 #: src/mainwindow.c:4423
-msgid "/File/Actions"
-msgstr "/Файл/Действия"
-
-#: src/mainwindow.c:4424
-msgid "/File/Actions/tear"
-msgstr "/Файл/Действия/tear"
-
-#: src/mainwindow.c:4425
-msgid "/File/Actions/1"
-msgstr "/Файл/Действия/1"
-
-#: src/mainwindow.c:4426
-msgid "/File/Actions/2"
-msgstr "/Файл/Действия/2"
-
-#: src/mainwindow.c:4427
-msgid "/File/Actions/3"
-msgstr "/Файл/Действия/3"
-
-#: src/mainwindow.c:4428
-msgid "/File/Actions/4"
-msgstr "/Файл/Действия/4"
-
-#: src/mainwindow.c:4429
-msgid "/File/Actions/5"
-msgstr "/Файл/Действия/5"
-
-#: src/mainwindow.c:4430
-msgid "/File/Actions/6"
-msgstr "/Файл/Действия/6"
-
-#: src/mainwindow.c:4431
-msgid "/File/Actions/7"
-msgstr "/Файл/Действия/7"
-
-#: src/mainwindow.c:4432
-msgid "/File/Actions/8"
-msgstr "/Файл/Действия/8"
-
-#: src/mainwindow.c:4433
-msgid "/File/Actions/9"
-msgstr "/Файл/Действия/9"
-
-#: src/mainwindow.c:4434
-msgid "/File/Actions/10"
-msgstr "/Файл/Действия/10"
-
-#: src/mainwindow.c:4435
-msgid "/File/Actions/11"
-msgstr "/Файл/Действия/11"
-
-#: src/mainwindow.c:4436
-msgid "/File/Actions/12"
-msgstr "/Файл/Действия/12"
-
-#: src/mainwindow.c:4437
-msgid "/File/Actions/13"
-msgstr "/Файл/Действия/13"
-
-#: src/mainwindow.c:4438
-msgid "/File/Actions/14"
-msgstr "/Файл/Действия/14"
-
-#: src/mainwindow.c:4439
-msgid "/File/Actions/15"
-msgstr "/Файл/Действия/15"
-
-#: src/mainwindow.c:4440
-msgid "/File/Actions/sepC"
-msgstr "/Файл/Действия/sepC"
+msgid "//Actions"
+msgstr "//Действия"
 
 #: src/mainwindow.c:4441
-msgid "/File/Actions/Configure"
-msgstr "/Файл/Действия/Настроить"
-
-#: src/mainwindow.c:4442
-msgid "/File/sepR"
-msgstr "/Файл/sepR"
-
-#: src/mainwindow.c:4443
-msgid "/File/1"
-msgstr "/Файл/1"
-
-#: src/mainwindow.c:4444
-msgid "/File/2"
-msgstr "/Файл/2"
-
-#: src/mainwindow.c:4445
-msgid "/File/3"
-msgstr "/Файл/3"
-
-#: src/mainwindow.c:4446
-msgid "/File/4"
-msgstr "/Файл/4"
-
-#: src/mainwindow.c:4447
-msgid "/File/5"
-msgstr "/Файл/5"
-
-#: src/mainwindow.c:4448
-msgid "/File/6"
-msgstr "/Файл/6"
-
-#: src/mainwindow.c:4449
-msgid "/File/7"
-msgstr "/Файл/7"
-
-#: src/mainwindow.c:4450
-msgid "/File/8"
-msgstr "/Файл/8"
-
-#: src/mainwindow.c:4451
-msgid "/File/9"
-msgstr "/Файл/9"
-
-#: src/mainwindow.c:4452
-msgid "/File/10"
-msgstr "/Файл/10"
-
-#: src/mainwindow.c:4453
-msgid "/File/11"
-msgstr "/Файл/11"
-
-#: src/mainwindow.c:4454
-msgid "/File/12"
-msgstr "/Файл/12"
-
-#: src/mainwindow.c:4455
-msgid "/File/13"
-msgstr "/Файл/13"
-
-#: src/mainwindow.c:4456
-msgid "/File/14"
-msgstr "/Файл/14"
-
-#: src/mainwindow.c:4457
-msgid "/File/15"
-msgstr "/Файл/15"
-
-#: src/mainwindow.c:4458
-msgid "/File/16"
-msgstr "/Файл/16"
-
-#: src/mainwindow.c:4459
-msgid "/File/17"
-msgstr "/Файл/17"
-
-#: src/mainwindow.c:4460
-msgid "/File/18"
-msgstr "/Файл/18"
-
-#: src/mainwindow.c:4461
-msgid "/File/19"
-msgstr "/Файл/19"
-
-#: src/mainwindow.c:4462
-msgid "/File/20"
-msgstr "/Файл/20"
-
-#: src/mainwindow.c:4463
-msgid "/File/sep3"
-msgstr "/Файл/sep3"
+msgid "///Configure"
+msgstr "///Настроить"
 
 #: src/mainwindow.c:4464
-msgid "/File/Quit"
-msgstr "/Файл/Выход"
+msgid "//Quit"
+msgstr "//Выход"
 
 #: src/mainwindow.c:4466
 msgid "/_Edit"
 msgstr "/_Правка"
 
-#: src/mainwindow.c:4467
-msgid "/Edit/tear"
-msgstr "/Правка/tear"
-
 #: src/mainwindow.c:4468
-msgid "/Edit/Undo"
-msgstr "/Правка/Отменить"
+msgid "//Undo"
+msgstr "//Отменить"
 
 #: src/mainwindow.c:4469
-msgid "/Edit/Redo"
-msgstr "/Правка/Вернуть"
-
-#: src/mainwindow.c:4470
-msgid "/Edit/sep1"
-msgstr "/Правка/sep1"
+msgid "//Redo"
+msgstr "//Вернуть"
 
 #: src/mainwindow.c:4471
-msgid "/Edit/Cut"
-msgstr "/Правка/Вырезать"
+msgid "//Cut"
+msgstr "//Вырезать"
 
 #: src/mainwindow.c:4472
-msgid "/Edit/Copy"
-msgstr "/Правка/Копировать"
+msgid "//Copy"
+msgstr "//Копировать"
 
 #: src/mainwindow.c:4473
-msgid "/Edit/Copy To Palette"
-msgstr "/Правка/Копировать в палитру"
+msgid "//Copy To Palette"
+msgstr "//Копировать в палитру"
 
 #: src/mainwindow.c:4474
-msgid "/Edit/Paste To Centre"
-msgstr "/Правка/Вставить в центр"
+msgid "//Paste To Centre"
+msgstr "//Вставить в центр"
 
 #: src/mainwindow.c:4475
-msgid "/Edit/Paste To New Layer"
-msgstr "/Правка/Вставить в новый слой"
+msgid "//Paste To New Layer"
+msgstr "//Вставить в новый слой"
 
 #: src/mainwindow.c:4476
-msgid "/Edit/Paste"
-msgstr "/Правка/Вставить"
+msgid "//Paste"
+msgstr "//Вставить"
 
 #: src/mainwindow.c:4477
-msgid "/Edit/Paste Text"
-msgstr "/Правка/Вставить текст"
+msgid "//Paste Text"
+msgstr "//Вставить текст"
 
 #: src/mainwindow.c:4479
-msgid "/Edit/Paste Text (FreeType)"
-msgstr "/Правка/Вставить текст (FreeType)"
+msgid "//Paste Text (FreeType)"
+msgstr "//Вставить текст (FreeType)"
 
 #: src/mainwindow.c:4481
-msgid "/Edit/Paste Palette"
-msgstr "/Правка/Вставить палитру"
-
-#: src/mainwindow.c:4482
-msgid "/Edit/sep2"
-msgstr "/Правка/sep2"
+msgid "//Paste Palette"
+msgstr "//Вставить палитру"
 
 #: src/mainwindow.c:4483
-msgid "/Edit/Load Clipboard"
-msgstr "/Правка/Загрузить буфер обмена"
-
-#: src/mainwindow.c:4484
-msgid "/Edit/Load Clipboard/tear"
-msgstr "/Правка/Загрузить буфер обмена/tear"
-
-#: src/mainwindow.c:4485
-msgid "/Edit/Load Clipboard/1"
-msgstr "/Правка/Загрузить буфер обмена/1"
-
-#: src/mainwindow.c:4486
-msgid "/Edit/Load Clipboard/2"
-msgstr "/Правка/Загрузить буфер обмена/2"
-
-#: src/mainwindow.c:4487
-msgid "/Edit/Load Clipboard/3"
-msgstr "/Правка/Загрузить буфер обмена/3"
-
-#: src/mainwindow.c:4488
-msgid "/Edit/Load Clipboard/4"
-msgstr "/Правка/Загрузить буфер обмена/4"
-
-#: src/mainwindow.c:4489
-msgid "/Edit/Load Clipboard/5"
-msgstr "/Правка/Загрузить буфер обмена/5"
-
-#: src/mainwindow.c:4490
-msgid "/Edit/Load Clipboard/6"
-msgstr "/Правка/Загрузить буфер обмена/6"
-
-#: src/mainwindow.c:4491
-msgid "/Edit/Load Clipboard/7"
-msgstr "/Правка/Загрузить буфер обмена/7"
-
-#: src/mainwindow.c:4492
-msgid "/Edit/Load Clipboard/8"
-msgstr "/Правка/Загрузить буфер обмена/8"
-
-#: src/mainwindow.c:4493
-msgid "/Edit/Load Clipboard/9"
-msgstr "/Правка/Загрузить буфер обмена/9"
-
-#: src/mainwindow.c:4494
-msgid "/Edit/Load Clipboard/10"
-msgstr "/Правка/Загрузить буфер обмена/10"
-
-#: src/mainwindow.c:4495
-msgid "/Edit/Load Clipboard/11"
-msgstr "/Правка/Загрузить буфер обмена/11"
-
-#: src/mainwindow.c:4496
-msgid "/Edit/Load Clipboard/12"
-msgstr "/Правка/Загрузить буфер обмена/12"
+msgid "//Load Clipboard"
+msgstr "//Загрузить буфер обмена"
 
 #: src/mainwindow.c:4497
-msgid "/Edit/Save Clipboard"
-msgstr "/Правка/Сохранить буфер обмена"
-
-#: src/mainwindow.c:4498
-msgid "/Edit/Save Clipboard/tear"
-msgstr "/Правка/Сохранить буфер обмена/tear"
-
-#: src/mainwindow.c:4499
-msgid "/Edit/Save Clipboard/1"
-msgstr "/Правка/Сохранить буфер обмена/1"
-
-#: src/mainwindow.c:4500
-msgid "/Edit/Save Clipboard/2"
-msgstr "/Правка/Сохранить буфер обмена/2"
-
-#: src/mainwindow.c:4501
-msgid "/Edit/Save Clipboard/3"
-msgstr "/Правка/Сохранить буфер обмена/3"
-
-#: src/mainwindow.c:4502
-msgid "/Edit/Save Clipboard/4"
-msgstr "/Правка/Сохранить буфер обмена/4"
-
-#: src/mainwindow.c:4503
-msgid "/Edit/Save Clipboard/5"
-msgstr "/Правка/Сохранить буфер обмена/5"
-
-#: src/mainwindow.c:4504
-msgid "/Edit/Save Clipboard/6"
-msgstr "/Правка/Сохранить буфер обмена/6"
-
-#: src/mainwindow.c:4505
-msgid "/Edit/Save Clipboard/7"
-msgstr "/Правка/Сохранить буфер обмена/7"
-
-#: src/mainwindow.c:4506
-msgid "/Edit/Save Clipboard/8"
-msgstr "/Правка/Сохранить буфер обмена/8"
-
-#: src/mainwindow.c:4507
-msgid "/Edit/Save Clipboard/9"
-msgstr "/Правка/Сохранить буфер обмена/9"
-
-#: src/mainwindow.c:4508
-msgid "/Edit/Save Clipboard/10"
-msgstr "/Правка/Сохранить буфер обмена/10"
-
-#: src/mainwindow.c:4509
-msgid "/Edit/Save Clipboard/11"
-msgstr "/Правка/Сохранить буфер обмена/11"
-
-#: src/mainwindow.c:4510
-msgid "/Edit/Save Clipboard/12"
-msgstr "/Правка/Сохранить буфер обмена/12"
+msgid "//Save Clipboard"
+msgstr "//Сохранить буфер обмена"
 
 #: src/mainwindow.c:4511
-msgid "/Edit/Import Clipboard from System"
-msgstr "/Правка/Заполнить буфер обмена из системного"
+msgid "//Import Clipboard from System"
+msgstr "//Заполнить буфер обмена из системного"
 
 #: src/mainwindow.c:4512
-msgid "/Edit/Export Clipboard to System"
-msgstr "/Правка/Передать буфер обмена в системный"
-
-#: src/mainwindow.c:4513
-msgid "/Edit/sep3"
-msgstr "/Правка/sep3"
+msgid "//Export Clipboard to System"
+msgstr "//Передать буфер обмена в системный"
 
 #: src/mainwindow.c:4514
-msgid "/Edit/Choose Pattern ..."
-msgstr "/Правка/Выбрать шаблон ..."
+msgid "//Choose Pattern ..."
+msgstr "//Выбрать шаблон ..."
 
 #: src/mainwindow.c:4515
-msgid "/Edit/Choose Brush ..."
-msgstr "/Правка/Выбрать кисть ..."
+msgid "//Choose Brush ..."
+msgstr "//Выбрать кисть ..."
 
 #: src/mainwindow.c:4517
 msgid "/_View"
 msgstr "/_Вид"
 
-#: src/mainwindow.c:4518
-msgid "/View/tear"
-msgstr "/Вид/tear"
-
 #: src/mainwindow.c:4519
-msgid "/View/Show Main Toolbar"
-msgstr "/Вид/Основная панель"
+msgid "//Show Main Toolbar"
+msgstr "//Основная панель"
 
 #: src/mainwindow.c:4520
-msgid "/View/Show Tools Toolbar"
-msgstr "/Вид/Панель инструментов"
+msgid "//Show Tools Toolbar"
+msgstr "//Панель инструментов"
 
 #: src/mainwindow.c:4521
-msgid "/View/Show Settings Toolbar"
-msgstr "/Вид/Панель настроек"
+msgid "//Show Settings Toolbar"
+msgstr "//Панель настроек"
 
 #: src/mainwindow.c:4522
-msgid "/View/Show Dock"
-msgstr "/Вид/Боковая панель"
+msgid "//Show Dock"
+msgstr "//Боковая панель"
 
 #: src/mainwindow.c:4523
-msgid "/View/Show Palette"
-msgstr "/Вид/Палитра"
+msgid "//Show Palette"
+msgstr "//Палитра"
 
 #: src/mainwindow.c:4524
-msgid "/View/Show Status Bar"
-msgstr "/Вид/Строка статуса"
-
-#: src/mainwindow.c:4525
-msgid "/View/sep1"
-msgstr "/Вид/sep1"
+msgid "//Show Status Bar"
+msgstr "//Строка статуса"
 
 #: src/mainwindow.c:4526
-msgid "/View/Toggle Image View"
-msgstr "/Вид/Режим просмотра"
+msgid "//Toggle Image View"
+msgstr "//Режим просмотра"
 
 #: src/mainwindow.c:4527
-msgid "/View/Centralize Image"
-msgstr "/Вид/Центрировать изображение"
+msgid "//Centralize Image"
+msgstr "//Центрировать изображение"
 
 #: src/mainwindow.c:4528
-msgid "/View/Show Zoom Grid"
-msgstr "/Вид/Показать сетку"
+msgid "//Show Zoom Grid"
+msgstr "//Показать сетку"
 
 #: src/mainwindow.c:4529
-msgid "/View/Configure Grid ..."
-msgstr "/Вид/Настроить сетку ..."
+msgid "//Configure Grid ..."
+msgstr "//Настроить сетку ..."
 
 #: src/mainwindow.c:4530
-msgid "/View/Tracing Image ..."
-msgstr "/Вид/Трафаретное изображение ..."
-
-#: src/mainwindow.c:4531
-msgid "/View/sep2"
-msgstr "/Вид/sep2"
+msgid "//Tracing Image ..."
+msgstr "//Трафаретное изображение ..."
 
 #: src/mainwindow.c:4532
-msgid "/View/View Window"
-msgstr "/Вид/Окно просмотра"
+msgid "//View Window"
+msgstr "//Окно просмотра"
 
 #: src/mainwindow.c:4533
-msgid "/View/Horizontal Split"
-msgstr "/Вид/Горизонтальное деление"
+msgid "//Horizontal Split"
+msgstr "//Горизонтальное деление"
 
 #: src/mainwindow.c:4534
-msgid "/View/Focus View Window"
-msgstr "/Вид/Синхронизация окна просмотра"
-
-#: src/mainwindow.c:4535
-msgid "/View/sep3"
-msgstr "/Вид/sep3"
+msgid "//Focus View Window"
+msgstr "//Синхронизация окна просмотра"
 
 #: src/mainwindow.c:4536
-msgid "/View/Pan Window"
-msgstr "/Вид/Окно навигации"
+msgid "//Pan Window"
+msgstr "//Окно навигации"
 
 #: src/mainwindow.c:4537
-msgid "/View/Layers Window"
-msgstr "/Вид/Окно слоев"
+msgid "//Layers Window"
+msgstr "//Окно слоев"
 
 #: src/mainwindow.c:4539
 msgid "/_Image"
 msgstr "/_Изображение"
 
-#: src/mainwindow.c:4540
-msgid "/Image/tear"
-msgstr "/Изображение/tear"
-
 #: src/mainwindow.c:4541
-msgid "/Image/Convert To RGB"
-msgstr "/Изображение/Преобразовать в RGB"
+msgid "//Convert To RGB"
+msgstr "//Преобразовать в RGB"
 
 #: src/mainwindow.c:4542
-msgid "/Image/Convert To Indexed ..."
-msgstr "/Изображение/Преобразовать в индексированное ..."
-
-#: src/mainwindow.c:4543
-msgid "/Image/sep1"
-msgstr "/Изображение/sep1"
+msgid "//Convert To Indexed ..."
+msgstr "//Преобразовать в индексированное ..."
 
 #: src/mainwindow.c:4544
-msgid "/Image/Scale Canvas ..."
-msgstr "/Изображение/Размер изображения ..."
+msgid "//Scale Canvas ..."
+msgstr "//Размер изображения ..."
 
 #: src/mainwindow.c:4545
-msgid "/Image/Resize Canvas ..."
-msgstr "/Изображение/Размер холста ..."
+msgid "//Resize Canvas ..."
+msgstr "//Размер холста ..."
 
 #: src/mainwindow.c:4546
-msgid "/Image/Crop"
-msgstr "/Изображение/Обрезать"
-
-#: src/mainwindow.c:4547
-msgid "/Image/sep2"
-msgstr "/Изображение/sep2"
+msgid "//Crop"
+msgstr "//Обрезать"
 
 #: src/mainwindow.c:4548
-msgid "/Image/Flip Vertically"
-msgstr "/Изображение/Перевернуть по вертикали"
+msgid "//Flip Vertically"
+msgstr "//Перевернуть по вертикали"
 
 #: src/mainwindow.c:4549
-msgid "/Image/Flip Horizontally"
-msgstr "/Изображение/Перевернуть по горизонтали"
+msgid "//Flip Horizontally"
+msgstr "//Перевернуть по горизонтали"
 
 #: src/mainwindow.c:4550
-msgid "/Image/Rotate Clockwise"
-msgstr "/Изображение/Повернуть по часовой"
+msgid "//Rotate Clockwise"
+msgstr "//Повернуть по часовой"
 
 #: src/mainwindow.c:4551
-msgid "/Image/Rotate Anti-Clockwise"
-msgstr "/Изображение/Повернуть против часовой"
+msgid "//Rotate Anti-Clockwise"
+msgstr "//Повернуть против часовой"
 
 #: src/mainwindow.c:4552
-msgid "/Image/Free Rotate ..."
-msgstr "/Изображение/Повернуть произвольно ..."
+msgid "//Free Rotate ..."
+msgstr "//Повернуть произвольно ..."
 
 #: src/mainwindow.c:4553
-msgid "/Image/Skew ..."
-msgstr "/Изображение/Наклонить ..."
-
-#: src/mainwindow.c:4554
-msgid "/Image/sep3"
-msgstr "/Изображение/sep3"
+msgid "//Skew ..."
+msgstr "//Наклонить ..."
 
 #: src/mainwindow.c:4555
-msgid "/Image/Information ..."
-msgstr "/Изображение/Информация ..."
+msgid "//Information ..."
+msgstr "//Информация ..."
 
 #: src/mainwindow.c:4556
-msgid "/Image/Preferences ..."
-msgstr "/Изображение/Настройки ..."
+msgid "//Preferences ..."
+msgstr "//Настройки ..."
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
 msgstr "/В_ыделение"
 
-#: src/mainwindow.c:4559
-msgid "/Selection/tear"
-msgstr "/Выделение/tear"
-
 #: src/mainwindow.c:4560
-msgid "/Selection/Select All"
-msgstr "/Выделение/Выделить все"
+msgid "//Select All"
+msgstr "//Выделить все"
 
 #: src/mainwindow.c:4561
-msgid "/Selection/Select None (Esc)"
-msgstr "/Выделение/Отменить выделение (Esc)"
+msgid "//Select None (Esc)"
+msgstr "//Отменить выделение (Esc)"
 
 #: src/mainwindow.c:4562
-msgid "/Selection/Lasso Selection"
-msgstr "/Выделение/Выделение лассо"
+msgid "//Lasso Selection"
+msgstr "//Выделение лассо"
 
 #: src/mainwindow.c:4563
-msgid "/Selection/Lasso Selection Cut"
-msgstr "/Выделение/Выделить+вырезать лассо"
-
-#: src/mainwindow.c:4564
-msgid "/Selection/sep1"
-msgstr "/Выделение/sep1"
+msgid "//Lasso Selection Cut"
+msgstr "//Выделить+вырезать лассо"
 
 #: src/mainwindow.c:4565
-msgid "/Selection/Outline Selection"
-msgstr "/Выделение/Контур"
+msgid "//Outline Selection"
+msgstr "//Контур"
 
 #: src/mainwindow.c:4566
-msgid "/Selection/Fill Selection"
-msgstr "/Выделение/Заполнить"
+msgid "//Fill Selection"
+msgstr "//Заполнить"
 
 #: src/mainwindow.c:4567
-msgid "/Selection/Outline Ellipse"
-msgstr "/Выделение/Контур эллипса"
+msgid "//Outline Ellipse"
+msgstr "//Контур эллипса"
 
 #: src/mainwindow.c:4568
-msgid "/Selection/Fill Ellipse"
-msgstr "/Выделение/Заполненный эллипс"
-
-#: src/mainwindow.c:4569
-msgid "/Selection/sep2"
-msgstr "/Выделение/sep2"
-
-#: src/mainwindow.c:4570
-msgid "/Selection/Flip Vertically"
-msgstr "/Выделение/Перевернуть по вертикали"
-
-#: src/mainwindow.c:4571
-msgid "/Selection/Flip Horizontally"
-msgstr "/Выделение/Перевернуть по горизонтали"
-
-#: src/mainwindow.c:4572
-msgid "/Selection/Rotate Clockwise"
-msgstr "/Выделение/Повернуть по часовой"
-
-#: src/mainwindow.c:4573
-msgid "/Selection/Rotate Anti-Clockwise"
-msgstr "/Выделение/Повернуть против часовой"
-
-#: src/mainwindow.c:4574
-msgid "/Selection/sep3"
-msgstr "/Выделение/sep3"
+msgid "//Fill Ellipse"
+msgstr "//Заполненный эллипс"
 
 #: src/mainwindow.c:4575
-msgid "/Selection/Horizontal Ramp"
-msgstr "/Выделение/Горизонтальный переход цвета"
+msgid "//Horizontal Ramp"
+msgstr "//Горизонтальный переход цвета"
 
 #: src/mainwindow.c:4576
-msgid "/Selection/Vertical Ramp"
-msgstr "/Выделение/Вертикальный переход цвета"
-
-#: src/mainwindow.c:4577
-msgid "/Selection/sep4"
-msgstr "/Выделение/sep4"
+msgid "//Vertical Ramp"
+msgstr "//Вертикальный переход цвета"
 
 #: src/mainwindow.c:4578
-msgid "/Selection/Alpha Blend A,B"
-msgstr "/Выделение/Переход А->В в маску"
+msgid "//Alpha Blend A,B"
+msgstr "//Переход А->В в маску"
 
 #: src/mainwindow.c:4579
-msgid "/Selection/Move Alpha to Mask"
-msgstr "/Выделение/Сделать альфа-канал маской"
+msgid "//Move Alpha to Mask"
+msgstr "//Сделать альфа-канал маской"
 
 #: src/mainwindow.c:4580
-msgid "/Selection/Mask Colour A,B"
-msgstr "/Выделение/Маскировать цвета А,В"
+msgid "//Mask Colour A,B"
+msgstr "//Маскировать цвета А,В"
 
 #: src/mainwindow.c:4581
-msgid "/Selection/Unmask Colour A,B"
-msgstr "/Выделение/Размаскировать цвета A,В"
+msgid "//Unmask Colour A,B"
+msgstr "//Размаскировать цвета A,В"
 
 #: src/mainwindow.c:4582
-msgid "/Selection/Mask All Colours"
-msgstr "/Выделение/Маскировать все цвета"
+msgid "//Mask All Colours"
+msgstr "//Маскировать все цвета"
 
 #: src/mainwindow.c:4583
-msgid "/Selection/Clear Mask"
-msgstr "/Выделение/Очистить маску"
+msgid "//Clear Mask"
+msgstr "//Очистить маску"
 
 #: src/mainwindow.c:4585
 msgid "/_Palette"
 msgstr "/_Палитра"
 
-#: src/mainwindow.c:4586
-msgid "/Palette/tear"
-msgstr "/Палитра/tear"
-
-#: src/mainwindow.c:4587
-msgid "/Palette/Open ..."
-msgstr "/Палитра/Открыть ..."
-
-#: src/mainwindow.c:4588
-msgid "/Palette/Save As ..."
-msgstr "/Палитра/Сохранить как ..."
-
 #: src/mainwindow.c:4589
-msgid "/Palette/Load Default"
-msgstr "/Палитра/Загрузить по умолчанию"
-
-#: src/mainwindow.c:4590
-msgid "/Palette/sep1"
-msgstr "/Палитра/sep1"
+msgid "//Load Default"
+msgstr "//Загрузить по умолчанию"
 
 #: src/mainwindow.c:4591
-msgid "/Palette/Mask All"
-msgstr "/Палитра/Маскировать все"
+msgid "//Mask All"
+msgstr "//Маскировать все"
 
 #: src/mainwindow.c:4592
-msgid "/Palette/Mask None"
-msgstr "/Палитра/Размаскировать все"
-
-#: src/mainwindow.c:4593
-msgid "/Palette/sep2"
-msgstr "/Палитра/sep2"
+msgid "//Mask None"
+msgstr "//Размаскировать все"
 
 #: src/mainwindow.c:4594
-msgid "/Palette/Swap A & B"
-msgstr "/Палитра/Обменять A с B"
+msgid "//Swap A & B"
+msgstr "//Обменять A с B"
 
 #: src/mainwindow.c:4595
-msgid "/Palette/Edit Colour A & B ..."
-msgstr "/Палитра/Изменить A и B ..."
+msgid "//Edit Colour A & B ..."
+msgstr "//Изменить A и B ..."
 
 #: src/mainwindow.c:4596
-msgid "/Palette/Dither A"
-msgstr "/Палитра/Dither A"
+msgid "//Dither A"
+msgstr ""
 
 #: src/mainwindow.c:4597
-msgid "/Palette/Palette Editor ..."
-msgstr "/Палитра/Редактор палитры ..."
+msgid "//Palette Editor ..."
+msgstr "//Редактор палитры ..."
 
 #: src/mainwindow.c:4598
-msgid "/Palette/Set Palette Size ..."
-msgstr "/Палитра/Установить размер палитры ..."
+msgid "//Set Palette Size ..."
+msgstr "//Установить размер палитры ..."
 
 #: src/mainwindow.c:4599
-msgid "/Palette/Merge Duplicate Colours"
-msgstr "/Палитра/Слияние повторяющихся цветов"
+msgid "//Merge Duplicate Colours"
+msgstr "//Слияние повторяющихся цветов"
 
 #: src/mainwindow.c:4600
-msgid "/Palette/Remove Unused Colours"
-msgstr "/Палитра/Удаление неиспользуемых цветов"
-
-#: src/mainwindow.c:4601
-msgid "/Palette/sep3"
-msgstr "/Палитра/sep3"
+msgid "//Remove Unused Colours"
+msgstr "//Удаление неиспользуемых цветов"
 
 #: src/mainwindow.c:4602
-msgid "/Palette/Create Quantized ..."
-msgstr "/Палитра/Создать квантизацией ..."
-
-#: src/mainwindow.c:4603
-msgid "/Palette/sep4"
-msgstr "/Палитра/sep4"
+msgid "//Create Quantized ..."
+msgstr "//Создать квантизацией ..."
 
 #: src/mainwindow.c:4604
-msgid "/Palette/Sort Colours ..."
-msgstr "/Палитра/Сортировать цвета ..."
+msgid "//Sort Colours ..."
+msgstr "//Сортировать цвета ..."
 
 #: src/mainwindow.c:4605
-msgid "/Palette/Palette Shifter ..."
-msgstr "/Палитра/Сдвиг палитры ..."
+msgid "//Palette Shifter ..."
+msgstr "//Сдвиг палитры ..."
 
 #: src/mainwindow.c:4607
 msgid "/Effe_cts"
 msgstr "/_Эффекты"
 
-#: src/mainwindow.c:4608
-msgid "/Effects/tear"
-msgstr "/Эффекты/tear"
-
 #: src/mainwindow.c:4609
-msgid "/Effects/Transform Colour ..."
-msgstr "/Эффекты/Трансформация цветов ..."
+msgid "//Transform Colour ..."
+msgstr "//Трансформация цветов ..."
 
 #: src/mainwindow.c:4610
-msgid "/Effects/Invert"
-msgstr "/Эффекты/Инвертирование"
+msgid "//Invert"
+msgstr "//Инвертирование"
 
 #: src/mainwindow.c:4611
-msgid "/Effects/Greyscale"
-msgstr "/Эффекты/Оттенки серого"
+msgid "//Greyscale"
+msgstr "//Оттенки серого"
 
 #: src/mainwindow.c:4612
-msgid "/Effects/Greyscale (Gamma corrected)"
-msgstr "/Эффекты/Оттенки серого (с гамма-коррекцией)"
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//Оттенки серого (с гамма-коррекцией)"
 
 #: src/mainwindow.c:4613
-msgid "/Effects/Isometric Transformation"
-msgstr "/Эффекты/Изометрическое преобразование"
-
-#: src/mainwindow.c:4614
-msgid "/Effects/Isometric Transformation/tear"
-msgstr "/Эффекты/Изометрическое преобразование/tear"
+msgid "//Isometric Transformation"
+msgstr "//Изометрическое преобразование"
 
 #: src/mainwindow.c:4615
-msgid "/Effects/Isometric Transformation/Left Side Down"
-msgstr "/Эффекты/Изометрическое преобразование/Левый край вниз"
+msgid "///Left Side Down"
+msgstr "///Левый край вниз"
 
 #: src/mainwindow.c:4616
-msgid "/Effects/Isometric Transformation/Right Side Down"
-msgstr "/Эффекты/Изометрическое преобразование/Правый край вниз"
+msgid "///Right Side Down"
+msgstr "///Правый край вниз"
 
 #: src/mainwindow.c:4617
-msgid "/Effects/Isometric Transformation/Top Side Right"
-msgstr "/Эффекты/Изометрическое преобразование/Верхний край вправо"
+msgid "///Top Side Right"
+msgstr "///Верхний край вправо"
 
 #: src/mainwindow.c:4618
-msgid "/Effects/Isometric Transformation/Bottom Side Right"
-msgstr "/Эффекты/Изометрическое преобразование/Нижний край вправо"
-
-#: src/mainwindow.c:4619
-msgid "/Effects/sep1"
-msgstr "/Эффекты/sep1"
+msgid "///Bottom Side Right"
+msgstr "///Нижний край вправо"
 
 #: src/mainwindow.c:4620
-msgid "/Effects/Edge Detect ..."
-msgstr "/Эффекты/Выделить границы ..."
+msgid "//Edge Detect ..."
+msgstr "//Выделить границы ..."
 
 #: src/mainwindow.c:4621
-msgid "/Effects/Difference of Gaussians ..."
-msgstr "/Эффекты/Разница по Гауссу ..."
+msgid "//Difference of Gaussians ..."
+msgstr "//Разница по Гауссу ..."
 
 #: src/mainwindow.c:4622
-msgid "/Effects/Sharpen ..."
-msgstr "/Эффекты/Резкость ..."
+msgid "//Sharpen ..."
+msgstr "//Резкость ..."
 
 #: src/mainwindow.c:4623
-msgid "/Effects/Unsharp Mask ..."
-msgstr "/Эффекты/Нерезкая маска ..."
+msgid "//Unsharp Mask ..."
+msgstr "//Нерезкая маска ..."
 
 #: src/mainwindow.c:4624
-msgid "/Effects/Soften ..."
-msgstr "/Эффекты/Сгладить ..."
+msgid "//Soften ..."
+msgstr "//Сгладить ..."
 
 #: src/mainwindow.c:4625
-msgid "/Effects/Gaussian Blur ..."
-msgstr "/Эффекты/Гауссово размывание ..."
+msgid "//Gaussian Blur ..."
+msgstr "//Гауссово размывание ..."
 
 #: src/mainwindow.c:4626
-msgid "/Effects/Kuwahara-Nagao Blur ..."
-msgstr "/Эффекты/Размывание Кувахары-Нагао ..."
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr "//Размывание Кувахары-Нагао ..."
 
 #: src/mainwindow.c:4627
-msgid "/Effects/Emboss"
-msgstr "/Эффекты/Барельеф"
+msgid "//Emboss"
+msgstr "//Барельеф"
 
 #: src/mainwindow.c:4628
-msgid "/Effects/Dilate"
-msgstr "/Эффекты/Дилатация"
+msgid "//Dilate"
+msgstr "//Дилатация"
 
 #: src/mainwindow.c:4629
-msgid "/Effects/Erode"
-msgstr "/Эффекты/Эрозия"
-
-#: src/mainwindow.c:4630
-msgid "/Effects/sep2"
-msgstr "/Эффекты/sep2"
+msgid "//Erode"
+msgstr "//Эрозия"
 
 #: src/mainwindow.c:4631
-msgid "/Effects/Bacteria ..."
-msgstr "/Эффекты/Бактерии ..."
+msgid "//Bacteria ..."
+msgstr "//Бактерии ..."
 
 #: src/mainwindow.c:4633
 msgid "/Cha_nnels"
 msgstr "/_Каналы"
 
-#: src/mainwindow.c:4634
-msgid "/Channels/tear"
-msgstr "/Каналы/tear"
-
 #: src/mainwindow.c:4635
-msgid "/Channels/New ..."
-msgstr "/Каналы/Новый ..."
+msgid "//New ..."
+msgstr "//Новый ..."
 
 #: src/mainwindow.c:4636
-msgid "/Channels/Load ..."
-msgstr "/Каналы/Загрузить ..."
-
-#: src/mainwindow.c:4637
-msgid "/Channels/Save As ..."
-msgstr "/Каналы/Сохранить как ..."
+msgid "//Load ..."
+msgstr "//Загрузить ..."
 
 #: src/mainwindow.c:4638
-msgid "/Channels/Delete ..."
-msgstr "/Каналы/Удалить ..."
-
-#: src/mainwindow.c:4639
-msgid "/Channels/sep1"
-msgstr "/Каналы/sep1"
+msgid "//Delete ..."
+msgstr "//Удалить ..."
 
 #: src/mainwindow.c:4640
-msgid "/Channels/Edit Image"
-msgstr "/Каналы/Редактировать изображение"
+msgid "//Edit Image"
+msgstr "//Редактировать изображение"
 
 #: src/mainwindow.c:4641
-msgid "/Channels/Edit Alpha"
-msgstr "/Каналы/Редактировать альфа"
+msgid "//Edit Alpha"
+msgstr "//Редактировать альфа"
 
 #: src/mainwindow.c:4642
-msgid "/Channels/Edit Selection"
-msgstr "/Каналы/Редактировать выделение"
+msgid "//Edit Selection"
+msgstr "//Редактировать выделение"
 
 #: src/mainwindow.c:4643
-msgid "/Channels/Edit Mask"
-msgstr "/Каналы/Редактировать маску"
-
-#: src/mainwindow.c:4644
-msgid "/Channels/sep2"
-msgstr "/Каналы/sep2"
+msgid "//Edit Mask"
+msgstr "//Редактировать маску"
 
 #: src/mainwindow.c:4645
-msgid "/Channels/Hide Image"
-msgstr "/Каналы/Скрыть изображение"
+msgid "//Hide Image"
+msgstr "//Скрыть изображение"
 
 #: src/mainwindow.c:4646
-msgid "/Channels/Disable Alpha"
-msgstr "/Каналы/Выключить альфа"
+msgid "//Disable Alpha"
+msgstr "//Выключить альфа"
 
 #: src/mainwindow.c:4647
-msgid "/Channels/Disable Selection"
-msgstr "/Каналы/Выключить выделение"
+msgid "//Disable Selection"
+msgstr "//Выключить выделение"
 
 #: src/mainwindow.c:4648
-msgid "/Channels/Disable Mask"
-msgstr "/Каналы/Выключить маску"
-
-#: src/mainwindow.c:4649
-msgid "/Channels/sep3"
-msgstr "/Каналы/sep3"
+msgid "//Disable Mask"
+msgstr "//Выключить маску"
 
 #: src/mainwindow.c:4650
-msgid "/Channels/Couple RGBA Operations"
-msgstr "/Каналы/Разрешить RGBA операции"
+msgid "//Couple RGBA Operations"
+msgstr "//Разрешить RGBA операции"
 
 #: src/mainwindow.c:4651
-msgid "/Channels/Threshold ..."
-msgstr "/Каналы/Порог ..."
+msgid "//Threshold ..."
+msgstr "//Порог ..."
 
 #: src/mainwindow.c:4652
-msgid "/Channels/Unassociate Alpha"
-msgstr "/Каналы/Отделить альфа"
-
-#: src/mainwindow.c:4653
-msgid "/Channels/sep4"
-msgstr "/Каналы/sep4"
+msgid "//Unassociate Alpha"
+msgstr "//Отделить альфа"
 
 #: src/mainwindow.c:4654
-msgid "/Channels/View Alpha as an Overlay"
-msgstr "/Каналы/Показать альфа как наложение"
+msgid "//View Alpha as an Overlay"
+msgstr "//Показать альфа как наложение"
 
 #: src/mainwindow.c:4655
-msgid "/Channels/Configure Overlays ..."
-msgstr "/Каналы/Настроить наложение ..."
+msgid "//Configure Overlays ..."
+msgstr "//Настроить наложение ..."
 
 #: src/mainwindow.c:4657
 msgid "/_Layers"
 msgstr "/_Слои"
 
-#: src/mainwindow.c:4658
-msgid "/Layers/tear"
-msgstr "/Слои/tear"
-
 #: src/mainwindow.c:4659
-msgid "/Layers/New Layer"
-msgstr "/Слои/Новый слой"
-
-#: src/mainwindow.c:4660
-msgid "/Layers/Save"
-msgstr "/Слои/Сохранить"
-
-#: src/mainwindow.c:4661
-msgid "/Layers/Save As ..."
-msgstr "/Слои/Сохранить как ..."
+msgid "//New Layer"
+msgstr "//Новый слой"
 
 #: src/mainwindow.c:4662
-msgid "/Layers/Save Composite Image ..."
-msgstr "/Слои/Сохранить составное изображение ..."
+msgid "//Save Composite Image ..."
+msgstr "//Сохранить составное изображение ..."
 
 #: src/mainwindow.c:4663
-msgid "/Layers/Composite to New Layer"
-msgstr "/Слои/Составное изображение в новый слой"
+msgid "//Composite to New Layer"
+msgstr "//Составное изображение в новый слой"
 
 #: src/mainwindow.c:4664
-msgid "/Layers/Remove All Layers"
-msgstr "/Слои/Удалить все слои"
-
-#: src/mainwindow.c:4665
-msgid "/Layers/sep1"
-msgstr "/Слои/sep1"
+msgid "//Remove All Layers"
+msgstr "//Удалить все слои"
 
 #: src/mainwindow.c:4666
-msgid "/Layers/Configure Animation ..."
-msgstr "/Слои/Настроить анимацию ..."
+msgid "//Configure Animation ..."
+msgstr "//Настроить анимацию ..."
 
 #: src/mainwindow.c:4667
-msgid "/Layers/Preview Animation ..."
-msgstr "/Слои/Просмотр анимации ..."
+msgid "//Preview Animation ..."
+msgstr "//Просмотр анимации ..."
 
 #: src/mainwindow.c:4668
-msgid "/Layers/Set Key Frame ..."
-msgstr "/Слои/Установить ключевой кадр ..."
+msgid "//Set Key Frame ..."
+msgstr "//Установить ключевой кадр ..."
 
 #: src/mainwindow.c:4669
-msgid "/Layers/Remove All Key Frames ..."
-msgstr "/Слои/Удалить все ключевые кадры ..."
+msgid "//Remove All Key Frames ..."
+msgstr "//Удалить все ключевые кадры ..."
 
 #: src/mainwindow.c:4671
 msgid "/More..."
@@ -2688,20 +2248,16 @@ msgid "/_Help"
 msgstr "/С_правка"
 
 #: src/mainwindow.c:4674
-msgid "/Help/Documentation"
-msgstr "/Справка/Документация"
+msgid "//Documentation"
+msgstr "//Документация"
 
 #: src/mainwindow.c:4675
-msgid "/Help/About"
-msgstr "/Справка/О программе"
-
-#: src/mainwindow.c:4676
-msgid "/Help/sep1"
-msgstr "/Справка/sep1"
+msgid "//About"
+msgstr "//О программе"
 
 #: src/mainwindow.c:4677
-msgid "/Help/Rebind Shortcut Keycodes"
-msgstr "/Справка/Переопределить горячие клавиши"
+msgid "//Rebind Shortcut Keycodes"
+msgstr "//Переопределить горячие клавиши"
 
 #: src/memory.c:2589 src/memory.c:2974
 msgid "Converting to Indexed Palette"

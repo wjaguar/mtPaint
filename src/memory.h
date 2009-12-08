@@ -475,6 +475,18 @@ static inline void do_xlate(unsigned char *xlat, unsigned char *data, int len)
 
 #define copy4(D,S) memcpy(D, S, 4 * sizeof(int))
 
+/// Block allocator
+
+typedef struct {
+	char *block;
+	unsigned int here, size;
+	unsigned int minsize, incr;
+} wjmem;
+
+wjmem *wjmemnew(int size, int incr);
+void wjmemfree(wjmem *mem);
+void *wjmalloc(wjmem *mem, int size, int align);
+
 /// Multiblock allocator
 
 #define MA_ALIGN_MASK    0x03 /* For alignment constraints */

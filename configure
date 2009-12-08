@@ -4,7 +4,7 @@
 
 echo
 
-MT_V="3.34.39"
+MT_V="3.34.40"
 MT_DATE="2009-12-08"
 
 MT_VERSION="mtPaint $MT_V"
@@ -253,9 +253,8 @@ do
 				do
 					echo New file = $file-a
 					mv $file $file-a
-					msgmerge -N $file-a mtpaint.pot > $file-b
-					perl xtend.pl $file-b $file
-					mv $file-* $NEW_DIR*
+					msgmerge -N $file-a mtpaint.pot > $file
+					mv $file-a $NEW_DIR*
 				done
 				rm mtpaint.pot
 				mv $NEW_DIR* ../../old_trans

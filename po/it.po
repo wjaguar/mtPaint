@@ -1764,1001 +1764,561 @@ msgstr "Vuoi davvero uscire?"
 msgid "/_File"
 msgstr ""
 
-#: src/mainwindow.c:4497
-msgid "/File/tear"
-msgstr ""
-
 #: src/mainwindow.c:4498
-msgid "/File/New"
-msgstr "/File/Nuovo"
+msgid "//New"
+msgstr "//Nuovo"
 
 #: src/mainwindow.c:4499
-msgid "/File/Open ..."
-msgstr "/File/Apri ..."
+msgid "//Open ..."
+msgstr "//Apri ..."
 
 #: src/mainwindow.c:4500
-msgid "/File/Save"
-msgstr "/File/Salva"
+msgid "//Save"
+msgstr "//Salva"
 
 #: src/mainwindow.c:4501
-msgid "/File/Save As ..."
-msgstr "/File/Salva come ..."
-
-#: src/mainwindow.c:4502
-msgid "/File/sep1"
-msgstr ""
+msgid "//Save As ..."
+msgstr "//Salva come ..."
 
 #: src/mainwindow.c:4503
-msgid "/File/Export Undo Images ..."
-msgstr "/File/Esporta Immagini annullate ..."
+msgid "//Export Undo Images ..."
+msgstr "//Esporta Immagini annullate ..."
 
 #: src/mainwindow.c:4504
-msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/File/Esporta Immagini annullate (invertito) ..."
+msgid "//Export Undo Images (reversed) ..."
+msgstr "//Esporta Immagini annullate (invertito) ..."
 
 #: src/mainwindow.c:4505
-msgid "/File/Export ASCII Art ..."
-msgstr "/File/Esporta in ASCII Art ..."
+msgid "//Export ASCII Art ..."
+msgstr "//Esporta in ASCII Art ..."
 
 #: src/mainwindow.c:4506
-msgid "/File/Export Animated GIF ..."
-msgstr "/File/Esporta GIF animata ..."
-
-#: src/mainwindow.c:4507
-msgid "/File/sep2"
-msgstr ""
+msgid "//Export Animated GIF ..."
+msgstr "//Esporta GIF animata ..."
 
 #: src/mainwindow.c:4508
-msgid "/File/Actions"
-msgstr "/File/Azioni"
-
-#: src/mainwindow.c:4509
-msgid "/File/Actions/tear"
-msgstr "/File/Azioni/tear"
-
-#: src/mainwindow.c:4510
-msgid "/File/Actions/1"
-msgstr "/File/Azioni/1"
-
-#: src/mainwindow.c:4511
-msgid "/File/Actions/2"
-msgstr "/File/Azioni/2"
-
-#: src/mainwindow.c:4512
-msgid "/File/Actions/3"
-msgstr "/File/Azioni/3"
-
-#: src/mainwindow.c:4513
-msgid "/File/Actions/4"
-msgstr "/File/Azioni/4"
-
-#: src/mainwindow.c:4514
-msgid "/File/Actions/5"
-msgstr "/File/Azioni/5"
-
-#: src/mainwindow.c:4515
-msgid "/File/Actions/6"
-msgstr "/File/Azioni/6"
-
-#: src/mainwindow.c:4516
-msgid "/File/Actions/7"
-msgstr "/File/Azioni/7"
-
-#: src/mainwindow.c:4517
-msgid "/File/Actions/8"
-msgstr "/File/Azioni/8"
-
-#: src/mainwindow.c:4518
-msgid "/File/Actions/9"
-msgstr "/File/Azioni/9"
-
-#: src/mainwindow.c:4519
-msgid "/File/Actions/10"
-msgstr "/File/Azioni/10"
-
-#: src/mainwindow.c:4520
-msgid "/File/Actions/11"
-msgstr "/File/Azioni/11"
-
-#: src/mainwindow.c:4521
-msgid "/File/Actions/12"
-msgstr "/File/Azioni/12"
-
-#: src/mainwindow.c:4522
-msgid "/File/Actions/13"
-msgstr "/File/Azioni/13"
-
-#: src/mainwindow.c:4523
-msgid "/File/Actions/14"
-msgstr "/File/Azioni/14"
-
-#: src/mainwindow.c:4524
-msgid "/File/Actions/15"
-msgstr "/File/Azioni/15"
-
-#: src/mainwindow.c:4525
-msgid "/File/Actions/sepC"
-msgstr "/File/Azioni/sep"
+msgid "//Actions"
+msgstr "//Azioni"
 
 #: src/mainwindow.c:4526
-msgid "/File/Actions/Configure"
-msgstr "/File/Azioni/Configura"
-
-#: src/mainwindow.c:4527
-msgid "/File/sepR"
-msgstr ""
-
-#: src/mainwindow.c:4528
-msgid "/File/1"
-msgstr "/File/1"
-
-#: src/mainwindow.c:4529
-msgid "/File/2"
-msgstr "/File/2"
-
-#: src/mainwindow.c:4530
-msgid "/File/3"
-msgstr "/File/3"
-
-#: src/mainwindow.c:4531
-msgid "/File/4"
-msgstr "/File/4"
-
-#: src/mainwindow.c:4532
-msgid "/File/5"
-msgstr "/File/5"
-
-#: src/mainwindow.c:4533
-msgid "/File/6"
-msgstr "/File/6"
-
-#: src/mainwindow.c:4534
-msgid "/File/7"
-msgstr "/File/7"
-
-#: src/mainwindow.c:4535
-msgid "/File/8"
-msgstr "/File/8"
-
-#: src/mainwindow.c:4536
-msgid "/File/9"
-msgstr ""
-
-#: src/mainwindow.c:4537
-msgid "/File/10"
-msgstr "/File/10"
-
-#: src/mainwindow.c:4538
-msgid "/File/11"
-msgstr "/File/11"
-
-#: src/mainwindow.c:4539
-msgid "/File/12"
-msgstr "/File/12"
-
-#: src/mainwindow.c:4540
-msgid "/File/13"
-msgstr "/File/13"
-
-#: src/mainwindow.c:4541
-msgid "/File/14"
-msgstr "/File/14"
-
-#: src/mainwindow.c:4542
-msgid "/File/15"
-msgstr "/File/15"
-
-#: src/mainwindow.c:4543
-msgid "/File/16"
-msgstr "/File/16"
-
-#: src/mainwindow.c:4544
-msgid "/File/17"
-msgstr "/File/17"
-
-#: src/mainwindow.c:4545
-msgid "/File/18"
-msgstr "/File/18"
-
-#: src/mainwindow.c:4546
-msgid "/File/19"
-msgstr "/File/19"
-
-#: src/mainwindow.c:4547
-msgid "/File/20"
-msgstr "/File/20"
-
-#: src/mainwindow.c:4548
-msgid "/File/sep3"
-msgstr ""
+msgid "///Configure"
+msgstr "///Configura"
 
 #: src/mainwindow.c:4549
-msgid "/File/Quit"
-msgstr "/File/Esci"
+msgid "//Quit"
+msgstr "//Esci"
 
 #: src/mainwindow.c:4551
 msgid "/_Edit"
 msgstr "/_Modifica"
 
-#: src/mainwindow.c:4552
-msgid "/Edit/tear"
-msgstr "/Modifica/tear"
-
 #: src/mainwindow.c:4553
-msgid "/Edit/Undo"
-msgstr "/Modifica/Annulla"
+msgid "//Undo"
+msgstr "//Annulla"
 
 #: src/mainwindow.c:4554
-msgid "/Edit/Redo"
-msgstr "/Modifica/Ripristina"
-
-#: src/mainwindow.c:4555
-msgid "/Edit/sep1"
-msgstr "/Modifica/sep1"
+msgid "//Redo"
+msgstr "//Ripristina"
 
 #: src/mainwindow.c:4556
-msgid "/Edit/Cut"
-msgstr "/Modifica/Taglia"
+msgid "//Cut"
+msgstr "//Taglia"
 
 #: src/mainwindow.c:4557
-msgid "/Edit/Copy"
-msgstr "/Modifica/Copia"
+msgid "//Copy"
+msgstr "//Copia"
 
 #: src/mainwindow.c:4558
-msgid "/Edit/Copy To Palette"
-msgstr "/Modifica/Copia nella tavolozza"
+msgid "//Copy To Palette"
+msgstr "//Copia nella tavolozza"
 
 #: src/mainwindow.c:4559
-msgid "/Edit/Paste To Centre"
-msgstr "/Modifica/Incolla al centro"
+msgid "//Paste To Centre"
+msgstr "//Incolla al centro"
 
 #: src/mainwindow.c:4560
-msgid "/Edit/Paste To New Layer"
-msgstr "/Modifica/Incolla su un nuovo livello"
+msgid "//Paste To New Layer"
+msgstr "//Incolla su un nuovo livello"
 
 #: src/mainwindow.c:4561
-msgid "/Edit/Paste"
-msgstr "/Modifica/Incolla"
+msgid "//Paste"
+msgstr "//Incolla"
 
 #: src/mainwindow.c:4562
-msgid "/Edit/Paste Text"
-msgstr "/Modifica/Incolla testo"
+msgid "//Paste Text"
+msgstr "//Incolla testo"
 
 #: src/mainwindow.c:4564
-msgid "/Edit/Paste Text (FreeType)"
-msgstr "/Modifica/Incolla testo (FreeType)"
+msgid "//Paste Text (FreeType)"
+msgstr "//Incolla testo (FreeType)"
 
 #: src/mainwindow.c:4566
-msgid "/Edit/Paste Palette"
-msgstr "/Modifica/Incolla tavolozza"
-
-#: src/mainwindow.c:4567
-msgid "/Edit/sep2"
-msgstr "/Modifica/sep2"
+msgid "//Paste Palette"
+msgstr "//Incolla tavolozza"
 
 #: src/mainwindow.c:4568
-msgid "/Edit/Load Clipboard"
-msgstr "/Modifica/Carica appunti"
-
-#: src/mainwindow.c:4569
-msgid "/Edit/Load Clipboard/tear"
-msgstr "/Modifica/Carica appunti/tear"
-
-#: src/mainwindow.c:4570
-msgid "/Edit/Load Clipboard/1"
-msgstr "/Modifica/Carica appunti/1"
-
-#: src/mainwindow.c:4571
-msgid "/Edit/Load Clipboard/2"
-msgstr "/Modifica/Carica appunti/2"
-
-#: src/mainwindow.c:4572
-msgid "/Edit/Load Clipboard/3"
-msgstr "/Modifica/Carica appunti/3"
-
-#: src/mainwindow.c:4573
-msgid "/Edit/Load Clipboard/4"
-msgstr "/Modifica/Carica appunti/4"
-
-#: src/mainwindow.c:4574
-msgid "/Edit/Load Clipboard/5"
-msgstr "/Modifica/Carica appunti/5"
-
-#: src/mainwindow.c:4575
-msgid "/Edit/Load Clipboard/6"
-msgstr "/Modifica/Carica appunti/6"
-
-#: src/mainwindow.c:4576
-msgid "/Edit/Load Clipboard/7"
-msgstr "/Modifica/Carica appunti/7"
-
-#: src/mainwindow.c:4577
-msgid "/Edit/Load Clipboard/8"
-msgstr "/Modifica/Carica appunti/8"
-
-#: src/mainwindow.c:4578
-msgid "/Edit/Load Clipboard/9"
-msgstr "/Modifica/Carica appunti/9"
-
-#: src/mainwindow.c:4579
-msgid "/Edit/Load Clipboard/10"
-msgstr "/Modifica/Carica appunti/10"
-
-#: src/mainwindow.c:4580
-msgid "/Edit/Load Clipboard/11"
-msgstr "/Modifica/Carica appunti/11"
-
-#: src/mainwindow.c:4581
-msgid "/Edit/Load Clipboard/12"
-msgstr "/Modifica/Carica appunti/12"
+msgid "//Load Clipboard"
+msgstr "//Carica appunti"
 
 #: src/mainwindow.c:4582
-msgid "/Edit/Save Clipboard"
-msgstr "/Modifica/Salva negli appunti"
-
-#: src/mainwindow.c:4583
-msgid "/Edit/Save Clipboard/tear"
-msgstr "/Modifica/Salva negli appunti/tear"
-
-#: src/mainwindow.c:4584
-msgid "/Edit/Save Clipboard/1"
-msgstr "/Modifica/Salva negli appunti/1"
-
-#: src/mainwindow.c:4585
-msgid "/Edit/Save Clipboard/2"
-msgstr "/Modifica/Salva negli appunti/2"
-
-#: src/mainwindow.c:4586
-msgid "/Edit/Save Clipboard/3"
-msgstr "/Modifica/Salva negli appunti/3"
-
-#: src/mainwindow.c:4587
-msgid "/Edit/Save Clipboard/4"
-msgstr "/Modifica/Salva negli appunti/4"
-
-#: src/mainwindow.c:4588
-msgid "/Edit/Save Clipboard/5"
-msgstr "/Modifica/Salva negli appunti/5"
-
-#: src/mainwindow.c:4589
-msgid "/Edit/Save Clipboard/6"
-msgstr "/Modifica/Salva negli appunti/6"
-
-#: src/mainwindow.c:4590
-msgid "/Edit/Save Clipboard/7"
-msgstr "/Modifica/Salva negli appunti/7"
-
-#: src/mainwindow.c:4591
-msgid "/Edit/Save Clipboard/8"
-msgstr "/Modifica/Salva negli appunti/8"
-
-#: src/mainwindow.c:4592
-msgid "/Edit/Save Clipboard/9"
-msgstr "/Modifica/Salva negli appunti/9"
-
-#: src/mainwindow.c:4593
-msgid "/Edit/Save Clipboard/10"
-msgstr "/Modifica/Salva negli appunti/10"
-
-#: src/mainwindow.c:4594
-msgid "/Edit/Save Clipboard/11"
-msgstr "/Modifica/Salva negli appunti/11"
-
-#: src/mainwindow.c:4595
-msgid "/Edit/Save Clipboard/12"
-msgstr "/Modifica/Salva negli appunti/12"
+msgid "//Save Clipboard"
+msgstr "//Salva negli appunti"
 
 #: src/mainwindow.c:4596
-msgid "/Edit/Import Clipboard from System"
-msgstr "/Modifica/Importa appunti dal sistema"
+msgid "//Import Clipboard from System"
+msgstr "//Importa appunti dal sistema"
 
 #: src/mainwindow.c:4597
-msgid "/Edit/Export Clipboard to System"
-msgstr "/Modifica/Esporta appunti sul sistema"
-
-#: src/mainwindow.c:4598
-msgid "/Edit/sep3"
-msgstr "/Modifica/sep3"
+msgid "//Export Clipboard to System"
+msgstr "//Esporta appunti sul sistema"
 
 #: src/mainwindow.c:4599
-msgid "/Edit/Choose Pattern ..."
-msgstr "/Modifica/Scegli motivo ..."
+msgid "//Choose Pattern ..."
+msgstr "//Scegli motivo ..."
 
 #: src/mainwindow.c:4600
-msgid "/Edit/Choose Brush ..."
-msgstr "/Modifica/Scegli pennello ..."
+msgid "//Choose Brush ..."
+msgstr "//Scegli pennello ..."
 
 #: src/mainwindow.c:4602
 msgid "/_View"
 msgstr "/_Vista"
 
-#: src/mainwindow.c:4603
-msgid "/View/tear"
-msgstr "/Vista/tear"
-
 #: src/mainwindow.c:4604
-msgid "/View/Show Main Toolbar"
-msgstr "/Vista/Mostra barra principale"
+msgid "//Show Main Toolbar"
+msgstr "//Mostra barra principale"
 
 #: src/mainwindow.c:4605
-msgid "/View/Show Tools Toolbar"
-msgstr "/Vista/Mostra barra strumenti"
+msgid "//Show Tools Toolbar"
+msgstr "//Mostra barra strumenti"
 
 #: src/mainwindow.c:4606
-msgid "/View/Show Settings Toolbar"
-msgstr "/Vista/Mostra impostazioni barra strumenti"
+msgid "//Show Settings Toolbar"
+msgstr "//Mostra impostazioni barra strumenti"
 
 #: src/mainwindow.c:4607
-msgid "/View/Show Dock"
-msgstr "/Vista/Mostra area di lavoro"
+msgid "//Show Dock"
+msgstr "//Mostra area di lavoro"
 
 #: src/mainwindow.c:4608
-msgid "/View/Show Palette"
-msgstr "/Vista/Mostra tavolozza"
+msgid "//Show Palette"
+msgstr "//Mostra tavolozza"
 
 #: src/mainwindow.c:4609
-msgid "/View/Show Status Bar"
-msgstr "/Vista/Mostra barra di stato"
-
-#: src/mainwindow.c:4610
-msgid "/View/sep1"
-msgstr "/Vista/sep1"
+msgid "//Show Status Bar"
+msgstr "//Mostra barra di stato"
 
 #: src/mainwindow.c:4611
-msgid "/View/Toggle Image View"
-msgstr "/Vista/Passa a vista immagine"
+msgid "//Toggle Image View"
+msgstr "//Passa a vista immagine"
 
 #: src/mainwindow.c:4612
-msgid "/View/Centralize Image"
-msgstr "/Vista/Centra immagine"
+msgid "//Centralize Image"
+msgstr "//Centra immagine"
 
 #: src/mainwindow.c:4613
-msgid "/View/Show Zoom Grid"
-msgstr "/Vista/Mostra zoom griglia"
+msgid "//Show Zoom Grid"
+msgstr "//Mostra zoom griglia"
 
 #: src/mainwindow.c:4614
-msgid "/View/Configure Grid ..."
-msgstr "/Vista/Configura Griglia ..."
+msgid "//Configure Grid ..."
+msgstr "//Configura Griglia ..."
 
 #: src/mainwindow.c:4615
-msgid "/View/Tracing Image ..."
-msgstr "/Vista/Tracciatura immagine ..."
-
-#: src/mainwindow.c:4616
-msgid "/View/sep2"
-msgstr "/Vista/sep2"
+msgid "//Tracing Image ..."
+msgstr "//Tracciatura immagine ..."
 
 #: src/mainwindow.c:4617
-msgid "/View/View Window"
-msgstr "/Vista/Mostra finestre"
+msgid "//View Window"
+msgstr "//Mostra finestre"
 
 #: src/mainwindow.c:4618
-msgid "/View/Horizontal Split"
-msgstr "/Vista/Dividi in orizzontale"
+msgid "//Horizontal Split"
+msgstr "//Dividi in orizzontale"
 
 #: src/mainwindow.c:4619
-msgid "/View/Focus View Window"
-msgstr "/Vista/Finestra di anteprima"
-
-#: src/mainwindow.c:4620
-msgid "/View/sep3"
-msgstr "/Vista/sep3"
+msgid "//Focus View Window"
+msgstr "//Finestra di anteprima"
 
 #: src/mainwindow.c:4621
-msgid "/View/Pan Window"
-msgstr "/Vista/Finestra panoramica"
+msgid "//Pan Window"
+msgstr "//Finestra panoramica"
 
 #: src/mainwindow.c:4622
-msgid "/View/Layers Window"
-msgstr "/Vista/Finestra livelli"
+msgid "//Layers Window"
+msgstr "//Finestra livelli"
 
 #: src/mainwindow.c:4624
 msgid "/_Image"
 msgstr "/_Immagine"
 
-#: src/mainwindow.c:4625
-msgid "/Image/tear"
-msgstr "/Immagine/tear"
-
 #: src/mainwindow.c:4626
-msgid "/Image/Convert To RGB"
-msgstr "/Immagine/Converti in RGB"
+msgid "//Convert To RGB"
+msgstr "//Converti in RGB"
 
 #: src/mainwindow.c:4627
-msgid "/Image/Convert To Indexed ..."
-msgstr "/Immagine/Converti in scala di colore ..."
-
-#: src/mainwindow.c:4628
-msgid "/Image/sep1"
-msgstr "/Immagine/sep1"
+msgid "//Convert To Indexed ..."
+msgstr "//Converti in scala di colore ..."
 
 #: src/mainwindow.c:4629
-msgid "/Image/Scale Canvas ..."
-msgstr "/Immagine/Scala tela ..."
+msgid "//Scale Canvas ..."
+msgstr "//Scala tela ..."
 
 #: src/mainwindow.c:4630
-msgid "/Image/Resize Canvas ..."
-msgstr "/Immagine/Ridimensiona tela ..."
+msgid "//Resize Canvas ..."
+msgstr "//Ridimensiona tela ..."
 
 #: src/mainwindow.c:4631
-msgid "/Image/Crop"
-msgstr "/Immagine/Ritaglia"
-
-#: src/mainwindow.c:4632
-msgid "/Image/sep2"
-msgstr "/Immagine/sep2"
+msgid "//Crop"
+msgstr "//Ritaglia"
 
 #: src/mainwindow.c:4633
-msgid "/Image/Flip Vertically"
-msgstr "/Immagine/Ribalta in verticale"
+msgid "//Flip Vertically"
+msgstr "//Ribalta in verticale"
 
 #: src/mainwindow.c:4634
-msgid "/Image/Flip Horizontally"
-msgstr "/Immagine/Ribalta in orizzontale"
+msgid "//Flip Horizontally"
+msgstr "//Ribalta in orizzontale"
 
 #: src/mainwindow.c:4635
-msgid "/Image/Rotate Clockwise"
-msgstr "/Immagine/Ruota in senso orario"
+msgid "//Rotate Clockwise"
+msgstr "//Ruota in senso orario"
 
 #: src/mainwindow.c:4636
-msgid "/Image/Rotate Anti-Clockwise"
-msgstr "/Immagine/Ruota in senso antiorario"
+msgid "//Rotate Anti-Clockwise"
+msgstr "//Ruota in senso antiorario"
 
 #: src/mainwindow.c:4637
-msgid "/Image/Free Rotate ..."
-msgstr "/Immagine/Rotazione libera ..."
+msgid "//Free Rotate ..."
+msgstr "//Rotazione libera ..."
 
 #: src/mainwindow.c:4638
-msgid "/Image/Skew ..."
-msgstr "/Immagine/Deforma ..."
-
-#: src/mainwindow.c:4639
-msgid "/Image/sep3"
-msgstr "/Immagine/sep3"
+msgid "//Skew ..."
+msgstr "//Deforma ..."
 
 #: src/mainwindow.c:4640
-msgid "/Image/Information ..."
-msgstr "/Immagine/Informazioni ..."
+msgid "//Information ..."
+msgstr "//Informazioni ..."
 
 #: src/mainwindow.c:4641
-msgid "/Image/Preferences ..."
-msgstr "/Immagine/Preferenze ..."
+msgid "//Preferences ..."
+msgstr "//Preferenze ..."
 
 #: src/mainwindow.c:4643
 msgid "/_Selection"
 msgstr "/_Selezione"
 
-#: src/mainwindow.c:4644
-msgid "/Selection/tear"
-msgstr "/Selezione/tear"
-
 #: src/mainwindow.c:4645
-msgid "/Selection/Select All"
-msgstr "/Selezione/Seleziona tutto"
+msgid "//Select All"
+msgstr "//Seleziona tutto"
 
 #: src/mainwindow.c:4646
-msgid "/Selection/Select None (Esc)"
-msgstr "/Selezione/Nessuna selezione (Esc)"
+msgid "//Select None (Esc)"
+msgstr "//Nessuna selezione (Esc)"
 
 #: src/mainwindow.c:4647
-msgid "/Selection/Lasso Selection"
-msgstr "/Selezione/Selezione laccio"
+msgid "//Lasso Selection"
+msgstr "//Selezione laccio"
 
 #: src/mainwindow.c:4648
-msgid "/Selection/Lasso Selection Cut"
-msgstr "/Selezione/Taglia selezione laccio"
-
-#: src/mainwindow.c:4649
-msgid "/Selection/sep1"
-msgstr "/Selezione/sep1"
+msgid "//Lasso Selection Cut"
+msgstr "//Taglia selezione laccio"
 
 #: src/mainwindow.c:4650
-msgid "/Selection/Outline Selection"
-msgstr "/Selezione/Selezione bordo"
+msgid "//Outline Selection"
+msgstr "//Selezione bordo"
 
 #: src/mainwindow.c:4651
-msgid "/Selection/Fill Selection"
-msgstr "/Selezione/Riempi selezione"
+msgid "//Fill Selection"
+msgstr "//Riempi selezione"
 
 #: src/mainwindow.c:4652
-msgid "/Selection/Outline Ellipse"
-msgstr "/Selezione/Ellisse contornata"
+msgid "//Outline Ellipse"
+msgstr "//Ellisse contornata"
 
 #: src/mainwindow.c:4653
-msgid "/Selection/Fill Ellipse"
-msgstr "/Selezione/Ellisse piena"
-
-#: src/mainwindow.c:4654
-msgid "/Selection/sep2"
-msgstr "/Selezione/sep2"
-
-#: src/mainwindow.c:4655
-msgid "/Selection/Flip Vertically"
-msgstr "/Selezione/Ribalta in verticale"
-
-#: src/mainwindow.c:4656
-msgid "/Selection/Flip Horizontally"
-msgstr "/Selezione/Ribalta in orizzontale"
-
-#: src/mainwindow.c:4657
-msgid "/Selection/Rotate Clockwise"
-msgstr "/Selezione/Ruota in senso orario"
-
-#: src/mainwindow.c:4658
-msgid "/Selection/Rotate Anti-Clockwise"
-msgstr "/Selezione/Ruota in senso antiorario"
-
-#: src/mainwindow.c:4659
-msgid "/Selection/sep3"
-msgstr "/Selezione/sep3"
+msgid "//Fill Ellipse"
+msgstr "//Ellisse piena"
 
 #: src/mainwindow.c:4660
-msgid "/Selection/Horizontal Ramp"
-msgstr "/Selezione/Rampa orizzontale"
+msgid "//Horizontal Ramp"
+msgstr "//Rampa orizzontale"
 
 #: src/mainwindow.c:4661
-msgid "/Selection/Vertical Ramp"
-msgstr "/Selezione/Rampa verticale"
-
-#: src/mainwindow.c:4662
-msgid "/Selection/sep4"
-msgstr "/Selezione/sep4"
+msgid "//Vertical Ramp"
+msgstr "//Rampa verticale"
 
 #: src/mainwindow.c:4663
-msgid "/Selection/Alpha Blend A,B"
-msgstr "/Selezione/Trasparenza alfa A,B"
+msgid "//Alpha Blend A,B"
+msgstr "//Trasparenza alfa A,B"
 
 #: src/mainwindow.c:4664
-msgid "/Selection/Move Alpha to Mask"
-msgstr "/Selezione/Porta alfa a maschera"
+msgid "//Move Alpha to Mask"
+msgstr "//Porta alfa a maschera"
 
 #: src/mainwindow.c:4665
-msgid "/Selection/Mask Colour A,B"
-msgstr "/Selezione/Maschera colore A,B"
+msgid "//Mask Colour A,B"
+msgstr "//Maschera colore A,B"
 
 #: src/mainwindow.c:4666
-msgid "/Selection/Unmask Colour A,B"
-msgstr "/Selezione/Elimina maschera colore A,B"
+msgid "//Unmask Colour A,B"
+msgstr "//Elimina maschera colore A,B"
 
 #: src/mainwindow.c:4667
-msgid "/Selection/Mask All Colours"
-msgstr "/Selezione/Maschera tutti i colori"
+msgid "//Mask All Colours"
+msgstr "//Maschera tutti i colori"
 
 #: src/mainwindow.c:4668
-msgid "/Selection/Clear Mask"
-msgstr "/Selezione/Cancella maschera"
+msgid "//Clear Mask"
+msgstr "//Cancella maschera"
 
 #: src/mainwindow.c:4670
 msgid "/_Palette"
 msgstr "/_Tavolozza"
 
-#: src/mainwindow.c:4671
-msgid "/Palette/tear"
-msgstr "/Tavolozza/tear"
-
-#: src/mainwindow.c:4672
-msgid "/Palette/Open ..."
-msgstr "/Tavolozza/Apri ..."
-
-#: src/mainwindow.c:4673
-msgid "/Palette/Save As ..."
-msgstr "/Tavolozza/Salva come ..."
-
 #: src/mainwindow.c:4674
-msgid "/Palette/Load Default"
-msgstr "/Tavolozza/Carica predefinita"
-
-#: src/mainwindow.c:4675
-msgid "/Palette/sep1"
-msgstr "/Tavolozza/sep1"
+msgid "//Load Default"
+msgstr "//Carica predefinita"
 
 #: src/mainwindow.c:4676
-msgid "/Palette/Mask All"
-msgstr "/Tavolozza/Maschera tutto"
+msgid "//Mask All"
+msgstr "//Maschera tutto"
 
 #: src/mainwindow.c:4677
-msgid "/Palette/Mask None"
-msgstr "/Tavolozza/Nessuna maschera"
-
-#: src/mainwindow.c:4678
-msgid "/Palette/sep2"
-msgstr "/Tavolozza/sep2"
+msgid "//Mask None"
+msgstr "//Nessuna maschera"
 
 #: src/mainwindow.c:4679
-msgid "/Palette/Swap A & B"
-msgstr "/Tavolozza/Scambia colori A & B"
+msgid "//Swap A & B"
+msgstr "//Scambia colori A & B"
 
 #: src/mainwindow.c:4680
-msgid "/Palette/Edit Colour A & B ..."
-msgstr "/Tavolozza/Modifica colore A & B ..."
+msgid "//Edit Colour A & B ..."
+msgstr "//Modifica colore A & B ..."
 
 #: src/mainwindow.c:4681
-msgid "/Palette/Dither A"
-msgstr "/Tavolozza/Retino A"
+msgid "//Dither A"
+msgstr "//Retino A"
 
 #: src/mainwindow.c:4682
-msgid "/Palette/Palette Editor ..."
-msgstr "/Tavolozza/Modifica tavolozza ..."
+msgid "//Palette Editor ..."
+msgstr "//Modifica tavolozza ..."
 
 #: src/mainwindow.c:4683
-msgid "/Palette/Set Palette Size ..."
-msgstr "/Tavolozza/Imposta dimensioni tavolozza ..."
+msgid "//Set Palette Size ..."
+msgstr "//Imposta dimensioni tavolozza ..."
 
 #: src/mainwindow.c:4684
-msgid "/Palette/Merge Duplicate Colours"
-msgstr "/Tavolozza/Fondi colori duplicati"
+msgid "//Merge Duplicate Colours"
+msgstr "//Fondi colori duplicati"
 
 #: src/mainwindow.c:4685
-msgid "/Palette/Remove Unused Colours"
-msgstr "/Tavolozza/Rimuovi colori non in uso"
-
-#: src/mainwindow.c:4686
-msgid "/Palette/sep3"
-msgstr "/Tavolozza/sep3"
+msgid "//Remove Unused Colours"
+msgstr "//Rimuovi colori non in uso"
 
 #: src/mainwindow.c:4687
-msgid "/Palette/Create Quantized ..."
-msgstr "/Tavolozza/Crea Quantizzato ..."
-
-#: src/mainwindow.c:4688
-msgid "/Palette/sep4"
-msgstr "/Tavolozza/sep4"
+msgid "//Create Quantized ..."
+msgstr "//Crea Quantizzato ..."
 
 #: src/mainwindow.c:4689
-msgid "/Palette/Sort Colours ..."
-msgstr "/Tavolozza/Ordina colori ..."
+msgid "//Sort Colours ..."
+msgstr "//Ordina colori ..."
 
 #: src/mainwindow.c:4690
-msgid "/Palette/Palette Shifter ..."
-msgstr "/Tavolozza/Cicla ..."
+msgid "//Palette Shifter ..."
+msgstr "//Cicla ..."
 
 #: src/mainwindow.c:4691
-msgid "/Palette/Pick Gradient ..."
-msgstr "/Tavolozza/Pick Gradient ..."
+msgid "//Pick Gradient ..."
+msgstr ""
 
 #: src/mainwindow.c:4693
 msgid "/Effe_cts"
 msgstr "/Effetti"
 
-#: src/mainwindow.c:4694
-msgid "/Effects/tear"
-msgstr "/Effetti/tear"
-
 #: src/mainwindow.c:4695
-msgid "/Effects/Transform Colour ..."
-msgstr "/Effetti/Trasforma colore ..."
+msgid "//Transform Colour ..."
+msgstr "//Trasforma colore ..."
 
 #: src/mainwindow.c:4696
-msgid "/Effects/Invert"
-msgstr "/Effetti/Inverti"
+msgid "//Invert"
+msgstr "//Inverti"
 
 #: src/mainwindow.c:4697
-msgid "/Effects/Greyscale"
-msgstr "/Effetti/Scala di grigio"
+msgid "//Greyscale"
+msgstr "//Scala di grigio"
 
 #: src/mainwindow.c:4698
-msgid "/Effects/Greyscale (Gamma corrected)"
-msgstr "/Effetti/Scala di grigio (con correzione gamma)"
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//Scala di grigio (con correzione gamma)"
 
 #: src/mainwindow.c:4699
-msgid "/Effects/Isometric Transformation"
-msgstr "/Effetti/Trasformazione isometrica"
-
-#: src/mainwindow.c:4700
-msgid "/Effects/Isometric Transformation/tear"
-msgstr "/Effetti/Trasformazione isometrica/tear"
+msgid "//Isometric Transformation"
+msgstr "//Trasformazione isometrica"
 
 #: src/mainwindow.c:4701
-msgid "/Effects/Isometric Transformation/Left Side Down"
-msgstr "/Effetti/Trasformazione isometrica/Sinistra verso il basso"
+msgid "///Left Side Down"
+msgstr "///Sinistra verso il basso"
 
 #: src/mainwindow.c:4702
-msgid "/Effects/Isometric Transformation/Right Side Down"
-msgstr "/Effetti/Trasformazione isometrica/Destra verso il basso"
+msgid "///Right Side Down"
+msgstr "///Destra verso il basso"
 
 #: src/mainwindow.c:4703
-msgid "/Effects/Isometric Transformation/Top Side Right"
-msgstr "/Effetti/Trasformazione isometrica/Lato superiore destro"
+msgid "///Top Side Right"
+msgstr "///Lato superiore destro"
 
 #: src/mainwindow.c:4704
-msgid "/Effects/Isometric Transformation/Bottom Side Right"
-msgstr "/Effetti/Trasformazione isometrica/Lato inferiore destro"
-
-#: src/mainwindow.c:4705
-msgid "/Effects/sep1"
-msgstr "/Effetti/sep1"
+msgid "///Bottom Side Right"
+msgstr "///Lato inferiore destro"
 
 #: src/mainwindow.c:4706
-msgid "/Effects/Edge Detect ..."
-msgstr "/Effetti/Trova bordi ..."
+msgid "//Edge Detect ..."
+msgstr "//Trova bordi ..."
 
 #: src/mainwindow.c:4707
-msgid "/Effects/Difference of Gaussians ..."
-msgstr "/Effetti/Differenza di Gaussiani ..."
+msgid "//Difference of Gaussians ..."
+msgstr "//Differenza di Gaussiani ..."
 
 #: src/mainwindow.c:4708
-msgid "/Effects/Sharpen ..."
-msgstr "/Effetti/Nitidezza ..."
+msgid "//Sharpen ..."
+msgstr "//Nitidezza ..."
 
 #: src/mainwindow.c:4709
-msgid "/Effects/Unsharp Mask ..."
-msgstr "/Effetti/Maschera sfocata ..."
+msgid "//Unsharp Mask ..."
+msgstr "//Maschera sfocata ..."
 
 #: src/mainwindow.c:4710
-msgid "/Effects/Soften ..."
-msgstr "/Effetti/Amorbidisci ..."
+msgid "//Soften ..."
+msgstr "//Amorbidisci ..."
 
 #: src/mainwindow.c:4711
-msgid "/Effects/Gaussian Blur ..."
-msgstr "/Effetti/Sfocatura Gaussiana ..."
+msgid "//Gaussian Blur ..."
+msgstr "//Sfocatura Gaussiana ..."
 
 #: src/mainwindow.c:4712
-msgid "/Effects/Kuwahara-Nagao Blur ..."
-msgstr "/Effetti/Sfocatura Kuwahara-Nagao ..."
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr "//Sfocatura Kuwahara-Nagao ..."
 
 #: src/mainwindow.c:4713
-msgid "/Effects/Emboss"
-msgstr "/Effetti/Rilievo"
+msgid "//Emboss"
+msgstr "//Rilievo"
 
 #: src/mainwindow.c:4714
-msgid "/Effects/Dilate"
-msgstr "/Effetti/Dilata"
+msgid "//Dilate"
+msgstr "//Dilata"
 
 #: src/mainwindow.c:4715
-msgid "/Effects/Erode"
-msgstr "/Effetti/Erodi"
-
-#: src/mainwindow.c:4716
-msgid "/Effects/sep2"
-msgstr "/Effetti/sep2"
+msgid "//Erode"
+msgstr "//Erodi"
 
 #: src/mainwindow.c:4717
-msgid "/Effects/Bacteria ..."
-msgstr "/Effetti/Bacteria ..."
+msgid "//Bacteria ..."
+msgstr ""
 
 #: src/mainwindow.c:4719
 msgid "/Cha_nnels"
 msgstr "/Canali"
 
-#: src/mainwindow.c:4720
-msgid "/Channels/tear"
-msgstr "/Canali/tear"
-
 #: src/mainwindow.c:4721
-msgid "/Channels/New ..."
-msgstr "/Canali/Nuovo ..."
+msgid "//New ..."
+msgstr "//Nuovo ..."
 
 #: src/mainwindow.c:4722
-msgid "/Channels/Load ..."
-msgstr "/Canali/Carica ..."
-
-#: src/mainwindow.c:4723
-msgid "/Channels/Save As ..."
-msgstr "/Canali/Salva come ..."
+msgid "//Load ..."
+msgstr "//Carica ..."
 
 #: src/mainwindow.c:4724
-msgid "/Channels/Delete ..."
-msgstr "/Canali/Elimina ..."
-
-#: src/mainwindow.c:4725
-msgid "/Channels/sep1"
-msgstr "/Canali/sep1"
+msgid "//Delete ..."
+msgstr "//Elimina ..."
 
 #: src/mainwindow.c:4726
-msgid "/Channels/Edit Image"
-msgstr "/Canali/Modifica immagine"
+msgid "//Edit Image"
+msgstr "//Modifica immagine"
 
 #: src/mainwindow.c:4727
-msgid "/Channels/Edit Alpha"
-msgstr "/Canali/Modifica alfa"
+msgid "//Edit Alpha"
+msgstr "//Modifica alfa"
 
 #: src/mainwindow.c:4728
-msgid "/Channels/Edit Selection"
-msgstr "/Canali/Modifica selezione"
+msgid "//Edit Selection"
+msgstr "//Modifica selezione"
 
 #: src/mainwindow.c:4729
-msgid "/Channels/Edit Mask"
-msgstr "/Canali/Modifica maschera"
-
-#: src/mainwindow.c:4730
-msgid "/Channels/sep2"
-msgstr "/Canali/sep2"
+msgid "//Edit Mask"
+msgstr "//Modifica maschera"
 
 #: src/mainwindow.c:4731
-msgid "/Channels/Hide Image"
-msgstr "/Canali/Nascondi immagine"
+msgid "//Hide Image"
+msgstr "//Nascondi immagine"
 
 #: src/mainwindow.c:4732
-msgid "/Channels/Disable Alpha"
-msgstr "/Canali/Disabilita alfa"
+msgid "//Disable Alpha"
+msgstr "//Disabilita alfa"
 
 #: src/mainwindow.c:4733
-msgid "/Channels/Disable Selection"
-msgstr "/Canali/Disabilita Selezione"
+msgid "//Disable Selection"
+msgstr "//Disabilita Selezione"
 
 #: src/mainwindow.c:4734
-msgid "/Channels/Disable Mask"
-msgstr "/Canali/Disabilita maschera"
-
-#: src/mainwindow.c:4735
-msgid "/Channels/sep3"
-msgstr "/Canali/sep3"
+msgid "//Disable Mask"
+msgstr "//Disabilita maschera"
 
 #: src/mainwindow.c:4736
-msgid "/Channels/Couple RGBA Operations"
-msgstr "/Canali/Operazioni RGBA"
+msgid "//Couple RGBA Operations"
+msgstr "//Operazioni RGBA"
 
 #: src/mainwindow.c:4737
-msgid "/Channels/Threshold ..."
-msgstr "/Canali/Soglia ..."
+msgid "//Threshold ..."
+msgstr "//Soglia ..."
 
 #: src/mainwindow.c:4738
-msgid "/Channels/Unassociate Alpha"
-msgstr "/Canali/Disassocia alfa"
-
-#: src/mainwindow.c:4739
-msgid "/Channels/sep4"
-msgstr "/Canali/sep4"
+msgid "//Unassociate Alpha"
+msgstr "//Disassocia alfa"
 
 #: src/mainwindow.c:4740
-msgid "/Channels/View Alpha as an Overlay"
-msgstr "/Canali/Vedi alfa come sovrapposizione"
+msgid "//View Alpha as an Overlay"
+msgstr "//Vedi alfa come sovrapposizione"
 
 #: src/mainwindow.c:4741
-msgid "/Channels/Configure Overlays ..."
-msgstr "/Canali/Configura sovrapposizione ..."
+msgid "//Configure Overlays ..."
+msgstr "//Configura sovrapposizione ..."
 
 #: src/mainwindow.c:4743
 msgid "/_Layers"
 msgstr "/_Livelli"
 
-#: src/mainwindow.c:4744
-msgid "/Layers/tear"
-msgstr "/Livelli/tear"
-
 #: src/mainwindow.c:4745
-msgid "/Layers/New Layer"
-msgstr "/Livelli/Nuovo livello"
-
-#: src/mainwindow.c:4746
-msgid "/Layers/Save"
-msgstr "/Livelli/Salva"
-
-#: src/mainwindow.c:4747
-msgid "/Layers/Save As ..."
-msgstr "/Livelli/Salva come ..."
+msgid "//New Layer"
+msgstr "//Nuovo livello"
 
 #: src/mainwindow.c:4748
-msgid "/Layers/Save Composite Image ..."
-msgstr "/Livelli/Salva immagine composita ..."
+msgid "//Save Composite Image ..."
+msgstr "//Salva immagine composita ..."
 
 #: src/mainwindow.c:4749
-msgid "/Layers/Composite to New Layer"
-msgstr "/Livelli/Composita su un nuovo livello"
+msgid "//Composite to New Layer"
+msgstr "//Composita su un nuovo livello"
 
 #: src/mainwindow.c:4750
-msgid "/Layers/Remove All Layers"
-msgstr "/Livelli/Rimuovi tutti i livelli"
-
-#: src/mainwindow.c:4751
-msgid "/Layers/sep1"
-msgstr "/Livelli/sep1"
+msgid "//Remove All Layers"
+msgstr "//Rimuovi tutti i livelli"
 
 #: src/mainwindow.c:4752
-msgid "/Layers/Configure Animation ..."
-msgstr "/Livelli/Configura animazione ..."
+msgid "//Configure Animation ..."
+msgstr "//Configura animazione ..."
 
 #: src/mainwindow.c:4753
-msgid "/Layers/Preview Animation ..."
-msgstr "/Livelli/Anteprima animazione ..."
+msgid "//Preview Animation ..."
+msgstr "//Anteprima animazione ..."
 
 #: src/mainwindow.c:4754
-msgid "/Layers/Set Key Frame ..."
-msgstr "/Livelli/Imposta fotogramma chiave ..."
+msgid "//Set Key Frame ..."
+msgstr "//Imposta fotogramma chiave ..."
 
 #: src/mainwindow.c:4755
-msgid "/Layers/Remove All Key Frames ..."
-msgstr "/Livelli/Rimuovi tutti i fotogrammi chiave ..."
+msgid "//Remove All Key Frames ..."
+msgstr "//Rimuovi tutti i fotogrammi chiave ..."
 
 #: src/mainwindow.c:4757
 msgid "/More..."
@@ -2769,20 +2329,16 @@ msgid "/_Help"
 msgstr "/_Aiuto"
 
 #: src/mainwindow.c:4760
-msgid "/Help/Documentation"
-msgstr "/Aiuto/Documentazione"
+msgid "//Documentation"
+msgstr "//Documentazione"
 
 #: src/mainwindow.c:4761
-msgid "/Help/About"
-msgstr "/Aiuto/A proposito di..."
-
-#: src/mainwindow.c:4762
-msgid "/Help/sep1"
-msgstr "/Aiuto/sep1"
+msgid "//About"
+msgstr "//A proposito di..."
 
 #: src/mainwindow.c:4763
-msgid "/Help/Rebind Shortcut Keycodes"
-msgstr "/Aiuto/Riassegna scorciatoie da tastiera"
+msgid "//Rebind Shortcut Keycodes"
+msgstr "//Riassegna scorciatoie da tastiera"
 
 #: src/memory.c:2833 src/memory.c:3218
 msgid "Converting to Indexed Palette"

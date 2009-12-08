@@ -305,6 +305,73 @@ static unsigned char mem_cross[PALETTE_CROSS_H] = {
 #error "Mismatched palette-window font"
 #endif
 
+/* While a number of unwieldy allocation APIs is provided by GLib, it's better
+ * to do it the right way once, than constantly invent workarounds - WJ */
+
+#define WJMEM_DEFINCR 16384
+#define WJMEM_RESERVED 64
+#define WJMEM_DEFSIZE (WJMEM_DEFINCR - WJMEM_RESERVED)
+
+wjmem *wjmemnew(int minsize, int incr)
+{
+	wjmem *mem;
+
+	if (incr <= 0) incr = WJMEM_DEFINCR;
+	if (minsize <= sizeof(wjmem)) minsize = WJMEM_DEFSIZE;
+	mem = calloc(1, minsize);
+	if (mem)
+	{
+		mem->block = (char *)mem;
+		mem->here = sizeof(wjmem);
+		mem->size = mem->minsize = minsize;
+		mem->incr = incr;
+	}
+	return (mem);
+}
+
+void wjmemfree(wjmem *mem)
+{
+	char *this, *next;
+
+	for (this = mem->block; this != (char *)mem; this = next)
+	{
+		next = *(char **)this;
+		free(this);
+	}
+	free(mem);
+}
+
+void *wjmalloc(wjmem *mem, int size, int align)
+{
+	char *dest;
+	unsigned int sz, ds;
+
+	align += !align; // 0 -> 1
+	dest = mem->block + mem->here;
+	dest = ALIGNED(dest, align);
+	ds = dest - mem->block + size;
+	if (ds > mem->size)
+	{
+		sz = mem->minsize;
+		ds = sizeof(char *) + align + size;
+		if (sz < ds)
+		{
+			ds += WJMEM_RESERVED + mem->incr - 1;
+			sz = ds - ds % mem->incr - WJMEM_RESERVED;
+		}
+		dest = calloc(1, sz);
+		if (!dest) return (NULL);
+		*(char **)dest = mem->block;
+		mem->block = dest;
+		mem->size = sz;
+		dest += sizeof(char *);
+		dest = ALIGNED(dest, align);
+		ds = dest - mem->block + size;
+	}
+	mem->here = ds;
+	return ((void *)dest);
+}
+
 /* This allocates several memory chunks in one block - making it one single
  * point of allocation failure, and needing just a single free() later on.
  * On Windows, allocations aren't guaranteed to be double-aligned, so

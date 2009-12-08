@@ -1625,997 +1625,557 @@ msgstr "您真的要離開嗎？"
 msgid "/_File"
 msgstr "/檔案(_F)"
 
-#: src/mainwindow.c:4412
-msgid "/File/tear"
-msgstr "/檔案(F)/tear"
-
 #: src/mainwindow.c:4413
-msgid "/File/New"
-msgstr "/檔案(F)/新增"
+msgid "//New"
+msgstr "//新增"
 
 #: src/mainwindow.c:4414
-msgid "/File/Open ..."
-msgstr "/檔案(F)/開啟…"
+msgid "//Open ..."
+msgstr "//開啟…"
 
 #: src/mainwindow.c:4415
-msgid "/File/Save"
-msgstr "/檔案(F)/儲存"
+msgid "//Save"
+msgstr "//儲存"
 
 #: src/mainwindow.c:4416
-msgid "/File/Save As ..."
-msgstr "/檔案(F)/另存為…"
-
-#: src/mainwindow.c:4417
-msgid "/File/sep1"
-msgstr "/檔案(F)/sep1"
+msgid "//Save As ..."
+msgstr "//另存為…"
 
 #: src/mainwindow.c:4418
-msgid "/File/Export Undo Images ..."
-msgstr "/檔案(F)/匯出復原圖像…"
+msgid "//Export Undo Images ..."
+msgstr "//匯出復原圖像…"
 
 #: src/mainwindow.c:4419
-msgid "/File/Export Undo Images (reversed) ..."
-msgstr "/檔案(F)/匯出復原圖像 (反向)…"
+msgid "//Export Undo Images (reversed) ..."
+msgstr "//匯出復原圖像 (反向)…"
 
 #: src/mainwindow.c:4420
-msgid "/File/Export ASCII Art ..."
-msgstr "/檔案(F)/匯出 ASCII 圖案…"
+msgid "//Export ASCII Art ..."
+msgstr "//匯出 ASCII 圖案…"
 
 #: src/mainwindow.c:4421
-msgid "/File/Export Animated GIF ..."
-msgstr "/檔案(F)/匯出動畫 GIF…"
-
-#: src/mainwindow.c:4422
-msgid "/File/sep2"
-msgstr "/檔案(F)/sep2"
+msgid "//Export Animated GIF ..."
+msgstr "//匯出動畫 GIF…"
 
 #: src/mainwindow.c:4423
-msgid "/File/Actions"
-msgstr "/檔案(F)/Actions"
-
-#: src/mainwindow.c:4424
-msgid "/File/Actions/tear"
-msgstr "/檔案(F)/Actions/tear"
-
-#: src/mainwindow.c:4425
-msgid "/File/Actions/1"
-msgstr "/檔案(F)/Actions/1"
-
-#: src/mainwindow.c:4426
-msgid "/File/Actions/2"
-msgstr "/檔案(F)/Actions/2"
-
-#: src/mainwindow.c:4427
-msgid "/File/Actions/3"
-msgstr "/檔案(F)/Actions/3"
-
-#: src/mainwindow.c:4428
-msgid "/File/Actions/4"
-msgstr "/檔案(F)/Actions/4"
-
-#: src/mainwindow.c:4429
-msgid "/File/Actions/5"
-msgstr "/檔案(F)/Actions/5"
-
-#: src/mainwindow.c:4430
-msgid "/File/Actions/6"
-msgstr "/檔案(F)/Actions/6"
-
-#: src/mainwindow.c:4431
-msgid "/File/Actions/7"
-msgstr "/檔案(F)/Actions/7"
-
-#: src/mainwindow.c:4432
-msgid "/File/Actions/8"
-msgstr "/檔案(F)/Actions/8"
-
-#: src/mainwindow.c:4433
-msgid "/File/Actions/9"
-msgstr "/檔案(F)/Actions/9"
-
-#: src/mainwindow.c:4434
-msgid "/File/Actions/10"
-msgstr "/檔案(F)/Actions/10"
-
-#: src/mainwindow.c:4435
-msgid "/File/Actions/11"
-msgstr "/檔案(F)/Actions/11"
-
-#: src/mainwindow.c:4436
-msgid "/File/Actions/12"
-msgstr "/檔案(F)/Actions/12"
-
-#: src/mainwindow.c:4437
-msgid "/File/Actions/13"
-msgstr "/檔案(F)/Actions/13"
-
-#: src/mainwindow.c:4438
-msgid "/File/Actions/14"
-msgstr "/檔案(F)/Actions/14"
-
-#: src/mainwindow.c:4439
-msgid "/File/Actions/15"
-msgstr "/檔案(F)/Actions/15"
-
-#: src/mainwindow.c:4440
-msgid "/File/Actions/sepC"
-msgstr "/檔案(F)/Actions/sepC"
+msgid "//Actions"
+msgstr ""
 
 #: src/mainwindow.c:4441
-msgid "/File/Actions/Configure"
-msgstr "/檔案(F)/Actions/Configure"
-
-#: src/mainwindow.c:4442
-msgid "/File/sepR"
-msgstr "/檔案(F)/sepR"
-
-#: src/mainwindow.c:4443
-msgid "/File/1"
-msgstr "/檔案(F)/1"
-
-#: src/mainwindow.c:4444
-msgid "/File/2"
-msgstr "/檔案(F)/2"
-
-#: src/mainwindow.c:4445
-msgid "/File/3"
-msgstr "/檔案(F)/3"
-
-#: src/mainwindow.c:4446
-msgid "/File/4"
-msgstr "/檔案(F)/4"
-
-#: src/mainwindow.c:4447
-msgid "/File/5"
-msgstr "/檔案(F)/5"
-
-#: src/mainwindow.c:4448
-msgid "/File/6"
-msgstr "/檔案(F)/6"
-
-#: src/mainwindow.c:4449
-msgid "/File/7"
-msgstr "/檔案(F)/7"
-
-#: src/mainwindow.c:4450
-msgid "/File/8"
-msgstr "/檔案(F)/8"
-
-#: src/mainwindow.c:4451
-msgid "/File/9"
-msgstr "/檔案(F)/9"
-
-#: src/mainwindow.c:4452
-msgid "/File/10"
-msgstr "/檔案(F)/10"
-
-#: src/mainwindow.c:4453
-msgid "/File/11"
-msgstr "/檔案(F)/11"
-
-#: src/mainwindow.c:4454
-msgid "/File/12"
-msgstr "/檔案(F)/12"
-
-#: src/mainwindow.c:4455
-msgid "/File/13"
-msgstr "/檔案(F)/13"
-
-#: src/mainwindow.c:4456
-msgid "/File/14"
-msgstr "/檔案(F)/14"
-
-#: src/mainwindow.c:4457
-msgid "/File/15"
-msgstr "/檔案(F)/15"
-
-#: src/mainwindow.c:4458
-msgid "/File/16"
-msgstr "/檔案(F)/16"
-
-#: src/mainwindow.c:4459
-msgid "/File/17"
-msgstr "/檔案(F)/17"
-
-#: src/mainwindow.c:4460
-msgid "/File/18"
-msgstr "/檔案(F)/18"
-
-#: src/mainwindow.c:4461
-msgid "/File/19"
-msgstr "/檔案(F)/19"
-
-#: src/mainwindow.c:4462
-msgid "/File/20"
-msgstr "/檔案(F)/20"
-
-#: src/mainwindow.c:4463
-msgid "/File/sep3"
-msgstr "/檔案(F)/sep3"
+msgid "///Configure"
+msgstr ""
 
 #: src/mainwindow.c:4464
-msgid "/File/Quit"
-msgstr "/檔案(F)/離開"
+msgid "//Quit"
+msgstr "//離開"
 
 #: src/mainwindow.c:4466
 msgid "/_Edit"
 msgstr "/編輯(_E)"
 
-#: src/mainwindow.c:4467
-msgid "/Edit/tear"
-msgstr "/編輯(E)/tear"
-
 #: src/mainwindow.c:4468
-msgid "/Edit/Undo"
-msgstr "/編輯(E)/復原"
+msgid "//Undo"
+msgstr "//復原"
 
 #: src/mainwindow.c:4469
-msgid "/Edit/Redo"
-msgstr "/編輯(E)/重做"
-
-#: src/mainwindow.c:4470
-msgid "/Edit/sep1"
-msgstr "/編輯(E)/sep1"
+msgid "//Redo"
+msgstr "//重做"
 
 #: src/mainwindow.c:4471
-msgid "/Edit/Cut"
-msgstr "/編輯(E)/剪下"
+msgid "//Cut"
+msgstr "//剪下"
 
 #: src/mainwindow.c:4472
-msgid "/Edit/Copy"
-msgstr "/編輯(E)/複製"
+msgid "//Copy"
+msgstr "//複製"
 
 #: src/mainwindow.c:4473
-msgid "/Edit/Copy To Palette"
-msgstr "/編輯(E)/Copy To Palette"
+msgid "//Copy To Palette"
+msgstr ""
 
 #: src/mainwindow.c:4474
-msgid "/Edit/Paste To Centre"
-msgstr "/編輯(E)/貼到中心"
+msgid "//Paste To Centre"
+msgstr "//貼到中心"
 
 #: src/mainwindow.c:4475
-msgid "/Edit/Paste To New Layer"
-msgstr "/編輯(E)/貼到新圖層"
+msgid "//Paste To New Layer"
+msgstr "//貼到新圖層"
 
 #: src/mainwindow.c:4476
-msgid "/Edit/Paste"
-msgstr "/編輯(E)/貼上"
+msgid "//Paste"
+msgstr "//貼上"
 
 #: src/mainwindow.c:4477
-msgid "/Edit/Paste Text"
-msgstr "/編輯(E)/貼上文字"
+msgid "//Paste Text"
+msgstr "//貼上文字"
 
 #: src/mainwindow.c:4479
-msgid "/Edit/Paste Text (FreeType)"
-msgstr "/編輯(E)/Paste Text (FreeType)"
+msgid "//Paste Text (FreeType)"
+msgstr ""
 
 #: src/mainwindow.c:4481
-msgid "/Edit/Paste Palette"
-msgstr "/編輯(E)/Paste Palette"
-
-#: src/mainwindow.c:4482
-msgid "/Edit/sep2"
-msgstr "/編輯(E)/sep2"
+msgid "//Paste Palette"
+msgstr ""
 
 #: src/mainwindow.c:4483
-msgid "/Edit/Load Clipboard"
-msgstr "/編輯(E)/載入剪貼簿"
-
-#: src/mainwindow.c:4484
-msgid "/Edit/Load Clipboard/tear"
-msgstr "/編輯(E)/載入剪貼簿/tear"
-
-#: src/mainwindow.c:4485
-msgid "/Edit/Load Clipboard/1"
-msgstr "/編輯(E)/載入剪貼簿/1"
-
-#: src/mainwindow.c:4486
-msgid "/Edit/Load Clipboard/2"
-msgstr "/編輯(E)/載入剪貼簿/2"
-
-#: src/mainwindow.c:4487
-msgid "/Edit/Load Clipboard/3"
-msgstr "/編輯(E)/載入剪貼簿/3"
-
-#: src/mainwindow.c:4488
-msgid "/Edit/Load Clipboard/4"
-msgstr "/編輯(E)/載入剪貼簿/4"
-
-#: src/mainwindow.c:4489
-msgid "/Edit/Load Clipboard/5"
-msgstr "/編輯(E)/載入剪貼簿/5"
-
-#: src/mainwindow.c:4490
-msgid "/Edit/Load Clipboard/6"
-msgstr "/編輯(E)/載入剪貼簿/6"
-
-#: src/mainwindow.c:4491
-msgid "/Edit/Load Clipboard/7"
-msgstr "/編輯(E)/載入剪貼簿/7"
-
-#: src/mainwindow.c:4492
-msgid "/Edit/Load Clipboard/8"
-msgstr "/編輯(E)/載入剪貼簿/8"
-
-#: src/mainwindow.c:4493
-msgid "/Edit/Load Clipboard/9"
-msgstr "/編輯(E)/載入剪貼簿/9"
-
-#: src/mainwindow.c:4494
-msgid "/Edit/Load Clipboard/10"
-msgstr "/編輯(E)/載入剪貼簿/10"
-
-#: src/mainwindow.c:4495
-msgid "/Edit/Load Clipboard/11"
-msgstr "/編輯(E)/載入剪貼簿/11"
-
-#: src/mainwindow.c:4496
-msgid "/Edit/Load Clipboard/12"
-msgstr "/編輯(E)/載入剪貼簿/12"
+msgid "//Load Clipboard"
+msgstr "//載入剪貼簿"
 
 #: src/mainwindow.c:4497
-msgid "/Edit/Save Clipboard"
-msgstr "/編輯(E)/儲存剪貼簿"
-
-#: src/mainwindow.c:4498
-msgid "/Edit/Save Clipboard/tear"
-msgstr "/編輯(E)/儲存剪貼簿/tear"
-
-#: src/mainwindow.c:4499
-msgid "/Edit/Save Clipboard/1"
-msgstr "/編輯(E)/儲存剪貼簿/1"
-
-#: src/mainwindow.c:4500
-msgid "/Edit/Save Clipboard/2"
-msgstr "/編輯(E)/儲存剪貼簿/2"
-
-#: src/mainwindow.c:4501
-msgid "/Edit/Save Clipboard/3"
-msgstr "/編輯(E)/儲存剪貼簿/3"
-
-#: src/mainwindow.c:4502
-msgid "/Edit/Save Clipboard/4"
-msgstr "/編輯(E)/儲存剪貼簿/4"
-
-#: src/mainwindow.c:4503
-msgid "/Edit/Save Clipboard/5"
-msgstr "/編輯(E)/儲存剪貼簿/5"
-
-#: src/mainwindow.c:4504
-msgid "/Edit/Save Clipboard/6"
-msgstr "/編輯(E)/儲存剪貼簿/6"
-
-#: src/mainwindow.c:4505
-msgid "/Edit/Save Clipboard/7"
-msgstr "/編輯(E)/儲存剪貼簿/7"
-
-#: src/mainwindow.c:4506
-msgid "/Edit/Save Clipboard/8"
-msgstr "/編輯(E)/儲存剪貼簿/8"
-
-#: src/mainwindow.c:4507
-msgid "/Edit/Save Clipboard/9"
-msgstr "/編輯(E)/儲存剪貼簿/9"
-
-#: src/mainwindow.c:4508
-msgid "/Edit/Save Clipboard/10"
-msgstr "/編輯(E)/儲存剪貼簿/10"
-
-#: src/mainwindow.c:4509
-msgid "/Edit/Save Clipboard/11"
-msgstr "/編輯(E)/儲存剪貼簿/11"
-
-#: src/mainwindow.c:4510
-msgid "/Edit/Save Clipboard/12"
-msgstr "/編輯(E)/儲存剪貼簿/12"
+msgid "//Save Clipboard"
+msgstr "//儲存剪貼簿"
 
 #: src/mainwindow.c:4511
-msgid "/Edit/Import Clipboard from System"
-msgstr "/編輯(E)/Import Clipboard from System"
+msgid "//Import Clipboard from System"
+msgstr ""
 
 #: src/mainwindow.c:4512
-msgid "/Edit/Export Clipboard to System"
-msgstr "/編輯(E)/Export Clipboard to System"
-
-#: src/mainwindow.c:4513
-msgid "/Edit/sep3"
-msgstr "/編輯(E)/sep3"
+msgid "//Export Clipboard to System"
+msgstr ""
 
 #: src/mainwindow.c:4514
-msgid "/Edit/Choose Pattern ..."
-msgstr "/編輯(E)/選取式樣…"
+msgid "//Choose Pattern ..."
+msgstr "//選取式樣…"
 
 #: src/mainwindow.c:4515
-msgid "/Edit/Choose Brush ..."
-msgstr "/編輯(E)/選取筆刷…"
+msgid "//Choose Brush ..."
+msgstr "//選取筆刷…"
 
 #: src/mainwindow.c:4517
 msgid "/_View"
 msgstr "/檢視(_V)"
 
-#: src/mainwindow.c:4518
-msgid "/View/tear"
-msgstr "/檢視(V)/tear"
-
 #: src/mainwindow.c:4519
-msgid "/View/Show Main Toolbar"
-msgstr "/檢視(V)/顯示主工具列"
+msgid "//Show Main Toolbar"
+msgstr "//顯示主工具列"
 
 #: src/mainwindow.c:4520
-msgid "/View/Show Tools Toolbar"
-msgstr "/檢視(V)/顯示工具工具列"
+msgid "//Show Tools Toolbar"
+msgstr "//顯示工具工具列"
 
 #: src/mainwindow.c:4521
-msgid "/View/Show Settings Toolbar"
-msgstr "/檢視(V)/顯示設定值工具列"
+msgid "//Show Settings Toolbar"
+msgstr "//顯示設定值工具列"
 
 #: src/mainwindow.c:4522
-msgid "/View/Show Dock"
-msgstr "/檢視(V)/Show Dock"
+msgid "//Show Dock"
+msgstr ""
 
 #: src/mainwindow.c:4523
-msgid "/View/Show Palette"
-msgstr "/檢視(V)/顯示調色盤"
+msgid "//Show Palette"
+msgstr "//顯示調色盤"
 
 #: src/mainwindow.c:4524
-msgid "/View/Show Status Bar"
-msgstr "/檢視(V)/顯示狀態列"
-
-#: src/mainwindow.c:4525
-msgid "/View/sep1"
-msgstr "/檢視(V)/sep1"
+msgid "//Show Status Bar"
+msgstr "//顯示狀態列"
 
 #: src/mainwindow.c:4526
-msgid "/View/Toggle Image View"
-msgstr "/檢視(V)/切換圖像檢視"
+msgid "//Toggle Image View"
+msgstr "//切換圖像檢視"
 
 #: src/mainwindow.c:4527
-msgid "/View/Centralize Image"
-msgstr "/檢視(V)/圖像置中"
+msgid "//Centralize Image"
+msgstr "//圖像置中"
 
 #: src/mainwindow.c:4528
-msgid "/View/Show Zoom Grid"
-msgstr "/檢視(V)/顯示縮放格線"
+msgid "//Show Zoom Grid"
+msgstr "//顯示縮放格線"
 
 #: src/mainwindow.c:4529
-msgid "/View/Configure Grid ..."
-msgstr "/檢視(V)/Configure Grid ..."
+msgid "//Configure Grid ..."
+msgstr ""
 
 #: src/mainwindow.c:4530
-msgid "/View/Tracing Image ..."
-msgstr "/檢視(V)/Tracing Image ..."
-
-#: src/mainwindow.c:4531
-msgid "/View/sep2"
-msgstr "/檢視(V)/sep2"
+msgid "//Tracing Image ..."
+msgstr ""
 
 #: src/mainwindow.c:4532
-msgid "/View/View Window"
-msgstr "/檢視(V)/檢視視窗"
+msgid "//View Window"
+msgstr "//檢視視窗"
 
 #: src/mainwindow.c:4533
-msgid "/View/Horizontal Split"
-msgstr "/檢視(V)/水平分隔"
+msgid "//Horizontal Split"
+msgstr "//水平分隔"
 
 #: src/mainwindow.c:4534
-msgid "/View/Focus View Window"
-msgstr "/檢視(V)/焦點檢視視窗"
-
-#: src/mainwindow.c:4535
-msgid "/View/sep3"
-msgstr "/檢視(V)/sep3"
+msgid "//Focus View Window"
+msgstr "//焦點檢視視窗"
 
 #: src/mainwindow.c:4536
-msgid "/View/Pan Window"
-msgstr "/檢視(V)/全景視窗"
+msgid "//Pan Window"
+msgstr "//全景視窗"
 
 #: src/mainwindow.c:4537
-msgid "/View/Layers Window"
-msgstr "/檢視(V)/圖層視窗"
+msgid "//Layers Window"
+msgstr "//圖層視窗"
 
 #: src/mainwindow.c:4539
 msgid "/_Image"
 msgstr "/圖像(_I)"
 
-#: src/mainwindow.c:4540
-msgid "/Image/tear"
-msgstr "/圖像(I)/tear"
-
 #: src/mainwindow.c:4541
-msgid "/Image/Convert To RGB"
-msgstr "/圖像(I)/轉換到 RGB"
+msgid "//Convert To RGB"
+msgstr "//轉換到 RGB"
 
 #: src/mainwindow.c:4542
-msgid "/Image/Convert To Indexed ..."
-msgstr "/圖像(I)/轉換到索引值…"
-
-#: src/mainwindow.c:4543
-msgid "/Image/sep1"
-msgstr "/圖像(I)/sep1"
+msgid "//Convert To Indexed ..."
+msgstr "//轉換到索引值…"
 
 #: src/mainwindow.c:4544
-msgid "/Image/Scale Canvas ..."
-msgstr "/圖像(I)/伸縮畫布…"
+msgid "//Scale Canvas ..."
+msgstr "//伸縮畫布…"
 
 #: src/mainwindow.c:4545
-msgid "/Image/Resize Canvas ..."
-msgstr "/圖像(I)/調整畫布大小…"
+msgid "//Resize Canvas ..."
+msgstr "//調整畫布大小…"
 
 #: src/mainwindow.c:4546
-msgid "/Image/Crop"
-msgstr "/圖像(I)/裁剪"
-
-#: src/mainwindow.c:4547
-msgid "/Image/sep2"
-msgstr "/圖像(I)/sep2"
+msgid "//Crop"
+msgstr "//裁剪"
 
 #: src/mainwindow.c:4548
-msgid "/Image/Flip Vertically"
-msgstr "/圖像(I)/垂直翻轉"
+msgid "//Flip Vertically"
+msgstr "//垂直翻轉"
 
 #: src/mainwindow.c:4549
-msgid "/Image/Flip Horizontally"
-msgstr "/圖像(I)/水平翻轉"
+msgid "//Flip Horizontally"
+msgstr "//水平翻轉"
 
 #: src/mainwindow.c:4550
-msgid "/Image/Rotate Clockwise"
-msgstr "/圖像(I)/順時針旋轉"
+msgid "//Rotate Clockwise"
+msgstr "//順時針旋轉"
 
 #: src/mainwindow.c:4551
-msgid "/Image/Rotate Anti-Clockwise"
-msgstr "/圖像(I)/逆時針旋轉"
+msgid "//Rotate Anti-Clockwise"
+msgstr "//逆時針旋轉"
 
 #: src/mainwindow.c:4552
-msgid "/Image/Free Rotate ..."
-msgstr "/圖像(I)/自由旋轉…"
+msgid "//Free Rotate ..."
+msgstr "//自由旋轉…"
 
 #: src/mainwindow.c:4553
-msgid "/Image/Skew ..."
-msgstr "/圖像(I)/Skew ..."
-
-#: src/mainwindow.c:4554
-msgid "/Image/sep3"
-msgstr "/圖像(I)/sep3"
+msgid "//Skew ..."
+msgstr ""
 
 #: src/mainwindow.c:4555
-msgid "/Image/Information ..."
-msgstr "/圖像(I)/資訊…"
+msgid "//Information ..."
+msgstr "//資訊…"
 
 #: src/mainwindow.c:4556
-msgid "/Image/Preferences ..."
-msgstr "/圖像(I)/偏好設定…"
+msgid "//Preferences ..."
+msgstr "//偏好設定…"
 
 #: src/mainwindow.c:4558
 msgid "/_Selection"
 msgstr "/選擇(_S)"
 
-#: src/mainwindow.c:4559
-msgid "/Selection/tear"
-msgstr "/選擇(S)/tear"
-
 #: src/mainwindow.c:4560
-msgid "/Selection/Select All"
-msgstr "/選擇(S)/全選"
+msgid "//Select All"
+msgstr "//全選"
 
 #: src/mainwindow.c:4561
-msgid "/Selection/Select None (Esc)"
-msgstr "/選擇(S)/全部不選 (Esc)"
+msgid "//Select None (Esc)"
+msgstr "//全部不選 (Esc)"
 
 #: src/mainwindow.c:4562
-msgid "/Selection/Lasso Selection"
-msgstr "/選擇(S)/套索選擇"
+msgid "//Lasso Selection"
+msgstr "//套索選擇"
 
 #: src/mainwindow.c:4563
-msgid "/Selection/Lasso Selection Cut"
-msgstr "/選擇(S)/剪下套索選擇"
-
-#: src/mainwindow.c:4564
-msgid "/Selection/sep1"
-msgstr "/選擇(S)/sep1"
+msgid "//Lasso Selection Cut"
+msgstr "//剪下套索選擇"
 
 #: src/mainwindow.c:4565
-msgid "/Selection/Outline Selection"
-msgstr "/選擇(S)/描邊選擇"
+msgid "//Outline Selection"
+msgstr "//描邊選擇"
 
 #: src/mainwindow.c:4566
-msgid "/Selection/Fill Selection"
-msgstr "/選擇(S)/填充選擇"
+msgid "//Fill Selection"
+msgstr "//填充選擇"
 
 #: src/mainwindow.c:4567
-msgid "/Selection/Outline Ellipse"
-msgstr "/選擇(S)/描邊橢圓"
+msgid "//Outline Ellipse"
+msgstr "//描邊橢圓"
 
 #: src/mainwindow.c:4568
-msgid "/Selection/Fill Ellipse"
-msgstr "/選擇(S)/填充橢圓"
-
-#: src/mainwindow.c:4569
-msgid "/Selection/sep2"
-msgstr "/選擇(S)/sep2"
-
-#: src/mainwindow.c:4570
-msgid "/Selection/Flip Vertically"
-msgstr "/選擇(S)/垂直翻轉"
-
-#: src/mainwindow.c:4571
-msgid "/Selection/Flip Horizontally"
-msgstr "/選擇(S)/水平翻轉"
-
-#: src/mainwindow.c:4572
-msgid "/Selection/Rotate Clockwise"
-msgstr "/選擇(S)/順時針旋轉"
-
-#: src/mainwindow.c:4573
-msgid "/Selection/Rotate Anti-Clockwise"
-msgstr "/選擇(S)/逆時針旋轉"
-
-#: src/mainwindow.c:4574
-msgid "/Selection/sep3"
-msgstr "/選擇(S)/sep3"
+msgid "//Fill Ellipse"
+msgstr "//填充橢圓"
 
 #: src/mainwindow.c:4575
-msgid "/Selection/Horizontal Ramp"
-msgstr "/選擇(S)/Horizontal Ramp"
+msgid "//Horizontal Ramp"
+msgstr ""
 
 #: src/mainwindow.c:4576
-msgid "/Selection/Vertical Ramp"
-msgstr "/選擇(S)/Vertical Ramp"
-
-#: src/mainwindow.c:4577
-msgid "/Selection/sep4"
-msgstr "/選擇(S)/sep4"
+msgid "//Vertical Ramp"
+msgstr ""
 
 #: src/mainwindow.c:4578
-msgid "/Selection/Alpha Blend A,B"
-msgstr "/選擇(S)/α 混色 A,B"
+msgid "//Alpha Blend A,B"
+msgstr "//α 混色 A,B"
 
 #: src/mainwindow.c:4579
-msgid "/Selection/Move Alpha to Mask"
-msgstr "/選擇(S)/移動 α 到遮罩"
+msgid "//Move Alpha to Mask"
+msgstr "//移動 α 到遮罩"
 
 #: src/mainwindow.c:4580
-msgid "/Selection/Mask Colour A,B"
-msgstr "/選擇(S)/遮罩顏色 A,B"
+msgid "//Mask Colour A,B"
+msgstr "//遮罩顏色 A,B"
 
 #: src/mainwindow.c:4581
-msgid "/Selection/Unmask Colour A,B"
-msgstr "/選擇(S)/取消遮罩顏色 A,B"
+msgid "//Unmask Colour A,B"
+msgstr "//取消遮罩顏色 A,B"
 
 #: src/mainwindow.c:4582
-msgid "/Selection/Mask All Colours"
-msgstr "/選擇(S)/遮罩所有顏色"
+msgid "//Mask All Colours"
+msgstr "//遮罩所有顏色"
 
 #: src/mainwindow.c:4583
-msgid "/Selection/Clear Mask"
-msgstr "/選擇(S)/清除遮罩"
+msgid "//Clear Mask"
+msgstr "//清除遮罩"
 
 #: src/mainwindow.c:4585
 msgid "/_Palette"
 msgstr "/調色盤(_P)"
 
-#: src/mainwindow.c:4586
-msgid "/Palette/tear"
-msgstr "/調色盤(P)/tear"
-
-#: src/mainwindow.c:4587
-msgid "/Palette/Open ..."
-msgstr "/調色盤(P)/開啟…"
-
-#: src/mainwindow.c:4588
-msgid "/Palette/Save As ..."
-msgstr "/調色盤(P)/另存為…"
-
 #: src/mainwindow.c:4589
-msgid "/Palette/Load Default"
-msgstr "/調色盤(P)/載入預設"
-
-#: src/mainwindow.c:4590
-msgid "/Palette/sep1"
-msgstr "/調色盤(P)/sep1"
+msgid "//Load Default"
+msgstr "//載入預設"
 
 #: src/mainwindow.c:4591
-msgid "/Palette/Mask All"
-msgstr "/調色盤(P)/全部遮罩"
+msgid "//Mask All"
+msgstr "//全部遮罩"
 
 #: src/mainwindow.c:4592
-msgid "/Palette/Mask None"
-msgstr "/調色盤(P)/全無遮罩"
-
-#: src/mainwindow.c:4593
-msgid "/Palette/sep2"
-msgstr "/調色盤(P)/sep2"
+msgid "//Mask None"
+msgstr "//全無遮罩"
 
 #: src/mainwindow.c:4594
-msgid "/Palette/Swap A & B"
-msgstr "/調色盤(P)/交換 A & B"
+msgid "//Swap A & B"
+msgstr "//交換 A & B"
 
 #: src/mainwindow.c:4595
-msgid "/Palette/Edit Colour A & B ..."
-msgstr "/調色盤(P)/編輯顏色 A & B…"
+msgid "//Edit Colour A & B ..."
+msgstr "//編輯顏色 A & B…"
 
 #: src/mainwindow.c:4596
-msgid "/Palette/Dither A"
-msgstr "/調色盤(P)/Dither A"
+msgid "//Dither A"
+msgstr ""
 
 #: src/mainwindow.c:4597
-msgid "/Palette/Palette Editor ..."
-msgstr "/調色盤(P)/調色盤編輯器…"
+msgid "//Palette Editor ..."
+msgstr "//調色盤編輯器…"
 
 #: src/mainwindow.c:4598
-msgid "/Palette/Set Palette Size ..."
-msgstr "/調色盤(P)/設定調色盤大小…"
+msgid "//Set Palette Size ..."
+msgstr "//設定調色盤大小…"
 
 #: src/mainwindow.c:4599
-msgid "/Palette/Merge Duplicate Colours"
-msgstr "/調色盤(P)/合併重製顏色"
+msgid "//Merge Duplicate Colours"
+msgstr "//合併重製顏色"
 
 #: src/mainwindow.c:4600
-msgid "/Palette/Remove Unused Colours"
-msgstr "/調色盤(P)/移除未使用的顏色"
-
-#: src/mainwindow.c:4601
-msgid "/Palette/sep3"
-msgstr "/調色盤(P)/sep3"
+msgid "//Remove Unused Colours"
+msgstr "//移除未使用的顏色"
 
 #: src/mainwindow.c:4602
-msgid "/Palette/Create Quantized ..."
-msgstr "/調色盤(P)/建立量化…"
-
-#: src/mainwindow.c:4603
-msgid "/Palette/sep4"
-msgstr "/調色盤(P)/sep4"
+msgid "//Create Quantized ..."
+msgstr "//建立量化…"
 
 #: src/mainwindow.c:4604
-msgid "/Palette/Sort Colours ..."
-msgstr "/調色盤(P)/排序顏色…"
+msgid "//Sort Colours ..."
+msgstr "//排序顏色…"
 
 #: src/mainwindow.c:4605
-msgid "/Palette/Palette Shifter ..."
-msgstr "/調色盤(P)/調色盤轉移器…"
+msgid "//Palette Shifter ..."
+msgstr "//調色盤轉移器…"
 
 #: src/mainwindow.c:4607
 msgid "/Effe_cts"
 msgstr "/效果(_C)"
 
-#: src/mainwindow.c:4608
-msgid "/Effects/tear"
-msgstr "/效果(C)/tear"
-
 #: src/mainwindow.c:4609
-msgid "/Effects/Transform Colour ..."
-msgstr "/效果(C)/變換顏色…"
+msgid "//Transform Colour ..."
+msgstr "//變換顏色…"
 
 #: src/mainwindow.c:4610
-msgid "/Effects/Invert"
-msgstr "/效果(C)/反相"
+msgid "//Invert"
+msgstr "//反相"
 
 #: src/mainwindow.c:4611
-msgid "/Effects/Greyscale"
-msgstr "/效果(C)/灰階"
+msgid "//Greyscale"
+msgstr "//灰階"
 
 #: src/mainwindow.c:4612
-msgid "/Effects/Greyscale (Gamma corrected)"
-msgstr "/效果(C)/灰階 (γ 值已修正)"
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//灰階 (γ 值已修正)"
 
 #: src/mainwindow.c:4613
-msgid "/Effects/Isometric Transformation"
-msgstr "/效果(C)/等量變換"
-
-#: src/mainwindow.c:4614
-msgid "/Effects/Isometric Transformation/tear"
-msgstr "/效果(C)/等量變換/tear"
+msgid "//Isometric Transformation"
+msgstr "//等量變換"
 
 #: src/mainwindow.c:4615
-msgid "/Effects/Isometric Transformation/Left Side Down"
-msgstr "/效果(C)/等量變換/左側向下"
+msgid "///Left Side Down"
+msgstr "///左側向下"
 
 #: src/mainwindow.c:4616
-msgid "/Effects/Isometric Transformation/Right Side Down"
-msgstr "/效果(C)/等量變換/右側向下"
+msgid "///Right Side Down"
+msgstr "///右側向下"
 
 #: src/mainwindow.c:4617
-msgid "/Effects/Isometric Transformation/Top Side Right"
-msgstr "/效果(C)/等量變換/頂端向右"
+msgid "///Top Side Right"
+msgstr "///頂端向右"
 
 #: src/mainwindow.c:4618
-msgid "/Effects/Isometric Transformation/Bottom Side Right"
-msgstr "/效果(C)/等量變換/底側向右"
-
-#: src/mainwindow.c:4619
-msgid "/Effects/sep1"
-msgstr "/效果(C)/sep1"
+msgid "///Bottom Side Right"
+msgstr "///底側向右"
 
 #: src/mainwindow.c:4620
-msgid "/Effects/Edge Detect ..."
-msgstr "/效果(C)/邊緣偵測…"
+msgid "//Edge Detect ..."
+msgstr "//邊緣偵測…"
 
 #: src/mainwindow.c:4621
-msgid "/Effects/Difference of Gaussians ..."
-msgstr "/效果(C)/Difference of Gaussians ..."
+msgid "//Difference of Gaussians ..."
+msgstr ""
 
 #: src/mainwindow.c:4622
-msgid "/Effects/Sharpen ..."
-msgstr "/效果(C)/銳化…"
+msgid "//Sharpen ..."
+msgstr "//銳化…"
 
 #: src/mainwindow.c:4623
-msgid "/Effects/Unsharp Mask ..."
-msgstr "/效果(C)/去銳化遮罩…"
+msgid "//Unsharp Mask ..."
+msgstr "//去銳化遮罩…"
 
 #: src/mainwindow.c:4624
-msgid "/Effects/Soften ..."
-msgstr "/效果(C)/柔化…"
+msgid "//Soften ..."
+msgstr "//柔化…"
 
 #: src/mainwindow.c:4625
-msgid "/Effects/Gaussian Blur ..."
-msgstr "/效果(C)/高斯模糊…"
+msgid "//Gaussian Blur ..."
+msgstr "//高斯模糊…"
 
 #: src/mainwindow.c:4626
-msgid "/Effects/Kuwahara-Nagao Blur ..."
-msgstr "/效果(C)/Kuwahara-Nagao Blur ..."
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr ""
 
 #: src/mainwindow.c:4627
-msgid "/Effects/Emboss"
-msgstr "/效果(C)/浮雕"
+msgid "//Emboss"
+msgstr "//浮雕"
 
 #: src/mainwindow.c:4628
-msgid "/Effects/Dilate"
-msgstr "/效果(C)/Dilate"
+msgid "//Dilate"
+msgstr ""
 
 #: src/mainwindow.c:4629
-msgid "/Effects/Erode"
-msgstr "/效果(C)/Erode"
-
-#: src/mainwindow.c:4630
-msgid "/Effects/sep2"
-msgstr "/效果(C)/sep2"
+msgid "//Erode"
+msgstr ""
 
 #: src/mainwindow.c:4631
-msgid "/Effects/Bacteria ..."
-msgstr "/效果(C)/菌化…"
+msgid "//Bacteria ..."
+msgstr "//菌化…"
 
 #: src/mainwindow.c:4633
 msgid "/Cha_nnels"
 msgstr "/通道(_N)"
 
-#: src/mainwindow.c:4634
-msgid "/Channels/tear"
-msgstr "/通道(N)/tear"
-
 #: src/mainwindow.c:4635
-msgid "/Channels/New ..."
-msgstr "/通道(N)/新增…"
+msgid "//New ..."
+msgstr "//新增…"
 
 #: src/mainwindow.c:4636
-msgid "/Channels/Load ..."
-msgstr "/通道(N)/載入…"
-
-#: src/mainwindow.c:4637
-msgid "/Channels/Save As ..."
-msgstr "/通道(N)/另存為…"
+msgid "//Load ..."
+msgstr "//載入…"
 
 #: src/mainwindow.c:4638
-msgid "/Channels/Delete ..."
-msgstr "/通道(N)/刪除…"
-
-#: src/mainwindow.c:4639
-msgid "/Channels/sep1"
-msgstr "/通道(N)/sep1"
+msgid "//Delete ..."
+msgstr "//刪除…"
 
 #: src/mainwindow.c:4640
-msgid "/Channels/Edit Image"
-msgstr "/通道(N)/編輯圖像"
+msgid "//Edit Image"
+msgstr "//編輯圖像"
 
 #: src/mainwindow.c:4641
-msgid "/Channels/Edit Alpha"
-msgstr "/通道(N)/編輯 α"
+msgid "//Edit Alpha"
+msgstr "//編輯 α"
 
 #: src/mainwindow.c:4642
-msgid "/Channels/Edit Selection"
-msgstr "/通道(N)/編輯選擇"
+msgid "//Edit Selection"
+msgstr "//編輯選擇"
 
 #: src/mainwindow.c:4643
-msgid "/Channels/Edit Mask"
-msgstr "/通道(N)/編輯遮罩"
-
-#: src/mainwindow.c:4644
-msgid "/Channels/sep2"
-msgstr "/通道(N)/sep2"
+msgid "//Edit Mask"
+msgstr "//編輯遮罩"
 
 #: src/mainwindow.c:4645
-msgid "/Channels/Hide Image"
-msgstr "/通道(N)/隱藏圖像"
+msgid "//Hide Image"
+msgstr "//隱藏圖像"
 
 #: src/mainwindow.c:4646
-msgid "/Channels/Disable Alpha"
-msgstr "/通道(N)/停用 α"
+msgid "//Disable Alpha"
+msgstr "//停用 α"
 
 #: src/mainwindow.c:4647
-msgid "/Channels/Disable Selection"
-msgstr "/通道(N)/停用選擇"
+msgid "//Disable Selection"
+msgstr "//停用選擇"
 
 #: src/mainwindow.c:4648
-msgid "/Channels/Disable Mask"
-msgstr "/通道(N)/停用遮罩"
-
-#: src/mainwindow.c:4649
-msgid "/Channels/sep3"
-msgstr "/通道(N)/sep3"
+msgid "//Disable Mask"
+msgstr "//停用遮罩"
 
 #: src/mainwindow.c:4650
-msgid "/Channels/Couple RGBA Operations"
-msgstr "/通道(N)/接合 RGBA 計算"
+msgid "//Couple RGBA Operations"
+msgstr "//接合 RGBA 計算"
 
 #: src/mainwindow.c:4651
-msgid "/Channels/Threshold ..."
-msgstr "/通道(N)/臨界值…"
+msgid "//Threshold ..."
+msgstr "//臨界值…"
 
 #: src/mainwindow.c:4652
-msgid "/Channels/Unassociate Alpha"
-msgstr "/通道(N)/Unassociate Alpha"
-
-#: src/mainwindow.c:4653
-msgid "/Channels/sep4"
-msgstr "/通道(N)/sep4"
+msgid "//Unassociate Alpha"
+msgstr ""
 
 #: src/mainwindow.c:4654
-msgid "/Channels/View Alpha as an Overlay"
-msgstr "/通道(N)/視 α 為外罩"
+msgid "//View Alpha as an Overlay"
+msgstr "//視 α 為外罩"
 
 #: src/mainwindow.c:4655
-msgid "/Channels/Configure Overlays ..."
-msgstr "/通道(N)/配置外罩…"
+msgid "//Configure Overlays ..."
+msgstr "//配置外罩…"
 
 #: src/mainwindow.c:4657
 msgid "/_Layers"
 msgstr "/圖層(_L)"
 
-#: src/mainwindow.c:4658
-msgid "/Layers/tear"
-msgstr "/圖層(L)/tear"
-
 #: src/mainwindow.c:4659
-msgid "/Layers/New Layer"
-msgstr "/圖層(L)/New Layer"
-
-#: src/mainwindow.c:4660
-msgid "/Layers/Save"
-msgstr "/圖層(L)/儲存"
-
-#: src/mainwindow.c:4661
-msgid "/Layers/Save As ..."
-msgstr "/圖層(L)/另存為…"
+msgid "//New Layer"
+msgstr ""
 
 #: src/mainwindow.c:4662
-msgid "/Layers/Save Composite Image ..."
-msgstr "/圖層(L)/儲存合成圖像…"
+msgid "//Save Composite Image ..."
+msgstr "//儲存合成圖像…"
 
 #: src/mainwindow.c:4663
-msgid "/Layers/Composite to New Layer"
-msgstr "/圖層(L)/Composite to New Layer"
+msgid "//Composite to New Layer"
+msgstr ""
 
 #: src/mainwindow.c:4664
-msgid "/Layers/Remove All Layers"
-msgstr "/圖層(L)/移除所有圖層"
-
-#: src/mainwindow.c:4665
-msgid "/Layers/sep1"
-msgstr "/圖層(L)/sep1"
+msgid "//Remove All Layers"
+msgstr "//移除所有圖層"
 
 #: src/mainwindow.c:4666
-msgid "/Layers/Configure Animation ..."
-msgstr "/圖層(L)/配置動畫…"
+msgid "//Configure Animation ..."
+msgstr "//配置動畫…"
 
 #: src/mainwindow.c:4667
-msgid "/Layers/Preview Animation ..."
-msgstr "/圖層(L)/預覽動畫…"
+msgid "//Preview Animation ..."
+msgstr "//預覽動畫…"
 
 #: src/mainwindow.c:4668
-msgid "/Layers/Set Key Frame ..."
-msgstr "/圖層(L)/設定關鍵框架…"
+msgid "//Set Key Frame ..."
+msgstr "//設定關鍵框架…"
 
 #: src/mainwindow.c:4669
-msgid "/Layers/Remove All Key Frames ..."
-msgstr "/圖層(L)/移除所有關鍵圖框…"
+msgid "//Remove All Key Frames ..."
+msgstr "//移除所有關鍵圖框…"
 
 #: src/mainwindow.c:4671
 msgid "/More..."
@@ -2626,20 +2186,16 @@ msgid "/_Help"
 msgstr "/求助(_H)"
 
 #: src/mainwindow.c:4674
-msgid "/Help/Documentation"
-msgstr "/求助(H)/文件"
+msgid "//Documentation"
+msgstr "//文件"
 
 #: src/mainwindow.c:4675
-msgid "/Help/About"
-msgstr "/求助(H)/關於"
-
-#: src/mainwindow.c:4676
-msgid "/Help/sep1"
-msgstr "/求助(H)/sep1"
+msgid "//About"
+msgstr "//關於"
 
 #: src/mainwindow.c:4677
-msgid "/Help/Rebind Shortcut Keycodes"
-msgstr "/求助(H)/重新連結快捷鍵"
+msgid "//Rebind Shortcut Keycodes"
+msgstr "//重新連結快捷鍵"
 
 #: src/memory.c:2589 src/memory.c:2974
 msgid "Converting to Indexed Palette"

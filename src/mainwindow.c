@@ -4038,27 +4038,54 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	GtkItemFactoryEntry wf;
 	GtkItemFactory *factory;
 	GtkWidget *widget, *wrap, *rwidgets[MENU_RESIZE_MAX];
-	char *radio[32], *rnames[MENU_RESIZE_MAX];
-	int i, j, rn = 0;
+	wjmem *mem;
+	char *radio[32], *rnames[MENU_RESIZE_MAX], buf[64];
+	char *tmp, *s, *s2, *t;
+	int i, j, l, itp, rn = 0, nsep = 0;
 #if GTK_MAJOR_VERSION == 1
 	GSList *en;
 #endif
 
+	mem = wjmemnew(0, 0);
 	memset(&wf, 0, sizeof(wf));
 	memset(radio, 0, sizeof(radio));
 	rnames[0] = NULL;
 	factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", accel_group);
+	tmp = "";
 	for (; items->path; items++)
 	{
-		wf.path = _(items->path);
+		s = items->path;
+		if (!s[strspn(s, "/")]) /* Generate an unique name */
+		{
+			sprintf(buf, "%sitem%d", s, nsep++);
+			s = buf;
+		}
+		else s = _(s); /* Translate an existing name */
+
+		/* Text up to the last "/" gets copied from the previous item,
+		 * so that untranslated items in submenus do not mess up the
+		 * menu structure. In addition, omitting text between "//" pairs
+		 * saves some space - WJ */
+		t = tmp;
+		while ((s2 = strchr(s, '/')))
+		{
+			s = s2;
+			t += strcspn(t, "/");
+			if (*t != '/') break;
+			s++; t++;
+		}
+		l = t - tmp;
+		t = wjmalloc(mem, l + strlen(s) + 1, 1);
+		memcpy(t, tmp, l);
+		strcpy(t + l, s);
+		wf.path = t;
+
+		itp = items->radio_BTS;
+		wf.item_type = itp < 1 ? bts[-itp & 15] :
+			radio[itp] ? radio[itp] : "<RadioItem>";
 		wf.accelerator = items->shortcut;
 		wf.callback = items->action ? menu_action : NULL;
 //		wf.callback_action = 0;
-		wf.item_type = items->radio_BTS < 1 ? bts[-items->radio_BTS & 15] :
-			radio[items->radio_BTS] ? radio[items->radio_BTS] :
-			"<RadioItem>";
-		if ((items->radio_BTS > 0) && !radio[items->radio_BTS])
-			radio[items->radio_BTS] = wf.path;
 #if GTK_MAJOR_VERSION == 2
 		if (show_menu_icons && items->xpm_icon_image)
 		{
@@ -4075,9 +4102,10 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		else
 #endif
 		gtk_item_factory_create_item(factory, &wf, items, 2);
-		/* !!! Workaround - internal path may differ from input path */
-		widget = gtk_item_factory_get_item(factory,
-			((GtkItemFactoryItem *)factory->items->data)->path);
+		/* !!! Internal path may differ from input path */
+		tmp = strchr(((GtkItemFactoryItem *)factory->items->data)->path, '/');
+		if ((itp > 0) && !radio[itp]) radio[itp] = tmp;
+		widget = gtk_item_factory_get_item(factory, tmp);
 		mapped_dis_add(widget, items->actmap);
 		/* For now, remember only requested widgets */
 		if (items->ID) menu_widgets[items->ID] = widget;
@@ -4089,6 +4117,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 
 	/* Setup overflow submenu */
 	r_menu[0].item = rwidgets[--rn];
+	l = strlen(rnames[rn]);
 	memset(&wf, 0, sizeof(wf));
 	for (i = 0; i < rn; i++)
 	{
@@ -4104,13 +4133,14 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		r_menu[j].key = gtk_label_get_mnemonic_keyval(GTK_LABEL(
 			GTK_BIN(widget)->child));
 #endif
-		wf.path = g_strconcat(rnames[rn], rnames[i], NULL);
+		wf.path = wjmalloc(mem, l + strlen(rnames[i]) + 1, 1);
+		memcpy(wf.path, rnames[rn], l);
+		strcpy(wf.path + l, rnames[i]);
 		wf.item_type = "<Branch>";
 		gtk_item_factory_create_item(factory, &wf, NULL, 2);
-		/* !!! Workaround - internal path may differ from input path */
+		/* !!! Internal path may differ from input path */
 		widget = gtk_item_factory_get_item(factory,
 			((GtkItemFactoryItem *)factory->items->data)->path);
-		g_free(wf.path);
 		r_menu[j].fallback = widget;
 		gtk_widget_hide(widget);
 	}
@@ -4126,6 +4156,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	gtk_signal_connect(GTK_OBJECT(wrap), "size_allocate",
 		GTK_SIGNAL_FUNC(smart_menu_size_alloc), NULL);
 
+	wjmemfree(mem);
 	return (wrap);
 }
 
@@ -4494,273 +4525,273 @@ static void pressed_sel_ramp(int vert)
 
 static menu_item main_menu[] = {
 	{ _("/_File"), -2 -16 },
-	{ _("/File/tear"), -3 },
-	{ _("/File/New"), -1, 0, 0, "<control>N", DLG_NEW, 0, XPM_ICON(new) },
-	{ _("/File/Open ..."), -1, 0, 0, "<control>O", DLG_FSEL, FS_PNG_LOAD, XPM_ICON(open) },
-	{ _("/File/Save"), -1, 0, 0, "<control>S", ACT_SAVE, 0, XPM_ICON(save) },
-	{ _("/File/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PNG_SAVE },
-	{ _("/File/sep1"), -4 },
-	{ _("/File/Export Undo Images ..."), -1, 0, NEED_UNDO, NULL, DLG_FSEL, FS_EXPORT_UNDO },
-	{ _("/File/Export Undo Images (reversed) ..."), -1, 0, NEED_UNDO, NULL, DLG_FSEL, FS_EXPORT_UNDO2 },
-	{ _("/File/Export ASCII Art ..."), -1, 0, NEED_IDX, NULL, DLG_FSEL, FS_EXPORT_ASCII },
-	{ _("/File/Export Animated GIF ..."), -1, 0, NEED_IDX, NULL, DLG_FSEL, FS_EXPORT_GIF },
-	{ _("/File/sep2"), -4 },
-	{ _("/File/Actions"), -2 },
-	{ _("/File/Actions/tear"), -3 },
-	{ _("/File/Actions/1"), -1, MENU_FACTION1, 0, NULL, ACT_FACTION, 1 },
-	{ _("/File/Actions/2"), -1, MENU_FACTION2, 0, NULL, ACT_FACTION, 2 },
-	{ _("/File/Actions/3"), -1, MENU_FACTION3, 0, NULL, ACT_FACTION, 3 },
-	{ _("/File/Actions/4"), -1, MENU_FACTION4, 0, NULL, ACT_FACTION, 4 },
-	{ _("/File/Actions/5"), -1, MENU_FACTION5, 0, NULL, ACT_FACTION, 5 },
-	{ _("/File/Actions/6"), -1, MENU_FACTION6, 0, NULL, ACT_FACTION, 6 },
-	{ _("/File/Actions/7"), -1, MENU_FACTION7, 0, NULL, ACT_FACTION, 7 },
-	{ _("/File/Actions/8"), -1, MENU_FACTION8, 0, NULL, ACT_FACTION, 8 },
-	{ _("/File/Actions/9"), -1, MENU_FACTION9, 0, NULL, ACT_FACTION, 9 },
-	{ _("/File/Actions/10"), -1, MENU_FACTION10, 0, NULL, ACT_FACTION, 10 },
-	{ _("/File/Actions/11"), -1, MENU_FACTION11, 0, NULL, ACT_FACTION, 11 },
-	{ _("/File/Actions/12"), -1, MENU_FACTION12, 0, NULL, ACT_FACTION, 12 },
-	{ _("/File/Actions/13"), -1, MENU_FACTION13, 0, NULL, ACT_FACTION, 13 },
-	{ _("/File/Actions/14"), -1, MENU_FACTION14, 0, NULL, ACT_FACTION, 14 },
-	{ _("/File/Actions/15"), -1, MENU_FACTION15, 0, NULL, ACT_FACTION, 15 },
-	{ _("/File/Actions/sepC"), -4, MENU_FACTION_S },
-	{ _("/File/Actions/Configure"), -1, 0, 0, NULL, DLG_FACTIONS, 0 },
-	{ _("/File/sepR"), -4, MENU_RECENT_S },
-	{ _("/File/1"), -1, MENU_RECENT1, 0, "<shift><control>F1", ACT_LOAD_RECENT, 1 },
-	{ _("/File/2"), -1, MENU_RECENT2, 0, "<shift><control>F2", ACT_LOAD_RECENT, 2 },
-	{ _("/File/3"), -1, MENU_RECENT3, 0, "<shift><control>F3", ACT_LOAD_RECENT, 3 },
-	{ _("/File/4"), -1, MENU_RECENT4, 0, "<shift><control>F4", ACT_LOAD_RECENT, 4 },
-	{ _("/File/5"), -1, MENU_RECENT5, 0, "<shift><control>F5", ACT_LOAD_RECENT, 5 },
-	{ _("/File/6"), -1, MENU_RECENT6, 0, "<shift><control>F6", ACT_LOAD_RECENT, 6 },
-	{ _("/File/7"), -1, MENU_RECENT7, 0, "<shift><control>F7", ACT_LOAD_RECENT, 7 },
-	{ _("/File/8"), -1, MENU_RECENT8, 0, "<shift><control>F8", ACT_LOAD_RECENT, 8 },
-	{ _("/File/9"), -1, MENU_RECENT9, 0, "<shift><control>F9", ACT_LOAD_RECENT, 9 },
-	{ _("/File/10"), -1, MENU_RECENT10, 0, "<shift><control>F10", ACT_LOAD_RECENT, 10 },
-	{ _("/File/11"), -1, MENU_RECENT11, 0, NULL, ACT_LOAD_RECENT, 11 },
-	{ _("/File/12"), -1, MENU_RECENT12, 0, NULL, ACT_LOAD_RECENT, 12 },
-	{ _("/File/13"), -1, MENU_RECENT13, 0, NULL, ACT_LOAD_RECENT, 13 },
-	{ _("/File/14"), -1, MENU_RECENT14, 0, NULL, ACT_LOAD_RECENT, 14 },
-	{ _("/File/15"), -1, MENU_RECENT15, 0, NULL, ACT_LOAD_RECENT, 15 },
-	{ _("/File/16"), -1, MENU_RECENT16, 0, NULL, ACT_LOAD_RECENT, 16 },
-	{ _("/File/17"), -1, MENU_RECENT17, 0, NULL, ACT_LOAD_RECENT, 17 },
-	{ _("/File/18"), -1, MENU_RECENT18, 0, NULL, ACT_LOAD_RECENT, 18 },
-	{ _("/File/19"), -1, MENU_RECENT19, 0, NULL, ACT_LOAD_RECENT, 19 },
-	{ _("/File/20"), -1, MENU_RECENT20, 0, NULL, ACT_LOAD_RECENT, 20 },
-	{ _("/File/sep3"), -4 },
-	{ _("/File/Quit"), -1, 0, 0, "<control>Q", ACT_QUIT, 1 },
+	{ "//", -3 },
+	{ _("//New"), -1, 0, 0, "<control>N", DLG_NEW, 0, XPM_ICON(new) },
+	{ _("//Open ..."), -1, 0, 0, "<control>O", DLG_FSEL, FS_PNG_LOAD, XPM_ICON(open) },
+	{ _("//Save"), -1, 0, 0, "<control>S", ACT_SAVE, 0, XPM_ICON(save) },
+	{ _("//Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PNG_SAVE },
+	{ "//", -4 },
+	{ _("//Export Undo Images ..."), -1, 0, NEED_UNDO, NULL, DLG_FSEL, FS_EXPORT_UNDO },
+	{ _("//Export Undo Images (reversed) ..."), -1, 0, NEED_UNDO, NULL, DLG_FSEL, FS_EXPORT_UNDO2 },
+	{ _("//Export ASCII Art ..."), -1, 0, NEED_IDX, NULL, DLG_FSEL, FS_EXPORT_ASCII },
+	{ _("//Export Animated GIF ..."), -1, 0, NEED_IDX, NULL, DLG_FSEL, FS_EXPORT_GIF },
+	{ "//", -4 },
+	{ _("//Actions"), -2 },
+	{ "///", -3 },
+	{ "///", -1, MENU_FACTION1, 0, NULL, ACT_FACTION, 1 },
+	{ "///", -1, MENU_FACTION2, 0, NULL, ACT_FACTION, 2 },
+	{ "///", -1, MENU_FACTION3, 0, NULL, ACT_FACTION, 3 },
+	{ "///", -1, MENU_FACTION4, 0, NULL, ACT_FACTION, 4 },
+	{ "///", -1, MENU_FACTION5, 0, NULL, ACT_FACTION, 5 },
+	{ "///", -1, MENU_FACTION6, 0, NULL, ACT_FACTION, 6 },
+	{ "///", -1, MENU_FACTION7, 0, NULL, ACT_FACTION, 7 },
+	{ "///", -1, MENU_FACTION8, 0, NULL, ACT_FACTION, 8 },
+	{ "///", -1, MENU_FACTION9, 0, NULL, ACT_FACTION, 9 },
+	{ "///", -1, MENU_FACTION10, 0, NULL, ACT_FACTION, 10 },
+	{ "///", -1, MENU_FACTION11, 0, NULL, ACT_FACTION, 11 },
+	{ "///", -1, MENU_FACTION12, 0, NULL, ACT_FACTION, 12 },
+	{ "///", -1, MENU_FACTION13, 0, NULL, ACT_FACTION, 13 },
+	{ "///", -1, MENU_FACTION14, 0, NULL, ACT_FACTION, 14 },
+	{ "///", -1, MENU_FACTION15, 0, NULL, ACT_FACTION, 15 },
+	{ "///", -4, MENU_FACTION_S },
+	{ _("///Configure"), -1, 0, 0, NULL, DLG_FACTIONS, 0 },
+	{ "//", -4, MENU_RECENT_S },
+	{ "//", -1, MENU_RECENT1, 0, "<shift><control>F1", ACT_LOAD_RECENT, 1 },
+	{ "//", -1, MENU_RECENT2, 0, "<shift><control>F2", ACT_LOAD_RECENT, 2 },
+	{ "//", -1, MENU_RECENT3, 0, "<shift><control>F3", ACT_LOAD_RECENT, 3 },
+	{ "//", -1, MENU_RECENT4, 0, "<shift><control>F4", ACT_LOAD_RECENT, 4 },
+	{ "//", -1, MENU_RECENT5, 0, "<shift><control>F5", ACT_LOAD_RECENT, 5 },
+	{ "//", -1, MENU_RECENT6, 0, "<shift><control>F6", ACT_LOAD_RECENT, 6 },
+	{ "//", -1, MENU_RECENT7, 0, "<shift><control>F7", ACT_LOAD_RECENT, 7 },
+	{ "//", -1, MENU_RECENT8, 0, "<shift><control>F8", ACT_LOAD_RECENT, 8 },
+	{ "//", -1, MENU_RECENT9, 0, "<shift><control>F9", ACT_LOAD_RECENT, 9 },
+	{ "//", -1, MENU_RECENT10, 0, "<shift><control>F10", ACT_LOAD_RECENT, 10 },
+	{ "//", -1, MENU_RECENT11, 0, NULL, ACT_LOAD_RECENT, 11 },
+	{ "//", -1, MENU_RECENT12, 0, NULL, ACT_LOAD_RECENT, 12 },
+	{ "//", -1, MENU_RECENT13, 0, NULL, ACT_LOAD_RECENT, 13 },
+	{ "//", -1, MENU_RECENT14, 0, NULL, ACT_LOAD_RECENT, 14 },
+	{ "//", -1, MENU_RECENT15, 0, NULL, ACT_LOAD_RECENT, 15 },
+	{ "//", -1, MENU_RECENT16, 0, NULL, ACT_LOAD_RECENT, 16 },
+	{ "//", -1, MENU_RECENT17, 0, NULL, ACT_LOAD_RECENT, 17 },
+	{ "//", -1, MENU_RECENT18, 0, NULL, ACT_LOAD_RECENT, 18 },
+	{ "//", -1, MENU_RECENT19, 0, NULL, ACT_LOAD_RECENT, 19 },
+	{ "//", -1, MENU_RECENT20, 0, NULL, ACT_LOAD_RECENT, 20 },
+	{ "//", -4 },
+	{ _("//Quit"), -1, 0, 0, "<control>Q", ACT_QUIT, 1 },
 
 	{ _("/_Edit"), -2 -16 },
-	{ _("/Edit/tear"), -3 },
-	{ _("/Edit/Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_UNDO, 0, XPM_ICON(undo) },
-	{ _("/Edit/Redo"), -1, 0, NEED_REDO, "<control>R", ACT_REDO, 0, XPM_ICON(redo) },
-	{ _("/Edit/sep1"), -4 },
-	{ _("/Edit/Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, XPM_ICON(cut) },
-	{ _("/Edit/Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, XPM_ICON(copy) },
-	{ _("/Edit/Copy To Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
-	{ _("/Edit/Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, XPM_ICON(paste) },
-	{ _("/Edit/Paste To New Layer"), -1, 0, NEED_PCLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
-	{ _("/Edit/Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
-	{ _("/Edit/Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, XPM_ICON(text) },
+	{ "//", -3 },
+	{ _("//Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_UNDO, 0, XPM_ICON(undo) },
+	{ _("//Redo"), -1, 0, NEED_REDO, "<control>R", ACT_REDO, 0, XPM_ICON(redo) },
+	{ "//", -4 },
+	{ _("//Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, XPM_ICON(cut) },
+	{ _("//Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, XPM_ICON(copy) },
+	{ _("//Copy To Palette"), -1, 0, NEED_PSEL, NULL, ACT_COPY_PAL, 0 },
+	{ _("//Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, XPM_ICON(paste) },
+	{ _("//Paste To New Layer"), -1, 0, NEED_PCLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
+	{ _("//Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
+	{ _("//Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, XPM_ICON(text) },
 #ifdef U_FREETYPE
-	{ _("/Edit/Paste Text (FreeType)"), -1, 0, 0, "T", DLG_TEXT_FT, 0 },
+	{ _("//Paste Text (FreeType)"), -1, 0, 0, "T", DLG_TEXT_FT, 0 },
 #endif
-	{ _("/Edit/Paste Palette"), -1, 0, 0, NULL, ACT_PASTE_PAL, 0 },
-	{ _("/Edit/sep2"), -4 },
-	{ _("/Edit/Load Clipboard"), -2 },
-	{ _("/Edit/Load Clipboard/tear"), -3 },
-	{ _("/Edit/Load Clipboard/1"), -1, 0, 0, "<shift>F1", ACT_LOAD_CLIP, 1 },
-	{ _("/Edit/Load Clipboard/2"), -1, 0, 0, "<shift>F2", ACT_LOAD_CLIP, 2 },
-	{ _("/Edit/Load Clipboard/3"), -1, 0, 0, "<shift>F3", ACT_LOAD_CLIP, 3 },
-	{ _("/Edit/Load Clipboard/4"), -1, 0, 0, "<shift>F4", ACT_LOAD_CLIP, 4 },
-	{ _("/Edit/Load Clipboard/5"), -1, 0, 0, "<shift>F5", ACT_LOAD_CLIP, 5 },
-	{ _("/Edit/Load Clipboard/6"), -1, 0, 0, "<shift>F6", ACT_LOAD_CLIP, 6 },
-	{ _("/Edit/Load Clipboard/7"), -1, 0, 0, "<shift>F7", ACT_LOAD_CLIP, 7 },
-	{ _("/Edit/Load Clipboard/8"), -1, 0, 0, "<shift>F8", ACT_LOAD_CLIP, 8 },
-	{ _("/Edit/Load Clipboard/9"), -1, 0, 0, "<shift>F9", ACT_LOAD_CLIP, 9 },
-	{ _("/Edit/Load Clipboard/10"), -1, 0, 0, "<shift>F10", ACT_LOAD_CLIP, 10 },
-	{ _("/Edit/Load Clipboard/11"), -1, 0, 0, "<shift>F11", ACT_LOAD_CLIP, 11 },
-	{ _("/Edit/Load Clipboard/12"), -1, 0, 0, "<shift>F12", ACT_LOAD_CLIP, 12 },
-	{ _("/Edit/Save Clipboard"), -2 },
-	{ _("/Edit/Save Clipboard/tear"), -3 },
-	{ _("/Edit/Save Clipboard/1"), -1, 0, NEED_CLIP, "<control>F1", ACT_SAVE_CLIP, 1 },
-	{ _("/Edit/Save Clipboard/2"), -1, 0, NEED_CLIP, "<control>F2", ACT_SAVE_CLIP, 2 },
-	{ _("/Edit/Save Clipboard/3"), -1, 0, NEED_CLIP, "<control>F3", ACT_SAVE_CLIP, 3 },
-	{ _("/Edit/Save Clipboard/4"), -1, 0, NEED_CLIP, "<control>F4", ACT_SAVE_CLIP, 4 },
-	{ _("/Edit/Save Clipboard/5"), -1, 0, NEED_CLIP, "<control>F5", ACT_SAVE_CLIP, 5 },
-	{ _("/Edit/Save Clipboard/6"), -1, 0, NEED_CLIP, "<control>F6", ACT_SAVE_CLIP, 6 },
-	{ _("/Edit/Save Clipboard/7"), -1, 0, NEED_CLIP, "<control>F7", ACT_SAVE_CLIP, 7 },
-	{ _("/Edit/Save Clipboard/8"), -1, 0, NEED_CLIP, "<control>F8", ACT_SAVE_CLIP, 8 },
-	{ _("/Edit/Save Clipboard/9"), -1, 0, NEED_CLIP, "<control>F9", ACT_SAVE_CLIP, 9 },
-	{ _("/Edit/Save Clipboard/10"), -1, 0, NEED_CLIP, "<control>F10", ACT_SAVE_CLIP, 10 },
-	{ _("/Edit/Save Clipboard/11"), -1, 0, NEED_CLIP, "<control>F11", ACT_SAVE_CLIP, 11 },
-	{ _("/Edit/Save Clipboard/12"), -1, 0, NEED_CLIP, "<control>F12", ACT_SAVE_CLIP, 12 },
-	{ _("/Edit/Import Clipboard from System"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
-	{ _("/Edit/Export Clipboard to System"), -1, 0, NEED_CLIP, NULL, ACT_SAVE_CLIP, -1 },
-	{ _("/Edit/sep3"), -4 },
-	{ _("/Edit/Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
-	{ _("/Edit/Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
+	{ _("//Paste Palette"), -1, 0, 0, NULL, ACT_PASTE_PAL, 0 },
+	{ "//", -4 },
+	{ _("//Load Clipboard"), -2 },
+	{ "///", -3 },
+	{ "///1", -1, 0, 0, "<shift>F1", ACT_LOAD_CLIP, 1 },
+	{ "///2", -1, 0, 0, "<shift>F2", ACT_LOAD_CLIP, 2 },
+	{ "///3", -1, 0, 0, "<shift>F3", ACT_LOAD_CLIP, 3 },
+	{ "///4", -1, 0, 0, "<shift>F4", ACT_LOAD_CLIP, 4 },
+	{ "///5", -1, 0, 0, "<shift>F5", ACT_LOAD_CLIP, 5 },
+	{ "///6", -1, 0, 0, "<shift>F6", ACT_LOAD_CLIP, 6 },
+	{ "///7", -1, 0, 0, "<shift>F7", ACT_LOAD_CLIP, 7 },
+	{ "///8", -1, 0, 0, "<shift>F8", ACT_LOAD_CLIP, 8 },
+	{ "///9", -1, 0, 0, "<shift>F9", ACT_LOAD_CLIP, 9 },
+	{ "///10", -1, 0, 0, "<shift>F10", ACT_LOAD_CLIP, 10 },
+	{ "///11", -1, 0, 0, "<shift>F11", ACT_LOAD_CLIP, 11 },
+	{ "///12", -1, 0, 0, "<shift>F12", ACT_LOAD_CLIP, 12 },
+	{ _("//Save Clipboard"), -2 },
+	{ "///", -3 },
+	{ "///1", -1, 0, NEED_CLIP, "<control>F1", ACT_SAVE_CLIP, 1 },
+	{ "///2", -1, 0, NEED_CLIP, "<control>F2", ACT_SAVE_CLIP, 2 },
+	{ "///3", -1, 0, NEED_CLIP, "<control>F3", ACT_SAVE_CLIP, 3 },
+	{ "///4", -1, 0, NEED_CLIP, "<control>F4", ACT_SAVE_CLIP, 4 },
+	{ "///5", -1, 0, NEED_CLIP, "<control>F5", ACT_SAVE_CLIP, 5 },
+	{ "///6", -1, 0, NEED_CLIP, "<control>F6", ACT_SAVE_CLIP, 6 },
+	{ "///7", -1, 0, NEED_CLIP, "<control>F7", ACT_SAVE_CLIP, 7 },
+	{ "///8", -1, 0, NEED_CLIP, "<control>F8", ACT_SAVE_CLIP, 8 },
+	{ "///9", -1, 0, NEED_CLIP, "<control>F9", ACT_SAVE_CLIP, 9 },
+	{ "///10", -1, 0, NEED_CLIP, "<control>F10", ACT_SAVE_CLIP, 10 },
+	{ "///11", -1, 0, NEED_CLIP, "<control>F11", ACT_SAVE_CLIP, 11 },
+	{ "///12", -1, 0, NEED_CLIP, "<control>F12", ACT_SAVE_CLIP, 12 },
+	{ _("//Import Clipboard from System"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
+	{ _("//Export Clipboard to System"), -1, 0, NEED_CLIP, NULL, ACT_SAVE_CLIP, -1 },
+	{ "//", -4 },
+	{ _("//Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
+	{ _("//Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
 
 	{ _("/_View"), -2 -16 },
-	{ _("/View/tear"), -3 },
-	{ _("/View/Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", ACT_TBAR, TOOLBAR_MAIN },
-	{ _("/View/Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", ACT_TBAR, TOOLBAR_TOOLS },
-	{ _("/View/Show Settings Toolbar"), 0, MENU_TBSET, 0, "F7", ACT_TBAR, TOOLBAR_SETTINGS },
-	{ _("/View/Show Dock"), 0, MENU_DOCK, 0, "F12", ACT_DOCK, 0 },
-	{ _("/View/Show Palette"), 0, MENU_SHOWPAL, 0, "F8", ACT_TBAR, TOOLBAR_PALETTE },
-	{ _("/View/Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, ACT_TBAR, TOOLBAR_STATUS },
-	{ _("/View/sep1"), -4 },
-	{ _("/View/Toggle Image View"), -1, 0, 0, "Home", ACT_VIEW, 0 },
-	{ _("/View/Centralize Image"), 0, MENU_CENTER, 0, NULL, ACT_CENTER, 0 },
-	{ _("/View/Show Zoom Grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
-	{ _("/View/Configure Grid ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_GRID },
-	{ _("/View/Tracing Image ..."), -1, 0, 0, NULL, DLG_TRACE, 0 },
-	{ _("/View/sep2"), -4 },
-	{ _("/View/View Window"), 0, MENU_VIEW, 0, "V", ACT_VWWIN, 0 },
-	{ _("/View/Horizontal Split"), 0, 0, 0, "H", ACT_VWSPLIT, 0 },
-	{ _("/View/Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, ACT_VWFOCUS, 0 },
-	{ _("/View/sep3"), -4 },
-	{ _("/View/Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, XPM_ICON(pan) },
-	{ _("/View/Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
+	{ "//", -3 },
+	{ _("//Show Main Toolbar"), 0, MENU_TBMAIN, 0, "F5", ACT_TBAR, TOOLBAR_MAIN },
+	{ _("//Show Tools Toolbar"), 0, MENU_TBTOOLS, 0, "F6", ACT_TBAR, TOOLBAR_TOOLS },
+	{ _("//Show Settings Toolbar"), 0, MENU_TBSET, 0, "F7", ACT_TBAR, TOOLBAR_SETTINGS },
+	{ _("//Show Dock"), 0, MENU_DOCK, 0, "F12", ACT_DOCK, 0 },
+	{ _("//Show Palette"), 0, MENU_SHOWPAL, 0, "F8", ACT_TBAR, TOOLBAR_PALETTE },
+	{ _("//Show Status Bar"), 0, MENU_SHOWSTAT, 0, NULL, ACT_TBAR, TOOLBAR_STATUS },
+	{ "//", -4 },
+	{ _("//Toggle Image View"), -1, 0, 0, "Home", ACT_VIEW, 0 },
+	{ _("//Centralize Image"), 0, MENU_CENTER, 0, NULL, ACT_CENTER, 0 },
+	{ _("//Show Zoom Grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
+	{ _("//Configure Grid ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_GRID },
+	{ _("//Tracing Image ..."), -1, 0, 0, NULL, DLG_TRACE, 0 },
+	{ "//", -4 },
+	{ _("//View Window"), 0, MENU_VIEW, 0, "V", ACT_VWWIN, 0 },
+	{ _("//Horizontal Split"), 0, 0, 0, "H", ACT_VWSPLIT, 0 },
+	{ _("//Focus View Window"), 0, MENU_VWFOCUS, 0, NULL, ACT_VWFOCUS, 0 },
+	{ "//", -4 },
+	{ _("//Pan Window"), -1, 0, 0, "End", ACT_PAN, 0, XPM_ICON(pan) },
+	{ _("//Layers Window"), 0, MENU_LAYER, 0, "L", DLG_LAYERS, 0 },
 
 	{ _("/_Image"), -2 -16 },
-	{ _("/Image/tear"), -3 },
-	{ _("/Image/Convert To RGB"), -1, 0, NEED_IDX, NULL, FILT_2RGB, 0 },
-	{ _("/Image/Convert To Indexed ..."), -1, 0, NEED_24, NULL, DLG_INDEXED, 0 },
-	{ _("/Image/sep1"), -4 },
-	{ _("/Image/Scale Canvas ..."), -1, 0, 0, NULL, DLG_SCALE, 0 },
-	{ _("/Image/Resize Canvas ..."), -1, 0, 0, NULL, DLG_SIZE, 0 },
-	{ _("/Image/Crop"), -1, 0, NEED_CROP, "<control><shift>X", ACT_CROP, 0 },
-	{ _("/Image/sep2"), -4 },
-	{ _("/Image/Flip Vertically"), -1, 0, 0, NULL, ACT_FLIP_V, 0 },
-	{ _("/Image/Flip Horizontally"), -1, 0, 0, "<control>M", ACT_FLIP_H, 0 },
-	{ _("/Image/Rotate Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 0 },
-	{ _("/Image/Rotate Anti-Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 1 },
-	{ _("/Image/Free Rotate ..."), -1, 0, 0, NULL, DLG_ROTATE, 0 },
-	{ _("/Image/Skew ..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
-	{ _("/Image/sep3"), -4 },
-	{ _("/Image/Information ..."), -1, 0, 0, "<control>I", DLG_INFO, 0 },
-	{ _("/Image/Preferences ..."), -1, MENU_PREFS, 0, "<control>P", DLG_PREFS, 0 },
+	{ "//", -3 },
+	{ _("//Convert To RGB"), -1, 0, NEED_IDX, NULL, FILT_2RGB, 0 },
+	{ _("//Convert To Indexed ..."), -1, 0, NEED_24, NULL, DLG_INDEXED, 0 },
+	{ "//", -4 },
+	{ _("//Scale Canvas ..."), -1, 0, 0, NULL, DLG_SCALE, 0 },
+	{ _("//Resize Canvas ..."), -1, 0, 0, NULL, DLG_SIZE, 0 },
+	{ _("//Crop"), -1, 0, NEED_CROP, "<control><shift>X", ACT_CROP, 0 },
+	{ "//", -4 },
+	{ _("//Flip Vertically"), -1, 0, 0, NULL, ACT_FLIP_V, 0 },
+	{ _("//Flip Horizontally"), -1, 0, 0, "<control>M", ACT_FLIP_H, 0 },
+	{ _("//Rotate Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 0 },
+	{ _("//Rotate Anti-Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 1 },
+	{ _("//Free Rotate ..."), -1, 0, 0, NULL, DLG_ROTATE, 0 },
+	{ _("//Skew ..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
+	{ "//", -4 },
+	{ _("//Information ..."), -1, 0, 0, "<control>I", DLG_INFO, 0 },
+	{ _("//Preferences ..."), -1, MENU_PREFS, 0, "<control>P", DLG_PREFS, 0 },
 
 	{ _("/_Selection"), -2 -16 },
-	{ _("/Selection/tear"), -3 },
-	{ _("/Selection/Select All"), -1, 0, 0, "<control>A", ACT_SELECT, 1 },
-	{ _("/Selection/Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", ACT_SELECT, 0 },
-	{ _("/Selection/Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, XPM_ICON(lasso) },
-	{ _("/Selection/Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 1 },
-	{ _("/Selection/sep1"), -4 },
-	{ _("/Selection/Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, XPM_ICON(rect1) },
-	{ _("/Selection/Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", ACT_OUTLINE, 1, XPM_ICON(rect2) },
-	{ _("/Selection/Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", ACT_ELLIPSE, 0, XPM_ICON(ellipse2) },
-	{ _("/Selection/Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", ACT_ELLIPSE, 1, XPM_ICON(ellipse) },
-	{ _("/Selection/sep2"), -4 },
-	{ _("/Selection/Flip Vertically"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_V, 0, XPM_ICON(flip_vs) },
-	{ _("/Selection/Flip Horizontally"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_H, 0, XPM_ICON(flip_hs) },
-	{ _("/Selection/Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 0, XPM_ICON(rotate_cs) },
-	{ _("/Selection/Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 1, XPM_ICON(rotate_as) },
-	{ _("/Selection/sep3"), -4 },
-	{ _("/Selection/Horizontal Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 0 },
-	{ _("/Selection/Vertical Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 1 },
-	{ _("/Selection/sep4"), -4 },
-	{ _("/Selection/Alpha Blend A,B"), -1, 0, NEED_ACLIP, NULL, ACT_SEL_ALPHA_AB, 0 },
-	{ _("/Selection/Move Alpha to Mask"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ALPHAMASK, 0 },
-	{ _("/Selection/Mask Colour A,B"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK_AB, 0 },
-	{ _("/Selection/Unmask Colour A,B"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK_AB, 255 },
-	{ _("/Selection/Mask All Colours"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK, 0 },
-	{ _("/Selection/Clear Mask"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK, 255 },
+	{ "//", -3 },
+	{ _("//Select All"), -1, 0, 0, "<control>A", ACT_SELECT, 1 },
+	{ _("//Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", ACT_SELECT, 0 },
+	{ _("//Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, XPM_ICON(lasso) },
+	{ _("//Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 1 },
+	{ "//", -4 },
+	{ _("//Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, XPM_ICON(rect1) },
+	{ _("//Fill Selection"), -1, 0, NEED_SEL2, "<shift><control>T", ACT_OUTLINE, 1, XPM_ICON(rect2) },
+	{ _("//Outline Ellipse"), -1, 0, NEED_SEL, "<control>L", ACT_ELLIPSE, 0, XPM_ICON(ellipse2) },
+	{ _("//Fill Ellipse"), -1, 0, NEED_SEL, "<shift><control>L", ACT_ELLIPSE, 1, XPM_ICON(ellipse) },
+	{ "//", -4 },
+	{ _("//Flip Vertically"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_V, 0, XPM_ICON(flip_vs) },
+	{ _("//Flip Horizontally"), -1, 0, NEED_CLIP, NULL, ACT_SEL_FLIP_H, 0, XPM_ICON(flip_hs) },
+	{ _("//Rotate Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 0, XPM_ICON(rotate_cs) },
+	{ _("//Rotate Anti-Clockwise"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ROT, 1, XPM_ICON(rotate_as) },
+	{ "//", -4 },
+	{ _("//Horizontal Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 0 },
+	{ _("//Vertical Ramp"), -1, 0, NEED_SEL, NULL, ACT_RAMP, 1 },
+	{ "//", -4 },
+	{ _("//Alpha Blend A,B"), -1, 0, NEED_ACLIP, NULL, ACT_SEL_ALPHA_AB, 0 },
+	{ _("//Move Alpha to Mask"), -1, 0, NEED_CLIP, NULL, ACT_SEL_ALPHAMASK, 0 },
+	{ _("//Mask Colour A,B"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK_AB, 0 },
+	{ _("//Unmask Colour A,B"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK_AB, 255 },
+	{ _("//Mask All Colours"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK, 0 },
+	{ _("//Clear Mask"), -1, 0, NEED_CLIP, NULL, ACT_SEL_MASK, 255 },
 
 	{ _("/_Palette"), -2 -16 },
-	{ _("/Palette/tear"), -3 },
-	{ _("/Palette/Open ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_LOAD, XPM_ICON(open) },
-	{ _("/Palette/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_SAVE, XPM_ICON(save) },
-	{ _("/Palette/Load Default"), -1, 0, 0, NULL, ACT_PAL_DEF, 0 },
-	{ _("/Palette/sep1"), -4 },
-	{ _("/Palette/Mask All"), -1, 0, 0, NULL, ACT_PAL_MASK, 255 },
-	{ _("/Palette/Mask None"), -1, 0, 0, NULL, ACT_PAL_MASK, 0 },
-	{ _("/Palette/sep2"), -4 },
-	{ _("/Palette/Swap A & B"), -1, 0, 0, "X", ACT_SWAP_AB, 0 },
-	{ _("/Palette/Edit Colour A & B ..."), -1, 0, 0, "<control>E", DLG_COLORS, COLSEL_EDIT_AB },
-	{ _("/Palette/Dither A"), -1, 0, NEED_24, NULL, ACT_DITHER_A, 0 },
-	{ _("/Palette/Palette Editor ..."), -1, 0, 0, "<control>W", DLG_COLORS, COLSEL_EDIT_ALL },
-	{ _("/Palette/Set Palette Size ..."), -1, 0, 0, NULL, DLG_PAL_SIZE, 0 },
-	{ _("/Palette/Merge Duplicate Colours"), -1, 0, NEED_IDX, NULL, ACT_PAL_MERGE, 0 },
-	{ _("/Palette/Remove Unused Colours"), -1, 0, NEED_IDX, NULL, ACT_PAL_CLEAN, 0 },
-	{ _("/Palette/sep3"), -4 },
-	{ _("/Palette/Create Quantized ..."), -1, 0, NEED_24, NULL, DLG_INDEXED, 1 },
-	{ _("/Palette/sep4"), -4 },
-	{ _("/Palette/Sort Colours ..."), -1, 0, 0, NULL, DLG_PAL_SORT, 0 },
-	{ _("/Palette/Palette Shifter ..."), -1, 0, 0, NULL, DLG_PAL_SHIFTER, 0 },
-	{ _("/Palette/Pick Gradient ..."), -1, 0, 0, NULL, DLG_PICK_GRAD, 0 },
+	{ "//", -3 },
+	{ _("//Load ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_LOAD, XPM_ICON(open) },
+	{ _("//Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_PALETTE_SAVE, XPM_ICON(save) },
+	{ _("//Load Default"), -1, 0, 0, NULL, ACT_PAL_DEF, 0 },
+	{ "//", -4 },
+	{ _("//Mask All"), -1, 0, 0, NULL, ACT_PAL_MASK, 255 },
+	{ _("//Mask None"), -1, 0, 0, NULL, ACT_PAL_MASK, 0 },
+	{ "//", -4 },
+	{ _("//Swap A & B"), -1, 0, 0, "X", ACT_SWAP_AB, 0 },
+	{ _("//Edit Colour A & B ..."), -1, 0, 0, "<control>E", DLG_COLORS, COLSEL_EDIT_AB },
+	{ _("//Dither A"), -1, 0, NEED_24, NULL, ACT_DITHER_A, 0 },
+	{ _("//Palette Editor ..."), -1, 0, 0, "<control>W", DLG_COLORS, COLSEL_EDIT_ALL },
+	{ _("//Set Palette Size ..."), -1, 0, 0, NULL, DLG_PAL_SIZE, 0 },
+	{ _("//Merge Duplicate Colours"), -1, 0, NEED_IDX, NULL, ACT_PAL_MERGE, 0 },
+	{ _("//Remove Unused Colours"), -1, 0, NEED_IDX, NULL, ACT_PAL_CLEAN, 0 },
+	{ "//", -4 },
+	{ _("//Create Quantized ..."), -1, 0, NEED_24, NULL, DLG_INDEXED, 1 },
+	{ "//", -4 },
+	{ _("//Sort Colours ..."), -1, 0, 0, NULL, DLG_PAL_SORT, 0 },
+	{ _("//Palette Shifter ..."), -1, 0, 0, NULL, DLG_PAL_SHIFTER, 0 },
+	{ _("//Pick Gradient ..."), -1, 0, 0, NULL, DLG_PICK_GRAD, 0 },
 
 	{ _("/Effe_cts"), -2 -16 },
-	{ _("/Effects/tear"), -3 },
-	{ _("/Effects/Transform Colour ..."), -1, 0, 0, "<control><shift>C", DLG_BRCOSA, 0, XPM_ICON(brcosa) },
-	{ _("/Effects/Invert"), -1, 0, 0, "<control><shift>I", FILT_INVERT, 0 },
-	{ _("/Effects/Greyscale"), -1, 0, 0, "<control>G", FILT_GREY, 0 },
-	{ _("/Effects/Greyscale (Gamma corrected)"), -1, 0, 0, "<control><shift>G", FILT_GREY, 1 },
-	{ _("/Effects/Isometric Transformation"), -2 },
-	{ _("/Effects/Isometric Transformation/tear"), -3 },
-	{ _("/Effects/Isometric Transformation/Left Side Down"), -1, 0, 0, NULL, ACT_ISOMETRY, 0 },
-	{ _("/Effects/Isometric Transformation/Right Side Down"), -1, 0, 0, NULL, ACT_ISOMETRY, 1 },
-	{ _("/Effects/Isometric Transformation/Top Side Right"), -1, 0, 0, NULL, ACT_ISOMETRY, 2 },
-	{ _("/Effects/Isometric Transformation/Bottom Side Right"), -1, 0, 0, NULL, ACT_ISOMETRY, 3 },
-	{ _("/Effects/sep1"), -4 },
-	{ _("/Effects/Edge Detect ..."), -1, 0, NEED_NOIDX, NULL, FILT_EDGE, 0 },
-	{ _("/Effects/Difference of Gaussians ..."), -1, 0, NEED_NOIDX, NULL, FILT_DOG, 0 },
-	{ _("/Effects/Sharpen ..."), -1, 0, NEED_NOIDX, NULL, FILT_SHARPEN, 0 },
-	{ _("/Effects/Unsharp Mask ..."), -1, 0, NEED_NOIDX, NULL, FILT_UNSHARP, 0 },
-	{ _("/Effects/Soften ..."), -1, 0, NEED_NOIDX, NULL, FILT_SOFTEN, 0 },
-	{ _("/Effects/Gaussian Blur ..."), -1, 0, NEED_NOIDX, NULL, FILT_GAUSS, 0 },
-	{ _("/Effects/Kuwahara-Nagao Blur ..."), -1, 0, NEED_24, NULL, FILT_KUWAHARA, 0 },
-	{ _("/Effects/Emboss"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_EMBOSS },
-	{ _("/Effects/Dilate"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_DILATE },
-	{ _("/Effects/Erode"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_ERODE },
-	{ _("/Effects/sep2"), -4 },
-	{ _("/Effects/Bacteria ..."), -1, 0, NEED_IDX, NULL, FILT_BACT, 0 },
+	{ "//", -3 },
+	{ _("//Transform Colour ..."), -1, 0, 0, "<control><shift>C", DLG_BRCOSA, 0, XPM_ICON(brcosa) },
+	{ _("//Invert"), -1, 0, 0, "<control><shift>I", FILT_INVERT, 0 },
+	{ _("//Greyscale"), -1, 0, 0, "<control>G", FILT_GREY, 0 },
+	{ _("//Greyscale (Gamma corrected)"), -1, 0, 0, "<control><shift>G", FILT_GREY, 1 },
+	{ _("//Isometric Transformation"), -2 },
+	{ "///", -3 },
+	{ _("///Left Side Down"), -1, 0, 0, NULL, ACT_ISOMETRY, 0 },
+	{ _("///Right Side Down"), -1, 0, 0, NULL, ACT_ISOMETRY, 1 },
+	{ _("///Top Side Right"), -1, 0, 0, NULL, ACT_ISOMETRY, 2 },
+	{ _("///Bottom Side Right"), -1, 0, 0, NULL, ACT_ISOMETRY, 3 },
+	{ "//", -4 },
+	{ _("//Edge Detect ..."), -1, 0, NEED_NOIDX, NULL, FILT_EDGE, 0 },
+	{ _("//Difference of Gaussians ..."), -1, 0, NEED_NOIDX, NULL, FILT_DOG, 0 },
+	{ _("//Sharpen ..."), -1, 0, NEED_NOIDX, NULL, FILT_SHARPEN, 0 },
+	{ _("//Unsharp Mask ..."), -1, 0, NEED_NOIDX, NULL, FILT_UNSHARP, 0 },
+	{ _("//Soften ..."), -1, 0, NEED_NOIDX, NULL, FILT_SOFTEN, 0 },
+	{ _("//Gaussian Blur ..."), -1, 0, NEED_NOIDX, NULL, FILT_GAUSS, 0 },
+	{ _("//Kuwahara-Nagao Blur ..."), -1, 0, NEED_24, NULL, FILT_KUWAHARA, 0 },
+	{ _("//Emboss"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_EMBOSS },
+	{ _("//Dilate"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_DILATE },
+	{ _("//Erode"), -1, 0, NEED_NOIDX, NULL, FILT_FX, FX_ERODE },
+	{ "//", -4 },
+	{ _("//Bacteria ..."), -1, 0, NEED_IDX, NULL, FILT_BACT, 0 },
 
 	{ _("/Cha_nnels"), -2 -16 },
-	{ _("/Channels/tear"), -3 },
-	{ _("/Channels/New ..."), -1, 0, 0, NULL, ACT_CHANNEL, -1 },
-	{ _("/Channels/Load ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_LOAD, XPM_ICON(open) },
-	{ _("/Channels/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_SAVE, XPM_ICON(save) },
-	{ _("/Channels/Delete ..."), -1, 0, NEED_CHAN, NULL, DLG_CHN_DEL, -1 },
-	{ _("/Channels/sep1"), -4 },
-	{ _("/Channels/Edit Image"), 1, MENU_CHAN0, 0, NULL, ACT_CHANNEL, CHN_IMAGE },
-	{ _("/Channels/Edit Alpha"), 1, MENU_CHAN1, 0, NULL, ACT_CHANNEL, CHN_ALPHA },
-	{ _("/Channels/Edit Selection"), 1, MENU_CHAN2, 0, NULL, ACT_CHANNEL, CHN_SEL },
-	{ _("/Channels/Edit Mask"), 1, MENU_CHAN3, 0, NULL, ACT_CHANNEL, CHN_MASK },
-	{ _("/Channels/sep2"), -4 },
-	{ _("/Channels/Hide Image"), 0, MENU_DCHAN0, 0, NULL, ACT_SET_OVERLAY, 1 },
-	{ _("/Channels/Disable Alpha"), 0, MENU_DCHAN1, 0, NULL, ACT_CHN_DIS, CHN_ALPHA },
-	{ _("/Channels/Disable Selection"), 0, MENU_DCHAN2, 0, NULL, ACT_CHN_DIS, CHN_SEL },
-	{ _("/Channels/Disable Mask"), 0, MENU_DCHAN3, 0, NULL, ACT_CHN_DIS, CHN_MASK },
-	{ _("/Channels/sep3"), -4 },
-	{ _("/Channels/Couple RGBA Operations"), 0, MENU_RGBA, 0, NULL, ACT_SET_RGBA, 0 },
-	{ _("/Channels/Threshold ..."), -1, 0, 0, NULL, FILT_THRES, 0 },
-	{ _("/Channels/Unassociate Alpha"), -1, 0, NEED_RGBA, NULL, FILT_UALPHA, 0 },
-	{ _("/Channels/sep4"), -4 },
-	{ _("/Channels/View Alpha as an Overlay"), 0, 0, 0, NULL, ACT_SET_OVERLAY, 0 },
-	{ _("/Channels/Configure Overlays ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_OVERLAYS },
+	{ "//", -3 },
+	{ _("//New ..."), -1, 0, 0, NULL, ACT_CHANNEL, -1 },
+	{ _("//Load ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_LOAD, XPM_ICON(open) },
+	{ _("//Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_SAVE, XPM_ICON(save) },
+	{ _("//Delete ..."), -1, 0, NEED_CHAN, NULL, DLG_CHN_DEL, -1 },
+	{ "//", -4 },
+	{ _("//Edit Image"), 1, MENU_CHAN0, 0, NULL, ACT_CHANNEL, CHN_IMAGE },
+	{ _("//Edit Alpha"), 1, MENU_CHAN1, 0, NULL, ACT_CHANNEL, CHN_ALPHA },
+	{ _("//Edit Selection"), 1, MENU_CHAN2, 0, NULL, ACT_CHANNEL, CHN_SEL },
+	{ _("//Edit Mask"), 1, MENU_CHAN3, 0, NULL, ACT_CHANNEL, CHN_MASK },
+	{ "//", -4 },
+	{ _("//Hide Image"), 0, MENU_DCHAN0, 0, NULL, ACT_SET_OVERLAY, 1 },
+	{ _("//Disable Alpha"), 0, MENU_DCHAN1, 0, NULL, ACT_CHN_DIS, CHN_ALPHA },
+	{ _("//Disable Selection"), 0, MENU_DCHAN2, 0, NULL, ACT_CHN_DIS, CHN_SEL },
+	{ _("//Disable Mask"), 0, MENU_DCHAN3, 0, NULL, ACT_CHN_DIS, CHN_MASK },
+	{ "//", -4 },
+	{ _("//Couple RGBA Operations"), 0, MENU_RGBA, 0, NULL, ACT_SET_RGBA, 0 },
+	{ _("//Threshold ..."), -1, 0, 0, NULL, FILT_THRES, 0 },
+	{ _("//Unassociate Alpha"), -1, 0, NEED_RGBA, NULL, FILT_UALPHA, 0 },
+	{ "//", -4 },
+	{ _("//View Alpha as an Overlay"), 0, 0, 0, NULL, ACT_SET_OVERLAY, 0 },
+	{ _("//Configure Overlays ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_OVERLAYS },
 
 	{ _("/_Layers"), -2 -16 },
-	{ _("/Layers/tear"), -3 },
-	{ _("/Layers/New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_NEW, XPM_ICON(new) },
-	{ _("/Layers/Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, XPM_ICON(save) },
-	{ _("/Layers/Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
-	{ _("/Layers/Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
-	{ _("/Layers/Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },
-	{ _("/Layers/Remove All Layers"), -1, 0, 0, NULL, ACT_LR_DEL, 1 },
-	{ _("/Layers/sep1"), -4 },
-	{ _("/Layers/Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },
-	{ _("/Layers/Preview Animation ..."), -1, 0, 0, NULL, DLG_ANI_VIEW, 0 },
-	{ _("/Layers/Set Key Frame ..."), -1, 0, 0, NULL, DLG_ANI_KEY, 0 },
-	{ _("/Layers/Remove All Key Frames ..."), -1, 0, 0, NULL, DLG_ANI_KILLKEY, 0 },
+	{ "//", -3 },
+	{ _("//New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_NEW, XPM_ICON(new) },
+	{ _("//Save"), -1, 0, 0, "<shift><control>S", ACT_LR_SAVE, 0, XPM_ICON(save) },
+	{ _("//Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_LAYER_SAVE },
+	{ _("//Save Composite Image ..."), -1, 0, 0, NULL, DLG_FSEL, FS_COMPOSITE_SAVE },
+	{ _("//Composite to New Layer"), -1, 0, 0, NULL, ACT_LR_ADD, LR_COMP },
+	{ _("//Remove All Layers"), -1, 0, 0, NULL, ACT_LR_DEL, 1 },
+	{ "//", -4 },
+	{ _("//Configure Animation ..."), -1, 0, 0, NULL, DLG_ANI, 0 },
+	{ _("//Preview Animation ..."), -1, 0, 0, NULL, DLG_ANI_VIEW, 0 },
+	{ _("//Set Key Frame ..."), -1, 0, 0, NULL, DLG_ANI_KEY, 0 },
+	{ _("//Remove All Key Frames ..."), -1, 0, 0, NULL, DLG_ANI_KILLKEY, 0 },
 
 	{ _("/More..."), -2 -16 }, /* This will hold overflow submenu */
 
 	{ _("/_Help"), -5 },
-	{ _("/Help/Documentation"), -1, 0, 0, NULL, ACT_DOCS, 0 },
-	{ _("/Help/About"), -1, MENU_HELP, 0, "F1", DLG_ABOUT, 0 },
-	{ _("/Help/sep1"), -4 },
-	{ _("/Help/Rebind Shortcut Keycodes"), -1, 0, 0, NULL, ACT_REBIND_KEYS, 0 },
+	{ _("//Documentation"), -1, 0, 0, NULL, ACT_DOCS, 0 },
+	{ _("//About"), -1, MENU_HELP, 0, "F1", DLG_ABOUT, 0 },
+	{ "//", -4 },
+	{ _("//Rebind Shortcut Keycodes"), -1, 0, 0, NULL, ACT_REBIND_KEYS, 0 },
 
 	{ NULL, 0 }
 	};
