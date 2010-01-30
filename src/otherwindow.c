@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -164,18 +164,18 @@ static void create_new(GtkWidget *widget)
 		gdk_window_lower( new_window->window );
 
 		gdk_flush();
-		while (gtk_events_pending()) gtk_main_iteration();	// Wait for minimize
+		handle_events();	// Wait for minimize
 
-		sleep(1);			// Wait a second for screen to redraw
+		sleep(1);		// Wait a second for screen to redraw
 #else /* #if GTK_MAJOR_VERSION == 2 */
 		gtk_window_set_transient_for( GTK_WINDOW(new_window), NULL );
 		gdk_window_iconify( new_window->window );
 		gdk_window_iconify( main_window->window );
 
 		gdk_flush();
-		while (gtk_events_pending()) gtk_main_iteration();	// Wait for minimize
+		handle_events(); 	// Wait for minimize
 
-		g_usleep(400000);		// Wait 0.4 of a second for screen to redraw
+		g_usleep(400000);	// Wait 0.4 of a second for screen to redraw
 #endif
 
 		// Use current layer
@@ -412,55 +412,30 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 
 ///	ADD COLOURS TO PALETTE WINDOW
 
-
-GtkWidget *add_col_window;
-GtkWidget *spinbutton_col_add;
-
-
-static void click_col_add_ok(GtkWidget *widget)
+static int do_add_cols(GtkWidget *spin, gpointer fdata)
 {
-	int to_add;
+	int i;
 
-	to_add = read_spin(spinbutton_col_add);
-
-	if ( to_add != mem_cols )
+	i = read_spin(spin);
+	if (i != mem_cols)
 	{
 		spot_undo(UNDO_PAL);
 
-		if (to_add > mem_cols) memset(mem_pal + mem_cols, 0,
-			(to_add - mem_cols) * sizeof(png_color));
+		if (i > mem_cols) memset(mem_pal + mem_cols, 0,
+			(i - mem_cols) * sizeof(png_color));
 
-		mem_cols = to_add;
+		mem_cols = i;
 		update_stuff(UPD_ADDPAL);
 	}
 
-	gtk_widget_destroy(add_col_window);
+	return TRUE;
 }
-
 
 void pressed_add_cols()
 {
-	GtkWidget *vbox5;
-
-	add_col_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Set Palette Size"),
-		GTK_WIN_POS_CENTER, TRUE );
-
-	gtk_widget_set_usize (add_col_window, 320, -2);
-
-	vbox5 = add_vbox(add_col_window);
-
-	add_hseparator( vbox5, -2, 10 );
-
-	spinbutton_col_add = pack5(vbox5, add_a_spin(256, 2, 256));
-
-	add_hseparator( vbox5, -2, 10 );
-
-	pack(vbox5, OK_box(0, add_col_window, _("OK"), GTK_SIGNAL_FUNC(click_col_add_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	gtk_widget_show (add_col_window);
+	GtkWidget *spin = add_a_spin(256, 2, 256);
+	filter_window(_("Set Palette Size"), spin, do_add_cols, NULL, FALSE);
 }
-
 
 /* Generic code to handle UI needs of common image transform tasks */
 
@@ -473,7 +448,7 @@ typedef struct {
 void run_filter(GtkWidget *widget, gpointer user_data)
 {
 	filter_wrap *fw = gtk_object_get_user_data(GTK_OBJECT(widget));
-	if (fw->func(fw->cont, fw->data)) gtk_widget_destroy(widget);
+	if (fw->func(fw->cont, fw->data)) destroy_dialog(widget);
 	update_stuff(UPD_IMG);
 }
 
@@ -500,8 +475,9 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 	add_hseparator(vbox, -2, 10);
 
 	pack(vbox, OK_box(0, win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
+		_("Cancel"), GTK_SIGNAL_FUNC(destroy_dialog)));
 
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_widget_show(win);
 }
 
@@ -592,7 +568,7 @@ void pressed_sort_pal()
 
 	hbox3 = pack(vbox1, OK_box(5, spal_window, _("OK"), GTK_SIGNAL_FUNC(click_spal_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox3, _("Apply"), GTK_SIGNAL_FUNC(click_spal_apply), 1);
+	OK_box_add(hbox3, _("Apply"), GTK_SIGNAL_FUNC(click_spal_apply));
 
 	gtk_widget_show (spal_window);
 }
@@ -1245,28 +1221,23 @@ static int allcol_idx, allcol_preview;
 static colour_hook allcol_hook;
 
 
-static void allcol_ok(colour_hook chook)
+static void allcol_ok(GtkWidget *window)
 {
-	/* Prod the focused spinbutton, if any, to update its value */
-#if GTK_MAJOR_VERSION == 1
-	gtk_container_focus(GTK_CONTAINER(allcol_window), GTK_DIR_TAB_FORWARD);
-#else
-	gtk_widget_child_focus(allcol_window, GTK_DIR_TAB_FORWARD);
-#endif
-	chook(CHOOK_OK);
-	gtk_widget_destroy(allcol_window);
+	update_window_spin(window);
+	allcol_hook(CHOOK_OK);
+	gtk_widget_destroy(window);
 	free(ctable_[CHN_IMAGE]);
 }
 
-static void allcol_preview_toggle(GtkToggleButton *button, colour_hook chook)
+static void allcol_preview_toggle(GtkToggleButton *button, GtkWidget *window)
 {
-	chook((allcol_preview = button->active) ? CHOOK_PREVIEW : CHOOK_UNVIEW);
+	allcol_hook((allcol_preview = button->active) ? CHOOK_PREVIEW : CHOOK_UNVIEW);
 }
 
-static gboolean allcol_cancel(colour_hook chook)
+static gboolean allcol_cancel(GtkWidget *window)
 {
-	chook(CHOOK_CANCEL);
-	gtk_widget_destroy(allcol_window);
+	allcol_hook(CHOOK_CANCEL);
+	gtk_widget_destroy(window);
 	free(ctable_[CHN_IMAGE]);
 	return (FALSE);
 }
@@ -1349,13 +1320,12 @@ static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
 static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	char **cnames, int alpha, colour_hook chook, GtkSignalFunc lhook)
 {
-	GtkWidget *vbox, *hbox, *hbut, *button_ok, *button_preview, *button_cancel;
+	GtkWidget *vbox, *hbox, *hbut;
 	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
 	GtkWidget *cs;
 	GtkAdjustment *adj;
 	char txt[64], *tmp = txt;
 	int i;
-	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
 	if (idx >= cnt) idx = 0;
@@ -1367,9 +1337,6 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 	allcol_window = win;
 	allcol_hook = chook;
 	allcol_preview = FALSE;
-
-	gtk_signal_connect_object(GTK_OBJECT(allcol_window), "delete_event",
-		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
 
 	swindow = gtk_scrolled_window_new(NULL, NULL);
 	gtk_widget_show(swindow);
@@ -1442,34 +1409,20 @@ static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
 
 	if (extbox) pack(vbox, extbox);
 
-	hbut = pack(vbox, gtk_hbox_new(FALSE, 3));
+	hbut = OK_box(0, allcol_window, _("OK"), GTK_SIGNAL_FUNC(allcol_ok),
+		_("Cancel"), GTK_SIGNAL_FUNC(allcol_cancel));
+	OK_box_add_toggle(hbut, _("Preview"), GTK_SIGNAL_FUNC(allcol_preview_toggle));
 
-	button_ok = pack_end5(hbut, gtk_button_new_with_label(_("OK")));
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button_ok, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect_object(GTK_OBJECT(button_ok), "clicked",
-		GTK_SIGNAL_FUNC(allcol_ok), (gpointer)chook);
-	gtk_widget_set_usize(button_ok, 80, -2);
-
-	button_preview = pack_end5(hbut, gtk_toggle_button_new_with_label(_("Preview")));
-	gtk_signal_connect(GTK_OBJECT(button_preview), "toggled",
-		GTK_SIGNAL_FUNC(allcol_preview_toggle), (gpointer)chook);
-	gtk_widget_set_usize(button_preview, 80, -2);
-
-	button_cancel = pack_end5(hbut, gtk_button_new_with_label(_("Cancel")));
-	gtk_widget_add_accelerator (button_cancel, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect_object(GTK_OBJECT(button_cancel), "clicked",
-		GTK_SIGNAL_FUNC(allcol_cancel), (gpointer)chook);
-	gtk_widget_set_usize(button_cancel, 80, -2);
-	gtk_widget_show_all(hbut);
+	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(hbox);
+	pack_end(hbox, widget_align_minsize(hbut, 260, -1));
 
 	gtk_widget_show( cs );
 	gtk_window_set_transient_for( GTK_WINDOW(allcol_window), GTK_WINDOW(main_window) );
 	gtk_widget_show( allcol_window );
-	gtk_window_add_accel_group( GTK_WINDOW(allcol_window), ag );
 
 #if GTK_MAJOR_VERSION == 1
-	while (gtk_events_pending()) gtk_main_iteration();
+	handle_events();
 	/* GTK2 calls select handler on its own, GTK1 needs prodding */
 	gtk_list_select_item(GTK_LIST(col_list), idx);
 	/* Re-render sliders, adjust option menu */
@@ -2184,7 +2137,7 @@ static int quantize_cols;
 /* Quantization & dither settings - persistent */
 static int quantize_mode = -1, dither_mode = -1;
 static int quantize_tp;
-static int dither_cspace = CSPACE_SRGB, dither_dist = 2, dither_limit;
+static int dither_cspace = CSPACE_SRGB, dither_dist = DIST_L2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
 static double dither_fract[2] = {1.0, 0.0};
 
@@ -2336,6 +2289,19 @@ static void choose_selective(GtkMenuItem *menuitem, gpointer user_data)
 	dither_sel = i;
 }
 
+static GtkWidget *cspace_frame(int idx, gpointer var, GtkSignalFunc handler)
+{
+	return (add_with_frame(NULL, _("Colour space"),
+		wj_radio_pack(cspnames, NUM_CSPACES, 1, idx, var, handler)));
+}
+
+static GtkWidget *difference_frame(int idx, gpointer var, GtkSignalFunc handler)
+{
+	char *dist_txt[] = {_("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2)")};
+	return (add_with_frame(NULL, _("Difference measure"),
+		wj_radio_pack(dist_txt, 3, 1, idx, var, handler)));
+}
+
 void pressed_quantize(int palette)
 {
 	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
@@ -2354,7 +2320,6 @@ void pressed_quantize(int palette)
 		_("Scattered (effect)"), NULL
 		};
 
-	char *dist_txt[] = {_("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2)")};
 	char *clamp_txt[] = {_("Gamut"), _("Weakly"), _("Strongly")};
 	char *err_txt[] = {_("Off"), _("Separate/Sum"), _("Separate/Split"),
 		_("Length/Sum"), _("Length/Split"), NULL};
@@ -2417,12 +2382,8 @@ void pressed_quantize(int palette)
 
 		/* Settings page */
 
-		hbox = wj_radio_pack(cspnames, NUM_CSPACES, 1,
-			dither_cspace, &dither_cspace, NULL);
-		add_with_frame(page1, _("Colour space"), hbox);
-
-		hbox = wj_radio_pack(dist_txt, 3, 1, dither_dist, &dither_dist, NULL);
-		add_with_frame(page1, _("Difference measure"), hbox);
+		pack(page1, cspace_frame(dither_cspace, &dither_cspace, NULL));
+		pack(page1, difference_frame(dither_dist, &dither_dist, NULL));
 
 		hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
 		add_with_frame(page1, _("Reduce colour bleed"), hbox);
@@ -3084,7 +3045,7 @@ void gradient_setup(int mode)
 
 	align = pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(align, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply), 1);
+	OK_box_add(align, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply));
 
 	/* Fill in values */
 
@@ -3352,7 +3313,7 @@ void bkg_setup()
 
 	hbox = pack(vbox, OK_box(5, win, _("OK"), GTK_SIGNAL_FUNC(click_bkg_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_bkg_apply), 1);
+	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_bkg_apply));
 	bkg_update_widgets(bw);
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_widget_show_all(win);

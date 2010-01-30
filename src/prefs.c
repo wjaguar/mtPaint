@@ -687,7 +687,7 @@ void pressed_preferences()
 
 	hbox4 = pack(vbox3, OK_box(0, prefs_window, _("OK"), GTK_SIGNAL_FUNC(prefs_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(delete_prefs)));
-	OK_box_add(hbox4, _("Apply"), GTK_SIGNAL_FUNC(prefs_apply), 1);
+	OK_box_add(hbox4, _("Apply"), GTK_SIGNAL_FUNC(prefs_apply));
 
 	gtk_window_set_transient_for( GTK_WINDOW(prefs_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (prefs_window);

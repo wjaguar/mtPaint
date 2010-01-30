@@ -314,8 +314,8 @@ void pan_thumbnail()		// Create thumbnail and selection box
 {
 	GtkAdjustment *hori, *vert;
 
-	while (gtk_events_pending()) gtk_main_iteration();
-		// Update main window first to get new scroll positions if necessary
+	// Update main window first to get new scroll positions if necessary
+	handle_events();
 
 	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
 	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
@@ -353,7 +353,7 @@ static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
 		gtk_adjustment_value_changed(vert);
 
 		/* Process events */
-		while (gtk_events_pending()) gtk_main_iteration();
+		handle_events();
 		if (in_pan < 2) break;
 
 		/* Do delayed update */

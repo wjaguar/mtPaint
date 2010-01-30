@@ -460,7 +460,8 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 
 static const char root_dir[] = { DIR_SEP, 0 };
 
-/* Scan directory, populate widgets */
+/* Scan directory, populate widgets; return 1 if success, 0 if total failure,
+ * -1 if failed with original dir and scanned a different one */
 static int fpick_scan_directory(fpicker *win, char *name, char *select)
 {
 	static char updir[] = { DIR_SEP, ' ', '.', '.', 0 };
@@ -475,7 +476,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	GtkCList  *clist = GTK_CLIST(win->clist);
 	GdkPixmap *icons[2];
 	GdkBitmap *masks[2];
-	int i, l, len, row, fail, idx = -1;
+	int i, l, len, row, fail, idx = -1, res = 1;
 
 
 	icons[0] = icons[1] = NULL;
@@ -503,6 +504,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	fail = 0;
 	while (!(dp = opendir(full_name)))
 	{
+		res = -1; // Remember that original path was invalid
 		full_name[len - 1] = 0;
 		cp = strrchr(full_name, DIR_SEP);
 		// Try to go one level up
@@ -515,7 +517,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 			full_name[len++] = DIR_SEP;
                 }
 		// If current dir hasn't helped either, give up
-		else return (FALSE);
+		else return (0);
 		full_name[len] = 0;
 	}
 
@@ -643,7 +645,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	if (masks[0]) gdk_pixmap_unref(masks[0]);
 	if (masks[1]) gdk_pixmap_unref(masks[1]);
 
-	return TRUE;
+	return (res);
 }
 
 static void fpick_enter_dir_via_list(fpicker *fp, char *name)
@@ -709,31 +711,35 @@ static void fpick_select_row(GtkCList *clist, gint row, gint col,
 	}
 }
 
-static int fpick_enter_dirname(fpicker *fp, const char *name)
+/* Return 1 if changed directory, 0 if directory was the same, -1 if tried
+ * to change but failed */
+static int fpick_enter_dirname(fpicker *fp, const char *name, int l)
 {
 	char txt[PATHBUF], *ctxt;
+	int res = 0;
 
+	name = name ? g_strndup(name, l) :
+		g_strdup(gtk_entry_get_text(GTK_ENTRY(fp->combo_entry)));
 	gtkncpy(txt, name, PATHBUF);
 
 	fpick_cleanse_path(txt); // Path might have been entered manually
 
-	// Only do something if the directory is new
-	if (!strcmp(txt, fp->txt_directory)) return (0);
-
-	if (!fpick_scan_directory(fp, txt, NULL))
-	{	// Directory doesn't exist so ask user if they want to create it
+	if (strcmp(txt, fp->txt_directory) &&
+		// Only do something if the directory is new
+		((res = fpick_scan_directory(fp, txt, NULL)) <= 0))
+	{	// Directory doesn't exist so tell user
 		ctxt = g_strdup_printf(_("Could not access directory %s"), name);
 		alert_box(_("Error"), ctxt, NULL);
 		g_free(ctxt);
-		return (-1);
+		res = res < 0 ? 1 : -1;
 	}
-	return (1);
+	g_free((char *)name);
+	return (res);
 }
 
 static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 {
-	fpicker *fp = user_data;
-	fpick_enter_dirname(fp, gtk_entry_get_text(GTK_ENTRY(fp->combo_entry)));
+	fpick_enter_dirname(user_data, NULL, 0);
 }
 
 static void fpick_dialog_fn(char *key)
@@ -965,15 +971,20 @@ static void fpick_wildcard(GtkButton *button, gpointer user_data)
 	fpicker *fp = user_data;
 	char *ctxt, *ds, *nm, *mask = fp->txt_mask;
 
-	if (!fp->allow_files) return; // File entry is hidden anyway
 	ctxt = (char *)gtk_entry_get_text(GTK_ENTRY(fp->file_entry));
 	/* Presume filename if called by user pressing "OK", pattern otherwise */
 	if (button)
 	{
+		/* First, check if user had changed directory in the combo */
+		if (fpick_enter_dirname(fp, NULL, 0)) ctxt = NULL;
+		/* If file entry is hidden anyway */
+		else if (!fp->allow_files) return;
 		/* Filename must have some chars and no wildcards in it */
-		if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return;
+		else if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return;
 		/* Don't let pattern pass as filename */
 		gtk_signal_emit_stop_by_name(GTK_OBJECT(button), "clicked");
+		/* Don't do anything else for directory change */
+		if (!ctxt) return;
 	}
 
 	/* Do we have directory in here? */
@@ -993,19 +1004,16 @@ static void fpick_wildcard(GtkButton *button, gpointer user_data)
 		mask[l] = '\0';
 	}
 
-	while (ds) /* Have directory - enter it */
-	{
-		int res = fpick_enter_dirname(fp,
-			ctxt = g_strndup(ctxt, ds + 1 - ctxt));
-		g_free(ctxt);
-		if (res <= 0) break; // If failed to open a new dir
+	/* Have directory - enter it */
+	if (ds && (fpick_enter_dirname(fp, ctxt, ds + 1 - ctxt) > 0))
+	{	// Opened a new dir - skip redisplay
 		gtk_entry_set_text(GTK_ENTRY(fp->file_entry), nm); // Cut dir off
-		return; // Opened a new dir - skip redisplay
 	}
-
-	/* Torture GtkCList into displaying only files that match pattern */
-	fpick_clist_repattern(GTK_CLIST(fp->clist), mask);
-	fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
+	else
+	{	/* Torture GtkCList into displaying only files that match pattern */
+		fpick_clist_repattern(GTK_CLIST(fp->clist), mask);
+		fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
+	}
 }
 
 /* "Tab completion" for entry field, like in GtkFileSelection */

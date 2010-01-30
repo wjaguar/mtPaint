@@ -232,7 +232,7 @@ static gboolean click_shift_close()	// Palette Shifter window closed by user or 
 	mem_pal_copy( mem_pal, sh_old_pal );
 	update_stuff(UPD_PAL);
 
-	gtk_widget_destroy( shifter_window );
+	destroy_dialog(shifter_window);
 	return (FALSE);
 }
 
@@ -342,12 +342,12 @@ void pressed_shifter()
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_shift_close), NULL );
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
+	delete_to_click(shifter_window, button);
 
-	gtk_signal_connect_object(GTK_OBJECT(shifter_window), "delete_event",
-		GTK_SIGNAL_FUNC(click_shift_close), NULL );
-
-	gtk_widget_show(shifter_window);
 	gtk_window_add_accel_group(GTK_WINDOW (shifter_window), ag);
+// !!! Transient windows cannot be minimized; don't know if that's desirable here
+//	gtk_window_set_transient_for(GTK_WINDOW(shifter_window), GTK_WINDOW(main_window));
+	gtk_widget_show(shifter_window);
 
 #if GTK_MAJOR_VERSION == 1
 	gtk_widget_queue_resize(shifter_window); /* Re-render sliders */

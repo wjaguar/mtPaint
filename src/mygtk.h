@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -86,7 +86,7 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 // Self-contained package of radio buttons
 
-GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 	GtkSignalFunc handler);
 
 // Convert window close into a button click ("Cancel" or whatever)
@@ -97,7 +97,8 @@ void delete_to_click(GtkWidget *window, GtkWidget *button);
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
-GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx);
+GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler);
+GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler);
 
 // Easier way with spinbuttons
 
@@ -359,6 +360,14 @@ char *resolve_path(char *buf, int buflen, char *path);
 #if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4))
 int wjfnmatch(const char *mask, const char *str, int utf);
 #endif
+
+// Prod the focused spinbutton, if any, to finally update its value
+
+void update_window_spin(GtkWidget *window);
+
+// Process event queue
+
+void handle_events();
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

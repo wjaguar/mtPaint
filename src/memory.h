@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -438,19 +438,18 @@ static inline unsigned int bitcount(unsigned int n)
 {
 	unsigned int m;
 #if UINT_MAX > 0xFFFFFFFFUL
-	/* Limit to 64 bits - in case 128-bit ints ever appear :-) */
-	n = (n & 0x5555555555555555ULL) + ((n & 0xAAAAAAAAAAAAAAAAULL) >> 1);
-	m = n & 0x3333333333333333ULL; n = m + ((n ^ m) >> 2);
-	m = n & 0x0F0F0F0F0F0F0F0FULL; n = m + ((n ^ m) >> 4);
-	m = n & 0x00FF00FF00FF00FFULL; n = m + ((n ^ m) >> 8);
-	m = n & 0x0000FFFF0000FFFFULL; n = m + ((n ^ m) >> 16);
-	n = (n & 0x00000000FFFFFFFFULL) + (n >> 32);
+	n -= (n >> 1) & 0x5555555555555555ULL;
+	m = n & 0xCCCCCCCCCCCCCCCCULL; n = (n ^ m) + (m >> 2);
+	n = (n + (n >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+	n = (n + (n >> 8)) & 0x00FF00FF00FF00FFULL;
+	n = (n + (n >> 16)) & 0x0000FFFF0000FFFFULL;
+	n = (n + (n >> 32)) & 0x00000000FFFFFFFFULL;
 #else
-	m = n & 0x55555555; n = m + ((n ^ m) >> 1);
+	n -= (n >> 1) & 0x55555555;
 	m = n & 0x33333333; n = m + ((n ^ m) >> 2);
-	m = n & 0x0F0F0F0F; n = m + ((n ^ m) >> 4);
-	m = n & 0x00FF00FF; n = m + ((n ^ m) >> 8);
-	n = (n & 0x0000FFFF) + (n >> 16);
+	n = (n + (n >> 4)) & 0x0F0F0F0F;
+	n = (n + (n >> 8)) & 0x00FF00FF;
+	n = (n + (n >> 16)) & 0x0000FFFF;
 #endif
 	return (n);
 }
@@ -597,6 +596,16 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor);
 void mem_dog(double radiusW, double radiusN, int norm, int gcor);
 void mem_kuwahara(int r, int gcor, int detail);
 
+/* Colorspaces */
+#define CSPACE_RGB  0
+#define CSPACE_SRGB 1
+#define CSPACE_LXN  2
+#define NUM_CSPACES 3
+
+/* Distance measures */
+#define DIST_LINF 0 /* Largest absolute difference (Linf measure) */
+#define DIST_L1   1 /* Sum of absolute differences (L1 measure) */
+#define DIST_L2   2 /* Euclidean distance (L2 measure) */
 
 /// PALETTE PROCS
 
@@ -605,6 +614,8 @@ void mem_pal_load_def();		// Load default palette
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
 void mem_greyscale(int gcor);		// Convert image to greyscale
+void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
+	unsigned char *src);
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
@@ -803,11 +814,6 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	unsigned char *img0, unsigned char *img,
 	unsigned char *alpha0, unsigned char *alpha, int opacity);
 
-#define CSPACE_RGB  0
-#define CSPACE_SRGB 1
-#define CSPACE_LXN  2
-#define NUM_CSPACES 3
-
 //	Select colors nearest to A->B gradient
 int mem_pick_gradient(unsigned char *buf, int cspace, int mode);
 
@@ -835,6 +841,15 @@ int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int 
 
 #define ALIGNED(P, N) ((void *)((char *)(P) + \
 	((~(unsigned)((char *)(P) - (char *)0) + 1) & ((N) - 1))))
+
+/* Get preferred alignment of a type */
+
+#ifdef __GNUC__ /* Have native implementation */
+#define ALIGNOF(X) __alignof__(X)
+#else
+#include <stddef.h> /* For offsetof() */
+#define ALIGNOF(X) offsetof(struct {char c; X x;}, x)
+#endif
 
 /* x87 FPU uses long doubles internally, which may cause calculation results
  * to depend on emitted assembly code, and change in mysterious ways depending

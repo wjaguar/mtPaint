@@ -48,6 +48,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Transparency in indexed TGA files is now read properly
 	* BUGFIX - Failed operations now do not flag image as modified
 	* BUGFIX - Gradient colours are now properly updated after converting indexed image to RGB
+	* BUGFIX - Builtin file selector now properly handles manual edits in directory box
 
 3.31	2009-4-15
 

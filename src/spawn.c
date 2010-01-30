@@ -432,7 +432,7 @@ void pressed_file_configure()
 
 	hbox = pack(vbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(faction_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox, _("Execute"), GTK_SIGNAL_FUNC(faction_execute), 1);
+	OK_box_add(hbox, _("Execute"), GTK_SIGNAL_FUNC(faction_execute));
 
 	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_widget_show_all(win);

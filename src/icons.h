@@ -101,8 +101,6 @@ extern unsigned char
 	xbm_horizontal_mask_bits[],
 	xbm_line_bits[],
 	xbm_line_mask_bits[],
-	xbm_move_bits[],
-	xbm_move_mask_bits[],
 	xbm_picker_bits[],
 	xbm_picker_mask_bits[],
 	xbm_polygon_bits[],

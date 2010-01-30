@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -104,8 +104,8 @@ typedef struct
 
 
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
-GdkCursor *m_cursor[32];		// My mouse cursors
-GdkCursor *move_cursor;
+GdkCursor *m_cursor[TOTAL_CURSORS];		// My mouse cursors
+GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 gboolean toolbar_status[TOOLBAR_MAX];		// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding

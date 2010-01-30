@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -42,8 +42,8 @@ gboolean toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
 	*drawing_col_prev, *settings_box;
 
-GdkCursor *move_cursor;
-GdkCursor *m_cursor[32];		// My mouse cursors
+GdkCursor *m_cursor[TOTAL_CURSORS];			// My mouse cursors
+GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 
 
@@ -631,6 +631,9 @@ void toolbar_init(GtkWidget *vbox_main)
 	static unsigned char cursor_tip[TOTAL_CURSORS][2] = { {0, 0}, {0, 0},
 		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 19},
 		{10, 10}, {0, 0}, {0, 0}, {10, 10}, {0, 0}, {0, 0} };
+	static GdkCursorType corners[4] = {
+		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
+		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
 	GtkWidget *toolbar_main, *toolbar_tools, *box;
 	char txt[32];
 	int i;
@@ -639,7 +642,9 @@ void toolbar_init(GtkWidget *vbox_main)
 	for (i=0; i<TOTAL_CURSORS; i++)
 		m_cursor[i] = make_cursor(xbm_list[i], xbm_mask_list[i],
 			20, 20, cursor_tip[i][0], cursor_tip[i][1]);
-	move_cursor = make_cursor(xbm_move_bits, xbm_move_mask_bits, 20, 20, 10, 10);
+	move_cursor = gdk_cursor_new(GDK_FLEUR);
+	busy_cursor = gdk_cursor_new(GDK_WATCH);
+	for (i = 0; i < 4; i++) corner_cursor[i] = gdk_cursor_new(corners[i]);
 
 	for ( i=1; i<TOOLBAR_MAX; i++ )
 	{

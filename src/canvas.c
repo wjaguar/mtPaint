@@ -1538,7 +1538,7 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		{png_compression, 0, 9}, {tga_RLE, 0, 1},
 		{jp2_rate, 0, 100},
 		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
-	GtkWidget *opt, *menu, *item, *label, *spin;
+	GtkWidget *opt, *menu, *item;
 	fformat *ff;
 	int i, j, k, l, ft_sort[NUM_FTYPES][2], mask = FF_256;
 	char *ext = strrchr(name, '.');
@@ -1554,13 +1554,12 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	}
 
 	/* Create controls (!!! two widgets per value - used in traversal) */
-	label = pack5(box, gtk_label_new(_("File Format")));
+	pack5(box, gtk_label_new(_("File Format")));
 	opt = pack5(box, gtk_option_menu_new());
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
-		label = pack5(box, gtk_label_new(spinnames[i]));
-		spin = pack5(box, add_a_spin(spindata[i][0],
-			spindata[i][1], spindata[i][2]));
+		pack5(box, gtk_label_new(spinnames[i]));
+		pack5(box, add_a_spin(spindata[i][0], spindata[i][1], spindata[i][2]));
 	}
 	gtk_widget_show_all(box);
 
@@ -1662,7 +1661,7 @@ static void loader_widgets(GtkWidget *box, char *name, int mode)
 /* Note: "name" is in system encoding */
 static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 {
-	GtkWidget *box, *label;
+	GtkWidget *box;
 	int ftype;
 
 	box = gtk_hbox_new(FALSE, 0);
@@ -1678,7 +1677,7 @@ static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
 		break;
 	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
-		label = pack5(box, gtk_label_new(_("Animation delay")));
+		pack5(box, gtk_label_new(_("Animation delay")));
 		pack5(box, add_a_spin(preserved_gif_delay, 1, MAX_DELAY));
 		gtk_widget_show_all(box);
 		break;

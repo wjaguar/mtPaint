@@ -36,8 +36,6 @@
 #include "graphics/xbm_horizontal_mask.xbm"
 #include "graphics/xbm_line.xbm"
 #include "graphics/xbm_line_mask.xbm"
-#include "graphics/xbm_move.xbm"
-#include "graphics/xbm_move_mask.xbm"
 #include "graphics/xbm_picker.xbm"
 #include "graphics/xbm_picker_mask.xbm"
 #include "graphics/xbm_polygon.xbm"

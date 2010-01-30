@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -202,10 +202,8 @@ void progress_init(char *text, int canc)		// Initialise progress window
 int progress_update(float val)		// Update progress window
 {
 	gtk_progress_set_percentage( GTK_PROGRESS (progress_bar), val );
-
-	while (gtk_events_pending()) gtk_main_iteration();
-
-	return prog_stop;
+	handle_events();
+	return (prog_stop);
 }
 
 void progress_end()			// Close progress window
@@ -371,13 +369,14 @@ static void wj_radio_toggle(GtkWidget *btn, gpointer idx)
 }
 
 /* void handler(GtkWidget *btn, gpointer user_data); */
-GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 	GtkSignalFunc handler)
 {
 	int i, j;
 	GtkWidget *box, *wbox, *button = NULL;
+	GtkSignalFunc hdl = handler;
 
-	if (!handler) handler = GTK_SIGNAL_FUNC(wj_radio_toggle);
+	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_radio_toggle);
 	box = wbox = vnum > 0 ? gtk_hbox_new(FALSE, 0) : gtk_vbox_new(FALSE, 0);
 	if (vnum < 2) gtk_object_set_user_data(GTK_OBJECT(wbox), var);
 
@@ -395,13 +394,13 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, int *var,
 		pack(wbox, button);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
-		gtk_signal_connect(GTK_OBJECT(button), "toggled", handler,
+		if (hdl) gtk_signal_connect(GTK_OBJECT(button), "toggled", hdl,
 			(gpointer)(i));
 		j++;
 	}
+	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
 	gtk_widget_show_all(box);
 
-	if (var) *var = idx < i ? idx : 0;
 	return (box);
 }
 
@@ -452,16 +451,28 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	return (hbox);
 }
 
-GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler, int idx)
+static GtkObject *OK_box_ins(GtkWidget *box, GtkWidget *button)
 {
-	GtkWidget *button;
-
-	button = xpack(box, gtk_button_new_with_label(name));
-	gtk_box_reorder_child(GTK_BOX(box), button, idx);
+	xpack(box, button);
+	gtk_box_reorder_child(GTK_BOX(box), button, 1);
 	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		Handler, GTK_OBJECT(gtk_object_get_user_data(GTK_OBJECT(box))));
 	gtk_widget_show(button);
+	return (GTK_OBJECT(gtk_object_get_user_data(GTK_OBJECT(box))));
+}
+
+GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler)
+{
+	GtkWidget *button = gtk_button_new_with_label(name);
+	GtkObject *win = OK_box_ins(box, button);
+	gtk_signal_connect_object(GTK_OBJECT(button), "clicked", Handler, win);
+	return (button);
+}
+
+GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler)
+{
+	GtkWidget *button = gtk_toggle_button_new_with_label(name);
+	GtkObject *win = OK_box_ins(box, button);
+	gtk_signal_connect(GTK_OBJECT(button), "toggled", Handler, win);
 	return (button);
 }
 
@@ -603,7 +614,7 @@ GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
 {
 	GtkWidget *frame = gtk_frame_new(text);
 	gtk_widget_show(frame);
-	gtk_box_pack_start(GTK_BOX(box), frame, !!expand, !!expand, 0);
+	if (box) gtk_box_pack_start(GTK_BOX(box), frame, !!expand, !!expand, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(frame), border);
 	gtk_container_add(GTK_CONTAINER(frame), widget);
 	return (frame);
@@ -3653,6 +3664,24 @@ fail:	if (!utf)
 }
 
 #endif
+
+// Prod the focused spinbutton, if any, to finally update its value
+
+void update_window_spin(GtkWidget *window)
+{
+#if GTK_MAJOR_VERSION == 1
+	gtk_container_focus(GTK_CONTAINER(window), GTK_DIR_TAB_FORWARD);
+#else
+	gtk_widget_child_focus(window, GTK_DIR_TAB_FORWARD);
+#endif
+}
+
+// Process event queue
+
+void handle_events()
+{
+	while (gtk_events_pending()) gtk_main_iteration();
+}
 
 // Maybe this will be needed someday...
 

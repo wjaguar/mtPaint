@@ -2440,7 +2440,7 @@ void set_zoom_centre( int x, int y )
 	}
 }
 
-static void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
+void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	unsigned char *src)
 {
 	int i, s3 = step * 3;
@@ -2650,7 +2650,7 @@ int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
 	bins = calloc(32768, sizeof(pnnbin));
 	if (!bins) return (-1);
 
-	progress_init("Quantize Pass 1", 1);
+	progress_init(_("Quantize Pass 1"), 1);
 
 	/* Build histogram */
 	k = width * height;
@@ -2704,7 +2704,7 @@ int pnnquan(unsigned char *inbuf, int width, int height, int quant_to,
 	}
 
 	progress_end();
-	progress_init("Quantize Pass 2", 1);
+	progress_init(_("Quantize Pass 2"), 1);
 
 	/* Merge bins which increase error the least */
 	extbins = maxbins - quant_to;
@@ -2776,6 +2776,34 @@ quit:	progress_end();
 	return (res);
 }
 
+/* Distance function, using any of 3 distance measures */
+static double distance_3d(const double *v0, const double *v1, int dist)
+{
+	switch (dist)
+	{
+	case DIST_LINF:
+	{
+		double td, td2;
+
+		td = fabs(v0[0] - v1[0]);
+		td2 = fabs(v0[1] - v1[1]);
+		if (td < td2) td = td2;
+		td2 = fabs(v0[2] - v1[2]);
+		if (td < td2) td = td2;
+		return (td);
+	}
+	case DIST_L1:
+		return (fabs(v0[0] - v1[0]) +
+			fabs(v0[1] - v1[1]) +
+			fabs(v0[2] - v1[2]));
+	default:
+	case DIST_L2:
+		return (sqrt((v0[0] - v1[0]) * (v0[0] - v1[0]) +
+			(v0[1] - v1[1]) * (v0[1] - v1[1]) +
+			(v0[2] - v1[2]) * (v0[2] - v1[2])));
+	}
+}
+
 /* Dithering works with 6-bit colours, because hardware VGA palette is 6-bit,
  * and any kind of dithering is imprecise by definition anyway - WJ */
 
@@ -2792,7 +2820,7 @@ static ctable *ctp;
 static int lookup_srgb(double *srgb)
 {
 	int i, j, k, n = 0, col[3];
-	double d, td, td2, tmp[3];
+	double d, td, tmp[3];
 
 	/* Convert to 8-bit RGB coords */
 	col[0] = UNGAMMA256(srgb[0]);
@@ -2833,32 +2861,8 @@ static int lookup_srgb(double *srgb)
 	d = 1000000000.0;
 	for (i = j = 0; i < ctp->ncols; i++)
 	{
-		switch (ctp->cdist)
-		{
-		case 0: /* Largest absolute difference (Linf measure) */
-			td = fabs(tmp[0] - ctp->xyz256[i * 3]);
-			td2 = fabs(tmp[1] - ctp->xyz256[i * 3 + 1]);
-			if (td < td2) td = td2;
-			td2 = fabs(tmp[2] - ctp->xyz256[i * 3 + 2]);
-			if (td < td2) td = td2;
-			break;
-		case 1: /* Sum of absolute differences (L1 measure) */
-			td = fabs(tmp[0] - ctp->xyz256[i * 3]) +
-				fabs(tmp[1] - ctp->xyz256[i * 3 + 1]) +
-				fabs(tmp[2] - ctp->xyz256[i * 3 + 2]);
-			break;
-		default:
-		case 2: /* Euclidean distance (L2 measure) */
-			td = sqrt((tmp[0] - ctp->xyz256[i * 3]) *
-				(tmp[0] - ctp->xyz256[i * 3]) +
-				(tmp[1] - ctp->xyz256[i * 3 + 1]) *
-				(tmp[1] - ctp->xyz256[i * 3 + 1]) +
-				(tmp[2] - ctp->xyz256[i * 3 + 2]) *
-				(tmp[2] - ctp->xyz256[i * 3 + 2]));
-			break;
-		}
-		if (td >= d) continue;
-		j = i; d = td;
+		td = distance_3d(tmp, ctp->xyz256 + i * 3, ctp->cdist);
+		if (td < d) j = i , d = td;
 	}
 
 	/* Store & return result */
@@ -2874,27 +2878,21 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	int dist, int limit, int selc, int serpent, int rgb8b, double emult)
 {
 	int i, j, k, l, kk, j0, j1, dj, rlen, col0, col1, progress;
-	unsigned char *ddata1, *ddata2, *src, *dest;
+	unsigned char *ddata, *src, *dest;
 	double *row0, *row1, *row2, *tmp;
 	double err, intd, extd, *gamma6, *lin6;
 	double tc0[3], tc1[3], color0[3], color1[3];
 	double fdiv = 0, gamut[6] = {1, 1, 1, 0, 0, 0};
 
 	/* Allocate working space */
-	rlen = (mem_width + 4) * 3;
-	k = (rlen * 3 + 1) * sizeof(double);
-	ddata1 = calloc(1, k);
-	ddata2 = calloc(1, sizeof(ctable) + sizeof(double));
-	if (!ddata1 || !ddata2)
-	{
-		free(ddata1);
-		free(ddata2);
-		return (1);
-	}
-	row0 = ALIGN(ddata1);
-	row1 = row0 + rlen;
-	row2 = row1 + rlen;
-	ctp = ALIGN(ddata2);
+	rlen = (mem_width + 4) * 3 * sizeof(double);
+	ddata = multialloc(MA_ALIGN_DOUBLE,
+		&row0, rlen,
+		&row1, rlen,
+		&row2, rlen,
+		&ctp, sizeof(ctable),
+		NULL);
+	if (!ddata) return (1);
 
 	if ((progress = mem_width * mem_height > 1000000))
 		progress_init(_("Converting to Indexed Palette"), 0);
@@ -2978,7 +2976,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	{
 		src = old + i * mem_width * 3;
 		dest = mem_img[CHN_IMAGE] + i * mem_width;
-		memset(row2, 0, rlen * sizeof(double));
+		memset(row2, 0, rlen);
 		if (serpent ^= 1)
 		{
 			j0 = 0; j1 = mem_width * 3; dj = 1;
@@ -3093,8 +3091,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 	}
 
 	if (progress) progress_end();
-	free(ddata1);
-	free(ddata2);
+	free(ddata);
 	return (0);
 }
 

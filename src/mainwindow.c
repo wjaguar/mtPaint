@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1356,9 +1356,6 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	gdouble pressure, int mflag, int dx, int dy)
 {
 	static int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
-	GdkCursor *temp_cursor = NULL;
-	GdkCursorType pointers[] = {GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
-		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER};
 	int new_cursor;
 	int i, pixel, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
 	int zoom = 1, scale = 1;
@@ -1529,26 +1526,21 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			if (cursor_tool)
 			{
 				i = close_to(x, y);
-				if ( i!=cursor_corner ) // Stops excessive CPU/flickering
-				{
-					 cursor_corner = i;
-					 temp_cursor = gdk_cursor_new(pointers[i]);
-					 gdk_window_set_cursor(drawing_canvas->window, temp_cursor);
-					 gdk_cursor_destroy(temp_cursor);
-				}
+				if (i != cursor_corner) // Stops excessive CPU/flickering
+					gdk_window_set_cursor(drawing_canvas->window,
+						corner_cursor[cursor_corner = i]);
 			}
 			else set_cursor();
 		}
 		if ( marq_status >= MARQUEE_PASTE )
 		{
-			new_cursor = 0;		// Cursor = normal
-			if ( x>=marq_x1 && x<=marq_x2 && y>=marq_y1 && y<=marq_y2 )
-				new_cursor = 1;		// Cursor = 4 way arrow
-
-			if ( new_cursor != cursor_corner ) // Stops flickering on slow hardware
+			new_cursor = (x >= marq_x1) && (x <= marq_x2) &&
+				(y >= marq_y1) && (y <= marq_y2); // Normal/4way
+			if (new_cursor != cursor_corner) // Stops flickering on slow hardware
 			{
 				if (!cursor_tool || !new_cursor) set_cursor();
-				else gdk_window_set_cursor(drawing_canvas->window, move_cursor);
+				else gdk_window_set_cursor(drawing_canvas->window,
+					move_cursor);
 				cursor_corner = new_cursor;
 			}
 		}
