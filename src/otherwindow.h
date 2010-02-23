@@ -1,5 +1,5 @@
 /*	otherwindow.h
-	Copyright (C) 2004-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -33,6 +33,7 @@ png_color brcosa_palette[256];
 int mem_preview, mem_preview_clip, brcosa_auto;
 int sharper_reduce;
 int spal_mode;
+seg_state *seg_preview;
 
 void generic_new_window(int type);
 
@@ -61,3 +62,5 @@ void gradient_setup(int mode);
 void pressed_skew();
 
 void bkg_setup();
+
+void pressed_segment();

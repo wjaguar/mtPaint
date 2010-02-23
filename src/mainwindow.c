@@ -113,10 +113,11 @@ static inilist ini_int[] = {
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
 	{ "tileWidth",		&tgrid_dx,		32  },
 	{ "tileHeight",		&tgrid_dy,		32  },
-	{ "gridRGB",		grid_rgb + 0,	RGB_2_INT( 50,  50,  50) },
-	{ "gridBorder",		grid_rgb + 1,	RGB_2_INT(  0, 219,   0) },
-	{ "gridTrans",		grid_rgb + 2,	RGB_2_INT(  0, 109, 109) },
-	{ "gridTile",		grid_rgb + 3,	RGB_2_INT(170, 170, 170) },
+	{ "gridRGB",		grid_rgb + GRID_NORMAL,	RGB_2_INT( 50,  50,  50) },
+	{ "gridBorder",		grid_rgb + GRID_BORDER,	RGB_2_INT(  0, 219,   0) },
+	{ "gridTrans",		grid_rgb + GRID_TRANS,	RGB_2_INT(  0, 109, 109) },
+	{ "gridTile",		grid_rgb + GRID_TILE,	RGB_2_INT(170, 170, 170) },
+	{ "gridSegment",	grid_rgb + GRID_SEGMENT,RGB_2_INT(219, 219,   0) },
 	{ NULL,			NULL }
 };
 
@@ -2531,11 +2532,10 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 
 /// GRID
 
+int grid_rgb[GRID_MAX];	// Grid colors to use
 int mem_show_grid;	// Boolean show toggle
 int mem_grid_min;	// Minimum zoom to show it at
 int color_grid;		// If to use grid coloring
-int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
-			// 1 for border, 2 for transparency, 3 for tile grid
 int show_tile_grid;	// Tile grid toggle
 int tgrid_x0, tgrid_y0;	// Tile grid origin
 int tgrid_dx, tgrid_dy;	// Tile grid spacing
@@ -2599,7 +2599,7 @@ static void draw_grid(unsigned char *rgb, int x, int y, int w, int h, int l)
 		unsigned char *tmp;
 		int i, j, k, step3, tc;
 
-		tc = grid_rgb[color_grid ? 2 : 0];
+		tc = grid_rgb[color_grid ? GRID_TRANS : GRID_NORMAL];
 		dx = (step - dx) * 3;
 		w *= 3;
 
@@ -2717,7 +2717,7 @@ static void draw_tgrid(unsigned char *rgb, int x, int y, int w, int h, int l)
 	yy = ((ny * tgrid_dy - dy) * scale) / zoom + scale - 1;
 	if ((xx >= x + w) && (yy >= y + h)) return; // Entirely inside grid cell
 
-	l *= 3; tc = grid_rgb[3];
+	l *= 3; tc = grid_rgb[GRID_TILE];
 	for (i = 0; i < h; i++)
 	{
 		tmp = rgb + l * i;
@@ -2740,6 +2740,81 @@ static void draw_tgrid(unsigned char *rgb, int x, int y, int w, int h, int l)
 			tm2[1] = INT_2_G(tc);
 			tm2[2] = INT_2_B(tc);
 			k = ((j * tgrid_dx - dx) * scale) / zoom + scale - 1;
+		}
+	}
+}
+
+/* Draw segmentation contours on rgb memory */
+static void draw_segments(unsigned char *rgb, int x, int y, int w, int h, int l)
+{
+	unsigned char lbuf[(MAX_WIDTH * 2 + 7) / 8];
+	int i, j, k, j0, kk, dx, dy, wx, ww, yy, vf, tc, zoom = 1, scale = 1;
+
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	l *= 3;
+	dx = x % scale;
+	wx = x / scale;
+	ww = (w + dx + scale - 1) / scale;
+
+	dy = y % scale;
+	yy = y / scale;
+
+	/* Initial row fill */
+	mem_seg_scan(lbuf, yy, wx, ww, zoom, seg_preview);
+
+	tc = grid_rgb[GRID_SEGMENT];
+	j0 = !!dx;
+	vf = (scale == 1) | 2; // Draw both edges in one pixel if no zoom
+	for (k = dy , i = 0; i < h; i++ , k++)
+	{
+		unsigned char *tmp, *buf;
+		int nv;
+
+		if (k == scale)
+		{
+			mem_seg_scan(lbuf, ++yy, wx, ww, zoom, seg_preview);
+			k = 0;
+		}
+
+		/* Horizontal lines */
+		if (!k && (scale > 1))
+		{
+			tmp = rgb + i * l;
+			buf = lbuf;
+			nv = *buf++ + 0x100;
+			for (kk = dx, j = 0; j < w; j++ , tmp += 3)
+			{
+				if (nv & 1) // Draw grid line
+				{
+					tmp[0] = INT_2_R(tc);
+					tmp[1] = INT_2_G(tc);
+					tmp[2] = INT_2_B(tc);
+				}
+				if (++kk == scale)
+				{
+					if ((nv >>= 2) == 1) nv = *buf++ + 0x100;
+					kk = 0;
+				}
+			}
+		}
+
+		/* Vertical/mixed lines */
+		tmp = rgb + i * l + (j0 * scale - dx) * 3;
+		buf = lbuf;
+		nv = (*buf++ + 0x100) >> (j0 * 2);
+		for (j = j0; j < ww; j++ , tmp += scale * 3)
+		{
+			if (nv & vf)
+			{
+				tmp[0] = INT_2_R(tc);
+				tmp[1] = INT_2_G(tc);
+				tmp[2] = INT_2_B(tc);
+			}
+			if ((nv >>= 2) == 1) nv = *buf++ + 0x100;
 		}
 	}
 }
@@ -2980,6 +3055,10 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	/* Tile grid */
 	if (show_tile_grid && irgb)
 		draw_tgrid(irgb, rect[0], rect[1], rect[2], rect[3], pw);
+
+	/* Segmentation preview */
+	if (seg_preview && irgb)
+		draw_segments(irgb, rect[0], rect[1], rect[2], rect[3], pw);
 
 	async_bk = FALSE;
 
@@ -3984,6 +4063,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		bkg_setup(); break;
 	case DLG_PICK_GRAD:
 		pressed_pick_gradient(); break;
+	case DLG_SEGMENT:
+		pressed_segment(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4659,6 +4740,9 @@ static menu_item main_menu[] = {
 	{ _("//Rotate Anti-Clockwise"), -1, 0, 0, NULL, ACT_ROTATE, 1 },
 	{ _("//Free Rotate ..."), -1, 0, 0, NULL, DLG_ROTATE, 0 },
 	{ _("//Skew ..."), -1, 0, 0, NULL, DLG_SKEW, 0 },
+	{ "//", -4 },
+// !!! Maybe support indexed mode too, later
+	{ _("//Segment ..."), -1, 0, NEED_24, NULL, DLG_SEGMENT, 0 },
 	{ "//", -4 },
 	{ _("//Information ..."), -1, 0, 0, "<control>I", DLG_INFO, 0 },
 	{ _("//Preferences ..."), -1, MENU_PREFS, 0, "<control>P", DLG_PREFS, 0 },

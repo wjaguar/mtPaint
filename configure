@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.41"
-MT_DATE="2010-01-30"
+MT_V="3.34.42"
+MT_DATE="2010-02-23"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -495,7 +495,7 @@ else
 				THREADS="gthread-2.0"
 			fi
 			GTK_INCLUDE=`pkg-config gtk+-2.0 $THREADS --cflags`
-			GTK_LIB="`pkg-config gtk+-2.0 $THREADS --libs` -lX11"
+			GTK_LIB="`pkg-config gtk+-2.0 $THREADS --libs` -lX11 -lm"
 		fi
 	else
 		if [ "$USE_THREADS" = "YES" ]

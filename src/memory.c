@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -9751,3 +9751,301 @@ int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int 
 	rr *= dd; gg *= dd; bb *= dd;
 	return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
 }
+
+// Convert a row of pixels to any of 3 colorspaces
+static void mem_convert_row(double *dest, unsigned char *src, int l, int cspace)
+{
+	if (cspace == CSPACE_LXN)
+	{
+		while (l-- > 0)
+		{
+			get_lxn(dest, MEM_2_INT(src, 0));
+			dest += 3; src += 3;
+		}
+	}
+	else if (cspace == CSPACE_SRGB)
+	{
+		l *= 3;
+		while (l-- > 0) *dest++ = gamma256[*src++];
+	}
+	else /* if (cspace == CSPACE_RGB) */
+	{
+		l *= 3;
+		while (l-- > 0) *dest++ = *src++;
+	}
+}
+
+///	SEGMENTATION
+
+/*
+ * This code implements a 4-way variation of the segmentation algorithm
+ * described in:
+ * Pedro F. Felzenszwalb, "Efficient Graph-Based Image Segmentation"
+ */
+
+static int cmp_edge(const void *v1, const void *v2)
+{
+	float f1 = ((seg_edge *)v1)->diff, f2 = ((seg_edge *)v2)->diff;
+	return (f1 < f2 ? -1 : f1 != f2 ? f1 > f2 :
+		((seg_edge *)v1)->which - ((seg_edge *)v2)->which);
+}
+
+static int seg_find(seg_pixel *pix, int n)
+{
+	unsigned int i, j;
+
+	for (i = n; i != (j = pix[i].group); i = j);
+	return (pix[n].group = i);
+}
+
+static int seg_join(seg_pixel *pix, int a, int b)
+{
+	seg_pixel *ca = pix + a, *cb = pix + b;
+
+	if (ca->rank > cb->rank)
+	{
+		ca->cnt += cb->cnt;
+		return (cb->group = a);
+	}
+	cb->cnt += ca->cnt;
+	cb->rank += (ca->rank == cb->rank);
+	return (ca->group = b);
+}
+
+seg_state *mem_seg_prepare(seg_state *s, unsigned char *img, int w, int h,
+	int flags, int cspace, int dist)
+{
+	static const unsigned char dist_scales[NUM_CSPACES] = { 1, 255, 1 };
+	seg_edge *e;
+	double mult, *row0, *row1, *rows[2];
+	int i, j, k, l, bsz, sz = w * h;
+
+
+	// !!! Will need a longer int type (and twice the memory) otherwise
+	if (sz > (INT_MAX >> 1) + 1) return (NULL);
+
+	/* 3 buffers will be sharing space */
+	bsz = w * 3 * 2 * sizeof(double);
+	l = sz * sizeof(seg_pixel);
+	if (l > bsz) bsz = l;
+
+	if (!s) // Reuse existing allocation if possible
+	{ /* Allocation is HUGE, but no way to make do with smaller one - WJ */
+		void *v[3];
+
+		s = multialloc(MA_ALIGN_DOUBLE,
+			v, sizeof(seg_state), // Dummy pointer (header struct)
+			v + 1, bsz, // Row buffers/pixel nodes
+			v + 2, sz * 2 * sizeof(seg_edge), // Pixel connections
+			NULL);
+		if (!s) return (NULL);
+		s->pix = v[1];
+		s->edges = v[2];
+		s->w = w;
+		s->h = h;
+	}
+	rows[0] = (void *)s->pix; // 1st row buffer
+	rows[1] = rows[0] + w * 3; // 2nd row buffer
+	s->phase = 0; // Struct is to be refilled
+
+	if (flags & SEG_PROGRESS) progress_init(_("Segmentation Pass 1"), 1);
+
+	/* Compute color distances, fill connections buffer */
+	l = w * 3;
+	mult = dist_scales[cspace]; // Make all colorspaces use similar scale
+	for (i = 0 , e = s->edges; i < h; i++)
+	{
+		k = i * w;
+		mem_convert_row(row1 = rows[i & 1], img + k * 3, w, cspace);
+		/* Right vertices for this row */
+		for (j = 3 , k *= 2; j < l; j += 3 , k += 2 , e++)
+		{
+			e->which = k;
+			e->diff = mult * distance_3d(row1 + j - 3, row1 + j, dist);
+		}
+		if (!i) continue;
+		/* Bottom vertices for previous row */
+		k = (i - 1) * w * 2 + 1;
+		row0 = rows[~i & 1];
+		for (j = 0; j < l; j += 3 , k += 2 , e++)
+		{
+			e->which = k;
+			e->diff = mult * distance_3d(row0 + j, row1 + j, dist);
+		}
+		if ((flags & SEG_PROGRESS) && ((i * 20) % h >= h - 20))
+			if (progress_update((0.9 * i) / h)) goto quit;
+	}
+
+	/* Sort connections, smallest distances first */
+	s->cnt = e - s->edges;
+	qsort(s->edges, s->cnt, sizeof(seg_edge), cmp_edge);
+
+	s->phase = 1;
+
+quit:	if (flags & SEG_PROGRESS) progress_end();
+
+	return (s);
+}
+
+int mem_seg_process_chunk(int start, int cnt, seg_state *s)
+{
+	seg_edge *edge;
+	seg_pixel *cp, *pix = s->pix;
+	double threshold = s->threshold;
+	int minrank = s->minrank, minsize = s->minsize;
+	int sz = s->w * s->h, w1[2] = { 1, s->w };
+	int i, ix, pass;
+
+	/* Initialize pixel nodes */
+	if (!start)
+	{
+		for (i = 0 , cp = pix; i < sz; i++ , cp++)
+		{
+			cp->group = i;
+			cp->cnt = 1;
+			cp->rank = 0;
+			cp->threshold = threshold;
+		}
+	}
+
+	/* Setup loop range */
+	pass = start / s->cnt;
+	i = start % s->cnt;
+	cnt += i;
+
+	for (; pass < 3; pass++)
+	{
+		ix = cnt < s->cnt ? cnt : s->cnt;
+		edge = s->edges + i;
+		for (; i < ix; i++ , edge++)
+		{
+			float dist;
+			int j, k, idx;
+
+			/* Get the original pixel */
+			dist = edge->diff;
+			idx = edge->which;
+			j = idx >> 1;
+			/* Get the neighboring pixel's index */
+			k = j + w1[idx & 1];
+			/* Get segment anchors */
+			j = seg_find(pix, j);
+			k = seg_find(pix, k);
+			if (j == k) continue;
+			/* Merge segments if difference is small enough in pass 0,
+			 * one of segments is too low rank in pass 1, or is too
+			 * small in pass 2 */
+			if (!pass ? ((dist <= pix[j].threshold) &&
+					(dist <= pix[k].threshold)) :
+				pass == 1 ? ((pix[j].rank < minrank) ||
+					(pix[k].rank < minrank)) :
+				((pix[j].cnt < minsize) || (pix[k].cnt < minsize)))
+			{
+				seg_pixel *cp = pix + seg_join(pix, j, k);
+				cp->threshold = dist + threshold / cp->cnt;
+			}
+		}
+		/* Pass not yet completed - return progress */
+		if (cnt < s->cnt) return (pass * s->cnt + cnt);
+		cnt -= s->cnt;
+		i = 0;
+		pass += !pass && !minrank; // Maybe skip pass 1
+		pass += pass && (minsize <= (1 << minrank)); // Maybe skip pass 2
+	}
+
+	/* Normalize groups */
+	for (i = 0; i < sz; i++) seg_find(pix, i);
+
+	/* All done */
+	s->phase |= 2;
+	return (s->cnt * 3);
+}
+
+int mem_seg_process(seg_state *s)
+{
+	int i, n, cnt = s->cnt * 3;
+
+
+	if (s->w * s->h < 1024 * 1024)
+	{
+		/* Run silently */
+		mem_seg_process_chunk(0, cnt, s);
+		return (TRUE);
+	}
+
+	/* Show progress */
+	n = (cnt + 19) / 20;
+	progress_init(_("Segmentation Pass 2"), 1);
+	for (i = 0; s->phase < 2; i = mem_seg_process_chunk(i, n, s))
+ 		if (progress_update((float)i / cnt)) break;
+	progress_end();
+	return (s->phase >= 2);
+}
+
+/* This produces for one row 2 difference bits per pixel: left & up; if called
+ * with segmentation still in progress, will show oversegmentation */
+void mem_seg_scan(unsigned char *dest, int y, int x, int w, int zoom,
+	const seg_state *s)
+{
+	int i, j, k, l, ofs, dy;
+	seg_pixel *pix = s->pix;
+
+	memset(dest, 0, (w + 3) >> 2);
+	ofs = (y * s->w + x) * zoom;
+	dy = y ? s->w * zoom : 0; // No up neighbors for Y=0
+	j = pix[ofs + (!x - 1) * zoom].group; // No left neighbor for X=0
+	for (i = 0; i < w; i++ , j = k , ofs += zoom)
+	{
+		k = pix[ofs].group , l = pix[ofs - dy].group;
+		dest[i >> 2] |= ((j != k) * 2 + (k != l)) << ((i + i) & 6);
+	}
+}
+
+/* Draw segments in unique colors */
+void mem_seg_render(unsigned char *img, const seg_state *s)
+{
+	int i, k, l, sz = s->w * s->h;
+	seg_pixel *pix = s->pix;
+
+	for (i = l = 0; i < sz; i++)
+	{
+		int j, k, r, g, b;
+
+		if (pix[i].group != i) continue; // Only new groups
+		k = l++;
+		/* Transform index to most distinct RGB color */
+		for (j = r = g = b = 0; j < 8; j++)
+		{
+			r += r + (k & 1); k >>= 1;
+			g += g + (k & 1); k >>= 1;
+			b += b + (k & 1); k >>= 1;
+		}
+		pix[i].cnt = RGB_2_INT(r, g, b);
+	}
+
+	for (i = 0; i < sz; i++ , img += 3)
+	{
+		k = pix[pix[i].group].cnt;
+		img[0] = INT_2_R(k);
+		img[1] = INT_2_G(k);
+		img[2] = INT_2_B(k);
+	}
+}
+
+#define FRACTAL_DIM 1.25
+//#define FRACTAL_THR 20 /* dragban2.jpg */
+#define FRACTAL_THR 15 /* dragban2.jpg after K-N */
+#define THRESHOLD_MULT 20.0
+
+/* Estimate contour length by fractal dimension, use the difference value found
+ * this way as threshold's base value */
+double mem_seg_threshold(seg_state *s)
+{
+	int k = s->cnt - FRACTAL_THR * pow(s->cnt, 0.5 * FRACTAL_DIM);
+	while (!s->edges[k].diff && (k < s->cnt - 1)) k++;
+	return (s->edges[k].diff ? s->edges[k].diff * THRESHOLD_MULT : 1.0);
+}
+
+#undef FRACTAL_DIM
+#undef FRACTAL_THR
+#undef THRESHOLD_MULT

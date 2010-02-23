@@ -26,6 +26,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
 	* Toggle to transform RGB clipboard image added to Transform Colour window
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
+	* "Image->Segment" added : See handbook section 6.10 for details
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle
 	* "Explode Frames" can now save frames in any suitable supported file format

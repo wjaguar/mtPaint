@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -124,6 +124,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_FILT,
 	DLG_TRACE,
 	DLG_PICK_GRAD,
+	DLG_SEGMENT,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -250,11 +251,19 @@ int config_bkg(int src); // 0 = unchanged, 1 = none, 2 = image, 3 = clipboard
 
 /// GRID
 
+/* !!! Indices 0-2 are hardcoded in draw_grid() */
+#define GRID_NORMAL  0 /* Normal/image grid */
+#define GRID_BORDER  1
+#define GRID_TRANS   2 /* For transparency */
+#define GRID_TILE    3
+#define GRID_SEGMENT 4
+
+#define GRID_MAX     5
+
+int grid_rgb[GRID_MAX];	// Grid colors to use
 int mem_show_grid;	// Boolean show toggle
 int mem_grid_min;	// Minimum zoom to show it at
 int color_grid;		// If to use grid coloring
-int grid_rgb[4];	// Grid colors to use; index 0 is normal/image grid,
-			// 1 for border, 2 for transparency, 3 for tile grid
 int show_tile_grid;	// Tile grid toggle
 int tgrid_x0, tgrid_y0;	// Tile grid origin
 int tgrid_dx, tgrid_dy;	// Tile grid spacing

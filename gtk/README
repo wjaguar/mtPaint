@@ -1,0 +1,79 @@
+-----------
+The History
+-----------
+
+For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of several different 2.6.x GTK+ versions, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support for Windows 98 systems, which became unsupported with GTK+ 2.8.
+
+But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Still, upgrading the package to a new version of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with custom-built libgdk, libgtk, and libwimp, based on GTK+ 2.6.7 and a set of patches backported from the later versions of GTK+.
+
+-------------
+The Specifics
+-------------
+
+Original patches from GTK+ tree contained in the cumulative patch:
+- svn  7886 / git d73fa807875951d0240dce572398992d395bbe77
+  Use GetDriveType() to recognize removable drives (in order to avoid
+  (REVERTED: was making flash drives inaccessible from file selector)
+- svn 14527 / git 3750d5da6b2dc7e104b9cc19f60b5724032e67c2
+  Get the invalidated region from ScrollWindowEx() instead of an incorrect
+  (APPLIED: fixes scrolling of partially covered windows)
+- svn 15720 / git f93e5455e983144e133e18b5041aab29afc97360
+  [WM_WINDOWPOSCHANGED] Replace identical code as in
+  (APPLIED: prerequisite for svn 17834)
+- svn 17096 / git 8d601fbde30fd28f9d9fc5e5ebc47cba5e56f351
+  New file. Downloaded from freedesktop.org's webcvs. Slighly edited cursors
+  (APPLIED: changes to several builtin cursors)
+- svn 17299 / git ea7cc8d95eade637c67c5331a9f98863210ad8f1
+  Fix Win32 resize events and flickering
+  (APPLIED)
+- svn 17615 / git f251591cf8d1d6c399485a4b0f95811e628e6b6f
+  Fix menuitem rendering in Vista
+  (BACKPORTED)
+- svn 17645 / git 2cf71073edccd5a445a3baef5a158d85caf16520
+  Use native Win32 cursors where it makes sense
+  (APPLIED)
+- svn 17834 / git 50af49319ad07682cd15913d264cb4a9570e1f8c
+  Fix context iterations for handle_configure_event()
+  (APPLIED)
+- svn 20250 / git 710c9619b944e993f5402e04dc08846851b11f38
+  leak of GDI region in function 'handle_wm_paint'
+  (APPLIED)
+- svn 20726 / git 0d0f9a7fc184db3ff8ce76e49256fee397de3d35
+  Windows' System Menu blocks main loop
+  (APPLIED)
+- svn 20881 / git c8fef535b20ad75f82739f68fce2216c1d62f6ab
+  Repaint glitches in widgets
+  (APPLIED)
+- svn 22511 / git 703a18c25fc4b1e8f06c4b9c8ea7cb74c06b3871
+  Can not resize shaped windows on Windows
+  (APPLIED)
+
+In addition, there are couple of my own patches, solving the build problems arising from use of recent MinGW on a Linux box (in GTK+ 2.6.x time, official Windows packages were built with MSVC on Windows).
+
+---------
+The Build
+---------
+
+The build was done on a Slackware Linux system using MinGW cross-compiler installation combined of the following parts:
+- TDM-GCC 4.2.3		( http://www.tdragon.net/recentgcc/ )
+- binutils 2.19		( http://mingw.sourceforge.net/ )
+- MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
+- Win32 API 3.13	( http://mingw.sourceforge.net/ )
+
+To replicate it, do the following:
+- download and unpack GTK+ 2.6.7 sources from http://ftp.gtk.org/pub/gtk/v2.6/gtk+-2.6.7.tar.bz2
+- download the Wintab development package from http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
+- unpack that package: unzip -LL wtkit126.zip
+- rename the 'wtkit126 Folder' directory to 'wintab' and move it into the directory with GTK+ sources ('gtk+-2.6.7')
+- apply the cumulative patch: "patch -p0 < gtk267_4wj.patch"
+- adjust "GTK_PREFIX", "CFLAGS", "TARGET", "MINGW_TOOL_PREFIX" and "MINGW_BIN" variables in the 'mingw-configure' script according to your MinGW cross-compiler's version and install location
+- run 'mingw-configure' from the directory with GTK+ sources
+- run 'runmake' from same directory, to compile GTK+
+- create a destination directory
+- run "make install DESTDIR=full_path_to_destination_directory" to produce the final binaries
+- go into your destination directory's 'bin' subdirectory
+- run the 'strip' command *from your MinGW package*, like this: "i586-mingw32-strip --strip-unneeded *.dll"
+- go into 'lib/gtk-2.0/2.4.0/engines' subdirectory and do the same
+
+---------------------------------
+Copyright (C) 2010 Dmitry Groshev

@@ -821,6 +821,43 @@ int mem_skew(double xskew, double yskew, int type, int gcor);
 
 int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int h);
 
+//// SEGMENTATION
+
+#define SEG_PROGRESS 1
+
+typedef struct {
+	int which; // Pixel index * 2 + (0 if right / 1 if down)
+	float diff;
+} seg_edge;
+
+typedef struct {
+	unsigned int group, cnt;
+	unsigned char rank; // Value is logarithmic, so this is more than enough
+//	unsigned char reserved[3];
+	float threshold;
+} seg_pixel;
+
+typedef struct {
+	/* Working set */
+	seg_edge *edges;
+	seg_pixel *pix;
+	int w, h, cnt;
+	int phase; // Which phase is currently valid
+	/* Parameters */
+	int minrank;
+	int minsize;
+	double threshold;
+} seg_state;
+
+seg_state *mem_seg_prepare(seg_state *s, unsigned char *img, int w, int h,
+	int flags, int cspace, int dist);
+int mem_seg_process_chunk(int start, int cnt, seg_state *s);
+int mem_seg_process(seg_state *s);
+double mem_seg_threshold(seg_state *s);
+void mem_seg_scan(unsigned char *dest, int y, int x, int w, int zoom,
+	const seg_state *s);
+void mem_seg_render(unsigned char *img, const seg_state *s);
+
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 
 #define mtMIN(a,b,c) if ( b<c ) a=b; else a=c;
