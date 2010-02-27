@@ -1721,6 +1721,7 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 	settings->xpm_trans = mem_xpm_trans;
 	settings->hot_x = mem_xbm_hot_x;
 	settings->hot_y = mem_xbm_hot_y;
+	settings->req_w = settings->req_h = 0;
 	settings->jpeg_quality = jpeg_quality;
 	settings->png_compression = png_compression;
 	settings->tga_RLE = tga_RLE;

@@ -114,10 +114,7 @@ fformat file_formats[NUM_FTYPES] = {
 //		| FF_TRANS | FF_COMPR },
 /* !!! Current state */
 	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS | FF_COMPR },
-/* !!! Not supported yet */
-//	{ "PCX", "pcx", "", FF_256 | FF_RGB },
-/* !!! Placeholder */
-	{ "", "", "", 0},
+	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 	{ "PBM", "pbm", "", FF_BW | FF_LAYER },
 	{ "PGM", "pgm", "", FF_256 | FF_LAYER | FF_NOSAVE },
 	{ "PPM", "ppm", "pnm", FF_RGB | FF_LAYER },
@@ -133,6 +130,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 /* An X pixmap - not a file at all */
 	{ "PIXMAP", "", "", FF_RGB | FF_NOSAVE },
+/* SVG image - import only */
+	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 };
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -4633,7 +4632,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	if (rle && (w < 129)) buflen = ibpp * 129;
 	buf = malloc(buflen + 1); /* One extra byte for bitparser */
 	res = FILE_MEM_ERROR;
-	if (!buf) goto fail2;
+	if (!buf) goto fail;
 	if ((res = allocate_image(settings, abits ? CMASK_RGBA : CMASK_IMAGE)))
 		goto fail2;
 	/* Don't even try reading alpha if nowhere to store it */
@@ -4970,6 +4969,314 @@ static int save_tga(char *file_name, ls_settings *settings)
 
 	free(buf);
 	return 0;
+}
+
+/* PCX header */
+#define PCX_ID        0 /*  8b */
+#define PCX_VER       1 /*  8b */
+#define PCX_ENC       2 /*  8b */
+#define PCX_BPP       3 /*  8b */
+#define PCX_X0        4 /* 16b */
+#define PCX_Y0        6 /* 16b */
+#define PCX_X1        8 /* 16b */
+#define PCX_Y1       10 /* 16b */
+#define PCX_HDPI     12 /* 16b */
+#define PCX_VDPI     14 /* 16b */
+#define PCX_PAL      16 /* 8b*3*16 */
+#define PCX_NPLANES  65 /*  8b */
+#define PCX_LINELEN  66 /* 16b */
+#define PCX_PALTYPE  68 /* 16b */
+#define PCX_HRES     70 /* 16b */
+#define PCX_VRES     72 /* 16b */
+#define PCX_HSIZE   128
+
+#define PCX_BUFSIZE 16384 /* Bytes read at a time */
+
+/* Default EGA/VGA palette */
+static const png_color def_pal[16] = {
+{0x00, 0x00, 0x00}, {0x00, 0x00, 0xAA}, {0x00, 0xAA, 0x00}, {0x00, 0xAA, 0xAA},
+{0xAA, 0x00, 0x00}, {0xAA, 0x00, 0xAA}, {0xAA, 0x55, 0x00}, {0xAA, 0xAA, 0xAA},
+{0x55, 0x55, 0x55}, {0x55, 0x55, 0xFF}, {0x55, 0xFF, 0x55}, {0x55, 0xFF, 0xFF},
+{0xFF, 0x55, 0x55}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0x55}, {0xFF, 0xFF, 0xFF},
+};
+
+static void copy_rgb_pal(png_color *dest, unsigned char *src, int cnt)
+{
+	while (cnt-- > 0)
+	{
+		dest->red = src[0];
+		dest->green = src[1];
+		dest->blue = src[2];
+		dest++; src += 3;
+	}
+}
+
+static int load_pcx(char *file_name, ls_settings *settings)
+{
+	static const unsigned char planarconfig[6] = {
+		0x11, /* BW */  0x12, /* 4c */   0x31, /* 8c */
+		0x41, /* 16c */ 0x18, /* 256c */ 0x38  /* RGB */ };
+	unsigned char hdr[PCX_HSIZE], pbuf[769];
+	unsigned char *buf, *row, *dest, *tmp;
+	FILE *fp;
+	int ver, bits, planes, ftype;
+	int y, ccnt, bstart, bstop, strl, plane;
+	int i, w, h, cols, buflen, bpp = 3, res = -1;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+
+	/* Read the header */
+	if (fread(hdr, 1, PCX_HSIZE, fp) < PCX_HSIZE) goto fail;
+
+	/* PCX has no real signature - so check fields one by one */
+	if ((hdr[PCX_ID] != 10) || (hdr[PCX_ENC] != 1)) goto fail;
+	ver = hdr[PCX_VER];
+	if (ver > 5) goto fail;
+
+	bits = hdr[PCX_BPP];
+	planes = hdr[PCX_NPLANES];
+	if ((bits | planes) > 15) goto fail;
+	if (!(tmp = memchr(planarconfig, (planes << 4) | bits, 6))) goto fail;
+	ftype = tmp - planarconfig;
+
+	/* Prepare palette */
+	if (ftype != 5)
+	{
+		bpp = 1;
+		settings->colors = cols = 1 << (bits * planes);
+		/* BW (0 is black) */
+		if (cols == 2)
+		{
+			settings->pal[0] = def_pal[0];
+			settings->pal[1] = def_pal[15];
+		}
+		/* Default 256-color palette - assumed greyscale */
+		else if ((ver == 3) && (cols == 256)) set_gray(settings);
+		/* Default 16-color palette */
+		else if ((ver == 3) && (cols == 16))
+			memcpy(settings->pal, def_pal, sizeof(def_pal));
+	/* !!! CGA palette is evil: what the PCX spec describes is the way it
+	 * was handled by PC Paintbrush 3.0, while 4.0 was using an entirely
+	 * different, undocumented encoding for palette selection.
+	 * The only seemingly sane way to differentiate the two is to look at
+	 * paletteinfo field: zeroed in 3.0, set in 4.0+ - WJ */
+		else if (cols == 4)
+		{
+			/* Bits 2:1:0 in index: color burst:palette:intensity */
+			static const unsigned char cga_pals[8 * 3] = {
+				2, 4, 6,  10, 12, 14,
+				3, 5, 7,  11, 13, 15,
+				3, 4, 7,  11, 12, 15,
+				3, 4, 7,  11, 12, 15 };
+			int i, idx = hdr[PCX_PAL + 3] >> 5; // PB 3.0
+
+			if (GET16(hdr + PCX_PALTYPE)) // PB 4.0
+			{
+				/* Pick green palette if G>B in slot 1 */
+				i = hdr[PCX_PAL + 5] >= hdr[PCX_PAL + 4];
+				/* Pick bright palette if max(G,B) > 200 */
+				idx = i * 2 + (hdr[PCX_PAL + 4 + i] > 200);
+			}
+
+			settings->pal[0] = def_pal[hdr[PCX_PAL] >> 4];
+			for (i = 1 , idx *= 3; i < 4; i++)
+				settings->pal[i] = def_pal[cga_pals[idx++]];
+		}
+		/* VGA palette - read from file */
+		else if (cols == 256)
+		{
+			if ((fseek(fp, -769, SEEK_END) < 0) ||
+				(fread(pbuf, 1, 769, fp) < 769) ||
+				(pbuf[0] != 0x0C)) goto fail;
+			copy_rgb_pal(settings->pal, pbuf + 1, 256);
+		}
+		/* 8 or 16 colors - read from header */
+		else copy_rgb_pal(settings->pal, hdr + PCX_PAL, cols);
+
+		/* If palette is all we need */
+		res = 1;
+		if ((settings->mode == FS_PALETTE_LOAD) ||
+			(settings->mode == FS_PALETTE_DEF)) goto fail;
+	}
+
+	/* Allocate buffer and image */
+	settings->width = w = GET16(hdr + PCX_X1) - GET16(hdr + PCX_X0) + 1;
+	settings->height = h = GET16(hdr + PCX_Y1) - GET16(hdr + PCX_Y0) + 1;
+	settings->bpp = bpp;
+	buflen = GET16(hdr + PCX_LINELEN);
+	res = -1;
+	if (buflen < ((w * bits + 7) >> 3)) goto fail;
+	buf = malloc(PCX_BUFSIZE + buflen);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail;
+	row = buf + PCX_BUFSIZE;
+	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+
+	/* Read and decode the file */
+	if (!settings->silent) ls_init("PCX", 0);
+	res = FILE_LIB_ERROR;
+	fseek(fp, PCX_HSIZE, SEEK_SET);
+	dest = settings->img[CHN_IMAGE];
+	if (bits == 1) memset(dest, 0, w * h); // Write will be by OR
+	y = plane = ccnt = 0;
+	bstart = bstop = PCX_BUFSIZE;
+	strl = buflen;
+	while (TRUE)
+	{
+		unsigned char v;
+
+		/* Keep the buffer filled */
+		if (bstart >= bstop)
+		{
+			bstart -= bstop;
+			bstop = fread(buf, 1, PCX_BUFSIZE, fp);
+			if (bstop <= bstart) goto fail3; /* Truncated file */
+		}
+
+		/* Decode data */
+		v = buf[bstart];
+		if (ccnt) /* Middle of a run */
+		{
+			int l = strl < ccnt ? strl : ccnt;
+			memset(row + buflen - strl, v, l);
+			strl -= l; ccnt -= l;
+		}
+		else if (v >= 0xC0) /* Start of a run */
+		{
+			ccnt = v & 0x3F;
+			bstart++;
+		}
+		else row[buflen - strl--] = v;
+		bstart += !ccnt;
+		if (strl) continue;
+
+		/* Store a line */
+		if (bits == 1) // N planes of 1-bit data (MSB first)
+		{
+			unsigned char v, *tmp = row;
+			int i, n = 7 - plane;
+
+			for (i = 0; i < w; i++ , v += v)
+			{
+				if (!(i & 7)) v = *tmp++;
+				dest[i] |= (v & 0x80) >> n;
+			}
+		}
+		else if (bits == 2) // Single plane of 2-bit data (MSB first)
+		{
+			unsigned char v, *tmp = row;
+
+			for (i = 0; i < w; i++ , v <<= 2)
+			{
+				if (!(i & 3)) v = *tmp++;
+				dest[i] = (v >> 6) & 3;
+			}
+		}
+		else // N planes of 8-bit data
+		{
+			unsigned char *tmp = dest + plane;
+
+			for (i = 0; i < w; i++ , tmp += planes)
+				*tmp = row[i];
+		}
+
+		if (++plane >= planes)
+		{
+			ls_progress(settings, y, 10);
+			if (++y >= h) break;
+			dest += w * bpp;
+			plane = 0;
+		}
+		strl = buflen;
+	}
+	res = 1;
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	free(buf);
+fail:	fclose(fp);
+	return (res);
+}
+
+static int save_pcx(char *file_name, ls_settings *settings)
+{
+	unsigned char *buf, *src, *dest;
+	FILE *fp;
+	int w = settings->width, h = settings->height, bpp = settings->bpp;
+	int i, l, plane, cnt;
+
+
+	/* Allocate buffer */
+	i = w * 2; // Buffer one plane, with worst-case RLE expansion factor 2
+	if (i < PCX_HSIZE) i = PCX_HSIZE;
+	if (i < 769) i = 769; // For palette
+	buf = calloc(1, i); // Zeroing out is for header
+	if (!buf) return (-1);
+	
+	if (!(fp = fopen(file_name, "wb")))
+	{
+		free(buf);
+		return (-1);
+	}
+
+	/* Prepare header */
+	memcpy(buf, "\x0A\x05\x01\x08", 4); // Version 5 PCX, 8 bits/plane
+	PUT16(buf + PCX_X1, w - 1);
+	PUT16(buf + PCX_Y1, h - 1);
+	PUT16(buf + PCX_HDPI, 300); // GIMP sets DPI to this value
+	PUT16(buf + PCX_VDPI, 300);
+	buf[PCX_NPLANES] = bpp;
+	PUT16(buf + PCX_LINELEN, w);
+	buf[PCX_PALTYPE] = 1;
+	fwrite(buf, 1, PCX_HSIZE, fp);
+
+	/* Compress & write pixel rows */
+	if (!settings->silent) ls_init("TGA", 1);
+	src = settings->img[CHN_IMAGE];
+	for (i = 0; i < h; i++ , src += w * bpp)
+	{
+		for (plane = 0; plane < bpp; plane++)
+		{
+			unsigned char v, *tmp = src + plane;
+
+			dest = buf; cnt = 0; l = w;
+			while (l > 0)
+			{
+				v = *tmp; tmp += bpp; cnt++;
+				if ((--l <= 0) || (cnt == 0x3F) || (v != *tmp))
+				{
+					if ((cnt > 1) || (v >= 0xC0))
+						*dest++ = cnt | 0xC0;
+					*dest++ = v; cnt = 0;
+				}
+			}
+			fwrite(buf, 1, dest - buf, fp);
+		}
+		ls_progress(settings, i, 20);
+	}
+
+	/* Write palette */
+	if (bpp == 1)
+	{
+		png_color *col = settings->pal;
+
+		memset(dest = buf + 1, 0, 768);
+		buf[0] = 0x0C;
+		for (i = 0; i < settings->colors; i++ , dest += 3 , col++)
+		{
+			dest[0] = col->red;
+			dest[1] = col->green;
+			dest[2] = col->blue;
+		}
+		fwrite(buf, 1, 769, fp);
+	}
+
+	fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return (0);
 }
 
 typedef void (*cvt_func)(unsigned char *dest, unsigned char *src, int len,
@@ -5702,6 +6009,99 @@ static int load_pixmap(char *pixmap_id, ls_settings *settings)
 	return (res);
 }
 
+/* Handle SVG import using gdk-pixbuf */
+
+#if (GDK_PIXBUF_MAJOR > 2) || ((GDK_PIXBUF_MAJOR == 2) && (GDK_PIXBUF_MINOR >= 4))
+
+#define MAY_HANDLE_SVG
+
+static int svg_ftype = -1;
+
+static int svg_supported()
+{
+	GSList *tmp, *ff;
+	int i, res = FALSE;
+
+	ff = gdk_pixbuf_get_formats();
+	for (tmp = ff; tmp; tmp = tmp->next)
+	{
+		gchar **mime = gdk_pixbuf_format_get_mime_types(tmp->data);
+
+		for (i = 0; mime[i]; i++)
+		{
+			res |= strstr(mime[i], "image/svg") == mime[i];
+		}
+		g_strfreev(mime);
+		if (res) break;
+	} 
+	g_slist_free(ff);
+	return (res);
+}
+
+static int load_svg(char *file_name, ls_settings *settings)
+{
+	GdkPixbuf *pbuf;
+	GError *err = NULL;
+	guchar *src;
+	unsigned char *dest, *dsta;
+	int i, j, w, h, bpp, cmask, skip, res = -1;
+
+
+#if (GDK_PIXBUF_MAJOR == 2) && (GDK_PIXBUF_MINOR < 8)
+	/* 2.4 can constrain size only while preserving aspect ratio;
+	 * 2.6 can constrain size fully, but not partially */
+	if (settings->req_w && settings->req_h)
+		pbuf = gdk_pixbuf_new_from_file_at_scale(file_name,
+			settings->req_w, settings->req_h, FALSE, &err);
+	else pbuf = gdk_pixbuf_new_from_file(file_name, &err);
+#else
+	/* 2.8+ is full-featured */
+	pbuf = gdk_pixbuf_new_from_file_at_scale(file_name,
+		settings->req_w ? settings->req_w : -1,
+		settings->req_h ? settings->req_h : -1,
+		!(settings->req_w && settings->req_h), &err);
+#endif
+	if (!pbuf)
+	{
+		if ((err->domain == GDK_PIXBUF_ERROR) &&
+			(err->code == GDK_PIXBUF_ERROR_INSUFFICIENT_MEMORY))
+			res = FILE_MEM_ERROR;
+		g_error_free(err);
+		return (res);
+	}
+	/* Prevent images loading wrong in case gdk-pixbuf ever starts using
+	 * something other than 8-bit RGB/RGBA without me noticing - WJ */
+	if (gdk_pixbuf_get_bits_per_sample(pbuf) != 8) goto fail;
+
+	bpp = gdk_pixbuf_get_n_channels(pbuf);
+	if (bpp == 4) cmask = CMASK_RGBA;
+	else if (bpp == 3) cmask = CMASK_IMAGE;
+	else goto fail;
+	settings->width = w = gdk_pixbuf_get_width(pbuf);
+	settings->height = h = gdk_pixbuf_get_height(pbuf);
+	settings->bpp = 3;
+	if ((res = allocate_image(settings, cmask))) goto fail;
+
+	skip = gdk_pixbuf_get_rowstride(pbuf) - w * bpp;
+	src = gdk_pixbuf_get_pixels(pbuf);
+	dest = settings->img[CHN_IMAGE];
+	dsta = settings->img[CHN_ALPHA];
+	for (i = 0; i < h; i++ , src += skip)
+	for (j = 0; j < w; j++ , src += bpp , dest += 3)
+	{
+		dest[0] = src[0];
+		dest[1] = src[1];
+		dest[2] = src[2];
+		if (dsta) *dsta++ = src[3];
+	}
+	res = 1;
+
+fail:	g_object_unref(pbuf);
+	return (res);
+}
+
+#endif
+
 /* Handle textual palette file formats - GIMP's GPL and mtPaint's own TXT */
 
 static void to_pal(png_color *c, int *rgb)
@@ -5829,8 +6229,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_XBM: res = save_xbm(file_name, &setw); break;
 	case FT_LSS: res = save_lss(file_name, &setw); break;
 	case FT_TGA: res = save_tga(file_name, &setw); break;
-/* !!! Not implemented yet */
-//	case FT_PCX:
+	case FT_PCX: res = save_pcx(file_name, &setw); break;
 	case FT_PBM: res = save_pbm(file_name, &setw); break;
 	case FT_PPM: res = save_ppm(file_name, &setw); break;
 	case FT_PAM: res = save_pam(file_name, &setw); break;
@@ -6027,13 +6426,15 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_XBM: res0 = load_xbm(file_name, &settings); break;
 	case FT_LSS: res0 = load_lss(file_name, &settings); break;
 	case FT_TGA: res0 = load_tga(file_name, &settings); break;
-/* !!! Not implemented yet */
-//	case FT_PCX:
+	case FT_PCX: res0 = load_pcx(file_name, &settings); break;
 	case FT_PBM:
 	case FT_PGM:
 	case FT_PPM:
 	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
 	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
+#ifdef MAY_HANDLE_SVG
+	case FT_SVG: res0 = load_svg(file_name, &settings); break;
+#endif
 	/* Palette files */
 	case FT_GPL:
 	case FT_TXT: res0 = load_txtpal(file_name, &settings); break;
@@ -6488,8 +6889,19 @@ static int do_detect_format(char *name, FILE *fp)
 		return (FT_NONE);
 	}
 
-/* !!! Not implemented yet */
-#if 0
+	/* Assume generic XML is SVG */
+	i = 0; sscanf(buf, " <?xml %n", &i);
+	if (!i) sscanf(buf, " <svg%n", &i);
+#ifdef MAY_HANDLE_SVG
+	if (i)
+	{ /* SVG support need be checked at runtime */
+		if (svg_ftype < 0) svg_ftype = svg_supported() ? FT_SVG : FT_NONE;
+		return (svg_ftype);
+	}
+#else
+	if (i) return (FT_NONE);
+#endif
+
 	/* Discern PCX from TGA */
 	while (buf[0] == 10)
 	{
@@ -6500,10 +6912,10 @@ static int do_detect_format(char *name, FILE *fp)
 		 * Bias to PCX - TGAs usually have 0th byte = 0 */
 		stop = strrchr(name, '.');
 		if (!stop) return (FT_PCX);
-		if (!strncasecmp(stop + 1, "tga", 4)) break;
+		if (!strcasecmp(stop + 1, "tga")) break;
 		return (FT_PCX);
 	}
-#endif
+
 	/* Check if this is TGA */
 	if ((buf[1] < 2) && (buf[2] < 12) && ((1 << buf[2]) & 0x0E0F))
 		return (FT_TGA);

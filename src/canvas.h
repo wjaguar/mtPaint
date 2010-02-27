@@ -87,26 +87,29 @@ int	col_reverse,					// Painting with right button
 #define MIN_ZOOM 0.1
 #define MAX_ZOOM 20
 
-#define FS_PNG_LOAD 1		// File selector codes
-#define FS_PNG_SAVE 2
-#define FS_PALETTE_LOAD 3
-#define FS_PALETTE_SAVE 4
-#define FS_CLIP_FILE 5
-#define FS_EXPORT_UNDO 6
-#define FS_EXPORT_UNDO2 7
-#define FS_EXPORT_ASCII 8
-#define FS_LAYER_SAVE 9
-#define FS_EXPLODE_FRAMES 10
-#define FS_EXPORT_GIF 11
-#define FS_CHANNEL_LOAD 12
-#define FS_CHANNEL_SAVE 13
-#define FS_COMPOSITE_SAVE 14
-#define FS_SELECT_FILE 15
-#define FS_SELECT_DIR 16
-#define FS_LAYER_LOAD 17
-#define FS_PATTERN_LOAD 18
-#define FS_CLIPBOARD 19
-#define FS_PALETTE_DEF 20
+/* File selector codes */
+enum {
+	FS_PNG_LOAD = 1,
+	FS_PNG_SAVE,
+	FS_PALETTE_LOAD,
+	FS_PALETTE_SAVE,
+	FS_CLIP_FILE,
+	FS_EXPORT_UNDO,
+	FS_EXPORT_UNDO2,
+	FS_EXPORT_ASCII,
+	FS_LAYER_SAVE,
+	FS_EXPLODE_FRAMES,
+	FS_EXPORT_GIF,
+	FS_CHANNEL_LOAD,
+	FS_CHANNEL_SAVE,
+	FS_COMPOSITE_SAVE,
+	FS_SELECT_FILE,
+	FS_SELECT_DIR,
+	FS_LAYER_LOAD,
+	FS_PATTERN_LOAD,
+	FS_CLIPBOARD,
+	FS_PALETTE_DEF
+};
 
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 

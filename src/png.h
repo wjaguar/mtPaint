@@ -60,6 +60,7 @@ enum {
 	FT_LAYERS1,
 	FT_LAYERS2,
 	FT_PIXMAP,
+	FT_SVG,
 	NUM_FTYPES
 };
 
@@ -93,6 +94,7 @@ enum {
 #define FF_WMEM    0x10000 /* Can be written to memory */
 #define FF_MEM     0x18000 /* Both of the above */
 #define FF_NOSAVE  0x20000 /* Can be read but not written */
+#define FF_SCALE   0x40000 /* Freely scalable (vector format) */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -111,7 +113,7 @@ typedef struct {
 	unsigned int flags;
 } fformat;
 
-fformat file_formats[NUM_FTYPES];
+extern fformat file_formats[];
 
 /* All-in-one transport container for save/load */
 typedef struct {
@@ -119,6 +121,7 @@ typedef struct {
 	int mode, ftype;
 	int xpm_trans;
 	int hot_x, hot_y;
+	int req_w, req_h; // Size request for scalable formats
 	int jpeg_quality;
 	int png_compression;
 	int tga_RLE;

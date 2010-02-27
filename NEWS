@@ -23,14 +23,16 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* sRGB colour scale generation added to palette editor
 	* sRGB gradients added
 	* "Palette->Pick Gradient" approximates an A->B gradient using colours from current palette (see handbook section 3.3.9)
+	* "Image->Segment" added : See handbook section 6.10 for details
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
 	* Toggle to transform RGB clipboard image added to Transform Colour window
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
-	* "Image->Segment" added : See handbook section 6.10 for details
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle
 	* "Explode Frames" can now save frames in any suitable supported file format
 	* Netpbm file formats (PBM/PGM/PPM/PAM) save/load added
+	* PCX file format save/load added
+	* SVG file format import added (using librsvg; requires GTK+ 2.4 or later)
 	* Better support for loading CMYK TIFF files as RGB/RGBA
 	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
 	* JPEG2000 file format support now can be compiled with either JasPer or OpenJPEG library
