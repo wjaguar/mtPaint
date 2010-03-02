@@ -739,7 +739,7 @@ void vw_focus_idle()
 	if (idle_focus) return;
 	if (!view_showing) return;
 	if (!vw_focus_on) return;
-	idle_focus = gtk_idle_add_priority(GTK_PRIORITY_REDRAW + 5,
+	idle_focus = threads_idle_add_priority(GTK_PRIORITY_REDRAW + 5,
 		(GtkFunction)vw_focus_view, NULL);
 }
 

@@ -407,3 +407,18 @@ void handle_events();
 #else /* Allow for expansion when converting from codepage to UTF8 */
 #define PATHTXT (PATHBUF * 2)
 #endif
+
+// Threading helpers
+
+#if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */
+//#ifdef U_THREADS
+guint threads_idle_add_priority(gint priority, GtkFunction function, gpointer data);
+guint threads_timeout_add(guint32 interval, GSourceFunc function, gpointer data);
+#define THREADS_ENTER() gdk_threads_enter()
+#define THREADS_LEAVE() gdk_threads_leave()
+#else
+#define threads_idle_add_priority(X,Y,Z) gtk_idle_add_priority(X,Y,Z)
+#define threads_timeout_add(X,Y,Z) g_timeout_add(X,Y,Z)
+#define THREADS_ENTER()
+#define THREADS_LEAVE()
+#endif

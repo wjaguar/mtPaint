@@ -3387,8 +3387,8 @@ static void seg_spin_changed(GtkAdjustment *adjustment, char *cp)
 	if (seg_preview)
 	{
 		if (sw->progress) gdk_window_set_cursor(sw->win->window, busy_cursor);
-		if (!seg_idle) seg_idle = gtk_idle_add_priority(GTK_PRIORITY_REDRAW + 5,
-			(GtkFunction)seg_process_idle, sw);
+		if (!seg_idle) seg_idle = threads_idle_add_priority(
+			GTK_PRIORITY_REDRAW + 5, (GtkFunction)seg_process_idle, sw);
 	}
 }
 

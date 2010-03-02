@@ -591,11 +591,11 @@ static gboolean ani_play_timer_call()
 
 static void ani_play_start()
 {
-	if ( ani_play_state == 0 )
+	if (!ani_play_state)
 	{
 		ani_play_state = 1;
-		if ( ani_timer_state == 0 )
-			ani_timer_state = g_timeout_add( ani_gif_delay*10, ani_play_timer_call, NULL );
+		if (!ani_timer_state) ani_timer_state = threads_timeout_add(
+			ani_gif_delay * 10, ani_play_timer_call, NULL);
 	}
 }
 

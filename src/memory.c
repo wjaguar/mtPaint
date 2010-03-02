@@ -2776,33 +2776,43 @@ quit:	progress_end();
 	return (res);
 }
 
-/* Distance function, using any of 3 distance measures */
-static double distance_3d(const double *v0, const double *v1, int dist)
-{
-	switch (dist)
-	{
-	case DIST_LINF:
-	{
-		double td, td2;
+/* Distance functions for 3 distance measures */
 
-		td = fabs(v0[0] - v1[0]);
-		td2 = fabs(v0[1] - v1[1]);
-		if (td < td2) td = td2;
-		td2 = fabs(v0[2] - v1[2]);
-		if (td < td2) td = td2;
-		return (td);
-	}
-	case DIST_L1:
-		return (fabs(v0[0] - v1[0]) +
-			fabs(v0[1] - v1[1]) +
-			fabs(v0[2] - v1[2]));
-	default:
-	case DIST_L2:
-		return (sqrt((v0[0] - v1[0]) * (v0[0] - v1[0]) +
-			(v0[1] - v1[1]) * (v0[1] - v1[1]) +
-			(v0[2] - v1[2]) * (v0[2] - v1[2])));
-	}
+#if defined(__GNUC__) && defined(__i386__)
+#define REGPARM2 __attribute__ ((regparm (2)))
+#else
+#define REGPARM2
+#endif
+
+typedef double REGPARM2 (*distance_func)(const double *v0, const double *v1);
+
+static double REGPARM2 distance_linf(const double *v0, const double *v1)
+{
+	double td, td2;
+
+	td = fabs(v0[0] - v1[0]);
+	td2 = fabs(v0[1] - v1[1]);
+	if (td < td2) td = td2;
+	td2 = fabs(v0[2] - v1[2]);
+	if (td < td2) td = td2;
+	return (td);
 }
+
+static double REGPARM2 distance_l1(const double *v0, const double *v1)
+{
+	return (fabs(v0[0] - v1[0]) + fabs(v0[1] - v1[1]) + fabs(v0[2] - v1[2]));
+}
+
+static double REGPARM2 distance_l2(const double *v0, const double *v1)
+{
+	return (sqrt((v0[0] - v1[0]) * (v0[0] - v1[0]) +
+		(v0[1] - v1[1]) * (v0[1] - v1[1]) +
+		(v0[2] - v1[2]) * (v0[2] - v1[2])));
+}
+
+static const distance_func distance_3d[NUM_DISTANCES] = {
+	distance_linf, distance_l1, distance_l2
+};
 
 /* Dithering works with 6-bit colours, because hardware VGA palette is 6-bit,
  * and any kind of dithering is imprecise by definition anyway - WJ */
@@ -2817,25 +2827,16 @@ typedef struct {
 
 static ctable *ctp;
 
-static int lookup_srgb(double *srgb)
+/* !!! Beware of GCC misoptimizing this! The two functions below is the result
+ * of much trial and error, and hopefully not VERY brittle; but still, after any
+ * modification to them, compare the performance to what it was before - WJ */
+
+static int find_nearest(int col[3], int n)
 {
-	int i, j, k, n = 0, col[3];
-	double d, td, tmp[3];
+	/* !!! Stack misalignment is a very real issue here */
+	unsigned char tmp_[4 * sizeof(double)];
+	double *tmp = ALIGNED(tmp_, sizeof(double));
 
-	/* Convert to 8-bit RGB coords */
-	col[0] = UNGAMMA256(srgb[0]);
-	col[1] = UNGAMMA256(srgb[1]);
-	col[2] = UNGAMMA256(srgb[2]);
-
-	/* Check if there is extended precision */
-	k = ((col[0] & 0xFC) << 10) + ((col[1] & 0xFC) << 4) + (col[2] >> 2);
-	if (ctp->lcmap[k >> 5] & (1 << (k & 31))) k = 64 * 64 * 64 +
-		ctp->cmap[k] * 64 + ((col[0] & 3) << 4) +
-		((col[1] & 3) << 2) + (col[2] & 3);
-	else n = 256; /* Use posterized values for 6-bit part */
-
-	/* Use colour cache if possible */
-	if (ctp->xcmap[k >> 5] & (1 << (k & 31))) return (ctp->cmap[k]);
 	
 	/* Prepare colour coords */
 	switch (ctp->cspace)
@@ -2858,17 +2859,44 @@ static int lookup_srgb(double *srgb)
 	}
 
 	/* Find nearest colour */
-	d = 1000000000.0;
-	for (i = j = 0; i < ctp->ncols; i++)
 	{
-		td = distance_3d(tmp, ctp->xyz256 + i * 3, ctp->cdist);
-		if (td < d) j = i , d = td;
+		const distance_func dist = distance_3d[ctp->cdist];
+		double d = 1000000000.0, td, *xyz = ctp->xyz256;
+		int i, j, l = ctp->ncols;
+
+		for (i = j = 0; i < l; i++)
+		{
+			td = dist(tmp, xyz + i * 3);
+			if (td < d) j = i , d = td;
+		}
+		return (j);
+	}
+}
+
+static int lookup_srgb(double *srgb)
+{
+	int k, n = 0, col[3];
+
+	/* Convert to 8-bit RGB coords */
+	col[0] = UNGAMMA256(srgb[0]);
+	col[1] = UNGAMMA256(srgb[1]);
+	col[2] = UNGAMMA256(srgb[2]);
+
+	/* Check if there is extended precision */
+	k = ((col[0] & 0xFC) << 10) + ((col[1] & 0xFC) << 4) + (col[2] >> 2);
+	if (ctp->lcmap[k >> 5] & (1 << (k & 31))) k = 64 * 64 * 64 +
+		ctp->cmap[k] * 64 + ((col[0] & 3) << 4) +
+		((col[1] & 3) << 2) + (col[2] & 3);
+	else n = 256; /* Use posterized values for 6-bit part */
+
+	/* Use colour cache if possible */
+	if (!(ctp->xcmap[k >> 5] & (1 << (k & 31))))
+	{
+		ctp->xcmap[k >> 5] |= 1 << (k & 31);
+		ctp->cmap[k] = find_nearest(col, n);
 	}
 
-	/* Store & return result */
-	ctp->xcmap[k >> 5] |= 1 << (k & 31);
-	ctp->cmap[k] = j;
-	return (j);
+	return (ctp->cmap[k]);
 }
 
 // !!! No support for transparency yet !!!
@@ -9861,7 +9889,7 @@ seg_state *mem_seg_prepare(seg_state *s, unsigned char *img, int w, int h,
 		for (j = 3 , k *= 2; j < l; j += 3 , k += 2 , e++)
 		{
 			e->which = k;
-			e->diff = mult * distance_3d(row1 + j - 3, row1 + j, dist);
+			e->diff = mult * distance_3d[dist](row1 + j - 3, row1 + j);
 		}
 		if (!i) continue;
 		/* Bottom vertices for previous row */
@@ -9870,7 +9898,7 @@ seg_state *mem_seg_prepare(seg_state *s, unsigned char *img, int w, int h,
 		for (j = 0; j < l; j += 3 , k += 2 , e++)
 		{
 			e->which = k;
-			e->diff = mult * distance_3d(row0 + j, row1 + j, dist);
+			e->diff = mult * distance_3d[dist](row0 + j, row1 + j);
 		}
 		if ((flags & SEG_PROGRESS) && ((i * 20) % h >= h - 20))
 			if (progress_update((0.9 * i) / h)) goto quit;

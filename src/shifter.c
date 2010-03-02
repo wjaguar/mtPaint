@@ -93,11 +93,11 @@ static gboolean shift_play_timer_call()
 
 static void shift_play_start()
 {
-	if ( shift_play_state == 0 )
+	if (!shift_play_state)
 	{
 		shift_play_state = 1;
-		if ( shift_timer_state == 0 )
-			shift_timer_state = g_timeout_add( 100, shift_play_timer_call, NULL );
+		if (!shift_timer_state) shift_timer_state = threads_timeout_add(
+			100, shift_play_timer_call, NULL);
 	}
 }
 

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.43"
-MT_DATE="2010-02-27"
+MT_V="3.34.44"
+MT_DATE="2010-03-02"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -207,7 +207,7 @@ do
 				echo
 				rm _conf.txt
 				rm po/mtpaint.pot
-				rm src/graphics/*.xpm src/graphics/*.xbm
+				rm -rf src/graphics
 				rm -rf slack
 				rm -f *.tgz
 				exit;;
@@ -436,6 +436,7 @@ mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
+	mkdir -p src/graphics
 	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
 
 	if [ "$GCCVER" \< "40" ]

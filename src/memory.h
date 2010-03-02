@@ -603,9 +603,10 @@ void mem_kuwahara(int r, int gcor, int detail);
 #define NUM_CSPACES 3
 
 /* Distance measures */
-#define DIST_LINF 0 /* Largest absolute difference (Linf measure) */
-#define DIST_L1   1 /* Sum of absolute differences (L1 measure) */
-#define DIST_L2   2 /* Euclidean distance (L2 measure) */
+#define DIST_LINF     0 /* Largest absolute difference (Linf measure) */
+#define DIST_L1       1 /* Sum of absolute differences (L1 measure) */
+#define DIST_L2       2 /* Euclidean distance (L2 measure) */
+#define NUM_DISTANCES 3
 
 /// PALETTE PROCS
 

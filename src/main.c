@@ -417,14 +417,9 @@ int main( int argc, char *argv[] )
 
 	update_menus();
 
-#ifdef U_THREADS
-	/* !!! Uncomment to allow GTK+ calls from other threads */
-	/* gdk_threads_enter(); */
+	THREADS_ENTER();
 	gtk_main();
-	/* gdk_threads_leave(); */
-#else
-	gtk_main();
-#endif
+	THREADS_LEAVE();
 
 	spawn_quit();
 	inifile_quit();

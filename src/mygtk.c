@@ -3683,6 +3683,128 @@ void handle_events()
 	while (gtk_events_pending()) gtk_main_iteration();
 }
 
+// Threading helpers
+
+#if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */
+//#ifdef U_THREADS
+
+/* The following is a replacement for gdk_threads_add_*() functions - which are
+ * useful, but hadn't been implemented before GTK+ 2.12 - WJ */
+
+#if GTK_MAJOR_VERSION == 1
+
+/* With GLib 1.2, a g_source_is_destroyed()-like check cannot be done from
+ * outside GLib, so thread-safety is limited (see GTK+ bug #321866) */
+
+typedef struct {
+	GSourceFunc callback;
+	gpointer user_data;
+} dispatch_info;
+
+static gboolean do_dispatch(dispatch_info *info)
+{
+	gboolean res;
+
+	gdk_threads_enter();
+	res = info->callback(info->user_data);
+	gdk_threads_leave();
+	return (res);
+}
+
+guint threads_idle_add_priority(gint priority, GtkFunction function, gpointer data)
+{
+	dispatch_info *disp = g_malloc(sizeof(dispatch_info));
+
+	disp->callback = function;
+	disp->user_data = data;
+	return (g_idle_add_full(priority, (GSourceFunc)do_dispatch, disp,
+		(GDestroyNotify)g_free));
+}
+
+guint threads_timeout_add(guint32 interval, GSourceFunc function, gpointer data)
+{
+	dispatch_info *disp = g_malloc(sizeof(dispatch_info));
+
+	disp->callback = function;
+	disp->user_data = data;
+	return (g_timeout_add_full(G_PRIORITY_DEFAULT, interval,
+		(GSourceFunc)do_dispatch, disp, (GDestroyNotify)g_free));
+}
+
+#else /* if GTK_MAJOR_VERSION == 2 */
+
+static GSourceFuncs threads_timeout_funcs, threads_idle_funcs;
+
+static gboolean threads_timeout_dispatch(GSource *source, GSourceFunc callback,
+	gpointer user_data)
+{
+	gboolean res = FALSE;
+
+	gdk_threads_enter();
+	/* The test below is what g_source_is_destroyed() in GLib 2.12+ does */
+	if (source->flags & G_HOOK_FLAG_ACTIVE)
+		res = g_timeout_funcs.dispatch(source, callback, user_data);
+	gdk_threads_leave();
+	return (res);
+}
+
+static gboolean threads_idle_dispatch(GSource *source, GSourceFunc callback,
+	gpointer user_data)
+{
+	gboolean res = FALSE;
+
+	gdk_threads_enter();
+	/* The test below is what g_source_is_destroyed() in GLib 2.12+ does */
+	if (source->flags & G_HOOK_FLAG_ACTIVE)
+		res = g_idle_funcs.dispatch(source, callback, user_data);
+	gdk_threads_leave();
+	return (res);
+}
+
+guint threads_timeout_add(guint32 interval, GSourceFunc function, gpointer data)
+{
+	GSource *source = g_timeout_source_new(interval);
+	guint id;
+
+	if (!threads_timeout_funcs.dispatch)
+	{
+		threads_timeout_funcs = g_timeout_funcs;
+		threads_timeout_funcs.dispatch = threads_timeout_dispatch;
+	}
+	source->source_funcs = &threads_timeout_funcs;
+
+	g_source_set_callback(source, function, data, NULL);
+	id = g_source_attach(source, NULL);
+	g_source_unref(source);
+
+	return (id);
+}
+
+guint threads_idle_add_priority(gint priority, GtkFunction function, gpointer data)
+{
+	GSource *source = g_idle_source_new();
+	guint id;
+
+	if (!threads_idle_funcs.dispatch)
+	{
+		threads_idle_funcs = g_idle_funcs;
+		threads_idle_funcs.dispatch = threads_idle_dispatch;
+	}
+	source->source_funcs = &threads_idle_funcs;
+
+	if (priority != G_PRIORITY_DEFAULT_IDLE)
+		g_source_set_priority(source, priority);
+	g_source_set_callback(source, function, data, NULL);
+	id = g_source_attach(source, NULL);
+	g_source_unref(source);
+
+	return (id);
+}
+
+#endif
+
+#endif
+
 // Maybe this will be needed someday...
 
 #if 0
