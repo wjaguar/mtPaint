@@ -18,13 +18,12 @@
 */
 
 #define TEXT_PASTE_NONE 0		// Not using text paste in the clipboard
-#define TEXT_PASTE_GTK 1		// GTK+ text paste
-#define TEXT_PASTE_FT 2			// FreeType text paste
+#define TEXT_PASTE_GTK  1		// GTK+ text paste
+#define TEXT_PASTE_FT   2		// FreeType text paste
 
-#define MT_TEXT_SHRINK 1		// Shrink size to minimum area possible around text
-#define MT_TEXT_MONO 2			// Force mono rendering
-#define MT_TEXT_ROTATE_NN 4		// Use nearest neighbour rotation on bitmap fonts
-#define MT_TEXT_OBLIQUE 8		// Apply Oblique matrix transformation to scalable fonts
+#define MT_TEXT_MONO      1		// Force mono rendering
+#define MT_TEXT_ROTATE_NN 2		// Use nearest neighbour rotation on bitmap fonts
+#define MT_TEXT_OBLIQUE   4		// Apply Oblique matrix transformation to scalable fonts
 
 
 unsigned char *mt_text_render(		// NULL return = failure, otherwise points to 8bpp memory chunk

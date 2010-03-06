@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -31,18 +31,16 @@
 
 #define MAX_CUTS 128
 
-int	hs_rgb[256][3],			// Raw frequencies
-	hs_rgb_sorted[256][3],		// Sorted frequencies
-	hs_rgb_norm[256][3]		// Normalized frequencies
-	;
+static int hs_rgb[256][3],		// Raw frequencies
+	hs_rgb_sorted[256][3];		// Sorted frequencies
 
 #define HS_GRAPH_W 256
 #define HS_GRAPH_H 64
 
-unsigned char *hs_rgb_mem = NULL;	// RGB chunk holding graphs
+static unsigned char *hs_rgb_mem;	// RGB chunk holding graphs
 
-GtkWidget *hs_drawingarea;
-gboolean hs_norm;
+static GtkWidget *hs_drawingarea;
+static int hs_norm;
 
 
 static void hs_plot_graph()				// Plot RGB graphs
@@ -213,12 +211,7 @@ static void hs_populate_rgb()				// Populate RGB tables
 		}
 	}
 
-	for ( i=0; i<256; i++ )
-	{
-		hs_rgb_sorted[i][0] = hs_rgb[i][0];
-		hs_rgb_sorted[i][1] = hs_rgb[i][1];
-		hs_rgb_sorted[i][2] = hs_rgb[i][2];
-	}
+	memcpy(hs_rgb_sorted, hs_rgb, sizeof(hs_rgb_sorted));
 
 	for ( k=0; k<3; k++ )			// Sort RGB table
 	{
@@ -440,7 +433,7 @@ void pressed_information()
 	gtk_signal_connect_object (GTK_OBJECT (info_window), "delete_event",
 		GTK_SIGNAL_FUNC (delete_info), GTK_OBJECT (info_window));
 
-	gtk_widget_show (info_window);
-	gtk_window_set_transient_for( GTK_WINDOW(info_window), GTK_WINDOW(main_window) );
-	gtk_window_add_accel_group(GTK_WINDOW (info_window), ag);
+	gtk_window_set_transient_for(GTK_WINDOW(info_window), GTK_WINDOW(main_window));
+	gtk_widget_show(info_window);
+	gtk_window_add_accel_group(GTK_WINDOW(info_window), ag);
 }

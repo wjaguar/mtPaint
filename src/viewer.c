@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1439,13 +1439,13 @@ void pressed_text()
 		_("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
 		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
 
-	gtk_widget_show(text_window);
-	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );
-
 	gtk_font_selection_set_font_name( GTK_FONT_SELECTION(text_font_window),
 		inifile_get( "lastTextFont", "-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ) );
 	gtk_font_selection_set_preview_text( GTK_FONT_SELECTION(text_font_window),
 		inifile_get( "textString", _("Enter Text Here") ) );
+
+	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );
+	gtk_widget_show(text_window);
 
 	gtk_widget_grab_focus( GTK_FONT_SELECTION(text_font_window)->preview_entry );
 }

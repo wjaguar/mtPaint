@@ -959,6 +959,10 @@ void pressed_brcosa()
 	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags)0);
 	brcosa_buttons[4] = button;
 
+	click_brcosa_preview_toggle();		// Show/hide preview button
+	brcosa_buttons_sensitive();		// Disable buttons
+	gtk_window_set_transient_for(GTK_WINDOW(brcosa_window), GTK_WINDOW(main_window));
+
 	gtk_widget_show(brcosa_window);
 	gtk_window_add_accel_group(GTK_WINDOW(brcosa_window), ag);
 
@@ -966,10 +970,6 @@ void pressed_brcosa()
 	/* To make Smooth theme engine render sliders properly */
 	gtk_widget_queue_resize(brcosa_window);
 #endif
-
-	click_brcosa_preview_toggle();		// Show/hide preview button
-	brcosa_buttons_sensitive();		// Disable buttons
-	gtk_window_set_transient_for(GTK_WINDOW(brcosa_window), GTK_WINDOW(main_window));
 }
 
 

@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2008 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -52,8 +52,6 @@
 	|			Definitions & Structs			|
 	-----------------------------------------------------------------
 */
-
-#ifdef U_FREETYPE
 
 #define FONT_INDEX_FILENAME ".mtpaint_fonts"
 
@@ -184,52 +182,38 @@ static void abcd_calc(
 		int		Y2,
 		double		angle_r,
 		int		X1,
-		int		*minx,
-		int		*miny,
-		int		*maxx,
-		int		*maxy
-		)
+		int		minxy[4])
 {
-	int Ax, Ay;
+	double sa = sin(angle_r), ca = cos(angle_r);
+	int Ax, Ay, y = Y1; // Point A/C
 
-	// Point A/C
-	Ax = pen.x - Y1*sin(angle_r) + X1*cos(angle_r);
-	Ay = pen.y + Y1*cos(angle_r) + X1*sin(angle_r);
-	if ( Ax!=0 )
+	while (TRUE)
 	{
-		if ( Ax<0 ) Ax = (Ax-63)/64;
-		else Ax = (Ax+63)/64;
-	}
-	if (Ax<*minx) *minx = Ax;
-	if (Ax>*maxx) *maxx = Ax;
-	if ( Ay!=0 )
-	{
-		if ( Ay<0 ) Ay = -(Ay-63)/64;
-		else Ay = -(Ay+63)/64;
-	}
-	if (Ay<*miny) *miny = Ay;
-	if (Ay>*maxy) *maxy = Ay;
+		Ax = pen.x - y * sa + X1 * ca;
+		if (Ax < 0) Ax = -(-Ax / 64);
+		else Ax = (Ax + 63) / 64;
+		if (Ax < minxy[0]) minxy[0] = Ax;
+		if (Ax > minxy[2]) minxy[2] = Ax;
 
-	// Point B/D
-	Ax = pen.x - Y2*sin(angle_r) + X1*cos(angle_r);
-	Ay = pen.y + Y2*cos(angle_r) + X1*sin(angle_r);
-	if ( Ax!=0 )
-	{
-		if ( Ax<0 ) Ax = (Ax-63)/64;
-		else Ax = (Ax+63)/64;
+		Ay = pen.y + y * ca + X1 * sa;
+		if (Ay < 0) Ay = (63 - Ay) / 64;
+		else Ay = -(Ay / 64);
+		if (Ay < minxy[1]) minxy[1] = Ay;
+		if (Ay > minxy[3]) minxy[3] = Ay;
+
+		if (y == Y2) return; // Done
+		y = Y2; // Point B/D
 	}
-	if (Ax<*minx) *minx = Ax;
-	if (Ax>*maxx) *maxx = Ax;
-	if ( Ay!=0 )
-	{
-		if ( Ay<0 ) Ay = -(Ay-63)/64;
-		else Ay = -(Ay+63)/64;
-	}
-	if (Ay<*miny) *miny = Ay;
-	if (Ay>*maxy) *maxy = Ay;
 }
 
-#endif
+static inline void extend(int *rxy, int x0, int y0, int x1, int y1)
+{
+	if (x0 < rxy[0]) rxy[0] = x0;
+	if (y0 < rxy[1]) rxy[1] = y0;
+	if (x1 > rxy[2]) rxy[2] = x1;
+	if (y1 > rxy[3]) rxy[3] = y1;
+}
+
 
 #endif	// U_FREETYPE
 
@@ -252,18 +236,17 @@ unsigned char *mt_text_render(
 		)
 {
 #if U_FREETYPE
-	unsigned char	*mem=NULL;
+	unsigned char	*mem = NULL;
 #ifdef WIN32
-	const char	*txtp1[1];
+	const char	*txtp1;
 #else
-	char		*txtp1[1];
+	char		*txtp1;
 #endif
-	char		*txtp2[1];
+	char		*txtp2;
 	double		angle_r = angle / 180 * M_PI;
-	int		n, minx, miny, maxx, maxy, bx, by, bw=0, bh=0,
-			pass, ppb=1,
-			fix_w=0, fix_h=0, scalable, Y1=0, Y2=0;
-	size_t		ssize1 = characters, ssize2 = ssize1*4+5, s;
+	int		n, bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable, Y1, Y2;
+	int		minxy[4] = { MAX_WIDTH, MAX_HEIGHT, -MAX_WIDTH, -MAX_HEIGHT };
+	size_t		s, ssize1 = characters, ssize2 = characters * 4 + 5;
 	iconv_t		cd;
 	FT_Library	library;
 	FT_Face		face;
@@ -277,7 +260,7 @@ unsigned char *mt_text_render(
 
 	if ( flags & MT_TEXT_MONO ) load_flags |= FT_LOAD_TARGET_MONO;
 
-	if ( ssize1<1 ) return NULL;
+	if (characters < 1) return NULL;
 
 	error = FT_Init_FreeType( &library );
 	if (error) return NULL;
@@ -287,12 +270,24 @@ unsigned char *mt_text_render(
 
 	scalable = FT_IS_SCALABLE(face);
 
-	if ( !scalable )
+	if (!scalable)
 	{
+/* !!! Linux .pcf fonts require requested height to match ppem rounded up;
+ * Windows .fon fonts, conversely, require width & height. So we try both - WJ */
 		fix_w = face->available_sizes[0].width;
 		fix_h = face->available_sizes[0].height;
-
 		error = FT_Set_Pixel_Sizes(face, fix_w, fix_h);
+		if (error)
+		{
+			fix_w = (face->available_sizes[0].x_ppem + 32) >> 6;
+			fix_h = (face->available_sizes[0].y_ppem + 32) >> 6;
+			error = FT_Set_Pixel_Sizes(face, fix_w, fix_h);
+		}
+		if (error) goto fail1;
+
+// !!! FNT fonts have special support in FreeType - maybe use it?
+		Y1 = face->size->metrics.ascender;
+		Y2 = face->size->metrics.descender;
 	}
 	else
 	{
@@ -310,20 +305,25 @@ unsigned char *mt_text_render(
 			matrix.yx = (FT_Fixed)( sin( angle_r ) * 0x10000L );
 			matrix.yy = (FT_Fixed)( cos( angle_r ) * 0x10000L );
 		}
+		/* Ignore embedded bitmaps if transforming the font */
+		if (angle_r) load_flags |= FT_LOAD_NO_BITMAP;
 
 		error = FT_Set_Char_Size( face, size*64, 0, 0, 0 );
-	}
+		if (error) goto fail1;
 
-	if (error) goto fail1;
+		Y1 = FT_MulFix(face->ascender, face->size->metrics.y_scale);
+		Y2 = FT_MulFix(face->descender, face->size->metrics.y_scale);
+	}
 
 	txt2 = calloc(1, ssize2);
 	if (!txt2) goto fail1;
 
-	txtp1[0] = text;
-	txtp2[0] = (char *)txt2;
+	txtp1 = text;
+	txtp2 = (char *)txt2;
 
 //	FT_Select_Charmap( face, FT_ENCODING_UNICODE );
 	FT_Set_Charmap( face, face->charmaps[0] );	// Needed to make dingbat fonts work
+// !!! Cannot same be done in a less clumsy way?
 
 	/* Convert input string to UTF-32, using native byte order */
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
@@ -334,146 +334,83 @@ unsigned char *mt_text_render(
 
 	if ( cd == (iconv_t)(-1) ) goto fail0;
 
-	s = iconv(cd, &txtp1[0], &ssize1, &txtp2[0], &ssize2);
+	s = iconv(cd, &txtp1, &ssize1, &txtp2, &ssize2);
 	iconv_close(cd);
-	if (s) goto fail0;
+	if (s < 0) goto fail0;
+	characters = (txtp2 - (char *)txt2) / sizeof(*txt2); // Converted length
 
-	minx=miny=2<<24; maxx=maxy=-(2<<24);
-
-	for ( pass = 0; pass<2; pass++ )
+	while (TRUE)
 	{
-		pen.x = 0;
-		pen.y = 0;
-		ssize1 = characters;
+		pen.x = pen.y = 0;
 
-		for ( n=0; ssize1>0 ; n+=1, ssize1-- )
+		for (n = 0; n < characters; n++)
 		{
 			if (txt2[n] == 0) break;
 			glyph_index = FT_Get_Char_Index( face, txt2[n] );
 
-			if ( scalable )		// Cannot rotate fixed fonts
-			{
-				FT_Set_Transform( face, &matrix, &pen );
-			}
+			if (scalable)	// Cannot rotate fixed fonts
+				FT_Set_Transform(face, &matrix, &pen);
 
 			error = FT_Load_Glyph( face, glyph_index, load_flags );
 			if ( error ) continue;
 
-			switch ( face->glyph->bitmap.pixel_mode )
+			// Remember left boundary line
+			if (!mem && !n) abcd_calc(pen, Y1, Y2, angle_r,
+				face->glyph->metrics.horiBearingX, minxy);
+
+			switch (face->glyph->bitmap.pixel_mode)
 			{
-				case FT_PIXEL_MODE_GRAY2:	ppb=2; break;
-				case FT_PIXEL_MODE_GRAY4:	ppb=4; break;
-				case FT_PIXEL_MODE_MONO:	ppb=8; break;
+				case FT_PIXEL_MODE_GRAY:	ppb = 1; break;
+				case FT_PIXEL_MODE_GRAY2:	ppb = 2; break;
+				case FT_PIXEL_MODE_GRAY4:	ppb = 4; break;
+				case FT_PIXEL_MODE_MONO:	ppb = 8; break;
+				default: continue; // Unsupported mode
 			}
 
-			if ( scalable )			// Scalable fonts
+			bx = face->glyph->bitmap_left;
+			by = -face->glyph->bitmap_top;
+			bw = face->glyph->bitmap.width;
+			bh = face->glyph->bitmap.rows;
+			bits = bw && bh;
+
+			// Bitmap glyphs don't get offset by FreeType
+			if (!scalable || (bits && !face->glyph->outline.n_points))
 			{
-				bx = face->glyph->bitmap_left;
-				by = -face->glyph->bitmap_top;
-				bw = face->glyph->bitmap.width;
-				bh = face->glyph->bitmap.rows;
-
-				if ( pass == 0 && bw>0 && bh>0)	// Only do this if there is a bitmap
-				{
-					if ( bx < minx ) minx = bx;
-					if ( by < miny ) miny = by;
-					if ( bx + bw - 1 > maxx ) maxx = bx + bw - 1;
-					if ( by + bh - 1 > maxy ) maxy = by + bh - 1;
-				}
-				if ( pass == 0 && !(flags & MT_TEXT_SHRINK) && n == 0 )
-				{
-/*
-Note: This is all my own trig work, so I can't be sure than FreeType will be using
-the same methods.  Therefore we must always use the shrinked values as a minimum
-safety net to avoid any segfaults due to chopping boundaries too harshly.
-MT 19-8-2007
-*/
-					Y1 = FT_MulFix(face->ascender, face->size->metrics.y_scale);
-					Y2 = FT_MulFix(face->descender, face->size->metrics.y_scale);
-
-					abcd_calc( pen, Y1, Y2, angle_r,
-						face->glyph->metrics.horiBearingX,
-						&minx, &miny, &maxx, &maxy );
-				}
-
-				pen.x += face->glyph->advance.x;
-				pen.y += face->glyph->advance.y;
+				bx += pen.x >> 6;
+				by += pen.y >> 6;
 			}
-			else					// Bitmap fonts
-			{
-				bx = pen.x + face->glyph->bitmap_left;
-				by = pen.y - face->glyph->bitmap_top;
-				bw = face->glyph->bitmap.width;
-				bh = face->glyph->bitmap.rows;
+			pen.x += face->glyph->advance.x;
+			pen.y += face->glyph->advance.y;
 
-				if ( pass==0 && (!(flags & MT_TEXT_SHRINK) || (bw>0 && bh>0)) )
-				{
-					if ( bx < minx ) minx = bx;
-					if ( by < miny ) miny = by;
-					if ( bx + bw - 1 > maxx ) maxx = bx + bw - 1;
-					if ( by + bh - 1 > maxy ) maxy = by + bh - 1;
-				}
+			// Remember bitmap bounds
+			if (!mem && bits)
+				extend(minxy, bx, by, bx + bw - 1, by + bh - 1);
 
-				pen.x += (face->glyph->advance.x >> 6);
-				pen.y += (face->glyph->advance.y >> 6);
-			}
-
-			if (pass==1)		// Draw bitmap onto clipboard memory in pass 1
-			{
-				ft_draw_bitmap( mem, *width, &face->glyph->bitmap,
-							bx-minx, by-miny, ppb );
-			}
+			// Draw bitmap onto clipboard memory in pass 1
+			if (mem) ft_draw_bitmap(mem, *width, &face->glyph->bitmap,
+				bx - minxy[0], by - minxy[1], ppb);
 		}
 
-		if ( pass==0 )		// Set up new clipboard
+		if (mem) break; // Done
+
+		// Remember right boundary line
+		if (face->glyph)
 		{
-			if ( scalable )
-			{
-				if ( !(flags & MT_TEXT_SHRINK) && face->glyph )
-				{
-					pen.x -= face->glyph->advance.x;
-					pen.y -= face->glyph->advance.y;
+			pen.x -= face->glyph->advance.x;
+			pen.y -= face->glyph->advance.y;
 
-					abcd_calc( pen, Y1, Y2, angle_r,
-						face->glyph->metrics.horiBearingX +
-						face->glyph->metrics.width-64,
-						&minx, &miny, &maxx, &maxy );
-				}
-			}
-			else
-			{
-				if (!(flags & MT_TEXT_SHRINK) && !FT_IS_FIXED_WIDTH(face))
-				{
-/*
-Note: Some bozo decided that bitmap fonts would not have ascent/descent values
-in the face structure, so therefore we have a major headache dealing with these
-fonts when we want a full vertical ascent/descent render.  Fixed width fonts seem
-OK as they are rendered in their entirity, but variable width bitmap fonts cannot
-accurately be rendering with ascent/descent.  My solution here is to multiply the
-vertical size by 1.2 and assume that the descent is 25% of the ascent.
-MT 19-8-2007
-*/
-					by = -(1.2 * fix_h) * 0.8 - 0.5;	// Ascent
-					if (by<miny) miny=by;
-					by = (1.2 * fix_h) * 0.2 + 0.5;		// Descent
-					if (by>maxy) maxy=by;
-				}
-			}
-
-			*width = maxx - minx + 1;
-			*height = maxy - miny + 1;
-			if ( (mem = calloc(1, (*width)*(*height)) ) )
-			{
-						// Memory prepared OK
-			}
-			else
-			{
-				pass=10;	// Allocation failed so bail out
-			}
+			abcd_calc(pen, Y1, Y2, angle_r,
+				face->glyph->metrics.horiBearingX +
+				face->glyph->metrics.width - 64, minxy);
 		}
+
+		// Set up new clipboard
+		mem = calloc(1, (*width = minxy[2] - minxy[0] + 1) *
+			(*height = minxy[3] - minxy[1] + 1));
+		if (!mem) break; // Allocation failed so bail out
 	}
 
-	if ( face && !scalable && (angle!=0 || size>=2) )	// Rotate/Scale the bitmap font
+	if (mem && !scalable && (angle!=0 || size>=2) )	// Rotate/Scale the bitmap font
 	{
 		chanlist old_img = {NULL, NULL, NULL, NULL}, new_img = {NULL, NULL, NULL, NULL};
 		int nw, nh, ow = *width, oh = *height, ch = CHN_MASK,
@@ -1273,7 +1210,7 @@ static gint click_add_font_dir( GtkWidget *widget, gpointer user )
 
 	if ( strlen(txt)>0 && i<TX_MAX_DIRS )
 	{
-		snprintf(buf, 128, "font_dir%i", i);
+		snprintf(buf, 32, "font_dir%i", i);
 		inifile_set( buf, txt );
 
 		snprintf(buf, 32, "%3i", i+1);
@@ -1906,13 +1843,13 @@ void pressed_mt_text()
 	populate_font_clist(mem, CLIST_DIRECTORIES);
 	font_clist_adjust_cols(mem, CLIST_FONTNAME);		// Needed to ensure all fonts visible
 
-	gtk_window_add_accel_group(GTK_WINDOW (mem->window), ag);
-	gtk_widget_show_all(mem->window);
-
 	font_clist_centralise(mem);				// Ensure each list is shown properly
 
 	if (mem_img_bpp == 1) gtk_widget_hide(mem->toggle[TX_TOGG_ANTIALIAS]);
 	gtk_window_set_transient_for( GTK_WINDOW(mem->window), GTK_WINDOW(main_window) );
+
+	gtk_widget_show_all(mem->window);
+	gtk_window_add_accel_group(GTK_WINDOW (mem->window), ag);
 
 	gtk_widget_grab_focus( mem->entry[TX_ENTRY_TEXT] );
 //font_index_display(mem->head_node);

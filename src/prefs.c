@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -449,7 +449,8 @@ void pressed_preferences()
 ///	SETUP NOTEBOOK
 
 	notebook1 = xpack(vbox3, gtk_notebook_new());
-	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
+//	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
+	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_LEFT);
 //	gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook1), TRUE);
 	gtk_widget_show(notebook1);
 

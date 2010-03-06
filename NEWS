@@ -52,6 +52,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Failed operations now do not flag image as modified
 	* BUGFIX - Gradient colours are now properly updated after converting indexed image to RGB
 	* BUGFIX - Builtin file selector now properly handles manual edits in directory box
+	* BUGFIX - Problem with FreeType text dialog occasionally hiding behind main window is now eliminated
+	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
+	* BUGFIX - FreeType text renderer now properly handles TTF fonts with embedded bitmaps
+	* BUGFIX - Redraw lag when moving a dialog over main window in Windows is now greatly reduced (fixed in GTK+)
 
 3.31	2009-4-15
 
