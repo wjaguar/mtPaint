@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -809,7 +809,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	FILE *fp = NULL;
 	int h = settings->height, w = settings->width, bpp = settings->bpp;
 	int i, chunks = 0, res = -1;
-	long dest_len, res_len;
+	long uninit_(dest_len), res_len;
 	char *mess;
 	unsigned char trans[256], *tmp, *rgba_row = NULL;
 	png_color_16 trans_rgb;

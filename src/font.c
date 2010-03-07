@@ -176,36 +176,6 @@ static void ft_draw_bitmap(
 	}
 }
 
-static void abcd_calc(
-		FT_Vector	pen,
-		int		Y1,
-		int		Y2,
-		double		angle_r,
-		int		X1,
-		int		minxy[4])
-{
-	double sa = sin(angle_r), ca = cos(angle_r);
-	int Ax, Ay, y = Y1; // Point A/C
-
-	while (TRUE)
-	{
-		Ax = pen.x - y * sa + X1 * ca;
-		if (Ax < 0) Ax = -(-Ax / 64);
-		else Ax = (Ax + 63) / 64;
-		if (Ax < minxy[0]) minxy[0] = Ax;
-		if (Ax > minxy[2]) minxy[2] = Ax;
-
-		Ay = pen.y + y * ca + X1 * sa;
-		if (Ay < 0) Ay = (63 - Ay) / 64;
-		else Ay = -(Ay / 64);
-		if (Ay < minxy[1]) minxy[1] = Ay;
-		if (Ay > minxy[3]) minxy[3] = Ay;
-
-		if (y == Y2) return; // Done
-		y = Y2; // Point B/D
-	}
-}
-
 static inline void extend(int *rxy, int x0, int y0, int x1, int y1)
 {
 	if (x0 < rxy[0]) rxy[0] = x0;
@@ -213,7 +183,6 @@ static inline void extend(int *rxy, int x0, int y0, int x1, int y1)
 	if (x1 > rxy[2]) rxy[2] = x1;
 	if (y1 > rxy[3]) rxy[3] = y1;
 }
-
 
 #endif	// U_FREETYPE
 
@@ -243,18 +212,20 @@ unsigned char *mt_text_render(
 	char		*txtp1;
 #endif
 	char		*txtp2;
-	double		angle_r = angle / 180 * M_PI;
-	int		n, bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable, Y1, Y2;
+	double		ca, sa, angle_r = angle / 180 * M_PI;
+	int		bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable;
+	int		Y1, Y2, X1, X2, ll, line, xflag;
 	int		minxy[4] = { MAX_WIDTH, MAX_HEIGHT, -MAX_WIDTH, -MAX_HEIGHT };
 	size_t		s, ssize1 = characters, ssize2 = characters * 4 + 5;
 	iconv_t		cd;
 	FT_Library	library;
 	FT_Face		face;
 	FT_Matrix	matrix;
-	FT_Vector	pen;
+	FT_Vector	pen, uninit_(pen0);
 	FT_Error	error;
 	FT_UInt		glyph_index;
-	FT_Int32	load_flags = FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT, *txt2;
+	FT_Int32	unichar, *txt2, *tmp2;
+	FT_Int32	load_flags = FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT;
 
 //printf("\n%s %i %s %s %f %i %f %i\n", text, characters, filename, encoding, size, face_index, angle, flags);
 
@@ -272,6 +243,8 @@ unsigned char *mt_text_render(
 
 	if (!scalable)
 	{
+		ca = 1.0; sa = 0.0; // Transform, if any, is for later
+
 /* !!! Linux .pcf fonts require requested height to match ppem rounded up;
  * Windows .fon fonts, conversely, require width & height. So we try both - WJ */
 		fix_w = face->available_sizes[0].width;
@@ -291,22 +264,18 @@ unsigned char *mt_text_render(
 	}
 	else
 	{
-		if ( flags & MT_TEXT_OBLIQUE )
-		{
-			matrix.xx = (FT_Fixed)( (cos( angle_r )) * 0x10000L );
-			matrix.xy = (FT_Fixed)( (0.25*cos(angle_r) - sin( angle_r )) * 0x10000L );
-			matrix.yx = (FT_Fixed)( (sin( angle_r )) * 0x10000L );
-			matrix.yy = (FT_Fixed)( (0.25*sin(angle_r) + cos( angle_r )) * 0x10000L );
-		}
-		else
-		{
-			matrix.xx = (FT_Fixed)( cos( angle_r ) * 0x10000L );
-			matrix.xy = (FT_Fixed)(-sin( angle_r ) * 0x10000L );
-			matrix.yx = (FT_Fixed)( sin( angle_r ) * 0x10000L );
-			matrix.yy = (FT_Fixed)( cos( angle_r ) * 0x10000L );
-		}
+		ca = cos(angle_r); sa = sin(angle_r);
 		/* Ignore embedded bitmaps if transforming the font */
 		if (angle_r) load_flags |= FT_LOAD_NO_BITMAP;
+
+		matrix.yy = matrix.xx = (FT_Fixed)(ca * 0x10000L);
+		matrix.xy = -(matrix.yx = (FT_Fixed)(sa * 0x10000L));
+		if (flags & MT_TEXT_OBLIQUE)
+		{
+			matrix.xy = (FT_Fixed)((0.25 * ca - sa) * 0x10000L);
+			matrix.yy = (FT_Fixed)((0.25 * sa + ca) * 0x10000L);
+			load_flags |= FT_LOAD_NO_BITMAP;
+		}
 
 		error = FT_Set_Char_Size( face, size*64, 0, 0, 0 );
 		if (error) goto fail1;
@@ -315,7 +284,7 @@ unsigned char *mt_text_render(
 		Y2 = FT_MulFix(face->descender, face->size->metrics.y_scale);
 	}
 
-	txt2 = calloc(1, ssize2);
+	txt2 = calloc(1, ssize2 + 4);
 	if (!txt2) goto fail1;
 
 	txtp1 = text;
@@ -338,15 +307,40 @@ unsigned char *mt_text_render(
 	iconv_close(cd);
 	if (s < 0) goto fail0;
 	characters = (txtp2 - (char *)txt2) / sizeof(*txt2); // Converted length
+	txt2[characters] = 0; // Terminate the line
 
+	xflag = X1 = X2 = 0;
 	while (TRUE)
 	{
 		pen.x = pen.y = 0;
+		ll = line = 0;
+		tmp2 = txt2;
 
-		for (n = 0; n < characters; n++)
+		while (TRUE)
 		{
-			if (txt2[n] == 0) break;
-			glyph_index = FT_Get_Char_Index( face, txt2[n] );
+			unichar = *tmp2++;
+			if (!unichar || (unichar == 0x0A)) // EOL or newline
+			{
+				// Remember right boundary
+				if (ll && face->glyph)
+				{
+					int tx = pen.x - pen0.x - face->glyph->advance.x;
+					int ty = pen.y - pen0.y - face->glyph->advance.y;
+					int tdx = face->glyph->metrics.horiBearingX +
+						face->glyph->metrics.width - 64;
+					/* Project pen offset onto rotated X axis */
+					tdx += tx * ca + ty * sa;
+					if (tdx > X2) X2 = tdx;
+				}
+				if (!unichar) break;
+				ll = (Y1 - Y2) * ++line;
+				pen.x = ll * sa;
+				pen.y = ll * -ca;
+				ll = 0; // Reset horizontal index
+				continue;
+			}
+
+			glyph_index = FT_Get_Char_Index(face, unichar);
 
 			if (scalable)	// Cannot rotate fixed fonts
 				FT_Set_Transform(face, &matrix, &pen);
@@ -354,9 +348,14 @@ unsigned char *mt_text_render(
 			error = FT_Load_Glyph( face, glyph_index, load_flags );
 			if ( error ) continue;
 
-			// Remember left boundary line
-			if (!mem && !n) abcd_calc(pen, Y1, Y2, angle_r,
-				face->glyph->metrics.horiBearingX, minxy);
+			// Remember left boundary
+			if (!ll++)
+			{
+				int tx = face->glyph->metrics.horiBearingX;
+				if (!xflag++) X1 = X2 = tx; // First glyph
+				if (tx < X1) X1 = tx;
+				pen0 = pen;
+			}
 
 			switch (face->glyph->bitmap.pixel_mode)
 			{
@@ -377,7 +376,7 @@ unsigned char *mt_text_render(
 			if (!scalable || (bits && !face->glyph->outline.n_points))
 			{
 				bx += pen.x >> 6;
-				by += pen.y >> 6;
+				by -= pen.y >> 6;
 			}
 			pen.x += face->glyph->advance.x;
 			pen.y += face->glyph->advance.y;
@@ -393,15 +392,33 @@ unsigned char *mt_text_render(
 
 		if (mem) break; // Done
 
-		// Remember right boundary line
-		if (face->glyph)
+		/* Adjust bounds for full-height rectangle; ignore possible
+		 * rounding issues, for their effect is purely visual - WJ */
+		by = Y2 + (Y2 - Y1) * line;
+		while (TRUE)
 		{
-			pen.x -= face->glyph->advance.x;
-			pen.y -= face->glyph->advance.y;
+			bx = X1;
+			while (TRUE)
+			{
+				int Ax, Ay;
 
-			abcd_calc(pen, Y1, Y2, angle_r,
-				face->glyph->metrics.horiBearingX +
-				face->glyph->metrics.width - 64, minxy);
+				Ax = bx * ca - by * sa;
+				if (Ax < 0) Ax = -(-Ax / 64);
+				else Ax = (Ax + 63) / 64;
+				if (Ax < minxy[0]) minxy[0] = Ax;
+				if (Ax > minxy[2]) minxy[2] = Ax;
+
+				Ay = by * ca + bx * sa;
+				if (Ay < 0) Ay = (63 - Ay) / 64;
+				else Ay = -(Ay / 64);
+				if (Ay < minxy[1]) minxy[1] = Ay;
+				if (Ay > minxy[3]) minxy[3] = Ay;
+
+				if (bx == X2) break;
+				bx = X2;
+			}
+			if (by == Y1) break; // Done
+			by = Y1;
 		}
 
 		// Set up new clipboard
@@ -1634,7 +1651,7 @@ static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
 
 	rgb = malloc( w*h*3 );
 	if ( !rgb ) return FALSE;
-	memset( rgb, inifile_get_gint32("backgroundGrey", 180), w*h*3 );
+	memset( rgb, mem_background, w*h*3 );
 
 	if ( fp->preview_rgb )
 	{
@@ -1670,10 +1687,8 @@ static void font_entry_changed(GtkWidget *widget, gpointer user)	// A GUI entry 
 {
 	mtfontsel *fp = user;
 
-
-	if (!fp) return;
 	read_font_controls(fp);
-	font_preview_update( fp );		// Update the font preview area
+	font_preview_update(fp);		// Update the font preview area
 }
 #endif		// U_FREETYPE
 
@@ -1683,7 +1698,8 @@ void pressed_mt_text()
 #ifdef U_FREETYPE
 	int		i;
 	mtfontsel	*mem;
-	GtkWidget	*vbox, *vbox2, *hbox, *notebook, *page, *scrolledwindow, *button;
+	GtkWidget	*vbox, *vbox2, *hbox, *notebook, *page, *scrolledwindow;
+	GtkWidget	*button, *entry;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
@@ -1734,11 +1750,12 @@ void pressed_mt_text()
 	hbox = gtk_hbox_new(FALSE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 	add_with_frame(vbox, _("Text"), hbox);
-	mem->entry[TX_ENTRY_TEXT] = xpack(hbox, gtk_entry_new());
-	gtk_entry_set_text (GTK_ENTRY (mem->entry[TX_ENTRY_TEXT]),
-		inifile_get( "textString", _("Enter Text Here") ) );
-	gtk_signal_connect(GTK_OBJECT(mem->entry[TX_ENTRY_TEXT]), "changed",
+	mem->entry[TX_ENTRY_TEXT] = entry = xpack(hbox, gtk_entry_new());
+	gtk_entry_set_text(GTK_ENTRY(entry),
+		inifile_get("textString", _("Enter Text Here")));
+	gtk_signal_connect(GTK_OBJECT(entry), "changed",
 		GTK_SIGNAL_FUNC(font_entry_changed), (gpointer)mem);
+	accept_ctrl_enter(entry);
 
 
 //	PREVIEW AREA

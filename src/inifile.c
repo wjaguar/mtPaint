@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2009 Dmitry Groshev
+	Copyright (C) 2007-2010 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -67,6 +67,83 @@ typedef char Integers_Do_Not_Fit_Into_Pointers[2 * (sizeof(int) <= sizeof(char *
 #define INI_DEFAULT 0x0008 /* Default value is defined */
 
 #define SLOT_NAME(I,S) ((I)->sblock[(S)->flags & INI_STRING] + (S)->key)
+
+/* Escaping is needed for leading tabs and spaces, and for inline CR and LF */
+static char *escape_string(char *src)
+{
+	static const char *escaped = "\t\r\n \\";
+	char c, *cp, *tmp, *t2;
+
+	if ((src[0] != '\t') && (src[0] != ' ') && !src[strcspn(src, "\r\n")])
+		return (NULL);
+	t2 = tmp = calloc(1, strlen(src) * 2 + 1);
+	if (tmp)
+	{
+		while ((c = *src++))
+		{
+			if ((cp = strchr(escaped, c)))
+			{
+				*t2++ = '\\';
+				c = "trn \\"[cp - escaped];
+			}
+			*t2++ = c;
+		}
+		*t2 = '\0';
+	}
+	return (tmp);
+}
+
+#if GTK_MAJOR_VERSION == 1
+
+/* GLib 1.2 doesn't provide g_strcompress() */
+static void unescape_string(char *buf)
+{
+#define NUM_ESCAPES 5
+	static const char escapes[] = "bfnrt01234567";
+	static const char escaped[] = { 7, 12, 10, 13, 8, 0, 1, 2, 3, 4, 5, 6, 7 };
+	char c, cc, *tmp, *src = buf;
+	int v;
+
+	while ((c = *src++))
+	{
+		if (c == '\\')
+		{
+			c = *src++;
+			if (!c) break;
+			while ((tmp = strchr(escapes, c)))
+			{
+				v = tmp - escapes;
+				c = escaped[v];
+				if (v >= NUM_ESCAPES)
+				{
+					// Octal escape
+					cc = *src - '0';
+					if (cc & ~7) break;
+					c = c * 8 + cc;
+					cc = *(++src) - '0';
+					if (cc & ~7) break;
+					c = c * 8 + cc;
+					++src;
+				}
+				break;
+			}
+		}
+		*buf++ = c;
+	}
+	*buf = '\0';
+#undef NUM_ESCAPES
+}
+
+#else
+
+static void unescape_string(char *buf)
+{
+	char *tmp = g_strcompress(buf);
+	strcpy(buf, tmp);
+	g_free(tmp);
+}
+
+#endif
 
 /* Thomas Wang's and "One at a time" hash functions */
 static guint32 hashf(guint32 seed, int section, char *key)
@@ -323,7 +400,7 @@ int read_ini(inifile *inip, char *fname, int itype)
 	inifile ini;
 	inislot *slot;
 	char *tmp, *wrk, *w2, *str;
-	int i, j, l, sec = 0;
+	int i, j, l, q, sec = 0;
 
 
 	/* Read the file */
@@ -378,7 +455,8 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 		for (wrk = w2 - 1; wrk - tmp >= 0; wrk--)
 			if ((*wrk != ' ') && (*wrk != '\t')) break;
 		wrk[1] = '\0';
-		w2 += 1 + strspn(w2 + 1, "\t ");
+		q = *(++w2) == '='; /* "==" means quoted value */
+		w2 += q + strspn(w2 + q, "\t ");
 //		for (wrk = str - 1; *wrk && ((*wrk == '\t') || (*wrk == ' '); *wrk-- = '\0');
 		/* Hash this pair */
 		slot = cuckoo_find(&ini, sec, tmp);
@@ -393,6 +471,7 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 			if (!cuckoo_insert(&ini, slot) && !rehash(&ini))
 				goto fail;
 		}
+		if (q) unescape_string(w2);
 		slot->value = w2;
 	}
 
@@ -410,7 +489,7 @@ int write_ini(inifile *inip, char *fname, char *header)
 {
 	FILE *fp;
 	inislot *slotp;
-	char *name, *sv;
+	char *name, *sv, *xv;
 	int i, j, max, sec, var, defv;
 
 	if (!(fp = fopen(fname, "w"))) return (FALSE);
@@ -452,7 +531,13 @@ int write_ini(inifile *inip, char *fname, char *header)
 					slotp->defv, sv)) break;
 			case INI_UNDEF:
 			default:
-				fprintf(fp, "%s = %s\n", name, sv);
+				/* Escape value if needed */
+				if ((xv = escape_string(sv)))
+				{
+					fprintf(fp, "%s == %s\n", name, xv);
+					free(xv);
+				}
+				else fprintf(fp, "%s = %s\n", name, sv);
 				break;
 			case INI_INT:
 				if (defv && ((int)slotp->value == slotp->defv)) break;

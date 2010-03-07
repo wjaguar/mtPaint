@@ -3683,6 +3683,35 @@ void handle_events()
 	while (gtk_events_pending()) gtk_main_iteration();
 }
 
+// Make GtkEntry accept Ctrl+Enter as a character
+
+static gboolean convert_ctrl_enter(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	if (((event->keyval == GDK_Return) || (event->keyval == GDK_KP_Enter)) &&
+		(event->state & GDK_CONTROL_MASK))
+	{
+#if GTK_MAJOR_VERSION == 1
+		GtkEditable *edit = GTK_EDITABLE(widget);
+		gint pos = edit->current_pos;
+
+		gtk_editable_delete_selection(edit);
+		gtk_editable_insert_text(edit, "\n", 1, &pos);
+		edit->current_pos = pos;
+#else
+		gtk_signal_emit_by_name(GTK_OBJECT(widget), "insert_at_cursor", "\n");
+#endif
+		return (TRUE);
+	}
+	return (FALSE);
+}
+
+void accept_ctrl_enter(GtkWidget *entry)
+{
+	gtk_signal_connect(GTK_OBJECT(entry), "key_press_event",
+		GTK_SIGNAL_FUNC(convert_ctrl_enter), NULL);
+}
+
 // Threading helpers
 
 #if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */

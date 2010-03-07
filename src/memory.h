@@ -926,3 +926,6 @@ void mem_seg_render(unsigned char *img, const seg_state *s);
 #define WJ_ROUND(I,X) (I) = (int)((X) + 0.5)
 #define WJ_FLOOR(I,X) (I) = floor(X)
 #endif
+
+/* Tell GCC to remain silent about an uninitialized variable */
+#define uninit_(X) X = X

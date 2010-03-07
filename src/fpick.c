@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -754,7 +754,7 @@ static void fpick_file_dialog(fpicker *fp, int row)
 	GtkWidget *win, *button, *label, *entry;
 	GtkCList *clist = GTK_CLIST(fp->clist);
 	GtkAccelGroup *ag = gtk_accel_group_new();
-	int l, res;
+	int uninit_(l), res;
 
 
 	if (row >= 0) /* Doing things to existing file */

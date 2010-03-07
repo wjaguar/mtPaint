@@ -369,6 +369,10 @@ void update_window_spin(GtkWidget *window);
 
 void handle_events();
 
+// Make GtkEntry accept Ctrl+Enter as a character
+
+void accept_ctrl_enter(GtkWidget *entry);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

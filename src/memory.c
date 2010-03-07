@@ -6084,7 +6084,7 @@ static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
 		1, 2, 0, /* #6: R..Y */
 		1, 2, 0  /* #7: W */ };
 	const unsigned char *new, *old;
-	int j, step3, nhex, ohex, mode = blend_mode;
+	int j, step3, uninit_(nhex), uninit_(ohex), mode = blend_mode;
 
 
 	/* Backward transfer? */

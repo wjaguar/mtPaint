@@ -235,7 +235,7 @@ int threads_running;
 void launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
 {
 	tcb *tp;
-	clock_t before, now;
+	clock_t uninit_(before), now;
 	int i, j, n0, n1 = total, flag = FALSE;
 #if GTK_MAJOR_VERSION == 1
 	pthread_t tid;

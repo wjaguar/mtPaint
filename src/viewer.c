@@ -1394,6 +1394,8 @@ void pressed_text()
 	gtk_widget_show(text_font_window);
 	gtk_container_set_border_width (GTK_CONTAINER (text_font_window), 4);
 
+	accept_ctrl_enter(GTK_FONT_SELECTION(text_font_window)->preview_entry);
+
 	add_hseparator( vbox, 200, 10 );
 
 	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));

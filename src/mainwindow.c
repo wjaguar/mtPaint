@@ -2416,7 +2416,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 	unsigned char **tlist = r.tlist;
 	int j, jj, j0, l, pw23;
 	unsigned char *xtemp = NULL;
-	xform_render_state xrstate;
+	xform_render_state uninit_(xrstate);
 	unsigned char *cstemp = NULL;
 	unsigned char *gtemp = NULL;
 	grad_render_state grstate;
