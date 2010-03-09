@@ -124,6 +124,7 @@ void set_new_filename(int layer, char *fname);
 void main_undo();
 void main_redo();
 
+void line_to_gradient();	// Setup gradient along line tool
 void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!
 void update_menus();					// Update undo/edit menu
 

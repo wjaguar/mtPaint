@@ -240,6 +240,8 @@ int grad_opacity;			// Preview opacity
 #define GRAD_TYPE_CONST    4
 #define GRAD_TYPE_CUSTOM   5
 
+#define STROKE_GRADIENT (mem_gradient && (gradient[mem_channel].status == GRAD_NONE))
+
 /// Bayer ordered dithering
 
 const unsigned char bayer[16];

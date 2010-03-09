@@ -4321,7 +4321,7 @@ void flood_fill(int x, int y, unsigned int target)
 	int i, j, k, l, sb, lw = (mem_width + 7) >> 3;
 
 	/* Shapeburst mode */
-	sb = mem_gradient && (gradient[mem_channel].status == GRAD_NONE);
+	sb = STROKE_GRADIENT;
 
 	/* Regular fill? */
 	if (!sb && !mem_tool_pat && (tool_opacity == 255) && !flood_step &&
@@ -4541,7 +4541,7 @@ void mem_ellipse(int x1, int y1, int x2, int y2, int thick)
 	yl = abs(y2 - y1) + 1;
 
 	/* Shapeburst mode */
-	if (mem_gradient && (gradient[mem_channel].status == GRAD_NONE))
+	if (STROKE_GRADIENT)
 	{
 		sb_rect[0] = xs; sb_rect[1] = ys;
 		sb_rect[2] = xl; sb_rect[3] = yl;

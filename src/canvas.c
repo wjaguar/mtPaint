@@ -834,7 +834,7 @@ void pressed_rectangle(int filled)
 	spot_undo(UNDO_DRAW);
 
 	/* Shapeburst mode */
-	sb = mem_gradient && (gradient[mem_channel].status == GRAD_NONE);
+	sb = STROKE_GRADIENT;
 
 	if ( tool_type == TOOL_POLYGON )
 	{
@@ -2194,8 +2194,7 @@ static void rec_continuous(int nx, int ny, int w, int h)
 
 	/* Redraw starting square only if need to fill in possible gap when
 	 * size changes, or to draw stroke gradient in the proper direction */
-	if (!tablet_working && !(mem_gradient &&
-		(gradient[mem_channel].status == GRAD_NONE)))
+	if (!tablet_working && !STROKE_GRADIENT)
 	{
 		i2 = tool_ox + dx[i + 1] + 1 - i * 2;
 		j2 = tool_oy + dy[j + 1] + 1 - j * 2;
@@ -2450,6 +2449,18 @@ static int tool_draw(int x, int y, int *update)
 	return (TRUE);
 }
 
+void line_to_gradient()
+{
+	if (STROKE_GRADIENT)
+	{
+		grad_info *grad = gradient + mem_channel;
+		grad->gmode = GRAD_MODE_LINEAR;
+		grad->status = GRAD_DONE;
+		copy4(grad->xy, line_xy);
+		grad_update(grad);
+	}
+}
+
 void tool_action(int event, int x, int y, int button, gdouble pressure)
 {
 	static double lstep;
@@ -2512,6 +2523,11 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			// Draw circle at x, y
 			if ( line_status == LINE_LINE )
 			{
+				grad_info svgrad = gradient[mem_channel];
+
+				/* If not called from draw_arrow() */
+				if (event != GDK_NOTHING) line_to_gradient();
+
 				mem_undo_next(UNDO_TOOL);
 				if ( tool_size > 1 )
 				{
@@ -2532,6 +2548,8 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 				line_x1 = line_x2;
 				line_y1 = line_y2;
+
+				gradient[mem_channel] = svgrad;
 			}
 			line_status = LINE_START;
 		}
@@ -2672,8 +2690,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		if (tool_type == TOOL_CIRCLE)
 		{
 			/* Redraw stroke gradient in proper direction */
-			if (mem_gradient &&
-				(gradient[mem_channel].status == GRAD_NONE))
+			if (STROKE_GRADIENT)
 				f_circle(tool_ox, tool_oy, tool_size);
 			tline(tool_ox, tool_oy, x, y, tool_size);
 			f_circle(x, y, tool_size);

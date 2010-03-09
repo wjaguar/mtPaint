@@ -1042,10 +1042,13 @@ static void draw_arrow(int mode)
 	int i, xa1, xa2, ya1, ya2, minx, maxx, miny, maxy, w, h;
 	double uvx, uvy;	// Line length & unit vector lengths
 	int oldmode = mem_undo_opacity;
+	grad_info svgrad;
 
 
 	if (!((tool_type == TOOL_LINE) && (line_status != LINE_NONE) &&
 		((line_x1 != line_x2) || (line_y1 != line_y2)))) return;
+	svgrad = gradient[mem_channel];
+	line_to_gradient();
 
 	// Calculate 2 coords for arrow corners
 	uvy = sqrt((line_x1 - line_x2) * (line_x1 - line_x2) +
@@ -1083,6 +1086,7 @@ static void draw_arrow(int mode)
 		poly_points = 0;
 	}
 	mem_undo_opacity = oldmode;
+	gradient[mem_channel] = svgrad;
 	mem_undo_prepare();
 
 	// Update screen areas
