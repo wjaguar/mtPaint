@@ -201,6 +201,7 @@ void progress_init(char *text, int canc)		// Initialise progress window
 
 int progress_update(float val)		// Update progress window
 {
+	if (!progress_window) return (FALSE);
 	gtk_progress_set_percentage( GTK_PROGRESS (progress_bar), val );
 	handle_events();
 	return (prog_stop);
@@ -208,7 +209,7 @@ int progress_update(float val)		// Update progress window
 
 void progress_end()			// Close progress window
 {
-	if ( progress_window != 0 )
+	if (progress_window)
 	{
 		gtk_widget_destroy( progress_window );
 		progress_window = NULL;
@@ -316,9 +317,8 @@ GtkWidget *mt_spinslide_new(int swidth, int sheight)
 
 void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv)
 {
-	GtkAdjustment *adj;
-	
-	adj = gtk_range_get_adjustment(GTK_RANGE(BOX_CHILD_0(spinslide)));
+	GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(spinslide);
+
 	adj->lower = minv;
 	adj->upper = maxv;
 	gtk_adjustment_changed(adj);
@@ -326,9 +326,8 @@ void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv)
 
 int mt_spinslide_get_value(GtkWidget *spinslide)
 {
-	GtkSpinButton *spin;
+	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 
-	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	gtk_spin_button_update(spin);
 	return (gtk_spin_button_get_value_as_int(spin));
 }
@@ -336,17 +335,13 @@ int mt_spinslide_get_value(GtkWidget *spinslide)
 /* Different in that this doesn't force slider to integer-value position */
 int mt_spinslide_read_value(GtkWidget *spinslide)
 {
-	GtkSpinButton *spin;
-
-	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
+	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	return (gtk_spin_button_get_value_as_int(spin));
 }
 
 void mt_spinslide_set_value(GtkWidget *spinslide, int value)
 {
-	GtkSpinButton *spin;
-
-	spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
+	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
 	gtk_spin_button_set_value(spin, value);
 }
 
@@ -354,9 +349,7 @@ void mt_spinslide_set_value(GtkWidget *spinslide, int value)
 void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 	gpointer user_data)
 {
-	GtkAdjustment *adj;
-	
-	adj = gtk_range_get_adjustment(GTK_RANGE(BOX_CHILD_0(spinslide)));
+	GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(spinslide);
 	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
 }
 
@@ -2430,6 +2423,7 @@ typedef struct
 	int		size[2];	// Requested (virtual) size
 	int		resize;		// Resize was requested
 	int		resizing;	// Requested resize is happening
+	guint32		scrolltime;	// For autoscroll rate-limiting
 } wjcanvas;
 
 typedef struct
@@ -2922,6 +2916,31 @@ int wjcanvas_scroll_in(GtkWidget *widget, int x, int y)
 	if (dx) gtk_adjustment_value_changed(canvas->adjustments[0]);
 	if (dy) gtk_adjustment_value_changed(canvas->adjustments[1]);
 	return (dx | dy);
+}
+
+#define WJCANVAS_SCROLL_LIMIT 333 /* 3 steps/second */
+
+/* If mouse moved outside canvas, scroll canvas & warp cursor back in */
+int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int oldv[4];
+
+	copy4(oldv, canvas->xy);
+	x += oldv[0]; y += oldv[1];
+	if ((x >= oldv[0]) && (x < oldv[2]) && (y >= oldv[1]) && (y < oldv[3]))
+		return (FALSE);
+	/* Limit scrolling rate for absolute pointing devices */
+#if GTK_MAJOR_VERSION == 1
+	if ((event->source != GDK_SOURCE_MOUSE) &&
+#else /* if GTK_MAJOR_VERSION == 2 */
+	if ((event->device->source != GDK_SOURCE_MOUSE) &&
+#endif
+		(event->time < canvas->scrolltime + WJCANVAS_SCROLL_LIMIT))
+		return (FALSE);
+	if (!wjcanvas_scroll_in(widget, x, y)) return (FALSE);
+	canvas->scrolltime = event->time;
+	return (move_mouse_relative(oldv[0] - canvas->xy[0], oldv[1] - canvas->xy[1]));
 }
 
 // Focusable pixmap widget

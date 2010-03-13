@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.40	2009-?-?
+3.40	2010-?-?
 
 	* Tagalog translation added by Anjelo delCarmen
 	* Czech translation updated by Roman Hornik
@@ -20,6 +20,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* "Protect details" toggle added to Kuwahara-Nagao blur
 	* Gaussian blur, Unsharp mask and Difference of Gaussians effects now use multithreading to utilize all available CPU cores
 	* Moving the pointer with the arrow keys now scrolls the canvas when moving beyond the viewport
+	* Dragging selection frame in canvas window, layer in view window, or colour in palette window, beyond the viewport now scrolls the window
 	* sRGB colour scale generation added to palette editor
 	* sRGB gradients added
 	* Line tool now uses stroke gradient when no gradient placement exists
@@ -44,6 +45,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Toolbar and menu icons are now themeable (Preferences->Paths->Default Theme)
 	* Command line globbing now possible using -w option, e.g. mtpaint -w "*.jpg"
 	* Drawing and fill tools now are 2-3 times faster
+	* Support for compiling with libpng 1.4 added
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should

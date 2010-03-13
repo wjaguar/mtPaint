@@ -482,7 +482,11 @@ static void ls_progress(ls_settings *settings, int n, int steps)
 		progress_update((float)n / h);
 }
 
-/* !!! libpng 1.2.17 or later loses extra chunks if there's no callback */
+#if PNG_LIBPNG_VER >= 10400 /* 1.4+ */
+#define png_set_gray_1_2_4_to_8(X) png_set_expand_gray_1_2_4_to_8(X)
+#endif
+
+/* !!! libpng 1.2.17-1.2.24 was losing extra chunks if there was no callback */
 static int buggy_libpng_handler()
 {
 	return (0);
@@ -575,7 +579,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		goto fail2;
 	}
 
-	/* !!! libpng 1.2.17+ needs this to read extra channels */
+	/* !!! libpng 1.2.17-1.2.24 needs this to read extra channels */
 	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
 	if (!mf) png_init_io(png_ptr, fp);

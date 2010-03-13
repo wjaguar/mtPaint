@@ -2512,7 +2512,13 @@ static void palette_pad_select(int i, int mode)
 {
 	palette_pad_set(i);
 	/* Indexed / utility / opacity */
-	if (!mode) mt_spinslide_set_value(grad_ed_ss, i);
+	if (!mode)
+	{
+		/* !!! Signal needs be sent even if value stays the same */
+		GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(grad_ed_ss);
+		adj->value = i;
+		gtk_adjustment_value_changed(adj);
+	}
 	else if (i < mem_cols) /* Valid RGB */
 	{
 		cpick_set_colour(grad_ed_cs, PNG_2_INT(mem_pal[i]), 255);

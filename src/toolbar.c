@@ -862,7 +862,6 @@ static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
-
 static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
 {
 	GdkModifierType state;
@@ -875,6 +874,10 @@ static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointe
 		y = event->y;
 		state = event->state;
 	}
+
+	/* If cursor got warped, will have another movement event to handle */
+	if (drag_index && wjcanvas_bind_mouse(widget, event, x, y)) return (TRUE);
+
 	wjcanvas_get_vport(widget, vport);
 
 	pindex = (y + vport[1] - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;

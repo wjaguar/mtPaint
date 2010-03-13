@@ -7086,6 +7086,68 @@ static void gauss_extend(gaussd *gd, double *temp, int w, int bpp)
 	}
 }
 
+/* Apply RGB horizontal filter */
+static void hor_gauss3(double *temp, int w, double *gaussX, int lenX,
+	unsigned char *mask)
+{
+	int j, jj, k, x1, x2;
+	double sum0, sum1, sum2;
+
+	for (j = jj = 0; jj < w; jj++ , j += 3)
+	{
+		if (mask[jj] == 255) continue;
+		sum0 = temp[j] * gaussX[0];
+		sum1 = temp[j + 1] * gaussX[0];
+		sum2 = temp[j + 2] * gaussX[0];
+		x1 = x2 = j;
+		for (k = 1; k < lenX; k++)
+		{
+			double gv = gaussX[k];
+			x1 -= 3; x2 += 3;
+			sum0 += (temp[x1] + temp[x2]) * gv;
+			sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gv;
+			sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gv;
+		}
+		temp[x1] = sum0;
+		temp[x1 + 1] = sum1;
+		temp[x1 + 2] = sum2;
+	}
+}
+
+// !!! Will need extra checks if used for out-of-range values
+static void pack_row3(unsigned char *dest, const double *src, int w, int gcor,
+	unsigned char *mask)
+{
+	int j, jj, k0, k1, k2, m;
+	double sum0, sum1, sum2;
+
+	for (j = jj = 0; jj < w; jj++ , j += 3)
+	{
+		sum0 = src[j];
+		sum1 = src[j + 1];
+		sum2 = src[j + 2];
+		if (gcor) /* Reverse gamma correction */
+		{
+			k0 = UNGAMMA256(sum0);
+			k1 = UNGAMMA256(sum1);
+			k2 = UNGAMMA256(sum2);
+		}
+		else /* Simply round to nearest */
+		{
+			k0 = rint(sum0);
+			k1 = rint(sum1);
+			k2 = rint(sum2);
+		}
+		m = mask[jj];
+		k0 = k0 * 255 + (dest[j] - k0) * m;
+		dest[j] = (k0 + (k0 >> 8) + 1) >> 8;
+		k1 = k1 * 255 + (dest[j + 1] - k1) * m;
+		dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
+		k2 = k2 * 255 + (dest[j + 2] - k2) * m;
+		dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
+	}
+}
+
 /* Most-used variables are local to inner blocks to shorten their live ranges -
  * otherwise stupid compilers might allocate them to memory */
 static void gauss_filter(tcb *thread)
@@ -7093,7 +7155,7 @@ static void gauss_filter(tcb *thread)
 	gaussd *gd = thread->data;
 	int lenX = gd->lenX, gcor = gd->gcor, channel = gd->channel;
 	int i, ii, cnt, wid, bpp;
-	double sum, sum0, sum1, sum2, *temp, *gaussX = gd->gaussX;
+	double sum, *temp, *gaussX = gd->gaussX;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
 	cnt = thread->nsteps;
@@ -7109,42 +7171,8 @@ static void gauss_filter(tcb *thread)
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
 		{
-			int j, jj, k, k0, k1, k2, x1, x2;
-
-			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
-			{
-				if (mask[jj] == 255) continue;
-				sum0 = temp[j] * gaussX[0];
-				sum1 = temp[j + 1] * gaussX[0];
-				sum2 = temp[j + 2] * gaussX[0];
-				x1 = x2 = j;
-				for (k = 1; k < lenX; k++)
-				{
-					double gv = gaussX[k];
-					x1 -= 3; x2 += 3;
-					sum0 += (temp[x1] + temp[x2]) * gv;
-					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gv;
-					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gv;
-				}
-				if (gcor) /* Reverse gamma correction */
-				{
-					k0 = UNGAMMA256(sum0);
-					k1 = UNGAMMA256(sum1);
-					k2 = UNGAMMA256(sum2);
-				}
-				else /* Simply round to nearest */
-				{
-					k0 = rint(sum0);
-					k1 = rint(sum1);
-					k2 = rint(sum2);
-				}
-				k0 = k0 * 255 + (dest[j] - k0) * mask[jj];
-				dest[j] = (k0 + (k0 >> 8) + 1) >> 8;
-				k1 = k1 * 255 + (dest[j + 1] - k1) * mask[jj];
-				dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
-				k2 = k2 * 255 + (dest[j + 2] - k2) * mask[jj];
-				dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
-			}
+			hor_gauss3(temp, mem_width, gaussX, lenX, mask);
+			pack_row3(dest, gd->temp, mem_width, gcor, mask);
 		}
 		else /* Run 1-bpp horizontal filter - no gamma here */
 		{
@@ -7306,17 +7334,17 @@ static void gauss_filter_rgba(tcb *thread)
 		dsta = mem_img[CHN_ALPHA] + i * mem_width;
 		/* Horizontal RGBA filter */
 		{
-			int j, jj, k, k1, k2, kk, x1, x2;
+			int j, jj, k, kk, x1, x2;
 
 			for (j = jj = 0; j < mem_width; j++ , jj += 3)
 			{
 				if (mask[j] == 255) continue;
+
 				sum = atmp[j] * gaussX[0];
 				for (k = 1; k < lenX; k++)
 				{
 					sum += (atmp[j - k] + atmp[j + k]) * gaussX[k];
 				}
-				kk = mask[j];
 				k = rint(sum);
 				src = temp;
 				mult = 1.0;
@@ -7325,9 +7353,11 @@ static void gauss_filter_rgba(tcb *thread)
 					src = tmpa;
 					mult /= sum;
 				}
+				kk = mask[j];
 				k = k * 255 + (dsta[j] - k) * kk;
-				if (k) kk = (255 * kk * dsta[j]) / k;
+				if (k) mask[j] = (255 * kk * dsta[j]) / k;
 				dsta[j] = (k + (k >> 8) + 1) >> 8;
+
 				sum = src[jj] * gaussX[0];
 				sum1 = src[jj + 1] * gaussX[0];
 				sum2 = src[jj + 2] * gaussX[0];
@@ -7340,25 +7370,11 @@ static void gauss_filter_rgba(tcb *thread)
 					sum1 += (src[x1 + 1] + src[x2 + 1]) * gv;
 					sum2 += (src[x1 + 2] + src[x2 + 2]) * gv;
 				}
-				if (gcor) /* Reverse gamma correction */
-				{
-					k = UNGAMMA256(sum * mult);
-					k1 = UNGAMMA256(sum1 * mult);
-					k2 = UNGAMMA256(sum2 * mult);
-				}
-				else /* Simply round to nearest */
-				{
-					k = rint(sum * mult);
-					k1 = rint(sum1 * mult);
-					k2 = rint(sum2 * mult);
-				}
-				k = k * 255 + (dest[jj] - k) * kk;
-				dest[jj] = (k + (k >> 8) + 1) >> 8;
-				k1 = k1 * 255 + (dest[jj + 1] - k1) * kk;
-				dest[jj + 1] = (k1 + (k1 >> 8) + 1) >> 8;
-				k2 = k2 * 255 + (dest[jj + 2] - k2) * kk;
-				dest[jj + 2] = (k2 + (k2 >> 8) + 1) >> 8;
+				temp[x1] = sum * mult;
+				temp[x1 + 1] = sum1 * mult;
+				temp[x1 + 2] = sum2 * mult;
 			}
+			pack_row3(dest, gd->temp, mem_width, gcor, mask);
 		}
 		if (thread_step(thread, ii + 1, cnt, 10)) break;
 	}

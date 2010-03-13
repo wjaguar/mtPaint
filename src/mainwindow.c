@@ -3257,6 +3257,10 @@ static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer
 	else if (state & GDK_BUTTON3_MASK) button = 3;
 	else if (state & GDK_BUTTON2_MASK) button = 2;
 
+	/* If cursor got warped, will have another movement event to handle */
+	if (button && (tool_type == TOOL_SELECT) &&
+		wjcanvas_bind_mouse(widget, event, x, y)) return (TRUE);
+
 	wjcanvas_get_vport(widget, vport);
 	mouse_event(event->type, x + vport[0], y + vport[1],
 		state, button, pressure, rm & 1, 0, 0);
