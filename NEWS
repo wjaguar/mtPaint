@@ -15,6 +15,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Eliminated flicker when positioning line, polygon side, or gradient in Windows version
 	* Scrolling made more smooth in Windows version
 	* Dock area now holds settings toolbar and layers dialog when their windows are closed
+	* Main toolbar and tools toolbar now rearrange themselves to fit in window
 	* The preview button on the colour selectors is now a toggle to enable interactive previews
 	* Gaussian blur effect now faster by 20-35%
 	* "Protect details" toggle added to Kuwahara-Nagao blur
@@ -44,6 +45,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Filename and modified status now part of undo system
 	* Toolbar and menu icons are now themeable (Preferences->Paths->Default Theme)
 	* Command line globbing now possible using -w option, e.g. mtpaint -w "*.jpg"
+	* Loading default settings from /etc/mtpaint/mtpaintrc is now supported in Windows version
+	* Name and location of user settings file is now configurable : See handbook section A.6.4 for details
 	* Drawing and fill tools now are 2-3 times faster
 	* Support for compiling with libpng 1.4 added
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)

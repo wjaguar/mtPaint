@@ -56,7 +56,7 @@ char *get_home_directory(void);
 
 /* Compatibility functions */
 
-void inifile_init(char *ini_filename);
+void inifile_init(char *system_ini, char *user_ini);
 void inifile_quit();
 
 char *inifile_get(char *setting, char *defaultValue);

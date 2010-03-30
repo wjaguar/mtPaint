@@ -286,7 +286,7 @@ int main( int argc, char *argv[] )
 	/* Enable threading for GLib, but NOT for GTK+ (at least, not yet) */
 	g_thread_init(NULL);
 #endif
-	inifile_init("/.mtpaint");
+	inifile_init("/etc/mtpaint/mtpaintrc", "~/.mtpaint");
 
 #ifdef U_NLS
 #if GTK_MAJOR_VERSION == 1

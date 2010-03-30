@@ -3589,18 +3589,28 @@ static void check_width_cache(int width)
 /* Show/hide widgets according to new state */
 static void change_to_state(int state)
 {
+	GtkWidget *w;
 	int i, oldst = r_menu_state;
 
 	if (oldst < state)
 	{
 		for (i = oldst + 1; i <= state; i++)
 			gtk_widget_hide(r_menu[i].item);
-		if (oldst == 0) gtk_widget_show(r_menu[0].item);
+		if (oldst == 0)
+		{
+			w = r_menu[0].item;
+			gtk_widget_set_state(w, GTK_STATE_NORMAL);
+			gtk_widget_show(w);
+		}
 	}
 	else
 	{
 		for (i = oldst; i > state; i--)
-			gtk_widget_show(r_menu[i].item);
+		{
+			w = r_menu[i].item;
+			gtk_widget_set_state(w, GTK_STATE_NORMAL);
+			gtk_widget_show(w);
+		}
 		if (state == 0) gtk_widget_hide(r_menu[0].item);
 	}
 	r_menu_state = state;
@@ -3648,7 +3658,7 @@ static int smart_menu_full_width(GtkWidget *widget, int width)
 	if (!r_menu[0].width)
 	{
 		GtkRequisition req;
-		GtkWidget *child = GTK_BIN(widget)->child;
+		GtkWidget *child = BOX_CHILD_0(widget);
 		int oldst = r_menu_state;
 		gpointer lock = toggle_updates(widget, NULL);
 		change_to_state(0);
@@ -3664,7 +3674,7 @@ static int smart_menu_full_width(GtkWidget *widget, int width)
 /* Switch to the state which best fits the allocated width */
 static void smart_menu_state_to_width(GtkWidget *widget, int rwidth, int awidth)
 {
-	GtkWidget *child = GTK_BIN(widget)->child;
+	GtkWidget *child = BOX_CHILD_0(widget);
 	gpointer lock = NULL;
 	int state, oldst, newst;
 
@@ -3700,11 +3710,13 @@ static void smart_menu_size_req(GtkWidget *widget, GtkRequisition *req,
 	gpointer user_data)
 {
 	GtkRequisition child_req;
-	GtkWidget *child = GTK_BIN(widget)->child;
+	GtkWidget *child;
 	int fullw;
 
 	req->width = req->height = GTK_CONTAINER(widget)->border_width * 2;
-	if (!child || !GTK_WIDGET_VISIBLE(child)) return;
+	if (!GTK_BOX(widget)->children) return;
+	child = BOX_CHILD_0(widget);
+	if (!GTK_WIDGET_VISIBLE(child)) return;
 
 	gtk_widget_size_request(child, &child_req);
 	fullw = smart_menu_full_width(widget, child_req.width);
@@ -3719,11 +3731,13 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	static int in_alloc;
 	GtkRequisition child_req;
 	GtkAllocation child_alloc;
-	GtkWidget *child = GTK_BIN(widget)->child;
+	GtkWidget *child;
 	int border = GTK_CONTAINER(widget)->border_width, border2 = border * 2;
 
 	widget->allocation = *alloc;
-	if (!child || !GTK_WIDGET_VISIBLE(child)) return;
+	if (!GTK_BOX(widget)->children) return;
+	child = BOX_CHILD_0(widget);
+	if (!GTK_WIDGET_VISIBLE(child)) return;
 
 	/* Maybe recursive calls to this cannot happen, but if they can,
 	 * crash would be quite spectacular - so, better safe than sorry */
@@ -4230,7 +4244,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	/* Wrap menubar with resize-controller widget */
 	widget = gtk_item_factory_get_widget(factory, "<main>");
 	gtk_widget_show(widget);
-	wrap = wj_size_bin();
+	wrap = wj_size_box();
 	gtk_container_add(GTK_CONTAINER(wrap), widget);
 	gtk_signal_connect(GTK_OBJECT(wrap), "size_request",
 		GTK_SIGNAL_FUNC(smart_menu_size_req), NULL);

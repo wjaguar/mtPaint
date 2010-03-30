@@ -1539,31 +1539,31 @@ int wj_combo_box_get_history(GtkWidget *combobox)
 
 #endif
 
-// Bin widget with customizable size handling
+// Box widget with customizable size handling
 
 /* There exist no way to override builtin handlers for GTK_RUN_FIRST signals,
  * such as size-request and size-allocate; so instead of building multiple
  * custom widget classes with different resize handling, it's better to build
  * one with no builtin sizing at all - WJ */
 
-GtkWidget *wj_size_bin()
+GtkWidget *wj_size_box()
 {
-	static GtkType size_bin_type;
+	static GtkType size_box_type;
 	GtkWidget *widget;
 
-	if (!size_bin_type)
+	if (!size_box_type)
 	{
 		static const GtkTypeInfo info = {
-			"WJSizeBin", sizeof(GtkBin),
-			sizeof(GtkBinClass), NULL /* class init */,
+			"WJSizeBox", sizeof(GtkBox),
+			sizeof(GtkBoxClass), NULL /* class init */,
 			NULL /* instance init */, NULL, NULL, NULL };
 		GtkWidgetClass *wc;
-		size_bin_type = gtk_type_unique(GTK_TYPE_BIN, &info);
-		wc = gtk_type_class(size_bin_type);
+		size_box_type = gtk_type_unique(GTK_TYPE_BOX, &info);
+		wc = gtk_type_class(size_box_type);
 		wc->size_request = NULL;
 		wc->size_allocate = NULL;
 	}
-	widget = gtk_widget_new(size_bin_type, NULL);
+	widget = gtk_widget_new(size_box_type, NULL);
 	GTK_WIDGET_SET_FLAGS(widget, GTK_NO_WINDOW);
 #if GTK_MAJOR_VERSION == 2
 	gtk_widget_set_redraw_on_allocate(widget, FALSE);
@@ -3729,6 +3729,57 @@ void accept_ctrl_enter(GtkWidget *entry)
 {
 	gtk_signal_connect(GTK_OBJECT(entry), "key_press_event",
 		GTK_SIGNAL_FUNC(convert_ctrl_enter), NULL);
+}
+
+// Grab/ungrab input
+
+int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
+{
+	int owner_events = mode != GRAB_FULL;
+
+#if GTK_MAJOR_VERSION == 1
+	if (!widget->window) return (FALSE);
+	if (gdk_keyboard_grab(widget->window, owner_events, GDK_CURRENT_TIME))
+		return (FALSE);
+	if (gdk_pointer_grab(widget->window, owner_events,
+		GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK,
+		NULL, cursor, GDK_CURRENT_TIME))
+	{
+		gdk_keyboard_ungrab(GDK_CURRENT_TIME);
+		return (FALSE);
+	}
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	guint32 time;
+
+	if (!widget->window) return (FALSE);
+	time = gtk_get_current_event_time();
+	if (gdk_keyboard_grab(widget->window, owner_events, time) != GDK_GRAB_SUCCESS)
+		return (FALSE);
+
+	if (gdk_pointer_grab(widget->window, owner_events,
+		GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK,
+		NULL, cursor, time) != GDK_GRAB_SUCCESS)
+	{
+		gdk_display_keyboard_ungrab(gtk_widget_get_display(widget), time);
+		return (FALSE);
+	}
+#endif
+	if (mode != GRAB_PROGRAM) gtk_grab_add(widget);
+	return (TRUE);
+}
+
+void undo_grab(GtkWidget *widget)
+{
+#if GTK_MAJOR_VERSION == 1
+	gdk_keyboard_ungrab(GDK_CURRENT_TIME);
+	gdk_pointer_ungrab(GDK_CURRENT_TIME);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	guint32 time = gtk_get_current_event_time();
+	GdkDisplay *display = gtk_widget_get_display(widget);
+	gdk_display_keyboard_ungrab(display, time);
+	gdk_display_pointer_ungrab(display, time);
+#endif
+	gtk_grab_remove(widget);
 }
 
 // Threading helpers

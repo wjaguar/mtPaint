@@ -263,9 +263,9 @@ GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc handler);
 int wj_combo_box_get_history(GtkWidget *combobox);
 
-// Bin widget with customizable size handling
+// Box widget with customizable size handling
 
-GtkWidget *wj_size_bin();
+GtkWidget *wj_size_box();
 
 // Disable visual updates while tweaking container's contents
 
@@ -373,6 +373,15 @@ void handle_events();
 // Make GtkEntry accept Ctrl+Enter as a character
 
 void accept_ctrl_enter(GtkWidget *entry);
+
+// Grab/ungrab input
+
+#define GRAB_FULL    0 /* Redirect everything */
+#define GRAB_WIDGET  1 /* Redirect everything outside widget */
+#define GRAB_PROGRAM 2 /* Redirect everything outside program's windows */
+
+int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor);
+void undo_grab(GtkWidget *widget);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

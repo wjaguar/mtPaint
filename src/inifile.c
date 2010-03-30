@@ -464,7 +464,6 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 		{
 			slot = add_slot(&ini);
 			if (!slot) goto fail;
-			slot->type = INI_UNDEF;
 			slot->sec = sec;
 			slot->key = tmp - ini.sblock[itype];
 			slot->flags = itype;
@@ -472,6 +471,7 @@ error:			g_printerr("Wrong INI line: '%s'\n", tmp);
 				goto fail;
 		}
 		if (q) unescape_string(w2);
+		slot->type = INI_UNDEF;
 		slot->value = w2;
 	}
 
@@ -775,6 +775,20 @@ char *get_home_directory(void)
 	return homedir;
 }
 
+static char *extend_path(const char *path)
+{
+	char *dir, *name;
+
+	if (path[0] == '~')
+		return (g_strdup_printf("%s%s", get_home_directory(), path + 1));
+	name = g_win32_get_package_installation_directory(NULL, NULL);
+	dir = g_locale_from_utf8(name, -1, NULL, NULL, NULL);
+	g_free(name);
+	name = g_strdup_printf("%s%s", dir, path);
+	g_free(dir);
+	return (name);
+}
+
 #else
 
 #include <unistd.h>
@@ -805,6 +819,13 @@ gchar *get_home_directory(void)
 	return homedir;
 }
 
+static char *extend_path(const char *path)
+{
+	if (path[0] == '~')
+		return (g_strdup_printf("%s%s", get_home_directory(), path + 1));
+	return (g_strdup(path));
+}
+
 #endif
 
 /* Compatibility functions */
@@ -812,26 +833,35 @@ gchar *get_home_directory(void)
 static inifile main_ini;
 static char *main_ininame;
 
-void inifile_init(char *ini_filename)
+void inifile_init(char *system_ini, char *user_ini)
 {
+	char *tmp, *ini = user_ini;
 	int res, mask = 3;
 
-	main_ininame = g_strdup_printf("%s%s", get_home_directory(), ini_filename);
 	while (new_ini(&main_ini))
 	{
-#ifndef WIN32
-		if (mask & 1)
+		if ((mask & 1) && system_ini)
 		{
-			res = read_ini(&main_ini, "/etc/mtpaint/mtpaintrc", INI_SYSTEM);
+			tmp = extend_path(system_ini);
+			res = read_ini(&main_ini, tmp, INI_SYSTEM);
+			g_free(tmp);
 			if (res <= 0) mask ^= 1; // Don't try again if failed
 			if (res < 0) continue; // Restart if struct got deleted
+			/* !!! Allow system inifile to relocate user inifile */
+			ini = inifile_get("userINI", user_ini);
+			if (!ini[0]) ini = system_ini;
 		}
-#endif
-		if (mask & 2)
+		if ((mask & 2) && user_ini)
 		{
-			res = read_ini(&main_ini, main_ininame, INI_USER);
-			if (res <= 0) mask ^= 2;
-			if (res < 0) continue;
+			tmp = extend_path(ini);
+			res = read_ini(&main_ini, tmp, INI_USER);
+			if (res <= 0) // Failed
+			{
+				g_free(tmp);
+				mask ^= 2;
+				if (res < 0) continue;
+			}
+			else main_ininame = tmp;
 		}
 		break;
 	}

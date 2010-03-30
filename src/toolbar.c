@@ -97,7 +97,7 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 	return FALSE;
 }
 
-static GtkWidget *toolbar_add_zoom(GtkWidget *tbar)	// Add zoom combo box
+static GtkWidget *toolbar_add_zoom(GtkWidget *box)	// Add zoom combo box
 {
 	int i;
 	static char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%",
@@ -116,9 +116,8 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *tbar)	// Add zoom combo box
 
 #if GTK_MAJOR_VERSION == 1
 	gtk_widget_set_usize(combo, 75, -1);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	gtk_entry_set_width_chars( GTK_ENTRY(combo_entry), 6);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_entry_set_width_chars(GTK_ENTRY(combo_entry), 6);
 #endif
 
 	gtk_entry_set_editable( GTK_ENTRY(combo_entry), FALSE );
@@ -129,10 +128,9 @@ static GtkWidget *toolbar_add_zoom(GtkWidget *tbar)	// Add zoom combo box
 	g_list_free( combo_list );
 	gtk_entry_set_text( GTK_ENTRY(combo_entry), "100%" );
 
-	gtk_toolbar_append_element(GTK_TOOLBAR(tbar), GTK_TOOLBAR_CHILD_WIDGET,
-		combo, NULL, NULL, NULL, NULL, NULL, NULL);
+	pack(box, combo);
 
-	return combo;
+	return (combo);
 }
 
 static float toolbar_get_zoom( GtkWidget *combo )
@@ -412,6 +410,468 @@ void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
 	}
 }
 
+/* The following is main toolbars auto-sizing code. If toolbar is too long for
+ * the window, some of its items get hidden, but remain accessible through an
+ * "overflow box" - a popup with 5xN grid of buttons inside. This way, we can
+ * support small-screen devices without penalizing large-screen ones. - WJ */
+
+#define WRAPBOX_W 5
+
+static void wrapbox_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	int cnt, nr, w, h, l, spacing;
+
+	cnt = w = h = spacing = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_size_request(child->widget, &wreq);
+		if (w < wreq.width) w = wreq.width;
+		if (h < wreq.height) h = wreq.height;
+		cnt++;
+	}
+	if (cnt) spacing = box->spacing;
+	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
+	cnt = nr > 1 ? WRAPBOX_W : cnt; 
+
+	l = GTK_CONTAINER(widget)->border_width * 2 - spacing;
+	req->width = (w + spacing) * cnt + l;
+	req->height = (h + spacing) * nr + l;
+}
+
+static void wrapbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	GtkAllocation wall;
+	int idx, cnt, nr, l, w, h, ww, wh, spacing;
+
+	widget->allocation = *alloc;
+
+	/* Count widgets */
+	cnt = w = h = 0;
+	for (chain = box->children; chain; chain = chain->next , idx++)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_get_child_requisition(child->widget, &wreq);
+		if (w < wreq.width) w = wreq.width;
+		if (h < wreq.height) h = wreq.height;
+		cnt++;
+	}
+	if (!cnt) return; // Nothing needs positioning in here
+	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
+	cnt = nr > 1 ? WRAPBOX_W : cnt; 
+
+	/* Adjust sizes (homogeneous, shrinkable, no expand, no fill) */
+	l = GTK_CONTAINER(widget)->border_width;
+	spacing = box->spacing;
+	ww = alloc->width - l * 2 + spacing;
+	wh = alloc->height - l * 2 + spacing;
+	if ((w + spacing) * cnt > ww) w = ww / cnt - spacing;
+	if (w < 1) w = 1;
+	if ((h + spacing) * nr > wh) h = wh / nr - spacing;
+	if (h < 1) h = 1;
+
+	/* Now position the widgets */
+	wall.height = h;
+	wall.width = w;
+	idx = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		wall.x = alloc->x + l + (w + spacing) * (idx % WRAPBOX_W);
+		wall.y = alloc->y + l + (h + spacing) * (idx / WRAPBOX_W);
+		gtk_widget_size_allocate(child->widget, &wall);
+		idx++;
+	}
+}
+
+static int split_toolbar_at(GtkWidget *vport, int w)
+{
+	GtkWidget *tbar;
+	GList *chain;
+	GtkToolbarChild *child;
+	GtkAllocation *alloc;
+	int border, x = 0;
+
+	if (w < 1) w = 1;
+	if (!GTK_IS_VIEWPORT(vport)) return (w);
+	tbar = GTK_BIN(vport)->child;
+	if (!tbar || !GTK_IS_TOOLBAR(tbar)) return (w);
+	border = GTK_CONTAINER(tbar)->border_width;
+	for (chain = GTK_TOOLBAR(tbar)->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (child->type == GTK_TOOLBAR_CHILD_SPACE) continue;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		alloc = &child->widget->allocation;
+		if (alloc->x < w)
+		{
+			if (alloc->x + alloc->width <= w)
+			{
+				x = alloc->x + alloc->width;
+				continue;
+			}
+			w = alloc->x;
+		}
+		if (!x) return (1); // Nothing to see here
+		return (x + border > w ? x : x + border);
+	}
+	return (w); // Toolbar is empty
+}
+
+static void htoolbox_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	int idx, cnt, w, h, l;
+
+	idx = cnt = w = h = 0;
+	for (chain = box->children; chain; chain = chain->next , idx++)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_size_request(child->widget, &wreq);
+		if (h < wreq.height) h = wreq.height;
+		/* Button in slot 1 adds no extra width */
+		if (idx == 1) continue;
+		w += wreq.width + child->padding * 2;
+		cnt++;
+	}
+	if (cnt > 1) w += (cnt - 1) * box->spacing;
+	l = GTK_CONTAINER(widget)->border_width * 2;
+	req->width = w + l;
+	req->height = h + l;
+}
+
+static void htoolbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	GtkWidget *button = NULL;
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	GtkAllocation wall;
+	int vw, bw, xw, dw, pad, spacing;
+	int idx, cnt, l, x, wrkw;
+
+	widget->allocation = *alloc;
+
+	/* Calculate required size */
+	idx = cnt = 0;
+	vw = bw = xw = 0;
+	spacing = box->spacing;
+	for (chain = box->children; chain; chain = chain->next , idx++)
+	{
+		child = chain->data;
+		pad = child->padding * 2;
+		if (idx == 1)
+		{
+			gtk_widget_size_request(button = child->widget, &wreq);
+			bw = wreq.width + pad + spacing; // Button
+		}
+		else if (GTK_WIDGET_VISIBLE(child->widget))
+		{
+			gtk_widget_get_child_requisition(child->widget, &wreq);
+			if (!idx) vw = wreq.width; // Viewport
+			else xw += wreq.width; // Extra widgets
+			xw += pad;
+			cnt++;
+		}
+	}
+	if (cnt > 1) xw += (cnt - 1) * spacing;
+	cnt -= !!vw; // Now this counts visible extra widgets
+	l = GTK_CONTAINER(widget)->border_width;
+	xw += l * 2;
+	if (vw && (xw + vw > alloc->width)) /* If viewport doesn't fit */
+		vw = split_toolbar_at(BOX_CHILD_0(widget), alloc->width - xw - bw);
+	else bw = 0;
+
+	/* Calculate how much to reduce extra widgets' sizes */
+	dw = 0;
+	if (cnt) dw = (xw + bw + vw - alloc->width + cnt - 1) / cnt;
+	if (dw < 0) dw = 0;
+
+	/* Now position the widgets */
+	x = alloc->x + l;
+	wall.y = alloc->y + l;
+	wall.height = alloc->height - l * 2;
+	if (wall.height < 1) wall.height = 1;
+	idx = 0;
+	for (chain = box->children; chain; chain = chain->next , idx++)
+	{
+		child = chain->data;
+		pad = child->padding;
+		/* Button uses size, the others, visibility */
+		if (idx == 1 ? !bw : !GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_get_child_requisition(child->widget, &wreq);
+		wrkw = idx ? wreq.width : vw;
+		if (idx > 1) wrkw -= dw;
+		if (wrkw < 1) wrkw = 1;
+		wall.width = wrkw;
+		x = (wall.x = x + pad) + wrkw + pad + spacing;
+		gtk_widget_size_allocate(child->widget, &wall);
+	}
+
+	if (button) (bw ? gtk_widget_show : gtk_widget_hide)(button);
+}
+
+static void htoolbox_popup(GtkWidget *button, gpointer user_data)
+{
+	GtkWidget *tool, *vport, *btn, *popup = user_data;
+	GtkAllocation *alloc = &button->allocation;
+	GtkRequisition req;
+	GtkBox *box;
+	GtkBoxChild *child;
+	GList *chain;
+	gint x, y, w, h, vl;
+
+	/* Pre-grab; use an already visible widget */
+	if (!do_grab(GRAB_PROGRAM, button, NULL)) return;
+
+	/* Position the popup */
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 2) /* GTK+ 2.2+ */
+	{
+		GdkScreen *screen = gtk_widget_get_screen(button);
+		w = gdk_screen_get_width(screen);
+		h = gdk_screen_get_height(screen);
+		/* !!! To have styles while unrealized, need at least this */
+		gtk_window_set_screen(GTK_WINDOW(popup), screen);
+	}
+#else
+	w = gdk_screen_width();
+	h = gdk_screen_height();
+#endif
+	vport = gtk_object_get_user_data(GTK_OBJECT(button));
+	vl = vport->allocation.width;
+	box = gtk_object_get_user_data(GTK_OBJECT(popup));
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		btn = child->widget;
+		tool = gtk_object_get_user_data(GTK_OBJECT(btn));
+		if (!tool) continue; // Paranoia
+		/* Copy button relief setting of toolbar buttons */
+		gtk_button_set_relief(GTK_BUTTON(btn),
+			gtk_button_get_relief(GTK_BUTTON(tool)));
+		/* Copy their state (feedback is disabled while invisible) */
+		if (GTK_IS_TOGGLE_BUTTON(btn)) gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(btn), GTK_TOGGLE_BUTTON(tool)->active);
+//		gtk_widget_set_style(btn, gtk_rc_get_style(tool));
+		/* Set visibility */
+		(GTK_WIDGET_VISIBLE(tool) && (tool->allocation.x >= vl) ?
+			gtk_widget_show : gtk_widget_hide)(btn);
+	}
+	gtk_widget_size_request(popup, &req);
+	gdk_window_get_origin(button->parent->window, &x, &y);
+	x += alloc->x + (alloc->width - req.width) / 2;
+	y += alloc->y + alloc->height;
+	if (x + req.width > w) x = w - req.width;
+	if (x < 0) x = 0;
+	if (y + req.height > h) y -= alloc->height + req.height;
+	if (y + req.height > h) y = h - req.height;
+	if (y < 0) y = 0;
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_realize(popup);
+	gtk_window_reposition(GTK_WINDOW(popup), x, y);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_window_move(GTK_WINDOW(popup), x, y);
+#endif
+
+	/* Actually popup it */
+	gtk_widget_show(popup);
+	gtk_window_set_focus(GTK_WINDOW(popup), NULL); // Nothing is focused
+	gdk_flush(); // !!! To accept grabs, window must be actually mapped
+
+	/* Transfer grab to it */
+	do_grab(GRAB_WIDGET, popup, NULL);
+}
+
+static void htoolbox_popdown(GtkWidget *widget)
+{
+	undo_grab(widget);
+	gtk_widget_hide(widget);
+}
+
+static void htoolbox_unrealize(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *popup = user_data;
+
+	if (GTK_WIDGET_VISIBLE(popup)) htoolbox_popdown(popup);
+	gtk_widget_unrealize(popup);
+}
+
+static gboolean htoolbox_popup_key(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	if ((event->keyval != GDK_Escape) || (event->state & (GDK_CONTROL_MASK |
+		GDK_SHIFT_MASK | GDK_MOD1_MASK))) return (FALSE);
+	htoolbox_popdown(widget);
+	return (TRUE);
+}
+
+static gboolean htoolbox_popup_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	GtkWidget *ev = gtk_get_event_widget((GdkEvent *)event);
+
+	/* Clicks on popup's descendants are OK; otherwise, remove the popup */
+	if (ev != widget)
+	{
+		while (ev)
+		{
+			ev = ev->parent;
+			if (ev == widget) return (FALSE);
+		}
+	}
+	htoolbox_popdown(widget);
+	return (TRUE);
+}
+
+static void htoolbox_tool_clicked(GtkWidget *button, gpointer user_data)
+{
+	GtkWidget *popup = user_data;
+
+	/* Invisible buttons don't send (virtual) clicks to toolbar */
+	if (!GTK_WIDGET_VISIBLE(popup)) return;
+	/* Ignore radio buttons getting depressed */
+	if (GTK_IS_RADIO_BUTTON(button) && !GTK_TOGGLE_BUTTON(button)->active)
+		return;
+	htoolbox_popdown(popup);
+	gtk_button_clicked(GTK_BUTTON(gtk_object_get_user_data(GTK_OBJECT(button))));
+}
+
+static gboolean htoolbox_tool_rclick(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	toolbar_item *item = user_data;
+
+	/* Handle only right clicks */
+	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
+		return (FALSE);
+	htoolbox_popdown(gtk_widget_get_toplevel(widget));
+	action_dispatch(item->action2, item->mode2, TRUE, FALSE);
+	return (TRUE);
+}
+
+static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
+{
+	GtkWidget *box, *vport, *button, *arrow, *tbar, *popup, *ebox, *frame;
+	GtkWidget *bbox, *item, *radio[32];
+
+	box = wj_size_box();
+	gtk_signal_connect(GTK_OBJECT(box), "size_request",
+		GTK_SIGNAL_FUNC(htoolbox_size_req), NULL);
+	gtk_signal_connect(GTK_OBJECT(box), "size_allocate",
+		GTK_SIGNAL_FUNC(htoolbox_size_alloc), NULL);
+
+	vport = pack(box, gtk_viewport_new(NULL, NULL));
+	gtk_viewport_set_shadow_type(GTK_VIEWPORT(vport), GTK_SHADOW_NONE);
+	gtk_widget_show(vport);
+	button = pack(box, gtk_button_new());
+	gtk_object_set_user_data(GTK_OBJECT(button), vport);
+#if GTK_MAJOR_VERSION == 1
+	// !!! Arrow w/o shadow is invisible in plain GTK+1
+	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_OUT);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_NONE);
+#endif
+	gtk_widget_show(arrow);
+	gtk_container_add(GTK_CONTAINER(button), arrow);
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
+#endif
+
+	popup = gtk_window_new(GTK_WINDOW_POPUP);
+	gtk_window_set_policy(GTK_WINDOW(popup), FALSE, FALSE, TRUE);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(htoolbox_popup), popup);
+	gtk_signal_connect(GTK_OBJECT(box), "unrealize",
+		GTK_SIGNAL_FUNC(htoolbox_unrealize), popup);
+	gtk_signal_connect_object(GTK_OBJECT(box), "destroy",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), popup);
+	/* Eventbox covers the popup, and popup has a grab; then, all clicks
+	 * inside the popup get its descendant as event widget; anything else,
+	 * including popup window itself, means click was outside, and triggers
+	 * popdown (solution from GtkCombo) - WJ */
+	ebox = gtk_event_box_new();
+	gtk_container_add(GTK_CONTAINER(popup), ebox);
+	frame = gtk_frame_new(NULL);
+	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_OUT);
+	gtk_container_add(GTK_CONTAINER(ebox), frame);
+
+	bbox = wj_size_box();
+	gtk_signal_connect(GTK_OBJECT(bbox), "size_request",
+		GTK_SIGNAL_FUNC(wrapbox_size_req), NULL);
+	gtk_signal_connect(GTK_OBJECT(bbox), "size_allocate",
+		GTK_SIGNAL_FUNC(wrapbox_size_alloc), NULL);
+	gtk_container_add(GTK_CONTAINER(frame), bbox);
+
+	gtk_widget_show_all(ebox);
+	gtk_signal_connect(GTK_OBJECT(popup), "key_press_event",
+		GTK_SIGNAL_FUNC(htoolbox_popup_key), NULL);
+	gtk_signal_connect(GTK_OBJECT(popup), "button_press_event",
+		GTK_SIGNAL_FUNC(htoolbox_popup_click), NULL);
+	gtk_object_set_user_data(GTK_OBJECT(popup), GTK_BOX(bbox));
+
+#if GTK_MAJOR_VERSION == 1
+	tbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	tbar = gtk_toolbar_new();
+	gtk_toolbar_set_style(GTK_TOOLBAR(tbar), GTK_TOOLBAR_ICONS);
+#endif
+	gtk_widget_show(tbar);
+	gtk_container_add(GTK_CONTAINER(vport), tbar);
+
+	fill_toolbar(GTK_TOOLBAR(tbar), items, wlist, NULL, NULL);
+	gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, button,
+		_("More..."), "Private");
+	memset(radio, 0, sizeof(radio));
+	for (; items->tooltip; items++)
+	{
+		if (!items->xpm) continue; // This is a separator
+		if (items->radio < 0) item = gtk_button_new();
+		else
+		{
+			if (!items->radio) item = gtk_toggle_button_new();
+			else radio[items->radio] = item = gtk_radio_button_new_from_widget(
+				GTK_RADIO_BUTTON_0(radio[items->radio]));
+			gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(item), FALSE);
+		}
+#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+		gtk_button_set_focus_on_click(GTK_BUTTON(item), FALSE);
+#endif
+		gtk_container_add(GTK_CONTAINER(item), xpm_image(items->xpm));
+		pack(bbox, item);
+		gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, item,
+			_(items->tooltip), "Private");
+		mapped_dis_add(item, items->actmap);
+		gtk_object_set_user_data(GTK_OBJECT(item), wlist[items->ID]);
+		gtk_signal_connect(GTK_OBJECT(item), "clicked",
+			GTK_SIGNAL_FUNC(htoolbox_tool_clicked), popup);
+		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
+			"button_press_event", GTK_SIGNAL_FUNC(htoolbox_tool_rclick),
+			(gpointer)items);
+	}
+
+	return (box);
+}
+
 #define GP_WIDTH 256
 #define GP_HEIGHT 16
 static GtkWidget *grad_view;
@@ -634,7 +1094,7 @@ void toolbar_init(GtkWidget *vbox_main)
 	static GdkCursorType corners[4] = {
 		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
-	GtkWidget *toolbar_main, *toolbar_tools, *box;
+	GtkWidget *box, *mbuttons[TOTAL_ICONS_MAIN];
 	char txt[32];
 	int i;
 
@@ -658,29 +1118,18 @@ void toolbar_init(GtkWidget *vbox_main)
 
 ///	MAIN TOOLBAR
 
-	toolbar_boxes[TOOLBAR_MAIN] = box = pack(vbox_main, gtk_alignment_new(0, 0, 0, 1));
-	if (toolbar_status[TOOLBAR_MAIN]) gtk_widget_show(box); // Only show if user wants
+	toolbar_boxes[TOOLBAR_MAIN] = box =
+		pack(vbox_main, smart_toolbar(main_bar, mbuttons));
 
-#if GTK_MAJOR_VERSION == 1
-	toolbar_main = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	toolbar_main = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_main), GTK_TOOLBAR_ICONS);
-#endif
-	gtk_container_add(GTK_CONTAINER(box), toolbar_main);
-
-	fill_toolbar(GTK_TOOLBAR(toolbar_main), main_bar, NULL, NULL, NULL);
-
-	toolbar_zoom_main = toolbar_add_zoom(toolbar_main);
-	toolbar_zoom_view = toolbar_add_zoom(toolbar_main);
+	toolbar_zoom_main = toolbar_add_zoom(box);
+	toolbar_zoom_view = toolbar_add_zoom(box);
 	/* In GTK1, combo box entry is updated continuously */
 #if GTK_MAJOR_VERSION == 1
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->popwin),
 		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->popwin),
 		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->entry),
 		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->entry),
@@ -688,27 +1137,18 @@ void toolbar_init(GtkWidget *vbox_main)
 #endif
 	toolbar_viewzoom(FALSE);
 
-	gtk_widget_show(toolbar_main);
-
+	if (toolbar_status[TOOLBAR_MAIN])
+		gtk_widget_show(box); // Only show if user wants
 
 ///	TOOLS TOOLBAR
 
-	toolbar_boxes[TOOLBAR_TOOLS] = box = pack(vbox_main, gtk_alignment_new(0, 0, 0, 1));
-	if (toolbar_status[TOOLBAR_TOOLS]) gtk_widget_show(box); // Only show if user wants
+	toolbar_boxes[TOOLBAR_TOOLS] =
+		pack(vbox_main, smart_toolbar(tools_bar, icon_buttons));
+	if (toolbar_status[TOOLBAR_TOOLS])
+		gtk_widget_show(toolbar_boxes[TOOLBAR_TOOLS]); // Only show if user wants
 
-#if GTK_MAJOR_VERSION == 1
-	toolbar_tools = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	toolbar_tools = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_tools), GTK_TOOLBAR_ICONS);
-#endif
-	gtk_container_add(GTK_CONTAINER(box), toolbar_tools);
-
-	fill_toolbar(GTK_TOOLBAR(toolbar_tools), tools_bar, icon_buttons, NULL, NULL);
 	/* !!! If hardcoded default tool isn't the default brush, this will crash */
 	change_to_tool(TTB_PAINT);
-
-	gtk_widget_show(toolbar_tools);
 }
 
 void ts_update_gradient()

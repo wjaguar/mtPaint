@@ -733,22 +733,11 @@ static void cpick_spin_change(GtkAdjustment *adjustment, gpointer user_data)
 	cpick_update(cp, input);
 }
 
-static void dropper_terminate(GtkWidget *widget1, gpointer user_data)
+static void dropper_terminate(GtkWidget *widget, gpointer user_data)
 {
-	cpicker *cp = user_data;
-	GtkWidget *widget = cp->hbox;
-
-#if GTK_MAJOR_VERSION == 1
-	gdk_keyboard_ungrab( GDK_CURRENT_TIME );
-	gdk_pointer_ungrab( GDK_CURRENT_TIME );
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	guint32 time = gtk_get_current_event_time ();
-	GdkDisplay *display = gtk_widget_get_display (widget);
-	gdk_display_keyboard_ungrab (display, time);
-	gdk_display_pointer_ungrab (display, time);
-#endif
-	gtk_signal_disconnect_by_data(GTK_OBJECT(widget), user_data);
-	gtk_grab_remove(widget);
+	GtkWidget *grab_widget = ((cpicker *)user_data)->hbox;
+	gtk_signal_disconnect_by_data(GTK_OBJECT(grab_widget), user_data);
+	undo_grab(grab_widget);
 }
 
 static void dropper_grab_colour(GtkWidget *widget, gint x, gint y,
@@ -809,54 +798,20 @@ static gboolean dropper_mouse_press(GtkWidget *widget, GdkEventButton *event,
 
 static void cpick_eyedropper(GtkButton *button, gpointer user_data)
 {
+	static GdkCursor *cursor;
 	cpicker *cp = user_data;
-	GtkWidget *widget = cp->hbox;
+	GtkWidget *grab_widget = cp->hbox;
 		// Using hbox avoids problems with mouse clicks in GTK+1
-	GdkCursor *cursor;
 
-#if GTK_MAJOR_VERSION == 1
-	gint grab_status;
-
-	if (gdk_keyboard_grab (widget->window, FALSE, GDK_CURRENT_TIME))
-		return;
-
-	cursor = make_cursor(xbm_picker_bits, xbm_picker_mask_bits,
+	if (!cursor) cursor = make_cursor(xbm_picker_bits, xbm_picker_mask_bits,
 		xbm_picker_width, xbm_picker_height, xbm_picker_x_hot, xbm_picker_y_hot);
-	grab_status = gdk_pointer_grab (widget->window, FALSE,
-		GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK,
-		NULL, cursor, GDK_CURRENT_TIME);
-	gdk_cursor_destroy(cursor);
-
-	if (grab_status)
+	if (do_grab(GRAB_FULL, grab_widget, cursor))
 	{
-		gdk_keyboard_ungrab( GDK_CURRENT_TIME );
-		return;
+		gtk_signal_connect(GTK_OBJECT(grab_widget), "button_release_event",
+			GTK_SIGNAL_FUNC(dropper_mouse_press), cp);
+		gtk_signal_connect(GTK_OBJECT(grab_widget), "key_press_event",
+			GTK_SIGNAL_FUNC(dropper_key_press), cp);
 	}
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	GdkGrabStatus grab_status;
-
-	if (gdk_keyboard_grab(widget->window, FALSE, gtk_get_current_event_time())
-		!= GDK_GRAB_SUCCESS) return;
-
-	cursor = make_cursor(xbm_picker_bits, xbm_picker_mask_bits,
-		xbm_picker_width, xbm_picker_height, xbm_picker_x_hot, xbm_picker_y_hot);
-	grab_status = gdk_pointer_grab (widget->window, FALSE,
-		GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK,
-		NULL, cursor, gtk_get_current_event_time ());
-	gdk_cursor_destroy(cursor);
-
-	if (grab_status != GDK_GRAB_SUCCESS)
-	{
-		gdk_display_keyboard_ungrab (gtk_widget_get_display (widget), GDK_CURRENT_TIME);
-		return;
-	}
-#endif
-	gtk_grab_add(widget);
-
-	gtk_signal_connect(GTK_OBJECT(widget), "button_release_event",
-		GTK_SIGNAL_FUNC(dropper_mouse_press), cp);
-	gtk_signal_connect(GTK_OBJECT(widget), "key_press_event",
-		GTK_SIGNAL_FUNC(dropper_key_press), cp);
 }
 
 static gboolean cpick_area_key(GtkWidget *widget, GdkEventKey *event, cpicker *cp)

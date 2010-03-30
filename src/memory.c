@@ -9834,7 +9834,7 @@ static int cmp_edge(const void *v1, const void *v2)
 		((seg_edge *)v1)->which - ((seg_edge *)v2)->which);
 }
 
-static int seg_find(seg_pixel *pix, int n)
+static inline int seg_find(seg_pixel *pix, int n)
 {
 	unsigned int i, j;
 
@@ -9842,7 +9842,7 @@ static int seg_find(seg_pixel *pix, int n)
 	return (pix[n].group = i);
 }
 
-static int seg_join(seg_pixel *pix, int a, int b)
+static inline int seg_join(seg_pixel *pix, int a, int b)
 {
 	seg_pixel *ca = pix + a, *cb = pix + b;
 
