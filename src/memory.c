@@ -3538,7 +3538,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 	int tab0[256], tab1[256], tmp, i, j;
 	png_color old_pal[256];
 	unsigned char *img;
-	double lxnA[3], lxnB[3], lxn[3];
+	double lxnA[3], lxn[3];
 
 	if ( i2 == i1 || i1>mem_cols || i2>mem_cols ) return;
 	if ( i2 < i1 )
@@ -3548,15 +3548,8 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		i2 = i;
 	}
 
-	switch (a)
-	{
-	case 3: case 4:
-		get_lxn(lxnA, PNG_2_INT(mem_col_A24));
-		get_lxn(lxnB, PNG_2_INT(mem_col_B24));
-		break;
-	case 9:	mem_get_histogram(CHN_IMAGE);
-		break;
-	}
+	if (a == 4) get_lxn(lxnA, PNG_2_INT(mem_col_A24));
+	if (a == 9) mem_get_histogram(CHN_IMAGE);
 	
 	for (i = 0; i < 256; i++)
 		tab0[i] = i;
@@ -3565,30 +3558,24 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		switch (a)
 		{
 		/* Hue */
-		case 0: tab1[i] = rint(1000 * rgb_hsl(0, mem_pal[i]));
+		case 0: tab1[i] = rint(1024 * rgb_hsl(0, mem_pal[i]));
 			break;
 		/* Saturation */
-		case 1: tab1[i] = rint(1000 * rgb_hsl(1, mem_pal[i]));
+		case 1: tab1[i] = rint(1024 * rgb_hsl(1, mem_pal[i]));
 			break;
-		/* Value */
-		case 2: tab1[i] = rint(1000 * rgb_hsl(2, mem_pal[i]));
+		/* Luminance */
+		case 2: tab1[i] = rint(1024 * rgb_hsl(2, mem_pal[i]));
+			break;
+		/* Brightness */
+		case 3: tab1[i] = rint(1024 * rgb2B(gamma256[mem_pal[i].red],
+			gamma256[mem_pal[i].green], gamma256[mem_pal[i].blue]));
 			break;
 		/* Distance to A */
-		case 3: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
-			tab1[i] = rint(1000 * ((lxn[0] - lxnA[0]) *
+		case 4: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
+			tab1[i] = rint(1024 * ((lxn[0] - lxnA[0]) *
 				(lxn[0] - lxnA[0]) + (lxn[1] - lxnA[1]) *
 				(lxn[1] - lxnA[1]) + (lxn[2] - lxnA[2]) *
 				(lxn[2] - lxnA[2])));
-			break;
-		/* Distance to A+B */
-		case 4: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
-			tab1[i] = rint(1000 *
-				(sqrt((lxn[0] - lxnA[0]) * (lxn[0] - lxnA[0]) +
-				(lxn[1] - lxnA[1]) * (lxn[1] - lxnA[1]) +
-				(lxn[2] - lxnA[2]) * (lxn[2] - lxnA[2])) +
-				sqrt((lxn[0] - lxnB[0]) * (lxn[0] - lxnB[0]) +
-				(lxn[1] - lxnB[1]) * (lxn[1] - lxnB[1]) +
-				(lxn[2] - lxnB[2]) * (lxn[2] - lxnB[2]))));
 			break;
 		/* Red */
 		case 5: tab1[i] = mem_pal[i].red;

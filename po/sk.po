@@ -912,8 +912,8 @@ msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G            Previesť do šedej škály"
 
 #: src/help.c:62
-msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"
-msgstr "  Shift-Ctrl-G       Prevést do šedej škály (S Gamma korekciou)\n"
+msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
+msgstr "  Shift-Ctrl-G       Prevést do šedej škály (S Gamma korekciou)"
 
 #: src/help.c:63
 msgid ""

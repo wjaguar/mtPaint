@@ -907,8 +907,8 @@ msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G            Escala de grises da imaxe"
 
 #: src/help.c:62
-msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"
-msgstr "  Mayús-Ctrl-G      Escala a imaxe á grises (gama corrixida)\n"
+msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
+msgstr "  Mayús-Ctrl-G      Escala a imaxe á grises (gama corrixida)"
 
 #: src/help.c:63
 msgid ""

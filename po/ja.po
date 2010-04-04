@@ -994,8 +994,8 @@ msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G         イメージをグレースケール"
 
 #: src/help.c:62
-msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"
-msgstr "  Shift-Ctrl-G   イメージをグレースケール（ガンマ補正）\n"
+msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
+msgstr "  Shift-Ctrl-G   イメージをグレースケール（ガンマ補正）"
 
 #: src/help.c:63
 msgid "  Ctrl-T            Draw a rectangle around the selection area with the current fill"

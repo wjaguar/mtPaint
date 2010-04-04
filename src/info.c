@@ -263,17 +263,11 @@ static gboolean hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
 
 static GtkWidget *info_window;
 
-static gboolean delete_info(GtkWidget *widget, GdkEvent *event, gpointer data)
+static void delete_info(GtkWidget *widget)
 {
-	gtk_widget_destroy(info_window);
-
-	if ( hs_rgb_mem != NULL )
-	{
-		free( hs_rgb_mem );
-		hs_rgb_mem = NULL;
-	}
-
-	return FALSE;
+	destroy_dialog(info_window);
+	free(hs_rgb_mem);
+	hs_rgb_mem = NULL;
 }
 
 void pressed_information()
@@ -282,8 +276,7 @@ void pressed_information()
 	int i, j, orphans = 0, maxi;
 
 	GtkWidget *vbox4, *vbox5, *table4, *hs_normalize_check;
-	GtkWidget *scrolledwindow1, *viewport1, *table5, *button3;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *scrolledwindow1, *viewport1, *table5;
 
 	info_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Information"), GTK_WIN_POS_CENTER, TRUE );
 
@@ -423,17 +416,9 @@ void pressed_information()
 	}
 
 	add_hseparator( vbox4, -2, 10 );
-
-	button3 = add_a_button(_("OK"), 2, vbox4, FALSE);
-	gtk_widget_add_accelerator (button3, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button3, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button3, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect(GTK_OBJECT(button3), "clicked",
-		GTK_SIGNAL_FUNC (delete_info), GTK_OBJECT (info_window) );
-	gtk_signal_connect_object (GTK_OBJECT (info_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_info), GTK_OBJECT (info_window));
+	pack(vbox4, OK_box(0, info_window, _("OK"), GTK_SIGNAL_FUNC(delete_info),
+		NULL, NULL));
 
 	gtk_window_set_transient_for(GTK_WINDOW(info_window), GTK_WINDOW(main_window));
 	gtk_widget_show(info_window);
-	gtk_window_add_accel_group(GTK_WINDOW(info_window), ag);
 }

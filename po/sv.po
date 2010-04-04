@@ -908,8 +908,8 @@ msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G            Ändra bilden till gråskala"
 
 #: src/help.c:62
-msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"
-msgstr "  Shift-Ctrl-G      Ändra bilden till gråskala (Tillrättad gamma)\n"
+msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
+msgstr "  Shift-Ctrl-G      Ändra bilden till gråskala (Tillrättad gamma)"
 
 #: src/help.c:63
 msgid ""

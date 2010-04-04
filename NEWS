@@ -26,7 +26,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* sRGB gradients added
 	* Line tool now uses stroke gradient when no gradient placement exists
 	* "Palette->Pick Gradient" approximates an A->B gradient using colours from current palette (see handbook section 3.3.9)
+	* New palette sort mode added - Brightness
 	* "Image->Segment" added : See handbook section 6.10 for details
+	* Colour chooser popup added - press 'E' to open
 	* Posterize function in Transform Colour window now has 3 types - Bitwise, Truncated, Rounded
 	* Toggle to transform RGB clipboard image added to Transform Colour window
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
@@ -63,6 +65,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
 	* BUGFIX - FreeType text renderer now properly handles TTF fonts with embedded bitmaps
 	* BUGFIX - Redraw lag when moving a dialog over main window in Windows is now greatly reduced (fixed in GTK+)
+	* BUGFIX - Ctrl+T key now draws selection outline as it should - keyboard shortcut for text tool is now Shift+T
+	* "Distance to A+B" palette sort mode removed due to utter uselessness
 
 3.31	2009-4-15
 

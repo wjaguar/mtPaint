@@ -309,39 +309,93 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 static GtkWidget *pat_window, *draw_pat;
 static int pat_brush;
-static unsigned char *mem_patch = NULL;
+static unsigned char *mem_patch;
 
+#define PAL_SLOT_SIZE 10
 
-static gint delete_pat( GtkWidget *widget, GdkEvent *event, gpointer data )
+static unsigned char *render_color_grid(int w, int h, int cellsize, int channel)
 {
-	gtk_widget_destroy(pat_window);
-	if ( pat_brush == 0 )
-	{
-		free(mem_patch);
-		mem_patch = NULL;
-	}
+	unsigned char *rgb, *tmp;
+	int i, j, k, col, row;
 
-	return FALSE;
+
+	row = w * 3;
+	rgb = calloc(1, h * row);
+	if (!rgb) return (NULL);
+
+	for (col = i = 0; i < h; i += cellsize)
+	{
+		tmp = rgb + i * row;
+		for (j = 0; j < row; j += cellsize * 3 , col++)
+		{
+			if (channel == CHN_IMAGE) /* Palette as such */
+			{
+				if (col < mem_cols) /* Draw only existing colors */
+				{
+					tmp[j + 0] = mem_pal[col].red;
+					tmp[j + 1] = mem_pal[col].green;
+					tmp[j + 2] = mem_pal[col].blue;
+				}
+			}
+			else if (channel >= 0) /* Utility */
+			{
+				k = channel_rgb[channel][0] * col;
+				tmp[j + 0] = (k + (k >> 8) + 1) >> 8;
+				k = channel_rgb[channel][1] * col;
+				tmp[j + 1] = (k + (k >> 8) + 1) >> 8;
+				k = channel_rgb[channel][2] * col;
+				tmp[j + 2] = (k + (k >> 8) + 1) >> 8;
+			}
+			else /* Opacity */
+			{
+				tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = col;
+			}
+			for (k = j + 3; k < j + cellsize * 3 - 3; k++)
+				tmp[k] = tmp[k - 3];
+		}
+		for (j = i + 1; j < i + cellsize - 1; j++)
+			memcpy(rgb + j * row, tmp, row);
+	}
+	return (rgb);
 }
 
-static gint key_pat( GtkWidget *widget, GdkEventKey *event )
+static gboolean delete_pat(GtkWidget *widget)
+{
+	gtk_widget_destroy(widget);
+	if (pat_brush != CHOOSE_BRUSH) free(mem_patch);
+	mem_patch = NULL;
+	pat_window = NULL;
+
+	return (FALSE);
+}
+
+static gboolean key_pat(GtkWidget *widget, GdkEventKey *event)
 {
 	/* xine-ui sends bogus keypresses so don't delete on this */
-	if (!XINE_FAKERY(event->keyval)) delete_pat( widget, NULL, NULL );
+	if (!XINE_FAKERY(event->keyval)) delete_pat(widget);
 
 	return (TRUE);
 }
 
-static gint click_pat( GtkWidget *widget, GdkEventButton *event )
+static gboolean click_pat(GtkWidget *widget, GdkEventButton *event)
 {
-	int pat_no, mx, my;
+	int pat_no, mx = event->x, my = event->y;
 
-	if (event->button != 1) return (FALSE);
 
-	mx = event->x;
-	my = event->y;
+	if (pat_brush == CHOOSE_COLOR)
+	{
+		int ab;
 
-	if (pat_brush == 0) /* Patterns */
+		if (!(ab = event->button == 3) && (event->button != 1))
+			return (FALSE); // Only left or right click
+		pat_no = mx / PAL_SLOT_SIZE + 16 * (my / PAL_SLOT_SIZE);
+		pat_no = pat_no < 0 ? 0 : pat_no >= mem_cols ? mem_cols - 1 : pat_no;
+		mem_col_[ab] = pat_no;
+		mem_col_24[ab] = mem_pal[pat_no];
+		update_stuff(UPD_AB);
+	}
+	else if (event->button != 1) return (FALSE); // Left click only
+	else if (pat_brush == CHOOSE_PATTERN)
 	{
 		pat_no = mx / (8 * 4 + 4) + PATTERN_GRID_W * (my / (8 * 4 + 4));
 		pat_no = pat_no < 0 ? 0 : pat_no >= PATTERN_GRID_W * PATTERN_GRID_H ?
@@ -349,7 +403,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 		mem_tool_pat = pat_no;
 		update_stuff(UPD_PAT);
 	}
-	else /* Brushes */
+	else /* if (pat_brush == CHOOSE_BRUSH) */
 	{
 		pat_no = mx / (PATCH_WIDTH/9) + 9*( my / (PATCH_HEIGHT/9) );
 		pat_no = pat_no < 0 ? 0 : pat_no > 80 ? 80 : pat_no;
@@ -361,7 +415,7 @@ static gint click_pat( GtkWidget *widget, GdkEventButton *event )
 	return (TRUE);
 }
 
-static gint expose_pat(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+static gboolean expose_pat(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
 	int w = (int)user_data;
 	gdk_draw_rgb_image( draw_pat->window, draw_pat->style->black_gc,
@@ -373,8 +427,9 @@ static gint expose_pat(GtkWidget *widget, GdkEventExpose *event, gpointer user_d
 
 void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 {
-	int w;
+	int w, h;
 
+	if (pat_window) return; // Already displayed
 	pat_brush = typ;
 	pat_window = add_a_window(GTK_WINDOW_POPUP, _("Pattern Chooser"),
 		GTK_WIN_POS_MOUSE, TRUE);
@@ -382,24 +437,33 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 
 	draw_pat = gtk_drawing_area_new();
 
-	if (typ == 0)
+	if (typ == CHOOSE_PATTERN)
 	{
 		mem_patch = render_patterns();
-		gtk_widget_set_usize(draw_pat, w = PATTERN_GRID_W * (8 * 4 + 4),
-			PATTERN_GRID_H * (8 * 4 + 4));
+		w = PATTERN_GRID_W * (8 * 4 + 4);
+		h = PATTERN_GRID_H * (8 * 4 + 4);
 	}
-	else
+	else if (typ == CHOOSE_BRUSH)
 	{
 		mem_patch = mem_brushes;
-		gtk_widget_set_usize(draw_pat, w = PATCH_WIDTH, PATCH_HEIGHT);
+		w = PATCH_WIDTH;
+		h = PATCH_HEIGHT;
 	}
+	else /* if (typ == CHOOSE_COLOR) */
+	{
+		w = h = 16 * PAL_SLOT_SIZE - 1;
+		mem_patch = render_color_grid(w, w, PAL_SLOT_SIZE, CHN_IMAGE);
+	}
+	gtk_widget_set_usize(draw_pat, w, h);
 
 	gtk_container_add(GTK_CONTAINER(pat_window), draw_pat);
 	gtk_signal_connect(GTK_OBJECT(draw_pat), "expose_event",
 		GTK_SIGNAL_FUNC(expose_pat), (gpointer)w);
 	gtk_signal_connect(GTK_OBJECT(draw_pat), "button_press_event",
 		GTK_SIGNAL_FUNC(click_pat), NULL);
-	gtk_signal_connect(GTK_OBJECT(draw_pat), "button_release_event",
+	/* !!! Given the window is modal, this makes it closeable by button
+	 * release anywhere over mtPaint's main window - WJ */
+	gtk_signal_connect(GTK_OBJECT(pat_window), "button_release_event",
 		GTK_SIGNAL_FUNC(delete_pat), NULL);
 	gtk_signal_connect(GTK_OBJECT(pat_window), "key_press_event",
 		GTK_SIGNAL_FUNC(key_pat), NULL);
@@ -535,8 +599,8 @@ static void click_spal_ok()
 void pressed_sort_pal()
 {
 	char *rad_txt[] = {
-		_("Hue"), _("Saturation"), _("Luminance"), _("Distance to A"),
-			_("Distance to A+B"),
+		_("Hue"), _("Saturation"), _("Luminance"), _("Brightness"),
+			_("Distance to A"),
 		_("Red"), _("Green"), _("Blue"), _("Projection to A->B"),
 			_("Frequency")};
 
@@ -2451,54 +2515,16 @@ static void palette_pad_set(int value)
 
 static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
 {
-	unsigned char *rgb, *tmp;
-	int i, j, k, w, h, col, row, cellsize = PPAD_SLOT;
-	int channel = (int)user_data;
+	unsigned char *rgb;
+	int w, h, col, cellsize = PPAD_SLOT;
 
 	if (!wjpixmap_pixmap(widget)) return;
 	w = PPAD_WIDTH(cellsize);
 	h = PPAD_HEIGHT(cellsize);
-	row = w * 3;
-	rgb = malloc(h * row);
+	rgb = render_color_grid(w, h, cellsize, (int)user_data);
 	if (!rgb) return;
-
-	memset(rgb, 0, h * row);
-	for (col = i = 0; i < h; i += cellsize)
-	{
-		tmp = rgb + i * row;
-		for (j = 0; j < row; j += cellsize * 3 , col++)
-		{
-			if (channel == CHN_IMAGE) /* Palette as such */
-			{
-				if (col < mem_cols) /* Draw only existing colors */
-				{
-					tmp[j + 0] = mem_pal[col].red;
-					tmp[j + 1] = mem_pal[col].green;
-					tmp[j + 2] = mem_pal[col].blue;
-				}
-			}
-			else if (channel >= 0) /* Utility */
-			{
-				k = channel_rgb[channel][0] * col;
-				tmp[j + 0] = (k + (k >> 8) + 1) >> 8;
-				k = channel_rgb[channel][1] * col;
-				tmp[j + 1] = (k + (k >> 8) + 1) >> 8;
-				k = channel_rgb[channel][2] * col;
-				tmp[j + 2] = (k + (k >> 8) + 1) >> 8;
-			}
-			else /* Opacity */
-			{
-				tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = col;
-			}
-			for (k = j + 3; k < j + cellsize * 3 - 3; k++)
-				tmp[k] = tmp[k - 3];
-		}
-		for (j = i + 1; j < i + cellsize - 1; j++)
-			memcpy(rgb + j * row, tmp, row);
-	}
-
 	palette_pad_set(0);
-	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, row);
+	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
 	col = (cellsize >> 1) - 1;
 	wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
 		xbm_ring4_width, xbm_ring4_height,

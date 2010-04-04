@@ -804,7 +804,7 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 	gtk_signal_connect(GTK_OBJECT(box), "unrealize",
 		GTK_SIGNAL_FUNC(htoolbox_unrealize), popup);
 	gtk_signal_connect_object(GTK_OBJECT(box), "destroy",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), popup);
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(popup));
 	/* Eventbox covers the popup, and popup has a grab; then, all clicks
 	 * inside the popup get its descendant as event widget; anything else,
 	 * including popup window itself, means click was outside, and triggers

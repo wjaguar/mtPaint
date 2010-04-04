@@ -402,7 +402,7 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 static gboolean do_delete_to_click(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	gtk_signal_emit_by_name(GTK_OBJECT(data), "clicked");
-	return (TRUE); // Click handler can delete window, or let it be
+	return (TRUE); // Click handler can destroy window, or let it be
 }
 
 void delete_to_click(GtkWidget *window, GtkWidget *button)
@@ -419,19 +419,25 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	GtkWidget *hbox, *ok_button, *cancel_button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
+
 	hbox = gtk_hbox_new(TRUE, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
-	cancel_button = xpack(hbox, gtk_button_new_with_label(nCancel));
-	gtk_container_set_border_width(GTK_CONTAINER(cancel_button), 5);
-	gtk_signal_connect_object(GTK_OBJECT(cancel_button), "clicked",
-		Cancel, GTK_OBJECT(window));
-	gtk_widget_add_accelerator(cancel_button, "clicked", ag, GDK_Escape, 0,
-		(GtkAccelFlags)0);
 
-	ok_button = xpack(hbox, gtk_button_new_with_label(nOK));
+	ok_button = cancel_button = gtk_button_new_with_label(nOK);
 	gtk_container_set_border_width(GTK_CONTAINER(ok_button), 5);
 	gtk_signal_connect_object(GTK_OBJECT(ok_button), "clicked",
 		OK, GTK_OBJECT(window));
+	if (nCancel)
+	{
+		cancel_button = xpack(hbox, gtk_button_new_with_label(nCancel));
+		gtk_container_set_border_width(GTK_CONTAINER(cancel_button), 5);
+		gtk_signal_connect_object(GTK_OBJECT(cancel_button), "clicked",
+			Cancel, GTK_OBJECT(window));
+	}
+	xpack(hbox, ok_button);
+
+	gtk_widget_add_accelerator(cancel_button, "clicked", ag, GDK_Escape, 0,
+		(GtkAccelFlags)0);
 	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_Return, 0,
 		(GtkAccelFlags)0);
 	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_KP_Enter, 0,

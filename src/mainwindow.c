@@ -774,8 +774,7 @@ int check_zoom_keys(int act_m)
 	if ((action == ACT_DOCK) || (action == ACT_QUIT) ||
 		(action == DLG_BRCOSA) || (action == ACT_PAN) ||
 		(action == ACT_CROP) || (action == ACT_SWAP_AB) ||
-		(action == DLG_PATTERN) || (action == DLG_BRUSH) ||
-		(action == ACT_TOOL))
+		(action == DLG_CHOOSER) || (action == ACT_TOOL))
 		action_dispatch(action, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
 	else return (FALSE);
 
@@ -835,8 +834,9 @@ static key_action main_keys[] = {
 	{ ACT_PAN,	0,		GDK_End,	MOD_cs  },
 	{ ACT_CROP,	0,		GDK_Delete,	MOD_cs  },
 	{ ACT_SWAP_AB,	0,		GDK_x,		MOD_csa },
-	{ DLG_PATTERN,	0,		GDK_F2,		MOD_csa },
-	{ DLG_BRUSH,	0,		GDK_F3,		MOD_csa },
+	{ DLG_CHOOSER,	CHOOSE_PATTERN,	GDK_F2,		MOD_csa },
+	{ DLG_CHOOSER,	CHOOSE_BRUSH,	GDK_F3,		MOD_csa },
+	{ DLG_CHOOSER,	CHOOSE_COLOR,	GDK_e,		MOD_csa },
 	{ ACT_TOOL,	TTB_PAINT,	GDK_F4,		MOD_csa },
 	{ ACT_TOOL,	TTB_SELECT,	GDK_F9, 	MOD_csa },
 	{ ACT_DOCK,	0,		GDK_F12,	MOD_csa },
@@ -4017,10 +4017,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		layer_press_centre(); break;
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
-	case DLG_PATTERN:
-		choose_pattern(0); break;
-	case DLG_BRUSH:
-		choose_pattern(1); break;
+	case DLG_CHOOSER:
+		choose_pattern(mode); break;
 	case DLG_SCALE:
 		pressed_scale_size(TRUE); break;
 	case DLG_SIZE:
@@ -4685,7 +4683,7 @@ static menu_item main_menu[] = {
 	{ _("//Paste To Centre"), -1, 0, NEED_CLIP, "<control>V", ACT_PASTE, 1, XPM_ICON(paste) },
 	{ _("//Paste To New Layer"), -1, 0, NEED_PCLIP, "<control><shift>V", ACT_LR_ADD, LR_PASTE },
 	{ _("//Paste"), -1, 0, NEED_CLIP, "<control>K", ACT_PASTE, 0 },
-	{ _("//Paste Text"), -1, 0, 0, "<control>T", DLG_TEXT, 0, XPM_ICON(text) },
+	{ _("//Paste Text"), -1, 0, 0, "<shift>T", DLG_TEXT, 0, XPM_ICON(text) },
 #ifdef U_FREETYPE
 	{ _("//Paste Text (FreeType)"), -1, 0, 0, "T", DLG_TEXT_FT, 0 },
 #endif
@@ -4722,8 +4720,9 @@ static menu_item main_menu[] = {
 	{ _("//Import Clipboard from System"), -1, 0, 0, NULL, ACT_LOAD_CLIP, -1 },
 	{ _("//Export Clipboard to System"), -1, 0, NEED_CLIP, NULL, ACT_SAVE_CLIP, -1 },
 	{ "//", -4 },
-	{ _("//Choose Pattern ..."), -1, 0, 0, "F2", DLG_PATTERN, 0 },
-	{ _("//Choose Brush ..."), -1, 0, 0, "F3", DLG_BRUSH, 0 },
+	{ _("//Choose Pattern ..."), -1, 0, 0, "F2", DLG_CHOOSER, CHOOSE_PATTERN },
+	{ _("//Choose Brush ..."), -1, 0, 0, "F3", DLG_CHOOSER, CHOOSE_BRUSH },
+	{ _("//Choose Colour ..."), -1, 0, 0, "E", DLG_CHOOSER, CHOOSE_COLOR },
 
 	{ _("/_View"), -2 -16 },
 	{ "//", -3 },
@@ -4922,6 +4921,12 @@ void main_init()
 	gtk_widget_set_usize(main_window, 100, 100);		// Set minimum width/height
 	win_restore_pos(main_window, "window", 0, 0, 630, 400);
 	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
+
+	/* !!! If main window receives these events, GTK+ will be able to
+	 * direct them to current modal window. Which makes it possible to
+	 * close popups by clicking on the main window outside popup - WJ */
+	gtk_widget_add_events(main_window,
+		GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
 
 	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
 	 * move as a move, so have to do some non-default processing - WJ */

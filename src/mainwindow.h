@@ -91,8 +91,7 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_LR_CENTER,
 
 	DLG_BRCOSA,
-	DLG_PATTERN,
-	DLG_BRUSH,
+	DLG_CHOOSER,
 	DLG_SCALE,
 	DLG_SIZE,
 	DLG_NEW,

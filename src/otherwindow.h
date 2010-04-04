@@ -26,6 +26,10 @@
 #define COLSEL_GRID      4
 #define COLSEL_EDIT_ALL  256
 
+#define CHOOSE_PATTERN 0
+#define CHOOSE_BRUSH   1
+#define CHOOSE_COLOR   2
+
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 typedef void (*colour_hook)(int what);
 

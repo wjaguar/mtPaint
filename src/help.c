@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2009 Mark Tyler
+	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -29,7 +29,7 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"),
+_("mtPaint 3.40 - Copyright (C) 2004-2010 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
@@ -42,6 +42,7 @@ static char *help_page1[] = {
 _("  Ctrl-N            Create new image"),
 _("  Ctrl-O            Open Image"),
 _("  Ctrl-S            Save Image"),
+_("  Ctrl-Shift-S      Save layers file"),
 _("  Ctrl-Q            Quit program\n"),
 _("  Ctrl-A            Select whole image"),
 _("  Escape            Select nothing, cancel paste box"),
@@ -49,17 +50,22 @@ _("  Ctrl-C            Copy selection to clipboard"),
 _("  Ctrl-X            Copy selection to clipboard, and then paint current pattern to selection area"),
 _("  Ctrl-V            Paste clipboard to centre of current view"),
 _("  Ctrl-K            Paste clipboard to location it was copied from"),
+_("  Ctrl-Shift-V      Paste clipboard to new layer"),
 _("  Enter/Return      Commit paste to canvas\n"),
 _("  Arrow keys        Paint Mode - Move the mouse pointer"),
 _("  Arrow keys        Selection Mode - Nudge selection box or paste box by one pixel"),
 _("  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x pixels - x is defined by the Preferences window"),
 _("  Ctrl+Arrows       Move layer or resize selection box\n"),
+_("  Enter/Return      Paint Mode - Simulate left click"),
+_("  Backspace         Paint Mode - Simulate right click\n"),
 _("  [ or ]            Change colour A to the next or previous palette item"),
 _("  Shift+[ or ]      Change colour B to the next or previous palette item\n"),
 _("  Delete            Crop image to selection"),
 _("  Insert            Transform colours - i.e. Brightness, Contrast, Saturation, Posterize, Gamma"),
 _("  Ctrl-G            Greyscale the image"),
-_("  Shift-Ctrl-G      Greyscale the image (Gamma corrected)\n"),
+_("  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"),
+_("  Ctrl+M            Mirror the image"),
+_("  Shift-Ctrl-I      Invert the image\n"),
 _("  Ctrl-T            Draw a rectangle around the selection area with the current fill"),
 _("  Ctrl-Shift-T      Fill in the selection area with the current fill"),
 _("  Ctrl-L            Draw an ellipse spanning the selection area"),
@@ -70,8 +76,12 @@ _("  Ctrl-P            Preferences"),
 _("  Ctrl-I            Information\n"),
 _("  Ctrl-Z            Undo last action"),
 _("  Ctrl-R            Redo an undone action\n"),
+_("  Shift-T           Text Tool (GTK+)"),
+_("  T                 Text Tool (FreeType)\n"),
 _("  V                 View Window"),
 _("  L                 Layers Window\n"),
+_("  X                 Swap Colours A & B"),
+_("  E                 Choose Colour\n"),
 _("  A                 Draw open arrow head when using the line tool (size set by flow setting)"),
 _("  S                 Draw closed arrow head when using the line tool (size set by flow setting)\n"),
 _("  +,=               Main edit window - Zoom in"),
@@ -150,7 +160,8 @@ _("Martin Zelaia"),
 _("Pavel Ruzicka"),
 _("Puppy Linux (Barry Kauler)"),
 _("Vlastimil Krejcir"),
-_("William Kern\n\n"),
+_("William Kern"),
+_("Pasi Kallinen\n\n"),
 _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan"),
 _("Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"),
@@ -171,7 +182,7 @@ _("Tagalog - Anjelo delCarmen"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };
-#define HELP_PAGE_MAX 72
+#define HELP_PAGE_MAX 82
 
 static char **help_pages[HELP_PAGE_COUNT] = {
 	help_page0, help_page1, help_page2, help_page3
