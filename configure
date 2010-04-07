@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.50"
-MT_DATE="2010-04-04"
+MT_V="3.34.51"
+MT_DATE="2010-04-07"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -33,8 +33,9 @@ STATIC_GIF=
 STATIC_FT=
 STATIC_CMS=
 AS_NEEDED=
-IMAGE_LIBDIR=
 HAVE_FUNCS=
+LL=
+II=
 
 GTK_FILE=_conf.txt
 
@@ -61,21 +62,6 @@ STATIC_LAST=
 # Called with lib ID & static mode
 LIB_NAME ()
 {
-	if [ "$IMAGE_LIBDIR" ]
-	then
-		L_TNM="${IMAGE_LIBDIR}/lib$1"
-		if [ "$2" ]
-		then
-			L_TNM="${L_TNM}.a"
-		else
-			L_TNM="${L_TNM}.so"
-		fi
-		if [ -r $L_TNM ]
-		then
-			L_EX="$L_EX $L_TNM"
-			return
-		fi
-	fi
 	if [ "$2" ]
 	then
 		if [ -z "$STATIC_LAST" ]
@@ -98,12 +84,12 @@ then
 	GTK=2
 	IS_LIB()
 	{
-		redir -e /dev/null $LD -$1 -o _conf.tmp -L/lib > /dev/null 2>&1
+		redir -e /dev/null $LD -$1 -o _conf.tmp $LL -L/lib > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		redir -e /dev/null $CC _conf.c -o _conf.tmp -L/lib > /dev/null 2>&1
+		redir -e /dev/null $CC _conf.c -o _conf.tmp $LL -L/lib > /dev/null 2>&1
 	}
 elif [ "$CROSSCC" ]
 then
@@ -112,12 +98,12 @@ then
 	CROSSPF=`echo $CROSSCC | sed -e 's/[^/]\+\/[^/]*\$//'`
 	IS_LIB()
 	{
-		$LD -$1 -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
+		$LD -$1 -o _conf.tmp $LL -L$CROSSPF/lib > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp -L$CROSSPF/lib > /dev/null 2>&1
+		$CC _conf.c -o _conf.tmp $LL -L$CROSSPF/lib > /dev/null 2>&1
 	}
 else
 	OS="GNU/Linux"
@@ -130,73 +116,14 @@ else
 	CROSSPF="/usr"
 	IS_LIB()
 	{
-		$LD -$1 -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		$LD -$1 -o _conf.tmp $LL -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		$CC _conf.c -o _conf.tmp $LL -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 fi
-
-if HAVE_FUNC "mkdtemp"
-then
-	HAVE_FUNCS="$HAVE_FUNCS -DHAVE_MKDTEMP"
-fi
-
-if IS_LIB "lgif"
-then
-	NGIF=GIF
-else
-	if IS_LIB "lungif"
-	then
-		NGIF=YES
-	else
-		NGIF=NO
-	fi
-fi
-
-if IS_LIB "ljpeg"
-then
-	NJPEG=YES
-else
-	NJPEG=NO
-fi
-
-if IS_LIB "lopenjpeg"
-then
-	NJP2=OpenJPEG
-else
-	if IS_LIB "ljasper"
-	then
-		NJP2=JasPer
-	else
-		NJP2=NO
-	fi
-fi
-
-if IS_LIB "ltiff"
-then
-	NTIFF=YES
-else
-	NTIFF=NO
-fi
-
-if IS_LIB "lfreetype"
-then
-	NFT=YES
-else
-	NFT=NO
-fi
-
-if IS_LIB "llcms"
-then
-	NCMS=YES
-else
-	NCMS=NO
-fi
-
-rm _conf.c _conf.tmp
 
 for A in "$@"
 do
@@ -232,7 +159,7 @@ do
 		"lcms" )	NCMS=YES;;
 		"nolcms" )	NCMS=NO;;
 		"staticlcms" )	STATIC_CMS=LittleCMS;;
-		"--libdir="* )	IMAGE_LIBDIR="`echo "$A" | sed -e "s/--libdir=//"`";;
+		"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
 		"slow" )	OPTS=NO;;
 		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
 		"debug" )	DEBUG=YES
@@ -264,9 +191,9 @@ do
 		"man" )		MT_MAN=YES;;
 		"pod" )		MT_POD=YES;;
 		"--help" )	HELP=0;;
-		"mtk="* )	MTK_DIR="`echo "$A" | sed -e "s/mtk=//"`"
-				mkdir $MTK_DIR/mtpaint-$MT_V
-				cp -ar $MTK_DIR/locale $MTK_DIR/mtpaint-$MT_V
+		"mtk="* )	MTK_DIR="${A#*=}"
+				mkdir "$MTK_DIR/mtpaint-$MT_V"
+				cp -ar "$MTK_DIR/locale" "$MTK_DIR/mtpaint-$MT_V"
 				MT_LANG_DEST="$MTK_DIR/mtpaint-$MT_V/locale"
 				MT_PO_DEST="locale"
 				LIN_BIN_INSTALL="$MTK_DIR/mtpaint-$MT_V"
@@ -277,13 +204,13 @@ do
 				;;
 		"thread" )	USE_THREADS=YES;;
 		"nothread" )	USE_THREADS=NO;;
-		"--bindir="* )	LIN_BIN_INSTALL="`echo "$A" | sed -e "s/--bindir=//"`"
+		"--bindir="* )	LIN_BIN_INSTALL="${A#*=}"
 				WIN_BIN_INSTALL=$LIN_BIN_INSTALL;;
-		"--locale="* )	MT_LANG_DEST="`echo "$A" | sed -e "s/--locale=//"`"
+		"--locale="* )	MT_LANG_DEST="${A#*=}"
 				MT_PO_DEST=$MT_LANG_DEST;;
-		"--mandir="* )	MT_MAN_DEST="`echo "$A" | sed -e "s/--mandir=//"`";;
+		"--mandir="* )	MT_MAN_DEST="${A#*=}";;
 		"cflags" )	CFLAG=${CFLAGS};;
-		"--cpu="* )	MARCH='-march='"`echo "$A" | sed -e "s/--cpu=//"`";;
+		"--cpu="* )	MARCH="-march=${A#*=}";;
 		"icons"* )	ICON_SET=$A;;
 		"386" )		MARCH='-march=i386';;
 		"486" )		MARCH='-march=i486';;
@@ -298,13 +225,13 @@ do
 				fi
 				AS_NEEDED=-Wl,--as-needed
 				HAVE_FUNCS="$HAVE_FUNCS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS";;
-		"--prefix="* )	MT_PREFIX="`echo "$A" | sed -e "s/--prefix=//"`"
+		"--prefix="* )	MT_PREFIX="${A#*=}"
 				WIN_BIN_INSTALL="$MT_PREFIX/bin"
 				LIN_BIN_INSTALL="$MT_PREFIX/bin"
 				MT_LANG_DEST="$MT_PREFIX/share/locale"
 				MT_PO_DEST=$MT_LANG_DEST
 				MT_MAN_DEST="$MT_PREFIX/man/man1";;
-		"--po="* )	MT_PO_DEST="`echo "$A" | sed -e "s/--po=//"`";;
+		"--po="* )	MT_PO_DEST="${A#*=}";;
 		"build" )	./configure flush
 				I_DIR=/home/wj/sf
 				cd ..
@@ -312,7 +239,7 @@ do
 				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
 				cd mtpaint-$MT_V*
 
-				./configure --mandir=/usr/man/man1 intl pod man release staticgif nojp2 --libdir=$I_DIR/libpng0
+				./configure --mandir=/usr/man/man1 intl pod man release staticgif nojp2 --fakeroot=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -325,7 +252,7 @@ do
 				cd ..
 				./configure flush
 
-				./configure --mandir=/usr/man/man1 intl man gtk1 release staticgif nojp2 --libdir=$I_DIR/libpng0
+				./configure --mandir=/usr/man/man1 intl man gtk1 release staticgif nojp2 --fakeroot=$I_DIR/libpng0
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/doc/mtpaint/
@@ -338,7 +265,7 @@ do
 				cd ..
 				./configure flush
 
-				./configure --prefix=/usr intl man release GIF staticgif nojp2 --libdir=$I_DIR/ubuntulibs
+				./configure --prefix=/usr intl man release GIF staticgif nojp2 --fakeroot=$I_DIR/ubuntulibs
 				make
 				mkdir -p slack/install/
 				mkdir -p slack/usr/share/doc/mtpaint/
@@ -411,7 +338,7 @@ staticft ........ Statically link FreeType library
 lcms ............ Use LittleCMS
 nolcms .......... Don't use LittleCMS
 staticlcms ...... Statically link LittleCMS library
---libdir=DIR .... DIR = location of image library files to use for cross-compilation
+--fakeroot=DIR .. DIR = location of library and include files to use for cross-compilation
 
 flush ........... Flush directories to initial state
 debug ........... Include debugging info in binary
@@ -436,6 +363,60 @@ mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
+	LL=${FAKE_ROOT:+-L$FAKE_ROOT/lib} # Extra libs
+	II=${FAKE_ROOT:+-L$FAKE_ROOT/include} # Extra includes
+
+	if HAVE_FUNC "mkdtemp"
+	then
+		HAVE_FUNCS="$HAVE_FUNCS -DHAVE_MKDTEMP"
+	fi
+
+	if IS_LIB "lgif"
+	then
+		NGIF=${NGIF:-GIF}
+	fi
+	if IS_LIB "lungif"
+	then
+		NGIF=${NGIF:-YES}
+	fi
+	NGIF=${NGIF:-NO}
+
+	if IS_LIB "ljpeg"
+	then
+		NJPEG=${NJPEG:-YES}
+	fi
+	NJPEG=${NJPEG:-NO}
+
+	if IS_LIB "lopenjpeg"
+	then
+		NJP2=${NJP2:-OpenJPEG}
+	fi
+	if IS_LIB "ljasper"
+	then
+		NJP2=${NJP2:-JasPer}
+	fi
+	NJP2=${NJP2:-NO}
+
+	if IS_LIB "ltiff"
+	then
+		NTIFF=${NTIFF:-YES}
+	fi
+	NTIFF=${NTIFF:-NO}
+
+	if IS_LIB "lfreetype"
+	then
+		NFT=${NFT:-YES}
+	fi
+	NFT=${NFT:-NO}
+
+	if IS_LIB "llcms"
+	then
+		NCMS=${NCMS:-YES}
+	fi
+	NCMS=${NCMS:-NO}
+
+	rm _conf.c _conf.tmp
+
 	mkdir -p src/graphics
 	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
 
@@ -517,12 +498,6 @@ else
 	fi
 	fi	# MTK
 
-	if [ "$IMAGE_LIBDIR" ]
-	then
-		AS_NEEDED="-Wl,--as-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
-	fi
-
-	L_EX=$AS_NEEDED
 	I_EX=$HAVE_FUNCS
 	if [ "$USE_THREADS" = "YES" ]
 	then
@@ -581,7 +556,7 @@ else
 	fi
 	LIB_NAME png "$STATIC_PNG"
 	LIB_NAME z "$STATIC_PNG"
-	if [ "$STATIC_LAST" ] && [ -z "$IMAGE_LIBDIR" ]
+	if [ "$STATIC_LAST" ]
 	then
 		L_EX="$L_EX -Wl,-dy"
 	fi
@@ -646,21 +621,36 @@ else
 		echo "MT_MAN_DEST=\"$MT_MAN_DEST\"" >> $GTK_FILE
 	fi
 
-	I_EX="$I_EX -DVERSION=\"\\\"$MT_VERSION\"\\\""
 	GTK_INCLUDE="$GTK_INCLUDE $I_EX"
-	echo "LDFLAG = $L_EX $GTK_LIB" >> $GTK_FILE
+	GTK_LIB="$L_EX $GTK_LIB"
 
-	if [ "$CFLAG" ]
+	# Rebase the paths for --fakeroot
+	if [ "$FAKE_ROOT" ]
 	then
-		echo "CFLAG = $CFLAG $GTK_INCLUDE" >> $GTK_FILE
-	else
-		if [ "$OPTS" = "YES" ]
-		then
-			echo "CFLAG = -O2 $MARCH $GTK_INCLUDE" >> $GTK_FILE
-		else
-			echo "CFLAG = $MARCH $GTK_INCLUDE" >> $GTK_FILE
-		fi
+		AS_NEEDED="-Wl,--as-needed -Wl,--no-add-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
+		for A in $GTK_LIB
+		do
+			case "$A" in
+				"-L/usr"* ) LL="$LL -L$FAKE_ROOT${A#-L/usr}";;
+			esac
+		done
+		for A in $GTK_INCLUDE
+		do
+			case "$A" in
+				"-I/usr"* ) II="$II -I$FAKE_ROOT${A#-I/usr}";;
+			esac
+		done
 	fi
+
+	echo "LDFLAG = $AS_NEEDED $LL $GTK_LIB" >> $GTK_FILE
+
+	if [ "$OPTS" = "YES" ]
+	then
+		XCFLAG=${CFLAG:--O2 $MARCH}
+	else
+		XCFLAG=${CFLAG:-$MARCH}
+	fi
+	echo "CFLAG = $II $XCFLAG $GTK_INCLUDE -DVERSION=\"\\\"$MT_VERSION\\\"\"" >> $GTK_FILE
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
 	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE

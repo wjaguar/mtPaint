@@ -799,6 +799,9 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 
 	popup = gtk_window_new(GTK_WINDOW_POPUP);
 	gtk_window_set_policy(GTK_WINDOW(popup), FALSE, FALSE, TRUE);
+#if GTK_MAJOR_VERSION == 2
+	gtk_window_set_type_hint(GTK_WINDOW(popup), GDK_WINDOW_TYPE_HINT_COMBO);
+#endif
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(htoolbox_popup), popup);
 	gtk_signal_connect(GTK_OBJECT(box), "unrealize",

@@ -16,6 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Scrolling made more smooth in Windows version
 	* Dock area now holds settings toolbar and layers dialog when their windows are closed
 	* Main toolbar and tools toolbar now rearrange themselves to fit in window
+	* Preferences window now has scrollbars when screen is too small to display it whole
 	* The preview button on the colour selectors is now a toggle to enable interactive previews
 	* Gaussian blur effect now faster by 20-35%
 	* "Protect details" toggle added to Kuwahara-Nagao blur

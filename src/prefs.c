@@ -65,6 +65,7 @@ static GdkDeviceInfo *tablet_device;
 #if GTK_MAJOR_VERSION == 2
 static GdkDevice *tablet_device;
 #endif
+static GtkWidget *inputd;
 
 int tablet_working;		// Has the device been initialized?
 
@@ -98,18 +99,14 @@ static gboolean expose_tablet_preview(GtkWidget *widget, GdkEventExpose *event)
 }
 
 
-static GtkWidget *inputd = NULL;
-
-
-gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void delete_inputd()
 {
 	int i, j;
 	char txt[32];
 
 #if GTK_MAJOR_VERSION == 1
 	GdkDeviceInfo *dev = tablet_device;
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 	GdkDevice *dev = GTK_INPUT_DIALOG (inputd)->current_device;
 #endif
 
@@ -122,8 +119,7 @@ gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
 		{
 #if GTK_MAJOR_VERSION == 1
 			j = dev->axes[i];
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 			j = dev->axes[i].use;
 #endif
 			sprintf(txt, "tablet_axes_v%i", i);
@@ -133,13 +129,11 @@ gint delete_inputd( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 	gtk_widget_destroy(inputd);
 	inputd = NULL;
-
-	return FALSE;
 }
 
 static void delete_prefs(GtkWidget *widget)
 {
-	if ( inputd != NULL ) delete_inputd( NULL, NULL, NULL );
+	if (inputd) delete_inputd();
 	gtk_widget_destroy(prefs_window);
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
 	clipboard_entry = NULL;
@@ -215,39 +209,38 @@ static void tablet_disable_device(GtkInputDialog *inputdialog, GdkDevice *device
 #endif
 
 
-gint conf_tablet( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void conf_tablet(GtkWidget *widget)
 {
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	GtkWidget *close;
+	GtkAccelGroup* ag;
 
-	if (inputd != NULL) return FALSE;	// Stops multiple dialogs being opened
+	if (inputd) return;	// Stops multiple dialogs being opened
 
 	inputd = gtk_input_dialog_new();
-	gtk_window_set_position( GTK_WINDOW(inputd), GTK_WIN_POS_CENTER );
+	gtk_window_set_position(GTK_WINDOW(inputd), GTK_WIN_POS_CENTER);
 
-	gtk_signal_connect(GTK_OBJECT (GTK_INPUT_DIALOG (inputd)->close_button), "clicked",
-		GTK_SIGNAL_FUNC(delete_inputd), (gpointer) inputd);
-	gtk_widget_add_accelerator (GTK_INPUT_DIALOG (inputd)->close_button, "clicked",
-		ag, GDK_Escape, 0, (GtkAccelFlags) 0);
+	close = GTK_INPUT_DIALOG(inputd)->close_button;
+	gtk_signal_connect(GTK_OBJECT(close), "clicked",
+		GTK_SIGNAL_FUNC(delete_inputd), NULL);
+	ag = gtk_accel_group_new();
+	gtk_widget_add_accelerator(close, "clicked",
+		ag, GDK_Escape, 0, (GtkAccelFlags)0);
+	delete_to_click(inputd, close);
 
-	gtk_signal_connect(GTK_OBJECT (inputd), "destroy",
-		GTK_SIGNAL_FUNC(delete_inputd), (gpointer) inputd);
+	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
+		GTK_SIGNAL_FUNC(tablet_enable_device), NULL);
+	gtk_signal_connect(GTK_OBJECT(inputd), "disable-device",
+		GTK_SIGNAL_FUNC(tablet_disable_device), NULL);
 
-	gtk_signal_connect(GTK_OBJECT (inputd), "enable-device",
-		GTK_SIGNAL_FUNC(tablet_enable_device), (gpointer) inputd);
-	gtk_signal_connect(GTK_OBJECT (inputd), "disable-device",
-		GTK_SIGNAL_FUNC(tablet_disable_device), (gpointer) inputd);
+	if (GTK_INPUT_DIALOG(inputd)->keys_list)
+		gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->keys_list);
+	if (GTK_INPUT_DIALOG(inputd)->keys_listbox)
+		gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->keys_listbox);
 
-	if ( GTK_INPUT_DIALOG (inputd)->keys_list != NULL )
-		gtk_widget_hide (GTK_INPUT_DIALOG (inputd)->keys_list);
-	if ( GTK_INPUT_DIALOG (inputd)->keys_listbox != NULL )
-		gtk_widget_hide (GTK_INPUT_DIALOG (inputd)->keys_listbox);
+	gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->save_button);
 
-	gtk_widget_hide (GTK_INPUT_DIALOG (inputd)->save_button);
-
-	gtk_widget_show (inputd);
-	gtk_window_add_accel_group(GTK_WINDOW (inputd), ag);
-
-	return FALSE;
+	gtk_widget_show(inputd);
+	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
 }
 
 
@@ -383,7 +376,7 @@ static gint tablet_preview_button (GtkWidget *widget, GdkEventButton *event)
 	return TRUE;
 }
 
-static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
+static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 {
 	gdouble pressure = 0.0;
 	GdkModifierType state;
@@ -399,8 +392,7 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 		pressure = event->pressure;
 		state = event->state;
 	}
-#endif
-#if GTK_MAJOR_VERSION == 2
+#else /* #if GTK_MAJOR_VERSION == 2 */
 	if (event->is_hint) gdk_device_get_state (event->device, event->window, NULL, &state);
 	else state = event->state;
 
@@ -411,6 +403,25 @@ static gint tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 		tablet_update_pressure( pressure );
   
 	return TRUE;
+}
+
+/* Try to avoid scrolling - request full size of contents */
+static void pref_scroll_size_req(GtkWidget *widget, GtkRequisition *requisition,
+	gpointer user_data)
+{
+	GtkWidget *child = GTK_BIN(widget)->child;
+
+	if (child && GTK_WIDGET_VISIBLE(child))
+	{
+		GtkRequisition wreq;
+		int n, border = GTK_CONTAINER(widget)->border_width * 2;
+
+		gtk_widget_get_child_requisition(child, &wreq);
+		n = wreq.width + border;
+		if (requisition->width < n) requisition->width = n;
+		n = wreq.height + border;
+		if (requisition->height < n) requisition->height = n;
+	}
 }
 
 void pressed_preferences()
@@ -428,7 +439,7 @@ void pressed_preferences()
 
 
 	GtkWidget *vbox3, *hbox4, *table3, *table4, *drawingarea_tablet;
-	GtkWidget *button1, *notebook1, *page, *vbox_2, *label;
+	GtkWidget *button1, *notebook1, *page, *vbox_2, *label, *scroll;
 
 	char *tab_tex2[] = { _("Transparency index"), _("XBM X hotspot"), _("XBM Y hotspot"),
 		_("JPEG Save Quality (100=High)"), _("JPEG2000 Compression (0=Lossless)"),
@@ -444,15 +455,26 @@ void pressed_preferences()
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
 
 	prefs_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Preferences"), GTK_WIN_POS_CENTER, FALSE );
+	// Let user and WM make window smaller - contents are scrollable
+	gtk_window_set_policy(GTK_WINDOW(prefs_window), TRUE, TRUE, FALSE);
 	vbox3 = add_vbox(prefs_window);
 
-///	SETUP NOTEBOOK
+///	SETUP SCROLLING
 
-	notebook1 = xpack(vbox3, gtk_notebook_new());
-//	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_TOP);
+	scroll = xpack(vbox3, gtk_scrolled_window_new(NULL, NULL));
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_signal_connect(GTK_OBJECT(scroll), "size_request",
+		GTK_SIGNAL_FUNC(pref_scroll_size_req), NULL);
+
+///	SETUP NOTEBOOK
+	
+	notebook1 = gtk_notebook_new();
 	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_LEFT);
 //	gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook1), TRUE);
-	gtk_widget_show(notebook1);
+	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), notebook1);
+	gtk_viewport_set_shadow_type(GTK_VIEWPORT(GTK_BIN(scroll)->child), GTK_SHADOW_NONE);
+	gtk_widget_show_all(scroll);
 
 ///	---- TAB1 - GENERAL
 
@@ -621,7 +643,8 @@ void pressed_preferences()
 	gtk_misc_set_padding (GTK_MISC (label_tablet_device), 5, 5);
 
 	button1 = add_a_button( _("Configure Device"), 0, vbox_2, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked", GTK_SIGNAL_FUNC(conf_tablet), NULL);
+	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
+		GTK_SIGNAL_FUNC(conf_tablet), NULL);
 
 	table3 = xpack(vbox_2, gtk_table_new(4, 2, FALSE));
 	gtk_widget_show (table3);
@@ -693,10 +716,7 @@ void pressed_preferences()
 	gtk_window_set_transient_for( GTK_WINDOW(prefs_window), GTK_WINDOW(main_window) );
 	gtk_widget_show (prefs_window);
 
-	if ( tablet_working )
-	{
-		tablet_update_device( tablet_device->name );
-	} else	tablet_update_device( "NONE" );
+	tablet_update_device(tablet_working ? tablet_device->name : "NONE");
 }
 
 
