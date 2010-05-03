@@ -887,7 +887,6 @@ void mem_seg_render(unsigned char *img, const seg_state *s);
 #ifdef __GNUC__ /* Have native implementation */
 #define ALIGNOF(X) __alignof__(X)
 #else
-#include <stddef.h> /* For offsetof() */
 #define ALIGNOF(X) offsetof(struct {char c; X x;}, x)
 #endif
 

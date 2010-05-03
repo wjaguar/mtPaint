@@ -104,7 +104,7 @@ static int case_insensitive;
 #define fpick_fnmatch(mask, str) !fnmatch(mask, str, FNM_PATHNAME | \
 	(case_insensitive ? FNM_CASEFOLD : 0))
 
-#elif (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4) /* GTK+ 2.0/2.2 */
+#elif (GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 4) /* GTK+ 2.0/2.2 */
 #define fpick_fnmatch(mask, str) wjfnmatch(mask, str, TRUE)
 #endif
 
@@ -138,7 +138,7 @@ static void fpick_clist_repattern(GtkCList *clist, const char *pattern)
 	GtkObject *obj = GTK_OBJECT(clist);
 	GList *tmp, *backup, *cur, *res, *pos = NULL;
 	int n = 0;
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	GtkFileFilter *filt = gtk_file_filter_new();
 	GtkFileFilterInfo info;
 	gtk_file_filter_add_pattern(filt, pattern);
@@ -173,7 +173,7 @@ static void fpick_clist_repattern(GtkCList *clist, const char *pattern)
 		tmp->prev = NULL;
 		/* Filter files, let directories pass */
 		if (GTK_CELL_TEXT(row->cell[FPICK_CLIST_SIZE])->text[0] && pattern[0] &&
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 			(info.display_name = name , !gtk_file_filter_filter(filt, &info)))
 #else
 			!fpick_fnmatch(pattern, name))
@@ -196,7 +196,7 @@ static void fpick_clist_repattern(GtkCList *clist, const char *pattern)
 	clist_reselect_row(clist, n); // Avoid "select_row" signal emission
 	/* Let it be redrawn */
 	gtk_clist_thaw(clist);
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	gtk_object_sink(GTK_OBJECT(filt));
 #endif
 }

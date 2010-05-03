@@ -1267,7 +1267,7 @@ void render_text( GtkWidget *widget )
 	PangoLayout *layout;
 	PangoFontDescription *font_desc;
 	int tx = PAD_SIZE, ty = PAD_SIZE;
-#if GTK_MINOR_VERSION >= 6
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 	PangoMatrix matrix = PANGO_MATRIX_INIT;
 	double degs, angle;
 	int w2, h2;
@@ -1283,7 +1283,7 @@ void render_text( GtkWidget *widget )
 
 	pango_layout_set_text( layout, inifile_get( "textString", "" ), -1 );
 
-#if GTK_MINOR_VERSION >= 6
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 	if (rotate)		// Rotation Toggle
 	{
 		degs = inifile_get_gint32("fontAngle", 0) * 0.01;

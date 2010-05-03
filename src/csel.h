@@ -31,7 +31,7 @@ typedef struct
 	int pcache[256], cbase, irange, amin, amax;
 	double clxn[3], cvec, range2;
 } csel_info;
-#define CSEL_SVSIZE ((size_t)(&((csel_info *)0)->colormap))
+#define CSEL_SVSIZE offsetof(csel_info, colormap)
 
 csel_info *csel_data;
 int csel_preview, csel_preview_a, csel_overlay;

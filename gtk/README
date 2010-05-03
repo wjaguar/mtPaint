@@ -2,7 +2,7 @@
 The History
 -----------
 
-For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of several different 2.6.x GTK+ versions, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support for Windows 98 systems, which became unsupported with GTK+ 2.8.
+For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of GTK+ 2.6.4 and 2.6.9, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support Windows 98, which became unsupported with GTK+ 2.8.
 
 But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Still, upgrading the package to a new version of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with custom-built libgdk, libgtk, and libwimp, based on GTK+ 2.6.7 and a set of patches backported from the later versions of GTK+.
 
@@ -14,6 +14,72 @@ Original patches from GTK+ tree contained in the cumulative patch:
 - svn  7886 / git d73fa807875951d0240dce572398992d395bbe77
   Use GetDriveType() to recognize removable drives (in order to avoid
   (REVERTED: was making flash drives inaccessible from file selector)
+- svn 12881 / git 0604a90098416694c1d26bfa920e34c3f5d61493
+  Remove debugging output. (#302404, Frederic Crozat)
+  (APPLIED: cleans up BMP loader)
+- svn 12899 / git cf5324d980fcddad8318bf52f5315d39fc4221f6
+  Don't grab focus to unrealized widgets. (#302240, Philip Langdale)
+  (APPLIED: fixes possible glitch in radiobutton groups)
+- svn 12903 / git 0ae5528968af2b0e28eebdb9c4b38f76af129707
+  Take multi-monitor offset into account. (#302525)
+  (APPLIED)
+- svn 12946 / git 35f75bd3401d498201327fe00fa454deb351cee1
+  Always initialize child-visible to FALSE, otherwise we may end up with the
+  (PARTIALLY APPLIED: fixes possible glitch in GtkNotebook)
+- svn 12968 / git ff576e3fe7dce780f2b892967fb16c073656d29d
+  Check that GDK_IS_SCREEN(screen) (like the X11 backend does), not screen
+  (APPLIED)
+- svn 12991 / git 7c337b69f23d4200d4975cc35da13d1d3c00cc1f
+  Don't blink the cursor if the entry is not editable. (#304171,Nikos
+  (APPLIED)
+- svn 12992 / git ef25506011d6bfa67294cdcc8bbdd40185f0bfaa
+  Don't bind GDK_Page_Up and GDK_Page_Down twice. (#168333, Hazael Maldonado
+  (APPLIED: fixes reaction to PageUp & PageDown keys in sliders)
+- svn 12994 / git f4fc3fee869d901eba7b6eaf22a4794b15659a2e
+  Keep the popup posted if the button is released over the cellview. This
+  (APPLIED: fixes GtkComboBox)
+- svn 13027 / git a9c0d119133ea9c22017cf7bb567b5de54b538c0
+  If the keysym isn't one of the special cases this function takes care of,
+  (APPLIED)
+- svn 13057 / git 67f3c556626c6e9fa06b2143c87633e635ed733c
+  If blitting from the root window, take the multi-monitor offset into
+  (APPLIED)
+- svn 13062 / git b27c1cc6ee8e5d86a628a3a96a8c3d56bdc00b7e
+  Make autoscrolling work at the bottom of the screen.
+  (APPLIED: fixes GtkComboBox)
+- svn 13095 / git 36c4c40f8822aa519aa33fa3222f42fc6563dfa8
+  Check for overflow. (#306394, Morten Welinder)
+  (APPLIED: fixes PNM loader)
+- svn 13200 / git 5e575c6df3a3e407042a666a9ba9cbb1e01c0b6c
+  [Win32] Borrow this function from GLib HEAD. (_gtk_get_localedir): [Win32]
+  (APPLIED: fixes possible problem with non-ASCII installation path)
+- svn 13219 / git 4a37701aa1615c30d80a6840fbc836fc2896adaa
+  Queue a draw on the old and new focus widgets, if their defaultness
+  (APPLIED)
+- svn 13224 / git c943c3552a7a8f2aee2bad0d3d694b67c6c8e41c
+  Set the actions and suggested_action fields in the GdkDragContext to
+  (APPLIED)
+- svn 13267 / git 406be320feec1adec2e5794150cb3eea351cb1fb
+  Connect to button-release-event as well, to handle touchscreen scenarios
+  (APPLIED)
+- svn 13438 / git 5454441a8336a0f96a3999143903e394ce1498cd
+  Fix handling of Aiptek and Aiptek-like graphical tablets such as Trust on
+  (APPLIED)
+- svn 13493 / git 91f2fb2d4d3b8f5474121a396c1b191938ad3887
+  don't iterate past the end of the string, so pango_layout_get_cursor_pos()
+  (APPLIED: fixes a glitch in GtkEntry)
+- svn 13498 / git 24d63ffe74df3b5f5780c8c9a8058c341f26da93
+  Don't fail if we can't get a keyboard grab. (#168351)
+  (APPLIED)
+- svn 13588 / git 1cabe720eb48eb0fd29421b4dcdf8c3f58eaf71e
+  Avoid spurious core pointer events when the tablet pen is lifted.
+  (APPLIED)
+- svn 13738 / git bd80abab9f749698ad034aa2a3b313ac62344b9c
+  Backport from 2.8.
+  (APPLIED: fixes possible crash in GtkComboBox)
+- svn 14261 / git 21b6ed0024a44054d99c4930914f4eb81dfdd05b
+  2.8.7
+  (PARTIALLY APPLIED: fixes two vulnerabilities in XPM loader)
 - svn 14527 / git 3750d5da6b2dc7e104b9cc19f60b5724032e67c2
   Get the invalidated region from ScrollWindowEx() instead of an incorrect
   (APPLIED: fixes scrolling of partially covered windows)
@@ -65,7 +131,7 @@ To replicate it, do the following:
 - download the Wintab development package from http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
 - unpack that package: unzip -LL wtkit126.zip
 - rename the 'wtkit126 Folder' directory to 'wintab' and move it into the directory with GTK+ sources ('gtk+-2.6.7')
-- apply the cumulative patch: "patch -p0 < gtk267_4wj.patch"
+- apply the cumulative patch: "patch -p0 < gtk267_5wj.patch"
 - adjust "GTK_PREFIX", "CFLAGS", "TARGET", "MINGW_TOOL_PREFIX" and "MINGW_BIN" variables in the 'mingw-configure' script according to your MinGW cross-compiler's version and install location
 - run 'mingw-configure' from the directory with GTK+ sources
 - run 'runmake' from same directory, to compile GTK+

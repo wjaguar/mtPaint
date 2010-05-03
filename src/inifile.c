@@ -781,6 +781,8 @@ static char *extend_path(const char *path)
 
 	if (path[0] == '~')
 		return (g_strdup_printf("%s%s", get_home_directory(), path + 1));
+	if (path[0] && (path[1] == ':')) // Path w/drive letter is absolute
+		return (g_strdup(path));
 	name = g_win32_get_package_installation_directory(NULL, NULL);
 	dir = g_locale_from_utf8(name, -1, NULL, NULL, NULL);
 	g_free(name);

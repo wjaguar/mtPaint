@@ -645,7 +645,7 @@ static void htoolbox_popup(GtkWidget *button, gpointer user_data)
 	if (!do_grab(GRAB_PROGRAM, button, NULL)) return;
 
 	/* Position the popup */
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 2) /* GTK+ 2.2+ */
+#if GTK2VERSION >= 2 /* GTK+ 2.2+ */
 	{
 		GdkScreen *screen = gtk_widget_get_screen(button);
 		w = gdk_screen_get_width(screen);
@@ -793,13 +793,13 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 #endif
 	gtk_widget_show(arrow);
 	gtk_container_add(GTK_CONTAINER(button), arrow);
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
 #endif
 
 	popup = gtk_window_new(GTK_WINDOW_POPUP);
 	gtk_window_set_policy(GTK_WINDOW(popup), FALSE, FALSE, TRUE);
-#if GTK_MAJOR_VERSION == 2
+#if GTK2VERSION >= 10 /* GTK+ 2.10+ */
 	gtk_window_set_type_hint(GTK_WINDOW(popup), GDK_WINDOW_TYPE_HINT_COMBO);
 #endif
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
@@ -856,7 +856,7 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 				GTK_RADIO_BUTTON_0(radio[items->radio]));
 			gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(item), FALSE);
 		}
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 		gtk_button_set_focus_on_click(GTK_BUTTON(item), FALSE);
 #endif
 		gtk_container_add(GTK_CONTAINER(item), xpm_image(items->xpm));
@@ -931,7 +931,7 @@ void create_settings_box()
 	gdk_pixmap_unref(pmap);
 	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(grad_view), FALSE);
 	gtk_container_add(GTK_CONTAINER(button), grad_view);
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
 #endif
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",

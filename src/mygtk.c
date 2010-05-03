@@ -1216,7 +1216,7 @@ int move_mouse_relative(int dx, int dy)
 	else return (FALSE);
 }
 
-#elif (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 8) /* GTK+ 2.8+ */
+#elif GTK2VERSION >= 8 /* GTK+ 2.8+ */
 
 int move_mouse_relative(int dx, int dy)
 {
@@ -1385,7 +1385,7 @@ GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
 // Menu-like combo box
 
 /* Use GtkComboBox when available */
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 4) /* GTK+ 2.4+ */
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 
 static void wj_combo(GtkComboBox *widget, gpointer user_data)
 {
@@ -2446,7 +2446,7 @@ static GtkType wjcanvas_get_type();
 
 static void wjcanvas_send_configure(GtkWidget *widget)
 {
-#if (GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION >= 2) /* GTK+ 2.2+ */
+#if GTK2VERSION >= 2 /* GTK+ 2.2+ */
 	GdkEvent *event = gdk_event_new(GDK_CONFIGURE);
 
 	event->configure.window = g_object_ref(widget->window);
@@ -3517,7 +3517,7 @@ char *resolve_path(char *buf, int buflen, char *path)
 // A (better) substitute for fnmatch(), in case one is needed
 
 /* One is necessary in case of Win32 or GTK+ 2.0/2.2 */
-#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4))
+#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 4))
 
 #ifdef WIN32
 

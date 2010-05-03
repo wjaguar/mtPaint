@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.51"
-MT_DATE="2010-04-07"
+MT_V="3.34.52"
+MT_DATE="2010-05-03"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -81,6 +81,7 @@ LIB_NAME ()
 if [ "$OSTYPE" = "msys" ]
 then
 	OS="MinGW/MSYS"
+	ARCH=${ARCH:i586}
 	GTK=2
 	IS_LIB()
 	{
@@ -94,6 +95,7 @@ then
 elif [ "$CROSSCC" ]
 then
 	OS="MinGW/GNU/Linux"
+	ARCH=${ARCH:i586}
 	GTK=2
 	CROSSPF=`echo $CROSSCC | sed -e 's/[^/]\+\/[^/]*\$//'`
 	IS_LIB()
@@ -165,7 +167,9 @@ do
 		"debug" )	DEBUG=YES
 				OPTS=NO;;
 		"gtk1" )	GTK=1;;
-		"gtk2" )	GTK=2;;
+		"gtk2"* )	GTK=2
+				# Override minor version of installed GTK+2
+				GTK2VERSION="`echo "$A" | sed -e 's/gtk2\.\?\([0-9]*\).*/\1/'`";;
 		"gtkfilesel" )	MT_FPICK=gtkfilesel;;
 		"gtkcolsel" )	MT_CPICK=gtkcolsel;;
 		"imagick" )	MT_ANIM=ImageMagick;;
@@ -216,14 +220,23 @@ do
 		"486" )		MARCH='-march=i486';;
 		"586" )		MARCH='-march=i586';;
 		"686" )		MARCH='-march=i686';;
-		"release" )	CFLAG='-O2 -march=i386'
+		"release" )	# Target i386 when compiling for any x86 CPU;
+				# this produces smallest *AND* fastest binary
+				case "${ARCH:-`uname -m`}" in
+					i?86) CFLAG="-O2 ${MARCH:--march=i386}";;
+					*) CFLAG="-O2 $MARCH";;
+				esac
+				# Add optimizations which are proven to really
+				# make mtPaint code faster
 				if [ "$GCCVER" \< "40" ]
-				then
+				then # GCC 3.x
 					CFLAG="$CFLAG -fweb"
-				else
+				else # GCC 4.x
 					CFLAG="$CFLAG -fweb -fomit-frame-pointer -fmodulo-sched"
 				fi
+				# Do not add unneeded dependencies
 				AS_NEEDED=-Wl,--as-needed
+				# Disable GTK+ debug code
 				HAVE_FUNCS="$HAVE_FUNCS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS";;
 		"--prefix="* )	MT_PREFIX="${A#*=}"
 				WIN_BIN_INSTALL="$MT_PREFIX/bin"
@@ -299,6 +312,7 @@ Options:
 win ............. Configure for Windows MinGW / MSYS
 gtk1 ............ Configure for GTK+1
 gtk2 ............ Configure for GTK+2
+gtk2.VER ........ Configure for GTK+2, minor version VER
 gtkfilesel ...... Use GtkFileSelection file picker
 gtkcolsel ....... Use GtkColorSelection colour picker
 imagick ......... Use ImageMagick for GIF animation tasks
@@ -621,7 +635,7 @@ else
 		echo "MT_MAN_DEST=\"$MT_MAN_DEST\"" >> $GTK_FILE
 	fi
 
-	GTK_INCLUDE="$GTK_INCLUDE $I_EX"
+	GTK_INCLUDE="$GTK_INCLUDE ${GTK2VERSION:+-DGTK2VERSION=$GTK2VERSION} $I_EX"
 	GTK_LIB="$L_EX $GTK_LIB"
 
 	# Rebase the paths for --fakeroot
@@ -686,7 +700,12 @@ then
 	echo "MTK - $MTK_DIR"
 	echo "    Use Xft             $MTK_XFT"
 else
+if [ "$GTK2VERSION" ]
+then
+	echo "GTK+ 2.$GTK2VERSION"
+else
 	echo "GTK+$GTK"
+fi
 fi
 	echo "    File Picker         $MT_FPICK"
 	echo "    Colour Picker       $MT_CPICK"

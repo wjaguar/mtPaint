@@ -1,6 +1,6 @@
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c gtk+-2.6.7/gdk/win32/gdkcursor-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c	2004-03-06 06:37:07.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkcursor-win32.c	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkcursor-win32.c	2010-04-27 01:10:46.000000000 +0400
 @@ -41,6 +41,12 @@ _gdk_win32_data_to_wcursor (GdkCursorTyp
    if (i >= G_N_ELEMENTS (cursors) || !cursors[i].name)
      return NULL;
@@ -14,9 +14,52 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c gtk+-2.6.7/gdk/win32/gdkcurso
    w = GetSystemMetrics (SM_CXCURSOR);
    h = GetSystemMetrics (SM_CYCURSOR);
  
+diff -udpr gtk+-2.6.7_/gdk/win32/gdkdnd-win32.c gtk+-2.6.7/gdk/win32/gdkdnd-win32.c
+--- gtk+-2.6.7_/gdk/win32/gdkdnd-win32.c	2004-12-20 00:00:58.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkdnd-win32.c	2010-04-27 01:52:49.000000000 +0400
+@@ -978,6 +978,8 @@ gdk_dropfiles_filter (GdkXEvent *xev,
+       /* WM_DROPFILES drops are always file names */
+       context->targets =
+ 	g_list_append (NULL, GUINT_TO_POINTER (_text_uri_list));
++      context->actions = GDK_ACTION_COPY;
++      context->suggested_action = GDK_ACTION_COPY;
+       current_dest_drag = context;
+ 
+       event->dnd.type = GDK_DROP_START;
+@@ -987,8 +989,8 @@ gdk_dropfiles_filter (GdkXEvent *xev,
+       DragQueryPoint (hdrop, &pt);
+       ClientToScreen (msg->hwnd, &pt);
+ 
+-      event->dnd.x_root = pt.x;
+-      event->dnd.y_root = pt.y;
++      event->dnd.x_root = pt.x + _gdk_offset_x;
++      event->dnd.y_root = pt.y + _gdk_offset_y;
+       event->dnd.time = _gdk_win32_get_next_tick (msg->time);
+ 
+       nfiles = DragQueryFile (hdrop, 0xFFFFFFFF, NULL, 0);
+diff -udpr gtk+-2.6.7_/gdk/win32/gdkdrawable-win32.c gtk+-2.6.7/gdk/win32/gdkdrawable-win32.c
+--- gtk+-2.6.7_/gdk/win32/gdkdrawable-win32.c	2005-04-04 00:36:39.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkdrawable-win32.c	2010-04-27 01:32:46.000000000 +0400
+@@ -1856,6 +1856,16 @@ _gdk_win32_blit (gboolean              u
+ 			   xdest, ydest,
+ 			   use_fg_bg));
+ 
++  /* If blitting from the root window, take the multi-monitor offset
++   * into account.
++   */
++  if (src == ((GdkWindowObject *)_gdk_parent_root)->impl)
++    {
++      GDK_NOTE (MISC, g_print ("... offsetting src coords\n"));
++      xsrc -= _gdk_offset_x;
++      ysrc -= _gdk_offset_y;
++    }
++
+   draw_impl = (GdkDrawableImplWin32 *) drawable;
+ 
+   if (GDK_IS_DRAWABLE_IMPL_WIN32 (src))
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkevents-win32.c gtk+-2.6.7/gdk/win32/gdkevents-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkevents-win32.c	2005-04-04 03:40:42.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkevents-win32.c	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkevents-win32.c	2010-04-27 01:10:46.000000000 +0400
 @@ -162,7 +162,8 @@ static HKL latin_locale = NULL;
  #endif
  
@@ -493,7 +536,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkevents-win32.c gtk+-2.6.7/gdk/win32/gdkevent
  
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c	2005-03-13 01:07:34.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c	2010-02-14 21:05:48.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c	2010-04-27 01:10:46.000000000 +0400
 @@ -108,9 +108,9 @@ gdk_window_scroll (GdkWindow *window,
    GdkRegion *invalidate_region;
    GdkWindowImplWin32 *impl;
@@ -564,9 +607,382 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c gtk+-2.6.7/gdk/win32/gdkgeo
  }
  
  void
+diff -udpr gtk+-2.6.7_/gdk/win32/gdkinput-win32.c gtk+-2.6.7/gdk/win32/gdkinput-win32.c
+--- gtk+-2.6.7_/gdk/win32/gdkinput-win32.c	2005-02-25 03:09:52.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkinput-win32.c	2010-04-27 01:52:07.000000000 +0400
+@@ -43,16 +43,10 @@
+ #define PACKETMODE (PK_BUTTONS)
+ #include <pktdef.h>
+ 
+-/* If USE_SYSCONTEXT is on, we open the Wintab device (hmm, what if
+- * there are several?) as a system pointing device, i.e. it controls
+- * the normal Windows cursor. This seems much more natural.
+- */
+-#define USE_SYSCONTEXT 1	/* The code for the other choice is not
+-				 * good at all.
+-				 */
+-
+ #define DEBUG_WINTAB 1		/* Verbose debug messages enabled */
+ 
++#define PROXIMITY_OUT_DELAY 200 /* In milliseconds, see set_ignore_core */
++
+ #endif
+ 
+ #if defined(HAVE_WINTAB) || defined(HAVE_WHATEVER_OTHER)
+@@ -63,10 +57,6 @@
+ 
+ /* Forward declarations */
+ 
+-#if !USE_SYSCONTEXT
+-static GdkInputWindow *gdk_input_window_find_within (GdkWindow *window);
+-#endif
+-
+ #ifdef HAVE_WINTAB
+ 
+ static GdkDevicePrivate *gdk_input_find_dev_from_ctx (HCTX hctx,
+@@ -211,7 +201,6 @@ _gdk_input_wintab_init_check (void)
+   GdkDevicePrivate *gdkdev;
+   GdkWindowAttr wa;
+   WORD specversion;
+-  LOGCONTEXT defcontext;
+   HCTX *hctx;
+   UINT ndevices, ncursors, ncsrtypes, firstcsr, hardware;
+   BOOL active;
+@@ -219,6 +208,7 @@ _gdk_input_wintab_init_check (void)
+   int i, k;
+   int devix, cursorix;
+   char devname[100], csrname[100];
++  BOOL defcontext_done;
+ 
+   if (wintab_initialized)
+     return;
+@@ -233,17 +223,6 @@ _gdk_input_wintab_init_check (void)
+       WTInfo (WTI_INTERFACE, IFC_SPECVERSION, &specversion);
+       GDK_NOTE (INPUT, g_print ("Wintab interface version %d.%d\n",
+ 			       HIBYTE (specversion), LOBYTE (specversion)));
+-#if USE_SYSCONTEXT
+-      WTInfo (WTI_DEFSYSCTX, 0, &defcontext);
+-#if DEBUG_WINTAB
+-      GDK_NOTE (INPUT, (g_print("DEFSYSCTX:\n"), print_lc(&defcontext)));
+-#endif
+-#else
+-      WTInfo (WTI_DEFCONTEXT, 0, &defcontext);
+-#if DEBUG_WINTAB
+-      GDK_NOTE (INPUT, (g_print("DEFCONTEXT:\n"), print_lc(&defcontext)));
+-#endif
+-#endif
+       WTInfo (WTI_INTERFACE, IFC_NDEVICES, &ndevices);
+       WTInfo (WTI_INTERFACE, IFC_NCURSORS, &ncursors);
+ #if DEBUG_WINTAB
+@@ -268,6 +247,11 @@ _gdk_input_wintab_init_check (void)
+       for (devix = 0; devix < ndevices; devix++)
+ 	{
+ 	  LOGCONTEXT lc;
++	  
++	  /* We open the Wintab device (hmm, what if there are several?) as a
++	   * system pointing device, i.e. it controls the normal Windows
++	   * cursor. This seems much more natural.
++	   */
+ 
+ 	  WTInfo (WTI_DEVICES + devix, DVC_NAME, devname);
+       
+@@ -279,65 +263,39 @@ _gdk_input_wintab_init_check (void)
+ 	  WTInfo (WTI_DEVICES + devix, DVC_NPRESSURE, &axis_npressure);
+ 	  WTInfo (WTI_DEVICES + devix, DVC_ORIENTATION, axis_or);
+ 
++	  defcontext_done = FALSE;
+ 	  if (HIBYTE (specversion) > 1 || LOBYTE (specversion) >= 1)
+ 	    {
+-	      WTInfo (WTI_DDCTXS + devix, CTX_NAME, lc.lcName);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_OPTIONS, &lc.lcOptions);
+-	      lc.lcOptions |= CXO_MESSAGES;
+-#if USE_SYSCONTEXT
+-	      lc.lcOptions |= CXO_SYSTEM;
++	      /* Try to get device-specific default context */
++	      /* Some drivers, e.g. Aiptek, don't provide this info */
++	      if (WTInfo (WTI_DSCTXS + devix, 0, &lc) > 0)
++		defcontext_done = TRUE;
++#if DEBUG_WINTAB
++	      if (defcontext_done)
++		GDK_NOTE (INPUT, (g_print("Using device-specific default context\n")));
++	      else
++		GDK_NOTE (INPUT, (g_print("Note: Driver did not provide device specific default context info despite claiming to support version 1.1\n")));
+ #endif
+-	      lc.lcStatus = 0;
+-	      WTInfo (WTI_DDCTXS + devix, CTX_LOCKS, &lc.lcLocks);
+-	      lc.lcMsgBase = WT_DEFBASE;
+-	      lc.lcDevice = devix;
+-	      lc.lcPktRate = 50;
+-	      lc.lcPktData = PACKETDATA;
+-	      lc.lcPktMode = PK_BUTTONS; /* We want buttons in relative mode */
+-	      lc.lcMoveMask = PACKETDATA;
+-	      lc.lcBtnDnMask = lc.lcBtnUpMask = ~0;
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INORGX, &lc.lcInOrgX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INORGY, &lc.lcInOrgY);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INORGZ, &lc.lcInOrgZ);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INEXTX, &lc.lcInExtX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INEXTY, &lc.lcInExtY);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_INEXTZ, &lc.lcInExtZ);
+-	      lc.lcOutOrgX = axis_x.axMin;
+-	      lc.lcOutOrgY = axis_y.axMin;
+-	      lc.lcOutExtX = axis_x.axMax - axis_x.axMin;
+-	      lc.lcOutExtY = axis_y.axMax - axis_y.axMin;
+-	      lc.lcOutExtY = -lc.lcOutExtY; /* We want Y growing downward */
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SENSX, &lc.lcSensX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SENSY, &lc.lcSensY);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SENSZ, &lc.lcSensZ);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSMODE, &lc.lcSysMode);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSORGX, &lc.lcSysOrgX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSORGY, &lc.lcSysOrgY);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSEXTX, &lc.lcSysExtX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSEXTY, &lc.lcSysExtY);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSSENSX, &lc.lcSysSensX);
+-	      WTInfo (WTI_DDCTXS + devix, CTX_SYSSENSY, &lc.lcSysSensY);
+ 	    }
+-	  else
+-	    {
+-	      lc = defcontext;
+-	      lc.lcOptions |= CXO_MESSAGES;
+-	      lc.lcMsgBase = WT_DEFBASE;
+-	      lc.lcPktRate = 50;
+-	      lc.lcPktData = PACKETDATA;
+-	      lc.lcPktMode = PACKETMODE;
+-	      lc.lcMoveMask = PACKETDATA;
+-	      lc.lcBtnUpMask = lc.lcBtnDnMask = ~0;
+-#if 0
+-	      lc.lcOutExtY = -lc.lcOutExtY; /* Y grows downward */
+-#else
+-	      lc.lcOutOrgX = axis_x.axMin;
+-	      lc.lcOutOrgY = axis_y.axMin;
+-	      lc.lcOutExtX = axis_x.axMax - axis_x.axMin;
+-	      lc.lcOutExtY = axis_y.axMax - axis_y.axMin;
+-	      lc.lcOutExtY = -lc.lcOutExtY; /* We want Y growing downward */
++
++	  if (!defcontext_done)
++	    WTInfo (WTI_DEFSYSCTX, 0, &lc);
++#if DEBUG_WINTAB
++	  GDK_NOTE (INPUT, (g_print("Default context:\n"), print_lc(&lc)));
+ #endif
+-	    }
++	  lc.lcOptions |= CXO_MESSAGES;
++	  lc.lcStatus = 0;
++	  lc.lcMsgBase = WT_DEFBASE;
++	  lc.lcPktRate = 50;
++	  lc.lcPktData = PACKETDATA;
++	  lc.lcPktMode = PACKETMODE;
++	  lc.lcMoveMask = PACKETDATA;
++	  lc.lcBtnUpMask = lc.lcBtnDnMask = ~0;
++	  lc.lcOutOrgX = axis_x.axMin;
++	  lc.lcOutOrgY = axis_y.axMin;
++	  lc.lcOutExtX = axis_x.axMax - axis_x.axMin;
++	  lc.lcOutExtY = axis_y.axMax - axis_y.axMin;
++	  lc.lcOutExtY = -lc.lcOutExtY; /* We want Y growing downward */
+ #if DEBUG_WINTAB
+ 	  GDK_NOTE (INPUT, (g_print("context for device %d:\n", devix),
+ 			   print_lc(&lc)));
+@@ -386,11 +344,7 @@ _gdk_input_wintab_init_check (void)
+ 	      gdkdev->info.name = g_strconcat (devname, " ", csrname, NULL);
+ 	      gdkdev->info.source = GDK_SOURCE_PEN;
+ 	      gdkdev->info.mode = GDK_MODE_SCREEN;
+-#if USE_SYSCONTEXT
+ 	      gdkdev->info.has_cursor = TRUE;
+-#else
+-	      gdkdev->info.has_cursor = FALSE;
+-#endif
+ 	      gdkdev->hctx = *hctx;
+ 	      gdkdev->cursor = cursorix;
+ 	      WTInfo (WTI_CURSORS + cursorix, CSR_PKTDATA, &gdkdev->pktdata);
+@@ -527,32 +481,6 @@ decode_tilt (gint   *axis_data,
+   axis_data[1] = sin (az) * cos (el) * 1000;
+ }
+ 
+-#if !USE_SYSCONTEXT
+-
+-static GdkInputWindow *
+-gdk_input_window_find_within (GdkWindow *window)
+-{
+-  GList *list;
+-  GdkWindow *tmpw;
+-  GdkInputWindow *candidate = NULL;
+-
+-  for (list = _gdk_input_windows; list != NULL; list = list->next)
+-    {
+-      tmpw = ((GdkInputWindow *) (tmp_list->data))->window;
+-      if (tmpw == window
+-	  || IsChild (GDK_WINDOW_HWND (window), GDK_WINDOW_HWND (tmpw)))
+-	{
+-	  if (candidate)
+-	    return NULL;		/* Multiple hits */
+-	  candidate = (GdkInputWindow *) (list->data);
+-	}
+-    }
+-
+-  return candidate;
+-}
+-
+-#endif /* USE_SYSCONTEXT */
+-
+ #endif /* HAVE_WINTAB */
+ 
+ static void
+@@ -726,15 +654,53 @@ get_modifier_key_state (void)
+   return state;
+ }
+ 
++#ifdef HAVE_WINTAB
++
++static guint ignore_core_timer = 0;
++
++static gboolean
++ignore_core_timefunc (gpointer data)
++{
++  /* The delay has passed */
++  _gdk_input_ignore_core = FALSE;
++  ignore_core_timer = 0;
++
++  return FALSE; /* remove timeout */
++}
++
++/*
++ * Set or unset the _gdk_input_ignore_core variable that tells GDK
++ * to ignore events for the core pointer when the tablet is in proximity
++ * The unsetting is delayed slightly so that if a tablet event arrives
++ * just after proximity out, it does not cause a core pointer event
++ * which e.g. causes GIMP to switch tools.
++ */
++static void
++set_ignore_core (gboolean ignore)
++{
++  if (ignore)
++    {
++      _gdk_input_ignore_core = TRUE;
++      /* Remove any pending clear */
++      if (ignore_core_timer)
++        {
++	  g_source_remove (ignore_core_timer);
++	  ignore_core_timer = 0;
++	}
++    }
++  else
++    if (!ignore_core_timer)
++      ignore_core_timer = g_timeout_add (PROXIMITY_OUT_DELAY,
++					 ignore_core_timefunc, NULL);
++}
++#endif /* HAVE_WINTAB */
++
+ gboolean 
+ _gdk_input_other_event (GdkEvent  *event,
+ 			MSG       *msg,
+ 			GdkWindow *window)
+ {
+ #ifdef HAVE_WINTAB
+-#if !USE_SYSCONTEXT
+-  GdkWindow *current_window;
+-#endif
+   GdkDisplay *display;
+   GdkWindowObject *obj, *grab_obj;
+   GdkInputWindow *input_window;
+@@ -753,7 +719,6 @@ _gdk_input_other_event (GdkEvent  *event
+       return FALSE;
+     }
+ 
+-#if USE_SYSCONTEXT
+   window = gdk_window_at_pointer (&x, &y);
+   if (window == NULL)
+     window = _gdk_parent_root;
+@@ -765,17 +730,6 @@ _gdk_input_other_event (GdkEvent  *event
+ 	    g_print ("gdk_input_win32_other_event: window=%p (%d,%d)\n",
+ 		     GDK_WINDOW_HWND (window), x, y));
+   
+-#else
+-  /* ??? This code is pretty bogus */
+-  current_window = gdk_win32_handle_table_lookup (GetActiveWindow ());
+-  if (current_window == NULL)
+-    return FALSE;
+-  
+-  input_window = gdk_input_window_find_within (current_window);
+-  if (input_window == NULL)
+-    return FALSE;
+-#endif
+-
+   if (msg->message == WT_PACKET)
+     {
+       if (!WTPacket ((HCTX) msg->lParam, msg->wParam, &packet))
+@@ -925,13 +879,6 @@ _gdk_input_other_event (GdkEvent  *event
+ 	  event->button.time = _gdk_win32_get_next_tick (msg->time);
+ 	  event->button.device = &gdkdev->info;
+ 	  
+-#if 0
+-#if USE_SYSCONTEXT
+-	  /* Buttons 1 to 3 will come in as WM_[LMR]BUTTON{DOWN,UP} */
+-	  if (event->button.button <= 3)
+-	    return FALSE;
+-#endif
+-#endif
+ 	  event->button.axes = g_new(gdouble, gdkdev->info.num_axes);
+ 
+ 	  gdk_input_translate_coordinates (gdkdev, input_window,
+@@ -1030,12 +977,12 @@ _gdk_input_other_event (GdkEvent  *event
+       if (LOWORD (msg->lParam) == 0)
+ 	{
+ 	  event->proximity.type = GDK_PROXIMITY_OUT;
+-	  _gdk_input_ignore_core = FALSE;
++	  set_ignore_core (FALSE);
+ 	}
+       else
+ 	{
+ 	  event->proximity.type = GDK_PROXIMITY_IN;
+-	  _gdk_input_ignore_core = TRUE;
++	  set_ignore_core (TRUE);
+ 	}
+       event->proximity.time = _gdk_win32_get_next_tick (msg->time);
+       event->proximity.device = &gdkdev->info;
+diff -udpr gtk+-2.6.7_/gdk/win32/gdkkeys-win32.c gtk+-2.6.7/gdk/win32/gdkkeys-win32.c
+--- gtk+-2.6.7_/gdk/win32/gdkkeys-win32.c	2005-02-24 01:02:59.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkkeys-win32.c	2010-04-27 01:36:26.000000000 +0400
+@@ -265,7 +265,7 @@ reset_after_dead (guchar key_state[256])
+     }
+ }
+ 
+-static gboolean
++static void
+ handle_dead (guint  keysym,
+ 	     guint *ksymp)
+ {
+@@ -306,9 +306,12 @@ handle_dead (guint  keysym,
+     case GDK_Greek_accentdieresis: /* 0x7ae */
+       *ksymp = GDK_Greek_accentdieresis; break;
+     default:
+-      return FALSE;
++      /* By default use the keysym as such. This takes care of for
++       * instance the dead U+09CD (BENGALI VIRAMA) on the ekushey
++       * Bengali layout.
++       */
++      *ksymp = keysym; break;
+     }
+-  return TRUE;
+ }
+ 
+ static void
+@@ -446,14 +449,7 @@ update_keymap (void)
+ 		      reset_after_dead (key_state);
+ 
+ 		      /* Use dead keysyms instead of "undead" ones */
+-		      if (!handle_dead (keysym, ksymp))
+-			GDK_NOTE (EVENTS,
+-				  g_print ("Unhandled dead key cp:%d vk:%02x sc:%x ch:%02x wc:%04x keysym:%04x%s%s\n",
+-					   _gdk_input_codepage, vk,
+-					   scancode, chars[0],
+-					   wcs[0], keysym,
+-					   (shift&0x1 ? " shift" : ""),
+-					   (shift&0x2 ? " altgr" : "")));
++		      handle_dead (keysym, ksymp);
+ 		    }
+ 		  else if (k == 0)
+ 		    {
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h gtk+-2.6.7/gdk/win32/gdkprivate-win32.h
 --- gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h	2005-04-04 03:40:42.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkprivate-win32.h	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkprivate-win32.h	2010-04-27 01:10:46.000000000 +0400
 @@ -360,6 +360,8 @@ HRGN	  _gdk_win32_gdkregion_to_hrgn  (Gd
  					 gint         x_origin,
  					 gint         y_origin);
@@ -576,9 +992,21 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h gtk+-2.6.7/gdk/win32/gdkpriv
  void	_gdk_win32_adjust_client_rect   (GdkWindow *window,
  					 RECT      *RECT);
  
+diff -udpr gtk+-2.6.7_/gdk/win32/gdkproperty-win32.c gtk+-2.6.7/gdk/win32/gdkproperty-win32.c
+--- gtk+-2.6.7_/gdk/win32/gdkproperty-win32.c	2005-04-04 03:40:42.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkproperty-win32.c	2010-04-27 01:55:59.000000000 +0400
+@@ -561,7 +561,7 @@ gdk_screen_get_setting (GdkScreen   *scr
+                         const gchar *name,
+                         GValue      *value)
+ {
+-  g_return_val_if_fail (screen == gdk_screen_get_default (), FALSE);
++  g_return_val_if_fail (GDK_IS_SCREEN (screen), FALSE);
+ 
+   /*
+    * XXX : if these values get changed through the Windoze UI the
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c gtk+-2.6.7/gdk/win32/gdkwindow-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c	2005-03-12 02:45:53.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkwindow-win32.c	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/gdkwindow-win32.c	2010-04-27 01:10:46.000000000 +0400
 @@ -37,7 +37,13 @@
  #include "gdkprivate-win32.h"
  #include "gdkinput-win32.h"
@@ -596,7 +1024,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c gtk+-2.6.7/gdk/win32/gdkwindo
    LONG         bV5Width; 
 diff -udpr gtk+-2.6.7_/gdk/win32/xcursors.h gtk+-2.6.7/gdk/win32/xcursors.h
 --- gtk+-2.6.7_/gdk/win32/xcursors.h	2001-02-23 06:51:40.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/xcursors.h	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk/win32/xcursors.h	2010-04-27 01:10:46.000000000 +0400
 @@ -1,357 +1,357 @@
 -static const struct { const gchar *name; gint type; guchar width; guchar height; guchar hotx; guchar hoty; guchar *data; } cursors[] = {
 -  { "X_cursor", 0, 16, 16, 7, 7, 
@@ -1059,7 +1487,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/xcursors.h gtk+-2.6.7/gdk/win32/xcursors.h
      "\246\245\124\125" }, 
 diff -udpr gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h
 --- gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h	2004-11-16 06:01:57.000000000 +0300
-+++ gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h	2010-04-27 01:10:46.000000000 +0400
 @@ -97,9 +97,9 @@ GdkPixbuf *_gdk_pixbuf_generic_image_loa
  GdkPixbufFormat *_gdk_pixbuf_get_format (GdkPixbufModule *image_module);
  
@@ -1072,9 +1500,234 @@ diff -udpr gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h gtk+-2.6.7/gdk-pixbuf/gdk
  #endif
  
  #endif /* GDK_PIXBUF_ENABLE_BACKEND */
+diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-bmp.c gtk+-2.6.7/gdk-pixbuf/io-bmp.c
+--- gtk+-2.6.7_/gdk-pixbuf/io-bmp.c	2005-04-10 01:53:39.000000000 +0400
++++ gtk+-2.6.7/gdk-pixbuf/io-bmp.c	2010-04-27 01:56:37.000000000 +0400
+@@ -1074,14 +1074,10 @@ gdk_pixbuf__bmp_image_load_increment(gpo
+ 
+ 	gint BytesToCopy;
+ 
+-	g_print ("load_inc\n");
+ 	if (context->read_state == READ_STATE_DONE)
+ 		return TRUE;
+ 	else if (context->read_state == READ_STATE_ERROR)
+-	{
+-		g_print ("ah\n");
+ 		return FALSE;
+-	}
+ 
+ 	while (size > 0) {
+ 		if (context->BufferDone < context->BufferSize) {	/* We still
+@@ -1107,37 +1103,25 @@ gdk_pixbuf__bmp_image_load_increment(gpo
+ 			if (!DecodeHeader (context->buff,
+ 					   context->buff + 14, context,
+ 					   error))
+-			{
+-				g_print ("bla\n");
+ 				return FALSE;
+-			}
+ 
+ 			break;
+ 
+ 		case READ_STATE_PALETTE:
+ 			if (!DecodeColormap (context->buff, context, error))
+-			{
+-				g_print ("bleh\n");
+ 				return FALSE;
+-			}
+ 			break;
+ 
+ 		case READ_STATE_BITMASKS:
+ 			if (!decode_bitmasks (context->buff, context, error))
+-			{
+-				g_print ("blurb\n");
+ 				return FALSE;
+-			}
+ 			break;
+ 
+ 		case READ_STATE_DATA:
+ 			if (context->Compressed == BI_RGB || context->Compressed == BI_BITFIELDS)
+ 				OneLine (context);
+ 			else if (!DoCompressed (context, error))
+-			{
+-				g_print ("blurb\n");
+ 				return FALSE;
+-			}
+ 
+ 			break;
+ 		case READ_STATE_DONE:
+diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-pnm.c gtk+-2.6.7/gdk-pixbuf/io-pnm.c
+--- gtk+-2.6.7_/gdk-pixbuf/io-pnm.c	2005-02-16 06:39:27.000000000 +0300
++++ gtk+-2.6.7/gdk-pixbuf/io-pnm.c	2010-04-27 01:57:05.000000000 +0400
+@@ -245,7 +245,7 @@ pnm_read_next_value (PnmIOBuffer *inbuf,
+ 	
+ 	/* get the value */
+ 	result = strtol (buf, &endptr, 10);
+-	if (*endptr != '\0' || result < 0) {
++	if (*endptr != '\0' || result < 0 || result > G_MAXUINT) {
+ 		g_set_error (error,
+ 			     GDK_PIXBUF_ERROR,
+ 			     GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-xpm.c gtk+-2.6.7/gdk-pixbuf/io-xpm.c
+--- gtk+-2.6.7_/gdk-pixbuf/io-xpm.c	2005-03-03 17:03:53.000000000 +0300
++++ gtk+-2.6.7/gdk-pixbuf/io-xpm.c	2010-04-27 01:57:28.000000000 +0400
+@@ -1167,7 +1167,8 @@ file_buffer (enum buf_op op, gpointer ha
+ 		/* Fall through to the xpm_read_string. */
+ 
+ 	case op_body:
+-		xpm_read_string (h->infile, &h->buffer, &h->buffer_size);
++		if(!xpm_read_string (h->infile, &h->buffer, &h->buffer_size))
++			return NULL;
+ 		return h->buffer;
+ 
+ 	default:
+@@ -1262,7 +1263,9 @@ pixbuf_create_from_xpm (const gchar * (*
+                              _("XPM has invalid number of chars per pixel"));
+ 		return NULL;
+ 	}
+-	if (n_col <= 0 || n_col >= G_MAXINT / (cpp + 1)) {
++	if (n_col <= 0 || 
++	    n_col >= G_MAXINT / (cpp + 1) || 
++	    n_col >= G_MAXINT / sizeof (XPMColor)) {
+                 g_set_error (error,
+                              GDK_PIXBUF_ERROR,
+                              GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
+diff -udpr gtk+-2.6.7_/gtk/gtkcombobox.c gtk+-2.6.7/gtk/gtkcombobox.c
+--- gtk+-2.6.7_/gtk/gtkcombobox.c	2005-04-09 02:03:53.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkcombobox.c	2010-04-27 01:55:00.000000000 +0400
+@@ -103,6 +103,7 @@ struct _GtkComboBoxPrivate
+   guint changed_id;
+   guint popup_idle_id;
+   guint scroll_timer;
++  guint resize_idle_id;
+ 
+   gint width;
+   GSList *cells;
+@@ -2852,6 +2853,8 @@ list_popup_resize_idle (gpointer user_da
+       gtk_window_move (GTK_WINDOW (combo_box->priv->popup_window), x, y);
+     }
+ 
++  combo_box->priv->resize_idle_id = 0;
++
+   GDK_THREADS_LEAVE ();
+ 
+   return FALSE;
+@@ -2860,7 +2863,9 @@ list_popup_resize_idle (gpointer user_da
+ static void
+ gtk_combo_box_list_popup_resize (GtkComboBox *combo_box)
+ {
+-  g_idle_add (list_popup_resize_idle, combo_box);
++  if (!combo_box->priv->resize_idle_id)
++    combo_box->priv->resize_idle_id = 
++      g_idle_add (list_popup_resize_idle, combo_box);
+ }
+ 
+ static void
+@@ -3330,6 +3335,12 @@ gtk_combo_box_list_destroy (GtkComboBox 
+       combo_box->priv->scroll_timer = 0;
+     }
+ 
++  if (combo_box->priv->resize_idle_id)
++    {
++      g_source_remove (combo_box->priv->resize_idle_id);
++      combo_box->priv->resize_idle_id = 0;
++    }
++
+   gtk_widget_destroy (combo_box->priv->tree_view);
+ 
+   combo_box->priv->tree_view = NULL;
+@@ -3416,7 +3427,8 @@ gtk_combo_box_list_button_released (GtkW
+ 
+   if (ewidget != combo_box->priv->tree_view)
+     {
+-      if (ewidget == combo_box->priv->button &&
++      if ((ewidget == combo_box->priv->button ||
++	   ewidget == combo_box->priv->box ) &&
+           !popup_in_progress &&
+           gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (combo_box->priv->button)))
+         {
+@@ -3425,7 +3437,8 @@ gtk_combo_box_list_button_released (GtkW
+         }
+ 
+       /* released outside treeview */
+-      if (ewidget != combo_box->priv->button)
++      if (ewidget != combo_box->priv->button &&
++	  ewidget != combo_box->priv->box)
+         {
+           gtk_combo_box_popdown (combo_box);
+ 
+@@ -3618,10 +3631,10 @@ gtk_combo_box_list_auto_scroll (GtkCombo
+ 	  value = adj->value - (tree_view->allocation.y - y + 1);
+ 	  gtk_adjustment_set_value (adj, CLAMP (value, adj->lower, adj->upper - adj->page_size));
+ 	}
+-      else if (y >= tree_view->allocation.y + tree_view->allocation.height &&
++      else if (y >= tree_view->allocation.height &&
+ 	       adj->upper - adj->page_size > adj->value)
+ 	{
+-	  value = adj->value + (y - tree_view->allocation.y - tree_view->allocation.height + 1);
++	  value = adj->value + (y - tree_view->allocation.height + 1);
+ 	  gtk_adjustment_set_value (adj, CLAMP (value, 0.0, adj->upper - adj->page_size));
+ 	}
+     }
+diff -udpr gtk+-2.6.7_/gtk/gtkdnd.c gtk+-2.6.7/gtk/gtkdnd.c
+--- gtk+-2.6.7_/gtk/gtkdnd.c	2005-03-20 09:25:27.000000000 +0300
++++ gtk+-2.6.7/gtk/gtkdnd.c	2010-04-27 01:18:04.000000000 +0400
+@@ -1949,11 +1949,7 @@ gtk_drag_begin_internal (GtkWidget      
+       return NULL;
+     }
+ 
+-  if (gdk_keyboard_grab (ipc_widget->window, FALSE, time) != 0)
+-    {
+-      gtk_drag_release_ipc_widget (ipc_widget);
+-      return NULL;
+-    }
++  gdk_keyboard_grab (ipc_widget->window, FALSE, time);
+ 
+   /* We use a GTK grab here to override any grabs that the widget
+    * we are dragging from might have held
+@@ -2145,6 +2141,9 @@ gtk_drag_source_set (GtkWidget          
+       g_signal_connect (widget, "button_press_event",
+ 			G_CALLBACK (gtk_drag_source_event_cb),
+ 			site);
++      g_signal_connect (widget, "button_release_event",
++			G_CALLBACK (gtk_drag_source_event_cb),
++			site);
+       g_signal_connect (widget, "motion_notify_event",
+ 			G_CALLBACK (gtk_drag_source_event_cb),
+ 			site);
+@@ -2183,9 +2182,6 @@ gtk_drag_source_unset (GtkWidget        
+       g_signal_handlers_disconnect_by_func (widget,
+ 					    gtk_drag_source_event_cb,
+ 					    site);
+-      g_signal_handlers_disconnect_by_func (widget,
+-					    gtk_drag_source_event_cb,
+-					    site);
+       g_object_set_data (G_OBJECT (widget), "gtk-site-data", NULL);
+     }
+ }
+diff -udpr gtk+-2.6.7_/gtk/gtkentry.c gtk+-2.6.7/gtk/gtkentry.c
+--- gtk+-2.6.7_/gtk/gtkentry.c	2005-04-07 08:45:30.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkentry.c	2010-04-27 01:35:21.000000000 +0400
+@@ -3553,7 +3553,7 @@ gtk_entry_move_forward_word (GtkEntry *e
+       
+       /* Find the next word end */
+       new_pos++;
+-      while (new_pos < n_attrs && !log_attrs[new_pos].is_word_end)
++      while (new_pos < n_attrs - 1 && !log_attrs[new_pos].is_word_end)
+ 	new_pos++;
+ 
+       g_free (log_attrs);
+@@ -4790,6 +4790,7 @@ cursor_blinks (GtkEntry *entry)
+   gboolean blink;
+ 
+   if (GTK_WIDGET_HAS_FOCUS (entry) &&
++      entry->editable &&
+       entry->selection_bound == entry->current_pos)
+     {
+       g_object_get (settings, "gtk-cursor-blink", &blink, NULL);
 diff -udpr gtk+-2.6.7_/gtk/gtkfilesel.c gtk+-2.6.7/gtk/gtkfilesel.c
 --- gtk+-2.6.7_/gtk/gtkfilesel.c	2005-04-07 08:45:30.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkfilesel.c	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/gtk/gtkfilesel.c	2010-04-27 01:10:46.000000000 +0400
 @@ -2070,7 +2070,8 @@ win32_gtk_add_drives_to_dir_list (GtkLis
    while (*textPtr != '\0')
      {
@@ -1085,9 +1738,187 @@ diff -udpr gtk+-2.6.7_/gtk/gtkfilesel.c gtk+-2.6.7/gtk/gtkfilesel.c
  	{
  	  /* Build the actual displayable string */
  	  g_snprintf (formatBuffer, sizeof (formatBuffer), "%c:\\", toupper (textPtr[0]));
+diff -udpr gtk+-2.6.7_/gtk/gtkmain.c gtk+-2.6.7/gtk/gtkmain.c
+--- gtk+-2.6.7_/gtk/gtkmain.c	2005-03-20 09:25:28.000000000 +0300
++++ gtk+-2.6.7/gtk/gtkmain.c	2010-04-27 01:32:08.000000000 +0400
+@@ -290,13 +290,46 @@ _gtk_get_libdir (void)
+   return gtk_libdir;
+ }
+ 
++/* Lifted from HEAD GLib */
++static gchar *
++g_win32_locale_filename_from_utf8 (const gchar *utf8filename)
++{
++  gchar *retval = g_locale_from_utf8 (utf8filename, -1, NULL, NULL, NULL);
++
++  if (retval == NULL && G_WIN32_HAVE_WIDECHAR_API ())
++    {
++      /* Conversion failed, so convert to wide chars, check if there
++       * is a 8.3 version, and use that.
++       */
++      wchar_t *wname = g_utf8_to_utf16 (utf8filename, -1, NULL, NULL, NULL);
++      if (wname != NULL)
++	{
++	  wchar_t wshortname[MAX_PATH + 1];
++	  if (GetShortPathNameW (wname, wshortname, G_N_ELEMENTS (wshortname)))
++	    {
++	      gchar *tem = g_utf16_to_utf8 (wshortname, -1, NULL, NULL, NULL);
++	      retval = g_locale_from_utf8 (tem, -1, NULL, NULL, NULL);
++	      g_free (tem);
++	    }
++	  g_free (wname);
++	}
++    }
++  return retval;
++}
++
+ const gchar *
+ _gtk_get_localedir (void)
+ {
+   static char *gtk_localedir = NULL;
+   if (gtk_localedir == NULL)
+-    gtk_localedir = g_win32_get_package_installation_subdirectory
+-      (GETTEXT_PACKAGE, dll_name, "lib\\locale");
++    {
++      gtk_localedir = g_win32_get_package_installation_subdirectory (GETTEXT_PACKAGE, dll_name, "lib\\locale");
++      if (gtk_localedir != NULL)
++	gtk_localedir = g_win32_locale_filename_from_utf8 (gtk_localedir);
++
++      if (gtk_localedir == NULL)
++	gtk_localedir = "\\";	/* Punt */
++    }
+ 
+   return gtk_localedir;
+ }
+diff -udpr gtk+-2.6.7_/gtk/gtknotebook.c gtk+-2.6.7/gtk/gtknotebook.c
+--- gtk+-2.6.7_/gtk/gtknotebook.c	2005-04-07 08:45:30.000000000 +0400
++++ gtk+-2.6.7/gtk/gtknotebook.c	2010-04-27 01:17:37.000000000 +0400
+@@ -4370,10 +4370,8 @@ gtk_notebook_insert_page_menu (GtkNotebo
+   if (!notebook->first_tab)
+     notebook->first_tab = notebook->children;
+ 
+-  if (!notebook->cur_page)
+-    gtk_widget_set_child_visible (child, TRUE);
+-  else
+-    gtk_widget_set_child_visible (child, FALSE);
++  /* child visible will be turned on by switch_page below */
++  gtk_widget_set_child_visible (child, FALSE);
+   
+   if (tab_label)
+     {
+diff -udpr gtk+-2.6.7_/gtk/gtkradiobutton.c gtk+-2.6.7/gtk/gtkradiobutton.c
+--- gtk+-2.6.7_/gtk/gtkradiobutton.c	2005-03-20 09:25:28.000000000 +0300
++++ gtk+-2.6.7/gtk/gtkradiobutton.c	2010-04-27 01:53:29.000000000 +0400
+@@ -510,7 +510,7 @@ gtk_radio_button_focus (GtkWidget       
+ 	    {
+ 	      GtkWidget *child = tmp_list->data;
+ 	      
+-	      if (GTK_WIDGET_VISIBLE (child) && GTK_WIDGET_IS_SENSITIVE (child))
++	      if (GTK_WIDGET_REALIZED (child) && GTK_WIDGET_IS_SENSITIVE (child))
+ 		{
+ 		  new_focus = child;
+ 		  break;
+@@ -528,7 +528,7 @@ gtk_radio_button_focus (GtkWidget       
+ 	    {
+ 	      GtkWidget *child = tmp_list->data;
+ 	      
+-	      if (GTK_WIDGET_VISIBLE (child) && GTK_WIDGET_IS_SENSITIVE (child))
++	      if (GTK_WIDGET_REALIZED (child) && GTK_WIDGET_IS_SENSITIVE (child))
+ 		{
+ 		  new_focus = child;
+ 		  break;
+diff -udpr gtk+-2.6.7_/gtk/gtkscale.c gtk+-2.6.7/gtk/gtkscale.c
+--- gtk+-2.6.7_/gtk/gtkscale.c	2005-04-07 08:45:30.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkscale.c	2010-04-27 01:53:49.000000000 +0400
+@@ -265,10 +265,10 @@ gtk_scale_class_init (GtkScaleClass *cla
+   add_slider_binding (binding_set, GDK_KP_Down, GDK_CONTROL_MASK,
+                       GTK_SCROLL_PAGE_DOWN);
+    
+-  add_slider_binding (binding_set, GDK_Page_Up, 0,
++  add_slider_binding (binding_set, GDK_Page_Up, GDK_CONTROL_MASK,
+                       GTK_SCROLL_PAGE_LEFT);
+ 
+-  add_slider_binding (binding_set, GDK_KP_Page_Up, 0,
++  add_slider_binding (binding_set, GDK_KP_Page_Up, GDK_CONTROL_MASK,
+                       GTK_SCROLL_PAGE_LEFT);  
+ 
+   add_slider_binding (binding_set, GDK_Page_Up, 0,
+@@ -277,10 +277,10 @@ gtk_scale_class_init (GtkScaleClass *cla
+   add_slider_binding (binding_set, GDK_KP_Page_Up, 0,
+                       GTK_SCROLL_PAGE_UP);
+   
+-  add_slider_binding (binding_set, GDK_Page_Down, 0,
++  add_slider_binding (binding_set, GDK_Page_Down, GDK_CONTROL_MASK,
+                       GTK_SCROLL_PAGE_RIGHT);
+ 
+-  add_slider_binding (binding_set, GDK_KP_Page_Down, 0,
++  add_slider_binding (binding_set, GDK_KP_Page_Down, GDK_CONTROL_MASK,
+                       GTK_SCROLL_PAGE_RIGHT);
+ 
+   add_slider_binding (binding_set, GDK_Page_Down, 0,
+diff -udpr gtk+-2.6.7_/gtk/gtkwindow.c gtk+-2.6.7/gtk/gtkwindow.c
+--- gtk+-2.6.7_/gtk/gtkwindow.c	2005-04-07 09:09:33.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkwindow.c	2010-04-27 01:29:04.000000000 +0400
+@@ -4695,16 +4695,20 @@ gtk_window_real_set_focus (GtkWindow *wi
+ {
+   GtkWidget *old_focus = window->focus_widget;
+   gboolean had_default = FALSE;
++  gboolean focus_had_default = FALSE;
++  gboolean old_focus_had_default = FALSE;
+ 
+   if (old_focus)
+     {
+       g_object_ref (old_focus);
+       g_object_freeze_notify (G_OBJECT (old_focus));
++      old_focus_had_default = GTK_WIDGET_HAS_DEFAULT (old_focus);
+     }
+   if (focus)
+     {
+       g_object_ref (focus);
+       g_object_freeze_notify (G_OBJECT (focus));
++      focus_had_default = GTK_WIDGET_HAS_DEFAULT (focus);
+     }
+   
+   if (window->default_widget)
+@@ -4716,10 +4720,11 @@ gtk_window_real_set_focus (GtkWindow *wi
+ 	  (window->focus_widget != window->default_widget))
+         {
+ 	  GTK_WIDGET_UNSET_FLAGS (window->focus_widget, GTK_HAS_DEFAULT);
+-
++	  gtk_widget_queue_draw (window->focus_widget);
++	  
+ 	  if (window->default_widget)
+ 	    GTK_WIDGET_SET_FLAGS (window->default_widget, GTK_HAS_DEFAULT);
+-        }
++	}
+ 
+       window->focus_widget = NULL;
+ 
+@@ -4761,14 +4766,20 @@ gtk_window_real_set_focus (GtkWindow *wi
+   if (window->default_widget &&
+       (had_default != GTK_WIDGET_HAS_DEFAULT (window->default_widget)))
+     gtk_widget_queue_draw (window->default_widget);
+-
++  
+   if (old_focus)
+     {
++      if (old_focus_had_default != GTK_WIDGET_HAS_DEFAULT (old_focus))
++	gtk_widget_queue_draw (old_focus);
++	
+       g_object_thaw_notify (G_OBJECT (old_focus));
+       g_object_unref (old_focus);
+     }
+   if (focus)
+     {
++      if (focus_had_default != GTK_WIDGET_HAS_DEFAULT (focus))
++	gtk_widget_queue_draw (focus);
++
+       g_object_thaw_notify (G_OBJECT (focus));
+       g_object_unref (focus);
+     }
 diff -udpr gtk+-2.6.7_/modules/engines/ms-windows/msw_style.c gtk+-2.6.7/modules/engines/ms-windows/msw_style.c
 --- gtk+-2.6.7_/modules/engines/ms-windows/msw_style.c	2005-03-21 01:40:58.000000000 +0300
-+++ gtk+-2.6.7/modules/engines/ms-windows/msw_style.c	2010-02-14 21:04:13.000000000 +0300
++++ gtk+-2.6.7/modules/engines/ms-windows/msw_style.c	2010-04-27 01:10:46.000000000 +0400
 @@ -1448,10 +1448,13 @@ draw_box (GtkStyle      *style,
      }
    else if (detail && strcmp (detail, "menuitem") == 0) {

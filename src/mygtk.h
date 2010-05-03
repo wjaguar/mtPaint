@@ -21,8 +21,17 @@
 #include <gdk/gdkkeysyms.h>
 #include <math.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+///	GTK+2 version to use
+
+#if GTK_MAJOR_VERSION == 2
+#ifndef GTK2VERSION
+#define GTK2VERSION GTK_MINOR_VERSION
+#endif
+#endif
 
 ///	Icon descriptor type
 
@@ -358,7 +367,7 @@ char *resolve_path(char *buf, int buflen, char *path);
 
 // A (better) substitute for fnmatch(), in case one is needed
 
-#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK_MINOR_VERSION < 4))
+#if defined(WIN32) || ((GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 4))
 int wjfnmatch(const char *mask, const char *str, int utf);
 #endif
 
