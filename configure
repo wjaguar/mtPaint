@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.52"
-MT_DATE="2010-05-03"
+MT_V="3.34.53"
+MT_DATE="2010-05-14"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -158,7 +158,8 @@ do
 		"statictiff" )	STATIC_TIFF=TIFF;;
 		"noft" )	NFT=NO;;
 		"staticft" )	STATIC_FT=FreeType;;
-		"lcms" )	NCMS=YES;;
+		"lcms" )	NCMS=LittleCMS;;
+		"lcms2" )	NCMS=LittleCMS2;;
 		"nolcms" )	NCMS=NO;;
 		"staticlcms" )	STATIC_CMS=LittleCMS;;
 		"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
@@ -350,6 +351,7 @@ statictiff ...... Statically link TIFF library
 noft ............ Don't use FreeType
 staticft ........ Statically link FreeType library
 lcms ............ Use LittleCMS
+lcms2............ Use LittleCMS2
 nolcms .......... Don't use LittleCMS
 staticlcms ...... Statically link LittleCMS library
 --fakeroot=DIR .. DIR = location of library and include files to use for cross-compilation
@@ -377,8 +379,8 @@ mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
-	LL=${FAKE_ROOT:+-L$FAKE_ROOT/lib} # Extra libs
-	II=${FAKE_ROOT:+-L$FAKE_ROOT/include} # Extra includes
+	LL=${FAKE_ROOT:+-L$FAKE_ROOT/lib --unresolved-symbols=ignore-in-shared-libs} # Extra libs
+	II=${FAKE_ROOT:+-I$FAKE_ROOT/include} # Extra includes
 
 	if HAVE_FUNC "mkdtemp"
 	then
@@ -423,9 +425,13 @@ else
 	fi
 	NFT=${NFT:-NO}
 
+	if IS_LIB "llcms2"
+	then
+		NCMS=${NCMS:-LittleCMS2}
+	fi
 	if IS_LIB "llcms"
 	then
-		NCMS=${NCMS:-YES}
+		NCMS=${NCMS:-LittleCMS}
 	fi
 	NCMS=${NCMS:-NO}
 
@@ -563,7 +569,12 @@ else
 			L_EX="$L_EX -liconv"
 		fi
 	fi
-	if [ "$NCMS" = "YES" ]
+	if [ "$NCMS" = "LittleCMS2" ]
+	then
+		LIB_NAME lcms2 "$STATIC_CMS"
+		I_EX="$I_EX -DU_LCMS=2"
+	fi
+	if [ "$NCMS" = "LittleCMS" ]
 	then
 		LIB_NAME lcms "$STATIC_CMS"
 		I_EX="$I_EX -DU_LCMS"
@@ -642,6 +653,7 @@ else
 	if [ "$FAKE_ROOT" ]
 	then
 		AS_NEEDED="-Wl,--as-needed -Wl,--no-add-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
+		LL="-L$FAKE_ROOT/lib"
 		for A in $GTK_LIB
 		do
 			case "$A" in
@@ -715,7 +727,7 @@ then
 	echo "    API checks          $API_CHECKS"
 fi
 	echo "    Use FreeType        $NFT"
-	echo "    Use LittleCMS       $NCMS"
+	echo "    Use CMS             $NCMS"
 if [ "$MT_CUSTOM" ]
 then
 	echo "    Customized for      $MT_CUSTOM"

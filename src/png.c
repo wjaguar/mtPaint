@@ -46,7 +46,13 @@
 #define NEED_CMYK
 #include <tiffio.h>
 #endif
-#ifdef U_LCMS
+#if U_LCMS == 2
+#include <lcms2.h>
+/* For version 1.x compatibility */
+#define icSigCmykData cmsSigCmykData
+#define icSigRgbData cmsSigRgbData
+#define icHeader cmsICCHeader
+#elif defined U_LCMS
 #include <lcms.h>
 #endif
 
