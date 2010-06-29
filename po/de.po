@@ -346,11 +346,11 @@ msgstr "JPEG2000 Kompression (0=verlustfrei)"
 
 #: src/canvas.c:1452
 msgid "Hotspot at X ="
-msgstr ""
+msgstr "Hotspot bei X ="
 
 #: src/canvas.c:1452
 msgid "Y ="
-msgstr "Y ="
+msgstr ""
 
 #: src/canvas.c:1474 src/canvas.c:1536
 msgid "File Format"
@@ -509,7 +509,7 @@ msgstr "Abbrechen"
 
 #: src/channels.c:319
 msgid "Delete Channels"
-msgstr ""
+msgstr "Kanäle löschen"
 
 #: src/channels.c:377
 msgid "Threshold Channel"
@@ -680,15 +680,15 @@ msgstr "Soll \"%s\" wirklich gelöscht werden?"
 
 #: src/fpick.c:973
 msgid "Unable to delete"
-msgstr ""
+msgstr "Kann nicht löschen"
 
 #: src/fpick.c:978
 msgid "Unable to rename"
-msgstr ""
+msgstr "Kann nicht umbenennen"
 
 #: src/fpick.c:987
 msgid "Unable to create directory"
-msgstr ""
+msgstr "Kann Verzeichnis nicht anlegen"
 
 #: src/fpick.c:1072
 msgid "Up"
@@ -704,7 +704,7 @@ msgstr "Neues Verzeichnis anlegen"
 
 #: src/fpick.c:1075
 msgid "Show Hidden Files"
-msgstr "Versteckte Dateien anzeigen"
+msgstr "Verborgene Dateien anzeigen"
 
 #: src/fpick.c:1076
 msgid "Case Insensitive Sort"
@@ -716,7 +716,7 @@ msgstr "Name"
 
 #: src/fpick.c:1177
 msgid "Type"
-msgstr ""
+msgstr "Typ"
 
 #: src/fpick.c:1178
 msgid "Modified"
@@ -739,8 +739,8 @@ msgid "Credits"
 msgstr "Credits"
 
 #: src/help.c:32
-msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
-msgstr ""
+msgid "mtPaint 3.40 - Copyright (C) 2004-2010 The Authors\n"
+msgstr "mtPaint 3.40 - Copyright (C) 2004-2010 Die Authoren\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1753,7 +1753,7 @@ msgstr "//Einstellungsleiste zeigen"
 
 #: src/mainwindow.c:4522
 msgid "//Show Dock"
-msgstr ""
+msgstr "//Zeige Dock"
 
 #: src/mainwindow.c:4523
 msgid "//Show Palette"
@@ -1777,7 +1777,7 @@ msgstr "//Zoomgitter zeigen"
 
 #: src/mainwindow.c:4529
 msgid "//Configure Grid ..."
-msgstr ""
+msgstr "//Gitter konfigurieren ..."
 
 #: src/mainwindow.c:4530
 msgid "//Tracing Image ..."
@@ -2081,7 +2081,7 @@ msgstr "//Laden ..."
 
 #: src/mainwindow.c:4638
 msgid "//Delete ..."
-msgstr ""
+msgstr "//Löschen ..."
 
 #: src/mainwindow.c:4640
 msgid "//Edit Image"
@@ -2125,7 +2125,7 @@ msgstr "//Schwellwert ..."
 
 #: src/mainwindow.c:4652
 msgid "//Unassociate Alpha"
-msgstr ""
+msgstr "//Alpha Verbindung lösen"
 
 #: src/mainwindow.c:4654
 msgid "//View Alpha as an Overlay"
@@ -2141,7 +2141,7 @@ msgstr "/Ebenen"
 
 #: src/mainwindow.c:4659
 msgid "//New Layer"
-msgstr ""
+msgstr "//Neue Ebene"
 
 #: src/mainwindow.c:4662
 msgid "//Save Composite Image ..."
@@ -2149,7 +2149,7 @@ msgstr "//Kompositbild speichern ..."
 
 #: src/mainwindow.c:4663
 msgid "//Composite to New Layer"
-msgstr ""
+msgstr "//Compositbild in neue Ebene"
 
 #: src/mainwindow.c:4664
 msgid "//Remove All Layers"
@@ -2478,7 +2478,7 @@ msgstr "Von"
 
 #: src/otherwindow.c:1842
 msgid "To"
-msgstr "Nach"
+msgstr "In"
 
 #: src/otherwindow.c:1843 src/otherwindow.c:2700
 msgid "HSV"
@@ -2534,7 +2534,7 @@ msgstr "Undurchsichtig"
 
 #: src/otherwindow.c:2006
 msgid "Border"
-msgstr "Rahmen"
+msgstr "Rand"
 
 #: src/otherwindow.c:2007
 msgid "Transparent"
@@ -2542,7 +2542,7 @@ msgstr "Transparent"
 
 #: src/otherwindow.c:2007
 msgid "Tile "
-msgstr ""
+msgstr "Kachel"
 
 #: src/otherwindow.c:2024
 msgid "Smart grid"
@@ -2550,23 +2550,23 @@ msgstr ""
 
 #: src/otherwindow.c:2026
 msgid "Tile grid"
-msgstr ""
+msgstr "Kachel Gitter"
 
 #: src/otherwindow.c:2028
 msgid "Minimum grid zoom"
-msgstr "Minimaler Raster-Zoom"
+msgstr "Minimaler Gitter-Zoom"
 
 #: src/otherwindow.c:2030
 msgid "Tile width"
-msgstr ""
+msgstr "Kachelbreite"
 
 #: src/otherwindow.c:2032
 msgid "Tile height"
-msgstr ""
+msgstr "Kachelhöhe"
 
 #: src/otherwindow.c:2044
 msgid "Configure Grid"
-msgstr ""
+msgstr "Gitter konfigurieren"
 
 #: src/otherwindow.c:2227
 msgid "Exact Conversion"
@@ -2889,7 +2889,7 @@ msgstr "Animation ansehen"
 #: src/png.c:4350
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
-msgstr ""
+msgstr "%d von %d frames konnten nicht gespeichert werden als %s - stattdessen als PNG gespeichert"
 
 #: src/png.c:4536
 msgid ""

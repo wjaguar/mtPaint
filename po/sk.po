@@ -1369,8 +1369,8 @@ msgid "Galician - Miguel Anxo Bouzada"
 msgstr ""
 
 #: src/help.c:160
-msgid "German - Oliver Frommel, B. Clausius"
-msgstr "Nemčina - Oliver Frommel, B. Clausius"
+msgid "German - Oliver Frommel, B. Clausius, Ulrich Ringel"
+msgstr "Nemčina - Oliver Frommel, B. Clausius, Ulrich Ringel"
 
 #: src/help.c:161
 msgid "Italian - Angelo Gemmi"
