@@ -37,10 +37,6 @@
 #include "cpick.h"
 #include "icons.h"
 
-#if GTK_MAJOR_VERSION == 1
-#include <unistd.h>
-#endif
-
 ///	NEW IMAGE WINDOW
 
 int im_type, new_window_type = 0;

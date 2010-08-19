@@ -58,8 +58,6 @@ static int numcpus()
 
 #else
 
-#include <unistd.h>
-
 static int numcpus()
 {
 #ifdef _SC_NPROCESSORS_ONLN

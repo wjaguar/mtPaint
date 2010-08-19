@@ -165,5 +165,3 @@ int detect_file_format(char *name, int need_palette);
 #define detect_palette_format(X) detect_file_format(X, TRUE)
 
 int valid_file(char *filename);		// Can this file be opened for reading?
-
-int show_html(char *browser, char *docs);

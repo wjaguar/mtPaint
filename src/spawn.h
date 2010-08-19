@@ -42,3 +42,5 @@ void spawn_quit();	// Delete temp files
 
 //	Run some default action
 int run_def_action(int action, char *sname, char *dname, int delay);
+
+int show_html(char *browser, char *docs);

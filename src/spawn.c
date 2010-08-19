@@ -17,7 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -658,4 +657,85 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 	g_free(command);
 
 	return (res);
+}
+
+
+#ifdef WIN32
+
+#include <shellapi.h>
+#define HANDBOOK_LOCATION_WIN "..\\docs\\index.html"
+
+#else /* Linux */
+
+#define HANDBOOK_BROWSER "firefox"
+#define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
+#define HANDBOOK_LOCATION2 "/usr/share/doc/mtpaint/index.html"
+
+#endif
+
+int show_html(char *browser, char *docs)
+{
+	char buf[PATHBUF], buf2[PATHBUF];
+	int i=-1;
+#ifdef WIN32
+	char *r;
+
+	if (!docs || !docs[0])
+	{
+		/* Use default path relative to installdir */
+		i = GetModuleFileNameA(NULL, buf, PATHBUF);
+		if (!i) return (-1);
+		r = strrchr(buf, '\\');
+		if (!r) return (-1);
+		r[1] = 0;
+		strnncat(buf, HANDBOOK_LOCATION_WIN, PATHBUF);
+		docs = buf;
+	}
+#else /* Linux */
+	char *argv[5];
+
+	if (!docs || !docs[0])
+	{
+		docs = HANDBOOK_LOCATION;
+		if (valid_file(docs) < 0) docs = HANDBOOK_LOCATION2;
+	}
+#endif
+	else docs = gtkncpy(buf, docs, PATHBUF);
+
+	if ((valid_file(docs) < 0))
+	{
+		alert_box( _("Error"),
+			_("I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."), NULL);
+		return (-1);
+	}
+
+#ifdef WIN32
+	if (browser && !browser[0]) browser = NULL;
+	if (browser) browser = gtkncpy(buf2, browser, PATHBUF);
+
+	if ((unsigned int)ShellExecuteA(NULL, "open", browser ? browser : docs,
+		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
+	else i = 0;
+#else
+	argv[1] = docs;
+	argv[2] = NULL;
+	/* Try to use default browser */
+	if (!browser || !browser[0])
+	{
+		argv[0] = "xdg-open";
+		i = spawn_process(argv, NULL);
+		if (!i) return (0); // System has xdg-utils installed
+		// No xdg-utils - try "BROWSER" variable then
+		browser = getenv("BROWSER");
+	}
+	else browser = gtkncpy(buf2, browser, PATHBUF);
+
+	if (!browser) browser = HANDBOOK_BROWSER;
+
+	argv[0] = browser;
+	i = spawn_process(argv, NULL);
+#endif
+	if (i) alert_box( _("Error"),
+		_("There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."), NULL);
+	return (i);
 }

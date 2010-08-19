@@ -2842,17 +2842,17 @@ static int find_nearest(int col[3], int n)
 	switch (ctp->cspace)
 	{
 	default:
-	case 0: /* RGB */
+	case CSPACE_RGB:
 		tmp[0] = ctp->lin[n + col[0]];
 		tmp[1] = ctp->lin[n + col[1]];
 		tmp[2] = ctp->lin[n + col[2]];
 		break;
-	case 1: /* sRGB */
+	case CSPACE_SRGB:
 		tmp[0] = ctp->gamma[n + col[0]];
 		tmp[1] = ctp->gamma[n + col[1]];
 		tmp[2] = ctp->gamma[n + col[2]];
 		break;
-	case 2: /* L*X*N* */
+	case CSPACE_LXN:
 		rgb2LXN(tmp, ctp->gamma[n + col[0]], ctp->gamma[n + col[1]],
 			ctp->gamma[n + col[2]]);
 		break;
