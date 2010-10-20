@@ -855,15 +855,13 @@ void inifile_init(char *system_ini, char *user_ini)
 		}
 		if ((mask & 2) && user_ini)
 		{
-			tmp = extend_path(ini);
-			res = read_ini(&main_ini, tmp, INI_USER);
+			main_ininame = extend_path(ini);
+			res = read_ini(&main_ini, main_ininame, INI_USER);
 			if (res <= 0) // Failed
 			{
-				g_free(tmp);
 				mask ^= 2;
 				if (res < 0) continue;
 			}
-			else main_ininame = tmp;
 		}
 		break;
 	}
