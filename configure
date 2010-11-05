@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.56"
-MT_DATE="2010-10-20"
+MT_V="3.34.57"
+MT_DATE="2010-11-05"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -90,7 +90,7 @@ then
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		redir -e /dev/null $CC _conf.c -o _conf.tmp $LL -L/lib > /dev/null 2>&1
+		redir -e /dev/null $CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L/lib > /dev/null 2>&1
 	}
 elif [ "$CROSSCC" ]
 then
@@ -105,7 +105,7 @@ then
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp $LL -L$CROSSPF/lib > /dev/null 2>&1
+		$CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L$CROSSPF/lib > /dev/null 2>&1
 	}
 else
 	OS="GNU/Linux"
@@ -123,7 +123,7 @@ else
 	HAVE_FUNC()
 	{
 		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp $LL -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
+		$CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
 	}
 fi
 
@@ -379,7 +379,7 @@ mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
-	LL=${FAKE_ROOT:+-L$FAKE_ROOT/lib --unresolved-symbols=ignore-in-shared-libs} # Extra libs
+	LL=${FAKE_ROOT:+--unresolved-symbols=ignore-in-shared-libs -L$FAKE_ROOT/lib} # Extra libs
 	II=${FAKE_ROOT:+-I$FAKE_ROOT/include} # Extra includes
 
 	if HAVE_FUNC "mkdtemp"
@@ -465,8 +465,7 @@ else
 		then
 			GTK_LIB="$GTK_LIB -lXft"
 		fi
-	else
-	if [ "$OS" = "GNU/Linux" ]
+	elif [ "$OS" = "GNU/Linux" ]
 	then
 		BIN_INSTALL=$LIN_BIN_INSTALL
 		if [ "$GTK" = "1" ]
@@ -516,7 +515,6 @@ else
 			GTK_LIB="-L$CROSSPF/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 $THREADS -lm -mwindows"
 		fi
 	fi
-	fi	# MTK
 
 	I_EX=$HAVE_FUNCS
 	if [ "$USE_THREADS" = "YES" ]
@@ -711,13 +709,11 @@ if [ "$MTK_DIR" ]
 then
 	echo "MTK - $MTK_DIR"
 	echo "    Use Xft             $MTK_XFT"
-else
-if [ "$GTK2VERSION" ]
+elif [ "$GTK2VERSION" ]
 then
 	echo "GTK+ 2.$GTK2VERSION"
 else
 	echo "GTK+$GTK"
-fi
 fi
 	echo "    File Picker         $MT_FPICK"
 	echo "    Colour Picker       $MT_CPICK"

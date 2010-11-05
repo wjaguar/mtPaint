@@ -280,7 +280,12 @@ int main( int argc, char *argv[] )
 	}
 
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
-	putenv("GDK_NATIVE_WINDOWS=1");	// I need no experimental stuff before GTK+3
+
+#if GTK2VERSION >= 4
+	/* Tablet handling in GTK+ 2.18+ is broken beyond repair if this mode
+	 * is set; so unset it, if g_unsetenv() is present */
+	g_unsetenv("GDK_NATIVE_WINDOWS");
+#endif
 
 #ifdef U_THREADS
 	/* Enable threading for GLib, but NOT for GTK+ (at least, not yet) */
