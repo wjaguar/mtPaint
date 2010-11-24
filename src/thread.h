@@ -43,6 +43,8 @@ typedef void (*thread_func)(tcb *thread);
 //	Configure max number of threads to launch
 int maxthreads;
 
+//	Estimate how many threads is enough for image
+int image_threads(int w, int h);
 //	Prepare memory structures for threads' use
 threaddata *talloc(int flags, int tmax, void *data, int dsize, ...);
 //	Launch threads and wait for their exiting

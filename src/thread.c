@@ -76,6 +76,14 @@ static int numcpus()
 #define THREAD_ALIGN    128
 #define THREAD_DEALIGN 4096
 
+int image_threads(int w, int h)
+{
+	int n = h / 3;
+// This can overflow, but mtPaint is unlikely to handle a 8+ Tb image anyway :-)
+	int m = ((size_t)w * h) / (THREAD_DEALIGN + THREAD_ALIGN);
+	return (n < m ? n : m);
+}
+
 /* This function takes *two* variable-length NULL-terminated sequences of
  * pointer/size pairs; the first sequence describes shared buffers, the
  * second, thread-local ones.
@@ -99,14 +107,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 
 
 	if (!tmax) /* Number of threads is whatever fits the current image */
-	{
-		int n, m;
-
-		n = mem_height / 3;
-// This can overflow, but mtPaint is unlikely to handle a 8+ Tb image anyway :-)
-		m = ((size_t)mem_width * mem_height) / (THREAD_DEALIGN + THREAD_ALIGN);
-		tmax = n < m ? n : m;
-	}
+		tmax = image_threads(mem_width, mem_height);
 
 	if (!(nt = maxthreads)) /* Use as many threads as there are cores */
 	{

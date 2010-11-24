@@ -5148,10 +5148,11 @@ int mem_image_rot( int dir )					// Rotate image 90 degrees
 
 
 ///	Code for scaling contributed by Dmitry Groshev, January 2006
+///	Multicore support added by Dmitry Groshev, November 2010
 
 typedef struct {
+	float *k;
 	int idx;
-	float k;
 } fstep;
 
 static double Cubic(double x, double A)
@@ -5189,12 +5190,17 @@ static double BH(double x)
 
 static const double Aarray[4] = {-0.5, -2.0 / 3.0, -0.75, -1.0};
 
+/* !!! Filter as a whole must be perfectly symmetric, and "idx" of step 0
+ * must be <= 0; these natural properties are relied on when allocating and
+ * extending horizontal temp arrays for BOUND_TILE mode.
+ * 2 extra steps at end hold end pointer & index, and terminating NULL. */
 static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 {
 	fstep *res, *buf;
+	__typeof__(*res->k) *kp;
 	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
 	double A = 0.0, kk = 1.0, sum;
-	int i, j, k, ix;
+	int i, j, k, ix, j0, k0 = 0;
 
 
 	/* To correct scale-shift */
@@ -5202,6 +5208,9 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 
 	/* Untransformed bilinear is useless for reduction */
 	if (type == 1) sharp = TRUE;
+
+	/* 1:1 transform is special */
+	if (scale == 1.0) type = 0;
 
 	if (scale < 1.0) kk = scale;
 	else sharp = FALSE;
@@ -5216,46 +5225,58 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 		break;
 	case 6:	fwidth = 6.0; /* Blackman-Harris windowed sinc */
 		break;
-	default:	 /* Bug */
+	default: /* 1:1 */
 		fwidth = 0.0;
 		break;
 	}
 	if (sharp) fwidth += scale - 1.0;
 	fwidth /= kk;
 
-	i = (int)floor(fwidth) + 2;
-	res = buf = calloc(l1 * (i + 1) + 1, sizeof(fstep));
-	if (!res) return (NULL);
+	buf = multialloc(MA_ALIGN_DOUBLE, &res, (l1 + 2) * sizeof(*res),
+		&kp, l1 * ((int)floor(fwidth) + 1) * sizeof(*res->k), NULL);
+	if (!buf) return (NULL);
+	res = buf; /* No need to double-align the index array */
 
 	fwidth *= 0.5;
-	type = type * 2 + (sharp ? 1 : 0);
-	for (i = 0; i < l1; i++)
+	type = type * 2 + !!sharp;
+	for (i = 0; i < l1; i++ , buf++)
 	{
 		basept = (double)i / scale + delta;
-		k = (int)floor(basept + fwidth);
-		for (j = (int)ceil(basept - fwidth); j <= k; j++)
+		j = j0 = (int)ceil(basept - fwidth);
+		k = k0 = (int)floor(basept + fwidth) + 1;
+		if (j0 < 0) j0 = 0;
+		if (k0 > l0) k0 = l0;
+		/* If filter doesn't cover source from end to end, tiling will
+		 * require physical copying */
+		if ((bound == BOUND_TILE) && (k0 - j0 < l0))
+			k0 = k , j0 = j;
+		buf->idx = j0;
+		buf->k = kp;
+		kp += k0 - j0;
+		sum = 0.0; 
+		for (; j < k; j++)
 		{
 			ix = j;
-			if ((j < 0) || (j >= l0))
+			if ((j < j0) || (j >= k0))
 			{
 				if (bound == BOUND_VOID) continue;
 				if (bound == BOUND_TILE)
 				{
-					if (ix < 0) ix = l0 - (-ix % l0);
-					ix %= l0;
+					if (ix < 0) ix = k0 - (-ix % k0);
+					ix %= k0;
 				}
-				else if (l0 == 1) ix = 0;
-				else 
+				else if (k0 == 1) ix = 0;
+				else
 				{
-					ix = abs(ix) % (l0 + l0 - 2);
-					if (ix >= l0) ix = l0 + l0 - 2 - ix;
+					ix = abs(ix) % (k0 + k0 - 2);
+					if (ix >= k0) ix = k0 + k0 - 2 - ix;
 				}
 			}
-			buf->idx = ix;
+			ix -= j0;
 			x = fabs(((double)j - basept) * kk);
-			y = 0;
 			switch (type)
 			{
+			case 0: /* 1:1 */
 			case 2: /* Bilinear */
 				y = 1.0 - x;
 				break;
@@ -5277,286 +5298,326 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 				y = BH(x + scale * 0.5) - BH(x - scale * 0.5);
 				break;
 			default: /* Bug */
+				y = 0;
 				break;
 			}
-			buf->k = y * kk;
-			if (buf->k != 0.0) buf++;
+			buf->k[ix] += y;
+			sum += y;
 		}
-		buf->idx = -1;
-		buf++;
-	}
-	buf->idx = -2;
-
-	/* Normalization pass */
-	for (buf = res; buf->idx >= -1; buf += i + 1)
-	{
-		sum = 0.0; 
-		for (i = 0; buf[i].idx >= 0; i++)
-			sum += buf[i].k;
+		/* Normalize */
 		if ((sum != 0.0) && (sum != 1.0))
 		{
+			__typeof__(*kp) *tp = buf->k;
 			sum = 1.0 / sum;
-			for (j = 0; j < i; j++)
-				buf[j].k *= sum;
+			while (tp != kp) *tp++ *= sum;
 		}
 	}
+	/* Finalize */
+	buf->idx = k0; // The rightmost extent
+	buf->k = kp;
 
 	return (res);
 }
 
 typedef struct {
-	char *workarea;
+	int tmask, gcor, progress;
+	int ow, oh, nw, nh, bpp;
+	unsigned char **src, **dest;
+	double *rgb;
 	fstep *hfilter, *vfilter;
+	threaddata *tdata; // For simplicity
 } scale_context;
 
 static void clear_scale(scale_context *ctx)
 {
-	free(ctx->workarea);
 	free(ctx->hfilter);
 	free(ctx->vfilter);
+	free(ctx->tdata);
 }
 
-static int prepare_scale(scale_context *ctx, int ow, int oh, int nw, int nh,
-	int type, int sharp, int bound)
+static int prepare_scale(scale_context *ctx, int type, int sharp, int bound)
 {
-	ctx->workarea = NULL;
 	ctx->hfilter = ctx->vfilter = NULL;
-	if (!type || (mem_img_bpp == 1)) return TRUE;
-	ctx->workarea = malloc((7 * ow + 1) * sizeof(double));
-	ctx->hfilter = make_filter(ow, nw, type, sharp, bound);
-	ctx->vfilter = make_filter(oh, nh, type, sharp, bound);
-	if (!ctx->workarea || !ctx->hfilter || !ctx->vfilter)
+	ctx->tdata = NULL;
+
+	/* We don't use threading for NN */
+	if (!type || (ctx->bpp == 1)) return (TRUE);
+
+	if ((ctx->hfilter = make_filter(ctx->ow, ctx->nw, type, sharp, bound)) &&
+		(ctx->vfilter = make_filter(ctx->oh, ctx->nh, type, sharp, bound)))
 	{
-		clear_scale(ctx);
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static void do_scale(scale_context *ctx, chanlist old_img, chanlist new_img,
-	int ow, int oh, int nw, int nh, int gcor, int progress)
-{
-	unsigned char *src, *img, *imga;
-	fstep *tmp = NULL, *tmpx, *tmpy, *tmpp;
-	double *wrk, *wrka, *work_area;
-	int i, j, cc, bpp, gc, tmask;
-
-	work_area = ALIGN(ctx->workarea);
-	tmask = new_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] ? CMASK_RGBA : CMASK_NONE;
-
-	/* For each destination line */
-	tmpy = ctx->vfilter;
-	for (i = 0; i < nh; i++, tmpy++)
-	{
-		/* Process regular channels */
-		for (cc = 0; cc < NUM_CHANNELS; cc++)
-		{
-			if (!new_img[cc]) continue;
-			/* Do RGBA separately */
-			if (tmask & CMASK_FOR(cc)) continue;
-			bpp = cc == CHN_IMAGE ? 3 : 1;
-			gc = cc == CHN_IMAGE ? gcor : FALSE;
-			memset(work_area, 0, ow * bpp * sizeof(double));
-			src = old_img[cc];
-			/* Build one vertically-scaled row */
-			for (tmp = tmpy; tmp->idx >= 0; tmp++)
-			{
-				const double kk = tmp->k;
-				img = src + tmp->idx * ow * bpp;
-				wrk = work_area;
-				if (gc) /* Gamma-correct */
-				{
-					for (j = 0; j < ow * bpp; j++)
-						*wrk++ += gamma256[*img++] * kk;
-				}
-				else /* Leave as is */
-				{
-					for (j = 0; j < ow * bpp; j++)
-						*wrk++ += *img++ * kk;
-				}
-			}
-			/* Scale it horizontally */
-			img = new_img[cc] + i * nw * bpp;
-			for (tmpx = ctx->hfilter; tmpx->idx >= -1; tmpx++ , img += bpp)
-			{
-				double sum, sum1, sum2;
-
-				sum = sum1 = sum2 = 0.0;
-				for (; tmpx->idx >= 0; tmpx++)
-				{
-					const double kk = tmpx->k;
-					wrk = work_area + tmpx->idx * bpp;
-					sum += wrk[0] * kk;
-					if (bpp == 1) continue;
-					sum1 += wrk[1] * kk;
-					sum2 += wrk[2] * kk;
-				}
-				if (gc) /* Reverse gamma correction */
-				{
-					img[0] = sum < 0.0 ? 0 : sum > 1.0 ?
-						0xFF : UNGAMMA256(sum);
-					img[1] = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
-						0xFF : UNGAMMA256(sum1);
-					img[2] = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
-						0xFF : UNGAMMA256(sum2);
-				}
-				else
-				{
-					j = (int)rint(sum);
-					img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					if (bpp == 1) continue;
-					j = (int)rint(sum1);
-					img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					j = (int)rint(sum2);
-					img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-				}
-			}
-		}
-		/* Process RGBA */
-		if (tmask != CMASK_NONE)
-		{
-			memset(work_area, 0, ow * 7 * sizeof(double));
-			/* Build one vertically-scaled row - with & w/o alpha */
-			for (tmp = tmpy; tmp->idx >= 0; tmp++)
-			{
-				img = old_img[CHN_IMAGE] + tmp->idx * ow * 3;
-				imga = old_img[CHN_ALPHA] + tmp->idx * ow;
-				wrk = work_area + ow;
-				if (gcor) /* Gamma-correct */
-				{
-					for (j = 0; j < ow; j++)
-					{
-						const double tk = tmp->k;
-						const double kk = imga[j] * tk;
-						double tv;
-
-						work_area[j] += kk;
-						wrk[0] += (tv = gamma256[img[0]]) * tk;
-						wrk[3] += tv * kk;
-						wrk[1] += (tv = gamma256[img[1]]) * tk;
-						wrk[4] += tv * kk;
-						wrk[2] += (tv = gamma256[img[2]]) * tk;
-						wrk[5] += tv * kk;
-						wrk += 6; img += 3;
-					}
-				}
-				else /* Leave as is */
-				{
-					for (j = 0; j < ow; j++)
-					{
-						const double tk = tmp->k;
-						const double kk = imga[j] * tk;
-						double tv;
-
-						work_area[j] += kk;
-						wrk[0] += (tv = img[0]) * tk;
-						wrk[3] += tv * kk;
-						wrk[1] += (tv = img[1]) * tk;
-						wrk[4] += tv * kk;
-						wrk[2] += (tv = img[2]) * tk;
-						wrk[5] += tv * kk;
-						wrk += 6; img += 3;
-					}
-				}
-			}
-			/* Scale it horizontally */
-			img = new_img[CHN_IMAGE] + i * nw * 3;
-			imga = new_img[CHN_ALPHA] + i * nw;
-			for (tmpx = ctx->hfilter; tmpx->idx >= -1; tmpx = tmpp + 1)
-			{
-				double sum, sum1, sum2, mult;
-
-				sum = 0.0;
-				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
-					sum += work_area[tmpp->idx] * tmpp->k;
-				j = (int)rint(sum);
-				*imga = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-				wrk = work_area + ow;
-				mult = 1.0;
-				if (*imga++)
-				{
-					wrk += 3;
-					mult /= sum;
-				}
-				sum = sum1 = sum2 = 0.0;
-				for (tmpp = tmpx; tmpp->idx >= 0; tmpp++)
-				{
-					const double kk = tmpp->k;
-					wrka = wrk + tmpp->idx * 6;
-					sum += wrka[0] * kk;
-					sum1 += wrka[1] * kk;
-					sum2 += wrka[2] * kk;
-				}
-				sum *= mult; sum1 *= mult; sum2 *= mult;
-				if (gcor) /* Reverse gamma correction */
-				{
-					img[0] = sum < 0.0 ? 0 : sum > 1.0 ?
-						0xFF : UNGAMMA256(sum);
-					img[1] = sum1 < 0.0 ? 0 : sum1 > 1.0 ?
-						0xFF : UNGAMMA256(sum1);
-					img[2] = sum2 < 0.0 ? 0 : sum2 > 1.0 ?
-						0xFF : UNGAMMA256(sum2);
-				}
-				else /* Simply round to nearest */
-				{
-					int j;
-					j = (int)rint(sum);
-					img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					j = (int)rint(sum1);
-					img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-					j = (int)rint(sum2);
-					img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
-				}
-				img += 3;
-			}
-		}
-		if ( progress && (i * 10) % nh >= nh - 10 ) progress_update((float)(i + 1) / nh);
-		if (tmp->idx < -1) break;
-		tmpy = tmp;
+		int l = (ctx->ow - ctx->hfilter[0].idx * 2) * sizeof(double);
+		if ((ctx->tdata = talloc(MA_ALIGN_DOUBLE,
+			image_threads(ctx->nw, ctx->nh), ctx, sizeof(*ctx),
+			NULL,
+			// !!! No space for RGBAS for now
+			&ctx->rgb, l * (ctx->tmask ? 7 : 3),
+			NULL))) return (TRUE);
 	}
 
 	clear_scale(ctx);
+	return (FALSE);
 }
 
-static void do_scale_internal(scale_context *ctx, chanlist old_img, chanlist neo_img,
-	int img_bpp, int type, int ow, int oh, int nw, int nh, int gcor, int progress)
+static void tile_extend(double *temp, int w, int l)
+{
+	memcpy(temp - l, temp + w - l, l * sizeof(*temp));
+	memcpy(temp + w, temp, l * sizeof(*temp));
+}
+
+typedef void REGPARM2 (*istore_func)(unsigned char *img, const double *sum);
+
+static void REGPARM2 istore_gc(unsigned char *img, const double *sum)
+{
+	/* Reverse gamma correction */
+	img[0] = UNGAMMA256X(sum[0]);
+	img[1] = UNGAMMA256X(sum[1]);
+	img[2] = UNGAMMA256X(sum[2]);
+}
+
+static void REGPARM2 istore_3(unsigned char *img, const double *sum)
+{
+	int j = (int)rint(sum[0]);
+	img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+	j = (int)rint(sum[1]);
+	img[1] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+	j = (int)rint(sum[2]);
+	img[2] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+}
+
+static void REGPARM2 istore_1(unsigned char *img, const double *sum)
+{
+	int j = (int)rint(sum[0]);
+	img[0] = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+}
+
+/* !!! Once again, beware of GCC misoptimization! The two functions below
+ * should not be both inlineable at once, otherwise poor code wasting both
+ * time and space will be produced - WJ */
+
+static void scale_row(fstep *tmpy, fstep *hfilter, double *work_area,
+	int bpp, int gc, int ow, int oh, int nw, int i,
+	unsigned char *src, unsigned char *dest)
+{
+	istore_func istore;
+	unsigned char *img;
+	fstep *tmpx;
+	__typeof__(*tmpy->k) *kp = tmpy->k - tmpy->idx;
+	int j, y, h = tmpy[1].k - kp, ll = hfilter[0].idx;
+
+
+	work_area -= ll * bpp;
+	ow *= bpp;
+	memset(work_area, 0, ow * sizeof(double));
+	/* Build one vertically-scaled row */
+	for (y = tmpy->idx; y < h; y++)
+	{
+		const double tk = kp[y];
+		double *wrk = work_area;
+		/* Only simple tiling isn't built into filter */
+		img = src + ((y + oh) % oh) * ow;
+		if (gc) /* Gamma-correct */
+		{
+			for (j = 0; j < ow; j++)
+				*wrk++ += gamma256[*img++] * tk;
+		}
+		else /* Leave as is */
+		{
+			for (j = 0; j < ow; j++)
+				*wrk++ += *img++ * tk;
+		}
+	}
+	tile_extend(work_area, ow, -ll * bpp);
+	/* Scale it horizontally */
+	istore = gc ? istore_gc : bpp == 1 ? istore_1 : istore_3;
+	img = dest + i * nw * bpp;
+	for (tmpx = hfilter; tmpx[1].k; tmpx++ , img += bpp)
+	{
+		__typeof__(*tmpx->k) *tp, *kp = tmpx[1].k;
+		double *wrk = work_area + tmpx->idx * bpp;
+		double sum[3], sum0, sum1, sum2;
+
+		sum0 = sum1 = sum2 = 0.0;
+		tp = tmpx->k;
+		while (tp != kp)
+		{
+			const double kk = *tp++;
+			sum0 += *wrk++ * kk;
+			if (bpp == 1) continue;
+			sum1 += *wrk++ * kk;
+			sum2 += *wrk++ * kk;
+		}
+		sum[0] = sum0; sum[1] = sum1; sum[2] = sum2;
+		istore(img, sum);
+	}
+}
+
+static void scale_rgba(fstep *tmpy, fstep *hfilter, double *work_area,
+	int bpp, int gc, int ow, int oh, int nw, int i,
+	unsigned char *src, unsigned char *dest,
+	unsigned char *srca, unsigned char *dsta)
+{
+	istore_func istore;
+	unsigned char *img, *imga;
+	fstep *tmpx;
+	__typeof__(*tmpy->k) *kp = tmpy->k - tmpy->idx;
+	int j, y, h = tmpy[1].k - kp, ll = hfilter[0].idx;
+	double *wrka = work_area + ow * 6 - ll * 13;
+
+
+	work_area -= ll * 6;
+	memset(work_area, 0, (ow - ll) * 7 * sizeof(double));
+	for (y = tmpy->idx; y < h; y++)
+	{
+		double *wrk = work_area;
+		int ix = (y + oh) % oh;
+
+		img = src + ix * ow * 3;
+		imga = srca + ix * ow;
+		if (gc) /* Gamma-correct */
+		{
+			const double tk = kp[y];
+			for (j = 0; j < ow; j++)
+			{
+				const double kk = imga[j] * tk;
+				double tv;
+
+				wrka[j] += kk;
+				wrk[0] += (tv = gamma256[img[0]]) * tk;
+				wrk[3] += tv * kk;
+				wrk[1] += (tv = gamma256[img[1]]) * tk;
+				wrk[4] += tv * kk;
+				wrk[2] += (tv = gamma256[img[2]]) * tk;
+				wrk[5] += tv * kk;
+				wrk += 6; img += 3;
+			}
+		}
+		else /* Leave as is */
+		{
+			const double tk = kp[y];
+			for (j = 0; j < ow; j++)
+			{
+				const double kk = imga[j] * tk;
+				double tv;
+
+				wrka[j] += kk;
+				wrk[0] += (tv = img[0]) * tk;
+				wrk[3] += tv * kk;
+				wrk[1] += (tv = img[1]) * tk;
+				wrk[4] += tv * kk;
+				wrk[2] += (tv = img[2]) * tk;
+				wrk[5] += tv * kk;
+				wrk += 6; img += 3;
+			}
+		}
+	}
+	tile_extend(work_area, ow * 6, -ll * 6);
+	tile_extend(wrka, ow, -ll);
+	/* Scale it horizontally */
+	istore = gc ? istore_gc : bpp == 1 ? istore_1 : istore_3;
+	img = dest + i * nw * 3;
+	imga = dsta + i * nw;
+	for (tmpx = hfilter; tmpx[1].k; tmpx++)
+	{
+		__typeof__(*tmpx->k) *tp, *kp = tmpx[1].k;
+		double *wrk;
+		double sum[3], sum0, sum1, sum2, mult;
+
+		sum0 = 0.0;
+		wrk = wrka + tmpx->idx;
+		tp = tmpx->k;
+		while (tp != kp) sum0 += *wrk++ * *tp++;
+		j = (int)rint(sum0);
+		*imga = j < 0 ? 0 : j > 0xFF ? 0xFF : j;
+		wrk = work_area + tmpx->idx * 6;
+		mult = 1.0;
+		if (*imga++)
+		{
+			wrk += 3;
+			mult /= sum0;
+		}
+		sum0 = sum1 = sum2 = 0.0;
+		tp = tmpx->k;
+		while (tp != kp)
+		{
+			const double kk = *tp++;
+			sum0 += wrk[0] * kk;
+			sum1 += wrk[1] * kk;
+			sum2 += wrk[2] * kk;
+			wrk += 6;
+		}
+		sum[0] = sum0 * mult; sum[1] = sum1 * mult; sum[2] = sum2 * mult;
+		istore(img, sum);
+		img += 3;
+	}
+}
+
+static void do_scale(tcb *thread)
+{
+	scale_context ctx = *(scale_context *)thread->data;
+	fstep *tmpy;
+	int i, ii, cc, cnt = thread->nsteps;
+
+
+	/* For each destination line */
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
+	{
+		tmpy = ctx.vfilter + i;
+		if (ctx.dest[CHN_IMAGE]) // Chanlist may contain, e.g., only mask
+		{
+			(ctx.tmask == CMASK_NONE ? (__typeof__(&scale_rgba))scale_row :
+				scale_rgba)(tmpy, ctx.hfilter, ctx.rgb,
+				3, ctx.gcor, ctx.ow, ctx.oh, ctx.nw, i,
+				ctx.src[CHN_IMAGE], ctx.dest[CHN_IMAGE],
+				ctx.src[CHN_ALPHA], ctx.dest[CHN_ALPHA]);
+		}
+
+		for (cc = CHN_IMAGE + 1; cc < NUM_CHANNELS; cc++)
+		{
+			if (ctx.dest[cc] && !(ctx.tmask & CMASK_FOR(cc)))
+				scale_row(tmpy, ctx.hfilter, ctx.rgb,
+					1, FALSE, ctx.ow, ctx.oh, ctx.nw, i,
+					ctx.src[cc], ctx.dest[cc]);
+		}
+
+		if (ctx.progress && thread_step(thread, ii + 1, cnt, 10)) break;
+	}
+	thread_done(thread);
+}
+
+static void do_scale_nn(chanlist old_img, chanlist neo_img, int img_bpp,
+	int type, int ow, int oh, int nw, int nh, int gcor, int progress)
 {
 	char *src, *dest;
 	int i, j, oi, oj, cc, bpp;
 	double scalex, scaley, deltax, deltay;
 
 
-	if (type && (img_bpp == 3))
-		do_scale(ctx, old_img, neo_img, ow, oh, nw, nh, gcor, progress);
-	else
-	{
-		scalex = (double)ow / (double)nw;
-		scaley = (double)oh / (double)nh;
-		deltax = 0.5 * scalex - 0.5;
-		deltay = 0.5 * scaley - 0.5;
+	scalex = (double)ow / (double)nw;
+	scaley = (double)oh / (double)nh;
+	deltax = 0.5 * scalex - 0.5;
+	deltay = 0.5 * scaley - 0.5;
 
-		for (j = 0; j < nh; j++)
+	for (j = 0; j < nh; j++)
+	{
+		for (cc = 0 , bpp = img_bpp; cc < NUM_CHANNELS; cc++ , bpp = 1)
 		{
-			for (cc = 0; cc < NUM_CHANNELS; cc++)
+			if (!neo_img[cc]) continue;
+			dest = neo_img[cc] + nw * j * bpp;
+			WJ_ROUND(oj, scaley * j + deltay);
+			src = old_img[cc] + ow * oj * bpp;
+			for (i = 0; i < nw; i++)
 			{
-				if (!neo_img[cc]) continue;
-				bpp = BPP(cc);
-				dest = neo_img[cc] + nw * j * bpp;
-				WJ_ROUND(oj, scaley * j + deltay);
-				src = old_img[cc] + ow * oj * bpp;
-				for (i = 0; i < nw; i++)
-				{
-					WJ_ROUND(oi, scalex * i + deltax);
-					oi *= bpp;
-					*dest++ = src[oi];
-					if (bpp == 1) continue;
-					*dest++ = src[oi + 1];
-					*dest++ = src[oi + 2];
-				}
+				WJ_ROUND(oi, scalex * i + deltax);
+				oi *= bpp;
+				*dest++ = src[oi];
+				if (bpp == 1) continue;
+				*dest++ = src[oi + 1];
+				*dest++ = src[oi + 2];
 			}
-			if (progress && (j * 10) % nh >= nh - 10)
-				progress_update((float)(j + 1) / nh);
 		}
+		if (progress && ((j * 10) % nh >= nh - 10))
+			progress_update((float)(j + 1) / nh);
 	}
 }
 
@@ -5566,42 +5627,63 @@ int mem_image_scale_real(chanlist old_img, int ow, int oh, int bpp,
 {
 	scale_context ctx;
 
+	ctx.tmask = CMASK_NONE;
+	ctx.gcor = gcor;
+	ctx.progress = FALSE;
+	ctx.ow = ow;
+	ctx.oh = oh;
+	ctx.nw = nw;
+	ctx.nh = nh;
+	ctx.bpp = bpp;
+	ctx.src = old_img;
+	ctx.dest = new_img;
 
-	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp, BOUND_MIRROR))
-		return 1;	// Not enough memory
+	if (!prepare_scale(&ctx, type, sharp, BOUND_MIRROR))
+		return (1);	// Not enough memory
 
-	do_scale_internal(&ctx, old_img, new_img, bpp, type, ow, oh,
-		nw, nh, gcor, FALSE);
+	if (type && (bpp == 3))
+		launch_threads(do_scale, ctx.tdata, NULL, nh);
+	else do_scale_nn(old_img, new_img, bpp, type, ow, oh, nw, nh, gcor, FALSE);
 
-	return 0;
+	return (0);
 }
 
 int mem_image_scale(int nw, int nh, int type, int gcor, int sharp, int bound)	// Scale image
 {
 	scale_context ctx;
 	chanlist old_img;
-	int res, ow = mem_width, oh = mem_height;
+	int res;
 
+	memcpy(old_img, mem_img, sizeof(chanlist));
 	nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 	nh = nh < 1 ? 1 : nh > MAX_HEIGHT ? MAX_HEIGHT : nh;
 
-	if (!prepare_scale(&ctx, ow, oh, nw, nh, type, sharp, bound))
-		return 1;	// Not enough memory
+	ctx.tmask = mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA] ? CMASK_RGBA : CMASK_NONE;
+	ctx.gcor = gcor;
+	ctx.progress = TRUE;
+	ctx.ow = mem_width;
+	ctx.oh = mem_height;
+	ctx.nw = nw;
+	ctx.nh = nh;
+	ctx.bpp = mem_img_bpp;
+	ctx.src = old_img;
+	ctx.dest = mem_img;
 
-	memcpy(old_img, mem_img, sizeof(chanlist));
-	res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL);
-	if (res)
+	if (!prepare_scale(&ctx, type, sharp, bound))
+		return (1);	// Not enough memory
+
+	if (!(res = undo_next_core(UC_NOCOPY, nw, nh, mem_img_bpp, CMASK_ALL)))
 	{
-		clear_scale(&ctx);
-		return (res);			// Not enough memory
+		progress_init(_("Scaling Image"), 0);
+		if (type && (mem_img_bpp == 3))
+			launch_threads(do_scale, ctx.tdata, NULL, mem_height);
+		else do_scale_nn(old_img, mem_img, mem_img_bpp, type,
+			ctx.ow, ctx.oh, nw, nh, gcor, TRUE);
+		progress_end();
 	}
 
-	progress_init(_("Scaling Image"),0);
-	do_scale_internal(&ctx, old_img, mem_img, mem_img_bpp, type, ow, oh,
-		nw, nh, gcor, TRUE);
-	progress_end();
-
-	return 0;
+	clear_scale(&ctx);
+	return (res);
 }
 
 
@@ -7552,12 +7634,9 @@ static void unsharp_filter(tcb *thread)
 						(gamma256[dest[j + 1]] - sum1);
 					sum2 = gamma256[dest[j + 2]] + amount *
 						(gamma256[dest[j + 2]] - sum2);
-					k = sum <= 0.0 ? 0 : sum >= 1.0 ?
-						255 : UNGAMMA256(sum);
-					k1 = sum1 <= 0.0 ? 0 : sum1 >= 1.0 ?
-						255 : UNGAMMA256(sum1);
-					k2 = sum2 <= 0.0 ? 0 : sum2 >= 1.0 ?
-						255 : UNGAMMA256(sum2);
+					k = UNGAMMA256X(sum);
+					k1 = UNGAMMA256X(sum1);
+					k2 = UNGAMMA256X(sum2);
 				}
 				else /* Combine values as linear */
 				{
@@ -7731,13 +7810,16 @@ static void dog_filter(tcb *thread)
 				if (gcor)
 				{
 #if 1 /* Reverse gamma - but does it make sense? */
-					k = sum <= 0.0 ? 0 : UNGAMMA256(sum);
-					k1 = sum1 <= 0.0 ? 0 : UNGAMMA256(sum1);
-					k2 = sum2 <= 0.0 ? 0 : UNGAMMA256(sum2);
+					k = UNGAMMA256X(sum);
+					k1 = UNGAMMA256X(sum1);
+					k2 = UNGAMMA256X(sum2);
 #else /* Let values remain linear */
-					k = sum <= 0.0 ? 0 : rint(sum * 256.0);
-					k1 = sum1 <= 0.0 ? 0 : rint(sum1 * 256.0);
-					k2 = sum2 <= 0.0 ? 0 : rint(sum2 * 256.0);
+					k = rint(sum * 255.0);
+					k = k < 0 ? 0 : k;
+					k1 = rint(sum1 * 255.0);
+					k1 = k1 < 0 ? 0 : k1;
+					k2 = rint(sum2 * 255.0);
+					k2 = k2 < 0 ? 0 : k2;
 #endif
 				}
 				else
@@ -9550,12 +9632,9 @@ static void mem_skew_filt(chanlist old_img, chanlist new_img, int ow, int oh,
 					}
 					if (gcor)
 					{
-						dest[0] = rr < 0.0 ? 0 : rr > 1.0 ?
-							0xFF : UNGAMMA256(rr);
-						dest[1] = gg < 0.0 ? 0 : gg > 1.0 ?
-							0xFF : UNGAMMA256(gg);
-						dest[2] = bb < 0.0 ? 0 : bb > 1.0 ?
-							0xFF : UNGAMMA256(bb);
+						dest[0] = UNGAMMA256X(rr);
+						dest[1] = UNGAMMA256X(gg);
+						dest[2] = UNGAMMA256X(bb);
 					}
 					else
 					{

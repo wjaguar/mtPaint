@@ -822,7 +822,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	int h = settings->height, w = settings->width, bpp = settings->bpp;
 	int i, chunks = 0, res = -1;
 	long uninit_(dest_len), res_len;
-	char *mess;
+	char *mess = NULL;
 	unsigned char trans[256], *tmp, *rgba_row = NULL;
 	png_color_16 trans_rgb;
 
@@ -836,6 +836,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		bpp = 4;
 	}
 
+	if (!settings->silent)
 	switch(settings->mode)
 	{
 	case FS_PNG_SAVE:
@@ -855,7 +856,6 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		settings->silent = TRUE;
 		break;
 	}
-	if (settings->silent) mess = NULL;
 
 	if (!mf && ((fp = fopen(file_name, "wb")) == NULL)) goto exit0;
 
@@ -1434,7 +1434,7 @@ static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
 	settings->bpp = 1;
 
 	if ((res = allocate_image(settings, CMASK_IMAGE))) return (res);
-	res = -1;
+	res = FILE_LIB_ERROR;
 
 	if (!settings->silent) ls_init("GIF", 0);
 
@@ -1619,7 +1619,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 			settings->gif_delay = delay;
 			settings->xpm_trans = trans;
 			res = load_gif_frame(giffy, settings);
-			if (res < 0) goto fail;
+			if (res != 1) goto fail;
 		}
 	}
 	res = 1;
@@ -5166,7 +5166,7 @@ static int load_pcx(char *file_name, ls_settings *settings)
 		/* Store a line */
 		if (bits == 1) // N planes of 1-bit data (MSB first)
 		{
-			unsigned char v, *tmp = row;
+			unsigned char uninit_(v), *tmp = row;
 			int i, n = 7 - plane;
 
 			for (i = 0; i < w; i++ , v += v)
@@ -5177,7 +5177,7 @@ static int load_pcx(char *file_name, ls_settings *settings)
 		}
 		else if (bits == 2) // Single plane of 2-bit data (MSB first)
 		{
-			unsigned char v, *tmp = row;
+			unsigned char uninit_(v), *tmp = row;
 
 			for (i = 0; i < w; i++ , v <<= 2)
 			{

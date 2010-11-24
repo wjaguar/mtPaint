@@ -36,9 +36,9 @@ typedef struct
 csel_info *csel_data;
 int csel_preview, csel_preview_a, csel_overlay;
 double gamma256[256], gamma64[64];
-double midgamma256[256], midgamma64[64];
-double kgamma256, kgamma64;
-extern unsigned char ungamma256[], ungamma64[];
+double midgamma256[256];
+int kgamma256;
+extern unsigned char ungamma256[];
 
 /* This gamma table is for when we need numeric stability */
 #ifdef NATIVE_DOUBLES
@@ -47,10 +47,18 @@ extern unsigned char ungamma256[], ungamma64[];
 float Fgamma256[256];
 #endif
 
-#define UNGAMMA64(X) (ungamma64[(int)((X) * kgamma64)] - \
-	((X) < midgamma64[ungamma64[(int)((X) * kgamma64)]]))
-#define UNGAMMA256(X) (ungamma256[(int)((X) * kgamma256)] - \
-	((X) < midgamma256[ungamma256[(int)((X) * kgamma256)]]))
+static inline int UNGAMMA256(double x)
+{
+	int j = (int)(x * kgamma256);
+	return (ungamma256[j] - (x < midgamma256[ungamma256[j]]));
+}
+
+static inline int UNGAMMA256X(double x)
+{
+	int j = (int)(x * kgamma256);
+	return (j < 0 ? 0 : j >= kgamma256 ? 255 :
+		ungamma256[j] - (x < midgamma256[ungamma256[j]]));
+}
 
 //double gamma65536(int idx);
 //int ungamma65536(double v);

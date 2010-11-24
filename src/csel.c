@@ -42,7 +42,7 @@ csel_info *csel_data;
 int csel_preview = 0x00FF00, csel_preview_a = 128, csel_overlay;
 
 double gamma256[256], gamma64[64];
-double midgamma256[256], midgamma64[64];
+double midgamma256[256];
 
 #ifndef NATIVE_DOUBLES
 float Fgamma256[256];
@@ -247,8 +247,8 @@ static void make_gamma(double *Gamma, int cnt)
 	}
 }
 
-double kgamma256 = KGAMMA * 4, kgamma64 = KGAMMA;
-unsigned char ungamma256[KGAMMA * 4 + 1], ungamma64[KGAMMA + 1];
+int kgamma256 = KGAMMA * 4;
+unsigned char ungamma256[KGAMMA * 4 + 1];
 
 static void make_ungamma(double *Gamma, double *Midgamma,
 	unsigned char *Ungamma,	int kgamma, int cnt)
@@ -351,7 +351,6 @@ void init_cols(void)
 	make_gamma(gamma64, 64);
 	make_ungamma64K();
 	make_ungamma(gamma256, midgamma256, ungamma256, kgamma256, 256);
-	make_ungamma(gamma64, midgamma64, ungamma64, kgamma64, 64);
 	make_CIE();
 	make_EXP();
 	make_rgb_xyz();
