@@ -5399,6 +5399,9 @@ static void scale_row(fstep *tmpy, fstep *hfilter, double *work_area,
 	int bpp, int gc, int ow, int oh, int nw, int i,
 	unsigned char *src, unsigned char *dest)
 {
+	/* !!! Protect from possible stack misalignment */
+	unsigned char sum_[4 * sizeof(double)];
+	double *sum = ALIGNED(sum_, sizeof(double));
 	istore_func istore;
 	unsigned char *img;
 	fstep *tmpx;
@@ -5435,7 +5438,7 @@ static void scale_row(fstep *tmpy, fstep *hfilter, double *work_area,
 	{
 		__typeof__(*tmpx->k) *tp, *kp = tmpx[1].k;
 		double *wrk = work_area + tmpx->idx * bpp;
-		double sum[3], sum0, sum1, sum2;
+		double sum0, sum1, sum2;
 
 		sum0 = sum1 = sum2 = 0.0;
 		tp = tmpx->k;
@@ -5457,6 +5460,9 @@ static void scale_rgba(fstep *tmpy, fstep *hfilter, double *work_area,
 	unsigned char *src, unsigned char *dest,
 	unsigned char *srca, unsigned char *dsta)
 {
+	/* !!! Protect from possible stack misalignment */
+	unsigned char sum_[4 * sizeof(double)];
+	double *sum = ALIGNED(sum_, sizeof(double));
 	istore_func istore;
 	unsigned char *img, *imga;
 	fstep *tmpx;
@@ -5470,6 +5476,7 @@ static void scale_rgba(fstep *tmpy, fstep *hfilter, double *work_area,
 	for (y = tmpy->idx; y < h; y++)
 	{
 		double *wrk = work_area;
+		unsigned char *img, *imga;
 		int ix = (y + oh) % oh;
 
 		img = src + ix * ow * 3;
@@ -5521,7 +5528,7 @@ static void scale_rgba(fstep *tmpy, fstep *hfilter, double *work_area,
 	{
 		__typeof__(*tmpx->k) *tp, *kp = tmpx[1].k;
 		double *wrk;
-		double sum[3], sum0, sum1, sum2, mult;
+		double sum0, sum1, sum2, mult;
 
 		sum0 = 0.0;
 		wrk = wrka + tmpx->idx;
@@ -6925,6 +6932,10 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 
 ////	EFFECTS
 
+static inline double dist(int n1, int n2)
+{
+	return (sqrt(n1 * n1 + n2 * n2));
+}
 
 void do_effect(int type, int param)
 {
@@ -6986,13 +6997,12 @@ void do_effect(int type, int param)
 				k = *src + (5 * k) / (125 - param);
 				break;
 			case FX_SOBEL: /* Another edge detector */
-				k1 = (src[dxp1] - src[dxm1]) * 2 +
+				k = dist((src[dxp1] - src[dxm1]) * 2 +
 					src[dym1 + dxp1] - src[dym1 + dxm1] +
-					src[dyp1 + dxp1] - src[dyp1 + dxm1];
-				k2 = (src[dyp1] - src[dym1]) * 2 +
+					src[dyp1 + dxp1] - src[dyp1 + dxm1],
+					(src[dyp1] - src[dym1]) * 2 +
 					src[dyp1 + dxm1] + src[dyp1 + dxp1] -
-					src[dym1 + dxm1] - src[dym1 + dxp1];
-				k = sqrt(k1 * k1 + k2 * k2);
+					src[dym1 + dxm1] - src[dym1 + dxp1]);
 				break;
 			case FX_PREWITT: /* Yet another edge detector */
 /* Actually, the filter kernel used is "Robinson"; what is attributable to
@@ -7026,14 +7036,12 @@ void do_effect(int type, int param)
 					// Division is for equalizing weight of edge
 				break;
 			case FX_GRADIENT: /* Still another edge detector */
-				k1 = src[dxp1] - src[0];
-				k2 = src[dyp1] - src[0];
-				k = 4.0 * sqrt(k1 * k1 + k2 * k2);
+				k = 4.0 * dist(src[dxp1] - src[0],
+					src[dyp1] - src[0]);
 				break;
 			case FX_ROBERTS: /* One more edge detector */
-				k1 = src[dyp1 + dxp1] - src[0];
-				k2 = src[dxp1] - src[dyp1];
-				k = 4.0 * sqrt(k1 * k1 + k2 * k2);
+				k = 4.0 * dist(src[dyp1 + dxp1] - src[0],
+					src[dxp1] - src[dyp1]);
 				break;
 			case FX_LAPLACE: /* The last edge detector... I hope */
 				k = src[dym1 + dxm1] + src[dym1] + src[dym1 + dxp1] +
@@ -7930,7 +7938,7 @@ typedef struct {
  * a chance to accumulate; to avoid, reduced-precision gamma is used - WJ */
 static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *info)
 {
-	double rs[3] = { 0.0, 0.0, 0.0 };
+	double rs0 = 0.0, rs1 = 0.0, rs2 = 0.0;
 	int avg[3] = { 0, 0, 0 }, dis[3] = { 0, 0, 0 };
 	int i, w, r = info->r, gc = info->gcor, *idx = info->idx;
 
@@ -7949,9 +7957,9 @@ static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *i
 		dis[2] += tv * tv;
 		if (gc)
 		{
-			rs[0] += Fgamma256[tvv[0]];
-			rs[1] += Fgamma256[tvv[1]];
-			rs[2] += Fgamma256[tvv[2]];
+			rs0 += Fgamma256[tvv[0]];
+			rs1 += Fgamma256[tvv[1]];
+			rs2 += Fgamma256[tvv[2]];
 		}
 		if (i < 0) continue;
 
@@ -7982,20 +7990,20 @@ static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *i
 			info->dis[i3 + 2] -= dis[2];
 		}
 		if (!gc) continue;
-		rs[0] -= Fgamma256[tvv[0]];
-		rs[1] -= Fgamma256[tvv[1]];
-		rs[2] -= Fgamma256[tvv[2]];
+		rs0 -= Fgamma256[tvv[0]];
+		rs1 -= Fgamma256[tvv[1]];
+		rs2 -= Fgamma256[tvv[2]];
 		if (add)
 		{
-			info->rs[i3 + 0] += rs[0];
-			info->rs[i3 + 1] += rs[1];
-			info->rs[i3 + 2] += rs[2];
+			info->rs[i3 + 0] += rs0;
+			info->rs[i3 + 1] += rs1;
+			info->rs[i3 + 2] += rs2;
 		}
 		else
 		{
-			info->rs[i3 + 0] -= rs[0];
-			info->rs[i3 + 1] -= rs[1];
-			info->rs[i3 + 2] -= rs[2];
+			info->rs[i3 + 0] -= rs0;
+			info->rs[i3 + 1] -= rs1;
+			info->rs[i3 + 2] -= rs2;
 		}
 	}
 }
