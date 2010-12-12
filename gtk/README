@@ -4,7 +4,7 @@ The History
 
 For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of GTK+ 2.6.4 and 2.6.9, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support Windows 98, which became unsupported with GTK+ 2.8.
 
-But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Still, upgrading the package to a new version of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with custom-built libgdk, libgtk, and libwimp, based on GTK+ 2.6.7 and a set of patches backported from the later versions of GTK+.
+But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Moreover, libraries such as libpng, libjpeg, LibTIFF, FreeType, and even zlib have undergone multiple version changes in the meantime, with bugfixes and other improvements. Still, upgrading the package to a newer official distribution of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with a custom build of GTK+ based on version 2.6.7 with a set of patches backported from the later versions, compiled from source along with all its dependencies.
 
 -------------
 The Specifics
@@ -116,30 +116,78 @@ Original patches from GTK+ tree contained in the cumulative patch:
 
 In addition, there are couple of my own patches, solving the build problems arising from use of recent MinGW on a Linux box (in GTK+ 2.6.x time, official Windows packages were built with MSVC on Windows).
 
+Patch from Pango tree:
+- svn 2489 / git d686e1d4ae80b64390149e7336329c0254479161
+  On Windows store the default aliases file in a string array. (#492517)
+  (BACKPORTED: needed to handle 'pango.aliases' for Windows Vista & Windows 7)
+
 ---------
 The Build
 ---------
 
 The build was done on a Slackware Linux system using MinGW cross-compiler installation combined of the following parts:
-- TDM-GCC 4.2.3		( http://www.tdragon.net/recentgcc/ )
+- TDM-GCC 4.2.4		( http://www.tdragon.net/recentgcc/ )
 - binutils 2.19		( http://mingw.sourceforge.net/ )
 - MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
 - Win32 API 3.13	( http://mingw.sourceforge.net/ )
 
-To replicate it, do the following:
-- download and unpack GTK+ 2.6.7 sources from http://ftp.gtk.org/pub/gtk/v2.6/gtk+-2.6.7.tar.bz2
-- download the Wintab development package from http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
-- unpack that package: unzip -LL wtkit126.zip
-- rename the 'wtkit126 Folder' directory to 'wintab' and move it into the directory with GTK+ sources ('gtk+-2.6.7')
-- apply the cumulative patch: "patch -p0 < gtk267_5wj.patch"
-- adjust "GTK_PREFIX", "CFLAGS", "TARGET", "MINGW_TOOL_PREFIX" and "MINGW_BIN" variables in the 'mingw-configure' script according to your MinGW cross-compiler's version and install location
-- run 'mingw-configure' from the directory with GTK+ sources
-- run 'runmake' from same directory, to compile GTK+
-- create a destination directory
-- run "make install DESTDIR=full_path_to_destination_directory" to produce the final binaries
-- go into your destination directory's 'bin' subdirectory
-- run the 'strip' command *from your MinGW package*, like this: "i586-mingw32-strip --strip-unneeded *.dll"
-- go into 'lib/gtk-2.0/2.4.0/engines' subdirectory and do the same
+To replicate it, you need the following source packages:
+- GTK+ 2.6.7 (this specific version and no other):
+    gtk+-2.6.7.tar.bz2
+    http://ftp.gtk.org/pub/gtk/v2.6/gtk+-2.6.7.tar.bz2
+- Wintab development package:
+    wtkit126.zip
+    http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
+- Pango 1.8.2 (this specific version and no other):
+    pango-1.8.2.tar.bz2
+    http://ftp.gtk.org/pub/gtk/v2.6/pango-1.8.2.tar.bz2
+- ATK 1.9.0:
+    atk-1.9.0.tar.bz2
+    http://ftp.gtk.org/pub/gtk/v2.6/atk-1.9.0.tar.bz2
+- GLib 2.6.6:
+    glib-2.6.6.tar.bz2
+    http://ftp.gtk.org/pub/gtk/v2.6/glib-2.6.6.tar.bz2
+- GNU gettext 0.14.5:
+    gettext-0.14.5.tar.gz
+    http://ftp.gnu.org/gnu/gettext/gettext-0.14.5.tar.gz
+- GNU libiconv 1.9.2:
+    libiconv-1.9.2.tar.gz
+    http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.9.2.tar.gz
+- zlib 1.2.5:
+    zlib-1.2.5.tar.bz2
+    http://zlib.net/zlib-1.2.5.tar.bz2
+- libpng 1.2.44:
+    libpng-1.2.44.tar.gz
+    ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng-1.2.44.tar.gz
+- libjpeg 8b:
+    jpegsrc.v8b.tar.gz
+    http://www.ijg.org/files/jpegsrc.v8b.tar.gz
+- LibTIFF 3.9.4:
+    tiff-3.9.4.tar.gz
+    http://download.osgeo.org/libtiff/tiff-3.9.4.tar.gz
+- FreeType 2.4.4:
+    freetype-2.4.4.tar.bz2
+    http://download.savannah.gnu.org/releases/freetype/freetype-2.4.4.tar.bz2
+- giflib 4.1.6:
+    giflib-4.1.6.tar.bz2
+    http://heanet.dl.sourceforge.net/project/giflib/giflib%204.x/giflib-4.1.6/giflib-4.1.6.tar.bz2
+- JasPer 1.900.1 (this specific version and no other):
+    jasper-1.900.1.zip
+    http://www.ece.uvic.ca/~mdadams/jasper/software/jasper-1.900.1.zip
+- Little CMS 2.1:
+    lcms2-2.1.tar.gz
+    http://heanet.dl.sourceforge.net/project/lcms/lcms/2.1/lcms2-2.1.tar.gz
+
+Also you need the following files from 'gtk' subdirectory of mtPaint source package:
+  winbuild.sh
+  gtk267_5wj.patch
+  gtkrc
+  pango182_1wj.patch
+  pango.aliases
+
+To recreate the "etc/pango/pango.modules" and "etc/gtk-2.0/gdk-pixbuf.loaders" files, you additionally need a working install of Wine.
+
+To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, runtime files will be placed under 'zad/pkg' and development libraries and headers, under 'zad/dev'.
 
 ---------------------------------
 Copyright (C) 2010 Dmitry Groshev

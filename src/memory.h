@@ -545,10 +545,6 @@ int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
 			// Count colours used in RGB chunk and dump to found table
 void mem_cols_found(png_color *userpal);	// Convert colours list into palette
 
-
-int read_hex( char in );			// Convert character to hex value 0..15.  -1=error
-int read_hex_dub( char *in );			// Read hex double
-
 #define FREE_IMAGE 1
 #define FREE_UNDO  2
 #define FREE_ALL   3
@@ -699,7 +695,7 @@ void *mem_try_malloc(size_t size);
 
 int sb_rect[4];				// Backbuffer placement
 int init_sb();				// Create shapeburst backbuffer
-void render_sb();			// Render from shapeburst backbuffer
+void render_sb(unsigned char *mask);	// Render from shapeburst backbuffer
 
 int mem_clip_mask_init(unsigned char val);		// Initialise the clipboard mask
 //	Extract alpha info from RGB clipboard

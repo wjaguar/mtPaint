@@ -877,7 +877,7 @@ void pressed_rectangle(int filled)
 		}
 	}
 
-	if (sb) render_sb();
+	if (sb) render_sb(NULL);
 
 	mem_undo_prepare();
 	update_stuff(UPD_IMG);
@@ -938,14 +938,24 @@ static void channel_mask()
 
 static void cut_clip()
 {
-	int i;
+	int i, sb = 0;
 
 	spot_undo(UNDO_DRAW);
+	/* Shapeburst mode */
+	if (STROKE_GRADIENT)
+	{
+		sb_rect[0] = mem_clip_x;
+		sb_rect[1] = mem_clip_y;
+		sb_rect[2] = mem_clip_w;
+		sb_rect[3] = mem_clip_h;
+		sb = init_sb();
+	}
 	for (i = 0; i < mem_clip_h; i++)
 	{
 		put_pixel_row(mem_clip_x, mem_clip_y + i, mem_clip_w,
 			mem_clip_mask ? mem_clip_mask + i * mem_clip_w : NULL);
 	}
+	if (sb) render_sb(mem_clip_mask);
 	mem_undo_prepare();
 }
 

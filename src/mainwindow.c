@@ -3443,9 +3443,19 @@ void set_image(gboolean state)
 	if (state) set_cursor(); /* Canvas window is now a new one */
 }
 
+static char read_hex_dub(char *in)	// Read hex double
+{
+	static const char chars[] = "0123456789abcdef0123456789ABCDEF";
+	const char *p1, *p2;
+
+	p1 = strchr(chars, in[0]);
+	p2 = strchr(chars, in[1]);
+	return (p1 && p2 ? (((p1 - chars) & 15) << 4) + ((p2 - chars) & 15) : '?');
+}
+
 static void parse_drag( char *txt )
 {
-	char fname[PATHBUF], *tp, *tp2;
+	char ch, fname[PATHBUF], *tp, *tp2;
 	int i, j, nlayer = TRUE;
 
 	set_image(FALSE);
@@ -3454,26 +3464,25 @@ static void parse_drag( char *txt )
 	while ((layers_total < MAX_LAYERS) && (tp2 = strstr(tp, "file:")))
 	{
 		tp = tp2 + 5;
-		while ( tp[0] == '/' ) tp++;
+		while (*tp == '/') tp++;
 #ifndef WIN32
 		// If not windows keep a leading slash
 		tp--;
 		// If windows strip away all leading slashes
 #endif
 		i = 0;
-		j = 0;
-		while ((tp[j] > 31) && (j < PATHBUF - 1))	// Copy filename
+		while ((ch = *tp++) > 31) // Copy filename
 		{
-			if ( tp[j] == '%' )	// Weed out those ghastly % substitutions
+			if (ch == '%')	// Weed out those ghastly % substitutions
 			{
-				fname[i++] = read_hex_dub( tp+j+1 );
-				j += 2;
+				ch = read_hex_dub(tp);
+				tp += 2;
 			}
-			else fname[i++] = tp[j];
-			j++;
+			fname[i++] = ch;
+			if (i >= PATHBUF - 1) break;
 		}
 		fname[i] = 0;
-		tp = tp + j;
+		tp--;
 
 		j = detect_image_format(fname);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))

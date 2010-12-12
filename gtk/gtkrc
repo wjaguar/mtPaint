@@ -1,0 +1,24 @@
+gtk-icon-sizes="gtk-menu=14,14:gtk-small-toolbar=16,16:gtk-large-toolbar=24,24:gtk-dnd=32,32"
+gtk-toolbar-icon-size=large-toolbar
+#gtk-button-images=0
+gtk-alternative-button-order=1
+
+style "msw-default"
+{
+  GtkWidget::interior_focus = 1
+  GtkOptionMenu::indicator_size = { 9, 5 }
+  GtkOptionMenu::indicator_spacing = { 7, 5, 2, 2 }
+  GtkToolbar::shadow-type = none
+  GtkHandleBox::shadow-type = etched-in 
+  GtkSpinButton::shadow-type = in
+  GtkComboBox::add-tearoffs = false
+
+  GtkTreeView::allow-rules = 0
+  GtkTreeView::expander_size = 11
+  GtkUIManager::add-tearoffs = false
+  
+  engine "wimp" 
+  {
+  }
+}
+class "*" style "msw-default"

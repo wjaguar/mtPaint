@@ -4017,10 +4017,11 @@ int init_sb()
 	return (TRUE);
 }
 
-void render_sb()
+/* Mask, if present, must be sb_rect[] sized */
+void render_sb(unsigned char *mask)
 {
 	grad_info svgrad, *grad = gradient + mem_channel;
-	int i, y1, maxd;
+	int i, maxd;
 
 	if (!sb_buf) return; /* Uninitialized */
 	put_pixel = put_pixel_def;
@@ -4033,9 +4034,9 @@ void render_sb()
 		if (!grad->len) grad->len = maxd - (maxd > 1);
 		grad_update(grad);
 
-		y1 = sb_rect[1] + sb_rect[3];
-		for (i = sb_rect[1]; i < y1; i++)
-			put_pixel_row(sb_rect[0], i, sb_rect[2], NULL);
+		for (i = 0; i < sb_rect[3]; i++)
+			put_pixel_row(sb_rect[0], sb_rect[1] + i, sb_rect[2],
+				mask ? mask + sb_rect[2] * i : NULL);
 
 		*grad = svgrad;
 	}
@@ -4359,7 +4360,7 @@ void flood_fill(int x, int y, unsigned int target)
 			memset(buf, 0, mem_width);
 		}
 
-		if (sb) render_sb(); /* Finalize */
+		if (sb) render_sb(NULL); /* Finalize */
 
 		break;
 	}
@@ -4540,7 +4541,7 @@ void mem_ellipse(int x1, int y1, int x2, int y2, int thick)
 	else wjellipse(xs, ys, xl, yl, thick && (thick * 2 < xl) &&
 		(thick * 2 < yl), thick);
 
-	if (sb) render_sb();
+	if (sb) render_sb(NULL);
 }
 
 static int circ_r, circ_trace[128];
@@ -4610,29 +4611,6 @@ void circle_line(int x0, int y0, int dx, int dy, int thick)
 	yy[iy ^ 1] = y0 - ((circ_trace[n] + dt) >> 1);
 
 	g_para(xx[0], yy[0], xx[1], yy[1], dx, dy);
-}
-
-int read_hex( char in )			// Convert character to hex value 0..15.  -1=error
-{
-	int res = -1;
-
-	if ( in >= '0' && in <='9' ) res = in - '0';
-	if ( in >= 'a' && in <='f' ) res = in - 'a' + 10;
-	if ( in >= 'A' && in <='F' ) res = in - 'A' + 10;
-
-	return res;
-}
-
-int read_hex_dub( char *in )		// Read hex double
-{
-	int hi, lo;
-
-	hi = read_hex( in[0] );
-	if ( hi < 0 ) return -1;
-	lo = read_hex( in[1] );
-	if ( lo < 0 ) return -1;
-
-	return 16*hi + lo;
 }
 
 void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp)

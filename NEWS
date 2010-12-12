@@ -64,6 +64,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Transparency in indexed TGA files is now read properly
 	* BUGFIX - Failed operations now do not flag image as modified
 	* BUGFIX - Gradient colours are now properly updated after converting indexed image to RGB
+	* BUGFIX - Cut operation in gradient mode when no placement exists now draws shapeburst gradient as it should
 	* BUGFIX - Builtin file selector now properly handles manual edits in directory box
 	* BUGFIX - Problem with FreeType text dialog occasionally hiding behind main window is now eliminated
 	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
