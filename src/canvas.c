@@ -281,6 +281,7 @@ void commit_paste(int swap, int *update)
 	{
 		unsigned char *wa = ua ? alpha : mem_clip_alpha + ofs;
 		unsigned char *wm = mem_clip_mask ? mem_clip_mask + ofs : NULL;
+		unsigned char *img = image;
 
 		row_protected(fx, fy + i, fw, mask);
 		if (swap)
@@ -296,9 +297,17 @@ void commit_paste(int swap, int *update)
 			mem_img[CHN_ALPHA] + iofs : NULL, old_alpha + iofs,
 			wa, wm, opacity, 0);
 
+		if (mem_clip_bpp < bpp)
+		{
+			/* Convert paletted clipboard to RGB */
+			do_convert_rgb(0, 1, fw, xbuf, img,
+				mem_clip_paletted ? mem_clip_pal : mem_pal);
+			img = xbuf;
+		}
+
 		process_img(0, 1, fw, mask, mem_img[mem_channel] + iofs * bpp,
-			old_image + iofs * bpp, image,
-			xbuf, mem_clip_bpp, opacity ? bpp : 0);
+			old_image + iofs * bpp, img,
+			xbuf, bpp, opacity);
 
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;

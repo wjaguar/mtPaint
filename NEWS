@@ -42,7 +42,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* PCX file format save/load added
 	* SVG file format import added (using librsvg; requires GTK+ 2.4 or later)
 	* Better support for loading CMYK TIFF files as RGB/RGBA
-	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS 1.x/2.0)
+	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
 	* JPEG2000 file format support now can be compiled with either JasPer or OpenJPEG library
 	* GIF loader made more tolerant to truncated or malformed GIF files
 	* "Palette->Open" now can extract palette from indexed images in any supported file format

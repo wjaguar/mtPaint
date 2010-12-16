@@ -941,7 +941,11 @@ int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
 	text_paste = 0;
 
 	/* Clear everything if no backup needed */
-	if (!backup) mem_free_image(&mem_clip, FREE_ALL);
+	if (!backup)
+	{
+		mem_free_image(&mem_clip, FREE_ALL);
+		mem_clip_paletted = 0;
+	}
 
 	/* Backup current contents if no backup yet */
 	else if (!HAVE_OLD_CLIP)
@@ -966,7 +970,11 @@ int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
 	res = mem_alloc_image(AI_NOINIT, &mem_clip, width, height, bpp, cmask, NULL);
 
 	/* Remove backup if allocation failed */
-	if (!res && HAVE_OLD_CLIP) mem_free_image(&mem_clip, FREE_ALL);
+	if (!res && HAVE_OLD_CLIP)
+	{
+		mem_free_image(&mem_clip, FREE_ALL);
+		mem_clip_paletted = 0;
+	}
 
 	/* Fill current undo frame if any */
 	else if (mem_clip.undo_.items) update_undo(&mem_clip);
@@ -2441,7 +2449,7 @@ void set_zoom_centre( int x, int y )
 }
 
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
-	unsigned char *src)
+	unsigned char *src, png_color *pal)
 {
 	int i, s3 = step * 3;
 
@@ -2449,7 +2457,7 @@ void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	cnt = start + step * cnt;
 	for (i = start; i < cnt; i += step)
 	{
-		png_color *col = mem_pal + src[i];
+		png_color *col = pal + src[i];
 		dest[0] = col->red;
 		dest[1] = col->green;
 		dest[2] = col->blue;
@@ -2464,7 +2472,8 @@ int mem_convert_rgb()			// Convert image to RGB
 
 	res = undo_next_core(UC_NOCOPY, mem_width, mem_height, 3, CMASK_IMAGE);
 	if (res) return (res);	// Not enough memory
-	do_convert_rgb(0, 1, mem_width * mem_height, mem_img[CHN_IMAGE], old_image);
+	do_convert_rgb(0, 1, mem_width * mem_height, mem_img[CHN_IMAGE],
+		old_image, mem_pal);
 	return (0);
 }
 
@@ -6489,7 +6498,7 @@ void put_pixel_def(int x, int y)	/* Combined */
 	offset *= bpp;
 	process_img(0, 1, 1, &opacity,
 		mem_img[mem_channel] + offset, old_image + offset, ti,
-		ti, bpp, !idx * bpp);
+		ti, bpp, !idx);
 }
 
 /* Repeat pattern in buffer */
@@ -6604,7 +6613,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		process_img(0, 1, l, mask,
 			mem_img[mem_channel] + offset * bpp,
 			old_image + offset * bpp, tmp_image,
-			tmp_image, bpp, idx * bpp);
+			tmp_image, bpp, idx);
 
 		if (!(len -= l)) return;
 		x += l;
@@ -6690,25 +6699,18 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	}
 }
 
+/* Here, opacity is just a "not indexed" flag, any nonzero value will serve */
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	unsigned char *xbuf, int sourcebpp, int destbpp)
+	unsigned char *xbuf, int bpp, int opacity)
 {
 	int tint;
 
 
-	if (sourcebpp < destbpp)
-	{
-		/* Convert paletted source to RGB */
-		do_convert_rgb(start, step, cnt, xbuf, img);
+	/* Apply blend mode's transform part */
+	if (mem_blend && (blend_mode & BLEND_MMASK) &&
+		blend_pixels(start, step, cnt, mask, xbuf, img0, img, bpp))
 		img = xbuf;
-	}
-	if (mem_blend && (blend_mode & BLEND_MMASK))
-	{
-		/* Apply blend mode's transform part */
-		if (blend_pixels(start, step, cnt, mask,
-			xbuf, img0, img, destbpp < 3 ? 1 : 3)) img = xbuf;
-	}
 
 	cnt = start + step * cnt;
 
@@ -6716,10 +6718,10 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	/* Indexed image or utility channel */
-	if (destbpp < 3)
+	if (bpp < 3)
 	{
 		unsigned char newc, oldc;
-		int i, j, mx = destbpp ? 255 : mem_cols - 1;
+		int i, j, mx = opacity ? 255 : mem_cols - 1;
 
 		for (i = start; i < cnt; i += step)
 		{

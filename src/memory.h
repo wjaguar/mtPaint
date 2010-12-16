@@ -352,6 +352,9 @@ image_info mem_clip;			// Current clipboard
 #define mem_clip_real_w		mem_clip.undo_.items[OLD_CLIP].width
 #define mem_clip_real_h		mem_clip.undo_.items[OLD_CLIP].height
 #define mem_clip_real_clear()	mem_free_image(&mem_clip, FREE_UNDO)
+// Repurpose the field
+#define mem_clip_paletted	mem_clip.changed
+#define mem_clip_pal		mem_clip.pal
 
 image_state mem_state;			// Current edit settings
 
@@ -614,7 +617,7 @@ void mem_pal_load_def();		// Load default palette
 void mem_pal_init();			// Initialise whole of palette RGB
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
-	unsigned char *src);
+	unsigned char *src, png_color *pal);
 int mem_convert_rgb();			// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
@@ -783,7 +786,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha);
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	unsigned char *xbuf, int sourcebpp, int destbpp);
+	unsigned char *xbuf, int bpp, int opacity); // opacity value is ignored
 void copy_area(image_info *dest, image_info *src, int x, int y);
 
 // Retroactive masking - by blending with undo frame

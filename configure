@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.60"
-MT_DATE="2010-12-12"
+MT_V="3.34.61"
+MT_DATE="2010-12-17"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -380,7 +380,7 @@ pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
 EOF
 else
 	LL=${FAKE_ROOT:+--unresolved-symbols=ignore-in-shared-libs -L$FAKE_ROOT/lib} # Extra libs
-	II=${FAKE_ROOT:+-I$FAKE_ROOT/include} # Extra includes
+	II=${FAKE_ROOT:+-isystem $FAKE_ROOT/include} # Extra includes
 
 	if HAVE_FUNC "mkdtemp"
 	then

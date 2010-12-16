@@ -2256,7 +2256,7 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 
 	memcpy(g->wimg, tmp, g->len * g->bpp);
 	process_img(start, step, cnt, g->wmask, g->wimg, tmp, g->gimg,
-		g->xbuf, g->bpp, g->opac ? g->bpp : 0);
+		g->xbuf, g->bpp, g->opac);
 
 	if (g->rgb) blend_indexed(start, step, cnt, g->rgb, mem_img[CHN_IMAGE] + l,
 		g->wimg ? g->wimg : mem_img[CHN_IMAGE] + l, mem_img[CHN_ALPHA] + l,
@@ -2410,8 +2410,15 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		do_transform(start, step, cnt, NULL, p->xform, clip_src);
 		clip_src = p->xform;
 	}
+	if (mem_clip_bpp < bpp)
+	{
+		/* Convert paletted clipboard to RGB */
+		do_convert_rgb(start, step, cnt, p->xbuf, clip_src,
+			mem_clip_paletted ? mem_clip_pal : mem_pal);
+		clip_src = p->xbuf;
+	}
 	process_img(start, step, cnt, p->mask, p->pix, mem_img[mem_channel] + ld * bpp,
-		clip_src, p->xbuf, mem_clip_bpp, p->opacity ? bpp : 0);
+		clip_src, p->xbuf, bpp, p->opacity);
 }
 
 static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)
@@ -4262,74 +4269,73 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 	return (wrap);
 }
 
-static void pressed_pal_copy()
+static int do_pal_copy(png_color *tpal, unsigned char *img,
+	unsigned char *alpha, unsigned char *mask,
+	unsigned char *mask2, png_color *wpal,
+	int w, int h, int bpp, int step)
 {
-	png_color tpal[256];
-	unsigned char *img, *tm2, *alpha = NULL, *mask = NULL, *mask2 = NULL;
-	int i, j, w, h, step, bpp, n = 0;
-
-	/* Source is selection */
-	if ((marq_status == MARQUEE_DONE) || (poly_status == POLY_DONE))
-	{
-		int rect[4];
-
-		marquee_at(rect);
-		bpp = MEM_BPP;
-		step = mem_width;
-		i = rect[1] * step + rect[0];
-		img = mem_img[mem_channel] + i * bpp;
-		if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA])
-			alpha = mem_img[CHN_ALPHA] + i;
-		if ((mem_channel <= CHN_ALPHA) && mem_img[CHN_SEL])
-			mask = mem_img[CHN_SEL] + i;
-		w = rect[2]; h = rect[3];
-		if (poly_status == POLY_DONE)
-		{
-			mask2 = calloc(1, w * h);
-			if (mask2) poly_draw(TRUE, mask2, w);
-		}
-	}
-	/* Source is clipboard */
-	else if (mem_clipboard)
-	{
-		w = mem_clip_w;
-		h = mem_clip_h;
-		bpp = mem_clip_bpp;
-		step = w;
-		img = mem_clipboard;
-		alpha = mem_clip_alpha;
-		mask = mem_clip_mask;
-	}
-	/* No source available */
-	else return;
+	int i, j, n;
 
 	mem_pal_copy(tpal, mem_pal);
-	tm2 = mask2;
-	for (i = 0; i < h; i++)
+	for (n = i = 0; i < h; i++)
 	{
 		for (j = 0; j < w; j++ , img += bpp)
 		{
 			/* Skip empty parts */
-			if ((tm2 && !tm2[j]) || (mask && !mask[j]) ||
+			if ((mask2 && !mask2[j]) || (mask && !mask[j]) ||
 				(alpha && !alpha[j])) continue;
-			if (bpp == 1) tpal[n] = mem_pal[*img];
+			if (bpp == 1) tpal[n] = wpal[*img];
 			else
 			{
 				tpal[n].red = img[0];
 				tpal[n].green = img[1];
 				tpal[n].blue = img[2];
 			}
-			if (++n >= 256) break;
+			if (++n >= 256) return (256);
 		}
-		if (n >= 256) break;
 		img += (step - w) * bpp;
 		if (alpha) alpha += step;
 		if (mask) mask += step;
-		if (tm2) tm2 += w;
+		if (mask2) mask2 += w;
 	}
-	if (mask2) free(mask2);
-	if (!n) return; // Empty set - ignore
+	return (n);
+}
 
+static void pressed_pal_copy()
+{
+	png_color tpal[256];
+	int n = 0;
+
+	/* Source is selection */
+	if ((marq_status == MARQUEE_DONE) || (poly_status == POLY_DONE))
+	{
+		unsigned char *mask2 = NULL;
+		int i, bpp, rect[4];
+
+		marquee_at(rect);
+		if ((poly_status == POLY_DONE) &&
+			(mask2 = calloc(1, rect[2] * rect[3])))
+			poly_draw(TRUE, mask2, rect[2]);
+
+		i = rect[1] * mem_width + rect[0];
+		bpp = MEM_BPP;
+		n = do_pal_copy(tpal, mem_img[mem_channel] + i * bpp,
+			(mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] ?
+			mem_img[CHN_ALPHA] + i : NULL,
+			(mem_channel <= CHN_ALPHA) && mem_img[CHN_SEL] ?
+			mem_img[CHN_SEL] + i : NULL,
+			mask2, mem_pal,
+			rect[2], rect[3], bpp, mem_width);
+
+		if (mask2) free(mask2);
+	}
+	/* Source is clipboard */
+	else if (mem_clipboard) n = do_pal_copy(tpal, mem_clipboard,
+		mem_clip_alpha, mem_clip_mask,
+		NULL, mem_clip_paletted ? mem_clip_pal : mem_pal,
+		mem_clip_w, mem_clip_h, mem_clip_bpp, mem_clip_w);
+
+	if (!n) return; // Empty set - ignore
 	spot_undo(UNDO_PAL);
 	mem_pal_copy(mem_pal, tpal);
 	mem_cols = n;
@@ -4349,23 +4355,18 @@ static void pressed_pal_paste()
 	}
 	h = (mem_cols + w - 1) / w;
 
-	mem_clip_new(w, h, 3, CMASK_IMAGE, FALSE);
+	mem_clip_new(w, h, 1, CMASK_IMAGE, FALSE);
 	if (!mem_clipboard)
 	{
 		memory_errors(1);
 		return;
 	}
+	mem_clip_paletted = 1;
+	mem_pal_copy(mem_clip_pal, mem_pal);
+	memset(dest = mem_clipboard, 0, w * h);
+	for (i = 0; i < mem_cols; i++) dest[i] = i;
 
-	memset(dest = mem_clipboard, 0, w * h * 3);
-	for (i = 0; i < mem_cols; i++ , dest += 3)
-	{
-		dest[0] = mem_pal[i].red;
-		dest[1] = mem_pal[i].green;
-		dest[2] = mem_pal[i].blue;
-	}
-
-	update_stuff(UPD_XCOPY);
-	if (MEM_BPP == 3) pressed_paste(TRUE);
+	pressed_paste(TRUE);
 }
 
 ///	DOCK AREA

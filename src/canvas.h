@@ -271,7 +271,7 @@ void create_default_image();			// Create default new image
 //	Changed selection geometry
 #define UPD_SGEOM  UPD_PSEL
 //	Initiated pasting something
-#define UPD_PASTE  (UPD_SEL | CF_DRAW)
+#define UPD_PASTE  (UPD_SEL | CF_DRAW | CF_CGEOM)
 //	Changed filename
 #define UPD_NAME   CF_NAME
 //	Changed transparent color
