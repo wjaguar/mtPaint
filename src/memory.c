@@ -6333,12 +6333,12 @@ static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
 			dest[0] = 255 - j0 >= 0 ? 255 - j0 : 0;
 			break;
 		case BLEND_DODGE: // div(old, ~new)
-			j1 = (old[1] << 8) / (~new[1] + 1);
+			j1 = (old[1] << 8) / ((unsigned char)~new[1] + 1);
 			dest[1] = j1 < 255 ? j1 : 255;
-			j2 = (old[2] << 8) / (~new[2] + 1);
+			j2 = (old[2] << 8) / ((unsigned char)~new[2] + 1);
 			dest[2] = j2 < 255 ? j2 : 255;
 		case BLEND_DODGE + BLEND_NMODES:
-			j0 = (old[0] << 8) / (~new[0] + 1);
+			j0 = (old[0] << 8) / ((unsigned char)~new[0] + 1);
 			dest[0] = j0 < 255 ? j0 : 255;
 			break;
 		case BLEND_DIV:
@@ -7926,7 +7926,7 @@ static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *i
 	for (i = -r; i < w; i++)
 	{
 		unsigned char *tvv;
-		int tv, i3;
+		int tv, i3, *iavg, *idis;
 
 		tvv = src + idx[i];
 		avg[0] += (tv = tvv[0]);
@@ -7951,39 +7951,45 @@ static void kuwahara_row(unsigned char *src, int base, int add, kuwahara_info *i
 		avg[2] -= (tv = tvv[2]);
 		dis[2] -= tv * tv;
 		i3 = (base + i) * 3;
+		iavg = info->avg + i3;
+		idis = info->dis + i3;
 		if (add)
 		{
-			info->avg[i3 + 0] += avg[0];
-			info->avg[i3 + 1] += avg[1];
-			info->avg[i3 + 2] += avg[2];
-			info->dis[i3 + 0] += dis[0];
-			info->dis[i3 + 1] += dis[1];
-			info->dis[i3 + 2] += dis[2];
+			iavg[0] += avg[0];
+			iavg[1] += avg[1];
+			iavg[2] += avg[2];
+			idis[0] += dis[0];
+			idis[1] += dis[1];
+			idis[2] += dis[2];
 		}
 		else
 		{
-			info->avg[i3 + 0] -= avg[0];
-			info->avg[i3 + 1] -= avg[1];
-			info->avg[i3 + 2] -= avg[2];
-			info->dis[i3 + 0] -= dis[0];
-			info->dis[i3 + 1] -= dis[1];
-			info->dis[i3 + 2] -= dis[2];
+			iavg[0] -= avg[0];
+			iavg[1] -= avg[1];
+			iavg[2] -= avg[2];
+			idis[0] -= dis[0];
+			idis[1] -= dis[1];
+			idis[2] -= dis[2];
 		}
-		if (!gc) continue;
-		rs0 -= Fgamma256[tvv[0]];
-		rs1 -= Fgamma256[tvv[1]];
-		rs2 -= Fgamma256[tvv[2]];
-		if (add)
+		if (gc)
 		{
-			info->rs[i3 + 0] += rs0;
-			info->rs[i3 + 1] += rs1;
-			info->rs[i3 + 2] += rs2;
-		}
-		else
-		{
-			info->rs[i3 + 0] -= rs0;
-			info->rs[i3 + 1] -= rs1;
-			info->rs[i3 + 2] -= rs2;
+			double *irs = info->rs + i3;
+
+			rs0 -= Fgamma256[tvv[0]];
+			rs1 -= Fgamma256[tvv[1]];
+			rs2 -= Fgamma256[tvv[2]];
+			if (add)
+			{
+				irs[0] += rs0;
+				irs[1] += rs1;
+				irs[2] += rs2;
+			}
+			else
+			{
+				irs[0] -= rs0;
+				irs[1] -= rs1;
+				irs[2] -= rs2;
+			}
 		}
 	}
 }
