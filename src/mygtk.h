@@ -426,7 +426,7 @@ void undo_grab(GtkWidget *widget);
 #define PATHBUF SANE_PATH_LEN
 #endif
 
-#if GTK_VERSION_MAJOR == 1 /* Same encoding in GTK+1 */
+#if GTK_MAJOR_VERSION == 1 /* Same encoding in GTK+1 */
 #define PATHTXT PATHBUF
 #else /* Allow for expansion when converting from codepage to UTF8 */
 #define PATHTXT (PATHBUF * 2)

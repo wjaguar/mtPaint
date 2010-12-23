@@ -262,7 +262,7 @@ int main( int argc, char *argv[] )
 	{
 		if ( strcmp(argv[1], "--version") == 0 )
 		{
-			printf("%s\n\n", VERSION);
+			printf("%s\n\n", MT_VERSION);
 			exit(0);
 		}
 		if ( strcmp(argv[1], "--help") == 0 )
@@ -274,7 +274,7 @@ int main( int argc, char *argv[] )
 				"  --version       Output version information\n"
 				"  -s              Grab screenshot\n"
 				"  -v              Start in viewer mode\n\n"
-			, VERSION);
+			, MT_VERSION);
 			exit(0);
 		}
 	}

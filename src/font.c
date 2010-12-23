@@ -1739,7 +1739,7 @@ void pressed_mt_text()
 	add_font_clist(CLIST_FONTSIZE, vbox2, mem, 0);
 	mem->spin[TX_SPIN_SIZE] = pack(vbox2,
 		add_a_spin(inifile_get_gint32("fontSize", 12), 1, 500));
-#if GTK_CHECK_VERSION(2,4,0)
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	gtk_entry_set_alignment( GTK_ENTRY(&(GTK_SPIN_BUTTON( mem->spin[TX_SPIN_SIZE] )->entry)), 0.5);
 #endif
 

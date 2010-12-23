@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.62"
-MT_DATE="2010-12-21"
+MT_V="3.34.63"
+MT_DATE="2010-12-24"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -674,7 +674,7 @@ else
 	else
 		XCFLAG=${CFLAG:-$MARCH}
 	fi
-	echo "CFLAG = $II $XCFLAG $GTK_INCLUDE -DVERSION=\"\\\"$MT_VERSION\\\"\"" >> $GTK_FILE
+	echo "CFLAG = $II $XCFLAG $GTK_INCLUDE -DMT_VERSION=\"\\\"$MT_VERSION\\\"\"" >> $GTK_FILE
 
 	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
 	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE

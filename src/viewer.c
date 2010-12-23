@@ -129,7 +129,7 @@ void pressed_help()
 
 	gtk_container_set_border_width (GTK_CONTAINER (help_window), 4);
 	gtk_window_set_position (GTK_WINDOW (help_window), GTK_WIN_POS_CENTER);
-	snprintf(txt, 120, "%s - %s", VERSION, _("About"));
+	snprintf(txt, 120, "%s - %s", MT_VERSION, _("About"));
 	gtk_window_set_title (GTK_WINDOW (help_window), txt);
 	gtk_widget_set_usize (help_window, -2, 400);
 
@@ -1361,7 +1361,7 @@ static void paste_text_ok(GtkWidget *widget)
 		return;
 #endif
 
-#if GTK_CHECK_VERSION(2,6,0)
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 	inifile_set_gint32("fontAngle", rint(read_float_spin(text_spin[1]) * 100.0));
 #endif
 
@@ -1429,7 +1429,7 @@ void pressed_text()
 
 	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
 
-#if GTK_CHECK_VERSION(2,6,0)
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 	text_spin[1] = pack5(hbox, add_float_spin(
 		inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360));
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 

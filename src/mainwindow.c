@@ -966,6 +966,9 @@ int wtf_pressed(GdkEventKey *event)
 		/* Let keycodes match when keyvals don't */
 		if (realkey == *kcd) cmatch = ap;
 	}
+/* !!! If the starting layout has the keyval+mods combo mapped to one key, and
+ * the current layout to another, both will work till "rebind keys" is done.
+ * I like this better than shortcuts moving with every layout switch - WJ */
 	/* If we have only a keycode match */
 	if (cmatch && !ap->action) ap = cmatch;
 	/* Return 0 if no match */
@@ -1157,7 +1160,7 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 	{
 		i = 2;
 		if (inifile_get_gboolean("exitToggle", FALSE))
-			i = alert_box(VERSION, _("Do you really want to quit?"),
+			i = alert_box(MT_VERSION, _("Do you really want to quit?"),
 				_("NO"), _("YES"), NULL);
 	}
 	if (i != 2) return (TRUE); // Cancel quitting
@@ -4761,8 +4764,8 @@ static menu_item main_menu[] = {
 	{ _("//Convert To RGB"), -1, 0, NEED_IDX, NULL, FILT_2RGB, 0 },
 	{ _("//Convert To Indexed ..."), -1, 0, NEED_24, NULL, DLG_INDEXED, 0 },
 	{ "//", -4 },
-	{ _("//Scale Canvas ..."), -1, 0, 0, NULL, DLG_SCALE, 0 },
-	{ _("//Resize Canvas ..."), -1, 0, 0, NULL, DLG_SIZE, 0 },
+	{ _("//Scale Canvas ..."), -1, 0, 0, "Page_Up", DLG_SCALE, 0 },
+	{ _("//Resize Canvas ..."), -1, 0, 0, "Page_Down", DLG_SIZE, 0 },
 	{ _("//Crop"), -1, 0, NEED_CROP, "<control><shift>X", ACT_CROP, 0 },
 	{ "//", -4 },
 	{ _("//Flip Vertically"), -1, 0, 0, NULL, ACT_FLIP_V, 0 },
@@ -4861,10 +4864,10 @@ static menu_item main_menu[] = {
 	{ _("//Save As ..."), -1, 0, 0, NULL, DLG_FSEL, FS_CHANNEL_SAVE, XPM_ICON(save) },
 	{ _("//Delete ..."), -1, 0, NEED_CHAN, NULL, DLG_CHN_DEL, -1 },
 	{ "//", -4 },
-	{ _("//Edit Image"), 1, MENU_CHAN0, 0, NULL, ACT_CHANNEL, CHN_IMAGE },
-	{ _("//Edit Alpha"), 1, MENU_CHAN1, 0, NULL, ACT_CHANNEL, CHN_ALPHA },
-	{ _("//Edit Selection"), 1, MENU_CHAN2, 0, NULL, ACT_CHANNEL, CHN_SEL },
-	{ _("//Edit Mask"), 1, MENU_CHAN3, 0, NULL, ACT_CHANNEL, CHN_MASK },
+	{ _("//Edit Image"), 1, MENU_CHAN0, 0, "<shift>1", ACT_CHANNEL, CHN_IMAGE },
+	{ _("//Edit Alpha"), 1, MENU_CHAN1, 0, "<shift>2", ACT_CHANNEL, CHN_ALPHA },
+	{ _("//Edit Selection"), 1, MENU_CHAN2, 0, "<shift>3", ACT_CHANNEL, CHN_SEL },
+	{ _("//Edit Mask"), 1, MENU_CHAN3, 0, "<shift>4", ACT_CHANNEL, CHN_MASK },
 	{ "//", -4 },
 	{ _("//Hide Image"), 0, MENU_DCHAN0, 0, NULL, ACT_SET_OVERLAY, 1 },
 	{ _("//Disable Alpha"), 0, MENU_DCHAN1, 0, NULL, ACT_CHN_DIS, CHN_ALPHA },
@@ -4930,7 +4933,7 @@ void main_init()
 	main_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_widget_set_usize(main_window, 100, 100);		// Set minimum width/height
 	win_restore_pos(main_window, "window", 0, 0, 630, 400);
-	gtk_window_set_title (GTK_WINDOW (main_window), VERSION );
+	gtk_window_set_title (GTK_WINDOW (main_window), MT_VERSION );
 
 	/* !!! If main window receives these events, GTK+ will be able to
 	 * direct them to current modal window. Which makes it possible to
@@ -5185,7 +5188,7 @@ void update_titlebar()		// Update filename in titlebar
 	changed = mem_changed;
 	name = mem_filename;
 
-	snprintf(txt, 290, "%s %s %s", VERSION,
+	snprintf(txt, 290, "%s %s %s", MT_VERSION,
 		changed ? _("(Modified)") : "-",
 		name ? gtkuncpy(txt2, name, PATHTXT) : _("Untitled"));
 

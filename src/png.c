@@ -5025,15 +5025,16 @@ static void copy_rgb_pal(png_color *dest, unsigned char *src, int cnt)
 
 static int load_pcx(char *file_name, ls_settings *settings)
 {
-	static const unsigned char planarconfig[6] = {
-		0x11, /* BW */  0x12, /* 4c */   0x31, /* 8c */
-		0x41, /* 16c */ 0x18, /* 256c */ 0x38  /* RGB */ };
+	static const unsigned char planarconfig[8] = {
+		0x11, /* BW */  0x12, /* 4c */  0x31, /* 8c */
+		0x41, /* 16c */ 0x14, /* 16c */ 0x18, /* 256c */
+		0x38, /* RGB */	0x48  /* RGBA */ };
 	unsigned char hdr[PCX_HSIZE], pbuf[769];
 	unsigned char *buf, *row, *dest, *tmp;
 	FILE *fp;
 	int ver, bits, planes, ftype;
 	int y, ccnt, bstart, bstop, strl, plane;
-	int i, w, h, cols, buflen, bpp = 3, res = -1;
+	int w, h, cols, buflen, bpp = 3, res = -1;
 
 
 	if (!(fp = fopen(file_name, "rb"))) return (-1);
@@ -5049,11 +5050,11 @@ static int load_pcx(char *file_name, ls_settings *settings)
 	bits = hdr[PCX_BPP];
 	planes = hdr[PCX_NPLANES];
 	if ((bits | planes) > 15) goto fail;
-	if (!(tmp = memchr(planarconfig, (planes << 4) | bits, 6))) goto fail;
+	if (!(tmp = memchr(planarconfig, (planes << 4) | bits, 8))) goto fail;
 	ftype = tmp - planarconfig;
 
 	/* Prepare palette */
-	if (ftype != 5)
+	if (ftype < 6)
 	{
 		bpp = 1;
 		settings->colors = cols = 1 << (bits * planes);
@@ -5119,11 +5120,13 @@ static int load_pcx(char *file_name, ls_settings *settings)
 	buflen = GET16(hdr + PCX_LINELEN);
 	res = -1;
 	if (buflen < ((w * bits + 7) >> 3)) goto fail;
-	buf = malloc(PCX_BUFSIZE + buflen);
+	/* To accommodate bitparser's extra step */
+	buf = malloc(PCX_BUFSIZE + buflen + 1);
 	res = FILE_MEM_ERROR;
 	if (!buf) goto fail;
 	row = buf + PCX_BUFSIZE;
-	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+	if ((res = allocate_image(settings, ftype > 6 ? CMASK_RGBA : CMASK_IMAGE)))
+		goto fail2;
 
 	/* Read and decode the file */
 	if (!settings->silent) ls_init("PCX", 0);
@@ -5175,23 +5178,10 @@ static int load_pcx(char *file_name, ls_settings *settings)
 				dest[i] |= (v & 0x80) >> n;
 			}
 		}
-		else if (bits == 2) // Single plane of 2-bit data (MSB first)
-		{
-			unsigned char uninit_(v), *tmp = row;
-
-			for (i = 0; i < w; i++ , v <<= 2)
-			{
-				if (!(i & 3)) v = *tmp++;
-				dest[i] = (v >> 6) & 3;
-			}
-		}
-		else // N planes of 8-bit data
-		{
-			unsigned char *tmp = dest + plane;
-
-			for (i = 0; i < w; i++ , tmp += planes)
-				*tmp = row[i];
-		}
+		else if (plane < 3) // BPP planes of 2/4/8-bit data (MSB first)
+			stream_MSB(row, dest + plane, w, bits, 0, bits, bpp);
+		else if (settings->img[CHN_ALPHA]) // 8-bit alpha plane
+			memcpy(settings->img[CHN_ALPHA] + y * w, row, w);
 
 		if (++plane >= planes)
 		{
@@ -5352,21 +5342,23 @@ static int check_next_pnm(FILE *fp, char id)
 	return (1);
 }
 
-/* PAM loader does not support nonstandard types like "CMYK", "CMYK_ALPHA",
- * "GRAYSCALEFP" and "RGBFP", because handling format variations which are
- * unlikely to be found in the wild is a waste of code - WJ */
+/* PAM loader does not support nonstandard types "GRAYSCALEFP" and "RGBFP",
+ * because handling format variations which aren't found in the wild
+ * is a waste of code - WJ */
 
 static int load_pam_frame(FILE *fp, ls_settings *settings)
 {
 	static const char *typenames[] = {
 		"BLACKANDWHITE", "BLACKANDWHITE_ALPHA",
 		"GRAYSCALE", "GRAYSCALE_ALPHA",
-		"RGB", "RGB_ALPHA" };
+		"RGB", "RGB_ALPHA",
+		"CMYK", "CMYK_ALPHA" };
+	static const char depths[] = { 1, 2, 1, 2, 3, 4, 4, 5 };
 	cvt_func cvt_stream;
 	char wbuf[512], *t1, *t2, *tail;
 	unsigned char *dest, *buf = NULL;
 	int maxval = 0, w = 0, h = 0, depth = 0, ftype = -1;
-	int i, j, l, m, ll, bpp, trans, vl, res;
+	int i, j, l, ll, bpp, trans, vl, res;
 
 
 	/* Read header */
@@ -5412,11 +5404,10 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 	if (ftype < 0) ftype = depth >= 3 ? 4 : 2;
 
 	/* Validate */
-	if ((depth < 1) || (depth > 16) || (maxval < 1) || (maxval > 65535))
-		return (-1);
+	if ((depth < depths[ftype]) || (depth > 16) ||
+		(maxval < 1) || (maxval > 65535)) return (-1);
 	bpp = ftype < 4 ? 1 : 3;
 	trans = ftype & 1;
-	if (depth < bpp + trans) return (-1);
 	vl = maxval < 256 ? 1 : 2;
 	ll = w * depth * vl;
 	if (ftype < 2) // BW
@@ -5443,7 +5434,6 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 	/* Read the image */
 	if (!settings->silent) ls_init("PAM", 0);
 	res = FILE_LIB_ERROR;
-	m = maxval * 2;
 	cvt_stream = vl > 1 ? convert_16b : copy_bytes;
 	for (i = 0; i < h; i++)
 	{
@@ -5456,10 +5446,16 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 		if (settings->img[CHN_ALPHA]) // Have alpha - parse it
 		{
 			cvt_stream(settings->img[CHN_ALPHA] + w * i,
-				buf + bpp * vl, w, 1, depth, maxval);
+				buf + depths[ftype] * vl - vl, w, 1, depth, maxval);
 		}
-		cvt_stream(settings->img[CHN_IMAGE] + w * bpp * i,
-			buf, w, bpp, depth, maxval);
+		dest = settings->img[CHN_IMAGE] + w * bpp * i;
+		if (ftype >= 6) // CMYK
+		{
+			cvt_stream(buf, buf, w, 4, depth, maxval);
+			if (maxval < 255) extend_bytes(buf, w * 4, maxval);
+			cmyk2rgb(dest, buf, w, FALSE, settings);
+		}
+		else cvt_stream(dest, buf, w, bpp, depth, maxval);
 	}
 
 	/* Check for next frame */
@@ -5472,7 +5468,8 @@ fail2:	if (maxval < 255) // Extend what we've read
 			extend_bytes(settings->img[CHN_ALPHA], j, maxval);
 		j *= bpp;
 		dest = settings->img[CHN_IMAGE];
-		if (ftype > 1) extend_bytes(dest, j, maxval);
+		if (ftype >= 6); // CMYK is done already
+		else if (ftype > 1) extend_bytes(dest, j, maxval);
 		else // Convert BW from 1-is-white to 1-is-black
 		{
 			for (i = 0; i < j; i++ , dest++) *dest = !*dest;
