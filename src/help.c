@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -29,7 +29,7 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.40 - Copyright (C) 2004-2010 The Authors\n"),
+_("mtPaint 3.40 - Copyright (C) 2004-2011 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
@@ -46,6 +46,7 @@ _("  Ctrl-Shift-S      Save layers file"),
 _("  Ctrl-Q            Quit program\n"),
 _("  Ctrl-A            Select whole image"),
 _("  Escape            Select nothing, cancel paste box"),
+_("  J                 Lasso selection\n"),
 _("  Ctrl-C            Copy selection to clipboard"),
 _("  Ctrl-X            Copy selection to clipboard, and then paint current pattern to selection area"),
 _("  Ctrl-V            Paste clipboard to centre of current view"),
@@ -80,10 +81,13 @@ _("  Shift-T           Text Tool (GTK+)"),
 _("  T                 Text Tool (FreeType)\n"),
 _("  V                 View Window"),
 _("  L                 Layers Window\n"),
+_("  B                 Toggle Snap to Tile Grid mode\n"),
 _("  X                 Swap Colours A & B"),
 _("  E                 Choose Colour\n"),
 _("  A                 Draw open arrow head when using the line tool (size set by flow setting)"),
 _("  S                 Draw closed arrow head when using the line tool (size set by flow setting)\n"),
+_("  D                 Line Tool"),
+_("  F                 Flood Fill Tool\n"),
 _("  +,=               Main edit window - Zoom in"),
 _("  -                 Main edit window - Zoom out"),
 _("  Shift +,=         View window - Zoom in"),
@@ -151,17 +155,18 @@ _("Alan Horkan"),
 _("Alexandre Prokoudine"),
 _("Antonio Andrea Bianco"),
 _("Dennis Lee"),
+_("Donald White"),
 _("Ed Jason"),
 _("Eddie Kohler - Created Gifsicle which is needed for the creation and viewing of animated GIF files http://www.lcdf.org/gifsicle/"),
 _("Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta registration"),
 _("Lou Afonso"),
 _("Magnus Hjorth"),
 _("Martin Zelaia"),
+_("Pasi Kallinen"),
 _("Pavel Ruzicka"),
 _("Puppy Linux (Barry Kauler)"),
 _("Vlastimil Krejcir"),
-_("William Kern"),
-_("Pasi Kallinen\n\n"),
+_("William Kern\n\n"),
 _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan"),
 _("Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"),
@@ -182,7 +187,7 @@ _("Tagalog - Anjelo delCarmen"),
 _("Taiwanese Chinese - Wei-Lun Chao"),
 _("Turkish - Muhammet Kara, Tutku Dalmaz"),
 NULL };
-#define HELP_PAGE_MAX 82
+#define HELP_PAGE_MAX 86
 
 static char **help_pages[HELP_PAGE_COUNT] = {
 	help_page0, help_page1, help_page2, help_page3

@@ -1,5 +1,5 @@
 --------------------------------------------------
-mtPaint 3.40 - Copyright (C) 2004-2010 The Authors
+mtPaint 3.40 - Copyright (C) 2004-2011 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
@@ -55,7 +55,13 @@ Then you can open some graphics files with "mtv *.jpg".  This is a shortcut to w
 
 After running mtPaint for the first time, a new file is created to store your preferred settings and previously used files etc.  This file is named ".mtpaint" and stored in the user's home directory.  If you rename or remove this file then the next time mtPaint is run it will use the default settings.
 
-It is also possible to compile mtPaint on a Windows system using MinGW/MSYS with the relevant header and library files.  If you want to do this you must first download the normal setup program and install the files to "C:/Program Files/mtPaint/" and then:
+The easiest way to compile mtPaint for Windows is using MinGW cross-compiler on a GNU/Linux system, with requisite library and header files, corresponding to the runtime libraries you intend to use. Since version 3.40, official mtPaint package for Windows uses custom-built runtime files, and development libraries and headers are produced in the build process (see "gtk/README" for details); with version 3.31 and earlier, you could use the packages listed below for MinGW/MSYS build. Either way, after the headers and libraries are installed where MinGW expects them, you configure mtPaint for cross-compilation in this (non-standard) way, then run "make" as usual:
+
+CROSSCC=/path/to/mingw-gcc ./configure [options]
+
+It should also still be possible to compile mtPaint for Windows the old way, using MinGW/MSYS on a Windows system. However this wasn't done for quite some time, so the description below still refers to older versions of MinGW, MSYS and library packages. mtpaint.exe compiled according to it, will only be compatible with runtime libraries packaged with mtPaint 3.31 or older; to use the newer runtime (of version 3.40+), you'll need to use library and header files produced while cross-compiling the runtime (see above).
+
+If you want to do this you must first download the mtPaint 3.31 setup program and install the files to "C:/Program Files/mtPaint/" and then:
 
 1) Install MinGW and MSYS - http://www.mingw.org/ 
 MinGW-3.1.0-1.exe - to c:/MinGW/
@@ -117,17 +123,18 @@ Alan Horkan
 Alexandre Prokoudine
 Antonio Andrea Bianco
 Dennis Lee
+Donald White
 Ed Jason
 Eddie Kohler - Created Gifsicle which is needed for the creation and viewing of animated GIF files http://www.lcdf.org/gifsicle/
 Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta registration
 Lou Afonso
 Magnus Hjorth
 Martin Zelaia
+Pasi Kallinen
 Pavel Ruzicka
 Puppy Linux (Barry Kauler)
 Vlastimil Krejcir
 William Kern
-Pasi Kallinen
 
 
 Translations

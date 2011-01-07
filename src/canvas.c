@@ -796,11 +796,8 @@ void pressed_paste(int centre)
 {
 	if (!mem_clipboard) return;
 
-	poly_status = POLY_NONE;
-	poly_points = 0;
-	if ((tool_type != TOOL_SELECT) && (tool_type != TOOL_POLYGON))
-		change_to_tool(TTB_SELECT);
-	else if (marq_status != MARQUEE_NONE) paint_marquee(0, 0, 0, NULL);
+	pressed_select(FALSE);
+	change_to_tool(TTB_SELECT);
 
 	if (centre)
 	{
@@ -1158,6 +1155,8 @@ void update_stuff(int flags)
 		canvas_size(&w, &h);
 		wjcanvas_size(drawing_canvas, w, h);
 	}
+	if (flags & CF_CGEOM)
+		if (marq_status >= MARQUEE_PASTE) flags |= CF_DRAW;
 	if (flags & (CF_GEOM | CF_CGEOM))
 		check_marquee();
 	if (flags & CF_PAL)
@@ -2585,7 +2584,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		}
 		if ( marq_status == MARQUEE_PASTE_DRAG && ( button == 1 || button == 13 || button == 2 ) )
 		{	// User wants to drag the paste box
-			paint_marquee(2, x - marq_drag_x, y - marq_drag_y, NULL);
+			paint_marquee(MARQ_MOVE, x - marq_drag_x, y - marq_drag_y, NULL);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
 			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
@@ -2602,7 +2601,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 		{
 			if ( marq_status == MARQUEE_DONE )
 			{
-				paint_marquee(0, 0, 0, NULL);
+				paint_marquee(MARQ_HIDE, 0, 0, NULL);
 				i = close_to(x, y);
 				if (!(i & 1) ^ (marq_x1 > marq_x2))
 					marq_x1 = marq_x2;
@@ -2618,12 +2617,12 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			marq_x2 = x;
 			marq_y2 = y;
 			marq_status = MARQUEE_SELECTING;
-			paint_marquee(1, 0, 0, NULL);
+			paint_marquee(MARQ_SNAP, 0, 0, NULL);
 		}
 		else
 		{
 			if (marq_status == MARQUEE_SELECTING)	// Continuing to make a selection
-				paint_marquee(3, x, y, NULL);
+				paint_marquee(MARQ_SIZE, x, y, NULL);
 		}
 
 		if ( tool_type == TOOL_POLYGON )
@@ -2885,16 +2884,28 @@ void marquee_at(int *rect)			// Read marquee location & size
 	rect[3] = abs(marq_y2 - marq_y1) + 1;
 }
 
-static void locate_marquee(int *xy)
+static void locate_marquee(int *xy, int snap)
 {
+	int rxy[4];
 	int x1, y1, x2, y2, w, h, zoom = 1, scale = 1;
+
+	if (snap && tgrid_snap)
+	{
+		copy4(rxy, marq_xy);
+		snap_xy(marq_xy);
+		/* What follows makes no sense in case of paste, but
+		 * check_marquee() will put everything right anyway - WJ */
+		snap_xy(marq_xy + 2);
+		marq_xy[(rxy[2] >= rxy[0]) * 2 + 0] += tgrid_dx - 1;
+		marq_xy[(rxy[3] >= rxy[1]) * 2 + 1] += tgrid_dy - 1;
+	}
+	check_marquee();
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
 	/* Get onscreen coords */
-	check_marquee();
 	x1 = (marq_x1 * scale) / zoom;
 	y1 = (marq_y1 * scale) / zoom;
 	x2 = (marq_x2 * scale) / zoom;
@@ -2905,7 +2916,6 @@ static void locate_marquee(int *xy)
 	xy[3] = (xy[1] = y1 < y2 ? y1 : y2) + h;
 }
 
-// Actions: 0 - hide, 1 - show, 2 - move, 3 - resize
 static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 	rgbcontext *ctx)
 {
@@ -2913,15 +2923,15 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 	int xy[4], nxy[4], rxy[4], clips[4 * 3];
 	int i, j, nc, r, g, b, rw, rh, offx, offy, mst = marq_status;
 
-	locate_marquee(xy);
+	locate_marquee(xy, action == MARQ_SNAP);
 	copy4(nxy, xy);
 	copy4(clips, xy);
-	nc = action == 1 ? 0 : 4; // No clear if showing anew
+	nc = action < MARQ_HIDE ? 0 : 4; // No clear if showing anew
 
 	/* Determine which parts moved outside */
-	while (action > 1)
+	while (action >= MARQ_MOVE)
 	{
-		if (action == 2) // Move
+		if (action == MARQ_MOVE) // Move
 		{
 			marq_x2 += new_x - marq_x1;
 			marq_x1 = new_x;
@@ -2929,7 +2939,7 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 			marq_y1 = new_y;
 		}
 		else marq_x2 = new_x , marq_y2 = new_y; // Resize
-		locate_marquee(nxy);
+		locate_marquee(nxy, TRUE);
 
 		/* No intersection? */
 		if (!clip(rxy, xy[0], xy[1], xy[2], xy[3], nxy)) break;
@@ -2980,7 +2990,7 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 		}
 	}
 	marq_status = mst;
-	if (action == 0) return; // All done for clear
+	if (action == MARQ_HIDE) return; // All done for clear
 
 	/* Determine visible area */
 	if (!clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], vxy)) return;

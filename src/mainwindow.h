@@ -54,6 +54,7 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_DOCK,
 	ACT_CENTER,
 	ACT_GRID,
+	ACT_SNAP,
 	ACT_VWWIN,
 	ACT_VWSPLIT,
 	ACT_VWFOCUS,
@@ -266,6 +267,10 @@ int color_grid;		// If to use grid coloring
 int show_tile_grid;	// Tile grid toggle
 int tgrid_x0, tgrid_y0;	// Tile grid origin
 int tgrid_dx, tgrid_dy;	// Tile grid spacing
+int tgrid_snap;		// Coordinates snap toggle
+
+/* Snap coordinate pair to tile grid (floored) */
+void snap_xy(int *xy);
 
 const unsigned char greyz[2]; // For opacity squares
 

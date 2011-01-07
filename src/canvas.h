@@ -130,6 +130,12 @@ void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );
 
+#define MARQ_SHOW 0
+#define MARQ_SNAP 1 /* show+snap */
+#define MARQ_HIDE 2
+#define MARQ_MOVE 3 /* +snap */
+#define MARQ_SIZE 4 /* +snap */
+
 void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx);	// Draw/clear marquee
 void paint_poly_marquee(rgbcontext *ctx, int whole);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
@@ -263,12 +269,12 @@ void create_default_image();			// Create default new image
 //	Changed rendering options
 #define UPD_RENDER CF_DRAW
 //	Changed clipboard geometry
-#define UPD_CGEOM  (CF_CGEOM | CF_SELBAR | UPD_CLIP)
-//	Changed polygonal selection
+#define UPD_CGEOM  (CF_CGEOM | CF_SELBAR)
+//	Changed polygonal selection (-redraw)
 #define UPD_PSEL   (CF_MENU | CF_SELBAR)
-//	Changed selection
+//	Changed selection (-)
 #define UPD_SEL    (UPD_PSEL | CF_CURSOR)
-//	Changed selection geometry
+//	Changed selection geometry (-)
 #define UPD_SGEOM  UPD_PSEL
 //	Initiated pasting something
 #define UPD_PASTE  (UPD_SEL | CF_DRAW | CF_CGEOM)

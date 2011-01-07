@@ -233,7 +233,7 @@ void pressed_select(int all)
 	{
 		i = UPD_SEL;
 		if (marq_status >= MARQUEE_PASTE) i = UPD_SEL | CF_DRAW;
-		else paint_marquee(0, 0, 0, NULL);
+		else paint_marquee(MARQ_HIDE, 0, 0, NULL);
 		marq_status = MARQUEE_NONE;
 	}
 	if ((tool_type == TOOL_POLYGON) && (poly_status != POLY_NONE))
@@ -262,7 +262,7 @@ void pressed_select(int all)
 		}
 		marq_status = MARQUEE_DONE;
 		if (i & CF_DRAW) break; // Full redraw will draw marquee too
-		paint_marquee(1, 0, 0, NULL);
+		paint_marquee(MARQ_SHOW, 0, 0, NULL);
 		break;
 	}
 	if (i) update_stuff(i);
@@ -838,7 +838,9 @@ static key_action main_keys[] = {
 	{ DLG_CHOOSER,	CHOOSE_BRUSH,	GDK_F3,		MOD_csa },
 	{ DLG_CHOOSER,	CHOOSE_COLOR,	GDK_e,		MOD_csa },
 	{ ACT_TOOL,	TTB_PAINT,	GDK_F4,		MOD_csa },
-	{ ACT_TOOL,	TTB_SELECT,	GDK_F9, 	MOD_csa },
+	{ ACT_TOOL,	TTB_SELECT,	GDK_F9,		MOD_csa },
+	{ ACT_TOOL,	TTB_FLOOD,	GDK_f,		MOD_csa },
+	{ ACT_TOOL,	TTB_LINE,	GDK_d,		MOD_csa },
 	{ ACT_DOCK,	0,		GDK_F12,	MOD_csa },
 	{ ACT_SEL_MOVE,	5,		GDK_Left,	MOD_cS  },
 	{ ACT_SEL_MOVE,	5,		GDK_KP_Left,	MOD_cS  },
@@ -1359,11 +1361,16 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 
 static int get_bkg(int xc, int yc, int dclick);
 
+static inline int xmmod(int x, int y)
+{
+	return (x - (x % y));
+}
+
 /* Mouse event from button/motion on the canvas */
 static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	gdouble pressure, int mflag, int dx, int dy)
 {
-	static int tool_fixx = -1, tool_fixy = -1;	// Fixate on axis
+	static int tool_fix, tool_fixv;	// Fixate on axis
 	int new_cursor;
 	int i, pixel, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
 	int zoom = 1, scale = 1;
@@ -1373,13 +1380,55 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	x0 = ((xc - margin_main_x) * zoom) / scale + dx;
-	y0 = ((yc - margin_main_y) * zoom) / scale + dy;
+	x = x0 = floor_div((xc - margin_main_x) * zoom, scale) + dx;
+	y = y0 = floor_div((yc - margin_main_y) * zoom, scale) + dy;
 
-	ox = x = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
-	oy = y = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
+	ox = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
+	oy = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
+
+	if (!mflag) /* Coordinate fixation */
+	{
+		if (!(state & _S)) tool_fix = 0;
+		else if (!(state & _C)) /* Shift */
+		{
+			if (tool_fix != 1) tool_fixv = x0;
+			tool_fix = 1;
+		}
+		else /* Ctrl+Shift */
+		{
+			if (tool_fix != 2) tool_fixv = y0;
+			tool_fix = 2;
+		}
+	}
+	/* No use when moving cursor by keyboard */
+	else if (event == GDK_MOTION_NOTIFY) tool_fix = 0;
+
+	if (tool_fix == 1) x = x0 = tool_fixv;
+	if (tool_fix == 2) y = y0 = tool_fixv;
+
+	if (tgrid_snap) /* Snap to grid */
+	{
+		int xy[2] = { x0, y0 };
+
+		/* For everything but rectangular selection, snap with rounding
+		 * feels more natural than with flooring - WJ */
+		if (tool_type != TOOL_SELECT)
+		{
+			xy[0] += tgrid_dx >> 1;
+			xy[1] += tgrid_dy >> 1;
+		}
+		snap_xy(xy);
+		if ((x = x0 = xy[0]) < 0) x += xmmod(tgrid_dx - x - 1, tgrid_dx);
+		if (x >= mem_width) x -= xmmod(tgrid_dx + x - mem_width, tgrid_dx);
+		if ((y = y0 = xy[1]) < 0) y += xmmod(tgrid_dy - y - 1, tgrid_dy);
+		if (y >= mem_height) y -= xmmod(tgrid_dy + y - mem_height, tgrid_dy);
+	}
+
+	x = x < 0 ? 0 : x >= mem_width ? mem_width - 1 : x;
+	y = y < 0 ? 0 : y >= mem_height ? mem_height - 1 : y;
 
 	/* ****** Release-event-specific code ****** */
+
 	if (event == GDK_BUTTON_RELEASE)
 	{
 		tint_mode[2] = 0;
@@ -1420,24 +1469,6 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	}
 
 	/* ****** Common click/motion handling code ****** */
-
-	if (!mflag) /* Coordinate fixation */
-	{
-		if ((tool_fixy < 0) && ((state & _CS) == _CS))
-		{
-			tool_fixx = -1;
-			tool_fixy = y;
-		}
-		if ((tool_fixx < 0) && ((state & _CS) == _S))
-			tool_fixx = x;
-		if (!(state & _S)) tool_fixx = tool_fixy = -1;
-		if (!(state & _C)) tool_fixy = -1;
-	}
-	/* No use when moving cursor by keyboard */
-	else if (event == GDK_MOTION_NOTIFY) tool_fixx = tool_fixy = -1;
-
-	if (tool_fixx > 0) x = x0 = tool_fixx;
-	if (tool_fixy > 0) y = y0 = tool_fixy;
 
 	while ((state & _CS) == _C)	// Set colour A/B
 	{
@@ -2553,6 +2584,18 @@ int color_grid;		// If to use grid coloring
 int show_tile_grid;	// Tile grid toggle
 int tgrid_x0, tgrid_y0;	// Tile grid origin
 int tgrid_dx, tgrid_dy;	// Tile grid spacing
+int tgrid_snap;		// Coordinates snap toggle
+
+/* Snap coordinate pair to tile grid (floored) */
+void snap_xy(int *xy)
+{
+	int dx, dy;
+
+	dx = (xy[0] - tgrid_x0) % tgrid_dx;
+	xy[0] -= dx + (dx < 0 ? tgrid_dx : 0);
+	dy = (xy[1] - tgrid_y0) % tgrid_dy;
+	xy[1] -= dy + (dy < 0 ? tgrid_dy : 0);
+}
 
 /* Buffer stores interleaved transparency bits for two pixel rows; current
  * row in bits 0, 2, etc., previous one in bits 1, 3, etc. */
@@ -3086,7 +3129,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 
 	/* Draw marquee as we may have drawn over it */
 	if (marq_status != MARQUEE_NONE)
-		paint_marquee(1, 0, 0, &ctx);
+		paint_marquee(MARQ_SHOW, 0, 0, &ctx);
 	if ((tool_type == TOOL_POLYGON) && poly_points)
 		paint_poly_marquee(&ctx, TRUE);
 
@@ -3412,7 +3455,7 @@ void change_to_tool(int icon)
 		&& (marq_x2 >= 0) && (marq_y2 >= 0))
 	{
 		marq_status = MARQUEE_DONE;
-		paint_marquee(1, 0, 0, NULL);
+		paint_marquee(MARQ_SHOW, 0, 0, NULL);
 	}
 	if ((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE))
 	{
@@ -3800,6 +3843,15 @@ static void pressed_sel_ramp(int vert);
 static const signed char arrow_dx[4] = { 0, -1, 1, 0 },
 	arrow_dy[4] = { 1, 0, 0, -1 };
 
+static void move_marquee(int action, int *xy, int change, int dir)
+{
+	int dx = tgrid_dx, dy = tgrid_dy;
+	if (!tgrid_snap) dx = dy = change;
+	paint_marquee(action,
+		xy[0] + dx * arrow_dx[dir], xy[1] + dy * arrow_dy[dir], NULL);
+	update_stuff(UPD_SGEOM);
+}
+
 void action_dispatch(int action, int mode, int state, int kbd)
 {
 	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
@@ -3827,11 +3879,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_SEL_MOVE:
 		/* Gradient tool has precedence over selection */
 		if ((tool_type != TOOL_GRADIENT) && (marq_status > MARQUEE_NONE))
-		{
-			paint_marquee(2, marq_x1 + change * arrow_dx[dir],
-				marq_y1 + change * arrow_dy[dir], NULL);
-			update_stuff(UPD_SGEOM);
-		}
+			move_marquee(MARQ_MOVE, marq_xy, change, dir);
 		else move_mouse(change * arrow_dx[dir], change * arrow_dy[dir], 0);
 		break;
 	case ACT_OPAC:
@@ -3842,11 +3890,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		/* User is selecting so allow CTRL+arrow keys to resize the
 		 * marquee; for consistency, gradient tool blocks this */
 		if ((tool_type != TOOL_GRADIENT) && (marq_status == MARQUEE_DONE))
-		{
-			paint_marquee(3, marq_x2 + change * arrow_dx[dir],
-				marq_y2 + change * arrow_dy[dir], NULL);
-			update_stuff(UPD_SGEOM);
-		}
+			move_marquee(MARQ_SIZE, marq_xy + 2, change, dir);
 		else if (layer_selected) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
 		else if (bkg_flag)
@@ -3952,6 +3996,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_centralize(state); break;
 	case ACT_GRID:
 		zoom_grid(state); break;
+	case ACT_SNAP:
+		tgrid_snap = state;
+		break;
 	case ACT_VWWIN:
 		if (state) view_show();
 		else view_hide();
@@ -4749,6 +4796,7 @@ static menu_item main_menu[] = {
 	{ _("//Toggle Image View"), -1, 0, 0, "Home", ACT_VIEW, 0 },
 	{ _("//Centralize Image"), 0, MENU_CENTER, 0, NULL, ACT_CENTER, 0 },
 	{ _("//Show Zoom Grid"), 0, MENU_SHOWGRID, 0, NULL, ACT_GRID, 0 },
+	{ _("//Snap To Tile Grid"), 0, 0, 0, "B", ACT_SNAP, 0 },
 	{ _("//Configure Grid ..."), -1, 0, 0, NULL, DLG_COLORS, COLSEL_GRID },
 	{ _("//Tracing Image ..."), -1, 0, 0, NULL, DLG_TRACE, 0 },
 	{ "//", -4 },
@@ -4785,7 +4833,7 @@ static menu_item main_menu[] = {
 	{ "//", -3 },
 	{ _("//Select All"), -1, 0, 0, "<control>A", ACT_SELECT, 1 },
 	{ _("//Select None (Esc)"), -1, 0, NEED_MARQ, "<shift><control>A", ACT_SELECT, 0 },
-	{ _("//Lasso Selection"), -1, 0, NEED_LAS2, NULL, ACT_LASSO, 0, XPM_ICON(lasso) },
+	{ _("//Lasso Selection"), -1, 0, NEED_LAS2, "J", ACT_LASSO, 0, XPM_ICON(lasso) },
 	{ _("//Lasso Selection Cut"), -1, 0, NEED_LASSO, NULL, ACT_LASSO, 1 },
 	{ "//", -4 },
 	{ _("//Outline Selection"), -1, 0, NEED_SEL2, "<control>T", ACT_OUTLINE, 0, XPM_ICON(rect1) },
