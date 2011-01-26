@@ -55,9 +55,12 @@ Then you can open some graphics files with "mtv *.jpg".  This is a shortcut to w
 
 After running mtPaint for the first time, a new file is created to store your preferred settings and previously used files etc.  This file is named ".mtpaint" and stored in the user's home directory.  If you rename or remove this file then the next time mtPaint is run it will use the default settings.
 
-The easiest way to compile mtPaint for Windows is using MinGW cross-compiler on a GNU/Linux system, with requisite library and header files, corresponding to the runtime libraries you intend to use. Since version 3.40, official mtPaint package for Windows uses custom-built runtime files, and development libraries and headers are produced in the build process (see "gtk/README" for details); with version 3.31 and earlier, you could use the packages listed below for MinGW/MSYS build. Either way, after the headers and libraries are installed where MinGW expects them, you configure mtPaint for cross-compilation in this (non-standard) way, then run "make" as usual:
+The easiest way to compile mtPaint for Windows is using MinGW cross-compiler on a GNU/Linux system, and the included "winbuild.sh" shell script. The script will compile mtPaint and all required runtime files from source code, and prepare a binary package and a separate development package, with headers and development libraries; see "gtk/README" for details.
 
-CROSSCC=/path/to/mingw-gcc ./configure [options]
+Another alternative is doing a manual build with MinGW on GNU/Linux, for which you'll need to have installed requisite library and header files, corresponding to the runtime libraries you intend to use. Since version 3.40, the official mtPaint package for Windows uses custom-built runtime files, and development libraries and headers, produced in the automated build process described above; with version 3.31 and earlier, you could use the packages listed below for MinGW/MSYS build. Either way, after the headers and libraries are installed where MinGW expects them, you configure mtPaint for cross-compiling, then run "make" as usual. Like this:
+
+PATH=/usr/i586-mingw32/bin:$PATH ./configure --host=i586-mingw32 [options]
+make
 
 It should also still be possible to compile mtPaint for Windows the old way, using MinGW/MSYS on a Windows system. However this wasn't done for quite some time, so the description below still refers to older versions of MinGW, MSYS and library packages. mtpaint.exe compiled according to it, will only be compatible with runtime libraries packaged with mtPaint 3.31 or older; to use the newer runtime (of version 3.40+), you'll need to use library and header files produced while cross-compiling the runtime (see above).
 
@@ -95,7 +98,7 @@ For some reason I needed to move c:/msys/bin/msgfmt & xgettext to c:/msys/local/
 
 5) If all goes well, you should have mtpaint.exe which you can run using the same method described above.  You may have compiled mtPaint using more recent versions of libraries so you may need to change the filenames, such as libpng12.dll -> libpng13.dll and libungif.dll -> libungif4.dll.
  
-Because I very rarely use Windows, I am sadly unable to support GTK+1 or older versions of GTK+2 on this system anymore due to a lack of time.
+Because I very rarely use Windows, I am sadly unable to support any other version of GTK+ but the one in the official package. That is, while mtPaint should in principle be able to compile and run with any version of GTK+2, only the packaged version has undergone real testing on Windows, and has been patched to fix all known Windows-specific bugs in it.
 
 -------
 Credits

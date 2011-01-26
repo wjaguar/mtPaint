@@ -56,6 +56,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Name and location of user settings file is now configurable : See handbook section A.6.4 for details
 	* Drawing and fill tools now are 2-3 times faster
 	* Support for compiling with libpng 1.4, libjpeg 8a, and zlib 1.2.5 added
+	* Configure script rewritten, now understands standard variables and options for installation paths and (cross-)compilation settings
 	* Minimum required GTK+2 version now can be specified as configure option (e.g., "./configure gtk2.8")
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated

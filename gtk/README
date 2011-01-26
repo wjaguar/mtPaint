@@ -177,6 +177,11 @@ To replicate it, you need the following source packages:
 - Little CMS 2.1:
     lcms2-2.1.tar.gz
     http://heanet.dl.sourceforge.net/project/lcms/lcms/2.1/lcms2-2.1.tar.gz
+- Gifsicle 1.60:
+    gifsicle-1.60.tar.gz
+    http://www.lcdf.org/gifsicle/gifsicle-1.60.tar.gz
+- mtPaint 3.40 (or later):
+    mtpaint-3.40.tar.bz2
 
 Also you need the following files from 'gtk' subdirectory of mtPaint source package:
   winbuild.sh
@@ -187,7 +192,7 @@ Also you need the following files from 'gtk' subdirectory of mtPaint source pack
 
 To recreate the "etc/pango/pango.modules" and "etc/gtk-2.0/gdk-pixbuf.loaders" files, you additionally need a working install of Wine.
 
-To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, runtime files will be placed under 'zad/pkg' and development libraries and headers, under 'zad/dev'.
+To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, executables and runtime files will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
 
 ---------------------------------
-Copyright (C) 2010 Dmitry Groshev
+Copyright (C) 2010,2011 Dmitry Groshev

@@ -5,9 +5,9 @@ ifdef HAVE_RANDSEED # Generate identical object files if possible
 else
   CFLAGS = $(CFLAG)
 endif
-LDFLAGS = $(LDFLAG) $(GLIB_LIB)
+LDFLAGS = $(LDFLAG)
 
-BIN = mtpaint
+BIN = mtpaint$(EXEEXT)
 
 OBJS = mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
 	viewer.o polygon.o layer.o info.o wu.o prefs.o ani.o mtlib.o\

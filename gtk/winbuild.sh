@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild.sh - cross-compile GTK+ and its dependencies for Windows
 
-# Copyright (C) 2010 Dmitry Groshev
+# Copyright (C) 2010,2011 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,11 +21,11 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-COMPONENTS="giflib zlib libjpeg libpng libtiff freetype jasper lcms "\
+LIBS="giflib zlib libjpeg libpng libtiff freetype jasper lcms "\
 "libiconv gettext glib atk pango gtk"
+PROGRAMS="gifsicle mtpaint"
+PHONY="libs all"
 LOCALES="es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv tl"
-MPREFIX=/usr/i586-mingw32-4.2.4
-MTARGET=i586-mingw32
 # Applied only to GTK+ ATM
 OPTIMIZE="-march=i686 -O2 -fweb -fomit-frame-pointer -fmodulo-sched -Wno-pointer-sign"
 
@@ -40,14 +40,31 @@ WRKDIR="$TOPDIR/wrk" # Where sources are compiled
 INSDIR="$TOPDIR/ins" # Where files get installed
 PKGDIR="$TOPDIR/pkg" # Where package gets formed
 DEVDIR="$TOPDIR/dev" # Where dev files get collected
-# Also "$TOPDIR/include" & "$TOPDIR/lib", with symlinks to actual files
+# Also "$TOPDIR/bin", "$TOPDIR/include" & "$TOPDIR/lib", with symlinks to actual files
 UNPDIR="$WRKDIR/_000_" # Where archives are unpacked
 
-##########################
+########################
+# CROSS-COMPILER PATHS #
+########################
 
+# SpeedBlue cross-MinGW or similar
+# http://www.speedblue.org/cross_compilation/
+MPREFIX=/usr/i586-mingw32-4.2.4
+MTARGET=i586-mingw32
+
+# mingw-cross-env
+# http://mingw-cross-env.nongnu.org/
+#MPREFIX=~/mingw-cross-env-2.18/usr
+#MTARGET=i686-pc-mingw32
+
+LONGPATH="$TOPDIR:$MPREFIX/bin:$PATH"
+SHORTPATH="$TOPDIR:$TOPDIR/bin:$PATH"
+ALLPATH="$TOPDIR:$TOPDIR/bin:$MPREFIX/bin:$PATH"
+
+########################
 
 # Initialize vars
-COMPONENTS=" $COMPONENTS all "
+COMPONENTS=" $LIBS $PROGRAMS $PHONY "
 for ZAD in $COMPONENTS
 do
 	eval "DEP_$ZAD="
@@ -187,9 +204,14 @@ DEP_libpng="zlib"
 BUILD_libpng ()
 {
 	UNPACK "libpng-*.tar.*" || return 0
+	# !!! Binutils 2.20 cannot create proper export libs if given a version
+	# script; so any libpng version before 1.4.4 needs the below fix
+	sed -i 's/have_ld_version_script=yes/have_ld_version_script=no/' ./configure
+	# !!! Make libpng12 default DLL, same as it is default everything else
+	sed -i 's/for ext in a la so sl/for ext in a dll.a la so sl/' ./Makefile.in
 	PATH="$LONGPATH"
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
-	./configure --prefix="$WPREFIX" --host=$MTARGET
+	./configure --prefix="$WPREFIX" --host=$MTARGET --without-libpng-compat
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
@@ -211,6 +233,7 @@ DEP_freetype="zlib"
 BUILD_freetype ()
 {
 	UNPACK "freetype-*.tar.*" || return 0
+# !!! Cross-compile breaks down if cross-gcc named "gcc" is present in PATH
 	PATH="$LONGPATH"
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET
@@ -358,6 +381,100 @@ DEP_gettext="libiconv"
 BUILD_gettext ()
 {
 	UNPACK "gettext-0.14.*.tar.*" || return 0
+	# git ec56ad8f2bf513a88efc3dba44953edff3909207
+	# Fix some incorrect SUBLANG_* values that were taken from glib's gwin32.c.
+	patch -p1 <<- 'END' # Is needed to fix build failure with w32api 3.15+
+	--- a/gettext-runtime/intl/localename.c
+	+++ b/gettext-runtime/intl/localename.c
+	@@ -494,10 +494,10 @@
+	 # define SUBLANG_AZERI_CYRILLIC 0x02
+	 # endif
+	 # ifndef SUBLANG_BENGALI_INDIA
+	-# define SUBLANG_BENGALI_INDIA 0x00
+	+# define SUBLANG_BENGALI_INDIA 0x01
+	 # endif
+	 # ifndef SUBLANG_BENGALI_BANGLADESH
+	-# define SUBLANG_BENGALI_BANGLADESH 0x01
+	+# define SUBLANG_BENGALI_BANGLADESH 0x02
+	 # endif
+	 # ifndef SUBLANG_CHINESE_MACAU
+	 # define SUBLANG_CHINESE_MACAU 0x05
+	@@ -590,16 +590,16 @@
+	 # define SUBLANG_NEPALI_INDIA 0x02
+	 # endif
+	 # ifndef SUBLANG_PUNJABI_INDIA
+	-# define SUBLANG_PUNJABI_INDIA 0x00
+	+# define SUBLANG_PUNJABI_INDIA 0x01
+	 # endif
+	 # ifndef SUBLANG_PUNJABI_PAKISTAN
+	-# define SUBLANG_PUNJABI_PAKISTAN 0x01
+	+# define SUBLANG_PUNJABI_PAKISTAN 0x02
+	 # endif
+	 # ifndef SUBLANG_ROMANIAN_ROMANIA
+	-# define SUBLANG_ROMANIAN_ROMANIA 0x00
+	+# define SUBLANG_ROMANIAN_ROMANIA 0x01
+	 # endif
+	 # ifndef SUBLANG_ROMANIAN_MOLDOVA
+	-# define SUBLANG_ROMANIAN_MOLDOVA 0x01
+	+# define SUBLANG_ROMANIAN_MOLDOVA 0x02
+	 # endif
+	 # ifndef SUBLANG_SERBIAN_LATIN
+	 # define SUBLANG_SERBIAN_LATIN 0x02
+	@@ -607,12 +607,12 @@
+	 # ifndef SUBLANG_SERBIAN_CYRILLIC
+	 # define SUBLANG_SERBIAN_CYRILLIC 0x03
+	 # endif
+	-# ifndef SUBLANG_SINDHI_INDIA
+	-# define SUBLANG_SINDHI_INDIA 0x00
+	-# endif
+	 # ifndef SUBLANG_SINDHI_PAKISTAN
+	 # define SUBLANG_SINDHI_PAKISTAN 0x01
+	 # endif
+	+# ifndef SUBLANG_SINDHI_AFGHANISTAN
+	+# define SUBLANG_SINDHI_AFGHANISTAN 0x02
+	+# endif
+	 # ifndef SUBLANG_SPANISH_GUATEMALA
+	 # define SUBLANG_SPANISH_GUATEMALA 0x04
+	 # endif
+	@@ -670,14 +670,14 @@
+	 # ifndef SUBLANG_TAMAZIGHT_ARABIC
+	 # define SUBLANG_TAMAZIGHT_ARABIC 0x01
+	 # endif
+	-# ifndef SUBLANG_TAMAZIGHT_LATIN
+	-# define SUBLANG_TAMAZIGHT_LATIN 0x02
+	+# ifndef SUBLANG_TAMAZIGHT_ALGERIA_LATIN
+	+# define SUBLANG_TAMAZIGHT_ALGERIA_LATIN 0x02
+	 # endif
+	 # ifndef SUBLANG_TIGRINYA_ETHIOPIA
+	-# define SUBLANG_TIGRINYA_ETHIOPIA 0x00
+	+# define SUBLANG_TIGRINYA_ETHIOPIA 0x01
+	 # endif
+	 # ifndef SUBLANG_TIGRINYA_ERITREA
+	-# define SUBLANG_TIGRINYA_ERITREA 0x01
+	+# define SUBLANG_TIGRINYA_ERITREA 0x02
+	 # endif
+	 # ifndef SUBLANG_URDU_PAKISTAN
+	 # define SUBLANG_URDU_PAKISTAN 0x01
+	@@ -1378,8 +1378,8 @@ _nl_locale_name_default (void)
+	       case LANG_SINDHI:
+	 	switch (sub)
+	 	  {
+	-	  case SUBLANG_SINDHI_INDIA: return "sd_IN";
+	 	  case SUBLANG_SINDHI_PAKISTAN: return "sd_PK";
+	+	  case SUBLANG_SINDHI_AFGHANISTAN: return "sd_AF";
+	 	  }
+	 	return "sd";
+	       case LANG_SINHALESE: return "si_LK";
+	@@ -1432,7 +1432,7 @@ _nl_locale_name_default (void)
+	 	  {
+	 	  /* FIXME: Adjust this when Tamazight locales appear on Unix.  */
+	 	  case SUBLANG_TAMAZIGHT_ARABIC: return "ber_MA@arabic";
+	-	  case SUBLANG_TAMAZIGHT_LATIN: return "ber_MA@latin";
+	+	  case SUBLANG_TAMAZIGHT_ALGERIA_LATIN: return "ber_DZ@latin";
+	 	  }
+	 	return "ber_MA";
+	       case LANG_TAMIL:
+	END
 # !!! Try upgrading to latest version - *this* one dir shouldn't drag in much
 # (But disable threading then - for use with mtPaint, it's a complete waste)
 	PATH="$LONGPATH"
@@ -374,6 +491,94 @@ DEP_glib="libiconv gettext"
 BUILD_glib ()
 {
 	UNPACK "glib-2.6.*.tar.*" || return 0
+	# Derived from gettext's git ec56ad8f2bf513a88efc3dba44953edff3909207
+	# (Chosen instead of the route GLib 2.14+ has taken with svn 5257, to
+	# preserve consistent behaviour across various Windows versions despite
+	# their multiple bugs.)
+	patch -p1 <<- 'END' # Is needed to fix build failure with w32api 3.15+
+	diff -udpr glib-2.6.6_/glib/gwin32.c glib-2.6.6/glib/gwin32.c
+	--- glib-2.6.6_/glib/gwin32.c	2005-03-14 07:02:07.000000000 +0300
+	+++ glib-2.6.6/glib/gwin32.c	2011-01-14 00:52:49.000000000 +0300
+	@@ -416,10 +416,10 @@ g_win32_ftruncate (gint  fd,
+	 #define SUBLANG_AZERI_CYRILLIC 0x02
+	 #endif
+	 #ifndef SUBLANG_BENGALI_INDIA
+	-#define SUBLANG_BENGALI_INDIA 0x00
+	+#define SUBLANG_BENGALI_INDIA 0x01
+	 #endif
+	 #ifndef SUBLANG_BENGALI_BANGLADESH
+	-#define SUBLANG_BENGALI_BANGLADESH 0x01
+	+#define SUBLANG_BENGALI_BANGLADESH 0x02
+	 #endif
+	 #ifndef SUBLANG_CHINESE_MACAU
+	 #define SUBLANG_CHINESE_MACAU 0x05
+	@@ -512,16 +512,16 @@ g_win32_ftruncate (gint  fd,
+	 #define SUBLANG_NEPALI_INDIA 0x02
+	 #endif
+	 #ifndef SUBLANG_PUNJABI_INDIA
+	-#define SUBLANG_PUNJABI_INDIA 0x00
+	+#define SUBLANG_PUNJABI_INDIA 0x01
+	 #endif
+	 #ifndef SUBLANG_PUNJABI_PAKISTAN
+	-#define SUBLANG_PUNJABI_PAKISTAN 0x01
+	+#define SUBLANG_PUNJABI_PAKISTAN 0x02
+	 #endif
+	 #ifndef SUBLANG_ROMANIAN_ROMANIA
+	-#define SUBLANG_ROMANIAN_ROMANIA 0x00
+	+#define SUBLANG_ROMANIAN_ROMANIA 0x01
+	 #endif
+	 #ifndef SUBLANG_ROMANIAN_MOLDOVA
+	-#define SUBLANG_ROMANIAN_MOLDOVA 0x01
+	+#define SUBLANG_ROMANIAN_MOLDOVA 0x02
+	 #endif
+	 #ifndef SUBLANG_SERBIAN_LATIN
+	 #define SUBLANG_SERBIAN_LATIN 0x02
+	@@ -529,12 +529,12 @@ g_win32_ftruncate (gint  fd,
+	 #ifndef SUBLANG_SERBIAN_CYRILLIC
+	 #define SUBLANG_SERBIAN_CYRILLIC 0x03
+	 #endif
+	-#ifndef SUBLANG_SINDHI_INDIA
+	-#define SUBLANG_SINDHI_INDIA 0x00
+	-#endif
+	 #ifndef SUBLANG_SINDHI_PAKISTAN
+	 #define SUBLANG_SINDHI_PAKISTAN 0x01
+	 #endif
+	+#ifndef SUBLANG_SINDHI_AFGHANISTAN
+	+#define SUBLANG_SINDHI_AFGHANISTAN 0x02
+	+#endif
+	 #ifndef SUBLANG_SPANISH_GUATEMALA
+	 #define SUBLANG_SPANISH_GUATEMALA 0x04
+	 #endif
+	@@ -592,14 +592,14 @@ g_win32_ftruncate (gint  fd,
+	 #ifndef SUBLANG_TAMAZIGHT_ARABIC
+	 #define SUBLANG_TAMAZIGHT_ARABIC 0x01
+	 #endif
+	-#ifndef SUBLANG_TAMAZIGHT_LATIN
+	-#define SUBLANG_TAMAZIGHT_LATIN 0x02
+	+#ifndef SUBLANG_TAMAZIGHT_ALGERIA_LATIN
+	+#define SUBLANG_TAMAZIGHT_ALGERIA_LATIN 0x02
+	 #endif
+	 #ifndef SUBLANG_TIGRINYA_ETHIOPIA
+	-#define SUBLANG_TIGRINYA_ETHIOPIA 0x00
+	+#define SUBLANG_TIGRINYA_ETHIOPIA 0x01
+	 #endif
+	 #ifndef SUBLANG_TIGRINYA_ERITREA
+	-#define SUBLANG_TIGRINYA_ERITREA 0x01
+	+#define SUBLANG_TIGRINYA_ERITREA 0x02
+	 #endif
+	 #ifndef SUBLANG_URDU_PAKISTAN
+	 #define SUBLANG_URDU_PAKISTAN 0x01
+	@@ -922,8 +922,8 @@ g_win32_getlocale (void)
+	     case LANG_SINDHI: l = "sd";
+	       switch (sub)
+	 	{
+	-	case SUBLANG_SINDHI_INDIA: sl = "IN"; break;
+	 	case SUBLANG_SINDHI_PAKISTAN: sl = "PK"; break;
+	+	case SUBLANG_SINDHI_AFGHANISTAN: sl = "AF"; break;
+	 	}
+	       break;
+	     case LANG_SINHALESE: l = "si"; sl = "LK"; break;
+	END
 	# Remove traces of existing install - just to be on the safe side
 	rm -rf "$TOPDIR/include/glib-2.0" "$TOPDIR/lib/glib-2.0"
 	rm -f "$TOPDIR/lib/pkgconfig"/glib*.pc "$TOPDIR/lib/pkgconfig"/gmodule*.pc
@@ -479,9 +684,35 @@ BUILD_gtk ()
 	EXPORT
 }
 
+BUILD_gifsicle ()
+{
+	UNPACK "gifsicle-*.tar.*" || return 0
+	PATH="$LONGPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	./configure --prefix="$WPREFIX" --host=$MTARGET \
+		--without-x
+	make
+	make install-strip DESTDIR="$DESTDIR"
+	echo 'PKG="$PKG bin/gifsicle.exe"' > "$DESTDIR.install"
+	echo 'DEV=' >> "$DESTDIR.install"
+}
+
+DEP_mtpaint="$LIBS gifsicle"
+BUILD_mtpaint ()
+{
+	UNPACK "mtpaint-*.tar.bz2" || return 0
+	PATH="$LONGPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	./configure --prefix="$WPREFIX" --host=$MTARGET \
+		release intl
+	make
+	make install DESTDIR="$DESTDIR"
+	echo 'PKG="$PKG bin/"' > "$DESTDIR.install"
+	echo 'DEV=' >> "$DESTDIR.install"
+}
+
 # Collect compiled files and drop them into runtime and development packages
-DEP_all="${COMPONENTS% all }"
-BUILD_all ()
+INST_all ()
 {
 	rm -rf "$PKGDIR"/* "$DEVDIR"/*
 	local ZAD
@@ -556,6 +787,18 @@ BUILD_all ()
 	fi
 }
 
+DEP_libs="$LIBS"
+BUILD_libs ()
+{
+	INST_all
+}
+
+DEP_all="$LIBS $PROGRAMS"
+BUILD_all ()
+{
+	INST_all
+}
+
 # Ctrl+C terminates script
 trap exit INT
 
@@ -569,20 +812,28 @@ fi
 ZAD=
 for ZAD in "$@"
 do
-	DEP="${ZAD#only-}"
+	case "$ZAD" in
+	only-?* | no-?* ) DEP="${ZAD#*-}";;
+	* ) DEP="$ZAD";;
+	esac
 	if [ "${COMPONENTS#* $DEP }" = "$COMPONENTS" ]
 	then
 		echo "Unknown parameter: '$ZAD'"
 		continue
 	fi
-	eval "NEED_$DEP=2" # Force compile
-	if [ "$DEP" != "$ZAD" ]
+	if [ "${ZAD%$DEP}" = "no-" ]
+	then # Without component
+		eval "HAVE_$DEP=1"
+	elif [ "${ZAD%$DEP}" = "only-" ]
 	then # Without dependencies
 		eval "DEPS=\$DEP_$DEP"
 		for DEP in $DEPS
 		do
 			eval "HAVE_$DEP=1"
 		done
+		eval "NEED_$DEP=2" # Force compile
+	else # With component
+		eval "NEED_$DEP=2"
 	fi
 done
 if [ -z "$ZAD" ]
@@ -597,21 +848,31 @@ mkdir -p "$WRKDIR" "$INSDIR" "$PKGDIR" "$DEVDIR"
 test -d "$TOPDIR/include" || cp -sR "$MPREFIX/include/" "$TOPDIR/include/"
 test -d "$TOPDIR/lib" || cp -sR "$MPREFIX/lib/" "$TOPDIR/lib/"
 
+# Create links for what misconfigured cross-compilers fail to provide
+mkdir -p "$TOPDIR/bin"
+LONGCC=`PATH="$LONGPATH" which $MTARGET-gcc`
+for BINARY in ${LONGCC%/*}/$MTARGET-*
+do
+	ln -sf "$BINARY" "$TOPDIR/bin/${BINARY##*/$MTARGET-}"
+done
+
 # Prepare fake pkg-config
 OLD_PKGCONFIG=`which pkg-config`
 PKG_CONFIG="$TOPDIR/pkg-config"
+export PKG_CONFIG
+rm -f "$PKG_CONFIG"
 cat << PKGCONFIG > "$PKG_CONFIG"
 #!/bin/sh
 
 export PKG_CONFIG_LIBDIR="$TOPDIR/lib/pkgconfig"
-export PKG_CONFIG_PATH=\$PKG_CONFIG_LIBDIR
+export PKG_CONFIG_PATH=
 
 # pkg-config doesn't like --define-variable with these
 if [ "x\${*#*--atleast-pkgconfig-version}" != "x\${*#*--atleast-version}" ]
 then
-	exec "$OLD_PKGCONFIG" \$*
+	exec "$OLD_PKGCONFIG" "\$@"
 else
-	exec "$OLD_PKGCONFIG" --define-variable=prefix="$TOPDIR" \$*
+	exec "$OLD_PKGCONFIG" --define-variable=prefix="$TOPDIR" "\$@"
 fi
 PKGCONFIG
 chmod +x "$PKG_CONFIG"
@@ -688,11 +949,8 @@ exit 1
 END
 chmod +x "$SCRIPTDIR"/*
 
-# Set variables
-LONGPATH="$TOPDIR:$MPREFIX/bin:$PATH"
-SHORTPATH="$TOPDIR:$MPREFIX/$MTARGET/bin:$PATH"
-ALLPATH="$TOPDIR:$MPREFIX/bin:$MPREFIX/$MTARGET/bin:$PATH"
-export PKG_CONFIG
+# A little extra safety
+LIBS= PROGRAMS= PHONY=
 
 # Do the build in proper order
 READY=

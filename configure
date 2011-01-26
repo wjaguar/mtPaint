@@ -1,793 +1,738 @@
 #!/bin/sh
 # Mini configure script
-# 1-10-2004
+# 26-01-2011
 
 echo
 
-MT_V="3.34.64"
-MT_DATE="2011-01-07"
+MT_V="3.34.65"
+MT_DATE="2011-01-26"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
 MT_MAN=NO
-MT_LANG_DEST=/usr/share/locale
-MT_PO_DEST=$MT_LANG_DEST
-MT_MAN_DEST=/usr/local/man/man1
-MT_PREFIX=/usr
+MT_POD=NO
 MT_CPICK=mtpaint
 MT_FPICK=mtpaint
 MT_ANIM=Gifsicle
-LIN_BIN_INSTALL=/usr/local/bin
-WIN_BIN_INSTALL="/c/Program Files/mtPaint/bin"
-BIN_INSTALL=
-MAKE_DIRS=src
 ICON_SET=icons1
-USE_THREADS=YES
-
-API_CHECKS=
-STATIC_PNG=
-STATIC_JPEG=
-STATIC_JP2=
-STATIC_TIFF=
-STATIC_GIF=
-STATIC_FT=
-STATIC_CMS=
-AS_NEEDED=
-HAVE_FUNCS=
-LL=
-II=
 
 GTK_FILE=_conf.txt
-
-CFLAG=
-MARCH=
-OPTS=YES
-DEBUG=NO
 HELP=1
 
-if [ "$CROSSCC" ]
-then
-	CC=$CROSSCC
-elif [ -z "$CC" ]
-then
-	CC=gcc
-fi
-LD=`which \`$CC -print-prog-name=ld\``
-CROSSPF=
+OS=
+MARCH=
+OPTS=YES
+USE_THREADS=YES
+AS_NEEDED=
+DEFS=
 
-GCCVER=`$CC -dumpversion | tr -d '.' | cut -c 1-2`
+# Path overrides
+MT_BINDIR=
+MT_DATAROOT=
+MT_DOCDIR=
+MT_LOCDIR=
+MT_MANDIR=
+MT_PO=
+MT_HOST=
 
-L_EX=
-STATIC_LAST=
-# Called with lib ID & static mode
-LIB_NAME ()
-{
-	if [ "$2" ]
-	then
-		if [ -z "$STATIC_LAST" ]
-		then
-			L_EX="$L_EX -Wl,-dn"
-		fi
-	else
-		if [ "$STATIC_LAST" ]
-		then
-			L_EX="$L_EX -Wl,-dy"
-		fi
-	fi
-	L_EX="$L_EX -l$1"
-	STATIC_LAST=$2
-}
+# Initialize library-tracking vars
+STATICLIBS=
+for A in PNG GIF JPEG JP2 TIFF FT CMS
+do
+	eval "N$A="
+	eval "STATIC_$A="
+	STATICLIBS="$STATICLIBS \$STATIC_$A"
+done
+GTK=
+GTK2VERSION=
 
-if [ "$OSTYPE" = "msys" ]
-then
-	OS="MinGW/MSYS"
-	ARCH=${ARCH:i586}
-	GTK=2
-	IS_LIB()
-	{
-		redir -e /dev/null $LD -$1 -o _conf.tmp $LL -L/lib > /dev/null 2>&1
-	}
-	HAVE_FUNC()
-	{
-		echo "main() { $1(); }" > _conf.c
-		redir -e /dev/null $CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L/lib > /dev/null 2>&1
-	}
-elif [ "$CROSSCC" ]
-then
-	OS="MinGW/GNU/Linux"
-	ARCH=${ARCH:i586}
-	GTK=2
-	CROSSPF=`echo $CROSSCC | sed -e 's/[^/]\+\/[^/]*\$//'`
-	IS_LIB()
-	{
-		$LD -$1 -o _conf.tmp $LL -L$CROSSPF/lib > /dev/null 2>&1
-	}
-	HAVE_FUNC()
-	{
-		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L$CROSSPF/lib > /dev/null 2>&1
-	}
-else
-	OS="GNU/Linux"
-	if pkg-config gtk+-2.0 --cflags > /dev/null
-	then
-		GTK=2
-	else
-		GTK=1
-	fi
-	CROSSPF="/usr"
-	IS_LIB()
-	{
-		$LD -$1 -o _conf.tmp $LL -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
-	}
-	HAVE_FUNC()
-	{
-		echo "main() { $1(); }" > _conf.c
-		$CC _conf.c -o _conf.tmp ${LL:+-Wl,$LL} -L/lib -L/usr/lib -L/usr/X11R6/lib -lX11 -lz -lm > /dev/null 2>&1
-	}
-fi
+# Prevent nasty surprises from locale
+unset LC_ALL
+export LC_COLLATE=C # LC_CTYPE=C LC_NUMERIC=C
 
 for A in "$@"
 do
 	case "$A" in
-		"flush" )	echo Clearing out directory to original state
-				echo
-				make clean
-				echo
-				rm _conf.txt
-				rm po/mtpaint.pot
-				rm -rf src/graphics
-				rm -rf slack
-				rm -f *.tgz
-				exit;;
-		"api" )		API_CHECKS=YES;;
-		"staticpng" )	STATIC_PNG=PNG;;
-		"GIF" )		NGIF=GIF;;
-		"gif" )		NGIF=YES;;
-		"nogif" )	NGIF=NO;;
-		"staticgif" )	STATIC_GIF=GIF;;
-		"jpeg" )	NJPEG=YES;;
-		"nojpeg" )	NJPEG=NO;;
-		"staticjpeg" )	STATIC_JPEG=JPEG;;
-		"jp2" )		NJP2=OpenJPEG;;
-		"jasper" )	NJP2=JasPer;;
-		"nojp2" )	NJP2=NO;;
-		"staticjp2" )	STATIC_JP2=JPEG2000;;
-		"tiff" )	NTIFF=YES;;
-		"notiff" )	NTIFF=NO;;
-		"statictiff" )	STATIC_TIFF=TIFF;;
-		"noft" )	NFT=NO;;
-		"staticft" )	STATIC_FT=FreeType;;
-		"lcms" )	NCMS=LittleCMS;;
-		"lcms2" )	NCMS=LittleCMS2;;
-		"nolcms" )	NCMS=NO;;
-		"staticlcms" )	STATIC_CMS=LittleCMS;;
-		"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
-		"slow" )	OPTS=NO;;
-		"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
-		"debug" )	DEBUG=YES
-				OPTS=NO;;
-		"gtk1" )	GTK=1;;
-		"gtk2"* )	GTK=2
-				# Override minor version of installed GTK+2
-				GTK2VERSION="`echo "$A" | sed -e 's/gtk2\.\?\([0-9]*\).*/\1/'`";;
-		"gtkfilesel" )	MT_FPICK=gtkfilesel;;
-		"gtkcolsel" )	MT_CPICK=gtkcolsel;;
-		"imagick" )	MT_ANIM=ImageMagick;;
-		"win" )		OS="MinGW/MSYS"
-				GTK=2;;
-		"intl" )	MT_LANG=YES;;
-		"merge" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
-				cd po
-				NEW_DIR=trans_
-				mkdir $NEW_DIR`date +%d-%m-%Y-%H-%M-%S`
-				ls *.po | while read file
-				do
-					echo New file = $file-a
-					mv $file $file-a
-					msgmerge -N $file-a mtpaint.pot > $file
-					mv $file-a $NEW_DIR*
-				done
-				rm mtpaint.pot
-				mv $NEW_DIR* ../../old_trans
-				exit;;
-		"newpo" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
-				exit;;
-		"man" )		MT_MAN=YES;;
-		"pod" )		MT_POD=YES;;
-		"--help" )	HELP=0;;
-		"mtk="* )	MTK_DIR="${A#*=}"
-				mkdir "$MTK_DIR/mtpaint-$MT_V"
-				cp -ar "$MTK_DIR/locale" "$MTK_DIR/mtpaint-$MT_V"
-				MT_LANG_DEST="$MTK_DIR/mtpaint-$MT_V/locale"
-				MT_PO_DEST="locale"
-				LIN_BIN_INSTALL="$MTK_DIR/mtpaint-$MT_V"
-				WIN_BIN_INSTALL=$LIN_BIN_INSTALL
-				MTK_XFT=YES
-				;;
-		"noxft" )	MTK_XFT=NO
-				;;
-		"thread" )	USE_THREADS=YES;;
-		"nothread" )	USE_THREADS=NO;;
-		"--bindir="* )	LIN_BIN_INSTALL="${A#*=}"
-				WIN_BIN_INSTALL=$LIN_BIN_INSTALL;;
-		"--locale="* )	MT_LANG_DEST="${A#*=}"
-				MT_PO_DEST=$MT_LANG_DEST;;
-		"--mandir="* )	MT_MAN_DEST="${A#*=}";;
-		"cflags" )	CFLAG=${CFLAGS};;
-		"--cpu="* )	MARCH="-march=${A#*=}";;
-		"icons"* )	ICON_SET=$A;;
-		"386" )		MARCH='-march=i386';;
-		"486" )		MARCH='-march=i486';;
-		"586" )		MARCH='-march=i586';;
-		"686" )		MARCH='-march=i686';;
-		"release" )	# Target i386 when compiling for any x86 CPU;
-				# this produces smallest *AND* fastest binary
-				case "${ARCH:-`uname -m`}" in
-					i?86) CFLAG="-O2 ${MARCH:--march=i386}";;
-					*) CFLAG="-O2 $MARCH";;
-				esac
-				# Add optimizations which are proven to really
-				# make mtPaint code faster
-				if [ "$GCCVER" \< "40" ]
-				then # GCC 3.x
-					CFLAG="$CFLAG -fweb"
-				else # GCC 4.x
-					CFLAG="$CFLAG -fweb -fomit-frame-pointer -fmodulo-sched"
-				fi
-				# Do not add unneeded dependencies
-				AS_NEEDED=-Wl,--as-needed
-				# Disable GTK+ debug code
-				HAVE_FUNCS="$HAVE_FUNCS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS";;
-		"--prefix="* )	MT_PREFIX="${A#*=}"
-				WIN_BIN_INSTALL="$MT_PREFIX/bin"
-				LIN_BIN_INSTALL="$MT_PREFIX/bin"
-				MT_LANG_DEST="$MT_PREFIX/share/locale"
-				MT_PO_DEST=$MT_LANG_DEST
-				MT_MAN_DEST="$MT_PREFIX/man/man1";;
-		"--po="* )	MT_PO_DEST="${A#*=}";;
-		"build" )	./configure flush
-				I_DIR=/home/wj/sf
-				cd ..
-				zip -r $I_DIR/mtpaint-$MT_V.zip mtpaint-$MT_V*/
-				tar cjvf $I_DIR/mtpaint-$MT_V.tar.bz2 mtpaint-$MT_V*/
-				cd mtpaint-$MT_V*
-
-				./configure --mandir=/usr/man/man1 intl pod man release staticgif nojp2 --fakeroot=$I_DIR/libpng0
-				make
-				mkdir -p slack/install/
-				mkdir -p slack/usr/doc/mtpaint/
-				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-				make install DESTDIR=`pwd`/slack
-				cp doc/slack-desc slack/install/
-				cd slack
-				GTK_V=gtk2
-				makepkg --chown n $I_DIR/mtpaint-$MT_V$GTK_V-i386-1.tgz
-				cd ..
-				./configure flush
-
-				./configure --mandir=/usr/man/man1 intl man gtk1 release staticgif nojp2 --fakeroot=$I_DIR/libpng0
-				make
-				mkdir -p slack/install/
-				mkdir -p slack/usr/doc/mtpaint/
-				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/doc/mtpaint/
-				make install DESTDIR=`pwd`/slack
-				cp doc/slack-desc slack/install/
-				cd slack
-				GTK_V=gtk1
-				makepkg --chown y $I_DIR/mtpaint-$MT_V$GTK_V-i386-1.tgz
-				cd ..
-				./configure flush
-
-				./configure --prefix=/usr intl man release GIF staticgif nojp2 --fakeroot=$I_DIR/ubuntulibs
-				make
-				mkdir -p slack/install/
-				mkdir -p slack/usr/share/doc/mtpaint/
-				cp -r ../docs-mtpaint3/mtpaint_*/docs/* slack/usr/share/doc/mtpaint/
-				make install DESTDIR=`pwd`/slack
-				cp doc/slack-desc slack/install/
-				cd slack
-				makepkg --chown y $I_DIR/mtpaint-$MT_V.tgz
-				cd ..
-				./configure flush
-
-				cp doc/alien-desc "$I_DIR"
-				cd "$I_DIR"
-				export EMAIL="mtpaint-user@lists.sourceforge.net"
-				alien -d --version=$MT_V --description="`cat alien-desc`" mtpaint-$MT_V.tgz
-				rename -2_all _i386 *.deb
-				chown wj:users *
-				exit;;
+	"staticpng" )	STATIC_PNG=PNG;;
+	"GIF" )		NGIF=GIF;;
+	"gif" )		NGIF=YES;;
+	"nogif" )	NGIF=NO;;
+	"staticgif" )	STATIC_GIF=GIF;;
+	"jpeg" )	NJPEG=YES;;
+	"nojpeg" )	NJPEG=NO;;
+	"staticjpeg" )	STATIC_JPEG=JPEG;;
+	"jp2" )		NJP2=OpenJPEG;;
+	"jasper" )	NJP2=JasPer;;
+	"nojp2" )	NJP2=NO;;
+	"staticjp2" )	STATIC_JP2=JPEG2000;;
+	"tiff" )	NTIFF=YES;;
+	"notiff" )	NTIFF=NO;;
+	"statictiff" )	STATIC_TIFF=TIFF;;
+	"noft" )	NFT=NO;;
+	"staticft" )	STATIC_FT=FreeType;;
+	"lcms" )	NCMS=LittleCMS;;
+	"lcms2" )	NCMS=LittleCMS2;;
+	"nolcms" )	NCMS=NO;;
+	"staticlcms" )	STATIC_CMS=LittleCMS;;
+	"gtk1" )	GTK=1;;
+	"gtk2"* )	GTK=2
+			# Override minor version of installed GTK+2
+			GTK2VERSION="`echo "$A" | sed -e 's/gtk2\.\?\([0-9]*\).*/\1/'`";;
+	"intl" )	MT_LANG=YES;;
+	"man" )		MT_MAN=YES;;
+	"pod" )		MT_POD=YES;;
+	"gtkfilesel" )	MT_FPICK=gtkfilesel;;
+	"gtkcolsel" )	MT_CPICK=gtkcolsel;;
+	"imagick" )	MT_ANIM=ImageMagick;;
+	"icons"* )	ICON_SET=$A;;
+	"win" )		OS="MinGW/MSYS"
+			GTK=2;;
+	"cflags" )	OPTS=CFLAGS;;
+	"386" )		MARCH='-march=i386';;
+	"486" )		MARCH='-march=i486';;
+	"586" )		MARCH='-march=i586';;
+	"686" )		MARCH='-march=i686';;
+	"--cpu="* )	MARCH="-march=${A#*=}";;
+	"slow" )	OPTS=NO;;
+	"debug" )	OPTS=DEBUG;;
+	"release" )	OPTS=RELEASE;;
+	"thread" )	USE_THREADS=YES;;
+	"nothread" )	USE_THREADS=NO;;
+	"asneeded" )	AS_NEEDED=-Wl,--as-needed;;
+	"--help" )	HELP=0;;
+	"--prefix="* )	MT_PREFIX="${A#*=}";;
+	"--bindir="* )	MT_BINDIR="${A#*=}";;
+	"--datarootdir="* )	MT_DATAROOT="${A#*=}";;
+	"--docdir="* )	MT_DOCDIR="${A#*=}";;
+	"--localedir="* )	MT_LOCDIR="${A#*=}";;
+	"--mandir="* )	MT_MANDIR="${A#*=}";;
+	"--host="* )	MT_HOST="${A#*=}";;
+	"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
+	"flush" )	echo Clearing out directory to original state
+			echo
+			make clean
+			echo
+			rm $GTK_FILE
+			rm po/mtpaint.pot
+			rm -rf src/graphics
+			exit;;
+	"merge" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+			cd po
+			NEW_DIR=trans_
+			mkdir $NEW_DIR`date +%d-%m-%Y-%H-%M-%S`
+			for file in *.po
+			do
+				echo New file = $file-a
+				mv "$file" "$file-a"
+				msgmerge -N "$file-a" mtpaint.pot > "$file"
+				mv "$file-a" $NEW_DIR*
+			done
+			rm mtpaint.pot
+			mv $NEW_DIR* ../../old_trans
+			exit;;
+	"newpo" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+			exit;;
+	# Override variable
+	[!=]*=* )	MT_VAR=${A%%=*}
+			if [ "$MT_VAR" != "${MT_VAR#*[!A-Za-z0-9_]}" ]
+			then
+				echo "Invalid variable: '$MT_VAR'"
+			else
+				eval $MT_VAR=\${A#*=}
+				export $MT_VAR
+			fi;;
 	esac
 done
-
 
 if [ "$HELP" = 0 ]
 then
 
-cat << EOF
-Usage: ./configure [OPTION] ...
+cat << 'EOF' ; exit
+Usage: ./configure [OPTION] ... [VAR=VALUE] ...
 
 Options:
 
-win ............. Configure for Windows MinGW / MSYS
-gtk1 ............ Configure for GTK+1
-gtk2 ............ Configure for GTK+2
-gtk2.VER ........ Configure for GTK+2, minor version VER
-gtkfilesel ...... Use GtkFileSelection file picker
-gtkcolsel ....... Use GtkColorSelection colour picker
-imagick ......... Use ImageMagick for GIF animation tasks
-mtk=DIR ......... Configure for MTK at the given location, e.g. /home/mark/mtk-1.0
-noxft ........... Don't use Xft in MTK
+win .............. Configure for Windows MinGW / MSYS
+gtk1 ............. Configure for GTK+1
+gtk2 ............. Configure for GTK+2
+gtk2.VER ......... Configure for GTK+2, minor version VER
+gtkfilesel ....... Use GtkFileSelection file picker
+gtkcolsel ........ Use GtkColorSelection colour picker
+imagick .......... Use ImageMagick for GIF animation tasks
 
-thread .......... Use multithreading
-nothread ........ Don't use multithreading
+thread ........... Use multithreading
+nothread ......... Don't use multithreading
 
-cflags .......... Use CFLAGS environment variable
---cpu= .......... Target a specific CPU, e.g. athlon-xp, x86-64
-686 ............. Target 686 machines
-586 ............. Target 586 machines
-486 ............. Target 486 machines
-386 ............. Target 386 machines
-slow ............ Don't use compiler optimizations
-asneeded ........ Use linker optimization --as-needed
-release ......... Use the set of optimizations which work best for mtPaint code
+cflags ........... Use CFLAGS environment variable
+--cpu= ........... Target a specific CPU, e.g. athlon-xp, x86-64
+686 .............. Target 686 machines
+586 .............. Target 586 machines
+486 .............. Target 486 machines
+386 .............. Target 386 machines
+slow ............. Don't use compiler optimizations
+asneeded ......... Use linker optimization --as-needed
+release .......... Use the set of optimizations which work best for mtPaint code
+debug ............ Include debugging info in binary
+--host= .......... Cross-compile with a specific toolchain, e.g. i586-mingw32
 
-staticpng ....... Statically link PNG library
-GIF ............. Use libgif
-gif ............. Use libungif
-nogif ........... Don't use libgif and libungif
-staticgif ....... Statically link GIF library
-jpeg ............ Use libjpeg
-nojpeg .......... Don't use libjpeg
-staticjpeg ...... Statically link JPEG library
-jp2 ............. Use libopenjpeg
-jasper........... Use libjasper
-nojp2 ........... Don't use libopenjpeg and libjasper
-staticjp2 ....... Statically link JPEG 2000 library
-tiff ............ Use libtiff
-notiff .......... Don't use libtiff
-statictiff ...... Statically link TIFF library
-noft ............ Don't use FreeType
-staticft ........ Statically link FreeType library
-lcms ............ Use LittleCMS
-lcms2............ Use LittleCMS2
-nolcms .......... Don't use LittleCMS
-staticlcms ...... Statically link LittleCMS library
---fakeroot=DIR .. DIR = location of library and include files to use for cross-compilation
+staticpng ........ Statically link PNG library
+GIF .............. Use libgif
+gif .............. Use libungif
+nogif ............ Don't use libgif and libungif
+staticgif ........ Statically link GIF library
+jpeg ............. Use libjpeg
+nojpeg ........... Don't use libjpeg
+staticjpeg ....... Statically link JPEG library
+jp2 .............. Use libopenjpeg
+jasper............ Use libjasper
+nojp2 ............ Don't use libopenjpeg and libjasper
+staticjp2 ........ Statically link JPEG 2000 library
+tiff ............. Use libtiff
+notiff ........... Don't use libtiff
+statictiff ....... Statically link TIFF library
+noft ............. Don't use FreeType
+staticft ......... Statically link FreeType library
+lcms ............. Use LittleCMS
+lcms2............. Use LittleCMS2
+nolcms ........... Don't use LittleCMS
+staticlcms ....... Statically link LittleCMS library
 
-flush ........... Flush directories to initial state
-debug ........... Include debugging info in binary
-api ............. Use extra sanity checks required for libmtpaint
---bindir=DIR .... DIR = location of bin file to install, /usr/local/bin by default
+intl ............. Use internationalized po files
+man .............. Install the mtPaint man page
 
-intl ............ Use internationalized po files
-newpo ........... Create ./po/mtpaint.pot
-merge ........... Update all po files with new strings - developers only
---locale=DIR .... DIR = location of locale files to install, /usr/share/locale by default
+--fakeroot=DIR ... DIR = location of library and include files to use for cross-compilation
+icons ............ Compile with alternative icon set - see ./src/icons1/README for details
 
-man ............. Install the mtPaint man page
-pod ............. Compile new man page - see ./doc/README for details
---mandir=DIR .... DIR = location of man page to install, /usr/local/man/man1 by default
+--prefix=DIR ..... DIR = prefix location of all installs, e.g. /usr or /usr/local (default)
+--bindir=DIR ..... DIR = location of bin file to install, ${prefix}/bin by default
+--docdir=DIR ..... DIR = location of documentation to install, ${prefix}/share/doc/mtpaint by default
+--localedir=DIR .. DIR = location of locale files to install, ${prefix}/share/locale by default
+--mandir=DIR ..... DIR = location of man page to install, ${prefix}/share/man/man1 by default
 
---prefix=DIR .... DIR = prefix location of all installs, e.g. /usr or /usr/local
+flush ............ Flush directories to initial state
+newpo ............ Create ./po/mtpaint.pot
+merge ............ Update all po files with new strings - developers only
 
-icons ........... Compile with alternative icon set - see ./src/icons1/README for details
+Environment variables:
+
+CC ............... C compiler (defaults to gcc)
+CFLAGS ........... C compiler flags (not recommended; for enabling better optimizations use 'release' option instead)
+LDFLAGS .......... linker flags, e.g. -L<libdir>
+CPPFLAGS ......... C preprocessor flags, e.g. -I<includedir>
+CCLD ............. "test link" command (defaults to $CC -nostartfiles)
+
 
 Default settings: GNU/Linux system, O2 optimizations, English only version,
 mtpaint file picker, mtpaint colour picker.
 pkg-config gtk+-2.0 is checked to determine GTK+2 availability in GNU/Linux
+
 EOF
+
+fi
+
+### Detect the OS
+
+if [ -n "$OS" ] ; then
+	: # Do nothing
+elif [ "$OSTYPE" = "msys" ] ; then
+	OS="MinGW/MSYS"
+elif [ -z "$MT_HOST" ] ; then
+	OS="GNU/Linux"
+elif [ "$MT_HOST" != "${MT_HOST%mingw32*}" ] ; then
+	OS="MinGW/GNU/Linux"
 else
-	LL=${FAKE_ROOT:+--unresolved-symbols=ignore-in-shared-libs -L$FAKE_ROOT/lib} # Extra libs
-	II=${FAKE_ROOT:+-isystem $FAKE_ROOT/include} # Extra includes
+	OS="Other/GNU/Linux"
+fi
 
-	if HAVE_FUNC "mkdtemp"
-	then
-		HAVE_FUNCS="$HAVE_FUNCS -DHAVE_MKDTEMP"
-	fi
+### Prepare to use selected icon set
 
-	if IS_LIB "lgif"
-	then
-		NGIF=${NGIF:-GIF}
-	fi
-	if IS_LIB "lungif"
-	then
-		NGIF=${NGIF:-YES}
-	fi
-	NGIF=${NGIF:-NO}
+mkdir -p src/graphics
+cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
 
-	if IS_LIB "ljpeg"
-	then
-		NJPEG=${NJPEG:-YES}
-	fi
-	NJPEG=${NJPEG:-NO}
+### Choose which sub-makefiles to run
 
-	if IS_LIB "lopenjpeg"
-	then
-		NJP2=${NJP2:-OpenJPEG}
-	fi
-	if IS_LIB "ljasper"
-	then
-		NJP2=${NJP2:-JasPer}
-	fi
-	NJP2=${NJP2:-NO}
+MAKE_DIRS=src
+[ "$MT_LANG" = YES ] && MAKE_DIRS="$MAKE_DIRS po" # translations
+[ "$MT_MAN" = YES ] && MAKE_DIRS="$MAKE_DIRS doc" # man page
 
-	if IS_LIB "ltiff"
-	then
-		NTIFF=${NTIFF:-YES}
-	fi
-	NTIFF=${NTIFF:-NO}
+### Setup directories
 
-	if IS_LIB "lfreetype"
-	then
-		NFT=${NFT:-YES}
-	fi
-	NFT=${NFT:-NO}
-
-	if IS_LIB "llcms2"
-	then
-		NCMS=${NCMS:-LittleCMS2}
-	fi
-	if IS_LIB "llcms"
-	then
-		NCMS=${NCMS:-LittleCMS}
-	fi
-	NCMS=${NCMS:-NO}
-
-	rm _conf.c _conf.tmp
-
-	mkdir -p src/graphics
-	cp src/$ICON_SET/*.xpm src/$ICON_SET/*.xbm src/graphics
-
-	if [ "$GCCVER" \< "40" ]
-	then
-		echo CC = $CC -Wall > $GTK_FILE
-	else # Tell gcc 4.x to shut up
-		echo CC = $CC -Wall -Wno-pointer-sign > $GTK_FILE
-	fi
-	echo "MT_VERSION=$MT_VERSION" >> $GTK_FILE
-	echo "MT_DATE=$MT_DATE" >> $GTK_FILE
-	echo "MT_PREFIX=\"$MT_PREFIX\"" >> $GTK_FILE
-
-	THREADS=
-	if [ "$MTK_DIR" ]
-	then
-		BIN_INSTALL=$LIN_BIN_INSTALL
-		GTK_INCLUDE="-I$MTK_DIR/include -I$MTK_DIR/include/glib -I/usr/include/X11 -DU_MTK"
-		GTK_LIB="$MTK_DIR/lib/libgtk.a $MTK_DIR/lib/libgdk.a $MTK_DIR/lib/libgmodule.a $MTK_DIR/lib/libglib.a"
-
-		echo "MTK_LIB = $GTK_LIB" >> $GTK_FILE
-
-		GTK_LIB="-L/usr/lib -L/usr/X11R6/lib $GTK_LIB -ldl -lXi -lXext -lX11 -lm"
-
-		if [ "$MTK_XFT" = "YES" ]
-		then
-			GTK_LIB="$GTK_LIB -lXft"
-		fi
-	elif [ "$OS" = "GNU/Linux" ]
-	then
-		BIN_INSTALL=$LIN_BIN_INSTALL
-		if [ "$GTK" = "1" ]
-		then
-			if [ "$USE_THREADS" = "YES" ]
-			then
-				THREADS="gthread"
-			fi
-			if gtk-config --cflags > /dev/null
-			then
-				GTK_INCLUDE=`gtk-config gtk $THREADS --cflags`
-				GTK_LIB=`gtk-config gtk $THREADS --libs | sed 's/-rdynamic//'`
-			else
-				echo
-				echo I have not been able to find gtk-config so I am assuming the following:
-				echo
-				GTK_INCLUDE="-I/opt/gnome/include/gtk-1.2 -I/opt/gnome/include/glib-1.2 -I/opt/gnome/lib/glib/include -I/usr/X11R6/include"
-				GTK_LIB="-L/usr/lib -L/usr/X11R6/lib -L/opt/gnome/lib -lgtk -lgdk -rdynamic -lgmodule -lglib -ldl -lXext -lX11 -lm"
-				echo GTK_INCLUDE = $GTK_INCLUDE
-				echo GTK_LIB = $GTK_LIB
-				echo
-				echo If these values are not right for your system, edit the configure script
-				echo
-			fi
-		else
-			if [ "$USE_THREADS" = "YES" ]
-			then
-				THREADS="gthread-2.0"
-			fi
-			GTK_INCLUDE=`pkg-config gtk+-2.0 $THREADS --cflags`
-			GTK_LIB="`pkg-config gtk+-2.0 $THREADS --libs` -lX11 -lm"
-		fi
-	else
-		if [ "$USE_THREADS" = "YES" ]
-		then
-			THREADS="-lgthread-2.0"
-		fi
-		BIN_INSTALL=$WIN_BIN_INSTALL
-		MT_LANG_DEST=locale
-		MT_PO_DEST=locale
-		if [ "$GTK" = "1" ]
-		then
-			GTK_INCLUDE="-I/include -I/include/glib-2.0 -I/lib/gtk+/include -I/lib/glib-2.0/include -mms-bitfields"
-			GTK_LIB="-L/lib -lgtk -lgdk -lglib-2.0 -lm -mwindows"
-		else
-			GTK_INCLUDE="-I$CROSSPF/include/gtk-2.0 -I$CROSSPF/lib/gtk-2.0/include -I$CROSSPF/include/atk-1.0 -I$CROSSPF/include/pango-1.0 -I$CROSSPF/include/freetype2 -I$CROSSPF/include/glib-2.0 -I$CROSSPF/lib/glib-2.0/include -I$CROSSPF/include -mms-bitfields"
-			GTK_LIB="-L$CROSSPF/lib -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 $THREADS -lm -mwindows"
-		fi
-	fi
-
-	I_EX=$HAVE_FUNCS
-	if [ "$USE_THREADS" = "YES" ]
-	then
-		I_EX="$I_EX -DU_THREADS"
-	fi
-	if [ "$NGIF" != "NO" ]
-	then
-		if [ "$NGIF" = "GIF" ]
-		then
-			LIB_NAME gif "$STATIC_GIF"
-		else
-			LIB_NAME ungif "$STATIC_GIF"
-		fi
-		I_EX="$I_EX -DU_GIF"
-	fi
-	if [ "$NJPEG" = "YES" ]
-	then
-		LIB_NAME jpeg "$STATIC_JPEG"
-		I_EX="$I_EX -DU_JPEG"
-	fi
-	if [ "$NJP2" = "OpenJPEG" ]
-	then
-		LIB_NAME openjpeg "$STATIC_JP2"
-		I_EX="$I_EX -I$CROSSPF/include/openjpeg -DU_JP2"
-		if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]
-		then
-			I_EX="$I_EX -DOPJ_STATIC"
-		fi
-	fi
-	if [ "$NJP2" = "JasPer" ]
-	then
-		LIB_NAME jasper "$STATIC_JP2"
-		I_EX="$I_EX -DU_JASPER"
-	fi
-	if [ "$NTIFF" = "YES" ]
-	then
-		LIB_NAME tiff "$STATIC_TIFF"
-		I_EX="$I_EX -DU_TIFF"
-	fi
-	if [ "$NFT" = YES ]
-	then
-		LIB_NAME freetype "$STATIC_FT"
-		if [ "$OS" = "GNU/Linux" ]
-		then
-			I_EX="$I_EX -DU_FREETYPE `freetype-config --cflags`"
-			L_EX="$L_EX `freetype-config --libs | sed 's/-lfreetype//'`"
-		else
-			I_EX="$I_EX -DU_FREETYPE"
-			L_EX="$L_EX -liconv"
-		fi
-	fi
-	if [ "$NCMS" = "LittleCMS2" ]
-	then
-		LIB_NAME lcms2 "$STATIC_CMS"
-		I_EX="$I_EX -DU_LCMS=2"
-	fi
-	if [ "$NCMS" = "LittleCMS" ]
-	then
-		LIB_NAME lcms "$STATIC_CMS"
-		I_EX="$I_EX -DU_LCMS"
-	fi
-	LIB_NAME png "$STATIC_PNG"
-	LIB_NAME z "$STATIC_PNG"
-	if [ "$STATIC_LAST" ]
-	then
-		L_EX="$L_EX -Wl,-dy"
-	fi
-
-	if [ "$API_CHECKS" ]
-	then
-		I_EX="$I_EX -DU_API"
-	fi
-
-	if [ "$MT_FPICK" = mtpaint ]
-	then
-		I_EX="$I_EX -DU_FPICK_MTPAINT"
-	fi
-	if [ "$MT_FPICK" = gtkfilesel ]
-	then
-		I_EX="$I_EX -DU_FPICK_GTKFILESEL"
-	fi
-
-	if [ "$MT_CPICK" = mtpaint ]
-	then
-		I_EX="$I_EX -DU_CPICK_MTPAINT"
-	fi
-	if [ "$MT_CPICK" = gtkcolsel ]
-	then
-		I_EX="$I_EX -DU_CPICK_GTK"
-	fi
-
-	if [ "$MT_ANIM" = ImageMagick ]
-	then
-		I_EX="$I_EX -DU_ANIM_IMAGICK"
-	fi
-
-
-	if [ "$DEBUG" = NO ]
-	then
-		GTK_LIB="$GTK_LIB -s"
-	else
-		I_EX="$I_EX -ggdb"
-	fi
-
-	if [ "$MT_CUSTOM" ]
-	then
-		I_EX="$I_EX -DU_$MT_CUSTOM"
-	fi
-
-	if [ "$MT_LANG" = YES ]
-	then
-		I_EX="$I_EX -DU_NLS -DMT_LANG_DEST=\"\\\"$MT_PO_DEST\"\\\""
-		MAKE_DIRS="$MAKE_DIRS po"
-
-		if [ "$OS" = "GNU/Linux" ]
-		then
-			echo "MT_LANG_DEST=\"$MT_LANG_DEST\"" >> $GTK_FILE
-		else
-			L_EX="$L_EX -lintl"
-			echo "MT_LANG_DEST=\"$BIN_INSTALL/$MT_LANG_DEST\"" >> $GTK_FILE
-		fi
-	fi
-	if [ "$MT_MAN" = YES ]
-	then
-		MAKE_DIRS="$MAKE_DIRS doc"
-		echo "MT_MAN_DEST=\"$MT_MAN_DEST\"" >> $GTK_FILE
-	fi
-
-	GTK_INCLUDE="$GTK_INCLUDE ${GTK2VERSION:+-DGTK2VERSION=$GTK2VERSION} $I_EX"
-	GTK_LIB="$L_EX $GTK_LIB"
-
-	# Rebase the paths for --fakeroot
-	if [ "$FAKE_ROOT" ]
-	then
-		AS_NEEDED="-Wl,--as-needed -Wl,--no-add-needed -Wl,--unresolved-symbols=ignore-in-shared-libs"
-		LL="-L$FAKE_ROOT/lib"
-		for A in $GTK_LIB
-		do
-			case "$A" in
-				"-L/usr"* ) LL="$LL -L$FAKE_ROOT${A#-L/usr}";;
-			esac
-		done
-		for A in $GTK_INCLUDE
-		do
-			case "$A" in
-				"-I/usr"* ) II="$II -I$FAKE_ROOT${A#-I/usr}";;
-			esac
-		done
-	fi
-
-	echo "LDFLAG = $AS_NEEDED $LL $GTK_LIB" >> $GTK_FILE
-
-	if [ "$OPTS" = "YES" ]
-	then
-		XCFLAG=${CFLAG:--O2 $MARCH}
-	else
-		XCFLAG=${CFLAG:-$MARCH}
-	fi
-	echo "CFLAG = $II $XCFLAG $GTK_INCLUDE -DMT_VERSION=\"\\\"$MT_VERSION\\\"\"" >> $GTK_FILE
-
-	echo "subdirs = $MAKE_DIRS" >> $GTK_FILE
-	echo "BIN_INSTALL=\"$BIN_INSTALL\"" >> $GTK_FILE
-
-	if [ "$GCCVER" \> "32" ]
-	then
-		echo "HAVE_RANDSEED=1" >> $GTK_FILE
-	fi
-
-
-
-	if [ "$MT_POD" = "YES" ]
-	then
-		cd doc
-		make pod
-		cd ..
-	fi
-
-	echo
-	echo ---------------------
-	echo mtPaint Configuration
-	echo ---------------------
-	echo
-	echo "-------"
-	echo "General"
-	echo "-------"
-	echo
-	echo "    Version             $MT_V"
-	echo "    System              $OS"
-	echo -n "    Toolkit             "
-if [ "$MTK_DIR" ]
+if [ "$OS" != "${OS#MinGW/}" ]
 then
-	echo "MTK - $MTK_DIR"
-	echo "    Use Xft             $MTK_XFT"
-elif [ "$GTK2VERSION" ]
-then
-	echo "GTK+ 2.$GTK2VERSION"
+	EXEEXT=".exe"
+	MT_PREFIX="${MT_PREFIX-/c/Program Files/mtPaint}"
 else
-	echo "GTK+$GTK"
+	MT_PREFIX="${MT_PREFIX-/usr/local}"
 fi
-	echo "    File Picker         $MT_FPICK"
-	echo "    Colour Picker       $MT_CPICK"
-	echo "    Animation Package   $MT_ANIM"
-if [ "$API_CHECKS" ]
+MT_BINDIR="${MT_BINDIR:-$MT_PREFIX/bin}"
+MT_DATAROOT="${MT_DATAROOT:-$MT_PREFIX/share}"
+MT_DOCDIR="${MT_DOCDIR:-$MT_DATAROOT/doc/mtpaint}"
+MT_MANDIR="${MT_MANDIR:-$MT_DATAROOT/man}"
+if [ "$OS" != "${OS#MinGW/}" ]
 then
-	echo "    API checks          $API_CHECKS"
-fi
-	echo "    Use FreeType        $NFT"
-	echo "    Use CMS             $NCMS"
-if [ "$MT_CUSTOM" ]
-then
-	echo "    Customized for      $MT_CUSTOM"
-fi
-	echo "    Icon set            $ICON_SET"
-	echo "    Internationalized   $MT_LANG"
-	echo "    Multithreaded       $USE_THREADS"
-
-
-	echo
-	echo "--------"
-	echo "Compiler"
-	echo "--------"
-	echo
-if [ "$CFLAG" ]
-then
-	echo "    CFLAGS              $CFLAG"
+	MT_LOCDIR="${MT_LOCDIR:-$MT_BINDIR/locale}"
+	# Need relative path on Windows
+	MT_PO=
+	MT_CURDIR="$MT_BINDIR/"
+	while [ "$MT_LOCDIR" = "${MT_LOCDIR#$MT_CURDIR}" ]
+	do
+		MT_PO="../$MT_PO"
+		if [ "$MT_CURDIR" = "${MT_CURDIR%/[!/]*/}/" ]
+		then
+			echo "'bindir' and 'localedir' should both be well-formed *nix-style paths"
+			exit 1 # And if they weren't, too bad
+		fi
+		MT_CURDIR="${MT_CURDIR%/[!/]*/}/"
+	done
+	MT_PO="$MT_PO${MT_LOCDIR#$MT_CURDIR}"
 else
-if [ "$MARCH" ]
+	MT_LOCDIR="${MT_LOCDIR:-$MT_DATAROOT/locale}"
+	MT_PO="$MT_LOCDIR"
+fi
+
+### Set feature flags
+
+[ "$USE_THREADS" = "YES" ] && DEFS="$DEFS -DU_THREADS"
+if [ "$MT_FPICK" = mtpaint ]
 then
-	echo "    MARCH target        $MARCH"
+	DEFS="$DEFS -DU_FPICK_MTPAINT"
+else # "$MT_FPICK" = gtkfilesel
+	DEFS="$DEFS -DU_FPICK_GTKFILESEL"
 fi
-	echo "    Optimizations       $OPTS $AS_NEEDED"
-fi
-	echo "    Debug info          $DEBUG"
-STATICLIBS=`echo -n " $STATIC_PNG $STATIC_GIF $STATIC_JPEG $STATIC_JP2\
- $STATIC_TIFF $STATIC_FT $STATIC_CMS" | sed 's/  */ /g'`
-if [ "$STATICLIBS" != " " ]
+if [ "$MT_CPICK" = mtpaint ]
 then
-	echo "    Static libraries   $STATICLIBS"
+	DEFS="$DEFS -DU_CPICK_MTPAINT"
+else #	"$MT_CPICK" = gtkcolsel
+	DEFS="$DEFS -DU_CPICK_GTK"
+fi
+[ "$MT_ANIM" = ImageMagick ] && DEFS="$DEFS -DU_ANIM_IMAGICK"
+# mtPaint version
+DEFS="$DEFS -DMT_VERSION='\"$MT_VERSION\"'"
+
+### Setup compiler (only GCC is really supported at this time)
+
+INCLUDES=
+LIBS=
+if [ "$OS" != "${OS%GNU/Linux}" ]
+then
+	CC=${CC:-`which ${MT_HOST:+$MT_HOST-}gcc`}
+	PKG_CONFIG=${PKG_CONFIG:-${MT_HOST:+$MT_HOST-}pkg-config}
+fi
+CC=${CC:-gcc}
+# Use compiler as linker in tests - this way, both accept "-Wl," in LDFLAGS
+CCLD=${CCLD:-$CC -nostartfiles}
+# Get GCC version
+GCCVER=`$CC -dumpversion`
+# Get target architecture
+GCCARCH=`$CC -dumpmachine`
+# For eternally misconfigured, Windows-hosted MinGW
+[ "$GCCARCH" != "${GCCARCH#mingw32}" ] && GCCARCH=i586-mingw32
+# For any properly built toolchain
+ARCH=${ARCH:-${GCCARCH%%-*}}
+
+if [ -n "$FAKE_ROOT" ] # A way to replace just some libraries, leaving others be
+then
+	PKGCONFIG () # Check both locations in turn
+	{
+		PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$FAKE_ROOT/lib/pkgconfig" \
+			pkg-config --define-variable=prefix="$FAKE_ROOT" "$@" \
+			2> /dev/null || "$PKG_CONFIG" "$@"
+	}
+	MT_TESTLINK="$CCLD -L$FAKE_ROOT/lib -Wl,--unresolved-symbols=ignore-in-shared-libs $LDFLAGS"
+	MT_TESTCOMP="$CC -fno-builtin -isystem $FAKE_ROOT/include $CPPFLAGS ${MT_TESTLINK#$CCLD}"
+else
+	PKGCONFIG ()
+	{
+		"$PKG_CONFIG" "$@"
+	}
+	MT_TESTLINK="$CCLD $LDFLAGS"
+	MT_TESTCOMP="$CC -fno-builtin $CPPFLAGS $LDFLAGS"
 fi
 
+if [ "$OS" != "${OS%/MSYS}" ]
+then
+	MT_TESTLINK="redir -e /dev/null $MT_TESTLINK -L/lib"
+	MT_TESTCOMP="redir -e /dev/null $MT_TESTCOMP -L/lib"
+	INCLUDES="-I/include"
+	LIBS="-L/lib"
+fi
+IS_LIB()
+{
+	$MT_TESTLINK -$1 -o _conf.tmp > /dev/null 2>&1
+}
+HAVE_FUNC()
+{
+	echo "main() { $1(); }" > _conf.c
+	$MT_TESTCOMP _conf.c -o _conf.tmp > /dev/null 2>&1
+}
 
-	echo
-	echo "----------"
-	echo "File Types"
-	echo "----------"
-	echo
-	echo "    Use GIF             $NGIF"
-	echo "    Use JPEG            $NJPEG"
-	echo "    Use JPEG 2000       $NJP2"
-	echo "    Use TIFF            $NTIFF"
+### Detect libraries and functions
 
+if HAVE_FUNC "mkdtemp"
+then
+	DEFS="$DEFS -DHAVE_MKDTEMP"
+fi
 
+if IS_LIB "lgif"
+then
+	NGIF=${NGIF:-GIF}
+fi
+if IS_LIB "lungif"
+then
+	NGIF=${NGIF:-YES}
+fi
+NGIF=${NGIF:-NO}
 
-	echo
-	echo "------------"
-	echo "Installation"
-	echo "------------"
-	echo
-	echo "    Binary install      $BIN_INSTALL"
+if IS_LIB "ljpeg"
+then
+	NJPEG=${NJPEG:-YES}
+fi
+NJPEG=${NJPEG:-NO}
+
+if IS_LIB "lopenjpeg"
+then
+	NJP2=${NJP2:-OpenJPEG}
+fi
+if IS_LIB "ljasper"
+then
+	NJP2=${NJP2:-JasPer}
+fi
+NJP2=${NJP2:-NO}
+
+if IS_LIB "ltiff"
+then
+	NTIFF=${NTIFF:-YES}
+fi
+NTIFF=${NTIFF:-NO}
+
+if IS_LIB "lfreetype"
+then
+	NFT=${NFT:-YES}
+fi
+NFT=${NFT:-NO}
+
+if IS_LIB "llcms2"
+then
+	NCMS=${NCMS:-LittleCMS2}
+fi
+if IS_LIB "llcms"
+then
+	NCMS=${NCMS:-LittleCMS}
+fi
+NCMS=${NCMS:-NO}
+
+### Setup optimizations
+
+if [ "$OPTS" = RELEASE ]
+then
+	# Target i386 when compiling for any x86 CPU;
+	# this produces smallest *AND* fastest binary
+	case $ARCH in
+		i?86) CFLAGS="-O2 ${MARCH:--march=i386}";;
+		*) CFLAGS="-O2 $MARCH";;
+	esac
+	# Add optimizations which are proven to really make mtPaint code faster
+	if [ "$GCCVER" \< "4.0" ]
+	then # GCC 3.x
+		CFLAGS="$CFLAGS -fweb"
+	else # GCC 4.x
+		CFLAGS="$CFLAGS -fweb -fomit-frame-pointer -fmodulo-sched"
+	fi
+	# Do not add unneeded dependencies
+	AS_NEEDED="-Wl,--as-needed"
+	# Disable GTK+ debug code
+	DEFS="$DEFS -DGTK_NO_CHECK_CASTS -DG_DISABLE_CAST_CHECKS"
+elif [ "$OPTS" = DEBUG ]
+then
+	CFLAGS="-ggdb"
+elif [ "$OPTS" = YES ]
+then
+	CFLAGS="-O2 $MARCH"
+elif [ "$OPTS" = NO ]
+then
+	CFLAGS="$MARCH"
+else # $OPTS = CFLAGS
+	MARCH=
+	# And leave CFLAGS alone
+fi
+[ "$OPTS" != DEBUG ] && LDFLAGS="-s $LDFLAGS" # Strip debug info
+# Set Windows-specific flags
+if [ "$OS" != "${OS#MinGW/}" ]
+then
+	CFLAGS="-mms-bitfields $CFLAGS"
+	LDFLAGS="-mwindows $LDFLAGS"
+fi
+# Enable warnings
+if [ "$GCCVER" \< "4.0" ]
+then
+	WARN="-Wall"
+else # Tell gcc 4.x to shut up
+	WARN="-Wall -Wno-pointer-sign"
+fi
+
+### Setup libraries
+
+MT_DLIBS=
+MT_SLIBS=
+LIB_NAME () # ( lib_ID , static_mode , libs )
+{
+	if [ "$2" ]
+	then
+		MT_SLIBS="$MT_SLIBS ${1:+-l$1}$3"
+	else
+		MT_DLIBS="$MT_DLIBS ${1:+-l$1}$3"
+	fi
+}
+
+if [ "$NGIF" != NO ]
+then
+	if [ "$NGIF" = GIF ]
+	then
+		LIB_NAME gif "$STATIC_GIF"
+	else
+		LIB_NAME ungif "$STATIC_GIF"
+	fi
+	DEFS="$DEFS -DU_GIF"
+fi
+if [ "$NJP2" = OpenJPEG ]
+then
+	LIB_NAME openjpeg "$STATIC_JP2"
+# !!! If <openjpeg.h> isn't found in include path, use CPPFLAGS or symlink;
+# I'm not inclined to scan all the places where different packagers can put it
+	DEFS="$DEFS -DU_JP2"
+	if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]
+	then
+		DEFS="$DEFS -DOPJ_STATIC"
+	fi
+fi
+if [ "$NJP2" = JasPer ]
+then
+	LIB_NAME jasper "$STATIC_JP2"
+	DEFS="$DEFS -DU_JASPER"
+fi
+if [ "$NTIFF" = YES ]
+then
+	LIB_NAME tiff "$STATIC_TIFF"
+	DEFS="$DEFS -DU_TIFF"
+fi
+if [ "$NJPEG" = YES ]
+then
+	LIB_NAME jpeg "$STATIC_JPEG"
+	DEFS="$DEFS -DU_JPEG"
+fi
+if [ "$NFT" = YES ]
+then
+	DEFS="$DEFS -DU_FREETYPE"
+	if [ "$OS" = "GNU/Linux" ]
+	then # Do it the old way, for native builds on *very* old distros
+		INCLUDES="$INCLUDES `freetype-config --cflags`"
+		LIB_NAME "" "$STATIC_FT" "`freetype-config --libs`"
+	elif [ "$OS" != "${OS%/MSYS}" ]
+	then # pkg-config may be missing on Windows - hardcode its results
+		INCLUDES="$INCLUDES -I/include/freetype2"
+		LIB_NAME "" "$STATIC_FT" "-lfreetype -lz"
+	else # Use pkg-config
+		INCLUDES="$INCLUDES `PKGCONFIG freetype2 --cflags`"
+		LIB_NAME "" "$STATIC_FT" "`PKGCONFIG freetype2 --libs`"
+	fi
+	# libiconv may be separate, or part of libc
+	HAVE_FUNC "iconv_open" || LIB_NAME iconv "$STATIC_FT"
+fi
+if [ "$NCMS" = LittleCMS2 ]
+then
+	LIB_NAME lcms2 "$STATIC_CMS"
+	DEFS="$DEFS -DU_LCMS=2"
+fi
+if [ "$NCMS" = LittleCMS ]
+then
+	LIB_NAME lcms "$STATIC_CMS"
+	DEFS="$DEFS -DU_LCMS"
+fi
+LIB_NAME png "$STATIC_PNG"
+LIB_NAME z "$STATIC_PNG"
+LIB_NAME m
 if [ "$MT_LANG" = YES ]
 then
-	echo "    Locale install      $MT_LANG_DEST"
-	echo "    Locale program      $MT_PO_DEST"
+	HAVE_FUNC "gettext" || LIB_NAME intl
+	DEFS="$DEFS -DU_NLS -DMT_LANG_DEST='\"$MT_PO\"'"
 fi
-	echo "    Install man page    $MT_MAN"
-if [ "$MT_MAN" = YES ]
+
+# !!! Would be nice to subtract MT_SLIBS from MT_DLIBS first
+LIBS="$LIBS $MT_DLIBS${MT_SLIBS:+ -Wl,-dn $MT_SLIBS -Wl,-dy}"
+
+rm -f _conf.c _conf.tmp
+
+### Setup GTK+
+
+FOUND_GTK=
+[ "$OS" != "${OS#MinGW/}" ] && GTK=2
+[ "$GTK" != 1 ] && PKGCONFIG gtk+-2.0 --cflags > /dev/null 2>&1 && FOUND_GTK=2 GTK=2
+[ "$GTK" != 2 ] && PKGCONFIG gtk+ --cflags > /dev/null 2>&1 && FOUND_GTK=1 GTK=1
+GTK=${GTK:-1}
+
+if [ "$USE_THREADS" = NO ] ; then
+	THREADS=
+elif [ "$GTK" = 2 ] ; then
+	THREADS="gthread-2.0"
+else # "$GTK" = 1
+	THREADS="gthread"
+fi
+
+# !!! It is assumed that the nondefault install prefix is the one GTK+ lives in
+if [ "$FOUND_GTK" = 2 ]
 then
-	echo "    Man page install    $MT_MAN_DEST"
-fi
+	GTKPREFIX=`PKGCONFIG gtk+-2.0 --variable=prefix`
+	INCLUDES="$INCLUDES `PKGCONFIG gtk+-2.0 $THREADS --cflags`"
+	LIBS="$LIBS `PKGCONFIG gtk+-2.0 $THREADS --libs`"
+elif [ "$FOUND_GTK" = 1 ]
+then
+# !!! Full equivalent to "gtk-config gtk" would be "pkg-config gtk+ gmodule",
+# but for mtPaint, 'gmodule' is nothing but a nuisance anyway
+	GTKPREFIX=`PKGCONFIG gtk+ --variable=prefix`
+	INCLUDES="$INCLUDES `PKGCONFIG gtk+ $THREADS --cflags`"
+	LIBS="$LIBS `PKGCONFIG gtk+ $THREADS --libs`"
+elif [ "GTK" = 2 ] && [ "$OS" != "${OS%/MSYS}" ]
+then # Windows system w/o working pkg-config
+	GTKPREFIX=/
+	INCLUDES="$INCLUDES -I/include/gtk-2.0 -I/lib/gtk-2.0/include -I/include/atk-1.0 -I/include/pango-1.0 -I/include/freetype2 -I/include/glib-2.0 -I/lib/glib-2.0/include"
+	LIBS="$LIBS -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 ${THREADS:+-lgthread-2.0}"
+elif [ "GTK" = 1 ] && gtk-config --cflags > /dev/null
+then # Very old GNU/Linux system
+	GTKPREFIX=`gtk-config gtk --prefix`
+	INCLUDES="$INCLUDES `gtk-config gtk $THREADS --cflags`"
+	LIBS="$LIBS `gtk-config gtk $THREADS --libs | sed 's/-rdynamic//'`"
+elif [ "GTK" = 1 ]
+then # Even older GNU/Linux system
+	GTKPREFIX=/opt/gnome
+	GTK_INCLUDE="-I$GTKPREFIX/include/gtk-1.2 -I$GTKPREFIX/include/glib-1.2 -I$GTKPREFIX/lib/glib/include -I/usr/X11R6/include"
+	GTK_LIB="-L/usr/lib -L/usr/X11R6/lib -L$GTKPREFIX/lib -lgtk -lgdk -lgmodule -lglib -ldl -lXext -lX11 -lm"
 	echo
+	echo I have not been able to find gtk-config so I am assuming the following:
+	echo
+	echo GTK_INCLUDE = $GTK_INCLUDE
+	echo GTK_LIB = $GTK_LIB
+	echo
+	echo If these values are not right for your system, edit the configure script
+	echo
+	INCLUDES="$INCLUDES $GTK_INCLUDE"
+	LIBS="$LIBS $GTK_LIB"
+else
+	echo "Failed to find required GTK+$GTK libraries" 1>&2
+	exit 1
+fi
+# Also need to add "-lX11" on GTK+2/X systems
+[ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
+# GTK+2 version to use
+DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
 
+### 
 
+### Rebase the paths, for '--fakeroot' substitutions to work
+
+FAKE_PATHS () # variable, key
+{
+	FAKE_KEYS=" "
+	for A in $1
+	do
+		[ "$A" = "${A#$2/}" ] && continue
+		for B in "$GTKPREFIX/include" "$GTKPREFIX/lib"\
+			/usr/include /usr/lib /usr/local/include /usr/local/lib
+		do 
+			[ "$A" != "${A#$2$B}" ] || continue
+			C="$2$FAKE_ROOT${A#$2${B%/*}}"
+			[ "$C" != "$A" ] && [ "$FAKE_KEYS" = "${FAKE_KEYS#* $C }" ] &&\
+				FAKE_KEYS="$FAKE_KEYS$C "
+			break
+		done
+	done
+	echo "$FAKE_KEYS"
+}
+if [ "$FAKE_ROOT" ]
+then
+	# !!! Spaces in paths will NOT be well received here
+	FAKE_PATHS "$LIBS" -L
+	LIBS="-L$FAKE_ROOT/lib $FAKE_KEYS $LIBS"
+	FAKE_PATHS "$INCLUDES" -I
+	INCLUDES="-isystem $FAKE_ROOT/include $FAKE_KEYS $INCLUDES"
+	AS_NEEDED="-Wl,--as-needed,--no-add-needed,--unresolved-symbols=ignore-in-shared-libs"
 fi
 
+### Write config
+
+cat << CONFIG > "$GTK_FILE"
+CC = $CC $WARN
+EXEEXT = $EXEEXT
+MT_VERSION=$MT_VERSION
+MT_DATE=$MT_DATE
+MT_PREFIX="$MT_PREFIX"
+MT_DATAROOT="$MT_DATAROOT"
+MT_LANG_DEST="$MT_LOCDIR"
+MT_MAN_DEST="$MT_MANDIR"
+LDFLAG = $AS_NEEDED $LIBS $LDFLAGS
+CFLAG = $DEFS $INCLUDES $CPPFLAGS $CFLAGS
+subdirs = $MAKE_DIRS
+BIN_INSTALL="$MT_BINDIR"
+CONFIG
+[ "$GCCVER" \> "3.2" ] && echo "HAVE_RANDSEED=1" >> $GTK_FILE
+
+### Report config
+
+eval STATICLIBS=\"$STATICLIBS\"
+STATICLIBS=`echo -n "$STATICLIBS" | sed -e 's/  */ /g' -e 's/^ //'`
+cat << CONFIG
+
+---------------------
+mtPaint Configuration
+---------------------
+
+-------
+General
+-------
+
+    Version             $MT_V
+    System              $OS
+    Toolkit             GTK+$GTK${GTK2VERSION:+.$GTK2VERSION}
+    File Picker         $MT_FPICK
+    Colour Picker       $MT_CPICK
+    Animation Package   $MT_ANIM
+    Use FreeType        $NFT
+    Use CMS             $NCMS
+    Icon set            $ICON_SET
+    Internationalized   $MT_LANG
+    Multithreaded       $USE_THREADS
+
+--------
+Compiler
+--------
+
+    Optimizations       $OPTS
+    CFLAGS              $CFLAGS
+    LDFLAGS             ${AS_NEEDED:+$AS_NEEDED }$LDFLAGS
+    Static libraries    ${STATICLIBS:-NONE}
+
+----------
+File Types
+----------
+
+    Use GIF             $NGIF
+    Use JPEG            $NJPEG
+    Use JPEG 2000       $NJP2
+    Use TIFF            $NTIFF
+
+------------
+Installation
+------------
+
+    Binary install      $MT_BINDIR
+CONFIG
+[ "$MT_LANG" = YES ] && cat << CONFIG
+    Locale install      $MT_LOCDIR
+    Locale program      $MT_PO
+CONFIG
+cat << CONFIG
+    Install man page    $MT_MAN
+CONFIG
+[ "$MT_MAN" = YES ] && cat << CONFIG
+    Man page install    $MT_MANDIR
+CONFIG
 echo
