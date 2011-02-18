@@ -432,12 +432,11 @@ then
 		*) CFLAGS="-O2 $MARCH";;
 	esac
 	# Add optimizations which are proven to really make mtPaint code faster
-	if [ "$GCCVER" \< "4.0" ]
-	then # GCC 3.x
-		CFLAGS="$CFLAGS -fweb"
-	else # GCC 4.x
-		CFLAGS="$CFLAGS -fweb -fomit-frame-pointer -fmodulo-sched"
-	fi
+        case $GCCVER in
+                3.*) CFLAGS="$CFLAGS -fweb";;
+                4.*) CFLAGS="$CFLAGS -fweb -fomit-frame-pointer -fmodulo-sched";;
+        esac
+
 	# Do not add unneeded dependencies
 	AS_NEEDED="-Wl,--as-needed"
 	# Disable GTK+ debug code
@@ -463,12 +462,12 @@ then
 	LDFLAGS="-mwindows $LDFLAGS"
 fi
 # Enable warnings
-if [ "$GCCVER" \< "4.0" ]
-then
-	WARN="-Wall"
-else # Tell gcc 4.x to shut up
-	WARN="-Wall -Wno-pointer-sign"
-fi
+
+case $GCCVER in
+        # Tell gcc 4.x to shut up
+        4.*) WARN="-Wall -Wno-pointer-sign";;
+        *) WARN="-Wall";;
+esac
 
 ### Setup libraries
 
@@ -673,7 +672,10 @@ CFLAG = $DEFS $INCLUDES $CPPFLAGS $CFLAGS
 subdirs = $MAKE_DIRS
 BIN_INSTALL="$MT_BINDIR"
 CONFIG
-[ "$GCCVER" \> "3.2" ] && echo "HAVE_RANDSEED=1" >> $GTK_FILE
+
+case $GCCVER in
+        3.[2-9]*|4.*) echo "HAVE_RANDSEED=1" >> $GTK_FILE;;
+esac
 
 ### Report config
 
