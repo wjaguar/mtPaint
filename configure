@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.65"
-MT_DATE="2011-01-26"
+MT_V="3.34.66"
+MT_DATE="2011-05-02"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -366,6 +366,20 @@ HAVE_FUNC()
 	$MT_TESTCOMP _conf.c -o _conf.tmp > /dev/null 2>&1
 }
 
+HAVE_GCC_VER()
+{
+	# First 2 parts of GCC version
+	MT_VN0=${GCCVER%%.*}
+	MT_VN1=${GCCVER#$MT_VN0}
+	MT_VN0=${MT_VN0%%[!0-9]*}
+	MT_VN1=${MT_VN1#.}
+	MT_VN1=${MT_VN1%%[!0-9]*}
+
+	# Compare them to given version
+	[ ${1%%.*} -eq "$MT_VN0" ] && [ ${1#*.} -le "$MT_VN1" ] || \
+		[ ${1%%.*} -lt "$MT_VN0" ]
+}
+
 ### Detect libraries and functions
 
 if HAVE_FUNC "mkdtemp"
@@ -432,11 +446,11 @@ then
 		*) CFLAGS="-O2 $MARCH";;
 	esac
 	# Add optimizations which are proven to really make mtPaint code faster
-	if [ "$GCCVER" \< "4.0" ]
-	then # GCC 3.x
-		CFLAGS="$CFLAGS -fweb"
-	else # GCC 4.x
+	if HAVE_GCC_VER 4.0
+	then # GCC 4.x
 		CFLAGS="$CFLAGS -fweb -fomit-frame-pointer -fmodulo-sched"
+	else # GCC 3.x
+		CFLAGS="$CFLAGS -fweb"
 	fi
 	# Do not add unneeded dependencies
 	AS_NEEDED="-Wl,--as-needed"
@@ -463,11 +477,11 @@ then
 	LDFLAGS="-mwindows $LDFLAGS"
 fi
 # Enable warnings
-if [ "$GCCVER" \< "4.0" ]
-then
-	WARN="-Wall"
-else # Tell gcc 4.x to shut up
+if HAVE_GCC_VER 4.0
+then # Tell gcc 4.x to shut up
 	WARN="-Wall -Wno-pointer-sign"
+else
+	WARN="-Wall"
 fi
 
 ### Setup libraries
@@ -673,7 +687,7 @@ CFLAG = $DEFS $INCLUDES $CPPFLAGS $CFLAGS
 subdirs = $MAKE_DIRS
 BIN_INSTALL="$MT_BINDIR"
 CONFIG
-[ "$GCCVER" \> "3.2" ] && echo "HAVE_RANDSEED=1" >> $GTK_FILE
+HAVE_GCC_VER 3.2 && echo "HAVE_RANDSEED=1" >> $GTK_FILE
 
 ### Report config
 

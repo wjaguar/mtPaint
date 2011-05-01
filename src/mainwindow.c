@@ -2998,16 +2998,10 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 /* Clip area to image & align rgb pointer with it */
 static unsigned char *clip_to_image(int *rect, unsigned char *rgb, int *vxy)
 {
-	int rxy[4], mw, mh, zoom = 1, scale = 1;
-
-
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
+	int rxy[4], mw, mh;
 
 	/* Clip update area to image bounds */
-	mw = (mem_width * scale + zoom - 1) / zoom;
-	mh = (mem_height * scale + zoom - 1) / zoom;
+	canvas_size(&mw, &mh);
 	if (!clip(rxy, margin_main_x, margin_main_y,
 		margin_main_x + mw, margin_main_y + mh, vxy)) return (NULL);
 
@@ -3186,21 +3180,14 @@ void main_update_area(int x, int y, int w, int h)
 /* Get zoomed canvas size */
 void canvas_size(int *w, int *h)
 {
-	int i;
+	int zoom = 1, scale = 1;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0)
-	{
-		i = rint(1.0 / can_zoom);
-		*w = (mem_width + i - 1) / i;
-		*h = (mem_height + i - 1) / i;
-	}
-	else
-	{
-		i = rint(can_zoom);
-		*w = mem_width * i;
-		*h = mem_height * i;
-	}
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	*w = (mem_width * scale + zoom - 1) / zoom;
+	*h = (mem_height * scale + zoom - 1) / zoom;
 }
 
 void clear_perim()
@@ -4578,11 +4565,10 @@ void dock_undock(int what, int state)
 	/* To prevent flicker */
 	cont = GTK_CONTAINER(dock_area);
 	mode = cont->resize_mode;
-	/* !!! If we add a new page beyond current one, immediate resize would
-	 * crash - but it isn't needed in such case anyway */
+	/* !!! Immediate resize is too prone to crashing */
 	if (dock_pages[1] || !dock_pages[0])
-		cont->resize_mode = GTK_RESIZE_IMMEDIATE;
-//	gtk_container_set_resize_mode(cont, GTK_RESIZE_IMMEDIATE);
+		cont->resize_mode = GTK_RESIZE_QUEUE;
+//	gtk_container_set_resize_mode(cont, GTK_RESIZE_QUEUE);
 
 	// Steal the widget
 	gtk_widget_ref(box);

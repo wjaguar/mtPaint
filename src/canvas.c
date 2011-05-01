@@ -792,6 +792,10 @@ void pressed_flip_sel_h()
 	update_stuff(UPD_CLIP);
 }
 
+static void locate_marquee(int *xy, int snap);
+
+#define MIN_VISIBLE 16 /* No less than a square this large must be visible */
+
 void pressed_paste(int centre)
 {
 	if (!mem_clipboard) return;
@@ -799,37 +803,37 @@ void pressed_paste(int centre)
 	pressed_select(FALSE);
 	change_to_tool(TTB_SELECT);
 
-	if (centre)
-	{
-		int w, h;
-		GtkAdjustment *hori, *vert;
-
-		hori = gtk_scrolled_window_get_hadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-		vert = gtk_scrolled_window_get_vadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-
-		canvas_size(&w, &h);
-		if (hori->page_size > w) mem_icx = 0.5;
-		else mem_icx = (hori->value + hori->page_size * 0.5) / w;
-
-		if (vert->page_size > h) mem_icy = 0.5;
-		else mem_icy = (vert->value + vert->page_size * 0.5) / h;
-
-		marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
-		marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
-	}
-	else
-	{	
-		marq_x1 = mem_clip_x;
-		marq_y1 = mem_clip_y;
-	}
-	marq_x2 = marq_x1 + mem_clip_w - 1;
-	marq_y2 = marq_y1 + mem_clip_h - 1;
 	marq_status = MARQUEE_PASTE;
 	cursor_corner = -1;
+	marq_x1 = mem_clip_x;
+	marq_y1 = mem_clip_y;
+	if (centre)
+	{
+		canvas_center(mem_ic);
+		marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
+		marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
+		/* Snap to grid, if it leaves enough of paste area visible */
+		if (tgrid_snap)
+		{
+			int marq0[4], mxy[4], vxy[4];
+
+			copy4(marq0, marq_xy);
+			locate_marquee(mxy, TRUE);
+			wjcanvas_get_vport(drawing_canvas, vxy);
+			if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+				vxy[2] - margin_main_x, vxy[3] - margin_main_y, mxy) ||
+				((vxy[2] - vxy[0] < MIN_VISIBLE) &&
+				 (vxy[2] - vxy[0] < mxy[2] - mxy[0])) ||
+				((vxy[3] - vxy[1] < MIN_VISIBLE) &&
+				 (vxy[3] - vxy[1] < mxy[3] - mxy[1])))
+				copy4(marq_xy, marq0);
+		}
+	}
+	// !!! marq_x2, marq_y2 will be set by update_stuff()
 	update_stuff(UPD_PASTE);
 }
+
+#undef MIN_VISIBLE
 
 void pressed_rectangle(int filled)
 {
@@ -2140,6 +2144,20 @@ void file_selector(int action_type)
 	if (fs) fs_setup(fs, action_type);
 }
 
+void canvas_center(float ic[2])		// Center of viewable area
+{
+	GtkAdjustment *hori, *vert;
+	int w, h;
+
+	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(
+		scrolledwindow_canvas));
+	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(
+		scrolledwindow_canvas));
+	canvas_size(&w, &h);
+	ic[0] = hori->page_size < w ? (hori->value + hori->page_size * 0.5) / w : 0.5;
+	ic[1] = vert->page_size < h ? (vert->value + vert->page_size * 0.5) / h : 0.5;
+}
+
 void align_size(float new_zoom)		// Set new zoom level
 {
 	if (zoom_flag) return;		// Needed as we could be called twice per iteration
@@ -2149,21 +2167,7 @@ void align_size(float new_zoom)		// Set new zoom level
 	if (new_zoom == can_zoom) return;
 
 	zoom_flag = 1;
-	if (mem_ics == 0)
-	{
-		GtkAdjustment *hori, *vert;
-		int w, h;
-
-		hori = gtk_scrolled_window_get_hadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-		vert = gtk_scrolled_window_get_vadjustment(
-			GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-		canvas_size(&w, &h);
-		if (hori->page_size > w) mem_icx = 0.5;
-		else mem_icx = (hori->value + hori->page_size * 0.5) / w;
-		if (vert->page_size > h) mem_icy = 0.5;
-		else mem_icy = (vert->value + vert->page_size * 0.5) / h;
-	}
+	if (!mem_ics) canvas_center(mem_ic);
 	mem_ics = 0;
 
 	can_zoom = new_zoom;
@@ -2893,11 +2897,12 @@ static void locate_marquee(int *xy, int snap)
 	{
 		copy4(rxy, marq_xy);
 		snap_xy(marq_xy);
-		/* What follows makes no sense in case of paste, but
-		 * check_marquee() will put everything right anyway - WJ */
-		snap_xy(marq_xy + 2);
-		marq_xy[(rxy[2] >= rxy[0]) * 2 + 0] += tgrid_dx - 1;
-		marq_xy[(rxy[3] >= rxy[1]) * 2 + 1] += tgrid_dy - 1;
+		if (marq_status < MARQUEE_PASTE)
+		{
+			snap_xy(marq_xy + 2);
+			marq_xy[(rxy[2] >= rxy[0]) * 2 + 0] += tgrid_dx - 1;
+			marq_xy[(rxy[3] >= rxy[1]) * 2 + 1] += tgrid_dy - 1;
+		}
 	}
 	check_marquee();
 

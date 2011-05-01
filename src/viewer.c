@@ -665,8 +665,8 @@ static guint idle_focus;
 
 void vw_focus_view()						// Focus view window to main window
 {
-	int w, h, w0, h0;
-	float main_h = 0.5, main_v = 0.5, px, py, nv_h, nv_v;
+	int w0, h0;
+	float px, py, nv_h, nv_v, main_hv[2];
 	GtkAdjustment *hori, *vert;
 
 	if (idle_focus) gtk_idle_remove(idle_focus);
@@ -680,48 +680,39 @@ void vw_focus_view()						// Focus view window to main window
 		return;
 	}
 
-	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-
-	canvas_size(&w, &h);
-	if (hori->page_size < w)
-		main_h = (hori->value + hori->page_size * 0.5) / w;
-	if (vert->page_size < h)
-		main_v = (vert->value + vert->page_size * 0.5) / h;
+	canvas_center(main_hv);
 
 	/* If we are editing a layer above the background make adjustments */
 	if (layers_total && layer_selected)
 	{
 		w0 = layer_table[0].image->image_.width;
 		h0 = layer_table[0].image->image_.height;
-		px = main_h * mem_width + layer_table[layer_selected].x;
-		py = main_v * mem_height + layer_table[layer_selected].y;
+		px = main_hv[0] * mem_width + layer_table[layer_selected].x;
+		py = main_hv[1] * mem_height + layer_table[layer_selected].y;
 		px = px < 0.0 ? 0.0 : px >= w0 ? w0 - 1 : px;
 		py = py < 0.0 ? 0.0 : py >= h0 ? h0 - 1 : py;
-		main_h = px / w0;
-		main_v = py / h0;
+		main_hv[0] = px / w0;
+		main_hv[1] = py / h0;
 	}
 
 	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
 	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
 
+	nv_h = nv_v = 0.0;
 	if (hori->page_size < vw_width)
 	{
-		nv_h = vw_width * main_h - hori->page_size * 0.5;
+		nv_h = vw_width * main_hv[0] - hori->page_size * 0.5;
 		if (nv_h + hori->page_size > vw_width)
 			nv_h = vw_width - hori->page_size;
 		if (nv_h < 0.0) nv_h = 0.0;
 	}
-	else nv_h = 0.0;
-
 	if ( vert->page_size < vw_height )
 	{
-		nv_v = vw_height * main_v - vert->page_size * 0.5;
+		nv_v = vw_height * main_hv[1] - vert->page_size * 0.5;
 		if (nv_v + vert->page_size > vw_height)
 			nv_v = vw_height - vert->page_size;
 		if (nv_v < 0.0) nv_v = 0.0;
 	}
-	else nv_v = 0.0;
 
 	/* Do nothing if nothing changed */
 	if ((hori->value == nv_h) && (vert->value == nv_v)) return;

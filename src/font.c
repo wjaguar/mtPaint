@@ -290,9 +290,10 @@ unsigned char *mt_text_render(
 	txtp1 = text;
 	txtp2 = (char *)txt2;
 
-//	FT_Select_Charmap( face, FT_ENCODING_UNICODE );
-	FT_Set_Charmap( face, face->charmaps[0] );	// Needed to make dingbat fonts work
-// !!! Cannot same be done in a less clumsy way?
+	/* !!! To handle non-Unicode fonts properly, is just too costly;
+	 * instead we map 'em to ISO 8859-1 and hope for the best - WJ */
+	if (FT_Select_Charmap(face, FT_ENCODING_UNICODE))
+		FT_Set_Charmap(face, face->charmaps[0]); // Fallback
 
 	/* Convert input string to UTF-32, using native byte order */
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN

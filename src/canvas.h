@@ -114,6 +114,7 @@ enum {
 #define FS_ENTRY_KEY "mtPaint.fs_entry"
 
 int do_a_load(char *fname, int undo);
+void canvas_center(float ic[2]);
 void align_size(float new_zoom);
 void realign_size();
 void init_ls_settings(ls_settings *settings, GtkWidget *box);

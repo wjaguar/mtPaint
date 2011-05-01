@@ -171,7 +171,7 @@ typedef struct {
 typedef struct {
 	int channel;			// Current active channel
 	int ics;			// Has the centre been set by the user?
-	float icx, icy;			// Current centre x,y
+	float ic[2];			// Current centre x,y
 	int tool_pat;			// Tool pattern number
 	int xpm_trans;			// Transparent colour index (-1 if none)
 	int xbm_hot_x, xbm_hot_y;	// Current XBM hot spot
@@ -359,8 +359,9 @@ image_info mem_clip;			// Current clipboard
 image_state mem_state;			// Current edit settings
 
 #define mem_channel		mem_state.channel
-#define mem_icx			mem_state.icx
-#define mem_icy			mem_state.icy
+#define mem_ic			mem_state.ic
+#define mem_icx			mem_state.ic[0]
+#define mem_icy			mem_state.ic[1]
 #define mem_ics			mem_state.ics
 #define mem_tool_pat		mem_state.tool_pat
 #define mem_xpm_trans		mem_state.xpm_trans

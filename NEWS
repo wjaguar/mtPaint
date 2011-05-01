@@ -72,6 +72,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Problem with FreeType text dialog occasionally hiding behind main window is now eliminated
 	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
 	* BUGFIX - FreeType text renderer now properly handles TTF fonts with embedded bitmaps
+	* BUGFIX - FreeType text renderer now doesn't mistake some Unicode fonts for non-Unicode
 	* BUGFIX - Redraw lag when moving a dialog over main window in Windows is now greatly reduced (fixed in GTK+)
 	* BUGFIX - Ctrl+T key now draws selection outline as it should - keyboard shortcut for text tool is now Shift+T
 	* "Distance to A+B" palette sort mode removed due to utter uselessness
