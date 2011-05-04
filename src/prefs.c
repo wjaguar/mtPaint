@@ -248,7 +248,7 @@ static void conf_tablet(GtkWidget *widget)
 static void prefs_apply(GtkWidget *widget)
 {
 	char path[PATHBUF];
-	int i, j;
+	int i, j, xpm_trans;
 
 	for ( i=0; i<STATUS_ITEMS; i++ )
 	{
@@ -264,8 +264,7 @@ static void prefs_apply(GtkWidget *widget)
 #ifdef U_THREADS
 	maxthreads = read_spin(spinbutton_threads);
 #endif
-
-	mem_xpm_trans = read_spin(spinbutton_trans);
+	xpm_trans = read_spin(spinbutton_trans);
 	mem_xbm_hot_x = read_spin(spinbutton_hotx);
 	mem_xbm_hot_y = read_spin(spinbutton_hoty);
 	jpeg_quality = read_spin(spinbutton_jpeg);
@@ -350,6 +349,8 @@ static void prefs_apply(GtkWidget *widget)
 #endif
 
 	update_stuff(UPD_PREFS);
+	/* Apply this undoable setting after everything else */
+	mem_set_trans(xpm_trans);
 }
 
 static void prefs_ok(GtkWidget *widget)

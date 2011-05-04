@@ -721,12 +721,11 @@ void ani_but_preview()
 static void create_frames_ani()
 {
 	image_info *image;
-	image_state *state;
 	ls_settings settings;
 	png_color pngpal[256], *trans;
 	unsigned char *layer_rgb, *irgb = NULL;
 	char output_path[PATHBUF], *command, *wild_path;
-	int a, b, k, i, cols, layer_w, layer_h, npt, l = 0;
+	int a, b, k, i, tr, cols, layer_w, layer_h, npt, l = 0;
 
 
 	ani_win_read_widgets();
@@ -764,8 +763,7 @@ static void create_frames_ani()
 	a = ani_frame1 < ani_frame2 ? ani_frame1 : ani_frame2;
 	b = ani_frame1 < ani_frame2 ? ani_frame2 : ani_frame1;
 
-	if (layer_selected == 0) image = &mem_image , state = &mem_state;
-	else image = &layer_table[0].image->image_ , state = &layer_table[0].image->state_;
+	image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
 
 	layer_w = image->width;
 	layer_h = image->height;
@@ -804,9 +802,8 @@ static void create_frames_ani()
 		settings.img[CHN_IMAGE] = layer_rgb;
 		settings.bpp = 3;
 		/* Background transparency */
-		settings.xpm_trans = state->xpm_trans;
-		settings.rgb_trans = settings.xpm_trans < 0 ? -1 :
-			PNG_2_INT(image->pal[settings.xpm_trans]);
+		settings.xpm_trans = tr = image->trans;
+		settings.rgb_trans = tr < 0 ? -1 : PNG_2_INT(image->pal[tr]);
 	}
 
 	progress_init(_("Creating Animation Frames"), 1);
@@ -841,9 +838,9 @@ static void create_frames_ani()
 				layer_w, layer_h, cols, FALSE)) goto failure2;
 
 			settings.xpm_trans = -1;	// Default is no transparency
-			if (state->xpm_trans >= 0)	// Background has transparency
+			if (image->trans >= 0)	// Background has transparency
 			{
-				trans = image->pal + state->xpm_trans;
+				trans = image->pal + image->trans;
 				npt = PNG_2_INT(*trans);
 				for (i = 0; i < cols; i++)
 				{	// Does it exist in the composite frame?

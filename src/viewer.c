@@ -625,8 +625,7 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 		if (ll)
 		{
 			opac = (layer_table[ll].opacity * 255 + 50) / 100;
-			xpm = ll == layer_selected ? mem_xpm_trans :
-				layer_table[ll].image->state_.xpm_trans;
+			xpm = image->trans;
 		}
 		img = image->img;
 		setup_row(xof + mx, mw, czoom, ii - i, xpm, opac,
@@ -939,8 +938,7 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 					if (img[CHN_ALPHA][ofs] < (bpp == 1 ? 255 : 1))
 						continue;
 				}
-				tpix = i == layer_selected ? mem_xpm_trans :
-					layer_table[i].image->state_.xpm_trans;
+				tpix = image->trans;
 				if (tpix >= 0)
 				{
 					if (bpp == 1) ppix = rgb[ofs];

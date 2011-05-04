@@ -135,6 +135,7 @@ static int clip_to_layer(int layer)
 		mem_free_image(img, FREE_IMAGE);
 		mem_pal_copy(img->pal, mem_pal);
 		img->cols = mem_cols;
+		img->trans = mem_xpm_trans;
 	}
 	if (!mem_alloc_image(AI_COPY, img, 0, 0, 0, 0, &mem_clip)) return (0);
 	update_undo(img);
@@ -583,7 +584,7 @@ static void click_spal_apply()
 	spot_undo(UNDO_XPAL);
 	mem_pal_sort(spal_mode, index1, index2, reverse);
 	mem_undo_prepare();
-	update_stuff(UPD_PAL);
+	update_stuff(UPD_TPAL);
 }
 
 static void click_spal_ok()

@@ -1228,6 +1228,8 @@ void update_stuff(int flags)
 		realign_size();
 	if (flags & CF_VALIGN)
 		vw_realign();
+	if (flags & CF_TRANS)
+		layer_show_trans();
 }
 
 void main_undo()
@@ -1808,7 +1810,7 @@ static void store_ls_settings(ls_settings *settings)
 	case FS_CHANNEL_SAVE:
 	case FS_COMPOSITE_SAVE:
 		if (fflags & FF_TRANS)
-			mem_xpm_trans = settings->xpm_trans;
+			mem_set_trans(settings->xpm_trans);
 		if (fflags & FF_SPOT)
 		{
 			mem_xbm_hot_x = settings->hot_x;
@@ -1923,7 +1925,6 @@ static void fs_ok(GtkWidget *fs)
 				layers_notify_changed();
 		}
 		set_new_filename(layer_selected, fname);
-		update_stuff(UPD_TRANS);
 		break;
 	case FS_PALETTE_LOAD:
 		if (load_pal(fname)) goto redo;

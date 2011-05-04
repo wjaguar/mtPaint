@@ -220,6 +220,7 @@ void create_default_image();			// Create default new image
 #define CF_TDRAW  0x00080000 /* Color/brush/pattern window */
 #define CF_ALIGN  0x00100000 /* Realign image window */
 #define CF_VALIGN 0x00200000 /* Realign view window */
+#define CF_TRANS  0x00400000 /* Transparent color in layers window */
 
 /* Compound updates */
 
@@ -243,8 +244,10 @@ void create_default_image();			// Create default new image
 #define UPD_PAT    (CF_AB | CF_TDRAW)
 //	Changed A, B, and pattern
 #define UPD_ABP    UPD_AB
-//	Changed palette 
+//	Changed palette
 #define UPD_PAL    (CF_PAL | CF_IMGBAR | CF_PDRAW | UPD_AB | UPD_IMG)
+//	Changed palette and transparent color
+#define UPD_TPAL   (UPD_PAL | CF_TRANS)
 //	Added colors to palette
 #define UPD_ADDPAL (CF_PAL | CF_IMGBAR | CF_PDRAW)
 //	Changed drawing mode in some way
@@ -264,7 +267,7 @@ void create_default_image();			// Create default new image
 //	Converted RGB image to indexed
 #define UPD_2IDX   (UPD_2RGB | UPD_PAL)
 //	Created or loaded a new image (+)
-#define UPD_ALL    (UPD_GEOM | UPD_PAL | UPD_CAB)
+#define UPD_ALL    (UPD_GEOM | UPD_PAL | UPD_CAB | CF_TRANS)
 //	Changed clipboard contents
 #define UPD_CLIP   CF_PMODE
 //	Changed rendering options
@@ -281,9 +284,9 @@ void create_default_image();			// Create default new image
 #define UPD_PASTE  (UPD_SEL | CF_DRAW | CF_CGEOM)
 //	Changed filename
 #define UPD_NAME   CF_NAME
-//	Changed transparent color
-#define UPD_TRANS  (UPD_IMG | CF_IMGBAR)
-//	Changed image contents (+undo)
+//	Changed transparent color (+undo)
+#define UPD_TRANS  (UPD_IMG | CF_IMGBAR | CF_MENU | CF_TRANS)
+//	Changed image contents (+)
 #define UPD_UIMG   (UPD_IMG | CF_MENU)
 //	Cut selection
 #define UPD_CUT    UPD_UIMG

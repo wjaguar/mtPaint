@@ -6359,12 +6359,12 @@ static void store_image_extras(image_info *image, image_state *state,
 	}
 
 	/* Accept vars which make sense */
-	state->xpm_trans = settings->xpm_trans;
 	state->xbm_hot_x = settings->hot_x;
 	state->xbm_hot_y = settings->hot_y;
 	preserved_gif_delay = settings->gif_delay;
 
 	/* Accept palette */
+	image->trans = settings->xpm_trans;
 	mem_pal_copy(image->pal, settings->pal);
 	image->cols = settings->colors;
 }

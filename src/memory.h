@@ -143,8 +143,9 @@ typedef struct {
 	png_color *pal_;
 	unsigned char *tileptr;
 	undo_data *dataptr;
-	int cols, width, height, bpp, flags;
 	size_t size;
+	int width, height, flags;
+	short cols, bpp, trans;
 } undo_item;
 
 typedef struct {
@@ -161,6 +162,7 @@ typedef struct {
 	png_color pal[256];	// RGB entries for all 256 palette colours
 	int cols;	// Number of colours in the palette: 1..256 or 0 for no image
 	int bpp;		// Bytes per pixel = 1 or 3
+	int trans;		// Transparent colour index (-1 if none)
 	int width, height;	// Image geometry
 	undo_stack undo_;	// Image's undo stack
 	char *filename;		// File name of file loaded/saved
@@ -173,7 +175,6 @@ typedef struct {
 	int ics;			// Has the centre been set by the user?
 	float ic[2];			// Current centre x,y
 	int tool_pat;			// Tool pattern number
-	int xpm_trans;			// Transparent colour index (-1 if none)
 	int xbm_hot_x, xbm_hot_y;	// Current XBM hot spot
 	char prot_mask[256];		// 256 bytes used for indexed images
 	int prot;			// Number of protected colours in prot_RGB
@@ -322,6 +323,7 @@ image_info mem_image;			// Current image
 #define mem_pal		mem_image.pal
 #define mem_cols	mem_image.cols
 #define mem_img_bpp	mem_image.bpp
+#define mem_xpm_trans	mem_image.trans
 #define mem_width	mem_image.width
 #define mem_height	mem_image.height
 
@@ -364,7 +366,6 @@ image_state mem_state;			// Current edit settings
 #define mem_icy			mem_state.ic[1]
 #define mem_ics			mem_state.ics
 #define mem_tool_pat		mem_state.tool_pat
-#define mem_xpm_trans		mem_state.xpm_trans
 #define mem_xbm_hot_x		mem_state.xbm_hot_x
 #define mem_xbm_hot_y		mem_state.xbm_hot_y
 #define mem_prot_mask		mem_state.prot_mask
@@ -644,6 +645,7 @@ void mem_mask_init();			// Initialise RGB protection mask
 int mem_protected_RGB(int intcol);	// Is this intcol in list?
 
 void mem_swap_cols(int redraw);		// Swaps colours and update memory
+void mem_set_trans(int trans);		// Set transparent colour and update
 void mem_get_histogram(int channel);	// Calculate how many of each colour index is on the canvas
 int scan_duplicates();			// Find duplicate palette colours
 void remove_duplicates();		// Remove duplicate palette colours - call AFTER scan_duplicates
@@ -666,15 +668,18 @@ void hsv2rgb(unsigned char *rgb, double *hsv);
 
 //// UNDO
 
-#define UNDO_PAL   0	/* Palette changes */
-#define UNDO_XPAL  1	/* Palette and indexed image changes */
-#define UNDO_COL   2	/* Palette and/or RGB image changes */
-#define UNDO_DRAW  3	/* Changes to current channel / RGBA */
-#define UNDO_INV   4	/* "Invert" operation */
-#define UNDO_XFORM 5	/* Changes to all channels */
-#define UNDO_FILT  6	/* Changes to current channel */
-#define UNDO_PASTE 7	/* Paste operation (current / RGBA) */
-#define UNDO_TOOL  8	/* Same as UNDO_DRAW but respects pen_down */
+enum {
+	UNDO_PAL = 0,	/* Palette changes */
+	UNDO_XPAL,	/* Palette and indexed image changes */
+	UNDO_COL,	/* Palette and/or RGB image changes */
+	UNDO_DRAW,	/* Changes to current channel / RGBA */
+	UNDO_INV,	/* "Invert" operation */
+	UNDO_XFORM,	/* Changes to all channels */
+	UNDO_FILT,	/* Changes to current channel */
+	UNDO_PASTE,	/* Paste operation (current / RGBA) */
+	UNDO_TOOL,	/* Same as UNDO_DRAW but respects pen_down */
+	UNDO_TRANS	/* Transparent colour change (cumulative) */
+};
 
 void mem_undo_next(int mode);	// Call this after a draw event but before any changes to image
 //	 Get address of previous channel data (or current if none)
@@ -689,6 +694,7 @@ void mem_undo_forward();		// REDO requested by user
 #define UC_DELETE  0x04	/* Force delete */
 #define UC_PENDOWN 0x08	/* Respect pen_down */
 #define UC_GETMEM  0x10 /* Get memory and do nothing */
+#define UC_ACCUM   0x20 /* Cumulative change */
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 void update_undo(image_info *image);	// Copy image state into current undo frame

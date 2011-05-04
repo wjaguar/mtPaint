@@ -270,19 +270,16 @@ void pressed_select(int all)
 
 static void pressed_remove_unused()
 {
-	int i;
-
-	i = mem_remove_unused_check();
-	if ( i <= 0 )
-		alert_box(_("Error"), _("There were no unused colours to remove!"), NULL);
-	if ( i > 0 )
+	if (mem_remove_unused_check() <= 0) alert_box(_("Error"),
+		_("There were no unused colours to remove!"), NULL);
+	else
 	{
 		spot_undo(UNDO_XPAL);
 
 		mem_remove_unused();
 		mem_undo_prepare();
 
-		update_stuff(UPD_PAL);
+		update_stuff(UPD_TPAL);
 	}
 }
 

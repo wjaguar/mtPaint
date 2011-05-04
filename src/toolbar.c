@@ -1348,11 +1348,10 @@ static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
 			mem_undo_next(UNDO_XPAL);		// Do undo stuff
 			mem_pal_index_move( drag_index_vals[0], drag_index_vals[1] );
 
-			if ( mem_img_bpp == 1 )
-				mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
+			mem_canvas_index_move( drag_index_vals[0], drag_index_vals[1] );
 
 			mem_undo_prepare();
-			update_stuff(UPD_PAL | CF_MENU);
+			update_stuff(UPD_TPAL | CF_MENU);
 		}
 	}
 

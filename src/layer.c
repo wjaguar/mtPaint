@@ -287,9 +287,10 @@ int layer_add(int w, int h, int bpp, int cols, png_color *pal, int cmask)
 		memory_errors(1);
 		return (FALSE);
 	}
-	lim->state_.xpm_trans = lim->state_.xbm_hot_x = lim->state_.xbm_hot_y = -1;
+	lim->state_.xbm_hot_x = lim->state_.xbm_hot_y = -1;
 	lim->state_.channel = lim->image_.img[mem_channel] ? mem_channel : CHN_IMAGE;
 
+	lim->image_.trans = -1;
 	lim->image_.cols = cols;
 	if (pal) mem_pal_copy(lim->image_.pal, pal);
 	else mem_bw_pal(lim->image_.pal, 0, cols - 1);
@@ -338,6 +339,7 @@ void layer_press_duplicate()
 	lim->state_ = ls->state_;
 	mem_pal_copy(lim->image_.pal, ls->image_.pal);
 	lim->image_.cols = ls->image_.cols;
+	lim->image_.trans = ls->image_.trans;
 	update_undo(&lim->image_);
 
 	// Copy across position data
@@ -441,6 +443,23 @@ static void layer_show_position()
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_x), t->x);
 	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_y), t->y);
 	layers_initialized = oldinit;
+}
+
+void layer_show_trans()
+{
+	GtkSpinButton *spin;
+	int n;
+
+	if (!layers_box) return;
+	spin = GTK_SPIN_BUTTON(layer_spin);
+	n = layer_selected ? mem_xpm_trans : -1;
+	if (gtk_spin_button_get_value_as_int(spin) != n)
+	{
+		int oldinit = layers_initialized;
+		layers_initialized = FALSE;
+		gtk_spin_button_set_value(spin, n);
+		layers_initialized = oldinit;
+	}
 }
 
 void layer_press_centre()
@@ -581,7 +600,6 @@ int load_layers( char *file_name )
 		lim2 = t->image;
 		// !!! No old name so no fuss with saving it
 		lim2->image_.filename = strdup(load_name);
-		init_istate(&lim2->state_, &lim2->image_);
 
 		fgets(tin, 256, fp);
 		string_chop(tin);
@@ -595,11 +613,12 @@ int load_layers( char *file_name )
 
 		kk = read_file_num(fp, tin);
 		k = read_file_num(fp, tin);
-		lim2->state_.xpm_trans = kk <= 0 ? -1 : k < 0 ? 0 : k > 255 ? 255 : k;
+		lim2->image_.trans = kk <= 0 ? -1 : k < 0 ? 0 : k > 255 ? 255 : k;
 
 		k = read_file_num(fp, tin);
 		t->opacity = k < 1 ? 1 : k > 100 ? 100 : k;
 
+		init_istate(&lim2->state_, &lim2->image_);
 		if (!layers_total++) layer_copy_to_main(0); // Update mem_state
 	}
 	if (layers_total) layers_total--;
@@ -693,7 +712,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			/* Move frame data to image */
 			memcpy(image->img, frm->img, sizeof(chanlist));
 			memset(frm->img, 0, sizeof(chanlist));
-			state->xpm_trans = frm->trans;
+			image->trans = frm->trans;
 			mem_pal_copy(image->pal, frm->pal ? frm->pal :
 				fset.pal ? fset.pal : mem_pal_def);
 			image->cols = frm->cols;
@@ -796,10 +815,10 @@ int layer_save_composite(char *fname, ls_settings *settings)
 		settings->bpp = 3;
 		if (layer_selected) /* Set up background transparency */
 		{
-			res = layer_table[0].image->state_.xpm_trans;
+			res = image->trans;
 			settings->xpm_trans = res;
 			settings->rgb_trans = res < 0 ? -1 :
-				PNG_2_INT(layer_table[0].image->image_.pal[res]);
+				PNG_2_INT(image->pal[res]);
 
 		}
 		res = save_image(fname, settings);
@@ -826,8 +845,7 @@ void layer_add_composite()
 		view_render_rgb(lim->image_.img[CHN_IMAGE], 0, 0,
 			image->width, image->height, 1);
 		/* Copy background's transparency */
-		lim->state_.xpm_trans = layer_selected ?
-			layer_table[0].image->state_.xpm_trans : mem_xpm_trans;
+		lim->image_.trans = image->trans;
 		/* Activate the result */
 		layer_show_new();
 	}
@@ -857,7 +875,7 @@ int save_layers( char *file_name )
 		parse_filename(comp_name, file_name, t->image->image_.filename, l);
 		fprintf( fp, "%s\n", comp_name );
 
-		xpm = t->image->state_.xpm_trans;
+		xpm = t->image->image_.trans;
 		fprintf(fp, "%s\n%i\n%i\n%i\n%i\n%i\n%i\n", t->name,
 			t->visible, t->x, t->y, xpm >= 0, xpm, t->opacity);
 	}
@@ -953,9 +971,8 @@ static void layer_inputs_changed(GtkObject *thing, gpointer user_data)
 		repaint_layer(layer_selected);
 		break;
 	case 3: // Transparency spin
-		mem_xpm_trans = gtk_spin_button_get_value_as_int(
-			GTK_SPIN_BUTTON(layer_spin));
-		update_stuff(UPD_TRANS);
+		mem_set_trans(gtk_spin_button_get_value_as_int(
+			GTK_SPIN_BUTTON(layer_spin)));
 		break;
 	}
 }
@@ -1001,7 +1018,7 @@ static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 
 	mt_spinslide_set_value(layer_slider, j ? t->opacity : 100);
 	layer_show_position();
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(layer_spin), j ? mem_xpm_trans : -1);
+	layer_show_trans();
 
 // !!! May cause list to be stuck in drag mode (release handled before press?)
 //	while (gtk_events_pending()) gtk_main_iteration();

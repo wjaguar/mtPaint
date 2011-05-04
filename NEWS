@@ -49,6 +49,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* "Palette->Open" now can extract palette from indexed images in any supported file format
 	* "Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system
+	* Transparent colour now part of undo system
+	* Palette sorting, dragging a colour, or removing duplicate colours now do not lose transparent colour
 	* New keyboard shortcuts added - J for lasso tool, D for line tool, F for flood fill tool
 	* Toolbar and menu icons are now themeable (Preferences->Paths->Default Theme)
 	* Command line globbing now possible using -w option, e.g. mtpaint -w "*.jpg"
@@ -62,6 +64,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should
 	* BUGFIX - Layers list now correctly displays selected layer after loading layers file
+	* BUGFIX - Layers window now correctly displays transparent colour after it has been modified elsewhere
 	* BUGFIX - Loading TIFF files with X or Y mirroring doesn't cause crash
 	* BUGFIX - Planar TIFF files with alpha now load properly
 	* BUGFIX - Transparency in indexed TGA files is now read properly

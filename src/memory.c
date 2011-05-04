@@ -101,10 +101,11 @@ int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
 #define TILE_SHIFT 6
 #define MAX_TILEMAP ((((MAX_WIDTH + TILE_SIZE - 1) / TILE_SIZE + 7) / 8) * \
 	((MAX_HEIGHT + TILE_SIZE - 1) / TILE_SIZE))
-#define UF_TILED 1
-#define UF_FLAT  2
-#define UF_SIZED 4
-#define UF_ORIG  8 /* Unmodified state */
+#define UF_TILED 0x01
+#define UF_FLAT  0x02
+#define UF_SIZED 0x04
+#define UF_ORIG  0x08 /* Unmodified state */
+#define UF_ACCUM 0x10 /* Cumulative */
 
 int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_common;		// Percent of undo space in common arena
@@ -700,9 +701,10 @@ void update_undo(image_info *image)
 	memcpy(undo->img, image->img, sizeof(chanlist));
 	undo->dataptr = NULL;
 	undo->cols = image->cols;
+	undo->trans = image->trans;
+	undo->bpp = image->bpp;
 	undo->width = image->width;
 	undo->height = image->height;
-	undo->bpp = image->bpp;
 	undo->flags = image->changed ? 0 : UF_ORIG;
 }
 
@@ -912,12 +914,13 @@ int mem_new( int width, int height, int bpp, int cmask )
 		// 8x8 is bound to work!
 		mem_alloc_image(0, &mem_image, 8, 8, bpp, CMASK_IMAGE, NULL);
 	}
+	mem_image.trans = -1;
 
 // !!! If palette isn't set up before mem_new(), undo frame will get wrong one
 // !!! (not that it affects anything at this time)
 	update_undo(&mem_image);
 	mem_channel = CHN_IMAGE;
-	mem_xpm_trans = mem_xbm_hot_x = mem_xbm_hot_y = -1;
+	mem_xbm_hot_x = mem_xbm_hot_y = -1;
 
 	return (!res);
 }
@@ -1516,6 +1519,15 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	/* Compress last undo frame */
 	mem_undo_prepare();
 
+	/* Let cumulative updates stack */
+	if (mode & UC_ACCUM)
+	{
+		int i = (mem_undo_pointer ? mem_undo_pointer : mem_undo_max) - 1;
+		mem_undo_im_[mem_undo_pointer].flags |= UF_ACCUM;
+		if (mem_undo_done && (mem_undo_im_[i].flags & UF_ACCUM))
+			return (0);
+	}
+
 	/* Calculate memory requirements */
 	mem_req = SIZEOF_PALETTE + 32;
 	wh = (size_t)new_width * new_height;
@@ -1600,6 +1612,9 @@ void mem_undo_next(int mode)
 
 	switch (mode)
 	{
+	case UNDO_TRANS: /* Transparent colour change (cumulative) */
+		wmode = UC_ACCUM;
+		/* Fallthrough */
 	case UNDO_PAL: /* Palette changes */
 		cmask = CMASK_NONE;
 		break;
@@ -1730,7 +1745,8 @@ static void mem_undo_swap(int old, int new, int redo)
 				mem_img[i] = prev->img[i];
 			}
 		}
-		curr->flags = UF_FLAT;
+		/* !!! If more flags need preserving, add them to mask */
+		curr->flags = (prev->flags & UF_ACCUM) | UF_FLAT;
 	}
 	prev->flags &= UF_ORIG;
 
@@ -1746,14 +1762,16 @@ static void mem_undo_swap(int old, int new, int redo)
 
 	curr->width = mem_width;
 	curr->height = mem_height;
-	curr->cols = mem_cols;
 	curr->bpp = mem_img_bpp;
+	curr->cols = mem_cols;
+	curr->trans = mem_xpm_trans;
 	if (!mem_changed) curr->flags |= UF_ORIG;
 
 	mem_width = prev->width;
 	mem_height = prev->height;
-	mem_cols = prev->cols;
 	mem_img_bpp = prev->bpp;
+	mem_cols = prev->cols;
+	mem_xpm_trans = prev->trans;
 	mem_changed = !(prev->flags & UF_ORIG);
 }
 
@@ -1887,7 +1905,7 @@ void mem_init()					// Initialise memory
 	/* Init editor settings */
 	mem_channel = CHN_IMAGE;
 	mem_icx = mem_icy = 0.5;
-	mem_xpm_trans = mem_xbm_hot_x = mem_xbm_hot_y = -1;
+	mem_xbm_hot_x = mem_xbm_hot_y = -1;
 	mem_col_A = 1;
 	mem_col_B = 0;
 
@@ -2017,6 +2035,14 @@ void mem_swap_cols(int redraw)
 		flags = redraw ? UPD_AB : CF_AB | CF_GRAD;
 	}
 	update_stuff(flags);
+}
+
+void mem_set_trans(int trans)
+{
+	if (trans == mem_xpm_trans) return;
+	mem_undo_next(UNDO_TRANS);
+	mem_xpm_trans = trans;
+	update_stuff(UPD_TRANS);
 }
 
 #define PALETTE_TEXT_GREY 200
@@ -2325,24 +2351,24 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 
 static unsigned char pal_dupes[256];
 
-int scan_duplicates()			// Find duplicate palette colours, return number found
+int scan_duplicates()	// Find duplicate palette colours, return number found
 {
-	int i, j, c, found = 0;
+	int i, j, c, found, pmap[256];
 
-	for (i = mem_cols - 1; i > 0; i--)
+	for (i = 0; i < mem_cols; i++)
+		pmap[i] = PNG_2_INT(mem_pal[i]);
+	/* Transparent color is different from any normal one */
+	if (mem_xpm_trans >= 0) pmap[mem_xpm_trans] = -1;
+
+	for (found = 0 , i = mem_cols - 1; i >= 0; i--)
 	{
-		pal_dupes[i] = i;		// Start with a clean sheet
-		c = PNG_2_INT(mem_pal[i]);
-		for (j = 0; j < i; j++)
-		{
-			if (c != PNG_2_INT(mem_pal[j])) continue;
-			found++;
-			pal_dupes[i] = j;	// Point to first duplicate in the palette
-			break;
-		}
+		c = pmap[i];
+		for (j = 0; pmap[j] != c; j++);
+		pal_dupes[i] = j;
+		found += i != j;
 	}
 
-	return found;
+	return (found);
 }
 
 void remove_duplicates()	// Remove duplicate palette colours - call AFTER scan_duplicates
@@ -2365,7 +2391,7 @@ int mem_remove_unused_check()
 
 int mem_remove_unused()
 {
-	unsigned char conv[256], *img;
+	unsigned char conv[256];
 	int i, j, found = mem_remove_unused_check();
 
 	if (found <= 0) return (0);
@@ -2380,21 +2406,11 @@ int mem_remove_unused()
 		}
 	}
 
-	if ( mem_xpm_trans >= 0 )		// Re-adjust transparent colour index if it exists
-	{
-		if ( mem_histogram[mem_xpm_trans] == 0 )
-			mem_xpm_trans = -1;	// No transparent pixels exist so remove reference
-		else
-			mem_xpm_trans = conv[mem_xpm_trans];	// New transparency colour position
-	}
+	// Re-adjust transparent colour index if it exists
+	mem_xpm_trans = (mem_xpm_trans < 0) || !mem_histogram[mem_xpm_trans] ?
+		-1 : conv[mem_xpm_trans];
 
-	j = mem_width * mem_height;
-	img = mem_img[CHN_IMAGE];
-	for (i = 0; i < j; i++)	// Convert canvas pixels as required
-	{
-		*img = conv[*img];
-		img++;
-	}
+	do_xlate(conv, mem_img[CHN_IMAGE], mem_width * mem_height);
 
 	mem_cols -= found;
 
@@ -3523,8 +3539,8 @@ void mem_pal_index_move( int c1, int c2 )	// Move index c1 to c2 and shuffle in 
 
 void mem_canvas_index_move( int c1, int c2 )	// Similar to palette item move but reworks canvas pixels
 {
-	unsigned char table[256], *img = mem_img[CHN_IMAGE];
-	int i, j = mem_width * mem_height;
+	unsigned char table[256];
+	int i;
 
 	if (c1 == c2) return;
 
@@ -3535,18 +3551,19 @@ void mem_canvas_index_move( int c1, int c2 )	// Similar to palette item move but
 	table[c1] = c2;
 	table[c2] += (c1 > c2);
 
-	for (i = 0; i < j; i++)		// Change pixel index to new palette
-	{
-		*img = table[*img];
-		img++;
-	}
+	// Remap transparent color
+	if (mem_xpm_trans >= 0) mem_xpm_trans = table[mem_xpm_trans];
+
+	// Change pixel index to new palette
+	if (mem_img_bpp == 1) do_xlate(table, mem_img[CHN_IMAGE],
+		mem_width * mem_height);
 }
 
 void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 {
 	int tab0[256], tab1[256], tmp, i, j;
 	png_color old_pal[256];
-	unsigned char *img;
+	unsigned char map[256];
 	double lxnA[3], lxn[3];
 
 	if ( i2 == i1 || i1>mem_cols || i2>mem_cols ) return;
@@ -3622,27 +3639,21 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 			}
 		}
 
-	mem_pal_copy( old_pal, mem_pal );
-	for ( i=i1; i<=i2; i++ )
+	mem_pal_copy(old_pal, mem_pal);
+	for (i = 0; i < 256; i++)
 	{
 		mem_pal[i] = old_pal[tab0[i]];
+		map[tab0[i]] = i;
 	}
+	if (mem_xpm_trans >= 0) mem_xpm_trans = map[mem_xpm_trans];
 
 	if (mem_img_bpp != 1) return;
 
 	// Adjust canvas pixels if in indexed palette mode
-	for (i = 0; i < 256; i++)
-		tab1[tab0[i]] = i;
-	img = mem_img[CHN_IMAGE];
-	j = mem_width * mem_height;
-	for (i = 0; i < j; i++)
-	{
-		*img = tab1[*img];
-		img++;
-	}
+	do_xlate(map, mem_img[CHN_IMAGE], mem_width * mem_height);
 	/* Modify A & B */
-	mem_col_A = tab1[mem_col_A];
-	mem_col_B = tab1[mem_col_B];
+	mem_col_A = map[mem_col_A];
+	mem_col_B = map[mem_col_B];
 }
 
 void mem_invert()			// Invert the palette

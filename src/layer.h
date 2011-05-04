@@ -102,3 +102,5 @@ void layer_press_delete();		// Delete current layer
 
 void string_chop( char *txt );
 int read_file_num(FILE *fp, char *txt);
+
+void layer_show_trans();		// Update transparency in layers window
