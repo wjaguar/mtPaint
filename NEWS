@@ -18,6 +18,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Main toolbar and tools toolbar now rearrange themselves to fit in window
 	* Preferences window now has scrollbars when screen is too small to display it whole
 	* The preview button on the colour selectors is now a toggle to enable interactive previews
+	* Line tool now displays geometry info on the status bar
 	* Gaussian blur effect now faster by 20-35%
 	* Image scaling now faster by 10-35%
 	* "Protect details" toggle added to Kuwahara-Nagao blur
@@ -39,6 +40,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle
 	* "Explode Frames" can now save frames in any suitable supported file format
+	* File actions can now specify file format conversion : See handbook section A.7 for details
 	* Netpbm file formats (PBM/PGM/PPM/PAM) save/load added
 	* PCX file format save/load added
 	* SVG file format import added (using librsvg; requires GTK+ 2.4 or later)

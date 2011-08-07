@@ -85,44 +85,89 @@ static int last_temp_index(char *name, int len, int idx)
 	return (index);
 }
 
-/* I'm lazy today, so using off-the-shelf list - WJ */
-static GList *namelist;
+typedef struct {
+	void *next, *id;
+	int type, rgb;
+	char name[1];
+} tempfile;
 
-static char *remember_temp_file(char *name)
+static void *tempchain;
+
+static char *remember_temp_file(char *name, int type, int rgb)
 {
-	namelist = g_list_prepend(namelist, name = strdup(name));
-	return (name);
+	static wjmem *tempstore;
+	tempfile *tmp, *tm0;
+
+	if ((tempstore || (tempstore = wjmemnew(0, 0))) &&
+		(tmp = wjmalloc(tempstore, offsetof(tempfile, name) +
+		strlen(name) + 1, ALIGNOF(tempfile))))
+	{
+		tmp->type = type;
+		tmp->rgb = rgb;
+		strcpy(tmp->name, name);
+		if (mem_tempfiles) /* Have anchor - insert after it */
+		{
+			tm0 = tmp->id = mem_tempfiles;
+			tmp->next = tm0->next;
+			tm0->next = (void *)tmp;
+		}
+		else /* No anchor - insert before all */
+		{
+			tmp->next = tempchain;
+			mem_tempfiles = tempchain = tmp->id = (void *)tmp;
+		}
+		return (tmp->name);
+	}
+	return (NULL); // Failed to allocate
 }
 
 void spawn_quit()
 {
-	g_list_foreach(namelist, (GFunc)unlink, NULL);
+	tempfile *tmp;
+
+	for (tmp = tempchain; tmp; tmp = tmp->next) unlink(tmp->name);
 	if (mt_temp_dir) rmdir(mt_temp_dir);
 }
 
-static char *new_temp_file()
+static char *get_temp_file(int type, int rgb)
 {
 	ls_settings settings;
+	tempfile *tmp;
+	unsigned char *img = NULL;
 	char buf[PATHBUF], ids[32], *c, *f = "tmp.png";
-	int fd, l, cnt, idx, res, type = FT_PNG;
+	int fd, l, cnt, idx, res;
+
+	/* Use the original file if possible */
+	if (!mem_changed && mem_filename && (!rgb ^ (mem_img_bpp == 3)) &&
+		((type == FT_NONE) ||
+		 (detect_file_format(mem_filename, FALSE) == type)))
+		return (mem_filename);
 
 	/* Prepare temp directory */
 	if (!mt_temp_dir) mt_temp_dir = new_temp_dir();
 	if (!mt_temp_dir) return (NULL); /* Temp dir creation failed */
 
 	/* Analyze name */
-	if (mem_filename)
+	if ((type == FT_NONE) && mem_filename)
 	{
 		f = strrchr(mem_filename, DIR_SEP);
 		if (!f) f = mem_filename;
 		type = file_type_by_ext(f, FF_SAVE_MASK);
-		if (type == FT_NONE) type = FT_PNG;
 	}
+	if (type == FT_NONE) type = FT_PNG;
+
+	/* Use existing file if possible */
+	for (tmp = mem_tempfiles; tmp; tmp = tmp->next)
+	{
+		if (tmp->id != mem_tempfiles) break;
+		if ((tmp->type == type) && (tmp->rgb == rgb))
+			return (tmp->name);
+	}
+
+	/* Create temp file */
 	c = strrchr(f, '.');
 	if (c == f) c = (f = "tmp.png") + 3; /* If extension w/o name */
 	l = c ? c - f : strlen(f);
-
-	/* Create temp file */
 	while (TRUE)
 	{
 		idx = last_temp_index(f, l, -1);
@@ -142,7 +187,7 @@ static char *new_temp_file()
 		f = "tmp.png"; l = 3; /* Try again with "tmp" */
 	}
 	close(fd);
-	
+
 	/* Save image */
 	init_ls_settings(&settings, NULL);
 	memcpy(settings.img, mem_img, sizeof(chanlist));
@@ -152,25 +197,61 @@ static char *new_temp_file()
 	settings.bpp = mem_img_bpp;
 	settings.colors = mem_cols;
 	settings.ftype = type;
+	if (rgb && (mem_img_bpp == 1)) /* Save indexed as RGB */
+	{
+		settings.img[CHN_IMAGE] = img =
+			malloc(mem_width * mem_height * 3);
+		if (!img) return (NULL); /* Failed to allocate RGB buffer */
+		settings.bpp = 3;
+		do_convert_rgb(0, 1, mem_width * mem_height, img,
+			mem_img[CHN_IMAGE], mem_pal);
+	}
 	res = save_image(buf, &settings);
+	free(img);
 	if (res) return (NULL); /* Failed to save */
 
-	return (remember_temp_file(buf));
+	return (remember_temp_file(buf, type, rgb));
 }
 
 static char *insert_temp_file(char *pattern, int where, int skip)
 {
-	char *fname = mem_filename;
+	char *fname, *pat = pattern;
+	int i, l, rgb = mem_img_bpp == 3, fform = FT_NONE;
 
-	if (mem_changed || !fname) /* If not saved */
+	while (TRUE)
 	{
-		if (!mem_tempname) mem_tempname = new_temp_file();
-		if (!mem_tempname) return (NULL); /* Temp save failed */
-		fname = mem_tempname;
+		/* Skip initial whitespace if any */
+		pat += strspn(pat, " \t");
+		/* Finish if not a transform request */
+		if (*pat != '>') break;
+		l = strcspn(++pat, "> \t");
+		if (!strncasecmp("RGB", pat, l)) rgb = TRUE;
+		else
+		{
+			for (i = FT_NONE + 1; i < NUM_FTYPES; i++)
+			{
+				fformat *ff = file_formats + i;
+				if ((ff->flags & FF_IMAGE) &&
+					!(ff->flags & FF_NOSAVE) &&
+					(!strncasecmp(ff->name, pat, l) ||
+					!strncasecmp(ff->ext, pat, l) ||
+					(ff->ext2[0] &&
+					!strncasecmp(ff->ext2, pat, l))))
+					fform = i;
+			}
+		}
+		pat += l;
 	}
+	where -= pat - pattern;
+	if (where < 0) return (NULL); // Syntax error
 
-	return (g_strdup_printf("%.*s\"%s\"%s", where, pattern, fname,
-		pattern + where + skip));
+	if (rgb && (fform != FT_NONE) && !(file_formats[fform].flags & FF_RGB))
+		fform = FT_NONE; // Stupidity detected
+
+	fname = get_temp_file(fform, rgb);
+	if (!fname) return (NULL); /* Temp save failed */
+	return (g_strdup_printf("%.*s\"%s\"%s", where, pat, fname,
+		pat + where + skip));
 }
 
 int spawn_expansion(char *cline, char *directory)

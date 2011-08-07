@@ -107,11 +107,19 @@ void update_sel_bar()			// Update selection stats on status bar
 
 	if ((((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
 		(marq_status > MARQUEE_NONE)) ||
-		((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE)))
+		((tool_type == TOOL_GRADIENT) && (grad->status != GRAD_NONE)) ||
+		((tool_type == TOOL_LINE) && (line_status != LINE_NONE)))
 	{
 		if (tool_type == TOOL_GRADIENT)
 		{
 			copy4(rect, grad->xy);
+			rect[2] -= rect[0];
+			rect[3] -= rect[1];
+			lang = (180.0 / M_PI) * atan2(rect[2], -rect[3]);
+		}
+		else if (tool_type == TOOL_LINE)
+		{
+			copy4(rect, line_xy);
 			rect[2] -= rect[0];
 			rect[3] -= rect[1];
 			lang = (180.0 / M_PI) * atan2(rect[2], -rect[3]);
@@ -154,6 +162,7 @@ void update_xy_bar(int x, int y)
 	}
 
 	if (!status_on[STATUS_PIXELRGB]) return;
+	*tmp = '\0';
 	if ((x >= 0) && (x < mem_width) && (y >= 0) && (y < mem_height))
 	{
 		pixel = get_pixel_img(x, y);
@@ -162,7 +171,7 @@ void update_xy_bar(int x, int y)
 				mem_pal[pixel].red, mem_pal[pixel].green,
 				mem_pal[pixel].blue);
 		else
-			tmp += sprintf(txt, "{%i,%i,%i}", INT_2_R(pixel),
+			tmp += sprintf(tmp, "{%i,%i,%i}", INT_2_R(pixel),
 				INT_2_G(pixel), INT_2_B(pixel));
 		if (mem_img[CHN_ALPHA] || mem_img[CHN_SEL] || mem_img[CHN_MASK])
 		{
@@ -174,9 +183,8 @@ void update_xy_bar(int x, int y)
 			tmp = chan_txt_cat(tmp, CHN_MASK, x, y);
 			strcpy(tmp, "}");
 		}
-		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt);
 	}
-	else gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), "");
+	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt);
 }
 
 static void update_undo_bar()

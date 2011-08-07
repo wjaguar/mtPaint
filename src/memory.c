@@ -600,8 +600,8 @@ void undo_swap_data(undo_item *outp, undo_item *inp)
 	unsigned int tmap;
 
 
-	if (mem_tempname) undo_add_data(outp, UD_TEMPNAME, mem_tempname);
-	mem_tempname = NULL;
+	if (mem_tempfiles) undo_add_data(outp, UD_TEMPFILES, mem_tempfiles);
+	mem_tempfiles = NULL;
 // !!! Other unconditionally outgoing stuff goes here
 
 	if (!(tmp = inp->dataptr)) return;
@@ -611,7 +611,7 @@ void undo_swap_data(undo_item *outp, undo_item *inp)
 		undo_add_data(outp, UD_FILENAME, mem_filename);
 		mem_filename = tmp->store[UD_FILENAME];
 	}
-	if (tmap & (1 << UD_TEMPNAME)) mem_tempname = tmp->store[UD_TEMPNAME];
+	if (tmap & (1 << UD_TEMPFILES)) mem_tempfiles = tmp->store[UD_TEMPFILES];
 // !!! All stuff (swappable or incoming) goes here
 
 	/* Release the incoming node */
@@ -646,9 +646,9 @@ void mem_replace_filename(int layer, char *fname)
 		undo->pointer : undo->max) - 1, UD_FILENAME, name);
 	else free(name);
 
-	/* Replace filename, and clear tempname too while we're at it */
+	/* Replace filename, and clear tempfiles too while we're at it */
 	image->filename = fname;
-	image->tempname = NULL;
+	image->tempfiles = NULL;
 }
 
 /* Label file's frames in current layer as changed */
@@ -803,7 +803,7 @@ void mem_free_image(image_info *image, int mode)
 		image->width = image->height = 0;
 
 		free(image->filename);
-		image->filename = image->tempname = NULL;
+		image->filename = image->tempfiles = NULL;
 	}
 
 	/* Delete undo frames if any */
@@ -834,7 +834,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	else
 	{
 		memset(image->img, 0, sizeof(chanlist));
-		image->filename = image->tempname = NULL; /* Paranoia */
+		image->filename = image->tempfiles = NULL; /* Paranoia */
 		image->changed = 0;
 	}
 
@@ -842,7 +842,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 	{
 		if (src->filename && !(image->filename = strdup(src->filename)))
 			return (FALSE);
-		image->tempname = src->tempname;
+		image->tempfiles = src->tempfiles;
 		image->changed = src->changed;
 
 		w = src->width;
@@ -1488,7 +1488,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	png_color *newpal;
 	undo_item *undo;
 	unsigned char *img;
-	char *tempname = mem_tempname;
+	void *tempfiles = mem_tempfiles;
 	chanlist holder, frame;
 	size_t mem_req, mem_lim, wh;
 	int i, j, k, need_frame;
@@ -1516,17 +1516,17 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		mem_undo_redo = 0;
 	}
 
-	/* Compress last undo frame */
-	mem_undo_prepare();
-
 	/* Let cumulative updates stack */
 	if (mode & UC_ACCUM)
 	{
 		int i = (mem_undo_pointer ? mem_undo_pointer : mem_undo_max) - 1;
-		mem_undo_im_[mem_undo_pointer].flags |= UF_ACCUM;
 		if (mem_undo_done && (mem_undo_im_[i].flags & UF_ACCUM))
 			return (0);
+		mem_undo_im_[mem_undo_pointer].flags |= UF_ACCUM;
 	}
+
+	/* Compress last undo frame */
+	mem_undo_prepare();
 
 	/* Calculate memory requirements */
 	mem_req = SIZEOF_PALETTE + 32;
@@ -1590,7 +1590,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	else mem_undo_done++;
 
 	/* Commit */
-	if (tempname) undo_add_data(undo, UD_TEMPNAME, tempname);
+	if (tempfiles) undo_add_data(undo, UD_TEMPFILES, tempfiles);
 	memcpy(undo->img, frame, sizeof(chanlist));
 	mem_undo_im_[mem_undo_pointer].pal_ = newpal;
 	memcpy(mem_img, holder, sizeof(chanlist));

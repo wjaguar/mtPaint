@@ -107,9 +107,9 @@
 #define FM_NUKE         4 /* Delete this frame at earliest opportunity */
 
 /* Undo data types */
-#define UD_FILENAME 0 /* Filename */
-#define UD_TEMPNAME 1 /* Temp file name */
-#define NUM_UTYPES  2 /* Should be no larger than 32 */
+#define UD_FILENAME  0 /* Filename */
+#define UD_TEMPFILES 1 /* Temp files list */
+#define NUM_UTYPES   2 /* Should be no larger than 32 */
 //	List in here all types which need freeing
 #define UD_FREE_MASK (1 << UD_FILENAME)
 
@@ -166,7 +166,7 @@ typedef struct {
 	int width, height;	// Image geometry
 	undo_stack undo_;	// Image's undo stack
 	char *filename;		// File name of file loaded/saved
-	char *tempname;		// File name of up-to-date temp file
+	void *tempfiles;	// List of up-to-date temp files
 	int changed;		// Changed since last load/save flag
 } image_info;
 
@@ -334,7 +334,7 @@ image_info mem_image;			// Current image
 #define mem_undo_max		mem_image.undo_.max
 
 #define mem_filename		mem_image.filename
-#define mem_tempname		mem_image.tempname
+#define mem_tempfiles		mem_image.tempfiles
 #define mem_changed		mem_image.changed
 
 image_info mem_clip;			// Current clipboard

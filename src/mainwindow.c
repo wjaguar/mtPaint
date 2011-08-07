@@ -1537,8 +1537,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	/* Pure moves are handled elsewhere */
 	else if (button) tool_action(event, x, y, button, pressure);
 
-	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON) ||
-		(tool_type == TOOL_GRADIENT)) update_sel_bar();
+	update_sel_bar();
 
 	/* ****** Now to mouse-move-specific part ****** */
 
@@ -5228,7 +5227,7 @@ void update_titlebar()		// Update filename in titlebar
 
 void notify_changed()		// Image/palette has just changed - update vars as needed
 {
-	mem_tempname = NULL;
+	mem_tempfiles = NULL;
 	if (!mem_changed)
 	{
 		mem_changed = TRUE;
