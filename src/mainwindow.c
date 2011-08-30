@@ -67,7 +67,6 @@ static inilist ini_bool[] = {
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
-	{ "colorGrid",		&color_grid,		FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "pasteCommit",	&paste_commit,		FALSE },
 	{ "applyICC",		&apply_icc,		FALSE },
@@ -82,6 +81,8 @@ static inilist ini_bool[] = {
 	{ "pasteToggle",	&show_paste,		TRUE  },
 	{ "cursorToggle",	&cursor_tool,		TRUE  },
 	{ "autopreviewToggle",	&brcosa_auto,		TRUE  },
+	{ "colorGrid",		&color_grid,		TRUE  },
+	{ "defaultGamma",	&use_gamma,		TRUE  },
 #if STATUS_ITEMS != 5
 #error Wrong number of "status?Toggle" inifile items defined
 #endif
@@ -133,7 +134,7 @@ static GtkWidget *main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit;
-int	files_passed, drag_index_vals[2], cursor_corner, show_dock;
+int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
 char **file_args;
 
 static int mouse_left_canvas;

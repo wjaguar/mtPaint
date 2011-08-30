@@ -159,6 +159,19 @@ double rgb2B(double r, double g, double b)
 	return (y > 1.0 ? 1.0 : y);
 }
 
+#if 0 /* Disable while not in use */
+void rgb2Lab(double *tmp, double r, double g, double b)
+{
+	double x = r * rxyz[0] + g * gxyz[0] + b * bxyz[0];
+	double y = r * rxyz[1] + g * gxyz[1] + b * bxyz[1];
+	double z = r * rxyz[2] + g * gxyz[2] + b * bxyz[2];
+	double L = CIElum(y);
+	tmp[0] = L;
+	tmp[1] = (CIElum(x * (WHITE_Y / WHITE_X)) - L) * (500.0 / 116.0);
+	tmp[2] = (L - CIElum(z * (WHITE_Y / (1.0 - WHITE_X - WHITE_Y))) * (200.0 / 116.0);
+}
+#endif
+
 /* ITU-R 709 */
 
 #define RED_X 0.640

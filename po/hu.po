@@ -1,0 +1,3495 @@
+# Hungarian translation for mtpaint
+# This file is distributed under the same license as the mtpaint package.
+# Balázs Úr <urbalazs@gmail.com>, 2011.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: mtpaint\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2009-02-13 21:54+0300\n"
+"PO-Revision-Date: 2009-09-26 16:34+0000\n"
+"Last-Translator: Balázs Úr <urbalazs@gmail.com>\n"
+"Language-Team: Hungarian\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Launchpad-Export-Date: 2009-12-04 18:32+0000\n"
+"X-Generator: Launchpad (build Unknown)\n"
+"X-Rosetta-Version: 0.1\n"
+
+#: src/ani.c:676
+msgid "Animation Preview"
+msgstr "Animáció előnézet"
+
+#: src/ani.c:685 src/shifter.c:307
+msgid "Play"
+msgstr "Lejátszás"
+
+#: src/ani.c:698
+msgid "Fix"
+msgstr ""
+
+#: src/ani.c:703 src/ani.c:1162 src/font.c:1874 src/font.c:1894
+#: src/shifter.c:342 src/viewer.c:210
+msgid "Close"
+msgstr "Bezárás"
+
+#: src/ani.c:759 src/ani.c:864 src/ani.c:1045 src/ani.c:1052 src/canvas.c:338
+#: src/canvas.c:621 src/canvas.c:900 src/canvas.c:1313 src/canvas.c:1340
+#: src/canvas.c:1355 src/canvas.c:1359 src/canvas.c:1366 src/canvas.c:1811
+#: src/canvas.c:1838 src/canvas.c:1844 src/canvas.c:1912 src/canvas.c:1994
+#: src/canvas.c:2011 src/font.c:1364 src/fpick.c:867 src/fpick.c:991
+#: src/layer.c:654 src/layer.c:784 src/layer.c:951 src/mainwindow.c:276
+#: src/mainwindow.c:304 src/mainwindow.c:533 src/mainwindow.c:577
+#: src/mainwindow.c:603 src/otherwindow.c:1005 src/otherwindow.c:1054
+#: src/otherwindow.c:1056 src/png.c:4535 src/png.c:4567 src/spawn.c:615
+#: src/viewer.c:1341
+msgid "Error"
+msgstr "Hiba"
+
+#: src/ani.c:759
+msgid "Unable to create output directory"
+msgstr "Nem sikerült a kimeneti mappa létrehozása"
+
+#: src/ani.c:760 src/ani.c:864 src/ani.c:1046 src/ani.c:1053 src/canvas.c:339
+#: src/canvas.c:623 src/canvas.c:901 src/canvas.c:1313 src/canvas.c:1341
+#: src/canvas.c:1355 src/canvas.c:1360 src/canvas.c:1366 src/canvas.c:1811
+#: src/canvas.c:1839 src/canvas.c:1845 src/canvas.c:1912 src/canvas.c:1995
+#: src/canvas.c:2012 src/channels.c:278 src/channels.c:336 src/font.c:1364
+#: src/fpick.c:867 src/fpick.c:991 src/fpick.c:1304 src/info.c:436
+#: src/layer.c:654 src/layer.c:784 src/layer.c:796 src/layer.c:952
+#: src/mainwindow.c:277 src/mainwindow.c:304 src/mainwindow.c:533
+#: src/mainwindow.c:577 src/mainwindow.c:603 src/otherwindow.c:466
+#: src/otherwindow.c:606 src/otherwindow.c:949 src/otherwindow.c:1006
+#: src/otherwindow.c:1054 src/otherwindow.c:1056 src/otherwindow.c:1183
+#: src/otherwindow.c:1399 src/otherwindow.c:2326 src/otherwindow.c:2756
+#: src/otherwindow.c:2964 src/otherwindow.c:3100 src/otherwindow.c:3199
+#: src/png.c:4352 src/png.c:4537 src/png.c:4569 src/prefs.c:660
+#: src/spawn.c:434 src/spawn.c:615 src/viewer.c:1342
+msgid "OK"
+msgstr "OK"
+
+#: src/ani.c:816
+msgid "Creating Animation Frames"
+msgstr ""
+
+#: src/ani.c:864
+msgid "Unable to save image"
+msgstr "Nem sikerült a kép mentése"
+
+#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:509
+#: src/layer.c:796 src/layer.c:816 src/mainwindow.c:308 src/mainwindow.c:1074
+#: src/png.c:4158 src/png.c:4352
+msgid "Warning"
+msgstr "Figyelem"
+
+#: src/ani.c:898
+msgid ""
+"Do you really want to clear all of the position and cycle data for all of "
+"the layers?"
+msgstr ""
+
+#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:816
+#: src/mainwindow.c:308
+msgid "No"
+msgstr "Nem"
+
+#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:816
+#: src/mainwindow.c:308
+msgid "Yes"
+msgstr "Igen"
+
+#: src/ani.c:1000
+msgid "Set Key Frame"
+msgstr ""
+
+#: src/ani.c:1045
+msgid "You must have at least 2 layers to create an animation"
+msgstr "Legalább 2 réteg szükséges az animáció létrehozásához"
+
+#: src/ani.c:1052
+msgid "You must save your layers file before creating an animation"
+msgstr "A rétegeket el kell menteni az animáció létrehozása előtt"
+
+#: src/ani.c:1063
+msgid "Configure Animation"
+msgstr "Animáció beállítása"
+
+#: src/ani.c:1074
+msgid "Output Files"
+msgstr "Kimeneti fájlok"
+
+#: src/ani.c:1077
+msgid "Start frame"
+msgstr ""
+
+#: src/ani.c:1078
+msgid "End frame"
+msgstr ""
+
+#: src/ani.c:1080 src/shifter.c:285
+msgid "Delay"
+msgstr "Késleltetés"
+
+#: src/ani.c:1081
+msgid "Output path"
+msgstr "Kimeneti elérési út"
+
+#: src/ani.c:1082
+msgid "File prefix"
+msgstr "Fájl előtag"
+
+#: src/ani.c:1110
+msgid "Create GIF frames"
+msgstr ""
+
+#: src/ani.c:1116
+msgid "Positions"
+msgstr ""
+
+#: src/ani.c:1153
+msgid "Cycling"
+msgstr ""
+
+#: src/ani.c:1166
+msgid "Save"
+msgstr "Mentés"
+
+#: src/ani.c:1169 src/font.c:1814 src/otherwindow.c:934 src/otherwindow.c:1406
+#: src/otherwindow.c:1959
+msgid "Preview"
+msgstr "Előnézet"
+
+#: src/ani.c:1172 src/shifter.c:337
+msgid "Create Frames"
+msgstr ""
+
+#: src/canvas.c:339
+msgid "The image is too large to transform."
+msgstr "A kép túl nagy a transzformációhoz."
+
+#: src/canvas.c:369
+msgid "MT"
+msgstr "MT"
+
+#: src/canvas.c:369
+msgid "Sobel"
+msgstr "Sobel"
+
+#: src/canvas.c:369
+msgid "Prewitt"
+msgstr "Prewitt"
+
+#: src/canvas.c:369
+msgid "Kirsch"
+msgstr "Kirsch"
+
+#: src/canvas.c:370 src/otherwindow.c:1843 src/otherwindow.c:2882
+msgid "Gradient"
+msgstr ""
+
+#: src/canvas.c:370
+msgid "Roberts"
+msgstr "Roberts"
+
+#: src/canvas.c:370
+msgid "Laplace"
+msgstr "Laplace"
+
+#: src/canvas.c:370
+msgid "Morphological"
+msgstr ""
+
+#: src/canvas.c:375
+msgid "Edge Detect"
+msgstr ""
+
+#: src/canvas.c:393
+msgid "Edge Sharpen"
+msgstr "Kontúrélesítés"
+
+#: src/canvas.c:399
+msgid "Edge Soften"
+msgstr ""
+
+#: src/canvas.c:451
+msgid "Different X/Y"
+msgstr ""
+
+#: src/canvas.c:455 src/memory.c:6935
+msgid "Gaussian Blur"
+msgstr "Gauss-elmosás"
+
+#: src/canvas.c:493
+msgid "Radius"
+msgstr "Sugár"
+
+#: src/canvas.c:494
+msgid "Amount"
+msgstr "Mennyiség"
+
+#: src/canvas.c:495
+msgid "Threshold "
+msgstr "Küszöb"
+
+#: src/canvas.c:497 src/memory.c:7083
+msgid "Unsharp Mask"
+msgstr ""
+
+#: src/canvas.c:537
+msgid "Outer radius"
+msgstr "Külső sugár"
+
+#: src/canvas.c:538
+msgid "Inner radius"
+msgstr "Belső sugár"
+
+#: src/canvas.c:539 src/info.c:379
+msgid "Normalize"
+msgstr "Normalizálás"
+
+#: src/canvas.c:541 src/memory.c:7261
+msgid "Difference of Gaussians"
+msgstr ""
+
+#: src/canvas.c:567
+msgid "Kuwahara-Nagao Blur"
+msgstr "Kuwahara-Nagao elmosás"
+
+#: src/canvas.c:622
+msgid "The image is too large for this rotation."
+msgstr "A kép túl nagy ehhez a forgatáshoz."
+
+#: src/canvas.c:640
+msgid "Smooth"
+msgstr "Simítás"
+
+#: src/canvas.c:642
+msgid "Free Rotate"
+msgstr "Szabad forgatás"
+
+#: src/canvas.c:900 src/viewer.c:1341
+msgid "Not enough memory to create clipboard"
+msgstr "Nincs elég memória a vágólap létrehozásához"
+
+#: src/canvas.c:1313
+msgid "Invalid channel file."
+msgstr "Érvénytelen csatornafájl."
+
+#: src/canvas.c:1340
+msgid "Cannot open file"
+msgstr "Nem lehet megnyitni a fájlt"
+
+#: src/canvas.c:1341
+msgid "Unsupported file format"
+msgstr "Nem támogatott fájlformátum"
+
+#: src/canvas.c:1354
+#, c-format
+msgid "File is too big, must be <= to width=%i height=%i"
+msgstr "A fájl túl nagy, legyen <= szélesség=%i magasság=%i"
+
+#: src/canvas.c:1359
+msgid "Unable to load file"
+msgstr "Nem tölthető be a fájl"
+
+#: src/canvas.c:1366
+msgid ""
+"The file import library had to terminate due to a problem with the file "
+"(possibly corrupt image data or a truncated file). I have managed to load "
+"some data as the header seemed fine, but I would suggest you save this image "
+"to a new file to ensure this does not happen again."
+msgstr ""
+
+#: src/canvas.c:1410
+#, c-format
+msgid "File: %s already exists. Do you want to overwrite it?"
+msgstr "Fájl: %s már létezik. Szeretné felülírni?"
+
+#: src/canvas.c:1411
+msgid "File Found"
+msgstr ""
+
+#: src/canvas.c:1411 src/mainwindow.c:1116
+msgid "NO"
+msgstr "NEM"
+
+#: src/canvas.c:1411 src/mainwindow.c:1116
+msgid "YES"
+msgstr "IGEN"
+
+#: src/canvas.c:1449 src/prefs.c:415
+msgid "Transparency index"
+msgstr "Átlátszóság index"
+
+#: src/canvas.c:1449 src/prefs.c:416
+msgid "JPEG Save Quality (100=High)"
+msgstr "JPEG mentés minőség (100 = magas)"
+
+#: src/canvas.c:1450 src/prefs.c:417
+msgid "PNG Compression (0=None)"
+msgstr "PNG tömörítés (0 = nincs)"
+
+#: src/canvas.c:1450 src/prefs.c:534
+msgid "TGA RLE Compression"
+msgstr "TGA RLE tömörítés"
+
+#: src/canvas.c:1451 src/prefs.c:416
+msgid "JPEG2000 Compression (0=Lossless)"
+msgstr "JPEG2000 tömörítés (0 = veszteségmentes)"
+
+#: src/canvas.c:1452
+msgid "Hotspot at X ="
+msgstr "Hotspot X ="
+
+#: src/canvas.c:1452
+msgid "Y ="
+msgstr "Y ="
+
+#: src/canvas.c:1474 src/canvas.c:1536
+msgid "File Format"
+msgstr "Fájlformátum"
+
+#: src/canvas.c:1562 src/otherwindow.c:302
+msgid "Undoable"
+msgstr ""
+
+#: src/canvas.c:1583
+msgid "Animation delay"
+msgstr "Animáció késleltetés"
+
+#: src/canvas.c:1810
+#, c-format
+msgid "File: %s invalid - palette not updated"
+msgstr "Fájl: %s érvénytelen - a paletta nem lett frissítve"
+
+#: src/canvas.c:1838
+msgid "Unable to export undo images"
+msgstr ""
+
+#: src/canvas.c:1844
+msgid "Unable to export ASCII file"
+msgstr "Nem lehet exportálni az ASCII fájlt"
+
+#: src/canvas.c:1911 src/layer.c:783 src/mainwindow.c:526
+#, c-format
+msgid "Unable to save file: %s"
+msgstr "Nem menthető a fájl: %s"
+
+#: src/canvas.c:1970 src/toolbar.c:554
+msgid "Load Image File"
+msgstr "Képfájl betöltése"
+
+#: src/canvas.c:1974 src/toolbar.c:555
+msgid "Save Image File"
+msgstr "Képfájl mentése"
+
+#: src/canvas.c:1977
+msgid "Load Palette File"
+msgstr "Palettafájl betöltése"
+
+#: src/canvas.c:1981
+msgid "Save Palette File"
+msgstr "Palettafájl mentése"
+
+#: src/canvas.c:1985
+msgid "Export Undo Images"
+msgstr ""
+
+#: src/canvas.c:1989
+msgid "Export Undo Images (reversed)"
+msgstr ""
+
+#: src/canvas.c:1994
+msgid "You must have 16 or fewer palette colours to export ASCII art."
+msgstr "16 vagy kevesebb palettaszín szükséges az ASCII Art exporthoz."
+
+#: src/canvas.c:1998
+msgid "Export ASCII Art"
+msgstr "ASCII Art exportálása"
+
+#: src/canvas.c:2002
+msgid "Save Layer Files"
+msgstr "Rétegfájlok mentése"
+
+#: src/canvas.c:2005
+msgid "Choose frames directory"
+msgstr ""
+
+#: src/canvas.c:2011
+msgid "You must save at least one frame to create an animated GIF."
+msgstr "Legalább egy keretet el kell mentenie az animált GIF létrehozásához."
+
+#: src/canvas.c:2015
+msgid "Export GIF animation"
+msgstr "GIF animáció exportálása"
+
+#: src/canvas.c:2018
+msgid "Load Channel"
+msgstr "Csatorna betöltése"
+
+#: src/canvas.c:2022
+msgid "Save Channel"
+msgstr "Csatorna mentése"
+
+#: src/canvas.c:2025
+msgid "Save Composite Image"
+msgstr "KOmpozitkép mentése"
+
+#: src/channels.c:236
+msgid "Cleared"
+msgstr ""
+
+#: src/channels.c:237
+msgid "Set"
+msgstr ""
+
+#: src/channels.c:238
+msgid "Set colour A radius B"
+msgstr ""
+
+#: src/channels.c:239
+msgid "Set blend A to B"
+msgstr ""
+
+#: src/channels.c:240
+msgid "Image Red"
+msgstr "Kép vörös"
+
+#: src/channels.c:241
+msgid "Image Green"
+msgstr "Kép zöld"
+
+#: src/channels.c:242
+msgid "Image Blue"
+msgstr "Kép kék"
+
+#: src/channels.c:244 src/mainwindow.c:1093
+msgid "Alpha"
+msgstr "Alfa"
+
+#: src/channels.c:245 src/mainwindow.c:1093
+msgid "Selection"
+msgstr "Kijelölés"
+
+#: src/channels.c:246 src/mainwindow.c:1093
+msgid "Mask"
+msgstr "Maszk"
+
+#: src/channels.c:256
+msgid "Create Channel"
+msgstr "Csatorna létrehozása"
+
+#: src/channels.c:265
+msgid "Channel Type"
+msgstr "Csatornatípus"
+
+#: src/channels.c:272
+msgid "Initial Channel State"
+msgstr "Kezdeti csatornaállapot"
+
+#: src/channels.c:276
+msgid "Inverted"
+msgstr "Invertált"
+
+#: src/channels.c:279 src/channels.c:337 src/fpick.c:921 src/fpick.c:1311
+#: src/otherwindow.c:307 src/otherwindow.c:467 src/otherwindow.c:513
+#: src/otherwindow.c:607 src/otherwindow.c:926 src/otherwindow.c:1184
+#: src/otherwindow.c:1411 src/otherwindow.c:2327 src/otherwindow.c:2757
+#: src/otherwindow.c:2965 src/otherwindow.c:3101 src/otherwindow.c:3200
+#: src/png.c:4159 src/prefs.c:661 src/spawn.c:435 src/viewer.c:1450
+msgid "Cancel"
+msgstr "Mégse"
+
+#: src/channels.c:319
+msgid "Delete Channels"
+msgstr "Csatornák törlése"
+
+#: src/channels.c:377
+msgid "Threshold Channel"
+msgstr "Küszöb csatorna"
+
+#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
+#: src/toolbar.c:298
+msgid "Red"
+msgstr "Vörös"
+
+#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
+#: src/toolbar.c:298
+msgid "Green"
+msgstr "Zöld"
+
+#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
+#: src/toolbar.c:298
+msgid "Blue"
+msgstr "Kék"
+
+#: src/cpick.c:945 src/otherwindow.c:572 src/otherwindow.c:804
+#: src/toolbar.c:300
+msgid "Hue"
+msgstr "Árnyalat"
+
+#: src/cpick.c:945 src/otherwindow.c:572 src/otherwindow.c:803
+#: src/toolbar.c:300
+msgid "Saturation"
+msgstr "Telítettség"
+
+#: src/cpick.c:946 src/toolbar.c:300
+msgid "Value"
+msgstr "Érték"
+
+#: src/cpick.c:946
+msgid "Hex"
+msgstr "Hex"
+
+#: src/cpick.c:946 src/layer.c:1167 src/otherwindow.c:2882 src/prefs.c:421
+#: src/toolbar.c:441
+msgid "Opacity"
+msgstr "Átlátszatlanság"
+
+#: src/font.c:985
+msgid "Creating Font Index"
+msgstr "Betűindex létrehozása"
+
+#: src/font.c:1364
+msgid "You must select at least one directory to search for fonts."
+msgstr "Legalább egy mappát ki kell választani a betűkereséshez."
+
+#: src/font.c:1516
+msgid "Font"
+msgstr "Betűkészlet"
+
+#: src/font.c:1517
+msgid "Style"
+msgstr "Stílus"
+
+#: src/font.c:1518 src/fpick.c:1176 src/otherwindow.c:3180 src/prefs.c:421
+#: src/toolbar.c:441
+msgid "Size"
+msgstr "Méret"
+
+#: src/font.c:1519
+msgid "Filename"
+msgstr "Fájlnév"
+
+#: src/font.c:1519
+msgid "Face"
+msgstr ""
+
+#: src/font.c:1520 src/spawn.c:427
+msgid "Directory"
+msgstr "Mappa"
+
+#: src/font.c:1761 src/font.c:1873 src/toolbar.c:580 src/viewer.c:1396
+#: src/viewer.c:1449
+msgid "Paste Text"
+msgstr "Szöveg beillesztése"
+
+#: src/font.c:1774 src/font.c:1802
+msgid "Text"
+msgstr "Szöveg"
+
+#: src/font.c:1805 src/viewer.c:1458
+msgid "Enter Text Here"
+msgstr "Ide írja a szöveget"
+
+#: src/font.c:1833 src/viewer.c:1412
+msgid "Antialias"
+msgstr "Élsimítás"
+
+#: src/font.c:1838 src/viewer.c:1422
+msgid "Invert"
+msgstr ""
+
+#: src/font.c:1843 src/viewer.c:1427
+msgid "Background colour ="
+msgstr "Háttérszín ="
+
+#: src/font.c:1853
+msgid "Oblique"
+msgstr "Kurzív"
+
+#: src/font.c:1856 src/viewer.c:1435
+msgid "Angle of rotation ="
+msgstr "Forgatás szöge ="
+
+#: src/font.c:1879
+msgid "Font Directories"
+msgstr "Betűkészlet mappa"
+
+#: src/font.c:1887
+msgid "New Directory"
+msgstr "Új mappa"
+
+#: src/font.c:1888 src/spawn.c:428
+msgid "Select Directory"
+msgstr "Válasszon mappát"
+
+#: src/font.c:1899
+msgid "Add"
+msgstr "Hozzáadás"
+
+#: src/font.c:1903
+msgid "Remove"
+msgstr "Eltávolítás"
+
+#: src/font.c:1907
+msgid "Create Index"
+msgstr "Index létrehozása"
+
+#: src/fpick.c:866
+#, c-format
+msgid "Could not access directory %s"
+msgstr "Nem lehet hozzáférni ehhez a mappához: %s"
+
+#: src/fpick.c:905 src/fpick.c:928
+msgid "Delete"
+msgstr "Törlés"
+
+#: src/fpick.c:905 src/fpick.c:933
+msgid "Rename"
+msgstr "Átnevezés"
+
+#: src/fpick.c:906
+msgid "Create Directory"
+msgstr "Mappa létrehozása"
+
+#: src/fpick.c:913
+msgid "Enter the new filename"
+msgstr "Adja meg az új fájlnevet"
+
+#: src/fpick.c:914
+msgid "Enter the name of the new directory"
+msgstr "Adja meg az új mappa nevét"
+
+#: src/fpick.c:933 src/otherwindow.c:306 src/otherwindow.c:1868
+msgid "Create"
+msgstr "Létrehozás"
+
+#: src/fpick.c:968
+#, c-format
+msgid "Do you really want to delete \"%s\" ?"
+msgstr "Biztosan törölni szeretné ezt: \"%s\" ?"
+
+#: src/fpick.c:973
+msgid "Unable to delete"
+msgstr "Nem lehet törölni"
+
+#: src/fpick.c:978
+msgid "Unable to rename"
+msgstr "Nem lehet átnevezni"
+
+#: src/fpick.c:987
+msgid "Unable to create directory"
+msgstr "Nem lehet mappát létrehozni"
+
+#: src/fpick.c:1072
+msgid "Up"
+msgstr "Fel"
+
+#: src/fpick.c:1073
+msgid "Home"
+msgstr "Saját mappa"
+
+#: src/fpick.c:1074
+msgid "Create New Directory"
+msgstr "Új mappa létrehozása"
+
+#: src/fpick.c:1075
+msgid "Show Hidden Files"
+msgstr "Rejtett fájlok megjelenítése"
+
+#: src/fpick.c:1076
+msgid "Case Insensitive Sort"
+msgstr "Kis- és nagybetű érzéketlen rendezés"
+
+#: src/fpick.c:1175
+msgid "Name"
+msgstr "Név"
+
+#: src/fpick.c:1177
+msgid "Type"
+msgstr "Típus"
+
+#: src/fpick.c:1178
+msgid "Modified"
+msgstr "Módosítva"
+
+#: src/help.c:25 src/prefs.c:443
+msgid "General"
+msgstr "Általános"
+
+#: src/help.c:26
+msgid "Keyboard shortcuts"
+msgstr "Gyorsbillentyűk"
+
+#: src/help.c:27
+msgid "Mouse shortcuts"
+msgstr "Egér gyorsbillentyűk"
+
+#: src/help.c:28
+msgid "Credits"
+msgstr "Köszönet"
+
+#: src/help.c:32
+msgid "mtPaint 3.40 - Copyright (C) 2004-2011 The Authors\n"
+msgstr "mtPaint 3.40 - Copyright (C) 2004-2011 A szerzők\n"
+
+#: src/help.c:33
+msgid "See 'Credits' section for a list of the authors.\n"
+msgstr "Tekintse meg a 'Köszönet' részt a szerzők listájához.\n"
+
+#: src/help.c:34
+msgid ""
+"mtPaint is free software; you can redistribute it and/or modify it under the "
+"terms of the GNU General Public License as published by the Free Software "
+"Foundation; either version 3 of the License, or (at your option) any later "
+"version.\n"
+msgstr ""
+"Az mtPaint szabad szoftver; terjeszthető illetve módosítható a Free "
+"Software Foundation által kiadott GNU General Public License dokumentumban "
+"leírtak, akár a licenc 3-as, akár (tetszőleges) későbbi változata szerint."
+
+#: src/help.c:35
+msgid ""
+"mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY "
+"WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS "
+"FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more "
+"details.\n"
+msgstr ""
+"Az mtPaint abban a reményben kerül közreadásra, hogy hasznos lesz, "
+"de minden egyéb GARANCIA NÉLKÜL, az ELADHATÓSÁGRA vagy VALAMELY CÉLRA VALÓ "
+"ALKALMAZHATÓSÁGRA való származtatott garanciát is beleértve. További "
+"részleteket a GNU Public License tartalmaz."
+
+#: src/help.c:36
+msgid ""
+"mtPaint is a simple GTK+1/2 painting program designed for creating icons and "
+"pixel based artwork. It can edit indexed palette or 24 bit RGB images and "
+"offers basic painting and palette manipulation tools. It also has several "
+"other more powerful features such as channels, layers and animation. Due to "
+"its simplicity and lack of dependencies it runs well on GNU/Linux, Windows "
+"and older PC hardware.\n"
+msgstr ""
+
+#: src/help.c:37
+msgid ""
+"There is full documentation of mtPaint's features contained in a handbook.  "
+"If you don't already have this, you can download it from the mtPaint "
+"website.\n"
+msgstr ""
+"A kézikönyvben az mtPaint minden funkciójáról teljes dokumentációt talál.  "
+"Ha ez még nincs meg önnek, letöltheti azt az mtPaint weboldaláról.\n"
+
+#: src/help.c:38
+msgid ""
+"If you like mtPaint and you want to keep up to date with new releases, or "
+"you want to give some feedback, then the mailing lists may be of interest to "
+"you:\n"
+msgstr ""
+
+#: src/help.c:39
+msgid "http://sourceforge.net/mail/?group_id=155874"
+msgstr "http://sourceforge.net/mail/?group_id=155874"
+
+#: src/help.c:42
+msgid "  Ctrl-N            Create new image"
+msgstr "  Ctrl-N            Új kép létrehozása"
+
+#: src/help.c:43
+msgid "  Ctrl-O            Open Image"
+msgstr "  Ctrl-O            Kép megnyitása"
+
+#: src/help.c:44
+msgid "  Ctrl-S            Save Image"
+msgstr "  Ctrl-S            Kép mentése"
+
+#: src/help.c:45
+msgid "  Ctrl-Q            Quit program\n"
+msgstr "  Ctrl-Q            Kilépés a programból\n"
+
+#: src/help.c:46
+msgid "  Ctrl-A            Select whole image"
+msgstr "  Ctrl-A            Az egész kép kijelölése"
+
+#: src/help.c:47
+msgid "  Escape            Select nothing, cancel paste box"
+msgstr "  Escape            Kijelölés megszüntetése, beillesztésdobox bezárása"
+
+#: src/help.c:48
+msgid "  Ctrl-C            Copy selection to clipboard"
+msgstr "  Ctrl-C            Kijelölés másolása a vágólapra"
+
+#: src/help.c:49
+msgid ""
+"  Ctrl-X            Copy selection to clipboard, and then paint current "
+"pattern to selection area"
+msgstr ""
+
+#: src/help.c:50
+msgid "  Ctrl-V            Paste clipboard to centre of current view"
+msgstr "  Ctrl-V            Beilleszti a vágólapot az aktuális nézet közepére"
+
+#: src/help.c:51
+msgid "  Ctrl-K            Paste clipboard to location it was copied from"
+msgstr ""
+
+#: src/help.c:52
+msgid "  Enter/Return      Commit paste to canvas\n"
+msgstr ""
+
+#: src/help.c:53
+msgid "  Arrow keys        Paint Mode - Move the mouse pointer"
+msgstr "  Nyílbillentyűk        Rajz mód - Mozgatja az egérmutatót"
+
+#: src/help.c:54
+msgid ""
+"  Arrow keys        Selection Mode - Nudge selection box or paste box by one "
+"pixel"
+msgstr ""
+
+#: src/help.c:55
+msgid ""
+"  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x "
+"pixels - x is defined by the Preferences window"
+msgstr ""
+
+#: src/help.c:56
+msgid "  Ctrl+Arrows       Move layer or resize selection box\n"
+msgstr "  Ctrl+Nyilak       Réteg mozgatása vagy kijelölődoboz átméretezése\n"
+
+#: src/help.c:57
+msgid ""
+"  [ or ]            Change colour A to the next or previous palette item"
+msgstr ""
+"  [ vagy ]            Szín A megváltoztatása a következő vagy előző palettaelemre"
+
+#: src/help.c:58
+msgid ""
+"  Shift+[ or ]      Change colour B to the next or previous palette item\n"
+msgstr ""
+"  Shift+[ vagy ]      Szín B megváltoztatása a következő vagy előző palettaelemre\n"
+
+#: src/help.c:59
+msgid "  Delete            Crop image to selection"
+msgstr "  Delete            Kép vágása a kijelölésre"
+
+#: src/help.c:60
+msgid ""
+"  Insert            Transform colours - i.e. Brightness, Contrast, "
+"Saturation, Posterize, Gamma"
+msgstr ""
+"  Insert            Színtranszformációk - azaz fényerő, kontraszt, "
+"telítettség, poszterizálás, gamma"
+
+#: src/help.c:61
+msgid "  Ctrl-G            Greyscale the image"
+msgstr "  Ctrl-G            Szürkeárnyalatossá teszi a képet"
+
+#: src/help.c:62
+msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
+msgstr "  Shift-Ctrl-G      Szürkeárnyalatossá teszi a képet (Gamma korrigáltan)"
+
+#: src/help.c:63
+msgid ""
+"  Ctrl-T            Draw a rectangle around the selection area with the "
+"current fill"
+msgstr ""
+"  Ctrl-T            Téglalapot rajzol a kijelölt terület köré az aktuális "
+"kitöltőszínnel"
+
+#: src/help.c:64
+msgid "  Ctrl-Shift-T      Fill in the selection area with the current fill"
+msgstr "  Ctrl-Shift-T      Kitölti a kijelölt területet az aktuális kitöltőszínnel"
+
+#: src/help.c:65
+msgid "  Ctrl-L            Draw an ellipse spanning the selection area"
+msgstr "  Ctrl-L            Ellipszist rajzol a kijelölt trületre"
+
+#: src/help.c:66
+msgid ""
+"  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
+msgstr ""
+"  Ctrl-Shift-L      Kitöltött ellipszist rajzol a kijelölt trületre\n"
+
+#: src/help.c:67
+msgid "  Ctrl-E            Edit the RGB values for colours A & B"
+msgstr "  Ctrl-E            Szín A & B RGB értékeit szerkeszti"
+
+#: src/help.c:68
+msgid "  Ctrl-W            Edit all palette colours\n"
+msgstr "  Ctrl-W            Minden palettaszín szerkesztése\n"
+
+#: src/help.c:69
+msgid "  Ctrl-P            Preferences"
+msgstr "  Ctrl-P            Beállítások"
+
+#: src/help.c:70
+msgid "  Ctrl-I            Information\n"
+msgstr "  Ctrl-I            Információ\n"
+
+#: src/help.c:71
+msgid "  Ctrl-Z            Undo last action"
+msgstr "  Ctrl-Z            Visszavonja a legutóbbi műveletet"
+
+#: src/help.c:72
+msgid "  Ctrl-R            Redo an undone action\n"
+msgstr "  Ctrl-R            Ismétli a visszavont műveletet\n"
+
+#: src/help.c:73
+msgid "  V                 View Window"
+msgstr "  V                 Nézet ablak"
+
+#: src/help.c:74
+msgid "  L                 Layers Window\n"
+msgstr "  L                 Rétegek ablak\n"
+
+#: src/help.c:75
+msgid ""
+"  A                 Draw open arrow head when using the line tool (size set "
+"by flow setting)"
+msgstr ""
+
+#: src/help.c:76
+msgid ""
+"  S                 Draw closed arrow head when using the line tool (size "
+"set by flow setting)\n"
+msgstr ""
+
+#: src/help.c:77
+msgid "  +,=               Main edit window - Zoom in"
+msgstr "  +,=               Fő szerkesztőablak - Nagyítás"
+
+#: src/help.c:78
+msgid "  -                 Main edit window - Zoom out"
+msgstr "  -                 Fő szerkesztőablak - Kicsinyítés"
+
+#: src/help.c:79
+msgid "  Shift +,=         View window - Zoom in"
+msgstr "  Shift +,=         Nézet ablak - Nagyítás"
+
+#: src/help.c:80
+msgid "  Shift -           View window - Zoom out\n"
+msgstr "  Shift -           Nézet ablak - Kicsinyítés\n"
+
+#: src/help.c:81
+#, c-format
+msgid "  1                 10% zoom"
+msgstr "  1                 10% nagyítás"
+
+#: src/help.c:82
+#, c-format
+msgid "  2                 25% zoom"
+msgstr "  2                 25% nagyítás"
+
+#: src/help.c:83
+#, c-format
+msgid "  3                 50% zoom"
+msgstr "  3                 50% nagyítás"
+
+#: src/help.c:84
+#, c-format
+msgid "  4                 100% zoom"
+msgstr "  4                 100% nagyítás"
+
+#: src/help.c:85
+#, c-format
+msgid "  5                 400% zoom"
+msgstr "  5                 400% nagyítás"
+
+#: src/help.c:86
+#, c-format
+msgid "  6                 800% zoom"
+msgstr "  6                 800% nagyítás"
+
+#: src/help.c:87
+#, c-format
+msgid "  7                 1200% zoom"
+msgstr "  7                 1200% nagyítás"
+
+#: src/help.c:88
+#, c-format
+msgid "  8                 1600% zoom"
+msgstr "  8                 1600% nagyítás"
+
+#: src/help.c:89
+#, c-format
+msgid "  9                 2000% zoom\n"
+msgstr "  9                 2000% nagyítás\n"
+
+#: src/help.c:90
+msgid "  Shift + 1         Edit image channel"
+msgstr "  Shift + 1         Kép csatorna szerkesztése"
+
+#: src/help.c:91
+msgid "  Shift + 2         Edit alpha channel"
+msgstr "  Shift + 2         Alfa csatorna szerkesztésa"
+
+#: src/help.c:92
+msgid "  Shift + 3         Edit selection channel"
+msgstr "  Shift + 3         Kijelölés csatorna szerkesztése"
+
+#: src/help.c:93
+msgid "  Shift + 4         Edit mask channel\n"
+msgstr "  Shift + 4         Maszk csatorna szerkesztése\n"
+
+#: src/help.c:94
+msgid "  F1                Help"
+msgstr "  F1                Súgó"
+
+#: src/help.c:95
+msgid "  F2                Choose Pattern"
+msgstr "  F2                Minta választása"
+
+#: src/help.c:96
+msgid "  F3                Choose Brush"
+msgstr "  F3                Ecset választása"
+
+#: src/help.c:97
+msgid "  F4                Paint Tool"
+msgstr "  F4                Festő eszköz"
+
+#: src/help.c:98
+msgid "  F5                Toggle Main Toolbar"
+msgstr "  F5                Fő eszköztár ki/be kapcsolása"
+
+#: src/help.c:99
+msgid "  F6                Toggle Tools Toolbar"
+msgstr "  F6                Eszközök eszköztár ki/be kapcsolása"
+
+#: src/help.c:100
+msgid "  F7                Toggle Settings Toolbar"
+msgstr "  F7                Beállítások eszköztár ki/be kapcsolása"
+
+#: src/help.c:101
+msgid "  F8                Toggle Palette"
+msgstr "  F8                Paletta ki/be kapcsolása"
+
+#: src/help.c:102
+msgid "  F9                Selection Tool"
+msgstr "  F9                Kijelölő eszköz"
+
+#: src/help.c:103
+msgid "  F12               Toggle Dock Area\n"
+msgstr "  F12               Dokk terület ki/be kapcsolása\n"
+
+#: src/help.c:104
+msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
+msgstr "  Ctrl + F1 - F12   Az aktuális vágólap mentése az 1-12 fájlba"
+
+#: src/help.c:105
+msgid "  Shift + F1 - F12  Load clipboard from file 1-12\n"
+msgstr "  Shift + F1 - F12  Vágólap betöltése az 1-12 fájlból\n"
+
+#: src/help.c:106
+msgid ""
+"  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad "
+"numbers)"
+msgstr ""
+"  Ctrl + 1, 2, ... , 0  Átlátszatlanság beállítása 10%, 20%, ... , 100% értékre "
+"(felső, vagy numerikus rész számai)"
+
+#: src/help.c:107
+msgid "  Ctrl + + or =     Increase opacity by 1"
+msgstr "  Ctrl + + or =     Átlátszatlanság növelése 1-gyel"
+
+#: src/help.c:108
+msgid "  Ctrl + -          Decrease opacity by 1\n"
+msgstr "  Ctrl + -          Átlátszatlanság csökkentése 1-gyel\n"
+
+#: src/help.c:109
+msgid ""
+"  Home              Show or hide main window menu/toolbar/status bar/palette"
+msgstr ""
+"  Home              Főablak menü/eszköztár/állapotsor/paletta megjelenítése vagy elrejtése"
+
+#: src/help.c:110
+msgid "  Page Up           Scale Image"
+msgstr "  Page Up           Kép nyújtása"
+
+#: src/help.c:111
+msgid "  Page Down         Resize Image canvas"
+msgstr "  Page Down         Képvászon átméretezése"
+
+#: src/help.c:112
+msgid "  End               Pan Window"
+msgstr ""
+
+#: src/help.c:115
+msgid "  Left button          Paint to canvas using the current tool"
+msgstr "  Bal egérgomb          Rajzolás a vászora az aktuális eszközzel"
+
+#: src/help.c:116
+msgid ""
+"  Middle button        Selects the point which will be the centre of the "
+"image after the next zoom"
+msgstr ""
+"  Középső egérgomb        Annak a pontnak a kiválasztása, amelyik a következő "
+"nagyításkor a kép közepe legyen"
+
+#: src/help.c:117
+msgid ""
+"  Right button         Commit paste to canvas / Stop drawing current line / "
+"Cancel selection\n"
+msgstr ""
+
+#: src/help.c:118
+msgid ""
+"  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in "
+"or out via the Preferences window\n"
+msgstr ""
+
+#: src/help.c:119
+msgid "  Ctrl+Left button     Choose colour A from under mouse pointer"
+msgstr ""
+
+#: src/help.c:120
+msgid ""
+"  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour "
+"in A (RGB images only)"
+msgstr ""
+
+#: src/help.c:121
+msgid "  Ctrl+Right button    Choose colour B from under mouse pointer"
+msgstr ""
+
+#: src/help.c:122
+msgid "  Ctrl+Scroll Wheel    Scroll the main edit window left or right\n"
+msgstr ""
+
+#: src/help.c:123
+msgid ""
+"  Ctrl+Double click    Set colour A or B to average colour under brush "
+"square or selection marquee (RGB only)\n"
+msgstr ""
+
+#: src/help.c:124
+msgid ""
+"  Shift+Right button   Selects the point which will be the centre of the "
+"image after the next zoom\n"
+"\n"
+msgstr ""
+
+#: src/help.c:125
+msgid "You can fixate the X/Y co-ordinates while moving the mouse:\n"
+msgstr ""
+
+#: src/help.c:126
+msgid "  Shift                Constrain mouse movements to vertical line"
+msgstr ""
+
+#: src/help.c:127
+msgid "  Shift+Ctrl           Constrain mouse movements to horizontal line"
+msgstr ""
+
+#: src/help.c:130
+msgid "mtPaint is maintained by Dmitry Groshev.\n"
+msgstr "Az mtPaint karbantartója Dmitry Groshev.\n"
+
+#: src/help.c:131
+msgid "wjaguar@users.sourceforge.net"
+msgstr "wjaguar@users.sourceforge.net"
+
+#: src/help.c:132
+msgid "http://mtpaint.sourceforge.net/\n"
+msgstr "http://mtpaint.sourceforge.net/\n"
+
+#: src/help.c:133
+msgid ""
+"The following people (in alphabetical order) have contributed directly to "
+"the project, and are therefore worthy of gracious thanks for their "
+"generosity and hard work:\n"
+"\n"
+msgstr ""
+"A következő személyek (ábécé sorrendben) járultak hozzá a projekthez közvetlenül, "
+"és ezért méltó köszönet jár a nagylelkűségükért és a kemény munkájukért:\n"
+
+#: src/help.c:134
+msgid "Authors\n"
+msgstr "Szerzők\n"
+
+#: src/help.c:135
+msgid ""
+"Dmitry Groshev - Contributing developer for version 2.30. Lead developer and "
+"maintainer from version 3.00 to the present."
+msgstr ""
+"Dmitry Groshev - A 2.30 verzió közreműködő fejlesztője. Vezető fejlesztő és "
+"karbantartó a 3.00 verziótól egészen máig."
+
+#: src/help.c:136
+msgid ""
+"Mark Tyler - Original author and maintainer up to version 3.00, occasional "
+"contributor thereafter."
+msgstr ""
+"Mark Tyler - Eredeti szerző és karbantartó a 3.00 verzióig, ezt követően "
+"alkalmi közreműködő."
+
+#: src/help.c:137
+msgid ""
+"Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more "
+"information.\n"
+"\n"
+msgstr ""
+"Xiaolin Wu - A Wu kvantálás eljárás írója - tekintse meg a wu.c fájlt "
+"további információért.\n"
+"\n"
+
+#: src/help.c:138
+msgid ""
+"General Contributions (Feedback and Ideas for improvements unless otherwise "
+"stated)\n"
+msgstr ""
+"Általános hozzájárulás (visszajelzések és ötletek a javításokhoz, hacsak "
+"másképp nem jelzik)\n"
+
+#: src/help.c:139
+msgid "Abdulla Al Muhairi - Website redesign April 2005"
+msgstr "Abdulla Al Muhairi - Website új dizájn 2005 április"
+
+#: src/help.c:140
+msgid "Alan Horkan"
+msgstr "Alan Horkan"
+
+#: src/help.c:141
+msgid "Alexandre Prokoudine"
+msgstr "Alexandre Prokoudine"
+
+#: src/help.c:142
+msgid "Antonio Andrea Bianco"
+msgstr "Antonio Andrea Bianco"
+
+#: src/help.c:143
+msgid "Dennis Lee"
+msgstr "Dennis Lee"
+
+#: src/help.c:144
+msgid "Ed Jason"
+msgstr "Ed Jason"
+
+#: src/help.c:145
+msgid ""
+"Eddie Kohler - Created Gifsicle which is needed for the creation and viewing "
+"of animated GIF files http://www.lcdf.org/gifsicle/"
+msgstr ""
+"Eddie Kohler - A Gifsicle alkotója, amely szükséges az animált GIF fájlok "
+"létrehozásához és megtekintéséhez http://www.lcdf.org/gifsicle/"
+
+#: src/help.c:146
+msgid ""
+"Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta "
+"registration"
+msgstr ""
+"Guadalinex Csapat (Junta de Andalucia) - man page, Launchpad/Rosetta "
+"regisztráció"
+
+#: src/help.c:147
+msgid "Lou Afonso"
+msgstr "Lou Afonso"
+
+#: src/help.c:148
+msgid "Magnus Hjorth"
+msgstr "Magnus Hjorth"
+
+#: src/help.c:149
+msgid "Martin Zelaia"
+msgstr "Martin Zelaia"
+
+#: src/help.c:150
+msgid "Pavel Ruzicka"
+msgstr "Pavel Ruzicka"
+
+#: src/help.c:151
+msgid "Puppy Linux (Barry Kauler)"
+msgstr "Puppy Linux (Barry Kauler)"
+
+#: src/help.c:152
+msgid "Vlastimil Krejcir"
+msgstr "Vlastimil Krejcir"
+
+#: src/help.c:153
+msgid ""
+"William Kern\n"
+"\n"
+msgstr ""
+"William Kern\n"
+"\n"
+
+#: src/help.c:154
+msgid "Translations\n"
+msgstr "Fordítások\n"
+
+#: src/help.c:155
+msgid "Brazilian Portuguese - Paulo Trevizan"
+msgstr "Brazíliai portugál - Paulo Trevizan"
+
+#: src/help.c:156
+msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
+msgstr "Cseh - Pavel Ruzicka, Martin Petricek, Roman Hornik"
+
+#: src/help.c:157
+msgid "Dutch - Hans Strijards"
+msgstr "Holland - Hans Strijards"
+
+#: src/help.c:158
+msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+msgstr "Francia - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+
+#: src/help.c:159
+msgid "Galician - Miguel Anxo Bouzada"
+msgstr "Galíciai - Miguel Anxo Bouzada"
+
+#: src/help.c:160
+msgid "German - Oliver Frommel, B. Clausius, Ulrich Ringel"
+msgstr "Német - Oliver Frommel, B. Clausius, Ulrich Ringel"
+
+#: src/help.c:161
+msgid "Italian - Angelo Gemmi"
+msgstr "Olasz - Angelo Gemmi"
+
+#: src/help.c:162
+msgid "Japanese - Norihiro YONEDA"
+msgstr "Japán - Norihiro YONEDA"
+
+#: src/help.c:163
+msgid "Polish - Bartosz Kaszubowski, LucaS"
+msgstr "Lengyel - Bartosz Kaszubowski, LucaS"
+
+#: src/help.c:164
+msgid "Portuguese - Israel G. Lugo, Tiago Silva"
+msgstr "Portugál - Israel G. Lugo, Tiago Silva"
+
+#: src/help.c:165
+msgid "Russian - Sergey Irupin, Dmitry Groshev"
+msgstr "Orosz - Sergey Irupin, Dmitry Groshev"
+
+#: src/help.c:166
+msgid "Simplified Chinese - Cecc"
+msgstr "Egyszerűsített kínai - Cecc"
+
+#: src/help.c:167
+msgid "Slovak - Jozef Riha"
+msgstr "Szlovák - Jozef Riha"
+
+#: src/help.c:168
+msgid ""
+"Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
+"Anxo Bouzada, Francisco Jose Rey"
+msgstr ""
+"Spanyol - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
+"Anxo Bouzada, Francisco Jose Rey"
+
+#: src/help.c:169
+msgid "Swedish - Daniel Nylander, Daniel Eriksson"
+msgstr "Svéd - Daniel Nylander, Daniel Eriksson"
+
+#: src/help.c:170
+msgid "Taiwanese Chinese - Wei-Lun Chao"
+msgstr "Taiwani kínai - Wei-Lun Chao"
+
+#: src/help.c:171
+msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
+msgstr "Török - Muhammet Kara, Tutku Dalmaz"
+
+#: src/info.c:295
+msgid "Information"
+msgstr "Információ"
+
+#: src/info.c:306
+msgid "Memory"
+msgstr "Memória"
+
+#: src/info.c:309
+msgid "Total memory for main + undo images"
+msgstr "Teljes memória a fő + visszavont képekhez"
+
+#: src/info.c:322
+msgid "Undo / Redo / Max levels used"
+msgstr "Visszavont / Ismételt / Max szint használat"
+
+#: src/info.c:326 src/otherwindow.c:3162 src/png.c:532 src/png.c:725
+msgid "Clipboard"
+msgstr "Vágólap"
+
+#: src/info.c:327
+msgid "Unused"
+msgstr "Nem használt"
+
+#: src/info.c:332
+#, c-format
+msgid "Clipboard = %i x %i"
+msgstr "Vágólap = %i x %i"
+
+#: src/info.c:334
+#, c-format
+msgid "Clipboard = %i x %i x RGB"
+msgstr "Vágólap = %i x %i x RGB"
+
+#: src/info.c:342
+msgid "Unique RGB pixels"
+msgstr "Egyedi RGB pixelek"
+
+#: src/info.c:355 src/layer.c:154
+msgid "Layers"
+msgstr "Rétegek"
+
+#: src/info.c:359
+msgid "Total layer memory usage"
+msgstr "Teljes réteg memória használat"
+
+#: src/info.c:366
+msgid "Colour Histogram"
+msgstr "Színhisztogram"
+
+#: src/info.c:388
+#, c-format
+msgid "Colour index totals - %i of %i used"
+msgstr ""
+
+#: src/info.c:407
+msgid "Index"
+msgstr "Index"
+
+#: src/info.c:408
+msgid "Canvas pixels"
+msgstr "Vászon pixelek"
+
+#: src/info.c:423
+msgid "Orphans"
+msgstr "Árvák"
+
+#: src/inifile.c:711
+msgid ""
+"Could not find home directory. Using current directory as home directory."
+msgstr ""
+"A saját mappa nem található. Az aktuális mappa lesz saját mappaként használva."
+
+#: src/layer.c:70
+msgid "Background"
+msgstr "Háttér"
+
+#: src/layer.c:152 src/mainwindow.c:4968
+msgid "(Modified)"
+msgstr "(Módosítva)"
+
+#: src/layer.c:155 src/mainwindow.c:4971
+msgid "Untitled"
+msgstr "Névtelen"
+
+#: src/layer.c:431
+#, c-format
+msgid "Do you really want to delete layer %i (%s) ?"
+msgstr ""
+
+#: src/layer.c:504
+msgid ""
+"One or more of the layers contains changes that have not been saved.  Do you "
+"really want to lose these changes?"
+msgstr ""
+"Egy vagy több réteg olyan módosításokat tartalmaz, amelyek még nincsenek elmentve. "
+"Biztosan elveti ezeket a módosításokat?"
+
+#: src/layer.c:509 src/mainwindow.c:1074
+msgid "Cancel Operation"
+msgstr "Művelet megszakítása"
+
+#: src/layer.c:509 src/mainwindow.c:1074
+msgid "Lose Changes"
+msgstr "Változások elvetése"
+
+#: src/layer.c:653
+#, c-format
+msgid "%d layers failed to load"
+msgstr "%d réteg betöltése meghiúsult"
+
+#: src/layer.c:796
+msgid ""
+"One or more of the image layers has not been saved.  You must save each "
+"image individually before saving the layers text file in order to load this "
+"composite image in the future."
+msgstr ""
+
+#: src/layer.c:816
+msgid "Do you really want to delete all of the layers?"
+msgstr "Biztosan törölni szeretné az összes réteget?"
+
+#: src/layer.c:951
+msgid "You cannot add any more layers."
+msgstr "Nem adhat hozzá több réteget."
+
+#: src/layer.c:1049 src/otherwindow.c:267
+msgid "New Layer"
+msgstr "Új réteg"
+
+#: src/layer.c:1050
+msgid "Raise"
+msgstr "Növel"
+
+#: src/layer.c:1051
+msgid "Lower"
+msgstr "Csökkent"
+
+#: src/layer.c:1052
+msgid "Duplicate Layer"
+msgstr "Réteg kettőzése"
+
+#: src/layer.c:1053
+msgid "Centralise Layer"
+msgstr "Réteg középre helyezése"
+
+#: src/layer.c:1054
+msgid "Delete Layer"
+msgstr "Réteg törlése"
+
+#: src/layer.c:1055
+msgid "Close Layers Window"
+msgstr "Rétegek ablak bezárása"
+
+#: src/layer.c:1165
+msgid "Layer Name"
+msgstr "Réteg neve"
+
+#: src/layer.c:1166
+msgid "Position"
+msgstr "Pozíció"
+
+#: src/layer.c:1168
+msgid "Transparent Colour"
+msgstr "Átlátszó szín"
+
+#: src/layer.c:1194
+msgid "Show all layers in main window"
+msgstr "Minden réteg mejelenítése a fő ablakban"
+
+#: src/mainwindow.c:276
+msgid "There were no unused colours to remove!"
+msgstr "Nincsen eltávolítható használaton kívüli szín!"
+
+#: src/mainwindow.c:304
+msgid "The palette does not contain 2 colours that have identical RGB values"
+msgstr "A paletta nem tartalmaz 2 olyan színt, amelyeknek azonosak az RGB értékeik"
+
+#: src/mainwindow.c:307
+#, c-format
+msgid ""
+"The palette contains %i colours that have identical RGB values.  Do you "
+"really want to merge them into one index and realign the canvas?"
+msgstr ""
+"A paletta %i olyan színt tartalmaz, amelyeknek azonosak az RGB értékeik. "
+"Biztosan egyesíteni szeretné őket egy indexbe és újraigazítani a vásznat?"
+
+#: src/mainwindow.c:495 src/otherwindow.c:1843 src/otherwindow.c:2700
+msgid "RGB"
+msgstr "RGB"
+
+#: src/mainwindow.c:498
+msgid "indexed"
+msgstr "indexelt"
+
+#: src/mainwindow.c:504
+#, c-format
+msgid ""
+"You are trying to save an %s image to an %s file which is not possible.  I "
+"would suggest you save with a PNG extension."
+msgstr ""
+
+#: src/mainwindow.c:506
+#, c-format
+msgid ""
+"You are trying to save an %s file with a palette of more than %d colours.  "
+"Either use another format or reduce the palette to %d colours."
+msgstr ""
+
+#: src/mainwindow.c:530
+msgid ""
+"You are trying to save an XPM file with more than 4096 colours.  Either use "
+"another format or posterize the image to 4 bits, or otherwise reduce the "
+"number of colours."
+msgstr ""
+
+#: src/mainwindow.c:577
+msgid "Unable to load clipboard"
+msgstr "A vególap nem tölthető be."
+
+#: src/mainwindow.c:603
+msgid "Unable to save clipboard"
+msgstr "A vágólap nem menthető el."
+
+#: src/mainwindow.c:1071
+msgid ""
+"This canvas/palette contains changes that have not been saved.  Do you "
+"really want to lose these changes?"
+msgstr ""
+"Ez a vászon/paletta el nem mentett módosításokat tartalmaz. Biztos benne, "
+"hogy elveti ezeket a módosításokat?"
+
+#: src/mainwindow.c:1093 src/otherwindow.c:802 src/otherwindow.c:3162
+msgid "Image"
+msgstr "Kép"
+
+#: src/mainwindow.c:1116
+msgid "Do you really want to quit?"
+msgstr "Biztosan ki szeretne lépni?"
+
+#: src/mainwindow.c:4411
+msgid "/_File"
+msgstr "/_Fájl"
+
+#: src/mainwindow.c:4413
+msgid "//New"
+msgstr "//Új"
+
+#: src/mainwindow.c:4414
+msgid "//Open ..."
+msgstr "//Megnyitás ..."
+
+#: src/mainwindow.c:4415
+msgid "//Save"
+msgstr "//Mentés"
+
+#: src/mainwindow.c:4416
+msgid "//Save As ..."
+msgstr "//Mentés másként ..."
+
+#: src/mainwindow.c:4418
+msgid "//Export Undo Images ..."
+msgstr ""
+
+#: src/mainwindow.c:4419
+msgid "//Export Undo Images (reversed) ..."
+msgstr ""
+
+#: src/mainwindow.c:4420
+msgid "//Export ASCII Art ..."
+msgstr "//Exportálás ASCII Art formátumba ..."
+
+#: src/mainwindow.c:4421
+msgid "//Export Animated GIF ..."
+msgstr "//Exportálás animált GIF formátumba ..."
+
+#: src/mainwindow.c:4423
+msgid "//Actions"
+msgstr "//Műveletek"
+
+#: src/mainwindow.c:4441
+msgid "///Configure"
+msgstr "///Beállítás"
+
+#: src/mainwindow.c:4464
+msgid "//Quit"
+msgstr "//Kilépés"
+
+#: src/mainwindow.c:4466
+msgid "/_Edit"
+msgstr "/S_zerkesztés"
+
+#: src/mainwindow.c:4468
+msgid "//Undo"
+msgstr "//Visszavonás"
+
+#: src/mainwindow.c:4469
+msgid "//Redo"
+msgstr "//Újra"
+
+#: src/mainwindow.c:4471
+msgid "//Cut"
+msgstr "//Kivágás"
+
+#: src/mainwindow.c:4472
+msgid "//Copy"
+msgstr "//Másolás"
+
+#: src/mainwindow.c:4473
+msgid "//Copy To Palette"
+msgstr "//Másolás a palettára"
+
+#: src/mainwindow.c:4474
+msgid "//Paste To Centre"
+msgstr "//Beillesztés középre"
+
+#: src/mainwindow.c:4475
+msgid "//Paste To New Layer"
+msgstr "//Beillesztés új rétegként"
+
+#: src/mainwindow.c:4476
+msgid "//Paste"
+msgstr "//Beillesztés"
+
+#: src/mainwindow.c:4477
+msgid "//Paste Text"
+msgstr "//Szöveg beillesztése"
+
+#: src/mainwindow.c:4479
+msgid "//Paste Text (FreeType)"
+msgstr "//Szöveg beillesztése (FreeType)"
+
+#: src/mainwindow.c:4481
+msgid "//Paste Palette"
+msgstr "//Paletta beillesztésa"
+
+#: src/mainwindow.c:4483
+msgid "//Load Clipboard"
+msgstr "//Vágólap betöltése"
+
+#: src/mainwindow.c:4497
+msgid "//Save Clipboard"
+msgstr "//Vágólap mentése"
+
+#: src/mainwindow.c:4511
+msgid "//Import Clipboard from System"
+msgstr "//Vágólap importálása a rendszerből"
+
+#: src/mainwindow.c:4512
+msgid "//Export Clipboard to System"
+msgstr "//Vágólap exportálása a rendszerbe"
+
+#: src/mainwindow.c:4514
+msgid "//Choose Pattern ..."
+msgstr "//Minta kiválasztása ..."
+
+#: src/mainwindow.c:4515
+msgid "//Choose Brush ..."
+msgstr "//Ecset kiválasztása ..."
+
+#: src/mainwindow.c:4517
+msgid "/_View"
+msgstr "/_Nézet"
+
+#: src/mainwindow.c:4519
+msgid "//Show Main Toolbar"
+msgstr "//Fő eszköztár megjelenítése"
+
+#: src/mainwindow.c:4520
+msgid "//Show Tools Toolbar"
+msgstr "//Eszközök eszköztár megjelenítése"
+
+#: src/mainwindow.c:4521
+msgid "//Show Settings Toolbar"
+msgstr "//Beállítások eszköztár megjelenítése"
+
+#: src/mainwindow.c:4522
+msgid "//Show Dock"
+msgstr "//Dokk megjelenítése"
+
+#: src/mainwindow.c:4523
+msgid "//Show Palette"
+msgstr "//Paletta megjelenítése"
+
+#: src/mainwindow.c:4524
+msgid "//Show Status Bar"
+msgstr "//Állapotsor megjelenítése"
+
+#: src/mainwindow.c:4526
+msgid "//Toggle Image View"
+msgstr "//Kép nézetre váltás"
+
+#: src/mainwindow.c:4527
+msgid "//Centralize Image"
+msgstr "//Kép központosítása"
+
+#: src/mainwindow.c:4528
+msgid "//Show Zoom Grid"
+msgstr "//Nagyításrács megjelenítése"
+
+#: src/mainwindow.c:4529
+msgid "//Configure Grid ..."
+msgstr "//Rács beállítása ..."
+
+#: src/mainwindow.c:4530
+msgid "//Tracing Image ..."
+msgstr ""
+
+#: src/mainwindow.c:4532
+msgid "//View Window"
+msgstr "//Nézet ablak"
+
+#: src/mainwindow.c:4533
+msgid "//Horizontal Split"
+msgstr "//Vízszintes felosztás"
+
+#: src/mainwindow.c:4534
+msgid "//Focus View Window"
+msgstr ""
+
+#: src/mainwindow.c:4536
+msgid "//Pan Window"
+msgstr ""
+
+#: src/mainwindow.c:4537
+msgid "//Layers Window"
+msgstr "//Rétegek ablak"
+
+#: src/mainwindow.c:4539
+msgid "/_Image"
+msgstr "/_Kép"
+
+#: src/mainwindow.c:4541
+msgid "//Convert To RGB"
+msgstr "//Konvertálás RGB-be"
+
+#: src/mainwindow.c:4542
+msgid "//Convert To Indexed ..."
+msgstr "//Konvertálás indexeltbe ..."
+
+#: src/mainwindow.c:4544
+msgid "//Scale Canvas ..."
+msgstr "//Vászon nyújtása ..."
+
+#: src/mainwindow.c:4545
+msgid "//Resize Canvas ..."
+msgstr "//Vászon átméretezése ..."
+
+#: src/mainwindow.c:4546
+msgid "//Crop"
+msgstr "//Levágás"
+
+#: src/mainwindow.c:4548
+msgid "//Flip Vertically"
+msgstr "//Függőleges tökrözés"
+
+#: src/mainwindow.c:4549
+msgid "//Flip Horizontally"
+msgstr "//Vízszintes tükrözés"
+
+#: src/mainwindow.c:4550
+msgid "//Rotate Clockwise"
+msgstr "//Forgatás jobbra"
+
+#: src/mainwindow.c:4551
+msgid "//Rotate Anti-Clockwise"
+msgstr "//Forgatás balra"
+
+#: src/mainwindow.c:4552
+msgid "//Free Rotate ..."
+msgstr "//Forgatás szabadon ..."
+
+#: src/mainwindow.c:4553
+msgid "//Skew ..."
+msgstr "//Döntés ..."
+
+#: src/mainwindow.c:4555
+msgid "//Information ..."
+msgstr "//Információ ..."
+
+#: src/mainwindow.c:4556
+msgid "//Preferences ..."
+msgstr "//Beállítások ..."
+
+#: src/mainwindow.c:4558
+msgid "/_Selection"
+msgstr "/Ki_jelölés"
+
+#: src/mainwindow.c:4560
+msgid "//Select All"
+msgstr "//Mindent kijelöl"
+
+#: src/mainwindow.c:4561
+msgid "//Select None (Esc)"
+msgstr "//Kijelölés megszüntetése (Esc)"
+
+#: src/mainwindow.c:4562
+msgid "//Lasso Selection"
+msgstr "//Lasszókijelölés"
+
+#: src/mainwindow.c:4563
+msgid "//Lasso Selection Cut"
+msgstr ""
+
+#: src/mainwindow.c:4565
+msgid "//Outline Selection"
+msgstr ""
+
+#: src/mainwindow.c:4566
+msgid "//Fill Selection"
+msgstr ""
+
+#: src/mainwindow.c:4567
+msgid "//Outline Ellipse"
+msgstr ""
+
+#: src/mainwindow.c:4568
+msgid "//Fill Ellipse"
+msgstr ""
+
+#: src/mainwindow.c:4575
+msgid "//Horizontal Ramp"
+msgstr ""
+
+#: src/mainwindow.c:4576
+msgid "//Vertical Ramp"
+msgstr ""
+
+#: src/mainwindow.c:4578
+msgid "//Alpha Blend A,B"
+msgstr ""
+
+#: src/mainwindow.c:4579
+msgid "//Move Alpha to Mask"
+msgstr ""
+
+#: src/mainwindow.c:4580
+msgid "//Mask Colour A,B"
+msgstr ""
+
+#: src/mainwindow.c:4581
+msgid "//Unmask Colour A,B"
+msgstr ""
+
+#: src/mainwindow.c:4582
+msgid "//Mask All Colours"
+msgstr ""
+
+#: src/mainwindow.c:4583
+msgid "//Clear Mask"
+msgstr "//Maszk törlése"
+
+#: src/mainwindow.c:4585
+msgid "/_Palette"
+msgstr "/_Paletta"
+
+#: src/mainwindow.c:4589
+msgid "//Load Default"
+msgstr "//Alapértelmezett betöltése"
+
+#: src/mainwindow.c:4591
+msgid "//Mask All"
+msgstr ""
+
+#: src/mainwindow.c:4592
+msgid "//Mask None"
+msgstr "//Nincs maszkolás"
+
+#: src/mainwindow.c:4594
+msgid "//Swap A & B"
+msgstr "//A és B felcserélése"
+
+#: src/mainwindow.c:4595
+msgid "//Edit Colour A & B ..."
+msgstr "//Szín A & B szerkesztése"
+
+#: src/mainwindow.c:4596
+msgid "//Dither A"
+msgstr ""
+
+#: src/mainwindow.c:4597
+msgid "//Palette Editor ..."
+msgstr "//Palettaszerkesztő ..."
+
+#: src/mainwindow.c:4598
+msgid "//Set Palette Size ..."
+msgstr "//Palettaméret megadása ..."
+
+#: src/mainwindow.c:4599
+msgid "//Merge Duplicate Colours"
+msgstr "//Duplikált színek egyesítése"
+
+#: src/mainwindow.c:4600
+msgid "//Remove Unused Colours"
+msgstr "//Nem használt színek eltávolítása"
+
+#: src/mainwindow.c:4602
+msgid "//Create Quantized ..."
+msgstr ""
+
+#: src/mainwindow.c:4604
+msgid "//Sort Colours ..."
+msgstr "//Színek rendezése ..."
+
+#: src/mainwindow.c:4605
+msgid "//Palette Shifter ..."
+msgstr "//Palettaváltó"
+
+#: src/mainwindow.c:4607
+msgid "/Effe_cts"
+msgstr "/_Hatások"
+
+#: src/mainwindow.c:4609
+msgid "//Transform Colour ..."
+msgstr "//Színtranszformáció ..."
+
+#: src/mainwindow.c:4610
+msgid "//Invert"
+msgstr "//Negatív"
+
+#: src/mainwindow.c:4611
+msgid "//Greyscale"
+msgstr "//Szürkeárnyalatos"
+
+#: src/mainwindow.c:4612
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//Szürkeárnyalatos (Gamma korrigált)"
+
+#: src/mainwindow.c:4613
+msgid "//Isometric Transformation"
+msgstr "//Izometrikus transformáció"
+
+#: src/mainwindow.c:4615
+msgid "///Left Side Down"
+msgstr "///Bal oldal lefelé"
+
+#: src/mainwindow.c:4616
+msgid "///Right Side Down"
+msgstr "///Jobb oldal lefelé"
+
+#: src/mainwindow.c:4617
+msgid "///Top Side Right"
+msgstr "///Felső rész jobbra"
+
+#: src/mainwindow.c:4618
+msgid "///Bottom Side Right"
+msgstr "///Alsó rész jobbra"
+
+#: src/mainwindow.c:4620
+msgid "//Edge Detect ..."
+msgstr "//Szélek keresése ..."
+
+#: src/mainwindow.c:4621
+msgid "//Difference of Gaussians ..."
+msgstr ""
+
+#: src/mainwindow.c:4622
+msgid "//Sharpen ..."
+msgstr "//Élesítés ..."
+
+#: src/mainwindow.c:4623
+msgid "//Unsharp Mask ..."
+msgstr ""
+
+#: src/mainwindow.c:4624
+msgid "//Soften ..."
+msgstr ""
+
+#: src/mainwindow.c:4625
+msgid "//Gaussian Blur ..."
+msgstr "//Gauss-elmosás ..."
+
+#: src/mainwindow.c:4626
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr "//Kuwahara-Nagao elmosás ..."
+
+#: src/mainwindow.c:4627
+msgid "//Emboss"
+msgstr "//Domborítás"
+
+#: src/mainwindow.c:4628
+msgid "//Dilate"
+msgstr ""
+
+#: src/mainwindow.c:4629
+msgid "//Erode"
+msgstr "//Erodál"
+
+#: src/mainwindow.c:4631
+msgid "//Bacteria ..."
+msgstr "//Baktérium ..."
+
+#: src/mainwindow.c:4633
+msgid "/Cha_nnels"
+msgstr "/_Csatornák"
+
+#: src/mainwindow.c:4635
+msgid "//New ..."
+msgstr "//Új ..."
+
+#: src/mainwindow.c:4636
+msgid "//Load ..."
+msgstr "//Betöltés ..."
+
+#: src/mainwindow.c:4638
+msgid "//Delete ..."
+msgstr "//Törlés ..."
+
+#: src/mainwindow.c:4640
+msgid "//Edit Image"
+msgstr "//Kép szerkesztése"
+
+#: src/mainwindow.c:4641
+msgid "//Edit Alpha"
+msgstr "//Alfa szerkesztése"
+
+#: src/mainwindow.c:4642
+msgid "//Edit Selection"
+msgstr "//Kijelölés szerkesztése"
+
+#: src/mainwindow.c:4643
+msgid "//Edit Mask"
+msgstr "//Maszk szerkesztése"
+
+#: src/mainwindow.c:4645
+msgid "//Hide Image"
+msgstr "//Kép elrejtése"
+
+#: src/mainwindow.c:4646
+msgid "//Disable Alpha"
+msgstr "//Alfa tiltása"
+
+#: src/mainwindow.c:4647
+msgid "//Disable Selection"
+msgstr "//Kijelölés tiltása"
+
+#: src/mainwindow.c:4648
+msgid "//Disable Mask"
+msgstr "//Maszk tiltása"
+
+#: src/mainwindow.c:4650
+msgid "//Couple RGBA Operations"
+msgstr ""
+
+#: src/mainwindow.c:4651
+msgid "//Threshold ..."
+msgstr "//Küszöb ..."
+
+#: src/mainwindow.c:4652
+msgid "//Unassociate Alpha"
+msgstr ""
+
+#: src/mainwindow.c:4654
+msgid "//View Alpha as an Overlay"
+msgstr ""
+
+#: src/mainwindow.c:4655
+msgid "//Configure Overlays ..."
+msgstr ""
+
+#: src/mainwindow.c:4657
+msgid "/_Layers"
+msgstr "/_Rétegek"
+
+#: src/mainwindow.c:4659
+msgid "//New Layer"
+msgstr "//Új réteg"
+
+#: src/mainwindow.c:4662
+msgid "//Save Composite Image ..."
+msgstr "//Kompozitkép mentése ..."
+
+#: src/mainwindow.c:4663
+msgid "//Composite to New Layer"
+msgstr "//Kompozitot új réteggé"
+
+#: src/mainwindow.c:4664
+msgid "//Remove All Layers"
+msgstr "//Minden réteg eltávolítása"
+
+#: src/mainwindow.c:4666
+msgid "//Configure Animation ..."
+msgstr "//Animáció beállítása ..."
+
+#: src/mainwindow.c:4667
+msgid "//Preview Animation ..."
+msgstr "//Animáció előnézete ..."
+
+#: src/mainwindow.c:4668
+msgid "//Set Key Frame ..."
+msgstr "//Kulcskocka megadása ..."
+
+#: src/mainwindow.c:4669
+msgid "//Remove All Key Frames ..."
+msgstr "//Minden kulcskocka eltávolítása ..."
+
+#: src/mainwindow.c:4671
+msgid "/More..."
+msgstr "/Továbbiak..."
+
+#: src/mainwindow.c:4673
+msgid "/_Help"
+msgstr "/_Súgó"
+
+#: src/mainwindow.c:4674
+msgid "//Documentation"
+msgstr "//Dokumentáció"
+
+#: src/mainwindow.c:4675
+msgid "//About"
+msgstr "//Névjegy"
+
+#: src/mainwindow.c:4677
+msgid "//Rebind Shortcut Keycodes"
+msgstr "//Gyorsbillentyűk újrakötése"
+
+#: src/memory.c:2594 src/memory.c:2979
+msgid "Converting to Indexed Palette"
+msgstr "Konvertálás indexelt palettára"
+
+#: src/memory.c:4316 src/otherwindow.c:535
+msgid "Bacteria Effect"
+msgstr "Baktérium hatás"
+
+#: src/memory.c:4351
+msgid "Rotating"
+msgstr "Forgatás"
+
+#: src/memory.c:4703
+msgid "Free Rotation"
+msgstr "Szabad forgatás"
+
+#: src/memory.c:5202
+msgid "Scaling Image"
+msgstr "Kép nyújtása"
+
+#: src/memory.c:6361
+msgid "Counting Unique RGB Pixels"
+msgstr "Egyedi RGB képpontok megszámolása"
+
+#: src/memory.c:6404
+msgid "Applying Effect"
+msgstr "Hatás alkalmazása"
+
+#: src/memory.c:7439
+msgid "Kuwahara-Nagao Filter"
+msgstr "Kuwahara-Nagao szűrő"
+
+#: src/memory.c:8905 src/otherwindow.c:3064
+msgid "Skew"
+msgstr "Döntés"
+
+#: src/mygtk.c:146
+msgid "Please Wait ..."
+msgstr "Kérem várjon ..."
+
+#: src/mygtk.c:168
+msgid "STOP"
+msgstr "STOP"
+
+#: src/mygtk.c:787
+msgid "Browse"
+msgstr "Tallózás"
+
+#: src/mygtk.c:2324
+msgid "Gamma corrected"
+msgstr "Gamma korrigált"
+
+#: src/otherwindow.c:265
+msgid "24 bit RGB"
+msgstr "24 bites RGB"
+
+#: src/otherwindow.c:265
+msgid "Greyscale"
+msgstr "Szürkeárnyalatos"
+
+#: src/otherwindow.c:265
+msgid "Indexed Palette"
+msgstr "Indexelt paletta"
+
+#: src/otherwindow.c:266
+msgid "From Clipboard"
+msgstr "Vágólapról"
+
+#: src/otherwindow.c:266
+msgid "Grab Screenshot"
+msgstr "Képernyőkép rögzítése"
+
+#: src/otherwindow.c:267 src/toolbar.c:553
+msgid "New Image"
+msgstr "Új kép"
+
+#: src/otherwindow.c:297
+msgid "Width"
+msgstr "Szélesség"
+
+#: src/otherwindow.c:298
+msgid "Height"
+msgstr "Magasság"
+
+#: src/otherwindow.c:299
+msgid "Colours"
+msgstr "Színek"
+
+#: src/otherwindow.c:385
+msgid "Pattern Chooser"
+msgstr "Mintaválasztó"
+
+#: src/otherwindow.c:451
+msgid "Set Palette Size"
+msgstr "Palettaméret megadása"
+
+#: src/otherwindow.c:512 src/otherwindow.c:608 src/otherwindow.c:944
+#: src/otherwindow.c:2966 src/otherwindow.c:3201 src/prefs.c:662
+msgid "Apply"
+msgstr "Alkalmaz"
+
+#: src/otherwindow.c:572
+msgid "Luminance"
+msgstr "Luminancia"
+
+#: src/otherwindow.c:572
+msgid "Distance to A"
+msgstr ""
+
+#: src/otherwindow.c:573
+msgid "Distance to A+B"
+msgstr ""
+
+#: src/otherwindow.c:574
+msgid "Projection to A->B"
+msgstr ""
+
+#: src/otherwindow.c:575
+msgid "Frequency"
+msgstr "Frekvencia"
+
+#: src/otherwindow.c:580
+msgid "Sort Palette Colours"
+msgstr "Palettaszínek rendezése"
+
+#: src/otherwindow.c:592
+msgid "Start Index"
+msgstr "Kezdő index"
+
+#: src/otherwindow.c:593
+msgid "End Index"
+msgstr "Vég index"
+
+#: src/otherwindow.c:599
+msgid "Reverse Order"
+msgstr "Fordított sorrend"
+
+#: src/otherwindow.c:801
+msgid "Auto-Preview"
+msgstr "Automatikus előnézet"
+
+#: src/otherwindow.c:802 src/otherwindow.c:878 src/otherwindow.c:2284
+msgid "Palette"
+msgstr "Paletta"
+
+#: src/otherwindow.c:803
+msgid "Brightness"
+msgstr "Fényerő"
+
+#: src/otherwindow.c:803
+msgid "Contrast"
+msgstr "Kontraszt"
+
+#: src/otherwindow.c:804 src/otherwindow.c:1927
+msgid "Posterize"
+msgstr "Poszterizálás"
+
+#: src/otherwindow.c:804
+msgid "Gamma"
+msgstr "Gamma"
+
+#: src/otherwindow.c:820 src/toolbar.c:564
+msgid "Transform Colour"
+msgstr "Színtraszformáció"
+
+#: src/otherwindow.c:858
+msgid "Show Detail"
+msgstr "Részletek megjelenítése"
+
+#: src/otherwindow.c:863
+msgid "Store Values"
+msgstr ""
+
+#: src/otherwindow.c:939
+msgid "Reset"
+msgstr "Visszaállítás"
+
+#: src/otherwindow.c:1005
+msgid "New geometry is the same as now - nothing to do."
+msgstr "Az új geometria megegyzik a mostanival - nincs mit tenni."
+
+#: src/otherwindow.c:1054
+msgid "The operating system cannot allocate the memory for this operation."
+msgstr "Az operációs rendszer nem tudott memóriát lefoglalni ehhez a művelethez."
+
+#: src/otherwindow.c:1056
+msgid ""
+"You have not allocated enough memory in the Preferences window for this "
+"operation."
+msgstr ""
+"Nem foglalt le elég memóriát ehhez a művelethez a Beállítások ablakban."
+
+#: src/otherwindow.c:1076
+msgid "Nearest Neighbour"
+msgstr "Legközelebbi szomszéd"
+
+#: src/otherwindow.c:1077
+msgid "Bilinear / Area Mapping"
+msgstr "Bilineáris / Area Mapping"
+
+#: src/otherwindow.c:1077 src/otherwindow.c:2904
+msgid "Bilinear"
+msgstr "Bilineáris"
+
+#: src/otherwindow.c:1078
+msgid "Bicubic"
+msgstr ""
+
+#: src/otherwindow.c:1079
+msgid "Bicubic edged"
+msgstr ""
+
+#: src/otherwindow.c:1080
+msgid "Bicubic better"
+msgstr ""
+
+#: src/otherwindow.c:1081
+msgid "Bicubic sharper"
+msgstr ""
+
+#: src/otherwindow.c:1082
+msgid "Blackman-Harris"
+msgstr "Blackman-Harris"
+
+#: src/otherwindow.c:1092 src/shifter.c:327
+msgid "Clear"
+msgstr ""
+
+#: src/otherwindow.c:1093
+msgid "Tile"
+msgstr "Csempe"
+
+#: src/otherwindow.c:1094
+msgid "Mirror tile"
+msgstr ""
+
+#: src/otherwindow.c:1109
+msgid "Width     "
+msgstr "Szélesség     "
+
+#: src/otherwindow.c:1110
+msgid "Height    "
+msgstr "Magasság    "
+
+#: src/otherwindow.c:1112
+msgid "Original      "
+msgstr "Eredeti      "
+
+#: src/otherwindow.c:1118
+msgid "New"
+msgstr "Új"
+
+#: src/otherwindow.c:1127 src/otherwindow.c:2937 src/otherwindow.c:3074
+msgid "Offset"
+msgstr "Eltolás"
+
+#: src/otherwindow.c:1133 src/otherwindow.c:1959
+msgid "Centre"
+msgstr "Közép"
+
+#: src/otherwindow.c:1144
+msgid "Fix Aspect Ratio"
+msgstr "Méretarány megtartása"
+
+#: src/otherwindow.c:1163 src/otherwindow.c:2268
+msgid "Settings"
+msgstr "Beállítások"
+
+#: src/otherwindow.c:1168
+msgid "Sharper image reduction"
+msgstr ""
+
+#: src/otherwindow.c:1193
+msgid "Scale Canvas"
+msgstr "Vászon nyújtása"
+
+#: src/otherwindow.c:1193
+msgid "Resize Canvas"
+msgstr "Vászon átméretezése"
+
+#: src/otherwindow.c:1842
+msgid "From"
+msgstr ""
+
+#: src/otherwindow.c:1842
+msgid "To"
+msgstr ""
+
+#: src/otherwindow.c:1843 src/otherwindow.c:2700
+msgid "HSV"
+msgstr "HSV"
+
+#: src/otherwindow.c:1858
+msgid "Scale"
+msgstr "Nyújtás"
+
+#: src/otherwindow.c:1873
+msgid "Palette Editor"
+msgstr "Paletta szerkesztő"
+
+#: src/otherwindow.c:1894
+msgid "Configure Overlays"
+msgstr ""
+
+#: src/otherwindow.c:1951
+msgid "Colour Editor"
+msgstr "Színszerkesztő"
+
+#: src/otherwindow.c:1959
+msgid "Limit"
+msgstr "Határ"
+
+#: src/otherwindow.c:1960
+msgid "Sphere"
+msgstr "Gömb"
+
+#: src/otherwindow.c:1960 src/otherwindow.c:3073
+msgid "Angle"
+msgstr "Fok"
+
+#: src/otherwindow.c:1960
+msgid "Cube"
+msgstr "Kocka"
+
+#: src/otherwindow.c:1990
+msgid "Range"
+msgstr ""
+
+#: src/otherwindow.c:1992
+msgid "Inverse"
+msgstr ""
+
+#: src/otherwindow.c:1997 src/toolbar.c:428
+msgid "Colour-Selective Mode"
+msgstr ""
+
+#: src/otherwindow.c:2006
+msgid "Opaque"
+msgstr "Átlátszatlan"
+
+#: src/otherwindow.c:2006
+msgid "Border"
+msgstr "Szegély"
+
+#: src/otherwindow.c:2007
+msgid "Transparent"
+msgstr "Átlátszó"
+
+#: src/otherwindow.c:2007
+msgid "Tile "
+msgstr "Csempe "
+
+#: src/otherwindow.c:2024
+msgid "Smart grid"
+msgstr "Inteligens rács"
+
+#: src/otherwindow.c:2026
+msgid "Tile grid"
+msgstr "Csempe rács"
+
+#: src/otherwindow.c:2028
+msgid "Minimum grid zoom"
+msgstr "Minimális rács nagyítás"
+
+#: src/otherwindow.c:2030
+msgid "Tile width"
+msgstr "Csempeszélesség"
+
+#: src/otherwindow.c:2032
+msgid "Tile height"
+msgstr "Csempemagasság"
+
+#: src/otherwindow.c:2044
+msgid "Configure Grid"
+msgstr "Rács beállítása"
+
+#: src/otherwindow.c:2227
+msgid "Exact Conversion"
+msgstr ""
+
+#: src/otherwindow.c:2227
+msgid "Use Current Palette"
+msgstr "Aktuális paletta használata"
+
+#: src/otherwindow.c:2228
+msgid "PNN Quantize (slow, better quality)"
+msgstr "PNN kvantálás (lassú, de jobb minőség)"
+
+#: src/otherwindow.c:2229
+msgid "Wu Quantize (fast)"
+msgstr "Wu kvantálás (gyors)"
+
+#: src/otherwindow.c:2230
+# fuzzy
+msgid "Max-Min Quantize (best for small palettes and dithering)"
+msgstr "Max-Min kvantálás (best for small palettes and dithering)"
+
+#: src/otherwindow.c:2233 src/otherwindow.c:2906 src/otherwindow.c:3162
+msgid "None"
+msgstr "Nincs"
+
+#: src/otherwindow.c:2233
+msgid "Floyd-Steinberg"
+msgstr "Floyd-Steinberg"
+
+#: src/otherwindow.c:2233
+msgid "Stucki"
+msgstr "Stucki"
+
+#: src/otherwindow.c:2236
+msgid "Floyd-Steinberg (quick)"
+msgstr "Floyd-Steinberg (gyors)"
+
+#: src/otherwindow.c:2236
+msgid "Dithered (effect)"
+msgstr ""
+
+#: src/otherwindow.c:2237
+msgid "Scattered (effect)"
+msgstr ""
+
+#: src/otherwindow.c:2240
+msgid "Largest (Linf)"
+msgstr ""
+
+#: src/otherwindow.c:2240
+msgid "Sum (L1)"
+msgstr ""
+
+#: src/otherwindow.c:2240
+msgid "Euclidean (L2)"
+msgstr ""
+
+#: src/otherwindow.c:2241
+msgid "Gamut"
+msgstr ""
+
+#: src/otherwindow.c:2241
+msgid "Weakly"
+msgstr ""
+
+#: src/otherwindow.c:2241
+msgid "Strongly"
+msgstr ""
+
+#: src/otherwindow.c:2242
+msgid "Off"
+msgstr ""
+
+#: src/otherwindow.c:2242
+msgid "Separate/Sum"
+msgstr ""
+
+#: src/otherwindow.c:2242
+msgid "Separate/Split"
+msgstr ""
+
+#: src/otherwindow.c:2243
+msgid "Length/Sum"
+msgstr ""
+
+#: src/otherwindow.c:2243
+msgid "Length/Split"
+msgstr ""
+
+#: src/otherwindow.c:2250
+msgid "Create Quantized"
+msgstr ""
+
+#: src/otherwindow.c:2250
+msgid "Convert To Indexed"
+msgstr ""
+
+#: src/otherwindow.c:2259
+msgid "Indexed Colours To Use"
+msgstr ""
+
+#: src/otherwindow.c:2282
+msgid "Truncate palette"
+msgstr ""
+
+#: src/otherwindow.c:2283
+msgid "Diameter based weighting"
+msgstr ""
+
+#: src/otherwindow.c:2294
+msgid "Dither"
+msgstr ""
+
+#: src/otherwindow.c:2299
+msgid "Colour space"
+msgstr ""
+
+#: src/otherwindow.c:2302
+msgid "Difference measure"
+msgstr ""
+
+#: src/otherwindow.c:2305
+msgid "Reduce colour bleed"
+msgstr ""
+
+#: src/otherwindow.c:2307
+msgid "Serpentine scan"
+msgstr ""
+
+#: src/otherwindow.c:2310
+msgid "Error propagation, %"
+msgstr ""
+
+#: src/otherwindow.c:2311
+msgid "Selective error propagation"
+msgstr ""
+
+#: src/otherwindow.c:2320
+msgid "Full error precision"
+msgstr ""
+
+#: src/otherwindow.c:2677
+msgid "Edit Gradient"
+msgstr "Színátmenet szerkesztése"
+
+#: src/otherwindow.c:2700
+msgid "Backward HSV"
+msgstr ""
+
+#: src/otherwindow.c:2701 src/otherwindow.c:2717
+msgid "Constant"
+msgstr "Konstans"
+
+#: src/otherwindow.c:2723
+msgid "Points:"
+msgstr "Pont:"
+
+#: src/otherwindow.c:2886 src/toolbar.c:314
+msgid "Reverse"
+msgstr "Fordított"
+
+#: src/otherwindow.c:2887
+msgid "Edit Custom"
+msgstr ""
+
+#: src/otherwindow.c:2904
+msgid "Linear"
+msgstr "Lineáris"
+
+#: src/otherwindow.c:2904
+msgid "Radial"
+msgstr "Sugaras"
+
+#: src/otherwindow.c:2904
+msgid "Square"
+msgstr "Négyzetes"
+
+#: src/otherwindow.c:2905
+msgid "Angular"
+msgstr "Szögletes"
+
+#: src/otherwindow.c:2905
+msgid "Conical"
+msgstr "Kúpos"
+
+#: src/otherwindow.c:2906
+msgid "Level"
+msgstr "Szint"
+
+#: src/otherwindow.c:2906
+msgid "Repeat"
+msgstr "Ismétlés"
+
+#: src/otherwindow.c:2906
+msgid "Mirror"
+msgstr "Tükrözés"
+
+#: src/otherwindow.c:2907
+msgid "A to B"
+msgstr "A-ból B-be"
+
+#: src/otherwindow.c:2907
+msgid "A to B (RGB)"
+msgstr "A-ból B-be (RGB)"
+
+#: src/otherwindow.c:2907
+msgid "A to B (HSV)"
+msgstr "A-ból B-be (HSV)"
+
+#: src/otherwindow.c:2908
+msgid "A to B (backward HSV)"
+msgstr "A-ból B-be (fordított HSV)"
+
+#: src/otherwindow.c:2908
+msgid "A only"
+msgstr "Csak A"
+
+#: src/otherwindow.c:2908 src/otherwindow.c:2909
+msgid "Custom"
+msgstr "Egyéni"
+
+#: src/otherwindow.c:2909
+msgid "Current to 0"
+msgstr ""
+
+#: src/otherwindow.c:2909
+msgid "Current only"
+msgstr "Csak a jelenlegi"
+
+#: src/otherwindow.c:2920
+msgid "Configure Gradient"
+msgstr "Színátmenet beállítása"
+
+#: src/otherwindow.c:2928 src/png.c:731
+msgid "Channel"
+msgstr "Csatorna"
+
+#: src/otherwindow.c:2933
+msgid "Length"
+msgstr "Hossz"
+
+#: src/otherwindow.c:2935
+msgid "Repeat length"
+msgstr ""
+
+#: src/otherwindow.c:2939
+msgid "Gradient type"
+msgstr "Átmenet típus"
+
+#: src/otherwindow.c:2941
+msgid "Extension type"
+msgstr "Kiterjesztés típus"
+
+#: src/otherwindow.c:2947
+msgid "Preview opacity"
+msgstr ""
+
+#: src/otherwindow.c:3075
+msgid "At distance"
+msgstr ""
+
+#: src/otherwindow.c:3076
+msgid "Horizontal "
+msgstr "Vízszintesi"
+
+#: src/otherwindow.c:3077
+msgid "Vertical"
+msgstr "Függőleges"
+
+#: src/otherwindow.c:3162
+msgid "Unchanged"
+msgstr ""
+
+#: src/otherwindow.c:3167
+msgid "Tracing Image"
+msgstr ""
+
+#: src/otherwindow.c:3179
+msgid "Source"
+msgstr "Forrás"
+
+#: src/otherwindow.c:3181
+msgid "Origin"
+msgstr "Kezdet"
+
+#: src/otherwindow.c:3182
+msgid "Relative scale"
+msgstr ""
+
+#: src/otherwindow.c:3193
+msgid "Display"
+msgstr ""
+
+#: src/png.c:392
+#, c-format
+msgid "Saving %s image"
+msgstr "%s kép mentése"
+
+#: src/png.c:392
+#, c-format
+msgid "Loading %s image"
+msgstr "%s kép betöltése"
+
+#: src/png.c:728
+msgid "Layer"
+msgstr "Réteg"
+
+#: src/png.c:4158
+msgid "This is an animated GIF file.  What do you want to do?"
+msgstr "Ez egy animált GIF fájl.  Mit szeretne csinálni?"
+
+#: src/png.c:4159
+msgid "Edit Frames"
+msgstr ""
+
+#: src/png.c:4161
+msgid "View Animation"
+msgstr "Animáció megtekintése"
+
+#: src/png.c:4350
+#, c-format
+msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
+msgstr ""
+
+#: src/png.c:4536
+msgid ""
+"I am unable to find the documentation.  Either you need to download the "
+"mtPaint Handbook from the web site and install it, or you need to set the "
+"correct location in the Preferences window."
+msgstr ""
+
+#: src/png.c:4568
+msgid ""
+"There was a problem running the HTML browser.  You need to set the correct "
+"program name in the Preferences window."
+msgstr ""
+"Probléma történt a HTML böngésző futtatásakor.  Állítsa be a megfelelő "
+"program nevét a Beállítások ablakban."
+
+#: src/prefs.c:145
+msgid "Pressure"
+msgstr "Nyomás"
+
+#: src/prefs.c:153
+msgid "Current Device"
+msgstr "Aktuális eszköz"
+
+#: src/prefs.c:402
+msgid "Default System Language"
+msgstr "Alapértelmezett rendszer nyelv"
+
+#: src/prefs.c:403
+msgid "Chinese (Simplified)"
+msgstr "Kínai (egyszerűsített)"
+
+#: src/prefs.c:403
+msgid "Chinese (Taiwanese)"
+msgstr "Kínai (Taiwan)"
+
+#: src/prefs.c:404
+msgid "Czech"
+msgstr "Cseh"
+
+#: src/prefs.c:404
+msgid "Dutch"
+msgstr "Holland"
+
+#: src/prefs.c:404
+msgid "English (UK)"
+msgstr "Angol (UK)"
+
+#: src/prefs.c:404
+msgid "French"
+msgstr "Francia"
+
+#: src/prefs.c:405
+msgid "Galician"
+msgstr "Galíciai"
+
+#: src/prefs.c:405
+msgid "German"
+msgstr "Német"
+
+#: src/prefs.c:405
+msgid "Italian"
+msgstr "Olasz"
+
+#: src/prefs.c:405
+msgid "Japanese"
+msgstr "Japán"
+
+#: src/prefs.c:406
+msgid "Polish"
+msgstr "Lengyel"
+
+#: src/prefs.c:406
+msgid "Portuguese"
+msgstr "Portugál"
+
+#: src/prefs.c:406
+msgid "Portuguese (Brazilian)"
+msgstr "Portugál (Brazil)"
+
+#: src/prefs.c:407
+msgid "Russian"
+msgstr "Orosz"
+
+#: src/prefs.c:407
+msgid "Slovak"
+msgstr "Szlovák"
+
+#: src/prefs.c:407
+msgid "Spanish"
+msgstr "Spanyol"
+
+#: src/prefs.c:407
+msgid "Swedish"
+msgstr "Svéd"
+
+#: src/prefs.c:408
+msgid "Turkish"
+msgstr "Török"
+
+#: src/prefs.c:415
+msgid "XBM X hotspot"
+msgstr "XBM X hotspot"
+
+#: src/prefs.c:415
+msgid "XBM Y hotspot"
+msgstr "XBM Y hotspot"
+
+#: src/prefs.c:417
+msgid "Recently Used Files"
+msgstr "Legutóbb használt fájlok"
+
+#: src/prefs.c:418
+msgid "Progress bar silence limit"
+msgstr ""
+
+#: src/prefs.c:419
+msgid "Canvas Geometry"
+msgstr "Vászon geometria"
+
+#: src/prefs.c:419
+msgid "Cursor X,Y"
+msgstr "Kurzor X,Y"
+
+#: src/prefs.c:420
+msgid "Pixel [I] {RGB}"
+msgstr "Pixel [I] {RGB}"
+
+#: src/prefs.c:420
+msgid "Selection Geometry"
+msgstr "Kijelölés geometria"
+
+#: src/prefs.c:420
+msgid "Undo / Redo"
+msgstr "Visszavonás / Újra"
+
+#: src/prefs.c:421 src/toolbar.c:441
+msgid "Flow"
+msgstr ""
+
+#: src/prefs.c:428
+msgid "Preferences"
+msgstr "Beállítások"
+
+#: src/prefs.c:447
+msgid "Max memory used for undo (MB)"
+msgstr "Max memóriahasználat visszavonáshoz (MB)"
+
+#: src/prefs.c:448
+msgid "Max undo levels"
+msgstr "Max visszavonás szint"
+
+#: src/prefs.c:449
+msgid "Communal layer undo space (%)"
+msgstr ""
+
+#: src/prefs.c:457
+msgid "Use gamma correction by default"
+msgstr "Gammakorrekció használat alapértelmezetten"
+
+#: src/prefs.c:459
+msgid "Optimize alpha chequers"
+msgstr ""
+
+#: src/prefs.c:461
+msgid "Disable view window transparencies"
+msgstr ""
+
+#: src/prefs.c:469
+msgid ""
+"Select preferred language translation\n"
+"\n"
+"You will need to restart mtPaint\n"
+"for this to take full effect"
+msgstr ""
+"Válassza ki a kívánt nyelvi fordítást\n"
+"\n"
+"Az mtPaint újraindítása szükséges\n"
+"a teljes hatás elérése érdekében."
+
+#: src/prefs.c:480
+msgid "Language"
+msgstr "Nyelv"
+
+#: src/prefs.c:485
+msgid "Interface"
+msgstr "Felület"
+
+#: src/prefs.c:489
+msgid "Greyscale backdrop"
+msgstr "Szürkeárnyalatos háttér"
+
+#: src/prefs.c:490
+msgid "Selection nudge pixels"
+msgstr ""
+
+#: src/prefs.c:491
+msgid "Max Pan Window Size"
+msgstr ""
+
+#: src/prefs.c:498
+msgid "Display clipboard while pasting"
+msgstr ""
+
+#: src/prefs.c:500
+msgid "Mouse cursor = Tool"
+msgstr "Egérkurzor = Eszköz"
+
+#: src/prefs.c:502
+msgid "Confirm Exit"
+msgstr ""
+
+#: src/prefs.c:504
+msgid "Q key quits mtPaint"
+msgstr "Q billentyűvel kilép az mtPaint"
+
+#: src/prefs.c:506
+msgid "Changing tool commits paste"
+msgstr ""
+
+#: src/prefs.c:508
+msgid "Centre tool settings dialogs"
+msgstr ""
+
+#: src/prefs.c:510
+msgid "New image sets zoom to 100%"
+msgstr ""
+
+#: src/prefs.c:513
+msgid "Mouse Scroll Wheel = Zoom"
+msgstr "Egérgörgő = Nagyítás"
+
+#: src/prefs.c:515
+msgid "Use menu icons"
+msgstr ""
+
+#: src/prefs.c:520
+msgid "Files"
+msgstr "Fájlok"
+
+#: src/prefs.c:535
+msgid "Read 16-bit TGAs as 5:6:5 BGR"
+msgstr "16-bites TGA-k beolvasása 5:6:5 BGR-ként"
+
+#: src/prefs.c:536
+msgid "Write TGAs in bottom-up row order"
+msgstr "TGA-k írása lentről-fel sorrendben"
+
+#: src/prefs.c:537
+msgid "Undoable image loading"
+msgstr ""
+
+#: src/prefs.c:541
+msgid "Paths"
+msgstr "Utak"
+
+#: src/prefs.c:543
+msgid "Clipboard Files"
+msgstr "Vágólap fájlok"
+
+#: src/prefs.c:544
+msgid "Select Clipboard File"
+msgstr "Vágólapfájl kiválasztása"
+
+#: src/prefs.c:548
+msgid "HTML Browser Program"
+msgstr "HTML böngésző program"
+
+#: src/prefs.c:549
+msgid "Select Browser Program"
+msgstr "Böngésző program kiválasztása"
+
+#: src/prefs.c:553
+msgid "Location of Handbook index"
+msgstr "Kézikönyv index helye"
+
+#: src/prefs.c:554
+msgid "Select Handbook Index File"
+msgstr "Kézikönyv index fájl kiválasztása"
+
+#: src/prefs.c:558
+msgid "Default Palette"
+msgstr "Alapértelmezett paletta"
+
+#: src/prefs.c:559
+msgid "Select Default Palette"
+msgstr "Alapértelmezett paletta kiválasztása"
+
+#: src/prefs.c:563
+msgid "Default Patterns"
+msgstr "Alapértelmezett minták"
+
+#: src/prefs.c:564
+msgid "Select Default Patterns File"
+msgstr "Alapértelmezett mintafájlok kiválasztása"
+
+#: src/prefs.c:571
+msgid "Status Bar"
+msgstr "Állapotsor"
+
+#: src/prefs.c:580
+msgid "Tablet"
+msgstr "Tábla"
+
+#: src/prefs.c:584
+msgid "Device Settings"
+msgstr "Eszközbeállítások"
+
+#: src/prefs.c:592
+msgid "Configure Device"
+msgstr "Eszköz beállítása"
+
+#: src/prefs.c:598
+msgid "Tool Variable"
+msgstr "Eszközváltozó"
+
+#: src/prefs.c:600
+msgid "Factor"
+msgstr "Faktor"
+
+#: src/prefs.c:628
+msgid "Test Area"
+msgstr "Teszt terület"
+
+#: src/shifter.c:205
+msgid "Frames"
+msgstr "Keretek"
+
+#: src/shifter.c:271
+msgid "Palette Shifter"
+msgstr "Palettaváltó"
+
+#: src/shifter.c:281
+msgid "Start"
+msgstr "Start"
+
+#: src/shifter.c:283
+msgid "Finish"
+msgstr "Kész"
+
+#: src/shifter.c:332
+msgid "Fix Palette"
+msgstr ""
+
+#: src/spawn.c:369 src/spawn.c:421
+msgid "Action"
+msgstr "Művelet"
+
+#: src/spawn.c:369 src/spawn.c:421
+msgid "Command"
+msgstr "Parancs"
+
+#: src/spawn.c:376
+msgid "Configure File Actions"
+msgstr ""
+
+#: src/spawn.c:436
+msgid "Execute"
+msgstr "Végrehajtás"
+
+#: src/spawn.c:613
+#, c-format
+msgid "Error %i reported when trying to run %s"
+msgstr ""
+
+#: src/toolbar.c:235
+msgid "RGB Cube"
+msgstr "RGB kocka"
+
+#: src/toolbar.c:236
+msgid "By image channel"
+msgstr ""
+
+#: src/toolbar.c:237
+msgid "Gradient-driven"
+msgstr ""
+
+#: src/toolbar.c:238
+msgid "Fill settings"
+msgstr ""
+
+#: src/toolbar.c:255
+msgid "Respect opacity mode"
+msgstr ""
+
+#: src/toolbar.c:256
+msgid "Smudge settings"
+msgstr ""
+
+#: src/toolbar.c:276
+msgid "Brush spacing"
+msgstr ""
+
+#: src/toolbar.c:300
+msgid "Normal"
+msgstr "Normál"
+
+#: src/toolbar.c:301
+msgid "Colour"
+msgstr "Szín"
+
+#: src/toolbar.c:301
+msgid "Saturate More"
+msgstr ""
+
+#: src/toolbar.c:302
+msgid "Multiply"
+msgstr ""
+
+#: src/toolbar.c:302
+msgid "Divide"
+msgstr ""
+
+#: src/toolbar.c:302
+msgid "Screen"
+msgstr ""
+
+#: src/toolbar.c:302
+msgid "Dodge"
+msgstr ""
+
+#: src/toolbar.c:303
+msgid "Burn"
+msgstr ""
+
+#: src/toolbar.c:303
+msgid "Hard Light"
+msgstr ""
+
+#: src/toolbar.c:303
+msgid "Soft Light"
+msgstr ""
+
+#: src/toolbar.c:303
+msgid "Difference"
+msgstr ""
+
+#: src/toolbar.c:304
+msgid "Darken"
+msgstr ""
+
+#: src/toolbar.c:304
+msgid "Lighten"
+msgstr ""
+
+#: src/toolbar.c:304
+msgid "Grain Extract"
+msgstr ""
+
+#: src/toolbar.c:305
+msgid "Grain Merge"
+msgstr ""
+
+#: src/toolbar.c:325
+msgid "Blend mode"
+msgstr ""
+
+#: src/toolbar.c:424
+msgid "Continuous Mode"
+msgstr ""
+
+#: src/toolbar.c:425
+msgid "Opacity Mode"
+msgstr ""
+
+#: src/toolbar.c:426
+msgid "Tint Mode"
+msgstr ""
+
+#: src/toolbar.c:427
+msgid "Tint +-"
+msgstr ""
+
+#: src/toolbar.c:429
+msgid "Blend Mode"
+msgstr ""
+
+#: src/toolbar.c:430
+msgid "Disable All Masks"
+msgstr "Minden maszk tiltása"
+
+#: src/toolbar.c:434
+msgid "Gradient Mode"
+msgstr ""
+
+#: src/toolbar.c:460
+msgid "Settings Toolbar"
+msgstr ""
+
+#: src/toolbar.c:557
+msgid "Cut"
+msgstr "Kivágás"
+
+#: src/toolbar.c:558
+msgid "Copy"
+msgstr "Másolás"
+
+#: src/toolbar.c:559
+msgid "Paste"
+msgstr "Beillesztés"
+
+#: src/toolbar.c:561
+msgid "Undo"
+msgstr "Visszavonás"
+
+#: src/toolbar.c:562
+msgid "Redo"
+msgstr "Újra"
+
+#: src/toolbar.c:565 src/viewer.c:490
+msgid "Pan Window"
+msgstr ""
+
+#: src/toolbar.c:569
+msgid "Paint"
+msgstr "Festés"
+
+#: src/toolbar.c:570
+msgid "Shuffle"
+msgstr "Keverés"
+
+#: src/toolbar.c:571
+msgid "Flood Fill"
+msgstr "Kitöltés"
+
+#: src/toolbar.c:572
+msgid "Straight Line"
+msgstr "Egyenes vonal"
+
+#: src/toolbar.c:573
+msgid "Smudge"
+msgstr ""
+
+#: src/toolbar.c:574
+msgid "Clone"
+msgstr "Klón"
+
+#: src/toolbar.c:575
+msgid "Make Selection"
+msgstr "Kijelölés készítése"
+
+#: src/toolbar.c:576
+msgid "Polygon Selection"
+msgstr "Poligonkijelölés"
+
+#: src/toolbar.c:577
+msgid "Place Gradient"
+msgstr "Színátmenet elhelyezése"
+
+#: src/toolbar.c:579
+msgid "Lasso Selection"
+msgstr "Lassszókijelölés"
+
+#: src/toolbar.c:582
+msgid "Ellipse Outline"
+msgstr "Ellipszis körvonal"
+
+#: src/toolbar.c:583
+msgid "Filled Ellipse"
+msgstr "Ellipszis kitöltés"
+
+#: src/toolbar.c:584
+msgid "Outline Selection"
+msgstr "Kijelölés körberajzolása"
+
+#: src/toolbar.c:585
+msgid "Fill Selection"
+msgstr "Kijelölés kitöltése"
+
+#: src/toolbar.c:587
+msgid "Flip Selection Vertically"
+msgstr "Kijelölés tükrözése függőlegesen"
+
+#: src/toolbar.c:588
+msgid "Flip Selection Horizontally"
+msgstr "Kijelölés tükrözése vízszintesen"
+
+#: src/toolbar.c:589
+msgid "Rotate Selection Clockwise"
+msgstr "Kijelölés forgatása jobbra"
+
+#: src/toolbar.c:590
+msgid "Rotate Selection Anti-Clockwise"
+msgstr "Kijelőlés forgatása balra"
+
+#: src/viewer.c:135
+msgid "About"
+msgstr "Névjegy"

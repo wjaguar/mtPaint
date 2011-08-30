@@ -2200,7 +2200,7 @@ static int quantize_mode = -1, dither_mode = -1;
 static int quantize_tp;
 static int dither_cspace = CSPACE_SRGB, dither_dist = DIST_L2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
-static double dither_fract[2] = {1.0, 0.0};
+static double dither_fract[2] = {1.0, 0.85};
 
 static void click_quantize_radio(GtkWidget *widget, gpointer data)
 {

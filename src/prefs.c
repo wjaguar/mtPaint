@@ -75,15 +75,15 @@ float tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 20
+#define PREF_LANGS 21
 
 char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"zh_CN.utf8", "zh_TW.utf8",
 	"cs_CZ", "nl_NL", "en_GB", "fr_FR",
-	"gl_ES", "de_DE", "it_IT", "ja_JP.utf8",
-	"pl_PL", "pt_PT", "pt_BR",
-	"ru_RU", "sk_SK", "es_ES", "sv_SE",
-	"tl_PH", "tr_TR" };
+	"gl_ES", "de_DE", "hu_HU", "it_IT",
+	"ja_JP.utf8", "pl_PL", "pt_PT",
+	"pt_BR", "ru_RU", "sk_SK",
+	"es_ES", "sv_SE", "tl_PH", "tr_TR" };
 
 int pref_lang;
 
@@ -311,8 +311,7 @@ static void prefs_apply(GtkWidget *widget)
 
 	inifile_set_gboolean("centerSettings",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_center)));
-	inifile_set_gboolean("defaultGamma",
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_gamma)));
+	use_gamma = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_gamma));
 #if GTK_MAJOR_VERSION == 2
 	show_menu_icons = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_menuicons));
 #endif
@@ -432,10 +431,10 @@ void pressed_preferences()
 	char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 		_("Chinese (Simplified)"), _("Chinese (Taiwanese)"),
 		_("Czech"), _("Dutch"), _("English (UK)"), _("French"),
-		_("Galician"), _("German"), _("Italian"), _("Japanese"),
-		_("Polish"), _("Portuguese"), _("Portuguese (Brazilian)"),
-		_("Russian"), _("Slovak"), _("Spanish"), _("Swedish"),
-		_("Tagalog"), _("Turkish") };
+		_("Galician"), _("German"), _("Hungarian"), _("Italian"),
+		_("Japanese"), _("Polish"), _("Portuguese"),
+		_("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
+		_("Spanish"), _("Swedish"), _("Tagalog"), _("Turkish") };
 #endif
 
 
@@ -500,7 +499,7 @@ void pressed_preferences()
 	spinbutton_commundo = spin_to_table(table3, 2, 1, 5, mem_undo_common, 0, 100);
 
 	checkbutton_gamma = add_a_toggle(_("Use gamma correction by default"),
-		page, inifile_get_gboolean("defaultGamma", FALSE));
+		page, use_gamma);
 	checkbutton_zoom[2] = add_a_toggle( _("Optimize alpha chequers"),
 		page, chequers_optimize );
 	checkbutton_zoom[3] = add_a_toggle( _("Disable view window transparencies"),

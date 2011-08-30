@@ -1980,8 +1980,7 @@ void *bound_malloc(GtkWidget *widget, int size)
 
 GtkWidget *gamma_toggle()
 {
-	return (sig_toggle(_("Gamma corrected"),
-		inifile_get_gboolean("defaultGamma", FALSE), NULL, NULL));
+	return (sig_toggle(_("Gamma corrected"), use_gamma, NULL, NULL));
 }
 
 // Render stock icons to pixmaps

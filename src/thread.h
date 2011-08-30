@@ -43,8 +43,6 @@ typedef void (*thread_func)(tcb *thread);
 //	Configure max number of threads to launch
 int maxthreads;
 
-//	Estimate how many threads is enough for image
-int image_threads(int w, int h);
 //	Prepare memory structures for threads' use
 threaddata *talloc(int flags, int tmax, void *data, int dsize, ...);
 //	Launch threads and wait for their exiting
@@ -55,6 +53,8 @@ void launch_threads(thread_func thread, threaddata *tdata, char *title, int tota
 //	Show threading status
 int threads_running;
 
+//	Estimate how many threads is enough for image
+int image_threads(int w, int h);
 //	Update progressbar from main thread
 int thread_progress(tcb *thread);
 
@@ -83,6 +83,8 @@ static inline void thread_done(tcb *thread)
 	if (threads_running) g_static_mutex_unlock(&name)
 
 #else /* Only one actual thread */
+
+#define image_threads(w,h) 1
 
 static inline int thread_step(tcb *thread, int i, int tlim, int steps)
 {

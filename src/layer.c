@@ -1142,9 +1142,14 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	}
 
 	layers_notify_changed();
-	if (l == layer_selected) layer_show_position();
+	if (l == layer_selected)
+	{
+		layer_show_position();
+		// All layers get moved while the current one stays still
+		if (show_layers_main) update_stuff(UPD_RENDER);
+	}
+	else if (show_layers_main) main_update_area(lx, ly, lw, lh);
 	vw_update_area(lx, ly, lw, lh);
-	if (show_layers_main) main_update_area(lx, ly, lw, lh);
 }
 
 #undef _

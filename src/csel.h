@@ -69,6 +69,7 @@ int ungamma65281(double v);
 
 double rgb2B(double r, double g, double b);
 void rgb2LXN(double *tmp, double r, double g, double b);
+//void rgb2Lab(double *tmp, double r, double g, double b);
 void init_cols();
 void get_lxn(double *lxn, int col);
 

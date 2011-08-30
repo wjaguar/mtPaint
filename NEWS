@@ -7,6 +7,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 3.40	2011-?-?
 
 	* Tagalog translation added by Anjelo delCarmen
+	* Hungarian translation added by Ur Balazs
 	* Czech translation updated by Roman Hornik
 	* German translation updated by B. Clausius
 	* Italian translation updated by Angelo Gemmi
@@ -58,6 +59,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Command line globbing now possible using -w option, e.g. mtpaint -w "*.jpg"
 	* Loading default settings from /etc/mtpaint/mtpaintrc is now supported in Windows version
 	* Name and location of user settings file is now configurable : See handbook section A.6.4 for details
+	* "Smart grid" and gamma correction are now enabled by default
+	* "Selective error propagation" for dithering is now at 85% by default
 	* Drawing and fill tools now are 2-3 times faster
 	* Support for compiling with libpng 1.4, libjpeg 8a, and zlib 1.2.5 added
 	* Configure script rewritten, now understands standard variables and options for installation paths and (cross-)compilation settings
@@ -67,6 +70,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should
 	* BUGFIX - Layers list now correctly displays selected layer after loading layers file
 	* BUGFIX - Layers window now correctly displays transparent colour after it has been modified elsewhere
+	* BUGFIX - Other layers shown on canvas are now redrawn properly when current layer is moved
 	* BUGFIX - Loading TIFF files with X or Y mirroring doesn't cause crash
 	* BUGFIX - Planar TIFF files with alpha now load properly
 	* BUGFIX - Transparency in indexed TGA files is now read properly

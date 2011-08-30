@@ -295,7 +295,7 @@ GtkWidget *main_window, *main_split,
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit;
-int	files_passed, drag_index_vals[2], cursor_corner, show_dock;
+int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
 char **file_args;
 
 extern char mem_clip_file[];
