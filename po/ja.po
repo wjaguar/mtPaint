@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-02-15 16:36+0300\n"
+"POT-Creation-Date: 2011-10-17 19:43+0400\n"
 "PO-Revision-Date: 2009-06-09 12:48+0900\n"
 "Last-Translator: YoN <yon8844@gmail.com>\n"
 "Language-Team: Puppy Linux Japanese\n"
@@ -15,524 +15,470 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Rosetta-Version: 0.1\n"
 
-#: src/ani.c:676
+#: src/ani.c:673
 msgid "Animation Preview"
 msgstr "アニメーションプレビュー"
 
-#: src/ani.c:685
-#: src/shifter.c:307
+#: src/ani.c:682 src/shifter.c:305
 msgid "Play"
 msgstr "再生"
 
-#: src/ani.c:698
+#: src/ani.c:695
 msgid "Fix"
 msgstr "固定"
 
-#: src/ani.c:703
-#: src/ani.c:1162
-#: src/font.c:1874
-#: src/font.c:1894
-#: src/shifter.c:342
-#: src/viewer.c:210
+#: src/ani.c:700 src/ani.c:1144 src/font.c:1826 src/font.c:1843
+#: src/shifter.c:340 src/viewer.c:205
 msgid "Close"
 msgstr "閉じる"
 
-#: src/ani.c:759
-#: src/ani.c:864
-#: src/ani.c:1045
-#: src/ani.c:1052
-#: src/canvas.c:338
-#: src/canvas.c:621
-#: src/canvas.c:900
-#: src/canvas.c:1313
-#: src/canvas.c:1340
-#: src/canvas.c:1355
-#: src/canvas.c:1359
-#: src/canvas.c:1366
-#: src/canvas.c:1811
-#: src/canvas.c:1838
-#: src/canvas.c:1844
-#: src/canvas.c:1912
-#: src/canvas.c:1994
-#: src/canvas.c:2011
-#: src/font.c:1364
-#: src/fpick.c:867
-#: src/fpick.c:991
-#: src/layer.c:654
-#: src/layer.c:784
-#: src/layer.c:951
-#: src/mainwindow.c:276
-#: src/mainwindow.c:304
-#: src/mainwindow.c:533
-#: src/mainwindow.c:577
-#: src/mainwindow.c:603
-#: src/otherwindow.c:1005
-#: src/otherwindow.c:1054
-#: src/otherwindow.c:1056
-#: src/png.c:4535
-#: src/png.c:4567
-#: src/spawn.c:615
-#: src/viewer.c:1341
+#: src/ani.c:755 src/ani.c:857 src/ani.c:1038 src/ani.c:1044 src/canvas.c:368
+#: src/canvas.c:650 src/canvas.c:924 src/canvas.c:1267 src/canvas.c:1297
+#: src/canvas.c:1399 src/canvas.c:1416 src/canvas.c:1961 src/canvas.c:1966
+#: src/canvas.c:2036 src/canvas.c:2114 src/canvas.c:2130 src/font.c:1316
+#: src/fpick.c:732 src/fpick.c:856 src/layer.c:639 src/layer.c:893
+#: src/layer.c:1057 src/mainwindow.c:274 src/mainwindow.c:302
+#: src/mainwindow.c:531 src/mainwindow.c:575 src/mainwindow.c:601
+#: src/otherwindow.c:1072 src/otherwindow.c:1122 src/otherwindow.c:1124
+#: src/spawn.c:734 src/spawn.c:788 src/spawn.c:819 src/thread.c:321
+#: src/viewer.c:1335
 msgid "Error"
 msgstr "エラー"
 
-#: src/ani.c:759
+#: src/ani.c:755
 msgid "Unable to create output directory"
 msgstr "出力ディレクトリを作成できません"
 
-#: src/ani.c:760
-#: src/ani.c:864
-#: src/ani.c:1046
-#: src/ani.c:1053
-#: src/canvas.c:339
-#: src/canvas.c:623
-#: src/canvas.c:901
-#: src/canvas.c:1313
-#: src/canvas.c:1341
-#: src/canvas.c:1355
-#: src/canvas.c:1360
-#: src/canvas.c:1366
-#: src/canvas.c:1811
-#: src/canvas.c:1839
-#: src/canvas.c:1845
-#: src/canvas.c:1912
-#: src/canvas.c:1995
-#: src/canvas.c:2012
-#: src/channels.c:278
-#: src/channels.c:336
-#: src/font.c:1364
-#: src/fpick.c:867
-#: src/fpick.c:991
-#: src/fpick.c:1304
-#: src/info.c:436
-#: src/layer.c:654
-#: src/layer.c:784
-#: src/layer.c:796
-#: src/layer.c:952
-#: src/mainwindow.c:277
-#: src/mainwindow.c:304
-#: src/mainwindow.c:533
-#: src/mainwindow.c:577
-#: src/mainwindow.c:603
-#: src/otherwindow.c:466
-#: src/otherwindow.c:606
-#: src/otherwindow.c:949
-#: src/otherwindow.c:1006
-#: src/otherwindow.c:1054
-#: src/otherwindow.c:1056
-#: src/otherwindow.c:1183
-#: src/otherwindow.c:1399
-#: src/otherwindow.c:2326
-#: src/otherwindow.c:2756
-#: src/otherwindow.c:2964
-#: src/otherwindow.c:3100
-#: src/otherwindow.c:3199
-#: src/png.c:4352
-#: src/png.c:4537
-#: src/png.c:4569
-#: src/prefs.c:660
-#: src/spawn.c:434
-#: src/spawn.c:615
-#: src/viewer.c:1342
-msgid "OK"
-msgstr "OK"
-
-#: src/ani.c:816
+#: src/ani.c:809
 msgid "Creating Animation Frames"
 msgstr "アニメーションフレームを作成中"
 
-#: src/ani.c:864
+#: src/ani.c:857
 msgid "Unable to save image"
 msgstr "イメージを保存できません"
 
-#: src/ani.c:898
-#: src/fpick.c:969
-#: src/layer.c:434
-#: src/layer.c:509
-#: src/layer.c:796
-#: src/layer.c:816
-#: src/mainwindow.c:308
-#: src/mainwindow.c:1074
-#: src/png.c:4158
-#: src/png.c:4352
+#: src/ani.c:890 src/fpick.c:834 src/layer.c:422 src/layer.c:497
+#: src/layer.c:904 src/layer.c:918 src/mainwindow.c:306 src/mainwindow.c:1120
+#: src/png.c:6729
 msgid "Warning"
 msgstr "警告"
 
-#: src/ani.c:898
-msgid "Do you really want to clear all of the position and cycle data for all of the layers?"
+#: src/ani.c:890
+msgid ""
+"Do you really want to clear all of the position and cycle data for all of "
+"the layers?"
 msgstr "本当に、全レイヤの位置とサイクルデータをすべてクリアしますか？"
 
-#: src/ani.c:898
-#: src/fpick.c:969
-#: src/layer.c:434
-#: src/layer.c:816
-#: src/mainwindow.c:308
+#: src/ani.c:891 src/fpick.c:834 src/layer.c:422 src/layer.c:920
+#: src/mainwindow.c:306
 msgid "No"
 msgstr "いいえ"
 
-#: src/ani.c:898
-#: src/fpick.c:969
-#: src/layer.c:434
-#: src/layer.c:816
-#: src/mainwindow.c:308
+#: src/ani.c:891 src/fpick.c:834 src/layer.c:422 src/layer.c:920
+#: src/mainwindow.c:306
 msgid "Yes"
 msgstr "はい"
 
-#: src/ani.c:1000
+#: src/ani.c:993
 msgid "Set Key Frame"
 msgstr "キーフレームの設定"
 
-#: src/ani.c:1045
+#: src/ani.c:1038
 msgid "You must have at least 2 layers to create an animation"
 msgstr "アニメーションを作るには２つ以上のレイヤが必要です"
 
-#: src/ani.c:1052
+#: src/ani.c:1044
 msgid "You must save your layers file before creating an animation"
 msgstr "アニメーションを作る前にレイヤを保存して下さい"
 
-#: src/ani.c:1063
+#: src/ani.c:1054
 msgid "Configure Animation"
 msgstr "アニメーション設定"
 
-#: src/ani.c:1074
+#: src/ani.c:1064
 msgid "Output Files"
 msgstr "出力ファイル"
 
-#: src/ani.c:1077
+#: src/ani.c:1067
 msgid "Start frame"
 msgstr "フレームの開始"
 
-#: src/ani.c:1078
+#: src/ani.c:1068
 msgid "End frame"
 msgstr "フレームの終了"
 
-#: src/ani.c:1080
-#: src/shifter.c:285
+#: src/ani.c:1070 src/shifter.c:283
 msgid "Delay"
 msgstr "遅延"
 
-#: src/ani.c:1081
+#: src/ani.c:1071
 msgid "Output path"
 msgstr "出力パス"
 
-#: src/ani.c:1082
+#: src/ani.c:1072
 msgid "File prefix"
 msgstr "ファイル プレフィックス"
 
-#: src/ani.c:1110
+#: src/ani.c:1092
 msgid "Create GIF frames"
 msgstr "GIFフレームを作成"
 
-#: src/ani.c:1116
+#: src/ani.c:1098
 msgid "Positions"
 msgstr "位置"
 
-#: src/ani.c:1153
+#: src/ani.c:1135
 msgid "Cycling"
 msgstr "循環"
 
-#: src/ani.c:1166
+#: src/ani.c:1148
 msgid "Save"
 msgstr "保存"
 
-#: src/ani.c:1169
-#: src/font.c:1814
-#: src/otherwindow.c:934
-#: src/otherwindow.c:1406
-#: src/otherwindow.c:1959
+#: src/ani.c:1151 src/font.c:1766 src/otherwindow.c:1001
+#: src/otherwindow.c:1475 src/otherwindow.c:2079 src/otherwindow.c:3548
 msgid "Preview"
 msgstr "プレビュー"
 
-#: src/ani.c:1172
-#: src/shifter.c:337
+#: src/ani.c:1154 src/shifter.c:335
 msgid "Create Frames"
 msgstr "フレームの作成"
 
-#: src/canvas.c:339
+#: src/canvas.c:369
 msgid "The image is too large to transform."
 msgstr "イメージは変換するには大きすぎます。"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "MT"
 msgstr "MT"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Sobel"
 msgstr "Sobel"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Prewitt"
 msgstr "Prewitt"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Kirsch"
 msgstr "Kirsch"
 
-#: src/canvas.c:370
-#: src/otherwindow.c:1843
-#: src/otherwindow.c:2882
+#: src/canvas.c:400 src/otherwindow.c:1964 src/otherwindow.c:2996
+#: src/otherwindow.c:3124
 msgid "Gradient"
 msgstr "グラデーション"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Roberts"
 msgstr "Roberts"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Laplace"
 msgstr "Laplace"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Morphological"
 msgstr "形態学的"
 
-#: src/canvas.c:375
+#: src/canvas.c:405
 msgid "Edge Detect"
 msgstr "境界検出"
 
-#: src/canvas.c:393
+#: src/canvas.c:423
 msgid "Edge Sharpen"
 msgstr "縁をシャープにする"
 
-#: src/canvas.c:399
+#: src/canvas.c:429
 msgid "Edge Soften"
 msgstr "縁をぼかす"
 
-#: src/canvas.c:451
+#: src/canvas.c:481
 msgid "Different X/Y"
 msgstr "X/Yの違い"
 
-#: src/canvas.c:455
-#: src/memory.c:6935
+#: src/canvas.c:485 src/memory.c:7541
 msgid "Gaussian Blur"
 msgstr "ガウスぼかし"
 
-#: src/canvas.c:493
+#: src/canvas.c:523
 msgid "Radius"
 msgstr "放射状"
 
-#: src/canvas.c:494
+#: src/canvas.c:524
 msgid "Amount"
 msgstr "量"
 
-#: src/canvas.c:495
+#: src/canvas.c:525
 msgid "Threshold "
 msgstr "しきい値"
 
-#: src/canvas.c:497
-#: src/memory.c:7083
+#: src/canvas.c:527 src/memory.c:7710
 msgid "Unsharp Mask"
 msgstr "アンシャープマスク"
 
-#: src/canvas.c:537
+#: src/canvas.c:563
 msgid "Outer radius"
 msgstr "外半径"
 
-#: src/canvas.c:538
+#: src/canvas.c:564
 msgid "Inner radius"
 msgstr "内半径"
 
-#: src/canvas.c:539
-#: src/info.c:379
+#: src/canvas.c:565 src/info.c:363
 msgid "Normalize"
 msgstr "標準化"
 
-#: src/canvas.c:541
-#: src/memory.c:7261
+#: src/canvas.c:567 src/memory.c:7882
 msgid "Difference of Gaussians"
 msgstr "ガウスの差異"
 
-#: src/canvas.c:567
+#: src/canvas.c:594
+msgid "Protect details"
+msgstr ""
+
+#: src/canvas.c:596
 msgid "Kuwahara-Nagao Blur"
 msgstr "Kuwahara-Nagaoぼかし"
 
-#: src/canvas.c:622
+#: src/canvas.c:651
 msgid "The image is too large for this rotation."
 msgstr "イメージはこの回転には大きすぎます。"
 
-#: src/canvas.c:640
+#: src/canvas.c:668
 msgid "Smooth"
 msgstr "平滑"
 
-#: src/canvas.c:642
+#: src/canvas.c:670
 msgid "Free Rotate"
 msgstr "自由回転"
 
-#: src/canvas.c:900
-#: src/viewer.c:1341
+#: src/canvas.c:924 src/viewer.c:1335
 msgid "Not enough memory to create clipboard"
 msgstr "クリップボードを作成するにメモリが足りません"
 
-#: src/canvas.c:1313
+#: src/canvas.c:1267
+msgid "Invalid palette file"
+msgstr ""
+
+#: src/canvas.c:1297
 msgid "Invalid channel file."
 msgstr "無効なチャンネルファイルです。"
 
-#: src/canvas.c:1340
-msgid "Cannot open file"
-msgstr "ファイルを開けません"
+#: src/canvas.c:1311
+msgid "Raw frames"
+msgstr ""
 
-#: src/canvas.c:1341
-msgid "Unsupported file format"
-msgstr "サポートされていないファイルフォーマットです"
+#: src/canvas.c:1311
+msgid "Composited frames"
+msgstr ""
 
-#: src/canvas.c:1354
+#: src/canvas.c:1312
+msgid "Composited frames with nonzero delay"
+msgstr ""
+
+#: src/canvas.c:1313
+msgid "Load First Frame"
+msgstr ""
+
+#: src/canvas.c:1313
+msgid "Explode Frames"
+msgstr ""
+
+#: src/canvas.c:1315
+msgid "View Animation"
+msgstr "アニメーションを表示"
+
+#: src/canvas.c:1332
+msgid "Load Frames"
+msgstr ""
+
+#: src/canvas.c:1336
+#, c-format
+msgid "This is an animated %s file."
+msgstr "これは%sアニメファイルです。"
+
+#: src/canvas.c:1337
+#, c-format
+msgid "This is a multipage %s file."
+msgstr ""
+
+#: src/canvas.c:1345
+msgid "Load into Layers"
+msgstr ""
+
+#: src/canvas.c:1388
 #, c-format
 msgid "File is too big, must be <= to width=%i height=%i"
 msgstr "フィルが大きすぎます。幅=%i 高さ=%i 以下にして下さい"
 
-#: src/canvas.c:1359
+#: src/canvas.c:1390
+msgid "Unable to explode frames"
+msgstr ""
+
+#: src/canvas.c:1392
 msgid "Unable to load file"
 msgstr "ファイルを読み込めません"
 
-#: src/canvas.c:1366
-msgid "The file import library had to terminate due to a problem with the file (possibly corrupt image data or a truncated file). I have managed to load some data as the header seemed fine, but I would suggest you save this image to a new file to ensure this does not happen again."
-msgstr "ファイルに問題があるのでファイルインポートライブラリは終了します（たぶん不正な画像データまたは不完全なファイルです）。ヘッダが間違いないようでしたので、いくつかのデータをロードできました。しかし二度と起こらないように、このイメージを新しいファイルに保存して下さい。"
+#: src/canvas.c:1394
+msgid ""
+"The file import library had to terminate due to a problem with the file "
+"(possibly corrupt image data or a truncated file). I have managed to load "
+"some data as the header seemed fine, but I would suggest you save this image "
+"to a new file to ensure this does not happen again."
+msgstr ""
+"ファイルに問題があるのでファイルインポートライブラリは終了します（たぶん不正"
+"な画像データまたは不完全なファイルです）。ヘッダが間違いないようでしたので、"
+"いくつかのデータをロードできました。しかし二度と起こらないように、このイメー"
+"ジを新しいファイルに保存して下さい。"
 
-#: src/canvas.c:1410
+#: src/canvas.c:1396
+msgid "The animation is too long to load all of it into layers."
+msgstr ""
+
+#: src/canvas.c:1398
+msgid "Could not explode all the frames in the animation."
+msgstr ""
+
+#: src/canvas.c:1416
+msgid "Cannot open file"
+msgstr "ファイルを開けません"
+
+#: src/canvas.c:1417
+msgid "Unsupported file format"
+msgstr "サポートされていないファイルフォーマットです"
+
+#: src/canvas.c:1523
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
 msgstr "ファイル：%s はすでに存在します。上書きしますか？"
 
-#: src/canvas.c:1411
+#: src/canvas.c:1524
 msgid "File Found"
 msgstr "ファイルが見つかりました"
 
-#: src/canvas.c:1411
-#: src/mainwindow.c:1116
+#: src/canvas.c:1524 src/mainwindow.c:1164
 msgid "NO"
 msgstr "いいえ"
 
-#: src/canvas.c:1411
-#: src/mainwindow.c:1116
+#: src/canvas.c:1524 src/mainwindow.c:1164
 msgid "YES"
 msgstr "はい"
 
-#: src/canvas.c:1449
-#: src/prefs.c:415
+#: src/canvas.c:1562 src/prefs.c:444
 msgid "Transparency index"
 msgstr "透明度指数"
 
-#: src/canvas.c:1449
-#: src/prefs.c:416
+#: src/canvas.c:1562 src/prefs.c:445
 msgid "JPEG Save Quality (100=High)"
 msgstr "JPEG 保存品質 (100=高い)"
 
-#: src/canvas.c:1450
-#: src/prefs.c:417
+#: src/canvas.c:1563 src/prefs.c:446
 msgid "PNG Compression (0=None)"
 msgstr "PNG 圧縮 (0=なし)"
 
-#: src/canvas.c:1450
-#: src/prefs.c:534
+#: src/canvas.c:1563 src/prefs.c:578
 msgid "TGA RLE Compression"
 msgstr "TGA RLE 圧縮"
 
-#: src/canvas.c:1451
-#: src/prefs.c:416
+#: src/canvas.c:1564 src/prefs.c:445
 msgid "JPEG2000 Compression (0=Lossless)"
 msgstr "JPEG2000 圧縮 (0=可逆)"
 
-#: src/canvas.c:1452
+#: src/canvas.c:1565
 msgid "Hotspot at X ="
 msgstr "X = のホットスポット"
 
-#: src/canvas.c:1452
+#: src/canvas.c:1565
 msgid "Y ="
 msgstr "Y ="
 
-#: src/canvas.c:1474
-#: src/canvas.c:1536
+#: src/canvas.c:1587 src/canvas.c:1648
 msgid "File Format"
 msgstr "ファイル フォーマット"
 
-#: src/canvas.c:1562
-#: src/otherwindow.c:302
+#: src/canvas.c:1677 src/canvas.c:1686 src/otherwindow.c:293
 msgid "Undoable"
 msgstr "取り消し可能"
 
-#: src/canvas.c:1583
+#: src/canvas.c:1678 src/prefs.c:583
+msgid "Apply colour profile"
+msgstr ""
+
+#: src/canvas.c:1710
 msgid "Animation delay"
 msgstr "アニメーション遅延"
 
-#: src/canvas.c:1810
-#, c-format
-msgid "File: %s invalid - palette not updated"
-msgstr "ファイル：%s は無効です - パレットは更新されません"
-
-#: src/canvas.c:1838
+#: src/canvas.c:1961
 msgid "Unable to export undo images"
 msgstr "アンドゥイメージをエクスポートできません"
 
-#: src/canvas.c:1844
+#: src/canvas.c:1966
 msgid "Unable to export ASCII file"
 msgstr "ASCIIファイルをエクスポートできません"
 
-#: src/canvas.c:1911
-#: src/layer.c:783
-#: src/mainwindow.c:526
+#: src/canvas.c:2035 src/layer.c:892 src/mainwindow.c:524
 #, c-format
 msgid "Unable to save file: %s"
 msgstr "ファイルを保存できません：%s"
 
-#: src/canvas.c:1970
-#: src/toolbar.c:554
+#: src/canvas.c:2090 src/toolbar.c:1038
 msgid "Load Image File"
 msgstr "イメージファイルをロード"
 
-#: src/canvas.c:1974
-#: src/toolbar.c:555
+#: src/canvas.c:2094 src/toolbar.c:1039
 msgid "Save Image File"
 msgstr "イメージファイルを保存"
 
-#: src/canvas.c:1977
+#: src/canvas.c:2097
 msgid "Load Palette File"
 msgstr "パレットをロード"
 
-#: src/canvas.c:1981
+#: src/canvas.c:2101
 msgid "Save Palette File"
 msgstr "パレットファイルを保存"
 
-#: src/canvas.c:1985
+#: src/canvas.c:2105
 msgid "Export Undo Images"
 msgstr "アンドゥイメージのエクスポート"
 
-#: src/canvas.c:1989
+#: src/canvas.c:2109
 msgid "Export Undo Images (reversed)"
 msgstr "アンドゥイメージを（反転して）エクスポート"
 
-#: src/canvas.c:1994
+#: src/canvas.c:2114
 msgid "You must have 16 or fewer palette colours to export ASCII art."
 msgstr "ASCIIアートにエクスポートするには16色以下のパレット色が必要です。"
 
-#: src/canvas.c:1998
+#: src/canvas.c:2117
 msgid "Export ASCII Art"
 msgstr "ASCIIアートをエクスポート"
 
-#: src/canvas.c:2002
+#: src/canvas.c:2121
 msgid "Save Layer Files"
 msgstr "レイヤファイルを保存"
 
-#: src/canvas.c:2005
+#: src/canvas.c:2124
 msgid "Choose frames directory"
 msgstr "フレームディレクトリを選択"
 
-#: src/canvas.c:2011
+#: src/canvas.c:2130
 msgid "You must save at least one frame to create an animated GIF."
 msgstr "アニメGIFを作るには少なくとも１つのフレームを保存して下さい。"
 
-#: src/canvas.c:2015
+#: src/canvas.c:2133
 msgid "Export GIF animation"
 msgstr "GIFアニメをエクスポート"
 
-#: src/canvas.c:2018
+#: src/canvas.c:2136
 msgid "Load Channel"
 msgstr "チャンネルをロード"
 
-#: src/canvas.c:2022
+#: src/canvas.c:2140
 msgid "Save Channel"
 msgstr "チャンネルを保存"
 
-#: src/canvas.c:2025
+#: src/canvas.c:2143
 msgid "Save Composite Image"
 msgstr "合成イメージを保存"
 
@@ -564,18 +510,15 @@ msgstr "綠色イメージ"
 msgid "Image Blue"
 msgstr "青色イメージ"
 
-#: src/channels.c:244
-#: src/mainwindow.c:1093
+#: src/channels.c:244 src/mainwindow.c:1139
 msgid "Alpha"
 msgstr "アルファ"
 
-#: src/channels.c:245
-#: src/mainwindow.c:1093
+#: src/channels.c:245 src/mainwindow.c:1139
 msgid "Selection"
 msgstr "選択"
 
-#: src/channels.c:246
-#: src/mainwindow.c:1093
+#: src/channels.c:246 src/mainwindow.c:1139
 msgid "Mask"
 msgstr "マスク"
 
@@ -583,289 +526,250 @@ msgstr "マスク"
 msgid "Create Channel"
 msgstr "チャンネルを作成"
 
-#: src/channels.c:265
+#: src/channels.c:262
 msgid "Channel Type"
 msgstr "チャンネルタイプ"
 
-#: src/channels.c:272
+#: src/channels.c:269
 msgid "Initial Channel State"
 msgstr "初期チャンネル状況"
 
-#: src/channels.c:276
+#: src/channels.c:273
 msgid "Inverted"
 msgstr "反転"
 
-#: src/channels.c:279
-#: src/channels.c:337
-#: src/fpick.c:921
-#: src/fpick.c:1311
-#: src/otherwindow.c:307
-#: src/otherwindow.c:467
-#: src/otherwindow.c:513
-#: src/otherwindow.c:607
-#: src/otherwindow.c:926
-#: src/otherwindow.c:1184
-#: src/otherwindow.c:1411
-#: src/otherwindow.c:2327
-#: src/otherwindow.c:2757
-#: src/otherwindow.c:2965
-#: src/otherwindow.c:3101
-#: src/otherwindow.c:3200
-#: src/png.c:4159
-#: src/prefs.c:661
-#: src/spawn.c:435
-#: src/viewer.c:1450
+#: src/channels.c:275 src/channels.c:332 src/fpick.c:1172 src/info.c:419
+#: src/mygtk.c:252 src/otherwindow.c:630 src/otherwindow.c:1016
+#: src/otherwindow.c:1251 src/otherwindow.c:1473 src/otherwindow.c:2469
+#: src/otherwindow.c:2870 src/otherwindow.c:3075 src/otherwindow.c:3245
+#: src/otherwindow.c:3343 src/prefs.c:712 src/spawn.c:513
+msgid "OK"
+msgstr "OK"
+
+#: src/channels.c:276 src/channels.c:333 src/fpick.c:786 src/fpick.c:1179
+#: src/otherwindow.c:298 src/otherwindow.c:539 src/otherwindow.c:631
+#: src/otherwindow.c:993 src/otherwindow.c:1252 src/otherwindow.c:1474
+#: src/otherwindow.c:2470 src/otherwindow.c:2871 src/otherwindow.c:3076
+#: src/otherwindow.c:3246 src/otherwindow.c:3344 src/otherwindow.c:3547
+#: src/prefs.c:713 src/spawn.c:514 src/viewer.c:1434
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: src/channels.c:319
+#: src/channels.c:316
 msgid "Delete Channels"
 msgstr "チャンネルを削除"
 
-#: src/channels.c:377
+#: src/channels.c:373
 msgid "Threshold Channel"
 msgstr "しきいチャンネル"
 
-#: src/cpick.c:945
-#: src/otherwindow.c:574
-#: src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Red"
 msgstr "赤色"
 
-#: src/cpick.c:945
-#: src/otherwindow.c:574
-#: src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Green"
 msgstr "綠色"
 
-#: src/cpick.c:945
-#: src/otherwindow.c:574
-#: src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Blue"
 msgstr "青色"
 
-#: src/cpick.c:945
-#: src/otherwindow.c:572
-#: src/otherwindow.c:804
-#: src/toolbar.c:300
+#: src/cpick.c:901 src/otherwindow.c:599 src/otherwindow.c:869
+#: src/toolbar.c:298
 msgid "Hue"
 msgstr "色相"
 
-#: src/cpick.c:945
-#: src/otherwindow.c:572
-#: src/otherwindow.c:803
-#: src/toolbar.c:300
+#: src/cpick.c:901 src/otherwindow.c:599 src/otherwindow.c:868
+#: src/toolbar.c:298
 msgid "Saturation"
 msgstr "彩度"
 
-#: src/cpick.c:946
-#: src/toolbar.c:300
+#: src/cpick.c:902 src/toolbar.c:298
 msgid "Value"
 msgstr "値"
 
-#: src/cpick.c:946
+#: src/cpick.c:902
 msgid "Hex"
 msgstr "Hex"
 
-#: src/cpick.c:946
-#: src/layer.c:1167
-#: src/otherwindow.c:2882
-#: src/prefs.c:421
-#: src/toolbar.c:441
+#: src/cpick.c:902 src/layer.c:1270 src/otherwindow.c:2996 src/prefs.c:450
+#: src/toolbar.c:903
 msgid "Opacity"
 msgstr "不透明度"
 
-#: src/font.c:985
+#: src/font.c:939
 msgid "Creating Font Index"
 msgstr "フォントインデックスを作成"
 
-#: src/font.c:1364
+#: src/font.c:1316
 msgid "You must select at least one directory to search for fonts."
 msgstr "フォントの検索には少なくとも１つのディレクトリを選択して下さい。"
 
-#: src/font.c:1516
+#: src/font.c:1468
 msgid "Font"
 msgstr "フォント"
 
-#: src/font.c:1517
+#: src/font.c:1469
 msgid "Style"
 msgstr "スタイル"
 
-#: src/font.c:1518
-#: src/fpick.c:1176
-#: src/otherwindow.c:3180
-#: src/prefs.c:421
-#: src/toolbar.c:441
+#: src/font.c:1470 src/fpick.c:1045 src/otherwindow.c:3324 src/prefs.c:450
+#: src/toolbar.c:903
 msgid "Size"
 msgstr "サイズ"
 
-#: src/font.c:1519
+#: src/font.c:1471
 msgid "Filename"
 msgstr "ファイル名"
 
-#: src/font.c:1519
+#: src/font.c:1471
 msgid "Face"
 msgstr "書体"
 
-#: src/font.c:1520
-#: src/spawn.c:427
+#: src/font.c:1472 src/spawn.c:506
 msgid "Directory"
 msgstr "辞書"
 
-#: src/font.c:1761
-#: src/font.c:1873
-#: src/toolbar.c:580
-#: src/viewer.c:1396
-#: src/viewer.c:1449
+#: src/font.c:1712 src/font.c:1825 src/toolbar.c:1064 src/viewer.c:1381
+#: src/viewer.c:1433
 msgid "Paste Text"
 msgstr "テキストを貼り付け"
 
-#: src/font.c:1774
-#: src/font.c:1802
+#: src/font.c:1725 src/font.c:1753
 msgid "Text"
 msgstr "テキスト"
 
-#: src/font.c:1805
-#: src/viewer.c:1458
+#: src/font.c:1756 src/viewer.c:1439
 msgid "Enter Text Here"
 msgstr "ここにテキストを入力"
 
-#: src/font.c:1833
-#: src/viewer.c:1412
+#: src/font.c:1785 src/viewer.c:1396
 msgid "Antialias"
 msgstr "アンチエイリアス"
 
-#: src/font.c:1838
-#: src/viewer.c:1422
+#: src/font.c:1790 src/viewer.c:1406
 msgid "Invert"
 msgstr "反転"
 
-#: src/font.c:1843
-#: src/viewer.c:1427
+#: src/font.c:1795 src/viewer.c:1411
 msgid "Background colour ="
 msgstr "背景色 ="
 
-#: src/font.c:1853
+#: src/font.c:1805
 msgid "Oblique"
 msgstr "斜体"
 
-#: src/font.c:1856
-#: src/viewer.c:1435
+#: src/font.c:1808 src/viewer.c:1419
 msgid "Angle of rotation ="
 msgstr "回転角度 ="
 
-#: src/font.c:1879
+#: src/font.c:1831
 msgid "Font Directories"
 msgstr "フォントディレクトリ"
 
-#: src/font.c:1887
+#: src/font.c:1836
 msgid "New Directory"
 msgstr "新規ディレクトリ"
 
-#: src/font.c:1888
-#: src/spawn.c:428
+#: src/font.c:1837 src/spawn.c:507
 msgid "Select Directory"
 msgstr "辞書を選択"
 
-#: src/font.c:1899
+#: src/font.c:1848
 msgid "Add"
 msgstr "追加"
 
-#: src/font.c:1903
+#: src/font.c:1852
 msgid "Remove"
 msgstr "削除"
 
-#: src/font.c:1907
+#: src/font.c:1856
 msgid "Create Index"
 msgstr "インデックスを作成"
 
-#: src/fpick.c:866
+#: src/fpick.c:731
 #, c-format
 msgid "Could not access directory %s"
 msgstr "ディレクトリ %s にアクセスできません"
 
-#: src/fpick.c:905
-#: src/fpick.c:928
+#: src/fpick.c:770 src/fpick.c:793
 msgid "Delete"
 msgstr "削除"
 
-#: src/fpick.c:905
-#: src/fpick.c:933
+#: src/fpick.c:770 src/fpick.c:798
 msgid "Rename"
 msgstr "リネーム"
 
-#: src/fpick.c:906
+#: src/fpick.c:771
 msgid "Create Directory"
 msgstr "ディレクトリを作成"
 
-#: src/fpick.c:913
+#: src/fpick.c:778
 msgid "Enter the new filename"
 msgstr "新規ファイル名を入力"
 
-#: src/fpick.c:914
+#: src/fpick.c:779
 msgid "Enter the name of the new directory"
 msgstr "新規ディレクトリ名を入力"
 
-#: src/fpick.c:933
-#: src/otherwindow.c:306
-#: src/otherwindow.c:1868
+#: src/fpick.c:798 src/otherwindow.c:297 src/otherwindow.c:1989
 msgid "Create"
 msgstr "作成"
 
-#: src/fpick.c:968
+#: src/fpick.c:833
 #, c-format
 msgid "Do you really want to delete \"%s\" ?"
 msgstr "本当に \"%s\" を削除しますか？"
 
-#: src/fpick.c:973
+#: src/fpick.c:838
 msgid "Unable to delete"
 msgstr "削除できません"
 
-#: src/fpick.c:978
+#: src/fpick.c:843
 msgid "Unable to rename"
 msgstr "リネームできません"
 
-#: src/fpick.c:987
+#: src/fpick.c:852
 msgid "Unable to create directory"
 msgstr "ディレクトリを作成できません"
 
-#: src/fpick.c:1072
+#: src/fpick.c:939
 msgid "Up"
 msgstr "上"
 
-#: src/fpick.c:1073
+#: src/fpick.c:940
 msgid "Home"
 msgstr "ホーム"
 
-#: src/fpick.c:1074
+#: src/fpick.c:941
 msgid "Create New Directory"
 msgstr "新規ディレクトリを作成"
 
-#: src/fpick.c:1075
+#: src/fpick.c:942
 msgid "Show Hidden Files"
 msgstr "隠しファイルを表示"
 
-#: src/fpick.c:1076
+#: src/fpick.c:943
 msgid "Case Insensitive Sort"
 msgstr "大文字小文字を区別して並び替え"
 
-#: src/fpick.c:1175
+#: src/fpick.c:1044
 msgid "Name"
 msgstr "名前"
 
-#: src/fpick.c:1177
+#: src/fpick.c:1046
 msgid "Type"
 msgstr "タイプ"
 
-#: src/fpick.c:1178
+#: src/fpick.c:1047
 msgid "Modified"
 msgstr "修正"
 
-#: src/help.c:25
-#: src/prefs.c:443
+#: src/help.c:25 src/prefs.c:481
 msgid "General"
 msgstr "一般"
 
@@ -882,32 +786,69 @@ msgid "Credits"
 msgstr "クレジット"
 
 #: src/help.c:32
-msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.40 - 著作権 (C) 2004-2009 作者たち\n"
+msgid "mtPaint 3.40 - Copyright (C) 2004-2011 The Authors\n"
+msgstr "mtPaint 3.40 - 著作権 (C) 2004-2011 作者たち\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
 msgstr "作者リストは「クレジット」をご覧下さい。\n"
 
 #: src/help.c:34
-msgid "mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"
-msgstr "mtPaintは、無料ソフトです; フリーソフトウェア財団によって発表されたGNU一般公有使用許諾(GPL)の条件の下で、あなたはそれを再配布する事も、それを修正する事もできます; バージョン３のライセンス、または（あなたのオプションで）どの最新バージョンでも。\n"
+msgid ""
+"mtPaint is free software; you can redistribute it and/or modify it under the "
+"terms of the GNU General Public License as published by the Free Software "
+"Foundation; either version 3 of the License, or (at your option) any later "
+"version.\n"
+msgstr ""
+"mtPaintは、無料ソフトです; フリーソフトウェア財団によって発表されたGNU一般公"
+"有使用許諾(GPL)の条件の下で、あなたはそれを再配布する事も、それを修正する事も"
+"できます; バージョン３のライセンス、または（あなたのオプションで）どの最新"
+"バージョンでも。\n"
 
 #: src/help.c:35
-msgid "mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"
-msgstr "mtPaintは、役に立つ事を希望して配布されますが「無保証」です;商品適格性または特定目的への適合性の黙示保証もありません。詳細はGNU一般公有使用許諾を見て下さい。\n"
+msgid ""
+"mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY "
+"WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS "
+"FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more "
+"details.\n"
+msgstr ""
+"mtPaintは、役に立つ事を希望して配布されますが「無保証」です;商品適格性または"
+"特定目的への適合性の黙示保証もありません。詳細はGNU一般公有使用許諾を見て下さ"
+"い。\n"
 
 #: src/help.c:36
-msgid "mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.\n"
-msgstr "mtPaintはアイコンとピクセルベースのアートワークを作成するために設計されたシンプルなGTK+1/2ペイントプログラムです。それはインデックスを付けられたパレットまたは24ビットのRGBイメージを編集でき、基本的な絵とパレット操作ツールを提供します。また、いくつかの強力な特徴、例えばチャンネル、レイヤ、アニメーションもあります。その単純さと依存性がないため、GNU/Linux、Windowsと古いPCハードウェアでも動きます。\n"
+msgid ""
+"mtPaint is a simple GTK+1/2 painting program designed for creating icons and "
+"pixel based artwork. It can edit indexed palette or 24 bit RGB images and "
+"offers basic painting and palette manipulation tools. It also has several "
+"other more powerful features such as channels, layers and animation. Due to "
+"its simplicity and lack of dependencies it runs well on GNU/Linux, Windows "
+"and older PC hardware.\n"
+msgstr ""
+"mtPaintはアイコンとピクセルベースのアートワークを作成するために設計されたシン"
+"プルなGTK+1/2ペイントプログラムです。それはインデックスを付けられたパレットま"
+"たは24ビットのRGBイメージを編集でき、基本的な絵とパレット操作ツールを提供しま"
+"す。また、いくつかの強力な特徴、例えばチャンネル、レイヤ、アニメーションもあ"
+"ります。その単純さと依存性がないため、GNU/Linux、Windowsと古いPCハードウェア"
+"でも動きます。\n"
 
 #: src/help.c:37
-msgid "There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.\n"
-msgstr "ハンドブックに含まれるmtPaintの特徴の完全なドキュメントがあります。あなたがまだ持っていないならば、mtPaintのウェブサイトからダウンロードできます。\n"
+msgid ""
+"There is full documentation of mtPaint's features contained in a handbook.  "
+"If you don't already have this, you can download it from the mtPaint "
+"website.\n"
+msgstr ""
+"ハンドブックに含まれるmtPaintの特徴の完全なドキュメントがあります。あなたがま"
+"だ持っていないならば、mtPaintのウェブサイトからダウンロードできます。\n"
 
 #: src/help.c:38
-msgid "If you like mtPaint and you want to keep up to date with new releases, or you want to give some feedback, then the mailing lists may be of interest to you:\n"
-msgstr "あなたがmtPaintが好きで、新しいリリースをアップデートしていたい、あるいはフィードバックをしたいなら、メーリングリストが興味深いかも知れません：\n"
+msgid ""
+"If you like mtPaint and you want to keep up to date with new releases, or "
+"you want to give some feedback, then the mailing lists may be of interest to "
+"you:\n"
+msgstr ""
+"あなたがmtPaintが好きで、新しいリリースをアップデートしていたい、あるいは"
+"フィードバックをしたいなら、メーリングリストが興味深いかも知れません：\n"
 
 #: src/help.c:39
 msgid "http://sourceforge.net/mail/?group_id=155874"
@@ -926,443 +867,593 @@ msgid "  Ctrl-S            Save Image"
 msgstr "  Ctrl-S         イメージを保存"
 
 #: src/help.c:45
+msgid "  Ctrl-Shift-S      Save layers file"
+msgstr ""
+
+#: src/help.c:46
 msgid "  Ctrl-Q            Quit program\n"
 msgstr "  Ctrl-Q         プログラムを終了\n"
 
-#: src/help.c:46
+#: src/help.c:47
 msgid "  Ctrl-A            Select whole image"
 msgstr "  Ctrl-A         イメージ全体を選択"
 
-#: src/help.c:47
+#: src/help.c:48
 msgid "  Escape            Select nothing, cancel paste box"
 msgstr "  Escape         何も選択せず、貼り付けをキャンセル"
 
-#: src/help.c:48
+#: src/help.c:49
+msgid "  J                 Lasso selection\n"
+msgstr ""
+
+#: src/help.c:50
 msgid "  Ctrl-C            Copy selection to clipboard"
 msgstr "  Ctrl-C         選択範囲をクリップボードへコピー"
 
-#: src/help.c:49
-msgid "  Ctrl-X            Copy selection to clipboard, and then paint current pattern to selection area"
-msgstr "  Ctrl-X         選択範囲をクリップボードへコピーして、現在のパターンで選択領域を塗りつぶす"
+#: src/help.c:51
+msgid ""
+"  Ctrl-X            Copy selection to clipboard, and then paint current "
+"pattern to selection area"
+msgstr ""
+"  Ctrl-X         選択範囲をクリップボードへコピーして、現在のパターンで選択領"
+"域を塗りつぶす"
 
-#: src/help.c:50
+#: src/help.c:52
 msgid "  Ctrl-V            Paste clipboard to centre of current view"
 msgstr "  Ctrl-V         クリップボードを現在の表示の中央へ貼り付け"
 
-#: src/help.c:51
+#: src/help.c:53
 msgid "  Ctrl-K            Paste clipboard to location it was copied from"
 msgstr "  Ctrl-K         クリップボードをコピーした位置へ貼り付け"
 
-#: src/help.c:52
-msgid "  Enter/Return      Commit paste to canvas\n"
-msgstr "  Enter/Return         キャンバスに貼り付け\n"
+#: src/help.c:54
+msgid "  Ctrl-Shift-V      Paste clipboard to new layer"
+msgstr ""
 
-#: src/help.c:53
+#: src/help.c:55
+msgid "  Enter/Return      Commit paste to canvas"
+msgstr "  Enter/Return         キャンバスに貼り付け"
+
+#: src/help.c:56
+msgid "  Shift+Enter/Return  Commit paste and swap canvas into the clipboard\n"
+msgstr ""
+
+#: src/help.c:57
 msgid "  Arrow keys        Paint Mode - Move the mouse pointer"
 msgstr "  矢印キー        塗りつぶしモード - マウスカーソルを移動"
 
-#: src/help.c:54
-msgid "  Arrow keys        Selection Mode - Nudge selection box or paste box by one pixel"
-msgstr "  矢印キー        選択モード - 選択ボックス、貼り付けボックスを１ピクセル単位で移動"
-
-#: src/help.c:55
-msgid "  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x pixels - x is defined by the Preferences window"
-msgstr "  Shift+矢印キー  マウスポインタ、選択ボックス、貼り付けボックスを x ピクセル単位で移動 - x は設定ウィンドウで決められます"
-
-#: src/help.c:56
-msgid "  Ctrl+Arrows       Move layer or resize selection box\n"
-msgstr "  Ctrl+矢印キー   レイヤの移動、選択ボックスのリサイズ\n"
-
-#: src/help.c:57
-msgid "  [ or ]            Change colour A to the next or previous palette item"
-msgstr "  [ か ]         色A を次の、または前のパレットアイテムに変更"
-
 #: src/help.c:58
-msgid "  Shift+[ or ]      Change colour B to the next or previous palette item\n"
-msgstr "  Shift+[ か ]   色B を次の、または前のパレットアイテムに変更\n"
+msgid ""
+"  Arrow keys        Selection Mode - Nudge selection box or paste box by one "
+"pixel"
+msgstr ""
+"  矢印キー        選択モード - 選択ボックス、貼り付けボックスを１ピクセル単位"
+"で移動"
 
 #: src/help.c:59
+msgid ""
+"  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x "
+"pixels - x is defined by the Preferences window"
+msgstr ""
+"  Shift+矢印キー  マウスポインタ、選択ボックス、貼り付けボックスを x ピクセル"
+"単位で移動 - x は設定ウィンドウで決められます"
+
+#: src/help.c:60
+msgid "  Ctrl+Arrows       Move layer or resize selection box"
+msgstr "  Ctrl+矢印キー   レイヤの移動、選択ボックスのリサイズ"
+
+#: src/help.c:61
+msgid "  Ctrl+Shift+Arrows  Move layer or resize selection box by x pixels\n"
+msgstr ""
+
+#: src/help.c:62
+msgid "  Enter/Return      Paint Mode - Simulate left click"
+msgstr ""
+
+#: src/help.c:63
+msgid "  Backspace         Paint Mode - Simulate right click\n"
+msgstr ""
+
+#: src/help.c:64
+msgid ""
+"  [ or ]            Change colour A to the next or previous palette item"
+msgstr "  [ か ]         色A を次の、または前のパレットアイテムに変更"
+
+#: src/help.c:65
+msgid ""
+"  Shift+[ or ]      Change colour B to the next or previous palette item\n"
+msgstr "  Shift+[ か ]   色B を次の、または前のパレットアイテムに変更\n"
+
+#: src/help.c:66
 msgid "  Delete            Crop image to selection"
 msgstr "  Delete          イメージを選択範囲にトリミング"
 
-#: src/help.c:60
-msgid "  Insert            Transform colours - i.e. Brightness, Contrast, Saturation, Posterize, Gamma"
-msgstr "  Insert          色を変換 - すなわち、明るさ、コントラスト、彩度、ポスタライズ、ガンマ"
+#: src/help.c:67
+msgid ""
+"  Insert            Transform colours - i.e. Brightness, Contrast, "
+"Saturation, Posterize, Gamma"
+msgstr ""
+"  Insert          色を変換 - すなわち、明るさ、コントラスト、彩度、ポスタライ"
+"ズ、ガンマ"
 
-#: src/help.c:61
+#: src/help.c:68
 msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G         イメージをグレースケール"
 
-#: src/help.c:62
+#: src/help.c:69
 msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
 msgstr "  Shift-Ctrl-G   イメージをグレースケール（ガンマ補正）"
 
-#: src/help.c:63
-msgid "  Ctrl-T            Draw a rectangle around the selection area with the current fill"
+#: src/help.c:70
+msgid "  Ctrl+M            Mirror the image"
+msgstr ""
+
+#: src/help.c:71
+msgid "  Shift-Ctrl-I      Invert the image\n"
+msgstr ""
+
+#: src/help.c:72
+msgid ""
+"  Ctrl-T            Draw a rectangle around the selection area with the "
+"current fill"
 msgstr "  Ctrl-T         選択領域に現在の色で長方形を描く"
 
-#: src/help.c:64
+#: src/help.c:73
 msgid "  Ctrl-Shift-T      Fill in the selection area with the current fill"
 msgstr "  Ctrl-Shift-T   選択領域を現在の色で塗りつぶす"
 
-#: src/help.c:65
+#: src/help.c:74
 msgid "  Ctrl-L            Draw an ellipse spanning the selection area"
 msgstr "  Ctrl-L         楕円の選択領域を描く"
 
-#: src/help.c:66
+#: src/help.c:75
 msgid "  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
 msgstr "  Ctrl-Shift-L   選択領域内に楕円を描く\n"
 
-#: src/help.c:67
+#: src/help.c:76
 msgid "  Ctrl-E            Edit the RGB values for colours A & B"
 msgstr "  Ctrl-E         色A と 色B のRGB値を編集"
 
-#: src/help.c:68
+#: src/help.c:77
 msgid "  Ctrl-W            Edit all palette colours\n"
 msgstr "  Ctrl-W         全パレット色を編集\n"
 
-#: src/help.c:69
+#: src/help.c:78
 msgid "  Ctrl-P            Preferences"
 msgstr "  Ctrl-P         設定"
 
-#: src/help.c:70
+#: src/help.c:79
 msgid "  Ctrl-I            Information\n"
 msgstr "  Ctrl-I         情報\n"
 
-#: src/help.c:71
+#: src/help.c:80
 msgid "  Ctrl-Z            Undo last action"
 msgstr "  Ctrl-Z         最後の操作を元に戻す"
 
-#: src/help.c:72
+#: src/help.c:81
 msgid "  Ctrl-R            Redo an undone action\n"
 msgstr "  Ctrl-R         未完成の操作をやり直す\n"
 
-#: src/help.c:73
+#: src/help.c:82
+msgid "  Shift-T           Text Tool (GTK+)"
+msgstr ""
+
+#: src/help.c:83
+msgid "  T                 Text Tool (FreeType)\n"
+msgstr ""
+
+#: src/help.c:84
 msgid "  V                 View Window"
 msgstr "  V              表示ウィンドウ"
 
-#: src/help.c:74
+#: src/help.c:85
 msgid "  L                 Layers Window\n"
 msgstr "  L              レイヤウィンドウ\n"
 
-#: src/help.c:75
-msgid "  A                 Draw open arrow head when using the line tool (size set by flow setting)"
-msgstr "  A                 線引きツールを使う時、開いた矢印を描く (フロー設定でサイズを設定)"
+#: src/help.c:86
+msgid "  B                 Toggle Snap to Tile Grid mode\n"
+msgstr ""
 
-#: src/help.c:76
-msgid "  S                 Draw closed arrow head when using the line tool (size set by flow setting)\n"
-msgstr "  S                 線引きツールを使う時、閉じた矢印を描く (フロー設定でサイズを設定)\n"
+#: src/help.c:87
+msgid "  X                 Swap Colours A & B"
+msgstr ""
 
-#: src/help.c:77
+#: src/help.c:88
+msgid "  E                 Choose Colour\n"
+msgstr ""
+
+#: src/help.c:89
+msgid ""
+"  A                 Draw open arrow head when using the line tool (size set "
+"by flow setting)"
+msgstr ""
+"  A                 線引きツールを使う時、開いた矢印を描く (フロー設定でサイ"
+"ズを設定)"
+
+#: src/help.c:90
+msgid ""
+"  S                 Draw closed arrow head when using the line tool (size "
+"set by flow setting)\n"
+msgstr ""
+"  S                 線引きツールを使う時、閉じた矢印を描く (フロー設定でサイ"
+"ズを設定)\n"
+
+#: src/help.c:91
+msgid "  D                 Line Tool"
+msgstr ""
+
+#: src/help.c:92
+msgid "  F                 Flood Fill Tool\n"
+msgstr ""
+
+#: src/help.c:93
 msgid "  +,=               Main edit window - Zoom in"
 msgstr "  +,=            メイン編集ウィンドウ - 拡大"
 
-#: src/help.c:78
+#: src/help.c:94
 msgid "  -                 Main edit window - Zoom out"
 msgstr "  -              メイン編集ウィンド - 縮小"
 
-#: src/help.c:79
+#: src/help.c:95
 msgid "  Shift +,=         View window - Zoom in"
 msgstr "  Shift +,=      表示ウィンドウ - 拡大"
 
-#: src/help.c:80
+#: src/help.c:96
 msgid "  Shift -           View window - Zoom out\n"
 msgstr "  Shift -        表示ウィンドウ - 縮小\n"
 
-#: src/help.c:81
+#: src/help.c:97
 #, fuzzy, c-format
 msgid "  1                 10% zoom"
 msgstr "  1              10% ズーム"
 
-#: src/help.c:82
+#: src/help.c:98
 #, fuzzy, c-format
 msgid "  2                 25% zoom"
 msgstr "  2              25% ズーム"
 
-#: src/help.c:83
+#: src/help.c:99
 #, fuzzy, c-format
 msgid "  3                 50% zoom"
 msgstr "  3              50% ズーム"
 
-#: src/help.c:84
+#: src/help.c:100
 #, fuzzy, c-format
 msgid "  4                 100% zoom"
 msgstr "  4              100% ズーム"
 
-#: src/help.c:85
+#: src/help.c:101
 #, fuzzy, c-format
 msgid "  5                 400% zoom"
 msgstr "  5              400% ズーム"
 
-#: src/help.c:86
+#: src/help.c:102
 #, fuzzy, c-format
 msgid "  6                 800% zoom"
 msgstr "  6              800% ズーム"
 
-#: src/help.c:87
+#: src/help.c:103
 #, fuzzy, c-format
 msgid "  7                 1200% zoom"
 msgstr "  7              1200% ズーム"
 
-#: src/help.c:88
+#: src/help.c:104
 #, fuzzy, c-format
 msgid "  8                 1600% zoom"
 msgstr "  8              1600% ズーム"
 
-#: src/help.c:89
+#: src/help.c:105
 #, fuzzy, c-format
 msgid "  9                 2000% zoom\n"
 msgstr "  9              2000% ズーム\n"
 
-#: src/help.c:90
+#: src/help.c:106
 msgid "  Shift + 1         Edit image channel"
 msgstr "  Shift + 1      イメージチャンネルを編集"
 
-#: src/help.c:91
+#: src/help.c:107
 msgid "  Shift + 2         Edit alpha channel"
 msgstr "  Shift + 2      アルファチャンネルを編集"
 
-#: src/help.c:92
+#: src/help.c:108
 msgid "  Shift + 3         Edit selection channel"
 msgstr "  Shift + 3      選択チャンネルを編集"
 
-#: src/help.c:93
+#: src/help.c:109
 msgid "  Shift + 4         Edit mask channel\n"
 msgstr "  Shift + 4      マスクチャンネルを編集\n"
 
-#: src/help.c:94
+#: src/help.c:110
 msgid "  F1                Help"
 msgstr "  F1             ヘルプ"
 
-#: src/help.c:95
+#: src/help.c:111
 msgid "  F2                Choose Pattern"
 msgstr "  F2             パターンを選択"
 
-#: src/help.c:96
+#: src/help.c:112
 msgid "  F3                Choose Brush"
 msgstr "  F3             ブラシを選択"
 
-#: src/help.c:97
+#: src/help.c:113
 msgid "  F4                Paint Tool"
 msgstr "  F4             ペイントツール"
 
-#: src/help.c:98
+#: src/help.c:114
 msgid "  F5                Toggle Main Toolbar"
 msgstr "  F5             メインツールバーを切り替え"
 
-#: src/help.c:99
+#: src/help.c:115
 msgid "  F6                Toggle Tools Toolbar"
 msgstr "  F6             ツールのツールバーを切り替え"
 
-#: src/help.c:100
+#: src/help.c:116
 msgid "  F7                Toggle Settings Toolbar"
 msgstr "  F7             設定ツールバーを切り替え"
 
-#: src/help.c:101
+#: src/help.c:117
 msgid "  F8                Toggle Palette"
 msgstr "  F8             パレットを切り替え"
 
-#: src/help.c:102
+#: src/help.c:118
 msgid "  F9                Selection Tool"
 msgstr "  F9             ツールの選択"
 
-#: src/help.c:103
+#: src/help.c:119
 msgid "  F12               Toggle Dock Area\n"
 msgstr "  F12               ドックエリアを切り替え\n"
 
-#: src/help.c:104
+#: src/help.c:120
 msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
 msgstr "  Ctrl + F1 - F12   現在のクリップボードをファイル 1-12 に保存"
 
-#: src/help.c:105
+#: src/help.c:121
 msgid "  Shift + F1 - F12  Load clipboard from file 1-12\n"
 msgstr "  Shift + F1 - F12  ファイル 1-12 からクリップボードを読み込み\n"
 
-#: src/help.c:106
-msgid "  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad numbers)"
-msgstr "  Ctrl + 1, 2, ... , 0  不透明度を 10%、20%、... , 100%に設定（メインあるいはキーパッドの番号）"
+#: src/help.c:122
+msgid ""
+"  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad "
+"numbers)"
+msgstr ""
+"  Ctrl + 1, 2, ... , 0  不透明度を 10%、20%、... , 100%に設定（メインあるいは"
+"キーパッドの番号）"
 
-#: src/help.c:107
+#: src/help.c:123
 msgid "  Ctrl + + or =     Increase opacity by 1"
 msgstr "  Ctrl + + or =  不透明度を 1 づつ増やす"
 
-#: src/help.c:108
+#: src/help.c:124
 msgid "  Ctrl + -          Decrease opacity by 1\n"
 msgstr "  Ctrl + -       不透明度を 1 づつ減らす\n"
 
-#: src/help.c:109
-msgid "  Home              Show or hide main window menu/toolbar/status bar/palette"
-msgstr "  Home        メインウィンドウのメニュー/ツールバー/ステータスバー/パレットの表示・非表示"
+#: src/help.c:125
+msgid ""
+"  Home              Show or hide main window menu/toolbar/status bar/palette"
+msgstr ""
+"  Home        メインウィンドウのメニュー/ツールバー/ステータスバー/パレットの"
+"表示・非表示"
 
-#: src/help.c:110
+#: src/help.c:126
 msgid "  Page Up           Scale Image"
 msgstr "  Page Up     イメージを縮小拡大"
 
-#: src/help.c:111
+#: src/help.c:127
 msgid "  Page Down         Resize Image canvas"
 msgstr "  Page Down     イメージキャンバスのサイズを変更"
 
-#: src/help.c:112
+#: src/help.c:128
 msgid "  End               Pan Window"
 msgstr "  End            ウィンドウをパンする"
 
-#: src/help.c:115
+#: src/help.c:131
 msgid "  Left button          Paint to canvas using the current tool"
 msgstr "  左ボタン        現在使用中のツールでキャンバスを塗る"
 
-#: src/help.c:116
-msgid "  Middle button        Selects the point which will be the centre of the image after the next zoom"
+#: src/help.c:132
+msgid ""
+"  Middle button        Selects the point which will be the centre of the "
+"image after the next zoom"
 msgstr "  中央ボタン     次のズーム後、イメージの中央になるポイントを選択"
 
-#: src/help.c:117
-msgid "  Right button         Commit paste to canvas / Stop drawing current line / Cancel selection\n"
-msgstr "  右ボタン         キャンバスに貼り付ける / 現在の線の描画を中止 / 選択をキャンセル\n"
+#: src/help.c:133
+msgid ""
+"  Right button         Commit paste to canvas / Stop drawing current line / "
+"Cancel selection\n"
+msgstr ""
+"  右ボタン         キャンバスに貼り付ける / 現在の線の描画を中止 / 選択をキャ"
+"ンセル\n"
 
-#: src/help.c:118
-msgid "  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window\n"
-msgstr "  スクロールボタン              GTK+2 では設定ウィンドウからスクロールボタンでズームの + - を使えるようにできます\n"
+#: src/help.c:134
+msgid ""
+"  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in "
+"or out via the Preferences window\n"
+msgstr ""
+"  スクロールボタン              GTK+2 では設定ウィンドウからスクロールボタン"
+"でズームの + - を使えるようにできます\n"
 
-#: src/help.c:119
+#: src/help.c:135
 msgid "  Ctrl+Left button     Choose colour A from under mouse pointer"
 msgstr "  Ctrl+左ボタン   マウスポインタ上の色 A を選択"
 
-#: src/help.c:120
-msgid "  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour in A (RGB images only)"
-msgstr "  Ctrl+中央ボタン   A/B 色を作成して A の RGB 色ベースでパターン化する(RGB イメージのみ)"
+#: src/help.c:136
+msgid ""
+"  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour "
+"in A (RGB images only)"
+msgstr ""
+"  Ctrl+中央ボタン   A/B 色を作成して A の RGB 色ベースでパターン化する(RGB イ"
+"メージのみ)"
 
-#: src/help.c:121
+#: src/help.c:137
 msgid "  Ctrl+Right button    Choose colour B from under mouse pointer"
 msgstr "  Ctrl+右ボタン    マウスポインタ上の色Bを選択"
 
-#: src/help.c:122
+#: src/help.c:138
 msgid "  Ctrl+Scroll Wheel    Scroll the main edit window left or right\n"
-msgstr "  Ctrl+スクロールボタン      メイン編集ウィンドウを左から右へスクロール\n"
+msgstr ""
+"  Ctrl+スクロールボタン      メイン編集ウィンドウを左から右へスクロール\n"
 
-#: src/help.c:123
-msgid "  Ctrl+Double click    Set colour A or B to average colour under brush square or selection marquee (RGB only)\n"
-msgstr "  Ctrl+ダブルクリック    色A または Bをブラシ四角か選択マーキーで平均色にする (RGB のみ)\n"
-
-#: src/help.c:124
+#: src/help.c:139
 msgid ""
-"  Shift+Right button   Selects the point which will be the centre of the image after the next zoom\n"
+"  Ctrl+Double click    Set colour A or B to average colour under brush "
+"square or selection marquee (RGB only)\n"
+msgstr ""
+"  Ctrl+ダブルクリック    色A または Bをブラシ四角か選択マーキーで平均色にす"
+"る (RGB のみ)\n"
+
+#: src/help.c:140
+msgid ""
+"  Shift+Right button   Selects the point which will be the centre of the "
+"image after the next zoom\n"
 "\n"
 msgstr ""
 "  Shift+右ボタン   次のズーム後ポイントがイメージの中央になるように選択\n"
 "\n"
 
-#: src/help.c:125
+#: src/help.c:141
 msgid "You can fixate the X/Y co-ordinates while moving the mouse:\n"
 msgstr "X/Y 座標をマウスの移動している間、固定できます:\n"
 
-#: src/help.c:126
+#: src/help.c:142
 msgid "  Shift                Constrain mouse movements to vertical line"
 msgstr "  Shift                マウスの垂直移動を抑制"
 
-#: src/help.c:127
+#: src/help.c:143
 msgid "  Shift+Ctrl           Constrain mouse movements to horizontal line"
 msgstr "  Shift+Ctrl           マウスの水平移動を抑制"
 
-#: src/help.c:130
+#: src/help.c:146
 msgid "mtPaint is maintained by Dmitry Groshev.\n"
 msgstr "mtPaint は Dmitry Groshev によってメンテナンスされています。\n"
 
-#: src/help.c:131
+#: src/help.c:147
 msgid "wjaguar@users.sourceforge.net"
 msgstr "wjaguar@users.sourceforge.net"
 
-#: src/help.c:132
+#: src/help.c:148
 msgid "http://mtpaint.sourceforge.net/\n"
 msgstr "http://mtpaint.sourceforge.net/\n"
 
-#: src/help.c:133
+#: src/help.c:149
 msgid ""
-"The following people (in alphabetical order) have contributed directly to the project, and are therefore worthy of gracious thanks for their generosity and hard work:\n"
+"The following people (in alphabetical order) have contributed directly to "
+"the project, and are therefore worthy of gracious thanks for their "
+"generosity and hard work:\n"
 "\n"
 msgstr ""
-"以下の方々（アルファベット順）がプロジェクトに直接、貢献しました。従って、その方々の寛大さときつい仕事に対して丁重なお礼をするに値します。:\n"
+"以下の方々（アルファベット順）がプロジェクトに直接、貢献しました。従って、そ"
+"の方々の寛大さときつい仕事に対して丁重なお礼をするに値します。:\n"
 "\n"
 
-#: src/help.c:134
+#: src/help.c:150
 msgid "Authors\n"
 msgstr "作者たち\n"
 
-#: src/help.c:135
-msgid "Dmitry Groshev - Contributing developer for version 2.30. Lead developer and maintainer from version 3.00 to the present."
-msgstr "Dmitry Groshev - バージョン 2.30の貢献開発者。バージョン 3.00 から今までにいたる指導的開発者でありメンテナー。"
-
-#: src/help.c:136
-msgid "Mark Tyler - Original author and maintainer up to version 3.00, occasional contributor thereafter."
-msgstr "Mark Tyler - バージョン 3.00 までのオリジナル作者でメンテナー。その後は時折の貢献者。"
-
-#: src/help.c:137
+#: src/help.c:151
 msgid ""
-"Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information.\n"
+"Dmitry Groshev - Contributing developer for version 2.30. Lead developer and "
+"maintainer from version 3.00 to the present."
+msgstr ""
+"Dmitry Groshev - バージョン 2.30の貢献開発者。バージョン 3.00 から今までにい"
+"たる指導的開発者でありメンテナー。"
+
+#: src/help.c:152
+msgid ""
+"Mark Tyler - Original author and maintainer up to version 3.00, occasional "
+"contributor thereafter."
+msgstr ""
+"Mark Tyler - バージョン 3.00 までのオリジナル作者でメンテナー。その後は時折の"
+"貢献者。"
+
+#: src/help.c:153
+msgid ""
+"Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more "
+"information.\n"
 "\n"
 msgstr ""
 "Xiaolin Wu - Wu 量子化方法を書いた - 詳細は wu.c をご覧下さい。\n"
 "\n"
 
-#: src/help.c:138
-msgid "General Contributions (Feedback and Ideas for improvements unless otherwise stated)\n"
-msgstr "一般貢献（その他記載されていない改良のためのアイデアとフィードバック）\n"
+#: src/help.c:154
+msgid ""
+"General Contributions (Feedback and Ideas for improvements unless otherwise "
+"stated)\n"
+msgstr ""
+"一般貢献（その他記載されていない改良のためのアイデアとフィードバック）\n"
 
-#: src/help.c:139
+#: src/help.c:155
 msgid "Abdulla Al Muhairi - Website redesign April 2005"
 msgstr "Abdulla Al Muhairi - 2005年4月にウェブサイトのリデザイン"
 
-#: src/help.c:140
+#: src/help.c:156
 msgid "Alan Horkan"
 msgstr "Alan Horkan"
 
-#: src/help.c:141
+#: src/help.c:157
 msgid "Alexandre Prokoudine"
 msgstr "Alexandre Prokoudine"
 
-#: src/help.c:142
+#: src/help.c:158
 msgid "Antonio Andrea Bianco"
 msgstr "Antonio Andrea Bianco"
 
-#: src/help.c:143
+#: src/help.c:159
 msgid "Dennis Lee"
 msgstr "Dennis Lee"
 
-#: src/help.c:144
+#: src/help.c:160
+msgid "Donald White"
+msgstr ""
+
+#: src/help.c:161
 msgid "Ed Jason"
 msgstr "Ed Jason"
 
-#: src/help.c:145
-msgid "Eddie Kohler - Created Gifsicle which is needed for the creation and viewing of animated GIF files http://www.lcdf.org/gifsicle/"
-msgstr "Eddie Kohler - アニメGIFファイルの作成と表示に必要な Gifsicle の作成 http://www.lcdf.org/gifsicle/"
+#: src/help.c:162
+msgid ""
+"Eddie Kohler - Created Gifsicle which is needed for the creation and viewing "
+"of animated GIF files http://www.lcdf.org/gifsicle/"
+msgstr ""
+"Eddie Kohler - アニメGIFファイルの作成と表示に必要な Gifsicle の作成 http://"
+"www.lcdf.org/gifsicle/"
 
-#: src/help.c:146
-msgid "Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta registration"
-msgstr "Guadalinex Team (Junta de Andalucia) - マニュアルページ、Launchpad/Rosetta の登録"
+#: src/help.c:163
+msgid ""
+"Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta "
+"registration"
+msgstr ""
+"Guadalinex Team (Junta de Andalucia) - マニュアルページ、Launchpad/Rosetta の"
+"登録"
 
-#: src/help.c:147
+#: src/help.c:164
 msgid "Lou Afonso"
 msgstr "Lou Afonso"
 
-#: src/help.c:148
+#: src/help.c:165
 msgid "Magnus Hjorth"
 msgstr "Magnus Hjorth"
 
-#: src/help.c:149
+#: src/help.c:166
 msgid "Martin Zelaia"
 msgstr "Martin Zelaia"
 
-#: src/help.c:150
+#: src/help.c:167
+msgid "Pasi Kallinen"
+msgstr ""
+
+#: src/help.c:168
 msgid "Pavel Ruzicka"
 msgstr "Pavel Ruzicka"
 
-#: src/help.c:151
+#: src/help.c:169
 msgid "Puppy Linux (Barry Kauler)"
 msgstr "Puppy Linux (Barry Kauler)"
 
-#: src/help.c:152
+#: src/help.c:170
 msgid "Vlastimil Krejcir"
 msgstr "Vlastimil Krejcir"
 
-#: src/help.c:153
+#: src/help.c:171
 msgid ""
 "William Kern\n"
 "\n"
@@ -1370,1768 +1461,1860 @@ msgstr ""
 "William Kern\n"
 "\n"
 
-#: src/help.c:154
+#: src/help.c:172
 msgid "Translations\n"
 msgstr "翻訳\n"
 
-#: src/help.c:155
-msgid "Brazilian Portuguese - Paulo Trevizan"
-msgstr "ブラジル ポルトガル語 - Paulo Trevizan"
+#: src/help.c:173
+msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
+msgstr "ブラジル ポルトガル語 - Paulo Trevizan, Valter Nazianzeno"
 
-#: src/help.c:156
+#: src/help.c:174
 msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
 msgstr "チェコ語 - Pavel Ruzicka, Martin Petricek, Roman Hornik"
 
-#: src/help.c:157
+#: src/help.c:175
 msgid "Dutch - Hans Strijards"
 msgstr "オランダ語 - Hans Strijards"
 
-#: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
-msgstr "フランス語 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+#: src/help.c:176
+msgid ""
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
+"Philippe Etienne"
+msgstr ""
+"フランス語 - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
+"Philippe Etienne"
 
-#: src/help.c:159
+#: src/help.c:177
 msgid "Galician - Miguel Anxo Bouzada"
 msgstr "ガリシア語 - Miguel Anxo Bouzada"
 
-#: src/help.c:160
+#: src/help.c:178
 msgid "German - Oliver Frommel, B. Clausius, Ulrich Ringel"
 msgstr "ドイツ語 - Oliver Frommel, B. Clausius, Ulrich Ringel"
 
-#: src/help.c:161
+#: src/help.c:179
+msgid "Hungarian - Ur Balazs"
+msgstr ""
+
+#: src/help.c:180
 msgid "Italian - Angelo Gemmi"
 msgstr "イタリア語 - Angelo Gemmi"
 
-#: src/help.c:162
+#: src/help.c:181
 msgid "Japanese - Norihiro YONEDA"
 msgstr "日本語 - 米田 憲弘"
 
-#: src/help.c:163
+#: src/help.c:182
 msgid "Polish - Bartosz Kaszubowski, LucaS"
 msgstr "ポーランド語 - Bartosz Kaszubowski, LucaS"
 
-#: src/help.c:164
+#: src/help.c:183
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
 msgstr "ポルトガル語 - Israel G. Lugo, Tiago Silva"
 
-#: src/help.c:165
+#: src/help.c:184
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
 msgstr "ロシア語 - Sergey Irupin, Dmitry Groshev"
 
-#: src/help.c:166
+#: src/help.c:185
 msgid "Simplified Chinese - Cecc"
 msgstr "簡体字中国語 - Cecc"
 
-#: src/help.c:167
+#: src/help.c:186
 msgid "Slovak - Jozef Riha"
 msgstr "スロバキア語 - Jozef Riha"
 
-#: src/help.c:168
-msgid "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel Anxo Bouzada, Francisco Jose Rey"
-msgstr "スペイン語 - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel Anxo Bouzada, Francisco Jose Rey"
+#: src/help.c:187
+msgid ""
+"Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
+"Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
+msgstr ""
+"スペイン語 - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, "
+"Miguel Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
-#: src/help.c:169
+#: src/help.c:188
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr "スウェーデン語 - Daniel Nylander, Daniel Eriksson"
 
-#: src/help.c:170
+#: src/help.c:189
+msgid "Tagalog - Anjelo delCarmen"
+msgstr ""
+
+#: src/help.c:190
 msgid "Taiwanese Chinese - Wei-Lun Chao"
 msgstr "台湾中国語 - Wei-Lun Chao"
 
-#: src/help.c:171
+#: src/help.c:191
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
 msgstr "トルコ語 - Muhammet Kara, Tutku Dalmaz"
 
-#: src/info.c:295
+#: src/info.c:281
 msgid "Information"
 msgstr "情報"
 
-#: src/info.c:306
+#: src/info.c:290
 msgid "Memory"
 msgstr "メモリ"
 
-#: src/info.c:309
+#: src/info.c:293
 msgid "Total memory for main + undo images"
 msgstr "メイン + イメージを元に戻すための合計メモリ"
 
-#: src/info.c:322
+#: src/info.c:306
 msgid "Undo / Redo / Max levels used"
 msgstr "元に戻す / やり直し / 最高レベルを使用"
 
-#: src/info.c:326
-#: src/otherwindow.c:3162
-#: src/png.c:532
-#: src/png.c:725
+#: src/info.c:310 src/otherwindow.c:954 src/otherwindow.c:3307 src/png.c:642
+#: src/png.c:847
 msgid "Clipboard"
 msgstr "クリップボード"
 
-#: src/info.c:327
+#: src/info.c:311
 msgid "Unused"
 msgstr "未使用"
 
-#: src/info.c:332
+#: src/info.c:316
 #, c-format
 msgid "Clipboard = %i x %i"
 msgstr "クリップボード = %i x %i"
 
-#: src/info.c:334
+#: src/info.c:318
 #, c-format
 msgid "Clipboard = %i x %i x RGB"
 msgstr "クリップボード = %i x %i x RGB"
 
-#: src/info.c:342
+#: src/info.c:326
 msgid "Unique RGB pixels"
 msgstr "一意 RGB ピクセル"
 
-#: src/info.c:355
-#: src/layer.c:154
+#: src/info.c:339 src/layer.c:155
 msgid "Layers"
 msgstr "レイヤ"
 
-#: src/info.c:359
+#: src/info.c:343
 msgid "Total layer memory usage"
 msgstr "レイヤメモリ使用量合計"
 
-#: src/info.c:366
+#: src/info.c:350
 msgid "Colour Histogram"
 msgstr "カラーヒストグラム"
 
-#: src/info.c:388
+#: src/info.c:372
 #, c-format
 msgid "Colour index totals - %i of %i used"
 msgstr "カラーインデックス合計 - %i の内 %i 使用"
 
-#: src/info.c:407
+#: src/info.c:391
 msgid "Index"
 msgstr "インデックス"
 
-#: src/info.c:408
+#: src/info.c:392
 msgid "Canvas pixels"
 msgstr "キャンバス ピクセル"
 
-#: src/info.c:423
+#: src/info.c:407
 msgid "Orphans"
 msgstr "最初の行"
 
-#: src/inifile.c:711
-msgid "Could not find home directory. Using current directory as home directory."
-msgstr "ホームディレクトリが見つかりません。現在のディレクトリをホームとして使います。"
+#: src/inifile.c:817
+msgid ""
+"Could not find home directory. Using current directory as home directory."
+msgstr ""
+"ホームディレクトリが見つかりません。現在のディレクトリをホームとして使いま"
+"す。"
 
 #: src/layer.c:70
 msgid "Background"
 msgstr "背景"
 
-#: src/layer.c:152
-#: src/mainwindow.c:4968
+#: src/layer.c:156 src/mainwindow.c:5223
 msgid "(Modified)"
 msgstr "(変更済み)"
 
-#: src/layer.c:155
-#: src/mainwindow.c:4971
+#: src/layer.c:157 src/mainwindow.c:5224
 msgid "Untitled"
 msgstr "無題"
 
-#: src/layer.c:431
+#: src/layer.c:419
 #, c-format
 msgid "Do you really want to delete layer %i (%s) ?"
 msgstr "本当にレイヤ %i (%s) を削除してもいいですか？"
 
-#: src/layer.c:504
-msgid "One or more of the layers contains changes that have not been saved.  Do you really want to lose these changes?"
-msgstr "１つ以上のレイヤに保存されていない変更があります。本当に変更を破棄しますか？"
+#: src/layer.c:498
+msgid ""
+"One or more of the layers contains changes that have not been saved.  Do you "
+"really want to lose these changes?"
+msgstr ""
+"１つ以上のレイヤに保存されていない変更があります。本当に変更を破棄しますか？"
 
-#: src/layer.c:509
-#: src/mainwindow.c:1074
+#: src/layer.c:499 src/mainwindow.c:1122
 msgid "Cancel Operation"
 msgstr "キャンセル"
 
-#: src/layer.c:509
-#: src/mainwindow.c:1074
+#: src/layer.c:499 src/mainwindow.c:1122
 msgid "Lose Changes"
 msgstr "変更を破棄"
 
-#: src/layer.c:653
+#: src/layer.c:638
 #, c-format
 msgid "%d layers failed to load"
 msgstr "%d レイヤの読み込みに失敗"
 
-#: src/layer.c:796
-msgid "One or more of the image layers has not been saved.  You must save each image individually before saving the layers text file in order to load this composite image in the future."
-msgstr "一つ以上のレイヤが保存されていません。将来この合成イメージを読み込むために、レイヤテキストを保存する前にイメージを個々に保存して下さい。"
+#: src/layer.c:904
+msgid ""
+"One or more of the image layers has not been saved.  You must save each "
+"image individually before saving the layers text file in order to load this "
+"composite image in the future."
+msgstr ""
+"一つ以上のレイヤが保存されていません。将来この合成イメージを読み込むために、"
+"レイヤテキストを保存する前にイメージを個々に保存して下さい。"
 
-#: src/layer.c:816
+#: src/layer.c:919
 msgid "Do you really want to delete all of the layers?"
 msgstr "本当にすべてのレイヤを削除しますか？"
 
-#: src/layer.c:951
+#: src/layer.c:1057
 msgid "You cannot add any more layers."
 msgstr "これ以上レイヤを追加できません。"
 
-#: src/layer.c:1049
-#: src/otherwindow.c:267
+#: src/layer.c:1159 src/otherwindow.c:261
 msgid "New Layer"
 msgstr "新規レイヤ"
 
-#: src/layer.c:1050
+#: src/layer.c:1160
 msgid "Raise"
 msgstr "上げる"
 
-#: src/layer.c:1051
+#: src/layer.c:1161
 msgid "Lower"
 msgstr "下げる"
 
-#: src/layer.c:1052
+#: src/layer.c:1162
 msgid "Duplicate Layer"
 msgstr "レイヤを複製"
 
-#: src/layer.c:1053
+#: src/layer.c:1163
 msgid "Centralise Layer"
 msgstr "レイヤを中央へ"
 
-#: src/layer.c:1054
+#: src/layer.c:1164
 msgid "Delete Layer"
 msgstr "レイヤを削除"
 
-#: src/layer.c:1055
+#: src/layer.c:1165
 msgid "Close Layers Window"
 msgstr "レイヤウィンドウを閉じる"
 
-#: src/layer.c:1165
+#: src/layer.c:1268
 msgid "Layer Name"
 msgstr "レイヤ名"
 
-#: src/layer.c:1166
+#: src/layer.c:1269
 msgid "Position"
 msgstr "位置"
 
-#: src/layer.c:1168
+#: src/layer.c:1272
 msgid "Transparent Colour"
 msgstr "透過色"
 
-#: src/layer.c:1194
+#: src/layer.c:1300
 msgid "Show all layers in main window"
 msgstr "メインウィンドウに全レイヤを表示"
 
-#: src/mainwindow.c:276
+#: src/mainwindow.c:275
 msgid "There were no unused colours to remove!"
 msgstr "削除する未使用の色はありません！"
 
-#: src/mainwindow.c:304
+#: src/mainwindow.c:302
 msgid "The palette does not contain 2 colours that have identical RGB values"
 msgstr "パレットは同じRGB値の２つの色がありません"
 
-#: src/mainwindow.c:307
+#: src/mainwindow.c:305
 #, c-format
-msgid "The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"
-msgstr "パレットは同じRGB値の色 %i を含みます。本当に１つのインデックスにマージしてキャンバスを再構成しますか？"
+msgid ""
+"The palette contains %i colours that have identical RGB values.  Do you "
+"really want to merge them into one index and realign the canvas?"
+msgstr ""
+"パレットは同じRGB値の色 %i を含みます。本当に１つのインデックスにマージして"
+"キャンバスを再構成しますか？"
 
-#: src/mainwindow.c:495
-#: src/otherwindow.c:1843
-#: src/otherwindow.c:2700
+#: src/mainwindow.c:493 src/mainwindow.c:1141 src/otherwindow.c:1964
+#: src/otherwindow.c:2589
 msgid "RGB"
 msgstr "RGB"
 
-#: src/mainwindow.c:498
+#: src/mainwindow.c:496
 msgid "indexed"
 msgstr "インデックス済み"
 
-#: src/mainwindow.c:504
+#: src/mainwindow.c:502
 #, c-format
-msgid "You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."
+msgid ""
+"You are trying to save an %s image to an %s file which is not possible.  I "
+"would suggest you save with a PNG extension."
 msgstr "%s イメージを %s ファイルで保存できません。PNG拡張子で保存して下さい。"
 
-#: src/mainwindow.c:506
+#: src/mainwindow.c:504
 #, c-format
-msgid "You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."
-msgstr "ファイル %s を %d 色以上のパレットで保存しようとしています。別のフォーマットを使うか、パレットを %d 色に減色して下さい。"
+msgid ""
+"You are trying to save an %s file with a palette of more than %d colours.  "
+"Either use another format or reduce the palette to %d colours."
+msgstr ""
+"ファイル %s を %d 色以上のパレットで保存しようとしています。別のフォーマット"
+"を使うか、パレットを %d 色に減色して下さい。"
 
-#: src/mainwindow.c:530
-msgid "You are trying to save an XPM file with more than 4096 colours.  Either use another format or posterize the image to 4 bits, or otherwise reduce the number of colours."
-msgstr "XPM ファイルを4096色以上で保存しようとしています。別のフォーマットを使うかイメージを4ビットにポスタリゼーションするか、色数を減色して下さい。"
+#: src/mainwindow.c:528
+msgid ""
+"You are trying to save an XPM file with more than 4096 colours.  Either use "
+"another format or posterize the image to 4 bits, or otherwise reduce the "
+"number of colours."
+msgstr ""
+"XPM ファイルを4096色以上で保存しようとしています。別のフォーマットを使うかイ"
+"メージを4ビットにポスタリゼーションするか、色数を減色して下さい。"
 
-#: src/mainwindow.c:577
+#: src/mainwindow.c:575
 msgid "Unable to load clipboard"
 msgstr "クリップボードを読み込めません"
 
-#: src/mainwindow.c:603
+#: src/mainwindow.c:601
 msgid "Unable to save clipboard"
 msgstr "クリップボードを保存できません"
 
-#: src/mainwindow.c:1071
-msgid "This canvas/palette contains changes that have not been saved.  Do you really want to lose these changes?"
-msgstr "このキャンバス/パレットには未保存の変更があります。この変更を破棄しますか？"
+#: src/mainwindow.c:1121
+msgid ""
+"This canvas/palette contains changes that have not been saved.  Do you "
+"really want to lose these changes?"
+msgstr ""
+"このキャンバス/パレットには未保存の変更があります。この変更を破棄しますか？"
 
-#: src/mainwindow.c:1093
-#: src/otherwindow.c:802
-#: src/otherwindow.c:3162
+#: src/mainwindow.c:1139 src/otherwindow.c:948 src/otherwindow.c:3307
 msgid "Image"
 msgstr "イメージ"
 
-#: src/mainwindow.c:1116
+#: src/mainwindow.c:1141 src/otherwindow.c:1964 src/otherwindow.c:2589
+msgid "sRGB"
+msgstr ""
+
+#: src/mainwindow.c:1163
 msgid "Do you really want to quit?"
 msgstr "本当に終了しますか？"
 
-#: src/mainwindow.c:4411
+#: src/mainwindow.c:4663
 msgid "/_File"
 msgstr "/ファイル(_F)"
 
-#: src/mainwindow.c:4413
+#: src/mainwindow.c:4665
 msgid "//New"
 msgstr "//新規"
 
-#: src/mainwindow.c:4414
+#: src/mainwindow.c:4666
 msgid "//Open ..."
 msgstr "//開く …"
 
-#: src/mainwindow.c:4415
+#: src/mainwindow.c:4667 src/mainwindow.c:4918
 msgid "//Save"
 msgstr "//保存"
 
-#: src/mainwindow.c:4416
+#: src/mainwindow.c:4668 src/mainwindow.c:4845 src/mainwindow.c:4895
+#: src/mainwindow.c:4919
 msgid "//Save As ..."
 msgstr "//名前を付けて保存…"
 
-#: src/mainwindow.c:4418
+#: src/mainwindow.c:4670
 msgid "//Export Undo Images ..."
 msgstr "//アンドゥイメージをエクスポート…"
 
-#: src/mainwindow.c:4419
+#: src/mainwindow.c:4671
 msgid "//Export Undo Images (reversed) ..."
 msgstr "//アンドゥイメージをエクスポート（反転）…"
 
-#: src/mainwindow.c:4420
+#: src/mainwindow.c:4672
 msgid "//Export ASCII Art ..."
 msgstr "//ASCIIアートをエクスポート…"
 
-#: src/mainwindow.c:4421
+#: src/mainwindow.c:4673
 msgid "//Export Animated GIF ..."
 msgstr "//GIFアニメをエクスポート…"
 
-#: src/mainwindow.c:4423
+#: src/mainwindow.c:4675
 msgid "//Actions"
 msgstr "//アクション"
 
-#: src/mainwindow.c:4441
+#: src/mainwindow.c:4693
 msgid "///Configure"
 msgstr "///設定"
 
-#: src/mainwindow.c:4464
+#: src/mainwindow.c:4716
 msgid "//Quit"
 msgstr "//終了"
 
-#: src/mainwindow.c:4466
+#: src/mainwindow.c:4718
 msgid "/_Edit"
 msgstr "/編集(_E)"
 
-#: src/mainwindow.c:4468
+#: src/mainwindow.c:4720
 msgid "//Undo"
 msgstr "//元に戻す"
 
-#: src/mainwindow.c:4469
+#: src/mainwindow.c:4721
 msgid "//Redo"
 msgstr "//やり直し"
 
-#: src/mainwindow.c:4471
+#: src/mainwindow.c:4723
 msgid "//Cut"
 msgstr "//切取り"
 
-#: src/mainwindow.c:4472
+#: src/mainwindow.c:4724
 msgid "//Copy"
 msgstr "//コピー"
 
-#: src/mainwindow.c:4473
+#: src/mainwindow.c:4725
 msgid "//Copy To Palette"
 msgstr "//パレットにコピー"
 
-#: src/mainwindow.c:4474
+#: src/mainwindow.c:4726
 msgid "//Paste To Centre"
 msgstr "//中央に貼り付け"
 
-#: src/mainwindow.c:4475
+#: src/mainwindow.c:4727
 msgid "//Paste To New Layer"
 msgstr "//新しいレイヤとして貼り付け"
 
-#: src/mainwindow.c:4476
+#: src/mainwindow.c:4728
 msgid "//Paste"
 msgstr "//貼り付け"
 
-#: src/mainwindow.c:4477
+#: src/mainwindow.c:4729
 msgid "//Paste Text"
 msgstr "//文字を貼り付け"
 
-#: src/mainwindow.c:4479
+#: src/mainwindow.c:4731
 msgid "//Paste Text (FreeType)"
 msgstr "//文字を貼り付け (FreeType)"
 
-#: src/mainwindow.c:4481
+#: src/mainwindow.c:4733
 msgid "//Paste Palette"
 msgstr "//パレットを貼り付け"
 
-#: src/mainwindow.c:4483
+#: src/mainwindow.c:4735
 msgid "//Load Clipboard"
 msgstr "//クリップボードをロード"
 
-#: src/mainwindow.c:4497
+#: src/mainwindow.c:4749
 msgid "//Save Clipboard"
 msgstr "//クリップボードを保存"
 
-#: src/mainwindow.c:4511
+#: src/mainwindow.c:4763
 msgid "//Import Clipboard from System"
 msgstr "//クリップボードをシステムからインポート"
 
-#: src/mainwindow.c:4512
+#: src/mainwindow.c:4764
 msgid "//Export Clipboard to System"
 msgstr "//クリップボードをシステムにエクスポート"
 
-#: src/mainwindow.c:4514
+#: src/mainwindow.c:4766
 msgid "//Choose Pattern ..."
 msgstr "//パターンを選択…"
 
-#: src/mainwindow.c:4515
+#: src/mainwindow.c:4767
 msgid "//Choose Brush ..."
 msgstr "//ブラシを選択…"
 
-#: src/mainwindow.c:4517
+#: src/mainwindow.c:4768
+msgid "//Choose Colour ..."
+msgstr ""
+
+#: src/mainwindow.c:4770
 msgid "/_View"
 msgstr "/表示(_V)"
 
-#: src/mainwindow.c:4519
+#: src/mainwindow.c:4772
 msgid "//Show Main Toolbar"
 msgstr "//メインツールバーを表示"
 
-#: src/mainwindow.c:4520
+#: src/mainwindow.c:4773
 msgid "//Show Tools Toolbar"
 msgstr "//ツールのツールバーを表示"
 
-#: src/mainwindow.c:4521
+#: src/mainwindow.c:4774
 msgid "//Show Settings Toolbar"
 msgstr "//ツールバーの設定を表示"
 
-#: src/mainwindow.c:4522
+#: src/mainwindow.c:4775
 msgid "//Show Dock"
 msgstr "//ドックを表示"
 
-#: src/mainwindow.c:4523
+#: src/mainwindow.c:4776
 msgid "//Show Palette"
 msgstr "//パレットを表示"
 
-#: src/mainwindow.c:4524
+#: src/mainwindow.c:4777
 msgid "//Show Status Bar"
 msgstr "//ステータスバーを表示"
 
-#: src/mainwindow.c:4526
+#: src/mainwindow.c:4779
 msgid "//Toggle Image View"
 msgstr "//イメージ表示を切換"
 
-#: src/mainwindow.c:4527
+#: src/mainwindow.c:4780
 msgid "//Centralize Image"
 msgstr "//イメージを中央に置く"
 
-#: src/mainwindow.c:4528
+#: src/mainwindow.c:4781
 msgid "//Show Zoom Grid"
 msgstr "//ズームグリッドを表示"
 
-#: src/mainwindow.c:4529
+#: src/mainwindow.c:4782
+msgid "//Snap To Tile Grid"
+msgstr ""
+
+#: src/mainwindow.c:4783
 msgid "//Configure Grid ..."
 msgstr "//グリッドを設定…"
 
-#: src/mainwindow.c:4530
+#: src/mainwindow.c:4784
 msgid "//Tracing Image ..."
 msgstr "//イメージをトレース…"
 
-#: src/mainwindow.c:4532
+#: src/mainwindow.c:4786
 msgid "//View Window"
 msgstr "//ウィンドウを表示"
 
-#: src/mainwindow.c:4533
+#: src/mainwindow.c:4787
 msgid "//Horizontal Split"
 msgstr "//水平分割"
 
-#: src/mainwindow.c:4534
+#: src/mainwindow.c:4788
 msgid "//Focus View Window"
 msgstr "//表示ウィンドウをフォーカス"
 
-#: src/mainwindow.c:4536
+#: src/mainwindow.c:4790
 msgid "//Pan Window"
 msgstr "//ウィンドウをパンする"
 
-#: src/mainwindow.c:4537
+#: src/mainwindow.c:4791
 msgid "//Layers Window"
 msgstr "//レイヤウィンドウ"
 
-#: src/mainwindow.c:4539
+#: src/mainwindow.c:4793
 msgid "/_Image"
 msgstr "/イメージ(_I)"
 
-#: src/mainwindow.c:4541
+#: src/mainwindow.c:4795
 msgid "//Convert To RGB"
 msgstr "//RGBに変換"
 
-#: src/mainwindow.c:4542
+#: src/mainwindow.c:4796
 msgid "//Convert To Indexed ..."
 msgstr "//インデックスに変換…"
 
-#: src/mainwindow.c:4544
+#: src/mainwindow.c:4798
 msgid "//Scale Canvas ..."
 msgstr "//キャンバスのサイズを拡大縮小…"
 
-#: src/mainwindow.c:4545
+#: src/mainwindow.c:4799
 msgid "//Resize Canvas ..."
 msgstr "//キャンバスのサイズを変更…"
 
-#: src/mainwindow.c:4546
+#: src/mainwindow.c:4800
 msgid "//Crop"
 msgstr "//トリミング"
 
-#: src/mainwindow.c:4548
+#: src/mainwindow.c:4802 src/mainwindow.c:4827
 msgid "//Flip Vertically"
 msgstr "//垂直に反転"
 
-#: src/mainwindow.c:4549
+#: src/mainwindow.c:4803 src/mainwindow.c:4828
 msgid "//Flip Horizontally"
 msgstr "//水平に反転"
 
-#: src/mainwindow.c:4550
+#: src/mainwindow.c:4804 src/mainwindow.c:4829
 msgid "//Rotate Clockwise"
 msgstr "//時計方向に回転"
 
-#: src/mainwindow.c:4551
+#: src/mainwindow.c:4805 src/mainwindow.c:4830
 msgid "//Rotate Anti-Clockwise"
 msgstr "//反時計方向に回転"
 
-#: src/mainwindow.c:4552
+#: src/mainwindow.c:4806
 msgid "//Free Rotate ..."
 msgstr "//自由に回転…"
 
-#: src/mainwindow.c:4553
+#: src/mainwindow.c:4807
 msgid "//Skew ..."
 msgstr "//歪み…"
 
-#: src/mainwindow.c:4555
+#: src/mainwindow.c:4810
+msgid "//Segment ..."
+msgstr ""
+
+#: src/mainwindow.c:4812
 msgid "//Information ..."
 msgstr "//情報…"
 
-#: src/mainwindow.c:4556
+#: src/mainwindow.c:4813
 msgid "//Preferences ..."
 msgstr "//設定…"
 
-#: src/mainwindow.c:4558
+#: src/mainwindow.c:4815
 msgid "/_Selection"
 msgstr "/選択(_S)"
 
-#: src/mainwindow.c:4560
+#: src/mainwindow.c:4817
 msgid "//Select All"
 msgstr "//全選択"
 
-#: src/mainwindow.c:4561
+#: src/mainwindow.c:4818
 msgid "//Select None (Esc)"
 msgstr "//選択しない (Esc)"
 
-#: src/mainwindow.c:4562
+#: src/mainwindow.c:4819
 msgid "//Lasso Selection"
 msgstr "//投げ縄ツールで選択"
 
-#: src/mainwindow.c:4563
+#: src/mainwindow.c:4820
 msgid "//Lasso Selection Cut"
 msgstr "//投げ縄ツールで切取り"
 
-#: src/mainwindow.c:4565
+#: src/mainwindow.c:4822
 msgid "//Outline Selection"
 msgstr "//アウトライン選択"
 
-#: src/mainwindow.c:4566
+#: src/mainwindow.c:4823
 msgid "//Fill Selection"
 msgstr "//選択範囲の塗りつぶし"
 
-#: src/mainwindow.c:4567
+#: src/mainwindow.c:4824
 msgid "//Outline Ellipse"
 msgstr "//楕円の輪郭"
 
-#: src/mainwindow.c:4568
+#: src/mainwindow.c:4825
 msgid "//Fill Ellipse"
 msgstr "//楕円の塗りつぶし"
 
-#: src/mainwindow.c:4575
+#: src/mainwindow.c:4832
 msgid "//Horizontal Ramp"
 msgstr "//水平色勾配"
 
-#: src/mainwindow.c:4576
+#: src/mainwindow.c:4833
 msgid "//Vertical Ramp"
 msgstr "//垂直色勾配"
 
-#: src/mainwindow.c:4578
+#: src/mainwindow.c:4835
 msgid "//Alpha Blend A,B"
 msgstr "//アルファチャンネルA、Bを混ぜる"
 
-#: src/mainwindow.c:4579
+#: src/mainwindow.c:4836
 msgid "//Move Alpha to Mask"
 msgstr "//アルファチャンネルをマスクに移動"
 
-#: src/mainwindow.c:4580
+#: src/mainwindow.c:4837
 msgid "//Mask Colour A,B"
 msgstr "//色A、Bをマスクする"
 
-#: src/mainwindow.c:4581
+#: src/mainwindow.c:4838
 msgid "//Unmask Colour A,B"
 msgstr "//色A、Bをアンマスクする"
 
-#: src/mainwindow.c:4582
+#: src/mainwindow.c:4839
 msgid "//Mask All Colours"
 msgstr "//すべての色をマスクする"
 
-#: src/mainwindow.c:4583
+#: src/mainwindow.c:4840
 msgid "//Clear Mask"
 msgstr "//マスクをクリア"
 
-#: src/mainwindow.c:4585
+#: src/mainwindow.c:4842
 msgid "/_Palette"
 msgstr "/パレット(_P)"
 
-#: src/mainwindow.c:4589
-msgid "//Load Default"
-msgstr "//デフォルトをロード"
-
-#: src/mainwindow.c:4591
-msgid "//Mask All"
-msgstr "//すべてマスク"
-
-#: src/mainwindow.c:4592
-msgid "//Mask None"
-msgstr "//マスクしない"
-
-#: src/mainwindow.c:4594
-msgid "//Swap A & B"
-msgstr "//AとBを入れ換える"
-
-#: src/mainwindow.c:4595
-msgid "//Edit Colour A & B ..."
-msgstr "//色AとBを編集…"
-
-#: src/mainwindow.c:4596
-msgid "//Dither A"
-msgstr "//Aをディザ"
-
-#: src/mainwindow.c:4597
-msgid "//Palette Editor ..."
-msgstr "//パレット編集…"
-
-#: src/mainwindow.c:4598
-msgid "//Set Palette Size ..."
-msgstr "//パレットサイズを設定…"
-
-#: src/mainwindow.c:4599
-msgid "//Merge Duplicate Colours"
-msgstr "//複製した色を結合"
-
-#: src/mainwindow.c:4600
-msgid "//Remove Unused Colours"
-msgstr "//未使用の色を削除"
-
-#: src/mainwindow.c:4602
-msgid "//Create Quantized ..."
-msgstr "//量子化の作成…"
-
-#: src/mainwindow.c:4604
-msgid "//Sort Colours ..."
-msgstr "//色の並び替え…"
-
-#: src/mainwindow.c:4605
-msgid "//Palette Shifter ..."
-msgstr "//パレットシフタ…"
-
-#: src/mainwindow.c:4607
-msgid "/Effe_cts"
-msgstr "/効果(_C)"
-
-#: src/mainwindow.c:4609
-msgid "//Transform Colour ..."
-msgstr "//色の変換…"
-
-#: src/mainwindow.c:4610
-msgid "//Invert"
-msgstr "//反転"
-
-#: src/mainwindow.c:4611
-msgid "//Greyscale"
-msgstr "//グレースケール"
-
-#: src/mainwindow.c:4612
-msgid "//Greyscale (Gamma corrected)"
-msgstr "//グレースケール(ガンマ補正)"
-
-#: src/mainwindow.c:4613
-msgid "//Isometric Transformation"
-msgstr "//等量変換"
-
-#: src/mainwindow.c:4615
-msgid "///Left Side Down"
-msgstr "///左側下"
-
-#: src/mainwindow.c:4616
-msgid "///Right Side Down"
-msgstr "///右側下"
-
-#: src/mainwindow.c:4617
-msgid "///Top Side Right"
-msgstr "///上右"
-
-#: src/mainwindow.c:4618
-msgid "///Bottom Side Right"
-msgstr "///下右"
-
-#: src/mainwindow.c:4620
-msgid "//Edge Detect ..."
-msgstr "//縁を検出…"
-
-#: src/mainwindow.c:4621
-msgid "//Difference of Gaussians ..."
-msgstr "//ガウスの差異…"
-
-#: src/mainwindow.c:4622
-msgid "//Sharpen ..."
-msgstr "//シャープにする…"
-
-#: src/mainwindow.c:4623
-msgid "//Unsharp Mask ..."
-msgstr "//マスクをぼかす…"
-
-#: src/mainwindow.c:4624
-msgid "//Soften ..."
-msgstr "//ぼかし…"
-
-#: src/mainwindow.c:4625
-msgid "//Gaussian Blur ..."
-msgstr "//ガウスぼかし…"
-
-#: src/mainwindow.c:4626
-msgid "//Kuwahara-Nagao Blur ..."
-msgstr "//Kuwahara-Nagaoぼかし…"
-
-#: src/mainwindow.c:4627
-msgid "//Emboss"
-msgstr "//エンボス"
-
-#: src/mainwindow.c:4628
-msgid "//Dilate"
-msgstr "//拡張"
-
-#: src/mainwindow.c:4629
-msgid "//Erode"
-msgstr "//腐食"
-
-#: src/mainwindow.c:4631
-msgid "//Bacteria ..."
-msgstr "//バクテリア…"
-
-#: src/mainwindow.c:4633
-msgid "/Cha_nnels"
-msgstr "/チャンネル(_N)"
-
-#: src/mainwindow.c:4635
-msgid "//New ..."
-msgstr "//新規…"
-
-#: src/mainwindow.c:4636
+#: src/mainwindow.c:4844 src/mainwindow.c:4894
 msgid "//Load ..."
 msgstr "//ロード…"
 
-#: src/mainwindow.c:4638
+#: src/mainwindow.c:4846
+msgid "//Load Default"
+msgstr "//デフォルトをロード"
+
+#: src/mainwindow.c:4848
+msgid "//Mask All"
+msgstr "//すべてマスク"
+
+#: src/mainwindow.c:4849
+msgid "//Mask None"
+msgstr "//マスクしない"
+
+#: src/mainwindow.c:4851
+msgid "//Swap A & B"
+msgstr "//AとBを入れ換える"
+
+#: src/mainwindow.c:4852
+msgid "//Edit Colour A & B ..."
+msgstr "//色AとBを編集…"
+
+#: src/mainwindow.c:4853
+msgid "//Dither A"
+msgstr "//Aをディザ"
+
+#: src/mainwindow.c:4854
+msgid "//Palette Editor ..."
+msgstr "//パレット編集…"
+
+#: src/mainwindow.c:4855
+msgid "//Set Palette Size ..."
+msgstr "//パレットサイズを設定…"
+
+#: src/mainwindow.c:4856
+msgid "//Merge Duplicate Colours"
+msgstr "//複製した色を結合"
+
+#: src/mainwindow.c:4857
+msgid "//Remove Unused Colours"
+msgstr "//未使用の色を削除"
+
+#: src/mainwindow.c:4859
+msgid "//Create Quantized ..."
+msgstr "//量子化の作成…"
+
+#: src/mainwindow.c:4861
+msgid "//Sort Colours ..."
+msgstr "//色の並び替え…"
+
+#: src/mainwindow.c:4862
+msgid "//Palette Shifter ..."
+msgstr "//パレットシフタ…"
+
+#: src/mainwindow.c:4863
+msgid "//Pick Gradient ..."
+msgstr ""
+
+#: src/mainwindow.c:4865
+msgid "/Effe_cts"
+msgstr "/効果(_C)"
+
+#: src/mainwindow.c:4867
+msgid "//Transform Colour ..."
+msgstr "//色の変換…"
+
+#: src/mainwindow.c:4868
+msgid "//Invert"
+msgstr "//反転"
+
+#: src/mainwindow.c:4869
+msgid "//Greyscale"
+msgstr "//グレースケール"
+
+#: src/mainwindow.c:4870
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//グレースケール(ガンマ補正)"
+
+#: src/mainwindow.c:4871
+msgid "//Isometric Transformation"
+msgstr "//等量変換"
+
+#: src/mainwindow.c:4873
+msgid "///Left Side Down"
+msgstr "///左側下"
+
+#: src/mainwindow.c:4874
+msgid "///Right Side Down"
+msgstr "///右側下"
+
+#: src/mainwindow.c:4875
+msgid "///Top Side Right"
+msgstr "///上右"
+
+#: src/mainwindow.c:4876
+msgid "///Bottom Side Right"
+msgstr "///下右"
+
+#: src/mainwindow.c:4878
+msgid "//Edge Detect ..."
+msgstr "//縁を検出…"
+
+#: src/mainwindow.c:4879
+msgid "//Difference of Gaussians ..."
+msgstr "//ガウスの差異…"
+
+#: src/mainwindow.c:4880
+msgid "//Sharpen ..."
+msgstr "//シャープにする…"
+
+#: src/mainwindow.c:4881
+msgid "//Unsharp Mask ..."
+msgstr "//マスクをぼかす…"
+
+#: src/mainwindow.c:4882
+msgid "//Soften ..."
+msgstr "//ぼかし…"
+
+#: src/mainwindow.c:4883
+msgid "//Gaussian Blur ..."
+msgstr "//ガウスぼかし…"
+
+#: src/mainwindow.c:4884
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr "//Kuwahara-Nagaoぼかし…"
+
+#: src/mainwindow.c:4885
+msgid "//Emboss"
+msgstr "//エンボス"
+
+#: src/mainwindow.c:4886
+msgid "//Dilate"
+msgstr "//拡張"
+
+#: src/mainwindow.c:4887
+msgid "//Erode"
+msgstr "//腐食"
+
+#: src/mainwindow.c:4889
+msgid "//Bacteria ..."
+msgstr "//バクテリア…"
+
+#: src/mainwindow.c:4891
+msgid "/Cha_nnels"
+msgstr "/チャンネル(_N)"
+
+#: src/mainwindow.c:4893
+msgid "//New ..."
+msgstr "//新規…"
+
+#: src/mainwindow.c:4896
 msgid "//Delete ..."
 msgstr "//削除…"
 
-#: src/mainwindow.c:4640
+#: src/mainwindow.c:4898
 msgid "//Edit Image"
 msgstr "//イメージを編集"
 
-#: src/mainwindow.c:4641
+#: src/mainwindow.c:4899
 msgid "//Edit Alpha"
 msgstr "//アルファチャンネルを編集"
 
-#: src/mainwindow.c:4642
+#: src/mainwindow.c:4900
 msgid "//Edit Selection"
 msgstr "//選択を編集"
 
-#: src/mainwindow.c:4643
+#: src/mainwindow.c:4901
 msgid "//Edit Mask"
 msgstr "//マスクを編集"
 
-#: src/mainwindow.c:4645
+#: src/mainwindow.c:4903
 msgid "//Hide Image"
 msgstr "//イメージを隠す"
 
-#: src/mainwindow.c:4646
+#: src/mainwindow.c:4904
 msgid "//Disable Alpha"
 msgstr "//アルファチャンネルを無効にする"
 
-#: src/mainwindow.c:4647
+#: src/mainwindow.c:4905
 msgid "//Disable Selection"
 msgstr "//選択を無効にする"
 
-#: src/mainwindow.c:4648
+#: src/mainwindow.c:4906
 msgid "//Disable Mask"
 msgstr "//マスクを無効にする"
 
-#: src/mainwindow.c:4650
+#: src/mainwindow.c:4908
 msgid "//Couple RGBA Operations"
 msgstr "//RGBA操作を結合"
 
-#: src/mainwindow.c:4651
+#: src/mainwindow.c:4909
 msgid "//Threshold ..."
 msgstr "//しきい値…"
 
-#: src/mainwindow.c:4652
+#: src/mainwindow.c:4910
 msgid "//Unassociate Alpha"
 msgstr "//アルファチャンネルを結合しない"
 
-#: src/mainwindow.c:4654
+#: src/mainwindow.c:4912
 msgid "//View Alpha as an Overlay"
 msgstr "//アルファチャンネルをオーバーレイとして表示"
 
-#: src/mainwindow.c:4655
+#: src/mainwindow.c:4913
 msgid "//Configure Overlays ..."
 msgstr "//オーバーレイを設定…"
 
-#: src/mainwindow.c:4657
+#: src/mainwindow.c:4915
 msgid "/_Layers"
 msgstr "/レイヤ(_L)"
 
-#: src/mainwindow.c:4659
+#: src/mainwindow.c:4917
 msgid "//New Layer"
 msgstr "//新規レイヤ"
 
-#: src/mainwindow.c:4662
+#: src/mainwindow.c:4920
 msgid "//Save Composite Image ..."
 msgstr "//合成イメージを保存…"
 
-#: src/mainwindow.c:4663
+#: src/mainwindow.c:4921
 msgid "//Composite to New Layer"
 msgstr "//新規レイヤに合成"
 
-#: src/mainwindow.c:4664
+#: src/mainwindow.c:4922
 msgid "//Remove All Layers"
 msgstr "//全レイヤを削除"
 
-#: src/mainwindow.c:4666
+#: src/mainwindow.c:4924
 msgid "//Configure Animation ..."
 msgstr "//アニメを設定…"
 
-#: src/mainwindow.c:4667
+#: src/mainwindow.c:4925
 msgid "//Preview Animation ..."
 msgstr "//アニメをプレビュー…"
 
-#: src/mainwindow.c:4668
+#: src/mainwindow.c:4926
 msgid "//Set Key Frame ..."
 msgstr "//キーフレームを設定…"
 
-#: src/mainwindow.c:4669
+#: src/mainwindow.c:4927
 msgid "//Remove All Key Frames ..."
 msgstr "//全キーフレームを削除…"
 
-#: src/mainwindow.c:4671
+#: src/mainwindow.c:4929
 msgid "/More..."
 msgstr "/さらに..."
 
-#: src/mainwindow.c:4673
+#: src/mainwindow.c:4931
 msgid "/_Help"
 msgstr "/ヘルプ(_H)"
 
-#: src/mainwindow.c:4674
+#: src/mainwindow.c:4932
 msgid "//Documentation"
 msgstr "//文書"
 
-#: src/mainwindow.c:4675
+#: src/mainwindow.c:4933
 msgid "//About"
 msgstr "//mtPaintについて"
 
-#: src/mainwindow.c:4677
+#: src/mainwindow.c:4935
 msgid "//Rebind Shortcut Keycodes"
 msgstr "//ショートカットキーコードのやり直し"
 
-#: src/memory.c:2594
-#: src/memory.c:2979
+#: src/memory.c:2678
+msgid "Quantize Pass 1"
+msgstr ""
+
+#: src/memory.c:2732
+msgid "Quantize Pass 2"
+msgstr ""
+
+#: src/memory.c:2951 src/memory.c:3335
 msgid "Converting to Indexed Palette"
 msgstr "インデックスパレットに変換"
 
-#: src/memory.c:4316
-#: src/otherwindow.c:535
+#: src/memory.c:4709 src/otherwindow.c:562
 msgid "Bacteria Effect"
 msgstr "バクテリア効果"
 
-#: src/memory.c:4351
+#: src/memory.c:4744
 msgid "Rotating"
 msgstr "回転"
 
-#: src/memory.c:4703
+#: src/memory.c:5096
 msgid "Free Rotation"
 msgstr "自由回転"
 
-#: src/memory.c:5202
+#: src/memory.c:5682
 msgid "Scaling Image"
 msgstr "イメージを縮小拡大"
 
-#: src/memory.c:6361
+#: src/memory.c:6903
 msgid "Counting Unique RGB Pixels"
 msgstr "一意RGBピクセルを計算"
 
-#: src/memory.c:6404
+#: src/memory.c:6950
 msgid "Applying Effect"
 msgstr "効果を適用"
 
-#: src/memory.c:7439
+#: src/memory.c:8167
 msgid "Kuwahara-Nagao Filter"
 msgstr "Kuwahara-Nagaoフィルタ"
 
-#: src/memory.c:8905
-#: src/otherwindow.c:3064
+#: src/memory.c:9822 src/otherwindow.c:3212
 msgid "Skew"
 msgstr "歪み"
 
-#: src/mygtk.c:146
-msgid "Please Wait ..."
-msgstr "お待ち下さい ..."
+#: src/memory.c:9966
+msgid "Segmentation Pass 1"
+msgstr ""
 
-#: src/mygtk.c:168
+#: src/memory.c:10093
+msgid "Segmentation Pass 2"
+msgstr ""
+
+#: src/mygtk.c:170
+msgid "Please Wait ..."
+msgstr "お待ち下さい…"
+
+#: src/mygtk.c:189
 msgid "STOP"
 msgstr "停止"
 
-#: src/mygtk.c:787
+#: src/mygtk.c:816
 msgid "Browse"
 msgstr "ブラウズ"
 
-#: src/mygtk.c:2324
+#: src/mygtk.c:1983
 msgid "Gamma corrected"
 msgstr "ガンマ補正"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "24 bit RGB"
 msgstr "24ビット RGB"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "Greyscale"
 msgstr "グレースケール"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "Indexed Palette"
 msgstr "インデックスパレット"
 
-#: src/otherwindow.c:266
+#: src/otherwindow.c:260
 msgid "From Clipboard"
 msgstr "クリップボードから"
 
-#: src/otherwindow.c:266
+#: src/otherwindow.c:260
 msgid "Grab Screenshot"
 msgstr "スクリーンショットをとる"
 
-#: src/otherwindow.c:267
-#: src/toolbar.c:553
+#: src/otherwindow.c:261 src/toolbar.c:1037
 msgid "New Image"
 msgstr "新規イメージ"
 
-#: src/otherwindow.c:297
+#: src/otherwindow.c:288
 msgid "Width"
 msgstr "幅"
 
-#: src/otherwindow.c:298
+#: src/otherwindow.c:289
 msgid "Height"
 msgstr "高さ"
 
-#: src/otherwindow.c:299
+#: src/otherwindow.c:290
 msgid "Colours"
 msgstr "色"
 
-#: src/otherwindow.c:385
+#: src/otherwindow.c:431
 msgid "Pattern Chooser"
 msgstr "パターン選択"
 
-#: src/otherwindow.c:451
+#: src/otherwindow.c:498
 msgid "Set Palette Size"
 msgstr "パレットサイズを設定"
 
-#: src/otherwindow.c:512
-#: src/otherwindow.c:608
-#: src/otherwindow.c:944
-#: src/otherwindow.c:2966
-#: src/otherwindow.c:3201
-#: src/prefs.c:662
+#: src/otherwindow.c:538 src/otherwindow.c:632 src/otherwindow.c:1011
+#: src/otherwindow.c:3077 src/otherwindow.c:3345 src/otherwindow.c:3546
+#: src/prefs.c:714
 msgid "Apply"
 msgstr "適用"
 
-#: src/otherwindow.c:572
+#: src/otherwindow.c:599
 msgid "Luminance"
 msgstr "輝度"
 
-#: src/otherwindow.c:572
-msgid "Distance to A"
-msgstr "Aまでの距離"
-
-#: src/otherwindow.c:573
-msgid "Distance to A+B"
-msgstr "A+Bまでの距離"
-
-#: src/otherwindow.c:574
-msgid "Projection to A->B"
-msgstr "A->Bへの投影"
-
-#: src/otherwindow.c:575
-msgid "Frequency"
-msgstr "頻度"
-
-#: src/otherwindow.c:580
-msgid "Sort Palette Colours"
-msgstr "パレット色を並び替え"
-
-#: src/otherwindow.c:592
-msgid "Start Index"
-msgstr "インデックスを開始"
-
-#: src/otherwindow.c:593
-msgid "End Index"
-msgstr "インデックスを終了"
-
-#: src/otherwindow.c:599
-msgid "Reverse Order"
-msgstr "逆順"
-
-#: src/otherwindow.c:801
-msgid "Auto-Preview"
-msgstr "自動プレビュー"
-
-#: src/otherwindow.c:802
-#: src/otherwindow.c:878
-#: src/otherwindow.c:2284
-msgid "Palette"
-msgstr "パレット"
-
-#: src/otherwindow.c:803
+#: src/otherwindow.c:599 src/otherwindow.c:868
 msgid "Brightness"
 msgstr "明るさ"
 
-#: src/otherwindow.c:803
+#: src/otherwindow.c:600
+msgid "Distance to A"
+msgstr "Aまでの距離"
+
+#: src/otherwindow.c:601
+msgid "Projection to A->B"
+msgstr "A->Bへの投影"
+
+#: src/otherwindow.c:602
+msgid "Frequency"
+msgstr "頻度"
+
+#: src/otherwindow.c:607
+msgid "Sort Palette Colours"
+msgstr "パレット色を並び替え"
+
+#: src/otherwindow.c:616
+msgid "Start Index"
+msgstr "インデックスを開始"
+
+#: src/otherwindow.c:617
+msgid "End Index"
+msgstr "インデックスを終了"
+
+#: src/otherwindow.c:623
+msgid "Reverse Order"
+msgstr "逆順"
+
+#: src/otherwindow.c:868
 msgid "Contrast"
 msgstr "コントラスト"
 
-#: src/otherwindow.c:804
-#: src/otherwindow.c:1927
+#: src/otherwindow.c:869 src/otherwindow.c:2048
 msgid "Posterize"
 msgstr "ポスタリゼーション"
 
-#: src/otherwindow.c:804
+#: src/otherwindow.c:869
 msgid "Gamma"
 msgstr "ガンマ"
 
-#: src/otherwindow.c:820
-#: src/toolbar.c:564
+#: src/otherwindow.c:870
+msgid "Bitwise"
+msgstr ""
+
+#: src/otherwindow.c:870
+msgid "Truncated"
+msgstr ""
+
+#: src/otherwindow.c:870
+msgid "Rounded"
+msgstr ""
+
+#: src/otherwindow.c:887 src/toolbar.c:1048
 msgid "Transform Colour"
 msgstr "色の変換"
 
-#: src/otherwindow.c:858
+#: src/otherwindow.c:921
 msgid "Show Detail"
 msgstr "詳細表示"
 
-#: src/otherwindow.c:863
+#: src/otherwindow.c:927
 msgid "Store Values"
 msgstr "値を格納"
 
-#: src/otherwindow.c:939
+#: src/otherwindow.c:937
+msgid "Posterize type"
+msgstr ""
+
+#: src/otherwindow.c:941 src/otherwindow.c:944 src/otherwindow.c:2429
+msgid "Palette"
+msgstr "パレット"
+
+#: src/otherwindow.c:973
+msgid "Auto-Preview"
+msgstr "自動プレビュー"
+
+#: src/otherwindow.c:1006
 msgid "Reset"
 msgstr "リセット"
 
-#: src/otherwindow.c:1005
+#: src/otherwindow.c:1072
 msgid "New geometry is the same as now - nothing to do."
 msgstr "新しい配位は現在と同じです - する事はありません。"
 
-#: src/otherwindow.c:1054
+#: src/otherwindow.c:1122
 msgid "The operating system cannot allocate the memory for this operation."
 msgstr "OSはこの操作にメモリを割り当てる事ができません。"
 
-#: src/otherwindow.c:1056
-msgid "You have not allocated enough memory in the Preferences window for this operation."
+#: src/otherwindow.c:1124
+msgid ""
+"You have not allocated enough memory in the Preferences window for this "
+"operation."
 msgstr "この操作の設定ウィンドウに必要なメモリを割り当てる事ができません。"
 
-#: src/otherwindow.c:1076
+#: src/otherwindow.c:1144
 msgid "Nearest Neighbour"
 msgstr "最近隣法"
 
-#: src/otherwindow.c:1077
+#: src/otherwindow.c:1145
 msgid "Bilinear / Area Mapping"
 msgstr "双線形/エリアマッピング"
 
-#: src/otherwindow.c:1077
-#: src/otherwindow.c:2904
+#: src/otherwindow.c:1145 src/otherwindow.c:3018
 msgid "Bilinear"
 msgstr "二本線"
 
-#: src/otherwindow.c:1078
+#: src/otherwindow.c:1146
 msgid "Bicubic"
 msgstr "双三次"
 
-#: src/otherwindow.c:1079
+#: src/otherwindow.c:1147
 msgid "Bicubic edged"
 msgstr "双三次境界"
 
-#: src/otherwindow.c:1080
+#: src/otherwindow.c:1148
 msgid "Bicubic better"
 msgstr "バイキュービック(良)"
 
-#: src/otherwindow.c:1081
+#: src/otherwindow.c:1149
 msgid "Bicubic sharper"
 msgstr "バイキュービック(鮮明)"
 
-#: src/otherwindow.c:1082
+#: src/otherwindow.c:1150
 msgid "Blackman-Harris"
 msgstr "Blackman-Harris"
 
-#: src/otherwindow.c:1092
-#: src/shifter.c:327
-msgid "Clear"
-msgstr "クリア"
-
-#: src/otherwindow.c:1093
-msgid "Tile"
-msgstr "タイル"
-
-#: src/otherwindow.c:1094
-msgid "Mirror tile"
-msgstr "ミラー タイル"
-
-#: src/otherwindow.c:1109
+#: src/otherwindow.c:1167
 msgid "Width     "
 msgstr "幅     "
 
-#: src/otherwindow.c:1110
+#: src/otherwindow.c:1168
 msgid "Height    "
 msgstr "高さ    "
 
-#: src/otherwindow.c:1112
+#: src/otherwindow.c:1170
 msgid "Original      "
 msgstr "元      "
 
-#: src/otherwindow.c:1118
+#: src/otherwindow.c:1176
 msgid "New"
 msgstr "新規"
 
-#: src/otherwindow.c:1127
-#: src/otherwindow.c:2937
-#: src/otherwindow.c:3074
+#: src/otherwindow.c:1185 src/otherwindow.c:3051 src/otherwindow.c:3219
 msgid "Offset"
 msgstr "オフセット"
 
-#: src/otherwindow.c:1133
-#: src/otherwindow.c:1959
+#: src/otherwindow.c:1191 src/otherwindow.c:2079
 msgid "Centre"
 msgstr "中央"
 
-#: src/otherwindow.c:1144
+#: src/otherwindow.c:1202
 msgid "Fix Aspect Ratio"
 msgstr "アスペクトレシオを固定"
 
-#: src/otherwindow.c:1163
-#: src/otherwindow.c:2268
-msgid "Settings"
-msgstr "設定"
+#: src/otherwindow.c:1211 src/shifter.c:325
+msgid "Clear"
+msgstr "クリア"
 
-#: src/otherwindow.c:1168
-msgid "Sharper image reduction"
-msgstr "シャープ化イメージの縮小"
-
-#: src/otherwindow.c:1193
-msgid "Scale Canvas"
-msgstr "キャンバスの縮小拡大"
-
-#: src/otherwindow.c:1193
-msgid "Resize Canvas"
-msgstr "キャンバスのサイズ変更"
-
-#: src/otherwindow.c:1842
-msgid "From"
-msgstr "から"
-
-#: src/otherwindow.c:1842
-msgid "To"
-msgstr "へ"
-
-#: src/otherwindow.c:1843
-#: src/otherwindow.c:2700
-msgid "HSV"
-msgstr "HSV"
-
-#: src/otherwindow.c:1858
-msgid "Scale"
-msgstr "スケール"
-
-#: src/otherwindow.c:1873
-msgid "Palette Editor"
-msgstr "パレット編集"
-
-#: src/otherwindow.c:1894
-msgid "Configure Overlays"
-msgstr "オーバーレイの設定"
-
-#: src/otherwindow.c:1951
-msgid "Colour Editor"
-msgstr "色編集"
-
-#: src/otherwindow.c:1959
-msgid "Limit"
-msgstr "限界"
-
-#: src/otherwindow.c:1960
-msgid "Sphere"
-msgstr "球"
-
-#: src/otherwindow.c:1960
-#: src/otherwindow.c:3073
-msgid "Angle"
-msgstr "角度"
-
-#: src/otherwindow.c:1960
-msgid "Cube"
-msgstr "立方体"
-
-#: src/otherwindow.c:1990
-msgid "Range"
-msgstr "範囲"
-
-#: src/otherwindow.c:1992
-msgid "Inverse"
-msgstr "反転"
-
-#: src/otherwindow.c:1997
-#: src/toolbar.c:428
-msgid "Colour-Selective Mode"
-msgstr "色選択モード"
-
-#: src/otherwindow.c:2006
-msgid "Opaque"
-msgstr "不透明"
-
-#: src/otherwindow.c:2006
-msgid "Border"
-msgstr "縁"
-
-#: src/otherwindow.c:2007
-msgid "Transparent"
-msgstr "透過"
-
-#: src/otherwindow.c:2007
-msgid "Tile "
+#: src/otherwindow.c:1211 src/otherwindow.c:1221
+msgid "Tile"
 msgstr "タイル"
 
-#: src/otherwindow.c:2024
-msgid "Smart grid"
-msgstr "スマートグリッド"
+#: src/otherwindow.c:1212
+msgid "Mirror tile"
+msgstr "ミラー タイル"
 
-#: src/otherwindow.c:2026
-msgid "Tile grid"
-msgstr "タイルグリッド"
-
-#: src/otherwindow.c:2028
-msgid "Minimum grid zoom"
-msgstr "最小グリッドズーム"
-
-#: src/otherwindow.c:2030
-msgid "Tile width"
-msgstr "タイル幅"
-
-#: src/otherwindow.c:2032
-msgid "Tile height"
-msgstr "タイル高さ"
-
-#: src/otherwindow.c:2044
-msgid "Configure Grid"
-msgstr "グリッドを設定"
-
-#: src/otherwindow.c:2227
-msgid "Exact Conversion"
-msgstr "正確な変換"
-
-#: src/otherwindow.c:2227
-msgid "Use Current Palette"
-msgstr "現在のパレットを使用"
-
-#: src/otherwindow.c:2228
-msgid "PNN Quantize (slow, better quality)"
-msgstr "PNN 量子化 (遅いが良い画質)"
-
-#: src/otherwindow.c:2229
-msgid "Wu Quantize (fast)"
-msgstr "Wu 量子化 (速い)"
-
-#: src/otherwindow.c:2230
-msgid "Max-Min Quantize (best for small palettes and dithering)"
-msgstr "最大最小量子化 (小さなパレットとディザに最適)"
-
-#: src/otherwindow.c:2233
-#: src/otherwindow.c:2906
-#: src/otherwindow.c:3162
-msgid "None"
-msgstr "なし"
-
-#: src/otherwindow.c:2233
-msgid "Floyd-Steinberg"
-msgstr "Floyd-Steinberg"
-
-#: src/otherwindow.c:2233
-msgid "Stucki"
-msgstr "Stucki"
-
-#: src/otherwindow.c:2236
-msgid "Floyd-Steinberg (quick)"
-msgstr "Floyd-Steinberg (速い)"
-
-#: src/otherwindow.c:2236
-msgid "Dithered (effect)"
-msgstr "ディザ(効果)"
-
-#: src/otherwindow.c:2237
-msgid "Scattered (effect)"
-msgstr "拡散(効果)"
-
-#: src/otherwindow.c:2240
-msgid "Largest (Linf)"
-msgstr "最大(Linf)"
-
-#: src/otherwindow.c:2240
-msgid "Sum (L1)"
-msgstr "合計(L1)"
-
-#: src/otherwindow.c:2240
-msgid "Euclidean (L2)"
-msgstr "ユークリッド(L2)"
-
-#: src/otherwindow.c:2241
-msgid "Gamut"
-msgstr "色域"
-
-#: src/otherwindow.c:2241
-msgid "Weakly"
-msgstr "弱く"
-
-#: src/otherwindow.c:2241
-msgid "Strongly"
-msgstr "強く"
-
-#: src/otherwindow.c:2242
-msgid "Off"
-msgstr "オフ"
-
-#: src/otherwindow.c:2242
-msgid "Separate/Sum"
-msgstr "分離/合計"
-
-#: src/otherwindow.c:2242
-msgid "Separate/Split"
-msgstr "分離/分割"
-
-#: src/otherwindow.c:2243
-msgid "Length/Sum"
-msgstr "長さ/合計"
-
-#: src/otherwindow.c:2243
-msgid "Length/Split"
-msgstr "長さ/分割"
-
-#: src/otherwindow.c:2250
-msgid "Create Quantized"
-msgstr "量子化の作成"
-
-#: src/otherwindow.c:2250
-msgid "Convert To Indexed"
-msgstr "インデックスに変換"
-
-#: src/otherwindow.c:2259
-msgid "Indexed Colours To Use"
-msgstr "使用するインデックスカラー"
-
-#: src/otherwindow.c:2282
-msgid "Truncate palette"
-msgstr "切り取りパレット"
-
-#: src/otherwindow.c:2283
-msgid "Diameter based weighting"
-msgstr "ロード量に基づく直径"
-
-#: src/otherwindow.c:2294
-msgid "Dither"
-msgstr "ディザ"
-
-#: src/otherwindow.c:2299
-msgid "Colour space"
-msgstr "色空間"
-
-#: src/otherwindow.c:2302
-msgid "Difference measure"
-msgstr "差異測定"
-
-#: src/otherwindow.c:2305
-msgid "Reduce colour bleed"
-msgstr "色のにじみを減らす"
-
-#: src/otherwindow.c:2307
-msgid "Serpentine scan"
-msgstr "蛇行スキャン"
-
-#: src/otherwindow.c:2310
-msgid "Error propagation, %"
-msgstr "エラー伝搬、 %"
-
-#: src/otherwindow.c:2311
-msgid "Selective error propagation"
-msgstr "選択できるエラー伝達"
-
-#: src/otherwindow.c:2320
-msgid "Full error precision"
-msgstr "全エラー予測"
-
-#: src/otherwindow.c:2677
-msgid "Edit Gradient"
-msgstr "グラデーションを編集"
-
-#: src/otherwindow.c:2700
-msgid "Backward HSV"
-msgstr "HSVを逆に"
-
-#: src/otherwindow.c:2701
-#: src/otherwindow.c:2717
-msgid "Constant"
-msgstr "定数"
-
-#: src/otherwindow.c:2723
-msgid "Points:"
-msgstr "点:"
-
-#: src/otherwindow.c:2886
-#: src/toolbar.c:314
-msgid "Reverse"
-msgstr "逆"
-
-#: src/otherwindow.c:2887
-msgid "Edit Custom"
-msgstr "カスタムを編集"
-
-#: src/otherwindow.c:2904
-msgid "Linear"
-msgstr "線形"
-
-#: src/otherwindow.c:2904
-msgid "Radial"
-msgstr "放射状"
-
-#: src/otherwindow.c:2904
-msgid "Square"
-msgstr "四角"
-
-#: src/otherwindow.c:2905
-msgid "Angular"
-msgstr "角度"
-
-#: src/otherwindow.c:2905
-msgid "Conical"
-msgstr "円錐"
-
-#: src/otherwindow.c:2906
-msgid "Level"
-msgstr "水平"
-
-#: src/otherwindow.c:2906
-msgid "Repeat"
-msgstr "繰返し"
-
-#: src/otherwindow.c:2906
+#: src/otherwindow.c:1221 src/otherwindow.c:3020
 msgid "Mirror"
 msgstr "ミラー"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:1221
+msgid "Void"
+msgstr ""
+
+#: src/otherwindow.c:1229 src/otherwindow.c:2408
+msgid "Settings"
+msgstr "設定"
+
+#: src/otherwindow.c:1234
+msgid "Sharper image reduction"
+msgstr "シャープ化イメージの縮小"
+
+#: src/otherwindow.c:1236
+msgid "Boundary extension"
+msgstr ""
+
+#: src/otherwindow.c:1261
+msgid "Scale Canvas"
+msgstr "キャンバスの縮小拡大"
+
+#: src/otherwindow.c:1261
+msgid "Resize Canvas"
+msgstr "キャンバスのサイズ変更"
+
+#: src/otherwindow.c:1963
+msgid "From"
+msgstr "から"
+
+#: src/otherwindow.c:1963
+msgid "To"
+msgstr "へ"
+
+#: src/otherwindow.c:1964 src/otherwindow.c:2589
+msgid "HSV"
+msgstr "HSV"
+
+#: src/otherwindow.c:1979
+msgid "Scale"
+msgstr "スケール"
+
+#: src/otherwindow.c:1994
+msgid "Palette Editor"
+msgstr "パレット編集"
+
+#: src/otherwindow.c:2015
+msgid "Configure Overlays"
+msgstr "オーバーレイの設定"
+
+#: src/otherwindow.c:2071
+msgid "Colour Editor"
+msgstr "色編集"
+
+#: src/otherwindow.c:2079
+msgid "Limit"
+msgstr "限界"
+
+#: src/otherwindow.c:2080
+msgid "Sphere"
+msgstr "球"
+
+#: src/otherwindow.c:2080 src/otherwindow.c:3218
+msgid "Angle"
+msgstr "角度"
+
+#: src/otherwindow.c:2080
+msgid "Cube"
+msgstr "立方体"
+
+#: src/otherwindow.c:2110
+msgid "Range"
+msgstr "範囲"
+
+#: src/otherwindow.c:2112
+msgid "Inverse"
+msgstr "反転"
+
+#: src/otherwindow.c:2119 src/toolbar.c:890
+msgid "Colour-Selective Mode"
+msgstr "色選択モード"
+
+#: src/otherwindow.c:2128
+msgid "Opaque"
+msgstr "不透明"
+
+#: src/otherwindow.c:2128
+msgid "Border"
+msgstr "縁"
+
+#: src/otherwindow.c:2129
+msgid "Transparent"
+msgstr "透過"
+
+#: src/otherwindow.c:2129
+msgid "Tile "
+msgstr "タイル"
+
+#: src/otherwindow.c:2129
+msgid "Segment"
+msgstr ""
+
+#: src/otherwindow.c:2146
+msgid "Smart grid"
+msgstr "スマートグリッド"
+
+#: src/otherwindow.c:2148
+msgid "Tile grid"
+msgstr "タイルグリッド"
+
+#: src/otherwindow.c:2150
+msgid "Minimum grid zoom"
+msgstr "最小グリッドズーム"
+
+#: src/otherwindow.c:2152
+msgid "Tile width"
+msgstr "タイル幅"
+
+#: src/otherwindow.c:2154
+msgid "Tile height"
+msgstr "タイル高さ"
+
+#: src/otherwindow.c:2168
+msgid "Configure Grid"
+msgstr "グリッドを設定"
+
+#: src/otherwindow.c:2355 src/otherwindow.c:3125
+msgid "Colour space"
+msgstr "色空間"
+
+#: src/otherwindow.c:2361
+msgid "Largest (Linf)"
+msgstr "最大(Linf)"
+
+#: src/otherwindow.c:2361
+msgid "Sum (L1)"
+msgstr "合計(L1)"
+
+#: src/otherwindow.c:2361
+msgid "Euclidean (L2)"
+msgstr "ユークリッド(L2)"
+
+#: src/otherwindow.c:2362
+msgid "Difference measure"
+msgstr "差異測定"
+
+#: src/otherwindow.c:2371
+msgid "Exact Conversion"
+msgstr "正確な変換"
+
+#: src/otherwindow.c:2371
+msgid "Use Current Palette"
+msgstr "現在のパレットを使用"
+
+#: src/otherwindow.c:2372
+msgid "PNN Quantize (slow, better quality)"
+msgstr "PNN 量子化 (遅いが良い画質)"
+
+#: src/otherwindow.c:2373
+msgid "Wu Quantize (fast)"
+msgstr "Wu 量子化 (速い)"
+
+#: src/otherwindow.c:2374
+msgid "Max-Min Quantize (best for small palettes and dithering)"
+msgstr "最大最小量子化 (小さなパレットとディザに最適)"
+
+#: src/otherwindow.c:2377 src/otherwindow.c:3020 src/otherwindow.c:3307
+msgid "None"
+msgstr "なし"
+
+#: src/otherwindow.c:2377
+msgid "Floyd-Steinberg"
+msgstr "Floyd-Steinberg"
+
+#: src/otherwindow.c:2377
+msgid "Stucki"
+msgstr "Stucki"
+
+#: src/otherwindow.c:2380
+msgid "Floyd-Steinberg (quick)"
+msgstr "Floyd-Steinberg (速い)"
+
+#: src/otherwindow.c:2380
+msgid "Dithered (effect)"
+msgstr "ディザ(効果)"
+
+#: src/otherwindow.c:2381
+msgid "Scattered (effect)"
+msgstr "拡散(効果)"
+
+#: src/otherwindow.c:2384
+msgid "Gamut"
+msgstr "色域"
+
+#: src/otherwindow.c:2384
+msgid "Weakly"
+msgstr "弱く"
+
+#: src/otherwindow.c:2384
+msgid "Strongly"
+msgstr "強く"
+
+#: src/otherwindow.c:2385
+msgid "Off"
+msgstr "オフ"
+
+#: src/otherwindow.c:2385
+msgid "Separate/Sum"
+msgstr "分離/合計"
+
+#: src/otherwindow.c:2385
+msgid "Separate/Split"
+msgstr "分離/分割"
+
+#: src/otherwindow.c:2386
+msgid "Length/Sum"
+msgstr "長さ/合計"
+
+#: src/otherwindow.c:2386
+msgid "Length/Split"
+msgstr "長さ/分割"
+
+#: src/otherwindow.c:2392
+msgid "Create Quantized"
+msgstr "量子化の作成"
+
+#: src/otherwindow.c:2392
+msgid "Convert To Indexed"
+msgstr "インデックスに変換"
+
+#: src/otherwindow.c:2400
+msgid "Indexed Colours To Use"
+msgstr "使用するインデックスカラー"
+
+#: src/otherwindow.c:2427
+msgid "Truncate palette"
+msgstr "切り取りパレット"
+
+#: src/otherwindow.c:2428
+msgid "Diameter based weighting"
+msgstr "ロード量に基づく直径"
+
+#: src/otherwindow.c:2442
+msgid "Dither"
+msgstr "ディザ"
+
+#: src/otherwindow.c:2450
+msgid "Reduce colour bleed"
+msgstr "色のにじみを減らす"
+
+#: src/otherwindow.c:2452
+msgid "Serpentine scan"
+msgstr "蛇行スキャン"
+
+#: src/otherwindow.c:2455
+msgid "Error propagation, %"
+msgstr "エラー伝搬、 %"
+
+#: src/otherwindow.c:2456
+msgid "Selective error propagation"
+msgstr "選択できるエラー伝達"
+
+#: src/otherwindow.c:2464
+msgid "Full error precision"
+msgstr "全エラー予測"
+
+#: src/otherwindow.c:2589
+msgid "Backward HSV"
+msgstr "HSVを逆に"
+
+#: src/otherwindow.c:2590 src/otherwindow.c:2831
+msgid "Constant"
+msgstr "定数"
+
+#: src/otherwindow.c:2794
+msgid "Edit Gradient"
+msgstr "グラデーションを編集"
+
+#: src/otherwindow.c:2837
+msgid "Points:"
+msgstr "点:"
+
+#: src/otherwindow.c:3000 src/toolbar.c:312
+msgid "Reverse"
+msgstr "逆"
+
+#: src/otherwindow.c:3001
+msgid "Edit Custom"
+msgstr "カスタムを編集"
+
+#: src/otherwindow.c:3018
+msgid "Linear"
+msgstr "線形"
+
+#: src/otherwindow.c:3018
+msgid "Radial"
+msgstr "放射状"
+
+#: src/otherwindow.c:3018
+msgid "Square"
+msgstr "四角"
+
+#: src/otherwindow.c:3019
+msgid "Angular"
+msgstr "角度"
+
+#: src/otherwindow.c:3019
+msgid "Conical"
+msgstr "円錐"
+
+#: src/otherwindow.c:3020 src/otherwindow.c:3539
+msgid "Level"
+msgstr "水平"
+
+#: src/otherwindow.c:3020
+msgid "Repeat"
+msgstr "繰返し"
+
+#: src/otherwindow.c:3021
 msgid "A to B"
 msgstr "AをBへ"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:3021
 msgid "A to B (RGB)"
 msgstr "AをBへ(RGB)"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:3021
+msgid "A to B (sRGB)"
+msgstr ""
+
+#: src/otherwindow.c:3022
 msgid "A to B (HSV)"
 msgstr "AをBへ(HSV)"
 
-#: src/otherwindow.c:2908
+#: src/otherwindow.c:3022
 msgid "A to B (backward HSV)"
 msgstr "AをBへ(HSVを逆に)"
 
-#: src/otherwindow.c:2908
+#: src/otherwindow.c:3022
 msgid "A only"
 msgstr "Aだけ"
 
-#: src/otherwindow.c:2908
-#: src/otherwindow.c:2909
+#: src/otherwindow.c:3023 src/otherwindow.c:3024
 msgid "Custom"
 msgstr "カスタム"
 
-#: src/otherwindow.c:2909
+#: src/otherwindow.c:3024
 msgid "Current to 0"
 msgstr "現在を 0 に"
 
-#: src/otherwindow.c:2909
+#: src/otherwindow.c:3024
 msgid "Current only"
 msgstr "現在だけ"
 
-#: src/otherwindow.c:2920
+#: src/otherwindow.c:3035
 msgid "Configure Gradient"
 msgstr "グラデーションを設定"
 
-#: src/otherwindow.c:2928
-#: src/png.c:731
+#: src/otherwindow.c:3042 src/png.c:853
 msgid "Channel"
 msgstr "チャンネル"
 
-#: src/otherwindow.c:2933
+#: src/otherwindow.c:3047
 msgid "Length"
 msgstr "長さ"
 
-#: src/otherwindow.c:2935
+#: src/otherwindow.c:3049
 msgid "Repeat length"
 msgstr "長さを繰り返す"
 
-#: src/otherwindow.c:2939
+#: src/otherwindow.c:3053
 msgid "Gradient type"
 msgstr "グラデーション形式"
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:3056
 msgid "Extension type"
 msgstr "拡張子形式"
 
-#: src/otherwindow.c:2947
+#: src/otherwindow.c:3059
 msgid "Preview opacity"
 msgstr "不透明度をプレビュー"
 
-#: src/otherwindow.c:3075
+#: src/otherwindow.c:3127
+msgid "Pick Gradient"
+msgstr ""
+
+#: src/otherwindow.c:3220
 msgid "At distance"
 msgstr "離れて"
 
-#: src/otherwindow.c:3076
+#: src/otherwindow.c:3221
 msgid "Horizontal "
 msgstr "水平"
 
-#: src/otherwindow.c:3077
+#: src/otherwindow.c:3222
 msgid "Vertical"
 msgstr "垂直"
 
-#: src/otherwindow.c:3162
+#: src/otherwindow.c:3307
 msgid "Unchanged"
 msgstr "変更しない"
 
-#: src/otherwindow.c:3167
+#: src/otherwindow.c:3312
 msgid "Tracing Image"
 msgstr "イメージをトレース"
 
-#: src/otherwindow.c:3179
+#: src/otherwindow.c:3323
 msgid "Source"
 msgstr "ソース"
 
-#: src/otherwindow.c:3181
+#: src/otherwindow.c:3325
 msgid "Origin"
 msgstr "起点"
 
-#: src/otherwindow.c:3182
+#: src/otherwindow.c:3326
 msgid "Relative scale"
 msgstr "相対スケール"
 
-#: src/otherwindow.c:3193
+#: src/otherwindow.c:3337
 msgid "Display"
 msgstr "表示"
 
-#: src/png.c:392
+#: src/otherwindow.c:3526
+msgid "Segment Image"
+msgstr ""
+
+#: src/otherwindow.c:3536
+msgid "Threshold"
+msgstr ""
+
+#: src/otherwindow.c:3542
+msgid "Minimum size"
+msgstr ""
+
+#: src/png.c:481
 #, c-format
 msgid "Saving %s image"
 msgstr "%s イメージを保存中"
 
-#: src/png.c:392
+#: src/png.c:481
 #, c-format
 msgid "Loading %s image"
 msgstr "%s イメージを読み込み中"
 
-#: src/png.c:728
+#: src/png.c:850
 msgid "Layer"
 msgstr "レイヤ"
 
-#: src/png.c:4158
-msgid "This is an animated GIF file.  What do you want to do?"
-msgstr "これはGIFアニメファイルです。どうしますか？"
+#: src/png.c:6318
+msgid "Applying colour profile"
+msgstr ""
 
-#: src/png.c:4159
-msgid "Edit Frames"
-msgstr "フレームを編集"
-
-#: src/png.c:4161
-msgid "View Animation"
-msgstr "アニメーションを表示"
-
-#: src/png.c:4350
+#: src/png.c:6727
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
-msgstr "%d フレームのうち %d は %s として保存できませんでした - かわりにPNGで保存しました"
+msgstr ""
+"%d フレームのうち %d は %s として保存できませんでした - かわりにPNGで保存しま"
+"した"
 
-#: src/png.c:4536
-msgid "I am unable to find the documentation.  Either you need to download the mtPaint Handbook from the web site and install it, or you need to set the correct location in the Preferences window."
-msgstr "ドキュメントが見つかりません。インターネットからmtPaintハンドブックをダウンロードしてインストールするか、設定ウィンドウで正しいロケーションを設定する必要があります。"
+#: src/png.c:6744
+msgid "Explode frames"
+msgstr ""
 
-#: src/png.c:4568
-msgid "There was a problem running the HTML browser.  You need to set the correct program name in the Preferences window."
-msgstr "HTMLブラウザを実行中に問題が発生しました。設定ウィンドウでプログラム名を正しく設定する必要があります。"
-
-#: src/prefs.c:145
+#: src/prefs.c:146
 msgid "Pressure"
 msgstr "圧力"
 
-#: src/prefs.c:153
+#: src/prefs.c:154
 msgid "Current Device"
 msgstr "現在のデバイス"
 
-#: src/prefs.c:402
+#: src/prefs.c:431
 msgid "Default System Language"
 msgstr "デフォルトシステム言語"
 
-#: src/prefs.c:403
+#: src/prefs.c:432
 msgid "Chinese (Simplified)"
 msgstr "簡体字中国語"
 
-#: src/prefs.c:403
+#: src/prefs.c:432
 msgid "Chinese (Taiwanese)"
 msgstr "中国語(台湾)"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "Czech"
 msgstr "チェコ語"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "Dutch"
 msgstr "オランダ語"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "English (UK)"
 msgstr "英語 (英国)"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "French"
 msgstr "フランス語"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
 msgid "Galician"
 msgstr "ガリシア語"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
 msgid "German"
 msgstr "ドイツ語"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
+msgid "Hungarian"
+msgstr ""
+
+#: src/prefs.c:434
 msgid "Italian"
 msgstr "イタリア語"
 
-#: src/prefs.c:405
+#: src/prefs.c:435
 msgid "Japanese"
 msgstr "日本語"
 
-#: src/prefs.c:406
+#: src/prefs.c:435
 msgid "Polish"
 msgstr "ポーランド語"
 
-#: src/prefs.c:406
+#: src/prefs.c:435
 msgid "Portuguese"
 msgstr "ポルトガル語"
 
-#: src/prefs.c:406
+#: src/prefs.c:436
 msgid "Portuguese (Brazilian)"
 msgstr "ポルトガル語 (ブラジル)"
 
-#: src/prefs.c:407
+#: src/prefs.c:436
 msgid "Russian"
 msgstr "ロシア語"
 
-#: src/prefs.c:407
+#: src/prefs.c:436
 msgid "Slovak"
 msgstr "スロバキア語"
 
-#: src/prefs.c:407
+#: src/prefs.c:437
 msgid "Spanish"
 msgstr "スペイン語"
 
-#: src/prefs.c:407
+#: src/prefs.c:437
 msgid "Swedish"
 msgstr "スウェーデン語"
 
-#: src/prefs.c:408
+#: src/prefs.c:437
+msgid "Tagalog"
+msgstr ""
+
+#: src/prefs.c:437
 msgid "Turkish"
 msgstr "トルコ語"
 
-#: src/prefs.c:415
+#: src/prefs.c:444
 msgid "XBM X hotspot"
 msgstr "XBM X ホットスポット"
 
-#: src/prefs.c:415
+#: src/prefs.c:444
 msgid "XBM Y hotspot"
 msgstr "XBM Y ホットスポット"
 
-#: src/prefs.c:417
+#: src/prefs.c:446
 msgid "Recently Used Files"
 msgstr "最近使ったファイル"
 
-#: src/prefs.c:418
+#: src/prefs.c:447
 msgid "Progress bar silence limit"
 msgstr "プログレスバー サイレンス 制限"
 
-#: src/prefs.c:419
+#: src/prefs.c:448
 msgid "Canvas Geometry"
 msgstr "キャンバス座標"
 
-#: src/prefs.c:419
+#: src/prefs.c:448
 msgid "Cursor X,Y"
 msgstr "カーソル X,Y"
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Pixel [I] {RGB}"
 msgstr "ピクセル [I] {RGB}"
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Selection Geometry"
 msgstr "座標を選択"
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Undo / Redo"
 msgstr "元に戻す / やり直し"
 
-#: src/prefs.c:421
-#: src/toolbar.c:441
+#: src/prefs.c:450 src/toolbar.c:903
 msgid "Flow"
 msgstr "フロー"
 
-#: src/prefs.c:428
+#: src/prefs.c:457
 msgid "Preferences"
 msgstr "設定"
 
-#: src/prefs.c:447
+#: src/prefs.c:484
+msgid "Max threads (0 to autodetect)"
+msgstr ""
+
+#: src/prefs.c:491
 msgid "Max memory used for undo (MB)"
 msgstr "元に戻すために使用される最大メモリ(MB)"
 
-#: src/prefs.c:448
+#: src/prefs.c:492
 msgid "Max undo levels"
 msgstr "元に戻す最高回数"
 
-#: src/prefs.c:449
+#: src/prefs.c:493
 msgid "Communal layer undo space (%)"
 msgstr "共有レイヤ アンドゥ スペース (%)"
 
-#: src/prefs.c:457
+#: src/prefs.c:501
 msgid "Use gamma correction by default"
 msgstr "ガンマ補正をデフォルトで使用"
 
-#: src/prefs.c:459
+#: src/prefs.c:503
 msgid "Optimize alpha chequers"
 msgstr "アルファチェックを最適化"
 
-#: src/prefs.c:461
+#: src/prefs.c:505
 msgid "Disable view window transparencies"
 msgstr "表示ウィンドウの透明度を無効にする"
 
-#: src/prefs.c:469
+#: src/prefs.c:513
 msgid ""
 "Select preferred language translation\n"
 "\n"
@@ -3143,147 +3326,155 @@ msgstr ""
 "設定を有効にするには mtPaint を\n"
 "リスタートする必要があります"
 
-#: src/prefs.c:480
+#: src/prefs.c:524
 msgid "Language"
 msgstr "言語"
 
-#: src/prefs.c:485
+#: src/prefs.c:529
 msgid "Interface"
 msgstr "インターフェース"
 
-#: src/prefs.c:489
+#: src/prefs.c:533
 msgid "Greyscale backdrop"
 msgstr "グレースケール背景"
 
-#: src/prefs.c:490
+#: src/prefs.c:534
 msgid "Selection nudge pixels"
 msgstr "微調整ピクセルを選択"
 
-#: src/prefs.c:491
+#: src/prefs.c:535
 msgid "Max Pan Window Size"
 msgstr "パンする最大ウィンドウサイズ"
 
-#: src/prefs.c:498
+#: src/prefs.c:542
 msgid "Display clipboard while pasting"
 msgstr "貼り付け時にクリップボードを表示"
 
-#: src/prefs.c:500
+#: src/prefs.c:544
 msgid "Mouse cursor = Tool"
 msgstr "マウスカーソル = ツール"
 
-#: src/prefs.c:502
+#: src/prefs.c:546
 msgid "Confirm Exit"
 msgstr "終了を確認"
 
-#: src/prefs.c:504
+#: src/prefs.c:548
 msgid "Q key quits mtPaint"
 msgstr "QキーでmtPaintを終了"
 
-#: src/prefs.c:506
+#: src/prefs.c:550
 msgid "Changing tool commits paste"
 msgstr "貼り付けツールを変更"
 
-#: src/prefs.c:508
+#: src/prefs.c:552
 msgid "Centre tool settings dialogs"
 msgstr "ツール設定ダイアログを中央に"
 
-#: src/prefs.c:510
+#: src/prefs.c:554
 msgid "New image sets zoom to 100%"
 msgstr "新しいイメージを100%ズームに設定"
 
-#: src/prefs.c:513
+#: src/prefs.c:557
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "マウススクロールボタン = ズーム"
 
-#: src/prefs.c:515
+#: src/prefs.c:559
 msgid "Use menu icons"
 msgstr "メニューアイコンを使う"
 
-#: src/prefs.c:520
+#: src/prefs.c:564
 msgid "Files"
 msgstr "ファイル"
 
-#: src/prefs.c:535
+#: src/prefs.c:579
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
 msgstr "16ビットTGAを 5:6:5 BGRとして読み込む"
 
-#: src/prefs.c:536
+#: src/prefs.c:580
 msgid "Write TGAs in bottom-up row order"
 msgstr "TGAを下から上への行順序で書く"
 
-#: src/prefs.c:537
+#: src/prefs.c:581
 msgid "Undoable image loading"
 msgstr "元に戻せるイメージをロード中"
 
-#: src/prefs.c:541
+#: src/prefs.c:588
 msgid "Paths"
 msgstr "パス"
 
-#: src/prefs.c:543
+#: src/prefs.c:590
 msgid "Clipboard Files"
 msgstr "クリップボードファイル"
 
-#: src/prefs.c:544
+#: src/prefs.c:591
 msgid "Select Clipboard File"
 msgstr "クリップボードファイルを選択"
 
-#: src/prefs.c:548
+#: src/prefs.c:595
 msgid "HTML Browser Program"
 msgstr "HTMLブラウザ"
 
-#: src/prefs.c:549
+#: src/prefs.c:596
 msgid "Select Browser Program"
 msgstr "ブラウザの選択"
 
-#: src/prefs.c:553
+#: src/prefs.c:600
 msgid "Location of Handbook index"
 msgstr "ハンドブックインデックスの場所"
 
-#: src/prefs.c:554
+#: src/prefs.c:601
 msgid "Select Handbook Index File"
 msgstr "ハンドブックインデックスファイルの選択"
 
-#: src/prefs.c:558
+#: src/prefs.c:605
 msgid "Default Palette"
 msgstr "デフォルトパレット"
 
-#: src/prefs.c:559
+#: src/prefs.c:606
 msgid "Select Default Palette"
 msgstr "デフォルトパレットを選択"
 
-#: src/prefs.c:563
+#: src/prefs.c:610
 msgid "Default Patterns"
 msgstr "デフォルトパターン"
 
-#: src/prefs.c:564
+#: src/prefs.c:611
 msgid "Select Default Patterns File"
 msgstr "デフォルトパターンファイルを選択"
 
-#: src/prefs.c:571
+#: src/prefs.c:616
+msgid "Default Theme"
+msgstr ""
+
+#: src/prefs.c:617
+msgid "Select Default Theme File"
+msgstr ""
+
+#: src/prefs.c:624
 msgid "Status Bar"
 msgstr "ステータスバー"
 
-#: src/prefs.c:580
+#: src/prefs.c:633
 msgid "Tablet"
 msgstr "タブレット"
 
-#: src/prefs.c:584
+#: src/prefs.c:637
 msgid "Device Settings"
 msgstr "デバイスの設定"
 
-#: src/prefs.c:592
+#: src/prefs.c:645
 msgid "Configure Device"
 msgstr "デバイスを設定"
 
-#: src/prefs.c:598
+#: src/prefs.c:652
 msgid "Tool Variable"
 msgstr "ツール変数"
 
-#: src/prefs.c:600
+#: src/prefs.c:654
 msgid "Factor"
 msgstr "係数"
 
-#: src/prefs.c:628
+#: src/prefs.c:680
 msgid "Test Area"
 msgstr "テスト領域"
 
@@ -3291,403 +3482,490 @@ msgstr "テスト領域"
 msgid "Frames"
 msgstr "フレーム"
 
-#: src/shifter.c:271
+#: src/shifter.c:272
 msgid "Palette Shifter"
 msgstr "パレットシフタ"
 
-#: src/shifter.c:281
+#: src/shifter.c:279
 msgid "Start"
 msgstr "開始"
 
-#: src/shifter.c:283
+#: src/shifter.c:281
 msgid "Finish"
 msgstr "完了"
 
-#: src/shifter.c:332
+#: src/shifter.c:330
 msgid "Fix Palette"
 msgstr "パレットを固定"
 
-#: src/spawn.c:369
-#: src/spawn.c:421
+#: src/spawn.c:449 src/spawn.c:500
 msgid "Action"
 msgstr "アクション"
 
-#: src/spawn.c:369
-#: src/spawn.c:421
+#: src/spawn.c:449 src/spawn.c:500
 msgid "Command"
 msgstr "コマンド"
 
-#: src/spawn.c:376
+#: src/spawn.c:456
 msgid "Configure File Actions"
 msgstr "ファイルアクションを設定"
 
-#: src/spawn.c:436
+#: src/spawn.c:515
 msgid "Execute"
 msgstr "実行"
 
-#: src/spawn.c:613
+#: src/spawn.c:732
 #, c-format
 msgid "Error %i reported when trying to run %s"
 msgstr "エラー %i が報告されました (%s を実行しようとして)"
 
-#: src/toolbar.c:235
+#: src/spawn.c:789
+msgid ""
+"I am unable to find the documentation.  Either you need to download the "
+"mtPaint Handbook from the web site and install it, or you need to set the "
+"correct location in the Preferences window."
+msgstr ""
+"ドキュメントが見つかりません。インターネットからmtPaintハンドブックをダウン"
+"ロードしてインストールするか、設定ウィンドウで正しいロケーションを設定する必"
+"要があります。"
+
+#: src/spawn.c:820
+msgid ""
+"There was a problem running the HTML browser.  You need to set the correct "
+"program name in the Preferences window."
+msgstr ""
+"HTMLブラウザを実行中に問題が発生しました。設定ウィンドウでプログラム名を正し"
+"く設定する必要があります。"
+
+#: src/thread.c:322
+msgid "Helper thread is not responding. Save your work and exit the program."
+msgstr ""
+
+#: src/toolbar.c:233
 msgid "RGB Cube"
 msgstr "RGB 立方体"
 
-#: src/toolbar.c:236
+#: src/toolbar.c:234
 msgid "By image channel"
 msgstr "イメージチャンネルによる"
 
-#: src/toolbar.c:237
+#: src/toolbar.c:235
 msgid "Gradient-driven"
 msgstr "グラデーション指向"
 
-#: src/toolbar.c:238
+#: src/toolbar.c:236
 msgid "Fill settings"
 msgstr "塗りつぶし設定"
 
-#: src/toolbar.c:255
+#: src/toolbar.c:253
 msgid "Respect opacity mode"
 msgstr "不透明度モードを重視"
 
-#: src/toolbar.c:256
+#: src/toolbar.c:254
 msgid "Smudge settings"
 msgstr "にじみ設定"
 
-#: src/toolbar.c:276
+#: src/toolbar.c:274
 msgid "Brush spacing"
 msgstr "ブラシ間隔"
 
-#: src/toolbar.c:300
+#: src/toolbar.c:298
 msgid "Normal"
 msgstr "標準"
 
-#: src/toolbar.c:301
+#: src/toolbar.c:299
 msgid "Colour"
 msgstr "色"
 
-#: src/toolbar.c:301
+#: src/toolbar.c:299
 msgid "Saturate More"
 msgstr "もっと染み込ませる"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Multiply"
 msgstr "掛け算"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Divide"
 msgstr "わり算"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Screen"
 msgstr "スクリーン"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Dodge"
 msgstr "覆い焼き"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Burn"
 msgstr "焼き込み"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Hard Light"
 msgstr "強い光"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Soft Light"
 msgstr "柔らかな光"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Difference"
 msgstr "相違"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Darken"
 msgstr "暗く"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Lighten"
 msgstr "明るくする"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Grain Extract"
 msgstr "粒子抽出"
 
-#: src/toolbar.c:305
+#: src/toolbar.c:303
 msgid "Grain Merge"
 msgstr "粒子結合"
 
-#: src/toolbar.c:325
+#: src/toolbar.c:323
 msgid "Blend mode"
 msgstr "ブレンドモード"
 
-#: src/toolbar.c:424
+#: src/toolbar.c:846
+msgid "More..."
+msgstr ""
+
+#: src/toolbar.c:886
 msgid "Continuous Mode"
 msgstr "連続モード"
 
-#: src/toolbar.c:425
+#: src/toolbar.c:887
 msgid "Opacity Mode"
 msgstr "不透明度モード"
 
-#: src/toolbar.c:426
+#: src/toolbar.c:888
 msgid "Tint Mode"
 msgstr "色調モード"
 
-#: src/toolbar.c:427
+#: src/toolbar.c:889
 msgid "Tint +-"
 msgstr "色調 +-"
 
-#: src/toolbar.c:429
+#: src/toolbar.c:891
 msgid "Blend Mode"
 msgstr "ブレンドモード"
 
-#: src/toolbar.c:430
+#: src/toolbar.c:892
 msgid "Disable All Masks"
 msgstr "全マスクを無効にする"
 
-#: src/toolbar.c:434
+#: src/toolbar.c:896
 msgid "Gradient Mode"
 msgstr "グラデーションモード"
 
-#: src/toolbar.c:460
+#: src/toolbar.c:1012
 msgid "Settings Toolbar"
 msgstr "ツールバーを設定"
 
-#: src/toolbar.c:557
+#: src/toolbar.c:1041
 msgid "Cut"
 msgstr "切り取り"
 
-#: src/toolbar.c:558
+#: src/toolbar.c:1042
 msgid "Copy"
 msgstr "コピー"
 
-#: src/toolbar.c:559
+#: src/toolbar.c:1043
 msgid "Paste"
 msgstr "貼り付け"
 
-#: src/toolbar.c:561
+#: src/toolbar.c:1045
 msgid "Undo"
 msgstr "元に戻す"
 
-#: src/toolbar.c:562
+#: src/toolbar.c:1046
 msgid "Redo"
 msgstr "やり直し"
 
-#: src/toolbar.c:565
-#: src/viewer.c:490
+#: src/toolbar.c:1049 src/viewer.c:485
 msgid "Pan Window"
 msgstr "ウィンドウをパンする"
 
-#: src/toolbar.c:569
+#: src/toolbar.c:1053
 msgid "Paint"
 msgstr "塗る"
 
-#: src/toolbar.c:570
+#: src/toolbar.c:1054
 msgid "Shuffle"
 msgstr "混ぜる"
 
-#: src/toolbar.c:571
+#: src/toolbar.c:1055
 msgid "Flood Fill"
 msgstr "塗りつぶす"
 
-#: src/toolbar.c:572
+#: src/toolbar.c:1056
 msgid "Straight Line"
 msgstr "直線"
 
-#: src/toolbar.c:573
+#: src/toolbar.c:1057
 msgid "Smudge"
 msgstr "にじみ"
 
-#: src/toolbar.c:574
+#: src/toolbar.c:1058
 msgid "Clone"
 msgstr "クローン"
 
-#: src/toolbar.c:575
+#: src/toolbar.c:1059
 msgid "Make Selection"
 msgstr "選択"
 
-#: src/toolbar.c:576
+#: src/toolbar.c:1060
 msgid "Polygon Selection"
 msgstr "ポリゴン選択"
 
-#: src/toolbar.c:577
+#: src/toolbar.c:1061
 msgid "Place Gradient"
 msgstr "グラデーションを置く"
 
-#: src/toolbar.c:579
+#: src/toolbar.c:1063
 msgid "Lasso Selection"
 msgstr "投げ縄ツール選択"
 
-#: src/toolbar.c:582
+#: src/toolbar.c:1066
 msgid "Ellipse Outline"
 msgstr "楕円アウトライン"
 
-#: src/toolbar.c:583
+#: src/toolbar.c:1067
 msgid "Filled Ellipse"
 msgstr "楕円を塗りつぶし"
 
-#: src/toolbar.c:584
+#: src/toolbar.c:1068
 msgid "Outline Selection"
 msgstr "アウトライン選択"
 
-#: src/toolbar.c:585
+#: src/toolbar.c:1069
 msgid "Fill Selection"
 msgstr "選択を塗りつぶす"
 
-#: src/toolbar.c:587
+#: src/toolbar.c:1071
 msgid "Flip Selection Vertically"
 msgstr "選択を垂直に反転"
 
-#: src/toolbar.c:588
+#: src/toolbar.c:1072
 msgid "Flip Selection Horizontally"
 msgstr "選択を水平に反転"
 
-#: src/toolbar.c:589
+#: src/toolbar.c:1073
 msgid "Rotate Selection Clockwise"
 msgstr "選択を時計方向に回転"
 
-#: src/toolbar.c:590
+#: src/toolbar.c:1074
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "選択を反時計方向に回転"
 
-#: src/viewer.c:135
+#: src/viewer.c:132
 msgid "About"
 msgstr "mtPaintについて"
 
+#~ msgid "File: %s invalid - palette not updated"
+#~ msgstr "ファイル：%s は無効です - パレットは更新されません"
+
+#~ msgid "Distance to A+B"
+#~ msgstr "A+Bまでの距離"
+
+#~ msgid "Edit Frames"
+#~ msgstr "フレームを編集"
+
 #~ msgid "  C                 Command Line Window"
 #~ msgstr "  C              コマンドラインウィンドウ"
+
 #~ msgid "The palette does not contain enough colours to do a merge"
 #~ msgstr "パレットは結合するに十分な色がありません。"
+
 #~ msgid "There are too many identical palette items to be reduced."
 #~ msgstr "減らす同じパレットアイテムが多すぎます。"
+
 #~ msgid "/View/Command Line Window"
 #~ msgstr "/表示(V)/コマンドラインウィンドウ"
+
 #~ msgid "Grid colour RGB"
 #~ msgstr "グリッドカラーRGB"
+
 #~ msgid "Zoom"
 #~ msgstr "ズーム"
+
 #~ msgid "%i Files on Command Line"
 #~ msgstr "コマンドラインの %i ファイル"
+
 #~ msgid ""
 #~ "Dennis Lee - Wrote the two quantizing methods DL1 & 3 - see quantizer.c "
 #~ "for more information."
 #~ msgstr ""
 #~ "Dennis Lee - DL1 と 3 の２つの量子化方法を書きました - 詳細はquantizer.c "
 #~ "をご覧下さい。"
+
 #~ msgid "Magnus Hjorth - Wrote inifile.c/h, from mhWaveEdit 1.3.0."
 #~ msgstr "Magnus Hjorth - mhWaveEdit 1.3.0 から inifile.c/h を書いた。"
+
 #~ msgid "DL1 Quantize (fastest)"
 #~ msgstr "DL1 量子化(最速)"
+
 #~ msgid "DL3 Quantize (very slow, better quality)"
 #~ msgstr "DL3 量子化 (とても遅いが高品質)"
+
 #~ msgid "Wu Quantize (best method for small palettes)"
 #~ msgstr "Wu 量子化 (小さいパレット向きの方法)"
+
 #~ msgid "Max-Min Quantize (best with dithering)"
 #~ msgstr "Max-Min 量子化 (ディザリングに最高)"
+
 #~ msgid "Not enough memory to rotate image"
 #~ msgstr "イメージを回転するにはメモリが足りません"
+
 #~ msgid "Not enough memory to rotate clipboard"
 #~ msgstr "クリップボードを回転するにはメモリが足りません"
+
 #~ msgid "File is too big, must be <= to width=%i height=%i : %s"
 #~ msgstr "ファイルが大きすぎます。これ以下にして下さい<= 幅=%i 高さ=%i：%s"
+
 #~ msgid "Could not open %s: %s"
 #~ msgstr "%s を開けません:%s"
+
 #~ msgid "Error closing %s: %s"
 #~ msgstr "%s を閉じる時にエラーが発生しました：%s"
+
 #~ msgid "Could not write to %s: %s"
 #~ msgstr "%s に書き込めません:%s"
+
 #~ msgid "patterns_user.c could not be opened in current directory"
 #~ msgstr "patterns_user.c は現在のディレクトリに開けません"
+
 #~ msgid "Done"
 #~ msgstr "完了"
+
 #~ msgid "patterns_user.c created in current directory"
 #~ msgstr "patterns_user.c は現在のディレクトリに作成されました"
+
 #~ msgid "Current image is not 94x94x3 so I cannot create patterns_user.c"
 #~ msgstr ""
 #~ "現在のイメージは 94x94x3 ではありません。patterns_user.c を作成できません"
+
 #~ msgid ""
 #~ "You are trying to save an RGB image to an XPM file which is not "
 #~ "possible.  I would suggest you save with a PNG extension."
 #~ msgstr ""
 #~ "RGBイメージを不可能なXPMファイルに保存しようとしています。PNG拡張子で保存"
 #~ "して下さい。"
+
 #~ msgid ""
 #~ "You are trying to save an RGB image to a GIF file which is not possible.  "
 #~ "I would suggest you save with a PNG extension."
 #~ msgstr ""
 #~ "RGBイメージを不可能なGIFファイルに保存しようとしています。PNG拡張子で保存"
 #~ "して下さい。"
+
 #~ msgid ""
 #~ "You are trying to save an XBM file with a palette of more than 2 "
 #~ "colours.  Either use another format or reduce the palette to 2 colours."
 #~ msgstr ""
 #~ "XBMファイルを2色以上のパレットで保存しようとしています。他のフォーマットに"
 #~ "するか、パレットを2色に減らして下さい。"
+
 #~ msgid ""
 #~ "You are trying to save an indexed canvas to a JPEG file which is not "
 #~ "possible.  I would suggest you save with a PNG extension."
 #~ msgstr ""
 #~ "インデックスキャンバスを不可能なJPEGファイルで保存しようとしています。PNG"
 #~ "拡張子で保存して下さい。"
+
 #~ msgid "/File/Actions/sep2"
 #~ msgstr "/ファイル(F)/アクション/sep2"
+
 #~ msgid "/Edit/Create Patterns"
 #~ msgstr "/編集(E)/パターンを作成"
+
 #~ msgid "/Palette/Create Quantized (DL1)"
 #~ msgstr "/パレット(P)/量子化の作成 (DL1)"
+
 #~ msgid "/Palette/Create Quantized (DL3)"
 #~ msgstr "/パレット(P)/量子化の作成 (DL3)"
+
 #~ msgid "/Palette/Create Quantized (Wu)"
 #~ msgstr "/パレット(P)/量子化の作成 (Wu)"
+
 #~ msgid "/Frames"
 #~ msgstr "/フレーム"
+
 #~ msgid "/File/%i"
 #~ msgstr "/ファイル(F)/%i"
+
 #~ msgid "/File/Actions/%i"
 #~ msgstr "/ファイル(F)/アクション/%i"
+
 #~ msgid "Loading PNG image"
 #~ msgstr "PNGイメージをロード"
+
 #~ msgid "Loading clipboard image"
 #~ msgstr "クリップボードイメージをロード"
+
 #~ msgid "Saving PNG image"
 #~ msgstr "PNGイメージを保存"
+
 #~ msgid "Saving Clipboard image"
 #~ msgstr "クリップボードイメージを保存"
+
 #~ msgid "Saving Layer image"
 #~ msgstr "レイヤイメージを保存"
+
 #~ msgid "Saving Channel image"
 #~ msgstr "チャンネルイメージを保存"
+
 #~ msgid "Loading GIF image"
 #~ msgstr "GIFイメージをロード"
+
 #~ msgid "Saving GIF image"
 #~ msgstr "GIFイメージを保存"
+
 #~ msgid "Loading JPEG image"
 #~ msgstr "JPEGイメージをロード"
+
 #~ msgid "Saving JPEG image"
 #~ msgstr "JPEGイメージを保存"
+
 #~ msgid "Loading TIFF image"
 #~ msgstr "TIFFイメージをロード"
+
 #~ msgid "Saving TIFF image"
 #~ msgstr "TIFFイメージを保存"
+
 #~ msgid "Loading BMP image"
 #~ msgstr "BMPイメージをロード"
+
 #~ msgid "Saving BMP image"
 #~ msgstr "BMPイメージを保存"
+
 #~ msgid "Loading XPM image"
 #~ msgstr "XPMイメージをロード"
+
 #~ msgid "Saving XPM image"
 #~ msgstr "XPMイメージを保存"
+
 #~ msgid "Loading XBM image"
 #~ msgstr "XBMイメージをロード"
+
 #~ msgid "Saving XBM image"
 #~ msgstr "XBMイメージを保存"
+
 #~ msgid "Loading LSS16 image"
 #~ msgstr "LSS16イメージをロード"
+
 #~ msgid "Saving LSS16 image"
 #~ msgstr "LSS16イメージを保存"
+
 #~ msgid "Saving UNDO images"
 #~ msgstr "アンドゥイメージを保存"
+
 #~ msgid "JPEG Save Quality (100=High)   "
 #~ msgstr "JPEGの保存品質 (100=高い)   "
-

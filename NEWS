@@ -13,6 +13,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Italian translation updated by Angelo Gemmi
 	* Japanese translation updated by Norihiro YONEDA
 	* Swedish translation updated by Daniel Eriksson
+	* Spanish translation updated by Adolfo Jayme
+	* Brazilian Portuguese translation updated by Valter Nazianzeno
+	* Chinese (Simplified) translation updated by Cecc
+	* Russian translation updated
 	* Eliminated flicker when positioning line, polygon side, or gradient in Windows version
 	* Scrolling made more smooth in Windows version
 	* Dock area now holds settings toolbar and layers dialog when their windows are closed

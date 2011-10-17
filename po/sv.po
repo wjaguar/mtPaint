@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-02-15 16:36+0300\n"
+"POT-Creation-Date: 2011-10-17 19:43+0400\n"
 "PO-Revision-Date: 2009-02-13 14:54+0000\n"
 "Last-Translator: Daniel Nylander <yeager@ubuntu.com>\n"
 "Language-Team: Swedish <sv@li.org>\n"
@@ -18,427 +18,472 @@ msgstr ""
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Rosetta-Version: 0.1\n"
 
-#: src/ani.c:676
+#: src/ani.c:673
 msgid "Animation Preview"
 msgstr "Förhansvisning Animation"
 
-#: src/ani.c:685 src/shifter.c:307
+#: src/ani.c:682 src/shifter.c:305
 msgid "Play"
 msgstr "Spela upp"
 
-#: src/ani.c:698
+#: src/ani.c:695
 msgid "Fix"
 msgstr "Rätta till"
 
-#: src/ani.c:703 src/ani.c:1162 src/font.c:1874 src/font.c:1894
-#: src/shifter.c:342 src/viewer.c:210
+#: src/ani.c:700 src/ani.c:1144 src/font.c:1826 src/font.c:1843
+#: src/shifter.c:340 src/viewer.c:205
 msgid "Close"
 msgstr "Stäng"
 
-#: src/ani.c:759 src/ani.c:864 src/ani.c:1045 src/ani.c:1052 src/canvas.c:338
-#: src/canvas.c:621 src/canvas.c:900 src/canvas.c:1313 src/canvas.c:1340
-#: src/canvas.c:1355 src/canvas.c:1359 src/canvas.c:1366 src/canvas.c:1811
-#: src/canvas.c:1838 src/canvas.c:1844 src/canvas.c:1912 src/canvas.c:1994
-#: src/canvas.c:2011 src/font.c:1364 src/fpick.c:867 src/fpick.c:991
-#: src/layer.c:654 src/layer.c:784 src/layer.c:951 src/mainwindow.c:276
-#: src/mainwindow.c:304 src/mainwindow.c:533 src/mainwindow.c:577
-#: src/mainwindow.c:603 src/otherwindow.c:1005 src/otherwindow.c:1054
-#: src/otherwindow.c:1056 src/png.c:4535 src/png.c:4567 src/spawn.c:615
-#: src/viewer.c:1341
+#: src/ani.c:755 src/ani.c:857 src/ani.c:1038 src/ani.c:1044 src/canvas.c:368
+#: src/canvas.c:650 src/canvas.c:924 src/canvas.c:1267 src/canvas.c:1297
+#: src/canvas.c:1399 src/canvas.c:1416 src/canvas.c:1961 src/canvas.c:1966
+#: src/canvas.c:2036 src/canvas.c:2114 src/canvas.c:2130 src/font.c:1316
+#: src/fpick.c:732 src/fpick.c:856 src/layer.c:639 src/layer.c:893
+#: src/layer.c:1057 src/mainwindow.c:274 src/mainwindow.c:302
+#: src/mainwindow.c:531 src/mainwindow.c:575 src/mainwindow.c:601
+#: src/otherwindow.c:1072 src/otherwindow.c:1122 src/otherwindow.c:1124
+#: src/spawn.c:734 src/spawn.c:788 src/spawn.c:819 src/thread.c:321
+#: src/viewer.c:1335
 msgid "Error"
 msgstr "Fel"
 
-#: src/ani.c:759
+#: src/ani.c:755
 msgid "Unable to create output directory"
 msgstr "Kunde inte skapa utdatakatalogen"
 
-#: src/ani.c:760 src/ani.c:864 src/ani.c:1046 src/ani.c:1053 src/canvas.c:339
-#: src/canvas.c:623 src/canvas.c:901 src/canvas.c:1313 src/canvas.c:1341
-#: src/canvas.c:1355 src/canvas.c:1360 src/canvas.c:1366 src/canvas.c:1811
-#: src/canvas.c:1839 src/canvas.c:1845 src/canvas.c:1912 src/canvas.c:1995
-#: src/canvas.c:2012 src/channels.c:278 src/channels.c:336 src/font.c:1364
-#: src/fpick.c:867 src/fpick.c:991 src/fpick.c:1304 src/info.c:436
-#: src/layer.c:654 src/layer.c:784 src/layer.c:796 src/layer.c:952
-#: src/mainwindow.c:277 src/mainwindow.c:304 src/mainwindow.c:533
-#: src/mainwindow.c:577 src/mainwindow.c:603 src/otherwindow.c:466
-#: src/otherwindow.c:606 src/otherwindow.c:949 src/otherwindow.c:1006
-#: src/otherwindow.c:1054 src/otherwindow.c:1056 src/otherwindow.c:1183
-#: src/otherwindow.c:1399 src/otherwindow.c:2326 src/otherwindow.c:2756
-#: src/otherwindow.c:2964 src/otherwindow.c:3100 src/otherwindow.c:3199
-#: src/png.c:4352 src/png.c:4537 src/png.c:4569 src/prefs.c:660
-#: src/spawn.c:434 src/spawn.c:615 src/viewer.c:1342
-msgid "OK"
-msgstr "OK"
-
-#: src/ani.c:816
+#: src/ani.c:809
 msgid "Creating Animation Frames"
 msgstr "Skapar Animationsbildrutor"
 
-#: src/ani.c:864
+#: src/ani.c:857
 msgid "Unable to save image"
 msgstr "Kunde inte spara bild"
 
-#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:509
-#: src/layer.c:796 src/layer.c:816 src/mainwindow.c:308 src/mainwindow.c:1074
-#: src/png.c:4158 src/png.c:4352
+#: src/ani.c:890 src/fpick.c:834 src/layer.c:422 src/layer.c:497
+#: src/layer.c:904 src/layer.c:918 src/mainwindow.c:306 src/mainwindow.c:1120
+#: src/png.c:6729
 msgid "Warning"
 msgstr "Varning"
 
-#: src/ani.c:898
+#: src/ani.c:890
 msgid ""
 "Do you really want to clear all of the position and cycle data for all of "
 "the layers?"
-msgstr "Är du säker på att du vill rensa all positions och cykeldata för alla lager?"
+msgstr ""
+"Är du säker på att du vill rensa all positions och cykeldata för alla lager?"
 
-#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:816
-#: src/mainwindow.c:308
+#: src/ani.c:891 src/fpick.c:834 src/layer.c:422 src/layer.c:920
+#: src/mainwindow.c:306
 msgid "No"
 msgstr "Nej"
 
-#: src/ani.c:898 src/fpick.c:969 src/layer.c:434 src/layer.c:816
-#: src/mainwindow.c:308
+#: src/ani.c:891 src/fpick.c:834 src/layer.c:422 src/layer.c:920
+#: src/mainwindow.c:306
 msgid "Yes"
 msgstr "Ja"
 
-#: src/ani.c:1000
+#: src/ani.c:993
 msgid "Set Key Frame"
 msgstr "Sätt Nyckelbildruta"
 
-#: src/ani.c:1045
+#: src/ani.c:1038
 msgid "You must have at least 2 layers to create an animation"
 msgstr "Du måste ha minst 2 lager för att skapa en animering"
 
-#: src/ani.c:1052
+#: src/ani.c:1044
 msgid "You must save your layers file before creating an animation"
 msgstr "Du måste spara din lagerfil innan en animering skapas"
 
-#: src/ani.c:1063
+#: src/ani.c:1054
 msgid "Configure Animation"
 msgstr "Konfigurera animering"
 
-#: src/ani.c:1074
+#: src/ani.c:1064
 msgid "Output Files"
 msgstr "Utdata Filer"
 
-#: src/ani.c:1077
+#: src/ani.c:1067
 msgid "Start frame"
 msgstr "Startruta"
 
-#: src/ani.c:1078
+#: src/ani.c:1068
 msgid "End frame"
 msgstr "Slutruta"
 
-#: src/ani.c:1080 src/shifter.c:285
+#: src/ani.c:1070 src/shifter.c:283
 msgid "Delay"
 msgstr "Fördröjning"
 
-#: src/ani.c:1081
+#: src/ani.c:1071
 msgid "Output path"
 msgstr "Sökväg för utmatning"
 
-#: src/ani.c:1082
+#: src/ani.c:1072
 msgid "File prefix"
 msgstr "Filprefix"
 
-#: src/ani.c:1110
+#: src/ani.c:1092
 msgid "Create GIF frames"
 msgstr "Skapa gifbildrutor"
 
-#: src/ani.c:1116
+#: src/ani.c:1098
 msgid "Positions"
 msgstr "Positioner"
 
-#: src/ani.c:1153
+#: src/ani.c:1135
 msgid "Cycling"
 msgstr ""
 
-#: src/ani.c:1166
+#: src/ani.c:1148
 msgid "Save"
 msgstr "Spara"
 
-#: src/ani.c:1169 src/font.c:1814 src/otherwindow.c:934 src/otherwindow.c:1406
-#: src/otherwindow.c:1959
+#: src/ani.c:1151 src/font.c:1766 src/otherwindow.c:1001
+#: src/otherwindow.c:1475 src/otherwindow.c:2079 src/otherwindow.c:3548
 msgid "Preview"
 msgstr "Förhandsvisa"
 
-#: src/ani.c:1172 src/shifter.c:337
+#: src/ani.c:1154 src/shifter.c:335
 msgid "Create Frames"
 msgstr "Skapa Bildrutor"
 
-#: src/canvas.c:339
+#: src/canvas.c:369
 msgid "The image is too large to transform."
 msgstr "Bilden är för stor för att transformera."
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "MT"
 msgstr "MT"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Sobel"
 msgstr "Sobel"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Prewitt"
 msgstr "Prewitt"
 
-#: src/canvas.c:369
+#: src/canvas.c:399
 msgid "Kirsch"
 msgstr "Kirsch"
 
-#: src/canvas.c:370 src/otherwindow.c:1843 src/otherwindow.c:2882
+#: src/canvas.c:400 src/otherwindow.c:1964 src/otherwindow.c:2996
+#: src/otherwindow.c:3124
 msgid "Gradient"
 msgstr "Gradient"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Roberts"
 msgstr "Roberts"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Laplace"
 msgstr "Laplace"
 
-#: src/canvas.c:370
+#: src/canvas.c:400
 msgid "Morphological"
 msgstr "Morfologiska"
 
-#: src/canvas.c:375
+#: src/canvas.c:405
 msgid "Edge Detect"
 msgstr "Hitta Kanter"
 
-#: src/canvas.c:393
+#: src/canvas.c:423
 msgid "Edge Sharpen"
 msgstr "Gör Kanter Skarpare"
 
-#: src/canvas.c:399
+#: src/canvas.c:429
 msgid "Edge Soften"
 msgstr "Gör Kanter Mjukare"
 
-#: src/canvas.c:451
+#: src/canvas.c:481
 msgid "Different X/Y"
 msgstr "DIfferens X/Y"
 
-#: src/canvas.c:455 src/memory.c:6935
+#: src/canvas.c:485 src/memory.c:7541
 msgid "Gaussian Blur"
 msgstr "Gaussisk oskärpa"
 
-#: src/canvas.c:493
+#: src/canvas.c:523
 msgid "Radius"
 msgstr "Radie"
 
-#: src/canvas.c:494
+#: src/canvas.c:524
 msgid "Amount"
 msgstr "Mängd"
 
-#: src/canvas.c:495
+#: src/canvas.c:525
 msgid "Threshold "
 msgstr "Tröskelvärde "
 
-#: src/canvas.c:497 src/memory.c:7083
+#: src/canvas.c:527 src/memory.c:7710
 msgid "Unsharp Mask"
 msgstr "Oskarp mask"
 
-#: src/canvas.c:537
+#: src/canvas.c:563
 msgid "Outer radius"
 msgstr "Yttre radie"
 
-#: src/canvas.c:538
+#: src/canvas.c:564
 msgid "Inner radius"
 msgstr "Innerradie"
 
-#: src/canvas.c:539 src/info.c:379
+#: src/canvas.c:565 src/info.c:363
 msgid "Normalize"
 msgstr "Normalisera"
 
-#: src/canvas.c:541 src/memory.c:7261
+#: src/canvas.c:567 src/memory.c:7882
 msgid "Difference of Gaussians"
 msgstr "Gaussiandifferens"
 
-#: src/canvas.c:567
+#: src/canvas.c:594
+msgid "Protect details"
+msgstr ""
+
+#: src/canvas.c:596
 msgid "Kuwahara-Nagao Blur"
 msgstr "Kuwahara-Nagao Oskärpa"
 
-#: src/canvas.c:622
+#: src/canvas.c:651
 msgid "The image is too large for this rotation."
 msgstr "Bilden är för stor för denna rotering."
 
-#: src/canvas.c:640
+#: src/canvas.c:668
 msgid "Smooth"
 msgstr "Mjuk"
 
-#: src/canvas.c:642
+#: src/canvas.c:670
 msgid "Free Rotate"
 msgstr "Fri Rotering"
 
-#: src/canvas.c:900 src/viewer.c:1341
+#: src/canvas.c:924 src/viewer.c:1335
 msgid "Not enough memory to create clipboard"
 msgstr "Inte tillräckligt mycket minne för att skapa urklipp"
 
-#: src/canvas.c:1313
+#: src/canvas.c:1267
+msgid "Invalid palette file"
+msgstr ""
+
+#: src/canvas.c:1297
 msgid "Invalid channel file."
 msgstr "Ogiltig kanalfil."
 
-#: src/canvas.c:1340
-msgid "Cannot open file"
-msgstr "Kan inte öppna filen"
+#: src/canvas.c:1311
+msgid "Raw frames"
+msgstr ""
 
-#: src/canvas.c:1341
-msgid "Unsupported file format"
-msgstr "Filformatet stöds inte"
+#: src/canvas.c:1311
+msgid "Composited frames"
+msgstr ""
 
-#: src/canvas.c:1354
+#: src/canvas.c:1312
+msgid "Composited frames with nonzero delay"
+msgstr ""
+
+#: src/canvas.c:1313
+msgid "Load First Frame"
+msgstr ""
+
+#: src/canvas.c:1313
+msgid "Explode Frames"
+msgstr ""
+
+#: src/canvas.c:1315
+msgid "View Animation"
+msgstr "Visa animering"
+
+#: src/canvas.c:1332
+msgid "Load Frames"
+msgstr ""
+
+#: src/canvas.c:1336
+#, c-format
+msgid "This is an animated %s file."
+msgstr "Detta är en animerad %s-fil."
+
+#: src/canvas.c:1337
+#, c-format
+msgid "This is a multipage %s file."
+msgstr ""
+
+#: src/canvas.c:1345
+msgid "Load into Layers"
+msgstr ""
+
+#: src/canvas.c:1388
 #, c-format
 msgid "File is too big, must be <= to width=%i height=%i"
 msgstr "Filen är för stor, måste vara <= till bredd=%i höjd=%i"
 
-#: src/canvas.c:1359
+#: src/canvas.c:1390
+msgid "Unable to explode frames"
+msgstr ""
+
+#: src/canvas.c:1392
 msgid "Unable to load file"
 msgstr "Kunde inte läsa in filen"
 
-#: src/canvas.c:1366
+#: src/canvas.c:1394
 msgid ""
 "The file import library had to terminate due to a problem with the file "
 "(possibly corrupt image data or a truncated file). I have managed to load "
 "some data as the header seemed fine, but I would suggest you save this image "
 "to a new file to ensure this does not happen again."
 msgstr ""
-"Filimportsbiblioteket avslutades p.g.a. ett problem med fil "
-"(möjligen beroende på korrupt fildata eller avskärd fil). Jag har lyckats ladda "
-"en del data eftersom huvudet verkar korrekt, men jag skulle reckommendera att spara bilden "
-"till en ny fil för att försäkra att detta inte händer igen."
+"Filimportsbiblioteket avslutades p.g.a. ett problem med fil (möjligen "
+"beroende på korrupt fildata eller avskärd fil). Jag har lyckats ladda en del "
+"data eftersom huvudet verkar korrekt, men jag skulle reckommendera att spara "
+"bilden till en ny fil för att försäkra att detta inte händer igen."
 
-#: src/canvas.c:1410
+#: src/canvas.c:1396
+msgid "The animation is too long to load all of it into layers."
+msgstr ""
+
+#: src/canvas.c:1398
+msgid "Could not explode all the frames in the animation."
+msgstr ""
+
+#: src/canvas.c:1416
+msgid "Cannot open file"
+msgstr "Kan inte öppna filen"
+
+#: src/canvas.c:1417
+msgid "Unsupported file format"
+msgstr "Filformatet stöds inte"
+
+#: src/canvas.c:1523
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
 msgstr "Filen %s finns redan. Vill du skriva över den?"
 
-#: src/canvas.c:1411
+#: src/canvas.c:1524
 msgid "File Found"
 msgstr "Filen hittades"
 
-#: src/canvas.c:1411 src/mainwindow.c:1116
+#: src/canvas.c:1524 src/mainwindow.c:1164
 msgid "NO"
 msgstr "NEJ"
 
-#: src/canvas.c:1411 src/mainwindow.c:1116
+#: src/canvas.c:1524 src/mainwindow.c:1164
 msgid "YES"
 msgstr "JA"
 
-#: src/canvas.c:1449 src/prefs.c:415
+#: src/canvas.c:1562 src/prefs.c:444
 msgid "Transparency index"
 msgstr "Genomskinlighetsindex"
 
-#: src/canvas.c:1449 src/prefs.c:416
+#: src/canvas.c:1562 src/prefs.c:445
 msgid "JPEG Save Quality (100=High)"
 msgstr "Kvalitet på JPEG-fil (100=Hög)"
 
-#: src/canvas.c:1450 src/prefs.c:417
+#: src/canvas.c:1563 src/prefs.c:446
 msgid "PNG Compression (0=None)"
 msgstr "PNG-komprimering (0=ingen)"
 
-#: src/canvas.c:1450 src/prefs.c:534
+#: src/canvas.c:1563 src/prefs.c:578
 msgid "TGA RLE Compression"
 msgstr "TGA RLE-komprimering"
 
-#: src/canvas.c:1451 src/prefs.c:416
+#: src/canvas.c:1564 src/prefs.c:445
 msgid "JPEG2000 Compression (0=Lossless)"
 msgstr "JPEG2000-komprimering (0=förlustfri)"
 
-#: src/canvas.c:1452
+#: src/canvas.c:1565
 msgid "Hotspot at X ="
 msgstr ""
 
-#: src/canvas.c:1452
+#: src/canvas.c:1565
 msgid "Y ="
 msgstr "Y ="
 
-#: src/canvas.c:1474 src/canvas.c:1536
+#: src/canvas.c:1587 src/canvas.c:1648
 msgid "File Format"
 msgstr "Filformat"
 
-#: src/canvas.c:1562 src/otherwindow.c:302
+#: src/canvas.c:1677 src/canvas.c:1686 src/otherwindow.c:293
 msgid "Undoable"
 msgstr "Ångras"
 
-#: src/canvas.c:1583
+#: src/canvas.c:1678 src/prefs.c:583
+msgid "Apply colour profile"
+msgstr ""
+
+#: src/canvas.c:1710
 msgid "Animation delay"
 msgstr "Animationsfördröjning"
 
-#: src/canvas.c:1810
-#, c-format
-msgid "File: %s invalid - palette not updated"
-msgstr "Fil: %s ogiltig - paletten inte uppdaterad"
-
-#: src/canvas.c:1838
+#: src/canvas.c:1961
 msgid "Unable to export undo images"
 msgstr "Kunde inte exportera ångra-historik"
 
-#: src/canvas.c:1844
+#: src/canvas.c:1966
 msgid "Unable to export ASCII file"
 msgstr "Kunde inte exportera ASCII-filen"
 
-#: src/canvas.c:1911 src/layer.c:783 src/mainwindow.c:526
+#: src/canvas.c:2035 src/layer.c:892 src/mainwindow.c:524
 #, c-format
 msgid "Unable to save file: %s"
 msgstr "Kunde inte spara filen: %s"
 
-#: src/canvas.c:1970 src/toolbar.c:554
+#: src/canvas.c:2090 src/toolbar.c:1038
 msgid "Load Image File"
 msgstr "Läs in bildfil"
 
-#: src/canvas.c:1974 src/toolbar.c:555
+#: src/canvas.c:2094 src/toolbar.c:1039
 msgid "Save Image File"
 msgstr "Spara bildfil"
 
-#: src/canvas.c:1977
+#: src/canvas.c:2097
 msgid "Load Palette File"
 msgstr "Läs in palettfil"
 
-#: src/canvas.c:1981
+#: src/canvas.c:2101
 msgid "Save Palette File"
 msgstr "Spara palettfil"
 
-#: src/canvas.c:1985
+#: src/canvas.c:2105
 msgid "Export Undo Images"
 msgstr "Exportera Ångra-historik"
 
-#: src/canvas.c:1989
+#: src/canvas.c:2109
 msgid "Export Undo Images (reversed)"
 msgstr "Exportera Ångra-historik (omvänd)"
 
-#: src/canvas.c:1994
+#: src/canvas.c:2114
 msgid "You must have 16 or fewer palette colours to export ASCII art."
 msgstr ""
 "Du måste ha 16 eller mindre palettfärger för att exportera ASCII-grafik."
 
-#: src/canvas.c:1998
+#: src/canvas.c:2117
 msgid "Export ASCII Art"
 msgstr "Exportera ASCII-grafik"
 
-#: src/canvas.c:2002
+#: src/canvas.c:2121
 msgid "Save Layer Files"
 msgstr "Spara lagerfiler"
 
-#: src/canvas.c:2005
+#: src/canvas.c:2124
 msgid "Choose frames directory"
 msgstr "Välj katalog för bildrutor"
 
-#: src/canvas.c:2011
+#: src/canvas.c:2130
 msgid "You must save at least one frame to create an animated GIF."
 msgstr "Du måste spara minst en bildruta för att skapa en animerad GIF."
 
-#: src/canvas.c:2015
+#: src/canvas.c:2133
 msgid "Export GIF animation"
 msgstr "Exportera GIF-animering"
 
-#: src/canvas.c:2018
+#: src/canvas.c:2136
 msgid "Load Channel"
 msgstr "Läs in kanal"
 
-#: src/canvas.c:2022
+#: src/canvas.c:2140
 msgid "Save Channel"
 msgstr "Spara kanal"
 
-#: src/canvas.c:2025
+#: src/canvas.c:2143
 msgid "Save Composite Image"
 msgstr "Spara sammansatt bild"
 
@@ -470,15 +515,15 @@ msgstr "Bild Grön"
 msgid "Image Blue"
 msgstr "Bild Blå"
 
-#: src/channels.c:244 src/mainwindow.c:1093
+#: src/channels.c:244 src/mainwindow.c:1139
 msgid "Alpha"
 msgstr "Alfa"
 
-#: src/channels.c:245 src/mainwindow.c:1093
+#: src/channels.c:245 src/mainwindow.c:1139
 msgid "Selection"
 msgstr "Markering"
 
-#: src/channels.c:246 src/mainwindow.c:1093
+#: src/channels.c:246 src/mainwindow.c:1139
 msgid "Mask"
 msgstr "Mask"
 
@@ -486,242 +531,250 @@ msgstr "Mask"
 msgid "Create Channel"
 msgstr "Skapa kanal"
 
-#: src/channels.c:265
+#: src/channels.c:262
 msgid "Channel Type"
 msgstr "Kanaltyp"
 
-#: src/channels.c:272
+#: src/channels.c:269
 msgid "Initial Channel State"
 msgstr "Ursprunglig kanalinställning"
 
-#: src/channels.c:276
+#: src/channels.c:273
 msgid "Inverted"
 msgstr "Inverterad"
 
-#: src/channels.c:279 src/channels.c:337 src/fpick.c:921 src/fpick.c:1311
-#: src/otherwindow.c:307 src/otherwindow.c:467 src/otherwindow.c:513
-#: src/otherwindow.c:607 src/otherwindow.c:926 src/otherwindow.c:1184
-#: src/otherwindow.c:1411 src/otherwindow.c:2327 src/otherwindow.c:2757
-#: src/otherwindow.c:2965 src/otherwindow.c:3101 src/otherwindow.c:3200
-#: src/png.c:4159 src/prefs.c:661 src/spawn.c:435 src/viewer.c:1450
+#: src/channels.c:275 src/channels.c:332 src/fpick.c:1172 src/info.c:419
+#: src/mygtk.c:252 src/otherwindow.c:630 src/otherwindow.c:1016
+#: src/otherwindow.c:1251 src/otherwindow.c:1473 src/otherwindow.c:2469
+#: src/otherwindow.c:2870 src/otherwindow.c:3075 src/otherwindow.c:3245
+#: src/otherwindow.c:3343 src/prefs.c:712 src/spawn.c:513
+msgid "OK"
+msgstr "OK"
+
+#: src/channels.c:276 src/channels.c:333 src/fpick.c:786 src/fpick.c:1179
+#: src/otherwindow.c:298 src/otherwindow.c:539 src/otherwindow.c:631
+#: src/otherwindow.c:993 src/otherwindow.c:1252 src/otherwindow.c:1474
+#: src/otherwindow.c:2470 src/otherwindow.c:2871 src/otherwindow.c:3076
+#: src/otherwindow.c:3246 src/otherwindow.c:3344 src/otherwindow.c:3547
+#: src/prefs.c:713 src/spawn.c:514 src/viewer.c:1434
 msgid "Cancel"
 msgstr "Avbryt"
 
-#: src/channels.c:319
+#: src/channels.c:316
 msgid "Delete Channels"
 msgstr "Ta bort kanaler"
 
-#: src/channels.c:377
+#: src/channels.c:373
 msgid "Threshold Channel"
 msgstr "Tröskel kanal"
 
-#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Red"
 msgstr "Röd"
 
-#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Green"
 msgstr "Grön"
 
-#: src/cpick.c:945 src/otherwindow.c:574 src/otherwindow.c:801
-#: src/toolbar.c:298
+#: src/cpick.c:901 src/otherwindow.c:601 src/otherwindow.c:867
+#: src/toolbar.c:296
 msgid "Blue"
 msgstr "Blå"
 
-#: src/cpick.c:945 src/otherwindow.c:572 src/otherwindow.c:804
-#: src/toolbar.c:300
+#: src/cpick.c:901 src/otherwindow.c:599 src/otherwindow.c:869
+#: src/toolbar.c:298
 msgid "Hue"
 msgstr "Nyans"
 
-#: src/cpick.c:945 src/otherwindow.c:572 src/otherwindow.c:803
-#: src/toolbar.c:300
+#: src/cpick.c:901 src/otherwindow.c:599 src/otherwindow.c:868
+#: src/toolbar.c:298
 msgid "Saturation"
 msgstr "Mättnad"
 
-#: src/cpick.c:946 src/toolbar.c:300
+#: src/cpick.c:902 src/toolbar.c:298
 msgid "Value"
 msgstr "Värde"
 
-#: src/cpick.c:946
+#: src/cpick.c:902
 msgid "Hex"
 msgstr "Hex"
 
-#: src/cpick.c:946 src/layer.c:1167 src/otherwindow.c:2882 src/prefs.c:421
-#: src/toolbar.c:441
+#: src/cpick.c:902 src/layer.c:1270 src/otherwindow.c:2996 src/prefs.c:450
+#: src/toolbar.c:903
 msgid "Opacity"
 msgstr "Opacitet"
 
-#: src/font.c:985
+#: src/font.c:939
 msgid "Creating Font Index"
 msgstr "Skapar typsnittsindex"
 
-#: src/font.c:1364
+#: src/font.c:1316
 msgid "You must select at least one directory to search for fonts."
 msgstr "Du måste välj minst en katalog att söka i efter typsnitt."
 
-#: src/font.c:1516
+#: src/font.c:1468
 msgid "Font"
 msgstr "Typsnitt"
 
-#: src/font.c:1517
+#: src/font.c:1469
 msgid "Style"
 msgstr "Stil"
 
-#: src/font.c:1518 src/fpick.c:1176 src/otherwindow.c:3180 src/prefs.c:421
-#: src/toolbar.c:441
+#: src/font.c:1470 src/fpick.c:1045 src/otherwindow.c:3324 src/prefs.c:450
+#: src/toolbar.c:903
 msgid "Size"
 msgstr "Storlek"
 
-#: src/font.c:1519
+#: src/font.c:1471
 msgid "Filename"
 msgstr "Filnamn"
 
-#: src/font.c:1519
+#: src/font.c:1471
 msgid "Face"
 msgstr "Typsnitt"
 
-#: src/font.c:1520 src/spawn.c:427
+#: src/font.c:1472 src/spawn.c:506
 msgid "Directory"
 msgstr "Katalog"
 
-#: src/font.c:1761 src/font.c:1873 src/toolbar.c:580 src/viewer.c:1396
-#: src/viewer.c:1449
+#: src/font.c:1712 src/font.c:1825 src/toolbar.c:1064 src/viewer.c:1381
+#: src/viewer.c:1433
 msgid "Paste Text"
 msgstr "Klistra in text"
 
-#: src/font.c:1774 src/font.c:1802
+#: src/font.c:1725 src/font.c:1753
 msgid "Text"
 msgstr "Text"
 
-#: src/font.c:1805 src/viewer.c:1458
+#: src/font.c:1756 src/viewer.c:1439
 msgid "Enter Text Here"
 msgstr "Ange text här"
 
-#: src/font.c:1833 src/viewer.c:1412
+#: src/font.c:1785 src/viewer.c:1396
 msgid "Antialias"
 msgstr "Kantutjämning"
 
-#: src/font.c:1838 src/viewer.c:1422
+#: src/font.c:1790 src/viewer.c:1406
 msgid "Invert"
 msgstr "Invertera"
 
-#: src/font.c:1843 src/viewer.c:1427
+#: src/font.c:1795 src/viewer.c:1411
 msgid "Background colour ="
 msgstr "Bakgrundsfärg ="
 
-#: src/font.c:1853
+#: src/font.c:1805
 msgid "Oblique"
 msgstr "Oblik"
 
-#: src/font.c:1856 src/viewer.c:1435
+#: src/font.c:1808 src/viewer.c:1419
 msgid "Angle of rotation ="
 msgstr "Vinkel på rotering ="
 
-#: src/font.c:1879
+#: src/font.c:1831
 msgid "Font Directories"
 msgstr "Typsnittskataloger"
 
-#: src/font.c:1887
+#: src/font.c:1836
 msgid "New Directory"
 msgstr "Ny katalog"
 
-#: src/font.c:1888 src/spawn.c:428
+#: src/font.c:1837 src/spawn.c:507
 msgid "Select Directory"
 msgstr "Välj katalog"
 
-#: src/font.c:1899
+#: src/font.c:1848
 msgid "Add"
 msgstr "Lägg till"
 
-#: src/font.c:1903
+#: src/font.c:1852
 msgid "Remove"
 msgstr "Ta bort"
 
-#: src/font.c:1907
+#: src/font.c:1856
 msgid "Create Index"
 msgstr "Skapa index"
 
-#: src/fpick.c:866
+#: src/fpick.c:731
 #, c-format
 msgid "Could not access directory %s"
 msgstr "Kunde inte komma åt katalogen %s"
 
-#: src/fpick.c:905 src/fpick.c:928
+#: src/fpick.c:770 src/fpick.c:793
 msgid "Delete"
 msgstr "Ta bort"
 
-#: src/fpick.c:905 src/fpick.c:933
+#: src/fpick.c:770 src/fpick.c:798
 msgid "Rename"
 msgstr "Byt namn"
 
-#: src/fpick.c:906
+#: src/fpick.c:771
 msgid "Create Directory"
 msgstr "Skapa katalog"
 
-#: src/fpick.c:913
+#: src/fpick.c:778
 msgid "Enter the new filename"
 msgstr "Ange nytt filnamn"
 
-#: src/fpick.c:914
+#: src/fpick.c:779
 msgid "Enter the name of the new directory"
 msgstr "Ange namnet på nya katalogen"
 
-#: src/fpick.c:933 src/otherwindow.c:306 src/otherwindow.c:1868
+#: src/fpick.c:798 src/otherwindow.c:297 src/otherwindow.c:1989
 msgid "Create"
 msgstr "Skapa"
 
-#: src/fpick.c:968
+#: src/fpick.c:833
 #, c-format
 msgid "Do you really want to delete \"%s\" ?"
 msgstr "Vill du verkligen ta bort \"%s\"?"
 
-#: src/fpick.c:973
+#: src/fpick.c:838
 msgid "Unable to delete"
 msgstr "Kunde inte ta bort"
 
-#: src/fpick.c:978
+#: src/fpick.c:843
 msgid "Unable to rename"
 msgstr "Kunde inte byta namn"
 
-#: src/fpick.c:987
+#: src/fpick.c:852
 msgid "Unable to create directory"
 msgstr "Kunde inte skapa katalogen"
 
-#: src/fpick.c:1072
+#: src/fpick.c:939
 msgid "Up"
 msgstr "Uppåt"
 
-#: src/fpick.c:1073
+#: src/fpick.c:940
 msgid "Home"
 msgstr "Hem"
 
-#: src/fpick.c:1074
+#: src/fpick.c:941
 msgid "Create New Directory"
 msgstr "Skapa ny katalog"
 
-#: src/fpick.c:1075
+#: src/fpick.c:942
 msgid "Show Hidden Files"
 msgstr "Visa dolda filer"
 
-#: src/fpick.c:1076
+#: src/fpick.c:943
 msgid "Case Insensitive Sort"
 msgstr "Skiftlägesokänslig sortering"
 
-#: src/fpick.c:1175
+#: src/fpick.c:1044
 msgid "Name"
 msgstr "Namn"
 
-#: src/fpick.c:1177
+#: src/fpick.c:1046
 msgid "Type"
 msgstr "Typ"
 
-#: src/fpick.c:1178
+#: src/fpick.c:1047
 msgid "Modified"
 msgstr "Ändrad"
 
-#: src/help.c:25 src/prefs.c:443
+#: src/help.c:25 src/prefs.c:481
 msgid "General"
 msgstr "Allmänt"
 
@@ -738,8 +791,8 @@ msgid "Credits"
 msgstr "Tack till"
 
 #: src/help.c:32
-msgid "mtPaint 3.40 - Copyright (C) 2004-2009 The Authors\n"
-msgstr "mtPaint 3.40 - Copyright © 2004-2009 Upphovsmännen\n"
+msgid "mtPaint 3.40 - Copyright (C) 2004-2011 The Authors\n"
+msgstr "mtPaint 3.40 - Copyright © 2004-2011 Upphovsmännen\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -821,22 +874,30 @@ msgid "  Ctrl-S            Save Image"
 msgstr "  Ctrl-S            Spara bild"
 
 #: src/help.c:45
+msgid "  Ctrl-Shift-S      Save layers file"
+msgstr ""
+
+#: src/help.c:46
 msgid "  Ctrl-Q            Quit program\n"
 msgstr "  Ctrl-Q            Avsluta programmet\n"
 
-#: src/help.c:46
+#: src/help.c:47
 msgid "  Ctrl-A            Select whole image"
 msgstr "  Ctrl-A            Markera hela bilden"
 
-#: src/help.c:47
+#: src/help.c:48
 msgid "  Escape            Select nothing, cancel paste box"
 msgstr "  Escape            Markera ingenting, avbryt inklistringsruta"
 
-#: src/help.c:48
+#: src/help.c:49
+msgid "  J                 Lasso selection\n"
+msgstr ""
+
+#: src/help.c:50
 msgid "  Ctrl-C            Copy selection to clipboard"
 msgstr "  Ctrl-C            Kopiera markering till urklipp"
 
-#: src/help.c:49
+#: src/help.c:51
 msgid ""
 "  Ctrl-X            Copy selection to clipboard, and then paint current "
 "pattern to selection area"
@@ -844,24 +905,32 @@ msgstr ""
 "  Ctrl-X            Kopiera markering till urklipp och rita sedan ut "
 "aktuellt mönster till markeringsytan"
 
-#: src/help.c:50
+#: src/help.c:52
 msgid "  Ctrl-V            Paste clipboard to centre of current view"
 msgstr "  Ctrl-V            Klistra in urklipp till mitten av aktuell vy"
 
-#: src/help.c:51
+#: src/help.c:53
 msgid "  Ctrl-K            Paste clipboard to location it was copied from"
 msgstr ""
 "  Ctrl-K            Klistra in urklipp till platsen den kopierades från"
 
-#: src/help.c:52
-msgid "  Enter/Return      Commit paste to canvas\n"
-msgstr "  Enter/Return      Verkställ inklistring till rityta\n"
+#: src/help.c:54
+msgid "  Ctrl-Shift-V      Paste clipboard to new layer"
+msgstr ""
 
-#: src/help.c:53
+#: src/help.c:55
+msgid "  Enter/Return      Commit paste to canvas"
+msgstr "  Enter/Return      Verkställ inklistring till rityta"
+
+#: src/help.c:56
+msgid "  Shift+Enter/Return  Commit paste and swap canvas into the clipboard\n"
+msgstr ""
+
+#: src/help.c:57
 msgid "  Arrow keys        Paint Mode - Move the mouse pointer"
 msgstr "  Piltangenter      Ritläge - Flytta muspekaren"
 
-#: src/help.c:54
+#: src/help.c:58
 msgid ""
 "  Arrow keys        Selection Mode - Nudge selection box or paste box by one "
 "pixel"
@@ -869,49 +938,70 @@ msgstr ""
 "  Piltangenter      Markeringsläge - Flytta markeringsrutan eller "
 "inklistringsrutan med en bildpunkt"
 
-#: src/help.c:55
+#: src/help.c:59
 msgid ""
 "  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x "
 "pixels - x is defined by the Preferences window"
 msgstr ""
-"  Shift+Piltangenter  Knuffa muspekaren, urvalsboxen eller inklistringsboxen med x "
-"pixlar - x är definierat i Inställningsfönstret"
+"  Shift+Piltangenter  Knuffa muspekaren, urvalsboxen eller inklistringsboxen "
+"med x pixlar - x är definierat i Inställningsfönstret"
 
-#: src/help.c:56
-msgid "  Ctrl+Arrows       Move layer or resize selection box\n"
-msgstr "  Ctrl+Piltangenter   Flytta lager eller ändra storlek på urvalsboxen\n"
+#: src/help.c:60
+msgid "  Ctrl+Arrows       Move layer or resize selection box"
+msgstr "  Ctrl+Piltangenter   Flytta lager eller ändra storlek på urvalsboxen"
 
-#: src/help.c:57
+#: src/help.c:61
+msgid "  Ctrl+Shift+Arrows  Move layer or resize selection box by x pixels\n"
+msgstr ""
+
+#: src/help.c:62
+msgid "  Enter/Return      Paint Mode - Simulate left click"
+msgstr ""
+
+#: src/help.c:63
+msgid "  Backspace         Paint Mode - Simulate right click\n"
+msgstr ""
+
+#: src/help.c:64
 msgid ""
 "  [ or ]            Change colour A to the next or previous palette item"
 msgstr ""
 "  [ eller ]         Ändra färg A till nästa eller föregående färg i paletten"
 
-#: src/help.c:58
+#: src/help.c:65
 msgid ""
 "  Shift+[ or ]      Change colour B to the next or previous palette item\n"
 msgstr ""
-"  Shift+[ eller ]   Ändra färg A till nästa eller föregående färg i paletten\n"
+"  Shift+[ eller ]   Ändra färg A till nästa eller föregående färg i "
+"paletten\n"
 
-#: src/help.c:59
+#: src/help.c:66
 msgid "  Delete            Crop image to selection"
 msgstr "  Delete            Beskär bilden till markeringen"
 
-#: src/help.c:60
+#: src/help.c:67
 msgid ""
 "  Insert            Transform colours - i.e. Brightness, Contrast, "
 "Saturation, Posterize, Gamma"
 msgstr ""
 
-#: src/help.c:61
+#: src/help.c:68
 msgid "  Ctrl-G            Greyscale the image"
 msgstr "  Ctrl-G            Ändra bilden till gråskala"
 
-#: src/help.c:62
+#: src/help.c:69
 msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
 msgstr "  Shift-Ctrl-G      Ändra bilden till gråskala (Tillrättad gamma)"
 
-#: src/help.c:63
+#: src/help.c:70
+msgid "  Ctrl+M            Mirror the image"
+msgstr ""
+
+#: src/help.c:71
+msgid "  Shift-Ctrl-I      Invert the image\n"
+msgstr ""
+
+#: src/help.c:72
 msgid ""
 "  Ctrl-T            Draw a rectangle around the selection area with the "
 "current fill"
@@ -919,192 +1009,220 @@ msgstr ""
 "  Ctrl-T            Rita en rektangel runt det valda området med vald "
 "fyllning"
 
-#: src/help.c:64
+#: src/help.c:73
 msgid "  Ctrl-Shift-T      Fill in the selection area with the current fill"
 msgstr "  Ctrl-Shift-T      Fyll det valda området med vald fyllning"
 
-#: src/help.c:65
+#: src/help.c:74
 msgid "  Ctrl-L            Draw an ellipse spanning the selection area"
 msgstr ""
 
-#: src/help.c:66
+#: src/help.c:75
 msgid "  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
 msgstr ""
 
-#: src/help.c:67
+#: src/help.c:76
 msgid "  Ctrl-E            Edit the RGB values for colours A & B"
 msgstr ""
 
-#: src/help.c:68
+#: src/help.c:77
 msgid "  Ctrl-W            Edit all palette colours\n"
 msgstr "  Ctrl-W            Redigera alla palettfärger\n"
 
-#: src/help.c:69
+#: src/help.c:78
 msgid "  Ctrl-P            Preferences"
 msgstr "  Ctrl-P            Inställningar"
 
-#: src/help.c:70
+#: src/help.c:79
 msgid "  Ctrl-I            Information\n"
 msgstr "  Ctrl-I            Information\n"
 
-#: src/help.c:71
+#: src/help.c:80
 msgid "  Ctrl-Z            Undo last action"
 msgstr "  Ctrl-Z            Ångra senaste åtgärd"
 
-#: src/help.c:72
+#: src/help.c:81
 msgid "  Ctrl-R            Redo an undone action\n"
 msgstr "  Ctrl-R            Gör om en ångrad åtgärd\n"
 
-#: src/help.c:73
+#: src/help.c:82
+msgid "  Shift-T           Text Tool (GTK+)"
+msgstr ""
+
+#: src/help.c:83
+msgid "  T                 Text Tool (FreeType)\n"
+msgstr ""
+
+#: src/help.c:84
 msgid "  V                 View Window"
 msgstr "  V                 Visningsfönster"
 
-#: src/help.c:74
+#: src/help.c:85
 msgid "  L                 Layers Window\n"
 msgstr "  L                 Lagerfönster\n"
 
-#: src/help.c:75
+#: src/help.c:86
+msgid "  B                 Toggle Snap to Tile Grid mode\n"
+msgstr ""
+
+#: src/help.c:87
+msgid "  X                 Swap Colours A & B"
+msgstr ""
+
+#: src/help.c:88
+msgid "  E                 Choose Colour\n"
+msgstr ""
+
+#: src/help.c:89
 msgid ""
 "  A                 Draw open arrow head when using the line tool (size set "
 "by flow setting)"
 msgstr ""
-"  A                 Rita öppet pilhuvud vid användande av linjeverktyget (storlek sätts "
-"av flödesinställning)"
+"  A                 Rita öppet pilhuvud vid användande av linjeverktyget "
+"(storlek sätts av flödesinställning)"
 
-#: src/help.c:76
+#: src/help.c:90
 msgid ""
 "  S                 Draw closed arrow head when using the line tool (size "
 "set by flow setting)\n"
 msgstr ""
-"  S                 Rita stängt pilhuvud vid användande av linjeverktyget (storlek sätts "
-"av flödesinställning)\n"
+"  S                 Rita stängt pilhuvud vid användande av linjeverktyget "
+"(storlek sätts av flödesinställning)\n"
 
-#: src/help.c:77
+#: src/help.c:91
+msgid "  D                 Line Tool"
+msgstr ""
+
+#: src/help.c:92
+msgid "  F                 Flood Fill Tool\n"
+msgstr ""
+
+#: src/help.c:93
 msgid "  +,=               Main edit window - Zoom in"
 msgstr "  +,=               Huvudredigeringsfönster - Zooma in"
 
-#: src/help.c:78
+#: src/help.c:94
 msgid "  -                 Main edit window - Zoom out"
 msgstr "  -                 Huvudredigeringsfönster - Zooma ut"
 
-#: src/help.c:79
+#: src/help.c:95
 msgid "  Shift +,=         View window - Zoom in"
 msgstr "  Shift +,=         Visningsfönster - Zooma in"
 
-#: src/help.c:80
+#: src/help.c:96
 msgid "  Shift -           View window - Zoom out\n"
 msgstr "  Shift -           Visningsfönster - Zooma ut\n"
 
-#: src/help.c:81
+#: src/help.c:97
 #, c-format
 msgid "  1                 10% zoom"
 msgstr "  1                 10% zoom"
 
-#: src/help.c:82
+#: src/help.c:98
 #, c-format
 msgid "  2                 25% zoom"
 msgstr "  2                 25% zoom"
 
-#: src/help.c:83
+#: src/help.c:99
 #, c-format
 msgid "  3                 50% zoom"
 msgstr "  3                 50% zoom"
 
-#: src/help.c:84
+#: src/help.c:100
 #, c-format
 msgid "  4                 100% zoom"
 msgstr "  4                 100% zoom"
 
-#: src/help.c:85
+#: src/help.c:101
 #, c-format
 msgid "  5                 400% zoom"
 msgstr "  5                 400% zoom"
 
-#: src/help.c:86
+#: src/help.c:102
 #, c-format
 msgid "  6                 800% zoom"
 msgstr "  6                 800% zoom"
 
-#: src/help.c:87
+#: src/help.c:103
 #, c-format
 msgid "  7                 1200% zoom"
 msgstr "  7                 1200% zoom"
 
-#: src/help.c:88
+#: src/help.c:104
 #, c-format
 msgid "  8                 1600% zoom"
 msgstr "  8                 1600% zoom"
 
-#: src/help.c:89
+#: src/help.c:105
 #, c-format
 msgid "  9                 2000% zoom\n"
 msgstr "  9                 2000% zoom\n"
 
-#: src/help.c:90
+#: src/help.c:106
 msgid "  Shift + 1         Edit image channel"
 msgstr "  Shift + 1         Redigera bildkanal"
 
-#: src/help.c:91
+#: src/help.c:107
 msgid "  Shift + 2         Edit alpha channel"
 msgstr "  Shift + 2         Redigera alfakanal"
 
-#: src/help.c:92
+#: src/help.c:108
 msgid "  Shift + 3         Edit selection channel"
 msgstr "  Shift + 3         Redigera markeringskanal"
 
-#: src/help.c:93
+#: src/help.c:109
 msgid "  Shift + 4         Edit mask channel\n"
 msgstr "  Shift + 4         Redigera maskkanal\n"
 
-#: src/help.c:94
+#: src/help.c:110
 msgid "  F1                Help"
 msgstr "  F1                Hjälp"
 
-#: src/help.c:95
+#: src/help.c:111
 msgid "  F2                Choose Pattern"
 msgstr "  F2                Välj mönster"
 
-#: src/help.c:96
+#: src/help.c:112
 msgid "  F3                Choose Brush"
 msgstr "  F3                Välj pensel"
 
-#: src/help.c:97
+#: src/help.c:113
 msgid "  F4                Paint Tool"
 msgstr "  F4                Ritverktyg"
 
-#: src/help.c:98
+#: src/help.c:114
 msgid "  F5                Toggle Main Toolbar"
 msgstr "  F5                Växla huvudverktygsrad"
 
-#: src/help.c:99
+#: src/help.c:115
 msgid "  F6                Toggle Tools Toolbar"
 msgstr "  F6                Växla Verktygsrad"
 
-#: src/help.c:100
+#: src/help.c:116
 msgid "  F7                Toggle Settings Toolbar"
 msgstr "  F7                Växla Inställningsrad"
 
-#: src/help.c:101
+#: src/help.c:117
 msgid "  F8                Toggle Palette"
 msgstr "  F8                Växla palett"
 
-#: src/help.c:102
+#: src/help.c:118
 msgid "  F9                Selection Tool"
 msgstr "  F9                Markeringsverktyg"
 
-#: src/help.c:103
+#: src/help.c:119
 msgid "  F12               Toggle Dock Area\n"
 msgstr "  F12               Växla Dockningsområde\n"
 
-#: src/help.c:104
+#: src/help.c:120
 msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
 msgstr "  Ctrl + F1 - F12   Spara aktuellt urklipp till fil 1-12"
 
-#: src/help.c:105
+#: src/help.c:121
 msgid "  Shift + F1 - F12  Load clipboard from file 1-12\n"
 msgstr "  Shift + F1 - F12  Läs in urklipp från fil 1-12\n"
 
-#: src/help.c:106
+#: src/help.c:122
 msgid ""
 "  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad "
 "numbers)"
@@ -1112,117 +1230,122 @@ msgstr ""
 "  Ctrl + 1, 2, ... , 0  Ställ in opacitet till 10%, 20%, ... , 100% (huvud- "
 "eller numeriska tangenter)"
 
-#: src/help.c:107
+#: src/help.c:123
 msgid "  Ctrl + + or =     Increase opacity by 1"
 msgstr "  Ctrl + + eller =  Öka opacitet med 1"
 
-#: src/help.c:108
+#: src/help.c:124
 msgid "  Ctrl + -          Decrease opacity by 1\n"
 msgstr "  Ctrl + -          Minska opacitet med 1\n"
 
-#: src/help.c:109
+#: src/help.c:125
 msgid ""
 "  Home              Show or hide main window menu/toolbar/status bar/palette"
-msgstr "  Home              Visa eller dölj huvudfönsrets meny/verktygsrad/statusrad/palett"
+msgstr ""
+"  Home              Visa eller dölj huvudfönsrets meny/verktygsrad/statusrad/"
+"palett"
 
-#: src/help.c:110
+#: src/help.c:126
 msgid "  Page Up           Scale Image"
 msgstr "  Page Up           Skala bild"
 
-#: src/help.c:111
+#: src/help.c:127
 msgid "  Page Down         Resize Image canvas"
 msgstr "  Page Down         Ändra storlek på bildens rityta"
 
-#: src/help.c:112
+#: src/help.c:128
 msgid "  End               Pan Window"
 msgstr "  End               Panorera Fönster"
 
-#: src/help.c:115
+#: src/help.c:131
 msgid "  Left button          Paint to canvas using the current tool"
 msgstr "  Vänster knapp        Rita till kanvas med valt verktyg"
 
-#: src/help.c:116
+#: src/help.c:132
 msgid ""
 "  Middle button        Selects the point which will be the centre of the "
 "image after the next zoom"
-msgstr "  Mittknappen          Väljer punkten som kommer att bli bildens center "
+msgstr ""
+"  Mittknappen          Väljer punkten som kommer att bli bildens center "
 "efter nästa zoom"
 
-#: src/help.c:117
+#: src/help.c:133
 msgid ""
 "  Right button         Commit paste to canvas / Stop drawing current line / "
 "Cancel selection\n"
-msgstr "  Höger knapp          Utför inklistring till kanvas / Sluta rita linje / "
+msgstr ""
+"  Höger knapp          Utför inklistring till kanvas / Sluta rita linje / "
 "Avbryt val\n"
 
-#: src/help.c:118
+#: src/help.c:134
 msgid ""
 "  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in "
 "or out via the Preferences window\n"
-msgstr "  Skrollhjulet         I GITK+2 kan användaren välja att låta scrollhjulet zooma "
-"in och ut i Inställningsfönstret\n"
+msgstr ""
+"  Skrollhjulet         I GITK+2 kan användaren välja att låta scrollhjulet "
+"zooma in och ut i Inställningsfönstret\n"
 
-#: src/help.c:119
+#: src/help.c:135
 msgid "  Ctrl+Left button     Choose colour A from under mouse pointer"
 msgstr "  Ctrl+Vänster knapp   Välj färg A från där muspekaren är"
 
-#: src/help.c:120
+#: src/help.c:136
 msgid ""
 "  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour "
 "in A (RGB images only)"
 msgstr ""
-"  Ctrl+Mittenknappen   Skapa färg A/B och mönster baserat på RGB-färg "
-"i A (Endast för RGB-bilder)"
+"  Ctrl+Mittenknappen   Skapa färg A/B och mönster baserat på RGB-färg i A "
+"(Endast för RGB-bilder)"
 
-#: src/help.c:121
+#: src/help.c:137
 msgid "  Ctrl+Right button    Choose colour B from under mouse pointer"
 msgstr "  Ctrl+Höger knapp     Välj färg B från där muspekaren är"
 
-#: src/help.c:122
+#: src/help.c:138
 msgid "  Ctrl+Scroll Wheel    Scroll the main edit window left or right\n"
 msgstr "  Ctrl+Skrollhjul      Skorlla huvudfönstret höger eller vänster\n"
 
-#: src/help.c:123
+#: src/help.c:139
 msgid ""
 "  Ctrl+Double click    Set colour A or B to average colour under brush "
 "square or selection marquee (RGB only)\n"
 msgstr ""
 
-#: src/help.c:124
+#: src/help.c:140
 msgid ""
 "  Shift+Right button   Selects the point which will be the centre of the "
 "image after the next zoom\n"
 "\n"
 msgstr ""
-"  Shift+Höger knapp    Väljer den punkt som kommer att vara center av "
-"bilden efter nästa zoom\n"
+"  Shift+Höger knapp    Väljer den punkt som kommer att vara center av bilden "
+"efter nästa zoom\n"
 "\n"
 
-#: src/help.c:125
+#: src/help.c:141
 msgid "You can fixate the X/Y co-ordinates while moving the mouse:\n"
 msgstr "Du kan låsa fast X/Y kordinaterna medans du flyttar musen:\n"
 
-#: src/help.c:126
+#: src/help.c:142
 msgid "  Shift                Constrain mouse movements to vertical line"
 msgstr "  Shift                Begränsa musrörelser till vertikal linje"
 
-#: src/help.c:127
+#: src/help.c:143
 msgid "  Shift+Ctrl           Constrain mouse movements to horizontal line"
 msgstr "  Shift+Ctrl           Begränsa musrörelser till horisontel linje"
 
-#: src/help.c:130
+#: src/help.c:146
 msgid "mtPaint is maintained by Dmitry Groshev.\n"
 msgstr "mtPaint underhålls av Dmitry Groshev.\n"
 
-#: src/help.c:131
+#: src/help.c:147
 msgid "wjaguar@users.sourceforge.net"
 msgstr "wjaguar@users.sourceforge.net"
 
-#: src/help.c:132
+#: src/help.c:148
 msgid "http://mtpaint.sourceforge.net/\n"
 msgstr "http://mtpaint.sourceforge.net/\n"
 
-#: src/help.c:133
+#: src/help.c:149
 msgid ""
 "The following people (in alphabetical order) have contributed directly to "
 "the project, and are therefore worthy of gracious thanks for their "
@@ -1233,11 +1356,11 @@ msgstr ""
 "och är därför värda ett stort tack för deras generösitet och hårda arbete:\n"
 "\n"
 
-#: src/help.c:134
+#: src/help.c:150
 msgid "Authors\n"
 msgstr "Upphovsmän\n"
 
-#: src/help.c:135
+#: src/help.c:151
 msgid ""
 "Dmitry Groshev - Contributing developer for version 2.30. Lead developer and "
 "maintainer from version 3.00 to the present."
@@ -1245,7 +1368,7 @@ msgstr ""
 "Dmitry Groshev - Bidragande utvecklare för version 2.30. Huvudutvecklare och "
 "ansvarig från version 3.00 till nuvarande."
 
-#: src/help.c:136
+#: src/help.c:152
 msgid ""
 "Mark Tyler - Original author and maintainer up to version 3.00, occasional "
 "contributor thereafter."
@@ -1253,7 +1376,7 @@ msgstr ""
 "Mark Tyler - Ursprunglig upphovsman och ansvarig upp till version 3.00, "
 "stundtals bidragsgivare efter det."
 
-#: src/help.c:137
+#: src/help.c:153
 msgid ""
 "Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more "
 "information.\n"
@@ -1262,7 +1385,7 @@ msgstr ""
 "Xiaolin Wu - Skrev Wu-kvantiseringsmetoden - se wu.c för mer information.\n"
 "\n"
 
-#: src/help.c:138
+#: src/help.c:154
 msgid ""
 "General Contributions (Feedback and Ideas for improvements unless otherwise "
 "stated)\n"
@@ -1270,31 +1393,35 @@ msgstr ""
 "Allmänna bidrag (återkoppling och idéer för förbättringar om inte annat har "
 "angivits)\n"
 
-#: src/help.c:139
+#: src/help.c:155
 msgid "Abdulla Al Muhairi - Website redesign April 2005"
 msgstr "Abdulla Al Muhairi - Designade om webbplatsen i april 2005"
 
-#: src/help.c:140
+#: src/help.c:156
 msgid "Alan Horkan"
 msgstr "Alan Horkan"
 
-#: src/help.c:141
+#: src/help.c:157
 msgid "Alexandre Prokoudine"
 msgstr "Alexandre Prokoudine"
 
-#: src/help.c:142
+#: src/help.c:158
 msgid "Antonio Andrea Bianco"
 msgstr "Antonio Andrea Bianco"
 
-#: src/help.c:143
+#: src/help.c:159
 msgid "Dennis Lee"
 msgstr "Dennis Lee"
 
-#: src/help.c:144
+#: src/help.c:160
+msgid "Donald White"
+msgstr ""
+
+#: src/help.c:161
 msgid "Ed Jason"
 msgstr "Ed Jason"
 
-#: src/help.c:145
+#: src/help.c:162
 msgid ""
 "Eddie Kohler - Created Gifsicle which is needed for the creation and viewing "
 "of animated GIF files http://www.lcdf.org/gifsicle/"
@@ -1302,7 +1429,7 @@ msgstr ""
 "Eddie Kohler - Skapade Gifsicle som behövs för att skapa och visa animerade "
 "GIF-filer, http://www.lcdf.org/gifsicle/"
 
-#: src/help.c:146
+#: src/help.c:163
 msgid ""
 "Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta "
 "registration"
@@ -1310,31 +1437,35 @@ msgstr ""
 "Guadalinex Team (Junta de Andalucia) - manualsida, Launchpad/Rosetta-"
 "registrering"
 
-#: src/help.c:147
+#: src/help.c:164
 msgid "Lou Afonso"
 msgstr "Lou Afonso"
 
-#: src/help.c:148
+#: src/help.c:165
 msgid "Magnus Hjorth"
 msgstr "Magnus Hjorth"
 
-#: src/help.c:149
+#: src/help.c:166
 msgid "Martin Zelaia"
 msgstr "Martin Zelaia"
 
-#: src/help.c:150
+#: src/help.c:167
+msgid "Pasi Kallinen"
+msgstr ""
+
+#: src/help.c:168
 msgid "Pavel Ruzicka"
 msgstr "Pavel Ruzicka"
 
-#: src/help.c:151
+#: src/help.c:169
 msgid "Puppy Linux (Barry Kauler)"
 msgstr "Puppy Linux (Barry Kauler)"
 
-#: src/help.c:152
+#: src/help.c:170
 msgid "Vlastimil Krejcir"
 msgstr "Vlastimil Krejcir"
 
-#: src/help.c:153
+#: src/help.c:171
 msgid ""
 "William Kern\n"
 "\n"
@@ -1342,150 +1473,163 @@ msgstr ""
 "William Kern\n"
 "\n"
 
-#: src/help.c:154
+#: src/help.c:172
 msgid "Translations\n"
 msgstr "Översättningar\n"
 
-#: src/help.c:155
-msgid "Brazilian Portuguese - Paulo Trevizan"
-msgstr "Brasilisk portugisiska - Paulo Trevizan"
+#: src/help.c:173
+msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
+msgstr "Brasilisk portugisiska - Paulo Trevizan, Valter Nazianzeno"
 
-#: src/help.c:156
+#: src/help.c:174
 msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
 msgstr "Tjeckiska - Pavel Ruzicka, Martin Petricek, Roman Hornik"
 
-#: src/help.c:157
+#: src/help.c:175
 msgid "Dutch - Hans Strijards"
 msgstr "Nederländska - Hans Strijards"
 
-#: src/help.c:158
-msgid "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
-msgstr "Franska - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"
+#: src/help.c:176
+msgid ""
+"French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
+"Philippe Etienne"
+msgstr ""
+"Franska - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
+"Philippe Etienne"
 
-#: src/help.c:159
+#: src/help.c:177
 msgid "Galician - Miguel Anxo Bouzada"
 msgstr "Galiciska - Miguel Anxo Bouzada"
 
-#: src/help.c:160
+#: src/help.c:178
 msgid "German - Oliver Frommel, B. Clausius, Ulrich Ringel"
 msgstr "Tyyska - Oliver Frommel, B. Clausius, Ulrich Ringel"
 
-#: src/help.c:161
+#: src/help.c:179
+msgid "Hungarian - Ur Balazs"
+msgstr ""
+
+#: src/help.c:180
 msgid "Italian - Angelo Gemmi"
 msgstr "Italienska - Angelo Gemmi"
 
-#: src/help.c:162
+#: src/help.c:181
 msgid "Japanese - Norihiro YONEDA"
 msgstr "Japanska - Norihiro YONEDA"
 
-#: src/help.c:163
+#: src/help.c:182
 msgid "Polish - Bartosz Kaszubowski, LucaS"
 msgstr "Polska - Bartosz Kaszubowski, LucaS"
 
-#: src/help.c:164
+#: src/help.c:183
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
 msgstr "Portugisiska - Israel G. Lugo, Tiago Silva"
 
-#: src/help.c:165
+#: src/help.c:184
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
 msgstr "Ryska - Sergey Irupin, Dmitry Groshev"
 
-#: src/help.c:166
+#: src/help.c:185
 msgid "Simplified Chinese - Cecc"
 msgstr "Förenklad kinesiska - Cecc"
 
-#: src/help.c:167
+#: src/help.c:186
 msgid "Slovak - Jozef Riha"
 msgstr "Slovakiska - Jozef Riha"
 
-#: src/help.c:168
+#: src/help.c:187
 msgid ""
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
-"Anxo Bouzada, Francisco Jose Rey"
+"Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 msgstr ""
 "Spanska - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
-"Anxo Bouzada, Francisco Jose Rey"
+"Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
-#: src/help.c:169
+#: src/help.c:188
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr "Svenska - Daniel Nylander, Daniel Eriksson"
 
-#: src/help.c:170
+#: src/help.c:189
+msgid "Tagalog - Anjelo delCarmen"
+msgstr ""
+
+#: src/help.c:190
 msgid "Taiwanese Chinese - Wei-Lun Chao"
 msgstr "Taiwanesisk kinesiska - Wei-Lun Chao"
 
-#: src/help.c:171
+#: src/help.c:191
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
 msgstr "Turkiska - Muhammet Kara, Tutku Dalmaz"
 
-#: src/info.c:295
+#: src/info.c:281
 msgid "Information"
 msgstr "Information"
 
-#: src/info.c:306
+#: src/info.c:290
 msgid "Memory"
 msgstr "Minne"
 
-#: src/info.c:309
+#: src/info.c:293
 msgid "Total memory for main + undo images"
 msgstr "Totalt minne för huvud + ångra-bilder"
 
-#: src/info.c:322
+#: src/info.c:306
 msgid "Undo / Redo / Max levels used"
 msgstr "Ångra / Återskapa / Max nivåer använda"
 
-#: src/info.c:326 src/otherwindow.c:3162 src/png.c:532 src/png.c:725
+#: src/info.c:310 src/otherwindow.c:954 src/otherwindow.c:3307 src/png.c:642
+#: src/png.c:847
 msgid "Clipboard"
 msgstr "Urklipp"
 
-#: src/info.c:327
+#: src/info.c:311
 msgid "Unused"
 msgstr "Oanvänt"
 
-#: src/info.c:332
+#: src/info.c:316
 #, c-format
 msgid "Clipboard = %i x %i"
 msgstr "Urklipp = %i x %i"
 
-#: src/info.c:334
+#: src/info.c:318
 #, c-format
 msgid "Clipboard = %i x %i x RGB"
 msgstr "Urklipp = %i x %i x RGB"
 
-#: src/info.c:342
+#: src/info.c:326
 msgid "Unique RGB pixels"
 msgstr "Unika RGB pixlar"
 
-#: src/info.c:355 src/layer.c:154
+#: src/info.c:339 src/layer.c:155
 msgid "Layers"
 msgstr "Lager"
 
-#: src/info.c:359
+#: src/info.c:343
 msgid "Total layer memory usage"
 msgstr "Totalt använt minne för lager"
 
-#: src/info.c:366
+#: src/info.c:350
 msgid "Colour Histogram"
 msgstr "Färghistogram"
 
-#: src/info.c:388
+#: src/info.c:372
 #, c-format
 msgid "Colour index totals - %i of %i used"
 msgstr "Färgindexnummer totalbeloppen - %i av %i används"
 
-#: src/info.c:407
+#: src/info.c:391
 msgid "Index"
 msgstr "Index"
 
-#: src/info.c:408
+#: src/info.c:392
 msgid "Canvas pixels"
 msgstr ""
 
-#: src/info.c:423
+#: src/info.c:407
 msgid "Orphans"
 msgstr ""
 
-#: src/inifile.c:711
+#: src/inifile.c:817
 msgid ""
 "Could not find home directory. Using current directory as home directory."
 msgstr ""
@@ -1495,20 +1639,20 @@ msgstr ""
 msgid "Background"
 msgstr "Bakgrund"
 
-#: src/layer.c:152 src/mainwindow.c:4968
+#: src/layer.c:156 src/mainwindow.c:5223
 msgid "(Modified)"
 msgstr "(Ändrad)"
 
-#: src/layer.c:155 src/mainwindow.c:4971
+#: src/layer.c:157 src/mainwindow.c:5224
 msgid "Untitled"
 msgstr "Namnlös"
 
-#: src/layer.c:431
+#: src/layer.c:419
 #, c-format
 msgid "Do you really want to delete layer %i (%s) ?"
 msgstr "Vill du verkligen ta bort lagret %i (%s) ?"
 
-#: src/layer.c:504
+#: src/layer.c:498
 msgid ""
 "One or more of the layers contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -1516,20 +1660,20 @@ msgstr ""
 "Ett eller flera av lagren innehåller ändringar som inte har sparats. Vill du "
 "verkligen förlora dessa ändringar?"
 
-#: src/layer.c:509 src/mainwindow.c:1074
+#: src/layer.c:499 src/mainwindow.c:1122
 msgid "Cancel Operation"
 msgstr "Avbryt åtgärd"
 
-#: src/layer.c:509 src/mainwindow.c:1074
+#: src/layer.c:499 src/mainwindow.c:1122
 msgid "Lose Changes"
 msgstr "Förlora ändringar"
 
-#: src/layer.c:653
+#: src/layer.c:638
 #, c-format
 msgid "%d layers failed to load"
 msgstr "%d lager gick inte att läsa in"
 
-#: src/layer.c:796
+#: src/layer.c:904
 msgid ""
 "One or more of the image layers has not been saved.  You must save each "
 "image individually before saving the layers text file in order to load this "
@@ -1539,67 +1683,67 @@ msgstr ""
 "individuellt innan du sparar lagrens textfil för att kunna läsa in denna "
 "kompositbild i framtiden."
 
-#: src/layer.c:816
+#: src/layer.c:919
 msgid "Do you really want to delete all of the layers?"
 msgstr "Vill du verkligen ta bort alla lagren?"
 
-#: src/layer.c:951
+#: src/layer.c:1057
 msgid "You cannot add any more layers."
 msgstr "Du kan inte lägga till fler lager."
 
-#: src/layer.c:1049 src/otherwindow.c:267
+#: src/layer.c:1159 src/otherwindow.c:261
 msgid "New Layer"
 msgstr "Nytt lager"
 
-#: src/layer.c:1050
+#: src/layer.c:1160
 msgid "Raise"
 msgstr "Höj"
 
-#: src/layer.c:1051
+#: src/layer.c:1161
 msgid "Lower"
 msgstr "Sänk"
 
-#: src/layer.c:1052
+#: src/layer.c:1162
 msgid "Duplicate Layer"
 msgstr "Duplicera lager"
 
-#: src/layer.c:1053
+#: src/layer.c:1163
 msgid "Centralise Layer"
 msgstr "Centrera lager"
 
-#: src/layer.c:1054
+#: src/layer.c:1164
 msgid "Delete Layer"
 msgstr "Ta bort lager"
 
-#: src/layer.c:1055
+#: src/layer.c:1165
 msgid "Close Layers Window"
 msgstr "Stäng lagerfönster"
 
-#: src/layer.c:1165
+#: src/layer.c:1268
 msgid "Layer Name"
 msgstr "Lagernamn"
 
-#: src/layer.c:1166
+#: src/layer.c:1269
 msgid "Position"
 msgstr "Position"
 
-#: src/layer.c:1168
+#: src/layer.c:1272
 msgid "Transparent Colour"
 msgstr "Transparent färg"
 
-#: src/layer.c:1194
+#: src/layer.c:1300
 msgid "Show all layers in main window"
 msgstr "Visa alla lager i huvudfönstret"
 
-#: src/mainwindow.c:276
+#: src/mainwindow.c:275
 msgid "There were no unused colours to remove!"
 msgstr "Det fanns inga oanvända färger att ta bort!"
 
-#: src/mainwindow.c:304
+#: src/mainwindow.c:302
 msgid "The palette does not contain 2 colours that have identical RGB values"
 msgstr "Paletten innehåller inte två färger som har identiska RGB-värden"
 
-#: src/mainwindow.c:307
+#: src/mainwindow.c:305
 #, c-format
 msgid ""
 "The palette contains %i colours that have identical RGB values.  Do you "
@@ -1608,15 +1752,16 @@ msgstr ""
 "Paletten innehåller %i färger som har identiska RGB-värden. Vill du "
 "verkligen sammanfoga dem till ett index och justera om ritytan?"
 
-#: src/mainwindow.c:495 src/otherwindow.c:1843 src/otherwindow.c:2700
+#: src/mainwindow.c:493 src/mainwindow.c:1141 src/otherwindow.c:1964
+#: src/otherwindow.c:2589
 msgid "RGB"
 msgstr "RGB"
 
-#: src/mainwindow.c:498
+#: src/mainwindow.c:496
 msgid "indexed"
 msgstr "indexerad"
 
-#: src/mainwindow.c:504
+#: src/mainwindow.c:502
 #, c-format
 msgid ""
 "You are trying to save an %s image to an %s file which is not possible.  I "
@@ -1625,7 +1770,7 @@ msgstr ""
 "Du försöker att spara en %s-bild till en %s-fil, vilket inte är möjligt. Jag "
 "föreslår att du sparar med en PNG-ändelse."
 
-#: src/mainwindow.c:506
+#: src/mainwindow.c:504
 #, c-format
 msgid ""
 "You are trying to save an %s file with a palette of more than %d colours.  "
@@ -1634,7 +1779,7 @@ msgstr ""
 "Du försöker att spara en %s-fil med en palett med fler än %d färger. Använd "
 "antingen ett annat format eller minska paletten till %d färger."
 
-#: src/mainwindow.c:530
+#: src/mainwindow.c:528
 msgid ""
 "You are trying to save an XPM file with more than 4096 colours.  Either use "
 "another format or posterize the image to 4 bits, or otherwise reduce the "
@@ -1644,15 +1789,15 @@ msgstr ""
 "ett annat format eller posterisera bilden till 4 bitar, annars minska "
 "antalet färger."
 
-#: src/mainwindow.c:577
+#: src/mainwindow.c:575
 msgid "Unable to load clipboard"
 msgstr "Kunde inte läsa in urklipp"
 
-#: src/mainwindow.c:603
+#: src/mainwindow.c:601
 msgid "Unable to save clipboard"
 msgstr "Kunde inte spara urklipp"
 
-#: src/mainwindow.c:1071
+#: src/mainwindow.c:1121
 msgid ""
 "This canvas/palette contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
@@ -1660,776 +1805,826 @@ msgstr ""
 "Denna rityta/palett innehåller ändringar som inte har sparats. Vill du "
 "verkligen förlora dessa ändringar?"
 
-#: src/mainwindow.c:1093 src/otherwindow.c:802 src/otherwindow.c:3162
+#: src/mainwindow.c:1139 src/otherwindow.c:948 src/otherwindow.c:3307
 msgid "Image"
 msgstr "Bild"
 
-#: src/mainwindow.c:1116
+#: src/mainwindow.c:1141 src/otherwindow.c:1964 src/otherwindow.c:2589
+msgid "sRGB"
+msgstr ""
+
+#: src/mainwindow.c:1163
 msgid "Do you really want to quit?"
 msgstr "Vill du verkligen avsluta?"
 
-#: src/mainwindow.c:4411
+#: src/mainwindow.c:4663
 msgid "/_File"
 msgstr "/_Arkiv"
 
-#: src/mainwindow.c:4413
+#: src/mainwindow.c:4665
 msgid "//New"
 msgstr "//Ny"
 
-#: src/mainwindow.c:4414
+#: src/mainwindow.c:4666
 msgid "//Open ..."
 msgstr "//Öppna ..."
 
-#: src/mainwindow.c:4415
+#: src/mainwindow.c:4667 src/mainwindow.c:4918
 msgid "//Save"
 msgstr "//Spara"
 
-#: src/mainwindow.c:4416
+#: src/mainwindow.c:4668 src/mainwindow.c:4845 src/mainwindow.c:4895
+#: src/mainwindow.c:4919
 msgid "//Save As ..."
 msgstr "//Spara som ..."
 
-#: src/mainwindow.c:4418
+#: src/mainwindow.c:4670
 msgid "//Export Undo Images ..."
 msgstr "//Exportera Ångra-historik ..."
 
-#: src/mainwindow.c:4419
+#: src/mainwindow.c:4671
 msgid "//Export Undo Images (reversed) ..."
 msgstr "//Exportera Ångra-historik (omvänd) ..."
 
-#: src/mainwindow.c:4420
+#: src/mainwindow.c:4672
 msgid "//Export ASCII Art ..."
 msgstr "//Exportera ASCII-grafik ..."
 
-#: src/mainwindow.c:4421
+#: src/mainwindow.c:4673
 msgid "//Export Animated GIF ..."
 msgstr "//Exportera animerad GIF ..."
 
-#: src/mainwindow.c:4423
+#: src/mainwindow.c:4675
 msgid "//Actions"
 msgstr "//Åtgärder"
 
-#: src/mainwindow.c:4441
+#: src/mainwindow.c:4693
 msgid "///Configure"
 msgstr "///Konfigurera"
 
-#: src/mainwindow.c:4464
+#: src/mainwindow.c:4716
 msgid "//Quit"
 msgstr "//Avsluta"
 
-#: src/mainwindow.c:4466
+#: src/mainwindow.c:4718
 msgid "/_Edit"
 msgstr "/_Redigera"
 
-#: src/mainwindow.c:4468
+#: src/mainwindow.c:4720
 msgid "//Undo"
 msgstr "//Ångra"
 
-#: src/mainwindow.c:4469
+#: src/mainwindow.c:4721
 msgid "//Redo"
 msgstr "//Gör om"
 
-#: src/mainwindow.c:4471
+#: src/mainwindow.c:4723
 msgid "//Cut"
 msgstr "//Klipp ut"
 
-#: src/mainwindow.c:4472
+#: src/mainwindow.c:4724
 msgid "//Copy"
 msgstr "//Kopiera"
 
-#: src/mainwindow.c:4473
+#: src/mainwindow.c:4725
 msgid "//Copy To Palette"
 msgstr "//Kopiera till palett"
 
-#: src/mainwindow.c:4474
+#: src/mainwindow.c:4726
 msgid "//Paste To Centre"
 msgstr "//Klistra in i mitten"
 
-#: src/mainwindow.c:4475
+#: src/mainwindow.c:4727
 msgid "//Paste To New Layer"
 msgstr "//Klistra in i nytt lager"
 
-#: src/mainwindow.c:4476
+#: src/mainwindow.c:4728
 msgid "//Paste"
 msgstr "//Klistra in"
 
-#: src/mainwindow.c:4477
+#: src/mainwindow.c:4729
 msgid "//Paste Text"
 msgstr "//Klistra in text"
 
-#: src/mainwindow.c:4479
+#: src/mainwindow.c:4731
 msgid "//Paste Text (FreeType)"
 msgstr "//Klistra in text (FreeType)"
 
-#: src/mainwindow.c:4481
+#: src/mainwindow.c:4733
 msgid "//Paste Palette"
 msgstr "//Klistra in palett"
 
-#: src/mainwindow.c:4483
+#: src/mainwindow.c:4735
 msgid "//Load Clipboard"
 msgstr "//Läs in urklipp"
 
-#: src/mainwindow.c:4497
+#: src/mainwindow.c:4749
 msgid "//Save Clipboard"
 msgstr "//Spara urklipp"
 
-#: src/mainwindow.c:4511
+#: src/mainwindow.c:4763
 msgid "//Import Clipboard from System"
 msgstr "//Importera urklipp från systemet"
 
-#: src/mainwindow.c:4512
+#: src/mainwindow.c:4764
 msgid "//Export Clipboard to System"
 msgstr "//Exportera urklipp till systemet"
 
-#: src/mainwindow.c:4514
+#: src/mainwindow.c:4766
 msgid "//Choose Pattern ..."
 msgstr "//Välj mönster ..."
 
-#: src/mainwindow.c:4515
+#: src/mainwindow.c:4767
 msgid "//Choose Brush ..."
 msgstr "//Välj pensel ..."
 
-#: src/mainwindow.c:4517
+#: src/mainwindow.c:4768
+msgid "//Choose Colour ..."
+msgstr ""
+
+#: src/mainwindow.c:4770
 msgid "/_View"
 msgstr "/_Visa"
 
-#: src/mainwindow.c:4519
+#: src/mainwindow.c:4772
 msgid "//Show Main Toolbar"
 msgstr "//Visa huvudverktygsrad"
 
-#: src/mainwindow.c:4520
+#: src/mainwindow.c:4773
 msgid "//Show Tools Toolbar"
 msgstr "//Visa verktygsrad"
 
-#: src/mainwindow.c:4521
+#: src/mainwindow.c:4774
 msgid "//Show Settings Toolbar"
 msgstr "//Visa inställningsrad"
 
-#: src/mainwindow.c:4522
+#: src/mainwindow.c:4775
 msgid "//Show Dock"
 msgstr "//Visa docka"
 
-#: src/mainwindow.c:4523
+#: src/mainwindow.c:4776
 msgid "//Show Palette"
 msgstr "//Visa palett"
 
-#: src/mainwindow.c:4524
+#: src/mainwindow.c:4777
 msgid "//Show Status Bar"
 msgstr "//Visa statusrad"
 
-#: src/mainwindow.c:4526
+#: src/mainwindow.c:4779
 msgid "//Toggle Image View"
 msgstr "//Växla bildvy"
 
-#: src/mainwindow.c:4527
+#: src/mainwindow.c:4780
 msgid "//Centralize Image"
 msgstr "//Centrera bild"
 
-#: src/mainwindow.c:4528
+#: src/mainwindow.c:4781
 msgid "//Show Zoom Grid"
 msgstr ""
 
-#: src/mainwindow.c:4529
+#: src/mainwindow.c:4782
+msgid "//Snap To Tile Grid"
+msgstr ""
+
+#: src/mainwindow.c:4783
 msgid "//Configure Grid ..."
 msgstr "//Konfigurera rutnät ..."
 
-#: src/mainwindow.c:4530
+#: src/mainwindow.c:4784
 msgid "//Tracing Image ..."
 msgstr ""
 
-#: src/mainwindow.c:4532
+#: src/mainwindow.c:4786
 msgid "//View Window"
 msgstr "//Visningsfönster"
 
-#: src/mainwindow.c:4533
+#: src/mainwindow.c:4787
 msgid "//Horizontal Split"
 msgstr ""
 
-#: src/mainwindow.c:4534
+#: src/mainwindow.c:4788
 msgid "//Focus View Window"
 msgstr "//Fokusera visningsfönster"
 
-#: src/mainwindow.c:4536
+#: src/mainwindow.c:4790
 msgid "//Pan Window"
 msgstr ""
 
-#: src/mainwindow.c:4537
+#: src/mainwindow.c:4791
 msgid "//Layers Window"
 msgstr "//Lagerfönster"
 
-#: src/mainwindow.c:4539
+#: src/mainwindow.c:4793
 msgid "/_Image"
 msgstr "/_Bild"
 
-#: src/mainwindow.c:4541
+#: src/mainwindow.c:4795
 msgid "//Convert To RGB"
 msgstr "//Konvertera till RGB"
 
-#: src/mainwindow.c:4542
+#: src/mainwindow.c:4796
 msgid "//Convert To Indexed ..."
 msgstr "//Konvertera till indexerad ..."
 
-#: src/mainwindow.c:4544
+#: src/mainwindow.c:4798
 msgid "//Scale Canvas ..."
 msgstr ""
 
-#: src/mainwindow.c:4545
+#: src/mainwindow.c:4799
 msgid "//Resize Canvas ..."
 msgstr ""
 
-#: src/mainwindow.c:4546
+#: src/mainwindow.c:4800
 msgid "//Crop"
 msgstr "//Beskär"
 
-#: src/mainwindow.c:4548
+#: src/mainwindow.c:4802 src/mainwindow.c:4827
 msgid "//Flip Vertically"
 msgstr "//Vänd vertikalt"
 
-#: src/mainwindow.c:4549
+#: src/mainwindow.c:4803 src/mainwindow.c:4828
 msgid "//Flip Horizontally"
 msgstr "//Vänd horisontellt"
 
-#: src/mainwindow.c:4550
+#: src/mainwindow.c:4804 src/mainwindow.c:4829
 msgid "//Rotate Clockwise"
 msgstr "//Rotera medsols"
 
-#: src/mainwindow.c:4551
+#: src/mainwindow.c:4805 src/mainwindow.c:4830
 msgid "//Rotate Anti-Clockwise"
 msgstr "//Rotera motsols"
 
-#: src/mainwindow.c:4552
+#: src/mainwindow.c:4806
 msgid "//Free Rotate ..."
 msgstr "//Fri rotering ..."
 
-#: src/mainwindow.c:4553
+#: src/mainwindow.c:4807
 msgid "//Skew ..."
 msgstr ""
 
-#: src/mainwindow.c:4555
+#: src/mainwindow.c:4810
+msgid "//Segment ..."
+msgstr ""
+
+#: src/mainwindow.c:4812
 msgid "//Information ..."
 msgstr ""
 
-#: src/mainwindow.c:4556
+#: src/mainwindow.c:4813
 msgid "//Preferences ..."
 msgstr "//Inställningar ..."
 
-#: src/mainwindow.c:4558
+#: src/mainwindow.c:4815
 msgid "/_Selection"
 msgstr "/_Markering"
 
-#: src/mainwindow.c:4560
+#: src/mainwindow.c:4817
 msgid "//Select All"
 msgstr "//Markera allt"
 
-#: src/mainwindow.c:4561
+#: src/mainwindow.c:4818
 msgid "//Select None (Esc)"
 msgstr "//Markera ingenting (Esc)"
 
-#: src/mainwindow.c:4562
+#: src/mainwindow.c:4819
 msgid "//Lasso Selection"
 msgstr "//Markera med lasso"
 
-#: src/mainwindow.c:4563
+#: src/mainwindow.c:4820
 msgid "//Lasso Selection Cut"
 msgstr ""
 
-#: src/mainwindow.c:4565
+#: src/mainwindow.c:4822
 msgid "//Outline Selection"
 msgstr "//Konturmarkering"
 
-#: src/mainwindow.c:4566
+#: src/mainwindow.c:4823
 msgid "//Fill Selection"
 msgstr ""
 
-#: src/mainwindow.c:4567
+#: src/mainwindow.c:4824
 msgid "//Outline Ellipse"
 msgstr ""
 
-#: src/mainwindow.c:4568
+#: src/mainwindow.c:4825
 msgid "//Fill Ellipse"
 msgstr ""
 
-#: src/mainwindow.c:4575
+#: src/mainwindow.c:4832
 msgid "//Horizontal Ramp"
 msgstr ""
 
-#: src/mainwindow.c:4576
+#: src/mainwindow.c:4833
 msgid "//Vertical Ramp"
 msgstr ""
 
-#: src/mainwindow.c:4578
+#: src/mainwindow.c:4835
 msgid "//Alpha Blend A,B"
 msgstr ""
 
-#: src/mainwindow.c:4579
+#: src/mainwindow.c:4836
 msgid "//Move Alpha to Mask"
 msgstr "//Flytta alfa till mask"
 
-#: src/mainwindow.c:4580
+#: src/mainwindow.c:4837
 msgid "//Mask Colour A,B"
 msgstr ""
 
-#: src/mainwindow.c:4581
+#: src/mainwindow.c:4838
 msgid "//Unmask Colour A,B"
 msgstr ""
 
-#: src/mainwindow.c:4582
+#: src/mainwindow.c:4839
 msgid "//Mask All Colours"
 msgstr "//Maskera alla färger"
 
-#: src/mainwindow.c:4583
+#: src/mainwindow.c:4840
 msgid "//Clear Mask"
 msgstr "//Töm mask"
 
-#: src/mainwindow.c:4585
+#: src/mainwindow.c:4842
 msgid "/_Palette"
 msgstr "/_Palett"
 
-#: src/mainwindow.c:4589
-msgid "//Load Default"
-msgstr "//Läs in standard"
-
-#: src/mainwindow.c:4591
-msgid "//Mask All"
-msgstr "//Maskera alla"
-
-#: src/mainwindow.c:4592
-msgid "//Mask None"
-msgstr "//Maskera inget"
-
-#: src/mainwindow.c:4594
-msgid "//Swap A & B"
-msgstr "//Växla A & B"
-
-#: src/mainwindow.c:4595
-msgid "//Edit Colour A & B ..."
-msgstr "//Redigera färg A & B ..."
-
-#: src/mainwindow.c:4596
-msgid "//Dither A"
-msgstr ""
-
-#: src/mainwindow.c:4597
-msgid "//Palette Editor ..."
-msgstr "//Palettredigerare ..."
-
-#: src/mainwindow.c:4598
-msgid "//Set Palette Size ..."
-msgstr "//Ställ in palettstorlek ..."
-
-#: src/mainwindow.c:4599
-msgid "//Merge Duplicate Colours"
-msgstr "//Slå samman dubbletta färger"
-
-#: src/mainwindow.c:4600
-msgid "//Remove Unused Colours"
-msgstr "//Ta bort oanvända färger"
-
-#: src/mainwindow.c:4602
-msgid "//Create Quantized ..."
-msgstr "//Skapa kvantiserad ..."
-
-#: src/mainwindow.c:4604
-msgid "//Sort Colours ..."
-msgstr "//Sortera färger ..."
-
-#: src/mainwindow.c:4605
-msgid "//Palette Shifter ..."
-msgstr "//Palettväxlare ..."
-
-#: src/mainwindow.c:4607
-msgid "/Effe_cts"
-msgstr "/Effe_kter"
-
-#: src/mainwindow.c:4609
-msgid "//Transform Colour ..."
-msgstr "//Transformera färg ..."
-
-#: src/mainwindow.c:4610
-msgid "//Invert"
-msgstr "//Invertera"
-
-#: src/mainwindow.c:4611
-msgid "//Greyscale"
-msgstr "//Gråskala"
-
-#: src/mainwindow.c:4612
-msgid "//Greyscale (Gamma corrected)"
-msgstr "//Gråskala (Gamma-korrigerad)"
-
-#: src/mainwindow.c:4613
-msgid "//Isometric Transformation"
-msgstr "//Isometrisk transformering"
-
-#: src/mainwindow.c:4615
-msgid "///Left Side Down"
-msgstr "///Vänster sida ner"
-
-#: src/mainwindow.c:4616
-msgid "///Right Side Down"
-msgstr "///Höger sida ner"
-
-#: src/mainwindow.c:4617
-msgid "///Top Side Right"
-msgstr "///Övre sidan åt höger"
-
-#: src/mainwindow.c:4618
-msgid "///Bottom Side Right"
-msgstr "///Nedre sidan åt höger"
-
-#: src/mainwindow.c:4620
-msgid "//Edge Detect ..."
-msgstr ""
-
-#: src/mainwindow.c:4621
-msgid "//Difference of Gaussians ..."
-msgstr ""
-
-#: src/mainwindow.c:4622
-msgid "//Sharpen ..."
-msgstr "//Gör skarp ..."
-
-#: src/mainwindow.c:4623
-msgid "//Unsharp Mask ..."
-msgstr ""
-
-#: src/mainwindow.c:4624
-msgid "//Soften ..."
-msgstr ""
-
-#: src/mainwindow.c:4625
-msgid "//Gaussian Blur ..."
-msgstr "//Gaussisk oskärpa ..."
-
-#: src/mainwindow.c:4626
-msgid "//Kuwahara-Nagao Blur ..."
-msgstr "//Kuwahara-Nagao-oskärpa ..."
-
-#: src/mainwindow.c:4627
-msgid "//Emboss"
-msgstr ""
-
-#: src/mainwindow.c:4628
-msgid "//Dilate"
-msgstr ""
-
-#: src/mainwindow.c:4629
-msgid "//Erode"
-msgstr ""
-
-#: src/mainwindow.c:4631
-msgid "//Bacteria ..."
-msgstr ""
-
-#: src/mainwindow.c:4633
-msgid "/Cha_nnels"
-msgstr "/Ka_naler"
-
-#: src/mainwindow.c:4635
-msgid "//New ..."
-msgstr "//Ny ..."
-
-#: src/mainwindow.c:4636
+#: src/mainwindow.c:4844 src/mainwindow.c:4894
 msgid "//Load ..."
 msgstr "//Läs in ..."
 
-#: src/mainwindow.c:4638
+#: src/mainwindow.c:4846
+msgid "//Load Default"
+msgstr "//Läs in standard"
+
+#: src/mainwindow.c:4848
+msgid "//Mask All"
+msgstr "//Maskera alla"
+
+#: src/mainwindow.c:4849
+msgid "//Mask None"
+msgstr "//Maskera inget"
+
+#: src/mainwindow.c:4851
+msgid "//Swap A & B"
+msgstr "//Växla A & B"
+
+#: src/mainwindow.c:4852
+msgid "//Edit Colour A & B ..."
+msgstr "//Redigera färg A & B ..."
+
+#: src/mainwindow.c:4853
+msgid "//Dither A"
+msgstr ""
+
+#: src/mainwindow.c:4854
+msgid "//Palette Editor ..."
+msgstr "//Palettredigerare ..."
+
+#: src/mainwindow.c:4855
+msgid "//Set Palette Size ..."
+msgstr "//Ställ in palettstorlek ..."
+
+#: src/mainwindow.c:4856
+msgid "//Merge Duplicate Colours"
+msgstr "//Slå samman dubbletta färger"
+
+#: src/mainwindow.c:4857
+msgid "//Remove Unused Colours"
+msgstr "//Ta bort oanvända färger"
+
+#: src/mainwindow.c:4859
+msgid "//Create Quantized ..."
+msgstr "//Skapa kvantiserad ..."
+
+#: src/mainwindow.c:4861
+msgid "//Sort Colours ..."
+msgstr "//Sortera färger ..."
+
+#: src/mainwindow.c:4862
+msgid "//Palette Shifter ..."
+msgstr "//Palettväxlare ..."
+
+#: src/mainwindow.c:4863
+msgid "//Pick Gradient ..."
+msgstr ""
+
+#: src/mainwindow.c:4865
+msgid "/Effe_cts"
+msgstr "/Effe_kter"
+
+#: src/mainwindow.c:4867
+msgid "//Transform Colour ..."
+msgstr "//Transformera färg ..."
+
+#: src/mainwindow.c:4868
+msgid "//Invert"
+msgstr "//Invertera"
+
+#: src/mainwindow.c:4869
+msgid "//Greyscale"
+msgstr "//Gråskala"
+
+#: src/mainwindow.c:4870
+msgid "//Greyscale (Gamma corrected)"
+msgstr "//Gråskala (Gamma-korrigerad)"
+
+#: src/mainwindow.c:4871
+msgid "//Isometric Transformation"
+msgstr "//Isometrisk transformering"
+
+#: src/mainwindow.c:4873
+msgid "///Left Side Down"
+msgstr "///Vänster sida ner"
+
+#: src/mainwindow.c:4874
+msgid "///Right Side Down"
+msgstr "///Höger sida ner"
+
+#: src/mainwindow.c:4875
+msgid "///Top Side Right"
+msgstr "///Övre sidan åt höger"
+
+#: src/mainwindow.c:4876
+msgid "///Bottom Side Right"
+msgstr "///Nedre sidan åt höger"
+
+#: src/mainwindow.c:4878
+msgid "//Edge Detect ..."
+msgstr ""
+
+#: src/mainwindow.c:4879
+msgid "//Difference of Gaussians ..."
+msgstr ""
+
+#: src/mainwindow.c:4880
+msgid "//Sharpen ..."
+msgstr "//Gör skarp ..."
+
+#: src/mainwindow.c:4881
+msgid "//Unsharp Mask ..."
+msgstr ""
+
+#: src/mainwindow.c:4882
+msgid "//Soften ..."
+msgstr ""
+
+#: src/mainwindow.c:4883
+msgid "//Gaussian Blur ..."
+msgstr "//Gaussisk oskärpa ..."
+
+#: src/mainwindow.c:4884
+msgid "//Kuwahara-Nagao Blur ..."
+msgstr "//Kuwahara-Nagao-oskärpa ..."
+
+#: src/mainwindow.c:4885
+msgid "//Emboss"
+msgstr ""
+
+#: src/mainwindow.c:4886
+msgid "//Dilate"
+msgstr ""
+
+#: src/mainwindow.c:4887
+msgid "//Erode"
+msgstr ""
+
+#: src/mainwindow.c:4889
+msgid "//Bacteria ..."
+msgstr ""
+
+#: src/mainwindow.c:4891
+msgid "/Cha_nnels"
+msgstr "/Ka_naler"
+
+#: src/mainwindow.c:4893
+msgid "//New ..."
+msgstr "//Ny ..."
+
+#: src/mainwindow.c:4896
 msgid "//Delete ..."
 msgstr "//Ta bort ..."
 
-#: src/mainwindow.c:4640
+#: src/mainwindow.c:4898
 msgid "//Edit Image"
 msgstr "//Redigera bild"
 
-#: src/mainwindow.c:4641
+#: src/mainwindow.c:4899
 msgid "//Edit Alpha"
 msgstr "//Redigera alfa"
 
-#: src/mainwindow.c:4642
+#: src/mainwindow.c:4900
 msgid "//Edit Selection"
 msgstr "//Redigera markering"
 
-#: src/mainwindow.c:4643
+#: src/mainwindow.c:4901
 msgid "//Edit Mask"
 msgstr "//Redigera mask"
 
-#: src/mainwindow.c:4645
+#: src/mainwindow.c:4903
 msgid "//Hide Image"
 msgstr "//Dölj bild"
 
-#: src/mainwindow.c:4646
+#: src/mainwindow.c:4904
 msgid "//Disable Alpha"
 msgstr "//Inaktivera alfa"
 
-#: src/mainwindow.c:4647
+#: src/mainwindow.c:4905
 msgid "//Disable Selection"
 msgstr "//Inaktivera markering"
 
-#: src/mainwindow.c:4648
+#: src/mainwindow.c:4906
 msgid "//Disable Mask"
 msgstr "//Inaktivera mask"
 
-#: src/mainwindow.c:4650
+#: src/mainwindow.c:4908
 msgid "//Couple RGBA Operations"
 msgstr ""
 
-#: src/mainwindow.c:4651
+#: src/mainwindow.c:4909
 msgid "//Threshold ..."
 msgstr "//Tröskelvärde ..."
 
-#: src/mainwindow.c:4652
+#: src/mainwindow.c:4910
 msgid "//Unassociate Alpha"
 msgstr ""
 
-#: src/mainwindow.c:4654
+#: src/mainwindow.c:4912
 msgid "//View Alpha as an Overlay"
 msgstr ""
 
-#: src/mainwindow.c:4655
+#: src/mainwindow.c:4913
 msgid "//Configure Overlays ..."
 msgstr ""
 
-#: src/mainwindow.c:4657
+#: src/mainwindow.c:4915
 msgid "/_Layers"
 msgstr "/_Lager"
 
-#: src/mainwindow.c:4659
+#: src/mainwindow.c:4917
 msgid "//New Layer"
 msgstr "//Nytt lager"
 
-#: src/mainwindow.c:4662
+#: src/mainwindow.c:4920
 msgid "//Save Composite Image ..."
 msgstr ""
 
-#: src/mainwindow.c:4663
+#: src/mainwindow.c:4921
 msgid "//Composite to New Layer"
 msgstr ""
 
-#: src/mainwindow.c:4664
+#: src/mainwindow.c:4922
 msgid "//Remove All Layers"
 msgstr "//Ta bort alla lager"
 
-#: src/mainwindow.c:4666
+#: src/mainwindow.c:4924
 msgid "//Configure Animation ..."
 msgstr "//Konfigurera animering ..."
 
-#: src/mainwindow.c:4667
+#: src/mainwindow.c:4925
 msgid "//Preview Animation ..."
 msgstr "//Förhandsvisa animering ..."
 
-#: src/mainwindow.c:4668
+#: src/mainwindow.c:4926
 msgid "//Set Key Frame ..."
 msgstr ""
 
-#: src/mainwindow.c:4669
+#: src/mainwindow.c:4927
 msgid "//Remove All Key Frames ..."
 msgstr ""
 
-#: src/mainwindow.c:4671
+#: src/mainwindow.c:4929
 msgid "/More..."
 msgstr "/Mer..."
 
-#: src/mainwindow.c:4673
+#: src/mainwindow.c:4931
 msgid "/_Help"
 msgstr "/_Hjälp"
 
-#: src/mainwindow.c:4674
+#: src/mainwindow.c:4932
 msgid "//Documentation"
 msgstr "//Dokumentation"
 
-#: src/mainwindow.c:4675
+#: src/mainwindow.c:4933
 msgid "//About"
 msgstr "//Om"
 
-#: src/mainwindow.c:4677
+#: src/mainwindow.c:4935
 msgid "//Rebind Shortcut Keycodes"
 msgstr ""
 
-#: src/memory.c:2594 src/memory.c:2979
+#: src/memory.c:2678
+msgid "Quantize Pass 1"
+msgstr ""
+
+#: src/memory.c:2732
+msgid "Quantize Pass 2"
+msgstr ""
+
+#: src/memory.c:2951 src/memory.c:3335
 msgid "Converting to Indexed Palette"
 msgstr "Konverterar till indexerad palett"
 
-#: src/memory.c:4316 src/otherwindow.c:535
+#: src/memory.c:4709 src/otherwindow.c:562
 msgid "Bacteria Effect"
 msgstr "Bakterie-effekt"
 
-#: src/memory.c:4351
+#: src/memory.c:4744
 msgid "Rotating"
 msgstr "Roterar"
 
-#: src/memory.c:4703
+#: src/memory.c:5096
 msgid "Free Rotation"
 msgstr "Fri rotering"
 
-#: src/memory.c:5202
+#: src/memory.c:5682
 msgid "Scaling Image"
 msgstr "Skalar bild"
 
-#: src/memory.c:6361
+#: src/memory.c:6903
 msgid "Counting Unique RGB Pixels"
 msgstr "Räknar unika RGB-bildpunkter"
 
-#: src/memory.c:6404
+#: src/memory.c:6950
 msgid "Applying Effect"
 msgstr "Tillämpar effekt"
 
-#: src/memory.c:7439
+#: src/memory.c:8167
 msgid "Kuwahara-Nagao Filter"
 msgstr "Kuwahara-Nagao-filter"
 
-#: src/memory.c:8905 src/otherwindow.c:3064
+#: src/memory.c:9822 src/otherwindow.c:3212
 msgid "Skew"
 msgstr "Gör sned"
 
-#: src/mygtk.c:146
+#: src/memory.c:9966
+msgid "Segmentation Pass 1"
+msgstr ""
+
+#: src/memory.c:10093
+msgid "Segmentation Pass 2"
+msgstr ""
+
+#: src/mygtk.c:170
 msgid "Please Wait ..."
 msgstr "Vänta ..."
 
-#: src/mygtk.c:168
+#: src/mygtk.c:189
 msgid "STOP"
 msgstr "STOP"
 
-#: src/mygtk.c:787
+#: src/mygtk.c:816
 msgid "Browse"
 msgstr "Bläddra"
 
-#: src/mygtk.c:2324
+#: src/mygtk.c:1983
 msgid "Gamma corrected"
 msgstr "Gamma korrigerad"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "24 bit RGB"
 msgstr "24-bitars RGB"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "Greyscale"
 msgstr "Gråskala"
 
-#: src/otherwindow.c:265
+#: src/otherwindow.c:259
 msgid "Indexed Palette"
 msgstr "Indexerad palett"
 
-#: src/otherwindow.c:266
+#: src/otherwindow.c:260
 msgid "From Clipboard"
 msgstr "Från urklipp"
 
-#: src/otherwindow.c:266
+#: src/otherwindow.c:260
 msgid "Grab Screenshot"
 msgstr "Fånga skärmbild"
 
-#: src/otherwindow.c:267 src/toolbar.c:553
+#: src/otherwindow.c:261 src/toolbar.c:1037
 msgid "New Image"
 msgstr "Ny bild"
 
-#: src/otherwindow.c:297
+#: src/otherwindow.c:288
 msgid "Width"
 msgstr "Bredd"
 
-#: src/otherwindow.c:298
+#: src/otherwindow.c:289
 msgid "Height"
 msgstr "Höjd"
 
-#: src/otherwindow.c:299
+#: src/otherwindow.c:290
 msgid "Colours"
 msgstr "Färger"
 
-#: src/otherwindow.c:385
+#: src/otherwindow.c:431
 msgid "Pattern Chooser"
 msgstr "Mönsterväljare"
 
-#: src/otherwindow.c:451
+#: src/otherwindow.c:498
 msgid "Set Palette Size"
 msgstr "Ange palettstorlek"
 
-#: src/otherwindow.c:512 src/otherwindow.c:608 src/otherwindow.c:944
-#: src/otherwindow.c:2966 src/otherwindow.c:3201 src/prefs.c:662
+#: src/otherwindow.c:538 src/otherwindow.c:632 src/otherwindow.c:1011
+#: src/otherwindow.c:3077 src/otherwindow.c:3345 src/otherwindow.c:3546
+#: src/prefs.c:714
 msgid "Apply"
 msgstr "Verkställ"
 
-#: src/otherwindow.c:572
+#: src/otherwindow.c:599
 msgid "Luminance"
 msgstr "Luminans"
 
-#: src/otherwindow.c:572
-msgid "Distance to A"
-msgstr "Avstånd till A"
-
-#: src/otherwindow.c:573
-msgid "Distance to A+B"
-msgstr "Avstånd till A+B"
-
-#: src/otherwindow.c:574
-msgid "Projection to A->B"
-msgstr "Projektion till A->B"
-
-#: src/otherwindow.c:575
-msgid "Frequency"
-msgstr "Frekvens"
-
-#: src/otherwindow.c:580
-msgid "Sort Palette Colours"
-msgstr "Sortera palettfärger"
-
-#: src/otherwindow.c:592
-msgid "Start Index"
-msgstr "Indexbörjan"
-
-#: src/otherwindow.c:593
-msgid "End Index"
-msgstr "Indexslut"
-
-#: src/otherwindow.c:599
-msgid "Reverse Order"
-msgstr "Omvänd ordning"
-
-#: src/otherwindow.c:801
-msgid "Auto-Preview"
-msgstr "Auto-förhandsvisning"
-
-#: src/otherwindow.c:802 src/otherwindow.c:878 src/otherwindow.c:2284
-msgid "Palette"
-msgstr "Palett"
-
-#: src/otherwindow.c:803
+#: src/otherwindow.c:599 src/otherwindow.c:868
 msgid "Brightness"
 msgstr "Ljusstyrka"
 
-#: src/otherwindow.c:803
+#: src/otherwindow.c:600
+msgid "Distance to A"
+msgstr "Avstånd till A"
+
+#: src/otherwindow.c:601
+msgid "Projection to A->B"
+msgstr "Projektion till A->B"
+
+#: src/otherwindow.c:602
+msgid "Frequency"
+msgstr "Frekvens"
+
+#: src/otherwindow.c:607
+msgid "Sort Palette Colours"
+msgstr "Sortera palettfärger"
+
+#: src/otherwindow.c:616
+msgid "Start Index"
+msgstr "Indexbörjan"
+
+#: src/otherwindow.c:617
+msgid "End Index"
+msgstr "Indexslut"
+
+#: src/otherwindow.c:623
+msgid "Reverse Order"
+msgstr "Omvänd ordning"
+
+#: src/otherwindow.c:868
 msgid "Contrast"
 msgstr "Kontrast"
 
-#: src/otherwindow.c:804 src/otherwindow.c:1927
+#: src/otherwindow.c:869 src/otherwindow.c:2048
 msgid "Posterize"
 msgstr "Posterisera"
 
-#: src/otherwindow.c:804
+#: src/otherwindow.c:869
 msgid "Gamma"
 msgstr "Gamma"
 
-#: src/otherwindow.c:820 src/toolbar.c:564
+#: src/otherwindow.c:870
+msgid "Bitwise"
+msgstr ""
+
+#: src/otherwindow.c:870
+msgid "Truncated"
+msgstr ""
+
+#: src/otherwindow.c:870
+msgid "Rounded"
+msgstr ""
+
+#: src/otherwindow.c:887 src/toolbar.c:1048
 msgid "Transform Colour"
 msgstr "Transformera färg"
 
-#: src/otherwindow.c:858
+#: src/otherwindow.c:921
 msgid "Show Detail"
 msgstr "Visa detalj"
 
-#: src/otherwindow.c:863
+#: src/otherwindow.c:927
 msgid "Store Values"
 msgstr "Lagra värden"
 
-#: src/otherwindow.c:939
+#: src/otherwindow.c:937
+msgid "Posterize type"
+msgstr ""
+
+#: src/otherwindow.c:941 src/otherwindow.c:944 src/otherwindow.c:2429
+msgid "Palette"
+msgstr "Palett"
+
+#: src/otherwindow.c:973
+msgid "Auto-Preview"
+msgstr "Auto-förhandsvisning"
+
+#: src/otherwindow.c:1006
 msgid "Reset"
 msgstr "Återställ"
 
-#: src/otherwindow.c:1005
+#: src/otherwindow.c:1072
 msgid "New geometry is the same as now - nothing to do."
 msgstr "Ny geometri är samma som nu - ingenting att göra."
 
-#: src/otherwindow.c:1054
+#: src/otherwindow.c:1122
 msgid "The operating system cannot allocate the memory for this operation."
 msgstr "Operativsystemet kan inte allokera minne för denna åtgärd."
 
-#: src/otherwindow.c:1056
+#: src/otherwindow.c:1124
 msgid ""
 "You have not allocated enough memory in the Preferences window for this "
 "operation."
@@ -2437,685 +2632,707 @@ msgstr ""
 "Du har inte allokerat tillräckligt mycket minne i inställningsfönstret för "
 "denna åtgärd."
 
-#: src/otherwindow.c:1076
+#: src/otherwindow.c:1144
 msgid "Nearest Neighbour"
 msgstr "Närmsta granne"
 
-#: src/otherwindow.c:1077
+#: src/otherwindow.c:1145
 msgid "Bilinear / Area Mapping"
 msgstr "Bilinjär / Områdesmappning"
 
-#: src/otherwindow.c:1077 src/otherwindow.c:2904
+#: src/otherwindow.c:1145 src/otherwindow.c:3018
 msgid "Bilinear"
 msgstr "Bilinjär"
 
-#: src/otherwindow.c:1078
+#: src/otherwindow.c:1146
 msgid "Bicubic"
 msgstr "Bikubisk"
 
-#: src/otherwindow.c:1079
+#: src/otherwindow.c:1147
 msgid "Bicubic edged"
 msgstr "Bikubisk kantad"
 
-#: src/otherwindow.c:1080
+#: src/otherwindow.c:1148
 msgid "Bicubic better"
 msgstr "Bättre Bikubisk"
 
-#: src/otherwindow.c:1081
+#: src/otherwindow.c:1149
 msgid "Bicubic sharper"
 msgstr "Skarpare Bikubisk"
 
-#: src/otherwindow.c:1082
+#: src/otherwindow.c:1150
 msgid "Blackman-Harris"
 msgstr "Blackman-Harris"
 
-#: src/otherwindow.c:1092 src/shifter.c:327
-msgid "Clear"
-msgstr "Töm"
-
-#: src/otherwindow.c:1093
-msgid "Tile"
-msgstr "Ruta"
-
-#: src/otherwindow.c:1094
-msgid "Mirror tile"
-msgstr "Spegla Ruta"
-
-#: src/otherwindow.c:1109
+#: src/otherwindow.c:1167
 msgid "Width     "
 msgstr "Bredd     "
 
-#: src/otherwindow.c:1110
+#: src/otherwindow.c:1168
 msgid "Height    "
 msgstr "Höjd    "
 
-#: src/otherwindow.c:1112
+#: src/otherwindow.c:1170
 msgid "Original      "
 msgstr ""
 
-#: src/otherwindow.c:1118
+#: src/otherwindow.c:1176
 msgid "New"
 msgstr "Ny"
 
-#: src/otherwindow.c:1127 src/otherwindow.c:2937 src/otherwindow.c:3074
+#: src/otherwindow.c:1185 src/otherwindow.c:3051 src/otherwindow.c:3219
 msgid "Offset"
 msgstr ""
 
-#: src/otherwindow.c:1133 src/otherwindow.c:1959
+#: src/otherwindow.c:1191 src/otherwindow.c:2079
 msgid "Centre"
 msgstr "Center"
 
-#: src/otherwindow.c:1144
+#: src/otherwindow.c:1202
 msgid "Fix Aspect Ratio"
 msgstr "Fixa Bildformat"
 
-#: src/otherwindow.c:1163 src/otherwindow.c:2268
-msgid "Settings"
-msgstr "Inställningar"
-
-#: src/otherwindow.c:1168
-msgid "Sharper image reduction"
-msgstr "Skarpare bildreduktion"
-
-#: src/otherwindow.c:1193
-msgid "Scale Canvas"
-msgstr "Skala rityta"
-
-#: src/otherwindow.c:1193
-msgid "Resize Canvas"
-msgstr "Ändra storlek på rityta"
-
-#: src/otherwindow.c:1842
-msgid "From"
-msgstr "Från"
-
-#: src/otherwindow.c:1842
-msgid "To"
-msgstr "Till"
-
-#: src/otherwindow.c:1843 src/otherwindow.c:2700
-msgid "HSV"
-msgstr "NMI"
-
-#: src/otherwindow.c:1858
-msgid "Scale"
-msgstr "Skala"
-
-#: src/otherwindow.c:1873
-msgid "Palette Editor"
-msgstr "Palettredigerare"
-
-#: src/otherwindow.c:1894
-msgid "Configure Overlays"
-msgstr "Konfigurera Överdrag"
-
-#: src/otherwindow.c:1951
-msgid "Colour Editor"
-msgstr "Färgredigerare"
-
-#: src/otherwindow.c:1959
-msgid "Limit"
-msgstr "Gräns"
-
-#: src/otherwindow.c:1960
-msgid "Sphere"
-msgstr "Sfär"
-
-#: src/otherwindow.c:1960 src/otherwindow.c:3073
-msgid "Angle"
-msgstr "Vinkel"
-
-#: src/otherwindow.c:1960
-msgid "Cube"
-msgstr "Kub"
-
-#: src/otherwindow.c:1990
-msgid "Range"
-msgstr "Intervall"
-
-#: src/otherwindow.c:1992
-msgid "Inverse"
-msgstr "Invertera"
-
-#: src/otherwindow.c:1997 src/toolbar.c:428
-msgid "Colour-Selective Mode"
-msgstr "Färg-Selektivt Läge"
-
-#: src/otherwindow.c:2006
-msgid "Opaque"
-msgstr "Opak"
-
-#: src/otherwindow.c:2006
-msgid "Border"
-msgstr "Ram"
-
-#: src/otherwindow.c:2007
-msgid "Transparent"
-msgstr "Genomskinlig"
-
-#: src/otherwindow.c:2007
-msgid "Tile "
-msgstr "Ruta "
-
-#: src/otherwindow.c:2024
-msgid "Smart grid"
-msgstr "Smart rutnät"
-
-#: src/otherwindow.c:2026
-msgid "Tile grid"
-msgstr "Rutnät"
-
-#: src/otherwindow.c:2028
-msgid "Minimum grid zoom"
-msgstr "Minimal rutnätszoom"
-
-#: src/otherwindow.c:2030
-msgid "Tile width"
-msgstr "Bredd på ruta"
-
-#: src/otherwindow.c:2032
-msgid "Tile height"
-msgstr "Höjd på ruta"
-
-#: src/otherwindow.c:2044
-msgid "Configure Grid"
-msgstr "Konfigurera rutnät"
-
-#: src/otherwindow.c:2227
-msgid "Exact Conversion"
-msgstr "Exakt konvertering"
-
-#: src/otherwindow.c:2227
-msgid "Use Current Palette"
-msgstr "Använd aktuell palett"
-
-#: src/otherwindow.c:2228
-msgid "PNN Quantize (slow, better quality)"
-msgstr "PNN-kvantisering (långsam, bättre kvalitet)"
-
-#: src/otherwindow.c:2229
-msgid "Wu Quantize (fast)"
-msgstr "Wu-kvantisering (snabb)"
-
-#: src/otherwindow.c:2230
-msgid "Max-Min Quantize (best for small palettes and dithering)"
-msgstr "Max-Min-kvantisering (bäst för mindre paletter och dithering)"
-
-#: src/otherwindow.c:2233 src/otherwindow.c:2906 src/otherwindow.c:3162
-msgid "None"
-msgstr "Ingen"
-
-#: src/otherwindow.c:2233
-msgid "Floyd-Steinberg"
-msgstr "Floyd-Steinberg"
-
-#: src/otherwindow.c:2233
-msgid "Stucki"
-msgstr "Stucki"
-
-#: src/otherwindow.c:2236
-msgid "Floyd-Steinberg (quick)"
-msgstr "Floyd-Steinberg (snabb)"
-
-#: src/otherwindow.c:2236
-msgid "Dithered (effect)"
-msgstr "Dithered (effekt)"
-
-#: src/otherwindow.c:2237
-msgid "Scattered (effect)"
-msgstr "Skingra (effekt)"
-
-#: src/otherwindow.c:2240
-msgid "Largest (Linf)"
-msgstr "Största (Linf)"
-
-#: src/otherwindow.c:2240
-msgid "Sum (L1)"
-msgstr "Summa (L1)"
-
-#: src/otherwindow.c:2240
-msgid "Euclidean (L2)"
-msgstr "Euklidisk (L2)"
-
-#: src/otherwindow.c:2241
-msgid "Gamut"
-msgstr "Gamut"
-
-#: src/otherwindow.c:2241
-msgid "Weakly"
-msgstr "Svagt"
-
-#: src/otherwindow.c:2241
-msgid "Strongly"
-msgstr "Starkt"
-
-#: src/otherwindow.c:2242
-msgid "Off"
-msgstr "Av"
-
-#: src/otherwindow.c:2242
-msgid "Separate/Sum"
-msgstr "Separera/Summa"
-
-#: src/otherwindow.c:2242
-msgid "Separate/Split"
-msgstr "Separera/Dela"
-
-#: src/otherwindow.c:2243
-msgid "Length/Sum"
-msgstr "Längd/Summa"
-
-#: src/otherwindow.c:2243
-msgid "Length/Split"
-msgstr "Längd/Dela"
-
-#: src/otherwindow.c:2250
-msgid "Create Quantized"
-msgstr ""
-
-#: src/otherwindow.c:2250
-msgid "Convert To Indexed"
-msgstr "Konvertera till indexerad"
-
-#: src/otherwindow.c:2259
-msgid "Indexed Colours To Use"
-msgstr "Indexerade färger att använda"
-
-#: src/otherwindow.c:2282
-msgid "Truncate palette"
-msgstr "Skär av pallett"
-
-#: src/otherwindow.c:2283
-msgid "Diameter based weighting"
-msgstr "Diameterbaserad viktning"
-
-#: src/otherwindow.c:2294
-msgid "Dither"
-msgstr "Dither"
-
-#: src/otherwindow.c:2299
-msgid "Colour space"
-msgstr "Färgrymd"
-
-#: src/otherwindow.c:2302
-msgid "Difference measure"
-msgstr ""
-
-#: src/otherwindow.c:2305
-msgid "Reduce colour bleed"
-msgstr "Reducera blödning av färg"
-
-#: src/otherwindow.c:2307
-msgid "Serpentine scan"
-msgstr ""
-
-#: src/otherwindow.c:2310
-msgid "Error propagation, %"
-msgstr "Felaktig spridning, %"
-
-#: src/otherwindow.c:2311
-msgid "Selective error propagation"
-msgstr "Selektiv felaktig spridning"
-
-#: src/otherwindow.c:2320
-msgid "Full error precision"
-msgstr "Full felprecision"
-
-#: src/otherwindow.c:2677
-msgid "Edit Gradient"
-msgstr "Redigera gradient"
-
-#: src/otherwindow.c:2700
-msgid "Backward HSV"
-msgstr ""
-
-#: src/otherwindow.c:2701 src/otherwindow.c:2717
-msgid "Constant"
-msgstr "Konstant"
-
-#: src/otherwindow.c:2723
-msgid "Points:"
-msgstr "Punkter:"
-
-#: src/otherwindow.c:2886 src/toolbar.c:314
-msgid "Reverse"
-msgstr "Omvänd"
-
-#: src/otherwindow.c:2887
-msgid "Edit Custom"
-msgstr "Redigera anpassad"
-
-#: src/otherwindow.c:2904
-msgid "Linear"
-msgstr "Linjär"
-
-#: src/otherwindow.c:2904
-msgid "Radial"
-msgstr "Radiell"
-
-#: src/otherwindow.c:2904
-msgid "Square"
-msgstr "Fyrkantig"
-
-#: src/otherwindow.c:2905
-msgid "Angular"
-msgstr "Vinkelformad"
-
-#: src/otherwindow.c:2905
-msgid "Conical"
-msgstr "Konisk"
-
-#: src/otherwindow.c:2906
-msgid "Level"
-msgstr "Nivå"
-
-#: src/otherwindow.c:2906
-msgid "Repeat"
-msgstr "Upprepa"
-
-#: src/otherwindow.c:2906
+#: src/otherwindow.c:1211 src/shifter.c:325
+msgid "Clear"
+msgstr "Töm"
+
+#: src/otherwindow.c:1211 src/otherwindow.c:1221
+msgid "Tile"
+msgstr "Ruta"
+
+#: src/otherwindow.c:1212
+msgid "Mirror tile"
+msgstr "Spegla Ruta"
+
+#: src/otherwindow.c:1221 src/otherwindow.c:3020
 msgid "Mirror"
 msgstr "Spegla"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:1221
+msgid "Void"
+msgstr ""
+
+#: src/otherwindow.c:1229 src/otherwindow.c:2408
+msgid "Settings"
+msgstr "Inställningar"
+
+#: src/otherwindow.c:1234
+msgid "Sharper image reduction"
+msgstr "Skarpare bildreduktion"
+
+#: src/otherwindow.c:1236
+msgid "Boundary extension"
+msgstr ""
+
+#: src/otherwindow.c:1261
+msgid "Scale Canvas"
+msgstr "Skala rityta"
+
+#: src/otherwindow.c:1261
+msgid "Resize Canvas"
+msgstr "Ändra storlek på rityta"
+
+#: src/otherwindow.c:1963
+msgid "From"
+msgstr "Från"
+
+#: src/otherwindow.c:1963
+msgid "To"
+msgstr "Till"
+
+#: src/otherwindow.c:1964 src/otherwindow.c:2589
+msgid "HSV"
+msgstr "NMI"
+
+#: src/otherwindow.c:1979
+msgid "Scale"
+msgstr "Skala"
+
+#: src/otherwindow.c:1994
+msgid "Palette Editor"
+msgstr "Palettredigerare"
+
+#: src/otherwindow.c:2015
+msgid "Configure Overlays"
+msgstr "Konfigurera Överdrag"
+
+#: src/otherwindow.c:2071
+msgid "Colour Editor"
+msgstr "Färgredigerare"
+
+#: src/otherwindow.c:2079
+msgid "Limit"
+msgstr "Gräns"
+
+#: src/otherwindow.c:2080
+msgid "Sphere"
+msgstr "Sfär"
+
+#: src/otherwindow.c:2080 src/otherwindow.c:3218
+msgid "Angle"
+msgstr "Vinkel"
+
+#: src/otherwindow.c:2080
+msgid "Cube"
+msgstr "Kub"
+
+#: src/otherwindow.c:2110
+msgid "Range"
+msgstr "Intervall"
+
+#: src/otherwindow.c:2112
+msgid "Inverse"
+msgstr "Invertera"
+
+#: src/otherwindow.c:2119 src/toolbar.c:890
+msgid "Colour-Selective Mode"
+msgstr "Färg-Selektivt Läge"
+
+#: src/otherwindow.c:2128
+msgid "Opaque"
+msgstr "Opak"
+
+#: src/otherwindow.c:2128
+msgid "Border"
+msgstr "Ram"
+
+#: src/otherwindow.c:2129
+msgid "Transparent"
+msgstr "Genomskinlig"
+
+#: src/otherwindow.c:2129
+msgid "Tile "
+msgstr "Ruta "
+
+#: src/otherwindow.c:2129
+msgid "Segment"
+msgstr ""
+
+#: src/otherwindow.c:2146
+msgid "Smart grid"
+msgstr "Smart rutnät"
+
+#: src/otherwindow.c:2148
+msgid "Tile grid"
+msgstr "Rutnät"
+
+#: src/otherwindow.c:2150
+msgid "Minimum grid zoom"
+msgstr "Minimal rutnätszoom"
+
+#: src/otherwindow.c:2152
+msgid "Tile width"
+msgstr "Bredd på ruta"
+
+#: src/otherwindow.c:2154
+msgid "Tile height"
+msgstr "Höjd på ruta"
+
+#: src/otherwindow.c:2168
+msgid "Configure Grid"
+msgstr "Konfigurera rutnät"
+
+#: src/otherwindow.c:2355 src/otherwindow.c:3125
+msgid "Colour space"
+msgstr "Färgrymd"
+
+#: src/otherwindow.c:2361
+msgid "Largest (Linf)"
+msgstr "Största (Linf)"
+
+#: src/otherwindow.c:2361
+msgid "Sum (L1)"
+msgstr "Summa (L1)"
+
+#: src/otherwindow.c:2361
+msgid "Euclidean (L2)"
+msgstr "Euklidisk (L2)"
+
+#: src/otherwindow.c:2362
+msgid "Difference measure"
+msgstr ""
+
+#: src/otherwindow.c:2371
+msgid "Exact Conversion"
+msgstr "Exakt konvertering"
+
+#: src/otherwindow.c:2371
+msgid "Use Current Palette"
+msgstr "Använd aktuell palett"
+
+#: src/otherwindow.c:2372
+msgid "PNN Quantize (slow, better quality)"
+msgstr "PNN-kvantisering (långsam, bättre kvalitet)"
+
+#: src/otherwindow.c:2373
+msgid "Wu Quantize (fast)"
+msgstr "Wu-kvantisering (snabb)"
+
+#: src/otherwindow.c:2374
+msgid "Max-Min Quantize (best for small palettes and dithering)"
+msgstr "Max-Min-kvantisering (bäst för mindre paletter och dithering)"
+
+#: src/otherwindow.c:2377 src/otherwindow.c:3020 src/otherwindow.c:3307
+msgid "None"
+msgstr "Ingen"
+
+#: src/otherwindow.c:2377
+msgid "Floyd-Steinberg"
+msgstr "Floyd-Steinberg"
+
+#: src/otherwindow.c:2377
+msgid "Stucki"
+msgstr "Stucki"
+
+#: src/otherwindow.c:2380
+msgid "Floyd-Steinberg (quick)"
+msgstr "Floyd-Steinberg (snabb)"
+
+#: src/otherwindow.c:2380
+msgid "Dithered (effect)"
+msgstr "Dithered (effekt)"
+
+#: src/otherwindow.c:2381
+msgid "Scattered (effect)"
+msgstr "Skingra (effekt)"
+
+#: src/otherwindow.c:2384
+msgid "Gamut"
+msgstr "Gamut"
+
+#: src/otherwindow.c:2384
+msgid "Weakly"
+msgstr "Svagt"
+
+#: src/otherwindow.c:2384
+msgid "Strongly"
+msgstr "Starkt"
+
+#: src/otherwindow.c:2385
+msgid "Off"
+msgstr "Av"
+
+#: src/otherwindow.c:2385
+msgid "Separate/Sum"
+msgstr "Separera/Summa"
+
+#: src/otherwindow.c:2385
+msgid "Separate/Split"
+msgstr "Separera/Dela"
+
+#: src/otherwindow.c:2386
+msgid "Length/Sum"
+msgstr "Längd/Summa"
+
+#: src/otherwindow.c:2386
+msgid "Length/Split"
+msgstr "Längd/Dela"
+
+#: src/otherwindow.c:2392
+msgid "Create Quantized"
+msgstr ""
+
+#: src/otherwindow.c:2392
+msgid "Convert To Indexed"
+msgstr "Konvertera till indexerad"
+
+#: src/otherwindow.c:2400
+msgid "Indexed Colours To Use"
+msgstr "Indexerade färger att använda"
+
+#: src/otherwindow.c:2427
+msgid "Truncate palette"
+msgstr "Skär av pallett"
+
+#: src/otherwindow.c:2428
+msgid "Diameter based weighting"
+msgstr "Diameterbaserad viktning"
+
+#: src/otherwindow.c:2442
+msgid "Dither"
+msgstr "Dither"
+
+#: src/otherwindow.c:2450
+msgid "Reduce colour bleed"
+msgstr "Reducera blödning av färg"
+
+#: src/otherwindow.c:2452
+msgid "Serpentine scan"
+msgstr ""
+
+#: src/otherwindow.c:2455
+msgid "Error propagation, %"
+msgstr "Felaktig spridning, %"
+
+#: src/otherwindow.c:2456
+msgid "Selective error propagation"
+msgstr "Selektiv felaktig spridning"
+
+#: src/otherwindow.c:2464
+msgid "Full error precision"
+msgstr "Full felprecision"
+
+#: src/otherwindow.c:2589
+msgid "Backward HSV"
+msgstr ""
+
+#: src/otherwindow.c:2590 src/otherwindow.c:2831
+msgid "Constant"
+msgstr "Konstant"
+
+#: src/otherwindow.c:2794
+msgid "Edit Gradient"
+msgstr "Redigera gradient"
+
+#: src/otherwindow.c:2837
+msgid "Points:"
+msgstr "Punkter:"
+
+#: src/otherwindow.c:3000 src/toolbar.c:312
+msgid "Reverse"
+msgstr "Omvänd"
+
+#: src/otherwindow.c:3001
+msgid "Edit Custom"
+msgstr "Redigera anpassad"
+
+#: src/otherwindow.c:3018
+msgid "Linear"
+msgstr "Linjär"
+
+#: src/otherwindow.c:3018
+msgid "Radial"
+msgstr "Radiell"
+
+#: src/otherwindow.c:3018
+msgid "Square"
+msgstr "Fyrkantig"
+
+#: src/otherwindow.c:3019
+msgid "Angular"
+msgstr "Vinkelformad"
+
+#: src/otherwindow.c:3019
+msgid "Conical"
+msgstr "Konisk"
+
+#: src/otherwindow.c:3020 src/otherwindow.c:3539
+msgid "Level"
+msgstr "Nivå"
+
+#: src/otherwindow.c:3020
+msgid "Repeat"
+msgstr "Upprepa"
+
+#: src/otherwindow.c:3021
 msgid "A to B"
 msgstr "A till B"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:3021
 msgid "A to B (RGB)"
 msgstr "A till B (RGB)"
 
-#: src/otherwindow.c:2907
+#: src/otherwindow.c:3021
+msgid "A to B (sRGB)"
+msgstr ""
+
+#: src/otherwindow.c:3022
 msgid "A to B (HSV)"
 msgstr "A till B (NMI)"
 
-#: src/otherwindow.c:2908
+#: src/otherwindow.c:3022
 msgid "A to B (backward HSV)"
 msgstr "A till B (omvänd NMI)"
 
-#: src/otherwindow.c:2908
+#: src/otherwindow.c:3022
 msgid "A only"
 msgstr "Endast A"
 
-#: src/otherwindow.c:2908 src/otherwindow.c:2909
+#: src/otherwindow.c:3023 src/otherwindow.c:3024
 msgid "Custom"
 msgstr "Anpassad"
 
-#: src/otherwindow.c:2909
+#: src/otherwindow.c:3024
 msgid "Current to 0"
 msgstr "Aktuell till 0"
 
-#: src/otherwindow.c:2909
+#: src/otherwindow.c:3024
 msgid "Current only"
 msgstr "Endast aktuell"
 
-#: src/otherwindow.c:2920
+#: src/otherwindow.c:3035
 msgid "Configure Gradient"
 msgstr "Konfigurera gradient"
 
-#: src/otherwindow.c:2928 src/png.c:731
+#: src/otherwindow.c:3042 src/png.c:853
 msgid "Channel"
 msgstr "Kanal"
 
-#: src/otherwindow.c:2933
+#: src/otherwindow.c:3047
 msgid "Length"
 msgstr "Längd"
 
-#: src/otherwindow.c:2935
+#: src/otherwindow.c:3049
 msgid "Repeat length"
 msgstr "Repetera längd"
 
-#: src/otherwindow.c:2939
+#: src/otherwindow.c:3053
 msgid "Gradient type"
 msgstr "Gradienttyp"
 
-#: src/otherwindow.c:2941
+#: src/otherwindow.c:3056
 msgid "Extension type"
 msgstr ""
 
-#: src/otherwindow.c:2947
+#: src/otherwindow.c:3059
 msgid "Preview opacity"
 msgstr "Förhandsvisa opacitet"
 
-#: src/otherwindow.c:3075
+#: src/otherwindow.c:3127
+msgid "Pick Gradient"
+msgstr ""
+
+#: src/otherwindow.c:3220
 msgid "At distance"
 msgstr "Vid avstånd"
 
-#: src/otherwindow.c:3076
+#: src/otherwindow.c:3221
 msgid "Horizontal "
 msgstr "Horisontell "
 
-#: src/otherwindow.c:3077
+#: src/otherwindow.c:3222
 msgid "Vertical"
 msgstr "Vertikal"
 
-#: src/otherwindow.c:3162
+#: src/otherwindow.c:3307
 msgid "Unchanged"
 msgstr "Oförändrad"
 
-#: src/otherwindow.c:3167
+#: src/otherwindow.c:3312
 msgid "Tracing Image"
 msgstr "Skissa Bild"
 
-#: src/otherwindow.c:3179
+#: src/otherwindow.c:3323
 msgid "Source"
 msgstr "Källa"
 
-#: src/otherwindow.c:3181
+#: src/otherwindow.c:3325
 msgid "Origin"
 msgstr "Ursprung"
 
-#: src/otherwindow.c:3182
+#: src/otherwindow.c:3326
 msgid "Relative scale"
 msgstr "Relativ skala"
 
-#: src/otherwindow.c:3193
+#: src/otherwindow.c:3337
 msgid "Display"
 msgstr "Bildskärm"
 
-#: src/png.c:392
+#: src/otherwindow.c:3526
+msgid "Segment Image"
+msgstr ""
+
+#: src/otherwindow.c:3536
+msgid "Threshold"
+msgstr ""
+
+#: src/otherwindow.c:3542
+msgid "Minimum size"
+msgstr ""
+
+#: src/png.c:481
 #, c-format
 msgid "Saving %s image"
 msgstr "Sparar %s-bild"
 
-#: src/png.c:392
+#: src/png.c:481
 #, c-format
 msgid "Loading %s image"
 msgstr "Läser in %s-bild"
 
-#: src/png.c:728
+#: src/png.c:850
 msgid "Layer"
 msgstr "Lager"
 
-#: src/png.c:4158
-msgid "This is an animated GIF file.  What do you want to do?"
-msgstr "Detta är en animerad GIF-fil. Vad vill du göra?"
+#: src/png.c:6318
+msgid "Applying colour profile"
+msgstr ""
 
-#: src/png.c:4159
-msgid "Edit Frames"
-msgstr "Redigera Bildrutor"
-
-#: src/png.c:4161
-msgid "View Animation"
-msgstr "Visa animering"
-
-#: src/png.c:4350
+#: src/png.c:6727
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
 msgstr ""
 "%d ut av %d bildrutor kunde inte sparas som %s - sparades som PNG istället"
 
-#: src/png.c:4536
-msgid ""
-"I am unable to find the documentation.  Either you need to download the "
-"mtPaint Handbook from the web site and install it, or you need to set the "
-"correct location in the Preferences window."
+#: src/png.c:6744
+msgid "Explode frames"
 msgstr ""
-"Jag kunde inte hitta dokumentationen. Antingen så behöver du ladda ner "
-"mtPaint Handboken från hemsidan och installera den, eller så behöver du sätta "
-"den korrekta platsen i Inställningsfönstret."
 
-#: src/png.c:4568
-msgid ""
-"There was a problem running the HTML browser.  You need to set the correct "
-"program name in the Preferences window."
-msgstr ""
-"Det uppstod ett problem med att köra HTML-läsaren. Du behöver sätta korrekt "
-"programnamn i Inställningsfönstret."
-
-#: src/prefs.c:145
+#: src/prefs.c:146
 msgid "Pressure"
 msgstr "Tryck"
 
-#: src/prefs.c:153
+#: src/prefs.c:154
 msgid "Current Device"
 msgstr "Aktuell enhet"
 
-#: src/prefs.c:402
+#: src/prefs.c:431
 msgid "Default System Language"
 msgstr "Standardspråk i systemet"
 
-#: src/prefs.c:403
+#: src/prefs.c:432
 msgid "Chinese (Simplified)"
 msgstr "Kinesiska (förenklad)"
 
-#: src/prefs.c:403
+#: src/prefs.c:432
 msgid "Chinese (Taiwanese)"
 msgstr "Kinesiska (Taiwan)"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "Czech"
 msgstr "Tjeckiska"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "Dutch"
 msgstr "Nederländska"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "English (UK)"
 msgstr "Engelska (UK)"
 
-#: src/prefs.c:404
+#: src/prefs.c:433
 msgid "French"
 msgstr "Franska"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
 msgid "Galician"
 msgstr "Galiciska"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
 msgid "German"
 msgstr "Tyska"
 
-#: src/prefs.c:405
+#: src/prefs.c:434
+msgid "Hungarian"
+msgstr ""
+
+#: src/prefs.c:434
 msgid "Italian"
 msgstr "Italienska"
 
-#: src/prefs.c:405
+#: src/prefs.c:435
 msgid "Japanese"
 msgstr "Japanska"
 
-#: src/prefs.c:406
+#: src/prefs.c:435
 msgid "Polish"
 msgstr "Polska"
 
-#: src/prefs.c:406
+#: src/prefs.c:435
 msgid "Portuguese"
 msgstr "Portugisiska"
 
-#: src/prefs.c:406
+#: src/prefs.c:436
 msgid "Portuguese (Brazilian)"
 msgstr "Portugisiska (brasiliansk)"
 
-#: src/prefs.c:407
+#: src/prefs.c:436
 msgid "Russian"
 msgstr "Ryska"
 
-#: src/prefs.c:407
+#: src/prefs.c:436
 msgid "Slovak"
 msgstr "Slovakiska"
 
-#: src/prefs.c:407
+#: src/prefs.c:437
 msgid "Spanish"
 msgstr "Spanska"
 
-#: src/prefs.c:407
+#: src/prefs.c:437
 msgid "Swedish"
 msgstr "Svenska"
 
-#: src/prefs.c:408
+#: src/prefs.c:437
+msgid "Tagalog"
+msgstr ""
+
+#: src/prefs.c:437
 msgid "Turkish"
 msgstr "Turkiska"
 
-#: src/prefs.c:415
+#: src/prefs.c:444
 msgid "XBM X hotspot"
 msgstr ""
 
-#: src/prefs.c:415
+#: src/prefs.c:444
 msgid "XBM Y hotspot"
 msgstr ""
 
-#: src/prefs.c:417
+#: src/prefs.c:446
 msgid "Recently Used Files"
 msgstr "Tidigare använda filer"
 
-#: src/prefs.c:418
+#: src/prefs.c:447
 msgid "Progress bar silence limit"
 msgstr ""
 
-#: src/prefs.c:419
+#: src/prefs.c:448
 msgid "Canvas Geometry"
 msgstr "Geometri för ram"
 
-#: src/prefs.c:419
+#: src/prefs.c:448
 msgid "Cursor X,Y"
 msgstr "Pekare X,Y"
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Pixel [I] {RGB}"
 msgstr ""
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Selection Geometry"
 msgstr "Geometri för urval"
 
-#: src/prefs.c:420
+#: src/prefs.c:449
 msgid "Undo / Redo"
 msgstr "Ångra / Gör om"
 
-#: src/prefs.c:421 src/toolbar.c:441
+#: src/prefs.c:450 src/toolbar.c:903
 msgid "Flow"
 msgstr "Flöde"
 
-#: src/prefs.c:428
+#: src/prefs.c:457
 msgid "Preferences"
 msgstr "Inställningar"
 
-#: src/prefs.c:447
+#: src/prefs.c:484
+msgid "Max threads (0 to autodetect)"
+msgstr ""
+
+#: src/prefs.c:491
 msgid "Max memory used for undo (MB)"
 msgstr "Max mängd minne för ångra (MB)"
 
-#: src/prefs.c:448
+#: src/prefs.c:492
 msgid "Max undo levels"
 msgstr "Max ångra-nivåer"
 
-#: src/prefs.c:449
+#: src/prefs.c:493
 msgid "Communal layer undo space (%)"
 msgstr ""
 
-#: src/prefs.c:457
+#: src/prefs.c:501
 msgid "Use gamma correction by default"
 msgstr "Använd gammakorrigering som standard"
 
-#: src/prefs.c:459
+#: src/prefs.c:503
 msgid "Optimize alpha chequers"
 msgstr ""
 
-#: src/prefs.c:461
+#: src/prefs.c:505
 msgid "Disable view window transparencies"
 msgstr "Stäng av visningsfönstrets genomskinlighet"
 
-#: src/prefs.c:469
+#: src/prefs.c:513
 msgid ""
 "Select preferred language translation\n"
 "\n"
@@ -3127,147 +3344,155 @@ msgstr ""
 "Du kommer att behöver starta om\n"
 "mtPaint för att aktivera nytt språk"
 
-#: src/prefs.c:480
+#: src/prefs.c:524
 msgid "Language"
 msgstr "Språk"
 
-#: src/prefs.c:485
+#: src/prefs.c:529
 msgid "Interface"
 msgstr "Gränssnitt"
 
-#: src/prefs.c:489
+#: src/prefs.c:533
 msgid "Greyscale backdrop"
 msgstr "Gråskala bakgrund"
 
-#: src/prefs.c:490
+#: src/prefs.c:534
 msgid "Selection nudge pixels"
 msgstr "Knuffa pixlar i urval"
 
-#: src/prefs.c:491
+#: src/prefs.c:535
 msgid "Max Pan Window Size"
 msgstr "Max storlek för panoreringsfönstret"
 
-#: src/prefs.c:498
+#: src/prefs.c:542
 msgid "Display clipboard while pasting"
 msgstr "Visa urklipp vid inklistring"
 
-#: src/prefs.c:500
+#: src/prefs.c:544
 msgid "Mouse cursor = Tool"
 msgstr "Muspekare = Verktyg"
 
-#: src/prefs.c:502
+#: src/prefs.c:546
 msgid "Confirm Exit"
 msgstr "Bekräfta avslut"
 
-#: src/prefs.c:504
+#: src/prefs.c:548
 msgid "Q key quits mtPaint"
 msgstr "Q knappen avslutar mtPaint"
 
-#: src/prefs.c:506
+#: src/prefs.c:550
 msgid "Changing tool commits paste"
 msgstr "Byta verktyg verkställer inklistring"
 
-#: src/prefs.c:508
+#: src/prefs.c:552
 msgid "Centre tool settings dialogs"
 msgstr "Centrera verktygsinställningsrutan"
 
-#: src/prefs.c:510
+#: src/prefs.c:554
 msgid "New image sets zoom to 100%"
 msgstr "Ny bild sätter zoom till 100%"
 
-#: src/prefs.c:513
+#: src/prefs.c:557
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "Musens Skrollhjul = Zoom"
 
-#: src/prefs.c:515
+#: src/prefs.c:559
 msgid "Use menu icons"
 msgstr "Använd menyikoner"
 
-#: src/prefs.c:520
+#: src/prefs.c:564
 msgid "Files"
 msgstr "Filer"
 
-#: src/prefs.c:535
+#: src/prefs.c:579
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
 msgstr "Läs 16-bits TGA:er som 5:6:5 BGR"
 
-#: src/prefs.c:536
+#: src/prefs.c:580
 msgid "Write TGAs in bottom-up row order"
 msgstr "Skriv TGA:er rad för rad nedifrån och upp"
 
-#: src/prefs.c:537
+#: src/prefs.c:581
 msgid "Undoable image loading"
 msgstr ""
 
-#: src/prefs.c:541
+#: src/prefs.c:588
 msgid "Paths"
 msgstr "Sökvägar"
 
-#: src/prefs.c:543
+#: src/prefs.c:590
 msgid "Clipboard Files"
 msgstr "Urklippsfiler"
 
-#: src/prefs.c:544
+#: src/prefs.c:591
 msgid "Select Clipboard File"
 msgstr "Välj urklippsfil"
 
-#: src/prefs.c:548
+#: src/prefs.c:595
 msgid "HTML Browser Program"
 msgstr "HTML Läsarprogram"
 
-#: src/prefs.c:549
+#: src/prefs.c:596
 msgid "Select Browser Program"
 msgstr "Välj webbläsarprogram"
 
-#: src/prefs.c:553
+#: src/prefs.c:600
 msgid "Location of Handbook index"
 msgstr "Plats för Handbokens index"
 
-#: src/prefs.c:554
+#: src/prefs.c:601
 msgid "Select Handbook Index File"
 msgstr "Välj Hanbokens indexfil"
 
-#: src/prefs.c:558
+#: src/prefs.c:605
 msgid "Default Palette"
 msgstr "Standardpalett"
 
-#: src/prefs.c:559
+#: src/prefs.c:606
 msgid "Select Default Palette"
 msgstr "Välj standardpalett"
 
-#: src/prefs.c:563
+#: src/prefs.c:610
 msgid "Default Patterns"
 msgstr "Standardmönster"
 
-#: src/prefs.c:564
+#: src/prefs.c:611
 msgid "Select Default Patterns File"
 msgstr "Välj standardmönsterfil"
 
-#: src/prefs.c:571
+#: src/prefs.c:616
+msgid "Default Theme"
+msgstr ""
+
+#: src/prefs.c:617
+msgid "Select Default Theme File"
+msgstr ""
+
+#: src/prefs.c:624
 msgid "Status Bar"
 msgstr "Statusrad"
 
-#: src/prefs.c:580
+#: src/prefs.c:633
 msgid "Tablet"
 msgstr "Ritbord"
 
-#: src/prefs.c:584
+#: src/prefs.c:637
 msgid "Device Settings"
 msgstr "Enhetsinställningar"
 
-#: src/prefs.c:592
+#: src/prefs.c:645
 msgid "Configure Device"
 msgstr "Konfigurera enhet"
 
-#: src/prefs.c:598
+#: src/prefs.c:652
 msgid "Tool Variable"
 msgstr "Verktygsvariabel"
 
-#: src/prefs.c:600
+#: src/prefs.c:654
 msgid "Factor"
 msgstr "Faktor"
 
-#: src/prefs.c:628
+#: src/prefs.c:680
 msgid "Test Area"
 msgstr "Testområde"
 
@@ -3275,263 +3500,298 @@ msgstr "Testområde"
 msgid "Frames"
 msgstr "Bildrutor"
 
-#: src/shifter.c:271
+#: src/shifter.c:272
 msgid "Palette Shifter"
 msgstr "Palettväxlare"
 
-#: src/shifter.c:281
+#: src/shifter.c:279
 msgid "Start"
 msgstr "Start"
 
-#: src/shifter.c:283
+#: src/shifter.c:281
 msgid "Finish"
 msgstr "Slut"
 
-#: src/shifter.c:332
+#: src/shifter.c:330
 msgid "Fix Palette"
 msgstr "Rätta till palett"
 
-#: src/spawn.c:369 src/spawn.c:421
+#: src/spawn.c:449 src/spawn.c:500
 msgid "Action"
 msgstr "Åtgärd"
 
-#: src/spawn.c:369 src/spawn.c:421
+#: src/spawn.c:449 src/spawn.c:500
 msgid "Command"
 msgstr "Kommando"
 
-#: src/spawn.c:376
+#: src/spawn.c:456
 msgid "Configure File Actions"
 msgstr "Konfigurera filåtgärder"
 
-#: src/spawn.c:436
+#: src/spawn.c:515
 msgid "Execute"
 msgstr "Kör"
 
-#: src/spawn.c:613
+#: src/spawn.c:732
 #, c-format
 msgid "Error %i reported when trying to run %s"
 msgstr "Fel %i rapporterat vid försök att köra %s"
 
-#: src/toolbar.c:235
+#: src/spawn.c:789
+msgid ""
+"I am unable to find the documentation.  Either you need to download the "
+"mtPaint Handbook from the web site and install it, or you need to set the "
+"correct location in the Preferences window."
+msgstr ""
+"Jag kunde inte hitta dokumentationen. Antingen så behöver du ladda ner "
+"mtPaint Handboken från hemsidan och installera den, eller så behöver du "
+"sätta den korrekta platsen i Inställningsfönstret."
+
+#: src/spawn.c:820
+msgid ""
+"There was a problem running the HTML browser.  You need to set the correct "
+"program name in the Preferences window."
+msgstr ""
+"Det uppstod ett problem med att köra HTML-läsaren. Du behöver sätta korrekt "
+"programnamn i Inställningsfönstret."
+
+#: src/thread.c:322
+msgid "Helper thread is not responding. Save your work and exit the program."
+msgstr ""
+
+#: src/toolbar.c:233
 msgid "RGB Cube"
 msgstr "RGB Kub"
 
-#: src/toolbar.c:236
+#: src/toolbar.c:234
 msgid "By image channel"
 msgstr "Av bildkanal"
 
-#: src/toolbar.c:237
+#: src/toolbar.c:235
 msgid "Gradient-driven"
 msgstr ""
 
-#: src/toolbar.c:238
+#: src/toolbar.c:236
 msgid "Fill settings"
 msgstr "Inställningar för fylla"
 
-#: src/toolbar.c:255
+#: src/toolbar.c:253
 msgid "Respect opacity mode"
 msgstr ""
 
-#: src/toolbar.c:256
+#: src/toolbar.c:254
 msgid "Smudge settings"
 msgstr "Inställningar för smeta"
 
-#: src/toolbar.c:276
+#: src/toolbar.c:274
 msgid "Brush spacing"
 msgstr ""
 
-#: src/toolbar.c:300
+#: src/toolbar.c:298
 msgid "Normal"
 msgstr ""
 
-#: src/toolbar.c:301
+#: src/toolbar.c:299
 msgid "Colour"
 msgstr "Färg"
 
-#: src/toolbar.c:301
+#: src/toolbar.c:299
 msgid "Saturate More"
 msgstr ""
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Multiply"
 msgstr "Multiplicera"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Divide"
 msgstr "Dividera"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Screen"
 msgstr "Skärm"
 
-#: src/toolbar.c:302
+#: src/toolbar.c:300
 msgid "Dodge"
 msgstr "Undvik"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Burn"
 msgstr "Bränn"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Hard Light"
 msgstr "Hårt ljus"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Soft Light"
 msgstr "Mjukt ljus"
 
-#: src/toolbar.c:303
+#: src/toolbar.c:301
 msgid "Difference"
 msgstr "Skillnad"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Darken"
 msgstr "Mörkare"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Lighten"
 msgstr "Ljusare"
 
-#: src/toolbar.c:304
+#: src/toolbar.c:302
 msgid "Grain Extract"
 msgstr "Grynextrahering"
 
-#: src/toolbar.c:305
+#: src/toolbar.c:303
 msgid "Grain Merge"
 msgstr "Kornsammanfogning"
 
-#: src/toolbar.c:325
+#: src/toolbar.c:323
 msgid "Blend mode"
 msgstr "Intoningsläge"
 
-#: src/toolbar.c:424
+#: src/toolbar.c:846
+msgid "More..."
+msgstr ""
+
+#: src/toolbar.c:886
 msgid "Continuous Mode"
 msgstr "Kontinuerligt Läge"
 
-#: src/toolbar.c:425
+#: src/toolbar.c:887
 msgid "Opacity Mode"
 msgstr "Opacitetsläge"
 
-#: src/toolbar.c:426
+#: src/toolbar.c:888
 msgid "Tint Mode"
 msgstr "Toningsläge"
 
-#: src/toolbar.c:427
+#: src/toolbar.c:889
 msgid "Tint +-"
 msgstr "Tona +-"
 
-#: src/toolbar.c:429
+#: src/toolbar.c:891
 msgid "Blend Mode"
 msgstr "Blandningsläge"
 
-#: src/toolbar.c:430
+#: src/toolbar.c:892
 msgid "Disable All Masks"
 msgstr "Inaktivera alla masker"
 
-#: src/toolbar.c:434
+#: src/toolbar.c:896
 msgid "Gradient Mode"
 msgstr "Gradientläge"
 
-#: src/toolbar.c:460
+#: src/toolbar.c:1012
 msgid "Settings Toolbar"
 msgstr "Inställningsverktygsrad"
 
-#: src/toolbar.c:557
+#: src/toolbar.c:1041
 msgid "Cut"
 msgstr "Klipp ut"
 
-#: src/toolbar.c:558
+#: src/toolbar.c:1042
 msgid "Copy"
 msgstr "Kopiera"
 
-#: src/toolbar.c:559
+#: src/toolbar.c:1043
 msgid "Paste"
 msgstr "Klistra in"
 
-#: src/toolbar.c:561
+#: src/toolbar.c:1045
 msgid "Undo"
 msgstr "Ångra"
 
-#: src/toolbar.c:562
+#: src/toolbar.c:1046
 msgid "Redo"
 msgstr "Gör om"
 
-#: src/toolbar.c:565 src/viewer.c:490
+#: src/toolbar.c:1049 src/viewer.c:485
 msgid "Pan Window"
 msgstr "Panorera Fönster"
 
-#: src/toolbar.c:569
+#: src/toolbar.c:1053
 msgid "Paint"
 msgstr "Måla"
 
-#: src/toolbar.c:570
+#: src/toolbar.c:1054
 msgid "Shuffle"
 msgstr "Blanda"
 
-#: src/toolbar.c:571
+#: src/toolbar.c:1055
 msgid "Flood Fill"
 msgstr ""
 
-#: src/toolbar.c:572
+#: src/toolbar.c:1056
 msgid "Straight Line"
 msgstr "Rak linje"
 
-#: src/toolbar.c:573
+#: src/toolbar.c:1057
 msgid "Smudge"
 msgstr "Smeta"
 
-#: src/toolbar.c:574
+#: src/toolbar.c:1058
 msgid "Clone"
 msgstr "Klona"
 
-#: src/toolbar.c:575
+#: src/toolbar.c:1059
 msgid "Make Selection"
 msgstr "Gör Urval"
 
-#: src/toolbar.c:576
+#: src/toolbar.c:1060
 msgid "Polygon Selection"
 msgstr "Polygonurval"
 
-#: src/toolbar.c:577
+#: src/toolbar.c:1061
 msgid "Place Gradient"
 msgstr "Placera gradient"
 
-#: src/toolbar.c:579
+#: src/toolbar.c:1063
 msgid "Lasso Selection"
 msgstr "Lasso-markering"
 
-#: src/toolbar.c:582
+#: src/toolbar.c:1066
 msgid "Ellipse Outline"
 msgstr "Oval Kontur"
 
-#: src/toolbar.c:583
+#: src/toolbar.c:1067
 msgid "Filled Ellipse"
 msgstr "Fylld Oval"
 
-#: src/toolbar.c:584
+#: src/toolbar.c:1068
 msgid "Outline Selection"
 msgstr "Konturmarkering"
 
-#: src/toolbar.c:585
+#: src/toolbar.c:1069
 msgid "Fill Selection"
 msgstr "Fyll Urval"
 
-#: src/toolbar.c:587
+#: src/toolbar.c:1071
 msgid "Flip Selection Vertically"
 msgstr "Vänd markering vertikalt"
 
-#: src/toolbar.c:588
+#: src/toolbar.c:1072
 msgid "Flip Selection Horizontally"
 msgstr "Vänd markering horisontellt"
 
-#: src/toolbar.c:589
+#: src/toolbar.c:1073
 msgid "Rotate Selection Clockwise"
 msgstr "Rotera markering medsols"
 
-#: src/toolbar.c:590
+#: src/toolbar.c:1074
 msgid "Rotate Selection Anti-Clockwise"
 msgstr "Rotera markering motsols"
 
-#: src/viewer.c:135
+#: src/viewer.c:132
 msgid "About"
 msgstr "Om"
+
+#~ msgid "File: %s invalid - palette not updated"
+#~ msgstr "Fil: %s ogiltig - paletten inte uppdaterad"
+
+#~ msgid "Distance to A+B"
+#~ msgstr "Avstånd till A+B"
+
+#~ msgid "Edit Frames"
+#~ msgstr "Redigera Bildrutor"
