@@ -134,7 +134,7 @@ static void delete_inputd()
 static void delete_prefs(GtkWidget *widget)
 {
 	if (inputd) delete_inputd();
-	gtk_widget_destroy(prefs_window);
+	destroy_dialog(prefs_window);
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
 	clipboard_entry = NULL;
 }

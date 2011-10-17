@@ -315,15 +315,19 @@ int main( int argc, char *argv[] )
 #endif
 
 #ifdef U_NLS
+	{
+		char *locdir = extend_path(MT_LANG_DEST);
 #if GTK_MAJOR_VERSION == 2
-	/* !!! GTK+2 starts acting up if this is before gtk_init() - WJ */
-	setup_language();
+		/* !!! GTK+2 starts acting up if this is before gtk_init() - WJ */
+		setup_language();
 #endif
-	bindtextdomain("mtpaint", MT_LANG_DEST);
-	textdomain("mtpaint");
+		bindtextdomain("mtpaint", locdir);
+		g_free(locdir);
+		textdomain("mtpaint");
 #if GTK_MAJOR_VERSION == 2
-	bind_textdomain_codeset("mtpaint", "UTF-8");
+		bind_textdomain_codeset("mtpaint", "UTF-8");
 #endif
+	}
 #endif
 
 	file_arg_start = 1;

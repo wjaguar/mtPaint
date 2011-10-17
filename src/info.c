@@ -47,7 +47,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 {
 	unsigned char *im, col1[3] = { mem_pal_def[0].red, mem_pal_def[0].green, mem_pal_def[0].blue},
 			col2[3];
-	int i, j, k, t, min[3], max[3], med[3], bars[256][3];
+	int i, j, k, t, /*min[3],*/ max[3], med[3], bars[256][3];
 	float f;
 
 	for ( i=0; i<3; i++ ) col2[i] = 255 - col1[i];
@@ -101,7 +101,7 @@ static void hs_plot_graph()				// Plot RGB graphs
 				}
 			}
 
-			min[k] = hs_rgb_sorted[t][k];
+//			min[k] = hs_rgb_sorted[t][k];
 			med[k] = hs_rgb_sorted[(t+255)/2][k];
 			max[k] = hs_rgb_sorted[255][k];
 		}
@@ -275,7 +275,7 @@ void pressed_information()
 	char txt[256];
 	int i, j, orphans = 0, maxi;
 
-	GtkWidget *vbox4, *vbox5, *table4, *hs_normalize_check;
+	GtkWidget *vbox4, *vbox5, *table4;//, *hs_normalize_check;
 	GtkWidget *scrolledwindow1, *viewport1, *table5;
 
 	info_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Information"), GTK_WIN_POS_CENTER, TRUE );
@@ -360,7 +360,8 @@ void pressed_information()
 	gtk_signal_connect_object( GTK_OBJECT(hs_drawingarea), "expose_event",
 		GTK_SIGNAL_FUNC (hs_expose_graph), NULL );
 
-	hs_normalize_check = pack(vbox5, sig_toggle(_("Normalize"), FALSE, NULL,
+//	hs_normalize_check =
+	pack(vbox5, sig_toggle(_("Normalize"), FALSE, NULL,
 		GTK_SIGNAL_FUNC(hs_click_normalize)));
 
 	if ( mem_img_bpp == 1 )

@@ -1582,7 +1582,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 	GifRecordType gif_rec;
 	GifByteType *byte_ext;
 	int res, val, frame = 0;
-	int delay = settings->gif_delay, trans = -1, disposal = 0;
+	int delay = settings->gif_delay, trans = -1;//, disposal = 0;
 
 
 	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
@@ -1604,7 +1604,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 				{
 					trans = byte_ext[1] & 1 ? byte_ext[4] : -1;
 					delay = byte_ext[2] + (byte_ext[3] << 8);
-					disposal = (byte_ext[1] >> 2) & 7;
+//					disposal = (byte_ext[1] >> 2) & 7;
 				}
 				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
 			}

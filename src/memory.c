@@ -2156,7 +2156,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	static const int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
 	static unsigned char gamma_table[256], bc_table[256], ps_table[256];
 	static int last_gamma, last_br, last_co, last_ps;
-	int do_gamma, do_bc, do_sa, do_ps;
+	int do_gamma, do_bc, /*do_sa,*/ do_ps;
 	unsigned char rgb[3], fmask;
 	int br, co, sa;
 	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
@@ -2185,7 +2185,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 
 	do_gamma = mem_prev_bcsp[4] - 100;
 	do_bc = br | (co - 255);
-	do_sa = sa - 255;
+//	do_sa = sa - 255;
 
 	/* Prepare posterize table */
 	if (do_ps && (do_ps != last_ps))
@@ -6026,7 +6026,7 @@ void set_xlate(unsigned char *xlat, int bpp)
 int is_filled(unsigned char *data, unsigned char val, int len)
 {
 	len++;
-	while (--len && (*data++ != val));
+	while (--len && (*data++ == val));
 	return (!len);
 }
 
@@ -9455,14 +9455,14 @@ static void mem_skew_filt(chanlist old_img, chanlist new_img, int ow, int oh,
 	double *xfilt, *yfilt, *wbuf, *rbuf;
 	int *dxx, *dyy;
 	double x0, y0, d, Kh, Kv, XX[4], YY[4], filler[7];
-	int i, cc, fw2, fh2, xfsz, yfsz, wbsz, rgba, step, ny, nr;
+	int i, cc, /*fw2, fh2,*/ xfsz, yfsz, wbsz, rgba, step, ny, nr;
 
 
 	/* Create temp data */
 	step = (rgba = new_img[CHN_ALPHA] && !dis_a) ? 7 : 3;
 	xmem = make_skew_filter(&xfilt, &dxx, &xfsz, oh, (nw - ow) * 0.5, xskew, mode);
 	ymem = make_skew_filter(&yfilt, &dyy, &yfsz, nw, (nh - oh) * 0.5, yskew, mode);
-	fw2 = xfsz >> 1; fh2 = yfsz >> 1;
+//	fw2 = xfsz >> 1; fh2 = yfsz >> 1;
 
 	wbsz = nw * step;
 	tmem = multialloc(MA_ALIGN_DOUBLE, &wbuf, wbsz * yfsz * sizeof(double),

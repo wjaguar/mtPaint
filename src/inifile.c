@@ -775,7 +775,7 @@ char *get_home_directory(void)
 	return homedir;
 }
 
-static char *extend_path(const char *path)
+char *extend_path(const char *path)
 {
 	char *dir, *name;
 
@@ -821,7 +821,7 @@ gchar *get_home_directory(void)
 	return homedir;
 }
 
-static char *extend_path(const char *path)
+char *extend_path(const char *path)
 {
 	if (path[0] == '~')
 		return (g_strdup_printf("%s%s", get_home_directory(), path + 1));

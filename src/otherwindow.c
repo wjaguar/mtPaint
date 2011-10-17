@@ -1157,7 +1157,7 @@ static GtkWidget *filter_pack(int am, int idx, int *var)
 void sisca_init( char *title )
 {
 	GtkWidget *button_centre, *sisca_vbox, *sisca_hbox;
-	GtkWidget *wvbox, *wvbox2, *notebook, *page0, *page1, *button;
+	GtkWidget *wvbox, *wvbox2, /**notebook,*/ *page0, *page1, *button;
 
 	sisca_window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE );
 	sisca_vbox = add_vbox(sisca_window);
@@ -1225,7 +1225,8 @@ void sisca_init( char *title )
 
 		sisca_gc = pack_end(wvbox, gamma_toggle());
 
-		notebook = pack(sisca_vbox, buttoned_book(&page0, &page1,
+//		notebook =
+		pack(sisca_vbox, buttoned_book(&page0, &page1,
 			&button, _("Settings")));
 		wvbox2 = pack_end(sisca_hbox, gtk_vbox_new(FALSE, 0));
 		pack(wvbox2, button);
@@ -2365,7 +2366,7 @@ static GtkWidget *difference_frame(int idx, gpointer var, GtkSignalFunc handler)
 
 void pressed_quantize(int palette)
 {
-	GtkWidget *mainbox, *topbox, *notebook, *page0, *page1, *button;
+	GtkWidget *mainbox, *topbox, /**notebook,*/ *page0, *page1, *button;
 	GtkWidget *vbox, *hbox, *table, *pages[3];
 
 	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
@@ -2404,7 +2405,8 @@ void pressed_quantize(int palette)
 
 	if (!palette)
 	{
-		notebook = xpack(mainbox, buttoned_book(&page0, &page1, &button,
+//		notebook =
+		xpack(mainbox, buttoned_book(&page0, &page1, &button,
 			_("Settings")));
 		pack_end(topbox, button);
 	}

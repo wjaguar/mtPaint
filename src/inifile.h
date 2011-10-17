@@ -53,6 +53,7 @@ int ini_getsection(inifile *inip, int section, char *key);
 
 char *slurp_file(char *fname);
 char *get_home_directory(void);
+char *extend_path(const char *path);
 
 /* Compatibility functions */
 

@@ -552,7 +552,7 @@ int load_layers( char *file_name )
 	layer_image *lim2;
 	char tin[300], load_name[PATHBUF], *c;
 	int i, j, k, kk, sens;
-	int layers_to_read = -1, layer_file_version = -1, lfail = 0, lplen = 0;
+	int layers_to_read = -1, /*layer_file_version = -1,*/ lfail = 0, lplen = 0;
 	FILE *fp;
 
 	c = strrchr(file_name, DIR_SEP);
@@ -568,7 +568,7 @@ int load_layers( char *file_name )
 
 	i = read_file_num(fp, tin);
 	if ( i==-987654321 ) goto fail2;
-	layer_file_version = i;
+//	layer_file_version = i;
 	if ( i>LAYERS_VERSION ) goto fail2;		// Version number must be compatible
 
 	i = read_file_num(fp, tin);

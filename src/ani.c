@@ -456,13 +456,12 @@ static gboolean delete_ani()
 static int parse_line_pos( char *txt, int layer, int row )	// Read in position row from some text
 {
 	ani_slot data = { -1, -1, -1, -1, -1 };
-	char *tx, *eol;
+	char *tx;;
 	int tot;
 
 	tx = strchr( txt, '\n' );			// Find out length of this input line
 	if ( tx == NULL ) tot = strlen(txt);
 	else tot = tx - txt + 1;
-	eol = txt + tot - 1;
 
 	while ( txt[0] < 32 )				// Skip non ascii chars
 	{
@@ -1026,7 +1025,7 @@ static GtkWidget *ani_text(GtkWidget **textptr)
 void pressed_animate_window()
 {
 	GtkWidget *table, *label, *button, *notebook1, *scrolledwindow;
-	GtkWidget *ani_toggle_gif, *ani_list_layers, *list_data;
+	GtkWidget /**ani_toggle_gif,*/ *ani_list_layers, *list_data;
 	GtkWidget *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	char txt[PATHTXT];
@@ -1089,7 +1088,8 @@ void pressed_animate_window()
 		ani_spin[0], ani_spin[1], ani_spin[2],
 		ani_entry_path, ani_entry_prefix, NULL);
 
-	ani_toggle_gif = pack(vbox4, sig_toggle(_("Create GIF frames"),
+//	ani_toggle_gif =
+	pack(vbox4, sig_toggle(_("Create GIF frames"),
 		ani_use_gif, NULL, GTK_SIGNAL_FUNC(ani_tog_gif)));
 
 ///	LAYERS TABLES

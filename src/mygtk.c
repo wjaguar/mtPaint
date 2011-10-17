@@ -2696,6 +2696,7 @@ static void wjcanvas_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
 	canvas->resizing = canvas->resize;
 	canvas->resize = FALSE;
 
+	copy4(oxy, canvas->xy);
 	widget->allocation = *allocation;
 	hchg = wjcanvas_readjust(canvas, 0);
 	vchg = wjcanvas_readjust(canvas, 1);
@@ -3704,7 +3705,8 @@ void update_window_spin(GtkWidget *window)
 
 void handle_events()
 {
-	while (gtk_events_pending()) gtk_main_iteration();
+	int i = 20; /* To prevent endless waiting */
+	while ((i-- > 0) && gtk_events_pending()) gtk_main_iteration();
 }
 
 // Make GtkEntry accept Ctrl+Enter as a character

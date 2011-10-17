@@ -70,6 +70,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Configure script rewritten, now understands standard variables and options for installation paths and (cross-)compilation settings
 	* Minimum required GTK+2 version now can be specified as configure option (e.g., "./configure gtk2.8")
 	* Workaround for bug in GTK+ versions 2.14.0 - 2.14.2, 2.16.0, 2.16.1 added (spin buttons had wrong max values)
+	* Workaround for unknown problem in GTK+ version 2.24.4 added (program locked up when trying to save a file when layers list is active)
 	* BUGFIX - Problems with editing large images at high zoom levels are now eliminated
 	* BUGFIX - Titlebar now displays new image's filename after loading layers file, as it should
 	* BUGFIX - Layers list now correctly displays selected layer after loading layers file
@@ -88,6 +89,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - FreeType text renderer now doesn't mistake some Unicode fonts for non-Unicode
 	* BUGFIX - Redraw lag when moving a dialog over main window in Windows is now greatly reduced (fixed in GTK+)
 	* BUGFIX - Ctrl+T key now draws selection outline as it should - keyboard shortcut for text tool is now Shift+T
+	* BUGFIX - Handbook installed into a path with spaces in it no longer fails to open in nondefault browser on Windows
+	* BUGFIX - Internationalization no longer fails on Windows when the current directory is not the installation directory
 	* "Distance to A+B" palette sort mode removed due to utter uselessness
 
 3.31	2009-4-15

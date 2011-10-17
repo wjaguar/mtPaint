@@ -656,7 +656,7 @@ static void cpick_get_hsv(cpicker *cp)		// Calculate HSV values from RGB
 
 static void cpick_update(cpicker *cp, int what)
 {
-	int new_rgb = FALSE, new_h = FALSE, new_sv = FALSE, new_opac = FALSE;
+	int new_rgb = FALSE, new_h = FALSE, new_sv = FALSE;//, new_opac = FALSE;
 
 	switch (what)
 	{
@@ -674,7 +674,7 @@ static void cpick_update(cpicker *cp, int what)
 		new_sv = TRUE;
 		break;
 	case CPICK_INPUT_OPACITY:
-		new_opac = TRUE;
+//		new_opac = TRUE;
 		break;
 	default: return;
 	}

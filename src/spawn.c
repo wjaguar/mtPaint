@@ -756,7 +756,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 
 int show_html(char *browser, char *docs)
 {
-	char buf[PATHBUF], buf2[PATHBUF];
+	char buf[PATHBUF + 2], buf2[PATHBUF];
 	int i=-1;
 #ifdef WIN32
 	char *r;
@@ -764,13 +764,13 @@ int show_html(char *browser, char *docs)
 	if (!docs || !docs[0])
 	{
 		/* Use default path relative to installdir */
-		i = GetModuleFileNameA(NULL, buf, PATHBUF);
+		docs = buf + 1;
+		i = GetModuleFileNameA(NULL, docs, PATHBUF);
 		if (!i) return (-1);
-		r = strrchr(buf, '\\');
+		r = strrchr(docs, '\\');
 		if (!r) return (-1);
 		r[1] = 0;
-		strnncat(buf, HANDBOOK_LOCATION_WIN, PATHBUF);
-		docs = buf;
+		strnncat(docs, HANDBOOK_LOCATION_WIN, PATHBUF);
 	}
 #else /* Linux */
 	char *argv[5];
@@ -781,7 +781,7 @@ int show_html(char *browser, char *docs)
 		if (valid_file(docs) < 0) docs = HANDBOOK_LOCATION2;
 	}
 #endif
-	else docs = gtkncpy(buf, docs, PATHBUF);
+	else docs = gtkncpy(buf + 1, docs, PATHBUF);
 
 	if ((valid_file(docs) < 0))
 	{
@@ -792,10 +792,18 @@ int show_html(char *browser, char *docs)
 
 #ifdef WIN32
 	if (browser && !browser[0]) browser = NULL;
-	if (browser) browser = gtkncpy(buf2, browser, PATHBUF);
-
-	if ((unsigned int)ShellExecuteA(NULL, "open", browser ? browser : docs,
-		browser ? docs : NULL, NULL, SW_SHOW) <= 32) i = -1;
+	if (browser)
+	{
+		/* Quote the filename */
+		i = strlen(docs);
+		buf[0] = docs[i] = '"';
+		docs[i + 1] = '\0';
+		/* Rearrange parameters */
+		docs = gtkncpy(buf2, browser, PATHBUF);
+		browser = buf;
+	}
+	if ((unsigned int)ShellExecuteA(NULL, "open", docs, browser,
+		NULL, SW_SHOW) <= 32) i = -1;
 	else i = 0;
 #else
 	argv[1] = docs;

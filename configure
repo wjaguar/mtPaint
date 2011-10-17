@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.34.70"
-MT_DATE="2011-10-17"
+MT_V="3.34.71"
+MT_DATE="2011-10-18"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -271,20 +271,22 @@ MT_MANDIR="${MT_MANDIR:-$MT_DATAROOT/man}"
 if [ "$OS" != "${OS#MinGW/}" ]
 then
 	MT_LOCDIR="${MT_LOCDIR:-$MT_BINDIR/locale}"
-	# Need relative path on Windows
-	MT_PO=
-	MT_CURDIR="$MT_BINDIR/"
-	while [ "$MT_LOCDIR" = "${MT_LOCDIR#$MT_CURDIR}" ]
+	# Want package-relative path on Windows
+	MT_PKGDIR=${MT_BINDIR%/bin}
+	[ "$MT_PKGDIR" = "$MT_BINDIR" ] && MT_PKGDIR=${MT_BINDIR%/lib}
+	MT_PKGDIR="$MT_PKGDIR/"
+	MT_PO="/"
+	while [ "$MT_LOCDIR" = "${MT_LOCDIR#$MT_PKGDIR}" ]
 	do
-		MT_PO="../$MT_PO"
-		if [ "$MT_CURDIR" = "${MT_CURDIR%/[!/]*/}/" ]
-		then
-			echo "'bindir' and 'localedir' should both be well-formed *nix-style paths"
-			exit 1 # And if they weren't, too bad
+		MT_PO="/..$MT_PO"
+		if [ "$MT_PKGDIR" = "${MT_PKGDIR%/[!/]*/}" ]
+		then # Cannot relativize path - leave it be
+			MT_PO=
+			break
 		fi
-		MT_CURDIR="${MT_CURDIR%/[!/]*/}/"
+		MT_PKGDIR="${MT_PKGDIR%/[!/]*/}/"
 	done
-	MT_PO="$MT_PO${MT_LOCDIR#$MT_CURDIR}"
+	MT_PO="$MT_PO${MT_LOCDIR#$MT_PKGDIR}"
 else
 	MT_LOCDIR="${MT_LOCDIR:-$MT_DATAROOT/locale}"
 	MT_PO="$MT_LOCDIR"
