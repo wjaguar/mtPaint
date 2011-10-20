@@ -245,8 +245,14 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 	where -= pat - pattern;
 	if (where < 0) return (NULL); // Syntax error
 
-	if (rgb && (fform != FT_NONE) && !(file_formats[fform].flags & FF_RGB))
-		fform = FT_NONE; // Stupidity detected
+	if (fform != FT_NONE)
+	{
+		unsigned int flags = file_formats[fform].flags;
+		if (rgb && !(flags & FF_RGB)) fform = FT_NONE; // No way
+		else if (flags & FF_SAVE_MASK); // Is OK
+		else if (flags & FF_RGB) rgb = TRUE; // Fallback
+		else fform = FT_NONE; // Give up
+	}
 
 	fname = get_temp_file(fform, rgb);
 	if (!fname) return (NULL); /* Temp save failed */

@@ -53,6 +53,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
 	* JPEG2000 file format support now can be compiled with either JasPer or OpenJPEG library
 	* GIF loader made more tolerant to truncated or malformed GIF files
+	* PNG loader now converts palette-based alpha into an alpha channel
 	* "Palette->Open" now can extract palette from indexed images in any supported file format
 	* "Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system
@@ -91,6 +92,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Ctrl+T key now draws selection outline as it should - keyboard shortcut for text tool is now Shift+T
 	* BUGFIX - Handbook installed into a path with spaces in it no longer fails to open in nondefault browser on Windows
 	* BUGFIX - Internationalization no longer fails on Windows when the current directory is not the installation directory
+	* BUGFIX - Redraw glitches in builtin file selector on Windows are now eliminated
 	* "Distance to A+B" palette sort mode removed due to utter uselessness
 
 3.31	2009-4-15

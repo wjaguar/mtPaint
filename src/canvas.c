@@ -1365,7 +1365,7 @@ static int anim_file_dialog(int ftype)
 
 	gtk_widget_show_all(vbox);
 
-//	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
 	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
 	gtk_widget_show(win);
 	gdk_window_raise(win->window);
@@ -2930,12 +2930,22 @@ static void locate_marquee(int *xy, int snap)
 	xy[3] = (xy[1] = y1 < y2 ? y1 : y2) + h;
 }
 
-static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
-	rgbcontext *ctx)
+
+void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
 {
 	unsigned char *rgb;
-	int xy[4], nxy[4], rxy[4], clips[4 * 3];
-	int i, j, nc, r, g, b, rw, rh, offx, offy, mst = marq_status;
+	int xy[4], vxy[4], nxy[4], rxy[4], clips[4 * 3];
+	int i, j, nc, r, g, b, rw, rh, offx, offy, wx, wy, mst = marq_status;
+
+
+	nxy[0] = nxy[1] = 0;
+	canvas_size(nxy + 2, nxy + 3);
+	if (ctx) copy4(vxy, ctx->xy);
+	else wjcanvas_get_vport(drawing_canvas, vxy);
+
+	if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+		vxy[2] - margin_main_x, vxy[3] - margin_main_y, nxy) && ctx)
+		return; /* If not in a refresh, must update location anyhow */
 
 	locate_marquee(xy, action == MARQ_SNAP);
 	copy4(nxy, xy);
@@ -3008,7 +3018,6 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 
 	/* Determine visible area */
 	if (!clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], vxy)) return;
-	rw = rxy[2] - rxy[0]; rh = rxy[3] - rxy[1];
 
 	/* Draw */
 	r = 255; g = b = 0; /* Draw in red */
@@ -3020,52 +3029,37 @@ static void trace_marquee(int action, int new_x, int new_y, const int *vxy,
 		r = g = 0; b = 255; /* Draw in blue */
 	}
 
+	rw = rxy[2] - rxy[0];
+	rh = rxy[3] - rxy[1];
+
 	/* Create pattern */
+	j = (rw > rh ? rw : rh) * 3;
+	rgb = malloc(j + 6 * 3); /* 6 pixels for offset */
+	if (!rgb) return;
+	rgb[0] = rgb[3] = rgb[6] = r;
+	rgb[1] = rgb[4] = rgb[7] = g;
+	rgb[2] = rgb[5] = rgb[8] = b;
+	memset(rgb + 9, 255, 9);
+	for (i = 0; i < j; i++) rgb[i + 6 * 3] = rgb[i];
 	offx = ((rxy[0] - nxy[0]) % 6) * 3;
 	offy = ((rxy[1] - nxy[1]) % 6) * 3;
-	j = (rw > rh ? rw : rh) * 3 + 6 * 3; /* 6 pixels for offset */
-	rgb = malloc(j + 2 * 3); /* 2 extra pixels reserved for loop */
-	if (!rgb) return;
-	memset(rgb, 255, j);
-	for (i = 0; i < j; i += 6 * 3)
-	{
-		rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
-		rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
-		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
-	}
+
+	wx = margin_main_x + rxy[0];
+	wy = margin_main_y + rxy[1];
 
 	if ((nxy[0] >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
-		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
-			1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
+		draw_rgb(wx, wy, 1, rh, rgb + offy, 3, ctx);
 
 	if ((nxy[2] <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
-		draw_rgb(margin_main_x + rxy[2] - 1, margin_main_y + rxy[1],
-			1, rxy[3] - rxy[1], rgb + offy, 3, ctx);
+		draw_rgb(wx + rw - 1, wy, 1, rh, rgb + offy, 3, ctx);
 
 	if ((nxy[1] >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
-		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[1],
-			rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
+		draw_rgb(wx, wy, rw, 1, rgb + offx, 0, ctx);
 
 	if ((nxy[3] <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
-		draw_rgb(margin_main_x + rxy[0], margin_main_y + rxy[3] - 1,
-			rxy[2] - rxy[0], 1, rgb + offx, 0, ctx);
+		draw_rgb(wx, wy + rh - 1, rw, 1, rgb + offx, 0, ctx);
 
 	free(rgb);
-}
-
-void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
-{
-	int vxy[4], cxy[4];
-
-	cxy[0] = cxy[1] = 0;
-	canvas_size(cxy + 2, cxy + 3);
-	if (ctx) copy4(vxy, ctx->xy);
-	else wjcanvas_get_vport(drawing_canvas, vxy);
-
-	if (clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x, vxy[3] - margin_main_y, cxy) || !ctx)
-		/* If not in a refresh, must call to update location */
-		trace_marquee(action, new_x, new_y, vxy, ctx);
 }
 
 

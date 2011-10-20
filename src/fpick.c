@@ -638,6 +638,8 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	else fpick_clist_repattern(clist, win->txt_mask);
 	gtk_clist_thaw(clist);
 	fpick_clist_scroll(clist); // Scroll to selected row
+	// !!! Incomplete redraws only happen on Windows, but let's make sure
+	gtk_widget_queue_draw(win->clist);
 
 	closedir(dp);
 	gdk_pixmap_unref(icons[0]);

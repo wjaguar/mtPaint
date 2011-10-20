@@ -563,7 +563,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	long dest_len;
 	FILE *fp = NULL;
 	int i, j, k, bit_depth, color_type, interlace_type, num_uk, res = -1;
-	int maxpass, x0, dx, y0, dy, n, nx, height, width;
+	int maxpass, x0, dx, y0, dy, n, nx, height, width, ltrans, ntrans = 0;
 
 	if (!mf)
 	{
@@ -623,7 +623,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	if ((color_type == PNG_COLOR_TYPE_RGB_ALPHA) ||
 		(color_type == PNG_COLOR_TYPE_GRAY_ALPHA)) i = CMASK_RGBA;
 	if ((res = allocate_image(settings, i))) goto fail2;
-	res = -1;
+	res = FILE_MEM_ERROR;
 
 	i = sizeof(png_bytep) * height;
 	row_pointers = malloc(i + width * 4);
@@ -644,6 +644,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		}
 	}
 	if (msg) ls_init(msg, 0);
+	res = -1;
 
 	/* RGB PNG file */
 	if (settings->bpp == 3)
@@ -656,7 +657,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		/* Is there a transparent color? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
-			png_get_tRNS(png_ptr, info_ptr, 0, 0, &trans_rgb);
+			png_get_tRNS(png_ptr, info_ptr, NULL, NULL, &trans_rgb);
 			if (color_type == PNG_COLOR_TYPE_GRAY)
 			{
 				i = trans_rgb->gray;
@@ -732,14 +733,12 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		/* Is there a transparent index? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
-			/* !!! Currently no support for partial transparency */
-			png_get_tRNS(png_ptr, info_ptr, &trans, &i, 0);
+			png_get_tRNS(png_ptr, info_ptr, &trans, &ltrans, NULL);
 			settings->xpm_trans = -1;
-			for (j = 0; j < i; j++)
+			for (j = 0; j < ltrans; j++)
 			{
-				if (trans[j]) continue;
-				settings->xpm_trans = j;
-				break;
+				ntrans += trans[j] < 255;
+				if (!trans[j]) settings->xpm_trans = j;
 			}
 		}
 		png_set_strip_16(png_ptr);
@@ -756,7 +755,24 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	if (msg) progress_update(1.0);
 
 	png_read_end(png_ptr, info_ptr);
-	res = 1;
+	res = 0;
+
+	/* If paletted with multiple (semi)transparent colors, add alpha */
+	if ((ntrans > 1) && !(res = allocate_image(settings, CMASK_FOR(CHN_ALPHA)))
+		&& settings->img[CHN_ALPHA])
+	{
+		unsigned char ttb[256], *src, *dest;
+
+		memset(ttb, 255, 256);
+		memcpy(ttb, trans, ltrans);
+
+		src = settings->img[CHN_IMAGE];
+		dest = settings->img[CHN_ALPHA];
+		i = width * height;
+		while (i-- > 0) *dest++ = ttb[*src++];
+
+		settings->xpm_trans = -1; // Redundant
+	}
 
 	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
 	if (num_uk)	/* File contains mtPaint's private chunks */

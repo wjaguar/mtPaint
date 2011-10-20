@@ -8844,7 +8844,7 @@ void grad_update(grad_info *grad)
 		 /* Stroke gradient */
 		if (grad->status == GRAD_NONE)
 		{
-			if (!grad->len) len = grad->rep + grad->ofs;
+			if (!len) len = grad->rep + grad->ofs;
 			if (len <= 0.0) grad->wmode = GRAD_MODE_NONE;
 			break;
 		}
@@ -8859,7 +8859,7 @@ void grad_update(grad_info *grad)
 		grad->xv = dx / l2;
 		grad->yv = dy / l2;
 		grad->wa = atan360(dx, dy);
-		if (!grad->len) len = grad->wmode == GRAD_MODE_ANGULAR ? 360.0 :
+		if (!len) len = grad->wmode == GRAD_MODE_ANGULAR ? 360.0 :
 			grad->wmode == GRAD_MODE_CONICAL ? 180.0 : l2;
 		break;
 	}

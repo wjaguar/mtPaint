@@ -674,7 +674,7 @@ msgstr "字体目录"
 
 #: src/font.c:1836
 msgid "New Directory"
-msgstr "斜体"
+msgstr "新建目录"
 
 #: src/font.c:1837 src/spawn.c:507
 msgid "Select Directory"
@@ -920,15 +920,13 @@ msgstr "  方向键             绘画模式 - 移动鼠标指针"
 msgid ""
 "  Arrow keys        Selection Mode - Nudge selection box or paste box by one "
 "pixel"
-msgstr "  方向键             选择模式 - 挪动选择框或以一个像素贴补框"
+msgstr "  方向键             选择模式 - 以一个像素挪动选择框或粘贴框"
 
 #: src/help.c:59
 msgid ""
 "  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x "
 "pixels - x is defined by the Preferences window"
-msgstr ""
-"  Shift+方向键       挪动鼠标指针，选择框或用 x 像素贴补框 - x 由首选项窗口定"
-"义"
+msgstr "  Shift+方向键       以 x 个像素挪动鼠标指针，选择框或粘贴框 - x 由首选项窗口定义"
 
 #: src/help.c:60
 msgid "  Ctrl+Arrows       Move layer or resize selection box"
@@ -1187,7 +1185,7 @@ msgstr "  F9                选取工具"
 
 #: src/help.c:119
 msgid "  F12               Toggle Dock Area\n"
-msgstr "  F12               切换 Dock 区\n"
+msgstr "  F12               切换停靠区\n"
 
 #: src/help.c:120
 msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
@@ -1916,7 +1914,7 @@ msgstr "//显示设置工具栏"
 
 #: src/mainwindow.c:4775
 msgid "//Show Dock"
-msgstr "//显示 Dock"
+msgstr "//显示停靠"
 
 #: src/mainwindow.c:4776
 msgid "//Show Palette"
@@ -2300,7 +2298,7 @@ msgstr "//阈值…"
 
 #: src/mainwindow.c:4910
 msgid "//Unassociate Alpha"
-msgstr "//未关联透明"
+msgstr "//解除关联透明"
 
 #: src/mainwindow.c:4912
 msgid "//View Alpha as an Overlay"
@@ -2348,7 +2346,7 @@ msgstr "//移除所有关键帧…"
 
 #: src/mainwindow.c:4929
 msgid "/More..."
-msgstr "/更多..."
+msgstr "/更多…"
 
 #: src/mainwindow.c:4931
 msgid "/_Help"
@@ -2652,11 +2650,11 @@ msgstr "清除"
 
 #: src/otherwindow.c:1211 src/otherwindow.c:1221
 msgid "Tile"
-msgstr "标题"
+msgstr "平铺效果"
 
 #: src/otherwindow.c:1212
 msgid "Mirror tile"
-msgstr "副标题"
+msgstr "镜像平铺效果"
 
 #: src/otherwindow.c:1221 src/otherwindow.c:3020
 msgid "Mirror"
@@ -2748,7 +2746,7 @@ msgstr "不透明"
 
 #: src/otherwindow.c:2128
 msgid "Border"
-msgstr "边框选择"
+msgstr "分界"
 
 #: src/otherwindow.c:2129
 msgid "Transparent"
@@ -2756,7 +2754,7 @@ msgstr "透明"
 
 #: src/otherwindow.c:2129
 msgid "Tile "
-msgstr "瓷砖 "
+msgstr "平铺 "
 
 #: src/otherwindow.c:2129
 msgid "Segment"
@@ -2768,7 +2766,7 @@ msgstr "智能网格"
 
 #: src/otherwindow.c:2148
 msgid "Tile grid"
-msgstr "瓷砖网格"
+msgstr "平铺网格"
 
 #: src/otherwindow.c:2150
 msgid "Minimum grid zoom"
@@ -2776,11 +2774,11 @@ msgstr "最小格线缩放"
 
 #: src/otherwindow.c:2152
 msgid "Tile width"
-msgstr "瓷砖宽"
+msgstr "平铺宽"
 
 #: src/otherwindow.c:2154
 msgid "Tile height"
-msgstr "瓷砖高"
+msgstr "平铺高"
 
 #: src/otherwindow.c:2168
 msgid "Configure Grid"
@@ -2900,7 +2898,7 @@ msgstr "缩短调色板"
 
 #: src/otherwindow.c:2428
 msgid "Diameter based weighting"
-msgstr "基于直径的加权"
+msgstr "基于直径的称量"
 
 #: src/otherwindow.c:2442
 msgid "Dither"
@@ -2908,7 +2906,7 @@ msgstr "抖动"
 
 #: src/otherwindow.c:2450
 msgid "Reduce colour bleed"
-msgstr "减少色彩流失"
+msgstr "减少渗色"
 
 #: src/otherwindow.c:2452
 msgid "Serpentine scan"
@@ -3040,7 +3038,7 @@ msgstr "扩展类型"
 
 #: src/otherwindow.c:3059
 msgid "Preview opacity"
-msgstr "预览不透明"
+msgstr "预览不透明度"
 
 #: src/otherwindow.c:3127
 msgid "Pick Gradient"
@@ -3068,11 +3066,11 @@ msgstr "描摹图像"
 
 #: src/otherwindow.c:3323
 msgid "Source"
-msgstr "源"
+msgstr "来源"
 
 #: src/otherwindow.c:3325
 msgid "Origin"
-msgstr ""
+msgstr "位移"
 
 #: src/otherwindow.c:3326
 msgid "Relative scale"
@@ -3271,7 +3269,7 @@ msgstr "最大撤销次数"
 
 #: src/prefs.c:493
 msgid "Communal layer undo space (%)"
-msgstr "公共图层还原空间(%)"
+msgstr "图层共享还原内存(%)"
 
 #: src/prefs.c:501
 msgid "Use gamma correction by default"
@@ -3603,7 +3601,7 @@ msgstr "混合模式"
 
 #: src/toolbar.c:846
 msgid "More..."
-msgstr ""
+msgstr "更多…"
 
 #: src/toolbar.c:886
 msgid "Continuous Mode"
