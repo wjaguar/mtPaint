@@ -53,7 +53,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* ICC colour profiles embedded in PNG, JPEG and TIFF images now can be applied on load (using LittleCMS)
 	* JPEG2000 file format support now can be compiled with either JasPer or OpenJPEG library
 	* GIF loader made more tolerant to truncated or malformed GIF files
-	* PNG loader now converts palette-based alpha into an alpha channel
+	* PNG and TGA loaders now convert palette-based alpha into an alpha channel
 	* "Palette->Open" now can extract palette from indexed images in any supported file format
 	* "Scale Canvas" now has 3 boundary extension modes - Mirror, Tile, Void
 	* Filename and modified status now part of undo system

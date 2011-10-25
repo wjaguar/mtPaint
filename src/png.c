@@ -474,6 +474,40 @@ static unsigned char *prepare_row(unsigned char *buf, ls_settings *settings,
 	return (buf);
 }
 
+/* Converts palette-based transparency to color transparency or alpha channel */
+static int palette_trans(ls_settings *settings, unsigned char ttb[256])
+{
+	int i, n, res;
+
+	/* Count transparent colors */
+	for (i = n = 0; i < 256; i++) n += ttb[i] < 255;
+	/* None means no transparency */
+	settings->xpm_trans = -1;
+	if (!n) return (0);
+	/* One fully transparent color means color transparency */
+	if (n == 1)
+	{
+		for (i = 0; i < 256; i++)
+		{
+			if (ttb[i]) continue;
+			settings->xpm_trans = i;
+			return (0);
+		}
+	}
+	/* Anything else means alpha transparency */
+	res = allocate_image(settings, CMASK_FOR(CHN_ALPHA));
+	if (!res && settings->img[CHN_ALPHA])
+	{
+		unsigned char *src, *dest;
+		size_t i = (size_t)settings->width * settings->height;
+
+		src = settings->img[CHN_IMAGE];
+		dest = settings->img[CHN_ALPHA];
+		while (i-- > 0) *dest++ = ttb[*src++];
+	}
+	return (res);
+}
+
 static void ls_init(char *what, int save)
 {
 	char buf[256];
@@ -553,17 +587,14 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	static char *msg;
 	png_structp png_ptr;
 	png_infop info_ptr;
-	png_color_16p trans_rgb;
 	png_unknown_chunkp uk_p;
-	png_bytep trans;
-	png_colorp png_palette;
 	png_uint_32 pwidth, pheight;
 	char buf[PNG_BYTES_TO_CHECK + 1];
-	unsigned char *src, *dest, *dsta;
+	unsigned char trans[256], *src, *dest, *dsta;
 	long dest_len;
 	FILE *fp = NULL;
 	int i, j, k, bit_depth, color_type, interlace_type, num_uk, res = -1;
-	int maxpass, x0, dx, y0, dy, n, nx, height, width, ltrans, ntrans = 0;
+	int maxpass, x0, dx, y0, dy, n, nx, height, width, itrans = FALSE;
 
 	if (!mf)
 	{
@@ -602,6 +633,8 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		&interlace_type, NULL, NULL);
 	if (png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
 	{
+		png_colorp png_palette;
+
 		png_get_PLTE(png_ptr, info_ptr, &png_palette, &settings->colors);
 		memcpy(settings->pal, png_palette, settings->colors * sizeof(png_color));
 		/* If palette is all we need */
@@ -655,8 +688,11 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		png_set_gray_to_rgb(png_ptr);
 
 		/* Is there a transparent color? */
+		settings->rgb_trans = -1;
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
+			png_color_16p trans_rgb;
+
 			png_get_tRNS(png_ptr, info_ptr, NULL, NULL, &trans_rgb);
 			if (color_type == PNG_COLOR_TYPE_GRAY)
 			{
@@ -675,7 +711,6 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 			else settings->rgb_trans = RGB_2_INT(trans_rgb->red,
 				trans_rgb->green, trans_rgb->blue);
 		}
-		else settings->rgb_trans = -1;
 
 		if (settings->img[CHN_ALPHA]) /* RGBA */
 		{
@@ -733,13 +768,13 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		/* Is there a transparent index? */
 		if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS))
 		{
-			png_get_tRNS(png_ptr, info_ptr, &trans, &ltrans, NULL);
-			settings->xpm_trans = -1;
-			for (j = 0; j < ltrans; j++)
-			{
-				ntrans += trans[j] < 255;
-				if (!trans[j]) settings->xpm_trans = j;
-			}
+			png_bytep ptrans;
+			int ltrans;
+
+			png_get_tRNS(png_ptr, info_ptr, &ptrans, &ltrans, NULL);
+			memset(trans, 255, 256);
+			memcpy(trans, ptrans, ltrans);
+			itrans = TRUE;
 		}
 		png_set_strip_16(png_ptr);
 		png_set_strip_alpha(png_ptr);
@@ -757,22 +792,8 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	png_read_end(png_ptr, info_ptr);
 	res = 0;
 
-	/* If paletted with multiple (semi)transparent colors, add alpha */
-	if ((ntrans > 1) && !(res = allocate_image(settings, CMASK_FOR(CHN_ALPHA)))
-		&& settings->img[CHN_ALPHA])
-	{
-		unsigned char ttb[256], *src, *dest;
-
-		memset(ttb, 255, 256);
-		memcpy(ttb, trans, ltrans);
-
-		src = settings->img[CHN_IMAGE];
-		dest = settings->img[CHN_ALPHA];
-		i = width * height;
-		while (i-- > 0) *dest++ = ttb[*src++];
-
-		settings->xpm_trans = -1; // Redundant
-	}
+	/* Apply palette transparency */
+	if (itrans) res = palette_trans(settings, trans);
 
 	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
 	if (num_uk)	/* File contains mtPaint's private chunks */
@@ -4164,10 +4185,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 	if ((settings->bpp != 1) || (settings->colors > 2)) return WRONG_FORMAT;
 
 	/* Extract valid C identifier from name */
-	tmp = strrchr(file_name, DIR_SEP);
-	tmp = tmp ? tmp + 1 : file_name;
-	for (; *tmp && !ISALPHA(*tmp); tmp++);
-	for (i = 0; (i < 256) && ISALNUM(tmp[i]); i++);
+	tmp = extract_ident(file_name, &i);
 	if (!i) return -1;
 
 	if (!(fp = fopen(file_name, "w"))) return -1;
@@ -4454,10 +4472,10 @@ static int save_lss(char *file_name, ls_settings *settings)
 static int load_tga(char *file_name, ls_settings *settings)
 {
 	unsigned char hdr[TGA_HSIZE], ftr[TGA_FSIZE], ext[TGA_EXTSIZE];
-	unsigned char pal[256 * 4], xlat5[32], xlat67[128];
+	unsigned char pal[256 * 4], xlat5[32], xlat67[128], trans[256];
 	unsigned char *buf = NULL, *dest, *dsta, *src = NULL, *srca = NULL;
 	FILE *fp;
-	int i, k, w, h, bpp, ftype, ptype, ibpp, rbits, abits;
+	int i, k, w, h, bpp, ftype, ptype, ibpp, rbits, abits, itrans = FALSE;
 	int rle, real_alpha = FALSE, assoc_alpha = FALSE, wmode = 0, res = -1;
 	int fl, fofs, iofs, buflen;
 	int ix, ishift, imask, ax, ashift, amask;
@@ -4493,7 +4511,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	{
 	case 1: /* Paletted */
 	{
-		int pbpp, i, j, k, l, tmp, mask;
+		int pbpp, i, j, k, l;
 		png_color *pptr;
 
 		if (ptype != 1) goto fail; /* Invalid palette */
@@ -4547,25 +4565,28 @@ static int load_tga(char *file_name, ls_settings *settings)
 		if ((settings->mode == FS_PALETTE_LOAD) ||
 			(settings->mode == FS_PALETTE_DEF)) goto fail;
 
-		/* Cannot have transparent color at all? */
-		if ((j <= 1) || ((ptype != 15) && (ptype != 32))) break;
-
-		/* Test if there are different alphas */
-		mask = ptype == 15 ? 0x80 : 0xFF;
-		tmp = pal[pbpp - 1] & mask;
-		for (i = 2; (i <= j) && ((pal[i * pbpp - 1] & mask) == tmp); i++);
-		if (i > j) break;
-		/* For 15 bpp, assume the less frequent value is transparent */
-		tmp = 0;
+		/* Assemble transparency table */
+		memset(trans, 255, 256);
 		if (ptype == 15)
 		{
-			for (i = 0; i < j; i++) tmp += pal[i + i + 1] & mask;
-			if (tmp >> 7 < j >> 1) tmp = 0x80; /* Transparent if set */
+			int i, n, tr;
+
+			for (i = n = 0; i < j; i++) n += pal[i + i + 1] & 0x80;
+			/* Assume the less frequent value is transparent */
+			tr = n >> 6 < j ? 0x80 : 0;
+			for (i = 0; i < j; i++)
+			{
+				if ((pal[i + i + 1] & 0x80) == tr) trans[i + k] = 0;
+			}
 		}
-		/* Search for first transparent color */
-		for (i = 1; (i <= j) && ((pal[i * pbpp - 1] & mask) != tmp); i++);
-		if (i > j) break; /* If 32-bit and not one alpha is zero */
-		settings->xpm_trans = i + k - 1;
+		else if (ptype == 32)
+		{
+			for (i = 0; i < j; i++) trans[i + k] = pal[i * 4 + 3];
+		}
+		else break; /* Cannot have transparent color at all */
+
+		/* If all alphas are identical, ignore them */
+		itrans = !is_filled(trans + k, trans[k], j);
 		break;
 	}
 	case 2: /* RGB */
@@ -4799,7 +4820,6 @@ static int load_tga(char *file_name, ls_settings *settings)
 		if (dsta) dsta += ystep;
 		strl = w;
 	}
-	res = 1;
 
 	/* Check if alpha channel is valid */
 	if (!real_alpha && settings->img[CHN_ALPHA])
@@ -4852,7 +4872,12 @@ static int load_tga(char *file_name, ls_settings *settings)
 		mem_demultiply(settings->img[CHN_IMAGE],
 			settings->img[CHN_ALPHA], w * h, bpp);
 	}
+	res = 0;
 
+	/* Apply palette transparency */
+	if (itrans) res = palette_trans(settings, trans);
+
+	if (!res) res = 1;
 fail3:	if (!settings->silent) progress_end();
 fail2:	free(buf);
 fail:	fclose(fp);
