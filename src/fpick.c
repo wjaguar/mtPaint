@@ -266,7 +266,6 @@ static char *isort_key(char *src)
 /* !!! Expects that "txt" points to PATHBUF-sized buffer */
 static void fpick_cleanse_path(char *txt)	// Clean up null terminated path
 {
-	static const char dds[] = { DIR_SEP, DIR_SEP, 0 };
 	char *src, *dest;
 
 #ifdef WIN32
@@ -277,12 +276,12 @@ static void fpick_cleanse_path(char *txt)	// Clean up null terminated path
 	// Expand home directory
 	if ((txt[0] == '~') && (txt[1] == DIR_SEP))
 	{
-		src = g_strconcat(get_home_directory(), txt + 1, NULL);
+		src = file_in_homedir(NULL, txt + 2, PATHBUF);
 		strncpy0(txt, src, PATHBUF - 1);
-		g_free(src);
+		free(src);
 	}
 	// Remove multiple consecutive occurences of DIR_SEP
-	if ((dest = src = strstr(txt, dds)))
+	if ((dest = src = strstr(txt, DIR_SEP_STR DIR_SEP_STR)))
 	{
 		while (*src)
 		{
@@ -458,13 +457,10 @@ static int fpick_scan_drives(fpicker *fp)	// Scan drives, populate widgets
 
 #endif
 
-static const char root_dir[] = { DIR_SEP, 0 };
-
 /* Scan directory, populate widgets; return 1 if success, 0 if total failure,
  * -1 if failed with original dir and scanned a different one */
 static int fpick_scan_directory(fpicker *win, char *name, char *select)
 {
-	static char updir[] = { DIR_SEP, ' ', '.', '.', 0 };
 	static char nothing[] = "";
 	DIR	*dp;
 	struct	dirent *ep;
@@ -541,9 +537,9 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 	gtk_clist_freeze(clist);
 	fpick_clist_clear(clist);	// Empty the list
 
-	if (strcmp(full_name, root_dir)) // Have a parent dir to move to?
+	if (strcmp(full_name, DIR_SEP_STR)) // Have a parent dir to move to?
 	{
-		row_txt[FPICK_CLIST_NAME] = updir;
+		row_txt[FPICK_CLIST_NAME] = DIR_SEP_STR " ..";
 		row_txt[FPICK_CLIST_TYPE] = row_txt[FPICK_CLIST_H_UC] =
 			row_txt[FPICK_CLIST_H_C] = "";
 		txt_size[0] = txt_date[0] = '\0';
@@ -599,7 +595,7 @@ static int fpick_scan_directory(fpicker *win, char *name, char *select)
 			while (src - tmp_txt >= 0) *dest-- = *src--;
 
 			cp = strrchr(txt_name, '.');
-			if (cp && (cp != txt_name))
+			if (cp && (cp != txt_name) && cp[1])
 			{
 #if GTK_MAJOR_VERSION == 1
 				g_strup(row_txt[FPICK_CLIST_TYPE] = g_strdup(cp + 1));
@@ -662,15 +658,13 @@ static void fpick_enter_dir_via_list(fpicker *fp, char *name)
 		if (l && (ndir[l - 1] == DIR_SEP)) ndir[--l] = '\0';
 		c = strrchr(ndir, DIR_SEP);
 		if (c) *c = '\0';
-		else
-#ifndef WIN32
-			 strcpy(ndir, root_dir);
-#else
+		else /* Already in root directory */
 		{
+#ifdef WIN32
 			fpick_scan_drives(fp);
+#endif
 			return;
 		}
-#endif
 	}
 	else gtkncpy(ndir + l, name, PATHBUF - l);
 	fpick_cleanse_path(ndir);
@@ -1289,7 +1283,7 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 		break;
 	case FPICK_ICON_HOME:
 		gtkncpy(nm, gtk_entry_get_text(GTK_ENTRY(fp->file_entry)), PATHBUF);
-		snprintf(fnm, PATHBUF, "%s%c%s", get_home_directory(), DIR_SEP, nm);
+		file_in_homedir(fnm, nm, PATHBUF);
 		fpick_set_filename(fp->window, fnm, FALSE);
 		break;
 	case FPICK_ICON_DIR:
@@ -1389,13 +1383,26 @@ void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 {
-	if (raw) strncpy0(buf, gtk_entry_get_text(GTK_ENTRY(
-		GTK_FILE_SELECTION(fp)->selection_entry)), len);
+	char *fname = (char *)gtk_entry_get_text(GTK_ENTRY(
+		GTK_FILE_SELECTION(fp)->selection_entry));
+	if (raw) strncpy0(buf, fname, len);
+	else
+	{
 #ifdef WIN32 /* Widget returns filename in UTF8 */
-	else gtkncpy(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
+		gtkncpy(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
 #else
-	else strncpy0(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
+		strncpy0(buf, gtk_file_selection_get_filename(GTK_FILE_SELECTION(fp)), len);
 #endif
+		/* Make sure directory paths end with DIR_SEP */
+		if (fname[0]) return;
+		raw = strlen(buf);
+		if (!raw || (buf[raw - 1] != DIR_SEP))
+		{
+			if (raw > len - 2) raw = len - 2;
+			buf[raw] = DIR_SEP;
+			buf[raw + 1] = '\0';
+		}
+	}
 }
 
 void fpick_set_filename(GtkWidget *fp, char *name, int raw)

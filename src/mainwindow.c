@@ -5167,7 +5167,7 @@ void main_init()
 	init_status_bar();
 	init_factions();				// Initialize file action menu
 
-	snprintf(txt, PATHBUF, "%s%c.clipboard", get_home_directory(), DIR_SEP);
+	file_in_homedir(txt, ".clipboard", PATHBUF);
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
 
 	change_to_tool(DEFAULT_TOOL_ICON);

@@ -133,10 +133,6 @@ void spin_set_range(GtkWidget *spin, int min, int max);
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
 
-// Wrapper for utf8->C translation
-
-char *gtkncpy(char *dest, const char *src, int cnt);
-
 // Wrapper for utf8->C and C->utf8 translation
 
 char *gtkxncpy(char *dest, const char *src, int cnt, int u);
@@ -150,6 +146,11 @@ char *gtkxncpy(char *dest, const char *src, int cnt, int u);
 // A more sane replacement for strncat()
 
 char *strnncat(char *dest, const char *src, int max);
+
+// Add directory to filename
+
+char *file_in_dir(char *dest, const char *dir, const char *file, int cnt);
+char *file_in_homedir(char *dest, const char *file, int cnt);
 
 // Extracting widget from GtkTable
 
@@ -406,6 +407,15 @@ void undo_grab(GtkWidget *widget);
 #define GTK_RADIO_BUTTON_0(X) (GtkRadioButton *)(X)
 #else
 #define GTK_RADIO_BUTTON_0(X) GTK_RADIO_BUTTON(X)
+#endif
+
+// Path separator char
+#ifdef WIN32
+#define DIR_SEP '\\'
+#define DIR_SEP_STR "\\"
+#else
+#define DIR_SEP '/'
+#define DIR_SEP_STR "/"
 #endif
 
 // Path string sizes

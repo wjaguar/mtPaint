@@ -547,7 +547,7 @@ static int font_dir_search( FT_Library *ft_lib, int dirnum, FILE *fp, char *dir 
 
 	while ( (ep = readdir(dp)) )
 	{
-		snprintf(full_name, PATHBUF, "%s%c%s", dir, DIR_SEP, ep->d_name);
+		file_in_dir(full_name, dir, ep->d_name, PATHBUF);
 
 		if ( stat(full_name, &buf)<0 ) continue;	// Get file details
 
@@ -1292,8 +1292,7 @@ static gint click_create_font_index( GtkWidget *widget, gpointer user )
 		int i;
 		char txt[PATHBUF];
 
-		snprintf(txt, PATHBUF, "%s%c%s", get_home_directory(),
-			DIR_SEP, FONT_INDEX_FILENAME);
+		file_in_homedir(txt, FONT_INDEX_FILENAME, PATHBUF);
 		font_gui_create_index(txt);			// Create new index file
 
 		for (i=0; i<=CLIST_FONTFILE; i++ )		// Empty all clists
@@ -1546,9 +1545,9 @@ static void add_font_clist(int i, GtkWidget *hbox, mtfontsel *mem, int padding)
 
 static void init_font_lists()		//	LIST INITIALIZATION
 {
-	char *root = get_home_directory(), txt[PATHBUF];
+	char txt[PATHBUF];
 
-	snprintf(txt, PATHBUF, "%s%c%s", root, DIR_SEP, FONT_INDEX_FILENAME);
+	file_in_homedir(txt, FONT_INDEX_FILENAME, PATHBUF);
 
 	font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
 
@@ -1560,12 +1559,10 @@ static void init_font_lists()		//	LIST INITIALIZATION
 		{
 			int new_dirs = 0;
 #ifdef WIN32
-			static char *windir = NULL;
-			char buf[PATHBUF];
+			char buf[PATHBUF], *windir = getenv("WINDIR");
 
-			windir = getenv("WINDIR");
-			if (!windir) windir = "C:\\WINDOWS";	// Fallback
-			snprintf(buf, PATHBUF, "%s%c%s", windir, DIR_SEP, "Fonts");
+			file_in_dir(buf, windir && *windir ? windir :
+				"C:\\WINDOWS", "Fonts", PATHBUF);
 
 			inifile_set( "font_dir0", buf );
 

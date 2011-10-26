@@ -6725,9 +6725,9 @@ static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_se
 	tmp = strrchr(file_name, DIR_SEP);
 	if (!tmp) tmp = file_name;
 	else tmp++;
-	snprintf(new_name, PATHBUF, "%s%c%s.", ani->destdir, DIR_SEP, tmp);
+	file_in_dir(new_name, ani->destdir, tmp, PATHBUF);
 	tmp = new_name + strlen(new_name);
-	sprintf(tmp, "%03d", ani->cnt);
+	sprintf(tmp, ".%03d", ani->cnt);
 
 	if (f_set) w_set = *f_set;
 	else

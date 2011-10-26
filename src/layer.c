@@ -787,7 +787,10 @@ static void parse_filename(char *dest, char *prefix, char *file, int len)
 		/* Count number of DIR_SEP encountered on and after point i in
 		 * 'prefix', add a '../' for each found */
 		for (k = i; k < len; k++)
-			if (prefix[k] == DIR_SEP) strnncat( dest, "../", PATHBUF);
+		{
+			if (prefix[k] == DIR_SEP)
+				strnncat(dest, ".." DIR_SEP_STR, PATHBUF);
+		}
 		/* nip backwards on 'file' from i to previous DIR_SEP or
 		 * beginning and ... */
 		for (k = i; (k >= 0) && (file[k] != DIR_SEP); k--);

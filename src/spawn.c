@@ -37,43 +37,45 @@ static char *get_tempdir()
 	char *env;
 
 	env = getenv("TMPDIR");
-	if (!env) env = getenv("TMP");
-	if (!env) env = getenv("TEMP");
+	if (!env || !*env) env = getenv("TMP");
+	if (!env || !*env) env = getenv("TEMP");
 #ifdef P_tmpdir
-	if (!env) env = P_tmpdir;
+	if (!env || !*env) env = P_tmpdir;
 #endif
+	if (!env || !*env || (strlen(env) >= PATHBUF)) // Bad if too long
 #ifdef WIN32
-	if (!env) env = "\\";
+		env = "\\";
 #else
-	if (!env) env = "/tmp";
+		env = "/tmp";
 #endif
 	return (env);
 }
 
 static char *new_temp_dir()
 {
-	char buf[PATHBUF], *base = get_tempdir();
-	int l = strlen(base);
+	char *buf, *base = get_tempdir();
 
-	l -= base[l - 1] == DIR_SEP;
 #ifdef HAVE_MKDTEMP
-	snprintf(buf, PATHBUF, "%.*s%cmtpaintXXXXXX", l, base, DIR_SEP);
-	if (!mkdtemp(buf)) return (NULL);
-	chmod(buf, 0755);
-	return (strdup(buf));
+	buf = file_in_dir(NULL, base, "mtpaintXXXXXX", PATHBUF);
+	if (!buf) return (NULL);
+	if (mkdtemp(buf))
+	{
+		chmod(buf, 0755);
+		return (buf);
+	}
 #else
-	strncpy0(buf, base, l); /* Cut off path separator */
-	base = tempnam(buf, "mttmp");
-	if (!base) return (NULL);
+	buf = tempnam(base, "mttmp");
+	if (!buf) return (NULL);
 #ifdef WIN32 /* No mkdtemp() in MinGW */
 	/* tempnam() may use Unix path separator */
-	for (l = 0; base[l]; l++) if (base[l] == '/') base[l] = '\\';
-	if (mkdir(base)) return (NULL);
+	for (base = buf; *base; base++) if (*base == '/') *base = '\\';
+	if (!mkdir(buf)) return (buf);
 #else
-	if (mkdir(base, 0755)) return (NULL);
+	if (!mkdir(buf, 0755)) return (buf);
 #endif
-	return (base);
 #endif
+	free(buf);
+	return (NULL);
 }
 
 /* Store index for name, or fetch it (when idx < 0) */

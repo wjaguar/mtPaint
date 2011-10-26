@@ -1979,9 +1979,9 @@ static void fs_ok(GtkWidget *fs)
 			c = strrchr(gif, DIR_SEP);
 			if (!c) c = gif;
 			else c++;
-			c = g_strdup_printf("%s%c%s", fname, DIR_SEP, c);
+			c = file_in_dir(NULL, fname, c, PATHBUF);
 			run_def_action(DA_GIF_EDIT, c, NULL, preserved_gif_delay);
-			g_free(c);
+			free(c);
 		}
 		else goto redo; // Fatal error
 		break;
@@ -2043,25 +2043,19 @@ redo:
 
 void fs_setup(GtkWidget *fs, int action_type)
 {
-	char txt[PATHTXT];
+	char txt[PATHBUF];
 	GtkWidget *xtra;
 
 
+	/* If we have a filename and saving */
 	if ((action_type == FS_PNG_SAVE) && mem_filename)
-		strncpy(txt, mem_filename, PATHBUF);	// If we have a filename and saving
+		strncpy(txt, mem_filename, PATHBUF);
 	else if ((action_type == FS_LAYER_SAVE) && layers_filename[0])
 		strncpy(txt, layers_filename, PATHBUF);
-	else if (action_type == FS_LAYER_SAVE)
+	else /* Default */
 	{
-		snprintf(txt, PATHBUF, "%s%clayers.txt",
-			inifile_get("last_dir", get_home_directory()),
-			DIR_SEP );
-	}
-	else
-	{
-		snprintf(txt, PATHBUF, "%s%c",
-			inifile_get("last_dir", get_home_directory()),
-			DIR_SEP );		// Default
+		file_in_dir(txt, inifile_get("last_dir", get_home_directory()),
+			action_type == FS_LAYER_SAVE ? "layers.txt" : "", PATHBUF);
 	}
 
 	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);

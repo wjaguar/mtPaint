@@ -591,6 +591,35 @@ char *strnncat(char *dest, const char *src, int max)
 	return (dest);
 }
 
+// Add directory to filename
+
+char *file_in_dir(char *dest, const char *dir, const char *file, int cnt)
+{
+	int dl = strlen(dir), fl = strlen(file);
+
+	dl -= dl && (dir[dl - 1] == DIR_SEP);
+	if (!dest)
+	{
+		cnt = dl + fl + 2;
+		dest = malloc(cnt);
+		if (!dest) return (NULL);
+	}
+	if (cnt > dl + 1)
+	{
+		memcpy(dest, dir, dl);
+		dest[dl++] = DIR_SEP;
+		strncpy(dest + dl, file, cnt - dl);
+	}
+	else memcpy(dest, dir, cnt);
+	dest[cnt - 1] = 0;
+	return (dest);
+}
+
+char *file_in_homedir(char *dest, const char *file, int cnt)
+{
+	return (file_in_dir(dest, get_home_directory(), file, cnt));
+}
+
 // Extracting widget from GtkTable
 
 GtkWidget *table_slot(GtkWidget *table, int row, int col)
@@ -3464,11 +3493,11 @@ char *resolve_path(char *buf, int buflen, char *path)
 		path += 2;
 	}
 	else *(tm2 = wbuf) = '\0';
-	tmp = g_strdup_printf("%s%s%s", wbuf, tm2, path);
+	tmp = g_strconcat(wbuf, tm2, path, NULL);
 #else
 	wbuf[0] = '\0';
 	if (path[0] != '/') getcwd(wbuf, PATHBUF - 1);
-	tmp = g_strdup_printf("%s%c%s", wbuf, DIR_SEP, path);
+	tmp = g_strconcat(wbuf, DIR_SEP_STR, path, NULL);
 #endif
 
 	/* Canonicalize path the way "realpath -s" does, i.e., symlinks

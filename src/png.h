@@ -29,12 +29,6 @@
 #define FILE_TOO_LONG   0xBAD04
 #define FILE_EXP_BREAK  0xBAD05
 
-#ifdef WIN32
-	#define DIR_SEP '\\'
-#else
-	#define DIR_SEP '/'
-#endif
-
 /* File types */
 enum {
 	FT_NONE = 0,
