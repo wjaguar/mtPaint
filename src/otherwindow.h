@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-#include <png.h>
-
 
 #define COLSEL_OVERLAYS  1
 #define COLSEL_EDIT_AB   2

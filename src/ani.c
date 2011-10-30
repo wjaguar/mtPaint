@@ -18,7 +18,6 @@
 */
 
 #include <stdio.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
 
@@ -737,23 +736,20 @@ static void create_frames_ani()
 
 	command = strrchr(layers_filename, DIR_SEP);
 	if (command) l = command - layers_filename + 1;
+	wjstrcat(output_path, PATHBUF, layers_filename, l, ani_output_path, NULL);
+	l = strlen(output_path);
 
-	if (ani_output_path[0])	// Output path used?
-	{
-		snprintf(output_path, PATHBUF, "%.*s%s",
-			l, layers_filename, ani_output_path);
-
+	if (!ani_output_path[0]); // Reusing layers file directory
 #ifdef WIN32
-		if (mkdir(output_path))
+	else if (mkdir(output_path))
 #else
-		if (mkdir(output_path, 0777))
+	else if (mkdir(output_path, 0777))
 #endif
+	{
+		if ( errno != EEXIST )
 		{
-			if ( errno != EEXIST )
-			{
-				alert_box(_("Error"), _("Unable to create output directory"), NULL);
-				goto failure;			// Failure to create directory
-			}
+			alert_box(_("Error"), _("Unable to create output directory"), NULL);
+			goto failure;			// Failure to create directory
 		}
 	}
 
@@ -814,8 +810,7 @@ static void create_frames_ani()
 		ani_set_frame_state(k);		// Change layer positions
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
 
-		snprintf(output_path, PATHBUF, "%.*s%s%c%s%05d.%s", 
-			l, layers_filename, ani_output_path, DIR_SEP,
+		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s%05d.%s",
 			ani_file_prefix, k, ani_use_gif ? "gif" : "png");
 
 		if ( ani_use_gif )	// Prepare palette
@@ -860,16 +855,14 @@ static void create_frames_ani()
 
 	if ( ani_use_gif )	// all GIF files created OK so lets give them to gifsicle
 	{
-		wild_path = g_strdup_printf("%.*s%s%c%s?????.gif",
-			l, layers_filename, ani_output_path, DIR_SEP,
-			ani_file_prefix);
-		snprintf(output_path, PATHBUF, "%.*s%s%c%s.gif",
-			l, layers_filename, ani_output_path, DIR_SEP,
+		wild_path = wjstrcat(NULL, 0, output_path, l,
+			DIR_SEP_STR, ani_file_prefix, "?????.gif", NULL);
+		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s.gif",
 			ani_file_prefix);
 
 		run_def_action(DA_GIF_CREATE, wild_path, output_path, ani_gif_delay);
 		run_def_action(DA_GIF_PLAY, output_path, NULL, 0);
-		g_free(wild_path);
+		free(wild_path);
 	}
 
 failure2:

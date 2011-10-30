@@ -18,7 +18,6 @@
 */
 
 #include <fcntl.h>
-#include <sys/stat.h>
 
 #include "global.h"
 
@@ -79,7 +78,7 @@ static char *new_temp_dir()
 }
 
 /* Store index for name, or fetch it (when idx < 0) */
-static int last_temp_index(char *name, int len, int idx)
+static int last_temp_index(char *name, int idx)
 {
 // !!! For now, use simplest model - same index regardless of name
 	static int index;
@@ -136,8 +135,8 @@ static char *get_temp_file(int type, int rgb)
 	ls_settings settings;
 	tempfile *tmp;
 	unsigned char *img = NULL;
-	char buf[PATHBUF], ids[32], *c, *f = "tmp.png";
-	int fd, l, cnt, idx, res;
+	char buf[PATHBUF], nstub[NAMEBUF], ids[32], *c, *f = "tmp.png";
+	int fd, cnt, idx, res;
 
 	/* Use the original file if possible */
 	if (!mem_changed && mem_filename && (!rgb ^ (mem_img_bpp == 3)) &&
@@ -166,27 +165,29 @@ static char *get_temp_file(int type, int rgb)
 			return (tmp->name);
 	}
 
-	/* Create temp file */
+	/* Stubify filename */
+	strcpy(nstub, "tmp");
 	c = strrchr(f, '.');
-	if (c == f) c = (f = "tmp.png") + 3; /* If extension w/o name */
-	l = c ? c - f : strlen(f);
+	if (c != f) /* Extension should not be alone */
+		wjstrcat(nstub, NAMEBUF, f, c ? c - f : strlen(f), NULL);
+
+	/* Create temp file */
 	while (TRUE)
 	{
-		idx = last_temp_index(f, l, -1);
+		idx = last_temp_index(nstub, -1);
 		ids[0] = 0;
 		for (cnt = 0; cnt < 256; cnt++ , idx++)
 		{
 			if (idx) sprintf(ids, "%d", idx);
-			snprintf(buf, PATHBUF, "%s%c%.*s%s.%s",
-				mt_temp_dir, DIR_SEP, l, f, ids,
-				file_formats[type].ext);
+			snprintf(buf, PATHBUF, "%s" DIR_SEP_STR "%s%s.%s",
+				mt_temp_dir, nstub, ids, file_formats[type].ext);
 			fd = open(buf, O_WRONLY | O_CREAT | O_EXCL, 0644);
 			if (fd >= 0) break;
 		}
-		last_temp_index(f, l, idx);
+		last_temp_index(nstub, idx);
 		if (fd >= 0) break;
-		if (!strncmp(f, "tmp.png", l)) return (NULL); /* Utter failure */
-		f = "tmp.png"; l = 3; /* Try again with "tmp" */
+		if (!strcmp(nstub, "tmp")) return (NULL); /* Utter failure */
+		strcpy(nstub, "tmp"); /* Try again with "tmp" */
 	}
 	close(fd);
 
@@ -258,8 +259,8 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 
 	fname = get_temp_file(fform, rgb);
 	if (!fname) return (NULL); /* Temp save failed */
-	return (g_strdup_printf("%.*s\"%s\"%s", where, pat, fname,
-		pat + where + skip));
+	return (wjstrcat(NULL, 0, pat, where, "\"", fname, "\"",
+		pat + where + skip, NULL));
 }
 
 int spawn_expansion(char *cline, char *directory)
@@ -281,7 +282,7 @@ int spawn_expansion(char *cline, char *directory)
 		{
 			argv[2] = s1;
 			res = spawn_process(argv, directory);
-			g_free(s1);
+			free(s1);
 		}
 		else return -1;
 	}

@@ -38,10 +38,6 @@
 
 /* This is Windows only, as POSIX systems have glob() implemented */
 
-#include <string.h>
-#include <dirent.h>
-#include <sys/stat.h>
-
 /* Error returns from glob() */
 #define	GLOB_NOSPACE 1 /* No memory */
 #define	GLOB_NOMATCH 3 /* No files */

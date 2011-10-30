@@ -27,8 +27,6 @@
 #include "canvas.h"
 #include "inifile.h"
 
-#include <errno.h>
-
 #ifdef U_FREETYPE
 #include <iconv.h>
 #include <ft2build.h>
@@ -515,9 +513,6 @@ fail2:
 #define SLOT_SIZE 3
 #define SLOT_FILENAME 4
 #define SLOT_TOT 5
-
-#include <dirent.h>
-#include <sys/stat.h>
 
 
 

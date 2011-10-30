@@ -21,7 +21,6 @@
 
 #include <stdio.h>
 #include <errno.h>
-#include <sys/stat.h>
 
 #define PNG_READ_PACK_SUPPORTED
 

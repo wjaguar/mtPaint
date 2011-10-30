@@ -25,6 +25,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 ///	GTK+2 version to use
 
@@ -146,6 +149,10 @@ char *gtkxncpy(char *dest, const char *src, int cnt, int u);
 // A more sane replacement for strncat()
 
 char *strnncat(char *dest, const char *src, int max);
+
+// Add C strings to a string with explicit length
+
+char *wjstrcat(char *dest, int max, const char *s0, int l, ...);
 
 // Add directory to filename
 
@@ -440,6 +447,18 @@ void undo_grab(GtkWidget *widget);
 #define PATHTXT PATHBUF
 #else /* Allow for expansion when converting from codepage to UTF8 */
 #define PATHTXT (PATHBUF * 2)
+#endif
+
+// Filename string size
+
+#ifdef WIN32
+#define NAMEBUF 256 /* MinGW doesn't define MAXNAMLEN nor NAME_MAX */
+#elif defined MAXNAMLEN
+#define NAMEBUF (MAXNAMLEN + 1)
+#elif defined NAME_MAX
+#define NAMEBUF (NAME_MAX + 1)
+#else
+#define NAMEBUF 256 /* Most filesystems limit filenames to 255 bytes or less */
 #endif
 
 // Threading helpers

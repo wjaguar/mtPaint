@@ -591,28 +591,49 @@ char *strnncat(char *dest, const char *src, int max)
 	return (dest);
 }
 
+// Add C strings to a string with explicit length
+
+char *wjstrcat(char *dest, int max, const char *s0, int l, ...)
+{
+	va_list args;
+	char *s, *w;
+	int ll;
+
+	if (!dest)
+	{
+		max = l + 1;
+		va_start(args, l);
+		while ((s = va_arg(args, char *))) max += strlen(s);
+		va_end(args);
+		dest = malloc(max);
+		if (!dest) return (NULL);
+	}
+
+	va_start(args, l);
+	w = dest;
+	s = (char *)s0; ll = l;
+	while (TRUE)
+	{
+		if (ll >= max) ll = max - 1;
+		memcpy(w, s, ll);
+		w += ll;
+		if ((max -= ll) <= 1) break;
+		s = va_arg(args, char *);
+		if (!s) break;
+		ll = strlen(s);
+	}
+	va_end(args);
+	*w = 0;
+	return (dest);
+}
+
 // Add directory to filename
 
 char *file_in_dir(char *dest, const char *dir, const char *file, int cnt)
 {
-	int dl = strlen(dir), fl = strlen(file);
-
-	dl -= dl && (dir[dl - 1] == DIR_SEP);
-	if (!dest)
-	{
-		cnt = dl + fl + 2;
-		dest = malloc(cnt);
-		if (!dest) return (NULL);
-	}
-	if (cnt > dl + 1)
-	{
-		memcpy(dest, dir, dl);
-		dest[dl++] = DIR_SEP;
-		strncpy(dest + dl, file, cnt - dl);
-	}
-	else memcpy(dest, dir, cnt);
-	dest[cnt - 1] = 0;
-	return (dest);
+	int dl = strlen(dir);
+	return wjstrcat(dest, cnt, dir, dl - (dir[dl - !!dl] == DIR_SEP),
+		DIR_SEP_STR, file, NULL);
 }
 
 char *file_in_homedir(char *dest, const char *file, int cnt)

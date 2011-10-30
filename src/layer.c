@@ -582,7 +582,7 @@ int load_layers( char *file_name )
 		// Read filename, strip end chars & try to load (if name length > 0)
 		fgets(tin, 256, fp);
 		string_chop(tin);
-		snprintf(load_name, PATHBUF, "%.*s%s", lplen, file_name, tin);
+		wjstrcat(load_name, PATHBUF, file_name, lplen, tin, NULL);
 		k = 1;
 		j = detect_image_format(load_name);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))

@@ -23,9 +23,6 @@
 
 #ifdef U_FPICK_MTPAINT		/* mtPaint fpicker */
 
-#include <dirent.h>
-#include <sys/stat.h>
-
 #include "inifile.h"
 #include "memory.h"
 #include "png.h"		// Needed by canvas.h
