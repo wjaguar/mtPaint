@@ -267,8 +267,7 @@ static void fpick_cleanse_path(char *txt)	// Clean up null terminated path
 
 #ifdef WIN32
 	// Unify path separators
-	src = txt;
-	while ((src = strchr(src, '/'))) *src = DIR_SEP;
+	reseparate(txt);
 #endif
 	// Expand home directory
 	if ((txt[0] == '~') && (txt[1] == DIR_SEP))

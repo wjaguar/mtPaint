@@ -67,7 +67,7 @@ static char *new_temp_dir()
 	if (!buf) return (NULL);
 #ifdef WIN32 /* No mkdtemp() in MinGW */
 	/* tempnam() may use Unix path separator */
-	for (base = buf; *base; base++) if (*base == '/') *base = '\\';
+	reseparate(buf);
 	if (!mkdir(buf)) return (buf);
 #else
 	if (!mkdir(buf, 0755)) return (buf);

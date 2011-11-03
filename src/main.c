@@ -142,7 +142,7 @@ static int glob(const char *pattern, int flags, void *nothing, glob_t *pglob)
 	glob_dir_level dirs[MAXDEPTH + 1], *dp;
 	struct dirent *ep;
 	struct stat sbuf;
-	char *pat, *tmp, buf[PATHBUF];
+	char *pat, buf[PATHBUF];
 	int l, lv, maxdepth, prevcnt, memfail = 0;
 
 
@@ -158,7 +158,7 @@ static int glob(const char *pattern, int flags, void *nothing, glob_t *pglob)
 	if (!pattern[0]) return (GLOB_NOMATCH);
 	pat = strdup(pattern);
 	if (!pat) goto mfail;
-	for (tmp = pat; (tmp = strchr(tmp, '/')); *tmp++ = DIR_SEP);
+	reseparate(pat);
 
 	/* Split up the pattern */
 	memset(dirs, 0, sizeof(dirs));

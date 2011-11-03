@@ -826,12 +826,12 @@ do
 		eval "HAVE_$DEP=1"
 	elif [ "${ZAD%$DEP}" = "only-" ]
 	then # Without dependencies
+		eval "NEED_$DEP=2" # Force compile
 		eval "DEPS=\$DEP_$DEP"
 		for DEP in $DEPS
 		do
 			eval "HAVE_$DEP=1"
 		done
-		eval "NEED_$DEP=2" # Force compile
 	else # With component
 		eval "NEED_$DEP=2"
 	fi

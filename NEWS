@@ -83,6 +83,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Failed operations now do not flag image as modified
 	* BUGFIX - Gradient colours are now properly updated after converting indexed image to RGB
 	* BUGFIX - Cut operation in gradient mode when no placement exists now draws shapeburst gradient as it should
+	* BUGFIX - Drawing arrowheads with tablet enabled now works properly
+	* BUGFIX - Drawing arrowheads now doesn't produce corrupted undo frames
 	* BUGFIX - Builtin file selector now properly handles manual edits in directory box
 	* BUGFIX - Problem with FreeType text dialog occasionally hiding behind main window is now eliminated
 	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
@@ -93,6 +95,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Handbook installed into a path with spaces in it no longer fails to open in nondefault browser on Windows
 	* BUGFIX - Internationalization no longer fails on Windows when the current directory is not the installation directory
 	* BUGFIX - Redraw glitches in builtin file selector on Windows are now eliminated
+	* BUGFIX - Drag 'n' drop of files with non ASCII characters in names now works on Windows
 	* "Distance to A+B" palette sort mode removed due to utter uselessness
 
 3.31	2009-4-15

@@ -1067,7 +1067,7 @@ static void draw_arrow(int mode)
 // !!! Call this, or let undo engine do it?
 //	mem_undo_prepare();
 	pen_down = 0;
-	tool_action(GDK_NOTHING, line_x2, line_y2, 1, 0);
+	tool_action(GDK_NOTHING, line_x2, line_y2, 1, 1.0);
 	line_status = LINE_LINE;
 
 	// Draw arrow lines & circles
@@ -1091,6 +1091,7 @@ static void draw_arrow(int mode)
 	mem_undo_opacity = oldmode;
 	gradient[mem_channel] = svgrad;
 	mem_undo_prepare();
+	pen_down = 0;
 
 	// Update screen areas
 	minx = xa1 < xa2 ? xa1 : xa2;
@@ -3492,8 +3493,14 @@ static char read_hex_dub(char *in)	// Read hex double
 
 static void parse_drag( char *txt )
 {
-	char ch, fname[PATHBUF], *tp, *tp2;
+#ifdef WIN32
+	char fname[PATHTXT];
+#else
+	char fname[PATHBUF];
+#endif
+	char ch, *tp, *tp2;
 	int i, j, nlayer = TRUE;
+
 
 	set_image(FALSE);
 
@@ -3516,11 +3523,16 @@ static void parse_drag( char *txt )
 				tp += 2;
 			}
 			fname[i++] = ch;
-			if (i >= PATHBUF - 1) break;
+			if (i >= sizeof(fname) - 1) break;
 		}
 		fname[i] = 0;
 		tp--;
 
+#ifdef WIN32
+		/* !!! GTK+ uses UTF-8 encoding for URIs on Windows */
+		gtkncpy(fname, fname, PATHBUF);
+		reseparate(fname);
+#endif
 		j = detect_image_format(fname);
 		if ((j > 0) && (j != FT_NONE) && (j != FT_LAYERS1))
 		{

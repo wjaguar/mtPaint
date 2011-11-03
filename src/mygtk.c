@@ -3740,6 +3740,17 @@ fail:	if (!utf)
 
 #endif
 
+// Replace '/' path separators
+
+#ifdef WIN32
+
+void reseparate(char *str)
+{
+	while ((str = strchr(str, '/'))) *str++ = DIR_SEP;
+}
+
+#endif
+
 // Prod the focused spinbutton, if any, to finally update its value
 
 void update_window_spin(GtkWidget *window)
