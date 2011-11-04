@@ -1077,6 +1077,129 @@ static toolbar_item tools_bar[] = {
 #undef _
 #define _(X) __(X)
 
+#define TWOBAR_KEY "mtPaint.twobar"
+
+static void twobar_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GtkRequisition wreq1, wreq2;
+	int l;
+
+
+	wreq1.width = wreq1.height = 0;
+	wreq2 = wreq1;
+	if (box->children)
+	{
+		child = box->children->data;
+		if (GTK_WIDGET_VISIBLE(child->widget))
+			gtk_widget_size_request(child->widget, &wreq1);
+		if (box->children->next)
+		{
+			child = box->children->next->data;
+			if (GTK_WIDGET_VISIBLE(child->widget))
+				gtk_widget_size_request(child->widget, &wreq2);
+		}
+	}
+
+	l = box->spacing;
+	/* One or none */
+	if (!wreq2.width);
+	else if (!wreq1.width) wreq1 = wreq2;
+	/* Two in one row */
+	else if (gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY))
+	{
+		wreq1.width += wreq2.width + l;
+		if (wreq1.height < wreq2.height) wreq1.height = wreq2.height;
+	}
+	/* Two rows (default) */
+	else
+	{	
+		wreq1.height += wreq2.height + l;
+		if (wreq1.width < wreq2.width) wreq1.width = wreq2.width;
+	}
+	/* !!! Children' padding is ignored (it isn't used anyway) */
+
+	l = GTK_CONTAINER(widget)->border_width * 2;
+	req->width = wreq1.width + l;
+	req->height = wreq1.height + l;
+}
+
+static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child, *child2 = NULL;
+	GtkRequisition wreq1, wreq2;
+	GtkAllocation wall;
+	int l, h, w2, h2, ww, wh, bar, oldbar;
+
+
+	widget->allocation = *alloc;
+
+	if (!box->children) return; // Empty
+	child = box->children->data;
+	if (box->children->next)
+	{
+		child2 = box->children->next->data;
+		if (!GTK_WIDGET_VISIBLE(child2->widget)) child2 = NULL;
+	}
+	if (!GTK_WIDGET_VISIBLE(child->widget)) child = child2 , child2 = NULL;
+	if (!child) return;
+
+	l = GTK_CONTAINER(widget)->border_width;
+	wall.x = alloc->x + l;
+	wall.y = alloc->y + l;
+	l *= 2;
+	ww = alloc->width - l;
+	if (ww < 1) ww = 1;
+	wall.width = ww;
+	wh = alloc->height - l;
+	if (wh < 1) wh = 1;
+	wall.height = wh; 
+
+	if (!child2) /* Place one, and be done */
+	{
+		gtk_widget_size_allocate(child->widget, &wall);
+		return;
+	}
+
+	/* Need to arrange two */
+	gtk_widget_get_child_requisition(child->widget, &wreq1);
+	gtk_widget_get_child_requisition(child2->widget, &wreq2);
+	l = box->spacing;
+	w2 = wreq1.width + wreq2.width + l;
+	h2 = (h = wreq1.height) + wreq2.height + l;
+	if (h < wreq2.height) h = wreq2.height;
+
+	bar = w2 <= ww; /* Can do one row */
+	if (bar)
+	{
+		if (wall.height > h) wall.height = h;
+		l += (wall.width = wreq1.width);
+		gtk_widget_size_allocate(child->widget, &wall);
+		wall.x += l;
+		wall.width = ww - l;
+	}
+	else /* Two rows */
+	{
+		l += (wall.height = wreq1.height);
+		gtk_widget_size_allocate(child->widget, &wall);
+		wall.y += l;
+		wall.height = wh - l;
+		if (wall.height < 1) wall.height = 1;
+	}
+	gtk_widget_size_allocate(child2->widget, &wall);
+
+	oldbar = (int)gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY);
+	if (bar != oldbar) /* Shape change */
+	{
+		gtk_object_set_data(GTK_OBJECT(widget), TWOBAR_KEY, (gpointer)bar);
+		gtk_widget_queue_resize(widget);
+	}
+}
+
 void toolbar_init(GtkWidget *vbox_main)
 {
 	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
@@ -1097,7 +1220,7 @@ void toolbar_init(GtkWidget *vbox_main)
 	static GdkCursorType corners[4] = {
 		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
-	GtkWidget *box, *mbuttons[TOTAL_ICONS_MAIN];
+	GtkWidget *toolbox, *box, *mbuttons[TOTAL_ICONS_MAIN];
 	char txt[32];
 	int i;
 
@@ -1119,10 +1242,18 @@ void toolbar_init(GtkWidget *vbox_main)
 			toolbar_status[i]);	// Menu toggles = status
 	}
 
+///	TOOLBOX WIDGET
+
+	toolbox = pack(vbox_main, wj_size_box());
+	gtk_signal_connect(GTK_OBJECT(toolbox), "size_request",
+		GTK_SIGNAL_FUNC(twobar_size_req), NULL);
+	gtk_signal_connect(GTK_OBJECT(toolbox), "size_allocate",
+		GTK_SIGNAL_FUNC(twobar_size_alloc), NULL);
+
 ///	MAIN TOOLBAR
 
 	toolbar_boxes[TOOLBAR_MAIN] = box =
-		pack(vbox_main, smart_toolbar(main_bar, mbuttons));
+		pack(toolbox, smart_toolbar(main_bar, mbuttons));
 
 	toolbar_zoom_main = toolbar_add_zoom(box);
 	toolbar_zoom_view = toolbar_add_zoom(box);
@@ -1146,7 +1277,7 @@ void toolbar_init(GtkWidget *vbox_main)
 ///	TOOLS TOOLBAR
 
 	toolbar_boxes[TOOLBAR_TOOLS] =
-		pack(vbox_main, smart_toolbar(tools_bar, icon_buttons));
+		pack(toolbox, smart_toolbar(tools_bar, icon_buttons));
 	if (toolbar_status[TOOLBAR_TOOLS])
 		gtk_widget_show(toolbar_boxes[TOOLBAR_TOOLS]); // Only show if user wants
 
