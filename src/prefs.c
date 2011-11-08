@@ -475,6 +475,7 @@ void pressed_preferences()
 	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), notebook1);
 	gtk_viewport_set_shadow_type(GTK_VIEWPORT(GTK_BIN(scroll)->child), GTK_SHADOW_NONE);
 	gtk_widget_show_all(scroll);
+	vport_noshadow_fix(GTK_BIN(scroll)->child);
 
 ///	---- TAB1 - GENERAL
 

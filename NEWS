@@ -42,6 +42,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Toggle to transform RGB clipboard image added to Transform Colour window
 	* The Convert To Indexed window now remembers the previous settings in that mtPaint session
 	* Text pasting tools now support multiline text (use Ctrl+Enter to insert line breaks)
+	* "~/.fonts" directory added to default font paths for FreeType text tool on Linux
 	* Animated GIF and multipage TIFF files now can be loaded into layers (one frame/page per layer)
 	* GIF animation file exploding is now done internally in mtPaint, not Gifsicle
 	* "Explode Frames" can now save frames in any suitable supported file format
@@ -87,9 +88,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Drawing arrowheads now doesn't produce corrupted undo frames
 	* BUGFIX - Builtin file selector now properly handles manual edits in directory box
 	* BUGFIX - Problem with FreeType text dialog occasionally hiding behind main window is now eliminated
+	* BUGFIX - Lists in FreeType text dialog now don't fail to update or scroll
 	* BUGFIX - FreeType text renderer now can handle PCF bitmap fonts
 	* BUGFIX - FreeType text renderer now properly handles TTF fonts with embedded bitmaps
 	* BUGFIX - FreeType text renderer now doesn't mistake some Unicode fonts for non-Unicode
+	* BUGFIX - ":unscaled" font paths in xorg.conf are now parsed properly
 	* BUGFIX - Redraw lag when moving a dialog over main window in Windows is now greatly reduced (fixed in GTK+)
 	* BUGFIX - Ctrl+T key now draws selection outline as it should - keyboard shortcut for text tool is now Shift+T
 	* BUGFIX - Handbook installed into a path with spaces in it no longer fails to open in nondefault browser on Windows

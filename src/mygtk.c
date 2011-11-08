@@ -3850,6 +3850,63 @@ void undo_grab(GtkWidget *widget)
 	gtk_grab_remove(widget);
 }
 
+#if GTK_MAJOR_VERSION == 1
+
+// Workaround for crazy GTK+1 resize handling
+
+/* !!! GTK+1 may "short-circuit" a resize just redoing an existing allocation -
+ * unless resize is queued on a toplevel and NOT from within its check_resize
+ * handler. As all size_request and size_allocate handlers ARE called from
+ * within it, here is a way to postpone queuing till after it finishes - WJ */
+
+#define RESIZE_KEY "mtPaint.resize"
+
+static guint resize_key;
+
+static void repeat_resize(GtkContainer *cont, gpointer user_data)
+{
+	GtkObject *obj = GTK_OBJECT(cont);
+
+	if (gtk_object_get_data_by_id(obj, resize_key) != (gpointer)2) return;
+	gtk_object_set_data_by_id(obj, resize_key, (gpointer)1);
+	gtk_widget_queue_resize(GTK_WIDGET(cont));
+}
+
+void force_resize(GtkWidget *widget)
+{
+	GtkObject *obj = GTK_OBJECT(gtk_widget_get_toplevel(widget));
+
+	if (!resize_key) resize_key = g_quark_from_static_string(RESIZE_KEY);
+	if (!gtk_object_get_data_by_id(obj, resize_key))
+		gtk_signal_connect_after(obj, "check_resize",
+			GTK_SIGNAL_FUNC(repeat_resize), NULL);
+	gtk_object_set_data_by_id(obj, resize_key, (gpointer)2);
+}
+
+// Workaround for broken GTK_SHADOW_NONE viewports in GTK+1
+
+/* !!! gtk_viewport_draw() adjusts for shadow thickness even with shadow
+ * disabled, resulting in lower right boundary left undrawn; easiest fix is
+ * to set thickness to 0 for such widgets - WJ */
+
+void vport_noshadow_fix(GtkWidget *widget)
+{
+	static GtkStyle *defstyle;
+	GtkStyleClass *class;
+
+	if (!defstyle)
+	{
+		defstyle = gtk_style_new();
+		class = g_malloc(sizeof(GtkStyleClass));
+		memcpy(class, defstyle->klass, sizeof(GtkStyleClass));
+		defstyle->klass = class;
+		class->xthickness = class->ythickness = 0;
+	}
+	gtk_widget_set_style(widget, defstyle);
+}
+
+#endif
+
 // Threading helpers
 
 #if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */

@@ -407,6 +407,21 @@ void accept_ctrl_enter(GtkWidget *entry);
 int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor);
 void undo_grab(GtkWidget *widget);
 
+// Workaround for crazy GTK+1 resize handling
+
+#if GTK_MAJOR_VERSION == 1
+void force_resize(GtkWidget *widget);
+#endif
+
+// Workaround for broken GTK_SHADOW_NONE viewports in GTK+1
+
+#if GTK_MAJOR_VERSION == 1
+void vport_noshadow_fix(GtkWidget *widget);
+#else
+#define vport_noshadow_fix(X)
+#endif
+
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

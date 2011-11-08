@@ -783,6 +783,7 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 	vport = pack(box, gtk_viewport_new(NULL, NULL));
 	gtk_viewport_set_shadow_type(GTK_VIEWPORT(vport), GTK_SHADOW_NONE);
 	gtk_widget_show(vport);
+	vport_noshadow_fix(vport);
 	button = pack(box, gtk_button_new());
 	gtk_object_set_user_data(GTK_OBJECT(button), vport);
 #if GTK_MAJOR_VERSION == 1
@@ -1122,6 +1123,13 @@ static void twobar_size_req(GtkWidget *widget, GtkRequisition *req,
 	/* !!! Children' padding is ignored (it isn't used anyway) */
 
 	l = GTK_CONTAINER(widget)->border_width * 2;
+
+#if GTK_MAJOR_VERSION == 1
+	/* !!! GTK+1 doesn't want to reallocate upper-level containers when
+	 * something on lower level gets downsized */
+	if (widget->requisition.height > wreq1.height + l) force_resize(widget);
+#endif
+
 	req->width = wreq1.width + l;
 	req->height = wreq1.height + l;
 }
@@ -1133,7 +1141,7 @@ static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	GtkBoxChild *child, *child2 = NULL;
 	GtkRequisition wreq1, wreq2;
 	GtkAllocation wall;
-	int l, h, w2, h2, ww, wh, bar, oldbar;
+	int l, h, w2, ww, wh, bar, oldbar;
 
 
 	widget->allocation = *alloc;
@@ -1170,7 +1178,7 @@ static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	gtk_widget_get_child_requisition(child2->widget, &wreq2);
 	l = box->spacing;
 	w2 = wreq1.width + wreq2.width + l;
-	h2 = (h = wreq1.height) + wreq2.height + l;
+	h = wreq1.height;
 	if (h < wreq2.height) h = wreq2.height;
 
 	bar = w2 <= ww; /* Can do one row */
@@ -1196,7 +1204,12 @@ static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	if (bar != oldbar) /* Shape change */
 	{
 		gtk_object_set_data(GTK_OBJECT(widget), TWOBAR_KEY, (gpointer)bar);
+		/* !!! GTK+1 doesn't handle requeued resizes properly */
+#if GTK_MAJOR_VERSION == 1
+		force_resize(widget);
+#else
 		gtk_widget_queue_resize(widget);
+#endif
 	}
 }
 

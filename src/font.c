@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2011 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -17,6 +17,8 @@
 	along with mtPaint in the file COPYING.
 */
 
+#ifdef U_FREETYPE
+
 #include "global.h"
 
 #include "mygtk.h"
@@ -26,19 +28,14 @@
 #include "viewer.h"
 #include "canvas.h"
 #include "inifile.h"
+#include "font.h"
 
-#ifdef U_FREETYPE
 #include <iconv.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
-
-#include "font.h"
-
-#if GTK_MAJOR_VERSION == 1
-#ifdef U_NLS
+#if (GTK_MAJOR_VERSION == 1) && defined(U_NLS)
 #include <langinfo.h>
-#endif
 #endif
 
 
@@ -50,6 +47,12 @@
 	|			Definitions & Structs			|
 	-----------------------------------------------------------------
 */
+
+#define MT_TEXT_MONO      1	/* Force mono rendering */
+#define MT_TEXT_ROTATE_NN 2	/* Use nearest neighbour rotation on bitmap fonts */
+#define MT_TEXT_OBLIQUE   4	/* Apply Oblique matrix transformation to scalable fonts */
+
+#define FONTSEL_KEY "mtfontsel"
 
 #define FONT_INDEX_FILENAME ".mtpaint_fonts"
 
@@ -113,7 +116,8 @@ struct fontNODE
 typedef struct
 {
 	int		sort_column,			// Which column is being sorted in Font clist
-			preview_w, preview_h		// Preview area geometry
+			preview_w, preview_h,		// Preview area geometry
+			update[FONTSEL_CLISTS]		// Delayed update flags
 			;
 
 	GtkWidget	*window,			// Font selection window
@@ -182,14 +186,12 @@ static inline void extend(int *rxy, int x0, int y0, int x1, int y1)
 	if (y1 > rxy[3]) rxy[3] = y1;
 }
 
-#endif	// U_FREETYPE
-
 
 /*
 Render text to a new chunk of memory. NULL return = failure, otherwise points to memory.
 int characters required to print unicode strings correctly.
 */
-unsigned char *mt_text_render(
+static unsigned char *mt_text_render(
 		char	*text,
 		int	characters,
 		char	*filename,
@@ -202,7 +204,6 @@ unsigned char *mt_text_render(
 		int	*height
 		)
 {
-#if U_FREETYPE
 	unsigned char	*mem = NULL;
 #ifdef WIN32
 	const char	*txtp1;
@@ -492,13 +493,9 @@ fail2:
 	FT_Done_FreeType(library);
 
 	return mem;
-#else
-	return NULL;
-#endif		// U_FREEPTYPE
 }
 
 
-#ifdef U_FREETYPE
 /*
 	-----------------------------------------------------------------
 	|			Font Indexing Code			|
@@ -526,19 +523,18 @@ static void trim_tab( char *buf, char *txt)
 	if ( buf[0] == 0 ) snprintf(buf, MAXLEN, "_None");
 }
 
-static int font_dir_search( FT_Library *ft_lib, int dirnum, FILE *fp, char *dir )
+static void font_dir_search(FT_Library *ft_lib, int dirnum, FILE *fp, char *dir)
 {	// Search given directory for font files - recursively traverse directories
 	FT_Face		face;
-	FT_Error	error;
 	DIR		*dp;
 	struct dirent	*ep;
 	struct stat	buf;
-	char		full_name[PATHBUF], size_type[MAXLEN], tmp[2][MAXLEN];
+	char		full_name[PATHBUF], tmp[2][MAXLEN];
 	int		face_index;
 
 
 	dp = opendir(dir);
-	if (!dp) return 0;
+	if (!dp) return;
 
 	while ( (ep = readdir(dp)) )
 	{
@@ -551,32 +547,29 @@ static int font_dir_search( FT_Library *ft_lib, int dirnum, FILE *fp, char *dir 
 #else
 		if ( ep->d_type == DT_DIR || S_ISDIR(buf.st_mode) )
 #endif
-		{				// Subdirectory so recurse
-			if ( strcmp(ep->d_name, ".") != 0 && strcmp(ep->d_name, "..") != 0 )
-			{
+		{	// Subdirectory so recurse
+			if (strcmp(ep->d_name, ".") && strcmp(ep->d_name, ".."))
 				font_dir_search( ft_lib, dirnum, fp, full_name );
-			}
+			continue;
 		}
-		else		// File so see if its a font
+		// File so see if its a font
 		for (	face_index = 0;
-			!(error = FT_New_Face( *ft_lib, full_name, face_index, &face ));
+			!FT_New_Face( *ft_lib, full_name, face_index, &face );
 			face_index++ )
 		{
-			if ( FT_IS_SCALABLE( face ) )
-				snprintf(size_type, MAXLEN, "0");
-			else
-				snprintf(size_type, MAXLEN, "%i",
-					face->available_sizes[0].height +
-					(face->available_sizes[0].width << SIZE_SHIFT) +
-					(face_index << (SIZE_SHIFT*2))
-					);
+			int size_type = 0;
+
+			if (!FT_IS_SCALABLE(face)) size_type =
+				face->available_sizes[0].height +
+				(face->available_sizes[0].width << SIZE_SHIFT) +
+				(face_index << (SIZE_SHIFT * 2));
 
 // I use a tab character as a field delimeter, so replace any in the strings with a space
 
 			trim_tab( tmp[0], face->family_name );
 			trim_tab( tmp[1], face->style_name );
 
-			fprintf(fp, "%s\t%i\t%s\t%s\t%s\n",
+			fprintf(fp, "%s\t%i\t%s\t%i\t%s\n",
 				tmp[0], dirnum, tmp[1], size_type, full_name);
 
 			if ( (face_index+1) >= face->num_faces )
@@ -588,33 +581,25 @@ static int font_dir_search( FT_Library *ft_lib, int dirnum, FILE *fp, char *dir 
 		}
 	}
 	closedir(dp);
-
-	return 0;		// No error
 }
 
-static int font_index_create(char *filename, char **dir_in)
+static void font_index_create(char *filename, char **dir_in)
 {	// dir_in points to NULL terminated sequence of directories to search for fonts
 	FT_Library	library;
-	FT_Error	error;
-	int		i, res=-1;
+	int		i;
 	FILE		*fp;
 
 
-	error = FT_Init_FreeType( &library );
-	if (error) return -1;
+	if (FT_Init_FreeType(&library)) return;
 
-	if ((fp = fopen(filename, "w")) == NULL) goto fail;
-
-	for ( i=0, res=0; dir_in[i] && !res; i++ )
+	if ((fp = fopen(filename, "w")))
 	{
-		res = font_dir_search( &library, i, fp, dir_in[i] );
+		for (i = 0; dir_in[i]; i++)
+			font_dir_search(&library, i, fp, dir_in[i]);
+		fclose(fp);
 	}
 
-	fclose(fp);
-fail:
 	FT_Done_FreeType(library);
-
-	return res;
 }
 
 
@@ -859,9 +844,7 @@ static unsigned char *render_to_1bpp(int *w, int *h)
 #else
 			"ISO-8859-1",	// Non-international verson so it must be this
 #endif
-#endif
-
-#if GTK_MAJOR_VERSION == 2
+#else /* if GTK_MAJOR_VERSION == 2 */
 			"UTF-8",
 #endif
 
@@ -939,7 +922,7 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 
 static void delete_text( GtkWidget *widget, gpointer data )
 {
-	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
+	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), FONTSEL_KEY);
 
 
 	if ( !fp ) fp = data;
@@ -952,11 +935,8 @@ static void delete_text( GtkWidget *widget, gpointer data )
 	free(fp);
 }
 
-#endif		// U_FREETYPE
-
 void ft_render_text()		// FreeType equivalent of render_text()
 {
-#ifdef U_FREETYPE
 	unsigned char *text_1bpp;
 	int w=1, h=1;
 
@@ -966,20 +946,46 @@ void ft_render_text()		// FreeType equivalent of render_text()
 	if (text_1bpp && make_text_clipboard(text_1bpp, w, h, 1))
 		text_paste = TEXT_PASTE_FT;
 	else text_paste = TEXT_PASTE_NONE;
-#endif		// U_FREETYPE
 }
 
-#ifdef U_FREETYPE
+static void update_clist(mtfontsel *mem, int cl, int what)
+{
+	GtkWidget *w = mem->clist[cl];
+	GtkCList *clist = GTK_CLIST(w);
+
+	if (!GTK_WIDGET_MAPPED(w)) /* Is frozen anyway */
+	{
+		what += (what & 1) * 3; // Flag a waiting refresh
+		mem->update[cl] |= what;
+		return;
+	}
+
+	what |= mem->update[cl];
+	mem->update[cl] = 0;
+	if (what & 4) /* Do a delayed refresh */
+	{
+		gtk_clist_freeze(clist);
+		gtk_clist_thaw(clist);
+	}
+	if ((what & 2) && clist->selection) /* Do a scroll */
+		gtk_clist_moveto(clist, (int)(clist->selection->data), 0, 0.5, 0);
+}
+
+static void font_clist_update(GtkWidget *clist, gpointer user_data)
+{
+	mtfontsel *mem = gtk_object_get_data(GTK_OBJECT(clist), FONTSEL_KEY);
+	int cl = (int)user_data;
+
+	update_clist(mem, cl, 0);
+}
+
 static void font_clist_centralise(mtfontsel *mem)
 {
 	int i;
 
-	for ( i=0; i<FONTSEL_CLISTS; i++ )	// Ensure selections are visible and central
-	{
-		if ( GTK_CLIST(mem->clist[i])->selection )
-			gtk_clist_moveto( GTK_CLIST(mem->clist[i]),
-				(int)(GTK_CLIST(mem->clist[i])->selection->data), 0, 0.5, 0);
-	}
+	/* Ensure selections are visible and central */
+	for (i = 0; i < FONTSEL_CLISTS; i++)
+		update_clist(mem, i, 2);
 }
 
 static void read_font_controls(mtfontsel *fp)
@@ -1011,7 +1017,7 @@ static void read_font_controls(mtfontsel *fp)
 
 static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 {
-	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
+	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), FONTSEL_KEY);
 
 
 	if ( !fp ) return FALSE;
@@ -1027,12 +1033,14 @@ static gint paste_text_ok( GtkWidget *widget, GdkEvent *event, gpointer data )
 
 static void font_clist_adjust_cols(mtfontsel *mem, int cl)
 {
+	GtkCList *clist = GTK_CLIST(mem->clist[cl]);
 	int i;
 
- 	for ( i=0; i<FONTSEL_CLISTS_MAXCOL; i++ )		// Adjust column widths for new data
+	/* Adjust column widths for new data */
+ 	for (i = 0; i < FONTSEL_CLISTS_MAXCOL; i++)
 	{
-		gtk_clist_set_column_width( GTK_CLIST(mem->clist[cl]), i,
-			5 + gtk_clist_optimal_column_width( GTK_CLIST(mem->clist[cl]), i ) );
+		gtk_clist_set_column_width(clist, i,
+			5 + gtk_clist_optimal_column_width(clist, i));
 	}
 }
 
@@ -1041,12 +1049,13 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 	int i, j, row, select_row = -1, real_size = 0;
 	char txt[32], buf[128], buf2[256];
 	gchar *row_text[FONTSEL_CLISTS_MAXCOL] = {NULL, NULL, NULL};
+	GtkCList *clist = GTK_CLIST(mem->clist[cl]);
 
 
-	gtk_clist_freeze( GTK_CLIST(mem->clist[cl]) );
-	gtk_clist_clear( GTK_CLIST(mem->clist[cl]) );
+	gtk_clist_freeze(clist);
+	gtk_clist_clear(clist);
 
-	if ( cl == CLIST_FONTNAME )
+	if (cl == CLIST_FONTNAME)
 	{
 		struct fontNODE *fn = mem->head_node;
 		char *last_font_name = inifile_get( "lastFontName", "" );
@@ -1066,8 +1075,8 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 				row_text[1] = "B";
 				bitmap_font = 1;
 			} else	bitmap_font = 0;
-			row = gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
-			gtk_clist_set_row_data( GTK_CLIST(mem->clist[cl]), row, (gpointer)fn );
+			row = gtk_clist_append(clist, row_text);
+			gtk_clist_set_row_data(clist, row, (gpointer)fn);
 
 			if ( !strcmp(fn->font_name, last_font_name) &&
 				last_font_name_dir == fn->directory &&
@@ -1078,7 +1087,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 			fn = fn->next;
 		}
 	}
-	if ( cl == CLIST_FONTSTYLE )
+	else if (cl == CLIST_FONTSTYLE)
 	{
 		static const char *default_styles[] =
 			{ "Regular", "Medium", "Book", "Roman", NULL };
@@ -1090,8 +1099,8 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 		{
 			gtkuncpy(buf2, sn->style_name, 256);	// Transfer to UTF-8 in GTK+2
 			row_text[0] = buf2;
-			row = gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
-			gtk_clist_set_row_data( GTK_CLIST(mem->clist[cl]), row, (gpointer)sn );
+			row = gtk_clist_append(clist, row_text);
+			gtk_clist_set_row_data(clist, row, (gpointer)sn);
 
 			for ( i=0; default_styles[i]; i++ )
 			{
@@ -1108,7 +1117,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 			sn = sn->next;
 		}
 	}
-	if ( cl == CLIST_FONTSIZE )
+	else if (cl == CLIST_FONTSIZE)
 	{
 		struct sizeNODE *zn = mem->current_size_node;
 		int old_bitmap_geometry = inifile_get_gint32( "lastfontBitmapGeometry", 0 );
@@ -1124,8 +1133,8 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 			{
 				snprintf(txt, 32, "%2i", sizes[i]);
 				row_text[0] = txt;
-				row = gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
-				gtk_clist_set_row_data( GTK_CLIST(mem->clist[cl]), row, (gpointer)zn );
+				row = gtk_clist_append(clist, row_text);
+				gtk_clist_set_row_data(clist, row, (gpointer)zn);
 				if ( sizes[i] == last_size ) select_row = row;
 			}
 			real_size = last_size;
@@ -1137,15 +1146,15 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 
 			snprintf(txt, 32, "%2i x %2i", i, j);
 			row_text[0] = txt;
-			row = gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
-			gtk_clist_set_row_data( GTK_CLIST(mem->clist[cl]), row, (gpointer)zn );
+			row = gtk_clist_append(clist, row_text);
+			gtk_clist_set_row_data(clist, row, (gpointer)zn);
 
 			if ( old_bitmap_geometry == zn->size ) select_row = row;
 
 			zn = zn->next;
 		}
 	}
-	if ( cl == CLIST_FONTFILE )
+	else if (cl == CLIST_FONTFILE)
 	{
 		struct filenameNODE *fn = mem->current_filename_node;
 		char *s, *last_filename = inifile_get( "lastTextFilename", "" );
@@ -1158,15 +1167,15 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 			snprintf(txt, 32, "%3i", fn->face_index);
 			row_text[0] = buf2;
 			row_text[1] = txt;
-			row = gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
-			gtk_clist_set_row_data( GTK_CLIST(mem->clist[cl]), row, (gpointer)fn );
+			row = gtk_clist_append(clist, row_text);
+			gtk_clist_set_row_data(clist, row, (gpointer)fn);
 
 			if ( !strcmp(fn->filename, last_filename) ) select_row = row;
 
 			fn = fn->next;
 		}
 	}
-	if ( cl == CLIST_DIRECTORIES )
+	else if (cl == CLIST_DIRECTORIES)
 	{
 		j = inifile_get_gint32("font_dirs", 0 );
 		for ( i=0; i<j; i++ )
@@ -1176,7 +1185,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 			gtkuncpy(buf2, inifile_get( buf, "" ), 256);	// Transfer to UTF-8 in GTK+2
 			row_text[0] = txt;
 			row_text[1] = buf2;
-			gtk_clist_append( GTK_CLIST(mem->clist[cl]), row_text );
+			gtk_clist_append(clist, row_text);
 //printf("%s %s\n", row_text[0], row_text[1]);
 		}
 	}
@@ -1185,22 +1194,18 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 
 	if ( select_row>=0 )	// Select chosen item _before_ the sort
 	{
-		gtk_clist_select_row( GTK_CLIST(mem->clist[cl]), select_row, 0 );
-		gtk_clist_sort( GTK_CLIST(mem->clist[cl]) );
+		gtk_clist_select_row(clist, select_row, 0);
+		gtk_clist_sort(clist);
 //printf("current selection = %i\n", (int) (GTK_CLIST(mem->clist[cl])->selection->data) );
 	}
 	else		// Select 1st item _after_ the sort
 	{
-		gtk_clist_sort( GTK_CLIST(mem->clist[cl]) );
-		gtk_clist_select_row( GTK_CLIST(mem->clist[cl]), 0, 0 );
+		gtk_clist_sort(clist);
+		gtk_clist_select_row(clist, 0, 0);
 	}
 
-	gtk_clist_thaw( GTK_CLIST(mem->clist[cl]) );
-
-	if ( GTK_CLIST(mem->clist[cl])->selection )
-		gtk_clist_moveto( GTK_CLIST(mem->clist[cl]),
-			(int)(GTK_CLIST(mem->clist[cl])->selection->data), 0, 0.5, 0);
-				// Needs to be after thaw
+	gtk_clist_thaw(clist);
+	update_clist(mem, cl, 3);
 
 	if ( real_size )
 		gtk_spin_button_set_value( GTK_SPIN_BUTTON( mem->spin[TX_SPIN_SIZE] ), real_size );
@@ -1208,15 +1213,13 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 }
 
 
-static gint click_add_font_dir( GtkWidget *widget, gpointer user )
+static void click_add_font_dir(GtkWidget *widget, gpointer user)
 {
 	int i = inifile_get_gint32("font_dirs", 0 );
 	char txt[PATHBUF], buf[32];
 	gchar *row_text[FONTSEL_CLISTS_MAXCOL] = {NULL, NULL, NULL};
 	mtfontsel *fp = user;
 
-
-	if ( !fp ) return FALSE;
 
 	row_text[1] = (gchar *)gtk_entry_get_text( GTK_ENTRY(fp->entry[TX_ENTRY_DIRECTORY]) );
 	gtkncpy( txt, row_text[1], PATHBUF);
@@ -1233,32 +1236,27 @@ static gint click_add_font_dir( GtkWidget *widget, gpointer user )
 		i++;
 		inifile_set_gint32("font_dirs", i );
 	}
-
-	return FALSE;
 }
 
-static gint click_remove_font_dir( GtkWidget *widget, gpointer user )
+static void click_remove_font_dir(GtkWidget *widget, gpointer user)
 {
 	char txt[32], txt2[32];
 	int i, delete_row = -1, row_tot = inifile_get_gint32("font_dirs", 0 );
 	mtfontsel *fp = user;
+	GtkCList *clist = GTK_CLIST(fp->clist[CLIST_DIRECTORIES]);
 
 
-	if ( !fp ) return FALSE;
+	if (clist->selection) delete_row = (int)(clist->selection->data);
 
-	if ( GTK_CLIST(fp->clist[CLIST_DIRECTORIES])->selection )
-		delete_row = (int)(GTK_CLIST(fp->clist[CLIST_DIRECTORIES])->selection->data);
+	if ((delete_row < 0) || (delete_row >= row_tot)) return;
 
-	if ( delete_row<0 || delete_row>=row_tot ) return FALSE;
-
-	gtk_clist_remove( GTK_CLIST(fp->clist[CLIST_DIRECTORIES]), delete_row );
-		// Delete current row in clist
+	gtk_clist_remove(clist, delete_row); // Delete current row in clist
 
 	for ( i=delete_row; i<(row_tot-1); i++)
 	{
 			// Re-number clist numbers in first column
 		snprintf(txt, 32, "%3i", i+1);
-		gtk_clist_set_text( GTK_CLIST(fp->clist[CLIST_DIRECTORIES]), i, 0, txt );
+		gtk_clist_set_text(clist, i, 0, txt);
 
 			// Re-work inifile items
 		snprintf(txt, 32, "font_dir%i", i);
@@ -1271,16 +1269,12 @@ static gint click_remove_font_dir( GtkWidget *widget, gpointer user )
 	inifile_get( txt, "" );
 
 	inifile_set_gint32("font_dirs", row_tot-1 );
-
-	return FALSE;
 }
 
-static gint click_create_font_index( GtkWidget *widget, gpointer user )
+static void click_create_font_index(GtkWidget *widget, gpointer user)
 {
 	mtfontsel *fp = user;
 
-
-	if ( !fp ) return FALSE;
 
 	if ( inifile_get_gint32("font_dirs", 0 ) > 0 )
 	{
@@ -1305,12 +1299,8 @@ static gint click_create_font_index( GtkWidget *widget, gpointer user )
 		font_clist_adjust_cols(fp, CLIST_FONTNAME);	// Needed to ensure all fonts visible
 		font_clist_centralise(fp);
 	}
-	else
-	{
-		alert_box(_("Error"), _("You must select at least one directory to search for fonts."), NULL);
-	}
-
-	return FALSE;
+	else alert_box(_("Error"),
+		_("You must select at least one directory to search for fonts."), NULL);
 }
 
 static void silent_update_size_spin( mtfontsel *fp )
@@ -1331,99 +1321,81 @@ static void silent_update_size_spin( mtfontsel *fp )
 	gtk_signal_handler_unblock_by_data( GTK_OBJECT(adj), (gpointer)fp );
 }
 
-static void font_clist_select_row( GtkWidget *clist, gint row, gint column, GdkEvent *event, gpointer user)
+static void font_clist_select_row(GtkCList *clist, gint row, gint column,
+	GdkEventButton *event, gpointer user)
 {
-	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(clist), "mtfontsel");
+	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(clist), FONTSEL_KEY);
+	void *rd = gtk_clist_get_row_data(clist, row);
 	int cl = (int) user;
 
 
 //printf("fp = %i row = %i user = %i\n", (int) fp, row, (int) user);
-	if ( !fp || cl<0 || cl>=FONTSEL_CLISTS ) return;
+	if (!fp || !rd) return;
 
-	if ( cl == CLIST_FONTNAME )
+	if (cl == CLIST_FONTNAME)
 	{
-		struct fontNODE *fn = gtk_clist_get_row_data( GTK_CLIST(clist), row );
+		struct fontNODE *fn = rd;
+		int bitmap_font = !!fn->style->size->size;
 
-		if ( fn )
-		{
-			int bitmap_font = !!fn->style->size->size;
+		inifile_set_gboolean( "fontTypeBitmap", bitmap_font );
+		gtk_widget_set_sensitive( fp->toggle[TX_TOGG_OBLIQUE],
+			!bitmap_font );
 
-			inifile_set_gboolean( "fontTypeBitmap", bitmap_font );
-			gtk_widget_set_sensitive( fp->toggle[TX_TOGG_OBLIQUE],
-				!bitmap_font );
+		silent_update_size_spin( fp );			// Update size spin
 
-			silent_update_size_spin( fp );			// Update size spin
-
-			fp->current_style_node = fn->style;		// New style head node
-//			fp->current_size_node = NULL;			// Now invalid
-//			fp->current_filename_node = NULL;		// Now invalid
-			populate_font_clist( fp, CLIST_FONTSTYLE );	// Update style list
-			inifile_set( "lastFontName", fn->font_name );
-			inifile_set_gint32( "lastFontNameDir", fn->directory );
-			inifile_set_gint32( "lastFontNameBitmap", bitmap_font );
-		}
+		fp->current_style_node = fn->style;		// New style head node
+//		fp->current_size_node = NULL;			// Now invalid
+//		fp->current_filename_node = NULL;		// Now invalid
+		populate_font_clist( fp, CLIST_FONTSTYLE );	// Update style list
+		inifile_set( "lastFontName", fn->font_name );
+		inifile_set_gint32( "lastFontNameDir", fn->directory );
+		inifile_set_gint32( "lastFontNameBitmap", bitmap_font );
 	}
-	if ( cl == CLIST_FONTSTYLE )
+	else if (cl == CLIST_FONTSTYLE)
 	{
-		struct styleNODE *sn = gtk_clist_get_row_data( GTK_CLIST(clist), row );
+		struct styleNODE *sn = rd;
 
-		if ( sn )
-		{
-			fp->current_size_node = sn->size;		// New size head node
-//			fp->current_filename_node = NULL;		// Now invalid
+		fp->current_size_node = sn->size;		// New size head node
+//		fp->current_filename_node = NULL;		// Now invalid
 
-			populate_font_clist( fp, CLIST_FONTSIZE );
-			inifile_set( "lastFontStyle", sn->style_name );
-		}
+		populate_font_clist( fp, CLIST_FONTSIZE );
+		inifile_set( "lastFontStyle", sn->style_name );
 	}
-	if ( cl == CLIST_FONTSIZE )
+	else if (cl == CLIST_FONTSIZE)
 	{
-		int i, j;
-		struct sizeNODE *zn = gtk_clist_get_row_data( GTK_CLIST(clist), row );
+		struct sizeNODE *zn = rd;
 		gchar *celltext;
 
-		if ( zn )
+		if (!gtk_clist_get_text(clist, row, 0, &celltext)); // Error
+		else if (!zn->size)	// Scalable so remember size
 		{
-			i = gtk_clist_get_text(GTK_CLIST(clist), row, 0, &celltext);
-			if ( zn->size == 0 )		// Scalable so remember size
-			{
-				if (i)
-				{
+			int j;
+			sscanf(celltext, "%i", &j);
+			inifile_set_gint32( "fontSize", j );
 
-					sscanf(celltext, "%i", &j);
-					inifile_set_gint32( "fontSize", j );
-
-					silent_update_size_spin( fp );		// Update size spin
-				}
-			}
-			if ( zn->size != 0 )		// Non-Scalable so remember index
-			{
-				if (i)
-				{
-					inifile_set_gint32( "lastfontBitmapGeometry", zn->size );
-				}
-			}
-			fp->current_filename_node = zn->filename;	// New filename head node
-			populate_font_clist( fp, CLIST_FONTFILE );	// Update filename list
+			silent_update_size_spin( fp );		// Update size spin
 		}
+		else			// Non-Scalable so remember index
+		{
+			inifile_set_gint32( "lastfontBitmapGeometry", zn->size );
+		}
+		fp->current_filename_node = zn->filename;	// New filename head node
+		populate_font_clist( fp, CLIST_FONTFILE );	// Update filename list
 	}
-	if ( cl == CLIST_FONTFILE )
+	else if (cl == CLIST_FONTFILE)
 	{
-		struct filenameNODE *fn = gtk_clist_get_row_data( GTK_CLIST(clist), row );
+		struct filenameNODE *fn = rd;
 
-		if ( fn )
-		{
-			inifile_set( "lastTextFilename", fn->filename );
-			inifile_set_gint32( "lastTextFace", fn->face_index );
-			font_preview_update( fp );		// Update the font preview area
-		}
+		inifile_set( "lastTextFilename", fn->filename );
+		inifile_set_gint32( "lastTextFace", fn->face_index );
+		font_preview_update( fp );		// Update the font preview area
 	}
 }
 
 
 static void font_clist_column_button( GtkWidget *widget, gint col, gpointer user)
 {
-	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
+	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), FONTSEL_KEY);
 	int cl = (int) user;
 	GtkSortType direction;
 
@@ -1455,86 +1427,77 @@ static void font_clist_column_button( GtkWidget *widget, gint col, gpointer user
 	gtk_clist_sort( GTK_CLIST(fp->clist[cl]) );
 }
 
-static void add_font_clist(int i, GtkWidget *hbox, mtfontsel *mem, int padding)
+static GtkWidget *make_font_clist(int i, mtfontsel *mem)
 {
-	int	j, clist_text_cols[FONTSEL_CLISTS] = { 3, 1, 1, 2, 2 };
-	char	*clist_text_titles[FONTSEL_CLISTS][FONTSEL_CLISTS_MAXCOL] = {
-			{ "", "", _("Font") },
-			{ _("Style"), "", "" },
-			{ _("Size"), "", "" },
-			{ _("Filename"), _("Face"), "" },
-			{ "", _("Directory"), "" }
-			};
-	GtkWidget	*scrolledwindow, *temp_hbox, *temp_label;
+	static const int clist_text_cols[FONTSEL_CLISTS] = { 3, 1, 1, 2, 2 };
+	char *clist_text_titles[FONTSEL_CLISTS][FONTSEL_CLISTS_MAXCOL] = {
+		{ "", "", _("Font") }, { _("Style"), "", "" },
+		{ _("Size"), "", "" }, { _("Filename"), _("Face"), "" },
+		{ "", _("Directory"), "" } };
+	GtkWidget *w, *scrolledwindow, *temp_hbox;
+	GtkCList *clist;
+	int j;
 
 
-	scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
+	scrolledwindow = gtk_scrolled_window_new(NULL, NULL);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledwindow),
+		i == CLIST_FONTNAME ? GTK_POLICY_NEVER : GTK_POLICY_AUTOMATIC,
+		GTK_POLICY_AUTOMATIC);
 
-	if ( i == CLIST_FONTNAME ) j = GTK_POLICY_NEVER;
-	else j= GTK_POLICY_AUTOMATIC;
+	mem->clist[i] = w = gtk_clist_new(clist_text_cols[i]);
+	gtk_container_add(GTK_CONTAINER(scrolledwindow), w);
+	gtk_object_set_data(GTK_OBJECT(w), FONTSEL_KEY, mem);
+	if (i == CLIST_FONTSTYLE) gtk_widget_set_usize(w, 100, -2);
 
-	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scrolledwindow),
-		j, GTK_POLICY_AUTOMATIC);
-
-	mem->clist[i] = gtk_clist_new( clist_text_cols[i] );
-	gtk_object_set_data( GTK_OBJECT(mem->clist[i]), "mtfontsel", mem );
-
-#if 0
-	if ( i == CLIST_FONTSIZE || i == CLIST_FONTSTYLE )
-		pack5(hbox, scrolledwindow);
-	else
-#endif
-		gtk_box_pack_start (GTK_BOX (hbox), scrolledwindow, TRUE, TRUE, padding);
-
-	if ( i == CLIST_FONTSTYLE )
-		gtk_widget_set_usize(mem->clist[i], 100, -2);
+	clist = GTK_CLIST(w);
 
 	for (j = 0; j < clist_text_cols[i]; j++)
 	{
 		temp_hbox = gtk_hbox_new( FALSE, 0 );
-		temp_label = pack(temp_hbox, gtk_label_new(clist_text_titles[i][j]));
+		pack(temp_hbox, gtk_label_new(clist_text_titles[i][j]));
+		gtk_widget_show_all(temp_hbox);
 
 		if (i == CLIST_FONTNAME) mem->sort_arrows[j] =
 			pack_end(temp_hbox, gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_IN));
 
-		gtk_widget_show( temp_label );
-		gtk_widget_show( temp_hbox );
-		gtk_clist_set_column_widget( GTK_CLIST( mem->clist[i] ), j, temp_hbox );
-		gtk_clist_set_column_resizeable( GTK_CLIST(mem->clist[i]), j, FALSE );
-		if (i == CLIST_FONTSIZE)
-			gtk_clist_set_column_justification(
-				GTK_CLIST(mem->clist[i]), j, GTK_JUSTIFY_CENTER);
+		gtk_clist_set_column_widget(clist, j, temp_hbox);
+		gtk_clist_set_column_resizeable(clist, j, FALSE);
+		if (i == CLIST_FONTSIZE) gtk_clist_set_column_justification(
+			clist, j, GTK_JUSTIFY_CENTER);
 	}
 
 	if ( i == CLIST_FONTNAME )
 	{
 		mem->sort_column = 2;
 		gtk_widget_show( mem->sort_arrows[mem->sort_column] );	// Show sort arrow
-		gtk_clist_set_sort_column( GTK_CLIST(mem->clist[i]), mem->sort_column );
+		gtk_clist_set_sort_column(clist, mem->sort_column);
 		gtk_arrow_set(GTK_ARROW( mem->sort_arrows[mem->sort_column] ),
 			( mem->sort_direction == GTK_SORT_ASCENDING ?
 				GTK_ARROW_DOWN : GTK_ARROW_UP), GTK_SHADOW_IN);
-		gtk_signal_connect(GTK_OBJECT(mem->clist[i]), "click_column",
+		gtk_signal_connect(GTK_OBJECT(clist), "click_column",
 				GTK_SIGNAL_FUNC(font_clist_column_button), (gpointer)i);
 	}
 	else
 	{
-#if GTK_MAJOR_VERSION == 2
-		gtk_clist_column_titles_passive(GTK_CLIST(mem->clist[i]));
-#endif
 #if GTK_MAJOR_VERSION == 1
 		for (j = 0; j < clist_text_cols[i]; j++)
-			gtk_clist_column_title_passive( GTK_CLIST(mem->clist[i]), j );
+			gtk_clist_column_title_passive(clist, j);
+#else /* if GTK_MAJOR_VERSION == 2 */
+		gtk_clist_column_titles_passive(clist);
 #endif
 	}
 
-	gtk_clist_column_titles_show( GTK_CLIST(mem->clist[i]) );
-	gtk_clist_set_selection_mode( GTK_CLIST(mem->clist[i]), GTK_SELECTION_BROWSE );
+	gtk_clist_column_titles_show(clist);
+	gtk_clist_set_selection_mode(clist, GTK_SELECTION_BROWSE);
 
-	gtk_container_add(GTK_CONTAINER( scrolledwindow ), mem->clist[i]);
-
-	gtk_signal_connect(GTK_OBJECT(mem->clist[i]), "select_row",
+	gtk_signal_connect(GTK_OBJECT(clist), "select_row",
 		GTK_SIGNAL_FUNC(font_clist_select_row), (gpointer)i);
+
+	/* This will apply delayed updates when they can take effect */
+	gtk_signal_connect_after(GTK_OBJECT(clist), "map",
+		GTK_SIGNAL_FUNC(font_clist_update), (gpointer)i);
+
+	return (scrolledwindow);
 }
 
 
@@ -1542,91 +1505,82 @@ static void init_font_lists()		//	LIST INITIALIZATION
 {
 	char txt[PATHBUF];
 
-	file_in_homedir(txt, FONT_INDEX_FILENAME, PATHBUF);
-
-	font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
-
-	if ( !global_font_node )		// Index file not loaded
+	/* Get font directories if we don't have any */
+	if (inifile_get_gint32("font_dirs", 0) <= 0)
 	{
-		if ( inifile_get_gint32("font_dirs", 0 ) > 0 )
-			font_gui_create_index(txt);	// We have directories so create them
-		else					// We don't have any directories so get them
-		{
-			int new_dirs = 0;
 #ifdef WIN32
-			char buf[PATHBUF], *windir = getenv("WINDIR");
+		int new_dirs = 1;
+		char *windir = getenv("WINDIR");
 
-			file_in_dir(buf, windir && *windir ? windir :
-				"C:\\WINDOWS", "Fonts", PATHBUF);
-
-			inifile_set( "font_dir0", buf );
-
-			new_dirs = 1;
+		file_in_dir(txt, windir && *windir ? windir : "C:\\WINDOWS",
+			"Fonts", PATHBUF);
+		inifile_set("font_dir0", txt);
 #else
-			FILE *fp;
-			char buf[4096], buf2[128], *s;
+		int new_dirs = 0;
+		FILE *fp;
+		char buf[4096], buf2[128], *s;
 
-			if ( (fp = fopen("/etc/X11/xorg.conf", "r") ) == NULL)
-				fp = fopen("/etc/X11/XF86Config", "r");
+		if (!(fp = fopen("/etc/X11/xorg.conf", "r")))
+			fp = fopen("/etc/X11/XF86Config", "r");
 
-			// If these files are not found the user will have to manually enter directories
+		// If these files are not found the user will have to manually enter directories
 
-			if ( fp )
+		if (fp)
+		{
+			while (fgets(buf, 4090, fp))
 			{
-				while ( new_dirs<TX_MAX_DIRS && fgets(buf, 4090, fp) )
-				{
-					buf[4090] = 0;
+				s = strstr(buf, "FontPath");
+				if (!s) continue;
 
-					s = strstr(buf, "FontPath");
-					if (!s) continue;
+				s = strstr(buf, ":unscaled\"");
+				if (!s) s = strrchr(buf, '"');
+				if (!s) continue;
+				*s = '\0';
 
-					s = strrchr(buf, '"');
-					if (!s) continue;
+				s = strchr(buf, '"');
+				if (!s) continue;
 
-					s[0] = 0;
-					s = strchr(buf, '"');
-					if (!s) continue;
-
-					snprintf(buf2, 128, "font_dir%i", new_dirs);
-					inifile_set( buf2, s+1 );
-					new_dirs++;
-				}
-				fclose(fp);
+				snprintf(buf2, 128, "font_dir%i", new_dirs);
+				inifile_set(buf2, s + 1);
+				if (++new_dirs >= TX_MAX_DIRS) break;
 			}
-
-			if (new_dirs == 0 && (fp = fopen("/etc/fonts/fonts.conf", "r")) )
-			{
-				char *s1, *s2;
-
-				while ( new_dirs<TX_MAX_DIRS && fgets(buf, 4090, fp) )
-				{
-					buf[4090] = 0;
-					s1 = buf;
-
-					while ( (s=strstr(s1, "</dir>")) )
-					{
-						s[0] = 0;
-						s2 = s1;
-						s1 = s+5;
-
-						s = strstr(s2, "<dir>");
-						if (!s) continue;
-						s += 5;
-
-						snprintf(buf2, 128, "font_dir%i", new_dirs);
-						inifile_set( buf2, s );
-						new_dirs++;
-					}
-				}
-				fclose(fp);
-			}
-#endif
-			if (new_dirs > 0)
-			{
-				inifile_set_gint32("font_dirs", new_dirs );
-				font_gui_create_index(txt);
-			}
+			fclose(fp);
 		}
+
+		if (!new_dirs && (fp = fopen("/etc/fonts/fonts.conf", "r")))
+		{
+			char *s1, *s2;
+
+			for (s1 = NULL; s1 || (s1 = fgets(buf, 4090, fp)); s1 = s2)
+			{
+				s2 = strstr(s1, "</dir>");
+				if (!s2) continue;
+				*s2 = '\0';
+				s2 += 6;
+
+				s = strstr(s1, "<dir>");
+				if (!s) continue;
+
+				snprintf(buf2, 128, "font_dir%i", new_dirs);
+				inifile_set(buf2, s + 5);
+				if (++new_dirs >= TX_MAX_DIRS) break;
+			}
+			fclose(fp);
+		}
+
+		/* Add user's font directory */
+		file_in_homedir(txt, ".fonts", PATHBUF);
+		snprintf(buf2, 128, "font_dir%i", new_dirs++);
+		inifile_set(buf2, txt);
+#endif
+		inifile_set_gint32("font_dirs", new_dirs);
+	}
+
+	file_in_homedir(txt, FONT_INDEX_FILENAME, PATHBUF);
+	font_index_load(txt);	// Does a valid ~/.mtpaint_fonts index exist?
+	if (!global_font_node)	// Index file not loaded
+	{
+		font_gui_create_index(txt);
 		font_index_load(txt);	// Try for second and last time
 	}
 }
@@ -1637,7 +1591,7 @@ static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
 	unsigned char *rgb;
 	int x = event->area.x, y = event->area.y;
 	int w = event->area.width, h = event->area.height;
-	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), "mtfontsel");
+	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), FONTSEL_KEY);
 
 
 	if ( !fp || w<1 || h<1 ) return FALSE;
@@ -1683,12 +1637,10 @@ static void font_entry_changed(GtkWidget *widget, gpointer user)	// A GUI entry 
 	read_font_controls(fp);
 	font_preview_update(fp);		// Update the font preview area
 }
-#endif		// U_FREETYPE
 
 
 void pressed_mt_text()
 {
-#ifdef U_FREETYPE
 	int		i;
 	mtfontsel	*mem;
 	GtkWidget	*vbox, *vbox2, *hbox, *notebook, *page, *scrolledwindow;
@@ -1705,7 +1657,7 @@ void pressed_mt_text()
 //	gtk_window_set_default_size( GTK_WINDOW(mem->window), 400, 450 );
 	win_restore_pos(mem->window, "paste_text_window", 0, 0, 400, 450);
 
-	gtk_object_set_data( GTK_OBJECT(mem->window), "mtfontsel", mem );
+	gtk_object_set_data(GTK_OBJECT(mem->window), FONTSEL_KEY, mem);
 //printf("mem = %i\n", (int)mem);
 
 	notebook = gtk_notebook_new();
@@ -1720,23 +1672,22 @@ void pressed_mt_text()
 	gtk_container_add (GTK_CONTAINER (page), hbox);
 
 	vbox = pack5(hbox, gtk_vbox_new(FALSE, 0));
-
-	add_font_clist(0, vbox, mem, 5);
+	xpack5(vbox, make_font_clist(CLIST_FONTNAME, mem));
 
 	vbox = xpack5(hbox, gtk_vbox_new(FALSE, 0));
 	hbox = xpack5(vbox, gtk_hbox_new(FALSE, 0));
 
-	add_font_clist(CLIST_FONTSTYLE, hbox, mem, 5);
+	xpack5(hbox, make_font_clist(CLIST_FONTSTYLE, mem));
 
 	vbox2 = xpack(hbox, gtk_vbox_new(FALSE, 0));
-	add_font_clist(CLIST_FONTSIZE, vbox2, mem, 0);
+	xpack(vbox2, make_font_clist(CLIST_FONTSIZE, mem));
 	mem->spin[TX_SPIN_SIZE] = pack(vbox2,
 		add_a_spin(inifile_get_gint32("fontSize", 12), 1, 500));
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 	gtk_entry_set_alignment( GTK_ENTRY(&(GTK_SPIN_BUTTON( mem->spin[TX_SPIN_SIZE] )->entry)), 0.5);
 #endif
 
-	add_font_clist(CLIST_FONTFILE, hbox, mem, 5);
+	xpack5(hbox, make_font_clist(CLIST_FONTFILE, mem));
 
 //	Text entry box
 
@@ -1762,7 +1713,7 @@ void pressed_mt_text()
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
 	mem->preview_area = gtk_drawing_area_new();
-	gtk_object_set_data( GTK_OBJECT(mem->preview_area), "mtfontsel", mem );
+	gtk_object_set_data(GTK_OBJECT(mem->preview_area), FONTSEL_KEY, mem);
 	gtk_drawing_area_size(GTK_DRAWING_AREA (mem->preview_area), 1, 1);
 	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow), mem->preview_area);
 	gtk_widget_show( mem->preview_area );
@@ -1823,7 +1774,7 @@ void pressed_mt_text()
 	page = add_new_page(notebook, _("Font Directories"));
 	vbox = add_vbox(page);
 
-	add_font_clist(CLIST_DIRECTORIES, vbox, mem, 5);
+	xpack5(vbox, make_font_clist(CLIST_DIRECTORIES, mem));
 
 	mem->entry[TX_ENTRY_DIRECTORY] = mt_path_box(_("New Directory"), vbox,
 						_("Select Directory"), FS_SELECT_DIR);
@@ -1863,5 +1814,6 @@ void pressed_mt_text()
 
 	gtk_widget_grab_focus( mem->entry[TX_ENTRY_TEXT] );
 //font_index_display(mem->head_node);
-#endif		// U_FREETYPE
 }
+
+#endif	/* U_FREETYPE */
