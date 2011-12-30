@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2011 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

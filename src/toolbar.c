@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2011 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

@@ -156,30 +156,33 @@ To replicate it, you need the following source packages:
 - zlib 1.2.5:
     zlib-1.2.5.tar.bz2
     http://zlib.net/zlib-1.2.5.tar.bz2
-- libpng 1.2.44:
-    libpng-1.2.44.tar.gz
-    ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng-1.2.44.tar.gz
-- libjpeg 8b:
-    jpegsrc.v8b.tar.gz
-    http://www.ijg.org/files/jpegsrc.v8b.tar.gz
-- LibTIFF 3.9.4:
-    tiff-3.9.4.tar.gz
-    http://download.osgeo.org/libtiff/tiff-3.9.4.tar.gz
-- FreeType 2.4.4:
-    freetype-2.4.4.tar.bz2
-    http://download.savannah.gnu.org/releases/freetype/freetype-2.4.4.tar.bz2
+- XZ Utils 5.0.3:
+    xz-5.0.3.tar.bz2
+    http://tukaani.org/xz/xz-5.0.3.tar.bz2
+- libpng 1.2.46:
+    libpng-1.2.46.tar.gz
+    ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng-1.2.46.tar.gz
+- libjpeg 8c:
+    jpegsrc.v8c.tar.gz
+    http://www.ijg.org/files/jpegsrc.v8c.tar.gz
+- LibTIFF 4.0.0:
+    tiff-4.0.0.tar.gz
+    http://download.osgeo.org/libtiff/tiff-4.0.0.tar.gz
+- FreeType 2.4.8:
+    freetype-2.4.8.tar.bz2
+    http://download.savannah.gnu.org/releases/freetype/freetype-2.4.8.tar.bz2
 - giflib 4.1.6:
     giflib-4.1.6.tar.bz2
     http://heanet.dl.sourceforge.net/project/giflib/giflib%204.x/giflib-4.1.6/giflib-4.1.6.tar.bz2
 - JasPer 1.900.1 (this specific version and no other):
     jasper-1.900.1.zip
     http://www.ece.uvic.ca/~mdadams/jasper/software/jasper-1.900.1.zip
-- Little CMS 2.1:
-    lcms2-2.1.tar.gz
-    http://heanet.dl.sourceforge.net/project/lcms/lcms/2.1/lcms2-2.1.tar.gz
-- Gifsicle 1.60:
-    gifsicle-1.60.tar.gz
-    http://www.lcdf.org/gifsicle/gifsicle-1.60.tar.gz
+- Little CMS 2.3:
+    lcms2-2.3.tar.gz
+    http://heanet.dl.sourceforge.net/project/lcms/lcms/2.3/lcms2-2.3.tar.gz
+- Gifsicle 1.64:
+    gifsicle-1.64.tar.gz
+    http://www.lcdf.org/gifsicle/gifsicle-1.64.tar.gz
 - mtPaint 3.40 (or later):
     mtpaint-3.40.tar.bz2
 

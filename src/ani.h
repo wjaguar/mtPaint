@@ -1,5 +1,5 @@
 /*	ani.h
-	Copyright (C) 2005-2006 Mark Tyler
+	Copyright (C) 2005-2009 Mark Tyler
 
 	This file is part of mtPaint.
 

@@ -1,5 +1,5 @@
 /*	inifile.h
-	Copyright (C) 2007-2009 Dmitry Groshev
+	Copyright (C) 2007-2011 Dmitry Groshev
 
 	This file is part of mtPaint.
 

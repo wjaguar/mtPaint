@@ -83,33 +83,37 @@
 #define TX_MAX_DIRS 100
 
 
+typedef struct filenameNODE filenameNODE;
 struct filenameNODE
 {
-	char			*filename;		// Filename of font
-	int			face_index;		// Face index within font file
-	struct filenameNODE	*next;			// Pointer to next filename, NULL=no more
+	char		*filename;		// Filename of font
+	int		face_index;		// Face index within font file
+	filenameNODE	*next;			// Pointer to next filename, NULL=no more
 };
 
+typedef struct sizeNODE sizeNODE;
 struct sizeNODE
 {
-	int			size;			// Font size.  0=Scalable
-	struct filenameNODE	*filename;		// Pointer to first filename
-	struct sizeNODE		*next;			// Pointer to next size, NULL=no more
+	int		size;			// Font size.  0=Scalable
+	filenameNODE	*filename;		// Pointer to first filename
+	sizeNODE	*next;			// Pointer to next size, NULL=no more
 };
 
+typedef struct styleNODE styleNODE;
 struct styleNODE
 {
-	char			*style_name;		// Style name
-	struct sizeNODE		*size;			// Pointer to first size of this font
-	struct styleNODE	*next;			// Pointer to next style, NULL=no more
+	char		*style_name;		// Style name
+	sizeNODE	*size;			// Pointer to first size of this font
+	styleNODE	*next;			// Pointer to next style, NULL=no more
 };
 
+typedef struct fontNODE fontNODE;
 struct fontNODE
 {
-	char			*font_name;		// Font name
-	int			directory;		// Which directory is this font in?
-	struct styleNODE	*style;			// Pointer to first style of this font
-	struct fontNODE		*next;			// Pointer to next font family, NULL=no more
+	char		*font_name;		// Font name
+	int		directory;		// Which directory is this font in?
+	styleNODE	*style;			// Pointer to first style of this font
+	fontNODE	*next;			// Pointer to next font family, NULL=no more
 };
 
 
@@ -133,14 +137,14 @@ typedef struct
 
 	GtkSortType	sort_direction;			// Sort direction of Font name clist
 
-	struct fontNODE		*head_node;			// Pointer to head node
-	struct styleNODE	*current_style_node;		// Current style node head
-	struct sizeNODE		*current_size_node;		// Current size node head
-	struct filenameNODE	*current_filename_node;		// Current filename node head
+	fontNODE	*head_node;			// Pointer to head node
+	styleNODE	*current_style_node;		// Current style node head
+	sizeNODE	*current_size_node;		// Current size node head
+	filenameNODE	*current_filename_node;		// Current filename node head
 } mtfontsel;
 
-
-static struct fontNODE *global_font_node;
+static wjmem *font_mem;
+static fontNODE *global_font_node;
 static char *font_text;
 
 
@@ -605,43 +609,21 @@ static void font_index_create(char *filename, char **dir_in)
 
 static void font_mem_clear()		// Empty whole structure from memory
 {
-	struct fontNODE		*fo, *fo2;
-	struct styleNODE	*sn, *sn2;
-	struct sizeNODE		*zn, *zn2;
-	struct filenameNODE	*fl, *fl2;
-
 	free(font_text); font_text = NULL;
-	for (fo = global_font_node; fo; fo = fo2)
-	{
-		for (sn = fo->style; sn; sn = sn2)
-		{
-			for (zn = sn->size; zn; zn = zn2)
-			{
-				for (fl = zn->filename; fl; fl = fl2)
-				{
-					fl2 = fl->next;
-					free( fl );
-				}
-				zn2 = zn->next;
-				free( zn );
-			}
-			sn2 = sn->next;
-			free( sn );
-		}
-		fo2 = fo->next;
-		free( fo );
-	}
+	wjmemfree(font_mem); font_mem = NULL;
 	global_font_node = NULL;
 }
+
+#define newNODE(X) wjmalloc(font_mem, sizeof(X), ALIGNOF(X))
 
 static int font_mem_add(char *font, int dirn, char *style, int fsize,
 	char *filename)
 {// Add new font data to memory structure. Returns TRUE if successful.
-	int			bm_index, res = FALSE;
-	struct fontNODE		*fo;
-	struct styleNODE	*st;
-	struct sizeNODE		*ze;
-	struct filenameNODE	*fl;
+	int		bm_index;
+	fontNODE	*fo;
+	styleNODE	*st;
+	sizeNODE	*ze;
+	filenameNODE	*fl;
 
 
 	bm_index = fsize >> SIZE_SHIFT * 2;
@@ -655,8 +637,8 @@ static int font_mem_add(char *font, int dirn, char *style, int fsize,
 
 	if (!fo)		// Set up new structure as no match currently exists
 	{
-		fo = calloc(1, sizeof(*fo) );	// calloc empties all records
-		if (fo == NULL) goto fail;	// Memory failure
+		fo = newNODE(fontNODE);
+		if (!fo) return (FALSE);	// Memory failure
 		fo->next = global_font_node;
 		global_font_node = fo;
 
@@ -679,8 +661,8 @@ MT 22-8-2007
 
 	if (!st)		// Set up new structure as no match currently exists
 	{
-		st = calloc(1, sizeof(*st) );	// calloc empties all records
-		if (st == NULL) goto fail;	// Memory failure
+		st = newNODE(styleNODE);
+		if (!st) return (FALSE);	// Memory failure
 		st->next = fo->style;
 		fo->style = st;				// New head style
 
@@ -694,8 +676,8 @@ MT 22-8-2007
 
 	if (!ze)		// Set up new structure
 	{
-		ze = calloc(1, sizeof(*ze) );	// calloc empties all records
-		if (ze == NULL) goto fail;	// Memory failure
+		ze = newNODE(sizeNODE);
+		if (!ze) return (FALSE);	// Memory failure
 		ze->next = st->size;
 		st->size = ze;			// New head size
 		ze->size = fsize;
@@ -707,8 +689,8 @@ If the user is stupid enough to pass dupicates then they must have their stupidi
 shown to them in glorious technicolour so they don't do it again!  ;-)
 MT 24-8-2007
 */
-	fl = calloc(1, sizeof(*fl));
-	if (!fl) goto fail;
+	fl = newNODE(filenameNODE);
+	if (!fl) return (FALSE);	// Memory failure
 
 	fl->next = ze->filename;		// Old first filename (maybe NULL)
 	ze->filename = fl;			// This is the new first filename
@@ -716,8 +698,7 @@ MT 24-8-2007
 	fl->filename = filename;
 	fl->face_index = bm_index;
 
-	res = TRUE;
-fail:	return (res);
+	return (TRUE);
 }
 
 static void font_index_load(char *filename)
@@ -726,8 +707,13 @@ static void font_index_load(char *filename)
 	int i, dir, size;
 
 
+	font_mem = wjmemnew(0, 0);
 	font_text = slurp_file(filename);
-	if (!font_text) return;
+	if (!font_mem || !font_text)
+	{
+		font_mem_clear();
+		return;
+	}
 
 	for (buf = font_text + 1; *buf; buf = tmp)
 	{
@@ -748,7 +734,7 @@ static void font_index_load(char *filename)
 		if (!font_mem_add(slots[0], dir, slots[2], size, slots[4]))
 		{	// Memory failure
 			font_mem_clear();
-			break;
+			return;
 		}
 	}
 }
@@ -756,25 +742,26 @@ static void font_index_load(char *filename)
 #if 0
 static void font_index_display(struct fontNODE	*head)
 {
-	int			tot=0, families=0, styles=0, sizes=0, filenames=0;
-	struct fontNODE		*fo = head;
-	struct styleNODE	*st;
-	struct sizeNODE		*ze;
-	struct filenameNODE	*fl;
+	int		families=0, styles=0, sizes=0, filenames=0;
+	fontNODE	*fo = head;
+	styleNODE	*st;
+	sizeNODE	*ze;
+	filenameNODE	*fl;
+	size_t		nspace = 0, sspace = 0;
 
 
 	while (fo)
 	{
 		printf("%s (%i)\n", fo->font_name, fo->directory);
-		tot += strlen(fo->font_name) + 1;
-		tot += sizeof(*fo);
+		nspace += strlen(fo->font_name) + 1;
+		sspace += sizeof(*fo);
 		families ++;
 		st = fo->style;
 		while (st)
 		{
 			printf("\t%s\n", st->style_name);
-			tot += strlen(st->style_name) + 1;
-			tot += sizeof(*st);
+			nspace += strlen(st->style_name) + 1;
+			sspace += sizeof(*st);
 			styles ++;
 			ze = st->size;
 			while (ze)
@@ -782,14 +769,14 @@ static void font_index_display(struct fontNODE	*head)
 				printf("\t\t%i x %i\n", ze->size % (1<<SIZE_SHIFT),
 						(ze->size >> SIZE_SHIFT) % (1<<SIZE_SHIFT)
 						);
-				tot += sizeof(*ze);
+				sspace += sizeof(*ze);
 				sizes ++;
 				fl = ze->filename;
 				while (fl)
 				{
 					printf("\t\t\t%3i %s\n", fl->face_index, fl->filename);
-					tot += strlen(fl->filename) + 1;
-					tot += sizeof(*fl);
+					nspace += strlen(fl->filename) + 1;
+					sspace += sizeof(*fl);
 					filenames++;
 					fl = fl->next;
 				}
@@ -799,7 +786,10 @@ static void font_index_display(struct fontNODE	*head)
 		}
 		fo = fo->next;
 	}
-	printf("\nMemory Used\t%'i (%.1fK)\nFont Families\t%i\nFont Styles\t%i\nFont Sizes\t%i\nFont Filenames\t%i\n\n", tot, ((double)tot)/1024, families, styles, sizes, filenames);
+	printf("\nMemory Used\t%'zu + %'zu (%.1fK)\n"
+		"Font Families\t%i\nFont Styles\t%i\nFont Sizes\t%i\nFont Filenames\t%i\n\n",
+		nspace, sspace, (double)(nspace + sspace) / 1024,
+		families, styles, sizes, filenames);
 }
 #endif
 
@@ -1057,7 +1047,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 
 	if (cl == CLIST_FONTNAME)
 	{
-		struct fontNODE *fn = mem->head_node;
+		fontNODE *fn = mem->head_node;
 		char *last_font_name = inifile_get( "lastFontName", "" );
 		int last_font_name_dir = inifile_get_gint32( "lastFontNameDir", 0 ),
 			last_font_name_bitmap = inifile_get_gint32( "lastFontNameBitmap", 0 ),
@@ -1092,7 +1082,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 		static const char *default_styles[] =
 			{ "Regular", "Medium", "Book", "Roman", NULL };
 		char *last_font_style = inifile_get( "lastFontStyle", "" );
-		struct styleNODE *sn = mem->current_style_node;
+		styleNODE *sn = mem->current_style_node;
 		int default_row = -1;
 
 		while (sn)
@@ -1119,7 +1109,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 	}
 	else if (cl == CLIST_FONTSIZE)
 	{
-		struct sizeNODE *zn = mem->current_size_node;
+		sizeNODE *zn = mem->current_size_node;
 		int old_bitmap_geometry = inifile_get_gint32( "lastfontBitmapGeometry", 0 );
 
 		if ( zn && zn->size == 0 )		// Scalable font so populate with selection
@@ -1156,7 +1146,7 @@ static void populate_font_clist( mtfontsel *mem, int cl )
 	}
 	else if (cl == CLIST_FONTFILE)
 	{
-		struct filenameNODE *fn = mem->current_filename_node;
+		filenameNODE *fn = mem->current_filename_node;
 		char *s, *last_filename = inifile_get( "lastTextFilename", "" );
 
 		while (fn)
@@ -1334,7 +1324,7 @@ static void font_clist_select_row(GtkCList *clist, gint row, gint column,
 
 	if (cl == CLIST_FONTNAME)
 	{
-		struct fontNODE *fn = rd;
+		fontNODE *fn = rd;
 		int bitmap_font = !!fn->style->size->size;
 
 		inifile_set_gboolean( "fontTypeBitmap", bitmap_font );
@@ -1353,7 +1343,7 @@ static void font_clist_select_row(GtkCList *clist, gint row, gint column,
 	}
 	else if (cl == CLIST_FONTSTYLE)
 	{
-		struct styleNODE *sn = rd;
+		styleNODE *sn = rd;
 
 		fp->current_size_node = sn->size;		// New size head node
 //		fp->current_filename_node = NULL;		// Now invalid
@@ -1363,7 +1353,7 @@ static void font_clist_select_row(GtkCList *clist, gint row, gint column,
 	}
 	else if (cl == CLIST_FONTSIZE)
 	{
-		struct sizeNODE *zn = rd;
+		sizeNODE *zn = rd;
 		gchar *celltext;
 
 		if (!gtk_clist_get_text(clist, row, 0, &celltext)); // Error
@@ -1384,7 +1374,7 @@ static void font_clist_select_row(GtkCList *clist, gint row, gint column,
 	}
 	else if (cl == CLIST_FONTFILE)
 	{
-		struct filenameNODE *fn = rd;
+		filenameNODE *fn = rd;
 
 		inifile_set( "lastTextFilename", fn->filename );
 		inifile_set_gint32( "lastTextFace", fn->face_index );
@@ -1586,48 +1576,29 @@ static void init_font_lists()		//	LIST INITIALIZATION
 }
 
 
-static gint preview_expose_event( GtkWidget *widget, GdkEventExpose *event )
+static gboolean preview_expose_event(GtkWidget *widget, GdkEventExpose *event)
 {
-	unsigned char *rgb;
 	int x = event->area.x, y = event->area.y;
 	int w = event->area.width, h = event->area.height;
+	int w2, h2;
 	mtfontsel *fp = gtk_object_get_data(GTK_OBJECT(widget), FONTSEL_KEY);
 
 
-	if ( !fp || w<1 || h<1 ) return FALSE;
+	if (!fp || !fp->preview_rgb) return (FALSE);
+#if GTK_MAJOR_VERSION == 1
+	/* !!! GTK+2 clears background automatically */
+	gdk_window_clear_area(widget->window, x, y, w, h);
+#endif
 
-	rgb = malloc( w*h*3 );
-	if ( !rgb ) return FALSE;
-	memset( rgb, mem_background, w*h*3 );
+	w2 = fp->preview_w - x; if (w > w2) w = w2;
+	h2 = fp->preview_h - y; if (h > h2) h = h2;
+	if ((w < 1) || (h < 1)) return (FALSE);
 
-	if ( fp->preview_rgb )
-	{
-		unsigned char *src, *dest;
-		int w2, h2, j;
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		x, y, w, h, GDK_RGB_DITHER_NONE,
+		fp->preview_rgb + (y * fp->preview_w + x) * 3, fp->preview_w * 3);
 
-		if ( x < fp->preview_w && y < fp->preview_h )
-		{
-			mtMIN( w2, w, fp->preview_w - x )
-			mtMIN( h2, h, fp->preview_h - y )
-
-			for ( j=0; j<h2; j++ )
-			{
-				src = fp->preview_rgb + 3*(x + fp->preview_w*(y+j));
-				dest = rgb + 3*w*j;
-				memcpy(dest, src, w2 * 3);
-			}
-		}
-	}
-
-	gdk_draw_rgb_image ( fp->preview_area->window,
-			fp->preview_area->style->black_gc,
-			x, y, w, h,
-			GDK_RGB_DITHER_NONE, rgb, w*3
-			);
-
-	free(rgb);
-
-	return FALSE;
+	return (FALSE);
 }
 
 static void font_entry_changed(GtkWidget *widget, gpointer user)	// A GUI entry has changed
@@ -1644,7 +1615,9 @@ void pressed_mt_text()
 	int		i;
 	mtfontsel	*mem;
 	GtkWidget	*vbox, *vbox2, *hbox, *notebook, *page, *scrolledwindow;
-	GtkWidget	*button, *entry;
+	GtkWidget	*button, *entry, *preview;
+	GdkColor	*c;
+	GtkRcStyle	*rc;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
@@ -1712,14 +1685,25 @@ void pressed_mt_text()
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolledwindow),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
-	mem->preview_area = gtk_drawing_area_new();
-	gtk_object_set_data(GTK_OBJECT(mem->preview_area), FONTSEL_KEY, mem);
-	gtk_drawing_area_size(GTK_DRAWING_AREA (mem->preview_area), 1, 1);
-	gtk_scrolled_window_add_with_viewport( GTK_SCROLLED_WINDOW(scrolledwindow), mem->preview_area);
-	gtk_widget_show( mem->preview_area );
-
-	gtk_signal_connect(GTK_OBJECT(mem->preview_area), "expose_event",
+	mem->preview_area = preview = gtk_drawing_area_new();
+	gtk_object_set_data(GTK_OBJECT(preview), FONTSEL_KEY, mem);
+	gtk_drawing_area_size(GTK_DRAWING_AREA(preview), 1, 1);
+	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scrolledwindow), preview);
+	gtk_signal_connect(GTK_OBJECT(preview), "expose_event",
 		GTK_SIGNAL_FUNC(preview_expose_event), NULL);
+	/* Set background color */
+#if GTK_MAJOR_VERSION == 1
+	rc = gtk_rc_style_new();
+#else /* if GTK_MAJOR_VERSION == 2 */
+	rc = gtk_widget_get_modifier_style(preview);
+#endif
+	c = &rc->bg[GTK_STATE_NORMAL];
+	c->pixel = 0; c->red = c->green = c->blue = mem_background * 257;
+	rc->color_flags[GTK_STATE_NORMAL] |= GTK_RC_BG;
+	gtk_widget_modify_style(preview, rc);
+#if GTK_MAJOR_VERSION == 1
+	gtk_rc_style_unref(rc);
+#endif
 
 //	TOGGLES
 
@@ -1813,7 +1797,7 @@ void pressed_mt_text()
 	gtk_window_add_accel_group(GTK_WINDOW (mem->window), ag);
 
 	gtk_widget_grab_focus( mem->entry[TX_ENTRY_TEXT] );
-//font_index_display(mem->head_node);
+//	font_index_display(mem->head_node);
 }
 
 #endif	/* U_FREETYPE */

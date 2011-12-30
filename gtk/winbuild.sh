@@ -21,11 +21,11 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-LIBS="giflib zlib libjpeg libpng libtiff freetype jasper lcms "\
+LIBS="giflib zlib xz libjpeg libpng libtiff freetype jasper lcms "\
 "libiconv gettext glib atk pango gtk"
-PROGRAMS="gifsicle mtpaint"
+PROGRAMS="gifsicle mtpaint mtpaint_handbook"
 PHONY="libs all"
-LOCALES="es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv tl"
+LOCALES="es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv tl hu"
 # Applied only to GTK+ ATM
 OPTIMIZE="-march=i686 -O2 -fweb -fomit-frame-pointer -fmodulo-sched -Wno-pointer-sign"
 
@@ -190,6 +190,17 @@ BUILD_zlib ()
 	EXPORT
 }
 
+BUILD_xz ()
+{
+	UNPACK "xz-*.tar.*" || return 0
+	PATH="$LONGPATH"
+	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-threads \
+		--disable-nls --enable-small --disable-scripts
+	make
+	make install-strip DESTDIR="$DESTDIR"
+	EXPORT
+}
+
 BUILD_libjpeg ()
 {
 	UNPACK "jpegsrc.*.tar.*" || return 0
@@ -217,13 +228,14 @@ BUILD_libpng ()
 	EXPORT
 }
 
-DEP_libtiff="zlib libjpeg"
+DEP_libtiff="zlib xz libjpeg"
 BUILD_libtiff ()
 {
 	UNPACK "tiff-*.tar.*" || return 0
 	PATH="$LONGPATH"
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
-	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-cxx
+	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-cxx \
+		--without-x
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
@@ -707,7 +719,29 @@ BUILD_mtpaint ()
 		release intl
 	make
 	make install DESTDIR="$DESTDIR"
-	echo 'PKG="$PKG bin/"' > "$DESTDIR.install"
+	# Now prepare Windows-specific package parts
+	local ZAD
+	for ZAD in COPYING NEWS README
+	do
+		# Convert to CRLF
+		sed -e 's/$/\x0D/g' ./$ZAD >"$DESTDIR/$ZAD.txt"
+	done
+	cp -a -t "$DESTDIR" "$SRCDIR/"*.ico
+	ZAD="${DESTDIR##*mtpaint-}" # Version number
+	sed -e "s/%VERSION%/$ZAD/g" "$SRCDIR/mtpaint-setup.iss" \
+		> "$DESTDIR/mtpaint-setup.iss"
+	ZAD='[InternetShortcut]\r\nURL=http://mtpaint.sourceforge.net/\r\n'
+	echo -en "$ZAD" > "$DESTDIR/mtpaint.url"
+	echo 'PKG="./"' > "$DESTDIR.install"
+	echo 'DEV=' >> "$DESTDIR.install"
+}
+
+BUILD_mtpaint_handbook ()
+{
+	UNPACK "mtpaint_handbook-*.zip" || return 0
+	mkdir -p "$DESTDIR"
+	cp -ar -t "$DESTDIR" docs
+	echo 'PKG="docs/"' > "$DESTDIR.install"
 	echo 'DEV=' >> "$DESTDIR.install"
 }
 

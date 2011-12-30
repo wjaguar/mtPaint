@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2011 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

@@ -1,5 +1,5 @@
 /*	thread.h
-	Copyright (C) 2009 Dmitry Groshev
+	Copyright (C) 2009-2011 Dmitry Groshev
 
 	This file is part of mtPaint.
 
