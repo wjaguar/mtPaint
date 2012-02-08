@@ -153,9 +153,9 @@ To replicate it, you need the following source packages:
 - GNU libiconv 1.9.2:
     libiconv-1.9.2.tar.gz
     http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.9.2.tar.gz
-- zlib 1.2.5:
-    zlib-1.2.5.tar.bz2
-    http://zlib.net/zlib-1.2.5.tar.bz2
+- zlib 1.2.6:
+    zlib-1.2.6.tar.bz2
+    http://zlib.net/zlib-1.2.6.tar.bz2
 - XZ Utils 5.0.3:
     xz-5.0.3.tar.bz2
     http://tukaani.org/xz/xz-5.0.3.tar.bz2

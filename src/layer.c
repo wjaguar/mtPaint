@@ -82,7 +82,7 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src)
 	if (init_undo(&lim->image_.undo_, mem_undo_depth) &&
 		mem_alloc_image(src ? AI_COPY : 0, &lim->image_, w, h, bpp, cmask, src))
 		return (lim);
-	free(lim->image_.undo_.items);
+	mem_free_image(&lim->image_, FREE_UNDO);
 	free(lim);
 	return (NULL);
 }

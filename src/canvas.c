@@ -598,10 +598,15 @@ void pressed_kuwahara()
 
 void pressed_convert_rgb()
 {
-	int i = mem_convert_rgb();
-
-	if (i) memory_errors(i);
-	else update_stuff(UPD_2RGB);
+	unsigned char *old_img = mem_img[CHN_IMAGE];
+	int res = undo_next_core(UC_NOCOPY, mem_width, mem_height, 3, CMASK_IMAGE);
+	if (res) memory_errors(res);
+	else
+	{
+		do_convert_rgb(0, 1, mem_width * mem_height, mem_img[CHN_IMAGE],
+			old_img, mem_pal);
+		update_stuff(UPD_2RGB);
+	}
 }
 
 void pressed_greyscale(int mode)

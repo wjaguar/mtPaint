@@ -183,10 +183,26 @@ BUILD_zlib ()
 	UNPACK "zlib-*.tar.*" || return 0
 	PATH="$SHORTPATH"
 	make -f win32/Makefile.gcc install INCLUDE_PATH="$DEST/include" \
-		LIBRARY_PATH="$DEST/lib"
+		LIBRARY_PATH="$DEST/lib" BINARY_PATH="$DEST/bin"
 	mkdir -p "$DEST/bin"
 	cp -fp zlib1.dll "$DEST"/bin
-	cp -fp libzdll.a "$DEST"/lib/libz.dll.a
+	if [ -e "$DEST"/lib/pkgconfig/zlib.pc ]
+	then
+		# Relativize pkgconfig file of zlib 1.2.6
+		cat <<- PKGFIX > zlib.pc_
+		prefix=$WPREFIX
+		exec_prefix=\${prefix}
+		libdir=\${exec_prefix}/lib
+		sharedlibdir=\${libdir}
+		includedir=\${prefix}/include
+		
+		`sed -e '/^Name:/,$!d' "$DEST"/lib/pkgconfig/zlib.pc`
+		PKGFIX
+		cp -fp zlib.pc_ "$DEST"/lib/pkgconfig/zlib.pc
+	else
+		# Rename import lib of zlib 1.2.5
+		cp -fp libzdll.a "$DEST"/lib/libz.dll.a
+	fi
 	EXPORT
 }
 

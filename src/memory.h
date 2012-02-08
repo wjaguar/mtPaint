@@ -134,8 +134,8 @@ typedef struct {
 } frameset;
 
 typedef struct {
-	unsigned int map;
 	void *store[NUM_UTYPES];
+	unsigned int map;
 } undo_data;
 
 typedef struct {
@@ -149,7 +149,7 @@ typedef struct {
 } undo_item;
 
 typedef struct {
-	undo_item *items;	// Pointer to undo images + current image being edited
+	undo_item **items;	// Array of pointers to undo frames
 	int pointer;		// Index of currently used image on canvas/screen
 	int done;		// Undo images that we have behind current image (i.e. possible UNDO)
 	int redo;		// Undo images that we have ahead of current image (i.e. possible REDO)
@@ -350,9 +350,9 @@ image_info mem_clip;			// Current clipboard
 #define OLD_CLIP 1
 // mem_clip.undo_.done == 0 means no backup clipboard
 #define HAVE_OLD_CLIP		(mem_clip.undo_.done)
-#define mem_clip_real_img	mem_clip.undo_.items[OLD_CLIP].img
-#define mem_clip_real_w		mem_clip.undo_.items[OLD_CLIP].width
-#define mem_clip_real_h		mem_clip.undo_.items[OLD_CLIP].height
+#define mem_clip_real_img	mem_clip.undo_.items[OLD_CLIP]->img
+#define mem_clip_real_w		mem_clip.undo_.items[OLD_CLIP]->width
+#define mem_clip_real_h		mem_clip.undo_.items[OLD_CLIP]->height
 #define mem_clip_real_clear()	mem_free_image(&mem_clip, FREE_UNDO)
 // Repurpose the field
 #define mem_clip_paletted	mem_clip.changed
@@ -619,8 +619,7 @@ void mem_pal_load_def();		// Load default palette
 void mem_pal_init();			// Initialise whole of palette RGB
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
-	unsigned char *src, png_color *pal);
-int mem_convert_rgb();			// Convert image to RGB
+	unsigned char *src, png_color *pal);	// Convert image to RGB
 int mem_convert_indexed();		// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
@@ -695,6 +694,7 @@ void mem_undo_forward();		// REDO requested by user
 #define UC_PENDOWN 0x08	/* Respect pen_down */
 #define UC_GETMEM  0x10 /* Get memory and do nothing */
 #define UC_ACCUM   0x20 /* Cumulative change */
+#define UC_RESET   0x40 /* Delete all, create flagged */
 
 int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cmask);
 void update_undo(image_info *image);	// Copy image state into current undo frame

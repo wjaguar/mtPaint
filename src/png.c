@@ -4823,12 +4823,9 @@ static int load_tga(char *file_name, ls_settings *settings)
 	/* Check if alpha channel is valid */
 	if (!real_alpha && settings->img[CHN_ALPHA])
 	{
-		unsigned char *tmp = settings->img[CHN_ALPHA];
-		int i, j = w * h, k = tmp[0];
-
-		for (i = 1; (tmp[i] == k) && (i < j); i++);
-		/* Delete flat "alpha" */
-		if (i >= j) deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
+		if (is_filled(settings->img[CHN_ALPHA],
+			settings->img[CHN_ALPHA][0], w * h))
+			deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
 	}
 
 	/* Check if alpha in 16-bpp BGRA is inverse */
