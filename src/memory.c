@@ -590,7 +590,7 @@ void init_istate(image_state *state, image_info *image)
 }
 
 /* Add a new undo data node */
-int undo_add_data(undo_item *undo, int type, void *ptr)
+static int undo_add_data(undo_item *undo, int type, void *ptr)
 {
 	undo_data *node;
 	unsigned int tmap = 1 << type;
@@ -615,7 +615,7 @@ fail:	/* Cannot store - delete the data right now */
 }
 
 /* Free an undo data block, and delete its data */
-void undo_free_data(undo_item *undo)
+static void undo_free_data(undo_item *undo)
 {
 	undo_data *tmp;
 	unsigned int tmap;
@@ -629,17 +629,17 @@ void undo_free_data(undo_item *undo)
 }
 
 /* Swap undo data - move current set out, and replace by incoming set */
-void undo_swap_data(undo_item *outp, undo_item *inp)
+static void undo_swap_data(undo_item *outp)
 {
-	undo_data *tmp;
+	undo_data *tmp = outp->dataptr;
 	unsigned int tmap;
 
-
+	outp->dataptr = NULL;
 	if (mem_tempfiles) undo_add_data(outp, UD_TEMPFILES, mem_tempfiles);
 	mem_tempfiles = NULL;
 // !!! Other unconditionally outgoing stuff goes here
 
-	if (!(tmp = inp->dataptr)) return;
+	if (!tmp) return;
 	tmap = tmp->map;
 	if (tmap & (1 << UD_FILENAME))
 	{
@@ -651,7 +651,6 @@ void undo_swap_data(undo_item *outp, undo_item *inp)
 
 	/* Release the incoming node */
 	freechunk(&undo_datastore, tmp);
-	inp->dataptr = NULL;
 }
 
 /* Change layer's filename
@@ -1768,106 +1767,82 @@ static void mem_undo_tile_swap(undo_item *undo, int redo)
 	}
 }
 
-static void mem_undo_swap(int old, int new, int redo)
+static void mem_undo_swap(undo_item *prev, int redo)
 {
-	undo_item *curr, *prev;
+	undo_item tmp = *prev;
+	png_color pal[256];
 	int i;
-
-	curr = mem_undo_im_[old];
-	prev = mem_undo_im_[new];
 
 	if (prev->flags & UF_TILED)
 	{
 		mem_undo_tile_swap(prev, redo);
-		for (i = 0; i < NUM_CHANNELS; i++)
-		{
-			curr->img[i] = prev->img[i];
-			prev->img[i] = mem_img[i];
-		}
-		curr->tileptr = prev->tileptr;
-		prev->tileptr = NULL;
-		curr->size = prev->size;
-		curr->flags = prev->flags & ~UF_ORIG;
+		prev->flags &= ~UF_ORIG;
 	}
 	else
 	{
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-			if (prev->img[i] == (void *)(-1))
+			if (prev->img[i] != (void *)(-1))
 			{
-				curr->img[i] = (void *)(-1);
 				prev->img[i] = mem_img[i];
-			}
-			else
-			{
-				curr->img[i] = mem_img[i];
-				mem_img[i] = prev->img[i];
+				mem_img[i] = tmp.img[i];
 			}
 		}
 		/* !!! If more flags need preserving, add them to mask */
-		curr->flags = (prev->flags & UF_ACCUM) | UF_FLAT;
+		prev->flags = (prev->flags & UF_ACCUM) | UF_FLAT;
 	}
-	prev->flags &= UF_ORIG;
 
-	mem_pal_copy(curr->pal_, mem_pal);
-	if (!prev->pal_)
+	if (prev->pal_)
 	{
-		prev->pal_ = curr->pal_;
-		curr->pal_ = NULL;
+		mem_pal_copy(pal, mem_pal);
+		mem_pal_copy(mem_pal, prev->pal_);
+		mem_pal_copy(prev->pal_, pal);
 	}
-	else mem_pal_copy(mem_pal, prev->pal_);
 
-	undo_swap_data(curr, prev);
+	undo_swap_data(prev);
 
-	curr->width = mem_width;
-	curr->height = mem_height;
-	curr->bpp = mem_img_bpp;
-	curr->cols = mem_cols;
-	curr->trans = mem_xpm_trans;
-	if (!mem_changed) curr->flags |= UF_ORIG;
+	prev->width = mem_width;
+	prev->height = mem_height;
+	prev->bpp = mem_img_bpp;
+	prev->cols = mem_cols;
+	prev->trans = mem_xpm_trans;
+	if (!mem_changed) prev->flags |= UF_ORIG;
 
-	mem_width = prev->width;
-	mem_height = prev->height;
-	mem_img_bpp = prev->bpp;
-	mem_cols = prev->cols;
-	mem_xpm_trans = prev->trans;
-	mem_changed = !(prev->flags & UF_ORIG);
+	mem_width = tmp.width;
+	mem_height = tmp.height;
+	mem_img_bpp = tmp.bpp;
+	mem_cols = tmp.cols;
+	mem_xpm_trans = tmp.trans;
+	mem_changed = !(tmp.flags & UF_ORIG);
 }
 
-void mem_undo_backward()		// UNDO requested by user
+void mem_do_undo(int redo)
 {
-	int i;
+	undo_item *curr, *prev;
+	int i, j;
 
 	/* Compress last undo frame */
 	mem_undo_prepare();
 
-	if ( mem_undo_done > 0 )
+	if ((redo ? mem_undo_redo : mem_undo_done) > 0 )
 	{
-		i = (mem_undo_pointer - 1 + mem_undo_max) % mem_undo_max;
-		mem_undo_swap(mem_undo_pointer, i, 0);
+		j = redo ? 1 : -1;
+		i = (mem_undo_pointer + j + mem_undo_max) % mem_undo_max;
 
+		/* Swap data */
+		curr = mem_undo_im_[mem_undo_pointer];
+		prev = mem_undo_im_[i];
+		mem_undo_swap(prev, redo);
+
+		/* Swap frames */
+		mem_undo_im_[mem_undo_pointer] = prev;
+		mem_undo_im_[i] = curr;
 		mem_undo_pointer = i;
-		mem_undo_done--;
-		mem_undo_redo++;
-	}
-	pen_down = 0;
-}
+		mem_undo_done += j;
+		mem_undo_redo -= j;
 
-void mem_undo_forward()			// REDO requested by user
-{
-	int i;
-
-	/* Compress last undo frame */
-	mem_undo_prepare();
-
-	if ( mem_undo_redo > 0 )
-	{
-		i = (mem_undo_pointer + 1) % mem_undo_max;	// New pointer
-		mem_undo_swap(mem_undo_pointer, i, 1);
-
-		mem_undo_pointer = i;
-		mem_undo_done++;
-		mem_undo_redo--;
+		/* Update current */
+		update_undo(&mem_image);
 	}
 	pen_down = 0;
 }

@@ -685,8 +685,7 @@ void mem_undo_next(int mode);	// Call this after a draw event but before any cha
 unsigned char *mem_undo_previous(int channel);
 void mem_undo_prepare();	// Call this after changes to image, to compress last frame
 
-void mem_undo_backward();		// UNDO requested by user
-void mem_undo_forward();		// REDO requested by user
+void mem_do_undo(int redo);	// Undo or redo requested by user
 
 #define UC_CREATE  0x01	/* Force create */
 #define UC_NOCOPY  0x02	/* Forbid copy */

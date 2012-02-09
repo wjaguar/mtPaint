@@ -1245,15 +1245,9 @@ void update_stuff(int flags)
 		layer_show_trans();
 }
 
-void main_undo()
+void pressed_do_undo(int redo)
 {
-	mem_undo_backward();
-	update_stuff(UPD_ALL | CF_NAME);
-}
-
-void main_redo()
-{
-	mem_undo_forward();
+	mem_do_undo(redo);
 	update_stuff(UPD_ALL | CF_NAME);
 }
 

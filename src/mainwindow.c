@@ -3964,10 +3964,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_file_action(mode); break;
 	case ACT_LOAD_RECENT:
 		pressed_load_recent(mode); break;
-	case ACT_UNDO:
-		main_undo(); break;
-	case ACT_REDO:
-		main_redo(); break;
+	case ACT_DO_UNDO:
+		pressed_do_undo(mode); break;
 	case ACT_COPY:
 		pressed_copy(mode); break;
 	case ACT_PASTE:
@@ -4729,8 +4727,8 @@ static menu_item main_menu[] = {
 
 	{ _("/_Edit"), -2 -16 },
 	{ "//", -3 },
-	{ _("//Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_UNDO, 0, XPM_ICON(undo) },
-	{ _("//Redo"), -1, 0, NEED_REDO, "<control>R", ACT_REDO, 0, XPM_ICON(redo) },
+	{ _("//Undo"), -1, 0, NEED_UNDO, "<control>Z", ACT_DO_UNDO, 0, XPM_ICON(undo) },
+	{ _("//Redo"), -1, 0, NEED_REDO, "<control>R", ACT_DO_UNDO, 1, XPM_ICON(redo) },
 	{ "//", -4 },
 	{ _("//Cut"), -1, 0, NEED_SEL2, "<control>X", ACT_COPY, 1, XPM_ICON(cut) },
 	{ _("//Copy"), -1, 0, NEED_SEL2, "<control>C", ACT_COPY, 0, XPM_ICON(copy) },

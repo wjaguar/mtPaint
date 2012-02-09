@@ -122,8 +122,7 @@ void fs_setup(GtkWidget *fs, int action_type);
 void file_selector( int action_type );
 void set_new_filename(int layer, char *fname);
 
-void main_undo();
-void main_redo();
+void pressed_do_undo(int redo);
 
 void line_to_gradient();	// Setup gradient along line tool
 void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!

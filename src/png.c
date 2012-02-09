@@ -6834,9 +6834,9 @@ int export_undo(char *file_name, ls_settings *settings)
 			}
 			if (!j) /* Goto first image */
 			{
-				if (mem_undo_done > 0) mem_undo_backward();
+				if (mem_undo_done > 0) mem_do_undo(FALSE);
 			}
-			else if (mem_undo_done < start) mem_undo_forward();
+			else if (mem_undo_done < start) mem_do_undo(TRUE);
 		}
 	}
 
