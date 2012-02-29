@@ -655,6 +655,8 @@ static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2],
 int mem_preview, mem_preview_clip, brcosa_auto;
 png_color brcosa_palette[256];
 
+int posterize_mode;	// bitwise/truncated/rounded
+
 // Set 4 brcosa button as sensitive if the user has assigned changes
 static void brcosa_buttons_sensitive()
 {
@@ -681,11 +683,12 @@ static void click_brcosa_preview(GtkWidget *widget)
 	}
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mem_prev_bcsp[i] = brcosa_values[i];
+		mem_bcsp.bcsp[i] = brcosa_values[i];
+	mem_bcsp.pmode = posterize_mode;
 
 	for (i = 0; i < 3; i++)
 	{
-		mem_brcosa_allow[i] = gtk_toggle_button_get_active(
+		mem_bcsp.allow[i] = gtk_toggle_button_get_active(
 			GTK_TOGGLE_BUTTON(brcosa_rgb[i]));
 	}
 
@@ -749,7 +752,7 @@ static gboolean click_brcosa_cancel()
 {
 	mem_pal_copy(mem_pal, brcosa_palette);
 	delete_brcosa();
-	update_stuff(mem_img_bpp == 3 ? UPD_PAL | UPD_RENDER : UPD_PAL);
+	update_stuff(UPD_PAL);
 	return (FALSE);
 }
 
@@ -794,7 +797,7 @@ static void click_brcosa_apply(GtkWidget *widget)
 	mem_undo_prepare();
 	// Disable preview for final update
 	if (!widget) mem_preview = mem_preview_clip = FALSE;
-	update_stuff(mask ? UPD_PAL | UPD_IMG : UPD_PAL);
+	update_stuff(UPD_PAL);
 
 	if (widget) // Don't need this when clicking OK
 	{
@@ -835,7 +838,7 @@ static void click_brcosa_reset()
 		mt_spinslide_set_value(brcosa_spins[i],
 			brcosa_values_default[BRCOSA_INDEX(i)]);
 	}
-	update_stuff(mem_img_bpp == 3 ? UPD_PAL | UPD_RENDER : UPD_PAL);
+	update_stuff(UPD_PAL);
 }
 
 static void brcosa_posterize_changed(GtkMenuItem *menuitem, gpointer user_data)
@@ -861,13 +864,21 @@ static void brcosa_posterize_changed(GtkMenuItem *menuitem, gpointer user_data)
 
 void pressed_brcosa()
 {
-	static int mins[] = {-255, -100, -100, 1, 20, -1529, 2},
+	static const GtkSignalFunc but_fn[] = {
+		GTK_SIGNAL_FUNC(click_brcosa_cancel),
+		GTK_SIGNAL_FUNC(click_brcosa_preview),
+		GTK_SIGNAL_FUNC(click_brcosa_reset),
+		GTK_SIGNAL_FUNC(click_brcosa_apply),
+		GTK_SIGNAL_FUNC(click_brcosa_ok) };
+	static const int mins[] = {-255, -100, -100, 1, 20, -1529, 2},
 		maxs[] = {255, 100, 100, 8, 500, 1529, 256},
 		order[] = {1, 2, 3, 5, 0, 4};
 	char *rgb_txt[] = { _("Red"), _("Green"), _("Blue") };
 	char *tab_txt[] = { _("Brightness"), _("Contrast"), _("Saturation"),
 		_("Posterize"), _("Gamma"), _("Hue") };
 	char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
+	char *but_txt[] = { _("Cancel"), _("Preview"), _("Reset"), _("Apply"),
+		_("OK") };
 	GtkWidget *vbox, *table, *table2, *hbox, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	int i, j;
@@ -876,7 +887,7 @@ void pressed_brcosa()
 	mem_pal_copy(brcosa_palette, mem_pal);	// Remember original palette
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mem_prev_bcsp[i] = brcosa_values_default[i];
+		mem_bcsp.bcsp[i] = brcosa_values_default[i];
 
 	/* Enables preview_toggle code to detect an initialisation call
 	 * (should not happen now, but let's play it safe) */
@@ -990,35 +1001,19 @@ void pressed_brcosa()
 	gtk_widget_show(hbox);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 
-	button = add_a_button(_("Cancel"), 4, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_cancel), NULL);
+	for (i = 0; i < 5; i++)
+	{
+		brcosa_buttons[i] = button = add_a_button(but_txt[i], 4, hbox, TRUE);
+		gtk_signal_connect(GTK_OBJECT(button), "clicked", but_fn[i], NULL);
+	}
+	gtk_widget_add_accelerator(brcosa_buttons[0], "clicked", ag,
+		GDK_Escape, 0, (GtkAccelFlags)0);
+	gtk_widget_add_accelerator(brcosa_buttons[4], "clicked", ag,
+		GDK_KP_Enter, 0, (GtkAccelFlags)0);
+	gtk_widget_add_accelerator(brcosa_buttons[4], "clicked", ag,
+		GDK_Return, 0, (GtkAccelFlags)0);
 	gtk_signal_connect(GTK_OBJECT(brcosa_window), "delete_event",
 		GTK_SIGNAL_FUNC(click_brcosa_cancel), NULL);
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
-	brcosa_buttons[0] = button;
-
-	button = add_a_button(_("Preview"), 4, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_preview), NULL);
-	brcosa_buttons[1] = button;
-
-	button = add_a_button(_("Reset"), 4, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_reset), NULL);
-	brcosa_buttons[2] = button;
-
-	button = add_a_button(_("Apply"), 4, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_apply), NULL);
-	brcosa_buttons[3] = button;
-
-	button = add_a_button(_("OK"), 4, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_ok), NULL);
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags)0);
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags)0);
-	brcosa_buttons[4] = button;
 
 	click_brcosa_preview_toggle();		// Show/hide preview button
 	brcosa_buttons_sensitive();		// Disable buttons

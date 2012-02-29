@@ -2620,8 +2620,8 @@ static void scan_trans(unsigned char *dest, int delta, int y, int x, int w)
 	buf = (*dest & 0x55) << 1;
 	for (i = 0; i < w; i++ , src += bpp , srca += da)
 	{
-		buf |= *srca && ((bpp == 1 ? *src : MEM_2_INT(src, 0)) != xpm) ?
-			bit : 0;
+		if (*srca && ((bpp == 1 ? *src : MEM_2_INT(src, 0)) != xpm))
+			buf |= bit;
 		if ((bit <<= 2) < 0x100) continue;
 		*dest++ = buf; buf = (*dest & 0x55) << 1; bit = 1;
 	}

@@ -303,7 +303,6 @@ double flood_step;
 int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
-int posterize_mode;	// bitwise/truncated/rounded
 
 /// QUANTIZATION SETTINGS
 
@@ -384,11 +383,19 @@ extern unsigned char mem_brushes[];	// Preset brushes image
 int mem_brush_list[81][3];		// Preset brushes parameters
 int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, GAMMA, Hue
-
 int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
+
+/// COLOR TRANSFORM
+
+typedef struct {
+	int bcsp[6];	// BR, CO, SA, POSTERIZE, GAMMA, Hue
+	int allow[3];	// R/G/B
+	int pmode;	// bitwise/truncated/rounded
+} transform_state;
+
+transform_state mem_bcsp;
 
 /// PATTERNS
 
@@ -414,10 +421,6 @@ tool_info tool_state;
 int pen_down;				// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;			// Previous tool coords - used by continuous mode
 int mem_continuous;			// Area we painting the static shapes continuously?
-
-/// PREVIEW
-
-int mem_brcosa_allow[3];		// BRCOSA RGB
 
 /// PALETTE
 

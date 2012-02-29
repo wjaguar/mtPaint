@@ -73,7 +73,6 @@ double flood_step;
 int flood_cube, flood_img, flood_slide;
 
 int smudge_mode;
-int posterize_mode;	// bitwise/truncated/rounded
 
 /// QUANTIZATION SETTINGS
 
@@ -93,7 +92,7 @@ unsigned char mem_brushes[PATCH_WIDTH * PATCH_HEIGHT * 3];
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-int mem_prev_bcsp[6];			// BR, CO, SA, POSTERIZE, Hue
+transform_state mem_bcsp;
 
 /// UNDO ENGINE
 
@@ -134,10 +133,6 @@ tool_info tool_state = { TOOL_SQUARE, TOOL_SQUARE, { 1, 1, 255 } };
 int pen_down;			// Are we drawing? - Used to see if we need to do an UNDO
 int tool_ox, tool_oy;		// Previous tool coords - used by continuous mode
 int mem_continuous;		// Area we painting the static shapes continuously?
-
-/// PREVIEW
-
-int mem_brcosa_allow[3];	// BRCOSA RGB
 
 
 
@@ -2199,26 +2194,26 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 
 	cnt = start + step * cnt;
 
-	if (!mem_brcosa_allow[0]) op0 = 255;
-	if (!mem_brcosa_allow[1]) op1 = 255;
-	if (!mem_brcosa_allow[2]) op2 = 255;
-	ops = op0 + op1 + op2;
+	if (!mem_bcsp.allow[0]) op0 = 255;
+	if (!mem_bcsp.allow[1]) op1 = 255;
+	if (!mem_bcsp.allow[2]) op2 = 255;
+	ops = op0 | op1 | op2;
 
-	br = mem_prev_bcsp[0] * 255;
-	co = mem_prev_bcsp[1];
+	br = mem_bcsp.bcsp[0] * 256;
+	co = mem_bcsp.bcsp[1];
 	if (co > 0) co *= 3;
 	co += 100;
-	co = (255 * co) / 100;
-	sa = (255 * mem_prev_bcsp[2]) / 100;
-	dH = sH = mem_prev_bcsp[5];
+	co = (256 * co) / 100;
+	sa = (256 * mem_bcsp.bcsp[2]) / 100;
+	dH = sH = mem_bcsp.bcsp[5];
 
 	// Map bitwise to truncated
-	do_ps = posterize_mode ? mem_prev_bcsp[3] : 1 << mem_prev_bcsp[3];
+	do_ps = mem_bcsp.pmode ? mem_bcsp.bcsp[3] : 1 << mem_bcsp.bcsp[3];
 	// Disable if 1:1, else separate truncated from rounded
-	if (do_ps &= 255) do_ps += (posterize_mode > 1) << 8;
+	if (do_ps &= 255) do_ps += (mem_bcsp.pmode > 1) << 8;
 
-	do_gamma = mem_prev_bcsp[4] - 100;
-	do_bc = br | (co - 255);
+	do_gamma = mem_bcsp.bcsp[4] - 100;
+	do_bc = br | (co - 256);
 //	do_sa = sa - 255;
 
 	/* Prepare posterize table */
@@ -2247,23 +2242,22 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		int i;
 
 		last_gamma = do_gamma;
-		w = 100.0 / (double)mem_prev_bcsp[4];
+		w = 100.0 / (double)mem_bcsp.bcsp[4];
 		for (i = 0; i < 256; i++)
 		{
 			gamma_table[i] = rint(255.0 * pow((double)i / 255.0, w));
 		}
 	}
 	/* Prepare brightness-contrast table */
-	if (do_bc && ((br != last_br) || (co != last_co)))
+	if (do_bc && ((br ^ last_br) | (co ^ last_co)))
 	{
 		int i, j;
 
 		last_br = br; last_co = co;
 		for (i = 0; i < 256; i++)
 		{
-			j = ((i + i - 255) * co + (255 * 255)) / 2 + br;
-			j = j < 0 ? 0 : j > (255 * 255) ? (255 * 255) : j;
-			bc_table[i] = (j + (j >> 8) + 1) >> 8;
+			j = ((i + i - 255) * co + (255 * 256)) / 2 + br;
+			bc_table[i] = j < 0 ? 0 : j > (255 * 256) ? 255 : j >> 8;
 		}
 	}
 	if (dH)
@@ -2350,15 +2344,12 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		if (sa)
 		{
 			j = 0.299 * r + 0.587 * g + 0.114 * b;
-			r = r * 255 + (r - j) * sa;
-			r = r < 0 ? 0 : r > (255 * 255) ? (255 * 255) : r;
-			r = (r + (r >> 8) + 1) >> 8;
-			g = g * 255 + (g - j) * sa;
-			g = g < 0 ? 0 : g > (255 * 255) ? (255 * 255) : g;
-			g = (g + (g >> 8) + 1) >> 8;
-			b = b * 255 + (b - j) * sa;
-			b = b < 0 ? 0 : b > (255 * 255) ? (255 * 255) : b;
-			b = (b + (b >> 8) + 1) >> 8;
+			r = r * 256 + (r - j) * sa;
+			r = r < 0 ? 0 : r > (255 * 256) ? 255 : r >> 8;
+			g = g * 256 + (g - j) * sa;
+			g = g < 0 ? 0 : g > (255 * 256) ? 255 : g >> 8;
+			b = b * 256 + (b - j) * sa;
+			b = b < 0 ? 0 : b > (255 * 256) ? 255 : b >> 8;
 		}
 		/* If we do posterize transform */
 		if (do_ps)
@@ -2368,7 +2359,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 			b = ps_table[b];
 		}
 		/* If we do partial masking */
-		if (ops || opacity)
+		if (ops | opacity)
 		{
 			r = r * 255 + (img0[ofs3 + 0] - r) * (opacity | op0);
 			r = (r + (r >> 8) + 1) >> 8;
