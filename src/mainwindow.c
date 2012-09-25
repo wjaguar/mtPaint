@@ -1539,81 +1539,71 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	/* Pure moves are handled elsewhere */
 	else if (button) tool_action(event, x, y, button, pressure);
 
-	update_sel_bar();
-
 	/* ****** Now to mouse-move-specific part ****** */
 
-	if (event != GDK_MOTION_NOTIFY) return;
-
-	if ( tool_type == TOOL_CLONE )
+	if (event == GDK_MOTION_NOTIFY)
 	{
-		tool_ox = x;
-		tool_oy = y;
-	}
-
-	if ( poly_status == POLY_SELECTING && button == 0 )
-	{
-		stretch_poly_line(x, y);
-	}
-
-	if ( tool_type == TOOL_SELECT || tool_type == TOOL_POLYGON )
-	{
-		if ( marq_status == MARQUEE_DONE )
+		if (tool_type == TOOL_CLONE)
 		{
-			if (cursor_tool)
+			tool_ox = x;
+			tool_oy = y;
+		}
+
+		if ((poly_status == POLY_SELECTING) && (button == 0))
+			stretch_poly_line(x, y);
+
+		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+		{
+			if (marq_status == MARQUEE_DONE)
 			{
 				i = close_to(x, y);
 				if (i != cursor_corner) // Stops excessive CPU/flickering
-					gdk_window_set_cursor(drawing_canvas->window,
-						corner_cursor[cursor_corner = i]);
+					set_cursor(corner_cursor[cursor_corner = i]);
 			}
-			else set_cursor();
-		}
-		if ( marq_status >= MARQUEE_PASTE )
-		{
-			new_cursor = (x >= marq_x1) && (x <= marq_x2) &&
-				(y >= marq_y1) && (y <= marq_y2); // Normal/4way
-			if (new_cursor != cursor_corner) // Stops flickering on slow hardware
+			if (marq_status >= MARQUEE_PASTE)
 			{
-				if (!cursor_tool || !new_cursor) set_cursor();
-				else gdk_window_set_cursor(drawing_canvas->window,
-					move_cursor);
-				cursor_corner = new_cursor;
+				new_cursor = (x >= marq_x1) && (x <= marq_x2) &&
+					(y >= marq_y1) && (y <= marq_y2); // Normal/4way
+				if (new_cursor != cursor_corner) // Stops flickering on slow hardware
+					set_cursor((cursor_corner = new_cursor) ?
+						move_cursor : NULL);
 			}
 		}
+		update_xy_bar(x, y);
+
+		/* TOOL PERIMETER BOX UPDATES */
+
+		if (perim_status > 0) clear_perim(); // Remove old perimeter box
+
+		if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
+		{
+			clone_x += tox - x;
+			clone_y += toy - y;
+		}
+
+		if (tool_size * can_zoom > 4)
+		{
+			perim_x = x - (tool_size >> 1);
+			perim_y = y - (tool_size >> 1);
+			perim_s = tool_size;
+			repaint_perim(NULL); // Repaint 4 sides
+		}
+
+		/* LINE UPDATES */
+
+		if ((tool_type == TOOL_LINE) && (line_status == LINE_LINE) &&
+			((line_x2 != x) || (line_y2 != y)))
+		{
+			int old[4];
+
+			copy4(old, line_xy);
+			line_x2 = x;
+			line_y2 = y;
+			repaint_line(old);
+		}
 	}
-	update_xy_bar(x, y);
 
-///	TOOL PERIMETER BOX UPDATES
-
-	if (perim_status > 0) clear_perim();	// Remove old perimeter box
-
-	if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
-	{
-		clone_x += tox - x;
-		clone_y += toy - y;
-	}
-
-	if (tool_size * can_zoom > 4)
-	{
-		perim_x = x - (tool_size >> 1);
-		perim_y = y - (tool_size >> 1);
-		perim_s = tool_size;
-		repaint_perim(NULL);			// Repaint 4 sides
-	}
-
-///	LINE UPDATES
-
-	if ((tool_type == TOOL_LINE) && (line_status == LINE_LINE) &&
-		((line_x2 != x) || (line_y2 != y)))
-	{
-		int old[4];
-
-		copy4(old, line_xy);
-		line_x2 = x;
-		line_y2 = y;
-		repaint_line(old);
-	}
+	update_sel_bar();
 }
 
 static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
@@ -3355,11 +3345,11 @@ static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
-void set_cursor()			// Set mouse cursor
+void set_cursor(GdkCursor *what)	// Set mouse cursor
 {
 	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
 	gdk_window_set_cursor(drawing_canvas->window,
-		cursor_tool ? m_cursor[tool_type] : NULL);
+		!cursor_tool ? NULL : what ? what : m_cursor[tool_type]);
 }
 
 void change_to_tool(int icon)
@@ -3478,7 +3468,7 @@ void set_image(gboolean state)
 
 	(state ? gtk_widget_show_all : gtk_widget_hide)(view_showing ? main_split :
 		scrolledwindow_canvas);
-	if (state) set_cursor(); /* Canvas window is now a new one */
+	if (state) set_cursor(NULL); /* Canvas window is now a new one */
 }
 
 static char read_hex_dub(char *in)	// Read hex double
@@ -3900,13 +3890,18 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_ESC:
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
 			pressed_select(FALSE);
-		else if (tool_type == TOOL_LINE) stop_line();
+		else if (tool_type == TOOL_LINE)
+		{
+			stop_line();
+			update_sel_bar();
+		}
 		else if ((tool_type == TOOL_GRADIENT) &&
 			(gradient[mem_channel].status != GRAD_NONE))
 		{
 			gradient[mem_channel].status = GRAD_NONE;
 			if (grad_opacity) update_stuff(UPD_RENDER);
 			else repaint_grad(NULL);
+			update_sel_bar();
 		}
 		break;
 	case ACT_COMMIT:
@@ -4539,7 +4534,7 @@ static void toggle_dock(int state, int internal)
 			gtk_container_add(GTK_CONTAINER(main_window), vbox_main);
 		}
 	}
-	set_cursor(); /* Because canvas window is now a new one */
+	set_cursor(NULL); /* Because canvas window is now a new one */
 	gtk_widget_unref(vbox_main);
 }
 
@@ -5173,7 +5168,7 @@ void main_init()
 	gdk_window_set_icon( main_window->window, NULL, icon_pix, NULL );
 //	gdk_pixmap_unref(icon_pix);
 
-	set_cursor();
+	set_cursor(NULL);
 	init_status_bar();
 	init_factions();				// Initialize file action menu
 

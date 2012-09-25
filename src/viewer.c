@@ -1017,7 +1017,7 @@ void view_show()
 	gtk_widget_unref(vw_scrolledwindow);
 	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
-	set_cursor(); /* Because canvas window is now a new one */
+	set_cursor(NULL); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), TRUE);
 	vw_focus_view();
@@ -1044,7 +1044,7 @@ void view_hide()
 	xpack(vbox_right, scrolledwindow_canvas);
 	gtk_widget_unref(scrolledwindow_canvas);
 	toolbar_viewzoom(FALSE);
-	set_cursor(); /* Because canvas window is now a new one */
+	set_cursor(NULL); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), FALSE);
 #if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */

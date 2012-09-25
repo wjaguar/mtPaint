@@ -1218,7 +1218,7 @@ void update_stuff(int flags)
 		move_mouse(0, 0, 0);	// To cause update of XY bar
 #endif
 	if (flags & CF_CURSOR)
-		set_cursor();
+		set_cursor(NULL);
 	if (flags & CF_PMODE)
 		if ((marq_status >= MARQUEE_PASTE) && show_paste) flags |= CF_DRAW;
 	if (flags & CF_GMODE)
@@ -2613,7 +2613,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 					marq_x1 = marq_x2;
 				if (!(i & 2) ^ (marq_y1 > marq_y2))
 					marq_y1 = marq_y2;
-				set_cursor();
+				set_cursor(NULL);
 			}
 			else
 			{

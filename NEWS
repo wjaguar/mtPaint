@@ -4,6 +4,10 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.41	2012-??-??
+	* Undo system now uses a bit less memory
+	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
+
 3.40	2011-12-30
 
 	* Tagalog translation added by Anjelo delCarmen

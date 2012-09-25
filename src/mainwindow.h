@@ -323,7 +323,7 @@ void stop_line();
 void change_to_tool(int icon);
 
 void spot_undo(int mode);		// Take snapshot for undo
-void set_cursor();			// Set mouse cursor
+void set_cursor(GdkCursor *what);	// Set mouse cursor
 int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 
 //	Try to save file + warn if error + return < 0 if fail
