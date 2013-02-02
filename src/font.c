@@ -309,7 +309,7 @@ static unsigned char *mt_text_render(
 
 	s = iconv(cd, &txtp1, &ssize1, &txtp2, &ssize2);
 	iconv_close(cd);
-	if (s < 0) goto fail0;
+	if (s == (size_t)(-1)) goto fail0;
 	characters = (txtp2 - (char *)txt2) / sizeof(*txt2); // Converted length
 	txt2[characters] = 0; // Terminate the line
 

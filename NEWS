@@ -4,9 +4,12 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.41	2012-??-??
+3.41	2013-??-??
 	* Undo system now uses a bit less memory
+	* XPM files with 65-92 colours are now saved with smaller size
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
+	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
+	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
 
 3.40	2011-12-30
 

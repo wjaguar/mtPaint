@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.04"
-MT_DATE="2012-09-26"
+MT_V="3.44.05"
+MT_DATE="2013-02-02"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -25,6 +25,7 @@ OPTS=YES
 USE_THREADS=YES
 AS_NEEDED=
 DEFS=
+WARN=
 
 # Path overrides
 MT_BINDIR=
@@ -108,6 +109,7 @@ do
 	"--mandir="* )	MT_MANDIR="${A#*=}";;
 	"--host="* )	MT_HOST="${A#*=}";;
 	"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
+	"panic" )	WARN="-Wextra -Wno-missing-field-initializers -Wno-unused-parameter";;
 	"flush" )	echo Clearing out directory to original state
 			echo
 			make clean
@@ -208,6 +210,8 @@ icons ............ Compile with alternative icon set - see ./src/icons1/README f
 --docdir=DIR ..... DIR = location of documentation to install, ${prefix}/share/doc/mtpaint by default
 --localedir=DIR .. DIR = location of locale files to install, ${prefix}/share/locale by default
 --mandir=DIR ..... DIR = location of man page to install, ${prefix}/share/man/man1 by default
+
+panic ............ Enable rarely-useful warnings - developers only
 
 flush ............ Flush directories to initial state
 newpo ............ Create ./po/mtpaint.pot
@@ -479,11 +483,10 @@ then
 	LDFLAGS="-mwindows $LDFLAGS"
 fi
 # Enable warnings
+WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
 then # Tell gcc 4.x to shut up
-	WARN="-Wall -Wno-pointer-sign"
-else
-	WARN="-Wall"
+	WARN="$WARN -Wno-pointer-sign"
 fi
 
 ### Setup libraries

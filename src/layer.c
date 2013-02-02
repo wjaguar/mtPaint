@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -272,6 +272,10 @@ void layer_show_new()
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(l->toggle), t->visible);
 
 		layer_select_slot(layers_total);
+
+		/* !!! Or the changes will be ignored if the list wasn't yet
+		 * displayed (as in inactive dock tab) - WJ */
+		gtk_widget_queue_resize(layer_list);
 	}
 }
 
@@ -405,6 +409,11 @@ void layer_refresh_list()
 			layers_total < MAX_LAYERS);
 		gtk_widget_set_sensitive(layer_tools[LTB_DUP],
 			layers_total < MAX_LAYERS);
+
+		/* !!! Or the changes will be ignored if the list wasn't yet
+		 * displayed (as in inactive dock tab) - WJ */
+		gtk_widget_queue_resize(layer_list);
+
 		if (in_refresh < 2) break;
 	}
 	in_refresh = 0;
@@ -1234,7 +1243,13 @@ void create_layers_box()
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 		layer_list_data[i].name = label;
 
+#if GTK_MAJOR_VERSION == 1
+		/* !!! Vertical spacing is too small without the label */
 		tog = pack(hbox, gtk_check_button_new_with_label(""));
+#else /* if GTK_MAJOR_VERSION == 2 */
+		/* !!! Focus frame is placed wrong with the empty label */
+		tog = pack(hbox, gtk_check_button_new());
+#endif
 		layer_list_data[i].toggle = tog;
 		gtk_widget_show_all(item);
 		if (i == 0) gtk_widget_set_sensitive(tog, FALSE);

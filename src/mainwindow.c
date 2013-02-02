@@ -407,7 +407,8 @@ int import_clipboard(int mode)
 #endif
 	if ((i = check_clipboard(n)))
 	{
-		udata[1] = (int)clip_formats[i].info;
+		udata[1] = (int)clip_formats[i].info |
+			((mode == FS_PNG_LOAD) && undo_load ? FTM_UNDO : 0);
 		i = process_clipboard(n, clip_formats[i].target,
 			GTK_SIGNAL_FUNC(clipboard_import_fn), udata);
 	}

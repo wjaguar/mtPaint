@@ -318,7 +318,7 @@ wjmem *wjmemnew(int minsize, int incr)
 	wjmem *mem;
 
 	if (incr <= 0) incr = WJMEM_DEFINCR;
-	if (minsize <= sizeof(wjmem)) minsize = WJMEM_DEFSIZE;
+	if (minsize <= (int)sizeof(wjmem)) minsize = WJMEM_DEFSIZE;
 	mem = calloc(1, minsize);
 	if (mem)
 	{

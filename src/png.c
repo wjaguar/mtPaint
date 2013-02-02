@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -373,8 +373,8 @@ static size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 
 	if (mf->file) return (fread(ptr, size, nmemb, mf->file));
 
+	if ((mf->here < 0) || (mf->here > mf->top)) return (0);
 	l = size * nmemb; m = mf->top - mf->here;
-	if ((mf->here < 0) || (m < 0)) return (0);
 	if (l > m) l = m , nmemb = m / size;
 	memcpy(ptr, mf->buf + mf->here, l);
 	mf->here += l;
@@ -550,7 +550,7 @@ static void png_memwrite(png_structp png_ptr, png_bytep data, png_size_t length)
 	memFILE *mf = (memFILE *)png_get_io_ptr(png_ptr);
 //	memFILE *mf = (memFILE *)png_ptr->io_ptr;
 
-	if ((mf->here + length > mf->size) && !mfextend(mf, length))
+	if ((mf->here + length > (unsigned)mf->size) && !mfextend(mf, length))
 		png_error(png_ptr, "Write Error");
 	else
 	{
@@ -2676,14 +2676,14 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		for (i = height - 1; i >= 0; i--)
 		{
 			tmp = settings->img[CHN_IMAGE] + width * i * bpp;
-			for (j = 0; j < width; j++)
+			j = width;
+			while (j--)
 			{
-				tmp[0] = TIFFGetR(tr[j]);
-				tmp[1] = TIFFGetG(tr[j]);
-				tmp[2] = TIFFGetB(tr[j]);
-				tmp += 3;
+				tmp[0] = TIFFGetR(*tr);
+				tmp[1] = TIFFGetG(*tr);
+				tmp[2] = TIFFGetB(*tr);
+				tmp += 3; tr++;
 			}
-			tr += width;
 			ls_progress(settings, height - i, 10);
 		}
 
@@ -2699,10 +2699,10 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	else
 	{
 		unsigned char xtable[256], *src, *tbuf = NULL;
-		int xstep = tw ? tw : width, ystep = th ? th : rps;
+		uint32 x0, y0, xstep = tw ? tw : width, ystep = th ? th : rps;
 		int aalpha, tsz = 0, wbpp = bpp;
 		int bpr, bits1, bit0, db, n, nx;
-		int j, k, x0, y0, bsz, plane, nplanes;
+		int j, k, bsz, plane, nplanes;
 
 
 		if (pmetric == PHOTOMETRIC_SEPARATED) // Needs temp buffer
@@ -2761,7 +2761,8 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 		for (plane = 0; plane < nplanes; plane++)
 		{
 			unsigned char *tmp, *tmpa;
-			int i, j, k, x, y, w, h, dx, dxa, dy, dys;
+			uint32 x, y, w, h, l;
+			int i, k, dx, dxa, dy, dys;
 
 			/* Read one piece */
 			if (tw)
@@ -2833,7 +2834,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			}
 
 			/* Decode it */
-			for (j = 0; j < h; j++ , n++ , src += dys , tmp += dy)
+			for (l = 0; l < h; l++ , n++ , src += dys , tmp += dy)
 			{
 				if (pr && ((n * 10) % nx >= nx - 10))
 					progress_update((float)n / nx);
@@ -2861,7 +2862,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 			src = tbuf;
 			tmp = settings->img[CHN_IMAGE] + (y * width + x) * 3;
 			w *= 3;
-			for (i = 0; i < h; i++ , tmp += width * 3 , src += w)
+			for (l = 0; l < h; l++ , tmp += width * 3 , src += w)
 				memcpy(tmp, src, w);
 		}
 		done_cmyk2rgb(settings);
@@ -3926,7 +3927,8 @@ fail:	fclose(fp);
 }
 
 static const char base64[] =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+	"!#$%&'()*,-.:;<=>?@[]^_`{|}~",
 	hex[] = "0123456789ABCDEF";
 
 /* Extract valid C identifier from filename */
@@ -4001,7 +4003,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		trans = settings->xpm_trans;
 	}
 
-	cpp = cols > 64 ? 2 : 1;
+	cpp = cols > 92 ? 2 : 1;
 	buf = malloc(w * cpp + 16);
 	if (!buf) return -1;
 
@@ -4033,8 +4035,12 @@ static int save_xpm(char *file_name, ls_settings *settings)
 			fprintf(fp, "\"%s\tc None\",\n", ws);
 			continue;
 		}
-		ws[0] = ctb[i & 63];
-		if (cpp > 1) ws[1] = ctb[i >> 6];
+		if (cpp > 1)
+		{
+			ws[0] = ctb[i & 63];
+			ws[1] = ctb[i >> 6];
+		}
+		else ws[0] = ctb[i];
 		src = rgbmem + i * 4;
 		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
 			src[0], src[1], src[2]);
