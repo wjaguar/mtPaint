@@ -6,10 +6,12 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.41	2013-??-??
 	* Undo system now uses a bit less memory
+	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
+	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale
 
 3.40	2011-12-30
 

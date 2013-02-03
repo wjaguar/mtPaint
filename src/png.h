@@ -55,6 +55,7 @@ enum {
 	FT_LAYERS2,
 	FT_PIXMAP,
 	FT_SVG,
+	FT_PMM,
 	NUM_FTYPES
 };
 

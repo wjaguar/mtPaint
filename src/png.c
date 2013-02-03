@@ -139,6 +139,9 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "PIXMAP", "", "", FF_RGB | FF_NOSAVE },
 /* SVG image - import only */
 	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
+/* mtPaint's own format - extended PAM */
+	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
+		| FF_TRANS | FF_LAYER } // | FF_PALETTE | FF_MEM
 };
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -407,6 +410,57 @@ static int mfseek(memFILE *mf, long offset, int mode)
 	else return (-1);
 	mf->here = offset;
 	return (0);
+}
+
+static char *mfgets(char *s, int size, memFILE *mf)
+{
+	size_t m;
+	char *t, *v;
+
+	if (mf->file) return (fgets(s, size, mf->file));
+
+	if (size < 1) return (NULL);
+	if ((mf->here < 0) || (mf->here > mf->top)) return (NULL);
+	m = mf->top - mf->here;
+	if (m >= (unsigned)size) m = size - 1;
+	t = memchr(v = mf->buf + mf->here, '\n', m);
+	if (t) m = t - v + 1;
+	memcpy(s, v, m);
+	s[m] = '\0';
+	mf->here += m;
+	return (s);
+}
+
+static int mfputs(const char *s, memFILE *mf)
+{
+	size_t l;
+
+	if (mf->file) return (fputs(s, mf->file));
+
+	l = strlen(s);
+	return (!l || mfwrite((void *)s, l, 1, mf) ? 0 : EOF);
+}
+
+static int mfputss(memFILE *mf, const char *s, ...)
+{
+	va_list args;
+	size_t l;
+	int m = 0;
+
+	va_start(args, s);
+	while (s)
+	{
+		if (mf->file) m = fputs(s, mf->file);
+		else
+		{
+			l = strlen(s);
+			m = !l || mfwrite((void *)s, l, 1, mf) ? 0 : EOF;
+		}
+		if (m < 0) break;
+		s = va_arg(args, const char *);
+	}
+	va_end(args);
+	return (m);
 }
 
 /* Fills temp buffer row, or returns image row if no buffer */
@@ -3953,7 +4007,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	str_hash cuckoo;
 	FILE *fp;
 	int bpp = settings->bpp, w = settings->width, h = settings->height;
-	int i, j, k, l, cpp, cols, trans = -1;
+	int i, j, k, l, cpp, cols, ccmask, trans = -1;
 
 
 	tmp = extract_ident(file_name, &l);
@@ -4023,6 +4077,8 @@ static int save_xpm(char *file_name, ls_settings *settings)
 			settings->hot_x, settings->hot_y);
 	else fprintf(fp, "\"%d %d %d %d\",\n", w, h, cols, cpp);
 
+	ccmask = 255 >> cpp; // 63 for 2 cpp, 127 for 1
+
 	/* Create colortable */
 	ctb = cols > 16 ? base64 : hex;
 	ws[1] = ws[2] = '\0';
@@ -4035,12 +4091,8 @@ static int save_xpm(char *file_name, ls_settings *settings)
 			fprintf(fp, "\"%s\tc None\",\n", ws);
 			continue;
 		}
-		if (cpp > 1)
-		{
-			ws[0] = ctb[i & 63];
-			ws[1] = ctb[i >> 6];
-		}
-		else ws[0] = ctb[i];
+		ws[0] = ctb[i & ccmask];
+		if (cpp > 1) ws[1] = ctb[i >> 6];
 		src = rgbmem + i * 4;
 		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
 			src[0], src[1], src[2]);
@@ -4058,7 +4110,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 			if (k == trans) tmp[0] = tmp[1] = ' ';
 			else
 			{
-				tmp[0] = ctb[k & 63];
+				tmp[0] = ctb[k & ccmask];
 				tmp[1] = ctb[k >> 6];
 			}
 		}
@@ -5350,14 +5402,15 @@ static void convert_16b(unsigned char *dest, unsigned char *src, int len,
 static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
 	int bpp, int step, int maxval)
 {
-	int i;
+	int i, dd = 0;
 
 	if (!(step -= bpp)) bpp *= len , len = 1;
+	else if (step < 0) bpp -= dd = -step , step = 0;
 	while (len-- > 0)
 	{
 		i = bpp;
 		while (i--) *dest++ = *src++;
-		src += step;
+		src += step; dest += dd;
 	}	
 }
 
@@ -5385,6 +5438,66 @@ static int check_next_pnm(FILE *fp, char id)
 	return (1);
 }
 
+/* Parse PAM header */
+static char *pam_behead(memFILE *mf, int whdm[4])
+{
+	char wbuf[2048];
+	char *t1, *t2, *tail, *res = NULL;
+	int i, n, l, flag = 0;
+
+	/* Read header, check for basic PAM */
+	if (!mfgets(wbuf, sizeof(wbuf), mf) || strncmp(wbuf, "P7", 2))
+		return (NULL);
+	while (TRUE)
+	{
+		if (!mfgets(wbuf, sizeof(wbuf), mf)) break;
+		if (!wbuf[0] || (wbuf[0] == '#')) continue; // Empty line or comment
+		t1 = wbuf + strspn(wbuf, WHITESPACE);
+		l = strcspn(t1, WHITESPACE);
+		t2 = t1 + l + strspn(t1 + l, WHITESPACE);
+		t1[l] = '\0';
+		if (!strcmp(t1, "ENDHDR"))
+		{
+			if (flag < 0x0F) break; // Incomplete header
+			return (res ? res : strdup("")); // TUPLTYPE is optional
+		}
+		if (!*t2) break; // There must be something but whitespace
+		tail = t2 + strcspn(t2, WHITESPACE);
+		if (!strcmp(t1, "TUPLTYPE"))
+		{
+			if (res) continue; // Only first value matters
+			while (TRUE)
+			{
+				t1 = tail + strspn(tail, WHITESPACE);
+				if (!*t1) break;
+				tail = t1 + strcspn(t1, WHITESPACE);
+			}
+			// Preserve value for caller
+			*tail = '\0';
+			res = strdup(t2);
+			continue;
+		}
+		// Other fields are numeric
+		*tail = '\0';
+		i = strtol(t2, &tail, 10);
+		if (*tail) break;
+		if (i < 1) break; // Must be at least 1
+
+		if (!strcmp(t1, "WIDTH")) n = 0;
+		else if (!strcmp(t1, "HEIGHT")) n = 1;
+		else if (!strcmp(t1, "DEPTH")) n = 2;
+		else if (!strcmp(t1, "MAXVAL")) n = 3;
+		else break; // Unknown IDs not allowed
+
+		whdm[n] = i;
+		n = 1 << n;
+		if (flag & n) break; // No duplicate entries
+		flag |= n;
+	}
+	free(res);
+	return (NULL);
+}
+
 /* PAM loader does not support nonstandard types "GRAYSCALEFP" and "RGBFP",
  * because handling format variations which aren't found in the wild
  * is a waste of code - WJ */
@@ -5397,58 +5510,33 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 		"RGB", "RGB_ALPHA",
 		"CMYK", "CMYK_ALPHA" };
 	static const char depths[] = { 1, 2, 1, 2, 3, 4, 4, 5 };
+	memFILE fake_mf;
 	cvt_func cvt_stream;
-	char wbuf[512], *t1, *t2, *tail;
+	char *t1;
 	unsigned char *dest, *buf = NULL;
-	int maxval = 0, w = 0, h = 0, depth = 0, ftype = -1;
-	int i, j, l, ll, bpp, trans, vl, res;
+	int maxval, w, h, depth, ftype = -1;
+	int i, j, ll, bpp, trans, vl, res, whdm[4];
 
 
 	/* Read header */
-	if (!fgets(wbuf, sizeof(wbuf), fp) || strncmp(wbuf, "P7", 2))
-		return (-1);
-	while (TRUE)
+	memset(&fake_mf, 0, sizeof(fake_mf));
+	fake_mf.file = fp;
+	if (!(t1 = pam_behead(&fake_mf, whdm))) return (-1);
+	/* Compare TUPLTYPE to list of known ones */
+	if (*t1) for (i = 0; typenames[i]; i++)
 	{
-		if (!fgets(wbuf, sizeof(wbuf), fp)) return (-1);
-		if (!wbuf[0] || (wbuf[0] == '#')) continue; // Empty line or comment
-		t2 = NULL;
-		t1 = wbuf + strspn(wbuf, WHITESPACE);
-		l = strcspn(t1, WHITESPACE);
-		if (t1[l])
-		{
-			t2 = t1 + l + strspn(t1 + l, WHITESPACE);
-			t2[strcspn(t2, WHITESPACE)] = '\0';
-		}
-		t1[l] = '\0';
-		if (!strcmp(t1, "ENDHDR")) break;
-		if (!strcmp(t1, "TUPLTYPE"))
-		{
-			if (!t2) continue;
-			for (i = 1; typenames[i]; i++)
-			{
-				if (strcmp(t2, typenames[i])) continue;
-				ftype = i;
-				break;
-			}	
-			continue;
-		}
-
-		if (!t2) return (-1); // Failure - other fields are numeric
-		i = strtol(t2, &tail, 10);
-		if (*tail) return (-1);
-
-		if (!strcmp(t1, "HEIGHT")) h = i;
-		else if (!strcmp(t1, "WIDTH")) w = i;
-		else if (!strcmp(t1, "DEPTH")) depth = i;
-		else if (!strcmp(t1, "MAXVAL")) maxval = i;
-		else return (-1); // Unknown IDs not allowed
+		if (strcmp(t1, typenames[i])) continue;
+		ftype = i;
+		break;
 	}
+	free(t1); // No use anymore
+	w = whdm[0]; h = whdm[1]; depth = whdm[2]; maxval = whdm[3];
 	/* Interpret unknown content as RGB or grayscale */
 	if (ftype < 0) ftype = depth >= 3 ? 4 : 2;
 
 	/* Validate */
-	if ((depth < depths[ftype]) || (depth > 16) ||
-		(maxval < 1) || (maxval > 65535)) return (-1);
+	if ((depth < depths[ftype]) || (depth > 16) || (maxval > 65535))
+		return (-1);
 	bpp = ftype < 4 ? 1 : 3;
 	trans = ftype & 1;
 	vl = maxval < 256 ? 1 : 2;
@@ -5894,6 +5982,292 @@ static int save_pam(char *file_name, ls_settings *settings)
 	return (0);
 }
 
+/* *** PREFACE ***
+ * PMM is mtPaint's own format, extending the PAM format in a compatible way;
+ * PAM tools from Netpbm can easily split a PMM file into regular PAM files, or
+ * build it back from these. Some extra values are stored inside the "TUPLTYPE"
+ * fields, because Netpbm tools do NOT preserve comments but don't much care
+ * about TUPLTYPE. Other things, like palette, are stored as separate
+ * pseudo-images preceding the bitmap, with their own TUPLTYPE and extra values.
+ * When building a PMM file out of PAMs by hand, just write out the PMM_ID1
+ * string, below, before the first PAM file - WJ */
+
+# define PMM_ID1 "P7\n#MTPAINT#"
+
+/* Compare & skip type tag */
+static char *cmptag(char *buf, char *str)
+{
+	int l = strlen(str);
+
+	if (l)
+	{	
+		if (str[l - 1] == '_') l--; // Optional continuation
+		if (strncmp(buf, str, l)) return (NULL); // Mismatch
+		buf += l;
+		if (str[l] && (*buf == '_')) return (buf + 1); // Continued
+	}
+	l = strspn(buf, WHITESPACE);
+	if (!l && *buf) return (NULL); // Garbage
+	return (buf + l); // Skip whitespace
+}
+
+/* Skip type tags */
+static char *skiptags(char *s)
+{
+	int l;
+
+	while (*s)
+	{
+		l = strcspn(s, "=" WHITESPACE);
+		if (s[l] == '=') break;
+		s = s + l + strspn(s + l, WHITESPACE);
+	}
+	return (s);
+}
+
+static int load_pmm_frame(memFILE *mf, ls_settings *settings)
+{
+	unsigned char *dest, *buf = NULL;
+	char *t1, *t2, *tail, *ttype = NULL;
+	int w, h, depth, rgbpp = 1, cmask = CMASK_IMAGE;
+	int i, j, l, res, whdm[4], slots[NUM_CHANNELS];
+
+	while (TRUE)
+	{
+		res = -1;
+		free(ttype);
+		if (!(ttype = pam_behead(mf, whdm))) break;
+		if (whdm[3] != 255) break; // Only the natural maxval
+		depth = whdm[2];
+		if (depth > 16) break; // Depth limited to sane values
+		w = whdm[0]; h = whdm[1];
+
+		if ((t1 = cmptag(ttype, "PALETTE")))
+		{
+			unsigned char pbuf[256 * 16], *tp = pbuf;
+
+			/* Parse parameters */
+			t2 = skiptags(t1); // Skip channel tags
+			while ((t2 = strchr(t1 = t2, '=')))
+			{
+				*t2++ = '\0';
+				l = strcspn(t2, WHITESPACE);
+				if (!l) break; // Format violation - stop
+				i = strtol(t2, &tail, 10);
+				if (tail - t2 < l) break; // Wrong value - stop
+				t2 = t2 + l + strspn(t2 + l, WHITESPACE);
+				/* Got something - find out what */
+				if (!strcmp(t1, "TRANS"))
+				{
+					/* Indexed transparency */
+					if ((i >= 0) && (i < w))
+						settings->xpm_trans = i;
+				}
+				// !!! No other parameters here yet
+			}
+
+			/* Validate */
+			if ((depth < 3) || (w < 2) || (w > 256) || (h != 1)) break;
+			if (mfread(pbuf, depth, w, mf) != w) break; // Failed
+			/* Store palette */
+			settings->colors = w;
+			for (i = 0; i < w; i++)
+			{
+				settings->pal[i].red = tp[0];
+				settings->pal[i].green = tp[1];
+				settings->pal[i].blue = tp[2];
+				tp += depth;
+			}
+			/* If palette is all we need */
+			res = EXPLODE_FAILED;
+			if ((settings->mode == FS_PALETTE_LOAD) ||
+				(settings->mode == FS_PALETTE_DEF)) break;
+			continue;
+		}
+
+		if (!((t1 = t2 = cmptag(ttype, "INDEXED_")) ||
+			(t1 = cmptag(ttype, "RGB_"))))
+		{
+			/* !!! IGNORE anything unrecognized */
+			mfseek(mf, w * h * depth, SEEK_CUR);
+			continue;
+		}
+
+		/* Got an image bitmap */
+		if (!t2) rgbpp = 3;
+		/* Add up extra channels */
+		memset(slots, 0, sizeof(slots));
+		j = rgbpp;
+		while (*t1)
+		{
+			if ((t2 = cmptag(t1, "ALPHA"))) i = CHN_ALPHA;
+			else if ((t2 = cmptag(t1, "SELECTION"))) i = CHN_SEL;
+			else if ((t2 = cmptag(t1, "MASK"))) i = CHN_MASK;
+			else
+			{
+				l = strcspn(t1, "=" WHITESPACE);
+				// Parameters - stop
+				if (t1[l] == '=') break;
+				// Unknown channel - skip
+				t1 += l + strspn(t1 + l, WHITESPACE);
+				j++;
+				continue;
+			}
+			slots[i] = j++;
+			cmask |= CMASK_FOR(i);
+			t1 = t2;
+		}
+		if (j > depth) break; // Cannot be
+
+		// !!! No parameters here yet
+
+		l = w * depth;
+		/* Allocate row buffer if cannot read directly into image */
+		if (rgbpp != depth)
+		{
+			res = FILE_MEM_ERROR;
+			if (!(buf = malloc(l))) break;
+		}
+		/* Allocate image */
+		settings->width = w;
+		settings->height = h;
+		settings->bpp = rgbpp;
+		if ((res = allocate_image(settings, cmask))) break;
+
+		/* Read the image */
+		if (!settings->silent) ls_init("* PMM *", 0);
+		res = FILE_LIB_ERROR;
+		for (i = 0; i < h; i++)
+		{
+			dest = settings->img[CHN_IMAGE] + w * rgbpp * i;
+			if (!mfread(buf ? buf : dest, l, 1, mf)) goto fail;
+			ls_progress(settings, i, 10);
+			if (!buf) continue; // Nothing else to do here
+
+			copy_bytes(dest, buf, w, rgbpp, depth, 0);
+			for (j = CHN_ALPHA; j < NUM_CHANNELS; j++)
+				if (settings->img[j]) copy_bytes(
+					settings->img[j] + w * i,
+					buf + slots[j], w, 1, depth, 0);
+		}
+		res = 1;
+
+		/* Check for next frame */
+		if (mfread(ttype, 2, 1, mf)) // it was no shorter than "RGB"
+		{
+			mfseek(mf, -2, SEEK_CUR);
+			if (!strncmp(ttype, "P7", 2)) res = FILE_HAS_FRAMES;
+		}
+
+fail:		if (!settings->silent) progress_end();
+		break;
+	}
+	free(buf);
+	free(ttype);
+	return (res);
+}
+
+static int load_pmm_frames(char *file_name, ani_settings *ani, memFILE *mf)
+{
+// !!! For now
+	return (-1);
+}
+
+static int load_pmm(char *file_name, ls_settings *settings, memFILE *mf)
+{
+	memFILE fake_mf;
+	FILE *fp = NULL;
+	int res;
+
+	if (!mf)
+	{
+		if (!(fp = fopen(file_name, "rb"))) return (-1);
+		memset(mf = &fake_mf, 0, sizeof(fake_mf));
+		fake_mf.file = fp;
+	}
+	res = load_pmm_frame(mf, settings);
+	if (fp) fclose(fp);
+	return (res);
+}
+
+static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
+{
+	unsigned char *dest, *src, *buf = NULL;
+	unsigned char sbuf[768];
+	memFILE fake_mf;
+	FILE *fp = NULL;
+	int rgbpp = settings->bpp, w = settings->width, h = settings->height;
+	int i, k, bpp;
+
+
+	for (i = bpp = 0; i < NUM_CHANNELS; i++) bpp += !!settings->img[i];
+	bpp += rgbpp - 1;
+	if (bpp != rgbpp)
+	{
+		buf = malloc(w * bpp);
+		if (!buf) return (-1);
+	}
+
+	if (!mf)
+	{
+		if (!(fp = fopen(file_name, "wb")))
+		{
+			free(buf);
+			return (-1);
+		}
+		memset(mf = &fake_mf, 0, sizeof(fake_mf));
+		fake_mf.file = fp;
+	}
+
+	if (!settings->silent) ls_init("* PMM *", 1);
+
+	/* First, write palette */
+	mfputs(PMM_ID1 "\n", mf);
+	snprintf(sbuf, sizeof(sbuf), "WIDTH %d\n", settings->colors);
+	mfputs(sbuf, mf);
+	// Extra data for palette: transparent index if any
+	sbuf[0] = '\0';
+	if (settings->xpm_trans >= 0) snprintf(sbuf, sizeof(sbuf),
+		" TRANS=%d", settings->xpm_trans);
+	mfputss(mf, "HEIGHT 1\nDEPTH 3\nMAXVAL 255\nTUPLTYPE PALETTE", sbuf,
+		"\nENDHDR\n", NULL);
+	pal2rgb(sbuf, settings->pal);
+	mfwrite(sbuf, 1, settings->colors * 3, mf);
+
+	/* Now, write image bitmap */
+	mfputs(PMM_ID1 "\n", mf);
+	snprintf(sbuf, sizeof(sbuf), "WIDTH %d\nHEIGHT %d\nDEPTH %d\n",
+		w, h, bpp);
+	mfputss(mf, sbuf, "MAXVAL 255\nTUPLTYPE ",
+		rgbpp > 1 ? "RGB" : "INDEXED",
+		settings->img[CHN_ALPHA] ? "_ALPHA" : "",
+		settings->img[CHN_SEL] ? " SELECTION" : "",
+		settings->img[CHN_MASK] ? " MASK" : "",
+		"\nENDHDR\n", NULL);
+
+	for (i = 0; i < h; i++)
+	{
+		src = settings->img[CHN_IMAGE] + i * w * rgbpp;
+		if ((dest = buf))
+		{
+			copy_bytes(dest, src, w, bpp, rgbpp, 0);
+			dest += rgbpp;
+			for (k = CHN_ALPHA; k < NUM_CHANNELS; k++)
+				if (settings->img[k]) copy_bytes(dest++,
+					settings->img[k] + i * w, w, bpp, 1, 0);
+			src = buf;
+		}
+		mfwrite(src, 1, w * bpp, mf);
+		ls_progress(settings, i, 20);
+	}
+	if (fp) fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return 0;
+}
+
 /* Put screenshots and X pixmaps on an equal footing with regular files */
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
@@ -6285,6 +6659,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_PBM: res = save_pbm(file_name, &setw); break;
 	case FT_PPM: res = save_ppm(file_name, &setw); break;
 	case FT_PAM: res = save_pam(file_name, &setw); break;
+	case FT_PMM: res = save_pmm(file_name, &setw, mf); break;
 	case FT_PIXMAP: res = save_pixmap(&setw, mf); break;
 	/* Palette files */
 	case FT_GPL:
@@ -6483,6 +6858,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_PGM:
 	case FT_PPM:
 	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
+	case FT_PMM: res0 = load_pmm(file_name, &settings, mf); break;
 	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
 #ifdef MAY_HANDLE_SVG
 	case FT_SVG: res0 = load_svg(file_name, &settings); break;
@@ -6648,6 +7024,7 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 }
 
 // !!! The only allowed modes for now are FS_LAYER_LOAD and FS_EXPLODE_FRAMES
+// !!! Load from memblock is not supported yet
 static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	int mode, int ftype)
 {
@@ -6683,6 +7060,7 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	case FT_PGM:
 	case FT_PPM:
 	case FT_PAM: return (load_pnm_frames(file_name, ani));
+	case FT_PMM: return (load_pmm_frames(file_name, ani, NULL));
 	}
 	return (-1);
 }
@@ -6919,6 +7297,8 @@ static int do_detect_format(char *name, FILE *fp)
 	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
+
+	if (!memcmp(buf, PMM_ID1, 12)) return (FT_PMM);
 
 	if (!memcmp(buf, "P7", 2)) return (FT_PAM);
 	if ((buf[0] == 'P') && (buf[1] >= '1') && (buf[1] <= '6'))
