@@ -99,10 +99,6 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
-/* !!! Ideal state */
-//	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_LAYER
-//		/* | FF_TRANS */ },
-/* !!! Current state */
 	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_LAYER },
 #else
 	{ "", "", "", 0},
@@ -116,10 +112,6 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "XPM", "xpm", "", FF_256 | FF_RGB | FF_TRANS | FF_SPOT },
 	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
-/* !!! Ideal state */
-//	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-//		| FF_TRANS | FF_COMPR },
-/* !!! Current state */
 	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS | FF_COMPR },
 	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 	{ "PBM", "pbm", "", FF_BW | FF_LAYER },
@@ -141,7 +133,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 /* mtPaint's own format - extended PAM */
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_LAYER } // | FF_PALETTE | FF_MEM
+		| FF_TRANS | FF_LAYER | FF_MEM } // | FF_PALETTE ?
 };
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -1140,7 +1132,7 @@ static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
 	stat->newtrans = settings->xpm_trans;
 
 	/* Prepare for new frame */
-	if (stat->mode == ANM_RAW) // Raw frame mode
+	if (stat->mode <= ANM_RAW) // Raw frame mode
 	{
 		stat->defw = settings->width;
 		stat->defh = settings->height;
@@ -1339,7 +1331,7 @@ static void composite_gif_frame(frameset *fset, ani_status *stat,
 
 	frame->trans = stat->newtrans;
 	/* In raw mode, just store the offsets */
-	if (stat->mode == ANM_RAW)
+	if (stat->mode <= ANM_RAW)
 	{
 		frame->x = settings->x;
 		frame->y = settings->y;
@@ -3020,9 +3012,6 @@ static int load_tiff(char *file_name, ls_settings *settings)
 
 static int save_tiff(char *file_name, ls_settings *settings)
 {
-/* !!! No private exts for now */
-//	char buf[512];
-
 	unsigned char *src, *row = NULL;
 	uint16 rgb[256 * 3], xs[NUM_CHANNELS];
 	int i, j, k, dt, xsamp = 0, cmask = CMASK_IMAGE, res = 0;
@@ -3032,9 +3021,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	/* Find out number of utility channels */
 	memset(xs, 0, sizeof(xs));
 
-/* !!! Only alpha channel as extra, for now */
 	for (i = CHN_ALPHA; i <= CHN_ALPHA; i++)
-//	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 	{
 		if (!settings->img[i]) continue;
 		cmask |= CMASK_FOR(i);
@@ -3047,26 +3034,13 @@ static int save_tiff(char *file_name, ls_settings *settings)
 		if (!row) return -1;
 	}
 
-	TIFFSetErrorHandler(NULL);		// We don't want any echoing to the output
+	TIFFSetErrorHandler(NULL);	// We don't want any echoing to the output
 	TIFFSetWarningHandler(NULL);
 	if (!(tif = TIFFOpen( file_name, "w" )))
 	{
 		free(row);
 		return -1;
 	}
-
-/* !!! No private exts for now */
-#if 0
-	/* Write private extension info in comments */
-	TIFFSetField(tif, TIFFTAG_SOFTWARE, "mtPaint 3");
-	// Extensions' version, then everything useful but lacking a TIFF tag
-	i = sprintf(buf, "VERSION=%d\n", TIFFX_VERSION);
-	i += sprintf(buf + i, "CHANNELS=%d\n", cmask);
-	i += sprintf(buf + i, "COLORS=%d\n", settings->colors);
-	i += sprintf(buf + i, "TRANSPARENCY=%d\n",
-		bpp == 1 ? settings->xpm_trans : settings->rgb_trans);
-	TIFFSetField(tif, TIFFTAG_IMAGEDESCRIPTION, buf);
-#endif
 
 	/* Write regular tags */
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
@@ -4721,12 +4695,6 @@ static int load_tga(char *file_name, ls_settings *settings)
 			assoc_alpha = ext[TGA_ATYPE] == 4;
 		/* Can believe alpha bits contain alpha if this field says so */
 		real_alpha |= assoc_alpha | (ext[TGA_ATYPE] == 3);
-/* !!! No private extensions for now */
-#if 0
-		if (strcmp(ext + TGA_SOFTID, "mtPaint")) break;
-		if (GET16(ext + TGA_SOFTV) <= 310) break;
-		/* !!! Read and interpret developer directory */
-#endif
 		break;
 	}
 
@@ -5066,7 +5034,6 @@ static int save_tga(char *file_name, ls_settings *settings)
 
 	/* Write footer */
 	memcpy(ftr + TGA_SIGN, "TRUEVISION-XFILE.", TGA_FSIZE - TGA_SIGN);
-/* !!! No private extensions for now */
 	memset(ftr, 0, TGA_SIGN);
 	fwrite(ftr, 1, TGA_FSIZE, fp);
 
@@ -6060,7 +6027,7 @@ static int load_pmm_frame(memFILE *mf, ls_settings *settings)
 				if (!strcmp(t1, "TRANS"))
 				{
 					/* Indexed transparency */
-					if ((i >= 0) && (i < w))
+					if ((i >= -1) && (i < w))
 						settings->xpm_trans = i;
 				}
 				// !!! No other parameters here yet
@@ -6169,8 +6136,35 @@ fail:		if (!settings->silent) progress_end();
 
 static int load_pmm_frames(char *file_name, ani_settings *ani, memFILE *mf)
 {
-// !!! For now
-	return (-1);
+	memFILE fake_mf;
+	FILE *fp = NULL;
+	ls_settings w_set;
+	int res, anim, next;
+
+
+	if (!mf)
+	{
+		if (!(fp = fopen(file_name, "rb"))) return (-1);
+		memset(mf = &fake_mf, 0, sizeof(fake_mf));
+		fake_mf.file = fp;
+	}
+	anim = FALSE; // Multipage by default
+	while (TRUE)
+	{
+		w_set = ani->settings;
+		res = load_pmm_frame(mf, &w_set);
+		next = res == FILE_HAS_FRAMES;
+		if ((res != 1) && !next) break;
+/* !!! For lack of better ideas, anims are detected by presence of frame delay */
+		anim |= w_set.gif_delay >= 0;
+		if ((res = process_page_frame(file_name, ani, &w_set))) break;
+		res = 1;
+		if (!next) break;
+		res = FILE_TOO_LONG;
+		if (!check_next_frame(&ani->fset, ani->settings.mode, anim)) break;
+	}
+	fclose(fp);
+	return (res);
 }
 
 static int load_pmm(char *file_name, ls_settings *settings, memFILE *mf)
@@ -6779,7 +6773,7 @@ static void store_image_extras(image_info *image, image_state *state,
 	/* Accept vars which make sense */
 	state->xbm_hot_x = settings->hot_x;
 	state->xbm_hot_y = settings->hot_y;
-	preserved_gif_delay = settings->gif_delay;
+	if (settings->gif_delay > 0) preserved_gif_delay = settings->gif_delay;
 
 	/* Accept palette */
 	image->trans = settings->xpm_trans;
@@ -6810,6 +6804,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	}
 
 	init_ls_settings(&settings, NULL);
+	/* Preset delay to -1, to detect animations by its changing */
+	settings.gif_delay = -1;
 #ifdef U_LCMS
 	/* Set size to -1 when we don't want color profile */
 	if (!apply_icc || ((mode == FS_CHANNEL_LOAD) ? (MEM_BPP != 3) :
@@ -6889,8 +6885,14 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 			update_undo(&mem_image);
 			mem_undo_prepare();
 			if (lim) layer_copy_from_main(0);
-			/* Report whether the file is animated */
+			/* Report whether the file is animated or multipage */
 			res = res0;
+			if ((res == FILE_HAS_FRAMES) &&
+				/* If file contains frame delay value... */
+				((settings.gif_delay >= 0) ||
+				/* ...or it cannot be multipage at all... */
+				!(file_formats[ftype].flags & FF_LAYER)))
+				res = FILE_HAS_ANIM; /* ...then it's animated */
 		}
 		/* Failure */
 		else

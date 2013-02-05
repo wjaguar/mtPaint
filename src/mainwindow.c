@@ -330,6 +330,7 @@ static void pressed_mask(int val)
 
 static GtkTargetEntry clip_formats[] = {
 	{ NULL, 0, FT_NONE },
+	{ "application/x-mtpaint-pmm", 0, FT_PMM | FTM_EXTEND },
 	{ "application/x-mtpaint-clipboard", 0, FT_PNG | FTM_EXTEND },
 	{ "image/png", 0, FT_PNG },
 	{ "image/bmp", 0, FT_BMP },

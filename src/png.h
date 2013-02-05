@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -26,8 +26,9 @@
 #define FILE_LIB_ERROR  0xBAD01
 #define FILE_MEM_ERROR  0xBAD02
 #define FILE_HAS_FRAMES 0xBAD03
-#define FILE_TOO_LONG   0xBAD04
-#define FILE_EXP_BREAK  0xBAD05
+#define FILE_HAS_ANIM   0xBAD04
+#define FILE_TOO_LONG   0xBAD05
+#define FILE_EXP_BREAK  0xBAD06
 
 /* File types */
 enum {
@@ -97,9 +98,10 @@ enum {
 	(X).colors > 2 ? FF_16 | FF_256 : FF_IDX)
 
 /* Animation loading modes */
-#define ANM_RAW    0 /* Raw frames (as written) */
-#define ANM_COMP   1 /* Composited frames (as displayed) */
-#define ANM_NOZERO 2 /* Composited frames with nonzero delays (as seen) */
+#define ANM_PAGE    0 /* No animation (pages as written) */
+#define ANM_RAW     1 /* Raw frames (as written) */
+#define ANM_COMP    2 /* Composited frames (as displayed) */
+#define ANM_NOZERO  3 /* Composited frames with nonzero delays (as seen) */
 
 #define LONGEST_EXT 5
 

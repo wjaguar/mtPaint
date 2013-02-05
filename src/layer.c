@@ -664,7 +664,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	layer_node *t;
 	layer_image *lim;
 	frameset fset;
-	int anim = file_formats[ftype].flags & FF_ANIM;
+	int anim = ani_mode > ANM_PAGE;
 	int i, j, l, dx, dy, sens, res, res0, lname;
 
 

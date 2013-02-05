@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1305,7 +1305,7 @@ static void anim_dialog_fn(char *key)
 	*(key - *key) = *key;
 }
 
-static int anim_file_dialog(int ftype)
+static int anim_file_dialog(int ftype, int is_anim)
 {
 	char *modes[] = { _("Raw frames"), _("Composited frames"),
 		_("Composited frames with nonzero delay") };
@@ -1318,14 +1318,12 @@ static int anim_file_dialog(int ftype)
 	char *tmp;
 	GtkWidget *win, *vbox, *hbox, *label, *button;
 	GtkAccelGroup* ag = gtk_accel_group_new();
-	int i, is_anim;
+	int i;
 
 
 	/* This function is better be immune to pointer grabs */
 	release_grab();
 
-	ftype &= FTM_FTYPE;
-	is_anim = file_formats[ftype].flags & FF_ANIM;
 	if (!is_anim) opts[2] = NULL; // No view if not animated
 
 	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Load Frames"),
@@ -1333,7 +1331,8 @@ static int anim_file_dialog(int ftype)
 	vbox = add_vbox(win);
 	
 	tmp = g_strdup_printf(is_anim ? _("This is an animated %s file.") :
-		_("This is a multipage %s file."), file_formats[ftype].name);
+		_("This is a multipage %s file."),
+		file_formats[ftype & FTM_FTYPE].name);
 	label = pack5(vbox, gtk_label_new(tmp));
 	gtk_misc_set_padding(GTK_MISC(label), 0, 5);
 	g_free(tmp);
@@ -1401,6 +1400,7 @@ static void handle_file_error(int res)
 static GtkWidget *file_selector_create(int action_type);
 #define FS_XNAME_KEY "mtPaint.fs_xname"
 #define FS_XTYPE_KEY "mtPaint.fs_xtype"
+#define FS_XANIM_KEY "mtPaint.fs_xanim"
 
 int do_a_load(char *fname, int undo)
 {
@@ -1424,14 +1424,15 @@ int do_a_load(char *fname, int undo)
 
 loaded:
 	/* Multiframe file was loaded so tell user */
-	if (res == FILE_HAS_FRAMES)
+	if ((res == FILE_HAS_FRAMES) || (res == FILE_HAS_ANIM))
 	{
-		int i;
+		int i, is_anim = res == FILE_HAS_ANIM;
 
 		/* Don't ask user in viewer mode */
 // !!! When implemented, load as frameset & run animation in that case instead
 		if (viewer_mode && view_image_only) i = 0;
-		else i = anim_file_dialog(ftype);
+		else i = anim_file_dialog(ftype, is_anim);
+		is_anim = is_anim ? anim_mode : ANM_PAGE;
 
 		if (i == 3)
 		{
@@ -1444,7 +1445,7 @@ loaded:
 				layer_table[0].image = tip;
 				layer_selected = 0;
 			}
-			mult = res = load_to_layers(real_fname, ftype, anim_mode);
+			mult = res = load_to_layers(real_fname, ftype, is_anim);
 			goto loaded;
 		} 
 		else if (i == 1) /* Ask for directory to explode frames to */
@@ -1458,6 +1459,8 @@ loaded:
 					(GtkDestroyNotify)g_free);
 				gtk_object_set_data(GTK_OBJECT(fs),
 					FS_XTYPE_KEY, (gpointer)ftype);
+				gtk_object_set_data(GTK_OBJECT(fs),
+					FS_XANIM_KEY, (gpointer)is_anim);
 				fs_setup(fs, FS_EXPLODE_FRAMES);
 			}
 		}
@@ -1971,7 +1974,8 @@ static void fs_ok(GtkWidget *fs)
 	case FS_EXPLODE_FRAMES:
 		gif = gtk_object_get_data(GTK_OBJECT(fs), FS_XNAME_KEY);
 		res = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
-		res = explode_frames(fname, anim_mode, gif, res, settings.ftype);
+		i = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XANIM_KEY);
+		res = explode_frames(fname, i, gif, res, settings.ftype);
 		if (res != 1) handle_file_error(res);
 		if (res > 0) // Success or nonfatal error
 		{
