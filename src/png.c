@@ -133,7 +133,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 /* mtPaint's own format - extended PAM */
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_LAYER | FF_MEM } // | FF_PALETTE ?
+		| FF_TRANS | FF_LAYER | FF_PALETTE | FF_MEM }
 };
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -185,6 +185,27 @@ static void set_gray(ls_settings *settings)
 	mem_bw_pal(settings->pal, 0, 255);
 }
 
+/* Map RGB transparency to indexed */
+static void map_rgb_trans(ls_settings *settings)
+{
+	int i;
+
+	if ((settings->rgb_trans < 0) || (settings->bpp < 3)) return;
+	// Look for transparent colour in palette
+	for (i = 0; i < settings->colors; i++)
+	{
+		if (PNG_2_INT(settings->pal[i]) != settings->rgb_trans) continue;
+		settings->xpm_trans = i;
+		return;
+	}
+	// Colour not in palette so force it into last entry
+	settings->pal[255].red = INT_2_R(settings->rgb_trans);
+	settings->pal[255].green = INT_2_G(settings->rgb_trans);
+	settings->pal[255].blue = INT_2_B(settings->rgb_trans);
+	settings->xpm_trans = 255;
+	settings->colors = 256;
+}
+
 static int check_next_frame(frameset *fset, int mode, int anim)
 {
 	int lim = mode != FS_LAYER_LOAD ? FRAMES_MAX : anim ? MAX_LAYERS - 1 :
@@ -208,7 +229,7 @@ static int process_page_frame(char *file_name, ani_settings *ani, ls_settings *w
 	frame = ani->fset.frames + (ani->fset.cnt - 1);
 	frame->cols = w_set->colors;
 	frame->trans = w_set->xpm_trans;
-	frame->delay = 0;
+	frame->delay = w_set->gif_delay > 0 ? w_set->gif_delay : 0;
 	frame->x = w_set->x;
 	frame->y = w_set->y;
 	memcpy(frame->img, w_set->img, sizeof(chanlist));
@@ -2979,6 +3000,7 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 		if (!check_next_frame(&ani->fset, ani->settings.mode, FALSE))
 			goto fail;
 		w_set = ani->settings;
+		w_set.gif_delay = -1; // Multipage
 		res = load_tiff_frame(tif, &w_set);
 		if (res != 1) goto fail;
 		res = process_page_frame(file_name, ani, &w_set);
@@ -4500,17 +4522,27 @@ static int save_lss(char *file_name, ls_settings *settings)
 #define TGA_ATYPE   494 /* 8b */
 #define TGA_EXTSIZE 495
 
+static void extend_bytes(unsigned char *dest, int len, int maxval)
+{
+	unsigned char tb[256];
+
+	memset(tb, 255, 256);
+	set_xlate_n(tb, maxval);
+	do_xlate(tb, dest, len);
+}
+
 static int load_tga(char *file_name, ls_settings *settings)
 {
 	unsigned char hdr[TGA_HSIZE], ftr[TGA_FSIZE], ext[TGA_EXTSIZE];
-	unsigned char pal[256 * 4], xlat5[32], xlat67[128], trans[256];
+	unsigned char pal[256 * 4], xlat5[32], xlat6[64], trans[256];
 	unsigned char *buf = NULL, *dest, *dsta, *src = NULL, *srca = NULL;
+	unsigned char *bstart, *bstop;
 	FILE *fp;
 	int i, k, w, h, bpp, ftype, ptype, ibpp, rbits, abits, itrans = FALSE;
 	int rle, real_alpha = FALSE, assoc_alpha = FALSE, wmode = 0, res = -1;
 	int fl, fofs, iofs, buflen;
 	int ix, ishift, imask, ax, ashift, amask;
-	int start, xstep, xstepb, ystep, bstart, bstop, ccnt, rcnt, strl, y;
+	int start, xstep, xstepb, ystep, ccnt, rcnt, strl, y;
 
 
 	if (!(fp = fopen(file_name, "rb"))) return (-1);
@@ -4537,6 +4569,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	ibpp = (rbits + 7) >> 3;
 	rbits -= abits;
 
+	set_xlate(xlat5, 5);
 	ptype = hdr[TGA_PALTYPE];
 	switch (ftype & 3)
 	{
@@ -4569,7 +4602,6 @@ static int load_tga(char *file_name, ls_settings *settings)
 		/* Store the palette */
 		settings->colors = j + k;
 		memset(settings->pal, 0, 256 * 3);
-		if (pbpp == 2) set_xlate(xlat5, 5);
 		pptr = settings->pal + k;
 		for (i = 0; i < l; i += pbpp , pptr++)
 		{
@@ -4629,8 +4661,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 			if (abits) goto fail;
 			if (tga_565)
 			{
-				set_xlate(xlat5, 5);
-				set_xlate(xlat67, 6);
+				set_xlate(xlat6, 6);
 				wmode = 4;
 				break;
 			}
@@ -4639,7 +4670,6 @@ static int load_tga(char *file_name, ls_settings *settings)
 		case 15: /* 5:5:5 BGR or 5:5:5:1 BGRA */
 			if (abits > 1) goto fail;
 			abits = 1; /* Here it's unreliable to uselessness */
-			set_xlate(xlat5, 5);
 			wmode = 2;
 			break;
 		case 32: /* 8:8:8 BGR or 8:8:8:8 BGRA */
@@ -4737,7 +4767,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 	dest = settings->img[CHN_IMAGE] + start * bpp;
 	dsta = settings->img[CHN_ALPHA] + start;
 	y = ccnt = rcnt = 0;
-	bstart = bstop = buflen;
+	bstart = bstop = buf + buflen;
 	strl = w;
 	while (TRUE)
 	{
@@ -4746,13 +4776,13 @@ static int load_tga(char *file_name, ls_settings *settings)
 		j = bstop - bstart;
 		if (j < ibpp)
 		{
-			if (bstop < buflen) goto fail3; /* Truncated file */
-			memcpy(buf, buf + bstart, j);
-			bstart = 0;
-			bstop = j + fread(buf + j, 1, buflen - j, fp);
+			if (bstop - buf < buflen) goto fail3; /* Truncated file */
+			memcpy(buf, bstart, j);
+			j += fread(buf + j, 1, buflen - j, fp);
+			bstop = (bstart = buf) + j;
 			if (!rle) /* Uncompressed */
 			{
-				if (bstop < buflen) goto fail3; /* Truncated file */
+				if (j < buflen) goto fail3; /* Truncated file */
 				rcnt = w; /* "Copy block" a row long */
 			}
 		}
@@ -4761,44 +4791,43 @@ static int load_tga(char *file_name, ls_settings *settings)
 			/* Read pixels */
 			if (rcnt)
 			{
-				int l;
+				int l, n;
 
 				l = rcnt < strl ? rcnt : strl;
-				if (bstart + ibpp * l > bstop)
-					l = (bstop - bstart) / ibpp;
+				if (j < ibpp * l) l = j / ibpp;
 				rcnt -= l; strl -= l;
 				while (l--)
 				{
 					switch (wmode)
 					{
 					case 1: /* Generic alpha */
-						*dsta = (((buf[bstart + ax + 1] << 8) +
-							buf[bstart + ax]) >> ashift) & amask;
+						*dsta = (((bstart[ax + 1] << 8) +
+							bstart[ax]) >> ashift) & amask;
 					case 0: /* Generic single channel */
-						*dest = (((buf[bstart + ix + 1] << 8) +
-							buf[bstart + ix]) >> ishift) & imask;
+						*dest = (((bstart[ix + 1] << 8) +
+							bstart[ix]) >> ishift) & imask;
 						break;
 					case 3: /* One-bit alpha for 16 bpp */
-						*dsta = buf[bstart + 1] >> 7;
+						*dsta = bstart[1] >> 7;
 					case 2: /* 5:5:5 BGR */
-						dest[0] = xlat5[(buf[bstart + 1] >> 2) & 0x1F];
-						dest[1] = xlat5[(((buf[bstart + 1] << 8) +
-							buf[bstart]) >> 5) & 0x1F];
-						dest[2] = xlat5[buf[bstart] & 0x1F];
+						n = (bstart[1] << 8) + bstart[0];
+						dest[0] = xlat5[(n >> 10) & 0x1F];
+						dest[1] = xlat5[(n >> 5) & 0x1F];
+						dest[2] = xlat5[n & 0x1F];
 						break;
 					case 5: /* Cannot happen */
 					case 4: /* 5:6:5 BGR */
-						dest[0] = xlat5[buf[bstart + 1] >> 3];
-						dest[1] = xlat67[(((buf[bstart + 1] << 8) +
-							buf[bstart]) >> 5) & 0x3F];
-						dest[2] = xlat5[buf[bstart] & 0x1F];
+						n = (bstart[1] << 8) + bstart[0];
+						dest[0] = xlat5[n >> 11];
+						dest[1] = xlat6[(n >> 5) & 0x3F];
+						dest[2] = xlat5[n & 0x1F];
 						break;
 					case 7: /* One-byte alpha for 32 bpp */
-						*dsta = buf[bstart + 3];
+						*dsta = bstart[3];
 					case 6: /* 8:8:8 BGR */
-						dest[0] = buf[bstart + 2];
-						dest[1] = buf[bstart + 1];
-						dest[2] = buf[bstart + 0];
+						dest[0] = bstart[2];
+						dest[1] = bstart[1];
+						dest[2] = bstart[0];
 						break;
 					}
 					dest += xstepb;
@@ -4827,8 +4856,9 @@ static int load_tga(char *file_name, ls_settings *settings)
 				if (!strl || ccnt) break; /* Row end or buffer end */
 			}
 			/* Read block header */
-			if (bstart >= bstop) break; /* Nothing in buffer */
-			rcnt = buf[bstart++];
+			j = bstop - bstart - 1;
+			if (j < 0) break; /* Nothing in buffer */
+			rcnt = *bstart++;
 			if (rcnt > 0x7F) /* Repeat block - one read + some copies */
 			{
 				ccnt = rcnt & 0x7F;
@@ -4880,13 +4910,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 
 	/* Rescale alpha */
 	if (settings->img[CHN_ALPHA] && (abits < 8))
-	{
-		unsigned char *tmp = settings->img[CHN_ALPHA];
-		int i, j = w * h;
-
-		set_xlate(xlat67, abits);
-		for (i = 0; i < j; i++) tmp[i] = xlat67[tmp[i]];
-	}
+		extend_bytes(settings->img[CHN_ALPHA], w * h, (1 << abits) - 1);
 
 	/* Unassociate alpha */
 	if (settings->img[CHN_ALPHA] && assoc_alpha && (abits > 1))
@@ -5381,18 +5405,6 @@ static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
 	}	
 }
 
-static void extend_bytes(unsigned char *dest, int len, int maxval)
-{
-	unsigned char tb[256];
-	int i, j, m = maxval * 2;
-
-	memset(tb, 255, 256);
-	for (i = 0 , j = maxval; i <= maxval; i++ , j += 255 * 2)
-		tb[i] = j / m;
-
-	for (j = 0; j < len; j++ , dest++) *dest = tb[*dest];
-}
-
 static int check_next_pnm(FILE *fp, char id)
 {
 	char buf[2];
@@ -5804,6 +5816,7 @@ static int load_pnm_frames(char *file_name, ani_settings *ani)
 		if (!check_next_frame(&ani->fset, ani->settings.mode, FALSE))
 			goto fail;
 		w_set = ani->settings;
+		w_set.gif_delay = -1; // Multipage
 		res = (is_pam ? load_pam_frame : load_pnm_frame)(fp, &w_set);
 		next = res == FILE_HAS_FRAMES;
 		if ((res != 1) && !next) goto fail;
@@ -5961,83 +5974,143 @@ static int save_pam(char *file_name, ls_settings *settings)
 
 # define PMM_ID1 "P7\n#MTPAINT#"
 
-/* Compare & skip type tag */
-static char *cmptag(char *buf, char *str)
-{
-	int l = strlen(str);
+typedef struct {
+	char *next; // the rest of string
+	char *tag; // last found tag
+	int val; // its value if any
+} tagline;
 
-	if (l)
-	{	
-		if (str[l - 1] == '_') l--; // Optional continuation
-		if (strncmp(buf, str, l)) return (NULL); // Mismatch
-		buf += l;
-		if (str[l] && (*buf == '_')) return (buf + 1); // Continued
+/* Parse a tag out of string */
+static int nexttag(tagline *iter, int split_under)
+{
+	char *s, *tail, *str = iter->next;
+	int l, n, res = 1;
+
+	iter->tag = str;
+	if (!str || !*str) return (0); // Empty
+	l = strcspn(str, "_=" WHITESPACE + !split_under);
+	if (!l) return (0); // No tag here - format violation
+	s = str + l;
+	if (*s == '=') /* NAME=VALUE */
+	{
+		n = strtol(++s, &tail, 10);
+		if ((tail == s) || (*tail && !strchr(WHITESPACE, *tail)))
+			return (0); // Unparsable or no value - format violation
+		iter->val = n;
+		s = tail;
+		res = 2; // Have value
 	}
-	l = strspn(buf, WHITESPACE);
-	if (!l && *buf) return (NULL); // Garbage
-	return (buf + l); // Skip whitespace
+	else s += (*s == '_'); /* NAME_ */
+
+	iter->next = s + strspn(s, WHITESPACE);
+	str[l] = '\0';
+
+	return (res); // Parsed another tag
 }
 
-/* Skip type tags */
-static char *skiptags(char *s)
+/* Interpret known value tags, ignore unknown ones */
+static void readtags(tagline *tl, ls_settings *settings, int bpp)
 {
-	int l;
+	static const char *tags[] = { "TRANS", "DELAY", "X", "Y", NULL };
+	int j, i = 2;
 
-	while (*s)
+	// Skip channel tags if no extra channels
+	if (!bpp) while ((i = nexttag(tl, FALSE)) == 1);
+
+	while (i == 2)
 	{
-		l = strcspn(s, "=" WHITESPACE);
-		if (s[l] == '=') break;
-		s = s + l + strspn(s + l, WHITESPACE);
+		for (j = 0; tags[j] && strcmp(tl->tag, tags[j]); j++);
+		i = tl->val;
+
+		switch (j)
+		{
+		case 0: // Transparent color
+			/* Invalid value - ignore */
+			if (i < -1) break;
+			/* No transparency - disable */
+			if (i == -1) settings->xpm_trans =
+				settings->rgb_trans = -1;
+			/* Indexed transparency */
+			else if (bpp < 3)
+			{
+				if (i < settings->colors) settings->xpm_trans = i;
+			}
+			/* RGB transparency */
+			else if (i <= 0xFFFFFF)
+			{
+				int j = settings->xpm_trans;
+				png_color *p = settings->pal + j;
+				// Only if differs from indexed
+				if ((j < 0) || (PNG_2_INT(*p) != i))
+					settings->rgb_trans = i;
+			}
+			break;
+		case 1: // Anim delay, in 0.01 sec
+			if (i >= 0) settings->gif_delay = i;
+			break;
+		case 2: // X offset
+			settings->x = i;
+			break;
+		case 3: // Y offset
+			settings->y = i;
+			break;
+		// !!! No other parameters yet
+		}
+		i = nexttag(tl, FALSE);
 	}
-	return (s);
 }
 
 static int load_pmm_frame(memFILE *mf, ls_settings *settings)
 {
+	/* !!! INDEXED is at index 1, RGB at index 3 to use index as BPP */
+	static const char *blocks[] = { "TAGS", "INDEXED", "PALETTE", "RGB", NULL };
+	tagline tl;
 	unsigned char *dest, *buf = NULL;
-	char *t1, *t2, *tail, *ttype = NULL;
-	int w, h, depth, rgbpp = 1, cmask = CMASK_IMAGE;
+	char *ttype = NULL;
+	int w, h, depth, rgbpp, cmask = CMASK_IMAGE;
 	int i, j, l, res, whdm[4], slots[NUM_CHANNELS];
 
 	while (TRUE)
 	{
 		res = -1;
 		free(ttype);
-		if (!(ttype = pam_behead(mf, whdm))) break;
-		if (whdm[3] != 255) break; // Only the natural maxval
+		if (!(tl.next = ttype = pam_behead(mf, whdm))) break;
+		if (whdm[3] > 255) break; // 16-bit values not allowed
 		depth = whdm[2];
 		if (depth > 16) break; // Depth limited to sane values
 		w = whdm[0]; h = whdm[1];
 
-		if ((t1 = cmptag(ttype, "PALETTE")))
+		/* Parse out type tag */
+		j = -1;
+		if (nexttag(&tl, TRUE) == 1)
+		{
+			for (j = 0; blocks[j] && strcmp(blocks[j], tl.tag); j++);
+			if (!blocks[j]) j = -1;
+		}
+
+		if (!j) readtags(&tl, settings, 0); /* TAGS */
+
+		if (j <= 0) /* !!! IGNORE anything unrecognized & skip "TAGS" */
+		{
+			mfseek(mf, w * h * depth, SEEK_CUR);
+			continue;
+		}
+
+		if (j == 2) /* PALETTE */
 		{
 			unsigned char pbuf[256 * 16], *tp = pbuf;
 
-			/* Parse parameters */
-			t2 = skiptags(t1); // Skip channel tags
-			while ((t2 = strchr(t1 = t2, '=')))
-			{
-				*t2++ = '\0';
-				l = strcspn(t2, WHITESPACE);
-				if (!l) break; // Format violation - stop
-				i = strtol(t2, &tail, 10);
-				if (tail - t2 < l) break; // Wrong value - stop
-				t2 = t2 + l + strspn(t2 + l, WHITESPACE);
-				/* Got something - find out what */
-				if (!strcmp(t1, "TRANS"))
-				{
-					/* Indexed transparency */
-					if ((i >= -1) && (i < w))
-						settings->xpm_trans = i;
-				}
-				// !!! No other parameters here yet
-			}
-
 			/* Validate */
 			if ((depth < 3) || (w < 2) || (w > 256) || (h != 1)) break;
+			settings->colors = w;
+			settings->xpm_trans = settings->rgb_trans = -1; // Default
+
+			/* Skip channel tags, interpret value tags */
+			readtags(&tl, settings, 0);
+
 			if (mfread(pbuf, depth, w, mf) != w) break; // Failed
 			/* Store palette */
-			settings->colors = w;
+			extend_bytes(tp, w * depth, whdm[3]);
 			for (i = 0; i < w; i++)
 			{
 				settings->pal[i].red = tp[0];
@@ -6052,41 +6125,28 @@ static int load_pmm_frame(memFILE *mf, ls_settings *settings)
 			continue;
 		}
 
-		if (!((t1 = t2 = cmptag(ttype, "INDEXED_")) ||
-			(t1 = cmptag(ttype, "RGB_"))))
-		{
-			/* !!! IGNORE anything unrecognized */
-			mfseek(mf, w * h * depth, SEEK_CUR);
-			continue;
-		}
-
 		/* Got an image bitmap */
-		if (!t2) rgbpp = 3;
+		// !!! Only slots 1 & 3 fall through to here
+		rgbpp = j;
 		/* Add up extra channels */
 		memset(slots, 0, sizeof(slots));
-		j = rgbpp;
-		while (*t1)
+		while ((i = nexttag(&tl, FALSE)) == 1)
 		{
-			if ((t2 = cmptag(t1, "ALPHA"))) i = CHN_ALPHA;
-			else if ((t2 = cmptag(t1, "SELECTION"))) i = CHN_SEL;
-			else if ((t2 = cmptag(t1, "MASK"))) i = CHN_MASK;
-			else
+			if (!strcmp(tl.tag, "ALPHA")) i = CHN_ALPHA;
+			else if (!strcmp(tl.tag, "SELECTION")) i = CHN_SEL;
+			else if (!strcmp(tl.tag, "MASK")) i = CHN_MASK;
+			else // Unknown channel - skip
 			{
-				l = strcspn(t1, "=" WHITESPACE);
-				// Parameters - stop
-				if (t1[l] == '=') break;
-				// Unknown channel - skip
-				t1 += l + strspn(t1 + l, WHITESPACE);
 				j++;
 				continue;
 			}
 			slots[i] = j++;
 			cmask |= CMASK_FOR(i);
-			t1 = t2;
 		}
 		if (j > depth) break; // Cannot be
 
-		// !!! No parameters here yet
+		/* Interpret value tags */
+		if (i == 2) readtags(&tl, settings, rgbpp);
 
 		l = w * depth;
 		/* Allocate row buffer if cannot read directly into image */
@@ -6117,9 +6177,21 @@ static int load_pmm_frame(memFILE *mf, ls_settings *settings)
 					settings->img[j] + w * i,
 					buf + slots[j], w, 1, depth, 0);
 		}
-		res = 1;
+
+		/* Extend what we've read */
+		if (whdm[3] < 255)
+		{
+			i = w * h * rgbpp;
+			for (j = CHN_IMAGE; j < NUM_CHANNELS; j++)
+			{
+				if (settings->img[j]) extend_bytes(
+					settings->img[j], i, whdm[3]);
+				i = w * h;
+			}
+		}
 
 		/* Check for next frame */
+		res = 1;
 		if (mfread(ttype, 2, 1, mf)) // it was no shorter than "RGB"
 		{
 			mfseek(mf, -2, SEEK_CUR);
@@ -6138,8 +6210,8 @@ static int load_pmm_frames(char *file_name, ani_settings *ani, memFILE *mf)
 {
 	memFILE fake_mf;
 	FILE *fp = NULL;
-	ls_settings w_set;
-	int res, anim, next;
+	ls_settings w_set, init_set;
+	int res, next;
 
 
 	if (!mf)
@@ -6148,20 +6220,27 @@ static int load_pmm_frames(char *file_name, ani_settings *ani, memFILE *mf)
 		memset(mf = &fake_mf, 0, sizeof(fake_mf));
 		fake_mf.file = fp;
 	}
-	anim = FALSE; // Multipage by default
+	init_set = ani->settings;
+	init_set.gif_delay = -1; // Multipage by default
 	while (TRUE)
 	{
-		w_set = ani->settings;
+		w_set = init_set;
 		res = load_pmm_frame(mf, &w_set);
 		next = res == FILE_HAS_FRAMES;
 		if ((res != 1) && !next) break;
-/* !!! For lack of better ideas, anims are detected by presence of frame delay */
-		anim |= w_set.gif_delay >= 0;
+		/* !!! RGB transparency may modify the palette */
+		map_rgb_trans(&w_set);
 		if ((res = process_page_frame(file_name, ani, &w_set))) break;
 		res = 1;
 		if (!next) break;
 		res = FILE_TOO_LONG;
-		if (!check_next_frame(&ani->fset, ani->settings.mode, anim)) break;
+		if (!check_next_frame(&ani->fset, ani->settings.mode,
+			w_set.gif_delay >= 0)) break;
+		/* Update initial values */
+		init_set.colors = w_set.colors; // Palettes are inheritable
+		init_set.xpm_trans = w_set.xpm_trans;
+		init_set.rgb_trans = w_set.rgb_trans;
+		init_set.gif_delay = w_set.gif_delay;
 	}
 	fclose(fp);
 	return (res);
@@ -6196,7 +6275,8 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 
 	for (i = bpp = 0; i < NUM_CHANNELS; i++) bpp += !!settings->img[i];
 	bpp += rgbpp - 1;
-	if (bpp != rgbpp)
+	/* Allocate row buffer if needed */
+	if ((bpp != rgbpp) && (settings->mode != FS_PALETTE_SAVE))
 	{
 		buf = malloc(w * bpp);
 		if (!buf) return (-1);
@@ -6227,6 +6307,8 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 		"\nENDHDR\n", NULL);
 	pal2rgb(sbuf, settings->pal);
 	mfwrite(sbuf, 1, settings->colors * 3, mf);
+	/* All done if only writing palette */
+	if (settings->mode == FS_PALETTE_SAVE) goto done;
 
 	/* Now, write image bitmap */
 	mfputs(PMM_ID1 "\n", mf);
@@ -6254,7 +6336,7 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 		mfwrite(src, 1, w * bpp, mf);
 		ls_progress(settings, i, 20);
 	}
-	if (fp) fclose(fp);
+done:	if (fp) fclose(fp);
 
 	if (!settings->silent) progress_end();
 
@@ -6618,6 +6700,9 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	}
 	setw.ftype &= FTM_FTYPE;
 
+	/* Be silent if only writing palette */
+	if (setw.mode == FS_PALETTE_SAVE) setw.silent = TRUE;
+
 	/* Provide a grayscale palette if needed */
 	if ((setw.bpp == 1) && !setw.pal)
 		mem_bw_pal(setw.pal = greypal, 0, 255);
@@ -6748,27 +6833,7 @@ static void store_image_extras(image_info *image, image_state *state,
 	if (settings->mode == FS_CHANNEL_LOAD) return;
 
 	/* Stuff RGB transparency into color 255 */
-	if ((settings->rgb_trans >= 0) && (settings->bpp == 3))
-	{
-		int i;
-
-		// Look for transparent colour in palette
-		for (i = 0; i < settings->colors; i++)
-		{
-			if (PNG_2_INT(settings->pal[i]) == settings->rgb_trans)
-				break;
-		}
-
-		if (i < settings->colors) settings->xpm_trans = i;
-		else
-		{	// Colour not in palette so force it into last entry
-			settings->pal[255].red = INT_2_R(settings->rgb_trans);
-			settings->pal[255].green = INT_2_G(settings->rgb_trans);
-			settings->pal[255].blue = INT_2_B(settings->rgb_trans);
-			settings->xpm_trans = 255;
-			settings->colors = 256;
-		}
-	}
+	map_rgb_trans(settings);
 
 	/* Accept vars which make sense */
 	state->xbm_hot_x = settings->hot_x;

@@ -756,7 +756,8 @@ int mem_isometrics(int type);
 void mem_threshold(unsigned char *img, int len, int level);	// Threshold channel values
 void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp);
 
-void set_xlate(unsigned char *xlat, int bpp);			// Build bitdepth translation table
+void set_xlate_n(unsigned char *xlat, int n);			// Build value rescaling table
+#define set_xlate(A,B) set_xlate_n((A), (1 << (B)) - 1)		/* Bitdepth translation table */
 int is_filled(unsigned char *data, unsigned char val, int len);	// Check if byte array is all one value
 
 void flood_fill( int x, int y, unsigned int target );

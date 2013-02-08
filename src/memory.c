@@ -6027,10 +6027,10 @@ void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp)
 	}
 }
 
-/* Build bitdepth translation table */
-void set_xlate(unsigned char *xlat, int bpp)
+/* Build value rescaling table */
+void set_xlate_n(unsigned char *xlat, int n)
 {
-	int i, j, m, n = (1 << bpp) - 1;
+	int i, j, m;
 
 	for (i = 0 , j = n , m = n + n; i <= n; i++ , j += 255 * 2)
 		xlat[i] = j / m;

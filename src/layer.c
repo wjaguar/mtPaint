@@ -746,15 +746,15 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			/* Build animation cycle for these layers */
 			memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
 			ani_frame1 = ani_cycle_table[0].frame0 = 1;
-			ani_frame2 = ani_cycle_table[0].frame1 = i - 1;
-			ani_cycle_table[0].len = i - 1;
-			for (j = 1; j < i; j++)
+			ani_frame2 = ani_cycle_table[0].frame1 = l - 1;
+			ani_cycle_table[0].len = l - 1;
+			for (j = 1; j < l; j++)
 				ani_cycle_table[0].layers[j - 1] = j;
 
 			/* Center the first frame over background */
 			dx = (mem_width - layer_table[1].image->image_.width) / 2;
 			dy = (mem_height - layer_table[1].image->image_.height) / 2;
-			for (j = 1; j < i; j++)
+			for (j = 1; j < l; j++)
 			{
 				layer_table[j].x += dx;
 				layer_table[j].y += dy;

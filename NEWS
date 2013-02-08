@@ -12,6 +12,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale
+	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
 
 3.40	2011-12-30
 
