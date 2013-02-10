@@ -4181,6 +4181,16 @@ static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
 		GTK_CHECK_MENU_ITEM(widget)->active, FALSE);
 }
 
+#if GTK2VERSION >= 4 /* Not needed before GTK+ 2.4 */
+
+/* Ignore shortcut key only when item itself is insensitive or hidden */
+static gboolean menu_allow_key(GtkWidget *widget, guint signal_id, gpointer user_data)
+{
+	return (GTK_WIDGET_IS_SENSITIVE(widget) && GTK_WIDGET_VISIBLE(widget));
+}
+
+#endif
+
 static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 {
 	static char *bts[6] = { "<CheckItem>", NULL, "<Branch>", "<Tearoff>",
@@ -4256,6 +4266,11 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 		tmp = strchr(((GtkItemFactoryItem *)factory->items->data)->path, '/');
 		if ((itp > 0) && !radio[itp]) radio[itp] = tmp;
 		widget = gtk_item_factory_get_item(factory, tmp);
+#if GTK2VERSION >= 4
+		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
+		gtk_signal_connect(GTK_OBJECT(widget), "can_activate_accel",
+			GTK_SIGNAL_FUNC(menu_allow_key), NULL);
+#endif
 		mapped_dis_add(widget, items->actmap);
 		/* For now, remember only requested widgets */
 		if (items->ID) menu_widgets[items->ID] = widget;

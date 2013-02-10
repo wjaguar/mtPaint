@@ -1626,7 +1626,8 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 
 	if (!toolbar_boxes[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
 
-	for (i = 0; i < 4; i++)
+	// Don't touch regular toolbars in view mode
+	if (!view_image_only) for (i = 0; i < 4; i++)
 	{
 		(toolbar_status[bar[i]] ? gtk_widget_show :
 			gtk_widget_hide)(toolbar_boxes[bar[i]]);
