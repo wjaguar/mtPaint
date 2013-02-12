@@ -14,6 +14,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - All keyboard shortcuts now work in Image View mode, as they should
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale
 	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
+	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
+	* BUGFIX - Command line switches beyond the first one are now parsed properly
 
 3.40	2011-12-30
 

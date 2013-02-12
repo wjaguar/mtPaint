@@ -326,26 +326,22 @@ int main( int argc, char *argv[] )
 	}
 #endif
 
-	file_arg_start = 1;
-	if (argc > 1)		// Argument received, so assume user is trying to load a file
+	for (file_arg_start = 1; file_arg_start < argc; file_arg_start++)
 	{
-		if ( strcmp(argv[1], "-g") == 0 )	// Loading GIF animation frames
+		char *arg = argv[file_arg_start];
+
+		if (!strcmp(arg, "-g"))		// Loading GIF animation frames
 		{
-			file_arg_start+=2;
-			sscanf(argv[2], "%i", &preserved_gif_delay);
+			if (++file_arg_start >= argc) break;
+			sscanf(argv[file_arg_start], "%i", &preserved_gif_delay);
 		}
-		if ( strcmp(argv[1], "-v") == 0 )	// Viewer mode
-		{
-			file_arg_start++;
+		else if (!strcmp(arg, "-v"))	// Viewer mode
 			viewer_mode = TRUE;
-		}
-		if ( strcmp(argv[1], "-s") == 0 )	// Screenshot
-		{
-			file_arg_start++;
+		else if (!strcmp(arg, "-s"))	// Screenshot
 			get_screenshot = TRUE;
-		}
-		if ( strstr(argv[0], "mtv") != NULL ) viewer_mode = TRUE;
+		else break;
 	}
+	if (strstr(argv[0], "mtv")) viewer_mode = TRUE;
 
 	/* Something else got passed in */
 	l = argc - file_arg_start;

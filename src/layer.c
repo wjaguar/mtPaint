@@ -665,7 +665,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	layer_image *lim;
 	frameset fset;
 	int anim = ani_mode > ANM_PAGE;
-	int i, j, l, dx, dy, sens, res, res0, lname;
+	int i, j, l, sens, res, res0, lname, uninit_(dx), uninit_(dy);
 
 
 	/* Create buffer for name mangling */
@@ -689,9 +689,24 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 		l = 0; // Start from layer 0
 		if (anim) /* Animation */
 		{
-			/* Create an empty indexed background of 0th frame's size */
+			int x0, y0, x1, y1, x, y;
+
 			frm = fset.frames;
-			do_new_one(frm->width, frm->height, 256, mem_pal_def, 1, FALSE);
+			/* Calculate a bounding box for the anim */
+			x1 = (x0 = frm->x) + frm->width;
+			y1 = (y0 = frm->y) + frm->height;
+			for (i = 1; i < fset.cnt; i++)
+			{
+				frm++;
+				x = frm->x; if (x0 > x) x0 = x;
+				x += frm->width; if (x1 < x) x1 = x;
+				y = frm->y; if (y0 > y) y0 = y;
+				y += frm->height; if (y1 < y) y1 = y;
+			}
+			/* Create an empty indexed background of that size */
+			do_new_one(x1 - x0, y1 - y0, 256, mem_pal_def, 1, FALSE);
+			/* Remember the offsets */
+			dx = -x0; dy = -y0;
 			l = 1; // Frames start from layer 1
 		}
 
@@ -751,9 +766,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			for (j = 1; j < l; j++)
 				ani_cycle_table[0].layers[j - 1] = j;
 
-			/* Center the first frame over background */
-			dx = (mem_width - layer_table[1].image->image_.width) / 2;
-			dy = (mem_height - layer_table[1].image->image_.height) / 2;
+			/* Center the frames over background */
 			for (j = 1; j < l; j++)
 			{
 				layer_table[j].x += dx;
