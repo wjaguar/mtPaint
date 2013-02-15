@@ -1577,7 +1577,11 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	int res, val, disposal, bpp, cmask, lastzero = FALSE;
 
 
+#if GIFLIB_MAJOR >= 5
+	if (!(giffy = DGifOpenFileName(file_name, NULL))) return (-1);
+#else
 	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
+#endif
 
 	/* Init state structure */
 	memset(&stat, 0, sizeof(stat));
@@ -1688,7 +1692,11 @@ static int load_gif(char *file_name, ls_settings *settings)
 	int delay = settings->gif_delay, trans = -1;//, disposal = 0;
 
 
+#if GIFLIB_MAJOR >= 5
+	if (!(giffy = DGifOpenFileName(file_name, NULL))) return (-1);
+#else
 	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
+#endif
 
 	/* Get global palette */
 	settings->colors = convert_gif_palette(settings->pal, giffy->SColorMap);
@@ -1749,10 +1757,13 @@ static int save_gif(char *file_name, ls_settings *settings)
 	nc |= nc >> 1; nc |= nc >> 2; nc |= nc >> 4;
 	nc += !nc + 1; // No less than 2 colors
 
-	gif_map = MakeMapObject(nc, NULL);
-	if (!gif_map) return -1;
-
+#if GIFLIB_MAJOR >= 5
+	if (!(gif_map = GifMakeMapObject(nc, NULL))) return -1;
+	giffy = EGifOpenFileName(file_name, FALSE, NULL);
+#else
+	if (!(gif_map = MakeMapObject(nc, NULL))) return -1;
 	giffy = EGifOpenFileName(file_name, FALSE);
+#endif
 	if (!giffy) goto fail0;
 
 	for (i = 0; i < settings->colors; i++)
@@ -1799,7 +1810,12 @@ fail:	EGifCloseFile(giffy);
 	umask(mode);
 	chmod(file_name, 0666 & ~mode);
 #endif
-fail0:	FreeMapObject(gif_map);
+fail0:
+#if GIFLIB_MAJOR >= 5
+	GifFreeMapObject(gif_map);
+#else
+	FreeMapObject(gif_map);
+#endif
 
 	return (msg);
 }

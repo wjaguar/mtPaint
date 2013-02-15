@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -519,63 +519,63 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	unsigned char *tmp, **img;
 	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, thid, tdis;
 	int ddx, ddy, mx, mw, my, mh;
-	int pw2 = pw, ph2 = ph, dx = 0, dy = 0;
+	int pw2 = pw, ph2 = ph, dx, dy;
 	int zoom = 1, scale = 1;
 
 	if (czoom < 1.0) zoom = rint(1.0 / czoom);
 	else scale = rint(czoom);
 
-	/* Align on selected layer if needed */
-	if (align && layers_total && layer_selected && (zoom > 1))
-	{
-		dx = layer_table[layer_selected].x % zoom;
-		if (dx < 0) dx += zoom;
-		dy = layer_table[layer_selected].y % zoom;
-		if (dy < 0) dy += zoom;
-	}
+	/* Align on specified layer */
+	dx = layer_table[align].x;
+	dy = layer_table[align].y;
 
 	/* Apply background bounds if needed */
 	if (layers_pastry_cut)
 	{
-		if (px < 0)
+		image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
+
+		ddx = (layer_table[0].x - dx) * scale;
+		ddy = (layer_table[0].y - dy) * scale;
+		i = image->width * scale + ddx - 1;
+		j = image->height * scale + ddy - 1;
+
+		if (zoom > 1)
 		{
-			rgb -= px * 3;
-			pw2 += px;
-			px = 0;
+			ddx = floor_div(ddx + zoom - 1, zoom);
+			ddy = floor_div(ddy + zoom - 1, zoom);
+			i = floor_div(i, zoom);
+			j = floor_div(j, zoom);
 		}
-		if (py < 0)
+
+		if (px < ddx)
 		{
-			rgb -= py * step;
-			ph2 += py;
-			py = 0;
+			rgb += (ddx - px) * 3;
+			pw2 -= ddx - px;
+			px = ddx;
 		}
-		i = mem_width;
-		j = mem_height;
-		if (layers_total && layer_selected)
-		{
-			i = layer_table[0].image->image_.width;
-			j = layer_table[0].image->image_.height;
-		}
-		i = ((i - dx + zoom - 1) / zoom) * scale;
-		j = ((j - dy + zoom - 1) / zoom) * scale;
+		i -= px - 1;
 		if (pw2 > i) pw2 = i;
+
+		if (py < ddy)
+		{
+			rgb += (ddy - py) * step;
+			ph2 -= ddy - py;
+			py = ddy;
+		}
+		j -= py - 1;
 		if (ph2 > j) ph2 = j;
+
 		if ((pw2 <= 0) || (ph2 <= 0)) return;
 	}
+
 	xof = px % scale;
 	if (xof < 0) xof += scale;
 
 	/* Get image-space bounds */
-	i = px % scale < 0 ? 1 : 0;
-	j = py % scale < 0 ? 1 : 0;
-	wx0 = (px / scale) * zoom + dx - i;
-	wy0 = (py / scale) * zoom + dy - j;
-	wx1 = px + pw2 - 1;
-	wy1 = py + ph2 - 1;
-	i = wx1 % scale < 0 ? 1 : 0;
-	j = wy1 % scale < 0 ? 1 : 0;
-	wx1 = (wx1 / scale) * zoom + dx - i;
-	wy1 = (wy1 / scale) * zoom + dy - j;
+	wx0 = floor_div(px * zoom, scale);
+	wy0 = floor_div(py * zoom, scale);
+	wx1 = floor_div((px + pw2 - 1) * zoom, scale);
+	wy1 = floor_div((py + ph2 - 1) * zoom, scale);
 
 	/* No point in doing that here */
 	thid = hide_image;
@@ -585,12 +585,12 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 
 	for (ll = lr0; ll <= lr1; ll++)
 	{
-		if (ll && !layer_table[ll].visible) continue;
-		i = layer_table[ll].x;
-		j = layer_table[ll].y;
-		if (!ll) i = j = 0;
-		image = ll == layer_selected ? &mem_image :
-			&layer_table[ll].image->image_;
+		layer_node *t = layer_table + ll;
+
+		if (ll && !t->visible) continue;
+		i = t->x - dx;
+		j = t->y - dy;
+		image = ll == layer_selected ? &mem_image : &t->image->image_;
 		ii = i + image->width;
 		jj = j + image->height;
 		if ((i > wx1) || (j > wy1) || (ii <= wx0) || (jj <= wy0))
@@ -622,9 +622,9 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 		tmp = rgb + my * step + mx * 3;
 		xpm = -1;
 		opac = 255;
-		if (ll)
+		if (t != layer_table) // above background
 		{
-			opac = (layer_table[ll].opacity * 255 + 50) / 100;
+			opac = (t->opacity * 255 + 50) / 100;
 			xpm = image->trans;
 		}
 		img = image->img;
@@ -686,8 +686,10 @@ void vw_focus_view()						// Focus view window to main window
 	{
 		w0 = layer_table[0].image->image_.width;
 		h0 = layer_table[0].image->image_.height;
-		px = main_hv[0] * mem_width + layer_table[layer_selected].x;
-		py = main_hv[1] * mem_height + layer_table[layer_selected].y;
+		px = main_hv[0] * mem_width + layer_table[layer_selected].x -
+			layer_table[0].x;
+		py = main_hv[1] * mem_height + layer_table[layer_selected].y -
+			layer_table[0].y;
 		px = px < 0.0 ? 0.0 : px >= w0 ? w0 - 1 : px;
 		py = py < 0.0 ? 0.0 : py >= h0 ? h0 - 1 : py;
 		main_hv[0] = px / w0;
@@ -845,10 +847,10 @@ void vw_update_area(int x, int y, int w, int h)	// Update x,y,w,h area of curren
 
 	if (!view_showing) return;
 	
-	if ( layer_selected > 0 )
+	if (layer_selected)
 	{
-		x += layer_table[layer_selected].x;
-		y += layer_table[layer_selected].y;
+		x += layer_table[layer_selected].x - layer_table[0].x;
+		y += layer_table[layer_selected].y - layer_table[0].y;
 	}
 
 	if (vw_zoom < 1.0)
@@ -900,8 +902,8 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 
 	dx = vw_last_x;
 	dy = vw_last_y;
-	vw_last_x = x = ((x - margin_view_x) / scale) * zoom;
-	vw_last_y = y = ((y - margin_view_y) / scale) * zoom;
+	vw_last_x = x = floor_div((x - margin_view_x) * zoom, scale);
+	vw_last_y = y = floor_div((y - margin_view_y) * zoom, scale);
 
 	vw_mouse_status |= 1;
 	if (i & 1)
@@ -911,11 +913,13 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 	}
 	else
 	{
+		dx = layer_table[0].x;
+		dy = layer_table[0].y;
 		vw_move_layer = -1;		// Which layer has the user clicked?
 		for (i = layers_total; i > 0; i--)
 		{
-			lx = layer_table[i].x;
-			ly = layer_table[i].y;
+			lx = layer_table[i].x - dx;
+			ly = layer_table[i].y - dy;
 			image = i == layer_selected ? &mem_image :
 				&layer_table[i].image->image_;
 			lw = image->width;

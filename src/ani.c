@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -159,6 +159,7 @@ static void ani_set_frame_state( int frame )
 	int i, k, e, a, b, done, l;
 	ani_slot *ani;
 
+// !!! Maybe make background x/y settable here too?
 	for ( k=1; k<=layers_total; k++ )	// Set x, y, opacity for each layer
 	{
 		ani = layer_table[k].image->ani_pos;
@@ -447,7 +448,7 @@ static gboolean delete_ani()
 	layers_pastry_cut = FALSE;
 
 	show_layers_main = ani_show_main_state;
-	update_all_views();
+	update_stuff(UPD_ALLV);
 	return (FALSE);
 }
 
@@ -619,8 +620,8 @@ static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data
 
 	if (layer_selected)
 	{
-		x = -layer_table[layer_selected].x;
-		y = -layer_table[layer_selected].y;
+		x = layer_table[0].x - layer_table[layer_selected].x;
+		y = layer_table[0].y - layer_table[layer_selected].y;
 		w = layer_table[0].image->image_.width;
 		h = layer_table[0].image->image_.height;
 	}
@@ -644,7 +645,7 @@ static gboolean ani_but_preview_close()
 	{
 		ani_write_layer_data();
 		layers_pastry_cut = FALSE;
-		update_all_views();
+		update_stuff(UPD_ALLV);
 	}
 	return (FALSE);
 }
@@ -710,7 +711,7 @@ void ani_but_preview()
 	else
 	{
 		layers_pastry_cut = TRUE;
-		update_all_views();
+		update_stuff(UPD_ALLV);
 	}
 
 	gtk_adjustment_value_changed(SPINSLIDE_ADJUSTMENT(ani_prev_slider));
@@ -896,6 +897,7 @@ static void ani_set_key_frame(int key)		// Set key frame postions & cycles as pe
 	int i, j, k, l;
 
 
+// !!! Maybe make background x/y settable here too?
 	for ( k=1; k<=layers_total; k++ )	// Add current position for each layer
 	{
 		ani = layer_table[k].image->ani_pos;
@@ -957,6 +959,7 @@ static void ani_layer_select( GtkList *list, GtkWidget *widget )
 {
 	int j = layers_total - gtk_list_child_position(list, widget);
 
+// !!! Allow background here when/if added to the list
 	if ( j<1 || j>layers_total ) return;		// Item not found
 
 	if ( ani_currently_selected_layer != -1 )	// Only if not first click
@@ -1103,6 +1106,7 @@ void pressed_animate_window()
 	gtk_widget_set_usize (ani_list_layers, 150, -2);
 	gtk_container_set_border_width (GTK_CONTAINER (ani_list_layers), 5);
 
+// !!! Maybe allow background here too, for x/y?
 	for ( i=layers_total; i>0; i-- )
 	{
 		hbox2 = gtk_hbox_new( FALSE, 3 );
@@ -1161,7 +1165,7 @@ void pressed_animate_window()
 	gtk_window_add_accel_group(GTK_WINDOW (animate_window), ag);
 
 	layers_pastry_cut = TRUE;
-	update_all_views();
+	update_stuff(UPD_ALLV);
 }
 
 

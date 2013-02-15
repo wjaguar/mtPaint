@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -189,8 +189,6 @@ void refresh_line(int mode, const int *lxy, rgbcontext *ctx);	// Refresh a part 
 void register_file( char *filename );		// Called after successful load/save
 void update_recent_files();			// Update the menu items
 
-void update_all_views();			// Update whole canvas on all views
-
 void create_default_image();			// Create default new image
 
 /// UPDATE STUFF
@@ -271,6 +269,10 @@ void create_default_image();			// Create default new image
 #define UPD_CLIP   CF_PMODE
 //	Changed rendering options
 #define UPD_RENDER CF_DRAW
+//	Changed viewing options
+#define UPD_VIEW   CF_VDRAW
+//	Update all views
+#define UPD_ALLV   (CF_DRAW | CF_VDRAW)
 //	Changed clipboard geometry
 #define UPD_CGEOM  (CF_CGEOM | CF_SELBAR)
 //	Changed polygonal selection (-redraw)

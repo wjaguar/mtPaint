@@ -96,13 +96,8 @@ static void repaint_layer(int l)	// Repaint layer in view/main window
 	image = l == layer_selected ? &mem_image : &t->image->image_;
 	lw = image->width;
 	lh = image->height;
-	lx = t->x;
-	ly = t->y;
-	if (layer_selected)
-	{
-		lx -= layer_table[layer_selected].x;
-		ly -= layer_table[layer_selected].y;
-	}
+	lx = t->x - layer_table[layer_selected].x;
+	ly = t->y - layer_table[layer_selected].y;
 
 	vw_update_area(lx, ly, lw, lh);
 	if (show_layers_main) main_update_area(lx, ly, lw, lh);
@@ -110,8 +105,7 @@ static void repaint_layer(int l)	// Repaint layer in view/main window
 
 static void repaint_layers()
 {
-	if (show_layers_main) gtk_widget_queue_draw(drawing_canvas);
-	if (view_showing) gtk_widget_queue_draw(vw_drawing);
+	update_stuff(show_layers_main ? UPD_ALLV : UPD_VIEW);
 }
 
 
@@ -205,7 +199,7 @@ static void layer_select_slot(int slot)
 void shift_layer(int val)
 {
 	layer_node temp;
-	int i, j, x, y, newbkg, lv = layer_selected + val;
+	int i, j, newbkg, lv = layer_selected + val;
 
 	if ((lv < 0) || (lv > layers_total)) return; // Cannot move
 	layer_copy_from_main(layer_selected);
@@ -214,18 +208,6 @@ void shift_layer(int val)
 	layer_table[lv] = temp;
 	newbkg = (layer_selected == 0) || (lv == 0);
 	layer_selected = lv;
-
-	/* Background layer changed - shift the entire stack */
-	if (newbkg)
-	{
-		x = layer_table[0].x;
-		y = layer_table[0].y;
-		for (i = 0; i <= layers_total; i++)
-		{
-			layer_table[i].x -= x;
-			layer_table[i].y -= y;
-		}
-	}
 
 	// Updated 2 list items - Text name + visible toggle
 	for (i = layer_selected , j = 0; j < 2; i -= val , j++)
@@ -474,10 +456,10 @@ void layer_show_trans()
 void layer_press_centre()
 {
 	if (!layer_selected) return; // Nothing to do
-	layer_table[layer_selected].x = layer_table[0].image->image_.width / 2 -
-		mem_width / 2;
-	layer_table[layer_selected].y = layer_table[0].image->image_.height / 2 -
-		mem_height / 2;
+	layer_table[layer_selected].x = layer_table[0].x +
+		layer_table[0].image->image_.width / 2 - mem_width / 2;
+	layer_table[layer_selected].y = layer_table[0].y +
+		layer_table[0].image->image_.height / 2 - mem_height / 2;
 	layer_show_position();
 	layers_notify_changed();
 	repaint_layers();
@@ -665,7 +647,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	layer_image *lim;
 	frameset fset;
 	int anim = ani_mode > ANM_PAGE;
-	int i, j, l, sens, res, res0, lname, uninit_(dx), uninit_(dy);
+	int i, j, l, sens, res, res0, lname;
 
 
 	/* Create buffer for name mangling */
@@ -706,7 +688,8 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			/* Create an empty indexed background of that size */
 			do_new_one(x1 - x0, y1 - y0, 256, mem_pal_def, 1, FALSE);
 			/* Remember the offsets */
-			dx = -x0; dy = -y0;
+			layer_table[0].x = x0;
+			layer_table[0].y = y0;
 			l = 1; // Frames start from layer 1
 		}
 
@@ -765,13 +748,6 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			ani_cycle_table[0].len = l - 1;
 			for (j = 1; j < l; j++)
 				ani_cycle_table[0].layers[j - 1] = j;
-
-			/* Center the frames over background */
-			for (j = 1; j < l; j++)
-			{
-				layer_table[j].x += dx;
-				layer_table[j].y += dy;
-			}
 
 			/* Display 1st layer in sequence */
 			layer_table[1].visible = TRUE;
@@ -838,7 +814,12 @@ int layer_save_composite(char *fname, ls_settings *settings)
 		settings->width = w;
 		settings->height = h;
 		settings->bpp = 3;
-		if (layer_selected) /* Set up background transparency */
+		if (layers_total) /* Remember global offset */
+		{
+			settings->x = layer_table[0].x;
+			settings->y = layer_table[0].y;
+		}
+		if (layer_selected) /* Set up transparency correctly */
 		{
 			res = image->trans;
 			settings->xpm_trans = res;
@@ -869,8 +850,10 @@ void layer_add_composite()
 		lim = layer_table[layers_total].image;
 		view_render_rgb(lim->image_.img[CHN_IMAGE], 0, 0,
 			image->width, image->height, 1);
-		/* Copy background's transparency */
+		/* Copy background's transparency and position */
 		lim->image_.trans = image->trans;
+		layer_table[layers_total].x = layer_table[0].x;
+		layer_table[layers_total].y = layer_table[0].y;
 		/* Activate the result */
 		layer_show_new();
 	}
@@ -1038,8 +1021,6 @@ static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 	gtk_widget_set_sensitive(layer_tools[LTB_CENTER], j);
 	gtk_widget_set_sensitive(layer_spin, j);
 	gtk_widget_set_sensitive(layer_slider, j);
-	gtk_widget_set_sensitive(layer_x, j);
-	gtk_widget_set_sensitive(layer_y, j);
 
 	mt_spinslide_set_value(layer_slider, j ? t->opacity : 100);
 	layer_show_position();
@@ -1093,8 +1074,8 @@ void pressed_paste_layer()
 	if (!layer_add(mem_clip_w, mem_clip_h, mem_clip_bpp, mem_cols, mem_pal,
 		cmask)) return; // Failed
 
-	layer_table[layers_total].x = mem_clip_x;
-	layer_table[layers_total].y = mem_clip_y;
+	layer_table[layers_total].x = layer_table[layer_selected].x + mem_clip_x;
+	layer_table[layers_total].y = layer_table[layer_selected].y + mem_clip_y;
 	lim = layer_table[layers_total].image;
 
 	lim->state_ = mem_state;
@@ -1152,7 +1133,7 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 {
 	image_info *image = l == layer_selected ? &mem_image :
 		&layer_table[l].image->image_;
-	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh;
+	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh, upd = 0;
 
 	layer_table[l].x += change_x;
 	layer_table[l].y += change_y;
@@ -1160,21 +1141,21 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	if (change_y < 0) ly += change_y;
 	lw = image->width + abs(change_x);
 	lh = image->height + abs(change_y);
-	if (layer_selected)
-	{
-		lx -= layer_table[layer_selected].x;
-		ly -= layer_table[layer_selected].y;
-	}
+	lx -= layer_table[layer_selected].x;
+	ly -= layer_table[layer_selected].y;
 
 	layers_notify_changed();
 	if (l == layer_selected)
 	{
 		layer_show_position();
 		// All layers get moved while the current one stays still
-		if (show_layers_main) update_stuff(UPD_RENDER);
+		if (show_layers_main) upd |= UPD_RENDER;
 	}
 	else if (show_layers_main) main_update_area(lx, ly, lw, lh);
-	vw_update_area(lx, ly, lw, lh);
+	// All layers get moved while the background stays still
+	if (l == 0) upd |= UPD_VIEW;
+	else vw_update_area(lx, ly, lw, lh);
+	if (upd) update_stuff(upd);
 }
 
 #undef _

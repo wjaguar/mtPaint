@@ -5,9 +5,11 @@ mtPaint NEWS
 Here is a summary of the main changes in this release (see handbook for full details):
 
 3.41	2013-??-??
+	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
 	* Undo system now uses a bit less memory
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
+	* Support for compiling with giflib 5 added
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated

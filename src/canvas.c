@@ -2257,12 +2257,6 @@ static void rec_continuous(int nx, int ny, int w, int h)
 	draw_quad(line1, line2, line3, line4);
 }
 
-void update_all_views()				// Update whole canvas on all views
-{
-	if ( view_showing && vw_drawing ) gtk_widget_queue_draw( vw_drawing );
-	if ( drawing_canvas ) gtk_widget_queue_draw( drawing_canvas );
-}
-
 
 static struct {
 	float c_zoom;
@@ -2683,7 +2677,10 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			{
 				spot_undo(UNDO_TOOL);
 				flood_fill(x, y, j);
-				update_all_views();
+				// All pixels could change
+				minx = miny = 0;
+				xw = mem_width;
+				yh = mem_height;
 			}
 		}
 		/* Undo the color swap if fill failed */

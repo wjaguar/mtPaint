@@ -3018,7 +3018,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 {
 	rgbcontext ctx;
 	unsigned char *rgb, *irgb;
-	int rect[4], vxy[4], vport[4], lx = 0, ly = 0, rpx, rpy;
+	int rect[4], vxy[4], vport[4], rpx, rpy;
 	int i, lr, zoom = 1, scale = 1, paste_f = FALSE;
 
 
@@ -3051,21 +3051,14 @@ void repaint_canvas(int px, int py, int pw, int ph)
 			(!overlay_alpha && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])))
 			render_background(irgb, rect[0], rect[1], rect[2], rect[3], pw * 3);
 	}
-	if (lr) /* Render underlying layers */
-	{
-		if (layer_selected)
-		{
-			lx = floor_div(layer_table[layer_selected].x * scale, zoom);
-			ly = floor_div(layer_table[layer_selected].y * scale, zoom);
-		}
-		render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
-			can_zoom, 0, layer_selected - 1, 1);
-	}
+	/* Render underlying layers */
+	if (lr) render_layers(rgb, pw * 3, rpx, rpy, pw, ph,
+		can_zoom, 0, layer_selected - 1, layer_selected);
 
 	if (irgb) paste_f = main_render_rgb(irgb, rect[0], rect[1], rect[2], rect[3], pw);
 
-	if (lr) render_layers(rgb, pw * 3, rpx + lx, rpy + ly, pw, ph,
-		can_zoom, layer_selected + 1, layers_total, 1);
+	if (lr) render_layers(rgb, pw * 3, rpx, rpy, pw, ph,
+		can_zoom, layer_selected + 1, layers_total, layer_selected);
 
 	/* No grid at all */
 	if (!mem_show_grid || (scale < mem_grid_min));
@@ -3879,7 +3872,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		 * marquee; for consistency, gradient tool blocks this */
 		if ((tool_type != TOOL_GRADIENT) && (marq_status == MARQUEE_DONE))
 			move_marquee(MARQ_SIZE, marq_xy + 2, change, dir);
-		else if (layer_selected) move_layer_relative(layer_selected,
+		else if (layers_total) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
 		else if (bkg_flag)
 		{
