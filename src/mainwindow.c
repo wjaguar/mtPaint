@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1676,8 +1676,6 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 	return (FALSE);
 }
 
-static int async_bk;
-
 static void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
 {
 	int i, j, k, scale, dx, dy, step, ii, jj, ii0, px, py;
@@ -1877,6 +1875,9 @@ static int get_bkg(int xc, int yc, int dclick)
 	return (MEM_2_INT(bkg_rgb, x));
 }
 
+/* This is set when background is at different scale than image */
+int async_bk;
+
 /* This is for a faster way to pass parameters into render_row() */
 typedef struct {
 	int dx;
@@ -1909,6 +1910,7 @@ void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 		rr.zoom = 1;
 		rr.scale = rint(czoom);
 		x0 %= rr.scale;
+		if (x0 < 0) x0 += rr.scale;
 	}
 	if (width + x0 > rr.scale)
 	{
@@ -3052,12 +3054,12 @@ void repaint_canvas(int px, int py, int pw, int ph)
 			render_background(irgb, rect[0], rect[1], rect[2], rect[3], pw * 3);
 	}
 	/* Render underlying layers */
-	if (lr) render_layers(rgb, pw * 3, rpx, rpy, pw, ph,
+	if (lr) render_layers(rgb, rpx, rpy, pw, ph,
 		can_zoom, 0, layer_selected - 1, layer_selected);
 
 	if (irgb) paste_f = main_render_rgb(irgb, rect[0], rect[1], rect[2], rect[3], pw);
 
-	if (lr) render_layers(rgb, pw * 3, rpx, rpy, pw, ph,
+	if (lr) render_layers(rgb, rpx, rpy, pw, ph,
 		can_zoom, layer_selected + 1, layers_total, layer_selected);
 
 	/* No grid at all */
@@ -3872,15 +3874,15 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		 * marquee; for consistency, gradient tool blocks this */
 		if ((tool_type != TOOL_GRADIENT) && (marq_status == MARQUEE_DONE))
 			move_marquee(MARQ_SIZE, marq_xy + 2, change, dir);
-		else if (layers_total) move_layer_relative(layer_selected,
-			change * arrow_dx[dir], change * arrow_dy[dir]);
-		else if (bkg_flag)
+		else if (bkg_flag && !layer_selected)
 		{
 			/* !!! Later, maybe localize redraw to the changed part */
 			bkg_x += change * arrow_dx[dir];
 			bkg_y += change * arrow_dy[dir];
 			update_stuff(UPD_RENDER);
 		}
+		else if (layers_total) move_layer_relative(layer_selected,
+			change * arrow_dx[dir], change * arrow_dy[dir]);
 		break;
 	case ACT_ESC:
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))

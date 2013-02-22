@@ -512,15 +512,15 @@ static int vw_mouse_status;
 GtkWidget *vw_drawing;
 int vw_focus_on;
 
-void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
+void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
 {
+	int rxy[4], cxy[4] = { px, py, px + pw, py + ph };
 	image_info *image;
 	unsigned char *tmp, **img;
-	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xof, xpm, opac, thid, tdis;
-	int ddx, ddy, mx, mw, my, mh;
-	int pw2 = pw, ph2 = ph, dx, dy;
-	int zoom = 1, scale = 1;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xpm, opac, thid, tdis;
+	int dx, dy, ddx, ddy, mx, mw, my, mh;
+	int step = pw * 3, zoom = 1, scale = 1;
 
 	if (czoom < 1.0) zoom = rint(1.0 / czoom);
 	else scale = rint(czoom);
@@ -529,53 +529,26 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 	dx = layer_table[align].x;
 	dy = layer_table[align].y;
 
-	/* Apply background bounds if needed */
+	/* Clip to background if needed */
 	if (layers_pastry_cut)
 	{
 		image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
 
-		ddx = (layer_table[0].x - dx) * scale;
-		ddy = (layer_table[0].y - dy) * scale;
-		i = image->width * scale + ddx - 1;
-		j = image->height * scale + ddy - 1;
+		ddx = (layer_table[0].x - dx) * scale - 1;
+		ddy = (layer_table[0].y - dy) * scale - 1;
 
-		if (zoom > 1)
-		{
-			ddx = floor_div(ddx + zoom - 1, zoom);
-			ddy = floor_div(ddy + zoom - 1, zoom);
-			i = floor_div(i, zoom);
-			j = floor_div(j, zoom);
-		}
-
-		if (px < ddx)
-		{
-			rgb += (ddx - px) * 3;
-			pw2 -= ddx - px;
-			px = ddx;
-		}
-		i -= px - 1;
-		if (pw2 > i) pw2 = i;
-
-		if (py < ddy)
-		{
-			rgb += (ddy - py) * step;
-			ph2 -= ddy - py;
-			py = ddy;
-		}
-		j -= py - 1;
-		if (ph2 > j) ph2 = j;
-
-		if ((pw2 <= 0) || (ph2 <= 0)) return;
+		if (!clip(cxy, floor_div(ddx + zoom, zoom),
+			floor_div(ddy + zoom, zoom),
+			floor_div(ddx + image->width * scale, zoom) + 1,
+			floor_div(ddy + image->height * scale, zoom) + 1,
+			cxy)) return;
 	}
 
-	xof = px % scale;
-	if (xof < 0) xof += scale;
-
 	/* Get image-space bounds */
-	wx0 = floor_div(px * zoom, scale);
-	wy0 = floor_div(py * zoom, scale);
-	wx1 = floor_div((px + pw2 - 1) * zoom, scale);
-	wy1 = floor_div((py + ph2 - 1) * zoom, scale);
+	wx0 = floor_div(cxy[0] * zoom, scale);
+	wy0 = floor_div(cxy[1] * zoom, scale);
+	wx1 = floor_div((cxy[2] - 1) * zoom, scale);
+	wy1 = floor_div((cxy[3] - 1) * zoom, scale);
 
 	/* No point in doing that here */
 	thid = hide_image;
@@ -595,31 +568,11 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 		jj = j + image->height;
 		if ((i > wx1) || (j > wy1) || (ii <= wx0) || (jj <= wy0))
 			continue;
-		ddx = ddy = mx = my = 0;
-		if (zoom > 1)
-		{
-			if (i > wx0) mx = (i - wx0 + zoom - 1) / zoom;
-			if (j > wy0) my = (j - wy0 + zoom - 1) / zoom;
-			ddx = wx0 + mx * zoom - i;
-			ddy = wy0 + my * zoom - j;
-			if (ii - 1 >= wx1) mw = pw2 - mx;
-			else mw = (ii - i - ddx + zoom - 1) / zoom;
-			if (jj - 1 >= wy1) mh = ph2 - my;
-			else mh = (jj - j - ddy + zoom - 1) / zoom;
-			if ((mw <= 0) || (mh <= 0)) continue;
-		}
-		else
-		{
-			if (i > wx0) mx = i * scale - px;
-			else ddx = wx0 - i;
-			if (j > wy0) my = j * scale - py;
-			else ddy = wy0 - j;
-			if (ii - 1 >= wx1) mw = pw2 - mx;
-			else mw = ii * scale - px - mx;
-			if (jj - 1 >= wy1) mh = ph2 - my;
-			else mh = jj * scale - py - my;
-		}
-		tmp = rgb + my * step + mx * 3;
+		if (!clip(rxy, floor_div(i * scale + zoom - 1, zoom),
+			floor_div(j * scale + zoom - 1, zoom),
+			floor_div(ii * scale - 1, zoom) + 1,
+			floor_div(jj * scale - 1, zoom) + 1, cxy)) continue;
+
 		xpm = -1;
 		opac = 255;
 		if (t != layer_table) // above background
@@ -627,15 +580,20 @@ void render_layers(unsigned char *rgb, int step, int px, int py, int pw, int ph,
 			opac = (t->opacity * 255 + 50) / 100;
 			xpm = image->trans;
 		}
-		img = image->img;
-		setup_row(xof + mx, mw, czoom, ii - i, xpm, opac,
-			image->bpp, image->pal);
-		i = (py + my) % scale;
+		mw = rxy[2] - (mx = rxy[0]);
+		setup_row(mx, mw, czoom, image->width, xpm, opac, image->bpp, image->pal);
+		mh = rxy[3] - (my = rxy[1]);
+		tmp = rgb + (my - py) * step + (mx - px) * 3;
+		ddx = floor_div(mx * zoom, scale) - i;
+		ddy = floor_div(my * zoom, scale) - j;
+
+		i = my % scale;
 		if (i < 0) i += scale;
 		mh = mh * zoom + i;
+		img = image->img;
 		for (j = -1; i < mh; i += zoom , tmp += step)
 		{
-			if (i / scale == j)
+			if ((i / scale == j) && !async_bk)
 			{
 				memcpy(tmp, tmp - step, mw * 3);
 				continue;
@@ -656,7 +614,7 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 	/* Control transparency separately */
 	overlay_alpha = opaque_view;
 	/* Always align on background layer */
-	render_layers(rgb, pw * 3, px, py, pw, ph, czoom, 0, layers_total, 0);
+	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
 	overlay_alpha = tmp;
 }
 

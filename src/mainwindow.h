@@ -312,6 +312,8 @@ void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of cur
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void repaint_perim(rgbcontext *ctx);	// Draw perimeter around mouse cursor
 void clear_perim();			// Clear perimeter around mouse cursor
+
+int async_bk;
 void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 	int bpp, png_color *pal);
 void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
