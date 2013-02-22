@@ -6,11 +6,14 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 3.41	2013-??-??
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
-	* Undo system now uses a bit less memory
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
+	* Committing paste when changing tool is now enabled by default
+	* Saving an image now commits paste if auto commit mode is enabled
+	* Undo system now uses a bit less memory
 	* Support for compiling with giflib 5 added
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
+	* BUGFIX - Gradient button no longer fails to show current gradient mode after showing settings toolbar
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
 	* BUGFIX - All keyboard shortcuts now work in Image View mode, as they should

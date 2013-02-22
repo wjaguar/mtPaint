@@ -68,8 +68,8 @@ static inilist ini_bool[] = {
 	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
-	{ "pasteCommit",	&paste_commit,		FALSE },
 	{ "applyICC",		&apply_icc,		FALSE },
+	{ "pasteCommit",	&paste_commit,		TRUE  },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
 	{ "optimizeChequers",	&chequers_optimize,	TRUE  },
@@ -508,6 +508,15 @@ int gui_save(char *filename, ls_settings *settings)
 	}
 	else
 	{
+		/* Commit paste if required */
+		if (paste_commit && (marq_status >= MARQUEE_PASTE))
+		{
+			commit_paste(FALSE, NULL);
+			pen_down = 0;
+			mem_undo_prepare();
+			pressed_select(FALSE);
+		}
+
 		/* Prepare to save image */
 		memcpy(settings->img, mem_img, sizeof(chanlist));
 		settings->pal = mem_pal;
@@ -3352,7 +3361,7 @@ void set_cursor(GdkCursor *what)	// Set mouse cursor
 void change_to_tool(int icon)
 {
 	grad_info *grad;
-	int i, t, update = CF_SELBAR | CF_MENU | CF_CURSOR;
+	int i, t, update = UPD_SEL;
 
 	if (!GTK_WIDGET_SENSITIVE(icon_buttons[icon])) return; // Blocked
 	if (!GTK_TOGGLE_BUTTON(icon_buttons[icon])->active) // Toggle the button

@@ -926,7 +926,6 @@ void create_settings_box()
 
 	/* Gradient mode button+preview */
 	settings_buttons[SETB_GRAD] = button = pack(vbox, gtk_toggle_button_new());
-	button = pack(vbox, gtk_toggle_button_new());
 	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
 	grad_view = gtk_pixmap_new(pmap, NULL);
 	gdk_pixmap_unref(pmap);
