@@ -2570,6 +2570,9 @@ static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
 	}
 }
 
+static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
+	int bpp, int step);
+
 #ifdef U_TIFF
 
 /* *** PREFACE ***
@@ -3046,29 +3049,18 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	return (res);
 }
 
-#define TIFFX_VERSION 0 // mtPaint's TIFF extensions version
-
 static int save_tiff(char *file_name, ls_settings *settings)
 {
 	unsigned char *src, *row = NULL;
-	uint16 rgb[256 * 3], xs[NUM_CHANNELS];
-	int i, j, k, dt, xsamp = 0, cmask = CMASK_IMAGE, res = 0;
+	uint16 rgb[256 * 3];
+	int i, res = 0;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
 
-	/* Find out number of utility channels */
-	memset(xs, 0, sizeof(xs));
 
-	for (i = CHN_ALPHA; i <= CHN_ALPHA; i++)
+	if (settings->img[CHN_ALPHA])
 	{
-		if (!settings->img[i]) continue;
-		cmask |= CMASK_FOR(i);
-		xs[xsamp++] = i == CHN_ALPHA ? EXTRASAMPLE_UNASSALPHA :
-			EXTRASAMPLE_UNSPECIFIED;
-	}
-	if (xsamp)
-	{
-		row = malloc(w * (bpp + xsamp));
+		row = malloc(w * (bpp + 1));
 		if (!row) return -1;
 	}
 
@@ -3083,7 +3075,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	/* Write regular tags */
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
 	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
-	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, bpp + xsamp);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, bpp + !!row);
 	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
 	TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
 	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
@@ -3100,33 +3092,22 @@ static int save_tiff(char *file_name, ls_settings *settings)
 		TIFFSetField(tif, TIFFTAG_COLORMAP, rgb, rgb + 256, rgb + 512);
 	}
 	else TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-	if (xsamp) TIFFSetField(tif, TIFFTAG_EXTRASAMPLES, xsamp, xs);
+	if (row)
+	{
+		rgb[0] = EXTRASAMPLE_UNASSALPHA;
+		TIFFSetField(tif, TIFFTAG_EXTRASAMPLES, 1, rgb);
+	}
 
 	/* Actually write the image */
 	if (!settings->silent) ls_init("TIFF", 1);
-	xsamp += bpp;
 	for (i = 0; i < h; i++)
 	{
 		src = settings->img[CHN_IMAGE] + w * i * bpp;
 		if (row) /* Interlace the channels */
 		{
-			for (dt = k = 0; k < w * bpp; k += bpp , dt += xsamp)
-			{
-				row[dt] = src[k];
-				if (bpp == 1) continue;
-				row[dt + 1] = src[k + 1];
-				row[dt + 2] = src[k + 2];
-			}
-			for (dt = bpp , j = CHN_ALPHA; j < NUM_CHANNELS; j++)
-			{
-				if (!settings->img[j]) continue;
-				src = settings->img[j] + w * i;
-				for (k = 0; k < w; k++ , dt += xsamp)
-				{
-					row[dt] = src[k];
-				}
-				dt -= w * xsamp - 1;
-			}
+			copy_bytes(row, src, w, bpp + 1, bpp);
+			copy_bytes(row + bpp, settings->img[CHN_ALPHA] + w * i,
+				w, bpp + 1, 1);
 		}
 		if (TIFFWriteScanline(tif, row ? row : src, i, 0) == -1)
 		{
@@ -5407,7 +5388,7 @@ static void convert_16b(unsigned char *dest, unsigned char *src, int len,
 }
 
 static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
-	int bpp, int step, int maxval)
+	int bpp, int step)
 {
 	int i, dd = 0;
 
@@ -5560,7 +5541,7 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 	/* Read the image */
 	if (!settings->silent) ls_init("PAM", 0);
 	res = FILE_LIB_ERROR;
-	cvt_stream = vl > 1 ? convert_16b : copy_bytes;
+	cvt_stream = vl > 1 ? convert_16b : (cvt_func)copy_bytes;
 	for (i = 0; i < h; i++)
 	{
 		dest = buf ? buf : settings->img[CHN_IMAGE] + ll * i;
@@ -6187,11 +6168,11 @@ static int load_pmm_frame(memFILE *mf, ls_settings *settings)
 			ls_progress(settings, i, 10);
 			if (!buf) continue; // Nothing else to do here
 
-			copy_bytes(dest, buf, w, rgbpp, depth, 0);
+			copy_bytes(dest, buf, w, rgbpp, depth);
 			for (j = CHN_ALPHA; j < NUM_CHANNELS; j++)
 				if (settings->img[j]) copy_bytes(
 					settings->img[j] + w * i,
-					buf + slots[j], w, 1, depth, 0);
+					buf + slots[j], w, 1, depth);
 		}
 
 		/* Extend what we've read */
@@ -6342,11 +6323,11 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 		src = settings->img[CHN_IMAGE] + i * w * rgbpp;
 		if ((dest = buf))
 		{
-			copy_bytes(dest, src, w, bpp, rgbpp, 0);
+			copy_bytes(dest, src, w, bpp, rgbpp);
 			dest += rgbpp;
 			for (k = CHN_ALPHA; k < NUM_CHANNELS; k++)
 				if (settings->img[k]) copy_bytes(dest++,
-					settings->img[k] + i * w, w, bpp, 1, 0);
+					settings->img[k] + i * w, w, bpp, 1);
 			src = buf;
 		}
 		mfwrite(src, 1, w * bpp, mf);

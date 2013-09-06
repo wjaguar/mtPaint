@@ -1413,8 +1413,16 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	/* No use when moving cursor by keyboard */
 	else if (event == GDK_MOTION_NOTIFY) tool_fix = 0;
 
-	if (tool_fix == 1) x = x0 = tool_fixv;
-	if (tool_fix == 2) y = y0 = tool_fixv;
+	if (!tool_fix);
+	/* For rectangular selection it makes sense to fix its width/height */
+	else if ((tool_type == TOOL_SELECT) && (button == 1) &&
+		((marq_status == MARQUEE_DONE) || (marq_status == MARQUEE_SELECTING)))
+	{
+		if (tool_fix == 1) x = x0 = marq_x2;
+		else y = y0 = marq_y2;
+	}
+	else if (tool_fix == 1) x = x0 = tool_fixv;
+	else /* if (tool_fix == 2) */ y = y0 = tool_fixv;
 
 	if (tgrid_snap) /* Snap to grid */
 	{
