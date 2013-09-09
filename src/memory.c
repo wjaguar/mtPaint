@@ -1136,7 +1136,7 @@ static int tile_row_compare(unsigned char *src, unsigned char *dest,
 			/* Value overlaps two or three tiles */
 			while (x < sizeof(v))
 			{
-				v = isrc[i] ^ idest[i];
+				v = *(R_INT *)(src + t) ^ *(R_INT *)(dest + t);
 tile2:				vm = ~0UL;
 				SHIFTUP(vm, x);
 				x += sizeof(v);

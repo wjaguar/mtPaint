@@ -22,6 +22,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
 	* BUGFIX - Command line switches beyond the first one are now parsed properly
+	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
+	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
 
 3.40	2011-12-30
 

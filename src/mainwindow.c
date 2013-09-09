@@ -1635,10 +1635,7 @@ static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
 	{
 		/* Steal focus from dock window */
 		if (dock_focused())
-		{
 			gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-			return (TRUE);
-		}
 
 		if (!mem_img[CHN_IMAGE]) return (TRUE);
 
