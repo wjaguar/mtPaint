@@ -254,6 +254,75 @@ static void ani_set_frame_state( int frame )
 	}
 }
 
+#define ANI_CYC_TEXT_MAX (128 + MAX_CYC_ITEMS * 10)
+
+static void ani_cyc_sprintf(char *txt, ani_cycle *chead, signed char *cdata)
+{
+	int j, k;
+	char *tmp = txt + sprintf(txt, "%i\t%i\t%i", chead->frame0,
+		chead->frame1, cdata[0]);
+	for (j = 1; j < MAX_CYC_ITEMS; j++)
+	{
+		k = cdata[j];
+		if (!k) break;
+		tmp += sprintf(tmp, ",%i", k);
+	}
+	strcpy(tmp, "\n");
+}
+
+/* Returns number of cycle steps */
+static int ani_cyc_sscanf(char *txt, ani_cycle *chead, signed char *cdata)
+{
+	char *tail;
+	int i, j, l, f0, f1;
+
+	while (*txt && (*txt < 32)) txt++;	// Skip non ascii chars
+	if (!*txt) return (0);
+	f0 = f1 = -1; i = 0;	// Default state if invalid
+	l = 0; sscanf(txt, "%i\t%i\t%n", &f0, &f1, &l);
+	chead->frame0 = f0;
+	chead->frame1 = f1;
+	if (l) // Parse cycles if header is valid
+	{
+		txt += l;
+		while (i < MAX_CYC_ITEMS)
+		{
+			j = strtol(txt, &tail, 0);
+			if (tail - txt <= 0) break; // No number there
+			// !!! No range check - need to fix it later
+			cdata[i++] = j;
+			txt = tail;
+			while (*txt && (*txt <= 32)) txt++;	// Skip whitespace etc
+			if (*txt++ != ',') break;	// Stop if no comma
+		}
+	}
+	if (!i) cdata[i++] = -1; // !!! Add fake item if no real ones
+	// Terminate with zero if needed
+	if (i < MAX_CYC_ITEMS) cdata[i] = 0;
+
+	return (i);
+}
+
+#define ANI_POS_TEXT_MAX 256
+
+static void ani_pos_sprintf(char *txt, ani_slot *ani)
+{
+	sprintf(txt, "%i\t%i\t%i\t%i\t%i\n",
+		ani->frame, ani->x, ani->y, ani->opacity, ani->effect);
+}
+
+static int ani_pos_sscanf(char *txt, ani_slot *ani)
+{
+	ani_slot data = { -1, -1, -1, -1, -1 };
+
+	while (*txt && (*txt < 32)) txt++;	// Skip non ascii chars
+	if (!*txt) return (FALSE);
+	// !!! Ignoring parse errors
+	sscanf(txt, "%i\t%i\t%i\t%i\t%i", &data.frame, &data.x, &data.y,
+		&data.opacity, &data.effect);
+	*ani = data;
+	return (TRUE);
+}
 
 
 
@@ -314,8 +383,8 @@ static void empty_text_widget(GtkWidget *w)	// Empty the text widget
 
 static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 {
-	int i, j, k;
-	char txt[128 + MAX_CYC_ITEMS * 6], *tmp;
+	char txt[ANI_CYC_TEXT_MAX];
+	int i;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
 
@@ -327,15 +396,8 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
 		if (!ani_cycle_table[i].frame0) break;
-		tmp = txt + sprintf(txt, "%i\t%i\t%i", ani_cycle_table[i].frame0,
-			ani_cycle_table[i].frame1, ani_cycle_table[i].layers[0]);
-		for (j = 1; j < MAX_CYC_ITEMS; j++)
-		{
-			k = ani_cycle_table[i].layers[j];
-			if (!k) break;
-			tmp += sprintf(tmp, ",%i", k);
-		}
-		strcpy(tmp, "\n");
+		ani_cyc_sprintf(txt, ani_cycle_table + i,
+			ani_cycle_table[i].layers);
 #if GTK_MAJOR_VERSION == 1
 		gtk_text_insert (GTK_TEXT (ani_text_cyc), NULL, NULL, NULL, txt, -1);
 #endif
@@ -354,7 +416,7 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 
 static void ani_pos_refresh_txt()		// Refresh the text in the position text widget
 {
-	char txt[256];
+	char txt[ANI_POS_TEXT_MAX];
 	int i = ani_currently_selected_layer, j;
 	ani_slot *ani;
 #if GTK_MAJOR_VERSION == 2
@@ -373,8 +435,7 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 			ani = layer_table[i].image->ani_pos + j;
 			if (ani->frame <= 0) break;
 			// Add a line if one exists
-			snprintf(txt, 250, "%i\t%i\t%i\t%i\t%i\n",
-				ani->frame, ani->x, ani->y, ani->opacity, ani->effect);
+			ani_pos_sprintf(txt, ani);
 #if GTK_MAJOR_VERSION == 1
 			gtk_text_insert (GTK_TEXT (ani_text_pos), NULL, NULL, NULL, txt, -1);
 #endif
@@ -453,98 +514,40 @@ static gboolean delete_ani()
 }
 
 
-static int parse_line_pos( char *txt, int layer, int row )	// Read in position row from some text
-{
-	ani_slot data = { -1, -1, -1, -1, -1 };
-	char *tx;;
-	int tot;
-
-	tx = strchr( txt, '\n' );			// Find out length of this input line
-	if ( tx == NULL ) tot = strlen(txt);
-	else tot = tx - txt + 1;
-
-	while ( txt[0] < 32 )				// Skip non ascii chars
-	{
-		if ( txt[0] == 0 ) return -1;		// If we reach the end, tell the caller
-		txt = txt + 1;
-	}
-	sscanf(txt, "%i\t%i\t%i\t%i\t%i", &data.frame, &data.x, &data.y,
-		&data.opacity, &data.effect);
-
-	layer_table[layer].image->ani_pos[row] = data;
-
-	return tot;
-}
-
 static void ani_parse_store_positions()		// Read current positions in text input and store
 {
-	char *txt = text_edit_widget_get( ani_text_pos ), *tx;
-	int i, j, layer = ani_currently_selected_layer;
+	char *txt, *tx, *tmp;
+	ani_slot *ani = layer_table[ani_currently_selected_layer].image->ani_pos;
+	int i;
 
-	tx = txt;
-
-	for ( i=0; i<MAX_POS_SLOTS; i++ )
+	tmp = tx = text_edit_widget_get(ani_text_pos);
+	for (i = 0; i < MAX_POS_SLOTS; i++)
 	{
-		j = parse_line_pos( txt, layer, i );
-		if ( j<0 ) break;
-		txt += j;
+		if (!(txt = tmp)) break;
+		tmp = strchr(txt, '\n');
+		if (tmp) *tmp++ = '\0';
+		if (!ani_pos_sscanf(txt, ani + i)) break;
 	}
-	if ( i<MAX_POS_SLOTS ) layer_table[layer].image->ani_pos[i].frame = 0;	// End delimeter
+	if (i < MAX_POS_SLOTS) ani[i].frame = 0;	// End delimeter
 
 	g_free(tx);
 }
 
-static int parse_line_cyc( char *txt, int row )		// Read in cycle row from some text
-{
-	char *tx, *eol;
-	int a=-1, b=-1, c=-1, tot, i;
-
-	tx = strchr( txt, '\n' );			// Find out length of this input line
-	if ( tx == NULL ) tot = strlen(txt);
-	else tot = tx - txt + 1;
-
-	eol = txt + tot - 1;
-
-	while ( txt[0] < 32 )				// Skip non ascii chars
-	{
-		if ( txt[0] == 0 ) return -1;		// If we reach the end, tell the caller
-		txt = txt + 1;
-	}
-	sscanf( txt, "%i\t%i\t%i", &a, &b, &c );
-	ani_cycle_table[row].frame0 = a;
-	ani_cycle_table[row].frame1 = b;
-	ani_cycle_table[row].layers[0] = c;
-
-	// Read in a number after each comma
-	for (i = 1; i < MAX_CYC_ITEMS; i++)
-	{
-		tx = strchr( txt, ',' );		// Get next comma
-		if (!tx || (eol - tx < 2)) break;	// Bail out if no comma on this line
-		a = -1;
-		sscanf(tx + 1, "%i", &a);
-		ani_cycle_table[row].layers[i] = a;
-		txt = tx + 1;
-	}
-	// Terminate with zero if needed
-	if (i < MAX_CYC_ITEMS) ani_cycle_table[row].layers[i] = 0;
-
-	return tot;
-}
-
 static void ani_parse_store_cycles()		// Read current cycles in text input and store
 {
-	char *txt = text_edit_widget_get( ani_text_cyc ), *tx;
-	int i, j;
+	char *txt, *tx, *tmp;
+	int i;
 
-	tx = txt;
-
-	for ( i=0; i<MAX_CYC_SLOTS; i++ )
+	tmp = tx = text_edit_widget_get(ani_text_cyc);
+	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
-		j = parse_line_cyc( txt, i );
-		if ( j<0 ) break;
-		txt += j;
+		if (!(txt = tmp)) break;
+		tmp = strchr(txt, '\n');
+		if (tmp) *tmp++ = '\0';
+		if (!ani_cyc_sscanf(txt, ani_cycle_table + i,
+			ani_cycle_table[i].layers)) break;
 	}
-	if ( i<MAX_CYC_SLOTS ) ani_cycle_table[i].frame0 = 0;	// End delimeter
+	if (i < MAX_CYC_SLOTS) ani_cycle_table[i].frame0 = 0;	// End delimeter
 
 	g_free(tx);
 }
@@ -1222,7 +1225,8 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	{
 		if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
 
-		parse_line_cyc( tin, j );
+		ani_cyc_sscanf(tin, ani_cycle_table + j,
+			ani_cycle_table[j].layers);
 	}
 	if ( j<MAX_CYC_SLOTS ) ani_cycle_table[j].frame0 = 0;	// Mark end
 
@@ -1237,8 +1241,7 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 		for ( j=0; j<tot; j++ )					// Read each position line
 		{
 			if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
-
-			parse_line_pos( tin, k, j );
+			ani_pos_sscanf(tin, layer_table[k].image->ani_pos + j);
 		}
 		if ( j<MAX_POS_SLOTS )
 			layer_table[k].image->ani_pos[j].frame = 0;	// Mark end
@@ -1247,7 +1250,8 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 
 void ani_write_file( FILE *fp )			// Write data to layers file already opened
 {
-	int gifcode = ani_gif_delay, i, j, k, l;
+	char txt[ANI_CYC_TEXT_MAX];
+	int gifcode = ani_gif_delay, i, j, k;
 
 	if ( layers_total == 0 ) return;	// No layers memory allocated so bail out
 
@@ -1272,15 +1276,9 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 
 	for ( k=0; k<i; k++ )
 	{
-		fprintf(fp, "%i\t%i\t%i", ani_cycle_table[k].frame0,
-			ani_cycle_table[k].frame1, ani_cycle_table[k].layers[0]);
-		for (j = 1; j < MAX_CYC_ITEMS; j++)
-		{
-			l = ani_cycle_table[k].layers[j];
-			if (!l) break;
-			fprintf( fp, ",%i", l);
-		}
-		fprintf( fp, "\n" );
+		ani_cyc_sprintf(txt, ani_cycle_table + k,
+			ani_cycle_table[k].layers);
+		fputs(txt, fp);
 	}
 
 	// POSITION INFO
@@ -1296,14 +1294,10 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 			if (ani[i].frame == 0) break;
 		}
 		fprintf( fp, "%i\n", i );		// Number of position lines for this layer
-		if ( i>0 )
+		for (j = 0; j < i; j++)
 		{
-			for ( j=0; j<i; j++ )
-			{
-				fprintf( fp, "%i\t%i\t%i\t%i\t%i\n",
-					ani[j].frame, ani[j].x, ani[j].y,
-					ani[j].opacity, ani[j].effect);
-			}
+			ani_pos_sprintf(txt, ani + j);
+			fputs(txt, fp);
 		}
 	}
 }
