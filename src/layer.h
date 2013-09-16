@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -21,22 +21,15 @@
 #define LAYERS_HEADER "# mtPaint layers"
 #define LAYERS_VERSION 1
 
-#define ANIMATION_HEADER "# mtPaint animation"
-#define MAX_POS_SLOTS 100
-
 #define LAYER_NAMELEN 35
 
 ///	GLOBALS
-
-typedef struct {
-	int frame, x, y, opacity, effect;
-} ani_slot;
 
 typedef struct
 {
 	image_info image_;
 	image_state state_;
-	ani_slot ani_pos[MAX_POS_SLOTS];
+	ani_info ani_;
 } layer_image;				// All as per memory.h definitions
 
 typedef struct

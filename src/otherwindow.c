@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -22,6 +22,7 @@
 #include "mygtk.h"
 #include "memory.h"
 #include "otherwindow.h"
+#include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"
@@ -29,7 +30,6 @@
 #include "canvas.h"
 #include "layer.h"
 #include "wu.h"
-#include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
 #include "csel.h"

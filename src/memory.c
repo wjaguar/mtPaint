@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -21,6 +21,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"

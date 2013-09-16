@@ -21,6 +21,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
@@ -31,7 +32,6 @@
 #include "polygon.h"
 #include "wu.h"
 #include "prefs.h"
-#include "ani.h"
 #include "spawn.h"
 #include "channels.h"
 #include "toolbar.h"

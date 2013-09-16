@@ -90,7 +90,7 @@ static void ani_cyc_len_init()		// Initialize the cycle length array before doin
 
 static void set_layer_from_slot( int layer, int slot )		// Set layer x, y, opacity from slot
 {
-	ani_slot *ani = layer_table[layer].image->ani_pos + slot;
+	ani_slot *ani = layer_table[layer].image->ani_.pos + slot;
 	layer_table[layer].x = ani->x;
 	layer_table[layer].y = ani->y;
 	layer_table[layer].opacity = ani->opacity;
@@ -101,7 +101,7 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 	MT_Coor c[4], co_res, lenz;
 	float p1, p2;
 	int f0, f1, f2, f3, ii[4] = {i-1, i, i+1, i+2}, j;
-	ani_slot *ani = layer_table[layer].image->ani_pos;
+	ani_slot *ani = layer_table[layer].image->ani_.pos;
 
 
 	f1 = ani[i].frame;
@@ -162,43 +162,37 @@ static void ani_set_frame_state( int frame )
 // !!! Maybe make background x/y settable here too?
 	for ( k=1; k<=layers_total; k++ )	// Set x, y, opacity for each layer
 	{
-		ani = layer_table[k].image->ani_pos;
-		if (ani[0].frame > 0)
-		{
-			for ( i=0; i<MAX_POS_SLOTS; i++ )		// Find first frame in position list that excedes or equals 'frame'
-			{
-				if (ani[i].frame <= 0) break;		// End of list
-				if (ani[i].frame >= frame) break;	// Exact match or one exceding it found
-			}
+		ani = layer_table[k].image->ani_.pos;
+		// If no slots have been defined leave the layer x, y, opacity as now
+		if (ani[0].frame <= 0) continue;
 
-			if ( i>=MAX_POS_SLOTS )		// All position slots < 'frame'
-			{
-				set_layer_from_slot( k, MAX_POS_SLOTS - 1 );
-					// Set layer pos/opac to last slot values
-			}
-			else
-			{
-				if (ani[i].frame == 0)		// All position slots < 'frame'
-				{
-					set_layer_from_slot( k, i - 1 );
-						// Set layer pos/opac to last slot values
-				}
-				else
-				{
-					if (ani[i].frame == frame || i == 0)
-					{
-						set_layer_from_slot( k, i );
-							// If closest frame = requested frame, set all values to this
-							// ditto if i=0, i.e. no better matches exist
-					}
-					else
-					{
-						// i is currently pointing to slot that excedes 'frame', so in between this and the previous slot
-						set_layer_inbetween( k, i-1, frame, ani[i - 1].effect );
-					}
-				}
-			}
-		}	// If no slots have been defined leave the layer x, y, opacity as now
+		for ( i=0; i<MAX_POS_SLOTS; i++ )		// Find first frame in position list that excedes or equals 'frame'
+		{
+			if (ani[i].frame <= 0) break;		// End of list
+			if (ani[i].frame >= frame) break;	// Exact match or one exceding it found
+		}
+
+		if ( i>=MAX_POS_SLOTS )		// All position slots < 'frame'
+		{
+			set_layer_from_slot( k, MAX_POS_SLOTS - 1 );
+				// Set layer pos/opac to last slot values
+		}
+		else if (ani[i].frame == 0)		// All position slots < 'frame'
+		{
+			set_layer_from_slot( k, i - 1 );
+				// Set layer pos/opac to last slot values
+		}
+		else if (ani[i].frame == frame || i == 0)
+		{
+			set_layer_from_slot( k, i );
+				// If closest frame = requested frame, set all values to this
+				// ditto if i=0, i.e. no better matches exist
+		}
+		else
+		{
+			// i is currently pointing to slot that excedes 'frame', so in between this and the previous slot
+			set_layer_inbetween( k, i-1, frame, ani[i - 1].effect );
+		}
 	}
 
 
@@ -432,7 +426,7 @@ static void ani_pos_refresh_txt()		// Refresh the text in the position text widg
 	{
 		for (j = 0; j < MAX_POS_SLOTS; j++)
 		{
-			ani = layer_table[i].image->ani_pos + j;
+			ani = layer_table[i].image->ani_.pos + j;
 			if (ani->frame <= 0) break;
 			// Add a line if one exists
 			ani_pos_sprintf(txt, ani);
@@ -467,7 +461,7 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 	if ( layers_total>0 )		// No position array malloc'd until layers>0
 	{
 		for (j = 0; j <= layers_total; j++)
-			layer_table[j].image->ani_pos[0].frame = 0;
+			layer_table[j].image->ani_.pos[0].frame = 0;
 	}
 
 	strcpy(ani_output_path, "frames");
@@ -517,7 +511,7 @@ static gboolean delete_ani()
 static void ani_parse_store_positions()		// Read current positions in text input and store
 {
 	char *txt, *tx, *tmp;
-	ani_slot *ani = layer_table[ani_currently_selected_layer].image->ani_pos;
+	ani_slot *ani = layer_table[ani_currently_selected_layer].image->ani_.pos;
 	int i;
 
 	tmp = tx = text_edit_widget_get(ani_text_pos);
@@ -888,7 +882,7 @@ void pressed_remove_key_frames()
 	if ( i==2 )
 	{
 		for (j = 0; j <= layers_total; j++)
-			layer_table[j].image->ani_pos[0].frame = 0;
+			layer_table[j].image->ani_.pos[0].frame = 0;
 							// Flush array in each layer
 		ani_cycle_table[0].frame0 = 0;
 	}
@@ -903,7 +897,7 @@ static void ani_set_key_frame(int key)		// Set key frame postions & cycles as pe
 // !!! Maybe make background x/y settable here too?
 	for ( k=1; k<=layers_total; k++ )	// Add current position for each layer
 	{
-		ani = layer_table[k].image->ani_pos;
+		ani = layer_table[k].image->ani_.pos;
 		// Find first occurence of 0 or frame # < 'key'
 		for ( i=0; i<MAX_POS_SLOTS; i++ )
 		{
@@ -1241,10 +1235,10 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 		for ( j=0; j<tot; j++ )					// Read each position line
 		{
 			if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
-			ani_pos_sscanf(tin, layer_table[k].image->ani_pos + j);
+			ani_pos_sscanf(tin, layer_table[k].image->ani_.pos + j);
 		}
 		if ( j<MAX_POS_SLOTS )
-			layer_table[k].image->ani_pos[j].frame = 0;	// Mark end
+			layer_table[k].image->ani_.pos[j].frame = 0;	// Mark end
 	}
 }
 
@@ -1288,7 +1282,7 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 
 	for ( k=0; k<=layers_total; k++ )		// Write position table for each layer
 	{
-		ani_slot *ani = layer_table[k].image->ani_pos;
+		ani_slot *ani = layer_table[k].image->ani_.pos;
 		for ( i=0; i<MAX_POS_SLOTS; i++ )	// Count how many lines are in the table
 		{
 			if (ani[i].frame == 0) break;

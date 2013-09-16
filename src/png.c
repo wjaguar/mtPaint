@@ -61,6 +61,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"

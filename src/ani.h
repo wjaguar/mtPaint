@@ -1,5 +1,5 @@
 /*	ani.h
-	Copyright (C) 2005-2009 Mark Tyler
+	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -17,8 +17,10 @@
 	along with mtPaint in the file COPYING.
 */
 
+#define ANIMATION_HEADER "# mtPaint animation"
 #define MAX_CYC_SLOTS 100
 #define MAX_CYC_ITEMS 100
+#define MAX_POS_SLOTS 100
 #define MAX_FRAME 99999
 #define MAX_DELAY 1000
 #define ANI_PREFIX_LEN 16
@@ -30,6 +32,14 @@ typedef struct {
 	int frame0, frame1, len;
 	signed char layers[MAX_CYC_ITEMS];
 } ani_cycle;
+
+typedef struct {
+	int frame, x, y, opacity, effect;
+} ani_slot;
+
+typedef struct {
+	ani_slot pos[MAX_POS_SLOTS];
+} ani_info;
 
 int ani_frame1, ani_frame2, ani_gif_delay;
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];

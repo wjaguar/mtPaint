@@ -19,6 +19,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "ani.h"
 #include "png.h"
 #include "layer.h"
 #include "mainwindow.h"
@@ -27,7 +28,6 @@
 #include "inifile.h"
 #include "global.h"
 #include "viewer.h"
-#include "ani.h"
 #include "channels.h"
 #include "toolbar.h"
 #include "icons.h"
@@ -329,7 +329,7 @@ void layer_press_duplicate()
 	update_undo(&lim->image_);
 
 	// Copy across position data
-	memcpy(lim->ani_pos, ls->ani_pos, sizeof(lim->ani_pos));
+	lim->ani_ = ls->ani_;
 
 	layer_show_new();
 }
