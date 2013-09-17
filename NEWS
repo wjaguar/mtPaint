@@ -9,6 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
+	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled
 	* Undo system now uses a bit less memory
@@ -21,6 +22,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale
 	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
+	* BUGFIX - Animation cycles are now properly updated when layers are reordered, duplicated or deleted
 	* BUGFIX - Command line switches beyond the first one are now parsed properly
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus

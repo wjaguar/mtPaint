@@ -25,20 +25,21 @@
 #define MAX_DELAY 1000
 #define ANI_PREFIX_LEN 16
 
-#if MAX_LAYERS > 128
+#if MAX_LAYERS > 127
 #error "Layer indices cannot fit in ani_cycle structure"
 #endif
 typedef struct {
 	int frame0, frame1, len;
-	signed char layers[MAX_CYC_ITEMS];
 } ani_cycle;
 
 typedef struct {
 	int frame, x, y, opacity, effect;
 } ani_slot;
 
+/* !!! cycles[] must be kept sorted by cycle */
 typedef struct {
 	ani_slot pos[MAX_POS_SLOTS];
+	unsigned char cycles[MAX_CYC_ITEMS * 2];
 } ani_info;
 
 int ani_frame1, ani_frame2, ani_gif_delay;

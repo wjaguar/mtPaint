@@ -75,19 +75,6 @@ static void ani_widget_changed()	// Widget changed so flag the layers as changed
 
 
 
-static void ani_cyc_len_init()		// Initialize the cycle length array before doing any animating
-{
-	int i, k;
-
-	for (i = 0; i < MAX_CYC_SLOTS; i++)
-	{
-		if (!ani_cycle_table[i].frame0) break;	// Last slot reached
-		for (k = 0; (k < MAX_CYC_ITEMS) && ani_cycle_table[i].layers[k]; k++);
-		// Must be a minimum of 1 for modulo use
-		ani_cycle_table[i].len = k ? k : 1;
-	}
-}
-
 static void set_layer_from_slot( int layer, int slot )		// Set layer x, y, opacity from slot
 {
 	ani_slot *ani = layer_table[layer].image->ani_.pos + slot;
@@ -154,147 +141,226 @@ static void set_layer_inbetween( int layer, int i, int frame, int effect )		// C
 	}
 }
 
-static void ani_set_frame_state( int frame )
+static void ani_set_frame_state(int frame)
 {
-	int i, k, e, a, b, done, l;
+	int i, j, k, v, c, f, p;
 	ani_slot *ani;
+	ani_cycle *cc;
+	unsigned char *cp;
 
 // !!! Maybe make background x/y settable here too?
-	for ( k=1; k<=layers_total; k++ )	// Set x, y, opacity for each layer
+	for (k = 1; k <= layers_total; k++)
 	{
+		/* Set x, y, opacity for layer */
 		ani = layer_table[k].image->ani_.pos;
-		// If no slots have been defined leave the layer x, y, opacity as now
-		if (ani[0].frame <= 0) continue;
 
-		for ( i=0; i<MAX_POS_SLOTS; i++ )		// Find first frame in position list that excedes or equals 'frame'
+		/* Find first frame in position list that excedes or equals 'frame' */
+		for (i = 0; i < MAX_POS_SLOTS; i++)
 		{
-			if (ani[i].frame <= 0) break;		// End of list
-			if (ani[i].frame >= frame) break;	// Exact match or one exceding it found
+			/* End of list */
+			if (ani[i].frame <= 0) break;
+			/* Exact match or one exceding it found */
+			if (ani[i].frame >= frame) break;
 		}
 
-		if ( i>=MAX_POS_SLOTS )		// All position slots < 'frame'
-		{
-			set_layer_from_slot( k, MAX_POS_SLOTS - 1 );
-				// Set layer pos/opac to last slot values
-		}
-		else if (ani[i].frame == 0)		// All position slots < 'frame'
-		{
-			set_layer_from_slot( k, i - 1 );
-				// Set layer pos/opac to last slot values
-		}
-		else if (ani[i].frame == frame || i == 0)
-		{
-			set_layer_from_slot( k, i );
-				// If closest frame = requested frame, set all values to this
-				// ditto if i=0, i.e. no better matches exist
-		}
-		else
-		{
-			// i is currently pointing to slot that excedes 'frame', so in between this and the previous slot
-			set_layer_inbetween( k, i-1, frame, ani[i - 1].effect );
-		}
-	}
+		/* If no slots have been defined
+		 * leave the layer x, y, opacity as now */
+		if (ani[0].frame <= 0);
+		/* All position slots < 'frame'
+		 * Set layer pos/opac to last slot values */
+		else if ((i >= MAX_POS_SLOTS) || !ani[i].frame)
+			set_layer_from_slot(k, i - 1);
+		/* If closest frame = requested frame, set all values to this
+		 * ditto if i=0, i.e. no better matches exist */
+		else if ((ani[i].frame == frame) || !i)
+			set_layer_from_slot(k, i);
+		/* i is currently pointing to slot that excedes 'frame',
+		 * so in between this and the previous slot */
+		else set_layer_inbetween(k, i - 1, frame, ani[i - 1].effect);
 
-
-
-	// Set visibility for each layer by processing cycle table
-
-	for ( i=0; i<MAX_CYC_SLOTS; i++ )
-	{
-		a = ani_cycle_table[i].frame0;
-		b = ani_cycle_table[i].frame1;
-		if (!a) break;		// End of list reached
-
-		if ( a==b && a<=frame )		// Special case for enabling/disabling en-masse
+		/* Set visibility for layer by processing cycle table */
+		/* !!! Table must be sorted by cycle # */
+		v = -1; // Leave alone by default
+		cp = layer_table[k].image->ani_.cycles;
+		for (i = c = 0; i < MAX_CYC_ITEMS; i++ , c = j)
 		{
-			for (k = 0; k < MAX_CYC_ITEMS; k++)
+			if (!(j = *cp++)) break; // Cycle # + 1
+			p = *cp++;
+			cc = ani_cycle_table + j - 1;
+			if (!(f = cc->frame0)) continue; // Paranoia
+			if (f > frame) continue; // Not yet active
+			/* Special case for enabling/disabling en-masse */
+			if (cc->frame1 == f)
 			{
-				e = ani_cycle_table[i].layers[k];
-				if ( e==0 ) break;		// End delimeter encountered so stop
-				if ( e<0 )
-				{
-					if ( (-e) <= layers_total )		// If valid, hide layer
-						layer_table[-e].visible = FALSE;
-				}
-				if ( e>0 )
-				{
-					if ( e <= layers_total )		// If valid, show layer
-						layer_table[e].visible = TRUE;
-				}
+				if (j != c) v = !p; // Ignore entries after 1st
+			}
+			/* Inside a normal cycle */
+			else if (cc->frame1 >= frame)
+			{
+				if (j != c) v = 0; // Hide initially
+				v |= (frame - f) % cc->len == p; // Show if matched
 			}
 		}
-		if ( a<b && a<=frame && frame<=b )	// Frame is between these points so act
-		{
-			done = -1;
-			l = ani_cycle_table[i].len;
-			for (k = 0; k < MAX_CYC_ITEMS; k++)
-			{
-				e = ani_cycle_table[i].layers[k];
-				if ( e==0 ) break;		// End delimeter encountered so stop
-				if ( e>0 && e<=layers_total && e!=done )
-				{
-					if ((frame - a) % l == k)
-					{
-						layer_table[e].visible = TRUE;
-						done = e;
-						// Don't switch this off later in loop
-					}
-					else
-						layer_table[e].visible = FALSE;
-					// Switch layer on or off according to frame position in cycle
-				}
-			}
-		}
+		if (v >= 0) layer_table[k].visible = v;
 	}
 }
 
+#define ANI_CYC_ROWLEN (MAX_CYC_ITEMS * 2 + 1)
 #define ANI_CYC_TEXT_MAX (128 + MAX_CYC_ITEMS * 10)
 
-static void ani_cyc_sprintf(char *txt, ani_cycle *chead, signed char *cdata)
+/* Convert cycle header & layers list to text */
+static void ani_cyc_sprintf(char *txt, ani_cycle *chead, unsigned char *cdata)
 {
-	int j, k;
-	char *tmp = txt + sprintf(txt, "%i\t%i\t%i", chead->frame0,
-		chead->frame1, cdata[0]);
-	for (j = 1; j < MAX_CYC_ITEMS; j++)
+	int j, l, b;
+	char *tmp = txt + sprintf(txt, "%i\t%i\t", chead->frame0, chead->frame1);
+
+	l = *cdata++;
+	if (!l); // Empty group
+	else if (chead->frame0 == chead->frame1) // Batch toggle group
 	{
-		k = cdata[j];
-		if (!k) break;
-		tmp += sprintf(tmp, ",%i", k);
+		while (TRUE)
+		{
+			tmp += sprintf(tmp, "%s%i", cdata[0] ? "-" : "", cdata[1]);
+			if (--l <= 0) break;
+			*tmp++ = ',';
+			cdata += 2;
+		}
+	}
+	else // Regular cycle
+	{
+		b = -1;
+		while (TRUE)
+		{
+			j = cdata[0] - b;
+			while (--j > 0) *tmp++ = '0' , *tmp++ = ',';
+			b = cdata[0];
+			if (--l <= 0) break;
+			if ((cdata[2] == b) && (j >= 0)) *tmp++ = '(';
+			tmp += sprintf(tmp, "%i%s,", cdata[1],
+				(cdata[2] != b) && (j < 0) ? ")" : "");
+			cdata += 2;
+		}
+		tmp += sprintf(tmp, "%i%s", cdata[1], j < 0 ? ")" : "");
+		j = chead->len - cdata[0];
+		while (--j > 0) *tmp++ = ',' , *tmp++ = '0';
 	}
 	strcpy(tmp, "\n");
 }
 
-/* Returns number of cycle steps */
-static int ani_cyc_sscanf(char *txt, ani_cycle *chead, signed char *cdata)
+/* Parse text into cycle header & layers list */
+static int ani_cyc_sscanf(char *txt, ani_cycle *chead, unsigned char *cdata)
 {
 	char *tail;
-	int i, j, l, f0, f1;
+	unsigned char *cntp;
+	int i, j, l, f, f0, f1, b;
 
 	while (*txt && (*txt < 32)) txt++;	// Skip non ascii chars
-	if (!*txt) return (0);
+	if (!*txt) return (FALSE);
 	f0 = f1 = -1; i = 0;	// Default state if invalid
 	l = 0; sscanf(txt, "%i\t%i\t%n", &f0, &f1, &l);
 	chead->frame0 = f0;
 	chead->frame1 = f1;
-	if (l) // Parse cycles if header is valid
+	chead->len = *cdata = 0;
+	if (!l) return (TRUE); // Invalid cycle is a cycle still
+	txt += l;
+
+	cntp = cdata++;
+	f = b = 0;
+	while (cdata - cntp < ANI_CYC_ROWLEN)
 	{
-		txt += l;
-		while (i < MAX_CYC_ITEMS)
+		while (*txt && (*txt <= 32)) txt++;	// Skip whitespace etc
+		if (*txt == '(')
 		{
-			j = strtol(txt, &tail, 0);
-			if (tail - txt <= 0) break; // No number there
-			// !!! No range check - need to fix it later
-			cdata[i++] = j;
-			txt = tail;
+			b = 1; txt++;
 			while (*txt && (*txt <= 32)) txt++;	// Skip whitespace etc
-			if (*txt++ != ',') break;	// Stop if no comma
+		}
+		j = strtol(txt, &tail, 0);
+		if (tail - txt <= 0) break; // No number there
+		if (f0 == f1) if ((f = j < 0)) j = -j; // Batch toggle group
+		if ((j < 0) || (j > MAX_LAYERS)) j = 0; // Out of range
+		*cdata++ = f; // Position
+		*cdata++ = j; // Layer
+		cntp[0]++;
+		txt = tail;
+		while (*txt && (*txt <= 32)) txt++;	// Skip whitespace etc
+		if (*txt == ')')
+		{
+			b = 0; txt++;
+			while (*txt && (*txt <= 32)) txt++;	// Skip whitespace etc
+		}
+		if (*txt++ != ',') break;	// Stop if no comma
+		f += 1 - b;
+	}
+	if (*cntp) chead->len = *(cdata - 2) + 1;
+
+	return (TRUE);
+}
+
+static int cmp_frames(const void *f1, const void *f2)
+{
+	int n = (int)((unsigned char *)f1)[0] - ((unsigned char *)f2)[0];
+	return (n ? n :
+		(int)((unsigned char *)f1)[1] - ((unsigned char *)f2)[1]);
+}
+
+/* Assemble cycles info from per-layer lists into per-cycle ones */
+static void ani_cyc_get(unsigned char *buf)
+{
+	unsigned char *ptr, *cycles;
+	int i, j, k, l;
+
+	memset(buf, 0, MAX_CYC_SLOTS * ANI_CYC_ROWLEN); // Clear
+	buf -= ANI_CYC_ROWLEN; // 1-based
+	for (i = 1; i <= layers_total; i++)
+	{
+		cycles = layer_table[i].image->ani_.cycles;
+		for (j = 0; j < MAX_CYC_ITEMS; j++)
+		{
+			if (!(k = *cycles++)) break; // Cycle # + 1
+			l = *cycles++; // Position
+			if ((k > MAX_CYC_SLOTS) || (l >= MAX_CYC_ITEMS))
+				continue;
+			ptr = buf + ANI_CYC_ROWLEN * k;
+			if (ptr[0] >= MAX_CYC_ITEMS) continue;
+			k = ptr[0]++;
+			ptr += k * 2 + 1;
+			ptr[0] = l; // Position
+			ptr[1] = i; // Layer
 		}
 	}
-	if (!i) cdata[i++] = -1; // !!! Add fake item if no real ones
-	// Terminate with zero if needed
-	if (i < MAX_CYC_ITEMS) cdata[i] = 0;
+	for (i = 1; i <= MAX_CYC_SLOTS; i++) // Sort by position & layer
+	{
+		ptr = buf + ANI_CYC_ROWLEN * i;
+		if (*ptr > 1) qsort(ptr + 1, *ptr, 2, cmp_frames);
+	}
+}
 
-	return (i);
+/* Distribute out cycles info from per-cycle to per-layer lists */
+static void ani_cyc_put(unsigned char *buf)
+{
+	unsigned char *ptr, *cycles;
+	int i, j, k, l, cnt[MAX_LAYERS + 1];
+
+	memset(cnt, 0, sizeof(cnt)); // Clear
+	buf -= ANI_CYC_ROWLEN; // 1-based
+	for (i = 1; i <= MAX_CYC_SLOTS; i++)
+	{
+		ptr = buf + ANI_CYC_ROWLEN * i;
+		j = *ptr++;
+		while (j-- > 0)
+		{
+			l = *ptr++; // Position
+			k = *ptr++; // Layer
+			if (!k || (k > layers_total)) continue;
+			if (cnt[k] >= MAX_CYC_ITEMS) continue;
+			cycles = layer_table[k].image->ani_.cycles + cnt[k]++ * 2;
+			cycles[0] = i; // Cycle # + 1
+			cycles[1] = l; // Position
+		}
+	}
+	for (i = 0; i <= layers_total; i++) // Mark end of list
+		if (cnt[i] < MAX_CYC_ITEMS)
+			layer_table[i].image->ani_.cycles[cnt[i] * 2] = 0;
 }
 
 #define ANI_POS_TEXT_MAX 256
@@ -378,6 +444,7 @@ static void empty_text_widget(GtkWidget *w)	// Empty the text widget
 static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 {
 	char txt[ANI_CYC_TEXT_MAX];
+	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	int i;
 #if GTK_MAJOR_VERSION == 2
 	GtkTextIter iter;
@@ -387,11 +454,12 @@ static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
 #endif
 	empty_text_widget(ani_text_cyc);	// Clear the text in the widget
 
+	ani_cyc_get(buf);
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
 		if (!ani_cycle_table[i].frame0) break;
 		ani_cyc_sprintf(txt, ani_cycle_table + i,
-			ani_cycle_table[i].layers);
+			buf + ANI_CYC_ROWLEN * i);
 #if GTK_MAJOR_VERSION == 1
 		gtk_text_insert (GTK_TEXT (ani_text_cyc), NULL, NULL, NULL, txt, -1);
 #endif
@@ -456,13 +524,9 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 	ani_frame2 = 100;
 	ani_gif_delay = 10;
 
-	ani_cycle_table[0].frame0 = 0;
-
-	if ( layers_total>0 )		// No position array malloc'd until layers>0
-	{
-		for (j = 0; j <= layers_total; j++)
-			layer_table[j].image->ani_.pos[0].frame = 0;
-	}
+	for (j = 0; j <= layers_total; j++)
+		memset(&layer_table[j].image->ani_, 0, sizeof(ani_info));
+	memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
 
 	strcpy(ani_output_path, "frames");
 	strcpy(ani_file_prefix, "f");
@@ -529,19 +593,22 @@ static void ani_parse_store_positions()		// Read current positions in text input
 
 static void ani_parse_store_cycles()		// Read current cycles in text input and store
 {
+	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	char *txt, *tx, *tmp;
 	int i;
 
 	tmp = tx = text_edit_widget_get(ani_text_cyc);
+	memset(buf, 0, sizeof(buf));
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
 		if (!(txt = tmp)) break;
 		tmp = strchr(txt, '\n');
 		if (tmp) *tmp++ = '\0';
 		if (!ani_cyc_sscanf(txt, ani_cycle_table + i,
-			ani_cycle_table[i].layers)) break;
+			buf + ANI_CYC_ROWLEN * i)) break;
 	}
 	if (i < MAX_CYC_SLOTS) ani_cycle_table[i].frame0 = 0;	// End delimeter
+	ani_cyc_put(buf);
 
 	g_free(tx);
 }
@@ -661,8 +728,6 @@ void ani_but_preview()
 	}
 	else	ani_read_layer_data();
 
-	ani_cyc_len_init();			// Prepare the cycle index for the animation
-
 	if ( !view_showing ) view_show();	// If not showing, show the view window
 
 	ani_prev_win = add_a_window( GTK_WINDOW_TOPLEVEL,
@@ -725,7 +790,6 @@ static void create_frames_ani()
 
 
 	ani_win_read_widgets();
-	ani_cyc_len_init();		// Prepare the cycle index for the animation
 
 	gtk_widget_hide(animate_window);
 
@@ -882,15 +946,17 @@ void pressed_remove_key_frames()
 	if ( i==2 )
 	{
 		for (j = 0; j <= layers_total; j++)
-			layer_table[j].image->ani_.pos[0].frame = 0;
-							// Flush array in each layer
-		ani_cycle_table[0].frame0 = 0;
+			memset(&layer_table[j].image->ani_, 0, sizeof(ani_info));
+		memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
 	}
 }
 
 static void ani_set_key_frame(int key)		// Set key frame postions & cycles as per current layers
 {
+	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
+	unsigned char *cp;
 	ani_slot *ani;
+	ani_cycle *cc;
 	int i, j, k, l;
 
 
@@ -930,20 +996,27 @@ static void ani_set_key_frame(int key)		// Set key frame postions & cycles as pe
 
 	if ( i>=MAX_CYC_SLOTS ) i=MAX_CYC_SLOTS-1;
 
-	//  Shift remaining data down a slot
-	for ( j=MAX_CYC_SLOTS-1; j>i; j-- )
-		ani_cycle_table[j] = ani_cycle_table[j - 1];
+	// Shift remaining data down a slot
+	l = MAX_CYC_SLOTS - 1 - i;
+	ani_cyc_get(buf);
+	cp = buf + ANI_CYC_ROWLEN * i;
+	memmove(cp + ANI_CYC_ROWLEN, cp, l * ANI_CYC_ROWLEN);
+	cc = ani_cycle_table + i;
+	memmove(cc + 1, cc, l * sizeof(ani_cycle));
 
-	//  Enter data for the current state
-	ani_cycle_table[i].frame0 = ani_cycle_table[i].frame1 = key;
-	for ( j=1; j<=layers_total; j++ )
+	// Enter data for the current state
+	l = layers_total;
+	if (l > MAX_CYC_ITEMS) l = MAX_CYC_ITEMS;
+	cc->frame0 = cc->frame1 = key;
+	cc->len = *cp++ = l;
+	for (j = 1; j <= l; j++)
 	{
-		if (j > MAX_CYC_ITEMS) break;	// More layers than free items so bail out
-		if ( layer_table[j].visible ) l=j; else l=-j;
-		ani_cycle_table[i].layers[j - 1] = l;
+		*cp++ = !layer_table[j].visible; // Position
+		*cp++ = j; // Layer
 	}
-	// Add terminator if needed
-	if (j <= MAX_CYC_ITEMS) ani_cycle_table[i].layers[j - 1] = 0;
+
+	// Write back
+	ani_cyc_put(buf);
 }
 
 static void ani_tog_gif(GtkToggleButton *togglebutton, gpointer user_data)
@@ -1171,8 +1244,9 @@ void pressed_animate_window()
 
 void ani_read_file( FILE *fp )			// Read data from layers file already opened
 {
-	int i, j, k, tot;
+	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	char tin[2048];
+	int i, j, k, tot;
 
 	ani_init();
 	do
@@ -1215,14 +1289,16 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	if ( i<0 || i>MAX_CYC_SLOTS ) return;			// BAILOUT - invalid #
 
 	tot = i;
+	memset(buf, 0, sizeof(buf));
 	for ( j=0; j<tot; j++ )					// Read each cycle line
 	{
 		if (!fgets(tin, 2000, fp)) break;		// BAILOUT - invalid line
 
 		ani_cyc_sscanf(tin, ani_cycle_table + j,
-			ani_cycle_table[j].layers);
+			buf + ANI_CYC_ROWLEN * j);
 	}
 	if ( j<MAX_CYC_SLOTS ) ani_cycle_table[j].frame0 = 0;	// Mark end
+	ani_cyc_put(buf);
 
 ///	POSITION DATA
 
@@ -1245,6 +1321,7 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 void ani_write_file( FILE *fp )			// Write data to layers file already opened
 {
 	char txt[ANI_CYC_TEXT_MAX];
+	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	int gifcode = ani_gif_delay, i, j, k;
 
 	if ( layers_total == 0 ) return;	// No layers memory allocated so bail out
@@ -1268,10 +1345,11 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 
 	fprintf( fp, "%i\n", i );
 
+	ani_cyc_get(buf);
 	for ( k=0; k<i; k++ )
 	{
 		ani_cyc_sprintf(txt, ani_cycle_table + k,
-			ani_cycle_table[k].layers);
+			buf + ANI_CYC_ROWLEN * k);
 		fputs(txt, fp);
 	}
 

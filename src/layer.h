@@ -25,15 +25,13 @@
 
 ///	GLOBALS
 
-typedef struct
-{
+typedef struct {
 	image_info image_;
 	image_state state_;
 	ani_info ani_;
-} layer_image;				// All as per memory.h definitions
+} layer_image;
 
-typedef struct
-{
+typedef struct {
 	char name[LAYER_NAMELEN];	// Layer text name
 	int x, y, opacity;		// Position of layer, opacity %
 	int visible;			// Show layer

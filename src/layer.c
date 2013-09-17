@@ -742,12 +742,15 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			preserved_gif_delay = ani_gif_delay = fset.frames[0].delay;
 
 			/* Build animation cycle for these layers */
-			memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
 			ani_frame1 = ani_cycle_table[0].frame0 = 1;
 			ani_frame2 = ani_cycle_table[0].frame1 = l - 1;
 			ani_cycle_table[0].len = l - 1;
 			for (j = 1; j < l; j++)
-				ani_cycle_table[0].layers[j - 1] = j;
+			{
+				unsigned char *cp = layer_table[j].image->ani_.cycles;
+				cp[0] = 1; // Cycle # + 1
+				cp[1] = j - 1; // Position
+			}
 
 			/* Display 1st layer in sequence */
 			layer_table[1].visible = TRUE;
