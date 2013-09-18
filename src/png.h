@@ -52,6 +52,7 @@ enum {
 	FT_GPL,
 	FT_TXT,
 	FT_PAL,
+	FT_ACT,
 	FT_LAYERS1,
 	FT_LAYERS2,
 	FT_PIXMAP,

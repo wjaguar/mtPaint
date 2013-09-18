@@ -1531,31 +1531,76 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 	return (res);
 }
 
+static int selected_file_type(GtkWidget *box)
+{
+	GtkWidget *opt = BOX_CHILD(box, 1);
+	if (!GTK_IS_OPTION_MENU(opt)) return (FT_NONE);
+	return (((int *)gtk_object_get_user_data(GTK_OBJECT(opt)))
+		[wj_option_menu_get_history(opt)]);
+}
+
 #define FORMAT_SPINS 7
-static void change_image_format(GtkMenuItem *menuitem, GtkWidget *box)
+static void change_image_format(GtkMenuItem *menuitem, GtkWidget **ww)
 {
 	static int flags[FORMAT_SPINS] = { FF_TRANS, FF_COMPJ, FF_COMPZ,
 		FF_COMPR, FF_COMPJ2, FF_SPOT, FF_SPOT };
-	GList *chain = GTK_BOX(box)->children->next->next;
+	void (*showhide)(GtkWidget *w);
 	int i, j, ftype;
 
-	ftype = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+	if (!ww[0]) return; // Paranoia
+	ftype = selected_file_type(ww[0]);
 	/* Hide/show name/value widget pairs */
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
 		j = flags[i] & FF_COMP ? FF_COMP : flags[i];
-		if ((file_formats[ftype].flags & j) == flags[i])
-		{
-			gtk_widget_show(((GtkBoxChild*)chain->data)->widget);
-			gtk_widget_show(((GtkBoxChild*)chain->next->data)->widget);
-		}
-		else
-		{
-			gtk_widget_hide(((GtkBoxChild*)chain->data)->widget);
-			gtk_widget_hide(((GtkBoxChild*)chain->next->data)->widget);
-		}
-		chain = chain->next->next;
+		showhide = (file_formats[ftype].flags & j) == flags[i] ?
+			gtk_widget_show : gtk_widget_hide;
+		showhide(ww[i * 2 + 1]);
+		showhide(ww[i * 2 + 2]);
 	}
+}
+
+static GtkWidget *ftype_selector(int mask, char *ext, int def,
+	GtkSignalFunc handler, gpointer data)
+{
+	GtkWidget *opt;
+	fformat *ff;
+	char *names[NUM_FTYPES];
+	int i, j, k, l, *ftmap, ft_sort[NUM_FTYPES], ft_key[NUM_FTYPES];
+
+	for (i = k = 0; i < NUM_FTYPES; i++)	// Populate sorted filetype list
+	{
+		ff = file_formats + i;
+		if (ff->flags & FF_NOSAVE) continue;
+		if (!(ff->flags & mask)) continue;
+		l = (ff->name[0] << 16) + (ff->name[1] << 8) + ff->name[2];
+		for (j = k; j > 0; j--)
+		{
+			if (ft_key[j - 1] < l) break;
+			ft_sort[j] = ft_sort[j - 1];
+			ft_key[j] = ft_key[j - 1];
+		}
+		ft_key[j] = l;
+		ft_sort[j] = i;
+		k++;
+	}
+	j = -1;
+	for (l = 0; l < k; l++)		// Prepare to generate option menu
+	{
+		i = ft_sort[l];
+		if ((j < 0) && (i == def)) j = l;	// Default type if not saved yet
+		ff = file_formats + i;
+		if (!strncasecmp(ext, ff->ext, LONGEST_EXT) || (ff->ext2[0] &&
+			!strncasecmp(ext, ff->ext2, LONGEST_EXT))) j = l;
+		names[l] = ff->name;
+	}
+
+	opt = wj_option_menu(names, k, j, data, handler);
+	ftmap = bound_malloc(opt, sizeof(int) * k);
+	memcpy(ftmap, ft_sort, sizeof(int) * k);
+	gtk_object_set_user_data(GTK_OBJECT(opt), (gpointer)ftmap);
+
+	return (opt);
 }
 
 static void image_widgets(GtkWidget *box, char *name, int mode)
@@ -1570,9 +1615,8 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 		{png_compression, 0, 9}, {tga_RLE, 0, 1},
 		{jp2_rate, 0, 100},
 		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
-	GtkWidget *opt, *menu, *item;
-	fformat *ff;
-	int i, j, k, l, ft_sort[NUM_FTYPES][2], mask = FF_256;
+	GtkWidget **ww;
+	int i, mask = FF_256;
 	char *ext = strrchr(name, '.');
 
 	ext = ext ? ext + 1 : "";
@@ -1585,90 +1629,34 @@ static void image_widgets(GtkWidget *box, char *name, int mode)
 	case FS_COMPOSITE_SAVE: mask = FF_RGB;
 	}
 
-	/* Create controls (!!! two widgets per value - used in traversal) */
+	ww = bound_malloc(box, sizeof(*ww) * (FORMAT_SPINS * 2 + 1));
 	pack5(box, gtk_label_new(_("File Format")));
-	opt = pack5(box, gtk_option_menu_new());
+	pack5(box, ftype_selector(mask, ext, FT_PNG,
+		GTK_SIGNAL_FUNC(change_image_format), (gpointer)ww));
+	/* Create controls (!!! two widgets per value - hardcoded for now) */
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
-		pack5(box, gtk_label_new(spinnames[i]));
-		pack5(box, add_a_spin(spindata[i][0], spindata[i][1], spindata[i][2]));
+		pack5(box, ww[i * 2 + 1] = gtk_label_new(spinnames[i]));
+		pack5(box, ww[i * 2 + 2] = add_a_spin(spindata[i][0],
+			spindata[i][1], spindata[i][2]));
 	}
+	ww[0] = box;
 	gtk_widget_show_all(box);
 
-	menu = gtk_menu_new();
-	for (i = k = 0; i < NUM_FTYPES; i++)		// Populate sorted filetype list
-	{
-		ff = file_formats + i;
-		if (ff->flags & FF_NOSAVE) continue;
-		if (!(ff->flags & mask)) continue;
-		l = (ff->name[0] << 16) + (ff->name[1] << 8) + ff->name[2];
-		for (j = k; j > 0; j--)
-		{
-			if (ft_sort[j - 1][0] < l) break;
-			ft_sort[j][0] = ft_sort[j - 1][0];
-			ft_sort[j][1] = ft_sort[j - 1][1];
-		}
-		ft_sort[j][0] = l;
-		ft_sort[j][1] = i;
-		k++;
-	}
-	j=-1;
-	for ( l=0; l<k; l++ )				// Populate the option menu list
-	{
-		i = ft_sort[l][1];
-		if ((j < 0) && (i == FT_PNG)) j = l;	// Default to PNG type if not saved yet
-		ff = file_formats + i;
-		if (!strncasecmp(ext, ff->ext, LONGEST_EXT) || (ff->ext2[0] &&
-			!strncasecmp(ext, ff->ext2, LONGEST_EXT))) j = l;
-		item = gtk_menu_item_new_with_label(ff->name);
-		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		gtk_signal_connect(GTK_OBJECT(item), "activate",
-			GTK_SIGNAL_FUNC(change_image_format), (gpointer)box);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-	}
-	gtk_widget_show_all(menu);
-	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
-
-	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
-
-	FIX_OPTION_MENU_SIZE(opt);
-
-	gtk_signal_emit_by_name(GTK_OBJECT(g_list_nth_data(
-		GTK_MENU_SHELL(menu)->children, j)), "activate", (gpointer)box);
+	change_image_format(NULL, ww);
 }
 
 static void ftype_widgets(GtkWidget *box, char *name, int mode)
 {
-	GtkWidget *opt, *menu, *item;
-	fformat *ff;
-	int i, j, k, mask;
+	int mask = FF_IMAGE, def = FT_PNG;
 	char *ext = strrchr(name, '.');
 
-	mask = mode == FS_PALETTE_SAVE ? FF_PALETTE : FF_IMAGE;
+	if (mode == FS_PALETTE_SAVE) mask = FF_PALETTE , def = FT_GPL;
 	ext = mode == FS_EXPLODE_FRAMES ? name : ext ? ext + 1 : "";
 
 	pack5(box, gtk_label_new(_("File Format")));
-	opt = pack5(box, gtk_option_menu_new());
-
-	menu = gtk_menu_new();
-	for (i = j = k = 0; i < NUM_FTYPES; i++)
-	{
-		ff = file_formats + i;
-		if (ff->flags & FF_NOSAVE) continue;
-		if (!(ff->flags & mask)) continue;
-		if (!strncasecmp(ext, ff->ext, LONGEST_EXT) || (ff->ext2[0] &&
-			!strncasecmp(ext, ff->ext2, LONGEST_EXT))) j = k;
-		item = gtk_menu_item_new_with_label(ff->name);
-		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-		k++;
-  	}
+	pack5(box, ftype_selector(mask, ext, def, NULL, NULL));
 	gtk_widget_show_all(box);
-	gtk_widget_show_all(menu);
-	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
-
-	FIX_OPTION_MENU_SIZE(opt);
 }
 
 static void loader_widgets(GtkWidget *box, char *name, int mode)
@@ -1730,17 +1718,6 @@ static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
 		break;
 	}
 	return (box);
-}
-
-static int selected_file_type(GtkWidget *box)
-{
-	GtkWidget *opt;
-
-	opt = BOX_CHILD(box, 1);
-	opt = gtk_option_menu_get_menu(GTK_OPTION_MENU(opt));
-	if (!opt) return (FT_NONE);
-	opt = gtk_menu_get_active(GTK_MENU(opt));
-	return ((int)gtk_object_get_user_data(GTK_OBJECT(opt)));
 }
 
 void init_ls_settings(ls_settings *settings, GtkWidget *box)

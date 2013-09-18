@@ -9,6 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
+	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
 	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled

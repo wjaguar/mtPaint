@@ -121,10 +121,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "PAM", "pam", "", FF_BW | FF_RGB | FF_ALPHA | FF_LAYER },
 	{ "GPL", "gpl", "", FF_PALETTE },
 	{ "TXT", "txt", "", FF_PALETTE },
-/* !!! Not supported yet */
-//	{ "PAL", "pal", "", FF_PALETTE },
-/* !!! Placeholder */
-	{ "", "", "", 0},
+	{ "PAL", "pal", "", FF_PALETTE },
+	{ "ACT", "act", "", FF_PALETTE },
 	{ "LAYERS", "txt", "", FF_LAYER },
 /* !!! No 2nd layers format yet */
 	{ "", "", "", 0},
@@ -6681,6 +6679,86 @@ static int save_txtpal(char *file_name, ls_settings *settings)
 	return (0);
 }
 
+/* Handle raw palette file formats - 6-bit PAL and 8-bit ACT */
+
+static int load_rawpal(char *file_name, ls_settings *settings)
+{
+	unsigned char buf[769], xlat[256], *tp;
+	FILE *fp;
+	char *stop;
+	int i, l, ftype;
+
+
+	memset(buf, 0, sizeof(buf));
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	l = fread(buf, 1, 769, fp);
+	fclose(fp);
+	if (!l || (l > 768) || (l % 3)) return (-1); // Wrong size
+	l /= 3;
+
+	/* !!! Filetype in ls_settings is ignored */
+	ftype = FT_NONE;
+	if ((stop = strrchr(file_name, '.')))
+	{
+		if (!strcasecmp(stop + 1, "act"))
+		{
+			if (l != 256) return (-1);
+			ftype = FT_ACT;
+		}
+		else if (!strcasecmp(stop + 1, "pal"))
+			ftype = FT_PAL;
+	}
+	if (l < 256) ftype = FT_PAL;
+
+	if (ftype != FT_ACT) // Default to 6-bit
+	{
+		set_xlate(xlat, 6);
+		for (i = 64; i < 255; i++) xlat[i] = xlat[i - 64];
+	}
+	else set_xlate(xlat, 8); // 1:1
+
+	for (i = 0 , tp = buf; i < l; i++)
+	{
+		settings->pal[i].red = xlat[tp[0]];
+		settings->pal[i].green = xlat[tp[1]];
+		settings->pal[i].blue = xlat[tp[2]];
+		tp += 3;
+	}
+	settings->colors = l;
+
+	return (1);
+}
+
+static int save_rawpal(char *file_name, ls_settings *settings)		
+{
+	FILE *fp;
+	unsigned char buf[768], xlat[256], *tp;
+	png_color *cp;
+	int i, n = settings->colors;
+
+	if (!(fp = fopen(file_name, "wb"))) return (-1);
+
+	memset(buf, 0, 768);
+	if (settings->ftype == FT_PAL) // 6-bit
+		for (i = 0; i < 256; i++)
+			xlat[i] = (63 * 2 * i + 255) / (255 * 2);
+	else for (i = 0; i < 256; i++) xlat[i] = i; // 8-bit ACT
+
+	cp = settings->pal;
+	for (i = 0 , tp = buf; i < n; i++ , cp++)
+	{
+		tp[0] = xlat[cp->red];
+		tp[1] = xlat[cp->green];
+		tp[2] = xlat[cp->blue];
+		tp += 3;
+	}
+	if (settings->ftype != FT_PAL) n = 256;
+	i = fwrite(buf, n * 3, 1, fp);
+	fclose(fp);
+
+	return (i ? 0 : -1);
+}
+
 static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	ls_settings setw = *settings; // Make a copy to safely modify
@@ -6741,8 +6819,8 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	/* Palette files */
 	case FT_GPL:
 	case FT_TXT: res = save_txtpal(file_name, &setw); break;
-/* !!! Not implemented yet */
-//	case FT_PAL:
+	case FT_PAL:
+	case FT_ACT: res = save_rawpal(file_name, &setw); break;
 	}
 
 	return (res);
@@ -6925,8 +7003,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	/* Palette files */
 	case FT_GPL:
 	case FT_TXT: res0 = load_txtpal(file_name, &settings); break;
-/* !!! Not implemented yet */
-//	case FT_PAL:
+	case FT_PAL:
+	case FT_ACT: res0 = load_rawpal(file_name, &settings); break;
 	}
 
 	/* Consider animated GIF a success */
@@ -7046,8 +7124,10 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		mem_free_chanlist(settings.img);
 		/* This "failure" in this context serves as shortcut */
 		if (res == EXPLODE_FAILED) res = 1;
-		/* Failure - do nothing */
-// !!! In case of _image_ format here, re-recognize as palette and retry
+		/* In case of image format, retry as raw palette */
+		if ((res != 1) && (file_formats[ftype].flags & FF_IMAGE))
+			res = load_rawpal(file_name, &settings);
+		/* Utter failure - do nothing */
 		if ((res != 1) || (settings.colors <= 0));
 		/* Replace default palette */
 		else if (mode == FS_PALETTE_DEF)
@@ -7446,8 +7526,7 @@ int detect_file_format(char *name, int need_palette)
 	f = file_formats[i].flags;
 	if (need_palette)
 	{
-#if 0
-		/* Check the raw "pal" format */
+		/* Check for PAL/ACT raw format */
 		if (!(f & (FF_16 | FF_256 | FF_PALETTE)))
 		{
 			int l;
@@ -7455,9 +7534,6 @@ int detect_file_format(char *name, int need_palette)
 			l = ftell(fp);
 			i = l && (l <= 768) && !(l % 3) ? FT_PAL : FT_NONE;
 		}
-#else
-		if (!(f & (FF_16 | FF_256 | FF_PALETTE))) i = FT_NONE;
-#endif
 	}
 	else if (!(f & (FF_IMAGE | FF_LAYER))) i = FT_NONE;
 	fclose(fp);

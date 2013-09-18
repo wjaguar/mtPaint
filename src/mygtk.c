@@ -701,7 +701,6 @@ GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
 	GtkSignalFunc hdl = handler;
 
 	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_option);
-	opt = gtk_option_menu_new();
 	menu = gtk_menu_new();
 	for (i = j = 0; (i != cnt) && names[i]; i++)
 	{
@@ -714,6 +713,7 @@ GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
   	}
 	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
 	gtk_widget_show_all(menu);
+	opt = gtk_option_menu_new();
 	gtk_widget_show(opt); /* !!! Show now - or size won't be set properly */
 	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
 	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
