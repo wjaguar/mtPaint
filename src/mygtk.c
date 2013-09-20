@@ -3907,6 +3907,15 @@ void vport_noshadow_fix(GtkWidget *widget)
 
 #endif
 
+// Helper for accessing scrollbars
+
+void get_scroll_adjustments(GtkWidget *win, GtkAdjustment **h, GtkAdjustment **v)
+{
+	GtkScrolledWindow *scroll = GTK_SCROLLED_WINDOW(win);
+	*h = gtk_scrolled_window_get_hadjustment(scroll);
+	*v = gtk_scrolled_window_get_vadjustment(scroll);
+}
+
 // Threading helpers
 
 #if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */

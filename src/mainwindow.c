@@ -69,6 +69,7 @@ static inilist ini_bool[] = {
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "applyICC",		&apply_icc,		FALSE },
+	{ "cursorZoom",		&cursor_zoom,		FALSE },
 	{ "pasteCommit",	&paste_commit,		TRUE  },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },

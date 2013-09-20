@@ -49,7 +49,7 @@ static GtkWidget *checkbutton_icc;
 
 static GtkWidget *checkbutton_paste, *checkbutton_cursor, *checkbutton_exit, *checkbutton_quit;
 static GtkWidget *checkbutton_zoom[4],		// zoom 100%, wheel, optimize cheq, disable trans
-	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma;
+	*checkbutton_commit, *checkbutton_center, *checkbutton_gamma, *checkbutton_czoom;
 #if GTK_MAJOR_VERSION == 2
 static GtkWidget *checkbutton_menuicons, *entry_theme;
 #endif
@@ -309,6 +309,7 @@ static void prefs_apply(GtkWidget *widget)
 
 	q_quit = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_quit));
 
+	cursor_zoom = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_czoom));
 	inifile_set_gboolean("centerSettings",
 		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_center)));
 	use_gamma = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(checkbutton_gamma));
@@ -554,6 +555,7 @@ void pressed_preferences()
 		page, inifile_get_gboolean("centerSettings", TRUE));
 	checkbutton_zoom[0] = add_a_toggle( _("New image sets zoom to 100%"),
 		page, inifile_get_gboolean("zoomToggle", FALSE) );
+	checkbutton_czoom = add_a_toggle( _("Zoom on cursor position"), page, cursor_zoom);
 #if GTK_MAJOR_VERSION == 2
 	checkbutton_zoom[1] = add_a_toggle( _("Mouse Scroll Wheel = Zoom"),
 		page, inifile_get_gboolean("scrollwheelZOOM", FALSE) );

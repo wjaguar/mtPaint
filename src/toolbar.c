@@ -172,8 +172,10 @@ void toolbar_zoom_update()			// Update the zoom combos to reflect current zoom
 static void toolbar_zoom_main_change()
 {
 	float new = toolbar_get_zoom( toolbar_zoom_main );
-
-	if ( new > 0 ) align_size( new );
+	int z = cursor_zoom;
+	cursor_zoom = FALSE; // !!! Cursor in dropdown - don't zoom on it
+	if (new > 0) align_size(new);
+	cursor_zoom = z;
 }
 
 static void toolbar_zoom_view_change()

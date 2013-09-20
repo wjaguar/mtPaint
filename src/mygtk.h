@@ -421,6 +421,9 @@ void vport_noshadow_fix(GtkWidget *widget);
 #define vport_noshadow_fix(X)
 #endif
 
+// Helper for accessing scrollbars
+
+void get_scroll_adjustments(GtkWidget *win, GtkAdjustment **h, GtkAdjustment **v);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

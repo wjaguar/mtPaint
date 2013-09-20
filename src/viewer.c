@@ -318,9 +318,7 @@ void pan_thumbnail()		// Create thumbnail and selection box
 	// Update main window first to get new scroll positions if necessary
 	handle_events();
 
-	hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-	vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-
+	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 	draw_pan_thumb(hori->value, vert->value, hori->page_size, vert->page_size);
 }
 
@@ -383,10 +381,7 @@ static gboolean key_pan(GtkWidget *widget, GdkEventKey *event)
 			!XINE_FAKERY(event->keyval)) delete_pan();
 		else
 		{
-			hori = gtk_scrolled_window_get_hadjustment(
-				GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-			vert = gtk_scrolled_window_get_vadjustment(
-				GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
+			get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 
 			nv_h = hori->value + hm * (hori->page_size / 4);
 			nv_v = vert->value + vm * (hori->page_size / 4);
@@ -407,8 +402,7 @@ static void pan_button(int mx, int my, int button)
 
 	if (button == 1)	// Left click = pan window
 	{
-		hori = gtk_scrolled_window_get_hadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
-		vert = gtk_scrolled_window_get_vadjustment( GTK_SCROLLED_WINDOW(scrolledwindow_canvas) );
+		get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 
 		cent_x = ((float) mx) / pan_w;
 		cent_y = ((float) my) / pan_h;
@@ -655,8 +649,7 @@ void vw_focus_view()						// Focus view window to main window
 		main_hv[1] = py / h0;
 	}
 
-	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
-	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(vw_scrolledwindow));
+	get_scroll_adjustments(vw_scrolledwindow, &hori, &vert);
 
 	nv_h = nv_v = 0.0;
 	if (hori->page_size < vw_width)

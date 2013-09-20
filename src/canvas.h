@@ -61,7 +61,8 @@ int	col_reverse,					// Painting with right button
 	status_on[STATUS_ITEMS],			// Show status bar items?
 	text_paste,					// Are we pasting text?
 	canvas_image_centre,				// Are we centering the image?
-	chequers_optimize				// Are we optimizing the chequers for speed?
+	chequers_optimize,				// Are we optimizing the chequers for speed?
+	cursor_zoom					// Are we zooming at cursor position?
 	;
 
 #define LINE_NONE 0

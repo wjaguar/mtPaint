@@ -53,8 +53,9 @@ int recent_files;					// Current recent files setting
 int	show_paste,					// Show contents of clipboard while pasting
 	col_reverse,					// Painting with right button
 	text_paste,					// Are we pasting text?
-	canvas_image_centre = TRUE,			// Are we centering the image?
-	chequers_optimize = TRUE			// Are we optimizing the chequers for speed?
+	canvas_image_centre,				// Are we centering the image?
+	chequers_optimize,				// Are we optimizing the chequers for speed?
+	cursor_zoom					// Are we zooming at cursor position?
 	;
 
 int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
@@ -2132,10 +2133,7 @@ void canvas_center(float ic[2])		// Center of viewable area
 	GtkAdjustment *hori, *vert;
 	int w, h;
 
-	hori = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(
-		scrolledwindow_canvas));
-	vert = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(
-		scrolledwindow_canvas));
+	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 	canvas_size(&w, &h);
 	ic[0] = hori->page_size < w ? (hori->value + hori->page_size * 0.5) / w : 0.5;
 	ic[1] = vert->page_size < h ? (vert->value + vert->page_size * 0.5) / h : 0.5;
@@ -2150,7 +2148,29 @@ void align_size(float new_zoom)		// Set new zoom level
 	if (new_zoom == can_zoom) return;
 
 	zoom_flag = 1;
-	if (!mem_ics) canvas_center(mem_ic);
+	if (!mem_ics)
+	{
+		GtkAdjustment *hori, *vert;
+		int xc, yc, dx, dy, w, h, x, y;
+
+		get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
+		xc = (int)hori->value * 2 + (w = hori->page_size);
+		yc = (int)vert->value * 2 + (h = vert->page_size);
+		dx = dy = 0;
+
+		if (cursor_zoom)
+		{
+			gdk_window_get_pointer(drawing_canvas->window,
+				&x, &y, NULL);
+			if ((x >= 0) && (x < w) && (y >= 0) && (y < h))
+				dx = x * 2 - w , dy = y * 2 - h;
+		}
+
+		mem_icx = ((xc + dx - margin_main_x * 2) / can_zoom -
+			dx / new_zoom) / (mem_width * 2);
+		mem_icy = ((yc + dy - margin_main_y * 2) / can_zoom -
+			dy / new_zoom) / (mem_height * 2);
+	}
 	mem_ics = 0;
 
 	can_zoom = new_zoom;
@@ -2163,10 +2183,7 @@ void realign_size()		// Reapply old zoom
 	GtkAdjustment *hori, *vert;
 	int w, h, nv_h = 0, nv_v = 0;	// New positions of scrollbar
 
-	hori = gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-	vert = gtk_scrolled_window_get_vadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
+	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 	canvas_size(&w, &h);
 	if (hori->page_size < w)
 		nv_h = rint(w * mem_icx - hori->page_size * 0.5);

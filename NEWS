@@ -7,6 +7,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 3.41	2013-??-??
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
+	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
