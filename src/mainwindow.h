@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -293,7 +293,7 @@ GtkWidget *main_window, *main_split,
 	*dock_pane, *dock_area;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
-int	show_menu_icons, paste_commit;
+int	show_menu_icons, paste_commit, scroll_zoom;
 int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
 char **file_args;
 

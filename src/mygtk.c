@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -3914,6 +3914,13 @@ void get_scroll_adjustments(GtkWidget *win, GtkAdjustment **h, GtkAdjustment **v
 	GtkScrolledWindow *scroll = GTK_SCROLLED_WINDOW(win);
 	*h = gtk_scrolled_window_get_hadjustment(scroll);
 	*v = gtk_scrolled_window_get_vadjustment(scroll);
+}
+
+// Helper for widget show/hide
+
+void widget_showhide(GtkWidget *widget, int what)
+{
+	(what ? gtk_widget_show : gtk_widget_hide)(widget);
 }
 
 // Threading helpers

@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -109,7 +109,7 @@ GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 gboolean toolbar_status[TOOLBAR_MAX];		// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
-	*drawing_col_prev, *settings_box;
+	*toolbar_zoom_view, *drawing_col_prev, *settings_box;
 
 
 
@@ -123,9 +123,10 @@ void toolbar_palette_init(GtkWidget *box);	// Set up the palette area
 void toolbar_exit();				// Remember toolbar settings on program exit
 void toolbar_showhide();			// Show/Hide all 4 toolbars
 void toolbar_zoom_update();			// Update the zoom combos to reflect current zoom
-void toolbar_viewzoom(gboolean visible);	// Show/hide the view zoom combo
 void toolbar_update_settings();			// Update details in the settings toolbar
 void create_settings_box();
+#define toolbar_viewzoom(V) widget_showhide(toolbar_zoom_view, V)
+						// Show/hide the view zoom combo
 
 void pressed_toolbar_toggle(int state, int which);
 						// Menu toggle for toolbars

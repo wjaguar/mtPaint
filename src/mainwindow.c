@@ -69,6 +69,7 @@ static inilist ini_bool[] = {
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "applyICC",		&apply_icc,		FALSE },
+	{ "scrollwheelZOOM",	&scroll_zoom,		FALSE },
 	{ "cursorZoom",		&cursor_zoom,		FALSE },
 	{ "pasteCommit",	&paste_commit,		TRUE  },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
@@ -134,7 +135,7 @@ GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 static GtkWidget *main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
-int	show_menu_icons, paste_commit;
+int	show_menu_icons, paste_commit, scroll_zoom;
 int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
 char **file_args;
 
@@ -1199,7 +1200,7 @@ static gboolean delete_event( GtkWidget *widget, GdkEvent *event, gpointer data 
 #if GTK_MAJOR_VERSION == 2
 gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
 {
-	if (inifile_get_gboolean( "scrollwheelZOOM", FALSE ))
+	if (scroll_zoom)
 	{
 		if (event->direction == GDK_SCROLL_DOWN) zoom_out();
 		else zoom_in();

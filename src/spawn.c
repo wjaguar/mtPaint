@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -373,7 +373,7 @@ static void update_faction_menu()	// Populate menu
 	}
 
 	/* Hide separator if no valid slots */
-	(items ? gtk_widget_show : gtk_widget_hide)(menu_widgets[MENU_FACTION_S]);
+	widget_showhide(menu_widgets[MENU_FACTION_S], items);
 }	
 
 void init_factions()

@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -424,6 +424,10 @@ void vport_noshadow_fix(GtkWidget *widget);
 // Helper for accessing scrollbars
 
 void get_scroll_adjustments(GtkWidget *win, GtkAdjustment **h, GtkAdjustment **v);
+
+// Helper for widget show/hide
+
+void widget_showhide(GtkWidget *widget, int what);
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32

@@ -1545,8 +1545,7 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget **ww)
 {
 	static int flags[FORMAT_SPINS] = { FF_TRANS, FF_COMPJ, FF_COMPZ,
 		FF_COMPR, FF_COMPJ2, FF_SPOT, FF_SPOT };
-	void (*showhide)(GtkWidget *w);
-	int i, j, ftype;
+	int i, j, ftype, showhide;
 
 	if (!ww[0]) return; // Paranoia
 	ftype = selected_file_type(ww[0]);
@@ -1554,10 +1553,9 @@ static void change_image_format(GtkMenuItem *menuitem, GtkWidget **ww)
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
 		j = flags[i] & FF_COMP ? FF_COMP : flags[i];
-		showhide = (file_formats[ftype].flags & j) == flags[i] ?
-			gtk_widget_show : gtk_widget_hide;
-		showhide(ww[i * 2 + 1]);
-		showhide(ww[i * 2 + 2]);
+		showhide = (file_formats[ftype].flags & j) == flags[i];
+		widget_showhide(ww[i * 2 + 1], showhide);
+		widget_showhide(ww[i * 2 + 2], showhide);
 	}
 }
 
@@ -3247,7 +3245,7 @@ void update_recent_files()			// Update the menu items
 		gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
 
 	// Hide separator if not needed
-	(count ? gtk_widget_show : gtk_widget_hide)(menu_widgets[MENU_RECENT_S]);
+	widget_showhide(menu_widgets[MENU_RECENT_S], count);
 }
 
 void register_file( char *filename )		// Called after successful load/save

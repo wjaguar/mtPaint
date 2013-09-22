@@ -812,7 +812,7 @@ static void click_brcosa_show_toggle(GtkWidget *widget, gpointer data)
 	int toggle = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
 	inifile_set_gboolean("transcol_show", toggle);
-	(toggle ? gtk_widget_show : gtk_widget_hide)(GTK_WIDGET(data));
+	widget_showhide(GTK_WIDGET(data), toggle);
 }
 
 /*
@@ -2904,8 +2904,7 @@ static void grad_reset_menu(int mode, int bpp)
 	for (; items; items = items->next)
 	{
 		i = (int)gtk_object_get_user_data(GTK_OBJECT(items->data));
-		(gtmap[2 * i + 1] & f ? gtk_widget_show : gtk_widget_hide)
-			(GTK_WIDGET(items->data));
+		widget_showhide(GTK_WIDGET(items->data), gtmap[2 * i + 1] & f);
 	}
 	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_gtype), j);
 }

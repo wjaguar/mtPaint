@@ -1,5 +1,5 @@
 /*	cpick.c
-	Copyright (C) 2008-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2008-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1128,15 +1128,13 @@ void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 
 void cpick_set_opacity_visibility( GtkWidget *w, int visible )
 {
-	void (*showhide)(GtkWidget *w);
 	cpicker *cp = CPICKER(w);
 
 	if (!IS_CPICKER(cp)) return;
-	showhide = visible ? gtk_widget_show : gtk_widget_hide;
 
-	showhide(cp->areas[CPICK_AREA_OPACITY]);
-	showhide(cp->inputs[CPICK_INPUT_OPACITY]);
-	showhide(cp->opacity_label);
+	widget_showhide(cp->areas[CPICK_AREA_OPACITY], visible);
+	widget_showhide(cp->inputs[CPICK_INPUT_OPACITY], visible);
+	widget_showhide(cp->opacity_label, visible);
 }
 
 

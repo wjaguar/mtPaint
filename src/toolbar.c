@@ -41,14 +41,14 @@ GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
 gboolean toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
-	*drawing_col_prev, *settings_box;
+	*toolbar_zoom_view, *drawing_col_prev, *settings_box;
 
 GdkCursor *m_cursor[TOTAL_CURSORS];			// My mouse cursors
 GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 
 
-static GtkWidget *toolbar_zoom_main, *toolbar_zoom_view,
+static GtkWidget *toolbar_zoom_main,
 	*toolbar_labels[2],		// Colour A & B details
 	*ts_spinslides[4],		// Size, flow, opacity, value
 	*ts_label_channel;		// Channel name
@@ -148,11 +148,6 @@ static float toolbar_get_zoom( GtkWidget *combo )
 	}
 
 	return res;
-}
-
-void toolbar_viewzoom(gboolean visible)
-{
-	(visible ? gtk_widget_show : gtk_widget_hide)(toolbar_zoom_view);
 }
 
 void toolbar_zoom_update()			// Update the zoom combos to reflect current zoom
@@ -631,7 +626,7 @@ static void htoolbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 		gtk_widget_size_allocate(child->widget, &wall);
 	}
 
-	if (button) (bw ? gtk_widget_show : gtk_widget_hide)(button);
+	if (button) widget_showhide(button, bw);
 }
 
 static void htoolbox_popup(GtkWidget *button, gpointer user_data)
@@ -677,8 +672,8 @@ static void htoolbox_popup(GtkWidget *button, gpointer user_data)
 			GTK_TOGGLE_BUTTON(btn), GTK_TOGGLE_BUTTON(tool)->active);
 //		gtk_widget_set_style(btn, gtk_rc_get_style(tool));
 		/* Set visibility */
-		(GTK_WIDGET_VISIBLE(tool) && (tool->allocation.x >= vl) ?
-			gtk_widget_show : gtk_widget_hide)(btn);
+		widget_showhide(btn, GTK_WIDGET_VISIBLE(tool) &&
+			(tool->allocation.x >= vl));
 	}
 	gtk_widget_size_request(popup, &req);
 	gdk_window_get_origin(button->parent->window, &x, &y);
@@ -1630,10 +1625,7 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 
 	// Don't touch regular toolbars in view mode
 	if (!view_image_only) for (i = 0; i < 4; i++)
-	{
-		(toolbar_status[bar[i]] ? gtk_widget_show :
-			gtk_widget_hide)(toolbar_boxes[bar[i]]);
-	}
+		widget_showhide(toolbar_boxes[bar[i]], toolbar_status[bar[i]]);
 
 	if (!toolbar_status[TOOLBAR_SETTINGS]) toolbar_exit();
 	else
