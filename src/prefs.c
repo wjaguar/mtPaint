@@ -26,13 +26,12 @@
 #include "viewer.h"
 #include "mainwindow.h"
 #include "thread.h"
+#include "vcode.h"
 
 #include "prefs.h"
 
 
 ///	PREFERENCES WINDOW
-
-static GtkWidget *prefs_window;
 
 static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
 
@@ -52,9 +51,6 @@ int tablet_working;		// Has the device been initialized?
 int tablet_tool_use[3];				// Size, flow, opacity
 float tablet_tool_factor[3];			// Size, flow, opacity
 
-static int tmp_xpm_trans;
-static void *pref_widgets;
-
 #ifdef U_NLS
 
 #define PREF_LANGS 21
@@ -67,141 +63,23 @@ static char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"pt_BR", "ru_RU", "sk_SK",
 	"es_ES", "sv_SE", "tl_PH", "tr_TR" };
 
+#undef _
+#define _(X) X
+
+static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
+	_("Chinese (Simplified)"), _("Chinese (Taiwanese)"), _("Czech"),
+	_("Dutch"), _("English (UK)"), _("French"), _("Galician"), _("German"),
+	_("Hungarian"), _("Italian"), _("Japanese"), _("Polish"),
+	_("Portuguese"), _("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
+	_("Spanish"), _("Swedish"), _("Tagalog"), _("Turkish") };
+
+#undef _
+#define _(X) __(X)
+
 static int pref_lang;
 
 #endif
 
-///	BYTECODE ENGINE
-
-enum {
-	op_WEND = 0,
-	op_WDONE,
-	op_PAGE,
-	op_TABLE2,
-	op_TSPIN,
-	op_TSPINx,
-	op_CHECK,
-	op_CHECKb,
-	op_PATH,
-	op_PATHs,
-	op_EXEC
-};
-
-typedef void **(*ext_fn)(int op, void **sp, GtkWidget ***wpp, void ***rr);
-
-static void *run_create(GtkWidget *root, void **ifcode, int ifsize, ext_fn ext)
-{
-	GtkWidget *wstack[1024], **wp = wstack + 1024;
-	void *res, **r, *stack[1024], **sp = stack + 1024;
-	void **ifend = (void **)((char *)ifcode + ifsize);
-	char txt[PATHTXT];
-	int op;
-
-	// Array of data widgets cannot grow larger than original bytecode
-	res = r = bound_malloc(root, ifsize);
-
-	*(--wp) = root;
-	while (ifend - ifcode > 0) switch (op = (int)*ifcode++)
-	{
-	case op_WEND: ifcode = ifend; break;
-	case op_WDONE: ++wp; break;
-	case op_PAGE:
-		--wp; wp[0] = add_new_page(wp[1], _(ifcode[0])); ifcode++; break;
-	case op_TABLE2:
-		--wp; wp[0] = add_a_table((int)*ifcode++, 2, 10, wp[1]); break;
-	case op_TSPIN: case op_TSPINx:
-	{
-	        GList *item;
-	        int y, n = 0;
-		// Find a free level
-	        for (item = GTK_TABLE(wp[0])->children; item; item = item->next)
-	        {
-        	        y = ((GtkTableChild *)item->data)->bottom_attach;
-                	if (n < y) n = y;
-	        }
-		*r++ = ifcode - 1;
-		add_to_table(_(ifcode[0]), wp[0], n, 0, 4);
-		sp -= 3;
-		sp[0] = (void *)*(int *)ifcode[1];
-		sp[1] = ifcode[2];
-		sp[2] = ifcode[3];
-		ifcode += 4;
-		// Run extra processing
-		if (op == op_TSPINx) sp = ext((int)*ifcode++, sp, &wp, &r);
-		*r++ = spin_to_table(wp[0], n, 1, 4, (int)sp[0], (int)sp[1],
-			(int)sp[2]);
-		sp += 3;
-		break;
-	}
-	case op_CHECK:
-		*r++ = ifcode - 1;
-		*r++ = add_a_toggle(_(ifcode[0]), wp[0], *(int *)ifcode[1]);
-		ifcode += 2;
-		break;
-	case op_CHECKb:
-		*r++ = ifcode - 1;
-		*r++ = add_a_toggle(_(ifcode[0]), wp[0], 
-			inifile_get_gboolean(ifcode[1], (int)ifcode[2]));
-		ifcode += 3;
-		break;
-	case op_PATH: case op_PATHs:
-		*r++ = ifcode - 1;
-		*r++ = mt_path_box(_(ifcode[0]), wp[0], _(ifcode[1]),
-			(int)ifcode[2]);
-		gtkuncpy(txt, op == op_PATHs ? inifile_get(ifcode[3], "") :
-			ifcode[3], PATHTXT);
-		gtk_entry_set_text(GTK_ENTRY(*(r - 1)), txt);
-		ifcode += 4;
-		break;
-	case op_EXEC:
-		sp = ext((int)*ifcode++, sp, &wp, &r); break;
-	}
-
-	return (res);
-}
-
-static void run_query(void **r)
-{
-	void **ifcode;
-	int op;
-
-	for (; (ifcode = *r++); r++) switch (op = (int)*ifcode++)
-	{
-	case op_TSPIN: case op_TSPINx:
-		*(int *)ifcode[1] = read_spin(*r); break;
-	case op_CHECK:
-		*(int *)ifcode[1] = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(*r));
-		break;
-	case op_CHECKb:
-		inifile_set_gboolean(ifcode[1], gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(*r)));
-		break;
-	case op_PATH:
-		gtkncpy(ifcode[3], gtk_entry_get_text(GTK_ENTRY(*r)), PATHBUF);
-		break;
-	case op_PATHs:
-	{
-		char path[PATHBUF];
-		gtkncpy(path, gtk_entry_get_text(GTK_ENTRY(*r)), PATHBUF);
-		inifile_set(ifcode[3], path);
-		break;
-	}
-	}
-}
-
-#define WEND (void *)op_WEND
-#define WDONE (void *)op_WDONE
-#define PAGE(A) (void *)op_PAGE, (A)
-#define TABLE2(A) (void *)op_TABLE2, (void *)(A)
-#define TSPIN(A,B,C,D) (void *)op_TSPIN, (A), &(B), (void *)(C), (void *)(D)
-#define TSPINx(A,B,C,D,OP) (void *)op_TSPINx, (A), &(B), \
-	(void *)(C), (void *)(D), (void *)(OP)
-#define CHECK(A,B) (void *)op_CHECK, (A), &(B)
-#define CHECKb(A,B,C) (void *)op_CHECKb, (A), (B), (void *)(C)
-#define PATH(A,B,C,D) (void *)op_PATH, (A), (B), (void *)(C), (D)
-#define PATHs(A,B,C,D) (void *)op_PATHs, (A), (B), (void *)(C), (D)
-#define EXEC(OP) (void *)op_EXEC, (void *)(OP)
 
 static gboolean expose_tablet_preview(GtkWidget *widget, GdkEventExpose *event)
 {
@@ -242,13 +120,6 @@ static void delete_inputd()
 
 	gtk_widget_destroy(inputd);
 	inputd = NULL;
-}
-
-static void delete_prefs(GtkWidget *widget)
-{
-	if (inputd) delete_inputd();
-	destroy_dialog(prefs_window);
-	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
 }
 
 static void tablet_update_pressure( double pressure )
@@ -355,47 +226,60 @@ static void conf_tablet(GtkWidget *widget)
 	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
 }
 
-static void prefs_apply(GtkWidget *widget)
+typedef struct {
+	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
+} pref_dd;
+
+static void prefs_evt(pref_dd *dt, void **wdata, int what)
 {
 	char *p, oldpal[PATHBUF], oldpat[PATHBUF];
 	int i, j;
 
-	strncpy0(oldpal, inifile_get(DEFAULT_PAL_INI, ""), PATHBUF);
-	strncpy0(oldpat, inifile_get(DEFAULT_PAT_INI, ""), PATHBUF);
-
-	/* Read back from bytecode-made part */
-	run_query(pref_widgets);
-
-	for (i = 0; i < 3; i++)
+	if (what != op_EVT_CANCEL) // OK/Apply
 	{
-		tablet_tool_use[i] = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check_tablet[i]));
-		inifile_set_gboolean( tablet_ini2[i], tablet_tool_use[i] );
-		j = mt_spinslide_get_value(hscale_tablet[i]);
-		inifile_set_gint32(tablet_ini[i], j);
-		tablet_tool_factor[i] = j / 100.0;
-	}
+		// Preserve old values
+		strncpy0(oldpal, inifile_get(DEFAULT_PAL_INI, ""), PATHBUF);
+		strncpy0(oldpat, inifile_get(DEFAULT_PAT_INI, ""), PATHBUF);
+
+		/* Read back from bytecode-made part */
+		run_query(wdata);
+		mem_undo_depth = dt->undo_depth[0];
+		mem_xbm_hot_x = dt->hot_x[0];
+		mem_xbm_hot_y = dt->hot_y[0];
+
+		for (i = 0; i < 3; i++)
+		{
+			tablet_tool_use[i] = gtk_toggle_button_get_active(
+				GTK_TOGGLE_BUTTON(check_tablet[i]));
+			inifile_set_gboolean( tablet_ini2[i], tablet_tool_use[i] );
+			j = mt_spinslide_get_value(hscale_tablet[i]);
+			inifile_set_gint32(tablet_ini[i], j);
+			tablet_tool_factor[i] = j / 100.0;
+		}
 
 #ifdef U_NLS
-	inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
-	setup_language();
-	string_init();				// Translate static strings
+		inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
+		setup_language();
+		string_init();			// Translate static strings
 #endif
 
-	inifile_set("clipFilename", mem_clip_file);
-	if (strcmp(oldpal, p = inifile_get(DEFAULT_PAL_INI, "")))
-		load_def_palette(p);
-	if (strcmp(oldpat, p = inifile_get(DEFAULT_PAT_INI, "")))
-		load_def_patterns(p);
+		inifile_set("clipFilename", mem_clip_file);
+		if (strcmp(oldpal, p = inifile_get(DEFAULT_PAL_INI, "")))
+			load_def_palette(p);
+		if (strcmp(oldpat, p = inifile_get(DEFAULT_PAT_INI, "")))
+			load_def_patterns(p);
 
-	update_stuff(UPD_PREFS);
-	/* Apply this undoable setting after everything else */
-	mem_set_trans(tmp_xpm_trans);
-}
+		update_stuff(UPD_PREFS);
+		/* Apply this undoable setting after everything else */
+		mem_set_trans(dt->trans[0]);
+	}
 
-static void prefs_ok(GtkWidget *widget)
-{
-	prefs_apply(NULL);
-	delete_prefs(NULL);
+	if (what != op_EVT_CLICK) // OK/Cancel
+	{
+		if (inputd) delete_inputd();
+		destroy_dialog(GET_WINDOW(wdata));
+		gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
+	}
 }
 
 static gint tablet_preview_button (GtkWidget *widget, GdkEventButton *event)
@@ -445,166 +329,118 @@ static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
-/* Try to avoid scrolling - request full size of contents */
-static void pref_scroll_size_req(GtkWidget *widget, GtkRequisition *requisition,
-	gpointer user_data)
-{
-	GtkWidget *child = GTK_BIN(widget)->child;
-
-	if (child && GTK_WIDGET_VISIBLE(child))
-	{
-		GtkRequisition wreq;
-		int n, border = GTK_CONTAINER(widget)->border_width * 2;
-
-		gtk_widget_get_child_requisition(child, &wreq);
-		n = wreq.width + border;
-		if (requisition->width < n) requisition->width = n;
-		n = wreq.height + border;
-		if (requisition->height < n) requisition->height = n;
-	}
-}
-
 ///	EXTENSIONS TO BYTECODE
 
-enum {
-	EXC_undo = 1,
-	EXC_lang,
-	EXC_trans,
-	EXC_hotx,
-	EXC_hoty,
-	EXC_tablet
-};
-
-static void **pref_ext(int op, void **sp, GtkWidget ***wpp, void ***rr)
-{
-	switch (op)
-	{
-	case EXC_undo: sp[0] = (void *)((int)sp[0] & ~1); break;
 #ifdef U_NLS
-	case EXC_lang:
+
+static void **create_pref_lang(void **r, GtkWidget ***wpp)
+{
+	char *cur, *langs[PREF_LANGS];
+	GtkWidget *vbox_2, *label;
+	int i, n;
+
+	vbox_2 = gtk_vbox_new(FALSE, 5);
+	gtk_container_set_border_width(GTK_CONTAINER(vbox_2), 5);
+
+	label = pack(vbox_2, gtk_label_new(
+		_("Select preferred language translation\n\n"
+		"You will need to restart mtPaint\nfor this to take full effect")));
+
+	cur = inifile_get("languageSETTING", "system");
+	for (i = n = 0; i < PREF_LANGS; i++)
 	{
-		char *pref_langs[PREF_LANGS] = { _("Default System Language"),
-			_("Chinese (Simplified)"), _("Chinese (Taiwanese)"),
-			_("Czech"), _("Dutch"), _("English (UK)"), _("French"),
-			_("Galician"), _("German"), _("Hungarian"), _("Italian"),
-			_("Japanese"), _("Polish"), _("Portuguese"),
-			_("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
-			_("Spanish"), _("Swedish"), _("Tagalog"), _("Turkish") };
-		GtkWidget *vbox_2, *label;
-		int i;
-
-		vbox_2 = gtk_vbox_new(FALSE, 5);
-		gtk_container_set_border_width(GTK_CONTAINER(vbox_2), 5);
-
-		label = pack(vbox_2, gtk_label_new(
-			_("Select preferred language translation\n\n"
-			"You will need to restart mtPaint\nfor this to take full effect")));
-
-		for (i = 0; i < PREF_LANGS; i++)
-		{
-			if (!strcmp(pref_lang_ini_code[i],
-				inifile_get("languageSETTING", "system"))) break;
-		}
-		pack(vbox_2, wj_option_menu(pref_langs, PREF_LANGS, i,
-			&pref_lang, NULL));
-
-		gtk_widget_show_all(vbox_2);
-		add_with_frame(**wpp, _("Language"), vbox_2);
-		break;
+		langs[i] = _(pref_langs[i]);
+		if (!strcmp(pref_lang_ini_code[i], cur)) n = i;
 	}
+	pack(vbox_2, wj_option_menu(langs, PREF_LANGS, n,
+		&pref_lang, NULL));
+
+	gtk_widget_show_all(vbox_2);
+	add_with_frame(**wpp, _("Language"), vbox_2);
+
+	return (r);
+}
+
 #endif
-	case EXC_trans:
-		/* !!! Slot mapped to temp variable, for updating the actual
-		 * value requires a function call */
-		sp[0] = (void *)(mem_xpm_trans);
-		sp[2] = (void *)(mem_cols - 1);
-		break;
-	case EXC_hotx:
-		sp[2] = (void *)(mem_width - 1); break;
-	case EXC_hoty:
-		sp[2] = (void *)(mem_height - 1); break;
-	case EXC_tablet:
+
+static void **create_pref_tablet(void **r, GtkWidget ***wpp)
+{
+	char *tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
+	GtkWidget *vbox_2, *label, *button1, *table3, *drawingarea_tablet;
+	char txt[128];
+	int i;
+
+	vbox_2 = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show (vbox_2);
+	add_with_frame(**wpp, _("Device Settings"), vbox_2);
+	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
+
+	label_tablet_device = pack(vbox_2, gtk_label_new(""));
+	gtk_widget_show (label_tablet_device);
+	gtk_misc_set_alignment (GTK_MISC (label_tablet_device), 0, 0.5);
+	gtk_misc_set_padding (GTK_MISC (label_tablet_device), 5, 5);
+
+	button1 = add_a_button( _("Configure Device"), 0, vbox_2, FALSE );
+	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
+		GTK_SIGNAL_FUNC(conf_tablet), NULL);
+
+	table3 = xpack(vbox_2, gtk_table_new(4, 2, FALSE));
+	gtk_widget_show (table3);
+
+	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
+	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
+	snprintf(txt, 60, "%s (%%)", _("Factor"));
+	label = add_to_table( txt, table3, 0, 1, 0 );
+	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
+	gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
+
+	for ( i=0; i<3; i++ )
 	{
-		char *tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
-		GtkWidget *vbox_2, *label, *button1, *table3, *drawingarea_tablet;
-		char txt[128];
-		int i;
+		check_tablet[i] = gtk_check_button_new_with_label(tablet_txt[i]);
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_tablet[i]),
+			tablet_tool_use[i]);
+		gtk_widget_show(check_tablet[i]);
+		to_table_l(check_tablet[i], table3, i + 1, 0, 1, 0);
 
-		vbox_2 = gtk_vbox_new (FALSE, 0);
-		gtk_widget_show (vbox_2);
-		add_with_frame(**wpp, _("Device Settings"), vbox_2);
-		gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
+	//	Size/Flow/Opacity sliders
 
-		label_tablet_device = pack(vbox_2, gtk_label_new(""));
-		gtk_widget_show (label_tablet_device);
-		gtk_misc_set_alignment (GTK_MISC (label_tablet_device), 0, 0.5);
-		gtk_misc_set_padding (GTK_MISC (label_tablet_device), 5, 5);
-
-		button1 = add_a_button( _("Configure Device"), 0, vbox_2, FALSE );
-		gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-			GTK_SIGNAL_FUNC(conf_tablet), NULL);
-
-		table3 = xpack(vbox_2, gtk_table_new(4, 2, FALSE));
-		gtk_widget_show (table3);
-
-		label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
-		gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-		snprintf(txt, 60, "%s (%%)", _("Factor"));
-		label = add_to_table( txt, table3, 0, 1, 0 );
-		gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-		gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
-
-		for ( i=0; i<3; i++ )
-		{
-			check_tablet[i] = gtk_check_button_new_with_label(
-				tablet_txt[i]);
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(
-				check_tablet[i]), tablet_tool_use[i]);
-			gtk_widget_show(check_tablet[i]);
-			to_table_l(check_tablet[i], table3, i + 1, 0, 1, 0);
-
-		//	Size/Flow/Opacity sliders
-
-			hscale_tablet[i] = mt_spinslide_new(150, -2);
-			mt_spinslide_set_range(hscale_tablet[i], -100, 100);
-			gtk_table_attach(GTK_TABLE(table3), hscale_tablet[i],
-				1, 2, i + 1, i + 2,
-				GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-			mt_spinslide_set_value(hscale_tablet[i],
-				rint(tablet_tool_factor[i] * 100.0));
-		}
-
-		vbox_2 = gtk_vbox_new (FALSE, 0);
-		gtk_widget_show (vbox_2);
-		add_with_frame(**wpp, _("Test Area"), vbox_2);
-		gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
-
-		drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());
-		gtk_widget_show (drawingarea_tablet);
-		gtk_widget_set_usize (drawingarea_tablet, 128, 64);
-		gtk_signal_connect( GTK_OBJECT(drawingarea_tablet), "expose_event",
-			GTK_SIGNAL_FUNC (expose_tablet_preview), (gpointer) drawingarea_tablet );
-
-		gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "motion_notify_event",
-			GTK_SIGNAL_FUNC (tablet_preview_motion), NULL);
-		gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "button_press_event",
-			GTK_SIGNAL_FUNC (tablet_preview_button), NULL);
-
-		gtk_widget_set_events (drawingarea_tablet, GDK_EXPOSURE_MASK
-			| GDK_LEAVE_NOTIFY_MASK
-			| GDK_BUTTON_PRESS_MASK
-			| GDK_POINTER_MOTION_MASK
-			| GDK_POINTER_MOTION_HINT_MASK);
-
-		gtk_widget_set_extension_events (drawingarea_tablet, GDK_EXTENSION_EVENTS_CURSOR);
-
-		label_tablet_pressure = pack(vbox_2, gtk_label_new(""));
-		gtk_widget_show (label_tablet_pressure);
-		gtk_misc_set_alignment (GTK_MISC (label_tablet_pressure), 0, 0.5);
-		break;
+		hscale_tablet[i] = mt_spinslide_new(150, -2);
+		mt_spinslide_set_range(hscale_tablet[i], -100, 100);
+		gtk_table_attach(GTK_TABLE(table3), hscale_tablet[i], 1, 2,
+			i + 1, i + 2, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+		mt_spinslide_set_value(hscale_tablet[i],
+			rint(tablet_tool_factor[i] * 100.0));
 	}
-	}
-	return (sp);
+
+	vbox_2 = gtk_vbox_new (FALSE, 0);
+	gtk_widget_show (vbox_2);
+	add_with_frame(**wpp, _("Test Area"), vbox_2);
+	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
+
+	drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());
+	gtk_widget_show (drawingarea_tablet);
+	gtk_widget_set_usize (drawingarea_tablet, 128, 64);
+	gtk_signal_connect( GTK_OBJECT(drawingarea_tablet), "expose_event",
+		GTK_SIGNAL_FUNC (expose_tablet_preview), (gpointer) drawingarea_tablet );
+
+	gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "motion_notify_event",
+		GTK_SIGNAL_FUNC (tablet_preview_motion), NULL);
+	gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "button_press_event",
+		GTK_SIGNAL_FUNC (tablet_preview_button), NULL);
+
+	gtk_widget_set_events (drawingarea_tablet, GDK_EXPOSURE_MASK
+		| GDK_LEAVE_NOTIFY_MASK
+		| GDK_BUTTON_PRESS_MASK
+		| GDK_POINTER_MOTION_MASK
+		| GDK_POINTER_MOTION_HINT_MASK);
+
+	gtk_widget_set_extension_events (drawingarea_tablet, GDK_EXTENSION_EVENTS_CURSOR);
+
+	label_tablet_pressure = pack(vbox_2, gtk_label_new(""));
+	gtk_widget_show (label_tablet_pressure);
+	gtk_misc_set_alignment (GTK_MISC (label_tablet_pressure), 0, 0.5);
+
+	return (r);
 }
 
 ///	BYTECODE
@@ -612,71 +448,78 @@ static void **pref_ext(int op, void **sp, GtkWidget ***wpp, void ***rr)
 #undef _
 #define _(X) X
 
-static void *ifcode[] = {
+#define WBbase pref_dd
+static void *pref_code[] = {
+	WINDOW(_("Preferences"), FALSE), // nonmodal
+	MKSHRINK, // shrinkable
+	SCROLL(1, 1), // auto/auto
+	WANTMAX, // max size
+	SNBOOK,
+	BORDER(TABLE, 10),
+	BORDER(TSPIN, 4),
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")),
 #ifdef U_THREADS
 	TABLE2(4),
-	TSPIN(_("Max threads (0 to autodetect)"), maxthreads, 0, 256),
+	TSPINv(_("Max threads (0 to autodetect)"), maxthreads, 0, 256),
 #else
 	TABLE2(3),
 #endif
-	TSPIN(_("Max memory used for undo (MB)"), mem_undo_limit, 1, 2048),
-	TSPINx(_("Max undo levels"), mem_undo_depth, MIN_UNDO & ~1,
-		MAX_UNDO & ~1, EXC_undo),
-	TSPIN(_("Communal layer undo space (%)"), mem_undo_common, 0, 100),
+	TSPINv(_("Max memory used for undo (MB)"), mem_undo_limit, 1, 2048),
+	TSPINa(_("Max undo levels"), undo_depth),
+	TSPINv(_("Communal layer undo space (%)"), mem_undo_common, 0, 100),
 	WDONE,
-	CHECK(_("Use gamma correction by default"), use_gamma),
-	CHECK(_("Optimize alpha chequers"), chequers_optimize),
-	CHECK(_("Disable view window transparencies"), opaque_view),
+	CHECKv(_("Use gamma correction by default"), use_gamma),
+	CHECKv(_("Optimize alpha chequers"), chequers_optimize),
+	CHECKv(_("Disable view window transparencies"), opaque_view),
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
-	EXEC(EXC_lang),
+	EXEC(create_pref_lang),
 #endif
 	WDONE,
 ///	---- TAB2 - INTERFACE
 	PAGE(_("Interface")),
 	TABLE2(3),
-	TSPIN(_("Greyscale backdrop"), mem_background, 0, 255),
-	TSPIN(_("Selection nudge pixels"), mem_nudge, 2, MAX_WIDTH),
-	TSPIN(_("Max Pan Window Size"), max_pan, 64, 256),
+	TSPINv(_("Greyscale backdrop"), mem_background, 0, 255),
+	TSPINv(_("Selection nudge pixels"), mem_nudge, 2, MAX_WIDTH),
+	TSPINv(_("Max Pan Window Size"), max_pan, 64, 256),
 	WDONE,
-	CHECK(_("Display clipboard while pasting"), show_paste),
-	CHECK(_("Mouse cursor = Tool"), cursor_tool),
+	CHECKv(_("Display clipboard while pasting"), show_paste),
+	CHECKv(_("Mouse cursor = Tool"), cursor_tool),
 	CHECKb(_("Confirm Exit"), "exitToggle", FALSE),
-	CHECK(_("Q key quits mtPaint"), q_quit),
-	CHECK(_("Changing tool commits paste"), paste_commit),
+	CHECKv(_("Q key quits mtPaint"), q_quit),
+	CHECKv(_("Changing tool commits paste"), paste_commit),
 	CHECKb(_("Centre tool settings dialogs"), "centerSettings", TRUE),
 	CHECKb(_("New image sets zoom to 100%"), "zoomToggle", FALSE),
-	CHECK(_("Zoom on cursor position"), cursor_zoom),
+	CHECKv(_("Zoom on cursor position"), cursor_zoom),
 #if GTK_MAJOR_VERSION == 2
-	CHECK(_("Mouse Scroll Wheel = Zoom"), scroll_zoom),
-	CHECK(_("Use menu icons"), show_menu_icons),
+	CHECKv(_("Mouse Scroll Wheel = Zoom"), scroll_zoom),
+	CHECKv(_("Use menu icons"), show_menu_icons),
 #endif
 	WDONE,
 ///	---- TAB3 - FILES
 	PAGE(_("Files")),
 	TABLE2(8),
-	TSPINx(_("Transparency index"), tmp_xpm_trans, -1, 0, EXC_trans),
-	TSPINx(_("XBM X hotspot"), mem_xbm_hot_x, -1, 0, EXC_hotx),
-	TSPINx(_("XBM Y hotspot"), mem_xbm_hot_y, -1, 0, EXC_hoty),
-	TSPIN(_("JPEG Save Quality (100=High)"), jpeg_quality, 0, 100),
-	TSPIN(_("JPEG2000 Compression (0=Lossless)"), jp2_rate, 0, 100),
-	TSPIN(_("PNG Compression (0=None)"), png_compression, 0, 9),
-	TSPIN(_("Recently Used Files"), recent_files, 0, MAX_RECENT),
-	TSPIN(_("Progress bar silence limit"), silence_limit, 0, 28),
+	TSPINa(_("Transparency index"), trans),
+	TSPINa(_("XBM X hotspot"), hot_x),
+	TSPINa(_("XBM Y hotspot"), hot_y),
+	TSPINv(_("JPEG Save Quality (100=High)"), jpeg_quality, 0, 100),
+	TSPINv(_("JPEG2000 Compression (0=Lossless)"), jp2_rate, 0, 100),
+	TSPINv(_("PNG Compression (0=None)"), png_compression, 0, 9),
+	TSPINv(_("Recently Used Files"), recent_files, 0, MAX_RECENT),
+	TSPINv(_("Progress bar silence limit"), silence_limit, 0, 28),
 	WDONE,
-	CHECK(_("TGA RLE Compression"), tga_RLE),
-	CHECK(_("Read 16-bit TGAs as 5:6:5 BGR"), tga_565),
-	CHECK(_("Write TGAs in bottom-up row order"), tga_defdir),
-	CHECK(_("Undoable image loading"), undo_load),
+	CHECKv(_("TGA RLE Compression"), tga_RLE),
+	CHECKv(_("Read 16-bit TGAs as 5:6:5 BGR"), tga_565),
+	CHECKv(_("Write TGAs in bottom-up row order"), tga_defdir),
+	CHECKv(_("Undoable image loading"), undo_load),
 #ifdef U_LCMS
-	CHECK(_("Apply colour profile"), apply_icc),
+	CHECKv(_("Apply colour profile"), apply_icc),
 #endif
 	WDONE,
 ///	---- TAB4 - PATHS
 	PAGE(_("Paths")),
-	PATH(_("Clipboard Files"), _("Select Clipboard File"),
+	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
 		FS_CLIP_FILE, mem_clip_file),
 	PATHs(_("HTML Browser Program"), _("Select Browser Program"),
 		FS_SELECT_FILE, HANDBOOK_BROWSER_INI),
@@ -693,62 +536,41 @@ static void *ifcode[] = {
 	WDONE,
 ///	---- TAB5 - STATUS BAR
 	PAGE(_("Status Bar")),
-	CHECK(_("Canvas Geometry"), status_on[0]),
-	CHECK(_("Cursor X,Y"), status_on[1]),
-	CHECK(_("Pixel [I] {RGB}"), status_on[2]),
-	CHECK(_("Selection Geometry"), status_on[3]),
-	CHECK(_("Undo / Redo"), status_on[4]),
+	CHECKv(_("Canvas Geometry"), status_on[0]),
+	CHECKv(_("Cursor X,Y"), status_on[1]),
+	CHECKv(_("Pixel [I] {RGB}"), status_on[2]),
+	CHECKv(_("Selection Geometry"), status_on[3]),
+	CHECKv(_("Undo / Redo"), status_on[4]),
 	WDONE,
 ///	---- TAB6 - TABLET
 	PAGE(_("Tablet")),
-	EXEC(EXC_tablet),
+	EXEC(create_pref_tablet),
+	WDONE,
+	WDONE, // notebook
+///	Bottom of Prefs window
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), prefs_evt, _("Cancel"), prefs_evt),
+	OKADD(_("Apply"), prefs_evt),
 	WEND
 };
+#undef WBbase
 
 #undef _
 #define _(X) __(X)
 
 void pressed_preferences()
 {
-	GtkWidget *vbox3, *hbox4, *notebook1, *scroll;
+	pref_dd tdata = { { mem_undo_depth & ~1, MIN_UNDO & ~1, MAX_UNDO & ~1 },
+		{ mem_xpm_trans, -1, mem_cols - 1 },
+		{ mem_xbm_hot_x, -1, mem_width - 1 },
+		{ mem_xbm_hot_y, -1, mem_height - 1 } };
+	void **res;
 
 	// Make sure the user can only open 1 prefs window
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
 
-	prefs_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Preferences"), GTK_WIN_POS_CENTER, FALSE );
-	// Let user and WM make window smaller - contents are scrollable
-	gtk_window_set_policy(GTK_WINDOW(prefs_window), TRUE, TRUE, FALSE);
-	vbox3 = add_vbox(prefs_window);
-
-///	SETUP SCROLLING
-
-	scroll = xpack(vbox3, gtk_scrolled_window_new(NULL, NULL));
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_signal_connect(GTK_OBJECT(scroll), "size_request",
-		GTK_SIGNAL_FUNC(pref_scroll_size_req), NULL);
-
-///	SETUP NOTEBOOK
-	
-	notebook1 = gtk_notebook_new();
-	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(notebook1), GTK_POS_LEFT);
-//	gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook1), TRUE);
-	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), notebook1);
-	gtk_viewport_set_shadow_type(GTK_VIEWPORT(GTK_BIN(scroll)->child), GTK_SHADOW_NONE);
-	gtk_widget_show_all(scroll);
-	vport_noshadow_fix(GTK_BIN(scroll)->child);
-
-	/* Run bytecode to create the inner parts */
-	pref_widgets = run_create(notebook1, ifcode, sizeof(ifcode), pref_ext);
-
-///	Bottom of Prefs window
-
-	hbox4 = pack(vbox3, OK_box(0, prefs_window, _("OK"), GTK_SIGNAL_FUNC(prefs_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(delete_prefs)));
-	OK_box_add(hbox4, _("Apply"), GTK_SIGNAL_FUNC(prefs_apply));
-
-	gtk_window_set_transient_for( GTK_WINDOW(prefs_window), GTK_WINDOW(main_window) );
-	gtk_widget_show (prefs_window);
+	res = run_create(pref_code, sizeof(pref_code), &tdata, sizeof(tdata));
+	gtk_widget_show(GET_WINDOW(res));
 
 	tablet_update_device(tablet_working ? tablet_device->name : "NONE");
 }

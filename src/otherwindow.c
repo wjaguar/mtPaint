@@ -36,20 +36,9 @@
 #include "font.h"
 #include "cpick.h"
 #include "icons.h"
+#include "vcode.h"
 
 ///	NEW IMAGE WINDOW
-
-int im_type, new_window_type = 0;
-GtkWidget *new_window;
-GtkWidget *spinbutton_height, *spinbutton_width, *spinbutton_cols, *tog_undo;
-
-
-gint delete_new( GtkWidget *widget, GdkEvent *event, gpointer data )
-{
-	gtk_widget_destroy(new_window);
-
-	return FALSE;
-}
 
 void reset_tools()
 {
@@ -143,16 +132,24 @@ static int clip_to_layer(int layer)
 	return (1);
 }
 
-static void create_new(GtkWidget *widget)
+typedef struct {
+	int type, w, h, c, undo, im_type;
+} newwin_dd;
+
+static void create_new(newwin_dd *dt, void **wdata)
 {
-	png_color *pal = im_type == 1 ? NULL : mem_pal_def;
+	GtkWidget *new_window = GET_WINDOW(wdata);
+	png_color *pal;
+	int im_type, new_window_type = dt->type;
 	int nw, nh, nc, err = 1, bpp;
 
-	nw = read_spin(spinbutton_width);
-	nh = read_spin(spinbutton_height);
-	nc = read_spin(spinbutton_cols);
-	if (!new_window_type) undo_load = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(tog_undo));
+
+	run_query(wdata);
+	im_type = dt->im_type;
+	pal = im_type == 1 ? NULL : mem_pal_def;
+
+	nw = dt->w; nh = dt->h; nc = dt->c;
+	if (!new_window_type) undo_load = dt->undo;
 
 	if (im_type == 4) /* Screenshot */
 	{
@@ -254,51 +251,53 @@ static void create_new(GtkWidget *widget)
 	gtk_widget_destroy(new_window);
 }
 
+#undef _
+#define _(X) X
+
+static char *rad_txt[] = { _("24 bit RGB"), _("Greyscale"), _("Indexed Palette"),
+	_("From Clipboard"), _("Grab Screenshot") };
+
+#define WBbase newwin_dd
+static void *newwin_code[] = {
+	IF(type), WINDOW(_("New Layer"), TRUE), // modal
+	UNLESS(type), WINDOW(_("New Image"), TRUE), // modal
+	TABLE2(3),
+	TSPIN(_("Width"), w, MIN_WIDTH, MAX_WIDTH),
+	TSPIN(_("Height"), h, MIN_HEIGHT, MAX_HEIGHT),
+	TSPIN(_("Colours"), c, 2, 256),
+	WDONE,
+	RPACK(rad_txt, 5, 0, im_type),
+	UNLESS(type), CHECK(_("Undoable"), undo),
+	HSEP,
+	OKBOX(_("Create"), create_new, _("Cancel"), NULL),
+	WEND
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
+
 void generic_new_window(int type)	// 0=New image, 1=New layer
 {
-	char *rad_txt[] = {_("24 bit RGB"), _("Greyscale"), _("Indexed Palette"),
-		_("From Clipboard"), _("Grab Screenshot")},
-		*title_txt[] = {_("New Image"), _("New Layer")};
-	GtkWidget *vbox1, *table1;
-	int w = mem_width, h = mem_height, c = mem_cols;
+	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load };
+	int im_type = 3 - mem_img_bpp;
+	void **res;
 
-
-	if (!type && (check_for_changes() == 1)) return;
-
-	new_window_type = type;
-	new_window = add_a_window( GTK_WINDOW_TOPLEVEL, title_txt[type], GTK_WIN_POS_CENTER, TRUE );
-	vbox1 = add_vbox(new_window);
-
-	table1 = add_a_table( 3, 2, 5, vbox1 );
 
 	if (!type)
 	{
-		w = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH);
-		h = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT);
-		c = inifile_get_gint32("lastnewCols", 256);
+		if (check_for_changes() == 1) return;
+
+		tdata.w = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH);
+		tdata.h = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT);
+		tdata.c = inifile_get_gint32("lastnewCols", 256);
 		im_type = inifile_get_gint32("lastnewType", 2);
-		if ( im_type<0 || im_type>2 ) im_type = 0;
+		if ((im_type < 0) || (im_type > 2)) im_type = 0;
 	}
-	else im_type = 3 - mem_img_bpp;
+	tdata.im_type = im_type;
 
-	spinbutton_width = spin_to_table(table1, 0, 1, 5, w, MIN_WIDTH, MAX_WIDTH);
-	spinbutton_height = spin_to_table(table1, 1, 1, 5, h, MIN_WIDTH, MAX_HEIGHT);
-	spinbutton_cols = spin_to_table(table1, 2, 1, 5, c, 2, 256);
-
-	add_to_table( _("Width"), table1, 0, 0, 5 );
-	add_to_table( _("Height"), table1, 1, 0, 5 );
-	add_to_table( _("Colours"), table1, 2, 0, 5 );
-
-	xpack(vbox1, wj_radio_pack(rad_txt, 5, 0, im_type, &im_type, NULL));
-	tog_undo = type ? NULL : add_a_toggle(_("Undoable"), vbox1, undo_load);
-
-	add_hseparator( vbox1, 200, 10 );
-
-	pack(vbox1, OK_box(5, new_window, _("Create"), GTK_SIGNAL_FUNC(create_new),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	gtk_window_set_transient_for( GTK_WINDOW(new_window), GTK_WINDOW(main_window) );
-	gtk_widget_show (new_window);
+	res = run_create(newwin_code, sizeof(newwin_code), &tdata, sizeof(tdata));
+	gtk_widget_show(GET_WINDOW(res));
 }
 
 
