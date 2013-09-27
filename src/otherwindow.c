@@ -254,23 +254,23 @@ static void create_new(newwin_dd *dt, void **wdata)
 #undef _
 #define _(X) X
 
-static char *rad_txt[] = { _("24 bit RGB"), _("Greyscale"), _("Indexed Palette"),
-	_("From Clipboard"), _("Grab Screenshot") };
+static char *newwin_txt[] = { _("24 bit RGB"), _("Greyscale"),
+	_("Indexed Palette"), _("From Clipboard"), _("Grab Screenshot") };
 
 #define WBbase newwin_dd
 static void *newwin_code[] = {
-	IF(type), WINDOW(_("New Layer"), TRUE), // modal
-	UNLESS(type), WINDOW(_("New Image"), TRUE), // modal
+	IF(type), WINDOWm(_("New Layer")), // modal
+	UNLESS(type), WINDOWm(_("New Image")), // modal
 	TABLE2(3),
 	TSPIN(_("Width"), w, MIN_WIDTH, MAX_WIDTH),
 	TSPIN(_("Height"), h, MIN_HEIGHT, MAX_HEIGHT),
 	TSPIN(_("Colours"), c, 2, 256),
 	WDONE,
-	RPACK(rad_txt, 5, 0, im_type),
+	RPACK(newwin_txt, 5, 0, im_type),
 	UNLESS(type), CHECK(_("Undoable"), undo),
-	HSEP,
+	HSEPl(200),
 	OKBOX(_("Create"), create_new, _("Cancel"), NULL),
-	WEND
+	WSHOW
 };
 #undef WBbase
 
@@ -281,8 +281,6 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 {
 	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load };
 	int im_type = 3 - mem_img_bpp;
-	void **res;
-
 
 	if (!type)
 	{
@@ -296,8 +294,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	}
 	tdata.im_type = im_type;
 
-	res = run_create(newwin_code, sizeof(newwin_code), &tdata, sizeof(tdata));
-	gtk_widget_show(GET_WINDOW(res));
+	run_create(newwin_code, sizeof(newwin_code), &tdata, sizeof(tdata));
 }
 
 
@@ -470,13 +467,18 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 
 
 
+typedef struct {
+	int n;
+} n1_dd;
+
 ///	ADD COLOURS TO PALETTE WINDOW
 
-static int do_add_cols(GtkWidget *spin, gpointer fdata)
+static void do_add_cols(n1_dd *dt, void **wdata)
 {
 	int i;
 
-	i = read_spin(spin);
+	run_query(wdata);
+	i = dt->n;
 	if (i != mem_cols)
 	{
 		spot_undo(UNDO_PAL);
@@ -485,16 +487,34 @@ static int do_add_cols(GtkWidget *spin, gpointer fdata)
 			(i - mem_cols) * sizeof(png_color));
 
 		mem_cols = i;
-		update_stuff(UPD_ADDPAL);
+		update_stuff(UPD_PAL);
 	}
-
-	return TRUE;
+	destroy_dialog(GET_WINDOW(wdata));
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase n1_dd
+static void *addcol_code[] = {
+	WINDOWm(_("Set Palette Size")), // modal
+	DEFW(300),
+	HSEP,
+	SPIN(n, 2, 256),
+	HSEP,
+	BORDER(OKBOX, 0),
+	OKBOX(_("Apply"), do_add_cols, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_add_cols()
 {
-	GtkWidget *spin = add_a_spin(256, 2, 256);
-	filter_window(_("Set Palette Size"), spin, do_add_cols, NULL, FALSE);
+	n1_dd tdata = { 256 };
+	run_create(addcol_code, sizeof(addcol_code), &tdata, sizeof(tdata));
 }
 
 /* Generic code to handle UI needs of common image transform tasks */
@@ -543,94 +563,102 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 ///	BACTERIA EFFECT
 
-static int do_bacteria(GtkWidget *spin, gpointer fdata)
+static void do_bacteria(n1_dd *dt, void **wdata)
 {
-	int i;
-
-	i = read_spin(spin);
+	run_query(wdata);
 	spot_undo(UNDO_FILT);
-	mem_bacteria(i);
+	mem_bacteria(dt->n);
 	mem_undo_prepare();
-
-	return FALSE;
+	update_stuff(UPD_IMG);
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase n1_dd
+static void *bacteria_code[] = {
+	WINDOWm(_("Bacteria Effect")), // modal
+	DEFW(300),
+	HSEP,
+	SPIN(n, 1, 100),
+	HSEP,
+	BORDER(OKBOX, 0),
+	OKBOX(_("Apply"), do_bacteria, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_bacteria()
 {
-	GtkWidget *spin = add_a_spin(10, 1, 100);
-	filter_window(_("Bacteria Effect"), spin, do_bacteria, NULL, FALSE);
+	n1_dd tdata = { 10 };
+	run_create(bacteria_code, sizeof(bacteria_code), &tdata, sizeof(tdata));
 }
 
 
 ///	SORT PALETTE COLOURS
 
-static GtkWidget *spal_window, *spal_spins[2], *spal_rev;
 int spal_mode;
 
-static void click_spal_apply()
+typedef struct {
+	int rgb, start[3], end[3];
+} spal_dd;
+
+static void spal_evt(spal_dd *dt, void **wdata, int what)
 {
 	int index1, index2, reverse;
 
+	run_query(wdata);
+	reverse = inifile_get_gboolean("palrevSort", FALSE);
+	index1 = dt->start[0];
+	index2 = dt->end[0];
 
-	reverse = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(spal_rev));
-	inifile_set_gboolean( "palrevSort", reverse );
-
-	index1 = read_spin(spal_spins[0]);
-	index2 = read_spin(spal_spins[1]);
-
-	if ( index1 == index2 ) return;
-
-	spot_undo(UNDO_XPAL);
-	mem_pal_sort(spal_mode, index1, index2, reverse);
-	mem_undo_prepare();
-	update_stuff(UPD_TPAL);
+	if (index1 != index2)
+	{
+		spot_undo(UNDO_XPAL);
+		mem_pal_sort(spal_mode, index1, index2, reverse);
+		mem_undo_prepare();
+		update_stuff(UPD_TPAL);
+	}
+	if (what == op_EVT_OK) gtk_widget_destroy(GET_WINDOW(wdata));
 }
 
-static void click_spal_ok()
-{
-	click_spal_apply();
-	gtk_widget_destroy(spal_window);
-}
+#undef _
+#define _(X) X
+
+static char *spal_txt[] = {
+	_("Hue"), _("Saturation"), _("Luminance"), _("Brightness"),
+		_("Distance to A"),
+	_("Red"), _("Green"), _("Blue"), _("Projection to A->B"),
+		_("Frequency") };
+
+#define WBbase spal_dd
+static void *spal_code[] = {
+	WINDOWm(_("Sort Palette Colours")), // modal
+	TABLE2(2),
+	TSPINa(_("Start Index"), start),
+	TSPINa(_("End Index"), end),
+	WDONE,
+	IF(rgb), RPACKv(spal_txt, 9, 5, spal_mode),
+	UNLESS(rgb), RPACKv(spal_txt, 10, 5, spal_mode),
+	CHECKb(_("Reverse Order"), "palrevSort", FALSE),
+	HSEPl(200),
+	OKBOX(_("OK"), spal_evt, _("Cancel"), NULL),
+	OKADD(_("Apply"), spal_evt),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_sort_pal()
 {
-	char *rad_txt[] = {
-		_("Hue"), _("Saturation"), _("Luminance"), _("Brightness"),
-			_("Distance to A"),
-		_("Red"), _("Green"), _("Blue"), _("Projection to A->B"),
-			_("Frequency")};
-
-
-	GtkWidget *vbox1, *hbox3, *table1;
-
-	spal_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Sort Palette Colours"),
-		GTK_WIN_POS_CENTER, TRUE );
-	vbox1 = add_vbox(spal_window);
-
-	table1 = add_a_table(2, 2, 5, vbox1);
-
-	spal_spins[0] = spin_to_table(table1, 0, 1, 5, 0, 0, mem_cols - 1);
-	spal_spins[1] = spin_to_table(table1, 1, 1, 5, mem_cols - 1, 0, mem_cols - 1);
-
-	add_to_table( _("Start Index"), table1, 0, 0, 5 );
-	add_to_table( _("End Index"), table1, 1, 0, 5 );
-
-	table1 = pack(vbox1, wj_radio_pack(rad_txt, mem_img_bpp == 3 ? 9 : 10, 5,
-		spal_mode, &spal_mode, NULL));
-	gtk_container_set_border_width(GTK_CONTAINER(table1), 5);
-
-	spal_rev = add_a_toggle(_("Reverse Order"), vbox1,
-		inifile_get_gboolean("palrevSort", FALSE));
-
-	add_hseparator( vbox1, 200, 10 );
-
-	/* Cancel / Apply / OK */
-
-	hbox3 = pack(vbox1, OK_box(5, spal_window, _("OK"), GTK_SIGNAL_FUNC(click_spal_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox3, _("Apply"), GTK_SIGNAL_FUNC(click_spal_apply));
-
-	gtk_widget_show (spal_window);
+	spal_dd tdata = { mem_img_bpp == 3, { 0, 0, mem_cols - 1 },
+		{ mem_cols - 1, 0, mem_cols - 1 } };
+	run_create(spal_code, sizeof(spal_code), &tdata, sizeof(tdata));
 }
 
 

@@ -450,7 +450,7 @@ static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 
 #define WBbase pref_dd
 static void *pref_code[] = {
-	WINDOW(_("Preferences"), FALSE), // nonmodal
+	WINDOW(_("Preferences")), // nonmodal
 	MKSHRINK, // shrinkable
 	SCROLL(1, 1), // auto/auto
 	WANTMAX, // max size
@@ -551,7 +551,7 @@ static void *pref_code[] = {
 	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), prefs_evt, _("Cancel"), prefs_evt),
 	OKADD(_("Apply"), prefs_evt),
-	WEND
+	WSHOW
 };
 #undef WBbase
 
@@ -564,13 +564,11 @@ void pressed_preferences()
 		{ mem_xpm_trans, -1, mem_cols - 1 },
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
 		{ mem_xbm_hot_y, -1, mem_height - 1 } };
-	void **res;
 
 	// Make sure the user can only open 1 prefs window
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
 
-	res = run_create(pref_code, sizeof(pref_code), &tdata, sizeof(tdata));
-	gtk_widget_show(GET_WINDOW(res));
+	run_create(pref_code, sizeof(pref_code), &tdata, sizeof(tdata));
 
 	tablet_update_device(tablet_working ? tablet_device->name : "NONE");
 }

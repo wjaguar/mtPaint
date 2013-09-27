@@ -573,6 +573,21 @@ static int palette_trans(ls_settings *settings, unsigned char ttb[256])
 	return (res);
 }
 
+/* Convenience wrapper - expand palette to RGB triples */
+static unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
+{
+	int i;
+
+	if (!pal) return (rgb + 768); // Nothing to expand
+	for (i = 0; i < 256; i++ , rgb += 3 , pal++)
+	{
+		rgb[0] = pal->red;
+		rgb[1] = pal->green;
+		rgb[2] = pal->blue;
+	}
+	return (rgb);
+}
+
 static void ls_init(char *what, int save)
 {
 	char buf[256];
@@ -1324,21 +1339,6 @@ RGB:	if (stat->global_cols > 0) // Use default palette if present
 		return (4);
 	// RGB otherwise
 	return (3);
-}
-
-/* Convenience wrapper - expand palette to RGB triples */
-static unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
-{
-	int i;
-
-	if (!pal) return (rgb + 768); // Nothing to expand
-	for (i = 0; i < 256; i++ , rgb += 3 , pal++)
-	{
-		rgb[0] = pal->red;
-		rgb[1] = pal->green;
-		rgb[2] = pal->blue;
-	}
-	return (rgb);
 }
 
 static void composite_gif_frame(frameset *fset, ani_status *stat,

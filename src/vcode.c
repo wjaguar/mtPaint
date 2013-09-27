@@ -124,14 +124,21 @@ void **run_create(void **ifcode, int ifsize, void *ddata, int ddsize)
 		switch (op &= 0xFFFF)
 		{
 		/* Terminate */
-		case op_WEND: ifcode = ifend; break;
+		case op_WEND: case op_WSHOW:
+			/* !!! For now, done unconditionally */
+			gtk_window_set_transient_for(GTK_WINDOW(window),
+				GTK_WINDOW(main_window));
+			/* Display */
+			if (op == op_WSHOW) gtk_widget_show(window);
+			ifcode = ifend;
+			break;
 		/* Done with a container */
 		case op_WDONE: ++wp; break;
 		/* Create a toplevel window, bind datastore to it, and
 		 * put a vertical box inside it */
-		case op_WINDOW:
+		case op_WINDOW: case op_WINDOWm:
 			window = add_a_window(GTK_WINDOW_TOPLEVEL, _(pp[0]),
-				GTK_WIN_POS_CENTER, !!pp[1]);
+				GTK_WIN_POS_CENTER, op == op_WINDOWm);
 			dstore = bound_malloc(window, dsize);
 			memcpy(dstore, ddata, ddsize); // Copy datastruct
 			res = r = (void **)(dstore + ld); // Anchor after it
@@ -170,8 +177,8 @@ void **run_create(void **ifcode, int ifsize, void *ddata, int ddsize)
 			break;
 		/* Add a horizontal line */
 		case op_HSEP:
-// !!! Length = 200, height = 10
-			add_hseparator(wp[0], 200, 10);
+// !!! Height = 10
+			add_hseparator(wp[0], lp ? (int)pp[0] : -2, 10);
 			break;
 		/* Add a named spin to table, fill from field/var */
 		case op_TSPIN: case op_TSPINv: case op_TSPINa:
@@ -187,6 +194,14 @@ void **run_create(void **ifcode, int ifsize, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			break;
 		}
+		/* Add a spin to box, fill from field */
+		case op_SPIN:
+// !!! Spacing = 5
+			*r++ = widget = pack5(wp[0], add_a_spin(
+				*(int *)((char *)ddata + (int)pp[0]),
+				(int)pp[1], (int)pp[2]));
+			*r++ = pp - 1;
+			break;
 		/* Add a named checkbox, fill from field/var */
 		case op_CHECK: case op_CHECKv:
 		{
@@ -202,11 +217,12 @@ void **run_create(void **ifcode, int ifsize, void *ddata, int ddsize)
 				inifile_get_gboolean(pp[1], (int)pp[2]));
 			*r++ = pp - 1;
 			break;
-		/* Add a (self-reading) pack of radio buttons */
-		case op_RPACK:
+		/* Add a (self-reading) pack of radio buttons for field/var */
+		case op_RPACK: case op_RPACKv:
 		{
 			char **src = pp[0];
-			int nh = (int)pp[1], *v = (int *)(dstore + (int)pp[2]);
+			int nh = (int)pp[1], *v = op == op_RPACKv ? pp[2] :
+				(int *)(dstore + (int)pp[2]);
 #if U_NLS
 			char *tc[256];
 			int i, n = nh & 255;
@@ -296,15 +312,17 @@ void **run_create(void **ifcode, int ifsize, void *ddata, int ddsize)
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(scroll_max_size_req), NULL);
 			break;
+		/* Set default width for window */
+		case op_DEFW:
+			gtk_window_set_default_size(GTK_WINDOW(window),
+				(int)pp[0], -1);
+			break;
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_TSPIN: case op_BOR_OKBOX:
 			borders[op - op_BOR_0] = (int)pp[0] - DEF_BORDER;
 			break;
 		}
 	}
-
-	/* !!! For now, done unconditionally */
-	gtk_window_set_transient_for(GTK_WINDOW(window), GTK_WINDOW(main_window));
 
 	/* Return anchor position */
 	return (res);
@@ -321,6 +339,7 @@ void run_query(void **wdata)
 		op = (int)*pp++;
 		switch (op &= 0xFFFF)
 		{
+		case op_SPIN: --pp; // offset & fallthrough
 		case op_TSPIN: case op_TSPINa:
 			*(int *)(data + (int)pp[1]) = read_spin(*wdata);
 			break;
@@ -337,7 +356,7 @@ void run_query(void **wdata)
 			inifile_set_gboolean(pp[1], gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata)));
 			break;
-//		case op_RPACK: // self-reading
+//		case op_RPACK: case op_RPACKv:	// self-reading
 		case op_PATHv:
 			gtkncpy(pp[3], gtk_entry_get_text(GTK_ENTRY(*wdata)), PATHBUF);
 			break;

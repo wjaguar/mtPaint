@@ -1,4 +1,4 @@
-/*	vcode.c
+/*	vcode.h
 	Copyright (C) 2013 Dmitry Groshev
 
 	This file is part of mtPaint.
@@ -19,8 +19,10 @@
 
 enum {
 	op_WEND = 0,
+	op_WSHOW,
 	op_WDONE,
 	op_WINDOW,
+	op_WINDOWm,
 	op_PAGE,
 	op_TABLE2,
 	op_SCROLL,
@@ -29,10 +31,12 @@ enum {
 	op_TSPIN,
 	op_TSPINv,
 	op_TSPINa,
+	op_SPIN,
 	op_CHECK,
 	op_CHECKv,
 	op_CHECKb,
 	op_RPACK,
+	op_RPACKv,
 	op_PATHv,
 	op_PATHs,
 	op_OKBOX,
@@ -45,6 +49,7 @@ enum {
 	op_UNLESS,
 	op_MKSHRINK,
 	op_WANTMAX,
+	op_DEFW,
 
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
@@ -69,24 +74,31 @@ void run_query(void **wdata);
 #define WBh(NM,L) (void *)( op_##NM + ((L) << 16))
 
 #define WEND WBh(WEND, 0)
+#define WSHOW WBh(WSHOW, 0)
 #define WDONE WBh(WDONE, 0)
-#define WINDOW(NM,MOD) WBh(WINDOW, 2), (NM), (void *)(MOD)
+#define WINDOW(NM) WBh(WINDOW, 1), (NM)
+#define WINDOWm(NM) WBh(WINDOWm, 1), (NM)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define TABLE2(H) WBh(TABLE2, 1), (void *)(H)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define HSEP WBh(HSEP, 0)
+#define HSEPl(V) WBh(HSEP, 1), (void *)(V)
 #define TSPIN(NM,V,V0,V1) WBh(TSPIN, 4), (NM), (void *)offsetof(WBbase, V), \
 	(void *)(V0), (void *)(V1)
 #define TSPINv(NM,V,V0,V1) WBh(TSPINv, 4), (NM), &(V), \
 	(void *)(V0), (void *)(V1)
 #define TSPINa(NM,A) WBh(TSPINa, 2), (NM), (void *)offsetof(WBbase, A)
+#define SPIN(V,V0,V1) WBh(SPIN, 3), (void *)offsetof(WBbase, V), \
+	(void *)(V0), (void *)(V1)
 #define CHECK(NM,V) WBh(CHECK, 2), (NM), (void *)offsetof(WBbase, V)
 #define CHECKv(NM,V) WBh(CHECKv, 2), (NM), &(V)
 #define CHECKb(NM,V,V0) WBh(CHECKb, 3), (NM), (V), (void *)(V0)
 /* !!! No more than 255 choices */
-#define RPACK(SS,N,H,V) WBh(RPACK, 3), (SS), (void *)(((N) & 255) + ((H) << 8)), \
-	(void *)offsetof(WBbase, V)
+#define RPACK(SS,N,H,V) WBh(RPACK, 3), (SS), \
+	(void *)(((N) & 255) + ((H) << 8)), (void *)offsetof(WBbase, V)
+#define RPACKv(SS,N,H,V) WBh(RPACKv, 3), (SS), \
+	(void *)(((N) & 255) + ((H) << 8)), &(V)
 #define PATHv(A,B,C,D) WBh(PATHv, 4), (A), (B), (void *)(C), (D)
 #define PATHs(A,B,C,D) WBh(PATHs, 4), (A), (B), (void *)(C), (D)
 /* !!! This block holds 2 nested EVENT blocks */
@@ -101,6 +113,7 @@ void run_query(void **wdata);
 #define BORDER(T,V) WBh(BOR_##T, 1), (void *)(V)
 #define MKSHRINK WBh(MKSHRINK, 0)
 #define WANTMAX WBh(WANTMAX, 0)
+#define DEFW(V) WBh(DEFW, 1), (void *)(V)
 
 //	Function to run with EXEC
 typedef void **(*ext_fn)(void **r, GtkWidget ***wpp);

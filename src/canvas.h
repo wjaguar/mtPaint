@@ -246,8 +246,6 @@ void create_default_image();			// Create default new image
 #define UPD_PAL    (CF_PAL | CF_IMGBAR | CF_PDRAW | UPD_AB | UPD_IMG)
 //	Changed palette and transparent color
 #define UPD_TPAL   (UPD_PAL | CF_TRANS)
-//	Added colors to palette
-#define UPD_ADDPAL (CF_PAL | CF_IMGBAR | CF_PDRAW)
 //	Changed drawing mode in some way
 #define UPD_MODE   (CF_PMODE | CF_GMODE)
 //	Toggled gradient mode
