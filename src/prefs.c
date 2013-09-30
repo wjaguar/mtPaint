@@ -277,7 +277,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 	if (what != op_EVT_CLICK) // OK/Cancel
 	{
 		if (inputd) delete_inputd();
-		destroy_dialog(GET_WINDOW(wdata));
+		run_destroy(wdata);
 		gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
 	}
 }

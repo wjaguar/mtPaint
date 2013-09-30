@@ -138,7 +138,7 @@ typedef struct {
 
 static void create_new(newwin_dd *dt, void **wdata)
 {
-	GtkWidget *new_window = GET_WINDOW(wdata);
+	GtkWidget *new_window = GET_REAL_WINDOW(wdata);
 	png_color *pal;
 	int im_type, new_window_type = dt->type;
 	int nw, nh, nc, err = 1, bpp;
@@ -248,7 +248,7 @@ static void create_new(newwin_dd *dt, void **wdata)
 		inifile_set_gint32("lastnewType", im_type );
 	}
 
-	gtk_widget_destroy(new_window);
+	run_destroy(wdata);
 }
 
 #undef _
@@ -489,7 +489,7 @@ static void do_add_cols(n1_dd *dt, void **wdata)
 		mem_cols = i;
 		update_stuff(UPD_PAL);
 	}
-	destroy_dialog(GET_WINDOW(wdata));
+	run_destroy(wdata);
 }
 
 #undef _
@@ -622,7 +622,7 @@ static void spal_evt(spal_dd *dt, void **wdata, int what)
 		mem_undo_prepare();
 		update_stuff(UPD_TPAL);
 	}
-	if (what == op_EVT_OK) gtk_widget_destroy(GET_WINDOW(wdata));
+	if (what == op_EVT_OK) run_destroy(wdata);
 }
 
 #undef _
@@ -669,139 +669,88 @@ void pressed_sort_pal()
 #define BRCOSA_INDEX(i) (((i) == BRCOSA_POSTERIZE) && posterize_mode ? \
 	BRCOSA_ITEMS : (i))
 
-static GtkWidget *brcosa_window,
-		*brcosa_view,	// Auto-preview toggle
-		*brcosa_img, *brcosa_clip, *brcosa_pal,	// What is affected
-		*brcosa_rgb[3],
-		*brcosa_spins[BRCOSA_ITEMS],
-		*brcosa_pspins[2],	// Palette limits
-		*brcosa_buttons[5];
+static int brcosa_values_default[BRCOSA_ITEMS + 1] = {0, 0, 0, 8, 100, 0, 256};
 
-static int brcosa_values[BRCOSA_ITEMS], brcosa_pal_lim[2],
-	brcosa_values_default[BRCOSA_ITEMS + 1] = {0, 0, 0, 8, 100, 0, 256};
 int mem_preview, mem_preview_clip, brcosa_auto;
-png_color brcosa_palette[256];
 
 int posterize_mode;	// bitwise/truncated/rounded
 
-// Set 4 brcosa button as sensitive if the user has assigned changes
-static void brcosa_buttons_sensitive()
+typedef struct {
+	int rgb;
+	int rgbclip, pflag;
+	int allow[3];
+	int c01[3 * 2];
+	int values[BRCOSA_ITEMS];
+	void **sss[BRCOSA_ITEMS]; // Spinsliders
+	void **buttons[4]; // Preview/Reset/Apply/OK
+	void **xtra; // "Details" area
+	png_color pal[256];
+} brcosa_dd;
+
+static void brcosa_preview(brcosa_dd *dt, void *cause)
 {
-	int i, state;
+	int i, j, update = UPD_PAL;
+	int do_pal = TRUE;	// palette processing
 
-	if (!brcosa_buttons[0]) return;
-
-	for (state = i = 0; i < BRCOSA_ITEMS; i++)
-		state |= brcosa_values[i] != brcosa_values_default[BRCOSA_INDEX(i)];
-	for (i = 2; i < 5; i++) gtk_widget_set_sensitive(brcosa_buttons[i], state);
-}
-
-static void click_brcosa_preview(GtkWidget *widget)
-{
-	int i, j, update = 0;
-	int do_pal = FALSE;	// RGB palette processing
-
-	mem_pal_copy(mem_pal, brcosa_palette);	// Get back normal palette
-	if (mem_img_bpp == 3)
-	{
-		do_pal = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_pal));
-		// If user has just cleared toggle
-		if (!do_pal && (widget == brcosa_pal)) update = UPD_PAL;
-	}
+	mem_pal_copy(mem_pal, dt->pal);	// Get back normal palette
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mem_bcsp.bcsp[i] = brcosa_values[i];
+		mem_bcsp.bcsp[i] = dt->values[i];
 	mem_bcsp.pmode = posterize_mode;
 
 	for (i = 0; i < 3; i++)
-	{
-		mem_bcsp.allow[i] = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(brcosa_rgb[i]));
-	}
+		mem_bcsp.allow[i] = dt->allow[i];
 
-	if ((mem_img_bpp == 1) || do_pal)
+	if (mem_img_bpp == 3)
 	{
-		j = brcosa_pal_lim[0] > brcosa_pal_lim[1];
-		transform_pal(mem_pal, brcosa_palette,
-			brcosa_pal_lim[j], brcosa_pal_lim[j ^ 1]);
-		update |= UPD_PAL;
+		update = UPD_RENDER | UPD_PAL;
+		do_pal = dt->pflag;
+		// Unless user has just cleared toggle
+		if (!do_pal && (cause != &dt->pflag)) update = UPD_RENDER;
 	}
-	if (mem_img_bpp == 3) update |= UPD_RENDER;
-	if (update) update_stuff(update);
+	if (do_pal)
+	{
+		j = dt->c01[0] > dt->c01[3] ? 3 : 0;
+		transform_pal(mem_pal, dt->pal, dt->c01[j], dt->c01[j ^ 3]);
+	}
+	update_stuff(update);
 }
 
-static void brcosa_pal_lim_change()
+static void brcosa_changed(brcosa_dd *dt, void **wdata, int what, void **where)
 {
+	brcosa_preview(dt, cmd_read(where, dt)); // Update everything
+}
+
+static void brcosa_moved(brcosa_dd *dt, void **wdata, int what, void **where)
+{
+	int i, state;
+	void *cause = cmd_read(where, dt);
+
+	if (brcosa_auto) brcosa_preview(dt, NULL);
+	if (cause == &brcosa_auto) cmd_showhide(dt->buttons[0], !brcosa_auto);
+
+	// Set 3 brcosa button as sensitive if the user has assigned changes
+	for (state = i = 0; i < BRCOSA_ITEMS; i++)
+		state |= dt->values[i] ^ brcosa_values_default[BRCOSA_INDEX(i)];
+	for (i = 1; i < 4; i++) cmd_sensitive(dt->buttons[i], state);
+}
+
+static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
+{
+	unsigned char *mask, *mask0, *tmp;
 	int i;
 
-	for (i = 0; i < 2; i++)
-		brcosa_pal_lim[i] = gtk_spin_button_get_value_as_int(
-			GTK_SPIN_BUTTON(brcosa_pspins[i]));
+	mem_pal_copy(mem_pal, dt->pal);
 
-	click_brcosa_preview(NULL);	// Update everything
-}
+	if (what != op_EVT_CANCEL) // OK/Apply
+	{	// !!! Buttons disabled for default values
+		spot_undo(UNDO_COL);
 
-static void click_brcosa_preview_toggle()
-{
-	if (!brcosa_buttons[0]) return;	// Traps call during initialisation
-
-	brcosa_auto = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(brcosa_view));
-	if (brcosa_auto)
-	{
-		click_brcosa_preview(NULL);
-		gtk_widget_hide(brcosa_buttons[1]);
-	}
-	else gtk_widget_show(brcosa_buttons[1]);
-}
-
-static void click_brcosa_RGB_toggle(GtkToggleButton *button, gpointer user_data)
-{
-	*(int *)user_data = gtk_toggle_button_get_active(button);
-	click_brcosa_preview(NULL);
-}
-
-static void brcosa_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
-{
-	brcosa_values[(int)user_data] = ADJ2INT(adj);
-	brcosa_buttons_sensitive();
-
-	if (brcosa_auto) click_brcosa_preview(NULL);
-}
-
-static void delete_brcosa()
-{
-	// If in RGB mode this is required to disable live preview
-	mem_preview = mem_preview_clip = FALSE;
-	gtk_widget_destroy(brcosa_window);
-}
-
-static gboolean click_brcosa_cancel()
-{
-	mem_pal_copy(mem_pal, brcosa_palette);
-	delete_brcosa();
-	update_stuff(UPD_PAL);
-	return (FALSE);
-}
-
-static void click_brcosa_apply(GtkWidget *widget)
-{
-	unsigned char *mask = NULL, *mask0, *tmp;
-	int i, j;
-
-	mem_pal_copy(mem_pal, brcosa_palette);
-
-	for (i = j = 0; i < BRCOSA_ITEMS; i++)
-		j |= brcosa_values[i] ^ brcosa_values_default[BRCOSA_INDEX(i)];
-	if (!j) return; // Nothing changed from default state
-
-	spot_undo(UNDO_COL);
-
-	click_brcosa_preview(NULL); // This modifies palette
-	if (mem_preview && (mem_img_bpp == 3))
-	{
-		mask = malloc(mem_width);
-		if (mask) // This modifies image
+		brcosa_preview(dt, NULL); // This modifies palette
+		while (mem_preview && (mem_img_bpp == 3)) // This modifies image
 		{
+			mask = malloc(mem_width);
+			if (!mask) break;
 			mask0 = NULL;
 			if (!channel_dis[CHN_MASK]) mask0 = mem_img[CHN_MASK];
 			tmp = mem_img[CHN_IMAGE];
@@ -813,246 +762,170 @@ static void click_brcosa_apply(GtkWidget *widget)
 				tmp += mem_width * 3;
 			}
 			free(mask);
+			break;
 		}
+		if (mem_preview_clip && (mem_img_bpp == 3) && (mem_clip_bpp == 3))
+		{
+			// This modifies clipboard
+			do_transform(0, 1, mem_clip_w * mem_clip_h, NULL,
+				mem_clipboard, mem_clipboard);
+		}
+		mem_undo_prepare();
 	}
-	if (mem_preview_clip && (mem_img_bpp == 3) && (mem_clip_bpp == 3))
-	{
-		// This modifies clipboard
-		do_transform(0, 1, mem_clip_w * mem_clip_h, NULL,
-			mem_clipboard, mem_clipboard);
-	}
-	mem_undo_prepare();
+
 	// Disable preview for final update
-	if (!widget) mem_preview = mem_preview_clip = FALSE;
+	if (what != op_EVT_CLICK) mem_preview = mem_preview_clip = FALSE;
+
 	update_stuff(UPD_PAL);
 
-	if (widget) // Don't need this when clicking OK
+	if (what == op_EVT_CLICK) // Apply
 	{
 		// Reload palette and redo preview
-		mem_pal_copy(brcosa_palette, mem_pal);
-		click_brcosa_preview(NULL);
+		mem_pal_copy(dt->pal, mem_pal);
+		brcosa_preview(dt, NULL);
 	}
+	else run_destroy(wdata); // OK/Cancel
 }
 
-static void click_brcosa_show_toggle(GtkWidget *widget, gpointer data)
+static void click_brcosa_show_toggle(brcosa_dd *dt, void **wdata, int what,
+	void **where)
 {
-	int toggle = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-
-	inifile_set_gboolean("transcol_show", toggle);
-	widget_showhide(GTK_WIDGET(data), toggle);
+	cmd_read(where, dt);
+	cmd_showhide(dt->xtra, inifile_get_gboolean("transcol_show", FALSE));
 }
 
-/*
-static void click_brcosa_store()
-{
-}
-*/
-
-static void click_brcosa_ok()
-{
-	click_brcosa_apply(NULL);
-	delete_brcosa();
-}
-
-static void click_brcosa_reset()
+static void click_brcosa_reset(brcosa_dd *dt)
 {
 	int i;
 
-	mem_pal_copy(mem_pal, brcosa_palette);
+	mem_pal_copy(mem_pal, dt->pal);
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-	{
-		mt_spinslide_set_value(brcosa_spins[i],
-			brcosa_values_default[BRCOSA_INDEX(i)]);
-	}
+		cmd_set(dt->sss[i], brcosa_values_default[BRCOSA_INDEX(i)]);
+
 	update_stuff(UPD_PAL);
 }
 
-static void brcosa_posterize_changed(GtkMenuItem *menuitem, gpointer user_data)
+static void brcosa_posterize_changed(brcosa_dd *dt, void **wdata, int what,
+	void **where)
 {
-	GtkWidget *spin = brcosa_spins[BRCOSA_POSTERIZE];
+	int vvv[3];
 	int i, v, oldv = posterize_mode;
 
-	posterize_mode = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+	cmd_read(where, dt);
 	if (!oldv ^ !posterize_mode) // From/to bitwise
 	{
-		v = mt_spinslide_read_value(spin);
-		if (oldv)// To bitwise
+		cmd_read(dt->sss[BRCOSA_POSTERIZE], dt);
+		v = dt->values[BRCOSA_POSTERIZE];
+		if (oldv) // To bitwise
 		{
 			for (i = 0 , v -= 1; v ; i++ , v >>= 1);
-			v = i;
+			vvv[0] = i;
+			vvv[1] = 1;
+			vvv[2] = 8;
 		}
-		else v = 1 << v; // From bitwise
-		mt_spinslide_set_range(spin, oldv ? 1 : 2, oldv ? 8 : 256);
-		mt_spinslide_set_value(spin, v);
+		else // From bitwise
+		{
+			vvv[0] = 1 << v;
+			vvv[1] = 2;
+			vvv[2] = 256;
+		}
+		cmd_set3(dt->sss[BRCOSA_POSTERIZE], vvv);
 	}
-	else if (brcosa_auto) click_brcosa_preview(NULL);
+	else if (brcosa_auto) brcosa_preview(dt, NULL);
 }
+
+#undef _
+#define _(X) X
+
+static char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
+
+#define WBbase brcosa_dd
+static void *brcosa_code[] = {
+	WPMOUSE, WINDOWm(_("Transform Colour")), NORESIZE,
+	BORDER(TABLE, 10),
+	TABLE2(6),
+	REF(sss[4]), TSPINSLIDE(_("Gamma"), values[4], 20, 500),
+	EVENT(CHANGE, brcosa_moved),
+	REF(sss[0]), TSPINSLIDE(_("Brightness"), values[0], -255, 255),
+	EVENT(CHANGE, brcosa_moved),
+	REF(sss[1]), TSPINSLIDE(_("Contrast"), values[1], -100, 100),
+	EVENT(CHANGE, brcosa_moved),
+	REF(sss[2]), TSPINSLIDE(_("Saturation"), values[2], -100, 100),
+	EVENT(CHANGE, brcosa_moved),
+	REF(sss[5]), TSPINSLIDE(_("Hue"), values[5], -1529, 1529),
+	EVENT(CHANGE, brcosa_moved),
+	REF(sss[3]),
+	UNLESSv(posterize_mode), TSPINSLIDE(_("Posterize"), values[3], 1, 8),
+	IFv(posterize_mode), TSPINSLIDE(_("Posterize"), values[3], 2, 256),
+	EVENT(CHANGE, brcosa_moved),
+	WDONE,
+///	MIDDLE SECTION
+	HSEP,
+	HBOX,
+	CHECKb(_("Show Detail"), "transcol_show", FALSE),
+	EVENT(CHANGE, click_brcosa_show_toggle), TRIGGER,
+	WDONE,
+	BORDER(TABLE, 0),
+	REF(xtra), TABLEr(4, 4),
+	TLLABEL(_("Posterize type"), 0, 0),
+	TLOPTvl(pos_txt, 3, posterize_mode, brcosa_posterize_changed, 1, 0, 2),
+	UNLESS(rgb), TLLABEL(_("Palette"), 0, 2),
+	IFx(rgb, 1),
+		TLCHECK(_("Palette"), pflag, 0, 2),
+		EVENT(CHANGE, brcosa_changed),
+		TLCHECKv(_("Image"), mem_preview, 0, 1),
+		EVENT(CHANGE, brcosa_changed),
+		IF(rgbclip),
+			TLCHECKvl(_("Clipboard"), mem_preview_clip, 1, 1, 2),
+		IF(rgbclip), EVENT(CHANGE, brcosa_changed),
+	ENDIF(1),
+	TLHBOXl(1, 2, 2),
+	XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed),
+	XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed),
+	WDONE,
+	TLCHECKv(_("Auto-Preview"), brcosa_auto, 0, 3),
+	EVENT(CHANGE, brcosa_moved), TRIGGER,
+	TLCHECK(_("Red"), allow[0], 1, 3), EVENT(CHANGE, brcosa_changed),
+	TLCHECK(_("Green"), allow[1], 2, 3), EVENT(CHANGE, brcosa_changed),
+	TLCHECK(_("Blue"), allow[2], 3, 3), EVENT(CHANGE, brcosa_changed),
+	WDONE,
+///	BOTTOM AREA
+	HSEP,
+	OKBOX0,
+	BORDER(OKBTN, 4),
+	CANCELBTN(_("Cancel"), brcosa_btn),
+	REF(buttons[0]), OKNEXT(_("Preview"), brcosa_changed),
+	REF(buttons[1]), OKNEXT(_("Reset"), click_brcosa_reset),
+	REF(buttons[2]), OKNEXT(_("Apply"), brcosa_btn),
+	REF(buttons[3]), OKBTN(_("OK"), brcosa_btn),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_brcosa()
 {
-	static const GtkSignalFunc but_fn[] = {
-		GTK_SIGNAL_FUNC(click_brcosa_cancel),
-		GTK_SIGNAL_FUNC(click_brcosa_preview),
-		GTK_SIGNAL_FUNC(click_brcosa_reset),
-		GTK_SIGNAL_FUNC(click_brcosa_apply),
-		GTK_SIGNAL_FUNC(click_brcosa_ok) };
-	static const int mins[] = {-255, -100, -100, 1, 20, -1529, 2},
-		maxs[] = {255, 100, 100, 8, 500, 1529, 256},
-		order[] = {1, 2, 3, 5, 0, 4};
-	char *rgb_txt[] = { _("Red"), _("Green"), _("Blue") };
-	char *tab_txt[] = { _("Brightness"), _("Contrast"), _("Saturation"),
-		_("Posterize"), _("Gamma"), _("Hue") };
-	char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
-	char *but_txt[] = { _("Cancel"), _("Preview"), _("Reset"), _("Apply"),
-		_("OK") };
-	GtkWidget *vbox, *table, *table2, *hbox, *button;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-	int i, j;
+	brcosa_dd tdata = { mem_img_bpp == 3,
+		mem_clipboard && (mem_clip_bpp == 3), FALSE,
+		{ TRUE, TRUE, TRUE },
+		{ 0, 0, mem_cols - 1, mem_cols - 1, 0, mem_cols - 1 } };
+	int i;
 
+	memcpy(tdata.values, brcosa_values_default, sizeof(tdata.values));
+	tdata.values[BRCOSA_POSTERIZE] =
+		brcosa_values_default[BRCOSA_INDEX(BRCOSA_POSTERIZE)];
+	mem_pal_copy(tdata.pal, mem_pal);	// Remember original palette
 
-	mem_pal_copy(brcosa_palette, mem_pal);	// Remember original palette
-
+	/* !!! In case a redraw happens inside run_create() */
 	for (i = 0; i < BRCOSA_ITEMS; i++)
 		mem_bcsp.bcsp[i] = brcosa_values_default[i];
 
-	/* Enables preview_toggle code to detect an initialisation call
-	 * (should not happen now, but let's play it safe) */
-	brcosa_buttons[0] = NULL;
+	mem_preview = TRUE;	// Enable live preview in RGB mode
 
-	mem_preview = TRUE;	// If in RGB mode this is required to enable live preview
-
-	brcosa_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Transform Colour"),
-		GTK_WIN_POS_MOUSE, TRUE);
-
-	gtk_window_set_policy(GTK_WINDOW(brcosa_window), FALSE, FALSE, TRUE);
-			// Automatically grow/shrink window
-
-	vbox = add_vbox(brcosa_window);
-
-	table2 = add_a_table(6, 2, 10, vbox );
-	for (i = 0; i < BRCOSA_ITEMS; i++)
-	{
-		j = BRCOSA_INDEX(i);
-		add_to_table(tab_txt[i], table2, order[i], 0, 0);
-		brcosa_values[i] = brcosa_values_default[j];
-		brcosa_spins[i] = mt_spinslide_new(255, 20);
-		gtk_table_attach(GTK_TABLE(table2), brcosa_spins[i], 1, 2,
-			order[i], order[i] + 1, GTK_EXPAND | GTK_FILL,
-			GTK_FILL, 0, 0);
-		mt_spinslide_set_range(brcosa_spins[i], mins[j], maxs[j]);
-		mt_spinslide_set_value(brcosa_spins[i], brcosa_values[i]);
-		mt_spinslide_connect(brcosa_spins[i],
-			GTK_SIGNAL_FUNC(brcosa_spinslide_moved), (gpointer)i);
-	}
-
-
-
-///	MIDDLE SECTION
-
-	add_hseparator(vbox, -2, 10);
-
-	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-
-	table = add_a_table(4, 4, 0, vbox);
-	button = add_a_toggle(_("Show Detail"), hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "toggled",
-		GTK_SIGNAL_FUNC(click_brcosa_show_toggle), table);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),
-		inifile_get_gboolean("transcol_show", FALSE));
-#if 0
-	button = gtk_button_new_with_label(_("Store Values"));
-	gtk_widget_show (button);
-	gtk_box_pack_end (GTK_BOX (hbox), button, FALSE, FALSE, 4);
-
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_brcosa_store), NULL);
-#endif
-
-///	OPTIONAL SECTION
-
-	add_to_table(_("Posterize type"), table, 0, 0, 5);
-	to_table_l(wj_option_menu(pos_txt, 3, posterize_mode, &posterize_mode,
-		GTK_SIGNAL_FUNC(brcosa_posterize_changed)), table, 0, 1, 2, 0);
-
-	if (mem_img_bpp == 1) add_to_table(_("Palette"), table, 2, 0, 5);
-	else
-	{
-		brcosa_pal = sig_toggle(_("Palette"), FALSE, NULL,
-			GTK_SIGNAL_FUNC(click_brcosa_preview));
-		to_table(brcosa_pal, table, 2, 0, 0);
-
-		brcosa_img = sig_toggle(_("Image"), TRUE, &mem_preview,
-			GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle));
-		to_table(brcosa_img, table, 1, 0, 0);
-
-		if (mem_clipboard && (mem_clip_bpp == 3))
-		{
-			brcosa_clip = sig_toggle(_("Clipboard"), FALSE,
-				&mem_preview_clip,
-				GTK_SIGNAL_FUNC(click_brcosa_RGB_toggle));
-			to_table_l(brcosa_clip, table, 1, 1, 2, 0);
-		}
-	}
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(hbox);
-	to_table_l(hbox, table, 2, 1, 2, 0);
-	brcosa_pal_lim[0] = 0;
-	brcosa_pal_lim[1] = mem_cols - 1;
-	for (i = 0; i < 2; i++)
-	{
-		brcosa_pspins[i] = xpack(hbox,add_a_spin(brcosa_pal_lim[i],
-			0, mem_cols - 1));
-		spin_connect(brcosa_pspins[i],
-			GTK_SIGNAL_FUNC(brcosa_pal_lim_change), NULL);
-	}
-
-	brcosa_view = sig_toggle(_("Auto-Preview"), brcosa_auto, NULL,
-		GTK_SIGNAL_FUNC(click_brcosa_preview_toggle));
-	to_table(brcosa_view, table, 3, 0, 0);
-	for (i = 0; i < 3; i++)
-	{
-		brcosa_rgb[i] = sig_toggle(rgb_txt[i], TRUE, NULL,
-			GTK_SIGNAL_FUNC(click_brcosa_preview));
-		to_table(brcosa_rgb[i], table, 3, 1 + i, 0);
-	}
-
-
-
-///	BOTTOM AREA
-
-	add_hseparator(vbox, -2, 10);
-
-	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-
-	for (i = 0; i < 5; i++)
-	{
-		brcosa_buttons[i] = button = add_a_button(but_txt[i], 4, hbox, TRUE);
-		gtk_signal_connect(GTK_OBJECT(button), "clicked", but_fn[i], NULL);
-	}
-	gtk_widget_add_accelerator(brcosa_buttons[0], "clicked", ag,
-		GDK_Escape, 0, (GtkAccelFlags)0);
-	gtk_widget_add_accelerator(brcosa_buttons[4], "clicked", ag,
-		GDK_KP_Enter, 0, (GtkAccelFlags)0);
-	gtk_widget_add_accelerator(brcosa_buttons[4], "clicked", ag,
-		GDK_Return, 0, (GtkAccelFlags)0);
-	gtk_signal_connect(GTK_OBJECT(brcosa_window), "delete_event",
-		GTK_SIGNAL_FUNC(click_brcosa_cancel), NULL);
-
-	click_brcosa_preview_toggle();		// Show/hide preview button
-	brcosa_buttons_sensitive();		// Disable buttons
-	gtk_window_set_transient_for(GTK_WINDOW(brcosa_window), GTK_WINDOW(main_window));
-
-	gtk_widget_show(brcosa_window);
-	gtk_window_add_accel_group(GTK_WINDOW(brcosa_window), ag);
-
-#if GTK_MAJOR_VERSION == 1
-	/* To make Smooth theme engine render sliders properly */
-	gtk_widget_queue_resize(brcosa_window);
-#endif
+	run_create(brcosa_code, sizeof(brcosa_code), &tdata, sizeof(tdata));
 }
 
 
@@ -1286,6 +1159,8 @@ void pressed_scale_size(int mode)
 
 
 ///	PALETTE EDITOR WINDOW
+
+png_color brcosa_palette[256];
 
 enum {
 	CHOOK_CANCEL = 0,
