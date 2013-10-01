@@ -49,6 +49,17 @@ const unsigned char greyz[2] = {GREY_W, GREY_B}; // For opacity squares
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 char *cspnames[NUM_CSPACES];
 
+#undef _
+#define _(X) X
+
+char *channames_[NUM_CHANNELS + 1] =
+		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
+char *cspnames_[NUM_CSPACES] =
+		{ _("RGB"), _("sRGB"), "LXN" };
+
+#undef _
+#define _(X) __(X)
+
 ///	INIFILE ENTRY LISTS
 
 typedef struct {
@@ -1149,17 +1160,13 @@ void var_init()
 
 void string_init()
 {
-	char *cnames[NUM_CHANNELS + 1] =
-		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
-	char *cspaces[NUM_CSPACES] =
-		{ _("RGB"), _("sRGB"), "LXN" };
 	int i;
 
 	for (i = 0; i < NUM_CHANNELS + 1; i++)
-		allchannames[i] = channames[i] = cnames[i];
+		allchannames[i] = channames[i] = _(channames_[i]);
 	channames[CHN_IMAGE] = "";
 	for (i = 0; i < NUM_CSPACES; i++)
-		cspnames[i] = cspaces[i];
+		cspnames[i] = _(cspnames_[i]);
 }
 
 static void toggle_dock(int state, int internal);

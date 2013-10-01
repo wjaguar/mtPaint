@@ -285,6 +285,9 @@ const unsigned char greyz[2]; // For opacity squares
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 char *cspnames[NUM_CSPACES];
 
+char *channames_[NUM_CHANNELS + 1];
+char *cspnames_[NUM_CSPACES];
+
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,

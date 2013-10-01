@@ -1,5 +1,5 @@
 /*	channels.c
-	Copyright (C) 2006-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -26,11 +26,12 @@
 #include "mainwindow.h"
 #include "otherwindow.h"
 #include "canvas.h"
+#include "vcode.h"
 #include "channels.h"
 
-int overlay_alpha = FALSE;
-int hide_image = FALSE;
-int RGBA_mode = FALSE;
+int overlay_alpha;
+int hide_image;
+int RGBA_mode;
 
 unsigned char channel_rgb[NUM_CHANNELS][3] = {
 	{0, 0, 0},	/* Image */
@@ -57,8 +58,7 @@ unsigned char channel_col_[2][NUM_CHANNELS] = {
 /* Channel disable flags */
 int channel_dis[NUM_CHANNELS] = {0, 0, 0, 0};
 
-static GtkWidget *newchan_window;
-static int chan_new_type, chan_new_state, chan_new_invert;
+static void **newchan_window;
 
 
 static void click_newchan_cancel()
@@ -67,11 +67,18 @@ static void click_newchan_cancel()
 		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
 		// Stops cancelled new channel showing as selected in the menu
 
-	gtk_widget_destroy( newchan_window );
+	run_destroy(newchan_window);
 	newchan_window = NULL;
 }
 
-static void click_newchan_ok(GtkButton *window, gpointer user_data)
+typedef struct {
+	int chan, state, inv, sens, req;
+	char **names;
+} cchan_dd;
+
+#define chan_new_type (dt->chan + CHN_ALPHA)
+#define chan_new_state (dt->state)
+static void click_newchan_ok(cchan_dd *dt, void **wdata)
 {
 	chanlist tlist;
 	int i, ii, j = mem_width * mem_height, range, rgb[3];
@@ -79,6 +86,7 @@ static void click_newchan_ok(GtkButton *window, gpointer user_data)
 	unsigned int k;
 	double r2, rr;
 
+	run_query(wdata);
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	if ((chan_new_type == CHN_ALPHA) && (chan_new_state == 3)) i = CMASK_RGBA;
 	else i = CMASK_FOR(chan_new_type);
@@ -215,13 +223,13 @@ dofail:
 	}
 
 	/* Invert */
-	if (chan_new_invert)
+	if (dt->inv)
 	{
 		for (i = 0; i < j; i++) dest[i] ^= 255;
 	}
 	mem_undo_prepare();
 
-	if ((int)gtk_object_get_user_data(GTK_OBJECT(window)) >= CHN_ALPHA)
+	if (dt->req >= CHN_ALPHA)
 	{
 		mem_channel = chan_new_type;
 		update_stuff(UPD_NEWCH);
@@ -229,10 +237,35 @@ dofail:
 	else update_stuff(UPD_ADDCH);
 	click_newchan_cancel();
 }
+#undef chan_new_type
+#undef chan_new_state
+
+#undef _
+#define _(X) X
+
+#define WBbase cchan_dd
+static void *cchan_code[] = {
+	WINDOWm(_("Create Channel")),
+	FRPACK(_("Channel Type"), channames_ + CHN_ALPHA,
+		NUM_CHANNELS - CHN_ALPHA, 1, chan),
+	IF(sens), INSENS,
+	FVBOX(_("Initial Channel State")),
+	RPACKd(names, 0, state),
+	HSEP,
+	CHECK(_("Inverted"), inv),
+	WDONE,
+	OKBOX(_("OK"), click_newchan_ok, _("Cancel"), click_newchan_cancel),
+	WSHOW
+};
+#undef WBbase
+
+#if NUM_CHANNELS > CHN_MASK + 1
+#error "Not all channels listed in dialog"
+#endif
 
 void pressed_channel_create(int channel)
 {
-	gchar *names2[] = {
+	char *names2[] = {
 		_("Cleared"),
 		_("Set"),
 		_("Set colour A radius B"),
@@ -246,54 +279,27 @@ void pressed_channel_create(int channel)
 		mem_img[CHN_MASK] ? _("Mask") : "",
 		NULL
 		};
+	cchan_dd tdata = { channel < CHN_ALPHA ? 0 : channel - CHN_ALPHA,
+		0, FALSE, channel >= 0, channel, names2 };
 
-	GtkWidget *vbox, *vbox2, *hbox;
-
-
-	chan_new_type = channel < CHN_ALPHA ? CHN_ALPHA : channel;
-	chan_new_state = 0;
-
-	newchan_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Create Channel"),
-			GTK_WIN_POS_CENTER, TRUE );
-	gtk_object_set_user_data(GTK_OBJECT(newchan_window), (gpointer)channel);
-	vbox = add_vbox(newchan_window);
-
-	hbox = wj_radio_pack(channames, -1, 1, chan_new_type, &chan_new_type, NULL);
-	add_with_frame(vbox, _("Channel Type"), hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	if (channel >= 0) gtk_widget_set_sensitive(hbox, FALSE);
-
-	vbox2 = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox2);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox2), 5);
-	add_with_frame(vbox, _("Initial Channel State"), vbox2);
-	pack(vbox2, wj_radio_pack(names2, -1, 0, chan_new_state, &chan_new_state, NULL));
-
-	add_hseparator(vbox2, -2, 10);
-	pack(vbox2, sig_toggle(_("Inverted"), FALSE, &chan_new_invert, NULL));
-
-	pack(vbox, OK_box(0, newchan_window, _("OK"), GTK_SIGNAL_FUNC(click_newchan_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(click_newchan_cancel)));
-
-	gtk_window_set_transient_for(GTK_WINDOW(newchan_window), GTK_WINDOW(main_window));
-	gtk_widget_show(newchan_window);
+	newchan_window = run_create(cchan_code, sizeof(cchan_code),
+		&tdata, sizeof(tdata));
 }
 
-static GtkWidget *cdel_box;
-static int cdel_count;
+#undef _
+#define _(X) __(X)
 
-static void click_delete_ok(GtkWidget *window)
+typedef struct {
+	int cc[NUM_CHANNELS], cf[NUM_CHANNELS];
+} dchan_dd;
+
+static void click_delete_ok(dchan_dd *dt, void **wdata)
 {
-	GtkWidget *check;
 	int i, cmask;
 
-	for (i = cmask = 0; i < cdel_count; i++)
-	{
-		check = BOX_CHILD(cdel_box, i);
-		if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
-			continue;
-		cmask |= (int)gtk_object_get_user_data(GTK_OBJECT(check));
-	}
+	run_query(wdata);
+	for (i = cmask = 0; i < NUM_CHANNELS; i++)
+		if (dt->cf[i]) cmask |= CMASK_FOR(i);
 	if (cmask)
 	{
 		undo_next_core(UC_DELETE, mem_width, mem_height, mem_img_bpp, cmask);
@@ -301,38 +307,42 @@ static void click_delete_ok(GtkWidget *window)
 		update_stuff(UPD_DELCH);
 	}
 
-	gtk_widget_destroy(window);
+	run_destroy(wdata);
 }
+
+#undef _
+#define _(X) X
+
+#if NUM_CHANNELS > CHN_MASK + 1
+#error "Not all channels listed in dialog"
+#endif
+
+#define WBbase dchan_dd
+static void *dchan_code[] = {
+	WINDOWm(_("Delete Channels")),
+	IF(cc[CHN_ALPHA]), CHECK(_("Alpha"), cf[CHN_ALPHA]),
+	IF(cc[CHN_SEL]),   CHECK(_("Selection"), cf[CHN_SEL]),
+	IF(cc[CHN_MASK]),  CHECK(_("Mask"), cf[CHN_MASK]),
+	HSEPl(200),
+	OKBOX(_("OK"), click_delete_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_channel_delete()
 {
-	GtkWidget *window, *vbox, *check;
-	int i;
+	dchan_dd tdata;
+	int i, j = FALSE;
 
-	/* Are there utility channels at all? */
-	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++) if (mem_img[i]) break;
-	if (i >= NUM_CHANNELS) return;
-	
-	window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Delete Channels"),
-		GTK_WIN_POS_CENTER, TRUE);
-
-	vbox = cdel_box = add_vbox(window);
-	cdel_count = 0;
+	memset(&tdata, 0, sizeof(tdata));
 	for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
-	{
-		if (!mem_img[i]) continue;
-		check = add_a_toggle(channames[i], vbox, i == mem_channel);
-		gtk_object_set_user_data(GTK_OBJECT(check), (gpointer)CMASK_FOR(i));
-		cdel_count++;
-	}
-	gtk_widget_show_all(vbox);
-
-	add_hseparator(vbox, 200, 10);
-
-	pack(vbox, OK_box(5, window, _("OK"), GTK_SIGNAL_FUNC(click_delete_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	gtk_widget_show(window);
+		if (mem_img[i]) j = tdata.cc[i] = TRUE;
+	tdata.cf[mem_channel] = tdata.cc[mem_channel];
+	/* If utility channels exist at all */
+	if (j) run_create(dchan_code, sizeof(dchan_code), &tdata, sizeof(tdata));
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */

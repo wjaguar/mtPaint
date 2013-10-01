@@ -76,8 +76,6 @@ static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 #undef _
 #define _(X) __(X)
 
-static int pref_lang;
-
 #endif
 
 
@@ -228,6 +226,7 @@ static void conf_tablet(GtkWidget *widget)
 
 typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
+	int lang;
 } pref_dd;
 
 static void prefs_evt(pref_dd *dt, void **wdata, int what)
@@ -258,7 +257,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 		}
 
 #ifdef U_NLS
-		inifile_set("languageSETTING", pref_lang_ini_code[pref_lang]);
+		inifile_set("languageSETTING", pref_lang_ini_code[dt->lang]);
 		setup_language();
 		string_init();			// Translate static strings
 #endif
@@ -330,38 +329,6 @@ static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 }
 
 ///	EXTENSIONS TO BYTECODE
-
-#ifdef U_NLS
-
-static void **create_pref_lang(void **r, GtkWidget ***wpp)
-{
-	char *cur, *langs[PREF_LANGS];
-	GtkWidget *vbox_2, *label;
-	int i, n;
-
-	vbox_2 = gtk_vbox_new(FALSE, 5);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox_2), 5);
-
-	label = pack(vbox_2, gtk_label_new(
-		_("Select preferred language translation\n\n"
-		"You will need to restart mtPaint\nfor this to take full effect")));
-
-	cur = inifile_get("languageSETTING", "system");
-	for (i = n = 0; i < PREF_LANGS; i++)
-	{
-		langs[i] = _(pref_langs[i]);
-		if (!strcmp(pref_lang_ini_code[i], cur)) n = i;
-	}
-	pack(vbox_2, wj_option_menu(langs, PREF_LANGS, n,
-		&pref_lang, NULL));
-
-	gtk_widget_show_all(vbox_2);
-	add_with_frame(**wpp, _("Language"), vbox_2);
-
-	return (r);
-}
-
-#endif
 
 static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 {
@@ -474,7 +441,11 @@ static void *pref_code[] = {
 	CHECKv(_("Disable view window transparencies"), opaque_view),
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
-	EXEC(create_pref_lang),
+	FVBOXs(_("Language"), 5),
+	MLABEL(_("Select preferred language translation\n\n"
+	"You will need to restart mtPaint\nfor this to take full effect")),
+	OPT(pref_langs, PREF_LANGS, lang, NULL),
+	WDONE,
 #endif
 	WDONE,
 ///	---- TAB2 - INTERFACE
@@ -563,10 +534,19 @@ void pressed_preferences()
 	pref_dd tdata = { { mem_undo_depth & ~1, MIN_UNDO & ~1, MAX_UNDO & ~1 },
 		{ mem_xpm_trans, -1, mem_cols - 1 },
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
-		{ mem_xbm_hot_y, -1, mem_height - 1 } };
+		{ mem_xbm_hot_y, -1, mem_height - 1 }, 0 };
 
 	// Make sure the user can only open 1 prefs window
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
+#ifdef U_NLS
+	{
+		char *cur = inifile_get("languageSETTING", "system");
+		int i;
+
+		for (i = 0; i < PREF_LANGS; i++)
+			if (!strcmp(pref_lang_ini_code[i], cur)) tdata.lang = i;
+	}
+#endif
 
 	run_create(pref_code, sizeof(pref_code), &tdata, sizeof(tdata));
 

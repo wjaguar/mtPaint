@@ -28,9 +28,11 @@ enum {
 	op_TABLEr,
 	op_HBOX,
 	op_TLHBOX,
+	op_FVBOX,
 	op_SCROLL,
 	op_SNBOOK,
 	op_HSEP,
+	op_MLABEL,
 	op_TLLABEL,
 	op_TSPIN,
 	op_TSPINv,
@@ -45,6 +47,9 @@ enum {
 	op_TLCHECKv,
 	op_RPACK,
 	op_RPACKv,
+	op_FRPACK,
+	op_RPACKd,
+	op_OPT,
 	op_TLOPTv,
 	op_PATHv,
 	op_PATHs,
@@ -65,6 +70,7 @@ enum {
 	op_WANTMAX,
 	op_DEFW,
 	op_WPMOUSE,
+	op_INSENS,
 //	op_SETBORDER,
 
 	op_EVT_0,
@@ -116,6 +122,7 @@ void *cmd_read(void **slot, void *ddata);
 #define WBh(NM,L) (void *)( op_##NM + ((L) << 16))
 #define WBfield(V) (void *)offsetof(WBbase, V)
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
+#define WBnh(N,H) (void *)(((H) & 255) + ((N) << 8))
 
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
@@ -128,38 +135,43 @@ void *cmd_read(void **slot, void *ddata);
 #define TABLEr(W,H) WBh(TABLEr, 1), (void *)((H) + ((W) << 16))
 #define HBOX WBh(HBOX, 0)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
+#define FVBOX(NM) WBh(FVBOX, 1), (NM)
+#define FVBOXs(NM,S) WBh(FVBOX, 2), (void *)(S), (NM)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
+#define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
-#define TSPIN(NM,V,V0,V1) WBh(TSPIN, 4), (NM), WBfield(V), \
-	(void *)(V0), (void *)(V1)
-#define TSPINv(NM,V,V0,V1) WBh(TSPINv, 4), (NM), &(V), \
-	(void *)(V0), (void *)(V1)
-#define TSPINa(NM,A) WBh(TSPINa, 2), (NM), WBfield(A)
+#define TSPIN(NM,V,V0,V1) WBh(TSPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), (NM)
+#define TSPINv(NM,V,V0,V1) WBh(TSPINv, 4), &(V), \
+	(void *)(V0), (void *)(V1), (NM)
+#define TSPINa(NM,A) WBh(TSPINa, 2), WBfield(A), (NM)
 #define SPIN(V,V0,V1) WBh(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define XSPINa(A) WBh(XSPINa, 1), WBfield(A)
-#define TSPINSLIDE(NM,V,V0,V1) WBh(TSPINSLIDE, 4), (NM), \
-	WBfield(V), (void *)(V0), (void *)(V1)
-#define CHECK(NM,V) WBh(CHECK, 2), (NM), WBfield(V)
-#define CHECKv(NM,V) WBh(CHECKv, 2), (NM), &(V)
-#define CHECKb(NM,V,V0) WBh(CHECKb, 3), (NM), (V), (void *)(V0)
-#define TLCHECKl(NM,V,X,Y,L) WBh(TLCHECK, 3), (NM), WBfield(V), WBxyl(X, Y, L)
+#define TSPINSLIDE(NM,V,V0,V1) WBh(TSPINSLIDE, 4), \
+	WBfield(V), (void *)(V0), (void *)(V1), (NM)
+#define CHECK(NM,V) WBh(CHECK, 2), WBfield(V), (NM)
+#define CHECKv(NM,V) WBh(CHECKv, 2), &(V), (NM)
+#define CHECKb(NM,V,V0) WBh(CHECKb, 3), (V), (void *)(V0), (NM)
+#define TLCHECKl(NM,V,X,Y,L) WBh(TLCHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
-#define TLCHECKvl(NM,V,X,Y,L) WBh(TLCHECKv, 3), (NM), &(V), WBxyl(X, Y, L)
+#define TLCHECKvl(NM,V,X,Y,L) WBh(TLCHECKv, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
 /* !!! No more than 255 choices */
-#define RPACK(SS,N,H,V) WBh(RPACK, 3), (SS), \
-	(void *)(((N) & 255) + ((H) << 8)), WBfield(V)
-#define RPACKv(SS,N,H,V) WBh(RPACKv, 3), (SS), \
-	(void *)(((N) & 255) + ((H) << 8)), &(V)
-/* !!! This block holds 1 nested EVENT block */
-#define TLOPTvl(SS,N,V,HS,X,Y,L) WBh(TLOPTv, 4 + 2), (SS), (void *)(N), \
-	&(V), EVENT(SELECT, HS), WBxyl(X, Y, L)
-#define PATHv(A,B,C,D) WBh(PATHv, 4), (A), (B), (void *)(C), (D)
-#define PATHs(A,B,C,D) WBh(PATHs, 4), (A), (B), (void *)(C), (D)
+#define RPACK(SS,N,H,V) WBh(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
+#define RPACKv(SS,N,H,V) WBh(RPACKv, 3), &(V), (SS), WBnh(N, H)
+#define FRPACK(NM,SS,N,H,V) WBh(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
+#define RPACKd(SP,H,V) WBh(RPACKd, 3), WBfield(V), WBfield(SP), (H)
+/* !!! These *OPT* blocks each hold 1 nested EVENT block */
+#define OPT(SS,N,V,HS) WBh(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
+	EVENT(SELECT, HS)
+#define TLOPTvl(SS,N,V,HS,X,Y,L) WBh(TLOPTv, 4 + 2), &(V), (SS), (void *)(N), \
+	EVENT(SELECT, HS), WBxyl(X, Y, L)
+#define PATHv(A,B,C,D) WBh(PATHv, 4), (D), (A), (B), (void *)(C)
+#define PATHs(A,B,C,D) WBh(PATHs, 4), (D), (A), (B), (void *)(C)
 /* !!! This block holds 2 nested EVENT blocks */
 #define OKBOX(NOK,HOK,NC,HC) WBh(OKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
@@ -183,6 +195,7 @@ void *cmd_read(void **slot, void *ddata);
 #define WANTMAX WBh(WANTMAX, 0)
 #define DEFW(V) WBh(DEFW, 1), (void *)(V)
 #define WPMOUSE WBh(WPMOUSE, 0)
+#define INSENS WBh(INSENS, 0)
 /* !!! Maybe better to integrate this into container codes */
 //#define SETBORDER(V) WBh(SETBORDER, 1), (void *)(V)
 #define EVENT(T,H) WBh(EVT_##T, 1), (H)
