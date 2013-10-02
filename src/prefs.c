@@ -240,7 +240,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 		strncpy0(oldpal, inifile_get(DEFAULT_PAL_INI, ""), PATHBUF);
 		strncpy0(oldpat, inifile_get(DEFAULT_PAT_INI, ""), PATHBUF);
 
-		/* Read back from bytecode-made part */
+		/* Read back from V-code slots */
 		run_query(wdata);
 		mem_undo_depth = dt->undo_depth[0];
 		mem_xbm_hot_x = dt->hot_x[0];
@@ -328,7 +328,7 @@ static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 	return TRUE;
 }
 
-///	EXTENSIONS TO BYTECODE
+///	EXTENSIONS TO V-CODE
 
 static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 {
@@ -410,7 +410,7 @@ static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 	return (r);
 }
 
-///	BYTECODE
+///	V-CODE
 
 #undef _
 #define _(X) X
@@ -548,7 +548,7 @@ void pressed_preferences()
 	}
 #endif
 
-	run_create(pref_code, sizeof(pref_code), &tdata, sizeof(tdata));
+	run_create(pref_code, &tdata, sizeof(tdata));
 
 	tablet_update_device(tablet_working ? tablet_device->name : "NONE");
 }

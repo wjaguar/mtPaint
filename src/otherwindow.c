@@ -294,7 +294,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	}
 	tdata.im_type = im_type;
 
-	run_create(newwin_code, sizeof(newwin_code), &tdata, sizeof(tdata));
+	run_create(newwin_code, &tdata, sizeof(tdata));
 }
 
 
@@ -466,19 +466,14 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 }
 
 
-
-typedef struct {
-	int n;
-} n1_dd;
-
 ///	ADD COLOURS TO PALETTE WINDOW
 
-static void do_add_cols(n1_dd *dt, void **wdata)
+static int do_add_cols(spin1_dd *dt, void **wdata)
 {
 	int i;
 
 	run_query(wdata);
-	i = dt->n;
+	i = dt->n[0];
 	if (i != mem_cols)
 	{
 		spot_undo(UNDO_PAL);
@@ -489,35 +484,53 @@ static void do_add_cols(n1_dd *dt, void **wdata)
 		mem_cols = i;
 		update_stuff(UPD_PAL);
 	}
-	run_destroy(wdata);
+	return (TRUE);
 }
 
 #undef _
 #define _(X) X
 
-#define WBbase n1_dd
-static void *addcol_code[] = {
-	WINDOWm(_("Set Palette Size")), // modal
-	DEFW(300),
-	HSEP,
-	SPIN(n, 2, 256),
-	HSEP,
-	BORDER(OKBOX, 0),
-	OKBOX(_("Apply"), do_add_cols, _("Cancel"), NULL),
-	WSHOW
-};
-#undef WBbase
+void pressed_add_cols()
+{
+	static spin1_dd tdata = {
+		{ _("Set Palette Size"), spin1_code, FW_FN(do_add_cols) },
+		{ 256, 2, 256 } };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
+}
 
 #undef _
 #define _(X) __(X)
 
-void pressed_add_cols()
+/* Generic code to handle UI needs of common image transform tasks */
+
+static void do_filterwindow(filterwindow_dd *dt, void **wdata)
 {
-	n1_dd tdata = { 256 };
-	run_create(addcol_code, sizeof(addcol_code), &tdata, sizeof(tdata));
+	if (dt->evt(dt, wdata)) run_destroy(wdata);
+	update_stuff(UPD_IMG);
 }
 
-/* Generic code to handle UI needs of common image transform tasks */
+#undef _
+#define _(X) X
+
+#define WBbase filterwindow_dd
+void *filterwindow_code[] = {
+	WINDOWpm(name), // modal
+	DEFW(300),
+	HSEP,
+	CALLp(code),
+	HSEP,
+	BORDER(OKBOX, 0),
+	OKBOX(_("Apply"), do_filterwindow, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+#define WBbase spin1_dd
+void *spin1_code[] = { SPINa(n), RET };
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 typedef struct {
 	GtkWidget *cont;
@@ -563,39 +576,28 @@ void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer 
 
 ///	BACTERIA EFFECT
 
-static void do_bacteria(n1_dd *dt, void **wdata)
+static int do_bacteria(spin1_dd *dt, void **wdata)
 {
 	run_query(wdata);
 	spot_undo(UNDO_FILT);
-	mem_bacteria(dt->n);
+	mem_bacteria(dt->n[0]);
 	mem_undo_prepare();
-	update_stuff(UPD_IMG);
+	return (FALSE);
 }
 
 #undef _
 #define _(X) X
 
-#define WBbase n1_dd
-static void *bacteria_code[] = {
-	WINDOWm(_("Bacteria Effect")), // modal
-	DEFW(300),
-	HSEP,
-	SPIN(n, 1, 100),
-	HSEP,
-	BORDER(OKBOX, 0),
-	OKBOX(_("Apply"), do_bacteria, _("Cancel"), NULL),
-	WSHOW
-};
-#undef WBbase
+void pressed_bacteria()
+{
+	static spin1_dd tdata = {
+		{ _("Bacteria Effect"), spin1_code, FW_FN(do_bacteria) },
+		{ 10, 1, 100 } };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
+}
 
 #undef _
 #define _(X) __(X)
-
-void pressed_bacteria()
-{
-	n1_dd tdata = { 10 };
-	run_create(bacteria_code, sizeof(bacteria_code), &tdata, sizeof(tdata));
-}
 
 
 ///	SORT PALETTE COLOURS
@@ -658,7 +660,7 @@ void pressed_sort_pal()
 {
 	spal_dd tdata = { mem_img_bpp == 3, { 0, 0, mem_cols - 1 },
 		{ mem_cols - 1, 0, mem_cols - 1 } };
-	run_create(spal_code, sizeof(spal_code), &tdata, sizeof(tdata));
+	run_create(spal_code, &tdata, sizeof(tdata));
 }
 
 
@@ -925,7 +927,7 @@ void pressed_brcosa()
 
 	mem_preview = TRUE;	// Enable live preview in RGB mode
 
-	run_create(brcosa_code, sizeof(brcosa_code), &tdata, sizeof(tdata));
+	run_create(brcosa_code, &tdata, sizeof(tdata));
 }
 
 

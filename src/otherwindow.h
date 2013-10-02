@@ -28,6 +28,27 @@
 #define CHOOSE_BRUSH   1
 #define CHOOSE_COLOR   2
 
+/// Generic V-code to handle UI needs of common image transform tasks
+
+typedef int (*filterwindow_fn)(void *ddata, void **wdata);
+#define FW_FN(X) (filterwindow_fn)(X)
+
+typedef struct {
+	char *name;
+	void **code;
+	filterwindow_fn evt;
+} filterwindow_dd;
+
+extern void *filterwindow_code[];
+
+typedef struct {
+	filterwindow_dd fw;
+	int n[3];
+} spin1_dd;
+
+extern void *spin1_code[];
+
+
 typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
 typedef void (*colour_hook)(int what);
 

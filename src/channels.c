@@ -282,8 +282,7 @@ void pressed_channel_create(int channel)
 	cchan_dd tdata = { channel < CHN_ALPHA ? 0 : channel - CHN_ALPHA,
 		0, FALSE, channel >= 0, channel, names2 };
 
-	newchan_window = run_create(cchan_code, sizeof(cchan_code),
-		&tdata, sizeof(tdata));
+	newchan_window = run_create(cchan_code, &tdata, sizeof(tdata));
 }
 
 #undef _
@@ -342,7 +341,7 @@ void pressed_channel_delete()
 		if (mem_img[i]) j = tdata.cc[i] = TRUE;
 	tdata.cf[mem_channel] = tdata.cc[mem_channel];
 	/* If utility channels exist at all */
-	if (j) run_create(dchan_code, sizeof(dchan_code), &tdata, sizeof(tdata));
+	if (j) run_create(dchan_code, &tdata, sizeof(tdata));
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */
@@ -365,23 +364,28 @@ void pressed_channel_disable(int state, int channel)
 	update_stuff(UPD_RENDER);
 }
 
-int do_threshold(GtkWidget *spin, gpointer fdata)
+static int do_threshold(spin1_dd *dt, void **wdata)
 {
-	int i;
-
-	i = read_spin(spin);
+	run_query(wdata);
 	spot_undo(UNDO_FILT);
-	mem_threshold(mem_img[mem_channel], mem_width * mem_height * MEM_BPP, i);
+	mem_threshold(mem_img[mem_channel], mem_width * mem_height * MEM_BPP, dt->n[0]);
 	mem_undo_prepare();
-
-	return TRUE;
+	return (TRUE);
 }
+
+#undef _
+#define _(X) X
 
 void pressed_threshold()
 {
-	GtkWidget *spin = add_a_spin(128, 0, 255);
-	filter_window(_("Threshold Channel"), spin, do_threshold, NULL, FALSE);
+	static spin1_dd tdata = {
+		{ _("Threshold Channel"), spin1_code, FW_FN(do_threshold) },
+		{ 128, 0, 255 } };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 void pressed_unassociate()
 {
