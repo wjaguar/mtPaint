@@ -26,23 +26,34 @@ enum {
 	op_WINDOWpm,
 	op_PAGE,
 	op_TABLE,
+	//
+	op_VBOX,
+	op_VBOXe, // VBOX'es must precede HBOX'es
 	op_HBOX,
 	op_TLHBOX,
+	//
 	op_FVBOX,
 	op_SCROLL,
 	op_SNBOOK,
+	op_PLAINBOOK,
+	op_BOOKBTN,
 	op_HSEP,
 	op_MLABEL,
 	op_TLLABEL,
-	op_TSPIN,
-	op_TSPINa,
+	op_TLNOSPIN,
+	//
 	op_SPIN,
+	op_TSPIN,
+	op_TLSPIN,
+	//
 	op_SPINa,
 	op_XSPINa,
+	op_TSPINa,
+	//
 	op_TSPINSLIDE,
 	op_CHECK,
+	op_TLCHECK, // must follow CHECK
 	op_CHECKb,
-	op_TLCHECK,
 	op_RPACK,
 	op_FRPACK,
 	op_RPACKd,
@@ -55,6 +66,7 @@ enum {
 	op_CANCELBTN,
 	op_OKADD,
 	op_OKNEXT,
+	op_TLBUTTON,
 	op_EXEC,
 	op_CALLp,
 	op_RET,
@@ -83,6 +95,8 @@ enum {
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_TSPIN,
+	op_BOR_TLLABEL,
+	op_BOR_FRPACK,
 	op_BOR_OKBOX,
 	op_BOR_OKBTN,
 
@@ -148,15 +162,22 @@ void *cmd_read(void **slot, void *ddata);
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), (void *)((H) + ((W) << 16))
 #define HBOX WBh(HBOX, 0)
+#define VBOX WBh(VBOX, 0)
+#define VBOXe WBh(VBOXe, 0)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
 #define FVBOXs(NM,S) WBh(FVBOX, 2), (void *)(S), (NM)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
+#define PLAINBOOK WBrh(PLAINBOOK, 0)
+#define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
+#define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TSPIN(NM,V,V0,V1) WBrhf(TSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), (NM)
 #define TSPINv(NM,V,V0,V1) WBrh(TSPIN, 4), &(V), \
@@ -179,6 +200,7 @@ void *cmd_read(void **slot, void *ddata);
 #define RPACK(SS,N,H,V) WBrhf(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
 #define RPACKv(SS,N,H,V) WBrh(RPACK, 3), &(V), (SS), WBnh(N, H)
 #define FRPACK(NM,SS,N,H,V) WBrhf(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
+#define FRPACKv(NM,SS,N,H,V) WBrh(FRPACK, 4), &(V), (SS), WBnh(N, H), (NM)
 #define RPACKd(SP,H,V) WBrhf(RPACKd, 3), WBfield(V), WBfield(SP), (H)
 /* !!! These *OPT* blocks each hold 1 nested EVENT block */
 #define OPT(SS,N,V,HS) WBr2hf(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
@@ -191,11 +213,13 @@ void *cmd_read(void **slot, void *ddata);
 #define OKBOX(NOK,HOK,NC,HC) WBr3h(OKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define OKBOX0 WBh(OKBOX, 0)
-/* !!! These *BTN/OK* blocks each hold 1 nested EVENT block */
+// !!! These *BTN,OK*,*BUTTON blocks each hold 1 nested EVENT block */
 #define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
 #define OKNEXT(NM,H) WBr2h(OKNEXT, 1 + 2), (NM), EVENT(CLICK, H)
+#define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
+	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
 #define CALLp(V) WBhf(CALLp, 1), WBfield(V)
 #define RET WBh(RET, 0)
@@ -203,6 +227,7 @@ void *cmd_read(void **slot, void *ddata);
 #define IFx(X,N) WBhf(IF, 2), WBfield(X), (void *)(N)
 #define IFv(X) WBh(IF, 1), &(X)
 #define UNLESS(X) WBhf(UNLESS, 1), WBfield(X)
+#define UNLESSx(X,N) WBhf(UNLESS, 2), WBfield(X), (void *)(N)
 #define UNLESSv(X) WBh(UNLESS, 1), &(X)
 #define ENDIF(N) WBh(ENDIF, 1), (void *)(N)
 #define REF(V) WBhf(REF, 1), WBfield(V)

@@ -933,35 +933,35 @@ void pressed_brcosa()
 
 ///	RESIZE/RESCALE WINDOWS
 
-GtkWidget *sisca_window, *sisca_table;
-GtkWidget *sisca_spins[6], *sisca_toggles[2], *sisca_gc;
-gboolean sisca_scale;
+typedef struct {
+	int mode, rgb;
+	int fix, gamma;
+	int w, h, x, y;
+	void **spin[4]; // w, h, x, y
+	void **book;
+} sisca_dd;
 
 
-static void sisca_moved(GtkAdjustment *adjustment, gpointer user_data)
+static void sisca_moved(sisca_dd *dt, void **wdata, int what, void **where)
 {
-	int w, h, nw, idx = (int)user_data;
+	int w, h, nw, idx;
 
-
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_toggles[0])))
-		return;
-	w = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[0]));
-	h = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(sisca_spins[1]));
-	if (idx)
+	idx = cmd_read(where, dt) != &dt->h; // _other_ spin index: w/h
+	if (!dt->fix) return;
+	w = dt->w; h = dt->h;
+	if (!idx)
 	{
-		nw = rint(h * mem_width / (float)mem_height);
+		nw = (h * mem_width * 2 + mem_height) / (mem_height * 2);
 		nw = nw < 1 ? 1 : nw > MAX_WIDTH ? MAX_WIDTH : nw;
 		if (nw == w) return;
 	}
 	else
 	{
-		nw = rint(w * mem_height / (float)mem_width);
+		nw = (w * mem_height * 2 + mem_width) / (mem_width * 2);
 		nw = nw < 1 ? 1 : nw > MAX_HEIGHT ? MAX_HEIGHT : nw;
 		if (nw == h) return;
 	}
-	idx ^= 1; /* Other coordinate */
-	gtk_spin_button_update(GTK_SPIN_BUTTON(sisca_spins[idx]));
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(sisca_spins[idx]), nw);
+	cmd_set(dt->spin[idx], nw); /* Other coordinate */
 }
 
 static void alert_same_geometry()
@@ -974,31 +974,27 @@ static int resize_mode = 0;
 static int boundary_mode = BOUND_MIRROR;
 int sharper_reduce;
 
-static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
+static void click_sisca_ok(sisca_dd *dt, void **wdata)
 {
-	int nw, nh, ox = 0, oy = 0, res = 1, scale_type = 0, gcor = FALSE;
+	int nw, nh, ox, oy, res, scale_type = 0, gcor = FALSE;
 
-	read_spin(sisca_spins[1]); // For aspect ratio handling
-	nw = read_spin(sisca_spins[0]);
-	nh = read_spin(sisca_spins[1]);
-	if (!sisca_scale)
-	{
-		ox = read_spin(sisca_spins[2]);
-		oy = read_spin(sisca_spins[3]);
-	}
+	// !!! Should teach run_query() to do this by itself, when required
+	update_window_spin(GET_REAL_WINDOW(wdata)); // For aspect ratio handling
+	run_query(wdata);
+	nw = dt->w; nh = dt->h; ox = dt->x; oy = dt->y;
 
-	if ((nw == mem_width) && (nh == mem_height) && !ox && !oy)
+	if (!((nw ^ mem_width) | (nh ^ mem_height) | ox | oy))
 	{
 		alert_same_geometry();
 		return;
 	}
 
-	if (sisca_scale)
+	if (dt->mode)
 	{
 		if (mem_img_bpp == 3)
 		{
 			scale_type = scale_mode;
-			gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sisca_gc));
+			gcor = dt->gamma;
 		}
 		res = mem_image_scale(nw, nh, scale_type, gcor, sharper_reduce,
 			boundary_mode);
@@ -1008,7 +1004,7 @@ static void click_sisca_ok(GtkWidget *widget, gpointer user_data)
 	if (!res)
 	{
 		update_stuff(UPD_GEOM);
-		destroy_dialog(sisca_window);
+		run_destroy(wdata);
 	}
 	else memory_errors(res);
 }
@@ -1021,142 +1017,85 @@ void memory_errors(int type)
 		alert_box(_("Error"), _("You have not allocated enough memory in the Preferences window for this operation."), NULL);
 }
 
-gint click_sisca_centre( GtkWidget *widget, GdkEvent *event, gpointer data )
+static void click_sisca_centre(sisca_dd *dt, void **wdata)
 {
-	int nw = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[0]) );
-	int nh = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(sisca_spins[1]) );
+	int nw = dt->w, nh = dt->h; // !!! sisca_moved() keeps these updated
 
-	nw = (nw - mem_width) / 2;
-	nh = (nh - mem_height) / 2;
-
-	gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[2]), nw );
-	gtk_spin_button_set_value( GTK_SPIN_BUTTON(sisca_spins[3]), nh );
-
-	return FALSE;
+	cmd_set(dt->spin[2], (nw - mem_width) / 2);
+	cmd_set(dt->spin[3], (nh - mem_height) / 2);
 }
 
-static GtkWidget *filter_pack(int am, int idx, int *var)
-{
-	char *fnames[] = {
-		_("Nearest Neighbour"),
-		am ? _("Bilinear / Area Mapping") : _("Bilinear"),
-		_("Bicubic"),
-		_("Bicubic edged"),
-		_("Bicubic better"),
-		_("Bicubic sharper"),
-		_("Blackman-Harris"),
-		NULL
-	};
+#undef _
+#define _(X) X
 
-	return (wj_radio_pack(fnames, -1, 0, idx, var, NULL));
-}
+static char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
+static char *resize_modes[] = { _("Clear"), _("Tile"), _("Mirror tile"), NULL };
+static char *scale_modes[] = { 
+	_("Nearest Neighbour"),
+	_("Bilinear / Area Mapping"),
+	_("Bicubic"),
+	_("Bicubic edged"),
+	_("Bicubic better"),
+	_("Bicubic sharper"),
+	_("Blackman-Harris"),
+	NULL
+};
 
-void sisca_init( char *title )
-{
-	GtkWidget *button_centre, *sisca_vbox, *sisca_hbox;
-	GtkWidget *wvbox, *wvbox2, /**notebook,*/ *page0, *page1, *button;
+#define WBbase sisca_dd
+static void *sisca_code[] = {
+	IF(mode), WINDOWm(_("Scale Canvas")),
+	UNLESS(mode), WINDOWm(_("Resize Canvas")),
+	TABLE(3, 3), // !!! in fact 5 rows in resize mode
+	BORDER(TLLABEL, 0),
+	TLLABEL(_("Width     "), 1, 0), TLLABEL(_("Height    "), 2, 0),
+	TLLABEL(_("Original      "), 0, 1), TLNOSPIN(w, 1, 1), TLNOSPIN(h, 2, 1),
+	TLLABEL(_("New"), 0, 2),
+	REF(spin[0]), TLSPIN(w, 1, MAX_WIDTH, 1, 2), EVENT(CHANGE, sisca_moved),
+	REF(spin[1]), TLSPIN(h, 1, MAX_HEIGHT, 2, 2), EVENT(CHANGE, sisca_moved),
+	UNLESSx(mode, 1),
+		TLLABEL(_("Offset"), 0, 3),
+		REF(spin[2]), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 3),
+		REF(spin[3]), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 3),
+		TLBUTTON(_("Centre"), click_sisca_centre, 0, 4),
+	ENDIF(1),
+	WDONE,
+	HSEP,
+	IF(rgb), HBOX, IF(rgb), VBOX,
+	CHECK(_("Fix Aspect Ratio"), fix), EVENT(CHANGE, sisca_moved),
+	IFx(rgb, 1),
+		CHECK(_("Gamma corrected"), gamma),
+		WDONE, VBOXe,
+		BOOKBTN(_("Settings"), book),
+		WDONE, WDONE,
+		HSEP,
+		REF(book), PLAINBOOK, // pages 0 and 1 are both stacked
+		RPACKv(scale_modes, 0, 0, scale_mode),
+		HSEP,
+		WDONE, // page 0
+		CHECKv(_("Sharper image reduction"), sharper_reduce),
+		BORDER(FRPACK, 0),
+		FRPACKv(_("Boundary extension"), bound_modes, 3, 0,
+			boundary_mode),
+		WDONE, // page 1
+	ENDIF(1),
+	UNLESSx(mode, 1),
+		HSEP,
+		RPACKv(resize_modes, 0, 0, resize_mode),
+		HSEP,
+	ENDIF(1),
+	OKBOX(_("OK"), click_sisca_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
 
-	sisca_window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_CENTER, TRUE );
-	sisca_vbox = add_vbox(sisca_window);
-
-	sisca_table = add_a_table(3, 3, 5, sisca_vbox);
-
-	add_to_table( _("Width     "), sisca_table, 0, 1, 0 );
-	add_to_table( _("Height    "), sisca_table, 0, 2, 0 );
-
-	add_to_table( _("Original      "), sisca_table, 1, 0, 0);
-	sisca_spins[0] = spin_to_table(sisca_table, 1, 1, 5, mem_width, mem_width, mem_width);
-	sisca_spins[1] = spin_to_table(sisca_table, 1, 2, 5, mem_height, mem_height, mem_height);
-	GTK_WIDGET_UNSET_FLAGS (sisca_spins[0], GTK_CAN_FOCUS);
-	GTK_WIDGET_UNSET_FLAGS (sisca_spins[1], GTK_CAN_FOCUS);
-
-	add_to_table( _("New"), sisca_table, 2, 0, 0 );
-	sisca_spins[0] = spin_to_table(sisca_table, 2, 1, 5, mem_width, 1, MAX_WIDTH);
-	sisca_spins[1] = spin_to_table(sisca_table, 2, 2, 5, mem_height, 1, MAX_HEIGHT);
-
-	spin_connect(sisca_spins[0], GTK_SIGNAL_FUNC(sisca_moved), (gpointer)0);
-	spin_connect(sisca_spins[1], GTK_SIGNAL_FUNC(sisca_moved), (gpointer)1);
-
-	if ( !sisca_scale )
-	{
-		add_to_table( _("Offset"), sisca_table, 3, 0, 0 );
-		sisca_spins[2] = spin_to_table(sisca_table, 3, 1, 5, 0,
-			-MAX_WIDTH, MAX_WIDTH);
-		sisca_spins[3] = spin_to_table(sisca_table, 3, 2, 5, 0,
-			-MAX_HEIGHT, MAX_HEIGHT);
-
-		button_centre = gtk_button_new_with_label(_("Centre"));
-
-		gtk_widget_show(button_centre);
-		gtk_table_attach (GTK_TABLE (sisca_table), button_centre, 0, 1, 4, 5,
-			(GtkAttachOptions) (GTK_FILL),
-			(GtkAttachOptions) (0), 5, 5);
-		gtk_signal_connect(GTK_OBJECT(button_centre), "clicked",
-			GTK_SIGNAL_FUNC(click_sisca_centre), NULL);
-	}
-	add_hseparator( sisca_vbox, -2, 10 );
-
-	sisca_toggles[0] = sig_toggle(_("Fix Aspect Ratio"), TRUE, (gpointer)0,
-		GTK_SIGNAL_FUNC(sisca_moved));
-
-	sisca_hbox = sisca_gc = NULL;
-	wvbox = page0 = sisca_vbox;
-
-	/* Resize */
-	if (!sisca_scale)
-	{
-		char *resize_modes[] = { _("Clear"), _("Tile"),
-			_("Mirror tile"), NULL };
-
-		sisca_hbox = wj_radio_pack(resize_modes, -1, 0, resize_mode,
-			&resize_mode, NULL);
-	}
-
-	/* RGB rescale */
-	else if (mem_img_bpp == 3)
-	{
-		char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
-
-		sisca_hbox = pack(sisca_vbox, gtk_hbox_new(FALSE, 0));
-		wvbox = pack(sisca_hbox, gtk_vbox_new(FALSE, 0));
-
-		sisca_gc = pack_end(wvbox, gamma_toggle());
-
-//		notebook =
-		pack(sisca_vbox, buttoned_book(&page0, &page1,
-			&button, _("Settings")));
-		wvbox2 = pack_end(sisca_hbox, gtk_vbox_new(FALSE, 0));
-		pack(wvbox2, button);
-
-		add_hseparator(page1, -2, 10);
-		pack(page1, sig_toggle(_("Sharper image reduction"),
-			sharper_reduce, &sharper_reduce, NULL));
-		add_with_frame(page1, _("Boundary extension"), wj_radio_pack(
-			bound_modes, 3, 0, boundary_mode, &boundary_mode, NULL));
-
-		sisca_hbox = filter_pack(TRUE, scale_mode, &scale_mode);
-	}
-
-	pack(wvbox, sisca_toggles[0]);
-
-	if (sisca_hbox)
-	{
-		add_hseparator(page0, -2, 10);
-		xpack(page0, sisca_hbox);
-	}
-	add_hseparator(page0, -2, 10);
-
-	pack(sisca_vbox, OK_box(5, sisca_window, _("OK"), GTK_SIGNAL_FUNC(click_sisca_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	gtk_window_set_transient_for(GTK_WINDOW(sisca_window), GTK_WINDOW(main_window));
-	gtk_widget_show_all(sisca_window);
-}
+#undef _
+#define _(X) __(X)
 
 void pressed_scale_size(int mode)
 {
-	sisca_scale = mode;
-	sisca_init(mode ? _("Scale Canvas") : _("Resize Canvas"));
+	sisca_dd tdata = { mode, mode && (mem_img_bpp == 3), TRUE, use_gamma,
+		mem_width, mem_height, 0, 0 };
+	run_create(sisca_code, &tdata, sizeof(tdata));
 }
 
 
@@ -3103,6 +3042,17 @@ static void skew_moved(GtkAdjustment *adjustment, gpointer user_data)
 	sw->lock = FALSE;
 }
 
+static GtkWidget *filter_pack(int idx, int *var)
+{
+	char *fnames[sizeof(scale_modes) / sizeof(scale_modes[0])];
+	int i;
+
+	for (i = 0; scale_modes[i]; i++) fnames[i] = _(scale_modes[i]);
+	fnames[i] = NULL;
+	fnames[1] = _("Bilinear");
+	return (wj_radio_pack(fnames, -1, 0, idx, var, NULL));
+}
+
 void pressed_skew()
 {
 	GtkWidget *skew_window, *vbox, *table;
@@ -3138,7 +3088,7 @@ void pressed_skew()
 	{
 		sw->gc = pack(vbox, gamma_toggle());
 		add_hseparator(vbox, -2, 10);
-		xpack(vbox, filter_pack(FALSE, skew_mode, &skew_mode));
+		xpack(vbox, filter_pack(skew_mode, &skew_mode));
 		add_hseparator(vbox, -2, 10);
 	}
 

@@ -51,10 +51,7 @@ static void get_evt_1(GtkObject *widget, gpointer user_data)
 static void **add_click(void **r, void **res, void **pp, GtkWidget *widget,
 	GtkWidget *window)
 {
-	// default to destructor
-	if (!pp[1]) gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(window));
-	else
+	if (pp[1])
 	{
 		r[0] = res;
 		r[1] = pp;
@@ -62,6 +59,9 @@ static void **add_click(void **r, void **res, void **pp, GtkWidget *widget,
 			GTK_SIGNAL_FUNC(get_evt_1), r);
 		r += 2;
 	}
+	// default to destructor
+	else if (window) gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(window));
 	return (r);
 }
 
@@ -73,7 +73,7 @@ static void **skip_if(void **pp)
 	ifcode = pp + 1 + (lp = (int)*pp >> 16);
 	if (lp > 1) // skip till corresponding ENDIF
 	{
-		mk = (int)pp[1];
+		mk = (int)pp[2];
 		while ((((int)*ifcode & WB_OPMASK) != op_ENDIF) ||
 			((int)ifcode[1] != mk))
 			ifcode += 1 + ((int)*ifcode >> 16);
@@ -133,9 +133,12 @@ static int predict_size(void **ifcode, char *ddata)
 	return (n);
 }
 
-static void table_it(GtkWidget *table, GtkWidget *it, int wh)
+// !!! And with inlining this, same problem
+void table_it(GtkWidget *table, GtkWidget *it, int wh, int pad)
 {
-	to_table_l(it, table, wh & 255, (wh >> 8) & 255, (wh >> 16) + 1, 0);
+	int row = wh & 255, column = (wh >> 8) & 255, l = (wh >> 16) + 1;
+	gtk_table_attach(GTK_TABLE(table), it, column, column + l, row, row + 1,
+		(GtkAttachOptions)(GTK_FILL), 0, pad >> 16, pad & 0xFFFF);
 }
 
 /* Find where unused rows start */
@@ -170,6 +173,13 @@ static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 	}
 }
 
+/* Toggle notebook pages */
+static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
+{
+	gtk_notebook_set_page(**(void ***)user_data,
+		!!gtk_toggle_button_get_active(button));
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -187,7 +197,9 @@ enum {
 	pk_PACK,
 	pk_PACK5,
 	pk_XPACK,
+	pk_PACKEND,
 	pk_TABLE,
+	pk_TABLEp,
 	pk_TABLE2,
 	pk_TABLE2x
 };
@@ -288,13 +300,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			--wp; wp[0] = widget = add_a_table((int)v & 0xFFFF,
 				(int)v >> 16, GET_BORDER(TABLE), wp[1]);
 			break;
-		/* Add a horizontal box */
+		/* Add a box */
+		case op_VBOX: case op_VBOXe:
 		case op_HBOX: case op_TLHBOX:
-			widget = gtk_hbox_new(FALSE, 0);
+			widget = (op < op_HBOX ? gtk_vbox_new :
+				gtk_hbox_new)(FALSE, 0);
 			gtk_widget_show(widget);
 // !!! Padding = 0
+			tpad = 0;
 			pk = pk_PACK | pkf_STACK;
 			if (op == op_TLHBOX) pk = pk_TABLE | pkf_STACK;
+			if (op == op_VBOXe) pk = pk_PACKEND | pkf_STACK;
 			break;
 		/* Add a framed vertical box */
 		case op_FVBOX:
@@ -325,6 +341,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_show_all(tw);
 			vport_noshadow_fix(tw);
 			break;
+		/* Add a plain notebook (2 pages for now) */
+		case op_PLAINBOOK:
+			// !!! Both pages go onto stack: #0 on top, #1 below
+			wp -= 2;
+			widget = pack(wp[2], plain_book(wp, 2));
+			break;
+		/* Add a toggle button for controlling 2-paged notebook */
+		case op_BOOKBTN:
+			widget = sig_toggle_button(_(pp[1]), FALSE, v,
+				GTK_SIGNAL_FUNC(toggle_vbook));
+			pk = pk_PACK;
+			break;
 		/* Add a horizontal line */
 		case op_HSEP:
 // !!! Height = 10
@@ -340,16 +368,27 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TLLABEL:
 		{
 			int wh = (int)pp[1];
-// !!! Padding = 5 Cells = 1
+// !!! Cells = 1
 			widget = add_to_table_l(_(v), wp[0],
-				wh & 255, (wh >> 8) & 255, 1, 5);
+				wh & 255, (wh >> 8) & 255, 1, GET_BORDER(TLLABEL));
+			break;
+		}
+		/* Add a non-spinning spin to table slot */
+		case op_TLNOSPIN:
+		{
+			int n = *(int *)v;
+			widget = add_a_spin(n, n, n);
+			GTK_WIDGET_UNSET_FLAGS(widget, GTK_CAN_FOCUS);
+			tpad = GET_BORDER(TSPIN);
+			pk = pk_TABLE;
 			break;
 		}
 		/* Add a spin, fill from field/var */
-		case op_SPIN: case op_TSPIN:
+		case op_SPIN: case op_TSPIN: case op_TLSPIN:
 			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
 			tpad = GET_BORDER(TSPIN);
 			pk = pk_TABLE2;
+			if (op == op_TLSPIN) pk = pk_TABLE;
 // !!! Padding = 5
 			if (op == op_SPIN) pk = pk_PACK5;
 			break;
@@ -382,6 +421,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_CHECK: case op_TLCHECK:
 			widget = sig_toggle(_(pp[1]), *(int *)v, NULL, NULL);
 // !!! Padding = 0
+			tpad = 0;
 			pk = pk_PACK;
 			if (op >= op_TLCHECK) pk = pk_TABLE;
 			break;
@@ -399,6 +439,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			int n = nh >> 8;
 			if (op == op_RPACKd) n = -1 ,
 				src = *(char ***)((char *)ddata + (int)pp[1]);
+			if (!n) n = -1;
 #if U_NLS
 			n = n_trans(tc, src, n);
 			src = tc;
@@ -407,9 +448,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_XPACK;
 			if (op == op_FRPACK)
 			{
-// !!! Border = 5
 				gtk_container_set_border_width(
-					GTK_CONTAINER(widget), 5);
+					GTK_CONTAINER(widget), GET_BORDER(FRPACK));
 				pk = pk_PACK | pkf_FRAME;
 			}
 			break;
@@ -430,6 +470,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			if (hs) *r++ = res , *r++ = pp + 3; // event
 // !!! Padding = 0
+			tpad = 0;
 			pk = op == op_TLOPT ? pk_TABLE : pk_PACK;
 			break;
 		}
@@ -512,6 +553,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			r = add_click(r, res, pp + 1, widget, window);
 			continue;
 		}
+		/* Add a clickable button to table slot */
+		case op_TLBUTTON:
+			*r++ = widget = gtk_button_new_with_label(_(v));
+			*r++ = pp - 1;
+			gtk_widget_show(widget);
+			/* Click-event */
+			r = add_click(r, res, pp + 1, widget, NULL);
+// !!! Padding = 5
+			tpad = 5;
+			pk = pk_TABLEp;
+			break;
 		/* Call a function */
 		case op_EXEC:
 			r = ((ext_fn)v)(r, &wp);
@@ -572,8 +624,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Support only what actually used on, and their brethren
 			switch (what)
 			{
-			case op_SPIN: case op_SPINa: case op_XSPINa:
-			case op_TSPIN: case op_TSPINa:
+			case op_SPIN: case op_TSPIN: case op_TLSPIN:
+			case op_SPINa: case op_XSPINa: case op_TSPINa:
 				spin_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -593,8 +645,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			continue;
 		/* Set nondefault border size */
-		case op_BOR_TABLE: case op_BOR_TSPIN: case op_BOR_OKBOX:
-		case op_BOR_OKBTN:
+		case op_BOR_TABLE: case op_BOR_TSPIN: case op_BOR_TLLABEL:
+		case op_BOR_FRPACK: case op_BOR_OKBOX: case op_BOR_OKBTN:
 			borders[op - op_BOR_0] = (int)v - DEF_BORDER;
 			continue;
 		default: continue;
@@ -615,7 +667,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case pk_PACK: pack(wp[0], widget); break;
 		case pk_PACK5: pack5(wp[0], widget); break;
 		case pk_XPACK: xpack(wp[0], widget); break;
-		case pk_TABLE: table_it(wp[0], widget, (int)pp[--lp]); break;
+		case pk_PACKEND: pack_end(wp[0], widget); break;
+		case pk_TABLEp: tpad += tpad << 16; // X and Y
+		case pk_TABLE:
+			table_it(wp[0], widget, (int)pp[--lp], tpad);
+			break;
 		case pk_TABLE2: case pk_TABLE2x:
 		{
 			int y = next_table_level(wp[0]);
@@ -643,8 +699,8 @@ static void *do_query(char *data, void **wdata, int mode)
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
-		case op_SPIN: case op_SPINa: case op_XSPINa:
-		case op_TSPIN: case op_TSPINa:
+		case op_SPIN: case op_TSPIN: case op_TLSPIN:
+		case op_SPINa: case op_XSPINa: case op_TSPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
@@ -701,8 +757,17 @@ void cmd_showhide(void **slot, int state)
 
 void cmd_set(void **slot, int v)
 {
-	if (GET_OP(slot) == op_TSPINSLIDE) // only spinsliders for now
+// !!! Support only what actually used on, and their brethren
+	switch (GET_OP(slot))
+	{
+	case op_TSPINSLIDE:
 		mt_spinslide_set_value(slot[0], v);
+		break;
+	case op_SPIN: case op_TSPIN: case op_TLSPIN:
+	case op_SPINa: case op_XSPINa: case op_TSPINa:
+		gtk_spin_button_set_value(slot[0], v);
+		break;
+	}
 }
 
 void cmd_set3(void **slot, int *v)

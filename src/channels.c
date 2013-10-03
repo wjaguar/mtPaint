@@ -254,6 +254,7 @@ static void *cchan_code[] = {
 	HSEP,
 	CHECK(_("Inverted"), inv),
 	WDONE,
+	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), click_newchan_ok, _("Cancel"), click_newchan_cancel),
 	WSHOW
 };
