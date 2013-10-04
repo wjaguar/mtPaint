@@ -222,8 +222,10 @@ void destroy_dialog(GtkWidget *window);
 // Settings notebook
 
 GtkWidget *plain_book(GtkWidget **pages, int npages);
+#if 0 /* Not needed anymore */
 GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 	GtkWidget **button, char *button_label);
+#endif
 
 // Most common use of boxes
 

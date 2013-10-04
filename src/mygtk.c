@@ -971,6 +971,7 @@ GtkWidget *plain_book(GtkWidget **pages, int npages)
 	return (notebook);
 }
 
+#if 0 /* Not needed anymore */
 static void toggle_book(GtkToggleButton *button, GtkNotebook *book)
 {
 	int i = gtk_toggle_button_get_active(button);
@@ -989,6 +990,7 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 		GTK_SIGNAL_FUNC(toggle_book));
 	return (notebook);
 }
+#endif
 
 // Most common use of boxes
 

@@ -36,6 +36,15 @@ typedef char Opcodes_Too_Long[2 * (op_BOR_LAST <= WB_OPMASK) - 1];
 /* Max container widget nesting */
 #define CONT_DEPTH 128
 
+#define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
+
+/* From event to its originator */
+static void **origin_slot(void **slot)
+{
+	while (((int)*(void **)slot[1] & WB_OPMASK) >= op_EVT_0) slot -= 2;
+	return (slot);
+}
+
 /* !!! Warning: handlers should not access datastore after window destruction!
  * GTK+ refs objects for signal duration, but no guarantee every other toolkit
  * will behave alike - WJ */
@@ -46,6 +55,27 @@ static void get_evt_1(GtkObject *widget, gpointer user_data)
 	void **base = slot[0], **desc = slot[1];
 
 	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
+}
+
+/* Handler for wj_radio_pack() */
+static void get_evt_wjr(GtkWidget *btn, gpointer idx)
+{
+	void **slot, **base, **desc, **orig, *v;
+	char *d;
+
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
+	slot = gtk_object_get_user_data(GTK_OBJECT(btn->parent));
+	base = slot[0];
+	d = GET_DDATA(base);
+	/* Update the value */
+	orig = origin_slot(slot);
+	desc = orig[1];
+	v = desc[1];
+	if ((int)desc[0] & WB_FFLAG) v = d + (int)v;
+	*(int *)v = (int)idx;
+	/* Call the handler */
+	desc = slot[1];
+	((evt_fn)desc[1])(d, base, (int)desc[0] & WB_OPMASK, slot);
 }
 
 static void **add_click(void **r, void **res, void **pp, GtkWidget *widget,
@@ -79,15 +109,6 @@ static void **skip_if(void **pp)
 			ifcode += 1 + ((int)*ifcode >> 16);
 	}
 	return (ifcode + 1 + ((int)*ifcode >> 16));
-}
-
-#define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
-
-/* From event to its originator */
-static void **origin_slot(void **slot)
-{
-	while (((int)*(void **)slot[1] & WB_OPMASK) >= op_EVT_0) slot -= 2;
-	return (slot);
 }
 
 /* Trigger events which need triggering */
@@ -301,7 +322,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(int)v >> 16, GET_BORDER(TABLE), wp[1]);
 			break;
 		/* Add a box */
-		case op_VBOX: case op_VBOXe:
+		case op_VBOX: case op_EVBOX:
 		case op_HBOX: case op_TLHBOX:
 			widget = (op < op_HBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, 0);
@@ -310,14 +331,23 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			tpad = 0;
 			pk = pk_PACK | pkf_STACK;
 			if (op == op_TLHBOX) pk = pk_TABLE | pkf_STACK;
-			if (op == op_VBOXe) pk = pk_PACKEND | pkf_STACK;
+			if (op == op_EVBOX) pk = pk_PACKEND | pkf_STACK;
+			break;
+		/* Add a horizontal box with spacing & border */
+		case op_BHBOX:
+// !!! Spacing = 5
+			widget = gtk_hbox_new(FALSE, 5);
+			gtk_widget_show(widget);
+// !!! Border = 10
+			gtk_container_set_border_width(GTK_CONTAINER(widget), 10);
+			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a framed vertical box */
 		case op_FVBOX:
 			widget = gtk_vbox_new(FALSE, lp > 1 ? (int)v : 0);
 			gtk_widget_show(widget);
-// !!! Border = 5
-			gtk_container_set_border_width(GTK_CONTAINER(widget), 5);
+			gtk_container_set_border_width(GTK_CONTAINER(widget),
+				GET_BORDER(FRBOX));
 			pk = pk_PACK | pkf_FRAME | pkf_STACK;
 			break;
 		/* Add a scrolled window */
@@ -343,10 +373,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a plain notebook (2 pages for now) */
 		case op_PLAINBOOK:
-			// !!! Both pages go onto stack: #0 on top, #1 below
-			wp -= 2;
-			widget = pack(wp[2], plain_book(wp, 2));
+		{
+			// !!! no extra args
+			int n = v ? (int)v : 2; // 2 pages by default
+			// !!! All pages go onto stack, with #0 on top
+			wp -= n;
+			widget = pack(wp[n], plain_book(wp, n));
 			break;
+		}
 		/* Add a toggle button for controlling 2-paged notebook */
 		case op_BOOKBTN:
 			widget = sig_toggle_button(_(pp[1]), FALSE, v,
@@ -358,21 +392,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Height = 10
 			add_hseparator(wp[0], lp ? (int)v : -2, 10);
 			continue; // !!! nonreferable: does not return widget
-		/* Add a (multiline) label */
-		case op_MLABEL:
+		/* Add a label */
+		case op_MLABEL: case op_TLLABEL:
 			widget = gtk_label_new(_(v));
 			gtk_widget_show(widget);
 			pk = pk_PACK;
+			if (op == op_MLABEL) break; // Multiline label
+			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
+			gtk_misc_set_alignment(GTK_MISC(widget), 0.0, 0.5);
+			tpad = GET_BORDER(TLLABEL);
+			pk = pk_TABLEp;
 			break;
-		/* Add a label to table slot */
-		case op_TLLABEL:
-		{
-			int wh = (int)pp[1];
-// !!! Cells = 1
-			widget = add_to_table_l(_(v), wp[0],
-				wh & 255, (wh >> 8) & 255, 1, GET_BORDER(TLLABEL));
-			break;
-		}
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
 		{
@@ -384,11 +414,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a spin, fill from field/var */
-		case op_SPIN: case op_TSPIN: case op_TLSPIN:
+		case op_SPIN: case op_XSPIN: case op_TSPIN: case op_TLSPIN:
 			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
 			tpad = GET_BORDER(TSPIN);
 			pk = pk_TABLE2;
 			if (op == op_TLSPIN) pk = pk_TABLE;
+			if (op == op_XSPIN) pk = pk_XPACK;
 // !!! Padding = 5
 			if (op == op_SPIN) pk = pk_PACK5;
 			break;
@@ -432,24 +463,30 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK;
 			break;
 		/* Add a (self-reading) pack of radio buttons for field/var */
-		case op_RPACK: case op_RPACKd: case op_FRPACK:
+		case op_RPACK: case op_RPACKD: case op_FRPACK:
 		{
 			char **src = pp[1];
 			int nh = (int)pp[2];
 			int n = nh >> 8;
-			if (op == op_RPACKd) n = -1 ,
+			if (op == op_RPACKD) n = -1 ,
 				src = *(char ***)((char *)ddata + (int)pp[1]);
 			if (!n) n = -1;
 #if U_NLS
 			n = n_trans(tc, src, n);
 			src = tc;
 #endif
-			widget = wj_radio_pack(src, n, nh & 255, *(int *)v, v, NULL);
+			widget = wj_radio_pack(src, n, nh & 255, *(int *)v,
+				ref > 1 ? r + 2 : v, // self-update by default
+				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_wjr) : NULL);
+			*r++ = widget;
+			*r++ = pp - 1;
+			if (ref > 1) *r++ = res , *r++ = pp + 3; // event
+			ref = 0;
 			pk = pk_XPACK;
 			if (op == op_FRPACK)
 			{
 				gtk_container_set_border_width(
-					GTK_CONTAINER(widget), GET_BORDER(FRPACK));
+					GTK_CONTAINER(widget), GET_BORDER(FRBOX));
 				pk = pk_PACK | pkf_FRAME;
 			}
 			break;
@@ -457,18 +494,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add an option menu for field/var */
 		case op_OPT: case op_TLOPT:
 		{
-			void *hs = pp[4]; // event handler
 			char **src = pp[1];
+			int n = (int)pp[2];
+			if (!n) n = -1;
 #if U_NLS
-			n_trans(tc, src, (int)pp[2]);
+			n = n_trans(tc, src, n);
 			src = tc;
 #endif
-			widget = wj_option_menu(src, (int)pp[2], *(int *)v,
-				hs ? r + 2 : NULL,
-				hs ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
+			widget = wj_option_menu(src, n, *(int *)v,
+				ref > 1 ? r + 2 : NULL,
+				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			*r++ = widget;
 			*r++ = pp - 1;
-			if (hs) *r++ = res , *r++ = pp + 3; // event
+			if (ref > 1) *r++ = res , *r++ = pp + 3; // event
+			ref = 0;
 // !!! Padding = 0
 			tpad = 0;
 			pk = op == op_TLOPT ? pk_TABLE : pk_PACK;
@@ -560,6 +599,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_show(widget);
 			/* Click-event */
 			r = add_click(r, res, pp + 1, widget, NULL);
+			ref = 0;
 // !!! Padding = 5
 			tpad = 5;
 			pk = pk_TABLEp;
@@ -624,7 +664,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Support only what actually used on, and their brethren
 			switch (what)
 			{
-			case op_SPIN: case op_TSPIN: case op_TLSPIN:
+			case op_SPIN: case op_XSPIN:
+			case op_TSPIN: case op_TLSPIN:
 			case op_SPINa: case op_XSPINa: case op_TSPINa:
 				spin_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
@@ -646,7 +687,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_TSPIN: case op_BOR_TLLABEL:
-		case op_BOR_FRPACK: case op_BOR_OKBOX: case op_BOR_OKBTN:
+		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_OKBTN:
 			borders[op - op_BOR_0] = (int)v - DEF_BORDER;
 			continue;
 		default: continue;
@@ -699,7 +740,8 @@ static void *do_query(char *data, void **wdata, int mode)
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
-		case op_SPIN: case op_TSPIN: case op_TLSPIN:
+		case op_SPIN: case op_XSPIN:
+		case op_TSPIN: case op_TLSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
@@ -716,7 +758,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			inifile_set_gboolean(v, gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata)));
 			break;
-		case op_RPACK: case op_RPACKd: case op_FRPACK:
+		case op_RPACK: case op_RPACKD: case op_FRPACK:
 			break; // self-reading
 		case op_OPT: case op_TLOPT:
 			*(int *)v = wj_option_menu_get_history(*wdata);
@@ -763,9 +805,13 @@ void cmd_set(void **slot, int v)
 	case op_TSPINSLIDE:
 		mt_spinslide_set_value(slot[0], v);
 		break;
-	case op_SPIN: case op_TSPIN: case op_TLSPIN:
+	case op_SPIN: case op_XSPIN:
+	case op_TSPIN: case op_TLSPIN:
 	case op_SPINa: case op_XSPINa: case op_TSPINa:
 		gtk_spin_button_set_value(slot[0], v);
+		break;
+	case op_PLAINBOOK:
+		gtk_notebook_set_page(slot[0], v);
 		break;
 	}
 }

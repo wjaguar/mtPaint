@@ -444,7 +444,7 @@ static void *pref_code[] = {
 	FVBOXs(_("Language"), 5),
 	MLABEL(_("Select preferred language translation\n\n"
 	"You will need to restart mtPaint\nfor this to take full effect")),
-	OPT(pref_langs, PREF_LANGS, lang, NULL),
+	OPT(pref_langs, PREF_LANGS, lang),
 	WDONE,
 #endif
 	WDONE,

@@ -871,7 +871,7 @@ static void *brcosa_code[] = {
 	BORDER(TABLE, 0),
 	REF(xtra), TABLEr(4, 4),
 	TLLABEL(_("Posterize type"), 0, 0),
-	TLOPTvl(pos_txt, 3, posterize_mode, brcosa_posterize_changed, 1, 0, 2),
+	TLOPTvle(pos_txt, 3, posterize_mode, brcosa_posterize_changed, 1, 0, 2),
 	UNLESS(rgb), TLLABEL(_("Palette"), 0, 2),
 	IFx(rgb, 1),
 		TLCHECK(_("Palette"), pflag, 0, 2),
@@ -1064,7 +1064,7 @@ static void *sisca_code[] = {
 	CHECK(_("Fix Aspect Ratio"), fix), EVENT(CHANGE, sisca_moved),
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),
-		WDONE, VBOXe,
+		WDONE, EVBOX,
 		BOOKBTN(_("Settings"), book),
 		WDONE, WDONE,
 		HSEP,
@@ -1073,7 +1073,7 @@ static void *sisca_code[] = {
 		HSEP,
 		WDONE, // page 0
 		CHECKv(_("Sharper image reduction"), sharper_reduce),
-		BORDER(FRPACK, 0),
+		BORDER(FRBOX, 0),
 		FRPACKv(_("Boundary extension"), bound_modes, 3, 0,
 			boundary_mode),
 		WDONE, // page 1
@@ -2030,41 +2030,45 @@ void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
 #define DITH_OLDSCATTER	6
 #define DITH_MAX	7
 
-static GtkWidget *quantize_window, *quantize_spin, *quantize_dither, *quantize_book;
-static GtkWidget *dither_serpent, *dither_spin, *dither_err;
-static int quantize_cols;
+typedef struct {
+	int pflag;
+	int cols, cols0;
+	int err;
+	char **qtxt;
+	void **dith, **colspin, **errspin;
+	void **book, **qbook;
+} quantize_dd;
 
 /* Quantization & dither settings - persistent */
 static int quantize_mode = -1, dither_mode = -1;
 static int quantize_tp;
 static int dither_cspace = CSPACE_SRGB, dither_dist = DIST_L2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
-static double dither_fract[2] = {1.0, 0.85};
+static int dither_pfract[2] = { 100, 85 };
 
-static void click_quantize_radio(GtkWidget *widget, gpointer data)
+static void click_quantize_radio(quantize_dd *dt, void **wdata)
 {
-	int c0 = 1, c1 = 256, n = (int)data;
+	int vvv[3] = { 1, 1, 256 }, n = quantize_mode; // self-updating
 
-	if (widget && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) return;
+	cmd_set(dt->qbook, (n == QUAN_PNN) || (n == QUAN_WU) ? 2 :
+		n == QUAN_CURRENT ? 1 : 0);
 
-	quantize_mode = n;
-	gtk_notebook_set_page(GTK_NOTEBOOK(quantize_book),
-		(n == QUAN_PNN) || (n == QUAN_WU) ? 2 : n == QUAN_CURRENT ? 1 : 0);
-
-	if (n == QUAN_EXACT) c0 = c1 = quantize_cols;
-	else if (n == QUAN_CURRENT) c1 = mem_cols;
-	spin_set_range(quantize_spin, c0, c1);
+	if (n == QUAN_EXACT) vvv[1] = vvv[2] = dt->cols0;
+	else if (n == QUAN_CURRENT) vvv[2] = mem_cols;
+	cmd_read(dt->colspin, dt);
+	vvv[0] = dt->cols; // !!! gets bounded when setting
+	cmd_set3(dt->colspin, vvv);
 
 	/* No dither for exact conversion */
-	if (quantize_dither) gtk_widget_set_sensitive(quantize_dither, n != QUAN_EXACT);
+	if (!dt->pflag) cmd_sensitive(dt->dith, n != QUAN_EXACT);
 }
 
-static void click_quantize_ok(GtkWidget *widget, gpointer data)
+static void click_quantize_ok(quantize_dd *dt, void **wdata)
 {
-	int i, dither, new_cols, have_image = !!quantize_dither, err = 0;
+	int i, dither, new_cols, have_image = !dt->pflag, err = 0;
+	int quantize_cols = dt->cols0, efrac = 0;
 	png_color newpal[256];
 	unsigned char *old_image = mem_img[CHN_IMAGE];
-	double efrac = 0.0;
 
 	/* Dithering filters */
 	/* Floyd-Steinberg dither */
@@ -2074,19 +2078,13 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	static short s_dither[16] =
 		{ 42,  0, 0, 0, 8, 4,  2, 4, 8, 4, 2,  1, 2, 4, 2, 1 };
 
+	run_query(wdata);
 	dither = quantize_mode != QUAN_EXACT ? dither_mode : DITH_NONE;
-	new_cols = read_spin(quantize_spin);
+	new_cols = dt->cols;
 	if (have_image) /* Work on image */
-	{
-		dither_scan = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(dither_serpent));
-		dither_8b = gtk_toggle_button_get_active(
-			GTK_TOGGLE_BUTTON(dither_err));
-		efrac = 0.01 * read_spin(dither_spin);
-		dither_fract[dither_sel ? 1 : 0] = efrac;
-	}
+		dither_pfract[dither_sel ? 1 : 0] = efrac = dt->err;
 
-	gtk_widget_destroy(quantize_window);
+	run_destroy(wdata);
 
 	/* Paranoia */
 	if ((quantize_mode >= QUAN_MAX) || (dither >= DITH_MAX)) return;
@@ -2145,7 +2143,7 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 		err = mem_dither(old_image, new_cols, dither == DITH_NONE ?
 			NULL : dither == DITH_FS ? fs_dither : s_dither,
 			dither_cspace, dither_dist, dither_limit, dither_sel,
-			dither_scan, dither_8b, efrac);
+			dither_scan, dither_8b, efrac * 0.01);
 		break;
 
 // !!! No code yet - temporarily disabled !!!
@@ -2173,147 +2171,111 @@ static void click_quantize_ok(GtkWidget *widget, gpointer data)
 	update_stuff(UPD_2IDX);
 }
 
-static void choose_selective(GtkMenuItem *menuitem, gpointer user_data)
+static void choose_selective(quantize_dd *dt, void **wdata, int what, void **where)
 {
-	int i = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
+	int i = dither_sel;
 
-	if (dither_sel == i) return;
+	cmd_read(where, dt);
 
 	/* Selectivity state toggled */
-	if ((dither_sel == 0) ^ (i == 0))
+	if ((i = !i) ^ !dither_sel)
 	{
-		dither_fract[dither_sel ? 1 : 0] = 0.01 * read_spin(dither_spin);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin),
-			100.0 * dither_fract[i ? 1 : 0]);
+		cmd_read(dt->errspin, dt);
+		dither_pfract[i ^ 1] = dt->err;
+		cmd_set(dt->errspin, dither_pfract[i]);
 	}
-	dither_sel = i;
 }
 
-static GtkWidget *cspace_frame(int idx, gpointer var, GtkSignalFunc handler)
-{
-	return (add_with_frame(NULL, _("Colour space"),
-		wj_radio_pack(cspnames, NUM_CSPACES, 1, idx, var, handler)));
-}
+#undef _
+#define _(X) X
 
-static GtkWidget *difference_frame(int idx, gpointer var, GtkSignalFunc handler)
-{
-	char *dist_txt[] = {_("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2)")};
-	return (add_with_frame(NULL, _("Difference measure"),
-		wj_radio_pack(dist_txt, 3, 1, idx, var, handler)));
-}
+static char *quan_txt[] = { _("Exact Conversion"), _("Use Current Palette"),
+	_("PNN Quantize (slow, better quality)"),
+	_("Wu Quantize (fast)"),
+	_("Max-Min Quantize (best for small palettes and dithering)"), NULL };
+static char *dith_txt[] = { _("None"), _("Floyd-Steinberg"), _("Stucki"),
+// !!! "Ordered" not done yet !!!
+	/* _("Ordered") */ "",
+	_("Floyd-Steinberg (quick)"), _("Dithered (effect)"),
+	_("Scattered (effect)"), NULL };
+static char *clamp_txt[] = { _("Gamut"), _("Weakly"), _("Strongly") };
+static char *err_txt[] = { _("Off"), _("Separate/Sum"), _("Separate/Split"),
+	_("Length/Sum"), _("Length/Split"), NULL };
+static char *dist_txt[] = { _("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2)") };
+
+#define WBbase quantize_dd
+static void *quantize_code[] = {
+	IF(pflag), WINDOWm(_("Create Quantized")),
+	UNLESS(pflag), WINDOWm(_("Convert To Indexed")),
+	BORDER(FRBOX, 0),
+	BHBOX, MLABEL(_("Indexed Colours To Use")),
+	REF(colspin), XSPIN(cols, 1, 256),
+	UNLESS(pflag), BOOKBTN(_("Settings"), book),
+	WDONE,
+	REF(book), UNLESS(pflag), PLAINBOOK,
+	/* Main page - Palette frame */
+	FVBOX(_("Palette")),
+	RPACKDve(qtxt, 0, quantize_mode, click_quantize_radio), TRIGGER,
+	REF(qbook), PLAINBOOKn(3),
+	WDONE, // empty page 0
+	CHECKv(_("Truncate palette"), quantize_tp), WDONE, // page 1
+	CHECKv(_("Diameter based weighting"), quan_sqrt), WDONE, // page 2
+	WDONE,
+	UNLESSx(pflag, 1),
+		/* Main page - Dither frame */
+		REF(dith),
+		FRPACKv(_("Dither"), dith_txt, 0, DITH_MAX / 2, dither_mode),
+		WDONE,
+		/* Settings page */
+		FRPACKv(_("Colour space"), cspnames_, NUM_CSPACES, 1, dither_cspace),
+		FRPACKv(_("Difference measure"), dist_txt, 3, 1, dither_dist),
+		FRPACKv(_("Reduce colour bleed"), clamp_txt, 3, 1, dither_limit),
+		CHECKv(_("Serpentine scan"), dither_scan),
+		TABLE2(2),
+		REF(errspin), TSPIN(_("Error propagation, %"), err, 0, 100),
+		TLLABEL(_("Selective error propagation"), 0, 1),
+		TLOPTve(err_txt, 0, dither_sel, choose_selective, 1, 1),
+		WDONE,
+		CHECKv(_("Full error precision"), dither_8b),
+		WDONE,
+	ENDIF(1),
+	/* OK / Cancel */
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), click_quantize_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_quantize(int palette)
 {
-	GtkWidget *mainbox, *topbox, /**notebook,*/ *page0, *page1, *button;
-	GtkWidget *vbox, *hbox, *table, *pages[3];
+	char *qnames[sizeof(quan_txt) / sizeof(quan_txt[0])];
+	quantize_dd tdata;
 
-	char *rad_txt[] = {_("Exact Conversion"), _("Use Current Palette"),
-		_("PNN Quantize (slow, better quality)"),
-		_("Wu Quantize (fast)"),
-		_("Max-Min Quantize (best for small palettes and dithering)"), NULL
-		};
+	tdata.pflag = palette;
+	tdata.cols = tdata.cols0 = mem_cols_used(257);
+	tdata.qtxt = qnames;
 
-	char *rad_txt2[] = {_("None"), _("Floyd-Steinberg"), _("Stucki"),
-// !!! "Ordered" not done yet !!!
-		/* _("Ordered") */ "",
-		_("Floyd-Steinberg (quick)"), _("Dithered (effect)"),
-		_("Scattered (effect)"), NULL
-		};
-
-	char *clamp_txt[] = {_("Gamut"), _("Weakly"), _("Strongly")};
-	char *err_txt[] = {_("Off"), _("Separate/Sum"), _("Separate/Split"),
-		_("Length/Sum"), _("Length/Split"), NULL};
-
-
-	quantize_cols = mem_cols_used(257);
-
-	quantize_window = add_a_window(GTK_WINDOW_TOPLEVEL, palette ?
-		_("Create Quantized") : _("Convert To Indexed"),
-		GTK_WIN_POS_CENTER, TRUE);
-	mainbox = add_vbox(quantize_window);
-
-	/* Colours spin */
-
-	topbox = pack(mainbox, gtk_hbox_new(FALSE, 5));
-	gtk_container_set_border_width(GTK_CONTAINER(topbox), 10);
-	pack(topbox, gtk_label_new(_("Indexed Colours To Use")));
-	quantize_spin = xpack(topbox, add_a_spin(quantize_cols, 1, 256));
-
-	/* Notebook */
-
-	if (!palette)
-	{
-//		notebook =
-		xpack(mainbox, buttoned_book(&page0, &page1, &button,
-			_("Settings")));
-		pack_end(topbox, button);
-	}
-	else page0 = mainbox;
-
-	/* Main page - Palette frame */
-
+	memcpy(qnames, quan_txt, sizeof(qnames));
 	/* No exact transfer if too many colours */
-	if (quantize_cols > 256) rad_txt[QUAN_EXACT] = "";
-	if (palette) rad_txt[QUAN_CURRENT] = "";
-	if ((quantize_mode < 0) || !rad_txt[quantize_mode][0]) // Use default mode
+	if (tdata.cols > 256) qnames[QUAN_EXACT] = "";
+	if (palette) qnames[QUAN_CURRENT] = "";
+	if ((quantize_mode < 0) || !qnames[quantize_mode][0]) // Use default mode
 	{
-		quantize_mode = palette || (quantize_cols > 256) ? QUAN_WU : QUAN_EXACT;
+		quantize_mode = palette || (tdata.cols > 256) ? QUAN_WU : QUAN_EXACT;
 		if (!palette) dither_mode = -1; // Reset dither too
 	}
-	vbox = wj_radio_pack(rad_txt, -1, 0, quantize_mode, &quantize_mode,
-		GTK_SIGNAL_FUNC(click_quantize_radio));
-	/* Settings subnotebook */
-	quantize_book = pack(vbox, plain_book(pages, 3));
-	pack(pages[1], sig_toggle(_("Truncate palette"), quantize_tp, &quantize_tp, NULL));
-	pack(pages[2], sig_toggle(_("Diameter based weighting"), quan_sqrt, &quan_sqrt, NULL));
-	add_with_frame(page0, _("Palette"), vbox);
 
-	/* Main page - Dither frame */
-
-	quantize_dither = NULL;
 	if (!palette)
 	{
-		if (dither_mode < 0) dither_mode = quantize_cols > 256 ?
+		if (dither_mode < 0) dither_mode = tdata.cols > 256 ?
 			DITH_DUMBFS : DITH_NONE;
-		hbox = wj_radio_pack(rad_txt2, -1, DITH_MAX / 2, dither_mode,
-			&dither_mode, NULL);
-// !!! If want to make both columns same width
-//		gtk_box_set_homogeneous(GTK_BOX(hbox), TRUE);
-		quantize_dither = add_with_frame(page0, _("Dither"), hbox);
-
-		/* Settings page */
-
-		pack(page1, cspace_frame(dither_cspace, &dither_cspace, NULL));
-		pack(page1, difference_frame(dither_dist, &dither_dist, NULL));
-
-		hbox = wj_radio_pack(clamp_txt, 3, 1, dither_limit, &dither_limit, NULL);
-		add_with_frame(page1, _("Reduce colour bleed"), hbox);
-
-		dither_serpent = add_a_toggle(_("Serpentine scan"), page1, dither_scan);
-
-		table = add_a_table(2, 2, 5, page1);
-		add_to_table(_("Error propagation, %"), table, 0, 0, 5);
-		add_to_table(_("Selective error propagation"), table, 1, 0, 5);
-		dither_spin = spin_to_table(table, 0, 1, 5, 100, 0, 100);
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(dither_spin),
-			(dither_sel ? dither_fract[1] : dither_fract[0]) * 100.0);
-		hbox = wj_option_menu(err_txt, -1, dither_sel, &dither_sel,
-			GTK_SIGNAL_FUNC(choose_selective));
-		to_table(hbox, table, 1, 1, 0);
-
-		dither_err = add_a_toggle(_("Full error precision"), page1, dither_8b);
+		tdata.err = dither_pfract[dither_sel ? 1 : 0];
 	}
 
-	/* OK / Cancel */
-
-	pack(mainbox, OK_box(0, quantize_window, _("OK"), GTK_SIGNAL_FUNC(click_quantize_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	click_quantize_radio(NULL, (gpointer)quantize_mode); // Update widgets
-
-	gtk_window_set_transient_for(GTK_WINDOW(quantize_window),
-		GTK_WINDOW(main_window));
-	gtk_widget_show_all(quantize_window);
+	run_create(quantize_code, &tdata, sizeof(tdata));
 }
 
 ///	GRADIENT WINDOW
@@ -3214,6 +3176,22 @@ typedef struct {
 static int seg_cspace = CSPACE_LXN, seg_dist = DIST_LINF;
 static int seg_rank = 4, seg_minsize = 1;
 static guint seg_idle;
+
+static GtkWidget *cspace_frame(int idx, gpointer var, GtkSignalFunc handler)
+{
+	return (add_with_frame(NULL, _("Colour space"),
+		wj_radio_pack(cspnames, NUM_CSPACES, 1, idx, var, handler)));
+}
+
+static GtkWidget *difference_frame(int idx, gpointer var, GtkSignalFunc handler)
+{
+	char *dnames[3];
+	int i;
+
+	for (i = 0; i < 3; i++) dnames[i] = _(dist_txt[i]);
+	return (add_with_frame(NULL, _("Difference measure"),
+		wj_radio_pack(dnames, 3, 1, idx, var, handler)));
+}
 
 /* Change colorspace or distance measure, causing full recalculation */
 static void seg_mode_toggled(GtkWidget *btn, gpointer idx)

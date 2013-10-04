@@ -28,8 +28,9 @@ enum {
 	op_TABLE,
 	//
 	op_VBOX,
-	op_VBOXe, // VBOX'es must precede HBOX'es
+	op_EVBOX, // VBOX'es must precede HBOX'es
 	op_HBOX,
+	op_BHBOX,
 	op_TLHBOX,
 	//
 	op_FVBOX,
@@ -43,6 +44,7 @@ enum {
 	op_TLNOSPIN,
 	//
 	op_SPIN,
+	op_XSPIN,
 	op_TSPIN,
 	op_TLSPIN,
 	//
@@ -56,7 +58,7 @@ enum {
 	op_CHECKb,
 	op_RPACK,
 	op_FRPACK,
-	op_RPACKd,
+	op_RPACKD,
 	op_OPT,
 	op_TLOPT,
 	op_PATH,
@@ -96,7 +98,7 @@ enum {
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_TSPIN,
 	op_BOR_TLLABEL,
-	op_BOR_FRPACK,
+	op_BOR_FRBOX,
 	op_BOR_OKBOX,
 	op_BOR_OKBTN,
 
@@ -161,15 +163,17 @@ void *cmd_read(void **slot, void *ddata);
 #define TABLE(W,H) WBh(TABLE, 1), (void *)((H) + ((W) << 16))
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), (void *)((H) + ((W) << 16))
-#define HBOX WBh(HBOX, 0)
 #define VBOX WBh(VBOX, 0)
-#define VBOXe WBh(VBOXe, 0)
+#define EVBOX WBh(EVBOX, 0)
+#define HBOX WBh(HBOX, 0)
+#define BHBOX WBh(BHBOX, 0)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
 #define FVBOXs(NM,S) WBh(FVBOX, 2), (void *)(S), (NM)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
+#define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
 #define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
@@ -184,6 +188,8 @@ void *cmd_read(void **slot, void *ddata);
 	(void *)(V0), (void *)(V1), (NM)
 #define TSPINa(NM,A) WBrhf(TSPINa, 2), WBfield(A), (NM)
 #define SPIN(V,V0,V1) WBrhf(SPIN, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
+#define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf(XSPINa, 1), WBfield(A)
@@ -201,12 +207,15 @@ void *cmd_read(void **slot, void *ddata);
 #define RPACKv(SS,N,H,V) WBrh(RPACK, 3), &(V), (SS), WBnh(N, H)
 #define FRPACK(NM,SS,N,H,V) WBrhf(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
 #define FRPACKv(NM,SS,N,H,V) WBrh(FRPACK, 4), &(V), (SS), WBnh(N, H), (NM)
-#define RPACKd(SP,H,V) WBrhf(RPACKd, 3), WBfield(V), WBfield(SP), (H)
-/* !!! These *OPT* blocks each hold 1 nested EVENT block */
-#define OPT(SS,N,V,HS) WBr2hf(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
+#define RPACKD(SP,H,V) WBrhf(RPACKD, 3), WBfield(V), WBfield(SP), (H)
+/* !!! This block holds 1 nested EVENT block */
+#define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), (H), \
 	EVENT(SELECT, HS)
-#define TLOPTvl(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
+#define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
+/* !!! This block holds 1 nested EVENT block */
+#define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS), WBxyl(X, Y, L)
+#define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
 #define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
 /* !!! This block holds 2 nested EVENT blocks */

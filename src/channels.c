@@ -250,7 +250,7 @@ static void *cchan_code[] = {
 		NUM_CHANNELS - CHN_ALPHA, 1, chan),
 	IF(sens), INSENS,
 	FVBOX(_("Initial Channel State")),
-	RPACKd(names, 0, state),
+	RPACKD(names, 0, state),
 	HSEP,
 	CHECK(_("Inverted"), inv),
 	WDONE,
