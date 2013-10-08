@@ -88,7 +88,8 @@ typedef struct
 			input_vals[CPICK_INPUT_TOT],	// Current input values
 			rgb_previous[4],		// Previous colour/opacity
 			area_size[CPICK_AREA_TOT][2],	// Width / height of each wjpixmap
-			lock;				// To block input handlers
+			lock,				// To block input handlers
+			opmask;				// To ignore opacity setting
 	int		drag_x, drag_y, may_drag;	// For drag & drop
 	unsigned char	drag_rgba[4];			// The color being dragged out
 } cpicker;
@@ -698,6 +699,13 @@ static void cpick_update(cpicker *cp, int what)
 	gtk_signal_emit(GTK_OBJECT(cp), cpicker_signals[COLOR_CHANGED]);
 }
 
+static void cpick_update_pixmaps(cpicker *cp)
+{
+	cpick_area_precur_create(cp, CPICK_AREA_CURRENT | CPICK_AREA_PREVIOUS);
+	cpick_area_picker_create(cp);
+	cpick_area_update_cursors(cp);
+}
+
 static gboolean cpick_hex_change(GtkWidget *widget, GdkEventFocus *event,
 	gpointer user_data)
 {
@@ -1043,6 +1051,10 @@ static void cpicker_init( cpicker *cp )
 				(GtkAttachOptions) (GTK_FILL),
 				(GtkAttachOptions) (0), 0, 0);
 	}
+
+	/* When everything is paintable at last */
+	gtk_signal_connect_after(GTK_OBJECT(cp), "map",
+		GTK_SIGNAL_FUNC(cpick_update_pixmaps), NULL);
 }
 
 GtkWidget *cpick_create()
@@ -1104,7 +1116,7 @@ void cpick_set_colour(GtkWidget *w, int rgb, int opacity)
 	cp->input_vals[CPICK_INPUT_RED] = INT_2_R(rgb);
 	cp->input_vals[CPICK_INPUT_GREEN] = INT_2_G(rgb);
 	cp->input_vals[CPICK_INPUT_BLUE] = INT_2_B(rgb);
-	cp->input_vals[CPICK_INPUT_OPACITY] = opacity & 0xFF;
+	cp->input_vals[CPICK_INPUT_OPACITY] = (opacity & 0xFF) | cp->opmask;
 
 	cpick_get_hsv(cp);
 
@@ -1120,7 +1132,7 @@ void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 	cp->rgb_previous[0] = INT_2_R(rgb);
 	cp->rgb_previous[1] = INT_2_G(rgb);
 	cp->rgb_previous[2] = INT_2_B(rgb);
-	cp->rgb_previous[3] = opacity & 0xFF;
+	cp->rgb_previous[3] = (opacity & 0xFF) | cp->opmask;
 
 	// Update previous colour
 	cpick_area_precur_create(cp, CPICK_AREA_PREVIOUS);
@@ -1132,6 +1144,7 @@ void cpick_set_opacity_visibility( GtkWidget *w, int visible )
 
 	if (!IS_CPICKER(cp)) return;
 
+	cp->opmask = visible ? 0 : 0xFF;
 	widget_showhide(cp->areas[CPICK_AREA_OPACITY], visible);
 	widget_showhide(cp->inputs[CPICK_INPUT_OPACITY], visible);
 	widget_showhide(cp->opacity_label, visible);

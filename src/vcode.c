@@ -301,7 +301,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			v = *(char **)v; // dereference & fallthrough
 		case op_WINDOW: case op_WINDOWm:
 			window = add_a_window(GTK_WINDOW_TOPLEVEL, _(v),
-				wpos, op == op_WINDOWm);
+				wpos, op != op_WINDOW);
 			res = bound_malloc(window, dsize);
 
 			memcpy(res, ddata, ddsize); // Copy datastruct
@@ -818,10 +818,19 @@ void cmd_set(void **slot, int v)
 
 void cmd_set3(void **slot, int *v)
 {
-	if (GET_OP(slot) == op_TSPINSLIDE) // only spinsliders for now
+// !!! Support only what actually used on, and their brethren
+	switch (GET_OP(slot))
 	{
+	case op_TSPINSLIDE:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
 		mt_spinslide_set_value(slot[0], v[0]);
+		break;
+	case op_SPIN: case op_XSPIN:
+	case op_TSPIN: case op_TLSPIN:
+	case op_SPINa: case op_XSPINa: case op_TSPINa:
+		spin_set_range(slot[0], v[1], v[2]);
+		gtk_spin_button_set_value(slot[0], v[0]);
+		break;
 	}
 }
 
