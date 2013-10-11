@@ -24,6 +24,7 @@
 #include "inifile.h"
 #include "png.h"
 #include "mainwindow.h"
+#include "cpick.h"
 #include "vcode.h"
 
 /* Make code not compile if it cannot work */
@@ -38,8 +39,24 @@ typedef char Opcodes_Too_Long[2 * (op_BOR_LAST <= WB_OPMASK) - 1];
 
 #define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
 
+enum {
+	pk_NONE = 0,
+	pk_PACK,
+	pk_PACKp,
+	pk_XPACK,
+	pk_PACKEND,
+	pk_TABLE,
+	pk_TABLEx,
+	pk_TABLEp,
+	pk_TABLE2,
+	pk_TABLE2x
+};
+#define pk_MASK    0xFF
+#define pkf_FRAME 0x100
+#define pkf_STACK 0x200
+
 /* From event to its originator */
-static void **origin_slot(void **slot)
+void **origin_slot(void **slot)
 {
 	while (((int)*(void **)slot[1] & WB_OPMASK) >= op_EVT_0) slot -= 2;
 	return (slot);
@@ -131,7 +148,7 @@ static void trigger_things(void **wdata)
 static int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, n = 2; // safety margin
+	int op, n = 2 + 1; // safety margin and WTAGS slot
 
 	while (TRUE)
 	{
@@ -155,21 +172,23 @@ static int predict_size(void **ifcode, char *ddata)
 }
 
 // !!! And with inlining this, same problem
-void table_it(GtkWidget *table, GtkWidget *it, int wh, int pad)
+void table_it(GtkWidget *table, GtkWidget *it, int wh, int pad, int pack)
 {
 	int row = wh & 255, column = (wh >> 8) & 255, l = (wh >> 16) + 1;
 	gtk_table_attach(GTK_TABLE(table), it, column, column + l, row, row + 1,
-		(GtkAttachOptions)(GTK_FILL), 0, pad >> 16, pad & 0xFFFF);
+		pack == pk_TABLEx ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0,
+		pack == pk_TABLEp ? pad : 0, pad);
 }
 
-/* Find where unused rows start */
-static int next_table_level(GtkWidget *table)
+/* Find where unused rows/columns start */
+static int next_table_level(GtkWidget *table, int h)
 {
 	GList *item;
 	int y, n = 0;
 	for (item = GTK_TABLE(table)->children; item; item = item->next)
 	{
-		y = ((GtkTableChild *)item->data)->bottom_attach;
+		y = h ? ((GtkTableChild *)item->data)->right_attach :
+			((GtkTableChild *)item->data)->bottom_attach;
 		if (n < y) n = y;
 	}
 	return (n);
@@ -201,6 +220,175 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 		!!gtk_toggle_button_get_active(button));
 }
 
+//	COLORLIST widget
+
+typedef struct {
+	unsigned char *col;
+	int cnt, *idx;
+	int scroll;
+} colorlist_data;
+
+// !!! ref to RGB[3]
+static gboolean col_expose(GtkWidget *widget, GdkEventExpose *event,
+	unsigned char *col)
+{
+	GdkGCValues sv;
+
+	gdk_gc_get_values(widget->style->black_gc, &sv);
+	gdk_rgb_gc_set_foreground(widget->style->black_gc, MEM_2_INT(col, 0));
+	gdk_draw_rectangle(widget->window, widget->style->black_gc, TRUE,
+		event->area.x, event->area.y, event->area.width, event->area.height);
+	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
+
+	return (TRUE);
+}
+
+static gboolean colorlist_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	colorlist_ext xdata;
+
+	if (event->type == GDK_BUTTON_PRESS)
+	{
+		xdata.idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+		xdata.button = event->button;
+		((evtx_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, slot, &xdata);
+	}
+
+	/* Let click processing continue */
+	return (FALSE);
+}
+
+static void colorlist_select(GtkList *list, GtkWidget *widget, gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
+
+	/* Update the value */
+	*(dt->idx) = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+	/* Call the handler */
+	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+static void colorlist_map_scroll(GtkWidget *list, colorlist_data *dt)
+{	
+	GtkAdjustment *adj;
+	int idx = dt->scroll - 1;
+
+	dt->scroll = 0;
+	if (idx < 0) return;
+	adj = gtk_scrolled_window_get_vadjustment(
+		GTK_SCROLLED_WINDOW(list->parent->parent));
+	if (adj->upper > adj->page_size)
+	{
+		float f = adj->upper * (idx + 0.5) / dt->cnt - adj->page_size * 0.5;
+		adj->value = f < 0.0 ? 0.0 : f > adj->upper - adj->page_size ?
+			adj->upper - adj->page_size : f;
+		gtk_adjustment_value_changed(adj);
+	}
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
+	void **r)
+{
+	GtkWidget *scroll, *list, *item, *col, *label;
+	colorlist_data *dt;
+	void *v, **cslot = NULL;
+	char txt[64], *t, **sp = NULL;
+	int i, cnt = 0;
+
+	scroll = pack(box, gtk_scrolled_window_new(NULL, NULL));
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+	list = gtk_list_new();
+
+	// Allocate datablock
+	dt = bound_malloc(list, sizeof(colorlist_data));
+	v = ddata + (int)pp[3];
+	if (((int)pp[0] & WB_OPMASK) == op_COLORLIST) // array of names
+	{
+		sp = *(char ***)v;
+		while (sp[cnt]) cnt++;
+	}
+	else cnt = *(int *)v; // op_COLORLISTN - number
+	dt->cnt = cnt;
+	dt->col = (void *)(ddata + (int)pp[2]); // palette
+	dt->idx = idx;
+
+	if (pp[7]) cslot = r , r += 2; // !!! ext-event handler goes first
+
+	gtk_object_set_user_data(GTK_OBJECT(list), dt); // know thy descriptor
+	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), list);
+	gtk_widget_show_all(scroll);
+
+	for (i = 0; i < cnt; i++)
+	{
+		item = gtk_list_item_new();
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		if (cslot) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
+			GTK_SIGNAL_FUNC(colorlist_click), cslot);
+		gtk_container_add(GTK_CONTAINER(list), item);
+
+		box = gtk_hbox_new(FALSE, 3);
+		gtk_widget_show(box);
+		gtk_container_set_border_width(GTK_CONTAINER(box), 3);
+		gtk_container_add(GTK_CONTAINER(item), box);
+
+		col = pack(box, gtk_drawing_area_new());
+		gtk_drawing_area_size(GTK_DRAWING_AREA(col), 20, 20);
+		gtk_signal_connect(GTK_OBJECT(col), "expose_event",
+			GTK_SIGNAL_FUNC(col_expose), dt->col + i * 3);
+
+		/* Name or index */
+		if (sp) t = _(sp[i]);
+		else sprintf(t = txt, "%d", i);
+		label = xpack(box, gtk_label_new(t));
+		gtk_misc_set_alignment(GTK_MISC(label), 0.0, 1.0);
+
+		gtk_widget_show_all(item);
+	}
+	gtk_list_set_selection_mode(GTK_LIST(list), GTK_SELECTION_BROWSE);
+	/* gtk_list_select_*() don't work in GTK_SELECTION_BROWSE mode */
+	gtk_container_set_focus_child(GTK_CONTAINER(list),
+		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, *idx)->data));
+	gtk_signal_connect(GTK_OBJECT(list), "select_child",
+		GTK_SIGNAL_FUNC(colorlist_select), r);
+	gtk_signal_connect_after(GTK_OBJECT(list), "map",
+		GTK_SIGNAL_FUNC(colorlist_map_scroll), dt);
+
+	return (list);
+}
+
+static void colorlist_scroll_in(GtkWidget *list, int idx)
+{
+	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
+	dt->scroll = idx + 1;
+	if (GTK_WIDGET_MAPPED(list)) colorlist_map_scroll(list, dt);
+}
+
+static void colorlist_set_color(GtkWidget *list, int idx, int v)
+{
+	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
+	unsigned char *rgb = dt->col + idx * 3;
+	GdkColor c;
+
+	c.pixel = 0;
+	c.red   = (rgb[0] = INT_2_R(v)) * 257;
+	c.green = (rgb[1] = INT_2_G(v)) * 257;
+	c.blue  = (rgb[2] = INT_2_B(v)) * 257;
+	// In case of some really ancient system with indexed display mode
+	gdk_colormap_alloc_color(gdk_colormap_get_system(), &c, FALSE, TRUE);
+	/* Redraw the item displaying the color */
+	gtk_widget_queue_draw(
+		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, idx)->data));
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -212,21 +400,6 @@ static int n_trans(char **dest, char **src, int n)
 }
 
 #endif
-
-enum {
-	pk_NONE = 0,
-	pk_PACK,
-	pk_PACK5,
-	pk_XPACK,
-	pk_PACKEND,
-	pk_TABLE,
-	pk_TABLEp,
-	pk_TABLE2,
-	pk_TABLE2x
-};
-#define pk_MASK    0xFF
-#define pkf_FRAME 0x100
-#define pkf_STACK 0x200
 
 /* V-code is really simple-minded; it can do 0-tests but no arithmetics, and
  * naturally, can inline only constants. Everything else must be prepared either
@@ -248,15 +421,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 	int have_sliders = FALSE;
 #endif
+	int have_spins = FALSE;
 	char txt[PATHTXT];
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *tw, *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL;
+	void *v, **pp, **tagslot = NULL, **r = NULL, **res = NULL;
 	int ld, dsize;
-	int n, op, lp, ref, pk, tpad = 0;
+	int n, op, lp, ref, pk, cw, tpad = 0;
 
 
 	// Allocation size
@@ -271,13 +445,22 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + (lp = op >> 16);
 		ref = WB_GETREF(op);
-		pk = 0;
+		pk = cw = 0;
 		v = lp ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
 		switch (op &= WB_OPMASK)
 		{
 		/* Terminate */
 		case op_WEND: case op_WSHOW:
+			/* Terminate the list */
+			*r++ = NULL;
+			*r++ = NULL;
+
+			/* Make WTAGS descriptor */
+			*tagslot = r;
+			*r++ = WBh(WTAGS, 1);
+			*r++ = (void *)have_spins; // only this for now
+
 			/* !!! For now, done unconditionally */
 			gtk_window_set_transient_for(GTK_WINDOW(window),
 				GTK_WINDOW(main_window));
@@ -310,6 +493,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = ddata; // Store struct ref at anchor
 			*r++ = window; // Store window ref right next to it
 			*r++ = pp - 1; // And slot ref after it
+			*r++ = window; // Store window again for WTAGS
+			tagslot = r; // Remember the location
+			*r++ = NULL; // No WTAGS descriptor yet
 			*--wp = add_vbox(window);
 			continue;
 		/* Add a notebook page */
@@ -322,32 +508,27 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(int)v >> 16, GET_BORDER(TABLE), wp[1]);
 			break;
 		/* Add a box */
-		case op_VBOX: case op_EVBOX:
-		case op_HBOX: case op_TLHBOX:
+		case op_TLHBOX:
+			if (lp < 2) v = NULL; // reserve the one parameter
+		case op_VBOX: case op_XVBOX: case op_EVBOX:
+		case op_HBOX: case op_XHBOX:
 			widget = (op < op_HBOX ? gtk_vbox_new :
-				gtk_hbox_new)(FALSE, 0);
+				gtk_hbox_new)(FALSE, (int)v & 255);
 			gtk_widget_show(widget);
+			cw = (int)v >> 8;
 // !!! Padding = 0
 			tpad = 0;
 			pk = pk_PACK | pkf_STACK;
+			if ((op == op_XVBOX) || (op == op_XHBOX))
+				pk = pk_XPACK | pkf_STACK;
 			if (op == op_TLHBOX) pk = pk_TABLE | pkf_STACK;
 			if (op == op_EVBOX) pk = pk_PACKEND | pkf_STACK;
-			break;
-		/* Add a horizontal box with spacing & border */
-		case op_BHBOX:
-// !!! Spacing = 5
-			widget = gtk_hbox_new(FALSE, 5);
-			gtk_widget_show(widget);
-// !!! Border = 10
-			gtk_container_set_border_width(GTK_CONTAINER(widget), 10);
-			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a framed vertical box */
 		case op_FVBOX:
 			widget = gtk_vbox_new(FALSE, lp > 1 ? (int)v : 0);
 			gtk_widget_show(widget);
-			gtk_container_set_border_width(GTK_CONTAINER(widget),
-				GET_BORDER(FRBOX));
+			cw = GET_BORDER(FRBOX);
 			pk = pk_PACK | pkf_FRAME | pkf_STACK;
 			break;
 		/* Add a scrolled window */
@@ -409,30 +590,42 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			int n = *(int *)v;
 			widget = add_a_spin(n, n, n);
 			GTK_WIDGET_UNSET_FLAGS(widget, GTK_CAN_FOCUS);
-			tpad = GET_BORDER(TSPIN);
+			tpad = GET_BORDER(SPIN);
 			pk = pk_TABLE;
 			break;
 		}
 		/* Add a spin, fill from field/var */
-		case op_SPIN: case op_XSPIN: case op_TSPIN: case op_TLSPIN:
+		case op_SPIN: case op_XSPIN:
+		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
-			tpad = GET_BORDER(TSPIN);
+			have_spins = TRUE;
+			tpad = GET_BORDER(SPIN);
 			pk = pk_TABLE2;
 			if (op == op_TLSPIN) pk = pk_TABLE;
+			if (op == op_TLXSPIN) pk = pk_TABLEx;
+// !!! Padding = 0
 			if (op == op_XSPIN) pk = pk_XPACK;
-// !!! Padding = 5
-			if (op == op_SPIN) pk = pk_PACK5;
+			if (op == op_SPIN) pk = pk_PACKp;
+			break;
+		/* Add float spin, fill from field/var */
+		case op_FSPIN:
+			widget = add_float_spin(*(int *)v / 100.0,
+				(int)pp[1] / 100.0, (int)pp[2] / 100.0);
+			have_spins = TRUE;
+// !!! Padding = 0
+			pk = pk_PACK;
 			break;
 		/* Add a spin, fill from array */
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
 		{
 			int *xp = v;
 			widget = add_a_spin(xp[0], xp[1], xp[2]);
-			tpad = GET_BORDER(TSPIN);
+			have_spins = TRUE;
+			tpad = GET_BORDER(SPIN);
 			pk = pk_TABLE2;
+// !!! Padding = 0
 			if (op == op_XSPINa) pk = pk_XPACK;
-// !!! Padding = 5
-			if (op == op_SPINa) pk = pk_PACK5;
+			if (op == op_SPINa) pk = pk_PACKp;
 			break;
 		}
 		/* Add a named spinslider to table, fill from field */
@@ -446,8 +639,33 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
+			have_spins = TRUE;
 			pk = pk_TABLE2x;
 			break;
+		/* Add a named spinslider to table horizontally, fill from field */
+		case op_HTSPINSLIDE:
+		{
+			GtkWidget *label;
+			int x;
+// !!! Width & height unset
+			widget = mt_spinslide_new(-1, -1);
+			mt_spinslide_set_range(widget, (int)pp[1], (int)pp[2]);
+			mt_spinslide_set_value(widget, *(int *)v);
+#if GTK_MAJOR_VERSION == 1
+			have_sliders = TRUE;
+#endif
+			have_spins = TRUE;
+
+			x = next_table_level(wp[0], TRUE);
+			label = gtk_label_new(_(pp[--lp]));
+			gtk_widget_show(label);
+			gtk_misc_set_alignment(GTK_MISC(label), 1.0 / 3.0, 0.5);
+// !!! Padding = 0
+			to_table(label, wp[0], 0, x, 0);
+			gtk_table_attach(GTK_TABLE(wp[0]), widget, x, x + 1,
+				1, 2, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+			break;
+		}
 		/* Add a named checkbox, fill from field/var */
 		case op_CHECK: case op_TLCHECK:
 			widget = sig_toggle(_(pp[1]), *(int *)v, NULL, NULL);
@@ -485,14 +703,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_XPACK;
 			if (op == op_FRPACK)
 			{
-				gtk_container_set_border_width(
-					GTK_CONTAINER(widget), GET_BORDER(FRBOX));
+				cw = GET_BORDER(FRBOX);
 				pk = pk_PACK | pkf_FRAME;
 			}
 			break;
 		}
 		/* Add an option menu for field/var */
-		case op_OPT: case op_TLOPT:
+		case op_OPT: case op_XOPT: case op_TLOPT:
 		{
 			char **src = pp[1];
 			int n = (int)pp[2];
@@ -511,6 +728,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Padding = 0
 			tpad = 0;
 			pk = op == op_TLOPT ? pk_TABLE : pk_PACK;
+// !!! Border = 4
+			if (op == op_XOPT) cw = 4 , pk = pk_XPACK;
 			break;
 		}
 		/* Add a path box, fill from var/inifile */
@@ -521,19 +740,46 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				PATHTXT);
 			gtk_entry_set_text(GTK_ENTRY(widget), txt);
 			break;
-		/* Add a box with "OK"/"Cancel", or something like */
-		case op_OKBOX:
+		/* Add a color picker box, w/field array, & leave unfilled(!) */
+		case op_COLOR: case op_TCOLOR:
+			widget = cpick_create();
+			cpick_set_opacity_visibility(widget, op == op_TCOLOR);
+			gtk_widget_show(widget);
+			have_spins = TRUE;
+			pk = pk_PACK;
+			break;
+		/* Add a colorlist box, fill from fields */
+		case op_COLORLIST: case op_COLORLISTN:
 		{
-			GtkWidget *ok_bt, *cancel_bt;
+			r[0] = widget = colorlist(wp[0], v, ddata, pp - 1, r + 2);
+			r[1] = pp - 1;
+			r += 2;
+			if (pp[6]) *r++ = res , *r++ = pp + 5; // click event
+			*r++ = res; *r++ = pp + 3; // select event
+			continue;
+		}
+		/* Add a box with "OK"/"Cancel", or something like */
+		case op_OKBOX: case op_EOKBOX:
+		{
+			GtkWidget *ok_bt, *cancel_bt, *box;
 
 			ag = gtk_accel_group_new();
  			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 
-			--wp; wp[0] = widget = pack(wp[1], gtk_hbox_new(TRUE, 0));
+			--wp; wp[0] = widget = gtk_hbox_new(TRUE, 0);
 			gtk_container_set_border_width(GTK_CONTAINER(widget),
 				GET_BORDER(OKBOX));
 			gtk_widget_show(widget);
-			if (!lp) break; // empty box for separate buttons
+			box = widget;
+			if (op == op_EOKBOX) // clustered to right side
+			{
+				box = gtk_hbox_new(FALSE, 0);
+				gtk_widget_show(box);
+// !!! Min width = 260
+				pack_end(box, widget_align_minsize(widget, 260, -1));
+			}
+			pack(wp[1], box);
+			if (ref < 2) break; // empty box for separate buttons
 			*r++ = widget;
 			*r++ = pp - 1;
 
@@ -592,8 +838,25 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			r = add_click(r, res, pp + 1, widget, window);
 			continue;
 		}
+		/* Add a toggle button to OK-box */
+		case op_OKTOGGLE:
+			*r++ = widget = xpack(wp[0],
+				gtk_toggle_button_new_with_label(_(pp[1])));
+			*r++ = pp - 1;
+			gtk_container_set_border_width(GTK_CONTAINER(widget),
+				GET_BORDER(OKBTN));
+			gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
+			gtk_widget_show(widget);
+			if (pp[3])
+			{
+				gtk_signal_connect(GTK_OBJECT(widget), "toggled",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				*r++ = res;
+				*r++ = pp + 2;
+			}
+			continue;
 		/* Add a clickable button to table slot */
-		case op_TLBUTTON:
+		case op_BUTTON: case op_TLBUTTON:
 			*r++ = widget = gtk_button_new_with_label(_(v));
 			*r++ = pp - 1;
 			gtk_widget_show(widget);
@@ -603,6 +866,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Padding = 5
 			tpad = 5;
 			pk = pk_TABLEp;
+			if (op == op_TLBUTTON) break;
+// !!! Border = 4
+			cw = 4;
+			pk = pk_XPACK;
 			break;
 		/* Call a function */
 		case op_EXEC:
@@ -650,12 +917,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_INSENS:
 			gtk_widget_set_sensitive(*origin_slot(r - 2), FALSE);
 			continue;
-#if 0
-		/* Set border on container widget */
-		case op_SETBORDER:
-			gtk_container_set_border_width(GTK_CONTAINER(wp[0])), (int)v);
-			continue;
-#endif
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
 		{
@@ -665,17 +926,22 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			switch (what)
 			{
 			case op_SPIN: case op_XSPIN:
-			case op_TSPIN: case op_TLSPIN:
+			case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 			case op_SPINa: case op_XSPINa: case op_TSPINa:
+			case op_FSPIN:
 				spin_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
-			case op_TSPINSLIDE:
+			case op_TSPINSLIDE: case op_HTSPINSLIDE:
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_CHECK: case op_TLCHECK: case op_CHECKb:
 				gtk_signal_connect(GTK_OBJECT(*slot), "toggled",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				break;
+			case op_COLOR: case op_TCOLOR:
+				gtk_signal_connect(GTK_OBJECT(*slot), "color_changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			}
@@ -686,7 +952,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			continue;
 		/* Set nondefault border size */
-		case op_BOR_TABLE: case op_BOR_TSPIN: case op_BOR_TLLABEL:
+		case op_BOR_TABLE: case op_BOR_SPIN: case op_BOR_TLLABEL:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_OKBTN:
 			borders[op - op_BOR_0] = (int)v - DEF_BORDER;
 			continue;
@@ -699,23 +965,27 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 		}
 		*(wp - 1) = widget; // pre-stack
+		/* Border this */
+		if (cw) gtk_container_set_border_width(GTK_CONTAINER(widget), cw);
 		/* Frame this */
 		if (pk & pkf_FRAME)
 			widget = add_with_frame(NULL, _(pp[--lp]), widget);
 		/* Pack this */
 		switch (n = pk & pk_MASK)
 		{
-		case pk_PACK: pack(wp[0], widget); break;
-		case pk_PACK5: pack5(wp[0], widget); break;
+		case pk_PACK: tpad = 0;
+		case pk_PACKp:
+			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
+				FALSE, FALSE, tpad);
+			break;
 		case pk_XPACK: xpack(wp[0], widget); break;
 		case pk_PACKEND: pack_end(wp[0], widget); break;
-		case pk_TABLEp: tpad += tpad << 16; // X and Y
-		case pk_TABLE:
-			table_it(wp[0], widget, (int)pp[--lp], tpad);
+		case pk_TABLE: case pk_TABLEx: case pk_TABLEp:
+			table_it(wp[0], widget, (int)pp[--lp], tpad, n);
 			break;
 		case pk_TABLE2: case pk_TABLE2x:
 		{
-			int y = next_table_level(wp[0]);
+			int y = next_table_level(wp[0], FALSE);
 			add_to_table(_(pp[--lp]), wp[0], y, 0, tpad);
 			gtk_table_attach(GTK_TABLE(wp[0]), widget, 1, 2,
 				y, y + 1, GTK_EXPAND | GTK_FILL,
@@ -740,17 +1010,26 @@ static void *do_query(char *data, void **wdata, int mode)
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
+		case op_WTAGS:
+			// For now, only this
+			if (!(mode & 1) && v) update_window_spin(*wdata);
+			break;
 		case op_SPIN: case op_XSPIN:
-		case op_TSPIN: case op_TLSPIN:
+		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
-		case op_TSPINSLIDE:
+		case op_FSPIN:
+			*(int *)v = rint((mode & 1 ?
+				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
+				read_float_spin(*wdata)) * 100);
+			break;
+		case op_TSPINSLIDE: case op_HTSPINSLIDE:
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
-		case op_CHECK: case op_TLCHECK:
+		case op_CHECK: case op_TLCHECK: case op_OKTOGGLE:
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
 			break;
@@ -759,8 +1038,15 @@ static void *do_query(char *data, void **wdata, int mode)
 				GTK_TOGGLE_BUTTON(*wdata)));
 			break;
 		case op_RPACK: case op_RPACKD: case op_FRPACK:
+		case op_COLORLIST: case op_COLORLISTN:
 			break; // self-reading
-		case op_OPT: case op_TLOPT:
+		case op_COLOR:
+			*(int *)v = cpick_get_colour(*wdata, NULL);
+			break;
+		case op_TCOLOR:
+			*(int *)v = cpick_get_colour(*wdata, (int *)v + 1);
+			break;
+		case op_OPT: case op_XOPT: case op_TLOPT:
 			*(int *)v = wj_option_menu_get_history(*wdata);
 			break;
 		case op_PATH:
@@ -802,17 +1088,36 @@ void cmd_set(void **slot, int v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
-	case op_TSPINSLIDE:
+	case op_TSPINSLIDE: case op_HTSPINSLIDE:
 		mt_spinslide_set_value(slot[0], v);
 		break;
 	case op_SPIN: case op_XSPIN:
-	case op_TSPIN: case op_TLSPIN:
+	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 	case op_SPINa: case op_XSPINa: case op_TSPINa:
 		gtk_spin_button_set_value(slot[0], v);
+		break;
+	case op_FSPIN:
+		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_PLAINBOOK:
 		gtk_notebook_set_page(slot[0], v);
 		break;
+	}
+}
+
+void cmd_set2(void **slot, int v0, int v1)
+{
+// !!! Support only what actually used on, and their brethren
+	switch (GET_OP(slot))
+	{
+	case op_COLOR: case op_TCOLOR:
+		cpick_set_colour(slot[0], v0, v1);
+		break;
+	case op_COLORLIST: case op_COLORLISTN:
+	{
+		colorlist_set_color(slot[0], v0, v1);
+		break;
+	}
 	}
 }
 
@@ -821,12 +1126,12 @@ void cmd_set3(void **slot, int *v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
-	case op_TSPINSLIDE:
+	case op_TSPINSLIDE: case op_HTSPINSLIDE:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
 		mt_spinslide_set_value(slot[0], v[0]);
 		break;
 	case op_SPIN: case op_XSPIN:
-	case op_TSPIN: case op_TLSPIN:
+	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 	case op_SPINa: case op_XSPINa: case op_TSPINa:
 		spin_set_range(slot[0], v[1], v[2]);
 		gtk_spin_button_set_value(slot[0], v[0]);
@@ -834,8 +1139,36 @@ void cmd_set3(void **slot, int *v)
 	}
 }
 
+void cmd_set4(void **slot, int *v)
+{
+// !!! Support only what actually used on, and their brethren
+	int op = GET_OP(slot);
+	if ((op == op_COLOR) || (op == op_TCOLOR))
+	{
+		cpick_set_colour_previous(slot[0], v[2], v[3]);
+		cpick_set_colour(slot[0], v[0], v[1]);
+	}
+}
+
 /* Passively query one slot, show where the result went */
 void *cmd_read(void **slot, void *ddata)
 {
 	return (do_query(ddata, origin_slot(slot), 3));
+}
+
+void cmd_repaint(void **slot)
+{
+	int op = GET_OP(slot);
+	if ((op == op_COLORLIST) || (op == op_COLORLISTN))
+	/* Stupid GTK+ does nothing for gtk_widget_queue_draw(allcol_list) */
+		gtk_container_foreach(GTK_CONTAINER(slot[0]),
+			(GtkCallback)gtk_widget_queue_draw, NULL);
+	else gtk_widget_queue_draw(slot[0]);
+}
+
+void cmd_scroll(void **slot, int idx)
+{
+	int op = GET_OP(slot);
+	if ((op == op_COLORLIST) || (op == op_COLORLISTN))
+		colorlist_scroll_in(slot[0], idx);
 }

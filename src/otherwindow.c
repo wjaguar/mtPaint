@@ -978,8 +978,6 @@ static void click_sisca_ok(sisca_dd *dt, void **wdata)
 {
 	int nw, nh, ox, oy, res, scale_type = 0, gcor = FALSE;
 
-	// !!! Should teach run_query() to do this by itself, when required
-	update_window_spin(GET_REAL_WINDOW(wdata)); // For aspect ratio handling
 	run_query(wdata);
 	nw = dt->w; nh = dt->h; ox = dt->x; oy = dt->y;
 
@@ -1101,8 +1099,6 @@ void pressed_scale_size(int mode)
 
 ///	PALETTE EDITOR WINDOW
 
-png_color brcosa_palette[256];
-
 enum {
 	CHOOK_CANCEL = 0,
 	CHOOK_PREVIEW,
@@ -1113,339 +1109,184 @@ enum {
 	CHOOK_CHANGE
 };
 
-static chanlist ctable_;
-/* "Alpha" here is in fact opacity, so is separate from channels */
-static unsigned char *opctable;
-static GtkWidget *allcol_window, *allcol_list;
-static int allcol_idx, allcol_preview;
-static colour_hook allcol_hook;
+typedef struct {
+	unsigned char rgb[768]; // everything needs it
+	unsigned char opac[256]; // only EDIT_OVERLAYS uses it
+	int AB[2][NUM_CHANNELS]; // for EDIT_AB
+	int csrange, csinv, csmode; // for EDIT_CSEL
+	int cgrid, tgrid, grid_min, tgrid_dx, tgrid_dy; // for GRID
+} csdata_dd;
+
+typedef struct colsel_dd colsel_dd;
+typedef void (*colsel_fn)(colsel_dd *dt, int what);
+
+struct colsel_dd {
+	colsel_fn select;
+	char *name, **cnames;
+	int opflag, mpflag;
+	int cnt, idx;
+
+	int preview;
+	int rflag; // recursion
+
+	int color[2];
+	void **clist, **csel;
+
+	int is_pal;
+	int n0, n1, scale;
+	void **fbutton, **fspin, **tspin;
+
+	int is_AB;
+	int pos_AB, v_AB[NUM_CHANNELS];
+	void **pspin_AB, **spin_AB[NUM_CHANNELS];
+
+	int is_csel;
+	void **fspin_csel;
+
+	int is_grid;
+
+	csdata_dd v, v0; // primary and backup
+};
 
 
-static void allcol_ok(GtkWidget *window)
+/* Put current color in list into selector */
+static void colsel_show_idx(colsel_dd *dt)
 {
-	update_window_spin(window);
-	allcol_hook(CHOOK_OK);
-	gtk_widget_destroy(window);
-	free(ctable_[CHN_IMAGE]);
+	unsigned char *c = dt->v.rgb + dt->idx * 3;
+	int color[4];
+
+	color[2] = color[0] = MEM_2_INT(c, 0);
+	color[3] = color[1] = dt->v.opac[dt->idx];
+	dt->rflag = TRUE; // prevent recursion
+	cmd_set4(dt->csel, color);
+	dt->rflag = FALSE;
 }
 
-static void allcol_preview_toggle(GtkToggleButton *button, GtkWidget *window)
+static void color_refresh(colsel_dd *dt)
 {
-	allcol_hook((allcol_preview = button->active) ? CHOOK_PREVIEW : CHOOK_UNVIEW);
-}
-
-static gboolean allcol_cancel(GtkWidget *window)
-{
-	allcol_hook(CHOOK_CANCEL);
-	gtk_widget_destroy(window);
-	free(ctable_[CHN_IMAGE]);
-	return (FALSE);
-}
-
-static void color_refresh()
-{
-	gtk_list_select_item(GTK_LIST(allcol_list), allcol_idx);
-
-	/* Stupid GTK+ does nothing for gtk_widget_queue_draw(allcol_list) */
-	gtk_container_foreach(GTK_CONTAINER(allcol_list),
-		(GtkCallback)gtk_widget_queue_draw, NULL);
-}
-
-static gboolean color_expose( GtkWidget *widget, GdkEventExpose *event, gpointer user_data )
-{
-	unsigned char *rgb, *lc = ctable_[CHN_IMAGE] + (int)user_data * 3;
-	int x = event->area.x, y = event->area.y, w = event->area.width, h = event->area.height;
-	int i, j = w * 3;
-
-	rgb = malloc(j);
-	if (rgb)
-	{
-		for (i = 0; i < j; i += 3)
-		{
-			rgb[i + 0] = lc[0];
-			rgb[i + 1] = lc[1];
-			rgb[i + 2] = lc[2];
-		}
-		gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-			x, y, w, h, GDK_RGB_DITHER_NONE, rgb, 0);
-		free(rgb);
-	}
-
-	return FALSE;
+	colsel_show_idx(dt);
+	cmd_repaint(dt->clist);
 }
 
 
-static void color_set(GtkWidget *cs, gpointer user_data)
+static void do_allcol(csdata_dd *v)
 {
-	unsigned char *lc;
-	int idx, rgb, opacity;
-	GtkWidget *widget;
-	GdkColor c;
-
-	rgb = cpick_get_colour(cs, &opacity);
-	widget = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(cs)));
-
-	idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
-	lc = ctable_[CHN_IMAGE] + idx * 3;
-	lc[0] = INT_2_R(rgb);
-	lc[1] = INT_2_G(rgb);
-	lc[2] = INT_2_B(rgb);
-	opctable[idx] = opacity;
-	c.pixel = 0;
-	c.red = lc[0] * 257; c.green = lc[1] * 257; c.blue = lc[2] * 257;
-	gdk_colormap_alloc_color( gdk_colormap_get_system(), &c, FALSE, TRUE );
-	gtk_widget_queue_draw(widget);
-	allcol_hook(CHOOK_SET);
-}
-
-static void color_select( GtkList *list, GtkWidget *widget, gpointer user_data )
-{
-	unsigned char *lc;
-	int rgb, idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
-	GtkWidget *cs = GTK_WIDGET(user_data);
-
-	gtk_object_set_user_data( GTK_OBJECT(cs), widget );
-	gtk_signal_handler_block_by_func( GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL );
-
-	lc = ctable_[CHN_IMAGE] + idx * 3;
-	rgb = MEM_2_INT(lc, 0);
-	cpick_set_colour_previous(cs, rgb, opctable[idx]);
-	cpick_set_colour(cs, rgb, opctable[idx]);
-	allcol_idx = idx;
-
-	gtk_signal_handler_unblock_by_func( GTK_OBJECT(cs), GTK_SIGNAL_FUNC(color_set), NULL );
-	allcol_hook(CHOOK_SELECT);
-}
-
-static void colour_window(GtkWidget *win, GtkWidget *extbox, int cnt, int idx,
-	char **cnames, int alpha, colour_hook chook, GtkSignalFunc lhook)
-{
-	GtkWidget *vbox, *hbox, *hbut;
-	GtkWidget *col_list, *l_item, *hbox2, *label, *drw, *swindow, *viewport;
-	GtkWidget *cs;
-	GtkAdjustment *adj;
-	char txt[64], *tmp = txt;
-	int i;
-
-
-	if (idx >= cnt) idx = 0;
-	cs = cpick_create();
-	cpick_set_opacity_visibility( cs, alpha );
-
-	gtk_signal_connect( GTK_OBJECT(cs), "color_changed", GTK_SIGNAL_FUNC(color_set), NULL );
-
-	allcol_window = win;
-	allcol_hook = chook;
-	allcol_preview = FALSE;
-
-	swindow = gtk_scrolled_window_new(NULL, NULL);
-	gtk_widget_show(swindow);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (swindow),
-		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-
-	viewport = gtk_viewport_new (NULL, NULL);
-	gtk_widget_show(viewport);
-	gtk_container_add (GTK_CONTAINER (swindow), viewport);
-
-	allcol_idx = idx;
-	allcol_list = col_list = gtk_list_new();
-	gtk_container_add ( GTK_CONTAINER(viewport), col_list );
-	gtk_widget_show( col_list );
-
-	for (i = 0; i < cnt; i++)
-	{
-		l_item = gtk_list_item_new();
-		gtk_object_set_user_data(GTK_OBJECT(l_item), (gpointer)i);
-		if (lhook) gtk_signal_connect(GTK_OBJECT(l_item),
-			"button_press_event", lhook, (gpointer)i);
-		gtk_container_add( GTK_CONTAINER(col_list), l_item );
-		gtk_widget_show( l_item );
-
-		hbox2 = gtk_hbox_new( FALSE, 3 );
-		gtk_widget_show( hbox2 );
-		gtk_container_set_border_width( GTK_CONTAINER(hbox2), 3 );
-		gtk_container_add( GTK_CONTAINER(l_item), hbox2 );
-
-		drw = pack(hbox2, gtk_drawing_area_new());
-		gtk_drawing_area_size( GTK_DRAWING_AREA(drw), 20, 20 );
-		gtk_signal_connect(GTK_OBJECT(drw), "expose_event",
-			GTK_SIGNAL_FUNC(color_expose), (gpointer)i);
-		gtk_widget_show(drw);
-
-		if (cnames) tmp = cnames[i];
-		else sprintf(txt, "%i", i);
-		label = xpack(hbox2, gtk_label_new(tmp));
-		gtk_widget_show( label );
-		gtk_misc_set_alignment( GTK_MISC(label), 0.0, 1.0 );
-	}
-	gtk_list_set_selection_mode(GTK_LIST(col_list), GTK_SELECTION_BROWSE);
-	/* gtk_list_select_*() don't work in GTK_SELECTION_BROWSE mode */
-	gtk_container_set_focus_child(GTK_CONTAINER(col_list),
-		GTK_WIDGET(g_list_nth(GTK_LIST(col_list)->children, idx)->data));
-	gtk_signal_connect(GTK_OBJECT(col_list), "select_child",
-		GTK_SIGNAL_FUNC(color_select), cs);
-
-	/* Make listbox top-to-bottom when it's useful or just not harmful */
-	if ((cnt > 6) || !extbox)
-	{
-		hbox = gtk_hbox_new(FALSE, 5);
-		gtk_container_add( GTK_CONTAINER(allcol_window), hbox );
-		pack(hbox, swindow);
-		vbox = xpack(hbox, gtk_vbox_new(FALSE, 5));
-		gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
-		gtk_box_pack_start (GTK_BOX (vbox), cs, TRUE, FALSE, 0);
-	}
-	else
-	{
-		vbox = gtk_vbox_new( FALSE, 5 );
-		gtk_container_set_border_width( GTK_CONTAINER(vbox), 5 );
-		gtk_container_add( GTK_CONTAINER(allcol_window), vbox );
-		hbox = xpack(vbox, gtk_hbox_new(FALSE, 10));
-		pack(hbox, swindow);
-		xpack(hbox, cs);
-	}
-	gtk_widget_show(vbox);
-	gtk_widget_show(hbox);
-
-	if (extbox) pack(vbox, extbox);
-
-	hbut = OK_box(0, allcol_window, _("OK"), GTK_SIGNAL_FUNC(allcol_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(allcol_cancel));
-	OK_box_add_toggle(hbut, _("Preview"), GTK_SIGNAL_FUNC(allcol_preview_toggle));
-
-	hbox = pack(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-	pack_end(hbox, widget_align_minsize(hbut, 260, -1));
-
-	gtk_widget_show( cs );
-	gtk_window_set_transient_for( GTK_WINDOW(allcol_window), GTK_WINDOW(main_window) );
-	gtk_widget_show( allcol_window );
-
-#if GTK_MAJOR_VERSION == 1
-	handle_events();
-	/* GTK2 calls select handler on its own, GTK1 needs prodding */
-	gtk_list_select_item(GTK_LIST(col_list), idx);
-	/* Re-render sliders, adjust option menu */
-	gtk_widget_queue_resize(allcol_window);
-#endif
-
-	/* Scroll list to selected item */
-	adj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(swindow));
-	if (adj->upper > adj->page_size)
-	{
-		float f = adj->upper * (idx + 0.5) / cnt - adj->page_size * 0.5;
-		adj->value = f < 0.0 ? 0.0 : f > adj->upper - adj->page_size ?
-			adj->upper - adj->page_size : f;
-		gtk_adjustment_value_changed(adj);
-	}
-}
-
-static void do_allcol()
-{
+	unsigned char *rgb = v->rgb;
 	int i;
 
 	for (i = 0; i < mem_cols; i++)
 	{
-		mem_pal[i].red = ctable_[CHN_IMAGE][i * 3 + 0];
-		mem_pal[i].green = ctable_[CHN_IMAGE][i * 3 + 1];
-		mem_pal[i].blue = ctable_[CHN_IMAGE][i * 3 + 2];
+		mem_pal[i].red = rgb[0];
+		mem_pal[i].green = rgb[1];
+		mem_pal[i].blue = rgb[2];
+		rgb += 3;
 	}
 	update_stuff(UPD_PAL);
 }
 
-static void do_allover(int idx)
+static void do_allover(csdata_dd *v)
 {
-	unsigned char *lc = ctable_[CHN_IMAGE] + idx * 3;
+	unsigned char *rgb = v->rgb;
 	int i;
 
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
-		channel_rgb[i][0] = lc[i * 3 + 0];
-		channel_rgb[i][1] = lc[i * 3 + 1];
-		channel_rgb[i][2] = lc[i * 3 + 2];
-		channel_opacity[i] = opctable[idx + i];
+		channel_rgb[i][0] = rgb[0];
+		channel_rgb[i][1] = rgb[1];
+		channel_rgb[i][2] = rgb[2];
+		channel_opacity[i] = v->opac[i];
+		rgb += 3;
 	}
 	update_stuff(UPD_RENDER);
 }
 
-static void do_AB(int idx)
+static void do_AB(csdata_dd *v)
 {
-	unsigned char *lc = ctable_[CHN_IMAGE] + idx * 3;
 	png_color *A0, *B0;
 	A0 = mem_img_bpp == 1 ? &mem_pal[mem_col_A] : &mem_col_A24;
 	B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
 
-	A0->red = lc[0]; A0->green = lc[1]; A0->blue = lc[2];
-	B0->red = lc[3]; B0->green = lc[4]; B0->blue = lc[5];
+	A0->red = v->rgb[0]; A0->green = v->rgb[1]; A0->blue = v->rgb[2];
+	B0->red = v->rgb[3]; B0->green = v->rgb[4]; B0->blue = v->rgb[5];
 	update_stuff(mem_img_bpp == 1 ? UPD_PAL : UPD_AB);
 }
 
-static void set_csel()
+static void set_csel(csdata_dd *v)
 {
-	unsigned char *lc = ctable_[CHN_IMAGE];
-	csel_data->center = RGB_2_INT(lc[0], lc[1], lc[2]);
-	csel_data->center_a = ctable_[CHN_ALPHA][0];
-	csel_data->limit = RGB_2_INT(lc[3], lc[4], lc[5]);
-	csel_data->limit_a = ctable_[CHN_ALPHA][1];
-	csel_preview = RGB_2_INT(lc[6], lc[7], lc[8]);
-/* !!! Alpha is disabled for now - later will be opacity !!! */
-//	csel_preview_a = opctable[2];
+	unsigned char *rgb = v->rgb;
+	csel_data->center = MEM_2_INT(rgb, 0);
+	csel_data->limit = MEM_2_INT(rgb, 3);
+	csel_preview = MEM_2_INT(rgb, 6);
+/* !!! Disabled for now - later will be opacity */
+//	csel_preview_a = v->opac[2];
+	csel_data->mode = v->csmode;
+	csel_data->range = v->csrange / 100.0;
+	csel_data->invert = v->csinv;
 }
 
-static GtkWidget *range_spins[2];
+static void set_grid(csdata_dd *v)
+{
+	unsigned char *rgb = v->rgb;
+	int i;
 
-static void select_colour(int what)
+	for (i = 0; i < GRID_MAX; i++)
+	{
+		grid_rgb[i] = MEM_2_INT(rgb, 0);
+		rgb += 3;
+	}
+	color_grid = v->cgrid;
+	show_tile_grid = v->tgrid;
+	mem_grid_min = v->grid_min;
+	tgrid_dx = v->tgrid_dx;
+	tgrid_dy = v->tgrid_dy;
+}
+
+static void select_colour(colsel_dd *dt, int what)
 {
 	switch (what)
 	{
 	case CHOOK_UNVIEW: /* Disable preview */
 	case CHOOK_CANCEL: /* Cancel */
-		mem_pal_copy(mem_pal, brcosa_palette);
-		update_stuff(UPD_PAL);
+		do_allcol(&dt->v0);
 		break;
 	case CHOOK_SET: /* Set */
-		if (!allcol_preview) break;
+		if (!dt->preview) break;
 	case CHOOK_PREVIEW: /* Preview */
-		do_allcol();
+		do_allcol(&dt->v);
 		break;
 	case CHOOK_OK: /* OK */
-		mem_pal_copy(mem_pal, brcosa_palette);
+		do_allcol(&dt->v0);
 		spot_undo(UNDO_PAL);
-		do_allcol();
+		do_allcol(&dt->v);
 		break;
 	}
 }
 
-static gint click_colour(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+static void click_colour(colsel_dd *dt, void **wdata, int what, void **where,
+	colorlist_ext *xdata)
 {
 	/* Middle click sets "from" */
-	if ((event->type == GDK_BUTTON_PRESS) && (event->button == 2))
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(range_spins[0]),
-			(int)user_data);
+	if (xdata->button == 2) cmd_set(dt->fspin, xdata->idx);
 
 	/* Right click sets "to" */
-	if ((event->type == GDK_BUTTON_PRESS) && (event->button == 3))
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(range_spins[1]),
-			(int)user_data);
-
-	/* Let click processing continue */
-	return (FALSE);
+	if (xdata->button == 3) cmd_set(dt->tspin, xdata->idx);
 }
 
-static void set_range_spin(GtkButton *button, GtkWidget *spin)
+static void set_range_spin(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), allcol_idx);
+	cmd_set(origin_slot(where) == dt->fbutton ? dt->fspin : dt->tspin, dt->idx);
 }
 
-static void make_cscale(GtkButton *button, gpointer user_data)
+static void make_cscale(colsel_dd *dt, void **wdata)
 {
 	int i, n, start, stop, start0, mode;
 	unsigned char *c0, *c1, *lc;
 	double d;
 
-	mode = wj_option_menu_get_history(GTK_WIDGET(user_data));
-	start = start0 = read_spin(range_spins[0]);
-	stop = read_spin(range_spins[1]);
+	run_query(wdata);
+	mode = dt->scale;
+	start = start0 = dt->n0;
+	stop = dt->n1;
 
 	if (mode <= 2) /* RGB/sRGB/HSV */
 	{
@@ -1454,8 +1295,8 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 	}
 	else if (stop == start) return; /* Gradient */
 
-	c0 = lc = ctable_[CHN_IMAGE] + start * 3;
-	c1 = ctable_[CHN_IMAGE] + stop * 3;
+	c0 = lc = dt->v.rgb + start * 3;
+	c1 = dt->v.rgb + stop * 3;
 	d = n = stop - start;
 
 	switch (mode)
@@ -1560,11 +1401,11 @@ static void make_cscale(GtkButton *button, gpointer user_data)
 		break;
 	}
 	}
-	color_refresh();
-	select_colour(CHOOK_SET);
+	color_refresh(dt);
+	select_colour(dt, CHOOK_SET);
 }
 
-static void select_overlay(int what)
+static void select_overlay(colsel_dd *dt, int what)
 {
 	char txt[64];
 	int i, j;
@@ -1573,15 +1414,15 @@ static void select_overlay(int what)
 	{
 	case CHOOK_UNVIEW: /* Disable preview */
 	case CHOOK_CANCEL: /* Cancel */
-		do_allover(NUM_CHANNELS);	// Restore original values
+		do_allover(&dt->v0);	// Restore original values
 		break;
 	case CHOOK_SET: /* Set */
-		if (!allcol_preview) break;
+		if (!dt->preview) break;
 	case CHOOK_PREVIEW: /* Preview */
-		do_allover(0);
+		do_allover(&dt->v);
 		break;
 	case CHOOK_OK: /* OK */
-		do_allover(0);
+		do_allover(&dt->v);
 		for (i = 0; i < NUM_CHANNELS; i++)	// Save all settings to ini file
 		{
 			for (j = 0; j < 4; j++)
@@ -1595,78 +1436,70 @@ static void select_overlay(int what)
 	}
 }
 
-static GtkWidget *AB_spins[NUM_CHANNELS];
-
-static void select_AB(int what)
+static void select_AB(colsel_dd *dt, int what)
 {
-	int i;
+	int i, *v;
 
 	switch (what)
 	{
 	case CHOOK_UNVIEW: /* Disable preview */
 	case CHOOK_CANCEL: /* Cancel */
-		do_AB(2);
+		do_AB(&dt->v0);
 		break;
 	case CHOOK_OK: /* OK */
-		do_AB(2);
+		do_AB(&dt->v0);
 		spot_undo(UNDO_PAL);
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 		{
-			channel_col_A[i] = ctable_[i][0];
-			channel_col_B[i] = ctable_[i][1];
+			channel_col_A[i] = dt->v.AB[0][i];
+			channel_col_B[i] = dt->v.AB[1][i];
 		}
-		do_AB(0);
+		do_AB(&dt->v);
 		break;
 	case CHOOK_SET: /* Set */
-		if (!allcol_preview) break;
+		if (!dt->preview) break;
 	case CHOOK_PREVIEW: /* Preview */
-		do_AB(0);
+		do_AB(&dt->v);
 		break;
 	case CHOOK_SELECT: /* Select */
+		v = dt->v.AB[dt->idx];
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
-		{
-			mt_spinslide_set_value(AB_spins[i], ctable_[i][allcol_idx]);
-		}
+			cmd_set(dt->spin_AB[i], v[i]);
 		break;
 	}
 }
 
-static void AB_spin_moved(GtkAdjustment *adj, gpointer user_data)
+static void AB_spin_moved(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	ctable_[(int)user_data][allcol_idx] = ADJ2INT(adj);
+	int *w = cmd_read(where, dt);
+	dt->v.AB[dt->idx][w - dt->v_AB] = *w;
 }
 
-static void posterize_AB(GtkButton *button, gpointer user_data)
+static void posterize_AB(colsel_dd *dt, void **wdata)
 {
 	static const int posm[8] = {0, 0xFF00, 0x5500, 0x2480, 0x1100,
 				 0x0840, 0x0410, 0x0204};
-	unsigned char *lc = ctable_[CHN_IMAGE];
+	unsigned char *lc = dt->v.rgb;
 	int i, pm, ps;
 
-	ps = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(user_data));
-	inifile_set_gint32("posterizeInt", ps);
+	cmd_read(dt->pspin_AB, dt);
+	inifile_set_gint32("posterizeInt", ps = dt->pos_AB);
 	if (ps >= 8) return;
 	pm = posm[ps]; ps = 8 - ps;
 
 	for (i = 0; i < 6; i++) lc[i] = ((lc[i] >> ps) * pm) >> 8;
-	color_refresh();
-	select_AB(CHOOK_SET);
+	color_refresh(dt);
+	select_AB(dt, CHOOK_SET);
 }
 
-static GtkWidget *csel_spin, *csel_toggle;
-static unsigned char csel_save[CSEL_SVSIZE];
-static int csel_preview0, csel_preview_a0;
-
-static void select_csel(int what)
+static void select_csel(colsel_dd *dt, int what)
 {
 	int old_over = csel_overlay;
 
 	switch (what)
 	{
 	case CHOOK_CANCEL: /* Cancel */
-		memcpy(csel_data, csel_save, CSEL_SVSIZE);
-		csel_preview = csel_preview0;
-		csel_preview_a = csel_preview_a0;
+		set_csel(&dt->v0);
 		csel_reset(csel_data);
 	case CHOOK_UNVIEW: /* Disable preview */
 		csel_overlay = 0;
@@ -1677,9 +1510,7 @@ static void select_csel(int what)
 	case CHOOK_CHANGE: /* Range/mode/invert controls changed */
 		if (!csel_overlay) break; // No preview
 	case CHOOK_OK: /* OK */
-		csel_data->range = read_float_spin(csel_spin);
-		csel_data->invert = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(csel_toggle));
-		set_csel();
+		set_csel(&dt->v);
 		csel_reset(csel_data);
 		if (what == CHOOK_OK)
 		{
@@ -1689,17 +1520,17 @@ static void select_csel(int what)
 		else update_stuff(UPD_RENDER);
 		break;
 	case CHOOK_SET: /* Set */
-		set_csel();
-		if (allcol_idx == 1) /* Limit color changed */
+		set_csel(&dt->v);
+		if (dt->idx == 1) /* Limit color changed */
 		{
 			// This triggers CHOOK_CHANGE which will redraw
-			gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin),
-				csel_eval(csel_data->mode, csel_data->center, csel_data->limit));
+			cmd_set(dt->fspin_csel, rint(csel_eval(csel_data->mode,
+				csel_data->center, csel_data->limit) * 100));
 		}
 		else if (csel_overlay)
 		{
 			/* Center color changed */
-			if (allcol_idx == 0) csel_reset(csel_data);
+			if (!dt->idx) csel_reset(csel_data);
 			/* Else, overlay color changed */
 			update_stuff(UPD_RENDER);
 		}
@@ -1707,310 +1538,316 @@ static void select_csel(int what)
 	}
 }
 
-static void csel_controls_changed()
+static void csel_controls_changed(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	select_csel(CHOOK_CHANGE);
+	if (cmd_read(where, dt) == &dt->v.csmode)
+	{
+		set_csel(&dt->v);
+		// This triggers CHOOK_CHANGE which will redraw
+		cmd_set(dt->fspin_csel, rint(csel_eval(csel_data->mode,
+			csel_data->center, csel_data->limit) * 100));
+	}
+	else select_csel(dt, CHOOK_CHANGE);
 }
 
-static void csel_mode_changed(GtkToggleButton *widget, gpointer user_data)
+static void select_grid(colsel_dd *dt, int what)
 {
-	if (!gtk_toggle_button_get_active(widget)) return;
-	if (csel_data->mode == (int)user_data) return;
-	csel_data->mode = (int)user_data;
-	set_csel();
-	// This triggers CHOOK_CHANGE which will redraw
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(csel_spin),
-		csel_eval(csel_data->mode, csel_data->center, csel_data->limit));
-}
-
-typedef struct {
-	GtkWidget *ctoggle, *szspin;
-	GtkWidget *ttoggle, *twspin, *thspin;
-	int color0[GRID_MAX];
-	int ctoggle0, size0;
-	int ttoggle0, tw0, th0;
-} grid_widgets;
-
-static void select_grid(int what)
-{
-	grid_widgets *gw = gtk_object_get_user_data(GTK_OBJECT(allcol_window));
-	int i;
-
 	switch (what)
 	{
 	case CHOOK_UNVIEW: /* Disable preview */
 	case CHOOK_CANCEL: /* Cancel */
 		// Restore original values
-		memcpy(grid_rgb, gw->color0, sizeof(gw->color0));
-		color_grid = gw->ctoggle0;
-		mem_grid_min = gw->size0;
-		show_tile_grid = gw->ttoggle0;
-		tgrid_dx = gw->tw0;
-		tgrid_dy = gw->th0;
+		set_grid(&dt->v0);
 		break;
 	case CHOOK_CHANGE: /* Grid controls changed */
 	case CHOOK_SET: /* Set */
-		if (!allcol_preview) return;
+		if (!dt->preview) return;
 	case CHOOK_PREVIEW: /* Preview */
 	case CHOOK_OK: /* OK */
-		for (i = 0; i < GRID_MAX; i++)
-		{
-			unsigned char *tmp = ctable_[CHN_IMAGE] + i * 3;
-			grid_rgb[i] = MEM_2_INT(tmp, 0);
-		}
-		if (what == CHOOK_SET) break; // Color, not controls, changed
-		color_grid = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gw->ctoggle));
-		mem_grid_min = read_spin(gw->szspin);
-		show_tile_grid = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gw->ttoggle));
-		tgrid_dx = read_spin(gw->twspin);
-		tgrid_dy = read_spin(gw->thspin);
+		set_grid(&dt->v);
 		break;
 	default: return;
 	}
 	update_stuff(UPD_RENDER);
 }
 
-static void grid_controls_changed()
+static void grid_controls_changed(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	select_grid(CHOOK_CHANGE);
+	cmd_read(where, dt);
+	select_grid(dt, CHOOK_CHANGE);
 }
 
-static int alloc_ctable(int nslots)
+
+static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	int i, sz = nslots * (NUM_CHANNELS + 3);
-	unsigned char *mem = calloc(1, sz);
-	if (!mem) return (FALSE);
-	ctable_[CHN_IMAGE] = mem;
-	mem += nslots * 3;
-	for (i = CHN_IMAGE + 1; i < NUM_CHANNELS; i++)
+	void *cause = NULL;
+
+	if (dt->rflag) return; // skip recursive calls
+	if (what == op_EVT_CHANGE) cause = cmd_read(where, dt);
+
+	if (what == op_EVT_SELECT) // COLORLIST, self-updating
 	{
-		ctable_[i] = mem;
-		mem += nslots;
+		colsel_show_idx(dt); // Set selected color
+		dt->select(dt, CHOOK_SELECT);
 	}
-	opctable = mem;
-	return (TRUE);
+	else if (cause == &dt->color)
+	{
+		/* Opacity */
+		dt->v.opac[dt->idx] = dt->color[1];
+		/* Color; will update the RGB array */
+		cmd_set2(dt->clist, dt->idx, dt->color[0]);
+		dt->select(dt, CHOOK_SET);
+	}
+	else if (cause == &dt->preview)
+		dt->select(dt, dt->preview ? CHOOK_PREVIEW : CHOOK_UNVIEW);
+	else if (what == op_EVT_OK)
+	{
+		run_query(wdata); // for final updating, and for extra part
+		dt->select(dt, CHOOK_OK);
+		run_destroy(wdata);
+	}
+	else if (what == op_EVT_CANCEL)
+	{
+		dt->select(dt, CHOOK_CANCEL);
+		run_destroy(wdata);
+	}
 }
 
-void colour_selector( int cs_type )		// Bring up GTK+ colour wheel
-{
-	unsigned char *lc;
-	GtkWidget *win, *extbox, *button, *spin, *opt;
-	int i, j;
+#undef _
+#define _(X) X
 
+static char *scales_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
+static char *AB_txt[] = { "A", "B", NULL };
+static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview"), NULL };
+static char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
+static char *grid_txt[GRID_MAX + 1] = { _("Opaque"), _("Border"),
+	_("Transparent"), _("Tile "), _("Segment"), NULL };
+/* !!! "Tile " has a trailing space to be distinct from "Tile" in "Resize Canvas" */
+
+#if NUM_CHANNELS > CHN_MASK + 1
+#error "Not all channels listed in dialog"
+#endif
+
+#define WBbase colsel_dd
+static void *colsel_code[] = {
+	IF(mpflag), WPMOUSE,
+	WINDOWpm(name),
+	REF(clist),
+	IFx(is_pal, 1), // long-list form - for now only palette needs it
+		XHBOXb(5, 0),
+		COLORLISTN(cnt, idx, v.rgb, colsel_evt, click_colour),
+		XVBOXb(5, 5),
+	ENDIF(1),
+	UNLESSx(is_pal, 1), // short-list form (6 items or less)
+		XVBOXb(5, 5),
+		XHBOXb(10, 0),
+		COLORLIST(cnames, idx, v.rgb, colsel_evt, NULL),
+	ENDIF(1),
+	TRIGGER, // colorlist SELECT
+	REF(csel),
+	IF(opflag), TCOLOR(color), // with opacity
+	UNLESS(opflag), COLOR(color), // solid colors
+	EVENT(CHANGE, colsel_evt),
+	UNLESS(is_pal), WDONE,
+	/* Task-specific part */
+	BORDER(TABLE, 0),
+	IFx(is_pal, 1),
+		BORDER(SPIN, 0),
+		HBOX,
+		MLABEL(_("Scale")),
+		REF(fbutton), BUTTON(_("From"), set_range_spin),
+		REF(fspin), SPIN(n0, 0, 255),
+		BUTTON(_("To"), set_range_spin),
+		REF(tspin), SPIN(n1, 0, 255),
+		XOPT(scales_txt, 4, scale),
+		BUTTON(_("Create"), make_cscale),
+		WDONE,
+	ENDIF(1),
+	IFx(is_AB, 1),
+		HBOX,
+		BUTTON(_("Posterize"), posterize_AB),
+		REF(pspin_AB), SPIN(pos_AB, 1, 8),
+		WDONE,
+		TABLE(2, 3),
+		REF(spin_AB[CHN_ALPHA]),
+		HTSPINSLIDE(_("Alpha"), v_AB[CHN_ALPHA], 0, 255),
+		EVENT(CHANGE, AB_spin_moved),
+		REF(spin_AB[CHN_SEL]),
+		HTSPINSLIDE(_("Selection"), v_AB[CHN_SEL], 0, 255),
+		EVENT(CHANGE, AB_spin_moved),
+		REF(spin_AB[CHN_MASK]),
+		HTSPINSLIDE(_("Mask"), v_AB[CHN_MASK], 0, 255),
+		EVENT(CHANGE, AB_spin_moved),
+		WDONE,
+	ENDIF(1),
+	IFx(is_csel, 1),
+		HBOX,
+		MLABEL(_("Range")),
+		REF(fspin_csel),
+		FSPIN(v.csrange, 0, 76500), EVENT(CHANGE, csel_controls_changed),
+		CHECK(_("Inverse"), v.csinv), EVENT(CHANGE, csel_controls_changed),
+		RPACKe(csel_modes, 0, 1, v.csmode, csel_controls_changed),
+		WDONE,
+	ENDIF(1),
+	IFx(is_grid, 1),
+		BORDER(SPIN, 0),
+		TABLE(6, 2),
+		TLCHECK(_("Smart grid"), v.cgrid, 0, 0),
+		EVENT(CHANGE, grid_controls_changed),
+		TLCHECKl(_("Tile grid"), v.tgrid, 1, 0, 2),
+		EVENT(CHANGE, grid_controls_changed),
+		TLLABEL(_("Minimum grid zoom"), 0, 1),
+		TLXSPIN(v.grid_min, 2, 12, 1, 1),
+		EVENT(CHANGE, grid_controls_changed),
+		TLLABEL(_("Tile width"), 2, 1),
+		TLXSPIN(v.tgrid_dx, 2, MAX_WIDTH, 3, 1),
+		EVENT(CHANGE, grid_controls_changed),
+		TLLABEL(_("Tile height"), 4, 1),
+		TLXSPIN(v.tgrid_dy, 2, MAX_HEIGHT, 5, 1),
+		EVENT(CHANGE, grid_controls_changed),
+		WDONE,
+	ENDIF(1),
+	BORDER(OKBOX, 0),
+	EOKBOX(_("OK"), colsel_evt, _("Cancel"), colsel_evt),
+	OKTOGGLE(_("Preview"), preview, colsel_evt),
+	WSHOW
+};
+#undef WBbase
+
+void colour_selector(int cs_type)
+{
+	colsel_dd tdata, *dt;
+	unsigned char *rgb = tdata.v.rgb;
+	void **res;
+	int i;
+
+	memset(&tdata, 0, sizeof(tdata));
 	if (cs_type >= COLSEL_EDIT_ALL)
 	{
-		char *fromto[] = { _("From"), _("To") };
-		char *scales[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
+		tdata.select = select_colour;
+		tdata.name = _("Palette Editor");
+		tdata.mpflag = TRUE;
+		tdata.cnt = mem_cols;
+		tdata.idx = cs_type - COLSEL_EDIT_ALL;
+		tdata.is_pal = TRUE;
 
-		if (!alloc_ctable(256)) return;
-		lc = ctable_[CHN_IMAGE];
-		mem_pal_copy(brcosa_palette, mem_pal);	// Remember old settings
 		for (i = 0; i < mem_cols; i++)
 		{
-			lc[i * 3 + 0] = mem_pal[i].red;
-			lc[i * 3 + 1] = mem_pal[i].green;
-			lc[i * 3 + 2] = mem_pal[i].blue;
-			opctable[i] = 255;
+			rgb[0] = mem_pal[i].red;
+			rgb[1] = mem_pal[i].green;
+			rgb[2] = mem_pal[i].blue;
+			// Opacity (unused)
+//			tdata.v.opac[i] = 255;
+			rgb += 3;
 		}
-
-		/* Prepare range controls */
-		extbox = gtk_hbox_new(FALSE, 0);
-		pack(extbox, gtk_label_new(_("Scale")));
-		for (i = 0; i < 2; i++)
-		{
-			button = add_a_button(fromto[i], 4, extbox, TRUE);
-			spin = range_spins[i] = pack(extbox, add_a_spin(0, 0, 255));
-			gtk_signal_connect(GTK_OBJECT(button), "clicked",
-				GTK_SIGNAL_FUNC(set_range_spin), spin);
-		}
-		opt = xpack(extbox, wj_option_menu(scales, 4, 0, NULL, NULL));
-		gtk_container_set_border_width(GTK_CONTAINER(opt), 4);
-		button = add_a_button(_("Create"), 4, extbox, TRUE);
-		gtk_signal_connect(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(make_cscale), (gpointer)opt);
-		gtk_widget_show_all(extbox);
-
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Palette Editor"),
-			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, extbox, mem_cols, cs_type - COLSEL_EDIT_ALL,
-			NULL, FALSE, select_colour, GTK_SIGNAL_FUNC(click_colour));
 	}
-
 	else if (cs_type == COLSEL_OVERLAYS)
 	{
-		if (!alloc_ctable(NUM_CHANNELS * 2)) return;
-		lc = ctable_[CHN_IMAGE];
+		tdata.select = select_overlay;
+		tdata.name = _("Configure Overlays");
+		tdata.cnames = channames_;
+		tdata.opflag = TRUE;
+		tdata.cnt = NUM_CHANNELS;
+
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-			lc[i * 3 + 0] = channel_rgb[i][0];
-			lc[i * 3 + 1] = channel_rgb[i][1];
-			lc[i * 3 + 2] = channel_rgb[i][2];
-			opctable[i] = channel_opacity[i];
+			tdata.v.opac[i] = channel_opacity[i];
+			rgb[0] = channel_rgb[i][0];
+			rgb[1] = channel_rgb[i][1];
+			rgb[2] = channel_rgb[i][2];
+			rgb += 3;
 		}
-		/* Save old values in the same array */
-		memcpy(lc + NUM_CHANNELS * 3, lc, NUM_CHANNELS * 3);
-		memcpy(opctable + NUM_CHANNELS, opctable, NUM_CHANNELS);
-
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Overlays"),
-			GTK_WIN_POS_CENTER, TRUE);
-		colour_window(win, NULL, NUM_CHANNELS, 0,
-			allchannames, TRUE, select_overlay, NULL);
 	}
-
 	else if (cs_type == COLSEL_EDIT_AB)
 	{
-		static char *AB_txt[] = { "A", "B" };
-		png_color *A0, *B0;
-		A0 = mem_img_bpp == 1 ? &mem_pal[mem_col_A] : &mem_col_A24;
-		B0 = mem_img_bpp == 1 ? &mem_pal[mem_col_B] : &mem_col_B24;
+		png_color *A0 = &mem_col_A24, *B0 = &mem_col_B24;
 
-		if (!alloc_ctable(4)) return;
-		lc = ctable_[CHN_IMAGE];
-		lc[0] = A0->red; lc[1] = A0->green; lc[2] = A0->blue;
-		lc[3] = B0->red; lc[4] = B0->green; lc[5] = B0->blue;
-		/* Save previous values right here */
-		memcpy(lc + 2 * 3, lc, 2 * 3);
-		opctable[0] = opctable[2] = 255;
-		opctable[1] = opctable[3] = 255;
+		tdata.select = select_AB;
+		tdata.name = _("Colour Editor");
+		tdata.cnames = AB_txt;
+		tdata.mpflag = TRUE; // at cursor
+		tdata.cnt = 2;
+		tdata.is_AB = TRUE;
+
+		tdata.pos_AB = inifile_get_gint32("posterizeInt", 1);
+
+		if (mem_img_bpp == 1)
+			A0 = &mem_pal[mem_col_A] , B0 = &mem_pal[mem_col_B];
+
+		rgb[0] = A0->red; rgb[1] = A0->green; rgb[2] = A0->blue;
+		rgb[3] = B0->red; rgb[4] = B0->green; rgb[5] = B0->blue;
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 		{
-			ctable_[i][0] = ctable_[i][2] = channel_col_A[i];
-			ctable_[i][1] = ctable_[i][3] = channel_col_B[i];
+			tdata.v.AB[0][i] = tdata.v_AB[i] = channel_col_A[i];
+			tdata.v.AB[1][i] = channel_col_B[i];
 		}
-
-		/* Prepare posterize controls */
-		
-		extbox = gtk_table_new(3, 3, FALSE);
-		win = gtk_hbox_new(FALSE, 0);
-		gtk_table_attach(GTK_TABLE(extbox), win, 0, 3, 0, 1,
-			GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-		button = add_a_button(_("Posterize"), 4, win, TRUE);
-		spin = pack(win, add_a_spin(inifile_get_gint32("posterizeInt", 1), 1, 8));
-		gtk_signal_connect(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(posterize_AB), spin);
-
-		/* Prepare channel A/B controls */
-
-		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
-		{
-			j = i - CHN_ALPHA;
-			spin = gtk_label_new(allchannames[i]);
-			to_table(spin, extbox, 1, j, 0);
-			gtk_misc_set_alignment(GTK_MISC(spin), 1.0 / 3.0, 0.5);
-			spin = AB_spins[i] = mt_spinslide_new(-1, -1);
-			gtk_table_attach(GTK_TABLE(extbox), spin, j, j + 1,
-				2, 3, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-			mt_spinslide_set_range(spin, 0, 255);
-			mt_spinslide_set_value(spin, channel_col_A[i]);
-			mt_spinslide_connect(spin,
-				GTK_SIGNAL_FUNC(AB_spin_moved), (gpointer)i);
-		}
-		gtk_widget_show_all(extbox);
-
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour Editor"),
-			GTK_WIN_POS_MOUSE, TRUE);
-		colour_window(win, extbox, 2, 0,
-			AB_txt, FALSE, select_AB, NULL);
+		// Opacity (unused)
+//		tdata.v.opac[0] = tdata.v.opac[1] = 255;
 	}
-
 	else if (cs_type == COLSEL_EDIT_CSEL)
 	{
-		char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview") };
-		char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
-
 		if (!csel_data)
 		{
 			csel_init();
 			if (!csel_data) return;
 		}
-		/* Save previous values */
-		memcpy(csel_save, csel_data, CSEL_SVSIZE);
-		csel_preview0 = csel_preview;
-		csel_preview_a0 = csel_preview_a;
 
-		if (!alloc_ctable(3)) return;
-		lc = ctable_[CHN_IMAGE];
-		lc[0] = INT_2_R(csel_data->center);
-		lc[1] = INT_2_G(csel_data->center);
-		lc[2] = INT_2_B(csel_data->center);
-		ctable_[CHN_ALPHA][0] = csel_data->center_a;
-		lc[3] = INT_2_R(csel_data->limit);
-		lc[4] = INT_2_G(csel_data->limit);
-		lc[5] = INT_2_B(csel_data->limit);
-		ctable_[CHN_ALPHA][1] = csel_data->limit_a;
-		lc[6] = INT_2_R(csel_preview);
-		lc[7] = INT_2_G(csel_preview);
-		lc[8] = INT_2_B(csel_preview);
-		opctable[0] = opctable[1] = 255;
-		opctable[2] = csel_preview_a;
+		tdata.select = select_csel;
+		tdata.name = _("Colour-Selective Mode");
+		tdata.cnames = csel_txt;
+		tdata.cnt = 3;
+		tdata.is_csel = TRUE;
 
-		/* Prepare extra controls */
-		extbox = gtk_hbox_new(FALSE, 0);
-		pack(extbox, gtk_label_new(_("Range")));
-		csel_spin = pack(extbox, add_float_spin(csel_data->range, 0, 765));
-		csel_toggle = add_a_toggle(_("Inverse"), extbox, csel_data->invert);
-		track_updates(GTK_SIGNAL_FUNC(csel_controls_changed),
-			csel_spin, csel_toggle, NULL);
-		pack(extbox, wj_radio_pack(csel_modes, -1, 1, csel_data->mode,
-			NULL, GTK_SIGNAL_FUNC(csel_mode_changed)));
-		gtk_widget_show_all(extbox);
+		tdata.v.csrange = rint(csel_data->range * 100);
+		tdata.v.csinv = csel_data->invert;
+		tdata.v.csmode = csel_data->mode;
 
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Colour-Selective Mode"),
-			GTK_WIN_POS_CENTER, TRUE);
-		colour_window(win, extbox, 3, 0,
-/* !!! Alpha ranges not implemented yet !!! */
-			csel_txt, FALSE /* TRUE */, select_csel, NULL);
+		rgb[0] = INT_2_R(csel_data->center);
+		rgb[1] = INT_2_G(csel_data->center);
+		rgb[2] = INT_2_B(csel_data->center);
+		rgb[3] = INT_2_R(csel_data->limit);
+		rgb[4] = INT_2_G(csel_data->limit);
+		rgb[5] = INT_2_B(csel_data->limit);
+		rgb[6] = INT_2_R(csel_preview);
+		rgb[7] = INT_2_G(csel_preview);
+		rgb[8] = INT_2_B(csel_preview);
+		// Opacity (unused)
+//		tdata.v.opac[0] = tdata.v.opac[1] = 255;
+//		tdata.v.opac[2] = csel_preview_a;
 	}
-
 	else if (cs_type == COLSEL_GRID)
 	{
-		char *grid_txt[GRID_MAX] = { _("Opaque"), _("Border"),
-			_("Transparent"), _("Tile "), _("Segment") };
-/* !!! "Tile " has a trailing space to be distinct from "Tile" in "Resize Canvas" */
-		grid_widgets *gw;
+		tdata.select = select_grid;
+		tdata.name = _("Configure Grid");
+		tdata.cnames = grid_txt;
+		tdata.cnt = GRID_MAX;
+		tdata.is_grid = TRUE;
 
-		if (!alloc_ctable(GRID_MAX)) return;
-		lc = ctable_[CHN_IMAGE];
+		tdata.v.cgrid = color_grid;
+		tdata.v.tgrid = show_tile_grid;
+		tdata.v.grid_min = mem_grid_min;
+		tdata.v.tgrid_dx = tgrid_dx;
+		tdata.v.tgrid_dy = tgrid_dy;
+
 		for (i = 0; i < GRID_MAX; i++)
 		{
-			lc[i * 3 + 0] = INT_2_R(grid_rgb[i]);
-			lc[i * 3 + 1] = INT_2_G(grid_rgb[i]);
-			lc[i * 3 + 2] = INT_2_B(grid_rgb[i]);
-			opctable[i] = 255;
+			rgb[0] = INT_2_R(grid_rgb[i]);
+			rgb[1] = INT_2_G(grid_rgb[i]);
+			rgb[2] = INT_2_B(grid_rgb[i]);
+			// Opacity (unused)
+//			tdata.v.opac[i] = 255;
+			rgb += 3;
 		}
-
-		/* Prepare extra controls */
-		extbox = gtk_table_new(6, 2, FALSE);
-		gw = bound_malloc(extbox, sizeof(grid_widgets));
-		gw->ctoggle = sig_toggle(_("Smart grid"), color_grid, NULL, NULL);
-		to_table_l(gw->ctoggle, extbox, 0, 0, 1, 0);
-		gw->ttoggle = sig_toggle(_("Tile grid"), show_tile_grid, NULL, NULL);
-		to_table_l(gw->ttoggle, extbox, 0, 1, 2, 0);
-		add_to_table(_("Minimum grid zoom"), extbox, 1, 0, 5);
-		gw->szspin = spin_to_table(extbox, 1, 1, 0, mem_grid_min, 2, 12);
-		add_to_table(_("Tile width"), extbox, 1, 2, 5);
-		gw->twspin = spin_to_table(extbox, 1, 3, 0, tgrid_dx, 2, MAX_WIDTH);
-		add_to_table(_("Tile height"), extbox, 1, 4, 5);
-		gw->thspin = spin_to_table(extbox, 1, 5, 0, tgrid_dy, 2, MAX_HEIGHT);
-		track_updates(GTK_SIGNAL_FUNC(grid_controls_changed),
-			gw->ctoggle, gw->ttoggle, gw->szspin, gw->twspin, gw->thspin, NULL);
-		gtk_widget_show_all(extbox);
-
-		/* Save old values */
-		memcpy(gw->color0, grid_rgb, sizeof(gw->color0));
-		gw->ctoggle0 = color_grid;
-		gw->size0 = mem_grid_min;
-		gw->ttoggle0 = show_tile_grid;
-		gw->tw0 = tgrid_dx;
-		gw->th0 = tgrid_dy;
-
-		win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Configure Grid"),
-			GTK_WIN_POS_CENTER, TRUE);
-		gtk_object_set_user_data(GTK_OBJECT(win), gw);
-		colour_window(win, extbox, GRID_MAX, 0,
-			grid_txt, FALSE, select_grid, NULL);
 	}
+
+	tdata.v0 = tdata.v; // Save original values
+	res = run_create(colsel_code, &tdata, sizeof(tdata));
+	dt = GET_DDATA(res);
+	cmd_scroll(dt->clist, dt->idx); // scroll in current position
 }
+
+#undef _
+#define _(X) __(X)
 
 ///	QUANTIZE WINDOW
 
@@ -2208,7 +2045,7 @@ static void *quantize_code[] = {
 	IF(pflag), WINDOWm(_("Create Quantized")),
 	UNLESS(pflag), WINDOWm(_("Convert To Indexed")),
 	BORDER(FRBOX, 0),
-	BHBOX, MLABEL(_("Indexed Colours To Use")),
+	HBOXb(5, 10), MLABEL(_("Indexed Colours To Use")),
 	REF(colspin), XSPIN(cols, 1, 256),
 	UNLESS(pflag), BOOKBTN(_("Settings"), book),
 	WDONE,

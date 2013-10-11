@@ -423,7 +423,7 @@ static void *pref_code[] = {
 	WANTMAX, // max size
 	SNBOOK,
 	BORDER(TABLE, 10),
-	BORDER(TSPIN, 4),
+	BORDER(SPIN, 4),
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")),
 #ifdef U_THREADS

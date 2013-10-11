@@ -1412,6 +1412,8 @@ void toolbar_update_settings()
 	ts_update_gradient();
 }
 
+static png_color brcosa_palette[256];
+
 static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {

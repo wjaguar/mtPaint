@@ -21,6 +21,7 @@ enum {
 	op_WEND = 0,
 	op_WSHOW,
 	op_WDONE,
+	op_WTAGS, // internal use
 	op_WINDOW,
 	op_WINDOWm,
 	op_WINDOWpm,
@@ -28,9 +29,10 @@ enum {
 	op_TABLE,
 	//
 	op_VBOX,
+	op_XVBOX,
 	op_EVBOX, // VBOX'es must precede HBOX'es
 	op_HBOX,
-	op_BHBOX,
+	op_XHBOX,
 	op_TLHBOX,
 	//
 	op_FVBOX,
@@ -47,12 +49,16 @@ enum {
 	op_XSPIN,
 	op_TSPIN,
 	op_TLSPIN,
+	op_TLXSPIN,
+	//
+	op_FSPIN,
 	//
 	op_SPINa,
 	op_XSPINa,
 	op_TSPINa,
 	//
 	op_TSPINSLIDE,
+	op_HTSPINSLIDE,
 	op_CHECK,
 	op_TLCHECK, // must follow CHECK
 	op_CHECKb,
@@ -60,15 +66,24 @@ enum {
 	op_FRPACK,
 	op_RPACKD,
 	op_OPT,
+	op_XOPT,
 	op_TLOPT,
 	op_PATH,
 	op_PATHs,
+	op_COLOR,
+	op_TCOLOR,
+	op_COLORLIST,
+	op_COLORLISTN,
 	op_OKBOX,
+	op_EOKBOX,
 	op_OKBTN,
 	op_CANCELBTN,
 	op_OKADD,
 	op_OKNEXT,
+	op_OKTOGGLE,
+	op_BUTTON,
 	op_TLBUTTON,
+
 	op_EXEC,
 	op_CALLp,
 	op_RET,
@@ -82,7 +97,6 @@ enum {
 	op_DEFW,
 	op_WPMOUSE,
 	op_INSENS,
-//	op_SETBORDER,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -90,13 +104,14 @@ enum {
 	op_EVT_CLICK,
 	op_EVT_SELECT,
 	op_EVT_CHANGE,
+	op_EVT_EXT, // generic event with extra data
 
 	op_EVT_LAST,
 	op_TRIGGER = op_EVT_LAST,
 
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
-	op_BOR_TSPIN,
+	op_BOR_SPIN,
 	op_BOR_TLLABEL,
 	op_BOR_FRBOX,
 	op_BOR_OKBOX,
@@ -106,6 +121,8 @@ enum {
 };
 
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
+typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
+	void *xdata);
 
 //	Build a dialog window out of V-code decription
 //void **run_create(const void **ifcode, const void *ddata, int ddsize);
@@ -122,16 +139,27 @@ void run_query(void **wdata);
 //	Extract actual toplevel window out of widget-map
 #define GET_REAL_WINDOW(V) ((V)[1])
 
+//	From event to its originator
+void **origin_slot(void **slot);
+
 //	Set sensitive state on slot
 void cmd_sensitive(void **slot, int state);
 //	Set visible state on slot
 void cmd_showhide(void **slot, int state);
-//	Set value on spinslider slot
+//	Set value on spinslider slot, page on plainbook slot
 void cmd_set(void **slot, int v);
-//	Set value & limits on spinslider slot
+//	Set color & opacity on color slot
+void cmd_set2(void **slot, int v0, int v1);
+//	Set value & limits on spin-like slot
 void cmd_set3(void **slot, int *v);
+//	Set current & previous color/opacity on color slot
+void cmd_set4(void **slot, int *v);
 //	Read back slot value (as is), return its storage location
 void *cmd_read(void **slot, void *ddata);
+//	Repaint slot
+void cmd_repaint(void **slot);
+//	Scroll in position on colorlist slot
+void cmd_scroll(void **slot, int idx);
 
 #define WB_OPBITS     13
 #define WB_OPMASK 0x1FFF /* ((1 << WB_OPBITS) - 1) */
@@ -152,6 +180,7 @@ void *cmd_read(void **slot, void *ddata);
 #define WBfield(V) (void *)offsetof(WBbase, V)
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
 #define WBnh(N,H) (void *)(((H) & 255) + ((N) << 8))
+#define WBbs(B,S) (void *)(((S) & 255) + ((B) << 8))
 
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
@@ -164,9 +193,11 @@ void *cmd_read(void **slot, void *ddata);
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), (void *)((H) + ((W) << 16))
 #define VBOX WBh(VBOX, 0)
+#define XVBOXb(S,B) WBh(XVBOX, 1), WBbs(B, S)
 #define EVBOX WBh(EVBOX, 0)
 #define HBOX WBh(HBOX, 0)
-#define BHBOX WBh(BHBOX, 0)
+#define HBOXb(S,B) WBh(HBOX, 1), WBbs(B, S)
+#define XHBOXb(S,B) WBh(XHBOX, 1), WBbs(B, S)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
 #define FVBOXs(NM,S) WBh(FVBOX, 2), (void *)(S), (NM)
@@ -182,6 +213,8 @@ void *cmd_read(void **slot, void *ddata);
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define TLXSPIN(V,V0,V1,X,Y) WBrhf(TLXSPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TSPIN(NM,V,V0,V1) WBrhf(TSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), (NM)
 #define TSPINv(NM,V,V0,V1) WBrh(TSPIN, 4), &(V), \
@@ -191,9 +224,13 @@ void *cmd_read(void **slot, void *ddata);
 	(void *)(V0), (void *)(V1)
 #define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
+#define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf(XSPINa, 1), WBfield(A)
 #define TSPINSLIDE(NM,V,V0,V1) WBrhf(TSPINSLIDE, 4), \
+	WBfield(V), (void *)(V0), (void *)(V1), (NM)
+#define HTSPINSLIDE(NM,V,V0,V1) WBrhf(HTSPINSLIDE, 4), \
 	WBfield(V), (void *)(V0), (void *)(V1), (NM)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
@@ -208,18 +245,29 @@ void *cmd_read(void **slot, void *ddata);
 #define FRPACK(NM,SS,N,H,V) WBrhf(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
 #define FRPACKv(NM,SS,N,H,V) WBrh(FRPACK, 4), &(V), (SS), WBnh(N, H), (NM)
 #define RPACKD(SP,H,V) WBrhf(RPACKD, 3), WBfield(V), WBfield(SP), (H)
-/* !!! This block holds 1 nested EVENT block */
-#define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), (H), \
-	EVENT(SELECT, HS)
+/* !!! These blocks each hold 1 nested EVENT block */
+#define RPACKe(SS,N,H,V,HS) WBr2hf(RPACK, 3 + 2), WBfield(V), (SS), \
+	WBnh(N, H), EVENT(SELECT, HS)
+#define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), \
+	(H), EVENT(SELECT, HS)
 #define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
+#define XOPT(SS,N,V) WBrhf(XOPT, 3), WBfield(V), (SS), (void *)(N)
 /* !!! This block holds 1 nested EVENT block */
 #define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS), WBxyl(X, Y, L)
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
 #define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
-/* !!! This block holds 2 nested EVENT blocks */
+#define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
+#define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
+/* !!! These blocks each hold 2 nested EVENT blocks */
+#define COLORLIST(SP,V,CC,HS,HX) WBr3hf(COLORLIST, 3 + 2 * 2), WBfield(V), \
+	WBfield(CC), WBfield(SP), EVENT(SELECT, HS), EVENT(EXT, HX)
+#define COLORLISTN(N,V,CC,HS,HX) WBr3hf(COLORLISTN, 3 + 2 * 2), WBfield(V), \
+	WBfield(CC), WBfield(N), EVENT(SELECT, HS), EVENT(EXT, HX)
 #define OKBOX(NOK,HOK,NC,HC) WBr3h(OKBOX, 2 + 2 * 2), (NOK), (NC), \
+	EVENT(OK, HOK), EVENT(CANCEL, HC)
+#define EOKBOX(NOK,HOK,NC,HC) WBr3h(EOKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define OKBOX0 WBh(OKBOX, 0)
 // !!! These *BTN,OK*,*BUTTON blocks each hold 1 nested EVENT block */
@@ -227,6 +275,9 @@ void *cmd_read(void **slot, void *ddata);
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
 #define OKNEXT(NM,H) WBr2h(OKNEXT, 1 + 2), (NM), EVENT(CLICK, H)
+#define OKTOGGLE(NM,V,H) WBr2hf(OKTOGGLE, 2 + 2), WBfield(V), (NM), \
+	EVENT(CHANGE, H)
+#define BUTTON(NM,H) WBr2h(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
@@ -254,3 +305,9 @@ void *cmd_read(void **slot, void *ddata);
 
 //	Function to run with EXEC
 typedef void **(*ext_fn)(void **r, GtkWidget ***wpp);
+
+//	Structure which COLORLIST provides to EXC event
+typedef struct {
+	int idx;	// which row was clicked
+	int button;	// which button was clicked (1-3 etc)
+} colorlist_ext;
