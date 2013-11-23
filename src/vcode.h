@@ -117,7 +117,8 @@ enum {
 	op_BOR_OKBOX,
 	op_BOR_OKBTN,
 
-	op_BOR_LAST
+	op_BOR_LAST,
+	op_LAST = op_BOR_LAST
 };
 
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);

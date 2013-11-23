@@ -1857,6 +1857,7 @@ static void done_cmyk2rgb(ls_settings *settings)
 #else /* No LCMS */
 #define done_cmyk2rgb(X)
 #endif
+#endif
 
 static void cmyk2rgb(unsigned char *dest, unsigned char *src, int cnt,
 	int inverted, ls_settings *settings)
@@ -1885,8 +1886,6 @@ static void cmyk2rgb(unsigned char *dest, unsigned char *src, int cnt,
 		dest[2] = (b + (b >> 8) + 1) >> 8;
 	}
 }
-
-#endif
 
 #ifdef U_JPEG
 struct my_error_mgr
@@ -5516,11 +5515,9 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 	trans = ftype & 1;
 	vl = maxval < 256 ? 1 : 2;
 	ll = w * depth * vl;
-	if (ftype < 2) // BW
-	{
-		set_bw(settings);
-		if (maxval > 1) return (-1);
-	}
+	/* !!! ImageMagick writes BLACKANDWHITE as GRAYSCALE */
+	if ((ftype < 2) && (maxval > 1)) ftype += 2;
+	if (ftype < 2) set_bw(settings); // BW
 	else if (bpp == 1) set_gray(settings); // Grayscale
 
 	/* Allocate row buffer if cannot read directly into image */

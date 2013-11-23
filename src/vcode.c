@@ -44,6 +44,7 @@ enum {
 	pk_PACK,
 	pk_PACKp,
 	pk_XPACK,
+	pk_XPACK1,
 	pk_PACKEND,
 	pk_TABLE,
 	pk_TABLEx,
@@ -95,21 +96,13 @@ static void get_evt_wjr(GtkWidget *btn, gpointer idx)
 	((evt_fn)desc[1])(d, base, (int)desc[0] & WB_OPMASK, slot);
 }
 
-static void **add_click(void **r, void **res, void **pp, GtkWidget *widget,
-	GtkWidget *window)
+static void add_click(void **r, void **pp, GtkWidget *widget, GtkWidget *window)
 {
-	if (pp[1])
-	{
-		r[0] = res;
-		r[1] = pp;
-		gtk_signal_connect(GTK_OBJECT(widget), "clicked",
-			GTK_SIGNAL_FUNC(get_evt_1), r);
-		r += 2;
-	}
+	if (pp[1]) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+		GTK_SIGNAL_FUNC(get_evt_1), r);
 	// default to destructor
 	else if (window) gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
 		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(window));
-	return (r);
 }
 
 static void **skip_if(void **pp)
@@ -299,7 +292,7 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 {
 	GtkWidget *scroll, *list, *item, *col, *label;
 	colorlist_data *dt;
-	void *v, **cslot = NULL;
+	void *v;
 	char txt[64], *t, **sp = NULL;
 	int i, cnt = 0;
 
@@ -321,8 +314,6 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 	dt->col = (void *)(ddata + (int)pp[2]); // palette
 	dt->idx = idx;
 
-	if (pp[7]) cslot = r , r += 2; // !!! ext-event handler goes first
-
 	gtk_object_set_user_data(GTK_OBJECT(list), dt); // know thy descriptor
 	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), list);
 	gtk_widget_show_all(scroll);
@@ -331,8 +322,8 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 	{
 		item = gtk_list_item_new();
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		if (cslot) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
-			GTK_SIGNAL_FUNC(colorlist_click), cslot);
+		if (pp[7]) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
+			GTK_SIGNAL_FUNC(colorlist_click), r + 2);
 		gtk_container_add(GTK_CONTAINER(list), item);
 
 		box = gtk_hbox_new(FALSE, 3);
@@ -401,12 +392,70 @@ static int n_trans(char **dest, char **src, int n)
 
 #endif
 
+/* Groups of codes differing only in details of packing */
+
+typedef struct {
+	unsigned short op, cmd, pk;	// orig code, group code, packing mode
+	signed char tpad, cw;		// padding and border
+} cmdef;
+
+enum {
+	cm_VBOX = op_LAST,
+	cm_HBOX,
+	cm_SPIN,
+	cm_SPINa,
+	cm_CHECK,
+	cm_RPACK,
+	cm_RPACKD,
+	cm_OPT,
+	cm_BUTTON
+};
+
+#define USE_BORDER(T) (op_BOR_0 - op_BOR_##T - 1)
+
+static cmdef cmddefs[] = {
+	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK },
+	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK },
+	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK },
+	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK },
+	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK },
+	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK },
+	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
+// !!! Padding = 0
+	{ op_XSPIN, cm_SPIN, pk_XPACK },
+	{ op_TSPIN, cm_SPIN, pk_TABLE2, USE_BORDER(SPIN) },
+	{ op_TLSPIN, cm_SPIN, pk_TABLE, USE_BORDER(SPIN) },
+	{ op_TLXSPIN, cm_SPIN, pk_TABLEx, USE_BORDER(SPIN) },
+	{ op_SPINa, cm_SPINa, pk_PACKp, USE_BORDER(SPIN) },
+// !!! Padding = 0
+	{ op_XSPINa, cm_SPINa, pk_XPACK },
+	{ op_TSPINa, cm_SPINa, pk_TABLE2, USE_BORDER(SPIN) },
+	{ op_CHECK, cm_CHECK, pk_PACK },
+	{ op_TLCHECK, cm_CHECK, pk_TABLE },
+	{ op_RPACK, cm_RPACK, pk_XPACK },
+	{ op_RPACKD, cm_RPACKD, pk_XPACK },
+	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
+	{ op_OPT, cm_OPT, pk_PACK },
+// !!! Border = 4
+	{ op_XOPT, cm_OPT, pk_XPACK, 0, 4 },
+	{ op_TLOPT, cm_OPT, pk_TABLE },
+	/* Codes can map to themselves, and some do */
+	{ op_OKBTN, op_OKBTN, pk_XPACK, 0, USE_BORDER(OKBTN) },
+	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK, 0, USE_BORDER(OKBTN) },
+	{ op_OKADD, op_OKADD, pk_XPACK1, 0, USE_BORDER(OKBTN) },
+	{ op_OKNEXT, op_OKNEXT, pk_XPACK, 0, USE_BORDER(OKBTN) },
+// !!! Border = 4
+	{ op_BUTTON, cm_BUTTON, pk_XPACK, 0, 4 },
+// !!! Padding = 5
+	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp, 5 }
+};
+
 /* V-code is really simple-minded; it can do 0-tests but no arithmetics, and
  * naturally, can inline only constants. Everything else must be prepared either
  * in global variables, or in fields of "ddata" structure.
  * Parameters of codes should be arrayed in fixed order:
  * result location first; frame name last; table location, or name in table,
- * directly before it (last if no frame name) */
+ * directly before it (last if no frame name); builtin event(s) before that */
 
 #define DEF_BORDER 5
 #define GET_BORDER(T) (borders[op_BOR_##T - op_BOR_0] + DEF_BORDER)
@@ -415,6 +464,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 {
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
 		GTK_POLICY_ALWAYS };
+	cmdef *cmds[op_LAST];
 #if U_NLS
 	char *tc[256];
 #endif
@@ -430,7 +480,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	void *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **tagslot = NULL, **r = NULL, **res = NULL;
 	int ld, dsize;
-	int n, op, lp, ref, pk, cw, tpad = 0;
+	int i, n, op, lp, ref, pk, cw, tpad = 0;
 
 
 	// Allocation size
@@ -440,6 +490,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	// Border sizes are DEF_BORDER-based
 	memset(borders, 0, sizeof(borders));
 
+	// Commands index
+	memset(cmds, 0, sizeof(cmds));
+	for (i = 0; i < sizeof(cmddefs) / sizeof(cmddefs[0]); i++)
+		cmds[cmddefs[i].op] = cmddefs + i;
+
 	while (TRUE)
 	{
 		op = (int)*ifcode++;
@@ -448,7 +503,19 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		pk = cw = 0;
 		v = lp ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
-		switch (op &= WB_OPMASK)
+		op &= WB_OPMASK;
+		if (cmds[op])
+		{
+			tpad = cmds[op]->tpad;
+			if (tpad < 0) tpad = borders[-tpad - 1] + DEF_BORDER;
+			cw = cmds[op]->cw;
+			if (cw < 0) cw = borders[-cw - 1] + DEF_BORDER;
+			pk = cmds[op]->pk;
+			i = ((pk & pk_MASK) >= pk_TABLE) + !!(pk & pkf_FRAME);
+			if (lp <= i) v = NULL;
+			op = cmds[op]->cmd;
+		}
+		switch (op)
 		{
 		/* Terminate */
 		case op_WEND: case op_WSHOW:
@@ -508,21 +575,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(int)v >> 16, GET_BORDER(TABLE), wp[1]);
 			break;
 		/* Add a box */
-		case op_TLHBOX:
-			if (lp < 2) v = NULL; // reserve the one parameter
-		case op_VBOX: case op_XVBOX: case op_EVBOX:
-		case op_HBOX: case op_XHBOX:
-			widget = (op < op_HBOX ? gtk_vbox_new :
+		case cm_VBOX: case cm_HBOX:
+			widget = (op == cm_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, (int)v & 255);
 			gtk_widget_show(widget);
 			cw = (int)v >> 8;
 // !!! Padding = 0
-			tpad = 0;
-			pk = pk_PACK | pkf_STACK;
-			if ((op == op_XVBOX) || (op == op_XHBOX))
-				pk = pk_XPACK | pkf_STACK;
-			if (op == op_TLHBOX) pk = pk_TABLE | pkf_STACK;
-			if (op == op_EVBOX) pk = pk_PACKEND | pkf_STACK;
 			break;
 		/* Add a framed vertical box */
 		case op_FVBOX:
@@ -595,17 +653,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a spin, fill from field/var */
-		case op_SPIN: case op_XSPIN:
-		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
+		case cm_SPIN:
 			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
 			have_spins = TRUE;
-			tpad = GET_BORDER(SPIN);
-			pk = pk_TABLE2;
-			if (op == op_TLSPIN) pk = pk_TABLE;
-			if (op == op_TLXSPIN) pk = pk_TABLEx;
-// !!! Padding = 0
-			if (op == op_XSPIN) pk = pk_XPACK;
-			if (op == op_SPIN) pk = pk_PACKp;
 			break;
 		/* Add float spin, fill from field/var */
 		case op_FSPIN:
@@ -616,16 +666,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK;
 			break;
 		/* Add a spin, fill from array */
-		case op_SPINa: case op_XSPINa: case op_TSPINa:
+		case cm_SPINa:
 		{
 			int *xp = v;
 			widget = add_a_spin(xp[0], xp[1], xp[2]);
 			have_spins = TRUE;
-			tpad = GET_BORDER(SPIN);
-			pk = pk_TABLE2;
-// !!! Padding = 0
-			if (op == op_XSPINa) pk = pk_XPACK;
-			if (op == op_SPINa) pk = pk_PACKp;
 			break;
 		}
 		/* Add a named spinslider to table, fill from field */
@@ -667,12 +712,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a named checkbox, fill from field/var */
-		case op_CHECK: case op_TLCHECK:
+		case cm_CHECK:
 			widget = sig_toggle(_(pp[1]), *(int *)v, NULL, NULL);
 // !!! Padding = 0
-			tpad = 0;
-			pk = pk_PACK;
-			if (op >= op_TLCHECK) pk = pk_TABLE;
 			break;
 		/* Add a named checkbox, fill from inifile */
 		case op_CHECKb:
@@ -681,12 +723,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK;
 			break;
 		/* Add a (self-reading) pack of radio buttons for field/var */
-		case op_RPACK: case op_RPACKD: case op_FRPACK:
+		case cm_RPACK: case cm_RPACKD:
 		{
 			char **src = pp[1];
 			int nh = (int)pp[2];
 			int n = nh >> 8;
-			if (op == op_RPACKD) n = -1 ,
+			if (op == cm_RPACKD) n = -1 ,
 				src = *(char ***)((char *)ddata + (int)pp[1]);
 			if (!n) n = -1;
 #if U_NLS
@@ -696,20 +738,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = wj_radio_pack(src, n, nh & 255, *(int *)v,
 				ref > 1 ? r + 2 : v, // self-update by default
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_wjr) : NULL);
-			*r++ = widget;
-			*r++ = pp - 1;
-			if (ref > 1) *r++ = res , *r++ = pp + 3; // event
-			ref = 0;
-			pk = pk_XPACK;
-			if (op == op_FRPACK)
-			{
-				cw = GET_BORDER(FRBOX);
-				pk = pk_PACK | pkf_FRAME;
-			}
 			break;
 		}
 		/* Add an option menu for field/var */
-		case op_OPT: case op_XOPT: case op_TLOPT:
+		case cm_OPT:
 		{
 			char **src = pp[1];
 			int n = (int)pp[2];
@@ -721,15 +753,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = wj_option_menu(src, n, *(int *)v,
 				ref > 1 ? r + 2 : NULL,
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
-			*r++ = widget;
-			*r++ = pp - 1;
-			if (ref > 1) *r++ = res , *r++ = pp + 3; // event
-			ref = 0;
 // !!! Padding = 0
-			tpad = 0;
-			pk = op == op_TLOPT ? pk_TABLE : pk_PACK;
-// !!! Border = 4
-			if (op == op_XOPT) cw = 4 , pk = pk_XPACK;
 			break;
 		}
 		/* Add a path box, fill from var/inifile */
@@ -750,14 +774,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
-		{
-			r[0] = widget = colorlist(wp[0], v, ddata, pp - 1, r + 2);
-			r[1] = pp - 1;
-			r += 2;
-			if (pp[6]) *r++ = res , *r++ = pp + 5; // click event
-			*r++ = res; *r++ = pp + 3; // select event
-			continue;
-		}
+			widget = colorlist(wp[0], v, ddata, pp - 1, r + 2);
+			break;
 		/* Add a box with "OK"/"Cancel", or something like */
 		case op_OKBOX: case op_EOKBOX:
 		{
@@ -780,15 +798,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			}
 			pack(wp[1], box);
 			if (ref < 2) break; // empty box for separate buttons
-			*r++ = widget;
-			*r++ = pp - 1;
 
 			ok_bt = cancel_bt = gtk_button_new_with_label(_(v));
 			gtk_container_set_border_width(GTK_CONTAINER(ok_bt),
 				GET_BORDER(OKBTN));
 			gtk_widget_show(ok_bt);
 			/* OK-event */
-			r = add_click(r, res, pp + 2, ok_bt, window);
+			add_click(r + 2, pp + 2, ok_bt, window);
 			if (pp[1])
 			{
 				cancel_bt = xpack(widget,
@@ -797,7 +813,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_CONTAINER(cancel_bt), GET_BORDER(OKBTN));
 				gtk_widget_show(cancel_bt);
 				/* Cancel-event */
-				r = add_click(r, res, pp + 4, cancel_bt, window);
+				add_click(r + 4, pp + 4, cancel_bt, window);
 			}
 			xpack(widget, ok_bt);
 
@@ -808,18 +824,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_add_accelerator(ok_bt, "clicked", ag,
 				GDK_KP_Enter, 0, (GtkAccelFlags)0);
 			delete_to_click(window, cancel_bt);
-			continue;
+			break;
 		}
 		/* Add a clickable button to OK-box */
 		case op_OKBTN: case op_CANCELBTN: case op_OKADD: case op_OKNEXT:
 		{
-			*r++ = widget = xpack(wp[0],
-				gtk_button_new_with_label(_(v)));
-			*r++ = pp - 1;
-			gtk_container_set_border_width(GTK_CONTAINER(widget),
-				GET_BORDER(OKBTN));
-			if (op == op_OKADD) gtk_box_reorder_child(GTK_BOX(wp[0]),
-				widget, 1);
+			widget = gtk_button_new_with_label(_(v));
 			gtk_widget_show(widget);
 			if (op == op_OKBTN)
 			{
@@ -835,41 +845,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				delete_to_click(window, widget);
 			}
 			/* Click-event */
-			r = add_click(r, res, pp + 1, widget, window);
-			continue;
+			add_click(r + 2, pp + 1, widget, window);
+			break;
 		}
 		/* Add a toggle button to OK-box */
 		case op_OKTOGGLE:
-			*r++ = widget = xpack(wp[0],
-				gtk_toggle_button_new_with_label(_(pp[1])));
-			*r++ = pp - 1;
-			gtk_container_set_border_width(GTK_CONTAINER(widget),
-				GET_BORDER(OKBTN));
-			gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
+			widget = gtk_toggle_button_new_with_label(_(pp[1]));
 			gtk_widget_show(widget);
-			if (pp[3])
-			{
-				gtk_signal_connect(GTK_OBJECT(widget), "toggled",
-					GTK_SIGNAL_FUNC(get_evt_1), r);
-				*r++ = res;
-				*r++ = pp + 2;
-			}
-			continue;
-		/* Add a clickable button to table slot */
-		case op_BUTTON: case op_TLBUTTON:
-			*r++ = widget = gtk_button_new_with_label(_(v));
-			*r++ = pp - 1;
+			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
+				"toggled", GTK_SIGNAL_FUNC(get_evt_1), r + 2);
+			cw = GET_BORDER(OKBTN);
+			pk = pk_XPACK1;
+			break;
+		/* Add a clickable button */
+		case cm_BUTTON:
+			widget = gtk_button_new_with_label(_(v));
 			gtk_widget_show(widget);
 			/* Click-event */
-			r = add_click(r, res, pp + 1, widget, NULL);
-			ref = 0;
-// !!! Padding = 5
-			tpad = 5;
-			pk = pk_TABLEp;
-			if (op == op_TLBUTTON) break;
-// !!! Border = 4
-			cw = 4;
-			pk = pk_XPACK;
+			add_click(r + 2, pp + 1, widget, NULL);
 			break;
 		/* Call a function */
 		case op_EXEC:
@@ -978,7 +971,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
 				FALSE, FALSE, tpad);
 			break;
-		case pk_XPACK: xpack(wp[0], widget); break;
+		case pk_XPACK: case pk_XPACK1:
+			xpack(wp[0], widget);
+			if (n == pk_XPACK1)
+				gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
+			break;
 		case pk_PACKEND: pack_end(wp[0], widget); break;
 		case pk_TABLE: case pk_TABLEx: case pk_TABLEp:
 			table_it(wp[0], widget, (int)pp[--lp], tpad, n);
@@ -995,6 +992,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Stack this */
 		if (pk & pkf_STACK) --wp;
+		/* Remember events */
+		if (ref > 2) // reserved
+		{
+			*r++ = res;
+			*r++ = pp + lp - 4;
+		}
+		if ((ref > 1) && pp[lp - 1]) // optional
+		{
+			*r++ = res;
+			*r++ = pp + lp - 2;
+		}
 	}
 }
 
