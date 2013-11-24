@@ -6945,7 +6945,7 @@ static inline double dist(int n1, int n2)
 
 void do_effect(int type, int param)
 {
-	unsigned char *src, *dest, *tmp = "\0", *mask = NULL;
+	unsigned char *src, *dest, *tmp, *mask;
 	int i, j, k = 0, k1, k2, bpp, ll, dxp1, dxm1, dyp1, dym1;
 	int op, md, ms;
 	double blur = (double)param / 200.0;
@@ -6966,7 +6966,7 @@ void do_effect(int type, int param)
 
 	for (i = 0; i < mem_height; i++)
 	{
-		if (mask) row_protected(0, i, mem_width, tmp = mask);
+		row_protected(0, i, mem_width, tmp = mask);
 		dyp1 = i < mem_height - 1 ? ll : -ll;
 		dym1 = i ? -ll : ll;
 		for (md = j = 0; j < ll; j++ , src++ , dest++)

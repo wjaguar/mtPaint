@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -527,12 +527,19 @@ static void trim_tab( char *buf, char *txt)
 	if ( buf[0] == 0 ) snprintf(buf, MAXLEN, "_None");
 }
 
-static void font_dir_search(FT_Library *ft_lib, int dirnum, FILE *fp, char *dir)
+typedef struct statchain statchain;
+struct statchain {
+	statchain *p;
+	struct stat buf;
+};
+
+static void font_dir_search(FT_Library *ft_lib, int dirnum, FILE *fp, char *dir,
+	statchain *cc)
 {	// Search given directory for font files - recursively traverse directories
+	statchain	sc = { cc };
 	FT_Face		face;
 	DIR		*dp;
 	struct dirent	*ep;
-	struct stat	buf;
 	char		full_name[PATHBUF], tmp[2][MAXLEN];
 	int		face_index;
 
@@ -544,16 +551,27 @@ static void font_dir_search(FT_Library *ft_lib, int dirnum, FILE *fp, char *dir)
 	{
 		file_in_dir(full_name, dir, ep->d_name, PATHBUF);
 
-		if ( stat(full_name, &buf)<0 ) continue;	// Get file details
+		if (stat(full_name, &sc.buf) < 0) continue;	// Get file details
 
 #ifdef WIN32
-		if ( S_ISDIR(buf.st_mode) )
+		if (S_ISDIR(sc.buf.st_mode))
 #else
-		if ( ep->d_type == DT_DIR || S_ISDIR(buf.st_mode) )
+		if ((ep->d_type == DT_DIR) || S_ISDIR(sc.buf.st_mode))
 #endif
 		{	// Subdirectory so recurse
-			if (strcmp(ep->d_name, ".") && strcmp(ep->d_name, ".."))
-				font_dir_search( ft_lib, dirnum, fp, full_name );
+			if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
+				continue;
+			/* If no inode number, assume it's Windows and just hope
+			 * for the best: symlink loops do exist in Windows 7+, but
+			 * I know of no simple approach for avoiding them - WJ */
+			if (sc.buf.st_ino)
+			{
+				for (cc = sc.p; cc; cc = cc->p)
+				if ((sc.buf.st_dev == cc->buf.st_dev) &&
+					(sc.buf.st_ino == cc->buf.st_ino)) break;
+				if (cc) continue; // Directory loop
+			}
+			font_dir_search( ft_lib, dirnum, fp, full_name, &sc );
 			continue;
 		}
 		// File so see if its a font
@@ -589,6 +607,7 @@ static void font_dir_search(FT_Library *ft_lib, int dirnum, FILE *fp, char *dir)
 
 static void font_index_create(char *filename, char **dir_in)
 {	// dir_in points to NULL terminated sequence of directories to search for fonts
+	statchain	sc = { NULL };
 	FT_Library	library;
 	int		i;
 	FILE		*fp;
@@ -599,7 +618,10 @@ static void font_index_create(char *filename, char **dir_in)
 	if ((fp = fopen(filename, "w")))
 	{
 		for (i = 0; dir_in[i]; i++)
-			font_dir_search(&library, i, fp, dir_in[i]);
+		{
+			if (stat(dir_in[i], &sc.buf) < 0) continue;
+			font_dir_search(&library, i, fp, dir_in[i], &sc);
+		}
 		fclose(fp);
 	}
 

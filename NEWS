@@ -14,9 +14,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled
+	* The Free Rotate window now remembers the previous rotation angle in that mtPaint session
 	* Undo system now uses a bit less memory
 	* Support for compiling with giflib 5 added
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
+	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
 	* BUGFIX - Gradient button no longer fails to show current gradient mode after showing settings toolbar
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
@@ -29,6 +31,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Command line switches beyond the first one are now parsed properly
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
+	* BUGFIX - Problem with command line window wrongly reacting to mouse in some cases is now eliminated
 
 3.40	2011-12-30
 

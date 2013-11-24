@@ -633,11 +633,12 @@ void pressed_rotate_sel(int dir)
 	else update_stuff(UPD_CGEOM);
 }
 
+static double angle = 45.00;
+
 static int do_rotate_free(GtkWidget *box, gpointer fdata)
 {
 	GtkWidget *spin = BOX_CHILD_0(box);
 	int j, smooth = 0, gcor = 0;
-	double angle;
 
 	angle = read_float_spin(spin);
 
@@ -667,7 +668,7 @@ void pressed_rotate_free()
 
 	box = gtk_vbox_new(FALSE, 5);
 	gtk_widget_show(box);
-	pack(box, add_float_spin(45, -360, 360));
+	pack(box, add_float_spin(angle, -360, 360));
 	if (mem_img_bpp == 3)
 	{
 		pack(box, gamma_toggle());

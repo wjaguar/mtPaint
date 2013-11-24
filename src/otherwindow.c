@@ -1448,7 +1448,8 @@ static void select_AB(colsel_dd *dt, int what)
 		break;
 	case CHOOK_OK: /* OK */
 		do_AB(&dt->v0);
-		spot_undo(UNDO_PAL);
+		/* Palette gets modified in indexed mode */
+		if (mem_img_bpp == 1) spot_undo(UNDO_PAL);
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 		{
 			channel_col_A[i] = dt->v.AB[0][i];

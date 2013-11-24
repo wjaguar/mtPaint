@@ -167,6 +167,9 @@ void progress_init(char *text, int canc)		// Initialise progress window
 {
 	GtkWidget *vbox6, *button_cancel, *viewport;
 
+	/* Break pointer grabs, to avoid originating widget misbehaving later on */
+	release_grab();
+
 	progress_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Please Wait ..."),
 		GTK_WIN_POS_CENTER, TRUE );
 	gtk_widget_set_usize (progress_window, 400, -2);
