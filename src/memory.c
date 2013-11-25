@@ -6004,8 +6004,9 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 void mem_threshold(unsigned char *img, int len, int level)
 {
 	if (!img) return; /* Paranoia */
+	level += 0xFFFF;
 	for (; len; len-- , img++)
-		*img = *img < level ? 0 : 255;
+		*img = (level - *img) >> 8;
 }
 
 /* Only supports BPP = 1 and 3 */

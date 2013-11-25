@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.32"
-MT_DATE="2013-11-24"
+MT_V="3.44.33"
+MT_DATE="2013-11-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -567,7 +567,13 @@ then
 	LIB_NAME lcms "$STATIC_CMS"
 	DEFS="$DEFS -DU_LCMS"
 fi
-LIB_NAME png "$STATIC_PNG"
+if [ -n "$FAKE_ROOT" ]
+then
+	INCLUDES="$INCLUDES `PKGCONFIG libpng --cflags`"
+	LIB_NAME "" "$STATIC_PNG" "`PKGCONFIG libpng --libs`"
+else
+	LIB_NAME png "$STATIC_PNG"
+fi
 LIB_NAME z "$STATIC_PNG"
 LIB_NAME m
 if [ "$MT_LANG" = YES ]

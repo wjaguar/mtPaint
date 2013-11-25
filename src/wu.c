@@ -14,6 +14,8 @@
 	Dmitry Groshev, July 2008.
 	And added "diameter weighting" mode.
 	Dmitry Groshev, November 2008.
+	Switched from float to double for better numeric stability.
+	Dmitry Groshev, November 2013.
 */
 
 #include "mygtk.h"
@@ -61,7 +63,7 @@ struct box { int r0, r1, g0, g1, b0, b1, vol;	// min value, exclusive. max value
  * NB: these must start out 0!
  */
 
-static float	*m2;
+static double	*m2;
 static int	*wt, *mr, *mg, *mb;
 
 static int	size; // image size
@@ -92,7 +94,7 @@ int *vwt, *vmr, *vmg, *vmb;
 		vmr[ind] += r;
 		vmg[ind] += g;
 		vmb[ind] += b;
-		m2[ind] += (float)(table[r]+table[g]+table[b]);
+		m2[ind] += table[r]+table[g]+table[b];
 	}
 
 	if (!quan_sqrt) return;
@@ -129,7 +131,7 @@ int *vwt, *vmr, *vmg, *vmb;
 	register unsigned short int ind1, ind2;
 	register unsigned char i, r, g, b;
 	long int line, line_r, line_g, line_b, area[33], area_r[33], area_g[33], area_b[33];
-	float line2, area2[33];
+	double line2, area2[33];
 
 	for(r=1; r<=32; ++r)
 	{
@@ -247,12 +249,12 @@ int mmt[33][33][33];
 }
 
 
-static float Var(cube)
+static double Var(cube)
 // Compute the weighted variance of a box
 // NB: as with the raw statistics, this is really the variance * size
 struct box *cube;
 {
-	float dr, dg, db, xx;
+	double dr, dg, db, xx;
 
 	dr = Vol(cube, mr); 
 	dg = Vol(cube, mg); 
@@ -265,7 +267,7 @@ struct box *cube;
 		+m2[ 33*33*cube->r0 + 33*cube->g1 + cube->b0]
 		+m2[ 33*33*cube->r0 + 33*cube->g0 + cube->b1]
 		-m2[ 33*33*cube->r0 + 33*cube->g0 + cube->b0];
-	return( xx - (dr*dr+dg*dg+db*db)/(float)Vol(cube,wt) );    
+	return( xx - (dr*dr+dg*dg+db*db)/(double)Vol(cube,wt) );    
 }
 
 /* We want to minimize the sum of the variances of two subboxes.
@@ -276,7 +278,7 @@ struct box *cube;
  */
 
 
-static float Maximize(cube, dir, first, last, cut, whole_r, whole_g, whole_b, whole_w)
+static double Maximize(cube, dir, first, last, cut, whole_r, whole_g, whole_b, whole_w)
 struct box *cube;
 unsigned char dir;
 int first, last, *cut;
@@ -285,7 +287,7 @@ long int whole_r, whole_g, whole_b, whole_w;
 	register long int half_r, half_g, half_b, half_w;
 	long int base_r, base_g, base_b, base_w;
 	register int i;
-	register float temp, max;
+	register double temp, max;
 
 	base_r = Bottom(cube, dir, mr);
 	base_g = Bottom(cube, dir, mg);
@@ -305,7 +307,7 @@ long int whole_r, whole_g, whole_b, whole_w;
 		{				// subbox could be empty of pixels!
 			continue;		// never split into an empty box
 		}
-		else temp = ((float)half_r*half_r + (float)half_g*half_g + (float)half_b*half_b)/half_w;
+		else temp = ((double)half_r*half_r + (double)half_g*half_g + (double)half_b*half_b)/half_w;
 
 		half_r = whole_r - half_r;
 		half_g = whole_g - half_g;
@@ -315,7 +317,7 @@ long int whole_r, whole_g, whole_b, whole_w;
 		{				// subbox could be empty of pixels!
 			continue;		// never split into an empty box
 		}
-		else temp += ((float)half_r*half_r + (float)half_g*half_g + (float)half_b*half_b)/half_w;
+		else temp += ((double)half_r*half_r + (double)half_g*half_g + (double)half_b*half_b)/half_w;
 
 		if (temp > max)
 		{
@@ -330,7 +332,7 @@ static int Cut(struct box *set1, struct box *set2)
 {
 	unsigned char dir;
 	int cutr, cutg, cutb;
-	float maxr, maxg, maxb;
+	double maxr, maxg, maxb;
 	long int whole_r, whole_g, whole_b, whole_w;
 
 	whole_r = Vol(set1, mr);
@@ -399,13 +401,13 @@ int wu_quant(unsigned char *inbuf, int width, int height, int quant_to, png_colo
 	unsigned char	*tag;
 	long int	next;
 	register long int i, k, weight;
-	float		vv[MAXCOLOR], temp;
+	double		vv[MAXCOLOR], temp;
 
 	K = quant_to;
 	size = width*height;
 
-	mem = multialloc(MA_ALIGN_DEFAULT,
-		&m2, 33*33*33 * sizeof(float),
+	mem = multialloc(MA_ALIGN_DOUBLE,
+		&m2, 33*33*33 * sizeof(double),
 		&wt, 33*33*33 * sizeof(int),
 		&mr, 33*33*33 * sizeof(int),
 		&mg, 33*33*33 * sizeof(int),

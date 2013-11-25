@@ -16,7 +16,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Saving an image now commits paste if auto commit mode is enabled
 	* The Free Rotate window now remembers the previous rotation angle in that mtPaint session
 	* Undo system now uses a bit less memory
-	* Support for compiling with giflib 5 added
+	* Support for compiling with giflib 5, libpng 1.6 and libjpeg 9 added
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key

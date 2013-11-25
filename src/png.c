@@ -31,6 +31,9 @@
 #endif
 #ifdef U_JPEG
 #define NEED_CMYK
+/* !!! libjpeg 9 headers conflict with these */
+#undef TRUE
+#undef FALSE
 #include <jpeglib.h>
 /* !!! Since libjpeg 7, this conflicts with <windows.h>; with libjpeg 8a,
  * conflict can be avoided if windows.h is included BEFORE this - WJ */
@@ -905,7 +908,12 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	/* Extract ICC profile if it's of use */
 	if (!settings->icc_size)
 	{
-		png_charp name, icc;
+#if PNG_LIBPNG_VER >= 10600 /* 1.6+ */
+		png_bytep icc;
+#else
+		png_charp icc;
+#endif
+		png_charp name;
 		png_uint_32 len;
 		int comp;
 
@@ -937,7 +945,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 	png_infop info_ptr;
 	FILE *fp = NULL;
 	int h = settings->height, w = settings->width, bpp = settings->bpp;
-	int i, chunks = 0, res = -1;
+	int i, j, res = -1;
 	long uninit_(dest_len), res_len;
 	char *mess = NULL;
 	unsigned char trans[256], *tmp, *rgba_row = NULL;
@@ -1025,18 +1033,20 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 
 	if (mess) ls_init(mess, 1);
 
-	for (i = 0; i < h; i++)
+	for (j = 0; j < h; j++)
 	{
-		tmp = prepare_row(rgba_row, settings, bpp, i);
+		tmp = prepare_row(rgba_row, settings, bpp, j);
 		png_write_row(png_ptr, (png_bytep)tmp);
-		ls_progress(settings, i, 20);
+		ls_progress(settings, j, 20);
 	}
 
 	/* Save private chunks into PNG file if we need to */
+	/* !!! Uncomment if default setting ever gets inadequate (in 1.7+) */
+//	png_set_keep_unknown_chunks(png_ptr, PNG_HANDLE_CHUNK_ALWAYS, NULL, 0);
 	tmp = NULL;
 	i = bpp == 1 ? CHN_ALPHA : CHN_ALPHA + 1;
 	if (settings->mode == FS_CLIPBOARD) i = NUM_CHANNELS; // Disable extensions
-	for (; i < NUM_CHANNELS; i++)
+	for (j = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!settings->img[i]) continue;
 		if (!tmp)
@@ -1059,9 +1069,12 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		strncpy(unknown0.name, chunk_names[i], 5);
 		unknown0.data = tmp;
 		unknown0.size = res_len;
+		unknown0.location = PNG_AFTER_IDAT;
 		png_set_unknown_chunks(png_ptr, info_ptr, &unknown0, 1);
+#if PNG_LIBPNG_VER < 10600 /* before 1.6 */
 		png_set_unknown_chunk_location(png_ptr, info_ptr,
-			chunks++, PNG_AFTER_IDAT);
+			j++, PNG_AFTER_IDAT);
+#endif
 	}
 	free(tmp);
 	png_write_end(png_ptr, info_ptr);
