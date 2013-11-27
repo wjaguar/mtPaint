@@ -3760,6 +3760,7 @@ void reseparate(char *str)
 
 void update_window_spin(GtkWidget *window)
 {
+	if (!GTK_IS_SPIN_BUTTON(GTK_WINDOW(window)->focus_widget)) return;
 #if GTK_MAJOR_VERSION == 1
 	gtk_container_focus(GTK_CONTAINER(window), GTK_DIR_TAB_FORWARD);
 #else

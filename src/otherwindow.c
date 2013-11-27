@@ -871,6 +871,7 @@ static void *brcosa_code[] = {
 	BORDER(TABLE, 0),
 	REF(xtra), TABLEr(4, 4),
 	TLLABEL(_("Posterize type"), 0, 0),
+	BORDER(TLOPT, 0),
 	TLOPTvle(pos_txt, 3, posterize_mode, brcosa_posterize_changed, 1, 0, 2),
 	UNLESS(rgb), TLLABEL(_("Palette"), 0, 2),
 	IFx(rgb, 1),
@@ -895,11 +896,11 @@ static void *brcosa_code[] = {
 ///	BOTTOM AREA
 	HSEP,
 	OKBOX0,
-	BORDER(OKBTN, 4),
+	BORDER(BUTTON, 4),
 	CANCELBTN(_("Cancel"), brcosa_btn),
-	REF(buttons[0]), OKNEXT(_("Preview"), brcosa_changed),
-	REF(buttons[1]), OKNEXT(_("Reset"), click_brcosa_reset),
-	REF(buttons[2]), OKNEXT(_("Apply"), brcosa_btn),
+	REF(buttons[0]), BUTTON(_("Preview"), brcosa_changed),
+	REF(buttons[1]), BUTTON(_("Reset"), click_brcosa_reset),
+	REF(buttons[2]), BUTTON(_("Apply"), brcosa_btn),
 	REF(buttons[3]), OKBTN(_("OK"), brcosa_btn),
 	WSHOW
 };
@@ -1633,6 +1634,7 @@ static char *grid_txt[GRID_MAX + 1] = { _("Opaque"), _("Border"),
 static void *colsel_code[] = {
 	IF(mpflag), WPMOUSE,
 	WINDOWpm(name),
+	BORDER(BUTTON, 4),
 	REF(clist),
 	IFx(is_pal, 1), // long-list form - for now only palette needs it
 		XHBOXb(5, 0),
@@ -1660,6 +1662,7 @@ static void *colsel_code[] = {
 		REF(fspin), SPIN(n0, 0, 255),
 		BUTTON(_("To"), set_range_spin),
 		REF(tspin), SPIN(n1, 0, 255),
+		BORDER(XOPT, 4),
 		XOPT(scales_txt, 4, scale),
 		BUTTON(_("Create"), make_cscale),
 		WDONE,
@@ -1708,7 +1711,7 @@ static void *colsel_code[] = {
 		EVENT(CHANGE, grid_controls_changed),
 		WDONE,
 	ENDIF(1),
-	BORDER(OKBOX, 0),
+	BORDER(OKBOX, 0), DEFBORDER(BUTTON),
 	EOKBOX(_("OK"), colsel_evt, _("Cancel"), colsel_evt),
 	OKTOGGLE(_("Preview"), preview, colsel_evt),
 	WSHOW
@@ -2072,6 +2075,7 @@ static void *quantize_code[] = {
 		TABLE2(2),
 		REF(errspin), TSPIN(_("Error propagation, %"), err, 0, 100),
 		TLLABEL(_("Selective error propagation"), 0, 1),
+		BORDER(TLOPT, 0),
 		TLOPTve(err_txt, 0, dither_sel, choose_selective, 1, 1),
 		WDONE,
 		CHECKv(_("Full error precision"), dither_8b),
@@ -2118,17 +2122,20 @@ void pressed_quantize(int palette)
 
 ///	GRADIENT WINDOW
 
-static int grad_channel;
-static grad_info grad_temps[NUM_CHANNELS];
-static grad_map grad_tmaps[NUM_CHANNELS + 1];
-static grad_store grad_tbytes;
+typedef struct {
+	int pmouse;
+	int channel, nchan;
+	int len, rep, ofs;
+	int type, bound, opac;
+	int gtype, grev;
+	int otype, orev;
+	void **opt, **gbut, **obut;
+	grad_info temps[NUM_CHANNELS];
+	grad_map tmaps[NUM_CHANNELS + 1];
+	grad_store tbytes;
+} grad_dd;
 
-static GtkWidget *grad_window;
-static GtkWidget *grad_spin_len, *grad_spin_rep, *grad_spin_ofs;
-static GtkWidget *grad_opt_type, *grad_opt_bound;
-static GtkWidget *grad_ss_pre;
-static GtkWidget *grad_opt_gtype, *grad_opt_otype;
-static GtkWidget *grad_check_grev, *grad_check_orev;
+static grad_dd *grad_dt; // tmp
 
 static unsigned char grad_pad[GRAD_POINTS * 3], grad_mpad[GRAD_POINTS];
 static int grad_cnt, grad_ofs, grad_slot, grad_mode;
@@ -2234,21 +2241,22 @@ static GtkWidget *grad_interp_menu(int value, int allow_const, GtkSignalFunc han
 
 static void click_grad_edit_ok(GtkWidget *widget)
 {
-	int idx = (grad_channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
-		grad_channel + 1;
+	grad_dd *dt = grad_dt;
+	int idx = (dt->channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
+		dt->channel + 1;
 
 	if (grad_mode < 0) /* Opacity */
 	{
-		memcpy(grad_tbytes + GRAD_CUSTOM_OPAC(idx), grad_pad, GRAD_POINTS);
-		memcpy(grad_tbytes + GRAD_CUSTOM_OMAP(idx), grad_mpad, GRAD_POINTS);
-		grad_tmaps[idx].coplen = grad_cnt;
+		memcpy(dt->tbytes + GRAD_CUSTOM_OPAC(idx), grad_pad, GRAD_POINTS);
+		memcpy(dt->tbytes + GRAD_CUSTOM_OMAP(idx), grad_mpad, GRAD_POINTS);
+		dt->tmaps[idx].coplen = grad_cnt;
 	}
 	else /* Gradient */
 	{
-		memcpy(grad_tbytes + GRAD_CUSTOM_DATA(idx), grad_pad,
+		memcpy(dt->tbytes + GRAD_CUSTOM_DATA(idx), grad_pad,
 			idx ? GRAD_POINTS : GRAD_POINTS * 3);
-		memcpy(grad_tbytes + GRAD_CUSTOM_DMAP(idx), grad_mpad, GRAD_POINTS);
-		grad_tmaps[idx].cvslen = grad_cnt;
+		memcpy(dt->tbytes + GRAD_CUSTOM_DMAP(idx), grad_mpad, GRAD_POINTS);
+		dt->tmaps[idx].cvslen = grad_cnt;
 	}
 	gtk_widget_destroy(widget);
 }
@@ -2405,27 +2413,29 @@ static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
-static void grad_edit(GtkWidget *widget, gpointer user_data)
+static void grad_edit(void **wdata, int opac)
 {
+	grad_dd *dt = GET_DDATA(wdata);
 	GtkWidget *win, *mainbox, *hbox, *hbox2, *pix, *cs, *ss, *sw, *btn;
-	int i, idx, opac = (int)user_data != 0;
+	int i, idx;
 
-	idx = (grad_channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
-		grad_channel + 1;
+	grad_dt = dt;
+	idx = (dt->channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
+		dt->channel + 1;
 
 	/* Copy to temp */
 	if (opac)
 	{
-		memcpy(grad_pad, grad_tbytes + GRAD_CUSTOM_OPAC(idx), GRAD_POINTS);
-		memcpy(grad_mpad, grad_tbytes + GRAD_CUSTOM_OMAP(idx), GRAD_POINTS);
-		grad_cnt = grad_tmaps[idx].coplen;
+		memcpy(grad_pad, dt->tbytes + GRAD_CUSTOM_OPAC(idx), GRAD_POINTS);
+		memcpy(grad_mpad, dt->tbytes + GRAD_CUSTOM_OMAP(idx), GRAD_POINTS);
+		grad_cnt = dt->tmaps[idx].coplen;
 	}
 	else
 	{
-		memcpy(grad_pad, grad_tbytes + GRAD_CUSTOM_DATA(idx),
+		memcpy(grad_pad, dt->tbytes + GRAD_CUSTOM_DATA(idx),
 			idx ? GRAD_POINTS : GRAD_POINTS * 3);
-		memcpy(grad_mpad, grad_tbytes + GRAD_CUSTOM_DMAP(idx), GRAD_POINTS);
-		grad_cnt = grad_tmaps[idx].cvslen;
+		memcpy(grad_mpad, dt->tbytes + GRAD_CUSTOM_DMAP(idx), GRAD_POINTS);
+		grad_cnt = dt->tmaps[idx].cvslen;
 	}
 	if (grad_cnt < 2) grad_cnt = 2;
 	grad_ofs = grad_slot = 0;
@@ -2443,7 +2453,7 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 		PPAD_HEIGHT(PPAD_SLOT)));
 	gtk_signal_connect(GTK_OBJECT(pix), "realize",
 		GTK_SIGNAL_FUNC(palette_pad_draw),
-		(gpointer)(opac ? -1 : grad_channel));
+		(gpointer)(opac ? -1 : dt->channel));
 	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
 		GTK_SIGNAL_FUNC(palette_pad_click), (gpointer)!grad_mode);
 	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
@@ -2513,7 +2523,8 @@ static void grad_edit(GtkWidget *widget, gpointer user_data)
 #ifndef U_CPICK_MTPAINT
 	grad_load_slot(0);
 #endif
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(grad_window));
+	gtk_window_set_transient_for(GTK_WINDOW(win),
+		GTK_WINDOW(GET_REAL_WINDOW(wdata)));
 	gtk_widget_show_all(win);
 #ifdef U_CPICK_MTPAINT
 	grad_load_slot(0);
@@ -2532,202 +2543,166 @@ static const char gtmap[NUM_GTYPES * 2] = { GRAD_TYPE_RGB, 1, GRAD_TYPE_RGB, 2,
 static const char opmap[NUM_OTYPES] = { GRAD_TYPE_RGB, GRAD_TYPE_CONST,
 	GRAD_TYPE_CUSTOM };
 
-static void grad_reset_menu(int mode, int bpp)
+static void store_channel_gradient(grad_dd *dt)
 {
-	GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
-		GTK_OPTION_MENU(grad_opt_gtype)))->children;
-	char f = bpp == 1 ? 1 : 2;
-	int i, j;
+	int channel = dt->channel;
+	grad_info *grad = dt->temps + channel;
+	grad_map *gmap = dt->tmaps + channel + 1;
 
-	for (j = NUM_GTYPES - 1; j >= 0; j--)
-	{
-		if ((gtmap[j * 2] == mode) && (gtmap[j * 2 + 1] & f)) break;
-	}
+	if ((channel == CHN_IMAGE) && (mem_img_bpp == 3)) gmap = dt->tmaps;
 
-	for (; items; items = items->next)
-	{
-		i = (int)gtk_object_get_user_data(GTK_OBJECT(items->data));
-		widget_showhide(GTK_WIDGET(items->data), gtmap[2 * i + 1] & f);
-	}
-	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_gtype), j);
+	grad->len = dt->len;
+	grad->gmode = dt->type + GRAD_MODE_LINEAR;
+	grad->rep = dt->rep;
+	grad->rmode = dt->bound;
+	grad->ofs = dt->ofs;
+
+	gmap->gtype = gtmap[2 * dt->gtype];
+	gmap->grev = dt->grev;
+	gmap->otype = opmap[dt->otype];
+	gmap->orev = dt->orev;
 }
 
-static void store_channel_gradient(int channel)
+static void show_channel_gradient(grad_dd *dt, void **wdata)
 {
-	grad_info *grad = grad_temps + channel;
-	grad_map *gmap = grad_tmaps + channel + 1;
-
-	if (channel < 0) return;
-	if ((channel == CHN_IMAGE) && (mem_img_bpp == 3)) gmap = grad_tmaps;
-
-	grad->len = read_spin(grad_spin_len);
-	grad->gmode = wj_option_menu_get_history(grad_opt_type) + GRAD_MODE_LINEAR;
-	grad->rep = read_spin(grad_spin_rep);
-	grad->rmode = wj_option_menu_get_history(grad_opt_bound);
-	grad->ofs = read_spin(grad_spin_ofs);
-
-	gmap->gtype = gtmap[2 * wj_option_menu_get_history(grad_opt_gtype)];
-	gmap->grev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_grev));
-	gmap->otype = opmap[wj_option_menu_get_history(grad_opt_otype)];
-	gmap->orev = !!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_check_orev));
-}
-
-static void show_channel_gradient(int channel)
-{
-	grad_info *grad = grad_temps + channel;
+	int channel = dt->channel;
+	grad_info *grad = dt->temps + channel;
 	grad_map *gmap;
-	int i, idx = channel + 1, bpp = BPP(channel);
+	char wmap[NUM_GTYPES];
+	int i, j, k, idx = channel + 1, bpp = BPP(channel);
 
 	if (bpp == 3) --idx;
-	gmap = grad_tmaps + idx;
+	gmap = dt->tmaps + idx;
 
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_len), grad->len);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_type),
-		grad->gmode - GRAD_MODE_LINEAR);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_rep), grad->rep);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_bound), grad->rmode);
-	gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_spin_ofs), grad->ofs);
+	/* Reconfigure gradient selector */
+	i = bpp == 1 ? 1 : 2;
+	for (k = j = NUM_GTYPES - 1; j >= 0; j--)
+	{
+		wmap[j] = !(gtmap[j * 2 + 1] & i) ? 0 : // hide
+			gtmap[j * 2] == gmap->gtype ? 2 : 1; // select : show
+		if (wmap[k] < wmap[j]) k = j;
+	}
+	dt->gtype = k;
+	cmd_setlist(dt->opt, wmap, NUM_GTYPES);
 
-	grad_reset_menu(gmap->gtype, bpp);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_grev), gmap->grev);
+	/* Opacity gradient */
 	for (i = NUM_OTYPES - 1; (i >= 0) && (opmap[i] != gmap->otype); i--);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(grad_opt_otype), i);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_check_orev), gmap->orev);
+	dt->otype = i;
+
+	/* Parameters */
+	dt->len = grad->len;
+	dt->rep = grad->rep;
+	dt->ofs = grad->ofs;
+	dt->type = grad->gmode - GRAD_MODE_LINEAR;
+	dt->bound = grad->rmode;
+	dt->grev = gmap->grev;
+	dt->orev = gmap->orev;
+
+	/* Display all that */
+	run_reset(wdata, 1);
 }
 
-static void click_grad_apply(GtkWidget *widget)
+static void grad_evt(grad_dd *dt, void **wdata, int what, void **where)
 {
-	int i;
-
-	store_channel_gradient(grad_channel);
-	memcpy(gradient, grad_temps, sizeof(grad_temps));
-	memcpy(graddata, grad_tmaps, sizeof(grad_tmaps));
-	memcpy(gradbytes, grad_tbytes, sizeof(grad_tbytes));
-
-	grad_opacity = mt_spinslide_get_value(grad_ss_pre);
-
-	for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
-	for (i = 0; i <= NUM_CHANNELS; i++) gmap_setup(graddata + i, gradbytes, i);
-	update_stuff(UPD_GRAD);
-}
-
-static void click_grad_ok(GtkWidget *widget)
-{
-	click_grad_apply(widget);
-	gtk_widget_destroy(widget);
-}
-
-static void grad_channel_changed(GtkToggleButton *widget, gpointer user_data)
-{
-	if ((int)user_data == grad_channel) return;
-	if (!gtk_toggle_button_get_active(widget)) return;
-	store_channel_gradient(grad_channel);
-	grad_channel = -1;
-	show_channel_gradient((int)user_data);
-	grad_channel = (int)user_data;
-}
-
-static void grad_selector_box(GtkWidget *box, char **mtext, int op)
-{
-	GtkWidget *vbox, *hbox, *menu, *rev, *btn;
-
-	vbox = gtk_vbox_new(FALSE, 0);
-	add_with_frame_x(box, op ? _("Opacity") : _("Gradient"), vbox, 5, TRUE);
-	menu = pack(vbox, wj_option_menu(mtext, -1, 0, NULL, NULL));
-	gtk_container_set_border_width(GTK_CONTAINER(menu), 5);
-	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
-	rev = add_a_toggle(_("Reverse"), hbox, FALSE);
-	btn = add_a_button(_("Edit Custom"), 5, hbox, TRUE);
-	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
-		GTK_SIGNAL_FUNC(grad_edit), (gpointer)op);
-	if (op)
+	run_query(wdata);
+	if (what == op_EVT_SELECT) // channel
 	{
-		grad_opt_otype = menu;
-		grad_check_orev = rev;
+		/* If same channel, it means doing a reset */
+		if (dt->nchan != dt->channel) store_channel_gradient(dt);
+		dt->channel = dt->nchan;
+		show_channel_gradient(dt, wdata);
+		return;
 	}
-	else
+	where = origin_slot(where); // button
+	if ((where == dt->gbut) || (where == dt->obut))
+		grad_edit(wdata, where == dt->obut); // value / opacity
+	else // OK/Apply
 	{
-		grad_opt_gtype = menu;
-		grad_check_grev = rev;
+		int i;
+
+		store_channel_gradient(dt);
+		memcpy(gradient, dt->temps, sizeof(dt->temps));
+		memcpy(graddata, dt->tmaps, sizeof(dt->tmaps));
+		memcpy(gradbytes, dt->tbytes, sizeof(dt->tbytes));
+
+		grad_opacity = dt->opac;
+
+		for (i = 0; i < NUM_CHANNELS; i++) grad_update(gradient + i);
+		for (i = 0; i <= NUM_CHANNELS; i++)
+			gmap_setup(graddata + i, gradbytes, i);
+		update_stuff(UPD_GRAD);
 	}
+	if (what == op_EVT_OK) run_destroy(wdata);
 }
+
+#undef _
+#define _(X) X
+
+static char *gtypes_txt[] = {_("Linear"), _("Bilinear"), _("Radial"),
+	_("Square"), _("Angular"), _("Conical")};
+static char *rtypes_txt[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
+static char *gradtypes_txt[NUM_GTYPES] = {_("A to B"), _("A to B (RGB)"),
+	_("A to B (sRGB)"), _("A to B (HSV)"), _("A to B (backward HSV)"),
+	_("A only"), _("Custom")};
+static char *optypes_txt[NUM_OTYPES] = {_("Current to 0"), _("Current only"),
+	_("Custom")};
+
+#define WBbase grad_dd
+static void *grad_code[] = {
+	IF(pmouse), WPMOUSE, WINDOWm(_("Configure Gradient")),
+	/* Channel box */
+	BORDER(FRBOX, 0),
+	FRPACKe(_("Channel"), channames_, NUM_CHANNELS, 1, nchan, grad_evt),
+	TRIGGER,
+	/* Setup block */
+	TABLE(4, 3),
+	GROUP(1),
+	TSPIN(_("Length"), len, 0, MAX_GRAD),
+	TSPIN(_("Repeat length"), rep, 0, MAX_GRAD),
+	TSPIN(_("Offset"), ofs, -MAX_GRAD, MAX_GRAD),
+	TLLABEL(_("Gradient type"), 2, 0), TLOPT(gtypes_txt, 6, type, 3, 0),
+	TLLABEL(_("Extension type"), 2, 1), TLOPT(rtypes_txt, 4, bound, 3, 1),
+	TLLABEL(_("Preview opacity"), 2, 2), TLSPINSLIDE(opac, 0, 255, 3, 2),
+	WDONE,
+	/* Select page */
+	EQBOX,
+	FXVBOX(_("Gradient")),
+	REF(opt), XOPT(gradtypes_txt, NUM_GTYPES, gtype),
+	EQBOX,
+	CHECK(_("Reverse"), grev),
+	REF(gbut), BUTTON(_("Edit Custom"), grad_evt),
+	WDONE, WDONE,
+	FXVBOX(_("Opacity")),
+	XOPT(optypes_txt, NUM_OTYPES, otype),
+	EQBOX,
+	CHECK(_("Reverse"), orev),
+	REF(obut), BUTTON(_("Edit Custom"), grad_evt),
+	WDONE, WDONE,
+	WDONE,
+	/* Cancel / Apply / OK */
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), grad_evt, _("Cancel"), NULL),
+	OKADD(_("Apply"), grad_evt),
+	WSHOW
+};
+#undef WBbase
 
 void gradient_setup(int mode)
 {
-	char *gtypes[] = {_("Linear"), _("Bilinear"), _("Radial"), _("Square"),
-		_("Angular"), _("Conical")};
-	char *rtypes[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
-	char *gradtypes[] = {_("A to B"), _("A to B (RGB)"), _("A to B (sRGB)"),
-		_("A to B (HSV)"), _("A to B (backward HSV)"), _("A only"),
-		_("Custom"), NULL};
-	char *optypes[] = {_("Current to 0"), _("Current only"), _("Custom"), NULL};
-	GtkWidget *win, *mainbox, *hbox, *table, *align;
-	GtkWindowPosition pos = !mode && !inifile_get_gboolean("centerSettings", TRUE) ?
-		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
+	grad_dd tdata;
 
-	memcpy(grad_temps, gradient, sizeof(grad_temps));
-	memcpy(grad_tmaps, graddata, sizeof(grad_tmaps));
-	memcpy(grad_tbytes, gradbytes, sizeof(grad_tbytes));
-	grad_channel = mem_channel;
-
-	grad_window = win = add_a_window(GTK_WINDOW_TOPLEVEL,
-		_("Configure Gradient"), pos, TRUE);
-	mainbox = add_vbox(win);
-
-	/* Channel box */
-
-	hbox = wj_radio_pack(allchannames, 4, 1, mem_channel, NULL,
-		GTK_SIGNAL_FUNC(grad_channel_changed));
-	add_with_frame(mainbox, _("Channel"), hbox);
-
-	/* Setup block */
-
-	table = add_a_table(3, 4, 5, mainbox);
-	add_to_table(_("Length"), table, 0, 0, 5);
-	grad_spin_len = spin_to_table(table, 0, 1, 5, 0, 0, MAX_GRAD);
-	add_to_table(_("Repeat length"), table, 1, 0, 5);
-	grad_spin_rep = spin_to_table(table, 1, 1, 5, 0, 0, MAX_GRAD);
-	add_to_table(_("Offset"), table, 2, 0, 5);
-	grad_spin_ofs = spin_to_table(table, 2, 1, 5, 0, -MAX_GRAD, MAX_GRAD);
-	add_to_table(_("Gradient type"), table, 0, 2, 5);
-	grad_opt_type = wj_option_menu(gtypes, 6, 0, NULL, NULL);
-	to_table(grad_opt_type, table, 0, 3, 5);
-	add_to_table(_("Extension type"), table, 1, 2, 5);
-	grad_opt_bound = wj_option_menu(rtypes, 4, 0, NULL, NULL);
-	to_table(grad_opt_bound, table, 1, 3, 5);
-	add_to_table(_("Preview opacity"), table, 2, 2, 5);
-	grad_ss_pre = mt_spinslide_new(-1, -1);
-	mt_spinslide_set_range(grad_ss_pre, 0, 255);
-	mt_spinslide_set_value(grad_ss_pre, grad_opacity);
-	/* !!! Box derivatives can't have their "natural" size set directly */
-	align = widget_align_minsize(grad_ss_pre, 200, -2);
-	to_table(align, table, 2, 3, 5);
-
-	/* Select page */
-
-	hbox = pack(mainbox, gtk_hbox_new(TRUE, 0));
-	grad_selector_box(hbox, gradtypes, 0);
-	grad_selector_box(hbox, optypes, 1);
-
-	/* Cancel / Apply / OK */
-
-	align = pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(align, _("Apply"), GTK_SIGNAL_FUNC(click_grad_apply));
-
-	/* Fill in values */
-
-	gtk_widget_show_all(mainbox);
-	show_channel_gradient(mem_channel);
-
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_widget_show(win);
-
-#if GTK_MAJOR_VERSION == 1
-	/* Re-render sliders, adjust option menus */
-	gtk_widget_queue_resize(win);
-#endif
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.pmouse = !mode && !inifile_get_gboolean("centerSettings", TRUE);
+	tdata.channel = tdata.nchan = mem_channel;
+	tdata.opac = grad_opacity;
+	memcpy(tdata.temps, gradient, sizeof(tdata.temps));
+	memcpy(tdata.tmaps, graddata, sizeof(tdata.tmaps));
+	memcpy(tdata.tbytes, gradbytes, sizeof(tdata.tbytes));
+	run_create(grad_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 /// GRADIENT PICKER
 

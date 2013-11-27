@@ -323,7 +323,7 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 		item = gtk_list_item_new();
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
 		if (pp[7]) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
-			GTK_SIGNAL_FUNC(colorlist_click), r + 2);
+			GTK_SIGNAL_FUNC(colorlist_click), r);
 		gtk_container_add(GTK_CONTAINER(list), item);
 
 		box = gtk_hbox_new(FALSE, 3);
@@ -349,7 +349,7 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 	gtk_container_set_focus_child(GTK_CONTAINER(list),
 		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, *idx)->data));
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
-		GTK_SIGNAL_FUNC(colorlist_select), r);
+		GTK_SIGNAL_FUNC(colorlist_select), r + 2);
 	gtk_signal_connect_after(GTK_OBJECT(list), "map",
 		GTK_SIGNAL_FUNC(colorlist_map_scroll), dt);
 
@@ -420,6 +420,10 @@ static cmdef cmddefs[] = {
 	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK },
 	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK },
 	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK },
+	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK,
+		0, USE_BORDER(FRBOX) },
+	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK,
+		0, USE_BORDER(FRBOX) },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_XSPIN, cm_SPIN, pk_XPACK },
@@ -436,16 +440,13 @@ static cmdef cmddefs[] = {
 	{ op_RPACKD, cm_RPACKD, pk_XPACK },
 	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
 	{ op_OPT, cm_OPT, pk_PACK },
-// !!! Border = 4
-	{ op_XOPT, cm_OPT, pk_XPACK, 0, 4 },
-	{ op_TLOPT, cm_OPT, pk_TABLE },
+	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
+	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(TLOPT) },
 	/* Codes can map to themselves, and some do */
-	{ op_OKBTN, op_OKBTN, pk_XPACK, 0, USE_BORDER(OKBTN) },
-	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK, 0, USE_BORDER(OKBTN) },
-	{ op_OKADD, op_OKADD, pk_XPACK1, 0, USE_BORDER(OKBTN) },
-	{ op_OKNEXT, op_OKNEXT, pk_XPACK, 0, USE_BORDER(OKBTN) },
-// !!! Border = 4
-	{ op_BUTTON, cm_BUTTON, pk_XPACK, 0, 4 },
+	{ op_OKBTN, op_OKBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
+	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
+	{ op_OKADD, op_OKADD, pk_XPACK1, 0, USE_BORDER(BUTTON) },
+	{ op_BUTTON, cm_BUTTON, pk_XPACK, 0, USE_BORDER(BUTTON) },
 // !!! Padding = 5
 	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp, 5 }
 };
@@ -471,16 +472,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 	int have_sliders = FALSE;
 #endif
-	int have_spins = FALSE;
 	char txt[PATHTXT];
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *tw, *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **tagslot = NULL, **r = NULL, **res = NULL;
+	void *v, **pp, **r = NULL, **res = NULL; /* **tagslot = NULL */
 	int ld, dsize;
-	int i, n, op, lp, ref, pk, cw, tpad = 0;
+	int i, n, op, lp, ref, pk, cw, tpad = 0, minw = 0;
 
 
 	// Allocation size
@@ -523,10 +523,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = NULL;
 			*r++ = NULL;
 
+#if 0 /* Not needed for now */
 			/* Make WTAGS descriptor */
 			*tagslot = r;
 			*r++ = WBh(WTAGS, 1);
 			*r++ = (void *)have_spins; // only this for now
+#endif
 
 			/* !!! For now, done unconditionally */
 			gtk_window_set_transient_for(GTK_WINDOW(window),
@@ -560,9 +562,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = ddata; // Store struct ref at anchor
 			*r++ = window; // Store window ref right next to it
 			*r++ = pp - 1; // And slot ref after it
+#if 0 /* Not needed for now */
 			*r++ = window; // Store window again for WTAGS
 			tagslot = r; // Remember the location
 			*r++ = NULL; // No WTAGS descriptor yet
+#endif
 			*--wp = add_vbox(window);
 			continue;
 		/* Add a notebook page */
@@ -579,15 +583,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = (op == cm_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, (int)v & 255);
 			gtk_widget_show(widget);
-			cw = (int)v >> 8;
+			if (!(pk & pkf_FRAME)) cw = (int)v >> 8;
 // !!! Padding = 0
 			break;
-		/* Add a framed vertical box */
-		case op_FVBOX:
-			widget = gtk_vbox_new(FALSE, lp > 1 ? (int)v : 0);
+		/* Add an equal-spaced horizontal box */
+		case op_EQBOX:
+			widget = gtk_hbox_new(TRUE, 0);
 			gtk_widget_show(widget);
-			cw = GET_BORDER(FRBOX);
-			pk = pk_PACK | pkf_FRAME | pkf_STACK;
+			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a scrolled window */
 		case op_SCROLL:
@@ -655,13 +658,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a spin, fill from field/var */
 		case cm_SPIN:
 			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
-			have_spins = TRUE;
 			break;
 		/* Add float spin, fill from field/var */
 		case op_FSPIN:
 			widget = add_float_spin(*(int *)v / 100.0,
 				(int)pp[1] / 100.0, (int)pp[2] / 100.0);
-			have_spins = TRUE;
 // !!! Padding = 0
 			pk = pk_PACK;
 			break;
@@ -670,7 +671,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		{
 			int *xp = v;
 			widget = add_a_spin(xp[0], xp[1], xp[2]);
-			have_spins = TRUE;
 			break;
 		}
 		/* Add a named spinslider to table, fill from field */
@@ -684,7 +684,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
-			have_spins = TRUE;
 			pk = pk_TABLE2x;
 			break;
 		/* Add a named spinslider to table horizontally, fill from field */
@@ -699,7 +698,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
-			have_spins = TRUE;
 
 			x = next_table_level(wp[0], TRUE);
 			label = gtk_label_new(_(pp[--lp]));
@@ -711,6 +709,21 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				1, 2, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
 			break;
 		}
+		/* Add a spinslider to table slot, fill from field */
+		case op_TLSPINSLIDE:
+// !!! Padding = 5
+			tpad = 5;
+// !!! Width & height unset
+			widget = mt_spinslide_new(-1, -1);
+			mt_spinslide_set_range(widget, (int)pp[1], (int)pp[2]);
+			mt_spinslide_set_value(widget, *(int *)v);
+#if GTK_MAJOR_VERSION == 1
+			have_sliders = TRUE;
+#endif
+// !!! Min width = 200
+			minw = 200;
+			pk = pk_TABLE;
+			break;
 		/* Add a named checkbox, fill from field/var */
 		case cm_CHECK:
 			widget = sig_toggle(_(pp[1]), *(int *)v, NULL, NULL);
@@ -753,7 +766,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = wj_option_menu(src, n, *(int *)v,
 				ref > 1 ? r + 2 : NULL,
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
-// !!! Padding = 0
 			break;
 		}
 		/* Add a path box, fill from var/inifile */
@@ -769,7 +781,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = cpick_create();
 			cpick_set_opacity_visibility(widget, op == op_TCOLOR);
 			gtk_widget_show(widget);
-			have_spins = TRUE;
 			pk = pk_PACK;
 			break;
 		/* Add a colorlist box, fill from fields */
@@ -801,7 +812,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 
 			ok_bt = cancel_bt = gtk_button_new_with_label(_(v));
 			gtk_container_set_border_width(GTK_CONTAINER(ok_bt),
-				GET_BORDER(OKBTN));
+				GET_BORDER(BUTTON));
 			gtk_widget_show(ok_bt);
 			/* OK-event */
 			add_click(r + 2, pp + 2, ok_bt, window);
@@ -810,7 +821,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				cancel_bt = xpack(widget,
 					gtk_button_new_with_label(_(pp[1])));
 				gtk_container_set_border_width(
-					GTK_CONTAINER(cancel_bt), GET_BORDER(OKBTN));
+					GTK_CONTAINER(cancel_bt), GET_BORDER(BUTTON));
 				gtk_widget_show(cancel_bt);
 				/* Cancel-event */
 				add_click(r + 4, pp + 4, cancel_bt, window);
@@ -826,8 +837,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			delete_to_click(window, cancel_bt);
 			break;
 		}
-		/* Add a clickable button to OK-box */
-		case op_OKBTN: case op_CANCELBTN: case op_OKADD: case op_OKNEXT:
+		/* Add a clickable button */
+		case op_OKBTN: case op_CANCELBTN: case op_OKADD: case cm_BUTTON:
 		{
 			widget = gtk_button_new_with_label(_(v));
 			gtk_widget_show(widget);
@@ -845,7 +856,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				delete_to_click(window, widget);
 			}
 			/* Click-event */
-			add_click(r + 2, pp + 1, widget, window);
+			add_click(r + 2, pp + 1, widget,
+				op == cm_BUTTON ? NULL : window);
 			break;
 		}
 		/* Add a toggle button to OK-box */
@@ -854,15 +866,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_show(widget);
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), r + 2);
-			cw = GET_BORDER(OKBTN);
+			cw = GET_BORDER(BUTTON);
 			pk = pk_XPACK1;
-			break;
-		/* Add a clickable button */
-		case cm_BUTTON:
-			widget = gtk_button_new_with_label(_(v));
-			gtk_widget_show(widget);
-			/* Click-event */
-			add_click(r + 2, pp + 1, widget, NULL);
 			break;
 		/* Call a function */
 		case op_EXEC:
@@ -926,6 +931,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_TSPINSLIDE: case op_HTSPINSLIDE:
+			case op_TLSPINSLIDE:
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -940,14 +946,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			}
 		} // fallthrough
 		/* Remember that event needs triggering here */
-		case op_TRIGGER:
+		/* Or remember start of a group of widgets */
+		case op_TRIGGER: case op_GROUP:
 			*r++ = res;
 			*r++ = pp - 1;
 			continue;
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_SPIN: case op_BOR_TLLABEL:
-		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_OKBTN:
-			borders[op - op_BOR_0] = (int)v - DEF_BORDER;
+		case op_BOR_TLOPT: case op_BOR_XOPT:
+		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
+			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
 		default: continue;
 		}
@@ -963,6 +971,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Frame this */
 		if (pk & pkf_FRAME)
 			widget = add_with_frame(NULL, _(pp[--lp]), widget);
+		/* Set min width for this */
+// !!! For now, always use wrapper
+		if (minw) widget = widget_align_minsize(widget, minw, -2);
+		minw = 0;
 		/* Pack this */
 		switch (n = pk & pk_MASK)
 		{
@@ -1018,10 +1030,12 @@ static void *do_query(char *data, void **wdata, int mode)
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
+#if 0 /* Not needed for now */
 		case op_WTAGS:
 			// For now, only this
 			if (!(mode & 1) && v) update_window_spin(*wdata);
 			break;
+#endif
 		case op_SPIN: case op_XSPIN:
 		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
@@ -1033,7 +1047,7 @@ static void *do_query(char *data, void **wdata, int mode)
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
 			break;
-		case op_TSPINSLIDE: case op_HTSPINSLIDE:
+		case op_TSPINSLIDE: case op_HTSPINSLIDE: case op_TLSPINSLIDE:
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
@@ -1076,7 +1090,75 @@ static void *do_query(char *data, void **wdata, int mode)
 
 void run_query(void **wdata)
 {
+	update_window_spin(GET_REAL_WINDOW(wdata));
 	do_query(GET_DDATA(wdata), GET_WINDOW(wdata), 0);
+}
+
+void run_reset(void **wdata, int group)
+{
+// !!! Support only what actually used on, and their brethren
+	char *data = GET_DDATA(wdata);
+	void **pp, *v = NULL;
+	int op, cgroup = 0;
+
+	wdata = GET_WINDOW(wdata);
+	for (; (pp = wdata[1]); wdata += 2)
+	{
+		op = (int)*pp++;
+		v = op & (~0 << 16) ? pp[0] : NULL;
+		if (op & WB_FFLAG) v = data + (int)v;
+		op &= WB_OPMASK;
+		if (op == op_GROUP) cgroup = (int)v;
+		if (cgroup != group) continue;
+		switch (op)
+		{
+		case op_SPIN: case op_XSPIN:
+		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
+		case op_SPINa: case op_XSPINa: case op_TSPINa:
+			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
+				*(int *)v);
+			break;
+		case op_TSPINSLIDE: case op_HTSPINSLIDE: case op_TLSPINSLIDE:
+			mt_spinslide_set_value(*wdata, *(int *)v);
+			break;
+		case op_CHECK: case op_TLCHECK: case op_OKTOGGLE:
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
+				*(int *)v);
+			break;
+		case op_OPT: case op_XOPT: case op_TLOPT:
+			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
+				*(int *)v);
+			break;
+#if 0 /* Not needed for now */
+		case op_FSPIN:
+			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
+				*(int *)v * 0.01);
+			break;
+		case op_CHECKb:
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
+				inifile_get_gboolean(v, (int)pp[1]));
+			break;
+		case op_RPACK: case op_RPACKD: case op_FRPACK:
+		case op_COLORLIST: case op_COLORLISTN:
+// !!! No ready setter functions for these (and no need of them yet)
+			break;
+		case op_COLOR:
+			cpick_set_colour(slot[0], *(int *)v, 255);
+			break;
+		case op_TCOLOR:
+			cpick_set_colour(slot[0], ((int *)v)[0], ((int *)v)[1]);
+			break;
+		case op_PATH: case op_PATHs:
+		{
+			char path[PATHTXT];
+			gtkuncpy(path, op == op_PATHs ? inifile_get(v, "") : v,
+				PATHTXT);
+			gtk_entry_set_text(GTK_ENTRY(*wdata), txt);
+			break;
+		}
+#endif
+		}
+	}
 }
 
 void cmd_sensitive(void **slot, int state)
@@ -1096,7 +1178,7 @@ void cmd_set(void **slot, int v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
-	case op_TSPINSLIDE: case op_HTSPINSLIDE:
+	case op_TSPINSLIDE: case op_HTSPINSLIDE: case op_TLSPINSLIDE:
 		mt_spinslide_set_value(slot[0], v);
 		break;
 	case op_SPIN: case op_XSPIN:
@@ -1134,7 +1216,7 @@ void cmd_set3(void **slot, int *v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
-	case op_TSPINSLIDE: case op_HTSPINSLIDE:
+	case op_TSPINSLIDE: case op_HTSPINSLIDE: case op_TLSPINSLIDE:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
 		mt_spinslide_set_value(slot[0], v[0]);
 		break;
@@ -1155,6 +1237,26 @@ void cmd_set4(void **slot, int *v)
 	{
 		cpick_set_colour_previous(slot[0], v[2], v[3]);
 		cpick_set_colour(slot[0], v[0], v[1]);
+	}
+}
+
+void cmd_setlist(void **slot, char *map, int n)
+{
+// !!! Support only what actually used on, and their brethren
+	int op = GET_OP(slot);
+	if ((op == op_OPT) || (op == op_XOPT) || (op == op_TLOPT))
+	{
+		GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
+			GTK_OPTION_MENU(slot[0])))->children;
+		int i, j, k;
+
+		for (i = j = 0; items; items = items->next , i++)
+		{
+			k = i < n ? map[i] : 0; // show/hide
+			if (k > 1) j = i; // select
+			widget_showhide(GTK_WIDGET(items->data), k);
+		}
+		gtk_option_menu_set_history(GTK_OPTION_MENU(slot[0]), j);
 	}
 }
 

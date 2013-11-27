@@ -30,12 +30,14 @@ enum {
 	//
 	op_VBOX,
 	op_XVBOX,
-	op_EVBOX, // VBOX'es must precede HBOX'es
+	op_EVBOX,
 	op_HBOX,
 	op_XHBOX,
 	op_TLHBOX,
-	//
 	op_FVBOX,
+	op_FXVBOX,
+	//
+	op_EQBOX,
 	op_SCROLL,
 	op_SNBOOK,
 	op_PLAINBOOK,
@@ -59,6 +61,7 @@ enum {
 	//
 	op_TSPINSLIDE,
 	op_HTSPINSLIDE,
+	op_TLSPINSLIDE,
 	op_CHECK,
 	op_TLCHECK, // must follow CHECK
 	op_CHECKb,
@@ -79,7 +82,6 @@ enum {
 	op_OKBTN,
 	op_CANCELBTN,
 	op_OKADD,
-	op_OKNEXT,
 	op_OKTOGGLE,
 	op_BUTTON,
 	op_TLBUTTON,
@@ -91,6 +93,7 @@ enum {
 	op_UNLESS,
 	op_ENDIF,
 	op_REF,
+	op_GROUP,
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
@@ -113,9 +116,11 @@ enum {
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_SPIN,
 	op_BOR_TLLABEL,
+	op_BOR_TLOPT,
+	op_BOR_XOPT,
 	op_BOR_FRBOX,
 	op_BOR_OKBOX,
-	op_BOR_OKBTN,
+	op_BOR_BUTTON,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -132,6 +137,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize);
 void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
 #define run_destroy(W) destroy_dialog(GET_REAL_WINDOW(W))
+//	Reset (a group of) dialog widgets, using widget-map
+void run_reset(void **wdata, int group);
 
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
@@ -155,6 +162,8 @@ void cmd_set2(void **slot, int v0, int v1);
 void cmd_set3(void **slot, int *v);
 //	Set current & previous color/opacity on color slot
 void cmd_set4(void **slot, int *v);
+//	Set per-item visibility and selection on list-like slot
+void cmd_setlist(void **slot, char *map, int n);
 //	Read back slot value (as is), return its storage location
 void *cmd_read(void **slot, void *ddata);
 //	Repaint slot
@@ -201,7 +210,9 @@ void cmd_scroll(void **slot, int idx);
 #define XHBOXb(S,B) WBh(XHBOX, 1), WBbs(B, S)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
-#define FVBOXs(NM,S) WBh(FVBOX, 2), (void *)(S), (NM)
+#define FVBOXs(NM,S) WBh(FVBOX, 2), WBbs(0, S), (NM)
+#define FXVBOX(NM) WBh(FXVBOX, 1), (NM)
+#define EQBOX WBh(EQBOX, 0)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
@@ -233,6 +244,8 @@ void cmd_scroll(void **slot, int idx);
 	WBfield(V), (void *)(V0), (void *)(V1), (NM)
 #define HTSPINSLIDE(NM,V,V0,V1) WBrhf(HTSPINSLIDE, 4), \
 	WBfield(V), (void *)(V0), (void *)(V1), (NM)
+#define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
 #define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (void *)(V0), (NM)
@@ -249,10 +262,14 @@ void cmd_scroll(void **slot, int idx);
 /* !!! These blocks each hold 1 nested EVENT block */
 #define RPACKe(SS,N,H,V,HS) WBr2hf(RPACK, 3 + 2), WBfield(V), (SS), \
 	WBnh(N, H), EVENT(SELECT, HS)
+#define FRPACKe(NM,SS,N,H,V,HS) WBr2hf(FRPACK, 4 + 2), WBfield(V), (SS), \
+	WBnh(N, H), EVENT(SELECT, HS), (NM)
 #define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), \
 	(H), EVENT(SELECT, HS)
 #define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
 #define XOPT(SS,N,V) WBrhf(XOPT, 3), WBfield(V), (SS), (void *)(N)
+#define TLOPT(SS,N,V,X,Y) WBrhf(TLOPT, 4), WBfield(V), (SS), (void *)(N), \
+	WBxyl(X, Y, 1)
 /* !!! This block holds 1 nested EVENT block */
 #define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS), WBxyl(X, Y, L)
@@ -262,10 +279,11 @@ void cmd_scroll(void **slot, int idx);
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
+/* !!! SELECT must be last, for it gets triggered */
 #define COLORLIST(SP,V,CC,HS,HX) WBr3hf(COLORLIST, 3 + 2 * 2), WBfield(V), \
-	WBfield(CC), WBfield(SP), EVENT(SELECT, HS), EVENT(EXT, HX)
+	WBfield(CC), WBfield(SP), EVENT(EXT, HX), EVENT(SELECT, HS)
 #define COLORLISTN(N,V,CC,HS,HX) WBr3hf(COLORLISTN, 3 + 2 * 2), WBfield(V), \
-	WBfield(CC), WBfield(N), EVENT(SELECT, HS), EVENT(EXT, HX)
+	WBfield(CC), WBfield(N), EVENT(EXT, HX), EVENT(SELECT, HS)
 #define OKBOX(NOK,HOK,NC,HC) WBr3h(OKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define EOKBOX(NOK,HOK,NC,HC) WBr3h(EOKBOX, 2 + 2 * 2), (NOK), (NC), \
@@ -275,7 +293,6 @@ void cmd_scroll(void **slot, int idx);
 #define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
-#define OKNEXT(NM,H) WBr2h(OKNEXT, 1 + 2), (NM), EVENT(CLICK, H)
 #define OKTOGGLE(NM,V,H) WBr2hf(OKTOGGLE, 2 + 2), WBfield(V), (NM), \
 	EVENT(CHANGE, H)
 #define BUTTON(NM,H) WBr2h(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
@@ -292,7 +309,10 @@ void cmd_scroll(void **slot, int idx);
 #define UNLESSv(X) WBh(UNLESS, 1), &(X)
 #define ENDIF(N) WBh(ENDIF, 1), (void *)(N)
 #define REF(V) WBhf(REF, 1), WBfield(V)
+#define GROUP(N) WBrh(GROUP, 1), (void *)(N)
+//#define DEFGROUP WBrh(GROUP, 0)
 #define BORDER(T,V) WBh(BOR_##T, 1), (void *)(V)
+#define DEFBORDER(T) WBh(BOR_##T, 0)
 #define MKSHRINK WBh(MKSHRINK, 0)
 #define NORESIZE WBh(NORESIZE, 0)
 #define WANTMAX WBh(WANTMAX, 0)
