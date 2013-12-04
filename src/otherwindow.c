@@ -306,43 +306,57 @@ static unsigned char *mem_patch;
 
 #define PAL_SLOT_SIZE 10
 
-static unsigned char *render_color_grid(int w, int h, int cellsize, int channel)
+static void make_crgb(unsigned char *tmp, int channel)
+{
+	int col, j, k;
+
+	for (col = 0; col < 256; col++)
+	{
+		j = col * 3;
+		if (channel <= CHN_IMAGE + 1) /* Palette as such */
+		{
+			tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = 0;
+			if (col < mem_cols) /* Draw only existing colors */
+			{
+				tmp[j + 0] = mem_pal[col].red;
+				tmp[j + 1] = mem_pal[col].green;
+				tmp[j + 2] = mem_pal[col].blue;
+			}
+		}
+		else if (channel < NUM_CHANNELS + 1) /* Utility */
+		{
+			k = channel_rgb[channel][0] * col;
+			tmp[j + 0] = (k + (k >> 8) + 1) >> 8;
+			k = channel_rgb[channel][1] * col;
+			tmp[j + 1] = (k + (k >> 8) + 1) >> 8;
+			k = channel_rgb[channel][2] * col;
+			tmp[j + 2] = (k + (k >> 8) + 1) >> 8;
+		}
+		else /* Opacity */
+		{
+			tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = col;
+		}
+	}
+}
+
+unsigned char *render_color_grid(int w, int h, int cellsize, unsigned char *pp)
 {
 	unsigned char *rgb, *tmp;
-	int i, j, k, col, row;
+	int i, j, k, row;
 
 
 	row = w * 3;
 	rgb = calloc(1, h * row);
 	if (!rgb) return (NULL);
 
-	for (col = i = 0; i < h; i += cellsize)
+	for (i = 0; i < h; i += cellsize)
 	{
 		tmp = rgb + i * row;
-		for (j = 0; j < row; j += cellsize * 3 , col++)
+		for (j = 0; j < row; j += cellsize * 3 , pp += 3)
 		{
-			if (channel == CHN_IMAGE) /* Palette as such */
-			{
-				if (col < mem_cols) /* Draw only existing colors */
-				{
-					tmp[j + 0] = mem_pal[col].red;
-					tmp[j + 1] = mem_pal[col].green;
-					tmp[j + 2] = mem_pal[col].blue;
-				}
-			}
-			else if (channel >= 0) /* Utility */
-			{
-				k = channel_rgb[channel][0] * col;
-				tmp[j + 0] = (k + (k >> 8) + 1) >> 8;
-				k = channel_rgb[channel][1] * col;
-				tmp[j + 1] = (k + (k >> 8) + 1) >> 8;
-				k = channel_rgb[channel][2] * col;
-				tmp[j + 2] = (k + (k >> 8) + 1) >> 8;
-			}
-			else /* Opacity */
-			{
-				tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = col;
-			}
+			tmp[j + 0] = pp[0];
+			tmp[j + 1] = pp[1];
+			tmp[j + 2] = pp[2];
 			for (k = j + 3; k < j + cellsize * 3 - 3; k++)
 				tmp[k] = tmp[k - 3];
 		}
@@ -420,6 +434,7 @@ static gboolean expose_pat(GtkWidget *widget, GdkEventExpose *event, gpointer us
 
 void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 {
+	unsigned char pp[768];
 	int w, h;
 
 	if (pat_window) return; // Already displayed
@@ -445,7 +460,8 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 	else /* if (typ == CHOOSE_COLOR) */
 	{
 		w = h = 16 * PAL_SLOT_SIZE - 1;
-		mem_patch = render_color_grid(w, w, PAL_SLOT_SIZE, CHN_IMAGE);
+		make_crgb(pp, CHN_IMAGE);
+		mem_patch = render_color_grid(w, w, PAL_SLOT_SIZE, pp);
 	}
 	gtk_widget_set_usize(draw_pat, w, h);
 
@@ -2135,405 +2151,190 @@ typedef struct {
 	grad_store tbytes;
 } grad_dd;
 
-static grad_dd *grad_dt; // tmp
+typedef struct {
+	void **xw; // parent widget-map
+	int lock; // prevent nested calls
+	int pcol, interp, crgb[3];
+	int cnt, slot, mode;
+	void **ppad;
+	void **col, **opt;
+	void **spin, **chk;
+	void **pspin, **gbar;
+	unsigned char rgb[768];
+	unsigned char pad[GRAD_POINTS * 3], mpad[GRAD_POINTS];
+} ged_dd;
 
-static unsigned char grad_pad[GRAD_POINTS * 3], grad_mpad[GRAD_POINTS];
-static int grad_cnt, grad_ofs, grad_slot, grad_mode;
-
-static GtkWidget *grad_ed_cs, *grad_ed_opt, *grad_ed_ss, *grad_ed_tog, *grad_ed_pm;
-static GtkWidget *grad_ed_len, *grad_ed_bar[16], *grad_ed_left, *grad_ed_right;
-
-#define SLOT_SIZE 15
-
-#define PPAD_SLOT 11
-#define PPAD_XSZ 32
-#define PPAD_YSZ 8
-#define PPAD_WIDTH(X) (PPAD_XSZ * (X) - 1)
-#define PPAD_HEIGHT(X) (PPAD_YSZ * (X) - 1)
-
-static void palette_pad_set(int value)
+static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 {
-	wjpixmap_move_cursor(grad_ed_pm, (value % PPAD_XSZ) * PPAD_SLOT,
-		(value / PPAD_XSZ) * PPAD_SLOT);
-}
+	void *cause;
+	int slot;
 
-static void palette_pad_draw(GtkWidget *widget, gpointer user_data)
-{
-	unsigned char *rgb;
-	int w, h, col, cellsize = PPAD_SLOT;
-
-	if (!wjpixmap_pixmap(widget)) return;
-	w = PPAD_WIDTH(cellsize);
-	h = PPAD_HEIGHT(cellsize);
-	rgb = render_color_grid(w, h, cellsize, (int)user_data);
-	if (!rgb) return;
-	palette_pad_set(0);
-	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
-	col = (cellsize >> 1) - 1;
-	wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
-		xbm_ring4_width, xbm_ring4_height,
-		xbm_ring4_x_hot - col, xbm_ring4_y_hot - col, TRUE);
-
-	free(rgb);
-}
-
-static void grad_edit_set_rgb(GtkWidget *selection, gpointer user_data);
-static void palette_pad_select(int i, int mode)
-{
-	palette_pad_set(i);
-	/* Indexed / utility / opacity */
-	if (!mode)
+	if (what == op_EVT_OK)
 	{
-		/* !!! Signal needs be sent even if value stays the same */
-		GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(grad_ed_ss);
-		adj->value = i;
-		gtk_adjustment_value_changed(adj);
-	}
-	else if (i < mem_cols) /* Valid RGB */
-	{
-		cpick_set_colour(grad_ed_cs, PNG_2_INT(mem_pal[i]), 255);
-// !!! GTK+2 emits "color_changed" when setting color, others need explicit call
-#if GTK_MAJOR_VERSION == 1 || defined U_CPICK_MTPAINT
-		grad_edit_set_rgb(grad_ed_cs, NULL);
-#endif
-	}
-}
+		grad_dd *gdt = GET_DDATA(dt->xw);
+		int idx = (gdt->channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
+			gdt->channel + 1;
 
-static gboolean palette_pad_click(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
-{
-	int x = event->x, y = event->y;
-
-	gtk_widget_grab_focus(widget);
-	/* Only single clicks */
-	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
-	x /= PPAD_SLOT; y /= PPAD_SLOT;
-	palette_pad_select(y * PPAD_XSZ + x, (int)user_data);
-	return (TRUE);
-}
-
-static gboolean palette_pad_key(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
-{
-	int x, y, dx, dy;
-
-	if (!arrow_key(event, &dx, &dy, 0)) return (FALSE);
-	wjpixmap_cursor(widget, &x, &y);
-	x = x / PPAD_SLOT + dx; y = y / PPAD_SLOT + dy;
-	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
-	y = y * PPAD_XSZ + x;
-	y = y < 0 ? 0 : y > 255 ? 255 : y;
-	palette_pad_select(y, (int)user_data);
-#if GTK_MAJOR_VERSION == 1
-	/* Return value alone doesn't stop GTK1 from running other handlers */
-	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
-#endif
-	return (TRUE);
-}
-
-static GtkWidget *grad_interp_menu(int value, int allow_const, GtkSignalFunc handler)
-{
-	char *interp[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
-		_("Constant") };
-
-	return (wj_option_menu(interp, allow_const ? 5 : 4, value, NULL, handler));
-}
-
-static void click_grad_edit_ok(GtkWidget *widget)
-{
-	grad_dd *dt = grad_dt;
-	int idx = (dt->channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
-		dt->channel + 1;
-
-	if (grad_mode < 0) /* Opacity */
-	{
-		memcpy(dt->tbytes + GRAD_CUSTOM_OPAC(idx), grad_pad, GRAD_POINTS);
-		memcpy(dt->tbytes + GRAD_CUSTOM_OMAP(idx), grad_mpad, GRAD_POINTS);
-		dt->tmaps[idx].coplen = grad_cnt;
-	}
-	else /* Gradient */
-	{
-		memcpy(dt->tbytes + GRAD_CUSTOM_DATA(idx), grad_pad,
-			idx ? GRAD_POINTS : GRAD_POINTS * 3);
-		memcpy(dt->tbytes + GRAD_CUSTOM_DMAP(idx), grad_mpad, GRAD_POINTS);
-		dt->tmaps[idx].cvslen = grad_cnt;
-	}
-	gtk_widget_destroy(widget);
-}
-
-static void grad_load_slot(int slot)
-{
-	if (slot >= grad_cnt) /* Empty slot */
-	{
-		grad_slot = slot;
+		run_query(wdata);
+		if (dt->mode > NUM_CHANNELS) /* Opacity */
+		{
+			memcpy(gdt->tbytes + GRAD_CUSTOM_OPAC(idx), dt->pad,
+				GRAD_POINTS);
+			memcpy(gdt->tbytes + GRAD_CUSTOM_OMAP(idx), dt->mpad,
+				GRAD_POINTS);
+			gdt->tmaps[idx].coplen = dt->cnt;
+		}
+		else /* Gradient */
+		{
+			memcpy(gdt->tbytes + GRAD_CUSTOM_DATA(idx), dt->pad,
+				idx ? GRAD_POINTS : GRAD_POINTS * 3);
+			memcpy(gdt->tbytes + GRAD_CUSTOM_DMAP(idx), dt->mpad,
+				GRAD_POINTS);
+			gdt->tmaps[idx].cvslen = dt->cnt;
+		}
+		run_destroy(wdata);
 		return;
 	}
-	grad_slot = -1; /* Block circular signal calls */
 
-	if (!grad_mode) /* RGB */
+	cause = cmd_read(where, dt);
+	if (dt->lock) return;
+	dt->lock = TRUE; /* Block circular signal calls */
+
+	slot = dt->slot;
+	if (cause == &dt->slot)	/* Select slot */
 	{
-		unsigned char *gp = grad_pad + slot * 3;
-		int rgb = MEM_2_INT(gp, 0);
-		cpick_set_colour(grad_ed_cs, rgb, 255);
-		cpick_set_colour_previous(grad_ed_cs, rgb, 255);
-
-		gtk_option_menu_set_history(GTK_OPTION_MENU(grad_ed_opt),
-			grad_mpad[slot]);
-	}
-	else /* Indexed / utility / opacity */
-	{
-		mt_spinslide_set_value(grad_ed_ss, grad_pad[slot]);
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(grad_ed_tog),
-			grad_mpad[slot] == GRAD_TYPE_CONST);
-		palette_pad_set(grad_pad[slot]);
-	}
-	grad_slot = slot;
-}
-
-static void grad_redraw_slots(int idx0, int idx1)
-{
-	if (idx0 < grad_ofs) idx0 = grad_ofs;
-	if (++idx1 > grad_ofs + 16) idx1 = grad_ofs + 16;
-	for (; idx0 < idx1; idx0++)
-		gtk_widget_queue_draw(GTK_BIN(grad_ed_bar[idx0 - grad_ofs])->child);
-}
-
-static void grad_edit_set_mode()
-{
-	int mode, ix0 = grad_slot;
-
-	if (grad_slot < 0) return; /* Blocked */
-	if (!grad_mode) mode = wj_option_menu_get_history(grad_ed_opt);
-	else mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(grad_ed_tog)) ?
-		GRAD_TYPE_CONST : GRAD_TYPE_RGB;
-	grad_mpad[grad_slot] = mode;
-
-	if (grad_cnt <= grad_slot)
-	{
-		ix0 = grad_cnt;
-		grad_cnt = grad_slot + 1;
-		gtk_spin_button_set_value(GTK_SPIN_BUTTON(grad_ed_len), grad_cnt);
-	}
-	grad_redraw_slots(ix0, grad_slot);
-}
-
-static void grad_edit_set_rgb(GtkWidget *selection, gpointer user_data)
-{
-	int i, rgb;
-
-	if (grad_slot < 0) return; /* Blocked */
-	rgb = cpick_get_colour(selection, NULL);
-	i = grad_slot * 3;
-	grad_pad[i++] = INT_2_R(rgb);
-	grad_pad[i++] = INT_2_G(rgb);
-	grad_pad[i  ] = INT_2_B(rgb);
-	grad_edit_set_mode();
-}
-
-static void grad_edit_move_slide(GtkAdjustment *adj, gpointer user_data)
-{
-	if (grad_slot < 0) return; /* Blocked */
-	palette_pad_set(grad_pad[grad_slot] = ADJ2INT(adj));
-	grad_edit_set_mode();
-}
-
-static void grad_edit_length(GtkAdjustment *adj, gpointer user_data)
-{
-	int l0 = grad_cnt;
-	grad_cnt = ADJ2INT(adj);
-	if (l0 < grad_cnt) grad_redraw_slots(l0, grad_cnt - 1);
-	else if (l0 > grad_cnt) grad_redraw_slots(grad_cnt, l0 - 1);
-}
-
-static void grad_edit_scroll(GtkButton *button, gpointer user_data)
-{
-	int dir = (int)user_data;
-	
-	grad_ofs += dir;
-	gtk_widget_set_sensitive(grad_ed_left, !!grad_ofs);
-	gtk_widget_set_sensitive(grad_ed_right, grad_ofs < GRAD_POINTS - 16);
-	grad_redraw_slots(0, GRAD_POINTS);
-}
-
-static void grad_edit_slot(GtkWidget *btn, gpointer user_data)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	grad_load_slot((int)user_data + grad_ofs);
-}
-
-static gboolean grad_draw_slot(GtkWidget *widget, GdkEventExpose *event,
-	gpointer idx)
-{
-	unsigned char rgb[SLOT_SIZE * 2 * 3];
-	int i, n = (int)idx + grad_ofs, mode = n >= grad_cnt ? -2 : grad_mode;
-
-	switch (mode)
-	{
-	default: /* Error */
-	case -2: /* Empty */
-		rgb[0] = rgb[1] = rgb[2] = 178;
-		break;
-	case -1: /* Opacity */
-		rgb[0] = rgb[1] = rgb[2] = grad_pad[n];
-		break;
-	case 0: /* RGB */
-		rgb[0] = grad_pad[n * 3 + 0];
-		rgb[1] = grad_pad[n * 3 + 1];
-		rgb[2] = grad_pad[n * 3 + 2];
-		break;
-	case CHN_IMAGE + 1: /* Indexed */
-		i = grad_pad[n];
-		if (i >= mem_cols) rgb[0] = rgb[1] = rgb[2] = 0;
-		else
+		if (slot >= dt->cnt) goto done; /* Empty slot */
+		if (!dt->mode) /* RGB */
 		{
-			rgb[0] = mem_pal[i].red;
-			rgb[1] = mem_pal[i].green;
-			rgb[2] = mem_pal[i].blue;
+			unsigned char *gp = dt->pad + slot * 3;
+			int color[4];
+
+			color[0] = color[2] = MEM_2_INT(gp, 0);
+			color[1] = color[3] = 255;
+			cmd_set4(dt->col, color);
+			cmd_set(dt->opt, dt->mpad[slot]);
 		}
-		break;
-	case CHN_ALPHA + 1: /* Alpha */
-	case CHN_SEL + 1: /* Selection */
-	case CHN_MASK + 1: /* Mask */
-		i = channel_rgb[mode - 1][0] * grad_pad[n];
-		rgb[0] = (i + (i >> 8) + 1) >> 8;
-		i = channel_rgb[mode - 1][1] * grad_pad[n];
-		rgb[1] = (i + (i >> 8) + 1) >> 8;
-		i = channel_rgb[mode - 1][2] * grad_pad[n];
-		rgb[2] = (i + (i >> 8) + 1) >> 8;
-		break;
+		else /* Indexed / utility / opacity */
+		{
+			cmd_set(dt->spin, dt->pad[slot]);
+			cmd_set(dt->chk, dt->mpad[slot] == GRAD_TYPE_CONST);
+			cmd_set(dt->ppad, dt->pad[slot]);
+		}
 	}
-	for (i = 3; i < SLOT_SIZE * 2 * 3; i++) rgb[i] = rgb[i - 3];
-	if (mode == -2) /* Empty slot - show that */
-		memset(rgb, 128, SLOT_SIZE * 3);
+	else if (cause == &dt->cnt) /* Set length */
+		cmd_repaint(dt->gbar);
+	else
+	{
+		if (cause == &dt->pcol) /* Select color on pad */
+		{
+			int n = dt->pcol;
 
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		0, 0, SLOT_SIZE, SLOT_SIZE, GDK_RGB_DITHER_NONE,
-		rgb + SLOT_SIZE * 3, -3);
+			if (n > dt->crgb[2]) goto done; // out of range
+			/* RGB */
+			else if (!dt->mode) cmd_set2(dt->col,
+				dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3), 255);
+			/* Indexed / utility / opacity */
+			else cmd_set(dt->spin, dt->crgb[0] = n);
+			/* Fallthrough to select color */
+		}
+		if (cause == &dt->interp) /* Select mode */
+		{
+			int n = dt->interp;
+			if (dt->mode) n = n ? GRAD_TYPE_CONST : GRAD_TYPE_RGB;
+			dt->mpad[slot] = n;
+		}
+		else if (!dt->mode) /* RGB */
+		{
+			unsigned char *gp = dt->pad + slot * 3;
+			int rgb = dt->crgb[0];
+			gp[0] = INT_2_R(rgb);
+			gp[1] = INT_2_G(rgb);
+			gp[2] = INT_2_B(rgb);
+		}
+		else /* Indexed / utility / opacity */
+			cmd_set(dt->ppad, dt->pad[slot] = dt->crgb[0]);
 
-	return (TRUE);
+		if (dt->cnt <= slot) // Extend as needed
+			cmd_set(dt->pspin, dt->cnt = slot + 1);
+
+		cmd_repaint(dt->gbar);
+	}
+done:	dt->lock = FALSE;
 }
+
+#undef _
+#define _(X) X
+
+static char *interp_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
+	_("Constant") };
+
+#define WBbase ged_dd
+static void *ged_code[] = {
+	ONTOP(xw), WINDOWm(_("Edit Gradient")),
+	XVBOXb(5, 5), // !!! Originally the main vbox was that way
+	/* Palette pad */
+	REF(ppad), COLORPAD(rgb, pcol, ged_event),
+	HSEP,
+	/* Editor widgets */
+	UNLESSx(mode, 1), /* RGB */
+		REF(col), COLOR(crgb), EVENT(CHANGE, ged_event),
+		EQBOXs(5), BORDER(XOPT, 0),
+		REF(opt), XOPTe(interp_txt, 5, interp, ged_event),
+	ENDIF(1),
+	IFx(mode, 1), /* Indexed / utility / opacity */
+		REF(spin), SPINSLIDEa(crgb), EVENT(CHANGE, ged_event),
+		EQBOXs(5),
+		REF(chk), XCHECK(_("Constant"), interp), EVENT(CHANGE, ged_event),
+	ENDIF(1),
+	XHBOXb(5, 0), MLABEL(_("Points:")),
+	REF(pspin), SPIN(cnt, 2, GRAD_POINTS), EVENT(CHANGE, ged_event),
+	WDONE, WDONE,
+	/* Gradient bar */
+	REF(gbar), GRADBAR(mode, slot, cnt, GRAD_POINTS, pad, rgb, ged_event),
+	TRIGGER,
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), ged_event, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
 
 static void grad_edit(void **wdata, int opac)
 {
+	ged_dd tdata;
 	grad_dd *dt = GET_DDATA(wdata);
-	GtkWidget *win, *mainbox, *hbox, *hbox2, *pix, *cs, *ss, *sw, *btn;
-	int i, idx;
+	int idx;
 
-	grad_dt = dt;
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.xw = wdata;
 	idx = (dt->channel == CHN_IMAGE) && (mem_img_bpp == 3) ? 0 :
 		dt->channel + 1;
 
 	/* Copy to temp */
 	if (opac)
 	{
-		memcpy(grad_pad, dt->tbytes + GRAD_CUSTOM_OPAC(idx), GRAD_POINTS);
-		memcpy(grad_mpad, dt->tbytes + GRAD_CUSTOM_OMAP(idx), GRAD_POINTS);
-		grad_cnt = dt->tmaps[idx].coplen;
+		memcpy(tdata.pad, dt->tbytes + GRAD_CUSTOM_OPAC(idx), GRAD_POINTS);
+		memcpy(tdata.mpad, dt->tbytes + GRAD_CUSTOM_OMAP(idx), GRAD_POINTS);
+		tdata.cnt = dt->tmaps[idx].coplen;
+		tdata.mode = NUM_CHANNELS + 1;
 	}
 	else
 	{
-		memcpy(grad_pad, dt->tbytes + GRAD_CUSTOM_DATA(idx),
+		memcpy(tdata.pad, dt->tbytes + GRAD_CUSTOM_DATA(idx),
 			idx ? GRAD_POINTS : GRAD_POINTS * 3);
-		memcpy(grad_mpad, dt->tbytes + GRAD_CUSTOM_DMAP(idx), GRAD_POINTS);
-		grad_cnt = dt->tmaps[idx].cvslen;
+		memcpy(tdata.mpad, dt->tbytes + GRAD_CUSTOM_DMAP(idx), GRAD_POINTS);
+		tdata.cnt = dt->tmaps[idx].cvslen;
+		tdata.mode = idx;
 	}
-	if (grad_cnt < 2) grad_cnt = 2;
-	grad_ofs = grad_slot = 0;
-	grad_mode = opac ? -1 : idx;
+	if (tdata.cnt < 2) tdata.cnt = 2;
+	tdata.crgb[2] = tdata.mode <= CHN_IMAGE + 1 ? mem_cols - 1 : 255;
 
-	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Edit Gradient"),
-		GTK_WIN_POS_CENTER, TRUE);
-	mainbox = gtk_vbox_new(FALSE, 5);
-	gtk_container_set_border_width(GTK_CONTAINER(mainbox), 5);
-	gtk_container_add(GTK_CONTAINER(win), mainbox);
+	make_crgb(tdata.rgb, tdata.mode);
 
-	/* Palette pad */
-
-	pix = grad_ed_pm = pack(mainbox, wjpixmap_new(PPAD_WIDTH(PPAD_SLOT),
-		PPAD_HEIGHT(PPAD_SLOT)));
-	gtk_signal_connect(GTK_OBJECT(pix), "realize",
-		GTK_SIGNAL_FUNC(palette_pad_draw),
-		(gpointer)(opac ? -1 : dt->channel));
-	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
-		GTK_SIGNAL_FUNC(palette_pad_click), (gpointer)!grad_mode);
-	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
-		GTK_SIGNAL_FUNC(palette_pad_key), (gpointer)!grad_mode);
-	add_hseparator(mainbox, -2, 10);
-
-	/* Editor widgets */
-
-	if (!grad_mode) /* RGB */
-	{
-		grad_ed_cs = cs = pack(mainbox, cpick_create());
-		cpick_set_opacity_visibility( cs, FALSE );
-
-		gtk_signal_connect(GTK_OBJECT(cs), "color_changed",
-			GTK_SIGNAL_FUNC(grad_edit_set_rgb), NULL);
-		grad_ed_opt = sw = grad_interp_menu(0, TRUE,
-			GTK_SIGNAL_FUNC(grad_edit_set_mode));
-	}
-	else /* Indexed / utility / opacity */
-	{
-		grad_ed_ss = ss = pack(mainbox, mt_spinslide_new(-2, -2));
-		mt_spinslide_set_range(ss, 0, grad_mode == CHN_IMAGE + 1 ?
-			mem_cols - 1 : 255);
-		mt_spinslide_connect(ss, GTK_SIGNAL_FUNC(grad_edit_move_slide), NULL);
-		grad_ed_tog = sw = sig_toggle(_("Constant"), FALSE, NULL,
-			GTK_SIGNAL_FUNC(grad_edit_set_mode));
-	}
-	hbox = pack(mainbox, gtk_hbox_new(TRUE, 5));
-	xpack(hbox, sw);
-	hbox2 = xpack(hbox, gtk_hbox_new(FALSE, 5));
-	pack(hbox2, gtk_label_new(_("Points:")));
-	grad_ed_len = sw = pack(hbox2, add_a_spin(grad_cnt, 2, GRAD_POINTS));
-	spin_connect(sw, GTK_SIGNAL_FUNC(grad_edit_length), NULL);
-
-	/* Gradient bar */
-
-	hbox2 = pack(mainbox, gtk_hbox_new(TRUE, 0));
-	grad_ed_left = btn = xpack(hbox2, gtk_button_new());
-	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
-		GTK_SHADOW_NONE));
-	gtk_widget_set_sensitive(btn, FALSE);
-	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
-		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)(-1));
-	btn = NULL;
-	for (i = 0; i < 16; i++)
-	{
-		grad_ed_bar[i] = btn = xpack(hbox2, gtk_radio_button_new_from_widget(
-			GTK_RADIO_BUTTON_0(btn)));
-		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
-		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
-			GTK_SIGNAL_FUNC(grad_edit_slot), (gpointer)i);
-		sw = gtk_drawing_area_new();
-		gtk_container_add(GTK_CONTAINER(btn), sw);
-		gtk_widget_set_usize(sw, SLOT_SIZE, SLOT_SIZE);
-		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
-			GTK_SIGNAL_FUNC(grad_draw_slot), (gpointer)i);
-	}
-	grad_ed_right = btn = xpack(hbox2, gtk_button_new());
-	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
-		GTK_SHADOW_NONE));
-	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
-		GTK_SIGNAL_FUNC(grad_edit_scroll), (gpointer)1);
-
-	pack(mainbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(click_grad_edit_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-#ifndef U_CPICK_MTPAINT
-	grad_load_slot(0);
-#endif
-	gtk_window_set_transient_for(GTK_WINDOW(win),
-		GTK_WINDOW(GET_REAL_WINDOW(wdata)));
-	gtk_widget_show_all(win);
-#ifdef U_CPICK_MTPAINT
-	grad_load_slot(0);
-#endif
-
-#if GTK_MAJOR_VERSION == 1
-	gtk_widget_queue_resize(win); /* Re-render sliders */
-#endif
+	run_create(ged_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 #define NUM_GTYPES 7
 #define NUM_OTYPES 3
@@ -2708,13 +2509,12 @@ void gradient_setup(int mode)
 
 static int pickg_grad = GRAD_TYPE_RGB, pickg_cspace = CSPACE_LXN;
 
-static int do_pick_gradient(GtkWidget *table, gpointer fdata)
+static int do_pick_gradient(filterwindow_dd *dt, void **wdata)
 {
 	unsigned char buf[256];
 	int len;
 
-	pickg_grad = wj_option_menu_get_history(table_slot(table, 0, 1));
-	pickg_cspace = wj_option_menu_get_history(table_slot(table, 1, 1));
+	run_query(wdata);
 
 	len = mem_pick_gradient(buf, pickg_cspace, pickg_grad);
 
@@ -2727,41 +2527,50 @@ static int do_pick_gradient(GtkWidget *table, gpointer fdata)
 	return TRUE;
 }
 
+#undef _
+#define _(X) X
+
+#define WBbase filterwindow_dd
+static void *gp_code[] = {
+	TABLE2(2),
+	TOPTv(_("Gradient"), interp_txt, 4, pickg_grad),
+	TOPTv(_("Colour space"), cspnames_, NUM_CSPACES, pickg_cspace),
+	WDONE, RET
+};
+#undef WBbase
+
 void pressed_pick_gradient()
 {
-	GtkWidget *table = gtk_table_new(2, 2, FALSE);
-
-	gtk_container_set_border_width(GTK_CONTAINER(table), 5);
-	to_table(grad_interp_menu(pickg_grad, FALSE, NULL), table, 0, 1, 5);
-	to_table(wj_option_menu(cspnames, NUM_CSPACES, pickg_cspace, NULL, NULL),
-		table, 1, 1, 5);
-	add_to_table(_("Gradient"), table, 0, 0, 5);
-	add_to_table(_("Colour space"), table, 1, 0, 5);
-	gtk_widget_show_all(table);
-	filter_window(_("Pick Gradient"), table, do_pick_gradient, NULL, FALSE);
+	static filterwindow_dd tdata = {
+		_("Pick Gradient"), gp_code, FW_FN(do_pick_gradient) };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 /// SKEW WINDOW
 
 typedef struct {
-	GtkWidget *angle[2], *ofs[2], *dist[2], *gc;
+	int rgb, gamma;
+	int angle[2], ofs[2], dist[2];
 	int angles, lock;
-} skew_widgets;
+	char **ftxt;
+	void **aspin[2], **ospin[2];
+} skew_dd;
 
 static int skew_mode = 6;
 
-static void click_skew_ok(GtkWidget *widget, gpointer user_data)
+static void click_skew_ok(skew_dd *dt, void **wdata)
 {
-	skew_widgets *sw = gtk_object_get_user_data(GTK_OBJECT(widget));
 	double xskew, yskew;
-	int res, ftype = 0, gcor = FALSE;
+	int res;
 
-	if ((sw->angles & 1) || GTK_WIDGET_HAS_FOCUS(sw->angle[0]))
-		xskew = tan(read_float_spin(sw->angle[0]) * (M_PI / 180.0));
-	else xskew = read_float_spin(sw->ofs[0]) / (double)read_spin(sw->dist[0]);
-	if ((sw->angles & 2) || GTK_WIDGET_HAS_FOCUS(sw->angle[1]))
-		yskew = tan(read_float_spin(sw->angle[1]) * (M_PI / 180.0));
-	else yskew = read_float_spin(sw->ofs[1]) / (double)read_spin(sw->dist[1]);
+	run_query(wdata);
+	if (dt->angles & 1) xskew = tan(dt->angle[0] * (M_PI / 18000.0));
+	else xskew = dt->ofs[0] / (double)(dt->dist[0] * 100);
+	if (dt->angles & 2) yskew = tan(dt->angle[1] * (M_PI / 18000.0));
+	else yskew = dt->ofs[1] / (double)(dt->dist[1] * 100);
 
 	if (!xskew && !yskew)
 	{
@@ -2769,109 +2578,100 @@ static void click_skew_ok(GtkWidget *widget, gpointer user_data)
 		return;
 	}
 
-	if (mem_img_bpp == 3)
-	{
-		ftype = skew_mode;
-		gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sw->gc));
-	}
-
-	res = mem_skew(xskew, yskew, ftype, gcor);
+	res = mem_skew(xskew, yskew, skew_mode, dt->gamma);
 	if (!res)
 	{
 		update_stuff(UPD_GEOM);
-		destroy_dialog(widget);
+		run_destroy(wdata);
 	}
 	else memory_errors(res);
 }
 
-static void skew_moved(GtkAdjustment *adjustment, gpointer user_data)
+static void skew_moved(skew_dd *dt, void **wdata, int what, void **where)
 {
-	skew_widgets *sw = user_data;
+	void *cause = cmd_read(where, dt);
 	int i;
 
-	if (sw->lock) return; // Avoid recursion
-	sw->lock = TRUE;
+	if (dt->lock) return; // Avoid recursion
+	dt->lock = TRUE;
 
 	for (i = 0; i < 2; i++)
 	{
 		/* Offset for angle */
-		if (adjustment == GTK_SPIN_BUTTON(sw->angle[i])->adjustment)
+		if (cause == &dt->angle[i])
 		{
-			gtk_spin_button_set_value(GTK_SPIN_BUTTON(sw->ofs[i]),
-				ADJ2INT(GTK_SPIN_BUTTON(sw->dist[i])->adjustment) *
-				tan(adjustment->value * (M_PI / 180.0)));
-			sw->angles |= 1 << i;
+			cmd_set(dt->ospin[i], rint(dt->dist[i] * 100 *
+				tan(dt->angle[i] * (M_PI / 18000.0))));
+			dt->angles |= 1 << i;
 		}
 		/* Angle for offset */
-		else if ((adjustment == GTK_SPIN_BUTTON(sw->ofs[i])->adjustment) ||
-			(adjustment == GTK_SPIN_BUTTON(sw->dist[i])->adjustment))
+		else if ((cause == &dt->ofs[i]) || (cause == &dt->dist[i]))
 		{
-			gtk_spin_button_set_value(GTK_SPIN_BUTTON(sw->angle[i]),
-				atan(GTK_SPIN_BUTTON(sw->ofs[i])->adjustment->value /
-				ADJ2INT(GTK_SPIN_BUTTON(sw->dist[i])->adjustment)) *
-				(180.0 / M_PI));
-			sw->angles &= ~(1 << i);
+			cmd_set(dt->aspin[i], rint(atan(dt->ofs[i] /
+				(dt->dist[i] * 100)) * (18000.0 / M_PI)));
+			dt->angles &= ~(1 << i);
 		}
 	}
 
-	sw->lock = FALSE;
+	dt->lock = FALSE;
 }
 
-static GtkWidget *filter_pack(int idx, int *var)
-{
-	char *fnames[sizeof(scale_modes) / sizeof(scale_modes[0])];
-	int i;
+#undef _
+#define _(X) X
 
-	for (i = 0; scale_modes[i]; i++) fnames[i] = _(scale_modes[i]);
-	fnames[i] = NULL;
-	fnames[1] = _("Bilinear");
-	return (wj_radio_pack(fnames, -1, 0, idx, var, NULL));
-}
+#define WBbase skew_dd
+static void *skew_code[] = {
+	WINDOWm(_("Skew")),
+	TABLE(4, 3),
+	BORDER(TLLABEL, 0),
+	TLLABEL(_("Angle"), 1, 0), TLLABEL(_("Offset"), 2, 0),
+		TLLABEL(_("At distance"), 3, 0),
+	TLLABEL(_("Horizontal "), 0, 1),
+	REF(aspin[0]), TLFSPIN(angle[0], -8999, 8999, 1, 1),
+	EVENT(CHANGE, skew_moved),
+	REF(ospin[0]), TLFSPIN(ofs[0], -MAX_WIDTH * 100, MAX_WIDTH * 100, 2, 1),
+	EVENT(CHANGE, skew_moved),
+	TLSPIN(dist[0], 1, MAX_HEIGHT, 3, 1), EVENT(CHANGE, skew_moved),
+	TLLABEL(_("Vertical"), 0, 2),
+	REF(aspin[1]), TLFSPIN(angle[1], -8999, 8999, 1, 2),
+	EVENT(CHANGE, skew_moved),
+	REF(ospin[1]), TLFSPIN(ofs[1], -MAX_HEIGHT * 100, MAX_HEIGHT * 100, 2, 2),
+	EVENT(CHANGE, skew_moved),
+	TLSPIN(dist[1], 1, MAX_WIDTH, 3, 2), EVENT(CHANGE, skew_moved),
+	WDONE,
+	HSEP,
+	IFx(rgb, 1),
+		CHECK(_("Gamma corrected"), gamma),
+		HSEP,
+		RPACKDv(ftxt, 0, skew_mode),
+		HSEP,
+	ENDIF(1),
+	OKBOX(_("OK"), click_skew_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
 
 void pressed_skew()
 {
-	GtkWidget *skew_window, *vbox, *table;
-	skew_widgets *sw;
+	char *fnames[sizeof(scale_modes) / sizeof(scale_modes[0])];
+	skew_dd tdata;
 
 
-	skew_window = add_a_window(GTK_WINDOW_TOPLEVEL, _("Skew"), GTK_WIN_POS_CENTER, TRUE);
-	sw = bound_malloc(skew_window, sizeof(skew_widgets));
-	gtk_object_set_user_data(GTK_OBJECT(skew_window), (gpointer)sw);
-	vbox = add_vbox(skew_window);
+	memcpy(fnames, scale_modes, sizeof(fnames));
+	fnames[1] = _("Bilinear");
 
-	table = add_a_table(3, 4, 5, vbox);
-	add_to_table(_("Angle"), table, 0, 1, 0);
-	add_to_table(_("Offset"), table, 0, 2, 0);
-	add_to_table(_("At distance"), table, 0, 3, 0);
-	add_to_table(_("Horizontal "), table, 1, 0, 0);
-	add_to_table(_("Vertical"), table, 2, 0, 0);
-	sw->angle[0] = float_spin_to_table(table, 1, 1, 5, 0, -89.99, 89.99);
-	sw->angle[1] = float_spin_to_table(table, 2, 1, 5, 0, -89.99, 89.99);
-	sw->ofs[0] = float_spin_to_table(table, 1, 2, 5, 0, -MAX_WIDTH, MAX_WIDTH);
-	sw->ofs[1] = float_spin_to_table(table, 2, 2, 5, 0, -MAX_HEIGHT, MAX_HEIGHT);
-	sw->dist[0] = spin_to_table(table, 1, 3, 5, mem_height, 1, MAX_HEIGHT);
-	sw->dist[1] = spin_to_table(table, 2, 3, 5, mem_width, 1, MAX_WIDTH);
-	spin_connect(sw->angle[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	spin_connect(sw->ofs[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	spin_connect(sw->dist[0], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	spin_connect(sw->angle[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	spin_connect(sw->ofs[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	spin_connect(sw->dist[1], GTK_SIGNAL_FUNC(skew_moved), (gpointer)sw);
-	add_hseparator(vbox, -2, 10);
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.rgb = mem_img_bpp == 3;
+	tdata.gamma = use_gamma;
+	tdata.dist[0] = mem_height;
+	tdata.dist[1] = mem_width;
+	tdata.ftxt = fnames;
 
-	if (mem_img_bpp == 3)
-	{
-		sw->gc = pack(vbox, gamma_toggle());
-		add_hseparator(vbox, -2, 10);
-		xpack(vbox, filter_pack(skew_mode, &skew_mode));
-		add_hseparator(vbox, -2, 10);
-	}
-
-	pack(vbox, OK_box(5, skew_window, _("OK"), GTK_SIGNAL_FUNC(click_skew_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	gtk_window_set_transient_for(GTK_WINDOW(skew_window), GTK_WINDOW(main_window));
-	gtk_widget_show_all(skew_window);
+	run_create(skew_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 /// TRACING IMAGE WINDOW
 

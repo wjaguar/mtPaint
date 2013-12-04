@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -794,7 +794,7 @@ static void fpick_file_dialog(fpicker *fp, int row)
 	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags)0);
 	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags)0);
 
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
+	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(fp->window));
 	gtk_widget_show_all(win);
 	gdk_window_raise(win->window);
 	gtk_widget_grab_focus(entry);

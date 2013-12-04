@@ -54,6 +54,7 @@ enum {
 	op_TLXSPIN,
 	//
 	op_FSPIN,
+	op_TLFSPIN,
 	//
 	op_SPINa,
 	op_XSPINa,
@@ -62,14 +63,17 @@ enum {
 	op_TSPINSLIDE,
 	op_HTSPINSLIDE,
 	op_TLSPINSLIDE,
+	op_SPINSLIDEa,
 	op_CHECK,
-	op_TLCHECK, // must follow CHECK
+	op_XCHECK,
+	op_TLCHECK,
 	op_CHECKb,
 	op_RPACK,
 	op_FRPACK,
 	op_RPACKD,
 	op_OPT,
 	op_XOPT,
+	op_TOPT,
 	op_TLOPT,
 	op_PATH,
 	op_PATHs,
@@ -77,6 +81,8 @@ enum {
 	op_TCOLOR,
 	op_COLORLIST,
 	op_COLORLISTN,
+	op_COLORPAD,
+	op_GRADBAR,
 	op_OKBOX,
 	op_EOKBOX,
 	op_OKBTN,
@@ -100,6 +106,7 @@ enum {
 	op_DEFW,
 	op_WPMOUSE,
 	op_INSENS,
+	op_ONTOP,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -213,6 +220,7 @@ void cmd_scroll(void **slot, int idx);
 #define FVBOXs(NM,S) WBh(FVBOX, 2), WBbs(0, S), (NM)
 #define FXVBOX(NM) WBh(FXVBOX, 1), (NM)
 #define EQBOX WBh(EQBOX, 0)
+#define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
@@ -238,6 +246,8 @@ void cmd_scroll(void **slot, int idx);
 	(void *)(V0), (void *)(V1)
 #define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
+#define TLFSPIN(V,V0,V1,X,Y) WBrhf(TLFSPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf(XSPINa, 1), WBfield(A)
 #define TSPINSLIDE(NM,V,V0,V1) WBrhf(TSPINSLIDE, 4), \
@@ -246,9 +256,11 @@ void cmd_scroll(void **slot, int idx);
 	WBfield(V), (void *)(V0), (void *)(V1), (NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define SPINSLIDEa(A) WBrhf(SPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
 #define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (void *)(V0), (NM)
+#define XCHECK(NM,V) WBrhf(XCHECK, 2), WBfield(V), (NM)
 #define TLCHECKl(NM,V,X,Y,L) WBrhf(TLCHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
 #define TLCHECKvl(NM,V,X,Y,L) WBrh(TLCHECK, 3), &(V), (NM), WBxyl(X, Y, L)
@@ -259,6 +271,7 @@ void cmd_scroll(void **slot, int idx);
 #define FRPACK(NM,SS,N,H,V) WBrhf(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
 #define FRPACKv(NM,SS,N,H,V) WBrh(FRPACK, 4), &(V), (SS), WBnh(N, H), (NM)
 #define RPACKD(SP,H,V) WBrhf(RPACKD, 3), WBfield(V), WBfield(SP), (H)
+#define RPACKDv(SP,H,V) WBrh(RPACKD, 3), &(V), WBfield(SP), (H)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define RPACKe(SS,N,H,V,HS) WBr2hf(RPACK, 3 + 2), WBfield(V), (SS), \
 	WBnh(N, H), EVENT(SELECT, HS)
@@ -268,12 +281,20 @@ void cmd_scroll(void **slot, int idx);
 	(H), EVENT(SELECT, HS)
 #define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
 #define XOPT(SS,N,V) WBrhf(XOPT, 3), WBfield(V), (SS), (void *)(N)
+#define TOPTv(NM,SS,N,V) WBrh(TOPT, 4), &(V), (SS), (void *)(N), (NM)
 #define TLOPT(SS,N,V,X,Y) WBrhf(TLOPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
-/* !!! This block holds 1 nested EVENT block */
+/* !!! These blocks each hold 1 nested EVENT block */
+#define XOPTe(SS,N,V,HS) WBr2hf(XOPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
+	EVENT(SELECT, HS)
 #define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS), WBxyl(X, Y, L)
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
+#define COLORPAD(CC,V,HS) WBr2hf(COLORPAD, 2 + 2), WBfield(V), WBfield(CC), \
+	EVENT(SELECT, HS)
+#define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
+	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
+	EVENT(SELECT, HS)
 #define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
 #define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
@@ -319,6 +340,7 @@ void cmd_scroll(void **slot, int idx);
 #define DEFW(V) WBh(DEFW, 1), (void *)(V)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define INSENS WBh(INSENS, 0)
+#define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 /* !!! Maybe better to integrate this into container codes */
 //#define SETBORDER(V) WBh(SETBORDER, 1), (void *)(V)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
