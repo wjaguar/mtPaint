@@ -633,6 +633,7 @@ static cmdef cmddefs[] = {
 	{ op_SPINa, cm_SPINa, pk_PACKp, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_FSPIN, cm_FSPIN, pk_PACK },
+	{ op_TFSPIN, cm_FSPIN, pk_TABLE2, USE_BORDER(SPIN) },
 	{ op_TLFSPIN, cm_FSPIN, pk_TABLE, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_XSPINa, cm_SPINa, pk_XPACK },
@@ -1128,7 +1129,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			case op_SPIN: case op_XSPIN:
 			case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 			case op_SPINa: case op_XSPINa: case op_TSPINa:
-			case op_FSPIN: case op_TLFSPIN:
+			case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 				spin_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -1245,7 +1246,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
-		case op_FSPIN: case op_TLFSPIN:
+		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 			*(int *)v = rint((mode & 1 ?
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
@@ -1336,7 +1337,7 @@ void run_reset(void **wdata, int group)
 				*(int *)v);
 			break;
 #if 0 /* Not needed for now */
-		case op_FSPIN: case op_TLFSPIN:
+		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
 				*(int *)v * 0.01);
 			break;
@@ -1388,12 +1389,15 @@ void cmd_set(void **slot, int v)
 	case op_SPINSLIDEa:
 		mt_spinslide_set_value(slot[0], v);
 		break;
+	case op_TLNOSPIN:
+		spin_set_range(slot[0], v, v);
+		break;
 	case op_SPIN: case op_XSPIN:
 	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 	case op_SPINa: case op_XSPINa: case op_TSPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
-	case op_FSPIN: case op_TLFSPIN:
+	case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_OKTOGGLE:
@@ -1499,4 +1503,10 @@ void cmd_scroll(void **slot, int idx)
 	int op = GET_OP(slot);
 	if ((op == op_COLORLIST) || (op == op_COLORLISTN))
 		colorlist_scroll_in(slot[0], idx);
+}
+
+// !!! GTK-specific for now
+void cmd_cursor(void **slot, GdkCursor *cursor)
+{
+	gdk_window_set_cursor(GTK_WIDGET(slot[0])->window, cursor);
 }

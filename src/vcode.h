@@ -54,6 +54,7 @@ enum {
 	op_TLXSPIN,
 	//
 	op_FSPIN,
+	op_TFSPIN,
 	op_TLFSPIN,
 	//
 	op_SPINa,
@@ -177,6 +178,8 @@ void *cmd_read(void **slot, void *ddata);
 void cmd_repaint(void **slot);
 //	Scroll in position on colorlist slot
 void cmd_scroll(void **slot, int idx);
+//	Set cursor for slot window
+void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 
 #define WB_OPBITS     13
 #define WB_OPMASK 0x1FFF /* ((1 << WB_OPBITS) - 1) */
@@ -231,6 +234,7 @@ void cmd_scroll(void **slot, int idx);
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLXSPIN(V,V0,V1,X,Y) WBrhf(TLXSPIN, 4), WBfield(V), \
@@ -246,6 +250,8 @@ void cmd_scroll(void **slot, int idx);
 	(void *)(V0), (void *)(V1)
 #define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
+#define TFSPIN(NM,V,V0,V1) WBrhf(TFSPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), (NM)
 #define TLFSPIN(V,V0,V1,X,Y) WBrhf(TLFSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
@@ -287,8 +293,10 @@ void cmd_scroll(void **slot, int idx);
 /* !!! These blocks each hold 1 nested EVENT block */
 #define XOPTe(SS,N,V,HS) WBr2hf(XOPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
-#define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), (void *)(N), \
-	EVENT(SELECT, HS), WBxyl(X, Y, L)
+#define TLOPTle(SS,N,V,HS,X,Y,L) WBr2hf(TLOPT, 4 + 2), WBfield(V), (SS), \
+	(void *)(N), EVENT(SELECT, HS), WBxyl(X, Y, L)
+#define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), \
+	(void *)(N), EVENT(SELECT, HS), WBxyl(X, Y, L)
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define COLORPAD(CC,V,HS) WBr2hf(COLORPAD, 2 + 2), WBfield(V), WBfield(CC), \
 	EVENT(SELECT, HS)

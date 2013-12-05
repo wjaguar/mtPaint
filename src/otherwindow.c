@@ -1688,7 +1688,7 @@ static void *colsel_code[] = {
 		BUTTON(_("Posterize"), posterize_AB),
 		REF(pspin_AB), SPIN(pos_AB, 1, 8),
 		WDONE,
-		TABLE(2, 3),
+		TABLE(3, 2),
 		REF(spin_AB[CHN_ALPHA]),
 		HTSPINSLIDE(_("Alpha"), v_AB[CHN_ALPHA], 0, 255),
 		EVENT(CHANGE, AB_spin_moved),
@@ -2676,167 +2676,123 @@ void pressed_skew()
 /// TRACING IMAGE WINDOW
 
 typedef struct {
-	GtkWidget *wspin, *hspin, *xspin, *yspin, *zspin, *opt, *tog;
-	int src, x, y, scale, state;
-} bkg_widgets;
+	int src;
+	int w, h;
+	int x, y;
+	int scale, state;
+	void **wspin, **hspin;
+} bkg_dd;
 
-static void bkg_update_widgets(bkg_widgets *bw)
+static void bkg_evt(bkg_dd *dt, void **wdata, int what)
 {
-	int w = 0, h = 0;
-
-	bw->src = wj_option_menu_get_history(bw->opt);
-	switch (bw->src)
+	run_query(wdata);
+	if (what == op_EVT_SELECT) // set source
 	{
-	case 0: w = bkg_w; h = bkg_h; break;
-	case 1: break;
-	case 2: w = mem_width; h = mem_height; break;
-	case 3: if (mem_clipboard) w = mem_clip_w , h = mem_clip_h;
+		int w = 0, h = 0;
+
+		switch (dt->src)
+		{
+		case 0: w = bkg_w; h = bkg_h; break;
+		case 1: break;
+		case 2: w = mem_width; h = mem_height; break;
+		case 3: if (mem_clipboard) w = mem_clip_w , h = mem_clip_h;
 		break;
+		}
+
+		cmd_set(dt->wspin, w);
+		cmd_set(dt->hspin, h);
 	}
-
-	spin_set_range(bw->wspin, w, w);
-	spin_set_range(bw->hspin, h, h);
-
-	bw->x = read_spin(bw->xspin);
-	bw->y = read_spin(bw->yspin);
-	bw->scale = read_spin(bw->zspin);
-	bw->state = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(bw->tog));
+	else // OK/Apply
+	{
+		bkg_x = dt->x;
+		bkg_y = dt->y;
+		bkg_scale = dt->scale;
+		bkg_flag = dt->state;
+		if (!config_bkg(dt->src)) memory_errors(1);
+		update_stuff(UPD_RENDER);
+	}
+	if (what == op_EVT_OK) run_destroy(wdata);
 }
 
-static void click_bkg_apply(GtkWidget *widget)
-{
-	bkg_widgets *bw = gtk_object_get_user_data(GTK_OBJECT(widget));
+#undef _
+#define _(X) X
 
-	bkg_update_widgets(bw);
-	bkg_x = bw->x;
-	bkg_y = bw->y;
-	bkg_scale = bw->scale;
-	bkg_flag = bw->state;
-	if (!config_bkg(bw->src)) memory_errors(1);
-	update_stuff(UPD_RENDER);
-}
+static char *srcs_txt[4] = { _("Unchanged"), _("None"), _("Image"),
+	_("Clipboard") };
 
-static void click_bkg_option(GtkMenuItem *menuitem, gpointer user_data)
-{
-	bkg_update_widgets(user_data);
-}
-
-static void click_bkg_ok(GtkWidget *widget)
-{
-	click_bkg_apply(widget);
-	gtk_widget_destroy(widget);
-}
+#define WBbase bkg_dd
+static void *bkg_code[] = {
+	WINDOWm(_("Tracing Image")),
+	XVBOXb(0, 5), // !!! Originally the main vbox was that way
+	TABLE(3, 4),
+	TLLABEL(_("Source"), 0, 0),
+	TLOPTle(srcs_txt, 4, src, bkg_evt, 1, 0, 2), TRIGGER,
+	TLLABEL(_("Size"), 0, 1),
+	REF(wspin), TLNOSPINr(w, 1, 1),
+	REF(hspin), TLNOSPINr(h, 2, 1),
+	TLLABEL(_("Origin"), 0, 2),
+	TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 2),
+	TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 2),
+	TLLABEL(_("Relative scale"), 0, 3),
+	TLSPIN(scale, 1, MAX_ZOOM, 1, 3),
+	WDONE,
+	CHECK(_("Display"), state),
+	HSEP,
+	OKBOX(_("OK"), bkg_evt, _("Cancel"), NULL),
+	OKADD(_("Apply"), bkg_evt),
+	WSHOW
+};
+#undef WBbase
 
 void bkg_setup()
 {
-	char *srcs[4] = { _("Unchanged"), _("None"), _("Image"), _("Clipboard") };
-	GtkWidget *win, *vbox, *table, *hbox;
-	bkg_widgets *bw;
-
-
-	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Tracing Image"), GTK_WIN_POS_CENTER, TRUE);
-	bw = bound_malloc(win, sizeof(bkg_widgets));
-	gtk_object_set_user_data(GTK_OBJECT(win), (gpointer)bw);
-
-	bw->src = 0;
-	bw->state = bkg_flag;
-
-	vbox = add_vbox(win);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
-
-	table = add_a_table(4, 3, 5, vbox);
-	add_to_table(_("Source"), table, 0, 0, 5);
-	add_to_table(_("Size"), table, 1, 0, 5);
-	add_to_table(_("Origin"), table, 2, 0, 5);
-	add_to_table(_("Relative scale"), table, 3, 0, 5);
-	bw->opt = wj_option_menu(srcs, 4, 0, bw, GTK_SIGNAL_FUNC(click_bkg_option));
-	to_table_l(bw->opt, table, 0, 1, 2, 5);
-	bw->wspin = spin_to_table(table, 1, 1, 5, 0, 0, 0);
-	bw->hspin = spin_to_table(table, 1, 2, 5, 0, 0, 0);
-	GTK_WIDGET_UNSET_FLAGS(bw->wspin, GTK_CAN_FOCUS);
-	GTK_WIDGET_UNSET_FLAGS(bw->hspin, GTK_CAN_FOCUS);
-	bw->xspin = spin_to_table(table, 2, 1, 5, bkg_x, -MAX_WIDTH, MAX_WIDTH);
-	bw->yspin = spin_to_table(table, 2, 2, 5, bkg_y, -MAX_HEIGHT, MAX_HEIGHT);
-	bw->zspin = spin_to_table(table, 3, 1, 5, bkg_scale, 1, MAX_ZOOM);
-
-	bw->tog = add_a_toggle(_("Display"), vbox, bkg_flag);
-
-	add_hseparator(vbox, -2, 10);
-
-	/* Cancel / Apply / OK */
-
-	hbox = pack(vbox, OK_box(5, win, _("OK"), GTK_SIGNAL_FUNC(click_bkg_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox, _("Apply"), GTK_SIGNAL_FUNC(click_bkg_apply));
-	bkg_update_widgets(bw);
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_widget_show_all(win);
+	bkg_dd tdata = { 0, 0, 0, bkg_x, bkg_y, bkg_scale, bkg_flag };
+	run_create(bkg_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 /// SEGMENTATION WINDOW
 
 seg_state *seg_preview;
 
 typedef struct {
-	char ids[3]; // For binding updaters
-	GtkWidget *win, *tspin, *pbutton;
+	int cspace, dist;
+	int threshold, rank, size[3];
+	int preview, progress;
+	int step;
+	void **tspin, **pbutton;
 	seg_state *s;
-	int vars[2]; // Colorspace and distance
-	int progress;
-	int step; // Calculation step of 2nd phase
-} seg_widgets;
+} seg_dd;
 
 static int seg_cspace = CSPACE_LXN, seg_dist = DIST_LINF;
 static int seg_rank = 4, seg_minsize = 1;
 static guint seg_idle;
 
-static GtkWidget *cspace_frame(int idx, gpointer var, GtkSignalFunc handler)
-{
-	return (add_with_frame(NULL, _("Colour space"),
-		wj_radio_pack(cspnames, NUM_CSPACES, 1, idx, var, handler)));
-}
-
-static GtkWidget *difference_frame(int idx, gpointer var, GtkSignalFunc handler)
-{
-	char *dnames[3];
-	int i;
-
-	for (i = 0; i < 3; i++) dnames[i] = _(dist_txt[i]);
-	return (add_with_frame(NULL, _("Difference measure"),
-		wj_radio_pack(dnames, 3, 1, idx, var, handler)));
-}
-
 /* Change colorspace or distance measure, causing full recalculation */
-static void seg_mode_toggled(GtkWidget *btn, gpointer idx)
+static void seg_mode_toggled(seg_dd *dt, void **wdata, int what, void **where)
 {
-	seg_widgets *sw;
-	char *cp;
-
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	cp = gtk_object_get_user_data(GTK_OBJECT(btn->parent));
-	sw = (seg_widgets *)(cp - *cp);
-	if (sw->vars[(int)*cp] == (int)idx) return;
-
-	sw->vars[(int)*cp] = (int)idx;
-	mem_seg_prepare(sw->s, mem_img[CHN_IMAGE], mem_width, mem_height,
-		sw->progress, sw->vars[0], sw->vars[1]);
+	cmd_read(where, dt);
+	mem_seg_prepare(dt->s, mem_img[CHN_IMAGE], mem_width, mem_height,
+		dt->progress, dt->cspace, dt->dist);
 	/* Disable preview if cancelled, change threshold if not */
-	if (!sw->s->phase) gtk_toggle_button_set_active(
-		GTK_TOGGLE_BUTTON(sw->pbutton), FALSE);
-	else gtk_spin_button_set_value(GTK_SPIN_BUTTON(sw->tspin),
-		mem_seg_threshold(sw->s));
+	if (!dt->s->phase) cmd_set(dt->pbutton, FALSE);
+	else cmd_set(dt->tspin, rint(mem_seg_threshold(dt->s) * 100));
 }
 
 /* Do phase 2 (segmentation) in the background */
-static gboolean seg_process_idle(seg_widgets *sw)
+static gboolean seg_process_idle(void **wdata)
 {
-	if (seg_preview && (sw->s->phase == 1))
+	seg_dd *dt = GET_DDATA(wdata);
+
+	if (seg_preview && (dt->s->phase == 1))
 	{
 #define SEG_STEP 100000
-		sw->step = mem_seg_process_chunk(sw->step, SEG_STEP, sw->s);
+		dt->step = mem_seg_process_chunk(dt->step, SEG_STEP, dt->s);
 #undef SEG_STEP
-		if (!(sw->s->phase & 2)) return (TRUE); // Not yet completed
-		gdk_window_set_cursor(sw->win->window, NULL);
+		if (!(dt->s->phase & 2)) return (TRUE); // Not yet completed
+		cmd_cursor(GET_WINDOW(wdata), NULL);
 		seg_idle = 0; // In case update_stuff() ever calls main loop
 		update_stuff(UPD_RENDER);
 	}
@@ -2845,102 +2801,120 @@ static gboolean seg_process_idle(seg_widgets *sw)
 }
 
 /* Change segmentation limits, causing phase 2 restart */
-static void seg_spin_changed(GtkAdjustment *adjustment, char *cp)
+static void seg_spin_changed(seg_dd *dt, void **wdata, int what, void **where)
 {
-	seg_widgets *sw = (seg_widgets *)(cp - *cp);
-	seg_state *s = sw->s;
+	void *cause = cmd_read(where, dt);
+	seg_state *s = dt->s;
 
-	if (!*cp) s->threshold = adjustment->value;
-	else *(*cp == 1 ? &s->minrank : &s->minsize) = ADJ2INT(adjustment);
+	if (cause == &dt->threshold) s->threshold = dt->threshold * 0.01;
+	else if (cause == &dt->rank) s->minrank = dt->rank;
+	else s->minsize = dt->size[0];
 	s->phase &= 1; // Need phase 2 rerun
-	sw->step = 0; // Restart phase 2 afresh
+	dt->step = 0; // Restart phase 2 afresh
 	if (seg_preview)
 	{
-		if (sw->progress) gdk_window_set_cursor(sw->win->window, busy_cursor);
+		if (dt->progress) cmd_cursor(GET_WINDOW(wdata), busy_cursor);
 		if (!seg_idle) seg_idle = threads_idle_add_priority(
-			GTK_PRIORITY_REDRAW + 5, (GtkFunction)seg_process_idle, sw);
+			GTK_PRIORITY_REDRAW + 5, (GtkFunction)seg_process_idle, wdata);
 	}
 }
 
 /* Finish all calculations (preparation and segmentation) */
-static int seg_process(seg_widgets *sw)
+static int seg_process(seg_dd *dt)
 {
 	/* Run phase 1 if necessary */
-	if (!sw->s->phase) mem_seg_prepare(sw->s, mem_img[CHN_IMAGE],
-		mem_width, mem_height, sw->progress, sw->vars[0], sw->vars[1]);
+	if (!dt->s->phase) mem_seg_prepare(dt->s, mem_img[CHN_IMAGE],
+		mem_width, mem_height, dt->progress, dt->cspace, dt->dist);
 	/* Run phase 2 if possible & necessary */
-	if (sw->s->phase == 1) mem_seg_process(sw->s);
+	if (dt->s->phase == 1) mem_seg_process(dt->s);
 	/* Return whether job is done */
-	return (sw->s->phase > 1);
+	return (dt->s->phase > 1);
 }
 
-/* Toggle interactive preview */
-static void seg_preview_toggle(GtkToggleButton *button, GtkWidget *window)
+static void seg_evt(seg_dd *dt, void **wdata, int what, void **where)
 {
 	seg_state *oldp = seg_preview;
-	seg_widgets *sw = NULL;
+	int update = 0;
 
-
-	if ((button && button->active) ^ !oldp) return; // Nothing to do
-	if (window) sw = gtk_object_get_user_data(GTK_OBJECT(window));
-	if (seg_idle) gtk_idle_remove(seg_idle);
-	seg_idle = 0;
-	if (oldp) // Disable
+	if (what == op_EVT_CHANGE) // Toggle preview
 	{
-// !!! Maybe better to add & use an integrated progressbar?
-		if (sw) gdk_window_set_cursor(sw->win->window, NULL);
-		seg_preview = NULL;
+		cmd_read(where, dt);
+		if (dt->preview ^ !oldp) return; // Nothing to do
+		if (!oldp) // Enable
+		{
+			/* Do segmentation conspicuously at first */
+			if (!seg_process(dt)) cmd_set(dt->pbutton, FALSE);
+			else seg_preview = dt->s;
+			if (seg_preview) update_stuff(UPD_RENDER);
+			return;
+		}
 	}
-	else // Enable
-	{
-		/* Do segmentation conspicuously at first */
-		if (!seg_process(sw)) gtk_toggle_button_set_active(button, FALSE);
-		else seg_preview = sw->s;
-	}
-	if (oldp != seg_preview) update_stuff(UPD_RENDER);
-}
-
-static gboolean seg_cancel(GtkWidget *window)
-{
-	seg_widgets *sw = gtk_object_get_user_data(GTK_OBJECT(window));
-
-	seg_preview_toggle(NULL, NULL);	// Clear the preview if enabled
-	destroy_dialog(window);
-	free(sw->s);
-	free(sw);
-	return (FALSE);
-}
-
-static void seg_ok(GtkWidget *window)
-{
-	seg_widgets *sw = gtk_object_get_user_data(GTK_OBJECT(window));
 
 	/* First, disable preview */
-	seg_preview_toggle(NULL, NULL);
-
-	/* Then, update parameters */
-	update_window_spin(window);
-	seg_cspace = sw->vars[0];
-	seg_dist = sw->vars[1];
-	seg_rank = sw->s->minrank;
-	seg_minsize = sw->s->minsize;
-
-	/* Now, finish segmentation & render results */
-	if (seg_process(sw))
+	if (oldp)
 	{
-		spot_undo(UNDO_FILT);
-		mem_seg_render(mem_img[CHN_IMAGE], sw->s);
-		mem_undo_prepare();
-		update_stuff(UPD_IMG);
+		if (seg_idle) gtk_idle_remove(seg_idle);
+		seg_idle = 0;
+		seg_preview = NULL;
+		update = UPD_RENDER;
 	}
 
-	seg_cancel(window);
+	if (what == op_EVT_OK)
+	{
+		/* Update parameters */
+		run_query(wdata);
+		seg_cspace = dt->cspace;
+		seg_dist = dt->dist;
+		seg_rank = dt->rank;
+		seg_minsize = dt->size[0];
+
+		/* Now, finish segmentation & render results */
+		if (seg_process(dt))
+		{
+			spot_undo(UNDO_FILT);
+			mem_seg_render(mem_img[CHN_IMAGE], dt->s);
+			mem_undo_prepare();
+			update |= UPD_IMG;
+		}
+	}
+
+	if (what != op_EVT_CHANGE) // Finished
+	{
+		oldp = dt->s;
+		run_destroy(wdata);
+		free(oldp);
+	}
+// !!! Maybe better to add & use an integrated progressbar?
+	else cmd_cursor(GET_WINDOW(wdata), NULL);
+
+	update_stuff(update);
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase seg_dd
+static void *seg_code[] = {
+	WINDOWm(_("Segment Image")),
+	BORDER(FRBOX, 0),
+	FRPACKe(_("Colour space"), cspnames_, NUM_CSPACES, 1, cspace, seg_mode_toggled),
+	FRPACKe(_("Difference measure"), dist_txt, 3, 1, dist, seg_mode_toggled),
+	TABLE2(3),
+	REF(tspin), TFSPIN(_("Threshold"), threshold, 0, 500000),
+	EVENT(CHANGE, seg_spin_changed),
+	TSPIN(_("Level"), rank, 0, 32), EVENT(CHANGE, seg_spin_changed),
+	TSPINa(_("Minimum size"), size), EVENT(CHANGE, seg_spin_changed),
+	WDONE,
+	BORDER(OKBOX, 0),
+	OKBOX(_("Apply"), seg_evt, _("Cancel"), seg_evt),
+	REF(pbutton), OKTOGGLE(_("Preview"), preview, seg_evt),
+	WSHOW
+};
+#undef WBbase
 
 void pressed_segment()
 {
-	GtkWidget *seg_window, *mainbox, *table, *hbox, *spin;
-	seg_widgets *sw;
+	seg_dd tdata;
 	seg_state *s;
 	int progress = 0, sz = mem_width * mem_height;
 
@@ -2958,36 +2932,21 @@ void pressed_segment()
 	if (!s->phase) return; // Terminated by user
 	s->threshold = mem_seg_threshold(s);
 
-	sw = calloc(1, sizeof(seg_widgets));
-	sw->ids[1] = 1; sw->ids[2] = 2;
-	sw->s = s;
-	sw->progress = progress;
+	tdata.s = s;
+	tdata.progress = progress;
 
-	sw->win = seg_window = add_a_window(GTK_WINDOW_TOPLEVEL,
-		_("Segment Image"), GTK_WIN_POS_CENTER, TRUE);
-	gtk_object_set_user_data(GTK_OBJECT(seg_window), sw);
-	mainbox = add_vbox(seg_window);
+	tdata.cspace = seg_cspace;
+	tdata.dist = seg_dist;
+	tdata.threshold = rint(s->threshold * 100);
+	tdata.rank = s->minrank = seg_rank;
+	tdata.size[0] = s->minsize = seg_minsize;
+	tdata.size[1] = 1;
+	tdata.size[2] = sz;
+	tdata.preview = FALSE;
+	tdata.step = 0;
 
-	pack(mainbox, cspace_frame(sw->vars[0] = seg_cspace, sw->ids + 0,
-		GTK_SIGNAL_FUNC(seg_mode_toggled)));
-	pack(mainbox, difference_frame(sw->vars[1] = seg_dist, sw->ids + 1,
-		GTK_SIGNAL_FUNC(seg_mode_toggled)));
-
-	table = add_a_table(3, 2, 5, mainbox);
-	add_to_table(_("Threshold"), table, 0, 0, 5);
-	sw->tspin = float_spin_to_table(table, 0, 1, 5, s->threshold, 0, 5000.0);
-	spin_connect(sw->tspin, GTK_SIGNAL_FUNC(seg_spin_changed), sw->ids + 0);
-	add_to_table(_("Level"), table, 1, 0, 5);
-	spin = spin_to_table(table, 1, 1, 5, s->minrank = seg_rank, 0, 32);
-	spin_connect(spin, GTK_SIGNAL_FUNC(seg_spin_changed), sw->ids + 1);
-	add_to_table(_("Minimum size"), table, 2, 0, 5);
-	spin = spin_to_table(table, 2, 1, 5, s->minsize = seg_minsize, 1, sz);
-	spin_connect(spin, GTK_SIGNAL_FUNC(seg_spin_changed), sw->ids + 2);
-
-	hbox = pack(mainbox, OK_box(0, seg_window, _("Apply"), GTK_SIGNAL_FUNC(seg_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(seg_cancel)));
-	sw->pbutton = OK_box_add_toggle(hbox, _("Preview"), GTK_SIGNAL_FUNC(seg_preview_toggle));
-
-	gtk_window_set_transient_for(GTK_WINDOW(seg_window), GTK_WINDOW(main_window));
-	gtk_widget_show(seg_window);
+	run_create(seg_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
