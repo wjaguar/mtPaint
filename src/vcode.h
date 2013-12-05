@@ -29,6 +29,7 @@ enum {
 	op_TABLE,
 	//
 	op_VBOX,
+	op_VBOXP,
 	op_XVBOX,
 	op_EVBOX,
 	op_HBOX,
@@ -213,6 +214,7 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), (void *)((H) + ((W) << 16))
 #define VBOX WBh(VBOX, 0)
+#define VBOXPb(S,B) WBh(VBOXP, 1), WBbs(B, S)
 #define XVBOXb(S,B) WBh(XVBOX, 1), WBbs(B, S)
 #define EVBOX WBh(EVBOX, 0)
 #define HBOX WBh(HBOX, 0)
@@ -249,6 +251,8 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 #define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
+#define FSPINv(V,V0,V1) WBrh(FSPIN, 3), &(V), \
 	(void *)(V0), (void *)(V1)
 #define TFSPIN(NM,V,V0,V1) WBrhf(TFSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), (NM)

@@ -618,6 +618,8 @@ static cmdef cmddefs[] = {
 	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK },
 	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK },
 	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK },
+// !!! Padding = 5
+	{ op_VBOXP, cm_VBOX, pk_PACKp | pkf_STACK, 5 },
 	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK },
 	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK },
 	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK,

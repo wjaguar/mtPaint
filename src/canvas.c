@@ -37,6 +37,7 @@
 #include "toolbar.h"
 #include "font.h"
 #include "fpick.h"
+#include "vcode.h"
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_xy[2];				// Top left of image from top left of canvas
@@ -383,11 +384,12 @@ void pressed_invert()
 
 static int edge_mode;
 
-static int do_edge(GtkWidget *box, gpointer fdata)
+static int do_edge(filterwindow_dd *dt, void **wdata)
 {
 	static const unsigned char fxmap[] = { FX_EDGE, FX_SOBEL, FX_PREWITT,
 		FX_KIRSCH, FX_GRADIENT, FX_ROBERTS, FX_LAPLACE, FX_MORPHEDGE };
 
+	run_query(wdata);
 	spot_undo(UNDO_FILT);
 	do_effect(fxmap[edge_mode], 0);
 	mem_undo_prepare();
@@ -395,40 +397,64 @@ static int do_edge(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
+#undef _
+#define _(X) X
+
+static char *fnames_txt[] = { _("MT"), _("Sobel"), _("Prewitt"), _("Kirsch"),
+	_("Gradient"), _("Roberts"), _("Laplace"), _("Morphological"), NULL };
+
+#define WBbase filterwindow_dd
+static void *edge_code[] = {
+	RPACKv(fnames_txt, 0, 4, edge_mode), RET
+};
+#undef WBbase
+
 void pressed_edge_detect()
 {
-	char *fnames[] = { _("MT"), _("Sobel"), _("Prewitt"), _("Kirsch"),
-		_("Gradient"), _("Roberts"), _("Laplace"), _("Morphological"),
-		NULL };
-	GtkWidget *box;
-
-	box = wj_radio_pack(fnames, -1, 4, edge_mode, &edge_mode, NULL);
-	filter_window(_("Edge Detect"), box, do_edge, NULL, FALSE);
+	static filterwindow_dd tdata = {
+		_("Edge Detect"), edge_code, FW_FN(do_edge) };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-static int do_fx(GtkWidget *spin, gpointer fdata)
-{
-	int i;
+#undef _
+#define _(X) __(X)
 
-	i = read_spin(spin);
+typedef struct {
+	spin1_dd s1;
+	int fx;
+} spin1f_dd;
+
+static int do_fx(spin1f_dd *dt, void **wdata)
+{
+	run_query(wdata);
 	spot_undo(UNDO_FILT);
-	do_effect((int)fdata, i);
+	do_effect(dt->fx, dt->s1.n[0]);
 	mem_undo_prepare();
 
 	return TRUE;
 }
 
+#undef _
+#define _(X) X
+
 void pressed_sharpen()
 {
-	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Sharpen"), spin, do_fx, (gpointer)FX_SHARPEN, FALSE);
+	static spin1f_dd tdata = { {
+		{ _("Edge Sharpen"), spin1_code, FW_FN(do_fx) },
+		{ 50, 1, 100 } }, FX_SHARPEN };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
 void pressed_soften()
 {
-	GtkWidget *spin = add_a_spin(50, 1, 100);
-	filter_window(_("Edge Soften"), spin, do_fx, (gpointer)FX_SOFTEN, FALSE);
+	static spin1f_dd tdata = { {
+		{ _("Edge Soften"), spin1_code, FW_FN(do_fx) },
+		{ 50, 1, 100 } }, FX_SOFTEN };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 void pressed_fx(int what)
 {
@@ -438,164 +464,193 @@ void pressed_fx(int what)
 	update_stuff(UPD_IMG);
 }
 
-static int do_gauss(GtkWidget *box, gpointer fdata)
+typedef struct {
+	filterwindow_dd fw;
+	int rgb;
+	int x, y, xy, gamma;
+	void **yspin;
+} gauss_dd;
+
+static int do_gauss(gauss_dd *dt, void **wdata)
 {
-	GtkWidget *spinX, *spinY, *toggleXY;
-	double radiusX, radiusY;
-	int gcor = FALSE;
+	int radiusX, radiusY, gcor = FALSE;
 
-	spinX = BOX_CHILD(box, 0);
-	spinY = BOX_CHILD(box, 1);
-	toggleXY = BOX_CHILD(box, 2);
-	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 3)));
+	run_query(wdata);
+	if (mem_channel == CHN_IMAGE) gcor = dt->gamma;
 
-	radiusX = radiusY = read_float_spin(spinX);
-	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggleXY)))
-		radiusY = read_float_spin(spinY);
+	radiusX = radiusY = dt->x;
+	if (dt->xy) radiusY = dt->y;
 
 	spot_undo(UNDO_DRAW);
-	mem_gauss(radiusX, radiusY, gcor);
+	mem_gauss(radiusX * 0.01, radiusY * 0.01, gcor);
 	mem_undo_prepare();
 
 	return TRUE;
 }
 
-static void gauss_xy_click(GtkButton *button, GtkWidget *spin)
+static void gauss_xy_click(gauss_dd *dt, void **wdata, int what, void **where)
 {
-	gtk_widget_set_sensitive(spin,
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button)));
+	cmd_read(where, dt);
+	cmd_sensitive(dt->yspin, dt->xy);
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase gauss_dd
+static void *gauss_code[] = {
+	VBOXPb(5, 0),
+	FSPIN(x, 0, 20000),
+	REF(yspin), FSPIN(y, 0, 20000), INSENS,
+	CHECK(_("Different X/Y"), xy), EVENT(CHANGE, gauss_xy_click),
+	IF(rgb), CHECK(_("Gamma corrected"), gamma),
+	WDONE, RET
+};
+#undef WBbase
 
 void pressed_gauss()
 {
-	int i;
-	GtkWidget *box, *spin, *check;
-
-	box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	for (i = 0; i < 2; i++)
-	{
-		spin = pack(box, add_float_spin(1, 0, 200));
-	}
-	gtk_widget_set_sensitive(spin, FALSE);
-	check = add_a_toggle(_("Different X/Y"), box, FALSE);
-	gtk_signal_connect(GTK_OBJECT(check), "clicked",
-		GTK_SIGNAL_FUNC(gauss_xy_click), (gpointer)spin);
-	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
-	filter_window(_("Gaussian Blur"), box, do_gauss, NULL, FALSE);
+	gauss_dd tdata = {
+		{ _("Gaussian Blur"), gauss_code, FW_FN(do_gauss) },
+		mem_channel == CHN_IMAGE, 100, 100, FALSE, use_gamma };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-static int do_unsharp(GtkWidget *box, gpointer fdata)
+#undef _
+#define _(X) __(X)
+
+typedef struct {
+	filterwindow_dd fw;
+	int rgb;
+	int radius, amount, threshold, gamma;
+} unsharp_dd;
+
+static int do_unsharp(unsharp_dd *dt, void **wdata)
 {
-	GtkWidget *table, *spinR, *spinA, *spinT;
-	double radius, amount;
-	int threshold, gcor = FALSE;
-
-	table = BOX_CHILD(box, 0);
-	spinR = table_slot(table, 0, 1);
-	spinA = table_slot(table, 1, 1);
-	spinT = table_slot(table, 2, 1);
-	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 1)));
-
-	radius = read_float_spin(spinR);
-	amount = read_float_spin(spinA);
-	threshold = read_float_spin(spinT);
-
+	run_query(wdata);
 	// !!! No RGBA mode for now, so UNDO_DRAW isn't needed
 	spot_undo(UNDO_FILT);
-	mem_unsharp(radius, amount, threshold, gcor);
+	mem_unsharp(dt->radius * 0.01, dt->amount * 0.01, dt->threshold,
+		(mem_channel == CHN_IMAGE) && dt->gamma);
 	mem_undo_prepare();
 
 	return TRUE;
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase unsharp_dd
+static void *unsharp_code[] = {
+	VBOXPb(5, 0),
+	BORDER(TABLE, 0),
+	TABLE2(3),
+	TFSPIN(_("Radius"), radius, 0, 20000),
+	TFSPIN(_("Amount"), amount, 0, 1000),
+	TSPIN(_("Threshold "), threshold, 0, 255),
+	WDONE,
+	IF(rgb), CHECK(_("Gamma corrected"), gamma),
+	WDONE, RET
+};
+#undef WBbase
 
 void pressed_unsharp()
 {
-	GtkWidget *box, *table;
-
-	box = gtk_vbox_new(FALSE, 5);
-	table = add_a_table(3, 2, 0, box);
-	gtk_widget_show_all(box);
-	float_spin_to_table(table, 0, 1, 5, 5, 0, 200);
-	float_spin_to_table(table, 1, 1, 5, 0.5, 0, 10);
-	spin_to_table(table, 2, 1, 5, 0, 0, 255);
-	add_to_table(_("Radius"), table, 0, 0, 5);
-	add_to_table(_("Amount"), table, 1, 0, 5);
-	add_to_table(_("Threshold "), table, 2, 0, 5);
-	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
-	filter_window(_("Unsharp Mask"), box, do_unsharp, NULL, FALSE);
+	unsharp_dd tdata = {
+		{ _("Unsharp Mask"), unsharp_code, FW_FN(do_unsharp) },
+		mem_channel == CHN_IMAGE, 500, 50, 0, use_gamma };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-static int do_dog(GtkWidget *box, gpointer fdata)
+#undef _
+#define _(X) __(X)
+
+typedef struct {
+	filterwindow_dd fw;
+	int rgb;
+	int outer, inner, norm, gamma;
+} dog_dd;
+
+static int do_dog(dog_dd *dt, void **wdata)
 {
-	GtkWidget *table, *spinW, *spinN;
-	double radW, radN;
-	int norm, gcor = FALSE;
-
-	table = BOX_CHILD(box, 0);
-	spinW = table_slot(table, 0, 1);
-	spinN = table_slot(table, 1, 1);
-	norm = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(BOX_CHILD(box, 1)));
-	if (mem_channel == CHN_IMAGE) gcor = gtk_toggle_button_get_active(
-		GTK_TOGGLE_BUTTON(BOX_CHILD(box, 2)));
-
-	radW = read_float_spin(spinW);
-	radN = read_float_spin(spinN);
-	if (radW <= radN) return (FALSE); /* Invalid parameters */
+	run_query(wdata);
+	if (dt->outer <= dt->inner) return (FALSE); /* Invalid parameters */
 
 	spot_undo(UNDO_FILT);
-	mem_dog(radW, radN, norm, gcor);
+	mem_dog(dt->outer * 0.01, dt->inner * 0.01, dt->norm,
+		(mem_channel == CHN_IMAGE) && dt->gamma);
 	mem_undo_prepare();
 
 	return TRUE;
 }
 
+#undef _
+#define _(X) X
+
+#define WBbase dog_dd
+static void *dog_code[] = {
+	VBOXPb(5, 0),
+	BORDER(TABLE, 0),
+	TABLE2(2),
+	TFSPIN(_("Outer radius"), outer, 0, 20000),
+	TFSPIN(_("Inner radius"), inner, 0, 20000),
+	WDONE,
+	CHECK(_("Normalize"), norm),
+	IF(rgb), CHECK(_("Gamma corrected"), gamma),
+	WDONE, RET
+};
+#undef WBbase
+
 void pressed_dog()
 {
-	GtkWidget *box, *table;
-
-	box = gtk_vbox_new(FALSE, 5);
-	table = add_a_table(3, 2, 0, box);
-	gtk_widget_show_all(box);
-	float_spin_to_table(table, 0, 1, 5, 3, 0, 200);
-	float_spin_to_table(table, 1, 1, 5, 1, 0, 200);
-	add_to_table(_("Outer radius"), table, 0, 0, 5);
-	add_to_table(_("Inner radius"), table, 1, 0, 5);
-	add_a_toggle(_("Normalize"), box, TRUE);
-	if (mem_channel == CHN_IMAGE) pack(box, gamma_toggle());
-	filter_window(_("Difference of Gaussians"), box, do_dog, NULL, FALSE);
+	dog_dd tdata = {
+		{ _("Difference of Gaussians"), dog_code, FW_FN(do_dog) },
+		mem_channel == CHN_IMAGE, 300, 100, TRUE, use_gamma };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-static int do_kuwahara(GtkWidget *box, gpointer fdata)
+#undef _
+#define _(X) __(X)
+
+typedef struct {
+	filterwindow_dd fw;
+	int r, detail, gamma;
+} kuw_dd;
+
+static int do_kuwahara(kuw_dd *dt, void **wdata)
 {
-	GtkWidget *spin = BOX_CHILD_0(box), *tog = BOX_CHILD_1(box);
-	GtkWidget *gamma = BOX_CHILD_2(box);
-	int r, detail, gcor;
-
-	r = read_spin(spin);
-	detail = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(tog));
-	gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gamma));
-
+	run_query(wdata);
 	spot_undo(UNDO_COL); // Always processes RGB image channel
-	mem_kuwahara(r, gcor, detail);
+	mem_kuwahara(dt->r, dt->gamma, dt->detail);
 	mem_undo_prepare();
 
 	return (TRUE);
 }
 
+#undef _
+#define _(X) X
+
+#define WBbase kuw_dd
+static void *kuw_code[] = {
+	VBOXPb(5, 0),
+	BORDER(SPIN, 0),
+	SPIN(r, 1, 127),
+	CHECK(_("Protect details"), detail),
+	CHECK(_("Gamma corrected"), gamma),
+	WDONE, RET
+};
+#undef WBbase
+
 void pressed_kuwahara()
 {
-	GtkWidget *box;
-
-	box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	pack(box, add_a_spin(1, 1, 127));
-	add_a_toggle(_("Protect details"), box, FALSE);
-	pack(box, gamma_toggle());
-	filter_window(_("Kuwahara-Nagao Blur"), box, do_kuwahara, NULL, FALSE);
+	kuw_dd tdata = {
+		{ _("Kuwahara-Nagao Blur"), kuw_code, FW_FN(do_kuwahara) },
+		1, FALSE, use_gamma };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 void pressed_convert_rgb()
 {
@@ -633,24 +688,25 @@ void pressed_rotate_sel(int dir)
 	else update_stuff(UPD_CGEOM);
 }
 
-static double angle = 45.00;
+static int angle = 4500;
 
-static int do_rotate_free(GtkWidget *box, gpointer fdata)
+typedef struct {
+	filterwindow_dd fw;
+	int rgb;
+	int smooth, gamma;
+} rfree_dd;
+
+static int do_rotate_free(rfree_dd *dt, void **wdata)
 {
-	GtkWidget *spin = BOX_CHILD_0(box);
 	int j, smooth = 0, gcor = 0;
 
-	angle = read_float_spin(spin);
-
+	run_query(wdata);
 	if (mem_img_bpp == 3)
 	{
-		GtkWidget *gch = BOX_CHILD_1(box);
-		GtkWidget *check = BOX_CHILD_2(box);
-		gcor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(gch));
-		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(check)))
-			smooth = 1;
+		gcor = dt->gamma;
+		smooth = dt->smooth;
 	}
-	j = mem_rotate_free(angle, smooth, gcor, 0);
+	j = mem_rotate_free(angle * 0.01, smooth, gcor, 0);
 	if (!j) update_stuff(UPD_GEOM);
 	else
 	{
@@ -662,20 +718,31 @@ static int do_rotate_free(GtkWidget *box, gpointer fdata)
 	return TRUE;
 }
 
+#undef _
+#define _(X) X
+
+#define WBbase rfree_dd
+static void *rfree_code[] = {
+	VBOXPb(5, 0),
+	FSPINv(angle, -36000, 36000),
+	IFx(rgb, 1),
+		CHECK(_("Gamma corrected"), gamma),
+		CHECK(_("Smooth"), smooth),
+	ENDIF(1),
+	WDONE, RET
+};
+#undef WBbase
+
 void pressed_rotate_free()
 {
-	GtkWidget *box;
-
-	box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	pack(box, add_float_spin(angle, -360, 360));
-	if (mem_img_bpp == 3)
-	{
-		pack(box, gamma_toggle());
-		add_a_toggle(_("Smooth"), box, TRUE);
-	}
-	filter_window(_("Free Rotate"), box, do_rotate_free, NULL, FALSE);
+	rfree_dd tdata = {
+		{ _("Free Rotate"), rfree_code, FW_FN(do_rotate_free) },
+		mem_img_bpp == 3, TRUE, use_gamma };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 
 void pressed_clip_mask(int val)
