@@ -20,8 +20,8 @@
 enum {
 	op_WEND = 0,
 	op_WSHOW,
+	op_WDIALOG,
 	op_WDONE,
-	op_WTAGS, // internal use
 	op_WINDOW,
 	op_WINDOWm,
 	op_WINDOWpm,
@@ -45,6 +45,7 @@ enum {
 	op_BOOKBTN,
 	op_HSEP,
 	op_MLABEL,
+	op_MLABELp,
 	op_TLLABEL,
 	op_TLNOSPIN,
 	//
@@ -108,7 +109,9 @@ enum {
 	op_DEFW,
 	op_WPMOUSE,
 	op_INSENS,
+	op_FOCUS,
 	op_ONTOP,
+	op_RAISED,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -124,8 +127,8 @@ enum {
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_SPIN,
-	op_BOR_TLLABEL,
-	op_BOR_TLOPT,
+	op_BOR_LABEL,
+	op_BOR_OPT,
 	op_BOR_XOPT,
 	op_BOR_FRBOX,
 	op_BOR_OKBOX,
@@ -182,6 +185,9 @@ void cmd_scroll(void **slot, int idx);
 //	Set cursor for slot window
 void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 
+///	Handler for dialog buttons
+void dialog_event(void *ddata, void **wdata, int what, void **where);
+
 #define WB_OPBITS     13
 #define WB_OPMASK 0x1FFF /* ((1 << WB_OPBITS) - 1) */
 #define WB_FFLAG  0x8000
@@ -205,6 +211,7 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
+#define WDIALOG(V) WBhf(WDIALOG, 1), WBfield(V)
 #define WDONE WBh(WDONE, 0)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
@@ -226,6 +233,7 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 #define FXVBOX(NM) WBh(FXVBOX, 1), (NM)
 #define EQBOX WBh(EQBOX, 0)
 #define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
+#define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
@@ -234,6 +242,7 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
+#define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
@@ -352,7 +361,9 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 #define DEFW(V) WBh(DEFW, 1), (void *)(V)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define INSENS WBh(INSENS, 0)
+#define FOCUS WBh(FOCUS, 0)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
+#define RAISED WBh(RAISED, 0)
 /* !!! Maybe better to integrate this into container codes */
 //#define SETBORDER(V) WBh(SETBORDER, 1), (void *)(V)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)

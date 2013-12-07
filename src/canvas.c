@@ -1369,80 +1369,70 @@ static int populate_channel(char *filename)
 
 static int anim_mode = ANM_COMP;
 
-static void anim_dialog_fn(char *key)
-{
-	*(key - *key) = *key;
-}
+typedef struct {
+	int is_anim;
+	char *what;
+	void **lload, **load1, **explode;
+	void **res;
+} animfile_dd;
+
+#undef _
+#define _(X) X
+
+static char *modes_txt[] = { _("Raw frames"), _("Composited frames"),
+		_("Composited frames with nonzero delay") };
+
+#define WBbase animfile_dd
+static void *animfile_code[] = {
+	WINDOWm(_("Load Frames")),
+	MLABELp(what),
+	EQBOXb(0, 5),
+	REF(lload), BUTTON(_("Load into Layers"), dialog_event), FOCUS,
+	WDONE,
+	IF(is_anim), RPACKv(modes_txt, 3, 0, anim_mode),
+	HSEP,
+	OKBOX0,
+	REF(load1), CANCELBTN(_("Load First Frame"), dialog_event),
+	REF(explode), BUTTON(_("Explode Frames"), dialog_event),
+#ifndef WIN32
+	IF(is_anim), BUTTON(_("View Animation"), dialog_event),
+#endif
+	WDONE,
+	RAISED, WDIALOG(res)
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 static int anim_file_dialog(int ftype, int is_anim)
 {
-	char *modes[] = { _("Raw frames"), _("Composited frames"),
-		_("Composited frames with nonzero delay") };
-	char *opts[] = { _("Load First Frame"), _("Explode Frames"),
-#ifndef WIN32
-		_("View Animation"),
-#endif
-		NULL };
-	char keys[] = { 0, 1, 2, 3, 4, 5 };
+	animfile_dd tdata, *dt;
+	void **res, **where;
 	char *tmp;
-	GtkWidget *win, *vbox, *hbox, *label, *button;
-	GtkAccelGroup* ag = gtk_accel_group_new();
 	int i;
 
 
 	/* This function is better be immune to pointer grabs */
 	release_grab();
 
-	if (!is_anim) opts[2] = NULL; // No view if not animated
-
-	win = add_a_window(GTK_WINDOW_TOPLEVEL, _("Load Frames"),
-		GTK_WIN_POS_CENTER, TRUE);
-	vbox = add_vbox(win);
-	
+	tdata.is_anim = is_anim;
 	tmp = g_strdup_printf(is_anim ? _("This is an animated %s file.") :
 		_("This is a multipage %s file."),
 		file_formats[ftype & FTM_FTYPE].name);
-	label = pack5(vbox, gtk_label_new(tmp));
-	gtk_misc_set_padding(GTK_MISC(label), 0, 5);
+	tdata.what = tmp;
+	res = run_create(animfile_code, &tdata, sizeof(tdata)); // run dialog
 	g_free(tmp);
 
-//	add_hseparator(vbox, -2, 10);
-	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
-        gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	button = add_a_button(_("Load into Layers"), 5, hbox, TRUE);
-	gtk_widget_grab_focus(button);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 5));
-	if (is_anim) pack(vbox, wj_radio_pack(modes, 3, 0, anim_mode,
-		&anim_mode, NULL));
+	/* Retrieve results */
+	run_query(res);
+	dt = GET_DDATA(res);
+	where = origin_slot(dt->res);
+	i = where == dt->lload ? 3 : where == dt->load1 ? 0 :
+		where == dt->explode ? 1 : 2;
+	run_destroy(res);
 
-	add_hseparator(vbox, -2, 10);
-	hbox = pack(vbox, gtk_hbox_new(TRUE, 0));
-        gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-	for (i = 0; opts[i]; i++)
-	{
-		button = add_a_button(opts[i], 5, hbox, TRUE);
-		if (!i) gtk_widget_add_accelerator(button, "clicked", ag,
-			GDK_Escape, 0, (GtkAccelFlags)0);
-		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + i + 2));
-	}
-	gtk_signal_connect_object(GTK_OBJECT(win), "destroy",
-		GTK_SIGNAL_FUNC(anim_dialog_fn), (gpointer)(keys + 1));
-
-	gtk_widget_show_all(vbox);
-
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
-	gtk_widget_show(win);
-	gdk_window_raise(win->window);
-
-	while (!keys[0]) gtk_main_iteration();
-	i = keys[0]; // !!! To save it from "destroy" event handler
-	if (i > 1) gtk_widget_destroy(win);
-	else i = 2;
-
-	return (i - 2);
+	return (i);
 }
 
 static void handle_file_error(int res)

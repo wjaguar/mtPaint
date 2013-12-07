@@ -65,6 +65,19 @@ void **origin_slot(void **slot)
 	return (slot);
 }
 
+void dialog_event(void *ddata, void **wdata, int what, void **where)
+{
+	void **slot = GET_WINDOW(wdata) + 2;
+	void **desc = slot[1];
+	void *v;
+	int op = (int)desc[0];
+
+	if ((op & WB_OPMASK) != op_WDIALOG) return; // Wrong context
+	v = desc[1];
+	if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
+	*(void ***)v = where;
+}
+
 /* !!! Warning: handlers should not access datastore after window destruction!
  * GTK+ refs objects for signal duration, but no guarantee every other toolkit
  * will behave alike - WJ */
@@ -143,7 +156,7 @@ static void trigger_things(void **wdata)
 static int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, n = 2 + 1; // safety margin and WTAGS slot
+	int op, n = 2 + 1; // noop-slot and safety margin
 
 	while (TRUE)
 	{
@@ -614,18 +627,25 @@ enum {
 #define USE_BORDER(T) (op_BOR_0 - op_BOR_##T - 1)
 
 static cmdef cmddefs[] = {
+// !!! Padding = 0
 	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK },
 	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK },
 	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK },
 	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK },
 // !!! Padding = 5
 	{ op_VBOXP, cm_VBOX, pk_PACKp | pkf_STACK, 5 },
+// !!! Padding = 0
 	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK },
 	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK },
 	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK,
 		0, USE_BORDER(FRBOX) },
 	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK,
 		0, USE_BORDER(FRBOX) },
+	/* Codes can map to themselves, and some do */
+	{ op_MLABEL, op_MLABEL, pk_PACKp, USE_BORDER(LABEL) },
+// !!! Border = 5
+	{ op_MLABELp, op_MLABELp, pk_PACKp, USE_BORDER(LABEL), 5 },
+	{ op_TLLABEL, op_TLLABEL, pk_TABLEp, USE_BORDER(LABEL) },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_XSPIN, cm_SPIN, pk_XPACK },
@@ -642,6 +662,7 @@ static cmdef cmddefs[] = {
 	{ op_TSPINa, cm_SPINa, pk_TABLE2, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_TSPINSLIDE, op_TSPINSLIDE, pk_TABLE2x },
+// !!! Padding = 5
 	{ op_TLSPINSLIDE, op_TLSPINSLIDE, pk_TABLE, 5 },
 	{ op_SPINSLIDEa, op_SPINSLIDEa, pk_PACK },
 	{ op_CHECK, cm_CHECK, pk_PACK },
@@ -650,11 +671,10 @@ static cmdef cmddefs[] = {
 	{ op_RPACK, cm_RPACK, pk_XPACK },
 	{ op_RPACKD, cm_RPACKD, pk_XPACK },
 	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
-	{ op_OPT, cm_OPT, pk_PACK },
+	{ op_OPT, cm_OPT, pk_PACKp, USE_BORDER(OPT) },
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
-	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(TLOPT) },
-	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(TLOPT) },
-	/* Codes can map to themselves, and some do */
+	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
+	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
 	{ op_OKBTN, op_OKBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
 	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
 	{ op_OKADD, op_OKADD, pk_XPACK1, 0, USE_BORDER(BUTTON) },
@@ -675,6 +695,7 @@ static cmdef cmddefs[] = {
 
 void **run_create(void **ifcode, void *ddata, int ddsize)
 {
+	static const void *noop[] = { WDONE, NULL };
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
 		GTK_POLICY_ALWAYS };
 	cmdef *cmds[op_LAST];
@@ -684,6 +705,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 	int have_sliders = FALSE;
 #endif
+	int raise = FALSE;
 	char txt[PATHTXT];
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWindow *tparent = GTK_WINDOW(main_window);
@@ -691,7 +713,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	GtkWidget *tw, *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL; /* **tagslot = NULL */
+	void *v, **pp, **r = NULL, **res = NULL, **resslot = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad = 0, minw = 0;
 
@@ -731,17 +753,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		switch (op)
 		{
 		/* Terminate */
-		case op_WEND: case op_WSHOW:
+		case op_WEND: case op_WSHOW: case op_WDIALOG:
 			/* Terminate the list */
 			*r++ = NULL;
 			*r++ = NULL;
-
-#if 0 /* Not needed for now */
-			/* Make WTAGS descriptor */
-			*tagslot = r;
-			*r++ = WBh(WTAGS, 1);
-			*r++ = (void *)have_spins; // only this for now
-#endif
 
 			gtk_window_set_transient_for(GTK_WINDOW(window), tparent);
 #if GTK_MAJOR_VERSION == 1
@@ -753,7 +768,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Trigger remembered events */
 			trigger_things(res);
 			/* Display */
-			if (op == op_WSHOW) gtk_widget_show(window);
+			if (op != op_WEND)
+			{
+				gtk_widget_show(window);
+				if (raise) gdk_window_raise(window->window);
+			}
+			/* Wait for input */
+			if (op == op_WDIALOG)
+			{
+				*resslot = pp - 1; // point to self
+				*(void ***)v = NULL; // clear result slot
+				while (!*(void ***)v) gtk_main_iteration();
+			}
 			/* Return anchor position */
 			return (res);
 		/* Done with a container */
@@ -773,11 +799,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = ddata; // Store struct ref at anchor
 			*r++ = window; // Store window ref right next to it
 			*r++ = pp - 1; // And slot ref after it
-#if 0 /* Not needed for now */
-			*r++ = window; // Store window again for WTAGS
-			tagslot = r; // Remember the location
-			*r++ = NULL; // No WTAGS descriptor yet
-#endif
+			*r++ = ddata; // Store struct ref for WDIALOG
+			resslot = r; // Remember the location
+			*r++ = noop; // No real descriptor yet
 			*--wp = add_vbox(window);
 			continue;
 		/* Add a notebook page */
@@ -795,12 +819,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				gtk_hbox_new)(FALSE, (int)v & 255);
 			gtk_widget_show(widget);
 			if (!(pk & pkf_FRAME)) cw = (int)v >> 8;
-// !!! Padding = 0
 			break;
 		/* Add an equal-spaced horizontal box */
 		case op_EQBOX:
 			widget = gtk_hbox_new(TRUE, (int)v & 255);
 			gtk_widget_show(widget);
+			cw = (int)v >> 8;
 			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a scrolled window */
@@ -846,15 +870,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			add_hseparator(wp[0], lp ? (int)v : -2, 10);
 			continue; // !!! nonreferable: does not return widget
 		/* Add a label */
+		case op_MLABELp:
+			v = *(char **)v; // dereference & fallthrough
 		case op_MLABEL: case op_TLLABEL:
 			widget = gtk_label_new(_(v));
 			gtk_widget_show(widget);
-			pk = pk_PACK;
-			if (op == op_MLABEL) break; // Multiline label
+			if (cw) gtk_misc_set_padding(GTK_MISC(widget), 0, cw);
+			cw = 0;
+			if (op != op_TLLABEL) break; // Multiline label
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
 			gtk_misc_set_alignment(GTK_MISC(widget), 0.0, 0.5);
-			tpad = GET_BORDER(TLLABEL);
-			pk = pk_TABLEp;
 			break;
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
@@ -1115,10 +1140,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_INSENS:
 			gtk_widget_set_sensitive(*origin_slot(r - 2), FALSE);
 			continue;
+		/* Make last referrable widget focused */
+		case op_FOCUS:
+			gtk_widget_grab_focus(*origin_slot(r - 2));
+			continue;
 		/* Make window transient to given widget-map */
 		case op_ONTOP:
 			tparent = !v ? NULL :
 				GTK_WINDOW(GET_REAL_WINDOW(*(void ***)v));
+			continue;
+		/* Raise window after displaying */
+		case op_RAISED:
+			raise = TRUE;
 			continue;
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
@@ -1158,8 +1191,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			continue;
 		/* Set nondefault border size */
-		case op_BOR_TABLE: case op_BOR_SPIN: case op_BOR_TLLABEL:
-		case op_BOR_TLOPT: case op_BOR_XOPT:
+		case op_BOR_TABLE: case op_BOR_SPIN: case op_BOR_LABEL:
+		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
@@ -1236,12 +1269,6 @@ static void *do_query(char *data, void **wdata, int mode)
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
-#if 0 /* Not needed for now */
-		case op_WTAGS:
-			// For now, only this
-			if (!(mode & 1) && v) update_window_spin(*wdata);
-			break;
-#endif
 		case op_SPIN: case op_XSPIN:
 		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
