@@ -67,11 +67,13 @@ void **origin_slot(void **slot)
 
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
-	void **slot = GET_WINDOW(wdata) + 2;
-	void **desc = slot[1];
-	void *v;
-	int op = (int)desc[0];
+	void *v, **desc, **slot = GET_WINDOW(wdata);
+	int op;
 
+	desc = slot[1];
+	slot = SLOT_N(slot, WB_GETREF((int)*desc));
+	desc = slot[1];
+	op = (int)desc[0];
 	if ((op & WB_OPMASK) != op_WDIALOG) return; // Wrong context
 	v = desc[1];
 	if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
@@ -164,7 +166,7 @@ static int predict_size(void **ifcode, char *ddata)
 		ifcode = (pp = ifcode) + (op >> 16);
 		n += WB_GETREF(op);
 		op &= WB_OPMASK;
-		if (op <= op_WSHOW) break; // End
+		if (op < op_END_LAST) break; // End
 		// Subroutine call/return
 		if (op == op_RET) ifcode = *--rp;
 		else if (op == op_CALLp)
@@ -364,7 +366,7 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 	gtk_container_set_focus_child(GTK_CONTAINER(list),
 		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, *idx)->data));
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
-		GTK_SIGNAL_FUNC(colorlist_select), r + 2);
+		GTK_SIGNAL_FUNC(colorlist_select), NEXT_SLOT(r));
 	gtk_signal_connect_after(GTK_OBJECT(list), "map",
 		GTK_SIGNAL_FUNC(colorlist_map_scroll), dt);
 
@@ -411,7 +413,7 @@ static void colorpad_set(void **slot, int v)
 	wjpixmap_move_cursor(widget, (v % PPAD_XSZ) * PPAD_SLOT,
 		(v / PPAD_XSZ) * PPAD_SLOT);
 	*(int *)gtk_object_get_user_data(GTK_OBJECT(widget)) = v; // self-reading
-	if (desc[4]) get_evt_1(NULL, slot + 2); // call handler
+	if (desc[4]) get_evt_1(NULL, NEXT_SLOT(slot)); // call handler
 }
 
 static gboolean colorpad_click(GtkWidget *widget, GdkEventButton *event,
@@ -964,7 +966,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			src = tc;
 #endif
 			widget = wj_radio_pack(src, n, nh & 255, *(int *)v,
-				ref > 1 ? r + 2 : v, // self-update by default
+				ref > 1 ? NEXT_SLOT(r) : v, // self-update by default
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_wjr) : NULL);
 			break;
 		}
@@ -979,7 +981,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			src = tc;
 #endif
 			widget = wj_option_menu(src, n, *(int *)v,
-				ref > 1 ? r + 2 : NULL,
+				ref > 1 ? NEXT_SLOT(r) : NULL,
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			break;
 		}
@@ -1000,16 +1002,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
-			widget = colorlist(wp[0], v, ddata, pp - 1, r + 2);
+			widget = colorlist(wp[0], v, ddata, pp - 1, NEXT_SLOT(r));
 			break;
 		/* Add a colorpad */
 		case op_COLORPAD:
-			widget = colorpad(v, ddata, pp - 1, r + 2);
+			widget = colorpad(v, ddata, pp - 1, NEXT_SLOT(r));
 			pk = pk_PACK;
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
-			widget = gradbar(v, ddata, pp - 1, r + 2);
+			widget = gradbar(v, ddata, pp - 1, NEXT_SLOT(r));
 			pk = pk_PACK;
 			break;
 		/* Add a box with "OK"/"Cancel", or something like */
@@ -1040,7 +1042,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GET_BORDER(BUTTON));
 			gtk_widget_show(ok_bt);
 			/* OK-event */
-			add_click(r + 2, pp + 2, ok_bt, window);
+			add_click(NEXT_SLOT(r), pp + 2, ok_bt, window);
 			if (pp[1])
 			{
 				cancel_bt = xpack(widget,
@@ -1049,7 +1051,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_CONTAINER(cancel_bt), GET_BORDER(BUTTON));
 				gtk_widget_show(cancel_bt);
 				/* Cancel-event */
-				add_click(r + 4, pp + 4, cancel_bt, window);
+				add_click(SLOT_N(r, 2), pp + 4, cancel_bt, window);
 			}
 			xpack(widget, ok_bt);
 
@@ -1081,7 +1083,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				delete_to_click(window, widget);
 			}
 			/* Click-event */
-			add_click(r + 2, pp + 1, widget,
+			add_click(NEXT_SLOT(r), pp + 1, widget,
 				op == cm_BUTTON ? NULL : window);
 			break;
 		}
@@ -1090,7 +1092,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = gtk_toggle_button_new_with_label(_(pp[1]));
 			gtk_widget_show(widget);
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
-				"toggled", GTK_SIGNAL_FUNC(get_evt_1), r + 2);
+				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			cw = GET_BORDER(BUTTON);
 			pk = pk_XPACK1;
 			break;

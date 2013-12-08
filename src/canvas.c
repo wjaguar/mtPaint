@@ -1879,7 +1879,7 @@ static void store_ls_settings(ls_settings *settings)
 static void fs_destroy(GtkWidget *fs)
 {
 	win_store_pos(fs, "fs_window");
-	fpick_destroy(fs);
+	destroy_dialog(fs);
 }
 
 static void fs_ok(GtkWidget *fs)
@@ -2065,7 +2065,7 @@ static void fs_ok(GtkWidget *fs)
 	}
 
 	update_menus();
-	fpick_destroy(fs);
+	destroy_dialog(fs);
 	return;
 redo_name:
 	f8 = gtkuncpy(NULL, fname, 0);

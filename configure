@@ -4,7 +4,7 @@
 
 echo
 
-MT_V="3.44.38"
+MT_V="3.44.39"
 MT_DATE="2013-12-08"
 
 MT_VERSION="mtPaint $MT_V"
@@ -118,7 +118,7 @@ do
 			rm po/mtpaint.pot
 			rm -rf src/graphics
 			exit;;
-	"merge" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+	"merge" )	xgettext src/*.c src/*.h --keyword=_ --keyword=__ -o po/mtpaint.pot
 			cd po
 			NEW_DIR=trans_
 			mkdir $NEW_DIR`date +%d-%m-%Y-%H-%M-%S`
@@ -132,7 +132,7 @@ do
 			rm mtpaint.pot
 			mv $NEW_DIR* ../../old_trans
 			exit;;
-	"newpo" )	xgettext src/*.c src/*.h --keyword=_ -o po/mtpaint.pot
+	"newpo" )	xgettext src/*.c src/*.h --keyword=_ --keyword=__ -o po/mtpaint.pot
 			exit;;
 	# Override variable
 	[!=]*=* )	MT_VAR=${A%%=*}

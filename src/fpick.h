@@ -22,7 +22,6 @@
 #define FPICK_DIRS_ONLY	4
 
 GtkWidget *fpick_create(char *title, int flags);
-void fpick_destroy(GtkWidget *fp);
 void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
 	GtkSignalFunc cancel_fn);
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw);

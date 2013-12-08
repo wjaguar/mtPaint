@@ -21,7 +21,10 @@ enum {
 	op_WEND = 0,
 	op_WSHOW,
 	op_WDIALOG,
-	op_WDONE,
+
+	op_END_LAST,
+	op_WDONE = op_END_LAST,
+
 	op_WINDOW,
 	op_WINDOWm,
 	op_WINDOWpm,
@@ -158,6 +161,9 @@ void run_reset(void **wdata, int group);
 #define GET_WINDOW(V) ((V) + 1)
 //	Extract actual toplevel window out of widget-map
 #define GET_REAL_WINDOW(V) ((V)[1])
+//	Iterate over slots
+#define NEXT_SLOT(V) ((V) + 2)
+#define SLOT_N(V,N) ((V) + (N) * 2)
 
 //	From event to its originator
 void **origin_slot(void **slot);
@@ -215,7 +221,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WDONE WBh(WDONE, 0)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
-#define WINDOWpm(V) WBrhf(WINDOWpm, 1), WBfield(V)
+#define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define TABLE(W,H) WBh(TABLE, 1), (void *)((H) + ((W) << 16))
 #define TABLE2(H) TABLE(2, (H))

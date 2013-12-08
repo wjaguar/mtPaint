@@ -1021,6 +1021,8 @@ static gboolean fpick_entry_key(GtkWidget *widget, GdkEventKey *event,
 	return (TRUE);
 }
 
+static void fpick_destroy(GtkObject *fp, gpointer user_data);
+
 GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 {
 	static const short col_width[FPICK_CLIST_COLS] = {250, 64, 80, 150};
@@ -1047,6 +1049,8 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 	res->txt_directory[0] = '\0';
 
 	res->window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_NONE, TRUE );
+	gtk_signal_connect(GTK_OBJECT(res->window), "destroy",
+		GTK_SIGNAL_FUNC(fpick_destroy), res);
 	gtk_object_set_data(GTK_OBJECT(res->window), FP_DATA_KEY, res);
 
 	win_restore_pos(res->window, "fs_window", 0, 0, 550, 500);
@@ -1237,9 +1241,9 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 	gtk_entry_set_text(GTK_ENTRY(win->file_entry), name);
 }
 
-void fpick_destroy(GtkWidget *fp)			// Destroy structures and release memory
+static void fpick_destroy(GtkObject *fp, gpointer user_data)	// Destroy structures and release memory
 {
-	fpicker *win = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
+	fpicker *win = user_data;
 	GtkCListColumn *col = GTK_CLIST(win->clist)->column;
 	char txt[64], buf[PATHBUF];
 	int i;
@@ -1260,8 +1264,8 @@ void fpick_destroy(GtkWidget *fp)			// Destroy structures and release memory
 	inifile_set_gboolean("fpick_case_insensitive", case_insensitive);
 	inifile_set_gboolean("fpick_show_hidden", win->show_hidden );
 
+	gtk_object_set_data(fp, FP_DATA_KEY, NULL); // Paranoia
 	free(win);
-	destroy_dialog(fp);
 }
 
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
@@ -1346,11 +1350,6 @@ GtkWidget *fpick_create(char *title, int flags)
 	}
 
 	return (fp);
-}
-
-void fpick_destroy(GtkWidget *fp)
-{
-	destroy_dialog(fp);
 }
 
 void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
