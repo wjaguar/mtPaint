@@ -1,5 +1,5 @@
 /*	fpick.h
-	Copyright (C) 2007-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -22,7 +22,7 @@
 #define FPICK_DIRS_ONLY	4
 
 GtkWidget *fpick_create(char *title, int flags);
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
-	GtkSignalFunc cancel_fn);
+void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc handler,
+	gpointer ok_data, gpointer cancel_data);
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw);
 void fpick_set_filename(GtkWidget *fp, char *name, int raw);

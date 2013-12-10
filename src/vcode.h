@@ -28,6 +28,7 @@ enum {
 	op_WINDOW,
 	op_WINDOWm,
 	op_WINDOWpm,
+	op_FPICKpm,
 	op_PAGE,
 	op_TABLE,
 	//
@@ -81,6 +82,7 @@ enum {
 	op_XOPT,
 	op_TOPT,
 	op_TLOPT,
+	op_OPTD,
 	op_PATH,
 	op_PATHs,
 	op_COLOR,
@@ -105,11 +107,13 @@ enum {
 	op_UNLESS,
 	op_ENDIF,
 	op_REF,
+	op_CLEANUP,
 	op_GROUP,
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
 	op_DEFW,
+	op_WXYWH,
 	op_WPMOUSE,
 	op_INSENS,
 	op_FOCUS,
@@ -154,6 +158,8 @@ void run_query(void **wdata);
 #define run_destroy(W) destroy_dialog(GET_REAL_WINDOW(W))
 //	Reset (a group of) dialog widgets, using widget-map
 void run_reset(void **wdata, int group);
+//	Store position values as defined by widget-map
+void run_locate(void **wdata);
 
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
@@ -184,6 +190,10 @@ void cmd_set4(void **slot, int *v);
 void cmd_setlist(void **slot, char *map, int n);
 //	Read back slot value (as is), return its storage location
 void *cmd_read(void **slot, void *ddata);
+//	Read extra data from slot
+void cmd_peekv(void **slot, void *res, int size, int idx);
+//	Set extra data on slot
+void cmd_setv(void **slot, void *res, int idx);
 //	Repaint slot
 void cmd_repaint(void **slot);
 //	Scroll in position on colorlist slot
@@ -201,16 +211,19 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WB_REF2   0x4000
 #define WB_REF3   0x6000
 #define WB_GETREF(X) (((X) >> WB_OPBITS) & 3)
+#define WB_LSHIFT     16
 
-#define WBh(NM,L) (void *)( op_##NM + ((L) << 16))
-#define WBhf(NM,L) (void *)( op_##NM + ((L) << 16) + WB_FFLAG)
-#define WBrh(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF1)
-#define WBrhf(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF1 + WB_FFLAG)
-#define WBr2h(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF2)
-#define WBr2hf(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF2 + WB_FFLAG)
-#define WBr3h(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF3)
-#define WBr3hf(NM,L) (void *)( op_##NM + ((L) << 16) + WB_REF3 + WB_FFLAG)
+#define WBlen(L) ((L) << WB_LSHIFT)
+#define WBh(NM,L) (void *)( op_##NM + WBlen(L))
+#define WBhf(NM,L) (void *)( op_##NM + WBlen(L) + WB_FFLAG)
+#define WBrh(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF1)
+#define WBrhf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF1 + WB_FFLAG)
+#define WBr2h(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF2)
+#define WBr2hf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF2 + WB_FFLAG)
+#define WBr3h(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF3)
+#define WBr3hf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF3 + WB_FFLAG)
 #define WBfield(V) (void *)offsetof(WBbase, V)
+#define WBwh(W,H) (void *)((H) + ((W) << 16))
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
 #define WBnh(N,H) (void *)(((H) & 255) + ((N) << 8))
 #define WBbs(B,S) (void *)(((S) & 255) + ((B) << 8))
@@ -222,10 +235,14 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
+/* !!! Note: string "V" is in system encoding */
+/* !!! This block holds 2 nested EVENT blocks */
+#define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
+	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
-#define TABLE(W,H) WBh(TABLE, 1), (void *)((H) + ((W) << 16))
+#define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
-#define TABLEr(W,H) WBrh(TABLE, 1), (void *)((H) + ((W) << 16))
+#define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXPb(S,B) WBh(VBOXP, 1), WBbs(B, S)
 #define XVBOXb(S,B) WBh(XVBOX, 1), WBbs(B, S)
@@ -248,6 +265,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
+#define MLABELr(NM) WBrh(MLABEL, 1), (NM)
 #define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
@@ -317,6 +335,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), \
 	(void *)(N), EVENT(SELECT, HS), WBxyl(X, Y, L)
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
+#define OPTDe(SP,V,HS) WBr2hf(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
+	EVENT(SELECT, HS)
 #define COLORPAD(CC,V,HS) WBr2hf(COLORPAD, 2 + 2), WBfield(V), WBfield(CC), \
 	EVENT(SELECT, HS)
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
@@ -357,6 +377,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define UNLESSv(X) WBh(UNLESS, 1), &(X)
 #define ENDIF(N) WBh(ENDIF, 1), (void *)(N)
 #define REF(V) WBhf(REF, 1), WBfield(V)
+#define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
 #define BORDER(T,V) WBh(BOR_##T, 1), (void *)(V)
@@ -365,6 +386,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define NORESIZE WBh(NORESIZE, 0)
 #define WANTMAX WBh(WANTMAX, 0)
 #define DEFW(V) WBh(DEFW, 1), (void *)(V)
+#define WXYWH(NM,W,H) WBrh(WXYWH, 2), (NM), WBwh(W, H)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define INSENS WBh(INSENS, 0)
 #define FOCUS WBh(FOCUS, 0)
@@ -383,3 +405,11 @@ typedef struct {
 	int idx;	// which row was clicked
 	int button;	// which button was clicked (1-3 etc)
 } colorlist_ext;
+
+//	Extra data of FPICK
+#define FPICK_VALUE 0
+#define FPICK_RAW   1
+//	Mode flags for FPICK
+#define FPICK_ENTRY	1
+#define FPICK_LOAD	2
+#define FPICK_DIRS_ONLY	4

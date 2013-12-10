@@ -112,15 +112,14 @@ enum {
 	FS_PALETTE_DEF
 };
 
-#define FS_ENTRY_KEY "mtPaint.fs_entry"
-
 int do_a_load(char *fname, int undo);
 void canvas_center(float ic[2]);
 void align_size(float new_zoom);
 void realign_size();
-void init_ls_settings(ls_settings *settings, GtkWidget *box);
+void init_ls_settings(ls_settings *settings, void **wdata);
 void fs_setup(GtkWidget *fs, int action_type);
-void file_selector( int action_type );
+void file_selector_x(int action_type, void **xdata);
+void file_selector(int action_type);
 void set_new_filename(int layer, char *fname);
 
 void pressed_do_undo(int redo);

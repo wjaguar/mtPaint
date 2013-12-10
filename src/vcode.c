@@ -27,6 +27,7 @@
 #include "otherwindow.h"
 #include "cpick.h"
 #include "icons.h"
+#include "fpick.h"
 #include "vcode.h"
 
 /* Make code not compile if it cannot work */
@@ -92,6 +93,15 @@ static void get_evt_1(GtkObject *widget, gpointer user_data)
 	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
 }
 
+static void get_evt_1_d(GtkObject *widget, gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+
+	if (!desc[1]) destroy_dialog(GET_REAL_WINDOW(base));
+	else ((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
+}
+
 /* Handler for wj_radio_pack() */
 static void get_evt_wjr(GtkWidget *btn, gpointer idx)
 {
@@ -113,13 +123,10 @@ static void get_evt_wjr(GtkWidget *btn, gpointer idx)
 	((evt_fn)desc[1])(d, base, (int)desc[0] & WB_OPMASK, slot);
 }
 
-static void add_click(void **r, void **pp, GtkWidget *widget, GtkWidget *window)
+static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
 {
-	if (pp[1]) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
-		GTK_SIGNAL_FUNC(get_evt_1), r);
-	// default to destructor
-	else if (window) gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(window));
+	if (pp[1] || destroy) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+		GTK_SIGNAL_FUNC(get_evt_1_d), r);
 }
 
 static void **skip_if(void **pp)
@@ -623,6 +630,7 @@ enum {
 	cm_RPACK,
 	cm_RPACKD,
 	cm_OPT,
+	cm_OPTD,
 	cm_BUTTON
 };
 
@@ -674,6 +682,7 @@ static cmdef cmddefs[] = {
 	{ op_RPACKD, cm_RPACKD, pk_XPACK },
 	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
 	{ op_OPT, cm_OPT, pk_PACKp, USE_BORDER(OPT) },
+	{ op_OPTD, cm_OPTD, pk_PACKp, USE_BORDER(OPT) },
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
 	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
@@ -684,6 +693,8 @@ static cmdef cmddefs[] = {
 // !!! Padding = 5
 	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp, 5 }
 };
+
+static void do_destroy(void **wdata);
 
 /* V-code is really simple-minded; it can do 0-tests but no arithmetics, and
  * naturally, can inline only constants. Everything else must be prepared either
@@ -760,6 +771,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = NULL;
 			*r++ = NULL;
 
+			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
+				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
+
 			gtk_window_set_transient_for(GTK_WINDOW(window), tparent);
 #if GTK_MAJOR_VERSION == 1
 			/* To make Smooth theme engine render sliders properly */
@@ -793,18 +807,37 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WINDOW: case op_WINDOWm:
 			window = add_a_window(GTK_WINDOW_TOPLEVEL, _(v),
 				wpos, op != op_WINDOW);
-			res = bound_malloc(window, dsize);
+		case op_FPICKpm:
+			if (op == op_FPICKpm) window = fpick_create(
+				*(char **)((char *)ddata + (int)pp[1]),
+				*(int *)((char *)ddata + (int)pp[2]));
 
+			res = calloc(1, dsize);
 			memcpy(res, ddata, ddsize); // Copy datastruct
 			ddata = res; // And switch to using it
 			r = res += ld; // Anchor after it
 			*r++ = ddata; // Store struct ref at anchor
 			*r++ = window; // Store window ref right next to it
 			*r++ = pp - 1; // And slot ref after it
+			if (op == op_FPICKpm)
+			{
+				gtk_window_set_modal(GTK_WINDOW(window), TRUE);
+				*--wp = gtk_hbox_new(FALSE, 0);
+				gtk_widget_show(wp[0]);
+				fpick_setup(window, wp[0], GTK_SIGNAL_FUNC(
+					get_evt_1_d), r, NEXT_SLOT(r));
+				/* OK/CANCEL refs */
+				*r++ = res;
+				*r++ = pp + lp - 4;
+				*r++ = res;
+				*r++ = pp + lp - 2;
+				/* Initialize */
+				fpick_set_filename(window, v, FALSE);
+			}
+			else *--wp = add_vbox(window);
 			*r++ = ddata; // Store struct ref for WDIALOG
 			resslot = r; // Remember the location
 			*r++ = noop; // No real descriptor yet
-			*--wp = add_vbox(window);
 			continue;
 		/* Add a notebook page */
 		case op_PAGE:
@@ -971,10 +1004,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add an option menu for field/var */
-		case cm_OPT:
+		case cm_OPT: case cm_OPTD:
 		{
 			char **src = pp[1];
 			int n = (int)pp[2];
+			if (op == cm_OPTD) n = -1 ,
+				src = *(char ***)((char *)ddata + (int)pp[1]);
 			if (!n) n = -1;
 #if U_NLS
 			n = n_trans(tc, src, n);
@@ -1042,7 +1077,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GET_BORDER(BUTTON));
 			gtk_widget_show(ok_bt);
 			/* OK-event */
-			add_click(NEXT_SLOT(r), pp + 2, ok_bt, window);
+			add_click(NEXT_SLOT(r), pp + 2, ok_bt, TRUE);
 			if (pp[1])
 			{
 				cancel_bt = xpack(widget,
@@ -1051,7 +1086,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_CONTAINER(cancel_bt), GET_BORDER(BUTTON));
 				gtk_widget_show(cancel_bt);
 				/* Cancel-event */
-				add_click(SLOT_N(r, 2), pp + 4, cancel_bt, window);
+				add_click(SLOT_N(r, 2), pp + 4, cancel_bt, TRUE);
 			}
 			xpack(widget, ok_bt);
 
@@ -1083,8 +1118,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				delete_to_click(window, widget);
 			}
 			/* Click-event */
-			add_click(NEXT_SLOT(r), pp + 1, widget,
-				op == cm_BUTTON ? NULL : window);
+			add_click(NEXT_SLOT(r), pp + 1, widget, op != cm_BUTTON);
 			break;
 		}
 		/* Add a toggle button to OK-box */
@@ -1136,6 +1170,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_DEFW:
 			gtk_window_set_default_size(GTK_WINDOW(window), (int)v, -1);
 			continue;
+		/* Apply saved size & position to window */
+		case op_WXYWH:
+			win_restore_pos(window, v, 0, 0, (unsigned)v > 0xFFFF ?
+				(unsigned)v >> 16 : -1, (unsigned)v & 0xFFFF ?
+				(unsigned)v & 0xFFFF : -1);
+			widget = window; // ref it with self
+			break;
 		/* Make toplevel window be positioned at mouse */
 		case op_WPMOUSE: wpos = GTK_WIN_POS_MOUSE; continue;
 		/* Make last referrable widget insensitive */
@@ -1188,7 +1229,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		} // fallthrough
 		/* Remember that event needs triggering here */
 		/* Or remember start of a group of widgets */
-		case op_TRIGGER: case op_GROUP:
+		/* Or a cleanup location */
+		case op_TRIGGER: case op_GROUP: case op_CLEANUP:
 			*r++ = res;
 			*r++ = pp - 1;
 			continue;
@@ -1246,17 +1288,34 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Stack this */
 		if (pk & pkf_STACK) --wp;
 		/* Remember events */
-		if (ref > 2) // reserved
+		if (ref > 2)
 		{
 			*r++ = res;
 			*r++ = pp + lp - 4;
 		}
-		if ((ref > 1) && pp[lp - 1]) // optional
+		if (ref > 1)
 		{
 			*r++ = res;
 			*r++ = pp + lp - 2;
 		}
 	}
+}
+
+static void do_destroy(void **wdata)
+{
+	void **pp, *v = NULL;
+	char *data = GET_DDATA(wdata);
+	int op;
+
+	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
+	{
+		op = (int)*pp++;
+		if ((op & WB_OPMASK) != op_CLEANUP) continue;
+		v = pp[0];
+		if (op & WB_FFLAG) v = data + (int)v;
+		free(*(void **)v);
+	}
+	free(data);
 }
 
 static void *do_query(char *data, void **wdata, int mode)
@@ -1267,10 +1326,13 @@ static void *do_query(char *data, void **wdata, int mode)
 	for (; (pp = wdata[1]); wdata += 2)
 	{
 		op = (int)*pp++;
-		v = op & (~0 << 16) ? pp[0] : NULL;
+		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = data + (int)v;
 		switch (op & WB_OPMASK)
 		{
+		case op_FPICKpm:
+			fpick_get_filename(*wdata, v, PATHBUF, FALSE);
+			break;
 		case op_SPIN: case op_XSPIN:
 		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
@@ -1306,6 +1368,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = cpick_get_colour(*wdata, (int *)v + 1);
 			break;
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
+		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
 			break;
 		case op_PATH:
@@ -1364,10 +1427,14 @@ void run_reset(void **wdata, int group)
 				*(int *)v);
 			break;
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
+		case op_OPTD:
 			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
 				*(int *)v);
 			break;
 #if 0 /* Not needed for now */
+		case op_FPICKpm:
+			fpick_set_filename(*wdata, v, FALSE);
+			break;
 		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
 				*(int *)v * 0.01);
@@ -1396,6 +1463,18 @@ void run_reset(void **wdata, int group)
 		}
 #endif
 		}
+	}
+}
+
+void run_locate(void **wdata)
+{
+	void **pp;
+	int op;
+
+	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
+	{
+		op = (int)*pp++;
+		if ((op & WB_OPMASK) == op_WXYWH) win_store_pos(*wdata, pp[0]);
 	}
 }
 
@@ -1434,7 +1513,7 @@ void cmd_set(void **slot, int v)
 	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_OKTOGGLE:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
-	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
+	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
 		gtk_option_menu_set_history(slot[0], v);
 		break;
 	case op_COLORPAD:
@@ -1497,7 +1576,7 @@ void cmd_setlist(void **slot, char *map, int n)
 // !!! Support only what actually used on, and their brethren
 	int op = GET_OP(slot);
 	if ((op == op_OPT) || (op == op_XOPT) || (op == op_TOPT) ||
-		(op == op_TLOPT))
+		(op == op_TLOPT) || (op == op_OPTD))
 	{
 		GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
 			GTK_OPTION_MENU(slot[0])))->children;
@@ -1517,6 +1596,20 @@ void cmd_setlist(void **slot, char *map, int n)
 void *cmd_read(void **slot, void *ddata)
 {
 	return (do_query(ddata, origin_slot(slot), 3));
+}
+
+void cmd_peekv(void **slot, void *res, int size, int idx)
+{
+// !!! Support only what actually used on
+	int op = GET_OP(slot);
+	if (op == op_FPICKpm) fpick_get_filename(slot[0], res, size, idx);
+}
+
+void cmd_setv(void **slot, void *res, int idx)
+{
+// !!! Support only what actually used on
+	int op = GET_OP(slot);
+	if (op == op_FPICKpm) fpick_set_filename(slot[0], res, idx);
 }
 
 void cmd_repaint(void **slot)

@@ -34,7 +34,6 @@
 #include "toolbar.h"
 #include "csel.h"
 #include "font.h"
-#include "cpick.h"
 #include "icons.h"
 #include "vcode.h"
 

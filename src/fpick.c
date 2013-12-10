@@ -1301,15 +1301,15 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
-	GtkSignalFunc cancel_fn)
+void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc handler,
+	gpointer ok_data, gpointer cancel_data)
 {
 	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
 
-	gtk_signal_connect_object(GTK_OBJECT(fpick->ok_button),
-		"clicked", ok_fn, GTK_OBJECT(fp));
-	gtk_signal_connect_object(GTK_OBJECT(fpick->cancel_button),
-		"clicked", cancel_fn, GTK_OBJECT(fp));
+	gtk_signal_connect(GTK_OBJECT(fpick->ok_button),
+		"clicked", handler, ok_data);
+	gtk_signal_connect(GTK_OBJECT(fpick->cancel_button),
+		"clicked", handler, cancel_data);
 	delete_to_click(fpick->window, fpick->cancel_button);
 	pack(fpick->main_vbox, xtra);
 }
@@ -1352,18 +1352,18 @@ GtkWidget *fpick_create(char *title, int flags)
 	return (fp);
 }
 
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc ok_fn,
-	GtkSignalFunc cancel_fn)
+void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc handler,
+	gpointer ok_data, gpointer cancel_data)
 {
 #if GTK_MAJOR_VERSION == 1
 	GtkAccelGroup* ag = gtk_accel_group_new();
 #endif
 
-	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fp)->ok_button),
-		"clicked", ok_fn, GTK_OBJECT(fp));
+	gtk_signal_connect(GTK_OBJECT(GTK_FILE_SELECTION(fp)->ok_button),
+		"clicked", handler, ok_data);
 
-	gtk_signal_connect_object(GTK_OBJECT(GTK_FILE_SELECTION(fp)->cancel_button),
-		"clicked", cancel_fn, GTK_OBJECT(fp));
+	gtk_signal_connect(GTK_OBJECT(GTK_FILE_SELECTION(fp)->cancel_button),
+		"clicked", handler, cancel_data);
 
 	delete_to_click(fp, GTK_FILE_SELECTION(fp)->cancel_button);
 

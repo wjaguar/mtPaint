@@ -844,15 +844,11 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
-	int flag = FPICK_LOAD;
-	GtkWidget *fs;
+	void *xdata[2];
 
-	if ((int)data == FS_SELECT_DIR) flag |= FPICK_DIRS_ONLY;
-
-	fs = fpick_create((char *)gtk_object_get_user_data(GTK_OBJECT(widget)), flag);
-	gtk_object_set_data(GTK_OBJECT(fs), FS_ENTRY_KEY,
-		BOX_CHILD_0(widget->parent));
-	fs_setup(fs, (int)data);
+	xdata[0] = gtk_object_get_user_data(GTK_OBJECT(widget)); // title
+	xdata[1] = BOX_CHILD_0(widget->parent); // GtkEntry
+	file_selector_x((int)data, xdata);
 }
 
 GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)

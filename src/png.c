@@ -7331,7 +7331,7 @@ int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype,
 	progress_end();
 
 	if (ani.miss && (res == 1))
-		warn_miss(ani.miss, ani.cnt, ftype & FTM_FTYPE);
+		warn_miss(ani.miss, ani.cnt, ani.desttype & FTM_FTYPE);
 
 	return (res);
 }

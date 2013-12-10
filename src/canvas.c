@@ -36,7 +36,6 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
-#include "fpick.h"
 #include "vcode.h"
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
@@ -1456,11 +1455,6 @@ static void handle_file_error(int res)
 	if (txt) alert_box(_("Error"), txt, NULL);
 }
 
-static GtkWidget *file_selector_create(int action_type);
-#define FS_XNAME_KEY "mtPaint.fs_xname"
-#define FS_XTYPE_KEY "mtPaint.fs_xtype"
-#define FS_XANIM_KEY "mtPaint.fs_xanim"
-
 int do_a_load(char *fname, int undo)
 {
 	char real_fname[PATHBUF];
@@ -1509,19 +1503,13 @@ loaded:
 		} 
 		else if (i == 1) /* Ask for directory to explode frames to */
 		{
-			GtkWidget *fs = file_selector_create(FS_EXPLODE_FRAMES);
-			if (fs)
-			{
-				/* Needed when starting new mtpaint process later */
-				gtk_object_set_data_full(GTK_OBJECT(fs),
-					FS_XNAME_KEY, g_strdup(real_fname),
-					(GtkDestroyNotify)g_free);
-				gtk_object_set_data(GTK_OBJECT(fs),
-					FS_XTYPE_KEY, (gpointer)ftype);
-				gtk_object_set_data(GTK_OBJECT(fs),
-					FS_XANIM_KEY, (gpointer)is_anim);
-				fs_setup(fs, FS_EXPLODE_FRAMES);
-			}
+			void *xdata[3];
+
+			/* Needed when starting new mtpaint process later */
+			xdata[0] = real_fname;
+			xdata[1] = (void *)ftype;
+			xdata[2] = (void *)is_anim;
+			file_selector_x(FS_EXPLODE_FRAMES, xdata);
 		}
 		else if (i == 2) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
 	}
@@ -1590,40 +1578,48 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 	return (res);
 }
 
-static int selected_file_type(GtkWidget *box)
-{
-	GtkWidget *opt = BOX_CHILD(box, 1);
-	if (!GTK_IS_OPTION_MENU(opt)) return (FT_NONE);
-	return (((int *)gtk_object_get_user_data(GTK_OBJECT(opt)))
-		[wj_option_menu_get_history(opt)]);
-}
-
 #define FORMAT_SPINS 7
-static void change_image_format(GtkMenuItem *menuitem, GtkWidget **ww)
+
+typedef struct {
+	void **lsp[FORMAT_SPINS];
+	char *title, **ftnames;
+	GtkWidget *entry; // !!! used by mt_path_box()
+	char *frames_name;
+	int frames_ftype, frames_anim;
+	int mode, fpmode;
+	int fmask, ftype, ftypes[NUM_FTYPES];
+	int need_save, need_anim, need_undo, need_icc;
+	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
+	int gif_delay, undo, icc;
+	/* Note: filename is in system encoding */
+	char filename[PATHBUF];
+} fselector_dd;
+
+static void change_image_format(fselector_dd *dt, void **wdata, int what,
+	void **where)
 {
 	static int flags[FORMAT_SPINS] = { FF_TRANS, FF_COMPJ, FF_COMPZ,
 		FF_COMPR, FF_COMPJ2, FF_SPOT, FF_SPOT };
 	int i, j, ftype, showhide;
 
-	if (!ww[0]) return; // Paranoia
-	ftype = selected_file_type(ww[0]);
+	if (!dt->need_save) return; // no use
+	cmd_read(where, dt);
+	ftype = dt->ftypes[dt->ftype];
 	/* Hide/show name/value widget pairs */
 	for (i = 0; i < FORMAT_SPINS; i++)
 	{
 		j = flags[i] & FF_COMP ? FF_COMP : flags[i];
 		showhide = (file_formats[ftype].flags & j) == flags[i];
-		widget_showhide(ww[i * 2 + 1], showhide);
-		widget_showhide(ww[i * 2 + 2], showhide);
+		cmd_showhide(dt->lsp[i], showhide);
+		cmd_showhide(NEXT_SLOT(dt->lsp[i]), showhide);
 	}
 }
 
-static GtkWidget *ftype_selector(int mask, char *ext, int def,
-	GtkSignalFunc handler, gpointer data)
+// !!! GCC inlining this, is a waste of space
+int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
 {
-	GtkWidget *opt;
 	fformat *ff;
-	char *names[NUM_FTYPES];
-	int i, j, k, l, *ftmap, ft_sort[NUM_FTYPES], ft_key[NUM_FTYPES];
+	int i, j, k, l, ft_sort[NUM_FTYPES], ft_key[NUM_FTYPES];
 
 	for (i = k = 0; i < NUM_FTYPES; i++)	// Populate sorted filetype list
 	{
@@ -1652,135 +1648,13 @@ static GtkWidget *ftype_selector(int mask, char *ext, int def,
 		names[l] = ff->name;
 	}
 
-	opt = wj_option_menu(names, k, j, data, handler);
-	ftmap = bound_malloc(opt, sizeof(int) * k);
-	memcpy(ftmap, ft_sort, sizeof(int) * k);
-	gtk_object_set_user_data(GTK_OBJECT(opt), (gpointer)ftmap);
-
-	return (opt);
+	names[k] = NULL;
+	memcpy(ftypes, ft_sort, sizeof(int) * k);
+	return (j);
 }
 
-static void image_widgets(GtkWidget *box, char *name, int mode)
+void init_ls_settings(ls_settings *settings, void **wdata)
 {
-	char *spinnames[FORMAT_SPINS] = {
-		_("Transparency index"), _("JPEG Save Quality (100=High)"),
-		_("PNG Compression (0=None)"), _("TGA RLE Compression"),
-		_("JPEG2000 Compression (0=Lossless)"),
-		_("Hotspot at X ="), _("Y =") };
-	int spindata[FORMAT_SPINS][3] = {
-		{mem_xpm_trans, -1, mem_cols - 1}, {jpeg_quality, 0, 100},
-		{png_compression, 0, 9}, {tga_RLE, 0, 1},
-		{jp2_rate, 0, 100},
-		{mem_xbm_hot_x, -1, mem_width - 1}, {mem_xbm_hot_y, -1, mem_height - 1} };
-	GtkWidget **ww;
-	int i, mask = FF_256;
-	char *ext = strrchr(name, '.');
-
-	ext = ext ? ext + 1 : "";
-	switch (mode)
-	{
-	default: return;
-	case FS_CHANNEL_SAVE: if (mem_channel != CHN_IMAGE) break;
-	case FS_PNG_SAVE: mask = FF_SAVE_MASK;
-		break;
-	case FS_COMPOSITE_SAVE: mask = FF_RGB;
-	}
-
-	ww = bound_malloc(box, sizeof(*ww) * (FORMAT_SPINS * 2 + 1));
-	pack5(box, gtk_label_new(_("File Format")));
-	pack5(box, ftype_selector(mask, ext, FT_PNG,
-		GTK_SIGNAL_FUNC(change_image_format), (gpointer)ww));
-	/* Create controls (!!! two widgets per value - hardcoded for now) */
-	for (i = 0; i < FORMAT_SPINS; i++)
-	{
-		pack5(box, ww[i * 2 + 1] = gtk_label_new(spinnames[i]));
-		pack5(box, ww[i * 2 + 2] = add_a_spin(spindata[i][0],
-			spindata[i][1], spindata[i][2]));
-	}
-	ww[0] = box;
-	gtk_widget_show_all(box);
-
-	change_image_format(NULL, ww);
-}
-
-static void ftype_widgets(GtkWidget *box, char *name, int mode)
-{
-	int mask = FF_IMAGE, def = FT_PNG;
-	char *ext = strrchr(name, '.');
-
-	if (mode == FS_PALETTE_SAVE) mask = FF_PALETTE , def = FT_GPL;
-	ext = mode == FS_EXPLODE_FRAMES ? name : ext ? ext + 1 : "";
-
-	pack5(box, gtk_label_new(_("File Format")));
-	pack5(box, ftype_selector(mask, ext, def, NULL, NULL));
-	gtk_widget_show_all(box);
-}
-
-static void loader_widgets(GtkWidget *box, char *name, int mode)
-{
-#ifdef U_LCMS
-	GtkWidget *undo, *icc;
-
-	undo = add_a_toggle(_("Undoable"), box, undo_load);
-	icc = add_a_toggle(_("Apply colour profile"), box, apply_icc);
-	gtk_widget_show_all(box);
-	if (mode == FS_PNG_LOAD) return;
-	/* Hide unapplicable controls for FS_CHANNEL_LOAD */
-	gtk_widget_hide(undo);
-	if (MEM_BPP != 3) gtk_widget_hide(icc);
-#else /* No CMS support */
-	if (mode != FS_PNG_LOAD) return;
-	add_a_toggle(_("Undoable"), box, undo_load);
-	gtk_widget_show_all(box);
-#endif
-}
-
-/* Note: "name" is in system encoding */
-static GtkWidget *ls_settings_box(GtkWidget *fs, char *name, int mode)
-{
-	GtkWidget *box;
-	int ftype;
-
-	box = gtk_hbox_new(FALSE, 0);
-	gtk_object_set_user_data(GTK_OBJECT(box), (gpointer)mode);
-
-	switch (mode) /* Only save operations need settings */
-	{
-	case FS_PNG_SAVE:
-	case FS_CHANNEL_SAVE:
-	case FS_COMPOSITE_SAVE:
-		image_widgets(box, name, mode);
-		break;
-	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
-		break;
-	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
-		pack5(box, gtk_label_new(_("Animation delay")));
-		pack5(box, add_a_spin(preserved_gif_delay, 1, MAX_DELAY));
-		gtk_widget_show_all(box);
-		break;
-	case FS_EXPLODE_FRAMES:
-		ftype = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
-		ftype_widgets(box, file_formats[ftype].ext, mode);
-		break;
-	case FS_EXPORT_UNDO:
-	case FS_EXPORT_UNDO2:
-	case FS_PALETTE_SAVE:
-		ftype_widgets(box, name, mode);
-		break;
-	case FS_CHANNEL_LOAD:
-	case FS_PNG_LOAD:
-		loader_widgets(box, name, mode);
-		break;
-	default: /* Give a hidden empty box */
-		break;
-	}
-	return (box);
-}
-
-void init_ls_settings(ls_settings *settings, GtkWidget *box)
-{
-	int xmode;
-
 	/* Set defaults */
 	memset(settings, 0, sizeof(ls_settings));
 	settings->ftype = FT_NONE;
@@ -1795,48 +1669,27 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
-	if (box)
+	if (wdata)
 	{
-		xmode = (int)gtk_object_get_user_data(GTK_OBJECT(box));
-		settings->mode = xmode;
-		switch (xmode)
-		{
-		case FS_PNG_SAVE:
-		case FS_CHANNEL_SAVE:
-		case FS_COMPOSITE_SAVE:
-			settings->ftype = selected_file_type(box);
-			settings->xpm_trans = read_spin(BOX_CHILD(box, 3));
-			settings->jpeg_quality = read_spin(BOX_CHILD(box, 5));
-			settings->png_compression = read_spin(BOX_CHILD(box, 7));
-			settings->tga_RLE = read_spin(BOX_CHILD(box, 9));
-			settings->jp2_rate = read_spin(BOX_CHILD(box, 11));
-			settings->hot_x = read_spin(BOX_CHILD(box, 13));
-			settings->hot_y = read_spin(BOX_CHILD(box, 15));
-			break;
-		case FS_LAYER_SAVE: /* Nothing to do yet */
-			break;
-		case FS_EXPORT_GIF: /* Hardcoded GIF format for now */
-			settings->ftype = FT_GIF;
-			settings->gif_delay = read_spin(BOX_CHILD(box, 1));
-			break;
-		case FS_EXPLODE_FRAMES:
-		case FS_EXPORT_UNDO:
-		case FS_EXPORT_UNDO2:
-		case FS_PALETTE_SAVE:
-			settings->ftype = selected_file_type(box);
-			break;
-		case FS_PNG_LOAD:
-			undo_load = gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(BOX_CHILD_0(box)));
+		fselector_dd *dt = GET_DDATA(wdata);
+		settings->xpm_trans = dt->xtrans[0];
+		settings->hot_x = dt->xx[0];
+		settings->hot_y = dt->xy[0];
+		settings->jpeg_quality = dt->jpeg_c;
+		settings->png_compression = dt->png_c;
+		settings->tga_RLE = dt->tga_c;
+		settings->jp2_rate = dt->jp2_c;
+		settings->gif_delay = dt->gif_delay;
+
+		settings->mode = dt->mode;
+		settings->ftype = dt->fmask ? dt->ftypes[dt->ftype] :
+			/* For animation, hardcoded GIF format for now */
+			dt->mode == FS_EXPORT_GIF ? FT_GIF : FT_NONE;
+
+		undo_load = dt->undo;
 #ifdef U_LCMS
-		case FS_CHANNEL_LOAD:
-			apply_icc = gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(BOX_CHILD_1(box)));
+		apply_icc = dt->icc;
 #endif
-			break;
-		default: /* Use defaults */
-			break;
-		}
 	}
 
 	/* Default expansion of xpm_trans */
@@ -1846,7 +1699,7 @@ void init_ls_settings(ls_settings *settings, GtkWidget *box)
 
 static void store_ls_settings(ls_settings *settings)
 {
-	guint32 fflags = file_formats[settings->ftype].flags;
+	unsigned int fflags = file_formats[settings->ftype].flags;
 
 	switch (settings->mode)
 	{
@@ -1876,33 +1729,29 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static void fs_destroy(GtkWidget *fs)
-{
-	win_store_pos(fs, "fs_window");
-	destroy_dialog(fs);
-}
-
-static void fs_ok(GtkWidget *fs)
+static void fs_event(fselector_dd *dt, void **wdata, int what)
 {
 	ls_settings settings;
-	GtkWidget *xtra, *entry;
 	char fname[PATHTXT], *msg, *f8;
 	char *c, *ext, *ext2, *gif, *gif2;
 	int i, j, res;
 
+	run_locate(wdata); /* Save the location */
+	if (what == op_EVT_CANCEL) goto done;
+
+	run_query(wdata);
 	/* Pick up extra info */
-	xtra = GTK_WIDGET(gtk_object_get_user_data(GTK_OBJECT(fs)));
-	init_ls_settings(&settings, xtra);
+	init_ls_settings(&settings, wdata);
 
 	/* Needed to show progress in Windows GTK+2 */
-	gtk_window_set_modal(GTK_WINDOW(fs), FALSE);
+// !!! Disable for now, see what happens
+//	gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), FALSE);
 
 	/* Looks better if no dialog under progressbar */
-	win_store_pos(fs, "fs_window"); /* Save the location */
-	gtk_widget_hide(fs);
+	cmd_showhide(GET_WINDOW(wdata), FALSE);
 
 	/* File extension */
-	fpick_get_filename(fs, fname, PATHTXT, TRUE);
+	cmd_peekv(GET_WINDOW(wdata), fname, PATHTXT, FPICK_RAW); // raw filename
 	c = strrchr(fname, '.');
 	while (TRUE)
 	{
@@ -1946,84 +1795,83 @@ static void fs_ok(GtkWidget *fs)
 			fname[i] = '.';
 			strncpy(fname + i + 1, ext, j + 1);
 		}
-		fpick_set_filename(fs, fname, TRUE);
+		cmd_setv(GET_WINDOW(wdata), fname, FPICK_RAW); // raw filename
 		break;
 	}
 
 	/* Get filename the proper way, in system filename encoding */
-	fpick_get_filename(fs, fname, PATHBUF, FALSE);
+	cmd_read(GET_WINDOW(wdata), dt);
 
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD:
-		if (do_a_load(fname, undo_load) == 1) goto redo;
+		if (do_a_load(dt->filename, undo_load) == 1) goto redo;
 		break;
 	case FS_PNG_SAVE:
-		if (check_file(fname)) goto redo;
+		if (check_file(dt->filename)) goto redo;
 		store_ls_settings(&settings);	// Update data in memory
-		if (gui_save(fname, &settings) < 0) goto redo;
+		if (gui_save(dt->filename, &settings) < 0) goto redo;
 		if (layers_total > 0)
 		{
 			/* Filename has changed so layers file needs re-saving to be correct */
-			if (!mem_filename || strcmp(fname, mem_filename))
+			if (!mem_filename || strcmp(dt->filename, mem_filename))
 				layers_notify_changed();
 		}
-		set_new_filename(layer_selected, fname);
+		set_new_filename(layer_selected, dt->filename);
 		break;
 	case FS_PALETTE_LOAD:
-		if (load_pal(fname)) goto redo;
+		if (load_pal(dt->filename)) goto redo;
 		notify_changed();
 		break;
 	case FS_PALETTE_SAVE:
-		if (check_file(fname)) goto redo;
+		if (check_file(dt->filename)) goto redo;
 		settings.pal = mem_pal;
 		settings.colors = mem_cols;
-		if (save_image(fname, &settings)) goto redo_name;
+		if (save_image(dt->filename, &settings)) goto redo_name;
 		break;
 	case FS_CLIP_FILE:
 	case FS_SELECT_FILE:
 	case FS_SELECT_DIR:
-		entry = gtk_object_get_data(GTK_OBJECT(fs), FS_ENTRY_KEY);
-		if (entry)
+		if (dt->entry)
 		{
-			f8 = gtkuncpy(NULL, fname, 0);
-			gtk_entry_set_text(GTK_ENTRY(entry), f8);
+			f8 = gtkuncpy(NULL, dt->filename, 0);
+			gtk_entry_set_text(GTK_ENTRY(dt->entry), f8);
 			g_free(f8);
 		}
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
-		if (export_undo(fname, &settings))
+		if (export_undo(dt->filename, &settings))
 			alert_box(_("Error"), _("Unable to export undo images"), NULL);
 		break;
 	case FS_EXPORT_ASCII:
-		if (check_file(fname)) goto redo;
-		if (export_ascii(fname))
+		if (check_file(dt->filename)) goto redo;
+		if (export_ascii(dt->filename))
 			alert_box(_("Error"), _("Unable to export ASCII file"), NULL);
 		break;
 	case FS_LAYER_SAVE:
-		if (check_file(fname)) goto redo;
-		if (save_layers(fname) != 1) goto redo;
+		if (check_file(dt->filename)) goto redo;
+		if (save_layers(dt->filename) != 1) goto redo;
 		break;
 	case FS_EXPLODE_FRAMES:
-		gif = gtk_object_get_data(GTK_OBJECT(fs), FS_XNAME_KEY);
-		res = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XTYPE_KEY);
-		i = (int)gtk_object_get_data(GTK_OBJECT(fs), FS_XANIM_KEY);
-		res = explode_frames(fname, i, gif, res, settings.ftype);
+		gif = dt->frames_name;
+		res = dt->frames_ftype;
+		i = dt->frames_anim;
+		res = explode_frames(dt->filename, i, gif, res, settings.ftype);
 		if (res != 1) handle_file_error(res);
 		if (res > 0) // Success or nonfatal error
 		{
 			c = strrchr(gif, DIR_SEP);
 			if (!c) c = gif;
 			else c++;
-			c = file_in_dir(NULL, fname, c, PATHBUF);
+			c = file_in_dir(NULL, dt->filename, c, PATHBUF);
 			run_def_action(DA_GIF_EDIT, c, NULL, preserved_gif_delay);
 			free(c);
 		}
 		else goto redo; // Fatal error
 		break;
 	case FS_EXPORT_GIF:
-		if (check_file(fname)) goto redo;
+		if (check_file(dt->filename)) goto redo;
 		store_ls_settings(&settings);	// Update data in memory
 		gif2 = g_strdup(mem_filename);	// Guaranteed to be non-NULL
 		for (i = strlen(gif2) - 1; i >= 0; i--)
@@ -2031,15 +1879,15 @@ static void fs_ok(GtkWidget *fs)
 			if (gif2[i] == DIR_SEP) break;
 			if ((unsigned char)(gif2[i] - '0') <= 9) gif2[i] = '?';
 		}
-		run_def_action(DA_GIF_CREATE, gif2, fname, settings.gif_delay);
-		run_def_action(DA_GIF_PLAY, fname, NULL, 0);
+		run_def_action(DA_GIF_CREATE, gif2, dt->filename, settings.gif_delay);
+		run_def_action(DA_GIF_PLAY, dt->filename, NULL, 0);
 		g_free(gif2);
 		break;
 	case FS_CHANNEL_LOAD:
-		if (populate_channel(fname)) goto redo;
+		if (populate_channel(dt->filename)) goto redo;
 		break;
 	case FS_CHANNEL_SAVE:
-		if (check_file(fname)) goto redo;
+		if (check_file(dt->filename)) goto redo;
 		settings.img[CHN_IMAGE] = mem_img[mem_channel];
 		settings.width = mem_width;
 		settings.height = mem_height;
@@ -2056,132 +1904,235 @@ static void fs_ok(GtkWidget *fs)
 			settings.colors = 256;
 			settings.xpm_trans = -1;
 		}
-		if (save_image(fname, &settings)) goto redo_name;
+		if (save_image(dt->filename, &settings)) goto redo_name;
 		break;
 	case FS_COMPOSITE_SAVE:
-		if (check_file(fname)) goto redo;
-		if (layer_save_composite(fname, &settings)) goto redo_name;
+		if (check_file(dt->filename)) goto redo;
+		if (layer_save_composite(dt->filename, &settings)) goto redo_name;
 		break;
 	}
 
 	update_menus();
-	destroy_dialog(fs);
+done:	run_destroy(wdata);
 	return;
 redo_name:
-	f8 = gtkuncpy(NULL, fname, 0);
+	f8 = gtkuncpy(NULL, dt->filename, 0);
 	msg = g_strdup_printf(_("Unable to save file: %s"), f8);
 	alert_box(_("Error"), msg, NULL);
 	g_free(msg);
 	g_free(f8);
 redo:
-	gtk_widget_show(fs);
-	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
+	cmd_showhide(GET_WINDOW(wdata), TRUE);
+// !!! Disable for now, see what happens
+//	gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), TRUE);
 }
 
-void fs_setup(GtkWidget *fs, int action_type)
+#undef _
+#define _(X) X
+
+#define WBbase fselector_dd
+static void *fselector_code[] = {
+	FPICKpm(title, fpmode, filename, fs_event, fs_event),
+	IFx(fmask, 1),
+		MLABEL(_("File Format")),
+		OPTDe(ftnames, ftype, change_image_format), TRIGGER,
+	ENDIF(1),
+	IFx(need_save, 1),
+		REF(lsp[0]), MLABELr(_("Transparency index")), SPINa(xtrans),
+		REF(lsp[1]), MLABELr(_("JPEG Save Quality (100=High)")),
+			SPIN(jpeg_c, 0, 100),
+		REF(lsp[2]), MLABELr(_("PNG Compression (0=None)")),
+			SPIN(png_c, 0, 9),
+		REF(lsp[3]), MLABELr(_("TGA RLE Compression")),
+			SPIN(tga_c, 0, 1),
+		REF(lsp[4]), MLABELr(_("JPEG2000 Compression (0=Lossless)")),
+			SPIN(jp2_c, 0, 100),
+		REF(lsp[5]), MLABELr(_("Hotspot at X =")), SPINa(xx),
+		REF(lsp[6]), MLABELr(_("Y =")), SPINa(xy),
+	ENDIF(1),
+	IFx(need_anim, 1),
+		MLABEL(_("Animation delay")),
+		SPIN(gif_delay, 1, MAX_DELAY),
+	ENDIF(1),
+	IF(need_undo), CHECK(_("Undoable"), undo),
+#ifdef U_LCMS
+	IF(need_icc), CHECK(_("Apply colour profile"), icc),
+#endif
+	WDONE,
+	WXYWH("fs_window", 550, 500),
+	CLEANUP(frames_name),
+	RAISED, WSHOW
+};
+#undef WBbase
+
+void file_selector_x(int action_type, void **xdata)
 {
-	char txt[PATHBUF];
-	GtkWidget *xtra;
+	fselector_dd tdata;
+	char *names[NUM_FTYPES + 1], *ext = NULL;
+	int def = FT_PNG;
 
 
-	/* If we have a filename and saving */
-	if ((action_type == FS_PNG_SAVE) && mem_filename)
-		strncpy(txt, mem_filename, PATHBUF);
-	else if ((action_type == FS_LAYER_SAVE) && layers_filename[0])
-		strncpy(txt, layers_filename, PATHBUF);
-	else /* Default */
-	{
-		file_in_dir(txt, inifile_get("last_dir", get_home_directory()),
-			action_type == FS_LAYER_SAVE ? "layers.txt" : "", PATHBUF);
-	}
-
-	gtk_window_set_modal(GTK_WINDOW(fs), TRUE);
-	win_restore_pos(fs, "fs_window", 0, 0, 550, 500);
-
-	xtra = ls_settings_box(fs, txt, action_type);
-	gtk_object_set_user_data(GTK_OBJECT(fs), xtra);
-	fpick_setup(fs, xtra, GTK_SIGNAL_FUNC(fs_ok), GTK_SIGNAL_FUNC(fs_destroy));
-	fpick_set_filename(fs, txt, FALSE);
-
-	gtk_widget_show(fs);
-	gtk_window_set_transient_for(GTK_WINDOW(fs), GTK_WINDOW(main_window));
-	gdk_window_raise(fs->window);	// Needed to ensure window is at the top
-}
-
-static GtkWidget *file_selector_create(int action_type)
-{
-	char *title = NULL;
-	int fpick_flags = FPICK_ENTRY;
-
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.mode = action_type;
+	tdata.fpmode = FPICK_ENTRY;
 	switch (action_type)
 	{
 	case FS_PNG_LOAD:
 		if ((layers_total ? check_layers_for_changes() :
-			check_for_changes()) == 1) return (NULL);
-		title = _("Load Image File");
-		fpick_flags = FPICK_LOAD;
+			check_for_changes()) == 1) return;
+		tdata.title = _("Load Image File");
+		tdata.fpmode = FPICK_LOAD;
+		tdata.need_undo = TRUE;
+#ifdef U_LCMS
+		tdata.need_icc = TRUE;
+#endif
 		break;
 	case FS_PNG_SAVE:
-		title = _("Save Image File");
+		tdata.fmask = FF_SAVE_MASK;
+		tdata.title = _("Save Image File");
+		if (mem_filename) strncpy(tdata.filename, mem_filename, PATHBUF);
+		tdata.need_save = TRUE;
 		break;
 	case FS_PALETTE_LOAD:
-		title = _("Load Palette File");
-		fpick_flags = FPICK_LOAD;
+		tdata.title = _("Load Palette File");
+		tdata.fpmode = FPICK_LOAD;
 		break;
 	case FS_PALETTE_SAVE:
-		title = _("Save Palette File");
+		tdata.fmask = FF_PALETTE;
+		def = FT_GPL;
+		tdata.title = _("Save Palette File");
 		break;
 	case FS_EXPORT_UNDO:
-		if (!mem_undo_done) return (NULL);
-		title = _("Export Undo Images");
+		if (!mem_undo_done) return;
+		tdata.fmask = FF_IMAGE;
+		tdata.title = _("Export Undo Images");
 		break;
 	case FS_EXPORT_UNDO2:
-		if (!mem_undo_done) return (NULL);
-		title = _("Export Undo Images (reversed)");
+		if (!mem_undo_done) return;
+		tdata.fmask = FF_IMAGE;
+		tdata.title = _("Export Undo Images (reversed)");
 		break;
 	case FS_EXPORT_ASCII:
 		if (mem_cols > 16)
 		{
+#undef _
+#define _(X) __(X)
 			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."), NULL);
-			return (NULL);
+			return;
+#undef _
+#define _(X) X
 		}
-		title = _("Export ASCII Art");
+		tdata.title = _("Export ASCII Art");
 		break;
-	case FS_LAYER_SAVE:
-		if (check_layers_all_saved()) return (NULL);
-		title = _("Save Layer Files");
+	case FS_LAYER_SAVE: /* !!! No selectable layer file format yet */
+		if (check_layers_all_saved()) return;
+		tdata.title = _("Save Layer Files");
+		strncpy(tdata.filename, layers_filename, PATHBUF);
 		break;
 	case FS_EXPLODE_FRAMES:
-		title = _("Choose frames directory");
-		fpick_flags = FPICK_DIRS_ONLY;
+		tdata.frames_name = strdup(xdata[0]);
+		tdata.frames_ftype = (int)xdata[1];
+		tdata.frames_anim = (int)xdata[2];
+
+		ext = file_formats[tdata.frames_ftype].ext;
+		tdata.fmask = FF_IMAGE;
+		tdata.title = _("Choose frames directory");
+		tdata.fpmode = FPICK_DIRS_ONLY;
 		break;
-	case FS_EXPORT_GIF:
+	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
 		if (!mem_filename)
 		{
+#undef _
+#define _(X) __(X)
 			alert_box(_("Error"), _("You must save at least one frame to create an animated GIF."), NULL);
-			return (NULL);
+			return;
+#undef _
+#define _(X) X
 		}
-		title = _("Export GIF animation");
+		tdata.title = _("Export GIF animation");
+		tdata.need_anim = TRUE;
 		break;
 	case FS_CHANNEL_LOAD:
-		title = _("Load Channel");
-		fpick_flags = FPICK_LOAD;
+		tdata.title = _("Load Channel");
+		tdata.fpmode = FPICK_LOAD;
+#ifdef U_LCMS
+		tdata.need_icc = MEM_BPP == 3;
+#endif
 		break;
 	case FS_CHANNEL_SAVE:
-		title = _("Save Channel");
+		tdata.fmask = mem_channel != CHN_IMAGE ? FF_256 : FF_SAVE_MASK;
+		tdata.title = _("Save Channel");
+		tdata.need_save = TRUE;
 		break;
 	case FS_COMPOSITE_SAVE:
-		title = _("Save Composite Image");
+		tdata.fmask = FF_RGB;
+		tdata.title = _("Save Composite Image");
+		tdata.need_save = TRUE;
 		break;
+	case FS_CLIP_FILE:
+	case FS_SELECT_FILE:
+	case FS_SELECT_DIR:
+		tdata.fpmode = action_type == FS_SELECT_DIR ?
+			FPICK_LOAD | FPICK_DIRS_ONLY : FPICK_LOAD;
+		tdata.title = xdata[0];
+		tdata.entry = xdata[1]; // !!! entry widget
+		break;
+	default: /*
+	FS_LAYER_LOAD,
+	FS_PATTERN_LOAD,
+	FS_CLIPBOARD,
+	FS_PALETTE_DEF */
+		return;	/* These are not for here */
 	}
 
-	return (fpick_create(title, fpick_flags));
+	/* Default filename */
+	if (!tdata.filename[0]) file_in_dir(tdata.filename,
+		inifile_get("last_dir", get_home_directory()),
+		action_type == FS_LAYER_SAVE ? "layers.txt" : "", PATHBUF);
+	if (!ext)
+	{
+		ext = strrchr(tdata.filename, '.');
+		ext = ext ? ext + 1 : "";
+	}
+
+	/* Filetype selector */
+	if (tdata.fmask)
+	{
+		tdata.ftype = ftype_selector(tdata.fmask, ext, def,
+			names, tdata.ftypes);
+		tdata.ftnames = names;
+	}
+
+	tdata.xtrans[0] = mem_xpm_trans;
+	tdata.xtrans[1] = -1;
+	tdata.xtrans[2] = mem_cols - 1;
+	tdata.xx[0] = mem_xbm_hot_x;
+	tdata.xx[1] = -1;
+	tdata.xx[2] = mem_width - 1;
+	tdata.xy[0] = mem_xbm_hot_y;
+	tdata.xy[1] = -1;
+	tdata.xy[2] = mem_height - 1;
+
+	tdata.jpeg_c = jpeg_quality;
+	tdata.png_c = png_compression;
+	tdata.tga_c = tga_RLE;
+	tdata.jp2_c = jp2_rate;
+
+	tdata.gif_delay = preserved_gif_delay;
+	tdata.undo = undo_load;
+#ifdef U_LCMS
+	tdata.icc = apply_icc;
+#endif
+
+	run_create(fselector_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 void file_selector(int action_type)
 {
-	GtkWidget *fs = file_selector_create(action_type);
-	if (fs) fs_setup(fs, action_type);
+	file_selector_x(action_type, NULL);
 }
 
 void canvas_center(float ic[2])		// Center of viewable area
