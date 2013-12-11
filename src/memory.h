@@ -471,6 +471,13 @@ static inline int floor_div(int dd, int dr)
 	return (dd / dr - (dd % dr < 0)); // optimizes to perfection on x86
 }
 
+/// Ceiling integer division
+
+static inline int ceil_div(int dd, int dr)
+{
+	return (dd / dr + (dd % dr > 0));
+}
+
 /// Table-based translation
 
 static inline void do_xlate(unsigned char *xlat, unsigned char *data, int len)

@@ -5211,52 +5211,56 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 {
 	fstep *res, *buf;
 	__typeof__(*res->k) *kp;
-	double x, y, basept, fwidth, delta, scale = (double)l1 / (double)l0;
+	double x, y, basept, scale;
 	double A = 0.0, kk = 1.0, sum;
-	int i, j, k, ix, j0, k0 = 0;
+	int i, j, k, ix, j0, fwidth, delta, k0 = 0;
 
-
-	/* To correct scale-shift */
-	delta = 0.5 / scale - 0.5;
 
 	/* Untransformed bilinear is useless for reduction */
 	if (type == 1) sharp = TRUE;
 
 	/* 1:1 transform is special */
-	if (scale == 1.0) type = 0;
-
-	if (scale < 1.0) kk = scale;
-	else sharp = FALSE;
+	if (l1 == l0) type = 0;
 
 	switch (type)
 	{
-	case 1:	fwidth = 2.0; /* Bilinear / Area-mapping */
+	case 1:	fwidth = 2; /* Bilinear / Area-mapping */
 		break;
 	case 2:	case 3: case 4: case 5:	/* Bicubic, all flavors */
-		fwidth = 4.0;
+		fwidth = 4;
 		A = Aarray[type - 2];
 		break;
-	case 6:	fwidth = 6.0; /* Blackman-Harris windowed sinc */
+	case 6:	fwidth = 6; /* Blackman-Harris windowed sinc */
 		break;
 	default: /* 1:1 */
-		fwidth = 0.0;
+		fwidth = 0;
 		break;
 	}
-	if (sharp) fwidth += scale - 1.0;
-	fwidth /= kk;
+	type *= 2;
+
+	scale = (double)l1 / (double)l0;
+	/* !!! fwidth is rational (l1 denominator) to prevent rounding errors */
+	if (l1 < l0)
+	{
+		kk = scale;
+		fwidth *= l0;
+		if (sharp) fwidth += l1 - l0 , type++;
+	}
+	else fwidth *= l1;
 
 	buf = multialloc(MA_ALIGN_DOUBLE, &res, (l1 + 2) * sizeof(*res),
-		&kp, l1 * ((int)floor(fwidth) + 1) * sizeof(*res->k), NULL);
+		&kp, (fwidth + l1) * sizeof(*res->k), NULL);
 	if (!buf) return (NULL);
 	res = buf; /* No need to double-align the index array */
 
-	fwidth *= 0.5;
-	type = type * 2 + !!sharp;
-	for (i = 0; i < l1; i++ , buf++)
+	/* To correct scale-shift */
+	delta = l0 - l1;	// 2*l1 denominator
+
+	for (i = l1 , l1 *= 2; i > 0; i-- , buf++ , delta += l0 * 2)
 	{
-		basept = (double)i / scale + delta;
-		j = j0 = (int)ceil(basept - fwidth);
-		k = k0 = (int)floor(basept + fwidth) + 1;
+		basept = delta / (double)l1;
+		j = j0 = ceil_div(delta - fwidth, l1);
+		k = k0 = (delta + fwidth) / l1 + 1;
 		if (j0 < 0) j0 = 0;
 		if (k0 > l0) k0 = l0;
 		/* If filter doesn't cover source from end to end, tiling will

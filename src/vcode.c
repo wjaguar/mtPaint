@@ -93,6 +93,12 @@ static void get_evt_1(GtkObject *widget, gpointer user_data)
 	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
 }
 
+static void get_evt_1_t(GtkObject *widget, gpointer user_data)
+{
+	if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+		get_evt_1(widget, user_data);
+}
+
 static void get_evt_1_d(GtkObject *widget, gpointer user_data)
 {
 	void **slot = user_data;
@@ -100,27 +106,6 @@ static void get_evt_1_d(GtkObject *widget, gpointer user_data)
 
 	if (!desc[1]) destroy_dialog(GET_REAL_WINDOW(base));
 	else ((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
-}
-
-/* Handler for wj_radio_pack() */
-static void get_evt_wjr(GtkWidget *btn, gpointer idx)
-{
-	void **slot, **base, **desc, **orig, *v;
-	char *d;
-
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	slot = gtk_object_get_user_data(GTK_OBJECT(btn->parent));
-	base = slot[0];
-	d = GET_DDATA(base);
-	/* Update the value */
-	orig = origin_slot(slot);
-	desc = orig[1];
-	v = desc[1];
-	if ((int)desc[0] & WB_FFLAG) v = d + (int)v;
-	*(int *)v = (int)idx;
-	/* Call the handler */
-	desc = slot[1];
-	((evt_fn)desc[1])(d, base, (int)desc[0] & WB_OPMASK, slot);
 }
 
 static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
@@ -985,7 +970,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(int)pp[1]), NULL, NULL);
 			pk = pk_PACK;
 			break;
-		/* Add a (self-reading) pack of radio buttons for field/var */
+		/* Add a pack of radio buttons for field/var */
 		case cm_RPACK: case cm_RPACKD:
 		{
 			char **src = pp[1];
@@ -999,8 +984,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			src = tc;
 #endif
 			widget = wj_radio_pack(src, n, nh & 255, *(int *)v,
-				ref > 1 ? NEXT_SLOT(r) : v, // self-update by default
-				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_wjr) : NULL);
+				ref > 1 ? NEXT_SLOT(r) : NULL,
+				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1_t) : NULL);
 			break;
 		}
 		/* Add an option menu for field/var */
@@ -1357,7 +1342,6 @@ static void *do_query(char *data, void **wdata, int mode)
 			inifile_set_gboolean(v, gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata)));
 			break;
-		case op_RPACK: case op_RPACKD: case op_FRPACK:
 		case op_COLORLIST: case op_COLORLISTN:
 		case op_COLORPAD: case op_GRADBAR:
 			break; // self-reading
@@ -1366,6 +1350,9 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_TCOLOR:
 			*(int *)v = cpick_get_colour(*wdata, (int *)v + 1);
+			break;
+		case op_RPACK: case op_RPACKD: case op_FRPACK:
+			*(int *)v = wj_radio_pack_get_active(*wdata);
 			break;
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
 		case op_OPTD:

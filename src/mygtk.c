@@ -103,11 +103,11 @@ GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int s
 	return (add_to_table_l(text, table, row, column, 1, spacing));
 }
 
-GtkWidget *to_table(GtkWidget *widget, GtkWidget *table, int row, int column, int spacing)
+GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
+	int expand, int spacing)
 {
 	gtk_table_attach(GTK_TABLE(table), widget, column, column + 1, row, row + 1,
-		(GtkAttachOptions)(GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, spacing);
+		expand ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, spacing);
 	return (widget);
 }
 
@@ -358,46 +358,54 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 // Managing batches of radio buttons with minimum of fuss
 
-static void wj_radio_toggle(GtkWidget *btn, gpointer idx)
+static void wj_radio_toggle(GtkWidget *btn, gpointer user_data)
 {
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	*(int *)gtk_object_get_user_data(GTK_OBJECT(btn->parent)) = (int)idx;
+	*(int *)user_data = (int)gtk_object_get_user_data(GTK_OBJECT(btn));
 }
 
 /* void handler(GtkWidget *btn, gpointer user_data); */
 GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 	GtkSignalFunc handler)
 {
-	int i, j;
-	GtkWidget *box, *wbox, *button = NULL;
+	int i, j, x;
+	GtkWidget *table, *button = NULL;
 	GtkSignalFunc hdl = handler;
 
 	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_radio_toggle);
-	box = wbox = vnum > 0 ? gtk_hbox_new(FALSE, 0) : gtk_vbox_new(FALSE, 0);
-	if (vnum < 2) gtk_object_set_user_data(GTK_OBJECT(wbox), var);
+	table = gtk_table_new(1, 1, FALSE);
 
-	for (i = j = 0; (i != cnt) && names[i]; i++)
+	for (i = j = x = 0; (i != cnt) && names[i]; i++)
 	{
 		if (!names[i][0]) continue;
 		button = gtk_radio_button_new_with_label_from_widget(
 			GTK_RADIO_BUTTON_0(button), names[i]);
-		if ((vnum > 1) && !(j % vnum))
-		{
-			wbox = xpack(box, gtk_vbox_new(FALSE, 0));
-			gtk_object_set_user_data(GTK_OBJECT(wbox), var);
-		}
+		gtk_object_set_user_data(GTK_OBJECT(button), (gpointer)i);
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-		pack(wbox, button);
+		if (vnum > 0) x = j / vnum;
+		to_table_x(button, table, j - x * vnum, x, vnum != 1, 0);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
-		if (hdl) gtk_signal_connect(GTK_OBJECT(button), "toggled", hdl,
-			(gpointer)(i));
+		if (hdl) gtk_signal_connect(GTK_OBJECT(button), "toggled", hdl, var);
 		j++;
 	}
 	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
-	gtk_widget_show_all(box);
+	gtk_widget_show_all(table);
 
-	return (box);
+	return (table);
+}
+
+int wj_radio_pack_get_active(GtkWidget *widget)
+{
+	GList *curr;
+
+	for (curr = GTK_TABLE(widget)->children; curr; curr = curr->next)
+	{
+		widget = ((GtkTableChild *)curr->data)->widget;
+		if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+			return ((int)gtk_object_get_user_data(GTK_OBJECT(widget)));
+	}
+	return (0);
 }
 
 // Convert window close into a button click ("Cancel" or whatever)

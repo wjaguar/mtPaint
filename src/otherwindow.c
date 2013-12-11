@@ -1904,10 +1904,12 @@ static int dither_cspace = CSPACE_SRGB, dither_dist = DIST_L2, dither_limit;
 static int dither_scan = TRUE, dither_8b, dither_sel;
 static int dither_pfract[2] = { 100, 85 };
 
-static void click_quantize_radio(quantize_dd *dt, void **wdata)
+static void click_quantize_radio(quantize_dd *dt, void **wdata, int what, void **where)
 {
-	int vvv[3] = { 1, 1, 256 }, n = quantize_mode; // self-updating
+	int vvv[3] = { 1, 1, 256 }, n;
 
+	cmd_read(where, dt);
+	n = quantize_mode;
 	cmd_set(dt->qbook, (n == QUAN_PNN) || (n == QUAN_WU) ? 2 :
 		n == QUAN_CURRENT ? 1 : 0);
 

@@ -64,7 +64,10 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
 GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
 	int l, int spacing);
-GtkWidget *to_table(GtkWidget *widget, GtkWidget *table, int row, int column, int spacing);
+GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
+	int expand, int spacing);
+#define to_table(widget, table, row, column, spacing) \
+	to_table_x(widget, table, row, column, TRUE, spacing)
 GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing);
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
@@ -101,6 +104,7 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 	GtkSignalFunc handler);
+int wj_radio_pack_get_active(GtkWidget *widget);
 
 // Convert window close into a button click ("Cancel" or whatever)
 
