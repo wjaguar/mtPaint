@@ -375,6 +375,25 @@ void *wjmalloc(wjmem *mem, int size, int align)
 	return ((void *)dest);
 }
 
+/* Simple doubling allocator */
+size_t getmemx2(memx2 *mem, size_t length)
+{
+	size_t s = mem->size - mem->here;
+
+	if (length > s)
+	{
+		size_t l = mem->here + length, l2 = mem->size * 2;
+		unsigned char *tmp = NULL;
+
+		if (l2 > l) tmp = realloc(mem->buf, l2);
+		if (!tmp) tmp = realloc(mem->buf, l2 = l);
+		if (!tmp) return (s);
+		mem->buf = tmp;
+		mem->size = l2;
+	}
+	return (length);
+}
+
 /* Calculate optimal number of objects in a memory chunk */
 static inline unsigned int objcount(unsigned int n, unsigned int size,
 	unsigned int hsize)

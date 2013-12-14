@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.41"
-MT_DATE="2013-12-12"
+MT_V="3.44.42"
+MT_DATE="2013-12-14"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -487,6 +487,10 @@ WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
 then # Tell gcc 4.x to shut up
 	WARN="$WARN -Wno-pointer-sign"
+fi
+if HAVE_GCC_VER 4.1
+then # Tell gcc 4.1+ to shut up some more
+	WARN="$WARN -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast"
 fi
 
 ### Setup libraries

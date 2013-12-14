@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2011 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -502,6 +502,16 @@ typedef struct {
 wjmem *wjmemnew(int size, int incr);
 void wjmemfree(wjmem *mem);
 void *wjmalloc(wjmem *mem, int size, int align);
+
+/// Simple doubling allocator
+
+typedef struct {
+	char *buf;  // data block
+	int here; // current position
+	int size; // currently allocated
+} memx2;
+
+size_t getmemx2(memx2 *mem, size_t length);
 
 /// Multiblock allocator
 

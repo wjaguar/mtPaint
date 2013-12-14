@@ -1729,15 +1729,12 @@ static void store_ls_settings(ls_settings *settings)
 	}
 }
 
-static void fs_event(fselector_dd *dt, void **wdata, int what)
+static void fs_ok(fselector_dd *dt, void **wdata)
 {
 	ls_settings settings;
 	char fname[PATHTXT], *msg, *f8;
 	char *c, *ext, *ext2, *gif, *gif2;
 	int i, j, res;
-
-	run_locate(wdata); /* Save the location */
-	if (what == op_EVT_CANCEL) goto done;
 
 	run_query(wdata);
 	/* Pick up extra info */
@@ -1913,7 +1910,7 @@ static void fs_event(fselector_dd *dt, void **wdata, int what)
 	}
 
 	update_menus();
-done:	run_destroy(wdata);
+	run_destroy(wdata);
 	return;
 redo_name:
 	f8 = gtkuncpy(NULL, dt->filename, 0);
@@ -1932,7 +1929,7 @@ redo:
 
 #define WBbase fselector_dd
 static void *fselector_code[] = {
-	FPICKpm(title, fpmode, filename, fs_event, fs_event),
+	FPICKpm(title, fpmode, filename, fs_ok, NULL),
 	IFx(fmask, 1),
 		MLABEL(_("File Format")),
 		OPTDe(ftnames, ftype, change_image_format), TRIGGER,

@@ -366,24 +366,9 @@ static void deallocate_image(ls_settings *settings, int cmask)
 
 typedef struct {
 	FILE *file; // for traditional use
-	char *buf;  // data block
-	int here; // current position
+	memx2 m; // data
 	int top;  // end of data
-	int size; // currently allocated
 } memFILE;
-
-static int mfextend(memFILE *mf, size_t length)
-{
-	size_t l = mf->here + length, l2 = mf->size * 2;
-	unsigned char *tmp = NULL;
-
-	if (l2 > l) tmp = realloc(mf->buf, l2);
-	if (!tmp) tmp = realloc(mf->buf, l2 = l);
-	if (!tmp) return (FALSE);
-	mf->buf = tmp;
-	mf->size = l2;
-	return (TRUE);
-}
 
 static size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 {
@@ -391,26 +376,26 @@ static size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 
 	if (mf->file) return (fread(ptr, size, nmemb, mf->file));
 
-	if ((mf->here < 0) || (mf->here > mf->top)) return (0);
-	l = size * nmemb; m = mf->top - mf->here;
+	if ((mf->m.here < 0) || (mf->m.here > mf->top)) return (0);
+	l = size * nmemb; m = mf->top - mf->m.here;
 	if (l > m) l = m , nmemb = m / size;
-	memcpy(ptr, mf->buf + mf->here, l);
-	mf->here += l;
+	memcpy(ptr, mf->m.buf + mf->m.here, l);
+	mf->m.here += l;
 	return (nmemb);
 }
 
 static size_t mfwrite(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 {
-	size_t l, m;
+	size_t l;
 
 	if (mf->file) return (fwrite(ptr, size, nmemb, mf->file));
 
-	if (mf->here < 0) return (0);
-	l = size * nmemb; m = mf->size - mf->here;
-	if ((l > m) && !mfextend(mf, l)) l = m , nmemb = m / size;
-	memcpy(mf->buf + mf->here, ptr, l);
+	if (mf->m.here < 0) return (0);
+	l = getmemx2(&mf->m, size * nmemb);
+	nmemb = l / size;
+	memcpy(mf->m.buf + mf->m.here, ptr, l);
 // !!! Nothing in here does fseek() when writing, so no need to track mf->top
-	mf->top = mf->here += l;
+	mf->top = mf->m.here += l;
 	return (nmemb);
 }
 
@@ -420,10 +405,10 @@ static int mfseek(memFILE *mf, long offset, int mode)
 	if (mf->file) return (fseek(mf->file, offset, mode));
 
 	if (mode == SEEK_SET);
-	else if (mode == SEEK_CUR) offset += mf->here;
+	else if (mode == SEEK_CUR) offset += mf->m.here;
 	else if (mode == SEEK_END) offset += mf->top;
 	else return (-1);
-	mf->here = offset;
+	mf->m.here = offset;
 	return (0);
 }
 
@@ -435,14 +420,14 @@ static char *mfgets(char *s, int size, memFILE *mf)
 	if (mf->file) return (fgets(s, size, mf->file));
 
 	if (size < 1) return (NULL);
-	if ((mf->here < 0) || (mf->here > mf->top)) return (NULL);
-	m = mf->top - mf->here;
+	if ((mf->m.here < 0) || (mf->m.here > mf->top)) return (NULL);
+	m = mf->top - mf->m.here;
 	if (m >= (unsigned)size) m = size - 1;
-	t = memchr(v = mf->buf + mf->here, '\n', m);
+	t = memchr(v = mf->m.buf + mf->m.here, '\n', m);
 	if (t) m = t - v + 1;
 	memcpy(s, v, m);
 	s[m] = '\0';
-	mf->here += m;
+	mf->m.here += m;
 	return (s);
 }
 
@@ -621,11 +606,11 @@ static void png_memread(png_structp png_ptr, png_bytep data, png_size_t length)
 {
 	memFILE *mf = (memFILE *)png_get_io_ptr(png_ptr);
 //	memFILE *mf = (memFILE *)png_ptr->io_ptr;
-	size_t l = mf->top - mf->here;
+	size_t l = mf->top - mf->m.here;
 
 	if (l > length) l = length;
-	memcpy(data, mf->buf + mf->here, l);
-	mf->here += l;
+	memcpy(data, mf->m.buf + mf->m.here, l);
+	mf->m.here += l;
 	if (l < length) png_error(png_ptr, "Read Error");
 }
 
@@ -634,12 +619,12 @@ static void png_memwrite(png_structp png_ptr, png_bytep data, png_size_t length)
 	memFILE *mf = (memFILE *)png_get_io_ptr(png_ptr);
 //	memFILE *mf = (memFILE *)png_ptr->io_ptr;
 
-	if ((mf->here + length > (unsigned)mf->size) && !mfextend(mf, length))
+	if (getmemx2(&mf->m, length) < length)
 		png_error(png_ptr, "Write Error");
 	else
 	{
-		memcpy(mf->buf + mf->here, data, length);
-		mf->top = mf->here += length;
+		memcpy(mf->m.buf + mf->m.here, data, length);
+		mf->top = mf->m.here += length;
 	}
 }
 
@@ -6450,7 +6435,7 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 	free(buf);
 
 	/* !!! '(void *)' is there to make GCC 4 shut up - WJ */
-	*(Pixmap *)(void *)&mf->buf = GDK_WINDOW_XWINDOW(exported[0]);
+	*(Pixmap *)(void *)&mf->m.buf = GDK_WINDOW_XWINDOW(exported[0]);
 	mf->top = sizeof(Pixmap);
 	return (0);
 }
@@ -6853,19 +6838,19 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
 		 * in buffer pointer, and then copy it into passed-in buffer
 		 * pointer - WJ */
 		res = save_image_x(NULL, settings, &mf);
-		if (!res) *buf = mf.buf , *len = mf.top;
+		if (!res) *buf = mf.m.buf , *len = mf.top;
 		return (res);
 	}
 
 	if (!(file_formats[settings->ftype & FTM_FTYPE].flags & FF_WMEM))
 		return (-1);
 
-	mf.buf = malloc(mf.size = 0x4000 - 64);
+	mf.m.buf = malloc(mf.m.size = 0x4000 - 64);
 	/* Be silent when saving to memory */
 	settings->silent = TRUE;
 	res = save_image_x(NULL, settings, &mf);
-	if (res) free(mf.buf);
-	else *buf = mf.buf , *len = mf.top;
+	if (res) free(mf.m.buf);
+	else *buf = mf.m.buf , *len = mf.top;
 	return (res);
 }
 
@@ -7174,7 +7159,7 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 	if (!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
 
 	memset(&mf, 0, sizeof(mf));
-	mf.buf = buf; mf.top = mf.size = len;
+	mf.m.buf = buf; mf.top = mf.m.size = len;
 	return (load_image_x(NULL, &mf, mode, ftype));
 }
 

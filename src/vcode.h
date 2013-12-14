@@ -31,6 +31,7 @@ enum {
 	op_FPICKpm,
 	op_PAGE,
 	op_TABLE,
+	op_XTABLE,
 	//
 	op_VBOX,
 	op_VBOXP,
@@ -45,6 +46,7 @@ enum {
 	op_EQBOX,
 	op_SCROLL,
 	op_SNBOOK,
+	op_NBOOK,
 	op_PLAINBOOK,
 	op_BOOKBTN,
 	op_HSEP,
@@ -83,8 +85,10 @@ enum {
 	op_TOPT,
 	op_TLOPT,
 	op_OPTD,
+	op_TPENTRY,
 	op_PATH,
 	op_PATHs,
+	op_TEXT,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -93,6 +97,7 @@ enum {
 	op_GRADBAR,
 	op_OKBOX,
 	op_EOKBOX,
+	op_UOKBOX,
 	op_OKBTN,
 	op_CANCELBTN,
 	op_OKADD,
@@ -112,9 +117,9 @@ enum {
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
-	op_DEFW,
 	op_WXYWH,
 	op_WPMOUSE,
+	op_WPWHEREVER,
 	op_INSENS,
 	op_FOCUS,
 	op_ONTOP,
@@ -135,6 +140,7 @@ enum {
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_SPIN,
 	op_BOR_LABEL,
+	op_BOR_TLABEL,
 	op_BOR_OPT,
 	op_BOR_XOPT,
 	op_BOR_FRBOX,
@@ -155,20 +161,19 @@ void **run_create(void **ifcode, void *ddata, int ddsize);
 //	Query dialog contents using its widget-map
 void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
-#define run_destroy(W) destroy_dialog(GET_REAL_WINDOW(W))
+void run_destroy(void **wdata);
 //	Reset (a group of) dialog widgets, using widget-map
 void run_reset(void **wdata, int group);
-//	Store position values as defined by widget-map
-void run_locate(void **wdata);
 
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
 //	Extract toplevel window slot out of widget-map
-#define GET_WINDOW(V) ((V) + 1)
+#define GET_WINDOW(V) ((V) + 2)
 //	Extract actual toplevel window out of widget-map
-#define GET_REAL_WINDOW(V) ((V)[1])
+#define GET_REAL_WINDOW(V) ((V)[2])
 //	Iterate over slots
 #define NEXT_SLOT(V) ((V) + 2)
+#define PREV_SLOT(V) ((V) - 2)
 #define SLOT_N(V,N) ((V) + (N) * 2)
 
 //	From event to its originator
@@ -243,12 +248,15 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
+#define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXPb(S,B) WBh(VBOXP, 1), WBbs(B, S)
+#define XVBOX WBh(XVBOX, 0)
 #define XVBOXb(S,B) WBh(XVBOX, 1), WBbs(B, S)
 #define EVBOX WBh(EVBOX, 0)
 #define HBOX WBh(HBOX, 0)
 #define HBOXb(S,B) WBh(HBOX, 1), WBbs(B, S)
+#define XHBOX WBh(XHBOX, 0)
 #define XHBOXb(S,B) WBh(XHBOX, 1), WBbs(B, S)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
@@ -259,6 +267,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
+#define NBOOK WBh(NBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
 #define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
 #define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
@@ -342,8 +351,10 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
 	EVENT(SELECT, HS)
+#define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
 #define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
 #define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
+#define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
@@ -357,6 +368,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EOKBOX(NOK,HOK,NC,HC) WBr3h(EOKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define OKBOX0 WBh(OKBOX, 0)
+#define UOKBOX0 WBh(UOKBOX, 0)
 // !!! These *BTN,OK*,*BUTTON blocks each hold 1 nested EVENT block */
 #define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
@@ -385,9 +397,10 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MKSHRINK WBh(MKSHRINK, 0)
 #define NORESIZE WBh(NORESIZE, 0)
 #define WANTMAX WBh(WANTMAX, 0)
-#define DEFW(V) WBh(DEFW, 1), (void *)(V)
-#define WXYWH(NM,W,H) WBrh(WXYWH, 2), (NM), WBwh(W, H)
+#define WXYWH(NM,W,H) WBh(WXYWH, 2), (NM), WBwh(W, H)
+#define DEFW(V) WXYWH(NULL, V, 0)
 #define WPMOUSE WBh(WPMOUSE, 0)
+#define WPWHEREVER WBh(WPWHEREVER, 0)
 #define INSENS WBh(INSENS, 0)
 #define FOCUS WBh(FOCUS, 0)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
@@ -398,7 +411,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TRIGGER WBrh(TRIGGER, 0)
 
 //	Function to run with EXEC
-typedef void **(*ext_fn)(void **r, GtkWidget ***wpp);
+typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
 
 //	Structure which COLORLIST provides to EXC event
 typedef struct {

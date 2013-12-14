@@ -1060,7 +1060,7 @@ static void *sisca_code[] = {
 	IF(mode), WINDOWm(_("Scale Canvas")),
 	UNLESS(mode), WINDOWm(_("Resize Canvas")),
 	TABLE(3, 3), // !!! in fact 5 rows in resize mode
-	BORDER(LABEL, 0),
+	BORDER(TLABEL, 0),
 	TLLABEL(_("Width     "), 1, 0), TLLABEL(_("Height    "), 2, 0),
 	TLLABEL(_("Original      "), 0, 1), TLNOSPIN(w, 1, 1), TLNOSPIN(h, 2, 1),
 	TLLABEL(_("New"), 0, 2),
@@ -2070,7 +2070,6 @@ static void *quantize_code[] = {
 	BORDER(FRBOX, 0),
 	BORDER(LABEL, 0),
 	HBOXb(5, 10), MLABEL(_("Indexed Colours To Use")),
-	DEFBORDER(LABEL),
 	REF(colspin), XSPIN(cols, 1, 256),
 	UNLESS(pflag), BOOKBTN(_("Settings"), book),
 	WDONE,
@@ -2629,9 +2628,10 @@ static void skew_moved(skew_dd *dt, void **wdata, int what, void **where)
 static void *skew_code[] = {
 	WINDOWm(_("Skew")),
 	TABLE(4, 3),
-	BORDER(LABEL, 0),
+	BORDER(TLABEL, 0),
 	TLLABEL(_("Angle"), 1, 0), TLLABEL(_("Offset"), 2, 0),
 		TLLABEL(_("At distance"), 3, 0),
+// !!! TFSPIN maybe ?
 	TLLABEL(_("Horizontal "), 0, 1),
 	REF(aspin[0]), TLFSPIN(angle[0], -8999, 8999, 1, 1),
 	EVENT(CHANGE, skew_moved),

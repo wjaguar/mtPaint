@@ -36,6 +36,15 @@
 #include "inifile.h"
 #include "mtlib.h"
 #include "wu.h"
+#include "vcode.h"
+
+typedef struct {
+	int frame1, frame2;
+	int lock;
+	char *pos, *cyc; // text buffers
+	void **posw, **cycw;
+	void **save, **preview, **frames;
+} anim_dd;
 
 ///	GLOBALS
 
@@ -46,10 +55,8 @@ int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10, ani_play_state = FALSE,
 
 ///	FORM VARIABLES
 
-static GtkWidget *animate_window = NULL, *ani_prev_win,
-	*ani_entry_path, *ani_entry_prefix,
-	*ani_spin[5],			// start, end, delay
-	*ani_text_pos, *ani_text_cyc,	// Text input widgets
+static void **animate_window_;
+static GtkWidget *ani_prev_win,
 	*ani_prev_slider		// Slider widget on preview area
 	;
 
@@ -57,20 +64,21 @@ ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
 static int
 	ani_layer_data[MAX_LAYERS + 1][4],	// x, y, opacity, visible
+// !!! For now
 	ani_currently_selected_layer;
 static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
 static gboolean ani_use_gif, ani_show_main_state;
 
 
 
-static void ani_win_read_widgets();
+static void ani_win_read_widgets(void **wdata);
 
 
 
 
-static void ani_widget_changed()	// Widget changed so flag the layers as changed
+static void ani_widget_changed(anim_dd *dt)	// Widget changed so flag the layers as changed
 {
-	layers_changed = 1;
+	if (!dt->lock) layers_changed = 1;
 }
 
 
@@ -413,107 +421,55 @@ static void ani_write_layer_data()		// Write current layer x/y/opacity data from
 	}
 }
 
-
-static char *text_edit_widget_get(GtkWidget *w)		// Get text string from input widget
-		// WARNING memory allocated for this so lose it with g_free(txt)
+static void addstr(memx2 *mem, char *s)
 {
-#if GTK_MAJOR_VERSION == 1
-	return gtk_editable_get_chars( GTK_EDITABLE(w), 0, -1 );
-#endif
-#if GTK_MAJOR_VERSION == 2
-	GtkTextIter begin, end;
-	GtkTextBuffer *buffer = GTK_TEXT_VIEW(w)->buffer;
+	int l;
 
-	gtk_text_buffer_get_start_iter( buffer, &begin );
-	gtk_text_buffer_get_end_iter( buffer, &end );
-	return gtk_text_buffer_get_text( buffer, &begin, &end, -1 );
-#endif
+	if ((l = getmemx2(mem, strlen(s) + 1)))
+	{
+		memcpy(mem->buf + mem->here, s, l);
+		mem->buf[mem->here += l - 1] = '\0';
+	}
 }
 
-static void empty_text_widget(GtkWidget *w)	// Empty the text widget
+static char *ani_cyc_txt()	// Text for the cycle text widget
 {
-#if GTK_MAJOR_VERSION == 1
-	gtk_text_set_point( GTK_TEXT(w), 0 );
-	gtk_text_forward_delete( GTK_TEXT(w), gtk_text_get_length(GTK_TEXT(w)) );
-#endif
-#if GTK_MAJOR_VERSION == 2
-	gtk_text_buffer_set_text( GTK_TEXT_VIEW(w)->buffer, "", 0 );
-#endif
-}
-
-static void ani_cyc_refresh_txt()		// Refresh the text in the cycle text widget
-{
+	memx2 mem;
 	char txt[ANI_CYC_TEXT_MAX];
 	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	int i;
-#if GTK_MAJOR_VERSION == 2
-	GtkTextIter iter;
 
-	g_signal_handlers_block_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-#endif
-	empty_text_widget(ani_text_cyc);	// Clear the text in the widget
-
+	memset(&mem, 0, sizeof(mem));
 	ani_cyc_get(buf);
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
 		if (!ani_cycle_table[i].frame0) break;
 		ani_cyc_sprintf(txt, ani_cycle_table + i,
 			buf + ANI_CYC_ROWLEN * i);
-#if GTK_MAJOR_VERSION == 1
-		gtk_text_insert (GTK_TEXT (ani_text_cyc), NULL, NULL, NULL, txt, -1);
-#endif
-#if GTK_MAJOR_VERSION == 2
-		gtk_text_buffer_get_end_iter( GTK_TEXT_VIEW(ani_text_cyc)->buffer, &iter );
-		gtk_text_buffer_insert( GTK_TEXT_VIEW(ani_text_cyc)->buffer, &iter, txt, -1 );
-#endif
+		addstr(&mem, txt);
 	}
-
-#if GTK_MAJOR_VERSION == 2
-	g_signal_handlers_unblock_by_func(GTK_TEXT_VIEW(ani_text_cyc)->buffer,
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	// We have to switch off then back on or it looks like the user changed it
-#endif
+	return (mem.buf);
 }
 
-static void ani_pos_refresh_txt()		// Refresh the text in the position text widget
+static char *ani_pos_txt(int idx)	// Text for the position text widget
 {
+	memx2 mem;
 	char txt[ANI_POS_TEXT_MAX];
-	int i = ani_currently_selected_layer, j;
+	int j;
 	ani_slot *ani;
-#if GTK_MAJOR_VERSION == 2
-	GtkTextIter iter;
 
-	g_signal_handlers_block_by_func(GTK_TEXT_VIEW(ani_text_pos)->buffer,
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-#endif
+	memset(&mem, 0, sizeof(mem));
+	if (idx <= 0) return ""; // Must no be for background layer or negative => PANIC!
 
-	empty_text_widget(ani_text_pos);	// Clear the text in the widget
-
-	if ( i > 0 )		// Must no be for background layer or negative => PANIC!
+	for (j = 0; j < MAX_POS_SLOTS; j++)
 	{
-		for (j = 0; j < MAX_POS_SLOTS; j++)
-		{
-			ani = layer_table[i].image->ani_.pos + j;
-			if (ani->frame <= 0) break;
-			// Add a line if one exists
-			ani_pos_sprintf(txt, ani);
-#if GTK_MAJOR_VERSION == 1
-			gtk_text_insert (GTK_TEXT (ani_text_pos), NULL, NULL, NULL, txt, -1);
-#endif
-#if GTK_MAJOR_VERSION == 2
-			gtk_text_buffer_get_end_iter( GTK_TEXT_VIEW(ani_text_pos)->buffer, &iter );
-			gtk_text_buffer_insert( GTK_TEXT_VIEW(ani_text_pos)->buffer, &iter, txt,
-				strlen(txt) );
-
-#endif
-		}
+		ani = layer_table[idx].image->ani_.pos + j;
+		if (ani->frame <= 0) break;
+		// Add a line if one exists
+		ani_pos_sprintf(txt, ani);
+		addstr(&mem, txt);
 	}
-#if GTK_MAJOR_VERSION == 2
-	g_signal_handlers_unblock_by_func(GTK_TEXT_VIEW(ani_text_pos)->buffer,
-		GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-	// We have to switch off then back on or it looks like the user changed it
-#endif
+	return (mem.buf);
 }
 
 void ani_init()			// Initialize variables/arrays etc. before loading or on startup
@@ -539,46 +495,54 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 ///	EXPORT ANIMATION FRAMES WINDOW
 
 
-static void ani_win_set_pos()
-{
-	win_restore_pos(animate_window, "ani", 0, 0, 200, 200);
-}
-
 static void ani_fix_pos()
 {
 	ani_read_layer_data();
 	layers_notify_changed();
 }
 
-static void ani_but_save()
+static void create_frames_ani();
+
+static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
 {
-	ani_win_read_widgets();
+	ani_win_read_widgets(wdata);
 	ani_write_layer_data();
-	layer_press_save();
+
+	if (what == op_EVT_CANCEL)
+	{
+		run_destroy(wdata);
+		animate_window_ = NULL;
+
+		layers_pastry_cut = FALSE;
+
+		show_layers_main = ani_show_main_state;
+		update_stuff(UPD_ALLV);
+		return;
+	}
+
+	where = origin_slot(where);
+
+// !!! For now, call w/o parameter (relies on animate_window_)
+	if (where == dt->preview) ani_but_preview();
+
+	else if (where == dt->frames)
+	{
+		cmd_showhide(GET_WINDOW(wdata), FALSE);
+		create_frames_ani();
+		cmd_showhide(GET_WINDOW(wdata), TRUE);
+	}
+
+	else layer_press_save(); // "Save"
 }
 
-static gboolean delete_ani()
+
+static void ani_parse_store_positions(char *tx)	// Read current positions in text input and store
 {
-	win_store_pos(animate_window, "ani");
-	ani_win_read_widgets();
-	gtk_widget_destroy(animate_window);
-	animate_window = NULL;
-	ani_write_layer_data();
-	layers_pastry_cut = FALSE;
-
-	show_layers_main = ani_show_main_state;
-	update_stuff(UPD_ALLV);
-	return (FALSE);
-}
-
-
-static void ani_parse_store_positions()		// Read current positions in text input and store
-{
-	char *txt, *tx, *tmp;
+	char *txt, *tmp;
 	ani_slot *ani = layer_table[ani_currently_selected_layer].image->ani_.pos;
 	int i;
 
-	tmp = tx = text_edit_widget_get(ani_text_pos);
+	tmp = tx;
 	for (i = 0; i < MAX_POS_SLOTS; i++)
 	{
 		if (!(txt = tmp)) break;
@@ -587,17 +551,15 @@ static void ani_parse_store_positions()		// Read current positions in text input
 		if (!ani_pos_sscanf(txt, ani + i)) break;
 	}
 	if (i < MAX_POS_SLOTS) ani[i].frame = 0;	// End delimeter
-
-	g_free(tx);
 }
 
-static void ani_parse_store_cycles()		// Read current cycles in text input and store
+static void ani_parse_store_cycles(char *tx)	// Read current cycles in text input and store
 {
 	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
-	char *txt, *tx, *tmp;
+	char *txt, *tmp;
 	int i;
 
-	tmp = tx = text_edit_widget_get(ani_text_cyc);
+	tmp = tx;
 	memset(buf, 0, sizeof(buf));
 	for (i = 0; i < MAX_CYC_SLOTS; i++)
 	{
@@ -609,28 +571,30 @@ static void ani_parse_store_cycles()		// Read current cycles in text input and s
 	}
 	if (i < MAX_CYC_SLOTS) ani_cycle_table[i].frame0 = 0;	// End delimeter
 	ani_cyc_put(buf);
-
-	g_free(tx);
 }
 
-static void ani_win_read_widgets()		// Read all widgets and set up relevant variables
+static void ani_win_read_widgets(void **wdata)	// Read all widgets and set up relevant variables
 {
-	int	a = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(ani_spin[0]) ),
-		b = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(ani_spin[1]) );
+	anim_dd *dt = GET_DDATA(wdata);
+	char *tmp;
+	int a, b;
 
+	run_query(wdata);
 
-	ani_gif_delay = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON(ani_spin[2]) );
+	ani_parse_store_positions(dt->pos);
+	ani_parse_store_cycles(dt->cyc);
+	/* Update 2 text widgets */
+	dt->lock = TRUE;
+	cmd_setv(dt->posw, tmp = ani_pos_txt(ani_currently_selected_layer), 0);
+	free(tmp);
+	cmd_setv(dt->cycw, tmp = ani_cyc_txt(), 0);
+	free(tmp);
+	dt->lock = FALSE;
 
-	ani_parse_store_positions();
-	ani_parse_store_cycles();
-	ani_pos_refresh_txt();		// Update 2 text widgets
-	ani_cyc_refresh_txt();
-
+	a = dt->frame1;
+	b = dt->frame2;
 	ani_frame1 = a < b ? a : b;
 	ani_frame2 = a < b ? b : a;
-	gtkncpy(ani_output_path, gtk_entry_get_text(GTK_ENTRY(ani_entry_path)), PATHBUF);
-	gtkncpy(ani_file_prefix, gtk_entry_get_text(GTK_ENTRY(ani_entry_prefix)), ANI_PREFIX_LEN + 1);
-	// GIF toggle is automatically set by callback
 }
 
 
@@ -700,11 +664,7 @@ static gboolean ani_but_preview_close()
 	win_store_pos(ani_prev_win, "ani_prev");
 	gtk_widget_destroy( ani_prev_win );
 
-	if ( animate_window != NULL )
-	{
-		ani_win_set_pos();
-		gtk_widget_show (animate_window);
-	}
+	if (animate_window_) cmd_showhide(GET_WINDOW(animate_window_), TRUE);
 	else
 	{
 		ani_write_layer_data();
@@ -720,13 +680,7 @@ void ani_but_preview()
 	GtkAccelGroup* ag = gtk_accel_group_new();
 
 
-	if ( animate_window != NULL )
-	{
-		/* We need to remember this as we are hiding it */
-		win_store_pos(animate_window, "ani");
-		ani_win_read_widgets();		// Get latest values for the preview
-	}
-	else	ani_read_layer_data();
+	ani_read_layer_data();
 
 	if ( !view_showing ) view_show();	// If not showing, show the view window
 
@@ -751,7 +705,7 @@ void ani_but_preview()
 	mt_spinslide_connect(ani_prev_slider,
 		GTK_SIGNAL_FUNC(ani_frame_slider_moved), NULL);
 
-	if ( animate_window == NULL )	// If called via the menu have a fix button
+	if (!animate_window_)	// If called via the menu have a fix button
 	{
 		button = add_a_button( _("Fix"), 5, hbox3, FALSE );
 		gtk_signal_connect(GTK_OBJECT(button), "clicked",
@@ -769,7 +723,7 @@ void ani_but_preview()
 	gtk_widget_show (ani_prev_win);
 	gtk_window_add_accel_group(GTK_WINDOW (ani_prev_win), ag);
 
-	if ( animate_window != NULL ) gtk_widget_hide (animate_window);
+	if (animate_window_) cmd_showhide(GET_WINDOW(animate_window_), FALSE);
 	else
 	{
 		layers_pastry_cut = TRUE;
@@ -789,11 +743,6 @@ static void create_frames_ani()
 	int a, b, k, i, tr, cols, layer_w, layer_h, npt, l = 0;
 
 
-	ani_win_read_widgets();
-
-	gtk_widget_hide(animate_window);
-
-	ani_write_layer_data();
 	layer_press_save();		// Save layers data file
 
 	command = strrchr(layers_filename, DIR_SEP);
@@ -933,8 +882,6 @@ failure2:
 
 failure:
 	free( irgb );
-
-	gtk_widget_show(animate_window);
 }
 
 void pressed_remove_key_frames()
@@ -1019,14 +966,10 @@ static void ani_set_key_frame(int key)		// Set key frame postions & cycles as pe
 	ani_cyc_put(buf);
 }
 
-static void ani_tog_gif(GtkToggleButton *togglebutton, gpointer user_data)
+static void ani_layer_select(GtkList *list, GtkWidget *widget, void **wdata)
 {
-	ani_use_gif = gtk_toggle_button_get_active(togglebutton);
-	ani_widget_changed();
-}
-
-static void ani_layer_select( GtkList *list, GtkWidget *widget )
-{
+	anim_dd *dt = GET_DDATA(wdata);
+	char *tmp;
 	int j = layers_total - gtk_list_child_position(list, widget);
 
 // !!! Allow background here when/if added to the list
@@ -1034,68 +977,104 @@ static void ani_layer_select( GtkList *list, GtkWidget *widget )
 
 	if ( ani_currently_selected_layer != -1 )	// Only if not first click
 	{
-		ani_parse_store_positions();		// Parse & store text inputs
+		cmd_read(dt->posw, dt);
+		ani_parse_store_positions(dt->pos);	// Parse & store text inputs
 	}
 
 	ani_currently_selected_layer = j;
-	ani_pos_refresh_txt();				// Refresh the text in the widget
+	/* Refresh the text in the widget */
+	dt->lock = TRUE;
+	cmd_setv(dt->posw, tmp = ani_pos_txt(j), 0);
+	free(tmp);
+	dt->lock = FALSE;
 }
 
-static int do_set_key_frame(GtkWidget *spin, gpointer fdata)
+static int do_set_key_frame(spin1_dd *dt, void **wdata)
 {
-	int i;
-
-	i = read_spin(spin);
-	ani_set_key_frame(i);
+	run_query(wdata);
+	ani_set_key_frame(dt->n[0]);
 	layers_notify_changed();
 
-	return TRUE;
+	return (TRUE);
 }
+
+#undef _
+#define _(X) X
 
 void pressed_set_key_frame()
 {
-	GtkWidget *spin = add_a_spin(ani_frame1, ani_frame1, ani_frame2);
-	filter_window(_("Set Key Frame"), spin, do_set_key_frame, NULL, FALSE);
+	spin1_dd tdata = {
+		{ _("Set Key Frame"), spin1_code, FW_FN(do_set_key_frame) },
+		{ ani_frame1, ani_frame1, ani_frame2 } };
+	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-static GtkWidget *ani_text(GtkWidget **textptr)
-{
-	GtkWidget *scroll, *text;
+#undef _
+#define _(X) __(X)
 
-#if GTK_MAJOR_VERSION == 1
-	text = gtk_text_new(NULL, NULL);
-	gtk_text_set_editable(GTK_TEXT(text), TRUE);
+#undef _
+#define _(X) X
 
-	gtk_signal_connect(GTK_OBJECT(text), "changed",
-			GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
+// !!! For now
+static void **create_ani_layers_list(void **r, GtkWidget ***wpp, void **wdata);
+static GtkWidget *ani_list_layers;
 
-	scroll = gtk_scrolled_window_new(NULL, GTK_TEXT(text)->vadj);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	GtkTextBuffer *texbuf = gtk_text_buffer_new(NULL);
+#define WBbase anim_dd
+static void *anim_code[] = {
+	WPWHEREVER, WINDOWm(_("Configure Animation")),
+	NBOOK,
+	PAGE(_("Output Files")),
+	XTABLE(2, 5),
+	TSPIN(_("Start frame"), frame1, 1, MAX_FRAME),
+	EVENT(CHANGE, ani_widget_changed),
+	TSPIN(_("End frame"), frame2, 1, MAX_FRAME),
+	EVENT(CHANGE, ani_widget_changed),
+	TSPINv(_("Delay"), ani_gif_delay, 1, MAX_DELAY),
+	EVENT(CHANGE, ani_widget_changed),
+	TPENTRYv(_("Output path"), ani_output_path, PATHBUF),
+	EVENT(CHANGE, ani_widget_changed),
+	TPENTRYv(_("File prefix"), ani_file_prefix, ANI_PREFIX_LEN),
+	EVENT(CHANGE, ani_widget_changed),
+	WDONE,
+	CHECKv(_("Create GIF frames"), ani_use_gif),
+	EVENT(CHANGE, ani_widget_changed),
+	WDONE,
+///	LAYERS TABLES
+	PAGE(_("Positions")),
+	XHBOX, // !!! Originally the page was an hbox
+	EXEC(create_ani_layers_list), // !!! leave for later
+	XVBOX, // !!! what for?
+	REF(posw), TEXT(pos),
+	EVENT(CHANGE, ani_widget_changed),
+	WDONE, WDONE, WDONE,
+///	CYCLES TAB
+	PAGE(_("Cycling")),
+	REF(cycw), TEXT(cyc),
+	EVENT(CHANGE, ani_widget_changed),
+	WDONE,
+	WDONE, /* NBOOK */
+///	MAIN BUTTONS
+	BORDER(OKBOX, 0),
+// !!! Maybe better make buttons equal, with OKBOX0
+	UOKBOX0,
+	CANCELBTN(_("Close"), ani_btn),
+	REF(save), BUTTON(_("Save"), ani_btn),
+	REF(preview), BUTTON(_("Preview"), ani_btn),
+	REF(frames), BUTTON(_("Create Frames"), ani_btn),
+	WDONE,
+	WXYWH("ani", 200, 200),
+// !!! Cannot WSHOW because init-event to trigger is not yet on V-code level:
+//	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
+	WEND
+};
+#undef WBbase
 
-	text = gtk_text_view_new_with_buffer(texbuf);
-
-	g_signal_connect(texbuf, "changed", GTK_SIGNAL_FUNC(ani_widget_changed), NULL);
-
-	scroll = gtk_scrolled_window_new(GTK_TEXT_VIEW(text)->hadjustment,
-		GTK_TEXT_VIEW(text)->vadjustment);
-#endif
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_container_add(GTK_CONTAINER(scroll), text);
-
-	*textptr = text;
-	return (scroll);
-}
+#undef _
+#define _(X) __(X)
 
 void pressed_animate_window()
 {
-	GtkWidget *table, *label, *button, *notebook1, *scrolledwindow;
-	GtkWidget /**ani_toggle_gif,*/ *ani_list_layers, *list_data;
-	GtkWidget *hbox4, *hbox2, *vbox1, *vbox3, *vbox4;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-	char txt[PATHTXT];
-	int i;
+	anim_dd tdata;
 
 
 	if ( layers_total < 1 )					// Only background layer available
@@ -1116,61 +1095,38 @@ void pressed_animate_window()
 
 	ani_currently_selected_layer = -1;
 
-	animate_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure Animation"),
-					GTK_WIN_POS_NONE, TRUE );
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.frame1 = ani_frame1;
+	tdata.frame2 = ani_frame2;
+	tdata.cyc = ani_cyc_txt();
 
-	ani_win_set_pos();
+	animate_window_ = run_create(anim_code, &tdata, sizeof(tdata));
+	free(tdata.cyc);
 
-	vbox1 = add_vbox(animate_window);
+	ani_show_main_state = show_layers_main;	// Remember old state
+	show_layers_main = FALSE;		// Don't show all layers in main window - too messy
 
-	notebook1 = xpack(vbox1, gtk_notebook_new());
-	gtk_container_set_border_width(GTK_CONTAINER(notebook1), 5);
+// !!! For now
+	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
+	cmd_showhide(GET_WINDOW(animate_window_), TRUE);
 
-	vbox4 = add_new_page(notebook1, _("Output Files"));
-	table = xpack(vbox4, gtk_table_new(5, 3, FALSE));
+	layers_pastry_cut = TRUE;
+	update_stuff(UPD_ALLV);
+}
 
-	label = add_to_table( _("Start frame"), table, 0, 0, 5 );
-	add_to_table( _("End frame"), table, 1, 0, 5 );
+static void **create_ani_layers_list(void **r, GtkWidget ***wpp, void **wdata)
+{
+	GtkWidget *label, *scrolledwindow, *list_data, *hbox2;
+	char txt[128];
+	int i;
 
-	add_to_table( _("Delay"), table, 2, 0, 5 );
-	add_to_table( _("Output path"), table, 3, 0, 5 );
-	add_to_table( _("File prefix"), table, 4, 0, 5 );
-
-	ani_spin[0] = spin_to_table(table, 0, 1, 5, ani_frame1, 1, MAX_FRAME);	// Start
-	ani_spin[1] = spin_to_table(table, 1, 1, 5, ani_frame2, 1, MAX_FRAME);	// End
-	ani_spin[2] = spin_to_table(table, 2, 1, 5, ani_gif_delay, 1, MAX_DELAY);	// Delay
-
-	ani_entry_path = gtk_entry_new_with_max_length(PATHBUF);
-	to_table(ani_entry_path, table, 3, 1, 0);
-	gtkuncpy(txt, ani_output_path, PATHTXT);
-	gtk_entry_set_text(GTK_ENTRY(ani_entry_path), txt);
-
-	ani_entry_prefix = gtk_entry_new_with_max_length(ANI_PREFIX_LEN);
-	to_table(ani_entry_prefix, table, 4, 1, 0);
-	gtkuncpy(txt, ani_file_prefix, PATHTXT);
-	gtk_entry_set_text(GTK_ENTRY(ani_entry_prefix), txt);
-
-	track_updates(GTK_SIGNAL_FUNC(ani_widget_changed),
-		ani_spin[0], ani_spin[1], ani_spin[2],
-		ani_entry_path, ani_entry_prefix, NULL);
-
-//	ani_toggle_gif =
-	pack(vbox4, sig_toggle(_("Create GIF frames"),
-		ani_use_gif, NULL, GTK_SIGNAL_FUNC(ani_tog_gif)));
-
-///	LAYERS TABLES
-
-	hbox4 = gtk_hbox_new(FALSE, 0);
-	label = gtk_label_new(_("Positions"));
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook1), hbox4, label);
-
-	scrolledwindow = pack(hbox4, gtk_scrolled_window_new(NULL, NULL));
+	scrolledwindow = pack(**wpp, gtk_scrolled_window_new(NULL, NULL));
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
 			GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 
 	ani_list_layers = gtk_list_new ();
-	gtk_signal_connect( GTK_OBJECT(ani_list_layers), "select_child",
-			GTK_SIGNAL_FUNC(ani_layer_select), NULL );
+	gtk_signal_connect(GTK_OBJECT(ani_list_layers), "select_child",
+			GTK_SIGNAL_FUNC(ani_layer_select), wdata);
 	gtk_scrolled_window_add_with_viewport (GTK_SCROLLED_WINDOW (scrolledwindow), ani_list_layers);
 
 	gtk_widget_set_usize (ani_list_layers, 150, -2);
@@ -1193,49 +1149,9 @@ void pressed_animate_window()
 		label = xpack(hbox2, gtk_label_new(layer_table[i].name)); // Layer name
 		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
 	}
+	gtk_widget_show_all(scrolledwindow);
 
-	vbox3 = xpack(hbox4, gtk_vbox_new(FALSE, 0));
-	xpack(vbox3, ani_text(&ani_text_pos));
-
-///	CYCLES TAB
-
-	vbox3 = add_new_page(notebook1, _("Cycling"));
-	xpack(vbox3, ani_text(&ani_text_cyc));
-
-	ani_cyc_refresh_txt();
-
-///	MAIN BUTTONS
-
-	hbox2 = pack(vbox1, gtk_hbox_new(FALSE, 0));
-
-	button = add_a_button(_("Close"), 5, hbox2, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(delete_ani), NULL);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	button = add_a_button(_("Save"), 5, hbox2, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_but_save), NULL);
-
-	button = add_a_button(_("Preview"), 5, hbox2, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_but_preview), NULL);
-
-	button = add_a_button(_("Create Frames"), 5, hbox2, TRUE);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(create_frames_ani), NULL);
-
-	gtk_signal_connect_object (GTK_OBJECT (animate_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_ani), NULL);
-
-	ani_show_main_state = show_layers_main;	// Remember old state
-	show_layers_main = FALSE;		// Don't show all layers in main window - too messy
-
-	gtk_window_set_transient_for( GTK_WINDOW(animate_window), GTK_WINDOW(main_window) );
-
-	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
-
-	gtk_widget_show_all(animate_window);
-	gtk_window_add_accel_group(GTK_WINDOW (animate_window), ag);
-
-	layers_pastry_cut = TRUE;
-	update_stuff(UPD_ALLV);
+	return (r);
 }
 
 

@@ -31,7 +31,7 @@
 #include "vcode.h"
 
 /* Make code not compile if it cannot work */
-typedef char Opcodes_Too_Long[2 * (op_BOR_LAST <= WB_OPMASK) - 1];
+typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 
 /// V-CODE ENGINE
 
@@ -55,9 +55,22 @@ enum {
 	pk_TABLE2,
 	pk_TABLE2x
 };
-#define pk_MASK    0xFF
-#define pkf_FRAME 0x100
-#define pkf_STACK 0x200
+#define pk_MASK     0xFF
+#define pkf_FRAME  0x100
+#define pkf_STACK  0x200
+#define pkf_PARENT 0x400
+#define pkf_SHOW   0x800
+
+/* Internal datastore */
+
+#define GET_VDATA(V) ((V)[1])
+
+typedef struct {
+	void *code;	// Noop tag, must be first field
+	void ***dv;	// Pointer to dialog response
+	char *ininame;	// Prefix for inifile vars
+	int xywh[4];	// Stored window position & size
+} v_dd;
 
 /* From event to its originator */
 void **origin_slot(void **slot)
@@ -68,17 +81,10 @@ void **origin_slot(void **slot)
 
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
-	void *v, **desc, **slot = GET_WINDOW(wdata);
-	int op;
+	v_dd *vdata = GET_VDATA(wdata);
 
-	desc = slot[1];
-	slot = SLOT_N(slot, WB_GETREF((int)*desc));
-	desc = slot[1];
-	op = (int)desc[0];
-	if ((op & WB_OPMASK) != op_WDIALOG) return; // Wrong context
-	v = desc[1];
-	if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
-	*(void ***)v = where;
+	if (((int)vdata->code & WB_OPMASK) != op_WDONE) return; // Paranoia
+	if (vdata->dv) *vdata->dv = where;
 }
 
 /* !!! Warning: handlers should not access datastore after window destruction!
@@ -104,7 +110,7 @@ static void get_evt_1_d(GtkObject *widget, gpointer user_data)
 	void **slot = user_data;
 	void **base = slot[0], **desc = slot[1];
 
-	if (!desc[1]) destroy_dialog(GET_REAL_WINDOW(base));
+	if (!desc[1]) run_destroy(base);
 	else ((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
 }
 
@@ -150,7 +156,7 @@ static void trigger_things(void **wdata)
 static int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, n = 2 + 1; // noop-slot and safety margin
+	int op, n = 2; // safety margin
 
 	while (TRUE)
 	{
@@ -471,7 +477,6 @@ static GtkWidget *colorpad(int *idx, char *ddata, void **pp, void **r)
 		GTK_SIGNAL_FUNC(colorpad_click), (gpointer)r);
 	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
 		GTK_SIGNAL_FUNC(colorpad_key), (gpointer)r);
-	gtk_widget_show(pix);
 	return (pix);
 }
 
@@ -586,6 +591,59 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 	return (hbox);
 }
 
+//	TEXT widget
+
+static GtkWidget *textarea(char *init)
+{
+	GtkWidget *scroll, *text;
+
+#if GTK_MAJOR_VERSION == 1
+	text = gtk_text_new(NULL, NULL);
+	gtk_text_set_editable(GTK_TEXT(text), TRUE);
+	if (init) gtk_text_insert(GTK_TEXT(text), NULL, NULL, NULL, init, -1);
+
+	scroll = gtk_scrolled_window_new(NULL, GTK_TEXT(text)->vadj);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	GtkTextBuffer *texbuf = gtk_text_buffer_new(NULL);
+	if (init) gtk_text_buffer_set_text(texbuf, init, -1);
+
+	text = gtk_text_view_new_with_buffer(texbuf);
+
+	scroll = gtk_scrolled_window_new(GTK_TEXT_VIEW(text)->hadjustment,
+		GTK_TEXT_VIEW(text)->vadjustment);
+#endif
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+	gtk_container_add(GTK_CONTAINER(scroll), text);
+	gtk_widget_show_all(scroll);
+
+	return (text);
+}
+
+static char *read_textarea(GtkWidget *text)
+{
+#if GTK_MAJOR_VERSION == 1
+	return (gtk_editable_get_chars(GTK_EDITABLE(text), 0, -1));
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	GtkTextIter begin, end;
+	GtkTextBuffer *buffer = GTK_TEXT_VIEW(text)->buffer;
+
+	gtk_text_buffer_get_start_iter(buffer, &begin);
+	gtk_text_buffer_get_end_iter(buffer, &end);
+	return (gtk_text_buffer_get_text(buffer, &begin, &end, TRUE));
+#endif
+}
+
+static void set_textarea(GtkWidget *text, char *init)
+{
+#if GTK_MAJOR_VERSION == 1
+	gtk_editable_delete_text(GTK_EDITABLE(text), 0, -1);
+	if (init) gtk_text_insert(GTK_TEXT(text), NULL, NULL, NULL, init, -1);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_text_buffer_set_text(GTK_TEXT_VIEW(text)->buffer, init ? init : "", -1);
+#endif
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -598,6 +656,23 @@ static int n_trans(char **dest, char **src, int n)
 
 #endif
 
+/* Get/set window position & size from/to inifile */
+void rw_pos(v_dd *vdata, int set)
+{
+	char name[128];
+	int i, l = strlen(vdata->ininame);
+
+	memcpy(name, vdata->ininame, l);
+	name[l++] = '_'; name[l + 1] = '\0';
+	for (i = 0; i < 4; i++)
+	{
+		name[l] = "xywh"[i];
+		if (set) inifile_set_gint32(name, vdata->xywh[i]);
+		else if (vdata->xywh[i] || (i < 2)) /* 0 means auto-size */
+			vdata->xywh[i] = inifile_get_gint32(name, vdata->xywh[i]);
+	}
+}
+
 /* Groups of codes differing only in details of packing */
 
 typedef struct {
@@ -606,7 +681,8 @@ typedef struct {
 } cmdef;
 
 enum {
-	cm_VBOX = op_LAST,
+	cm_TABLE = op_LAST,
+	cm_VBOX,
 	cm_HBOX,
 	cm_SPIN,
 	cm_SPINa,
@@ -623,24 +699,28 @@ enum {
 
 static cmdef cmddefs[] = {
 // !!! Padding = 0
-	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK },
-	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK },
-	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK },
-	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK },
+	{ op_TABLE, cm_TABLE, pk_PACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(TABLE) },
+// !!! Padding = 0 Border = 0
+	{ op_XTABLE, cm_TABLE, pk_XPACK | pkf_STACK | pkf_SHOW },
+	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK | pkf_SHOW },
+	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK | pkf_SHOW },
+	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK | pkf_SHOW },
+	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK | pkf_SHOW },
 // !!! Padding = 5
-	{ op_VBOXP, cm_VBOX, pk_PACKp | pkf_STACK, 5 },
+	{ op_VBOXP, cm_VBOX, pk_PACKp | pkf_STACK | pkf_SHOW, 5 },
 // !!! Padding = 0
-	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK },
-	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK },
-	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK,
+	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK | pkf_SHOW },
+	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK | pkf_SHOW },
+	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
-	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK,
+	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
 	/* Codes can map to themselves, and some do */
-	{ op_MLABEL, op_MLABEL, pk_PACKp, USE_BORDER(LABEL) },
+	{ op_MLABEL, op_MLABEL, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
 // !!! Border = 5
-	{ op_MLABELp, op_MLABELp, pk_PACKp, USE_BORDER(LABEL), 5 },
-	{ op_TLLABEL, op_TLLABEL, pk_TABLEp, USE_BORDER(LABEL) },
+	{ op_MLABELp, op_MLABELp, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL), 5 },
+	{ op_TLLABEL, op_TLLABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_XSPIN, cm_SPIN, pk_XPACK },
@@ -671,12 +751,12 @@ static cmdef cmddefs[] = {
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
 	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
-	{ op_OKBTN, op_OKBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
-	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK, 0, USE_BORDER(BUTTON) },
-	{ op_OKADD, op_OKADD, pk_XPACK1, 0, USE_BORDER(BUTTON) },
-	{ op_BUTTON, cm_BUTTON, pk_XPACK, 0, USE_BORDER(BUTTON) },
+	{ op_OKBTN, op_OKBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_OKADD, op_OKADD, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_BUTTON, cm_BUTTON, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 // !!! Padding = 5
-	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp, 5 }
+	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp | pkf_SHOW, 5 }
 };
 
 static void do_destroy(void **wdata);
@@ -693,7 +773,6 @@ static void do_destroy(void **wdata);
 
 void **run_create(void **ifcode, void *ddata, int ddsize)
 {
-	static const void *noop[] = { WDONE, NULL };
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
 		GTK_POLICY_ALWAYS };
 	cmdef *cmds[op_LAST];
@@ -710,15 +789,25 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *tw, *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
+	v_dd *vdata;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL, **resslot = NULL;
+	void *v, **pp, **r = NULL, **res = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad = 0, minw = 0;
 
 
 	// Allocation size
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
-	dsize = (ld + 2 + predict_size(ifcode, ddata) * 2) * sizeof(void *);
+	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
+	dsize = (ld + n + 2 + predict_size(ifcode, ddata) * 2) * sizeof(void *);
+	res = calloc(1, dsize);
+	memcpy(res, ddata, ddsize); // Copy datastruct
+	ddata = res; // And switch to using it
+	vdata = (void *)(res += ld); // Locate where internal data go
+	r = res += n; // Anchor after it
+	*r++ = ddata; // Store struct ref at anchor
+	vdata->code = WDONE; // Make internal datastruct a noop
+	*r++ = vdata; // And use it as tag for anchor
 
 	// Border sizes are DEF_BORDER-based
 	memset(borders, 0, sizeof(borders));
@@ -733,7 +822,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + (lp = op >> 16);
 		ref = WB_GETREF(op);
-		pk = cw = 0;
+		pk = tpad = cw = 0;
 		v = lp ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
 		op &= WB_OPMASK;
@@ -771,89 +860,67 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Display */
 			if (op != op_WEND)
 			{
-				gtk_widget_show(window);
+				cmd_showhide(GET_WINDOW(res), TRUE);
 				if (raise) gdk_window_raise(window->window);
 			}
 			/* Wait for input */
 			if (op == op_WDIALOG)
 			{
-				*resslot = pp - 1; // point to self
 				*(void ***)v = NULL; // clear result slot
+				vdata->dv = v; // announce it
 				while (!*(void ***)v) gtk_main_iteration();
 			}
 			/* Return anchor position */
 			return (res);
 		/* Done with a container */
 		case op_WDONE: ++wp; continue;
-		/* Create a toplevel window, bind datastore to it, and
-		 * put a vertical box inside it */
+		/* Create a toplevel window, and put a vertical box inside it */
 		case op_WINDOWpm:
 			v = *(char **)v; // dereference & fallthrough
 		case op_WINDOW: case op_WINDOWm:
-			window = add_a_window(GTK_WINDOW_TOPLEVEL, _(v),
+			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL, _(v),
 				wpos, op != op_WINDOW);
+			*--wp = add_vbox(window);
+			break;
+		/* Create a fileselector window, and put a horizontal box inside */
 		case op_FPICKpm:
-			if (op == op_FPICKpm) window = fpick_create(
+			widget = window = fpick_create(
 				*(char **)((char *)ddata + (int)pp[1]),
 				*(int *)((char *)ddata + (int)pp[2]));
-
-			res = calloc(1, dsize);
-			memcpy(res, ddata, ddsize); // Copy datastruct
-			ddata = res; // And switch to using it
-			r = res += ld; // Anchor after it
-			*r++ = ddata; // Store struct ref at anchor
-			*r++ = window; // Store window ref right next to it
-			*r++ = pp - 1; // And slot ref after it
-			if (op == op_FPICKpm)
-			{
-				gtk_window_set_modal(GTK_WINDOW(window), TRUE);
-				*--wp = gtk_hbox_new(FALSE, 0);
-				gtk_widget_show(wp[0]);
-				fpick_setup(window, wp[0], GTK_SIGNAL_FUNC(
-					get_evt_1_d), r, NEXT_SLOT(r));
-				/* OK/CANCEL refs */
-				*r++ = res;
-				*r++ = pp + lp - 4;
-				*r++ = res;
-				*r++ = pp + lp - 2;
-				/* Initialize */
-				fpick_set_filename(window, v, FALSE);
-			}
-			else *--wp = add_vbox(window);
-			*r++ = ddata; // Store struct ref for WDIALOG
-			resslot = r; // Remember the location
-			*r++ = noop; // No real descriptor yet
-			continue;
+			gtk_window_set_modal(GTK_WINDOW(window), TRUE);
+			*--wp = gtk_hbox_new(FALSE, 0);
+			gtk_widget_show(wp[0]);
+			fpick_setup(window, wp[0], GTK_SIGNAL_FUNC(get_evt_1_d),
+				NEXT_SLOT(r), SLOT_N(r, 2));
+			/* Initialize */
+			fpick_set_filename(window, v, FALSE);
+			break;
 		/* Add a notebook page */
 		case op_PAGE:
 			--wp; wp[0] = widget = add_new_page(wp[1], _(v));
 			break;
 		/* Add a table */
-		case op_TABLE:
-			--wp; wp[0] = widget = add_a_table((int)v & 0xFFFF,
-				(int)v >> 16, GET_BORDER(TABLE), wp[1]);
+		case cm_TABLE:
+			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
 			break;
 		/* Add a box */
 		case cm_VBOX: case cm_HBOX:
 			widget = (op == cm_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, (int)v & 255);
-			gtk_widget_show(widget);
 			if (!(pk & pkf_FRAME)) cw = (int)v >> 8;
 			break;
 		/* Add an equal-spaced horizontal box */
 		case op_EQBOX:
 			widget = gtk_hbox_new(TRUE, (int)v & 255);
-			gtk_widget_show(widget);
 			cw = (int)v >> 8;
-			pk = pk_PACK | pkf_STACK;
+			pk = pk_PACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a scrolled window */
 		case op_SCROLL:
 			widget = gtk_scrolled_window_new(NULL, NULL);
 			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
 				scrollp[(int)v & 255], scrollp[(int)v >> 8]);
-			gtk_widget_show(widget);
-			pk = pk_XPACK | pkf_STACK;
+			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Put a notebook into scrolled window */
 		case op_SNBOOK:
@@ -867,6 +934,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_viewport_set_shadow_type(GTK_VIEWPORT(tw), GTK_SHADOW_NONE);
 			gtk_widget_show_all(tw);
 			vport_noshadow_fix(tw);
+			break;
+		/* Add a normal notebook */
+		case op_NBOOK:
+			widget = gtk_notebook_new();
+// !!! Border = 5
+			cw = 5;
+			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a plain notebook (2 pages for now) */
 		case op_PLAINBOOK:
@@ -894,7 +968,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			v = *(char **)v; // dereference & fallthrough
 		case op_MLABEL: case op_TLLABEL:
 			widget = gtk_label_new(_(v));
-			gtk_widget_show(widget);
 			if (cw) gtk_misc_set_padding(GTK_MISC(widget), 0, cw);
 			cw = 0;
 			if (op != op_TLLABEL) break; // Multiline label
@@ -1005,20 +1078,31 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			break;
 		}
-		/* Add a path box, fill from var/inifile */
-		case op_PATH: case op_PATHs:
-			widget = mt_path_box(_(pp[1]), wp[0], _(pp[2]),
-				(int)pp[3]);
+		/* Add a path entry or box to table */
+		case op_TPENTRY: case op_PATH: case op_PATHs:
+			if (op == op_TPENTRY)
+			{
+				widget = gtk_entry_new_with_max_length((int)pp[1]);
+// !!! Padding = 0
+				pk = pk_TABLE2 | pkf_SHOW;
+			}
+			else widget = mt_path_box(_(pp[1]), wp[0], _(pp[2]), (int)pp[3]);
 			gtkuncpy(txt, op == op_PATHs ? inifile_get(v, "") : v,
 				PATHTXT);
 			gtk_entry_set_text(GTK_ENTRY(widget), txt);
+			break;
+		/* Add a text widget, fill from drop-away buffer at pointer */
+		case op_TEXT:
+			widget = textarea(*(char **)v);
+			*(char **)v = NULL;
+// !!! Padding = 0 Border = 0
+			pk = pk_XPACK | pkf_PARENT; // wrapped
 			break;
 		/* Add a color picker box, w/field array, & leave unfilled(!) */
 		case op_COLOR: case op_TCOLOR:
 			widget = cpick_create();
 			cpick_set_opacity_visibility(widget, op == op_TCOLOR);
-			gtk_widget_show(widget);
-			pk = pk_PACK;
+			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
@@ -1027,7 +1111,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a colorpad */
 		case op_COLORPAD:
 			widget = colorpad(v, ddata, pp - 1, NEXT_SLOT(r));
-			pk = pk_PACK;
+			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
@@ -1035,26 +1119,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK;
 			break;
 		/* Add a box with "OK"/"Cancel", or something like */
-		case op_OKBOX: case op_EOKBOX:
+		case op_OKBOX: case op_EOKBOX: case op_UOKBOX:
 		{
 			GtkWidget *ok_bt, *cancel_bt, *box;
 
 			ag = gtk_accel_group_new();
  			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 
-			--wp; wp[0] = widget = gtk_hbox_new(TRUE, 0);
-			gtk_container_set_border_width(GTK_CONTAINER(widget),
-				GET_BORDER(OKBOX));
-			gtk_widget_show(widget);
-			box = widget;
+			widget = gtk_hbox_new(op != op_UOKBOX, 0);
+			pk = pk_PACK | pkf_STACK | pkf_SHOW;
 			if (op == op_EOKBOX) // clustered to right side
 			{
 				box = gtk_hbox_new(FALSE, 0);
 				gtk_widget_show(box);
 // !!! Min width = 260
 				pack_end(box, widget_align_minsize(widget, 260, -1));
+				pk = pk_PACK | pkf_STACK | pkf_SHOW | pkf_PARENT;
 			}
-			pack(wp[1], box);
+			cw = GET_BORDER(OKBOX);
 			if (ref < 2) break; // empty box for separate buttons
 
 			ok_bt = cancel_bt = gtk_button_new_with_label(_(v));
@@ -1088,7 +1170,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_OKBTN: case op_CANCELBTN: case op_OKADD: case cm_BUTTON:
 		{
 			widget = gtk_button_new_with_label(_(v));
-			gtk_widget_show(widget);
 			if (op == op_OKBTN)
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
@@ -1109,15 +1190,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a toggle button to OK-box */
 		case op_OKTOGGLE:
 			widget = gtk_toggle_button_new_with_label(_(pp[1]));
-			gtk_widget_show(widget);
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			cw = GET_BORDER(BUTTON);
-			pk = pk_XPACK1;
+			pk = pk_XPACK1 | pkf_SHOW;
 			break;
 		/* Call a function */
 		case op_EXEC:
-			r = ((ext_fn)v)(r, &wp);
+			r = ((ext_fn)v)(r, &wp, res);
 			continue;
 		/* Call a V-code subroutine, indirect from field/var */
 // !!! Maybe add opcode for direct call too
@@ -1151,19 +1231,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(scroll_max_size_req), NULL);
 			continue;
-		/* Set default width for window */
-		case op_DEFW:
-			gtk_window_set_default_size(GTK_WINDOW(window), (int)v, -1);
-			continue;
-		/* Apply saved size & position to window */
+		/* Use saved size & position for window */
 		case op_WXYWH:
-			win_restore_pos(window, v, 0, 0, (unsigned)v > 0xFFFF ?
-				(unsigned)v >> 16 : -1, (unsigned)v & 0xFFFF ?
-				(unsigned)v & 0xFFFF : -1);
-			widget = window; // ref it with self
-			break;
+		{
+			unsigned int n = (unsigned)pp[1];
+			vdata->ininame = v;
+			vdata->xywh[2] = n >> 16;
+			vdata->xywh[3] = n & 0xFFFF;
+			if (v) rw_pos(vdata, FALSE);
+			continue;
+		}
 		/* Make toplevel window be positioned at mouse */
 		case op_WPMOUSE: wpos = GTK_WIN_POS_MOUSE; continue;
+		/* Make toplevel window be positioned anywhere WM pleases */
+		case op_WPWHEREVER: wpos = GTK_WIN_POS_NONE; continue;
 		/* Make last referrable widget insensitive */
 		case op_INSENS:
 			gtk_widget_set_sensitive(*origin_slot(r - 2), FALSE);
@@ -1210,6 +1291,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				gtk_signal_connect(GTK_OBJECT(*slot), "color_changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
+			case op_TEXT:
+#if GTK_MAJOR_VERSION == 2 /* In GTK+1, same handler as for GtkEntry */
+				g_signal_connect(GTK_TEXT_VIEW(*slot)->buffer,
+					"changed", GTK_SIGNAL_FUNC(get_evt_1), r);
+				break;
+#endif
+			case op_TPENTRY: case op_PATH: case op_PATHs:
+				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				break;
 			}
 		} // fallthrough
 		/* Remember that event needs triggering here */
@@ -1234,8 +1325,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 		}
 		*(wp - 1) = widget; // pre-stack
+		/* Show this */
+		if (pk & pkf_SHOW) gtk_widget_show(widget);
 		/* Border this */
 		if (cw) gtk_container_set_border_width(GTK_CONTAINER(widget), cw);
+		/* Unwrap this */
+		if (pk & pkf_PARENT)
+			while (widget->parent) widget = widget->parent;
 		/* Frame this */
 		if (pk & pkf_FRAME)
 			widget = add_with_frame(NULL, _(pp[--lp]), widget);
@@ -1263,7 +1359,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case pk_TABLE2: case pk_TABLE2x:
 		{
 			int y = next_table_level(wp[0], FALSE);
-			add_to_table(_(pp[--lp]), wp[0], y, 0, tpad);
+			add_to_table(_(pp[--lp]), wp[0], y, 0, GET_BORDER(TLABEL));
 			gtk_table_attach(GTK_TABLE(wp[0]), widget, 1, 2,
 				y, y + 1, GTK_EXPAND | GTK_FILL,
 				n == pk_TABLE2x ? GTK_FILL : 0, 0, tpad);
@@ -1295,10 +1391,11 @@ static void do_destroy(void **wdata)
 	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
 	{
 		op = (int)*pp++;
-		if ((op & WB_OPMASK) != op_CLEANUP) continue;
 		v = pp[0];
 		if (op & WB_FFLAG) v = data + (int)v;
-		free(*(void **)v);
+		op &= WB_OPMASK;
+		if (op == op_CLEANUP) free(*(void **)v);
+		else if (op == op_TEXT) g_free(*(char **)v);
 	}
 	free(data);
 }
@@ -1313,7 +1410,8 @@ static void *do_query(char *data, void **wdata, int mode)
 		op = (int)*pp++;
 		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = data + (int)v;
-		switch (op & WB_OPMASK)
+		op &= WB_OPMASK;
+		switch (op)
 		{
 		case op_FPICKpm:
 			fpick_get_filename(*wdata, v, PATHBUF, FALSE);
@@ -1358,8 +1456,9 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
 			break;
-		case op_PATH:
-			gtkncpy(v, gtk_entry_get_text(GTK_ENTRY(*wdata)), PATHBUF);
+		case op_TPENTRY: case op_PATH:
+			gtkncpy(v, gtk_entry_get_text(GTK_ENTRY(*wdata)),
+				op == op_TPENTRY ? (int)pp[1] : PATHBUF);
 			break;
 		case op_PATHs:
 		{
@@ -1368,6 +1467,10 @@ static void *do_query(char *data, void **wdata, int mode)
 			inifile_set(v, path);
 			break;
 		}
+		case op_TEXT:
+			g_free(*(char **)v);
+			*(char **)v = read_textarea(*wdata);
+			break;
 		default: v = NULL; break;
 		}
 		if (mode > 1) return (v);
@@ -1379,6 +1482,14 @@ void run_query(void **wdata)
 {
 	update_window_spin(GET_REAL_WINDOW(wdata));
 	do_query(GET_DDATA(wdata), GET_WINDOW(wdata), 0);
+}
+
+void run_destroy(void **wdata)
+{
+	v_dd *vdata = GET_VDATA(wdata);
+	if (vdata->ininame && vdata->ininame[0])
+		cmd_showhide(GET_WINDOW(wdata), FALSE); // save position & size
+	destroy_dialog(GET_REAL_WINDOW(wdata));
 }
 
 void run_reset(void **wdata, int group)
@@ -1453,18 +1564,6 @@ void run_reset(void **wdata, int group)
 	}
 }
 
-void run_locate(void **wdata)
-{
-	void **pp;
-	int op;
-
-	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
-	{
-		op = (int)*pp++;
-		if ((op & WB_OPMASK) == op_WXYWH) win_store_pos(*wdata, pp[0]);
-	}
-}
-
 void cmd_sensitive(void **slot, int state)
 {
 	if (GET_OP(slot) < op_EVT_0) // any widget
@@ -1473,8 +1572,33 @@ void cmd_sensitive(void **slot, int state)
 
 void cmd_showhide(void **slot, int state)
 {
-	if (GET_OP(slot) < op_EVT_0) // any widget
-		widget_showhide(slot[0], state);
+	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
+	if (!GTK_WIDGET_VISIBLE(slot[0]) ^ !!state) return; // no use
+	if (GET_OP(PREV_SLOT(slot)) == op_WDONE) // toplevels are special
+	{
+		v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
+		GtkWidget *w = GTK_WIDGET(slot[0]);
+
+		if (state) // show - apply stored size & position
+		{
+			if (vdata->ininame) gtk_widget_set_uposition(w,
+				vdata->xywh[0], vdata->xywh[1]);
+			else vdata->ininame = ""; // first time
+			gtk_window_set_default_size(GTK_WINDOW(w),
+				vdata->xywh[2] ? vdata->xywh[2] : -1,
+				vdata->xywh[3] ? vdata->xywh[3] : -1);
+		}
+		else // hide - remember size & position
+		{
+			gdk_window_get_size(w->window,
+				vdata->xywh + 2, vdata->xywh + 3);
+			gdk_window_get_root_origin(w->window,
+				vdata->xywh + 0, vdata->xywh + 1);
+			if (vdata->ininame && vdata->ininame[0])
+				rw_pos(vdata, TRUE);
+		}
+	}
+	widget_showhide(slot[0], state);
 }
 
 void cmd_set(void **slot, int v)
@@ -1597,6 +1721,7 @@ void cmd_setv(void **slot, void *res, int idx)
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
 	if (op == op_FPICKpm) fpick_set_filename(slot[0], res, idx);
+	else if (op == op_TEXT) set_textarea(slot[0], res);
 }
 
 void cmd_repaint(void **slot)
