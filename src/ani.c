@@ -46,19 +46,21 @@ typedef struct {
 	void **save, **preview, **frames;
 } anim_dd;
 
+typedef struct {
+	void **awin;
+	int fix;
+	int frame[3];
+	void **fslider;
+} apview_dd;
+
 ///	GLOBALS
 
-int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10, ani_play_state = FALSE,
-	ani_timer_state = 0;
+int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10;
+static int ani_play_state, ani_timer_state;
 
 
 
 ///	FORM VARIABLES
-
-static void **animate_window_;
-static GtkWidget *ani_prev_win,
-	*ani_prev_slider		// Slider widget on preview area
-	;
 
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
@@ -67,7 +69,7 @@ static int
 // !!! For now
 	ani_currently_selected_layer;
 static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
-static gboolean ani_use_gif, ani_show_main_state;
+static int ani_use_gif, ani_show_main_state;
 
 
 
@@ -495,12 +497,6 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 ///	EXPORT ANIMATION FRAMES WINDOW
 
 
-static void ani_fix_pos()
-{
-	ani_read_layer_data();
-	layers_notify_changed();
-}
-
 static void create_frames_ani();
 
 static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
@@ -511,7 +507,6 @@ static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
 	if (what == op_EVT_CANCEL)
 	{
 		run_destroy(wdata);
-		animate_window_ = NULL;
 
 		layers_pastry_cut = FALSE;
 
@@ -522,8 +517,7 @@ static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
 
 	where = origin_slot(where);
 
-// !!! For now, call w/o parameter (relies on animate_window_)
-	if (where == dt->preview) ani_but_preview();
+	if (where == dt->preview) ani_but_preview(wdata);
 
 	else if (where == dt->frames)
 	{
@@ -598,53 +592,36 @@ static void ani_win_read_widgets(void **wdata)	// Read all widgets and set up re
 }
 
 
-static gboolean ani_play_timer_call()
+static gboolean ani_play_timer_call(gpointer data)
 {
-	int i;
-
-	if ( ani_play_state == 0 )
+	if (!ani_play_state)
 	{
 		ani_timer_state = 0;
 		return FALSE;			// Stop animating
 	}
 	else
 	{
-		i = ADJ2INT(SPINSLIDE_ADJUSTMENT(ani_prev_slider)) + 1;
-		if (i > ani_frame2) i = ani_frame1;
-		mt_spinslide_set_value(ani_prev_slider, i);
+		apview_dd *dt = data;
+		int i;
+
+		cmd_read(dt->fslider, dt);
+		i = dt->frame[0] + 1;
+		if (i > dt->frame[2]) i = dt->frame[1];
+		cmd_set(dt->fslider, i);
 		return TRUE;
 	}
-}
-
-static void ani_play_start()
-{
-	if (!ani_play_state)
-	{
-		ani_play_state = 1;
-		if (!ani_timer_state) ani_timer_state = threads_timeout_add(
-			ani_gif_delay * 10, ani_play_timer_call, NULL);
-	}
-}
-
-static void ani_play_stop()
-{
-	ani_play_state = 0;
 }
 
 
 ///	PREVIEW WINDOW CALLBACKS
 
-static void ani_but_playstop(GtkToggleButton *togglebutton, gpointer user_data)
-{
-	if (gtk_toggle_button_get_active(togglebutton)) ani_play_start();
-	else ani_play_stop();
-}
-
-static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data)
+static void ani_frame_slider_moved(apview_dd *dt, void **wdata, int what,
+	void **where)
 {
 	int x = 0, y = 0, w = mem_width, h = mem_height;
 
-	ani_set_frame_state(ADJ2INT(adjustment));
+	cmd_read(where, dt);
+	ani_set_frame_state(dt->frame[0]);
 
 	if (layer_selected)
 	{
@@ -657,80 +634,76 @@ static void ani_frame_slider_moved(GtkAdjustment *adjustment, gpointer user_data
 	vw_update_area(x, y, w, h);	// Update only the area we need
 }
 
-static gboolean ani_but_preview_close()
+static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)
 {
-	ani_play_stop();				// Stop animation playing if necessary
-
-	win_store_pos(ani_prev_win, "ani_prev");
-	gtk_widget_destroy( ani_prev_win );
-
-	if (animate_window_) cmd_showhide(GET_WINDOW(animate_window_), TRUE);
-	else
+	if (what == op_EVT_CANCEL)
 	{
-		ani_write_layer_data();
-		layers_pastry_cut = FALSE;
-		update_stuff(UPD_ALLV);
+		void **awin = dt->awin; // for after run_destroy()
+
+		ani_play_state = FALSE;	// Stop animation playing if necessary
+
+		run_destroy(wdata);
+
+		if (awin) cmd_showhide(GET_WINDOW(awin), TRUE);
+		else
+		{
+			ani_write_layer_data();
+			layers_pastry_cut = FALSE;
+			update_stuff(UPD_ALLV);
+		}
 	}
-	return (FALSE);
+	else if (what == op_EVT_CHANGE) // Play toggle
+	{
+		cmd_read(where, dt);
+		if (ani_play_state && !ani_timer_state) // Start timer
+			ani_timer_state = threads_timeout_add(ani_gif_delay * 10,
+				ani_play_timer_call, dt);
+	}
+	else /* if (what == op_EVT_CLICK) */ // Fix
+	{
+		ani_read_layer_data();
+		layers_notify_changed();
+	}
 }
 
-void ani_but_preview()
-{
-	GtkWidget *hbox3, *button;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+#undef _
+#define _(X) X
 
+#define WBbase apview_dd
+static void *apview_code[] = {
+	WPWHEREVER, WINDOWm(_("Animation Preview")),
+	WXYWH("ani_prev", 200, 0),
+	UOKBOX0, // !!! Originally the window was that way, and had no vbox
+	UTOGGLEv(_("Play"), ani_play_state, ani_play_btn),
+	REF(fslider), MINWIDTH(200), XSPINSLIDEa(frame),
+	EVENT(CHANGE, ani_frame_slider_moved), TRIGGER,
+	IF(fix), UBUTTON(_("Fix"), ani_play_btn),
+	UCANCELBTN(_("Close"), ani_play_btn),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
+
+void ani_but_preview(void **awin)
+{
+	apview_dd tdata = { awin, !awin, { ani_frame1, ani_frame1, ani_frame2 } };
 
 	ani_read_layer_data();
 
-	if ( !view_showing ) view_show();	// If not showing, show the view window
+	if (!view_showing) view_show();	// If not showing, show the view window
 
-	ani_prev_win = add_a_window( GTK_WINDOW_TOPLEVEL,
-			_("Animation Preview"), GTK_WIN_POS_NONE, TRUE );
-	gtk_container_set_border_width(GTK_CONTAINER(ani_prev_win), 5);
+	ani_play_state = FALSE;	// Stopped
 
-	win_restore_pos(ani_prev_win, "ani_prev", 0, 0, 200, -1);
-
-	hbox3 = gtk_hbox_new (FALSE, 0);
-	gtk_widget_show (hbox3);
-	gtk_container_add (GTK_CONTAINER (ani_prev_win), hbox3);
-
-	pack(hbox3, sig_toggle_button(_("Play"), FALSE, NULL,
-		GTK_SIGNAL_FUNC(ani_but_playstop)));
-	ani_play_state = FALSE;			// Stopped
-
-	ani_prev_slider = mt_spinslide_new(-2, -2);
-	xpack(hbox3, widget_align_minsize(ani_prev_slider, 200, -2));
-	mt_spinslide_set_range(ani_prev_slider, ani_frame1, ani_frame2);
-	mt_spinslide_set_value(ani_prev_slider, ani_frame1);
-	mt_spinslide_connect(ani_prev_slider,
-		GTK_SIGNAL_FUNC(ani_frame_slider_moved), NULL);
-
-	if (!animate_window_)	// If called via the menu have a fix button
-	{
-		button = add_a_button( _("Fix"), 5, hbox3, FALSE );
-		gtk_signal_connect(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(ani_fix_pos), NULL);
-	}
-
-	button = add_a_button( _("Close"), 5, hbox3, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button), "clicked", GTK_SIGNAL_FUNC(ani_but_preview_close), NULL);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	gtk_signal_connect (GTK_OBJECT (ani_prev_win), "delete_event",
-			GTK_SIGNAL_FUNC(ani_but_preview_close), NULL);
-
-	gtk_window_set_transient_for( GTK_WINDOW(ani_prev_win), GTK_WINDOW(main_window) );
-	gtk_widget_show (ani_prev_win);
-	gtk_window_add_accel_group(GTK_WINDOW (ani_prev_win), ag);
-
-	if (animate_window_) cmd_showhide(GET_WINDOW(animate_window_), FALSE);
+	if (awin) cmd_showhide(GET_WINDOW(awin), FALSE);
 	else
 	{
 		layers_pastry_cut = TRUE;
 		update_stuff(UPD_ALLV);
 	}
 
-	gtk_adjustment_value_changed(SPINSLIDE_ADJUSTMENT(ani_prev_slider));
+	run_create(apview_code, &tdata, sizeof(tdata));
 }
 
 static void create_frames_ani()
@@ -1022,6 +995,7 @@ static GtkWidget *ani_list_layers;
 #define WBbase anim_dd
 static void *anim_code[] = {
 	WPWHEREVER, WINDOWm(_("Configure Animation")),
+	WXYWH("ani", 200, 200),
 	NBOOK,
 	PAGE(_("Output Files")),
 	XTABLE(2, 5),
@@ -1062,7 +1036,6 @@ static void *anim_code[] = {
 	REF(preview), BUTTON(_("Preview"), ani_btn),
 	REF(frames), BUTTON(_("Create Frames"), ani_btn),
 	WDONE,
-	WXYWH("ani", 200, 200),
 // !!! Cannot WSHOW because init-event to trigger is not yet on V-code level:
 //	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
 	WEND
@@ -1075,6 +1048,7 @@ static void *anim_code[] = {
 void pressed_animate_window()
 {
 	anim_dd tdata;
+	void **wdata;
 
 
 	if ( layers_total < 1 )					// Only background layer available
@@ -1100,7 +1074,7 @@ void pressed_animate_window()
 	tdata.frame2 = ani_frame2;
 	tdata.cyc = ani_cyc_txt();
 
-	animate_window_ = run_create(anim_code, &tdata, sizeof(tdata));
+	wdata = run_create(anim_code, &tdata, sizeof(tdata));
 	free(tdata.cyc);
 
 	ani_show_main_state = show_layers_main;	// Remember old state
@@ -1108,7 +1082,7 @@ void pressed_animate_window()
 
 // !!! For now
 	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
-	cmd_showhide(GET_WINDOW(animate_window_), TRUE);
+	cmd_showhide(GET_WINDOW(wdata), TRUE);
 
 	layers_pastry_cut = TRUE;
 	update_stuff(UPD_ALLV);

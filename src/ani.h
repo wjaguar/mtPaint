@@ -55,4 +55,4 @@ void pressed_remove_key_frames();
 void ani_read_file( FILE *fp );		// Read data from layers file already opened
 void ani_write_file( FILE *fp );	// Write data to layers file already opened
 
-void ani_but_preview();			// Preview the animation
+void ani_but_preview(void **awin);	// Preview the animation

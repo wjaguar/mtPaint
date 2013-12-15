@@ -687,12 +687,15 @@ enum {
 	cm_SPIN,
 	cm_SPINa,
 	cm_FSPIN,
+	cm_SPINSLIDEa,
 	cm_CHECK,
 	cm_RPACK,
 	cm_RPACKD,
 	cm_OPT,
 	cm_OPTD,
-	cm_BUTTON
+	cm_CANCELBTN,
+	cm_BUTTON,
+	cm_TOGGLE
 };
 
 #define USE_BORDER(T) (op_BOR_0 - op_BOR_##T - 1)
@@ -739,7 +742,8 @@ static cmdef cmddefs[] = {
 	{ op_TSPINSLIDE, op_TSPINSLIDE, pk_TABLE2x },
 // !!! Padding = 5
 	{ op_TLSPINSLIDE, op_TLSPINSLIDE, pk_TABLE, 5 },
-	{ op_SPINSLIDEa, op_SPINSLIDEa, pk_PACK },
+	{ op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACK },
+	{ op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK },
 	{ op_CHECK, cm_CHECK, pk_PACK },
 	{ op_XCHECK, cm_CHECK, pk_XPACK },
 	{ op_TLCHECK, cm_CHECK, pk_TABLE },
@@ -752,11 +756,15 @@ static cmdef cmddefs[] = {
 	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
 	{ op_OKBTN, op_OKBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
-	{ op_CANCELBTN, op_CANCELBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_CANCELBTN, cm_CANCELBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_UCANCELBTN, cm_CANCELBTN, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_OKADD, op_OKADD, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_BUTTON, cm_BUTTON, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_UBUTTON, cm_BUTTON, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 // !!! Padding = 5
-	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp | pkf_SHOW, 5 }
+	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp | pkf_SHOW, 5 },
+	{ op_OKTOGGLE, cm_TOGGLE, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_UTOGGLE, cm_TOGGLE, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) }
 };
 
 static void do_destroy(void **wdata);
@@ -1002,19 +1010,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a spinslider */
 		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case op_SPINSLIDEa:
+		case cm_SPINSLIDEa:
 // !!! Width = 255 Height = 20
 			widget = op == op_TSPINSLIDE ? mt_spinslide_new(255, 20) :
 				mt_spinslide_new(-1, -1);
-			if (op == op_SPINSLIDEa) mt_spinslide_set_range(widget,
+			if (op == cm_SPINSLIDEa) mt_spinslide_set_range(widget,
 				((int *)v)[1], ((int *)v)[2]);
 			else mt_spinslide_set_range(widget, (int)pp[1], (int)pp[2]);
 			mt_spinslide_set_value(widget, *(int *)v);
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
-// !!! Min width = 200
-			if (op == op_TLSPINSLIDE) minw = 200;
 			if (op == op_HTSPINSLIDE)
 			{
 				GtkWidget *label;
@@ -1167,7 +1173,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a clickable button */
-		case op_OKBTN: case op_CANCELBTN: case op_OKADD: case cm_BUTTON:
+		case op_OKBTN: case cm_CANCELBTN: case op_OKADD: case cm_BUTTON:
 		{
 			widget = gtk_button_new_with_label(_(v));
 			if (op == op_OKBTN)
@@ -1177,7 +1183,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_KP_Enter, 0, (GtkAccelFlags)0);
 			}
-			else if (op == op_CANCELBTN)
+			else if (op == cm_CANCELBTN)
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_Escape, 0, (GtkAccelFlags)0);
@@ -1188,12 +1194,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a toggle button to OK-box */
-		case op_OKTOGGLE:
+		case cm_TOGGLE:
 			widget = gtk_toggle_button_new_with_label(_(pp[1]));
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
-			cw = GET_BORDER(BUTTON);
-			pk = pk_XPACK1 | pkf_SHOW;
 			break;
 		/* Call a function */
 		case op_EXEC:
@@ -1253,6 +1257,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_FOCUS:
 			gtk_widget_grab_focus(*origin_slot(r - 2));
 			continue;
+		/* Set minimum width for next widget */
+		case op_MINWIDTH:
+			minw = (int)v;
+			continue;
 		/* Make window transient to given widget-map */
 		case op_ONTOP:
 			tparent = !v ? NULL :
@@ -1279,6 +1287,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 			case op_TSPINSLIDE: case op_TLSPINSLIDE:
 			case op_HTSPINSLIDE: case op_SPINSLIDEa:
+			case op_XSPINSLIDEa:
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -1428,11 +1437,12 @@ static void *do_query(char *data, void **wdata, int mode)
 				read_float_spin(*wdata)) * 100);
 			break;
 		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case op_SPINSLIDEa:
+		case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_OKTOGGLE:
+		case op_CHECK: case op_XCHECK: case op_TLCHECK:
+		case op_OKTOGGLE: case op_UTOGGLE:
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
 			break;
@@ -1517,10 +1527,11 @@ void run_reset(void **wdata, int group)
 				*(int *)v);
 			break;
 		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case op_SPINSLIDEa:
+		case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_OKTOGGLE:
+		case op_CHECK: case op_XCHECK: case op_TLCHECK:
+		case op_OKTOGGLE: case op_UTOGGLE:
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
 				*(int *)v);
 			break;
@@ -1607,7 +1618,7 @@ void cmd_set(void **slot, int v)
 	switch (GET_OP(slot))
 	{
 	case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-	case op_SPINSLIDEa:
+	case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_value(slot[0], v);
 		break;
 	case op_TLNOSPIN:
@@ -1621,7 +1632,8 @@ void cmd_set(void **slot, int v)
 	case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
-	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_OKTOGGLE:
+	case op_CHECK: case op_XCHECK: case op_TLCHECK:
+	case op_OKTOGGLE: case op_UTOGGLE:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
@@ -1658,7 +1670,7 @@ void cmd_set3(void **slot, int *v)
 	switch (GET_OP(slot))
 	{
 	case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-	case op_SPINSLIDEa:
+	case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
 		mt_spinslide_set_value(slot[0], v[0]);
 		break;

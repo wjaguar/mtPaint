@@ -4135,7 +4135,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_ANI:
 		pressed_animate_window(); break;
 	case DLG_ANI_VIEW:
-		ani_but_preview(); break;
+		ani_but_preview(NULL); break;
 	case DLG_ANI_KEY:
 		pressed_set_key_frame(); break;
 	case DLG_ANI_KILLKEY:

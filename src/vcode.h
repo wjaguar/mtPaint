@@ -73,6 +73,7 @@ enum {
 	op_HTSPINSLIDE,
 	op_TLSPINSLIDE,
 	op_SPINSLIDEa,
+	op_XSPINSLIDEa,
 	op_CHECK,
 	op_XCHECK,
 	op_TLCHECK,
@@ -100,9 +101,12 @@ enum {
 	op_UOKBOX,
 	op_OKBTN,
 	op_CANCELBTN,
+	op_UCANCELBTN,
 	op_OKADD,
 	op_OKTOGGLE,
+	op_UTOGGLE,
 	op_BUTTON,
+	op_UBUTTON,
 	op_TLBUTTON,
 
 	op_EXEC,
@@ -122,6 +126,7 @@ enum {
 	op_WPWHEREVER,
 	op_INSENS,
 	op_FOCUS,
+	op_MINWIDTH,
 	op_ONTOP,
 	op_RAISED,
 
@@ -309,6 +314,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINSLIDEa(A) WBrhf(SPINSLIDEa, 1), WBfield(A)
+#define XSPINSLIDEa(A) WBrhf(XSPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
 #define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (void *)(V0), (NM)
@@ -369,13 +375,16 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define OKBOX0 WBh(OKBOX, 0)
 #define UOKBOX0 WBh(UOKBOX, 0)
-// !!! These *BTN,OK*,*BUTTON blocks each hold 1 nested EVENT block */
+// !!! These *BTN,OK*,*TOGGLE,*BUTTON blocks each hold 1 nested EVENT block */
 #define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define UCANCELBTN(NM,H) WBr2h(UCANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
 #define OKTOGGLE(NM,V,H) WBr2hf(OKTOGGLE, 2 + 2), WBfield(V), (NM), \
 	EVENT(CHANGE, H)
+#define UTOGGLEv(NM,V,H) WBr2h(UTOGGLE, 2 + 2), &(V), (NM), EVENT(CHANGE, H)
 #define BUTTON(NM,H) WBr2h(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define UBUTTON(NM,H) WBr2h(UBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
@@ -403,6 +412,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WPWHEREVER WBh(WPWHEREVER, 0)
 #define INSENS WBh(INSENS, 0)
 #define FOCUS WBh(FOCUS, 0)
+#define MINWIDTH(N) WBh(MINWIDTH, 1), (void *)(N)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define RAISED WBh(RAISED, 0)
 /* !!! Maybe better to integrate this into container codes */

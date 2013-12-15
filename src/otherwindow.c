@@ -2468,7 +2468,8 @@ static void *grad_code[] = {
 	TSPIN(_("Offset"), ofs, -MAX_GRAD, MAX_GRAD),
 	TLLABEL(_("Gradient type"), 2, 0), TLOPT(gtypes_txt, 6, type, 3, 0),
 	TLLABEL(_("Extension type"), 2, 1), TLOPT(rtypes_txt, 4, bound, 3, 1),
-	TLLABEL(_("Preview opacity"), 2, 2), TLSPINSLIDE(opac, 0, 255, 3, 2),
+	TLLABEL(_("Preview opacity"), 2, 2),
+		MINWIDTH(200), TLSPINSLIDE(opac, 0, 255, 3, 2),
 	WDONE,
 	/* Select page */
 	EQBOX,

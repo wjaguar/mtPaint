@@ -165,7 +165,9 @@ char *file_in_homedir(char *dest, const char *file, int cnt);
 
 // Extracting widget from GtkTable
 
+#if 0 /* Not needed anymore */
 GtkWidget *table_slot(GtkWidget *table, int row, int col);
+#endif
 
 // Packing framed widget
 
@@ -311,10 +313,6 @@ int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 
 void *bound_malloc(GtkWidget *widget, int size);
 
-// Gamma correction toggle
-
-GtkWidget *gamma_toggle();
-
 // Image widget
 
 GtkWidget *xpm_image(XPM_TYPE xpm);
@@ -374,7 +372,9 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 
 // Track updates of multiple widgets (by whatever means necessary)
 
+#if 0 /* Not needed anymore */
 void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
+#endif
 
 // Convert pathname to absolute
 

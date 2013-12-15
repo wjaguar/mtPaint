@@ -741,6 +741,8 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 // !!! These legacy things need be replaced by a per-layer field
 			preserved_gif_delay = ani_gif_delay = fset.frames[0].delay;
 
+			/* Clear stale cycles */
+			memset(ani_cycle_table, 0, sizeof(ani_cycle_table));
 			/* Build animation cycle for these layers */
 			ani_frame1 = ani_cycle_table[0].frame0 = 1;
 			ani_frame2 = ani_cycle_table[0].frame1 = l - 1;

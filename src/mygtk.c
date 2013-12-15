@@ -654,6 +654,7 @@ char *file_in_homedir(char *dest, const char *file, int cnt)
 
 // Extracting widget from GtkTable
 
+#if 0 /* Not needed anymore */
 GtkWidget *table_slot(GtkWidget *table, int row, int col)
 {
 	GList *curr;
@@ -666,6 +667,7 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col)
 	}
 	return (NULL);
 }
+#endif
 
 // Packing framed widget
 
@@ -2033,13 +2035,6 @@ void *bound_malloc(GtkWidget *widget, int size)
 	if (mem) gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
 		GTK_SIGNAL_FUNC(g_free), (gpointer)mem);
 	return (mem);
-}
-
-// Gamma correction toggle
-
-GtkWidget *gamma_toggle()
-{
-	return (sig_toggle(_("Gamma corrected"), use_gamma, NULL, NULL));
 }
 
 // Render stock icons to pixmaps
@@ -3473,6 +3468,7 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 
 // Track updates of multiple widgets (by whatever means necessary)
 
+#if 0 /* Not needed anymore */
 /* void handler(GtkWidget *widget) */
 void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
 {
@@ -3497,6 +3493,7 @@ void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
 	}
 	va_end(args);
 }
+#endif
 
 // Convert pathname to absolute
 
