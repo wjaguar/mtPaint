@@ -34,7 +34,6 @@ enum {
 	op_XTABLE,
 	//
 	op_VBOX,
-	op_VBOXP,
 	op_XVBOX,
 	op_EVBOX,
 	op_HBOX,
@@ -45,6 +44,7 @@ enum {
 	//
 	op_EQBOX,
 	op_SCROLL,
+	op_XSCROLL,
 	op_SNBOOK,
 	op_NBOOK,
 	op_PLAINBOOK,
@@ -86,6 +86,7 @@ enum {
 	op_TOPT,
 	op_TLOPT,
 	op_OPTD,
+	op_MLENTRY,
 	op_TPENTRY,
 	op_PATH,
 	op_PATHs,
@@ -96,6 +97,7 @@ enum {
 	op_COLORLISTN,
 	op_COLORPAD,
 	op_GRADBAR,
+	op_LISTCCr,
 	op_OKBOX,
 	op_EOKBOX,
 	op_UOKBOX,
@@ -126,9 +128,13 @@ enum {
 	op_WPWHEREVER,
 	op_INSENS,
 	op_FOCUS,
-	op_MINWIDTH,
+	op_WIDTH,
 	op_ONTOP,
 	op_RAISED,
+
+	op_WLIST,
+	op_IDXCOL,
+	op_TXTCOL,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -143,6 +149,7 @@ enum {
 
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
+	op_BOR_NBOOK,
 	op_BOR_SPIN,
 	op_BOR_LABEL,
 	op_BOR_TLABEL,
@@ -237,6 +244,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
 #define WBnh(N,H) (void *)(((H) & 255) + ((N) << 8))
 #define WBbs(B,S) (void *)(((S) & 255) + ((B) << 8))
+#define WBpbs(P,B,S) (void *)(((S) & 255) + ((B) << 8) + ((P) << 16))
 
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
@@ -255,14 +263,18 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
-#define VBOXPb(S,B) WBh(VBOXP, 1), WBbs(B, S)
+#define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
+#define VBOXPS VBOXbp(5, 0, 5)
 #define XVBOX WBh(XVBOX, 0)
-#define XVBOXb(S,B) WBh(XVBOX, 1), WBbs(B, S)
+#define XVBOXbp(S,B,P) WBh(XVBOX, 1), WBpbs(P, B, S)
+#define XVBOXb(S,B) XVBOXbp(S, B, 0)
 #define EVBOX WBh(EVBOX, 0)
 #define HBOX WBh(HBOX, 0)
-#define HBOXb(S,B) WBh(HBOX, 1), WBbs(B, S)
+#define HBOXbp(S,B,P) WBh(HBOX, 1), WBpbs(P, B, S)
+#define HBOXb(S,B) HBOXbp(S, B, 0)
 #define XHBOX WBh(XHBOX, 0)
-#define XHBOXb(S,B) WBh(XHBOX, 1), WBbs(B, S)
+#define XHBOXbp(S,B,P) WBh(XHBOX, 1), WBpbs(P, B, S)
+#define XHBOXb(S,B) XHBOXbp(S, B, 0)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
 #define FVBOXs(NM,S) WBh(FVBOX, 2), WBbs(0, S), (NM)
@@ -271,6 +283,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
 #define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
+#define XSCROLL(HP,VP) WBh(XSCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define NBOOK WBh(NBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
@@ -357,7 +370,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
 	EVENT(SELECT, HS)
+#define LISTCCr(V,L,HS) WBr2hf(LISTCCr, 2 + 2), WBfield(V), WBfield(L), \
+	EVENT(SELECT, HS)
+#define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
+#define PATH(A,B,C,D) WBrhf(PATH, 4), WBfield(D), (A), (B), (void *)(C)
 #define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
 #define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
@@ -412,9 +429,15 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WPWHEREVER WBh(WPWHEREVER, 0)
 #define INSENS WBh(INSENS, 0)
 #define FOCUS WBh(FOCUS, 0)
-#define MINWIDTH(N) WBh(MINWIDTH, 1), (void *)(N)
+#define WIDTH(N) WBh(WIDTH, 1), (void *)(N)
+#define MINWIDTH(N) WBh(WIDTH, 1), (void *)(-(N))
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define RAISED WBh(RAISED, 0)
+#define WLIST WBh(WLIST, 0)
+#define TXTCOLv(A,S,W,J) WBrh(TXTCOL, 3), &(A), (void *)(S), \
+	(void *)((W) + ((J) << 16))
+#define IDXCOL(N0,S,W,J) WBrh(IDXCOL, 3), (void *)(N0), (void *)(S), \
+	(void *)((W) + ((J) << 16))
 /* !!! Maybe better to integrate this into container codes */
 //#define SETBORDER(V) WBh(SETBORDER, 1), (void *)(V)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)

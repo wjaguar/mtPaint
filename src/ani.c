@@ -40,6 +40,7 @@
 
 typedef struct {
 	int frame1, frame2;
+	int nlayer, lnum, layer;
 	int lock;
 	char *pos, *cyc; // text buffers
 	void **posw, **cycw;
@@ -65,9 +66,7 @@ static int ani_play_state, ani_timer_state;
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
 static int
-	ani_layer_data[MAX_LAYERS + 1][4],	// x, y, opacity, visible
-// !!! For now
-	ani_currently_selected_layer;
+	ani_layer_data[MAX_LAYERS + 1][4];	// x, y, opacity, visible
 static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
 static int ani_use_gif, ani_show_main_state;
 
@@ -530,10 +529,11 @@ static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
 }
 
 
-static void ani_parse_store_positions(char *tx)	// Read current positions in text input and store
+/* Read current positions in text input and store */
+static void ani_parse_store_positions(char *tx, int layer)
 {
 	char *txt, *tmp;
-	ani_slot *ani = layer_table[ani_currently_selected_layer].image->ani_.pos;
+	ani_slot *ani = layer_table[layer].image->ani_.pos;
 	int i;
 
 	tmp = tx;
@@ -547,7 +547,8 @@ static void ani_parse_store_positions(char *tx)	// Read current positions in tex
 	if (i < MAX_POS_SLOTS) ani[i].frame = 0;	// End delimeter
 }
 
-static void ani_parse_store_cycles(char *tx)	// Read current cycles in text input and store
+/* Read current cycles in text input and store */
+static void ani_parse_store_cycles(char *tx)
 {
 	unsigned char buf[MAX_CYC_SLOTS * ANI_CYC_ROWLEN];
 	char *txt, *tmp;
@@ -575,11 +576,11 @@ static void ani_win_read_widgets(void **wdata)	// Read all widgets and set up re
 
 	run_query(wdata);
 
-	ani_parse_store_positions(dt->pos);
+	ani_parse_store_positions(dt->pos, dt->layer);
 	ani_parse_store_cycles(dt->cyc);
 	/* Update 2 text widgets */
 	dt->lock = TRUE;
-	cmd_setv(dt->posw, tmp = ani_pos_txt(ani_currently_selected_layer), 0);
+	cmd_setv(dt->posw, tmp = ani_pos_txt(dt->layer), 0);
 	free(tmp);
 	cmd_setv(dt->cycw, tmp = ani_cyc_txt(), 0);
 	free(tmp);
@@ -939,22 +940,23 @@ static void ani_set_key_frame(int key)		// Set key frame postions & cycles as pe
 	ani_cyc_put(buf);
 }
 
-static void ani_layer_select(GtkList *list, GtkWidget *widget, void **wdata)
+static void ani_layer_select(anim_dd *dt, void **wdata, int what, void **where)
 {
-	anim_dd *dt = GET_DDATA(wdata);
 	char *tmp;
-	int j = layers_total - gtk_list_child_position(list, widget);
+	int j;
 
-// !!! Allow background here when/if added to the list
-	if ( j<1 || j>layers_total ) return;		// Item not found
+	cmd_read(where, dt);
+// !!! Allow background here when/if added to the list (no +1 then)
+	j = dt->nlayer + 1;
 
-	if ( ani_currently_selected_layer != -1 )	// Only if not first click
+	if (j != dt->layer)	// If switching out of layer
 	{
 		cmd_read(dt->posw, dt);
-		ani_parse_store_positions(dt->pos);	// Parse & store text inputs
+		// Parse & store text inputs
+		ani_parse_store_positions(dt->pos, dt->layer);
 	}
 
-	ani_currently_selected_layer = j;
+	dt->layer = j;
 	/* Refresh the text in the widget */
 	dt->lock = TRUE;
 	cmd_setv(dt->posw, tmp = ani_pos_txt(j), 0);
@@ -988,10 +990,6 @@ void pressed_set_key_frame()
 #undef _
 #define _(X) X
 
-// !!! For now
-static void **create_ani_layers_list(void **r, GtkWidget ***wpp, void **wdata);
-static GtkWidget *ani_list_layers;
-
 #define WBbase anim_dd
 static void *anim_code[] = {
 	WPWHEREVER, WINDOWm(_("Configure Animation")),
@@ -1016,7 +1014,13 @@ static void *anim_code[] = {
 ///	LAYERS TABLES
 	PAGE(_("Positions")),
 	XHBOX, // !!! Originally the page was an hbox
-	EXEC(create_ani_layers_list), // !!! leave for later
+	SCROLL(0, 1), // never/auto
+	WLIST,
+// !!! Maybe allow background here too, for x/y? (set base=0 here then)
+	IDXCOL(1, 1, 40, 1), // center
+	TXTCOLv(layer_table[1].name, sizeof(layer_table[1]), 0, 0), // left
+	WIDTH(150),
+	LISTCCr(nlayer, lnum, ani_layer_select), TRIGGER,
 	XVBOX, // !!! what for?
 	REF(posw), TEXT(pos),
 	EVENT(CHANGE, ani_widget_changed),
@@ -1036,9 +1040,7 @@ static void *anim_code[] = {
 	REF(preview), BUTTON(_("Preview"), ani_btn),
 	REF(frames), BUTTON(_("Create Frames"), ani_btn),
 	WDONE,
-// !!! Cannot WSHOW because init-event to trigger is not yet on V-code level:
-//	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
-	WEND
+	WSHOW
 };
 #undef WBbase
 
@@ -1067,12 +1069,14 @@ void pressed_animate_window()
 
 	ani_read_layer_data();
 
-	ani_currently_selected_layer = -1;
-
 	memset(&tdata, 0, sizeof(tdata));
 	tdata.frame1 = ani_frame1;
 	tdata.frame2 = ani_frame2;
 	tdata.cyc = ani_cyc_txt();
+// !!! Maybe allow background here too, for x/y? (set base=0 here then)
+	tdata.lnum = layers_total;
+	tdata.nlayer = layers_total - 1; // last layer in list
+	tdata.layer = layers_total; // regular index of same
 
 	wdata = run_create(anim_code, &tdata, sizeof(tdata));
 	free(tdata.cyc);
@@ -1080,52 +1084,8 @@ void pressed_animate_window()
 	ani_show_main_state = show_layers_main;	// Remember old state
 	show_layers_main = FALSE;		// Don't show all layers in main window - too messy
 
-// !!! For now
-	gtk_list_select_item( GTK_LIST(ani_list_layers), 0 );
-	cmd_showhide(GET_WINDOW(wdata), TRUE);
-
 	layers_pastry_cut = TRUE;
 	update_stuff(UPD_ALLV);
-}
-
-static void **create_ani_layers_list(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GtkWidget *label, *scrolledwindow, *list_data, *hbox2;
-	char txt[128];
-	int i;
-
-	scrolledwindow = pack(**wpp, gtk_scrolled_window_new(NULL, NULL));
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow),
-			GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-
-	ani_list_layers = gtk_list_new ();
-	gtk_signal_connect(GTK_OBJECT(ani_list_layers), "select_child",
-			GTK_SIGNAL_FUNC(ani_layer_select), wdata);
-	gtk_scrolled_window_add_with_viewport (GTK_SCROLLED_WINDOW (scrolledwindow), ani_list_layers);
-
-	gtk_widget_set_usize (ani_list_layers, 150, -2);
-	gtk_container_set_border_width (GTK_CONTAINER (ani_list_layers), 5);
-
-// !!! Maybe allow background here too, for x/y?
-	for ( i=layers_total; i>0; i-- )
-	{
-		hbox2 = gtk_hbox_new( FALSE, 3 );
-
-		list_data = gtk_list_item_new();
-		gtk_container_add( GTK_CONTAINER(ani_list_layers), list_data );
-		gtk_container_add( GTK_CONTAINER(list_data), hbox2 );
-
-		sprintf(txt, "%i", i);					// Layer number
-		label = pack(hbox2, gtk_label_new(txt));
-		gtk_widget_set_usize (label, 40, -2);
-		gtk_misc_set_alignment( GTK_MISC(label), 0.5, 0.5 );
-
-		label = xpack(hbox2, gtk_label_new(layer_table[i].name)); // Layer name
-		gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
-	}
-	gtk_widget_show_all(scrolledwindow);
-
-	return (r);
 }
 
 

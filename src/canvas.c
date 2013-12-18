@@ -498,7 +498,8 @@ static void gauss_xy_click(gauss_dd *dt, void **wdata, int what, void **where)
 
 #define WBbase gauss_dd
 static void *gauss_code[] = {
-	VBOXPb(5, 0),
+	VBOXPS,
+	BORDER(SPIN, 0),
 	FSPIN(x, 0, 20000),
 	REF(yspin), FSPIN(y, 0, 20000), INSENS,
 	CHECK(_("Different X/Y"), xy), EVENT(CHANGE, gauss_xy_click),
@@ -541,7 +542,7 @@ static int do_unsharp(unsharp_dd *dt, void **wdata)
 
 #define WBbase unsharp_dd
 static void *unsharp_code[] = {
-	VBOXPb(5, 0),
+	VBOXPS,
 	BORDER(TABLE, 0),
 	TABLE2(3),
 	TFSPIN(_("Radius"), radius, 0, 20000),
@@ -588,7 +589,7 @@ static int do_dog(dog_dd *dt, void **wdata)
 
 #define WBbase dog_dd
 static void *dog_code[] = {
-	VBOXPb(5, 0),
+	VBOXPS,
 	BORDER(TABLE, 0),
 	TABLE2(2),
 	TFSPIN(_("Outer radius"), outer, 0, 20000),
@@ -631,7 +632,7 @@ static int do_kuwahara(kuw_dd *dt, void **wdata)
 
 #define WBbase kuw_dd
 static void *kuw_code[] = {
-	VBOXPb(5, 0),
+	VBOXPS,
 	BORDER(SPIN, 0),
 	SPIN(r, 1, 127),
 	CHECK(_("Protect details"), detail),
@@ -722,7 +723,8 @@ static int do_rotate_free(rfree_dd *dt, void **wdata)
 
 #define WBbase rfree_dd
 static void *rfree_code[] = {
-	VBOXPb(5, 0),
+	VBOXPS,
+	BORDER(SPIN, 0),
 	FSPINv(angle, -36000, 36000),
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),

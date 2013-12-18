@@ -419,7 +419,7 @@ static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 static void *pref_code[] = {
 	WINDOW(_("Preferences")), // nonmodal
 	MKSHRINK, // shrinkable
-	SCROLL(1, 1), // auto/auto
+	XSCROLL(1, 1), // auto/auto
 	WANTMAX, // max size
 	SNBOOK,
 	BORDER(TABLE, 10),

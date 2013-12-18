@@ -1701,6 +1701,7 @@ static void *colsel_code[] = {
 		WDONE,
 	ENDIF(1),
 	IFx(is_csel, 1),
+		BORDER(SPIN, 0),
 		BORDER(LABEL, 0),
 		HBOX,
 		MLABEL(_("Range")),

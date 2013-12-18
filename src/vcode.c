@@ -39,6 +39,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define CALL_DEPTH 16
 /* Max container widget nesting */
 #define CONT_DEPTH 128
+/* Max columns in a list */
+#define MAX_COLS 16
 
 #define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
 
@@ -53,7 +55,9 @@ enum {
 	pk_TABLEx,
 	pk_TABLEp,
 	pk_TABLE2,
-	pk_TABLE2x
+	pk_TABLE2x,
+	pk_SCROLLVP,
+	pk_SCROLLVPn
 };
 #define pk_MASK     0xFF
 #define pkf_FRAME  0x100
@@ -644,6 +648,110 @@ static void set_textarea(GtkWidget *text, char *init)
 #endif
 }
 
+//	LISTCC widget
+
+typedef struct {
+	void **r;	// slot
+	unsigned char idx[MAX_COLS]; // index vector
+} ref_data;
+
+typedef struct {
+	int cnt, bk, ncol;	// height, direction, columns
+	int *idx;		// result field
+	void **columns[MAX_COLS]; // column slots
+	ref_data ref;		// own slot, index ref targets
+} listcc_data;
+
+// !!! Won't work when the list is insensitive
+static void listcc_select_item(GtkWidget *list, int n)
+{
+	GList *slot = g_list_nth(GTK_LIST(list)->children, n);
+	if (slot) list_select_item(list, GTK_WIDGET(slot->data));
+}
+
+static void listcc_select(GtkList *list, GtkWidget *widget, gpointer user_data)
+{
+	listcc_data *dt = user_data;
+	void **slot = NEXT_SLOT(dt->ref.r), **base = slot[0], **desc = slot[1];
+	int idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+
+	/* Update the value */
+	if (dt->bk) idx = dt->cnt - idx - 1; // Reverse indices
+	*dt->idx = idx;
+	/* Call the handler */
+	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+// !!! With inlining this, problem also
+GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
+	int ncol, void **r)
+{
+	char *str, txt[128];
+	GtkWidget *label, *list, *item, *hbox;
+	listcc_data *ld;
+	int i, j, n, cnt, bk;
+
+
+	cnt = *(int *)(void *)(ddata + (int)pp[2]); // length
+	bk = ((int)pp[0] & WB_OPMASK) == op_LISTCCr; // bottom to top
+
+	list = gtk_list_new();
+	gtk_list_set_selection_mode(GTK_LIST(list), GTK_SELECTION_BROWSE);
+
+	/* Make datastruct */
+	ld = bound_malloc(list, sizeof(listcc_data));
+	for (i = 0; i < MAX_COLS; i++) ld->ref.idx[i] = i;
+	ld->ref.r = r;
+	ld->idx = idx;
+	ld->cnt = cnt;
+	ld->bk = bk;
+	ld->ncol = ncol;
+	/* Link columns to list */
+	for (i = 0; i < ncol; i++)
+		*(ld->columns[i] = columns[i]) = ld->ref.idx + i;
+
+	for (i = 0; i < cnt; i++)
+	{
+		item = gtk_list_item_new();
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_container_add(GTK_CONTAINER(list), item);
+// !!! Spacing = 3
+		hbox = gtk_hbox_new(FALSE, 3);
+		gtk_container_add(GTK_CONTAINER(item), hbox);
+		n = bk ? cnt - i - 1 : i; // backward/forward
+
+		for (j = 0; j < ncol; j++)
+		{
+			void **cp = columns[j][1];
+			char *v = cp[1];
+			int op = (int)cp[0], step = (int)cp[2], jw = (int)cp[3];
+
+			if (op & WB_FFLAG) v = (void *)(ddata + (int)v);
+// !!! Will need "D" group, for *v as pointer to array
+			v += step * n;
+			op &= WB_OPMASK;
+			if (op == op_TXTCOL) str = v; // Array of chars
+			else /* if (op == op_IDXCOL) */ // Constant
+				sprintf(str = txt, "%d", (int)v);
+			label = pack(hbox, gtk_label_new(str));
+			if (jw & 0xFFFF)
+				gtk_widget_set_usize(label, jw & 0xFFFF, -2);
+			gtk_misc_set_alignment(GTK_MISC(label),
+				(jw >> 16) * 0.5, 0.5);
+		}
+	}
+	gtk_widget_show_all(list);
+
+	i = *idx;
+	if (bk) i = cnt - i - 1; // reverse order
+	listcc_select_item(list, i);
+	gtk_signal_connect(GTK_OBJECT(list), "select_child",
+		GTK_SIGNAL_FUNC(listcc_select), ld);
+
+	return (list);
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -707,14 +815,12 @@ static cmdef cmddefs[] = {
 // !!! Padding = 0 Border = 0
 	{ op_XTABLE, cm_TABLE, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK | pkf_SHOW },
-	{ op_HBOX, cm_HBOX, pk_PACK | pkf_STACK | pkf_SHOW },
+	{ op_HBOX, cm_HBOX, pk_PACKp | pkf_STACK | pkf_SHOW },
 	{ op_XHBOX, cm_HBOX, pk_XPACK | pkf_STACK | pkf_SHOW },
-	{ op_VBOX, cm_VBOX, pk_PACK | pkf_STACK | pkf_SHOW },
-// !!! Padding = 5
-	{ op_VBOXP, cm_VBOX, pk_PACKp | pkf_STACK | pkf_SHOW, 5 },
-// !!! Padding = 0
+	{ op_VBOX, cm_VBOX, pk_PACKp | pkf_STACK | pkf_SHOW },
 	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK | pkf_SHOW },
+// !!! Padding = 0
 	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
 	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
@@ -731,8 +837,7 @@ static cmdef cmddefs[] = {
 	{ op_TLSPIN, cm_SPIN, pk_TABLE, USE_BORDER(SPIN) },
 	{ op_TLXSPIN, cm_SPIN, pk_TABLEx, USE_BORDER(SPIN) },
 	{ op_SPINa, cm_SPINa, pk_PACKp, USE_BORDER(SPIN) },
-// !!! Padding = 0
-	{ op_FSPIN, cm_FSPIN, pk_PACK },
+	{ op_FSPIN, cm_FSPIN, pk_PACKp, USE_BORDER(SPIN) },
 	{ op_TFSPIN, cm_FSPIN, pk_TABLE2, USE_BORDER(SPIN) },
 	{ op_TLFSPIN, cm_FSPIN, pk_TABLE, USE_BORDER(SPIN) },
 // !!! Padding = 0
@@ -795,13 +900,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWindow *tparent = GTK_WINDOW(main_window);
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
-	GtkWidget *tw, *window = NULL, *widget = NULL;
+	GtkWidget *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	v_dd *vdata;
-	void *rstack[CALL_DEPTH], **rp = rstack;
+	void **columns[MAX_COLS], *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **r = NULL, **res = NULL;
 	int ld, dsize;
-	int i, n, op, lp, ref, pk, cw, tpad = 0, minw = 0;
+	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, ncol = 0;
 
 
 	// Allocation size
@@ -915,7 +1020,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case cm_VBOX: case cm_HBOX:
 			widget = (op == cm_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, (int)v & 255);
-			if (!(pk & pkf_FRAME)) cw = (int)v >> 8;
+			if (pk & pkf_FRAME) break;
+			cw = ((int)v >> 8) & 255;
+			tpad = ((int)v >> 16) & 255;
 			break;
 		/* Add an equal-spaced horizontal box */
 		case op_EQBOX:
@@ -924,30 +1031,25 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a scrolled window */
-		case op_SCROLL:
+		case op_SCROLL: case op_XSCROLL:
 			widget = gtk_scrolled_window_new(NULL, NULL);
 			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
 				scrollp[(int)v & 255], scrollp[(int)v >> 8]);
-			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
+			pk = op == op_SCROLL ? pk_PACK | pkf_STACK | pkf_SHOW :
+				pk_XPACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Put a notebook into scrolled window */
 		case op_SNBOOK:
-			tw = *wp++; // unstack the box
-			--wp; wp[0] = widget = gtk_notebook_new();
+			widget = gtk_notebook_new();
 			gtk_notebook_set_tab_pos(GTK_NOTEBOOK(widget), GTK_POS_LEFT);
-//			gtk_notebook_set_scrollable(GTK_NOTEBOOK(wp[0]), TRUE);
-			gtk_scrolled_window_add_with_viewport(
-				GTK_SCROLLED_WINDOW(tw), widget);
-			tw = GTK_BIN(tw)->child;
-			gtk_viewport_set_shadow_type(GTK_VIEWPORT(tw), GTK_SHADOW_NONE);
-			gtk_widget_show_all(tw);
-			vport_noshadow_fix(tw);
+//			gtk_notebook_set_scrollable(GTK_NOTEBOOK(widget), TRUE);
+			pk = pk_SCROLLVP | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a normal notebook */
 		case op_NBOOK:
 			widget = gtk_notebook_new();
-// !!! Border = 5
-			cw = 5;
+//			gtk_notebook_set_tab_pos(GTK_NOTEBOOK(widget), GTK_POS_TOP);
+			cw = GET_BORDER(NBOOK);
 			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a plain notebook (2 pages for now) */
@@ -1084,6 +1186,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			break;
 		}
+		/* Add a multiline entry widget, fill from drop-away buffer */
+		case op_MLENTRY:
+			widget = gtk_entry_new();
+			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
+			accept_ctrl_enter(widget);
+// !!! Padding = 0 Border = 0
+			pk = pk_PACK | pkf_SHOW;
+			break;
 		/* Add a path entry or box to table */
 		case op_TPENTRY: case op_PATH: case op_PATHs:
 			if (op == op_TPENTRY)
@@ -1123,6 +1233,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_GRADBAR:
 			widget = gradbar(v, ddata, pp - 1, NEXT_SLOT(r));
 			pk = pk_PACK;
+			break;
+		/* Add a list with pre-defined columns */
+		case op_LISTCCr:
+			widget = listcc(v, ddata, pp - 1, columns, ncol, r);
+			ncol = 0;
+// !!! Border = 5
+			cw = 5;
+			pk = pk_SCROLLVP;
 			break;
 		/* Add a box with "OK"/"Cancel", or something like */
 		case op_OKBOX: case op_EOKBOX: case op_UOKBOX:
@@ -1257,8 +1375,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_FOCUS:
 			gtk_widget_grab_focus(*origin_slot(r - 2));
 			continue;
-		/* Set minimum width for next widget */
-		case op_MINWIDTH:
+		/* Set fixed/minimum width for next widget */
+		case op_WIDTH:
 			minw = (int)v;
 			continue;
 		/* Make window transient to given widget-map */
@@ -1269,6 +1387,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Raise window after displaying */
 		case op_RAISED:
 			raise = TRUE;
+			continue;
+		/* Start group of list columns */
+		case op_WLIST:
+			ncol = 0;
+			continue;
+		/* Add a list column */
+		case op_IDXCOL: case op_TXTCOL:
+			columns[ncol++] = r;
+			*r++ = NULL;
+			*r++ = pp - 1;
 			continue;
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
@@ -1306,7 +1434,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					"changed", GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 #endif
-			case op_TPENTRY: case op_PATH: case op_PATHs:
+			case op_MLENTRY: case op_TPENTRY:
+			case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -1320,7 +1449,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = pp - 1;
 			continue;
 		/* Set nondefault border size */
-		case op_BOR_TABLE: case op_BOR_SPIN: case op_BOR_LABEL:
+		case op_BOR_TABLE: case op_BOR_NBOOK: case op_BOR_SPIN:
+		case op_BOR_LABEL: case op_BOR_TLABEL:
 		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
@@ -1346,7 +1476,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = add_with_frame(NULL, _(pp[--lp]), widget);
 		/* Set min width for this */
 // !!! For now, always use wrapper
-		if (minw) widget = widget_align_minsize(widget, minw, -2);
+		if (minw < 0) widget = widget_align_minsize(widget, -minw, -2);
+		/* Or fixed width */
+		else if (minw) gtk_widget_set_usize(widget, minw, -2);
 		minw = 0;
 		/* Pack this */
 		switch (n = pk & pk_MASK)
@@ -1357,7 +1489,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				FALSE, FALSE, tpad);
 			break;
 		case pk_XPACK: case pk_XPACK1:
-			xpack(wp[0], widget);
+			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
+				TRUE, TRUE, tpad);
 			if (n == pk_XPACK1)
 				gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
 			break;
@@ -1372,6 +1505,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_table_attach(GTK_TABLE(wp[0]), widget, 1, 2,
 				y, y + 1, GTK_EXPAND | GTK_FILL,
 				n == pk_TABLE2x ? GTK_FILL : 0, 0, tpad);
+			break;
+		}
+		case pk_SCROLLVP: case pk_SCROLLVPn:
+		{
+			GtkWidget *tw = wp[0];
+
+			wp[0] = *(wp - 1); ++wp; // unstack
+			gtk_scrolled_window_add_with_viewport(
+				GTK_SCROLLED_WINDOW(tw), widget);
+			if (n != pk_SCROLLVPn) break;
+			/* Set viewport to shadowless */
+			tw = GTK_BIN(tw)->child;
+			gtk_viewport_set_shadow_type(GTK_VIEWPORT(tw), GTK_SHADOW_NONE);
+			vport_noshadow_fix(tw);
 			break;
 		}
 		}
@@ -1451,7 +1598,7 @@ static void *do_query(char *data, void **wdata, int mode)
 				GTK_TOGGLE_BUTTON(*wdata)));
 			break;
 		case op_COLORLIST: case op_COLORLISTN:
-		case op_COLORPAD: case op_GRADBAR:
+		case op_COLORPAD: case op_GRADBAR: case op_LISTCCr:
 			break; // self-reading
 		case op_COLOR:
 			*(int *)v = cpick_get_colour(*wdata, NULL);
@@ -1465,6 +1612,9 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
 		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
+			break;
+		case op_MLENTRY:
+			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
 		case op_TPENTRY: case op_PATH:
 			gtkncpy(v, gtk_entry_get_text(GTK_ENTRY(*wdata)),
