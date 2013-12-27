@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2011 Dmitry Groshev
+	Copyright (C) 2007-2013 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -565,17 +565,18 @@ int ini_setstr(inifile *inip, int section, char *key, char *value)
 {
 	inislot *slot;
 
-	if (!(slot = key_slot(inip, section, key, INI_STR))) return (FALSE);
-	slot->value = "";
-/* NULLs are stored as empty strings, for less hazardous handling */
-	if (!value);
-/* Uncomment this instead if want NULLs to remain NULLs */
-//	if (!value) slot->value = NULL;
-	else if (!*value);
-	else
+	/* NULLs are stored as empty strings, for less hazardous handling.
+	 * Value duplicated at once, for key_slot() might free it
+	 * (if it is the current one, being stored over itself) */
+	value = value && *value ? strdup(value) : NULL;
+	if (!(slot = key_slot(inip, section, key, INI_STR)))
 	{
-		value = strdup(value);
-		if (!value) return (FALSE);
+		free(value);
+		return (FALSE);
+	}
+	slot->value = "";
+	if (value)
+	{
 		slot->value = value;
 		slot->flags |= INI_MALLOC;
 	}
@@ -605,9 +606,8 @@ char *ini_getstr(inifile *inip, int section, char *key, char *defv)
 	inislot *slot;
 	char *tail;
 
-/* NULLs are stored as empty strings, for less hazardous handling */
+	/* NULLs are stored as empty strings, for less hazardous handling */
 	if (!defv) defv = "";
-/* Comment out the above if want NULLs to remain NULLs */
 
 	/* Read existing */
 	slot = key_slot(inip, section, key, INI_NONE);

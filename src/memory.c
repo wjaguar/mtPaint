@@ -376,6 +376,7 @@ void *wjmalloc(wjmem *mem, int size, int align)
 }
 
 /* Simple doubling allocator */
+
 size_t getmemx2(memx2 *mem, size_t length)
 {
 	size_t s = mem->size - mem->here;
@@ -392,6 +393,18 @@ size_t getmemx2(memx2 *mem, size_t length)
 		mem->size = l2;
 	}
 	return (length);
+}
+
+void addstr(memx2 *mem, char *s, int bk)
+{
+	int l;
+
+	if ((l = getmemx2(mem, strlen(s) + 1)))
+	{
+		memcpy(mem->buf + mem->here, s, l);
+		mem->buf[(l += mem->here) - 1] = '\0';
+		mem->here = l - bk;
+	}
 }
 
 /* Calculate optimal number of objects in a memory chunk */

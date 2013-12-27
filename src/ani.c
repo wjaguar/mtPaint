@@ -422,17 +422,6 @@ static void ani_write_layer_data()		// Write current layer x/y/opacity data from
 	}
 }
 
-static void addstr(memx2 *mem, char *s)
-{
-	int l;
-
-	if ((l = getmemx2(mem, strlen(s) + 1)))
-	{
-		memcpy(mem->buf + mem->here, s, l);
-		mem->buf[mem->here += l - 1] = '\0';
-	}
-}
-
 static char *ani_cyc_txt()	// Text for the cycle text widget
 {
 	memx2 mem;
@@ -447,7 +436,7 @@ static char *ani_cyc_txt()	// Text for the cycle text widget
 		if (!ani_cycle_table[i].frame0) break;
 		ani_cyc_sprintf(txt, ani_cycle_table + i,
 			buf + ANI_CYC_ROWLEN * i);
-		addstr(&mem, txt);
+		addstr(&mem, txt, 1);
 	}
 	return (mem.buf);
 }
@@ -468,7 +457,7 @@ static char *ani_pos_txt(int idx)	// Text for the position text widget
 		if (ani->frame <= 0) break;
 		// Add a line if one exists
 		ani_pos_sprintf(txt, ani);
-		addstr(&mem, txt);
+		addstr(&mem, txt, 1);
 	}
 	return (mem.buf);
 }
@@ -1017,8 +1006,8 @@ static void *anim_code[] = {
 	SCROLL(0, 1), // never/auto
 	WLIST,
 // !!! Maybe allow background here too, for x/y? (set base=0 here then)
-	IDXCOL(1, 1, 40, 1), // center
-	TXTCOLv(layer_table[1].name, sizeof(layer_table[1]), 0, 0), // left
+	IDXCOLUMN(1, 1, 40, 1), // center
+	TXTCOLUMNv(layer_table[1].name, sizeof(layer_table[1]), 0, 0), // left
 	WIDTH(150),
 	LISTCCr(nlayer, lnum, ani_layer_select), TRIGGER,
 	XVBOX, // !!! what for?

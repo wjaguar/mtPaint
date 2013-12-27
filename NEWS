@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.41	2013-??-??
+3.45	2014-??-??
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
 	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)

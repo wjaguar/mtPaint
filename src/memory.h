@@ -512,6 +512,7 @@ typedef struct {
 } memx2;
 
 size_t getmemx2(memx2 *mem, size_t length);
+void addstr(memx2 *mem, char *s, int bk);
 
 /// Multiblock allocator
 

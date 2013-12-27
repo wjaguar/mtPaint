@@ -2150,7 +2150,7 @@ typedef struct {
 	int type, bound, opac;
 	int gtype, grev;
 	int otype, orev;
-	void **opt, **gbut, **obut;
+	void **opt, **gbut, **obut, **group;
 	grad_info temps[NUM_CHANNELS];
 	grad_map tmaps[NUM_CHANNELS + 1];
 	grad_store tbytes;
@@ -2406,7 +2406,7 @@ static void show_channel_gradient(grad_dd *dt, void **wdata)
 	dt->orev = gmap->orev;
 
 	/* Display all that */
-	run_reset(wdata, 1);
+	cmd_reset(dt->group, dt);
 }
 
 static void grad_evt(grad_dd *dt, void **wdata, int what, void **where)
@@ -2463,7 +2463,7 @@ static void *grad_code[] = {
 	TRIGGER,
 	/* Setup block */
 	TABLE(4, 3),
-	GROUP(1),
+	REF(group), GROUP(1),
 	TSPIN(_("Length"), len, 0, MAX_GRAD),
 	TSPIN(_("Repeat length"), rep, 0, MAX_GRAD),
 	TSPIN(_("Offset"), ofs, -MAX_GRAD, MAX_GRAD),

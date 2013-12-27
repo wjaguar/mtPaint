@@ -56,6 +56,7 @@ enum {
 	op_TLNOSPIN,
 	//
 	op_SPIN,
+	op_SPINc,
 	op_XSPIN,
 	op_TSPIN,
 	op_TLSPIN,
@@ -98,7 +99,10 @@ enum {
 	op_COLORPAD,
 	op_GRADBAR,
 	op_LISTCCr,
+	op_LISTC,
+	op_LISTCS,
 	op_OKBOX,
+	op_OKBOXp,
 	op_EOKBOX,
 	op_UOKBOX,
 	op_OKBTN,
@@ -133,8 +137,9 @@ enum {
 	op_RAISED,
 
 	op_WLIST,
-	op_IDXCOL,
-	op_TXTCOL,
+	op_IDXCOLUMN,
+	op_TXTCOLUMN,
+	op_STRCOLUMN,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -150,6 +155,7 @@ enum {
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_NBOOK,
+	op_BOR_XSCROLL,
 	op_BOR_SPIN,
 	op_BOR_LABEL,
 	op_BOR_TLABEL,
@@ -174,8 +180,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize);
 void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
 void run_destroy(void **wdata);
-//	Reset (a group of) dialog widgets, using widget-map
-void run_reset(void **wdata, int group);
 
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
@@ -213,6 +217,8 @@ void cmd_peekv(void **slot, void *res, int size, int idx);
 void cmd_setv(void **slot, void *res, int idx);
 //	Repaint slot
 void cmd_repaint(void **slot);
+//	Reset slot (or a group)
+void cmd_reset(void **slot, void *ddata);
 //	Scroll in position on colorlist slot
 void cmd_scroll(void **slot, int idx);
 //	Set cursor for slot window
@@ -229,6 +235,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WB_REF3   0x6000
 #define WB_GETREF(X) (((X) >> WB_OPBITS) & 3)
 #define WB_LSHIFT     16
+#define WB_GETLEN(X) ((X) >> WB_LSHIFT)
 
 #define WBlen(L) ((L) << WB_LSHIFT)
 #define WBh(NM,L) (void *)( op_##NM + WBlen(L))
@@ -308,6 +315,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TSPINa(NM,A) WBrhf(TSPINa, 2), WBfield(A), (NM)
 #define SPIN(V,V0,V1) WBrhf(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
+#define SPINc(V,V0,V1) WBrhf(SPINc, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
 #define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
@@ -372,6 +381,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(SELECT, HS)
 #define LISTCCr(V,L,HS) WBr2hf(LISTCCr, 2 + 2), WBfield(V), WBfield(L), \
 	EVENT(SELECT, HS)
+#define LISTC(V,L,FP,S,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
+	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
+#define LISTCm(V,L,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
+	NULL, NULL, NULL, EVENT(SELECT, HS)
+#define LISTCS(V,L,FP,S,SM,HS) WBr2hf(LISTCS, 5 + 2), WBfield(V), WBfield(L), \
+	WBfield(SM), WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
 #define PATH(A,B,C,D) WBrhf(PATH, 4), WBfield(D), (A), (B), (void *)(C)
@@ -387,6 +402,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define COLORLISTN(N,V,CC,HS,HX) WBr3hf(COLORLISTN, 3 + 2 * 2), WBfield(V), \
 	WBfield(CC), WBfield(N), EVENT(EXT, HX), EVENT(SELECT, HS)
 #define OKBOX(NOK,HOK,NC,HC) WBr3h(OKBOX, 2 + 2 * 2), (NOK), (NC), \
+	EVENT(OK, HOK), EVENT(CANCEL, HC)
+#define OKBOXp(NOK,HOK,NC,HC) WBr3h(OKBOXp, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define EOKBOX(NOK,HOK,NC,HC) WBr3h(EOKBOX, 2 + 2 * 2), (NOK), (NC), \
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
@@ -434,12 +451,16 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define RAISED WBh(RAISED, 0)
 #define WLIST WBh(WLIST, 0)
-#define TXTCOLv(A,S,W,J) WBrh(TXTCOL, 3), &(A), (void *)(S), \
+#define IDXCOLUMN(N0,S,W,J) WBrh(IDXCOLUMN, 3), (void *)(N0), (void *)(S), \
 	(void *)((W) + ((J) << 16))
-#define IDXCOL(N0,S,W,J) WBrh(IDXCOL, 3), (void *)(N0), (void *)(S), \
+#define TXTCOLUMNv(A,S,W,J) WBrh(TXTCOLUMN, 3), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16))
-/* !!! Maybe better to integrate this into container codes */
-//#define SETBORDER(V) WBh(SETBORDER, 1), (void *)(V)
+#define NTXTCOLUMNv(NM,A,S,W,J) WBrh(TXTCOLUMN, 4), &(A), (void *)(S), \
+	(void *)((W) + ((J) << 16)), (NM)
+#define STRCOLUMND(ST,F,W,J) WBrh(STRCOLUMN, 3), (void *)offsetof(ST, F), \
+	NULL, (void *)((W) + ((J) << 16))
+#define NSTRCOLUMND(NM,ST,F,W,J) WBrh(STRCOLUMN, 4), (void *)offsetof(ST, F), \
+	NULL, (void *)((W) + ((J) << 16)), (NM)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
 
