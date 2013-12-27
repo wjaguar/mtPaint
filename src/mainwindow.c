@@ -104,6 +104,12 @@ static inilist ini_bool[] = {
 	{ "status2Toggle",	status_on + 2,		TRUE  },
 	{ "status3Toggle",	status_on + 3,		TRUE  },
 	{ "status4Toggle",	status_on + 4,		TRUE  },
+#ifdef U_FREETYPE
+	{ "fontAntialias0",	&font_aa,		TRUE  },
+	{ "fontAntialias1",	&font_bk,		FALSE },
+	{ "fontAntialias2",	&font_r,		FALSE },
+	{ "fontAntialias3",	&font_obl,		FALSE },
+#endif
 	{ NULL,			NULL }
 };
 
@@ -132,6 +138,13 @@ static inilist ini_int[] = {
 	{ "gridTrans",		grid_rgb + GRID_TRANS,	RGB_2_INT(  0, 109, 109) },
 	{ "gridTile",		grid_rgb + GRID_TILE,	RGB_2_INT(170, 170, 170) },
 	{ "gridSegment",	grid_rgb + GRID_SEGMENT,RGB_2_INT(219, 219,   0) },
+#ifdef U_FREETYPE
+	{ "fontSizeBitmap",	&font_bmsize,		1   },
+	{ "fontSize",		&font_size,		12  },
+	{ "fontBackground",	&font_bkg,		0   },
+	{ "fontAngle",		&font_angle,		0   },
+	{ "font_dirs",		&font_dirs,		0   },
+#endif
 	{ NULL,			NULL }
 };
 

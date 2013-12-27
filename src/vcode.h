@@ -139,7 +139,7 @@ enum {
 	op_WLIST,
 	op_IDXCOLUMN,
 	op_TXTCOLUMN,
-	op_STRCOLUMN,
+	op_RTXTCOLUMN,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -457,9 +457,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)((W) + ((J) << 16))
 #define NTXTCOLUMNv(NM,A,S,W,J) WBrh(TXTCOLUMN, 4), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), (NM)
-#define STRCOLUMND(ST,F,W,J) WBrh(STRCOLUMN, 3), (void *)offsetof(ST, F), \
+#define RTXTCOLUMND(ST,F,W,J) WBrh(RTXTCOLUMN, 3), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16))
-#define NSTRCOLUMND(NM,ST,F,W,J) WBrh(STRCOLUMN, 4), (void *)offsetof(ST, F), \
+#define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)

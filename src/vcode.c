@@ -834,7 +834,7 @@ static void listc_reset(GtkCList *clist, listc_data *ld)
 			v += step * i;
 			op &= WB_OPMASK;
 			row_text[j] = op == op_TXTCOLUMN ? v : // Array of chars
-				/* op == op_STRCOLUMN */ *(char **)v; // String
+				/* op == op_RTXTCOLUMN */ (char *)v + *(int *)v;
 // !!! IDXCOLUMN not supported
 		}
 		row = gtk_clist_append(clist, row_text);
@@ -1648,7 +1648,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			ncol = 0;
 			continue;
 		/* Add a list column */
-		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_STRCOLUMN:
+		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_RTXTCOLUMN:
 			columns[ncol++] = r;
 			*r++ = NULL;
 			*r++ = pp - 1;

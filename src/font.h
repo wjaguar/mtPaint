@@ -1,5 +1,5 @@
 /*	font.h
-	Copyright (C) 2007-2011 Mark Tyler
+	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -22,8 +22,15 @@
 #define TEXT_PASTE_FT   2		// FreeType text paste
 
 #ifdef U_FREETYPE
+
+int font_aa, font_bk, font_r, font_obl;
+int font_bmsize, font_size;
+int font_bkg, font_angle;
+int font_dirs;
+
 void pressed_mt_text();
 void ft_render_text();			// FreeType equivalent of render_text()
+
 #else
 #define pressed_mt_text()
 #define ft_render_text()

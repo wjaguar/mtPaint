@@ -57,6 +57,12 @@
 
 #define TX_MAX_DIRS 100
 
+/* Persistent settings */
+int font_aa, font_bk, font_r, font_obl;
+int font_bmsize, font_size;
+int font_bkg, font_angle;
+int font_dirs;
+
 
 typedef struct filenameNODE filenameNODE;
 struct filenameNODE
@@ -94,27 +100,27 @@ struct fontNODE
 
 typedef struct {
 	fontNODE *fn;
-	char *dir, *bm, *name;
+	int dir, bm, name;
 } fontname_cc;
 
 typedef struct {
 	styleNODE *sn;
-	char *name;
+	int name;
 } fontstyle_cc;
 
 typedef struct {
 	sizeNODE *zn;
-	char *what;
+	int what;
 	int n;
 } fontsize_cc;
 
 typedef struct {
 	filenameNODE *fn;
-	char *name, *face;
+	int name, face;
 } fontfile_cc;
 
 typedef struct {
-	char *idx, *dir;
+	int idx, dir;
 } dir_cc;
 
 typedef struct {
@@ -126,8 +132,7 @@ typedef struct {
 	int fontfile, nfontfiles;
 	int dir, ndirs;
 	int fontsize;
-	int aa, bflag, bkg[3];
-	int obl, rflag, angle;
+	int bkg[3];
 	int lock;
 	int preview_w, preview_h;
 	GtkWidget *preview_area; // !!! for now
@@ -829,20 +834,16 @@ static unsigned char *render_to_1bpp(int *w, int *h)
 	int flags = 0, size = 1;
 
 
-	if ( inifile_get_gboolean( "fontTypeBitmap", TRUE ) )
-		size = inifile_get_gint32( "fontSizeBitmap", 1 );
-	else
-		size = inifile_get_gint32( "fontSize", 12 );
+	size = inifile_get_gboolean("fontTypeBitmap", TRUE) ?
+		font_bmsize : font_size;
 
-	if ( mem_img_bpp == 1 || !inifile_get_gboolean( "fontAntialias0", TRUE ) )
+	if ((mem_img_bpp == 1) || !font_aa)
 	{
 		flags |= MT_TEXT_MONO;
 		flags |= MT_TEXT_ROTATE_NN;	// RGB image without AA = nearest neighbour rotation
 	}
-	if ( inifile_get_gboolean( "fontAntialias3", TRUE ) )
-		flags |= MT_TEXT_OBLIQUE;
-	if ( inifile_get_gboolean( "fontAntialias2", FALSE ) )
-		angle = ((double)inifile_get_gint32( "fontAngle", 0 ))/100;
+	if (font_obl) flags |= MT_TEXT_OBLIQUE;
+	if (font_r) angle = font_angle / 100.0;
 
 	text_1bpp = mt_text_render(
 			inifile_get( "textString", "" ),
@@ -914,15 +915,14 @@ static void font_preview_update(font_dd *dt)
 static void font_gui_create_index(char *filename) // Create index file with settings from ~/.mtpaint
 {
 	char buf[128], *dirs[TX_MAX_DIRS + 1];
-	int i, j = inifile_get_gint32("font_dirs", 0 );
+	int i;
 
 
 	memset(dirs, 0, sizeof(dirs));
-	for ( i=0; i<j; i++ )
+	for (i = 0; i < font_dirs; i++)
 	{
 		snprintf(buf, 128, "font_dir%i", i);
 		dirs[i] = inifile_get( buf, "" );
-//printf("%s\n", dirs[i] );
 	}
 
 	progress_init( _("Creating Font Index"), 0 );
@@ -947,16 +947,10 @@ void ft_render_text()		// FreeType equivalent of render_text()
 static void store_values(font_dd *dt)
 {
 	inifile_set("textString", dt->text);
-	inifile_set_gboolean("fontAntialias0", dt->aa);
-	inifile_set_gboolean("fontAntialias1", dt->bflag);
-	inifile_set_gboolean("fontAntialias2", dt->rflag);
-	inifile_set_gboolean("fontAntialias3", dt->obl);
-	inifile_set_gint32("fontAngle", dt->angle);
 	if (inifile_get_gboolean( "fontTypeBitmap", TRUE))
-		inifile_set_gint32("fontSizeBitmap", dt->fontsize);
-	else inifile_set_gint32("fontSize", dt->fontsize);
-	if (mem_channel == CHN_IMAGE)
-		inifile_set_gint32("fontBackground", dt->bkg[0]);
+		font_bmsize = dt->fontsize;
+	else font_size = dt->fontsize;
+	if (mem_channel == CHN_IMAGE) font_bkg = dt->bkg[0];
 }
 
 static void paste_text_ok(font_dd *dt, void **wdata, int what, void **where)
@@ -977,7 +971,7 @@ static void collect_fontnames(font_dd *dt)
 	char *last_font_name = inifile_get("lastFontName", "");
 	int last_font_name_dir = inifile_get_gint32("lastFontNameDir", 0),
 		last_font_name_bitmap = inifile_get_gint32("lastFontNameBitmap", 0);
-	int i, ofs, dir, cnt, strs[TX_MAX_DIRS];
+	int ofs, dir, cnt, b, strs[TX_MAX_DIRS];
 
 	/* Gather up nodes */
 	for (fn = global_font_node , cnt = 0; fn; fn = fn->next) cnt++;
@@ -985,7 +979,8 @@ static void collect_fontnames(font_dd *dt)
 	memset(strs, 0, sizeof(strs));
 	mem.here = 0;
 	getmemx2(&mem, 8000); // default size
-	mem.here += getmemx2(&mem, cnt * sizeof(fontname_cc)); // minimum size
+	b = mem.here += getmemx2(&mem, cnt * sizeof(fontname_cc)); // minimum size
+	addstr(&mem, "B", 0);
 	for (fn = global_font_node , cnt = 0; fn; fn = fn->next)
 	{
 		if ((fn->directory < 0) || (fn->directory >= TX_MAX_DIRS))
@@ -1011,20 +1006,17 @@ static void collect_fontnames(font_dd *dt)
 		/* Add a row - with offsets for now */
 		fc = (fontname_cc *)mem.buf + cnt;
 		fc->fn = fn;
-		fc->dir = (void *)dir;
-		fc->bm = fn->style->size->size ? "B" : NULL;
-		fc->name = (void *)ofs;
+		fc->dir = dir - ((char *)&fc->dir - mem.buf);
+		// "B" if has size (is bitmap), "" otherwise
+		fc->bm = (fn->style->size->size ? b : b + 1) -
+			((char *)&fc->bm - mem.buf);
+		fc->name = ofs - ((char *)&fc->name - mem.buf);
 		cnt++;
 	}
 	dt->nfontnames = cnt;
 
 	/* Allocations done - now set up pointers */
-	dt->fontnames = fc = (void *)mem.buf; // won't change now
-	for (i = 0; i < cnt; i++ , fc++)
-	{
-		fc->dir = mem.buf + (int)fc->dir;
-		fc->name = mem.buf + (int)fc->name;
-	}
+	dt->fontnames = (void *)mem.buf; // won't change now
 
 	/* Save allocator data */
 	dt->fnmmem = mem;
@@ -1066,7 +1058,7 @@ static void collect_fontstyles(font_dd *dt)
 		/* Add a row - with offset for now */
 		fc = (fontstyle_cc *)mem.buf + cnt;
 		fc->sn = sn;
-		fc->name = (void *)ofs;
+		fc->name = ofs - ((char *)&fc->name - mem.buf);
 		cnt++;
 	}
 	/* Use default if last style not found */
@@ -1074,9 +1066,7 @@ static void collect_fontstyles(font_dd *dt)
 	dt->nfontstyles = cnt;
 
 	/* Allocations done - now set up pointers */
-	dt->fontstyles = fc = (void *)mem.buf; // won't change now
-	for (i = 0; i < cnt; i++ , fc++)
-		fc->name = mem.buf + (int)fc->name;
+	dt->fontstyles = (void *)mem.buf; // won't change now
 
 	/* Save allocator data */
 	dt->fstmem = mem;
@@ -1101,14 +1091,12 @@ static void collect_fontsizes(font_dd *dt)
 		sizeof(sizes) * sizeof(fontsize_cc) : 4000); // default size
 	if (zn && !zn->size)
 	{
-		int real_size = inifile_get_gint32("fontSize", 12);
-
 		mem.here += sizeof(sizes) * sizeof(fontsize_cc);
 		for (i = 0; i < sizeof(sizes); i++)
 		{
 			int ofs, n = sizes[i];
 			/* Trying to remember start row */
-			if (n == real_size) dt->lfontsize = i;
+			if (n == font_size) dt->lfontsize = i;
 			/* Prepare text */
 			ofs = mem.here;
 			sprintf(buf2, "%2d", n);
@@ -1117,7 +1105,7 @@ static void collect_fontsizes(font_dd *dt)
 			fc = (fontsize_cc *)mem.buf + i;
 			fc->zn = zn;
 			fc->n = n;
-			fc->what = (void *)ofs;
+			fc->what = ofs - ((char *)&fc->what - mem.buf);
 		}
 		cnt = sizeof(sizes);
 	}
@@ -1143,16 +1131,14 @@ static void collect_fontsizes(font_dd *dt)
 			fc = (fontsize_cc *)mem.buf + cnt;
 			fc->zn = zn;
 			fc->n = 0; // !!! or maybe zn->size?
-			fc->what = (void *)ofs;
+			fc->what = ofs - ((char *)&fc->what - mem.buf);
 			cnt++;
 		}
 	}
 	dt->nlfontsizes = cnt;
 
 	/* Allocations done - now set up pointers */
-	dt->fontsizes = fc = (void *)mem.buf; // won't change now
-	for (i = 0; i < cnt; i++ , fc++)
-		fc->what = mem.buf + (int)fc->what;
+	dt->fontsizes = (void *)mem.buf; // won't change now
 
 	/* Save allocator data */
 	dt->fszmem = mem;
@@ -1165,7 +1151,7 @@ static void collect_fontfiles(font_dd *dt)
 	filenameNODE *fn;
 	fontfile_cc *fc;
 	memx2 mem = dt->ffnmem;
-	int i, cnt;
+	int cnt;
 
 	/* Gather up nodes */
 	fn = dt->fontsizes[dt->lfontsize].zn->filename;
@@ -1195,19 +1181,14 @@ static void collect_fontfiles(font_dd *dt)
 		/* Add a row - with offsets for now */
 		fc = (fontfile_cc *)mem.buf + cnt;
 		fc->fn = fn;
-		fc->name = (void *)ofs1;
-		fc->face = (void *)ofs2;
+		fc->name = ofs1 - ((char *)&fc->name - mem.buf);
+		fc->face = ofs2 - ((char *)&fc->face - mem.buf);
 		cnt++;
 	}
 	dt->nfontfiles = cnt;
 
 	/* Allocations done - now set up pointers */
-	dt->fontfiles = fc = (void *)mem.buf; // won't change now
-	for (i = 0; i < cnt; i++ , fc++)
-	{
-		fc->name = mem.buf + (int)fc->name;
-		fc->face = mem.buf + (int)fc->face;
-	}
+	dt->fontfiles = (void *)mem.buf; // won't change now
 
 	/* Save allocator data */
 	dt->ffnmem = mem;
@@ -1218,14 +1199,13 @@ static void collect_dirnames(font_dd *dt)
 	memx2 mem = dt->dirmem;
 	char buf2[256];
 	dir_cc *fc;
-	int i, cnt;
+	int i;
 
 	/* Gather up nodes */
-	cnt = inifile_get_gint32("font_dirs", 0);
 	mem.here = 0;
 	getmemx2(&mem, 4000); // default size
-	mem.here += getmemx2(&mem, cnt * sizeof(dir_cc)); // minimum size
-	for (i = 0; i < cnt; i++)
+	mem.here += getmemx2(&mem, font_dirs * sizeof(dir_cc)); // minimum size
+	for (i = 0; i < font_dirs; i++)
 	{
 		int ofs1, ofs2;
 		/* Prepare dir index */
@@ -1239,18 +1219,13 @@ static void collect_dirnames(font_dd *dt)
 		addstr(&mem, buf2, 0);
 		/* Add a row - with offsets for now */
 		fc = (dir_cc *)mem.buf + i;
-		fc->idx = (void *)ofs1;
-		fc->dir = (void *)ofs2;
+		fc->idx = ofs1 - ((char *)&fc->idx - mem.buf);
+		fc->dir = ofs2 - ((char *)&fc->dir - mem.buf);
 	}
-	dt->ndirs = cnt;
+	dt->ndirs = font_dirs;
 
 	/* Allocations done - now set up pointers */
-	dt->dirs = fc = (void *)mem.buf; // won't change now
-	for (i = 0; i < cnt; i++ , fc++)
-	{
-		fc->idx = mem.buf + (int)fc->idx;
-		fc->dir = mem.buf + (int)fc->dir;
-	}
+	dt->dirs = (void *)mem.buf; // won't change now
 
 	/* Save allocator data */
 	dt->dirmem = mem;
@@ -1259,12 +1234,13 @@ static void collect_dirnames(font_dd *dt)
 
 static void click_font_dir_btn(font_dd *dt, void **wdata, int what, void **where)
 {
-	int i, rows = inifile_get_gint32("font_dirs", 0);
+	int i, rows = font_dirs;
 	char buf[32], buf2[32];
 
 	run_query(wdata);
 	if (origin_slot(where) != dt->add_b) // Remove row
 	{
+		if (!rows) return; // Nothing to delete
 		rows--;
 		// Re-work inifile items
 		for (i = dt->dir; i < rows; i++)
@@ -1276,13 +1252,14 @@ static void click_font_dir_btn(font_dd *dt, void **wdata, int what, void **where
 		// !!! List is sorted by index, so selected row == selected index
 		if (dt->dir >= rows) dt->dir--;
 	}
-	else if (!dt->dirp[0] || (rows >= TX_MAX_DIRS)) return; // Cannot add row
 	else // Add row
 	{
+		if (!dt->dirp[0] || (rows >= TX_MAX_DIRS))
+			return; // Cannot add
 		snprintf(buf, sizeof(buf), "font_dir%i", rows++);
 		inifile_set(buf, dt->dirp);
 	}
-	inifile_set_gint32("font_dirs", rows);
+	font_dirs = rows;
 	collect_dirnames(dt);
 	cmd_reset(dt->dir_l, dt);
 }
@@ -1291,7 +1268,7 @@ static void select_font(font_dd *dt, void **wdata, int what, void **where);
 
 static void click_create_font_index(font_dd *dt, void **wdata)
 {
-	if (inifile_get_gint32("font_dirs", 0) > 0)
+	if (font_dirs > 0)
 	{
 		char txt[PATHBUF];
 
@@ -1356,7 +1333,7 @@ static void select_font(font_dd *dt, void **wdata, int what, void **where)
 		fc = dt->fontsizes + dt->lfontsize;
 
 		// Scalable so remember size
-		if (!fc->zn->size) inifile_set_gint32("fontSize", fc->n);
+		if (!fc->zn->size) font_size = fc->n;
 		// Non-Scalable so remember index
 		else inifile_set_gint32("lastfontBitmapGeometry", fc->zn->size);
 
@@ -1374,8 +1351,7 @@ static void select_font(font_dd *dt, void **wdata, int what, void **where)
 
 	/* Update size */
 	dt->fontsize = dt->fontsizes[dt->lfontsize].zn->size ? // nonzero for bitmaps
-		inifile_get_gint32("fontSizeBitmap", 1) :
-		inifile_get_gint32("fontSize", 12);
+		font_bmsize : font_size;
 	cmd_reset(dt->size_spin, dt);
 
 	dt->lock = FALSE;
@@ -1389,7 +1365,7 @@ static void init_font_lists()		//	LIST INITIALIZATION
 	char txt[PATHBUF];
 
 	/* Get font directories if we don't have any */
-	if (inifile_get_gint32("font_dirs", 0) <= 0)
+	if (font_dirs <= 0)
 	{
 #ifdef WIN32
 		int new_dirs = 1;
@@ -1456,7 +1432,7 @@ static void init_font_lists()		//	LIST INITIALIZATION
 		snprintf(buf2, 128, "font_dir%i", new_dirs++);
 		inifile_set(buf2, txt);
 #endif
-		inifile_set_gint32("font_dirs", new_dirs);
+		font_dirs = new_dirs;
 	}
 
 	file_in_homedir(txt, FONT_INDEX_FILENAME, PATHBUF);
@@ -1548,9 +1524,9 @@ static void *font_code[] = {
 	VBOXbp(0, 0, 5), // !!! what for?
 	XSCROLL(0, 1), // never/auto
 	WLIST,
-	STRCOLUMND(fontname_cc, dir, 0, 0),
-	STRCOLUMND(fontname_cc, bm, 0, 0),
-	NSTRCOLUMND(_("Font"), fontname_cc, name, 0, 0),
+	RTXTCOLUMND(fontname_cc, dir, 0, 0),
+	RTXTCOLUMND(fontname_cc, bm, 0, 0),
+	NRTXTCOLUMND(_("Font"), fontname_cc, name, 0, 0),
 	REF(fname_l), LISTCS(fontname, nfontnames, fontnames, sizeof(fontname_cc),
 		fnsort, select_font), TRIGGER, CLEANUP(fontnames),
 	WDONE, // VBOXP
@@ -1558,7 +1534,7 @@ static void *font_code[] = {
 	XHBOXbp(0, 0, 5),
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
-	NSTRCOLUMND(_("Style"), fontstyle_cc, name, 0, 0),
+	NRTXTCOLUMND(_("Style"), fontstyle_cc, name, 0, 0),
 	REF(fstyle_l), WIDTH(100), LISTC(fontstyle, nfontstyles, fontstyles,
 		sizeof(fontstyle_cc), select_font), CLEANUP(fontstyles),
 	XVBOX,
@@ -1566,15 +1542,15 @@ static void *font_code[] = {
 	XSCROLL(1, 1), // auto/auto
 	DEFBORDER(XSCROLL),
 	WLIST,
-	NSTRCOLUMND(_("Size"), fontsize_cc, what, 0, 1), // centered
+	NRTXTCOLUMND(_("Size"), fontsize_cc, what, 0, 1), // centered
 	REF(fsize_l), LISTC(lfontsize, nlfontsizes, fontsizes,
 		sizeof(fontsize_cc), select_font), CLEANUP(fontsizes),
 	REF(size_spin), SPINc(fontsize, 1, 500), EVENT(CHANGE, font_entry_changed),
 	WDONE, // XVBOX
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
-	NSTRCOLUMND(_("Filename"), fontfile_cc, name, 0, 0),
-	NSTRCOLUMND(_("Face"), fontfile_cc, face, 0, 0),
+	NRTXTCOLUMND(_("Filename"), fontfile_cc, name, 0, 0),
+	NRTXTCOLUMND(_("Face"), fontfile_cc, face, 0, 0),
 	REF(ffile_l), LISTC(fontfile, nfontfiles, fontfiles,
 		sizeof(fontfile_cc), select_font), CLEANUP(fontfiles),
 	WDONE, // XHBOXbp
@@ -1593,21 +1569,21 @@ static void *font_code[] = {
 //	TOGGLES
 	HBOX,
 	UNLESSx(idx, 1),
-		CHECK(_("Antialias"), aa), EVENT(CHANGE, font_entry_changed),
+		CHECKv(_("Antialias"), font_aa), EVENT(CHANGE, font_entry_changed),
 	ENDIF(1),
 	UNLESSx(img, 1),
-		CHECK(_("Invert"), bflag), EVENT(CHANGE, font_entry_changed),
+		CHECKv(_("Invert"), font_bk), EVENT(CHANGE, font_entry_changed),
 	ENDIF(1),
 	IFx(img, 1),
-		CHECK(_("Background colour ="), bflag),
+		CHECKv(_("Background colour ="), font_bk),
 			EVENT(CHANGE, font_entry_changed),
 		SPINa(bkg), EVENT(CHANGE, font_entry_changed),
 	ENDIF(1),
 	WDONE, // HBOX
 	HBOX,
-	REF(obl_c), CHECK(_("Oblique"), obl), EVENT(CHANGE, font_entry_changed),
-	CHECK(_("Angle of rotation ="), rflag), EVENT(CHANGE, font_entry_changed),
-	FSPIN(angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
+	REF(obl_c), CHECKv(_("Oblique"), font_obl), EVENT(CHANGE, font_entry_changed),
+	CHECKv(_("Angle of rotation ="), font_r), EVENT(CHANGE, font_entry_changed),
+	FSPINv(font_angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
 	WDONE,
 	HSEPl(200),
 	OKBOXp(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
@@ -1617,8 +1593,8 @@ static void *font_code[] = {
 //	VBOX, // !!! utterly useless
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
-	STRCOLUMND(dir_cc, idx, 0, 0),
-	NSTRCOLUMND(_("Directory"), dir_cc, dir, 0, 0),
+	RTXTCOLUMND(dir_cc, idx, 0, 0),
+	NRTXTCOLUMND(_("Directory"), dir_cc, dir, 0, 0),
 	REF(dir_l), LISTC(dir, ndirs, dirs, sizeof(dir_cc), NULL), CLEANUP(dirs),
 	PATH(_("New Directory"), _("Select Directory"), FS_SELECT_DIR, dirp),
 	HSEPl(200),
@@ -1643,16 +1619,11 @@ void pressed_mt_text()
 	if (!global_font_node) init_font_lists();
 
 	memset(&tdata, 0, sizeof(tdata));
-	tdata.fontsize = inifile_get_gint32("fontSize", 12); // !!! is reset
+	tdata.fontsize = font_size; // !!! is reset
 	tdata.text = inifile_get("textString", _("Enter Text Here"));
-	tdata.aa = inifile_get_gboolean("fontAntialias0", TRUE);
-	tdata.bflag = inifile_get_gboolean("fontAntialias1", FALSE);
-	tdata.bkg[0] = inifile_get_gint32("fontBackground", 0) % mem_cols;
+	tdata.bkg[0] = font_bkg % mem_cols;
 	tdata.bkg[1] = 0;
 	tdata.bkg[2] = mem_cols - 1;
-	tdata.obl = inifile_get_gboolean("fontAntialias3", FALSE);
-	tdata.rflag = inifile_get_gboolean("fontAntialias2", FALSE);
-	tdata.angle = inifile_get_gint32("fontAngle", 0);
 	tdata.img = mem_channel == CHN_IMAGE;
 	tdata.idx = tdata.img && (mem_img_bpp == 1);
 	collect_fontnames(&tdata);
