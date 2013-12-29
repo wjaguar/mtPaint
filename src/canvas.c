@@ -1583,9 +1583,8 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 #define FORMAT_SPINS 7
 
 typedef struct {
-	void **lsp[FORMAT_SPINS];
+	void **lsp[FORMAT_SPINS], **pathbox;
 	char *title, **ftnames;
-	GtkWidget *entry; // !!! used by mt_path_box()
 	char *frames_name;
 	int frames_ftype, frames_anim;
 	int mode, fpmode;
@@ -1831,12 +1830,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	case FS_CLIP_FILE:
 	case FS_SELECT_FILE:
 	case FS_SELECT_DIR:
-		if (dt->entry)
-		{
-			f8 = gtkuncpy(NULL, dt->filename, 0);
-			gtk_entry_set_text(GTK_ENTRY(dt->entry), f8);
-			g_free(f8);
-		}
+		if (dt->pathbox) cmd_setv(dt->pathbox, dt->filename, PATH_VALUE);
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
@@ -2074,7 +2068,7 @@ void file_selector_x(int action_type, void **xdata)
 		tdata.fpmode = action_type == FS_SELECT_DIR ?
 			FPICK_LOAD | FPICK_DIRS_ONLY : FPICK_LOAD;
 		tdata.title = xdata[0];
-		tdata.entry = xdata[1]; // !!! entry widget
+		tdata.pathbox = xdata[1]; // pathbox slot
 		break;
 	default: /*
 	FS_LAYER_LOAD,

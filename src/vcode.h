@@ -41,6 +41,7 @@ enum {
 	op_TLHBOX,
 	op_FVBOX,
 	op_FXVBOX,
+	op_FHBOX,
 	//
 	op_EQBOX,
 	op_SCROLL,
@@ -87,6 +88,7 @@ enum {
 	op_TOPT,
 	op_TLOPT,
 	op_OPTD,
+	op_XENTRY,
 	op_MLENTRY,
 	op_TPENTRY,
 	op_PATH,
@@ -100,6 +102,7 @@ enum {
 	op_GRADBAR,
 	op_LISTCCr,
 	op_LISTC,
+	op_LISTCd,
 	op_LISTCS,
 	op_OKBOX,
 	op_OKBOXp,
@@ -286,6 +289,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define FVBOX(NM) WBh(FVBOX, 1), (NM)
 #define FVBOXs(NM,S) WBh(FVBOX, 2), WBbs(0, S), (NM)
 #define FXVBOX(NM) WBh(FXVBOX, 1), (NM)
+#define FHBOX(NM) WBh(FHBOX, 1), (NM)
 #define EQBOX WBh(EQBOX, 0)
 #define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
 #define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
@@ -383,15 +387,16 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(SELECT, HS)
 #define LISTC(V,L,FP,S,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
 	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
-#define LISTCm(V,L,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
-	NULL, NULL, NULL, EVENT(SELECT, HS)
+#define LISTCd(V,L,FP,S,HS) WBr2hf(LISTCd, 5 + 2), WBfield(V), WBfield(L), \
+	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define LISTCS(V,L,FP,S,SM,HS) WBr2hf(LISTCS, 5 + 2), WBfield(V), WBfield(L), \
 	WBfield(SM), WBfield(FP), (void *)(S), EVENT(SELECT, HS)
+#define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
-#define PATH(A,B,C,D) WBrhf(PATH, 4), WBfield(D), (A), (B), (void *)(C)
-#define PATHv(A,B,C,D) WBrh(PATH, 4), (D), (A), (B), (void *)(C)
-#define PATHs(A,B,C,D) WBrh(PATHs, 4), (D), (A), (B), (void *)(C)
+#define PATH(NM,T,M,V) WBrhf(PATH, 4), WBfield(V), (T), (void *)(M), (NM)
+#define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
+#define PATHs(NM,T,M,V) WBrh(PATHs, 4), (V), (T), (void *)(M), (NM)
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
@@ -442,6 +447,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WANTMAX WBh(WANTMAX, 0)
 #define WXYWH(NM,W,H) WBh(WXYWH, 2), (NM), WBwh(W, H)
 #define DEFW(V) WXYWH(NULL, V, 0)
+#define DEFSIZE(W,H) WXYWH(NULL, W, H)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define WPWHEREVER WBh(WPWHEREVER, 0)
 #define INSENS WBh(INSENS, 0)
@@ -457,6 +463,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)((W) + ((J) << 16))
 #define NTXTCOLUMNv(NM,A,S,W,J) WBrh(TXTCOLUMN, 4), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), (NM)
+#define NTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
+	NULL, (void *)((W) + ((J) << 16)), (NM)
 #define RTXTCOLUMND(ST,F,W,J) WBrh(RTXTCOLUMN, 3), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16))
 #define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
@@ -474,9 +482,16 @@ typedef struct {
 } colorlist_ext;
 
 //	Extra data of FPICK
-#define FPICK_VALUE 0
-#define FPICK_RAW   1
+#define FPICK_VALUE	0
+#define FPICK_RAW	1
 //	Mode flags for FPICK
 #define FPICK_ENTRY	1
 #define FPICK_LOAD	2
 #define FPICK_DIRS_ONLY	4
+
+//	Extra data of PATH
+#define PATH_VALUE	0
+
+//	Extra data of LISTC
+#define LISTC_ORDER	0
+#define LISTC_RESET_ROW	1

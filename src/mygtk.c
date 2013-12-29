@@ -852,6 +852,7 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 // Path box
 
+#if 0 /* Not needed anymore */
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
 	void *xdata[2];
@@ -879,6 +880,7 @@ GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
 
 	return (entry);
 }
+#endif
 
 // Workaround for GtkCList reordering bug
 

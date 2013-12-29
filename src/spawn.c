@@ -28,6 +28,7 @@
 #include "canvas.h"
 #include "mainwindow.h"
 #include "spawn.h"
+#include "vcode.h"
 
 static char *mt_temp_dir;
 
@@ -303,9 +304,23 @@ int spawn_expansion(char *cline, char *directory)
 
 // Front End stuff
 
-static GtkWidget *faction_list, *faction_entry[3];
-static int faction_current_row, faction_block;
 static char *faction_ini[3] = { "fact%dName", "fact%dCommand", "fact%dDir" };
+
+#define MAXNAMELEN 2048
+typedef struct {
+	char name[MAXNAMELEN];
+	char cmd[PATHTXT]; // UTF-8
+	char dir[PATHBUF]; // system encoding
+} spawn_row;
+
+typedef struct {
+	spawn_row *strs;
+	char *name, *cmd;
+	void **list, **group;
+	int idx, nidx, cnt;
+	int lock;
+	char dir[PATHBUF];
+} spawn_dd;
 
 
 void pressed_file_action(int item)
@@ -320,31 +335,41 @@ void pressed_file_action(int item)
 	spawn_expansion(comm, dir);
 }
 
-static void faction_changed(GtkEditable *entry, gpointer user_data)
+static void faction_changed(spawn_dd *dt, void **wdata, int what, void **where)
 {
-	if (faction_block) return;
-	gtk_clist_set_text(GTK_CLIST(faction_list), faction_current_row,
-		(int)user_data, gtk_entry_get_text(GTK_ENTRY(entry)));
-}
+	void *cause;
+	spawn_row *rp;
 
-static void faction_select_row(GtkCList *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
-{
-	gchar *celltext;
-	int i, j;
+	if (dt->lock) return;
+	cause = cmd_read(where, dt);
 
-	faction_current_row = row;
-	faction_block = TRUE;
-	for (i = 0; i < 3; i++)
+	rp = dt->strs + dt->idx;
+	if (cause == dt->dir) strncpy(rp->dir, dt->dir, sizeof(rp->dir));
+	else
 	{
-		j = gtk_clist_get_text(GTK_CLIST(faction_list), row, i, &celltext);
-		gtk_entry_set_text(GTK_ENTRY(faction_entry[i]), j ? celltext : "");
+		strncpy0(rp->name, dt->name, sizeof(rp->name));
+		strncpy0(rp->cmd, dt->cmd, sizeof(rp->cmd));
+		cmd_setv(dt->list, (void *)dt->idx, LISTC_RESET_ROW);
 	}
-	faction_block = FALSE;
 }
 
-static void faction_moved(GtkCList *clist, gint src, gint dest, gpointer user_data)
+static void faction_select_row(spawn_dd *dt, void **wdata, int what, void **where)
 {
-	faction_current_row = dest;
+	spawn_row *rp;
+
+	cmd_read(where, dt);
+
+	if (dt->nidx == dt->idx) return; // no change
+	dt->lock = TRUE;
+	
+	/* Get strings from array, and reset entries */
+	rp = dt->strs + (dt->idx = dt->nidx);
+	dt->name = rp->name;
+	dt->cmd = rp->cmd;
+	strncpy(dt->dir, rp->dir, PATHBUF);
+	cmd_reset(dt->group, dt);
+
+	dt->lock = FALSE;
 }
 
 static void update_faction_menu()	// Populate menu
@@ -421,111 +446,94 @@ void init_factions()
 	update_faction_menu();			// Prepare menu
 }
 
-static void faction_ok(GtkWidget *widget, gpointer user_data)
+static void faction_btn(spawn_dd *dt, void **wdata, int what, void **where)
 {
-	char txt[64], path[PATHBUF];
-	gchar *celltext;
-	int i, j, k;
+	spawn_row *rp = dt->strs;
+	char *s, txt[64], buf[PATHBUF];
+	int i, j, idx[FACTION_ROWS_TOTAL];
 
-	for (i = 0; i < FACTION_ROWS_TOTAL; i++)
+	if (what == op_EVT_CLICK) /* Execute */
+	{
+		gtkncpy(buf, dt->cmd, PATHBUF);
+		spawn_expansion(buf, dt->dir);
+		return;
+	}
+
+	cmd_peekv(dt->list, idx, sizeof(idx), LISTC_ORDER);
+	for (i = 0; i < FACTION_ROWS_TOTAL; i++ , rp++)
 	{
 		for (j = 0; j < 3; j++)
 		{
-			sprintf(txt, faction_ini[j], i + 1);
-			k = gtk_clist_get_text(GTK_CLIST(faction_list), i, j,
-				&celltext);
-			if (!k) celltext = "";
-			else if (j)
-			{
-				gtkncpy(path, celltext, PATHBUF);
-				celltext = path;
-			}
-			inifile_set(txt, celltext);
+			sprintf(txt, faction_ini[j], idx[i] + 1);
+			if (!j) s = rp->name;
+			else if (j == 1) gtkncpy(s = buf, rp->cmd, sizeof(buf));
+			else s = rp->dir;
+			inifile_set(txt, s);
 		}
 	}
 	update_faction_menu();
-	gtk_widget_destroy(widget);
+	run_destroy(wdata);
 }
 
-static void faction_execute(GtkWidget *widget, gpointer user_data)
-{
-	spawn_expansion((char *)gtk_entry_get_text(GTK_ENTRY(faction_entry[1])),
-		(char *)gtk_entry_get_text(GTK_ENTRY(faction_entry[2])));
-}
+#undef _
+#define _(X) X
+
+#define WBbase spawn_dd
+static void *spawn_code[] = {
+	WINDOWm(_("Configure File Actions")),
+	DEFSIZE(500, 400),
+	XVBOXb(0, 5), // !!! Originally the main vbox was that way
+	XSCROLL(1, 1), // auto/auto
+	WLIST,
+	NTXTCOLUMND(_("Action"), spawn_row, name, 200, 0),
+	NTXTCOLUMND(_("Command"), spawn_row, cmd, 0 /* 200 */, 0),
+	REF(list), LISTCd(nidx, cnt, strs, sizeof(spawn_row), faction_select_row),
+	TRIGGER, CLEANUP(strs),
+	REF(group), GROUP(1),
+	FHBOX(_("Action")), XENTRY(name), EVENT(CHANGE, faction_changed), WDONE,
+	FHBOX(_("Command")), XENTRY(cmd), EVENT(CHANGE, faction_changed), WDONE,
+	PATH(_("Directory"), _("Select Directory"), FS_SELECT_DIR, dir),
+	EVENT(CHANGE, faction_changed),
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), faction_btn, _("Cancel"), NULL),
+	OKADD(_("Execute"), faction_btn),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_file_configure()
 {
-	gchar *clist_titles[3] = { _("Action"), _("Command"), "" };
-	GtkWidget *vbox, *hbox, *win, *sw, *clist, *entry;
-	gchar *row_text[3];
-	char txt[64], paths[2][PATHTXT];
+	spawn_dd tdata;
+	spawn_row *rp;
+	char txt[64], *s;
 	int i, j;
 
+	rp = tdata.strs = calloc(FACTION_ROWS_TOTAL, sizeof(spawn_row));
+	if (!rp) return; // Not enough memory
 
-	win = add_a_window( GTK_WINDOW_TOPLEVEL, _("Configure File Actions"), GTK_WIN_POS_CENTER, TRUE );
-	gtk_window_set_default_size( GTK_WINDOW(win), 500, 400 );
-
-	vbox = add_vbox(win);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
-
-	sw = xpack5(vbox, gtk_scrolled_window_new(NULL, NULL));
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (sw), GTK_POLICY_AUTOMATIC,
-			GTK_POLICY_AUTOMATIC);
-
-	faction_list = clist = gtk_clist_new_with_titles(3, clist_titles);
-	gtk_container_add(GTK_CONTAINER(sw), clist);
-	/* Store directories in a hidden third column */
-	gtk_clist_set_column_visibility(GTK_CLIST(clist), 2, FALSE);
-	gtk_clist_set_column_width(GTK_CLIST(clist), 0, 200);
-//	gtk_clist_set_column_width(GTK_CLIST(clist), 1, 200);
-	gtk_clist_column_titles_passive(GTK_CLIST(clist));
-	gtk_clist_set_selection_mode(GTK_CLIST(clist), GTK_SELECTION_BROWSE);
-	clist_enable_drag(clist);
-
-	for (i = 1; i <= FACTION_ROWS_TOTAL; i++)
+	for (i = 1; i <= FACTION_ROWS_TOTAL; i++ , rp++)
 	{
 		for (j = 0; j < 3; j++)
 		{
 			sprintf(txt, faction_ini[j], i);
-			row_text[j] = inifile_get(txt, "");
-			if (!j) continue;
-			gtkuncpy(paths[j - 1], row_text[j], PATHTXT);
-			row_text[j] = paths[j - 1];
+			s = inifile_get(txt, "");
+			if (!j) strncpy0(rp->name, s, sizeof(rp->name));
+			else if (j == 1) gtkuncpy(rp->cmd, s, sizeof(rp->cmd));
+			else strncpy0(rp->dir, s, sizeof(rp->dir));
 		}
-		gtk_clist_append(GTK_CLIST(clist), row_text);
 	}
 
-	gtk_signal_connect(GTK_OBJECT(clist), "select_row",
-		GTK_SIGNAL_FUNC(faction_select_row), NULL);
-	gtk_signal_connect(GTK_OBJECT(clist), "row_move",
-		GTK_SIGNAL_FUNC(faction_moved), NULL);
+	tdata.name = tdata.cmd = "";
+	tdata.dir[0] = '\0';
+	tdata.idx = -1;
+	tdata.nidx = 0;
+	tdata.cnt = FACTION_ROWS_TOTAL;
+	tdata.lock = FALSE;
 
-	/* Entries */
-
-	for (j = 0; j < 2; j++)
-	{
-		hbox = gtk_hbox_new(FALSE, 0);
-		gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-		add_with_frame(vbox, !j ? _("Action") : _("Command"), hbox);
-		faction_entry[j] = entry = xpack5(hbox, gtk_entry_new());
-		gtk_signal_connect(GTK_OBJECT(entry), "changed",
-			GTK_SIGNAL_FUNC(faction_changed), (gpointer)j);
-	}
-
-	faction_entry[2] = mt_path_box(_("Directory"), vbox,
-		_("Select Directory"), FS_SELECT_DIR);
-	gtk_signal_connect(GTK_OBJECT(faction_entry[2]), "changed",
-		GTK_SIGNAL_FUNC(faction_changed), (gpointer)2);
-
-	/* Cancel / Execute / OK */
-
-	hbox = pack(vbox, OK_box(0, win, _("OK"), GTK_SIGNAL_FUNC(faction_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-	OK_box_add(hbox, _("Execute"), GTK_SIGNAL_FUNC(faction_execute));
-
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_widget_show_all(win);
-	gtk_clist_select_row(GTK_CLIST(clist), 0, 0);	// Select first item
+	run_create(spawn_code, &tdata, sizeof(tdata));
 }
 
 

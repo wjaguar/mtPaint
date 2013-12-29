@@ -177,7 +177,9 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget);
 
 // Entry + Browse
 
+#if 0 /* Not needed anymore */
 GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode);
+#endif
 
 // Option menu
 

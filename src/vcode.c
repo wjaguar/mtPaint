@@ -25,6 +25,7 @@
 #include "png.h"
 #include "mainwindow.h"
 #include "otherwindow.h"
+#include "canvas.h"
 #include "cpick.h"
 #include "icons.h"
 #include "fpick.h"
@@ -755,6 +756,7 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 //	LISTC widget
 
 typedef struct {
+	int kind;		// type of list
 	int ncol;		// columns
 	int update;		// delayed update flags
 	int lock;		// against in-reset signals
@@ -806,12 +808,33 @@ static void listc_update(GtkWidget *w, gpointer user_data)
 		gtk_clist_moveto(clist, (int)(clist->selection->data), 0, 0.5, 0);
 }
 
+static void listc_collect(gchar **row_text, listc_data *ld, int row)
+{
+	char *base = *ld->basev, *ddata = ld->ddata;
+	int j, ncol = ld->ncol, bstep = ld->bstep;
+
+	for (j = 0; j < ncol; j++)
+	{
+		void **cp = ld->columns[j][1];
+		char *v = cp[1];
+		int op = (int)cp[0], step = (int)cp[2];
+
+		if (op & WB_FFLAG) v = (void *)(ddata + (int)v);
+		if (!step) v = (void *)(base + (int)v) , step = bstep;
+//		if (!step) v = (void *)(base + (int)v + bstep * row);
+		v += step * row;
+		op &= WB_OPMASK;
+		row_text[j] = op == op_TXTCOLUMN ? v : // Array of chars
+			/* op == op_RTXTCOLUMN */ (char *)v + *(int *)v;
+// !!! IDXCOLUMN not supported
+	}
+}
+
 /* !!! Should not redraw old things while resetting - or at least, not refer
  * outside of new data if doing it */
 static void listc_reset(GtkCList *clist, listc_data *ld)
 {
-	char *base = *ld->basev, *ddata = ld->ddata;
-	int i, j, ncol = ld->ncol, cnt = *ld->cnt, bstep = ld->bstep;
+	int i, j, ncol = ld->ncol, cnt = *ld->cnt;
 
 	ld->lock = TRUE;
 	gtk_clist_freeze(clist);
@@ -822,45 +845,39 @@ static void listc_reset(GtkCList *clist, listc_data *ld)
 		gchar *row_text[MAX_COLS];
 		int row;
 
-		for (j = 0; j < ncol; j++)
-		{
-			void **cp = ld->columns[j][1];
-			char *v = cp[1];
-			int op = (int)cp[0], step = (int)cp[2];
-
-			if (op & WB_FFLAG) v = (void *)(ddata + (int)v);
-			if (!step) v = (void *)(base + (int)v) , step = bstep;
-//			if (!step) v = (void *)(base + (int)v + bstep * i);
-			v += step * i;
-			op &= WB_OPMASK;
-			row_text[j] = op == op_TXTCOLUMN ? v : // Array of chars
-				/* op == op_RTXTCOLUMN */ (char *)v + *(int *)v;
-// !!! IDXCOLUMN not supported
-		}
+		listc_collect(row_text, ld, i);
 		row = gtk_clist_append(clist, row_text);
 		gtk_clist_set_row_data(clist, row, (gpointer)i);
 	}
 
-	/* Adjust column widths */
- 	for (j = 0; j < ncol; j++)
+	/* Adjust column widths (not for draggable list) */
+	if (ld->kind != op_LISTCd) for (j = 0; j < ncol; j++)
 	{
 // !!! Spacing = 5
 		gtk_clist_set_column_width(clist, j,
 			5 + gtk_clist_optimal_column_width(clist, j));
 	}
 
-	if (*ld->idx >= 0)	/* Select item and let it sort */
+	i = *ld->idx;
+	if (i >= cnt) i = cnt - 1;
+	if (!cnt) i = 0;	/* Safer than -1 for empty list */
+	else if (ld->kind == op_LISTCd)	/* Draggable list - not sorted */
 	{
-		if (*ld->idx >= cnt) *ld->idx = cnt - 1;
-		gtk_clist_select_row(clist, *ld->idx, 0);
+		if (i < 0) i = 0;
+		gtk_clist_select_row(clist, i, 0);
+	}
+	else if (i >= 0)	/* Select item and let it sort */
+	{
+		gtk_clist_select_row(clist, i, 0);
 		gtk_clist_sort(clist);
 	}
 	else	/* Select whatever is first after sort */
 	{
 		gtk_clist_sort(clist);
 		gtk_clist_select_row(clist, 0, 0);
-		*ld->idx = (int)gtk_clist_get_row_data(clist, 0);
+		i = (int)gtk_clist_get_row_data(clist, 0);
 	}
+	*ld->idx = i;
 
 	gtk_clist_thaw(clist);
 	ld->update |= 3;
@@ -900,14 +917,14 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 	GtkCList *clist;
 	listc_data *ld;
 	void **basev;
-	int i, j, bstep, sm, *cntv, *sort = &zero;
+	int i, j, bstep, sm, kind, *cntv, *sort = &zero;
 
 
 	cntv = (void *)(ddata + (int)pp[2]); // length var
 	basev = (void *)(ddata + (int)pp[4]); // array base var
 	bstep = (int)pp[5]; // array item size
-	if (((int)pp[0] & WB_OPMASK) == op_LISTCS)
-		sort = (void *)(ddata + (int)pp[3]); // sort mode
+	kind = (int)pp[0] & WB_OPMASK; // kind of list
+	if (kind == op_LISTCS) sort = (void *)(ddata + (int)pp[3]); // sort mode
 
 	list = gtk_clist_new(ncol);
 
@@ -916,6 +933,7 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 	gtk_object_set_user_data(GTK_OBJECT(list), ld);
 	for (i = 0; i < MAX_COLS; i++) ld->ref.idx[i] = i;
 	ld->ref.r = r;
+	ld->kind = kind;
 	ld->ddata = ddata;
 	ld->basev = basev;
 	ld->bstep = bstep;
@@ -980,7 +998,44 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 	gtk_signal_connect(GTK_OBJECT(clist), "select_row",
 		GTK_SIGNAL_FUNC(listc_select_row), ld);
 
+	if (kind == op_LISTCd) clist_enable_drag(list); // draggable rows
+
 	return (list);
+}
+
+//	PATH widget
+
+static void pathbox_button(GtkWidget *widget, gpointer user_data)
+{
+	void **slot = user_data, **desc = slot[1];
+	void *xdata[2] = { _(desc[2]), slot }; // title and slot
+
+	file_selector_x((int)desc[3], xdata);
+}
+
+// !!! With inlining this, problem also
+GtkWidget *pathbox(void **r)
+{
+	GtkWidget *hbox, *entry, *button;
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(hbox);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+
+	entry = xpack5(hbox, gtk_entry_new());
+	button = add_a_button(_("Browse"), 2, hbox, FALSE);
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(pathbox_button), r);
+
+	return (entry);
+}
+
+/* Set value of path widget */
+static void set_path(GtkWidget *widget, int op, char *s)
+{
+	char path[PATHTXT];
+	gtkuncpy(path, op == op_PATHs ? inifile_get(s, "") : s, PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(widget), path);
 }
 
 #if U_NLS
@@ -1059,6 +1114,8 @@ static cmdef cmddefs[] = {
 		0, USE_BORDER(FRBOX) },
 	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
+	{ op_FHBOX, cm_HBOX, pk_PACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(FRBOX) },
 // !!! Padding = 0
 	{ op_SCROLL, cm_SCROLL, pk_PACK | pkf_STACK | pkf_SHOW },
 	{ op_XSCROLL, cm_SCROLL, pk_XPACK | pkf_STACK | pkf_SHOW,
@@ -1099,6 +1156,10 @@ static cmdef cmddefs[] = {
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
 	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
+// !!! Padding = 5
+	{ op_XENTRY, op_XENTRY, pk_XPACK | pkf_SHOW, 5 },
+// !!! Padding = 0 Border = 0
+	{ op_MLENTRY, op_MLENTRY, pk_PACK | pkf_SHOW },
 	{ op_OKBOX, cm_OKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
 		USE_BORDER(OKBOX) },
 // !!! Padding = 5 Border = 0
@@ -1143,7 +1204,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	int have_sliders = FALSE;
 #endif
 	int raise = FALSE;
-	char txt[PATHTXT];
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWindow *tparent = GTK_WINDOW(main_window);
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
@@ -1160,7 +1220,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
 	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
 	dsize = (ld + n + 2 + predict_size(ifcode, ddata) * 2) * sizeof(void *);
-	res = calloc(1, dsize);
+	if (!(res = calloc(1, dsize))) return (NULL); // failed
 	memcpy(res, ddata, ddsize); // Copy datastruct
 	ddata = res; // And switch to using it
 	vdata = (void *)(res += ld); // Locate where internal data go
@@ -1435,28 +1495,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			break;
 		}
-		/* Add a multiline entry widget, fill from drop-away buffer */
-		case op_MLENTRY:
+		/* Add an entry widget, fill from drop-away buffer */
+		case op_XENTRY: case op_MLENTRY:
 			widget = gtk_entry_new();
 			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
-			accept_ctrl_enter(widget);
+			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(widget));
-// !!! Padding = 0 Border = 0
-			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a path entry or box to table */
-		case op_TPENTRY: case op_PATH: case op_PATHs:
-			if (op == op_TPENTRY)
-			{
-				widget = gtk_entry_new_with_max_length((int)pp[1]);
+		case op_TPENTRY:
+			widget = gtk_entry_new_with_max_length((int)pp[1]);
 // !!! Padding = 0
-				pk = pk_TABLE2 | pkf_SHOW;
-			}
-			else widget = mt_path_box(_(pp[1]), wp[0], _(pp[2]), (int)pp[3]);
-			gtkuncpy(txt, op == op_PATHs ? inifile_get(v, "") : v,
-				PATHTXT);
-			gtk_entry_set_text(GTK_ENTRY(widget), txt);
+			set_path(widget, op, v);
+			pk = pk_TABLE2 | pkf_SHOW;
+			break;
+		/* Add a path box to table */
+		case op_PATH: case op_PATHs:
+			widget = pathbox(r);
+			set_path(widget, op, v);
+			pk = pk_PACK | pkf_SHOW | pkf_PARENT | pkf_FRAME;
 			break;
 		/* Add a text widget, fill from drop-away buffer at pointer */
 		case op_TEXT:
@@ -1494,7 +1552,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_SCROLLVP;
 			break;
 		/* Add a clist with pre-defined columns */
-		case op_LISTC: case op_LISTCS:
+		case op_LISTC: case op_LISTCd: case op_LISTCS:
 			widget = listc(v, ddata, pp - 1, columns, ncol, r);
 			ncol = 0;
 // !!! Border = 0
@@ -1689,7 +1747,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					"changed", GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 #endif
-			case op_MLENTRY: case op_TPENTRY:
+			case op_XENTRY: case op_MLENTRY: case op_TPENTRY:
 			case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
@@ -1858,7 +1916,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_COLORLIST: case op_COLORLISTN:
 		case op_COLORPAD: case op_GRADBAR:
-		case op_LISTCCr: case op_LISTC: case op_LISTCS:
+		case op_LISTCCr: case op_LISTC: case op_LISTCd: case op_LISTCS:
 			break; // self-reading
 		case op_COLOR:
 			*(int *)v = cpick_get_colour(*wdata, NULL);
@@ -1873,7 +1931,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
 			break;
-		case op_MLENTRY:
+		case op_XENTRY: case op_MLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
 		case op_TPENTRY: case op_PATH:
@@ -1952,9 +2010,17 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
 				*(int *)v);
 			break;
-		case op_LISTC: case op_LISTCS:
+		case op_LISTC: case op_LISTCd: case op_LISTCS:
 			listc_reset(GTK_CLIST(*wdata),
 				gtk_object_get_user_data(GTK_OBJECT(*wdata)));
+			break;
+		case op_XENTRY: case op_MLENTRY:
+			gtk_entry_set_text(GTK_ENTRY(*wdata), *(char **)v);
+			// Replace transient buffer - it may get freed on return
+			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
+			break;
+		case op_TPENTRY: case op_PATH: case op_PATHs:
+			set_path(*wdata, op, v);
 			break;
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
@@ -1978,14 +2044,6 @@ void cmd_reset(void **slot, void *ddata)
 		case op_TCOLOR:
 			cpick_set_colour(slot[0], ((int *)v)[0], ((int *)v)[1]);
 			break;
-		case op_PATH: case op_PATHs:
-		{
-			char path[PATHTXT];
-			gtkuncpy(path, op == op_PATHs ? inifile_get(v, "") : v,
-				PATHTXT);
-			gtk_entry_set_text(GTK_ENTRY(*wdata), txt);
-			break;
-		}
 #endif
 		}
 		if (cgroup < 0) return;
@@ -2143,25 +2201,52 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
 	if (op == op_FPICKpm) fpick_get_filename(slot[0], res, size, idx);
-#if 0 /* Not needed for now */
-	else if ((op == op_LISTC) || (op == op_LISTCS))
+	else if ((op == op_LISTC) || (op == op_LISTCd) || (op == op_LISTCS))
 	{
 		GtkCList *clist = GTK_CLIST(slot[0]);
+		/* if (idx == LISTC_ORDER) */
+		int i, l = size / sizeof(int);
+
+		for (i = 0; i < l; i++)
+			((int *)res)[i] = -1; // nowhere by default
+		if (l > clist->rows) l = clist->rows;
+		for (i = 0; i < l; i++)
+			((int *)res)[(int)gtk_clist_get_row_data(clist, i)] = i;
+#if 0 /* Getting raw selection - not needed for now */
 		*(int *)res = (clist->selection ? (int)clist->selection->data : 0);
-	}
 #endif
+	}
 }
 
 void cmd_setv(void **slot, void *res, int idx)
 {
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
-	if (op == op_FPICKpm) fpick_set_filename(slot[0], res, idx);
-	else if (op == op_TEXT) set_textarea(slot[0], res);
-#if 0 /* Not needed for now */
-	else if ((op == op_LISTC) || (op == op_LISTCS))
+	switch (op)
+	{
+	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
+	case op_TEXT: set_textarea(slot[0], res); break;
+	case op_TPENTRY: case op_PATH: case op_PATHs:
+		set_path(slot[0], op, res);
+		break;
+	case op_LISTC: case op_LISTCd: case op_LISTCS:
+	{
+		GtkCList *clist = GTK_CLIST(slot[0]);
+		/* if (idx == LISTC_RESET_ROW) */
+		listc_data *ld = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		gchar *row_text[MAX_COLS];
+		int i, row, n = (int)res, ncol = ld->ncol;
+
+		listc_collect(row_text, ld, n);
+		row = gtk_clist_find_row_from_data(clist, (gpointer)n);
+		for (i = 0; i < ncol; i++) gtk_clist_set_text(clist,
+			row, i, row_text[i]);
+		break;
+#if 0 /* Moving raw selection - not needed for now */
 		gtk_clist_select_row(slot[0], (int)res, 0);
 #endif
+	}
+	}
 }
 
 void cmd_repaint(void **slot)
