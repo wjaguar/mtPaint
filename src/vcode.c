@@ -171,8 +171,10 @@ static int predict_size(void **ifcode, char *ddata)
 		n += WB_GETREF(op);
 		op &= WB_OPMASK;
 		if (op < op_END_LAST) break; // End
+		// Direct jump
+		if (op == op_GOTO) ifcode = *pp;
 		// Subroutine call/return
-		if (op == op_RET) ifcode = *--rp;
+		else if (op == op_RET) ifcode = *--rp;
 		else if (op == op_CALLp)
 		{
 			*rp++ = ifcode;
@@ -1156,6 +1158,8 @@ static cmdef cmddefs[] = {
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
 	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
+// !!! Padding = 0
+	{ op_COMBO, op_COMBO, pk_PACK | pkf_SHOW },
 // !!! Padding = 5
 	{ op_XENTRY, op_XENTRY, pk_XPACK | pkf_SHOW, 5 },
 // !!! Padding = 0 Border = 0
@@ -1478,8 +1482,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1_t) : NULL);
 			break;
 		}
-		/* Add an option menu for field/var */
-		case cm_OPT: case cm_OPTD:
+		/* Add an option menu or combobox for field/var */
+		case cm_OPT: case cm_OPTD: case op_COMBO:
 		{
 			char **src = pp[1];
 			int n = (int)pp[2];
@@ -1490,7 +1494,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			n = n_trans(tc, src, n);
 			src = tc;
 #endif
-			widget = wj_option_menu(src, n, *(int *)v,
+			widget = (op == op_COMBO ? wj_combo_box : wj_option_menu)
+				(src, n, *(int *)v,
 				ref > 1 ? NEXT_SLOT(r) : NULL,
 				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
 			break;
@@ -1634,6 +1639,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_EXEC:
 			r = ((ext_fn)v)(r, &wp, res);
 			continue;
+		/* Do a V-code direct jump */
+		case op_GOTO:
+			ifcode = v;
+			continue;
 		/* Call a V-code subroutine, indirect from field/var */
 // !!! Maybe add opcode for direct call too
 		case op_CALLp:
@@ -1647,6 +1656,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Skip next token(s) if/unless field/var is unset */
 		case op_IF: case op_UNLESS:
 			if (!*(int *)v ^ (op != op_IF))
+				ifcode = skip_if(pp - 1);
+			continue;
+		/* Skip next token(s) unless inifile var, set by default, is unset */
+		case op_UNLESSbt:
+			if (inifile_get_gboolean(v, TRUE))
 				ifcode = skip_if(pp - 1);
 			continue;
 		/* Store a reference to whatever is next into field */
@@ -1930,6 +1944,9 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
 		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
+			break;
+		case op_COMBO:
+			*(int *)v = wj_combo_box_get_history(*wdata);
 			break;
 		case op_XENTRY: case op_MLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));

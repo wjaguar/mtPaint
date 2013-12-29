@@ -49,9 +49,6 @@ typedef struct {
 extern void *spin1_code[];
 
 
-typedef int (*filter_hook)(GtkWidget *content, gpointer user_data);
-typedef void (*colour_hook)(int what);
-
 int mem_preview, mem_preview_clip, brcosa_auto;
 int posterize_mode;
 int sharper_reduce;
@@ -79,7 +76,6 @@ int do_new_one(int nw, int nh, int nc, png_color *pal, int bpp, int undo);
 void do_new_chores(int undo);
 void reset_tools();
 
-void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool);
 void memory_errors(int type);
 
 void gradient_setup(int mode);

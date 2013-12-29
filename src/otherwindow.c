@@ -547,48 +547,6 @@ void *spin1_code[] = { SPINa(n), RET };
 #undef _
 #define _(X) __(X)
 
-typedef struct {
-	GtkWidget *cont;
-	filter_hook func;
-	gpointer data;
-} filter_wrap;
-
-void run_filter(GtkWidget *widget, gpointer user_data)
-{
-	filter_wrap *fw = gtk_object_get_user_data(GTK_OBJECT(widget));
-	if (fw->func(fw->cont, fw->data)) destroy_dialog(widget);
-	update_stuff(UPD_IMG);
-}
-
-void filter_window(gchar *title, GtkWidget *content, filter_hook filt, gpointer fdata, int istool)
-{
-	filter_wrap *fw;
-	GtkWidget *win, *vbox;
-	GtkWindowPosition pos = istool && !inifile_get_gboolean("centerSettings", TRUE) ?
-		GTK_WIN_POS_MOUSE : GTK_WIN_POS_CENTER;
-
-	win = add_a_window(GTK_WINDOW_TOPLEVEL, title, pos, TRUE);
-	fw = bound_malloc(win, sizeof(filter_wrap));
-	gtk_object_set_user_data(GTK_OBJECT(win), (gpointer)fw);
-	gtk_window_set_default_size(GTK_WINDOW(win), 300, -1);
-
-	fw->cont = content;
-	fw->func = filt;
-	fw->data = fdata;
-
-	vbox = add_vbox(win);
-
-	add_hseparator(vbox, -2, 10);
-	pack5(vbox, content);
-	add_hseparator(vbox, -2, 10);
-
-	pack(vbox, OK_box(0, win, _("Apply"), GTK_SIGNAL_FUNC(run_filter),
-		_("Cancel"), GTK_SIGNAL_FUNC(destroy_dialog)));
-
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(main_window));
-	gtk_widget_show(win);
-}
-
 ///	BACTERIA EFFECT
 
 static int do_bacteria(spin1_dd *dt, void **wdata)

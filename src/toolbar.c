@@ -34,6 +34,7 @@
 #include "csel.h"
 #include "font.h"
 #include "icons.h"
+#include "vcode.h"
 
 
 
@@ -203,123 +204,148 @@ void mode_change(int setting, int state)
 	update_stuff(setting == SETB_GRAD ? UPD_GMODE : UPD_MODE);
 }
 
-static int set_flood(GtkWidget *box, gpointer fdata)
+typedef struct {
+	filterwindow_dd fw;
+	int fstep;
+} flood_dd;
+
+static int set_flood(flood_dd *dt, void **wdata)
 {
-	GtkWidget *spin, *toggle;
-	GList *chain = GTK_BOX(box)->children;
-
-	spin = ((GtkBoxChild*)chain->data)->widget;
-	flood_step = read_float_spin(spin);
-	chain = chain->next;
-	toggle = ((GtkBoxChild*)chain->data)->widget;
-	flood_cube = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
-	chain = chain->next;
-	toggle = ((GtkBoxChild*)chain->data)->widget;
-	flood_img = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
-	chain = chain->next;
-	toggle = ((GtkBoxChild*)chain->data)->widget;
-	flood_slide = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
-
+	run_query(wdata);
+	flood_step = dt->fstep / 100.0;
 	return TRUE;
 }
+
+#undef _
+#define _(X) X
+
+static void *toolwindow_code[] = {
+	UNLESSbt("centerSettings"), WPMOUSE, GOTO(filterwindow_code) };
+
+#define WBbase flood_dd
+static void *flood_code[] = {
+	VBOXPS,
+	BORDER(SPIN, 0),
+	FSPIN(fstep, 0, 20000),
+	CHECKv(_("RGB Cube"), flood_cube),
+	CHECKv(_("By image channel"), flood_img),
+	CHECKv(_("Gradient-driven"), flood_slide),
+	WDONE, RET
+};
+#undef WBbase
 
 void flood_settings() /* Flood fill step */
 {
-	GtkWidget *box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	pack(box, add_float_spin(flood_step, 0, 200));
-	add_a_toggle(_("RGB Cube"), box, flood_cube);
-	add_a_toggle(_("By image channel"), box, flood_img);
-	add_a_toggle(_("Gradient-driven"), box, flood_slide);
-	filter_window(_("Fill settings"), box, set_flood, NULL, TRUE);
+	flood_dd tdata = {
+		{ _("Fill settings"), flood_code, FW_FN(set_flood) },
+		rint(flood_step * 100) };
+	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
-static int set_smudge(GtkWidget *box, gpointer fdata)
+#undef _
+#define _(X) __(X)
+
+static int set_settings(filterwindow_dd *dt, void **wdata)
 {
-	GtkWidget *toggle;
-
-	toggle = BOX_CHILD_0(box);
-	smudge_mode = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
-
+	run_query(wdata);
 	return TRUE;
 }
+
+#undef _
+#define _(X) X
+
+#define WBbase filterwindow_dd
+void *smudge_code[] = { CHECKv(_("Respect opacity mode"), smudge_mode), RET };
+#undef WBbase
 
 void smudge_settings() /* Smudge opacity mode */
 {
-	GtkWidget *box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	add_a_toggle(_("Respect opacity mode"), box, smudge_mode);
-	filter_window(_("Smudge settings"), box, set_smudge, NULL, TRUE);
+	static filterwindow_dd tdata = {
+		_("Smudge settings"), smudge_code, FW_FN(set_settings) };
+	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
-static int set_brush_step(GtkWidget *box, gpointer fdata)
-{
-	GtkWidget *spin;
-
-	spin = BOX_CHILD_0(box);
-	brush_spacing = read_spin(spin);
-
-	return TRUE;
-}
+#define WBbase filterwindow_dd
+void *step_code[] = {
+	VBOXPS,
+	BORDER(SPIN, 0),
+	SPINv(brush_spacing, 0, MAX_WIDTH),
+// !!! Not implemented yet
+//	CHECKv(_("Flat gradient strokes"), ???),
+	WDONE, RET
+};
+#undef WBbase
 
 void step_settings() /* Brush spacing */
 {
-	GtkWidget *box = gtk_vbox_new(FALSE, 5);
-	gtk_widget_show(box);
-	pack(box, add_a_spin(brush_spacing, 0, MAX_WIDTH));
-// !!! Not implemented yet
-//	add_a_toggle(_("Flat gradient strokes"), box, ???);
-	filter_window(_("Brush spacing"), box, set_brush_step, NULL, TRUE);
+	static filterwindow_dd tdata = {
+		_("Brush spacing"), step_code, FW_FN(set_settings) };
+	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
-#define BLENDTEMP_SIZE 5
+#undef _
+#define _(X) __(X)
 
-static int set_blend(GtkWidget *box, gpointer fdata)
+typedef struct {
+	filterwindow_dd fw;
+	int mode, reverse;
+	int red, green, blue;
+} blend_dd;
+
+static int set_blend(blend_dd *dt, void **wdata)
 {
-	int i, j, *blendtemp = fdata;
+	int i, j;
 
-	i = blendtemp[0] < 0 ? BLEND_NORMAL : blendtemp[0];
-	j = !blendtemp[2] + (!blendtemp[3] << 1) + (!blendtemp[4] << 2);
+	run_query(wdata);
+	i = dt->mode < 0 ? BLEND_NORMAL : dt->mode; // Paranoia
+	j = !dt->red + (!dt->green << 1) + (!dt->blue << 2);
 
 	/* Don't accept stop-all or do-nothing */
 	if ((j == 7) || !(i | j)) return (FALSE);
 
-	blend_mode = i | (blendtemp[1] ? BLEND_REVERSE : 0) | (j << BLEND_RGBSHIFT);
+	blend_mode = i | (dt->reverse ? BLEND_REVERSE : 0) | (j << BLEND_RGBSHIFT);
 
 	return (TRUE);
 }
 
+#undef _
+#define _(X) X
+
+static char *blends[BLEND_NMODES] = {
+	_("Normal"), _("Hue"), _("Saturation"), _("Value"),
+	_("Colour"), _("Saturate More"),
+	_("Multiply"), _("Divide"), _("Screen"), _("Dodge"),
+	_("Burn"), _("Hard Light"), _("Soft Light"), _("Difference"),
+	_("Darken"), _("Lighten"), _("Grain Extract"),
+	_("Grain Merge") };
+
+#define WBbase blend_dd
+static void *blend_code[] = {
+	VBOXbp(5, 5, 5),
+	COMBO(blends, BLEND_NMODES, mode),
+	CHECK(_("Reverse"), reverse),
+	HSEP,
+	EQBOXs(5),
+	CHECK(_("Red"), red),
+	CHECK(_("Green"), green),
+	CHECK(_("Blue"), blue),
+	WDONE, WDONE, RET
+};
+#undef WBbase
+
 void blend_settings() /* Blend mode */
 {
-	char *rgbnames[3] = { _("Red"), _("Green"), _("Blue") };
-	char *blends[BLEND_NMODES] = {
-		_("Normal"), _("Hue"), _("Saturation"), _("Value"),
-		_("Colour"), _("Saturate More"),
-		_("Multiply"), _("Divide"), _("Screen"), _("Dodge"),
-		_("Burn"), _("Hard Light"), _("Soft Light"), _("Difference"),
-		_("Darken"), _("Lighten"), _("Grain Extract"),
-		_("Grain Merge") };
-	GtkWidget *box, *hbox;
-	int i, *blendtemp;
-
-	box = gtk_vbox_new(FALSE, 5);
-	blendtemp = bound_malloc(box, BLENDTEMP_SIZE * sizeof(int));
-	gtk_container_set_border_width(GTK_CONTAINER(box), 5);
-	pack(box, wj_combo_box(blends, BLEND_NMODES,
-		blend_mode & BLEND_MMASK, blendtemp + 0, NULL));
-	pack(box, sig_toggle(_("Reverse"), blend_mode & BLEND_REVERSE,
-		blendtemp + 1, NULL));
-	add_hseparator(box, -2, 10);
-	hbox = pack(box, gtk_hbox_new(TRUE, 5));
-	for (i = 0; i < 3; i++)
-	{
-		pack(hbox, sig_toggle(rgbnames[i],
-			~blend_mode & ((1 << BLEND_RGBSHIFT) << i),
-			blendtemp + 2 + i, NULL));
-	}
-	gtk_widget_show_all(box);
-	filter_window(_("Blend mode"), box, set_blend, (gpointer)blendtemp, TRUE);
+	blend_dd tdata = {
+		{ _("Blend mode"), blend_code, FW_FN(set_blend) },
+		blend_mode & BLEND_MMASK, blend_mode & BLEND_REVERSE,
+		~blend_mode & (1 << BLEND_RGBSHIFT),
+		~blend_mode & (2 << BLEND_RGBSHIFT),
+		~blend_mode & (4 << BLEND_RGBSHIFT) };
+	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
+
+#undef _
+#define _(X) __(X)
 
 
 static void ts_update_spinslides()

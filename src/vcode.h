@@ -88,6 +88,7 @@ enum {
 	op_TOPT,
 	op_TLOPT,
 	op_OPTD,
+	op_COMBO,
 	op_XENTRY,
 	op_MLENTRY,
 	op_TPENTRY,
@@ -119,10 +120,12 @@ enum {
 	op_TLBUTTON,
 
 	op_EXEC,
+	op_GOTO,
 	op_CALLp,
 	op_RET,
 	op_IF,
 	op_UNLESS,
+	op_UNLESSbt,
 	op_ENDIF,
 	op_REF,
 	op_CLEANUP,
@@ -319,6 +322,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TSPINa(NM,A) WBrhf(TSPINa, 2), WBfield(A), (NM)
 #define SPIN(V,V0,V1) WBrhf(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
+#define SPINv(V,V0,V1) WBrh(SPIN, 3), &(V), \
+	(void *)(V0), (void *)(V1)
 #define SPINc(V,V0,V1) WBrhf(SPINc, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
@@ -378,6 +383,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define OPTDe(SP,V,HS) WBr2hf(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS)
+#define COMBO(SS,N,V) WBrhf(COMBO, 3), WBfield(V), (SS), (void *)(N)
 #define COLORPAD(CC,V,HS) WBr2hf(COLORPAD, 2 + 2), WBfield(V), WBfield(CC), \
 	EVENT(SELECT, HS)
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
@@ -427,6 +433,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
+#define GOTO(A) WBh(GOTO, 1), (A)
 #define CALLp(V) WBhf(CALLp, 1), WBfield(V)
 #define RET WBh(RET, 0)
 #define IF(X) WBhf(IF, 1), WBfield(X)
@@ -435,6 +442,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define UNLESS(X) WBhf(UNLESS, 1), WBfield(X)
 #define UNLESSx(X,N) WBhf(UNLESS, 2), WBfield(X), (void *)(N)
 #define UNLESSv(X) WBh(UNLESS, 1), &(X)
+#define UNLESSbt(V) WBh(UNLESSbt, 1), (V)
 #define ENDIF(N) WBh(ENDIF, 1), (void *)(N)
 #define REF(V) WBhf(REF, 1), WBfield(V)
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
