@@ -288,12 +288,13 @@ char *cspnames[NUM_CSPACES];
 char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
+void **main_window_;
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
 	*menu_widgets[TOTAL_MENU_IDS],
-	*dock_pane, *dock_area;
+	*dock_area;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;

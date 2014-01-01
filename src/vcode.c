@@ -29,6 +29,7 @@
 #include "cpick.h"
 #include "icons.h"
 #include "fpick.h"
+#include "prefs.h"
 #include "vcode.h"
 
 /* Make code not compile if it cannot work */
@@ -111,13 +112,23 @@ static void get_evt_1_t(GtkObject *widget, gpointer user_data)
 		get_evt_1(widget, user_data);
 }
 
-static void get_evt_1_d(GtkObject *widget, gpointer user_data)
+static void do_evt_1_d(void **slot)
 {
-	void **slot = user_data;
 	void **base = slot[0], **desc = slot[1];
 
 	if (!desc[1]) run_destroy(base);
 	else ((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
+}
+
+static void get_evt_1_d(GtkObject *widget, gpointer user_data)
+{
+	do_evt_1_d(user_data);
+}
+
+static gboolean get_evt_del(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+	do_evt_1_d(user_data);
+	return (TRUE); // it is for handler to decide, destroy it or not
 }
 
 static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
@@ -1298,6 +1309,43 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			return (res);
 		/* Done with a container */
 		case op_WDONE: ++wp; continue;
+		/* Create the main window */
+		case op_MAINWINDOW:
+		{
+			int wh = (int)pp[2];
+			GdkPixmap *icon_pix;
+
+			gdk_rgb_init();
+			init_tablet();	// Set up the tablet
+//			ag = gtk_accel_group_new();
+
+			widget = window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+			// Set minimum width/height
+			gtk_widget_set_usize(window, wh >> 16, wh & 0xFFFF);
+			// Set name _without_ translating
+			gtk_window_set_title(GTK_WINDOW(window), v);
+
+	/* !!! If main window receives these events, GTK+ will be able to
+	 * direct them to current modal window. Which makes it possible to
+	 * close popups by clicking on the main window outside popup - WJ */
+			gtk_widget_add_events(window,
+				GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK);
+
+			// we need to realize the window because we use pixmaps
+			// for items on the toolbar & menus in the context of it
+			gtk_widget_realize(window);
+
+			icon_pix = gdk_pixmap_create_from_xpm_d(window->window,
+				NULL, NULL, pp[1]);
+			gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
+//			gdk_pixmap_unref(icon_pix);
+
+			gtk_signal_connect(GTK_OBJECT(window), "delete_event",
+				GTK_SIGNAL_FUNC(get_evt_del), NEXT_SLOT(r));
+
+			pk = pkf_STACK; // bin container
+			break;
+		}
 		/* Create a toplevel window, and put a vertical box inside it */
 		case op_WINDOWpm:
 			v = *(char **)v; // dereference & fallthrough
@@ -1319,6 +1367,35 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Initialize */
 			fpick_set_filename(window, v, FALSE);
 			break;
+		/* Add a dock widget */
+		case op_DOCK:
+		{
+			GtkWidget *p0, *p1, *pane;
+
+			widget = gtk_hbox_new(FALSE, 0);
+			gtk_widget_show(widget);
+
+			/* First, create the dock pane - hidden for now */
+			pane = gtk_hpaned_new();
+			paned_mouse_fix(pane);
+			gtk_box_pack_end(GTK_BOX(widget), pane, TRUE, TRUE, 0);
+
+			/* Create the right pane */
+			p1 = gtk_vbox_new(FALSE, 0);
+			gtk_widget_show(p1);
+			gtk_paned_pack2(GTK_PANED(pane), p1, FALSE, TRUE);
+
+			/* Now, create the left pane - for now, separate */
+			p0 = xpack(widget, gtk_vbox_new(FALSE, 0));
+			gtk_widget_show(p0);
+
+			/* Pack everything */
+			gtk_container_add(GTK_CONTAINER(*wp), widget);
+			*wp-- = p1; // right page second
+			*wp = p0; // left page first
+
+			break;
+		}
 		/* Add a notebook page */
 		case op_PAGE:
 			--wp; wp[0] = widget = add_new_page(wp[1], _(v));
@@ -1883,6 +1960,7 @@ static void do_destroy(void **wdata)
 		op &= WB_OPMASK;
 		if (op == op_CLEANUP) free(*(void **)v);
 		else if (op == op_TEXT) g_free(*(char **)v);
+		else if (op == op_MAINWINDOW) gtk_main_quit();
 	}
 	free(data);
 }
@@ -2109,6 +2187,42 @@ void cmd_set(void **slot, int v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
+	case op_DOCK:
+	{
+		GtkWidget *window, *vbox, *pane = BOX_CHILD_0(slot[0]);
+		char *ini = ((void **)slot[1])[1];
+		int w, w2;
+
+		window = gtk_widget_get_toplevel(slot[0]);
+		if (GTK_WIDGET_VISIBLE(window))
+			gdk_window_get_size(window->window, &w2, NULL);
+		/* Window size isn't yet valid */
+		else gtk_object_get(GTK_OBJECT(window), "default_width", &w2, NULL);
+
+		if (v)
+		{
+			/* Restore dock size if set, autodetect otherwise */
+			w = inifile_get_gint32(ini, -1);
+			if (w >= 0) gtk_paned_set_position(GTK_PANED(pane), w2 - w);
+			/* Now, let's juggle the widgets */
+			vbox = BOX_CHILD_1(slot[0]);
+			gtk_widget_ref(vbox);
+			gtk_container_remove(GTK_CONTAINER(slot[0]), vbox);
+			gtk_paned_pack1(GTK_PANED(pane), vbox, TRUE, TRUE);
+			gtk_widget_show(pane);
+		}
+		else
+		{
+			inifile_set_gint32(ini, w2 - GTK_PANED(pane)->child1_size);
+			gtk_widget_hide(pane);
+			vbox = GTK_PANED(pane)->child1;
+			gtk_widget_ref(vbox);
+			gtk_container_remove(GTK_CONTAINER(pane), vbox);
+			xpack(slot[0], vbox);
+		}
+		gtk_widget_unref(vbox);
+		break;
+	}
 	case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
 	case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_value(slot[0], v);

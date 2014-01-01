@@ -25,10 +25,12 @@ enum {
 	op_END_LAST,
 	op_WDONE = op_END_LAST,
 
+	op_MAINWINDOW,
 	op_WINDOW,
 	op_WINDOWm,
 	op_WINDOWpm,
 	op_FPICKpm,
+	op_DOCK,
 	op_PAGE,
 	op_TABLE,
 	op_XTABLE,
@@ -263,6 +265,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WSHOW WBh(WSHOW, 0)
 #define WDIALOG(V) WBhf(WDIALOG, 1), WBfield(V)
 #define WDONE WBh(WDONE, 0)
+/* !!! This block holds 1 nested EVENT block */
+#define MAINWINDOW(NM,ICN,HC,W,H) WBr2h(MAINWINDOW, 3 + 2), (NM), (ICN), \
+	WBwh(W, H), EVENT(CANCEL, HC)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
@@ -270,6 +275,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 /* !!! This block holds 2 nested EVENT blocks */
 #define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
 	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
+#define DOCK(K) WBrh(DOCK, 1), (K)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
