@@ -131,6 +131,21 @@ static gboolean get_evt_del(GtkWidget *widget, GdkEvent *event, gpointer user_da
 	return (TRUE); // it is for handler to decide, destroy it or not
 }
 
+static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	key_ext key = {
+		event->keyval, low_key(event), real_key(event), event->state };
+	int res = ((evtkey_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &key);
+#if GTK_MAJOR_VERSION == 1
+	/* Return value alone doesn't stop GTK1 from running other handlers */
+	if (res) gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
+#endif
+	return (!!res);
+}
+
 static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
 {
 	if (pp[1] || destroy) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
@@ -582,7 +597,12 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 
 	dt->lr[0] = btn = xpack(hbox, gtk_button_new());
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
+#if GTK_MAJOR_VERSION == 1
+        // !!! Arrow w/o shadow is invisible in plain GTK+1
+		GTK_SHADOW_OUT));
+#else /* #if GTK_MAJOR_VERSION == 2 */
 		GTK_SHADOW_NONE));
+#endif
 	gtk_widget_set_sensitive(btn, FALSE);
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(gradbar_scroll), (gpointer)0);
@@ -602,7 +622,12 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 	}
 	dt->lr[1] = btn = xpack(hbox, gtk_button_new());
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
+#if GTK_MAJOR_VERSION == 1
+        // !!! Arrow w/o shadow is invisible in plain GTK+1
+		GTK_SHADOW_OUT));
+#else /* #if GTK_MAJOR_VERSION == 2 */
 		GTK_SHADOW_NONE));
+#endif
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(gradbar_scroll), (gpointer)1);
 
@@ -874,7 +899,8 @@ static void listc_reset(GtkCList *clist, listc_data *ld)
 	i = *ld->idx;
 	if (i >= cnt) i = cnt - 1;
 	if (!cnt) i = 0;	/* Safer than -1 for empty list */
-	else if (ld->kind == op_LISTCd)	/* Draggable list - not sorted */
+	/* Draggable and unordered lists aren't sorted */
+	else if ((ld->kind == op_LISTCd) || (ld->kind == op_LISTCu))
 	{
 		if (i < 0) i = 0;
 		gtk_clist_select_row(clist, i, 0);
@@ -999,7 +1025,7 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 			GTK_SIGNAL_FUNC(listc_column_button), ld);
 	}
 
-	gtk_clist_column_titles_show(clist);
+	if (kind != op_LISTCu) gtk_clist_column_titles_show(clist);
 	gtk_clist_set_selection_mode(clist, GTK_SELECTION_BROWSE);
 
 	/* This will apply delayed updates when they can take effect */
@@ -1216,11 +1242,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	char *tc[256];
 #endif
 #if GTK_MAJOR_VERSION == 1
+	/* GTK+1 typecasts dislike NULLs */
+	GtkWindow *tparent = (GtkWindow *)main_window;
 	int have_sliders = FALSE;
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	GtkWindow *tparent = GTK_WINDOW(main_window);
 #endif
 	int raise = FALSE;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
-	GtkWindow *tparent = GTK_WINDOW(main_window);
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
@@ -1400,6 +1429,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_PAGE:
 			--wp; wp[0] = widget = add_new_page(wp[1], _(v));
 			break;
+		/* Add a notebook page with iconic tab */
+		case op_PAGEi:
+			widget = gtk_vbox_new(FALSE, (int)pp[1]);
+			gtk_notebook_append_page(GTK_NOTEBOOK(wp[0]),
+				widget, xpm_image(v));
+			pk = pkf_SHOW | pkf_STACK;
+			break;
 		/* Add a table */
 		case cm_TABLE:
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
@@ -1456,9 +1492,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a horizontal line */
 		case op_HSEP:
+			widget = gtk_hseparator_new();
+			pk = pk_PACK | pkf_SHOW;
 // !!! Height = 10
-			add_hseparator(wp[0], lp ? (int)v : -2, 10);
-			continue; // !!! nonreferable: does not return widget
+			if (v >= 0) gtk_widget_set_usize(widget,
+				lp ? (int)v : -2, 10);
+			break;
 		/* Add a label */
 		case op_MLABELp:
 			v = *(char **)v; // dereference & fallthrough
@@ -1634,7 +1673,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_SCROLLVP;
 			break;
 		/* Add a clist with pre-defined columns */
-		case op_LISTC: case op_LISTCd: case op_LISTCS:
+		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 			widget = listc(v, ddata, pp - 1, columns, ncol, r);
 			ncol = 0;
 // !!! Border = 0
@@ -1757,6 +1796,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(scroll_max_size_req), NULL);
 			continue;
+		/* Make widget keep max requested width */
+		case op_KEEPWIDTH:
+			widget_set_keepsize(widget, FALSE);
+			continue;
 		/* Use saved size & position for window */
 		case op_WXYWH:
 		{
@@ -1802,6 +1845,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = NULL;
 			*r++ = pp - 1;
 			continue;
+		/* Install key event handler */
+		case op_EVT_KEY:
+		{
+			void **slot = origin_slot(r - 2);
+			gtk_signal_connect(GTK_OBJECT(*slot), "key_press_event",
+				GTK_SIGNAL_FUNC(get_evt_key), r);
+			*r++ = res;
+			*r++ = pp - 1;
+			continue;
+		}
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
 		{
@@ -2008,7 +2061,8 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_COLORLIST: case op_COLORLISTN:
 		case op_COLORPAD: case op_GRADBAR:
-		case op_LISTCCr: case op_LISTC: case op_LISTCd: case op_LISTCS:
+		case op_LISTCCr:
+		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 			break; // self-reading
 		case op_COLOR:
 			*(int *)v = cpick_get_colour(*wdata, NULL);
@@ -2105,7 +2159,7 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
 				*(int *)v);
 			break;
-		case op_LISTC: case op_LISTCd: case op_LISTCS:
+		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 			listc_reset(GTK_CLIST(*wdata),
 				gtk_object_get_user_data(GTK_OBJECT(*wdata)));
 			break;
@@ -2184,6 +2238,7 @@ void cmd_showhide(void **slot, int state)
 
 void cmd_set(void **slot, int v)
 {
+	slot = origin_slot(slot);
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
@@ -2251,6 +2306,22 @@ void cmd_set(void **slot, int v)
 	case op_PLAINBOOK:
 		gtk_notebook_set_page(slot[0], v);
 		break;
+	case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
+	{
+		GtkWidget *widget = GTK_WIDGET(slot[0]);
+		GtkCList *clist = GTK_CLIST(slot[0]);
+		int row = gtk_clist_find_row_from_data(clist, (gpointer)v);
+
+		if (row < 0) break; // Paranoia
+		gtk_clist_select_row(clist, row, 0);
+		/* !!! Focus fails to follow selection in browse mode - have to
+		 * move it here, but a full redraw is necessary afterwards */
+		if (clist->focus_row == row) break;
+		clist->focus_row = row;
+		if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
+			gtk_widget_queue_draw(widget);
+		break;
+	}
 	}
 }
 
@@ -2332,7 +2403,8 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
 	if (op == op_FPICKpm) fpick_get_filename(slot[0], res, size, idx);
-	else if ((op == op_LISTC) || (op == op_LISTCd) || (op == op_LISTCS))
+	else if ((op == op_LISTC) || (op == op_LISTCd) || (op == op_LISTCu) ||
+		(op == op_LISTCS))
 	{
 		GtkCList *clist = GTK_CLIST(slot[0]);
 		/* if (idx == LISTC_ORDER) */
@@ -2360,7 +2432,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_TPENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], op, res);
 		break;
-	case op_LISTC: case op_LISTCd: case op_LISTCS:
+	case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 	{
 		GtkCList *clist = GTK_CLIST(slot[0]);
 		/* if (idx == LISTC_RESET_ROW) */

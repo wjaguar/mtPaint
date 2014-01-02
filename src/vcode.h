@@ -32,6 +32,7 @@ enum {
 	op_FPICKpm,
 	op_DOCK,
 	op_PAGE,
+	op_PAGEi,
 	op_TABLE,
 	op_XTABLE,
 	//
@@ -106,6 +107,7 @@ enum {
 	op_LISTCCr,
 	op_LISTC,
 	op_LISTCd,
+	op_LISTCu,
 	op_LISTCS,
 	op_OKBOX,
 	op_OKBOXp,
@@ -121,28 +123,7 @@ enum {
 	op_UBUTTON,
 	op_TLBUTTON,
 
-	op_EXEC,
-	op_GOTO,
-	op_CALLp,
-	op_RET,
-	op_IF,
-	op_UNLESS,
-	op_UNLESSbt,
-	op_ENDIF,
-	op_REF,
-	op_CLEANUP,
 	op_GROUP,
-	op_MKSHRINK,
-	op_NORESIZE,
-	op_WANTMAX,
-	op_WXYWH,
-	op_WPMOUSE,
-	op_WPWHEREVER,
-	op_INSENS,
-	op_FOCUS,
-	op_WIDTH,
-	op_ONTOP,
-	op_RAISED,
 
 	op_WLIST,
 	op_IDXCOLUMN,
@@ -155,10 +136,34 @@ enum {
 	op_EVT_CLICK,
 	op_EVT_SELECT,
 	op_EVT_CHANGE,
+	op_EVT_KEY, // with key data
 	op_EVT_EXT, // generic event with extra data
 
 	op_EVT_LAST,
 	op_TRIGGER = op_EVT_LAST,
+
+	op_EXEC,
+	op_GOTO,
+	op_CALLp,
+	op_RET,
+	op_IF,
+	op_UNLESS,
+	op_UNLESSbt,
+	op_ENDIF,
+	op_REF,
+	op_CLEANUP,
+	op_MKSHRINK,
+	op_NORESIZE,
+	op_WANTMAX,
+	op_KEEPWIDTH,
+	op_WXYWH,
+	op_WPMOUSE,
+	op_WPWHEREVER,
+	op_INSENS,
+	op_FOCUS,
+	op_WIDTH,
+	op_ONTOP,
+	op_RAISED,
 
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
@@ -177,7 +182,26 @@ enum {
 	op_LAST = op_BOR_LAST
 };
 
+//	Function to run with EXEC
+typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
+
+//	Structure which COLORLIST provides to EXC event
+typedef struct {
+	int idx;	// which row was clicked
+	int button;	// which button was clicked (1-3 etc)
+} colorlist_ext;
+
+//	Structure which is provided to KEY event
+typedef struct {
+	unsigned int key;	// keysym
+	unsigned int lowkey;	// lowercase keysym
+	unsigned int realkey;	// keycode
+	unsigned int state;	// modifier flags
+} key_ext;
+
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
+typedef int (*evtkey_fn)(void *ddata, void **wdata, int what, void **where,
+	key_ext *keydata);
 typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
 
@@ -277,6 +301,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define DOCK(K) WBrh(DOCK, 1), (K)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
+#define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
+#define PAGEir(ICN,S) WBrh(PAGEi, 2), (ICN), (void *)(S)
 #define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
@@ -306,11 +332,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define XSCROLL(HP,VP) WBh(XSCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define NBOOK WBh(NBOOK, 0)
+#define NBOOKr WBrh(NBOOK, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
 #define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
 #define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
+#define HSEPt WBh(HSEP, 1), (void *)(-1)
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define MLABELr(NM) WBrh(MLABEL, 1), (NM)
 #define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
@@ -401,6 +429,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define LISTCd(V,L,FP,S,HS) WBr2hf(LISTCd, 5 + 2), WBfield(V), WBfield(L), \
 	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
+#define LISTCu(V,L,FP,S,HS) WBr2hf(LISTCu, 5 + 2), WBfield(V), WBfield(L), \
+	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define LISTCS(V,L,FP,S,SM,HS) WBr2hf(LISTCS, 5 + 2), WBfield(V), WBfield(L), \
 	WBfield(SM), WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
@@ -468,6 +498,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define FOCUS WBh(FOCUS, 0)
 #define WIDTH(N) WBh(WIDTH, 1), (void *)(N)
 #define MINWIDTH(N) WBh(WIDTH, 1), (void *)(-(N))
+#define KEEPWIDTH WBh(KEEPWIDTH, 0)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define RAISED WBh(RAISED, 0)
 #define WLIST WBh(WLIST, 0)
@@ -481,19 +512,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	NULL, (void *)((W) + ((J) << 16)), (NM)
 #define RTXTCOLUMND(ST,F,W,J) WBrh(RTXTCOLUMN, 3), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16))
+#define RTXTCOLUMNDi(W,J) WBrh(RTXTCOLUMN, 3), (void *)0, \
+	NULL, (void *)((W) + ((J) << 16))
 #define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
-
-//	Function to run with EXEC
-typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
-
-//	Structure which COLORLIST provides to EXC event
-typedef struct {
-	int idx;	// which row was clicked
-	int button;	// which button was clicked (1-3 etc)
-} colorlist_ext;
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0

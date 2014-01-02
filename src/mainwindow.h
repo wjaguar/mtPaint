@@ -293,12 +293,11 @@ GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
-	*menu_widgets[TOTAL_MENU_IDS],
-	*dock_area;
+	*menu_widgets[TOTAL_MENU_IDS];
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
-int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
+int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
 char **file_args;
 
 extern char mem_clip_file[];

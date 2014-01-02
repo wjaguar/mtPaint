@@ -44,7 +44,10 @@
 
 
 typedef struct {
-	void **mainwin, **dock;
+	int need_cline;
+	int idx_c, nidx_c, cnt_c;
+	int *strs_c;
+	void **dock, **dockbook, **dockpage1;
 } main_dd;
 
 #define GREY_W 153
@@ -159,16 +162,16 @@ GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
-	*menu_widgets[TOTAL_MENU_IDS],
-	*dock_area;
+	*menu_widgets[TOTAL_MENU_IDS];
 
 static GtkWidget *main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
-int	files_passed, drag_index_vals[2], cursor_corner, show_dock, use_gamma;
+int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
 char **file_args;
 
+static int show_dock;
 static int mouse_left_canvas;
 
 static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
@@ -991,23 +994,21 @@ static void rebind_keys()
 #endif
 }
 
-int wtf_pressed(GdkEventKey *event)
+static int wtf_pressed_(key_ext *key)
 {
 	key_action *ap = main_keys, *cmatch = NULL;
 	guint *kcd = main_keycodes;
-	guint realkey = real_key(event);
-	guint lowkey = low_key(event);
 
 	for (; ap->action; kcd++ , ap++)
 	{
 		/* Relevant modifiers should match first */
-		if ((event->state & mod_bits[ap->mod & 0xF]) !=
+		if ((key->state & mod_bits[ap->mod & 0xF]) !=
 			mod_bits[ap->mod >> 4]) continue;
 		/* Let keyval have priority; this is also a workaround for
 		 * GTK2 bug #136280 */
-		if (lowkey == ap->key) break;
+		if (key->lowkey == ap->key) break;
 		/* Let keycodes match when keyvals don't */
-		if (realkey == *kcd) cmatch = ap;
+		if (key->realkey == *kcd) cmatch = ap;
 	}
 /* !!! If the starting layout has the keyval+mods combo mapped to one key, and
  * the current layout to another, both will work till "rebind keys" is done.
@@ -1020,10 +1021,18 @@ int wtf_pressed(GdkEventKey *event)
 	return ((ap->action << 16) + (ap->mode + 0x8000));
 }
 
+int wtf_pressed(GdkEventKey *event)
+{
+	key_ext key = {
+		event->keyval, low_key(event), real_key(event), event->state };
+	return wtf_pressed_(&key);
+}
+
 int dock_focused()
 {
 	GtkWidget *focus = GTK_WINDOW(main_window)->focus_widget;
-	return (focus && gtk_widget_is_ancestor(focus, dock_area));
+	GtkWidget *dock = ((main_dd *)GET_DDATA(main_window_))->dockbook[0];
+	return (focus && ((focus == dock) || gtk_widget_is_ancestor(focus, dock)));
 }
 
 static int check_smart_menu_keys(GdkEventKey *event);
@@ -4462,28 +4471,8 @@ static void pressed_pal_paste()
 
 ///	DOCK AREA
 
-static GtkWidget *dock_book, *dock_pages[2], *dock_lr_pane;
-static int dock_state, dock_lr_h;
-
-static void add_dock_page1()
-{
-	GtkWidget *vbox, *pane;
-
-	vbox = gtk_vbox_new(FALSE, 5);
-	pack(vbox, gtk_hseparator_new());
-	pane = xpack(vbox, gtk_vpaned_new());
-	paned_mouse_fix(pane);
-	/* Initialize from layers window, then persist throughout session */
-	if (dock_lr_h <= 0) dock_lr_h = inifile_get_gint32("layers_h", 400);
-	gtk_paned_set_position(GTK_PANED(pane), dock_lr_h);
-	gtk_paned_pack2(GTK_PANED(pane), gtk_vbox_new(FALSE, 0),
-		TRUE, TRUE);
-	gtk_widget_show_all(vbox);
-	gtk_notebook_append_page(GTK_NOTEBOOK(dock_book),
-		vbox, xpm_image(XPM_ICON(layers)));
-	dock_lr_pane = pane;
-	dock_pages[1] = vbox;
-}
+static GtkWidget *dock_lr_pane;
+static int dock_state;
 
 static void pack_0(GtkWidget *box, GtkWidget *widget)
 {
@@ -4497,6 +4486,12 @@ static void toggle_dock(int state, int internal)
 	main_dd *dt = GET_DDATA(main_window_);
 
 	if (istate ^ !state) return;
+
+	/* Show tabs only when it makes sense */
+	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dt->dockbook[0]),
+		(dock_state & (1 << DOCK_CLINE)) &&
+		(dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS))));
+
 	cmd_set(dt->dock, state);
 // !!! Later, make gradient reset its "realize" handler and be done with it
 	if (state) toolbar_update_settings();
@@ -4507,7 +4502,8 @@ static void toggle_dock(int state, int internal)
 
 void dock_undock(int what, int state)
 {
-	GtkWidget *box;
+	main_dd *dt = GET_DDATA(main_window_);
+	GtkWidget *box, *dock_area = dt->dockbook[0];
 	GtkContainer *cont;
 	int mode, flag, cnt;
 
@@ -4534,7 +4530,7 @@ void dock_undock(int what, int state)
 	cont = GTK_CONTAINER(dock_area);
 	mode = cont->resize_mode;
 	/* !!! Immediate resize is too prone to crashing */
-	if (dock_pages[1] || !dock_pages[0])
+	if (dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS)))
 		cont->resize_mode = GTK_RESIZE_QUEUE;
 //	gtk_container_set_resize_mode(cont, GTK_RESIZE_QUEUE);
 
@@ -4548,14 +4544,13 @@ void dock_undock(int what, int state)
 		if ((flag = GTK_WIDGET_MAPPED(dock_area)))
 			gtk_widget_unmap(dock_area); // To prevent flicker
 #endif
-		if (!dock_pages[1]) add_dock_page1();
 		if (what == DOCK_LAYERS)
 		{
 			gtk_paned_pack1(GTK_PANED(dock_lr_pane), box, FALSE, TRUE);
 		}
 		else /* if (what == DOCK_SETTINGS) */
 		{
-			pack_0(dock_pages[1], box);
+			pack_0(dt->dockpage1[0], box);
 		}
 		gtk_widget_unref(box);
 		toolbar_update_settings();
@@ -4563,20 +4558,16 @@ void dock_undock(int what, int state)
 		if (flag) gtk_widget_map(dock_area);
 #endif
 	}
-	else // Undock
-	{
-		dock_state ^= flag;
-		/* Remove settings + layers page if it's empty but other page(s) remain */
-		if (dock_state && !(dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS))))
-		{
-			gtk_container_remove(GTK_CONTAINER(dock_book), dock_pages[1]);
-			dock_pages[1] = NULL;
-		}
-	}
+	else dock_state ^= flag; // Undock
+
+	/* Hide settings + layers page if it's empty */
+	cmd_showhide(dt->dockpage1,
+		dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS)));
 
 	/* Show tabs only when it makes sense */
-	if (dock_state) gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dock_book),
-		g_list_length(GTK_NOTEBOOK(dock_book)->children) > 1);
+	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dock_area),
+		(dock_state & (1 << DOCK_CLINE)) &&
+		(dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS))));
 
 	cont->resize_mode = mode;
 //	gtk_container_set_resize_mode(cont, mode);
@@ -4914,7 +4905,6 @@ static menu_item main_menu[] = {
 
 static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
-	main_dd *dt = GET_DDATA(wdata);
 	GtkRequisition req;
 	GtkAdjustment *adj;
 	GtkWidget *hbox_bar, *hbox_bottom;
@@ -4930,7 +4920,7 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 ///	MAIN WINDOW
 
 	main_window_ = wdata; // !!! For the code which needs this too early
-	main_window = dt->mainwin[0];
+	main_window = GET_REAL_WINDOW(wdata);
 	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
 	 * move as a move, so have to do some non-default processing - WJ */
 	gtk_drag_dest_set(main_window, GTK_DEST_DEFAULT_HIGHLIGHT |
@@ -5094,36 +5084,23 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-static void **create_dock(void **r, GtkWidget ***wpp, void **wdata)
+static void **create_page1(void **r, GtkWidget ***wpp, void **wdata)
 {
-	GtkWidget *vbox = **wpp;
+	GtkWidget *pane, *vbox = **wpp;
 
-	dock_area = vbox;
-	dock_book = xpack(vbox, gtk_notebook_new());
-	gtk_notebook_set_tab_pos(GTK_NOTEBOOK(dock_book), GTK_POS_TOP);
-	// Don't shrink when contents get removed
-	widget_set_keepsize(dock_book, FALSE);
-	gtk_widget_show(dock_book);
+	pane = xpack(vbox, gtk_vpaned_new());
+	paned_mouse_fix(pane);
+	gtk_paned_set_position(GTK_PANED(pane), inifile_get_gint32("layers_h", 400));
+	gtk_paned_pack2(GTK_PANED(pane), gtk_vbox_new(FALSE, 0),
+		TRUE, TRUE);
+	gtk_widget_show_all(vbox);
+	dock_lr_pane = pane;
 
-	/* Commandline box in a page all its own */
-	if (files_passed > 1)
-	{
-		dock_state |= (1 << DOCK_CLINE);
-		dock_pages[0] = gtk_vbox_new(FALSE, 0);
-		gtk_widget_show(dock_pages[0]);
-		gtk_notebook_append_page(GTK_NOTEBOOK(dock_book),
-			dock_pages[0], xpm_image(XPM_ICON(cline)));
-		create_cline_area(dock_pages[0]);
-	}
-
-	/* Settings + layers page */
-	if (!layers_window || !toolbar_status[TOOLBAR_SETTINGS])
-		add_dock_page1();
 	if (!toolbar_status[TOOLBAR_SETTINGS])
 	{
 		dock_state |= (1 << DOCK_SETTINGS);
 		create_settings_box();
-		pack_0(dock_pages[1], settings_box);
+		pack_0(vbox, settings_box);
 		gtk_widget_unref(settings_box);
 	}
 	if (!layers_window)
@@ -5134,12 +5111,15 @@ static void **create_dock(void **r, GtkWidget ***wpp, void **wdata)
 		gtk_widget_unref(layers_box);
 	}
 
-	/* Show tabs only when it makes sense */
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dock_book),
-		g_list_length(GTK_NOTEBOOK(dock_book)->children) > 1);
+	return (r);
+}
+
+static void **finish_dock(void **r, GtkWidget ***wpp, void **wdata)
+{
+	main_dd *dt = GET_DDATA(wdata);
 
 	// Display dock area if requested
-	show_dock = (files_passed > 1);
+	show_dock = dt->need_cline;
 	if (show_dock)
 	{
 		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
@@ -5155,17 +5135,52 @@ static void **create_dock(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
+static int cline_keypress(void *ddata, void **wdata, int what, void **where,
+	key_ext *keydata)
+{
+	return (check_zoom_keys(wtf_pressed_(keydata))); // Check HOME/zoom keys
+}
+
+static void cline_select(main_dd *dt, void **wdata, int what, void **where)
+{
+	cmd_read(where, dt);
+
+	if (dt->idx_c == dt->nidx_c) return; // no change
+	if ((layers_total ? check_layers_for_changes() : check_for_changes()) == 1)
+		cmd_set(where, dt->idx_c); // Go back
+	// Load requested file
+	else do_a_load(file_args[dt->idx_c = dt->nidx_c], undo_load);
+}
+
 #undef _
 #define _(X) X
 
 #define WBbase main_dd
 static void *main_code[] = {
-	REF(mainwin), // !!! temporary for create_internals()
 	MAINWINDOW(MT_VERSION, icon_xpm, delete_event, 100, 100),
 	WXYWH("window", 630, 400),
 	REF(dock), DOCK("dockSize"),
 	EXEC(create_internals), WDONE, // left pane
-	EXEC(create_dock), WDONE, // right pane
+	BORDER(NBOOK, 0),
+	REF(dockbook), NBOOKr, KEEPWIDTH,
+	IFx(need_cline, 1),
+		PAGEi(XPM_ICON(cline), 0),
+		BORDER(XSCROLL, 0),
+		XSCROLL(1, 1), // auto/auto
+		WLIST,
+		RTXTCOLUMNDi(0, 0),
+		LISTCu(nidx_c, cnt_c, strs_c, sizeof(int), cline_select), FOCUS,
+		EVENT(KEY, cline_keypress),
+		CLEANUP(strs_c),
+		WDONE,
+	ENDIF(1),
+	REF(dockpage1), PAGEir(XPM_ICON(layers), 5),
+	HSEPt,
+	EXEC(create_page1),
+	WDONE, // page
+	WDONE, // nbook
+	EXEC(finish_dock), // !!! Later will be TRIGGER on menuitem
+	WDONE, // right pane
 	RAISED, WSHOW
 };
 #undef WBbase
@@ -5176,9 +5191,31 @@ static void *main_code[] = {
 void main_init()
 {
 	main_dd tdata;
-	char txt[PATHBUF];
+	char txt[PATHTXT];
 
+	memset(&tdata, 0, sizeof(tdata));
+	/* Prepare commandline list */
+	if ((tdata.need_cline = files_passed > 1))
+	{
+		memx2 mem;
+		int i, *p;
 
+		memset(&mem, 0, sizeof(mem));
+		getmemx2(&mem, 4000); // default size
+		mem.here += getmemx2(&mem, files_passed * sizeof(int)); // minsize
+		for (i = 0; i < files_passed; i++)
+		{
+			p = (int *)mem.buf + i;
+			*p = mem.here - ((char *)p - mem.buf);
+			/* Convert name string (to UTF-8 in GTK+2) and store it */
+			gtkuncpy(txt, file_args[i], sizeof(txt));
+			addstr(&mem, txt, 0);
+		}
+		tdata.cnt_c = files_passed;
+		tdata.strs_c = (int *)mem.buf;
+
+		dock_state |= (1 << DOCK_CLINE);
+	}
 	main_window_ = run_create(main_code, &tdata, sizeof(tdata));
 
 	/* !!! Have to wait till canvas is displayed, to init keyboard */

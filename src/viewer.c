@@ -38,67 +38,6 @@ float vw_zoom = 1;
 int opaque_view;
 
 
-static gint viewer_keypress( GtkWidget *widget, GdkEventKey *event )
-{					// Used by command line window too
-	if (check_zoom_keys(wtf_pressed(event))) return TRUE;	// Check HOME/zoom keys
-
-	return FALSE;
-}
-
-
-////	COMMAND LINE WINDOW
-
-
-void cline_select(GtkWidget *clist, gint row, gint col, GdkEvent *event, gpointer *pointer)
-{
-	static int last_row; // 0 initially
-
-	if (row != last_row)
-	{
-		if ((layers_total ? check_layers_for_changes() :
-			check_for_changes()) == 1)
-			clist_reselect_row(GTK_CLIST(clist), last_row); // Go back
-		// Load requested file
-		else do_a_load(file_args[last_row = row], undo_load);
-	}
-}
-
-void create_cline_area( GtkWidget *vbox1 )
-{
-	int i;
-	char txt2[PATHTXT];
-	GtkWidget *scrolledwindow, *col_list;
-	gchar *item[1];
-
-	scrolledwindow = xpack(vbox1, gtk_scrolled_window_new(NULL, NULL));
-	gtk_widget_show(scrolledwindow);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(scrolledwindow),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	col_list = gtk_clist_new(1);
-	gtk_clist_set_column_auto_resize( GTK_CLIST(col_list), 0, TRUE );
-	gtk_clist_set_selection_mode(GTK_CLIST(col_list), GTK_SELECTION_BROWSE);
-
-	item[0] = txt2;
-	for (i = 0; i < files_passed; i++)
-	{
-		gtkuncpy(txt2, file_args[i], PATHTXT);
-		gtk_clist_set_selectable ( GTK_CLIST(col_list),
-			gtk_clist_append(GTK_CLIST (col_list), item), TRUE );
-	}
-	gtk_container_add ( GTK_CONTAINER(scrolledwindow), col_list );
-	gtk_widget_show(col_list);
-	gtk_signal_connect(GTK_OBJECT(col_list), "select_row",
-		GTK_SIGNAL_FUNC(cline_select), NULL);
-
-	gtk_widget_grab_focus(col_list);
-
-	gtk_signal_connect(GTK_OBJECT(col_list), "key_press_event",
-		GTK_SIGNAL_FUNC(viewer_keypress), NULL);
-}
-
-
-
 ///	HELP WINDOW
 
 #include "help.c"
@@ -948,10 +887,7 @@ static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 
 	/* Steal focus from dock window */
 	if (pflag && dock_focused())
-	{
 		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-		return (TRUE);
-	}
 
 	wjcanvas_get_vport(widget, vport);
 	vw_mouse_event(event->type, event->x + vport[0], event->y + vport[1],
