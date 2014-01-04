@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -4516,13 +4516,6 @@ void dock_undock(int what, int state)
 	else if (what == DOCK_SETTINGS) box = settings_box;
 	else return; // Nonexistent or unmovable
 
-	if (!state && !box) /* Create boxes on undock request, if needed */
-	{
-		if (what == DOCK_LAYERS) create_layers_box();
-		else if (what == DOCK_SETTINGS) create_settings_box();
-		return; // Do nothing else
-	}
-
 	flag = 1 << what;
 	if (!(dock_state & flag) ^ state) return; // Already that way
 
@@ -5096,20 +5089,15 @@ static void **create_page1(void **r, GtkWidget ***wpp, void **wdata)
 	gtk_widget_show_all(vbox);
 	dock_lr_pane = pane;
 
-	if (!toolbar_status[TOOLBAR_SETTINGS])
-	{
-		dock_state |= (1 << DOCK_SETTINGS);
-		create_settings_box();
-		pack_0(vbox, settings_box);
-		gtk_widget_unref(settings_box);
-	}
-	if (!layers_window)
-	{
-		dock_state |= (1 << DOCK_LAYERS);
-		create_layers_box();
-		gtk_paned_pack1(GTK_PANED(dock_lr_pane), layers_box, FALSE, TRUE);
-		gtk_widget_unref(layers_box);
-	}
+	dock_state |= (1 << DOCK_SETTINGS);
+	create_settings_box();
+	pack_0(vbox, settings_box);
+	gtk_widget_unref(settings_box);
+
+	dock_state |= (1 << DOCK_LAYERS);
+	create_layers_box();
+	gtk_paned_pack1(GTK_PANED(dock_lr_pane), layers_box, FALSE, TRUE);
+	gtk_widget_unref(layers_box);
 
 	return (r);
 }

@@ -1,5 +1,5 @@
 /*	vcode.h
-	Copyright (C) 2013 Dmitry Groshev
+	Copyright (C) 2013-2014 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -30,11 +30,13 @@ enum {
 	op_WINDOWm,
 	op_WINDOWpm,
 	op_FPICKpm,
+	op_TOPVBOX,
 	op_DOCK,
 	op_PAGE,
 	op_PAGEi,
 	op_TABLE,
 	op_XTABLE,
+	op_ETABLE,
 	//
 	op_VBOX,
 	op_XVBOX,
@@ -57,6 +59,7 @@ enum {
 	op_MLABEL,
 	op_MLABELp,
 	op_TLLABEL,
+	op_TLLABELp,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -77,11 +80,14 @@ enum {
 	op_TSPINSLIDE,
 	op_HTSPINSLIDE,
 	op_TLSPINSLIDE,
+	op_TLSPINSLIDEs,
+	op_TLSPINSLIDEx,
 	op_SPINSLIDEa,
 	op_XSPINSLIDEa,
 	op_CHECK,
 	op_XCHECK,
 	op_TLCHECK,
+	op_TLCHECKs,
 	op_CHECKb,
 	op_RPACK,
 	op_FRPACK,
@@ -284,6 +290,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WBnh(N,H) (void *)(((H) & 255) + ((N) << 8))
 #define WBbs(B,S) (void *)(((S) & 255) + ((B) << 8))
 #define WBpbs(P,B,S) (void *)(((S) & 255) + ((B) << 8) + ((P) << 16))
+#define WBppa(PX,PY,AX) (void *)((PY) + ((PX) << 8) + (AX << 16))
 
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
@@ -299,6 +306,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 /* !!! This block holds 2 nested EVENT blocks */
 #define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
 	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
+#define TOPVBOX WBrh(TOPVBOX, 0)
 #define DOCK(K) WBrh(DOCK, 1), (K)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
@@ -307,6 +315,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TABLE2(H) TABLE(2, (H))
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
+#define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
 #define VBOXPS VBOXbp(5, 0, 5)
@@ -341,8 +350,16 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define HSEPt WBh(HSEP, 1), (void *)(-1)
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define MLABELr(NM) WBrh(MLABEL, 1), (NM)
+#define MLABELxr(NM,PX,PY,AX) WBrh(MLABEL, 2), (NM), WBppa(PX, PY, AX)
 #define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
 #define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
+#define TLLABELr(NM,X,Y) WBrh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
+#define TLLABELx(NM,X,Y,PX,PY,AX) WBh(TLLABEL, 3), (NM), \
+	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh(TLLABEL, 3), (NM), \
+	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define TLLABELpx(V,X,Y,PX,PY,AX) WBhf(TLLABELp, 3), WBfield(V), \
+	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -378,6 +395,10 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	WBfield(V), (void *)(V0), (void *)(V1), (NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEs, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define TLSPINSLIDEx(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEx, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINSLIDEa(A) WBrhf(SPINSLIDEa, 1), WBfield(A)
 #define XSPINSLIDEa(A) WBrhf(XSPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
@@ -388,6 +409,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
 #define TLCHECKvl(NM,V,X,Y,L) WBrh(TLCHECK, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
+#define TLCHECKsv(NM,V,X,Y) WBrh(TLCHECKs, 3), &(V), (NM), WBxyl(X, Y, 1)
 /* !!! No more than 255 choices */
 #define RPACK(SS,N,H,V) WBrhf(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
 #define RPACKv(SS,N,H,V) WBrh(RPACK, 3), &(V), (SS), WBnh(N, H)
@@ -481,6 +503,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define UNLESSbt(V) WBh(UNLESSbt, 1), (V)
 #define ENDIF(N) WBh(ENDIF, 1), (void *)(N)
 #define REF(V) WBhf(REF, 1), WBfield(V)
+#define REFv(V) WBh(REF, 1), &(V)
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
@@ -533,3 +556,6 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of LISTC
 #define LISTC_ORDER	0
 #define LISTC_RESET_ROW	1
+
+//	Extra data of LABEL
+#define LABEL_VALUE	0

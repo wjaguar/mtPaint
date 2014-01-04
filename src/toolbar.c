@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -49,8 +49,8 @@ GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 
 
-static GtkWidget *toolbar_zoom_main,
-	*toolbar_labels[2],		// Colour A & B details
+static GtkWidget *toolbar_zoom_main;
+static void **toolbar_labels[2],	// Colour A & B
 	*ts_spinslides[4],		// Size, flow, opacity, value
 	*ts_label_channel;		// Channel name
 
@@ -348,30 +348,24 @@ void blend_settings() /* Blend mode */
 #define _(X) __(X)
 
 
-static void ts_update_spinslides()
+typedef struct {
+	int size, flow, opac, chan;
+} settings_dd;
+
+static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **where)
 {
-	mt_spinslide_set_value(ts_spinslides[0], tool_size);
-	mt_spinslide_set_value(ts_spinslides[1], tool_flow);
-	mt_spinslide_set_value(ts_spinslides[2], tool_opacity);
-	if (mem_channel != CHN_IMAGE)
-		mt_spinslide_set_value(ts_spinslides[3], channel_col_A[mem_channel]);
-}
+	void *cause = cmd_read(where, dt);
 
-
-static void ts_spinslide_moved(GtkAdjustment *adj, gpointer user_data)
-{
-	int n = ADJ2INT(adj);
-
-	switch ((int)user_data)
+	if (cause == &dt->size) tool_size = dt->size;
+	else if (cause == &dt->flow) tool_flow = dt->flow;
+	else if (cause == &dt->opac)
 	{
-	case 0: tool_size = n;
-		break;
-	case 1:	tool_flow = n;
-		break;
-	case 2:	if (n != tool_opacity) pressed_opacity(n);
-		break;
-	case 3: if (n != channel_col_A[mem_channel]) pressed_value(n);
-		break;
+		if (dt->opac != tool_opacity) pressed_opacity(dt->opac);
+	}
+	else /* if (cause == &dt->chan) */
+	{
+		if (dt->chan != channel_col_A[mem_channel])
+			pressed_value(dt->chan);
 	}
 }
 
@@ -923,25 +917,18 @@ static toolbar_item gradient_button =
 #undef _
 #define _(X) __(X)
 
-void create_settings_box()
+static void **create_settings_tbar(void **r, GtkWidget ***wpp, void **wdata)
 {
-	char *ts_titles[4] = { _("Size"), _("Flow"), _("Opacity"), "" };
-	GtkWidget *box, *label, *vbox, *table, *toolbar_settings;
-	GtkWidget *button;
+	GtkWidget *toolbar_settings, *button;
 	GdkPixmap *pmap;
 	int i;
 
-
-	vbox = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
-
 #if GTK_MAJOR_VERSION == 1
-	toolbar_settings = pack(vbox, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+	toolbar_settings = pack(**wpp, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
 		GTK_TOOLBAR_ICONS));
 #endif
 #if GTK_MAJOR_VERSION == 2
-	toolbar_settings = pack(vbox, gtk_toolbar_new());
+	toolbar_settings = pack(**wpp, gtk_toolbar_new());
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS);
 #endif
 
@@ -949,7 +936,7 @@ void create_settings_box()
 	gtk_widget_show(toolbar_settings);
 
 	/* Gradient mode button+preview */
-	settings_buttons[SETB_GRAD] = button = pack(vbox, gtk_toggle_button_new());
+	settings_buttons[SETB_GRAD] = button = pack(**wpp, gtk_toggle_button_new());
 	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
 	grad_view = gtk_pixmap_new(pmap, NULL);
 	gdk_pixmap_unref(pmap);
@@ -973,40 +960,48 @@ void create_settings_box()
 			!!*(vars_settings[i]));
 	}
 
+	return (r);
+}
+
+#undef _
+#define _(X) X
+
+#define WBbase settings_dd
+static void *settings_code[] = {
+	TOPVBOX, // Keep height at max requested, to let dock contents stay put
+	EXEC(create_settings_tbar),
 	/* Colors A & B */
-	label = pack(vbox, gtk_label_new(""));
-	toolbar_labels[0] = label;
-	gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
-	gtk_widget_show (label);
-	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
+	BORDER(LABEL, 0),
+	REFv(toolbar_labels[0]), MLABELxr("", 5, 2, 0),
+	REFv(toolbar_labels[1]), MLABELxr("", 5, 2, 0),
+	ETABLE(2, 4), BORDER(TLABEL, 0),
+	TLLABEL(_("Size"), 0, 0),
+	REFv(ts_spinslides[0]), TLSPINSLIDEx(size, 1, 255, 1, 0),
+	EVENT(CHANGE, ts_spinslide_moved),
+	TLLABEL(_("Flow"), 0, 1),
+	REFv(ts_spinslides[1]), TLSPINSLIDEx(flow, 1, 255, 1, 1),
+	EVENT(CHANGE, ts_spinslide_moved),
+	TLLABEL(_("Opacity"), 0, 2),
+	REFv(ts_spinslides[2]), TLSPINSLIDEx(opac, 0, 255, 1, 2),
+	EVENT(CHANGE, ts_spinslide_moved),
+	REFv(ts_label_channel), TLLABELr("", 0, 3),
+	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3),
+	EVENT(CHANGE, ts_spinslide_moved),
+	WEND
+};
+#undef WBbase
 
-	label = pack(vbox, gtk_label_new(""));
-	toolbar_labels[1] = label;
-	gtk_misc_set_alignment( GTK_MISC(label), 0, 0.5 );
-	gtk_widget_show (label);
-	gtk_misc_set_padding (GTK_MISC (label), 5, 2);
+#undef _
+#define _(X) __(X)
 
-	table = pack_end(vbox, gtk_table_new(4, 2, FALSE));
-	gtk_widget_show(table);
-	gtk_container_set_border_width(GTK_CONTAINER(table), 5);
-	for (i = 0; i < 4; i++)
-	{
-		label = add_to_table(ts_titles[i], table, i, 0, 0);
-		ts_spinslides[i] = mt_spinslide_new(-1, -1);
-		gtk_table_attach(GTK_TABLE(table), ts_spinslides[i], 1, 2,
-			i, i + 1, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-		mt_spinslide_set_range(ts_spinslides[i], i < 2 ? 1 : 0, 255);
-		mt_spinslide_connect(ts_spinslides[i],
-			GTK_SIGNAL_FUNC(ts_spinslide_moved), (gpointer)i);
-	}
-// !!! Use the fact that channel value slider is the last one
-	ts_label_channel = label;
+void create_settings_box()
+{
+	static settings_dd tdata; // zeroed out, get updated later
+	GtkWidget *box;
+	void **wdata;
 
-	/* Keep height at max requested, to let dock contents stay put */
-	box = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
-	gtk_widget_show(box);
-	gtk_container_add(GTK_CONTAINER(box), vbox);
-	widget_set_keepsize(box, TRUE);
+	wdata = run_create(settings_code, &tdata, sizeof(tdata));
+	box = GET_REAL_WINDOW(wdata);
 
 	/* Make widget to report its demise */
 	gtk_signal_connect(GTK_OBJECT(box), "destroy",
@@ -1024,9 +1019,6 @@ static void toolbar_settings_init()
 	if (toolbar_boxes[TOOLBAR_SETTINGS])
 	{
 		gtk_widget_show(toolbar_boxes[TOOLBAR_SETTINGS]);	// Used when Home key is pressed
-#if GTK_MAJOR_VERSION == 1
-		gtk_widget_queue_resize(toolbar_boxes[TOOLBAR_SETTINGS]); /* Re-render sliders */
-#endif
 		return;
 	}
 
@@ -1413,28 +1405,24 @@ void toolbar_update_settings()
 			c, j, mem_pal[j].red, mem_pal[j].green, mem_pal[j].blue);
 		else snprintf(txt, 30, "%c = {%i,%i,%i}", c, mem_col_24[i].red,
 			mem_col_24[i].green, mem_col_24[i].blue);
-		gtk_label_set_text(GTK_LABEL(toolbar_labels[i]), txt);
+		cmd_setv(toolbar_labels[i], txt, LABEL_VALUE);
 	}
 
-	if (mem_channel == CHN_IMAGE)
-	{
-		gtk_widget_show(toolbar_labels[0]);
-		gtk_widget_show(toolbar_labels[1]);
-		gtk_widget_hide(ts_label_channel);
-		gtk_widget_hide(ts_spinslides[3]);
-	}
-	else
-	{
-		gtk_label_set_text(GTK_LABEL(ts_label_channel), channames[mem_channel]);
-		gtk_widget_hide(toolbar_labels[0]);
-		gtk_widget_hide(toolbar_labels[1]);
-		gtk_widget_show(ts_label_channel);
-		gtk_widget_show(ts_spinslides[3]);
-	}
+	i = mem_channel == CHN_IMAGE;
+	cmd_showhide(toolbar_labels[0], i);
+	cmd_showhide(toolbar_labels[1], i);
+	cmd_showhide(ts_spinslides[3], !i);
+	cmd_showhide(ts_label_channel, !i);
+	if (!i) cmd_setv(ts_label_channel, channames[mem_channel], LABEL_VALUE);
 	// Disable opacity for indexed image
-	gtk_widget_set_sensitive(ts_spinslides[2], !IS_INDEXED);
+	cmd_sensitive(ts_spinslides[2], !IS_INDEXED);
 
-	ts_update_spinslides();		// Update tool settings
+	// Update tool settings
+	cmd_set(ts_spinslides[0], tool_size);
+	cmd_set(ts_spinslides[1], tool_flow);
+	cmd_set(ts_spinslides[2], tool_opacity);
+	if (!i) cmd_set(ts_spinslides[3], channel_col_A[mem_channel]);
+
 	ts_update_gradient();
 }
 

@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -33,7 +33,7 @@
 
 ///	PREFERENCES WINDOW
 
-static GtkWidget *check_tablet[3], *hscale_tablet[3], *label_tablet_device, *label_tablet_pressure;
+static void **label_tablet_device, **label_tablet_pressure;
 
 static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
 		*tablet_ini2[] = { "tablet_use_size", "tablet_use_flow", "tablet_use_opacity" };
@@ -125,7 +125,7 @@ static void tablet_update_pressure( double pressure )
 	char txt[64];
 
 	sprintf(txt, "%s = %.2f", _("Pressure"), pressure);
-	gtk_label_set_text( GTK_LABEL(label_tablet_pressure), txt );
+	cmd_setv(label_tablet_pressure, txt, LABEL_VALUE);
 }
 
 static void tablet_update_device( char *device )
@@ -133,7 +133,7 @@ static void tablet_update_device( char *device )
 	char txt[64];
 
 	sprintf(txt, "%s = %s", _("Current Device"), device);
-	gtk_label_set_text( GTK_LABEL(label_tablet_device), txt );
+	cmd_setv(label_tablet_device, txt, LABEL_VALUE);
 }
 
 
@@ -190,7 +190,7 @@ static void tablet_disable_device(GtkInputDialog *inputdialog, GdkDevice *device
 #endif
 
 
-static void conf_tablet(GtkWidget *widget)
+static void conf_tablet()
 {
 	GtkWidget *close;
 	GtkAccelGroup* ag;
@@ -226,7 +226,9 @@ static void conf_tablet(GtkWidget *widget)
 
 typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
+	int tf[3];
 	int lang;
+	char *factor_str;
 } pref_dd;
 
 static void prefs_evt(pref_dd *dt, void **wdata, int what)
@@ -248,10 +250,8 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 
 		for (i = 0; i < 3; i++)
 		{
-			tablet_tool_use[i] = gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(check_tablet[i]));
-			inifile_set_gboolean( tablet_ini2[i], tablet_tool_use[i] );
-			j = mt_spinslide_get_value(hscale_tablet[i]);
+			inifile_set_gboolean(tablet_ini2[i], tablet_tool_use[i]);
+			j = dt->tf[i];
 			inifile_set_gint32(tablet_ini[i], j);
 			tablet_tool_factor[i] = j / 100.0;
 		}
@@ -330,61 +330,11 @@ static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
 
 ///	EXTENSIONS TO V-CODE
 
-static void **create_pref_tablet(void **r, GtkWidget ***wpp)
+static void **create_test_area(void **r, GtkWidget ***wpp)
 {
-	char *tablet_txt[] = { _("Size"), _("Flow"), _("Opacity") };
-	GtkWidget *vbox_2, *label, *button1, *table3, *drawingarea_tablet;
-	char txt[128];
-	int i;
+	GtkWidget *drawingarea_tablet;
 
-	vbox_2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_2);
-	add_with_frame(**wpp, _("Device Settings"), vbox_2);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
-
-	label_tablet_device = pack(vbox_2, gtk_label_new(""));
-	gtk_widget_show (label_tablet_device);
-	gtk_misc_set_alignment (GTK_MISC (label_tablet_device), 0, 0.5);
-	gtk_misc_set_padding (GTK_MISC (label_tablet_device), 5, 5);
-
-	button1 = add_a_button( _("Configure Device"), 0, vbox_2, FALSE );
-	gtk_signal_connect(GTK_OBJECT(button1), "clicked",
-		GTK_SIGNAL_FUNC(conf_tablet), NULL);
-
-	table3 = xpack(vbox_2, gtk_table_new(4, 2, FALSE));
-	gtk_widget_show (table3);
-
-	label = add_to_table( _("Tool Variable"), table3, 0, 0, 0 );
-	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-	snprintf(txt, 60, "%s (%%)", _("Factor"));
-	label = add_to_table( txt, table3, 0, 1, 0 );
-	gtk_misc_set_padding (GTK_MISC (label), 5, 5);
-	gtk_misc_set_alignment (GTK_MISC (label), 0.4, 0.5);
-
-	for ( i=0; i<3; i++ )
-	{
-		check_tablet[i] = gtk_check_button_new_with_label(tablet_txt[i]);
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_tablet[i]),
-			tablet_tool_use[i]);
-		gtk_widget_show(check_tablet[i]);
-		to_table_l(check_tablet[i], table3, i + 1, 0, 1, 0);
-
-	//	Size/Flow/Opacity sliders
-
-		hscale_tablet[i] = mt_spinslide_new(150, -2);
-		mt_spinslide_set_range(hscale_tablet[i], -100, 100);
-		gtk_table_attach(GTK_TABLE(table3), hscale_tablet[i], 1, 2,
-			i + 1, i + 2, GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-		mt_spinslide_set_value(hscale_tablet[i],
-			rint(tablet_tool_factor[i] * 100.0));
-	}
-
-	vbox_2 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox_2);
-	add_with_frame(**wpp, _("Test Area"), vbox_2);
-	gtk_container_set_border_width (GTK_CONTAINER (vbox_2), 5);
-
-	drawingarea_tablet = xpack(vbox_2, gtk_drawing_area_new());
+	drawingarea_tablet = xpack(**wpp, gtk_drawing_area_new());
 	gtk_widget_show (drawingarea_tablet);
 	gtk_widget_set_usize (drawingarea_tablet, 128, 64);
 	gtk_signal_connect( GTK_OBJECT(drawingarea_tablet), "expose_event",
@@ -402,10 +352,6 @@ static void **create_pref_tablet(void **r, GtkWidget ***wpp)
 		| GDK_POINTER_MOTION_HINT_MASK);
 
 	gtk_widget_set_extension_events (drawingarea_tablet, GDK_EXTENSION_EVENTS_CURSOR);
-
-	label_tablet_pressure = pack(vbox_2, gtk_label_new(""));
-	gtk_widget_show (label_tablet_pressure);
-	gtk_misc_set_alignment (GTK_MISC (label_tablet_pressure), 0, 0.5);
 
 	return (r);
 }
@@ -425,6 +371,7 @@ static void *pref_code[] = {
 	SNBOOK,
 	BORDER(TABLE, 10),
 	BORDER(TLABEL, 4), BORDER(SPIN, 4),
+	BORDER(LABEL, 0),
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")),
 #ifdef U_THREADS
@@ -442,7 +389,6 @@ static void *pref_code[] = {
 	CHECKv(_("Disable view window transparencies"), opaque_view),
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
-	BORDER(LABEL, 0),
 	BORDER(OPT, 0),
 	FVBOXs(_("Language"), 5),
 	MLABEL(_("Select preferred language translation\n\n"
@@ -518,8 +464,27 @@ static void *pref_code[] = {
 	WDONE,
 ///	---- TAB6 - TABLET
 	PAGE(_("Tablet")),
-	EXEC(create_pref_tablet),
-	WDONE,
+	FVBOX(_("Device Settings")),
+	REFv(label_tablet_device), MLABELxr("", 5, 5, 0),
+	BORDER(BUTTON, 0),
+	UBUTTON(_("Configure Device"), conf_tablet),
+	DEFBORDER(BUTTON),
+	XTABLE(2, 4),
+	BORDER(TLABEL, 0),
+	TLLABELx(_("Tool Variable"), 0, 0, 5, 5, 5),
+	TLLABELpx(factor_str, 1, 0, 5, 5, 4),
+	TLCHECKsv(_("Size"), tablet_tool_use[0], 0, 1),
+	TLCHECKsv(_("Flow"), tablet_tool_use[1], 0, 2),
+	TLCHECKsv(_("Opacity"), tablet_tool_use[2], 0, 3),
+	//	Size/Flow/Opacity sliders
+	TLSPINSLIDEs(tf[0], -100, 100, 1, 1),
+	TLSPINSLIDEs(tf[1], -100, 100, 1, 2),
+	TLSPINSLIDEs(tf[2], -100, 100, 1, 3),
+	WDONE, WDONE,
+	FVBOX(_("Test Area")),
+	EXEC(create_test_area),
+	REFv(label_tablet_pressure), MLABELxr("", 0, 0, 0),
+	WDONE, WDONE,
 	WDONE, // notebook
 ///	Bottom of Prefs window
 	BORDER(OKBOX, 0),
@@ -534,10 +499,15 @@ static void *pref_code[] = {
 
 void pressed_preferences()
 {
+	char txt[128];
 	pref_dd tdata = { { mem_undo_depth & ~1, MIN_UNDO & ~1, MAX_UNDO & ~1 },
 		{ mem_xpm_trans, -1, mem_cols - 1 },
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
-		{ mem_xbm_hot_y, -1, mem_height - 1 }, 0 };
+		{ mem_xbm_hot_y, -1, mem_height - 1 },
+		{ rint(tablet_tool_factor[0] * 100.0),
+		  rint(tablet_tool_factor[1] * 100.0),
+		  rint(tablet_tool_factor[2] * 100.0) },
+		0, txt };
 
 	// Make sure the user can only open 1 prefs window
 	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
@@ -550,6 +520,7 @@ void pressed_preferences()
 			if (!strcmp(pref_lang_ini_code[i], cur)) tdata.lang = i;
 	}
 #endif
+	snprintf(txt, sizeof(txt), "%s (%%)", _("Factor"));
 
 	run_create(pref_code, &tdata, sizeof(tdata));
 

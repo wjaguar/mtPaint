@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013 Dmitry Groshev
+	Copyright (C) 2013-2014 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -45,6 +45,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define MAX_COLS 16
 
 #define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
+
+#define VCODE_KEY "mtPaint.Vcode"
 
 enum {
 	pk_NONE = 0,
@@ -1114,6 +1116,11 @@ typedef struct {
 	signed char tpad, cw;		// padding and border
 } cmdef;
 
+typedef struct {
+	cmdef s;
+	void *x;	// additional parameter
+} xcmdef;
+
 enum {
 	cm_TABLE = op_LAST,
 	cm_VBOX,
@@ -1122,7 +1129,6 @@ enum {
 	cm_SPIN,
 	cm_SPINa,
 	cm_FSPIN,
-	cm_SPINSLIDEa,
 	cm_CHECK,
 	cm_RPACK,
 	cm_RPACKD,
@@ -1131,7 +1137,13 @@ enum {
 	cm_OKBOX,
 	cm_CANCELBTN,
 	cm_BUTTON,
-	cm_TOGGLE
+	cm_TOGGLE,
+
+	cm_XDEFS_0,
+	cm_LABEL = cm_XDEFS_0,
+	cm_LABELp,
+	cm_SPINSLIDE,
+	cm_SPINSLIDEa,
 };
 
 #define USE_BORDER(T) (op_BOR_0 - op_BOR_##T - 1)
@@ -1139,6 +1151,8 @@ enum {
 static cmdef cmddefs[] = {
 // !!! Padding = 0
 	{ op_TABLE, cm_TABLE, pk_PACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(TABLE) },
+	{ op_ETABLE, cm_TABLE, pk_PACKEND | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(TABLE) },
 // !!! Padding = 0 Border = 0
 	{ op_XTABLE, cm_TABLE, pk_XPACK | pkf_STACK | pkf_SHOW },
@@ -1159,12 +1173,8 @@ static cmdef cmddefs[] = {
 	{ op_SCROLL, cm_SCROLL, pk_PACK | pkf_STACK | pkf_SHOW },
 	{ op_XSCROLL, cm_SCROLL, pk_XPACK | pkf_STACK | pkf_SHOW,
 		USE_BORDER(XSCROLL) },
-	/* Codes can map to themselves, and some do */
-	{ op_MLABEL, op_MLABEL, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
-// !!! Border = 5
-	{ op_MLABELp, op_MLABELp, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL), 5 },
-	{ op_TLLABEL, op_TLLABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
+	/* Codes can map to themselves, and some do */
 // !!! Padding = 0
 	{ op_SPINc, op_SPINc, pk_PACK },
 	{ op_XSPIN, cm_SPIN, pk_XPACK },
@@ -1178,15 +1188,12 @@ static cmdef cmddefs[] = {
 // !!! Padding = 0
 	{ op_XSPINa, cm_SPINa, pk_XPACK },
 	{ op_TSPINa, cm_SPINa, pk_TABLE2, USE_BORDER(SPIN) },
-// !!! Padding = 0
-	{ op_TSPINSLIDE, op_TSPINSLIDE, pk_TABLE2x },
-// !!! Padding = 5
-	{ op_TLSPINSLIDE, op_TLSPINSLIDE, pk_TABLE, 5 },
-	{ op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACK },
-	{ op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK },
-	{ op_CHECK, cm_CHECK, pk_PACK },
-	{ op_XCHECK, cm_CHECK, pk_XPACK },
-	{ op_TLCHECK, cm_CHECK, pk_TABLE },
+// !!! Padding = 0 Border = 5
+	{ op_CHECK, cm_CHECK, pk_PACK | pkf_SHOW, 0, 5 },
+	{ op_XCHECK, cm_CHECK, pk_XPACK | pkf_SHOW, 0, 5 },
+	{ op_TLCHECK, cm_CHECK, pk_TABLE | pkf_SHOW, 0, 5 },
+// !!! Padding = 0 Border = 0
+	{ op_TLCHECKs, cm_CHECK, pk_TABLE | pkf_SHOW, 0, 0 },
 	{ op_RPACK, cm_RPACK, pk_XPACK },
 	{ op_RPACKD, cm_RPACKD, pk_XPACK },
 	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
@@ -1221,6 +1228,29 @@ static cmdef cmddefs[] = {
 	{ op_UTOGGLE, cm_TOGGLE, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) }
 };
 
+static xcmdef xcmddefs[] = {
+	/* Labels have 2 border values and X alignment, not a regular border */
+	{ { op_MLABEL, cm_LABEL, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
+		WBppa(0, 0, 5) },
+	{ { op_MLABELp, cm_LABELp, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
+		WBppa(0, 5, 5) },
+	{ { op_TLLABEL, cm_LABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
+		WBppa(0, 0, 0) },
+	{ { op_TLLABELp, cm_LABELp, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
+		WBppa(0, 0, 0) },
+	/* Spinsliders use border field for preset width & height of slider */
+// !!! Padding = 0
+	{ { op_TSPINSLIDE, cm_SPINSLIDE, pk_TABLE2x }, WBwh(255, 20) },
+// !!! Padding = 5
+	{ { op_TLSPINSLIDE, cm_SPINSLIDE, pk_TABLE, 5 } },
+// !!! Padding = 0
+	{ { op_TLSPINSLIDEs, cm_SPINSLIDE, pk_TABLE }, WBwh(150, 0) },
+	{ { op_TLSPINSLIDEx, cm_SPINSLIDE, pk_TABLEx } },
+	{ { op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACK } },
+	{ { op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK } },
+	{ { op_HTSPINSLIDE, op_HTSPINSLIDE, 0 } }
+};
+
 static void do_destroy(void **wdata);
 
 /* V-code is really simple-minded; it can do 0-tests but no arithmetics, and
@@ -1248,12 +1278,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #else /* #if GTK_MAJOR_VERSION == 2 */
 	GtkWindow *tparent = GTK_WINDOW(main_window);
 #endif
-	int raise = FALSE;
+	int part = FALSE, raise = FALSE;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	v_dd *vdata;
+	cmdef *cmd;
 	void **columns[MAX_COLS], *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **r = NULL, **res = NULL;
 	int ld, dsize;
@@ -1280,6 +1311,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	memset(cmds, 0, sizeof(cmds));
 	for (i = 0; i < sizeof(cmddefs) / sizeof(cmddefs[0]); i++)
 		cmds[cmddefs[i].op] = cmddefs + i;
+	for (i = 0; i < sizeof(xcmddefs) / sizeof(xcmddefs[0]); i++)
+		cmds[xcmddefs[i].s.op] = &xcmddefs[i].s;
 
 	while (TRUE)
 	{
@@ -1290,16 +1323,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		v = lp ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
 		op &= WB_OPMASK;
-		if (cmds[op])
+		if ((cmd = cmds[op]))
 		{
-			tpad = cmds[op]->tpad;
+			tpad = cmd->tpad;
 			if (tpad < 0) tpad = borders[-tpad - 1] + DEF_BORDER;
-			cw = cmds[op]->cw;
+			cw = cmd->cw;
 			if (cw < 0) cw = borders[-cw - 1] + DEF_BORDER;
-			pk = cmds[op]->pk;
+			pk = cmd->pk;
 			i = ((pk & pk_MASK) >= pk_TABLE) + !!(pk & pkf_FRAME);
 			if (lp <= i) v = NULL;
-			op = cmds[op]->cmd;
+			op = cmd->cmd;
 		}
 		switch (op)
 		{
@@ -1309,18 +1342,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = NULL;
 			*r++ = NULL;
 
+			gtk_object_set_data(GTK_OBJECT(window), VCODE_KEY,
+				(gpointer)res);
 			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
 				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
-
-			gtk_window_set_transient_for(GTK_WINDOW(window), tparent);
 #if GTK_MAJOR_VERSION == 1
 			/* To make Smooth theme engine render sliders properly */
 			if (have_sliders) gtk_signal_connect_after(
 				GTK_OBJECT(window), "show",
 				GTK_SIGNAL_FUNC(gtk_widget_queue_resize), NULL);
 #endif
-			/* Trigger remembered events */
-			trigger_things(res);
+			/* Add finishing touches to a toplevel */
+			if (!part)
+			{
+				gtk_window_set_transient_for(GTK_WINDOW(window),
+					tparent);
+				/* Trigger remembered events */
+				trigger_things(res);
+			}
 			/* Display */
 			if (op != op_WEND)
 			{
@@ -1395,6 +1434,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				NEXT_SLOT(r), SLOT_N(r, 2));
 			/* Initialize */
 			fpick_set_filename(window, v, FALSE);
+			break;
+		/* Create a vbox which will serve as separate widget */
+		case op_TOPVBOX:
+			part = TRUE; // not toplevel
+			// Fill space vertically but not horizontally
+			widget = window = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
+			// Keep max vertical size
+			widget_set_keepsize(window, TRUE);
+			*--wp = add_vbox(window);
+// !!! Border = 5
+			gtk_container_set_border_width(GTK_CONTAINER(wp[0]), 5);
+			pk = pkf_SHOW;
 			break;
 		/* Add a dock widget */
 		case op_DOCK:
@@ -1499,16 +1550,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				lp ? (int)v : -2, 10);
 			break;
 		/* Add a label */
-		case op_MLABELp:
+		case cm_LABELp:
 			v = *(char **)v; // dereference & fallthrough
-		case op_MLABEL: case op_TLLABEL:
-			widget = gtk_label_new(_(v));
-			if (cw) gtk_misc_set_padding(GTK_MISC(widget), 0, cw);
-			cw = 0;
-			if (op != op_TLLABEL) break; // Multiline label
+		case cm_LABEL:
+		{
+			int z = (int)((xcmdef *)cmd)->x;
+			widget = gtk_label_new(*(char *)v ? _(v) : v);
+			if (lp - i > 1) z = (int)pp[1];
+			if (z & 0xFFFF) gtk_misc_set_padding(GTK_MISC(widget),
+				(z >> 8) & 255, z & 255);
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
-			gtk_misc_set_alignment(GTK_MISC(widget), 0.0, 0.5);
+			gtk_misc_set_alignment(GTK_MISC(widget),
+				(z >> 16) / 10.0, 0.5);
 			break;
+		}
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
 		{
@@ -1540,11 +1595,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a spinslider */
-		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case cm_SPINSLIDEa:
-// !!! Width = 255 Height = 20
-			widget = op == op_TSPINSLIDE ? mt_spinslide_new(255, 20) :
-				mt_spinslide_new(-1, -1);
+		case cm_SPINSLIDE: case op_HTSPINSLIDE: case cm_SPINSLIDEa:
+		{
+			int z = (int)((xcmdef *)cmd)->x;
+			widget = mt_spinslide_new(z > 0xFFFF ? z >> 16 : -1,
+				z & 0xFFFF ? z & 0xFFFF : -1);
 			if (op == cm_SPINSLIDEa) mt_spinslide_set_range(widget,
 				((int *)v)[1], ((int *)v)[2]);
 			else mt_spinslide_set_range(widget, (int)pp[1], (int)pp[2]);
@@ -1569,10 +1624,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
 			}
 			break;
+		}
 		/* Add a named checkbox, fill from field/var */
 		case cm_CHECK:
-			widget = sig_toggle(_(pp[1]), *(int *)v, NULL, NULL);
-// !!! Padding = 0
+			widget = gtk_check_button_new_with_label(_(pp[1]));
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),
+				*(int *)v);
 			break;
 		/* Add a named checkbox, fill from inifile */
 		case op_CHECKb:
@@ -1871,8 +1928,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_TSPINSLIDE: case op_TLSPINSLIDE:
-			case op_HTSPINSLIDE: case op_SPINSLIDEa:
-			case op_XSPINSLIDEa:
+			case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+			case op_HTSPINSLIDE:
+			case op_SPINSLIDEa: case op_XSPINSLIDEa:
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -2045,8 +2103,9 @@ static void *do_query(char *data, void **wdata, int mode)
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
 			break;
-		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case op_SPINSLIDEa: case op_XSPINSLIDEa:
+		case op_TSPINSLIDE:
+		case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
@@ -2145,8 +2204,9 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
 				*(int *)v);
 			break;
-		case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-		case op_SPINSLIDEa: case op_XSPINSLIDEa:
+		case op_TSPINSLIDE:
+		case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
 		case op_CHECK: case op_XCHECK: case op_TLCHECK:
@@ -2278,8 +2338,9 @@ void cmd_set(void **slot, int v)
 		gtk_widget_unref(vbox);
 		break;
 	}
-	case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-	case op_SPINSLIDEa: case op_XSPINSLIDEa:
+	case op_TSPINSLIDE:
+	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_value(slot[0], v);
 		break;
 	case op_TLNOSPIN:
@@ -2346,8 +2407,9 @@ void cmd_set3(void **slot, int *v)
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
-	case op_TSPINSLIDE: case op_TLSPINSLIDE: case op_HTSPINSLIDE:
-	case op_SPINSLIDEa: case op_XSPINSLIDEa:
+	case op_TSPINSLIDE:
+	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
 		mt_spinslide_set_value(slot[0], v[0]);
 		break;
@@ -2428,6 +2490,9 @@ void cmd_setv(void **slot, void *res, int idx)
 	switch (op)
 	{
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
+	case op_MLABEL: case op_MLABELp: case op_TLLABEL: case op_TLLABELp:
+		gtk_label_set_text(GTK_LABEL(slot[0]), res);
+		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
 	case op_TPENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], op, res);
