@@ -40,9 +40,10 @@
 
 GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
 
-gboolean toolbar_status[TOOLBAR_MAX];			// True=show
+int toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
-	*toolbar_zoom_view, *drawing_col_prev, *settings_box;
+	*toolbar_zoom_view, *drawing_col_prev;
+void **toolbar_boxes_[TOOLBAR_MAX];		// Used for showing/hiding
 
 GdkCursor *m_cursor[TOTAL_CURSORS];			// My mouse cursors
 GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
@@ -370,11 +371,14 @@ static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **w
 }
 
 
-static gboolean toolbar_settings_exit()
+void toolbar_settings_exit(void *dt, void **wdata)
 {
+	if (!wdata) wdata = toolbar_boxes_[TOOLBAR_SETTINGS];
+	if (!wdata) return;
+	toolbar_boxes_[TOOLBAR_SETTINGS] = NULL;
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
-	return (FALSE);
+	run_destroy(wdata);
 }
 
 static void toolbar_click(GtkWidget *widget, gpointer user_data)
@@ -968,7 +972,7 @@ static void **create_settings_tbar(void **r, GtkWidget ***wpp, void **wdata)
 
 #define WBbase settings_dd
 static void *settings_code[] = {
-	TOPVBOX, // Keep height at max requested, to let dock contents stay put
+	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
 	EXEC(create_settings_tbar),
 	/* Colors A & B */
 	BORDER(LABEL, 0),
@@ -984,8 +988,8 @@ static void *settings_code[] = {
 	TLLABEL(_("Opacity"), 0, 2),
 	REFv(ts_spinslides[2]), TLSPINSLIDEx(opac, 0, 255, 1, 2),
 	EVENT(CHANGE, ts_spinslide_moved),
-	REFv(ts_label_channel), TLLABELr("", 0, 3),
-	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3),
+	REFv(ts_label_channel), TLLABELr("", 0, 3), HIDDEN,
+	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3), HIDDEN,
 	EVENT(CHANGE, ts_spinslide_moved),
 	WEND
 };
@@ -994,56 +998,36 @@ static void *settings_code[] = {
 #undef _
 #define _(X) __(X)
 
-void create_settings_box()
+void **create_settings_box()
 {
 	static settings_dd tdata; // zeroed out, get updated later
-	GtkWidget *box;
-	void **wdata;
-
-	wdata = run_create(settings_code, &tdata, sizeof(tdata));
-	box = GET_REAL_WINDOW(wdata);
-
-	/* Make widget to report its demise */
-	gtk_signal_connect(GTK_OBJECT(box), "destroy",
-		GTK_SIGNAL_FUNC(gtk_widget_destroyed), &settings_box);
-
-	/* Keep the invariant */
-	gtk_widget_ref(box);
-	gtk_object_sink(GTK_OBJECT(box));
-
-	settings_box = box;
+	return (run_create(settings_code, &tdata, sizeof(tdata)));
 }
+
+#undef _
+#define _(X) X
+
+static void *sbar_code[] = {
+	WPWHEREVER, WINDOWd(_("Settings Toolbar"), toolbar_settings_exit),
+	WXYWH("toolbar_settings", 0, 0),
+	REMOUNTv(settings_dock),
+	WSHOW
+};
+
+#undef _
+#define _(X) __(X)
 
 static void toolbar_settings_init()
 {
-	if (toolbar_boxes[TOOLBAR_SETTINGS])
+	if (toolbar_boxes_[TOOLBAR_SETTINGS]) // Used when Home key is pressed
 	{
-		gtk_widget_show(toolbar_boxes[TOOLBAR_SETTINGS]);	// Used when Home key is pressed
+		cmd_showhide(toolbar_boxes_[TOOLBAR_SETTINGS], TRUE);
 		return;
 	}
 
 ///	SETTINGS TOOLBAR
 
-	toolbar_boxes[TOOLBAR_SETTINGS] = add_a_window(GTK_WINDOW_TOPLEVEL,
-		_("Settings Toolbar"), GTK_WIN_POS_NONE, FALSE);
-
-	gtk_widget_set_uposition(toolbar_boxes[TOOLBAR_SETTINGS],
-		inifile_get_gint32("toolbar_settings_x", 0),
-		inifile_get_gint32("toolbar_settings_y", 0));
-
-	dock_undock(DOCK_SETTINGS, FALSE);
-	gtk_container_add(GTK_CONTAINER(toolbar_boxes[TOOLBAR_SETTINGS]),
-		settings_box);
-	gtk_widget_unref(settings_box);
-
-	gtk_signal_connect(GTK_OBJECT(toolbar_boxes[TOOLBAR_SETTINGS]),
-		"delete_event", GTK_SIGNAL_FUNC(toolbar_settings_exit), NULL);
-	gtk_window_set_transient_for(GTK_WINDOW(toolbar_boxes[TOOLBAR_SETTINGS]),
-		GTK_WINDOW(main_window));
-
-	toolbar_update_settings();
-
-	gtk_widget_show(toolbar_boxes[TOOLBAR_SETTINGS]);
+	toolbar_boxes_[TOOLBAR_SETTINGS] = run_create(sbar_code, sbar_code, 0);
 }
 
 #undef _
@@ -1249,7 +1233,6 @@ void toolbar_init(GtkWidget *vbox_main)
 		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
 	GtkWidget *toolbox, *box, *mbuttons[TOTAL_ICONS_MAIN];
-	char txt[32];
 	int i;
 
 
@@ -1262,9 +1245,6 @@ void toolbar_init(GtkWidget *vbox_main)
 
 	for ( i=1; i<TOOLBAR_MAX; i++ )
 	{
-		sprintf(txt, "toolbar%i", i);
-		toolbar_status[i] = inifile_get_gboolean( txt, TRUE );
-
 		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 			menu_widgets[MENU_TBMAIN - TOOLBAR_MAIN + i]),
 			toolbar_status[i]);	// Menu toggles = status
@@ -1395,8 +1375,6 @@ void toolbar_update_settings()
 {
 	char txt[32];
 	int i, j, c;
-
-	if (!settings_box) return;
 
 	for (i = 0; i < 2; i++)
 	{
@@ -1607,30 +1585,6 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 	gtk_widget_set_events (drawing_palette, GDK_ALL_EVENTS_MASK);
 }
 
-void toolbar_exit()		// Remember toolbar settings on program exit
-{
-	int i, x, y;
-	char txt[32];
-
-	for (i =TOOLBAR_MAIN; i < TOOLBAR_MAX; i++)	// Remember current show/hide status
-	{
-		sprintf(txt, "toolbar%i", i);
-		inifile_set_gboolean(txt, toolbar_status[i]);
-	}
-
-	if (!toolbar_boxes[TOOLBAR_SETTINGS]) return;
-
-	gdk_window_get_root_origin(toolbar_boxes[TOOLBAR_SETTINGS]->window, &x, &y);
-	
-	inifile_set_gint32("toolbar_settings_x", x);
-	inifile_set_gint32("toolbar_settings_y", y);
-
-	dock_undock(DOCK_SETTINGS, TRUE);
-	gtk_widget_destroy(toolbar_boxes[TOOLBAR_SETTINGS]);
-	toolbar_boxes[TOOLBAR_SETTINGS] = NULL;
-}
-
-
 void toolbar_showhide()				// Show/Hide all 4 toolbars
 {
 	static const unsigned char bar[4] =
@@ -1643,7 +1597,8 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 	if (!view_image_only) for (i = 0; i < 4; i++)
 		widget_showhide(toolbar_boxes[bar[i]], toolbar_status[bar[i]]);
 
-	if (!toolbar_status[TOOLBAR_SETTINGS]) toolbar_exit();
+	if (!toolbar_status[TOOLBAR_SETTINGS])
+		toolbar_settings_exit(NULL, NULL);
 	else
 	{
 		toolbar_settings_init();

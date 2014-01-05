@@ -273,14 +273,6 @@ void snap_xy(int *xy);
 
 const unsigned char greyz[2]; // For opacity squares
 
-#define DOCK_CLINE		0
-#define DOCK_SETTINGS		1
-#define DOCK_LAYERS		2
-
-#define DOCK_TOTAL		3
-
-#define DOCKABLE() ((files_passed > 1) + !layers_window + !toolbar_boxes[TOOLBAR_SETTINGS])
-
 
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 char *cspnames[NUM_CSPACES];
@@ -288,7 +280,7 @@ char *cspnames[NUM_CSPACES];
 char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
-void **main_window_;
+void **main_window_, **settings_dock, **layers_dock;
 GtkWidget *main_window, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
@@ -361,4 +353,3 @@ void force_main_configure();	// Force reconfigure of main drawing area - for cen
 void set_image(gboolean state);	// Toggle image access (nestable)
 
 int dock_focused();		// Check if focus is inside dock window
-void dock_undock(int what, int state);	// Move stuff into or out of dock

@@ -31,6 +31,7 @@ enum {
 	op_WINDOWpm,
 	op_FPICKpm,
 	op_TOPVBOX,
+	op_TOPVBOXV,
 	op_DOCK,
 	op_PAGE,
 	op_PAGEi,
@@ -128,6 +129,9 @@ enum {
 	op_BUTTON,
 	op_UBUTTON,
 	op_TLBUTTON,
+	op_MOUNT,
+	op_PMOUNT,
+	op_REMOUNT,
 
 	op_GROUP,
 
@@ -165,6 +169,7 @@ enum {
 	op_WXYWH,
 	op_WPMOUSE,
 	op_WPWHEREVER,
+	op_HIDDEN,
 	op_INSENS,
 	op_FOCUS,
 	op_WIDTH,
@@ -190,6 +195,8 @@ enum {
 
 //	Function to run with EXEC
 typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
+//	Function to run with MOUNT
+typedef void **(*mnt_fn)(void **wdata);
 
 //	Structure which COLORLIST provides to EXC event
 typedef struct {
@@ -300,6 +307,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MAINWINDOW(NM,ICN,HC,W,H) WBr2h(MAINWINDOW, 3 + 2), (NM), (ICN), \
 	WBwh(W, H), EVENT(CANCEL, HC)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
+/* !!! This block holds 1 nested EVENT block */
+#define WINDOWd(NM, HC) WBr2h(WINDOW, 1 + 2), (NM), EVENT(CANCEL, HC)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
 /* !!! Note: string "V" is in system encoding */
@@ -307,6 +316,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
 	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define TOPVBOX WBrh(TOPVBOX, 0)
+#define TOPVBOXV WBrh(TOPVBOXV, 0)
 #define DOCK(K) WBrh(DOCK, 1), (K)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
@@ -490,6 +500,10 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define UBUTTON(NM,H) WBr2h(UBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
+#define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
+#define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
+	(void *)(NK), EVENT(CHANGE, H)
+#define REMOUNTv(V) WBrh(REMOUNT, 1), &(V)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
 #define GOTO(A) WBh(GOTO, 1), (A)
 #define CALLp(V) WBhf(CALLp, 1), WBfield(V)
@@ -517,6 +531,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define DEFSIZE(W,H) WXYWH(NULL, W, H)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define WPWHEREVER WBh(WPWHEREVER, 0)
+#define HIDDEN WBh(HIDDEN, 0)
 #define INSENS WBh(INSENS, 0)
 #define FOCUS WBh(FOCUS, 0)
 #define WIDTH(N) WBh(WIDTH, 1), (void *)(N)
@@ -559,3 +574,6 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 
 //	Extra data of LABEL
 #define LABEL_VALUE	0
+
+//	Extra data of NBOOK
+#define NBOOK_TABS	0

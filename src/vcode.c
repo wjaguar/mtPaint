@@ -79,6 +79,7 @@ typedef struct {
 	void ***dv;	// Pointer to dialog response
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
+	int done;	// Set when destroyed
 } v_dd;
 
 /* From event to its originator */
@@ -152,6 +153,12 @@ static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
 {
 	if (pp[1] || destroy) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
 		GTK_SIGNAL_FUNC(get_evt_1_d), r);
+}
+
+static void add_del(void **r, GtkWidget *window)
+{
+	gtk_signal_connect(GTK_OBJECT(window), "delete_event",
+		GTK_SIGNAL_FUNC(get_evt_del), r);
 }
 
 static void **skip_if(void **pp)
@@ -1346,6 +1353,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(gpointer)res);
 			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
 				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
+			/* !!! Freeing the datastruct is best to happen only when
+			 * all refs to underlying object are safely dropped */
+			gtk_object_weakref(GTK_OBJECT(window),
+				(GtkDestroyNotify)free, (gpointer)ddata);
 #if GTK_MAJOR_VERSION == 1
 			/* To make Smooth theme engine render sliders properly */
 			if (have_sliders) gtk_signal_connect_after(
@@ -1408,8 +1419,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
 //			gdk_pixmap_unref(icon_pix);
 
-			gtk_signal_connect(GTK_OBJECT(window), "delete_event",
-				GTK_SIGNAL_FUNC(get_evt_del), NEXT_SLOT(r));
+			add_del(NEXT_SLOT(r), window);
 
 			pk = pkf_STACK; // bin container
 			break;
@@ -1418,9 +1428,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WINDOWpm:
 			v = *(char **)v; // dereference & fallthrough
 		case op_WINDOW: case op_WINDOWm:
-			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL, _(v),
-				wpos, op != op_WINDOW);
+			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL,
+				*(char *)v ? _(v) : v, wpos, op != op_WINDOW);
 			*--wp = add_vbox(window);
+			if (ref > 1) add_del(NEXT_SLOT(r), window);
 			break;
 		/* Create a fileselector window, and put a horizontal box inside */
 		case op_FPICKpm:
@@ -1437,6 +1448,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Create a vbox which will serve as separate widget */
 		case op_TOPVBOX:
+			part = TRUE; // not toplevel
+			widget = window = gtk_vbox_new(FALSE, 0);
+// !!! Border = 5
+			cw = 5;
+			pk = pkf_STACK | pkf_SHOW;
+			break;
+		/* Create a widget vbox with special sizing behaviour */
+		case op_TOPVBOXV:
 			part = TRUE; // not toplevel
 			// Fill space vertically but not horizontally
 			widget = window = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
@@ -1546,7 +1565,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = gtk_hseparator_new();
 			pk = pk_PACK | pkf_SHOW;
 // !!! Height = 10
-			if (v >= 0) gtk_widget_set_usize(widget,
+			if ((int)v >= 0) gtk_widget_set_usize(widget,
 				lp ? (int)v : -2, 10);
 			break;
 		/* Add a label */
@@ -1808,6 +1827,43 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			break;
+		/* Add a mount socket with custom-built separable widget */
+		case op_MOUNT: case op_PMOUNT:
+		{
+			void **what = ((mnt_fn)pp[1])(res);
+			*(int *)v = TRUE;
+			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+			gtk_container_add(GTK_CONTAINER(widget),
+				GET_REAL_WINDOW(what));
+			pk = pk_PACK | pkf_SHOW;
+			if (op == op_PMOUNT) // put socket in pane w/preset size
+			{
+				GtkWidget *pane = gtk_vpaned_new();
+				paned_mouse_fix(pane);
+				gtk_paned_set_position(GTK_PANED(pane),
+					inifile_get_gint32(pp[2], (int)pp[3]));
+				gtk_paned_pack2(GTK_PANED(pane),
+					gtk_vbox_new(FALSE, 0), TRUE, TRUE);
+				gtk_widget_show_all(pane);
+				gtk_paned_pack1(GTK_PANED(pane),
+					widget, FALSE, TRUE);
+				pk = pk_XPACK | pkf_SHOW | pkf_PARENT;
+			}
+			break;
+		}
+		/* Steal a widget from its mount socket by slot ref */
+		case op_REMOUNT:
+		{
+			void **where = *(void ***)v;
+			GtkWidget *what = GTK_BIN(where[0])->child;
+
+			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+			gtk_widget_hide(where[0]);
+			gtk_widget_reparent(what, widget);
+			get_evt_1(where[0], where + 2);
+			pk = pk_XPACK | pkf_SHOW;
+			break;
+		}
 		/* Call a function */
 		case op_EXEC:
 			r = ((ext_fn)v)(r, &wp, res);
@@ -1871,6 +1927,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WPMOUSE: wpos = GTK_WIN_POS_MOUSE; continue;
 		/* Make toplevel window be positioned anywhere WM pleases */
 		case op_WPWHEREVER: wpos = GTK_WIN_POS_NONE; continue;
+		/* Make last referrable widget hidden */
+		case op_HIDDEN:
+			gtk_widget_hide(*origin_slot(r - 2));
+			continue;
 		/* Make last referrable widget insensitive */
 		case op_INSENS:
 			gtk_widget_set_sensitive(*origin_slot(r - 2), FALSE);
@@ -2061,8 +2121,11 @@ static void do_destroy(void **wdata)
 {
 	void **pp, *v = NULL;
 	char *data = GET_DDATA(wdata);
+	v_dd *vdata = GET_VDATA(wdata);
 	int op;
 
+	if (vdata->done) return; // Paranoia
+	vdata->done = TRUE;
 	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
 	{
 		op = (int)*pp++;
@@ -2071,9 +2134,17 @@ static void do_destroy(void **wdata)
 		op &= WB_OPMASK;
 		if (op == op_CLEANUP) free(*(void **)v);
 		else if (op == op_TEXT) g_free(*(char **)v);
+		else if (op == op_REMOUNT)
+		{
+			void **where = *(void ***)v;
+			GtkWidget *what = GTK_BIN(*wdata)->child;
+
+			gtk_widget_reparent(what, where[0]);
+			gtk_widget_show(where[0]);
+			get_evt_1(where[0], where + 2);
+		}
 		else if (op == op_MAINWINDOW) gtk_main_quit();
 	}
-	free(data);
 }
 
 static void *do_query(char *data, void **wdata, int mode)
@@ -2157,6 +2228,9 @@ static void *do_query(char *data, void **wdata, int mode)
 			g_free(*(char **)v);
 			*(char **)v = read_textarea(*wdata);
 			break;
+		case op_MOUNT: case op_PMOUNT:
+			*(int *)v = !!GTK_BIN(*wdata)->child;
+			break;
 		default: v = NULL; break;
 		}
 		if (mode > 1) return (v);
@@ -2173,6 +2247,7 @@ void run_query(void **wdata)
 void run_destroy(void **wdata)
 {
 	v_dd *vdata = GET_VDATA(wdata);
+	if (vdata->done) return; // already destroyed
 	if (vdata->ininame && vdata->ininame[0])
 		cmd_showhide(GET_WINDOW(wdata), FALSE); // save position & size
 	destroy_dialog(GET_REAL_WINDOW(wdata));
@@ -2307,6 +2382,8 @@ void cmd_set(void **slot, int v)
 		GtkWidget *window, *vbox, *pane = BOX_CHILD_0(slot[0]);
 		char *ini = ((void **)slot[1])[1];
 		int w, w2;
+
+		if (!v ^ !!GTK_PANED(pane)->child1) return; // nothing to do
 
 		window = gtk_widget_get_toplevel(slot[0]);
 		if (GTK_WIDGET_VISIBLE(window))
@@ -2490,6 +2567,9 @@ void cmd_setv(void **slot, void *res, int idx)
 	switch (op)
 	{
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
+	case op_NBOOK: case op_SNBOOK:
+		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);
+		break;
 	case op_MLABEL: case op_MLABELp: case op_TLLABEL: case op_TLLABELp:
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;

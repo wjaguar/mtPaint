@@ -39,8 +39,6 @@ typedef struct {
 } layer_node;
 
 
-GtkWidget *layers_box, *layers_window;
-
 layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
 
 int	layers_total,			// Layers currently in use
@@ -59,8 +57,8 @@ void layers_init();
 layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src);
 void pressed_layers();
 void pressed_paste_layer();
-gboolean delete_layers_window();
-void create_layers_box();
+void delete_layers_window();
+void **create_layers_box();
 
 int load_layers( char *file_name );
 int save_layers( char *file_name );

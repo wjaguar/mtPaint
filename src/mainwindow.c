@@ -44,8 +44,8 @@
 
 
 typedef struct {
-	int need_cline;
 	int idx_c, nidx_c, cnt_c;
+	int cline_d, settings_d, layers_d;
 	int *strs_c;
 	void **dock, **dockbook, **dockpage1;
 } main_dd;
@@ -112,6 +112,14 @@ static inilist ini_bool[] = {
 	{ "status2Toggle",	status_on + 2,		TRUE  },
 	{ "status3Toggle",	status_on + 3,		TRUE  },
 	{ "status4Toggle",	status_on + 4,		TRUE  },
+#if TOOLBAR_MAX != 6
+#error Wrong number of "toolbar?" inifile items defined
+#endif
+	{ "toolbar1",		toolbar_status + 1,	TRUE  },
+	{ "toolbar2",		toolbar_status + 2,	TRUE  },
+	{ "toolbar3",		toolbar_status + 3,	TRUE  },
+	{ "toolbar4",		toolbar_status + 4,	TRUE  },
+	{ "toolbar5",		toolbar_status + 5,	TRUE  },
 #ifdef U_FREETYPE
 	{ "fontAntialias0",	&font_aa,		TRUE  },
 	{ "fontAntialias1",	&font_bk,		FALSE },
@@ -157,7 +165,7 @@ static inilist ini_int[] = {
 };
 
 
-void **main_window_;
+void **main_window_, **settings_dock, **layers_dock;
 GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
@@ -670,7 +678,10 @@ static void toggle_view()
 
 		gtk_widget_hide(main_menubar);
 		for (i = TOOLBAR_MAIN; i < TOOLBAR_MAX; i++)
+		{
 			if (toolbar_boxes[i]) gtk_widget_hide(toolbar_boxes[i]);
+			if (toolbar_boxes_[i]) cmd_showhide(toolbar_boxes_[i], FALSE);
+		}
 	}
 	else
 	{
@@ -1197,7 +1208,7 @@ void string_init()
 		cspnames[i] = _(cspnames_[i]);
 }
 
-static void toggle_dock(int state, int internal);
+static void toggle_dock(int state);
 
 static void delete_event(main_dd *dt, void **wdata)
 {
@@ -1214,12 +1225,13 @@ static void delete_event(main_dd *dt, void **wdata)
 	}
 	if (i != 2) return; // Cancel quitting
 
-	toggle_dock(FALSE, TRUE);
+	toggle_dock(FALSE); // To remember dock size
 
 	// Get rid of extra windows + remember positions
 	delete_layers_window();
 
-	toolbar_exit();			// Remember the toolbar settings
+	// Remember the toolbar settings
+	toolbar_settings_exit(NULL, NULL);
 
 	/* Store listed settings */
 	for (ilp = ini_bool; ilp->name; ilp++)
@@ -4022,7 +4034,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_TBAR:
 		pressed_toolbar_toggle(state, mode); break;
 	case ACT_DOCK:
-		if (!kbd) toggle_dock(show_dock = state, FALSE);
+		if (!kbd) toggle_dock(show_dock = state);
 		else if (GTK_WIDGET_SENSITIVE(menu_widgets[MENU_DOCK]))
 			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 				menu_widgets[MENU_DOCK]), !show_dock);
@@ -4471,103 +4483,13 @@ static void pressed_pal_paste()
 
 ///	DOCK AREA
 
-static GtkWidget *dock_lr_pane;
-static int dock_state;
-
-static void pack_0(GtkWidget *box, GtkWidget *widget)
+static void toggle_dock(int state)
 {
-	gtk_box_pack_start(GTK_BOX(box), widget, FALSE, FALSE, 0);
-	gtk_box_reorder_child(GTK_BOX(box), widget, 0);
-}
-
-static void toggle_dock(int state, int internal)
-{
-	static int istate; // dock starts hidden
 	main_dd *dt = GET_DDATA(main_window_);
-
-	if (istate ^ !state) return;
-
-	/* Show tabs only when it makes sense */
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dt->dockbook[0]),
-		(dock_state & (1 << DOCK_CLINE)) &&
-		(dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS))));
 
 	cmd_set(dt->dock, state);
-// !!! Later, make gradient reset its "realize" handler and be done with it
-	if (state) toolbar_update_settings();
-// !!! And make this canvas' "realize" handler the same way
+// !!! Later make this canvas' "realize" handler
 	set_cursor(NULL); /* Because canvas window is now a new one */
-	istate = !istate;
-}
-
-void dock_undock(int what, int state)
-{
-	main_dd *dt = GET_DDATA(main_window_);
-	GtkWidget *box, *dock_area = dt->dockbook[0];
-	GtkContainer *cont;
-	int mode, flag, cnt;
-
-
-	/* Enable/disable menu item */
-	cnt = state ? state : DOCKABLE();
-	gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], cnt > 0);
-
-	if (what == DOCK_LAYERS) box = layers_box;
-	else if (what == DOCK_SETTINGS) box = settings_box;
-	else return; // Nonexistent or unmovable
-
-	flag = 1 << what;
-	if (!(dock_state & flag) ^ state) return; // Already that way
-
-	/* To prevent flicker */
-	cont = GTK_CONTAINER(dock_area);
-	mode = cont->resize_mode;
-	/* !!! Immediate resize is too prone to crashing */
-	if (dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS)))
-		cont->resize_mode = GTK_RESIZE_QUEUE;
-//	gtk_container_set_resize_mode(cont, GTK_RESIZE_QUEUE);
-
-	// Steal the widget
-	gtk_widget_ref(box);
-	gtk_container_remove(GTK_CONTAINER(box->parent), box);
-	if (state) // Dock
-	{
-		dock_state |= flag;
-#if GTK_MAJOR_VERSION == 2
-		if ((flag = GTK_WIDGET_MAPPED(dock_area)))
-			gtk_widget_unmap(dock_area); // To prevent flicker
-#endif
-		if (what == DOCK_LAYERS)
-		{
-			gtk_paned_pack1(GTK_PANED(dock_lr_pane), box, FALSE, TRUE);
-		}
-		else /* if (what == DOCK_SETTINGS) */
-		{
-			pack_0(dt->dockpage1[0], box);
-		}
-		gtk_widget_unref(box);
-		toolbar_update_settings();
-#if GTK_MAJOR_VERSION == 2
-		if (flag) gtk_widget_map(dock_area);
-#endif
-	}
-	else dock_state ^= flag; // Undock
-
-	/* Hide settings + layers page if it's empty */
-	cmd_showhide(dt->dockpage1,
-		dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS)));
-
-	/* Show tabs only when it makes sense */
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(dock_area),
-		(dock_state & (1 << DOCK_CLINE)) &&
-		(dock_state & ((1 << DOCK_LAYERS) | (1 << DOCK_SETTINGS))));
-
-	cont->resize_mode = mode;
-//	gtk_container_set_resize_mode(cont, mode);
-
-	/* Close dock if nothing left in it */
-	if (!dock_state) gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-		menu_widgets[MENU_DOCK]), FALSE);
 }
 
 static void pressed_sel_ramp(int vert)
@@ -5077,37 +4999,12 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-static void **create_page1(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GtkWidget *pane, *vbox = **wpp;
-
-	pane = xpack(vbox, gtk_vpaned_new());
-	paned_mouse_fix(pane);
-	gtk_paned_set_position(GTK_PANED(pane), inifile_get_gint32("layers_h", 400));
-	gtk_paned_pack2(GTK_PANED(pane), gtk_vbox_new(FALSE, 0),
-		TRUE, TRUE);
-	gtk_widget_show_all(vbox);
-	dock_lr_pane = pane;
-
-	dock_state |= (1 << DOCK_SETTINGS);
-	create_settings_box();
-	pack_0(vbox, settings_box);
-	gtk_widget_unref(settings_box);
-
-	dock_state |= (1 << DOCK_LAYERS);
-	create_layers_box();
-	gtk_paned_pack1(GTK_PANED(dock_lr_pane), layers_box, FALSE, TRUE);
-	gtk_widget_unref(layers_box);
-
-	return (r);
-}
-
 static void **finish_dock(void **r, GtkWidget ***wpp, void **wdata)
 {
 	main_dd *dt = GET_DDATA(wdata);
 
 	// Display dock area if requested
-	show_dock = dt->need_cline;
+	show_dock = dt->cline_d;
 	if (show_dock)
 	{
 		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
@@ -5140,6 +5037,26 @@ static void cline_select(main_dd *dt, void **wdata, int what, void **where)
 	else do_a_load(file_args[dt->idx_c = dt->nidx_c], undo_load);
 }
 
+static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
+{
+	int dstate;
+
+	cmd_read(where, dt);
+	dstate = dt->settings_d | dt->layers_d;
+
+	/* Hide settings + layers page if it's empty */
+	cmd_showhide(dt->dockpage1, dstate);
+
+	/* Show tabs only when it makes sense */
+	cmd_setv(dt->dockbook, (void *)(dt->cline_d && dstate), NBOOK_TABS);
+
+	/* Close dock if nothing left in it */
+	dstate |= dt->cline_d;
+	if (!dstate) gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+		menu_widgets[MENU_DOCK]), FALSE);
+	gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], dstate);
+}
+
 #undef _
 #define _(X) X
 
@@ -5151,7 +5068,7 @@ static void *main_code[] = {
 	EXEC(create_internals), WDONE, // left pane
 	BORDER(NBOOK, 0),
 	REF(dockbook), NBOOKr, KEEPWIDTH,
-	IFx(need_cline, 1),
+	IFx(cline_d, 1),
 		PAGEi(XPM_ICON(cline), 0),
 		BORDER(XSCROLL, 0),
 		XSCROLL(1, 1), // auto/auto
@@ -5163,8 +5080,12 @@ static void *main_code[] = {
 		WDONE,
 	ENDIF(1),
 	REF(dockpage1), PAGEir(XPM_ICON(layers), 5),
+	REFv(settings_dock),
+	MOUNT(settings_d, create_settings_box, dock_undock_evt),
 	HSEPt,
-	EXEC(create_page1),
+	REFv(layers_dock),
+	PMOUNT(layers_d, create_layers_box, dock_undock_evt, "layers_h", 400),
+	TRIGGER,
 	WDONE, // page
 	WDONE, // nbook
 	EXEC(finish_dock), // !!! Later will be TRIGGER on menuitem
@@ -5183,7 +5104,7 @@ void main_init()
 
 	memset(&tdata, 0, sizeof(tdata));
 	/* Prepare commandline list */
-	if ((tdata.need_cline = files_passed > 1))
+	if ((tdata.cline_d = files_passed > 1))
 	{
 		memx2 mem;
 		int i, *p;
@@ -5201,8 +5122,6 @@ void main_init()
 		}
 		tdata.cnt_c = files_passed;
 		tdata.strs_c = (int *)mem.buf;
-
-		dock_state |= (1 << DOCK_CLINE);
 	}
 	main_window_ = run_create(main_code, &tdata, sizeof(tdata));
 

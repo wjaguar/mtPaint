@@ -31,6 +31,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "icons.h"
+#include "vcode.h"
 
 //	Layer toolbar buttons
 #define LTB_NEW    0
@@ -111,7 +112,8 @@ static void repaint_layers()
 
 ///	LAYERS WINDOW
 
-GtkWidget *layers_box, *layers_window;
+static GtkWidget *layers_box, *layers_window;
+static void **layers_window_;
 
 typedef struct {
 	GtkWidget *item, *name, *toggle;
@@ -1036,25 +1038,17 @@ static void layer_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 	layers_initialized = TRUE;
 }
 
-gboolean delete_layers_window()
+void delete_layers_window()
 {
 	// No deletion if no window, or inside a sensitive action
-	if (!layers_window || !layers_initialized) return (TRUE);
+	if (!layers_window || !layers_initialized) return;
 	// Stop user prematurely exiting while drag 'n' drop loading
-	if (!GTK_WIDGET_SENSITIVE(layers_box)) return (TRUE);
+	if (!GTK_WIDGET_SENSITIVE(layers_box)) return;
 
-	layers_initialized = FALSE;
-	win_store_pos(layers_window, "layers");
-
-	gtk_widget_hide(layers_window); // Butcher it when out of sight :-)
-	dock_undock(DOCK_LAYERS, TRUE);
-	gtk_widget_destroy(layers_window);
 	layers_window = NULL;
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
 		menu_widgets[MENU_LAYER]), FALSE); // Ensure it's unchecked
-	layers_initialized = !!layers_box; // It may be docked now
-
-	return (FALSE);
+	run_destroy(layers_window_);
 }
 
 void pressed_paste_layer()
@@ -1197,7 +1191,7 @@ static GtkWidget *layer_toolbar(GtkWidget **wlist)
 	return toolbar;
 }
 
-void create_layers_box()
+static void **create_layers_widgets(void **r, GtkWidget ***wpp, void **wdata)
 {
 	GtkWidget *vbox, *hbox, *table, *label, *tog, *scrolledwindow, *item;
 	char txt[32];
@@ -1205,9 +1199,7 @@ void create_layers_box()
 
 
 	layers_initialized = FALSE;
-	layers_box = vbox = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(vbox);
-	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
+	layers_box = vbox = **wpp;
 
 	scrolledwindow = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show (scrolledwindow);
@@ -1321,38 +1313,47 @@ void create_layers_box()
 	layers_initialized = TRUE;
 	layer_select_slot(layer_selected);
 
-	/* Make widget to report its demise */
-	gtk_signal_connect(GTK_OBJECT(layers_box), "destroy",
-		GTK_SIGNAL_FUNC(gtk_widget_destroyed), &layers_box);
-
-	/* Keep the invariant */
-	gtk_widget_ref(layers_box);
-	gtk_object_sink(GTK_OBJECT(layers_box));
+	return (r);
 }
+
+#undef _
+#define _(X) X
+
+static void *layers_code[] = {
+	TOPVBOX,
+	EXEC(create_layers_widgets),
+	WEND
+};
+
+#undef _
+#define _(X) __(X)
+
+void **create_layers_box()
+{
+	return (run_create(layers_code, layers_code, 0));
+}
+
+static void *layersw_code[] = {
+	WPWHEREVER, WINDOWd("", delete_layers_window),
+	WXYWH("layers", 400, 400),
+	REMOUNTv(layers_dock),
+	WSHOW
+};
 
 void pressed_layers()
 {
 	GtkAccelGroup *ag;
+	void **res;
 
 
 	if (layers_window) return; // Already have it open
+	layers_window_ = res = run_create(layersw_code, layersw_code, 0);
+	layers_window = GET_REAL_WINDOW(res);
 
-	layers_window = add_a_window(GTK_WINDOW_TOPLEVEL, "", GTK_WIN_POS_NONE, FALSE);
-	win_restore_pos(layers_window, "layers", 0, 0, 400, 400);
 	layers_update_titlebar();
-
-	dock_undock(DOCK_LAYERS, FALSE);
-	gtk_container_add(GTK_CONTAINER(layers_window), layers_box);
-	gtk_widget_unref(layers_box);
 
 	ag = gtk_accel_group_new();
 	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
 		GDK_Escape, 0, (GtkAccelFlags)0);
-
-	gtk_signal_connect_object(GTK_OBJECT(layers_window), "delete_event",
-		GTK_SIGNAL_FUNC(delete_layers_window), NULL);
-
-	gtk_window_set_transient_for(GTK_WINDOW(layers_window), GTK_WINDOW(main_window));
-	gtk_widget_show(layers_window);
 	gtk_window_add_accel_group(GTK_WINDOW(layers_window), ag);
 }
