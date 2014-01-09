@@ -72,8 +72,10 @@ GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing);
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
+#if 0 /* Not needed anymore */
 GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	double value, double min, double max);
+#endif
 void add_hseparator( GtkWidget *widget, int xs, int ys );
 
 void progress_init(char *text, int canc);		// Initialise progress window
@@ -84,7 +86,9 @@ int alert_box(char *title, char *message, char *text1, ...);
 
 // Add page to notebook
 
+#if 0 /* Not needed anymore */
 GtkWidget *add_new_page(GtkWidget *notebook, char *name);
+#endif
 
 // Slider-spin combo (practically a new widget class)
 
@@ -114,8 +118,10 @@ void delete_to_click(GtkWidget *window, GtkWidget *button);
 
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
+#if 0 /* Not needed anymore */
 GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler);
 GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler);
+#endif
 
 // Easier way with spinbuttons
 
@@ -250,9 +256,11 @@ GtkWidget *add_vbox(GtkWidget *cont);
 
 // Save/restore window positions
 
+#if 0 /* Not needed anymore */
 void win_store_pos(GtkWidget *window, char *inikey);
 void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	int defw, int defh);
+#endif
 
 // Fix for paned widgets losing focus in GTK+1
 

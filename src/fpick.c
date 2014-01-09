@@ -1053,8 +1053,6 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 		GTK_SIGNAL_FUNC(fpick_destroy), res);
 	gtk_object_set_data(GTK_OBJECT(res->window), FP_DATA_KEY, res);
 
-	win_restore_pos(res->window, "fs_window", 0, 0, 550, 500);
-
 	vbox1 = add_vbox(res->window);
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
 

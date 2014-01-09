@@ -129,6 +129,7 @@ GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	return (spin);
 }
 
+#if 0 /* Not needed anymore */
 GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	double value, double min, double max)
 {
@@ -138,6 +139,7 @@ GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacin
 		(GtkAttachOptions) (0), 0, spacing);
 	return (spin);
 }
+#endif
 
 void add_hseparator( GtkWidget *widget, int xs, int ys )
 {
@@ -283,6 +285,7 @@ int alert_box(char *title, char *message, char *text1, ...)
 
 // Add page to notebook
 
+#if 0 /* Not needed anymore */
 GtkWidget *add_new_page(GtkWidget *notebook, char *name)
 {
 	GtkWidget *page, *label;
@@ -294,6 +297,7 @@ GtkWidget *add_new_page(GtkWidget *notebook, char *name)
 	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page, label);
 	return (page);
 }
+#endif
 
 // Slider-spin combo (practically a new widget class)
 
@@ -461,6 +465,7 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	return (hbox);
 }
 
+#if 0 /* Not needed anymore */
 static GtkObject *OK_box_ins(GtkWidget *box, GtkWidget *button)
 {
 	xpack(box, button);
@@ -485,6 +490,7 @@ GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler)
 	gtk_signal_connect(GTK_OBJECT(button), "toggled", Handler, win);
 	return (button);
 }
+#endif
 
 // Easier way with spinbuttons
 
@@ -1053,6 +1059,7 @@ GtkWidget *add_vbox(GtkWidget *cont)
 
 // Save/restore window positions
 
+#if 0 /* Not needed anymore */
 void win_store_pos(GtkWidget *window, char *inikey)
 {
 	char name[128];
@@ -1087,6 +1094,7 @@ void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
 	gtk_window_set_default_size(GTK_WINDOW(window), xywh[2], xywh[3]);
 	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
 }
+#endif
 
 // Fix for paned widgets losing focus in GTK+1
 

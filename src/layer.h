@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

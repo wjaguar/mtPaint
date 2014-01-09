@@ -62,6 +62,7 @@ enum {
 	pk_TABLE2x,
 	pk_SCROLLVP,
 	pk_SCROLLVPn,
+	pk_SCROLLVPv,
 	pk_BIN
 };
 #define pk_MASK     0xFF
@@ -185,8 +186,18 @@ static void trigger_things(void **wdata)
 
 	for (wdata = GET_WINDOW(wdata); wdata[1]; wdata += 2)
 	{
-		if (GET_OP(wdata) != op_TRIGGER) continue;
-		slot = wdata - 2;
+		int op = GET_OP(wdata);
+		/* Trigger events for nested widget */
+		if ((op == op_MOUNT) || (op == op_PMOUNT))
+		{
+			GtkWidget *w = GTK_BIN(wdata[0])->child;
+			if (!w) continue;
+			slot = gtk_object_get_data(GTK_OBJECT(w), VCODE_KEY);
+			if (slot) trigger_things(slot);
+			continue;
+		}
+		if (op != op_TRIGGER) continue;
+		slot = PREV_SLOT(wdata);
 		desc = slot[1];
 		((evt_fn)desc[1])(data, slot[0], (int)desc[0] & WB_OPMASK, slot);
 	}
@@ -697,78 +708,185 @@ static void set_textarea(GtkWidget *text, char *init)
 #endif
 }
 
+//	Columns for LIST* widgets
+
+typedef struct {
+	void **columns[MAX_COLS];	// column slots
+	char *base[MAX_COLS];		// column base pointers
+	void **r;			// slot
+	int ncol;			// columns
+	unsigned char idx[MAX_COLS];	// index vector
+} col_data;
+
+static void set_columns(col_data *c, void ***columns, int ncol, char *ddata,
+	void **r)
+{
+	int i;
+
+	c->r = r;
+	for (i = 0; i < MAX_COLS; i++) c->idx[i] = i;
+	c->ncol = ncol;
+	for (i = 0; i < ncol; i++)
+	{
+		void **cp;
+		char *v;
+
+		/* Link columns to list */
+		*(c->columns[i] = cp = columns[i]) = c->idx + i;
+		/* Prepare base pointer */
+		cp = cp[1];
+		v = cp[1];
+		if ((int)cp[0] & WB_FFLAG) v = (void *)(ddata + (int)v);
+		c->base[i] = v;
+	}
+}
+
 //	LISTCC widget
 
 typedef struct {
-	void **r;	// slot
-	unsigned char idx[MAX_COLS]; // index vector
-} ref_data;
-
-typedef struct {
-	int cnt, bk, ncol;	// height, direction, columns
+	int lock;		// against in-reset signals
+	int wantfoc;		// delayed focus
+	int h;			// max height
 	int *idx;		// result field
-	void **columns[MAX_COLS]; // column slots
-	ref_data ref;		// own slot, index ref targets
+	int *cnt;		// length field
+	col_data c;
 } listcc_data;
-
-// !!! Won't work when the list is insensitive
-static void listcc_select_item(GtkWidget *list, int n)
-{
-	GList *slot = g_list_nth(GTK_LIST(list)->children, n);
-	if (slot) list_select_item(list, GTK_WIDGET(slot->data));
-}
 
 static void listcc_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 {
 	listcc_data *dt = user_data;
-	void **slot = NEXT_SLOT(dt->ref.r), **base = slot[0], **desc = slot[1];
-	int idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+	void **base, **desc, **slot = NEXT_SLOT(dt->c.r);
 
+	if (dt->lock) return;
 	/* Update the value */
-	if (dt->bk) idx = dt->cnt - idx - 1; // Reverse indices
-	*dt->idx = idx;
+	*dt->idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+	// !!! No touching slot outside lock: uninitialized the first time
+	base = slot[0]; desc = slot[1];
 	/* Call the handler */
 	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot);
+}
+
+static void listcc_select_item(GtkList *list, listcc_data *dt)
+{
+	GtkWidget *item;
+	int idx = *dt->idx, n = dt->h - idx - 1; // backward
+
+	if (!(item = g_list_nth_data(list->children, n))) return;
+	/* Move focus if sensitive, flag to be moved later if not */
+	if (!(dt->wantfoc = !GTK_WIDGET_SENSITIVE((GtkWidget *)list)))
+	{
+		dt->lock++; // this is strictly a visual update
+		list_select_item((GtkWidget *)list, item);
+		dt->lock--;
+	}
+	/* Signal must be reliable even with focus delayed */
+	listcc_select(list, item, dt);
+}
+
+static void listcc_toggled(GtkWidget *widget, gpointer user_data)
+{
+	listcc_data *dt = user_data;
+	void **cp, **slot, **base, **desc;
+	char *v;
+	int col, row, step;
+
+	if (dt->lock) return;
+	/* Find out what happened to what, and where */
+	col = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
+	slot = dt->c.columns[col];
+	cp = slot[1];
+	v = dt->c.base[col];
+	row = (int)gtk_object_get_user_data(GTK_OBJECT(widget->parent->parent));
+	step = (int)cp[2];
+	v += step * row;
+
+	/* Self-updating */
+	*(int *)v = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+	/* Now call the handler */
+	slot = NEXT_SLOT(slot);
+	base = slot[0]; desc = slot[1];
+	if (desc[1]) ((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, (void *)row);
+}
+
+static void listcc_reset(GtkList *list, listcc_data *ld, int row)
+{
+	GList *col, *curr = list->children;
+	int cnt = *ld->cnt;
+
+
+	if (row >= 0) // specific row, not whole list
+		curr = g_list_nth(curr, ld->h - row - 1); // backward
+	ld->lock = TRUE;
+	for (; curr; curr = curr->next)
+	{
+		GtkWidget *item = curr->data;
+		int j, n = (int)gtk_object_get_user_data(GTK_OBJECT(item));
+
+		if (n >= cnt)
+		{
+			gtk_widget_hide(item);
+			continue;
+		}
+		
+		col = GTK_BOX(GTK_BIN(item)->child)->children;
+		for (j = 0; col; col = col->next , j++)
+		{
+			GtkWidget *widget = ((GtkBoxChild *)(col->data))->widget;
+			void **cp = ld->c.columns[j][1];
+			char *v = ld->c.base[j];
+			int op = (int)cp[0], step = (int)cp[2];
+
+			v += step * n;
+			op &= WB_OPMASK;
+			if ((op == op_TXTCOLUMN) || (op == op_XTXTCOLUMN))
+				gtk_label_set_text(GTK_LABEL(widget), v);
+			else if (op == op_CHKCOLUMNi0)
+				gtk_toggle_button_set_active(
+					GTK_TOGGLE_BUTTON(widget), *(int *)v);
+		}
+		gtk_widget_show(item);
+		if (row >= 0) break; // one row only
+	}
+
+	if (row < 0) listcc_select_item(list, ld); // only when full reset
+	ld->lock = FALSE;
 }
 
 // !!! With inlining this, problem also
 GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 	int ncol, void **r)
 {
-	char *str, txt[128];
-	GtkWidget *label, *list, *item, *hbox;
+	char txt[128];
+	GtkWidget *widget, *list, *item, *hbox;
 	listcc_data *ld;
-	int i, j, n, cnt, bk;
+	int j, n, h, kind, *cnt;
 
 
-	cnt = *(int *)(void *)(ddata + (int)pp[2]); // length
-	bk = ((int)pp[0] & WB_OPMASK) == op_LISTCCr; // bottom to top
+	cnt = (void *)(ddata + (int)pp[2]); // length pointer
+	kind = (int)pp[0] & WB_OPMASK;
+	h = kind == op_LISTCCHr ? (int)pp[3] : *cnt; // max for variable length
 
 	list = gtk_list_new();
 	gtk_list_set_selection_mode(GTK_LIST(list), GTK_SELECTION_BROWSE);
 
 	/* Make datastruct */
 	ld = bound_malloc(list, sizeof(listcc_data));
-	for (i = 0; i < MAX_COLS; i++) ld->ref.idx[i] = i;
-	ld->ref.r = r;
+	gtk_object_set_user_data(GTK_OBJECT(list), ld);
 	ld->idx = idx;
 	ld->cnt = cnt;
-	ld->bk = bk;
-	ld->ncol = ncol;
-	/* Link columns to list */
-	for (i = 0; i < ncol; i++)
-		*(ld->columns[i] = columns[i]) = ld->ref.idx + i;
+	ld->h = h;
+	set_columns(&ld->c, columns, ncol, ddata, r);
 
-	for (i = 0; i < cnt; i++)
+	for (n = h - 1; n >= 0; n--) // Reverse numbering
 	{
 		item = gtk_list_item_new();
-		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)n);
 		gtk_container_add(GTK_CONTAINER(list), item);
 // !!! Spacing = 3
 		hbox = gtk_hbox_new(FALSE, 3);
 		gtk_container_add(GTK_CONTAINER(item), hbox);
-		n = bk ? cnt - i - 1 : i; // backward/forward
 
 		for (j = 0; j < ncol; j++)
 		{
@@ -776,24 +894,43 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 			char *v = cp[1];
 			int op = (int)cp[0], step = (int)cp[2], jw = (int)cp[3];
 
-			if (op & WB_FFLAG) v = (void *)(ddata + (int)v);
 			v += step * n;
 			op &= WB_OPMASK;
-			if (op == op_TXTCOLUMN) str = v; // Array of chars
-			else /* if (op == op_IDXCOLUMN) */ // Constant
-				sprintf(str = txt, "%d", (int)v);
-			label = pack(hbox, gtk_label_new(str));
+			if (op == op_CHKCOLUMNi0)
+			{
+#if GTK_MAJOR_VERSION == 1
+			/* !!! Vertical spacing is too small without the label */
+				widget = gtk_check_button_new_with_label("");
+#else /* if GTK_MAJOR_VERSION == 2 */
+			/* !!! Focus frame is placed wrong with the empty label */
+				widget = gtk_check_button_new();
+#endif
+				gtk_object_set_user_data(GTK_OBJECT(widget),
+					(gpointer)j);
+				gtk_signal_connect(GTK_OBJECT(widget), "toggled",
+					GTK_SIGNAL_FUNC(listcc_toggled), ld);
+				/* !!! "i0" means 0th slot is insensitive */
+				if (!n) gtk_widget_set_sensitive(widget, FALSE);
+			}
+			else
+			{
+				if ((op == op_TXTCOLUMN) || (op == op_XTXTCOLUMN))
+					txt[0] = '\0'; // Init to empty string
+				else /* if (op == op_IDXCOLUMN) */ // Constant
+					sprintf(txt, "%d", (int)v);
+				widget = gtk_label_new(txt);
+				gtk_misc_set_alignment(GTK_MISC(widget),
+					(jw >> 16) * 0.5, 0.5);
+			}
 			if (jw & 0xFFFF)
-				gtk_widget_set_usize(label, jw & 0xFFFF, -2);
-			gtk_misc_set_alignment(GTK_MISC(label),
-				(jw >> 16) * 0.5, 0.5);
+				gtk_widget_set_usize(widget, jw & 0xFFFF, -2);
+			(op == op_XTXTCOLUMN ? xpack : pack)(hbox, widget);
 		}
+		gtk_widget_show_all(hbox);
 	}
-	gtk_widget_show_all(list);
 
-	i = *idx;
-	if (bk) i = cnt - i - 1; // reverse order
-	listcc_select_item(list, i);
+	if (*cnt) listcc_reset(GTK_LIST(list), ld, -1);
+
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
 		GTK_SIGNAL_FUNC(listcc_select), ld);
 
@@ -804,24 +941,22 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 
 typedef struct {
 	int kind;		// type of list
-	int ncol;		// columns
 	int update;		// delayed update flags
 	int lock;		// against in-reset signals
 	int bstep;		// base array step
 	int *idx;		// result field
 	int *cnt;		// length field
 	int *sort;		// sort column & direction
-	void *ddata, **basev;	// base arrays
-	void **columns[MAX_COLS]; // column slots
+	void **basev;		// base array
 	GtkWidget *sort_arrows[MAX_COLS];
-	ref_data ref;		// own slot, index ref targets
+	col_data c;
 } listc_data;
 
 static void listc_select_row(GtkCList *clist, gint row, gint column,
 	GdkEventButton *event, gpointer user_data)
 {
 	listc_data *dt = user_data;
-	void **slot = NEXT_SLOT(dt->ref.r), **base = slot[0], **desc = slot[1];
+	void **slot = NEXT_SLOT(dt->c.r), **base = slot[0], **desc = slot[1];
 
 	if (dt->lock) return;
 	/* Update the value */
@@ -857,16 +992,15 @@ static void listc_update(GtkWidget *w, gpointer user_data)
 
 static void listc_collect(gchar **row_text, listc_data *ld, int row)
 {
-	char *base = *ld->basev, *ddata = ld->ddata;
-	int j, ncol = ld->ncol, bstep = ld->bstep;
+	char *base = *ld->basev;
+	int j, ncol = ld->c.ncol, bstep = ld->bstep;
 
 	for (j = 0; j < ncol; j++)
 	{
-		void **cp = ld->columns[j][1];
-		char *v = cp[1];
+		void **cp = ld->c.columns[j][1];
+		char *v = ld->c.base[j];
 		int op = (int)cp[0], step = (int)cp[2];
 
-		if (op & WB_FFLAG) v = (void *)(ddata + (int)v);
 		if (!step) v = (void *)(base + (int)v) , step = bstep;
 //		if (!step) v = (void *)(base + (int)v + bstep * row);
 		v += step * row;
@@ -881,7 +1015,7 @@ static void listc_collect(gchar **row_text, listc_data *ld, int row)
  * outside of new data if doing it */
 static void listc_reset(GtkCList *clist, listc_data *ld)
 {
-	int i, j, ncol = ld->ncol, cnt = *ld->cnt;
+	int i, j, ncol = ld->c.ncol, cnt = *ld->cnt;
 
 	ld->lock = TRUE;
 	gtk_clist_freeze(clist);
@@ -965,7 +1099,7 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 	GtkCList *clist;
 	listc_data *ld;
 	void **basev;
-	int i, j, bstep, sm, kind, *cntv, *sort = &zero;
+	int j, bstep, sm, kind, *cntv, *sort = &zero;
 
 
 	cntv = (void *)(ddata + (int)pp[2]); // length var
@@ -979,19 +1113,13 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
 	/* Make datastruct */
 	ld = bound_malloc(list, sizeof(listc_data));
 	gtk_object_set_user_data(GTK_OBJECT(list), ld);
-	for (i = 0; i < MAX_COLS; i++) ld->ref.idx[i] = i;
-	ld->ref.r = r;
 	ld->kind = kind;
-	ld->ddata = ddata;
 	ld->basev = basev;
 	ld->bstep = bstep;
 	ld->idx = idx;
 	ld->cnt = cntv;
 	ld->sort = sort;
-	ld->ncol = ncol;
-	/* Link columns to list */
-	for (i = 0; i < ncol; i++)
-		*(ld->columns[i] = columns[i]) = ld->ref.idx + i;
+	set_columns(&ld->c, columns, ncol, ddata, r);
 
 	sm = *sort;
 	clist = GTK_CLIST(list);
@@ -1215,6 +1343,7 @@ static cmdef cmddefs[] = {
 	{ op_XENTRY, op_XENTRY, pk_XPACK | pkf_SHOW, 5 },
 // !!! Padding = 0 Border = 0
 	{ op_MLENTRY, op_MLENTRY, pk_PACK | pkf_SHOW },
+	{ op_TLENTRY, op_TLENTRY, pk_TABLE | pkf_SHOW },
 	{ op_OKBOX, cm_OKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
 		USE_BORDER(OKBOX) },
 // !!! Padding = 5 Border = 0
@@ -1337,8 +1466,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			cw = cmd->cw;
 			if (cw < 0) cw = borders[-cw - 1] + DEF_BORDER;
 			pk = cmd->pk;
-			i = ((pk & pk_MASK) >= pk_TABLE) + !!(pk & pkf_FRAME);
-			if (lp <= i) v = NULL;
+			i = lp - ((pk & pk_MASK) >= pk_TABLE) - !!(pk & pkf_FRAME);
+			if (i <= 0) v = NULL;
 			op = cmd->cmd;
 		}
 		switch (op)
@@ -1496,19 +1625,27 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a notebook page */
-		case op_PAGE:
-			--wp; wp[0] = widget = add_new_page(wp[1], _(v));
-			break;
-		/* Add a notebook page with iconic tab */
-		case op_PAGEi:
-			widget = gtk_vbox_new(FALSE, (int)pp[1]);
+		case op_PAGE: case op_PAGEi:
+		{
+			GtkWidget *label = op == op_PAGE ?
+				gtk_label_new(_(v)) : xpm_image(v);
+			gtk_widget_show(label);
+			widget = gtk_vbox_new(FALSE, op == op_PAGE ?
+				0 : (int)pp[1]);
 			gtk_notebook_append_page(GTK_NOTEBOOK(wp[0]),
-				widget, xpm_image(v));
+				widget, label);
 			pk = pkf_SHOW | pkf_STACK;
 			break;
+		}
 		/* Add a table */
 		case cm_TABLE:
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
+			if (i > 1)
+			{
+				int s = (int)pp[1];
+				gtk_table_set_row_spacings(GTK_TABLE(widget), s);
+				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
+			}
 			break;
 		/* Add a box */
 		case cm_VBOX: case cm_HBOX:
@@ -1575,7 +1712,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		{
 			int z = (int)((xcmdef *)cmd)->x;
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
-			if (lp - i > 1) z = (int)pp[1];
+			if (i > 1) z = (int)pp[1];
 			if (z & 0xFFFF) gtk_misc_set_padding(GTK_MISC(widget),
 				(z >> 8) & 255, z & 255);
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
@@ -1693,8 +1830,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add an entry widget, fill from drop-away buffer */
-		case op_XENTRY: case op_MLENTRY:
+		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			widget = gtk_entry_new();
+			if (op == op_TLENTRY) gtk_entry_set_max_length(
+				GTK_ENTRY(widget), (int)pp[1]);
 			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
 			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
@@ -1741,12 +1880,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK;
 			break;
 		/* Add a list with pre-defined columns */
-		case op_LISTCCr:
+		case op_LISTCCr: case op_LISTCCHr:
 			widget = listcc(v, ddata, pp - 1, columns, ncol, r);
 			ncol = 0;
-// !!! Border = 5
-			cw = 5;
-			pk = pk_SCROLLVP;
+// !!! Border = 5 / 0
+			if (op == op_LISTCCr) cw = 5;
+			pk = pk_SCROLLVPv | pkf_SHOW;
 			break;
 		/* Add a clist with pre-defined columns */
 		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
@@ -1860,7 +1999,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
 			gtk_widget_hide(where[0]);
 			gtk_widget_reparent(what, widget);
-			get_evt_1(where[0], where + 2);
+			get_evt_1(where[0], NEXT_SLOT(where));
 			pk = pk_XPACK | pkf_SHOW;
 			break;
 		}
@@ -1929,15 +2068,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WPWHEREVER: wpos = GTK_WIN_POS_NONE; continue;
 		/* Make last referrable widget hidden */
 		case op_HIDDEN:
-			gtk_widget_hide(*origin_slot(r - 2));
+			gtk_widget_hide(*origin_slot(PREV_SLOT(r)));
 			continue;
 		/* Make last referrable widget insensitive */
 		case op_INSENS:
-			gtk_widget_set_sensitive(*origin_slot(r - 2), FALSE);
+			gtk_widget_set_sensitive(*origin_slot(PREV_SLOT(r)), FALSE);
 			continue;
 		/* Make last referrable widget focused */
 		case op_FOCUS:
-			gtk_widget_grab_focus(*origin_slot(r - 2));
+			gtk_widget_grab_focus(*origin_slot(PREV_SLOT(r)));
 			continue;
 		/* Set fixed/minimum width for next widget */
 		case op_WIDTH:
@@ -1957,25 +2096,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			ncol = 0;
 			continue;
 		/* Add a list column */
-		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_RTXTCOLUMN:
+		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
+		case op_RTXTCOLUMN: case op_CHKCOLUMNi0:
 			columns[ncol++] = r;
-			*r++ = NULL;
-			*r++ = pp - 1;
-			continue;
+			widget = NULL;
+			break;
 		/* Install key event handler */
 		case op_EVT_KEY:
 		{
-			void **slot = origin_slot(r - 2);
+			void **slot = origin_slot(PREV_SLOT(r));
 			gtk_signal_connect(GTK_OBJECT(*slot), "key_press_event",
 				GTK_SIGNAL_FUNC(get_evt_key), r);
-			*r++ = res;
-			*r++ = pp - 1;
-			continue;
+			widget = NULL;
+			break;
 		}
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
 		{
-			void **slot = origin_slot(r - 2);
+			void **slot = origin_slot(PREV_SLOT(r));
 			int what = GET_OP(slot);
 // !!! Support only what actually used on, and their brethren
 			switch (what)
@@ -2009,8 +2147,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					"changed", GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 #endif
-			case op_XENTRY: case op_MLENTRY: case op_TPENTRY:
-			case op_PATH: case op_PATHs:
+			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
+			case op_TPENTRY: case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -2020,9 +2158,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Or remember start of a group of widgets */
 		/* Or a cleanup location */
 		case op_TRIGGER: case op_GROUP: case op_CLEANUP:
-			*r++ = res;
-			*r++ = pp - 1;
-			continue;
+			widget = NULL;
+			break;
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_NBOOK: case op_BOR_XSCROLL:
 		case op_BOR_SPIN: case op_BOR_LABEL: case op_BOR_TLABEL:
@@ -2035,7 +2172,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Remember this */
 		if (ref)
 		{
-			*r++ = widget;
+			*r++ = widget ? (void *)widget : res;
 			*r++ = pp - 1;
 		}
 		*(wp - 1) = widget; // pre-stack
@@ -2082,13 +2219,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				n == pk_TABLE2x ? GTK_FILL : 0, 0, tpad);
 			break;
 		}
-		case pk_SCROLLVP: case pk_SCROLLVPn:
+		case pk_SCROLLVP: case pk_SCROLLVPn: case pk_SCROLLVPv:
 		{
 			GtkWidget *tw = wp[0];
+			GtkScrolledWindow *sw = GTK_SCROLLED_WINDOW(tw);
 
 			wp[0] = *(wp - 1); ++wp; // unstack
-			gtk_scrolled_window_add_with_viewport(
-				GTK_SCROLLED_WINDOW(tw), widget);
+			gtk_scrolled_window_add_with_viewport(sw, widget);
+			if (n == pk_SCROLLVPv)
+			{
+				gtk_container_set_focus_vadjustment(GTK_CONTAINER(widget),
+					gtk_scrolled_window_get_vadjustment(sw));
+			}
 			if (n != pk_SCROLLVPn) break;
 			/* Set viewport to shadowless */
 			tw = GTK_BIN(tw)->child;
@@ -2141,7 +2283,7 @@ static void do_destroy(void **wdata)
 
 			gtk_widget_reparent(what, where[0]);
 			gtk_widget_show(where[0]);
-			get_evt_1(where[0], where + 2);
+			get_evt_1(where[0], NEXT_SLOT(where));
 		}
 		else if (op == op_MAINWINDOW) gtk_main_quit();
 	}
@@ -2191,7 +2333,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_COLORLIST: case op_COLORLISTN:
 		case op_COLORPAD: case op_GRADBAR:
-		case op_LISTCCr:
+		case op_LISTCCr: case op_LISTCCHr:
 		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 			break; // self-reading
 		case op_COLOR:
@@ -2210,7 +2352,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_COMBO:
 			*(int *)v = wj_combo_box_get_history(*wdata);
 			break;
-		case op_XENTRY: case op_MLENTRY:
+		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
 		case op_TPENTRY: case op_PATH:
@@ -2294,11 +2436,18 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
 				*(int *)v);
 			break;
+		case op_LISTCCr: case op_LISTCCHr:
+			listcc_reset(GTK_LIST(*wdata),
+				gtk_object_get_user_data(GTK_OBJECT(*wdata)), -1);
+			/* !!! Or the changes will be ignored if the list wasn't
+			 * yet displayed (as in inactive dock tab) - WJ */
+			gtk_widget_queue_resize(*wdata);
+			break;
 		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 			listc_reset(GTK_CLIST(*wdata),
 				gtk_object_get_user_data(GTK_OBJECT(*wdata)));
 			break;
-		case op_XENTRY: case op_MLENTRY:
+		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			gtk_entry_set_text(GTK_ENTRY(*wdata), *(char **)v);
 			// Replace transient buffer - it may get freed on return
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
@@ -2336,8 +2485,16 @@ void cmd_reset(void **slot, void *ddata)
 
 void cmd_sensitive(void **slot, int state)
 {
-	if (GET_OP(slot) < op_EVT_0) // any widget
-		gtk_widget_set_sensitive(slot[0], state);
+	int op = GET_OP(slot);
+
+	if (op >= op_EVT_0) return; // only widgets
+	gtk_widget_set_sensitive(slot[0], state);
+	/* Move focus in LISTCC when delayed by insensitivity */
+	if (state && ((op == op_LISTCCr) || (op == op_LISTCCHr)))
+	{
+		listcc_data *dt = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		if (dt->wantfoc) listcc_select_item(GTK_LIST(slot[0]), dt);
+	}
 }
 
 void cmd_showhide(void **slot, int state)
@@ -2444,6 +2601,14 @@ void cmd_set(void **slot, int v)
 	case op_PLAINBOOK:
 		gtk_notebook_set_page(slot[0], v);
 		break;
+	case op_LISTCCr: case op_LISTCCHr:
+	{
+		listcc_data *dt = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		if ((v < 0) || (v >= *dt->cnt)) break; // Ensure sanity
+		*dt->idx = v;
+		listcc_select_item(GTK_LIST(slot[0]), dt);
+		break;
+	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 	{
 		GtkWidget *widget = GTK_WIDGET(slot[0]);
@@ -2574,8 +2739,16 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
+	case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
+		gtk_entry_set_text(GTK_ENTRY(slot[0]), res); break;
 	case op_TPENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], op, res);
+		break;
+	case op_LISTCCr: case op_LISTCCHr:
+		listcc_reset(GTK_LIST(slot[0]),
+			gtk_object_get_user_data(GTK_OBJECT(slot[0])), (int)res);
+// !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
+//		gtk_widget_queue_resize(slot[0]);
 		break;
 	case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 	{
@@ -2583,7 +2756,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		/* if (idx == LISTC_RESET_ROW) */
 		listc_data *ld = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
 		gchar *row_text[MAX_COLS];
-		int i, row, n = (int)res, ncol = ld->ncol;
+		int i, row, n = (int)res, ncol = ld->c.ncol;
 
 		listc_collect(row_text, ld, n);
 		row = gtk_clist_find_row_from_data(clist, (gpointer)n);

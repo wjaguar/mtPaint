@@ -101,6 +101,7 @@ enum {
 	op_COMBO,
 	op_XENTRY,
 	op_MLENTRY,
+	op_TLENTRY,
 	op_TPENTRY,
 	op_PATH,
 	op_PATHs,
@@ -112,6 +113,7 @@ enum {
 	op_COLORPAD,
 	op_GRADBAR,
 	op_LISTCCr,
+	op_LISTCCHr,
 	op_LISTC,
 	op_LISTCd,
 	op_LISTCu,
@@ -138,7 +140,9 @@ enum {
 	op_WLIST,
 	op_IDXCOLUMN,
 	op_TXTCOLUMN,
+	op_XTXTCOLUMN,
 	op_RTXTCOLUMN,
+	op_CHKCOLUMNi0,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -323,6 +327,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define PAGEir(ICN,S) WBrh(PAGEi, 2), (ICN), (void *)(S)
 #define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
+#define TABLEs(W,H,S) WBh(TABLE, 2), WBwh(W, H), (void *)(S)
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
@@ -362,7 +367,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MLABELr(NM) WBrh(MLABEL, 1), (NM)
 #define MLABELxr(NM,PX,PY,AX) WBrh(MLABEL, 2), (NM), WBppa(PX, PY, AX)
 #define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
-#define TLLABEL(NM,X,Y) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
+#define TLLABELl(NM,X,Y,L) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, L)
+#define TLLABEL(NM,X,Y) TLLABELl(NM, X, Y, 1)
 #define TLLABELr(NM,X,Y) WBrh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define TLLABELx(NM,X,Y,PX,PY,AX) WBh(TLLABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
@@ -407,8 +413,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEs, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TLSPINSLIDEx(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEx, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define TLSPINSLIDExl(V,V0,V1,X,Y,L) WBrhf(TLSPINSLIDEx, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, L)
+#define TLSPINSLIDEx(V,V0,V1,X,Y) TLSPINSLIDExl(V, V0, V1, X, Y, 1)
 #define SPINSLIDEa(A) WBrhf(SPINSLIDEa, 1), WBfield(A)
 #define XSPINSLIDEa(A) WBrhf(XSPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
@@ -457,6 +464,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(SELECT, HS)
 #define LISTCCr(V,L,HS) WBr2hf(LISTCCr, 2 + 2), WBfield(V), WBfield(L), \
 	EVENT(SELECT, HS)
+#define LISTCCHr(V,L,H,HS) WBr2hf(LISTCCHr, 3 + 2), WBfield(V), WBfield(L), \
+	(void *)(H), EVENT(SELECT, HS)
 #define LISTC(V,L,FP,S,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
 	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define LISTCd(V,L,FP,S,HS) WBr2hf(LISTCd, 5 + 2), WBfield(V), WBfield(L), \
@@ -467,6 +476,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	WBfield(SM), WBfield(FP), (void *)(S), EVENT(SELECT, HS)
 #define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
+#define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
+	WBxyl(X, Y, L)
 #define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
 #define PATH(NM,T,M,V) WBrhf(PATH, 4), WBfield(V), (T), (void *)(M), (NM)
 #define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
@@ -544,6 +555,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)((W) + ((J) << 16))
 #define TXTCOLUMNv(A,S,W,J) WBrh(TXTCOLUMN, 3), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16))
+#define XTXTCOLUMNv(A,S,W,J) WBrh(XTXTCOLUMN, 3), &(A), (void *)(S), \
+	(void *)((W) + ((J) << 16))
 #define NTXTCOLUMNv(NM,A,S,W,J) WBrh(TXTCOLUMN, 4), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), (NM)
 #define NTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
@@ -554,6 +567,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	NULL, (void *)((W) + ((J) << 16))
 #define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
+#define CHKCOLUMNi0v(A,S,W,J,HC) WBr2h(CHKCOLUMNi0, 3 + 2), &(A), (void *)(S), \
+	(void *)((W) + ((J) << 16)), EVENT(CHANGE, HC)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
 
@@ -568,12 +583,18 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of PATH
 #define PATH_VALUE	0
 
+//	Extra data of LISTCC
+#define LISTCC_RESET_ROW 0
+
 //	Extra data of LISTC
-#define LISTC_ORDER	0
-#define LISTC_RESET_ROW	1
+#define LISTC_RESET_ROW	0
+#define LISTC_ORDER	1
 
 //	Extra data of LABEL
 #define LABEL_VALUE	0
 
 //	Extra data of NBOOK
 #define NBOOK_TABS	0
+
+//	Extra data of ENTRY
+#define ENTRY_VALUE	0
