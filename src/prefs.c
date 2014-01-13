@@ -477,6 +477,7 @@ static void *pref_code[] = {
 	TLCHECKsv(_("Flow"), tablet_tool_use[1], 0, 2),
 	TLCHECKsv(_("Opacity"), tablet_tool_use[2], 0, 3),
 	//	Size/Flow/Opacity sliders
+	BORDER(SPINSLIDE, 0),
 	TLSPINSLIDEs(tf[0], -100, 100, 1, 1),
 	TLSPINSLIDEs(tf[1], -100, 100, 1, 2),
 	TLSPINSLIDEs(tf[2], -100, 100, 1, 3),

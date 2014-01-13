@@ -978,7 +978,7 @@ static void *settings_code[] = {
 	BORDER(LABEL, 0),
 	REFv(toolbar_labels[0]), MLABELxr("", 5, 2, 0),
 	REFv(toolbar_labels[1]), MLABELxr("", 5, 2, 0),
-	ETABLE(2, 4), BORDER(TLABEL, 0),
+	ETABLE(2, 4), BORDER(TLABEL, 0), BORDER(SPINSLIDE, 0),
 	TLLABEL(_("Size"), 0, 0),
 	REFv(ts_spinslides[0]), TLSPINSLIDEx(size, 1, 255, 1, 0),
 	EVENT(CHANGE, ts_spinslide_moved),

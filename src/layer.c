@@ -1102,7 +1102,7 @@ static void *layers_code[] = {
 	REF(llist), LISTCCHr(nlayer, lnum, MAX_LAYERS + 1, layer_select), TRIGGER,
 	EXEC(layer_toolbar),
 	TABLEs(3, 4, 5),
-	BORDER(TLABEL, 0), BORDER(SPIN, 0),
+	BORDER(TLABEL, 0), BORDER(SPIN, 0), BORDER(SPINSLIDE, 0),
 	TLLABEL(_("Layer Name"), 0, 0),
 	REF(nmentry), MINWIDTH(100), TLENTRY(lname, LAYER_NAMELEN - 1, 1, 0, 2),
 	EVENT(CHANGE, layer_inputs_changed),

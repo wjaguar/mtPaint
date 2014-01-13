@@ -818,7 +818,7 @@ static char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
 #define WBbase brcosa_dd
 static void *brcosa_code[] = {
 	WPMOUSE, WINDOWm(_("Transform Colour")), NORESIZE,
-	BORDER(TABLE, 10),
+	BORDER(TABLE, 10), BORDER(SPINSLIDE, 0),
 	TABLE2(6),
 	REF(sss[4]), TSPINSLIDE(_("Gamma"), values[4], 20, 500),
 	EVENT(CHANGE, brcosa_moved),
@@ -2245,6 +2245,7 @@ static void *ged_code[] = {
 		REF(opt), XOPTe(interp_txt, 5, interp, ged_event),
 	ENDIF(1),
 	IFx(mode, 1), /* Indexed / utility / opacity */
+		BORDER(SPINSLIDE, 0),
 		REF(spin), SPINSLIDEa(crgb), EVENT(CHANGE, ged_event),
 		EQBOXs(5),
 		REF(chk), XCHECK(_("Constant"), interp), EVENT(CHANGE, ged_event),

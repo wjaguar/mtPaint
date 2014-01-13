@@ -38,6 +38,8 @@ enum {
 	op_TABLE,
 	op_XTABLE,
 	op_ETABLE,
+	op_FTABLE,
+	op_FSXTABLEp,
 	//
 	op_VBOX,
 	op_XVBOX,
@@ -59,8 +61,11 @@ enum {
 	op_HSEP,
 	op_MLABEL,
 	op_MLABELp,
+	op_XLABEL,
 	op_TLLABEL,
 	op_TLLABELp,
+	op_TLTEXT,
+	op_TLTEXTp,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -78,6 +83,7 @@ enum {
 	op_XSPINa,
 	op_TSPINa,
 	//
+	op_TLSPINPACK,
 	op_TSPINSLIDE,
 	op_HTSPINSLIDE,
 	op_TLSPINSLIDE,
@@ -185,6 +191,7 @@ enum {
 	op_BOR_NBOOK,
 	op_BOR_XSCROLL,
 	op_BOR_SPIN,
+	op_BOR_SPINSLIDE,
 	op_BOR_LABEL,
 	op_BOR_TLABEL,
 	op_BOR_OPT,
@@ -331,6 +338,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
+#define FTABLE(NM,W,H) WBh(FTABLE, 2), WBwh(W, H), (NM)
+#define FSXTABLEp(V,W,H) WBhf(FSXTABLEp, 2), WBfield(V), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
 #define VBOXPS VBOXbp(5, 0, 5)
@@ -367,6 +376,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MLABELr(NM) WBrh(MLABEL, 1), (NM)
 #define MLABELxr(NM,PX,PY,AX) WBrh(MLABEL, 2), (NM), WBppa(PX, PY, AX)
 #define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
+#define XLABELr(NM) WBrh(XLABEL, 1), (NM)
 #define TLLABELl(NM,X,Y,L) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, L)
 #define TLLABEL(NM,X,Y) TLLABELl(NM, X, Y, 1)
 #define TLLABELr(NM,X,Y) WBrh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
@@ -374,8 +384,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
 #define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh(TLLABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define TLLABELp(V,X,Y) WBhf(TLLABELp, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLLABELpx(V,X,Y,PX,PY,AX) WBhf(TLLABELp, 3), WBfield(V), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
+#define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
+#define TLTEXTp(V,X,Y) WBhf(TLTEXTp, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -405,10 +419,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf(XSPINa, 1), WBfield(A)
-#define TSPINSLIDE(NM,V,V0,V1) WBrhf(TSPINSLIDE, 4), \
-	WBfield(V), (void *)(V0), (void *)(V1), (NM)
-#define HTSPINSLIDE(NM,V,V0,V1) WBrhf(HTSPINSLIDE, 4), \
-	WBfield(V), (void *)(V0), (void *)(V1), (NM)
+/* !!! This block holds 1 nested EVENT block */
+#define TLSPINPACKv(A,N,HC,W,X,Y) WBr2h(TLSPINPACK, 3 + 2), (A), (void *)(N), \
+	WBxyl(X, Y, W), EVENT(CHANGE, HC)
+#define TSPINSLIDE(NM,V,V0,V1) WBrhf(TSPINSLIDE, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), (NM)
+#define HTSPINSLIDE(NM,V,V0,V1) WBrhf(HTSPINSLIDE, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), (NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEs, 4), WBfield(V), \
@@ -539,6 +556,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WANTMAX WBh(WANTMAX, 0)
 #define WXYWH(NM,W,H) WBh(WXYWH, 2), (NM), WBwh(W, H)
 #define DEFW(V) WXYWH(NULL, V, 0)
+#define DEFH(V) WXYWH(NULL, 0, V)
 #define DEFSIZE(W,H) WXYWH(NULL, W, H)
 #define WPMOUSE WBh(WPMOUSE, 0)
 #define WPWHEREVER WBh(WPWHEREVER, 0)
@@ -549,6 +567,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MINWIDTH(N) WBh(WIDTH, 1), (void *)(-(N))
 #define KEEPWIDTH WBh(KEEPWIDTH, 0)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
+#define ONTOP0 WBh(ONTOP, 0)
 #define RAISED WBh(RAISED, 0)
 #define WLIST WBh(WLIST, 0)
 #define IDXCOLUMN(N0,S,W,J) WBrh(IDXCOLUMN, 3), (void *)(N0), (void *)(S), \

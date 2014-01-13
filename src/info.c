@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -26,25 +26,31 @@
 #include "mainwindow.h"
 #include "canvas.h"
 #include "layer.h"
+#include "vcode.h"
 
 
 // Maximum median cuts to make
 
 #define MAX_CUTS 128
 
-static int hs_rgb[256][3],		// Raw frequencies
-	hs_rgb_sorted[256][3];		// Sorted frequencies
-
 #define HS_GRAPH_W 256
 #define HS_GRAPH_H 64
 
-static unsigned char *hs_rgb_mem;	// RGB chunk holding graphs
+typedef struct {
+	int indexed, clip, layers;
+	int norm;
+	char *col_h, *col_d;
+	unsigned char *rgb_mem;
+	GtkWidget *drawingarea;
+	char mem_d[128], clip_d[256], rgb_d[64], lr_d[128];
+	int rgb[256][3];	// Raw frequencies
+	int rgb_sorted[256][3];	// Sorted frequencies
+} info_dd;
 
-static GtkWidget *hs_drawingarea;
-static int hs_norm;
 
-
-static void hs_plot_graph()				// Plot RGB graphs
+/* Plot RGB graphs */
+static void hs_plot_graph(unsigned char *hs_rgb_mem, int hs_norm,
+	int hs_rgb[256][3], int hs_rgb_sorted[256][3])
 {
 	unsigned char *im, col1[3] = { mem_pal_def[0].red, mem_pal_def[0].green, mem_pal_def[0].blue},
 			col2[3];
@@ -176,21 +182,22 @@ static void hs_plot_graph()				// Plot RGB graphs
 	}
 }
 
-static void hs_click_normalize(GtkToggleButton *togglebutton, gpointer user_data)
+static void hs_click_normalize(info_dd *dt, void **wdata, int what, void **where)
 {
-	hs_norm = gtk_toggle_button_get_active(togglebutton);
+	cmd_read(where, dt);
 
-	hs_plot_graph();
+	hs_plot_graph(dt->rgb_mem, dt->norm, dt->rgb, dt->rgb_sorted);
 
-	gtk_widget_queue_draw(hs_drawingarea);
+	gtk_widget_queue_draw(dt->drawingarea);
 }
 
-static void hs_populate_rgb()				// Populate RGB tables
+/* Populate RGB tables */
+static void hs_populate_rgb(int hs_rgb[256][3], int hs_rgb_sorted[256][3])
 {
 	int i, j, k, t;
 	unsigned char *im = mem_img[CHN_IMAGE];
 
-	memset(&hs_rgb[0][0], 0, sizeof(hs_rgb));
+	memset(&hs_rgb[0][0], 0, 256 * 3 * sizeof(hs_rgb[0][0]));
 
 	j = mem_width * mem_height;
 
@@ -212,7 +219,7 @@ static void hs_populate_rgb()				// Populate RGB tables
 		}
 	}
 
-	memcpy(hs_rgb_sorted, hs_rgb, sizeof(hs_rgb_sorted));
+	memcpy(hs_rgb_sorted, hs_rgb, 256 * 3 * sizeof(hs_rgb_sorted[0][0]));
 
 	for ( k=0; k<3; k++ )			// Sort RGB table
 	{
@@ -231,24 +238,38 @@ static void hs_populate_rgb()				// Populate RGB tables
 	}
 }
 
-static gboolean hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
+static gboolean hs_expose_graph(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
 {
+	info_dd *dt = user_data;
 	int x = event->area.x, y = event->area.y;
 	int w = event->area.width, h = event->area.height;
 
-	if ( hs_rgb_mem == NULL ) return FALSE;
-	if ( x >= HS_GRAPH_W || y >= HS_GRAPH_H*mem_img_bpp ) return FALSE;
+	if (!dt->rgb_mem) return (FALSE);
+	if ((x >= HS_GRAPH_W) || (y >= HS_GRAPH_H * mem_img_bpp)) return (FALSE);
 
-	mtMIN( w, w, HS_GRAPH_W-x )
-	mtMIN( h, h, HS_GRAPH_H*3-y )
+	if (w > HS_GRAPH_W - x) w = HS_GRAPH_W - x;
+	if (h > HS_GRAPH_H * 3 - y) h = HS_GRAPH_H * 3 - y;
 
-	gdk_draw_rgb_image (hs_drawingarea->window,
-			hs_drawingarea->style->black_gc,
-			x, y, w, h,
-			GDK_RGB_DITHER_NONE, hs_rgb_mem + 3*(x + y*HS_GRAPH_W), HS_GRAPH_W*3
-			);
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		x, y, w, h, GDK_RGB_DITHER_NONE,
+		dt->rgb_mem + 3 * (x + y * HS_GRAPH_W), HS_GRAPH_W * 3);
 
-	return FALSE;
+	return (FALSE);
+}
+
+static void **create_histogram(void **r, GtkWidget ***wpp, void **wdata)
+{
+	info_dd *dt = GET_DDATA(wdata);
+	GtkWidget *hs_drawingarea;
+
+	hs_drawingarea = dt->drawingarea = pack(**wpp, gtk_drawing_area_new());
+	gtk_widget_show(hs_drawingarea);
+	gtk_widget_set_usize(hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H * mem_img_bpp);
+	gtk_signal_connect(GTK_OBJECT(hs_drawingarea), "expose_event",
+		GTK_SIGNAL_FUNC(hs_expose_graph), dt);
+
+	return (r);
 }
 
 
@@ -262,165 +283,134 @@ static gboolean hs_expose_graph( GtkWidget *widget, GdkEventExpose *event )
 
 ////	INFORMATION WINDOW
 
-static GtkWidget *info_window;
+#undef _
+#define _(X) X
 
-static void delete_info(GtkWidget *widget)
-{
-	destroy_dialog(info_window);
-	free(hs_rgb_mem);
-	hs_rgb_mem = NULL;
-}
+#define WBbase info_dd
+static void *info_code[] = {
+	WINDOWm(_("Information")),
+	IF(indexed), DEFH(400),
+	FTABLE(_("Memory"), 2, 3),
+	TLLABEL(_("Total memory for main + undo images"), 0, 0),
+		TLTEXTf(mem_d, 1, 0),
+	TLLABEL(_("Undo / Redo / Max levels used"), 0, 1),
+	UNLESSx(clip, 1),
+		TLLABEL(_("Clipboard"), 0, 2), TLLABEL(_("Unused"), 1, 2),
+	ENDIF(1),
+	IF(clip), TLTEXTf(clip_d, 0, 2),
+	UNLESSx(indexed, 1),
+		TLLABEL(_("Unique RGB pixels"), 0, 3), TLTEXTf(rgb_d, 1, 3),
+	ENDIF(1),
+	IFx(layers, 1),
+		TLLABEL(_("Layers"), 0, 4), TLTEXTf(lr_d, 1, 4),
+		TLLABEL(_("Total layer memory usage"), 0, 5),
+	ENDIF(1),
+	WDONE,
+	BORDER(FRBOX, 0),
+	FVBOX(_("Colour Histogram")),
+	EXEC(create_histogram),
+	CLEANUP(rgb_mem),
+	CHECK(_("Normalize"), norm), EVENT(CHANGE, hs_click_normalize), TRIGGER,
+	WDONE,
+	IFx(indexed, 1),
+///	Big index table
+		BORDER(FRBOX, 4),
+		FSXTABLEp(col_h, 3, 256 + 3),
+		TLLABEL(_("Index"), 0, 0),
+		TLLABEL(_("Canvas pixels"), 1, 0),
+		TLLABEL("%", 2, 0),
+		BORDER(TLABEL, 0),
+		TLTEXTp(col_d, 0, 1), CLEANUP(col_d),
+		WDONE,
+	ENDIF(1),
+	HSEP,
+	BORDER(OKBOX, 0),
+	OKBOX(_("OK"), NULL, NULL, NULL),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
 
 void pressed_information()
 {
+	info_dd tdata;
 	char txt[256];
-	int i, j, orphans = 0, maxi;
+	int i, j, maxi, orphans;
 
-	GtkWidget *vbox4, *vbox5, *table4;//, *hs_normalize_check;
-	GtkWidget *scrolledwindow1, *viewport1, *table5;
 
-	info_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Information"), GTK_WIN_POS_CENTER, TRUE );
-
-	if ( mem_img_bpp == 1 )
-		gtk_widget_set_usize (GTK_WIDGET (info_window), -2, 400);
-
-	vbox4 = add_vbox(info_window);
-
-	table4 = gtk_table_new (3, 2, FALSE);
-	gtk_widget_show (table4);
-	add_with_frame(vbox4, _("Memory"), table4);
-	gtk_container_set_border_width (GTK_CONTAINER (table4), 5);
-
-	add_to_table( _("Total memory for main + undo images"), table4, 0, 0, 5 );
-
-	snprintf(txt, 60, "%1.1f MB", ( (float) mem_used() )/1024/1024 );
-	add_to_table( txt, table4, 0, 1, 5 );
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.indexed = mem_img_bpp == 1;
 
 	maxi = rint(((double)mem_undo_limit * 1024 * 1024) *
 		(mem_undo_common * layers_total * 0.01 + 1) /
 		(mem_width * mem_height * mem_img_bpp * (layers_total + 1)) - 1.25);
 	maxi = maxi < 0 ? 0 : maxi >= mem_undo_max ? mem_undo_max - 1 : maxi;
 
-	snprintf(txt, 60, "%i / %i / %i", mem_undo_done, mem_undo_redo, maxi);
-	add_to_table( txt, table4, 1, 1, 5 );
+	snprintf(tdata.mem_d, sizeof(tdata.mem_d), "%1.1f MB\n%d / %d / %d",
+		mem_used() / (double)(1024 * 1024),
+		mem_undo_done, mem_undo_redo, maxi);
 
-	add_to_table( _("Undo / Redo / Max levels used"), table4, 1, 0, 5 );
-
-	if ( mem_clipboard == NULL )
+	if (mem_clipboard)
 	{
-		add_to_table( _("Clipboard"), table4, 2, 0, 5 );
-		add_to_table( _("Unused"), table4, 2, 1, 5 );
-	}
-	else
-	{
-		if ( mem_clip_bpp == 1 )
-			snprintf(txt, 250, _("Clipboard = %i x %i"), mem_clip_w, mem_clip_h );
-		if ( mem_clip_bpp == 3 )
-			snprintf(txt, 250, _("Clipboard = %i x %i x RGB"), mem_clip_w, mem_clip_h );
-		add_to_table( txt, table4, 2, 0, 5 );
-		snprintf(txt, 250, "%1.1f MB", ( (float) mem_clip_w * mem_clip_h * mem_clip_bpp )/1024/1024 );
-		add_to_table( txt, table4, 2, 1, 5 );
+		tdata.clip = TRUE;
+		snprintf(tdata.clip_d, sizeof(tdata.clip_d), mem_clip_bpp == 1 ?
+			_("Clipboard = %i x %i") : _("Clipboard = %i x %i x RGB"),
+			mem_clip_w, mem_clip_h);
+		snprintf(txt, sizeof(txt), "\t%1.1f MB",
+			((size_t)mem_clip_w * mem_clip_h * mem_clip_bpp) /
+			(double)(1024 * 1024));
+		strnncat(tdata.clip_d, txt, sizeof(tdata.clip_d));
 	}
 
-	if ( mem_img_bpp == 3)		// RGB image so count different colours
+	if (mem_img_bpp == 3)	// RGB image so count different colours
 	{
-		add_to_table( _("Unique RGB pixels"), table4, 3, 0, 5 );
 		i = mem_count_all_cols();
-		if ( i<0 )
+		if (i < 0) // not enough memory
 		{
-			maxi = mem_cols_used(1024);
-			if ( maxi < 1024 ) snprintf(txt, 250, "%i", maxi);
-			else sprintf( txt, ">1023" );
-		}	else snprintf(txt, 250, "%i", i);
-		add_to_table( txt, table4, 3, 1, 5 );
+			i = mem_cols_used(1024);
+			if (i >= 1024) i = -1;
+			strcpy(tdata.rgb_d, ">1023");
+		}
+		if (i >= 0) snprintf(tdata.rgb_d, sizeof(tdata.rgb_d), "%d", i);
 	}
 
-	if ( layers_total>0 )
+	if ((tdata.layers = layers_total))
 	{
-		add_to_table( _("Layers"), table4, 4, 0, 5 );
-		snprintf(txt, 60, "%i", layers_total );
-		add_to_table( txt, table4, 4, 1, 5 );
-
-		add_to_table( _("Total layer memory usage"), table4, 5, 0, 5 );
-		snprintf(txt, 60, "%1.1f MB", ( (float) mem_used_layers() )/1024/1024 );
-		add_to_table( txt, table4, 5, 1, 5 );
+		snprintf(tdata.lr_d, sizeof(tdata.lr_d), "%d\n%1.1f MB",
+			layers_total, mem_used_layers() / (double)(1024 * 1024));
 	}
 
-	vbox5 = gtk_vbox_new (FALSE, 0);
-	gtk_widget_show (vbox5);
-	add_with_frame_x(vbox4, _("Colour Histogram"), vbox5, 4, FALSE);
+	hs_populate_rgb(tdata.rgb, tdata.rgb_sorted);
+	tdata.rgb_mem = malloc(HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp);
 
-	hs_norm = FALSE;
-	hs_rgb_mem = malloc( HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp );
-	hs_populate_rgb();
-	hs_plot_graph();
-
-	hs_drawingarea = pack(vbox5, gtk_drawing_area_new());
-	gtk_widget_show (hs_drawingarea);
-	gtk_widget_set_usize (hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H*mem_img_bpp);
-	gtk_signal_connect_object( GTK_OBJECT(hs_drawingarea), "expose_event",
-		GTK_SIGNAL_FUNC (hs_expose_graph), NULL );
-
-//	hs_normalize_check =
-	pack(vbox5, sig_toggle(_("Normalize"), FALSE, NULL,
-		GTK_SIGNAL_FUNC(hs_click_normalize)));
-
-	if ( mem_img_bpp == 1 )
+	if (mem_img_bpp == 1)
 	{
+		memx2 mem;
+
 		mem_get_histogram(CHN_IMAGE);
 
-		j = 0;
-		for ( i=0; i<mem_cols; i++ ) if ( mem_histogram[i] > 0 ) j++;
-		snprintf( txt, 250, _("Colour index totals - %i of %i used"), j, mem_cols );
-
-		scrolledwindow1 = gtk_scrolled_window_new (NULL, NULL);
-		gtk_widget_show (scrolledwindow1);
-		add_with_frame_x(vbox4, txt, scrolledwindow1, 4, TRUE);
-		gtk_container_set_border_width (GTK_CONTAINER (scrolledwindow1), 4);
-		gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow1),
-			GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-		viewport1 = gtk_viewport_new (NULL, NULL);
-		gtk_widget_show (viewport1);
-		gtk_container_add (GTK_CONTAINER (scrolledwindow1), viewport1);
-
-///	Big index table
-
-		table5 = gtk_table_new (mem_cols+2+1, 3, FALSE);
-		gtk_widget_show (table5);
-		gtk_container_add (GTK_CONTAINER (viewport1), table5);
-
-		add_to_table( _("Index"), table5, 0, 0, 5 );
-		add_to_table( _("Canvas pixels"), table5, 0, 1, 5 );
-		add_to_table( "%", table5, 0, 2, 5 );
-
-		for ( i=0; i<mem_cols; i++ )
+		memset(&mem, 0, sizeof(mem));
+		j = mem_width * mem_height;
+		for (i = 0; i < mem_cols; i++)
 		{
-			snprintf(txt, 60, "%i", i);
-			add_to_table( txt, table5, i+1, 0, 0 );
-
-			snprintf(txt, 60, "%i", mem_histogram[i]);
-			add_to_table( txt, table5, i+1, 1, 0 );
-
-			snprintf(txt, 60, "%1.1f", 100*((float) mem_histogram[i]) /
-				(mem_width*mem_height));
-			add_to_table( txt, table5, i+1, 2, 0 );
+			snprintf(txt, sizeof(txt), "%d\t%d\t%1.1f\n",
+				i, mem_histogram[i],
+				(100.0 * mem_histogram[i]) / j);
+			addstr(&mem, txt, 1);
 		}
-		add_to_table( _("Orphans"), table5, mem_cols+1, 0, 0 );
-		if ( mem_cols < 256 ) for ( i=mem_cols; i<256; i++ ) orphans = orphans +
-			mem_histogram[i];
+		for (orphans = 0 , i = mem_cols; i < 256; i++)
+			orphans += mem_histogram[i];
+		snprintf(txt, sizeof(txt), "%s\t%d\t%1.1f",
+				_("Orphans"), orphans, (100.0 * orphans) / j);
+		addstr(&mem, txt, 0);
+		tdata.col_d = mem.buf;
 
-		snprintf(txt, 60, "%i", orphans);
-		add_to_table( txt, table5, mem_cols+1, 1, 0 );
-
-		snprintf(txt, 60, "%1.1f", 100*((float) orphans) / (mem_width*mem_height));
-		add_to_table( txt, table5, mem_cols+1, 2, 0 );
+		for (j = i = 0; i < mem_cols; i++) if (mem_histogram[i]) j++;
+		snprintf(tdata.col_h = txt, sizeof(txt),
+			_("Colour index totals - %i of %i used"), j, mem_cols);
 	}
 
-	add_hseparator( vbox4, -2, 10 );
-	pack(vbox4, OK_box(0, info_window, _("OK"), GTK_SIGNAL_FUNC(delete_info),
-		NULL, NULL));
-
-	gtk_window_set_transient_for(GTK_WINDOW(info_window), GTK_WINDOW(main_window));
-	gtk_widget_show(info_window);
+	run_create(info_code, &tdata, sizeof(tdata));
 }

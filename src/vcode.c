@@ -1214,6 +1214,94 @@ static void set_path(GtkWidget *widget, int op, char *s)
 	gtk_entry_set_text(GTK_ENTRY(widget), path);
 }
 
+//	SPINPACK widget
+
+static void spinpack_evt(GtkAdjustment *adj, gpointer user_data)
+{
+	void **tp = user_data, **vp = *tp, **r = *vp;
+	void **slot, **base, **desc;
+	char *ddata;
+	int *v, idx = (tp - vp) / 2 - 1;
+
+	if (!r) return; // Lock
+	/* Locate the data */
+	slot = NEXT_SLOT(r);
+	base = slot[0];
+	ddata = GET_DDATA(base);
+	/* Locate the cell in array */
+	desc = r[1];
+	v = desc[1];
+	if ((int)desc[0] & WB_FFLAG) v = (void *)(ddata + (int)v);
+	v += idx * 3;
+	/* Read the value */
+	*v = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(*(tp - 1)));
+	/* Call the handler */
+	desc = slot[1];
+	if (desc[1]) ((evtx_fn)desc[1])(ddata, base, (int)desc[0] & WB_OPMASK,
+		slot, (void *)idx);
+}
+
+// !!! With inlining this, problem also
+GtkWidget *tlspinpack(int *np, void **pp, void **r, GtkWidget *table)
+{
+	GtkWidget *widget = NULL;
+	void **vp, **tp;
+	int wh, row, column, i, l, n;
+
+	n = (int)pp[2];
+	wh = (int)pp[3];
+	row = wh & 255;
+	column = (wh >> 8) & 255;
+	l = (wh >> 16) + 1;
+
+	vp = tp = calloc(n * 2 + 1, sizeof(void **));
+	*tp++ = r;
+
+	for (i = 0; i < n; i++ , np += 3)
+	{
+		int x = i % l, y = i / l;
+// !!! Spacing = 2
+		*tp++ = widget = spin_to_table(table, row + y, column + x, 2,
+			np[0], np[1], np[2]);
+		/* Value might get clamped, and slot is self-reading so should
+		 * reflect that */
+		np[0] = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
+		spin_connect(widget, GTK_SIGNAL_FUNC(spinpack_evt), tp);
+		*tp++ = vp;
+	}
+	gtk_object_set_user_data(GTK_OBJECT(widget), vp);
+	gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
+		GTK_SIGNAL_FUNC(free), (gpointer)vp);
+	return (widget);
+}
+
+//	TLTEXT widget
+
+// !!! Even with inlining this, some space gets wasted
+void tltext(char *v, void **pp, GtkWidget *table, int pad)
+{
+	char *tmp, *s;
+	int x, wh, row, column;
+
+	tmp = s = strdup(v);
+
+	wh = (int)pp[2];
+	row = wh & 255;
+	x = column = (wh >> 8) & 255;
+
+	while (TRUE)
+	{
+		int i = strcspn(tmp, "\t\n");
+		int c = tmp[i];
+		tmp[i] = '\0';
+		add_to_table(tmp, table, row, x++, pad);
+		if (!c) break;
+		if (c == '\n') x = column , row++;
+		tmp += i + 1;
+	}
+	free(s);
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -1289,6 +1377,8 @@ static cmdef cmddefs[] = {
 		0, USE_BORDER(TABLE) },
 	{ op_ETABLE, cm_TABLE, pk_PACKEND | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(TABLE) },
+	{ op_FTABLE, cm_TABLE, pk_PACK | pkf_STACK | pkf_SHOW | pkf_FRAME,
+		0, USE_BORDER(FRBOX) },
 // !!! Padding = 0 Border = 0
 	{ op_XTABLE, cm_TABLE, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK | pkf_SHOW },
@@ -1370,19 +1460,21 @@ static xcmdef xcmddefs[] = {
 		WBppa(0, 0, 5) },
 	{ { op_MLABELp, cm_LABELp, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
 		WBppa(0, 5, 5) },
+// !!! Padding = 0
+	{ { op_XLABEL, cm_LABEL, pk_XPACK | pkf_SHOW }, WBppa(0, 0, 5) },
 	{ { op_TLLABEL, cm_LABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 		WBppa(0, 0, 0) },
 	{ { op_TLLABELp, cm_LABELp, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 		WBppa(0, 0, 0) },
 	/* Spinsliders use border field for preset width & height of slider */
+	{ { op_TSPINSLIDE, cm_SPINSLIDE, pk_TABLE2x, USE_BORDER(SPINSLIDE) },
+		WBwh(255, 20) },
+	{ { op_TLSPINSLIDE, cm_SPINSLIDE, pk_TABLE, USE_BORDER(SPINSLIDE) } },
+	{ { op_TLSPINSLIDEs, cm_SPINSLIDE, pk_TABLE, USE_BORDER(SPINSLIDE) },
+		WBwh(150, 0) },
+	{ { op_TLSPINSLIDEx, cm_SPINSLIDE, pk_TABLEx, USE_BORDER(SPINSLIDE) } },
+	{ { op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACKp, USE_BORDER(SPINSLIDE) } },
 // !!! Padding = 0
-	{ { op_TSPINSLIDE, cm_SPINSLIDE, pk_TABLE2x }, WBwh(255, 20) },
-// !!! Padding = 5
-	{ { op_TLSPINSLIDE, cm_SPINSLIDE, pk_TABLE, 5 } },
-// !!! Padding = 0
-	{ { op_TLSPINSLIDEs, cm_SPINSLIDE, pk_TABLE }, WBwh(150, 0) },
-	{ { op_TLSPINSLIDEx, cm_SPINSLIDE, pk_TABLEx } },
-	{ { op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACK } },
 	{ { op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK } },
 	{ { op_HTSPINSLIDE, op_HTSPINSLIDE, 0 } }
 };
@@ -1647,6 +1739,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
 			}
 			break;
+		/* Add a framed scrollable table with dynamic name (ugh) */
+		case op_FSXTABLEp:
+		{
+			GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
+
+			gtk_widget_show(scroll);
+			add_with_frame(NULL, *(char **)v, scroll);
+			gtk_container_set_border_width(GTK_CONTAINER(scroll),
+				GET_BORDER(FRBOX));
+			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
+				GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+
+			widget = gtk_table_new((int)pp[1] & 0xFFFF,
+				(int)pp[1] >> 16, FALSE);
+			gtk_scrolled_window_add_with_viewport(
+				GTK_SCROLLED_WINDOW(scroll), widget);
+
+			pk = pk_XPACK | pkf_SHOW | pkf_STACK | pkf_PARENT;
+			break;
+		}
 		/* Add a box */
 		case cm_VBOX: case cm_HBOX:
 			widget = (op == cm_VBOX ? gtk_vbox_new :
@@ -1720,6 +1832,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(z >> 16) / 10.0, 0.5);
 			break;
 		}
+		/* Add to table a batch of labels generated from text string */
+		case op_TLTEXTp:
+			v = *(char **)v; // dereference & fallthrough
+		case op_TLTEXT:
+			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
+			break;
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
 		{
@@ -1750,6 +1868,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = add_a_spin(xp[0], xp[1], xp[2]);
 			break;
 		}
+		/* Add a grid of spins, fill from array of arrays */
+		// !!! Presents one widget out of all grid (the last one)
+		case op_TLSPINPACK:
+			widget = tlspinpack(v, pp - 1, r, wp[0]);
+			break;
 		/* Add a spinslider */
 		case cm_SPINSLIDE: case op_HTSPINSLIDE: case cm_SPINSLIDEa:
 		{
@@ -2162,7 +2285,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_NBOOK: case op_BOR_XSCROLL:
-		case op_BOR_SPIN: case op_BOR_LABEL: case op_BOR_TLABEL:
+		case op_BOR_SPIN: case op_BOR_SPINSLIDE:
+		case op_BOR_LABEL: case op_BOR_TLABEL:
 		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
@@ -2421,6 +2545,25 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
 				*(int *)v);
 			break;
+		case op_TLSPINPACK:
+		{
+			void **vp = gtk_object_get_user_data(GTK_OBJECT(*wdata));
+			int i, n = (int)pp[1];
+
+			*vp = NULL; // Lock
+			for (i = 0; i < n; i++)
+			{
+				GtkSpinButton *spin = GTK_SPIN_BUTTON(vp[i * 2 + 1]);
+				int *p = (int *)v + i * 3;
+
+				gtk_spin_button_set_value(spin, *p);
+				/* Value might get clamped, and slot is
+				 * self-reading so should reflect that */
+				*p = gtk_spin_button_get_value_as_int(spin);
+			}
+			*vp = wdata; // Unlock
+			break;
+		}
 		case op_TSPINSLIDE:
 		case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
 		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
@@ -2646,6 +2789,7 @@ void cmd_set2(void **slot, int v0, int v1)
 
 void cmd_set3(void **slot, int *v)
 {
+	int n = v[0];
 // !!! Support only what actually used on, and their brethren
 	switch (GET_OP(slot))
 	{
@@ -2653,13 +2797,13 @@ void cmd_set3(void **slot, int *v)
 	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
 	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
-		mt_spinslide_set_value(slot[0], v[0]);
+		mt_spinslide_set_value(slot[0], n);
 		break;
 	case op_SPIN: case op_SPINc: case op_XSPIN:
 	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 	case op_SPINa: case op_XSPINa: case op_TSPINa:
 		spin_set_range(slot[0], v[1], v[2]);
-		gtk_spin_button_set_value(slot[0], v[0]);
+		gtk_spin_button_set_value(slot[0], n);
 		break;
 	}
 }
@@ -2735,7 +2879,8 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_NBOOK: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);
 		break;
-	case op_MLABEL: case op_MLABELp: case op_TLLABEL: case op_TLLABELp:
+	case op_MLABEL: case op_MLABELp: case op_XLABEL:
+	case op_TLLABEL: case op_TLLABELp:
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
