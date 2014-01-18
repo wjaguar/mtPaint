@@ -248,6 +248,10 @@ void run_destroy(void **wdata);
 #define PREV_SLOT(V) ((V) - 2)
 #define SLOT_N(V,N) ((V) + (N) * 2)
 
+//	Install event handler
+void add_click(void **r, GtkWidget *widget);
+void add_del(void **r, GtkWidget *window);
+
 //	From event to its originator
 void **origin_slot(void **slot);
 
@@ -314,12 +318,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WSHOW WBh(WSHOW, 0)
 #define WDIALOG(V) WBhf(WDIALOG, 1), WBfield(V)
 #define WDONE WBh(WDONE, 0)
-/* !!! This block holds 1 nested EVENT block */
-#define MAINWINDOW(NM,ICN,HC,W,H) WBr2h(MAINWINDOW, 3 + 2), (NM), (ICN), \
-	WBwh(W, H), EVENT(CANCEL, HC)
+#define MAINWINDOW(NM,ICN,W,H) WBr2h(MAINWINDOW, 3), (NM), (ICN), WBwh(W, H)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
-/* !!! This block holds 1 nested EVENT block */
-#define WINDOWd(NM, HC) WBr2h(WINDOW, 1 + 2), (NM), EVENT(CANCEL, HC)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
 /* !!! Note: string "V" is in system encoding */

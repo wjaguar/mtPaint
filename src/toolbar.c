@@ -1008,7 +1008,8 @@ void **create_settings_box()
 #define _(X) X
 
 static void *sbar_code[] = {
-	WPWHEREVER, WINDOWd(_("Settings Toolbar"), toolbar_settings_exit),
+	WPWHEREVER, WINDOW(_("Settings Toolbar")),
+		EVENT(CANCEL, toolbar_settings_exit),
 	WXYWH("toolbar_settings", 0, 0),
 	REMOUNTv(settings_dock),
 	WSHOW

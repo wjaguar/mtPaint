@@ -20,6 +20,7 @@
 #include "global.h"
 #include "mygtk.h"
 #include "fpick.h"
+#include "vcode.h"
 
 #ifdef U_FPICK_MTPAINT		/* mtPaint fpicker */
 
@@ -1023,7 +1024,7 @@ static gboolean fpick_entry_key(GtkWidget *widget, GdkEventKey *event,
 
 static void fpick_destroy(GtkObject *fp, gpointer user_data);
 
-GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
+GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 {
 	static const short col_width[FPICK_CLIST_COLS] = {250, 64, 80, 150};
 	char txt[64], *col_titles[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
@@ -1031,7 +1032,8 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 	GtkWidget *vbox1, *hbox1, *scrolledwindow1, *temp_hbox;
 	GtkAccelGroup* ag = gtk_accel_group_new();
 	fpicker *res = calloc(1, sizeof(fpicker));
-	int i, w, l;
+	char *title = *(char **)(ddata + (int)pp[2]);
+	int i, w, l, flags = *(int *)(ddata + (int)pp[3]);
 
 	if (!res) return NULL;
 
@@ -1215,6 +1217,13 @@ GtkWidget *fpick_create(char *title, int flags)		// Initialize file picker
 		gtk_clist_set_column_width(GTK_CLIST(res->clist), i, w);
 	}
 
+	add_click(NEXT_SLOT(r), res->ok_button);
+	add_click(SLOT_N(r, 2), res->cancel_button);
+	add_del(SLOT_N(r, 2), res->window);
+	*--*wpp = hbox1 = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(hbox1);
+	pack(res->main_vbox, hbox1);
+
 	return (res->window);
 }
 
@@ -1299,19 +1308,6 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc handler,
-	gpointer ok_data, gpointer cancel_data)
-{
-	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
-
-	gtk_signal_connect(GTK_OBJECT(fpick->ok_button),
-		"clicked", handler, ok_data);
-	gtk_signal_connect(GTK_OBJECT(fpick->cancel_button),
-		"clicked", handler, cancel_data);
-	delete_to_click(fpick->window, fpick->cancel_button);
-	pack(fpick->main_vbox, xtra);
-}
-
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 {
 	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
@@ -1336,10 +1332,16 @@ void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 
 #ifdef U_FPICK_GTKFILESEL		/* GtkFileSelection based dialog */
 
-GtkWidget *fpick_create(char *title, int flags)
+GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 {
-	GtkWidget *fp = gtk_file_selection_new(title);
+#if GTK_MAJOR_VERSION == 1
+	GtkAccelGroup* ag = gtk_accel_group_new();
+#endif
+	GtkWidget *box, *fp;
+	int flags = *(int *)(ddata + (int)pp[3]);
 
+	fp = gtk_file_selection_new(*(char **)(ddata + (int)pp[2]));
+	gtk_window_set_modal(GTK_WINDOW(fp), TRUE);
 	if ( flags & FPICK_DIRS_ONLY )
 	{
 		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fp)->selection_entry));
@@ -1347,31 +1349,20 @@ GtkWidget *fpick_create(char *title, int flags)
 			FALSE);		// Don't let the user select files
 	}
 
-	return (fp);
-}
+	add_click(NEXT_SLOT(r), GTK_FILE_SELECTION(fp)->ok_button);
+	add_click(SLOT_N(r, 2), GTK_FILE_SELECTION(fp)->cancel_button);
+	add_del(SLOT_N(r, 2), fp);
 
-void fpick_setup(GtkWidget *fp, GtkWidget *xtra, GtkSignalFunc handler,
-	gpointer ok_data, gpointer cancel_data)
-{
-#if GTK_MAJOR_VERSION == 1
-	GtkAccelGroup* ag = gtk_accel_group_new();
-#endif
-
-	gtk_signal_connect(GTK_OBJECT(GTK_FILE_SELECTION(fp)->ok_button),
-		"clicked", handler, ok_data);
-
-	gtk_signal_connect(GTK_OBJECT(GTK_FILE_SELECTION(fp)->cancel_button),
-		"clicked", handler, cancel_data);
-
-	delete_to_click(fp, GTK_FILE_SELECTION(fp)->cancel_button);
-
-	pack(GTK_FILE_SELECTION(fp)->main_vbox, xtra);
+	*--*wpp = box = gtk_hbox_new(FALSE, 0);
+	gtk_widget_show(box);
+	pack(GTK_FILE_SELECTION(fp)->main_vbox, box);
 
 #if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
 	gtk_widget_add_accelerator(GTK_FILE_SELECTION(fp)->cancel_button,
 		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
 	gtk_window_add_accel_group(GTK_WINDOW(fp), ag);
 #endif
+	return (fp);
 }
 
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)

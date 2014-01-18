@@ -88,7 +88,7 @@ static gboolean expose_tablet_preview(GtkWidget *widget, GdkEventExpose *event)
 }
 
 
-static void delete_inputd()
+static gboolean delete_inputd()
 {
 	int i, j;
 	char txt[32];
@@ -118,6 +118,7 @@ static void delete_inputd()
 
 	gtk_widget_destroy(inputd);
 	inputd = NULL;
+	return (TRUE);
 }
 
 static void tablet_update_pressure( double pressure )
@@ -203,10 +204,11 @@ static void conf_tablet()
 	close = GTK_INPUT_DIALOG(inputd)->close_button;
 	gtk_signal_connect(GTK_OBJECT(close), "clicked",
 		GTK_SIGNAL_FUNC(delete_inputd), NULL);
+	gtk_signal_connect(GTK_OBJECT(inputd), "delete_event",
+		GTK_SIGNAL_FUNC(delete_inputd), NULL);
 	ag = gtk_accel_group_new();
 	gtk_widget_add_accelerator(close, "clicked",
 		ag, GDK_Escape, 0, (GtkAccelFlags)0);
-	delete_to_click(inputd, close);
 
 	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
 		GTK_SIGNAL_FUNC(tablet_enable_device), NULL);

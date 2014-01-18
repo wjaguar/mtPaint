@@ -150,13 +150,13 @@ static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user
 	return (!!res);
 }
 
-static void add_click(void **r, void **pp, GtkWidget *widget, int destroy)
+void add_click(void **r, GtkWidget *widget)
 {
-	if (pp[1] || destroy) gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+	gtk_signal_connect(GTK_OBJECT(widget), "clicked",
 		GTK_SIGNAL_FUNC(get_evt_1_d), r);
 }
 
-static void add_del(void **r, GtkWidget *window)
+void add_del(void **r, GtkWidget *window)
 {
 	gtk_signal_connect(GTK_OBJECT(window), "delete_event",
 		GTK_SIGNAL_FUNC(get_evt_del), r);
@@ -1640,8 +1640,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
 //			gdk_pixmap_unref(icon_pix);
 
-			add_del(NEXT_SLOT(r), window);
-
 			pk = pkf_STACK; // bin container
 			break;
 		}
@@ -1652,18 +1650,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL,
 				*(char *)v ? _(v) : v, wpos, op != op_WINDOW);
 			*--wp = add_vbox(window);
-			if (ref > 1) add_del(NEXT_SLOT(r), window);
 			break;
-		/* Create a fileselector window, and put a horizontal box inside */
+		/* Create a fileselector window (with horizontal box inside) */
 		case op_FPICKpm:
-			widget = window = fpick_create(
-				*(char **)((char *)ddata + (int)pp[1]),
-				*(int *)((char *)ddata + (int)pp[2]));
-			gtk_window_set_modal(GTK_WINDOW(window), TRUE);
-			*--wp = gtk_hbox_new(FALSE, 0);
-			gtk_widget_show(wp[0]);
-			fpick_setup(window, wp[0], GTK_SIGNAL_FUNC(get_evt_1_d),
-				NEXT_SLOT(r), SLOT_N(r, 2));
+			widget = window = fpick(&wp, ddata, pp - 1, r);
 			/* Initialize */
 			fpick_set_filename(window, v, FALSE);
 			break;
@@ -2021,6 +2011,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case cm_OKBOX: case op_EOKBOX: case op_UOKBOX:
 		{
 			GtkWidget *ok_bt, *cancel_bt, *box;
+			void **cancel_r;
 
 			ag = gtk_accel_group_new();
  			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
@@ -2040,7 +2031,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GET_BORDER(BUTTON));
 			gtk_widget_show(ok_bt);
 			/* OK-event */
-			add_click(NEXT_SLOT(r), pp + 2, ok_bt, TRUE);
+			add_click(cancel_r = NEXT_SLOT(r), ok_bt);
 			if (pp[1])
 			{
 				cancel_bt = xpack(widget,
@@ -2049,8 +2040,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_CONTAINER(cancel_bt), GET_BORDER(BUTTON));
 				gtk_widget_show(cancel_bt);
 				/* Cancel-event */
-				add_click(SLOT_N(r, 2), pp + 4, cancel_bt, TRUE);
+				add_click(cancel_r = SLOT_N(r, 2), cancel_bt);
 			}
+			add_del(cancel_r, window);
 			xpack(widget, ok_bt);
 
 			gtk_widget_add_accelerator(cancel_bt, "clicked", ag,
@@ -2059,7 +2051,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GDK_Return, 0, (GtkAccelFlags)0);
 			gtk_widget_add_accelerator(ok_bt, "clicked", ag,
 				GDK_KP_Enter, 0, (GtkAccelFlags)0);
-			delete_to_click(window, cancel_bt);
 			break;
 		}
 		/* Add a clickable button */
@@ -2077,10 +2068,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_Escape, 0, (GtkAccelFlags)0);
-				delete_to_click(window, widget);
+				add_del(NEXT_SLOT(r), window);
 			}
 			/* Click-event */
-			add_click(NEXT_SLOT(r), pp + 1, widget, op != cm_BUTTON);
+			if ((op != cm_BUTTON) || pp[1 + 1])
+				add_click(NEXT_SLOT(r), widget);
 			break;
 		}
 		/* Add a toggle button to OK-box */
@@ -2222,6 +2214,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
 		case op_RTXTCOLUMN: case op_CHKCOLUMNi0:
 			columns[ncol++] = r;
+			widget = NULL;
+			break;
+		/* Install destroy event handler (onto window) */
+		case op_EVT_CANCEL:
+			add_del(r, window);
 			widget = NULL;
 			break;
 		/* Install key event handler */

@@ -5062,7 +5062,7 @@ static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
 
 #define WBbase main_dd
 static void *main_code[] = {
-	MAINWINDOW(MT_VERSION, icon_xpm, delete_event, 100, 100),
+	MAINWINDOW(MT_VERSION, icon_xpm, 100, 100), EVENT(CANCEL, delete_event),
 	WXYWH("window", 630, 400),
 	REF(dock), DOCK("dockSize"),
 	EXEC(create_internals), WDONE, // left pane

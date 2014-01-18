@@ -1142,7 +1142,7 @@ void **create_layers_box()
 }
 
 static void *layersw_code[] = {
-	WPWHEREVER, WINDOWd("", delete_layers_window),
+	WPWHEREVER, WINDOW(""), EVENT(CANCEL, delete_layers_window),
 	WXYWH("layers", 400, 400),
 	REMOUNTv(layers_dock),
 	WSHOW

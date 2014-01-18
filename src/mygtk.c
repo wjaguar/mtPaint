@@ -24,7 +24,6 @@
 #include "mainwindow.h"
 #include "canvas.h"
 #include "inifile.h"
-#include "fpick.h"
 
 #if GTK_MAJOR_VERSION == 1
 #include <gtk/gtkprivate.h>
