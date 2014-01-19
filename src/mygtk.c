@@ -1127,8 +1127,10 @@ void paned_mouse_fix(GtkWidget *widget)
 // Init-time bugfixes
 
 /* Bugs: GtkViewport size request in GTK+1; GtkHScale breakage in Smooth Theme
- * Engine in GTK+1; mixing up keys in GTK+2/Windows; opaque focus rectangle in
- * Gtk-Qt theme engine (v0.8) in GTK+2/X */
+ * Engine in GTK+1; GtkListItem and GtkCList stealing Esc key in GTK+1; GtkEntry
+ * and GtkSpinButton stealing Enter key and mishandling keypad Enter key in
+ * GTK+1; mixing up keys in GTK+2/Windows; opaque focus rectangle in Gtk-Qt theme
+ * engine (v0.8) in GTK+2/X */
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -1185,6 +1187,14 @@ typedef struct {
   guint refcount;
 } GtkThemeEnginePrivate;
 
+/* This is for routing Enter keys around GtkEntry's default handler */
+static gboolean (*ekeypress)(GtkWidget *widget, GdkEventKey *event);
+static gboolean gtk_entry_key_press_fixed(GtkWidget *widget, GdkEventKey *event)
+{
+	if (event && ((event->keyval == GDK_Return) ||
+		(event->keyval == GDK_KP_Enter))) return (FALSE);
+	return (ekeypress(widget, event));
+}
 
 void gtk_init_bugfixes()
 {
@@ -1208,6 +1218,15 @@ void gtk_init_bugfixes()
 		wc->size_request = gtk_hscale_size_request_smooth_fixed;
 	}
 	gtk_object_sink(GTK_OBJECT(hs)); /* Destroy a floating-ref thing */
+
+	gtk_binding_entry_remove(gtk_binding_set_by_class(gtk_type_class(
+		GTK_TYPE_CLIST)), GDK_Escape, 0);
+	gtk_binding_entry_remove(gtk_binding_set_by_class(gtk_type_class(
+		GTK_TYPE_LIST_ITEM)), GDK_Escape, 0);
+
+	wc = gtk_type_class(GTK_TYPE_ENTRY);
+	ekeypress = wc->key_press_event;
+	wc->key_press_event = gtk_entry_key_press_fixed;
 }
 
 #elif defined GDK_WINDOWING_WIN32

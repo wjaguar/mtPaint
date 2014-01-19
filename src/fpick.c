@@ -880,12 +880,6 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 		return (TRUE);
 	case GDK_Return: case GDK_KP_Enter:
 		break;
-#if GTK_MAJOR_VERSION == 1
-	/* !!! Just having ESC as accelerator isn't enough in GTK+1 */
-	case GDK_Escape:
-		gtk_button_clicked(GTK_BUTTON(fp->cancel_button));
-		return (TRUE);
-#endif
 	default: return (FALSE);
 	}
 

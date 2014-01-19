@@ -32,6 +32,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
 	* BUGFIX - Problem with command line window wrongly reacting to mouse in some cases is now eliminated
+	* BUGFIX - Escape and Enter keys now work properly in all dialogs in GTK+1
 
 3.40	2011-12-30
 
