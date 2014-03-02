@@ -1207,10 +1207,10 @@ GtkWidget *pathbox(void **r)
 }
 
 /* Set value of path widget */
-static void set_path(GtkWidget *widget, int op, char *s)
+static void set_path(GtkWidget *widget, char *s)
 {
 	char path[PATHTXT];
-	gtkuncpy(path, op == op_PATHs ? inifile_get(s, "") : s, PATHTXT);
+	gtkuncpy(path, s, PATHTXT);
 	gtk_entry_set_text(GTK_ENTRY(widget), path);
 }
 
@@ -1956,13 +1956,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TPENTRY:
 			widget = gtk_entry_new_with_max_length((int)pp[1]);
 // !!! Padding = 0
-			set_path(widget, op, v);
+			set_path(widget, v);
 			pk = pk_TABLE2 | pkf_SHOW;
 			break;
 		/* Add a path box to table */
-		case op_PATH: case op_PATHs:
+		case op_PATHs:
+			v = inifile_get(v, ""); // read and fallthrough
+		case op_PATH:
 			widget = pathbox(r);
-			set_path(widget, op, v);
+			set_path(widget, v);
 			pk = pk_PACK | pkf_SHOW | pkf_PARENT | pkf_FRAME;
 			break;
 		/* Add a text widget, fill from drop-away buffer at pointer */
@@ -2592,8 +2594,10 @@ void cmd_reset(void **slot, void *ddata)
 			// Replace transient buffer - it may get freed on return
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
-		case op_TPENTRY: case op_PATH: case op_PATHs:
-			set_path(*wdata, op, v);
+		case op_PATHs:
+			v = inifile_get(v, ""); // read and fallthrough
+		case op_TPENTRY: case op_PATH:
+			set_path(*wdata, v);
 			break;
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
@@ -2884,7 +2888,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 		gtk_entry_set_text(GTK_ENTRY(slot[0]), res); break;
 	case op_TPENTRY: case op_PATH: case op_PATHs:
-		set_path(slot[0], op, res);
+		set_path(slot[0], res);
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(GTK_LIST(slot[0]),
