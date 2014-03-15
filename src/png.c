@@ -7287,8 +7287,12 @@ static void warn_miss(int miss, int total, int ftype)
 {
 	char *txt = g_strdup_printf(_("%d out of %d frames could not be saved as %s - saved as PNG instead"),
 		miss, total, file_formats[ftype].name);
+#undef _
+#define _(X) X
 	alert_box(_("Warning"), txt, NULL);
 	g_free(txt);
+#undef _
+#define _(X) __(X)
 }
 
 int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype,

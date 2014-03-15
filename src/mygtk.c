@@ -24,6 +24,7 @@
 #include "mainwindow.h"
 #include "canvas.h"
 #include "inifile.h"
+#include "vcode.h"
 
 #if GTK_MAJOR_VERSION == 1
 #include <gtk/gtkprivate.h>
@@ -224,63 +225,61 @@ void progress_end()			// Close progress window
 
 ////	ALERT BOX
 
-static int alert_result;
+/* !!! Only up to 2 choices for now */
+typedef struct {
+	char *title, *what;
+	char *cancel, *ok;
+	int have2;
+	void **cb, **res;
+} alert_dd;
 
-static void alert_reply(gpointer data)
-{
-	if (!alert_result) alert_result = (int)data;
-}
+#undef _
+#define _(X) X
+
+#define WBbase alert_dd
+static void *alert_code[] = {
+	DIALOGpm(title),
+	WLABELp(what),
+	WDONE, // vbox
+	BORDER(BUTTON, 2),
+	REF(cb), CANCELBTNp(cancel, dialog_event),
+	IF(have2), BUTTONp(ok, dialog_event),
+	RAISED, WDIALOG(res)
+};
+#undef WBbase
 
 int alert_box(char *title, char *message, char *text1, ...)
 {
+	alert_dd *dt, tdata = { title, message, _("OK"), NULL, 0 };
 	va_list args;
-	GtkWidget *alert, *button, *label;
 	char *txt;
-	int i = 0;
-	GtkAccelGroup* ag = gtk_accel_group_new();
+	void **dd;
+	int res;
 
 	/* This function must be immune to pointer grabs */
 	release_grab();
 
-	alert = gtk_dialog_new();
-	gtk_window_set_title( GTK_WINDOW(alert), title );
-	gtk_window_set_modal( GTK_WINDOW(alert), TRUE );
-	gtk_window_set_position( GTK_WINDOW(alert), GTK_WIN_POS_CENTER );
-	gtk_container_set_border_width( GTK_CONTAINER(alert), 6 );
-	
-	label = gtk_label_new( message );
-	gtk_label_set_line_wrap( GTK_LABEL(label), TRUE );
-	gtk_box_pack_start( GTK_BOX(GTK_DIALOG(alert)->vbox), label, TRUE, FALSE, 8 );
-	gtk_widget_show( label );
-
-	txt = text1 ? text1 : _("OK");
-	va_start(args, text1);
-	while (TRUE)
+	if (text1)
 	{
-		button = add_a_button(txt, 2, GTK_DIALOG(alert)->action_area, TRUE);
-		if (!i) gtk_widget_add_accelerator(button, "clicked", ag,
-			GDK_Escape, 0, (GtkAccelFlags)0);
-		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(alert_reply), (gpointer)(++i));
-		if (!text1) break;
-		if (!(txt = va_arg(args, char *))) break;
+		tdata.cancel = text1;
+		va_start(args, text1);
+		if ((txt = va_arg(args, char *)))
+		{
+			tdata.ok = txt;
+			tdata.have2 = TRUE;
+		}
+		va_end(args);
 	}
-	va_end(args);
+	dd = run_create(alert_code, &tdata, sizeof(tdata)); // run dialog
+	dt = GET_DDATA(dd);
+	res = origin_slot(dt->res) == dt->cb ? 1 : 2;
+	run_destroy(dd);
 
-	gtk_signal_connect_object(GTK_OBJECT(alert), "destroy",
-		GTK_SIGNAL_FUNC(alert_reply), (gpointer)(++i));
-	gtk_window_set_transient_for( GTK_WINDOW(alert), GTK_WINDOW(main_window) );
-	gtk_widget_show(alert);
-	gdk_window_raise(alert->window);
-	alert_result = 0;
-	gtk_window_add_accel_group(GTK_WINDOW(alert), ag);
-
-	while (!alert_result) gtk_main_iteration();
-	if (alert_result != i) gtk_widget_destroy(alert);
-	else alert_result = 1;
-
-	return (alert_result);
+	return (res);
 }
+
+#undef _
+#define _(X) __(X)
 
 // Add page to notebook
 

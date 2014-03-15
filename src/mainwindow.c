@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -57,16 +59,10 @@ const unsigned char greyz[2] = {GREY_W, GREY_B}; // For opacity squares
 char *channames[NUM_CHANNELS + 1], *allchannames[NUM_CHANNELS + 1];
 char *cspnames[NUM_CSPACES];
 
-#undef _
-#define _(X) X
-
 char *channames_[NUM_CHANNELS + 1] =
 		{ _("Image"), _("Alpha"), _("Selection"), _("Mask"), NULL };
 char *cspnames_[NUM_CSPACES] =
 		{ _("RGB"), _("sRGB"), "LXN" };
-
-#undef _
-#define _(X) __(X)
 
 ///	INIFILE ENTRY LISTS
 
@@ -345,7 +341,7 @@ static void pressed_remove_duplicates()
 		alert_box(_("Error"), _("The palette does not contain 2 colours that have identical RGB values"), NULL);
 		return;
 	}
-	mess = g_strdup_printf(_("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
+	mess = g_strdup_printf(__("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
 	if (alert_box(_("Warning"), mess, _("Yes"), _("No"), NULL) == 1)
 	{
 		spot_undo(UNDO_XPAL);
@@ -535,18 +531,18 @@ int gui_save(char *filename, ls_settings *settings)
 		char *fform = NULL, *fname = file_formats[settings->ftype].name;
 
 		/* RGB to indexed (or to unsaveable) */
-		if (mem_img_bpp == 3) fform = _("RGB");
+		if (mem_img_bpp == 3) fform = __("RGB");
 		/* Indexed to RGB, or to unsaveable format */
 		else if (!(fflags & FF_IDX) || (fflags & FF_NOSAVE))
-			fform = _("indexed");
+			fform = __("indexed");
 		/* More than 16 colors */
 		else if (fflags & FF_16) maxc = 16;
 		/* More than 2 colors */
 		else maxc = 2;
 		/* Build message */
-		if (fform) mess = g_strdup_printf(_("You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."),
+		if (fform) mess = g_strdup_printf(__("You are trying to save an %s image to an %s file which is not possible.  I would suggest you save with a PNG extension."),
 			fform, fname);
-		else mess = g_strdup_printf(_("You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."),
+		else mess = g_strdup_printf(__("You are trying to save an %s file with a palette of more than %d colours.  Either use another format or reduce the palette to %d colours."),
 			fname, maxc, maxc);
 	}
 	else
@@ -575,7 +571,7 @@ int gui_save(char *filename, ls_settings *settings)
 		if (res == -1)
 		{
 			f8 = gtkuncpy(NULL, filename, 0);
-			mess = g_strdup_printf(_("Unable to save file: %s"), f8);
+			mess = g_strdup_printf(__("Unable to save file: %s"), f8);
 			g_free(f8);
 		}
 		else if ((res == WRONG_FORMAT) && (settings->ftype == FT_XPM))
@@ -1202,10 +1198,10 @@ void string_init()
 	int i;
 
 	for (i = 0; i < NUM_CHANNELS + 1; i++)
-		allchannames[i] = channames[i] = _(channames_[i]);
+		allchannames[i] = channames[i] = __(channames_[i]);
 	channames[CHN_IMAGE] = "";
 	for (i = 0; i < NUM_CSPACES; i++)
-		cspnames[i] = _(cspnames_[i]);
+		cspnames[i] = __(cspnames_[i]);
 }
 
 static void toggle_dock(int state);
@@ -4276,7 +4272,7 @@ static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 			sprintf(buf, "%sitem%d", s, nsep++);
 			s = buf;
 		}
-		else s = _(s); /* Translate an existing name */
+		else s = __(s); /* Translate an existing name */
 
 		/* Text up to the last "/" gets copied from the previous item,
 		 * so that untranslated items in submenus do not mess up the
@@ -4531,9 +4527,6 @@ static void pressed_sel_ramp(int vert)
 
 	update_stuff(UPD_IMG);
 }
-
-#undef _
-#define _(X) X
 
 /* !!! Keep MENU_RESIZE_MAX larger than number of resize-enabled items */
 
@@ -4815,9 +4808,6 @@ static menu_item main_menu[] = {
 	{ NULL, 0 }
 	};
 
-#undef _
-#define _(X) __(X)
-
 static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
 	GtkRequisition req;
@@ -5020,7 +5010,7 @@ static void **finish_dock(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-static int cline_keypress(void *ddata, void **wdata, int what, void **where,
+static int cline_keypress(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
 	return (check_zoom_keys(wtf_pressed_(keydata))); // Check HOME/zoom keys
@@ -5057,9 +5047,6 @@ static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
 	gtk_widget_set_sensitive(menu_widgets[MENU_DOCK], dstate);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase main_dd
 static void *main_code[] = {
 	MAINWINDOW(MT_VERSION, icon_xpm, 100, 100), EVENT(CANCEL, delete_event),
@@ -5093,9 +5080,6 @@ static void *main_code[] = {
 	RAISED, WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void main_init()
 {
@@ -5187,8 +5171,8 @@ void update_titlebar()		// Update filename in titlebar
 	name = mem_filename;
 
 	snprintf(txt, 290, "%s %s %s", MT_VERSION,
-		changed ? _("(Modified)") : "-",
-		name ? gtkuncpy(txt2, name, PATHTXT) : _("Untitled"));
+		changed ? __("(Modified)") : "-",
+		name ? gtkuncpy(txt2, name, PATHTXT) : __("Untitled"));
 
 	gtk_window_set_title(GTK_WINDOW(main_window), txt);
 }

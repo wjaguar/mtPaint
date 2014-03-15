@@ -17,6 +17,10 @@
 	along with mtPaint in the file COPYING.
 */
 
+#include "global.h"
+#undef _
+#define _(X) X
+
 #include "mygtk.h"
 #include "memory.h"
 #include "ani.h"
@@ -26,7 +30,6 @@
 #include "otherwindow.h"
 #include "canvas.h"
 #include "inifile.h"
-#include "global.h"
 #include "viewer.h"
 #include "channels.h"
 #include "toolbar.h"
@@ -68,7 +71,7 @@ static void layer_clear_slot(int l, int visible)
 void layers_init()
 {
 	layer_clear_slot(0, TRUE);
-	strncpy0(layer_table[0].name, _("Background"), LAYER_NAMELEN);
+	strncpy0(layer_table[0].name, __("Background"), LAYER_NAMELEN);
 	layer_table[0].image = calloc(1, sizeof(layer_image));
 }
 
@@ -133,9 +136,9 @@ static void layers_update_titlebar()		// Update filename in titlebar
 	if (!layers_window_) return;	// Don't bother if window is not showing
 
 	gtkuncpy(txt2, layers_filename, PATHTXT);
-	snprintf(txt, 290, "%s %s %s", _("Layers"),
-		layers_changed ? _("(Modified)") : "-",
-		txt2[0] ? txt2 : _("Untitled"));
+	snprintf(txt, 290, "%s %s %s", __("Layers"),
+		layers_changed ? __("(Modified)") : "-",
+		txt2[0] ? txt2 : __("Untitled"));
 	gtk_window_set_title(GTK_WINDOW(GET_REAL_WINDOW(layers_window_)), txt);
 }
 
@@ -310,7 +313,7 @@ void layer_press_delete()
 	int i;
 
 	if (!layer_selected) return; // Deleting background is forbidden
-	snprintf(txt, 256, _("Do you really want to delete layer %i (%s) ?"),
+	snprintf(txt, 256, __("Do you really want to delete layer %i (%s) ?"),
 		layer_selected, layer_table[layer_selected].name );
 
 	i = alert_box(_("Warning"), txt, _("No"), _("Yes"), NULL);
@@ -523,7 +526,7 @@ int load_layers( char *file_name )
 
 	if (lfail) /* There were failures */
 	{
-		snprintf(tin, 300, _("%d layers failed to load"), lfail);
+		snprintf(tin, 300, __("%d layers failed to load"), lfail);
 		alert_box(_("Error"), tin, NULL);
 	}
 
@@ -801,7 +804,7 @@ int save_layers( char *file_name )
 	return 1;		// Success
 fail:
 	c = gtkuncpy(NULL, layers_filename, 0);
-	msg = g_strdup_printf(_("Unable to save file: %s"), c);
+	msg = g_strdup_printf(__("Unable to save file: %s"), c);
 	alert_box(_("Error"), msg, NULL);
 	g_free(msg);
 	g_free(c);
@@ -1051,9 +1054,6 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	if (upd) update_stuff(upd);
 }
 
-#undef _
-#define _(X) X
-
 static toolbar_item layer_bar[] = {
 	{ _("New Layer"), -1, LTB_NEW, 0, XPM_ICON(new), ACT_LR_ADD, LR_NEW },
 	{ _("Raise"), -1, LTB_RAISE, 0, XPM_ICON(up), ACT_LR_SHIFT, 1 },
@@ -1063,9 +1063,6 @@ static toolbar_item layer_bar[] = {
 	{ _("Delete Layer"), -1, LTB_DEL, 0, XPM_ICON(cut), ACT_LR_DEL, 0 },
 	{ _("Close Layers Window"), -1, LTB_CLOSE, 0, XPM_ICON(close), DLG_LAYERS, 1 },
 	{ NULL }};
-
-#undef _
-#define _(X) __(X)
 
 /* Create toolbar for layers window */
 static void **layer_toolbar(void **r, GtkWidget ***wpp, void **wdata)
@@ -1085,9 +1082,6 @@ static void **layer_toolbar(void **r, GtkWidget ***wpp, void **wdata)
 
 	return (r);
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase layers_dd
 static void *layers_code[] = {
@@ -1123,9 +1117,6 @@ static void *layers_code[] = {
 	WEND
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void **create_layers_box()
 {

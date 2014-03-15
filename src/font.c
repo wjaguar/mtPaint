@@ -20,6 +20,8 @@
 #ifdef U_FREETYPE
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -925,7 +927,7 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 		dirs[i] = inifile_get( buf, "" );
 	}
 
-	progress_init( _("Creating Font Index"), 0 );
+	progress_init( __("Creating Font Index"), 0 );
 	font_index_create( filename, dirs );
 	progress_end();
 }
@@ -1510,9 +1512,6 @@ static void **create_font_pad(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase font_dd
 static void *font_code[] = {
 	WPWHEREVER, WINDOWm(_("Paste Text")),
@@ -1609,9 +1608,6 @@ static void *font_code[] = {
 };
 #undef WBbase
 
-#undef _
-#define _(X) __(X)
-
 void pressed_mt_text()
 {
 	font_dd tdata;
@@ -1620,7 +1616,7 @@ void pressed_mt_text()
 
 	memset(&tdata, 0, sizeof(tdata));
 	tdata.fontsize = font_size; // !!! is reset
-	tdata.text = inifile_get("textString", _("Enter Text Here"));
+	tdata.text = inifile_get("textString", __("Enter Text Here"));
 	tdata.bkg[0] = font_bkg % mem_cols;
 	tdata.bkg[1] = 0;
 	tdata.bkg[2] = mem_cols - 1;

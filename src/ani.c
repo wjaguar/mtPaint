@@ -22,6 +22,8 @@
 #include <errno.h>
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -656,9 +658,6 @@ static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)
 	}
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase apview_dd
 static void *apview_code[] = {
 	WPWHEREVER, WINDOWm(_("Animation Preview")),
@@ -672,9 +671,6 @@ static void *apview_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void ani_but_preview(void **awin)
 {
@@ -775,7 +771,7 @@ static void create_frames_ani()
 		settings.rgb_trans = tr < 0 ? -1 : PNG_2_INT(image->pal[tr]);
 	}
 
-	progress_init(_("Creating Animation Frames"), 1);
+	progress_init(__("Creating Animation Frames"), 1);
 	for ( k=a; k<=b; k++ )			// Create each frame and save it as a PNG or GIF image
 	{
 		if (progress_update(b == a ? 0.0 : (k - a) / (float)(b - a)))
@@ -962,9 +958,6 @@ static int do_set_key_frame(spin1_dd *dt, void **wdata)
 	return (TRUE);
 }
 
-#undef _
-#define _(X) X
-
 void pressed_set_key_frame()
 {
 	spin1_dd tdata = {
@@ -972,12 +965,6 @@ void pressed_set_key_frame()
 		{ ani_frame1, ani_frame1, ani_frame2 } };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
-
-#undef _
-#define _(X) X
 
 #define WBbase anim_dd
 static void *anim_code[] = {
@@ -1032,9 +1019,6 @@ static void *anim_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_animate_window()
 {

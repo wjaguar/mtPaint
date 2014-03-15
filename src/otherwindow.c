@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -250,9 +252,6 @@ static void create_new(newwin_dd *dt, void **wdata)
 	run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 static char *newwin_txt[] = { _("24 bit RGB"), _("Greyscale"),
 	_("Indexed Palette"), _("From Clipboard"), _("Grab Screenshot") };
 
@@ -272,9 +271,6 @@ static void *newwin_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void generic_new_window(int type)	// 0=New image, 1=New layer
 {
@@ -438,7 +434,7 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 
 	if (pat_window) return; // Already displayed
 	pat_brush = typ;
-	pat_window = add_a_window(GTK_WINDOW_POPUP, _("Pattern Chooser"),
+	pat_window = add_a_window(GTK_WINDOW_POPUP, __("Pattern Chooser"),
 		GTK_WIN_POS_MOUSE, TRUE);
 	gtk_container_set_border_width(GTK_CONTAINER(pat_window), 4);
 
@@ -502,9 +498,6 @@ static int do_add_cols(spin1_dd *dt, void **wdata)
 	return (TRUE);
 }
 
-#undef _
-#define _(X) X
-
 void pressed_add_cols()
 {
 	static spin1_dd tdata = {
@@ -513,9 +506,6 @@ void pressed_add_cols()
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 /* Generic code to handle UI needs of common image transform tasks */
 
 static void do_filterwindow(filterwindow_dd *dt, void **wdata)
@@ -523,9 +513,6 @@ static void do_filterwindow(filterwindow_dd *dt, void **wdata)
 	if (dt->evt(dt, wdata)) run_destroy(wdata);
 	update_stuff(UPD_IMG);
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase filterwindow_dd
 void *filterwindow_code[] = {
@@ -544,9 +531,6 @@ void *filterwindow_code[] = {
 void *spin1_code[] = { SPINa(n), RET };
 #undef WBbase
 
-#undef _
-#define _(X) __(X)
-
 ///	BACTERIA EFFECT
 
 static int do_bacteria(spin1_dd *dt, void **wdata)
@@ -558,9 +542,6 @@ static int do_bacteria(spin1_dd *dt, void **wdata)
 	return (FALSE);
 }
 
-#undef _
-#define _(X) X
-
 void pressed_bacteria()
 {
 	static spin1_dd tdata = {
@@ -568,9 +549,6 @@ void pressed_bacteria()
 		{ 10, 1, 100 } };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 
 ///	SORT PALETTE COLOURS
@@ -600,9 +578,6 @@ static void spal_evt(spal_dd *dt, void **wdata, int what)
 	if (what == op_EVT_OK) run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 static char *spal_txt[] = {
 	_("Hue"), _("Saturation"), _("Luminance"), _("Brightness"),
 		_("Distance to A"),
@@ -625,9 +600,6 @@ static void *spal_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_sort_pal()
 {
@@ -810,9 +782,6 @@ static void brcosa_posterize_changed(brcosa_dd *dt, void **wdata, int what,
 	else if (brcosa_auto) brcosa_preview(dt, NULL);
 }
 
-#undef _
-#define _(X) X
-
 static char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
 
 #define WBbase brcosa_dd
@@ -878,9 +847,6 @@ static void *brcosa_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_brcosa()
 {
@@ -997,9 +963,6 @@ static void click_sisca_centre(sisca_dd *dt, void **wdata)
 	cmd_set(dt->spin[3], (nh - mem_height) / 2);
 }
 
-#undef _
-#define _(X) X
-
 static char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
 static char *resize_modes[] = { _("Clear"), _("Tile"), _("Mirror tile"), NULL };
 static char *scale_modes[] = { 
@@ -1059,9 +1022,6 @@ static void *sisca_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_scale_size(int mode)
 {
@@ -1588,9 +1548,6 @@ static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 	}
 }
 
-#undef _
-#define _(X) X
-
 static char *scales_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
 static char *AB_txt[] = { "A", "B", NULL };
 static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview"), NULL };
@@ -1826,9 +1783,6 @@ void colour_selector(int cs_type)
 	cmd_scroll(dt->clist, dt->idx); // scroll in current position
 }
 
-#undef _
-#define _(X) __(X)
-
 ///	QUANTIZE WINDOW
 
 #define QUAN_EXACT   0
@@ -2005,9 +1959,6 @@ static void choose_selective(quantize_dd *dt, void **wdata, int what, void **whe
 	}
 }
 
-#undef _
-#define _(X) X
-
 static char *quan_txt[] = { _("Exact Conversion"), _("Use Current Palette"),
 	_("PNN Quantize (slow, better quality)"),
 	_("Wu Quantize (fast)"),
@@ -2066,9 +2017,6 @@ static void *quantize_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_quantize(int palette)
 {
@@ -2225,9 +2173,6 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 done:	dt->lock = FALSE;
 }
 
-#undef _
-#define _(X) X
-
 static char *interp_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
 	_("Constant") };
 
@@ -2297,9 +2242,6 @@ static void grad_edit(void **wdata, int opac)
 
 	run_create(ged_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 #define NUM_GTYPES 7
 #define NUM_OTYPES 3
@@ -2401,9 +2343,6 @@ static void grad_evt(grad_dd *dt, void **wdata, int what, void **where)
 	if (what == op_EVT_OK) run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 static char *gtypes_txt[] = {_("Linear"), _("Bilinear"), _("Radial"),
 	_("Square"), _("Angular"), _("Conical")};
 static char *rtypes_txt[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
@@ -2468,9 +2407,6 @@ void gradient_setup(int mode)
 	run_create(grad_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 /// GRADIENT PICKER
 
 static int pickg_grad = GRAD_TYPE_RGB, pickg_cspace = CSPACE_LXN;
@@ -2493,9 +2429,6 @@ static int do_pick_gradient(filterwindow_dd *dt, void **wdata)
 	return TRUE;
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase filterwindow_dd
 static void *gp_code[] = {
 	TABLE2(2),
@@ -2511,9 +2444,6 @@ void pressed_pick_gradient()
 		_("Pick Gradient"), gp_code, FW_FN(do_pick_gradient) };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 /// SKEW WINDOW
 
@@ -2582,9 +2512,6 @@ static void skew_moved(skew_dd *dt, void **wdata, int what, void **where)
 	dt->lock = FALSE;
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase skew_dd
 static void *skew_code[] = {
 	WINDOWm(_("Skew")),
@@ -2637,9 +2564,6 @@ void pressed_skew()
 	run_create(skew_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 /// TRACING IMAGE WINDOW
 
 typedef struct {
@@ -2681,9 +2605,6 @@ static void bkg_evt(bkg_dd *dt, void **wdata, int what)
 	if (what == op_EVT_OK) run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 static char *srcs_txt[4] = { _("Unchanged"), _("None"), _("Image"),
 	_("Clipboard") };
 
@@ -2716,9 +2637,6 @@ void bkg_setup()
 	bkg_dd tdata = { 0, 0, 0, bkg_x, bkg_y, bkg_scale, bkg_flag };
 	run_create(bkg_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 /// SEGMENTATION WINDOW
 
@@ -2857,9 +2775,6 @@ static void seg_evt(seg_dd *dt, void **wdata, int what, void **where)
 	update_stuff(update);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase seg_dd
 static void *seg_code[] = {
 	WINDOWm(_("Segment Image")),
@@ -2914,6 +2829,3 @@ void pressed_segment()
 
 	run_create(seg_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)

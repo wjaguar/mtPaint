@@ -1223,8 +1223,12 @@ void render_text( GtkWidget *widget )
 	if (!have_rgb) free(buf);
 	else have_rgb = make_text_clipboard(buf, width, height, 3);
 
+#undef _
+#define _(X) X
 	if (have_rgb) text_paste = TEXT_PASTE_GTK;
 	else alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
+#undef _
+#define _(X) __(X)
 }
 
 static void paste_text_ok(GtkWidget *widget)

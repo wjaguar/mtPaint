@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"

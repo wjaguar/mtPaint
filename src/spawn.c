@@ -20,6 +20,8 @@
 #include <fcntl.h>
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "inifile.h"
@@ -475,9 +477,6 @@ static void faction_btn(spawn_dd *dt, void **wdata, int what, void **where)
 	run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase spawn_dd
 static void *spawn_code[] = {
 	WINDOWm(_("Configure File Actions")),
@@ -500,9 +499,6 @@ static void *spawn_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_file_configure()
 {
@@ -746,7 +742,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		if (res > 0) code = WEXITSTATUS(res);
 		else code = res;
 		c8 = gtkuncpy(NULL, command, 0);
-		msg = g_strdup_printf(_("Error %i reported when trying to run %s"),
+		msg = g_strdup_printf(__("Error %i reported when trying to run %s"),
 			code, c8);
 		alert_box(_("Error"), msg, NULL);
 		g_free(msg);

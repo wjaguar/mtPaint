@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -396,9 +398,6 @@ static int do_edge(filterwindow_dd *dt, void **wdata)
 	return TRUE;
 }
 
-#undef _
-#define _(X) X
-
 static char *fnames_txt[] = { _("MT"), _("Sobel"), _("Prewitt"), _("Kirsch"),
 	_("Gradient"), _("Roberts"), _("Laplace"), _("Morphological"), NULL };
 
@@ -415,9 +414,6 @@ void pressed_edge_detect()
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	spin1_dd s1;
 	int fx;
@@ -432,9 +428,6 @@ static int do_fx(spin1f_dd *dt, void **wdata)
 
 	return TRUE;
 }
-
-#undef _
-#define _(X) X
 
 void pressed_sharpen()
 {
@@ -451,9 +444,6 @@ void pressed_soften()
 		{ 50, 1, 100 } }, FX_SOFTEN };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 void pressed_fx(int what)
 {
@@ -493,9 +483,6 @@ static void gauss_xy_click(gauss_dd *dt, void **wdata, int what, void **where)
 	cmd_sensitive(dt->yspin, dt->xy);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase gauss_dd
 static void *gauss_code[] = {
 	VBOXPS,
@@ -516,9 +503,6 @@ void pressed_gauss()
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	filterwindow_dd fw;
 	int rgb;
@@ -536,9 +520,6 @@ static int do_unsharp(unsharp_dd *dt, void **wdata)
 
 	return TRUE;
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase unsharp_dd
 static void *unsharp_code[] = {
@@ -562,9 +543,6 @@ void pressed_unsharp()
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	filterwindow_dd fw;
 	int rgb;
@@ -583,9 +561,6 @@ static int do_dog(dog_dd *dt, void **wdata)
 
 	return TRUE;
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase dog_dd
 static void *dog_code[] = {
@@ -609,9 +584,6 @@ void pressed_dog()
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	filterwindow_dd fw;
 	int r, detail, gamma;
@@ -626,9 +598,6 @@ static int do_kuwahara(kuw_dd *dt, void **wdata)
 
 	return (TRUE);
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase kuw_dd
 static void *kuw_code[] = {
@@ -648,9 +617,6 @@ void pressed_kuwahara()
 		1, FALSE, use_gamma };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 void pressed_convert_rgb()
 {
@@ -718,9 +684,6 @@ static int do_rotate_free(rfree_dd *dt, void **wdata)
 	return TRUE;
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase rfree_dd
 static void *rfree_code[] = {
 	VBOXPS,
@@ -741,9 +704,6 @@ void pressed_rotate_free()
 		mem_img_bpp == 3, TRUE, use_gamma };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 
 void pressed_clip_mask(int val)
@@ -1377,9 +1337,6 @@ typedef struct {
 	void **res;
 } animfile_dd;
 
-#undef _
-#define _(X) X
-
 static char *modes_txt[] = { _("Raw frames"), _("Composited frames"),
 		_("Composited frames with nonzero delay") };
 
@@ -1403,9 +1360,6 @@ static void *animfile_code[] = {
 };
 #undef WBbase
 
-#undef _
-#define _(X) __(X)
-
 static int anim_file_dialog(int ftype, int is_anim)
 {
 	animfile_dd tdata, *dt;
@@ -1418,8 +1372,8 @@ static int anim_file_dialog(int ftype, int is_anim)
 	release_grab();
 
 	tdata.is_anim = is_anim;
-	tmp = g_strdup_printf(is_anim ? _("This is an animated %s file.") :
-		_("This is a multipage %s file."),
+	tmp = g_strdup_printf(is_anim ? __("This is an animated %s file.") :
+		__("This is a multipage %s file."),
 		file_formats[ftype & FTM_FTYPE].name);
 	tdata.what = tmp;
 	res = run_create(animfile_code, &tdata, sizeof(tdata)); // run dialog
@@ -1443,7 +1397,7 @@ static void handle_file_error(int res)
 	/* Image was too large for OS */
 	if (res == FILE_MEM_ERROR) memory_errors(1);
 	else if (res == TOO_BIG)
-		snprintf(txt = mess, 250, _("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
+		snprintf(txt = mess, 250, __("File is too big, must be <= to width=%i height=%i"), MAX_WIDTH, MAX_HEIGHT);
 	else if (res == EXPLODE_FAILED)
 		txt = _("Unable to explode frames");
 	else if (res <= 0)
@@ -1571,7 +1525,7 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 	if ( valid_file(fname) == 0 )
 	{
 		f8 = gtkuncpy(NULL, fname, 0);
-		msg = g_strdup_printf(_("File: %s already exists. Do you want to overwrite it?"), f8);
+		msg = g_strdup_printf(__("File: %s already exists. Do you want to overwrite it?"), f8);
 		res = alert_box(_("File Found"), msg, _("NO"), _("YES"), NULL) != 2;
 		g_free(msg);
 		g_free(f8);
@@ -1910,7 +1864,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	return;
 redo_name:
 	f8 = gtkuncpy(NULL, dt->filename, 0);
-	msg = g_strdup_printf(_("Unable to save file: %s"), f8);
+	msg = g_strdup_printf(__("Unable to save file: %s"), f8);
 	alert_box(_("Error"), msg, NULL);
 	g_free(msg);
 	g_free(f8);
@@ -1919,9 +1873,6 @@ redo:
 // !!! Disable for now, see what happens
 //	gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), TRUE);
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase fselector_dd
 static void *fselector_code[] = {
@@ -2008,12 +1959,8 @@ void file_selector_x(int action_type, void **xdata)
 	case FS_EXPORT_ASCII:
 		if (mem_cols > 16)
 		{
-#undef _
-#define _(X) __(X)
 			alert_box( _("Error"), _("You must have 16 or fewer palette colours to export ASCII art."), NULL);
 			return;
-#undef _
-#define _(X) X
 		}
 		tdata.title = _("Export ASCII Art");
 		break;
@@ -2035,12 +1982,8 @@ void file_selector_x(int action_type, void **xdata)
 	case FS_EXPORT_GIF: /* !!! No selectable formats yet */
 		if (!mem_filename)
 		{
-#undef _
-#define _(X) __(X)
 			alert_box(_("Error"), _("You must save at least one frame to create an animated GIF."), NULL);
 			return;
-#undef _
-#define _(X) X
 		}
 		tdata.title = _("Export GIF animation");
 		tdata.need_anim = TRUE;
@@ -2119,9 +2062,6 @@ void file_selector_x(int action_type, void **xdata)
 
 	run_create(fselector_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 void file_selector(int action_type)
 {

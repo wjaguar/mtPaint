@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -217,9 +219,6 @@ static int set_flood(flood_dd *dt, void **wdata)
 	return TRUE;
 }
 
-#undef _
-#define _(X) X
-
 static void *toolwindow_code[] = {
 	UNLESSbt("centerSettings"), WPMOUSE, GOTO(filterwindow_code) };
 
@@ -243,17 +242,11 @@ void flood_settings() /* Flood fill step */
 	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 static int set_settings(filterwindow_dd *dt, void **wdata)
 {
 	run_query(wdata);
 	return TRUE;
 }
-
-#undef _
-#define _(X) X
 
 #define WBbase filterwindow_dd
 void *smudge_code[] = { CHECKv(_("Respect opacity mode"), smudge_mode), RET };
@@ -284,9 +277,6 @@ void step_settings() /* Brush spacing */
 	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	filterwindow_dd fw;
 	int mode, reverse;
@@ -308,9 +298,6 @@ static int set_blend(blend_dd *dt, void **wdata)
 
 	return (TRUE);
 }
-
-#undef _
-#define _(X) X
 
 static char *blends[BLEND_NMODES] = {
 	_("Normal"), _("Hue"), _("Saturation"), _("Value"),
@@ -344,9 +331,6 @@ void blend_settings() /* Blend mode */
 		~blend_mode & (4 << BLEND_RGBSHIFT) };
 	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 
 typedef struct {
@@ -422,7 +406,7 @@ void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
 			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
 			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
 			items->radio > 0 ? radio[items->radio] : NULL,
-			NULL, _(items->tooltip), "Private",
+			NULL, __(items->tooltip), "Private",
 			xpm_image(items->xpm), lclick, (gpointer)items);
 		if (items->radio > 0) radio[items->radio] = item;
 		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
@@ -866,7 +850,7 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 
 	fill_toolbar(GTK_TOOLBAR(tbar), items, wlist, NULL, NULL);
 	gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, button,
-		_("More..."), "Private");
+		__("More..."), "Private");
 	memset(radio, 0, sizeof(radio));
 	for (; items->tooltip; items++)
 	{
@@ -885,7 +869,7 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 		gtk_container_add(GTK_CONTAINER(item), xpm_image(items->xpm));
 		pack(bbox, item);
 		gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, item,
-			_(items->tooltip), "Private");
+			__(items->tooltip), "Private");
 		mapped_dis_add(item, items->actmap);
 		gtk_object_set_user_data(GTK_OBJECT(item), wlist[items->ID]);
 		gtk_signal_connect(GTK_OBJECT(item), "clicked",
@@ -902,9 +886,6 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 #define GP_HEIGHT 16
 static GtkWidget *grad_view;
 
-#undef _
-#define _(X) X
-
 static toolbar_item settings_bar[] = {
 	{ _("Continuous Mode"), 0, SETB_CONT, 0, XPM_ICON(mode_cont), ACT_MODE, SETB_CONT, DLG_STEP, 0 },
 	{ _("Opacity Mode"), 0, SETB_OPAC, 0, XPM_ICON(mode_opac), ACT_MODE, SETB_OPAC },
@@ -917,9 +898,6 @@ static toolbar_item settings_bar[] = {
 
 static toolbar_item gradient_button =
 	{ _("Gradient Mode"), 0, SETB_GRAD, 0, NULL, ACT_MODE, SETB_GRAD, DLG_GRAD, 1 };
-
-#undef _
-#define _(X) __(X)
 
 static void **create_settings_tbar(void **r, GtkWidget ***wpp, void **wdata)
 {
@@ -967,9 +945,6 @@ static void **create_settings_tbar(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase settings_dd
 static void *settings_code[] = {
 	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
@@ -995,17 +970,11 @@ static void *settings_code[] = {
 };
 #undef WBbase
 
-#undef _
-#define _(X) __(X)
-
 void **create_settings_box()
 {
 	static settings_dd tdata; // zeroed out, get updated later
 	return (run_create(settings_code, &tdata, sizeof(tdata)));
 }
-
-#undef _
-#define _(X) X
 
 static void *sbar_code[] = {
 	WPWHEREVER, WINDOW(_("Settings Toolbar")),
@@ -1014,9 +983,6 @@ static void *sbar_code[] = {
 	REMOUNTv(settings_dock),
 	WSHOW
 };
-
-#undef _
-#define _(X) __(X)
 
 static void toolbar_settings_init()
 {
@@ -1030,9 +996,6 @@ static void toolbar_settings_init()
 
 	toolbar_boxes_[TOOLBAR_SETTINGS] = run_create(sbar_code, sbar_code, 0);
 }
-
-#undef _
-#define _(X) X
 
 static toolbar_item main_bar[] = {
 	{ _("New Image"), -1, MTB_NEW, 0, XPM_ICON(new), DLG_NEW, 0 },
@@ -1074,9 +1037,6 @@ static toolbar_item tools_bar[] = {
 	{ _("Rotate Selection Clockwise"), -1, TTB_SELRCW, NEED_CLIP, XPM_ICON(rotate_cs), ACT_SEL_ROT, 0 },
 	{ _("Rotate Selection Anti-Clockwise"), -1, TTB_SELRCCW, NEED_CLIP, XPM_ICON(rotate_as), ACT_SEL_ROT, 1 },
 	{ NULL }};
-
-#undef _
-#define _(X) __(X)
 
 #define TWOBAR_KEY "mtPaint.twobar"
 

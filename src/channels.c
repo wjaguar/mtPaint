@@ -19,6 +19,8 @@
 
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -240,9 +242,6 @@ dofail:
 #undef chan_new_type
 #undef chan_new_state
 
-#undef _
-#define _(X) X
-
 #define WBbase cchan_dd
 static void *cchan_code[] = {
 	WINDOWm(_("Create Channel")),
@@ -286,9 +285,6 @@ void pressed_channel_create(int channel)
 	newchan_window = run_create(cchan_code, &tdata, sizeof(tdata));
 }
 
-#undef _
-#define _(X) __(X)
-
 typedef struct {
 	int cc[NUM_CHANNELS], cf[NUM_CHANNELS];
 } dchan_dd;
@@ -310,9 +306,6 @@ static void click_delete_ok(dchan_dd *dt, void **wdata)
 	run_destroy(wdata);
 }
 
-#undef _
-#define _(X) X
-
 #if NUM_CHANNELS > CHN_MASK + 1
 #error "Not all channels listed in dialog"
 #endif
@@ -328,9 +321,6 @@ static void *dchan_code[] = {
 	WSHOW
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 void pressed_channel_delete()
 {
@@ -374,9 +364,6 @@ static int do_threshold(spin1_dd *dt, void **wdata)
 	return (TRUE);
 }
 
-#undef _
-#define _(X) X
-
 void pressed_threshold()
 {
 	static spin1_dd tdata = {
@@ -384,9 +371,6 @@ void pressed_threshold()
 		{ 128, 0, 255 } };
 	run_create(filterwindow_code, &tdata, sizeof(tdata));
 }
-
-#undef _
-#define _(X) __(X)
 
 void pressed_unassociate()
 {

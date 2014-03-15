@@ -18,6 +18,9 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
+
 #include "mygtk.h"
 #include "fpick.h"
 #include "vcode.h"
@@ -730,7 +733,7 @@ static int fpick_enter_dirname(fpicker *fp, const char *name, int l)
 		// Only do something if the directory is new
 		((res = fpick_scan_directory(fp, txt, NULL)) <= 0))
 	{	// Directory doesn't exist so tell user
-		ctxt = g_strdup_printf(_("Could not access directory %s"), name);
+		ctxt = g_strdup_printf(__("Could not access directory %s"), name);
 		alert_box(_("Error"), ctxt, NULL);
 		g_free(ctxt);
 		res = res < 0 ? 1 : -1;
@@ -753,9 +756,6 @@ typedef struct {
 	char fname[PATHBUF];
 } fdialog_dd;
 
-#undef _
-#define _(X) X
-
 #define WBbase fdialog_dd
 static void *fdialog_code[] = {
 	ONTOP(xw), DIALOGpm(title),
@@ -774,9 +774,6 @@ static void *fdialog_code[] = {
 	RAISED, WDIALOG(res)
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 static void fpick_file_dialog(void **wdata, int row)
 {
@@ -799,9 +796,7 @@ static void fpick_file_dialog(void **wdata, int row)
 		if (fname[1] == ':') return; // Drive
 #endif
 
-		sprintf(tdata.title = fnm, "%s / %s", _("Delete"), _("Rename"));
-#undef _
-#define _(X) X
+		sprintf(tdata.title = fnm, "%s / %s", __("Delete"), __("Rename"));
 		tdata.what = _("Enter the new filename");
 		gtkuncpy(tdata.fname, fname, PATHBUF);
 	}
@@ -811,8 +806,6 @@ static void fpick_file_dialog(void **wdata, int row)
 		tdata.what = _("Enter the name of the new directory");
 		tdata.dir = TRUE;
 	}
-#undef _
-#define _(X) __(X)
 	dd = run_create(fdialog_code, &tdata, sizeof(tdata)); // run dialog
 
 	/* Retrieve results */
@@ -839,7 +832,7 @@ static void fpick_file_dialog(void **wdata, int row)
 	tmp = NULL;
 	if (res == 2) // Delete file or directory
 	{
-		char *ts = g_strdup_printf(_("Do you really want to delete \"%s\" ?"), fname);
+		char *ts = g_strdup_printf(__("Do you really want to delete \"%s\" ?"), fname);
 		int r = alert_box(_("Warning"), ts, _("No"), _("Yes"), NULL);
 		g_free(ts);
 		if (r == 2)
@@ -939,9 +932,6 @@ static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
 	return (TRUE);
 }
 
-#undef _
-#define _(X) X
-
 static toolbar_item fpick_bar[] = {
 	{ _("Up"),			-1, FPICK_ICON_UP, 0, XPM_ICON(up) },
 	{ _("Home"),			-1, FPICK_ICON_HOME, 0, XPM_ICON(home) },
@@ -949,9 +939,6 @@ static toolbar_item fpick_bar[] = {
 	{ _("Show Hidden Files"),	 0, FPICK_ICON_HIDDEN, 0, XPM_ICON(hidden) },
 	{ _("Case Insensitive Sort"),	 0, FPICK_ICON_CASE, 0, XPM_ICON(case) },
 	{ NULL }};
-
-#undef _
-#define _(X) __(X)
 
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data);
 
@@ -1049,10 +1036,10 @@ static void **make_fpick(void **r, GtkWidget ***wpp, void **wdata)
 	int i;
 
 
-	col_titles[FPICK_CLIST_NAME] = _("Name");
-	col_titles[FPICK_CLIST_SIZE] = _("Size");
-	col_titles[FPICK_CLIST_TYPE] = _("Type");
-	col_titles[FPICK_CLIST_DATE] = _("Modified");
+	col_titles[FPICK_CLIST_NAME] = __("Name");
+	col_titles[FPICK_CLIST_SIZE] = __("Size");
+	col_titles[FPICK_CLIST_TYPE] = __("Type");
+	col_titles[FPICK_CLIST_DATE] = __("Modified");
 
 	res->sort_direction = GTK_SORT_ASCENDING;
 	res->sort_column = 0;
@@ -1288,9 +1275,6 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 	set_fname(GET_DDATA(get_wdata(fp, FP_KEY)), name, raw);
 }
 
-#undef _
-#define _(X) X
-
 #define WBbase fpick_dd
 static void *fpick_code[] = {
 	IDENT(FP_KEY),
@@ -1312,9 +1296,6 @@ static void *fpick_code[] = {
 	WEND
 };
 #undef WBbase
-
-#undef _
-#define _(X) __(X)
 
 GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 {
@@ -1356,7 +1337,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 	GtkWidget *box, *fp;
 	int flags = *(int *)(ddata + (int)pp[3]);
 
-	fp = gtk_file_selection_new(_(*(char **)(ddata + (int)pp[2])));
+	fp = gtk_file_selection_new(__(*(char **)(ddata + (int)pp[2])));
 	gtk_window_set_modal(GTK_WINDOW(fp), TRUE);
 	if ( flags & FPICK_DIRS_ONLY )
 	{
