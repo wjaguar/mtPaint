@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -32,6 +32,7 @@
 #include "mainwindow.h"
 #include "icons.h"
 
+#define FP_KEY "mtPaint.fpick"
 #define FP_DATA_KEY "mtPaint.fp_data"
 #define FP_BACKUP_KEY "mtPaint.fp_backup"
 
@@ -71,24 +72,31 @@ typedef struct
 			txt_mask[PATHTXT]	// Filter mask - UTF8 in GTK+2
 			;
 
-	GtkWidget	*window,			// Main window
-			*ok_button,			// OK button
-			*cancel_button,			// Cancel button
-			*main_vbox,			// For extra widgets
-			*toolbar,			// Toolbar
+	GtkWidget	*toolbar,			// Toolbar
 			*icons[FPICK_ICON_TOT],		// Icons
 			*combo,				// List at top holding recent directories
 			*combo_entry,			// Directory entry area in combo
 			*clist,				// Containing list of files/directories
-			*sort_arrows[FPICK_CLIST_COLS+FPICK_CLIST_COLS_HIDDEN],	// Column sort arrows
-			*file_entry			// Text entry box for filename
+			*sort_arrows[FPICK_CLIST_COLS+FPICK_CLIST_COLS_HIDDEN]	// Column sort arrows
 			;
 	GtkSortType	sort_direction;			// Sort direction of clist
 
 	GList		*combo_list;			// List of combo items
 } fpicker;
 
+typedef struct {
+	char *title;
+	int flags;
+	int entry_f;
+	void **hbox, **entry;
+	void **ok, **cancel;
+	fpicker f;
+	char fname[PATHBUF];
+} fpick_dd;
+
 static int case_insensitive;
+
+static void fpick_btn(fpick_dd *dt, void **wdata, int what, void **where);
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -681,7 +689,8 @@ static char *get_fname(GtkCList *clist, int row)
 static void fpick_select_row(GtkCList *clist, gint row, gint col,
 	GdkEventButton *event, gpointer user_data)
 {
-	fpicker *fp = user_data;
+	fpick_dd *dt = user_data;
+	fpicker *fp = &dt->f;
 	char *txt_name, *txt_size;
 	int dclick = event && (event->type == GDK_2BUTTON_PRESS);
 
@@ -697,10 +706,10 @@ static void fpick_select_row(GtkCList *clist, gint row, gint col,
 	}
 	else					// File selected
 	{
-		gtk_entry_set_text(GTK_ENTRY(fp->file_entry), txt_name);
+		cmd_setv(dt->entry, txt_name, PATH_RAW);
 
 		// Double click on file, so press OK button
-		if (dclick) gtk_button_clicked(GTK_BUTTON(fp->ok_button));
+		if (dclick) fpick_btn(dt, NULL, op_EVT_OK, NULL);
 	}
 }
 
@@ -735,21 +744,53 @@ static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
 	fpick_enter_dirname(user_data, NULL, 0);
 }
 
-static void fpick_dialog_fn(char *key)
-{
-	*(key - *key) = *key;
-}
+typedef struct {
+	char *title, *what;
+	void **xw; // parent widget-map
+	void **cancel, **delete, **rename, **create;
+	void **res;
+	int dir;
+	char fname[PATHBUF];
+} fdialog_dd;
 
-static void fpick_file_dialog(fpicker *fp, int row)
+#undef _
+#define _(X) X
+
+#define WBbase fdialog_dd
+static void *fdialog_code[] = {
+	ONTOP(xw), DIALOGpm(title),
+	WLABELp(what),
+	XPENTRY(fname, PATHBUF), FOCUS,
+	WDONE, // vbox
+	BORDER(BUTTON, 2),
+	REF(cancel), CANCELBTN(_("Cancel"), dialog_event),
+	UNLESSx(dir, 1),
+		REF(delete), BUTTON(_("Delete"), dialog_event),
+		REF(rename), OKBTN(_("Rename"), dialog_event),
+	ENDIF(1),
+	IFx(dir, 1),
+		REF(create), OKBTN(_("Create"), dialog_event),
+	ENDIF(1),
+	RAISED, WDIALOG(res)
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
+
+static void fpick_file_dialog(void **wdata, int row)
 {
-	char keys[] = { 0, 1, 2, 3, 4 };
+	fdialog_dd tdata, *ddt;
 	char fnm[PATHBUF], *tmp, *fname = NULL, *snm = NULL;
-	GtkWidget *win, *button, *label, *entry;
+	void **dd, **where;
+	fpick_dd *dt = GET_DDATA(wdata);
+	fpicker *fp = &dt->f;
 	GtkCList *clist = GTK_CLIST(fp->clist);
-	GtkAccelGroup *ag = gtk_accel_group_new();
 	int uninit_(l), res;
 
 
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.xw = wdata;
 	if (row >= 0) /* Doing things to existing file */
 	{
 		fname = get_fname(clist, row);
@@ -757,60 +798,34 @@ static void fpick_file_dialog(fpicker *fp, int row)
 #ifdef WIN32
 		if (fname[1] == ':') return; // Drive
 #endif
+
+		sprintf(tdata.title = fnm, "%s / %s", _("Delete"), _("Rename"));
+#undef _
+#define _(X) X
+		tdata.what = _("Enter the new filename");
+		gtkuncpy(tdata.fname, fname, PATHBUF);
 	}
-
-	win = gtk_dialog_new();
-	if (fname) sprintf(tmp = fnm, "%s / %s", _("Delete"), _("Rename"));
-	else tmp = _("Create Directory");
-	gtk_window_set_title(GTK_WINDOW(win), tmp);
-	gtk_window_set_modal(GTK_WINDOW(win), TRUE);
-	gtk_window_set_position(GTK_WINDOW(win), GTK_WIN_POS_CENTER);
-	gtk_container_set_border_width(GTK_CONTAINER(win), 6);
-	gtk_signal_connect_object(GTK_OBJECT(win), "destroy",
-		GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + 1));
-	label = gtk_label_new(fname ? _("Enter the new filename") :
-		_("Enter the name of the new directory"));
-	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(win)->vbox), label, TRUE, FALSE, 8);
-
-	entry = xpack5(GTK_DIALOG(win)->vbox, gtk_entry_new_with_max_length(PATHBUF));
-	if (fname) gtk_entry_set_text(GTK_ENTRY(entry), fname);
-
-	button = add_a_button(_("Cancel"), 2, GTK_DIALOG(win)->action_area, TRUE);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(win));
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
-
-	if (fname)
+	else
 	{
-		button = add_a_button(_("Delete"), 2, GTK_DIALOG(win)->action_area, TRUE);
-		gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-			GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + 2));
+		tdata.title = _("Create Directory");
+		tdata.what = _("Enter the name of the new directory");
+		tdata.dir = TRUE;
 	}
+#undef _
+#define _(X) __(X)
+	dd = run_create(fdialog_code, &tdata, sizeof(tdata)); // run dialog
 
-	button = add_a_button(fname ? _("Rename") : _("Create"), 2,
-		GTK_DIALOG(win)->action_area, TRUE );
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(fpick_dialog_fn), (gpointer)(keys + (fname ? 3 : 4)));
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags)0);
-	gtk_widget_add_accelerator(button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags)0);
+	/* Retrieve results */
+	run_query(dd);
+	ddt = GET_DDATA(dd);
+	where = origin_slot(ddt->res);
+	res = where == ddt->delete ? 2 : where == ddt->rename ? 3 :
+		where == ddt->create ? 4 : 1;
 
-	gtk_window_set_transient_for(GTK_WINDOW(win), GTK_WINDOW(fp->window));
-	gtk_widget_show_all(win);
-	gdk_window_raise(win->window);
-	gtk_widget_grab_focus(entry);
-
-	gtk_window_add_accel_group(GTK_WINDOW(win), ag);
-
-	while (!keys[0]) gtk_main_iteration();
-
-	res = keys[0];
 	if (res > 1)
 	{
-		strncpy(fnm, fp->txt_directory, PATHBUF);
-		l = strlen(fnm);
-		gtkncpy(fnm + l, gtk_entry_get_text(GTK_ENTRY(entry)), PATHBUF - l);
-		gtk_widget_destroy(win);
+		l = strlen(fp->txt_directory);
+		wjstrcat(fnm, PATHBUF, fp->txt_directory, l, ddt->fname, NULL);
 		if (fname)
 		{
 			// The source name SHOULD NOT get truncated, ever
@@ -819,6 +834,7 @@ static void fpick_file_dialog(fpicker *fp, int row)
 			g_free(ts);
 		}
 	}
+	run_destroy(dd);
 
 	tmp = NULL;
 	if (res == 2) // Delete file or directory
@@ -830,6 +846,7 @@ static void fpick_file_dialog(fpicker *fp, int row)
 		{
 			if (remove(snm)) tmp = _("Unable to delete");
 		}
+		else res = 1;
 	}
 	else if (res == 3) // Rename file or directory
 	{
@@ -863,7 +880,8 @@ static void fpick_file_dialog(fpicker *fp, int row)
 static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
-	fpicker *fp = user_data;
+	fpick_dd *dt = user_data;
+	fpicker *fp = &dt->f;
 	GtkCList *clist = GTK_CLIST(fp->clist);
 	GList *list;
 	char *txt_name, *txt_size;
@@ -895,7 +913,7 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 	/* Directory selected */
 	if (!txt_size[0]) fpick_enter_dir_via_list(fp, txt_name);
 	/* File selected */
-	else gtk_button_clicked(GTK_BUTTON(fp->ok_button));
+	else fpick_btn(dt, NULL, op_EVT_OK, NULL);
 
 	return (TRUE);
 }
@@ -903,7 +921,9 @@ static gboolean fpick_key_event(GtkWidget *widget, GdkEventKey *event,
 static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
-	fpicker *fp = user_data;
+	void **wdata = user_data;
+	fpick_dd *dt = GET_DDATA(wdata);
+	fpicker *fp = &dt->f;
 	GtkCList *clist = GTK_CLIST(fp->clist);
 	gint row, col;
 
@@ -915,7 +935,7 @@ static gboolean fpick_click_event(GtkWidget *widget, GdkEventButton *event,
 	if (clist->focus_row != row) clist_reselect_row(clist, row);
 	if (clist->focus_row < 0) return (TRUE);
 
-	fpick_file_dialog(fp, clist->focus_row);
+	fpick_file_dialog(wdata, clist->focus_row);
 	return (TRUE);
 }
 
@@ -953,25 +973,22 @@ static GtkWidget *fpick_toolbar(GtkWidget **wlist)
 	return toolbar;
 }
 
-static void fpick_wildcard(GtkButton *button, gpointer user_data)
+static int fpick_wildcard(fpick_dd *dt, int button)
 {
-	fpicker *fp = user_data;
-	char *ctxt, *ds, *nm, *mask = fp->txt_mask;
+	char ctxt[PATHTXT];
+	fpicker *fp = &dt->f;
+	char *ds, *nm, *mask = fp->txt_mask;
 
-	ctxt = (char *)gtk_entry_get_text(GTK_ENTRY(fp->file_entry));
+	cmd_peekv(dt->entry, ctxt, PATHTXT, PATH_RAW);
 	/* Presume filename if called by user pressing "OK", pattern otherwise */
 	if (button)
 	{
-		/* First, check if user had changed directory in the combo */
-		if (fpick_enter_dirname(fp, NULL, 0)) ctxt = NULL;
+		/* If user had changed directory in the combo */
+		if (fpick_enter_dirname(fp, NULL, 0)) return (FALSE);
 		/* If file entry is hidden anyway */
-		else if (!fp->allow_files) return;
+		if (!fp->allow_files) return (TRUE);
 		/* Filename must have some chars and no wildcards in it */
-		else if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return;
-		/* Don't let pattern pass as filename */
-		gtk_signal_emit_stop_by_name(GTK_OBJECT(button), "clicked");
-		/* Don't do anything else for directory change */
-		if (!ctxt) return;
+		if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return (TRUE);
 	}
 
 	/* Do we have directory in here? */
@@ -994,62 +1011,53 @@ static void fpick_wildcard(GtkButton *button, gpointer user_data)
 	/* Have directory - enter it */
 	if (ds && (fpick_enter_dirname(fp, ctxt, ds + 1 - ctxt) > 0))
 	{	// Opened a new dir - skip redisplay
-		gtk_entry_set_text(GTK_ENTRY(fp->file_entry), nm); // Cut dir off
+		cmd_setv(dt->entry, nm, PATH_RAW); // Cut dir off
 	}
 	else
 	{	/* Torture GtkCList into displaying only files that match pattern */
 		fpick_clist_repattern(GTK_CLIST(fp->clist), mask);
 		fpick_clist_scroll(GTK_CLIST(fp->clist)); // Scroll to selected row
 	}
+
+	/* Don't let pattern pass as filename */
+	return (FALSE);
 }
 
 /* "Tab completion" for entry field, like in GtkFileSelection */
-static gboolean fpick_entry_key(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
+static int fpick_entry_key(fpick_dd *dt, void **wdata, int what, void **where,
+	key_ext *keydata)
 {
-	if (event->keyval != GDK_Tab) return (FALSE);
-#if GTK_MAJOR_VERSION == 1
-	/* Return value alone doesn't stop GTK1 from running other handlers */
-	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
-#endif
-	fpick_wildcard(NULL, user_data);
+	if (keydata->key != GDK_Tab) return (FALSE);
+	fpick_wildcard(dt, FALSE);
 	return (TRUE);
 }
 
-static void fpick_destroy(GtkObject *fp, gpointer user_data);
-
-GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
+// !!! May get NULLs in "wdata" and "where" when called from other handlers
+static void fpick_btn(fpick_dd *dt, void **wdata, int what, void **where)
 {
-	static const short col_width[FPICK_CLIST_COLS] = {250, 64, 80, 150};
+	if (what == op_EVT_CANCEL) do_evt_1_d(dt->cancel);
+	else if (fpick_wildcard(dt, TRUE)) do_evt_1_d(dt->ok);
+}
+
+static void **make_fpick(void **r, GtkWidget ***wpp, void **wdata)
+{
 	char txt[64], *col_titles[FPICK_CLIST_COLS + FPICK_CLIST_COLS_HIDDEN] =
 		{ "", "", "", "", "", "" };
 	GtkWidget *vbox1, *hbox1, *scrolledwindow1, *temp_hbox;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-	fpicker *res = calloc(1, sizeof(fpicker));
-	char *title = *(char **)(ddata + (int)pp[2]);
-	int i, w, l, flags = *(int *)(ddata + (int)pp[3]);
+	fpick_dd *dt = GET_DDATA(wdata);
+	fpicker *res = &dt->f;
+	int i;
 
-	if (!res) return NULL;
 
 	col_titles[FPICK_CLIST_NAME] = _("Name");
 	col_titles[FPICK_CLIST_SIZE] = _("Size");
 	col_titles[FPICK_CLIST_TYPE] = _("Type");
 	col_titles[FPICK_CLIST_DATE] = _("Modified");
 
-	case_insensitive = inifile_get_gboolean("fpick_case_insensitive", TRUE );
-
-	res->show_hidden = inifile_get_gboolean("fpick_show_hidden", FALSE );
 	res->sort_direction = GTK_SORT_ASCENDING;
 	res->sort_column = 0;
-	res->allow_files = res->allow_dirs = TRUE;
-	res->txt_directory[0] = '\0';
 
-	res->window = add_a_window( GTK_WINDOW_TOPLEVEL, title, GTK_WIN_POS_NONE, TRUE );
-	gtk_signal_connect(GTK_OBJECT(res->window), "destroy",
-		GTK_SIGNAL_FUNC(fpick_destroy), res);
-	gtk_object_set_data(GTK_OBJECT(res->window), FP_DATA_KEY, res);
-
-	vbox1 = add_vbox(res->window);
+	vbox1 = **wpp;
 	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
 
 	// ------- Combo Box -------
@@ -1082,7 +1090,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 			res->show_hidden );
 	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(res->icons[FPICK_ICON_CASE]),
 			case_insensitive );
-	gtk_object_set_data( GTK_OBJECT(res->toolbar), FP_DATA_KEY, res );
+	gtk_object_set_data(GTK_OBJECT(res->toolbar), FP_DATA_KEY, wdata);
 			// Set this after setting the toggles so any events are ignored
 
 	// ------- CLIST - File List -------
@@ -1136,55 +1144,25 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 	gtk_signal_connect(GTK_OBJECT(res->clist), "click_column",
 		GTK_SIGNAL_FUNC(fpick_column_button), res);
 	gtk_signal_connect(GTK_OBJECT(res->clist), "select_row",
-		GTK_SIGNAL_FUNC(fpick_select_row), res);
+		GTK_SIGNAL_FUNC(fpick_select_row), dt);
 	gtk_signal_connect(GTK_OBJECT(res->clist), "key_press_event",
-		GTK_SIGNAL_FUNC(fpick_key_event), res);
+		GTK_SIGNAL_FUNC(fpick_key_event), dt);
 	gtk_signal_connect(GTK_OBJECT(res->clist), "button_press_event",
-		GTK_SIGNAL_FUNC(fpick_click_event), res);
+		GTK_SIGNAL_FUNC(fpick_click_event), wdata);
+
+	return (r);
+}
+
+static void **finish_fpick(void **r, GtkWidget ***wpp, void **wdata)
+{
+	static const short col_width[FPICK_CLIST_COLS] = {250, 64, 80, 150};
+	char txt[64];
+	fpick_dd *dt = GET_DDATA(wdata);
+	fpicker *res = &dt->f;
+	int i, w, l;
 
 
-	// ------- Extra widget section -------
-
-	gtk_widget_show(res->main_vbox = pack5(vbox1, gtk_vbox_new(FALSE, 0)));
-
-	// ------- Entry Box -------
-
-	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
-	res->file_entry = xpack5(hbox1, gtk_entry_new_with_max_length(PATHBUF));
-	gtk_widget_show_all(hbox1);
-	gtk_signal_connect(GTK_OBJECT(res->file_entry), "key_press_event",
-		GTK_SIGNAL_FUNC(fpick_entry_key), res);
-
-	// ------- Buttons -------
-
-	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
-
-	res->ok_button = pack_end5(hbox1, gtk_button_new_with_label(_("OK")));
-	gtk_widget_set_usize(res->ok_button, 100, -1);
-//	gtk_widget_add_accelerator (res->ok_button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-//	gtk_widget_add_accelerator (res->ok_button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_signal_connect(GTK_OBJECT(res->ok_button), "clicked",
-		GTK_SIGNAL_FUNC(fpick_wildcard), res);
-
-	res->cancel_button = pack_end5(hbox1, gtk_button_new_with_label(_("Cancel")));
-	gtk_widget_set_usize(res->cancel_button, 100, -1);
-	gtk_widget_add_accelerator (res->cancel_button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-
-	gtk_widget_show_all(hbox1);
-
-	gtk_window_add_accel_group(GTK_WINDOW (res->window), ag);
-
-	gtk_signal_connect_object(GTK_OBJECT(res->file_entry), "activate",
-		GTK_SIGNAL_FUNC(gtk_button_clicked), GTK_OBJECT(res->ok_button));
-
-	if ( flags & FPICK_ENTRY ) gtk_widget_grab_focus(res->file_entry);
-	else gtk_widget_grab_focus(res->clist);
-
-	if ( flags & FPICK_DIRS_ONLY )
-	{
-		res->allow_files = FALSE;
-		gtk_widget_hide(res->file_entry);
-	}
+	if (!dt->entry_f) gtk_widget_grab_focus(res->clist);
 
 	/* Ensure enough space for pixmaps */
 	gtk_widget_realize(res->clist);
@@ -1211,40 +1189,31 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 		gtk_clist_set_column_width(GTK_CLIST(res->clist), i, w);
 	}
 
-	add_click(NEXT_SLOT(r), res->ok_button);
-	add_click(SLOT_N(r, 2), res->cancel_button);
-	add_del(SLOT_N(r, 2), res->window);
-	*--*wpp = hbox1 = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(hbox1);
-	pack(res->main_vbox, hbox1);
-
-	return (res->window);
+	return (r);
 }
 
-void fpick_set_filename(GtkWidget *fp, char *name, int raw)
+static void set_fname(fpick_dd *dt, char *name, int raw)
 {
-	fpicker *win = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
-	char txt[PATHTXT], *c;
+	fpicker *win = &dt->f;
+	char txt[PATHTXT];
 
 	if (!raw)
 	{
 		/* Ensure that path is absolute */
 		resolve_path(txt, PATHBUF, name);
 		/* Separate the filename */
-		c = strrchr(txt, DIR_SEP);
-		*c++ = '\0';
+		name = strrchr(txt, DIR_SEP);
+		*name++ = '\0';
 		// Scan directory, populate boxes if successful
 		if (!fpick_scan_directory(win, txt, "")) return;
-
-		/* Name is in locale encoding on input */
-		name = gtkuncpy(txt, c, PATHTXT);
 	}
-	gtk_entry_set_text(GTK_ENTRY(win->file_entry), name);
+	cmd_setv(dt->entry, name, raw ? PATH_RAW : PATH_VALUE);
 }
 
-static void fpick_destroy(GtkObject *fp, gpointer user_data)	// Destroy structures and release memory
+/* Store things to inifile */
+static void fpick_destroy(fpick_dd *dt, void **wdata)
 {
-	fpicker *win = user_data;
+	fpicker *win = &dt->f;
 	GtkCListColumn *col = GTK_CLIST(win->clist)->column;
 	char txt[64], buf[PATHBUF];
 	int i;
@@ -1264,31 +1233,32 @@ static void fpick_destroy(GtkObject *fp, gpointer user_data)	// Destroy structur
 
 	inifile_set_gboolean("fpick_case_insensitive", case_insensitive);
 	inifile_set_gboolean("fpick_show_hidden", win->show_hidden );
-
-	gtk_object_set_data(fp, FP_DATA_KEY, NULL); // Paranoia
-	free(win);
 }
 
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 {
 	toolbar_item *item = user_data;
-	fpicker *fp = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
-	char nm[PATHBUF], fnm[PATHBUF];
+	void **wdata = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
+	fpick_dd *dt;
+	fpicker *fp;
+	char fnm[PATHBUF];
 
-	if (!fp) return;
+	if (!wdata) return;
 
+	dt = GET_DDATA(wdata);
+	fp = &dt->f;
 	switch (item->ID)
 	{
 	case FPICK_ICON_UP:
 		fpick_enter_dir_via_list(fp, "..");
 		break;
 	case FPICK_ICON_HOME:
-		gtkncpy(nm, gtk_entry_get_text(GTK_ENTRY(fp->file_entry)), PATHBUF);
-		file_in_homedir(fnm, nm, PATHBUF);
-		fpick_set_filename(fp->window, fnm, FALSE);
+		cmd_read(dt->entry, dt);
+		file_in_homedir(fnm, dt->fname, PATHBUF);
+		set_fname(dt, fnm, FALSE);
 		break;
 	case FPICK_ICON_DIR:
-		fpick_file_dialog(fp, -1);
+		fpick_file_dialog(wdata, -1);
 		break;
 	case FPICK_ICON_HIDDEN:
 		fp->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
@@ -1304,21 +1274,73 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 {
-	fpicker *fpick = gtk_object_get_data(GTK_OBJECT(fp), FP_DATA_KEY);
-	char *txt = (char *)gtk_entry_get_text(GTK_ENTRY(fpick->file_entry));
-
-	if (raw) strncpy0(buf, txt, len);
-#if GTK_MAJOR_VERSION == 1 /* Same encoding everywhere */
-	else snprintf(buf, len, "%s%s", fpick->txt_directory, txt);
-#else /* Convert filename to locale */
+	fpick_dd *dt = GET_DDATA(get_wdata(fp, FP_KEY));
+	if (raw) cmd_peekv(dt->entry, buf, len, PATH_RAW);
 	else
 	{
-		txt = gtkncpy(NULL, txt, PATHBUF);
-		snprintf(buf, len, "%s%s", fpick->txt_directory, txt);
-		g_free(txt);
+		cmd_read(dt->entry, dt);
+		snprintf(buf, len, "%s%s", dt->f.txt_directory, dt->fname);
 	}
-#endif
 }
+
+void fpick_set_filename(GtkWidget *fp, char *name, int raw)
+{
+	set_fname(GET_DDATA(get_wdata(fp, FP_KEY)), name, raw);
+}
+
+#undef _
+#define _(X) X
+
+#define WBbase fpick_dd
+static void *fpick_code[] = {
+	IDENT(FP_KEY),
+	WPWHEREVER, WINDOWpm(title), EVENT(DESTROY, fpick_destroy),
+	EXEC(make_fpick),
+	// ------- Extra widget section -------
+	REF(hbox), HBOXPr, WDONE,
+	// ------- Entry Box -------
+	HBOXbp(0, 0, 5),
+	REF(entry), XPENTRY(fname, PATHBUF),
+	EVENT(KEY, fpick_entry_key), EVENT(OK, fpick_btn),
+	UNLESS(f.allow_files), HIDDEN, IF(entry_f), FOCUS,
+	WDONE,
+	// ------- Buttons -------
+	UOKBOXp0,
+	MINWIDTH(100), EBUTTON(_("OK"), fpick_btn),
+	MINWIDTH(100), ECANCELBTN(_("Cancel"), fpick_btn),
+	EXEC(finish_fpick),
+	WEND
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
+
+GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
+{
+	fpick_dd tdata, *dt;
+	void **res;
+
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.title = *(char **)(ddata + (int)pp[2]);
+	tdata.flags = *(int *)(ddata + (int)pp[3]);
+	tdata.ok = NEXT_SLOT(r);
+	tdata.cancel = SLOT_N(r, 2);
+
+	tdata.entry_f = tdata.flags & FPICK_ENTRY;
+
+	case_insensitive = inifile_get_gboolean("fpick_case_insensitive", TRUE );
+
+	tdata.f.show_hidden = inifile_get_gboolean("fpick_show_hidden", FALSE );
+	tdata.f.allow_files = !(tdata.flags & FPICK_DIRS_ONLY);
+	tdata.f.allow_dirs = TRUE;
+
+	res = run_create(fpick_code, &tdata, sizeof(tdata));
+	dt = GET_DDATA(res);
+	*--*wpp = dt->hbox[0];
+	return (GET_REAL_WINDOW(res));
+}
+
 #endif				/* mtPaint fpicker */
 
 
@@ -1334,7 +1356,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 	GtkWidget *box, *fp;
 	int flags = *(int *)(ddata + (int)pp[3]);
 
-	fp = gtk_file_selection_new(*(char **)(ddata + (int)pp[2]));
+	fp = gtk_file_selection_new(_(*(char **)(ddata + (int)pp[2])));
 	gtk_window_set_modal(GTK_WINDOW(fp), TRUE);
 	if ( flags & FPICK_DIRS_ONLY )
 	{

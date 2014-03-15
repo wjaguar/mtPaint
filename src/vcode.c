@@ -54,6 +54,7 @@ enum {
 	pk_PACKp,
 	pk_XPACK,
 	pk_XPACK1,
+	pk_EPACK,
 	pk_PACKEND,
 	pk_TABLE,
 	pk_TABLEx,
@@ -78,10 +79,17 @@ enum {
 typedef struct {
 	void *code;	// Noop tag, must be first field
 	void ***dv;	// Pointer to dialog response
+	void **destroy;	// Pre-destruction event slot
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
 	int done;	// Set when destroyed
 } v_dd;
+
+/* From widget to its wdata */
+void **get_wdata(GtkWidget *widget, char *id)
+{
+	return (gtk_object_get_data(GTK_OBJECT(widget), id ? id : VCODE_KEY));
+}
 
 /* From event to its originator */
 void **origin_slot(void **slot)
@@ -116,17 +124,12 @@ static void get_evt_1_t(GtkObject *widget, gpointer user_data)
 		get_evt_1(widget, user_data);
 }
 
-static void do_evt_1_d(void **slot)
+void do_evt_1_d(void **slot)
 {
 	void **base = slot[0], **desc = slot[1];
 
 	if (!desc[1]) run_destroy(base);
 	else ((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
-}
-
-static void get_evt_1_d(GtkObject *widget, gpointer user_data)
-{
-	do_evt_1_d(user_data);
 }
 
 static gboolean get_evt_del(GtkWidget *widget, GdkEvent *event, gpointer user_data)
@@ -152,8 +155,8 @@ static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user
 
 void add_click(void **r, GtkWidget *widget)
 {
-	gtk_signal_connect(GTK_OBJECT(widget), "clicked",
-		GTK_SIGNAL_FUNC(get_evt_1_d), r);
+	gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
+		GTK_SIGNAL_FUNC(do_evt_1_d), r);
 }
 
 void add_del(void **r, GtkWidget *window)
@@ -191,9 +194,8 @@ static void trigger_things(void **wdata)
 		if ((op == op_MOUNT) || (op == op_PMOUNT))
 		{
 			GtkWidget *w = GTK_BIN(wdata[0])->child;
-			if (!w) continue;
-			slot = gtk_object_get_data(GTK_OBJECT(w), VCODE_KEY);
-			if (slot) trigger_things(slot);
+			if (w && (slot = get_wdata(w, NULL)))
+				trigger_things(slot);
 			continue;
 		}
 		if (op != op_TRIGGER) continue;
@@ -1207,11 +1209,11 @@ GtkWidget *pathbox(void **r)
 }
 
 /* Set value of path widget */
-static void set_path(GtkWidget *widget, char *s)
+static void set_path(GtkWidget *widget, char *s, int mode)
 {
 	char path[PATHTXT];
-	gtkuncpy(path, s, PATHTXT);
-	gtk_entry_set_text(GTK_ENTRY(widget), path);
+	if (mode == PATH_VALUE) s = gtkuncpy(path, s, PATHTXT);
+	gtk_entry_set_text(GTK_ENTRY(widget), s);
 }
 
 //	SPINPACK widget
@@ -1357,14 +1359,15 @@ enum {
 	cm_RPACKD,
 	cm_OPT,
 	cm_OPTD,
+	cm_PENTRY,
 	cm_OKBOX,
+	cm_UOKBOX,
 	cm_CANCELBTN,
 	cm_BUTTON,
 	cm_TOGGLE,
 
 	cm_XDEFS_0,
 	cm_LABEL = cm_XDEFS_0,
-	cm_LABELp,
 	cm_SPINSLIDE,
 	cm_SPINSLIDEa,
 };
@@ -1434,21 +1437,30 @@ static cmdef cmddefs[] = {
 // !!! Padding = 0 Border = 0
 	{ op_MLENTRY, op_MLENTRY, pk_PACK | pkf_SHOW },
 	{ op_TLENTRY, op_TLENTRY, pk_TABLE | pkf_SHOW },
+// !!! Padding = 5
+	{ op_XPENTRY, cm_PENTRY, pk_XPACK | pkf_SHOW, 5 },
+// !!! Padding = 0
+	{ op_TPENTRY, cm_PENTRY, pk_TABLE2 | pkf_SHOW },
 	{ op_OKBOX, cm_OKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
 		USE_BORDER(OKBOX) },
 // !!! Padding = 5 Border = 0
 	{ op_OKBOXp, cm_OKBOX, pk_PACKp | pkf_STACK | pkf_SHOW, 5, 0 },
 	{ op_EOKBOX, op_EOKBOX, pk_PACK | pkf_STACK | pkf_SHOW | pkf_PARENT, 0,
 		USE_BORDER(OKBOX) },
-	{ op_UOKBOX, op_UOKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
+	{ op_UOKBOX, cm_UOKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
 		USE_BORDER(OKBOX) },
+// !!! Padding = 5 Border = 0
+	{ op_UOKBOXp, cm_UOKBOX, pk_PACKp | pkf_STACK | pkf_SHOW, 5, 0 },
 	{ op_OKBTN, op_OKBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_CANCELBTN, cm_CANCELBTN, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_UCANCELBTN, cm_CANCELBTN, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+// !!! Padding = 5 Border = 0
+	{ op_ECANCELBTN, cm_CANCELBTN, pk_PACKEND | pkf_SHOW, 5 },
 	{ op_OKADD, op_OKADD, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_BUTTON, cm_BUTTON, pk_XPACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_UBUTTON, cm_BUTTON, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
-// !!! Padding = 5
+// !!! Padding = 5 Border = 0
+	{ op_EBUTTON, cm_BUTTON, pk_PACKEND | pkf_SHOW, 5 },
 	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp | pkf_SHOW, 5 },
 	{ op_OKTOGGLE, cm_TOGGLE, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 	{ op_UTOGGLE, cm_TOGGLE, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) }
@@ -1458,13 +1470,11 @@ static xcmdef xcmddefs[] = {
 	/* Labels have 2 border values and X alignment, not a regular border */
 	{ { op_MLABEL, cm_LABEL, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
 		WBppa(0, 0, 5) },
-	{ { op_MLABELp, cm_LABELp, pk_PACKp | pkf_SHOW, USE_BORDER(LABEL) },
-		WBppa(0, 5, 5) },
+// !!! Padding = 8
+	{ { op_WLABEL, op_WLABEL, pk_EPACK | pkf_SHOW, 8 }, WBppa(0, 0, 5) },
 // !!! Padding = 0
 	{ { op_XLABEL, cm_LABEL, pk_XPACK | pkf_SHOW }, WBppa(0, 0, 5) },
 	{ { op_TLLABEL, cm_LABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
-		WBppa(0, 0, 0) },
-	{ { op_TLLABELp, cm_LABELp, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 		WBppa(0, 0, 0) },
 	/* Spinsliders use border field for preset width & height of slider */
 	{ { op_TSPINSLIDE, cm_SPINSLIDE, pk_TABLE2x, USE_BORDER(SPINSLIDE) },
@@ -1496,6 +1506,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
 		GTK_POLICY_ALWAYS };
 	cmdef *cmds[op_LAST];
+	char *ident = VCODE_KEY;
 #if U_NLS
 	char *tc[256];
 #endif
@@ -1550,6 +1561,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		pk = tpad = cw = 0;
 		v = lp ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
+		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
 		op &= WB_OPMASK;
 		if ((cmd = cmds[op]))
 		{
@@ -1570,7 +1582,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*r++ = NULL;
 			*r++ = NULL;
 
-			gtk_object_set_data(GTK_OBJECT(window), VCODE_KEY,
+			gtk_object_set_data(GTK_OBJECT(window), ident,
 				(gpointer)res);
 			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
 				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
@@ -1644,12 +1656,23 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Create a toplevel window, and put a vertical box inside it */
-		case op_WINDOWpm:
-			v = *(char **)v; // dereference & fallthrough
 		case op_WINDOW: case op_WINDOWm:
 			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL,
 				*(char *)v ? _(v) : v, wpos, op != op_WINDOW);
 			*--wp = add_vbox(window);
+			break;
+		/* Create a dialog window, with vertical & horizontal box */
+		case op_DIALOGm:
+			widget = window = gtk_dialog_new();
+			gtk_window_set_title(GTK_WINDOW(window), _(v));
+			gtk_window_set_position(GTK_WINDOW(window), wpos);
+			gtk_window_set_modal(GTK_WINDOW(window), TRUE);
+			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
+			ag = gtk_accel_group_new();
+ 			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
+			/* Both boxes go onto stack, with vbox on top */
+			*--wp = GTK_DIALOG(window)->action_area;
+			*--wp = GTK_DIALOG(window)->vbox;
 			break;
 		/* Create a fileselector window (with horizontal box inside) */
 		case op_FPICKpm:
@@ -1783,7 +1806,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			cw = GET_BORDER(NBOOK);
 			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
 			break;
-		/* Add a plain notebook (2 pages for now) */
+		/* Add a plain notebook */
 		case op_PLAINBOOK:
 		{
 			// !!! no extra args
@@ -1808,12 +1831,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				lp ? (int)v : -2, 10);
 			break;
 		/* Add a label */
-		case cm_LABELp:
-			v = *(char **)v; // dereference & fallthrough
-		case cm_LABEL:
+		case cm_LABEL: case op_WLABEL:
 		{
 			int z = (int)((xcmdef *)cmd)->x;
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
+			if (op == op_WLABEL)
+				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
 			if (i > 1) z = (int)pp[1];
 			if (z & 0xFFFF) gtk_misc_set_padding(GTK_MISC(widget),
 				(z >> 8) & 255, z & 255);
@@ -1823,8 +1846,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add to table a batch of labels generated from text string */
-		case op_TLTEXTp:
-			v = *(char **)v; // dereference & fallthrough
 		case op_TLTEXT:
 			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
 			break;
@@ -1945,26 +1966,23 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add an entry widget, fill from drop-away buffer */
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			widget = gtk_entry_new();
-			if (op == op_TLENTRY) gtk_entry_set_max_length(
-				GTK_ENTRY(widget), (int)pp[1]);
+			if (i > 1) gtk_entry_set_max_length(GTK_ENTRY(widget), (int)pp[1]);
 			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
 			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(widget));
 			break;
 		/* Add a path entry or box to table */
-		case op_TPENTRY:
+		case cm_PENTRY:
 			widget = gtk_entry_new_with_max_length((int)pp[1]);
-// !!! Padding = 0
-			set_path(widget, v);
-			pk = pk_TABLE2 | pkf_SHOW;
+			set_path(widget, v, PATH_VALUE);
 			break;
 		/* Add a path box to table */
 		case op_PATHs:
 			v = inifile_get(v, ""); // read and fallthrough
 		case op_PATH:
 			widget = pathbox(r);
-			set_path(widget, v);
+			set_path(widget, v, PATH_VALUE);
 			pk = pk_PACK | pkf_SHOW | pkf_PARENT | pkf_FRAME;
 			break;
 		/* Add a text widget, fill from drop-away buffer at pointer */
@@ -2010,7 +2028,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_BIN | pkf_SHOW;
 			break;
 		/* Add a box with "OK"/"Cancel", or something like */
-		case cm_OKBOX: case op_EOKBOX: case op_UOKBOX:
+		case cm_OKBOX: case op_EOKBOX: case cm_UOKBOX:
 		{
 			GtkWidget *ok_bt, *cancel_bt, *box;
 			void **cancel_r;
@@ -2018,7 +2036,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			ag = gtk_accel_group_new();
  			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 
-			widget = gtk_hbox_new(op != op_UOKBOX, 0);
+			widget = gtk_hbox_new(op != cm_UOKBOX, 0);
 			if (op == op_EOKBOX) // clustered to right side
 			{
 				box = gtk_hbox_new(FALSE, 0);
@@ -2204,6 +2222,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			tparent = !v ? NULL :
 				GTK_WINDOW(GET_REAL_WINDOW(*(void ***)v));
 			continue;
+		/* Change identifier, for reusable toplevels */
+		case op_IDENT:
+			ident = v;
+			continue;
 		/* Raise window after displaying */
 		case op_RAISED:
 			raise = TRUE;
@@ -2218,9 +2240,32 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			columns[ncol++] = r;
 			widget = NULL;
 			break;
+		/* Install activate event handler */
+		case op_EVT_OK:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			int what = GET_OP(slot);
+// !!! Support only what actually used on, and their brethren
+			switch (what)
+			{
+			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
+			case op_XPENTRY: case op_TPENTRY:
+			case op_PATH: case op_PATHs:
+				gtk_signal_connect(GTK_OBJECT(*slot), "activate",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				break;
+			}
+			widget = NULL;
+			break;
+		}
 		/* Install destroy event handler (onto window) */
 		case op_EVT_CANCEL:
 			add_del(r, window);
+			widget = NULL;
+			break;
+		/* Install deallocation event handler */
+		case op_EVT_DESTROY:
+			vdata->destroy = r;
 			widget = NULL;
 			break;
 		/* Install key event handler */
@@ -2270,7 +2315,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 #endif
 			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
-			case op_TPENTRY: case op_PATH: case op_PATHs:
+			case op_XPENTRY: case op_TPENTRY:
+			case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -2323,13 +2369,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
 				FALSE, FALSE, tpad);
 			break;
-		case pk_XPACK: case pk_XPACK1:
+		case pk_XPACK: case pk_XPACK1: case pk_EPACK:
 			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
-				TRUE, TRUE, tpad);
+				TRUE, n != pk_EPACK, tpad);
 			if (n == pk_XPACK1)
 				gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
 			break;
-		case pk_PACKEND: pack_end(wp[0], widget); break;
+		case pk_PACKEND:
+			gtk_box_pack_end(GTK_BOX(wp[0]), widget,
+				FALSE, FALSE, tpad);
+			break;
 		case pk_TABLE: case pk_TABLEx: case pk_TABLEp:
 			table_it(wp[0], widget, (int)pp[--lp], tpad, n);
 			break;
@@ -2391,6 +2440,14 @@ static void do_destroy(void **wdata)
 
 	if (vdata->done) return; // Paranoia
 	vdata->done = TRUE;
+
+	if (vdata->destroy)
+	{
+		void **base = vdata->destroy[0], **desc = vdata->destroy[1];
+		((evt_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, vdata->destroy);
+	}
+
 	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
 	{
 		op = (int)*pp++;
@@ -2478,9 +2535,9 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
-		case op_TPENTRY: case op_PATH:
+		case op_XPENTRY: case op_TPENTRY: case op_PATH:
 			gtkncpy(v, gtk_entry_get_text(GTK_ENTRY(*wdata)),
-				op == op_TPENTRY ? (int)pp[1] : PATHBUF);
+				op != op_PATH ? (int)pp[1] : PATHBUF);
 			break;
 		case op_PATHs:
 		{
@@ -2596,8 +2653,8 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_PATHs:
 			v = inifile_get(v, ""); // read and fallthrough
-		case op_TPENTRY: case op_PATH:
-			set_path(*wdata, v);
+		case op_XPENTRY: case op_TPENTRY: case op_PATH:
+			set_path(*wdata, v, PATH_VALUE);
 			break;
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
@@ -2851,9 +2908,17 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 {
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
-	if (op == op_FPICKpm) fpick_get_filename(slot[0], res, size, idx);
-	else if ((op == op_LISTC) || (op == op_LISTCd) || (op == op_LISTCu) ||
-		(op == op_LISTCS))
+	switch (op)
+	{
+	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
+	case op_XPENTRY: case op_TPENTRY: case op_PATH:
+	{
+		char *s = (char *)gtk_entry_get_text(GTK_ENTRY(slot[0]));
+		if (idx == PATH_VALUE) gtkncpy(res, s, size);
+		else strncpy0(res, s, size); // PATH_RAW
+		break;
+	}
+	case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
 	{
 		GtkCList *clist = GTK_CLIST(slot[0]);
 		/* if (idx == LISTC_ORDER) */
@@ -2868,6 +2933,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 		*(int *)res = (clist->selection ? (int)clist->selection->data : 0);
 #endif
 	}
+	}
 }
 
 void cmd_setv(void **slot, void *res, int idx)
@@ -2880,15 +2946,14 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_NBOOK: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);
 		break;
-	case op_MLABEL: case op_MLABELp: case op_XLABEL:
-	case op_TLLABEL: case op_TLLABELp:
+	case op_MLABEL: case op_WLABEL: case op_XLABEL: case op_TLLABEL:
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
 	case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 		gtk_entry_set_text(GTK_ENTRY(slot[0]), res); break;
-	case op_TPENTRY: case op_PATH: case op_PATHs:
-		set_path(slot[0], res);
+	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
+		set_path(slot[0], res, idx);
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(GTK_LIST(slot[0]),

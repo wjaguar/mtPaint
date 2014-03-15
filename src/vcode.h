@@ -28,7 +28,7 @@ enum {
 	op_MAINWINDOW,
 	op_WINDOW,
 	op_WINDOWm,
-	op_WINDOWpm,
+	op_DIALOGm,
 	op_FPICKpm,
 	op_TOPVBOX,
 	op_TOPVBOXV,
@@ -60,12 +60,10 @@ enum {
 	op_BOOKBTN,
 	op_HSEP,
 	op_MLABEL,
-	op_MLABELp,
+	op_WLABEL,
 	op_XLABEL,
 	op_TLLABEL,
-	op_TLLABELp,
 	op_TLTEXT,
-	op_TLTEXTp,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -108,6 +106,7 @@ enum {
 	op_XENTRY,
 	op_MLENTRY,
 	op_TLENTRY,
+	op_XPENTRY,
 	op_TPENTRY,
 	op_PATH,
 	op_PATHs,
@@ -128,20 +127,24 @@ enum {
 	op_OKBOXp,
 	op_EOKBOX,
 	op_UOKBOX,
+	op_UOKBOXp,
 	op_OKBTN,
 	op_CANCELBTN,
 	op_UCANCELBTN,
+	op_ECANCELBTN,
 	op_OKADD,
 	op_OKTOGGLE,
 	op_UTOGGLE,
 	op_BUTTON,
 	op_UBUTTON,
+	op_EBUTTON,
 	op_TLBUTTON,
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
 
 	op_GROUP,
+	op_IDENT,
 
 	op_WLIST,
 	op_IDXCOLUMN,
@@ -156,6 +159,7 @@ enum {
 	op_EVT_CLICK,
 	op_EVT_SELECT,
 	op_EVT_CHANGE,
+	op_EVT_DESTROY, // before deallocation
 	op_EVT_KEY, // with key data
 	op_EVT_EXT, // generic event with extra data
 
@@ -248,9 +252,15 @@ void run_destroy(void **wdata);
 #define PREV_SLOT(V) ((V) - 2)
 #define SLOT_N(V,N) ((V) + (N) * 2)
 
+//	From widget to its wdata
+void **get_wdata(GtkWidget *widget, char *id);
+
 //	Install event handler
 void add_click(void **r, GtkWidget *widget);
 void add_del(void **r, GtkWidget *window);
+
+//	Run event handler, defaulting to run_destroy()
+void do_evt_1_d(void **slot);
 
 //	From event to its originator
 void **origin_slot(void **slot);
@@ -287,25 +297,29 @@ void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
 ///	Handler for dialog buttons
 void dialog_event(void *ddata, void **wdata, int what, void **where);
 
-#define WB_OPBITS     13
-#define WB_OPMASK 0x1FFF /* ((1 << WB_OPBITS) - 1) */
+#define WB_OPBITS     12
+#define WB_OPMASK 0x0FFF /* ((1 << WB_OPBITS) - 1) */
 #define WB_FFLAG  0x8000
-#define WB_REF1   0x2000
-#define WB_REF2   0x4000
-#define WB_REF3   0x6000
+#define WB_NFLAG  0x4000
+#define WB_REF1   0x1000
+#define WB_REF2   0x2000
+#define WB_REF3   0x3000
 #define WB_GETREF(X) (((X) >> WB_OPBITS) & 3)
 #define WB_LSHIFT     16
 #define WB_GETLEN(X) ((X) >> WB_LSHIFT)
 
 #define WBlen(L) ((L) << WB_LSHIFT)
-#define WBh(NM,L) (void *)( op_##NM + WBlen(L))
-#define WBhf(NM,L) (void *)( op_##NM + WBlen(L) + WB_FFLAG)
-#define WBrh(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF1)
-#define WBrhf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF1 + WB_FFLAG)
-#define WBr2h(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF2)
-#define WBr2hf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF2 + WB_FFLAG)
-#define WBr3h(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF3)
-#define WBr3hf(NM,L) (void *)( op_##NM + WBlen(L) + WB_REF3 + WB_FFLAG)
+#define WBh(NM,L) (void *)(op_##NM + WBlen(L))
+#define WBhf(NM,L) (void *)(op_##NM + WBlen(L) + WB_FFLAG)
+#define WBrh(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1)
+#define WBrhf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1 + WB_FFLAG)
+#define WBr2h(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2)
+#define WBr2hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_FFLAG)
+#define WBr3h(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3)
+#define WBr3hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3 + WB_FFLAG)
+#define WBhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_NFLAG + WB_FFLAG)
+#define WBrhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1 + WB_NFLAG + WB_FFLAG)
+#define WBr2hnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_NFLAG + WB_FFLAG)
 #define WBfield(V) (void *)offsetof(WBbase, V)
 #define WBwh(W,H) (void *)((H) + ((W) << 16))
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
@@ -321,7 +335,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MAINWINDOW(NM,ICN,W,H) WBr2h(MAINWINDOW, 3), (NM), (ICN), WBwh(W, H)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
-#define WINDOWpm(NP) WBrhf(WINDOWpm, 1), WBfield(NP)
+#define WINDOWpm(NP) WBrhnf(WINDOWm, 1), WBfield(NP)
+#define DIALOGpm(NP) WBrhnf(DIALOGm, 1), WBfield(NP)
 /* !!! Note: string "V" is in system encoding */
 /* !!! This block holds 2 nested EVENT blocks */
 #define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
@@ -350,6 +365,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define HBOX WBh(HBOX, 0)
 #define HBOXbp(S,B,P) WBh(HBOX, 1), WBpbs(P, B, S)
 #define HBOXb(S,B) HBOXbp(S, B, 0)
+#define HBOXPr WBrh(HBOX, 1), WBpbs(5, 0, 0)
 #define XHBOX WBh(XHBOX, 0)
 #define XHBOXbp(S,B,P) WBh(XHBOX, 1), WBpbs(P, B, S)
 #define XHBOXb(S,B) XHBOXbp(S, B, 0)
@@ -375,7 +391,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MLABEL(NM) WBh(MLABEL, 1), (NM)
 #define MLABELr(NM) WBrh(MLABEL, 1), (NM)
 #define MLABELxr(NM,PX,PY,AX) WBrh(MLABEL, 2), (NM), WBppa(PX, PY, AX)
-#define MLABELp(V) WBhf(MLABELp, 1), WBfield(V)
+#define MLABELp(V) WBhnf(MLABEL, 1), WBfield(V)
+#define WLABELp(V) WBhnf(WLABEL, 1), WBfield(V)
 #define XLABELr(NM) WBrh(XLABEL, 1), (NM)
 #define TLLABELl(NM,X,Y,L) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, L)
 #define TLLABEL(NM,X,Y) TLLABELl(NM, X, Y, 1)
@@ -384,12 +401,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
 #define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh(TLLABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
-#define TLLABELp(V,X,Y) WBhf(TLLABELp, 2), WBfield(V), WBxyl(X, Y, 1)
-#define TLLABELpx(V,X,Y,PX,PY,AX) WBhf(TLLABELp, 3), WBfield(V), \
+#define TLLABELp(V,X,Y) WBhnf(TLLABEL, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLLABELpx(V,X,Y,PX,PY,AX) WBhnf(TLLABEL, 3), WBfield(V), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
 #define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
-#define TLTEXTp(V,X,Y) WBhf(TLTEXTp, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -495,6 +512,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
 	WBxyl(X, Y, L)
+#define XPENTRY(V,MX) WBrhf(XPENTRY, 2), WBfield(V), (void *)(MX)
 #define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
 #define PATH(NM,T,M,V) WBrhf(PATH, 4), WBfield(V), (T), (void *)(M), (NM)
 #define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
@@ -516,16 +534,21 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(OK, HOK), EVENT(CANCEL, HC)
 #define OKBOX0 WBh(OKBOX, 0)
 #define UOKBOX0 WBh(UOKBOX, 0)
+#define UOKBOXp0 WBh(UOKBOXp, 0)
 // !!! These *BTN,OK*,*TOGGLE,*BUTTON blocks each hold 1 nested EVENT block */
 #define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define CANCELBTNp(NP,H) WBr2hnf(CANCELBTN, 1 + 2), WBfield(NP), EVENT(CANCEL, H)
 #define UCANCELBTN(NM,H) WBr2h(UCANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define ECANCELBTN(NM,H) WBr2h(ECANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
 #define OKTOGGLE(NM,V,H) WBr2hf(OKTOGGLE, 2 + 2), WBfield(V), (NM), \
 	EVENT(CHANGE, H)
 #define UTOGGLEv(NM,V,H) WBr2h(UTOGGLE, 2 + 2), &(V), (NM), EVENT(CHANGE, H)
 #define BUTTON(NM,H) WBr2h(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define BUTTONp(NP,H) WBr2hnf(BUTTON, 1 + 2), WBfield(NP), EVENT(CLICK, H)
 #define UBUTTON(NM,H) WBr2h(UBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define EBUTTON(NM,H) WBr2h(EBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
@@ -549,6 +572,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
+#define IDENT(NM) WBh(IDENT, 1), (NM)
 #define BORDER(T,V) WBh(BOR_##T, 1), (void *)(V)
 #define DEFBORDER(T) WBh(BOR_##T, 0)
 #define MKSHRINK WBh(MKSHRINK, 0)
@@ -599,8 +623,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define FPICK_LOAD	2
 #define FPICK_DIRS_ONLY	4
 
-//	Extra data of PATH
+//	Extra data of PATH and PENTRY
 #define PATH_VALUE	0
+#define PATH_RAW	1
 
 //	Extra data of LISTCC
 #define LISTCC_RESET_ROW 0
