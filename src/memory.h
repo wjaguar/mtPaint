@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -849,7 +849,8 @@ int mem_pick_gradient(unsigned char *buf, int cspace, int mode);
 
 int mem_skew(double xskew, double yskew, int type, int gcor);
 
-int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int h);
+int average_channel(unsigned char *src, int iw, int *vxy);
+int average_pixels(unsigned char *rgb, unsigned char *alpha, int iw, int *vxy);
 
 //// SEGMENTATION
 

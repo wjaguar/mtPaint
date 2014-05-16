@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -226,7 +226,7 @@ void create_default_image();			// Create default new image
 //	Changed image geometry (+undo)
 #define UPD_GEOM   (CF_GEOM | CF_MENU | CF_IMGBAR | UPD_IMG)
 //	Added a new channel (+)
-#define UPD_ADDCH  (CF_MENU | CF_IMGBAR | UPD_IMG)
+#define UPD_ADDCH  (CF_SET | CF_MENU | CF_IMGBAR | UPD_IMG)
 //	Deleted an existing channel (+)
 #define UPD_DELCH  UPD_ADDCH
 //	Switched to new channel (+)

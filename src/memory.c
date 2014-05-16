@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -9884,37 +9884,67 @@ int mem_skew(double xskew, double yskew, int type, int gcor)
 	return (0);
 }
 
-// Get gamma-corrected average of RGB pixels in an area, or -1 if out of bounds
-int average_pixels(unsigned char *rgb, int iw, int ih, int x, int y, int w, int h)
+// Get average of utility channel pixels in an area
+int average_channel(unsigned char *src, int iw, int *vxy)
 {
 	unsigned char *tmp;
+	unsigned int nn, wh;
+	int i, j, x, y, w, h;
+
+	w = vxy[2] - (x = vxy[0]);
+	h = vxy[3] - (y = vxy[1]);
+	src += y * iw + x;
+
+	/* Average area */
+	for (nn = i = 0; i < h; i++)
+	{
+		tmp = src + i * iw;
+		for (j = w; j--; nn += *tmp++);
+	}
+	wh = w * h;
+	return ((nn + (wh >> 1)) / wh);
+}
+
+// Get gamma-corrected average of RGB/RGBA pixels in an area
+int average_pixels(unsigned char *rgb, unsigned char *alpha, int iw, int *vxy)
+{
+	unsigned char *tmp, *tma;
 	double rr, gg, bb, dd;
-	int i, j;
+	int i, j, k, x, y, w, h;
 
-
-	/* Clip to image */
-	w += x; h += y;
-	if (x < 0) x = 0;
-	if (w > iw) w = iw;
-	if (y < 0) y = 0;
-	if (h > ih) h = ih;
-	/* Nothing remained */
-	if ((x >= w) || (y >= h)) return (-1);
+	w = vxy[2] - (x = vxy[0]);
+	h = vxy[3] - (y = vxy[1]);
+	rgb += (y * iw + x) * 3;
+	if (alpha) alpha += y * iw + x;
 
 	/* Average (gamma corrected) area */
-	w -= x;
-	rr = gg = bb = 0.0;
-	for (i = y; i < h; i++)
+	rr = gg = bb = dd = 0.0;
+	for (i = 0; i < h; i++)
 	{
-		tmp = rgb + (i * iw + x) * 3;
-		for (j = 0; j < w; j++ , tmp += 3)
+		tmp = rgb + i * iw * 3;
+		if (alpha)
 		{
-			rr += gamma256[tmp[0]];
-			gg += gamma256[tmp[1]];
-			bb += gamma256[tmp[2]];
+			tma = alpha + i * iw;
+			for (j = 0; j < w; j++ , tmp += 3)
+			{
+				dd += k = *tma++;
+				rr += k * gamma256[tmp[0]];
+				gg += k * gamma256[tmp[1]];
+				bb += k * gamma256[tmp[2]];
+			}
+		}
+		else
+		{
+			dd += w;
+			for (j = 0; j < w; j++ , tmp += 3)
+			{
+				rr += gamma256[tmp[0]];
+				gg += gamma256[tmp[1]];
+				bb += gamma256[tmp[2]];
+			}
 		}
 	}
-	dd = 1.0 / (w * (h - y));
+	dd = 1.0 / dd;
 	rr *= dd; gg *= dd; bb *= dd;
 	return (RGB_2_INT(UNGAMMA256(rr), UNGAMMA256(gg), UNGAMMA256(bb)));
 }

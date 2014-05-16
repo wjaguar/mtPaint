@@ -1,5 +1,5 @@
 /*	channels.c
-	Copyright (C) 2006-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -391,6 +391,7 @@ void pressed_channel_toggle(int state, int what)
 
 void pressed_RGBA_toggle(int state)
 {
+	if (RGBA_mode == state) return;
 	RGBA_mode = state;
-	update_stuff(UPD_MODE);
+	update_stuff(UPD_MODE | CF_SET);
 }

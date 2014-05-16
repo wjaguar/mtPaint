@@ -465,7 +465,7 @@ static void wrapbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 
 	/* Count widgets */
 	cnt = w = h = 0;
-	for (chain = box->children; chain; chain = chain->next , idx++)
+	for (chain = box->children; chain; chain = chain->next)
 	{
 		child = chain->data;
 		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
@@ -1334,16 +1334,18 @@ void ts_update_gradient()
 
 void toolbar_update_settings()
 {
-	char txt[32];
-	int i, j, c;
+	char txt[64];
+	int i, j, c, l;
 
 	for (i = 0; i < 2; i++)
 	{
 		c = "AB"[i]; j = mem_col_[i];
-		if (mem_img_bpp == 1) snprintf(txt, 30, "%c [%d] = {%d,%d,%d}",
+		if (mem_img_bpp == 1) l = sprintf(txt, "%c [%d] = {%d,%d,%d}",
 			c, j, mem_pal[j].red, mem_pal[j].green, mem_pal[j].blue);
-		else snprintf(txt, 30, "%c = {%i,%i,%i}", c, mem_col_24[i].red,
+		else l = sprintf(txt, "%c = {%i,%i,%i}", c, mem_col_24[i].red,
 			mem_col_24[i].green, mem_col_24[i].blue);
+		if (RGBA_mode && mem_img[CHN_ALPHA])
+			sprintf(txt + l, " + {%d}", channel_col_[i][CHN_ALPHA]);
 		cmd_setv(toolbar_labels[i], txt, LABEL_VALUE);
 	}
 

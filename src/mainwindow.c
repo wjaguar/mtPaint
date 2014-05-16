@@ -1425,7 +1425,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 {
 	static int tool_fix, tool_fixv;	// Fixate on axis
 	int new_cursor;
-	int i, pixel, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
+	int i, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
 	int zoom = 1, scale = 1;
 
 
@@ -1534,6 +1534,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	while ((state & _CS) == _C)	// Set colour A/B
 	{
 		int ab = button == 3; /* A for left, B for right */
+		int pixel, alpha, rgba, upd = 0;
 
 		if (button == 2) /* Auto-dither */
 		{
@@ -1542,8 +1543,13 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			break;
 		}
 		if ((button != 1) && (button != 3)) break;
+		/* Default alpha */
+		rgba = RGBA_mode && (mem_channel == CHN_IMAGE);
+		alpha = channel_col_[ab][CHN_ALPHA];
 		/* Pick color from tracing image if possible */
-		pixel = get_bkg(xc + dx * scale, yc + dy * scale, event == GDK_2BUTTON_PRESS);
+		pixel = get_bkg(xc + dx * scale, yc + dy * scale,
+			event == GDK_2BUTTON_PRESS);
+		if (pixel >= 0) alpha = 255; // opaque
 		/* Otherwise, average brush or selection area on Ctrl+double click */
 		while ((pixel < 0) && (event == GDK_2BUTTON_PRESS) && (MEM_BPP == 3))
 		{
@@ -1557,24 +1563,44 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 				rect[2] = rect[3] = tool_size;
 			}
 			/* Have selection marquee */
-			else if ((marq_status > MARQUEE_NONE) && (marq_status < MARQUEE_PASTE))
-				marquee_at(rect);
+			else if ((marq_status > MARQUEE_NONE) &&
+				(marq_status < MARQUEE_PASTE)) marquee_at(rect);
 			else break;
-			pixel = average_pixels(mem_img[CHN_IMAGE], mem_width, mem_height,
-				rect[0], rect[1], rect[2], rect[3]);
+			/* Clip to image */
+			rect[2] += rect[0];
+			rect[3] += rect[1];
+			if (!clip(rect, 0, 0, mem_width, mem_height, rect)) break;
+			/* Average alpha if needed */
+			if (rgba && mem_img[CHN_ALPHA]) alpha = average_channel(
+				mem_img[CHN_ALPHA], mem_width, rect);
+			/* Average image channel as RGBA or RGB */
+			pixel = average_pixels(mem_img[CHN_IMAGE],
+				rgba && alpha && !channel_dis[CHN_ALPHA] ?
+				mem_img[CHN_ALPHA] : NULL, mem_width, rect);
 			break;
 		}
 		/* Failing that, just pick color from image */
-		if (pixel < 0) pixel = get_pixel(ox, oy);
+		if (pixel < 0)
+		{
+			pixel = get_pixel(ox, oy);
+			if (mem_img[CHN_ALPHA])
+				alpha = mem_img[CHN_ALPHA][mem_width * oy + ox];
+		}
+
+		if (rgba)
+		{
+			upd = channel_col_[ab][CHN_ALPHA] ^ alpha;
+			channel_col_[ab][CHN_ALPHA] = alpha;
+		}
 
 		if (mem_channel != CHN_IMAGE)
 		{
-			if (channel_col_[ab][mem_channel] == pixel) break;
+			upd |= channel_col_[ab][mem_channel] ^ pixel;
 			channel_col_[ab][mem_channel] = pixel;
 		}
 		else if (mem_img_bpp == 1)
 		{
-			if (mem_col_[ab] == pixel) break;
+			upd |= mem_col_[ab] ^ pixel;
 			mem_col_[ab] = pixel;
 			mem_col_24[ab] = mem_pal[pixel];
 		}
@@ -1582,12 +1608,12 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		{
 			png_color *col = mem_col_24 + ab;
 
-			if (PNG_2_INT(*col) == pixel) break;
+			upd |= PNG_2_INT(*col) ^ pixel;
 			col->red = INT_2_R(pixel);
 			col->green = INT_2_G(pixel);
 			col->blue = INT_2_B(pixel);
 		}
-		update_stuff(UPD_CAB);
+		if (upd) update_stuff(UPD_CAB);
 		break;
 	}
 
@@ -1920,9 +1946,16 @@ static int get_bkg(int xc, int yc, int dclick)
 			PNG_2_INT(mem_pal[mem_xpm_trans])) return (-1);
 
 		/* Double click averages background under image pixel */
-		if (dclick) return (average_pixels(bkg_rgb, bkg_w, bkg_h,
-			xi * bkg_scale - bkg_x, yi * bkg_scale - bkg_y,
-			bkg_scale, bkg_scale));
+		if (dclick)
+		{
+			int vxy[4];
+
+			vxy[2] = (vxy[0] = xi * bkg_scale - bkg_x) + bkg_scale;
+			vxy[3] = (vxy[1] = yi * bkg_scale - bkg_y) + bkg_scale;
+
+			return (clip(vxy, 0, 0, bkg_w, bkg_h, vxy) ?
+				average_pixels(bkg_rgb, NULL, bkg_w, vxy) : -1);
+		}
 	}
 	xb = floor_div((xc - margin_main_x) * bkg_scale, scale) - bkg_x;
 	yb = floor_div((yc - margin_main_y) * bkg_scale, scale) - bkg_y;
