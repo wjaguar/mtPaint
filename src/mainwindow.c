@@ -5094,9 +5094,9 @@ static void *main_code[] = {
 		XSCROLL(1, 1), // auto/auto
 		WLIST,
 		RTXTCOLUMNDi(0, 0),
-		LISTCu(nidx_c, cnt_c, strs_c, sizeof(int), cline_select), FOCUS,
+		COLUMNDATA(strs_c, sizeof(int)), CLEANUP(strs_c),
+		LISTCu(nidx_c, cnt_c, cline_select), FOCUS,
 		EVENT(KEY, cline_keypress),
-		CLEANUP(strs_c),
 		WDONE,
 	ENDIF(1),
 	REF(dockpage1), PAGEir(XPM_ICON(layers), 5),

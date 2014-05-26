@@ -147,6 +147,7 @@ enum {
 	op_IDENT,
 
 	op_WLIST,
+	op_COLUMNDATA,
 	op_IDXCOLUMN,
 	op_TXTCOLUMN,
 	op_XTXTCOLUMN,
@@ -500,14 +501,14 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(SELECT, HS)
 #define LISTCCHr(V,L,H,HS) WBr2hf(LISTCCHr, 3 + 2), WBfield(V), WBfield(L), \
 	(void *)(H), EVENT(SELECT, HS)
-#define LISTC(V,L,FP,S,HS) WBr2hf(LISTC, 5 + 2), WBfield(V), WBfield(L), \
-	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
-#define LISTCd(V,L,FP,S,HS) WBr2hf(LISTCd, 5 + 2), WBfield(V), WBfield(L), \
-	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
-#define LISTCu(V,L,FP,S,HS) WBr2hf(LISTCu, 5 + 2), WBfield(V), WBfield(L), \
-	NULL, WBfield(FP), (void *)(S), EVENT(SELECT, HS)
-#define LISTCS(V,L,FP,S,SM,HS) WBr2hf(LISTCS, 5 + 2), WBfield(V), WBfield(L), \
-	WBfield(SM), WBfield(FP), (void *)(S), EVENT(SELECT, HS)
+#define LISTC(V,L,HS) WBr2hf(LISTC, 3 + 2), WBfield(V), WBfield(L), \
+	NULL, EVENT(SELECT, HS)
+#define LISTCd(V,L,HS) WBr2hf(LISTCd, 3 + 2), WBfield(V), WBfield(L), \
+	NULL, EVENT(SELECT, HS)
+#define LISTCu(V,L,HS) WBr2hf(LISTCu, 3 + 2), WBfield(V), WBfield(L), \
+	NULL, EVENT(SELECT, HS)
+#define LISTCS(V,L,SM,HS) WBr2hf(LISTCS, 3 + 2), WBfield(V), WBfield(L), \
+	WBfield(SM), EVENT(SELECT, HS)
 #define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
@@ -594,6 +595,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define ONTOP0 WBh(ONTOP, 0)
 #define RAISED WBh(RAISED, 0)
 #define WLIST WBh(WLIST, 0)
+#define COLUMNDATA(V,S) WBhnf(COLUMNDATA, 2), WBfield(V), (void *)(S)
 #define IDXCOLUMN(N0,S,W,J) WBrh(IDXCOLUMN, 3), (void *)(N0), (void *)(S), \
 	(void *)((W) + ((J) << 16))
 #define TXTCOLUMNv(A,S,W,J) WBrh(TXTCOLUMN, 3), &(A), (void *)(S), \

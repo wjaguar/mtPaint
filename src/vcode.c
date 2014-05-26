@@ -713,34 +713,47 @@ static void set_textarea(GtkWidget *text, char *init)
 //	Columns for LIST* widgets
 
 typedef struct {
+	char *ddata;			// datastruct
+	void **dcolumn;			// datablock "column" if any
 	void **columns[MAX_COLS];	// column slots
-	char *base[MAX_COLS];		// column base pointers
 	void **r;			// slot
 	int ncol;			// columns
 	unsigned char idx[MAX_COLS];	// index vector
 } col_data;
 
-static void set_columns(col_data *c, void ***columns, int ncol, char *ddata,
-	void **r)
+static void *get_cell(col_data *c, int row, int col)
+{
+	void **cp = c->columns[col][1];
+	char *v;
+	int op, ofs = 0;
+
+	if (!cp[2]) // relative
+	{
+		ofs = (int)cp[1];
+		cp = c->dcolumn;
+	}
+	op = (int)cp[0];
+	v = cp[1];
+	if (op & WB_FFLAG) v = c->ddata + (int)v;
+	if (op & WB_NFLAG) v = *(void **)v; // dereference
+
+	return (v + ofs + row * (int)cp[2]);
+}
+
+static void set_columns(col_data *c, col_data *src, char *ddata, void **r)
 {
 	int i;
 
+	/* Copy & clear the source */
+	*c = *src;
+	memset(src, 0, sizeof(*src));
+
+	c->ddata = ddata;
 	c->r = r;
 	for (i = 0; i < MAX_COLS; i++) c->idx[i] = i;
-	c->ncol = ncol;
-	for (i = 0; i < ncol; i++)
-	{
-		void **cp;
-		char *v;
-
-		/* Link columns to list */
-		*(c->columns[i] = cp = columns[i]) = c->idx + i;
-		/* Prepare base pointer */
-		cp = cp[1];
-		v = cp[1];
-		if ((int)cp[0] & WB_FFLAG) v = (void *)(ddata + (int)v);
-		c->base[i] = v;
-	}
+	/* Link columns to list */
+	for (i = 0; i < c->ncol; i++)
+		c->columns[i][0] = c->idx + i;
 }
 
 //	LISTCC widget
@@ -789,23 +802,20 @@ static void listcc_select_item(GtkList *list, listcc_data *dt)
 static void listcc_toggled(GtkWidget *widget, gpointer user_data)
 {
 	listcc_data *dt = user_data;
-	void **cp, **slot, **base, **desc;
+	void **slot, **base, **desc;
 	char *v;
-	int col, row, step;
+	int col, row;
 
 	if (dt->lock) return;
 	/* Find out what happened to what, and where */
 	col = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
-	slot = dt->c.columns[col];
-	cp = slot[1];
-	v = dt->c.base[col];
 	row = (int)gtk_object_get_user_data(GTK_OBJECT(widget->parent->parent));
-	step = (int)cp[2];
-	v += step * row;
 
 	/* Self-updating */
+	v = get_cell(&dt->c, row, col);
 	*(int *)v = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 	/* Now call the handler */
+	slot = dt->c.columns[col];
 	slot = NEXT_SLOT(slot);
 	base = slot[0]; desc = slot[1];
 	if (desc[1]) ((evtx_fn)desc[1])(GET_DDATA(base), base,
@@ -836,12 +846,10 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 		for (j = 0; col; col = col->next , j++)
 		{
 			GtkWidget *widget = ((GtkBoxChild *)(col->data))->widget;
+			char *v = get_cell(&ld->c, n, j);
 			void **cp = ld->c.columns[j][1];
-			char *v = ld->c.base[j];
-			int op = (int)cp[0], step = (int)cp[2];
+			int op = (int)cp[0] & WB_OPMASK;
 
-			v += step * n;
-			op &= WB_OPMASK;
 			if ((op == op_TXTCOLUMN) || (op == op_XTXTCOLUMN))
 				gtk_label_set_text(GTK_LABEL(widget), v);
 			else if (op == op_CHKCOLUMNi0)
@@ -857,8 +865,7 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 }
 
 // !!! With inlining this, problem also
-GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
-	int ncol, void **r)
+GtkWidget *listcc(int *idx, char *ddata, void **pp, col_data *c, void **r)
 {
 	char txt[128];
 	GtkWidget *widget, *list, *item, *hbox;
@@ -879,7 +886,7 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 	ld->idx = idx;
 	ld->cnt = cnt;
 	ld->h = h;
-	set_columns(&ld->c, columns, ncol, ddata, r);
+	set_columns(&ld->c, c, ddata, r);
 
 	for (n = h - 1; n >= 0; n--) // Reverse numbering
 	{
@@ -890,14 +897,11 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 		hbox = gtk_hbox_new(FALSE, 3);
 		gtk_container_add(GTK_CONTAINER(item), hbox);
 
-		for (j = 0; j < ncol; j++)
+		for (j = 0; j < ld->c.ncol; j++)
 		{
-			void **cp = columns[j][1];
-			char *v = cp[1];
-			int op = (int)cp[0], step = (int)cp[2], jw = (int)cp[3];
+			void **cp = ld->c.columns[j][1];
+			int op = (int)cp[0] & WB_OPMASK, jw = (int)cp[3];
 
-			v += step * n;
-			op &= WB_OPMASK;
 			if (op == op_CHKCOLUMNi0)
 			{
 #if GTK_MAJOR_VERSION == 1
@@ -919,7 +923,7 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, void ***columns,
 				if ((op == op_TXTCOLUMN) || (op == op_XTXTCOLUMN))
 					txt[0] = '\0'; // Init to empty string
 				else /* if (op == op_IDXCOLUMN) */ // Constant
-					sprintf(txt, "%d", (int)v);
+					sprintf(txt, "%d", (int)cp[1] + (int)cp[2] * n);
 				widget = gtk_label_new(txt);
 				gtk_misc_set_alignment(GTK_MISC(widget),
 					(jw >> 16) * 0.5, 0.5);
@@ -945,11 +949,9 @@ typedef struct {
 	int kind;		// type of list
 	int update;		// delayed update flags
 	int lock;		// against in-reset signals
-	int bstep;		// base array step
 	int *idx;		// result field
 	int *cnt;		// length field
 	int *sort;		// sort column & direction
-	void **basev;		// base array
 	GtkWidget *sort_arrows[MAX_COLS];
 	col_data c;
 } listc_data;
@@ -992,23 +994,18 @@ static void listc_update(GtkWidget *w, gpointer user_data)
 		gtk_clist_moveto(clist, (int)(clist->selection->data), 0, 0.5, 0);
 }
 
-static void listc_collect(gchar **row_text, listc_data *ld, int row)
+static void listc_collect(gchar **row_text, col_data *c, int row)
 {
-	char *base = *ld->basev;
-	int j, ncol = ld->c.ncol, bstep = ld->bstep;
+	int j, ncol = c->ncol;
 
 	for (j = 0; j < ncol; j++)
 	{
-		void **cp = ld->c.columns[j][1];
-		char *v = ld->c.base[j];
-		int op = (int)cp[0], step = (int)cp[2];
+		char *v = get_cell(c, row, j);
+		void **cp = c->columns[j][1];
+		int op = (int)cp[0] & WB_OPMASK;
 
-		if (!step) v = (void *)(base + (int)v) , step = bstep;
-//		if (!step) v = (void *)(base + (int)v + bstep * row);
-		v += step * row;
-		op &= WB_OPMASK;
 		row_text[j] = op == op_TXTCOLUMN ? v : // Array of chars
-			/* op == op_RTXTCOLUMN */ (char *)v + *(int *)v;
+			/* op == op_RTXTCOLUMN */ v + *(int *)v;
 // !!! IDXCOLUMN not supported
 	}
 }
@@ -1028,7 +1025,7 @@ static void listc_reset(GtkCList *clist, listc_data *ld)
 		gchar *row_text[MAX_COLS];
 		int row;
 
-		listc_collect(row_text, ld, i);
+		listc_collect(row_text, &ld->c, i);
 		row = gtk_clist_append(clist, row_text);
 		gtk_clist_set_row_data(clist, row, (gpointer)i);
 	}
@@ -1093,41 +1090,35 @@ static void listc_column_button(GtkCList *clist, gint col, gpointer user_data)
 }
 
 // !!! With inlining this, problem also likely
-GtkWidget *listc(int *idx, char *ddata, void **pp, void ***columns,
-	int ncol, void **r)
+GtkWidget *listc(int *idx, char *ddata, void **pp, col_data *c, void **r)
 {
 	static int zero = 0;
 	GtkWidget *list, *hbox;
 	GtkCList *clist;
 	listc_data *ld;
-	void **basev;
-	int j, bstep, sm, kind, *cntv, *sort = &zero;
+	int j, sm, kind, *cntv, *sort = &zero;
 
 
 	cntv = (void *)(ddata + (int)pp[2]); // length var
-	basev = (void *)(ddata + (int)pp[4]); // array base var
-	bstep = (int)pp[5]; // array item size
 	kind = (int)pp[0] & WB_OPMASK; // kind of list
 	if (kind == op_LISTCS) sort = (void *)(ddata + (int)pp[3]); // sort mode
 
-	list = gtk_clist_new(ncol);
+	list = gtk_clist_new(c->ncol);
 
 	/* Make datastruct */
 	ld = bound_malloc(list, sizeof(listc_data));
 	gtk_object_set_user_data(GTK_OBJECT(list), ld);
 	ld->kind = kind;
-	ld->basev = basev;
-	ld->bstep = bstep;
 	ld->idx = idx;
 	ld->cnt = cntv;
 	ld->sort = sort;
-	set_columns(&ld->c, columns, ncol, ddata, r);
+	set_columns(&ld->c, c, ddata, r);
 
 	sm = *sort;
 	clist = GTK_CLIST(list);
-	for (j = 0; j < ncol; j++)
+	for (j = 0; j < ld->c.ncol; j++)
 	{
-		void **cp = columns[j][1];
+		void **cp = ld->c.columns[j][1];
 		int op = (int)cp[0], jw = (int)cp[3];
 		int l = WB_GETLEN(op); // !!! -2 for each extra ref
 
@@ -1524,10 +1515,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	GtkAccelGroup* ag = NULL;
 	v_dd *vdata;
 	cmdef *cmd;
-	void **columns[MAX_COLS], *rstack[CALL_DEPTH], **rp = rstack;
+	col_data c;
+	void *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **r = NULL, **res = NULL;
 	int ld, dsize;
-	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, ncol = 0;
+	int i, n, op, lp, ref, pk, cw, tpad, minw = 0;
 
 
 	// Allocation size
@@ -1552,6 +1544,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		cmds[cmddefs[i].op] = cmddefs + i;
 	for (i = 0; i < sizeof(xcmddefs) / sizeof(xcmddefs[0]); i++)
 		cmds[xcmddefs[i].s.op] = &xcmddefs[i].s;
+
+	// Column data
+	memset(&c, 0, sizeof(c));
 
 	while (TRUE)
 	{
@@ -2014,16 +2009,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a list with pre-defined columns */
 		case op_LISTCCr: case op_LISTCCHr:
-			widget = listcc(v, ddata, pp - 1, columns, ncol, r);
-			ncol = 0;
+			widget = listcc(v, ddata, pp - 1, &c, r);
 // !!! Border = 5 / 0
 			if (op == op_LISTCCr) cw = 5;
 			pk = pk_SCROLLVPv | pkf_SHOW;
 			break;
 		/* Add a clist with pre-defined columns */
 		case op_LISTC: case op_LISTCd: case op_LISTCu: case op_LISTCS:
-			widget = listc(v, ddata, pp - 1, columns, ncol, r);
-			ncol = 0;
+			widget = listc(v, ddata, pp - 1, &c, r);
 // !!! Border = 0
 			pk = pk_BIN | pkf_SHOW;
 			break;
@@ -2232,12 +2225,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		/* Start group of list columns */
 		case op_WLIST:
-			ncol = 0;
+			memset(&c, 0, sizeof(c));
 			continue;
-		/* Add a list column */
+		/* Add a datablock pseudo-column */
+		case op_COLUMNDATA:
+			c.dcolumn = pp - 1;
+			continue;
+		/* Add a regular list column */
 		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
 		case op_RTXTCOLUMN: case op_CHKCOLUMNi0:
-			columns[ncol++] = r;
+			c.columns[c.ncol++] = r;
 			widget = NULL;
 			break;
 		/* Install activate event handler */
@@ -2969,7 +2966,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		gchar *row_text[MAX_COLS];
 		int i, row, n = (int)res, ncol = ld->c.ncol;
 
-		listc_collect(row_text, ld, n);
+		listc_collect(row_text, &ld->c, n);
 		row = gtk_clist_find_row_from_data(clist, (gpointer)n);
 		for (i = 0; i < ncol; i++) gtk_clist_set_text(clist,
 			row, i, row_text[i]);

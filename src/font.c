@@ -1526,32 +1526,32 @@ static void *font_code[] = {
 	RTXTCOLUMND(fontname_cc, dir, 0, 0),
 	RTXTCOLUMND(fontname_cc, bm, 0, 0),
 	NRTXTCOLUMND(_("Font"), fontname_cc, name, 0, 0),
-	REF(fname_l), LISTCS(fontname, nfontnames, fontnames, sizeof(fontname_cc),
-		fnsort, select_font), TRIGGER, CLEANUP(fontnames),
+	COLUMNDATA(fontnames, sizeof(fontname_cc)), CLEANUP(fontnames),
+	REF(fname_l), LISTCS(fontname, nfontnames, fnsort, select_font), TRIGGER,
 	WDONE, // VBOXP
 	XVBOXbp(0, 0, 5),
 	XHBOXbp(0, 0, 5),
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	NRTXTCOLUMND(_("Style"), fontstyle_cc, name, 0, 0),
-	REF(fstyle_l), WIDTH(100), LISTC(fontstyle, nfontstyles, fontstyles,
-		sizeof(fontstyle_cc), select_font), CLEANUP(fontstyles),
+	COLUMNDATA(fontstyles, sizeof(fontstyle_cc)), CLEANUP(fontstyles),
+	REF(fstyle_l), WIDTH(100), LISTC(fontstyle, nfontstyles, select_font),
 	XVBOX,
 	BORDER(XSCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
 	DEFBORDER(XSCROLL),
 	WLIST,
 	NRTXTCOLUMND(_("Size"), fontsize_cc, what, 0, 1), // centered
-	REF(fsize_l), LISTC(lfontsize, nlfontsizes, fontsizes,
-		sizeof(fontsize_cc), select_font), CLEANUP(fontsizes),
+	COLUMNDATA(fontsizes, sizeof(fontsize_cc)), CLEANUP(fontsizes),
+	REF(fsize_l), LISTC(lfontsize, nlfontsizes, select_font),
 	REF(size_spin), SPINc(fontsize, 1, 500), EVENT(CHANGE, font_entry_changed),
 	WDONE, // XVBOX
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	NRTXTCOLUMND(_("Filename"), fontfile_cc, name, 0, 0),
 	NRTXTCOLUMND(_("Face"), fontfile_cc, face, 0, 0),
-	REF(ffile_l), LISTC(fontfile, nfontfiles, fontfiles,
-		sizeof(fontfile_cc), select_font), CLEANUP(fontfiles),
+	COLUMNDATA(fontfiles, sizeof(fontfile_cc)), CLEANUP(fontfiles),
+	REF(ffile_l), LISTC(fontfile, nfontfiles, select_font),
 	WDONE, // XHBOXbp
 //	Text entry box
 	FVBOX(_("Text")), // !!! Originally was hbox
@@ -1594,7 +1594,8 @@ static void *font_code[] = {
 	WLIST,
 	RTXTCOLUMND(dir_cc, idx, 0, 0),
 	NRTXTCOLUMND(_("Directory"), dir_cc, dir, 0, 0),
-	REF(dir_l), LISTC(dir, ndirs, dirs, sizeof(dir_cc), NULL), CLEANUP(dirs),
+	COLUMNDATA(dirs, sizeof(dir_cc)), CLEANUP(dirs),
+	REF(dir_l), LISTC(dir, ndirs, NULL),
 	PATH(_("New Directory"), _("Select Directory"), FS_SELECT_DIR, dirp),
 	HSEPl(200),
 	HBOXbp(0, 0, 5),
