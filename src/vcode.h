@@ -123,6 +123,7 @@ enum {
 	op_LISTCd,
 	op_LISTCu,
 	op_LISTCS,
+	op_LISTCX,
 	op_OKBOX,
 	op_OKBOXp,
 	op_EOKBOX,
@@ -152,6 +153,7 @@ enum {
 	op_TXTCOLUMN,
 	op_XTXTCOLUMN,
 	op_RTXTCOLUMN,
+	op_RFILECOLUMN,
 	op_CHKCOLUMNi0,
 
 	op_EVT_0,
@@ -509,6 +511,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	NULL, EVENT(SELECT, HS)
 #define LISTCS(V,L,SM,HS) WBr2hf(LISTCS, 3 + 2), WBfield(V), WBfield(L), \
 	WBfield(SM), EVENT(SELECT, HS)
+#define LISTCX(V,L,SM,M,HS,HX) WBr3hf(LISTCX, 4 + 2 * 2), WBfield(V), \
+	WBfield(L), WBfield(SM), WBfield(M), EVENT(SELECT, HS), EVENT(EXT, HX)
 #define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
 #define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
 #define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
@@ -612,6 +616,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	NULL, (void *)((W) + ((J) << 16))
 #define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
+#define NRTXTCOLUMNDax(NM,F,W,J,I) WBrh(RTXTCOLUMN, 5), \
+	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
+#define NRTXTCOLUMNDaxx(NM,F,W,J,I,S) WBrh(RTXTCOLUMN, 6), \
+	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), \
+	(I), (S)
+#define NRFILECOLUMNDax(NM,F,W,J,I) WBrh(RFILECOLUMN, 5), \
+	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
 #define CHKCOLUMNi0v(A,S,W,J,HC) WBr2h(CHKCOLUMNi0, 3 + 2), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), EVENT(CHANGE, HC)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
@@ -635,6 +646,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of LISTC
 #define LISTC_RESET_ROW	0
 #define LISTC_ORDER	1
+#define LISTC_SORT	2
 
 //	Extra data of LABEL
 #define LABEL_VALUE	0

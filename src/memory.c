@@ -407,6 +407,13 @@ void addstr(memx2 *mem, char *s, int bk)
 	}
 }
 
+void addchars(memx2 *mem, int c, int l)
+{
+	l = getmemx2(mem, l);
+	memset(mem->buf + mem->here, c, l);
+	mem->here += l;
+}
+
 /* Calculate optimal number of objects in a memory chunk */
 static inline unsigned int objcount(unsigned int n, unsigned int size,
 	unsigned int hsize)

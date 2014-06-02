@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -919,6 +919,7 @@ void clist_enable_drag(GtkWidget *clist)
 
 // Move browse-mode selection in GtkCList without invoking callbacks
 
+#if 0 /* Not needed anymore */
 void clist_reselect_row(GtkCList *clist, int n)
 {
 	GtkWidget *widget;
@@ -937,6 +938,7 @@ void clist_reselect_row(GtkCList *clist, int n)
 	if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
 		gtk_widget_queue_draw(widget);
 }
+#endif
 
 // Move browse-mode selection in GtkList
 
