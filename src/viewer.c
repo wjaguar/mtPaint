@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -18,6 +18,8 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -31,6 +33,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
+#include "vcode.h"
 
 int view_showing, view_update_pending;
 float vw_zoom = 1;
@@ -69,7 +72,7 @@ void pressed_help()
 
 	gtk_container_set_border_width (GTK_CONTAINER (help_window), 4);
 	gtk_window_set_position (GTK_WINDOW (help_window), GTK_WIN_POS_CENTER);
-	snprintf(txt, 120, "%s - %s", MT_VERSION, _("About"));
+	snprintf(txt, 120, "%s - %s", MT_VERSION, __("About"));
 	gtk_window_set_title (GTK_WINDOW (help_window), txt);
 	gtk_widget_set_usize (help_window, -2, 400);
 
@@ -89,7 +92,7 @@ void pressed_help()
 	for (i = 0; i < HELP_PAGE_COUNT; i++)
 	{
 		tmp = help_pages[i];
-		for (j = 0; tmp[j]; j++) strs[j + 1] = _(tmp[j]);
+		for (j = 0; tmp[j]; j++) strs[j + 1] = __(tmp[j]);
 		strs[j + 1] = NULL;
 		res = g_strjoinv("\n", strs);
 
@@ -132,7 +135,7 @@ void pressed_help()
 		gtk_misc_set_alignment (GTK_MISC (label2), 0, 0);
 		gtk_misc_set_padding (GTK_MISC (label2), 5, 5);
 
-		label = gtk_label_new(_(help_titles[i]));
+		label = gtk_label_new(__(help_titles[i]));
 		gtk_notebook_append_page (GTK_NOTEBOOK (notebook), frame, label);
 	}
 
@@ -142,7 +145,7 @@ void pressed_help()
 	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
 	gtk_widget_show (box2);
 
-	button = xpack(box2, gtk_button_new_with_label (_("Close")));
+	button = xpack(box2, gtk_button_new_with_label (__("Close")));
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
 	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
@@ -416,7 +419,7 @@ void pressed_pan()
 
 	pan_thumbnail();
 
-	pan_window = add_a_window( GTK_WINDOW_POPUP, _("Pan Window"), GTK_WIN_POS_MOUSE, TRUE );
+	pan_window = add_a_window( GTK_WINDOW_POPUP, __("Pan Window"), GTK_WIN_POS_MOUSE, TRUE );
 	gtk_container_set_border_width (GTK_CONTAINER (pan_window), 2);
 
 	draw_pan = gtk_drawing_area_new();
@@ -984,8 +987,6 @@ void init_view()
 
 ////	TEXT TOOL
 
-GtkWidget *text_window, *text_font_window, *text_toggle[3], *text_spin[2];
-
 #define PAD_SIZE 4
 
 /* !!! This function invalidates "img" (may free or realloc it) */
@@ -997,10 +998,10 @@ int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp)
 
 	idx = (mem_channel == CHN_IMAGE) && (mem_img_bpp == 1);
 	/* Indexed image can't be antialiased */
-	aa = !idx && inifile_get_gboolean("fontAntialias0", FALSE);
-	ab = inifile_get_gboolean("fontAntialias1", FALSE);
+	aa = !idx && font_aa;
+	ab = font_bk;
 
-	back = inifile_get_gint32("fontBackground", 0);
+	back = font_bkg;
 // !!! Bug - who said palette is unchanged?
 	bkg[0] = mem_pal[back].red;
 	bkg[1] = mem_pal[back].green;
@@ -1148,12 +1149,6 @@ void render_text( GtkWidget *widget )
 	PangoLayout *layout;
 	PangoFontDescription *font_desc;
 	int tx = PAD_SIZE, ty = PAD_SIZE;
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	PangoMatrix matrix = PANGO_MATRIX_INIT;
-	double degs, angle;
-	int w2, h2;
-	int rotate = inifile_get_gboolean( "fontAntialias2", FALSE );
-#endif
 
 
 	context = gtk_widget_create_pango_context (widget);
@@ -1165,9 +1160,13 @@ void render_text( GtkWidget *widget )
 	pango_layout_set_text( layout, inifile_get( "textString", "" ), -1 );
 
 #if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	if (rotate)		// Rotation Toggle
+	if (font_r)		// Rotation Toggle
 	{
-		degs = inifile_get_gint32("fontAngle", 0) * 0.01;
+		PangoMatrix matrix = PANGO_MATRIX_INIT;
+		double degs, angle;
+		int w2, h2;
+
+		degs = font_angle * 0.01;
 		angle = G_PI*degs/180;
 		pango_matrix_rotate (&matrix, degs);
 		pango_context_set_matrix (context, &matrix);
@@ -1223,119 +1222,97 @@ void render_text( GtkWidget *widget )
 	if (!have_rgb) free(buf);
 	else have_rgb = make_text_clipboard(buf, width, height, 3);
 
-#undef _
-#define _(X) X
 	if (have_rgb) text_paste = TEXT_PASTE_GTK;
 	else alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
-#undef _
-#define _(X) __(X)
 }
 
-static void paste_text_ok(GtkWidget *widget)
-{
-	gboolean antialias[3] = { gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(text_toggle[0])),
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(text_toggle[1])),
-		gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(text_toggle[2])) };
+typedef struct {
+	int img, idx;
+	int bkg[3];
+	GtkWidget *textw;
+} text_dd;
 
-	char *t_string = (char *) gtk_font_selection_get_preview_text(
-				GTK_FONT_SELECTION(text_font_window) ),
-		*t_font_name = gtk_font_selection_get_font_name( GTK_FONT_SELECTION(text_font_window) );
+static void paste_text_ok(text_dd *dt, void **wdata, int what)
+{
+	char *t_string = (char *)gtk_font_selection_get_preview_text(
+			GTK_FONT_SELECTION(dt->textw)),
+		*t_font_name = gtk_font_selection_get_font_name(GTK_FONT_SELECTION(dt->textw));
 
 #if GTK_MAJOR_VERSION == 1
-	if (!gtk_font_selection_get_font(GTK_FONT_SELECTION(text_font_window)))
+	if (!gtk_font_selection_get_font(GTK_FONT_SELECTION(dt->textw)))
 		return;
 #endif
 
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	inifile_set_gint32("fontAngle", rint(read_float_spin(text_spin[1]) * 100.0));
-#endif
+	run_query(wdata);
 
-	if (mem_channel == CHN_IMAGE)
-	{
-		inifile_set_gint32( "fontBackground", read_spin(text_spin[0]));
-	}
+	inifile_set("lastTextFont", t_font_name);
+	inifile_set("textString", t_string);
 
-	inifile_set( "lastTextFont", t_font_name );
-	inifile_set( "textString", t_string );
-	inifile_set_gboolean( "fontAntialias0", antialias[0] );
-	inifile_set_gboolean( "fontAntialias1", antialias[1] );
-	inifile_set_gboolean( "fontAntialias2", antialias[2] );
-
-	render_text(widget);
+	render_text(dt->textw);
 	update_stuff(UPD_XCOPY);
 	if (mem_clipboard) pressed_paste(TRUE);
 
-	gtk_widget_destroy(widget);
+	run_destroy(wdata);
 
-	if (t_font_name) g_free(t_font_name);
+	g_free(t_font_name);
 }
+
+static void **create_fontsel(void **r, GtkWidget ***wpp, void **wdata)
+{
+	text_dd *dt = GET_DDATA(wdata);
+	GtkWidget *w;
+
+	dt->textw = w = gtk_font_selection_new();
+	gtk_widget_show(w);
+	gtk_container_set_border_width(GTK_CONTAINER(w), 4);
+
+	accept_ctrl_enter(GTK_FONT_SELECTION(w)->preview_entry);
+
+	xpack(**wpp, w);
+
+	// !!! Fails if no toplevel
+	gtk_font_selection_set_font_name(GTK_FONT_SELECTION(w),
+		inifile_get("lastTextFont", "-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ));
+	gtk_font_selection_set_preview_text(GTK_FONT_SELECTION(w),
+		inifile_get("textString", __("Enter Text Here")));
+
+	gtk_widget_grab_focus(GTK_FONT_SELECTION(w)->preview_entry);
+
+	return (r);
+}
+
+#define WBbase text_dd
+static void *text_code[] = {
+	WINDOWm(_("Paste Text")),
+	DEFSIZE(400, 400),
+	EXEC(create_fontsel),
+	HSEPl(200),
+	HBOXbp(0, 0, 5),
+#if defined(U_MTK) || GTK_MAJOR_VERSION == 2
+	UNLESS(idx), CHECKv(_("Antialias"), font_aa),
+#endif
+	UNLESS(img), CHECKv(_("Invert"), font_bk),
+	IFx(img, 1),
+		CHECKv(_("Background colour ="), font_bk), SPINa(bkg),
+	ENDIF(1),
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+	CHECKv(_("Angle of rotation ="), font_r),
+	FSPINv(font_angle, -36000, 36000),
+#endif
+	WDONE,
+	HSEPl(200),
+	BORDER(OKBOX, 0),
+	OKBOXp(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
 
 void pressed_text()
 {
-	GtkWidget *vbox, *hbox;
+	text_dd tdata = { mem_channel == CHN_IMAGE,
+		tdata.img && (mem_img_bpp == 1),
+		{ font_bkg % mem_cols, 0, mem_cols - 1 }, NULL };
+//	tdata.text = inifile_get("textString", __("Enter Text Here"));
 
-	text_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Paste Text"), GTK_WIN_POS_CENTER, TRUE );
-	gtk_window_set_default_size( GTK_WINDOW(text_window), 400, 400 );
-	vbox = add_vbox(text_window);
-
-	text_font_window = xpack(vbox, gtk_font_selection_new());
-	gtk_widget_show(text_font_window);
-	gtk_container_set_border_width (GTK_CONTAINER (text_font_window), 4);
-
-	accept_ctrl_enter(GTK_FONT_SELECTION(text_font_window)->preview_entry);
-
-	add_hseparator( vbox, 200, 10 );
-
-	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-
-	text_toggle[0] = add_a_toggle( _("Antialias"), hbox,
-			inifile_get_gboolean( "fontAntialias0", FALSE ) );
-
-#if defined(U_MTK) || GTK_MAJOR_VERSION == 2
-	if (mem_img_bpp == 1)
-#endif
-		gtk_widget_hide(text_toggle[0]);
-
-	if (mem_channel != CHN_IMAGE)
-	{
-		text_toggle[1] = add_a_toggle( _("Invert"), hbox,
-			inifile_get_gboolean( "fontAntialias1", FALSE ) );
-	}
-	else
-	{
-		text_toggle[1] = add_a_toggle( _("Background colour ="), hbox,
-			inifile_get_gboolean( "fontAntialias1", FALSE ) );
-
-		text_spin[0] = pack5(hbox, add_a_spin(
-			inifile_get_gint32("fontBackground", 0)	% mem_cols,
-			0, mem_cols - 1));
-	}
-
-	text_toggle[2] = add_a_toggle( _("Angle of rotation ="), hbox, FALSE );
-
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	text_spin[1] = pack5(hbox, add_float_spin(
-		inifile_get_gint32("fontAngle", 0) * 0.01, -360, 360));
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(text_toggle[2]), 
-		inifile_get_gboolean( "fontAntialias2", FALSE ) );
-#else
-	gtk_widget_hide( text_toggle[2] );
-#endif
-
-	add_hseparator( vbox, 200, 10 );
-
-	hbox = pack5(vbox, OK_box(0, text_window,
-		_("Paste Text"), GTK_SIGNAL_FUNC(paste_text_ok),
-		_("Cancel"), GTK_SIGNAL_FUNC(gtk_widget_destroy)));
-
-	gtk_font_selection_set_font_name( GTK_FONT_SELECTION(text_font_window),
-		inifile_get( "lastTextFont", "-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ) );
-	gtk_font_selection_set_preview_text( GTK_FONT_SELECTION(text_font_window),
-		inifile_get( "textString", _("Enter Text Here") ) );
-
-	gtk_window_set_transient_for( GTK_WINDOW(text_window), GTK_WINDOW(main_window) );
-	gtk_widget_show(text_window);
-
-	gtk_widget_grab_focus( GTK_FONT_SELECTION(text_font_window)->preview_entry );
+	run_create(text_code, &tdata, sizeof(tdata));
 }

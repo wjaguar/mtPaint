@@ -111,6 +111,7 @@ enum {
 	op_PATH,
 	op_PATHs,
 	op_TEXT,
+	op_COMBOENTRY,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -523,6 +524,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
 #define PATHs(NM,T,M,V) WBrh(PATHs, 4), (V), (T), (void *)(M), (NM)
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
+#define COMBOENTRY(V,SP,N,H) WBr2hf(COMBOENTRY, 3 + 2), WBfield(V), \
+	WBfield(SP), (void *)(N), EVENT(OK, H)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
@@ -654,5 +657,5 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of NBOOK
 #define NBOOK_TABS	0
 
-//	Extra data of ENTRY
+//	Extra data of ENTRY and COMBOENTRY
 #define ENTRY_VALUE	0

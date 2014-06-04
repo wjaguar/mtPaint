@@ -660,6 +660,38 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 	return (hbox);
 }
 
+//	COMBOENTRY widget
+
+static void comboentry_reset(GtkCombo *combo, char **v, char **src, int n)
+{
+	GList *list = NULL;
+	int i;
+
+	gtk_entry_set_text(GTK_ENTRY(combo->entry), *(char **)v);
+	// Replace transient buffer
+	*(const char **)v = gtk_entry_get_text(GTK_ENTRY(combo->entry));
+	// Leave list empty if no pointer array
+	if (src) for (i = 0; i < n; i++) list = g_list_append(list, src[i]);
+	gtk_combo_set_popdown_strings(combo, list);
+	g_list_free(list);
+}
+
+static GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
+{
+	GtkWidget *w = gtk_combo_new();
+	GtkCombo *combo = GTK_COMBO(w);
+
+	gtk_combo_disable_activate(combo);
+	comboentry_reset(combo, v, *(char ***)(ddata + (int)pp[2]), (int)pp[3]);
+
+	gtk_signal_connect_after(GTK_OBJECT(combo->popwin), "hide",
+		GTK_SIGNAL_FUNC(get_evt_1), r);
+	gtk_signal_connect(GTK_OBJECT(combo->entry), "activate",
+		GTK_SIGNAL_FUNC(get_evt_1), r);
+
+	return (w);
+}
+
 //	TEXT widget
 
 static GtkWidget *textarea(char *init)
@@ -2267,6 +2299,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 // !!! Padding = 0 Border = 0
 			pk = pk_XPACK | pkf_PARENT; // wrapped
 			break;
+		/* Add a combo-entry for text strings */
+		case op_COMBOENTRY:
+			widget = comboentry(v, ddata, pp - 1, NEXT_SLOT(r));
+// !!! Padding = 5
+			tpad = 5;
+			pk = pk_XPACK | pkf_SHOW;
+			break;
 		/* Add a color picker box, w/field array, & leave unfilled(!) */
 		case op_COLOR: case op_TCOLOR:
 			widget = cpick_create();
@@ -2585,8 +2624,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
-			case op_CHECK: case op_XCHECK: case op_TLCHECK:
-			case op_CHECKb:
+			case op_CHECK: case op_XCHECK:
+			case op_TLCHECK: case op_TLCHECKs: case op_CHECKb:
 				gtk_signal_connect(GTK_OBJECT(*slot), "toggled",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -2797,7 +2836,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK:
+		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
 		case op_OKTOGGLE: case op_UTOGGLE:
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
@@ -2827,6 +2866,10 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_COMBO:
 			*(int *)v = wj_combo_box_get_history(*wdata);
+			break;
+		case op_COMBOENTRY:
+			*(const char **)v = gtk_entry_get_text(
+				GTK_ENTRY(GTK_COMBO(*wdata)->entry));
 			break;
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
@@ -2921,7 +2964,7 @@ void cmd_reset(void **slot, void *ddata)
 		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK:
+		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
 		case op_OKTOGGLE: case op_UTOGGLE:
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
 				*(int *)v);
@@ -2942,6 +2985,10 @@ void cmd_reset(void **slot, void *ddata)
 		case op_LISTCS: case op_LISTCX:
 			listc_reset(GTK_CLIST(*wdata),
 				gtk_object_get_user_data(GTK_OBJECT(*wdata)));
+			break;
+		case op_COMBOENTRY:
+			comboentry_reset(GTK_COMBO(*wdata), v,
+				*(char ***)(ddata + (int)pp[1]), (int)pp[2]);
 			break;
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			gtk_entry_set_text(GTK_ENTRY(*wdata), *(char **)v);
@@ -3086,7 +3133,7 @@ void cmd_set(void **slot, int v)
 	case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
-	case op_CHECK: case op_XCHECK: case op_TLCHECK:
+	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
 	case op_OKTOGGLE: case op_UTOGGLE:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
@@ -3253,6 +3300,9 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_entry_set_text(GTK_ENTRY(slot[0]), res); break;
 	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], res, idx);
+		break;
+	case op_COMBOENTRY:
+		gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(slot[0])->entry), res);
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(GTK_LIST(slot[0]),

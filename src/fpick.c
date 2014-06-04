@@ -63,41 +63,25 @@ enum {
 
 // ------ Main Data Structure ------
 
-typedef struct
-{
-	int		allow_files,			// Allow the user to select files/directories
-			allow_dirs,
-			show_hidden
-			;
-
-	char		combo_items[FPICK_COMBO_ITEMS][PATHTXT],	// UTF8 in GTK+2
-			/* Must be DIR_SEP terminated at all times */
-			txt_directory[PATHBUF],	// Current directory - Normal C string
-			txt_mask[PATHTXT]	// Filter mask - UTF8 in GTK+2
-			;
-
-	GtkWidget	*toolbar,			// Toolbar
-			*icons[FPICK_ICON_TOT],		// Icons
-			*combo,				// List at top holding recent directories
-			*combo_entry			// Directory entry area in combo
-			;
-
-	GList		*combo_list;			// List of combo items
-} fpicker;
-
 typedef struct {
 	char *title;
 	int flags;
 	int entry_f;
-	void **list;
-	void **hbox, **entry;
-	void **ok, **cancel;
+	int allow_files, allow_dirs; // Allow the user to select files/directories
+	int show_hidden;
 	int cnt, cntx, idx;
 	int fsort;		// Sort column/direction of list
 	int *fcols, *fmap;
+	char *cdir, **cpp, *cp[FPICK_COMBO_ITEMS];
+	void **combo, **list;
+	void **hbox, **entry;
+	void **ok, **cancel;
+	GtkWidget *toolbar, *icons[FPICK_ICON_TOT];
 	memx2 files;
-	fpicker f;
 	char fname[PATHBUF];
+	char txt_directory[PATHBUF];	// Current directory - Normal C string
+	char txt_mask[PATHTXT];		// Filter mask - UTF8 in GTK+2
+	char combo_items[FPICK_COMBO_ITEMS][PATHTXT];	// UTF8 in GTK+2
 } fpick_dd;
 
 static int case_insensitive;
@@ -294,24 +278,24 @@ static int cmp_rows(const void *f1, const void *f2)
 }
 
 
-static void fpick_directory_new(fpicker *win, char *name)	// Register directory in combo
+/* Register directory in combo */
+static void fpick_directory_new(fpick_dd *dt, char *name)
 {
+	char *dest, **cpp, txt[PATHTXT];
 	int i;
-	char txt[PATHTXT];
 
 	gtkuncpy(txt, name, PATHTXT);
 
-// !!! Shuffle list items, not strings !!!
-	for ( i=0 ; i<(FPICK_COMBO_ITEMS-1); i++ )	// Does this text already exist in the list?
-		if ( !strcmp(txt, win->combo_items[i]) ) break;
+	/* Does this text already exist in the list? */
+	cpp = dt->cpp;
+	for (i = 0 ; i < FPICK_COMBO_ITEMS - 1; i++)
+		if (!strcmp(txt, cpp[i])) break;
+	dest = cpp[i];
+	memmove(cpp + 1, cpp, i * sizeof(*cpp)); // Shuffle items down as needed
+	memcpy(cpp[0] = dest, txt, PATHTXT); // Add item to list
 
-	for ( ; i>0; i-- )				// Shuffle items down as needed
-		strncpy(win->combo_items[i], win->combo_items[i-1], PATHTXT);
-
-	strncpy(win->combo_items[0], txt, PATHTXT);		// Add item to list
-
-	gtk_combo_set_popdown_strings( GTK_COMBO(win->combo), win->combo_list );
-	gtk_entry_set_text( GTK_ENTRY(win->combo_entry), txt );
+	dt->cdir = txt;
+	cmd_reset(dt->combo, dt);
 }
 
 #ifdef WIN32
@@ -367,14 +351,13 @@ static void scan_drives(fpick_dd *dt, int cdrive)
 
 static void fpick_scan_drives(fpick_dd *dt)	// Scan drives, populate widgets
 {
-	fpicker *fp = &dt->f;
 	int cdrive = 0;
 
 	/* Get the current drive letter */
-	if (fp->txt_directory[1] == ':') cdrive = fp->txt_directory[0];
+	if (dt->txt_directory[1] == ':') cdrive = dt->txt_directory[0];
 
-	fp->txt_directory[0] = '\0';
-	gtk_entry_set_text(GTK_ENTRY(fp->combo_entry), ""); // Just clear it
+	dt->txt_directory[0] = '\0';
+	cmd_setv(dt->combo, "", ENTRY_VALUE); // Just clear it
 
 	scan_drives(dt, cdrive);
 	cmd_reset(dt->list, dt);
@@ -385,9 +368,8 @@ static void fpick_scan_drives(fpick_dd *dt)	// Scan drives, populate widgets
 static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 {
 	char full_name[PATHBUF], txt_size[64], txt_date[64], tmp_txt[64];
-	char *nm, *src, *dest, *dir = dt->f.txt_directory;
+	char *nm, *src, *dest, *dir = dt->txt_directory;
 	memx2 mem = dt->files;
-	fpicker *win = &dt->f;
 	struct dirent *ep;
 	struct stat buf;
 	int *tc;
@@ -416,7 +398,7 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 		// Error getting file details
 		if (stat(full_name, &buf) < 0) continue;
 
-		if (!win->show_hidden && (ep->d_name[0] == '.')) continue;
+		if (!dt->show_hidden && (ep->d_name[0] == '.')) continue;
 
 #ifdef WIN32
 		subdir = S_ISDIR(buf.st_mode);
@@ -426,13 +408,13 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 		tf = 'F'; // Type flag: 'D' for dir, 'F' for file
 		if (subdir)
 		{
-			if (!win->allow_dirs) continue;
+			if (!dt->allow_dirs) continue;
 			// Don't look at '.' or '..'
 			if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, ".."))
 				continue;
 			tf = 'D';
 		}
-		else if (!win->allow_files) continue;
+		else if (!dt->allow_files) continue;
 
 		/* Remember which row has matching name */
 		if (select && !strcmp(ep->d_name, select)) dt->idx = cnt;
@@ -523,7 +505,6 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
  * -1 if failed with original dir and scanned a different one */
 static int fpick_scan_directory(fpick_dd *dt, char *name, char *select)
 {
-	fpicker *win = &dt->f;
 	DIR	*dp;
 	char	*cp, *parent = NULL;
 	char	full_name[PATHBUF];
@@ -559,24 +540,24 @@ static int fpick_scan_directory(fpick_dd *dt, char *name, char *select)
 	/* If we're going up the path and want to show from where */
 	if (!select)
 	{
-		if (!strncmp(win->txt_directory, full_name, len) &&
-			win->txt_directory[len])
+		if (!strncmp(dt->txt_directory, full_name, len) &&
+			dt->txt_directory[len])
 		{
-			cp = strchr(win->txt_directory + len, DIR_SEP); // Guaranteed
-			parent = win->txt_directory + len;
+			cp = strchr(dt->txt_directory + len, DIR_SEP); // Guaranteed
+			parent = dt->txt_directory + len;
 			select = parent = g_strndup(parent, cp - parent);
 		}
 	}
 	/* If we've nothing to show */
 	else if (!select[0]) select = NULL; 
 
-	strncpy(win->txt_directory, full_name, PATHBUF);
-	fpick_directory_new(win, full_name);		// Register directory in combo
+	strncpy(dt->txt_directory, full_name, PATHBUF);
+	fpick_directory_new(dt, full_name);	// Register directory in combo
 
 	scan_dir(dt, dp, select);
 	g_free(parent);
 	closedir(dp);
-	filter_dir(dt, win->txt_mask);
+	filter_dir(dt, dt->txt_mask);
 
 	cmd_reset(dt->list, dt);
 
@@ -586,10 +567,9 @@ static int fpick_scan_directory(fpick_dd *dt, char *name, char *select)
 static void fpick_enter_dir_via_list(fpick_dd *dt, char *name)
 {
 	char ndir[PATHBUF], *c;
-	fpicker *fp = &dt->f;
 	int l;
 
-	strncpy(ndir, fp->txt_directory, PATHBUF);
+	strncpy(ndir, dt->txt_directory, PATHBUF);
 	l = strlen(ndir);
 	if (!strcmp(name, ".."))	// Go to parent directory
 	{
@@ -634,16 +614,19 @@ static void fpick_select(fpick_dd *dt, void **wdata, int what, void **where)
 static int fpick_enter_dirname(fpick_dd *dt, const char *name, int l)
 {
 	char txt[PATHBUF], *ctxt;
-	fpicker *fp = &dt->f;
 	int res = 0;
 
-	name = name ? g_strndup(name, l) :
-		g_strdup(gtk_entry_get_text(GTK_ENTRY(fp->combo_entry)));
+	if (name) name = g_strndup(name, l);
+	else
+	{
+		cmd_read(dt->combo, dt);
+		name = g_strdup(dt->cdir);
+	}
 	gtkncpy(txt, name, PATHBUF);
 
 	fpick_cleanse_path(txt); // Path might have been entered manually
 
-	if (strcmp(txt, fp->txt_directory) &&
+	if (strcmp(txt, dt->txt_directory) &&
 		// Only do something if the directory is new
 		((res = fpick_scan_directory(dt, txt, NULL)) <= 0))
 	{	// Directory doesn't exist so tell user
@@ -656,9 +639,9 @@ static int fpick_enter_dirname(fpick_dd *dt, const char *name, int l)
 	return (res);
 }
 
-static void fpick_combo_changed(GtkWidget *widget, gpointer user_data)
+static void fpick_combo_changed(fpick_dd *dt, void **wdata, int what, void **where)
 {
-	fpick_enter_dirname(user_data, NULL, 0);
+	fpick_enter_dirname(dt, NULL, 0);
 }
 
 typedef struct {
@@ -695,7 +678,6 @@ static void fpick_file_dialog(fpick_dd *dt, void **wdata, int what, void **where
 	fdialog_dd tdata, *ddt;
 	char fnm[PATHBUF], *tmp, *fname = NULL, *snm = NULL;
 	void **dd;
-	fpicker *fp = &dt->f;
 	int uninit_(l), res, row = (int)xdata;
 
 
@@ -730,10 +712,10 @@ static void fpick_file_dialog(fpick_dd *dt, void **wdata, int what, void **where
 
 	if (res > 1)
 	{
-		l = strlen(fp->txt_directory);
-		wjstrcat(fnm, PATHBUF, fp->txt_directory, l, ddt->fname, NULL);
+		l = strlen(dt->txt_directory);
+		wjstrcat(fnm, PATHBUF, dt->txt_directory, l, ddt->fname, NULL);
 		// The source name SHOULD NOT get truncated, ever
-		if (fname) snm = g_strconcat(fp->txt_directory, fname, NULL);
+		if (fname) snm = g_strconcat(dt->txt_directory, fname, NULL);
 	}
 	run_destroy(dd);
 
@@ -778,7 +760,7 @@ static void fpick_file_dialog(fpick_dd *dt, void **wdata, int what, void **where
 		}
 		else tmp = fnm + l; /* Created a directory - move to it */
 
-		fpick_scan_directory(dt, fp->txt_directory, tmp);
+		fpick_scan_directory(dt, dt->txt_directory, tmp);
 	}
 }
 
@@ -792,8 +774,9 @@ static toolbar_item fpick_bar[] = {
 
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data);
 
-static GtkWidget *fpick_toolbar(GtkWidget **wlist)
+static void **fpick_toolbar(void **r, GtkWidget ***wpp, void **wdata)
 {		
+	fpick_dd *dt = GET_DDATA(wdata);
 	GtkWidget *toolbar;
 
 #if GTK_MAJOR_VERSION == 1
@@ -803,18 +786,26 @@ static GtkWidget *fpick_toolbar(GtkWidget **wlist)
 	toolbar = gtk_toolbar_new();
 	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
 #endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar, wlist,
+	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar, dt->icons,
 		GTK_SIGNAL_FUNC(fpick_iconbar_click), NULL);
-	gtk_widget_show(toolbar);
 
-	return toolbar;
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dt->icons[FPICK_ICON_HIDDEN]),
+			dt->show_hidden);
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dt->icons[FPICK_ICON_CASE]),
+			case_insensitive);
+	gtk_object_set_data(GTK_OBJECT(toolbar), FP_DATA_KEY, wdata);
+			// Set this after setting the toggles so any events are ignored
+
+	gtk_widget_show(toolbar);
+	pack5(**wpp, toolbar);
+
+	return (r);
 }
 
 static int fpick_wildcard(fpick_dd *dt, int button)
 {
 	char ctxt[PATHTXT];
-	fpicker *fp = &dt->f;
-	char *ds, *nm, *mask = fp->txt_mask;
+	char *ds, *nm, *mask = dt->txt_mask;
 
 	cmd_peekv(dt->entry, ctxt, PATHTXT, PATH_RAW);
 	/* Presume filename if called by user pressing "OK", pattern otherwise */
@@ -823,7 +814,7 @@ static int fpick_wildcard(fpick_dd *dt, int button)
 		/* If user had changed directory in the combo */
 		if (fpick_enter_dirname(dt, NULL, 0)) return (FALSE);
 		/* If file entry is hidden anyway */
-		if (!fp->allow_files) return (TRUE);
+		if (!dt->allow_files) return (TRUE);
 		/* Filename must have some chars and no wildcards in it */
 		if (ctxt[0] && !ctxt[strcspn(ctxt, "?*")]) return (TRUE);
 	}
@@ -876,54 +867,6 @@ static void fpick_btn(fpick_dd *dt, void **wdata, int what, void **where)
 	else if (fpick_wildcard(dt, TRUE)) do_evt_1_d(dt->ok);
 }
 
-static void **make_fpick(void **r, GtkWidget ***wpp, void **wdata)
-{
-	char txt[64];
-	GtkWidget *vbox1, *hbox1;
-	fpick_dd *dt = GET_DDATA(wdata);
-	fpicker *res = &dt->f;
-	int i;
-
-
-	vbox1 = **wpp;
-	hbox1 = pack5(vbox1, gtk_hbox_new(FALSE, 0));
-
-	// ------- Combo Box -------
-
-	res->combo = xpack5(hbox1, gtk_combo_new());
-	gtk_combo_disable_activate(GTK_COMBO(res->combo));
-	res->combo_entry = GTK_COMBO(res->combo)->entry;
-
-	for ( i=0; i<FPICK_COMBO_ITEMS; i++ )
-	{
-		sprintf(txt, "fpick_dir_%i", i);
-		gtkuncpy(res->combo_items[i], inifile_get(txt, ""), PATHTXT);
-		res->combo_list = g_list_append( res->combo_list, res->combo_items[i] );
-	}
-	gtk_combo_set_popdown_strings( GTK_COMBO(res->combo), res->combo_list );
-
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(res->combo)->popwin),
-		"hide", GTK_SIGNAL_FUNC(fpick_combo_changed), dt);
-	gtk_signal_connect(GTK_OBJECT(res->combo_entry),
-		"activate", GTK_SIGNAL_FUNC(fpick_combo_changed), dt);
-
-	// !!! Show things now - toolbars in GTK+1 mishandle show_all
-	gtk_widget_show_all(vbox1);
-
-	// ------- Toolbar -------
-
-	res->toolbar = pack5(hbox1, fpick_toolbar(res->icons));
-
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(res->icons[FPICK_ICON_HIDDEN]),
-			res->show_hidden );
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(res->icons[FPICK_ICON_CASE]),
-			case_insensitive );
-	gtk_object_set_data(GTK_OBJECT(res->toolbar), FP_DATA_KEY, wdata);
-			// Set this after setting the toggles so any events are ignored
-
-	return (r);
-}
-
 static void set_fname(fpick_dd *dt, char *name, int raw)
 {
 	char txt[PATHTXT];
@@ -944,19 +887,19 @@ static void set_fname(fpick_dd *dt, char *name, int raw)
 /* Store things to inifile */
 static void fpick_destroy(fpick_dd *dt, void **wdata)
 {
-	fpicker *win = &dt->f;
 	char txt[64], buf[PATHBUF];
 	int i;
 
-	for ( i=0; i<FPICK_COMBO_ITEMS; i++ )		// Remember recently used directories
+	/* Remember recently used directories */
+	for (i = 0; i < FPICK_COMBO_ITEMS; i++)
 	{
-		gtkncpy(buf, win->combo_items[i], PATHBUF);
+		gtkncpy(buf, dt->cpp[i], PATHBUF);
 		sprintf(txt, "fpick_dir_%i", i);
 		inifile_set(txt, buf);
 	}
 
 	inifile_set_gboolean("fpick_case_insensitive", case_insensitive);
-	inifile_set_gboolean("fpick_show_hidden", win->show_hidden );
+	inifile_set_gboolean("fpick_show_hidden", dt->show_hidden );
 }
 
 static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
@@ -964,13 +907,11 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 	toolbar_item *item = user_data;
 	void **wdata = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
 	fpick_dd *dt;
-	fpicker *fp;
 	char fnm[PATHBUF];
 
 	if (!wdata) return;
 
 	dt = GET_DDATA(wdata);
-	fp = &dt->f;
 	switch (item->ID)
 	{
 	case FPICK_ICON_UP:
@@ -985,8 +926,8 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 		fpick_file_dialog(dt, wdata, 0, NULL, (void *)(-1));
 		break;
 	case FPICK_ICON_HIDDEN:
-		fp->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
-		fpick_scan_directory(dt, fp->txt_directory, "");
+		dt->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
+		fpick_scan_directory(dt, dt->txt_directory, "");
 		break;
 	case FPICK_ICON_CASE:
 		case_insensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
@@ -1002,7 +943,7 @@ void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw)
 	else
 	{
 		cmd_read(dt->entry, dt);
-		snprintf(buf, len, "%s%s", dt->f.txt_directory, dt->fname);
+		snprintf(buf, len, "%s%s", dt->txt_directory, dt->fname);
 	}
 }
 
@@ -1015,7 +956,12 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 static void *fpick_code[] = {
 	IDENT(FP_KEY),
 	WPWHEREVER, WINDOWpm(title), EVENT(DESTROY, fpick_destroy),
-	EXEC(make_fpick),
+	HBOXbp(0, 0, 5),
+	// ------- Combo Box -------
+	REF(combo), COMBOENTRY(cdir, cpp, FPICK_COMBO_ITEMS, fpick_combo_changed),
+	// ------- Toolbar -------
+	EXEC(fpick_toolbar),
+	WDONE,
 	// ------- File List -------
 	XHBOXbp(0, 0, 5),
 	XSCROLL(1, 2), // auto/always
@@ -1036,7 +982,7 @@ static void *fpick_code[] = {
 	HBOXbp(0, 0, 5),
 	REF(entry), XPENTRY(fname, PATHBUF),
 	EVENT(KEY, fpick_entry_key), EVENT(OK, fpick_btn),
-	UNLESS(f.allow_files), HIDDEN, IF(entry_f), FOCUS,
+	UNLESS(allow_files), HIDDEN, IF(entry_f), FOCUS,
 	WDONE,
 	// ------- Buttons -------
 	UOKBOXp0,
@@ -1050,6 +996,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 {
 	fpick_dd tdata, *dt;
 	void **res;
+	int i;
 
 	memset(&tdata, 0, sizeof(tdata));
 	tdata.title = *(char **)(ddata + (int)pp[2]);
@@ -1063,12 +1010,26 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 
 	case_insensitive = inifile_get_gboolean("fpick_case_insensitive", TRUE );
 
-	tdata.f.show_hidden = inifile_get_gboolean("fpick_show_hidden", FALSE );
-	tdata.f.allow_files = !(tdata.flags & FPICK_DIRS_ONLY);
-	tdata.f.allow_dirs = TRUE;
+	tdata.show_hidden = inifile_get_gboolean("fpick_show_hidden", FALSE );
+	tdata.allow_files = !(tdata.flags & FPICK_DIRS_ONLY);
+	tdata.allow_dirs = TRUE;
+
+	// Pointers can't yet be properly prepared, so the combo is created empty
+	tdata.cdir = "";
 
 	res = run_create(fpick_code, &tdata, sizeof(tdata));
 	dt = GET_DDATA(res);
+
+	for (i = 0; i < FPICK_COMBO_ITEMS; i++)
+	{
+		char txt[64];
+		sprintf(txt, "fpick_dir_%i", i);
+		gtkuncpy(dt->cp[i] = dt->combo_items[i],
+			inifile_get(txt, ""), PATHTXT);
+	}
+	dt->cpp = dt->cp;
+	cmd_reset(dt->combo, dt);
+
 	*--*wpp = dt->hbox[0];
 	return (GET_REAL_WINDOW(res));
 }
