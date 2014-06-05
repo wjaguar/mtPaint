@@ -32,7 +32,6 @@
 #include "inifile.h"
 #include "viewer.h"
 #include "channels.h"
-#include "toolbar.h"
 #include "icons.h"
 #include "vcode.h"
 

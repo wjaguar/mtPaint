@@ -115,9 +115,6 @@ void **toolbar_boxes_[TOOLBAR_MAX];		// Used for showing/hiding
 
 //	GLOBAL PROCEDURES
 
-void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
-	GtkSignalFunc lclick, GtkSignalFunc rclick);
-
 void toolbar_init(GtkWidget *vbox_main);	// Set up the widgets to the vbox
 void toolbar_palette_init(GtkWidget *box);	// Set up the palette area
 void toolbar_showhide();			// Show/Hide all 4 toolbars

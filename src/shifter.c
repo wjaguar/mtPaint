@@ -143,7 +143,7 @@ static void shifter_moved(shifter_dd *dt, void **wdata)
 	dt->frame[2] = lcm - 1;
 	// Re-centre the slider if its out of range on the new scale
 	if (dt->frame[0] >= lcm) dt->frame[0] = 0;
-	cmd_set3(dt->slider, dt->frame); // Set min/max value of slider
+	cmd_setv(dt->slider, dt->frame, SPIN_ALL); // Set min/max value of slider
 
 	snprintf(txt, 128, "%s = %i", _("Frames"), lcm);
 	cmd_setv(dt->label, txt, LABEL_VALUE);

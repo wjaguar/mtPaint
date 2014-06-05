@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -777,7 +777,7 @@ static void brcosa_posterize_changed(brcosa_dd *dt, void **wdata, int what,
 			vvv[1] = 2;
 			vvv[2] = 256;
 		}
-		cmd_set3(dt->sss[BRCOSA_POSTERIZE], vvv);
+		cmd_setv(dt->sss[BRCOSA_POSTERIZE], vvv, SPIN_ALL);
 	}
 	else if (brcosa_auto) brcosa_preview(dt, NULL);
 }
@@ -1092,7 +1092,7 @@ static void colsel_show_idx(colsel_dd *dt)
 	color[2] = color[0] = MEM_2_INT(c, 0);
 	color[3] = color[1] = dt->v.opac[dt->idx];
 	dt->rflag = TRUE; // prevent recursion
-	cmd_set4(dt->csel, color);
+	cmd_setv(dt->csel, color, COLOR_ALL);
 	dt->rflag = FALSE;
 }
 
@@ -1527,10 +1527,15 @@ static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 	}
 	else if (cause == &dt->color)
 	{
+		unsigned char *c = dt->v.rgb + dt->idx * 3;
+		int col = dt->color[0];
 		/* Opacity */
 		dt->v.opac[dt->idx] = dt->color[1];
-		/* Color; will update the RGB array */
-		cmd_set2(dt->clist, dt->idx, dt->color[0]);
+		/* Color */
+		c[0] = INT_2_R(col);
+		c[1] = INT_2_G(col);
+		c[2] = INT_2_B(col);
+		cmd_setv(dt->clist, (void *)dt->idx, COLORLIST_RESET_ROW);
 		dt->select(dt, CHOOK_SET);
 	}
 	else if (cause == &dt->preview)
@@ -1830,7 +1835,7 @@ static void click_quantize_radio(quantize_dd *dt, void **wdata, int what, void *
 	else if (n == QUAN_CURRENT) vvv[2] = mem_cols;
 	cmd_read(dt->colspin, dt);
 	vvv[0] = dt->cols; // !!! gets bounded when setting
-	cmd_set3(dt->colspin, vvv);
+	cmd_setv(dt->colspin, vvv, SPIN_ALL);
 
 	/* No dither for exact conversion */
 	if (!dt->pflag) cmd_sensitive(dt->dith, n != QUAN_EXACT);
@@ -2122,7 +2127,7 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 
 			color[0] = color[2] = MEM_2_INT(gp, 0);
 			color[1] = color[3] = 255;
-			cmd_set4(dt->col, color);
+			cmd_setv(dt->col, color, COLOR_ALL);
 			cmd_set(dt->opt, dt->mpad[slot]);
 		}
 		else /* Indexed / utility / opacity */
@@ -2138,12 +2143,17 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 	{
 		if (cause == &dt->pcol) /* Select color on pad */
 		{
+			int color[2];
 			int n = dt->pcol;
 
 			if (n > dt->crgb[2]) goto done; // out of range
 			/* RGB */
-			else if (!dt->mode) cmd_set2(dt->col,
-				dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3), 255);
+			else if (!dt->mode)
+			{
+				color[0] = dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3);
+				color[1] = 255;
+				cmd_setv(dt->col, color, COLOR_RGBA);
+			}
 			/* Indexed / utility / opacity */
 			else cmd_set(dt->spin, dt->crgb[0] = n);
 			/* Fallthrough to select color */

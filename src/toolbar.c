@@ -184,7 +184,8 @@ static void toolbar_zoom_view_change()
 	if ( new > 0 ) vw_align_size( new );
 }
 
-static GtkWidget *settings_buttons[TOTAL_SETTINGS];
+static void **settings_buttons[TOTAL_SETTINGS];
+static int v_settings[TOTAL_SETTINGS];
 static int *vars_settings[TOTAL_SETTINGS] = {
 	&mem_continuous, &mem_undo_opacity,
 	&tint_mode[0], &tint_mode[1],
@@ -194,8 +195,8 @@ static int *vars_settings[TOTAL_SETTINGS] = {
 
 void mode_change(int setting, int state)
 {
-	if (!GTK_TOGGLE_BUTTON(settings_buttons[setting])->active != !state) // Toggle the button
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_buttons[setting]), state);
+	if (!*(int *)cmd_read(settings_buttons[setting], NULL) != !state)
+		cmd_set(settings_buttons[setting], state); // Toggle the button
 
 	if (!state == !*vars_settings[setting]) return; // No change, or changed already
 	*(vars_settings[setting]) = state;
@@ -385,7 +386,7 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	return (TRUE);
 }
 
-void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
+static void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
 	GtkSignalFunc lclick, GtkSignalFunc rclick)
 {
 	GtkWidget *item, *radio[32];
@@ -886,69 +887,73 @@ static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
 #define GP_HEIGHT 16
 static GtkWidget *grad_view;
 
-static toolbar_item settings_bar[] = {
-	{ _("Continuous Mode"), 0, SETB_CONT, 0, XPM_ICON(mode_cont), ACT_MODE, SETB_CONT, DLG_STEP, 0 },
-	{ _("Opacity Mode"), 0, SETB_OPAC, 0, XPM_ICON(mode_opac), ACT_MODE, SETB_OPAC },
-	{ _("Tint Mode"), 0, SETB_TINT, 0, XPM_ICON(mode_tint), ACT_MODE, SETB_TINT },
-	{ _("Tint +-"), 0, SETB_TSUB, 0, XPM_ICON(mode_tint2), ACT_MODE, SETB_TSUB },
-	{ _("Colour-Selective Mode"), 0, SETB_CSEL, 0, XPM_ICON(mode_csel), ACT_MODE, SETB_CSEL, DLG_COLORS, COLSEL_EDIT_CSEL },
-	{ _("Blend Mode"), 0, SETB_FILT, 0, XPM_ICON(mode_blend), ACT_MODE, SETB_FILT, DLG_FILT, 0 },
-	{ _("Disable All Masks"), 0, SETB_MASK, 0, XPM_ICON(mode_mask), ACT_MODE, SETB_MASK },
-	{ NULL }};
-
-static toolbar_item gradient_button =
-	{ _("Gradient Mode"), 0, SETB_GRAD, 0, NULL, ACT_MODE, SETB_GRAD, DLG_GRAD, 1 };
-
-static void **create_settings_tbar(void **r, GtkWidget ***wpp, void **wdata)
+static void **create_grad_view(void **r, GtkWidget ***wpp, void **wdata)
 {
-	GtkWidget *toolbar_settings, *button;
 	GdkPixmap *pmap;
-	int i;
 
-#if GTK_MAJOR_VERSION == 1
-	toolbar_settings = pack(**wpp, gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
-		GTK_TOOLBAR_ICONS));
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar_settings = pack(**wpp, gtk_toolbar_new());
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar_settings), GTK_TOOLBAR_ICONS);
-#endif
-
-	fill_toolbar(GTK_TOOLBAR(toolbar_settings), settings_bar, settings_buttons, NULL, NULL);
-	gtk_widget_show(toolbar_settings);
-
-	/* Gradient mode button+preview */
-	settings_buttons[SETB_GRAD] = button = pack(**wpp, gtk_toggle_button_new());
+	/* Gradient mode preview */
 	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
 	grad_view = gtk_pixmap_new(pmap, NULL);
 	gdk_pixmap_unref(pmap);
 	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(grad_view), FALSE);
-	gtk_container_add(GTK_CONTAINER(button), grad_view);
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
-	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
-#endif
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(toolbar_click), (gpointer)&gradient_button);
-	gtk_signal_connect(GTK_OBJECT(button), "button_press_event",
-		GTK_SIGNAL_FUNC(toolbar_rclick), (gpointer)&gradient_button);
-	gtk_widget_show_all(button);
-	/* Parasite gradient tooltip on settings toolbar */
-	gtk_tooltips_set_tip(GTK_TOOLBAR(toolbar_settings)->tooltips,
-		button, gradient_button.tooltip, "Private");
-
-	for (i = 0; i < TOTAL_SETTINGS; i++) // Initialize buttons' state
-	{
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(settings_buttons[i]),
-			!!*(vars_settings[i]));
-	}
+	gtk_container_add(GTK_CONTAINER(**wpp), grad_view);
+	gtk_widget_show(grad_view);
 
 	return (r);
+}
+
+static void settings_bar_click(settings_dd *dt, void **wdata, int what, void **where)
+{
+	int act_m, res;
+
+	if (what == op_EVT_CHANGE)
+	{
+		act_m = TOOL_ID(where);
+		res = *(int *)cmd_read(where, dt);
+	}
+	else /* if (what == op_EVT_CLICK) */
+	{
+		act_m = TOOL_IR(where);
+		res = TRUE;
+	}
+	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, res, FALSE);
 }
 
 #define WBbase settings_dd
 static void *settings_code[] = {
 	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
-	EXEC(create_settings_tbar),
+	BORDER(TOOLBAR, 0),
+	TOOLBARx(settings_bar_click, settings_bar_click),
+	REFv(settings_buttons[SETB_CONT]),
+	TBTOGGLExv(_("Continuous Mode"), XPM_ICON(mode_cont),
+		ACTMOD(ACT_MODE, SETB_CONT), ACTMOD(DLG_STEP, 0),
+		v_settings[SETB_CONT]),
+	REFv(settings_buttons[SETB_OPAC]),
+	TBTOGGLEv(_("Opacity Mode"), XPM_ICON(mode_opac),
+		ACTMOD(ACT_MODE, SETB_OPAC), v_settings[SETB_OPAC]),
+	REFv(settings_buttons[SETB_TINT]),
+	TBTOGGLEv(_("Tint Mode"), XPM_ICON(mode_tint),
+		ACTMOD(ACT_MODE, SETB_TINT), v_settings[SETB_TINT]),
+	REFv(settings_buttons[SETB_TSUB]),
+	TBTOGGLEv(_("Tint +-"), XPM_ICON(mode_tint2),
+		ACTMOD(ACT_MODE, SETB_TSUB), v_settings[SETB_TSUB]),
+	REFv(settings_buttons[SETB_CSEL]),
+	TBTOGGLExv(_("Colour-Selective Mode"), XPM_ICON(mode_csel),
+		ACTMOD(ACT_MODE, SETB_CSEL), ACTMOD(DLG_COLORS, COLSEL_EDIT_CSEL),
+		v_settings[SETB_CSEL]),
+	REFv(settings_buttons[SETB_FILT]),
+	TBTOGGLExv(_("Blend Mode"), XPM_ICON(mode_blend),
+		ACTMOD(ACT_MODE, SETB_FILT), ACTMOD(DLG_FILT, 0),
+		v_settings[SETB_FILT]),
+	REFv(settings_buttons[SETB_MASK]),
+	TBTOGGLEv(_("Disable All Masks"), XPM_ICON(mode_mask),
+		ACTMOD(ACT_MODE, SETB_MASK), v_settings[SETB_MASK]),
+	REFv(settings_buttons[SETB_GRAD]),
+	TBBOXTOGxv(_("Gradient Mode"), NULL,
+		ACTMOD(ACT_MODE, SETB_GRAD), ACTMOD(DLG_GRAD, 1),
+		v_settings[SETB_GRAD]),
+	EXEC(create_grad_view),
+	WDONE, WDONE,
 	/* Colors A & B */
 	BORDER(LABEL, 0),
 	REFv(toolbar_labels[0]), MLABELxr("", 5, 2, 0),
@@ -973,6 +978,10 @@ static void *settings_code[] = {
 void **create_settings_box()
 {
 	static settings_dd tdata; // zeroed out, get updated later
+	int i;
+
+	for (i = 0; i < TOTAL_SETTINGS; i++) // Initialize buttons' state
+		v_settings[i] = *vars_settings[i];
 	return (run_create(settings_code, &tdata, sizeof(tdata)));
 }
 

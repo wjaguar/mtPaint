@@ -437,16 +437,16 @@ static void colorlist_scroll_in(GtkWidget *list, int idx)
 	if (GTK_WIDGET_MAPPED(list)) colorlist_map_scroll(list, dt);
 }
 
-static void colorlist_set_color(GtkWidget *list, int idx, int v)
+static void colorlist_reset_color(GtkWidget *list, int idx)
 {
 	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
 	unsigned char *rgb = dt->col + idx * 3;
 	GdkColor c;
 
 	c.pixel = 0;
-	c.red   = (rgb[0] = INT_2_R(v)) * 257;
-	c.green = (rgb[1] = INT_2_G(v)) * 257;
-	c.blue  = (rgb[2] = INT_2_B(v)) * 257;
+	c.red   = rgb[0] * 257;
+	c.green = rgb[1] * 257;
+	c.blue  = rgb[2] * 257;
 	// In case of some really ancient system with indexed display mode
 	gdk_colormap_alloc_color(gdk_colormap_get_system(), &c, FALSE, TRUE);
 	/* Redraw the item displaying the color */
@@ -1605,16 +1605,31 @@ void tltext(char *v, void **pp, GtkWidget *table, int pad)
 
 //	TOOLBAR widget
 
-/* !!! This passes the button slot, not event slot, as event source */
+/* !!! These pass the button slot, not event slot, as event source */
+
 static void toolbar_lclick(GtkWidget *widget, gpointer user_data)
 {
-	void **slot = gtk_object_get_user_data(GTK_OBJECT(widget));
-	void **base, **desc;
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
 
-	if (!slot) return; // Not yet initialized
-	base = slot[0]; desc = slot[1];
-	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK,
-		user_data);
+	slot = gtk_object_get_user_data(GTK_OBJECT(widget)); // if initialized
+	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+
+	/* Handle only right clicks */
+	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
+		return (FALSE);
+	slot = gtk_object_get_user_data(GTK_OBJECT(widget)); // if initialized
+	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+	return (TRUE);
 }
 
 #if U_NLS
@@ -2440,16 +2455,33 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			tpad = GET_BORDER(TOOLBAR);
 			pk = pk_PACKp | pkf_STACK | pkf_SHOW;
 			break;
+		/* Add a container-toggle beside toolbar */
+		case op_TBBOXTOG:
+			widget = pack(wp[1], gtk_toggle_button_new());
+			/* Parasite tooltip on toolbar */
+			gtk_tooltips_set_tip(GTK_TOOLBAR(*wp)->tooltips,
+				widget, _(pp[2]), "Private");
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+			gtk_button_set_focus_on_click(GTK_BUTTON(widget), FALSE);
+#endif
+			gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
+			pk = pkf_STACK | pkf_SHOW;
+			// Fallthrough
 		/* Add a toolbar button/toggle */
 		case op_TBBUTTON: case op_TBTOGGLE:
-			widget = gtk_toolbar_append_element(GTK_TOOLBAR(*wp),
+			if (op != op_TBBOXTOG)
+				widget = gtk_toolbar_append_element(GTK_TOOLBAR(*wp),
 				op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
 				GTK_TOOLBAR_CHILD_TOGGLEBUTTON, NULL,
 				NULL, _(pp[2]), "Private", xpm_image(pp[3]),
-				GTK_SIGNAL_FUNC(toolbar_lclick), r);
-			if (op == op_TBTOGGLE) gtk_toggle_button_set_active(
+				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
+			if (v) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(widget), *(int *)v);
-			gtk_object_set_user_data(GTK_OBJECT(widget), NEXT_SLOT(tbar));
+			if (lp > 4) gtk_signal_connect(GTK_OBJECT(widget),
+				"button_press_event",
+				GTK_SIGNAL_FUNC(toolbar_rclick), SLOT_N(tbar, 2));
+			gtk_object_set_user_data(GTK_OBJECT(widget), r);
 			break;
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT: case op_PMOUNT:
@@ -3212,54 +3244,6 @@ void cmd_set(void **slot, int v)
 	}
 }
 
-void cmd_set2(void **slot, int v0, int v1)
-{
-// !!! Support only what actually used on, and their brethren
-	switch (GET_OP(slot))
-	{
-	case op_COLOR: case op_TCOLOR:
-		cpick_set_colour(slot[0], v0, v1);
-		break;
-	case op_COLORLIST: case op_COLORLISTN:
-	{
-		colorlist_set_color(slot[0], v0, v1);
-		break;
-	}
-	}
-}
-
-void cmd_set3(void **slot, int *v)
-{
-	int n = v[0];
-// !!! Support only what actually used on, and their brethren
-	switch (GET_OP(slot))
-	{
-	case op_TSPINSLIDE:
-	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
-		mt_spinslide_set_range(slot[0], v[1], v[2]);
-		mt_spinslide_set_value(slot[0], n);
-		break;
-	case op_SPIN: case op_SPINc: case op_XSPIN:
-	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-	case op_SPINa: case op_XSPINa: case op_TSPINa:
-		spin_set_range(slot[0], v[1], v[2]);
-		gtk_spin_button_set_value(slot[0], n);
-		break;
-	}
-}
-
-void cmd_set4(void **slot, int *v)
-{
-// !!! Support only what actually used on, and their brethren
-	int op = GET_OP(slot);
-	if ((op == op_COLOR) || (op == op_TCOLOR))
-	{
-		cpick_set_colour_previous(slot[0], v[2], v[3]);
-		cpick_set_colour(slot[0], v[0], v[1]);
-	}
-}
-
 void cmd_setlist(void **slot, char *map, int n)
 {
 // !!! Support only what actually used on, and their brethren
@@ -3341,6 +3325,24 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_NBOOK: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);
 		break;
+	case op_TSPINSLIDE:
+	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
+	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
+	{
+		int *v = res, n = v[0];
+		mt_spinslide_set_range(slot[0], v[1], v[2]);
+		mt_spinslide_set_value(slot[0], n);
+		break;
+	}
+	case op_SPIN: case op_SPINc: case op_XSPIN:
+	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
+	case op_SPINa: case op_XSPINa: case op_TSPINa:
+	{
+		int *v = res, n = v[0];
+		spin_set_range(slot[0], v[1], v[2]);
+		gtk_spin_button_set_value(slot[0], n);
+		break;
+	}
 	case op_MLABEL: case op_WLABEL: case op_XLABEL: case op_TLLABEL:
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;
@@ -3352,6 +3354,17 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	case op_COMBOENTRY:
 		gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(slot[0])->entry), res);
+		break;
+	case op_COLOR: case op_TCOLOR:
+	{
+		int *v = res;
+		if (idx == COLOR_ALL)
+			cpick_set_colour_previous(slot[0], v[2], v[3]);
+		cpick_set_colour(slot[0], v[0], v[1]);
+		break;
+	}
+	case op_COLORLIST: case op_COLORLISTN:
+		colorlist_reset_color(slot[0], (int)res);
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(GTK_LIST(slot[0]),

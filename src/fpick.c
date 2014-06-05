@@ -31,7 +31,6 @@
 #include "memory.h"
 #include "png.h"		// Needed by canvas.h
 #include "canvas.h"
-#include "toolbar.h"
 #include "mainwindow.h"
 #include "icons.h"
 

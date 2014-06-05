@@ -144,6 +144,7 @@ enum {
 	op_TOOLBAR,
 	op_TBBUTTON,
 	op_TBTOGGLE,
+	op_TBBOXTOG,
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
@@ -261,6 +262,7 @@ void run_destroy(void **wdata);
 #define SLOT_N(V,N) ((V) + (N) * 2)
 //	Extract ID out of toolbar item
 #define TOOL_ID(V) (int)(((void **)(V)[1])[2])
+#define TOOL_IR(V) (int)(((void **)(V)[1])[5])
 //	Combine action and mode
 #define ACTMOD(A,M) (((A) << 16) | (((M) + 0x8000) & 0xFFFF))
 
@@ -281,14 +283,8 @@ void **origin_slot(void **slot);
 void cmd_sensitive(void **slot, int state);
 //	Set visible state on slot
 void cmd_showhide(void **slot, int state);
-//	Set value on spinslider slot, page on plainbook slot
+//	Set value on slot, page on plainbook slot
 void cmd_set(void **slot, int v);
-//	Set color & opacity on color slot
-void cmd_set2(void **slot, int v0, int v1);
-//	Set value & limits on spin-like slot
-void cmd_set3(void **slot, int *v);
-//	Set current & previous color/opacity on color slot
-void cmd_set4(void **slot, int *v);
 //	Set per-item visibility and selection on list-like slot
 void cmd_setlist(void **slot, char *map, int n);
 //	Read back slot value (as is), return its storage location
@@ -568,10 +564,16 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
 #define TOOLBAR(HC) WBr2h(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
+#define TOOLBARx(HC,HR) WBr3h(TOOLBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
+	EVENT(CLICK, HR)
 #define TBBUTTON(NM,IC,ID) WBrh(TBBUTTON, 4), NULL, (void *)(ID), (NM), (IC)
 #define TBTOGGLE(NM,IC,ID,V) WBrhf(TBTOGGLE, 4), WBfield(V), (void *)(ID), \
 	(NM), (IC)
 #define TBTOGGLEv(NM,IC,ID,V) WBrh(TBTOGGLE, 4), &(V), (void *)(ID), (NM), (IC)
+#define TBTOGGLExv(NM,IC,ID,IR,V) WBrh(TBTOGGLE, 5), &(V), (void *)(ID), (NM), \
+	(IC), (void *)(IR)
+#define TBBOXTOGxv(NM,IC,ID,IR,V) WBrh(TBBOXTOG, 5), &(V), (void *)(ID), (NM), \
+	(IC), (void *)(IR)
 #define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
 #define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
@@ -676,3 +678,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of WINDOW
 #define WINDOW_TITLE	0
 #define WINDOW_ESC_BTN	1
+
+//	Extra data of COLOR
+#define COLOR_RGBA	0
+#define COLOR_ALL	1
+
+//	Extra data of SPIN and SPINSLIDE
+#define SPIN_ALL	0
+
+//	Extra data of COLORLIST
+#define COLORLIST_RESET_ROW 0
