@@ -141,6 +141,9 @@ enum {
 	op_UBUTTON,
 	op_EBUTTON,
 	op_TLBUTTON,
+	op_TOOLBAR,
+	op_TBBUTTON,
+	op_TBTOGGLE,
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
@@ -207,6 +210,7 @@ enum {
 	op_BOR_FRBOX,
 	op_BOR_OKBOX,
 	op_BOR_BUTTON,
+	op_BOR_TOOLBAR,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -255,6 +259,10 @@ void run_destroy(void **wdata);
 #define NEXT_SLOT(V) ((V) + 2)
 #define PREV_SLOT(V) ((V) - 2)
 #define SLOT_N(V,N) ((V) + (N) * 2)
+//	Extract ID out of toolbar item
+#define TOOL_ID(V) (int)(((void **)(V)[1])[2])
+//	Combine action and mode
+#define ACTMOD(A,M) (((A) << 16) | (((M) + 0x8000) & 0xFFFF))
 
 //	From widget to its wdata
 void **get_wdata(GtkWidget *widget, char *id);
@@ -524,8 +532,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
 #define PATHs(NM,T,M,V) WBrh(PATHs, 4), (V), (T), (void *)(M), (NM)
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
-#define COMBOENTRY(V,SP,N,H) WBr2hf(COMBOENTRY, 3 + 2), WBfield(V), \
-	WBfield(SP), (void *)(N), EVENT(OK, H)
+#define COMBOENTRY(V,SP,H) WBr2hf(COMBOENTRY, 2 + 2), WBfield(V), WBfield(SP), \
+	EVENT(OK, H)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
@@ -559,6 +567,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EBUTTON(NM,H) WBr2h(EBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
 	EVENT(CLICK, H), WBxyl(X, Y, 1)
+#define TOOLBAR(HC) WBr2h(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
+#define TBBUTTON(NM,IC,ID) WBrh(TBBUTTON, 4), NULL, (void *)(ID), (NM), (IC)
+#define TBTOGGLE(NM,IC,ID,V) WBrhf(TBTOGGLE, 4), WBfield(V), (void *)(ID), \
+	(NM), (IC)
+#define TBTOGGLEv(NM,IC,ID,V) WBrh(TBTOGGLE, 4), &(V), (void *)(ID), (NM), (IC)
 #define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
 #define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
@@ -659,3 +672,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 
 //	Extra data of ENTRY and COMBOENTRY
 #define ENTRY_VALUE	0
+
+//	Extra data of WINDOW
+#define WINDOW_TITLE	0
+#define WINDOW_ESC_BTN	1

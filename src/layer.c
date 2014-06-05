@@ -36,17 +36,6 @@
 #include "icons.h"
 #include "vcode.h"
 
-//	Layer toolbar buttons
-#define LTB_NEW    0
-#define LTB_RAISE  1
-#define LTB_LOWER  2
-#define LTB_DUP    3
-#define LTB_CENTER 4
-#define LTB_DEL    5
-#define LTB_CLOSE  6
-
-#define TOTAL_ICONS_LAYER 7
-
 
 int	layers_total,		// Layers currently being used
 	layer_selected,		// Layer currently selected in the layers window
@@ -121,11 +110,11 @@ typedef struct {
 	int nlayer, lnum;
 	char *lname;
 	void **llist, **nmentry, **xspin, **yspin, **opslider, **trspin;
+	void **ltb_new, **ltb_raise, **ltb_lower, **ltb_dup, **ltb_center,
+		**ltb_del, **ltb_close;
 } layers_dd;
 
 static void **layers_box_, **layers_window_;
-
-static GtkWidget *layer_tools[TOTAL_ICONS_LAYER];
 
 
 static void layers_update_titlebar()		// Update filename in titlebar
@@ -139,7 +128,7 @@ static void layers_update_titlebar()		// Update filename in titlebar
 	snprintf(txt, 290, "%s %s %s", __("Layers"),
 		layers_changed ? __("(Modified)") : "-",
 		txt2[0] ? txt2 : __("Untitled"));
-	gtk_window_set_title(GTK_WINDOW(GET_REAL_WINDOW(layers_window_)), txt);
+	cmd_setv(GET_WINDOW(layers_window_), txt, WINDOW_TITLE);
 }
 
 void layers_notify_changed()			// Layers have just changed - update vars as needed
@@ -919,13 +908,13 @@ static void layer_select(layers_dd *dt, void **wdata, int what, void **where)
 
 	t = layer_table + j;
 	cmd_setv(dt->nmentry, t->name, ENTRY_VALUE);
-	gtk_widget_set_sensitive(layer_tools[LTB_RAISE], j < layers_total);
-	gtk_widget_set_sensitive(layer_tools[LTB_LOWER], j);
-	gtk_widget_set_sensitive(layer_tools[LTB_DEL], j);
-	gtk_widget_set_sensitive(layer_tools[LTB_CENTER], j);
+	cmd_sensitive(dt->ltb_raise, j < layers_total);
+	cmd_sensitive(dt->ltb_lower, j);
+	cmd_sensitive(dt->ltb_del, j);
+	cmd_sensitive(dt->ltb_center, j);
 	// Disable new/duplicate if we have max layers
-	gtk_widget_set_sensitive(layer_tools[LTB_NEW], layers_total < MAX_LAYERS);
-	gtk_widget_set_sensitive(layer_tools[LTB_DUP], layers_total < MAX_LAYERS);
+	cmd_sensitive(dt->ltb_new, layers_total < MAX_LAYERS);
+	cmd_sensitive(dt->ltb_dup, layers_total < MAX_LAYERS);
 	cmd_sensitive(dt->trspin, j);
 	cmd_sensitive(dt->opslider, j);
 
@@ -1054,33 +1043,11 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	if (upd) update_stuff(upd);
 }
 
-static toolbar_item layer_bar[] = {
-	{ _("New Layer"), -1, LTB_NEW, 0, XPM_ICON(new), ACT_LR_ADD, LR_NEW },
-	{ _("Raise"), -1, LTB_RAISE, 0, XPM_ICON(up), ACT_LR_SHIFT, 1 },
-	{ _("Lower"), -1, LTB_LOWER, 0, XPM_ICON(down), ACT_LR_SHIFT, -1 },
-	{ _("Duplicate Layer"), -1, LTB_DUP, 0, XPM_ICON(copy), ACT_LR_ADD, LR_DUP },
-	{ _("Centralise Layer"), -1, LTB_CENTER, 0, XPM_ICON(centre), ACT_LR_CENTER, 0 },
-	{ _("Delete Layer"), -1, LTB_DEL, 0, XPM_ICON(cut), ACT_LR_DEL, 0 },
-	{ _("Close Layers Window"), -1, LTB_CLOSE, 0, XPM_ICON(close), DLG_LAYERS, 1 },
-	{ NULL }};
+static void layer_bar_click(layers_dd *dt, void **wdata, int what, void **where)
+{
+	int act_m = TOOL_ID(where);
 
-/* Create toolbar for layers window */
-static void **layer_toolbar(void **r, GtkWidget ***wpp, void **wdata)
-{		
-	GtkWidget *toolbar;
-
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
-#endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), layer_bar, layer_tools, NULL, NULL);
-	gtk_widget_show(toolbar);
-	pack(**wpp, toolbar);
-
-	return (r);
+	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, TRUE, FALSE);
 }
 
 #define WBbase layers_dd
@@ -1094,7 +1061,23 @@ static void *layers_code[] = {
 	CHKCOLUMNi0v(layer_table[0].visible, sizeof(layer_table[0]), 0, 0,
 		layer_tog_visible),
 	REF(llist), LISTCCHr(nlayer, lnum, MAX_LAYERS + 1, layer_select), TRIGGER,
-	EXEC(layer_toolbar),
+	BORDER(TOOLBAR, 0),
+	TOOLBAR(layer_bar_click),
+	REF(ltb_new), TBBUTTON(_("New Layer"), XPM_ICON(new),
+		ACTMOD(ACT_LR_ADD, LR_NEW)),
+	REF(ltb_raise), TBBUTTON(_("Raise"), XPM_ICON(up),
+		ACTMOD(ACT_LR_SHIFT, 1)),
+	REF(ltb_lower), TBBUTTON(_("Lower"), XPM_ICON(down),
+		ACTMOD(ACT_LR_SHIFT, -1)),
+	REF(ltb_dup), TBBUTTON(_("Duplicate Layer"), XPM_ICON(copy),
+		ACTMOD(ACT_LR_ADD, LR_DUP)),
+	REF(ltb_center), TBBUTTON(_("Centralise Layer"), XPM_ICON(centre),
+		ACTMOD(ACT_LR_CENTER, 0)),
+	REF(ltb_del), TBBUTTON(_("Delete Layer"), XPM_ICON(cut),
+		ACTMOD(ACT_LR_DEL, 0)),
+	REF(ltb_close), TBBUTTON(_("Close Layers Window"), XPM_ICON(close),
+		ACTMOD(DLG_LAYERS, 1)),
+	WDONE,
 	TABLEs(3, 4, 5),
 	BORDER(TLABEL, 0), BORDER(SPIN, 0), BORDER(SPINSLIDE, 0),
 	TLLABEL(_("Layer Name"), 0, 0),
@@ -1141,17 +1124,13 @@ static void *layersw_code[] = {
 
 void pressed_layers()
 {
-	GtkAccelGroup *ag;
 	void **res;
-
 
 	if (layers_window_) return; // Already have it open
 	layers_window_ = res = run_create(layersw_code, layersw_code, 0);
 
 	layers_update_titlebar();
 
-	ag = gtk_accel_group_new();
-	gtk_widget_add_accelerator(layer_tools[LTB_CLOSE], "clicked", ag,
-		GDK_Escape, 0, (GtkAccelFlags)0);
-	gtk_window_add_accel_group(GTK_WINDOW(GET_REAL_WINDOW(res)), ag);
+	cmd_setv(GET_WINDOW(res),
+		((layers_dd *)GET_DDATA(layers_box_))->ltb_close, WINDOW_ESC_BTN);
 }

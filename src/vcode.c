@@ -662,16 +662,15 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 
 //	COMBOENTRY widget
 
-static void comboentry_reset(GtkCombo *combo, char **v, char **src, int n)
+static void comboentry_reset(GtkCombo *combo, char **v, char **src)
 {
 	GList *list = NULL;
-	int i;
 
 	gtk_entry_set_text(GTK_ENTRY(combo->entry), *(char **)v);
 	// Replace transient buffer
 	*(const char **)v = gtk_entry_get_text(GTK_ENTRY(combo->entry));
-	// Leave list empty if no pointer array
-	if (src) for (i = 0; i < n; i++) list = g_list_append(list, src[i]);
+	// NULL-terminated array of pointers
+	while (*src) list = g_list_append(list, *src++);
 	gtk_combo_set_popdown_strings(combo, list);
 	g_list_free(list);
 }
@@ -682,7 +681,7 @@ static GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
 	GtkCombo *combo = GTK_COMBO(w);
 
 	gtk_combo_disable_activate(combo);
-	comboentry_reset(combo, v, *(char ***)(ddata + (int)pp[2]), (int)pp[3]);
+	comboentry_reset(combo, v, *(char ***)(ddata + (int)pp[2]));
 
 	gtk_signal_connect_after(GTK_OBJECT(combo->popwin), "hide",
 		GTK_SIGNAL_FUNC(get_evt_1), r);
@@ -1604,6 +1603,20 @@ void tltext(char *v, void **pp, GtkWidget *table, int pad)
 	free(s);
 }
 
+//	TOOLBAR widget
+
+/* !!! This passes the button slot, not event slot, as event source */
+static void toolbar_lclick(GtkWidget *widget, gpointer user_data)
+{
+	void **slot = gtk_object_get_user_data(GTK_OBJECT(widget));
+	void **base, **desc;
+
+	if (!slot) return; // Not yet initialized
+	base = slot[0]; desc = slot[1];
+	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK,
+		user_data);
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -1826,7 +1839,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	cmdef *cmd;
 	col_data c;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL;
+	void *v, **pp, **r = NULL, **res = NULL, **tbar = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad, minw = 0;
 
@@ -1924,7 +1937,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Return anchor position */
 			return (res);
 		/* Done with a container */
-		case op_WDONE: ++wp; continue;
+		case op_WDONE: ++wp; tbar = NULL; continue;
 		/* Create the main window */
 		case op_MAINWINDOW:
 		{
@@ -2414,6 +2427,30 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			break;
+		/* Add a toolbar */
+		case op_TOOLBAR:
+#if GTK_MAJOR_VERSION == 1
+			widget = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
+				GTK_TOOLBAR_ICONS);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+			widget = gtk_toolbar_new();
+			gtk_toolbar_set_style(GTK_TOOLBAR(widget), GTK_TOOLBAR_ICONS);
+#endif
+			tbar = r;
+			tpad = GET_BORDER(TOOLBAR);
+			pk = pk_PACKp | pkf_STACK | pkf_SHOW;
+			break;
+		/* Add a toolbar button/toggle */
+		case op_TBBUTTON: case op_TBTOGGLE:
+			widget = gtk_toolbar_append_element(GTK_TOOLBAR(*wp),
+				op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
+				GTK_TOOLBAR_CHILD_TOGGLEBUTTON, NULL,
+				NULL, _(pp[2]), "Private", xpm_image(pp[3]),
+				GTK_SIGNAL_FUNC(toolbar_lclick), r);
+			if (op == op_TBTOGGLE) gtk_toggle_button_set_active(
+				GTK_TOGGLE_BUTTON(widget), *(int *)v);
+			gtk_object_set_user_data(GTK_OBJECT(widget), NEXT_SLOT(tbar));
+			break;
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT: case op_PMOUNT:
 		{
@@ -2666,6 +2703,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_BOR_LABEL: case op_BOR_TLABEL:
 		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
+		case op_BOR_TOOLBAR:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
 		default: continue;
@@ -2837,7 +2875,7 @@ static void *do_query(char *data, void **wdata, int mode)
 				mt_spinslide_get_value)(*wdata);
 			break;
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-		case op_OKTOGGLE: case op_UTOGGLE:
+		case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
 			break;
@@ -2965,7 +3003,7 @@ void cmd_reset(void **slot, void *ddata)
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-		case op_OKTOGGLE: case op_UTOGGLE:
+		case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
 				*(int *)v);
 			break;
@@ -2988,7 +3026,7 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_COMBOENTRY:
 			comboentry_reset(GTK_COMBO(*wdata), v,
-				*(char ***)(ddata + (int)pp[1]), (int)pp[2]);
+				*(char ***)(ddata + (int)pp[1]));
 			break;
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			gtk_entry_set_text(GTK_ENTRY(*wdata), *(char **)v);
@@ -3134,7 +3172,7 @@ void cmd_set(void **slot, int v)
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-	case op_OKTOGGLE: case op_UTOGGLE:
+	case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
@@ -3288,6 +3326,17 @@ void cmd_setv(void **slot, void *res, int idx)
 	int op = GET_OP(slot);
 	switch (op)
 	{
+	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
+		if (idx == WINDOW_TITLE)
+			gtk_window_set_title(GTK_WINDOW(slot[0]), res);
+		else /* if (idx == WINDOW_ESC_BTN) */
+		{
+			GtkAccelGroup *ag = gtk_accel_group_new();
+			gtk_widget_add_accelerator(*(void **)res, "clicked", ag,
+				GDK_Escape, 0, (GtkAccelFlags)0);
+			gtk_window_add_accel_group(GTK_WINDOW(slot[0]), ag);
+		}
+		break;
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
 	case op_NBOOK: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);

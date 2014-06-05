@@ -36,7 +36,6 @@
 #include "icons.h"
 
 #define FP_KEY "mtPaint.fpick"
-#define FP_DATA_KEY "mtPaint.fp_data"
 
 #define FPICK_ICON_UP 0
 #define FPICK_ICON_HOME 1
@@ -72,7 +71,7 @@ typedef struct {
 	int cnt, cntx, idx;
 	int fsort;		// Sort column/direction of list
 	int *fcols, *fmap;
-	char *cdir, **cpp, *cp[FPICK_COMBO_ITEMS];
+	char *cdir, **cpp, *cp[FPICK_COMBO_ITEMS + 1];
 	void **combo, **list;
 	void **hbox, **entry;
 	void **ok, **cancel;
@@ -764,44 +763,6 @@ static void fpick_file_dialog(fpick_dd *dt, void **wdata, int what, void **where
 	}
 }
 
-static toolbar_item fpick_bar[] = {
-	{ _("Up"),			-1, FPICK_ICON_UP, 0, XPM_ICON(up) },
-	{ _("Home"),			-1, FPICK_ICON_HOME, 0, XPM_ICON(home) },
-	{ _("Create New Directory"),	-1, FPICK_ICON_DIR, 0, XPM_ICON(newdir) },
-	{ _("Show Hidden Files"),	 0, FPICK_ICON_HIDDEN, 0, XPM_ICON(hidden) },
-	{ _("Case Insensitive Sort"),	 0, FPICK_ICON_CASE, 0, XPM_ICON(case) },
-	{ NULL }};
-
-static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data);
-
-static void **fpick_toolbar(void **r, GtkWidget ***wpp, void **wdata)
-{		
-	fpick_dd *dt = GET_DDATA(wdata);
-	GtkWidget *toolbar;
-
-#if GTK_MAJOR_VERSION == 1
-	toolbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#endif
-#if GTK_MAJOR_VERSION == 2
-	toolbar = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(toolbar), GTK_TOOLBAR_ICONS);
-#endif
-	fill_toolbar(GTK_TOOLBAR(toolbar), fpick_bar, dt->icons,
-		GTK_SIGNAL_FUNC(fpick_iconbar_click), NULL);
-
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dt->icons[FPICK_ICON_HIDDEN]),
-			dt->show_hidden);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(dt->icons[FPICK_ICON_CASE]),
-			case_insensitive);
-	gtk_object_set_data(GTK_OBJECT(toolbar), FP_DATA_KEY, wdata);
-			// Set this after setting the toggles so any events are ignored
-
-	gtk_widget_show(toolbar);
-	pack5(**wpp, toolbar);
-
-	return (r);
-}
-
 static int fpick_wildcard(fpick_dd *dt, int button)
 {
 	char ctxt[PATHTXT];
@@ -902,17 +863,13 @@ static void fpick_destroy(fpick_dd *dt, void **wdata)
 	inifile_set_gboolean("fpick_show_hidden", dt->show_hidden );
 }
 
-static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
+static void fpick_iconbar_click(fpick_dd *dt, void **wdata, int what, void **where)
 {
-	toolbar_item *item = user_data;
-	void **wdata = gtk_object_get_data(GTK_OBJECT(widget->parent), FP_DATA_KEY);
-	fpick_dd *dt;
 	char fnm[PATHBUF];
+	int id = TOOL_ID(where);
 
-	if (!wdata) return;
-
-	dt = GET_DDATA(wdata);
-	switch (item->ID)
+	cmd_read(where, dt);
+	switch (id)
 	{
 	case FPICK_ICON_UP:
 		fpick_enter_dir_via_list(dt, "..");
@@ -926,11 +883,9 @@ static void fpick_iconbar_click(GtkWidget *widget, gpointer user_data)
 		fpick_file_dialog(dt, wdata, 0, NULL, (void *)(-1));
 		break;
 	case FPICK_ICON_HIDDEN:
-		dt->show_hidden = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 		fpick_scan_directory(dt, dt->txt_directory, "");
 		break;
 	case FPICK_ICON_CASE:
-		case_insensitive = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 		cmd_setv(dt->list, (void *)dt->fsort, LISTC_SORT);
 		break;
 	}
@@ -958,10 +913,17 @@ static void *fpick_code[] = {
 	WPWHEREVER, WINDOWpm(title), EVENT(DESTROY, fpick_destroy),
 	HBOXbp(0, 0, 5),
 	// ------- Combo Box -------
-	REF(combo), COMBOENTRY(cdir, cpp, FPICK_COMBO_ITEMS, fpick_combo_changed),
+	REF(combo), COMBOENTRY(cdir, cpp, fpick_combo_changed),
 	// ------- Toolbar -------
-	EXEC(fpick_toolbar),
-	WDONE,
+	TOOLBAR(fpick_iconbar_click),
+	TBBUTTON(_("Up"), XPM_ICON(up), FPICK_ICON_UP),
+	TBBUTTON(_("Home"), XPM_ICON(home), FPICK_ICON_HOME),
+	TBBUTTON(_("Create New Directory"), XPM_ICON(newdir), FPICK_ICON_DIR),
+	TBTOGGLE(_("Show Hidden Files"), XPM_ICON(hidden), FPICK_ICON_HIDDEN,
+		show_hidden),
+	TBTOGGLEv(_("Case Insensitive Sort"), XPM_ICON(case), FPICK_ICON_CASE,
+		case_insensitive),
+	WDONE, WDONE,
 	// ------- File List -------
 	XHBOXbp(0, 0, 5),
 	XSCROLL(1, 2), // auto/always
@@ -1016,6 +978,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 
 	// Pointers can't yet be properly prepared, so the combo is created empty
 	tdata.cdir = "";
+	tdata.cpp = tdata.cp;
 
 	res = run_create(fpick_code, &tdata, sizeof(tdata));
 	dt = GET_DDATA(res);
