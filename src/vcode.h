@@ -142,9 +142,14 @@ enum {
 	op_EBUTTON,
 	op_TLBUTTON,
 	op_TOOLBAR,
+	op_SMARTTBAR,
+	op_SMARTTBMORE,
 	op_TBBUTTON,
 	op_TBTOGGLE,
+	op_TBRBUTTON,
 	op_TBBOXTOG,
+	op_TBSPACE,
+	op_TWOBOX,
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
@@ -176,7 +181,7 @@ enum {
 
 	op_EXEC,
 	op_GOTO,
-	op_CALLp,
+	op_CALL,
 	op_RET,
 	op_IF,
 	op_UNLESS,
@@ -184,6 +189,7 @@ enum {
 	op_ENDIF,
 	op_REF,
 	op_CLEANUP,
+	op_ACTMAP,
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
@@ -566,7 +572,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TOOLBAR(HC) WBr2h(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
 #define TOOLBARx(HC,HR) WBr3h(TOOLBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
 	EVENT(CLICK, HR)
+#define SMARTTBAR(HC) WBr2h(SMARTTBAR, 0 + 2), EVENT(CHANGE, HC)
+#define SMARTTBARx(HC,HR) WBr3h(SMARTTBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
+	EVENT(CLICK, HR)
+#define SMARTTBMORE(NM) WBh(SMARTTBMORE, 1), (NM)
 #define TBBUTTON(NM,IC,ID) WBrh(TBBUTTON, 4), NULL, (void *)(ID), (NM), (IC)
+#define TBBUTTONx(NM,IC,ID,IR) WBrh(TBBUTTON, 5), NULL, (void *)(ID), (NM), \
+	(IC), (void *)(IR)
 #define TBTOGGLE(NM,IC,ID,V) WBrhf(TBTOGGLE, 4), WBfield(V), (void *)(ID), \
 	(NM), (IC)
 #define TBTOGGLEv(NM,IC,ID,V) WBrh(TBTOGGLE, 4), &(V), (void *)(ID), (NM), (IC)
@@ -574,13 +586,19 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(IC), (void *)(IR)
 #define TBBOXTOGxv(NM,IC,ID,IR,V) WBrh(TBBOXTOG, 5), &(V), (void *)(ID), (NM), \
 	(IC), (void *)(IR)
+#define TBRBUTTONv(NM,IC,ID,V) WBrh(TBRBUTTON, 4), &(V), (void *)(ID), (NM), (IC)
+#define TBRBUTTONxv(NM,IC,ID,IR,V) WBrh(TBRBUTTON, 5), &(V), (void *)(ID), \
+	(NM), (IC), (void *)(IR)
+#define TBSPACE WBh(TBSPACE, 0)
+#define TWOBOX WBh(TWOBOX, 0)
 #define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
 #define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
 #define REMOUNTv(V) WBrh(REMOUNT, 1), &(V)
 #define EXEC(FN) WBh(EXEC, 1), (FN)
 #define GOTO(A) WBh(GOTO, 1), (A)
-#define CALLp(V) WBhf(CALLp, 1), WBfield(V)
+#define CALL(A) WBh(CALL, 1), (A)
+#define CALLp(V) WBhnf(CALL, 1), WBfield(V)
 #define RET WBh(RET, 0)
 #define IF(X) WBhf(IF, 1), WBfield(X)
 #define IFx(X,N) WBhf(IF, 2), WBfield(X), (void *)(N)
@@ -593,6 +611,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define REF(V) WBhf(REF, 1), WBfield(V)
 #define REFv(V) WBh(REF, 1), &(V)
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
+#define ACTMAP(N) WBrh(ACTMAP, 1), (void *)(N)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
 #define IDENT(NM) WBh(IDENT, 1), (NM)

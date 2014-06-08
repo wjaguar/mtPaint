@@ -40,7 +40,7 @@
 
 
 
-GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
+void **icon_buttons[TOTAL_TOOLS];
 
 int toolbar_status[TOOLBAR_MAX];			// True=show
 GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
@@ -54,8 +54,8 @@ GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
 static GtkWidget *toolbar_zoom_main;
 static void **toolbar_labels[2],	// Colour A & B
-	*ts_spinslides[4],		// Size, flow, opacity, value
-	*ts_label_channel;		// Channel name
+	**ts_spinslides[4],		// Size, flow, opacity, value
+	**ts_label_channel;		// Channel name
 
 static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
 					// RGB colours, tool, pattern preview
@@ -366,523 +366,6 @@ void toolbar_settings_exit(void *dt, void **wdata)
 	run_destroy(wdata);
 }
 
-static void toolbar_click(GtkWidget *widget, gpointer user_data)
-{
-	toolbar_item *item = user_data;
-
-	action_dispatch(item->action, item->mode, item->radio < 0 ? TRUE :
-		GTK_TOGGLE_BUTTON(widget)->active, FALSE);
-}
-
-static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
-{
-	toolbar_item *item = user_data;
-
-	/* Handle only right clicks */
-	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
-		return (FALSE);
-	action_dispatch(item->action2, item->mode2, TRUE, FALSE);
-	return (TRUE);
-}
-
-static void fill_toolbar(GtkToolbar *bar, toolbar_item *items, GtkWidget **wlist,
-	GtkSignalFunc lclick, GtkSignalFunc rclick)
-{
-	GtkWidget *item, *radio[32];
-
-	if (!lclick) lclick = GTK_SIGNAL_FUNC(toolbar_click);
-	if (!rclick) rclick = GTK_SIGNAL_FUNC(toolbar_rclick);
-
-	memset(radio, 0, sizeof(radio));
-	for (; items->tooltip; items++)
-	{
-		if (!items->xpm) // This is a separator
-		{
-			gtk_toolbar_append_space(bar);
-			continue;
-		}
-		item = gtk_toolbar_append_element(bar,
-			items->radio < 0 ? GTK_TOOLBAR_CHILD_BUTTON :
-			items->radio ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
-			GTK_TOOLBAR_CHILD_TOGGLEBUTTON,
-			items->radio > 0 ? radio[items->radio] : NULL,
-			NULL, __(items->tooltip), "Private",
-			xpm_image(items->xpm), lclick, (gpointer)items);
-		if (items->radio > 0) radio[items->radio] = item;
-		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
-			"button_press_event", rclick, (gpointer)items);
-		mapped_dis_add(item, items->actmap);
-		if (wlist) wlist[items->ID] = item;
-	}
-}
-
-/* The following is main toolbars auto-sizing code. If toolbar is too long for
- * the window, some of its items get hidden, but remain accessible through an
- * "overflow box" - a popup with 5xN grid of buttons inside. This way, we can
- * support small-screen devices without penalizing large-screen ones. - WJ */
-
-#define WRAPBOX_W 5
-
-static void wrapbox_size_req(GtkWidget *widget, GtkRequisition *req,
-	gpointer user_data)
-{
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child;
-	GList *chain;
-	GtkRequisition wreq;
-	int cnt, nr, w, h, l, spacing;
-
-	cnt = w = h = spacing = 0;
-	for (chain = box->children; chain; chain = chain->next)
-	{
-		child = chain->data;
-		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
-		gtk_widget_size_request(child->widget, &wreq);
-		if (w < wreq.width) w = wreq.width;
-		if (h < wreq.height) h = wreq.height;
-		cnt++;
-	}
-	if (cnt) spacing = box->spacing;
-	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
-	cnt = nr > 1 ? WRAPBOX_W : cnt; 
-
-	l = GTK_CONTAINER(widget)->border_width * 2 - spacing;
-	req->width = (w + spacing) * cnt + l;
-	req->height = (h + spacing) * nr + l;
-}
-
-static void wrapbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
-	gpointer user_data)
-{
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child;
-	GList *chain;
-	GtkRequisition wreq;
-	GtkAllocation wall;
-	int idx, cnt, nr, l, w, h, ww, wh, spacing;
-
-	widget->allocation = *alloc;
-
-	/* Count widgets */
-	cnt = w = h = 0;
-	for (chain = box->children; chain; chain = chain->next)
-	{
-		child = chain->data;
-		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
-		gtk_widget_get_child_requisition(child->widget, &wreq);
-		if (w < wreq.width) w = wreq.width;
-		if (h < wreq.height) h = wreq.height;
-		cnt++;
-	}
-	if (!cnt) return; // Nothing needs positioning in here
-	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
-	cnt = nr > 1 ? WRAPBOX_W : cnt; 
-
-	/* Adjust sizes (homogeneous, shrinkable, no expand, no fill) */
-	l = GTK_CONTAINER(widget)->border_width;
-	spacing = box->spacing;
-	ww = alloc->width - l * 2 + spacing;
-	wh = alloc->height - l * 2 + spacing;
-	if ((w + spacing) * cnt > ww) w = ww / cnt - spacing;
-	if (w < 1) w = 1;
-	if ((h + spacing) * nr > wh) h = wh / nr - spacing;
-	if (h < 1) h = 1;
-
-	/* Now position the widgets */
-	wall.height = h;
-	wall.width = w;
-	idx = 0;
-	for (chain = box->children; chain; chain = chain->next)
-	{
-		child = chain->data;
-		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
-		wall.x = alloc->x + l + (w + spacing) * (idx % WRAPBOX_W);
-		wall.y = alloc->y + l + (h + spacing) * (idx / WRAPBOX_W);
-		gtk_widget_size_allocate(child->widget, &wall);
-		idx++;
-	}
-}
-
-static int split_toolbar_at(GtkWidget *vport, int w)
-{
-	GtkWidget *tbar;
-	GList *chain;
-	GtkToolbarChild *child;
-	GtkAllocation *alloc;
-	int border, x = 0;
-
-	if (w < 1) w = 1;
-	if (!GTK_IS_VIEWPORT(vport)) return (w);
-	tbar = GTK_BIN(vport)->child;
-	if (!tbar || !GTK_IS_TOOLBAR(tbar)) return (w);
-	border = GTK_CONTAINER(tbar)->border_width;
-	for (chain = GTK_TOOLBAR(tbar)->children; chain; chain = chain->next)
-	{
-		child = chain->data;
-		if (child->type == GTK_TOOLBAR_CHILD_SPACE) continue;
-		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
-		alloc = &child->widget->allocation;
-		if (alloc->x < w)
-		{
-			if (alloc->x + alloc->width <= w)
-			{
-				x = alloc->x + alloc->width;
-				continue;
-			}
-			w = alloc->x;
-		}
-		if (!x) return (1); // Nothing to see here
-		return (x + border > w ? x : x + border);
-	}
-	return (w); // Toolbar is empty
-}
-
-static void htoolbox_size_req(GtkWidget *widget, GtkRequisition *req,
-	gpointer user_data)
-{
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child;
-	GList *chain;
-	GtkRequisition wreq;
-	int idx, cnt, w, h, l;
-
-	idx = cnt = w = h = 0;
-	for (chain = box->children; chain; chain = chain->next , idx++)
-	{
-		child = chain->data;
-		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
-		gtk_widget_size_request(child->widget, &wreq);
-		if (h < wreq.height) h = wreq.height;
-		/* Button in slot 1 adds no extra width */
-		if (idx == 1) continue;
-		w += wreq.width + child->padding * 2;
-		cnt++;
-	}
-	if (cnt > 1) w += (cnt - 1) * box->spacing;
-	l = GTK_CONTAINER(widget)->border_width * 2;
-	req->width = w + l;
-	req->height = h + l;
-}
-
-static void htoolbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
-	gpointer user_data)
-{
-	GtkWidget *button = NULL;
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child;
-	GList *chain;
-	GtkRequisition wreq;
-	GtkAllocation wall;
-	int vw, bw, xw, dw, pad, spacing;
-	int idx, cnt, l, x, wrkw;
-
-	widget->allocation = *alloc;
-
-	/* Calculate required size */
-	idx = cnt = 0;
-	vw = bw = xw = 0;
-	spacing = box->spacing;
-	for (chain = box->children; chain; chain = chain->next , idx++)
-	{
-		child = chain->data;
-		pad = child->padding * 2;
-		if (idx == 1)
-		{
-			gtk_widget_size_request(button = child->widget, &wreq);
-			bw = wreq.width + pad + spacing; // Button
-		}
-		else if (GTK_WIDGET_VISIBLE(child->widget))
-		{
-			gtk_widget_get_child_requisition(child->widget, &wreq);
-			if (!idx) vw = wreq.width; // Viewport
-			else xw += wreq.width; // Extra widgets
-			xw += pad;
-			cnt++;
-		}
-	}
-	if (cnt > 1) xw += (cnt - 1) * spacing;
-	cnt -= !!vw; // Now this counts visible extra widgets
-	l = GTK_CONTAINER(widget)->border_width;
-	xw += l * 2;
-	if (vw && (xw + vw > alloc->width)) /* If viewport doesn't fit */
-		vw = split_toolbar_at(BOX_CHILD_0(widget), alloc->width - xw - bw);
-	else bw = 0;
-
-	/* Calculate how much to reduce extra widgets' sizes */
-	dw = 0;
-	if (cnt) dw = (xw + bw + vw - alloc->width + cnt - 1) / cnt;
-	if (dw < 0) dw = 0;
-
-	/* Now position the widgets */
-	x = alloc->x + l;
-	wall.y = alloc->y + l;
-	wall.height = alloc->height - l * 2;
-	if (wall.height < 1) wall.height = 1;
-	idx = 0;
-	for (chain = box->children; chain; chain = chain->next , idx++)
-	{
-		child = chain->data;
-		pad = child->padding;
-		/* Button uses size, the others, visibility */
-		if (idx == 1 ? !bw : !GTK_WIDGET_VISIBLE(child->widget)) continue;
-		gtk_widget_get_child_requisition(child->widget, &wreq);
-		wrkw = idx ? wreq.width : vw;
-		if (idx > 1) wrkw -= dw;
-		if (wrkw < 1) wrkw = 1;
-		wall.width = wrkw;
-		x = (wall.x = x + pad) + wrkw + pad + spacing;
-		gtk_widget_size_allocate(child->widget, &wall);
-	}
-
-	if (button) widget_showhide(button, bw);
-}
-
-static void htoolbox_popup(GtkWidget *button, gpointer user_data)
-{
-	GtkWidget *tool, *vport, *btn, *popup = user_data;
-	GtkAllocation *alloc = &button->allocation;
-	GtkRequisition req;
-	GtkBox *box;
-	GtkBoxChild *child;
-	GList *chain;
-	gint x, y, w, h, vl;
-
-	/* Pre-grab; use an already visible widget */
-	if (!do_grab(GRAB_PROGRAM, button, NULL)) return;
-
-	/* Position the popup */
-#if GTK2VERSION >= 2 /* GTK+ 2.2+ */
-	{
-		GdkScreen *screen = gtk_widget_get_screen(button);
-		w = gdk_screen_get_width(screen);
-		h = gdk_screen_get_height(screen);
-		/* !!! To have styles while unrealized, need at least this */
-		gtk_window_set_screen(GTK_WINDOW(popup), screen);
-	}
-#else
-	w = gdk_screen_width();
-	h = gdk_screen_height();
-#endif
-	vport = gtk_object_get_user_data(GTK_OBJECT(button));
-	vl = vport->allocation.width;
-	box = gtk_object_get_user_data(GTK_OBJECT(popup));
-	for (chain = box->children; chain; chain = chain->next)
-	{
-		child = chain->data;
-		btn = child->widget;
-		tool = gtk_object_get_user_data(GTK_OBJECT(btn));
-		if (!tool) continue; // Paranoia
-		/* Copy button relief setting of toolbar buttons */
-		gtk_button_set_relief(GTK_BUTTON(btn),
-			gtk_button_get_relief(GTK_BUTTON(tool)));
-		/* Copy their state (feedback is disabled while invisible) */
-		if (GTK_IS_TOGGLE_BUTTON(btn)) gtk_toggle_button_set_active(
-			GTK_TOGGLE_BUTTON(btn), GTK_TOGGLE_BUTTON(tool)->active);
-//		gtk_widget_set_style(btn, gtk_rc_get_style(tool));
-		/* Set visibility */
-		widget_showhide(btn, GTK_WIDGET_VISIBLE(tool) &&
-			(tool->allocation.x >= vl));
-	}
-	gtk_widget_size_request(popup, &req);
-	gdk_window_get_origin(button->parent->window, &x, &y);
-	x += alloc->x + (alloc->width - req.width) / 2;
-	y += alloc->y + alloc->height;
-	if (x + req.width > w) x = w - req.width;
-	if (x < 0) x = 0;
-	if (y + req.height > h) y -= alloc->height + req.height;
-	if (y + req.height > h) y = h - req.height;
-	if (y < 0) y = 0;
-#if GTK_MAJOR_VERSION == 1
-	gtk_widget_realize(popup);
-	gtk_window_reposition(GTK_WINDOW(popup), x, y);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	gtk_window_move(GTK_WINDOW(popup), x, y);
-#endif
-
-	/* Actually popup it */
-	gtk_widget_show(popup);
-	gtk_window_set_focus(GTK_WINDOW(popup), NULL); // Nothing is focused
-	gdk_flush(); // !!! To accept grabs, window must be actually mapped
-
-	/* Transfer grab to it */
-	do_grab(GRAB_WIDGET, popup, NULL);
-}
-
-static void htoolbox_popdown(GtkWidget *widget)
-{
-	undo_grab(widget);
-	gtk_widget_hide(widget);
-}
-
-static void htoolbox_unrealize(GtkWidget *widget, gpointer user_data)
-{
-	GtkWidget *popup = user_data;
-
-	if (GTK_WIDGET_VISIBLE(popup)) htoolbox_popdown(popup);
-	gtk_widget_unrealize(popup);
-}
-
-static gboolean htoolbox_popup_key(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
-{
-	if ((event->keyval != GDK_Escape) || (event->state & (GDK_CONTROL_MASK |
-		GDK_SHIFT_MASK | GDK_MOD1_MASK))) return (FALSE);
-	htoolbox_popdown(widget);
-	return (TRUE);
-}
-
-static gboolean htoolbox_popup_click(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
-{
-	GtkWidget *ev = gtk_get_event_widget((GdkEvent *)event);
-
-	/* Clicks on popup's descendants are OK; otherwise, remove the popup */
-	if (ev != widget)
-	{
-		while (ev)
-		{
-			ev = ev->parent;
-			if (ev == widget) return (FALSE);
-		}
-	}
-	htoolbox_popdown(widget);
-	return (TRUE);
-}
-
-static void htoolbox_tool_clicked(GtkWidget *button, gpointer user_data)
-{
-	GtkWidget *popup = user_data;
-
-	/* Invisible buttons don't send (virtual) clicks to toolbar */
-	if (!GTK_WIDGET_VISIBLE(popup)) return;
-	/* Ignore radio buttons getting depressed */
-	if (GTK_IS_RADIO_BUTTON(button) && !GTK_TOGGLE_BUTTON(button)->active)
-		return;
-	htoolbox_popdown(popup);
-	gtk_button_clicked(GTK_BUTTON(gtk_object_get_user_data(GTK_OBJECT(button))));
-}
-
-static gboolean htoolbox_tool_rclick(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
-{
-	toolbar_item *item = user_data;
-
-	/* Handle only right clicks */
-	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
-		return (FALSE);
-	htoolbox_popdown(gtk_widget_get_toplevel(widget));
-	action_dispatch(item->action2, item->mode2, TRUE, FALSE);
-	return (TRUE);
-}
-
-static GtkWidget *smart_toolbar(toolbar_item *items, GtkWidget **wlist)
-{
-	GtkWidget *box, *vport, *button, *arrow, *tbar, *popup, *ebox, *frame;
-	GtkWidget *bbox, *item, *radio[32];
-
-	box = wj_size_box();
-	gtk_signal_connect(GTK_OBJECT(box), "size_request",
-		GTK_SIGNAL_FUNC(htoolbox_size_req), NULL);
-	gtk_signal_connect(GTK_OBJECT(box), "size_allocate",
-		GTK_SIGNAL_FUNC(htoolbox_size_alloc), NULL);
-
-	vport = pack(box, gtk_viewport_new(NULL, NULL));
-	gtk_viewport_set_shadow_type(GTK_VIEWPORT(vport), GTK_SHADOW_NONE);
-	gtk_widget_show(vport);
-	vport_noshadow_fix(vport);
-	button = pack(box, gtk_button_new());
-	gtk_object_set_user_data(GTK_OBJECT(button), vport);
-#if GTK_MAJOR_VERSION == 1
-	// !!! Arrow w/o shadow is invisible in plain GTK+1
-	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_OUT);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_NONE);
-#endif
-	gtk_widget_show(arrow);
-	gtk_container_add(GTK_CONTAINER(button), arrow);
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
-	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
-#endif
-
-	popup = gtk_window_new(GTK_WINDOW_POPUP);
-	gtk_window_set_policy(GTK_WINDOW(popup), FALSE, FALSE, TRUE);
-#if GTK2VERSION >= 10 /* GTK+ 2.10+ */
-	gtk_window_set_type_hint(GTK_WINDOW(popup), GDK_WINDOW_TYPE_HINT_COMBO);
-#endif
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(htoolbox_popup), popup);
-	gtk_signal_connect(GTK_OBJECT(box), "unrealize",
-		GTK_SIGNAL_FUNC(htoolbox_unrealize), popup);
-	gtk_signal_connect_object(GTK_OBJECT(box), "destroy",
-		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(popup));
-	/* Eventbox covers the popup, and popup has a grab; then, all clicks
-	 * inside the popup get its descendant as event widget; anything else,
-	 * including popup window itself, means click was outside, and triggers
-	 * popdown (solution from GtkCombo) - WJ */
-	ebox = gtk_event_box_new();
-	gtk_container_add(GTK_CONTAINER(popup), ebox);
-	frame = gtk_frame_new(NULL);
-	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_OUT);
-	gtk_container_add(GTK_CONTAINER(ebox), frame);
-
-	bbox = wj_size_box();
-	gtk_signal_connect(GTK_OBJECT(bbox), "size_request",
-		GTK_SIGNAL_FUNC(wrapbox_size_req), NULL);
-	gtk_signal_connect(GTK_OBJECT(bbox), "size_allocate",
-		GTK_SIGNAL_FUNC(wrapbox_size_alloc), NULL);
-	gtk_container_add(GTK_CONTAINER(frame), bbox);
-
-	gtk_widget_show_all(ebox);
-	gtk_signal_connect(GTK_OBJECT(popup), "key_press_event",
-		GTK_SIGNAL_FUNC(htoolbox_popup_key), NULL);
-	gtk_signal_connect(GTK_OBJECT(popup), "button_press_event",
-		GTK_SIGNAL_FUNC(htoolbox_popup_click), NULL);
-	gtk_object_set_user_data(GTK_OBJECT(popup), GTK_BOX(bbox));
-
-#if GTK_MAJOR_VERSION == 1
-	tbar = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL, GTK_TOOLBAR_ICONS);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	tbar = gtk_toolbar_new();
-	gtk_toolbar_set_style(GTK_TOOLBAR(tbar), GTK_TOOLBAR_ICONS);
-#endif
-	gtk_widget_show(tbar);
-	gtk_container_add(GTK_CONTAINER(vport), tbar);
-
-	fill_toolbar(GTK_TOOLBAR(tbar), items, wlist, NULL, NULL);
-	gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, button,
-		__("More..."), "Private");
-	memset(radio, 0, sizeof(radio));
-	for (; items->tooltip; items++)
-	{
-		if (!items->xpm) continue; // This is a separator
-		if (items->radio < 0) item = gtk_button_new();
-		else
-		{
-			if (!items->radio) item = gtk_toggle_button_new();
-			else radio[items->radio] = item = gtk_radio_button_new_from_widget(
-				GTK_RADIO_BUTTON_0(radio[items->radio]));
-			gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(item), FALSE);
-		}
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
-		gtk_button_set_focus_on_click(GTK_BUTTON(item), FALSE);
-#endif
-		gtk_container_add(GTK_CONTAINER(item), xpm_image(items->xpm));
-		pack(bbox, item);
-		gtk_tooltips_set_tip(GTK_TOOLBAR(tbar)->tooltips, item,
-			__(items->tooltip), "Private");
-		mapped_dis_add(item, items->actmap);
-		gtk_object_set_user_data(GTK_OBJECT(item), wlist[items->ID]);
-		gtk_signal_connect(GTK_OBJECT(item), "clicked",
-			GTK_SIGNAL_FUNC(htoolbox_tool_clicked), popup);
-		if (items->action2) gtk_signal_connect(GTK_OBJECT(item),
-			"button_press_event", GTK_SIGNAL_FUNC(htoolbox_tool_rclick),
-			(gpointer)items);
-	}
-
-	return (box);
-}
-
 #define GP_WIDTH 256
 #define GP_HEIGHT 16
 static GtkWidget *grad_view;
@@ -902,20 +385,19 @@ static void **create_grad_view(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-static void settings_bar_click(settings_dd *dt, void **wdata, int what, void **where)
+static void toolbar_click(settings_dd *dt, void **wdata, int what, void **where)
 {
-	int act_m, res;
+	int act_m, res = TRUE;
 
 	if (what == op_EVT_CHANGE)
 	{
+		void *cause = cmd_read(where, dt);
+		// Good for radiobuttons too, as all action codes are nonzero
+		if (cause) res = *(int *)cause;
 		act_m = TOOL_ID(where);
-		res = *(int *)cmd_read(where, dt);
 	}
-	else /* if (what == op_EVT_CLICK) */
-	{
-		act_m = TOOL_IR(where);
-		res = TRUE;
-	}
+	else act_m = TOOL_IR(where); // op_EVT_CLICK
+
 	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, res, FALSE);
 }
 
@@ -923,7 +405,7 @@ static void settings_bar_click(settings_dd *dt, void **wdata, int what, void **w
 static void *settings_code[] = {
 	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
 	BORDER(TOOLBAR, 0),
-	TOOLBARx(settings_bar_click, settings_bar_click),
+	TOOLBARx(toolbar_click, toolbar_click),
 	REFv(settings_buttons[SETB_CONT]),
 	TBTOGGLExv(_("Continuous Mode"), XPM_ICON(mode_cont),
 		ACTMOD(ACT_MODE, SETB_CONT), ACTMOD(DLG_STEP, 0),
@@ -1006,183 +488,7 @@ static void toolbar_settings_init()
 	toolbar_boxes_[TOOLBAR_SETTINGS] = run_create(sbar_code, sbar_code, 0);
 }
 
-static toolbar_item main_bar[] = {
-	{ _("New Image"), -1, MTB_NEW, 0, XPM_ICON(new), DLG_NEW, 0 },
-	{ _("Load Image File"), -1, MTB_OPEN, 0, XPM_ICON(open), DLG_FSEL, FS_PNG_LOAD },
-	{ _("Save Image File"), -1, MTB_SAVE, 0, XPM_ICON(save), ACT_SAVE, 0 },
-	{""},
-	{ _("Cut"), -1, MTB_CUT, NEED_SEL2, XPM_ICON(cut), ACT_COPY, 1 },
-	{ _("Copy"), -1, MTB_COPY, NEED_SEL2, XPM_ICON(copy), ACT_COPY, 0 },
-	{ _("Paste"), -1, MTB_PASTE, NEED_CLIP, XPM_ICON(paste), ACT_PASTE, 0 },
-	{""},
-	{ _("Undo"), -1, MTB_UNDO, NEED_UNDO, XPM_ICON(undo), ACT_DO_UNDO, 0 },
-	{ _("Redo"), -1, MTB_REDO, NEED_REDO, XPM_ICON(redo), ACT_DO_UNDO, 1 },
-	{""},
-	{ _("Transform Colour"), -1, MTB_BRCOSA, 0, XPM_ICON(brcosa), DLG_BRCOSA, 0 },
-	{ _("Pan Window"), -1, MTB_PAN, 0, XPM_ICON(pan), ACT_PAN, 0 },
-	{ NULL }};
-
-static toolbar_item tools_bar[] = {
-	{ _("Paint"), 1, TTB_PAINT, 0, XPM_ICON(paint), ACT_TOOL, TTB_PAINT },
-	{ _("Shuffle"), 1, TTB_SHUFFLE, 0, XPM_ICON(shuffle), ACT_TOOL, TTB_SHUFFLE },
-	{ _("Flood Fill"), 1, TTB_FLOOD, 0, XPM_ICON(flood), ACT_TOOL, TTB_FLOOD, DLG_FLOOD, 0 },
-	{ _("Straight Line"), 1, TTB_LINE, 0, XPM_ICON(line), ACT_TOOL, TTB_LINE },
-	{ _("Smudge"), 1, TTB_SMUDGE, NEED_24, XPM_ICON(smudge), ACT_TOOL, TTB_SMUDGE, DLG_SMUDGE, 0 },
-	{ _("Clone"), 1, TTB_CLONE, 0, XPM_ICON(clone), ACT_TOOL, TTB_CLONE },
-	{ _("Make Selection"), 1, TTB_SELECT, 0, XPM_ICON(select), ACT_TOOL, TTB_SELECT },
-	{ _("Polygon Selection"), 1, TTB_POLY, 0, XPM_ICON(polygon), ACT_TOOL, TTB_POLY },
-	{ _("Place Gradient"), 1, TTB_GRAD, 0, XPM_ICON(grad_place), ACT_TOOL, TTB_GRAD, DLG_GRAD, 0 },
-	{""},
-	{ _("Lasso Selection"), -1, TTB_LASSO, NEED_LAS2, XPM_ICON(lasso), ACT_LASSO, 0 },
-	{ _("Paste Text"), -1, TTB_TEXT, 0, XPM_ICON(text), DLG_TEXT, 0, DLG_TEXT_FT, 0 },
-	{""},
-	{ _("Ellipse Outline"), -1, TTB_ELLIPSE, NEED_SEL, XPM_ICON(ellipse2), ACT_ELLIPSE, 0 },
-	{ _("Filled Ellipse"), -1, TTB_FELLIPSE, NEED_SEL, XPM_ICON(ellipse), ACT_ELLIPSE, 1 },
-	{ _("Outline Selection"), -1, TTB_OUTLINE, NEED_SEL2, XPM_ICON(rect1), ACT_OUTLINE, 0 },
-	{ _("Fill Selection"), -1, TTB_FILL, NEED_SEL2, XPM_ICON(rect2), ACT_OUTLINE, 1 },
-	{""},
-	{ _("Flip Selection Vertically"), -1, TTB_SELFV, NEED_CLIP, XPM_ICON(flip_vs), ACT_SEL_FLIP_V, 0 },
-	{ _("Flip Selection Horizontally"), -1, TTB_SELFH, NEED_CLIP, XPM_ICON(flip_hs), ACT_SEL_FLIP_H, 0 },
-	{ _("Rotate Selection Clockwise"), -1, TTB_SELRCW, NEED_CLIP, XPM_ICON(rotate_cs), ACT_SEL_ROT, 0 },
-	{ _("Rotate Selection Anti-Clockwise"), -1, TTB_SELRCCW, NEED_CLIP, XPM_ICON(rotate_as), ACT_SEL_ROT, 1 },
-	{ NULL }};
-
-#define TWOBAR_KEY "mtPaint.twobar"
-
-static void twobar_size_req(GtkWidget *widget, GtkRequisition *req,
-	gpointer user_data)
-{
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child;
-	GtkRequisition wreq1, wreq2;
-	int l;
-
-
-	wreq1.width = wreq1.height = 0;
-	wreq2 = wreq1;
-	if (box->children)
-	{
-		child = box->children->data;
-		if (GTK_WIDGET_VISIBLE(child->widget))
-			gtk_widget_size_request(child->widget, &wreq1);
-		if (box->children->next)
-		{
-			child = box->children->next->data;
-			if (GTK_WIDGET_VISIBLE(child->widget))
-				gtk_widget_size_request(child->widget, &wreq2);
-		}
-	}
-
-	l = box->spacing;
-	/* One or none */
-	if (!wreq2.width);
-	else if (!wreq1.width) wreq1 = wreq2;
-	/* Two in one row */
-	else if (gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY))
-	{
-		wreq1.width += wreq2.width + l;
-		if (wreq1.height < wreq2.height) wreq1.height = wreq2.height;
-	}
-	/* Two rows (default) */
-	else
-	{	
-		wreq1.height += wreq2.height + l;
-		if (wreq1.width < wreq2.width) wreq1.width = wreq2.width;
-	}
-	/* !!! Children' padding is ignored (it isn't used anyway) */
-
-	l = GTK_CONTAINER(widget)->border_width * 2;
-
-#if GTK_MAJOR_VERSION == 1
-	/* !!! GTK+1 doesn't want to reallocate upper-level containers when
-	 * something on lower level gets downsized */
-	if (widget->requisition.height > wreq1.height + l) force_resize(widget);
-#endif
-
-	req->width = wreq1.width + l;
-	req->height = wreq1.height + l;
-}
-
-static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
-	gpointer user_data)
-{
-	GtkBox *box = GTK_BOX(widget);
-	GtkBoxChild *child, *child2 = NULL;
-	GtkRequisition wreq1, wreq2;
-	GtkAllocation wall;
-	int l, h, w2, ww, wh, bar, oldbar;
-
-
-	widget->allocation = *alloc;
-
-	if (!box->children) return; // Empty
-	child = box->children->data;
-	if (box->children->next)
-	{
-		child2 = box->children->next->data;
-		if (!GTK_WIDGET_VISIBLE(child2->widget)) child2 = NULL;
-	}
-	if (!GTK_WIDGET_VISIBLE(child->widget)) child = child2 , child2 = NULL;
-	if (!child) return;
-
-	l = GTK_CONTAINER(widget)->border_width;
-	wall.x = alloc->x + l;
-	wall.y = alloc->y + l;
-	l *= 2;
-	ww = alloc->width - l;
-	if (ww < 1) ww = 1;
-	wall.width = ww;
-	wh = alloc->height - l;
-	if (wh < 1) wh = 1;
-	wall.height = wh; 
-
-	if (!child2) /* Place one, and be done */
-	{
-		gtk_widget_size_allocate(child->widget, &wall);
-		return;
-	}
-
-	/* Need to arrange two */
-	gtk_widget_get_child_requisition(child->widget, &wreq1);
-	gtk_widget_get_child_requisition(child2->widget, &wreq2);
-	l = box->spacing;
-	w2 = wreq1.width + wreq2.width + l;
-	h = wreq1.height;
-	if (h < wreq2.height) h = wreq2.height;
-
-	bar = w2 <= ww; /* Can do one row */
-	if (bar)
-	{
-		if (wall.height > h) wall.height = h;
-		l += (wall.width = wreq1.width);
-		gtk_widget_size_allocate(child->widget, &wall);
-		wall.x += l;
-		wall.width = ww - l;
-	}
-	else /* Two rows */
-	{
-		l += (wall.height = wreq1.height);
-		gtk_widget_size_allocate(child->widget, &wall);
-		wall.y += l;
-		wall.height = wh - l;
-		if (wall.height < 1) wall.height = 1;
-	}
-	gtk_widget_size_allocate(child2->widget, &wall);
-
-	oldbar = (int)gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY);
-	if (bar != oldbar) /* Shape change */
-	{
-		gtk_object_set_data(GTK_OBJECT(widget), TWOBAR_KEY, (gpointer)bar);
-		/* !!! GTK+1 doesn't handle requeued resizes properly */
-#if GTK_MAJOR_VERSION == 1
-		force_resize(widget);
-#else
-		gtk_widget_queue_resize(widget);
-#endif
-	}
-}
-
-void toolbar_init(GtkWidget *vbox_main)
+static void **prepare_cursors(void **r, GtkWidget ***wpp, void **wdata)
 {
 	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
 		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
@@ -1202,7 +508,6 @@ void toolbar_init(GtkWidget *vbox_main)
 	static GdkCursorType corners[4] = {
 		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
 		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
-	GtkWidget *toolbox, *box, *mbuttons[TOTAL_ICONS_MAIN];
 	int i;
 
 
@@ -1213,25 +518,12 @@ void toolbar_init(GtkWidget *vbox_main)
 	busy_cursor = gdk_cursor_new(GDK_WATCH);
 	for (i = 0; i < 4; i++) corner_cursor[i] = gdk_cursor_new(corners[i]);
 
-	for ( i=1; i<TOOLBAR_MAX; i++ )
-	{
-		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-			menu_widgets[MENU_TBMAIN - TOOLBAR_MAIN + i]),
-			toolbar_status[i]);	// Menu toggles = status
-	}
+	return (r);
+}
 
-///	TOOLBOX WIDGET
-
-	toolbox = pack(vbox_main, wj_size_box());
-	gtk_signal_connect(GTK_OBJECT(toolbox), "size_request",
-		GTK_SIGNAL_FUNC(twobar_size_req), NULL);
-	gtk_signal_connect(GTK_OBJECT(toolbox), "size_allocate",
-		GTK_SIGNAL_FUNC(twobar_size_alloc), NULL);
-
-///	MAIN TOOLBAR
-
-	toolbar_boxes[TOOLBAR_MAIN] = box =
-		pack(toolbox, smart_toolbar(main_bar, mbuttons));
+static void **create_zoom(void **r, GtkWidget ***wpp, void **wdata)
+{
+	GtkWidget *box = **wpp;
 
 	toolbar_zoom_main = toolbar_add_zoom(box);
 	toolbar_zoom_view = toolbar_add_zoom(box);
@@ -1249,19 +541,112 @@ void toolbar_init(GtkWidget *vbox_main)
 #endif
 	toolbar_viewzoom(FALSE);
 
-	if (toolbar_status[TOOLBAR_MAIN])
-		gtk_widget_show(box); // Only show if user wants
-
-///	TOOLS TOOLBAR
-
-	toolbar_boxes[TOOLBAR_TOOLS] =
-		pack(toolbox, smart_toolbar(tools_bar, icon_buttons));
-	if (toolbar_status[TOOLBAR_TOOLS])
-		gtk_widget_show(toolbar_boxes[TOOLBAR_TOOLS]); // Only show if user wants
-
-	/* !!! If hardcoded default tool isn't the default brush, this will crash */
-	change_to_tool(TTB_PAINT);
+	return (r);
 }
+
+/* !!! For later change_to_tool(DEFAULT_TOOL_ICON) to go through, this need be
+ * set to something different initially */
+static int tool_id = TTB_PAINT;
+
+void *toolbar_code[] = {
+	EXEC(prepare_cursors),
+	TWOBOX,
+///	MAIN TOOLBAR
+	REFv(toolbar_boxes_[TOOLBAR_MAIN]),
+	SMARTTBAR(toolbar_click),
+	UNLESSv(toolbar_status[TOOLBAR_MAIN]), HIDDEN, // Only show if user wants
+	TBBUTTON(_("New Image"), XPM_ICON(new), ACTMOD(DLG_NEW, 0)),
+	TBBUTTON(_("Load Image File"), XPM_ICON(open), ACTMOD(DLG_FSEL, FS_PNG_LOAD)),
+	TBBUTTON(_("Save Image File"), XPM_ICON(save), ACTMOD(ACT_SAVE, 0)),
+	TBSPACE,
+	TBBUTTON(_("Cut"),XPM_ICON(cut), ACTMOD(ACT_COPY, 1)),
+		ACTMAP(NEED_SEL2),
+	TBBUTTON(_("Copy"), XPM_ICON(copy), ACTMOD(ACT_COPY, 0)),
+		ACTMAP(NEED_SEL2),
+	TBBUTTON(_("Paste"), XPM_ICON(paste), ACTMOD(ACT_PASTE, 0)),
+		ACTMAP(NEED_CLIP),
+	TBSPACE,
+	TBBUTTON(_("Undo"), XPM_ICON(undo), ACTMOD(ACT_DO_UNDO, 0)),
+		ACTMAP(NEED_UNDO),
+	TBBUTTON(_("Redo"), XPM_ICON(redo), ACTMOD(ACT_DO_UNDO, 1)),
+		ACTMAP(NEED_REDO),
+	TBSPACE,
+	TBBUTTON(_("Transform Colour"), XPM_ICON(brcosa), ACTMOD(DLG_BRCOSA, 0)),
+	TBBUTTON(_("Pan Window"), XPM_ICON(pan), ACTMOD(ACT_PAN, 0)),
+	SMARTTBMORE(_("More...")),
+	EXEC(create_zoom),
+	WDONE,
+///	TOOLS TOOLBAR
+	REFv(toolbar_boxes_[TOOLBAR_TOOLS]),
+	SMARTTBARx(toolbar_click, toolbar_click),
+	UNLESSv(toolbar_status[TOOLBAR_TOOLS]), HIDDEN, // Only show if user wants
+	REFv(icon_buttons[TTB_PAINT]),
+	TBRBUTTONv(_("Paint"), XPM_ICON(paint),
+		ACTMOD(ACT_TOOL, TTB_PAINT), tool_id),
+	/* !!! This, with matching tool_id, would set default tool - which is
+	 * exactly the wrong thing to do in here */
+//		EVENT(CHANGE, toolbar_click), TRIGGER,
+	REFv(icon_buttons[TTB_SHUFFLE]),
+	TBRBUTTONv(_("Shuffle"), XPM_ICON(shuffle),
+		ACTMOD(ACT_TOOL, TTB_SHUFFLE), tool_id),
+	REFv(icon_buttons[TTB_FLOOD]),
+	TBRBUTTONxv(_("Flood Fill"), XPM_ICON(flood),
+		ACTMOD(ACT_TOOL, TTB_FLOOD), ACTMOD(DLG_FLOOD, 0), tool_id),
+	REFv(icon_buttons[TTB_LINE]),
+	TBRBUTTONv(_("Straight Line"), XPM_ICON(line),
+		ACTMOD(ACT_TOOL, TTB_LINE), tool_id),
+	REFv(icon_buttons[TTB_SMUDGE]),
+	TBRBUTTONxv(_("Smudge"), XPM_ICON(smudge),
+		ACTMOD(ACT_TOOL, TTB_SMUDGE), ACTMOD(DLG_SMUDGE, 0), tool_id),
+		ACTMAP(NEED_24),
+	REFv(icon_buttons[TTB_CLONE]),
+	TBRBUTTONv(_("Clone"), XPM_ICON(clone),
+		ACTMOD(ACT_TOOL, TTB_CLONE), tool_id),
+	REFv(icon_buttons[TTB_SELECT]),
+	TBRBUTTONv(_("Make Selection"), XPM_ICON(select),
+		ACTMOD(ACT_TOOL, TTB_SELECT), tool_id),
+	REFv(icon_buttons[TTB_POLY]),
+	TBRBUTTONv(_("Polygon Selection"), XPM_ICON(polygon),
+		ACTMOD(ACT_TOOL, TTB_POLY), tool_id),
+	REFv(icon_buttons[TTB_GRAD]),
+	TBRBUTTONxv(_("Place Gradient"), XPM_ICON(grad_place),
+		ACTMOD(ACT_TOOL, TTB_GRAD), ACTMOD(DLG_GRAD, 0), tool_id),
+	TBSPACE,
+	TBBUTTON(_("Lasso Selection"), XPM_ICON(lasso),
+		ACTMOD(ACT_LASSO, 0)),
+		ACTMAP(NEED_LAS2),
+	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
+		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)),
+	TBSPACE,
+	TBBUTTON(_("Ellipse Outline"), XPM_ICON(ellipse2),
+		ACTMOD(ACT_ELLIPSE, 0)),
+		ACTMAP(NEED_SEL),
+	TBBUTTON(_("Filled Ellipse"), XPM_ICON(ellipse),
+		ACTMOD(ACT_ELLIPSE, 1)),
+		ACTMAP(NEED_SEL),
+	TBBUTTON(_("Outline Selection"), XPM_ICON(rect1),
+		ACTMOD(ACT_OUTLINE, 0)),
+		ACTMAP(NEED_SEL2),
+	TBBUTTON(_("Fill Selection"), XPM_ICON(rect2),
+		ACTMOD(ACT_OUTLINE, 1)),
+		ACTMAP(NEED_SEL2),
+	TBSPACE,
+	TBBUTTON(_("Flip Selection Vertically"), XPM_ICON(flip_vs),
+		ACTMOD(ACT_SEL_FLIP_V, 0)),
+		ACTMAP(NEED_CLIP),
+	TBBUTTON(_("Flip Selection Horizontally"), XPM_ICON(flip_hs),
+		ACTMOD(ACT_SEL_FLIP_H, 0)),
+		ACTMAP(NEED_CLIP),
+	TBBUTTON(_("Rotate Selection Clockwise"), XPM_ICON(rotate_cs),
+		ACTMOD(ACT_SEL_ROT, 0)),
+		ACTMAP(NEED_CLIP),
+	TBBUTTON(_("Rotate Selection Anti-Clockwise"), XPM_ICON(rotate_as),
+		ACTMOD(ACT_SEL_ROT, 1)),
+		ACTMAP(NEED_CLIP),
+	SMARTTBMORE(_("More...")), WDONE,
+	WDONE, // twobox
+	RET
+};
 
 void ts_update_gradient()
 {
@@ -1563,11 +948,18 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 		{ TOOLBAR_MAIN, TOOLBAR_TOOLS, TOOLBAR_PALETTE, TOOLBAR_STATUS };
 	int i;
 
-	if (!toolbar_boxes[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
+// !!! Likely won't be needed after menu is moved to V-code
+	if (!toolbar_boxes_[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
 
 	// Don't touch regular toolbars in view mode
 	if (!view_image_only) for (i = 0; i < 4; i++)
-		widget_showhide(toolbar_boxes[bar[i]], toolbar_status[bar[i]]);
+	{
+		int n = bar[i];
+		if (toolbar_boxes[n]) widget_showhide(toolbar_boxes[n],
+			toolbar_status[n]);
+		if (toolbar_boxes_[n]) cmd_showhide(toolbar_boxes_[n],
+			toolbar_status[n]);
+	}
 
 	if (!toolbar_status[TOOLBAR_SETTINGS])
 		toolbar_settings_exit(NULL, NULL);

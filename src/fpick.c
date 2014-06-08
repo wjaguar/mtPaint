@@ -74,7 +74,6 @@ typedef struct {
 	void **combo, **list;
 	void **hbox, **entry;
 	void **ok, **cancel;
-	GtkWidget *toolbar, *icons[FPICK_ICON_TOT];
 	memx2 files;
 	char fname[PATHBUF];
 	char txt_directory[PATHBUF];	// Current directory - Normal C string

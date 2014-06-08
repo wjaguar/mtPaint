@@ -159,7 +159,7 @@ static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user
 void add_click(void **r, GtkWidget *widget)
 {
 	gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
-		GTK_SIGNAL_FUNC(do_evt_1_d), r);
+		GTK_SIGNAL_FUNC(do_evt_1_d), (gpointer)r);
 }
 
 void add_del(void **r, GtkWidget *window)
@@ -213,26 +213,26 @@ static void trigger_things(void **wdata)
 static int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, n = 2; // safety margin
+	int op, opf, n = 2; // safety margin
 
 	while (TRUE)
 	{
-		op = (int)*ifcode++;
+		opf = op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + WB_GETLEN(op);
 		n += WB_GETREF(op);
 		op &= WB_OPMASK;
 		if (op < op_END_LAST) break; // End
-		// Direct jump
-		if (op == op_GOTO) ifcode = *pp;
-		// Subroutine call/return
-		else if (op == op_RET) ifcode = *--rp;
-		else if (op == op_CALLp)
+		// Subroutine return
+		if (op == op_RET) ifcode = *--rp;
+		// Jump or subroutine call
+		else if ((op == op_GOTO) || (op == op_CALL))
 		{
-			*rp++ = ifcode;
+			if (op == op_CALL) *rp++ = ifcode;
 			v = *pp;
-			if ((int)*(pp - 1) & WB_FFLAG)
+			if (opf & WB_FFLAG)
 				v = (void *)(ddata + (int)v);
-			ifcode = *v;
+			if (opf & WB_NFLAG) v = *v; // dereference
+			ifcode = v;
 		}
 	}
 	return (n);
@@ -1612,6 +1612,9 @@ static void toolbar_lclick(GtkWidget *widget, gpointer user_data)
 	void **slot = user_data;
 	void **base = slot[0], **desc = slot[1];
 
+	/* Ignore radio buttons getting depressed */
+	if (GTK_IS_RADIO_BUTTON(widget) && !GTK_TOGGLE_BUTTON(widget)->active)
+		return;
 	slot = gtk_object_get_user_data(GTK_OBJECT(widget)); // if initialized
 	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot);
@@ -1630,6 +1633,622 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot);
 	return (TRUE);
+}
+
+//	SMARTTBAR widget
+
+/* The following is main toolbars auto-sizing code. If toolbar is too long for
+ * the window, some of its items get hidden, but remain accessible through an
+ * "overflow box" - a popup with 5xN grid of buttons inside. This way, we can
+ * support small-screen devices without penalizing large-screen ones. - WJ */
+
+typedef struct {
+	void **r, **r2;	// slot and end-of-items slot
+	GtkWidget *button, *tbar, *vport, *popup, *bbox;
+} smarttbar_data;
+
+#define WRAPBOX_W 5
+
+static void wrapbox_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	int cnt, nr, w, h, l, spacing;
+
+	cnt = w = h = spacing = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_size_request(child->widget, &wreq);
+		if (w < wreq.width) w = wreq.width;
+		if (h < wreq.height) h = wreq.height;
+		cnt++;
+	}
+	if (cnt) spacing = box->spacing;
+	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
+	cnt = nr > 1 ? WRAPBOX_W : cnt; 
+
+	l = GTK_CONTAINER(widget)->border_width * 2 - spacing;
+	req->width = (w + spacing) * cnt + l;
+	req->height = (h + spacing) * nr + l;
+}
+
+static void wrapbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	GtkAllocation wall;
+	int idx, cnt, nr, l, w, h, ww, wh, spacing;
+
+	widget->allocation = *alloc;
+
+	/* Count widgets */
+	cnt = w = h = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_get_child_requisition(child->widget, &wreq);
+		if (w < wreq.width) w = wreq.width;
+		if (h < wreq.height) h = wreq.height;
+		cnt++;
+	}
+	if (!cnt) return; // Nothing needs positioning in here
+	nr = (cnt + WRAPBOX_W - 1) / WRAPBOX_W;
+	cnt = nr > 1 ? WRAPBOX_W : cnt; 
+
+	/* Adjust sizes (homogeneous, shrinkable, no expand, no fill) */
+	l = GTK_CONTAINER(widget)->border_width;
+	spacing = box->spacing;
+	ww = alloc->width - l * 2 + spacing;
+	wh = alloc->height - l * 2 + spacing;
+	if ((w + spacing) * cnt > ww) w = ww / cnt - spacing;
+	if (w < 1) w = 1;
+	if ((h + spacing) * nr > wh) h = wh / nr - spacing;
+	if (h < 1) h = 1;
+
+	/* Now position the widgets */
+	wall.height = h;
+	wall.width = w;
+	idx = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		wall.x = alloc->x + l + (w + spacing) * (idx % WRAPBOX_W);
+		wall.y = alloc->y + l + (h + spacing) * (idx / WRAPBOX_W);
+		gtk_widget_size_allocate(child->widget, &wall);
+		idx++;
+	}
+}
+
+static int split_toolbar_at(GtkWidget *tbar, int w)
+{
+	GList *chain;
+	GtkToolbarChild *child;
+	GtkAllocation *alloc;
+	int border, x = 0;
+
+	if (w < 1) w = 1;
+	if (!tbar) return (w);
+	border = GTK_CONTAINER(tbar)->border_width;
+	for (chain = GTK_TOOLBAR(tbar)->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (child->type == GTK_TOOLBAR_CHILD_SPACE) continue;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		alloc = &child->widget->allocation;
+		if (alloc->x < w)
+		{
+			if (alloc->x + alloc->width <= w)
+			{
+				x = alloc->x + alloc->width;
+				continue;
+			}
+			w = alloc->x;
+		}
+		if (!x) return (1); // Nothing to see here
+		return (x + border > w ? x : x + border);
+	}
+	return (w); // Toolbar is empty
+}
+
+static void htoolbox_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	smarttbar_data *sd = user_data;
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	int cnt, w, h, l;
+
+	cnt = w = h = 0;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		child = chain->data;
+		if (!GTK_WIDGET_VISIBLE(child->widget)) continue;
+		gtk_widget_size_request(child->widget, &wreq);
+		if (h < wreq.height) h = wreq.height;
+		/* Button adds no extra width */
+		if (child->widget == sd->button) continue;
+		w += wreq.width + child->padding * 2;
+		cnt++;
+	}
+	if (cnt > 1) w += (cnt - 1) * box->spacing;
+	l = GTK_CONTAINER(widget)->border_width * 2;
+	req->width = w + l;
+	req->height = h + l;
+}
+
+static void htoolbox_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	smarttbar_data *sd = user_data;
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GList *chain;
+	GtkRequisition wreq;
+	GtkAllocation wall;
+	int vw, bw, xw, dw, pad, spacing;
+	int cnt, l, x, wrkw;
+
+	widget->allocation = *alloc;
+
+	/* Calculate required size */
+	cnt = 0;
+	vw = bw = xw = 0;
+	spacing = box->spacing;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		GtkWidget *w;
+
+		child = chain->data;
+		pad = child->padding * 2;
+		w = child->widget;
+		if (w == sd->button)
+		{
+			gtk_widget_size_request(w, &wreq);
+			bw = wreq.width + pad + spacing; // Button
+		}
+		else if (GTK_WIDGET_VISIBLE(w))
+		{
+			gtk_widget_get_child_requisition(w, &wreq);
+			if (w == sd->vport) vw = wreq.width; // Viewport
+			else xw += wreq.width; // Extra widgets
+			xw += pad;
+			cnt++;
+		}
+	}
+	if (cnt > 1) xw += (cnt - 1) * spacing;
+	cnt -= !!vw; // Now this counts visible extra widgets
+	l = GTK_CONTAINER(widget)->border_width;
+	xw += l * 2;
+	if (vw && (xw + vw > alloc->width)) /* If viewport doesn't fit */
+		vw = split_toolbar_at(sd->tbar, alloc->width - xw - bw);
+	else bw = 0;
+
+	/* Calculate how much to reduce extra widgets' sizes */
+	dw = 0;
+	if (cnt) dw = (xw + bw + vw - alloc->width + cnt - 1) / cnt;
+	if (dw < 0) dw = 0;
+
+	/* Now position the widgets */
+	x = alloc->x + l;
+	wall.y = alloc->y + l;
+	wall.height = alloc->height - l * 2;
+	if (wall.height < 1) wall.height = 1;
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		GtkWidget *w;
+
+		child = chain->data;
+		pad = child->padding;
+		w = child->widget;
+		/* Button uses size, the others, visibility */
+		if (w == sd->button ? !bw : !GTK_WIDGET_VISIBLE(w)) continue;
+		gtk_widget_get_child_requisition(w, &wreq);
+		wrkw = w == sd->vport ? vw : w == sd->button ? wreq.width :
+			wreq.width - dw;
+		if (wrkw < 1) wrkw = 1;
+		wall.width = wrkw;
+		x = (wall.x = x + pad) + wrkw + pad + spacing;
+		gtk_widget_size_allocate(w, &wall);
+	}
+
+	if (sd->button) widget_showhide(sd->button, bw);
+}
+
+static void htoolbox_popup(GtkWidget *button, gpointer user_data)
+{
+	smarttbar_data *sd = user_data;
+	GtkWidget *popup = sd->popup;
+	GtkAllocation *alloc = &button->allocation;
+	GtkRequisition req;
+	GtkBox *box;
+	GtkBoxChild *child;
+	GList *chain;
+	gint x, y, w, h, vl;
+
+	/* Pre-grab; use an already visible widget */
+	if (!do_grab(GRAB_PROGRAM, button, NULL)) return;
+
+	/* Position the popup */
+#if GTK2VERSION >= 2 /* GTK+ 2.2+ */
+	{
+		GdkScreen *screen = gtk_widget_get_screen(button);
+		w = gdk_screen_get_width(screen);
+		h = gdk_screen_get_height(screen);
+		/* !!! To have styles while unrealized, need at least this */
+		gtk_window_set_screen(GTK_WINDOW(popup), screen);
+	}
+#else
+	w = gdk_screen_width();
+	h = gdk_screen_height();
+#endif
+	vl = sd->vport->allocation.width;
+	box = GTK_BOX(sd->bbox);
+	for (chain = box->children; chain; chain = chain->next)
+	{
+		GtkWidget *btn, *tool;
+		void **slot;
+
+		child = chain->data;
+		btn = child->widget;
+		slot = gtk_object_get_user_data(GTK_OBJECT(btn));
+		if (!slot) continue; // Paranoia
+		tool = slot[0];
+		/* Copy button relief setting of toolbar buttons */
+		gtk_button_set_relief(GTK_BUTTON(btn),
+			gtk_button_get_relief(GTK_BUTTON(tool)));
+		/* Copy their state (feedback is disabled while invisible) */
+		if (GTK_IS_TOGGLE_BUTTON(btn)) gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(btn), GTK_TOGGLE_BUTTON(tool)->active);
+//		gtk_widget_set_style(btn, gtk_rc_get_style(tool));
+		/* Set visibility */
+		widget_showhide(btn, GTK_WIDGET_VISIBLE(tool) &&
+			(tool->allocation.x >= vl));
+	}
+	gtk_widget_size_request(popup, &req);
+	gdk_window_get_origin(GTK_WIDGET(sd->r[0])->window, &x, &y);
+	x += alloc->x + (alloc->width - req.width) / 2;
+	y += alloc->y + alloc->height;
+	if (x + req.width > w) x = w - req.width;
+	if (x < 0) x = 0;
+	if (y + req.height > h) y -= alloc->height + req.height;
+	if (y + req.height > h) y = h - req.height;
+	if (y < 0) y = 0;
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_realize(popup);
+	gtk_window_reposition(GTK_WINDOW(popup), x, y);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_window_move(GTK_WINDOW(popup), x, y);
+#endif
+
+	/* Actually popup it */
+	gtk_widget_show(popup);
+	gtk_window_set_focus(GTK_WINDOW(popup), NULL); // Nothing is focused
+	gdk_flush(); // !!! To accept grabs, window must be actually mapped
+
+	/* Transfer grab to it */
+	do_grab(GRAB_WIDGET, popup, NULL);
+}
+
+static void htoolbox_popdown(GtkWidget *widget)
+{
+	undo_grab(widget);
+	gtk_widget_hide(widget);
+}
+
+static void htoolbox_unrealize(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *popup = user_data;
+
+	if (GTK_WIDGET_VISIBLE(popup)) htoolbox_popdown(popup);
+	gtk_widget_unrealize(popup);
+}
+
+static gboolean htoolbox_popup_key(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	if ((event->keyval != GDK_Escape) || (event->state & (GDK_CONTROL_MASK |
+		GDK_SHIFT_MASK | GDK_MOD1_MASK))) return (FALSE);
+	htoolbox_popdown(widget);
+	return (TRUE);
+}
+
+static gboolean htoolbox_popup_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	GtkWidget *ev = gtk_get_event_widget((GdkEvent *)event);
+
+	/* Clicks on popup's descendants are OK; otherwise, remove the popup */
+	if (ev != widget)
+	{
+		while (ev)
+		{
+			ev = ev->parent;
+			if (ev == widget) return (FALSE);
+		}
+	}
+	htoolbox_popdown(widget);
+	return (TRUE);
+}
+
+static void htoolbox_tool_clicked(GtkWidget *button, gpointer user_data)
+{
+	smarttbar_data *sd = user_data;
+	void **slot;
+
+	/* Invisible buttons don't send (virtual) clicks to toolbar */
+	if (!GTK_WIDGET_VISIBLE(sd->popup)) return;
+	/* Ignore radio buttons getting depressed */
+	if (GTK_IS_RADIO_BUTTON(button) && !GTK_TOGGLE_BUTTON(button)->active)
+		return;
+	htoolbox_popdown(sd->popup);
+	slot = gtk_object_get_user_data(GTK_OBJECT(button));
+	gtk_button_clicked(GTK_BUTTON(slot[0]));
+}
+
+static gboolean htoolbox_tool_rclick(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	smarttbar_data *sd = user_data;
+	void **slot;
+
+	/* Handle only right clicks */
+	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
+		return (FALSE);
+	htoolbox_popdown(sd->popup);
+	slot = gtk_object_get_user_data(GTK_OBJECT(widget));
+	return (toolbar_rclick(slot[0], event, SLOT_N(sd->r, 2)));
+}
+
+// !!! With inlining this, problem also
+GtkWidget *smarttbar_button(smarttbar_data *sd, char *v)
+{
+	GtkWidget *box = sd->r[0], *item = NULL, *ritem = NULL;
+	GtkWidget *button, *arrow, *popup, *ebox, *frame, *bbox;
+	void **slot, *rvar = (void *)(-1);
+
+	sd->button = button = pack(box, gtk_button_new());
+#if GTK_MAJOR_VERSION == 1
+	// !!! Arrow w/o shadow is invisible in plain GTK+1
+	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_OUT);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	arrow = gtk_arrow_new(GTK_ARROW_DOWN, GTK_SHADOW_NONE);
+#endif
+	gtk_widget_show(arrow);
+	gtk_container_add(GTK_CONTAINER(button), arrow);
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+	gtk_button_set_focus_on_click(GTK_BUTTON(button), FALSE);
+#endif
+	if (v) gtk_tooltips_set_tip(GTK_TOOLBAR(sd->tbar)->tooltips, button,
+		_(v), "Private");
+
+	sd->popup = popup = gtk_window_new(GTK_WINDOW_POPUP);
+	gtk_window_set_policy(GTK_WINDOW(popup), FALSE, FALSE, TRUE);
+#if GTK2VERSION >= 10 /* GTK+ 2.10+ */
+	gtk_window_set_type_hint(GTK_WINDOW(popup), GDK_WINDOW_TYPE_HINT_COMBO);
+#endif
+	gtk_signal_connect(GTK_OBJECT(button), "clicked",
+		GTK_SIGNAL_FUNC(htoolbox_popup), sd);
+	gtk_signal_connect(GTK_OBJECT(box), "unrealize",
+		GTK_SIGNAL_FUNC(htoolbox_unrealize), popup);
+	gtk_signal_connect_object(GTK_OBJECT(box), "destroy",
+		GTK_SIGNAL_FUNC(gtk_widget_destroy), GTK_OBJECT(popup));
+	/* Eventbox covers the popup, and popup has a grab; then, all clicks
+	 * inside the popup get its descendant as event widget; anything else,
+	 * including popup window itself, means click was outside, and triggers
+	 * popdown (solution from GtkCombo) - WJ */
+	ebox = gtk_event_box_new();
+	gtk_container_add(GTK_CONTAINER(popup), ebox);
+	frame = gtk_frame_new(NULL);
+	gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_OUT);
+	gtk_container_add(GTK_CONTAINER(ebox), frame);
+
+	sd->bbox = bbox = wj_size_box();
+	gtk_signal_connect(GTK_OBJECT(bbox), "size_request",
+		GTK_SIGNAL_FUNC(wrapbox_size_req), NULL);
+	gtk_signal_connect(GTK_OBJECT(bbox), "size_allocate",
+		GTK_SIGNAL_FUNC(wrapbox_size_alloc), NULL);
+	gtk_container_add(GTK_CONTAINER(frame), bbox);
+
+	gtk_widget_show_all(ebox);
+	gtk_signal_connect(GTK_OBJECT(popup), "key_press_event",
+		GTK_SIGNAL_FUNC(htoolbox_popup_key), NULL);
+	gtk_signal_connect(GTK_OBJECT(popup), "button_press_event",
+		GTK_SIGNAL_FUNC(htoolbox_popup_click), NULL);
+
+	for (slot = sd->r; slot - sd->r2 < 0; slot = NEXT_SLOT(slot))
+	{
+		void **desc = slot[1];
+		int l, op = (int)desc[0];
+
+		l = WB_GETLEN(op);
+		op &= WB_OPMASK;
+		if (op == op_TBBUTTON) item = gtk_button_new();
+		else if (op == op_TBTOGGLE) item = gtk_toggle_button_new();
+		else if (op == op_TBRBUTTON)
+		{
+			ritem = item = gtk_radio_button_new_from_widget(
+				rvar != desc[1] ? NULL : GTK_RADIO_BUTTON(ritem));
+			rvar = desc[1];
+			/* !!! Flags are ignored; can XOR desc[0]'s to compare
+			 * them too, but false match improbable anyway - WJ */
+			gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(item), FALSE);
+		}
+		// !!! Maybe instead copy sensitivity within htoolbox_popup() ?
+		// (even a separate pass may be simpler than making fake slots)
+		else if (op == op_ACTMAP)
+		{
+			// !!! Paranoia - in case map's widget got skipped
+			if (gtk_object_get_user_data(GTK_OBJECT(item)) !=
+				(gpointer)origin_slot(slot)) continue;
+// !!! Switch to a slot-based map later (and generate fake slots for it)
+			mapped_dis_add(item, (int)slot[0]);
+			continue;
+		}
+		else continue; // Not a regular toolbar button
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+		gtk_button_set_focus_on_click(GTK_BUTTON(item), FALSE);
+#endif
+		gtk_container_add(GTK_CONTAINER(item), xpm_image(desc[4]));
+		pack(bbox, item);
+		gtk_tooltips_set_tip(GTK_TOOLBAR(sd->tbar)->tooltips, item,
+			_(desc[3]), "Private");
+		gtk_object_set_user_data(GTK_OBJECT(item), slot);
+		gtk_signal_connect(GTK_OBJECT(item), "clicked",
+			GTK_SIGNAL_FUNC(htoolbox_tool_clicked), sd);
+		if (l > 4) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
+			GTK_SIGNAL_FUNC(htoolbox_tool_rclick), sd);
+	}
+
+	return (button);
+}
+
+//	TWOBOX widget
+
+#define TWOBAR_KEY "mtPaint.twobar"
+
+static void twobar_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child;
+	GtkRequisition wreq1, wreq2;
+	int l;
+
+
+	wreq1.width = wreq1.height = 0;
+	wreq2 = wreq1;
+	if (box->children)
+	{
+		child = box->children->data;
+		if (GTK_WIDGET_VISIBLE(child->widget))
+			gtk_widget_size_request(child->widget, &wreq1);
+		if (box->children->next)
+		{
+			child = box->children->next->data;
+			if (GTK_WIDGET_VISIBLE(child->widget))
+				gtk_widget_size_request(child->widget, &wreq2);
+		}
+	}
+
+	l = box->spacing;
+	/* One or none */
+	if (!wreq2.width);
+	else if (!wreq1.width) wreq1 = wreq2;
+	/* Two in one row */
+	else if (gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY))
+	{
+		wreq1.width += wreq2.width + l;
+		if (wreq1.height < wreq2.height) wreq1.height = wreq2.height;
+	}
+	/* Two rows (default) */
+	else
+	{	
+		wreq1.height += wreq2.height + l;
+		if (wreq1.width < wreq2.width) wreq1.width = wreq2.width;
+	}
+	/* !!! Children' padding is ignored (it isn't used anyway) */
+
+	l = GTK_CONTAINER(widget)->border_width * 2;
+
+#if GTK_MAJOR_VERSION == 1
+	/* !!! GTK+1 doesn't want to reallocate upper-level containers when
+	 * something on lower level gets downsized */
+	if (widget->requisition.height > wreq1.height + l) force_resize(widget);
+#endif
+
+	req->width = wreq1.width + l;
+	req->height = wreq1.height + l;
+}
+
+static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	GtkBox *box = GTK_BOX(widget);
+	GtkBoxChild *child, *child2 = NULL;
+	GtkRequisition wreq1, wreq2;
+	GtkAllocation wall;
+	int l, h, w2, ww, wh, bar, oldbar;
+
+
+	widget->allocation = *alloc;
+
+	if (!box->children) return; // Empty
+	child = box->children->data;
+	if (box->children->next)
+	{
+		child2 = box->children->next->data;
+		if (!GTK_WIDGET_VISIBLE(child2->widget)) child2 = NULL;
+	}
+	if (!GTK_WIDGET_VISIBLE(child->widget)) child = child2 , child2 = NULL;
+	if (!child) return;
+
+	l = GTK_CONTAINER(widget)->border_width;
+	wall.x = alloc->x + l;
+	wall.y = alloc->y + l;
+	l *= 2;
+	ww = alloc->width - l;
+	if (ww < 1) ww = 1;
+	wall.width = ww;
+	wh = alloc->height - l;
+	if (wh < 1) wh = 1;
+	wall.height = wh; 
+
+	if (!child2) /* Place one, and be done */
+	{
+		gtk_widget_size_allocate(child->widget, &wall);
+		return;
+	}
+
+	/* Need to arrange two */
+	gtk_widget_get_child_requisition(child->widget, &wreq1);
+	gtk_widget_get_child_requisition(child2->widget, &wreq2);
+	l = box->spacing;
+	w2 = wreq1.width + wreq2.width + l;
+	h = wreq1.height;
+	if (h < wreq2.height) h = wreq2.height;
+
+	bar = w2 <= ww; /* Can do one row */
+	if (bar)
+	{
+		if (wall.height > h) wall.height = h;
+		l += (wall.width = wreq1.width);
+		gtk_widget_size_allocate(child->widget, &wall);
+		wall.x += l;
+		wall.width = ww - l;
+	}
+	else /* Two rows */
+	{
+		l += (wall.height = wreq1.height);
+		gtk_widget_size_allocate(child->widget, &wall);
+		wall.y += l;
+		wall.height = wh - l;
+		if (wall.height < 1) wall.height = 1;
+	}
+	gtk_widget_size_allocate(child2->widget, &wall);
+
+	oldbar = (int)gtk_object_get_data(GTK_OBJECT(widget), TWOBAR_KEY);
+	if (bar != oldbar) /* Shape change */
+	{
+		gtk_object_set_data(GTK_OBJECT(widget), TWOBAR_KEY, (gpointer)bar);
+		/* !!! GTK+1 doesn't handle requeued resizes properly */
+#if GTK_MAJOR_VERSION == 1
+		force_resize(widget);
+#else
+		gtk_widget_queue_resize(widget);
+#endif
+	}
 }
 
 #if U_NLS
@@ -1854,7 +2473,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	cmdef *cmd;
 	col_data c;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL, **tbar = NULL;
+	void *v, **pp, **r = NULL, **res = NULL;
+	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad, minw = 0;
 
@@ -2443,7 +3063,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			break;
 		/* Add a toolbar */
-		case op_TOOLBAR:
+		case op_TOOLBAR: case op_SMARTTBAR:
+		{
+			GtkWidget *vport, *bar;
+			smarttbar_data *sd;
+
+			tbar = r;
+			rvar = rslot = NULL;
 #if GTK_MAJOR_VERSION == 1
 			widget = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
 				GTK_TOOLBAR_ICONS);
@@ -2451,10 +3077,57 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = gtk_toolbar_new();
 			gtk_toolbar_set_style(GTK_TOOLBAR(widget), GTK_TOOLBAR_ICONS);
 #endif
-			tbar = r;
-			tpad = GET_BORDER(TOOLBAR);
-			pk = pk_PACKp | pkf_STACK | pkf_SHOW;
+			if (op != op_SMARTTBAR)
+			{
+				tpad = GET_BORDER(TOOLBAR);
+				pk = pk_PACKp | pkf_STACK | pkf_SHOW;
+				break;
+			}
+
+			bar = widget;
+			widget = pack(wp[0], wj_size_box());
+
+			/* Make datastruct */
+			sd = bound_malloc(widget, sizeof(smarttbar_data));
+			gtk_object_set_user_data(GTK_OBJECT(widget), sd);
+			sd->tbar = bar;
+			sd->r = r;
+
+			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
+				GTK_SIGNAL_FUNC(htoolbox_size_req), sd);
+			gtk_signal_connect(GTK_OBJECT(widget), "size_allocate",
+				GTK_SIGNAL_FUNC(htoolbox_size_alloc), sd);
+
+			vport = pack(widget, gtk_viewport_new(NULL, NULL));
+			gtk_viewport_set_shadow_type(GTK_VIEWPORT(vport),
+				GTK_SHADOW_NONE);
+			gtk_widget_show(vport);
+			vport_noshadow_fix(vport);
+			sd->vport = vport;
+
+			// !!! Toolbar is what sits on stack till SMARTTBMORE
+			*--wp = bar;
+			gtk_widget_show(bar);
+			gtk_container_add(GTK_CONTAINER(vport), bar);
+
+			pk = pkf_SHOW;
 			break;
+		}
+		/* Add the arrow button to smart toolbar */
+		case op_SMARTTBMORE:
+		{
+			GtkWidget *box = tbar[0];
+			smarttbar_data *sd = gtk_object_get_user_data(
+				GTK_OBJECT(box));
+
+			// !!! Box replaces toolbar on stack
+			*wp = box;
+			sd->r2 = r; // remember where the slots end
+
+			widget = smarttbar_button(sd, v);
+			pk = pkf_SHOW;
+			break;
+		}
 		/* Add a container-toggle beside toolbar */
 		case op_TBBOXTOG:
 			widget = pack(wp[1], gtk_toggle_button_new());
@@ -2469,11 +3142,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pkf_STACK | pkf_SHOW;
 			// Fallthrough
 		/* Add a toolbar button/toggle */
-		case op_TBBUTTON: case op_TBTOGGLE:
-			if (op != op_TBBOXTOG)
-				widget = gtk_toolbar_append_element(GTK_TOOLBAR(*wp),
-				op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
-				GTK_TOOLBAR_CHILD_TOGGLEBUTTON, NULL,
+		case op_TBBUTTON: case op_TBTOGGLE: case op_TBRBUTTON:
+		{
+			GtkWidget *rb = NULL;
+			int mode = op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
+				GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
+
+			if (op == op_TBRBUTTON)
+			{
+				static int set = TRUE;
+
+				mode = GTK_TOOLBAR_CHILD_RADIOBUTTON;
+				if (rvar == v) rb = rslot[0];
+				/* Now this represents group */
+				rslot = r; rvar = v;
+				/* Activate the one button whose ID matches var */
+				v = *(int *)v == (int)pp[1] ? &set : NULL;
+			}
+
+			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
+				GTK_TOOLBAR(*wp), mode, rb,
 				NULL, _(pp[2]), "Private", xpm_image(pp[3]),
 				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
 			if (v) gtk_toggle_button_set_active(
@@ -2482,6 +3170,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				"button_press_event",
 				GTK_SIGNAL_FUNC(toolbar_rclick), SLOT_N(tbar, 2));
 			gtk_object_set_user_data(GTK_OBJECT(widget), r);
+			break;
+		}
+		/* Add a toolbar separator */
+		case op_TBSPACE:
+			gtk_toolbar_append_space(GTK_TOOLBAR(*wp));
+			break;
+		/* Add a two/one row container for 2 toolbars */
+		case op_TWOBOX:
+			widget = wj_size_box();
+			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
+				GTK_SIGNAL_FUNC(twobar_size_req), NULL);
+			gtk_signal_connect(GTK_OBJECT(widget), "size_allocate",
+				GTK_SIGNAL_FUNC(twobar_size_alloc), NULL);
+			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT: case op_PMOUNT:
@@ -2524,15 +3226,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_EXEC:
 			r = ((ext_fn)v)(r, &wp, res);
 			continue;
-		/* Do a V-code direct jump */
+		/* Call a V-code subroutine */
+		case op_CALL:
+			*rp++ = ifcode;
+			// Fallthrough
+		/* Do a V-code jump */
 		case op_GOTO:
 			ifcode = v;
-			continue;
-		/* Call a V-code subroutine, indirect from field/var */
-// !!! Maybe add opcode for direct call too
-		case op_CALLp:
-			*rp++ = ifcode;
-			ifcode = *(void **)v;
 			continue;
 		/* Return from V-code subroutine */
 		case op_RET:
@@ -2548,6 +3248,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			if (inifile_get_gboolean(v, TRUE))
 				ifcode = skip_if(pp - 1);
 			continue;
+		/* Put last referrable widget into activation map */
+		/* And remember map in a slot for later reference */
+		case op_ACTMAP:
+// !!! Switch to a slot-based map later
+			mapped_dis_add(*origin_slot(PREV_SLOT(r)), (int)v);
+			widget = v;
+			break;
 		/* Store a reference to whatever is next into field */
 		case op_REF:
 			*(void **)v = r;
@@ -2911,6 +3618,29 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
 			break;
+		case op_TBRBUTTON:
+		{
+			GSList *group;
+			void **slot = wdata;
+
+			/* If reading radio group through an inactive slot */
+			if (!gtk_toggle_button_get_active(
+				GTK_TOGGLE_BUTTON(*wdata)))
+			{
+				/* Let outer loop find active item */
+				if (mode <= 1) break;
+				/* Otherwise, find active item here */
+				group = gtk_radio_button_group(
+					GTK_RADIO_BUTTON(*wdata));
+				while (group && !GTK_TOGGLE_BUTTON(group->data)->active)
+					group = group->next;
+				if (!group) break; // impossible happened
+				slot = gtk_object_get_user_data(
+					GTK_OBJECT(group->data));
+			}
+			*(int *)v = TOOL_ID(slot);
+			break;
+		}
 		case op_CHECKb:
 			inifile_set_gboolean(v, gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata)));
@@ -3082,6 +3812,11 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
 				inifile_get_gboolean(v, (int)pp[1]));
 			break;
+		case op_TBRBUTTON:
+			if (*(int *)v == TOOL_ID(wdata))
+				gtk_toggle_button_set_active(
+					GTK_TOGGLE_BUTTON(*wdata), TRUE);
+			break;
 		case op_RPACK: case op_RPACKD: case op_FRPACK:
 		case op_COLORLIST: case op_COLORLISTN:
 // !!! No ready setter functions for these (and no need of them yet)
@@ -3204,7 +3939,7 @@ void cmd_set(void **slot, int v)
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-	case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
+	case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE: case op_TBRBUTTON:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
@@ -3278,7 +4013,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	switch (op)
 	{
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
-	case op_XPENTRY: case op_TPENTRY: case op_PATH:
+	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
 	{
 		char *s = (char *)gtk_entry_get_text(GTK_ENTRY(slot[0]));
 		if (idx == PATH_VALUE) gtkncpy(res, s, size);
@@ -3303,6 +4038,14 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	}
 	}
 }
+
+/* These cannot be peeked just by calling do_query() with a preset var:
+	op_TBRBUTTON
+	op_CHECKb
+	op_COMBOENTRY
+	op_XENTRY, op_MLENTRY, op_TLENTRY
+	op_TEXT
+ * Others can, if need be */
 
 void cmd_setv(void **slot, void *res, int idx)
 {

@@ -37,73 +37,70 @@
 
 
 //	Main toolbar buttons
-#define MTB_NEW    0
-#define MTB_OPEN   1
-#define MTB_SAVE   2
-#define MTB_CUT    3
-#define MTB_COPY   4
-#define MTB_PASTE  5
-#define MTB_UNDO   6
-#define MTB_REDO   7
-#define MTB_BRCOSA 8
-#define MTB_PAN    9
+enum {
+	MTB_NEW = 0,
+	MTB_OPEN,
+	MTB_SAVE,
+	MTB_CUT,
+	MTB_COPY,
+	MTB_PASTE,
+	MTB_UNDO,
+	MTB_REDO,
+	MTB_BRCOSA,
+	MTB_PAN,
 
-#define TOTAL_ICONS_MAIN 10
-
+	TOTAL_ICONS_MAIN
+};
 
 //	Tools toolbar buttons
-#define TTB_PAINT    0
-#define TTB_SHUFFLE  1
-#define TTB_FLOOD    2
-#define TTB_LINE     3
-#define TTB_SMUDGE   4
-#define TTB_CLONE    5
-#define TTB_SELECT   6
-#define TTB_POLY     7
-#define TTB_GRAD     8
-#define TTB_LASSO    9
-#define TTB_TEXT     10
-#define TTB_ELLIPSE  11
-#define TTB_FELLIPSE 12
-#define TTB_OUTLINE  13
-#define TTB_FILL     14
-#define TTB_SELFV    15
-#define TTB_SELFH    16
-#define TTB_SELRCW   17
-#define TTB_SELRCCW  18
+enum {
+	TTB_PAINT = 0,
+	TTB_SHUFFLE,
+	TTB_FLOOD,
+	TTB_LINE,
+	TTB_SMUDGE,
+	TTB_CLONE,
+	TTB_SELECT,
+	TTB_POLY,
+	TTB_GRAD,
 
+	TOTAL_TOOLS,
+	TTB_LASSO = TOTAL_TOOLS,
+	TTB_TEXT,
+	TTB_ELLIPSE,
+	TTB_FELLIPSE,
+	TTB_OUTLINE,
+	TTB_FILL,
+	TTB_SELFV,
+	TTB_SELFH,
+	TTB_SELRCW,
+	TTB_SELRCCW,
+
+	TOTAL_ICONS_TOOLS
+};
 #define DEFAULT_TOOL_ICON TTB_SELECT
 #define SMUDGE_TOOL_ICON TTB_SMUDGE
 
 #define TTB_0 TOTAL_SETTINGS
-#define TOTAL_ICONS_TOOLS 19
 
 //	Settings toolbar buttons
-#define SETB_CONT 0
-#define SETB_OPAC 1
-#define SETB_TINT 2
-#define SETB_TSUB 3
-#define SETB_CSEL 4
-#define SETB_FILT 5
-#define SETB_MASK 6
-#define TOTAL_ICONS_SETTINGS 7
-#define SETB_GRAD 7
-#define TOTAL_SETTINGS 8
+enum {
+	SETB_CONT = 0,
+	SETB_OPAC,
+	SETB_TINT,
+	SETB_TSUB,
+	SETB_CSEL,
+	SETB_FILT,
+	SETB_MASK,
+	SETB_GRAD,
 
-typedef struct
-{
-	char *tooltip;
-	signed char radio;
-	unsigned short ID;
-	int actmap;
-	XPM_TYPE xpm;
-	short action, mode, action2, mode2;
-} toolbar_item;
+	TOTAL_SETTINGS
+};
 
 //	GLOBAL VARIABLES
 
 
-GtkWidget *icon_buttons[TOTAL_ICONS_TOOLS];
+void **icon_buttons[TOTAL_TOOLS];
 GdkCursor *m_cursor[TOTAL_CURSORS];		// My mouse cursors
 GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
 
@@ -112,10 +109,10 @@ GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 	*toolbar_zoom_view, *drawing_col_prev;
 void **toolbar_boxes_[TOOLBAR_MAX];		// Used for showing/hiding
 
-
 //	GLOBAL PROCEDURES
 
-void toolbar_init(GtkWidget *vbox_main);	// Set up the widgets to the vbox
+extern void *toolbar_code[];			// Set up the widgets to the vbox
+
 void toolbar_palette_init(GtkWidget *box);	// Set up the palette area
 void toolbar_showhide();			// Show/Hide all 4 toolbars
 void toolbar_zoom_update();			// Update the zoom combos to reflect current zoom

@@ -116,10 +116,10 @@ static inilist ini_bool[] = {
 	{ "toolbar3",		toolbar_status + 3,	TRUE  },
 	{ "toolbar4",		toolbar_status + 4,	TRUE  },
 	{ "toolbar5",		toolbar_status + 5,	TRUE  },
-#ifdef U_FREETYPE
 	{ "fontAntialias0",	&font_aa,		TRUE  },
 	{ "fontAntialias1",	&font_bk,		FALSE },
 	{ "fontAntialias2",	&font_r,		FALSE },
+#ifdef U_FREETYPE
 	{ "fontAntialias3",	&font_obl,		FALSE },
 #endif
 	{ NULL,			NULL }
@@ -150,11 +150,11 @@ static inilist ini_int[] = {
 	{ "gridTrans",		grid_rgb + GRID_TRANS,	RGB_2_INT(  0, 109, 109) },
 	{ "gridTile",		grid_rgb + GRID_TILE,	RGB_2_INT(170, 170, 170) },
 	{ "gridSegment",	grid_rgb + GRID_SEGMENT,RGB_2_INT(219, 219,   0) },
+	{ "fontBackground",	&font_bkg,		0   },
+	{ "fontAngle",		&font_angle,		0   },
 #ifdef U_FREETYPE
 	{ "fontSizeBitmap",	&font_bmsize,		1   },
 	{ "fontSize",		&font_size,		12  },
-	{ "fontBackground",	&font_bkg,		0   },
-	{ "fontAngle",		&font_angle,		0   },
 	{ "font_dirs",		&font_dirs,		0   },
 #endif
 	{ NULL,			NULL }
@@ -162,7 +162,7 @@ static inilist ini_int[] = {
 
 
 void **main_window_, **settings_dock, **layers_dock;
-GtkWidget *main_window, *vbox_main, *main_vsplit, *main_hsplit, *main_split,
+GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
 	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
@@ -3442,11 +3442,14 @@ void set_cursor(GdkCursor *what)	// Set mouse cursor
 void change_to_tool(int icon)
 {
 	grad_info *grad;
+	void *var, **slot = icon_buttons[icon];
 	int i, t, update = UPD_SEL;
 
-	if (!GTK_WIDGET_SENSITIVE(icon_buttons[icon])) return; // Blocked
-	if (!GTK_TOGGLE_BUTTON(icon_buttons[icon])->active) // Toggle the button
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(icon_buttons[icon]), TRUE);
+// !!! Use V-code API for this later
+	if (!GTK_WIDGET_SENSITIVE(slot[0])) return; // Blocked
+// !!! Unnecessarily complicated approach - better add a peek operation
+	var = cmd_read(slot, NULL);
+	if ((int)var != TOOL_ID(slot)) cmd_set(slot, TRUE);
 
 	switch (icon)
 	{
@@ -4841,18 +4844,10 @@ static menu_item main_menu[] = {
 	{ NULL, 0 }
 	};
 
-static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
+static void **create_menu(void **r, GtkWidget ***wpp, void **wdata)
 {
-	GtkRequisition req;
-	GtkAdjustment *adj;
-	GtkWidget *hbox_bar, *hbox_bottom;
-	GtkAccelGroup *accel_group;
+	GtkAccelGroup *accel_group = gtk_accel_group_new ();
 	int i;
-
-
-	toolbar_boxes[TOOLBAR_MAIN] = NULL;		// Needed as test to avoid segfault in toolbar.c
-
-	accel_group = gtk_accel_group_new ();
 
 
 ///	MAIN WINDOW
@@ -4869,8 +4864,6 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	gtk_signal_connect(GTK_OBJECT(main_window), "drag_drop",
 		GTK_SIGNAL_FUNC(drag_n_drop_tried), NULL);
 
-	vbox_main = **wpp;
-
 ///	MENU
 
 	main_menubar = fill_menu(main_menu, accel_group);
@@ -4883,19 +4876,32 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(menu_widgets[MENU_SHOWGRID]),
 		mem_show_grid);
 
-	pack(vbox_main, main_menubar);
+	for ( i=1; i<TOOLBAR_MAX; i++ )
+	{
+		gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
+			menu_widgets[MENU_TBMAIN - TOOLBAR_MAIN + i]),
+			toolbar_status[i]);	// Menu toggles = status
+	}
+
+	pack(**wpp, main_menubar);
 
 	gtk_accel_group_lock( accel_group );	// Stop dynamic allocation of accelerators during runtime
 	gtk_window_add_accel_group(GTK_WINDOW(main_window), accel_group);
 
-///	TOOLBARS
+	return (r);
+}
 
-	toolbar_init(vbox_main);
+static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
+{
+	GtkRequisition req;
+	GtkAdjustment *adj;
+	GtkWidget *hbox_bar, *hbox_bottom;
+	int i;
+
 
 ///	PALETTE
 
-	hbox_bottom = xpack(vbox_main, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox_bottom);
+	hbox_bottom = **wpp;
 
 	toolbar_palette_init(hbox_bottom);
 
@@ -5085,7 +5091,12 @@ static void *main_code[] = {
 	MAINWINDOW(MT_VERSION, icon_xpm, 100, 100), EVENT(CANCEL, delete_event),
 	WXYWH("window", 630, 400),
 	REF(dock), DOCK("dockSize"),
-	EXEC(create_internals), WDONE, // left pane
+	EXEC(create_menu),
+	CALL(toolbar_code),
+	XHBOX,
+	EXEC(create_internals),
+	WDONE, // xhbox
+	WDONE, // left pane
 	BORDER(NBOOK, 0),
 	REF(dockbook), NBOOKr, KEEPWIDTH,
 	IFx(cline_d, 1),

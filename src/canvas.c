@@ -1174,7 +1174,8 @@ void update_menus()			// Update edit/undo menu
 
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
-		!GTK_WIDGET_IS_SENSITIVE(icon_buttons[SMUDGE_TOOL_ICON]))
+// !!! Use V-code API for this later
+		!GTK_WIDGET_IS_SENSITIVE(icon_buttons[SMUDGE_TOOL_ICON][0]))
 		change_to_tool(DEFAULT_TOOL_ICON);
 }
 
