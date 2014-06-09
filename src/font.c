@@ -60,9 +60,7 @@
 #define TX_MAX_DIRS 100
 
 /* Persistent settings */
-int font_aa, font_bk, font_r, font_obl;
-int font_bmsize, font_size;
-int font_bkg, font_angle;
+int font_obl, font_bmsize, font_size;
 int font_dirs;
 
 

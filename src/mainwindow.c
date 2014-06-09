@@ -161,9 +161,9 @@ static inilist ini_int[] = {
 };
 
 
-void **main_window_, **settings_dock, **layers_dock;
-GtkWidget *main_window, *main_vsplit, *main_hsplit, *main_split,
-	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
+void **main_window_, **settings_dock, **layers_dock, **main_split;
+GtkWidget *main_window,
+	*drawing_palette, *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
 	*menu_widgets[TOTAL_MENU_IDS];
@@ -173,6 +173,7 @@ static GtkWidget *main_menubar;
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
 int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
+int	view_vsplit;
 char **file_args;
 
 static int show_dock;
@@ -674,10 +675,7 @@ static void toggle_view()
 
 		gtk_widget_hide(main_menubar);
 		for (i = TOOLBAR_MAIN; i < TOOLBAR_MAX; i++)
-		{
-			if (toolbar_boxes[i]) gtk_widget_hide(toolbar_boxes[i]);
-			if (toolbar_boxes_[i]) cmd_showhide(toolbar_boxes_[i], FALSE);
-		}
+			if (toolbar_boxes[i]) cmd_showhide(toolbar_boxes[i], FALSE);
 	}
 	else
 	{
@@ -1744,10 +1742,10 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 	/* Only do this if we have an image */
 	if (!mem_img[CHN_IMAGE]) return (FALSE);
 	mouse_left_canvas = TRUE;
-	if ( status_on[STATUS_CURSORXY] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-	if ( status_on[STATUS_PIXELRGB] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
+	if (status_on[STATUS_CURSORXY])
+		cmd_setv(label_bar[STATUS_CURSORXY], "", LABEL_VALUE);
+	if (status_on[STATUS_PIXELRGB])
+		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
 	if (perim_status > 0) clear_perim();
 
 	if (grad_tool(GDK_LEAVE_NOTIFY, 0, 0, 0, 0)) return (FALSE);
@@ -3432,11 +3430,11 @@ static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
-void set_cursor(GdkCursor *what)	// Set mouse cursor
+void set_cursor(void **what)	// Set mouse cursor
 {
 	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
-	gdk_window_set_cursor(drawing_canvas->window,
-		!cursor_tool ? NULL : what ? what : m_cursor[tool_type]);
+	what = !cursor_tool ? NULL : what ? what : m_cursor[tool_type];
+	gdk_window_set_cursor(drawing_canvas->window, what ? what[0] : NULL);
 }
 
 void change_to_tool(int icon)
@@ -3533,21 +3531,13 @@ void change_to_tool(int icon)
 
 static void pressed_view_hori(int state)
 {
-	gboolean vs = view_showing;
-
-	if (state)
+	if (!state != view_vsplit) return; // unchanged
+	view_vsplit = !view_vsplit;
+	if (view_showing)
 	{
-		if (main_split == main_hsplit) return;
-		view_hide();
-		main_split = main_hsplit;
+		view_showing = FALSE;
+		view_show(); // rearrange
 	}
-	else
-	{
-		if (main_split == main_vsplit) return;
-		view_hide();
-		main_split = main_vsplit;
-	}
-	if (vs) view_show();
 }
 
 void set_image(gboolean state)
@@ -3556,9 +3546,8 @@ void set_image(gboolean state)
 
 	if (state ? --depth : depth++) return;
 
-	(state ? gtk_widget_show_all : gtk_widget_hide)(view_showing ? main_split :
-		scrolledwindow_canvas);
-	if (state) set_cursor(NULL); /* Canvas window is now a new one */
+	cmd_showhide(main_split, state);
+	if (state) set_cursor(NULL); /* Canvas window now maybe a new one */
 }
 
 static char read_hex_dub(char *in)	// Read hex double
@@ -4893,53 +4882,9 @@ static void **create_menu(void **r, GtkWidget ***wpp, void **wdata)
 
 static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
-	GtkRequisition req;
 	GtkAdjustment *adj;
-	GtkWidget *hbox_bar, *hbox_bottom;
-	int i;
+	GtkWidget *box = **wpp;
 
-
-///	PALETTE
-
-	hbox_bottom = **wpp;
-
-	toolbar_palette_init(hbox_bottom);
-
-	vbox_right = xpack(hbox_bottom, gtk_vbox_new(FALSE, 0));
-	gtk_widget_show(vbox_right);
-
-
-///	DRAWING AREA
-
-	main_vsplit = gtk_hpaned_new ();
-	paned_mouse_fix(main_vsplit);
-	gtk_widget_show (main_vsplit);
-	gtk_widget_ref(main_vsplit);
-	gtk_object_sink(GTK_OBJECT(main_vsplit));
-
-	main_hsplit = gtk_vpaned_new ();
-	paned_mouse_fix(main_hsplit);
-	gtk_widget_show (main_hsplit);
-	gtk_widget_ref(main_hsplit);
-	gtk_object_sink(GTK_OBJECT(main_hsplit));
-
-	main_split = main_vsplit;
-
-//	VIEW WINDOW
-
-	vw_scrolledwindow = gtk_scrolled_window_new (NULL, NULL);
-	gtk_widget_show (vw_scrolledwindow);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(vw_scrolledwindow),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	gtk_widget_ref(vw_scrolledwindow);
-	gtk_object_sink(GTK_OBJECT(vw_scrolledwindow));
-
-	vw_drawing = wjcanvas_new();
-	wjcanvas_size(vw_drawing, 1, 1);
-	gtk_widget_show(vw_drawing);
-	add_with_wjframe(vw_scrolledwindow, vw_drawing);
-
-	init_view();
 
 //	MAIN WINDOW
 
@@ -4947,7 +4892,7 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	wjcanvas_size(drawing_canvas, 48, 48);
 	gtk_widget_show(drawing_canvas);
 
-	scrolledwindow_canvas = xpack(vbox_right, gtk_scrolled_window_new(NULL, NULL));
+	scrolledwindow_canvas = xpack(box, gtk_scrolled_window_new(NULL, NULL));
 	gtk_widget_show(scrolledwindow_canvas);
 
 	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
@@ -4983,37 +4928,26 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 	gtk_widget_set_events (drawing_canvas, GDK_ALL_EVENTS_MASK);
 	gtk_widget_set_extension_events (drawing_canvas, GDK_EXTENSION_EVENTS_CURSOR);
 
-////	STATUS BAR
+//	VIEW WINDOW
 
-	hbox_bar = pack_end(vbox_right, gtk_hbox_new(FALSE, 0));
-	if ( toolbar_status[TOOLBAR_STATUS] ) gtk_widget_show (hbox_bar);
+	vw_scrolledwindow = xpack(box, gtk_scrolled_window_new(NULL, NULL));
+//	!!! Left hidden
+	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(vw_scrolledwindow),
+		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 
+	vw_drawing = wjcanvas_new();
+	wjcanvas_size(vw_drawing, 1, 1);
+	gtk_widget_show(vw_drawing);
+	add_with_wjframe(vw_scrolledwindow, vw_drawing);
 
-	for (i = 0; i < STATUS_ITEMS; i++)
-	{
-		label_bar[i] = gtk_label_new("");
-		gtk_misc_set_alignment(GTK_MISC(label_bar[i]),
-			(i == STATUS_CURSORXY) || (i == STATUS_UNDOREDO) ? 0.5 : 0.0, 0.0);
-		gtk_widget_show(label_bar[i]);
-	}
-	for (i = 0; i < STATUS_ITEMS; i++)
-	{
-		if (i < 3) pack(hbox_bar, label_bar[i]);
-		else pack_end(hbox_bar, label_bar[(STATUS_ITEMS - 1) + 3 - i]);
-	}
-	if ( status_on[STATUS_CURSORXY] ) gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
-	if ( status_on[STATUS_UNDOREDO] ) gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 70, -2);
-	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "0+0" );
+	init_view();
 
-
-
-	/* To prevent statusbar wobbling */
-	gtk_widget_size_request(hbox_bar, &req);
-	gtk_widget_set_usize(hbox_bar, -1, req.height);
-
+	return (r);
+}
 
 /////////	End of main window widget setup
-
+static void **finish_internals(void **r, GtkWidget ***wpp, void **wdata)
+{
 	gtk_signal_connect( GTK_OBJECT(main_window), "key_press_event",
 		GTK_SIGNAL_FUNC (handle_keypress), NULL );
 
@@ -5021,9 +4955,6 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
-	toolbar_boxes[TOOLBAR_STATUS] = hbox_bar;
-
-	view_hide();					// Hide paned view initially
 
 	return (r);
 }
@@ -5094,7 +5025,25 @@ static void *main_code[] = {
 	EXEC(create_menu),
 	CALL(toolbar_code),
 	XHBOX,
+///	PALETTE
+	CALL(toolbar_palette_code),
+	XVBOX,
+///	DRAWING AREA
+	REFv(main_split), HVSPLIT,
 	EXEC(create_internals),
+	WDONE, // hvsplit
+////	STATUS BAR
+	REFv(toolbar_boxes[TOOLBAR_STATUS]),
+	STATUSBAR, UNLESSv(toolbar_status[TOOLBAR_STATUS]), HIDDEN,
+	/* Labels visibility is set later by init_status_bar() */
+	REFv(label_bar[STATUS_GEOMETRY]), STLABEL(0, 0, 0),
+	REFv(label_bar[STATUS_CURSORXY]), STLABEL(90, 1, 0),
+	REFv(label_bar[STATUS_PIXELRGB]), STLABEL(0, 0, 0),
+	REFv(label_bar[STATUS_SELEGEOM]), STLABEL(0, 0, 1),
+	REFv(label_bar[STATUS_UNDOREDO]), STLABEL(70, 1, 1),
+	WDONE, // statusbar
+	WDONE, // xvbox
+	EXEC(finish_internals),
 	WDONE, // xhbox
 	WDONE, // left pane
 	BORDER(NBOOK, 0),

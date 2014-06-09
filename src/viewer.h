@@ -17,6 +17,9 @@
 	along with mtPaint in the file COPYING.
 */
 
+int font_aa, font_bk, font_r;
+int font_bkg, font_angle;
+
 float vw_zoom;
 int view_showing, vw_focus_on;
 int opaque_view;

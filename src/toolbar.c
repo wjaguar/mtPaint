@@ -43,16 +43,18 @@
 void **icon_buttons[TOTAL_TOOLS];
 
 int toolbar_status[TOOLBAR_MAX];			// True=show
-GtkWidget *toolbar_boxes[TOOLBAR_MAX],			// Used for showing/hiding
-	*toolbar_zoom_view, *drawing_col_prev;
-void **toolbar_boxes_[TOOLBAR_MAX];		// Used for showing/hiding
+GtkWidget *drawing_col_prev;
+void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
+	**toolbar_zoom_view;
 
-GdkCursor *m_cursor[TOTAL_CURSORS];			// My mouse cursors
-GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
+void **m_cursor[TOTAL_CURSORS];			// My mouse cursors
+void **move_cursor, **busy_cursor, **corner_cursor[4]; // System cursors
 
 
 
-static GtkWidget *toolbar_zoom_main;
+static int v_zoom_main = 100, v_zoom_view = 100;
+
+static void **toolbar_zoom_main;
 static void **toolbar_labels[2],	// Colour A & B
 	**ts_spinslides[4],		// Size, flow, opacity, value
 	**ts_label_channel;		// Channel name
@@ -102,86 +104,27 @@ static gint click_colours( GtkWidget *widget, GdkEventButton *event )
 	return FALSE;
 }
 
-static GtkWidget *toolbar_add_zoom(GtkWidget *box)	// Add zoom combo box
+void toolbar_zoom_update()	// Update the zoom combos to reflect current zoom
 {
-	int i;
-	static char *txt[] = { "10%", "20%", "25%", "33%", "50%", "100%",
-		"200%", "300%", "400%", "800%", "1200%", "1600%", "2000%", NULL };
-	GtkWidget *combo, *combo_entry;
-	GList *combo_list = NULL;
+	if (!toolbar_zoom_main || !toolbar_zoom_view) return;
 
-
-	combo = gtk_combo_new();
-	gtk_combo_set_value_in_list (GTK_COMBO (combo), FALSE, FALSE);
-	gtk_widget_show (combo);
-	combo_entry = GTK_COMBO (combo)->entry;
-	GTK_WIDGET_UNSET_FLAGS (combo_entry, GTK_CAN_FOCUS);
-	gtk_widget_set_usize(GTK_COMBO(combo)->button, 18, -1);
-
-
-#if GTK_MAJOR_VERSION == 1
-	gtk_widget_set_usize(combo, 75, -1);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	gtk_entry_set_width_chars(GTK_ENTRY(combo_entry), 6);
-#endif
-
-	gtk_entry_set_editable( GTK_ENTRY(combo_entry), FALSE );
-
-	for ( i=0; txt[i]; i++ ) combo_list = g_list_append( combo_list, txt[i] );
-
-	gtk_combo_set_popdown_strings( GTK_COMBO(combo), combo_list );
-	g_list_free( combo_list );
-	gtk_entry_set_text( GTK_ENTRY(combo_entry), "100%" );
-
-	pack(box, combo);
-
-	return (combo);
+	cmd_set(toolbar_zoom_main, (int)(can_zoom * 100));
+	cmd_set(toolbar_zoom_view, (int)(vw_zoom * 100));
 }
 
-static float toolbar_get_zoom( GtkWidget *combo )
+static void toolbar_zoom_change(void *dt, void **wdata, int what, void **where)
 {
-	int i = 0;
-	float res = 0;
-	char *txt = (char *) gtk_entry_get_text( GTK_ENTRY(GTK_COMBO (combo)->entry) );
+	int *cause = cmd_read(where, dt);
+	float new = *cause < 100 ? 1.0 / (100 / *cause) : *cause / 100.0;
 
-	if ( strlen(txt) > 2)		// Weed out bogus calls
+	if (cause == &v_zoom_main)
 	{
-		sscanf(txt, "%i%%", &i);
-		res = (float)i / 100;
-		if (res < 1.0) res = 1.0 / rint(1.0 / res);
+		int z = cursor_zoom;
+		cursor_zoom = FALSE; // !!! Cursor in dropdown - don't zoom on it
+		align_size(new);
+		cursor_zoom = z;
 	}
-
-	return res;
-}
-
-void toolbar_zoom_update()			// Update the zoom combos to reflect current zoom
-{
-	char txt[32];
-
-	if ( toolbar_zoom_main == NULL ) return;
-	if ( toolbar_zoom_view == NULL ) return;
-
-	snprintf( txt, 30, "%i%%", (int)(can_zoom*100) );
-	gtk_entry_set_text( GTK_ENTRY(GTK_COMBO(toolbar_zoom_main)->entry), txt );
-
-	snprintf( txt, 30, "%i%%", (int)(vw_zoom*100) );
-	gtk_entry_set_text( GTK_ENTRY(GTK_COMBO(toolbar_zoom_view)->entry), txt );
-}
-
-static void toolbar_zoom_main_change()
-{
-	float new = toolbar_get_zoom( toolbar_zoom_main );
-	int z = cursor_zoom;
-	cursor_zoom = FALSE; // !!! Cursor in dropdown - don't zoom on it
-	if (new > 0) align_size(new);
-	cursor_zoom = z;
-}
-
-static void toolbar_zoom_view_change()
-{
-	float new = toolbar_get_zoom( toolbar_zoom_view );
-
-	if ( new > 0 ) vw_align_size( new );
+	else vw_align_size(new);
 }
 
 static void **settings_buttons[TOTAL_SETTINGS];
@@ -358,9 +301,9 @@ static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **w
 
 void toolbar_settings_exit(void *dt, void **wdata)
 {
-	if (!wdata) wdata = toolbar_boxes_[TOOLBAR_SETTINGS];
+	if (!wdata) wdata = toolbar_boxes[TOOLBAR_SETTINGS];
 	if (!wdata) return;
-	toolbar_boxes_[TOOLBAR_SETTINGS] = NULL;
+	toolbar_boxes[TOOLBAR_SETTINGS] = NULL;
 	gtk_check_menu_item_set_active(
 		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
 	run_destroy(wdata);
@@ -477,82 +420,49 @@ static void *sbar_code[] = {
 
 static void toolbar_settings_init()
 {
-	if (toolbar_boxes_[TOOLBAR_SETTINGS]) // Used when Home key is pressed
+	if (toolbar_boxes[TOOLBAR_SETTINGS]) // Used when Home key is pressed
 	{
-		cmd_showhide(toolbar_boxes_[TOOLBAR_SETTINGS], TRUE);
+		cmd_showhide(toolbar_boxes[TOOLBAR_SETTINGS], TRUE);
 		return;
 	}
 
 ///	SETTINGS TOOLBAR
 
-	toolbar_boxes_[TOOLBAR_SETTINGS] = run_create(sbar_code, sbar_code, 0);
+	toolbar_boxes[TOOLBAR_SETTINGS] = run_create(sbar_code, sbar_code, 0);
 }
 
-static void **prepare_cursors(void **r, GtkWidget ***wpp, void **wdata)
-{
-	static char *xbm_list[TOTAL_CURSORS] = { xbm_square_bits, xbm_circle_bits,
-		xbm_horizontal_bits, xbm_vertical_bits, xbm_slash_bits, xbm_backslash_bits,
-		xbm_spray_bits, xbm_shuffle_bits, xbm_flood_bits, xbm_select_bits, xbm_line_bits,
-		xbm_smudge_bits, xbm_polygon_bits, xbm_clone_bits, xbm_grad_bits
-		},
-	*xbm_mask_list[TOTAL_CURSORS] = { xbm_square_mask_bits, xbm_circle_mask_bits,
-		xbm_horizontal_mask_bits, xbm_vertical_mask_bits, xbm_slash_mask_bits,
-		xbm_backslash_mask_bits, xbm_spray_mask_bits, xbm_shuffle_mask_bits,
-		xbm_flood_mask_bits, xbm_select_mask_bits, xbm_line_mask_bits,
-		xbm_smudge_mask_bits, xbm_polygon_mask_bits, xbm_clone_mask_bits,
-		xbm_grad_mask_bits
-		};
-	static unsigned char cursor_tip[TOTAL_CURSORS][2] = { {0, 0}, {0, 0},
-		{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {2, 19},
-		{10, 10}, {0, 0}, {0, 0}, {10, 10}, {0, 0}, {0, 0} };
-	static GdkCursorType corners[4] = {
-		GDK_TOP_LEFT_CORNER, GDK_TOP_RIGHT_CORNER,
-		GDK_BOTTOM_LEFT_CORNER, GDK_BOTTOM_RIGHT_CORNER };
-	int i;
-
-
-	for (i=0; i<TOTAL_CURSORS; i++)
-		m_cursor[i] = make_cursor(xbm_list[i], xbm_mask_list[i],
-			20, 20, cursor_tip[i][0], cursor_tip[i][1]);
-	move_cursor = gdk_cursor_new(GDK_FLEUR);
-	busy_cursor = gdk_cursor_new(GDK_WATCH);
-	for (i = 0; i < 4; i++) corner_cursor[i] = gdk_cursor_new(corners[i]);
-
-	return (r);
-}
-
-static void **create_zoom(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GtkWidget *box = **wpp;
-
-	toolbar_zoom_main = toolbar_add_zoom(box);
-	toolbar_zoom_view = toolbar_add_zoom(box);
-	/* In GTK1, combo box entry is updated continuously */
-#if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->popwin),
-		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->popwin),
-		"hide", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_main)->entry),
-		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_main_change), NULL);
-	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(toolbar_zoom_view)->entry),
-		"changed", GTK_SIGNAL_FUNC(toolbar_zoom_view_change), NULL);
-#endif
-	toolbar_viewzoom(FALSE);
-
-	return (r);
-}
+static int zooms[] = {
+	10, 20, 25, 33, 50, 100, 200, 300, 400, 800, 1200, 1600, 2000, 0 };
 
 /* !!! For later change_to_tool(DEFAULT_TOOL_ICON) to go through, this need be
  * set to something different initially */
 static int tool_id = TTB_PAINT;
 
 void *toolbar_code[] = {
-	EXEC(prepare_cursors),
+	REFv(m_cursor[TOOL_SQUARE]), XBMCURSOR(square, 0, 0),
+	REFv(m_cursor[TOOL_CIRCLE]), XBMCURSOR(circle, 0, 0),
+	REFv(m_cursor[TOOL_HORIZONTAL]), XBMCURSOR(horizontal, 0, 0),
+	REFv(m_cursor[TOOL_VERTICAL]), XBMCURSOR(vertical, 0, 0),
+	REFv(m_cursor[TOOL_SLASH]), XBMCURSOR(slash, 0, 0),
+	REFv(m_cursor[TOOL_BACKSLASH]), XBMCURSOR(backslash, 0, 0),
+	REFv(m_cursor[TOOL_SPRAY]), XBMCURSOR(spray, 0, 0),
+	REFv(m_cursor[TOOL_SHUFFLE]), XBMCURSOR(shuffle, 0, 0),
+	REFv(m_cursor[TOOL_FLOOD]), XBMCURSOR(flood, 2, 19),
+	REFv(m_cursor[TOOL_SELECT]), XBMCURSOR(select, 10, 10),
+	REFv(m_cursor[TOOL_LINE]), XBMCURSOR(line, 0, 0),
+	REFv(m_cursor[TOOL_SMUDGE]), XBMCURSOR(smudge, 0, 0),
+	REFv(m_cursor[TOOL_POLYGON]), XBMCURSOR(polygon, 10, 10),
+	REFv(m_cursor[TOOL_CLONE]), XBMCURSOR(clone, 0, 0),
+	REFv(m_cursor[TOOL_GRADIENT]), XBMCURSOR(grad, 0, 0),
+	REFv(move_cursor), SYSCURSOR(FLEUR),
+	REFv(busy_cursor), SYSCURSOR(WATCH),
+	REFv(corner_cursor[0]), SYSCURSOR(TOP_LEFT_CORNER),
+	REFv(corner_cursor[1]), SYSCURSOR(TOP_RIGHT_CORNER),
+	REFv(corner_cursor[2]), SYSCURSOR(BOTTOM_LEFT_CORNER),
+	REFv(corner_cursor[3]), SYSCURSOR(BOTTOM_RIGHT_CORNER),
 	TWOBOX,
 ///	MAIN TOOLBAR
-	REFv(toolbar_boxes_[TOOLBAR_MAIN]),
+	REFv(toolbar_boxes[TOOLBAR_MAIN]),
 	SMARTTBAR(toolbar_click),
 	UNLESSv(toolbar_status[TOOLBAR_MAIN]), HIDDEN, // Only show if user wants
 	TBBUTTON(_("New Image"), XPM_ICON(new), ACTMOD(DLG_NEW, 0)),
@@ -574,10 +484,13 @@ void *toolbar_code[] = {
 	TBBUTTON(_("Transform Colour"), XPM_ICON(brcosa), ACTMOD(DLG_BRCOSA, 0)),
 	TBBUTTON(_("Pan Window"), XPM_ICON(pan), ACTMOD(ACT_PAN, 0)),
 	SMARTTBMORE(_("More...")),
-	EXEC(create_zoom),
+	REFv(toolbar_zoom_main),
+	PCTCOMBOv(v_zoom_main, zooms, toolbar_zoom_change),
+	REFv(toolbar_zoom_view),
+	PCTCOMBOv(v_zoom_view, zooms, toolbar_zoom_change), HIDDEN,
 	WDONE,
 ///	TOOLS TOOLBAR
-	REFv(toolbar_boxes_[TOOLBAR_TOOLS]),
+	REFv(toolbar_boxes[TOOLBAR_TOOLS]),
 	SMARTTBARx(toolbar_click, toolbar_click),
 	UNLESSv(toolbar_status[TOOLBAR_TOOLS]), HIDDEN, // Only show if user wants
 	REFv(icon_buttons[TTB_PAINT]),
@@ -873,7 +786,7 @@ static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 			mem_pal_copy(brcosa_palette, mem_pal);
 			drag_index = TRUE;
 			drag_index_vals[0] = drag_index_vals[1] = pindex;
-			gdk_window_set_cursor(drawing_palette->window, move_cursor);
+			gdk_window_set_cursor(drawing_palette->window, move_cursor[0]);
 		}
 		else if ((event->button == 1) || (event->button == 3))
 		{
@@ -894,13 +807,11 @@ static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 	return (TRUE);
 }
 
-void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
+static void **toolbar_palette_init(void **r, GtkWidget ***wpp, void **wdata)
 {
 	GtkWidget *vbox, *hbox, *scrolledwindow_palette, *viewport_palette;
 
-
-	toolbar_boxes[TOOLBAR_PALETTE] = vbox = pack(box, gtk_vbox_new(FALSE, 0));
-	if (toolbar_status[TOOLBAR_PALETTE]) gtk_widget_show(vbox);
+	vbox = **wpp;
 
 	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
 	gtk_widget_show(hbox);
@@ -940,7 +851,17 @@ void toolbar_palette_init(GtkWidget *box)		// Set up the palette area
 		GTK_SIGNAL_FUNC (release_palette), GTK_OBJECT(drawing_palette) );
 
 	gtk_widget_set_events (drawing_palette, GDK_ALL_EVENTS_MASK);
+
+	return (r);
 }
+
+void *toolbar_palette_code[] = {
+	REFv(toolbar_boxes[TOOLBAR_PALETTE]), VBOXr,
+	UNLESSv(toolbar_status[TOOLBAR_PALETTE]), HIDDEN,
+	EXEC(toolbar_palette_init),
+	WDONE,
+	RET
+};
 
 void toolbar_showhide()				// Show/Hide all 4 toolbars
 {
@@ -949,15 +870,13 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 	int i;
 
 // !!! Likely won't be needed after menu is moved to V-code
-	if (!toolbar_boxes_[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
+	if (!toolbar_boxes[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
 
 	// Don't touch regular toolbars in view mode
 	if (!view_image_only) for (i = 0; i < 4; i++)
 	{
 		int n = bar[i];
-		if (toolbar_boxes[n]) widget_showhide(toolbar_boxes[n],
-			toolbar_status[n]);
-		if (toolbar_boxes_[n]) cmd_showhide(toolbar_boxes_[n],
+		if (toolbar_boxes[n]) cmd_showhide(toolbar_boxes[n],
 			toolbar_status[n]);
 	}
 

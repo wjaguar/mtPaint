@@ -280,9 +280,9 @@ char *cspnames[NUM_CSPACES];
 char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
-void **main_window_, **settings_dock, **layers_dock;
-GtkWidget *main_window, *main_split,
-	*drawing_palette, *drawing_canvas, *vbox_right, *vw_scrolledwindow,
+void **main_window_, **settings_dock, **layers_dock, **main_split;
+GtkWidget *main_window,
+	*drawing_palette, *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas,
 
 	*menu_widgets[TOTAL_MENU_IDS];
@@ -290,6 +290,7 @@ GtkWidget *main_window, *main_split,
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
 int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
+int	view_vsplit;
 char **file_args;
 
 extern char mem_clip_file[];
@@ -320,7 +321,7 @@ void stop_line();
 void change_to_tool(int icon);
 
 void spot_undo(int mode);		// Take snapshot for undo
-void set_cursor(GdkCursor *what);	// Set mouse cursor
+void set_cursor(void **what);		// Set mouse cursor
 int check_for_changes();		// 1=STOP, 2=IGNORE, 10=ESCAPE, -10=NOT CHECKED
 
 //	Try to save file + warn if error + return < 0 if fail

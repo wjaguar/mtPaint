@@ -33,6 +33,7 @@ enum {
 	op_TOPVBOX,
 	op_TOPVBOXV,
 	op_DOCK,
+	op_HVSPLIT,
 	op_PAGE,
 	op_PAGEi,
 	op_TABLE,
@@ -58,6 +59,8 @@ enum {
 	op_NBOOK,
 	op_PLAINBOOK,
 	op_BOOKBTN,
+	op_STATUSBAR,
+	op_STLABEL,
 	op_HSEP,
 	op_MLABEL,
 	op_WLABEL,
@@ -118,6 +121,7 @@ enum {
 	op_COLORLISTN,
 	op_COLORPAD,
 	op_GRADBAR,
+	op_PCTCOMBO,
 	op_LISTCCr,
 	op_LISTCCHr,
 	op_LISTC,
@@ -155,7 +159,6 @@ enum {
 	op_REMOUNT,
 
 	op_GROUP,
-	op_IDENT,
 
 	op_WLIST,
 	op_COLUMNDATA,
@@ -165,6 +168,9 @@ enum {
 	op_RTXTCOLUMN,
 	op_RFILECOLUMN,
 	op_CHKCOLUMNi0,
+
+	op_XBMCURSOR,
+	op_SYSCURSOR,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -190,6 +196,7 @@ enum {
 	op_REF,
 	op_CLEANUP,
 	op_ACTMAP,
+	op_IDENT,
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
@@ -256,16 +263,18 @@ void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
 void run_destroy(void **wdata);
 
+#define VSLOT_SIZE 2
+
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
 //	Extract toplevel window slot out of widget-map
-#define GET_WINDOW(V) ((V) + 2)
+#define GET_WINDOW(V) ((V) + VSLOT_SIZE)
 //	Extract actual toplevel window out of widget-map
-#define GET_REAL_WINDOW(V) ((V)[2])
+#define GET_REAL_WINDOW(V) ((V)[VSLOT_SIZE + 0])
 //	Iterate over slots
-#define NEXT_SLOT(V) ((V) + 2)
-#define PREV_SLOT(V) ((V) - 2)
-#define SLOT_N(V,N) ((V) + (N) * 2)
+#define NEXT_SLOT(V) ((V) + VSLOT_SIZE)
+#define PREV_SLOT(V) ((V) - VSLOT_SIZE)
+#define SLOT_N(V,N) ((V) + (N) * VSLOT_SIZE)
 //	Extract ID out of toolbar item
 #define TOOL_ID(V) (int)(((void **)(V)[1])[2])
 #define TOOL_IR(V) (int)(((void **)(V)[1])[5])
@@ -306,7 +315,7 @@ void cmd_reset(void **slot, void *ddata);
 //	Scroll in position on colorlist slot
 void cmd_scroll(void **slot, int idx);
 //	Set cursor for slot window
-void cmd_cursor(void **slot, GdkCursor *cursor); // !!! GTK-specific for now
+void cmd_cursor(void **slot, void **cursor);
 
 ///	Handler for dialog buttons
 void dialog_event(void *ddata, void **wdata, int what, void **where);
@@ -358,6 +367,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TOPVBOX WBrh(TOPVBOX, 0)
 #define TOPVBOXV WBrh(TOPVBOXV, 0)
 #define DOCK(K) WBrh(DOCK, 1), (K)
+#define HVSPLIT WBrh(HVSPLIT, 0)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
 #define PAGEir(ICN,S) WBrh(PAGEi, 2), (ICN), (void *)(S)
@@ -370,6 +380,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define FTABLE(NM,W,H) WBh(FTABLE, 2), WBwh(W, H), (NM)
 #define FSXTABLEp(V,W,H) WBhf(FSXTABLEp, 2), WBfield(V), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
+#define VBOXr WBrh(VBOX, 0)
 #define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
 #define VBOXPS VBOXbp(5, 0, 5)
 #define XVBOX WBh(XVBOX, 0)
@@ -399,6 +410,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
 #define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
 #define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
+#define STATUSBAR WBrh(STATUSBAR, 0)
+#define STLABEL(W,A,P) WBrh(STLABEL, 1), (void *)((W) + ((A) << 16) + ((P) << 24))
 #define HSEP WBh(HSEP, 0)
 #define HSEPl(V) WBh(HSEP, 1), (void *)(V)
 #define HSEPt WBh(HSEP, 1), (void *)(-1)
@@ -510,6 +523,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
 	EVENT(SELECT, HS)
+#define PCTCOMBOv(V,A,HC) WBr2h(PCTCOMBO, 2 + 2), &(V), (A), EVENT(CHANGE, HC)
 #define LISTCCr(V,L,HS) WBr2hf(LISTCCr, 2 + 2), WBfield(V), WBfield(L), \
 	EVENT(SELECT, HS)
 #define LISTCCHr(V,L,H,HS) WBr2hf(LISTCCHr, 3 + 2), WBfield(V), WBfield(L), \
@@ -662,6 +676,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
 #define CHKCOLUMNi0v(A,S,W,J,HC) WBr2h(CHKCOLUMNi0, 3 + 2), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), EVENT(CHANGE, HC)
+#define	XBMCURSOR(T,X,Y) WBrh(XBMCURSOR, 3), (xbm_##T##_bits), \
+	(xbm_##T##_mask_bits), WBxyl(X, Y, 20 + 1)
+#define	SYSCURSOR(T) WBrh(SYSCURSOR, 1), (void *)(GDK_##T)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
 

@@ -101,25 +101,25 @@ enum {
 
 
 void **icon_buttons[TOTAL_TOOLS];
-GdkCursor *m_cursor[TOTAL_CURSORS];		// My mouse cursors
-GdkCursor *move_cursor, *busy_cursor, *corner_cursor[4]; // System cursors
+void **m_cursor[TOTAL_CURSORS];		// My mouse cursors
+void **move_cursor, **busy_cursor, **corner_cursor[4]; // System cursors
 
 int toolbar_status[TOOLBAR_MAX];		// True=show
-GtkWidget *toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
-	*toolbar_zoom_view, *drawing_col_prev;
-void **toolbar_boxes_[TOOLBAR_MAX];		// Used for showing/hiding
+GtkWidget *drawing_col_prev;
+void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
+	**toolbar_zoom_view;
 
 //	GLOBAL PROCEDURES
 
 extern void *toolbar_code[];			// Set up the widgets to the vbox
+extern void *toolbar_palette_code[];		// Set up the palette area
 
-void toolbar_palette_init(GtkWidget *box);	// Set up the palette area
 void toolbar_showhide();			// Show/Hide all 4 toolbars
 void toolbar_zoom_update();			// Update the zoom combos to reflect current zoom
 void toolbar_update_settings();			// Update details in the settings toolbar
 void **create_settings_box();
 void toolbar_settings_exit(void *dt, void **wdata);
-#define toolbar_viewzoom(V) widget_showhide(toolbar_zoom_view, V)
+#define toolbar_viewzoom(V) cmd_showhide(toolbar_zoom_view, V)
 						// Show/hide the view zoom combo
 
 void pressed_toolbar_toggle(int state, int which);

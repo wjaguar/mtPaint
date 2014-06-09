@@ -56,6 +56,7 @@ enum {
 	pk_XPACK1,
 	pk_EPACK,
 	pk_PACKEND,
+	pk_PACKEND1,
 	pk_TABLE,
 	pk_TABLEx,
 	pk_TABLEp,
@@ -97,7 +98,7 @@ void **get_wdata(GtkWidget *widget, char *id)
 /* From event to its originator */
 void **origin_slot(void **slot)
 {
-	while (((int)*(void **)slot[1] & WB_OPMASK) >= op_EVT_0) slot -= 2;
+	while (GET_OP(slot) >= op_EVT_0) slot = PREV_SLOT(slot);
 	return (slot);
 }
 
@@ -190,7 +191,7 @@ static void trigger_things(void **wdata)
 	char *data = GET_DDATA(wdata);
 	void **slot, **desc;
 
-	for (wdata = GET_WINDOW(wdata); wdata[1]; wdata += 2)
+	for (wdata = GET_WINDOW(wdata); wdata[1]; wdata = NEXT_SLOT(wdata))
 	{
 		int op = GET_OP(wdata);
 		/* Trigger events for nested widget */
@@ -210,7 +211,7 @@ static void trigger_things(void **wdata)
 
 /* Predict how many _slots_ a V-code sequence could need */
 // !!! With GCC inlining this, weird size fluctuations can happen
-static int predict_size(void **ifcode, char *ddata)
+int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
 	int op, opf, n = 2; // safety margin
@@ -523,7 +524,8 @@ static void colorpad_draw(GtkWidget *widget, gpointer user_data)
 	free(rgb);
 }
 
-static GtkWidget *colorpad(int *idx, char *ddata, void **pp, void **r)
+// !!! Even with inlining this, some space gets wasted
+GtkWidget *colorpad(int *idx, char *ddata, void **pp, void **r)
 {
 	GtkWidget *pix;
 
@@ -531,7 +533,7 @@ static GtkWidget *colorpad(int *idx, char *ddata, void **pp, void **r)
 	gtk_object_set_user_data(GTK_OBJECT(pix), (gpointer)idx);
 	gtk_signal_connect(GTK_OBJECT(pix), "realize",
 		GTK_SIGNAL_FUNC(colorpad_draw), (gpointer)(ddata + (int)pp[2]));
-	r -= 2; // using the origin slot
+	// using the origin slot
 	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
 		GTK_SIGNAL_FUNC(colorpad_click), (gpointer)r);
 	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
@@ -675,7 +677,8 @@ static void comboentry_reset(GtkCombo *combo, char **v, char **src)
 	g_list_free(list);
 }
 
-static GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
+// !!! With inlining this, problem also
+GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
 {
 	GtkWidget *w = gtk_combo_new();
 	GtkCombo *combo = GTK_COMBO(w);
@@ -687,6 +690,55 @@ static GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
 		GTK_SIGNAL_FUNC(get_evt_1), r);
 	gtk_signal_connect(GTK_OBJECT(combo->entry), "activate",
 		GTK_SIGNAL_FUNC(get_evt_1), r);
+
+	return (w);
+}
+
+//	PCTCOMBO widget
+
+// !!! Even with inlining this, some space gets wasted
+GtkWidget *pctcombo(int v, void **pp, void **r)
+{
+	GtkWidget *w, *entry;
+	GList *list = NULL;
+	char *ts, *s;
+	int i, n = 0, *ns = pp[1];
+
+	/* Uses 0-terminated array of ints */
+	while (ns[n] > 0) n++;
+
+	w = gtk_combo_new();
+	gtk_combo_set_value_in_list(GTK_COMBO(w), FALSE, FALSE);
+	entry = GTK_COMBO(w)->entry;
+	GTK_WIDGET_UNSET_FLAGS(entry, GTK_CAN_FOCUS);
+	gtk_widget_set_usize(GTK_COMBO(w)->button, 18, -1);
+#if GTK_MAJOR_VERSION == 1
+	gtk_widget_set_usize(w, 75, -1);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_entry_set_width_chars(GTK_ENTRY(entry), 6);
+#endif
+	gtk_entry_set_editable(GTK_ENTRY(entry), FALSE);
+
+	ts = s = calloc(n, 32); // 32 chars per int
+	for (i = 0; i < n; i++)
+	{
+		list = g_list_append(list, s);
+		s += sprintf(s, "%d%%", ns[i]) + 1;
+	}
+	gtk_combo_set_popdown_strings(GTK_COMBO(w), list);
+	g_list_free(list);
+	sprintf(ts, "%d%%", v);
+	gtk_entry_set_text(GTK_ENTRY(entry), ts);
+	free(ts);
+
+	/* In GTK1, combo box entry is updated continuously */
+#if GTK_MAJOR_VERSION == 1
+	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(w)->popwin), "hide",
+		GTK_SIGNAL_FUNC(get_evt_1), r);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_signal_connect(GTK_OBJECT(entry), "changed",
+		GTK_SIGNAL_FUNC(get_evt_1), r);
+#endif
 
 	return (w);
 }
@@ -2448,6 +2500,9 @@ static void do_destroy(void **wdata);
 #define DEF_BORDER 5
 #define GET_BORDER(T) (borders[op_BOR_##T - op_BOR_0] + DEF_BORDER)
 
+/* Create a new slot */
+#define ADD_SLOT(R,W,D) (R)[0] = (W) , (R)[1] = (D) , (R) += VSLOT_SIZE
+
 void **run_create(void **ifcode, void *ddata, int ddsize)
 {
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
@@ -2482,15 +2537,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	// Allocation size
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
 	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
-	dsize = (ld + n + 2 + predict_size(ifcode, ddata) * 2) * sizeof(void *);
+	dsize = (ld + n + 2 + predict_size(ifcode, ddata) * VSLOT_SIZE) * sizeof(void *);
 	if (!(res = calloc(1, dsize))) return (NULL); // failed
 	memcpy(res, ddata, ddsize); // Copy datastruct
 	ddata = res; // And switch to using it
 	vdata = (void *)(res += ld); // Locate where internal data go
 	r = res += n; // Anchor after it
-	*r++ = ddata; // Store struct ref at anchor
 	vdata->code = WDONE; // Make internal datastruct a noop
-	*r++ = vdata; // And use it as tag for anchor
+	// Store struct ref at anchor, use datastruct as tag for it
+	ADD_SLOT(r, ddata, vdata);
 
 	// Border sizes are DEF_BORDER-based
 	memset(borders, 0, sizeof(borders));
@@ -2531,8 +2586,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Terminate */
 		case op_WEND: case op_WSHOW: case op_WDIALOG:
 			/* Terminate the list */
-			*r++ = NULL;
-			*r++ = NULL;
+			ADD_SLOT(r, NULL, NULL);
 
 			gtk_object_set_data(GTK_OBJECT(window), ident,
 				(gpointer)res);
@@ -2684,6 +2738,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 
 			break;
 		}
+		/* Add a horizontal/vertical split widget */
+		case op_HVSPLIT:
+		{
+			GtkWidget *p;
+
+			widget = gtk_vbox_new(FALSE, 0);
+
+			/* Create the two panes - hidden for now */
+			p = gtk_hpaned_new();
+			paned_mouse_fix(p);
+			gtk_box_pack_end(GTK_BOX(widget), p, TRUE, TRUE, 0);
+			p = gtk_vpaned_new();
+			paned_mouse_fix(p);
+			gtk_box_pack_end(GTK_BOX(widget), p, TRUE, TRUE, 0);
+
+			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
+			break;
+		}
 		/* Add a notebook page */
 		case op_PAGE: case op_PAGEi:
 		{
@@ -2777,6 +2849,40 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GTK_SIGNAL_FUNC(toggle_vbook));
 			pk = pk_PACK;
 			break;
+		/* Add a statusbar box */
+		case op_STATUSBAR:
+		{
+			GtkWidget *label;
+			GtkRequisition req;
+
+		/* !!! The following is intended to give enough height to the bar
+		 * even in case no items are shown. It depends on GTK+ setting
+		 * proper height (and zero width) for a label containing an empty
+		 * string. And size fixing isn't sure to set the right value if
+		 * the toplevel isn't yet realized (unlike MAINWINDOW) - WJ */
+			widget = pack_end(wp[0], gtk_hbox_new(FALSE, 0));
+			label = pack(widget, gtk_label_new(""));
+			gtk_widget_show(label);
+			/* To prevent statusbar wobbling */
+			gtk_widget_size_request(widget, &req);
+			gtk_widget_set_usize(widget, -1, req.height);
+
+			pk = pkf_STACK | pkf_SHOW;
+			break;
+		}
+		/* Add a statusbar label */
+		case op_STLABEL:
+		{
+			int paw = (int)v;
+			widget = gtk_label_new("");
+			gtk_misc_set_alignment(GTK_MISC(widget),
+				((paw >> 16) & 255) / 2.0, 0.0);
+			if (paw & 0xFFFF)
+				gtk_widget_set_usize(widget, paw & 0xFFFF, -2);
+			pk = paw >> 24 ? pk_PACKEND1 | pkf_SHOW :
+				pk_PACK | pkf_SHOW;
+			break;
+		}
 		/* Add a horizontal line */
 		case op_HSEP:
 			widget = gtk_hseparator_new();
@@ -2966,13 +3072,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a colorpad */
 		case op_COLORPAD:
-			widget = colorpad(v, ddata, pp - 1, NEXT_SLOT(r));
+			widget = colorpad(v, ddata, pp - 1, r);
 			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
 			widget = gradbar(v, ddata, pp - 1, NEXT_SLOT(r));
 			pk = pk_PACK;
+			break;
+		/* Add a combo for percent values */
+		case op_PCTCOMBO:
+			widget = pctcombo(*(int *)v, pp, NEXT_SLOT(r));
+			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a list with pre-defined columns */
 		case op_LISTCCr: case op_LISTCCHr:
@@ -3132,7 +3243,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TBBOXTOG:
 			widget = pack(wp[1], gtk_toggle_button_new());
 			/* Parasite tooltip on toolbar */
-			gtk_tooltips_set_tip(GTK_TOOLBAR(*wp)->tooltips,
+			gtk_tooltips_set_tip(GTK_TOOLBAR(wp[0])->tooltips,
 				widget, _(pp[2]), "Private");
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 			gtk_button_set_focus_on_click(GTK_BUTTON(widget), FALSE);
@@ -3161,7 +3272,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			}
 
 			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
-				GTK_TOOLBAR(*wp), mode, rb,
+				GTK_TOOLBAR(wp[0]), mode, rb,
 				NULL, _(pp[2]), "Private", xpm_image(pp[3]),
 				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
 			if (v) gtk_toggle_button_set_active(
@@ -3174,7 +3285,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a toolbar separator */
 		case op_TBSPACE:
-			gtk_toolbar_append_space(GTK_TOOLBAR(*wp));
+			gtk_toolbar_append_space(GTK_TOOLBAR(wp[0]));
 			break;
 		/* Add a two/one row container for 2 toolbars */
 		case op_TWOBOX:
@@ -3333,6 +3444,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			c.columns[c.ncol++] = r;
 			widget = NULL;
 			break;
+		/* Create an XBM cursor */
+		case op_XBMCURSOR:
+		{
+			int xyl = (int)pp[2], l = xyl >> 16;
+			widget = (void *)make_cursor(v, pp[1], l, l,
+				(xyl >> 8) & 255, xyl & 255);
+			break;
+		}
+		/* Create a system cursor */
+		case op_SYSCURSOR:
+			widget = (void *)gdk_cursor_new((int)v);
+			break;
 		/* Install activate event handler */
 		case op_EVT_OK:
 		{
@@ -3448,11 +3571,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		default: continue;
 		}
 		/* Remember this */
-		if (ref)
-		{
-			*r++ = widget ? (void *)widget : res;
-			*r++ = pp - 1;
-		}
+		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp - 1);
 		*(wp - 1) = widget; // pre-stack
 		/* Show this */
 		if (pk & pkf_SHOW) gtk_widget_show(widget);
@@ -3481,10 +3600,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case pk_XPACK: case pk_XPACK1: case pk_EPACK:
 			gtk_box_pack_start(GTK_BOX(wp[0]), widget,
 				TRUE, n != pk_EPACK, tpad);
-			if (n == pk_XPACK1)
-				gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
 			break;
-		case pk_PACKEND:
+		case pk_PACKEND: case pk_PACKEND1:
 			gtk_box_pack_end(GTK_BOX(wp[0]), widget,
 				FALSE, FALSE, tpad);
 			break;
@@ -3524,19 +3641,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			wp[0] = *(wp - 1); ++wp; // unstack
 			break;
 		}
+		if ((n == pk_XPACK1) || (n == pk_PACKEND1))
+			gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
 		/* Stack this */
 		if (pk & pkf_STACK) --wp;
 		/* Remember events */
-		if (ref > 2)
-		{
-			*r++ = res;
-			*r++ = pp + lp - 4;
-		}
-		if (ref > 1)
-		{
-			*r++ = res;
-			*r++ = pp + lp - 2;
-		}
+		if (ref > 2) ADD_SLOT(r, res, pp + lp - 4);
+		if (ref > 1) ADD_SLOT(r, res, pp + lp - 2);
 	}
 }
 
@@ -3557,7 +3668,7 @@ static void do_destroy(void **wdata)
 			(int)desc[0] & WB_OPMASK, vdata->destroy);
 	}
 
-	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata += 2)
+	for (wdata = GET_WINDOW(wdata); (pp = wdata[1]); wdata = NEXT_SLOT(wdata))
 	{
 		op = (int)*pp++;
 		v = pp[0];
@@ -3585,7 +3696,7 @@ static void *do_query(char *data, void **wdata, int mode)
 	void **pp, *v = NULL;
 	int op;
 
-	for (; (pp = wdata[1]); wdata += 2)
+	for (; (pp = wdata[1]); wdata = NEXT_SLOT(wdata))
 	{
 		op = (int)*pp++;
 		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
@@ -3667,6 +3778,12 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_COMBO:
 			*(int *)v = wj_combo_box_get_history(*wdata);
 			break;
+		case op_PCTCOMBO:
+			*(int *)v = 0; // default for error
+			sscanf(gtk_entry_get_text(
+				GTK_ENTRY(GTK_COMBO(*wdata)->entry)), "%d%%",
+				(int *)v);
+			break;
 		case op_COMBOENTRY:
 			*(const char **)v = gtk_entry_get_text(
 				GTK_ENTRY(GTK_COMBO(*wdata)->entry));
@@ -3721,7 +3838,7 @@ void cmd_reset(void **slot, void *ddata)
 	int op, group, cgroup;
 
 	cgroup = group = -1;
-	for (; (pp = wdata[1]); wdata += 2)
+	for (; (pp = wdata[1]); wdata = NEXT_SLOT(wdata))
 	{
 		op = (int)*pp++;
 		v = WB_GETLEN(op) ? pp[0] : NULL;
@@ -3817,6 +3934,9 @@ void cmd_reset(void **slot, void *ddata)
 				gtk_toggle_button_set_active(
 					GTK_TOGGLE_BUTTON(*wdata), TRUE);
 			break;
+		case op_PCTCOMBO:
+			/* Same as in cmd_set() */
+			break;
 		case op_RPACK: case op_RPACKD: case op_FRPACK:
 		case op_COLORLIST: case op_COLORLISTN:
 // !!! No ready setter functions for these (and no need of them yet)
@@ -3849,6 +3969,7 @@ void cmd_sensitive(void **slot, int state)
 
 void cmd_showhide(void **slot, int state)
 {
+	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
 	if (!GTK_WIDGET_VISIBLE(slot[0]) ^ !!state) return; // no use
 	if (GET_OP(PREV_SLOT(slot)) == op_WDONE) // toplevels are special
@@ -3922,6 +4043,63 @@ void cmd_set(void **slot, int v)
 		gtk_widget_unref(vbox);
 		break;
 	}
+	case op_HVSPLIT:
+	{
+		GtkWidget *w, *pane, *p[2], *box = slot[0];
+		int v0, v1;
+
+		p[0] = BOX_CHILD_0(box);
+		p[1] = BOX_CHILD_1(box);
+		v0 = GTK_WIDGET_VISIBLE(p[0]) ? 1 :
+			GTK_WIDGET_VISIBLE(p[1]) ? 2 : 0;
+		v1 = (int)v < 1 ? 0 : (int)v > 1 ? 2 : 1;
+		if (v1 == v0) return; // nothing to do
+		if (!v1) // hide 2nd part
+		{
+			pane = p[v0 - 1];
+			gtk_widget_hide(pane);
+			w = GTK_PANED(pane)->child1;
+			gtk_widget_ref(w);
+			gtk_container_remove(GTK_CONTAINER(pane), w);
+			xpack(box, w);
+		}
+		else if (!v0) // show 2nd part
+		{
+			pane = p[v1 - 1];
+			if (!GTK_PANED(pane)->child2) // move
+			{
+				w = GTK_PANED(p[2 - v1])->child2;
+				if (!w) w = BOX_CHILD(box, 3);
+				gtk_widget_ref(w);
+				gtk_container_remove(GTK_CONTAINER(w->parent), w);
+				gtk_paned_pack2(GTK_PANED(pane), w, TRUE, TRUE);
+				gtk_widget_unref(w);
+				gtk_widget_show(w);
+			}
+			w = BOX_CHILD_2(box);
+			gtk_widget_ref(w);
+			gtk_container_remove(GTK_CONTAINER(box), w);
+			gtk_paned_pack1(GTK_PANED(pane), w, TRUE, TRUE);
+			gtk_widget_show(pane);
+		}
+		else // swap direction
+		{
+			pane = p[v0 - 1];
+			gtk_widget_hide(pane);
+			w = GTK_PANED(pane)->child1;
+			gtk_widget_ref(w);
+			gtk_container_remove(GTK_CONTAINER(pane), w);
+			gtk_paned_pack1(GTK_PANED(p[2 - v0]), w, TRUE, TRUE);
+			gtk_widget_unref(w);
+			w = GTK_PANED(pane)->child2;
+			gtk_widget_ref(w);
+			gtk_container_remove(GTK_CONTAINER(pane), w);
+			gtk_paned_pack2(GTK_PANED(p[2 - v0]), w, TRUE, TRUE);
+			gtk_widget_show(p[2 - v0]);
+		}
+		gtk_widget_unref(w);
+		break;
+	}
 	case op_TSPINSLIDE:
 	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
 	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
@@ -3945,6 +4123,18 @@ void cmd_set(void **slot, int v)
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
 		gtk_option_menu_set_history(slot[0], v);
 		break;
+	case op_PCTCOMBO:
+	{
+		char buf[32];
+
+		sprintf(buf, "%d%%", v);
+		gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(slot[0])->entry), buf);
+#if GTK_MAJOR_VERSION == 1
+		/* Call the handler, for consistency */
+		get_evt_1(NULL, NEXT_SLOT(slot));
+#endif
+		break;
+	}
 	case op_COLORPAD:
 		colorpad_set(slot, v);
 		break;
@@ -4039,9 +4229,10 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	}
 }
 
-/* These cannot be peeked just by calling do_query() with a preset var:
+/* These cannot be peeked just by calling do_query() with a preset int* var:
 	op_TBRBUTTON
 	op_CHECKb
+	op_TCOLOR
 	op_COMBOENTRY
 	op_XENTRY, op_MLENTRY, op_TLENTRY
 	op_TEXT
@@ -4087,6 +4278,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_MLABEL: case op_WLABEL: case op_XLABEL: case op_TLLABEL:
+	case op_STLABEL:
 		gtk_label_set_text(GTK_LABEL(slot[0]), res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
@@ -4163,8 +4355,8 @@ void cmd_scroll(void **slot, int idx)
 		colorlist_scroll_in(slot[0], idx);
 }
 
-// !!! GTK-specific for now
-void cmd_cursor(void **slot, GdkCursor *cursor)
+void cmd_cursor(void **slot, void **cursor)
 {
-	gdk_window_set_cursor(GTK_WIDGET(slot[0])->window, cursor);
+	gdk_window_set_cursor(GTK_WIDGET(slot[0])->window,
+		cursor ? cursor[0] : NULL);
 }

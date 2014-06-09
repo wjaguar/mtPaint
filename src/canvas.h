@@ -54,7 +54,7 @@ int preserved_gif_delay, undo_load;
 #define STATUS_SELEGEOM 3
 #define STATUS_UNDOREDO 4
 
-GtkWidget *label_bar[STATUS_ITEMS];
+void **label_bar[STATUS_ITEMS];
 
 int	col_reverse,					// Painting with right button
 	show_paste,					// Show contents of clipboard while pasting

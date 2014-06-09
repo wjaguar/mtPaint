@@ -67,7 +67,7 @@ int preserved_gif_delay = 10, undo_load;
 
 ///	STATUS BAR
 
-GtkWidget *label_bar[STATUS_ITEMS];
+void **label_bar[STATUS_ITEMS];
 
 static void update_image_bar()
 {
@@ -95,7 +95,7 @@ static void update_image_bar()
 	if ( mem_xpm_trans>=0 )
 		tmp += sprintf(tmp, "  (T=%i)", mem_xpm_trans);
 	strcpy(tmp, "  ");
-	gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), txt );
+	cmd_setv(label_bar[STATUS_GEOMETRY], txt, LABEL_VALUE);
 }
 
 void update_sel_bar()			// Update selection stats on status bar
@@ -144,7 +144,7 @@ void update_sel_bar()			// Update selection stats on status bar
 			poly_status != POLY_DONE ? '+' : '\0');
 	}
 
-	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_SELEGEOM]), txt);
+	cmd_setv(label_bar[STATUS_SELEGEOM], txt, LABEL_VALUE);
 }
 
 static char *chan_txt_cat(char *txt, int chan, int x, int y)
@@ -161,7 +161,7 @@ void update_xy_bar(int x, int y)
 	if (status_on[STATUS_CURSORXY])
 	{
 		snprintf(txt, 60, "%i,%i", x, y);
-		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_CURSORXY]), txt);
+		cmd_setv(label_bar[STATUS_CURSORXY], txt, LABEL_VALUE);
 	}
 
 	if (!status_on[STATUS_PIXELRGB]) return;
@@ -187,7 +187,7 @@ void update_xy_bar(int x, int y)
 			strcpy(tmp, "}");
 		}
 	}
-	gtk_label_set_text(GTK_LABEL(label_bar[STATUS_PIXELRGB]), txt);
+	cmd_setv(label_bar[STATUS_PIXELRGB], txt, LABEL_VALUE);
 }
 
 static void update_undo_bar()
@@ -197,40 +197,18 @@ static void update_undo_bar()
 	if (status_on[STATUS_UNDOREDO])
 	{
 		sprintf(txt, "%i+%i", mem_undo_done, mem_undo_redo);
-		gtk_label_set_text(GTK_LABEL(label_bar[STATUS_UNDOREDO]), txt);
+		cmd_setv(label_bar[STATUS_UNDOREDO], txt, LABEL_VALUE);
 	}
 }
 
 void init_status_bar()
 {
-	if ( !status_on[STATUS_GEOMETRY] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_GEOMETRY]), "" );
-	else update_image_bar();
+	int i;
 
-	if ( status_on[STATUS_CURSORXY] )
-		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 90, -2);
-	else
-	{
-		gtk_widget_set_usize(label_bar[STATUS_CURSORXY], 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_CURSORXY]), "" );
-	}
-
-	if ( !status_on[STATUS_PIXELRGB] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_PIXELRGB]), "" );
-
-	if ( !status_on[STATUS_SELEGEOM] )
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_SELEGEOM]), "" );
-
-	if (status_on[STATUS_UNDOREDO])
-	{	
-		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 70, -2);
-		update_undo_bar();
-	}
-	else
-	{
-		gtk_widget_set_usize(label_bar[STATUS_UNDOREDO], 0, -2);
-		gtk_label_set_text( GTK_LABEL(label_bar[STATUS_UNDOREDO]), "" );
-	}
+	for (i = 0; i < STATUS_ITEMS; i++)
+		cmd_showhide(label_bar[i], status_on[i]);
+	update_image_bar();
+	update_undo_bar();
 }
 
 

@@ -35,6 +35,9 @@
 #include "font.h"
 #include "vcode.h"
 
+int font_aa, font_bk, font_r;
+int font_bkg, font_angle;
+
 int view_showing, view_update_pending;
 float vw_zoom = 1;
 
@@ -44,6 +47,8 @@ int opaque_view;
 ///	HELP WINDOW
 
 #include "help.c"
+#undef _
+#define _(X) X
 
 static gboolean click_help_end(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
@@ -902,15 +907,8 @@ static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 void view_show()
 {
 	if (view_showing) return;
-	gtk_widget_ref(scrolledwindow_canvas);
-	gtk_container_remove(GTK_CONTAINER(vbox_right), scrolledwindow_canvas);
-	gtk_paned_pack1 (GTK_PANED (main_split), scrolledwindow_canvas, FALSE, TRUE);
-	gtk_paned_pack2 (GTK_PANED (main_split), vw_scrolledwindow, FALSE, TRUE);
+	cmd_set(main_split, view_vsplit + 1);
 	view_showing = TRUE;
-	xpack(vbox_right, main_split);
-	gtk_widget_unref(scrolledwindow_canvas);
-	gtk_widget_unref(vw_scrolledwindow);
-	gtk_widget_unref(main_split);
 	toolbar_viewzoom(TRUE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
@@ -930,14 +928,7 @@ void view_hide()
 {
 	if (!view_showing) return;
 	view_showing = FALSE;
-	gtk_widget_ref(scrolledwindow_canvas);
-	gtk_widget_ref(vw_scrolledwindow);
-	gtk_widget_ref(main_split);
-	gtk_container_remove(GTK_CONTAINER(vbox_right), main_split);
-	gtk_container_remove(GTK_CONTAINER(main_split), scrolledwindow_canvas);
-	gtk_container_remove(GTK_CONTAINER(main_split), vw_scrolledwindow);
-	xpack(vbox_right, scrolledwindow_canvas);
-	gtk_widget_unref(scrolledwindow_canvas);
+	cmd_set(main_split, 0);
 	toolbar_viewzoom(FALSE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
 	gtk_check_menu_item_set_active(
