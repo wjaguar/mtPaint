@@ -1960,6 +1960,9 @@ static void htoolbox_popup(GtkWidget *button, gpointer user_data)
 		/* Copy button relief setting of toolbar buttons */
 		gtk_button_set_relief(GTK_BUTTON(btn),
 			gtk_button_get_relief(GTK_BUTTON(tool)));
+		/* Copy their sensitivity */
+		gtk_widget_set_sensitive(GTK_WIDGET(btn),
+			GTK_WIDGET_SENSITIVE(GTK_WIDGET(tool)));
 		/* Copy their state (feedback is disabled while invisible) */
 		if (GTK_IS_TOGGLE_BUTTON(btn)) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(btn), GTK_TOGGLE_BUTTON(tool)->active);
@@ -2066,8 +2069,8 @@ static gboolean htoolbox_tool_rclick(GtkWidget *widget, GdkEventButton *event,
 // !!! With inlining this, problem also
 GtkWidget *smarttbar_button(smarttbar_data *sd, char *v)
 {
-	GtkWidget *box = sd->r[0], *item = NULL, *ritem = NULL;
-	GtkWidget *button, *arrow, *popup, *ebox, *frame, *bbox;
+	GtkWidget *box = sd->r[0], *ritem = NULL;
+	GtkWidget *button, *arrow, *popup, *ebox, *frame, *bbox, *item;
 	void **slot, *rvar = (void *)(-1);
 
 	sd->button = button = pack(box, gtk_button_new());
@@ -2136,17 +2139,6 @@ GtkWidget *smarttbar_button(smarttbar_data *sd, char *v)
 			/* !!! Flags are ignored; can XOR desc[0]'s to compare
 			 * them too, but false match improbable anyway - WJ */
 			gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(item), FALSE);
-		}
-		// !!! Maybe instead copy sensitivity within htoolbox_popup() ?
-		// (even a separate pass may be simpler than making fake slots)
-		else if (op == op_ACTMAP)
-		{
-			// !!! Paranoia - in case map's widget got skipped
-			if (gtk_object_get_user_data(GTK_OBJECT(item)) !=
-				(gpointer)origin_slot(slot)) continue;
-// !!! Switch to a slot-based map later (and generate fake slots for it)
-			mapped_dis_add(item, (int)slot[0]);
-			continue;
 		}
 		else continue; // Not a regular toolbar button
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
@@ -3725,7 +3717,8 @@ static void *do_query(char *data, void **wdata, int mode)
 				mt_spinslide_get_value)(*wdata);
 			break;
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-		case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
+		case op_OKTOGGLE: case op_UTOGGLE:
+		case op_TBTOGGLE: case op_TBBOXTOG:
 			*(int *)v = gtk_toggle_button_get_active(
 				GTK_TOGGLE_BUTTON(*wdata));
 			break;
@@ -3882,7 +3875,8 @@ void cmd_reset(void **slot, void *ddata)
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-		case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE:
+		case op_OKTOGGLE: case op_UTOGGLE:
+		case op_TBTOGGLE: case op_TBBOXTOG:
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
 				*(int *)v);
 			break;
@@ -4117,7 +4111,8 @@ void cmd_set(void **slot, int v)
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
-	case op_OKTOGGLE: case op_UTOGGLE: case op_TBTOGGLE: case op_TBRBUTTON:
+	case op_OKTOGGLE: case op_UTOGGLE:
+	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
@@ -4244,6 +4239,8 @@ void cmd_setv(void **slot, void *res, int idx)
 	int op = GET_OP(slot);
 	switch (op)
 	{
+	case op_WDONE: slot = NEXT_SLOT(slot);
+		// Fallthrough - noop before a toplevel
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
 		if (idx == WINDOW_TITLE)
 			gtk_window_set_title(GTK_WINDOW(slot[0]), res);

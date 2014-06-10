@@ -4250,7 +4250,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	}
 }
 
-static void menu_action(GtkMenuItem *widget, gpointer user_data, gint data)
+static void menu_action(GtkMenuItem *widget, gpointer user_data)
 {
 	menu_item *item = user_data;
 
@@ -4270,135 +4270,131 @@ static gboolean menu_allow_key(GtkWidget *widget, guint signal_id, gpointer user
 
 static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
 {
-	static char *bts[6] = { "<CheckItem>", NULL, "<Branch>", "<Tearoff>",
-		"<Separator>", "<LastBranch>" };
-	GtkItemFactoryEntry wf;
-	GtkItemFactory *factory;
-	GtkWidget *widget, *wrap, *rwidgets[MENU_RESIZE_MAX];
-	wjmem *mem;
-	char *radio[32], *rnames[MENU_RESIZE_MAX], buf[64];
-	char *tmp, *s, *s2, *t;
-	int i, j, l, itp, rn = 0, nsep = 0;
-#if GTK_MAJOR_VERSION == 1
-	GSList *en;
-#endif
+	GtkWidget *wrap, *mbar, *item, *parent, *label;
+	GtkWidget *parents[16], *radio[32];
+	char *s, *names[MENU_RESIZE_MAX];
+	int i, itp, depth, rn = 0, sp = 0;
 
-	mem = wjmemnew(0, 0);
-	memset(&wf, 0, sizeof(wf));
+#if GTK_MAJOR_VERSION == 2
+	gtk_accel_map_add_entry("<f>/a/k/e", 0, 0);
+#endif
 	memset(radio, 0, sizeof(radio));
-	rnames[0] = NULL;
-	factory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", accel_group);
-	tmp = "";
+	parents[sp++] = mbar = gtk_menu_bar_new();
 	for (; items->path; items++)
 	{
-		s = items->path;
-		if (!s[strspn(s, "/")]) /* Generate an unique name */
-		{
-			sprintf(buf, "%sitem%d", s, nsep++);
-			s = buf;
-		}
-		else s = __(s); /* Translate an existing name */
+		guint keyval, mods;
 
-		/* Text up to the last "/" gets copied from the previous item,
-		 * so that untranslated items in submenus do not mess up the
-		 * menu structure. In addition, omitting text between "//" pairs
-		 * saves some space - WJ */
-		t = tmp;
-		while ((s2 = strchr(s, '/')))
-		{
-			s = s2;
-			t += strcspn(t, "/");
-			if (*t != '/') break;
-			s++; t++;
-		}
-		l = t - tmp;
-		t = wjmalloc(mem, l + strlen(s) + 1, 1);
-		memcpy(t, tmp, l);
-		strcpy(t + l, s);
-		wf.path = t;
+		s = items->path;
+		depth = strspn(s, "/");
+		if (sp < depth) continue; // Nesting error
+		sp = depth; // Select level
+		if (s[depth]) s = __(s); /* Translate an existing name */
+		s += depth;
 
 		itp = items->radio_BTS;
-		wf.item_type = itp < 1 ? bts[-itp & 15] :
-			radio[itp] ? radio[itp] : "<RadioItem>";
-		wf.accelerator = items->shortcut;
-		wf.callback = items->action ? menu_action : NULL;
-//		wf.callback_action = 0;
-#if GTK_MAJOR_VERSION == 2
-		if (show_menu_icons && items->xpm_icon_image)
+		if (itp <= -16) itp += 16;
+		if (itp == 0) item = gtk_check_menu_item_new_with_label("");
+		else if (itp > 0)
 		{
-			wf.item_type = "<ImageItem>";
-			wf.extra_data = NULL;
-			gtk_item_factory_create_item(factory, &wf, items, 2);
-
-			widget = gtk_item_factory_get_item(factory,
-				((GtkItemFactoryItem *)factory->items->data)->path);
-
-			gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(widget),
+			GSList *group = radio[itp] ? gtk_radio_menu_item_group(
+				GTK_RADIO_MENU_ITEM(radio[itp])) : NULL;
+			radio[itp] = item = gtk_radio_menu_item_new_with_label(
+				group, "");
+		}
+		else if (itp == -3) item = gtk_tearoff_menu_item_new();
+#if GTK_MAJOR_VERSION == 2
+		else if ((itp == -1) && show_menu_icons && items->xpm_icon_image)
+		{
+			item = gtk_image_menu_item_new_with_label("");
+			gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item),
 				xpm_image(items->xpm_icon_image));
 		}
-		else
 #endif
-		gtk_item_factory_create_item(factory, &wf, items, 2);
-		/* !!! Internal path may differ from input path */
-		tmp = strchr(((GtkItemFactoryItem *)factory->items->data)->path, '/');
-		if ((itp > 0) && !radio[itp]) radio[itp] = tmp;
-		widget = gtk_item_factory_get_item(factory, tmp);
+		else if (itp == -4)
+		{
+			item = gtk_menu_item_new();
+			gtk_widget_set_sensitive(item, FALSE);
+		}
+		else item = gtk_menu_item_new_with_label("");
+		gtk_widget_show(item);
+
+		parent = parents[sp - 1];
+		gtk_container_add(GTK_CONTAINER(parent), item);
+
+		if (itp >= 0) gtk_check_menu_item_set_show_toggle(
+			GTK_CHECK_MENU_ITEM(item), TRUE);
+		if ((itp != -4) && (itp != -3))
+		{
+			label = GTK_BIN(item)->child;
+			keyval = gtk_label_parse_uline(GTK_LABEL(label), s);
+			if ((parent == mbar) && (keyval != GDK_VoidSymbol))
+#if GTK_MAJOR_VERSION == 1
+				gtk_widget_add_accelerator(item, "activate_item",
+				accel_group, keyval, GDK_MOD1_MASK, GTK_ACCEL_LOCKED);
+#else
+				gtk_label_set_text_with_mnemonic(GTK_LABEL(label), s);
+#endif
+		}
+		if (itp == -5) gtk_menu_item_right_justify(GTK_MENU_ITEM(item));
+		if ((itp == -2) || (itp == -5))
+		{
+			parents[sp++] = parent = gtk_menu_new();
+			gtk_menu_set_accel_group(GTK_MENU(parent), accel_group);
+			gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), parent);
+		}
+		else if (items->action) gtk_signal_connect(GTK_OBJECT(item),
+			"activate", GTK_SIGNAL_FUNC(menu_action), items);
+		if (items->shortcut)
+		{
+			gtk_accelerator_parse(items->shortcut, &keyval, &mods);
+			gtk_widget_add_accelerator(item, "activate",
+				accel_group, keyval, mods, GTK_ACCEL_VISIBLE);
+		}
+#if GTK_MAJOR_VERSION == 2
+		// !!! Otherwise GTK+ won't add spacing to an empty accel field
+		else gtk_widget_set_accel_path(item, "<f>/a/k/e", accel_group);
+#endif
 #if GTK2VERSION >= 4
 		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
-		gtk_signal_connect(GTK_OBJECT(widget), "can_activate_accel",
+		gtk_signal_connect(GTK_OBJECT(item), "can_activate_accel",
 			GTK_SIGNAL_FUNC(menu_allow_key), NULL);
 #endif
-		mapped_dis_add(widget, items->actmap);
+		mapped_dis_add(item, items->actmap);
 		/* For now, remember only requested widgets */
-		if (items->ID) menu_widgets[items->ID] = widget;
+		if (items->ID) menu_widgets[items->ID] = item;
 		/* Remember what is size-aware */
 		if (items->radio_BTS > -16) continue;
-		rnames[rn] = wf.path;
-		rwidgets[rn++] = widget;
+		r_menu[rn].item = item;
+		r_menu[rn].key = keyval;
+		names[rn] = s;
+		rn++;
 	}
 
 	/* Setup overflow submenu */
-	r_menu[0].item = rwidgets[--rn];
-	l = strlen(rnames[rn]);
-	memset(&wf, 0, sizeof(wf));
+	parent = GTK_MENU_ITEM(r_menu[--rn].item)->submenu;
 	for (i = 0; i < rn; i++)
 	{
-		j = rn - i;
-		widget = r_menu[j].item = rwidgets[i];
-#if GTK_MAJOR_VERSION == 1
-		en = gtk_accel_group_entries_from_object(GTK_OBJECT(widget));
-	/* !!! This'll get confused if both underline and normal accelerators
-	 * are defined for the item */
-		r_menu[j].key = en ? ((GtkAccelEntry *)en->data)->accelerator_key :
-			GDK_VoidSymbol;
-#else
-		r_menu[j].key = gtk_label_get_mnemonic_keyval(GTK_LABEL(
-			GTK_BIN(widget)->child));
-#endif
-		wf.path = wjmalloc(mem, l + strlen(rnames[i]) + 1, 1);
-		memcpy(wf.path, rnames[rn], l);
-		strcpy(wf.path + l, rnames[i]);
-		wf.item_type = "<Branch>";
-		gtk_item_factory_create_item(factory, &wf, NULL, 2);
-		/* !!! Internal path may differ from input path */
-		widget = gtk_item_factory_get_item(factory,
-			((GtkItemFactoryItem *)factory->items->data)->path);
-		r_menu[j].fallback = widget;
-		gtk_widget_hide(widget);
+		r_menu[i].fallback = item = gtk_menu_item_new_with_label("");
+		gtk_container_add(GTK_CONTAINER(parent), item);
+		gtk_label_parse_uline(GTK_LABEL(GTK_BIN(item)->child), names[i]);
+	}
+	for (i = 0; i <= rn / 2; i++) // Swap ends
+	{
+		r_menu_slot tmp = r_menu[i];
+		r_menu[i] = r_menu[rn - i];
+		r_menu[rn - i] = tmp;
 	}
 	gtk_widget_hide(r_menu[0].item);
 
 	/* Wrap menubar with resize-controller widget */
-	widget = gtk_item_factory_get_widget(factory, "<main>");
-	gtk_widget_show(widget);
+	gtk_widget_show(mbar);
 	wrap = wj_size_box();
-	gtk_container_add(GTK_CONTAINER(wrap), widget);
+	gtk_container_add(GTK_CONTAINER(wrap), mbar);
 	gtk_signal_connect(GTK_OBJECT(wrap), "size_request",
 		GTK_SIGNAL_FUNC(smart_menu_size_req), NULL);
 	gtk_signal_connect(GTK_OBJECT(wrap), "size_allocate",
 		GTK_SIGNAL_FUNC(smart_menu_size_alloc), NULL);
 
-	wjmemfree(mem);
 	return (wrap);
 }
 
