@@ -65,8 +65,7 @@ static void **newchan_window;
 
 static void click_newchan_cancel()
 {
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
+	cmd_set(menu_slots[MENU_CHAN0 + mem_channel], TRUE);
 		// Stops cancelled new channel showing as selected in the menu
 
 	run_destroy(newchan_window);
@@ -384,14 +383,12 @@ void pressed_unassociate()
 void pressed_channel_toggle(int state, int what)
 {
 	int *toggle = what ? &hide_image : &overlay_alpha;
-	if (*toggle == state) return;
 	*toggle = state;
 	update_stuff(UPD_RENDER);
 }
 
 void pressed_RGBA_toggle(int state)
 {
-	if (RGBA_mode == state) return;
 	RGBA_mode = state;
 	update_stuff(UPD_MODE | CF_SET);
 }

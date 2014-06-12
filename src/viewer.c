@@ -38,7 +38,7 @@
 int font_aa, font_bk, font_r;
 int font_bkg, font_angle;
 
-int view_showing, view_update_pending;
+int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
 float vw_zoom = 1;
 
 int opaque_view;
@@ -53,7 +53,7 @@ int opaque_view;
 static gboolean click_help_end(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
 	// Make sure the user can only open 1 help window
-	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], TRUE);
+	cmd_sensitive(menu_slots[MENU_HELP], TRUE);
 	gtk_widget_destroy(widget);
 
 	return FALSE;
@@ -71,7 +71,7 @@ void pressed_help()
 	ag = gtk_accel_group_new();
 
 	// Make sure the user can only open 1 help help_window
-	gtk_widget_set_sensitive(menu_widgets[MENU_HELP], FALSE);
+	cmd_sensitive(menu_slots[MENU_HELP], FALSE);
 
 	help_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 
@@ -906,13 +906,12 @@ static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
 
 void view_show()
 {
-	if (view_showing) return;
+	if (view_showing == view_vsplit + 1) return;
 	cmd_set(main_split, view_vsplit + 1);
-	view_showing = TRUE;
+	view_showing = view_vsplit + 1;
 	toolbar_viewzoom(TRUE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
-	gtk_check_menu_item_set_active(
-		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), TRUE);
+	cmd_set(menu_slots[MENU_VIEW], TRUE);
 	vw_focus_view();
 #if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
 	gtk_adjustment_value_changed(
@@ -927,12 +926,11 @@ void view_show()
 void view_hide()
 {
 	if (!view_showing) return;
-	view_showing = FALSE;
+	view_showing = 0;
 	cmd_set(main_split, 0);
 	toolbar_viewzoom(FALSE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
-	gtk_check_menu_item_set_active(
-		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_VIEW]), FALSE);
+	cmd_set(menu_slots[MENU_VIEW], FALSE);
 #if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
 	gtk_adjustment_value_changed(
 		gtk_scrolled_window_get_hadjustment(
@@ -957,8 +955,6 @@ void init_view()
 {
 	vw_width = 1;
 	vw_height = 1;
-
-	view_showing = FALSE;
 
 	gtk_signal_connect( GTK_OBJECT(vw_drawing), "configure_event",
 		GTK_SIGNAL_FUNC (vw_configure), NULL );

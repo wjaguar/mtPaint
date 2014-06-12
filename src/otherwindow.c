@@ -1573,12 +1573,14 @@ static void *colsel_code[] = {
 	REF(clist),
 	IFx(is_pal, 1), // long-list form - for now only palette needs it
 		XHBOXb(5, 0),
+		SCROLL(0, 1), // never/auto
 		COLORLISTN(cnt, idx, v.rgb, colsel_evt, click_colour),
 		XVBOXb(5, 5),
 	ENDIF(1),
 	UNLESSx(is_pal, 1), // short-list form (6 items or less)
 		XVBOXb(5, 5),
 		XHBOXb(10, 0),
+		SCROLL(0, 1), // never/auto
 		COLORLIST(cnames, idx, v.rgb, colsel_evt, NULL),
 	ENDIF(1),
 	TRIGGER, // colorlist SELECT
@@ -1658,9 +1660,8 @@ static void *colsel_code[] = {
 
 void colour_selector(int cs_type)
 {
-	colsel_dd tdata, *dt;
+	colsel_dd tdata;
 	unsigned char *rgb = tdata.v.rgb;
-	void **res;
 	int i;
 
 	memset(&tdata, 0, sizeof(tdata));
@@ -1783,9 +1784,7 @@ void colour_selector(int cs_type)
 	}
 
 	tdata.v0 = tdata.v; // Save original values
-	res = run_create(colsel_code, &tdata, sizeof(tdata));
-	dt = GET_DDATA(res);
-	cmd_scroll(dt->clist, dt->idx); // scroll in current position
+	run_create(colsel_code, &tdata, sizeof(tdata));
 }
 
 ///	QUANTIZE WINDOW

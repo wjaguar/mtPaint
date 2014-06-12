@@ -279,7 +279,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 	{
 		if (inputd) delete_inputd();
 		run_destroy(wdata);
-		gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], TRUE);
+		cmd_sensitive(menu_slots[MENU_PREFS], TRUE);
 	}
 }
 
@@ -513,7 +513,7 @@ void pressed_preferences()
 		0, txt };
 
 	// Make sure the user can only open 1 prefs window
-	gtk_widget_set_sensitive(menu_widgets[MENU_PREFS], FALSE);
+	cmd_sensitive(menu_slots[MENU_PREFS], FALSE);
 #ifdef U_NLS
 	{
 		char *cur = inifile_get("languageSETTING", "system");

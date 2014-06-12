@@ -1,5 +1,5 @@
 /*	viewer.h
-	Copyright (C) 2004-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -20,8 +20,9 @@
 int font_aa, font_bk, font_r;
 int font_bkg, font_angle;
 
+int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
+int vw_focus_on;
 float vw_zoom;
-int view_showing, vw_focus_on;
 int opaque_view;
 int max_pan;
 

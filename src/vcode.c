@@ -44,7 +44,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 /* Max columns in a list */
 #define MAX_COLS 16
 
-#define GET_OP(S) ((int)*(void **)(S)[1] & WB_OPMASK)
+#define GET_OPF(S) ((int)*(void **)(S)[1])
+#define GET_OP(S) (GET_OPF(S) & WB_OPMASK)
 
 #define VCODE_KEY "mtPaint.Vcode"
 
@@ -65,13 +66,16 @@ enum {
 	pk_SCROLLVP,
 	pk_SCROLLVPn,
 	pk_SCROLLVPv,
+	pk_SCROLLVPm,
+	pk_CONT,
 	pk_BIN
 };
-#define pk_MASK     0xFF
-#define pkf_FRAME  0x100
-#define pkf_STACK  0x200
-#define pkf_PARENT 0x400
-#define pkf_SHOW   0x800
+#define pk_MASK      0xFF
+#define pkf_FRAME  0x0100
+#define pkf_STACK  0x0200
+#define pkf_CHILD  0x0400
+#define pkf_PARENT 0x0800
+#define pkf_SHOW   0x1000
 
 /* Internal datastore */
 
@@ -189,11 +193,11 @@ static void **skip_if(void **pp)
 static void trigger_things(void **wdata)
 {
 	char *data = GET_DDATA(wdata);
-	void **slot, **desc;
+	void **slot, **base, **desc;
 
 	for (wdata = GET_WINDOW(wdata); wdata[1]; wdata = NEXT_SLOT(wdata))
 	{
-		int op = GET_OP(wdata);
+		int opf = GET_OPF(wdata), op = opf & WB_OPMASK;
 		/* Trigger events for nested widget */
 		if ((op == op_MOUNT) || (op == op_PMOUNT))
 		{
@@ -203,9 +207,16 @@ static void trigger_things(void **wdata)
 			continue;
 		}
 		if (op != op_TRIGGER) continue;
-		slot = PREV_SLOT(wdata);
-		desc = slot[1];
-		((evt_fn)desc[1])(data, slot[0], (int)desc[0] & WB_OPMASK, slot);
+		base = slot = PREV_SLOT(wdata);
+		if (WB_GETLEN(opf)) // Version for menu/toolbar items
+		{
+			/* Here, event is put into next slot, and widget is
+			 * in nearest widgetlike slot before */
+			base = NEXT_SLOT(wdata);
+			slot = origin_slot(slot);
+		}
+		desc = base[1];
+		((evt_fn)desc[1])(data, base[0], (int)desc[0] & WB_OPMASK, slot);
 	}
 }
 
@@ -293,7 +304,6 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 typedef struct {
 	unsigned char *col;
 	int cnt, *idx;
-	int scroll;
 } colorlist_data;
 
 // !!! ref to RGB[3]
@@ -343,37 +353,15 @@ static void colorlist_select(GtkList *list, GtkWidget *widget, gpointer user_dat
 		(int)desc[0] & WB_OPMASK, slot);
 }
 
-static void colorlist_map_scroll(GtkWidget *list, colorlist_data *dt)
-{	
-	GtkAdjustment *adj;
-	int idx = dt->scroll - 1;
-
-	dt->scroll = 0;
-	if (idx < 0) return;
-	adj = gtk_scrolled_window_get_vadjustment(
-		GTK_SCROLLED_WINDOW(list->parent->parent));
-	if (adj->upper > adj->page_size)
-	{
-		float f = adj->upper * (idx + 0.5) / dt->cnt - adj->page_size * 0.5;
-		adj->value = f < 0.0 ? 0.0 : f > adj->upper - adj->page_size ?
-			adj->upper - adj->page_size : f;
-		gtk_adjustment_value_changed(adj);
-	}
-}
-
 // !!! And with inlining this, problem also
-GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
-	void **r)
+GtkWidget *colorlist(int *idx, char *ddata, void **pp, void **r)
 {
-	GtkWidget *scroll, *list, *item, *col, *label;
+	GtkWidget *list, *item, *col, *label, *box;
 	colorlist_data *dt;
 	void *v;
 	char txt[64], *t, **sp = NULL;
 	int i, cnt = 0;
 
-	scroll = pack(box, gtk_scrolled_window_new(NULL, NULL));
-	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-		GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
 	list = gtk_list_new();
 
 	// Allocate datablock
@@ -390,8 +378,6 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 	dt->idx = idx;
 
 	gtk_object_set_user_data(GTK_OBJECT(list), dt); // know thy descriptor
-	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(scroll), list);
-	gtk_widget_show_all(scroll);
 
 	for (i = 0; i < cnt; i++)
 	{
@@ -425,17 +411,8 @@ GtkWidget *colorlist(GtkWidget *box, int *idx, char *ddata, void **pp,
 		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, *idx)->data));
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
 		GTK_SIGNAL_FUNC(colorlist_select), NEXT_SLOT(r));
-	gtk_signal_connect_after(GTK_OBJECT(list), "map",
-		GTK_SIGNAL_FUNC(colorlist_map_scroll), dt);
 
 	return (list);
-}
-
-static void colorlist_scroll_in(GtkWidget *list, int idx)
-{
-	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
-	dt->scroll = idx + 1;
-	if (GTK_WIDGET_MAPPED(list)) colorlist_map_scroll(list, dt);
 }
 
 static void colorlist_reset_color(GtkWidget *list, int idx)
@@ -453,6 +430,22 @@ static void colorlist_reset_color(GtkWidget *list, int idx)
 	/* Redraw the item displaying the color */
 	gtk_widget_queue_draw(
 		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, idx)->data));
+}
+
+static void list_scroll_in(GtkWidget *widget, gpointer user_data)
+{	
+	GtkContainer *list = GTK_CONTAINER(widget);
+	GtkAdjustment *adj = user_data;
+	int y;
+
+	if (!list->focus_child) return; // Paranoia
+	if (adj->upper <= adj->page_size) return; // Nothing to scroll
+	y = list->focus_child->allocation.y +
+		list->focus_child->allocation.height / 2 -
+		adj->page_size / 2;
+	adj->value = y < 0 ? 0 : y > adj->upper - adj->page_size ?
+		adj->upper - adj->page_size : y;
+	gtk_adjustment_value_changed(adj);
 }
 
 //	COLORPAD widget
@@ -2295,6 +2288,32 @@ static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	}
 }
 
+//	MENUBAR widget
+
+/* !!! This passes the item slot, not event slot, as event source */
+
+static void menu_evt(GtkWidget *widget, gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+
+	/* Ignore radio buttons getting depressed */
+	if (GTK_IS_RADIO_MENU_ITEM(widget) && !GTK_CHECK_MENU_ITEM(widget)->active)
+		return;
+	slot = gtk_object_get_user_data(GTK_OBJECT(widget));
+	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
+}
+
+#if GTK2VERSION >= 4 /* Not needed before GTK+ 2.4 */
+
+/* Ignore shortcut key only when item itself is insensitive or hidden */
+static gboolean menu_allow_key(GtkWidget *widget, guint signal_id, gpointer user_data)
+{
+	return (GTK_WIDGET_IS_SENSITIVE(widget) && GTK_WIDGET_VISIBLE(widget));
+}
+
+#endif
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -2618,7 +2637,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Return anchor position */
 			return (res);
 		/* Done with a container */
-		case op_WDONE: ++wp; tbar = NULL; continue;
+		case op_WDONE: ++wp; continue;
 		/* Create the main window */
 		case op_MAINWINDOW:
 		{
@@ -3060,7 +3079,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
-			widget = colorlist(wp[0], v, ddata, pp - 1, NEXT_SLOT(r));
+			widget = colorlist(v, ddata, pp - 1, NEXT_SLOT(r));
+			pk = pk_SCROLLVPm | pkf_SHOW;
 			break;
 		/* Add a colorpad */
 		case op_COLORPAD:
@@ -3187,8 +3207,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 			}
 
-			bar = widget;
-			widget = pack(wp[0], wj_size_box());
+			// !!! Toolbar is what sits on stack till SMARTTBMORE
+			*--wp = bar = widget;
+			gtk_widget_show(bar);
+
+			widget = wj_size_box();
 
 			/* Make datastruct */
 			sd = bound_malloc(widget, sizeof(smarttbar_data));
@@ -3207,13 +3230,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_show(vport);
 			vport_noshadow_fix(vport);
 			sd->vport = vport;
-
-			// !!! Toolbar is what sits on stack till SMARTTBMORE
-			*--wp = bar;
-			gtk_widget_show(bar);
 			gtk_container_add(GTK_CONTAINER(vport), bar);
 
-			pk = pkf_SHOW;
+			pk = pk_PACK | pkf_CHILD | pkf_SHOW;
 			break;
 		}
 		/* Add the arrow button to smart toolbar */
@@ -3288,6 +3307,124 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GTK_SIGNAL_FUNC(twobar_size_alloc), NULL);
 			pk = pk_PACK | pkf_STACK;
 			break;
+		/* Add a menubar */
+		case op_MENUBAR:
+			ag = gtk_accel_group_new();
+			// Stop dynamic allocation of accelerators during runtime
+			gtk_accel_group_lock(ag);
+ 			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
+
+			tbar = r;
+			rvar = rslot = NULL;
+			widget = gtk_menu_bar_new();
+
+			pk = pk_PACK | pkf_STACK | pkf_SHOW;
+			break;
+		/* Add a dropdown submenu */
+		case op_SUBMENU: case op_ESUBMENU: case op_SSUBMENU:
+		{
+			GtkWidget *label, *menu;
+			char *s;
+			guint keyval;
+			int l;
+
+			widget = gtk_menu_item_new_with_label("");
+			if (op == op_ESUBMENU)
+				gtk_menu_item_right_justify(GTK_MENU_ITEM(widget));
+
+			l = strspn(s = v, "/");
+			if (s[l]) s = _(s); // Translate
+			s += l;
+
+			label = GTK_BIN(widget)->child;
+			keyval = gtk_label_parse_uline(GTK_LABEL(label), s);
+			/* Toplevel submenus can have Alt+letter shortcuts */
+			if ((l < 2) && (keyval != GDK_VoidSymbol))
+#if GTK_MAJOR_VERSION == 1
+				gtk_widget_add_accelerator(widget, "activate_item",
+					ag, keyval, GDK_MOD1_MASK, GTK_ACCEL_LOCKED);
+#else
+				gtk_label_set_text_with_mnemonic(GTK_LABEL(label), s);
+#endif
+
+			*--wp = menu = gtk_menu_new();
+			gtk_menu_set_accel_group(GTK_MENU(menu), ag);
+			gtk_menu_item_set_submenu(GTK_MENU_ITEM(widget), menu);
+
+			pk = pk_CONT | pkf_CHILD | pkf_SHOW;
+			break;
+		}
+		case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
+		{
+			char *s;
+			int l;
+
+			if (op == op_MENUCHECK)
+				widget = gtk_check_menu_item_new_with_label("");
+			else if (op == op_MENURITEM)
+			{
+				GSList *group = NULL;
+
+				if (rvar == v) group = gtk_radio_menu_item_group(
+					rslot[0]);
+				/* Now this represents group */
+				rslot = r; rvar = v;
+				widget = gtk_radio_menu_item_new_with_label(group, "");
+			}
+#if GTK_MAJOR_VERSION == 2
+			else if ((lp > 3) && show_menu_icons)
+			{
+				widget = gtk_image_menu_item_new_with_label("");
+				gtk_image_menu_item_set_image(
+					GTK_IMAGE_MENU_ITEM(widget),xpm_image(pp[3]));
+			}
+#endif
+			else widget = gtk_menu_item_new_with_label("");
+
+			if (v) /* Initialize a check/radio item */
+			{
+				int f = *(int *)v;
+				/* Activate the one button whose ID matches var */
+				if ((op != op_MENURITEM) || (f = f == (int)pp[1]))
+					gtk_check_menu_item_set_active(
+						GTK_CHECK_MENU_ITEM(widget), f);
+				gtk_check_menu_item_set_show_toggle(
+					GTK_CHECK_MENU_ITEM(widget), TRUE);
+			}
+
+			l = strspn(s = pp[2], "/");
+			if (s[l]) s = _(s); // Translate
+			s += l;
+
+			gtk_label_parse_uline(GTK_LABEL(GTK_BIN(widget)->child), s);
+
+			gtk_signal_connect(GTK_OBJECT(widget), "activate",
+				GTK_SIGNAL_FUNC(menu_evt), NEXT_SLOT(tbar));
+			gtk_object_set_user_data(GTK_OBJECT(widget), r);
+
+#if GTK_MAJOR_VERSION == 2
+		/* !!! Otherwise GTK+ won't add spacing to an empty accel field */
+			gtk_widget_set_accel_path(widget, "<f>/a/k/e", ag);
+#endif
+#if GTK2VERSION >= 4
+		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
+			gtk_signal_connect(GTK_OBJECT(widget), "can_activate_accel",
+				GTK_SIGNAL_FUNC(menu_allow_key), NULL);
+#endif
+			pk = pk_CONT | pkf_SHOW;
+			break;
+		}
+		/* Add a tearoff menu item */
+		case op_MENUTEAR:
+			widget = gtk_tearoff_menu_item_new();
+			pk = pk_CONT | pkf_SHOW;
+			break;
+		/* Add a separator menu item */
+		case op_MENUSEP:
+			widget = gtk_menu_item_new();
+			gtk_widget_set_sensitive(widget, FALSE);
+			pk = pk_CONT | pkf_SHOW;
+			break;
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT: case op_PMOUNT:
 		{
@@ -3354,10 +3491,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Put last referrable widget into activation map */
 		/* And remember map in a slot for later reference */
 		case op_ACTMAP:
-// !!! Switch to a slot-based map later
-			mapped_dis_add(*origin_slot(PREV_SLOT(r)), (int)v);
+			mapped_dis_add(origin_slot(PREV_SLOT(r)), (int)v);
 			widget = v;
 			break;
+		/* Add a shortcut, from text desc, to last referrable widget */
+		/* And remember the fact in a slot for later reference */
+		case op_SHORTCUTs:
+		{
+			guint keyval, mods;
+
+			widget = *origin_slot(PREV_SLOT(r));
+#if GTK_MAJOR_VERSION == 2
+			/* !!! In case one had been set (for menu spacing) */
+			gtk_widget_set_accel_path(widget, NULL, ag);
+#endif
+			gtk_accelerator_parse(v, &keyval, &mods);
+			gtk_widget_add_accelerator(widget, "activate",
+				ag, keyval, mods, GTK_ACCEL_VISIBLE);
+			widget = v;
+			break;
+		}
 		/* Store a reference to whatever is next into field */
 		case op_REF:
 			*(void **)v = r;
@@ -3582,6 +3735,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		else if (minw) gtk_widget_set_usize(widget, minw, -2);
 		minw = 0;
 		/* Pack this */
+		if (pk & pkf_CHILD) ++wp; // have child widget on stack
 		switch (n = pk & pk_MASK)
 		{
 		case pk_PACK: tpad = 0;
@@ -3609,17 +3763,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				n == pk_TABLE2x ? GTK_FILL : 0, 0, tpad);
 			break;
 		}
-		case pk_SCROLLVP: case pk_SCROLLVPn: case pk_SCROLLVPv:
+		case pk_SCROLLVP: case pk_SCROLLVPn:
+		case pk_SCROLLVPv: case pk_SCROLLVPm:
 		{
 			GtkWidget *tw = wp[0];
 			GtkScrolledWindow *sw = GTK_SCROLLED_WINDOW(tw);
+			GtkAdjustment *adj = gtk_scrolled_window_get_vadjustment(sw);
 
 			wp[0] = *(wp - 1); ++wp; // unstack
 			gtk_scrolled_window_add_with_viewport(sw, widget);
 			if (n == pk_SCROLLVPv)
 			{
-				gtk_container_set_focus_vadjustment(GTK_CONTAINER(widget),
-					gtk_scrolled_window_get_vadjustment(sw));
+				gtk_container_set_focus_vadjustment(
+					GTK_CONTAINER(widget), adj);
+			}
+			else if (n == pk_SCROLLVPm)
+			{
+				gtk_signal_connect_after(GTK_OBJECT(widget), "map",
+					GTK_SIGNAL_FUNC(list_scroll_in), adj);
 			}
 			if (n != pk_SCROLLVPn) break;
 			/* Set viewport to shadowless */
@@ -3628,15 +3789,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			vport_noshadow_fix(tw);
 			break;
 		}
-		case pk_BIN:
+		case pk_CONT: case pk_BIN:
 			gtk_container_add(GTK_CONTAINER(wp[0]), widget);
+			if (n != pk_BIN) break;
 			wp[0] = *(wp - 1); ++wp; // unstack
 			break;
 		}
 		if ((n == pk_XPACK1) || (n == pk_PACKEND1))
 			gtk_box_reorder_child(GTK_BOX(wp[0]), widget, 1);
 		/* Stack this */
-		if (pk & pkf_STACK) --wp;
+		if (pk & (pkf_STACK | pkf_CHILD)) --wp;
 		/* Remember events */
 		if (ref > 2) ADD_SLOT(r, res, pp + lp - 4);
 		if (ref > 1) ADD_SLOT(r, res, pp + lp - 2);
@@ -3719,8 +3881,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
 		case op_OKTOGGLE: case op_UTOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
-			*(int *)v = gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(*wdata));
+			*(int *)v = gtk_toggle_button_get_active(*wdata);
 			break;
 		case op_TBRBUTTON:
 		{
@@ -3728,14 +3889,12 @@ static void *do_query(char *data, void **wdata, int mode)
 			void **slot = wdata;
 
 			/* If reading radio group through an inactive slot */
-			if (!gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(*wdata)))
+			if (!gtk_toggle_button_get_active(*wdata))
 			{
 				/* Let outer loop find active item */
 				if (mode <= 1) break;
 				/* Otherwise, find active item here */
-				group = gtk_radio_button_group(
-					GTK_RADIO_BUTTON(*wdata));
+				group = gtk_radio_button_group(*wdata);
 				while (group && !GTK_TOGGLE_BUTTON(group->data)->active)
 					group = group->next;
 				if (!group) break; // impossible happened
@@ -3746,9 +3905,32 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		}
 		case op_CHECKb:
-			inifile_set_gboolean(v, gtk_toggle_button_get_active(
-				GTK_TOGGLE_BUTTON(*wdata)));
+			inifile_set_gboolean(v, gtk_toggle_button_get_active(*wdata));
 			break;
+		case op_MENUCHECK:
+			*(int *)v = gtk_check_menu_item_get_active(*wdata);
+			break;
+		case op_MENURITEM:
+		{
+			GSList *group;
+			void **slot = wdata;
+
+			/* If reading radio group through an inactive slot */
+			if (!gtk_check_menu_item_get_active(*wdata))
+			{
+				/* Let outer loop find active item */
+				if (mode <= 1) break;
+				/* Otherwise, find active item here */
+				group = gtk_radio_menu_item_group(*wdata);
+				while (group && !GTK_CHECK_MENU_ITEM(group->data)->active)
+					group = group->next;
+				if (!group) break; // impossible happened
+				slot = gtk_object_get_user_data(
+					GTK_OBJECT(group->data));
+			}
+			*(int *)v = TOOL_ID(slot);
+			break;
+		}
 		case op_COLORLIST: case op_COLORLISTN:
 		case op_COLORPAD: case op_GRADBAR:
 		case op_LISTCCr: case op_LISTCCHr:
@@ -3847,18 +4029,17 @@ void cmd_reset(void **slot, void *ddata)
 		case op_SPIN: case op_SPINc: case op_XSPIN:
 		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
 		case op_SPINa: case op_XSPINa: case op_TSPINa:
-			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
-				*(int *)v);
+			gtk_spin_button_set_value(*wdata, *(int *)v);
 			break;
 		case op_TLSPINPACK:
 		{
-			void **vp = gtk_object_get_user_data(GTK_OBJECT(*wdata));
+			void **vp = gtk_object_get_user_data(*wdata);
 			int i, n = (int)pp[1];
 
 			*vp = NULL; // Lock
 			for (i = 0; i < n; i++)
 			{
-				GtkSpinButton *spin = GTK_SPIN_BUTTON(vp[i * 2 + 1]);
+				GtkSpinButton *spin = vp[i * 2 + 1];
 				int *p = (int *)v + i * 3;
 
 				gtk_spin_button_set_value(spin, *p);
@@ -3877,34 +4058,29 @@ void cmd_reset(void **slot, void *ddata)
 		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
 		case op_OKTOGGLE: case op_UTOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
-				*(int *)v);
+			gtk_toggle_button_set_active(*wdata, *(int *)v);
 			break;
 		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
 		case op_OPTD:
-			gtk_option_menu_set_history(GTK_OPTION_MENU(*wdata),
-				*(int *)v);
+			gtk_option_menu_set_history(*wdata, *(int *)v);
 			break;
 		case op_LISTCCr: case op_LISTCCHr:
-			listcc_reset(GTK_LIST(*wdata),
-				gtk_object_get_user_data(GTK_OBJECT(*wdata)), -1);
+			listcc_reset(*wdata, gtk_object_get_user_data(*wdata), -1);
 			/* !!! Or the changes will be ignored if the list wasn't
 			 * yet displayed (as in inactive dock tab) - WJ */
 			gtk_widget_queue_resize(*wdata);
 			break;
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
 		case op_LISTCS: case op_LISTCX:
-			listc_reset(GTK_CLIST(*wdata),
-				gtk_object_get_user_data(GTK_OBJECT(*wdata)));
+			listc_reset(*wdata, gtk_object_get_user_data(*wdata));
 			break;
 		case op_COMBOENTRY:
-			comboentry_reset(GTK_COMBO(*wdata), v,
-				*(char ***)(ddata + (int)pp[1]));
+			comboentry_reset(*wdata, v, *(char ***)(ddata + (int)pp[1]));
 			break;
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
-			gtk_entry_set_text(GTK_ENTRY(*wdata), *(char **)v);
+			gtk_entry_set_text(*wdata, *(char **)v);
 			// Replace transient buffer - it may get freed on return
-			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
+			*(const char **)v = gtk_entry_get_text(*wdata);
 			break;
 		case op_PATHs:
 			v = inifile_get(v, ""); // read and fallthrough
@@ -3916,17 +4092,22 @@ void cmd_reset(void **slot, void *ddata)
 			fpick_set_filename(*wdata, v, FALSE);
 			break;
 		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
-			gtk_spin_button_set_value(GTK_SPIN_BUTTON(*wdata),
-				*(int *)v * 0.01);
+			gtk_spin_button_set_value(*wdata, *(int *)v * 0.01);
 			break;
 		case op_CHECKb:
-			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(*wdata),
+			gtk_toggle_button_set_active(*wdata,
 				inifile_get_gboolean(v, (int)pp[1]));
 			break;
 		case op_TBRBUTTON:
 			if (*(int *)v == TOOL_ID(wdata))
-				gtk_toggle_button_set_active(
-					GTK_TOGGLE_BUTTON(*wdata), TRUE);
+				gtk_toggle_button_set_active(*wdata, TRUE);
+			break;
+		case op_MENURITEM:
+			if (*(int *)v != TOOL_ID(wdata)) break;
+			// Fallthrough
+		case op_MENUCHECK:
+			gtk_check_menu_item_set_active(*wdata,
+				op == op_MENURITEM ? TRUE : *(int *)v);
 			break;
 		case op_PCTCOMBO:
 			/* Same as in cmd_set() */
@@ -3936,10 +4117,10 @@ void cmd_reset(void **slot, void *ddata)
 // !!! No ready setter functions for these (and no need of them yet)
 			break;
 		case op_COLOR:
-			cpick_set_colour(slot[0], *(int *)v, 255);
+			cpick_set_colour(*wdata, *(int *)v, 255);
 			break;
 		case op_TCOLOR:
-			cpick_set_colour(slot[0], ((int *)v)[0], ((int *)v)[1]);
+			cpick_set_colour(*wdata, ((int *)v)[0], ((int *)v)[1]);
 			break;
 #endif
 		}
@@ -4115,6 +4296,9 @@ void cmd_set(void **slot, int v)
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
+	case op_MENUCHECK: case op_MENURITEM:
+		gtk_check_menu_item_set_active(slot[0], v);
+		break;
 	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
 		gtk_option_menu_set_history(slot[0], v);
 		break;
@@ -4138,17 +4322,17 @@ void cmd_set(void **slot, int v)
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
 	{
-		listcc_data *dt = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		listcc_data *dt = gtk_object_get_user_data(slot[0]);
 		if ((v < 0) || (v >= *dt->cnt)) break; // Ensure sanity
 		*dt->idx = v;
-		listcc_select_item(GTK_LIST(slot[0]), dt);
+		listcc_select_item(slot[0], dt);
 		break;
 	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
 	{
-		GtkWidget *widget = GTK_WIDGET(slot[0]);
-		GtkCList *clist = GTK_CLIST(slot[0]);
+		GtkWidget *widget = slot[0];
+		GtkCList *clist = slot[0];
 		int row = gtk_clist_find_row_from_data(clist, (gpointer)v);
 
 		if (row < 0) break; // Paranoia
@@ -4200,7 +4384,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
 	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
 	{
-		char *s = (char *)gtk_entry_get_text(GTK_ENTRY(slot[0]));
+		char *s = (char *)gtk_entry_get_text(slot[0]);
 		if (idx == PATH_VALUE) gtkncpy(res, s, size);
 		else strncpy0(res, s, size); // PATH_RAW
 		break;
@@ -4208,7 +4392,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
 	{
-		GtkCList *clist = GTK_CLIST(slot[0]);
+		GtkCList *clist = slot[0];
 		/* if (idx == LISTC_ORDER) */
 		int i, l = size / sizeof(int);
 
@@ -4227,6 +4411,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 /* These cannot be peeked just by calling do_query() with a preset int* var:
 	op_TBRBUTTON
 	op_CHECKb
+	op_MENURITEM
 	op_TCOLOR
 	op_COMBOENTRY
 	op_XENTRY, op_MLENTRY, op_TLENTRY
@@ -4254,7 +4439,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
 	case op_NBOOK: case op_SNBOOK:
-		gtk_notebook_set_show_tabs(GTK_NOTEBOOK(slot[0]), (int)res);
+		gtk_notebook_set_show_tabs(slot[0], (int)res);
 		break;
 	case op_TSPINSLIDE:
 	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
@@ -4274,13 +4459,16 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_spin_button_set_value(slot[0], n);
 		break;
 	}
+	case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
+		gtk_label_set_text(GTK_LABEL(GTK_BIN(slot[0])->child), res);
+		break;
 	case op_MLABEL: case op_WLABEL: case op_XLABEL: case op_TLLABEL:
 	case op_STLABEL:
-		gtk_label_set_text(GTK_LABEL(slot[0]), res);
+		gtk_label_set_text(slot[0], res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
 	case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
-		gtk_entry_set_text(GTK_ENTRY(slot[0]), res); break;
+		gtk_entry_set_text(slot[0], res); break;
 	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], res, idx);
 		break;
@@ -4299,16 +4487,15 @@ void cmd_setv(void **slot, void *res, int idx)
 		colorlist_reset_color(slot[0], (int)res);
 		break;
 	case op_LISTCCr: case op_LISTCCHr:
-		listcc_reset(GTK_LIST(slot[0]),
-			gtk_object_get_user_data(GTK_OBJECT(slot[0])), (int)res);
+		listcc_reset(slot[0], gtk_object_get_user_data(slot[0]), (int)res);
 // !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
 //		gtk_widget_queue_resize(slot[0]);
 		break;
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
 	{
-		GtkCList *clist = GTK_CLIST(slot[0]);
-		listc_data *ld = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		GtkCList *clist = slot[0];
+		listc_data *ld = gtk_object_get_user_data(slot[0]);
 
 		if (idx == LISTC_RESET_ROW)
 		{
@@ -4343,13 +4530,6 @@ void cmd_repaint(void **slot)
 		gtk_container_foreach(GTK_CONTAINER(slot[0]),
 			(GtkCallback)gtk_widget_queue_draw, NULL);
 	else gtk_widget_queue_draw(slot[0]);
-}
-
-void cmd_scroll(void **slot, int idx)
-{
-	int op = GET_OP(slot);
-	if ((op == op_COLORLIST) || (op == op_COLORLISTN))
-		colorlist_scroll_in(slot[0], idx);
 }
 
 void cmd_cursor(void **slot, void **cursor)

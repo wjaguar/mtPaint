@@ -678,7 +678,7 @@ void ani_but_preview(void **awin)
 
 	ani_read_layer_data();
 
-	if (!view_showing) view_show();	// If not showing, show the view window
+	view_show();	// Ensure the view window is shown
 
 	ani_play_state = FALSE;	// Stopped
 

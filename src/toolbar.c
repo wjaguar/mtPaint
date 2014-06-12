@@ -304,8 +304,7 @@ void toolbar_settings_exit(void *dt, void **wdata)
 	if (!wdata) wdata = toolbar_boxes[TOOLBAR_SETTINGS];
 	if (!wdata) return;
 	toolbar_boxes[TOOLBAR_SETTINGS] = NULL;
-	gtk_check_menu_item_set_active(
-		GTK_CHECK_MENU_ITEM(menu_widgets[MENU_TBSET]), FALSE);
+	cmd_set(menu_slots[MENU_TBSET], FALSE);
 	run_destroy(wdata);
 }
 
@@ -328,7 +327,7 @@ static void **create_grad_view(void **r, GtkWidget ***wpp, void **wdata)
 	return (r);
 }
 
-static void toolbar_click(settings_dd *dt, void **wdata, int what, void **where)
+static void toolbar_click(void *dt, void **wdata, int what, void **where)
 {
 	int act_m, res = TRUE;
 
@@ -868,9 +867,6 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 	static const unsigned char bar[4] =
 		{ TOOLBAR_MAIN, TOOLBAR_TOOLS, TOOLBAR_PALETTE, TOOLBAR_STATUS };
 	int i;
-
-// !!! Likely won't be needed after menu is moved to V-code
-	if (!toolbar_boxes[TOOLBAR_MAIN]) return;	// Grubby hack to avoid segfault
 
 	// Don't touch regular toolbars in view mode
 	if (!view_image_only) for (i = 0; i < 4; i++)

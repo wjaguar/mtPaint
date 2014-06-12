@@ -932,8 +932,7 @@ void delete_layers_window()
 	if (!wdata) return;
 
 	layers_window_ = NULL;
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-		menu_widgets[MENU_LAYER]), FALSE); // Ensure it's unchecked
+	cmd_set(menu_slots[MENU_LAYER], FALSE); // Ensure it's unchecked
 	run_destroy(wdata);
 }
 

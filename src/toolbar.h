@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -23,7 +23,6 @@
 #define PATTERN_GRID_W 10
 #define PATTERN_GRID_H 10
 
-/* !!! Must match order of menu item IDs (MENU_TBMAIN etc.) */
 #define TOOLBAR_MAIN 1
 #define TOOLBAR_TOOLS 2
 #define TOOLBAR_SETTINGS 3

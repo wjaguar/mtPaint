@@ -171,7 +171,7 @@ void action_dispatch(int action, int mode, int state, int kbd);
 #define NEED_PSEL  (NEED_MARQ | NEED_PCLIP)
 #define NEED_LAS2  (NEED_LASSO | NEED_PCLIP)
 
-void mapped_dis_add(GtkWidget *widget, int actmap);
+void mapped_dis_add(void **slot, int actmap);
 void mapped_item_state(int statemap);	// Change state of preset menu items
 
 /* Notable menu items */
@@ -213,15 +213,15 @@ enum {
 	MENU_RECENT18,
 	MENU_RECENT19,
 	MENU_RECENT20,
-	MENU_TBMAIN,
-	MENU_TBTOOLS,
+//	MENU_TBMAIN,
+//	MENU_TBTOOLS,
 	MENU_TBSET,
-	MENU_SHOWPAL,
-	MENU_SHOWSTAT,
-	MENU_CENTER,
-	MENU_SHOWGRID,
+//	MENU_SHOWPAL,
+//	MENU_SHOWSTAT,
+//	MENU_CENTER,
+//	MENU_SHOWGRID,
 	MENU_VIEW,
-	MENU_VWFOCUS,
+//	MENU_VWFOCUS,
 	MENU_LAYER,
 	MENU_PREFS,
 	MENU_CHAN0,
@@ -232,7 +232,7 @@ enum {
 	MENU_DCHAN1,
 	MENU_DCHAN2,
 	MENU_DCHAN3,
-	MENU_RGBA,
+//	MENU_RGBA,
 	MENU_HELP,
 	MENU_DOCK,
 
@@ -280,12 +280,12 @@ char *cspnames[NUM_CSPACES];
 char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
-void **main_window_, **settings_dock, **layers_dock, **main_split;
+void **main_window_, **settings_dock, **layers_dock, **main_split,
+
+	**menu_slots[TOTAL_MENU_IDS];
 GtkWidget *main_window,
 	*drawing_palette, *drawing_canvas, *vw_scrolledwindow,
-	*scrolledwindow_canvas,
-
-	*menu_widgets[TOTAL_MENU_IDS];
+	*scrolledwindow_canvas;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
@@ -351,6 +351,6 @@ void update_titlebar();		// Update filename in titlebar
 void force_main_configure();	// Force reconfigure of main drawing area - for centralizing code
 
 
-void set_image(gboolean state);	// Toggle image access (nestable)
+void set_image(int state);	// Toggle image access (nestable)
 
 int dock_focused();		// Check if focus is inside dock window

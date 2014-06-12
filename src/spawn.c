@@ -376,31 +376,31 @@ static void faction_select_row(spawn_dd *dt, void **wdata, int what, void **wher
 
 static void update_faction_menu()	// Populate menu
 {
-	int i, items = 0;
+	int i, v, items = 0;
 	char txt[64], *nm, *cm;
-	GtkWidget *item;
+	void **slot;
 
 	/* Show valid slots in menu */
 	for (i = 1; i <= FACTION_PRESETS_TOTAL; i++)
 	{
-		item = menu_widgets[MENU_FACTION1 - 1 + i];
-		gtk_widget_hide(item);		/* Hide by default */
 		sprintf(txt, faction_ini[0], i);
 		nm = inifile_get(txt, "");
 
-		if (!nm || !nm[0] || (nm[0] == '#')) continue;
 		sprintf(txt, faction_ini[1], i);
 		cm = inifile_get(txt, "");
 
-		if (!cm || !cm[0] || (cm[0] == '#')) continue;
-		gtk_label_set_text(
-			GTK_LABEL(GTK_MENU_ITEM(item)->item.bin.child), nm);
-		gtk_widget_show(item);
-		items++;
+		slot = menu_slots[MENU_FACTION1 - 1 + i];
+
+		if ((v = nm && nm[0] && (nm[0] != '#') &&
+			cm && cm[0] && (cm[0] != '#')))
+			cmd_setv(slot, nm, LABEL_VALUE);
+
+		cmd_showhide(slot, v);	/* Hide by default */
+		items += v;
 	}
 
 	/* Hide separator if no valid slots */
-	widget_showhide(menu_widgets[MENU_FACTION_S], items);
+	cmd_showhide(menu_slots[MENU_FACTION_S], items);
 }	
 
 void init_factions()

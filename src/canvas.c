@@ -1138,13 +1138,12 @@ void update_menus()			// Update edit/undo menu
 	if (mem_undo_done) statemap |= NEED_UNDO;
 	if (mem_undo_redo) statemap |= NEED_REDO;
 
-	gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(
-		menu_widgets[MENU_CHAN0 + mem_channel]), TRUE);
+	cmd_set(menu_slots[MENU_CHAN0 + mem_channel], TRUE);
 
 	for (i = j = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
 	{
 		if (mem_img[i]) j++;
-		gtk_widget_set_sensitive(menu_widgets[MENU_DCHAN0 + i], !!mem_img[i]);
+		cmd_sensitive(menu_slots[MENU_DCHAN0 + i], !!mem_img[i]);
 	}
 	if (j > 1) statemap |= NEED_CHAN;
 
@@ -3150,23 +3149,20 @@ void update_recent_files()			// Update the menu items
 	{
 		sprintf(txt, "file%i", i + 1);
 
-		t = inifile_get(txt, ".");
-		if (strlen(t) < 2)	// Hide if empty
+		t = inifile_get(txt, "");
+		if (t[0])
 		{
-			gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
-			continue;
+			gtkuncpy(txt2, t, PATHTXT);
+			cmd_setv(menu_slots[MENU_RECENT1 + i], txt2, LABEL_VALUE);
+			count++;
 		}
-		gtkuncpy(txt2, t, PATHTXT);
-		gtk_label_set_text(GTK_LABEL(GTK_MENU_ITEM(
-			menu_widgets[MENU_RECENT1 + i])->item.bin.child), txt2);
-		gtk_widget_show(menu_widgets[MENU_RECENT1 + i]);
-		count++;
+		cmd_showhide(menu_slots[MENU_RECENT1 + i], t[0]); // Hide if empty
 	}
 	for (; i < MAX_RECENT; i++)		// Hide extra items
-		gtk_widget_hide(menu_widgets[MENU_RECENT1 + i]);
+		cmd_showhide(menu_slots[MENU_RECENT1 + i], FALSE);
 
 	// Hide separator if not needed
-	widget_showhide(menu_widgets[MENU_RECENT_S], count);
+	cmd_showhide(menu_slots[MENU_RECENT_S], count);
 }
 
 void register_file( char *filename )		// Called after successful load/save
@@ -3189,7 +3185,7 @@ void register_file( char *filename )		// Called after successful load/save
 	while ( i<MAX_RECENT && f==0 )
 	{
 		sprintf( txt, "file%i", i );
-		c = inifile_get( txt, "." );
+		c = inifile_get(txt, "");
 		if ( strcmp( filename, c ) == 0 ) f = 1;	// Filename found in list
 		else i++;
 	}

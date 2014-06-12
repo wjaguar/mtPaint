@@ -154,6 +154,17 @@ enum {
 	op_TBBOXTOG,
 	op_TBSPACE,
 	op_TWOBOX,
+	op_MENUBAR,
+//	op_SMARTMENU,
+//	op_SMDONE,
+	op_SUBMENU,
+	op_ESUBMENU,
+	op_SSUBMENU,
+	op_MENUITEM,
+	op_MENUCHECK,
+	op_MENURITEM,
+	op_MENUTEAR,
+	op_MENUSEP,
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
@@ -196,6 +207,7 @@ enum {
 	op_REF,
 	op_CLEANUP,
 	op_ACTMAP,
+	op_SHORTCUTs,
 	op_IDENT,
 	op_MKSHRINK,
 	op_NORESIZE,
@@ -312,8 +324,6 @@ void cmd_setv(void **slot, void *res, int idx);
 void cmd_repaint(void **slot);
 //	Reset slot (or a group)
 void cmd_reset(void **slot, void *ddata);
-//	Scroll in position on colorlist slot
-void cmd_scroll(void **slot, int idx);
 //	Set cursor for slot window
 void cmd_cursor(void **slot, void **cursor);
 
@@ -605,6 +615,19 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(NM), (IC), (void *)(IR)
 #define TBSPACE WBh(TBSPACE, 0)
 #define TWOBOX WBh(TWOBOX, 0)
+#define MENUBAR(HC) WBr2h(MENUBAR, 0 + 2), EVENT(CHANGE, HC)
+//#define SMARTMENU(HC) WBr2h(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
+//#define SMDONE WBh(SMDONE, 0)
+#define SUBMENU(NM) WBh(SUBMENU, 1), (NM)
+#define ESUBMENU(NM) WBh(ESUBMENU, 1), (NM)
+#define SSUBMENU(NM) WBrh(SSUBMENU, 1), (NM)
+#define MENUITEM(NM,ID) WBrh(MENUITEM, 3), NULL, (void *)(ID), (NM)
+#define MENUITEMi(NM,ID,IC) WBrh(MENUITEM, 4), NULL, (void *)(ID), (NM), (IC)
+#define MENUCHECKv(NM,ID,V) WBrh(MENUCHECK, 3), &(V), (void *)(ID), (NM)
+#define MENURITEMv(NM,ID,V) WBrh(MENURITEM, 3), &(V), (void *)(ID), (NM)
+#define MENUTEAR WBh(MENUTEAR, 0)
+#define MENUSEP WBh(MENUSEP, 0)
+#define MENUSEPr WBrh(MENUSEP, 0)
 #define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
 #define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
@@ -626,6 +649,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define REFv(V) WBh(REF, 1), &(V)
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
 #define ACTMAP(N) WBrh(ACTMAP, 1), (void *)(N)
+#define SHORTCUTs(NM) WBrh(SHORTCUTs, 1), (NM)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
 #define IDENT(NM) WBh(IDENT, 1), (NM)
@@ -681,6 +705,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define	SYSCURSOR(T) WBrh(SYSCURSOR, 1), (void *)(GDK_##T)
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
+#define MTRIGGER(H) WBr2h(TRIGGER, 0 + 2), EVENT(CHANGE, H)
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0
@@ -702,7 +727,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define LISTC_ORDER	1
 #define LISTC_SORT	2
 
-//	Extra data of LABEL
+//	Extra data of LABEL and MENUITEM
 #define LABEL_VALUE	0
 
 //	Extra data of NBOOK
