@@ -1038,64 +1038,14 @@ int dock_focused()
 	return (focus && ((focus == dock) || gtk_widget_is_ancestor(focus, dock)));
 }
 
-#if 0 /* !!! Waiting reimplementation of smart menu */
-static int check_smart_menu_keys(GdkEventKey *event);
-#endif
-
-static gboolean handle_keypress(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
+static int handle_keypress(main_dd *dt, void **wdata, int what, void **where,
+	key_ext *keydata)
 {
-	static GdkEventKey *now_handling;
-	int act_m = 0, handled = 0;
+	int act_m = wtf_pressed_(keydata);
 
-	/* Do nothing if called recursively */
-	if (event == now_handling) return (FALSE);
+	if (!act_m) return (FALSE);
 
-	/* Builtin handlers have priority outside of dock */
-	if (!dock_focused());
-	/* Pressing Escape moves focus out of dock - to nowhere */
-	else if (event->keyval == GDK_Escape)
-	{
-		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-		act_m = ACTMOD_DUMMY;
-	}
-#if GTK_MAJOR_VERSION == 2
-	/* We let docked widgets process the keys first */
-	else if (gtk_window_propagate_key_event(GTK_WINDOW(widget), event))
-		return (TRUE);
-#endif
-	/* Default handlers have priority inside dock */
-	else
-	{
-		// Be ready to handle nested events
-		GdkEventKey *was_handling = now_handling;
-		gint result = 0;
-
-		now_handling = event;
-		gtk_signal_emit_by_name(GTK_OBJECT(widget), "key_press_event",
-			event, &result);
-		now_handling = was_handling;
-		if (result) act_m = ACTMOD_DUMMY;
-		handled = ACTMOD_DUMMY;
-	}
-
-	if (!act_m) 
-	{
-		act_m = wtf_pressed(event);
-#if 0 /* !!! Waiting reimplementation of smart menu */
-		if (!act_m) act_m = check_smart_menu_keys(event);
-#endif
-		if (!act_m) act_m = handled;
-		if (!act_m) return (FALSE);
-	}
-
-#if GTK_MAJOR_VERSION == 1
-	/* Return value alone doesn't stop GTK1 from running other handlers */
-	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
-#endif
-
-	if (act_m != ACTMOD_DUMMY)
-		action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
+	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
 	return (TRUE);
 }
 
@@ -3646,260 +3596,6 @@ static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context,
 }
 
 
-#if 0 /* !!! Waiting reimplementation */
-typedef struct
-{
-	char *path; /* Full path for now */
-	signed char radio_BTS; /* -2..-5 are for BTS */
-	unsigned short ID;
-	int actmap;
-	char *shortcut; /* Text form for now */
-	short action, mode;
-	XPM_TYPE xpm_icon_image;
-} menu_item;
-
-/* The following is main menu auto-rearrange code. If the menu is too long for
- * the window, some of its items are moved into "overflow" submenu - and moved
- * back to menubar when the window is made wider. This way, we can support
- * small-screen devices without penalizing large-screen ones. - WJ */
-
-#define MENU_RESIZE_MAX 16
-
-typedef struct {
-	GtkWidget *item, *fallback;
-	guint key;
-	int width;
-} r_menu_slot;
-
-int r_menu_state;
-r_menu_slot r_menu[MENU_RESIZE_MAX];
-
-/* Handle keyboard accels for overflow menu */
-static int check_smart_menu_keys(GdkEventKey *event)
-{
-	guint lowkey;
-	int i;
-
-	/* View mode - do nothing */
-	if (view_image_only) return (0);
-	/* No overflow - nothing to do */
-	if (r_menu_state == 0) return (0);
-	/* Alt+key only */
-	if ((event->state & _CSA) != _A) return (0);
-
-	lowkey = low_key(event);
-	for (i = 1; i <= r_menu_state; i++)
-	{
-		if (r_menu[i].key != lowkey) continue;
-		/* Just popup - if we're here, overflow menu is offscreen anyway */
-		gtk_menu_popup(GTK_MENU(GTK_MENU_ITEM(r_menu[i].fallback)->submenu),
-			NULL, NULL, NULL, NULL, 0, 0);
-
-		return (ACTMOD_DUMMY);
-	}
-	return (0);
-}
-
-/* Invalidate width cache after width-affecting change */
-static void check_width_cache(int width)
-{
-	r_menu_slot *slot;
-
-	if (r_menu[r_menu_state].width == width) return;
-	if (r_menu[r_menu_state].width)
-		for (slot = r_menu; slot->item; slot++) slot->width = 0;
-	r_menu[r_menu_state].width = width;
-}
-
-/* Show/hide widgets according to new state */
-static void change_to_state(int state)
-{
-	GtkWidget *w;
-	int i, oldst = r_menu_state;
-
-	if (oldst < state)
-	{
-		for (i = oldst + 1; i <= state; i++)
-			gtk_widget_hide(r_menu[i].item);
-		if (oldst == 0)
-		{
-			w = r_menu[0].item;
-			gtk_widget_set_state(w, GTK_STATE_NORMAL);
-			gtk_widget_show(w);
-		}
-	}
-	else
-	{
-		for (i = oldst; i > state; i--)
-		{
-			w = r_menu[i].item;
-			gtk_widget_set_state(w, GTK_STATE_NORMAL);
-			gtk_widget_show(w);
-		}
-		if (state == 0) gtk_widget_hide(r_menu[0].item);
-	}
-	r_menu_state = state;
-}
-
-/* Move submenus between menubar and overflow submenu */
-static void switch_states(int newstate, int oldstate)
-{
-	GtkWidget *submenu;
-	GtkMenuItem *item;
-	int i;
-
-	if (newstate < oldstate) /* To main menu */
-	{
-		for (i = oldstate; i > newstate; i--)
-		{
-			gtk_widget_hide(r_menu[i].fallback);
-			item = GTK_MENU_ITEM(r_menu[i].fallback);
-			gtk_widget_ref(submenu = item->submenu);
-			gtk_menu_item_remove_submenu(item);
-			item = GTK_MENU_ITEM(r_menu[i].item);
-			gtk_menu_item_set_submenu(item, submenu);
-			gtk_widget_unref(submenu);
-		}
-	}
-	else /* To overflow submenu */
-	{
-		for (i = oldstate + 1; i <= newstate; i++)
-		{
-			item = GTK_MENU_ITEM(r_menu[i].item);
-			gtk_widget_ref(submenu = item->submenu);
-			gtk_menu_item_remove_submenu(item);
-			item = GTK_MENU_ITEM(r_menu[i].fallback);
-			gtk_menu_item_set_submenu(item, submenu);
-			gtk_widget_unref(submenu);
-			gtk_widget_show(r_menu[i].fallback);
-		}
-	}
-}
-
-/* Get width request for default state */
-static int smart_menu_full_width(GtkWidget *widget, int width)
-{
-	check_width_cache(width);
-	if (!r_menu[0].width)
-	{
-		GtkRequisition req;
-		GtkWidget *child = BOX_CHILD_0(widget);
-		int oldst = r_menu_state;
-		gpointer lock = toggle_updates(widget, NULL);
-		change_to_state(0);
-		gtk_widget_size_request(child, &req);
-		r_menu[0].width = req.width;
-		change_to_state(oldst);
-		child->requisition.width = width;
-		toggle_updates(widget, lock);
-	}
-	return (r_menu[0].width);
-}
-
-/* Switch to the state which best fits the allocated width */
-static void smart_menu_state_to_width(GtkWidget *widget, int rwidth, int awidth)
-{
-	GtkWidget *child = BOX_CHILD_0(widget);
-	gpointer lock = NULL;
-	int state, oldst, newst;
-
-	check_width_cache(rwidth);
-	state = oldst = r_menu_state;
-	while (TRUE)
-	{
-		newst = rwidth < awidth ? state - 1 : state + 1;
-		if ((newst < 0) || !r_menu[newst].item) break;
-		if (!r_menu[newst].width)
-		{
-			GtkRequisition req;
-			if (!lock) lock = toggle_updates(widget, NULL);
-			change_to_state(newst);
-			gtk_widget_size_request(child, &req);
-			r_menu[newst].width = req.width;
-		}
-		state = newst;
-		if ((rwidth < awidth) ^ (r_menu[state].width <= awidth)) break;
-	}
-	while ((r_menu[state].width > awidth) && r_menu[state + 1].item) state++;
-	if (state != r_menu_state)
-	{
-		if (!lock) lock = toggle_updates(widget, NULL);
-		change_to_state(state);
-		child->requisition.width = r_menu[state].width;
-	}
-	if (state != oldst) switch_states(state, oldst);
-	if (lock) toggle_updates(widget, lock);
-}
-
-static void smart_menu_size_req(GtkWidget *widget, GtkRequisition *req,
-	gpointer user_data)
-{
-	GtkRequisition child_req;
-	GtkWidget *child;
-	int fullw;
-
-	req->width = req->height = GTK_CONTAINER(widget)->border_width * 2;
-	if (!GTK_BOX(widget)->children) return;
-	child = BOX_CHILD_0(widget);
-	if (!GTK_WIDGET_VISIBLE(child)) return;
-
-	gtk_widget_size_request(child, &child_req);
-	fullw = smart_menu_full_width(widget, child_req.width);
-
-	req->width += fullw;
-	req->height += child_req.height;
-}
-
-static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
-	gpointer user_data)
-{
-	static int in_alloc;
-	GtkRequisition child_req;
-	GtkAllocation child_alloc;
-	GtkWidget *child;
-	int border = GTK_CONTAINER(widget)->border_width, border2 = border * 2;
-
-	widget->allocation = *alloc;
-	if (!GTK_BOX(widget)->children) return;
-	child = BOX_CHILD_0(widget);
-	if (!GTK_WIDGET_VISIBLE(child)) return;
-
-	/* Maybe recursive calls to this cannot happen, but if they can,
-	 * crash would be quite spectacular - so, better safe than sorry */
-	if (in_alloc) /* Postpone reaction */
-	{
-		in_alloc |= 2;
-		return;
-	}
-
-	/* !!! Always keep child widget requisition set according to its
-	 * !!! mode, or this code will break down in interesting ways */
-	gtk_widget_get_child_requisition(child, &child_req);
-/* !!! Alternative approach - reliable but slow */
-//	gtk_widget_size_request(child, &child_req);
-	while (TRUE)
-	{
-		in_alloc = 1;
-		child_alloc.x = alloc->x + border;
-		child_alloc.y = alloc->y + border;
-		child_alloc.width = alloc->width > border2 ?
-			alloc->width - border2 : 0;
-		child_alloc.height = alloc->height > border2 ?
-			alloc->height - border2 : 0;
-		if ((child_alloc.width != child->allocation.width) &&
-			(r_menu_state > 0 ? child_alloc.width != child_req.width :
-			child_alloc.width < child_req.width))
-			smart_menu_state_to_width(widget, child_req.width,
-				child_alloc.width);
-		if (in_alloc < 2) break;
-		alloc = &widget->allocation;
-	}
-	in_alloc = 0;
-
-	gtk_widget_size_allocate(child, &child_alloc);
-}
-#endif
-
 static void pressed_pal_copy();
 static void pressed_pal_paste();
 static void pressed_sel_ramp(int vert);
@@ -4258,135 +3954,6 @@ static void menu_action(void *dt, void **wdata, int what, void **where)
 	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, res, FALSE);
 }
 
-#if 0 /* !!! Waiting reimplementation of smart menu part */
-static GtkWidget *fill_menu(menu_item *items, GtkAccelGroup *accel_group)
-{
-	GtkWidget *wrap, *mbar, *item, *parent, *label;
-	GtkWidget *parents[16], *radio[32];
-	char *s, *names[MENU_RESIZE_MAX];
-	int i, itp, depth, rn = 0, sp = 0;
-
-	memset(radio, 0, sizeof(radio));
-	parents[sp++] = mbar = gtk_menu_bar_new();
-	for (; items->path; items++)
-	{
-		guint keyval, mods;
-
-		s = items->path;
-		depth = strspn(s, "/");
-		if (sp < depth) continue; // Nesting error
-		sp = depth; // Select level
-		if (s[depth]) s = __(s); /* Translate an existing name */
-		s += depth;
-
-		itp = items->radio_BTS;
-		if (itp <= -16) itp += 16;
-		if (itp == 0) item = gtk_check_menu_item_new_with_label("");
-		else if (itp > 0)
-		{
-			GSList *group = radio[itp] ? gtk_radio_menu_item_group(
-				GTK_RADIO_MENU_ITEM(radio[itp])) : NULL;
-			radio[itp] = item = gtk_radio_menu_item_new_with_label(
-				group, "");
-		}
-		else if (itp == -3) item = gtk_tearoff_menu_item_new();
-#if GTK_MAJOR_VERSION == 2
-		else if ((itp == -1) && show_menu_icons && items->xpm_icon_image)
-		{
-			item = gtk_image_menu_item_new_with_label("");
-			gtk_image_menu_item_set_image(GTK_IMAGE_MENU_ITEM(item),
-				xpm_image(items->xpm_icon_image));
-		}
-#endif
-		else if (itp == -4)
-		{
-			item = gtk_menu_item_new();
-			gtk_widget_set_sensitive(item, FALSE);
-		}
-		else item = gtk_menu_item_new_with_label("");
-		gtk_widget_show(item);
-
-		parent = parents[sp - 1];
-		gtk_container_add(GTK_CONTAINER(parent), item);
-
-		if (itp >= 0) gtk_check_menu_item_set_show_toggle(
-			GTK_CHECK_MENU_ITEM(item), TRUE);
-		if ((itp != -4) && (itp != -3))
-		{
-			label = GTK_BIN(item)->child;
-			keyval = gtk_label_parse_uline(GTK_LABEL(label), s);
-			if ((parent == mbar) && (keyval != GDK_VoidSymbol))
-#if GTK_MAJOR_VERSION == 1
-				gtk_widget_add_accelerator(item, "activate_item",
-				accel_group, keyval, GDK_MOD1_MASK, GTK_ACCEL_LOCKED);
-#else
-				gtk_label_set_text_with_mnemonic(GTK_LABEL(label), s);
-#endif
-		}
-		if (itp == -5) gtk_menu_item_right_justify(GTK_MENU_ITEM(item));
-		if ((itp == -2) || (itp == -5))
-		{
-			parents[sp++] = parent = gtk_menu_new();
-			gtk_menu_set_accel_group(GTK_MENU(parent), accel_group);
-			gtk_menu_item_set_submenu(GTK_MENU_ITEM(item), parent);
-		}
-		else if (items->action) gtk_signal_connect(GTK_OBJECT(item),
-			"activate", GTK_SIGNAL_FUNC(menu_action), items);
-		if (items->shortcut)
-		{
-			gtk_accelerator_parse(items->shortcut, &keyval, &mods);
-			gtk_widget_add_accelerator(item, "activate",
-				accel_group, keyval, mods, GTK_ACCEL_VISIBLE);
-		}
-#if GTK_MAJOR_VERSION == 2
-		// !!! Otherwise GTK+ won't add spacing to an empty accel field
-		else gtk_widget_set_accel_path(item, "<f>/a/k/e", accel_group);
-#endif
-#if GTK2VERSION >= 4
-		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
-		gtk_signal_connect(GTK_OBJECT(item), "can_activate_accel",
-			GTK_SIGNAL_FUNC(menu_allow_key), NULL);
-#endif
-		mapped_dis_add(item, items->actmap);
-		/* For now, remember only requested widgets */
-		if (items->ID) menu_widgets[items->ID] = item;
-		/* Remember what is size-aware */
-		if (items->radio_BTS > -16) continue;
-		r_menu[rn].item = item;
-		r_menu[rn].key = keyval;
-		names[rn] = s;
-		rn++;
-	}
-
-	/* Setup overflow submenu */
-	parent = GTK_MENU_ITEM(r_menu[--rn].item)->submenu;
-	for (i = 0; i < rn; i++)
-	{
-		r_menu[i].fallback = item = gtk_menu_item_new_with_label("");
-		gtk_container_add(GTK_CONTAINER(parent), item);
-		gtk_label_parse_uline(GTK_LABEL(GTK_BIN(item)->child), names[i]);
-	}
-	for (i = 0; i <= rn / 2; i++) // Swap ends
-	{
-		r_menu_slot tmp = r_menu[i];
-		r_menu[i] = r_menu[rn - i];
-		r_menu[rn - i] = tmp;
-	}
-	gtk_widget_hide(r_menu[0].item);
-
-	/* Wrap menubar with resize-controller widget */
-	gtk_widget_show(mbar);
-	wrap = wj_size_box();
-	gtk_container_add(GTK_CONTAINER(wrap), mbar);
-	gtk_signal_connect(GTK_OBJECT(wrap), "size_request",
-		GTK_SIGNAL_FUNC(smart_menu_size_req), NULL);
-	gtk_signal_connect(GTK_OBJECT(wrap), "size_allocate",
-		GTK_SIGNAL_FUNC(smart_menu_size_alloc), NULL);
-
-	return (wrap);
-}
-#endif
-
 static int do_pal_copy(png_color *tpal, unsigned char *img,
 	unsigned char *alpha, unsigned char *mask,
 	unsigned char *mask2, png_color *wpal,
@@ -4542,8 +4109,7 @@ static int menu_view, menu_layer;
 static int menu_chan = ACTMOD(ACT_CHANNEL, CHN_IMAGE); // initial state
 
 static void *main_menu_code[] = {
-// !!! Will be SMARTMENU() later
-	REFv(main_menubar), MENUBAR(menu_action),
+	REFv(main_menubar), SMARTMENU(menu_action),
 	SSUBMENU(_("/_File")),
 	MENUTEAR, //
 	MENUITEMi(_("//New"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
@@ -5001,8 +4567,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Set Key Frame ..."), ACTMOD(DLG_ANI_KEY, 0)),
 	MENUITEM(_("//Remove All Key Frames ..."), ACTMOD(DLG_ANI_KILLKEY, 0)),
 	WDONE,
-// !!! For now, hide it explicitly
-	SSUBMENU(_("/More...")), HIDDEN,
+	SSUBMENU(_("/More...")),
 	WDONE,
 	ESUBMENU(_("/_Help")),
 	MENUITEM(_("//Documentation"), ACTMOD(ACT_DOCS, 0)),
@@ -5012,8 +4577,7 @@ static void *main_menu_code[] = {
 	MENUSEP, //
 	MENUITEM(_("//Rebind Shortcut Keycodes"), ACTMOD(ACT_REBIND_KEYS, 0)),
 	WDONE,
-// !!! Will be SMDONE later
-	WDONE, // menubar
+	SMDONE, // smartmenu
 	RET
 };
 
@@ -5104,15 +4668,24 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 /////////	End of main window widget setup
 static void **finish_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
-	gtk_signal_connect( GTK_OBJECT(main_window), "key_press_event",
-		GTK_SIGNAL_FUNC (handle_keypress), NULL );
-
 	mapped_item_state(0);
 
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 
 	return (r);
+}
+
+static int dock_esc(main_dd *dt, void **wdata, int what, void **where,
+	key_ext *keydata)
+{
+	/* Pressing Escape moves focus out of dock - to nowhere */
+	if (keydata->key == GDK_Escape)
+	{
+		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+		return (TRUE);
+	}
+	return (FALSE);
 }
 
 static int cline_keypress(main_dd *dt, void **wdata, int what, void **where,
@@ -5155,6 +4728,7 @@ static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
 static void *main_code[] = {
 ///	MAIN WINDOW
 	MAINWINDOW(MT_VERSION, icon_xpm, 100, 100), EVENT(CANCEL, delete_event),
+	EVENT(KEY, handle_keypress),
 	WXYWH("window", 630, 400),
 	REF(dock), DOCK("dockSize"),
 	EXEC(set_drop),
@@ -5185,7 +4759,7 @@ static void *main_code[] = {
 	WDONE, // xhbox
 	WDONE, // left pane
 	BORDER(NBOOK, 0),
-	REF(dockbook), NBOOKr, KEEPWIDTH,
+	REF(dockbook), NBOOKr, KEEPWIDTH, WANTKEYS(dock_esc),
 	IFx(cline_d, 1),
 		PAGEi(XPM_ICON(cline), 0),
 		BORDER(XSCROLL, 0),
@@ -5308,7 +4882,7 @@ void update_titlebar()		// Update filename in titlebar
 		changed ? __("(Modified)") : "-",
 		name ? gtkuncpy(txt2, name, PATHTXT) : __("Untitled"));
 
-	gtk_window_set_title(GTK_WINDOW(main_window), txt);
+	cmd_setv(main_window_, txt, WINDOW_TITLE);
 }
 
 void notify_changed()		// Image/palette has just changed - update vars as needed

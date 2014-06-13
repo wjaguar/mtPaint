@@ -155,8 +155,8 @@ enum {
 	op_TBSPACE,
 	op_TWOBOX,
 	op_MENUBAR,
-//	op_SMARTMENU,
-//	op_SMDONE,
+	op_SMARTMENU,
+	op_SMDONE,
 	op_SUBMENU,
 	op_ESUBMENU,
 	op_SSUBMENU,
@@ -208,6 +208,7 @@ enum {
 	op_CLEANUP,
 	op_ACTMAP,
 	op_SHORTCUTs,
+	op_WANTKEYS,
 	op_IDENT,
 	op_MKSHRINK,
 	op_NORESIZE,
@@ -260,6 +261,12 @@ typedef struct {
 	unsigned int realkey;	// keycode
 	unsigned int state;	// modifier flags
 } key_ext;
+
+#define _Cmask (GDK_CONTROL_MASK)
+#define _Smask (GDK_SHIFT_MASK)
+#define _Amask (GDK_MOD1_MASK)
+#define _CSmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
+#define _CSAmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
 
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
 typedef int (*evtkey_fn)(void *ddata, void **wdata, int what, void **where,
@@ -616,8 +623,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TBSPACE WBh(TBSPACE, 0)
 #define TWOBOX WBh(TWOBOX, 0)
 #define MENUBAR(HC) WBr2h(MENUBAR, 0 + 2), EVENT(CHANGE, HC)
-//#define SMARTMENU(HC) WBr2h(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
-//#define SMDONE WBh(SMDONE, 0)
+#define SMARTMENU(HC) WBr2h(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
+#define SMDONE WBh(SMDONE, 0)
 #define SUBMENU(NM) WBh(SUBMENU, 1), (NM)
 #define ESUBMENU(NM) WBh(ESUBMENU, 1), (NM)
 #define SSUBMENU(NM) WBrh(SSUBMENU, 1), (NM)
@@ -706,6 +713,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EVENT(T,H) WBrh(EVT_##T, 1), (H)
 #define TRIGGER WBrh(TRIGGER, 0)
 #define MTRIGGER(H) WBr2h(TRIGGER, 0 + 2), EVENT(CHANGE, H)
+#define WANTKEYS(H) WBr2h(WANTKEYS, 0 + 2), EVENT(KEY, H)
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0

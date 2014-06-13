@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

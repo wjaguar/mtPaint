@@ -47,6 +47,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define GET_OPF(S) ((int)*(void **)(S)[1])
 #define GET_OP(S) (GET_OPF(S) & WB_OPMASK)
 
+#define GET_HANDLER(S) (((void **)(S)[1])[1])
+
 #define VCODE_KEY "mtPaint.Vcode"
 
 enum {
@@ -85,6 +87,9 @@ typedef struct {
 	void *code;	// Noop tag, must be first field
 	void ***dv;	// Pointer to dialog response
 	void **destroy;	// Pre-destruction event slot
+	void **wantkey;	// Slot of prioritized keyboard handler
+	void **smmenu;	// SMARTMENU slot
+	void *now_evt;	// Keyboard event being handled (check against recursion)
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
 	int done;	// Set when destroyed
@@ -159,6 +164,70 @@ static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user
 	if (res) gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
 #endif
 	return (!!res);
+}
+
+static int check_smart_menu_keys(void *sdata, GdkEventKey *event);
+
+static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+	void **slot = user_data;
+	v_dd *vdata = GET_VDATA((void **)slot[0]);
+	gint res, res2, stop;
+
+	/* Do nothing if called recursively */
+	if ((void *)event == vdata->now_evt) return (FALSE);
+
+	res = res2 = stop = 0;
+	/* First, ask smart menu */
+	if (vdata->smmenu) res = check_smart_menu_keys(vdata->smmenu, event);
+
+	/* Now, ask prioritized widget */
+	while (!res && vdata->wantkey)
+	{
+		GtkWidget *focus, *w = origin_slot(vdata->wantkey)[0];
+		void *was_evt;
+
+// !!! Likely later will be cmd_check_focus() - and w/o "...MAPPED()?"
+		if (!GTK_WIDGET_MAPPED(w)) break; // not displayed
+		focus = GTK_WINDOW(widget)->focus_widget;
+		if (!(focus && ((focus == w) ||
+			gtk_widget_is_ancestor(focus, w)))) break; // not focused
+
+		slot = NEXT_SLOT(vdata->wantkey);
+		if (GET_HANDLER(slot) &&
+			(res = stop = get_evt_key(widget, event, slot))) break;
+
+#if GTK_MAJOR_VERSION == 2
+		/* We let widgets in the focused part process the keys first */
+		res = gtk_window_propagate_key_event(GTK_WINDOW(widget), event);
+		if (res) break;
+#endif
+		/* Let default handlers have priority */
+		// !!! Be ready to handle nested events
+		was_evt = vdata->now_evt;
+		vdata->now_evt = event;
+
+		gtk_signal_emit_by_name(GTK_OBJECT(widget), "key_press_event",
+			event, &res);
+		res2 = TRUE; // Default events checked already
+
+		vdata->now_evt = was_evt;
+
+		break;
+	}
+
+	/* And only now, run own handler */
+	slot = user_data;
+	if (!res && GET_HANDLER(slot))
+		res = stop = get_evt_key(widget, event, slot);
+
+	res |= res2;
+#if GTK_MAJOR_VERSION == 1
+	/* Return value alone doesn't stop GTK1 from running other handlers */
+	if (res && !stop)
+		gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
+#endif
+	return (res);
 }
 
 void add_click(void **r, GtkWidget *widget)
@@ -2314,6 +2383,304 @@ static gboolean menu_allow_key(GtkWidget *widget, guint signal_id, gpointer user
 
 #endif
 
+//	SMARTMENU widget
+
+/* The following is main menu auto-rearrange code. If the menu is too long for
+ * the window, some of its items are moved into "overflow" submenu - and moved
+ * back to menubar when the window is made wider. This way, we can support
+ * small-screen devices without penalizing large-screen ones. - WJ */
+
+#define MENU_RESIZE_MAX 16
+
+typedef struct {
+	void **slot;
+	GtkWidget *fallback;
+	guint key;
+	int width;
+} r_menu_slot;
+
+typedef struct {
+	void **r; // own slot
+	GtkWidget *mbar;
+	int r_menu_state;
+	int in_alloc;
+	r_menu_slot r_menu[MENU_RESIZE_MAX];
+} smartmenu_data;
+
+/* Handle keyboard accels for overflow menu */
+static int check_smart_menu_keys(void *sdata, GdkEventKey *event)
+{
+	smartmenu_data *sd = sdata;
+	r_menu_slot *slot;
+	guint lowkey;
+	int l = sd->r_menu_state;
+
+	/* No overflow - nothing to do */
+	if (!l) return (FALSE);
+	/* Menu hidden - do nothing */
+	if (!GTK_WIDGET_VISIBLE(sd->r[0])) return (FALSE);
+	/* Alt+key only */
+	if ((event->state & _CSAmask) != _Amask) return (FALSE);
+
+	lowkey = low_key(event);
+	for (slot = sd->r_menu + 1; slot->key != lowkey; slot++)
+		if (--l <= 0) return (FALSE); // No such key in overflow
+
+	/* Just popup - if we're here, overflow menu is offscreen anyway */
+	gtk_menu_popup(GTK_MENU(GTK_MENU_ITEM(slot->fallback)->submenu),
+		NULL, NULL, NULL, NULL, 0, 0);
+	return (TRUE);
+}
+
+/* Invalidate width cache after width-affecting change */
+static void check_width_cache(smartmenu_data *sd, int width)
+{
+	r_menu_slot *slot, *sm = sd->r_menu + sd->r_menu_state;
+
+	if (sm->width == width) return;
+	if (sm->width) for (slot = sd->r_menu; slot->slot; slot++)
+		slot->width = 0;
+	sm->width = width;
+}
+
+/* Show/hide widgets according to new state */
+static void change_to_state(smartmenu_data *sd, int state)
+{
+	GtkWidget *w;
+	r_menu_slot *r_menu = sd->r_menu;
+	int i, oldst = sd->r_menu_state;
+
+	if (oldst < state)
+	{
+		for (i = oldst + 1; i <= state; i++)
+			gtk_widget_hide(r_menu[i].slot[0]);
+		if (oldst == 0)
+		{
+			w = r_menu[0].slot[0];
+			gtk_widget_set_state(w, GTK_STATE_NORMAL);
+			gtk_widget_show(w);
+		}
+	}
+	else
+	{
+		for (i = oldst; i > state; i--)
+		{
+			w = r_menu[i].slot[0];
+			gtk_widget_set_state(w, GTK_STATE_NORMAL);
+			gtk_widget_show(w);
+		}
+		if (state == 0) gtk_widget_hide(r_menu[0].slot[0]);
+	}
+	sd->r_menu_state = state;
+}
+
+/* Move submenus between menubar and overflow submenu */
+static void switch_states(smartmenu_data *sd, int newstate, int oldstate)
+{
+	r_menu_slot *r_menu = sd->r_menu;
+	GtkWidget *submenu;
+	GtkMenuItem *item;
+	int i;
+
+	if (newstate < oldstate) /* To main menu */
+	{
+		for (i = oldstate; i > newstate; i--)
+		{
+			gtk_widget_hide(r_menu[i].fallback);
+			item = GTK_MENU_ITEM(r_menu[i].fallback);
+			gtk_widget_ref(submenu = item->submenu);
+			gtk_menu_item_remove_submenu(item);
+			item = GTK_MENU_ITEM(r_menu[i].slot[0]);
+			gtk_menu_item_set_submenu(item, submenu);
+			gtk_widget_unref(submenu);
+		}
+	}
+	else /* To overflow submenu */
+	{
+		for (i = oldstate + 1; i <= newstate; i++)
+		{
+			item = GTK_MENU_ITEM(r_menu[i].slot[0]);
+			gtk_widget_ref(submenu = item->submenu);
+			gtk_menu_item_remove_submenu(item);
+			item = GTK_MENU_ITEM(r_menu[i].fallback);
+			gtk_menu_item_set_submenu(item, submenu);
+			gtk_widget_unref(submenu);
+			gtk_widget_show(r_menu[i].fallback);
+		}
+	}
+}
+
+/* Get width request for default state */
+static int smart_menu_full_width(smartmenu_data *sd, GtkWidget *widget, int width)
+{
+	check_width_cache(sd, width);
+	if (!sd->r_menu[0].width)
+	{
+		GtkRequisition req;
+		GtkWidget *child = sd->mbar; /* aka BOX_CHILD_0(widget) */
+		int oldst = sd->r_menu_state;
+		gpointer lock = toggle_updates(widget, NULL);
+		change_to_state(sd, 0);
+		gtk_widget_size_request(child, &req);
+		sd->r_menu[0].width = req.width;
+		change_to_state(sd, oldst);
+		child->requisition.width = width;
+		toggle_updates(widget, lock);
+	}
+	return (sd->r_menu[0].width);
+}
+
+/* Switch to the state which best fits the allocated width */
+static void smart_menu_state_to_width(smartmenu_data *sd, GtkWidget *widget,
+	int rwidth, int awidth)
+{
+	r_menu_slot *slot;
+	GtkWidget *child = BOX_CHILD_0(widget);
+	gpointer lock = NULL;
+	int state, oldst, newst;
+
+	check_width_cache(sd, rwidth);
+	state = oldst = sd->r_menu_state;
+	while (TRUE)
+	{
+		newst = rwidth < awidth ? state - 1 : state + 1;
+		slot = sd->r_menu + newst;
+		if ((newst < 0) || !slot->slot) break;
+		if (!slot->width)
+		{
+			GtkRequisition req;
+			if (!lock) lock = toggle_updates(widget, NULL);
+			change_to_state(sd, newst);
+			gtk_widget_size_request(child, &req);
+			slot->width = req.width;
+		}
+		state = newst;
+		if ((rwidth < awidth) ^ (slot->width <= awidth)) break;
+	}
+	while ((sd->r_menu[state].width > awidth) && sd->r_menu[state + 1].slot)
+		state++;
+	if (state != sd->r_menu_state)
+	{
+		if (!lock) lock = toggle_updates(widget, NULL);
+		change_to_state(sd, state);
+		child->requisition.width = sd->r_menu[state].width;
+	}
+	if (state != oldst) switch_states(sd, state, oldst);
+	if (lock) toggle_updates(widget, lock);
+}
+
+static void smart_menu_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	smartmenu_data *sd = user_data;
+	GtkRequisition child_req;
+	GtkWidget *child;
+	int fullw;
+
+	req->width = req->height = GTK_CONTAINER(widget)->border_width * 2;
+	if (!GTK_BOX(widget)->children) return;
+	child = BOX_CHILD_0(widget);
+	if (!GTK_WIDGET_VISIBLE(child)) return;
+
+	gtk_widget_size_request(child, &child_req);
+	fullw = smart_menu_full_width(sd, widget, child_req.width);
+
+	req->width += fullw;
+	req->height += child_req.height;
+}
+
+static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	smartmenu_data *sd = user_data;
+	GtkRequisition child_req;
+	GtkAllocation child_alloc;
+	GtkWidget *child;
+	int border = GTK_CONTAINER(widget)->border_width, border2 = border * 2;
+
+	widget->allocation = *alloc;
+	if (!GTK_BOX(widget)->children) return;
+	child = BOX_CHILD_0(widget);
+	if (!GTK_WIDGET_VISIBLE(child)) return;
+
+	/* Maybe recursive calls to this cannot happen, but if they can,
+	 * crash would be quite spectacular - so, better safe than sorry */
+	if (sd->in_alloc) /* Postpone reaction */
+	{
+		sd->in_alloc |= 2;
+		return;
+	}
+
+	/* !!! Always keep child widget requisition set according to its
+	 * !!! mode, or this code will break down in interesting ways */
+	gtk_widget_get_child_requisition(child, &child_req);
+/* !!! Alternative approach - reliable but slow */
+//	gtk_widget_size_request(child, &child_req);
+	while (TRUE)
+	{
+		sd->in_alloc = 1;
+		child_alloc.x = alloc->x + border;
+		child_alloc.y = alloc->y + border;
+		child_alloc.width = alloc->width > border2 ?
+			alloc->width - border2 : 0;
+		child_alloc.height = alloc->height > border2 ?
+			alloc->height - border2 : 0;
+		if ((child_alloc.width != child->allocation.width) &&
+			(sd->r_menu_state > 0 ?
+			child_alloc.width != child_req.width :
+			child_alloc.width < child_req.width))
+			smart_menu_state_to_width(sd, widget, child_req.width,
+				child_alloc.width);
+		if (sd->in_alloc < 2) break;
+		alloc = &widget->allocation;
+	}
+	sd->in_alloc = 0;
+
+	gtk_widget_size_allocate(child, &child_alloc);
+}
+
+/* Fill smart menu structure */
+// !!! With inlining this, problem also
+void *smartmenu_done(void **tbar, void **r)
+{
+	smartmenu_data *sd = gtk_object_get_user_data(tbar[0]);
+	GtkWidget *parent, *item;
+	void **rr;
+	char *s;
+	int i, l, n = 0;
+
+	/* Find items */
+	for (rr = tbar; rr - r < 0; rr = NEXT_SLOT(rr))
+	{
+		if (GET_OP(rr) != op_SSUBMENU) continue;
+		sd->r_menu[n++].slot = rr;
+	}
+
+	/* Setup overflow submenu */
+	parent = GTK_MENU_ITEM(sd->r_menu[--n].slot[0])->submenu;
+	for (i = 0; i < n; i++)
+	{
+		sd->r_menu[i].fallback = item = gtk_menu_item_new_with_label("");
+		gtk_container_add(GTK_CONTAINER(parent), item);
+		rr = sd->r_menu[i].slot[1];
+
+		l = strspn(s = rr[1], "/");
+		if (s[l]) s = _(s); // Translate
+		s += l;
+		sd->r_menu[i].key = gtk_label_parse_uline(
+			GTK_LABEL(GTK_BIN(item)->child), s);
+	}
+	for (i = 0; i <= n / 2; i++) // Swap ends
+	{
+		r_menu_slot tmp = sd->r_menu[i];
+		sd->r_menu[i] = sd->r_menu[n - i];
+		sd->r_menu[n - i] = tmp;
+	}
+	gtk_widget_hide(sd->r_menu[0].slot[0]);
+
+	return (sd);
+}
+
 #if U_NLS
 
 /* Translate array of strings */
@@ -3308,7 +3675,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK | pkf_STACK;
 			break;
 		/* Add a menubar */
-		case op_MENUBAR:
+		case op_MENUBAR: case op_SMARTMENU:
+		{
+			GtkWidget *bar;
+			smartmenu_data *sd;
+
 			ag = gtk_accel_group_new();
 			// Stop dynamic allocation of accelerators during runtime
 			gtk_accel_group_lock(ag);
@@ -3318,8 +3689,40 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			rvar = rslot = NULL;
 			widget = gtk_menu_bar_new();
 
-			pk = pk_PACK | pkf_STACK | pkf_SHOW;
+			if (op != op_SMARTMENU)
+			{
+				pk = pk_PACK | pkf_STACK | pkf_SHOW;
+				break;
+			}
+
+			// !!! Menubar is what sits on stack till SMDONE
+			*--wp = bar = widget;
+			gtk_widget_show(bar);
+
+			widget = wj_size_box();
+
+			/* Make datastruct */
+			sd = bound_malloc(widget, sizeof(smartmenu_data));
+			gtk_object_set_user_data(GTK_OBJECT(widget), sd);
+			sd->mbar = bar;
+			sd->r = r;
+
+			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
+				GTK_SIGNAL_FUNC(smart_menu_size_req), sd);
+			gtk_signal_connect(GTK_OBJECT(widget), "size_allocate",
+				GTK_SIGNAL_FUNC(smart_menu_size_alloc), sd);
+
+			pack(widget, bar);
+
+			pk = pk_PACK | pkf_CHILD | pkf_SHOW;
 			break;
+		}
+		/* Prepare smart menubar when done */
+		case op_SMDONE:
+			vdata->smmenu = smartmenu_done(tbar, r);
+			/* Done with this container */
+// !!! Should be fallthrough to WDONE, but such arrangement will be ugly
+			++wp; continue;
 		/* Add a dropdown submenu */
 		case op_SUBMENU: case op_ESUBMENU: case op_SSUBMENU:
 		{
@@ -3354,6 +3757,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_CONT | pkf_CHILD | pkf_SHOW;
 			break;
 		}
+		/* Add a menu item/toggle */
 		case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
 		{
 			char *s;
@@ -3511,6 +3915,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = v;
 			break;
 		}
+		/* Install priority key handler for when widget is focused */
+		case op_WANTKEYS:
+			vdata->wantkey = r;
+			widget = NULL;
+			break;
 		/* Store a reference to whatever is next into field */
 		case op_REF:
 			*(void **)v = r;
@@ -3641,7 +4050,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_EVT_KEY:
 		{
 			void **slot = origin_slot(PREV_SLOT(r));
+			int toplevel = (slot == GET_WINDOW(res)) &&
+				GTK_IS_WINDOW(slot[0]);
+
 			gtk_signal_connect(GTK_OBJECT(*slot), "key_press_event",
+				// Special handler for toplevels
+				toplevel ? GTK_SIGNAL_FUNC(window_evt_key) :
 				GTK_SIGNAL_FUNC(get_evt_key), r);
 			widget = NULL;
 			break;
@@ -3908,7 +4322,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			inifile_set_gboolean(v, gtk_toggle_button_get_active(*wdata));
 			break;
 		case op_MENUCHECK:
-			*(int *)v = gtk_check_menu_item_get_active(*wdata);
+			*(int *)v = GTK_CHECK_MENU_ITEM(*wdata)->active;
 			break;
 		case op_MENURITEM:
 		{
@@ -3916,7 +4330,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			void **slot = wdata;
 
 			/* If reading radio group through an inactive slot */
-			if (!gtk_check_menu_item_get_active(*wdata))
+			if (!GTK_CHECK_MENU_ITEM(*wdata)->active)
 			{
 				/* Let outer loop find active item */
 				if (mode <= 1) break;
