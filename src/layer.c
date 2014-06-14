@@ -23,6 +23,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "layer.h"
@@ -33,7 +34,6 @@
 #include "viewer.h"
 #include "channels.h"
 #include "icons.h"
-#include "vcode.h"
 
 
 int	layers_total,		// Layers currently being used

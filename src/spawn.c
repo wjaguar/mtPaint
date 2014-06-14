@@ -26,11 +26,11 @@
 #include "mygtk.h"
 #include "inifile.h"
 #include "memory.h"
+#include "vcode.h"
 #include "png.h"
 #include "canvas.h"
 #include "mainwindow.h"
 #include "spawn.h"
-#include "vcode.h"
 
 static char *mt_temp_dir;
 

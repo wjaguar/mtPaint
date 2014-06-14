@@ -27,6 +27,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
@@ -38,7 +39,6 @@
 #include "inifile.h"
 #include "mtlib.h"
 #include "wu.h"
-#include "vcode.h"
 
 typedef struct {
 	int frame1, frame2;

@@ -21,6 +21,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "inifile.h"
 #include "png.h"
 #include "mainwindow.h"
@@ -30,7 +31,6 @@
 #include "icons.h"
 #include "fpick.h"
 #include "prefs.h"
-#include "vcode.h"
 
 /* Make code not compile if it cannot work */
 typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
@@ -94,9 +94,6 @@ typedef struct {
 	int xywh[4];	// Stored window position & size
 	int done;	// Set when destroyed
 } v_dd;
-
-/* Main toplevel, for anchoring dialogs and rendering pixmaps */
-static GtkWidget *mainwindow;
 
 /* From widget to its wdata */
 void **get_wdata(GtkWidget *widget, char *id)
@@ -230,6 +227,50 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	return (res);
 }
 
+static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	mouse_ext mouse = {
+		event->x, event->y, event->button,
+		event->type == GDK_BUTTON_PRESS ? 1 :
+		event->type == GDK_2BUTTON_PRESS ? 2 :
+		event->type == GDK_3BUTTON_PRESS ? 3 :
+		event->type == GDK_BUTTON_RELEASE ? -1 : 0,
+		event->state };
+	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &mouse));
+}
+
+static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	mouse_ext mouse;
+
+	if (event->is_hint) gdk_window_get_pointer(event->window,
+		&mouse.x, &mouse.y, &mouse.state);
+	else
+	{
+		mouse.x = event->x;
+		mouse.y = event->y;
+		mouse.state = event->state;
+	}
+
+	// This peculiar encoding is historically used throughout mtPaint
+	mouse.button = (mouse.state & _B13mask) == _B13mask ? 13 :
+		mouse.state & _B1mask ? 1 :
+		mouse.state & _B3mask ? 3 :
+		mouse.state & _B2mask ? 2 : 0;
+
+	mouse.count = 0; // motion
+
+	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &mouse));
+}
+
 void add_click(void **r, GtkWidget *widget)
 {
 	gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
@@ -289,12 +330,12 @@ static void trigger_things(void **wdata)
 	}
 }
 
-/* Predict how many _slots_ a V-code sequence could need */
+/* Predict how many _void pointers_ a V-code sequence could need */
 // !!! With GCC inlining this, weird size fluctuations can happen
 int predict_size(void **ifcode, char *ddata)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, opf, n = 2; // safety margin
+	int op, opf, u = 0, n = 2; // safety margin
 
 	while (TRUE)
 	{
@@ -315,8 +356,15 @@ int predict_size(void **ifcode, char *ddata)
 			if (opf & WB_NFLAG) v = *v; // dereference
 			ifcode = v;
 		}
+		// Allocation
+		else if ((op == op_TALLOC) || (op == op_TCOPY))
+		{
+			int l = *(int *)(ddata + (int)pp[1]);
+			u += (l + sizeof(void *) - 1) / sizeof(void *);
+		}
 	}
-	return (n);
+
+	return (n * VSLOT_SIZE + u);
 }
 
 // !!! And with inlining this, same problem
@@ -366,6 +414,19 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 {
 	gtk_notebook_set_page(**(void ***)user_data,
 		!!gtk_toggle_button_get_active(button));
+}
+
+//	RGBIMAGE widget
+
+static gboolean expose_rgb(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
+{
+	int w = (int)user_data;
+	unsigned char *rgb = gtk_object_get_user_data(GTK_OBJECT(widget));
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		event->area.x, event->area.y, event->area.width, event->area.height,
+		GDK_RGB_DITHER_NONE,
+		rgb + 3 * (event->area.x + w * event->area.y), w * 3);
+	return (TRUE);
 }
 
 //	COLORLIST widget
@@ -576,8 +637,9 @@ static void colorpad_draw(GtkWidget *widget, gpointer user_data)
 	if (!wjpixmap_pixmap(widget)) return;
 	w = PPAD_WIDTH(PPAD_SLOT);
 	h = PPAD_HEIGHT(PPAD_SLOT);
-	rgb = render_color_grid(w, h, PPAD_SLOT, user_data);
+	rgb = calloc(1, w * h * 3);
 	if (!rgb) return;
+	render_color_grid(rgb, w, h, PPAD_SLOT, user_data);
 	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
 	c = (PPAD_SLOT >> 1) - 1;
 	wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
@@ -1558,17 +1620,17 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, col_data *c, void **r)
 	if (kind == op_LISTCX)
 	{
 #ifdef GTK_STOCK_DIRECTORY
-		ld->icons[1] = render_stock_pixmap(mainwindow,
+		ld->icons[1] = render_stock_pixmap(main_window,
 			GTK_STOCK_DIRECTORY, &ld->masks[1]);
 #endif
 #ifdef GTK_STOCK_FILE
-		ld->icons[0] = render_stock_pixmap(mainwindow,
+		ld->icons[0] = render_stock_pixmap(main_window,
 			GTK_STOCK_FILE, &ld->masks[0]);
 #endif
 		if (!ld->icons[1]) ld->icons[1] = gdk_pixmap_create_from_xpm_d(
-			mainwindow->window, &ld->masks[1], NULL, xpm_open_xpm);
+			main_window->window, &ld->masks[1], NULL, xpm_open_xpm);
 		if (!ld->icons[0]) ld->icons[0] = gdk_pixmap_create_from_xpm_d(
-			mainwindow->window, &ld->masks[0], NULL, xpm_new_xpm);
+			main_window->window, &ld->masks[0], NULL, xpm_new_xpm);
 
 		gtk_signal_connect(GTK_OBJECT(clist), "key_press_event",
 			GTK_SIGNAL_FUNC(listcx_key), ld);
@@ -2892,21 +2954,21 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #endif
 #if GTK_MAJOR_VERSION == 1
 	/* GTK+1 typecasts dislike NULLs */
-	GtkWindow *tparent = (GtkWindow *)mainwindow;
+	GtkWindow *tparent = (GtkWindow *)main_window;
 	int have_sliders = FALSE;
 #else /* #if GTK_MAJOR_VERSION == 2 */
-	GtkWindow *tparent = GTK_WINDOW(mainwindow);
+	GtkWindow *tparent = GTK_WINDOW(main_window);
 #endif
-	int part = FALSE, raise = FALSE;
+	int part = FALSE, raise = FALSE, accel = FALSE;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *window = NULL, *widget = NULL;
-	GtkAccelGroup* ag = NULL;
+	GtkAccelGroup* ag = gtk_accel_group_new();
 	v_dd *vdata;
 	cmdef *cmd;
 	col_data c;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **r = NULL, **res = NULL;
+	void *v, **pp, **dtail, **r = NULL, **res = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad, minw = 0;
@@ -2915,8 +2977,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	// Allocation size
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
 	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
-	dsize = (ld + n + 2 + predict_size(ifcode, ddata) * VSLOT_SIZE) * sizeof(void *);
-	if (!(res = calloc(1, dsize))) return (NULL); // failed
+	dsize = ld + n + 2 + predict_size(ifcode, ddata);
+	if (!(res = calloc(dsize, sizeof(void *)))) return (NULL); // failed
+	dtail = res + dsize; // Locate tail of block
 	memcpy(res, ddata, ddsize); // Copy datastruct
 	ddata = res; // And switch to using it
 	vdata = (void *)(res += ld); // Locate where internal data go
@@ -2966,6 +3029,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			/* Terminate the list */
 			ADD_SLOT(r, NULL, NULL);
 
+			/* Add accel group, or drop it if unused */
+			if (!accel) gtk_accel_group_unref(ag);
+			else gtk_window_add_accel_group(GTK_WINDOW(window), ag);
+
 			gtk_object_set_data(GTK_OBJECT(window), ident,
 				(gpointer)res);
 			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
@@ -3013,7 +3080,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 
 			gdk_rgb_init();
 			init_tablet();	// Set up the tablet
-//			ag = gtk_accel_group_new();
 
 			widget = window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 			// Set minimum width/height
@@ -3037,7 +3103,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 //			gdk_pixmap_unref(icon_pix);
 
 			// For use as anchor and context
-			mainwindow = window;
+			main_window = window;
 
 			pk = pkf_STACK; // bin container
 			break;
@@ -3055,8 +3121,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_window_set_position(GTK_WINDOW(window), wpos);
 			gtk_window_set_modal(GTK_WINDOW(window), TRUE);
 			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
-			ag = gtk_accel_group_new();
- 			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 			/* Both boxes go onto stack, with vbox on top */
 			*--wp = GTK_DIALOG(window)->action_area;
 			*--wp = GTK_DIALOG(window)->vbox;
@@ -3066,6 +3130,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = window = fpick(&wp, ddata, pp - 1, r);
 			/* Initialize */
 			fpick_set_filename(window, v, FALSE);
+			break;
+		/* Create a popup window */
+		case op_POPUP:
+			widget = window = add_a_window(GTK_WINDOW_POPUP,
+				*(char *)v ? _(v) : v, wpos, TRUE);
+			cw = GET_BORDER(POPUP);
+			pk = pkf_STACK; // bin container
 			break;
 		/* Create a vbox which will serve as separate widget */
 		case op_TOPVBOX:
@@ -3288,6 +3359,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TLTEXT:
 			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
 			break;
+		/* Add an RGB renderer */
+		case op_RGBIMAGE:
+		{
+			int *wh = (int *)((char *)ddata + (int)pp[1]);
+			widget = gtk_drawing_area_new();
+			gtk_widget_set_usize(widget, wh[0], wh[1]);
+			gtk_object_set_user_data(GTK_OBJECT(widget), v);
+			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
+				GTK_SIGNAL_FUNC(expose_rgb), (gpointer)wh[0]);
+			pk = pk_BIN | pkf_SHOW;
+			break;
+		}
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
 		{
@@ -3484,9 +3567,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			GtkWidget *ok_bt, *cancel_bt, *box;
 			void **cancel_r;
 
-			ag = gtk_accel_group_new();
- 			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
-
 			widget = gtk_hbox_new(op != cm_UOKBOX, 0);
 			if (op == op_EOKBOX) // clustered to right side
 			{
@@ -3522,6 +3602,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GDK_Return, 0, (GtkAccelFlags)0);
 			gtk_widget_add_accelerator(ok_bt, "clicked", ag,
 				GDK_KP_Enter, 0, (GtkAccelFlags)0);
+			accel = TRUE;
 			break;
 		}
 		/* Add a clickable button */
@@ -3534,12 +3615,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GDK_Return, 0, (GtkAccelFlags)0);
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_KP_Enter, 0, (GtkAccelFlags)0);
+				accel = TRUE;
 			}
 			else if (op == cm_CANCELBTN)
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_Escape, 0, (GtkAccelFlags)0);
 				add_del(NEXT_SLOT(r), window);
+				accel = TRUE;
 			}
 			/* Click-event */
 			if ((op != cm_BUTTON) || pp[1 + 1])
@@ -3680,10 +3763,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			GtkWidget *bar;
 			smartmenu_data *sd;
 
-			ag = gtk_accel_group_new();
+			accel = TRUE;
 			// Stop dynamic allocation of accelerators during runtime
 			gtk_accel_group_lock(ag);
- 			gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 
 			tbar = r;
 			rvar = rslot = NULL;
@@ -3912,6 +3994,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_accelerator_parse(v, &keyval, &mods);
 			gtk_widget_add_accelerator(widget, "activate",
 				ag, keyval, mods, GTK_ACCEL_VISIBLE);
+			accel = TRUE;
 			widget = v;
 			break;
 		}
@@ -4060,6 +4143,23 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = NULL;
 			break;
 		}
+		/* Install mouse event handler */
+		case op_EVT_MOUSE: case op_EVT_MMOUSE: case op_EVT_RMOUSE:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+
+			gtk_signal_connect(GTK_OBJECT(*slot),
+				op == op_EVT_MOUSE ? "button_press_event" :
+				op == op_EVT_MMOUSE ? "motion_notify_event" :
+				"button_release_event",
+				op == op_EVT_MMOUSE ?
+				GTK_SIGNAL_FUNC(get_evt_mmouse) :
+				GTK_SIGNAL_FUNC(get_evt_mouse), r);
+// !!! Maybe do *_add_events() instead, in more fine-grained way?
+			gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
+			widget = NULL;
+			break;
+		}
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
 		{
@@ -4118,13 +4218,22 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TRIGGER: case op_GROUP: case op_CLEANUP:
 			widget = NULL;
 			break;
+		/* Allocate/copy memory */
+		case op_TALLOC: case op_TCOPY:
+		{
+			int l = *(int *)((char *)ddata + (int)pp[1]);
+			dtail -= (l + sizeof(void *) - 1) / sizeof(void *);
+			if (op == op_TCOPY) memcpy(dtail, *(void **)v, l);
+			*(void **)v = dtail;
+			continue;
+		}
 		/* Set nondefault border size */
 		case op_BOR_TABLE: case op_BOR_NBOOK: case op_BOR_XSCROLL:
 		case op_BOR_SPIN: case op_BOR_SPINSLIDE:
 		case op_BOR_LABEL: case op_BOR_TLABEL:
 		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
-		case op_BOR_TOOLBAR:
+		case op_BOR_TOOLBAR: case op_BOR_POPUP:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
 		default: continue;

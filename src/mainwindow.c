@@ -23,6 +23,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
@@ -42,7 +43,6 @@
 #include "font.h"
 #include "icons.h"
 #include "thread.h"
-#include "vcode.h"
 
 
 typedef struct {
@@ -164,8 +164,7 @@ static inilist ini_int[] = {
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *main_window,
-	*drawing_palette, *drawing_canvas, *vw_scrolledwindow,
+GtkWidget *drawing_palette, *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas;
 
 static void **main_menubar;
@@ -997,7 +996,7 @@ static void rebind_keys()
 #endif
 }
 
-static int wtf_pressed_(key_ext *key)
+int wtf_pressed_(key_ext *key)
 {
 	key_action *ap = main_keys, *cmatch = NULL;
 	guint *kcd = main_keycodes;
@@ -1033,7 +1032,7 @@ int wtf_pressed(GdkEventKey *event)
 
 int dock_focused()
 {
-	GtkWidget *focus = GTK_WINDOW(main_window)->focus_widget;
+	GtkWidget *focus = GTK_WINDOW(GET_REAL_WINDOW(main_window_))->focus_widget;
 	GtkWidget *dock = ((main_dd *)GET_DDATA(main_window_))->dockbook[0];
 	return (focus && ((focus == dock) || gtk_widget_is_ancestor(focus, dock)));
 }
@@ -4586,7 +4585,6 @@ static void **set_drop(void **r, GtkWidget ***wpp, void **wdata)
 ///	MAIN WINDOW
 
 	main_window_ = wdata; // !!! For the code which needs this too early
-	main_window = GET_REAL_WINDOW(wdata);
 	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
 	 * move as a move, so have to do some non-default processing - WJ */
 	gtk_drag_dest_set(main_window, GTK_DEST_DEFAULT_HIGHLIGHT |
@@ -4873,7 +4871,7 @@ void update_titlebar()		// Update filename in titlebar
 
 
 	/* Don't send needless updates */
-	if (!main_window || ((mem_changed == changed) && (mem_filename == name)))
+	if (!main_window_ || ((mem_changed == changed) && (mem_filename == name)))
 		return;
 	changed = mem_changed;
 	name = mem_filename;

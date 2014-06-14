@@ -21,12 +21,12 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
 #include "layer.h"
-#include "vcode.h"
 
 
 // Maximum median cuts to make

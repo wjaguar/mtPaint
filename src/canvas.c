@@ -23,6 +23,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
@@ -38,7 +39,6 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
-#include "vcode.h"
 
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_xy[2];				// Top left of image from top left of canvas

@@ -20,11 +20,11 @@
 #include "global.h"
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
 #include "inifile.h"
-#include "vcode.h"
 
 #if GTK_MAJOR_VERSION == 1
 #include <gtk/gtkprivate.h>
@@ -39,6 +39,7 @@
 #include <gdk/gdkwin32.h>
 #endif
 
+GtkWidget *main_window;
 
 ///	GENERIC WIDGET PRIMITIVES
 
@@ -1436,12 +1437,12 @@ guint keyval_key(guint keyval)
 
 // Interpreting arrow keys
 
-int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult)
+int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult)
 {
-	if ((event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) !=
+	if ((state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) !=
 		GDK_SHIFT_MASK) mult = 1;
 	*dx = *dy = 0;
-	switch (event->keyval)
+	switch (key)
 	{
 		case GDK_KP_Left: case GDK_Left:
 			*dx = -mult; break;

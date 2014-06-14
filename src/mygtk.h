@@ -54,6 +54,10 @@ typedef struct {
 	unsigned char *rgb;
 } rgbcontext;
 
+///	Main toplevel, for anchoring dialogs and rendering pixmaps
+
+GtkWidget *main_window;
+
 ///	Generic Widget Primitives
 
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
@@ -288,7 +292,8 @@ guint keyval_key(guint keyval);
 
 // Interpreting arrow keys
 
-int arrow_key(GdkEventKey *event, int *dx, int *dy, int mult);
+int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult);
+#define arrow_key(E,X,Y,M) arrow_key_((E)->keyval, (E)->state, (X), (Y), (M))
 
 // Create pixmap cursor
 

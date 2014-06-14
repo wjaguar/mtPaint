@@ -30,6 +30,7 @@ enum {
 	op_WINDOWm,
 	op_DIALOGm,
 	op_FPICKpm,
+	op_POPUP,
 	op_TOPVBOX,
 	op_TOPVBOXV,
 	op_DOCK,
@@ -67,6 +68,7 @@ enum {
 	op_XLABEL,
 	op_TLLABEL,
 	op_TLTEXT,
+	op_RGBIMAGE,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -191,6 +193,9 @@ enum {
 	op_EVT_CHANGE,
 	op_EVT_DESTROY, // before deallocation
 	op_EVT_KEY, // with key data
+	op_EVT_MOUSE, // with button data
+	op_EVT_MMOUSE, // movement, with same
+	op_EVT_RMOUSE, // release, with same
 	op_EVT_EXT, // generic event with extra data
 
 	op_EVT_LAST,
@@ -206,6 +211,8 @@ enum {
 	op_ENDIF,
 	op_REF,
 	op_CLEANUP,
+	op_TALLOC,
+	op_TCOPY,
 	op_ACTMAP,
 	op_SHORTCUTs,
 	op_WANTKEYS,
@@ -238,6 +245,7 @@ enum {
 	op_BOR_OKBOX,
 	op_BOR_BUTTON,
 	op_BOR_TOOLBAR,
+	op_BOR_POPUP,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -262,15 +270,30 @@ typedef struct {
 	unsigned int state;	// modifier flags
 } key_ext;
 
+//	Structure which is provided to MOUSE/MMOUSE/RMOUSE event
+typedef struct {
+	int x, y;
+	int button;	// what was pressed, stays pressed (?), or got released
+	int count;	// 1/2/3 single/double/triple click, 0 move, -1 release
+	unsigned int state;	// button & modifier flags
+// !!! No pressure yet, and no device type too
+} mouse_ext;
+
 #define _Cmask (GDK_CONTROL_MASK)
 #define _Smask (GDK_SHIFT_MASK)
 #define _Amask (GDK_MOD1_MASK)
 #define _CSmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
 #define _CSAmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
+#define _B1mask (GDK_BUTTON1_MASK)
+#define _B2mask (GDK_BUTTON2_MASK)
+#define _B3mask (GDK_BUTTON3_MASK)
+#define _B13mask (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)
 
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
 typedef int (*evtkey_fn)(void *ddata, void **wdata, int what, void **where,
 	key_ext *keydata);
+typedef int (*evtmouse_fn)(void *ddata, void **wdata, int what, void **where,
+	mouse_ext *mousedata);
 typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
 
@@ -381,6 +404,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 /* !!! This block holds 2 nested EVENT blocks */
 #define FPICKpm(NP,F,V,HOK,HC) WBr3hf(FPICKpm, 3 + 2 * 2), WBfield(V), \
 	WBfield(NP), WBfield(F), EVENT(OK, HOK), EVENT(CANCEL, HC)
+#define POPUP(NM) WBrh(POPUP, 1), (NM)
 #define TOPVBOX WBrh(TOPVBOX, 0)
 #define TOPVBOXV WBrh(TOPVBOXV, 0)
 #define DOCK(K) WBrh(DOCK, 1), (K)
@@ -451,6 +475,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
 #define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
+#define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -655,6 +680,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define REF(V) WBhf(REF, 1), WBfield(V)
 #define REFv(V) WBh(REF, 1), &(V)
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
+#define TALLOC(V,L) WBhf(TALLOC, 2), WBfield(V), WBfield(L)
+#define TCOPY(V,L) WBhf(TCOPY, 2), WBfield(V), WBfield(L)
 #define ACTMAP(N) WBrh(ACTMAP, 1), (void *)(N)
 #define SHORTCUTs(NM) WBrh(SHORTCUTs, 1), (NM)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)

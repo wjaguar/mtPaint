@@ -21,11 +21,11 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "canvas.h"
 #include "shifter.h"
-#include "vcode.h"
 
 #define NSHIFT 8
 

@@ -23,6 +23,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "inifile.h"
 #include "ani.h"
 #include "png.h"
@@ -36,7 +37,6 @@
 #include "csel.h"
 #include "font.h"
 #include "icons.h"
-#include "vcode.h"
 
 
 
@@ -921,15 +921,14 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 #endif
 
 /* Create RGB dump of patterns to display, with each pattern repeated 4x4 */
-unsigned char *render_patterns()
+void render_patterns(unsigned char *buf)
 {
 	png_color *p;
-	unsigned char *buf, *dest;
+	unsigned char *dest;
 	int i = 0, j, x, y, h, b;
 
 #define PAT_ROW_L (PATTERN_GRID_W * (8 * 4 + 4) * 3)
 #define PAT_8ROW_L (8 * PAT_ROW_L)
-	buf = calloc(1, PATTERN_GRID_H * (8 * 4 + 4) * PAT_ROW_L);
 	dest = buf + 2 * PAT_ROW_L + 2 * 3;
 	for (y = 0; y < PATTERN_GRID_H; y++ , dest += (8 * 3 + 4) * PAT_ROW_L)
 	{
@@ -952,7 +951,6 @@ unsigned char *render_patterns()
 	}
 #undef PAT_8ROW_L
 #undef PAT_ROW_L
-	return (buf);
 }
 
 /* Set 0-1 indexed image as new patterns */

@@ -21,6 +21,7 @@
 #include "global.h"
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "inifile.h"
 #include "png.h"
 #include "mainwindow.h"

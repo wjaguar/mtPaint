@@ -25,13 +25,13 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "png.h"
 #include "mainwindow.h"
 #include "viewer.h"
 #include "canvas.h"
 #include "inifile.h"
 #include "font.h"
-#include "vcode.h"
 
 #include <iconv.h>
 #include <ft2build.h>

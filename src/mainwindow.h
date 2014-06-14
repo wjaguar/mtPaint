@@ -149,6 +149,7 @@ enum { // To let constants renumber themselves when adding new ones
 #define LR_PASTE 2
 #define LR_COMP  3
 
+int wtf_pressed_(key_ext *key);
 int wtf_pressed(GdkEventKey *event);
 void action_dispatch(int action, int mode, int state, int kbd);
 
@@ -283,8 +284,7 @@ char *cspnames_[NUM_CSPACES];
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *main_window,
-	*drawing_palette, *drawing_canvas, *vw_scrolledwindow,
+GtkWidget *drawing_palette, *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;

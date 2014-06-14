@@ -20,13 +20,13 @@
 #include "global.h"
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "png.h"
 #include "canvas.h"
 #include "inifile.h"
 #include "viewer.h"
 #include "mainwindow.h"
 #include "thread.h"
-#include "vcode.h"
 
 #include "prefs.h"
 

@@ -23,6 +23,7 @@
 
 #include "mygtk.h"
 #include "memory.h"
+#include "vcode.h"
 #include "ani.h"
 #include "png.h"
 #include "mainwindow.h"
@@ -33,7 +34,6 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
-#include "vcode.h"
 
 int font_aa, font_bk, font_r;
 int font_bkg, font_angle;
@@ -175,19 +175,21 @@ void pressed_help()
 
 int max_pan;
 
-static GtkWidget *pan_window, *draw_pan;
-static int pan_w, pan_h;
-static unsigned char *pan_rgb;
+typedef struct {
+	int wh[3];
+	int wait_h, wait_v, in_pan;
+	unsigned char *rgb;
+	void **img;
+} pan_dd;
 
-void draw_pan_thumb(int x1, int y1, int x2, int y2)
+void draw_pan_thumb(pan_dd *dt, int x1, int y1, int x2, int y2)
 {
 	int i, j, k, ix, iy, zoom = 1, scale = 1;
+	int pan_w = dt->wh[0], pan_h = dt->wh[1];
 	unsigned char *dest, *src;
 
-	if (!pan_rgb) return;		// Needed to stop segfault
-
 	/* Create thumbnail */
-	dest = pan_rgb;
+	dest = dt->rgb;
 	for (i = 0; i < pan_h; i++)
 	{
 		iy = (i * mem_height) / pan_h;
@@ -236,7 +238,7 @@ void draw_pan_thumb(int x1, int y1, int x2, int y2)
 	y2 = (y2 * pan_h) / mem_height;
 
 	/* Draw the border */
-	dest = src = pan_rgb + (y1 * pan_w + x1) * 3;
+	dest = src = dt->rgb + (y1 * pan_w + x1) * 3;
 	j = y2 - y1;
 	k = (x2 - x1) * 3;
 	for (i = 0; i <= j; i++)
@@ -254,11 +256,10 @@ void draw_pan_thumb(int x1, int y1, int x2, int y2)
 		src += 3;
 	}
 
-	if (draw_pan) gdk_draw_rgb_image(draw_pan->window, draw_pan->style->black_gc,
-		0, 0, pan_w, pan_h, GDK_RGB_DITHER_NONE, pan_rgb, pan_w * 3);
+	cmd_repaint(dt->img);
 }
 
-void pan_thumbnail()		// Create thumbnail and selection box
+static void pan_thumbnail(pan_dd *dt)	// Create thumbnail and selection box
 {
 	GtkAdjustment *hori, *vert;
 
@@ -266,31 +267,30 @@ void pan_thumbnail()		// Create thumbnail and selection box
 	handle_events();
 
 	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
-	draw_pan_thumb(hori->value, vert->value, hori->page_size, vert->page_size);
+	draw_pan_thumb(dt, hori->value, vert->value, hori->page_size, vert->page_size);
 }
 
-static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
+static void do_pan(pan_dd *dt, GtkAdjustment *hori, GtkAdjustment *vert,
+	int nv_h, int nv_v)
 {
-	static int wait_h, wait_v, in_pan;
-
 	nv_h = nv_h < 0 ? 0 : nv_h > hori->upper - hori->page_size ?
 		hori->upper - hori->page_size : nv_h;
 	nv_v = nv_v < 0 ? 0 : nv_v > vert->upper - vert->page_size ?
 		vert->upper - vert->page_size : nv_v;
 
-	if (in_pan) /* Delay reaction */
+	if (dt->in_pan) /* Delay reaction */
 	{
-		wait_h = nv_h; wait_v = nv_v;
-		in_pan |= 2;
+		dt->wait_h = nv_h; dt->wait_v = nv_v;
+		dt->in_pan |= 2;
 		return;
 	}
 
 	while (TRUE)
 	{
-		in_pan = 1;
+		dt->in_pan = 1;
 
 		/* Update selection box */
-		draw_pan_thumb(nv_h, nv_v, hori->page_size, vert->page_size);
+		draw_pan_thumb(dt, nv_h, nv_v, hori->page_size, vert->page_size);
 
 		/* Update position of main window scrollbars */
 		hori->value = nv_h;
@@ -300,32 +300,25 @@ static void do_pan(GtkAdjustment *hori, GtkAdjustment *vert, int nv_h, int nv_v)
 
 		/* Process events */
 		handle_events();
-		if (in_pan < 2) break;
+		if (dt->in_pan < 2) break;
 
 		/* Do delayed update */
-		nv_h = wait_h;
-		nv_v = wait_v;
+		nv_h = dt->wait_h;
+		nv_v = dt->wait_v;
 	}
-	in_pan = 0;
+	dt->in_pan = 0;
 }
 
-static void delete_pan()
-{
-	free(pan_rgb);
-	pan_rgb = NULL;				// Needed to stop segfault
-	gtk_widget_destroy(pan_window);
-}
-
-static gboolean key_pan(GtkWidget *widget, GdkEventKey *event)
+static int key_pan(pan_dd *dt, void **wdata, int what, void **where, key_ext *key)
 {
 	int nv_h, nv_v, hm, vm;
 	GtkAdjustment *hori, *vert;
 
-	if (!check_zoom_keys_real(wtf_pressed(event)))
+	if (!check_zoom_keys_real(wtf_pressed_(key)))
 	{
 		/* xine-ui sends bogus keypresses so don't delete on this */
-		if (!arrow_key(event, &hm, &vm, 4) &&
-			!XINE_FAKERY(event->keyval)) delete_pan();
+		if (!arrow_key_(key->key, key->state, &hm, &vm, 4) &&
+			!XINE_FAKERY(key->key)) run_destroy(wdata);
 		else
 		{
 			get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
@@ -333,115 +326,75 @@ static gboolean key_pan(GtkWidget *widget, GdkEventKey *event)
 			nv_h = hori->value + hm * (hori->page_size / 4);
 			nv_v = vert->value + vm * (hori->page_size / 4);
 
-			do_pan(hori, vert, nv_h, nv_v);
+			do_pan(dt, hori, vert, nv_h, nv_v);
 		}
 	}
-	else pan_thumbnail();	// Update selection box as user may have zoomed in/out
+	else pan_thumbnail(dt);	// Update selection box as user may have zoomed in/out
 
 	return (TRUE);
 }
 
-static void pan_button(int mx, int my, int button)
+static int pan_button(pan_dd *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
 	int nv_h, nv_v;
 	float cent_x, cent_y;
 	GtkAdjustment *hori, *vert;
 
-	if (button == 1)	// Left click = pan window
+	if (mouse->button == 1)	// Left click = pan window
 	{
 		get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
 
-		cent_x = ((float) mx) / pan_w;
-		cent_y = ((float) my) / pan_h;
+		cent_x = ((float) mouse->x) / dt->wh[0];
+		cent_y = ((float) mouse->y) / dt->wh[1];
 
 		nv_h = mem_width*can_zoom*cent_x - hori->page_size/2;
 		nv_v = mem_height*can_zoom*cent_y - vert->page_size/2;
 
-		do_pan(hori, vert, nv_h, nv_v);
+		do_pan(dt, hori, vert, nv_h, nv_v);
 	}
-	else if (button == 3) delete_pan();	// Right click = kill window
-}
-
-static gboolean click_pan(GtkWidget *widget, GdkEventButton *event)
-{
-	pan_button(event->x, event->y, event->button);
-	return (TRUE);
-}
-
-static gboolean pan_motion(GtkWidget *widget, GdkEventMotion *event)
-{
-	int x, y, button = 0;
-	GdkModifierType state;
-
-	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
-	else
-	{
-		x = event->x;
-		y = event->y;
-		state = event->state;
-	}
-
-	if (state & GDK_BUTTON1_MASK) button = 1;
-	if (state & GDK_BUTTON3_MASK) button = 3;
-
-	pan_button(x, y, button);
+	else if ((mouse->button == 3) || (mouse->button == 13))
+		run_destroy(wdata);	// Right click = kill window
 
 	return (TRUE);
 }
 
-static gboolean expose_pan(GtkWidget *widget, GdkEventExpose *event)
-{
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		event->area.x, event->area.y, event->area.width, event->area.height,
-		GDK_RGB_DITHER_NONE,
-		pan_rgb + (event->area.y * pan_w + event->area.x) * 3, pan_w * 3);
-	return (FALSE);
-}
+#define WBbase pan_dd
+void *pan_code[] = {
+	BORDER(POPUP, 2),
+	WPMOUSE, POPUP(_("Pan Window")),
+	EVENT(KEY, key_pan),
+	TALLOC(rgb, wh[2]),
+	REF(img), RGBIMAGE(rgb, wh),
+	EVENT(MOUSE, pan_button), EVENT(MMOUSE, pan_button),
+	WEND
+};
+#undef WBbase
 
 void pressed_pan()
 {
-	float rat_x, rat_y;
+	pan_dd tdata;
+	void **wdata;
+	int pan_w, pan_h;
 
-	draw_pan = NULL;	// Needed by draw_pan_thumb above
 
-	rat_x = max_pan / ((float) mem_width);
-	rat_y = max_pan / ((float) mem_height);
+	pan_w = pan_h = max_pan;
+	if (mem_width < mem_height) pan_w = (max_pan * mem_width) / mem_height;
+	else pan_h = (max_pan * mem_height) / mem_width;
+	if (pan_w < 1) pan_w = 1;
+	if (pan_h < 1) pan_h = 1;
 
-	if ( rat_x > rat_y )
-	{
-		pan_w = rat_y * mem_width;
-		pan_h = max_pan;
-	}
-	else
-	{
-		pan_w = max_pan;
-		pan_h = rat_x * mem_height;
-	}
-	mtMAX(pan_w, pan_w, 1)
-	mtMAX(pan_h, pan_h, 1)
+	tdata.wh[0] = pan_w;
+	tdata.wh[1] = pan_h;
+	tdata.wh[2] = pan_w * pan_h * 3;
+	tdata.wait_h = tdata.wait_v = tdata.in_pan = 0;
 
-	pan_rgb = calloc(1, pan_w * pan_h * 3);
+	wdata = run_create(pan_code, &tdata, sizeof(tdata));
+	if (!wdata) return; // can fail if no memory
 
-	pan_thumbnail();
+	pan_thumbnail(GET_DDATA(wdata));
 
-	pan_window = add_a_window( GTK_WINDOW_POPUP, __("Pan Window"), GTK_WIN_POS_MOUSE, TRUE );
-	gtk_container_set_border_width (GTK_CONTAINER (pan_window), 2);
-
-	draw_pan = gtk_drawing_area_new();
-	gtk_widget_set_usize( draw_pan, pan_w, pan_h );
-	gtk_container_add (GTK_CONTAINER (pan_window), draw_pan);
-	gtk_widget_show( draw_pan );
-	gtk_signal_connect(GTK_OBJECT(draw_pan), "expose_event",
-		GTK_SIGNAL_FUNC(expose_pan), NULL);
-	gtk_signal_connect(GTK_OBJECT(draw_pan), "button_press_event",
-		GTK_SIGNAL_FUNC(click_pan), NULL);
-	gtk_signal_connect(GTK_OBJECT(draw_pan), "motion_notify_event",
-		GTK_SIGNAL_FUNC(pan_motion), NULL);
-	gtk_signal_connect(GTK_OBJECT(pan_window), "key_press_event",
-		GTK_SIGNAL_FUNC(key_pan), NULL);
-	gtk_widget_set_events(draw_pan, GDK_ALL_EVENTS_MASK);
-
-	gtk_widget_show(pan_window);
+	cmd_showhide(wdata, TRUE);
 }
 
 
