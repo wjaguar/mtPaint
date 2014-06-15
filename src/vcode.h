@@ -69,6 +69,8 @@ enum {
 	op_TLLABEL,
 	op_TLTEXT,
 	op_RGBIMAGE,
+	op_WRGBIMAGE,
+	op_RGBIMAGEP,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -333,6 +335,8 @@ void add_del(void **r, GtkWidget *window);
 //	Run event handler, defaulting to run_destroy()
 void do_evt_1_d(void **slot);
 
+//	From slot to its wdata
+void **wdata_slot(void **slot);
 //	From event to its originator
 void **origin_slot(void **slot);
 
@@ -476,6 +480,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
 #define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
 #define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
+#define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
+#define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \

@@ -865,15 +865,7 @@ void view_show()
 	toolbar_viewzoom(TRUE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
 	cmd_set(menu_slots[MENU_VIEW], TRUE);
-	vw_focus_view();
-#if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
-	gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
-	if (!vw_focus_on) gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(vw_scrolledwindow)));
-#endif
+	vw_realign();
 }
 
 void view_hide()
@@ -884,11 +876,6 @@ void view_hide()
 	toolbar_viewzoom(FALSE);
 	set_cursor(NULL); /* Because canvas window is now a new one */
 	cmd_set(menu_slots[MENU_VIEW], FALSE);
-#if GTK_MAJOR_VERSION == 1 /* GTK+1 leaves adjustments in wrong state */
-	gtk_adjustment_value_changed(
-		gtk_scrolled_window_get_hadjustment(
-		GTK_SCROLLED_WINDOW(scrolledwindow_canvas)));
-#endif
 }
 
 

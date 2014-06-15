@@ -101,6 +101,22 @@ void **get_wdata(GtkWidget *widget, char *id)
 	return (gtk_object_get_data(GTK_OBJECT(widget), id ? id : VCODE_KEY));
 }
 
+/* From slot to its wdata */
+void **wdata_slot(void **slot)
+{
+	while (TRUE)
+	{
+		int op = GET_OP(slot);
+		// WDONE anchors wdata
+		if (op == op_WDONE) return (slot);
+		// EVTs link to it
+		if ((op >= op_EVT_0) && (op <= op_EVT_LAST)) return (*slot);
+
+		slot = PREV_SLOT(slot);
+		/* And if not valid wdata, die by SIGSEGV in the end */
+	}
+}
+
 /* From event to its originator */
 void **origin_slot(void **slot)
 {
@@ -418,15 +434,81 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 
 //	RGBIMAGE widget
 
+typedef struct {
+	unsigned char *rgb;
+	int w, h;
+} rgbimage_data;
+
 static gboolean expose_rgb(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
-	int w = (int)user_data;
-	unsigned char *rgb = gtk_object_get_user_data(GTK_OBJECT(widget));
+	rgbimage_data *rd = user_data;
+	int x = event->area.x, y = event->area.y;
+	int w = event->area.width, h = event->area.height;
+	int ww = rd->w, wh = rd->h;
+	if (x + w > ww) w = ww - x;
+	if (y + h > wh) h = wh - y;
+	/* With theme engines lurking out there, weirdest things can happen */
+	if ((w <= 0) || (h <= 0)) return (TRUE);
 	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		event->area.x, event->area.y, event->area.width, event->area.height,
-		GDK_RGB_DITHER_NONE,
-		rgb + 3 * (event->area.x + w * event->area.y), w * 3);
+		x, y, w, h, GDK_RGB_DITHER_NONE,
+		rd->rgb + 3 * (x + ww * y), ww * 3);
 	return (TRUE);
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *rgbimage(void *v, int *wh)
+{
+	GtkWidget *widget;
+	rgbimage_data *rd;
+
+	widget = gtk_drawing_area_new();
+	rd = bound_malloc(widget, sizeof(rgbimage_data));
+	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
+	rd->rgb = v;
+	rd->w = wh[0];
+	rd->h = wh[1];
+	gtk_widget_set_usize(widget, wh[0], wh[1]);
+	gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
+		GTK_SIGNAL_FUNC(expose_rgb), rd);
+
+	return (widget);
+}
+
+//	RGBIMAGEP widget
+
+static void reset_rgbp(GtkWidget *widget, gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	GdkPixmap *pmap;
+
+	gtk_pixmap_get(GTK_PIXMAP(widget), &pmap, NULL);
+	gdk_draw_rgb_image(pmap, widget->style->black_gc,
+		0, 0, rd->w, rd->h, GDK_RGB_DITHER_NONE,
+		rd->rgb, rd->w * 3);
+	gtk_widget_queue_draw(widget);
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *rgbimagep(void *v, int w, int h)
+{
+	rgbimage_data *rd;
+	GdkPixmap *pmap;
+	GtkWidget *widget;
+
+	pmap = gdk_pixmap_new(main_window->window, w, h, -1);
+	widget = gtk_pixmap_new(pmap, NULL);
+	gdk_pixmap_unref(pmap);
+	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(widget), FALSE);
+
+	rd = bound_malloc(widget, sizeof(rgbimage_data));
+	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
+	rd->rgb = v;
+	rd->w = w;
+	rd->h = h;
+	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+		GTK_SIGNAL_FUNC(reset_rgbp), rd);
+
+	return (widget);
 }
 
 //	COLORLIST widget
@@ -2790,6 +2872,7 @@ enum {
 	cm_VBOX,
 	cm_HBOX,
 	cm_SCROLL,
+	cm_RGB,
 	cm_SPIN,
 	cm_SPINa,
 	cm_FSPIN,
@@ -2840,6 +2923,8 @@ static cmdef cmddefs[] = {
 	{ op_SCROLL, cm_SCROLL, pk_PACK | pkf_STACK | pkf_SHOW },
 	{ op_XSCROLL, cm_SCROLL, pk_XPACK | pkf_STACK | pkf_SHOW,
 		USE_BORDER(XSCROLL) },
+	{ op_RGBIMAGE, cm_RGB, pk_BIN | pkf_SHOW },
+	{ op_WRGBIMAGE, cm_RGB, pk_PACK | pkf_SHOW },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 	/* Codes can map to themselves, and some do */
 // !!! Padding = 0
@@ -2959,7 +3044,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #else /* #if GTK_MAJOR_VERSION == 2 */
 	GtkWindow *tparent = GTK_WINDOW(main_window);
 #endif
-	int part = FALSE, raise = FALSE, accel = FALSE;
+	int part = FALSE, raise = FALSE, accel = 0;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *window = NULL, *widget = NULL;
@@ -3028,6 +3113,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WEND: case op_WSHOW: case op_WDIALOG:
 			/* Terminate the list */
 			ADD_SLOT(r, NULL, NULL);
+
+			/* !!! In GTK+1, doing it earlier makes any following
+			 * gtk_widget_add_accelerator() calls to silently fail */
+			if (accel > 1) gtk_accel_group_lock(ag);
 
 			/* Add accel group, or drop it if unused */
 			if (!accel) gtk_accel_group_unref(ag);
@@ -3360,17 +3449,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
 			break;
 		/* Add an RGB renderer */
-		case op_RGBIMAGE:
-		{
-			int *wh = (int *)((char *)ddata + (int)pp[1]);
-			widget = gtk_drawing_area_new();
-			gtk_widget_set_usize(widget, wh[0], wh[1]);
-			gtk_object_set_user_data(GTK_OBJECT(widget), v);
-			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
-				GTK_SIGNAL_FUNC(expose_rgb), (gpointer)wh[0]);
+		case cm_RGB:
+			widget = rgbimage(v, (int *)((char *)ddata + (int)pp[1]));
+			break;
+		/* Add a buffered (by pixmap) RGB renderer */
+		case op_RGBIMAGEP:
+			widget = rgbimagep(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
 			pk = pk_BIN | pkf_SHOW;
 			break;
-		}
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
 		{
@@ -3602,7 +3688,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GDK_Return, 0, (GtkAccelFlags)0);
 			gtk_widget_add_accelerator(ok_bt, "clicked", ag,
 				GDK_KP_Enter, 0, (GtkAccelFlags)0);
-			accel = TRUE;
+			accel |= 1;
 			break;
 		}
 		/* Add a clickable button */
@@ -3615,14 +3701,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GDK_Return, 0, (GtkAccelFlags)0);
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_KP_Enter, 0, (GtkAccelFlags)0);
-				accel = TRUE;
+				accel |= 1;
 			}
 			else if (op == cm_CANCELBTN)
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
 					GDK_Escape, 0, (GtkAccelFlags)0);
 				add_del(NEXT_SLOT(r), window);
-				accel = TRUE;
+				accel |= 1;
 			}
 			/* Click-event */
 			if ((op != cm_BUTTON) || pp[1 + 1])
@@ -3763,9 +3849,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			GtkWidget *bar;
 			smartmenu_data *sd;
 
-			accel = TRUE;
 			// Stop dynamic allocation of accelerators during runtime
-			gtk_accel_group_lock(ag);
+			accel |= 3;
 
 			tbar = r;
 			rvar = rslot = NULL;
@@ -3994,7 +4079,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_accelerator_parse(v, &keyval, &mods);
 			gtk_widget_add_accelerator(widget, "activate",
 				ag, keyval, mods, GTK_ACCEL_VISIBLE);
-			accel = TRUE;
+			accel |= 1;
 			widget = v;
 			break;
 		}
@@ -4610,6 +4695,13 @@ void cmd_reset(void **slot, void *ddata)
 		case op_XPENTRY: case op_TPENTRY: case op_PATH:
 			set_path(*wdata, v, PATH_VALUE);
 			break;
+		case op_RGBIMAGEP:
+		{
+			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			rd->rgb = v; // Size is fixed, but update source
+			if (GTK_WIDGET_REALIZED(*wdata)) reset_rgbp(*wdata, rd);
+			break;
+		}
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
 			fpick_set_filename(*wdata, v, FALSE);
@@ -4645,6 +4737,16 @@ void cmd_reset(void **slot, void *ddata)
 		case op_TCOLOR:
 			cpick_set_colour(*wdata, ((int *)v)[0], ((int *)v)[1]);
 			break;
+		case op_RGBIMAGE: case op_WRGBIMAGE:
+		{
+			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			int *wh = (int *)(ddata + (int)pp[1]);
+			rd->rgb = v;
+			rd->w = wh[0];
+			rd->h = wh[1];
+			gtk_widget_queue_draw(*wdata);
+			break;
+		}
 #endif
 		}
 		if (cgroup < 0) return;

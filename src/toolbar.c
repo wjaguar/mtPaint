@@ -276,9 +276,13 @@ void blend_settings() /* Blend mode */
 	run_create(toolwindow_code, &tdata, sizeof(tdata));
 }
 
+#define GP_WIDTH 256
+#define GP_HEIGHT 16
+static void **grad_view;
 
 typedef struct {
 	int size, flow, opac, chan;
+	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3];
 } settings_dd;
 
 static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **where)
@@ -306,25 +310,6 @@ void toolbar_settings_exit(void *dt, void **wdata)
 	toolbar_boxes[TOOLBAR_SETTINGS] = NULL;
 	cmd_set(menu_slots[MENU_TBSET], FALSE);
 	run_destroy(wdata);
-}
-
-#define GP_WIDTH 256
-#define GP_HEIGHT 16
-static GtkWidget *grad_view;
-
-static void **create_grad_view(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GdkPixmap *pmap;
-
-	/* Gradient mode preview */
-	pmap = gdk_pixmap_new(main_window->window, GP_WIDTH, GP_HEIGHT, -1);
-	grad_view = gtk_pixmap_new(pmap, NULL);
-	gdk_pixmap_unref(pmap);
-	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(grad_view), FALSE);
-	gtk_container_add(GTK_CONTAINER(**wpp), grad_view);
-	gtk_widget_show(grad_view);
-
-	return (r);
 }
 
 static void toolbar_click(void *dt, void **wdata, int what, void **where)
@@ -376,8 +361,8 @@ static void *settings_code[] = {
 	TBBOXTOGxv(_("Gradient Mode"), NULL,
 		ACTMOD(ACT_MODE, SETB_GRAD), ACTMOD(DLG_GRAD, 1),
 		v_settings[SETB_GRAD]),
-	EXEC(create_grad_view),
-	WDONE, WDONE,
+	REFv(grad_view), RGBIMAGEP(rgb, GP_WIDTH, GP_HEIGHT), // in TBBOXTOG
+	WDONE,
 	/* Colors A & B */
 	BORDER(LABEL, 0),
 	REFv(toolbar_labels[0]), MLABELxr("", 5, 2, 0),
@@ -562,14 +547,13 @@ void *toolbar_code[] = {
 
 void ts_update_gradient()
 {
-	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3], cset[3];
-	unsigned char pal[256 * 3], *tmp = NULL, *dest;
+	settings_dd *dt;
+	unsigned char pal[256 * 3], cset[3], *dest, *rgb, *tmp = NULL;
 	int i, j, k, op, op2, frac, slot, idx = 255, wrk[NUM_CHANNELS + 3];
-	GdkPixmap *pmap;
 
-	if (!grad_view) return;
-	gtk_widget_realize(grad_view); // Ensure widget has a GC
-	if (!GTK_WIDGET_REALIZED(grad_view)) return;
+	if (!grad_view) return; // Paranoia
+	dt = GET_DDATA(wdata_slot(grad_view));
+	rgb = dt->rgb;
 
 	slot = mem_channel + 1;
 	if (mem_channel != CHN_IMAGE) /* Create pseudo palette */
@@ -631,11 +615,7 @@ void ts_update_gradient()
 	}
 
 	/* Show it */
-	gtk_pixmap_get(GTK_PIXMAP(grad_view), &pmap, NULL);
-	gdk_draw_rgb_image(pmap, grad_view->style->black_gc,
-		0, 0, GP_WIDTH, GP_HEIGHT,
-		GDK_RGB_DITHER_NONE, rgb, GP_WIDTH * 3);
-	gtk_widget_queue_draw(grad_view);
+	cmd_reset(grad_view, dt);
 }
 
 void toolbar_update_settings()

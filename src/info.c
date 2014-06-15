@@ -39,9 +39,10 @@
 typedef struct {
 	int indexed, clip, layers;
 	int norm;
+	int wh[3];
 	char *col_h, *col_d;
 	unsigned char *rgb_mem;
-	GtkWidget *drawingarea;
+	void **drawingarea;
 	char mem_d[128], clip_d[256], rgb_d[64], lr_d[128];
 	int rgb[256][3];	// Raw frequencies
 	int rgb_sorted[256][3];	// Sorted frequencies
@@ -188,7 +189,7 @@ static void hs_click_normalize(info_dd *dt, void **wdata, int what, void **where
 
 	hs_plot_graph(dt->rgb_mem, dt->norm, dt->rgb, dt->rgb_sorted);
 
-	gtk_widget_queue_draw(dt->drawingarea);
+	cmd_repaint(dt->drawingarea);
 }
 
 /* Populate RGB tables */
@@ -238,40 +239,6 @@ static void hs_populate_rgb(int hs_rgb[256][3], int hs_rgb_sorted[256][3])
 	}
 }
 
-static gboolean hs_expose_graph(GtkWidget *widget, GdkEventExpose *event,
-	gpointer user_data)
-{
-	info_dd *dt = user_data;
-	int x = event->area.x, y = event->area.y;
-	int w = event->area.width, h = event->area.height;
-
-	if (!dt->rgb_mem) return (FALSE);
-	if ((x >= HS_GRAPH_W) || (y >= HS_GRAPH_H * mem_img_bpp)) return (FALSE);
-
-	if (w > HS_GRAPH_W - x) w = HS_GRAPH_W - x;
-	if (h > HS_GRAPH_H * 3 - y) h = HS_GRAPH_H * 3 - y;
-
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		x, y, w, h, GDK_RGB_DITHER_NONE,
-		dt->rgb_mem + 3 * (x + y * HS_GRAPH_W), HS_GRAPH_W * 3);
-
-	return (FALSE);
-}
-
-static void **create_histogram(void **r, GtkWidget ***wpp, void **wdata)
-{
-	info_dd *dt = GET_DDATA(wdata);
-	GtkWidget *hs_drawingarea;
-
-	hs_drawingarea = dt->drawingarea = pack(**wpp, gtk_drawing_area_new());
-	gtk_widget_show(hs_drawingarea);
-	gtk_widget_set_usize(hs_drawingarea, HS_GRAPH_W, HS_GRAPH_H * mem_img_bpp);
-	gtk_signal_connect(GTK_OBJECT(hs_drawingarea), "expose_event",
-		GTK_SIGNAL_FUNC(hs_expose_graph), dt);
-
-	return (r);
-}
-
 
 
 
@@ -308,8 +275,8 @@ static void *info_code[] = {
 	WDONE,
 	BORDER(FRBOX, 0),
 	FVBOX(_("Colour Histogram")),
-	EXEC(create_histogram),
-	CLEANUP(rgb_mem),
+	TALLOC(rgb_mem, wh[2]),
+	REF(drawingarea), WRGBIMAGE(rgb_mem, wh),
 	CHECK(_("Normalize"), norm), EVENT(CHANGE, hs_click_normalize), TRIGGER,
 	WDONE,
 	IFx(indexed, 1),
@@ -383,7 +350,9 @@ void pressed_information()
 	}
 
 	hs_populate_rgb(tdata.rgb, tdata.rgb_sorted);
-	tdata.rgb_mem = malloc(HS_GRAPH_W * HS_GRAPH_H * 3 * mem_img_bpp);
+	tdata.wh[0] = HS_GRAPH_W;
+	tdata.wh[1] = HS_GRAPH_H * mem_img_bpp;
+	tdata.wh[2] = tdata.wh[0] * tdata.wh[1] * 3;
 
 	if (mem_img_bpp == 1)
 	{

@@ -1333,7 +1333,11 @@ static void select_font(font_dd *dt, void **wdata, int what, void **where)
 		fc = dt->fontsizes + dt->lfontsize;
 
 		// Scalable so remember size
-		if (!fc->zn->size) font_size = fc->n;
+		if (!fc->zn->size)
+		{
+			// Only if it really was reselected
+			if (idx == 2) font_size = fc->n;
+		}
 		// Non-Scalable so remember index
 		else inifile_set_gint32("lastfontBitmapGeometry", fc->zn->size);
 
