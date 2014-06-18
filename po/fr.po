@@ -1089,7 +1089,7 @@ msgstr ""
 
 #: src/help.c:88
 msgid "  E                 Choose Colour\n"
-msgstr ""
+msgstr "  E                 Choisir couleur\n"
 
 #: src/help.c:89
 msgid ""
@@ -1971,7 +1971,7 @@ msgstr "//Sélectionner le pinceau ..."
 
 #: src/mainwindow.c:4768
 msgid "//Choose Colour ..."
-msgstr ""
+msgstr "//Choisir couleur ..."
 
 #: src/mainwindow.c:4770
 msgid "/_View"
@@ -2399,7 +2399,7 @@ msgstr "//Enregistrer l'image composée ..."
 
 #: src/mainwindow.c:4921
 msgid "//Composite to New Layer"
-msgstr ""
+msgstr "//Image composée vers nouveau calque"
 
 #: src/mainwindow.c:4922
 msgid "//Remove All Layers"

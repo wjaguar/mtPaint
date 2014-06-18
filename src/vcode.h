@@ -71,6 +71,8 @@ enum {
 	op_RGBIMAGE,
 	op_WRGBIMAGE,
 	op_RGBIMAGEP,
+	op_CANVASIMG,
+	op_ECANVASIMG,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -203,6 +205,11 @@ enum {
 	op_EVT_LAST,
 	op_TRIGGER = op_EVT_LAST,
 
+	op_EV_0, // dynamic tags - event values
+	op_EV_MOUSE = op_EV_0,
+
+	op_EV_LAST,
+
 	op_EXEC,
 	op_GOTO,
 	op_CALL,
@@ -275,7 +282,7 @@ typedef struct {
 //	Structure which is provided to MOUSE/MMOUSE/RMOUSE event
 typedef struct {
 	int x, y;
-	int button;	// what was pressed, stays pressed (?), or got released
+	int button;	// what was pressed, stays pressed, or got released
 	int count;	// 1/2/3 single/double/triple click, 0 move, -1 release
 	unsigned int state;	// button & modifier flags
 // !!! No pressure yet, and no device type too
@@ -360,6 +367,8 @@ void cmd_repaint(void **slot);
 void cmd_reset(void **slot, void *ddata);
 //	Set cursor for slot window
 void cmd_cursor(void **slot, void **cursor);
+//	Check extra state on slot
+int cmd_checkv(void **slot, int idx);
 
 ///	Handler for dialog buttons
 void dialog_event(void *ddata, void **wdata, int what, void **where);
@@ -399,7 +408,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WSHOW WBh(WSHOW, 0)
 #define WDIALOG(V) WBhf(WDIALOG, 1), WBfield(V)
 #define WDONE WBh(WDONE, 0)
-#define MAINWINDOW(NM,ICN,W,H) WBr2h(MAINWINDOW, 3), (NM), (ICN), WBwh(W, H)
+#define MAINWINDOW(NM,ICN,W,H) WBrh(MAINWINDOW, 3), (NM), (ICN), WBwh(W, H)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhnf(WINDOWm, 1), WBfield(NP)
@@ -482,6 +491,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
+#define CANVASIMGv(CP,W,H) WBrh(CANVASIMG, 2), (CP), WBwh(W, H)
+#define ECANVASIMGv(CP,W,H) WBrh(ECANVASIMG, 2), (CP), WBwh(W, H)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -748,6 +759,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MTRIGGER(H) WBr2h(TRIGGER, 0 + 2), EVENT(CHANGE, H)
 #define WANTKEYS(H) WBr2h(WANTKEYS, 0 + 2), EVENT(KEY, H)
 
+#define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B)
+
+//	EVDATA slot size
+#define EV_SIZE		2
+
 //	Extra data of FPICK
 #define FPICK_VALUE	0
 #define FPICK_RAW	1
@@ -790,3 +806,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 
 //	Extra data of COLORLIST
 #define COLORLIST_RESET_ROW 0
+
+//	Extra data of CANVASIMG
+#define CANVAS_SIZE	0
+
+//	Extra state of EV_MOUSE
+#define MOUSE_BOUND	0

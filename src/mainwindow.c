@@ -164,7 +164,7 @@ static inilist ini_int[] = {
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *drawing_palette, *drawing_canvas, *vw_scrolledwindow,
+GtkWidget *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas;
 
 static void **main_menubar;

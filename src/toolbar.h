@@ -104,7 +104,7 @@ void **m_cursor[TOTAL_CURSORS];		// My mouse cursors
 void **move_cursor, **busy_cursor, **corner_cursor[4]; // System cursors
 
 int toolbar_status[TOOLBAR_MAX];		// True=show
-GtkWidget *drawing_col_prev;
+void **drawing_col_prev, **drawing_palette;
 void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 	**toolbar_zoom_view;
 

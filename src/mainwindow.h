@@ -284,7 +284,7 @@ char *cspnames_[NUM_CSPACES];
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *drawing_palette, *drawing_canvas, *vw_scrolledwindow,
+GtkWidget *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;

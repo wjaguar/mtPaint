@@ -111,8 +111,11 @@ void **wdata_slot(void **slot)
 		if (op == op_WDONE) return (slot);
 		// EVTs link to it
 		if ((op >= op_EVT_0) && (op <= op_EVT_LAST)) return (*slot);
-
-		slot = PREV_SLOT(slot);
+		// EVs link to parent slot
+		if ((op >= op_EV_0) && (op <= op_EV_LAST))
+			slot = GET_HANDLER(slot);
+		// Other slots just repose in sequence
+		else slot = PREV_SLOT(slot);
 		/* And if not valid wdata, die by SIGSEGV in the end */
 	}
 }
@@ -120,8 +123,16 @@ void **wdata_slot(void **slot)
 /* From event to its originator */
 void **origin_slot(void **slot)
 {
-	while (GET_OP(slot) >= op_EVT_0) slot = PREV_SLOT(slot);
-	return (slot);
+	while (TRUE)
+	{
+		int op = GET_OP(slot);
+		if (op < op_EVT_0) return (slot);
+		// EVs link to parent slot
+		else if ((op >= op_EV_0) && (op <= op_EV_LAST))
+			slot = GET_HANDLER(slot);
+		else slot = PREV_SLOT(slot);
+		/* And if not valid wdata, die by SIGSEGV in the end */
+	}
 }
 
 void dialog_event(void *ddata, void **wdata, int what, void **where)
@@ -243,11 +254,34 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	return (res);
 }
 
+typedef struct {
+	void *slot[EV_SIZE + VSLOT_SIZE];
+	mouse_ext *mouse;
+	int vport[4];
+} mouse_den;
+
+static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
+{
+	void **orig = origin_slot(slot);
+	void **base = slot[0], **desc = slot[1];
+	mouse_den den = { { EVDATA(MOUSE, orig, event, den.slot) },
+		mouse, { 0, 0, 0, 0 } };
+	int op = GET_OP(orig);
+
+	if ((op == op_CANVASIMG) || (op == op_ECANVASIMG))
+	{
+		wjcanvas_get_vport(orig[0], den.vport);
+		den.mouse->x += den.vport[0];
+		den.mouse->y += den.vport[1];
+	}
+
+	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, mouse));
+}
+
 static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
-	void **slot = user_data;
-	void **base = slot[0], **desc = slot[1];
 	mouse_ext mouse = {
 		event->x, event->y, event->button,
 		event->type == GDK_BUTTON_PRESS ? 1 :
@@ -255,15 +289,12 @@ static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
 		event->type == GDK_3BUTTON_PRESS ? 3 :
 		event->type == GDK_BUTTON_RELEASE ? -1 : 0,
 		event->state };
-	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, slot, &mouse));
+	return (do_evt_mouse(user_data, event, &mouse));
 }
 
 static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	gpointer user_data)
 {
-	void **slot = user_data;
-	void **base = slot[0], **desc = slot[1];
 	mouse_ext mouse;
 
 	if (event->is_hint) gdk_window_get_pointer(event->window,
@@ -283,8 +314,7 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 
 	mouse.count = 0; // motion
 
-	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, slot, &mouse));
+	return (do_evt_mouse(user_data, event, &mouse));
 }
 
 void add_click(void **r, GtkWidget *widget)
@@ -507,6 +537,67 @@ GtkWidget *rgbimagep(void *v, int w, int h)
 	rd->h = h;
 	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(reset_rgbp), rd);
+
+	return (widget);
+}
+
+//	CANVASIMG widget
+
+static gboolean expose_canvasimg(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	unsigned char *src = rd->rgb;
+	int w = rd->w, h = rd->h;
+	int x1, y1, x2, y2, vport[4];
+
+	wjcanvas_get_vport(widget, vport);
+	x2 = (x1 = event->area.x + vport[0]) + event->area.width;
+	y2 = (y1 = event->area.y + vport[1]) + event->area.height;
+
+	/* With theme engines lurking out there, weirdest things can happen */
+	if (y2 > h)
+	{
+		gdk_draw_rectangle(widget->window, widget->style->black_gc,
+			TRUE, event->area.x, h - vport[1],
+			event->area.width, y2 - h);
+		if (y1 >= h) return (TRUE);
+		y2 = h;
+	}
+	if (x2 > w)
+	{
+		gdk_draw_rectangle(widget->window, widget->style->black_gc,
+			TRUE, w - vport[0], event->area.y,
+			x2 - w, event->area.height);
+		if (x1 >= w) return (TRUE);
+		x2 = w;
+	}
+
+	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+		event->area.x, event->area.y, x2 - x1, y2 - y1,
+		GDK_RGB_DITHER_NONE, src + (y1 * w + x1) * 3, w * 3);
+
+	return (TRUE);
+}
+
+GtkWidget *canvasimg(void *v, int w, int h)
+{
+	rgbimage_data *rd;
+	GtkWidget *widget, *frame;
+
+	widget = wjcanvas_new();
+	rd = bound_malloc(widget, sizeof(rgbimage_data));
+	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
+	rd->rgb = v;
+	rd->w = w;
+	rd->h = h;
+	wjcanvas_size(widget, w, h);
+	gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
+		GTK_SIGNAL_FUNC(expose_canvasimg), rd);
+
+	frame = wjframe_new();
+	gtk_widget_show(frame);
+	gtk_container_add(GTK_CONTAINER(frame), widget);
 
 	return (widget);
 }
@@ -2873,6 +2964,7 @@ enum {
 	cm_HBOX,
 	cm_SCROLL,
 	cm_RGB,
+	cm_CANVAS,
 	cm_SPIN,
 	cm_SPINa,
 	cm_FSPIN,
@@ -2925,6 +3017,8 @@ static cmdef cmddefs[] = {
 		USE_BORDER(XSCROLL) },
 	{ op_RGBIMAGE, cm_RGB, pk_BIN | pkf_SHOW },
 	{ op_WRGBIMAGE, cm_RGB, pk_PACK | pkf_SHOW },
+	{ op_CANVASIMG, cm_CANVAS, pk_BIN | pkf_SHOW | pkf_PARENT },
+	{ op_ECANVASIMG, cm_CANVAS, pk_EPACK | pkf_SHOW | pkf_PARENT },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 	/* Codes can map to themselves, and some do */
 // !!! Padding = 0
@@ -3264,6 +3358,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			p1 = gtk_vbox_new(FALSE, 0);
 			gtk_widget_show(p1);
 			gtk_paned_pack2(GTK_PANED(pane), p1, FALSE, TRUE);
+#if GTK_MAJOR_VERSION == 1
+	/* !!! Hack - but nothing else seems to prevent a sorry mess when
+	 * a widget gets REMOUNT'ed from a never-yet displayed pane */
+			gtk_container_set_resize_mode(GTK_CONTAINER(p1),
+				GTK_RESIZE_QUEUE);
+#endif
 
 			/* Now, create the left pane - for now, separate */
 			p0 = xpack(widget, gtk_vbox_new(FALSE, 0));
@@ -3456,6 +3556,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_RGBIMAGEP:
 			widget = rgbimagep(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
 			pk = pk_BIN | pkf_SHOW;
+			break;
+		/* Add a framed canvas-based renderer */
+		case cm_CANVAS:
+			widget = canvasimg(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
 			break;
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
@@ -5111,6 +5215,15 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_COLORLIST: case op_COLORLISTN:
 		colorlist_reset_color(slot[0], (int)res);
 		break;
+	case op_CANVASIMG: case op_ECANVASIMG:
+	{
+		rgbimage_data *rd = gtk_object_get_user_data(slot[0]);
+		int *v = res;
+		rd->w = v[0];
+		rd->h = v[1];
+		wjcanvas_size(slot[0], v[0], v[1]);
+		break;
+	}
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(slot[0], gtk_object_get_user_data(slot[0]), (int)res);
 // !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
@@ -5161,4 +5274,19 @@ void cmd_cursor(void **slot, void **cursor)
 {
 	gdk_window_set_cursor(GTK_WIDGET(slot[0])->window,
 		cursor ? cursor[0] : NULL);
+}
+
+int cmd_checkv(void **slot, int idx)
+{
+	int op = GET_OP(slot);
+	if (op == op_EV_MOUSE)
+	{
+		mouse_den *dp = slot[1];
+		void **canvas = GET_HANDLER(slot);
+		if (dp->mouse->count) return (FALSE); // Not a move
+		return (wjcanvas_bind_mouse(canvas[0], slot[0],
+			dp->mouse->x - dp->vport[0],
+			dp->mouse->y - dp->vport[1]));
+	}
+	return (FALSE);
 }

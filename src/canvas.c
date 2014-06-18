@@ -1186,11 +1186,13 @@ void update_stuff(int flags)
 		check_marquee();
 	if (flags & CF_PAL)
 	{
+		int wh[2] = { PALETTE_WIDTH,
+			mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2 };
+
 		if (mem_col_A >= mem_cols) mem_col_A = 0;
 		if (mem_col_B >= mem_cols) mem_col_B = 0;
 		mem_mask_init();	// Reinit RGB masks
-		wjcanvas_size(drawing_palette, PALETTE_WIDTH,
-			mem_cols * PALETTE_SWATCH_H + PALETTE_SWATCH_Y * 2);
+		cmd_setv(drawing_palette, wh, CANVAS_SIZE);
 	}
 	if (flags & CF_AB)
 	{
@@ -1199,7 +1201,7 @@ void update_stuff(int flags)
 		{
 			if (text_paste == TEXT_PASTE_FT) ft_render_text();
 			else /* if ( text_paste == TEXT_PASTE_GTK ) */
-				render_text( drawing_col_prev );
+				render_text();
 			check_marquee();
 			flags |= CF_PMODE;
 		}
@@ -1238,12 +1240,12 @@ void update_stuff(int flags)
 	if (flags & CF_PDRAW)
 	{
 		mem_pal_init();		// Update palette RGB on screen
-		gtk_widget_queue_draw(drawing_palette);
+		cmd_repaint(drawing_palette);
 	}
 	if (flags & CF_TDRAW)
 	{
 		update_top_swatch();
-		gtk_widget_queue_draw(drawing_col_prev);
+		cmd_repaint(drawing_col_prev);
 	}
 	if (flags & CF_ALIGN)
 		realign_size();

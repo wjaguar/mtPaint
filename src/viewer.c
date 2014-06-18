@@ -1064,8 +1064,9 @@ fail:		free(img);
 	return (TRUE);
 }
 
-void render_text( GtkWidget *widget )
+void render_text()
 {
+	GtkWidget *widget = main_window;
 	GdkPixmap *text_pixmap;
 	unsigned char *buf;
 	int width, height, have_rgb = 0;
@@ -1172,10 +1173,12 @@ static void paste_text_ok(text_dd *dt, void **wdata, int what)
 
 	run_query(wdata);
 
+	if (mem_channel == CHN_IMAGE) font_bkg = dt->bkg[0];
+
 	inifile_set("lastTextFont", t_font_name);
 	inifile_set("textString", t_string);
 
-	render_text(dt->textw);
+	render_text();
 	update_stuff(UPD_XCOPY);
 	if (mem_clipboard) pressed_paste(TRUE);
 

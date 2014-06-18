@@ -43,7 +43,7 @@
 void **icon_buttons[TOTAL_TOOLS];
 
 int toolbar_status[TOOLBAR_MAX];			// True=show
-GtkWidget *drawing_col_prev;
+void **drawing_col_prev, **drawing_palette;
 void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 	**toolbar_zoom_view;
 
@@ -62,46 +62,17 @@ static void **toolbar_labels[2],	// Colour A & B
 static unsigned char mem_prev[PREVIEW_WIDTH * PREVIEW_HEIGHT * 3];
 					// RGB colours, tool, pattern preview
 
-static gint expose_preview( GtkWidget *widget, GdkEventExpose *event )
-{
-	int rx, ry, rw, rh;
-
-	rx = event->area.x;
-	ry = event->area.y;
-	rw = event->area.width;
-	rh = event->area.height;
-
-	if ( ry < PREVIEW_HEIGHT )
-	{
-		if ( (ry+rh) >= PREVIEW_HEIGHT )
-		{
-			rh = PREVIEW_HEIGHT - ry;
-		}
-		gdk_draw_rgb_image( widget->window, widget->style->black_gc,
-				rx, ry, rw, rh,
-				GDK_RGB_DITHER_NONE,
-				mem_prev + 3*( rx + PREVIEW_WIDTH*ry ),
-				PREVIEW_WIDTH*3
-				);
-	}
-
-	return FALSE;
-}
-
-
-static gint click_colours( GtkWidget *widget, GdkEventButton *event )
+static int click_colours(void *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
 	if (mem_img[CHN_IMAGE])
 	{
-		if ( event->y > 31 ) choose_pattern(0);
-		else
-		{
-			if ( event->x < 48 ) colour_selector(COLSEL_EDIT_AB);
-			else choose_pattern(1);
-		}
+		if (mouse->y > 31) choose_pattern(0);
+		else if (mouse->x < 48) colour_selector(COLSEL_EDIT_AB);
+		else choose_pattern(1);
 	}
 
-	return FALSE;
+	return (FALSE);
 }
 
 void toolbar_zoom_update()	// Update the zoom combos to reflect current zoom
@@ -655,59 +626,15 @@ void toolbar_update_settings()
 
 static png_color brcosa_palette[256];
 
-static gboolean expose_palette(GtkWidget *widget, GdkEventExpose *event,
-	gpointer user_data)
+static int motion_palette(void *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
-	int x1, y1, x2, y2, vport[4];
-
-	wjcanvas_get_vport(widget, vport);
-	x2 = (x1 = event->area.x + vport[0]) + event->area.width;
-	y2 = (y1 = event->area.y + vport[1]) + event->area.height;
-
-	/* With theme engines lurking out there, weirdest things can happen */
-	if (y2 > PALETTE_HEIGHT)
-	{
-		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, event->area.x, PALETTE_HEIGHT - vport[1],
-			event->area.width, y2 - PALETTE_HEIGHT);
-		if (y1 >= PALETTE_HEIGHT) return (TRUE);
-		y2 = PALETTE_HEIGHT;
-	}
-	if (x2 > PALETTE_WIDTH)
-	{
-		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, PALETTE_WIDTH - vport[0], event->area.y,
-			x2 - PALETTE_WIDTH, event->area.height);
-		if (x1 >= PALETTE_WIDTH) return (TRUE);
-		x2 = PALETTE_WIDTH;
-	}
-
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		event->area.x, event->area.y, x2 - x1, y2 - y1,
-		GDK_RGB_DITHER_NONE, mem_pals + y1 * PALETTE_W3 + x1 * 3, PALETTE_W3);
-
-	return (TRUE);
-}
-
-static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
-{
-	GdkModifierType state;
-	int x, y, pindex, vport[4];
-
-	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
-	else
-	{
-		x = event->x;
-		y = event->y;
-		state = event->state;
-	}
+	int pindex;
 
 	/* If cursor got warped, will have another movement event to handle */
-	if (drag_index && wjcanvas_bind_mouse(widget, event, x, y)) return (TRUE);
+	if (drag_index && cmd_checkv(where, MOUSE_BOUND)) return (TRUE);
 
-	wjcanvas_get_vport(widget, vport);
-
-	pindex = (y + vport[1] - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
+	pindex = (mouse->y - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
 	pindex = pindex < 0 ? 0 : pindex >= mem_cols ? mem_cols - 1 : pindex;
 
 	if (drag_index && (drag_index_vals[1] != pindex))
@@ -720,12 +647,13 @@ static gboolean motion_palette(GtkWidget *widget, GdkEventMotion *event, gpointe
 	return (TRUE);
 }
 
-static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
+static int release_palette(void *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
 	if (drag_index)
 	{
 		drag_index = FALSE;
-		gdk_window_set_cursor( drawing_palette->window, NULL );
+		cmd_cursor(drawing_palette, NULL);
 		if ( drag_index_vals[0] != drag_index_vals[1] )
 		{
 			mem_pal_copy(mem_pal, brcosa_palette);	// Get old values back
@@ -742,17 +670,15 @@ static gboolean release_palette( GtkWidget *widget, GdkEventButton *event )
 	return FALSE;
 }
 
-static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
+static int click_palette(void *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
-	int px, py, pindex, vport[4];
+	int pindex, px = mouse->x, py = mouse->y;
 
 
 	/* Filter out multiple clicks */
-	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
+	if (mouse->count > 1) return (TRUE);
 
-	wjcanvas_get_vport(widget, vport);
-	px = event->x + vport[0];
-	py = event->y + vport[1];
 	if (py < PALETTE_SWATCH_Y) return (TRUE);
 	pindex = (py - PALETTE_SWATCH_Y) / PALETTE_SWATCH_H;
 	if (pindex >= mem_cols) return (TRUE);
@@ -760,16 +686,16 @@ static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 	if (px < PALETTE_SWATCH_X) colour_selector(COLSEL_EDIT_ALL + pindex);
 	else if (px < PALETTE_CROSS_X)		// Colour A or B changed
 	{
-		if ((event->button == 1) && (event->state & GDK_SHIFT_MASK))
+		if ((mouse->button == 1) && (mouse->state & _Smask))
 		{
 			mem_pal_copy(brcosa_palette, mem_pal);
 			drag_index = TRUE;
 			drag_index_vals[0] = drag_index_vals[1] = pindex;
-			gdk_window_set_cursor(drawing_palette->window, move_cursor[0]);
+			cmd_cursor(drawing_palette, move_cursor);
 		}
-		else if ((event->button == 1) || (event->button == 3))
+		else if ((mouse->button == 1) || (mouse->button == 3))
 		{
-			int ab = (event->button == 3) || (event->state & GDK_CONTROL_MASK);
+			int ab = (mouse->button == 3) || (mouse->state & _Cmask);
 
 			mem_col_[ab] = pindex;
 			mem_col_24[ab] = mem_pal[pindex];
@@ -786,58 +712,21 @@ static gboolean click_palette( GtkWidget *widget, GdkEventButton *event )
 	return (TRUE);
 }
 
-static void **toolbar_palette_init(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GtkWidget *vbox, *hbox, *scrolledwindow_palette, *viewport_palette;
-
-	vbox = **wpp;
-
-	hbox = pack5(vbox, gtk_hbox_new(FALSE, 0));
-	gtk_widget_show(hbox);
-
-	drawing_col_prev = wjcanvas_new();
-	gtk_widget_show(drawing_col_prev);
-	wjcanvas_size(drawing_col_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT);
-
-	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "button_release_event",
-		GTK_SIGNAL_FUNC (click_colours), GTK_OBJECT(drawing_col_prev) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_col_prev), "expose_event",
-		GTK_SIGNAL_FUNC (expose_preview), GTK_OBJECT(drawing_col_prev) );
-	gtk_widget_set_events (drawing_col_prev, GDK_ALL_EVENTS_MASK);
-
-	viewport_palette = wjframe_new();
-	gtk_widget_show(viewport_palette);
-	gtk_container_add(GTK_CONTAINER(viewport_palette), drawing_col_prev);
-	gtk_box_pack_start(GTK_BOX(hbox), viewport_palette, TRUE, FALSE, 0);
-
-	scrolledwindow_palette = xpack(vbox, gtk_scrolled_window_new(NULL, NULL));
-	gtk_widget_show (scrolledwindow_palette);
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_palette),
-		GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
-
-	drawing_palette = wjcanvas_new();
-	gtk_widget_show(drawing_palette);
-	wjcanvas_size(drawing_palette, PALETTE_WIDTH, 64);
-	add_with_wjframe(scrolledwindow_palette, drawing_palette);
-
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "expose_event",
-		GTK_SIGNAL_FUNC (expose_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "button_press_event",
-		GTK_SIGNAL_FUNC (click_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "motion_notify_event",
-		GTK_SIGNAL_FUNC (motion_palette), GTK_OBJECT(drawing_palette) );
-	gtk_signal_connect_object( GTK_OBJECT(drawing_palette), "button_release_event",
-		GTK_SIGNAL_FUNC (release_palette), GTK_OBJECT(drawing_palette) );
-
-	gtk_widget_set_events (drawing_palette, GDK_ALL_EVENTS_MASK);
-
-	return (r);
-}
-
 void *toolbar_palette_code[] = {
 	REFv(toolbar_boxes[TOOLBAR_PALETTE]), VBOXr,
 	UNLESSv(toolbar_status[TOOLBAR_PALETTE]), HIDDEN,
-	EXEC(toolbar_palette_init),
+	HBOXbp(0, 0, 5),
+	REFv(drawing_col_prev),
+	ECANVASIMGv(mem_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT),
+	EVENT(RMOUSE, click_colours),
+	WDONE, // HBOXbp
+	BORDER(XSCROLL, 0),
+	XSCROLL(0, 2), // never/always
+	REFv(drawing_palette),
+	CANVASIMGv(mem_pals, PALETTE_WIDTH, 64), // initial size
+	EVENT(MOUSE, click_palette),
+	EVENT(MMOUSE, motion_palette),
+	EVENT(RMOUSE, release_palette),
 	WDONE,
 	RET
 };

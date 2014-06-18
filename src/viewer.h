@@ -41,7 +41,7 @@ void view_hide();
 int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp);
 void pressed_help();
 void pressed_text();
-void render_text( GtkWidget *widget );
+void render_text();
 
 void vw_align_size( float new_zoom );				// Set new zoom
 void vw_realign();						// Reapply old zoom
