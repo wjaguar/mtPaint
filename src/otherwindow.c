@@ -339,7 +339,7 @@ static void make_crgb(unsigned char *tmp, int channel)
 	}
 }
 
-void render_color_grid(unsigned char *rgb, int w, int h, int cellsize,
+static void render_color_grid(unsigned char *rgb, int w, int h, int cellsize,
 	unsigned char *pp)
 {
 	unsigned char *tmp;
@@ -2058,6 +2058,13 @@ void pressed_quantize(int palette)
 
 ///	GRADIENT WINDOW
 
+#define PPAD_SLOT 11
+#define PPAD_XSZ 32
+#define PPAD_YSZ 8
+#define PPAD_WIDTH (PPAD_XSZ * PPAD_SLOT - 1)
+#define PPAD_HEIGHT (PPAD_YSZ * PPAD_SLOT - 1)
+#define PPAD_C ((PPAD_SLOT >> 1) - 1)
+
 typedef struct {
 	int pmouse;
 	int channel, nchan;
@@ -2074,15 +2081,45 @@ typedef struct {
 typedef struct {
 	void **xw; // parent widget-map
 	int lock; // prevent nested calls
-	int pcol, interp, crgb[3];
+	int interp, crgb[3];
 	int cnt, slot, mode;
+	int pgridsize, gxy[2];
 	void **ppad;
 	void **col, **opt;
 	void **spin, **chk;
 	void **pspin, **gbar;
+	unsigned char *pgrid;
 	unsigned char rgb[768];
 	unsigned char pad[GRAD_POINTS * 3], mpad[GRAD_POINTS];
 } ged_dd;
+
+static void ged_set_pad(ged_dd *dt, int n)
+{
+	int xy[2], color[2];
+	void **slot;
+
+	if (n > dt->crgb[2]) return; // out of range
+
+	xy[0] = (n % PPAD_XSZ) * PPAD_SLOT + PPAD_C;
+	xy[1] = (n / PPAD_XSZ) * PPAD_SLOT + PPAD_C;
+	cmd_setv(dt->ppad, xy, FCIMAGE_XY);
+
+	if (dt->lock) return;
+	dt->lock = TRUE; /* Block circular signal calls */
+
+	/* RGB */
+	if (!dt->mode)
+	{
+		color[0] = dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3);
+		color[1] = 255;
+		cmd_setv(slot = dt->col, color, COLOR_RGBA);
+	}
+	/* Indexed / utility / opacity */
+	else cmd_set(slot = dt->spin, dt->crgb[0] = n);
+	dt->lock = FALSE;
+
+	cmd_event(slot, op_EVT_CHANGE); // And now call event
+}
 
 static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 {
@@ -2138,30 +2175,13 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 		{
 			cmd_set(dt->spin, dt->pad[slot]);
 			cmd_set(dt->chk, dt->mpad[slot] == GRAD_TYPE_CONST);
-			cmd_set(dt->ppad, dt->pad[slot]);
+			ged_set_pad(dt, dt->pad[slot]);
 		}
 	}
 	else if (cause == &dt->cnt) /* Set length */
 		cmd_repaint(dt->gbar);
 	else
 	{
-		if (cause == &dt->pcol) /* Select color on pad */
-		{
-			int color[2];
-			int n = dt->pcol;
-
-			if (n > dt->crgb[2]) goto done; // out of range
-			/* RGB */
-			else if (!dt->mode)
-			{
-				color[0] = dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3);
-				color[1] = 255;
-				cmd_setv(dt->col, color, COLOR_RGBA);
-			}
-			/* Indexed / utility / opacity */
-			else cmd_set(dt->spin, dt->crgb[0] = n);
-			/* Fallthrough to select color */
-		}
 		if (cause == &dt->interp) /* Select mode */
 		{
 			int n = dt->interp;
@@ -2177,7 +2197,7 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 			gp[2] = INT_2_B(rgb);
 		}
 		else /* Indexed / utility / opacity */
-			cmd_set(dt->ppad, dt->pad[slot] = dt->crgb[0]);
+			ged_set_pad(dt, dt->pad[slot] = dt->crgb[0]);
 
 		if (dt->cnt <= slot) // Extend as needed
 			cmd_set(dt->pspin, dt->cnt = slot + 1);
@@ -2185,6 +2205,37 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 		cmd_repaint(dt->gbar);
 	}
 done:	dt->lock = FALSE;
+}
+
+static int ged_pkey(ged_dd *dt, void **wdata, int what, void **where,
+	key_ext *key)
+{
+	int x, y;
+
+	if (!arrow_key_(key->key, key->state, &x, &y, 0)) return (FALSE);
+	x += dt->gxy[0] / PPAD_SLOT;
+	y += dt->gxy[1] / PPAD_SLOT;
+	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
+	y = y * PPAD_XSZ + x;
+	y = y < 0 ? 0 : y > 255 ? 255 : y;
+	ged_set_pad(dt, y);
+
+	return (TRUE);
+}
+
+static int ged_pclick(ged_dd *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
+{
+	int x, y;
+
+	/* Only single clicks */
+	if (mouse->count != 1) return (TRUE);
+	x = mouse->x / PPAD_SLOT;
+	y = mouse->y / PPAD_SLOT;
+	y = y * PPAD_XSZ + x;
+	ged_set_pad(dt, y);
+
+	return (TRUE);
 }
 
 static char *interp_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
@@ -2195,7 +2246,9 @@ static void *ged_code[] = {
 	ONTOP(xw), WINDOWm(_("Edit Gradient")),
 	XVBOXb(5, 5), // !!! Originally the main vbox was that way
 	/* Palette pad */
-	REF(ppad), COLORPAD(rgb, pcol, ged_event),
+	TALLOC(pgrid, pgridsize),
+	REF(ppad), FCIMAGEP(pgrid, gxy, PPAD_WIDTH, PPAD_HEIGHT),
+	EVENT(KEY, ged_pkey), EVENT(MOUSE, ged_pclick),
 	HSEP,
 	/* Editor widgets */
 	UNLESSx(mode, 1), /* RGB */
@@ -2218,14 +2271,15 @@ static void *ged_code[] = {
 	TRIGGER,
 	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), ged_event, _("Cancel"), NULL),
-	WSHOW
+	WEND
 };
 #undef WBbase
 
 static void grad_edit(void **wdata, int opac)
 {
-	ged_dd tdata;
+	ged_dd tdata, *ddt;
 	grad_dd *dt = GET_DDATA(wdata);
+	void **dd;
 	int idx;
 
 	memset(&tdata, 0, sizeof(tdata));
@@ -2254,7 +2308,14 @@ static void grad_edit(void **wdata, int opac)
 
 	make_crgb(tdata.rgb, tdata.mode);
 
-	run_create(ged_code, &tdata, sizeof(tdata));
+	tdata.pgridsize = PPAD_WIDTH * PPAD_HEIGHT * 3;
+	tdata.gxy[0] = tdata.gxy[1] = PPAD_C;
+
+	dd = run_create(ged_code, &tdata, sizeof(tdata));
+	ddt = GET_DDATA(dd);
+	render_color_grid(ddt->pgrid, PPAD_WIDTH, PPAD_HEIGHT, PPAD_SLOT, ddt->rgb);
+
+	cmd_showhide(dd, TRUE);
 }
 
 #define NUM_GTYPES 7

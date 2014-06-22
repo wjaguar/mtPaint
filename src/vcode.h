@@ -73,6 +73,8 @@ enum {
 	op_RGBIMAGEP,
 	op_CANVASIMG,
 	op_ECANVASIMG,
+	op_FCIMAGEP,
+	op_TLFCIMAGEP,
 	op_TLNOSPIN,
 	//
 	op_SPIN,
@@ -125,7 +127,6 @@ enum {
 	op_TCOLOR,
 	op_COLORLIST,
 	op_COLORLISTN,
-	op_COLORPAD,
 	op_GRADBAR,
 	op_PCTCOMBO,
 	op_LISTCCr,
@@ -201,12 +202,15 @@ enum {
 	op_EVT_MMOUSE, // movement, with same
 	op_EVT_RMOUSE, // release, with same
 	op_EVT_EXT, // generic event with extra data
+	op_EVT_DRAGFROM,
+	op_EVT_DROP,
 
 	op_EVT_LAST,
 	op_TRIGGER = op_EVT_LAST,
 
 	op_EV_0, // dynamic tags - event values
 	op_EV_MOUSE = op_EV_0,
+	op_EV_DRAGFROM,
 
 	op_EV_LAST,
 
@@ -255,6 +259,7 @@ enum {
 	op_BOR_BUTTON,
 	op_BOR_TOOLBAR,
 	op_BOR_POPUP,
+	op_BOR_TOPVBOX,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -288,6 +293,15 @@ typedef struct {
 // !!! No pressure yet, and no device type too
 } mouse_ext;
 
+//	Structure which is provided to DRAGFROM and DROP event
+
+typedef struct {
+	int x, y;
+	void **format; // !!! Not valid yet
+	void *data;
+	int len;
+} drag_ext;
+
 #define _Cmask (GDK_CONTROL_MASK)
 #define _Smask (GDK_SHIFT_MASK)
 #define _Amask (GDK_MOD1_MASK)
@@ -299,11 +313,9 @@ typedef struct {
 #define _B13mask (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)
 
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
-typedef int (*evtkey_fn)(void *ddata, void **wdata, int what, void **where,
-	key_ext *keydata);
-typedef int (*evtmouse_fn)(void *ddata, void **wdata, int what, void **where,
-	mouse_ext *mousedata);
 typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
+	void *xdata);
+typedef int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
 
 //	Build a dialog window out of V-code decription
@@ -346,6 +358,12 @@ void do_evt_1_d(void **slot);
 void **wdata_slot(void **slot);
 //	From event to its originator
 void **origin_slot(void **slot);
+
+//	From slot to its storage location */
+void *slot_data(void **slot, void *ddata);
+
+//	Raise event on slot
+void cmd_event(void **slot, int op);
 
 //	Set sensitive state on slot
 void cmd_sensitive(void **slot, int state);
@@ -491,8 +509,14 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
-#define CANVASIMGv(CP,W,H) WBrh(CANVASIMG, 2), (CP), WBwh(W, H)
-#define ECANVASIMGv(CP,W,H) WBrh(ECANVASIMG, 2), (CP), WBwh(W, H)
+#define CANVASIMGv(CC,W,H) WBrh(CANVASIMG, 2), (CC), WBwh(W, H)
+#define ECANVASIMGv(CC,W,H) WBrh(ECANVASIMG, 2), (CC), WBwh(W, H)
+#define FCIMAGEP(CP,A,W,H) WBrhnf(FCIMAGEP, 3), WBfield(CP), WBfield(A), \
+	WBwh(W, H)
+#define TLFCIMAGEP(CP,A,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
+	WBfield(A), WBfield(AS), WBxyl(X, Y, 1)
+#define TLFCIMAGEPn(CP,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
+	(void *)(-1), WBfield(AS), WBxyl(X, Y, 1)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -577,8 +601,6 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define OPTDe(SP,V,HS) WBr2hf(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS)
 #define COMBO(SS,N,V) WBrhf(COMBO, 3), WBfield(V), (SS), (void *)(N)
-#define COLORPAD(CC,V,HS) WBr2hf(COLORPAD, 2 + 2), WBfield(V), WBfield(CC), \
-	EVENT(SELECT, HS)
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
 	EVENT(SELECT, HS)
@@ -758,6 +780,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TRIGGER WBrh(TRIGGER, 0)
 #define MTRIGGER(H) WBr2h(TRIGGER, 0 + 2), EVENT(CHANGE, H)
 #define WANTKEYS(H) WBr2h(WANTKEYS, 0 + 2), EVENT(KEY, H)
+// !!! For now
+#define DRAGFROM(H,L) WBrh(EVT_DRAGFROM, 2), (H), (L)
+#define DROP(H,A,N) WBrh(EVT_DROP, 3), (H), (A), (void *)(N)
 
 #define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B)
 
@@ -810,5 +835,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of CANVASIMG
 #define CANVAS_SIZE	0
 
+//	Extra data of FCIMAGE
+#define FCIMAGE_XY	0
+
 //	Extra state of EV_MOUSE
 #define MOUSE_BOUND	0
+
+//	Extra data of EV_DRAGFROM
+#define DRAG_DATA	0	/* array of 2 pointers: start/end */
+#define DRAG_ICON_RGB	1

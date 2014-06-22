@@ -55,9 +55,6 @@ int sharper_reduce;
 int spal_mode;
 seg_state *seg_preview;
 
-void render_color_grid(unsigned char *rgb, int w, int h, int cellsize,
-	unsigned char *pp);
-
 void generic_new_window(int type);
 
 void pressed_add_cols();

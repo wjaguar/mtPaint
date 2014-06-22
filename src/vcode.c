@@ -135,6 +135,17 @@ void **origin_slot(void **slot)
 	}
 }
 
+/* From slot to its storage location */
+void *slot_data(void **slot, void *ddata)
+{
+	void **desc = slot[1], **v = desc[1];
+	int opf = (int)desc[0];
+
+	if (opf & WB_FFLAG) v = (void *)(ddata + (int)v);
+	if (opf & WB_NFLAG) v = *v; // dereference
+	return (v);
+}
+
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
 	v_dd *vdata = GET_VDATA(wdata);
@@ -181,7 +192,7 @@ static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user
 	void **base = slot[0], **desc = slot[1];
 	key_ext key = {
 		event->keyval, low_key(event), real_key(event), event->state };
-	int res = ((evtkey_fn)desc[1])(GET_DDATA(base), base,
+	int res = ((evtxr_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot, &key);
 #if GTK_MAJOR_VERSION == 1
 	/* Return value alone doesn't stop GTK1 from running other handlers */
@@ -275,10 +286,12 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 		den.mouse->y += den.vport[1];
 	}
 
-	return (((evtmouse_fn)desc[1])(GET_DDATA(base), base,
+	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, mouse));
 }
 
+/* !!! After a drop, gtk_drag_end() sends to drag source a fake release event
+ * with coordinates (0, 0); remember to ignore them where necessary - WJ */
 static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -315,6 +328,178 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	mouse.count = 0; // motion
 
 	return (do_evt_mouse(user_data, event, &mouse));
+}
+
+//	Drag handling
+
+typedef struct {
+	int x, y, may_drag;
+	int color;
+	void **r;
+	GtkTargetList *targets;
+} drag_ctx;
+
+typedef struct {
+	GdkDragContext *drag_context;
+	GtkSelectionData *data;
+	guint info;
+	guint time;
+} drag_sel;
+
+typedef struct {
+	void *slot[EV_SIZE + VSLOT_SIZE];
+	drag_sel *ds;
+	drag_ctx *dc;
+	drag_ext d;
+} drag_den;
+
+static int drag_event(drag_sel *ds, GtkWidget *widget, drag_ctx *dc)
+{
+	void **slot = dc->r, **orig = origin_slot(slot);
+	void **base = slot[0], **desc = slot[1];
+	drag_den den = { { EVDATA(DRAGFROM, orig, NULL, den.slot) },
+		ds, dc };
+
+	/* While technically, drag starts at current position, I use the saved
+	 * one - where user had clicked to begin drag - WJ */
+	// !!! Struct not stable yet, so init fields one by one
+	memset(&den.d, 0, sizeof(den.d));
+	den.d.x = dc->x;
+	den.d.y = dc->y;
+// !!! Not valid yet, only serves as flag
+	den.d.format = !ds ? NULL : (void *)(-1);
+
+	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, &den.d));
+}
+
+#define RGB_DND_W 48
+#define RGB_DND_H 32
+
+static void set_drag_icon(GdkDragContext *context, GtkWidget *src, int rgb)
+{
+	GdkGCValues sv;
+	GdkPixmap *swatch;
+
+	swatch = gdk_pixmap_new(src->window, RGB_DND_W, RGB_DND_H, -1);
+	gdk_gc_get_values(src->style->black_gc, &sv);
+	gdk_rgb_gc_set_foreground(src->style->black_gc, rgb);
+	gdk_draw_rectangle(swatch, src->style->black_gc, TRUE, 0, 0,
+		RGB_DND_W, RGB_DND_H);
+	gdk_gc_set_foreground(src->style->black_gc, &sv.foreground);
+	gtk_drag_set_icon_pixmap(context, gtk_widget_get_colormap(src),
+		swatch, NULL, -2, -2);
+	gdk_pixmap_unref(swatch);
+}
+
+static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data)
+{
+	drag_ctx *dc = user_data;
+	int rx, ry;
+	GdkModifierType state;
+
+	if (event->type == GDK_BUTTON_PRESS)
+	{
+		if (event->button.button == 1) // Only left button inits drag
+		{
+			dc->x = event->button.x;
+			dc->y = event->button.y;
+			dc->may_drag = TRUE;
+		}
+	}
+	else if (event->type == GDK_BUTTON_RELEASE)
+	{
+		if (event->button.button == 1) dc->may_drag = FALSE;
+	}
+	else if (event->type == GDK_MOTION_NOTIFY)
+	{
+		if (event->motion.is_hint)
+			gdk_window_get_pointer(event->motion.window, &rx, &ry, &state);
+		else
+		{
+			rx = event->motion.x;
+			ry = event->motion.y;
+			state = event->motion.state;
+		}
+		/* May init drag */
+		if (state & GDK_BUTTON1_MASK)
+		{
+			/* No dragging without clicking on the widget first */
+			if (dc->may_drag &&
+#if GTK_MAJOR_VERSION == 1
+				((abs(rx - dc->x) > 3) ||
+				(abs(ry - dc->y) > 3))
+#else /* if GTK_MAJOR_VERSION == 2 */
+				gtk_drag_check_threshold(widget,
+					dc->x, dc->y, rx, ry)
+#endif
+			) /* Initiate drag */
+			{
+				GdkDragContext *context;
+
+				dc->may_drag = FALSE;
+				/* Call handler so it can decide if it wants
+				 * this drag, and maybe set icon color */
+				dc->color = -1;
+				if (!drag_event(NULL, widget, dc))
+					return (TRUE); // no drag
+				context = gtk_drag_begin(widget, dc->targets,
+					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
+				if (!context) return (TRUE); // failed
+				if (dc->color >= 0)
+					set_drag_icon(context, widget, dc->color);
+				return (TRUE);
+			}
+		}
+		else dc->may_drag = FALSE; // Release events can be lost
+	}
+	return (FALSE);
+}
+
+static void get_evt_drag(GtkWidget *widget, GdkDragContext *drag_context,
+	GtkSelectionData *data, guint info, guint time, gpointer user_data)
+{
+	drag_sel ds = { drag_context, data, info, time };
+	drag_event(&ds, widget, user_data);
+}
+
+static void fcimage_rxy(void **slot, int *xy);
+
+static void get_evt_drop(GtkWidget *widget, GdkDragContext *drag_context,
+	gint x,	gint y,	GtkSelectionData *data,	guint info, guint time,
+	gpointer user_data)
+{
+	void **slot = user_data, **orig = origin_slot(slot);
+	void **base = slot[0], **desc = slot[1];
+	int op = GET_OP(orig), xy[2] = { x, y };
+	drag_ext dx;
+
+#if GTK_MAJOR_VERSION == 1
+	/* GTK+1 provides window-relative coordinates, not widget-relative */
+	if (GTK_WIDGET_NO_WINDOW(*orig))
+	{
+		xy[0] -= GTK_WIDGET(*orig)->allocation.x;
+		xy[1] -= GTK_WIDGET(*orig)->allocation.y;
+	}
+#endif
+	/* Map widget-relative coordinates to inner window */
+	if ((op == op_FCIMAGEP) || (op == op_TLFCIMAGEP))
+		fcimage_rxy(orig, xy);
+
+	/* Selection data format isn't checked because it's how GTK+2 does it,
+	 * reportedly to ignore a bug in (some versions of) KDE - WJ */
+
+	// !!! Struct not stable yet, so init fields one by one
+	memset(&dx, 0, sizeof(dx));
+	dx.x = xy[0];
+	dx.y = xy[1];
+// !!! Not valid yet, only serves as flag
+	dx.format = (void *)(-1);
+	dx.data = data->data;
+	dx.len = data->length;
+
+	((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &dx);
 }
 
 void add_click(void **r, GtkWidget *widget)
@@ -602,6 +787,76 @@ GtkWidget *canvasimg(void *v, int w, int h)
 	return (widget);
 }
 
+//	FCIMAGEP widget
+
+typedef struct {
+	void **mslot;
+	unsigned char *rgb;
+	int *xy;
+	int w, h, cursor;
+} fcimage_data;
+
+static void reset_fcimage(GtkWidget *widget, gpointer user_data)
+{
+	fcimage_data *fd = user_data;
+
+	if (!wjpixmap_pixmap(widget)) return;
+	wjpixmap_draw_rgb(widget, 0, 0, fd->w, fd->h, fd->rgb, fd->w * 3);
+	if (!fd->xy) return;
+	if (!fd->cursor) wjpixmap_set_cursor(widget,
+		xbm_ring4_bits, xbm_ring4_mask_bits,
+		xbm_ring4_width, xbm_ring4_height,
+		xbm_ring4_x_hot, xbm_ring4_y_hot, FALSE);
+	fd->cursor = TRUE;
+	wjpixmap_move_cursor(widget, fd->xy[0], fd->xy[1]);
+}
+
+static gboolean click_fcimage(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	gtk_widget_grab_focus(widget);
+	return (FALSE);
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *fcimagep(void *v, char *ddata, void **pp)
+{
+	fcimage_data *fd;
+	GtkWidget *widget;
+	int w, h, *xy;
+
+	if (((int)pp[0] & WB_OPMASK) == op_FCIMAGEP)
+		w = (int)pp[3] >> 16 , h = (int)pp[3] & 0xFFFF;
+	else
+	{
+		xy = (void *)(ddata + (int)pp[3]);
+		w = xy[0]; h = xy[1];
+	}
+	xy = pp[2] == (void *)(-1) ? NULL : (void *)(ddata + (int)pp[2]);
+
+	widget = wjpixmap_new(w, h);
+	fd = bound_malloc(widget, sizeof(fcimage_data));
+	gtk_object_set_user_data(GTK_OBJECT(widget), fd);
+	fd->xy = xy;
+	fd->rgb = v;
+	fd->w = w;
+	fd->h = h;
+	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+		GTK_SIGNAL_FUNC(reset_fcimage), fd);
+	gtk_signal_connect(GTK_OBJECT(widget), "button_press_event",
+		GTK_SIGNAL_FUNC(click_fcimage), NULL);
+	return (widget);
+}
+
+static void fcimage_rxy(void **slot, int *xy)
+{
+	fcimage_data *fd = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+
+	wjpixmap_rxy(slot[0], xy[0], xy[1], xy + 0, xy + 1);
+	xy[0] = xy[0] < 0 ? 0 : xy[0] >= fd->w ? fd->w - 1 : xy[0];
+	xy[1] = xy[1] < 0 ? 0 : xy[1] >= fd->h ? fd->h - 1 : xy[1];
+}
+
 //	COLORLIST widget
 
 typedef struct {
@@ -749,93 +1004,6 @@ static void list_scroll_in(GtkWidget *widget, gpointer user_data)
 	adj->value = y < 0 ? 0 : y > adj->upper - adj->page_size ?
 		adj->upper - adj->page_size : y;
 	gtk_adjustment_value_changed(adj);
-}
-
-//	COLORPAD widget
-
-#define PPAD_SLOT 11
-#define PPAD_XSZ 32
-#define PPAD_YSZ 8
-#define PPAD_WIDTH(X) (PPAD_XSZ * (X) - 1)
-#define PPAD_HEIGHT(X) (PPAD_YSZ * (X) - 1)
-
-static void colorpad_set(void **slot, int v)
-{
-	GtkWidget *widget = slot[0];
-	void **desc = slot[1];
-
-	wjpixmap_move_cursor(widget, (v % PPAD_XSZ) * PPAD_SLOT,
-		(v / PPAD_XSZ) * PPAD_SLOT);
-	*(int *)gtk_object_get_user_data(GTK_OBJECT(widget)) = v; // self-reading
-	if (desc[4]) get_evt_1(NULL, NEXT_SLOT(slot)); // call handler
-}
-
-static gboolean colorpad_click(GtkWidget *widget, GdkEventButton *event,
-	gpointer user_data)
-{
-	int x = event->x, y = event->y;
-
-	gtk_widget_grab_focus(widget);
-	/* Only single clicks */
-	if (event->type != GDK_BUTTON_PRESS) return (TRUE);
-	x /= PPAD_SLOT; y /= PPAD_SLOT;
-	colorpad_set(user_data, y * PPAD_XSZ + x);
-	return (TRUE);
-}
-
-static gboolean colorpad_key(GtkWidget *widget, GdkEventKey *event,
-	gpointer user_data)
-{
-	int x, y, dx, dy;
-
-	if (!arrow_key(event, &dx, &dy, 0)) return (FALSE);
-	wjpixmap_cursor(widget, &x, &y);
-	x = x / PPAD_SLOT + dx; y = y / PPAD_SLOT + dy;
-	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
-	y = y * PPAD_XSZ + x;
-	y = y < 0 ? 0 : y > 255 ? 255 : y;
-	colorpad_set(user_data, y);
-#if GTK_MAJOR_VERSION == 1
-	/* Return value alone doesn't stop GTK1 from running other handlers */
-	gtk_signal_emit_stop_by_name(GTK_OBJECT(widget), "key_press_event");
-#endif
-	return (TRUE);
-}
-
-static void colorpad_draw(GtkWidget *widget, gpointer user_data)
-{
-	unsigned char *rgb;
-	int w, h, c;
-
-	if (!wjpixmap_pixmap(widget)) return;
-	w = PPAD_WIDTH(PPAD_SLOT);
-	h = PPAD_HEIGHT(PPAD_SLOT);
-	rgb = calloc(1, w * h * 3);
-	if (!rgb) return;
-	render_color_grid(rgb, w, h, PPAD_SLOT, user_data);
-	wjpixmap_draw_rgb(widget, 0, 0, w, h, rgb, w * 3);
-	c = (PPAD_SLOT >> 1) - 1;
-	wjpixmap_set_cursor(widget, xbm_ring4_bits, xbm_ring4_mask_bits,
-		xbm_ring4_width, xbm_ring4_height,
-		xbm_ring4_x_hot - c, xbm_ring4_y_hot - c, TRUE);
-	free(rgb);
-}
-
-// !!! Even with inlining this, some space gets wasted
-GtkWidget *colorpad(int *idx, char *ddata, void **pp, void **r)
-{
-	GtkWidget *pix;
-
-	pix = wjpixmap_new(PPAD_WIDTH(PPAD_SLOT), PPAD_HEIGHT(PPAD_SLOT));
-	gtk_object_set_user_data(GTK_OBJECT(pix), (gpointer)idx);
-	gtk_signal_connect(GTK_OBJECT(pix), "realize",
-		GTK_SIGNAL_FUNC(colorpad_draw), (gpointer)(ddata + (int)pp[2]));
-	// using the origin slot
-	gtk_signal_connect(GTK_OBJECT(pix), "button_press_event",
-		GTK_SIGNAL_FUNC(colorpad_click), (gpointer)r);
-	gtk_signal_connect(GTK_OBJECT(pix), "key_press_event",
-		GTK_SIGNAL_FUNC(colorpad_key), (gpointer)r);
-	return (pix);
 }
 
 //	GRADBAR widget
@@ -2965,6 +3133,7 @@ enum {
 	cm_SCROLL,
 	cm_RGB,
 	cm_CANVAS,
+	cm_FCIMAGE,
 	cm_SPIN,
 	cm_SPINa,
 	cm_FSPIN,
@@ -3019,6 +3188,8 @@ static cmdef cmddefs[] = {
 	{ op_WRGBIMAGE, cm_RGB, pk_PACK | pkf_SHOW },
 	{ op_CANVASIMG, cm_CANVAS, pk_BIN | pkf_SHOW | pkf_PARENT },
 	{ op_ECANVASIMG, cm_CANVAS, pk_EPACK | pkf_SHOW | pkf_PARENT },
+	{ op_FCIMAGEP, cm_FCIMAGE, pk_PACK | pkf_SHOW },
+	{ op_TLFCIMAGEP, cm_FCIMAGE, pk_TABLE | pkf_SHOW },
 	{ op_SPIN, cm_SPIN, pk_PACKp, USE_BORDER(SPIN) },
 	/* Codes can map to themselves, and some do */
 // !!! Padding = 0
@@ -3325,8 +3496,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TOPVBOX:
 			part = TRUE; // not toplevel
 			widget = window = gtk_vbox_new(FALSE, 0);
-// !!! Border = 5
-			cw = 5;
+			cw = GET_BORDER(TOPVBOX);
 			pk = pkf_STACK | pkf_SHOW;
 			break;
 		/* Create a widget vbox with special sizing behaviour */
@@ -3337,8 +3507,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			// Keep max vertical size
 			widget_set_keepsize(window, TRUE);
 			*--wp = add_vbox(window);
-// !!! Border = 5
-			gtk_container_set_border_width(GTK_CONTAINER(wp[0]), 5);
+			gtk_container_set_border_width(GTK_CONTAINER(wp[0]),
+				GET_BORDER(TOPVBOX));
 			pk = pkf_SHOW;
 			break;
 		/* Add a dock widget */
@@ -3533,10 +3703,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case cm_LABEL: case op_WLABEL:
 		{
 			int z = (int)((xcmdef *)cmd)->x;
+			if (i > 1) z = (int)pp[1];
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
 			if (op == op_WLABEL)
 				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
-			if (i > 1) z = (int)pp[1];
 			if (z & 0xFFFF) gtk_misc_set_padding(GTK_MISC(widget),
 				(z >> 8) & 255, z & 255);
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
@@ -3560,6 +3730,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a framed canvas-based renderer */
 		case cm_CANVAS:
 			widget = canvasimg(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+			break;
+		/* Add a focusable buffered RGB renderer with cursor */
+		case cm_FCIMAGE:
+			widget = fcimagep(v, ddata, pp - 1);
 			break;
 		/* Add a non-spinning spin to table slot */
 		case op_TLNOSPIN:
@@ -3713,19 +3887,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a color picker box, w/field array, & leave unfilled(!) */
 		case op_COLOR: case op_TCOLOR:
-			widget = cpick_create();
-			cpick_set_opacity_visibility(widget, op == op_TCOLOR);
+			widget = cpick_create(op == op_TCOLOR);
 			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
 			widget = colorlist(v, ddata, pp - 1, NEXT_SLOT(r));
 			pk = pk_SCROLLVPm | pkf_SHOW;
-			break;
-		/* Add a colorpad */
-		case op_COLORPAD:
-			widget = colorpad(v, ddata, pp - 1, r);
-			pk = pk_PACK | pkf_SHOW;
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
@@ -4051,7 +4219,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			{
 				widget = gtk_image_menu_item_new_with_label("");
 				gtk_image_menu_item_set_image(
-					GTK_IMAGE_MENU_ITEM(widget),xpm_image(pp[3]));
+					GTK_IMAGE_MENU_ITEM(widget), xpm_image(pp[3]));
 			}
 #endif
 			else widget = gtk_menu_item_new_with_label("");
@@ -4282,6 +4450,37 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_SYSCURSOR:
 			widget = (void *)gdk_cursor_new((int)v);
 			break;
+		/* Install a drag source */
+// !!! This must be done before mouse event handlers
+		case op_EVT_DRAGFROM:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
+			dc->r = r;
+			dc->targets = *(void **)(pp[1]);
+			gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
+				GTK_SIGNAL_FUNC(try_start_drag), dc);
+			gtk_signal_connect(GTK_OBJECT(*slot), "motion_notify_event",
+				GTK_SIGNAL_FUNC(try_start_drag), dc);
+			gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
+				GTK_SIGNAL_FUNC(try_start_drag), dc);
+			gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
+				GTK_SIGNAL_FUNC(get_evt_drag), dc);
+			widget = NULL;
+			break;
+		}
+		/* Install a drop target */
+		case op_EVT_DROP:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			gtk_drag_dest_set(*slot, GTK_DEST_DEFAULT_HIGHLIGHT |
+				GTK_DEST_DEFAULT_MOTION | GTK_DEST_DEFAULT_DROP,
+				pp[1], (int)pp[2], GDK_ACTION_COPY);
+			gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
+				GTK_SIGNAL_FUNC(get_evt_drop), r);
+			widget = NULL;
+			break;
+		}
 		/* Install activate event handler */
 		case op_EVT_OK:
 		{
@@ -4344,6 +4543,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				op == op_EVT_MMOUSE ?
 				GTK_SIGNAL_FUNC(get_evt_mmouse) :
 				GTK_SIGNAL_FUNC(get_evt_mouse), r);
+#if GTK_MAJOR_VERSION == 1
+			if (!GTK_WIDGET_NO_WINDOW(*slot))
+#endif
 // !!! Maybe do *_add_events() instead, in more fine-grained way?
 			gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
 			widget = NULL;
@@ -4377,8 +4579,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_COLOR: case op_TCOLOR:
-				gtk_signal_connect(GTK_OBJECT(*slot), "color_changed",
-					GTK_SIGNAL_FUNC(get_evt_1), r);
+				cpick_set_evt(*slot, r);
 				break;
 			case op_TEXT:
 #if GTK_MAJOR_VERSION == 2 /* In GTK+1, same handler as for GtkEntry */
@@ -4422,7 +4623,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_BOR_LABEL: case op_BOR_TLABEL:
 		case op_BOR_OPT: case op_BOR_XOPT:
 		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
-		case op_BOR_TOOLBAR: case op_BOR_POPUP:
+		case op_BOR_TOOLBAR: case op_BOR_POPUP: case op_BOR_TOPVBOX:
 			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
 		default: continue;
@@ -4643,8 +4844,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = TOOL_ID(slot);
 			break;
 		}
-		case op_COLORLIST: case op_COLORLISTN:
-		case op_COLORPAD: case op_GRADBAR:
+		case op_COLORLIST: case op_COLORLISTN: case op_GRADBAR:
 		case op_LISTCCr: case op_LISTCCHr:
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
 		case op_LISTCS: case op_LISTCX:
@@ -4730,6 +4930,7 @@ void cmd_reset(void **slot, void *ddata)
 		op = (int)*pp++;
 		v = WB_GETLEN(op) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (char *)ddata + (int)v;
+		if (op & WB_NFLAG) v = *(void **)v; // dereference
 		op &= WB_OPMASK;
 		if ((op != op_GROUP) && (cgroup != group)) continue;
 		switch (op)
@@ -4804,6 +5005,13 @@ void cmd_reset(void **slot, void *ddata)
 			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
 			rd->rgb = v; // Size is fixed, but update source
 			if (GTK_WIDGET_REALIZED(*wdata)) reset_rgbp(*wdata, rd);
+			break;
+		}
+		case op_FCIMAGEP: case op_TLFCIMAGEP:
+		{
+			fcimage_data *fd = gtk_object_get_user_data(*wdata);
+			fd->rgb = v; // Update source, leave other parts be
+			if (GTK_WIDGET_REALIZED(*wdata)) reset_fcimage(*wdata, fd);
 			break;
 		}
 #if 0 /* Not needed for now */
@@ -5043,9 +5251,6 @@ void cmd_set(void **slot, int v)
 #endif
 		break;
 	}
-	case op_COLORPAD:
-		colorpad_set(slot, v);
-		break;
 	case op_PLAINBOOK:
 		gtk_notebook_set_page(slot[0], v);
 		break;
@@ -5224,6 +5429,15 @@ void cmd_setv(void **slot, void *res, int idx)
 		wjcanvas_size(slot[0], v[0], v[1]);
 		break;
 	}
+	case op_FCIMAGEP: case op_TLFCIMAGEP:
+	{
+		fcimage_data *fd = gtk_object_get_user_data(slot[0]);
+		int *v = res;
+		if (!fd->xy) break;
+		memcpy(fd->xy, v, sizeof(int) * 2);
+		wjpixmap_move_cursor(slot[0], v[0], v[1]);
+		break;
+	}
 	case op_LISTCCr: case op_LISTCCHr:
 		listcc_reset(slot[0], gtk_object_get_user_data(slot[0]), (int)res);
 // !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
@@ -5257,6 +5471,19 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_clist_select_row(slot[0], (int)res, 0);
 #endif
 	}
+	case op_EV_DRAGFROM:
+	{
+		drag_den *dp = slot[1];
+		if (idx == DRAG_ICON_RGB) dp->dc->color = (int)res;
+		else /* if (idx == DRAG_DATA) */
+		{
+			char **pp = res;
+			gtk_selection_data_set(dp->ds->data,
+// !!! Hardcoded for now: type name, and data format (16-bit)
+				gdk_atom_intern("application/x-color", FALSE), 16,
+				pp[0], pp[1] - pp[0]);
+		}
+	}
 	}
 }
 
@@ -5289,4 +5516,21 @@ int cmd_checkv(void **slot, int idx)
 			dp->mouse->y - dp->vport[1]));
 	}
 	return (FALSE);
+}
+
+void cmd_event(void **slot, int op)
+{
+	int n;
+
+	while (TRUE)
+	{
+		slot = NEXT_SLOT(slot);
+		n = GET_OP(slot);
+		// Found
+		if (n == op) get_evt_1(NULL, slot);
+		// Till another origin slot
+		else if (n >= op_EVT_0) continue;
+		// Finished
+		break;
+	}
 }

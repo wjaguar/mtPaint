@@ -35,6 +35,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
 	* BUGFIX - Problem with command line window wrongly reacting to mouse in some cases is now eliminated
 	* BUGFIX - Escape and Enter keys now work properly in all dialogs in GTK+1
+	* BUGFIX - Dropping colours to palette in builtin colour selector now works properly in GTK+1
 
 3.40	2011-12-30
 
