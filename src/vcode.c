@@ -47,7 +47,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define GET_OPF(S) ((int)*(void **)(S)[1])
 #define GET_OP(S) (GET_OPF(S) & WB_OPMASK)
 
-#define GET_HANDLER(S) (((void **)(S)[1])[1])
+#define GET_DESCV(S,N) (((void **)(S)[1])[(N)])
+#define GET_HANDLER(S) GET_DESCV(S, 1)
 
 #define VCODE_KEY "mtPaint.Vcode"
 
@@ -333,10 +334,17 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 //	Drag handling
 
 typedef struct {
+	int n;
+	clipform_dd *src;
+	GtkTargetList *targets;
+	GtkTargetEntry ent[1];
+} clipform_data;
+
+typedef struct {
 	int x, y, may_drag;
 	int color;
 	void **r;
-	GtkTargetList *targets;
+	clipform_data *cd;
 } drag_ctx;
 
 typedef struct {
@@ -366,8 +374,7 @@ static int drag_event(drag_sel *ds, GtkWidget *widget, drag_ctx *dc)
 	memset(&den.d, 0, sizeof(den.d));
 	den.d.x = dc->x;
 	den.d.y = dc->y;
-// !!! Not valid yet, only serves as flag
-	den.d.format = !ds ? NULL : (void *)(-1);
+	den.d.format = ds ? dc->cd->src + ds->info : NULL;
 
 	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, &den.d));
@@ -443,7 +450,7 @@ static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data
 				dc->color = -1;
 				if (!drag_event(NULL, widget, dc))
 					return (TRUE); // no drag
-				context = gtk_drag_begin(widget, dc->targets,
+				context = gtk_drag_begin(widget, dc->cd->targets,
 					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
 				if (!context) return (TRUE); // failed
 				if (dc->color >= 0)
@@ -469,9 +476,10 @@ static void get_evt_drop(GtkWidget *widget, GdkDragContext *drag_context,
 	gint x,	gint y,	GtkSelectionData *data,	guint info, guint time,
 	gpointer user_data)
 {
-	void **slot = user_data, **orig = origin_slot(slot);
-	void **base = slot[0], **desc = slot[1];
-	int op = GET_OP(orig), xy[2] = { x, y };
+	void **dd = user_data, **orig = origin_slot(dd);
+	void **slot, **base, **desc;
+	clipform_data *cd = *dd; // from DRAGDROP slot
+	int res, op = GET_OP(orig), xy[2] = { x, y };
 	drag_ext dx;
 
 #if GTK_MAJOR_VERSION == 1
@@ -486,20 +494,53 @@ static void get_evt_drop(GtkWidget *widget, GdkDragContext *drag_context,
 	if ((op == op_FCIMAGEP) || (op == op_TLFCIMAGEP))
 		fcimage_rxy(orig, xy);
 
-	/* Selection data format isn't checked because it's how GTK+2 does it,
-	 * reportedly to ignore a bug in (some versions of) KDE - WJ */
-
 	// !!! Struct not stable yet, so init fields one by one
 	memset(&dx, 0, sizeof(dx));
 	dx.x = xy[0];
 	dx.y = xy[1];
-// !!! Not valid yet, only serves as flag
-	dx.format = (void *)(-1);
+	dx.format = cd->src + info;
 	dx.data = data->data;
 	dx.len = data->length;
 
+	/* Selection data format isn't checked because it's how GTK+2 does it,
+	 * reportedly to ignore a bug in (some versions of) KDE - WJ */
+	res = dx.format->size ? dx.len == dx.format->size : dx.len >= 0;
+
+	slot = SLOT_N(dd, 2); // from DRAGDROP to its EVT_DROP
+	base = slot[0]; desc = slot[1];
 	((evtx_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot, &dx);
+
+	if (GET_DESCV(dd, 2)) // Accept move as a copy (disallow deleting source)
+		gtk_drag_finish(drag_context, res, FALSE, time);
+}
+
+static gboolean tried_drop(GtkWidget *widget, GdkDragContext *context,
+	gint x, gint y, guint time, gpointer user_data)
+{
+	GdkAtom target;
+	/* Check if drop could provide a supported format */
+#if GTK_MAJOR_VERSION == 1
+	clipform_data *cd = user_data;
+	GList *dest, *src;
+	gpointer tp;
+
+	for (dest = cd->targets->list; dest; dest = dest->next)
+	{
+		target = ((GtkTargetPair *)dest->data)->target;
+		tp = GUINT_TO_POINTER(target);
+		for (src = context->targets; src && (src->data != tp); src = src->next);
+		if (src) break;
+	}
+	if (!dest) return (FALSE);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	target = gtk_drag_dest_find_target(widget, context, NULL);
+	if (target == GDK_NONE) return (FALSE);
+#endif
+
+	/* Trigger "drag_data_received" event */
+	gtk_drag_get_data(widget, context, target, time);
+	return (TRUE);
 }
 
 void add_click(void **r, GtkWidget *widget)
@@ -638,6 +679,20 @@ static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 		n = wreq.height + border;
 		if (requisition->height < n) requisition->height = n;
 	}
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *scrollw(int op, int vh)
+{
+	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
+		GTK_POLICY_ALWAYS };
+	GtkWidget *widget = gtk_scrolled_window_new(NULL, NULL);
+	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
+		scrollp[vh & 255], scrollp[vh >> 8]);
+// !!! Border = 10
+	if (op == op_FSCROLL) gtk_container_set_border_width(GTK_CONTAINER(
+		add_with_frame(NULL, NULL, widget)), 10);
+	return (widget);
 }
 
 /* Toggle notebook pages */
@@ -3131,6 +3186,7 @@ enum {
 	cm_VBOX,
 	cm_HBOX,
 	cm_SCROLL,
+	cm_NBOOKl,
 	cm_RGB,
 	cm_CANVAS,
 	cm_FCIMAGE,
@@ -3184,6 +3240,12 @@ static cmdef cmddefs[] = {
 	{ op_SCROLL, cm_SCROLL, pk_PACK | pkf_STACK | pkf_SHOW },
 	{ op_XSCROLL, cm_SCROLL, pk_XPACK | pkf_STACK | pkf_SHOW,
 		USE_BORDER(XSCROLL) },
+	{ op_FSCROLL, op_FSCROLL, pk_XPACK | pkf_STACK | pkf_SHOW | pkf_PARENT },
+	{ op_SNBOOK, cm_NBOOKl, pk_SCROLLVP | pkf_STACK | pkf_SHOW },
+	{ op_NBOOK, op_NBOOK, pk_XPACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(NBOOK) },
+	{ op_NBOOKl, cm_NBOOKl, pk_XPACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(NBOOK) },
 	{ op_RGBIMAGE, cm_RGB, pk_BIN | pkf_SHOW },
 	{ op_WRGBIMAGE, cm_RGB, pk_PACK | pkf_SHOW },
 	{ op_CANVASIMG, cm_CANVAS, pk_BIN | pkf_SHOW | pkf_PARENT },
@@ -3295,8 +3357,6 @@ static void do_destroy(void **wdata);
 
 void **run_create(void **ifcode, void *ddata, int ddsize)
 {
-	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
-		GTK_POLICY_ALWAYS };
 	cmdef *cmds[op_LAST];
 	char *ident = VCODE_KEY;
 #if U_NLS
@@ -3321,7 +3381,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	void *v, **pp, **dtail, **r = NULL, **res = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
 	int ld, dsize;
-	int i, n, op, lp, ref, pk, cw, tpad, minw = 0;
+	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0;
 
 
 	// Allocation size
@@ -3588,12 +3648,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			}
 			break;
 		/* Add a framed scrollable table with dynamic name (ugh) */
-		case op_FSXTABLEp:
+		case op_FSXTABLE:
 		{
 			GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
 
 			gtk_widget_show(scroll);
-			add_with_frame(NULL, *(char **)v, scroll);
+			add_with_frame(NULL, v, scroll);
 			gtk_container_set_border_width(GTK_CONTAINER(scroll),
 				GET_BORDER(FRBOX));
 			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
@@ -3622,24 +3682,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			pk = pk_PACK | pkf_STACK | pkf_SHOW;
 			break;
 		/* Add a scrolled window */
-		case cm_SCROLL:
-			widget = gtk_scrolled_window_new(NULL, NULL);
-			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
-				scrollp[(int)v & 255], scrollp[(int)v >> 8]);
-			break;
-		/* Put a notebook into scrolled window */
-		case op_SNBOOK:
-			widget = gtk_notebook_new();
-			gtk_notebook_set_tab_pos(GTK_NOTEBOOK(widget), GTK_POS_LEFT);
-//			gtk_notebook_set_scrollable(GTK_NOTEBOOK(widget), TRUE);
-			pk = pk_SCROLLVP | pkf_STACK | pkf_SHOW;
+		case cm_SCROLL: case op_FSCROLL:
+// !!! Border = 10 for FSCROLL
+			widget = scrollw(op, (int)v);
 			break;
 		/* Add a normal notebook */
-		case op_NBOOK:
+		case cm_NBOOKl: case op_NBOOK:
 			widget = gtk_notebook_new();
-//			gtk_notebook_set_tab_pos(GTK_NOTEBOOK(widget), GTK_POS_TOP);
-			cw = GET_BORDER(NBOOK);
-			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
+			if (op == cm_NBOOKl) gtk_notebook_set_tab_pos(
+				GTK_NOTEBOOK(widget), GTK_POS_LEFT);
 			break;
 		/* Add a plain notebook */
 		case op_PLAINBOOK:
@@ -3714,6 +3765,28 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				(z >> 16) / 10.0, 0.5);
 			break;
 		}
+		/* Add a helptext label */
+		case op_HLABEL: case op_HLABELm:
+			widget = gtk_label_new(v);
+			GTK_WIDGET_SET_FLAGS(widget, GTK_CAN_FOCUS);
+#if GTK_MAJOR_VERSION == 2
+			gtk_label_set_selectable(GTK_LABEL(widget), TRUE);
+			if (op == op_HLABELm)
+			{
+				PangoFontDescription *pfd =
+					pango_font_description_from_string("Monospace 9");
+					// Courier also works
+				gtk_widget_modify_font(widget, pfd);
+				pango_font_description_free(pfd);
+			}
+#endif
+			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
+			gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
+			gtk_misc_set_alignment(GTK_MISC(widget), 0, 0);
+// !!! Padding = 5/5
+			gtk_misc_set_padding(GTK_MISC(widget), 5, 5);
+			pk = pk_SCROLLVP | pkf_SHOW;
+			break;
 		/* Add to table a batch of labels generated from text string */
 		case op_TLTEXT:
 			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
@@ -4411,6 +4484,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_WIDTH:
 			minw = (int)v;
 			continue;
+		/* Set fixed/minimum height for next widget */
+		case op_HEIGHT:
+			minh = (int)v;
+			continue;
 		/* Make window transient to given widget-map */
 		case op_ONTOP:
 			tparent = !v ? NULL :
@@ -4450,36 +4527,62 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_SYSCURSOR:
 			widget = (void *)gdk_cursor_new((int)v);
 			break;
-		/* Install a drag source */
-// !!! This must be done before mouse event handlers
-		case op_EVT_DRAGFROM:
+		/* Add a group of clipboard formats */
+		case op_CLIPFORM:
 		{
-			void **slot = origin_slot(PREV_SLOT(r));
-			drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
-			dc->r = r;
-			dc->targets = *(void **)(pp[1]);
-			gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
-				GTK_SIGNAL_FUNC(try_start_drag), dc);
-			gtk_signal_connect(GTK_OBJECT(*slot), "motion_notify_event",
-				GTK_SIGNAL_FUNC(try_start_drag), dc);
-			gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
-				GTK_SIGNAL_FUNC(try_start_drag), dc);
-			gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
-				GTK_SIGNAL_FUNC(get_evt_drag), dc);
-			widget = NULL;
+			int i, n = (int)pp[1], l = sizeof(clipform_data) + 
+				sizeof(GtkTargetEntry) * (n - 1);
+			clipform_data *cd = calloc(1, l);
+
+			cd->n = n;
+			cd->src = v;
+			for (i = 0; i < n; i++)
+			{
+				cd->ent[i].target = cd->src[i].target;
+				cd->ent[i].info = i;
+				/* cd->ent[i].flags = 0; */
+			}
+			cd->targets = gtk_target_list_new(cd->ent, n);
+
+			widget = (void *)cd;
 			break;
 		}
-		/* Install a drop target */
-		case op_EVT_DROP:
+		/* Install drag/drop handlers */
+// !!! For drag, this must be done before mouse event handlers
+		case op_DRAGDROP:
 		{
+			clipform_data *cd = **(void ***)v;
 			void **slot = origin_slot(PREV_SLOT(r));
-			gtk_drag_dest_set(*slot, GTK_DEST_DEFAULT_HIGHLIGHT |
-				GTK_DEST_DEFAULT_MOTION | GTK_DEST_DEFAULT_DROP,
-				pp[1], (int)pp[2], GDK_ACTION_COPY);
-			gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
-				GTK_SIGNAL_FUNC(get_evt_drop), r);
-			widget = NULL;
-			break;
+
+			widget = (void *)cd; // For drop handler
+			if (pp[3]) // Have drag handler
+			{
+				drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
+				dc->r = NEXT_SLOT(r);
+				dc->cd = cd;
+				gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
+					GTK_SIGNAL_FUNC(try_start_drag), dc);
+				gtk_signal_connect(GTK_OBJECT(*slot), "motion_notify_event",
+					GTK_SIGNAL_FUNC(try_start_drag), dc);
+				gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
+					GTK_SIGNAL_FUNC(try_start_drag), dc);
+				gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
+					GTK_SIGNAL_FUNC(get_evt_drag), dc);
+			}
+			if (pp[5]) // Have drop handler
+			{
+				int dmode = GTK_DEST_DEFAULT_HIGHLIGHT |
+					GTK_DEST_DEFAULT_MOTION;
+				if (!pp[1]) dmode |= GTK_DEST_DEFAULT_DROP;
+				else gtk_signal_connect(GTK_OBJECT(*slot), "drag_drop",
+					GTK_SIGNAL_FUNC(tried_drop), cd);
+
+				gtk_drag_dest_set(*slot, dmode, cd->ent, cd->n,
+					pp[1] ? GDK_ACTION_COPY | GDK_ACTION_MOVE :
+					GDK_ACTION_COPY);
+				gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
+					GTK_SIGNAL_FUNC(get_evt_drop), r);
+			}
 		}
 		/* Install activate event handler */
 		case op_EVT_OK:
@@ -4641,12 +4744,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Frame this */
 		if (pk & pkf_FRAME)
 			widget = add_with_frame(NULL, _(pp[--lp]), widget);
-		/* Set min width for this */
+		/* Set fixed width/height for this */
+		if ((minw > 0) || (minh > 0)) gtk_widget_set_usize(
+			widget, minw > 0 ? minw : -2, minh > 0 ? minh : -2);
+		/* And/or min ones */
 // !!! For now, always use wrapper
-		if (minw < 0) widget = widget_align_minsize(widget, -minw, -2);
-		/* Or fixed width */
-		else if (minw) gtk_widget_set_usize(widget, minw, -2);
-		minw = 0;
+		if ((minw < 0) || (minh < 0)) widget = widget_align_minsize(
+			widget, minw < 0 ? -minw : -2, minh < 0 ? -minh : -2);
+		minw = minh = 0;
 		/* Pack this */
 		if (pk & pkf_CHILD) ++wp; // have child widget on stack
 		switch (n = pk & pk_MASK)
@@ -4742,6 +4847,12 @@ static void do_destroy(void **wdata)
 		if (op & WB_FFLAG) v = data + (int)v;
 		op &= WB_OPMASK;
 		if (op == op_CLEANUP) free(*(void **)v);
+		else if (op == op_CLIPFORM)
+		{
+			clipform_data *cd = *wdata;
+			gtk_target_list_unref(cd->targets);
+			free(cd);
+		}
 		else if (op == op_TEXT) g_free(*(char **)v);
 		else if (op == op_REMOUNT)
 		{
@@ -5356,10 +5467,10 @@ void cmd_setv(void **slot, void *res, int idx)
 {
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
+	if (op == op_WDONE) // skip head noop
+		slot = NEXT_SLOT(slot) , op = GET_OP(slot);
 	switch (op)
 	{
-	case op_WDONE: slot = NEXT_SLOT(slot);
-		// Fallthrough - noop before a toplevel
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
 		if (idx == WINDOW_TITLE)
 			gtk_window_set_title(GTK_WINDOW(slot[0]), res);
@@ -5372,7 +5483,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		}
 		break;
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
-	case op_NBOOK: case op_SNBOOK:
+	case op_NBOOK: case op_NBOOKl: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(slot[0], (int)res);
 		break;
 	case op_TSPINSLIDE:
@@ -5479,8 +5590,8 @@ void cmd_setv(void **slot, void *res, int idx)
 		{
 			char **pp = res;
 			gtk_selection_data_set(dp->ds->data,
-// !!! Hardcoded for now: type name, and data format (16-bit)
-				gdk_atom_intern("application/x-color", FALSE), 16,
+				gdk_atom_intern(dp->d.format->target, FALSE),
+				dp->d.format->format ? dp->d.format->format : 8,
 				pp[0], pp[1] - pp[0]);
 		}
 	}
@@ -5514,6 +5625,13 @@ int cmd_checkv(void **slot, int idx)
 		return (wjcanvas_bind_mouse(canvas[0], slot[0],
 			dp->mouse->x - dp->vport[0],
 			dp->mouse->y - dp->vport[1]));
+	}
+	else if (op < op_EVT_0) // Regular widget
+	{
+		GtkWidget *w = gtk_widget_get_toplevel(slot[0]);
+		if (!GTK_IS_WINDOW(w)) return (FALSE);
+		w = GTK_WINDOW(w)->focus_widget;
+		return (w && ((w == slot[0]) || gtk_widget_is_ancestor(w, slot[0])));
 	}
 	return (FALSE);
 }

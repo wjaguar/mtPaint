@@ -69,8 +69,7 @@
 #define CPICK_AREA_CURRENT	1
 #define CPICK_AREA_PREVIOUS	2
 
-static GtkTargetEntry cpick_target = { "application/x-color", 0, 0 };
-static GtkTargetList *cpick_tlist;
+static clipform_dd xcolor = { "application/x-color", NULL, 8, 16 };
 
 typedef struct
 {
@@ -86,6 +85,7 @@ typedef struct
 typedef struct {
 	void **evt;				// Event slot
 	GtkWidget *input_hex;			// Hex input
+	void **drag;				// Drag/drop format
 	void **inputs[CPICK_INPUT_TOT],		// Spin buttons
 		**areas[CPICK_AREA_TOT];	// Focusable pixmaps
 	unsigned char *imgs[CPICK_AREA_TOT];	// Image buffers
@@ -771,12 +771,12 @@ static void *cpick_code[] = {
 	// --- Palette/Mixer table
 	BORDER(TABLE, 0),
 	TABLE(4, 2),
+	REF(drag), CLIPFORM(xcolor, 1),
 	/* Palette */
 	TALLOC(imgs[CPICK_AREA_PALETTE], c.area_size[CPICK_AREA_PALETTE][2]),
 	REF(areas[CPICK_AREA_PALETTE]),
 	TLFCIMAGEPn(imgs[CPICK_AREA_PALETTE], c.area_size[CPICK_AREA_PALETTE], 0, 0),
-		DRAGFROM(cpick_drag_get, &cpick_tlist),
-		DROP(cpick_drag_set, &cpick_target, 1),
+		DRAGDROP(drag, cpick_drag_get, cpick_drag_set),
 		EVENT(MOUSE, cpick_area_event), EVENT(MMOUSE, cpick_area_event),
 	/* Picker drawing area - Main */
 	TALLOC(imgs[CPICK_AREA_PICKER], c.area_size[CPICK_AREA_PICKER][2]),
@@ -804,8 +804,7 @@ static void *cpick_code[] = {
 	TALLOC(imgs[CPICK_AREA_PRECUR], c.area_size[CPICK_AREA_PRECUR][2]),
 	REF(areas[CPICK_AREA_PRECUR]),
 	TLFCIMAGEPn(imgs[CPICK_AREA_PRECUR], c.area_size[CPICK_AREA_PRECUR], 1, 1),
-		DRAGFROM(cpick_drag_get, &cpick_tlist),
-		DROP(cpick_drag_set, &cpick_target, 1),
+		DRAGDROP(drag, cpick_drag_get, cpick_drag_set),
 		EVENT(MOUSE, cpick_area_event), EVENT(MMOUSE, cpick_area_event),
 	EXEC(add_dropper),
 	WDONE, // table
@@ -863,11 +862,8 @@ GtkWidget *cpick_create(int opacity)
 	unsigned char *dest;
 	int i, k, kk, w, h, w3, x, y, dd, d1, hy, oy, size, pal_strips;
 
+
 	memset(&tdata, 0, sizeof(tdata));
-
-	/* For drag & drop */
-	if (!cpick_tlist) cpick_tlist = gtk_target_list_new(&cpick_target, 1);
-
 	tdata.opacity_f = opacity;
 
 	size = inifile_get_gint32("cpickerSize", CPICK_SIZE_DEFAULT);

@@ -63,8 +63,10 @@ GtkWidget *main_window;
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
 GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler );
 GtkWidget *add_a_spin( int value, int min, int max );
+#if 0 /* Not needed anymore */
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
+#endif
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
 GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
 	int l, int spacing);
@@ -72,8 +74,10 @@ GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int expand, int spacing);
 #define to_table(widget, table, row, column, spacing) \
 	to_table_x(widget, table, row, column, TRUE, spacing)
+#if 0 /* Not needed anymore */
 GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing);
+#endif
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
 #if 0 /* Not needed anymore */
@@ -120,9 +124,9 @@ void delete_to_click(GtkWidget *window, GtkWidget *button);
 
 // Buttons for standard dialogs
 
+#if 0 /* Not needed anymore */
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel);
-#if 0 /* Not needed anymore */
 GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler);
 GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler);
 #endif

@@ -137,8 +137,8 @@ int close_to( int x1, int y1 );
 #define MARQ_SIZE 4 /* +snap */
 
 void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx);	// Draw/clear marquee
-void paint_poly_marquee(rgbcontext *ctx, int whole);	// Paint polygon marquee
-void stretch_poly_line(int x, int y);			// Clear old temp line, draw next temp line
+void paint_poly_marquee(rgbcontext *ctx);	// Paint polygon marquee
+void stretch_poly_line(int x, int y);		// Clear old temp line, draw next temp line
 
 void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar

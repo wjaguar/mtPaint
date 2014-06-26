@@ -50,123 +50,85 @@ int opaque_view;
 #undef _
 #define _(X) X
 
-static gboolean click_help_end(GtkWidget *widget, GdkEvent *event, gpointer data)
+typedef struct {
+	char *name, *help[HELP_PAGE_COUNT];
+} help_dd;
+
+static void click_help_end(help_dd *dt, void **wdata)
 {
 	// Make sure the user can only open 1 help window
 	cmd_sensitive(menu_slots[MENU_HELP], TRUE);
-	gtk_widget_destroy(widget);
-
-	return FALSE;
+	run_destroy(wdata);
 }
+
+#if HELP_PAGE_COUNT != 4
+#error Wrong number of help pages defined
+#endif
+
+#define WBbase help_dd
+static void *help_code[] = {
+	HEIGHT(400), WINDOWp(name),
+	DEFSIZE(600, 2),
+	XVBOXb(0, 4), // originally the window was that way
+	BORDER(NBOOK, 1),
+	NBOOKl,
+	CLEANUP(help[0]),
+	PAGEvp(help_titles[0]),
+	FSCROLL(0, 2), // never/always
+	WIDTH(380), HLABELp(help[0]),
+	WDONE, // page 0
+	PAGEvp(help_titles[1]),
+	FSCROLL(0, 2), // never/always
+	WIDTH(380), HLABELmp(help[1]),
+	WDONE, // page 1
+	PAGEvp(help_titles[2]),
+	FSCROLL(0, 2), // never/always
+	WIDTH(380), HLABELmp(help[2]),
+	WDONE, // page 2
+	PAGEvp(help_titles[3]),
+	FSCROLL(0, 2), // never/always
+	WIDTH(380), HLABELp(help[3]),
+	WDONE, // page 3
+	WDONE, // nbook
+	BORDER(OKBOX, 1), BORDER(BUTTON, 0),
+	OKBOX(_("Close"), click_help_end, NULL, NULL),
+	// !!! originally had GTK_CAN_DEFAULT set on button
+	WDONE, // xvbox
+	ONTOP0,
+	WSHOW
+};
+#undef WBbase
 
 void pressed_help()
 {
-	GtkAccelGroup* ag;
-	GtkWidget *help_window, *table, *notebook, *frame, *label, *button,
-		*box1, *box2, *scrolled_window1, *viewport1, *label2;
-	int i, j;
-	char txt[128], **tmp, *res, *strs[HELP_PAGE_MAX + 1];
-
-
-	ag = gtk_accel_group_new();
+	help_dd tdata;
+	memx2 mem;
+	char **tmp, txt[128];
+	int i, j, ofs[HELP_PAGE_COUNT];
 
 	// Make sure the user can only open 1 help help_window
 	cmd_sensitive(menu_slots[MENU_HELP], FALSE);
 
-	help_window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-
-	gtk_container_set_border_width (GTK_CONTAINER (help_window), 4);
-	gtk_window_set_position (GTK_WINDOW (help_window), GTK_WIN_POS_CENTER);
 	snprintf(txt, 120, "%s - %s", MT_VERSION, __("About"));
-	gtk_window_set_title (GTK_WINDOW (help_window), txt);
-	gtk_widget_set_usize (help_window, -2, 400);
+	tdata.name = txt;
 
-	box1 = add_vbox(help_window);
-
-	box2 = xpack(box1, gtk_vbox_new(FALSE, 10));
-	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
-	gtk_widget_show (box2);
-
-	table = xpack(box2, gtk_table_new(3, 6, FALSE));
-
-	notebook = gtk_notebook_new ();
-	gtk_table_attach_defaults (GTK_TABLE (table), notebook, 0, 6, 0, 1);
-	gtk_widget_show (notebook);
-
-	strs[0] = "";
+	memset(&mem, 0, sizeof(mem));
+	getmemx2(&mem, 4000); // default size
 	for (i = 0; i < HELP_PAGE_COUNT; i++)
 	{
+		ofs[i] = mem.here;
 		tmp = help_pages[i];
-		for (j = 0; tmp[j]; j++) strs[j + 1] = __(tmp[j]);
-		strs[j + 1] = NULL;
-		res = g_strjoinv("\n", strs);
-
-		frame = gtk_frame_new (NULL);
-		gtk_container_set_border_width (GTK_CONTAINER (frame), 10);
-		gtk_widget_show (frame);
-
-		scrolled_window1 = gtk_scrolled_window_new (NULL, NULL);
-		gtk_widget_show (scrolled_window1);
-		gtk_container_add (GTK_CONTAINER (frame), scrolled_window1);
-		gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolled_window1), 
-			GTK_POLICY_NEVER, GTK_POLICY_ALWAYS);
-
-		viewport1 = gtk_viewport_new (NULL, NULL);
-		gtk_widget_show (viewport1);
-		gtk_container_add (GTK_CONTAINER (scrolled_window1), viewport1);
-
-		label2 = gtk_label_new(res);
-		g_free(res);
-#if GTK_MAJOR_VERSION == 2
-		if ((i == 1) || (i == 2))	// Keyboard/Mouse shortcuts tab only
+		for (j = 0; tmp[j]; j++)
 		{
-			PangoFontDescription *pfd =
-				pango_font_description_from_string("Monospace 9");
-				// Courier also works
-			gtk_widget_modify_font(label2, pfd);
-			pango_font_description_free(pfd);
+			addchars(&mem, '\n', 1);
+			addstr(&mem, __(tmp[j]), 1);
 		}
-#endif
-		gtk_widget_set_usize( label2, 380, -2 );		// Set minimum width/height
-		gtk_widget_show (label2);
-
-		gtk_container_add (GTK_CONTAINER (viewport1), label2);
-		GTK_WIDGET_SET_FLAGS (label2, GTK_CAN_FOCUS);
-#if GTK_MAJOR_VERSION == 2
-		gtk_label_set_selectable(GTK_LABEL (label2), TRUE);
-#endif
-		gtk_label_set_justify (GTK_LABEL (label2), GTK_JUSTIFY_LEFT);
-		gtk_label_set_line_wrap (GTK_LABEL (label2), TRUE);
-		gtk_misc_set_alignment (GTK_MISC (label2), 0, 0);
-		gtk_misc_set_padding (GTK_MISC (label2), 5, 5);
-
-		label = gtk_label_new(__(help_titles[i]));
-		gtk_notebook_append_page (GTK_NOTEBOOK (notebook), frame, label);
+		addchars(&mem, '\0', 1);
 	}
+	for (i = 0; i < HELP_PAGE_COUNT; i++)
+		tdata.help[i] = mem.buf + ofs[i];
 
-	gtk_notebook_set_tab_pos (GTK_NOTEBOOK (notebook), GTK_POS_LEFT);
-
-	box2 = pack(box1, gtk_vbox_new(FALSE, 10));
-	gtk_container_set_border_width (GTK_CONTAINER (box2), 1);
-	gtk_widget_show (box2);
-
-	button = xpack(box2, gtk_button_new_with_label (__("Close")));
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_KP_Enter, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Return, 0, (GtkAccelFlags) 0);
-	gtk_widget_add_accelerator (button, "clicked", ag, GDK_Escape, 0, (GtkAccelFlags) 0);
-	GTK_WIDGET_SET_FLAGS (button, GTK_CAN_DEFAULT);
-
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_help_end), GTK_OBJECT(help_window));
-	gtk_signal_connect(GTK_OBJECT(help_window), "delete_event",
-		GTK_SIGNAL_FUNC(click_help_end), NULL);
-
-	gtk_widget_show (button);
-
-	gtk_widget_show (table);
-	gtk_window_set_default_size( GTK_WINDOW(help_window), 600, 2 );
-	gtk_widget_show (help_window);
-	gtk_window_add_accel_group(GTK_WINDOW (help_window), ag);
+	run_create(help_code, &tdata, sizeof(tdata));
 }
 
 

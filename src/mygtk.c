@@ -70,6 +70,7 @@ GtkWidget *add_a_spin( int value, int min, int max )
 	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 0), 0));
 }
 
+#if 0 /* Not needed anymore */
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box )
 {
 	GtkWidget *table = pack(box, gtk_table_new(rows, columns, FALSE));
@@ -83,6 +84,7 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 {
 	return (pack(box, sig_toggle(label, value, NULL, NULL)));
 }
+#endif
 
 GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
 	int l, int spacing)
@@ -112,6 +114,7 @@ GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
 	return (widget);
 }
 
+#if 0 /* Not needed anymore */
 GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing)
 {
@@ -119,6 +122,7 @@ GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 		(GtkAttachOptions)(GTK_FILL), (GtkAttachOptions) (0), 0, spacing);
 	return (widget);
 }
+#endif
 
 GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max)
@@ -427,6 +431,7 @@ void delete_to_click(GtkWidget *window, GtkWidget *button)
 
 // Buttons for standard dialogs
 
+#if 0 /* Not needed anymore */
 GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	char *nCancel, GtkSignalFunc Cancel)
 {
@@ -464,7 +469,6 @@ GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
 	return (hbox);
 }
 
-#if 0 /* Not needed anymore */
 static GtkObject *OK_box_ins(GtkWidget *box, GtkWidget *button)
 {
 	xpack(box, button);

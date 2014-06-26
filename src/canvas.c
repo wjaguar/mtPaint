@@ -2175,12 +2175,14 @@ static void rec_continuous(int nx, int ny, int w, int h)
 static struct {
 	float c_zoom;
 	int points;
-	int xy[2 * MAX_POLY + 2], step[MAX_POLY + 1];
+	int xy[2 * MAX_POLY + 2];
+//	int step[MAX_POLY + 1];
 } poly_cache;
 
 static void poly_update_cache()
 {
-	int i, i0, last, dx, dy, *pxy, *ps, ds, zoom = 1, scale = 1;
+//	int dx, dy, *ps;
+	int i, i0, last, *pxy, ds, zoom = 1, scale = 1;
 
 	i0 = poly_cache.c_zoom == can_zoom ? poly_cache.points : 0;
 	last = poly_points + (poly_status == POLY_DONE);
@@ -2206,6 +2208,7 @@ static void poly_update_cache()
 		*pxy++ = poly_cache.xy[0];
 		*pxy++ = poly_cache.xy[1];
 	}
+#if 0 /* No need for now */
 	/* Get distances */
 	poly_cache.step[0] = 0;
 	if (!i0) i0 = 1;
@@ -2217,6 +2220,7 @@ static void poly_update_cache()
 		dy = abs(pxy[3] - pxy[1]);
 		ps[1] = ps[0] + (dx > dy ? dx : dy);
 	}
+#endif
 }
 
 void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp line
@@ -2234,15 +2238,23 @@ void stretch_poly_line(int x, int y)			// Clear old temp line, draw next temp li
 	repaint_line(old);
 }
 
+static void refresh_lines(const int xy0[4], const int xy1[4]);
+
 static void poly_conclude()
 {
 	if (!poly_points) poly_status = POLY_NONE;
 	else
 	{
+		int n = poly_points - 1, edge[4] = {
+			poly_mem[0][0], poly_mem[0][1],
+			poly_mem[n][0], poly_mem[n][1] };
+
 		poly_status = POLY_DONE;
-		repaint_line(NULL);
 		check_marquee();
-		paint_poly_marquee(NULL, FALSE);
+		poly_update_cache();
+		/* Combine erasing old line with drawing final segment:
+		 * there is no new line to be drawn */
+		refresh_lines(line_xy, edge);
 	}
 	update_stuff(UPD_PSEL);
 }
@@ -2256,13 +2268,16 @@ static void poly_add_po(int x, int y)
 	if (poly_points >= MAX_POLY) poly_conclude();
 	else
 	{
-		int old[4];
+		int n = poly_points > 1 ? poly_points - 2 : 0;
+		int old[4], edge[4] = {	poly_mem[n][0], poly_mem[n][1], x, y };
 
+		poly_update_cache();
 		copy4(old, line_xy);
 		line_x1 = line_x2 = x;
 		line_y1 = line_y2 = y;
-		repaint_line(old);
-		paint_poly_marquee(NULL, FALSE);
+		/* Combine erasing old line with redrawing new segment:
+		 * the 1-point new line will be drawn as part of it */
+		refresh_lines(old, edge);
 		update_sel_bar();
 	}
 }
@@ -2770,21 +2785,12 @@ void check_marquee()	// Check marquee boundaries are OK - may be outside limits 
 	marq_y2 = marq_y2 < 0 ? 0 : marq_y2 >= mem_height ? mem_height - 1 : marq_y2;
 }
 
-void paint_poly_marquee(rgbcontext *ctx, int whole)	// Paint polygon marquee
+void paint_poly_marquee(rgbcontext *ctx)	// Paint polygon marquee
 {
-	int i;
-
 	if ((tool_type != TOOL_POLYGON) || !poly_points) return;
 // !!! Maybe check boundary clipping too
 	poly_update_cache();
-	i = poly_cache.points;
-	if (whole) draw_poly(poly_cache.xy, i, 0, margin_main_x, margin_main_y, ctx);
-	else
-	{
-		i -= 2;
-		draw_poly(poly_cache.xy + i * 2, 2, poly_cache.step[i],
-			margin_main_x, margin_main_y, ctx);
-	}
+	draw_poly(poly_cache.xy, poly_cache.points, 0, margin_main_x, margin_main_y, ctx);
 }
 
 

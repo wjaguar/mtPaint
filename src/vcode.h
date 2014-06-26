@@ -41,7 +41,7 @@ enum {
 	op_XTABLE,
 	op_ETABLE,
 	op_FTABLE,
-	op_FSXTABLEp,
+	op_FSXTABLE,
 	//
 	op_VBOX,
 	op_XVBOX,
@@ -56,8 +56,10 @@ enum {
 	op_EQBOX,
 	op_SCROLL,
 	op_XSCROLL,
+	op_FSCROLL,
 	op_SNBOOK,
 	op_NBOOK,
+	op_NBOOKl,
 	op_PLAINBOOK,
 	op_BOOKBTN,
 	op_STATUSBAR,
@@ -67,6 +69,8 @@ enum {
 	op_WLABEL,
 	op_XLABEL,
 	op_TLLABEL,
+	op_HLABEL,
+	op_HLABELm,
 	op_TLTEXT,
 	op_RGBIMAGE,
 	op_WRGBIMAGE,
@@ -226,6 +230,8 @@ enum {
 	op_CLEANUP,
 	op_TALLOC,
 	op_TCOPY,
+	op_CLIPFORM,
+	op_DRAGDROP,
 	op_ACTMAP,
 	op_SHORTCUTs,
 	op_WANTKEYS,
@@ -241,6 +247,7 @@ enum {
 	op_INSENS,
 	op_FOCUS,
 	op_WIDTH,
+	op_HEIGHT,
 	op_ONTOP,
 	op_RAISED,
 
@@ -293,11 +300,18 @@ typedef struct {
 // !!! No pressure yet, and no device type too
 } mouse_ext;
 
-//	Structure which is provided to DRAGFROM and DROP event
+//	Structure which is supplied to CLIPFORM
+typedef struct {
+	char *target;	// MIME type
+	void *id;	// anything
+	int size;	// fixed, or 0 for variable
+	int format;	// bit width: 8/16/32 (0 defaults to 8)
+} clipform_dd;
 
+//	Structure which is provided to DRAGFROM and DROP event
 typedef struct {
 	int x, y;
-	void **format; // !!! Not valid yet
+	clipform_dd *format;
 	void *data;
 	int len;
 } drag_ext;
@@ -411,6 +425,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WBr2hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_FFLAG)
 #define WBr3h(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3)
 #define WBr3hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3 + WB_FFLAG)
+#define WBhn(NM,L) (void *)(op_##NM + WBlen(L) + WB_NFLAG)
 #define WBhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_NFLAG + WB_FFLAG)
 #define WBrhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1 + WB_NFLAG + WB_FFLAG)
 #define WBr2hnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_NFLAG + WB_FFLAG)
@@ -428,6 +443,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WDONE WBh(WDONE, 0)
 #define MAINWINDOW(NM,ICN,W,H) WBrh(MAINWINDOW, 3), (NM), (ICN), WBwh(W, H)
 #define WINDOW(NM) WBrh(WINDOW, 1), (NM)
+#define WINDOWp(NP) WBrhnf(WINDOW, 1), WBfield(NP)
 #define WINDOWm(NM) WBrh(WINDOWm, 1), (NM)
 #define WINDOWpm(NP) WBrhnf(WINDOWm, 1), WBfield(NP)
 #define DIALOGpm(NP) WBrhnf(DIALOGm, 1), WBfield(NP)
@@ -441,6 +457,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define DOCK(K) WBrh(DOCK, 1), (K)
 #define HVSPLIT WBrh(HVSPLIT, 0)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
+#define PAGEvp(NP) WBhn(PAGE, 1), &(NP)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
 #define PAGEir(ICN,S) WBrh(PAGEi, 2), (ICN), (void *)(S)
 #define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
@@ -450,7 +467,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
 #define FTABLE(NM,W,H) WBh(FTABLE, 2), WBwh(W, H), (NM)
-#define FSXTABLEp(V,W,H) WBhf(FSXTABLEp, 2), WBfield(V), WBwh(W, H)
+#define FSXTABLEp(V,W,H) WBhnf(FSXTABLE, 2), WBfield(V), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXr WBrh(VBOX, 0)
 #define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
@@ -476,9 +493,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
 #define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define XSCROLL(HP,VP) WBh(XSCROLL, 1), (void *)((HP) + ((VP) << 8))
+#define FSCROLL(HP,VP) WBh(FSCROLL, 1), (void *)((HP) + ((VP) << 8))
 #define SNBOOK WBh(SNBOOK, 0)
 #define NBOOK WBh(NBOOK, 0)
 #define NBOOKr WBrh(NBOOK, 0)
+#define NBOOKl WBh(NBOOKl, 0)
 #define PLAINBOOK WBrh(PLAINBOOK, 0)
 #define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
 #define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
@@ -503,6 +522,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLLABELp(V,X,Y) WBhnf(TLLABEL, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLLABELpx(V,X,Y,PX,PY,AX) WBhnf(TLLABEL, 3), WBfield(V), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define HLABELp(V) WBhnf(HLABEL, 1), WBfield(V)
+#define HLABELmp(V) WBhnf(HLABELm, 1), WBfield(V)
 #define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
 #define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
@@ -743,6 +764,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define WIDTH(N) WBh(WIDTH, 1), (void *)(N)
 #define MINWIDTH(N) WBh(WIDTH, 1), (void *)(-(N))
 #define KEEPWIDTH WBh(KEEPWIDTH, 0)
+#define HEIGHT(N) WBh(HEIGHT, 1), (void *)(N)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define ONTOP0 WBh(ONTOP, 0)
 #define RAISED WBh(RAISED, 0)
@@ -780,9 +802,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TRIGGER WBrh(TRIGGER, 0)
 #define MTRIGGER(H) WBr2h(TRIGGER, 0 + 2), EVENT(CHANGE, H)
 #define WANTKEYS(H) WBr2h(WANTKEYS, 0 + 2), EVENT(KEY, H)
-// !!! For now
-#define DRAGFROM(H,L) WBrh(EVT_DRAGFROM, 2), (H), (L)
-#define DROP(H,A,N) WBrh(EVT_DROP, 3), (H), (A), (void *)(N)
+#define CLIPFORM(A,N) WBrh(CLIPFORM, 2), &(A), (void *)(N)
+#define DRAGDROP(F,HF,HT) WBr3hf(DRAGDROP, 2 + 2 * 2), WBfield(F), NULL, \
+	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
+#define DRAGDROPm(F,HF,HT) WBr3hf(DRAGDROP, 2 + 2 * 2), WBfield(F), (void *)1, \
+	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
 
 #define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B)
 
@@ -844,3 +868,6 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of EV_DRAGFROM
 #define DRAG_DATA	0	/* array of 2 pointers: start/end */
 #define DRAG_ICON_RGB	1
+
+//	Extra state of all regular widgets
+#define SLOT_FOCUSED	0

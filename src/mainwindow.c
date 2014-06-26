@@ -49,7 +49,8 @@ typedef struct {
 	int idx_c, nidx_c, cnt_c;
 	int cline_d, settings_d, layers_d;
 	int *strs_c;
-	void **dock, **dockbook, **dockpage1;
+	void **drop;
+	void **dockpage1;
 } main_dd;
 
 #define GREY_W 153
@@ -167,7 +168,7 @@ void **main_window_, **settings_dock, **layers_dock, **main_split,
 GtkWidget *drawing_canvas, *vw_scrolledwindow,
 	*scrolledwindow_canvas;
 
-static void **main_menubar;
+static void **dock_area, **dock_book, **main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
@@ -739,6 +740,8 @@ static void move_mouse(int dx, int dy, int button)
 	if (!mem_img[CHN_IMAGE]) return;
 	dx += lastdx; dy += lastdy;
 
+// !!! Will be cmd_peekv(), with vport added inside -
+// and maybe, even returning a full-fledged mouse_ext struct
 	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
 	wjcanvas_get_vport(drawing_canvas, vxy);
 	x += vxy[0]; y += vxy[1];
@@ -1032,9 +1035,7 @@ int wtf_pressed(GdkEventKey *event)
 
 int dock_focused()
 {
-	GtkWidget *focus = GTK_WINDOW(GET_REAL_WINDOW(main_window_))->focus_widget;
-	GtkWidget *dock = ((main_dd *)GET_DDATA(main_window_))->dockbook[0];
-	return (focus && ((focus == dock) || gtk_widget_is_ancestor(focus, dock)));
+	return (cmd_checkv(dock_book, SLOT_FOCUSED));
 }
 
 static int handle_keypress(main_dd *dt, void **wdata, int what, void **where,
@@ -2936,22 +2937,15 @@ void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbconte
 	}
 }
 
-/* Redirectable polygon drawing */
+/* Polygon drawing to RGB memory */
 void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 {
-#define PT_BATCH 100
-	GdkPoint white[PT_BATCH], black[PT_BATCH], *p;
 	linedata line;
 	unsigned char *rgb;
-	int w = 0, nw = 0, nb = 0;
-	int i, x0, y0, x1, y1, dx, dy, a0, a, vxy[4];
+	int i, x0, y0, x1, y1, dx, dy, a0, a, w, vxy[4];
 
-	if (ctx)
-	{
-		copy4(vxy, ctx->xy);
-		w = vxy[2] - vxy[0];
-	}
-	else wjcanvas_get_vport(drawing_canvas, vxy);
+	copy4(vxy, ctx->xy);
+	w = vxy[2] - vxy[0];
 	--vxy[2]; --vxy[3];
 
 	x1 = x00 + *xy++; y1 = y00 + *xy++;
@@ -2987,43 +2981,14 @@ void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx)
 			if (line_clip(line, vxy, &a0) < 0) continue;
 			dx -= a0;
 		}
+		// Draw to RGB
 		for (dx = shift - dx; line[2] >= 0; line_step(line) , dx++)
 		{
-			if (ctx) // Draw to RGB
-			{
-				rgb = ctx->rgb + ((line[1] - ctx->xy[1]) * w +
-					(line[0] - ctx->xy[0])) * 3;
-				rgb[0] = rgb[1] = rgb[2] = ((~dx >> 2) & 1) * 255;
-				continue;
-			}
-			if (dx & 4) // Draw to canvas in black
-			{
-				p = black + nb++;
-				p->x = line[0] - vxy[0];
-				p->y = line[1] - vxy[1];
-				if (nb < PT_BATCH) continue;
-			}
-			else // Draw to canvas in white
-			{
-				p = white + nw++;
-				p->x = line[0] - vxy[0];
-				p->y = line[1] - vxy[1];
-				if (nw < PT_BATCH) continue;
-			}
-			// Batch drawing to canvas
-			if (nb) gdk_draw_points(drawing_canvas->window,
-				drawing_canvas->style->black_gc, black, nb);
-			if (nw)	gdk_draw_points(drawing_canvas->window,
-				drawing_canvas->style->white_gc, white, nw);
-			nb = nw = 0;
+			rgb = ctx->rgb + ((line[1] - ctx->xy[1]) * w +
+				(line[0] - ctx->xy[0])) * 3;
+			rgb[0] = rgb[1] = rgb[2] = ((~dx >> 2) & 1) * 255;
 		}
 	}
-	// Finish drawing
-	if (nb) gdk_draw_points(drawing_canvas->window,
-		drawing_canvas->style->black_gc, black, nb);
-	if (nw) gdk_draw_points(drawing_canvas->window,
-		drawing_canvas->style->white_gc, white, nw);
-#undef PT_BATCH
 }
 
 /* Clip area to image & align rgb pointer with it */
@@ -3149,7 +3114,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	if (marq_status != MARQUEE_NONE)
 		paint_marquee(MARQ_SHOW, 0, 0, &ctx);
 	if ((tool_type == TOOL_POLYGON) && poly_points)
-		paint_poly_marquee(&ctx, TRUE);
+		paint_poly_marquee(&ctx);
 
 	/* Redraw line if needed */
 	if ((((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
@@ -3506,16 +3471,19 @@ static char read_hex_dub(char *in)	// Read hex double
 	return (p1 && p2 ? (((p1 - chars) & 15) << 4) + ((p2 - chars) & 15) : '?');
 }
 
-static void parse_drag( char *txt )
+static void parse_drag(main_dd *dt, void **wdata, int what, void **where,
+	drag_ext *drag)
 {
 #ifdef WIN32
 	char fname[PATHTXT];
 #else
 	char fname[PATHBUF];
 #endif
-	char ch, *tp, *tp2;
+	char ch, *tp, *tp2, *txt = drag->data;
 	int i, j, nlayer = TRUE;
 
+
+	if (drag->len <= 0) return;
 
 	set_image(FALSE);
 
@@ -3566,33 +3534,7 @@ static void parse_drag( char *txt )
 }
 
 
-static const GtkTargetEntry uri_list = { "text/uri-list", 0, 1 };
-
-static gboolean drag_n_drop_tried(GtkWidget *widget, GdkDragContext *context,
-	gint x, gint y, guint time, gpointer user_data)
-{
-	GdkAtom target = gdk_atom_intern("text/uri-list", FALSE);
-	gpointer tp = GUINT_TO_POINTER(target);
-	GList *src;
-
-	/* Check if drop could provide a supported format */
-	for (src = context->targets; src && (src->data != tp); src = src->next);
-	if (!src) return (FALSE);
-	/* Trigger "drag_data_received" event */
-	gtk_drag_get_data(widget, context, target, time);
-	return (TRUE);
-}
-
-static void drag_n_drop_received(GtkWidget *widget, GdkDragContext *context,
-	gint x, gint y, GtkSelectionData *data, guint info, guint time)
-{
-	int success;
-
-	if ((success = ((data->length >= 0) && (data->format == 8))))
-		parse_drag((gchar *)data->data);
-	/* Accept move as a copy (disallow deleting source) */
-	gtk_drag_finish(context, success, FALSE, time);
-}
+static clipform_dd uri_list = { "text/uri-list" };
 
 
 static void pressed_pal_copy();
@@ -4057,9 +3999,7 @@ static void pressed_pal_paste()
 
 static void toggle_dock(int state)
 {
-	main_dd *dt = GET_DDATA(main_window_);
-
-	cmd_set(dt->dock, state);
+	cmd_set(dock_area, state);
 // !!! Later make this canvas' "realize" handler
 	set_cursor(NULL); /* Because canvas window is now a new one */
 }
@@ -4580,24 +4520,6 @@ static void *main_menu_code[] = {
 	RET
 };
 
-static void **set_drop(void **r, GtkWidget ***wpp, void **wdata)
-{
-///	MAIN WINDOW
-
-	main_window_ = wdata; // !!! For the code which needs this too early
-	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
-	 * move as a move, so have to do some non-default processing - WJ */
-	gtk_drag_dest_set(main_window, GTK_DEST_DEFAULT_HIGHLIGHT |
-		GTK_DEST_DEFAULT_MOTION, &uri_list, 1, GDK_ACTION_COPY |
-		GDK_ACTION_MOVE);
-	gtk_signal_connect(GTK_OBJECT(main_window), "drag_data_received",
-		GTK_SIGNAL_FUNC(drag_n_drop_received), NULL);
-	gtk_signal_connect(GTK_OBJECT(main_window), "drag_drop",
-		GTK_SIGNAL_FUNC(drag_n_drop_tried), NULL);
-
-	return (r);
-}
-
 static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
 	GtkAdjustment *adj;
@@ -4714,7 +4636,7 @@ static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
 	cmd_showhide(dt->dockpage1, dstate);
 
 	/* Show tabs only when it makes sense */
-	cmd_setv(dt->dockbook, (void *)(dt->cline_d && dstate), NBOOK_TABS);
+	cmd_setv(dock_book, (void *)(dt->cline_d && dstate), NBOOK_TABS);
 
 	/* Close dock if nothing left in it */
 	dstate |= dt->cline_d;
@@ -4727,9 +4649,12 @@ static void *main_code[] = {
 ///	MAIN WINDOW
 	MAINWINDOW(MT_VERSION, icon_xpm, 100, 100), EVENT(CANCEL, delete_event),
 	EVENT(KEY, handle_keypress),
+	REF(drop), CLIPFORM(uri_list, 1),
+	/* !!! Konqueror needs GDK_ACTION_MOVE to do a drop; we never accept
+	 * move as a move, so have to do some non-default processing - WJ */
+	DRAGDROPm(drop, NULL, parse_drag),
 	WXYWH("window", 630, 400),
-	REF(dock), DOCK("dockSize"),
-	EXEC(set_drop),
+	REFv(dock_area), DOCK("dockSize"),
 ///	MENU
 	CALL(main_menu_code),
 ///	TOOLBARS
@@ -4757,7 +4682,7 @@ static void *main_code[] = {
 	WDONE, // xhbox
 	WDONE, // left pane
 	BORDER(NBOOK, 0),
-	REF(dockbook), NBOOKr, KEEPWIDTH, WANTKEYS(dock_esc),
+	REFv(dock_book), NBOOKr, KEEPWIDTH, WANTKEYS(dock_esc),
 	IFx(cline_d, 1),
 		PAGEi(XPM_ICON(cline), 0),
 		BORDER(XSCROLL, 0),
