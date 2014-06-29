@@ -71,6 +71,7 @@ static void *help_code[] = {
 	DEFSIZE(600, 2),
 	XVBOXb(0, 4), // originally the window was that way
 	BORDER(NBOOK, 1),
+	BORDER(FRAME, 10), BORDER(FRBOX, 0),
 	NBOOKl,
 	CLEANUP(help[0]),
 	PAGEvp(help_titles[0]),

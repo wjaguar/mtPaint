@@ -925,7 +925,7 @@ static void font_gui_create_index(char *filename) // Create index file with sett
 		dirs[i] = inifile_get( buf, "" );
 	}
 
-	progress_init( __("Creating Font Index"), 0 );
+	progress_init(_("Creating Font Index"), 0);
 	font_index_create( filename, dirs );
 	progress_end();
 }

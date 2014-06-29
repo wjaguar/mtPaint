@@ -18,6 +18,9 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
+
 #include "mygtk.h"
 #include "memory.h"
 #include "vcode.h"
@@ -55,6 +58,7 @@ GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos,
 	return win;
 }
 
+#if 0 /* Not needed anymore */
 GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
 {
 	GtkWidget *button = gtk_button_new_with_label(text);
@@ -64,6 +68,7 @@ GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
 
 	return button;
 }
+#endif
 
 GtkWidget *add_a_spin( int value, int min, int max )
 {
@@ -84,7 +89,6 @@ GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
 {
 	return (pack(box, sig_toggle(label, value, NULL, NULL)));
 }
-#endif
 
 GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
 	int l, int spacing)
@@ -114,7 +118,6 @@ GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
 	return (widget);
 }
 
-#if 0 /* Not needed anymore */
 GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing)
 {
@@ -122,7 +125,6 @@ GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 		(GtkAttachOptions)(GTK_FILL), (GtkAttachOptions) (0), 0, spacing);
 	return (widget);
 }
-#endif
 
 GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max)
@@ -134,7 +136,6 @@ GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	return (spin);
 }
 
-#if 0 /* Not needed anymore */
 GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	double value, double min, double max)
 {
@@ -144,7 +145,6 @@ GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacin
 		(GtkAttachOptions) (0), 0, spacing);
 	return (spin);
 }
-#endif
 
 void add_hseparator( GtkWidget *widget, int xs, int ys )
 {
@@ -152,76 +152,74 @@ void add_hseparator( GtkWidget *widget, int xs, int ys )
 	gtk_widget_show(sep);
 	gtk_widget_set_usize(sep, xs, ys);
 }
+#endif
 
 
 
 ////	PROGRESS WINDOW
 
-static GtkWidget *progress_window, *progress_bar;
-static int prog_stop;
+static void **progress_window;
 
-static void do_cancel_progress()
+typedef struct {
+	int stop, can_stop;
+	char *what;
+	void **pbar;
+} progress_dd;
+
+static void do_cancel_progress(progress_dd *dt)
 {
-	prog_stop = 1;
+	dt->stop = 1;
 }
 
-static gboolean delete_progress(GtkWidget *widget, GdkEvent *event, gpointer data)
+static void delete_progress()
 {
-	return TRUE;			// This stops the user closing the window via the window manager
+	// This stops the user closing the window via the window manager
 }
+
+#define WBbase progress_dd
+static void *progress_code[] = {
+	WIDTH(400), WINDOWm(_("Please Wait ...")),
+	EVENT(CANCEL, delete_progress),
+	EFVBOX, // originally was box in viewport
+	REF(pbar), PROGRESSp(what),
+	IFx(can_stop, 1),
+		HSEP,
+		BUTTON(_("STOP"), do_cancel_progress),
+	ENDIF(1),
+	WSHOW
+};
+#undef WBbase
 
 void progress_init(char *text, int canc)		// Initialise progress window
 {
-	GtkWidget *vbox6, *button_cancel, *viewport;
+	progress_dd tdata = { 0, canc, text };
 
 	/* Break pointer grabs, to avoid originating widget misbehaving later on */
 	release_grab();
 
-	progress_window = add_a_window( GTK_WINDOW_TOPLEVEL, _("Please Wait ..."),
-		GTK_WIN_POS_CENTER, TRUE );
-	gtk_widget_set_usize (progress_window, 400, -2);
+	progress_window = run_create(progress_code, &tdata, sizeof(tdata));
 
-	viewport = gtk_viewport_new (NULL, NULL);
-	gtk_widget_show(viewport);
-	gtk_container_add( GTK_CONTAINER( progress_window ), viewport );
-	gtk_viewport_set_shadow_type( GTK_VIEWPORT(viewport), GTK_SHADOW_ETCHED_OUT );
-	vbox6 = add_vbox(viewport);
-
-	progress_bar = pack(vbox6, gtk_progress_bar_new());
-	gtk_progress_set_format_string( GTK_PROGRESS (progress_bar), text );
-	gtk_progress_set_show_text( GTK_PROGRESS (progress_bar), TRUE );
-	gtk_container_set_border_width (GTK_CONTAINER (vbox6), 10);
-	gtk_widget_show( progress_bar );
-
-	if ( canc == 1 )
-	{
-		add_hseparator( vbox6, -2, 10 );
-		button_cancel = add_a_button(_("STOP"), 5, vbox6, TRUE);
-		gtk_signal_connect(GTK_OBJECT(button_cancel), "clicked",
-			GTK_SIGNAL_FUNC(do_cancel_progress), NULL);
-	}
-
-	gtk_signal_connect_object (GTK_OBJECT (progress_window), "delete_event",
-		GTK_SIGNAL_FUNC (delete_progress), NULL);
-
-	prog_stop = 0;
-	gtk_widget_show( progress_window );
 	progress_update(0.0);
 }
 
 int progress_update(float val)		// Update progress window
 {
-	if (!progress_window) return (FALSE);
-	gtk_progress_set_percentage( GTK_PROGRESS (progress_bar), val );
-	handle_events();
-	return (prog_stop);
+	if (progress_window)
+	{
+		progress_dd *dt = GET_DDATA(progress_window);
+		cmd_setv(dt->pbar, (void *)(int)(val * 100), PROGRESS_PERCENT);
+		handle_events();
+		// !!! Depends on window not being closeable by user
+		return (dt->stop);
+	}
+	return (FALSE);
 }
 
 void progress_end()			// Close progress window
 {
 	if (progress_window)
 	{
-		gtk_widget_destroy( progress_window );
+		run_destroy(progress_window);
 		progress_window = NULL;
 	}
 }
@@ -237,9 +235,6 @@ typedef struct {
 	int have2;
 	void **cb, **res;
 } alert_dd;
-
-#undef _
-#define _(X) X
 
 #define WBbase alert_dd
 static void *alert_code[] = {
@@ -282,9 +277,6 @@ int alert_box(char *title, char *message, char *text1, ...)
 
 	return (res);
 }
-
-#undef _
-#define _(X) __(X)
 
 // Add page to notebook
 
@@ -390,7 +382,9 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 		gtk_object_set_user_data(GTK_OBJECT(button), (gpointer)i);
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 		if (vnum > 0) x = j / vnum;
-		to_table_x(button, table, j - x * vnum, x, vnum != 1, 0);
+		gtk_table_attach(GTK_TABLE(table), button, x, x + 1,
+			j - x * vnum, j - x * vnum + 1,
+			vnum != 1 ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, 0);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
 		if (hdl) gtk_signal_connect(GTK_OBJECT(button), "toggled", hdl, var);
@@ -676,7 +670,6 @@ GtkWidget *table_slot(GtkWidget *table, int row, int col)
 	}
 	return (NULL);
 }
-#endif
 
 // Packing framed widget
 
@@ -695,6 +688,7 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget)
 {
 	return (add_with_frame_x(box, text, widget, 5, FALSE));
 }
+#endif
 
 // Option menu
 
@@ -825,6 +819,7 @@ void widget_set_keepsize(GtkWidget *widget, int keep_height)
 
 // Signalled toggles
 
+#if 0 /* Not needed anymore */
 static void sig_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
 {
 	*(int *)user_data = gtk_toggle_button_get_active(togglebutton);
@@ -861,7 +856,6 @@ GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc
 
 // Path box
 
-#if 0 /* Not needed anymore */
 static void click_file_browse(GtkWidget *widget, gpointer data)
 {
 	void *xdata[2];
@@ -1912,6 +1906,8 @@ int internal_clipboard(int which)
 
 #endif
 
+#if 0 /* Not needed anymore */
+
 /* While GTK+2 allows for synchronous clipboard handling, it's implemented
  * through copying the entire clipboard data - and when the data might be
  * a huge image which mtPaint is bound to allocate *yet again*, this would be
@@ -2058,6 +2054,8 @@ int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 	}
 	return (FALSE);
 }
+
+#endif
 
 #endif
 

@@ -48,8 +48,10 @@
 typedef struct {
 	int idx_c, nidx_c, cnt_c;
 	int cline_d, settings_d, layers_d;
+	int impmode;
 	int *strs_c;
-	void **drop;
+	void **drop, **clip;
+	void **clipboard;
 	void **dockpage1;
 } main_dd;
 
@@ -368,92 +370,41 @@ static void pressed_mask(int val)
 
 // System clipboard import
 
-static GtkTargetEntry clip_formats[] = {
-	{ NULL, 0, FT_NONE },
-	{ "application/x-mtpaint-pmm", 0, FT_PMM | FTM_EXTEND },
-	{ "application/x-mtpaint-clipboard", 0, FT_PNG | FTM_EXTEND },
-	{ "image/png", 0, FT_PNG },
-	{ "image/bmp", 0, FT_BMP },
-	{ "image/x-bmp", 0, FT_BMP },
-	{ "image/x-MS-bmp", 0, FT_BMP },
+static clipform_dd clip_formats[] = {
+	{ "application/x-mtpaint-pmm", (void *)(FT_PMM | FTM_EXTEND) },
+	{ "application/x-mtpaint-clipboard", (void *)(FT_PNG | FTM_EXTEND) },
+	{ "image/png", (void *)(FT_PNG) },
+	{ "image/bmp", (void *)(FT_BMP) },
+	{ "image/x-bmp", (void *)(FT_BMP) },
+	{ "image/x-MS-bmp", (void *)(FT_BMP) },
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 	/* These two don't make sense without X */
-	{ "PIXMAP", 0, FT_PIXMAP },
-	{ "BITMAP", 0, FT_PIXMAP },
+	{ "PIXMAP", (void *)(FT_PIXMAP), 4, 32 },
+	{ "BITMAP", (void *)(FT_PIXMAP), 4, 32 },
 	/* !!! BITMAP requests are handled same as PIXMAP - because it is only
 	 * done to appease buggy XPaint which requests both and crashes if
 	 * receiving only one - WJ */
 #endif
 };
-#define CLIP_TARGETS (sizeof(clip_formats) / sizeof(GtkTargetEntry))
-static GdkAtom clip_atoms[CLIP_TARGETS];
+#define CLIP_TARGETS (sizeof(clip_formats) / sizeof(clip_formats[0]))
 
 /* Seems it'll be better to prefer BMP when talking to the likes of GIMP -
  * they send PNGs really slowly (likely, compressed to the max); but not
  * everyone supports alpha in BMPs. */
 
-static int clipboard_check_fn(GtkSelectionData *data, gpointer user_data)
+static int clipboard_import_fn(main_dd *dt, void **wdata, int what, void **where,
+	copy_ext *cdata)
 {
-	GdkAtom *targets, tst;
-	int i, j, k, n = data->length / sizeof(GdkAtom);
-
-	if ((n <= 0) || (data->format != 32) ||
-		(data->type != GDK_SELECTION_TYPE_ATOM)) return (FALSE);
-
-	/* Convert names to atoms if not done already */
-	if (!clip_atoms[1])
-	{
-		for (i = 1; i < CLIP_TARGETS; i++) clip_atoms[i] =
-			gdk_atom_intern(clip_formats[i].target, FALSE);
-	}
-
-	/* Search for best match */
-	targets = (GdkAtom *)data->data;
-	for (i = 0 , k = CLIP_TARGETS; i < n; i++)
-	{
-		tst = *targets++;
-//g_print("\"%s\" ", gdk_atom_name(tst));
-		for (j = 1; (j < k) && (tst != clip_atoms[j]); j++);
-		k = j;
-	}
-//g_print(": %d\n", k);
-	*(int *)user_data = k;
-	return (k < CLIP_TARGETS);
-}
-
-static int check_clipboard(int which)
-{
-	int res;
-
-	if (internal_clipboard(which)) return (0); // if we're who put data there
-	if (!process_clipboard(which, "TARGETS",
-		GTK_SIGNAL_FUNC(clipboard_check_fn), &res)) return (0); // no luck
-	return (res);
-}
-
-static int clipboard_import_fn(GtkSelectionData *data, gpointer user_data)
-{
-//g_print("!!! %X %d\n", data->data, data->length);
-	return (load_mem_image((unsigned char *)data->data, data->length,
-		((int *)user_data)[0], ((int *)user_data)[1]) == 1);
+	int form = (int)cdata->format->id;
+	if ((dt->impmode == FS_PNG_LOAD) && undo_load) form |= FTM_UNDO;
+	return (load_mem_image(cdata->data, cdata->len, dt->impmode, form) == 1);
 }
 
 int import_clipboard(int mode)
 {
-	int i = 0, n = 0, udata[2] = { mode };
-
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	// If no luck with CLIPBOARD, check PRIMARY too
-	for (; !i && (n < 2); n++)
-#endif
-	if ((i = check_clipboard(n)))
-	{
-		udata[1] = (int)clip_formats[i].info |
-			((mode == FS_PNG_LOAD) && undo_load ? FTM_UNDO : 0);
-		i = process_clipboard(n, clip_formats[i].target,
-			GTK_SIGNAL_FUNC(clipboard_import_fn), udata);
-	}
-	return (i);
+	main_dd *dt = GET_DDATA(main_window_);
+	dt->impmode = mode;
+	return (cmd_checkv(dt->clipboard, CLIP_PROCESS));
 }
 
 static void setup_clip_save(ls_settings *settings)
@@ -467,57 +418,44 @@ static void setup_clip_save(ls_settings *settings)
 	settings->colors = mem_cols;
 }
 
-static int clipboard_export_fn(GtkSelectionData *data, gpointer user_data)
+static void clipboard_export_fn(main_dd *dt, void **wdata, int what, void **where,
+	copy_ext *cdata)
 {
 	ls_settings settings;
-	unsigned char *buf;
-	int res, len, type = (int)user_data;
+	unsigned char *buf, *pp[2];
+	int res, len, type;
 
-//g_print("Entered! %X %d\n", data, type);
-	if (!data) return (FALSE); // Someone else stole system clipboard
-	if (!mem_clipboard) return (FALSE); // Our own clipboard got emptied
+	if (!cdata->format) return; // Someone else stole system clipboard
+	if (!mem_clipboard) return; // Our own clipboard got emptied
 
 	/* Prepare settings */
 	setup_clip_save(&settings);
 	settings.mode = FS_CLIPBOARD;
-	settings.ftype = type;
+	settings.ftype = type = (int)cdata->format->id;
 	settings.png_compression = 1; // Speed is of the essence
 
 	res = save_mem_image(&buf, &len, &settings);
-//g_print("Save returned %d\n", res);
-	if (res) return (FALSE); // No luck creating in-memory image
+	if (res) return; // No luck creating in-memory image
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	/* !!! XID of pixmap gets returned in buffer pointer */
 	if ((type & FTM_FTYPE) == FT_PIXMAP)
 	{
-		/* !!! XID of pixmap gets returned in buffer pointer */
-		gtk_selection_data_set(data, data->target, 32, (guchar *)&buf, len);
-		return (TRUE);
+		pp[1] = (pp[0] = (void *)&buf) + len; 
+		cmd_setv(where, pp, COPY_DATA);
+		return;
 	}
 #endif
-
-/* !!! Should allocation for data copying fail, GTK+ will die horribly - so
- * maybe it'll be better to hack up the function and pass the original data
- * instead; but to do so, I'd need to use g_try_*() allocation functions in
- * memFILE writing path - WJ */
-	gtk_selection_data_set(data, data->target, 8, buf, len);
+	pp[1] = (pp[0] = buf) + len; 
+	cmd_setv(where, pp, COPY_DATA);
 	free(buf);
-	return (TRUE);
 }
 
 static int export_clipboard()
 {
-	int res;
-
+	main_dd *dt = GET_DDATA(main_window_);
 	if (!mem_clipboard) return (FALSE);
-	res = offer_clipboard(0, clip_formats + 1, CLIP_TARGETS - 1,
-		GTK_SIGNAL_FUNC(clipboard_export_fn));
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	/* Offer both CLIPBOARD and PRIMARY */
-	res |= offer_clipboard(1, clip_formats + 1, CLIP_TARGETS - 1,
-		GTK_SIGNAL_FUNC(clipboard_export_fn));
-#endif
-	return (res);
+	return (cmd_checkv(dt->clipboard, CLIP_OFFER));
 }
 
 int gui_save(char *filename, ls_settings *settings)
@@ -4704,6 +4642,8 @@ static void *main_code[] = {
 	WDONE, // page
 	WDONE, // nbook
 	WDONE, // right pane
+	REF(clip), CLIPFORM(clip_formats, CLIP_TARGETS),
+	REF(clipboard), CLIPBOARD(clip, 3, clipboard_export_fn, clipboard_import_fn),
 	RAISED, WSHOW
 };
 #undef WBbase

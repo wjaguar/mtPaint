@@ -263,11 +263,11 @@ static int ani_cyc_sscanf(char *txt, ani_cycle *chead, unsigned char *cdata)
 {
 	char *tail;
 	unsigned char *cntp;
-	int i, j, l, f, f0, f1, b;
+	int j, l, f, f0, f1, b;
 
 	while (*txt && (*txt < 32)) txt++;	// Skip non ascii chars
 	if (!*txt) return (FALSE);
-	f0 = f1 = -1; i = 0;	// Default state if invalid
+	f0 = f1 = -1;		// Default state if invalid
 	l = 0; sscanf(txt, "%i\t%i\t%n", &f0, &f1, &l);
 	chead->frame0 = f0;
 	chead->frame1 = f1;
@@ -771,7 +771,7 @@ static void create_frames_ani()
 		settings.rgb_trans = tr < 0 ? -1 : PNG_2_INT(image->pal[tr]);
 	}
 
-	progress_init(__("Creating Animation Frames"), 1);
+	progress_init(_("Creating Animation Frames"), 1);
 	for ( k=a; k<=b; k++ )			// Create each frame and save it as a PNG or GIF image
 	{
 		if (progress_update(b == a ? 0.0 : (k - a) / (float)(b - a)))
@@ -1023,7 +1023,6 @@ static void *anim_code[] = {
 void pressed_animate_window()
 {
 	anim_dd tdata;
-	void **wdata;
 
 
 	if ( layers_total < 1 )					// Only background layer available
@@ -1051,7 +1050,7 @@ void pressed_animate_window()
 	tdata.nlayer = layers_total - 1; // last layer in list
 	tdata.layer = layers_total; // regular index of same
 
-	wdata = run_create(anim_code, &tdata, sizeof(tdata));
+	run_create(anim_code, &tdata, sizeof(tdata));
 	free(tdata.cyc);
 
 	ani_show_main_state = show_layers_main;	// Remember old state

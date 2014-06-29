@@ -392,7 +392,7 @@ static void *pref_code[] = {
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
 	BORDER(OPT, 0),
-	FVBOXs(_("Language"), 5),
+	FVBOXb(_("Language"), 5, 5),
 	MLABEL(_("Select preferred language translation\n\n"
 	"You will need to restart mtPaint\nfor this to take full effect")),
 	OPT(pref_langs, PREF_LANGS, lang),
@@ -472,12 +472,12 @@ static void *pref_code[] = {
 	UBUTTON(_("Configure Device"), conf_tablet),
 	DEFBORDER(BUTTON),
 	XTABLE(2, 4),
-	BORDER(TLABEL, 0),
-	TLLABELx(_("Tool Variable"), 0, 0, 5, 5, 5),
+	BORDER(TLABEL, 0), BORDER(CHECK, 0),
+	TLABELx(_("Tool Variable"), 5, 5, 5),
 	TLLABELpx(factor_str, 1, 0, 5, 5, 4),
-	TLCHECKsv(_("Size"), tablet_tool_use[0], 0, 1),
-	TLCHECKsv(_("Flow"), tablet_tool_use[1], 0, 2),
-	TLCHECKsv(_("Opacity"), tablet_tool_use[2], 0, 3),
+	TLCHECKv(_("Size"), tablet_tool_use[0], 0, 1),
+	TLCHECKv(_("Flow"), tablet_tool_use[1], 0, 2),
+	TLCHECKv(_("Opacity"), tablet_tool_use[2], 0, 3),
 	//	Size/Flow/Opacity sliders
 	BORDER(SPINSLIDE, 0),
 	TLSPINSLIDEs(tf[0], -100, 100, 1, 1),

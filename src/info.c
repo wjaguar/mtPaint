@@ -282,7 +282,8 @@ static void *info_code[] = {
 	IFx(indexed, 1),
 ///	Big index table
 		BORDER(FRBOX, 4),
-		FSXTABLEp(col_h, 3, 256 + 3),
+		FSCROLLp(col_h, 1, 1), // auto/auto
+		STABLE(3, 256 + 3),
 		TLLABEL(_("Index"), 0, 0),
 		TLLABEL(_("Canvas pixels"), 1, 0),
 		TLLABEL("%", 2, 0),

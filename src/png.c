@@ -61,6 +61,8 @@
 #endif
 
 #include "global.h"
+#undef _
+#define _(X) X
 
 #include "mygtk.h"
 #include "memory.h"
@@ -579,7 +581,7 @@ static void ls_init(char *what, int save)
 {
 	char buf[256];
 
-	sprintf(buf, save ? _("Saving %s image") : _("Loading %s image"), what);
+	sprintf(buf, save ? __("Saving %s image") : __("Loading %s image"), what);
 	progress_init(buf, 0);
 }
 
@@ -739,7 +741,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 			break;
 		case FS_CLIP_FILE:
 		case FS_CLIPBOARD:
-			msg = _("Clipboard");
+			msg = __("Clipboard");
 			break;
 		}
 	}
@@ -953,13 +955,13 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		break;
 	case FS_CLIP_FILE:
 	case FS_CLIPBOARD:
-		mess = _("Clipboard");
+		mess = __("Clipboard");
 		break;
 	case FS_COMPOSITE_SAVE:
-		mess = _("Layer");
+		mess = __("Layer");
 		break;
 	case FS_CHANNEL_SAVE:
-		mess = _("Channel");
+		mess = __("Channel");
 		break;
 	default:
 		settings->silent = TRUE;
@@ -4390,7 +4392,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 {
 	unsigned char *buf, *tmp, *src;
 	FILE *fp;
-	int i, j, k, last, cnt, idx;
+	int i, j, uninit_(k), last, cnt, idx;
 	int w = settings->width, h = settings->height;
 
 
@@ -7284,14 +7286,11 @@ static int write_out_frame(char *file_name, ani_settings *ani, ls_settings *f_se
 
 static void warn_miss(int miss, int total, int ftype)
 {
-	char *txt = g_strdup_printf(_("%d out of %d frames could not be saved as %s - saved as PNG instead"),
+	char *txt = g_strdup_printf(
+		__("%d out of %d frames could not be saved as %s - saved as PNG instead"),
 		miss, total, file_formats[ftype].name);
-#undef _
-#define _(X) X
 	alert_box(_("Warning"), txt, NULL);
 	g_free(txt);
-#undef _
-#define _(X) __(X)
 }
 
 int explode_frames(char *dest_path, int ani_mode, char *file_name, int ftype,

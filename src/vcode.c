@@ -61,24 +61,23 @@ enum {
 	pk_EPACK,
 	pk_PACKEND,
 	pk_PACKEND1,
-	pk_TABLE,
-	pk_TABLEx,
-	pk_TABLEp,
-	pk_TABLE2,
-	pk_TABLE2x,
 	pk_SCROLLVP,
 	pk_SCROLLVPn,
 	pk_SCROLLVPv,
 	pk_SCROLLVPm,
 	pk_CONT,
-	pk_BIN
+	pk_BIN,
+	pk_TABLE0p,
+	pk_TABLE1x,
+	pk_TABLE,
+	pk_TABLEx,
+	pk_TABLEp,
 };
-#define pk_MASK      0xFF
-#define pkf_FRAME  0x0100
-#define pkf_STACK  0x0200
-#define pkf_CHILD  0x0400
-#define pkf_PARENT 0x0800
-#define pkf_SHOW   0x1000
+#define pk_MASK     0xFF
+#define pkf_STACK  0x100
+#define pkf_CHILD  0x200
+#define pkf_PARENT 0x400
+#define pkf_SHOW   0x800
 
 /* Internal datastore */
 
@@ -361,7 +360,7 @@ typedef struct {
 	drag_ext d;
 } drag_den;
 
-static int drag_event(drag_sel *ds, GtkWidget *widget, drag_ctx *dc)
+static int drag_event(drag_sel *ds, drag_ctx *dc)
 {
 	void **slot = dc->r, **orig = origin_slot(slot);
 	void **base = slot[0], **desc = slot[1];
@@ -448,8 +447,7 @@ static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data
 				/* Call handler so it can decide if it wants
 				 * this drag, and maybe set icon color */
 				dc->color = -1;
-				if (!drag_event(NULL, widget, dc))
-					return (TRUE); // no drag
+				if (!drag_event(NULL, dc)) return (TRUE); // no drag
 				context = gtk_drag_begin(widget, dc->cd->targets,
 					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
 				if (!context) return (TRUE); // failed
@@ -467,7 +465,7 @@ static void get_evt_drag(GtkWidget *widget, GdkDragContext *drag_context,
 	GtkSelectionData *data, guint info, guint time, gpointer user_data)
 {
 	drag_sel ds = { drag_context, data, info, time };
-	drag_event(&ds, widget, user_data);
+	drag_event(&ds, user_data);
 }
 
 static void fcimage_rxy(void **slot, int *xy);
@@ -542,6 +540,325 @@ static gboolean tried_drop(GtkWidget *widget, GdkDragContext *context,
 	gtk_drag_get_data(widget, context, target, time);
 	return (TRUE);
 }
+
+void *dragdrop(void *v, void **pp, void **r)
+{
+	clipform_data *cd = **(void ***)v;
+	void **slot = origin_slot(PREV_SLOT(r));
+
+	if (pp[3]) // Have drag handler
+	{
+		drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
+		dc->r = NEXT_SLOT(r);
+		dc->cd = cd;
+		gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
+			GTK_SIGNAL_FUNC(try_start_drag), dc);
+		gtk_signal_connect(GTK_OBJECT(*slot), "motion_notify_event",
+			GTK_SIGNAL_FUNC(try_start_drag), dc);
+		gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
+			GTK_SIGNAL_FUNC(try_start_drag), dc);
+		gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
+			GTK_SIGNAL_FUNC(get_evt_drag), dc);
+	}
+	if (pp[5]) // Have drop handler
+	{
+		int dmode = GTK_DEST_DEFAULT_HIGHLIGHT |
+			GTK_DEST_DEFAULT_MOTION;
+		if (!pp[1]) dmode |= GTK_DEST_DEFAULT_DROP;
+		else gtk_signal_connect(GTK_OBJECT(*slot), "drag_drop",
+			GTK_SIGNAL_FUNC(tried_drop), cd);
+
+		gtk_drag_dest_set(*slot, dmode, cd->ent, cd->n, pp[1] ?
+			GDK_ACTION_COPY | GDK_ACTION_MOVE : GDK_ACTION_COPY);
+		gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
+			GTK_SIGNAL_FUNC(get_evt_drop), r);
+	}
+	return (cd); // For drop handler
+}
+
+//	Clipboard handling
+
+typedef struct {
+	void *slot[EV_SIZE + VSLOT_SIZE];
+	GtkSelectionData *data;
+	guint info;
+	clipform_data *cd;
+	copy_ext c;
+} copy_den;
+
+static void clip_evt(GtkSelectionData *sel, guint info, void **slot)
+{
+	void **base, **desc;
+	clipform_data *cd = slot[0];
+	copy_den den = { { EVDATA(COPY, slot, NULL, den.slot) }, sel, info, cd,
+		{ sel ? cd->src + info : NULL, NULL, 0 } };
+
+	slot = NEXT_SLOT(slot); // from CLIPBOARD to EVT_COPY
+	base = slot[0]; desc = slot[1];
+	((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, &den.c);
+}
+
+static int paste_evt(GtkSelectionData *sel, clipform_dd *format, void **slot)
+{
+	void **base = slot[0], **desc = slot[1];
+	copy_ext c = { format, sel->data, sel->length };
+
+	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &c));
+}
+
+static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
+{
+	GList *dest;
+	GdkAtom target, *targets;
+	int i, n = sel->length / sizeof(GdkAtom);
+
+	if ((n > 0) && (sel->format == 32) &&
+		(sel->type == GDK_SELECTION_TYPE_ATOM))
+	{
+		targets = (GdkAtom *)sel->data;
+		for (dest = cd->targets->list; dest; dest = dest->next)
+		{
+			target = ((GtkTargetPair *)dest->data)->target;
+			for (i = 0; (i < n) && (targets[i] != target); i++);
+			if (i < n) break;
+		}
+		// Return the matching format
+		if (dest) return (cd->src + ((GtkTargetPair *)dest->data)->info);
+	}
+	return (NULL);
+}
+
+#if GTK_MAJOR_VERSION == 1
+
+#define CLIPMASK 3 /* 2 clipboards */
+
+static void selection_callback(GtkWidget *widget, GtkSelectionData *sel,
+	guint time, gpointer user_data)
+{
+	void **res = user_data;
+	if (!res[1]) res[1] = clip_format(sel, res[0]); // check
+	else if ((sel->length < 0) || !paste_evt(sel, res[1], res[0])) // paste
+		res[1] = NULL; // fail
+	res[0] = NULL; // done
+}
+
+static int process_clipboard(void **slot)
+{
+	clipform_data *cd = slot[0];
+	void **desc = slot[1];
+	void *res[2] = { NULL, NULL };
+	clipform_dd *format;
+	GdkAtom sel;
+	guint sig = 0;
+	int which, nw = (int)desc[2] & CLIPMASK;
+
+	for (which = 0; (1 << which) <= nw; which++)
+	{
+		if (!((1 << which) & nw)) continue;
+		// If we're who put data there
+// !!! No check if same program but another clipboard - no need for now
+		if (internal_clipboard(which)) continue;
+		sel = gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE);
+
+		res[0] = cd; res[1] = NULL;
+		if (!sig) sig = gtk_signal_connect(GTK_OBJECT(main_window),
+			"selection_received",
+			GTK_SIGNAL_FUNC(selection_callback), &res);
+		/* First, deciding on format... */
+		gtk_selection_convert(main_window, sel,
+			gdk_atom_intern("TARGETS", FALSE), GDK_CURRENT_TIME);
+		while (res[0]) gtk_main_iteration();
+		if (!(format = res[1])) continue; // no luck
+		/* ...then, requesting the format */
+		res[0] = SLOT_N(slot, 2); // from CLIPBOARD to EVT_PASTE
+		gtk_selection_convert(main_window, sel,
+			gdk_atom_intern(format->target, FALSE), GDK_CURRENT_TIME);
+		while (res[0]) gtk_main_iteration();
+		if (res[1]) break; // success
+	}
+	if (sig) gtk_signal_disconnect(GTK_OBJECT(main_window), sig);
+
+	return (!!res[1]);
+}
+
+static void selection_get_callback(GtkWidget *widget, GtkSelectionData *sel,
+	guint info, guint time, gpointer user_data)
+{
+	void **slot = g_dataset_get_data(main_window,
+		gdk_atom_name(sel->selection));
+	if (slot) clip_evt(sel, info, slot);
+}
+
+static void selection_clear_callback(GtkWidget *widget, GdkEventSelection *event,
+	gpointer user_data)
+{
+	void **slot = g_dataset_get_data(main_window,
+		gdk_atom_name(event->selection));
+	if (slot) clip_evt(NULL, 0, slot);
+}
+
+// !!! GTK+ 1.2 internal type (gtk/gtkselection.c)
+typedef struct {
+	GdkAtom selection;
+	GtkTargetList *list;
+} GtkSelectionTargetList;
+
+static int offer_clipboard(void **slot)
+{
+	static int connected;
+	void **desc = slot[1];
+	clipform_data *cd = slot[0];
+	GtkSelectionTargetList *slist;
+	GList *list, *tmp;
+	GdkAtom sel;
+	int which, res = FALSE, nw = (int)desc[2] & CLIPMASK;
+
+	for (which = 0; (1 << which) <= nw; which++)
+	{
+		if (!((1 << which) & nw)) continue;
+		sel = gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE);
+		if (!gtk_selection_owner_set(main_window, sel, GDK_CURRENT_TIME))
+			continue;
+
+		/* Don't have gtk_selection_clear_targets() in GTK+1 - have to
+		 * reimplement */
+		list = gtk_object_get_data(GTK_OBJECT(main_window),
+			"gtk-selection-handlers");
+		for (tmp = list; tmp; tmp = tmp->next)
+		{
+			if ((slist = tmp->data)->selection != sel) continue;
+			list = g_list_remove_link(list, tmp);
+			gtk_target_list_unref(slist->list);
+			g_free(slist);
+			break;
+		}
+		gtk_object_set_data(GTK_OBJECT(main_window),
+			"gtk-selection-handlers", list);
+
+		// !!! Have to resort to this to allow for multiple X clipboards
+		g_dataset_set_data(main_window, which ? "PRIMARY" : "CLIPBOARD",
+			(gpointer)slot);
+		if (!connected)
+		{
+			gtk_signal_connect(GTK_OBJECT(main_window), "selection_get",
+				GTK_SIGNAL_FUNC(selection_get_callback), NULL);
+			gtk_signal_connect(GTK_OBJECT(main_window), "selection_clear_event",
+				GTK_SIGNAL_FUNC(selection_clear_callback), NULL);
+			connected = TRUE;
+		}
+
+		gtk_selection_add_targets(main_window, sel, cd->ent, cd->n);
+		res = TRUE;
+	}
+
+	return (res);
+}
+
+#else /* if GTK_MAJOR_VERSION == 2 */
+
+#ifdef GDK_WINDOWING_X11
+#define CLIPMASK 3 /* 2 clipboards */
+#else
+#define CLIPMASK 1 /* 1 clipboard */
+#endif
+
+/* While GTK+2 allows for synchronous clipboard handling, it's implemented
+ * through copying the entire clipboard data - and when the data might be
+ * a huge image which mtPaint is bound to allocate *yet again*, this would be
+ * asking for trouble - WJ */
+
+static void clip_paste(GtkClipboard *clipboard, GtkSelectionData *sel,
+	gpointer user_data)
+{
+	void **res = user_data;
+	if ((sel->length < 0) || !paste_evt(sel, res[1], res[0]))
+		res[1] = NULL; // fail
+	res[0] = NULL; // done
+}
+
+static void clip_check(GtkClipboard *clipboard, GtkSelectionData *sel,
+	gpointer user_data)
+{
+	void **res = user_data;
+	res[1] = clip_format(sel, res[0]);
+	res[0] = NULL; // done
+}
+
+static int process_clipboard(void **slot)
+{
+	GtkClipboard *clip;
+	clipform_data *cd = slot[0];
+	void **desc = slot[1];
+	int which, nw = (int)desc[2] & CLIPMASK;
+
+	for (which = 0; (1 << which) <= nw; which++)
+	{
+		if (!((1 << which) & nw)) continue;
+		// If we're who put data there
+// !!! No check if same program but another clipboard - no need for now
+		if (internal_clipboard(which)) continue;
+		clip = gtk_clipboard_get(which ? GDK_SELECTION_PRIMARY :
+			GDK_SELECTION_CLIPBOARD);
+		{
+			void *res[] = { cd, NULL };
+			clipform_dd *format;
+			/* First, deciding on format... */
+			gtk_clipboard_request_contents(clip,
+				gdk_atom_intern("TARGETS", FALSE),
+				clip_check, res);
+			while (res[0]) gtk_main_iteration();
+			if (!(format = res[1])) continue; // no luck
+			/* ...then, requesting the format */
+			res[0] = SLOT_N(slot, 2); // from CLIPBOARD to EVT_PASTE
+			gtk_clipboard_request_contents(clip,
+				gdk_atom_intern(format->target, FALSE),
+				clip_paste, res);
+			while (res[0]) gtk_main_iteration();
+			if (res[1]) return (TRUE); // success
+		}
+	}
+	return (FALSE);
+}
+
+static void clip_copy(GtkClipboard *clipboard, GtkSelectionData *sel, guint info,
+	gpointer user_data)
+{
+	clip_evt(sel, info, user_data);
+}
+
+static void clip_clear(GtkClipboard *clipboard, gpointer user_data)
+{
+	clip_evt(NULL, 0, user_data);
+}
+
+static int offer_clipboard(void **slot)
+{
+	void **desc = slot[1];
+	clipform_data *cd = slot[0];
+	int i, which, res = FALSE, nw = (int)desc[2] & CLIPMASK;
+
+	for (which = 0; (1 << which) <= nw; which++)
+	{
+		if (!((1 << which) & nw)) continue;
+		// Two attempts, for GTK+2 function can fail for strange reasons
+		for (i = 0; i < 2; i++)
+		{
+			if (!gtk_clipboard_set_with_data(gtk_clipboard_get(
+				which ? GDK_SELECTION_CLIPBOARD :
+				GDK_SELECTION_PRIMARY), cd->ent, cd->n,
+				clip_copy, clip_clear, slot)) continue;
+			res = TRUE;
+			break;
+		}
+	}
+	return (res);
+}
+
+#endif
+
+#undef CLIPMASK
 
 void add_click(void **r, GtkWidget *widget)
 {
@@ -648,15 +965,18 @@ void table_it(GtkWidget *table, GtkWidget *it, int wh, int pad, int pack)
 		pack == pk_TABLEp ? pad : 0, pad);
 }
 
-/* Find where unused rows/columns start */
-static int next_table_level(GtkWidget *table, int h)
+/* Find where unused rows start in given column */
+static int next_table_level(GtkWidget *table, int where)
 {
 	GList *item;
 	int y, n = 0;
+
 	for (item = GTK_TABLE(table)->children; item; item = item->next)
 	{
-		y = h ? ((GtkTableChild *)item->data)->right_attach :
-			((GtkTableChild *)item->data)->bottom_attach;
+		GtkTableChild *c = item->data;
+		if ((c->left_attach > where) || (c->right_attach <= where))
+			continue;
+		y = c->bottom_attach;
 		if (n < y) n = y;
 	}
 	return (n);
@@ -682,16 +1002,13 @@ static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 }
 
 // !!! And with inlining this, problem also
-GtkWidget *scrollw(int op, int vh)
+GtkWidget *scrollw(int vh)
 {
 	static const int scrollp[3] = { GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC,
 		GTK_POLICY_ALWAYS };
 	GtkWidget *widget = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
 		scrollp[vh & 255], scrollp[vh >> 8]);
-// !!! Border = 10
-	if (op == op_FSCROLL) gtk_container_set_border_width(GTK_CONTAINER(
-		add_with_frame(NULL, NULL, widget)), 10);
 	return (widget);
 }
 
@@ -910,6 +1227,33 @@ static void fcimage_rxy(void **slot, int *xy)
 	wjpixmap_rxy(slot[0], xy[0], xy[1], xy + 0, xy + 1);
 	xy[0] = xy[0] < 0 ? 0 : xy[0] >= fd->w ? fd->w - 1 : xy[0];
 	xy[1] = xy[1] < 0 ? 0 : xy[1] >= fd->h ? fd->h - 1 : xy[1];
+}
+
+//	RPACK*/OPT*/COMBO widgets
+
+GtkWidget *mkpack(int mode, int d, int ref, int v, char *ddata, void **pp,
+	void **r)
+{
+#if U_NLS
+	char *tc[256];
+#endif
+	char **src = pp[1];
+	int nh, n;
+
+	nh = (n = (int)pp[2]) & 255;
+	if (mode < 0) n >>= 8;
+	if (d) n = -1 , src = *(char ***)(ddata + (int)pp[1]);
+	if (!n) n = -1;
+#if U_NLS
+	n = n_trans(tc, src, n);
+	src = tc;
+#endif
+	return (mode < 0 ? wj_radio_pack(src, n, nh, v,
+		ref > 1 ? NEXT_SLOT(r) : NULL,
+		ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1_t) : NULL) :
+		(mode? wj_combo_box : wj_option_menu)(src, n, v,
+		ref > 1 ? NEXT_SLOT(r) : NULL,
+		ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL));
 }
 
 //	COLORLIST widget
@@ -2072,7 +2416,10 @@ GtkWidget *pathbox(void **r)
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 
 	entry = xpack5(hbox, gtk_entry_new());
-	button = add_a_button(_("Browse"), 2, hbox, FALSE);
+	button = pack(hbox, gtk_button_new_with_label(_("Browse")));
+	gtk_container_set_border_width(GTK_CONTAINER(button), 2);
+	gtk_widget_show(button);
+
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(pathbox_button), r);
 
@@ -2133,13 +2480,15 @@ GtkWidget *tlspinpack(int *np, void **pp, void **r, GtkWidget *table)
 	for (i = 0; i < n; i++ , np += 3)
 	{
 		int x = i % l, y = i / l;
-// !!! Spacing = 2
-		*tp++ = widget = spin_to_table(table, row + y, column + x, 2,
-			np[0], np[1], np[2]);
+		*tp++ = widget = add_a_spin(np[0], np[1], np[2]);
 		/* Value might get clamped, and slot is self-reading so should
 		 * reflect that */
 		np[0] = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
 		spin_connect(widget, GTK_SIGNAL_FUNC(spinpack_evt), tp);
+// !!! Spacing = 2
+		gtk_table_attach(GTK_TABLE(table), widget,
+			column + x, column + x + 1, row + y, row + y + 1,
+			GTK_EXPAND | GTK_FILL, 0, 0, 2);
 		*tp++ = vp;
 	}
 	gtk_object_set_user_data(GTK_OBJECT(widget), vp);
@@ -2153,6 +2502,7 @@ GtkWidget *tlspinpack(int *np, void **pp, void **r, GtkWidget *table)
 // !!! Even with inlining this, some space gets wasted
 void tltext(char *v, void **pp, GtkWidget *table, int pad)
 {
+	GtkWidget *label;
 	char *tmp, *s;
 	int x, wh, row, column;
 
@@ -2167,7 +2517,13 @@ void tltext(char *v, void **pp, GtkWidget *table, int pad)
 		int i = strcspn(tmp, "\t\n");
 		int c = tmp[i];
 		tmp[i] = '\0';
-		add_to_table(tmp, table, row, x++, pad);
+		label = gtk_label_new(tmp);
+		gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
+		gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+		gtk_widget_show(label);
+		gtk_table_attach(GTK_TABLE(table), label, x, x + 1, row, row + 1,
+			GTK_FILL, 0, pad, pad);
+		x++;
 		if (!c) break;
 		if (c == '\n') x = column , row++;
 		tmp += i + 1;
@@ -3185,6 +3541,7 @@ enum {
 	cm_TABLE = op_LAST,
 	cm_VBOX,
 	cm_HBOX,
+	cm_FRAME,
 	cm_SCROLL,
 	cm_NBOOKl,
 	cm_RGB,
@@ -3219,9 +3576,10 @@ static cmdef cmddefs[] = {
 		0, USE_BORDER(TABLE) },
 	{ op_ETABLE, cm_TABLE, pk_PACKEND | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(TABLE) },
-	{ op_FTABLE, cm_TABLE, pk_PACK | pkf_STACK | pkf_SHOW | pkf_FRAME,
+	{ op_BTABLE, cm_TABLE, pk_BIN | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
 // !!! Padding = 0 Border = 0
+	{ op_STABLE, cm_TABLE, pk_SCROLLVP | pkf_STACK | pkf_SHOW },
 	{ op_XTABLE, cm_TABLE, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_TLHBOX, cm_HBOX, pk_TABLE | pkf_STACK | pkf_SHOW },
 	{ op_HBOX, cm_HBOX, pk_PACKp | pkf_STACK | pkf_SHOW },
@@ -3230,17 +3588,23 @@ static cmdef cmddefs[] = {
 	{ op_XVBOX, cm_VBOX, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_EVBOX, cm_VBOX, pk_PACKEND | pkf_STACK | pkf_SHOW },
 // !!! Padding = 0
-	{ op_FVBOX, cm_VBOX, pk_PACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
+	{ op_BVBOX, cm_VBOX, pk_BIN | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
-	{ op_FXVBOX, cm_VBOX, pk_XPACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
+	{ op_BHBOX, cm_HBOX, pk_BIN | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(FRBOX) },
-	{ op_FHBOX, cm_HBOX, pk_PACK | pkf_FRAME | pkf_STACK | pkf_SHOW,
-		0, USE_BORDER(FRBOX) },
-// !!! Padding = 0
+	{ op_FRAME, cm_FRAME, pk_PACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(FRAME) },
+	{ op_XFRAME, cm_FRAME, pk_XPACK | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(FRAME) },
+// !!! Padding = 0 Border = 0
+	{ op_EFRAME, op_EFRAME, pk_XPACK | pkf_STACK | pkf_SHOW },
 	{ op_SCROLL, cm_SCROLL, pk_PACK | pkf_STACK | pkf_SHOW },
+// !!! Border = 0
 	{ op_XSCROLL, cm_SCROLL, pk_XPACK | pkf_STACK | pkf_SHOW,
 		USE_BORDER(XSCROLL) },
-	{ op_FSCROLL, op_FSCROLL, pk_XPACK | pkf_STACK | pkf_SHOW | pkf_PARENT },
+	{ op_BSCROLL, cm_SCROLL, pk_BIN | pkf_STACK | pkf_SHOW,
+		0, USE_BORDER(FRBOX) },
+// !!! Border = 0
 	{ op_SNBOOK, cm_NBOOKl, pk_SCROLLVP | pkf_STACK | pkf_SHOW },
 	{ op_NBOOK, op_NBOOK, pk_XPACK | pkf_STACK | pkf_SHOW,
 		0, USE_BORDER(NBOOK) },
@@ -3257,29 +3621,29 @@ static cmdef cmddefs[] = {
 // !!! Padding = 0
 	{ op_SPINc, op_SPINc, pk_PACK },
 	{ op_XSPIN, cm_SPIN, pk_XPACK },
-	{ op_TSPIN, cm_SPIN, pk_TABLE2, USE_BORDER(SPIN) },
+	{ op_T1SPIN, cm_SPIN, pk_TABLE1x, USE_BORDER(SPIN) },
 	{ op_TLSPIN, cm_SPIN, pk_TABLE, USE_BORDER(SPIN) },
 	{ op_TLXSPIN, cm_SPIN, pk_TABLEx, USE_BORDER(SPIN) },
 	{ op_SPINa, cm_SPINa, pk_PACKp, USE_BORDER(SPIN) },
 	{ op_FSPIN, cm_FSPIN, pk_PACKp, USE_BORDER(SPIN) },
-	{ op_TFSPIN, cm_FSPIN, pk_TABLE2, USE_BORDER(SPIN) },
+	{ op_T1FSPIN, cm_FSPIN, pk_TABLE1x, USE_BORDER(SPIN) },
 	{ op_TLFSPIN, cm_FSPIN, pk_TABLE, USE_BORDER(SPIN) },
 // !!! Padding = 0
 	{ op_XSPINa, cm_SPINa, pk_XPACK },
-	{ op_TSPINa, cm_SPINa, pk_TABLE2, USE_BORDER(SPIN) },
-// !!! Padding = 0 Border = 5
-	{ op_CHECK, cm_CHECK, pk_PACK | pkf_SHOW, 0, 5 },
-	{ op_XCHECK, cm_CHECK, pk_XPACK | pkf_SHOW, 0, 5 },
-	{ op_TLCHECK, cm_CHECK, pk_TABLE | pkf_SHOW, 0, 5 },
-// !!! Padding = 0 Border = 0
-	{ op_TLCHECKs, cm_CHECK, pk_TABLE | pkf_SHOW, 0, 0 },
+	{ op_T1SPINa, cm_SPINa, pk_TABLE1x, USE_BORDER(SPIN) },
+	{ op_TLNOSPIN, op_TLNOSPIN, pk_TABLE, USE_BORDER(SPIN) },
+// !!! Padding = 0
+	{ op_CHECK, cm_CHECK, pk_PACK | pkf_SHOW, 0, USE_BORDER(CHECK) },
+	{ op_XCHECK, cm_CHECK, pk_XPACK | pkf_SHOW, 0, USE_BORDER(CHECK) },
+	{ op_TLCHECK, cm_CHECK, pk_TABLE | pkf_SHOW, 0, USE_BORDER(CHECK) },
+	{ op_CHECKb, op_CHECKb, pk_PACK | pkf_SHOW, 0, USE_BORDER(CHECK) },
 	{ op_RPACK, cm_RPACK, pk_XPACK },
 	{ op_RPACKD, cm_RPACKD, pk_XPACK },
-	{ op_FRPACK, cm_RPACK, pk_PACK | pkf_FRAME, 0, USE_BORDER(FRBOX) },
+	{ op_BRPACK, cm_RPACK, pk_BIN, 0, USE_BORDER(FRBOX) },
 	{ op_OPT, cm_OPT, pk_PACKp, USE_BORDER(OPT) },
 	{ op_OPTD, cm_OPTD, pk_PACKp, USE_BORDER(OPT) },
 	{ op_XOPT, cm_OPT, pk_XPACK, 0, USE_BORDER(XOPT) },
-	{ op_TOPT, cm_OPT, pk_TABLE2, USE_BORDER(OPT) },
+	{ op_T1OPT, cm_OPT, pk_TABLE1x, USE_BORDER(OPT) },
 	{ op_TLOPT, cm_OPT, pk_TABLE, USE_BORDER(OPT) },
 // !!! Padding = 0
 	{ op_COMBO, op_COMBO, pk_PACK | pkf_SHOW },
@@ -3291,7 +3655,7 @@ static cmdef cmddefs[] = {
 // !!! Padding = 5
 	{ op_XPENTRY, cm_PENTRY, pk_XPACK | pkf_SHOW, 5 },
 // !!! Padding = 0
-	{ op_TPENTRY, cm_PENTRY, pk_TABLE2 | pkf_SHOW },
+	{ op_T1PENTRY, cm_PENTRY, pk_TABLE1x | pkf_SHOW },
 	{ op_OKBOX, cm_OKBOX, pk_PACK | pkf_STACK | pkf_SHOW, 0,
 		USE_BORDER(OKBOX) },
 // !!! Padding = 5 Border = 0
@@ -3314,7 +3678,8 @@ static cmdef cmddefs[] = {
 	{ op_EBUTTON, cm_BUTTON, pk_PACKEND | pkf_SHOW, 5 },
 	{ op_TLBUTTON, cm_BUTTON, pk_TABLEp | pkf_SHOW, 5 },
 	{ op_OKTOGGLE, cm_TOGGLE, pk_XPACK1 | pkf_SHOW, 0, USE_BORDER(BUTTON) },
-	{ op_UTOGGLE, cm_TOGGLE, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) }
+	{ op_UTOGGLE, cm_TOGGLE, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
+	{ op_BOOKBTN, op_BOOKBTN, pk_PACK | pkf_SHOW, 0, USE_BORDER(BUTTON) },
 };
 
 static xcmdef xcmddefs[] = {
@@ -3325,10 +3690,14 @@ static xcmdef xcmddefs[] = {
 	{ { op_WLABEL, op_WLABEL, pk_EPACK | pkf_SHOW, 8 }, WBppa(0, 0, 5) },
 // !!! Padding = 0
 	{ { op_XLABEL, cm_LABEL, pk_XPACK | pkf_SHOW }, WBppa(0, 0, 5) },
+	{ { op_TLABEL, cm_LABEL, pk_TABLE0p | pkf_SHOW, USE_BORDER(TLABEL) },
+		WBppa(0, 0, 0) },
 	{ { op_TLLABEL, cm_LABEL, pk_TABLEp | pkf_SHOW, USE_BORDER(TLABEL) },
 		WBppa(0, 0, 0) },
+// !!! Padding = 0
+	{ { op_TXLABEL, cm_LABEL, pk_TABLEx | pkf_SHOW }, WBppa(0, 0, 3) },
 	/* Spinsliders use border field for preset width & height of slider */
-	{ { op_TSPINSLIDE, cm_SPINSLIDE, pk_TABLE2x, USE_BORDER(SPINSLIDE) },
+	{ { op_T1SPINSLIDE, cm_SPINSLIDE, pk_TABLE1x, USE_BORDER(SPINSLIDE) },
 		WBwh(255, 20) },
 	{ { op_TLSPINSLIDE, cm_SPINSLIDE, pk_TABLE, USE_BORDER(SPINSLIDE) } },
 	{ { op_TLSPINSLIDEs, cm_SPINSLIDE, pk_TABLE, USE_BORDER(SPINSLIDE) },
@@ -3337,7 +3706,6 @@ static xcmdef xcmddefs[] = {
 	{ { op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACKp, USE_BORDER(SPINSLIDE) } },
 // !!! Padding = 0
 	{ { op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK } },
-	{ { op_HTSPINSLIDE, op_HTSPINSLIDE, 0 } }
 };
 
 static void do_destroy(void **wdata);
@@ -3346,8 +3714,7 @@ static void do_destroy(void **wdata);
  * naturally, can inline only constants. Everything else must be prepared either
  * in global variables, or in fields of "ddata" structure.
  * Parameters of codes should be arrayed in fixed order:
- * result location first; frame name last; table location, or name in table,
- * directly before it (last if no frame name); builtin event(s) before that */
+ * result location first; table location last; builtin event(s) before that */
 
 #define DEF_BORDER 5
 #define GET_BORDER(T) (borders[op_BOR_##T - op_BOR_0] + DEF_BORDER)
@@ -3359,9 +3726,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 {
 	cmdef *cmds[op_LAST];
 	char *ident = VCODE_KEY;
-#if U_NLS
-	char *tc[256];
-#endif
 #if GTK_MAJOR_VERSION == 1
 	/* GTK+1 typecasts dislike NULLs */
 	GtkWindow *tparent = (GtkWindow *)main_window;
@@ -3428,8 +3792,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			cw = cmd->cw;
 			if (cw < 0) cw = borders[-cw - 1] + DEF_BORDER;
 			pk = cmd->pk;
-			i = lp - ((pk & pk_MASK) >= pk_TABLE) - !!(pk & pkf_FRAME);
-			if (i <= 0) v = NULL;
+			/* Table loc is outside the token proper */
+			lp -= (pk & pk_MASK) >= pk_TABLE;
+			if (lp <= 0) v = NULL;
 			op = cmd->cmd;
 		}
 		switch (op)
@@ -3640,38 +4005,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a table */
 		case cm_TABLE:
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
-			if (i > 1)
+			if (lp > 1)
 			{
 				int s = (int)pp[1];
 				gtk_table_set_row_spacings(GTK_TABLE(widget), s);
 				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
 			}
 			break;
-		/* Add a framed scrollable table with dynamic name (ugh) */
-		case op_FSXTABLE:
-		{
-			GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
-
-			gtk_widget_show(scroll);
-			add_with_frame(NULL, v, scroll);
-			gtk_container_set_border_width(GTK_CONTAINER(scroll),
-				GET_BORDER(FRBOX));
-			gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
-				GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-			widget = gtk_table_new((int)pp[1] & 0xFFFF,
-				(int)pp[1] >> 16, FALSE);
-			gtk_scrolled_window_add_with_viewport(
-				GTK_SCROLLED_WINDOW(scroll), widget);
-
-			pk = pk_XPACK | pkf_SHOW | pkf_STACK | pkf_PARENT;
-			break;
-		}
 		/* Add a box */
 		case cm_VBOX: case cm_HBOX:
 			widget = (op == cm_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(FALSE, (int)v & 255);
-			if (pk & pkf_FRAME) break;
+			if (!lp) break;
 			cw = ((int)v >> 8) & 255;
 			tpad = ((int)v >> 16) & 255;
 			break;
@@ -3681,10 +4026,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			cw = (int)v >> 8;
 			pk = pk_PACK | pkf_STACK | pkf_SHOW;
 			break;
+		/* Add a frame */
+		case cm_FRAME: case op_EFRAME:
+			widget = gtk_frame_new(v && *(char *)v ? _(v) : v);
+			if (op == op_EFRAME) gtk_frame_set_shadow_type(
+				GTK_FRAME(widget), GTK_SHADOW_ETCHED_OUT);
+			break;
 		/* Add a scrolled window */
-		case cm_SCROLL: case op_FSCROLL:
-// !!! Border = 10 for FSCROLL
-			widget = scrollw(op, (int)v);
+		case cm_SCROLL:
+			widget = scrollw((int)v);
 			break;
 		/* Add a normal notebook */
 		case cm_NBOOKl: case op_NBOOK:
@@ -3695,7 +4045,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a plain notebook */
 		case op_PLAINBOOK:
 		{
-			// !!! no extra args
 			int n = v ? (int)v : 2; // 2 pages by default
 			// !!! All pages go onto stack, with #0 on top
 			wp -= n;
@@ -3704,9 +4053,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a toggle button for controlling 2-paged notebook */
 		case op_BOOKBTN:
-			widget = sig_toggle_button(_(pp[1]), FALSE, v,
-				GTK_SIGNAL_FUNC(toggle_vbook));
-			pk = pk_PACK;
+			widget = gtk_toggle_button_new_with_label(_(pp[1]));
+			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+			gtk_signal_connect(GTK_OBJECT(widget), "toggled",
+				GTK_SIGNAL_FUNC(toggle_vbook), v);
 			break;
 		/* Add a statusbar box */
 		case op_STATUSBAR:
@@ -3754,7 +4104,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case cm_LABEL: case op_WLABEL:
 		{
 			int z = (int)((xcmdef *)cmd)->x;
-			if (i > 1) z = (int)pp[1];
+			if (lp > 1) z = (int)pp[1];
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
 			if (op == op_WLABEL)
 				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
@@ -3791,6 +4141,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_TLTEXT:
 			tltext(v, pp - 1, wp[0], GET_BORDER(TLABEL));
 			break;
+		/* Add a progressbar */
+		case op_PROGRESS:
+			widget = gtk_progress_bar_new();
+			gtk_progress_set_format_string(GTK_PROGRESS(widget), _(v));
+			gtk_progress_set_show_text(GTK_PROGRESS(widget), TRUE);
+			pk = pk_PACK | pkf_SHOW;
+			break;
 		/* Add an RGB renderer */
 		case cm_RGB:
 			widget = rgbimage(v, (int *)((char *)ddata + (int)pp[1]));
@@ -3814,8 +4171,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			int n = *(int *)v;
 			widget = add_a_spin(n, n, n);
 			GTK_WIDGET_UNSET_FLAGS(widget, GTK_CAN_FOCUS);
-			tpad = GET_BORDER(SPIN);
-			pk = pk_TABLE;
 			break;
 		}
 		/* Add a spin, fill from field/var */
@@ -3844,7 +4199,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = tlspinpack(v, pp - 1, r, wp[0]);
 			break;
 		/* Add a spinslider */
-		case cm_SPINSLIDE: case op_HTSPINSLIDE: case cm_SPINSLIDEa:
+		case cm_SPINSLIDE: case cm_SPINSLIDEa:
 		{
 			int z = (int)((xcmdef *)cmd)->x;
 			widget = mt_spinslide_new(z > 0xFFFF ? z >> 16 : -1,
@@ -3856,76 +4211,29 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
-			if (op == op_HTSPINSLIDE)
-			{
-				GtkWidget *label;
-				int x;
-
-				x = next_table_level(wp[0], TRUE);
-				label = gtk_label_new(_(pp[--lp]));
-				gtk_widget_show(label);
-				gtk_misc_set_alignment(GTK_MISC(label),
-					1.0 / 3.0, 0.5);
-// !!! Padding = 0
-				to_table(label, wp[0], 0, x, 0);
-				gtk_table_attach(GTK_TABLE(wp[0]), widget,
-					x, x + 1, 1, 2,
-					GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
-			}
 			break;
 		}
-		/* Add a named checkbox, fill from field/var */
-		case cm_CHECK:
+		/* Add a named checkbox, fill from field/var/inifile */
+		case cm_CHECK: case op_CHECKb:
 			widget = gtk_check_button_new_with_label(_(pp[1]));
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),
-				*(int *)v);
-			break;
-		/* Add a named checkbox, fill from inifile */
-		case op_CHECKb:
-			widget = sig_toggle(_(pp[2]), inifile_get_gboolean(v,
-				(int)pp[1]), NULL, NULL);
-			pk = pk_PACK;
+				op != op_CHECKb ? *(int *)v :
+				inifile_get_gboolean(v, (int)pp[2]));
 			break;
 		/* Add a pack of radio buttons for field/var */
 		case cm_RPACK: case cm_RPACKD:
-		{
-			char **src = pp[1];
-			int nh = (int)pp[2];
-			int n = nh >> 8;
-			if (op == cm_RPACKD) n = -1 ,
-				src = *(char ***)((char *)ddata + (int)pp[1]);
-			if (!n) n = -1;
-#if U_NLS
-			n = n_trans(tc, src, n);
-			src = tc;
-#endif
-			widget = wj_radio_pack(src, n, nh & 255, *(int *)v,
-				ref > 1 ? NEXT_SLOT(r) : NULL,
-				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1_t) : NULL);
+			widget = mkpack(-1, op == cm_RPACKD, ref,
+				*(int *)v, ddata, pp, r);
 			break;
-		}
 		/* Add an option menu or combobox for field/var */
 		case cm_OPT: case cm_OPTD: case op_COMBO:
-		{
-			char **src = pp[1];
-			int n = (int)pp[2];
-			if (op == cm_OPTD) n = -1 ,
-				src = *(char ***)((char *)ddata + (int)pp[1]);
-			if (!n) n = -1;
-#if U_NLS
-			n = n_trans(tc, src, n);
-			src = tc;
-#endif
-			widget = (op == op_COMBO ? wj_combo_box : wj_option_menu)
-				(src, n, *(int *)v,
-				ref > 1 ? NEXT_SLOT(r) : NULL,
-				ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL);
+			widget = mkpack(op == op_COMBO, op == cm_OPTD, ref,
+				*(int *)v, ddata, pp, r);
 			break;
-		}
 		/* Add an entry widget, fill from drop-away buffer */
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			widget = gtk_entry_new();
-			if (i > 1) gtk_entry_set_max_length(GTK_ENTRY(widget), (int)pp[1]);
+			if (lp > 1) gtk_entry_set_max_length(GTK_ENTRY(widget), (int)pp[1]);
 			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
 			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
@@ -3942,7 +4250,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_PATH:
 			widget = pathbox(r);
 			set_path(widget, v, PATH_VALUE);
-			pk = pk_PACK | pkf_SHOW | pkf_PARENT | pkf_FRAME;
+			pk = pk_BIN | pkf_SHOW | pkf_PARENT;
 			break;
 		/* Add a text widget, fill from drop-away buffer at pointer */
 		case op_TEXT:
@@ -4550,40 +4858,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Install drag/drop handlers */
 // !!! For drag, this must be done before mouse event handlers
 		case op_DRAGDROP:
-		{
-			clipform_data *cd = **(void ***)v;
-			void **slot = origin_slot(PREV_SLOT(r));
-
-			widget = (void *)cd; // For drop handler
-			if (pp[3]) // Have drag handler
-			{
-				drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
-				dc->r = NEXT_SLOT(r);
-				dc->cd = cd;
-				gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
-					GTK_SIGNAL_FUNC(try_start_drag), dc);
-				gtk_signal_connect(GTK_OBJECT(*slot), "motion_notify_event",
-					GTK_SIGNAL_FUNC(try_start_drag), dc);
-				gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
-					GTK_SIGNAL_FUNC(try_start_drag), dc);
-				gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
-					GTK_SIGNAL_FUNC(get_evt_drag), dc);
-			}
-			if (pp[5]) // Have drop handler
-			{
-				int dmode = GTK_DEST_DEFAULT_HIGHLIGHT |
-					GTK_DEST_DEFAULT_MOTION;
-				if (!pp[1]) dmode |= GTK_DEST_DEFAULT_DROP;
-				else gtk_signal_connect(GTK_OBJECT(*slot), "drag_drop",
-					GTK_SIGNAL_FUNC(tried_drop), cd);
-
-				gtk_drag_dest_set(*slot, dmode, cd->ent, cd->n,
-					pp[1] ? GDK_ACTION_COPY | GDK_ACTION_MOVE :
-					GDK_ACTION_COPY);
-				gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
-					GTK_SIGNAL_FUNC(get_evt_drop), r);
-			}
-		}
+			widget = dragdrop(v, pp, r);
+			break;
+		/* Add a clipboard control slot */
+		case op_CLIPBOARD:
+			widget = **(void ***)v; // from CLIPFORM
+			break;
 		/* Install activate event handler */
 		case op_EVT_OK:
 		{
@@ -4593,7 +4873,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			switch (what)
 			{
 			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
-			case op_XPENTRY: case op_TPENTRY:
+			case op_XPENTRY: case op_T1PENTRY:
 			case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "activate",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
@@ -4663,21 +4943,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			switch (what)
 			{
 			case op_SPIN: case op_SPINc: case op_XSPIN:
-			case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-			case op_SPINa: case op_XSPINa: case op_TSPINa:
-			case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
+			case op_T1SPIN: case op_TLSPIN: case op_TLXSPIN:
+			case op_SPINa: case op_XSPINa: case op_T1SPINa:
+			case op_FSPIN: case op_T1FSPIN: case op_TLFSPIN:
 				spin_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
-			case op_TSPINSLIDE: case op_TLSPINSLIDE:
+			case op_T1SPINSLIDE: case op_TLSPINSLIDE:
 			case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-			case op_HTSPINSLIDE:
 			case op_SPINSLIDEa: case op_XSPINSLIDEa:
 				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_CHECK: case op_XCHECK:
-			case op_TLCHECK: case op_TLCHECKs: case op_CHECKb:
+			case op_TLCHECK: case op_CHECKb:
 				gtk_signal_connect(GTK_OBJECT(*slot), "toggled",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
@@ -4691,7 +4970,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 #endif
 			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
-			case op_XPENTRY: case op_TPENTRY:
+			case op_XPENTRY: case op_T1PENTRY:
 			case op_PATH: case op_PATHs:
 				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
@@ -4720,16 +4999,11 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*(void **)v = dtail;
 			continue;
 		}
-		/* Set nondefault border size */
-		case op_BOR_TABLE: case op_BOR_NBOOK: case op_BOR_XSCROLL:
-		case op_BOR_SPIN: case op_BOR_SPINSLIDE:
-		case op_BOR_LABEL: case op_BOR_TLABEL:
-		case op_BOR_OPT: case op_BOR_XOPT:
-		case op_BOR_FRBOX: case op_BOR_OKBOX: case op_BOR_BUTTON:
-		case op_BOR_TOOLBAR: case op_BOR_POPUP: case op_BOR_TOPVBOX:
-			borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
+		default:
+			/* Set nondefault border size */
+			if ((op >= op_BOR_0) && (op < op_BOR_LAST))
+				borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
-		default: continue;
 		}
 		/* Remember this */
 		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp - 1);
@@ -4741,9 +5015,6 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Unwrap this */
 		if (pk & pkf_PARENT)
 			while (widget->parent) widget = widget->parent;
-		/* Frame this */
-		if (pk & pkf_FRAME)
-			widget = add_with_frame(NULL, _(pp[--lp]), widget);
 		/* Set fixed width/height for this */
 		if ((minw > 0) || (minh > 0)) gtk_widget_set_usize(
 			widget, minw > 0 ? minw : -2, minh > 0 ? minh : -2);
@@ -4770,15 +5041,18 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				FALSE, FALSE, tpad);
 			break;
 		case pk_TABLE: case pk_TABLEx: case pk_TABLEp:
-			table_it(wp[0], widget, (int)pp[--lp], tpad, n);
+			table_it(wp[0], widget, (int)pp[lp], tpad, n);
 			break;
-		case pk_TABLE2: case pk_TABLE2x:
+		case pk_TABLE0p:
 		{
-			int y = next_table_level(wp[0], FALSE);
-			add_to_table(_(pp[--lp]), wp[0], y, 0, GET_BORDER(TLABEL));
-			gtk_table_attach(GTK_TABLE(wp[0]), widget, 1, 2,
-				y, y + 1, GTK_EXPAND | GTK_FILL,
-				n == pk_TABLE2x ? GTK_FILL : 0, 0, tpad);
+			int y = next_table_level(wp[0], 0);
+			table_it(wp[0], widget, y, tpad, pk_TABLEp);
+			break;
+		}
+		case pk_TABLE1x:
+		{
+			int y = next_table_level(wp[0], 1);
+			table_it(wp[0], widget, 0x100 + y, tpad, pk_TABLEx);
 			break;
 		}
 		case pk_SCROLLVP: case pk_SCROLLVPn:
@@ -4886,23 +5160,23 @@ static void *do_query(char *data, void **wdata, int mode)
 			fpick_get_filename(*wdata, v, PATHBUF, FALSE);
 			break;
 		case op_SPIN: case op_SPINc: case op_XSPIN:
-		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-		case op_SPINa: case op_XSPINa: case op_TSPINa:
+		case op_T1SPIN: case op_TLSPIN: case op_TLXSPIN:
+		case op_SPINa: case op_XSPINa: case op_T1SPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
-		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
+		case op_FSPIN: case op_T1FSPIN: case op_TLFSPIN:
 			*(int *)v = rint((mode & 1 ?
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
 			break;
-		case op_TSPINSLIDE:
+		case op_T1SPINSLIDE:
 		case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
+		case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
+		case op_CHECK: case op_XCHECK: case op_TLCHECK:
 		case op_OKTOGGLE: case op_UTOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
 			*(int *)v = gtk_toggle_button_get_active(*wdata);
@@ -4966,10 +5240,10 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_TCOLOR:
 			*(int *)v = cpick_get_colour(*wdata, (int *)v + 1);
 			break;
-		case op_RPACK: case op_RPACKD: case op_FRPACK:
+		case op_RPACK: case op_RPACKD: case op_BRPACK:
 			*(int *)v = wj_radio_pack_get_active(*wdata);
 			break;
-		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
+		case op_OPT: case op_XOPT: case op_T1OPT: case op_TLOPT:
 		case op_OPTD:
 			*(int *)v = wj_option_menu_get_history(*wdata);
 			break;
@@ -4989,7 +5263,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
-		case op_XPENTRY: case op_TPENTRY: case op_PATH:
+		case op_XPENTRY: case op_T1PENTRY: case op_PATH:
 			gtkncpy(v, gtk_entry_get_text(GTK_ENTRY(*wdata)),
 				op != op_PATH ? (int)pp[1] : PATHBUF);
 			break;
@@ -5051,8 +5325,8 @@ void cmd_reset(void **slot, void *ddata)
 			if (cgroup < 0) cgroup = group;
 			break;
 		case op_SPIN: case op_SPINc: case op_XSPIN:
-		case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-		case op_SPINa: case op_XSPINa: case op_TSPINa:
+		case op_T1SPIN: case op_TLSPIN: case op_TLXSPIN:
+		case op_SPINa: case op_XSPINa: case op_T1SPINa:
 			gtk_spin_button_set_value(*wdata, *(int *)v);
 			break;
 		case op_TLSPINPACK:
@@ -5074,17 +5348,17 @@ void cmd_reset(void **slot, void *ddata)
 			*vp = wdata; // Unlock
 			break;
 		}
-		case op_TSPINSLIDE:
+		case op_T1SPINSLIDE:
 		case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-		case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
+		case op_SPINSLIDEa: case op_XSPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
-		case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
+		case op_CHECK: case op_XCHECK: case op_TLCHECK:
 		case op_OKTOGGLE: case op_UTOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
 			gtk_toggle_button_set_active(*wdata, *(int *)v);
 			break;
-		case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT:
+		case op_OPT: case op_XOPT: case op_T1OPT: case op_TLOPT:
 		case op_OPTD:
 			gtk_option_menu_set_history(*wdata, *(int *)v);
 			break;
@@ -5108,7 +5382,7 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_PATHs:
 			v = inifile_get(v, ""); // read and fallthrough
-		case op_XPENTRY: case op_TPENTRY: case op_PATH:
+		case op_XPENTRY: case op_T1PENTRY: case op_PATH:
 			set_path(*wdata, v, PATH_VALUE);
 			break;
 		case op_RGBIMAGEP:
@@ -5129,12 +5403,12 @@ void cmd_reset(void **slot, void *ddata)
 		case op_FPICKpm:
 			fpick_set_filename(*wdata, v, FALSE);
 			break;
-		case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
+		case op_FSPIN: case op_T1FSPIN: case op_TLFSPIN:
 			gtk_spin_button_set_value(*wdata, *(int *)v * 0.01);
 			break;
 		case op_CHECKb:
 			gtk_toggle_button_set_active(*wdata,
-				inifile_get_gboolean(v, (int)pp[1]));
+				inifile_get_gboolean(v, (int)pp[2]));
 			break;
 		case op_TBRBUTTON:
 			if (*(int *)v == TOOL_ID(wdata))
@@ -5150,7 +5424,7 @@ void cmd_reset(void **slot, void *ddata)
 		case op_PCTCOMBO:
 			/* Same as in cmd_set() */
 			break;
-		case op_RPACK: case op_RPACKD: case op_FRPACK:
+		case op_RPACK: case op_RPACKD: case op_BRPACK:
 		case op_COLORLIST: case op_COLORLISTN:
 // !!! No ready setter functions for these (and no need of them yet)
 			break;
@@ -5323,23 +5597,23 @@ void cmd_set(void **slot, int v)
 		gtk_widget_unref(w);
 		break;
 	}
-	case op_TSPINSLIDE:
+	case op_T1SPINSLIDE:
 	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
+	case op_SPINSLIDEa: case op_XSPINSLIDEa:
 		mt_spinslide_set_value(slot[0], v);
 		break;
 	case op_TLNOSPIN:
 		spin_set_range(slot[0], v, v);
 		break;
 	case op_SPIN: case op_SPINc: case op_XSPIN:
-	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-	case op_SPINa: case op_XSPINa: case op_TSPINa:
+	case op_T1SPIN: case op_TLSPIN: case op_TLXSPIN:
+	case op_SPINa: case op_XSPINa: case op_T1SPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
-	case op_FSPIN: case op_TFSPIN: case op_TLFSPIN:
+	case op_FSPIN: case op_T1FSPIN: case op_TLFSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
-	case op_CHECK: case op_XCHECK: case op_TLCHECK: case op_TLCHECKs: 
+	case op_CHECK: case op_XCHECK: case op_TLCHECK:
 	case op_OKTOGGLE: case op_UTOGGLE:
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 		gtk_toggle_button_set_active(slot[0], v);
@@ -5347,7 +5621,7 @@ void cmd_set(void **slot, int v)
 	case op_MENUCHECK: case op_MENURITEM:
 		gtk_check_menu_item_set_active(slot[0], v);
 		break;
-	case op_OPT: case op_XOPT: case op_TOPT: case op_TLOPT: case op_OPTD:
+	case op_OPT: case op_XOPT: case op_T1OPT: case op_TLOPT: case op_OPTD:
 		gtk_option_menu_set_history(slot[0], v);
 		break;
 	case op_PCTCOMBO:
@@ -5397,7 +5671,7 @@ void cmd_setlist(void **slot, char *map, int n)
 {
 // !!! Support only what actually used on, and their brethren
 	int op = GET_OP(slot);
-	if ((op == op_OPT) || (op == op_XOPT) || (op == op_TOPT) ||
+	if ((op == op_OPT) || (op == op_XOPT) || (op == op_T1OPT) ||
 		(op == op_TLOPT) || (op == op_OPTD))
 	{
 		GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
@@ -5427,7 +5701,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	switch (op)
 	{
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
-	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
+	case op_XPENTRY: case op_T1PENTRY: case op_PATH: case op_PATHs:
 	{
 		char *s = (char *)gtk_entry_get_text(slot[0]);
 		if (idx == PATH_VALUE) gtkncpy(res, s, size);
@@ -5486,9 +5760,9 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_NBOOK: case op_NBOOKl: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(slot[0], (int)res);
 		break;
-	case op_TSPINSLIDE:
+	case op_T1SPINSLIDE:
 	case op_TLSPINSLIDE: case op_TLSPINSLIDEs: case op_TLSPINSLIDEx:
-	case op_HTSPINSLIDE: case op_SPINSLIDEa: case op_XSPINSLIDEa:
+	case op_SPINSLIDEa: case op_XSPINSLIDEa:
 	{
 		int *v = res, n = v[0];
 		mt_spinslide_set_range(slot[0], v[1], v[2]);
@@ -5496,8 +5770,8 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_SPIN: case op_SPINc: case op_XSPIN:
-	case op_TSPIN: case op_TLSPIN: case op_TLXSPIN:
-	case op_SPINa: case op_XSPINa: case op_TSPINa:
+	case op_T1SPIN: case op_TLSPIN: case op_TLXSPIN:
+	case op_SPINa: case op_XSPINa: case op_T1SPINa:
 	{
 		int *v = res, n = v[0];
 		spin_set_range(slot[0], v[1], v[2]);
@@ -5507,14 +5781,14 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
 		gtk_label_set_text(GTK_LABEL(GTK_BIN(slot[0])->child), res);
 		break;
-	case op_MLABEL: case op_WLABEL: case op_XLABEL: case op_TLLABEL:
-	case op_STLABEL:
+	case op_MLABEL: case op_WLABEL: case op_XLABEL:
+	case op_TLABEL: case op_TLLABEL: case op_TXLABEL: case op_STLABEL:
 		gtk_label_set_text(slot[0], res);
 		break;
 	case op_TEXT: set_textarea(slot[0], res); break;
 	case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 		gtk_entry_set_text(slot[0], res); break;
-	case op_XPENTRY: case op_TPENTRY: case op_PATH: case op_PATHs:
+	case op_XPENTRY: case op_T1PENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], res, idx);
 		break;
 	case op_COMBOENTRY:
@@ -5530,6 +5804,9 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_COLORLIST: case op_COLORLISTN:
 		colorlist_reset_color(slot[0], (int)res);
+		break;
+	case op_PROGRESS:
+		gtk_progress_set_percentage(slot[0], (int)res / 100.0);
 		break;
 	case op_CANVASIMG: case op_ECANVASIMG:
 	{
@@ -5590,10 +5867,19 @@ void cmd_setv(void **slot, void *res, int idx)
 		{
 			char **pp = res;
 			gtk_selection_data_set(dp->ds->data,
+				/* Could use "dp->ds->data->target" instead */
 				gdk_atom_intern(dp->d.format->target, FALSE),
 				dp->d.format->format ? dp->d.format->format : 8,
 				pp[0], pp[1] - pp[0]);
 		}
+	}
+	case op_EV_COPY:
+	{
+		copy_den *cp = slot[1];
+		char **pp = res;
+		gtk_selection_data_set(cp->data, cp->data->target,
+			cp->c.format->format ? cp->c.format->format : 8,
+			pp[0], pp[1] - pp[0]);
 	}
 	}
 }
@@ -5617,7 +5903,12 @@ void cmd_cursor(void **slot, void **cursor)
 int cmd_checkv(void **slot, int idx)
 {
 	int op = GET_OP(slot);
-	if (op == op_EV_MOUSE)
+	if (op == op_CLIPBOARD)
+	{
+		if (idx == CLIP_OFFER) return (offer_clipboard(slot));
+		if (idx == CLIP_PROCESS) return (process_clipboard(slot));
+	}
+	else if (op == op_EV_MOUSE)
 	{
 		mouse_den *dp = slot[1];
 		void **canvas = GET_HANDLER(slot);

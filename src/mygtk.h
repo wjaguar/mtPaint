@@ -61,12 +61,13 @@ GtkWidget *main_window;
 ///	Generic Widget Primitives
 
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
+#if 0 /* Not needed anymore */
 GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler );
+#endif
 GtkWidget *add_a_spin( int value, int min, int max );
 #if 0 /* Not needed anymore */
 GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
 GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
-#endif
 GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
 GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
 	int l, int spacing);
@@ -74,17 +75,14 @@ GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int expand, int spacing);
 #define to_table(widget, table, row, column, spacing) \
 	to_table_x(widget, table, row, column, TRUE, spacing)
-#if 0 /* Not needed anymore */
 GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
 	int l, int spacing);
-#endif
 GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
 	int value, int min, int max );
-#if 0 /* Not needed anymore */
 GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
 	double value, double min, double max);
-#endif
 void add_hseparator( GtkWidget *widget, int xs, int ys );
+#endif
 
 void progress_init(char *text, int canc);		// Initialise progress window
 int progress_update(float val);				// Update progress window
@@ -181,7 +179,6 @@ char *file_in_homedir(char *dest, const char *file, int cnt);
 
 #if 0 /* Not needed anymore */
 GtkWidget *table_slot(GtkWidget *table, int row, int col);
-#endif
 
 // Packing framed widget
 
@@ -191,7 +188,6 @@ GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget);
 
 // Entry + Browse
 
-#if 0 /* Not needed anymore */
 GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode);
 #endif
 
@@ -222,8 +218,10 @@ void widget_set_keepsize(GtkWidget *widget, int keep_height);
 
 // Signalled toggles
 
+#if 0 /* Not needed anymore */
 GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler);
 GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc handler);
+#endif
 
 // Workaround for GtkCList reordering bug in GTK2
 
@@ -326,9 +324,11 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 // Clipboard
 
 int internal_clipboard(int which);
+#if 0 /* Not needed anymore */
 int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data);
 int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
 	GtkSignalFunc handler);
+#endif
 
 // Allocate a memory chunk which is freed along with a given widget
 

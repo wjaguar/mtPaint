@@ -40,8 +40,8 @@ enum {
 	op_TABLE,
 	op_XTABLE,
 	op_ETABLE,
-	op_FTABLE,
-	op_FSXTABLE,
+	op_BTABLE,
+	op_STABLE,
 	//
 	op_VBOX,
 	op_XVBOX,
@@ -49,14 +49,16 @@ enum {
 	op_HBOX,
 	op_XHBOX,
 	op_TLHBOX,
-	op_FVBOX,
-	op_FXVBOX,
-	op_FHBOX,
+	op_BVBOX,
+	op_BHBOX,
 	//
 	op_EQBOX,
+	op_FRAME,
+	op_XFRAME,
+	op_EFRAME,
 	op_SCROLL,
 	op_XSCROLL,
-	op_FSCROLL,
+	op_BSCROLL,
 	op_SNBOOK,
 	op_NBOOK,
 	op_NBOOKl,
@@ -68,10 +70,13 @@ enum {
 	op_MLABEL,
 	op_WLABEL,
 	op_XLABEL,
+	op_TLABEL,
 	op_TLLABEL,
+	op_TXLABEL,
 	op_HLABEL,
 	op_HLABELm,
 	op_TLTEXT,
+	op_PROGRESS,
 	op_RGBIMAGE,
 	op_WRGBIMAGE,
 	op_RGBIMAGEP,
@@ -84,21 +89,20 @@ enum {
 	op_SPIN,
 	op_SPINc,
 	op_XSPIN,
-	op_TSPIN,
+	op_T1SPIN,
 	op_TLSPIN,
 	op_TLXSPIN,
 	//
 	op_FSPIN,
-	op_TFSPIN,
+	op_T1FSPIN,
 	op_TLFSPIN,
 	//
 	op_SPINa,
 	op_XSPINa,
-	op_TSPINa,
+	op_T1SPINa,
 	//
 	op_TLSPINPACK,
-	op_TSPINSLIDE,
-	op_HTSPINSLIDE,
+	op_T1SPINSLIDE,
 	op_TLSPINSLIDE,
 	op_TLSPINSLIDEs,
 	op_TLSPINSLIDEx,
@@ -107,14 +111,13 @@ enum {
 	op_CHECK,
 	op_XCHECK,
 	op_TLCHECK,
-	op_TLCHECKs,
 	op_CHECKb,
 	op_RPACK,
-	op_FRPACK,
+	op_BRPACK,
 	op_RPACKD,
 	op_OPT,
 	op_XOPT,
-	op_TOPT,
+	op_T1OPT,
 	op_TLOPT,
 	op_OPTD,
 	op_COMBO,
@@ -122,7 +125,7 @@ enum {
 	op_MLENTRY,
 	op_TLENTRY,
 	op_XPENTRY,
-	op_TPENTRY,
+	op_T1PENTRY,
 	op_PATH,
 	op_PATHs,
 	op_TEXT,
@@ -191,6 +194,8 @@ enum {
 	op_RFILECOLUMN,
 	op_CHKCOLUMNi0,
 
+	op_CLIPBOARD,
+
 	op_XBMCURSOR,
 	op_SYSCURSOR,
 
@@ -201,13 +206,15 @@ enum {
 	op_EVT_SELECT,
 	op_EVT_CHANGE,
 	op_EVT_DESTROY, // before deallocation
-	op_EVT_KEY, // with key data
-	op_EVT_MOUSE, // with button data
+	op_EVT_KEY, // with key data & ret
+	op_EVT_MOUSE, // with button data & ret
 	op_EVT_MMOUSE, // movement, with same
 	op_EVT_RMOUSE, // release, with same
 	op_EVT_EXT, // generic event with extra data
-	op_EVT_DRAGFROM,
-	op_EVT_DROP,
+	op_EVT_DRAGFROM, // with drag data & ret
+	op_EVT_DROP, // with drag data 
+	op_EVT_COPY, // with copy data
+	op_EVT_PASTE, // with copy data & ret
 
 	op_EVT_LAST,
 	op_TRIGGER = op_EVT_LAST,
@@ -215,6 +222,7 @@ enum {
 	op_EV_0, // dynamic tags - event values
 	op_EV_MOUSE = op_EV_0,
 	op_EV_DRAGFROM,
+	op_EV_COPY,
 
 	op_EV_LAST,
 
@@ -267,6 +275,8 @@ enum {
 	op_BOR_TOOLBAR,
 	op_BOR_POPUP,
 	op_BOR_TOPVBOX,
+	op_BOR_CHECK,
+	op_BOR_FRAME,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -315,6 +325,13 @@ typedef struct {
 	void *data;
 	int len;
 } drag_ext;
+
+//	Structure which is provided to COPY and PASTE event
+typedef struct {
+	clipform_dd *format;
+	void *data;
+	int len;
+} copy_ext;
 
 #define _Cmask (GDK_CONTROL_MASK)
 #define _Smask (GDK_SHIFT_MASK)
@@ -466,8 +483,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
 #define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
 #define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
-#define FTABLE(NM,W,H) WBh(FTABLE, 2), WBwh(W, H), (NM)
-#define FSXTABLEp(V,W,H) WBhnf(FSXTABLE, 2), WBfield(V), WBwh(W, H)
+#define FTABLE(NM,W,H) FRAME(NM), WBh(BTABLE, 1), WBwh(W, H)
+#define STABLE(W,H) WBh(STABLE, 1), WBwh(W, H)
 #define VBOX WBh(VBOX, 0)
 #define VBOXr WBrh(VBOX, 0)
 #define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
@@ -484,16 +501,22 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define XHBOXbp(S,B,P) WBh(XHBOX, 1), WBpbs(P, B, S)
 #define XHBOXb(S,B) XHBOXbp(S, B, 0)
 #define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
-#define FVBOX(NM) WBh(FVBOX, 1), (NM)
-#define FVBOXs(NM,S) WBh(FVBOX, 2), WBbs(0, S), (NM)
-#define FXVBOX(NM) WBh(FXVBOX, 1), (NM)
-#define FHBOX(NM) WBh(FHBOX, 1), (NM)
+#define FVBOX(NM) FRAME(NM), WBh(BVBOX, 0)
+#define FVBOXb(NM,S,B) FRAME(NM), WBh(BVBOX, 1), WBbs(B, S)
+#define FXVBOX(NM) XFRAME(NM), WBh(BVBOX, 0)
+#define EFVBOX EFRAME, WBh(BVBOX, 1), WBbs(10, 0)
+#define FHBOX(NM) FRAME(NM), WBh(BHBOX, 0)
 #define EQBOX WBh(EQBOX, 0)
 #define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
 #define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
-#define SCROLL(HP,VP) WBh(SCROLL, 1), (void *)((HP) + ((VP) << 8))
-#define XSCROLL(HP,VP) WBh(XSCROLL, 1), (void *)((HP) + ((VP) << 8))
-#define FSCROLL(HP,VP) WBh(FSCROLL, 1), (void *)((HP) + ((VP) << 8))
+#define FRAME(NM) WBh(FRAME, 1), (NM)
+#define XFRAME(NM) WBh(XFRAME, 1), (NM)
+#define XFRAMEp(V) WBhnf(XFRAME, 1), WBfield(V)
+#define EFRAME WBh(EFRAME, 0)
+#define SCROLL(HP,VP) WBh(SCROLL, 1), WBnh(VP, HP)
+#define XSCROLL(HP,VP) WBh(XSCROLL, 1), WBnh(VP, HP)
+#define FSCROLL(HP,VP) XFRAME(NULL), WBh(BSCROLL, 1), WBnh(VP, HP)
+#define FSCROLLp(V,HP,VP) XFRAMEp(V), WBh(BSCROLL, 1), WBnh(VP, HP)
 #define SNBOOK WBh(SNBOOK, 0)
 #define NBOOK WBh(NBOOK, 0)
 #define NBOOKr WBrh(NBOOK, 0)
@@ -512,9 +535,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define MLABELp(V) WBhnf(MLABEL, 1), WBfield(V)
 #define WLABELp(V) WBhnf(WLABEL, 1), WBfield(V)
 #define XLABELr(NM) WBrh(XLABEL, 1), (NM)
+#define TLABEL(NM) WBh(TLABEL, 1), (NM)
+#define TLABELr(NM) WBrh(TLABEL, 1), (NM)
+#define TLABELx(NM,PX,PY,AX) WBh(TLABEL, 2), (NM), WBppa(PX, PY, AX)
 #define TLLABELl(NM,X,Y,L) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, L)
 #define TLLABEL(NM,X,Y) TLLABELl(NM, X, Y, 1)
-#define TLLABELr(NM,X,Y) WBrh(TLLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define TLLABELx(NM,X,Y,PX,PY,AX) WBh(TLLABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
 #define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh(TLLABEL, 3), (NM), \
@@ -522,11 +547,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLLABELp(V,X,Y) WBhnf(TLLABEL, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLLABELpx(V,X,Y,PX,PY,AX) WBhnf(TLLABEL, 3), WBfield(V), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
+#define TXLABEL(NM,X,Y) WBh(TXLABEL, 2), (NM), WBxyl(X, Y, 1)
 #define HLABELp(V) WBhnf(HLABEL, 1), WBfield(V)
 #define HLABELmp(V) WBhnf(HLABELm, 1), WBfield(V)
 #define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
 #define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
+#define PROGRESSp(V) WBrhnf(PROGRESS, 1), WBfield(V)
 #define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
@@ -544,11 +571,12 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLXSPIN(V,V0,V1,X,Y) WBrhf(TLXSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TSPIN(NM,V,V0,V1) WBrhf(TSPIN, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), (NM)
-#define TSPINv(NM,V,V0,V1) WBrh(TSPIN, 4), &(V), \
-	(void *)(V0), (void *)(V1), (NM)
-#define TSPINa(NM,A) WBrhf(TSPINa, 2), WBfield(A), (NM)
+#define T1SPIN(V,V0,V1) WBrhf(T1SPIN, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
+#define TSPIN(NM,V,V0,V1) T1SPIN(V,V0,V1), TLABEL(NM)
+#define TSPINv(NM,V,V0,V1) WBrh(T1SPIN, 3), &(V), \
+	(void *)(V0), (void *)(V1), TLABEL(NM)
+#define TSPINa(NM,A) WBrhf(T1SPINa, 1), WBfield(A), TLABEL(NM)
 #define SPIN(V,V0,V1) WBrhf(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define SPINv(V,V0,V1) WBrh(SPIN, 3), &(V), \
@@ -561,8 +589,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	(void *)(V0), (void *)(V1)
 #define FSPINv(V,V0,V1) WBrh(FSPIN, 3), &(V), \
 	(void *)(V0), (void *)(V1)
-#define TFSPIN(NM,V,V0,V1) WBrhf(TFSPIN, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), (NM)
+#define TFSPIN(NM,V,V0,V1) WBrhf(T1FSPIN, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1), TLABEL(NM)
 #define TLFSPIN(V,V0,V1,X,Y) WBrhf(TLFSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
@@ -570,10 +598,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 /* !!! This block holds 1 nested EVENT block */
 #define TLSPINPACKv(A,N,HC,W,X,Y) WBr2h(TLSPINPACK, 3 + 2), (A), (void *)(N), \
 	WBxyl(X, Y, W), EVENT(CHANGE, HC)
-#define TSPINSLIDE(NM,V,V0,V1) WBrhf(TSPINSLIDE, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), (NM)
-#define HTSPINSLIDE(NM,V,V0,V1) WBrhf(HTSPINSLIDE, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), (NM)
+#define T1SPINSLIDE(V,V0,V1) WBrhf(T1SPINSLIDE, 3), WBfield(V), \
+	(void *)(V0), (void *)(V1)
+#define TSPINSLIDE(NM,V,V0,V1) T1SPINSLIDE(V,V0,V1), TLABEL(NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEs, 4), WBfield(V), \
@@ -585,30 +612,30 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define XSPINSLIDEa(A) WBrhf(XSPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
-#define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (void *)(V0), (NM)
+#define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (NM), (void *)(V0)
 #define XCHECK(NM,V) WBrhf(XCHECK, 2), WBfield(V), (NM)
 #define TLCHECKl(NM,V,X,Y,L) WBrhf(TLCHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
 #define TLCHECKvl(NM,V,X,Y,L) WBrh(TLCHECK, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
-#define TLCHECKsv(NM,V,X,Y) WBrh(TLCHECKs, 3), &(V), (NM), WBxyl(X, Y, 1)
 /* !!! No more than 255 choices */
 #define RPACK(SS,N,H,V) WBrhf(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
 #define RPACKv(SS,N,H,V) WBrh(RPACK, 3), &(V), (SS), WBnh(N, H)
-#define FRPACK(NM,SS,N,H,V) WBrhf(FRPACK, 4), WBfield(V), (SS), WBnh(N, H), (NM)
-#define FRPACKv(NM,SS,N,H,V) WBrh(FRPACK, 4), &(V), (SS), WBnh(N, H), (NM)
+#define FRPACK(NM,SS,N,H,V) FRAME(NM), WBrhf(BRPACK, 3), WBfield(V), (SS), \
+	WBnh(N, H)
+#define FRPACKv(NM,SS,N,H,V) FRAME(NM), WBrh(BRPACK, 3), &(V), (SS), WBnh(N, H)
 #define RPACKD(SP,H,V) WBrhf(RPACKD, 3), WBfield(V), WBfield(SP), (H)
 #define RPACKDv(SP,H,V) WBrh(RPACKD, 3), &(V), WBfield(SP), (H)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define RPACKe(SS,N,H,V,HS) WBr2hf(RPACK, 3 + 2), WBfield(V), (SS), \
 	WBnh(N, H), EVENT(SELECT, HS)
-#define FRPACKe(NM,SS,N,H,V,HS) WBr2hf(FRPACK, 4 + 2), WBfield(V), (SS), \
-	WBnh(N, H), EVENT(SELECT, HS), (NM)
+#define FRPACKe(NM,SS,N,H,V,HS) FRAME(NM), WBr2hf(BRPACK, 3 + 2), WBfield(V), \
+	(SS), WBnh(N, H), EVENT(SELECT, HS)
 #define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), \
 	(H), EVENT(SELECT, HS)
 #define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
 #define XOPT(SS,N,V) WBrhf(XOPT, 3), WBfield(V), (SS), (void *)(N)
-#define TOPTv(NM,SS,N,V) WBrh(TOPT, 4), &(V), (SS), (void *)(N), (NM)
+#define TOPTv(NM,SS,N,V) WBrh(T1OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
 #define TLOPT(SS,N,V,X,Y) WBrhf(TLOPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 /* !!! These blocks each hold 1 nested EVENT block */
@@ -645,10 +672,10 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
 	WBxyl(X, Y, L)
 #define XPENTRY(V,MX) WBrhf(XPENTRY, 2), WBfield(V), (void *)(MX)
-#define TPENTRYv(NM,V,MX) WBrh(TPENTRY, 3), (V), (void *)(MX), (NM)
-#define PATH(NM,T,M,V) WBrhf(PATH, 4), WBfield(V), (T), (void *)(M), (NM)
-#define PATHv(NM,T,M,V) WBrh(PATH, 4), (V), (T), (void *)(M), (NM)
-#define PATHs(NM,T,M,V) WBrh(PATHs, 4), (V), (T), (void *)(M), (NM)
+#define TPENTRYv(NM,V,MX) WBrh(T1PENTRY, 2), (V), (void *)(MX), TLABEL(NM)
+#define PATH(NM,T,M,V) FRAME(NM), WBrhf(PATH, 3), WBfield(V), (T), (void *)(M)
+#define PATHv(NM,T,M,V) FRAME(NM), WBrh(PATH, 3), (V), (T), (void *)(M)
+#define PATHs(NM,T,M,V) FRAME(NM), WBrh(PATHs, 3), (V), (T), (void *)(M)
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
 #define COMBOENTRY(V,SP,H) WBr2hf(COMBOENTRY, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(OK, H)
@@ -807,6 +834,8 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
 #define DRAGDROPm(F,HF,HT) WBr3hf(DRAGDROP, 2 + 2 * 2), WBfield(F), (void *)1, \
 	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
+#define CLIPBOARD(F,T,HC,HP) WBr3hf(CLIPBOARD, 2 + 2 * 2), WBfield(F), \
+	(void *)(T), EVENT(COPY, HC), EVENT(PASTE, HP)
 
 #define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B)
 
@@ -856,6 +885,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of COLORLIST
 #define COLORLIST_RESET_ROW 0
 
+//	Extra data of PROGRESS
+#define PROGRESS_PERCENT 0
+
 //	Extra data of CANVASIMG
 #define CANVAS_SIZE	0
 
@@ -868,6 +900,13 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of EV_DRAGFROM
 #define DRAG_DATA	0	/* array of 2 pointers: start/end */
 #define DRAG_ICON_RGB	1
+
+//	Extra data of EV_COPY
+#define COPY_DATA	0
+
+//	Extra state of CLIPBOARD
+#define CLIP_OFFER	0
+#define CLIP_PROCESS	1
 
 //	Extra state of all regular widgets
 #define SLOT_FOCUSED	0
