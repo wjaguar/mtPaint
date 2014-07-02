@@ -224,22 +224,22 @@ void draw_pan_thumb(pan_dd *dt, int x1, int y1, int x2, int y2)
 
 static void pan_thumbnail(pan_dd *dt)	// Create thumbnail and selection box
 {
-	GtkAdjustment *hori, *vert;
+	int xyhv[4];
 
 	// Update main window first to get new scroll positions if necessary
 	handle_events();
 
-	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
-	draw_pan_thumb(dt, hori->value, vert->value, hori->page_size, vert->page_size);
+	cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
+	draw_pan_thumb(dt, xyhv[0], xyhv[1], xyhv[2], xyhv[3]);
 }
 
-static void do_pan(pan_dd *dt, GtkAdjustment *hori, GtkAdjustment *vert,
-	int nv_h, int nv_v)
+static void do_pan(pan_dd *dt, int w, int h, int nv_h, int nv_v)
 {
-	nv_h = nv_h < 0 ? 0 : nv_h > hori->upper - hori->page_size ?
-		hori->upper - hori->page_size : nv_h;
-	nv_v = nv_v < 0 ? 0 : nv_v > vert->upper - vert->page_size ?
-		vert->upper - vert->page_size : nv_v;
+	int mx[2], *xy;
+
+	cmd_peekv(scrolledwindow_canvas, mx, sizeof(mx), CSCROLL_LIMITS);
+	nv_h = nv_h < 0 ? 0 : nv_h > mx[0] ? mx[0] : nv_h;
+	nv_v = nv_v < 0 ? 0 : nv_v > mx[1] ? mx[1] : nv_v;
 
 	if (dt->in_pan) /* Delay reaction */
 	{
@@ -248,18 +248,18 @@ static void do_pan(pan_dd *dt, GtkAdjustment *hori, GtkAdjustment *vert,
 		return;
 	}
 
+	xy = slot_data(scrolledwindow_canvas, NULL);
 	while (TRUE)
 	{
 		dt->in_pan = 1;
 
 		/* Update selection box */
-		draw_pan_thumb(dt, nv_h, nv_v, hori->page_size, vert->page_size);
+		draw_pan_thumb(dt, nv_h, nv_v, w, h);
 
 		/* Update position of main window scrollbars */
-		hori->value = nv_h;
-		vert->value = nv_v;
-		gtk_adjustment_value_changed(hori);
-		gtk_adjustment_value_changed(vert);
+		xy[0] = nv_h;
+		xy[1] = nv_v;
+		cmd_reset(scrolledwindow_canvas, NULL);
 
 		/* Process events */
 		handle_events();
@@ -274,22 +274,21 @@ static void do_pan(pan_dd *dt, GtkAdjustment *hori, GtkAdjustment *vert,
 
 static int key_pan(pan_dd *dt, void **wdata, int what, void **where, key_ext *key)
 {
-	int nv_h, nv_v, hm, vm;
-	GtkAdjustment *hori, *vert;
+	int nv_h, nv_v, hm, vm, xyhv[4];
 
-	if (!check_zoom_keys_real(wtf_pressed_(key)))
+	if (!check_zoom_keys_real(wtf_pressed(key)))
 	{
 		/* xine-ui sends bogus keypresses so don't delete on this */
 		if (!arrow_key_(key->key, key->state, &hm, &vm, 4) &&
 			!XINE_FAKERY(key->key)) run_destroy(wdata);
 		else
 		{
-			get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
+			cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 
-			nv_h = hori->value + hm * (hori->page_size / 4);
-			nv_v = vert->value + vm * (hori->page_size / 4);
+			nv_h = xyhv[0] + hm * (xyhv[2] / 4);
+			nv_v = xyhv[1] + vm * (xyhv[3] / 4);
 
-			do_pan(dt, hori, vert, nv_h, nv_v);
+			do_pan(dt, xyhv[2], xyhv[3], nv_h, nv_v);
 		}
 	}
 	else pan_thumbnail(dt);	// Update selection box as user may have zoomed in/out
@@ -300,21 +299,20 @@ static int key_pan(pan_dd *dt, void **wdata, int what, void **where, key_ext *ke
 static int pan_button(pan_dd *dt, void **wdata, int what, void **where,
 	mouse_ext *mouse)
 {
-	int nv_h, nv_v;
+	int nv_h, nv_v, xyhv[4];
 	float cent_x, cent_y;
-	GtkAdjustment *hori, *vert;
 
 	if (mouse->button == 1)	// Left click = pan window
 	{
-		get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
+		cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 
 		cent_x = ((float) mouse->x) / dt->wh[0];
 		cent_y = ((float) mouse->y) / dt->wh[1];
 
-		nv_h = mem_width*can_zoom*cent_x - hori->page_size/2;
-		nv_v = mem_height*can_zoom*cent_y - vert->page_size/2;
+		nv_h = mem_width * can_zoom * cent_x - xyhv[2] * 0.5;
+		nv_v = mem_height * can_zoom * cent_y - xyhv[3] * 0.5;
 
-		do_pan(dt, hori, vert, nv_h, nv_v);
+		do_pan(dt, xyhv[2], xyhv[3], nv_h, nv_v);
 	}
 	else if ((mouse->button == 3) || (mouse->button == 13))
 		run_destroy(wdata);	// Right click = kill window
@@ -364,10 +362,13 @@ void pressed_pan()
 
 ////	VIEW WINDOW
 
-static int vw_width, vw_height, vw_last_x, vw_last_y, vw_move_layer;
+static int vw_width = 1, vw_height = 1;
+static int vw_last_x, vw_last_y, vw_move_layer;
+static int vwxy[2];	// view window position
 static int vw_mouse_status;
+static void **vw_scrolledwindow;
 
-GtkWidget *vw_drawing;
+void **vw_drawing;
 int vw_focus_on;
 
 void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
@@ -480,9 +481,8 @@ static guint idle_focus;
 
 void vw_focus_view()						// Focus view window to main window
 {
-	int w0, h0;
-	float px, py, nv_h, nv_v, main_hv[2];
-	GtkAdjustment *hori, *vert;
+	int w0, h0, xyhv[4], nv_hv[2] = { 0, 0 };
+	float px, py, main_hv[2];
 
 	if (idle_focus) gtk_idle_remove(idle_focus);
 	idle_focus = 0;
@@ -512,33 +512,30 @@ void vw_focus_view()						// Focus view window to main window
 		main_hv[1] = py / h0;
 	}
 
-	get_scroll_adjustments(vw_scrolledwindow, &hori, &vert);
+	cmd_peekv(vw_scrolledwindow, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 
-	nv_h = nv_v = 0.0;
-	if (hori->page_size < vw_width)
+	if (xyhv[2] < vw_width)
 	{
-		nv_h = vw_width * main_hv[0] - hori->page_size * 0.5;
-		if (nv_h + hori->page_size > vw_width)
-			nv_h = vw_width - hori->page_size;
-		if (nv_h < 0.0) nv_h = 0.0;
+		nv_hv[0] = vw_width * main_hv[0] - xyhv[2] * 0.5;
+		if (nv_hv[0] + xyhv[2] > vw_width)
+			nv_hv[0] = vw_width - xyhv[2];
+		if (nv_hv[0] < 0) nv_hv[0] = 0;
 	}
-	if ( vert->page_size < vw_height )
+	if (xyhv[3] < vw_height)
 	{
-		nv_v = vw_height * main_hv[1] - vert->page_size * 0.5;
-		if (nv_v + vert->page_size > vw_height)
-			nv_v = vw_height - vert->page_size;
-		if (nv_v < 0.0) nv_v = 0.0;
+		nv_hv[1] = vw_height * main_hv[1] - xyhv[3] * 0.5;
+		if (nv_hv[1] + xyhv[3] > vw_height)
+			nv_hv[1] = vw_height - xyhv[3];
+		if (nv_hv[1] < 0) nv_hv[1] = 0;
 	}
 
 	/* Do nothing if nothing changed */
-	if ((hori->value == nv_h) && (vert->value == nv_v)) return;
-
-	hori->value = nv_h;
-	vert->value = nv_v;
+	if (!((xyhv[0] ^ nv_hv[0]) | (xyhv[1] ^ nv_hv[1]))) return;
 
 	/* Update position of view window scrollbars */
-	gtk_adjustment_value_changed(hori);
-	gtk_adjustment_value_changed(vert);
+	vwxy[0] = nv_hv[0];
+	vwxy[1] = nv_hv[1];
+	cmd_reset(vw_scrolledwindow, NULL);
 }
 
 void vw_focus_idle()
@@ -550,17 +547,16 @@ void vw_focus_idle()
 		(GtkFunction)vw_focus_view, NULL);
 }
 
-gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
+void vw_configure()
 {
-	int ww, wh, new_margin_x = 0, new_margin_y = 0;
+	int new_margin_x = 0, new_margin_y = 0;
 
 	if (canvas_image_centre)
 	{
-		ww = vw_drawing->allocation.width - vw_width;
-		wh = vw_drawing->allocation.height - vw_height;
-
-		if (ww > 0) new_margin_x = ww >> 1;
-		if (wh > 0) new_margin_y = wh >> 1;
+		int wh[2];
+		cmd_peekv(vw_drawing, wh, sizeof(wh), CANVAS_SIZE);
+		if ((wh[0] -= vw_width) > 0) new_margin_x = wh[0] >> 1;
+		if ((wh[1] -= vw_height) > 0) new_margin_y = wh[1] >> 1;
 	}
 
 	if ((new_margin_x != margin_view_x) || (new_margin_y != margin_view_y))
@@ -568,11 +564,9 @@ gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event )
 		margin_view_x = new_margin_x;
 		margin_view_y = new_margin_y;
 		/* Force redraw of whole canvas as the margin has shifted */
-		gtk_widget_queue_draw(vw_drawing);
+		cmd_repaint(vw_drawing);
 	}
 	if (idle_focus) vw_focus_view(); // Time to refocus is NOW
-
-	return TRUE;
 }
 
 void vw_align_size(float new_zoom)
@@ -614,51 +608,35 @@ void vw_realign()
 
 	if ((vw_width != sw) || (vw_height != sh))
 	{
+		int wh[2] = { sw, sh };
 		vw_width = sw;
 		vw_height = sh;
-		wjcanvas_size(vw_drawing, vw_width, vw_height);
+		cmd_setv(vw_drawing, wh, CANVAS_SIZE);
 	}
 	/* !!! Let refocus wait a bit - if window is being resized, view pane's
 	 * allocation could be not yet updated (canvas is done first) - WJ */
 	vw_focus_idle();
 }
 
-static void vw_repaint(int px, int py, int pw, int ph)
+static int vw_repaint(void *dt, void **wdata, int what, void **where,
+	rgbcontext *ctx)
 {
-	unsigned char *rgb;
-	int vport[4];
+	unsigned char *rgb = ctx->rgb;
+	int px, py, pw, ph;
 
-	if ((pw <= 0) || (ph <= 0)) return;
+	pw = ctx->xy[2] - (px = ctx->xy[0]);
+	ph = ctx->xy[3] - (py = ctx->xy[1]);
 
-	rgb = calloc(1, pw * ph * 3);
-	if (rgb)
-	{
-		memset(rgb, mem_background, pw * ph * 3);
-		view_render_rgb(rgb, px - margin_view_x, py - margin_view_y,
-			pw, ph, vw_zoom);
-		wjcanvas_get_vport(vw_drawing, vport);
-		gdk_draw_rgb_image(vw_drawing->window, vw_drawing->style->black_gc,
-			px - vport[0], py - vport[1], pw, ph,
-			GDK_RGB_DITHER_NONE, rgb, pw * 3);
-		free(rgb);
-	}
-}
+	memset(rgb, mem_background, pw * ph * 3);
+	view_render_rgb(rgb, px - margin_view_x, py - margin_view_y,
+		pw, ph, vw_zoom);
 
-#define REPAINT_VIEW_COST 256
-
-static gboolean vw_expose(GtkWidget *widget, GdkEventExpose *event)
-{
-	int vport[4];
-
-	wjcanvas_get_vport(widget, vport);
-	repaint_expose(event, vport, vw_repaint, REPAINT_VIEW_COST);
-
-	return (FALSE);
+	return (TRUE); // now draw this
 }
 
 void vw_update_area(int x, int y, int w, int h)	// Update x,y,w,h area of current image
 {
-	int zoom, scale, vport[4], rxy[4];
+	int zoom, scale, rxy[4];
 
 	if (!view_showing) return;
 	
@@ -688,28 +666,36 @@ void vw_update_area(int x, int y, int w, int h)	// Update x,y,w,h area of curren
 		h *= scale;
 	}
 
-	x += margin_view_x; y += margin_view_y;
-	wjcanvas_get_vport(vw_drawing, vport);
-	if (clip(rxy, x, y, x + w, y + h, vport))
-		gtk_widget_queue_draw_area(vw_drawing,
-			rxy[0] - vport[0], rxy[1] - vport[1],
-			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+	rxy[2] = (rxy[0] = x + margin_view_x) + w;
+	rxy[3] = (rxy[1] = y + margin_view_y) + h;
+	cmd_setv(vw_drawing, rxy, CANVAS_REPAINT);
 }
 
-static void vw_mouse_event(int event, int x, int y, guint state, guint button)
+
+static int vw_mouse_event(void *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
 	image_info *image;
 	unsigned char *rgb, **img;
-	int dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
-	int zoom = 1, scale = 1;
+	int x, y, dx, dy, i, lx, ly, lw, lh, bpp, tpix, ppix, ofs;
+	int pflag = mouse->count >= 0, zoom = 1, scale = 1;
 	png_color *pal;
 
+	/* Steal focus from dock window */
+	if ((mouse->count > 0) && dock_focused())
+// !!! Use V-code API for that
+		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+
+	/* If cursor got warped, will have another movement event to handle */
+	if (!mouse->count && mouse->button && cmd_checkv(where, MOUSE_BOUND))
+		return (TRUE);
+
 	i = vw_mouse_status;
-	if (!button || !layers_total || (event == GDK_BUTTON_RELEASE))
+	if (!pflag || !mouse->button || !layers_total)
 	{
 		vw_mouse_status = 0;
 		if (i & 2) vw_focus_view(); /* Delayed focus event */
-		return;
+		return (pflag);
 	}
 
 	if (vw_zoom < 1.0) zoom = rint(1.0 / vw_zoom);
@@ -717,8 +703,8 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 
 	dx = vw_last_x;
 	dy = vw_last_y;
-	vw_last_x = x = floor_div((x - margin_view_x) * zoom, scale);
-	vw_last_y = y = floor_div((y - margin_view_y) * zoom, scale);
+	vw_last_x = x = floor_div((mouse->x - margin_view_x) * zoom, scale);
+	vw_last_y = y = floor_div((mouse->y - margin_view_y) * zoom, scale);
 
 	vw_mouse_status |= 1;
 	if (i & 1)
@@ -774,48 +760,6 @@ static void vw_mouse_event(int event, int x, int y, guint state, guint button)
 		if (i > 0) vw_move_layer = i;
 		layer_choose(i);
 	}
-}
-
-static gboolean view_window_motion(GtkWidget *widget, GdkEventMotion *event)
-{
-	GdkModifierType state;
-	guint button = 0;
-	int x, y, vport[4];
-
-	if (event->is_hint) gdk_window_get_pointer (event->window, &x, &y, &state);
-	else
-	{
-		x = event->x;
-		y = event->y;
-		state = event->state;
-	}
-
-	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
-		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
-	else if (state & GDK_BUTTON1_MASK) button = 1;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
-	else if (state & GDK_BUTTON2_MASK) button = 2;
-
-	/* If cursor got warped, will have another movement event to handle */
-	if (button && wjcanvas_bind_mouse(widget, event, x, y)) return (TRUE);
-
-	wjcanvas_get_vport(widget, vport);
-	vw_mouse_event(event->type, x + vport[0], y + vport[1], state, button);
-
-	return (TRUE);
-}
-
-static gint view_window_button( GtkWidget *widget, GdkEventButton *event )
-{
-	int vport[4], pflag = event->type != GDK_BUTTON_RELEASE;
-
-	/* Steal focus from dock window */
-	if (pflag && dock_focused())
-		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-
-	wjcanvas_get_vport(widget, vport);
-	vw_mouse_event(event->type, event->x + vport[0], event->y + vport[1],
-		event->state, event->button);
 
 	return (pflag);
 }
@@ -854,25 +798,16 @@ void pressed_view_focus(int state)
 	vw_focus_view();
 }
 
-void init_view()
-{
-	vw_width = 1;
-	vw_height = 1;
+#define REPAINT_VIEW_COST 256
 
-	gtk_signal_connect( GTK_OBJECT(vw_drawing), "configure_event",
-		GTK_SIGNAL_FUNC (vw_configure), NULL );
-	gtk_signal_connect( GTK_OBJECT(vw_drawing), "expose_event",
-		GTK_SIGNAL_FUNC (vw_expose), NULL );
-
-	gtk_signal_connect( GTK_OBJECT(vw_drawing), "button_press_event",
-		GTK_SIGNAL_FUNC (view_window_button), NULL );
-	gtk_signal_connect( GTK_OBJECT(vw_drawing), "button_release_event",
-		GTK_SIGNAL_FUNC (view_window_button), NULL );
-	gtk_signal_connect( GTK_OBJECT(vw_drawing), "motion_notify_event",
-		GTK_SIGNAL_FUNC (view_window_motion), NULL );
-	gtk_widget_set_events (vw_drawing, GDK_ALL_EVENTS_MASK);
-}
-
+void *init_view_code[] = {
+	REFv(vw_scrolledwindow), CSCROLLv(vwxy), HIDDEN,
+	REFv(vw_drawing), CANVAS(1, 1, REPAINT_VIEW_COST, vw_repaint),
+	EVENT(CHANGE, vw_configure),
+	EVENT(MOUSE, vw_mouse_event), EVENT(RMOUSE, vw_mouse_event),
+	EVENT(MMOUSE, vw_mouse_event),
+	RET
+};
 
 
 ////	TEXT TOOL

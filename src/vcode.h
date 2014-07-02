@@ -77,14 +77,19 @@ enum {
 	op_HLABELm,
 	op_TLTEXT,
 	op_PROGRESS,
+	op_COLORPATCH,
 	op_RGBIMAGE,
 	op_WRGBIMAGE,
 	op_RGBIMAGEP,
 	op_CANVASIMG,
 	op_ECANVASIMG,
+	op_CANVASIMGB,
 	op_FCIMAGEP,
 	op_TLFCIMAGEP,
 	op_TLNOSPIN,
+	//
+	op_CSCROLL,
+	op_CANVAS,
 	//
 	op_SPIN,
 	op_SPINc,
@@ -210,6 +215,11 @@ enum {
 	op_EVT_MOUSE, // with button data & ret
 	op_EVT_MMOUSE, // movement, with same
 	op_EVT_RMOUSE, // release, with same
+	op_EVT_XMOUSE0,
+	op_EVT_XMOUSE = op_EVT_XMOUSE0, // with button & pressure data & ret
+	op_EVT_MXMOUSE, // movement, with same
+	op_EVT_RXMOUSE, // release, with same
+	op_EVT_CROSS, // enter/leave, with flag
 	op_EVT_EXT, // generic event with extra data
 	op_EVT_DRAGFROM, // with drag data & ret
 	op_EVT_DROP, // with drag data 
@@ -301,13 +311,15 @@ typedef struct {
 	unsigned int state;	// modifier flags
 } key_ext;
 
+#define MAX_PRESSURE 0xFF00 /* Nicest fixedpoint scale */
+
 //	Structure which is provided to MOUSE/MMOUSE/RMOUSE event
 typedef struct {
 	int x, y;
 	int button;	// what was pressed, stays pressed, or got released
 	int count;	// 1/2/3 single/double/triple click, 0 move, -1 release
 	unsigned int state;	// button & modifier flags
-// !!! No pressure yet, and no device type too
+	int pressure;	// scaled to 0..MAX_PRESSURE
 } mouse_ext;
 
 //	Structure which is supplied to CLIPFORM
@@ -517,6 +529,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define XSCROLL(HP,VP) WBh(XSCROLL, 1), WBnh(VP, HP)
 #define FSCROLL(HP,VP) XFRAME(NULL), WBh(BSCROLL, 1), WBnh(VP, HP)
 #define FSCROLLp(V,HP,VP) XFRAMEp(V), WBh(BSCROLL, 1), WBnh(VP, HP)
+#define CSCROLLv(A) WBrh(CSCROLL, 1), (A)
 #define SNBOOK WBh(SNBOOK, 0)
 #define NBOOK WBh(NBOOK, 0)
 #define NBOOKr WBrh(NBOOK, 0)
@@ -554,17 +567,21 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
 #define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
 #define PROGRESSp(V) WBrhnf(PROGRESS, 1), WBfield(V)
+#define COLORPATCHv(CP,W,H) WBrh(COLORPATCH, 2), (CP), WBwh(W, H)
 #define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
 #define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
 #define CANVASIMGv(CC,W,H) WBrh(CANVASIMG, 2), (CC), WBwh(W, H)
 #define ECANVASIMGv(CC,W,H) WBrh(ECANVASIMG, 2), (CC), WBwh(W, H)
+#define CANVASIMGB(CP,A) WBrhnf(CANVASIMGB, 2), WBfield(CP), WBfield(A)
 #define FCIMAGEP(CP,A,W,H) WBrhnf(FCIMAGEP, 3), WBfield(CP), WBfield(A), \
 	WBwh(W, H)
 #define TLFCIMAGEP(CP,A,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
 	WBfield(A), WBfield(AS), WBxyl(X, Y, 1)
 #define TLFCIMAGEPn(CP,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
 	(void *)(-1), WBfield(AS), WBxyl(X, Y, 1)
+#define CANVAS(W,H,C,HX) WBr2h(CANVAS, 2 + 2), WBwh(W, H), (void *)(C), \
+	EVENT(EXT, HX)
 #define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
@@ -888,8 +905,15 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of PROGRESS
 #define PROGRESS_PERCENT 0
 
-//	Extra data of CANVASIMG
+//	Extra data of CSCROLL
+#define CSCROLL_XYSIZE	0	/* 4 ints: xywh; read-only */
+#define CSCROLL_LIMITS	1	/* 2 ints: wh; read-only */
+#define CSCROLL_XYRANGE	2	/* 4 ints: xywh */
+
+//	Extra data of CANVASIMG and CANVAS
 #define CANVAS_SIZE	0
+#define CANVAS_REPAINT	1
+#define CANVAS_PAINT	2
 
 //	Extra data of FCIMAGE
 #define FCIMAGE_XY	0

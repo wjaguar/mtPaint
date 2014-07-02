@@ -20,7 +20,6 @@
 float can_zoom;						// Zoom factor 1..MAX_ZOOM
 int margin_main_xy[2];					// Top left of image from top left of canvas
 int margin_view_xy[2];
-int zoom_flag;
 int marq_status, marq_xy[4];				// Selection marquee
 int marq_drag_x, marq_drag_y;				// Marquee dragging offset
 int line_status, line_xy[4];				// Line tool

@@ -79,15 +79,6 @@ static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 #endif
 
 
-static gboolean expose_tablet_preview(GtkWidget *widget, GdkEventExpose *event)
-{
-        gdk_draw_rectangle(widget->window, widget->style->white_gc, TRUE,
-		event->area.x, event->area.y, event->area.width, event->area.height);
-
-	return (FALSE);
-}
-
-
 static gboolean delete_inputd()
 {
 	int i, j;
@@ -125,7 +116,7 @@ static void tablet_update_pressure( double pressure )
 {
 	char txt[64];
 
-	sprintf(txt, "%s = %.2f", _("Pressure"), pressure);
+	sprintf(txt, "%s = %.2f", _("Pressure"), pressure * (1.0 / MAX_PRESSURE));
 	cmd_setv(label_tablet_pressure, txt, LABEL_VALUE);
 }
 
@@ -283,79 +274,12 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 	}
 }
 
-static gint tablet_preview_button (GtkWidget *widget, GdkEventButton *event)
+static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
-	gdouble pressure = 0.0;
-
-	if (event->button == 1)
-	{
-#if GTK_MAJOR_VERSION == 1
-		pressure = event->pressure;
-#endif
-#if GTK_MAJOR_VERSION == 2
-		gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
-#endif
-		tablet_update_pressure( pressure );
-	}
-
-	return TRUE;
-}
-
-static gboolean tablet_preview_motion(GtkWidget *widget, GdkEventMotion *event)
-{
-	gdouble pressure = 0.0;
-	GdkModifierType state;
-
-#if GTK_MAJOR_VERSION == 1
-	if (event->is_hint)
-	{
-		gdk_input_window_get_pointer (event->window, event->deviceid,
-				NULL, NULL, &pressure, NULL, NULL, &state);
-	}
-	else
-	{
-		pressure = event->pressure;
-		state = event->state;
-	}
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	if (event->is_hint) gdk_device_get_state (event->device, event->window, NULL, &state);
-	else state = event->state;
-
-	gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
-#endif
-
-	if (state & GDK_BUTTON1_MASK)
-		tablet_update_pressure( pressure );
+	if (mouse->button == 1) tablet_update_pressure(mouse->pressure);
   
-	return TRUE;
-}
-
-///	EXTENSIONS TO V-CODE
-
-static void **create_test_area(void **r, GtkWidget ***wpp)
-{
-	GtkWidget *drawingarea_tablet;
-
-	drawingarea_tablet = xpack(**wpp, gtk_drawing_area_new());
-	gtk_widget_show (drawingarea_tablet);
-	gtk_widget_set_usize (drawingarea_tablet, 128, 64);
-	gtk_signal_connect( GTK_OBJECT(drawingarea_tablet), "expose_event",
-		GTK_SIGNAL_FUNC (expose_tablet_preview), (gpointer) drawingarea_tablet );
-
-	gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "motion_notify_event",
-		GTK_SIGNAL_FUNC (tablet_preview_motion), NULL);
-	gtk_signal_connect (GTK_OBJECT (drawingarea_tablet), "button_press_event",
-		GTK_SIGNAL_FUNC (tablet_preview_button), NULL);
-
-	gtk_widget_set_events (drawingarea_tablet, GDK_EXPOSURE_MASK
-		| GDK_LEAVE_NOTIFY_MASK
-		| GDK_BUTTON_PRESS_MASK
-		| GDK_POINTER_MOTION_MASK
-		| GDK_POINTER_MOTION_HINT_MASK);
-
-	gtk_widget_set_extension_events (drawingarea_tablet, GDK_EXTENSION_EVENTS_CURSOR);
-
-	return (r);
+	return (TRUE);
 }
 
 ///	V-CODE
@@ -485,7 +409,8 @@ static void *pref_code[] = {
 	TLSPINSLIDEs(tf[2], -100, 100, 1, 3),
 	WDONE, WDONE,
 	FVBOX(_("Test Area")),
-	EXEC(create_test_area),
+	COLORPATCHv("\xFF\xFF\xFF", 128, 64), // white
+	EVENT(XMOUSE, tablet_preview), EVENT(MXMOUSE, tablet_preview),
 	REFv(label_tablet_pressure), MLABELxr("", 0, 0, 0),
 	WDONE, WDONE,
 	WDONE, // notebook

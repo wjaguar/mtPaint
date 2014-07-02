@@ -26,7 +26,7 @@ float vw_zoom;
 int opaque_view;
 int max_pan;
 
-GtkWidget *vw_drawing;
+void **vw_drawing;
 
 void create_cline_area( GtkWidget *vbox1 );
 
@@ -34,7 +34,7 @@ void pressed_pan();
 
 void pressed_centralize(int state);
 void pressed_view_focus(int state);
-void init_view();			// Initial setup
+extern void *init_view_code[];		// Initial setup
 void view_show();
 void view_hide();
 
@@ -52,4 +52,4 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align);
 
-gboolean vw_configure( GtkWidget *widget, GdkEventConfigure *event );
+void vw_configure();

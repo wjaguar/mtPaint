@@ -165,10 +165,10 @@ static inilist ini_int[] = {
 
 
 void **main_window_, **settings_dock, **layers_dock, **main_split,
+	**scrolledwindow_canvas,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *drawing_canvas, *vw_scrolledwindow,
-	*scrolledwindow_canvas;
+GtkWidget *drawing_canvas;
 
 static void **dock_area, **dock_book, **main_menubar;
 
@@ -180,6 +180,7 @@ char **file_args;
 
 static int show_dock;
 static int mouse_left_canvas;
+static int cvxy[2];	// canvas window position
 
 static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
 
@@ -937,7 +938,7 @@ static void rebind_keys()
 #endif
 }
 
-int wtf_pressed_(key_ext *key)
+int wtf_pressed(key_ext *key)
 {
 	key_action *ap = main_keys, *cmatch = NULL;
 	guint *kcd = main_keycodes;
@@ -964,13 +965,6 @@ int wtf_pressed_(key_ext *key)
 	return ((ap->action << 16) + (ap->mode + 0x8000));
 }
 
-int wtf_pressed(GdkEventKey *event)
-{
-	key_ext key = {
-		event->keyval, low_key(event), real_key(event), event->state };
-	return wtf_pressed_(&key);
-}
-
 int dock_focused()
 {
 	return (cmd_checkv(dock_book, SLOT_FOCUSED));
@@ -979,7 +973,7 @@ int dock_focused()
 static int handle_keypress(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
-	int act_m = wtf_pressed_(keydata);
+	int act_m = wtf_pressed(keydata);
 
 	if (!act_m) return (FALSE);
 
@@ -2847,10 +2841,11 @@ static void draw_segments(unsigned char *rgb, int x, int y, int w, int h, int l)
 }
 
 /* Redirectable RGB blitting */
-void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, int step, rgbcontext *ctx)
+void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, rgbcontext *ctx)
 {
 	unsigned char *dest;
-	int l, rxy[4], vxy[4];
+	int rxy[4], vxy[4];
+	int l, step = w * 3;
 
 	if (!ctx)
 	{
@@ -3153,11 +3148,11 @@ void repaint_perim_real(int r, int g, int b, int ox, int oy, rgbcontext *ctx)
 		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
 	}
 
-	draw_rgb(x0, y0, 1, h, rgb, 3, ctx);
-	draw_rgb(x1, y0, 1, h, rgb, 3, ctx);
+	draw_rgb(x0, y0, 1, h, rgb, ctx);
+	draw_rgb(x1, y0, 1, h, rgb, ctx);
 
-	draw_rgb(x0 + 1, y0, w - 2, 1, rgb, 0, ctx);
-	draw_rgb(x0 + 1, y1, w - 2, 1, rgb, 0, ctx);
+	draw_rgb(x0 + 1, y0, w - 2, 1, rgb, ctx);
+	draw_rgb(x0 + 1, y1, w - 2, 1, rgb, ctx);
 	free(rgb);
 }
 
@@ -3265,7 +3260,7 @@ static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
 void force_main_configure()
 {
 	if (drawing_canvas) configure_canvas(drawing_canvas, NULL);
-	if (view_showing && vw_drawing) vw_configure(vw_drawing, NULL);
+	if (view_showing && vw_drawing) vw_configure();
 }
 
 #define REPAINT_CANVAS_COST 512
@@ -3274,9 +3269,6 @@ static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
 	int vport[4];
-
-	/* Stops excess jerking in GTK+1 when zooming */
-	if (zoom_flag) return (TRUE);
 
 	wjcanvas_get_vport(widget, vport);
 	repaint_expose(event, vport, repaint_canvas, REPAINT_CANVAS_COST);
@@ -4460,29 +4452,14 @@ static void *main_menu_code[] = {
 
 static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 {
-	GtkAdjustment *adj;
-	GtkWidget *box = **wpp;
+	GtkWidget *scroll = *(*wpp)++;
 
-
-//	MAIN WINDOW
 
 	drawing_canvas = wjcanvas_new();
 	wjcanvas_size(drawing_canvas, 48, 48);
 	gtk_widget_show(drawing_canvas);
 
-	scrolledwindow_canvas = xpack(box, gtk_scrolled_window_new(NULL, NULL));
-	gtk_widget_show(scrolledwindow_canvas);
-
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW (scrolledwindow_canvas),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-	adj = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
-		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
-	adj = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scrolledwindow_canvas));
-	gtk_signal_connect(GTK_OBJECT(adj), "value_changed",
-		GTK_SIGNAL_FUNC(vw_focus_idle), NULL);
-
-	add_with_wjframe(scrolledwindow_canvas, drawing_canvas);
+	add_with_wjframe(scroll, drawing_canvas);
 
 	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "configure_event",
 		GTK_SIGNAL_FUNC (configure_canvas), NULL );
@@ -4505,20 +4482,6 @@ static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
 
 	gtk_widget_set_events (drawing_canvas, GDK_ALL_EVENTS_MASK);
 	gtk_widget_set_extension_events (drawing_canvas, GDK_EXTENSION_EVENTS_CURSOR);
-
-//	VIEW WINDOW
-
-	vw_scrolledwindow = xpack(box, gtk_scrolled_window_new(NULL, NULL));
-//	!!! Left hidden
-	gtk_scrolled_window_set_policy (GTK_SCROLLED_WINDOW(vw_scrolledwindow),
-		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-
-	vw_drawing = wjcanvas_new();
-	wjcanvas_size(vw_drawing, 1, 1);
-	gtk_widget_show(vw_drawing);
-	add_with_wjframe(vw_scrolledwindow, vw_drawing);
-
-	init_view();
 
 	return (r);
 }
@@ -4549,7 +4512,7 @@ static int dock_esc(main_dd *dt, void **wdata, int what, void **where,
 static int cline_keypress(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
-	return (check_zoom_keys(wtf_pressed_(keydata))); // Check HOME/zoom keys
+	return (check_zoom_keys(wtf_pressed(keydata))); // Check HOME/zoom keys
 }
 
 static void cline_select(main_dd *dt, void **wdata, int what, void **where)
@@ -4603,7 +4566,11 @@ static void *main_code[] = {
 	XVBOX,
 ///	DRAWING AREA
 	REFv(main_split), HVSPLIT,
+//	MAIN WINDOW
+	REFv(scrolledwindow_canvas), CSCROLLv(cvxy), EVENT(CHANGE, vw_focus_idle),
 	EXEC(create_internals),
+//	VIEW WINDOW
+	CALL(init_view_code),
 	WDONE, // hvsplit
 ////	STATUS BAR
 	REFv(toolbar_boxes[TOOLBAR_STATUS]),
@@ -4676,9 +4643,12 @@ void main_init()
 	}
 	main_window_ = run_create(main_code, &tdata, sizeof(tdata));
 
-	// !!! Later will be UNLESSv + FOCUS on canvas
 	if (!show_dock) // Stops first icon in toolbar being selected
-		gtk_widget_grab_focus(scrolledwindow_canvas);
+// !!! Use V-code API for that - and for here, maybe make FOCUS on toplevel do it
+		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+// Older way
+// !!! Can be UNLESSv + FOCUS - but who guarantees CSCROLL to be focusable?
+//		gtk_widget_grab_focus(scrolledwindow_canvas);
 
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
 	fill_keycodes(main_keys);

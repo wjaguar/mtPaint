@@ -43,7 +43,6 @@
 float can_zoom = 1;				// Zoom factor 1..MAX_ZOOM
 int margin_main_xy[2];				// Top left of image from top left of canvas
 int margin_view_xy[2];
-int zoom_flag;
 int marq_status = MARQUEE_NONE, marq_xy[4] = { -1, -1, -1, -1 };	// Selection marquee
 int marq_drag_x, marq_drag_y;						// Marquee dragging offset
 int line_status = LINE_NONE, line_xy[4];				// Line tool
@@ -1236,7 +1235,7 @@ void update_stuff(int flags)
 	if (flags & CF_DRAW)
 		if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
 	if (flags & CF_VDRAW)
-		if (view_showing && vw_drawing) gtk_widget_queue_draw(vw_drawing);
+		if (view_showing && vw_drawing) cmd_repaint(vw_drawing);
 	if (flags & CF_PDRAW)
 	{
 		mem_pal_init();		// Update palette RGB on screen
@@ -2050,17 +2049,18 @@ void file_selector(int action_type)
 
 void canvas_center(float ic[2])		// Center of viewable area
 {
-	GtkAdjustment *hori, *vert;
-	int w, h;
+	int w, h, xyhv[4];
 
-	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
+	cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 	canvas_size(&w, &h);
-	ic[0] = hori->page_size < w ? (hori->value + hori->page_size * 0.5) / w : 0.5;
-	ic[1] = vert->page_size < h ? (vert->value + vert->page_size * 0.5) / h : 0.5;
+	ic[0] = xyhv[2] < w ? (xyhv[0] + xyhv[2] * 0.5) / w : 0.5;
+	ic[1] = xyhv[3] < h ? (xyhv[1] + xyhv[3] * 0.5) / h : 0.5;
 }
 
 void align_size(float new_zoom)		// Set new zoom level
 {
+	static int zoom_flag;
+
 	if (zoom_flag) return;		// Needed as we could be called twice per iteration
 
 	if (new_zoom < MIN_ZOOM) new_zoom = MIN_ZOOM;
@@ -2070,12 +2070,11 @@ void align_size(float new_zoom)		// Set new zoom level
 	zoom_flag = 1;
 	if (!mem_ics)
 	{
-		GtkAdjustment *hori, *vert;
-		int xc, yc, dx, dy, w, h, x, y;
+		int xc, yc, dx, dy, w, h, x, y, xyhv[4];
 
-		get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
-		xc = (int)hori->value * 2 + (w = hori->page_size);
-		yc = (int)vert->value * 2 + (h = vert->page_size);
+		cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
+		xc = xyhv[0] * 2 + (w = xyhv[2]);
+		yc = xyhv[1] * 2 + (h = xyhv[3]);
 		dx = dy = 0;
 
 		if (cursor_zoom)
@@ -2100,22 +2099,20 @@ void align_size(float new_zoom)		// Set new zoom level
 
 void realign_size()		// Reapply old zoom
 {
-	GtkAdjustment *hori, *vert;
-	int w, h, nv_h = 0, nv_v = 0;	// New positions of scrollbar
+	int xyhv[4], xywh[4];
 
-	get_scroll_adjustments(scrolledwindow_canvas, &hori, &vert);
-	canvas_size(&w, &h);
-	if (hori->page_size < w)
-		nv_h = rint(w * mem_icx - hori->page_size * 0.5);
-	if (vert->page_size < h)
-		nv_v = rint(h * mem_icy - vert->page_size * 0.5);
+	cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
+	canvas_size(xywh + 2, xywh + 3);
+	xywh[0] = xywh[1] = 0;	// New positions of scrollbar
+	if (xyhv[2] < xywh[2]) xywh[0] = rint(xywh[2] * mem_icx - xyhv[2] * 0.5);
+	if (xyhv[3] < xywh[3]) xywh[1] = rint(xywh[3] * mem_icy - xyhv[3] * 0.5);
 
-	hori->value = nv_h;
-	hori->upper = w;
-	vert->value = nv_v;
-	vert->upper = h;
-
-	wjcanvas_size(drawing_canvas, w, h);
+	/* !!! CSCROLL's self-updating for CANVAS resize is delayed in GTK+, as
+	 * is the actual resize; so to communicate new position to that latter
+	 * resize, I preset both position and range of CSCROLL here - WJ */
+	cmd_setv(scrolledwindow_canvas, xywh, CSCROLL_XYRANGE);
+ 
+	wjcanvas_size(drawing_canvas, xywh[2], xywh[3]);
 	vw_focus_view();	// View window position may need updating
 	toolbar_zoom_update();	// Zoom factor may have been reset
 }
@@ -2962,16 +2959,16 @@ void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
 	wy = margin_main_y + rxy[1];
 
 	if ((nxy[0] >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
-		draw_rgb(wx, wy, 1, rh, rgb + offy, 3, ctx);
+		draw_rgb(wx, wy, 1, rh, rgb + offy, ctx);
 
 	if ((nxy[2] <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
-		draw_rgb(wx + rw - 1, wy, 1, rh, rgb + offy, 3, ctx);
+		draw_rgb(wx + rw - 1, wy, 1, rh, rgb + offy, ctx);
 
 	if ((nxy[1] >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
-		draw_rgb(wx, wy, rw, 1, rgb + offx, 0, ctx);
+		draw_rgb(wx, wy, rw, 1, rgb + offx, ctx);
 
 	if ((nxy[3] <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
-		draw_rgb(wx, wy + rh - 1, rw, 1, rgb + offx, 0, ctx);
+		draw_rgb(wx, wy + rh - 1, rw, 1, rgb + offx, ctx);
 
 	free(rgb);
 }

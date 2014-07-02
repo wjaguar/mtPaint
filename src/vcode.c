@@ -186,6 +186,13 @@ static gboolean get_evt_del(GtkWidget *widget, GdkEvent *event, gpointer user_da
 	return (TRUE); // it is for handler to decide, destroy it or not
 }
 
+static gboolean get_evt_conf(GtkWidget *widget, GdkEventConfigure *event,
+	gpointer user_data)
+{
+	get_evt_1(NULL, user_data);
+	return (TRUE); // no use of its propagating
+}
+
 static gboolean get_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
 {
 	void **slot = user_data;
@@ -279,7 +286,16 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 		mouse, { 0, 0, 0, 0 } };
 	int op = GET_OP(orig);
 
-	if ((op == op_CANVASIMG) || (op == op_ECANVASIMG))
+#if GTK_MAJOR_VERSION == 2
+	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_working)
+	{
+		gdouble pressure;
+		gdk_event_get_axis(event, GDK_AXIS_PRESSURE, &pressure);
+		mouse->pressure = (int)(pressure * MAX_PRESSURE + 0.5);
+	}
+#endif
+	if ((op == op_CANVASIMG) || (op == op_ECANVASIMG) ||
+		(op == op_CANVASIMGB) || (op == op_CANVAS))
 	{
 		wjcanvas_get_vport(orig[0], den.vport);
 		den.mouse->x += den.vport[0];
@@ -301,7 +317,11 @@ static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
 		event->type == GDK_2BUTTON_PRESS ? 2 :
 		event->type == GDK_3BUTTON_PRESS ? 3 :
 		event->type == GDK_BUTTON_RELEASE ? -1 : 0,
-		event->state };
+		event->state, MAX_PRESSURE };
+#if GTK_MAJOR_VERSION == 1
+	if (GET_OP((void **)user_data) >= op_EVT_XMOUSE0)
+		mouse.pressure = (int)(event->pressure * MAX_PRESSURE + 0.5);
+#endif
 	return (do_evt_mouse(user_data, event, &mouse));
 }
 
@@ -310,13 +330,36 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 {
 	mouse_ext mouse;
 
-	if (event->is_hint) gdk_window_get_pointer(event->window,
-		&mouse.x, &mouse.y, &mouse.state);
-	else
+	mouse.pressure = MAX_PRESSURE;
+#if GTK_MAJOR_VERSION == 1
+	if (GET_OP((void **)user_data) >= op_EVT_XMOUSE0)
 	{
+		gdouble pressure = event->pressure;
+		if (event->is_hint) gdk_input_window_get_pointer(event->window,
+			event->deviceid, NULL, NULL, &pressure, NULL, NULL, NULL);
+		mouse.pressure = (int)(pressure * MAX_PRESSURE + 0.5);
+	}
+#endif
+	while (TRUE)
+	{
+		if (!event->is_hint);
+#if GTK_MAJOR_VERSION == 2
+		else if (GET_OP((void **)user_data) >= op_EVT_XMOUSE0)
+		{
+			gdk_device_get_state(event->device, event->window,
+				NULL, &mouse.state);
+		}
+#endif
+		else
+		{
+			gdk_window_get_pointer(event->window,
+				&mouse.x, &mouse.y, &mouse.state);
+			break;
+		}
 		mouse.x = event->x;
 		mouse.y = event->y;
 		mouse.state = event->state;
+		break;
 	}
 
 	// This peculiar encoding is historically used throughout mtPaint
@@ -328,6 +371,21 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	mouse.count = 0; // motion
 
 	return (do_evt_mouse(user_data, event, &mouse));
+}
+
+static gboolean get_evt_cross(GtkWidget *widget, GdkEventCrossing *event,
+	gpointer user_data)
+{
+	void **slot, **base, **desc;
+
+	/* Skip grab/ungrab related events */
+	if (event->mode != GDK_CROSSING_NORMAL) return (FALSE);
+	
+	slot = user_data; base = slot[0]; desc = slot[1];
+	((evtx_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot,
+		(void *)(event->type == GDK_ENTER_NOTIFY));
+
+	return (FALSE); // let it propagate
 }
 
 //	Drag handling
@@ -1023,22 +1081,44 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 
 typedef struct {
 	unsigned char *rgb;
-	int w, h;
+	int w, h, bkg;
 } rgbimage_data;
+
+static void expose_ext(GtkWidget *widget, GdkEventExpose *event,
+	rgbimage_data *rd, int dx, int dy)
+{
+	GdkGCValues sv;
+	GdkGC *gc = widget->style->black_gc;
+	unsigned char *src = rd->rgb;
+	int w = rd->w, h = rd->h, bkg = 0;
+	int x1, y1, x2, y2, rxy[4] = { 0, 0, w, h };
+
+	x2 = (x1 = event->area.x + dx) + event->area.width;
+	y2 = (y1 = event->area.y + dy) + event->area.height;
+
+	if (!clip(rxy, x1, y1, x2, y2, rxy) || !src) rxy[2] = x1 , rxy[3] = y2;
+	else gdk_draw_rgb_image(widget->window, gc,
+		event->area.x, event->area.y, rxy[2] - rxy[0], rxy[3] - rxy[1],
+		GDK_RGB_DITHER_NONE, src + (y1 * w + x1) * 3, w * 3);
+
+	/* With theme engines lurking out there, weirdest things can happen */
+	if (((rxy[2] < x2) || (rxy[3] < y2)) && (bkg = rd->bkg))
+	{
+		gdk_gc_get_values(gc, &sv);
+		gdk_rgb_gc_set_foreground(gc, bkg);
+	}
+	if (rxy[2] < x2) gdk_draw_rectangle(widget->window, gc,
+		TRUE, rxy[2] - dx, event->area.y,
+		x2 - rxy[2], rxy[3] - rxy[1]);
+	if (rxy[3] < y2) gdk_draw_rectangle(widget->window, gc,
+		TRUE, event->area.x, rxy[3] - dy,
+		event->area.width, y2 - rxy[3]);
+	if (bkg) gdk_gc_set_foreground(gc, &sv.foreground);
+}
 
 static gboolean expose_rgb(GtkWidget *widget, GdkEventExpose *event, gpointer user_data)
 {
-	rgbimage_data *rd = user_data;
-	int x = event->area.x, y = event->area.y;
-	int w = event->area.width, h = event->area.height;
-	int ww = rd->w, wh = rd->h;
-	if (x + w > ww) w = ww - x;
-	if (y + h > wh) h = wh - y;
-	/* With theme engines lurking out there, weirdest things can happen */
-	if ((w <= 0) || (h <= 0)) return (TRUE);
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		x, y, w, h, GDK_RGB_DITHER_NONE,
-		rd->rgb + 3 * (x + ww * y), ww * 3);
+	expose_ext(widget, event, user_data, 0, 0);
 	return (TRUE);
 }
 
@@ -1103,41 +1183,14 @@ GtkWidget *rgbimagep(void *v, int w, int h)
 static gboolean expose_canvasimg(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
-	rgbimage_data *rd = user_data;
-	unsigned char *src = rd->rgb;
-	int w = rd->w, h = rd->h;
-	int x1, y1, x2, y2, vport[4];
+	int vport[4];
 
 	wjcanvas_get_vport(widget, vport);
-	x2 = (x1 = event->area.x + vport[0]) + event->area.width;
-	y2 = (y1 = event->area.y + vport[1]) + event->area.height;
-
-	/* With theme engines lurking out there, weirdest things can happen */
-	if (y2 > h)
-	{
-		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, event->area.x, h - vport[1],
-			event->area.width, y2 - h);
-		if (y1 >= h) return (TRUE);
-		y2 = h;
-	}
-	if (x2 > w)
-	{
-		gdk_draw_rectangle(widget->window, widget->style->black_gc,
-			TRUE, w - vport[0], event->area.y,
-			x2 - w, event->area.height);
-		if (x1 >= w) return (TRUE);
-		x2 = w;
-	}
-
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		event->area.x, event->area.y, x2 - x1, y2 - y1,
-		GDK_RGB_DITHER_NONE, src + (y1 * w + x1) * 3, w * 3);
-
+	expose_ext(widget, event, user_data, vport[0], vport[1]);
 	return (TRUE);
 }
 
-GtkWidget *canvasimg(void *v, int w, int h)
+GtkWidget *canvasimg(void *v, int w, int h, int bkg)
 {
 	rgbimage_data *rd;
 	GtkWidget *widget, *frame;
@@ -1148,6 +1201,7 @@ GtkWidget *canvasimg(void *v, int w, int h)
 	rd->rgb = v;
 	rd->w = w;
 	rd->h = h;
+	rd->bkg = bkg;
 	wjcanvas_size(widget, w, h);
 	gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
 		GTK_SIGNAL_FUNC(expose_canvasimg), rd);
@@ -1157,6 +1211,58 @@ GtkWidget *canvasimg(void *v, int w, int h)
 	gtk_container_add(GTK_CONTAINER(frame), widget);
 
 	return (widget);
+}
+
+//	CANVAS widget
+
+static gboolean expose_canvas_(GtkWidget *widget, GdkEventExpose *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	GdkRectangle *r = &event->area;
+	rgbcontext ctx;
+	int vport[4];
+	int i, cnt = 1, wh = r->width * r->height;
+#if GTK_MAJOR_VERSION == 2 /* Maybe use regions */
+	GdkRectangle *rects;
+	gint nrects;
+	int m, s, sz, cost = (int)GET_DESCV(PREV_SLOT(slot), 2);
+ 
+	gdk_region_get_rectangles(event->region, &rects, &nrects);
+	for (i = m = sz = 0; i < nrects; i++)
+	{
+		sz += (s = rects[i].width * rects[i].height);
+		if (m < s) m = s;
+	}
+
+	/* Only bother with regions if worth it */
+	if (wh - sz > cost * (nrects - 1))
+		r = rects , cnt = nrects , wh = m;
+#endif
+	wjcanvas_get_vport(widget, vport);
+
+	ctx.rgb = malloc(wh * 3);
+	for (i = 0; i < cnt; i++)
+	{
+		ctx.xy[2] = (ctx.xy[0] = vport[0] + r[i].x) + r[i].width;
+		ctx.xy[3] = (ctx.xy[1] = vport[1] + r[i].y) + r[i].height;
+
+		if (((evtxr_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, slot, &ctx))
+// !!! Allow drawing area to be reduced, or ignored altogether
+			gdk_draw_rgb_image(widget->window, widget->style->black_gc,
+				ctx.xy[0] - vport[0], ctx.xy[1] - vport[1],
+				ctx.xy[2] - ctx.xy[0], ctx.xy[3] - ctx.xy[1],
+				GDK_RGB_DITHER_NONE, ctx.rgb,
+				(ctx.xy[2] - ctx.xy[0]) * 3);
+	}
+	free(ctx.rgb);
+
+#if GTK_MAJOR_VERSION == 2
+	g_free(rects);
+#endif
+	return (FALSE);
 }
 
 //	FCIMAGEP widget
@@ -1245,8 +1351,13 @@ GtkWidget *mkpack(int mode, int d, int ref, int v, char *ddata, void **pp,
 	if (d) n = -1 , src = *(char ***)(ddata + (int)pp[1]);
 	if (!n) n = -1;
 #if U_NLS
-	n = n_trans(tc, src, n);
-	src = tc;
+	{
+		int i;
+		for (i = 0; (i != n) && src[i]; i++)
+			tc[i] = src[i][0] ? _(src[i]) : "";
+		n = i;
+		src = tc;
+	}
 #endif
 	return (mode < 0 ? wj_radio_pack(src, n, nh, v,
 		ref > 1 ? NEXT_SLOT(r) : NULL,
@@ -3495,19 +3606,6 @@ void *smartmenu_done(void **tbar, void **r)
 	return (sd);
 }
 
-#if U_NLS
-
-/* Translate array of strings */
-static int n_trans(char **dest, char **src, int n)
-{
-	int i;
-	for (i = 0; (i != n) && src[i]; i++)
-		dest[i] = src[i][0] ? _(src[i]) : "";
-	return (i);
-}
-
-#endif
-
 /* Get/set window position & size from/to inifile */
 void rw_pos(v_dd *vdata, int set)
 {
@@ -3566,6 +3664,7 @@ enum {
 	cm_LABEL = cm_XDEFS_0,
 	cm_SPINSLIDE,
 	cm_SPINSLIDEa,
+	cm_EVT_MOUSE,
 };
 
 #define USE_BORDER(T) (op_BOR_0 - op_BOR_##T - 1)
@@ -3706,6 +3805,13 @@ static xcmdef xcmddefs[] = {
 	{ { op_SPINSLIDEa, cm_SPINSLIDEa, pk_PACKp, USE_BORDER(SPINSLIDE) } },
 // !!! Padding = 0
 	{ { op_XSPINSLIDEa, cm_SPINSLIDEa, pk_XPACK } },
+// !!! Events use the fields a different way
+	{ { op_EVT_MOUSE, cm_EVT_MOUSE, 0, 0 }, "button_press_event" },
+	{ { op_EVT_MMOUSE, cm_EVT_MOUSE, 0, 1 }, "motion_notify_event" },
+	{ { op_EVT_RMOUSE, cm_EVT_MOUSE, 0, 0 }, "button_release_event" },
+	{ { op_EVT_XMOUSE, cm_EVT_MOUSE, 0, 2 }, "button_press_event" },
+	{ { op_EVT_MXMOUSE, cm_EVT_MOUSE, 0, 3 }, "motion_notify_event" },
+	{ { op_EVT_RXMOUSE, cm_EVT_MOUSE, 0, 2 }, "button_release_event" },
 };
 
 static void do_destroy(void **wdata);
@@ -4036,6 +4142,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case cm_SCROLL:
 			widget = scrollw((int)v);
 			break;
+		/* Add a control-like scrolled window */
+		case op_CSCROLL:
+		{
+			int *xp = v;
+			xp[0] = xp[1] = 0; // initial position
+			widget = scrollw(0x101); // auto/auto
+			pk = pk_XPACK | pkf_STACK | pkf_SHOW;
+			break;
+		}
 		/* Add a normal notebook */
 		case cm_NBOOKl: case op_NBOOK:
 			widget = gtk_notebook_new();
@@ -4148,6 +4263,15 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_progress_set_show_text(GTK_PROGRESS(widget), TRUE);
 			pk = pk_PACK | pkf_SHOW;
 			break;
+		/* Add a color patch renderer */
+		case op_COLORPATCH:
+			widget = gtk_drawing_area_new();
+			gtk_drawing_area_size(GTK_DRAWING_AREA(widget),
+				(int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
+				GTK_SIGNAL_FUNC(col_expose), v);
+			pk = pk_XPACK | pkf_SHOW;
+			break;
 		/* Add an RGB renderer */
 		case cm_RGB:
 			widget = rgbimage(v, (int *)((char *)ddata + (int)pp[1]));
@@ -4159,8 +4283,34 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a framed canvas-based renderer */
 		case cm_CANVAS:
-			widget = canvasimg(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+			widget = canvasimg(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF, 0);
 			break;
+		/* Add a framed canvas-based renderer with background */
+		case op_CANVASIMGB:
+		{
+			int *xp = (int *)((char *)ddata + (int)pp[1]);
+			widget = canvasimg(v, xp[0], xp[1], xp[2]);
+			pk = pk_BIN | pkf_SHOW | pkf_PARENT;
+			break;
+		}
+		/* Add a canvas widget */
+		case op_CANVAS:
+		{
+			GtkWidget *frame;
+
+			widget = wjcanvas_new();
+			wjcanvas_size(widget, (int)v >> 16, (int)v & 0xFFFF);
+			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
+				GTK_SIGNAL_FUNC(expose_canvas_), NEXT_SLOT(r));
+
+			frame = wjframe_new();
+			gtk_widget_show(frame);
+			gtk_container_add(GTK_CONTAINER(frame), widget);
+
+// !!! For now, connection to scrollbars is automatic
+			pk = pk_BIN | pkf_SHOW | pkf_PARENT;
+			break;
+		}
 		/* Add a focusable buffered RGB renderer with cursor */
 		case cm_FCIMAGE:
 			widget = fcimagep(v, ddata, pp - 1);
@@ -4915,21 +5065,32 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Install mouse event handler */
-		case op_EVT_MOUSE: case op_EVT_MMOUSE: case op_EVT_RMOUSE:
+		case cm_EVT_MOUSE:
 		{
 			void **slot = origin_slot(PREV_SLOT(r));
 
 			gtk_signal_connect(GTK_OBJECT(*slot),
-				op == op_EVT_MOUSE ? "button_press_event" :
-				op == op_EVT_MMOUSE ? "motion_notify_event" :
-				"button_release_event",
-				op == op_EVT_MMOUSE ?
+				((xcmdef *)cmd)->x, tpad & 1 ?
 				GTK_SIGNAL_FUNC(get_evt_mmouse) :
 				GTK_SIGNAL_FUNC(get_evt_mouse), r);
 #if GTK_MAJOR_VERSION == 1
 			if (!GTK_WIDGET_NO_WINDOW(*slot))
 #endif
 // !!! Maybe do *_add_events() instead, in more fine-grained way?
+			gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
+			if (tpad > 1) gtk_widget_set_extension_events(*slot,
+				GDK_EXTENSION_EVENTS_CURSOR);
+			widget = NULL;
+			break;
+		}
+		/* Install crossing event handler */
+		case op_EVT_CROSS:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			gtk_signal_connect(GTK_OBJECT(*slot), "enter_notify_event",
+				GTK_SIGNAL_FUNC(get_evt_cross), r);
+			gtk_signal_connect(GTK_OBJECT(*slot), "leave_notify_event",
+				GTK_SIGNAL_FUNC(get_evt_cross), r);
 			gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
 			widget = NULL;
 			break;
@@ -4957,11 +5118,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 			case op_CHECK: case op_XCHECK:
 			case op_TLCHECK: case op_CHECKb:
-				gtk_signal_connect(GTK_OBJECT(*slot), "toggled",
+				gtk_signal_connect(*slot, "toggled",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_COLOR: case op_TCOLOR:
 				cpick_set_evt(*slot, r);
+				break;
+			case op_CSCROLL:
+			{
+				GtkAdjustment *xa, *ya;
+				get_scroll_adjustments(*slot, &xa, &ya);
+				gtk_signal_connect(GTK_OBJECT(xa), "value_changed",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				gtk_signal_connect(GTK_OBJECT(ya), "value_changed",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
+				break;
+			}
+			case op_CANVAS:
+		/* !!! This is sent after realize, or resize while realized */
+				gtk_signal_connect(*slot, "configure_event",
+					GTK_SIGNAL_FUNC(get_evt_conf), r);
 				break;
 			case op_TEXT:
 #if GTK_MAJOR_VERSION == 2 /* In GTK+1, same handler as for GtkEntry */
@@ -4972,13 +5148,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			case op_XENTRY: case op_MLENTRY: case op_TLENTRY:
 			case op_XPENTRY: case op_T1PENTRY:
 			case op_PATH: case op_PATHs:
-				gtk_signal_connect(GTK_OBJECT(*slot), "changed",
+				gtk_signal_connect(*slot, "changed",
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_LISTCX:
 			{
-				listc_data *ld = gtk_object_get_user_data(
-					GTK_OBJECT(*slot));
+				listc_data *ld = gtk_object_get_user_data(*slot);
 				ld->change = r;
 				break;
 			}
@@ -5240,6 +5415,15 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_TCOLOR:
 			*(int *)v = cpick_get_colour(*wdata, (int *)v + 1);
 			break;
+		case op_CSCROLL:
+		{
+			GtkAdjustment *xa, *ya;
+			int *xp = v;
+			get_scroll_adjustments(*wdata, &xa, &ya);
+			xp[0] = xa->value;
+			xp[1] = ya->value;
+			break;
+		}
 		case op_RPACK: case op_RPACKD: case op_BRPACK:
 			*(int *)v = wj_radio_pack_get_active(*wdata);
 			break;
@@ -5372,6 +5556,17 @@ void cmd_reset(void **slot, void *ddata)
 		case op_LISTCS: case op_LISTCX:
 			listc_reset(*wdata, gtk_object_get_user_data(*wdata));
 			break;
+		case op_CSCROLL:
+		{
+			GtkAdjustment *xa, *ya;
+			int *xp = v;
+			get_scroll_adjustments(*wdata, &xa, &ya);
+			xa->value = xp[0];
+			ya->value = xp[1];
+			gtk_adjustment_value_changed(xa);
+			gtk_adjustment_value_changed(ya);
+			break;
+		}
 		case op_COMBOENTRY:
 			comboentry_reset(*wdata, v, *(char ***)(ddata + (int)pp[1]));
 			break;
@@ -5390,6 +5585,20 @@ void cmd_reset(void **slot, void *ddata)
 			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
 			rd->rgb = v; // Size is fixed, but update source
 			if (GTK_WIDGET_REALIZED(*wdata)) reset_rgbp(*wdata, rd);
+			break;
+		}
+		case op_CANVASIMGB:
+		{
+			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			int nw, *xp = (int *)(ddata + (int)pp[1]);
+
+			nw = (rd->w ^ xp[0]) | (rd->h ^ xp[1]);
+			rd->rgb = v;
+			rd->w = xp[0];
+			rd->h = xp[1];
+			rd->bkg = xp[2];
+			if (nw) wjcanvas_size(*wdata, xp[0], xp[1]);
+			gtk_widget_queue_draw(*wdata);
 			break;
 		}
 		case op_FCIMAGEP: case op_TLFCIMAGEP:
@@ -5698,6 +5907,7 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 {
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
+	if (size <= 0) return;
 	switch (op)
 	{
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
@@ -5706,6 +5916,40 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 		char *s = (char *)gtk_entry_get_text(slot[0]);
 		if (idx == PATH_VALUE) gtkncpy(res, s, size);
 		else strncpy0(res, s, size); // PATH_RAW
+		break;
+	}
+	case op_CSCROLL:
+	{
+		GtkAdjustment *xa, *ya;
+		int *v = res;
+		get_scroll_adjustments(slot[0], &xa, &ya);
+		if (idx == CSCROLL_XYSIZE)
+		{
+			switch (size / sizeof(int))
+			{
+			default:
+			case 4: v[3] = ya->page_size;
+			case 3: v[2] = xa->page_size;
+			case 2: v[1] = ya->value;
+			case 1: v[0] = xa->value;
+			case 0: break;
+			}
+		}
+		else if (idx == CSCROLL_LIMITS)
+		{
+			if (size >= sizeof(int))
+				v[0] = xa->upper - xa->page_size;
+			if (size >= sizeof(int) * 2)
+				v[1] = ya->upper - ya->page_size;
+		}
+		break;
+	}
+	case op_CANVAS:
+	{
+		GtkWidget *w = slot[0];
+		int *v = res;
+		if (size >= sizeof(int)) v[0] = w->allocation.width;
+		if (size >= sizeof(int) * 2) v[1] = w->allocation.height;
 		break;
 	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
@@ -5808,13 +6052,64 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_PROGRESS:
 		gtk_progress_set_percentage(slot[0], (int)res / 100.0);
 		break;
-	case op_CANVASIMG: case op_ECANVASIMG:
+	case op_CSCROLL:
+	{
+		/* if (idx == CSCROLL_XYRANGE) */
+		/* Used as a way to preset position for a delayed resize */
+		GtkAdjustment *xa, *ya;
+		int *v = res;
+		get_scroll_adjustments(slot[0], &xa, &ya);
+		xa->value = v[0];
+		ya->value = v[1];
+		xa->upper = v[2];
+		ya->upper = v[3];
+		break;
+	}
+	case op_CANVASIMG: case op_ECANVASIMG: case op_CANVASIMGB:
 	{
 		rgbimage_data *rd = gtk_object_get_user_data(slot[0]);
 		int *v = res;
 		rd->w = v[0];
 		rd->h = v[1];
 		wjcanvas_size(slot[0], v[0], v[1]);
+		break;
+	}
+	case op_CANVAS:
+	{
+		GtkWidget *w = slot[0];
+		int vport[4], rxy[4], *v = res;
+
+		if (idx == CANVAS_SIZE) wjcanvas_size(w, v[0], v[1]);
+		else if (idx == CANVAS_REPAINT)
+		{
+			wjcanvas_get_vport(w, vport);
+			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
+				gtk_widget_queue_draw_area(w,
+					rxy[0] - vport[0], rxy[1] - vport[1],
+					rxy[2] - rxy[0], rxy[3] - rxy[1]);
+		}
+		else if (idx == CANVAS_PAINT)
+		{
+			rgbcontext *ctx = res;
+			wjcanvas_get_vport(w, vport);
+			/* Paint */
+			if (ctx->rgb)
+			{
+				gdk_draw_rgb_image(w->window, w->style->black_gc,
+					ctx->xy[0] - vport[0],
+					ctx->xy[1] - vport[1],
+					ctx->xy[2] - ctx->xy[0],
+					ctx->xy[3] - ctx->xy[1],
+					GDK_RGB_DITHER_NONE, ctx->rgb,
+					(ctx->xy[2] - ctx->xy[0]) * 3);
+				free(ctx->rgb);
+			}
+			/* Prepare */
+			else if (clip(ctx->xy, vport[0], vport[1],
+				vport[2], vport[3], ctx->xy))
+				ctx->rgb = malloc((ctx->xy[2] - ctx->xy[0]) *
+					(ctx->xy[3] - ctx->xy[1]) * 3);
+		}
 		break;
 	}
 	case op_FCIMAGEP: case op_TLFCIMAGEP:
@@ -5896,8 +6191,8 @@ void cmd_repaint(void **slot)
 
 void cmd_cursor(void **slot, void **cursor)
 {
-	gdk_window_set_cursor(GTK_WIDGET(slot[0])->window,
-		cursor ? cursor[0] : NULL);
+	GtkWidget *w = slot[0];
+	if (w->window) gdk_window_set_cursor(w->window, cursor ? cursor[0] : NULL);
 }
 
 int cmd_checkv(void **slot, int idx)

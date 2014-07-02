@@ -164,7 +164,8 @@ static int set_settings(filterwindow_dd *dt, void **wdata)
 }
 
 #define WBbase filterwindow_dd
-void *smudge_code[] = { CHECKv(_("Respect opacity mode"), smudge_mode), RET };
+static void *smudge_code[] = {
+	CHECKv(_("Respect opacity mode"), smudge_mode), RET };
 #undef WBbase
 
 void smudge_settings() /* Smudge opacity mode */
@@ -175,7 +176,7 @@ void smudge_settings() /* Smudge opacity mode */
 }
 
 #define WBbase filterwindow_dd
-void *step_code[] = {
+static void *step_code[] = {
 	VBOXPS,
 	BORDER(SPIN, 0),
 	SPINv(brush_spacing, 0, MAX_WIDTH),

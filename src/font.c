@@ -133,9 +133,8 @@ typedef struct {
 	int dir, ndirs;
 	int fontsize;
 	int bkg[3];
+	int preview_whc[3];
 	int lock;
-	int preview_w, preview_h;
-	GtkWidget *preview_area; // !!! for now
 	unsigned char *preview_rgb;
 	memx2 fnmmem, fstmem, fszmem, ffnmem, dirmem;
 	fontname_cc *fontnames;
@@ -143,6 +142,7 @@ typedef struct {
 	fontsize_cc *fontsizes;
 	fontfile_cc *fontfiles;
 	dir_cc *dirs;
+	void **preview_area;
 	void **obl_c, **size_spin, **add_b;
 	void **fname_l, **fstyle_l, **fsize_l, **ffile_l, **dir_l;
 	char dirp[PATHBUF];
@@ -897,17 +897,15 @@ static void font_preview_update(font_dd *dt)
 				dest += 3;
 			}
 
-			dt->preview_w = w;
-			dt->preview_h = h;
+			dt->preview_whc[0] = w;
+			dt->preview_whc[1] = h;
 		}
 		free( text_1bpp );
 //printf("font preview update %i x %i\n", w, h);
 	}
 
-	gtk_widget_set_usize(dt->preview_area, w, h);
-	gtk_widget_queue_draw(dt->preview_area);
+	cmd_reset(dt->preview_area, dt);
 		// Show the world the fruits of my hard labour!  ;-)
-// FIXME - GTK+1 has rendering problems when the area becomes smaller - old artifacts are left behind
 }
 
 
@@ -1449,32 +1447,6 @@ static void init_font_lists()		//	LIST INITIALIZATION
 }
 
 
-static gboolean preview_expose_event(GtkWidget *widget, GdkEventExpose *event,
-	gpointer user_data)
-{
-	int x = event->area.x, y = event->area.y;
-	int w = event->area.width, h = event->area.height;
-	int w2, h2;
-	font_dd *dt = user_data;
-
-
-	if (!dt->preview_rgb) return (FALSE);
-#if GTK_MAJOR_VERSION == 1
-	/* !!! GTK+2 clears background automatically */
-	gdk_window_clear_area(widget->window, x, y, w, h);
-#endif
-
-	w2 = dt->preview_w - x; if (w > w2) w = w2;
-	h2 = dt->preview_h - y; if (h > h2) h = h2;
-	if ((w < 1) || (h < 1)) return (FALSE);
-
-	gdk_draw_rgb_image(widget->window, widget->style->black_gc,
-		x, y, w, h, GDK_RGB_DITHER_NONE,
-		dt->preview_rgb + (y * dt->preview_w + x) * 3, dt->preview_w * 3);
-
-	return (FALSE);
-}
-
 static void font_entry_changed(font_dd *dt, void **wdata, int what, void **where)
 {
 	cmd_read(where, dt);
@@ -1482,36 +1454,6 @@ static void font_entry_changed(font_dd *dt, void **wdata, int what, void **where
 
 	store_values(dt);
 	font_preview_update(dt);	// Update the font preview area
-}
-
-static void **create_font_pad(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GdkColor *c;
-	GtkRcStyle *rc;
-	GtkWidget *preview;
-	font_dd *dt = GET_DDATA(wdata);
-	
-	dt->preview_area = preview = gtk_drawing_area_new();
-	gtk_widget_show(preview);
-	gtk_drawing_area_size(GTK_DRAWING_AREA(preview), 1, 1);
-	gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(*(*wpp)++),
-		preview);
-	gtk_signal_connect(GTK_OBJECT(preview), "expose_event",
-		GTK_SIGNAL_FUNC(preview_expose_event), dt);
-	/* Set background color */
-#if GTK_MAJOR_VERSION == 1
-	rc = gtk_rc_style_new();
-#else /* if GTK_MAJOR_VERSION == 2 */
-	rc = gtk_widget_get_modifier_style(preview);
-#endif
-	c = &rc->bg[GTK_STATE_NORMAL];
-	c->pixel = 0; c->red = c->green = c->blue = mem_background * 257;
-	rc->color_flags[GTK_STATE_NORMAL] |= GTK_RC_BG;
-	gtk_widget_modify_style(preview, rc);
-#if GTK_MAJOR_VERSION == 1
-	gtk_rc_style_unref(rc);
-#endif
-	return (r);
 }
 
 #define WBbase font_dd
@@ -1564,7 +1506,7 @@ static void *font_code[] = {
 	BORDER(XSCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
 	DEFBORDER(XSCROLL),
-	EXEC(create_font_pad), // !!! for later
+	REF(preview_area), CANVASIMGB(preview_rgb, preview_whc),
 	CLEANUP(preview_rgb),
 	WDONE, // FXVBOX
 //	TOGGLES
@@ -1601,8 +1543,9 @@ static void *font_code[] = {
 	PATH(_("New Directory"), _("Select Directory"), FS_SELECT_DIR, dirp),
 	HSEPl(200),
 	HBOXbp(0, 0, 5),
-	/* !!! Keyboard shortcut doesn't work for invisible buttons in GTK+ */
-// !!! Test whether the event tries to happen twice on window close, then
+	/* !!! Keyboard shortcut doesn't work for invisible buttons in GTK+, and
+	 * doubled handlers of window close don't matter - destructor called by
+	 * the first one removes the other before it runs - WJ */
 	CANCELBTN(_("Close"), NULL),
 	REF(add_b), BUTTON(_("Add"), click_font_dir_btn),
 	BUTTON(_("Remove"), click_font_dir_btn),
@@ -1623,6 +1566,8 @@ void pressed_mt_text()
 	tdata.bkg[0] = font_bkg % mem_cols;
 	tdata.bkg[1] = 0;
 	tdata.bkg[2] = mem_cols - 1;
+	tdata.preview_whc[0] = tdata.preview_whc[1] = 1;
+	tdata.preview_whc[2] = mem_background * 0x010101;
 	tdata.img = mem_channel == CHN_IMAGE;
 	tdata.idx = tdata.img && (mem_img_bpp == 1);
 	collect_fontnames(&tdata);
