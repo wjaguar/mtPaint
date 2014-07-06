@@ -254,9 +254,11 @@ GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget);
+#if 0 /* Not needed anymore */
 GtkWidget *pack5(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget);
 GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget);
+#endif
 
 // Put vbox into container
 
@@ -371,15 +373,20 @@ GtkWidget *wjpixmap_new(int width, int height);
 GdkPixmap *wjpixmap_pixmap(GtkWidget *widget);
 void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 	unsigned char *rgb, int step);
+#if 0 /* Not needed anymore */
 void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb);
+#endif
 void wjpixmap_move_cursor(GtkWidget *widget, int x, int y);
 void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 	int width, int height, int hot_x, int hot_y, int focused);
+#if 0 /* Not needed anymore */
 void wjpixmap_cursor(GtkWidget *widget, int *x, int *y);
+#endif
 int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr);
 
 // Repaint expose region
 
+#if 0 /* Not needed anymore */
 // !!! For now, repaint_func() is expected to know widget & window to repaint
 typedef void (*repaint_func)(int x, int y, int w, int h);
 
@@ -393,7 +400,6 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 
 // Track updates of multiple widgets (by whatever means necessary)
 
-#if 0 /* Not needed anymore */
 void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
 #endif
 

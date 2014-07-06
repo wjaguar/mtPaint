@@ -751,7 +751,7 @@ void toolbar_showhide()				// Show/Hide all 4 toolbars
 	else
 	{
 		toolbar_settings_init();
-		gdk_window_raise(main_window->window);
+		cmd_setv(main_window_, (void *)1, WINDOW_RAISE);
 	}
 }
 

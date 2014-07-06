@@ -1028,6 +1028,7 @@ GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget)
 	return (widget);
 }
 
+#if 0 /* Not needed anymore */
 GtkWidget *pack5(GtkWidget *box, GtkWidget *widget)
 {
 	gtk_box_pack_start(GTK_BOX(box), widget, FALSE, FALSE, 5);
@@ -1045,6 +1046,7 @@ GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget)
 	gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, 5);
 	return (widget);
 }
+#endif
 
 // Put vbox into container
 
@@ -1287,7 +1289,7 @@ void gtk_init_bugfixes()
 
 int move_mouse_relative(int dx, int dy)
 {
-	XWarpPointer(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+	XWarpPointer(GDK_WINDOW_XDISPLAY(main_window->window),
 		None, None, 0, 0, 0, 0, dx, dy);
 	return (TRUE);
 }
@@ -1311,7 +1313,7 @@ int move_mouse_relative(int dx, int dy)
 {
 	gint x0, y0;
 	GdkScreen *screen;
-	GdkDisplay *display = gtk_widget_get_display(drawing_canvas);
+	GdkDisplay *display = gtk_widget_get_display(main_window);
 
 	gdk_display_get_pointer(display, &screen, &x0, &y0, NULL);
 	gdk_display_warp_pointer(display, screen, x0 + dx, y0 + dy);
@@ -1333,7 +1335,7 @@ int move_mouse_relative(int dx, int dy)
 
 guint real_key(GdkEventKey *event)
 {
-	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(main_window->window),
 		event->keyval));
 }
 
@@ -1344,7 +1346,7 @@ guint low_key(GdkEventKey *event)
 
 guint keyval_key(guint keyval)
 {
-	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(drawing_canvas->window),
+	return (XKeysymToKeycode(GDK_WINDOW_XDISPLAY(main_window->window),
 		keyval));
 }
 
@@ -1410,7 +1412,7 @@ guint low_key(GdkEventKey *event)
 
 guint keyval_key(guint keyval)
 {
-	GdkDisplay *display = gtk_widget_get_display(drawing_canvas);
+	GdkDisplay *display = gtk_widget_get_display(main_window);
 	GdkKeymap *keymap = gdk_keymap_get_for_display(display);
 	GdkKeymapKey *key;
 	gint nkeys;
@@ -3364,6 +3366,7 @@ void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 #endif
 }
 
+#if 0 /* Not needed anymore */
 void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
 {
 	GdkGCValues sv;
@@ -3384,6 +3387,7 @@ void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
 	}
 #endif
 }
+#endif
 
 void wjpixmap_move_cursor(GtkWidget *widget, int x, int y)
 {
@@ -3450,12 +3454,14 @@ void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 	if (pix->pixmap) gtk_widget_queue_draw(widget);
 }
 
+#if 0 /* Not needed anymore */
 void wjpixmap_cursor(GtkWidget *widget, int *x, int *y)
 {
 	wjpixmap *pix = WJPIXMAP(widget);
 	if (pix->cursor) *x = pix->xc , *y = pix->yc;
 	else *x = *y = 0;
 }
+#endif
 
 /* Translate allocation-relative coords to pixmap-relative */
 int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
@@ -3471,6 +3477,7 @@ int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 
 // Repaint expose region
 
+#if 0 /* Not needed anymore */
 #if GTK_MAJOR_VERSION == 2
 
 // !!! For now, repaint_func() is expected to know widget & window to repaint
@@ -3500,7 +3507,6 @@ void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int
 
 // Track updates of multiple widgets (by whatever means necessary)
 
-#if 0 /* Not needed anymore */
 /* void handler(GtkWidget *widget) */
 void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
 {
@@ -4082,20 +4088,4 @@ guint threads_idle_add_priority(gint priority, GtkFunction function, gpointer da
 
 #endif
 
-#endif
-
-// Maybe this will be needed someday...
-
-#if 0
-/* This transmutes a widget into one of different type. If the two types aren't 
- * bit-for-bit compatible, Bad Things (tm) will happen - WJ */
-
-static void steal_widget(GtkWidget *widget, GtkType wrapper_type)
-{
-#if GTK_MAJOR_VERSION == 1
-	GTK_OBJECT(widget)->klass = gtk_type_class(wrapper_type);
-#else
-	G_OBJECT(widget)->g_type_instance.g_class = gtk_type_class(wrapper_type);
-#endif
-}
 #endif

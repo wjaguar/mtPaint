@@ -124,7 +124,7 @@ void set_new_filename(int layer, char *fname);
 void pressed_do_undo(int redo);
 
 void line_to_gradient();	// Setup gradient along line tool
-void tool_action(int event, int x, int y, int button, gdouble pressure);	// Paint some pixels!
+void tool_action(int count, int x, int y, int button, int pressure);	// Paint some pixels!
 void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );
@@ -223,7 +223,7 @@ void create_default_image();			// Create default new image
 //	Changed image contents
 #define UPD_IMG    (CF_DRAW | CF_VDRAW | CF_PIXEL)
 //	Changed image geometry (+undo)
-#define UPD_GEOM   (CF_GEOM | CF_MENU | CF_IMGBAR | UPD_IMG)
+#define UPD_GEOM   (CF_GEOM | CF_MENU | CF_IMGBAR | UPD_IMG | UPD_SGEOM)
 //	Added a new channel (+)
 #define UPD_ADDCH  (CF_SET | CF_MENU | CF_IMGBAR | UPD_IMG)
 //	Deleted an existing channel (+)

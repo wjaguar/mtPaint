@@ -165,10 +165,9 @@ static inilist ini_int[] = {
 
 
 void **main_window_, **settings_dock, **layers_dock, **main_split,
-	**scrolledwindow_canvas,
+	**drawing_canvas, **scrolledwindow_canvas,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *drawing_canvas;
 
 static void **dock_area, **dock_book, **main_menubar;
 
@@ -646,58 +645,34 @@ static void quit_all(int mode)
 	if (mode || q_quit) delete_event(GET_DDATA(main_window_), main_window_);
 }
 
-/* Autoscroll canvas if required */
-static int real_move_mouse(int *vxy, int x, int y, int dx, int dy)
-{
-	int nxy[4];
-
-	if ((x >= vxy[0]) && (x < vxy[2]) && (y >= vxy[1]) && (y < vxy[3]) &&
-		wjcanvas_scroll_in(drawing_canvas, x + dx, y + dy))
-	{
-		wjcanvas_get_vport(drawing_canvas, nxy);
-		dx += vxy[0] - nxy[0];
-		dy += vxy[1] - nxy[1];
-	}
-	return (move_mouse_relative(dx, dy));
-}
-
 /* Forward declaration */
-static void mouse_event(int event, int xc, int yc, guint state, guint button,
-	gdouble pressure, int mflag, int dx, int dy);
+static void mouse_event(mouse_ext *m, int mflag, int dx, int dy);
 
 /* For "dual" mouse control */
 static int unreal_move, lastdx, lastdy;
 
 static void move_mouse(int dx, int dy, int button)
 {
-	static GdkModifierType bmasks[4] =
-		{ 0, GDK_BUTTON1_MASK, GDK_BUTTON2_MASK, GDK_BUTTON3_MASK };
-	GdkModifierType state;
-	int x, y, vxy[4], zoom = 1, scale = 1;
+	static unsigned int bmasks[4] = { 0, _B1mask, _B2mask, _B3mask };
+	mouse_ext m;
+	int dxy[2], zoom = 1, scale = 1;
 
 	if (!unreal_move) lastdx = lastdy = 0;
 	if (!mem_img[CHN_IMAGE]) return;
 	dx += lastdx; dy += lastdy;
 
-// !!! Will be cmd_peekv(), with vport added inside -
-// and maybe, even returning a full-fledged mouse_ext struct
-	gdk_window_get_pointer(drawing_canvas->window, &x, &y, &state);
-	wjcanvas_get_vport(drawing_canvas, vxy);
-	x += vxy[0]; y += vxy[1];
+	cmd_peekv(drawing_canvas, &m, sizeof(m), CANVAS_FIND_MOUSE);
 
 	if (button) /* Clicks simulated without extra movements */
 	{
-		mouse_event(GDK_BUTTON_PRESS, x, y, state, button, 1.0, 1, dx, dy);
-		state |= bmasks[button]; // Shows state _prior_ to event
-		mouse_event(GDK_BUTTON_RELEASE, x, y, state, button, 1.0, 1, dx, dy);
+		m.button = button;
+		m.count = 1; // press
+		mouse_event(&m, 1, dx, dy);
+		m.state |= bmasks[button]; // Shows state _prior_ to event
+		m.count = -1; // release
+		mouse_event(&m, 1, dx, dy);
 		return;
 	}
-
-	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
-		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
-	else if (state & GDK_BUTTON1_MASK) button = 1;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
-	else if (state & GDK_BUTTON2_MASK) button = 2;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -706,18 +681,16 @@ static void move_mouse(int dx, int dy, int button)
 	if (zoom > 1) /* Fine control required */
 	{
 		lastdx = dx; lastdy = dy;
-		mouse_event(GDK_MOTION_NOTIFY, x, y, state, button, 1.0, 1, dx, dy);
+		mouse_event(&m, 1, dx, dy); // motion
 
 		/* Nudge cursor when needed */
 		if ((abs(lastdx) >= zoom) || (abs(lastdy) >= zoom))
 		{
-			dx = lastdx * can_zoom;
-			dy = lastdy * can_zoom;
-			lastdx -= dx * zoom;
-			lastdy -= dy * zoom;
+			lastdx -= (dxy[0] = lastdx * can_zoom) * zoom;
+			lastdy -= (dxy[1] = lastdy * can_zoom) * zoom;
 			unreal_move = 3;
 			/* Event can be delayed or lost */
-			real_move_mouse(vxy, x, y, dx, dy);
+			cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
 		}
 		else unreal_move = 2;
 	}
@@ -726,12 +699,18 @@ static void move_mouse(int dx, int dy, int button)
 		unreal_move = 1;
 
 		/* Simulate movement if failed to actually move mouse */
-		if (!real_move_mouse(vxy, x, y, dx * scale, dy * scale))
+		dxy[0] = dx * scale;
+		dxy[1] = dy * scale;
+		cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
+		if (dxy[0] | dxy[1]) // failed
 		{
 			lastdx = dx; lastdy = dy;
-			mouse_event(GDK_MOTION_NOTIFY, x, y, state, button, 1.0, 1, dx, dy);
+			mouse_event(&m, 1, dx, dy); // motion
 		}
 	}
+	/* !!! The code above doesn't even try to handle situation where
+	 * autoscroll works but cursor warp doesn't. If one such ever arises,
+	 * values returned from CANVAS_BMOVE_MOUSE will have to be used - WJ */
 }
 
 void stop_line()
@@ -1008,7 +987,7 @@ static void draw_arrow(int mode)
 // !!! Call this, or let undo engine do it?
 //	mem_undo_prepare();
 	pen_down = 0;
-	tool_action(GDK_NOTHING, line_x2, line_y2, 1, 1.0);
+	tool_action(MCOUNT_NOTHING, line_x2, line_y2, 1, MAX_PRESSURE);
 	line_status = LINE_LINE;
 
 	// Draw arrow lines & circles
@@ -1103,6 +1082,12 @@ static void delete_event(main_dd *dt, void **wdata)
 	}
 	if (i != 2) return; // Cancel quitting
 
+	/* Store listed settings */
+	for (ilp = ini_bool; ilp->name; ilp++)
+		inifile_set_gboolean(ilp->name, *(ilp->var));
+	for (ilp = ini_int; ilp->name; ilp++)
+		inifile_set_gint32(ilp->name, *(ilp->var));
+
 	toggle_dock(FALSE); // To remember dock size
 
 	// Get rid of extra windows + remember positions
@@ -1111,38 +1096,27 @@ static void delete_event(main_dd *dt, void **wdata)
 	// Remember the toolbar settings
 	toolbar_settings_exit(NULL, NULL);
 
-	/* Store listed settings */
-	for (ilp = ini_bool; ilp->name; ilp++)
-		inifile_set_gboolean(ilp->name, *(ilp->var));
-	for (ilp = ini_int; ilp->name; ilp++)
-		inifile_set_gint32(ilp->name, *(ilp->var));
-
 	run_destroy(wdata);
 }
 
-#if GTK_MAJOR_VERSION == 2
-gint canvas_scroll_gtk2( GtkWidget *widget, GdkEventScroll *event )
+static void canvas_scroll(main_dd *dt, void **wdata, int what, void **where,
+	scroll_ext *scroll)
 {
 	if (scroll_zoom)
 	{
-		if (event->direction == GDK_SCROLL_DOWN) zoom_out();
+		if (scroll->yscroll > 0) zoom_out();
 		else zoom_in();
-		return (TRUE);
+		scroll->xscroll = scroll->yscroll = 0;
 	}
-	if (event->state & _C) /* Convert up-down into left-right */
+	else if (scroll->state & _Cmask) /* Convert up-down into left-right */
 	{
-		if (event->direction == GDK_SCROLL_UP)
-			event->direction = GDK_SCROLL_LEFT;
-		else if (event->direction == GDK_SCROLL_DOWN)
-			event->direction = GDK_SCROLL_RIGHT;
+		scroll->xscroll = scroll->yscroll;
+		scroll->yscroll = 0;
 	}
-	/* Normal GTK+2 scrollwheel behaviour */
-	return (FALSE);
 }
-#endif
 
 
-int grad_tool(int event, int x, int y, guint state, guint button)
+int grad_tool(int count, int x, int y, unsigned int state, int button)
 {
 	int i, j, old[4];
 	double d, stroke;
@@ -1153,8 +1127,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	{
 		/* Not a gradient stroke */
 		if (!mem_gradient || (grad->status != GRAD_NONE) ||
-			(grad->wmode == GRAD_MODE_NONE) ||
-			(event == GDK_BUTTON_RELEASE) || !button)
+			(grad->wmode == GRAD_MODE_NONE) || (count < 0) || !button)
 			return (FALSE);
 
 		/* Limit coordinates to canvas */
@@ -1206,7 +1179,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 
 	copy4(old, grad->xy);
 	/* Left click sets points and picks them up again */
-	if ((event == GDK_BUTTON_PRESS) && (button == 1))
+	if ((count == 1) && (button == 1))
 	{
 		/* Start anew */
 		if (grad->status == GRAD_NONE)
@@ -1224,7 +1197,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			grad->xy[1] = y;
 			grad->status = GRAD_DONE;
 			grad_update(grad);
-			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			if (grad_opacity) cmd_repaint(drawing_canvas);
 		}
 		/* Place end point */
 		else if (grad->status == GRAD_END)
@@ -1233,7 +1206,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 			grad->xy[3] = y;
 			grad->status = GRAD_DONE;
 			grad_update(grad);
-			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			if (grad_opacity) cmd_repaint(drawing_canvas);
 		}
 		/* Pick up nearest end */
 		else if (grad->status == GRAD_DONE)
@@ -1255,7 +1228,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 				grad->status = GRAD_END;
 			}
 			grad_update(grad);
-			if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+			if (grad_opacity) cmd_repaint(drawing_canvas);
 			else repaint_grad(old);
 		}
 	}
@@ -1264,10 +1237,10 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	else if (grad->status == GRAD_NONE);
 
 	/* Right click deletes the gradient */
-	else if (event == GDK_BUTTON_PRESS) /* button != 1 */
+	else if (count == 1) /* button != 1 */
 	{
 		grad->status = GRAD_NONE;
-		if (grad_opacity) gtk_widget_queue_draw(drawing_canvas);
+		if (grad_opacity) cmd_repaint(drawing_canvas);
 		else repaint_grad(NULL);
 		grad_update(grad);
 	}
@@ -1276,7 +1249,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	else if (grad->status == GRAD_DONE);
 
 	/* Motion drags points around */
-	else if (event == GDK_MOTION_NOTIFY)
+	else if (!count)
 	{
 		int *xy = grad->xy + (grad->status == GRAD_START ? 0 : 2);
 		if ((xy[0] != x) || (xy[1] != y))
@@ -1289,7 +1262,7 @@ int grad_tool(int event, int x, int y, guint state, guint button)
 	}
 
 	/* Leave hides the dragged line */
-	else if (event == GDK_LEAVE_NOTIFY) repaint_grad(NULL);
+	else if (count == MCOUNT_LEAVE) repaint_grad(NULL);
 
 	return (TRUE);
 }
@@ -1302,8 +1275,7 @@ static inline int xmmod(int x, int y)
 }
 
 /* Mouse event from button/motion on the canvas */
-static void mouse_event(int event, int xc, int yc, guint state, guint button,
-	gdouble pressure, int mflag, int dx, int dy)
+static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 {
 	static int tool_fix, tool_fixv;	// Fixate on axis
 	int new_cursor;
@@ -1315,16 +1287,16 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	x = x0 = floor_div((xc - margin_main_x) * zoom, scale) + dx;
-	y = y0 = floor_div((yc - margin_main_y) * zoom, scale) + dy;
+	x = x0 = floor_div((m->x - margin_main_x) * zoom, scale) + dx;
+	y = y0 = floor_div((m->y - margin_main_y) * zoom, scale) + dy;
 
 	ox = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
 	oy = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
 
 	if (!mflag) /* Coordinate fixation */
 	{
-		if (!(state & _S)) tool_fix = 0;
-		else if (!(state & _C)) /* Shift */
+		if (!(m->state & _Smask)) tool_fix = 0;
+		else if (!(m->state & _Cmask)) /* Shift */
 		{
 			if (tool_fix != 1) tool_fixv = x0;
 			tool_fix = 1;
@@ -1336,11 +1308,11 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		}
 	}
 	/* No use when moving cursor by keyboard */
-	else if (event == GDK_MOTION_NOTIFY) tool_fix = 0;
+	else if (!m->count) tool_fix = 0;
 
 	if (!tool_fix);
 	/* For rectangular selection it makes sense to fix its width/height */
-	else if ((tool_type == TOOL_SELECT) && (button == 1) &&
+	else if ((tool_type == TOOL_SELECT) && (m->button == 1) &&
 		((marq_status == MARQUEE_DONE) || (marq_status == MARQUEE_SELECTING)))
 	{
 		if (tool_fix == 1) x = x0 = marq_x2;
@@ -1372,7 +1344,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 	/* ****** Release-event-specific code ****** */
 
-	if (event == GDK_BUTTON_RELEASE)
+	if (m->count < 0)
 	{
 		tint_mode[2] = 0;
 		pen_down = 0;
@@ -1382,9 +1354,9 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			mem_swap_cols(FALSE);
 		}
 
-		if (grad_tool(event, x0, y0, state, button)) return;
+		if (grad_tool(m->count, x0, y0, m->state, m->button)) return;
 
-		if ((tool_type == TOOL_LINE) && (button == 1) &&
+		if ((tool_type == TOOL_LINE) && (m->button == 1) &&
 			(line_status == LINE_START))
 		{
 			line_status = LINE_LINE;
@@ -1392,7 +1364,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		}
 
 		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
-			(button == 1))
+			(m->button == 1))
 		{
 			if (marq_status == MARQUEE_SELECTING)
 				marq_status = MARQUEE_DONE;
@@ -1403,7 +1375,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 		// Finish off dragged polygon selection
 		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
-			tool_action(event, x, y, button, pressure);
+			tool_action(m->count, x, y, m->button, m->pressure);
 
 		mem_undo_prepare();
 		update_menus();
@@ -1413,27 +1385,26 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 	/* ****** Common click/motion handling code ****** */
 
-	while ((state & _CS) == _C)	// Set colour A/B
+	while ((m->state & _CSmask) == _Cmask)	// Set colour A/B
 	{
-		int ab = button == 3; /* A for left, B for right */
+		int ab = m->button == 3; /* A for left, B for right */
 		int pixel, alpha, rgba, upd = 0;
 
-		if (button == 2) /* Auto-dither */
+		if (m->button == 2) /* Auto-dither */
 		{
 			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
 				pressed_dither_A();
 			break;
 		}
-		if ((button != 1) && (button != 3)) break;
+		if ((m->button != 1) && (m->button != 3)) break;
 		/* Default alpha */
 		rgba = RGBA_mode && (mem_channel == CHN_IMAGE);
 		alpha = channel_col_[ab][CHN_ALPHA];
 		/* Pick color from tracing image if possible */
-		pixel = get_bkg(xc + dx * scale, yc + dy * scale,
-			event == GDK_2BUTTON_PRESS);
+		pixel = get_bkg(m->x + dx * scale, m->y + dy * scale, m->count == 2);
 		if (pixel >= 0) alpha = 255; // opaque
 		/* Otherwise, average brush or selection area on Ctrl+double click */
-		while ((pixel < 0) && (event == GDK_2BUTTON_PRESS) && (MEM_BPP == 3))
+		while ((pixel < 0) && (m->count == 2) && (MEM_BPP == 3))
 		{
 			int rect[4];
 
@@ -1499,19 +1470,19 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 		break;
 	}
 
-	if ((state & _CS) == _C); /* Done above */
+	if ((m->state & _CSmask) == _Cmask); /* Done above */
 
-	else if ((button == 2) || ((button == 3) && (state & _S)))
+	else if ((m->button == 2) || ((m->button == 3) && (m->state & _Smask)))
 		set_zoom_centre(ox, oy);
 
-	else if (grad_tool(event, x0, y0, state, button));
+	else if (grad_tool(m->count, x0, y0, m->state, m->button));
 
 	/* Pure moves are handled elsewhere */
-	else if (button) tool_action(event, x, y, button, pressure);
+	else if (m->button) tool_action(m->count, x, y, m->button, m->pressure);
 
 	/* ****** Now to mouse-move-specific part ****** */
 
-	if (event == GDK_MOTION_NOTIFY)
+	if (!m->count)
 	{
 		if (tool_type == TOOL_CLONE)
 		{
@@ -1519,7 +1490,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 			tool_oy = y;
 		}
 
-		if ((poly_status == POLY_SELECTING) && (button == 0))
+		if ((poly_status == POLY_SELECTING) && !m->button)
 			stretch_poly_line(x, y);
 
 		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
@@ -1545,7 +1516,7 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 
 		if (perim_status > 0) clear_perim(); // Remove old perimeter box
 
-		if ((tool_type == TOOL_CLONE) && (button == 0) && (state & _C))
+		if ((tool_type == TOOL_CLONE) && !m->button && (m->state & _Cmask))
 		{
 			clone_x += tox - x;
 			clone_y += toy - y;
@@ -1576,55 +1547,52 @@ static void mouse_event(int event, int xc, int yc, guint state, guint button,
 	update_sel_bar();
 }
 
-static gboolean canvas_button(GtkWidget *widget, GdkEventButton *event)
+static int canvas_mouse(main_dd *dt, void **wdata, int what, void **where,
+	mouse_ext *mouse)
 {
-	int vport[4], pflag = event->type != GDK_BUTTON_RELEASE;
-	gdouble pressure = 1.0;
+	int rm = unreal_move;
 
 	mouse_left_canvas = FALSE;
-	if (pflag) /* For button press events only */
+
+	/* Steal focus from dock window */
+	if ((mouse->count > 0) && dock_focused())
+		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
+
+	/* Skip synthetic mouse moves */
+	if (!mouse->count)
 	{
-		/* Steal focus from dock window */
-		if (dock_focused())
-			gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-
-		if (!mem_img[CHN_IMAGE]) return (TRUE);
-
-		if (tablet_working)
-#if GTK_MAJOR_VERSION == 1
-			pressure = event->pressure;
-#endif
-#if GTK_MAJOR_VERSION == 2
-			gdk_event_get_axis((GdkEvent *)event, GDK_AXIS_PRESSURE,
-				&pressure);
-#endif
+		if (unreal_move == 3)
+		{
+			unreal_move = 2;
+			return (TRUE);
+		}
+		unreal_move = 0;
 	}
 
-	wjcanvas_get_vport(widget, vport);
-	mouse_event(event->type, event->x + vport[0], event->y + vport[1],
-		event->state, event->button, pressure, unreal_move & 1, 0, 0);
+	/* Do nothing if no image */
+	if ((mouse->count >= 0) && !mem_img[CHN_IMAGE]) return (TRUE);
 
-	return (pflag);
+	/* If cursor got warped, will have another movement event to handle */
+	if (!mouse->count && mouse->button && (tool_type == TOOL_SELECT) &&
+		cmd_checkv(where, MOUSE_BOUND)) return (TRUE);
+
+	mouse_event(mouse, rm & 1, 0, 0);
+
+	return (mouse->count >= 0);
 }
 
-// Mouse enters the canvas
-static gint canvas_enter(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
+// Mouse enters/leaves the canvas
+static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where,
+	void *enter)
 {
-	/* !!! Have to skip grab/ungrab related events if doing something */
-//	if (event->mode != GDK_CROSSING_NORMAL) return (TRUE);
-
-	mouse_left_canvas = FALSE;
-
-	return (FALSE);
-}
-
-static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer user_data)
-{
-	/* Skip grab/ungrab related events */
-	if (event->mode != GDK_CROSSING_NORMAL) return (FALSE);
-
+	if (enter)
+	{
+		mouse_left_canvas = FALSE;
+		return;
+	}
+	/* If leaving canvas */
 	/* Only do this if we have an image */
-	if (!mem_img[CHN_IMAGE]) return (FALSE);
+	if (!mem_img[CHN_IMAGE]) return;
 	mouse_left_canvas = TRUE;
 	if (status_on[STATUS_CURSORXY])
 		cmd_setv(label_bar[STATUS_CURSORXY], "", LABEL_VALUE);
@@ -1632,13 +1600,11 @@ static gint canvas_left(GtkWidget *widget, GdkEventCrossing *event, gpointer use
 		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
 	if (perim_status > 0) clear_perim();
 
-	if (grad_tool(GDK_LEAVE_NOTIFY, 0, 0, 0, 0)) return (FALSE);
+	if (grad_tool(MCOUNT_LEAVE, 0, 0, 0, 0)) return;
 
 	if (((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
 		((tool_type == TOOL_LINE) && (line_status == LINE_LINE)))
 		repaint_line(NULL);
-
-	return (FALSE);
 }
 
 static void render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
@@ -2840,34 +2806,48 @@ static void draw_segments(unsigned char *rgb, int x, int y, int w, int h, int l)
 	}
 }
 
-/* Redirectable RGB blitting */
-void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, rgbcontext *ctx)
+/* Draw dashed line to RGB memory or straight to canvas */
+void draw_dash(int c0, int c1, int ofs, int x, int y, int w, int h, rgbcontext *ctx)
 {
+	rgbcontext cw;
 	unsigned char *dest;
-	int rxy[4], vxy[4];
-	int l, step = w * 3;
+	int i, k, l, ww, step, cc[2] = { c0, c1 };
 
 	if (!ctx)
 	{
-		wjcanvas_get_vport(drawing_canvas, vxy);
-		if (!clip(rxy, x, y, x + w, y + h, vxy)) return;
-		gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-			rxy[0] - vxy[0], rxy[1] - vxy[1], rxy[2] - rxy[0], rxy[3] - rxy[1],
-			GDK_RGB_DITHER_NONE, rgb, step);
+		cw.xy[2] = (cw.xy[0] = x) + w;
+		cw.xy[3] = (cw.xy[1] = y) + h;
+		cw.rgb = NULL;
+		cmd_setv(drawing_canvas, ctx = &cw, CANVAS_PAINT);
+		if (!cw.rgb) return;
 	}
-	else
+	else if (!clip(cw.xy, x, y, x + w, y + h, ctx->xy)) return;
+
+	ofs += cw.xy[0] + cw.xy[1] - x - y; // offset in pattern
+	ww = (ctx->xy[2] - ctx->xy[0]) * 3;
+	if (w == 1) // Vertical
 	{
-		if (!clip(rxy, x, y, x + w, y + h, ctx->xy)) return;
-		rgb += (rxy[1] - y) * step + (rxy[0] - x) * 3;
-		l = (ctx->xy[2] - ctx->xy[0]) * 3;
-		dest = ctx->rgb + (rxy[1] - ctx->xy[1]) * l + (rxy[0] - ctx->xy[0]) * 3;
-		w = (rxy[2] - rxy[0]) * 3;
-		for (h = rxy[3] - rxy[1]; h; h--)
-		{
-			memcpy(dest, rgb, w);
-			dest += l; rgb += step;
-		}
+		step = ww;
+		l = cw.xy[3] - cw.xy[1];
 	}
+	else // Horizontal
+	{
+		step = 3;
+		l = cw.xy[2] - cw.xy[0];
+	}
+	dest = ctx->rgb + (cw.xy[1] - ctx->xy[1]) * ww +
+		(cw.xy[0] - ctx->xy[0]) * 3;
+
+	for (i = 0; i < l; i++)
+	{
+		k = cc[((i + ofs) / 3) & 1];
+		dest[0] = INT_2_R(k);
+		dest[1] = INT_2_G(k);
+		dest[2] = INT_2_B(k);
+		dest += step;
+	}
+
+	if (ctx == &cw) cmd_setv(drawing_canvas, ctx, CANVAS_PAINT);
 }
 
 /* Polygon drawing to RGB memory */
@@ -2953,27 +2933,19 @@ void prepare_line_clip(int *lxy, int *vxy, int scale)
 		lxy[i] = floor_div(vxy[i] - margin_main_xy[i & 1] - (i >> 1), scale);
 }
 
-void repaint_canvas(int px, int py, int pw, int ph)
+static int paint_canvas(void *dt, void **wdata, int what, void **where,
+	rgbcontext *ctx)
 {
-	rgbcontext ctx;
-	unsigned char *rgb, *irgb;
-	int rect[4], vxy[4], vport[4], rpx, rpy;
-	int i, lr, zoom = 1, scale = 1, paste_f = FALSE;
+	unsigned char *irgb, *rgb = ctx->rgb;
+	int rect[4], vxy[4], rpx, rpy;
+	int i, lr, px, py, pw, ph, zoom = 1, scale = 1, paste_f = FALSE;
 
-
-	/* Clip area & init context */
-	wjcanvas_get_vport(drawing_canvas, vport);
-	if (!clip(ctx.xy, px, py, px + pw, py + ph, vport)) return;
-	pw = ctx.xy[2] - (px = ctx.xy[0]);
-	ph = ctx.xy[3] - (py = ctx.xy[1]);
-
-	rgb = malloc(i = pw * ph * 3);
-	if (!rgb) return;
-	memset(rgb, mem_background, i);
-	ctx.rgb = rgb;
+	pw = ctx->xy[2] - (px = ctx->xy[0]);
+	ph = ctx->xy[3] - (py = ctx->xy[1]);
+	memset(rgb, mem_background, pw * ph * 3);
 
 	/* Find out which part is image */
-	irgb = clip_to_image(rect, rgb, ctx.xy);
+	irgb = clip_to_image(rect, rgb, ctx->xy);
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
@@ -2983,7 +2955,7 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	rpy = py - margin_main_y;
 
 	lr = layers_total && show_layers_main;
-	if (bkg_flag && bkg_rgb) render_bkg(&ctx); /* Tracing image */
+	if (bkg_flag && bkg_rgb) render_bkg(ctx); /* Tracing image */
 	else if (!lr) /* Render default background if no layers shown */
 	{
 		if (irgb && ((mem_xpm_trans >= 0) ||
@@ -3036,38 +3008,45 @@ void repaint_canvas(int px, int py, int pw, int ph)
 	async_bk = FALSE;
 
 /* !!! All other over-the-image things have to be redrawn here as well !!! */
-	prepare_line_clip(vxy, ctx.xy, scale);
+	prepare_line_clip(vxy, ctx->xy, scale);
 	/* Redraw gradient line if needed */
 	i = gradient[mem_channel].status;
 	if ((mem_gradient || (tool_type == TOOL_GRADIENT)) &&
 		(mouse_left_canvas ? (i == GRAD_DONE) : (i != GRAD_NONE)))
-		refresh_line(3, vxy, &ctx);
+		refresh_line(3, vxy, ctx);
 
 	/* Draw marquee as we may have drawn over it */
-	if (marq_status != MARQUEE_NONE)
-		paint_marquee(MARQ_SHOW, 0, 0, &ctx);
+	if ((marq_status != MARQUEE_NONE) && irgb)
+		paint_marquee(MARQ_SHOW, 0, 0, ctx);
 	if ((tool_type == TOOL_POLYGON) && poly_points)
-		paint_poly_marquee(&ctx);
+		paint_poly_marquee(ctx);
 
 	/* Redraw line if needed */
 	if ((((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
 		((tool_type == TOOL_LINE) && (line_status == LINE_LINE))) &&
 		!mouse_left_canvas)
-		refresh_line(tool_type == TOOL_LINE ? 1 : 2, vxy, &ctx);
+		refresh_line(tool_type == TOOL_LINE ? 1 : 2, vxy, ctx);
 
 	/* Redraw perimeter if needed */
-	if (perim_status && !mouse_left_canvas) repaint_perim(&ctx);
+	if (perim_status && !mouse_left_canvas) repaint_perim(ctx);
 
-	gdk_draw_rgb_image(drawing_canvas->window, drawing_canvas->style->black_gc,
-		px - vport[0], py - vport[1], pw, ph,
-		GDK_RGB_DITHER_NONE, rgb, pw * 3);
-	free(rgb);
+	return (TRUE); // now draw this
+}
+
+void repaint_canvas(int px, int py, int pw, int ph)
+{
+	rgbcontext ctx = { { px, py, px + pw, py + ph }, NULL };
+
+	cmd_setv(drawing_canvas, &ctx, CANVAS_PAINT);
+	if (!ctx.rgb) return;
+	paint_canvas(NULL, NULL, 0, NULL, &ctx);
+	cmd_setv(drawing_canvas, &ctx, CANVAS_PAINT);
 }
 
 /* Update x,y,w,h area of current image */
 void main_update_area(int x, int y, int w, int h)
 {
-	int zoom, scale, vport[4], rxy[4];
+	int zoom, scale, rxy[4];
 
 	if (can_zoom < 1.0)
 	{
@@ -3091,12 +3070,9 @@ void main_update_area(int x, int y, int w, int h)
 			w++ , h++; // Redraw grid lines bordering the area
 	}
 
-	x += margin_main_x; y += margin_main_y;
-	wjcanvas_get_vport(drawing_canvas, vport);
-	if (clip(rxy, x, y, x + w, y + h, vport))
-		gtk_widget_queue_draw_area(drawing_canvas,
-			rxy[0] - vport[0], rxy[1] - vport[1],
-			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+	rxy[2] = (rxy[0] = x + margin_main_x) + w;
+	rxy[3] = (rxy[1] = y + margin_main_y) + h;
+	cmd_setv(drawing_canvas, rxy, CANVAS_REPAINT);
 }
 
 /* Get zoomed canvas size */
@@ -3121,10 +3097,9 @@ void clear_perim()
 	if ( tool_type == TOOL_CLONE ) clear_perim_real(clone_x, clone_y);
 }
 
-void repaint_perim_real(int r, int g, int b, int ox, int oy, rgbcontext *ctx)
+static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
 {
-	int i, j, w, h, x0, y0, x1, y1, zoom = 1, scale = 1;
-	unsigned char *rgb;
+	int w, h, x0, y0, x1, y1, zoom = 1, scale = 1;
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
@@ -3138,149 +3113,57 @@ void repaint_perim_real(int r, int g, int b, int ox, int oy, rgbcontext *ctx)
 
 	w = x1 - x0 + 1;
 	h = y1 - y0 + 1;
-	j = (w > h ? w : h) * 3;
-	rgb = calloc(j + 2 * 3, 1); /* 2 extra pixels reserved for loop */
-	if (!rgb) return;
-	for (i = 0; i < j; i += 6 * 3)
-	{
-		rgb[i + 0] = rgb[i + 3] = rgb[i + 6] = r;
-		rgb[i + 1] = rgb[i + 4] = rgb[i + 7] = g;
-		rgb[i + 2] = rgb[i + 5] = rgb[i + 8] = b;
-	}
 
-	draw_rgb(x0, y0, 1, h, rgb, ctx);
-	draw_rgb(x1, y0, 1, h, rgb, ctx);
+	draw_dash(c, RGB_2_INT(0, 0, 0), 0, x0, y0, 1, h, ctx);
+	draw_dash(c, RGB_2_INT(0, 0, 0), 0, x1, y0, 1, h, ctx);
 
-	draw_rgb(x0 + 1, y0, w - 2, 1, rgb, ctx);
-	draw_rgb(x0 + 1, y1, w - 2, 1, rgb, ctx);
-	free(rgb);
+	draw_dash(c, RGB_2_INT(0, 0, 0), 0, x0 + 1, y0, w - 2, 1, ctx);
+	draw_dash(c, RGB_2_INT(0, 0, 0), 0, x0 + 1, y1, w - 2, 1, ctx);
 }
 
 void repaint_perim(rgbcontext *ctx)
 {
 	/* Don't bother if tool has no perimeter */
 	if (NO_PERIM(tool_type)) return;
-	repaint_perim_real(255, 255, 255, 0, 0, ctx);
+	repaint_perim_real(RGB_2_INT(255, 255, 255), 0, 0, ctx);
 	if ( tool_type == TOOL_CLONE )
-		repaint_perim_real(255, 0, 0, clone_x, clone_y, ctx);
+		repaint_perim_real(RGB_2_INT(255, 0, 0), clone_x, clone_y, ctx);
 	perim_status = 1; /* Drawn */
 }
 
-static gboolean canvas_motion(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
+static void configure_canvas()
 {
-	int x, y, rm, vport[4], button = 0;
-	GdkModifierType state;
-	gdouble pressure = 1.0;
+	int new_margin_x = 0, new_margin_y = 0;
 
-
-	mouse_left_canvas = FALSE;
-
-	/* Skip synthetic mouse moves */
-	if (unreal_move == 3)
+	if (canvas_image_centre)
 	{
-		unreal_move = 2;
-		return TRUE;
-	}
-	rm = unreal_move;
-	unreal_move = 0;
-
-	/* Do nothing if no image */
-	if (!mem_img[CHN_IMAGE]) return (TRUE);
-
-#if GTK_MAJOR_VERSION == 1
-	if (event->is_hint)
-	{
-		gdk_input_window_get_pointer(event->window, event->deviceid,
-			NULL, NULL, &pressure, NULL, NULL, &state);
-		gdk_window_get_pointer(event->window, &x, &y, &state);
-	}
-	else
-	{
-		x = event->x;
-		y = event->y;
-		pressure = event->pressure;
-		state = event->state;
-	}
-#endif
-#if GTK_MAJOR_VERSION == 2
-	if (event->is_hint) gdk_device_get_state(event->device, event->window,
-		NULL, &state);
-	x = event->x;
-	y = event->y;
-	state = event->state;
-
-	if (tablet_working) gdk_event_get_axis((GdkEvent *)event,
-		GDK_AXIS_PRESSURE, &pressure);
-#endif
-
-	if ((state & (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) ==
-		(GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)) button = 13;
-	else if (state & GDK_BUTTON1_MASK) button = 1;
-	else if (state & GDK_BUTTON3_MASK) button = 3;
-	else if (state & GDK_BUTTON2_MASK) button = 2;
-
-	/* If cursor got warped, will have another movement event to handle */
-	if (button && (tool_type == TOOL_SELECT) &&
-		wjcanvas_bind_mouse(widget, event, x, y)) return (TRUE);
-
-	wjcanvas_get_vport(widget, vport);
-	mouse_event(event->type, x + vport[0], y + vport[1],
-		state, button, pressure, rm & 1, 0, 0);
-
-	return TRUE;
-}
-
-static gboolean configure_canvas( GtkWidget *widget, GdkEventConfigure *event )
-{
-	int w, h, new_margin_x = 0, new_margin_y = 0;
-
-	if ( canvas_image_centre )
-	{
+		int w, h, wh[2];
+		cmd_peekv(drawing_canvas, wh, sizeof(wh), CANVAS_SIZE);
 		canvas_size(&w, &h);
-
-		w = drawing_canvas->allocation.width - w;
-		h = drawing_canvas->allocation.height - h;
-
-		if (w > 0) new_margin_x = w >> 1;
-		if (h > 0) new_margin_y = h >> 1;
+		if ((wh[0] -= w) > 0) new_margin_x = wh[0] >> 1;
+		if ((wh[1] -= h) > 0) new_margin_y = wh[1] >> 1;
 	}
 
 	if ((new_margin_x != margin_main_x) || (new_margin_y != margin_main_y))
 	{
 		margin_main_x = new_margin_x;
 		margin_main_y = new_margin_y;
-		gtk_widget_queue_draw(drawing_canvas);
+		cmd_repaint(drawing_canvas);
 			// Force redraw of whole canvas as the margin has shifted
 	}
 	vw_realign();	// Update the view window as needed
-
-	return (TRUE);
 }
 
 void force_main_configure()
 {
-	if (drawing_canvas) configure_canvas(drawing_canvas, NULL);
+	if (drawing_canvas) configure_canvas();
 	if (view_showing && vw_drawing) vw_configure();
-}
-
-#define REPAINT_CANVAS_COST 512
-
-static gboolean expose_canvas(GtkWidget *widget, GdkEventExpose *event,
-	gpointer user_data)
-{
-	int vport[4];
-
-	wjcanvas_get_vport(widget, vport);
-	repaint_expose(event, vport, repaint_canvas, REPAINT_CANVAS_COST);
-
-	return (TRUE);
 }
 
 void set_cursor(void **what)	// Set mouse cursor
 {
-	if (!drawing_canvas->window) return; /* Do nothing if canvas hidden */
-	what = !cursor_tool ? NULL : what ? what : m_cursor[tool_type];
-	gdk_window_set_cursor(drawing_canvas->window, what ? what[0] : NULL);
+	cmd_cursor(drawing_canvas, !cursor_tool ? NULL : what ? what :
+		m_cursor[tool_type]);
 }
 
 void change_to_tool(int icon)
@@ -3289,8 +3172,7 @@ void change_to_tool(int icon)
 	void *var, **slot = icon_buttons[icon];
 	int i, t, update = UPD_SEL;
 
-// !!! Use V-code API for this later
-	if (!GTK_WIDGET_SENSITIVE(slot[0])) return; // Blocked
+	if (!cmd_checkv(slot, SLOT_SENSITIVE)) return; // Blocked
 // !!! Unnecessarily complicated approach - better add a peek operation
 	var = cmd_read(slot, NULL);
 	if ((int)var != TOOL_ID(slot)) cmd_set(slot, TRUE);
@@ -3388,7 +3270,6 @@ void set_image(int state)
 	if (state ? --depth : depth++) return;
 
 	cmd_showhide(main_split, state);
-	if (state) set_cursor(NULL); /* Canvas window now maybe a new one */
 }
 
 static char read_hex_dub(char *in)	// Read hex double
@@ -3622,8 +3503,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_toolbar_toggle(state, mode); break;
 	case ACT_DOCK:
 		if (!kbd) toggle_dock(show_dock = state);
-// !!! Use V-code API for this later
-		else if (GTK_WIDGET_SENSITIVE(menu_slots[MENU_DOCK][0]))
+		else if (cmd_checkv(menu_slots[MENU_DOCK], SLOT_SENSITIVE))
 			cmd_set(menu_slots[MENU_DOCK], !show_dock);
 		break;
 	case ACT_CENTER:
@@ -3930,8 +3810,6 @@ static void pressed_pal_paste()
 static void toggle_dock(int state)
 {
 	cmd_set(dock_area, state);
-// !!! Later make this canvas' "realize" handler
-	set_cursor(NULL); /* Because canvas window is now a new one */
 }
 
 static void pressed_sel_ramp(int vert)
@@ -4450,60 +4328,13 @@ static void *main_menu_code[] = {
 	RET
 };
 
-static void **create_internals(void **r, GtkWidget ***wpp, void **wdata)
-{
-	GtkWidget *scroll = *(*wpp)++;
-
-
-	drawing_canvas = wjcanvas_new();
-	wjcanvas_size(drawing_canvas, 48, 48);
-	gtk_widget_show(drawing_canvas);
-
-	add_with_wjframe(scroll, drawing_canvas);
-
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "configure_event",
-		GTK_SIGNAL_FUNC (configure_canvas), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "expose_event",
-		GTK_SIGNAL_FUNC (expose_canvas), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "button_press_event",
-		GTK_SIGNAL_FUNC (canvas_button), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "button_release_event",
-		GTK_SIGNAL_FUNC (canvas_button), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "motion_notify_event",
-		GTK_SIGNAL_FUNC (canvas_motion), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "enter_notify_event",
-		GTK_SIGNAL_FUNC (canvas_enter), NULL );
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "leave_notify_event",
-		GTK_SIGNAL_FUNC (canvas_left), NULL );
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect( GTK_OBJECT(drawing_canvas), "scroll_event",
-		GTK_SIGNAL_FUNC (canvas_scroll_gtk2), NULL );
-#endif
-
-	gtk_widget_set_events (drawing_canvas, GDK_ALL_EVENTS_MASK);
-	gtk_widget_set_extension_events (drawing_canvas, GDK_EXTENSION_EVENTS_CURSOR);
-
-	return (r);
-}
-
-/////////	End of main window widget setup
-static void **finish_internals(void **r, GtkWidget ***wpp, void **wdata)
-{
-	mapped_item_state(0);
-
-	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
-	update_recent_files();
-
-	return (r);
-}
-
 static int dock_esc(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
 	/* Pressing Escape moves focus out of dock - to nowhere */
 	if (keydata->key == GDK_Escape)
 	{
-		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
 		return (TRUE);
 	}
 	return (FALSE);
@@ -4545,6 +4376,8 @@ static void dock_undock_evt(main_dd *dt, void **wdata, int what, void **where)
 	cmd_sensitive(menu_slots[MENU_DOCK], dstate);
 }
 
+#define REPAINT_CANVAS_COST 512
+
 #define WBbase main_dd
 static void *main_code[] = {
 ///	MAIN WINDOW
@@ -4568,7 +4401,11 @@ static void *main_code[] = {
 	REFv(main_split), HVSPLIT,
 //	MAIN WINDOW
 	REFv(scrolledwindow_canvas), CSCROLLv(cvxy), EVENT(CHANGE, vw_focus_idle),
-	EXEC(create_internals),
+	REFv(drawing_canvas), CANVAS(48, 48, REPAINT_CANVAS_COST, paint_canvas),
+	EVENT(CHANGE, configure_canvas),
+	EVENT(XMOUSE, canvas_mouse), EVENT(RXMOUSE, canvas_mouse),
+	EVENT(MXMOUSE, canvas_mouse), EVENT(CROSS, canvas_enter_leave),
+	EVENT(SCROLL, canvas_scroll),
 //	VIEW WINDOW
 	CALL(init_view_code),
 	WDONE, // hvsplit
@@ -4583,7 +4420,6 @@ static void *main_code[] = {
 	REFv(label_bar[STATUS_UNDOREDO]), STLABEL(70, 1, 1),
 	WDONE, // statusbar
 	WDONE, // xvbox
-	EXEC(finish_internals),
 	WDONE, // xhbox
 	WDONE, // left pane
 	BORDER(NBOOK, 0),
@@ -4611,7 +4447,7 @@ static void *main_code[] = {
 	WDONE, // right pane
 	REF(clip), CLIPFORM(clip_formats, CLIP_TARGETS),
 	REF(clipboard), CLIPBOARD(clip, 3, clipboard_export_fn, clipboard_import_fn),
-	RAISED, WSHOW
+	RAISED, WEND
 };
 #undef WBbase
 
@@ -4643,29 +4479,29 @@ void main_init()
 	}
 	main_window_ = run_create(main_code, &tdata, sizeof(tdata));
 
+	mapped_item_state(0);
+
+	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
+	update_recent_files();
+
 	if (!show_dock) // Stops first icon in toolbar being selected
-// !!! Use V-code API for that - and for here, maybe make FOCUS on toplevel do it
-		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
-// Older way
-// !!! Can be UNLESSv + FOCUS - but who guarantees CSCROLL to be focusable?
-//		gtk_widget_grab_focus(scrolledwindow_canvas);
+		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
 
-	/* !!! Have to wait till canvas is displayed, to init keyboard */
-	fill_keycodes(main_keys);
-
-// !!! And what are _these_ doing sitting here, instead of before WSHOW?
-
-	set_cursor(NULL);
 	init_status_bar();
 	init_factions();				// Initialize file action menu
 
 	file_in_homedir(txt, ".clipboard", PATHBUF);
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
 
+	set_cursor(NULL);
 	change_to_tool(DEFAULT_TOOL_ICON);
 
-	toolbar_showhide();
+	cmd_showhide(main_window_, TRUE);
+	/* !!! Have to wait till canvas is displayed, to init keyboard */
+	fill_keycodes(main_keys);
+
 	if (viewer_mode) toggle_view();
+	else toolbar_showhide();
 }
 
 void spot_undo(int mode)

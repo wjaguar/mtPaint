@@ -683,8 +683,7 @@ static int vw_mouse_event(void *dt, void **wdata, int what, void **where,
 
 	/* Steal focus from dock window */
 	if ((mouse->count > 0) && dock_focused())
-// !!! Use V-code API for that
-		gtk_window_set_focus(GTK_WINDOW(main_window), NULL);
+		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
 
 	/* If cursor got warped, will have another movement event to handle */
 	if (!mouse->count && mouse->button && cmd_checkv(where, MOUSE_BOUND))
@@ -770,7 +769,6 @@ void view_show()
 	cmd_set(main_split, view_vsplit + 1);
 	view_showing = view_vsplit + 1;
 	toolbar_viewzoom(TRUE);
-	set_cursor(NULL); /* Because canvas window is now a new one */
 	cmd_set(menu_slots[MENU_VIEW], TRUE);
 	vw_realign();
 }
@@ -781,7 +779,6 @@ void view_hide()
 	view_showing = 0;
 	cmd_set(main_split, 0);
 	toolbar_viewzoom(FALSE);
-	set_cursor(NULL); /* Because canvas window is now a new one */
 	cmd_set(menu_slots[MENU_VIEW], FALSE);
 }
 
@@ -1053,67 +1050,32 @@ void render_text()
 }
 
 typedef struct {
+	char *fsel[2];
 	int img, idx;
 	int bkg[3];
-	GtkWidget *textw;
 } text_dd;
 
 static void paste_text_ok(text_dd *dt, void **wdata, int what)
 {
-	char *t_string = (char *)gtk_font_selection_get_preview_text(
-			GTK_FONT_SELECTION(dt->textw)),
-		*t_font_name = gtk_font_selection_get_font_name(GTK_FONT_SELECTION(dt->textw));
-
-#if GTK_MAJOR_VERSION == 1
-	if (!gtk_font_selection_get_font(GTK_FONT_SELECTION(dt->textw)))
-		return;
-#endif
-
 	run_query(wdata);
 
 	if (mem_channel == CHN_IMAGE) font_bkg = dt->bkg[0];
 
-	inifile_set("lastTextFont", t_font_name);
-	inifile_set("textString", t_string);
+	if (dt->fsel[0]) inifile_set("lastTextFont", dt->fsel[0]);
+	inifile_set("textString", dt->fsel[1]);
 
 	render_text();
 	update_stuff(UPD_XCOPY);
 	if (mem_clipboard) pressed_paste(TRUE);
 
 	run_destroy(wdata);
-
-	g_free(t_font_name);
-}
-
-static void **create_fontsel(void **r, GtkWidget ***wpp, void **wdata)
-{
-	text_dd *dt = GET_DDATA(wdata);
-	GtkWidget *w;
-
-	dt->textw = w = gtk_font_selection_new();
-	gtk_widget_show(w);
-	gtk_container_set_border_width(GTK_CONTAINER(w), 4);
-
-	accept_ctrl_enter(GTK_FONT_SELECTION(w)->preview_entry);
-
-	xpack(**wpp, w);
-
-	// !!! Fails if no toplevel
-	gtk_font_selection_set_font_name(GTK_FONT_SELECTION(w),
-		inifile_get("lastTextFont", "-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ));
-	gtk_font_selection_set_preview_text(GTK_FONT_SELECTION(w),
-		inifile_get("textString", __("Enter Text Here")));
-
-	gtk_widget_grab_focus(GTK_FONT_SELECTION(w)->preview_entry);
-
-	return (r);
 }
 
 #define WBbase text_dd
 static void *text_code[] = {
 	WINDOWm(_("Paste Text")),
 	DEFSIZE(400, 400),
-	EXEC(create_fontsel),
+	FONTSEL(fsel), FOCUS,
 	HSEPl(200),
 	HBOXbp(0, 0, 5),
 #if defined(U_MTK) || GTK_MAJOR_VERSION == 2
@@ -1137,10 +1099,12 @@ static void *text_code[] = {
 
 void pressed_text()
 {
-	text_dd tdata = { mem_channel == CHN_IMAGE,
+	text_dd tdata = { { inifile_get("lastTextFont",
+		"-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ),
+		inifile_get("textString", __("Enter Text Here")) },
+		mem_channel == CHN_IMAGE,
 		tdata.img && (mem_img_bpp == 1),
-		{ font_bkg % mem_cols, 0, mem_cols - 1 }, NULL };
-//	tdata.text = inifile_get("textString", __("Enter Text Here"));
+		{ font_bkg % mem_cols, 0, mem_cols - 1 } };
 
 	run_create(text_code, &tdata, sizeof(tdata));
 }

@@ -92,6 +92,8 @@ typedef struct {
 	void *now_evt;	// Keyboard event being handled (check against recursion)
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
+	int raise;	// Raise after displaying
+	int unfocus;	// Focus to NULL after displaying
 	int done;	// Set when destroyed
 } v_dd;
 
@@ -325,6 +327,15 @@ static gboolean get_evt_mouse(GtkWidget *widget, GdkEventButton *event,
 	return (do_evt_mouse(user_data, event, &mouse));
 }
 
+// This peculiar encoding is historically used throughout mtPaint
+static inline int state_to_button(unsigned int state)
+{
+	return ((state & _B13mask) == _B13mask ? 13 :
+		state & _B1mask ? 1 :
+		state & _B3mask ? 3 :
+		state & _B2mask ? 2 : 0);
+}
+
 static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	gpointer user_data)
 {
@@ -362,11 +373,7 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 		break;
 	}
 
-	// This peculiar encoding is historically used throughout mtPaint
-	mouse.button = (mouse.state & _B13mask) == _B13mask ? 13 :
-		mouse.state & _B1mask ? 1 :
-		mouse.state & _B3mask ? 3 :
-		mouse.state & _B2mask ? 2 : 0;
+	mouse.button = state_to_button(mouse.state);
 
 	mouse.count = 0; // motion
 
@@ -387,6 +394,30 @@ static gboolean get_evt_cross(GtkWidget *widget, GdkEventCrossing *event,
 
 	return (FALSE); // let it propagate
 }
+
+#if GTK_MAJOR_VERSION == 2
+
+static gboolean get_evt_scroll(GtkWidget *widget, GdkEventScroll *event,
+	gpointer user_data)
+{
+	void **slot = user_data, **base = slot[0], **desc = slot[1];
+	scroll_ext scroll = { event->direction == GDK_SCROLL_LEFT ? -1 :
+		event->direction == GDK_SCROLL_RIGHT ? 1 : 0,
+		event->direction == GDK_SCROLL_UP ? -1 :
+		event->direction == GDK_SCROLL_DOWN ? 1 : 0,
+		event->state };
+
+	((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, &scroll);
+
+	if (!(scroll.xscroll | scroll.yscroll)) return (TRUE);
+	event->direction = scroll.xscroll < 0 ? GDK_SCROLL_LEFT :
+		scroll.xscroll > 0 ? GDK_SCROLL_RIGHT :
+		scroll.yscroll < 0 ? GDK_SCROLL_UP :
+		/* scroll.yscroll > 0 ? */ GDK_SCROLL_DOWN;
+	return (FALSE);
+}
+#endif
 
 //	Drag handling
 
@@ -1771,6 +1802,21 @@ static void set_textarea(GtkWidget *text, char *init)
 #endif
 }
 
+//	FONTSEL widget
+
+// !!! With inlining this, problem also
+GtkWidget *fontsel(GtkWidget *box, char **ss)
+{
+	GtkWidget *widget = gtk_font_selection_new();
+	accept_ctrl_enter(GTK_FONT_SELECTION(widget)->preview_entry);
+	xpack(box, widget);
+	// !!! Fails if no toplevel
+	gtk_font_selection_set_font_name(GTK_FONT_SELECTION(widget), ss[0]);
+	gtk_font_selection_set_preview_text(GTK_FONT_SELECTION(widget), ss[1]);
+	ss[0] = ss[1] = NULL;
+	return (widget);
+}
+
 //	Columns for LIST* widgets
 
 typedef struct {
@@ -2526,7 +2572,8 @@ GtkWidget *pathbox(void **r)
 	gtk_widget_show(hbox);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
 
-	entry = xpack5(hbox, gtk_entry_new());
+	entry = gtk_entry_new();
+	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
 	button = pack(hbox, gtk_button_new_with_label(_("Browse")));
 	gtk_container_set_border_width(GTK_CONTAINER(button), 2);
 	gtk_widget_show(button);
@@ -3839,7 +3886,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #else /* #if GTK_MAJOR_VERSION == 2 */
 	GtkWindow *tparent = GTK_WINDOW(main_window);
 #endif
-	int part = FALSE, raise = FALSE, accel = 0;
+	int part = FALSE, accel = 0;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	GtkWidget *wstack[CONT_DEPTH], **wp = wstack + CONT_DEPTH;
 	GtkWidget *window = NULL, *widget = NULL;
@@ -3941,11 +3988,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				trigger_things(res);
 			}
 			/* Display */
-			if (op != op_WEND)
-			{
-				cmd_showhide(GET_WINDOW(res), TRUE);
-				if (raise) gdk_window_raise(window->window);
-			}
+			if (op != op_WEND) cmd_showhide(GET_WINDOW(res), TRUE);
 			/* Wait for input */
 			if (op == op_WDIALOG)
 			{
@@ -4408,6 +4451,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			*(char **)v = NULL;
 // !!! Padding = 0 Border = 0
 			pk = pk_XPACK | pkf_PARENT; // wrapped
+			break;
+		/* Add a font selector, fill from array: font name/test string */
+		case op_FONTSEL:
+			widget = fontsel(*wp, v);
+// !!! Border = 4
+			cw = 4;
+			pk = pkf_SHOW;
 			break;
 		/* Add a combo-entry for text strings */
 		case op_COMBOENTRY:
@@ -4936,8 +4986,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		/* Make last referrable widget focused */
 		case op_FOCUS:
-			gtk_widget_grab_focus(*origin_slot(PREV_SLOT(r)));
+		{
+			void **orig = origin_slot(PREV_SLOT(r));
+			/* !!! For GtkFontSelection, focusing needs be done after
+			 * window is shown - in GTK+ 2.24.10, at least */
+			if (GET_OP(orig) == op_FONTSEL) gtk_signal_connect_object_after(
+				GTK_OBJECT(window), "show",
+				GTK_SIGNAL_FUNC(gtk_widget_grab_focus),
+				(gpointer)GTK_FONT_SELECTION(*orig)->preview_entry);
+			else gtk_widget_grab_focus(*orig);
 			continue;
+		}
 		/* Set fixed/minimum width for next widget */
 		case op_WIDTH:
 			minw = (int)v;
@@ -4957,7 +5016,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		/* Raise window after displaying */
 		case op_RAISED:
-			raise = TRUE;
+			vdata->raise = TRUE;
 			continue;
 		/* Start group of list columns */
 		case op_WLIST:
@@ -5095,6 +5154,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = NULL;
 			break;
 		}
+#if GTK_MAJOR_VERSION == 2
+		/* Install scroll event handler */
+		case op_EVT_SCROLL:
+		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			gtk_signal_connect(GTK_OBJECT(*slot), "scroll_event",
+				GTK_SIGNAL_FUNC(get_evt_scroll), r);
+			break;
+		}
+#endif
 		/* Install Change-event handler */
 		case op_EVT_CHANGE:
 		{
@@ -5302,7 +5371,8 @@ static void do_destroy(void **wdata)
 			gtk_target_list_unref(cd->targets);
 			free(cd);
 		}
-		else if (op == op_TEXT) g_free(*(char **)v);
+		else if ((op == op_TEXT) || (op == op_FONTSEL))
+			g_free(*(char **)v);
 		else if (op == op_REMOUNT)
 		{
 			void **where = *(void ***)v;
@@ -5462,6 +5532,19 @@ static void *do_query(char *data, void **wdata, int mode)
 			g_free(*(char **)v);
 			*(char **)v = read_textarea(*wdata);
 			break;
+		case op_FONTSEL:
+		{
+			char **ss = v;
+			g_free(ss[0]);
+#if GTK_MAJOR_VERSION == 1
+			ss[0] = NULL;
+			if (gtk_font_selection_get_font(*wdata))
+#endif
+			ss[0] = gtk_font_selection_get_font_name(*wdata);
+			*(const char **)(ss + 1) =
+				gtk_font_selection_get_preview_text(*wdata);
+			break;
+		}
 		case op_MOUNT: case op_PMOUNT:
 			*(int *)v = !!GTK_BIN(*wdata)->child;
 			break;
@@ -5675,6 +5758,8 @@ void cmd_sensitive(void **slot, int state)
 
 void cmd_showhide(void **slot, int state)
 {
+	int raise = FALSE, unfocus = FALSE;
+
 	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
 	if (!GTK_WIDGET_VISIBLE(slot[0]) ^ !!state) return; // no use
@@ -5683,7 +5768,7 @@ void cmd_showhide(void **slot, int state)
 		v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
 		GtkWidget *w = GTK_WIDGET(slot[0]);
 
-		if (state) // show - apply stored size & position
+		if (state) // show - apply stored size, position, raise, unfocus
 		{
 			if (vdata->ininame) gtk_widget_set_uposition(w,
 				vdata->xywh[0], vdata->xywh[1]);
@@ -5691,6 +5776,10 @@ void cmd_showhide(void **slot, int state)
 			gtk_window_set_default_size(GTK_WINDOW(w),
 				vdata->xywh[2] ? vdata->xywh[2] : -1,
 				vdata->xywh[3] ? vdata->xywh[3] : -1);
+			/* Prepare to do postponed actions */
+			raise = vdata->raise;
+			unfocus = vdata->unfocus;
+			vdata->raise = vdata->unfocus = FALSE;
 		}
 		else // hide - remember size & position
 		{
@@ -5703,6 +5792,8 @@ void cmd_showhide(void **slot, int state)
 		}
 	}
 	widget_showhide(slot[0], state);
+	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
+	if (unfocus) gtk_window_set_focus(slot[0], NULL);
 }
 
 void cmd_set(void **slot, int v)
@@ -5947,9 +6038,34 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	case op_CANVAS:
 	{
 		GtkWidget *w = slot[0];
-		int *v = res;
-		if (size >= sizeof(int)) v[0] = w->allocation.width;
-		if (size >= sizeof(int) * 2) v[1] = w->allocation.height;
+		if (idx == CANVAS_SIZE)
+		{
+			int *v = res;
+			if (size >= sizeof(int)) v[0] = w->allocation.width;
+			if (size >= sizeof(int) * 2) v[1] = w->allocation.height;
+		}
+		else if (idx == CANVAS_VPORT)
+		{
+			if (size < sizeof(int) * 4) break;
+			wjcanvas_get_vport(w, res);
+		}
+		else if (idx == CANVAS_FIND_MOUSE)
+		{
+			mouse_ext *m = res;
+			gint x, y;
+			int vport[4];
+
+			// No reason to parcel the data
+			if (size < sizeof(mouse_ext)) break;
+			gdk_window_get_pointer(w->window, &x, &y, &m->state);
+			wjcanvas_get_vport(w, vport);
+			m->x = x + vport[0];
+			m->y = y + vport[1];
+
+			m->button = state_to_button(m->state);
+			m->count = 0;
+			m->pressure = MAX_PRESSURE;
+		}
 		break;
 	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
@@ -5990,16 +6106,68 @@ void cmd_setv(void **slot, void *res, int idx)
 	switch (op)
 	{
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
+	{
+		v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
+
 		if (idx == WINDOW_TITLE)
-			gtk_window_set_title(GTK_WINDOW(slot[0]), res);
-		else /* if (idx == WINDOW_ESC_BTN) */
+			gtk_window_set_title(slot[0], res);
+		else if (idx == WINDOW_ESC_BTN)
 		{
 			GtkAccelGroup *ag = gtk_accel_group_new();
 			gtk_widget_add_accelerator(*(void **)res, "clicked", ag,
 				GDK_Escape, 0, (GtkAccelFlags)0);
-			gtk_window_add_accel_group(GTK_WINDOW(slot[0]), ag);
+			gtk_window_add_accel_group(slot[0], ag);
+		}
+		else if (idx == WINDOW_FOCUS)
+		{
+			/* Cannot move focus to nowhere while window is hidden */
+			if (!res && !GTK_WIDGET_VISIBLE(slot[0]))
+				vdata->unfocus = TRUE;
+			gtk_window_set_focus(slot[0], res ? *(void **)res : NULL);
+		}
+		else if (idx == WINDOW_RAISE)
+		{
+			if (GTK_WIDGET_VISIBLE(slot[0]))
+				gdk_window_raise(GTK_WIDGET(slot[0])->window);
+			/* Cannot raise hidden window, will do it later */
+			else vdata->raise = TRUE;
+		}
+		else if (idx == WINDOW_DISAPPEAR)
+		{
+			GtkWidget *w = slot[0];
+			if (!res) /* Show again */
+			{
+#if GTK_MAJOR_VERSION == 2
+				gdk_window_deiconify(w->window);
+#endif
+				gdk_window_raise(w->window);
+				break;
+			}
+			/* Hide from view, to allow a screenshot */
+#if GTK_MAJOR_VERSION == 1
+			gdk_window_lower(main_window->window);
+			if (w != main_window) gdk_window_lower(w->window);
+
+			gdk_flush();
+			handle_events();	// Wait for minimize
+
+			sleep(1);	// Wait a second for screen to redraw
+#else /* #if GTK_MAJOR_VERSION == 2 */
+			if (w != main_window)
+			{
+				gtk_window_set_transient_for(slot[0], NULL);
+				gdk_window_iconify(w->window);
+			}
+			gdk_window_iconify(main_window->window);
+
+			gdk_flush();
+			handle_events(); 	// Wait for minimize
+
+			g_usleep(400000);	// Wait 0.4 s for screen to redraw
+#endif
 		}
 		break;
+	}
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
 	case op_NBOOK: case op_NBOOKl: case op_SNBOOK:
 		gtk_notebook_set_show_tabs(slot[0], (int)res);
@@ -6079,10 +6247,14 @@ void cmd_setv(void **slot, void *res, int idx)
 		GtkWidget *w = slot[0];
 		int vport[4], rxy[4], *v = res;
 
-		if (idx == CANVAS_SIZE) wjcanvas_size(w, v[0], v[1]);
-		else if (idx == CANVAS_REPAINT)
+		if (idx == CANVAS_SIZE)
 		{
-			wjcanvas_get_vport(w, vport);
+			wjcanvas_size(w, v[0], v[1]);
+			break;
+		}
+		wjcanvas_get_vport(w, vport);
+		if (idx == CANVAS_REPAINT)
+		{
 			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
 				gtk_widget_queue_draw_area(w,
 					rxy[0] - vport[0], rxy[1] - vport[1],
@@ -6091,7 +6263,6 @@ void cmd_setv(void **slot, void *res, int idx)
 		else if (idx == CANVAS_PAINT)
 		{
 			rgbcontext *ctx = res;
-			wjcanvas_get_vport(w, vport);
 			/* Paint */
 			if (ctx->rgb)
 			{
@@ -6109,6 +6280,22 @@ void cmd_setv(void **slot, void *res, int idx)
 				vport[2], vport[3], ctx->xy))
 				ctx->rgb = malloc((ctx->xy[2] - ctx->xy[0]) *
 					(ctx->xy[3] - ctx->xy[1]) * 3);
+		}
+		else if (idx == CANVAS_BMOVE_MOUSE)
+		{
+			gint x, y;
+			gdk_window_get_pointer(w->window, &x, &y, NULL);
+			if ((x >= 0) && (y >= 0) &&
+				((x += vport[0]) < vport[2]) &&
+				((y += vport[1]) < vport[3]) &&
+				/* Autoscroll canvas if required */
+				wjcanvas_scroll_in(w, x + v[0], y + v[1]))
+			{
+				wjcanvas_get_vport(w, rxy);
+				v[0] += vport[0] - rxy[0];
+				v[1] += vport[1] - rxy[1];
+			}
+			if (move_mouse_relative(v[0], v[1])) v[0] = v[1] = 0;
 		}
 		break;
 	}
@@ -6189,9 +6376,27 @@ void cmd_repaint(void **slot)
 	else gtk_widget_queue_draw(slot[0]);
 }
 
+#define SETCUR_KEY "mtPaint.cursor"
+
+static void reset_cursor(GtkWidget *widget, gpointer user_data)
+{
+	gpointer c = gtk_object_get_data_by_id(GTK_OBJECT(widget), (guint)user_data);
+	if (c != (gpointer)(-1)) gdk_window_set_cursor(widget->window, c);
+}
+
 void cmd_cursor(void **slot, void **cursor)
 {
+	static guint setcur_key;
 	GtkWidget *w = slot[0];
+
+	/* Remember cursor for restoring it after realize */
+	if (!setcur_key) setcur_key = g_quark_from_static_string(SETCUR_KEY);
+	if (!gtk_object_get_data_by_id(slot[0], setcur_key))
+		gtk_signal_connect_after(slot[0], "realize",
+			GTK_SIGNAL_FUNC(reset_cursor), (gpointer)setcur_key);
+	gtk_object_set_data_by_id(slot[0], setcur_key, cursor ? cursor[0] :
+		(gpointer)(-1));
+
 	if (w->window) gdk_window_set_cursor(w->window, cursor ? cursor[0] : NULL);
 }
 
@@ -6214,10 +6419,16 @@ int cmd_checkv(void **slot, int idx)
 	}
 	else if (op < op_EVT_0) // Regular widget
 	{
-		GtkWidget *w = gtk_widget_get_toplevel(slot[0]);
-		if (!GTK_IS_WINDOW(w)) return (FALSE);
-		w = GTK_WINDOW(w)->focus_widget;
-		return (w && ((w == slot[0]) || gtk_widget_is_ancestor(w, slot[0])));
+		if (idx == SLOT_SENSITIVE)
+			return (GTK_WIDGET_SENSITIVE(slot[0]));
+		if (idx == SLOT_FOCUSED)
+		{
+			GtkWidget *w = gtk_widget_get_toplevel(slot[0]);
+			if (!GTK_IS_WINDOW(w)) return (FALSE);
+			w = GTK_WINDOW(w)->focus_widget;
+			return (w && ((w == slot[0]) ||
+				gtk_widget_is_ancestor(w, slot[0])));
+		}
 	}
 	return (FALSE);
 }

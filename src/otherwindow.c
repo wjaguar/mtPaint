@@ -139,7 +139,6 @@ typedef struct {
 
 static void create_new(newwin_dd *dt, void **wdata)
 {
-	GtkWidget *new_window = GET_REAL_WINDOW(wdata);
 	png_color *pal;
 	int im_type, new_window_type = dt->type;
 	int nw, nh, nc, err = 1, bpp;
@@ -154,24 +153,8 @@ static void create_new(newwin_dd *dt, void **wdata)
 
 	if (im_type == 4) /* Screenshot */
 	{
-#if GTK_MAJOR_VERSION == 1
-		gdk_window_lower( main_window->window );
-		gdk_window_lower( new_window->window );
-
-		gdk_flush();
-		handle_events();	// Wait for minimize
-
-		sleep(1);		// Wait a second for screen to redraw
-#else /* #if GTK_MAJOR_VERSION == 2 */
-		gtk_window_set_transient_for( GTK_WINDOW(new_window), NULL );
-		gdk_window_iconify( new_window->window );
-		gdk_window_iconify( main_window->window );
-
-		gdk_flush();
-		handle_events(); 	// Wait for minimize
-
-		g_usleep(400000);	// Wait 0.4 of a second for screen to redraw
-#endif
+		// Ensure that both this window and the main one are offscreen
+		cmd_setv(wdata, (void *)(TRUE), WINDOW_DISAPPEAR);
 
 		// Use current layer
 		if (!new_window_type)
@@ -192,10 +175,8 @@ static void create_new(newwin_dd *dt, void **wdata)
 			else layer_delete(layers_total);
 		}
 
-#if GTK_MAJOR_VERSION == 2
-		gdk_window_deiconify( main_window->window );
-#endif
-		gdk_window_raise( main_window->window );
+		// Let main window onscreen again
+		cmd_setv(main_window_, (void *)(FALSE), WINDOW_DISAPPEAR);
 	}
 
 	if (im_type == 3) /* Clipboard */

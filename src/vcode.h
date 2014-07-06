@@ -135,6 +135,7 @@ enum {
 	op_PATHs,
 	op_TEXT,
 	op_COMBOENTRY,
+	op_FONTSEL,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -220,6 +221,7 @@ enum {
 	op_EVT_MXMOUSE, // movement, with same
 	op_EVT_RXMOUSE, // release, with same
 	op_EVT_CROSS, // enter/leave, with flag
+	op_EVT_SCROLL, // with 2 directions
 	op_EVT_EXT, // generic event with extra data
 	op_EVT_DRAGFROM, // with drag data & ret
 	op_EVT_DROP, // with drag data 
@@ -322,6 +324,12 @@ typedef struct {
 	int pressure;	// scaled to 0..MAX_PRESSURE
 } mouse_ext;
 
+//	Structure which is provided to SCROLL event
+typedef struct {
+	int xscroll, yscroll;
+	unsigned int state;
+} scroll_ext;
+
 //	Structure which is supplied to CLIPFORM
 typedef struct {
 	char *target;	// MIME type
@@ -344,6 +352,19 @@ typedef struct {
 	void *data;
 	int len;
 } copy_ext;
+
+//	Values of mouse count
+enum {
+	MCOUNT_RELEASE	= -1,
+	MCOUNT_MOVE	= 0,
+	MCOUNT_CLICK	= 1,
+	MCOUNT_2CLICK	= 2,
+	MCOUNT_3CLICK	= 3,
+	/* Used to denote other events */
+	MCOUNT_ENTER	= 10,
+	MCOUNT_LEAVE,
+	MCOUNT_NOTHING
+};
 
 #define _Cmask (GDK_CONTROL_MASK)
 #define _Smask (GDK_SHIFT_MASK)
@@ -696,6 +717,7 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
 #define COMBOENTRY(V,SP,H) WBr2hf(COMBOENTRY, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(OK, H)
+#define FONTSEL(A) WBrhf(FONTSEL, 1), WBfield(A)
 #define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
 #define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
@@ -891,6 +913,9 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 //	Extra data of WINDOW
 #define WINDOW_TITLE	0
 #define WINDOW_ESC_BTN	1
+#define WINDOW_FOCUS	2
+#define WINDOW_RAISE	3
+#define WINDOW_DISAPPEAR 4
 
 //	Extra data of COLOR
 #define COLOR_RGBA	0
@@ -912,8 +937,11 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 
 //	Extra data of CANVASIMG and CANVAS
 #define CANVAS_SIZE	0
-#define CANVAS_REPAINT	1
-#define CANVAS_PAINT	2
+#define CANVAS_VPORT	1
+#define CANVAS_REPAINT	2
+#define CANVAS_PAINT	3
+#define CANVAS_FIND_MOUSE  4	/* mouse_ext: as motion event */
+#define CANVAS_BMOVE_MOUSE 5
 
 //	Extra data of FCIMAGE
 #define FCIMAGE_XY	0
@@ -933,4 +961,5 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define CLIP_PROCESS	1
 
 //	Extra state of all regular widgets
-#define SLOT_FOCUSED	0
+#define SLOT_SENSITIVE	0
+#define SLOT_FOCUSED	1

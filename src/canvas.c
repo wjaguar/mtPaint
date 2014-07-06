@@ -839,7 +839,8 @@ void pressed_paste(int centre)
 
 			copy4(marq0, marq_xy);
 			locate_marquee(mxy, TRUE);
-			wjcanvas_get_vport(drawing_canvas, vxy);
+			// !!! Could use CSCROLL_XYSIZE here instead
+			cmd_peekv(drawing_canvas, vxy, sizeof(vxy), CANVAS_VPORT);
 			if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
 				vxy[2] - margin_main_x, vxy[3] - margin_main_y, mxy) ||
 				((vxy[2] - vxy[0] < MIN_VISIBLE) &&
@@ -1150,8 +1151,7 @@ void update_menus()			// Update edit/undo menu
 
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
-// !!! Use V-code API for this later
-		!GTK_WIDGET_IS_SENSITIVE(icon_buttons[SMUDGE_TOOL_ICON][0]))
+		!cmd_checkv(icon_buttons[SMUDGE_TOOL_ICON], SLOT_SENSITIVE))
 		change_to_tool(DEFAULT_TOOL_ICON);
 }
 
@@ -1175,9 +1175,9 @@ void update_stuff(int flags)
 		update_titlebar();
 	if (flags & CF_GEOM)
 	{
-		int w, h;
-		canvas_size(&w, &h);
-		wjcanvas_size(drawing_canvas, w, h);
+		int wh[2];
+		canvas_size(wh + 0, wh + 1);
+		cmd_setv(drawing_canvas, wh, CANVAS_SIZE);
 	}
 	if (flags & CF_CGEOM)
 		if (marq_status >= MARQUEE_PASTE) flags |= CF_DRAW;
@@ -1233,7 +1233,7 @@ void update_stuff(int flags)
 	if (flags & CF_GMODE)
 		if ((tool_type == TOOL_GRADIENT) && grad_opacity) flags |= CF_DRAW;
 	if (flags & CF_DRAW)
-		if (drawing_canvas) gtk_widget_queue_draw(drawing_canvas);
+		if (drawing_canvas) cmd_repaint(drawing_canvas);
 	if (flags & CF_VDRAW)
 		if (view_showing && vw_drawing) cmd_repaint(vw_drawing);
 	if (flags & CF_PDRAW)
@@ -2079,8 +2079,10 @@ void align_size(float new_zoom)		// Set new zoom level
 
 		if (cursor_zoom)
 		{
-			gdk_window_get_pointer(drawing_canvas->window,
-				&x, &y, NULL);
+			mouse_ext m;
+			cmd_peekv(drawing_canvas, &m, sizeof(m), CANVAS_FIND_MOUSE);
+			x = m.x - xyhv[0];
+			y = m.y - xyhv[1];
 			if ((x >= 0) && (x < w) && (y >= 0) && (y < h))
 				dx = x * 2 - w , dy = y * 2 - h;
 		}
@@ -2112,7 +2114,7 @@ void realign_size()		// Reapply old zoom
 	 * resize, I preset both position and range of CSCROLL here - WJ */
 	cmd_setv(scrolledwindow_canvas, xywh, CSCROLL_XYRANGE);
  
-	wjcanvas_size(drawing_canvas, xywh[2], xywh[3]);
+	cmd_setv(drawing_canvas, xywh + 2, CANVAS_SIZE);
 	vw_focus_view();	// View window position may need updating
 	toolbar_zoom_update();	// Zoom factor may have been reset
 }
@@ -2407,7 +2409,7 @@ void line_to_gradient()
 	}
 }
 
-void tool_action(int event, int x, int y, int button, gdouble pressure)
+void tool_action(int count, int x, int y, int button, int pressure)
 {
 	static double lstep;
 	linedata ncline;
@@ -2437,14 +2439,15 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 
 	if ( tablet_working )
 	{
-		pressure = pressure <= 0.2 ? -1.0 : pressure >= 1.0 ? 0.0 :
-			(pressure - 1.0) * (1.0 / 0.8);
+// !!! Later, switch the calculations to integer
+		double p = pressure <= (MAX_PRESSURE * 2 / 10) ? -1.0 :
+			(pressure - MAX_PRESSURE) * (10.0 / (8 * MAX_PRESSURE));
 
 		for (i = 0; i < 3; i++)
 		{
 			if (!tablet_tool_use[i]) continue;
 			tool_state.var[i] *= (tablet_tool_factor[i] > 0) +
-				tablet_tool_factor[i] * pressure;
+				tablet_tool_factor[i] * p;
 			if (tool_state.var[i] < 1) tool_state.var[i] = 1;
 		}
 	}
@@ -2472,7 +2475,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 				grad_info svgrad = gradient[mem_channel];
 
 				/* If not called from draw_arrow() */
-				if (event != GDK_NOTHING) line_to_gradient();
+				if (count != MCOUNT_NOTHING) line_to_gradient();
 
 				mem_undo_next(UNDO_TOOL);
 				if ( tool_size > 1 )
@@ -2517,8 +2520,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			paint_marquee(MARQ_MOVE, x - marq_drag_x, y - marq_drag_y, NULL);
 		}
 		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
-			(((button == 3) && (event == GDK_BUTTON_PRESS)) ||
-			((button == 13) && (event == GDK_MOTION_NOTIFY))))
+			(((button == 3) && (count == 1)) || ((button == 13) && !count)))
 		{	// User wants to commit the paste
 			res = 0; /* Fall through to noncontinuous tools */
 		}
@@ -2573,7 +2575,7 @@ void tool_action(int event, int x, int y, int button, gdouble pressure)
 			if ( poly_status == POLY_DRAGGING )
 			{
 				/* Stop forming polygon */
-				if (event == GDK_BUTTON_RELEASE) poly_conclude();
+				if (count < 0) poly_conclude();
 				/* Add another point to polygon */
 				else poly_add_po(x, y);		
 			}
@@ -2831,10 +2833,10 @@ static void locate_marquee(int *xy, int snap)
 	else scale = rint(can_zoom);
 
 	/* Get onscreen coords */
-	x1 = (marq_x1 * scale) / zoom;
-	y1 = (marq_y1 * scale) / zoom;
-	x2 = (marq_x2 * scale) / zoom;
-	y2 = (marq_y2 * scale) / zoom;
+	x1 = floor_div(marq_x1 * scale, zoom);
+	y1 = floor_div(marq_y1 * scale, zoom);
+	x2 = floor_div(marq_x2 * scale, zoom);
+	y2 = floor_div(marq_y2 * scale, zoom);
 	w = abs(x2 - x1) + scale;
 	h = abs(y2 - y1) + scale;
 	xy[2] = (xy[0] = x1 < x2 ? x1 : x2) + w;
@@ -2844,19 +2846,12 @@ static void locate_marquee(int *xy, int snap)
 
 void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
 {
-	unsigned char *rgb;
 	int xy[4], vxy[4], nxy[4], rxy[4], clips[4 * 3];
-	int i, j, nc, r, g, b, rw, rh, offx, offy, wx, wy, mst = marq_status;
+	int i, nc, rgb, rw, rh, offx, offy, wx, wy, mst = marq_status;
 
 
-	nxy[0] = nxy[1] = 0;
-	canvas_size(nxy + 2, nxy + 3);
-	if (ctx) copy4(vxy, ctx->xy);
-	else wjcanvas_get_vport(drawing_canvas, vxy);
-
-	if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-		vxy[2] - margin_main_x, vxy[3] - margin_main_y, nxy) && ctx)
-		return; /* If not in a refresh, must update location anyhow */
+	vxy[0] = vxy[1] = 0;
+	canvas_size(vxy + 2, vxy + 3);
 
 	locate_marquee(xy, action == MARQ_SNAP);
 	copy4(nxy, xy);
@@ -2928,49 +2923,42 @@ void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx)
 	if (action == MARQ_HIDE) return; // All done for clear
 
 	/* Determine visible area */
+	if (ctx) clip(vxy, ctx->xy[0] - margin_main_x, ctx->xy[1] - margin_main_y,
+		ctx->xy[2] - margin_main_x, ctx->xy[3] - margin_main_y, vxy);
 	if (!clip(rxy, nxy[0], nxy[1], nxy[2], nxy[3], vxy)) return;
 
 	/* Draw */
-	r = 255; g = b = 0; /* Draw in red */
+	rgb = RGB_2_INT(255, 0, 0); /* Draw in red */
 	if (marq_status >= MARQUEE_PASTE)
 	{
 		/* Display paste RGB, only if not being called from repaint_canvas */
-		if (show_paste && !ctx) repaint_clipped(marq_x1 < 0 ? 0 : nxy[0] + 1,
-			marq_y1 < 0 ? 0 : nxy[1] + 1, nxy[2] - 1, nxy[3] - 1, vxy);
-		r = g = 0; b = 255; /* Draw in blue */
+		if (show_paste && !ctx) repaint_clipped(nxy[0] + 1, nxy[1] + 1,
+			nxy[2] - 1, nxy[3] - 1, vxy);
+		rgb = RGB_2_INT(0, 0, 255); /* Draw in blue */
 	}
 
 	rw = rxy[2] - rxy[0];
 	rh = rxy[3] - rxy[1];
-
-	/* Create pattern */
-	j = (rw > rh ? rw : rh) * 3;
-	rgb = malloc(j + 6 * 3); /* 6 pixels for offset */
-	if (!rgb) return;
-	rgb[0] = rgb[3] = rgb[6] = r;
-	rgb[1] = rgb[4] = rgb[7] = g;
-	rgb[2] = rgb[5] = rgb[8] = b;
-	memset(rgb + 9, 255, 9);
-	for (i = 0; i < j; i++) rgb[i + 6 * 3] = rgb[i];
-	offx = ((rxy[0] - nxy[0]) % 6) * 3;
-	offy = ((rxy[1] - nxy[1]) % 6) * 3;
-
 	wx = margin_main_x + rxy[0];
 	wy = margin_main_y + rxy[1];
+	offx = rxy[0] - nxy[0];
+	offy = rxy[1] - nxy[1];
 
-	if ((nxy[0] >= vxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
-		draw_rgb(wx, wy, 1, rh, rgb + offy, ctx);
+	if ((nxy[0] >= rxy[0]) && (marq_x1 >= 0) && (marq_x2 >= 0))
+		draw_dash(rgb, RGB_2_INT(255, 255, 255), offy,
+			wx, wy, 1, rh, ctx);
 
-	if ((nxy[2] <= vxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
-		draw_rgb(wx + rw - 1, wy, 1, rh, rgb + offy, ctx);
+	if ((nxy[2] <= rxy[2]) && (marq_x1 < mem_width) && (marq_x2 < mem_width))
+		draw_dash(rgb, RGB_2_INT(255, 255, 255), offy,
+			wx + rw - 1, wy, 1, rh, ctx);
 
-	if ((nxy[1] >= vxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
-		draw_rgb(wx, wy, rw, 1, rgb + offx, ctx);
+	if ((nxy[1] >= rxy[1]) && (marq_y1 >= 0) && (marq_y2 >= 0))
+		draw_dash(rgb, RGB_2_INT(255, 255, 255), offx,
+			wx, wy, rw, 1, ctx);
 
-	if ((nxy[3] <= vxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
-		draw_rgb(wx, wy + rh - 1, rw, 1, rgb + offx, ctx);
-
-	free(rgb);
+	if ((nxy[3] <= rxy[3]) && (marq_y1 < mem_height) && (marq_y2 < mem_height))
+		draw_dash(rgb, RGB_2_INT(255, 255, 255), offx,
+			wx, wy + rh - 1, rw, 1, ctx);
 }
 
 
@@ -3022,7 +3010,8 @@ static void refresh_lines(const int xy0[4], const int xy1[4])
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	wjcanvas_get_vport(drawing_canvas, ixy);
+	// !!! Could use CSCROLL_XYSIZE here instead
+	cmd_peekv(drawing_canvas, ixy, sizeof(ixy), CANVAS_VPORT);
 	prepare_line_clip(ixy, ixy, scale);
 
 	for (i = j = 0; j < 2; j++)

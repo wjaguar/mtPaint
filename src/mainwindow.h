@@ -281,10 +281,9 @@ char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
 void **main_window_, **settings_dock, **layers_dock, **main_split,
-	**scrolledwindow_canvas,
+	**drawing_canvas, **scrolledwindow_canvas,
 
 	**menu_slots[TOTAL_MENU_IDS];
-GtkWidget *drawing_canvas;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
@@ -298,7 +297,7 @@ void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
 
-void draw_rgb(int x, int y, int w, int h, unsigned char *rgb, rgbcontext *ctx);
+void draw_dash(int c0, int c1, int ofs, int x, int y, int w, int h, rgbcontext *ctx);
 void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx);
 
 void canvas_size(int *w, int *h);	// Get zoomed canvas size
