@@ -1051,7 +1051,7 @@ static void layer_bar_click(layers_dd *dt, void **wdata, int what, void **where)
 #define WBbase layers_dd
 static void *layers_code[] = {
 	TOPVBOX,
-	BORDER(XSCROLL, 0),
+	BORDER(SCROLL, 0), BORDER(LISTCC, 0),
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	IDXCOLUMN(0, 1, 40, 1), // center
@@ -1077,7 +1077,8 @@ static void *layers_code[] = {
 		ACTMOD(DLG_LAYERS, 1)),
 	WDONE,
 	TABLEs(3, 4, 5),
-	BORDER(TLABEL, 0), BORDER(SPIN, 0), BORDER(SPINSLIDE, 0),
+	BORDER(LABEL, 0), BORDER(ENTRY, 0),
+	BORDER(SPIN, 0), BORDER(SPINSLIDE, 0),
 	TLABEL(_("Layer Name")),
 	REF(nmentry), MINWIDTH(100), TLENTRY(lname, LAYER_NAMELEN - 1, 1, 0, 2),
 	EVENT(CHANGE, layer_inputs_changed),

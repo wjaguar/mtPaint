@@ -653,6 +653,7 @@ typedef struct {
 #define WBbase fdialog_dd
 static void *fdialog_code[] = {
 	ONTOP(xw), DIALOGpm(title),
+	BORDER(LABEL, 8),
 	WLABELp(what),
 	XPENTRY(fname, PATHBUF), FOCUS,
 	WDONE, // vbox
@@ -909,7 +910,7 @@ void fpick_set_filename(GtkWidget *fp, char *name, int raw)
 static void *fpick_code[] = {
 	IDENT(FP_KEY),
 	WPWHEREVER, WINDOWpm(title), EVENT(DESTROY, fpick_destroy),
-	HBOXbp(0, 0, 5),
+	HBOXP,
 	// ------- Combo Box -------
 	REF(combo), COMBOENTRY(cdir, cpp, fpick_combo_changed),
 	// ------- Toolbar -------
@@ -923,7 +924,7 @@ static void *fpick_code[] = {
 		case_insensitive),
 	WDONE, WDONE,
 	// ------- File List -------
-	XHBOXbp(0, 0, 5),
+	XHBOXP,
 	XSCROLL(1, 2), // auto/always
 	WLIST,
 	NRFILECOLUMNDax(_("Name"), COL_NAME, 250, 0, "fpick_col1"),
@@ -939,28 +940,28 @@ static void *fpick_code[] = {
 	// ------- Extra widget section -------
 	REF(hbox), HBOXPr, WDONE,
 	// ------- Entry Box -------
-	HBOXbp(0, 0, 5),
+	HBOXP,
 	REF(entry), XPENTRY(fname, PATHBUF),
 	EVENT(KEY, fpick_entry_key), EVENT(OK, fpick_btn),
 	UNLESS(allow_files), HIDDEN, IF(entry_f), FOCUS,
 	WDONE,
 	// ------- Buttons -------
-	UOKBOXp0,
-	MINWIDTH(100), EBUTTON(_("OK"), fpick_btn),
-	MINWIDTH(100), ECANCELBTN(_("Cancel"), fpick_btn),
+	HBOX,
+	MINWIDTH(110), EBUTTON(_("OK"), fpick_btn),
+	MINWIDTH(110), ECANCELBTN(_("Cancel"), fpick_btn),
 	WEND
 };
 #undef WBbase
 
-GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
+GtkWidget *fpick(GtkWidget **box, char *title, int flags, void **r)
 {
 	fpick_dd tdata, *dt;
 	void **res;
 	int i;
 
 	memset(&tdata, 0, sizeof(tdata));
-	tdata.title = *(char **)(ddata + (int)pp[2]);
-	tdata.flags = *(int *)(ddata + (int)pp[3]);
+	tdata.title = title;
+	tdata.flags = flags;
 	tdata.ok = NEXT_SLOT(r);
 	tdata.cancel = SLOT_N(r, 2);
 
@@ -991,7 +992,7 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 	dt->cpp = dt->cp;
 	cmd_reset(dt->combo, dt);
 
-	*--*wpp = dt->hbox[0];
+	*box = dt->hbox[0];
 	return (GET_REAL_WINDOW(res));
 }
 
@@ -1002,33 +1003,34 @@ GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
 
 #ifdef U_FPICK_GTKFILESEL		/* GtkFileSelection based dialog */
 
-GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r)
+GtkWidget *fpick(GtkWidget **box, char *title, int flags, void **r)
 {
 #if GTK_MAJOR_VERSION == 1
 	GtkAccelGroup* ag = gtk_accel_group_new();
 #endif
-	GtkWidget *box, *fp;
-	int flags = *(int *)(ddata + (int)pp[3]);
+	GtkWidget *fp;
+	GtkFileSelection *fs;
 
-	fp = gtk_file_selection_new(__(*(char **)(ddata + (int)pp[2])));
+	fp = gtk_file_selection_new(__(title));
+	fs = GTK_FILE_SELECTION(fp);
 	gtk_window_set_modal(GTK_WINDOW(fp), TRUE);
 	if ( flags & FPICK_DIRS_ONLY )
 	{
-		gtk_widget_hide(GTK_WIDGET(GTK_FILE_SELECTION(fp)->selection_entry));
-		gtk_widget_set_sensitive(GTK_WIDGET(GTK_FILE_SELECTION(fp)->file_list),
+		gtk_widget_hide(GTK_WIDGET(fs->selection_entry));
+		gtk_widget_set_sensitive(GTK_WIDGET(fs->file_list),
 			FALSE);		// Don't let the user select files
 	}
 
-	add_click(NEXT_SLOT(r), GTK_FILE_SELECTION(fp)->ok_button);
-	add_click(SLOT_N(r, 2), GTK_FILE_SELECTION(fp)->cancel_button);
-	add_del(SLOT_N(r, 2), fp);
+	gtk_signal_connect_object(GTK_OBJECT(fs->ok_button), "clicked",
+		GTK_SIGNAL_FUNC(do_evt_1_d), (gpointer)NEXT_SLOT(r));
+	gtk_signal_connect_object(GTK_OBJECT(fs->cancel_button), "clicked",
+		GTK_SIGNAL_FUNC(do_evt_1_d), (gpointer)SLOT_N(r, 2));
 
-	*--*wpp = box = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(box);
-	pack(GTK_FILE_SELECTION(fp)->main_vbox, box);
+	*box = pack(fs->main_vbox, gtk_hbox_new(FALSE, 0));
+	gtk_widget_show(*box);
 
 #if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
-	gtk_widget_add_accelerator(GTK_FILE_SELECTION(fp)->cancel_button,
+	gtk_widget_add_accelerator(fs->cancel_button,
 		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
 	gtk_window_add_accel_group(GTK_WINDOW(fp), ag);
 #endif

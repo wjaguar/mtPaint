@@ -273,27 +273,28 @@ static void *info_code[] = {
 		TLLABEL(_("Total layer memory usage"), 0, 5),
 	ENDIF(1),
 	WDONE,
-	BORDER(FRBOX, 0),
-	FVBOX(_("Colour Histogram")),
+	BORDER(TABLE, 0),
+	FTABLE(_("Colour Histogram"), 2, 2),
 	TALLOC(rgb_mem, wh[2]),
-	REF(drawingarea), WRGBIMAGE(rgb_mem, wh),
-	CHECK(_("Normalize"), norm), EVENT(CHANGE, hs_click_normalize), TRIGGER,
+	REF(drawingarea), TLRGBIMAGE(rgb_mem, wh, 0, 0),
+	TLCHECK(_("Normalize"), norm, 0, 1), EVENT(CHANGE, hs_click_normalize),
+		TRIGGER,
 	WDONE,
 	IFx(indexed, 1),
 ///	Big index table
-		BORDER(FRBOX, 4),
-		FSCROLLp(col_h, 1, 1), // auto/auto
-		STABLE(3, 256 + 3),
+		BORDER(SCROLL, 0),
+		XFRAMEp(col_h), VBOXbp(0, 4, 0), XSCROLL(1, 1), // auto/auto
+		BORDER(TABLE, 0),
+		TABLE(3, 256 + 3),
 		TLLABEL(_("Index"), 0, 0),
 		TLLABEL(_("Canvas pixels"), 1, 0),
 		TLLABEL("%", 2, 0),
-		BORDER(TLABEL, 0),
+		BORDER(LABEL, 0),
 		TLTEXTp(col_d, 0, 1), CLEANUP(col_d),
-		WDONE,
+		WDONE, WDONE, // VBOXbp, TABLE
 	ENDIF(1),
 	HSEP,
-	BORDER(OKBOX, 0),
-	OKBOX(_("OK"), NULL, NULL, NULL),
+	UDONEBTN(_("OK"), NULL),
 	WSHOW
 };
 #undef WBbase

@@ -291,13 +291,13 @@ static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
 static void *pref_code[] = {
 	WINDOW(_("Preferences")), // nonmodal
 	MKSHRINK, // shrinkable
-	BORDER(XSCROLL, 0),
+	BORDER(SCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
 	WANTMAX, // max size
-	SNBOOK,
+	BORDER(NBOOK, 0),
+	NBOOKl,
 	BORDER(TABLE, 10),
-	BORDER(TLABEL, 4), BORDER(SPIN, 4),
-	BORDER(LABEL, 0),
+	BORDER(LABEL, 4), BORDER(SPIN, 4),
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")),
 #ifdef U_THREADS
@@ -316,9 +316,11 @@ static void *pref_code[] = {
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
 	BORDER(OPT, 0),
-	FVBOXb(_("Language"), 5, 5),
-	MLABEL(_("Select preferred language translation\n\n"
+	FVBOXBS(_("Language")),
+	BORDER(LABEL, 0),
+	MLABELc(_("Select preferred language translation\n\n"
 	"You will need to restart mtPaint\nfor this to take full effect")),
+	BORDER(LABEL, 4),
 	OPT(pref_langs, PREF_LANGS, lang),
 	WDONE,
 #endif
@@ -390,13 +392,15 @@ static void *pref_code[] = {
 	WDONE,
 ///	---- TAB6 - TABLET
 	PAGE(_("Tablet")),
-	FVBOX(_("Device Settings")),
+	FVBOXB(_("Device Settings")),
+	BORDER(LABEL, 0),
 	REFv(label_tablet_device), MLABELxr("", 5, 5, 0),
 	BORDER(BUTTON, 0),
 	UBUTTON(_("Configure Device"), conf_tablet),
 	DEFBORDER(BUTTON),
+	BORDER(TABLE, 0),
 	XTABLE(2, 4),
-	BORDER(TLABEL, 0), BORDER(CHECK, 0),
+	BORDER(CHECK, 0),
 	TLABELx(_("Tool Variable"), 5, 5, 5),
 	TLLABELpx(factor_str, 1, 0, 5, 5, 4),
 	TLCHECKv(_("Size"), tablet_tool_use[0], 0, 1),
@@ -408,16 +412,14 @@ static void *pref_code[] = {
 	TLSPINSLIDEs(tf[1], -100, 100, 1, 2),
 	TLSPINSLIDEs(tf[2], -100, 100, 1, 3),
 	WDONE, WDONE,
-	FVBOX(_("Test Area")),
+	FVBOXB(_("Test Area")),
 	COLORPATCHv("\xFF\xFF\xFF", 128, 64), // white
 	EVENT(XMOUSE, tablet_preview), EVENT(MXMOUSE, tablet_preview),
-	REFv(label_tablet_pressure), MLABELxr("", 0, 0, 0),
+	REFv(label_tablet_pressure), MLABELr(""),
 	WDONE, WDONE,
 	WDONE, // notebook
 ///	Bottom of Prefs window
-	BORDER(OKBOX, 0),
-	OKBOX(_("OK"), prefs_evt, _("Cancel"), prefs_evt),
-	OKADD(_("Apply"), prefs_evt),
+	OKBOX3(_("OK"), prefs_evt, _("Cancel"), prefs_evt, _("Apply"), prefs_evt),
 	WSHOW
 };
 #undef WBbase

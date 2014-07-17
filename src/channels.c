@@ -247,12 +247,12 @@ static void *cchan_code[] = {
 	FRPACK(_("Channel Type"), channames_ + CHN_ALPHA,
 		NUM_CHANNELS - CHN_ALPHA, 1, chan),
 	IF(sens), INSENS,
-	FVBOX(_("Initial Channel State")),
+	FVBOXB(_("Initial Channel State")),
+	BORDER(RPACK, 0),
 	RPACKD(names, 0, state),
 	HSEP,
 	CHECK(_("Inverted"), inv),
 	WDONE,
-	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), click_newchan_ok, _("Cancel"), click_newchan_cancel),
 	WSHOW
 };
@@ -316,7 +316,7 @@ static void *dchan_code[] = {
 	IF(cc[CHN_SEL]),   CHECK(_("Selection"), cf[CHN_SEL]),
 	IF(cc[CHN_MASK]),  CHECK(_("Mask"), cf[CHN_MASK]),
 	HSEPl(200),
-	OKBOX(_("OK"), click_delete_ok, _("Cancel"), NULL),
+	OKBOXB(_("OK"), click_delete_ok, _("Cancel"), NULL),
 	WSHOW
 };
 #undef WBbase

@@ -4413,11 +4413,11 @@ static void *main_code[] = {
 	REFv(toolbar_boxes[TOOLBAR_STATUS]),
 	STATUSBAR, UNLESSv(toolbar_status[TOOLBAR_STATUS]), HIDDEN,
 	/* Labels visibility is set later by init_status_bar() */
-	REFv(label_bar[STATUS_GEOMETRY]), STLABEL(0, 0, 0),
-	REFv(label_bar[STATUS_CURSORXY]), STLABEL(90, 1, 0),
-	REFv(label_bar[STATUS_PIXELRGB]), STLABEL(0, 0, 0),
-	REFv(label_bar[STATUS_SELEGEOM]), STLABEL(0, 0, 1),
-	REFv(label_bar[STATUS_UNDOREDO]), STLABEL(70, 1, 1),
+	REFv(label_bar[STATUS_GEOMETRY]), STLABEL(0, 0),
+	REFv(label_bar[STATUS_CURSORXY]), STLABEL(90, 1),
+	REFv(label_bar[STATUS_PIXELRGB]), STLABEL(0, 0),
+	REFv(label_bar[STATUS_SELEGEOM]), STLABELe(0, 0),
+	REFv(label_bar[STATUS_UNDOREDO]), STLABELe(70, 1),
 	WDONE, // statusbar
 	WDONE, // xvbox
 	WDONE, // xhbox
@@ -4426,7 +4426,7 @@ static void *main_code[] = {
 	REFv(dock_book), NBOOKr, KEEPWIDTH, WANTKEYS(dock_esc),
 	IFx(cline_d, 1),
 		PAGEi(XPM_ICON(cline), 0),
-		BORDER(XSCROLL, 0),
+		BORDER(SCROLL, 0),
 		XSCROLL(1, 1), // auto/auto
 		WLIST,
 		RTXTCOLUMNDi(0, 0),

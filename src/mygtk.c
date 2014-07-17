@@ -58,101 +58,10 @@ GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos,
 	return win;
 }
 
-#if 0 /* Not needed anymore */
-GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler )
-{
-	GtkWidget *button = gtk_button_new_with_label(text);
-	gtk_widget_show (button);
-	gtk_box_pack_start (GTK_BOX (box), button, filler, filler, 0);
-	gtk_container_set_border_width (GTK_CONTAINER (button), bord);
-
-	return button;
-}
-#endif
-
 GtkWidget *add_a_spin( int value, int min, int max )
 {
 	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 0), 0));
 }
-
-#if 0 /* Not needed anymore */
-GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box )
-{
-	GtkWidget *table = pack(box, gtk_table_new(rows, columns, FALSE));
-	gtk_widget_show(table);
-	gtk_container_set_border_width(GTK_CONTAINER(table), bord);
-
-	return table;
-}
-
-GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value )
-{
-	return (pack(box, sig_toggle(label, value, NULL, NULL)));
-}
-
-GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
-	int l, int spacing)
-{
-	GtkWidget *label;
-
-	label = gtk_label_new(text);
-	gtk_widget_show(label);
-	gtk_table_attach(GTK_TABLE(table), label, column, column + l, row, row + 1,
-		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (0), spacing, spacing);
-	gtk_label_set_justify(GTK_LABEL (label), GTK_JUSTIFY_LEFT);
-	gtk_misc_set_alignment(GTK_MISC (label), 0.0, 0.5);
-
-	return (label);
-}
-
-GtkWidget *add_to_table(char *text, GtkWidget *table, int row, int column, int spacing)
-{
-	return (add_to_table_l(text, table, row, column, 1, spacing));
-}
-
-GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
-	int expand, int spacing)
-{
-	gtk_table_attach(GTK_TABLE(table), widget, column, column + 1, row, row + 1,
-		expand ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, spacing);
-	return (widget);
-}
-
-GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
-	int l, int spacing)
-{
-	gtk_table_attach(GTK_TABLE(table), widget, column, column + l, row, row + 1,
-		(GtkAttachOptions)(GTK_FILL), (GtkAttachOptions) (0), 0, spacing);
-	return (widget);
-}
-
-GtkWidget *spin_to_table(GtkWidget *table, int row, int column, int spacing,
-	int value, int min, int max)
-{
-	GtkWidget *spin = add_a_spin( value, min, max );
-	gtk_table_attach(GTK_TABLE(table), spin, column, column+1, row, row+1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, spacing);
-	return (spin);
-}
-
-GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
-	double value, double min, double max)
-{
-	GtkWidget *spin = add_float_spin(value, min, max);
-	gtk_table_attach(GTK_TABLE(table), spin, column, column+1, row, row+1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, spacing);
-	return (spin);
-}
-
-void add_hseparator( GtkWidget *widget, int xs, int ys )
-{
-	GtkWidget *sep = pack(widget, gtk_hseparator_new());
-	gtk_widget_show(sep);
-	gtk_widget_set_usize(sep, xs, ys);
-}
-#endif
 
 
 
@@ -180,6 +89,7 @@ static void delete_progress()
 static void *progress_code[] = {
 	WIDTH(400), WINDOWm(_("Please Wait ...")),
 	EVENT(CANCEL, delete_progress),
+	BORDER(FRAME, 0),
 	EFVBOX, // originally was box in viewport
 	REF(pbar), PROGRESSp(what),
 	IFx(can_stop, 1),
@@ -239,6 +149,7 @@ typedef struct {
 #define WBbase alert_dd
 static void *alert_code[] = {
 	DIALOGpm(title),
+	BORDER(LABEL, 8),
 	WLABELp(what),
 	WDONE, // vbox
 	BORDER(BUTTON, 2),
@@ -277,22 +188,6 @@ int alert_box(char *title, char *message, char *text1, ...)
 
 	return (res);
 }
-
-// Add page to notebook
-
-#if 0 /* Not needed anymore */
-GtkWidget *add_new_page(GtkWidget *notebook, char *name)
-{
-	GtkWidget *page, *label;
-
-	page = gtk_vbox_new(FALSE, 0);
-	gtk_widget_show(page);
-	label = gtk_label_new(name);
-	gtk_widget_show(label);
-	gtk_notebook_append_page(GTK_NOTEBOOK(notebook), page, label);
-	return (page);
-}
-#endif
 
 // Slider-spin combo (practically a new widget class)
 
@@ -408,86 +303,6 @@ int wj_radio_pack_get_active(GtkWidget *widget)
 	}
 	return (0);
 }
-
-// Convert window close into a button click ("Cancel" or whatever)
-
-static gboolean do_delete_to_click(GtkWidget *widget, GdkEvent *event, gpointer data)
-{
-	gtk_signal_emit_by_name(GTK_OBJECT(data), "clicked");
-	return (TRUE); // Click handler can destroy window, or let it be
-}
-
-void delete_to_click(GtkWidget *window, GtkWidget *button)
-{
-	gtk_signal_connect(GTK_OBJECT(window), "delete_event",
-		GTK_SIGNAL_FUNC(do_delete_to_click), button);
-}
-
-// Buttons for standard dialogs
-
-#if 0 /* Not needed anymore */
-GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
-	char *nCancel, GtkSignalFunc Cancel)
-{
-	GtkWidget *hbox, *ok_button, *cancel_button;
-	GtkAccelGroup* ag = gtk_accel_group_new();
-
-
-	hbox = gtk_hbox_new(TRUE, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
-
-	ok_button = cancel_button = gtk_button_new_with_label(nOK);
-	gtk_container_set_border_width(GTK_CONTAINER(ok_button), 5);
-	gtk_signal_connect_object(GTK_OBJECT(ok_button), "clicked",
-		OK, GTK_OBJECT(window));
-	if (nCancel)
-	{
-		cancel_button = xpack(hbox, gtk_button_new_with_label(nCancel));
-		gtk_container_set_border_width(GTK_CONTAINER(cancel_button), 5);
-		gtk_signal_connect_object(GTK_OBJECT(cancel_button), "clicked",
-			Cancel, GTK_OBJECT(window));
-	}
-	xpack(hbox, ok_button);
-
-	gtk_widget_add_accelerator(cancel_button, "clicked", ag, GDK_Escape, 0,
-		(GtkAccelFlags)0);
-	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_Return, 0,
-		(GtkAccelFlags)0);
-	gtk_widget_add_accelerator(ok_button, "clicked", ag, GDK_KP_Enter, 0,
-		(GtkAccelFlags)0);
- 
-	gtk_window_add_accel_group(GTK_WINDOW(window), ag);
-	delete_to_click(window, cancel_button);
-	gtk_object_set_user_data(GTK_OBJECT(hbox), (gpointer)window);
-	gtk_widget_show_all(hbox);
-	return (hbox);
-}
-
-static GtkObject *OK_box_ins(GtkWidget *box, GtkWidget *button)
-{
-	xpack(box, button);
-	gtk_box_reorder_child(GTK_BOX(box), button, 1);
-	gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-	gtk_widget_show(button);
-	return (GTK_OBJECT(gtk_object_get_user_data(GTK_OBJECT(box))));
-}
-
-GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler)
-{
-	GtkWidget *button = gtk_button_new_with_label(name);
-	GtkObject *win = OK_box_ins(box, button);
-	gtk_signal_connect_object(GTK_OBJECT(button), "clicked", Handler, win);
-	return (button);
-}
-
-GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler)
-{
-	GtkWidget *button = gtk_toggle_button_new_with_label(name);
-	GtkObject *win = OK_box_ins(box, button);
-	gtk_signal_connect(GTK_OBJECT(button), "toggled", Handler, win);
-	return (button);
-}
-#endif
 
 // Easier way with spinbuttons
 
@@ -655,41 +470,6 @@ char *file_in_homedir(char *dest, const char *file, int cnt)
 	return (file_in_dir(dest, get_home_directory(), file, cnt));
 }
 
-// Extracting widget from GtkTable
-
-#if 0 /* Not needed anymore */
-GtkWidget *table_slot(GtkWidget *table, int row, int col)
-{
-	GList *curr;
-
-	for (curr = GTK_TABLE(table)->children; curr; curr = curr->next)
-	{
-		if ((((GtkTableChild *)curr->data)->left_attach == col) &&
-			(((GtkTableChild *)curr->data)->top_attach == row))
-			return (((GtkTableChild *)curr->data)->widget);
-	}
-	return (NULL);
-}
-
-// Packing framed widget
-
-GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
-	int border, int expand)
-{
-	GtkWidget *frame = gtk_frame_new(text);
-	gtk_widget_show(frame);
-	if (box) gtk_box_pack_start(GTK_BOX(box), frame, !!expand, !!expand, 0);
-	gtk_container_set_border_width(GTK_CONTAINER(frame), border);
-	gtk_container_add(GTK_CONTAINER(frame), widget);
-	return (frame);
-}
-
-GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget)
-{
-	return (add_with_frame_x(box, text, widget, 5, FALSE));
-}
-#endif
-
 // Option menu
 
 static void wj_option(GtkMenuItem *menuitem, gpointer user_data)
@@ -817,74 +597,6 @@ void widget_set_keepsize(GtkWidget *widget, int keep_height)
 		GTK_SIGNAL_FUNC(widget_size_keep), (gpointer)keep_height);
 }
 
-// Signalled toggles
-
-#if 0 /* Not needed anymore */
-static void sig_toggle_toggled(GtkToggleButton *togglebutton, gpointer user_data)
-{
-	*(int *)user_data = gtk_toggle_button_get_active(togglebutton);
-}
-
-static void make_sig_toggle(GtkWidget *tog, int value, gpointer var, GtkSignalFunc handler)
-{
-	if (!handler && var)
-	{
-		*(int *)var = value;
-		handler = GTK_SIGNAL_FUNC(sig_toggle_toggled);
-	}
-
-	gtk_widget_show(tog);
-	gtk_container_set_border_width(GTK_CONTAINER(tog), 5);
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(tog), value);
-	if (handler) gtk_signal_connect(GTK_OBJECT(tog), "toggled", handler,
-		(gpointer)var);
-}
-
-GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler)
-{
-	GtkWidget *tog = gtk_check_button_new_with_label(label);
-	make_sig_toggle(tog, value, var, handler);
-	return (tog);
-}
-
-GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc handler)
-{
-	GtkWidget *tog = gtk_toggle_button_new_with_label(label);
-	make_sig_toggle(tog, value, var, handler);
-	return (tog);
-}
-
-// Path box
-
-static void click_file_browse(GtkWidget *widget, gpointer data)
-{
-	void *xdata[2];
-
-	xdata[0] = gtk_object_get_user_data(GTK_OBJECT(widget)); // title
-	xdata[1] = BOX_CHILD_0(widget->parent); // GtkEntry
-	file_selector_x((int)data, xdata);
-}
-
-GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode)
-{
-	GtkWidget *hbox, *entry, *button;
-
-	hbox = gtk_hbox_new(FALSE, 0);
-	gtk_widget_show(hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
-
-	add_with_frame(box, name, hbox);
-	entry = xpack5(hbox, gtk_entry_new());
-	gtk_widget_show(entry);
-	button = add_a_button(_("Browse"), 2, hbox, FALSE);
-	gtk_object_set_user_data(GTK_OBJECT(button), title);
-	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(click_file_browse), (gpointer)fsmode);
-
-	return (entry);
-}
-#endif
-
 // Workaround for GtkCList reordering bug
 
 /* This bug is the favorite pet of GNOME developer Behdad Esfahbod
@@ -914,29 +626,6 @@ void clist_enable_drag(GtkWidget *clist)
 	gtk_clist_set_reorderable(GTK_CLIST(clist), TRUE);
 }
 
-#endif
-
-// Move browse-mode selection in GtkCList without invoking callbacks
-
-#if 0 /* Not needed anymore */
-void clist_reselect_row(GtkCList *clist, int n)
-{
-	GtkWidget *widget;
-
-	if (n < 0) return;
-#if GTK_MAJOR_VERSION == 1
-	GTK_CLIST_CLASS(((GtkObject *)clist)->klass)->select_row(clist, n, -1, NULL);
-#else /* if GTK_MAJOR_VERSION == 2 */
-	GTK_CLIST_GET_CLASS(clist)->select_row(clist, n, -1, NULL);
-#endif
-	/* !!! Focus fails to follow selection in browse mode - have to move
-	 * it here; but it means a full redraw is necessary afterwards */
-	if (clist->focus_row == n) return;
-	clist->focus_row = n;
-	widget = GTK_WIDGET(clist);
-	if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
-		gtk_widget_queue_draw(widget);
-}
 #endif
 
 // Move browse-mode selection in GtkList
@@ -970,44 +659,6 @@ void destroy_dialog(GtkWidget *window)
 	gtk_widget_destroy(window);
 }
 
-// Settings notebook
-
-GtkWidget *plain_book(GtkWidget **pages, int npages)
-{
-	GtkWidget *notebook = gtk_notebook_new();
-	gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
-	gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
-	while (npages--)
-	{
-		*pages = gtk_vbox_new(FALSE, 0);
-		gtk_notebook_append_page(GTK_NOTEBOOK(notebook), *pages, NULL);
-		pages++;
-	}
-	gtk_widget_show_all(notebook);
-	return (notebook);
-}
-
-#if 0 /* Not needed anymore */
-static void toggle_book(GtkToggleButton *button, GtkNotebook *book)
-{
-	int i = gtk_toggle_button_get_active(button);
-	gtk_notebook_set_page(book, i ? 1 : 0);
-}
-
-GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
-	GtkWidget **button, char *button_label)
-{
-	GtkWidget *notebook, *pages[2];
-
-	notebook = plain_book(pages, 2);
-	*page0 = pages[0];
-	*page1 = pages[1];
-	*button = sig_toggle_button(button_label, FALSE, GTK_NOTEBOOK(notebook),
-		GTK_SIGNAL_FUNC(toggle_book));
-	return (notebook);
-}
-#endif
-
 // Most common use of boxes
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget)
@@ -1028,26 +679,6 @@ GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget)
 	return (widget);
 }
 
-#if 0 /* Not needed anymore */
-GtkWidget *pack5(GtkWidget *box, GtkWidget *widget)
-{
-	gtk_box_pack_start(GTK_BOX(box), widget, FALSE, FALSE, 5);
-	return (widget);
-}
-
-GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget)
-{
-	gtk_box_pack_start(GTK_BOX(box), widget, TRUE, TRUE, 5);
-	return (widget);
-}
-
-GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget)
-{
-	gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, 5);
-	return (widget);
-}
-#endif
-
 // Put vbox into container
 
 GtkWidget *add_vbox(GtkWidget *cont)
@@ -1057,45 +688,6 @@ GtkWidget *add_vbox(GtkWidget *cont)
 	gtk_container_add(GTK_CONTAINER(cont), box);
 	return (box);
 }
-
-// Save/restore window positions
-
-#if 0 /* Not needed anymore */
-void win_store_pos(GtkWidget *window, char *inikey)
-{
-	char name[128];
-	gint xywh[4];
-	int i, l = strlen(inikey);
-
-	memcpy(name, inikey, l);
-	name[l++] = '_'; name[l + 1] = '\0';
-	gdk_window_get_size(window->window, xywh + 2, xywh + 3);
-	gdk_window_get_root_origin(window->window, xywh + 0, xywh + 1);
-	for (i = 0; i < 4; i++)
-	{
-		name[l] = "xywh"[i];
-		inifile_set_gint32(name, xywh[i]);
-	}
-}
-
-void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
-	int defw, int defh)
-{
-	char name[128];
-	int i, l = strlen(inikey), xywh[4] = { defx, defy, defw, defh };
-
-	memcpy(name, inikey, l);
-	name[l++] = '_'; name[l + 1] = '\0';
-	for (i = 0; i < 4; i++)
-	{
-		if (xywh[i] < 0) continue; /* Default of -1 means auto-size */
-		name[l] = "xywh"[i];
-		xywh[i] = inifile_get_gint32(name, xywh[i]);
-	}
-	gtk_window_set_default_size(GTK_WINDOW(window), xywh[2], xywh[3]);
-	gtk_widget_set_uposition(window, xywh[0], xywh[1]);
-}
-#endif
 
 // Fix for paned widgets losing focus in GTK+1
 
@@ -1905,159 +1497,6 @@ int internal_clipboard(int which)
 	gdk_window_get_user_data(win, &widget);
 	return (!!widget); // Real widget or foreign window?
 }
-
-#endif
-
-#if 0 /* Not needed anymore */
-
-/* While GTK+2 allows for synchronous clipboard handling, it's implemented
- * through copying the entire clipboard data - and when the data might be
- * a huge image which mtPaint is bound to allocate *yet again*, this would be
- * asking for trouble - WJ */
-
-typedef int (*clip_function)(GtkSelectionData *data, gpointer user_data);
-
-typedef struct {
-	int flag;
-	clip_function handler;
-	gpointer data;
-} clip_info;
-
-#if GTK_MAJOR_VERSION == 1
-
-static void selection_callback(GtkWidget *widget, GtkSelectionData *data,
-	guint time, clip_info *res)
-{
-	res->flag = (data->length >= 0) && res->handler(data, res->data);
-}
-
-int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data)
-{
-	clip_info res = { -1, (clip_function)handler, data };
-
-	gtk_signal_connect(GTK_OBJECT(main_window), "selection_received",
-		GTK_SIGNAL_FUNC(selection_callback), &res);
-	gtk_selection_convert(main_window,
-		gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE),
-		gdk_atom_intern(what, FALSE), GDK_CURRENT_TIME);
-	while (res.flag == -1) gtk_main_iteration();
-	gtk_signal_disconnect_by_func(GTK_OBJECT(main_window), 
-		GTK_SIGNAL_FUNC(selection_callback), &res);
-	return (res.flag);
-}
-
-static void selection_get_callback(GtkWidget *widget, GtkSelectionData *data,
-	guint info, guint time, gpointer user_data)
-{
-	clip_function cf = g_dataset_get_data(main_window,
-		gdk_atom_name(data->selection));
-	if (cf) cf(data, (gpointer)(int)info);
-}
-
-static void selection_clear_callback(GtkWidget *widget, GdkEventSelection *event,
-	gpointer user_data)
-{
-	clip_function cf = g_dataset_get_data(main_window,
-		gdk_atom_name(event->selection));
-	if (cf) cf(NULL, (gpointer)0);
-}
-
-// !!! GTK+ 1.2 internal type (gtk/gtkselection.c)
-typedef struct {
-	GdkAtom selection;
-	GtkTargetList *list;
-} GtkSelectionTargetList;
-
-int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
-	GtkSignalFunc handler)
-{
-	static int connected;
-	GtkSelectionTargetList *slist;
-	GList *list, *tmp;
-	GdkAtom sel = gdk_atom_intern(which ? "PRIMARY" : "CLIPBOARD", FALSE);
-
-	if (!gtk_selection_owner_set(main_window, sel, GDK_CURRENT_TIME))
-		return (FALSE);
-
-	/* Don't have gtk_selection_clear_targets() in GTK+1 - have to
-	 * reimplement */
-	list = gtk_object_get_data(GTK_OBJECT(main_window), "gtk-selection-handlers");
-	for (tmp = list; tmp; tmp = tmp->next)
-	{
-		if ((slist = tmp->data)->selection != sel) continue;
-		list = g_list_remove_link(list, tmp);
-		gtk_target_list_unref(slist->list);
-		g_free(slist);
-		break;
-	}
-	gtk_object_set_data(GTK_OBJECT(main_window), "gtk-selection-handlers", list);
-
-	/* !!! Have to resort to this to allow for multiple clipboards in X */
-	g_dataset_set_data(main_window, which ? "PRIMARY" : "CLIPBOARD",
-		(gpointer)handler);
-	if (!connected)
-	{
-		gtk_signal_connect(GTK_OBJECT(main_window), "selection_get",
-			GTK_SIGNAL_FUNC(selection_get_callback), NULL);
-		gtk_signal_connect(GTK_OBJECT(main_window), "selection_clear_event",
-			GTK_SIGNAL_FUNC(selection_clear_callback), NULL);
-		connected = TRUE;
-	}
-
-	gtk_selection_add_targets(main_window, sel, targets, ntargets);
-	return (TRUE);
-}
-
-#else /* #if GTK_MAJOR_VERSION == 2 */
-
-static void clipboard_callback(GtkClipboard *clipboard,
-	GtkSelectionData *selection_data, gpointer data)
-{
-	clip_info *res = data;
-	res->flag = (selection_data->length >= 0) &&
-		res->handler(selection_data, res->data);
-}
-
-int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data)
-{
-	clip_info res = { -1, (clip_function)handler, data };
-
-	gtk_clipboard_request_contents(gtk_clipboard_get(which ?
-		GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD),
-		gdk_atom_intern(what, FALSE), clipboard_callback, &res);
-	while (res.flag == -1) gtk_main_iteration();
-	return (res.flag);
-}
-
-static void clipboard_get_callback(GtkClipboard *clipboard,
-	GtkSelectionData *selection_data, guint info, gpointer user_data)
-{
-	((clip_function)user_data)(selection_data, (gpointer)(int)info);
-}
-
-static void clipboard_clear_callback(GtkClipboard *clipboard, gpointer user_data)
-{
-	((clip_function)user_data)(NULL, (gpointer)0);
-}
-
-int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
-	GtkSignalFunc handler)
-{
-	int i;
-
-	/* Two attempts, for GTK+2 function can fail for strange reasons */
-	for (i = 0; i < 2; i++)
-	{
-		if (gtk_clipboard_set_with_data(gtk_clipboard_get(which ?
-			GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD),
-			targets, ntargets, clipboard_get_callback,
-			clipboard_clear_callback, (gpointer)handler))
-			return (TRUE);
-	}
-	return (FALSE);
-}
-
-#endif
 
 #endif
 
@@ -3366,29 +2805,6 @@ void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 #endif
 }
 
-#if 0 /* Not needed anymore */
-void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb)
-{
-	GdkGCValues sv;
-	wjpixmap *pix = WJPIXMAP(widget);
-
-	if (!pix->pixmap) return;
-	gdk_gc_get_values(widget->style->black_gc, &sv);
-	gdk_rgb_gc_set_foreground(widget->style->black_gc, rgb);
-	gdk_draw_rectangle(pix->pixmap, widget->style->black_gc, TRUE, x, y, w, h);
-	gdk_gc_set_foreground(widget->style->black_gc, &sv.foreground);
-#if GTK_MAJOR_VERSION == 1
-	gtk_widget_queue_draw_area(widget, x + pix->pm.x, y + pix->pm.y, w, h);
-#else /* if GTK_MAJOR_VERSION == 2 */
-	if (pix->pixwindow)
-	{
-		GdkRectangle wr = { x, y, w, h };
-		gdk_window_invalidate_rect(pix->pixwindow, &wr, FALSE);
-	}
-#endif
-}
-#endif
-
 void wjpixmap_move_cursor(GtkWidget *widget, int x, int y)
 {
 	wjpixmap *pix = WJPIXMAP(widget);
@@ -3454,15 +2870,6 @@ void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 	if (pix->pixmap) gtk_widget_queue_draw(widget);
 }
 
-#if 0 /* Not needed anymore */
-void wjpixmap_cursor(GtkWidget *widget, int *x, int *y)
-{
-	wjpixmap *pix = WJPIXMAP(widget);
-	if (pix->cursor) *x = pix->xc , *y = pix->yc;
-	else *x = *y = 0;
-}
-#endif
-
 /* Translate allocation-relative coords to pixmap-relative */
 int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 {
@@ -3474,64 +2881,6 @@ int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 	*xr = x; *yr = y;
 	return ((x >= 0) && (x < pix->pm.width) && (y >= 0) && (y < pix->pm.height));
 }
-
-// Repaint expose region
-
-#if 0 /* Not needed anymore */
-#if GTK_MAJOR_VERSION == 2
-
-// !!! For now, repaint_func() is expected to know widget & window to repaint
-void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int cost)
-{
-	GdkRectangle *rects;
-	gint nrects;
-	int i, sz, dx = vport[0], dy = vport[1];
- 
-	gdk_region_get_rectangles(event->region, &rects, &nrects);
-	for (i = sz = 0; i < nrects; i++)
-		sz += rects[i].width * rects[i].height;
-
-	/* Don't bother with regions if not worth it */
-	if (event->area.width * event->area.height - sz > cost * (nrects - 1))
-	{
-		for (i = 0; i < nrects; i++)
-			repaint(rects[i].x + dx, rects[i].y + dy,
-				rects[i].width, rects[i].height);
-	}
-	else repaint(event->area.x + dx, event->area.y + dy,
-		event->area.width, event->area.height);
-	g_free(rects);
-}
-
-#endif
-
-// Track updates of multiple widgets (by whatever means necessary)
-
-/* void handler(GtkWidget *widget) */
-void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...)
-{
-	va_list args;
-	GtkWidget *w;
-
-	va_start(args, widget);
-	for (w = widget; w; w = va_arg(args, GtkWidget *))
-	{
-		if (GTK_IS_SPIN_BUTTON(w))
-		{
-			GtkAdjustment *adj = gtk_spin_button_get_adjustment(
-				GTK_SPIN_BUTTON(w));
-			gtk_signal_connect_object(GTK_OBJECT(adj),
-				"value_changed", handler, GTK_OBJECT(w));
-		}
-		else if (GTK_IS_TOGGLE_BUTTON(w)) gtk_signal_connect(
-			GTK_OBJECT(w), "toggled", handler, NULL);
-		else if (GTK_IS_ENTRY(w)) gtk_signal_connect(
-			GTK_OBJECT(w), "changed", handler, NULL);
-// !!! Add other widget types here
-	}
-	va_end(args);
-}
-#endif
 
 // Convert pathname to absolute
 

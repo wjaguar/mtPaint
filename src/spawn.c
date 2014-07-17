@@ -481,7 +481,7 @@ static void faction_btn(spawn_dd *dt, void **wdata, int what, void **where)
 static void *spawn_code[] = {
 	WINDOWm(_("Configure File Actions")),
 	DEFSIZE(500, 400),
-	XVBOXb(0, 5), // !!! Originally the main vbox was that way
+	XVBOXB, // !!! Originally the main vbox was that way
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	NTXTCOLUMND(_("Action"), spawn_row, name, 200, 0),
@@ -489,13 +489,11 @@ static void *spawn_code[] = {
 	COLUMNDATA(strs, sizeof(spawn_row)), CLEANUP(strs),
 	REF(list), LISTCd(nidx, cnt, faction_select_row), TRIGGER,
 	REF(group), GROUP(1),
-	FHBOX(_("Action")), XENTRY(name), EVENT(CHANGE, faction_changed), WDONE,
-	FHBOX(_("Command")), XENTRY(cmd), EVENT(CHANGE, faction_changed), WDONE,
+	FHBOXB(_("Action")), XENTRY(name), EVENT(CHANGE, faction_changed), WDONE,
+	FHBOXB(_("Command")), XENTRY(cmd), EVENT(CHANGE, faction_changed), WDONE,
 	PATH(_("Directory"), _("Select Directory"), FS_SELECT_DIR, dir),
 	EVENT(CHANGE, faction_changed),
-	BORDER(OKBOX, 0),
-	OKBOX(_("OK"), faction_btn, _("Cancel"), NULL),
-	OKADD(_("Execute"), faction_btn),
+	OKBOX3(_("OK"), faction_btn, _("Cancel"), NULL, _("Execute"), faction_btn),
 	WSHOW
 };
 #undef WBbase

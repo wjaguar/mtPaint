@@ -84,7 +84,6 @@ typedef struct
 
 typedef struct {
 	void **evt;				// Event slot
-	GtkWidget *input_hex;			// Hex input
 	void **drag;				// Drag/drop format
 	void **inputs[CPICK_INPUT_TOT],		// Spin buttons
 		**areas[CPICK_AREA_TOT];	// Focusable pixmaps
@@ -92,6 +91,7 @@ typedef struct {
 	int xy[CPICK_AREA_TOT][2];		// Cursor positions
 	int pal[CPICK_PAL_MAX];			// Palette colors
 	int opacity_f;				// Opacity flag
+	int drop;				// Eyedropper input
 	cpicker c;
 } cpick_dd;
 
@@ -252,17 +252,15 @@ static void cpick_populate_inputs(cpick_dd *dt)
 {
 	cpicker *win = &dt->c;
 	int i, n = CPICK_INPUT_OPACITY - !dt->opacity_f; // skip disabled opacity
-	char txt[32];
 
 	win->lock = TRUE;
 	for (i = 0; i <= n; i++)
 		cmd_set(dt->inputs[i], win->input_vals[i]);
 
-	sprintf(txt, "#%06X", RGB_2_INT(
+	cmd_set(dt->inputs[CPICK_INPUT_HEX], RGB_2_INT(
 		win->input_vals[CPICK_INPUT_RED],
 		win->input_vals[CPICK_INPUT_GREEN],
 		win->input_vals[CPICK_INPUT_BLUE]));
-	gtk_entry_set_text(GTK_ENTRY(dt->input_hex), txt);
 	win->lock = FALSE;
 }
 
@@ -517,28 +515,22 @@ static void cpick_update(cpick_dd *dt, int what)
 	if (dt->evt) do_evt_1_d(dt->evt);
 }
 
-static gboolean cpick_hex_change(GtkWidget *widget, GdkEventFocus *event,
-	gpointer user_data)
+static void cpick_hex_change(cpick_dd *dt, void **wdata, int what, void **where)
 {
-	cpick_dd *dt = user_data;
-	cpicker *cp = &dt->c;
-	GdkColor col;
-	int r, g, b;
+	int r, g, b, rgb;
 
-	if (cp->lock) return (FALSE);
-	if (!gdk_color_parse(gtk_entry_get_text(GTK_ENTRY(widget)), &col))
-		return (FALSE);
-	r = ((int)col.red + 128) / 257;
-	g = ((int)col.green + 128) / 257;
-	b = ((int)col.blue + 128) / 257;
-	if (!((r ^ cp->input_vals[CPICK_INPUT_RED]) |
-		(g ^ cp->input_vals[CPICK_INPUT_GREEN]) |
-		(b ^ cp->input_vals[CPICK_INPUT_BLUE]))) return (FALSE);
-	cp->input_vals[CPICK_INPUT_RED] = r;
-	cp->input_vals[CPICK_INPUT_GREEN] = g;
-	cp->input_vals[CPICK_INPUT_BLUE] = b;
+	if (dt->c.lock) return;
+	rgb = *(int *)cmd_read(where, dt);
+	r = INT_2_R(rgb);
+	g = INT_2_G(rgb);
+	b = INT_2_B(rgb);
+	if (!((r ^ dt->c.input_vals[CPICK_INPUT_RED]) |
+		(g ^ dt->c.input_vals[CPICK_INPUT_GREEN]) |
+		(b ^ dt->c.input_vals[CPICK_INPUT_BLUE]))) return; // no change
+	dt->c.input_vals[CPICK_INPUT_RED] = r;
+	dt->c.input_vals[CPICK_INPUT_GREEN] = g;
+	dt->c.input_vals[CPICK_INPUT_BLUE] = b;
 	cpick_update(dt, CPICK_INPUT_HEX);
-	return (FALSE);
 }
 
 static void cpick_spin_change(cpick_dd *dt, void **wdata, int what, void **where)
@@ -561,8 +553,7 @@ static void dropper_terminate(GtkWidget *widget, gpointer user_data)
 static void dropper_grab_colour(GtkWidget *widget, gint x, gint y,
 	gpointer user_data)
 {
-	cpick_dd *dt = user_data;
-	cpicker *cp = &dt->c;
+	void **slot = user_data, **base = slot[0];
 	unsigned char rgb[3];
 
 #if GTK_MAJOR_VERSION == 1
@@ -575,8 +566,9 @@ static void dropper_grab_colour(GtkWidget *widget, gint x, gint y,
 	/* Ungrab before sending signal - better safe than sorry */
 	dropper_terminate(widget, user_data);
 
-	set_colour(dt, MEM_2_INT(rgb, 0), cp->input_vals[CPICK_INPUT_OPACITY]);
-	if (dt->evt) do_evt_1_d(dt->evt);
+	*(int *)slot_data(PREV_SLOT(slot), GET_DDATA(base)) =
+		MEM_2_INT(rgb, 0); // self-updating
+	do_evt_1_d(slot);
 }
 
 static gboolean dropper_key_press(GtkWidget *widget, GdkEventKey *event,
@@ -614,10 +606,9 @@ static gboolean dropper_mouse_press(GtkWidget *widget, GdkEventButton *event,
 	return (TRUE);
 }
 
-static void cpick_eyedropper(GtkButton *button, gpointer user_data)
+static void click_eyedropper(GtkButton *button, gpointer user_data)
 {
 	static GdkCursor *cursor;
-	cpick_dd *dt = user_data;
 	/* !!! If button itself is used for grab widget, it will receive mouse
 	 * clicks, with obvious result */
 	GtkWidget *grab_widget = GTK_WIDGET(button)->parent;
@@ -627,9 +618,9 @@ static void cpick_eyedropper(GtkButton *button, gpointer user_data)
 	if (do_grab(GRAB_FULL, grab_widget, cursor))
 	{
 		gtk_signal_connect(GTK_OBJECT(grab_widget), "button_release_event",
-			GTK_SIGNAL_FUNC(dropper_mouse_press), dt);
+			GTK_SIGNAL_FUNC(dropper_mouse_press), user_data);
 		gtk_signal_connect(GTK_OBJECT(grab_widget), "key_press_event",
-			GTK_SIGNAL_FUNC(dropper_key_press), dt);
+			GTK_SIGNAL_FUNC(dropper_key_press), user_data);
 	}
 }
 
@@ -709,11 +700,10 @@ static void hex_size_req(GtkWidget *widget, GtkRequisition *requisition,
 
 #endif
 
-static void **add_dropper(void **r, GtkWidget ***wpp, void **wdata)
+GtkWidget *eyedropper(void **r)
 {
-	GtkWidget *button, *iconw, *table = **wpp;
+	GtkWidget *button, *iconw;
 	GdkPixmap *icon, *mask;
-	cpick_dd *dt = GET_DDATA(wdata);
 
 	button = gtk_button_new();
 
@@ -729,39 +719,51 @@ static void **add_dropper(void **r, GtkWidget ***wpp, void **wdata)
 	gdk_pixmap_unref( mask );
 	gtk_container_add( GTK_CONTAINER (button), iconw );
 
-	gtk_table_attach (GTK_TABLE (table), button, 2, 3, 1, 2,
-		(GtkAttachOptions) (GTK_FILL), (GtkAttachOptions) (GTK_FILL),
-		2, 2);
-	gtk_widget_show(button);
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
-		GTK_SIGNAL_FUNC(cpick_eyedropper), dt);
+		GTK_SIGNAL_FUNC(click_eyedropper), NEXT_SLOT(r));
 
-	return (r);
+	return (button);
 }
 
-static void **add_hex(void **r, GtkWidget ***wpp, void **wdata)
+static gboolean hexentry_change(GtkWidget *widget, GdkEventFocus *event,
+	gpointer user_data)
 {
-	GtkWidget *table = **wpp;
-	cpick_dd *dt = GET_DDATA(wdata);
+	void **slot = user_data, **base = slot[0];
+	GdkColor col;
 
-	dt->input_hex = gtk_entry_new();
+	if (!gdk_color_parse(gtk_entry_get_text(GTK_ENTRY(widget)), &col))
+		return (FALSE);
+
+	*(int *)slot_data(PREV_SLOT(slot), GET_DDATA(base)) = RGB_2_INT(
+		((int)col.red + 128) / 257, ((int)col.green + 128) / 257,
+		((int)col.blue + 128) / 257); // self-updating
+	do_evt_1_d(slot);
+
+	return (FALSE);
+}
+
+void set_hexentry(GtkWidget *entry, int c)
+{
+	char txt[32];
+	sprintf(txt, "#%06X", c);
+	gtk_entry_set_text(GTK_ENTRY(entry), txt);
+}
+
+GtkWidget *hexentry(int c, void **r)
+{
+	GtkWidget *entry = gtk_entry_new();
 
 #if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect_after(GTK_OBJECT(dt->input_hex),
+	gtk_signal_connect_after(GTK_OBJECT(entry),
 		"size_request", GTK_SIGNAL_FUNC(hex_size_req), NULL);
 #else /* #if GTK_MAJOR_VERSION == 2 */
-	gtk_entry_set_width_chars(GTK_ENTRY(dt->input_hex), 9);
+	gtk_entry_set_width_chars(GTK_ENTRY(entry), 9);
 #endif
+	set_hexentry(entry, c);
+	gtk_signal_connect(GTK_OBJECT(entry), "focus_out_event",
+		GTK_SIGNAL_FUNC(hexentry_change), NEXT_SLOT(r));
 
-	gtk_signal_connect(GTK_OBJECT(dt->input_hex), "focus_out_event",
-		GTK_SIGNAL_FUNC(cpick_hex_change), dt);
-	gtk_widget_show(dt->input_hex);
-	gtk_table_attach(GTK_TABLE(table), dt->input_hex,
-		1, 2, 6, 7,
-		(GtkAttachOptions) (GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
-
-	return (r);
+	return (entry);
 }
 
 #define WBbase cpick_dd
@@ -806,10 +808,10 @@ static void *cpick_code[] = {
 	TLFCIMAGEPn(imgs[CPICK_AREA_PRECUR], c.area_size[CPICK_AREA_PRECUR], 1, 1),
 		DRAGDROP(drag, cpick_drag_get, cpick_drag_set),
 		EVENT(MOUSE, cpick_area_event), EVENT(MMOUSE, cpick_area_event),
-	EXEC(add_dropper),
+	EYEDROPPER(drop, cpick_hex_change, 2, 1),
 	WDONE, // table
 	// --- Table for inputs on right hand side
-	BORDER(TLABEL, 2), BORDER(SPIN, 0),
+	BORDER(LABEL, 2), BORDER(SPIN, 0),
 	TABLE(2, 8),
 	TLABELx(_("Red"), 0, 0, 10),
 	REF(inputs[CPICK_INPUT_RED]),
@@ -836,7 +838,8 @@ static void *cpick_code[] = {
 	T1SPIN(c.input_vals[CPICK_INPUT_VALUE], 0, 255),
 		EVENT(CHANGE, cpick_spin_change),
 	TLABELx(_("Hex"), 0, 0, 10),
-	EXEC(add_hex),
+	REF(inputs[CPICK_INPUT_HEX]),
+	HEXENTRY(c.input_vals[CPICK_INPUT_HEX], cpick_hex_change, 1, 6),
 // !!! Or better just to hide it?
 	IFx(opacity_f, 1),
 		TLABELx(_("Opacity"), 0, 0, 10),

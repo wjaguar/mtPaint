@@ -380,6 +380,7 @@ static char *fnames_txt[] = { _("MT"), _("Sobel"), _("Prewitt"), _("Kirsch"),
 
 #define WBbase filterwindow_dd
 static void *edge_code[] = {
+	BORDER(RPACK, 0),
 	RPACKv(fnames_txt, 0, 4, edge_mode), RET
 };
 #undef WBbase
@@ -1322,13 +1323,14 @@ static char *modes_txt[] = { _("Raw frames"), _("Composited frames"),
 #define WBbase animfile_dd
 static void *animfile_code[] = {
 	WINDOWm(_("Load Frames")),
-	MLABELp(what),
-	EQBOXb(0, 5),
+	MLABELcp(what),
+	EQBOXB, // !!! why not HBOXB ?
 	REF(lload), BUTTON(_("Load into Layers"), dialog_event), FOCUS,
 	WDONE,
+	BORDER(RPACK, 0),
 	IF(is_anim), RPACKv(modes_txt, 3, 0, anim_mode),
 	HSEP,
-	OKBOX0,
+	EQBOXB,
 	REF(load1), CANCELBTN(_("Load First Frame"), dialog_event),
 	REF(explode), BUTTON(_("Explode Frames"), dialog_event),
 #ifndef WIN32

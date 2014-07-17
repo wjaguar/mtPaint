@@ -1464,7 +1464,7 @@ static void *font_code[] = {
 //	TAB 1 - TEXT
 	PAGE(_("Text")),
 	XHBOX, // !!! Originally the page was an hbox
-	VBOXbp(0, 0, 5), // !!! what for?
+	VBOXP, // !!! what for?
 	XSCROLL(0, 1), // never/auto
 	WLIST,
 	RTXTCOLUMND(fontname_cc, dir, 0, 0),
@@ -1473,22 +1473,24 @@ static void *font_code[] = {
 	COLUMNDATA(fontnames, sizeof(fontname_cc)), CLEANUP(fontnames),
 	REF(fname_l), LISTCS(fontname, nfontnames, fnsort, select_font), TRIGGER,
 	WDONE, // VBOXP
-	XVBOXbp(0, 0, 5),
-	XHBOXbp(0, 0, 5),
+	XVBOXP,
+	XHBOXP,
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	NRTXTCOLUMND(_("Style"), fontstyle_cc, name, 0, 0),
 	COLUMNDATA(fontstyles, sizeof(fontstyle_cc)), CLEANUP(fontstyles),
 	REF(fstyle_l), WIDTH(100), LISTC(fontstyle, nfontstyles, select_font),
 	XVBOX,
-	BORDER(XSCROLL, 0),
+	BORDER(SCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
-	DEFBORDER(XSCROLL),
+	DEFBORDER(SCROLL),
 	WLIST,
 	NRTXTCOLUMND(_("Size"), fontsize_cc, what, 0, 1), // centered
 	COLUMNDATA(fontsizes, sizeof(fontsize_cc)), CLEANUP(fontsizes),
 	REF(fsize_l), LISTC(lfontsize, nlfontsizes, select_font),
+	BORDER(SPIN, 0),
 	REF(size_spin), SPINc(fontsize, 1, 500), EVENT(CHANGE, font_entry_changed),
+	DEFBORDER(SPIN),
 	WDONE, // XVBOX
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
@@ -1496,19 +1498,20 @@ static void *font_code[] = {
 	NRTXTCOLUMND(_("Face"), fontfile_cc, face, 0, 0),
 	COLUMNDATA(fontfiles, sizeof(fontfile_cc)), CLEANUP(fontfiles),
 	REF(ffile_l), LISTC(fontfile, nfontfiles, select_font),
-	WDONE, // XHBOXbp
+	WDONE, // XHBOXP
 //	Text entry box
-	FVBOX(_("Text")), // !!! Originally was hbox
+	FVBOXB(_("Text")), // !!! Originally was hbox
+	BORDER(ENTRY, 0),
 	MLENTRY(text), EVENT(CHANGE, font_entry_changed), FOCUS,
 	WDONE,
 //	PREVIEW AREA
-	FXVBOX(_("Preview")), // !!! Originally was hbox
-	BORDER(XSCROLL, 0),
+	FXVBOXB(_("Preview")), // !!! Originally was hbox
+	BORDER(SCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
-	DEFBORDER(XSCROLL),
+	DEFBORDER(SCROLL),
 	REF(preview_area), CANVASIMGB(preview_rgb, preview_whc),
 	CLEANUP(preview_rgb),
-	WDONE, // FXVBOX
+	WDONE, // FXVBOXB
 //	TOGGLES
 	HBOX,
 	UNLESSx(idx, 1),
@@ -1529,8 +1532,8 @@ static void *font_code[] = {
 	FSPINv(font_angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
 	WDONE,
 	HSEPl(200),
-	OKBOXp(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
-	WDONE, WDONE, WDONE, // XVBOXbp, XHBOX, PAGE
+	OKBOXP(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
+	WDONE, WDONE, WDONE, // XVBOXP, XHBOX, PAGE
 //	TAB 2 - DIRECTORIES
 	PAGE(_("Font Directories")),
 //	VBOX, // !!! utterly useless
@@ -1542,7 +1545,7 @@ static void *font_code[] = {
 	REF(dir_l), LISTC(dir, ndirs, NULL),
 	PATH(_("New Directory"), _("Select Directory"), FS_SELECT_DIR, dirp),
 	HSEPl(200),
-	HBOXbp(0, 0, 5),
+	HBOXP,
 	/* !!! Keyboard shortcut doesn't work for invisible buttons in GTK+, and
 	 * doubled handlers of window close don't matter - destructor called by
 	 * the first one removes the other before it runs - WJ */

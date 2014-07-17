@@ -69,9 +69,9 @@ static void click_help_end(help_dd *dt, void **wdata)
 static void *help_code[] = {
 	HEIGHT(400), WINDOWp(name),
 	DEFSIZE(600, 2),
-	XVBOXb(0, 4), // originally the window was that way
+	XVBOXbp(0, 4, 0), // originally the window was that way
 	BORDER(NBOOK, 1),
-	BORDER(FRAME, 10), BORDER(FRBOX, 0),
+	BORDER(FRAME, 10), /* BORDER(SCROLL, 0), */
 	NBOOKl,
 	CLEANUP(help[0]),
 	PAGEvp(help_titles[0]),
@@ -91,8 +91,8 @@ static void *help_code[] = {
 	WIDTH(380), HLABELp(help[3]),
 	WDONE, // page 3
 	WDONE, // nbook
-	BORDER(OKBOX, 1), BORDER(BUTTON, 0),
-	OKBOX(_("Close"), click_help_end, NULL, NULL),
+	BORDER(BUTTON, 1),
+	UDONEBTN(_("Close"), click_help_end),
 	// !!! originally had GTK_CAN_DEFAULT set on button
 	WDONE, // xvbox
 	ONTOP0,
@@ -1077,7 +1077,7 @@ static void *text_code[] = {
 	DEFSIZE(400, 400),
 	FONTSEL(fsel), FOCUS,
 	HSEPl(200),
-	HBOXbp(0, 0, 5),
+	HBOXP,
 #if defined(U_MTK) || GTK_MAJOR_VERSION == 2
 	UNLESS(idx), CHECKv(_("Antialias"), font_aa),
 #endif
@@ -1091,8 +1091,7 @@ static void *text_code[] = {
 #endif
 	WDONE,
 	HSEPl(200),
-	BORDER(OKBOX, 0),
-	OKBOXp(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
+	OKBOXP(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
 	WSHOW
 };
 #undef WBbase

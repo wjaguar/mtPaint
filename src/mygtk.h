@@ -61,40 +61,13 @@ GtkWidget *main_window;
 ///	Generic Widget Primitives
 
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
-#if 0 /* Not needed anymore */
-GtkWidget *add_a_button( char *text, int bord, GtkWidget *box, gboolean filler );
-#endif
 GtkWidget *add_a_spin( int value, int min, int max );
-#if 0 /* Not needed anymore */
-GtkWidget *add_a_table( int rows, int columns, int bord, GtkWidget *box );
-GtkWidget *add_a_toggle( char *label, GtkWidget *box, gboolean value );
-GtkWidget *add_to_table( char *text, GtkWidget *table, int row, int column, int spacing);
-GtkWidget *add_to_table_l(char *text, GtkWidget *table, int row, int column,
-	int l, int spacing);
-GtkWidget *to_table_x(GtkWidget *widget, GtkWidget *table, int row, int column,
-	int expand, int spacing);
-#define to_table(widget, table, row, column, spacing) \
-	to_table_x(widget, table, row, column, TRUE, spacing)
-GtkWidget *to_table_l(GtkWidget *widget, GtkWidget *table, int row, int column,
-	int l, int spacing);
-GtkWidget *spin_to_table( GtkWidget *table, int row, int column, int spacing,
-	int value, int min, int max );
-GtkWidget *float_spin_to_table(GtkWidget *table, int row, int column, int spacing,
-	double value, double min, double max);
-void add_hseparator( GtkWidget *widget, int xs, int ys );
-#endif
 
 void progress_init(char *text, int canc);		// Initialise progress window
 int progress_update(float val);				// Update progress window
 void progress_end();					// Close progress window
 
 int alert_box(char *title, char *message, char *text1, ...);
-
-// Add page to notebook
-
-#if 0 /* Not needed anymore */
-GtkWidget *add_new_page(GtkWidget *notebook, char *name);
-#endif
 
 // Slider-spin combo (practically a new widget class)
 
@@ -115,19 +88,6 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 	GtkSignalFunc handler);
 int wj_radio_pack_get_active(GtkWidget *widget);
-
-// Convert window close into a button click ("Cancel" or whatever)
-
-void delete_to_click(GtkWidget *window, GtkWidget *button);
-
-// Buttons for standard dialogs
-
-#if 0 /* Not needed anymore */
-GtkWidget *OK_box(int border, GtkWidget *window, char *nOK, GtkSignalFunc OK,
-	char *nCancel, GtkSignalFunc Cancel);
-GtkWidget *OK_box_add(GtkWidget *box, char *name, GtkSignalFunc Handler);
-GtkWidget *OK_box_add_toggle(GtkWidget *box, char *name, GtkSignalFunc Handler);
-#endif
 
 // Easier way with spinbuttons
 
@@ -175,22 +135,6 @@ char *wjstrcat(char *dest, int max, const char *s0, int l, ...);
 char *file_in_dir(char *dest, const char *dir, const char *file, int cnt);
 char *file_in_homedir(char *dest, const char *file, int cnt);
 
-// Extracting widget from GtkTable
-
-#if 0 /* Not needed anymore */
-GtkWidget *table_slot(GtkWidget *table, int row, int col);
-
-// Packing framed widget
-
-GtkWidget *add_with_frame_x(GtkWidget *box, char *text, GtkWidget *widget,
-	int border, int expand);
-GtkWidget *add_with_frame(GtkWidget *box, char *text, GtkWidget *widget);
-
-// Entry + Browse
-
-GtkWidget *mt_path_box(char *name, GtkWidget *box, char *title, int fsmode);
-#endif
-
 // Option menu
 
 GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
@@ -216,22 +160,9 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height);
 
 void widget_set_keepsize(GtkWidget *widget, int keep_height);
 
-// Signalled toggles
-
-#if 0 /* Not needed anymore */
-GtkWidget *sig_toggle(char *label, int value, gpointer var, GtkSignalFunc handler);
-GtkWidget *sig_toggle_button(char *label, int value, gpointer var, GtkSignalFunc handler);
-#endif
-
 // Workaround for GtkCList reordering bug in GTK2
 
 void clist_enable_drag(GtkWidget *clist);
-
-// Move browse-mode selection in GtkCList without invoking callbacks
-
-#if 0 /* Not needed anymore */
-void clist_reselect_row(GtkCList *clist, int n);
-#endif
 
 // Move browse-mode selection in GtkList
 
@@ -241,36 +172,15 @@ void list_select_item(GtkWidget *list, GtkWidget *item);
 
 void destroy_dialog(GtkWidget *window);
 
-// Settings notebook
-
-GtkWidget *plain_book(GtkWidget **pages, int npages);
-#if 0 /* Not needed anymore */
-GtkWidget *buttoned_book(GtkWidget **page0, GtkWidget **page1,
-	GtkWidget **button, char *button_label);
-#endif
-
 // Most common use of boxes
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *xpack(GtkWidget *box, GtkWidget *widget);
 GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget);
-#if 0 /* Not needed anymore */
-GtkWidget *pack5(GtkWidget *box, GtkWidget *widget);
-GtkWidget *xpack5(GtkWidget *box, GtkWidget *widget);
-GtkWidget *pack_end5(GtkWidget *box, GtkWidget *widget);
-#endif
 
 // Put vbox into container
 
 GtkWidget *add_vbox(GtkWidget *cont);
-
-// Save/restore window positions
-
-#if 0 /* Not needed anymore */
-void win_store_pos(GtkWidget *window, char *inikey);
-void win_restore_pos(GtkWidget *window, char *inikey, int defx, int defy,
-	int defw, int defh);
-#endif
 
 // Fix for paned widgets losing focus in GTK+1
 
@@ -326,11 +236,6 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 // Clipboard
 
 int internal_clipboard(int which);
-#if 0 /* Not needed anymore */
-int process_clipboard(int which, char *what, GtkSignalFunc handler, gpointer data);
-int offer_clipboard(int which, GtkTargetEntry *targets, int ntargets,
-	GtkSignalFunc handler);
-#endif
 
 // Allocate a memory chunk which is freed along with a given widget
 
@@ -373,35 +278,10 @@ GtkWidget *wjpixmap_new(int width, int height);
 GdkPixmap *wjpixmap_pixmap(GtkWidget *widget);
 void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 	unsigned char *rgb, int step);
-#if 0 /* Not needed anymore */
-void wjpixmap_fill_rgb(GtkWidget *widget, int x, int y, int w, int h, int rgb);
-#endif
 void wjpixmap_move_cursor(GtkWidget *widget, int x, int y);
 void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 	int width, int height, int hot_x, int hot_y, int focused);
-#if 0 /* Not needed anymore */
-void wjpixmap_cursor(GtkWidget *widget, int *x, int *y);
-#endif
 int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr);
-
-// Repaint expose region
-
-#if 0 /* Not needed anymore */
-// !!! For now, repaint_func() is expected to know widget & window to repaint
-typedef void (*repaint_func)(int x, int y, int w, int h);
-
-#if GTK_MAJOR_VERSION == 1 /* No regions there */
-#define repaint_expose(event, vport, repaint, cost) \
-	(repaint)((event)->area.x + (vport)[0], (event)->area.y + (vport)[1], \
-		(event)->area.width, (event)->area.height)
-#else 
-void repaint_expose(GdkEventExpose *event, int *vport, repaint_func repaint, int cost);
-#endif
-
-// Track updates of multiple widgets (by whatever means necessary)
-
-void track_updates(GtkSignalFunc handler, GtkWidget *widget, ...);
-#endif
 
 // Convert pathname to absolute
 

@@ -38,28 +38,12 @@ enum {
 	op_PAGE,
 	op_PAGEi,
 	op_TABLE,
-	op_XTABLE,
-	op_ETABLE,
-	op_BTABLE,
-	op_STABLE,
-	//
 	op_VBOX,
-	op_XVBOX,
-	op_EVBOX,
 	op_HBOX,
-	op_XHBOX,
-	op_TLHBOX,
-	op_BVBOX,
-	op_BHBOX,
-	//
 	op_EQBOX,
 	op_FRAME,
-	op_XFRAME,
 	op_EFRAME,
 	op_SCROLL,
-	op_XSCROLL,
-	op_BSCROLL,
-	op_SNBOOK,
 	op_NBOOK,
 	op_NBOOKl,
 	op_PLAINBOOK,
@@ -67,75 +51,48 @@ enum {
 	op_STATUSBAR,
 	op_STLABEL,
 	op_HSEP,
-	op_MLABEL,
+	op_LABEL,
 	op_WLABEL,
-	op_XLABEL,
-	op_TLABEL,
-	op_TLLABEL,
-	op_TXLABEL,
 	op_HLABEL,
 	op_HLABELm,
 	op_TLTEXT,
 	op_PROGRESS,
 	op_COLORPATCH,
 	op_RGBIMAGE,
-	op_WRGBIMAGE,
 	op_RGBIMAGEP,
 	op_CANVASIMG,
-	op_ECANVASIMG,
 	op_CANVASIMGB,
 	op_FCIMAGEP,
-	op_TLFCIMAGEP,
-	op_TLNOSPIN,
+	op_NOSPIN,
 	//
 	op_CSCROLL,
 	op_CANVAS,
 	//
 	op_SPIN,
 	op_SPINc,
-	op_XSPIN,
-	op_T1SPIN,
-	op_TLSPIN,
-	op_TLXSPIN,
-	//
 	op_FSPIN,
-	op_T1FSPIN,
-	op_TLFSPIN,
-	//
 	op_SPINa,
-	op_XSPINa,
-	op_T1SPINa,
 	//
 	op_TLSPINPACK,
-	op_T1SPINSLIDE,
-	op_TLSPINSLIDE,
-	op_TLSPINSLIDEs,
-	op_TLSPINSLIDEx,
+	op_SPINSLIDE,
 	op_SPINSLIDEa,
-	op_XSPINSLIDEa,
 	op_CHECK,
-	op_XCHECK,
-	op_TLCHECK,
 	op_CHECKb,
 	op_RPACK,
-	op_BRPACK,
 	op_RPACKD,
 	op_OPT,
-	op_XOPT,
-	op_T1OPT,
-	op_TLOPT,
 	op_OPTD,
 	op_COMBO,
-	op_XENTRY,
+	op_ENTRY,
 	op_MLENTRY,
-	op_TLENTRY,
-	op_XPENTRY,
-	op_T1PENTRY,
+	op_PENTRY,
 	op_PATH,
 	op_PATHs,
 	op_TEXT,
 	op_COMBOENTRY,
 	op_FONTSEL,
+	op_HEXENTRY,
+	op_EYEDROPPER,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -143,28 +100,16 @@ enum {
 	op_GRADBAR,
 	op_PCTCOMBO,
 	op_LISTCCr,
-	op_LISTCCHr,
 	op_LISTC,
 	op_LISTCd,
 	op_LISTCu,
 	op_LISTCS,
 	op_LISTCX,
-	op_OKBOX,
-	op_OKBOXp,
-	op_EOKBOX,
-	op_UOKBOX,
-	op_UOKBOXp,
 	op_OKBTN,
 	op_CANCELBTN,
-	op_UCANCELBTN,
-	op_ECANCELBTN,
-	op_OKADD,
-	op_OKTOGGLE,
-	op_UTOGGLE,
+	op_DONEBTN,
+	op_TOGGLE,
 	op_BUTTON,
-	op_UBUTTON,
-	op_EBUTTON,
-	op_TLBUTTON,
 	op_TOOLBAR,
 	op_SMARTTBAR,
 	op_SMARTTBMORE,
@@ -238,7 +183,7 @@ enum {
 
 	op_EV_LAST,
 
-	op_EXEC,
+//	op_EXEC,
 	op_GOTO,
 	op_CALL,
 	op_RET,
@@ -274,28 +219,27 @@ enum {
 	op_BOR_0,
 	op_BOR_TABLE = op_BOR_0,
 	op_BOR_NBOOK,
-	op_BOR_XSCROLL,
+	op_BOR_SCROLL,
 	op_BOR_SPIN,
 	op_BOR_SPINSLIDE,
 	op_BOR_LABEL,
-	op_BOR_TLABEL,
 	op_BOR_OPT,
-	op_BOR_XOPT,
-	op_BOR_FRBOX,
-	op_BOR_OKBOX,
 	op_BOR_BUTTON,
 	op_BOR_TOOLBAR,
 	op_BOR_POPUP,
 	op_BOR_TOPVBOX,
 	op_BOR_CHECK,
 	op_BOR_FRAME,
+	op_BOR_RPACK,
+	op_BOR_ENTRY,
+	op_BOR_LISTCC,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
 };
 
 //	Function to run with EXEC
-typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
+//typedef void **(*ext_fn)(void **r, GtkWidget ***wpp, void **wdata);
 //	Function to run with MOUNT
 typedef void **(*mnt_fn)(void **wdata);
 
@@ -411,10 +355,6 @@ void run_destroy(void **wdata);
 //	From widget to its wdata
 void **get_wdata(GtkWidget *widget, char *id);
 
-//	Install event handler
-void add_click(void **r, GtkWidget *widget);
-void add_del(void **r, GtkWidget *window);
-
 //	Run event handler, defaulting to run_destroy()
 void do_evt_1_d(void **slot);
 
@@ -433,7 +373,7 @@ void cmd_event(void **slot, int op);
 void cmd_sensitive(void **slot, int state);
 //	Set visible state on slot
 void cmd_showhide(void **slot, int state);
-//	Set value on slot, page on plainbook slot
+//	Set value on slot
 void cmd_set(void **slot, int v);
 //	Set per-item visibility and selection on list-like slot
 void cmd_setlist(void **slot, char *map, int n);
@@ -455,30 +395,97 @@ int cmd_checkv(void **slot, int idx);
 ///	Handler for dialog buttons
 void dialog_event(void *ddata, void **wdata, int what, void **where);
 
-#define WB_OPBITS     12
-#define WB_OPMASK 0x0FFF /* ((1 << WB_OPBITS) - 1) */
-#define WB_FFLAG  0x8000
-#define WB_NFLAG  0x4000
-#define WB_REF1   0x1000
-#define WB_REF2   0x2000
-#define WB_REF3   0x3000
-#define WB_GETREF(X) (((X) >> WB_OPBITS) & 3)
-#define WB_LSHIFT     16
+enum {
+	pk_NONE = 0,
+	pk_PACK,
+	pk_XPACK,
+	pk_DEF = pk_XPACK,
+	pk_EPACK,
+	pk_PACKEND,
+	pk_TABLE1x,
+	pk_TABLE,
+	pk_TABLEx,
+
+	pk_LAST
+};
+
+#define WB_OPBITS      12
+#define WB_OPMASK  0x0FFF /* ((1 << WB_OPBITS) - 1) */
+#define WB_PKBITS       4
+#define WB_PKMASK     0xF /* ((1 << WB_PKBITS) - 1) */
+#define WB_GETPK(X) (((X) >> WB_OPBITS) & WB_PKMASK)
+
+#define WB_FFLAG  0x80000
+#define WB_NFLAG  0x40000
+#define WB_REF1   0x10000
+#define WB_REF2   0x20000
+#define WB_REF3   0x30000
+#define WB_GETREF(X) (((X) >> (WB_OPBITS + WB_PKBITS)) & 3)
+#define WB_LSHIFT     24
 #define WB_GETLEN(X) ((X) >> WB_LSHIFT)
 
 #define WBlen(L) ((L) << WB_LSHIFT)
-#define WBh(NM,L) (void *)(op_##NM + WBlen(L))
-#define WBhf(NM,L) (void *)(op_##NM + WBlen(L) + WB_FFLAG)
-#define WBrh(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1)
-#define WBrhf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1 + WB_FFLAG)
-#define WBr2h(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2)
-#define WBr2hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_FFLAG)
-#define WBr3h(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3)
-#define WBr3hf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF3 + WB_FFLAG)
-#define WBhn(NM,L) (void *)(op_##NM + WBlen(L) + WB_NFLAG)
-#define WBhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_NFLAG + WB_FFLAG)
-#define WBrhnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF1 + WB_NFLAG + WB_FFLAG)
-#define WBr2hnf(NM,L) (void *)(op_##NM + WBlen(L) + WB_REF2 + WB_NFLAG + WB_FFLAG)
+#define WBpk(P) ((P) << WB_OPBITS)
+#define WB_0	0
+#define WB_F	WB_FFLAG
+#define WB_R	WB_REF1
+#define WB_RF	(WB_REF1 + WB_FFLAG)
+#define WB_R2	WB_REF2
+#define WB_R2F	(WB_REF2 + WB_FFLAG)
+#define WB_R3	WB_REF3
+#define WB_R3F	(WB_REF3 + WB_FFLAG)
+#define WB_N	WB_NFLAG
+#define WB_NF	(WB_NFLAG + WB_FFLAG)
+#define WB_RNF	(WB_REF1 + WB_NFLAG + WB_FFLAG)
+#define WB_R2NF	(WB_REF2 + WB_NFLAG + WB_FFLAG)
+#define WBp(NM,L,P,F) (void *)(op_##NM + WBlen(L) + WBpk(pk_##P) + WB_##F)
+#define WBp_(OP,L,P,F) (void *)(OP + WBlen(L) + WBpk(pk_##P) + WB_##F)
+
+#define WBh(NM,L) WBp_(op_##NM, L, NONE, 0)
+#define WBh_(NM,L) WBp_(op_##NM, L, PACK, 0)
+#define WBh_x(NM,L) WBp_(op_##NM, L, XPACK, 0)
+#define WBh_e(NM,L) WBp_(op_##NM, L, PACKEND, 0)
+#define WBh_t(NM,L) WBp_(op_##NM, L, TABLE, 0)
+#define WBh_tx(NM,L) WBp_(op_##NM, L, TABLEx, 0)
+#define WBh_t1(NM,L) WBp_(op_##NM, L, TABLE1x, 0)
+#define WBhf(NM,L) WBp_(op_##NM, L, NONE, F)
+#define WBhf_(NM,L) WBp_(op_##NM, L, PACK, F)
+#define WBhf_t(NM,L) WBp_(op_##NM, L, TABLE, F)
+#define WBrh(NM,L) WBp_(op_##NM, L, NONE, R)
+#define WBrh_(NM,L) WBp_(op_##NM, L, PACK, R)
+#define WBrh_x(NM,L) WBp_(op_##NM, L, XPACK, R)
+#define WBrh_c(NM,L) WBp_(op_##NM, L, EPACK, R)
+#define WBrh_e(NM,L) WBp_(op_##NM, L, PACKEND, R)
+#define WBrh_t(NM,L) WBp_(op_##NM, L, TABLE, R)
+#define WBrh_t1(NM,L) WBp_(op_##NM, L, TABLE1x, R)
+#define WBrhf(NM,L) WBp_(op_##NM, L, NONE, RF)
+#define WBrhf_(NM,L) WBp_(op_##NM, L, PACK, RF)
+#define WBrhf_x(NM,L) WBp_(op_##NM, L, XPACK, RF)
+#define WBrhf_t(NM,L) WBp_(op_##NM, L, TABLE, RF)
+#define WBrhf_tx(NM,L) WBp_(op_##NM, L, TABLEx, RF)
+#define WBrhf_t1(NM,L) WBp_(op_##NM, L, TABLE1x, RF)
+#define WBr2h(NM,L) WBp_(op_##NM, L, NONE, R2)
+#define WBr2h_(NM,L) WBp_(op_##NM, L, PACK, R2)
+#define WBr2h_x(NM,L) WBp_(op_##NM, L, XPACK, R2)
+#define WBr2h_e(NM,L) WBp_(op_##NM, L, PACKEND, R2)
+#define WBr2h_t(NM,L) WBp_(op_##NM, L, TABLE, R2)
+#define WBr2hf_(NM,L) WBp_(op_##NM, L, PACK, R2F)
+#define WBr2hf_x(NM,L) WBp_(op_##NM, L, XPACK, R2F)
+#define WBr2hf_t(NM,L) WBp_(op_##NM, L, TABLE, R2F)
+#define WBr3h_(NM,L) WBp_(op_##NM, L, PACK, R3)
+#define WBr3h_e(NM,L) WBp_(op_##NM, L, PACKEND, R3)
+#define WBr3hf(NM,L) WBp_(op_##NM, L, NONE, R3F)
+#define WBr3hf_(NM,L) WBp_(op_##NM, L, PACK, R3F)
+#define WBhn(NM,L) WBp_(op_##NM, L, NONE, N)
+#define WBhnf(NM,L) WBp_(op_##NM, L, NONE, NF)
+#define WBhnf_(NM,L) WBp_(op_##NM, L, PACK, NF)
+#define WBhnf_x(NM,L) WBp_(op_##NM, L, XPACK, NF)
+#define WBhnf_t(NM,L) WBp_(op_##NM, L, TABLE, NF)
+#define WBrhnf(NM,L) WBp_(op_##NM, L, NONE, RNF)
+#define WBrhnf_(NM,L) WBp_(op_##NM, L, PACK, RNF)
+#define WBrhnf_t(NM,L) WBp_(op_##NM, L, TABLE, RNF)
+#define WBr2hnf_x(NM,L) WBp_(op_##NM, L, XPACK, R2NF)
+
 #define WBfield(V) (void *)offsetof(WBbase, V)
 #define WBwh(W,H) (void *)((H) + ((W) << 16))
 #define WBxyl(X,Y,L) (void *)((Y) + ((X) << 8) + ((L - 1) << 16))
@@ -504,258 +511,270 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define POPUP(NM) WBrh(POPUP, 1), (NM)
 #define TOPVBOX WBrh(TOPVBOX, 0)
 #define TOPVBOXV WBrh(TOPVBOXV, 0)
-#define DOCK(K) WBrh(DOCK, 1), (K)
-#define HVSPLIT WBrh(HVSPLIT, 0)
+#define DOCK(K) WBrh_(DOCK, 1), (K)
+#define HVSPLIT WBrh_x(HVSPLIT, 0)
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define PAGEvp(NP) WBhn(PAGE, 1), &(NP)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
 #define PAGEir(ICN,S) WBrh(PAGEi, 2), (ICN), (void *)(S)
-#define TABLE(W,H) WBh(TABLE, 1), WBwh(W, H)
+#define TABLE(W,H) WBh_(TABLE, 1), WBwh(W, H)
 #define TABLE2(H) TABLE(2, (H))
-#define TABLEs(W,H,S) WBh(TABLE, 2), WBwh(W, H), (void *)(S)
-#define TABLEr(W,H) WBrh(TABLE, 1), WBwh(W, H)
-#define XTABLE(W,H) WBh(XTABLE, 1), WBwh(W, H)
-#define ETABLE(W,H) WBh(ETABLE, 1), WBwh(W, H)
-#define FTABLE(NM,W,H) FRAME(NM), WBh(BTABLE, 1), WBwh(W, H)
-#define STABLE(W,H) WBh(STABLE, 1), WBwh(W, H)
-#define VBOX WBh(VBOX, 0)
-#define VBOXr WBrh(VBOX, 0)
-#define VBOXbp(S,B,P) WBh(VBOX, 1), WBpbs(P, B, S)
+#define TABLEs(W,H,S) WBh_(TABLE, 2), WBwh(W, H), (void *)(S)
+#define TABLEr(W,H) WBrh_(TABLE, 1), WBwh(W, H)
+#define XTABLE(W,H) WBh_x(TABLE, 1), WBwh(W, H)
+#define ETABLE(W,H) WBh_e(TABLE, 1), WBwh(W, H)
+#define FTABLE(NM,W,H) FRAME(NM), TABLE(W, H)
+#define VBOX WBh_(VBOX, 0)
+#define VBOXr WBrh_(VBOX, 0)
+#define VBOXbp(S,B,P) WBh_(VBOX, 1), WBpbs(P, B, S)
+#define VBOXP VBOXbp(0, 0, 5)
+#define VBOXB VBOXbp(0, 5, 0)
 #define VBOXPS VBOXbp(5, 0, 5)
-#define XVBOX WBh(XVBOX, 0)
-#define XVBOXbp(S,B,P) WBh(XVBOX, 1), WBpbs(P, B, S)
-#define XVBOXb(S,B) XVBOXbp(S, B, 0)
-#define EVBOX WBh(EVBOX, 0)
-#define HBOX WBh(HBOX, 0)
-#define HBOXbp(S,B,P) WBh(HBOX, 1), WBpbs(P, B, S)
-#define HBOXb(S,B) HBOXbp(S, B, 0)
-#define HBOXPr WBrh(HBOX, 1), WBpbs(5, 0, 0)
-#define XHBOX WBh(XHBOX, 0)
-#define XHBOXbp(S,B,P) WBh(XHBOX, 1), WBpbs(P, B, S)
-#define XHBOXb(S,B) XHBOXbp(S, B, 0)
-#define TLHBOXl(X,Y,L) WBh(TLHBOX, 1), WBxyl(X, Y, L)
-#define FVBOX(NM) FRAME(NM), WBh(BVBOX, 0)
-#define FVBOXb(NM,S,B) FRAME(NM), WBh(BVBOX, 1), WBbs(B, S)
-#define FXVBOX(NM) XFRAME(NM), WBh(BVBOX, 0)
-#define EFVBOX EFRAME, WBh(BVBOX, 1), WBbs(10, 0)
-#define FHBOX(NM) FRAME(NM), WBh(BHBOX, 0)
-#define EQBOX WBh(EQBOX, 0)
-#define EQBOXs(S) WBh(EQBOX, 1), WBbs(0, S)
-#define EQBOXb(S,B) WBh(EQBOX, 1), WBbs(B, S)
-#define FRAME(NM) WBh(FRAME, 1), (NM)
-#define XFRAME(NM) WBh(XFRAME, 1), (NM)
-#define XFRAMEp(V) WBhnf(XFRAME, 1), WBfield(V)
-#define EFRAME WBh(EFRAME, 0)
-#define SCROLL(HP,VP) WBh(SCROLL, 1), WBnh(VP, HP)
-#define XSCROLL(HP,VP) WBh(XSCROLL, 1), WBnh(VP, HP)
-#define FSCROLL(HP,VP) XFRAME(NULL), WBh(BSCROLL, 1), WBnh(VP, HP)
-#define FSCROLLp(V,HP,VP) XFRAMEp(V), WBh(BSCROLL, 1), WBnh(VP, HP)
-#define CSCROLLv(A) WBrh(CSCROLL, 1), (A)
-#define SNBOOK WBh(SNBOOK, 0)
-#define NBOOK WBh(NBOOK, 0)
-#define NBOOKr WBrh(NBOOK, 0)
-#define NBOOKl WBh(NBOOKl, 0)
-#define PLAINBOOK WBrh(PLAINBOOK, 0)
-#define PLAINBOOKn(N) WBrh(PLAINBOOK, 1), (void *)(N)
-#define BOOKBTN(NM,V) WBhf(BOOKBTN, 2), WBfield(V), (NM)
-#define STATUSBAR WBrh(STATUSBAR, 0)
-#define STLABEL(W,A,P) WBrh(STLABEL, 1), (void *)((W) + ((A) << 16) + ((P) << 24))
-#define HSEP WBh(HSEP, 0)
-#define HSEPl(V) WBh(HSEP, 1), (void *)(V)
-#define HSEPt WBh(HSEP, 1), (void *)(-1)
-#define MLABEL(NM) WBh(MLABEL, 1), (NM)
-#define MLABELr(NM) WBrh(MLABEL, 1), (NM)
-#define MLABELxr(NM,PX,PY,AX) WBrh(MLABEL, 2), (NM), WBppa(PX, PY, AX)
-#define MLABELp(V) WBhnf(MLABEL, 1), WBfield(V)
-#define WLABELp(V) WBhnf(WLABEL, 1), WBfield(V)
-#define XLABELr(NM) WBrh(XLABEL, 1), (NM)
-#define TLABEL(NM) WBh(TLABEL, 1), (NM)
-#define TLABELr(NM) WBrh(TLABEL, 1), (NM)
-#define TLABELx(NM,PX,PY,AX) WBh(TLABEL, 2), (NM), WBppa(PX, PY, AX)
-#define TLLABELl(NM,X,Y,L) WBh(TLLABEL, 2), (NM), WBxyl(X, Y, L)
+#define VBOXBS VBOXbp(5, 5, 0)
+#define VBOXPBS VBOXbp(5, 5, 5)
+#define XVBOX WBh_x(VBOX, 0)
+#define XVBOXbp(S,B,P) WBh_x(VBOX, 1), WBpbs(P, B, S)
+#define XVBOXP XVBOXbp(0, 0, 5)
+#define XVBOXB XVBOXbp(0, 5, 0)
+#define XVBOXBS XVBOXbp(5, 5, 0)
+#define EVBOX WBh_e(VBOX, 0)
+#define HBOX WBh_(HBOX, 0)
+#define HBOXbp(S,B,P) WBh_(HBOX, 1), WBpbs(P, B, S)
+#define HBOXP HBOXbp(0, 0, 5)
+#define HBOXPr WBrh_(HBOX, 1), WBpbs(5, 0, 0)
+#define HBOXB HBOXbp(0, 5, 0)
+#define XHBOX WBh_x(HBOX, 0)
+#define XHBOXbp(S,B,P) WBh_x(HBOX, 1), WBpbs(P, B, S)
+#define XHBOXP XHBOXbp(0, 0, 5)
+#define XHBOXS XHBOXbp(5, 0, 0)
+#define TLHBOXl(X,Y,L) WBh_t(HBOX, 1), WBxyl(X, Y, L)
+#define FVBOX(NM) FRAME(NM), VBOX
+#define FVBOXB(NM) FRAME(NM), VBOXB
+#define FVBOXBS(NM) FRAME(NM), VBOXBS
+#define FXVBOX(NM) XFRAME(NM), VBOX
+#define FXVBOXB(NM) XFRAME(NM), VBOXB
+#define EFVBOX EFRAME, VBOXbp(0, 10, 0)
+#define FHBOXB(NM) FRAME(NM), HBOXB
+#define EQBOX WBh_(EQBOX, 0)
+#define EQBOXbp(S,B,P) WBh_(EQBOX, 1), WBpbs(P, B, S)
+#define EQBOXP EQBOXbp(0, 0, 5)
+#define EQBOXB EQBOXbp(0, 5, 0)
+#define EQBOXS EQBOXbp(5, 0, 0)
+#define EEQBOX WBh_e(EQBOX, 0)
+#define FRAME(NM) WBh_(FRAME, 1), (NM)
+#define XFRAME(NM) WBh_x(FRAME, 1), (NM)
+#define XFRAMEp(V) WBhnf_x(FRAME, 1), WBfield(V)
+#define EFRAME WBh_(EFRAME, 0)
+#define SCROLL(HP,VP) WBh_(SCROLL, 1), WBnh(VP, HP)
+#define XSCROLL(HP,VP) WBh_x(SCROLL, 1), WBnh(VP, HP)
+#define FSCROLL(HP,VP) XFRAME(NULL), SCROLL(HP, VP)
+#define CSCROLLv(A) WBrh_x(CSCROLL, 1), (A)
+#define NBOOK WBh_x(NBOOK, 0)
+#define NBOOKr WBrh_x(NBOOK, 0)
+#define NBOOKl WBh_x(NBOOKl, 0)
+#define PLAINBOOK WBrh_(PLAINBOOK, 0)
+#define PLAINBOOKn(N) WBrh_(PLAINBOOK, 1), (void *)(N)
+#define BOOKBTN(NM,V) WBhf_(BOOKBTN, 2), WBfield(V), (NM)
+#define STATUSBAR WBrh_e(STATUSBAR, 0)
+#define STLABEL(W,A) WBrh_(STLABEL, 1), (void *)((W) + ((A) << 16))
+#define STLABELe(W,A) WBrh_e(STLABEL, 1), (void *)((W) + ((A) << 16))
+#define HSEP WBh_(HSEP, 0)
+#define HSEPl(V) WBh_(HSEP, 1), (void *)(V)
+#define HSEPt WBh_(HSEP, 1), (void *)(-1)
+#define MLABEL(NM) WBh_(LABEL, 1), (NM)
+#define MLABELr(NM) WBrh_(LABEL, 1), (NM)
+#define MLABELc(NM) WBh_(LABEL, 2), (NM), WBppa(0, 0, 5)
+#define MLABELxr(NM,PX,PY,AX) WBrh_(LABEL, 2), (NM), WBppa(PX, PY, AX)
+#define MLABELcp(V) WBhnf_(LABEL, 2), WBfield(V), WBppa(0, 0, 5)
+#define WLABELp(V) WBhnf_x(WLABEL, 2), WBfield(V), WBppa(0, 0, 5)
+#define XLABELcr(NM) WBrh_x(LABEL, 2), (NM), WBppa(0, 0, 5)
+#define TLABEL(NM) WBh_t1(LABEL, 1), (NM)
+#define TLABELr(NM) WBrh_t1(LABEL, 1), (NM)
+#define TLABELx(NM,PX,PY,AX) WBh_t1(LABEL, 2), (NM), WBppa(PX, PY, AX)
+#define TLLABELl(NM,X,Y,L) WBh_t(LABEL, 2), (NM), WBxyl(X, Y, L)
 #define TLLABEL(NM,X,Y) TLLABELl(NM, X, Y, 1)
-#define TLLABELx(NM,X,Y,PX,PY,AX) WBh(TLLABEL, 3), (NM), \
+#define TLLABELx(NM,X,Y,PX,PY,AX) WBh_t(LABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
-#define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh(TLLABEL, 3), (NM), \
+#define TLLABELxr(NM,X,Y,PX,PY,AX) WBrh_t(LABEL, 3), (NM), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
-#define TLLABELp(V,X,Y) WBhnf(TLLABEL, 2), WBfield(V), WBxyl(X, Y, 1)
-#define TLLABELpx(V,X,Y,PX,PY,AX) WBhnf(TLLABEL, 3), WBfield(V), \
+#define TLLABELp(V,X,Y) WBhnf_t(LABEL, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLLABELpx(V,X,Y,PX,PY,AX) WBhnf_t(LABEL, 3), WBfield(V), \
 	WBppa(PX, PY, AX), WBxyl(X, Y, 1)
-#define TXLABEL(NM,X,Y) WBh(TXLABEL, 2), (NM), WBxyl(X, Y, 1)
-#define HLABELp(V) WBhnf(HLABEL, 1), WBfield(V)
-#define HLABELmp(V) WBhnf(HLABELm, 1), WBfield(V)
-#define TLTEXT(S,X,Y) WBh(TLTEXT, 2), (S), WBxyl(X, Y, 1)
-#define TLTEXTf(C,X,Y) WBhf(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
-#define TLTEXTp(V,X,Y) WBhnf(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
-#define PROGRESSp(V) WBrhnf(PROGRESS, 1), WBfield(V)
-#define COLORPATCHv(CP,W,H) WBrh(COLORPATCH, 2), (CP), WBwh(W, H)
-#define RGBIMAGE(CP,A) WBrhnf(RGBIMAGE, 2), WBfield(CP), WBfield(A)
-#define WRGBIMAGE(CP,A) WBrhnf(WRGBIMAGE, 2), WBfield(CP), WBfield(A)
-#define RGBIMAGEP(CC,W,H) WBrhf(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
-#define CANVASIMGv(CC,W,H) WBrh(CANVASIMG, 2), (CC), WBwh(W, H)
-#define ECANVASIMGv(CC,W,H) WBrh(ECANVASIMG, 2), (CC), WBwh(W, H)
-#define CANVASIMGB(CP,A) WBrhnf(CANVASIMGB, 2), WBfield(CP), WBfield(A)
-#define FCIMAGEP(CP,A,W,H) WBrhnf(FCIMAGEP, 3), WBfield(CP), WBfield(A), \
-	WBwh(W, H)
-#define TLFCIMAGEP(CP,A,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
+#define TXLABEL(NM,X,Y) WBh_tx(LABEL, 3), (NM), WBppa(0, 0, 3), WBxyl(X, Y, 1)
+#define HLABELp(V) WBhnf_(HLABEL, 1), WBfield(V)
+#define HLABELmp(V) WBhnf_(HLABELm, 1), WBfield(V)
+#define TLTEXT(S,X,Y) WBh_t(TLTEXT, 2), (S), WBxyl(X, Y, 1)
+#define TLTEXTf(C,X,Y) WBhf_t(TLTEXT, 2), WBfield(C), WBxyl(X, Y, 1)
+#define TLTEXTp(V,X,Y) WBhnf_t(TLTEXT, 2), WBfield(V), WBxyl(X, Y, 1)
+#define PROGRESSp(V) WBrhnf_(PROGRESS, 1), WBfield(V)
+#define COLORPATCHv(CP,W,H) WBrh_x(COLORPATCH, 2), (CP), WBwh(W, H)
+#define RGBIMAGE(CP,A) WBrhnf_(RGBIMAGE, 2), WBfield(CP), WBfield(A)
+#define TLRGBIMAGE(CP,A,X,Y) WBrhnf_t(RGBIMAGE, 3), WBfield(CP), WBfield(A), \
+	WBxyl(X, Y, 1)
+#define RGBIMAGEP(CC,W,H) WBrhf_(RGBIMAGEP, 2), WBfield(CC), WBwh(W, H)
+#define CANVASIMGv(CC,W,H) WBrh_(CANVASIMG, 2), (CC), WBwh(W, H)
+#define CCANVASIMGv(CC,W,H) WBrh_c(CANVASIMG, 2), (CC), WBwh(W, H)
+#define CANVASIMGB(CP,A) WBrhnf_(CANVASIMGB, 2), WBfield(CP), WBfield(A)
+#define FCIMAGEP(CP,A,AS) WBrhnf_(FCIMAGEP, 3), WBfield(CP), WBfield(A), \
+	WBfield(AS)
+#define TLFCIMAGEP(CP,A,AS,X,Y) WBrhnf_t(FCIMAGEP, 4), WBfield(CP), \
 	WBfield(A), WBfield(AS), WBxyl(X, Y, 1)
-#define TLFCIMAGEPn(CP,AS,X,Y) WBrhnf(TLFCIMAGEP, 4), WBfield(CP), \
+#define TLFCIMAGEPn(CP,AS,X,Y) WBrhnf_t(FCIMAGEP, 4), WBfield(CP), \
 	(void *)(-1), WBfield(AS), WBxyl(X, Y, 1)
-#define CANVAS(W,H,C,HX) WBr2h(CANVAS, 2 + 2), WBwh(W, H), (void *)(C), \
+#define CANVAS(W,H,C,HX) WBr2h_(CANVAS, 2 + 2), WBwh(W, H), (void *)(C), \
 	EVENT(EXT, HX)
-#define TLNOSPIN(V,X,Y) WBhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
-#define TLNOSPINr(V,X,Y) WBrhf(TLNOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
-#define TLSPIN(V,V0,V1,X,Y) WBrhf(TLSPIN, 4), WBfield(V), \
+#define TLNOSPIN(V,X,Y) WBhf_t(NOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLNOSPINr(V,X,Y) WBrhf_t(NOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
+#define TLSPIN(V,V0,V1,X,Y) WBrhf_t(SPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TLXSPIN(V,V0,V1,X,Y) WBrhf(TLXSPIN, 4), WBfield(V), \
+#define TLXSPIN(V,V0,V1,X,Y) WBrhf_tx(SPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define T1SPIN(V,V0,V1) WBrhf(T1SPIN, 3), WBfield(V), \
+#define T1SPIN(V,V0,V1) WBrhf_t1(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 #define TSPIN(NM,V,V0,V1) T1SPIN(V,V0,V1), TLABEL(NM)
-#define TSPINv(NM,V,V0,V1) WBrh(T1SPIN, 3), &(V), \
+#define TSPINv(NM,V,V0,V1) WBrh_t1(SPIN, 3), &(V), \
 	(void *)(V0), (void *)(V1), TLABEL(NM)
-#define TSPINa(NM,A) WBrhf(T1SPINa, 1), WBfield(A), TLABEL(NM)
-#define SPIN(V,V0,V1) WBrhf(SPIN, 3), WBfield(V), \
+#define TSPINa(NM,A) WBrhf_t1(SPINa, 1), WBfield(A), TLABEL(NM)
+#define SPIN(V,V0,V1) WBrhf_(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
-#define SPINv(V,V0,V1) WBrh(SPIN, 3), &(V), \
+#define SPINv(V,V0,V1) WBrh_(SPIN, 3), &(V), \
 	(void *)(V0), (void *)(V1)
-#define SPINc(V,V0,V1) WBrhf(SPINc, 3), WBfield(V), \
+#define SPINc(V,V0,V1) WBrhf_(SPINc, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
-#define XSPIN(V,V0,V1) WBrhf(XSPIN, 3), WBfield(V), \
+#define XSPIN(V,V0,V1) WBrhf_x(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
-#define FSPIN(V,V0,V1) WBrhf(FSPIN, 3), WBfield(V), \
+#define FSPIN(V,V0,V1) WBrhf_(FSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
-#define FSPINv(V,V0,V1) WBrh(FSPIN, 3), &(V), \
+#define FSPINv(V,V0,V1) WBrh_(FSPIN, 3), &(V), \
 	(void *)(V0), (void *)(V1)
-#define TFSPIN(NM,V,V0,V1) WBrhf(T1FSPIN, 3), WBfield(V), \
+#define TFSPIN(NM,V,V0,V1) WBrhf_t1(FSPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1), TLABEL(NM)
-#define TLFSPIN(V,V0,V1,X,Y) WBrhf(TLFSPIN, 4), WBfield(V), \
+#define TLFSPIN(V,V0,V1,X,Y) WBrhf_t(FSPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define SPINa(A) WBrhf(SPINa, 1), WBfield(A)
-#define XSPINa(A) WBrhf(XSPINa, 1), WBfield(A)
+#define SPINa(A) WBrhf_(SPINa, 1), WBfield(A)
+#define XSPINa(A) WBrhf_x(SPINa, 1), WBfield(A)
 /* !!! This block holds 1 nested EVENT block */
-#define TLSPINPACKv(A,N,HC,W,X,Y) WBr2h(TLSPINPACK, 3 + 2), (A), (void *)(N), \
+#define TLSPINPACKv(A,N,HC,W,X,Y) WBr2h_t(TLSPINPACK, 3 + 2), (A), (void *)(N), \
 	WBxyl(X, Y, W), EVENT(CHANGE, HC)
-#define T1SPINSLIDE(V,V0,V1) WBrhf(T1SPINSLIDE, 3), WBfield(V), \
-	(void *)(V0), (void *)(V1)
+#define T1SPINSLIDE(V,V0,V1) WBrhf_t1(SPINSLIDE, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBwh(255, 20)
 #define TSPINSLIDE(NM,V,V0,V1) T1SPINSLIDE(V,V0,V1), TLABEL(NM)
-#define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf(TLSPINSLIDE, 4), WBfield(V), \
+#define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf_t(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf(TLSPINSLIDEs, 4), WBfield(V), \
-	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TLSPINSLIDExl(V,V0,V1,X,Y,L) WBrhf(TLSPINSLIDEx, 4), WBfield(V), \
+#define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf_t(SPINSLIDE, 5), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBwh(150, 0), WBxyl(X, Y, 1)
+#define TLSPINSLIDExl(V,V0,V1,X,Y,L) WBrhf_tx(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, L)
 #define TLSPINSLIDEx(V,V0,V1,X,Y) TLSPINSLIDExl(V, V0, V1, X, Y, 1)
-#define SPINSLIDEa(A) WBrhf(SPINSLIDEa, 1), WBfield(A)
-#define XSPINSLIDEa(A) WBrhf(XSPINSLIDEa, 1), WBfield(A)
-#define CHECK(NM,V) WBrhf(CHECK, 2), WBfield(V), (NM)
-#define CHECKv(NM,V) WBrh(CHECK, 2), &(V), (NM)
-#define CHECKb(NM,V,V0) WBrh(CHECKb, 3), (V), (NM), (void *)(V0)
-#define XCHECK(NM,V) WBrhf(XCHECK, 2), WBfield(V), (NM)
-#define TLCHECKl(NM,V,X,Y,L) WBrhf(TLCHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
+#define SPINSLIDEa(A) WBrhf_(SPINSLIDEa, 1), WBfield(A)
+#define XSPINSLIDEa(A) WBrhf_x(SPINSLIDEa, 1), WBfield(A)
+#define CHECK(NM,V) WBrhf_(CHECK, 2), WBfield(V), (NM)
+#define CHECKv(NM,V) WBrh_(CHECK, 2), &(V), (NM)
+#define CHECKb(NM,V,V0) WBrh_(CHECKb, 3), (V), (NM), (void *)(V0)
+#define XCHECK(NM,V) WBrhf_x(CHECK, 2), WBfield(V), (NM)
+#define TLCHECKl(NM,V,X,Y,L) WBrhf_t(CHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
-#define TLCHECKvl(NM,V,X,Y,L) WBrh(TLCHECK, 3), &(V), (NM), WBxyl(X, Y, L)
+#define TLCHECKvl(NM,V,X,Y,L) WBrh_t(CHECK, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
 /* !!! No more than 255 choices */
-#define RPACK(SS,N,H,V) WBrhf(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
-#define RPACKv(SS,N,H,V) WBrh(RPACK, 3), &(V), (SS), WBnh(N, H)
-#define FRPACK(NM,SS,N,H,V) FRAME(NM), WBrhf(BRPACK, 3), WBfield(V), (SS), \
-	WBnh(N, H)
-#define FRPACKv(NM,SS,N,H,V) FRAME(NM), WBrh(BRPACK, 3), &(V), (SS), WBnh(N, H)
-#define RPACKD(SP,H,V) WBrhf(RPACKD, 3), WBfield(V), WBfield(SP), (H)
-#define RPACKDv(SP,H,V) WBrh(RPACKD, 3), &(V), WBfield(SP), (H)
+#define RPACK(SS,N,H,V) WBrhf_x(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
+#define RPACKv(SS,N,H,V) WBrh_x(RPACK, 3), &(V), (SS), WBnh(N, H)
+#define FRPACK(NM,SS,N,H,V) FRAME(NM), RPACK(SS,N,H,V)
+#define FRPACKv(NM,SS,N,H,V) FRAME(NM), RPACKv(SS,N,H,V)
+#define RPACKD(SP,H,V) WBrhf_x(RPACKD, 3), WBfield(V), WBfield(SP), (H)
+#define RPACKDv(SP,H,V) WBrh_x(RPACKD, 3), &(V), WBfield(SP), (H)
 /* !!! These blocks each hold 1 nested EVENT block */
-#define RPACKe(SS,N,H,V,HS) WBr2hf(RPACK, 3 + 2), WBfield(V), (SS), \
+#define RPACKe(SS,N,H,V,HS) WBr2hf_x(RPACK, 3 + 2), WBfield(V), (SS), \
 	WBnh(N, H), EVENT(SELECT, HS)
-#define FRPACKe(NM,SS,N,H,V,HS) FRAME(NM), WBr2hf(BRPACK, 3 + 2), WBfield(V), \
-	(SS), WBnh(N, H), EVENT(SELECT, HS)
-#define RPACKDve(SP,H,V,HS) WBr2h(RPACKD, 3 + 2), &(V), WBfield(SP), \
+#define FRPACKe(NM,SS,N,H,V,HS) FRAME(NM), RPACKe(SS,N,H,V,HS)
+#define RPACKDve(SP,H,V,HS) WBr2h_x(RPACKD, 3 + 2), &(V), WBfield(SP), \
 	(H), EVENT(SELECT, HS)
-#define OPT(SS,N,V) WBrhf(OPT, 3), WBfield(V), (SS), (void *)(N)
-#define XOPT(SS,N,V) WBrhf(XOPT, 3), WBfield(V), (SS), (void *)(N)
-#define TOPTv(NM,SS,N,V) WBrh(T1OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
-#define TLOPT(SS,N,V,X,Y) WBrhf(TLOPT, 4), WBfield(V), (SS), (void *)(N), \
+#define OPT(SS,N,V) WBrhf_(OPT, 3), WBfield(V), (SS), (void *)(N)
+#define TOPTv(NM,SS,N,V) WBrh_t1(OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
+#define TLOPT(SS,N,V,X,Y) WBrhf_t(OPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 /* !!! These blocks each hold 1 nested EVENT block */
-#define XOPTe(SS,N,V,HS) WBr2hf(XOPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
+#define XOPTe(SS,N,V,HS) WBr2hf_x(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
-#define TLOPTle(SS,N,V,HS,X,Y,L) WBr2hf(TLOPT, 4 + 2), WBfield(V), (SS), \
+#define TLOPTle(SS,N,V,HS,X,Y,L) WBr2hf_t(OPT, 4 + 2), WBfield(V), (SS), \
 	(void *)(N), EVENT(SELECT, HS), WBxyl(X, Y, L)
-#define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h(TLOPT, 4 + 2), &(V), (SS), \
+#define TLOPTvle(SS,N,V,HS,X,Y,L) WBr2h_t(OPT, 4 + 2), &(V), (SS), \
 	(void *)(N), EVENT(SELECT, HS), WBxyl(X, Y, L)
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
-#define OPTDe(SP,V,HS) WBr2hf(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
+#define OPTDe(SP,V,HS) WBr2hf_(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS)
-#define COMBO(SS,N,V) WBrhf(COMBO, 3), WBfield(V), (SS), (void *)(N)
-#define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf(GRADBAR, 6 + 2), WBfield(V), \
+#define COMBO(SS,N,V) WBrhf_(COMBO, 3), WBfield(V), (SS), (void *)(N)
+#define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf_(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
 	EVENT(SELECT, HS)
-#define PCTCOMBOv(V,A,HC) WBr2h(PCTCOMBO, 2 + 2), &(V), (A), EVENT(CHANGE, HC)
-#define LISTCCr(V,L,HS) WBr2hf(LISTCCr, 2 + 2), WBfield(V), WBfield(L), \
-	EVENT(SELECT, HS)
-#define LISTCCHr(V,L,H,HS) WBr2hf(LISTCCHr, 3 + 2), WBfield(V), WBfield(L), \
+#define PCTCOMBOv(V,A,HC) WBr2h_(PCTCOMBO, 2 + 2), &(V), (A), EVENT(CHANGE, HC)
+#define LISTCCHr(V,L,H,HS) WBr2hf_(LISTCCr, 3 + 2), WBfield(V), WBfield(L), \
 	(void *)(H), EVENT(SELECT, HS)
-#define LISTC(V,L,HS) WBr2hf(LISTC, 3 + 2), WBfield(V), WBfield(L), \
+#define LISTCCr(V,L,HS) LISTCCHr(V, L, 0, HS)
+#define LISTC(V,L,HS) WBr2hf_(LISTC, 3 + 2), WBfield(V), WBfield(L), \
 	NULL, EVENT(SELECT, HS)
-#define LISTCd(V,L,HS) WBr2hf(LISTCd, 3 + 2), WBfield(V), WBfield(L), \
+#define LISTCd(V,L,HS) WBr2hf_(LISTCd, 3 + 2), WBfield(V), WBfield(L), \
 	NULL, EVENT(SELECT, HS)
-#define LISTCu(V,L,HS) WBr2hf(LISTCu, 3 + 2), WBfield(V), WBfield(L), \
+#define LISTCu(V,L,HS) WBr2hf_(LISTCu, 3 + 2), WBfield(V), WBfield(L), \
 	NULL, EVENT(SELECT, HS)
-#define LISTCS(V,L,SM,HS) WBr2hf(LISTCS, 3 + 2), WBfield(V), WBfield(L), \
+#define LISTCS(V,L,SM,HS) WBr2hf_(LISTCS, 3 + 2), WBfield(V), WBfield(L), \
 	WBfield(SM), EVENT(SELECT, HS)
-#define LISTCX(V,L,SM,M,HS,HX) WBr3hf(LISTCX, 4 + 2 * 2), WBfield(V), \
+#define LISTCX(V,L,SM,M,HS,HX) WBr3hf_(LISTCX, 4 + 2 * 2), WBfield(V), \
 	WBfield(L), WBfield(SM), WBfield(M), EVENT(SELECT, HS), EVENT(EXT, HX)
-#define XENTRY(V) WBrhf(XENTRY, 1), WBfield(V)
-#define MLENTRY(V) WBrhf(MLENTRY, 1), WBfield(V)
-#define TLENTRY(V,MX,X,Y,L) WBrhf(TLENTRY, 3), WBfield(V), (void *)(MX), \
+#define XENTRY(V) WBrhf_x(ENTRY, 1), WBfield(V)
+#define MLENTRY(V) WBrhf_(MLENTRY, 1), WBfield(V)
+#define TLENTRY(V,MX,X,Y,L) WBrhf_t(ENTRY, 3), WBfield(V), (void *)(MX), \
 	WBxyl(X, Y, L)
-#define XPENTRY(V,MX) WBrhf(XPENTRY, 2), WBfield(V), (void *)(MX)
-#define TPENTRYv(NM,V,MX) WBrh(T1PENTRY, 2), (V), (void *)(MX), TLABEL(NM)
-#define PATH(NM,T,M,V) FRAME(NM), WBrhf(PATH, 3), WBfield(V), (T), (void *)(M)
-#define PATHv(NM,T,M,V) FRAME(NM), WBrh(PATH, 3), (V), (T), (void *)(M)
-#define PATHs(NM,T,M,V) FRAME(NM), WBrh(PATHs, 3), (V), (T), (void *)(M)
-#define TEXT(V) WBrhf(TEXT, 1), WBfield(V)
-#define COMBOENTRY(V,SP,H) WBr2hf(COMBOENTRY, 2 + 2), WBfield(V), WBfield(SP), \
-	EVENT(OK, H)
-#define FONTSEL(A) WBrhf(FONTSEL, 1), WBfield(A)
-#define COLOR(V) WBrhf(COLOR, 1), WBfield(V)
-#define TCOLOR(A) WBrhf(TCOLOR, 1), WBfield(A)
+#define XPENTRY(V,MX) WBrhf_x(PENTRY, 2), WBfield(V), (void *)(MX)
+#define TPENTRYv(NM,V,MX) WBrh_t1(PENTRY, 2), (V), (void *)(MX), TLABEL(NM)
+#define PATH(NM,T,M,V) FRAME(NM), WBrhf_(PATH, 3), WBfield(V), (T), (void *)(M)
+#define PATHv(NM,T,M,V) FRAME(NM), WBrh_(PATH, 3), (V), (T), (void *)(M)
+#define PATHs(NM,T,M,V) FRAME(NM), WBrh_(PATHs, 3), (V), (T), (void *)(M)
+#define TEXT(V) WBrhf_x(TEXT, 1), WBfield(V)
+#define COMBOENTRY(V,SP,H) WBr2hf_x(COMBOENTRY, 2 + 2), WBfield(V), \
+	WBfield(SP), EVENT(OK, H)
+#define FONTSEL(A) WBrhf_x(FONTSEL, 1), WBfield(A)
+#define HEXENTRY(V,HC,X,Y) WBr2hf_t(HEXENTRY, 2 + 2), WBfield(V), \
+	EVENT(CHANGE, HC), WBxyl(X, Y, 1)
+#define EYEDROPPER(V,HC,X,Y) WBr2hf_t(EYEDROPPER, 2 + 2), WBfield(V), \
+	EVENT(CHANGE, HC), WBxyl(X, Y, 1)
+#define COLOR(V) WBrhf_(COLOR, 1), WBfield(V)
+#define TCOLOR(A) WBrhf_(TCOLOR, 1), WBfield(A)
 /* !!! These blocks each hold 2 nested EVENT blocks */
 /* !!! SELECT must be last, for it gets triggered */
-#define COLORLIST(SP,V,CC,HS,HX) WBr3hf(COLORLIST, 3 + 2 * 2), WBfield(V), \
+#define COLORLIST(SP,V,CC,HS,HX) WBr3hf_(COLORLIST, 3 + 2 * 2), WBfield(V), \
 	WBfield(CC), WBfield(SP), EVENT(EXT, HX), EVENT(SELECT, HS)
-#define COLORLISTN(N,V,CC,HS,HX) WBr3hf(COLORLISTN, 3 + 2 * 2), WBfield(V), \
+#define COLORLISTN(N,V,CC,HS,HX) WBr3hf_(COLORLISTN, 3 + 2 * 2), WBfield(V), \
 	WBfield(CC), WBfield(N), EVENT(EXT, HX), EVENT(SELECT, HS)
-#define OKBOX(NOK,HOK,NC,HC) WBr3h(OKBOX, 2 + 2 * 2), (NOK), (NC), \
-	EVENT(OK, HOK), EVENT(CANCEL, HC)
-#define OKBOXp(NOK,HOK,NC,HC) WBr3h(OKBOXp, 2 + 2 * 2), (NOK), (NC), \
-	EVENT(OK, HOK), EVENT(CANCEL, HC)
-#define EOKBOX(NOK,HOK,NC,HC) WBr3h(EOKBOX, 2 + 2 * 2), (NOK), (NC), \
-	EVENT(OK, HOK), EVENT(CANCEL, HC)
-#define OKBOX0 WBh(OKBOX, 0)
-#define UOKBOX0 WBh(UOKBOX, 0)
-#define UOKBOXp0 WBh(UOKBOXp, 0)
-// !!! These *BTN,OK*,*TOGGLE,*BUTTON blocks each hold 1 nested EVENT block */
-#define OKBTN(NM,H) WBr2h(OKBTN, 1 + 2), (NM), EVENT(OK, H)
-#define CANCELBTN(NM,H) WBr2h(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
-#define CANCELBTNp(NP,H) WBr2hnf(CANCELBTN, 1 + 2), WBfield(NP), EVENT(CANCEL, H)
-#define UCANCELBTN(NM,H) WBr2h(UCANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
-#define ECANCELBTN(NM,H) WBr2h(ECANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
-#define OKADD(NM,H) WBr2h(OKADD, 1 + 2), (NM), EVENT(CLICK, H)
-#define OKTOGGLE(NM,V,H) WBr2hf(OKTOGGLE, 2 + 2), WBfield(V), (NM), \
+#define OKBOX(NOK,HOK,NC,HC) EQBOX, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
+#define OKBOXP(NOK,HOK,NC,HC) EQBOXP, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
+#define OKBOXB(NOK,HOK,NC,HC) EQBOXB, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
+#define OKBOX3(NOK,HOK,NC,HC,NB,HB) EQBOX, CANCELBTN(NC, HC), BUTTON(NB, HB), \
+	OKBTN(NOK, HOK)
+#define OKBOX3B(NOK,HOK,NC,HC,NB,HB) EQBOXB, CANCELBTN(NC, HC), BUTTON(NB, HB), \
+	OKBTN(NOK, HOK)
+// !!! These *BTN,*TOGGLE,*BUTTON blocks each hold 1 nested EVENT block */
+#define OKBTN(NM,H) WBr2h_x(OKBTN, 1 + 2), (NM), EVENT(OK, H)
+#define CANCELBTN(NM,H) WBr2h_x(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define CANCELBTNp(NP,H) WBr2hnf_x(CANCELBTN, 1 + 2), WBfield(NP), \
+	EVENT(CANCEL, H)
+#define UCANCELBTN(NM,H) WBr2h_(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define ECANCELBTN(NM,H) WBr2h_e(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
+#define UDONEBTN(NM,H) WBr2h_(DONEBTN, 1 + 2), (NM), EVENT(OK, H)
+#define TOGGLE(NM,V,H) WBr2hf_x(TOGGLE, 2 + 2), WBfield(V), (NM), \
 	EVENT(CHANGE, H)
-#define UTOGGLEv(NM,V,H) WBr2h(UTOGGLE, 2 + 2), &(V), (NM), EVENT(CHANGE, H)
-#define BUTTON(NM,H) WBr2h(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
-#define BUTTONp(NP,H) WBr2hnf(BUTTON, 1 + 2), WBfield(NP), EVENT(CLICK, H)
-#define UBUTTON(NM,H) WBr2h(UBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
-#define EBUTTON(NM,H) WBr2h(EBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
-#define TLBUTTON(NM,H,X,Y) WBr2h(TLBUTTON, 2 + 2), (NM), \
-	EVENT(CLICK, H), WBxyl(X, Y, 1)
-#define TOOLBAR(HC) WBr2h(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
-#define TOOLBARx(HC,HR) WBr3h(TOOLBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
+#define UTOGGLEv(NM,V,H) WBr2h_(TOGGLE, 2 + 2), &(V), (NM), EVENT(CHANGE, H)
+#define BUTTON(NM,H) WBr2h_x(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define BUTTONp(NP,H) WBr2hnf_x(BUTTON, 1 + 2), WBfield(NP), EVENT(CLICK, H)
+#define UBUTTON(NM,H) WBr2h_(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define EBUTTON(NM,H) WBr2h_e(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define TLBUTTON(NM,H,X,Y) WBr2h_t(BUTTON, 2 + 2), (NM), EVENT(CLICK, H), \
+	WBxyl(X, Y, 1)
+#define TOOLBAR(HC) WBr2h_(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
+#define TOOLBARx(HC,HR) WBr3h_(TOOLBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
 	EVENT(CLICK, HR)
-#define SMARTTBAR(HC) WBr2h(SMARTTBAR, 0 + 2), EVENT(CHANGE, HC)
-#define SMARTTBARx(HC,HR) WBr3h(SMARTTBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
+#define SMARTTBAR(HC) WBr2h_(SMARTTBAR, 0 + 2), EVENT(CHANGE, HC)
+#define SMARTTBARx(HC,HR) WBr3h_(SMARTTBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
 	EVENT(CLICK, HR)
 #define SMARTTBMORE(NM) WBh(SMARTTBMORE, 1), (NM)
 #define TBBUTTON(NM,IC,ID) WBrh(TBBUTTON, 4), NULL, (void *)(ID), (NM), (IC)
@@ -772,25 +791,25 @@ void dialog_event(void *ddata, void **wdata, int what, void **where);
 #define TBRBUTTONxv(NM,IC,ID,IR,V) WBrh(TBRBUTTON, 5), &(V), (void *)(ID), \
 	(NM), (IC), (void *)(IR)
 #define TBSPACE WBh(TBSPACE, 0)
-#define TWOBOX WBh(TWOBOX, 0)
-#define MENUBAR(HC) WBr2h(MENUBAR, 0 + 2), EVENT(CHANGE, HC)
-#define SMARTMENU(HC) WBr2h(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
+#define TWOBOX WBh_(TWOBOX, 0)
+#define MENUBAR(HC) WBr2h_(MENUBAR, 0 + 2), EVENT(CHANGE, HC)
+#define SMARTMENU(HC) WBr2h_(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
 #define SMDONE WBh(SMDONE, 0)
-#define SUBMENU(NM) WBh(SUBMENU, 1), (NM)
-#define ESUBMENU(NM) WBh(ESUBMENU, 1), (NM)
-#define SSUBMENU(NM) WBrh(SSUBMENU, 1), (NM)
-#define MENUITEM(NM,ID) WBrh(MENUITEM, 3), NULL, (void *)(ID), (NM)
-#define MENUITEMi(NM,ID,IC) WBrh(MENUITEM, 4), NULL, (void *)(ID), (NM), (IC)
-#define MENUCHECKv(NM,ID,V) WBrh(MENUCHECK, 3), &(V), (void *)(ID), (NM)
-#define MENURITEMv(NM,ID,V) WBrh(MENURITEM, 3), &(V), (void *)(ID), (NM)
-#define MENUTEAR WBh(MENUTEAR, 0)
-#define MENUSEP WBh(MENUSEP, 0)
-#define MENUSEPr WBrh(MENUSEP, 0)
-#define MOUNT(V,FN,H) WBr2hf(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
-#define PMOUNT(V,FN,H,K,NK) WBr2hf(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
+#define SUBMENU(NM) WBh_(SUBMENU, 1), (NM)
+#define ESUBMENU(NM) WBh_(ESUBMENU, 1), (NM)
+#define SSUBMENU(NM) WBrh_(SSUBMENU, 1), (NM)
+#define MENUITEM(NM,ID) WBrh_(MENUITEM, 3), NULL, (void *)(ID), (NM)
+#define MENUITEMi(NM,ID,IC) WBrh_(MENUITEM, 4), NULL, (void *)(ID), (NM), (IC)
+#define MENUCHECKv(NM,ID,V) WBrh_(MENUCHECK, 3), &(V), (void *)(ID), (NM)
+#define MENURITEMv(NM,ID,V) WBrh_(MENURITEM, 3), &(V), (void *)(ID), (NM)
+#define MENUTEAR WBh_(MENUTEAR, 0)
+#define MENUSEP WBh_(MENUSEP, 0)
+#define MENUSEPr WBrh_(MENUSEP, 0)
+#define MOUNT(V,FN,H) WBr2hf_(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
+#define PMOUNT(V,FN,H,K,NK) WBr2hf_x(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
-#define REMOUNTv(V) WBrh(REMOUNT, 1), &(V)
-#define EXEC(FN) WBh(EXEC, 1), (FN)
+#define REMOUNTv(V) WBrh_x(REMOUNT, 1), &(V)
+//#define EXEC(FN) WBh(EXEC, 1), (FN)
 #define GOTO(A) WBh(GOTO, 1), (A)
 #define CALL(A) WBh(CALL, 1), (A)
 #define CALLp(V) WBhnf(CALL, 1), WBfield(V)

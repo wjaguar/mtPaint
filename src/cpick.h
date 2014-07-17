@@ -17,6 +17,12 @@
 	along with mtPaint in the file COPYING.
 */
 
+#ifdef U_CPICK_MTPAINT		/* mtPaint dialog */
+GtkWidget *eyedropper(void **r);
+void set_hexentry(GtkWidget *entry, int c);
+GtkWidget *hexentry(int c, void **r);
+#endif
+
 GtkWidget *cpick_create(int opacity);
 void cpick_set_evt(GtkWidget *w, void **r);
 

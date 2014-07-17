@@ -662,8 +662,9 @@ static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)
 static void *apview_code[] = {
 	WPWHEREVER, WINDOWm(_("Animation Preview")),
 	WXYWH("ani_prev", 200, 0),
-	UOKBOX0, // !!! Originally the window was that way, and had no vbox
+	HBOXB, // !!! Originally the window was that way, and had no vbox
 	UTOGGLEv(_("Play"), ani_play_state, ani_play_btn),
+	BORDER(SPINSLIDE, 0),
 	REF(fslider), MINWIDTH(200), XSPINSLIDEa(frame),
 	EVENT(CHANGE, ani_frame_slider_moved), TRIGGER,
 	IF(fix), UBUTTON(_("Fix"), ani_play_btn),
@@ -972,6 +973,7 @@ static void *anim_code[] = {
 	WXYWH("ani", 200, 200),
 	NBOOK,
 	PAGE(_("Output Files")),
+	BORDER(TABLE, 0), BORDER(ENTRY, 0),
 	XTABLE(2, 5),
 	TSPIN(_("Start frame"), frame1, 1, MAX_FRAME),
 	EVENT(CHANGE, ani_widget_changed),
@@ -990,6 +992,7 @@ static void *anim_code[] = {
 ///	LAYERS TABLES
 	PAGE(_("Positions")),
 	XHBOX, // !!! Originally the page was an hbox
+	BORDER(SCROLL, 0),
 	SCROLL(0, 1), // never/auto
 	WLIST,
 // !!! Maybe allow background here too, for x/y? (set base=0 here then)
@@ -1008,9 +1011,8 @@ static void *anim_code[] = {
 	WDONE,
 	WDONE, /* NBOOK */
 ///	MAIN BUTTONS
-	BORDER(OKBOX, 0),
-// !!! Maybe better make buttons equal, with OKBOX0
-	UOKBOX0,
+// !!! Maybe better make buttons equal, with EQBOX
+	HBOX,
 	CANCELBTN(_("Close"), ani_btn),
 	REF(save), BUTTON(_("Save"), ani_btn),
 	REF(preview), BUTTON(_("Preview"), ani_btn),

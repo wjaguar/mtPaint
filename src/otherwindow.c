@@ -245,10 +245,11 @@ static void *newwin_code[] = {
 	TSPIN(_("Height"), h, MIN_HEIGHT, MAX_HEIGHT),
 	TSPIN(_("Colours"), c, 2, 256),
 	WDONE,
+	BORDER(RPACK, 0),
 	RPACK(newwin_txt, 5, 0, im_type),
 	UNLESS(type), CHECK(_("Undoable"), undo),
 	HSEPl(200),
-	OKBOX(_("Create"), create_new, _("Cancel"), NULL),
+	OKBOXB(_("Create"), create_new, _("Cancel"), NULL),
 	WSHOW
 };
 #undef WBbase
@@ -507,7 +508,6 @@ void *filterwindow_code[] = {
 	HSEP,
 	CALLp(code),
 	HSEP,
-	BORDER(OKBOX, 0),
 	OKBOX(_("Apply"), do_filterwindow, _("Cancel"), NULL),
 	WSHOW
 };
@@ -577,12 +577,12 @@ static void *spal_code[] = {
 	TSPINa(_("Start Index"), start),
 	TSPINa(_("End Index"), end),
 	WDONE,
+	BORDER(RPACK, 0),
 	IF(rgb), RPACKv(spal_txt, 9, 5, spal_mode),
 	UNLESS(rgb), RPACKv(spal_txt, 10, 5, spal_mode),
 	CHECKb(_("Reverse Order"), "palrevSort", FALSE),
 	HSEPl(200),
-	OKBOX(_("OK"), spal_evt, _("Cancel"), NULL),
-	OKADD(_("Apply"), spal_evt),
+	OKBOX3B(_("OK"), spal_evt, _("Cancel"), NULL, _("Apply"), spal_evt),
 	WSHOW
 };
 #undef WBbase
@@ -813,6 +813,7 @@ static void *brcosa_code[] = {
 		IF(rgbclip), EVENT(CHANGE, brcosa_changed),
 	ENDIF(1),
 	TLHBOXl(1, 2, 2),
+	BORDER(SPIN, 0),
 	XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed),
 	XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed),
 	WDONE,
@@ -824,7 +825,7 @@ static void *brcosa_code[] = {
 	WDONE,
 ///	BOTTOM AREA
 	HSEP,
-	OKBOX0,
+	EQBOXB,
 	BORDER(BUTTON, 4),
 	CANCELBTN(_("Cancel"), brcosa_btn),
 	REF(buttons[0]), BUTTON(_("Preview"), brcosa_changed),
@@ -968,7 +969,7 @@ static void *sisca_code[] = {
 	IF(mode), WINDOWm(_("Scale Canvas")),
 	UNLESS(mode), WINDOWm(_("Resize Canvas")),
 	TABLE(3, 3), // !!! in fact 5 rows in resize mode
-	BORDER(TLABEL, 0),
+	BORDER(LABEL, 0),
 	TLLABEL(_("Width     "), 1, 0), TLLABEL(_("Height    "), 2, 0),
 	TLLABEL(_("Original      "), 0, 1), TLNOSPIN(w, 1, 1), TLNOSPIN(h, 2, 1),
 	TLABEL(_("New")),
@@ -984,6 +985,7 @@ static void *sisca_code[] = {
 	HSEP,
 	IF(rgb), HBOX, IF(rgb), VBOX,
 	CHECK(_("Fix Aspect Ratio"), fix), EVENT(CHANGE, sisca_moved),
+	BORDER(RPACK, 0),
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),
 		WDONE, EVBOX,
@@ -995,7 +997,6 @@ static void *sisca_code[] = {
 		HSEP,
 		WDONE, // page 0
 		CHECKv(_("Sharper image reduction"), sharper_reduce),
-		BORDER(FRBOX, 0),
 		FRPACKv(_("Boundary extension"), bound_modes, 3, 0,
 			boundary_mode),
 		WDONE, // page 1
@@ -1005,7 +1006,7 @@ static void *sisca_code[] = {
 		RPACKv(resize_modes, 0, 0, resize_mode),
 		HSEP,
 	ENDIF(1),
-	OKBOX(_("OK"), click_sisca_ok, _("Cancel"), NULL),
+	OKBOXB(_("OK"), click_sisca_ok, _("Cancel"), NULL),
 	WSHOW
 };
 #undef WBbase
@@ -1556,17 +1557,17 @@ static char *grid_txt[GRID_MAX + 1] = { _("Opaque"), _("Border"),
 static void *colsel_code[] = {
 	IF(mpflag), WPMOUSE,
 	WINDOWpm(name),
-	BORDER(BUTTON, 4),
+	BORDER(SCROLL, 0), BORDER(BUTTON, 4),
 	REF(clist),
 	IFx(is_pal, 1), // long-list form - for now only palette needs it
-		XHBOXb(5, 0),
+		XHBOXS,
 		SCROLL(0, 1), // never/auto
 		COLORLISTN(cnt, idx, v.rgb, colsel_evt, click_colour),
-		XVBOXb(5, 5),
+		XVBOXBS,
 	ENDIF(1),
 	UNLESSx(is_pal, 1), // short-list form (6 items or less)
-		XVBOXb(5, 5),
-		XHBOXb(10, 0),
+		XVBOXBS,
+		XHBOXbp(10, 0, 0),
 		SCROLL(0, 1), // never/auto
 		COLORLIST(cnames, idx, v.rgb, colsel_evt, NULL),
 	ENDIF(1),
@@ -1587,13 +1588,14 @@ static void *colsel_code[] = {
 		REF(fspin), SPIN(n0, 0, 255),
 		BUTTON(_("To"), set_range_spin),
 		REF(tspin), SPIN(n1, 0, 255),
-		BORDER(XOPT, 4),
-		XOPT(scales_txt, 4, scale),
+		BORDER(OPT, 0),
+		XVBOXbp(0, 4, 0), OPT(scales_txt, 4, scale), WDONE,
 		BUTTON(_("Create"), make_cscale),
 		WDONE,
 	ENDIF(1),
 	IFx(is_AB, 1),
 		BORDER(SPINSLIDE, 0),
+		BORDER(LABEL, 0),
 		HBOX,
 		BUTTON(_("Posterize"), posterize_AB),
 		REF(pspin_AB), SPIN(pos_AB, 1, 8),
@@ -1616,6 +1618,7 @@ static void *colsel_code[] = {
 	IFx(is_csel, 1),
 		BORDER(SPIN, 0),
 		BORDER(LABEL, 0),
+		BORDER(RPACK, 0),
 		HBOX,
 		MLABEL(_("Range")),
 		REF(fspin_csel),
@@ -1642,9 +1645,11 @@ static void *colsel_code[] = {
 		EVENT(CHANGE, grid_controls_changed),
 		WDONE,
 	ENDIF(1),
-	BORDER(OKBOX, 0), DEFBORDER(BUTTON),
-	EOKBOX(_("OK"), colsel_evt, _("Cancel"), colsel_evt),
-	OKTOGGLE(_("Preview"), preview, colsel_evt),
+	HBOX, MINWIDTH(260), EEQBOX,
+	DEFBORDER(BUTTON),
+	CANCELBTN(_("Cancel"), colsel_evt),
+	TOGGLE(_("Preview"), preview, colsel_evt),
+	OKBTN(_("OK"), colsel_evt),
 	WSHOW
 };
 #undef WBbase
@@ -1972,10 +1977,13 @@ static char *dist_txt[] = { _("Largest (Linf)"), _("Sum (L1)"), _("Euclidean (L2
 static void *quantize_code[] = {
 	IF(pflag), WINDOWm(_("Create Quantized")),
 	UNLESS(pflag), WINDOWm(_("Convert To Indexed")),
-	BORDER(FRBOX, 0),
+	BORDER(RPACK, 0),
 	BORDER(LABEL, 0),
-	HBOXb(5, 10), MLABEL(_("Indexed Colours To Use")),
+	HBOXbp(5, 10, 0), MLABEL(_("Indexed Colours To Use")),
+	DEFBORDER(LABEL),
+	BORDER(SPIN, 0),
 	REF(colspin), XSPIN(cols, 1, 256),
+	DEFBORDER(SPIN),
 	UNLESS(pflag), BOOKBTN(_("Settings"), book),
 	WDONE,
 	REF(book), UNLESS(pflag), PLAINBOOK,
@@ -2007,7 +2015,6 @@ static void *quantize_code[] = {
 		WDONE,
 	ENDIF(1),
 	/* OK / Cancel */
-	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), click_quantize_ok, _("Cancel"), NULL),
 	WSHOW
 };
@@ -2069,7 +2076,7 @@ typedef struct {
 	int lock; // prevent nested calls
 	int interp, crgb[3];
 	int cnt, slot, mode;
-	int pgridsize, gxy[2];
+	int gsize[3], gxy[2];
 	void **ppad;
 	void **col, **opt;
 	void **spin, **chk;
@@ -2230,32 +2237,31 @@ static char *interp_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Backward HSV"),
 #define WBbase ged_dd
 static void *ged_code[] = {
 	ONTOP(xw), WINDOWm(_("Edit Gradient")),
-	XVBOXb(5, 5), // !!! Originally the main vbox was that way
+	XVBOXBS, // !!! Originally the main vbox was that way
 	/* Palette pad */
-	TALLOC(pgrid, pgridsize),
-	REF(ppad), FCIMAGEP(pgrid, gxy, PPAD_WIDTH, PPAD_HEIGHT),
+	TALLOC(pgrid, gsize[2]),
+	REF(ppad), FCIMAGEP(pgrid, gxy, gsize),
 	EVENT(KEY, ged_pkey), EVENT(MOUSE, ged_pclick),
 	HSEP,
 	/* Editor widgets */
 	UNLESSx(mode, 1), /* RGB */
 		REF(col), COLOR(crgb), EVENT(CHANGE, ged_event),
-		EQBOXs(5), BORDER(XOPT, 0),
+		EQBOXS, BORDER(OPT, 0),
 		REF(opt), XOPTe(interp_txt, 5, interp, ged_event),
 	ENDIF(1),
 	IFx(mode, 1), /* Indexed / utility / opacity */
 		BORDER(SPINSLIDE, 0),
 		REF(spin), SPINSLIDEa(crgb), EVENT(CHANGE, ged_event),
-		EQBOXs(5),
+		EQBOXS,
 		REF(chk), XCHECK(_("Constant"), interp), EVENT(CHANGE, ged_event),
 	ENDIF(1),
 	BORDER(LABEL, 0),
-	XHBOXb(5, 0), MLABEL(_("Points:")),
+	XHBOXS, MLABEL(_("Points:")),
 	REF(pspin), SPIN(cnt, 2, GRAD_POINTS), EVENT(CHANGE, ged_event),
 	WDONE, WDONE,
 	/* Gradient bar */
 	REF(gbar), GRADBAR(mode, slot, cnt, GRAD_POINTS, pad, rgb, ged_event),
 	TRIGGER,
-	BORDER(OKBOX, 0),
 	OKBOX(_("OK"), ged_event, _("Cancel"), NULL),
 	WEND
 };
@@ -2294,7 +2300,8 @@ static void grad_edit(void **wdata, int opac)
 
 	make_crgb(tdata.rgb, tdata.mode);
 
-	tdata.pgridsize = PPAD_WIDTH * PPAD_HEIGHT * 3;
+	tdata.gsize[2] = (tdata.gsize[0] = PPAD_WIDTH) *
+		(tdata.gsize[1] = PPAD_HEIGHT) * 3;
 	tdata.gxy[0] = tdata.gxy[1] = PPAD_C;
 
 	dd = run_create(ged_code, &tdata, sizeof(tdata));
@@ -2417,7 +2424,7 @@ static char *optypes_txt[NUM_OTYPES] = {_("Current to 0"), _("Current only"),
 static void *grad_code[] = {
 	IF(pmouse), WPMOUSE, WINDOWm(_("Configure Gradient")),
 	/* Channel box */
-	BORDER(FRBOX, 0),
+	BORDER(RPACK, 0),
 	FRPACKe(_("Channel"), channames_, NUM_CHANNELS, 1, nchan, grad_evt),
 	TRIGGER,
 	/* Setup block */
@@ -2433,23 +2440,22 @@ static void *grad_code[] = {
 	WDONE,
 	/* Select page */
 	EQBOX,
+	BORDER(OPT, 0),
 	FXVBOX(_("Gradient")),
-	REF(opt), XOPT(gradtypes_txt, NUM_GTYPES, gtype),
+	VBOXB, REF(opt), OPT(gradtypes_txt, NUM_GTYPES, gtype), WDONE,
 	EQBOX,
 	CHECK(_("Reverse"), grev),
 	REF(gbut), BUTTON(_("Edit Custom"), grad_evt),
 	WDONE, WDONE,
 	FXVBOX(_("Opacity")),
-	XOPT(optypes_txt, NUM_OTYPES, otype),
+	VBOXB, OPT(optypes_txt, NUM_OTYPES, otype), WDONE,
 	EQBOX,
 	CHECK(_("Reverse"), orev),
 	REF(obut), BUTTON(_("Edit Custom"), grad_evt),
 	WDONE, WDONE,
 	WDONE,
 	/* Cancel / Apply / OK */
-	BORDER(OKBOX, 0),
-	OKBOX(_("OK"), grad_evt, _("Cancel"), NULL),
-	OKADD(_("Apply"), grad_evt),
+	OKBOX3(_("OK"), grad_evt, _("Cancel"), NULL, _("Apply"), grad_evt),
 	WSHOW
 };
 #undef WBbase
@@ -2577,7 +2583,7 @@ static void skew_moved(skew_dd *dt, void **wdata, int what, void **where)
 static void *skew_code[] = {
 	WINDOWm(_("Skew")),
 	TABLE(4, 3),
-	BORDER(TLABEL, 0),
+	BORDER(LABEL, 0),
 	TLLABEL(_("Angle"), 1, 0), TLLABEL(_("Offset"), 2, 0),
 		TLLABEL(_("At distance"), 3, 0),
 	TLLABEL(_("Horizontal "), 0, 1),
@@ -2597,10 +2603,11 @@ static void *skew_code[] = {
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),
 		HSEP,
+		BORDER(RPACK, 0),
 		RPACKDv(ftxt, 0, skew_mode),
 		HSEP,
 	ENDIF(1),
-	OKBOX(_("OK"), click_skew_ok, _("Cancel"), NULL),
+	OKBOXB(_("OK"), click_skew_ok, _("Cancel"), NULL),
 	WSHOW
 };
 #undef WBbase
@@ -2671,7 +2678,7 @@ static char *srcs_txt[4] = { _("Unchanged"), _("None"), _("Image"),
 #define WBbase bkg_dd
 static void *bkg_code[] = {
 	WINDOWm(_("Tracing Image")),
-	XVBOXb(0, 5), // !!! Originally the main vbox was that way
+	XVBOXB, // !!! Originally the main vbox was that way
 	TABLE(3, 4),
 	TLABEL(_("Source")),
 	TLOPTle(srcs_txt, 4, src, bkg_evt, 1, 0, 2), TRIGGER,
@@ -2686,8 +2693,7 @@ static void *bkg_code[] = {
 	WDONE,
 	CHECK(_("Display"), state),
 	HSEP,
-	OKBOX(_("OK"), bkg_evt, _("Cancel"), NULL),
-	OKADD(_("Apply"), bkg_evt),
+	OKBOX3B(_("OK"), bkg_evt, _("Cancel"), NULL, _("Apply"), bkg_evt),
 	WSHOW
 };
 #undef WBbase
@@ -2838,7 +2844,7 @@ static void seg_evt(seg_dd *dt, void **wdata, int what, void **where)
 #define WBbase seg_dd
 static void *seg_code[] = {
 	WINDOWm(_("Segment Image")),
-	BORDER(FRBOX, 0),
+	BORDER(RPACK, 0),
 	FRPACKe(_("Colour space"), cspnames_, NUM_CSPACES, 1, cspace, seg_mode_toggled),
 	FRPACKe(_("Difference measure"), dist_txt, 3, 1, dist, seg_mode_toggled),
 	TABLE2(3),
@@ -2847,9 +2853,10 @@ static void *seg_code[] = {
 	TSPIN(_("Level"), rank, 0, 32), EVENT(CHANGE, seg_spin_changed),
 	TSPINa(_("Minimum size"), size), EVENT(CHANGE, seg_spin_changed),
 	WDONE,
-	BORDER(OKBOX, 0),
-	OKBOX(_("Apply"), seg_evt, _("Cancel"), seg_evt),
-	REF(pbutton), OKTOGGLE(_("Preview"), preview, seg_evt),
+	EQBOX,
+	CANCELBTN(_("Cancel"), seg_evt),
+	REF(pbutton), TOGGLE(_("Preview"), preview, seg_evt),
+	OKBTN(_("Apply"), seg_evt),
 	WSHOW
 };
 #undef WBbase

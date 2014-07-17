@@ -225,11 +225,11 @@ static char *blends[BLEND_NMODES] = {
 
 #define WBbase blend_dd
 static void *blend_code[] = {
-	VBOXbp(5, 5, 5),
+	VBOXPBS,
 	COMBO(blends, BLEND_NMODES, mode),
 	CHECK(_("Reverse"), reverse),
 	HSEP,
-	EQBOXs(5),
+	EQBOXS,
 	CHECK(_("Red"), red),
 	CHECK(_("Green"), green),
 	CHECK(_("Blue"), blue),
@@ -339,7 +339,7 @@ static void *settings_code[] = {
 	BORDER(LABEL, 0),
 	REFv(toolbar_labels[0]), MLABELxr("", 5, 2, 0),
 	REFv(toolbar_labels[1]), MLABELxr("", 5, 2, 0),
-	ETABLE(2, 4), BORDER(TLABEL, 0), BORDER(SPINSLIDE, 0),
+	ETABLE(2, 4), BORDER(SPINSLIDE, 0),
 	TLABEL(_("Size")),
 	REFv(ts_spinslides[0]), TLSPINSLIDEx(size, 1, 255, 1, 0),
 	EVENT(CHANGE, ts_spinslide_moved),
@@ -716,12 +716,12 @@ static int click_palette(void *dt, void **wdata, int what, void **where,
 void *toolbar_palette_code[] = {
 	REFv(toolbar_boxes[TOOLBAR_PALETTE]), VBOXr,
 	UNLESSv(toolbar_status[TOOLBAR_PALETTE]), HIDDEN,
-	HBOXbp(0, 0, 5),
+	HBOXP,
 	REFv(drawing_col_prev),
-	ECANVASIMGv(mem_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT),
+	CCANVASIMGv(mem_prev, PREVIEW_WIDTH, PREVIEW_HEIGHT), // centered in box
 	EVENT(RMOUSE, click_colours),
-	WDONE, // HBOXbp
-	BORDER(XSCROLL, 0),
+	WDONE, // HBOXP
+	BORDER(SCROLL, 0),
 	XSCROLL(0, 2), // never/always
 	REFv(drawing_palette),
 	CANVASIMGv(mem_pals, PALETTE_WIDTH, 64), // initial size

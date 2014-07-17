@@ -21,6 +21,6 @@
 #define FPICK_LOAD	2
 #define FPICK_DIRS_ONLY	4
 
-GtkWidget *fpick(GtkWidget ***wpp, char *ddata, void **pp, void **r);
+GtkWidget *fpick(GtkWidget **box, char *title, int flags, void **r);
 void fpick_get_filename(GtkWidget *fp, char *buf, int len, int raw);
 void fpick_set_filename(GtkWidget *fp, char *name, int raw);
