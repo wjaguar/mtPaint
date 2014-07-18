@@ -237,10 +237,6 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 
 int internal_clipboard(int which);
 
-// Allocate a memory chunk which is freed along with a given widget
-
-void *bound_malloc(GtkWidget *widget, int size);
-
 // Image widget
 
 GtkWidget *xpm_image(XPM_TYPE xpm);

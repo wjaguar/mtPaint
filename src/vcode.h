@@ -334,7 +334,7 @@ void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
 void run_destroy(void **wdata);
 
-#define VSLOT_SIZE 2
+#define VSLOT_SIZE 3
 
 //	Extract data structure out of widget-map
 #define GET_DDATA(V) ((V)[0])
@@ -655,7 +655,7 @@ enum {
 #define XSPINa(A) WBrhf_x(SPINa, 1), WBfield(A)
 /* !!! This block holds 1 nested EVENT block */
 #define TLSPINPACKv(A,N,HC,W,X,Y) WBr2h_t(TLSPINPACK, 3 + 2), (A), (void *)(N), \
-	WBxyl(X, Y, W), EVENT(CHANGE, HC)
+	EVENT(CHANGE, HC), WBxyl(X, Y, W)
 #define T1SPINSLIDE(V,V0,V1) WBrhf_t1(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBwh(255, 20)
 #define TSPINSLIDE(NM,V,V0,V1) T1SPINSLIDE(V,V0,V1), TLABEL(NM)
@@ -894,11 +894,6 @@ enum {
 	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
 #define CLIPBOARD(F,T,HC,HP) WBr3hf(CLIPBOARD, 2 + 2 * 2), WBfield(F), \
 	(void *)(T), EVENT(COPY, HC), EVENT(PASTE, HP)
-
-#define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B)
-
-//	EVDATA slot size
-#define EV_SIZE		2
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0

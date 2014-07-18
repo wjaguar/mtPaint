@@ -70,6 +70,12 @@ typedef struct {
 	int done;	// Set when destroyed
 } v_dd;
 
+typedef struct {
+	unsigned short op, size;
+} cmdef;
+
+static cmdef *cmds[op_LAST];
+
 /* From widget to its wdata */
 void **get_wdata(GtkWidget *widget, char *id)
 {
@@ -120,6 +126,11 @@ void *slot_data(void **slot, void *ddata)
 	if (opf & WB_NFLAG) v = *v; // dereference
 	return (v);
 }
+
+#define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B), NULL
+
+//	EVDATA slot size
+#define EV_SIZE		2
 
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
@@ -620,14 +631,14 @@ static gboolean tried_drop(GtkWidget *widget, GdkDragContext *context,
 	return (TRUE);
 }
 
-void *dragdrop(void *v, void **pp, void **r)
+void *dragdrop(void **r)
 {
+	void *v = r[0], **pp = r[1] + 1, **slot = origin_slot(PREV_SLOT(r));
 	clipform_data *cd = **(void ***)v;
-	void **slot = origin_slot(PREV_SLOT(r));
 
 	if (pp[3]) // Have drag handler
 	{
-		drag_ctx *dc = bound_malloc(*slot, sizeof(drag_ctx));
+		drag_ctx *dc = r[2];
 		dc->r = NEXT_SLOT(r);
 		dc->cd = cd;
 		gtk_signal_connect(GTK_OBJECT(*slot), "button_press_event",
@@ -992,43 +1003,6 @@ static void trigger_things(void **wdata)
 	}
 }
 
-/* Predict how many _void pointers_ a V-code sequence could need */
-// !!! And with inlining this, same problem
-int predict_size(void **ifcode, char *ddata)
-{
-	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, opf, u = 0, n = 2; // safety margin
-
-	while (TRUE)
-	{
-		opf = op = (int)*ifcode++;
-		ifcode = (pp = ifcode) + WB_GETLEN(op);
-		n += WB_GETREF(op);
-		op &= WB_OPMASK;
-		if (op < op_END_LAST) break; // End
-		// Subroutine return
-		if (op == op_RET) ifcode = *--rp;
-		// Jump or subroutine call
-		else if ((op == op_GOTO) || (op == op_CALL))
-		{
-			if (op == op_CALL) *rp++ = ifcode;
-			v = *pp;
-			if (opf & WB_FFLAG)
-				v = (void *)(ddata + (int)v);
-			if (opf & WB_NFLAG) v = *v; // dereference
-			ifcode = v;
-		}
-		// Allocation
-		else if ((op == op_TALLOC) || (op == op_TCOPY))
-		{
-			int l = *(int *)(ddata + (int)pp[1]);
-			u += (l + sizeof(void *) - 1) / sizeof(void *);
-		}
-	}
-
-	return (n * VSLOT_SIZE + u);
-}
-
 /* More specialized packing modes */
 
 enum {
@@ -1158,15 +1132,13 @@ static gboolean expose_rgb(GtkWidget *widget, GdkEventExpose *event, gpointer us
 }
 
 // !!! And with inlining this, problem also
-GtkWidget *rgbimage(void *v, int *wh)
+GtkWidget *rgbimage(void **r, int *wh)
 {
 	GtkWidget *widget;
-	rgbimage_data *rd;
+	rgbimage_data *rd = r[2];
 
 	widget = gtk_drawing_area_new();
-	rd = bound_malloc(widget, sizeof(rgbimage_data));
-	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
-	rd->rgb = v;
+	rd->rgb = r[0];
 	rd->w = wh[0];
 	rd->h = wh[1];
 	gtk_widget_set_usize(widget, wh[0], wh[1]);
@@ -1191,9 +1163,9 @@ static void reset_rgbp(GtkWidget *widget, gpointer user_data)
 }
 
 // !!! And with inlining this, problem also
-GtkWidget *rgbimagep(void *v, int w, int h)
+GtkWidget *rgbimagep(void **r, int w, int h)
 {
-	rgbimage_data *rd;
+	rgbimage_data *rd = r[2];
 	GdkPixmap *pmap;
 	GtkWidget *widget;
 
@@ -1202,9 +1174,7 @@ GtkWidget *rgbimagep(void *v, int w, int h)
 	gdk_pixmap_unref(pmap);
 	gtk_pixmap_set_build_insensitive(GTK_PIXMAP(widget), FALSE);
 
-	rd = bound_malloc(widget, sizeof(rgbimage_data));
-	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
-	rd->rgb = v;
+	rd->rgb = r[0];
 	rd->w = w;
 	rd->h = h;
 	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
@@ -1225,15 +1195,13 @@ static gboolean expose_canvasimg(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
-GtkWidget *canvasimg(void *v, int w, int h, int bkg)
+GtkWidget *canvasimg(void **r, int w, int h, int bkg)
 {
-	rgbimage_data *rd;
+	rgbimage_data *rd = r[2];
 	GtkWidget *widget, *frame;
 
 	widget = wjcanvas_new();
-	rd = bound_malloc(widget, sizeof(rgbimage_data));
-	gtk_object_set_user_data(GTK_OBJECT(widget), rd);
-	rd->rgb = v;
+	rd->rgb = r[0];
 	rd->w = w;
 	rd->h = h;
 	rd->bkg = bkg;
@@ -1332,9 +1300,10 @@ static gboolean click_fcimage(GtkWidget *widget, GdkEventButton *event,
 }
 
 // !!! And with inlining this, problem also
-GtkWidget *fcimagep(void *v, char *ddata, void **pp)
+GtkWidget *fcimagep(void **r, char *ddata)
 {
-	fcimage_data *fd;
+	fcimage_data *fd = r[2];
+	void **pp = r[1];
 	GtkWidget *widget;
 	int w, h, *xy;
 
@@ -1343,10 +1312,8 @@ GtkWidget *fcimagep(void *v, char *ddata, void **pp)
 	xy = pp[2] == (void *)(-1) ? NULL : (void *)(ddata + (int)pp[2]);
 
 	widget = wjpixmap_new(w, h);
-	fd = bound_malloc(widget, sizeof(fcimage_data));
-	gtk_object_set_user_data(GTK_OBJECT(widget), fd);
 	fd->xy = xy;
-	fd->rgb = v;
+	fd->rgb = r[0];
 	fd->w = w;
 	fd->h = h;
 	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
@@ -1358,7 +1325,7 @@ GtkWidget *fcimagep(void *v, char *ddata, void **pp)
 
 static void fcimage_rxy(void **slot, int *xy)
 {
-	fcimage_data *fd = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+	fcimage_data *fd = slot[2];
 
 	wjpixmap_rxy(slot[0], xy[0], xy[1], xy + 0, xy + 1);
 	xy[0] = xy[0] < 0 ? 0 : xy[0] >= fd->w ? fd->w - 1 : xy[0];
@@ -1440,9 +1407,9 @@ static gboolean colorlist_click(GtkWidget *widget, GdkEventButton *event,
 
 static void colorlist_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 {
-	void **slot = user_data;
+	void **orig = user_data, **slot = SLOT_N(orig, 2);
 	void **base = slot[0], **desc = slot[1];
-	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
+	colorlist_data *dt = orig[2];
 
 	/* Update the value */
 	*dt->idx = (int)gtk_object_get_user_data(GTK_OBJECT(widget));
@@ -1452,18 +1419,17 @@ static void colorlist_select(GtkList *list, GtkWidget *widget, gpointer user_dat
 }
 
 // !!! And with inlining this, problem also
-GtkWidget *colorlist(int *idx, char *ddata, void **pp, void **r)
+GtkWidget *colorlist(void **r, char *ddata)
 {
 	GtkWidget *list, *item, *col, *label, *box;
-	colorlist_data *dt;
-	void *v;
+	colorlist_data *dt = r[2];
+	void *v, **pp = r[1];
 	char txt[64], *t, **sp = NULL;
-	int i, cnt = 0;
+	int i, cnt = 0, *idx = r[0];
 
 	list = gtk_list_new();
 
-	// Allocate datablock
-	dt = bound_malloc(list, sizeof(colorlist_data));
+	// Fill datablock
 	v = ddata + (int)pp[3];
 	if (((int)pp[0] & WB_OPMASK) == op_COLORLIST) // array of names
 	{
@@ -1475,14 +1441,12 @@ GtkWidget *colorlist(int *idx, char *ddata, void **pp, void **r)
 	dt->col = (void *)(ddata + (int)pp[2]); // palette
 	dt->idx = idx;
 
-	gtk_object_set_user_data(GTK_OBJECT(list), dt); // know thy descriptor
-
 	for (i = 0; i < cnt; i++)
 	{
 		item = gtk_list_item_new();
 		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
 		if (pp[5]) gtk_signal_connect(GTK_OBJECT(item), "button_press_event",
-			GTK_SIGNAL_FUNC(colorlist_click), r);
+			GTK_SIGNAL_FUNC(colorlist_click), NEXT_SLOT(r));
 		gtk_container_add(GTK_CONTAINER(list), item);
 
 		box = gtk_hbox_new(FALSE, 3);
@@ -1508,14 +1472,14 @@ GtkWidget *colorlist(int *idx, char *ddata, void **pp, void **r)
 	gtk_container_set_focus_child(GTK_CONTAINER(list),
 		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, *idx)->data));
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
-		GTK_SIGNAL_FUNC(colorlist_select), NEXT_SLOT(r));
+		GTK_SIGNAL_FUNC(colorlist_select), r);
 
 	return (list);
 }
 
-static void colorlist_reset_color(GtkWidget *list, int idx)
+static void colorlist_reset_color(void **slot, int idx)
 {
-	colorlist_data *dt = gtk_object_get_user_data(GTK_OBJECT(list));
+	colorlist_data *dt = slot[2];
 	unsigned char *rgb = dt->col + idx * 3;
 	GdkColor c;
 
@@ -1527,7 +1491,7 @@ static void colorlist_reset_color(GtkWidget *list, int idx)
 	gdk_colormap_alloc_color(gdk_colormap_get_system(), &c, FALSE, TRUE);
 	/* Redraw the item displaying the color */
 	gtk_widget_queue_draw(
-		GTK_WIDGET(g_list_nth(GTK_LIST(list)->children, idx)->data));
+		GTK_WIDGET(g_list_nth(GTK_LIST(slot[0])->children, idx)->data));
 }
 
 static void list_scroll_in(GtkWidget *widget, gpointer user_data)
@@ -1556,12 +1520,14 @@ typedef struct {
 	GtkWidget *lr[2];
 	void **r;
 	int ofs, lim, *idx, *len;
+	unsigned char idxs[GRADBAR_LEN];
 } gradbar_data;
 
 static void gradbar_scroll(GtkWidget *btn, gpointer user_data)
 {
-	gradbar_data *dt = gtk_object_get_user_data(GTK_OBJECT(btn->parent));
-	int dir = (int)user_data * 2 - 1;
+	unsigned char *idx = user_data;
+	gradbar_data *dt = (void *)(idx - offsetof(gradbar_data, idxs) - *idx);
+	int dir = *idx * 2 - 1;
 
 	dt->ofs += dir;
 	*dt->idx += dir; // self-reading
@@ -1573,21 +1539,21 @@ static void gradbar_scroll(GtkWidget *btn, gpointer user_data)
 
 static void gradbar_slot(GtkWidget *btn, gpointer user_data)
 {
+	unsigned char *idx = user_data;
 	gradbar_data *dt;
 
 	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	dt = gtk_object_get_user_data(GTK_OBJECT(btn->parent));
-	*dt->idx = (int)user_data + dt->ofs; // self-reading
+	dt = (void *)(idx - offsetof(gradbar_data, idxs) - *idx);
+	*dt->idx = *idx + dt->ofs; // self-reading
 	get_evt_1(NULL, (gpointer)dt->r);
 }
 
 static gboolean gradbar_draw(GtkWidget *widget, GdkEventExpose *event,
-	gpointer idx)
+	gpointer user_data)
 {
-	unsigned char rgb[SLOT_SIZE * 2 * 3];
-	gradbar_data *dt = gtk_object_get_user_data(
-		GTK_OBJECT(widget->parent->parent));
-	int i, n = (int)idx + dt->ofs;
+	unsigned char rgb[SLOT_SIZE * 2 * 3], *idx = user_data;
+	gradbar_data *dt = (void *)(idx - offsetof(gradbar_data, idxs) - *idx);
+	int i, n = *idx + dt->ofs;
 
 	if (n < *dt->len) // Filled slot
 	{
@@ -1609,18 +1575,17 @@ static gboolean gradbar_draw(GtkWidget *widget, GdkEventExpose *event,
 }
 
 // !!! With inlining this, problem also
-GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
+GtkWidget *gradbar(void **r, char *ddata)
 {
 	GtkWidget *hbox, *btn, *sw;
-	gradbar_data *dt;
+	gradbar_data *dt = r[2];
+	void **pp = r[1];
 	int i;
 
 	hbox = gtk_hbox_new(TRUE, 0);
-	dt = bound_malloc(hbox, sizeof(gradbar_data));
-	gtk_object_set_user_data(GTK_OBJECT(hbox), dt);
 
-	dt->r = r;
-	dt->idx = idx;
+	dt->r = NEXT_SLOT(r);
+	dt->idx = r[0];
 	dt->len = (void *)(ddata + (int)pp[3]); // length
 	dt->map = (void *)(ddata + (int)pp[4]); // gradient map
 	if (*(int *)(ddata + (int)pp[2])) // mode not-RGB
@@ -1637,20 +1602,21 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 #endif
 	gtk_widget_set_sensitive(btn, FALSE);
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
-		GTK_SIGNAL_FUNC(gradbar_scroll), (gpointer)0);
+		GTK_SIGNAL_FUNC(gradbar_scroll), dt->idxs + 0);
 	btn = NULL;
 	for (i = 0; i < GRADBAR_LEN; i++)
 	{
+		dt->idxs[i] = i;
 		btn = xpack(hbox, gtk_radio_button_new_from_widget(
 			GTK_RADIO_BUTTON_0(btn)));
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
-			GTK_SIGNAL_FUNC(gradbar_slot), (gpointer)i);
+			GTK_SIGNAL_FUNC(gradbar_slot), dt->idxs + i);
 		sw = gtk_drawing_area_new();
 		gtk_container_add(GTK_CONTAINER(btn), sw);
 		gtk_widget_set_usize(sw, SLOT_SIZE, SLOT_SIZE);
 		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
-			GTK_SIGNAL_FUNC(gradbar_draw), (gpointer)i);
+			GTK_SIGNAL_FUNC(gradbar_draw), dt->idxs + i);
 	}
 	dt->lr[1] = btn = xpack(hbox, gtk_button_new());
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
@@ -1661,7 +1627,7 @@ GtkWidget *gradbar(int *idx, char *ddata, void **pp, void **r)
 		GTK_SHADOW_NONE));
 #endif
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
-		GTK_SIGNAL_FUNC(gradbar_scroll), (gpointer)1);
+		GTK_SIGNAL_FUNC(gradbar_scroll), dt->idxs + 1);
 
 	gtk_widget_show_all(hbox);
 	return (hbox);
@@ -1678,6 +1644,10 @@ static void comboentry_reset(GtkCombo *combo, char **v, char **src)
 	*(const char **)v = gtk_entry_get_text(GTK_ENTRY(combo->entry));
 	// NULL-terminated array of pointers
 	while (*src) list = g_list_append(list, *src++);
+#if GTK_MAJOR_VERSION == 1
+	if (!list) gtk_list_clear_items(GTK_LIST(combo->list), 0, -1);
+	else /* Fails if list is empty in GTK+1 */
+#endif
 	gtk_combo_set_popdown_strings(combo, list);
 	g_list_free(list);
 }
@@ -1956,12 +1926,13 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 }
 
 // !!! With inlining this, problem also
-GtkWidget *listcc(int *idx, char *ddata, void **pp, col_data *c, void **r)
+GtkWidget *listcc(void **r, char *ddata, col_data *c)
 {
 	char txt[128];
 	GtkWidget *widget, *list, *item, *hbox;
-	listcc_data *ld;
-	int j, n, h, kind, *cnt;
+	listcc_data *ld = r[2];
+	void **pp = r[1];
+	int j, n, h, kind, *cnt, *idx = r[0];
 
 
 	cnt = (void *)(ddata + (int)pp[2]); // length pointer
@@ -1972,9 +1943,7 @@ GtkWidget *listcc(int *idx, char *ddata, void **pp, col_data *c, void **r)
 	list = gtk_list_new();
 	gtk_list_set_selection_mode(GTK_LIST(list), GTK_SELECTION_BROWSE);
 
-	/* Make datastruct */
-	ld = bound_malloc(list, sizeof(listcc_data));
-	gtk_object_set_user_data(GTK_OBJECT(list), ld);
+	/* Fill datastruct */
 	ld->idx = idx;
 	ld->cnt = cnt;
 	ld->h = h;
@@ -2066,6 +2035,7 @@ static gboolean listcx_key(GtkWidget *widget, GdkEventKey *event,
 	{
 	case GDK_End: case GDK_KP_End:
 		row = clist->rows - 1;
+		// Fallthrough
 	case GDK_Home: case GDK_KP_Home:
 		clist->focus_row = row;
 		gtk_clist_select_row(clist, row, 0);
@@ -2419,12 +2389,13 @@ static void listc_prepare(GtkWidget *w, gpointer user_data)
 }
 
 // !!! With inlining this, problem also likely
-GtkWidget *listc(int *idx, char *ddata, void **pp, col_data *c, void **r)
+GtkWidget *listc(void **r, char *ddata, col_data *c)
 {
 	static int zero = 0;
 	GtkWidget *list, *hbox;
 	GtkCList *clist;
-	listc_data *ld;
+	listc_data *ld = r[2];
+	void **pp = r[1];
 	int j, w, sm, kind, *cntv, *sort = &zero, **map = NULL;
 
 
@@ -2439,11 +2410,9 @@ GtkWidget *listc(int *idx, char *ddata, void **pp, col_data *c, void **r)
 
 	list = gtk_clist_new(c->ncol);
 
-	/* Make datastruct */
-	ld = bound_malloc(list, sizeof(listc_data));
-	gtk_object_set_user_data(GTK_OBJECT(list), ld);
+	/* Fill datastruct */
 	ld->kind = kind;
-	ld->idx = idx;
+	ld->idx = r[0];
 	ld->cnt = cntv;
 	ld->sort = sort;
 	ld->map = map;
@@ -2579,6 +2548,8 @@ static void set_path(GtkWidget *widget, char *s, int mode)
 
 //	SPINPACK widget
 
+#define TLSPINPACK_SIZE(P) (((int)(P)[2] * 2 + 1) * sizeof(void **))
+
 static void spinpack_evt(GtkAdjustment *adj, gpointer user_data)
 {
 	void **tp = user_data, **vp = *tp, **r = *vp;
@@ -2605,19 +2576,17 @@ static void spinpack_evt(GtkAdjustment *adj, gpointer user_data)
 }
 
 // !!! With inlining this, problem also
-GtkWidget *tlspinpack(int *np, void **pp, void **r, GtkWidget *table)
+GtkWidget *tlspinpack(void **r, void **vp, GtkWidget *table, int wh)
 {
 	GtkWidget *widget = NULL;
-	void **vp, **tp;
-	int wh, row, column, i, l, n;
+	void **tp = vp, **pp = r[1];
+	int row, column, i, l, n, *np = r[0];
 
 	n = (int)pp[2];
-	wh = (int)pp[3];
 	row = wh & 255;
 	column = (wh >> 8) & 255;
 	l = (wh >> 16) + 1;
 
-	vp = tp = calloc(n * 2 + 1, sizeof(void **));
 	*tp++ = r;
 
 	for (i = 0; i < n; i++ , np += 3)
@@ -2634,9 +2603,6 @@ GtkWidget *tlspinpack(int *np, void **pp, void **r, GtkWidget *table)
 			GTK_EXPAND | GTK_FILL, 0, 0, 2);
 		*tp++ = vp;
 	}
-	gtk_object_set_user_data(GTK_OBJECT(widget), vp);
-	gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
-		GTK_SIGNAL_FUNC(free), (gpointer)vp);
 	return (widget);
 }
 
@@ -3600,7 +3566,7 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 // !!! With inlining this, problem also
 void *smartmenu_done(void **tbar, void **r)
 {
-	smartmenu_data *sd = gtk_object_get_user_data(tbar[0]);
+	smartmenu_data *sd = tbar[2];
 	GtkWidget *parent, *item;
 	void **rr;
 	char *s;
@@ -3765,6 +3731,65 @@ int do_pack(GtkWidget *widget, void **wp, void **pp, int n, int tpad)
 	return (0);
 }
 
+/* Predict how many _void pointers_ a V-code sequence could need */
+// !!! And with inlining this, same problem
+int predict_size(void **ifcode, char *ddata)
+{
+	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
+	int op, opf, u = 0, n = 2; // safety margin
+
+	while (TRUE)
+	{
+		opf = op = (int)*ifcode++;
+		ifcode = (pp = ifcode) + WB_GETLEN(op);
+		n += WB_GETREF(op);
+		op &= WB_OPMASK;
+		if (op < op_END_LAST) break; // End
+		// Subroutine return
+		if (op == op_RET) ifcode = *--rp;
+		// Jump or subroutine call
+		else if ((op == op_GOTO) || (op == op_CALL))
+		{
+			if (op == op_CALL) *rp++ = ifcode;
+			v = *pp;
+			if (opf & WB_FFLAG)
+				v = (void *)(ddata + (int)v);
+			if (opf & WB_NFLAG) v = *v; // dereference
+			ifcode = v;
+		}
+		// Allocation
+		else 
+		{
+			int l = (op == op_TALLOC) || (op == op_TCOPY) ?
+				*(int *)(ddata + (int)pp[1]) :
+				op == op_TLSPINPACK ? TLSPINPACK_SIZE(pp - 1) :
+				cmds[op] ? cmds[op]->size : 0;
+			u += (l + sizeof(void *) - 1) / sizeof(void *);
+		}
+	}
+
+	return (n * VSLOT_SIZE + u);
+}
+
+static cmdef cmddefs[] = {
+	{ op_RGBIMAGE,	sizeof(rgbimage_data) },
+	{ op_RGBIMAGEP,	sizeof(rgbimage_data) },
+	{ op_CANVASIMG,	sizeof(rgbimage_data) },
+	{ op_FCIMAGEP,	sizeof(fcimage_data) },
+	{ op_COLORLIST,	sizeof(colorlist_data) },
+	{ op_COLORLISTN, sizeof(colorlist_data) },
+	{ op_GRADBAR,	sizeof(gradbar_data) },
+	{ op_LISTCCr,	sizeof(listcc_data) },
+	{ op_LISTC,	sizeof(listc_data) },
+	{ op_LISTCd,	sizeof(listc_data) },
+	{ op_LISTCu,	sizeof(listc_data) },
+	{ op_LISTCS,	sizeof(listc_data) },
+	{ op_LISTCX,	sizeof(listc_data) },
+	{ op_SMARTTBAR,	sizeof(smarttbar_data) },
+	{ op_SMARTMENU,	sizeof(smartmenu_data) },
+	{ op_DRAGDROP,	sizeof(drag_ctx) },
+};
+
 static void do_destroy(void **wdata);
 
 /* V-code is really simple-minded; it can do 0-tests but no arithmetics, and
@@ -3777,7 +3802,8 @@ static void do_destroy(void **wdata);
 #define GET_BORDER(T) (borders[op_BOR_##T - op_BOR_0] + DEF_BORDER)
 
 /* Create a new slot */
-#define ADD_SLOT(R,W,D) (R)[0] = (W) , (R)[1] = (D) , (R) += VSLOT_SIZE
+#define PREP_SLOT(R,W,D,T) (R)[0] = (W) , (R)[1] = (D) , (R)[2] = (T)
+#define ADD_SLOT(R,W,D,T) PREP_SLOT(R, W, D, T) , (R) += VSLOT_SIZE
 
 void **run_create(void **ifcode, void *ddata, int ddsize)
 {
@@ -3800,8 +3826,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	void *v, **pp, **dtail, **r = NULL, **res = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
 	int ld, dsize;
-	int n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0, ct = 0;
+	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0, ct = 0;
 
+        // Per-command allocations
+        memset(cmds, 0, sizeof(cmds));
+        for (i = 0; i < sizeof(cmddefs) / sizeof(cmddefs[0]); i++)
+                cmds[cmddefs[i].op] = cmddefs + i;
 
 	// Allocation size
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
@@ -3815,7 +3845,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	r = res += n; // Anchor after it
 	vdata->code = WDONE; // Make internal datastruct a noop
 	// Store struct ref at anchor, use datastruct as tag for it
-	ADD_SLOT(r, ddata, vdata);
+	ADD_SLOT(r, ddata, vdata, dtail);
 
 	// Border sizes are DEF_BORDER-based
 	memset(borders, 0, sizeof(borders));
@@ -3825,27 +3855,30 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 
 	while (TRUE)
 	{
-		op = (int)*ifcode++;
-		ifcode = (pp = ifcode) + (lp = WB_GETLEN(op));
-		ref = WB_GETREF(op);
-		v = lp ? pp[0] : NULL;
-		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
-		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
+		op = (int)*ifcode;
+		ifcode = (pp = ifcode + 1) + (lp = WB_GETLEN(op));
 		pk = WB_GETPK(op);
-		tpad = cw = 0;
-		op &= WB_OPMASK;
 		/* Table loc is outside the token proper */
 		{
-			int p = pk & pk_MASK;
+			int p = pk & pk_MASK; // !!! To prevent GCC misoptimizing
 			lp -= (p >= pk_TABLE) && (p <= pk_TABLEx);
 		}
-		if (lp <= 0) v = NULL;
+		v = lp > 0 ? pp[0] : NULL;
+		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
+		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
+		ref = WB_GETREF(op);
+		op &= WB_OPMASK;
+		if (cmds[op]) dtail -= (cmds[op]->size + sizeof(void *) - 1) /
+			sizeof(void *);
+		/* Pass most relevant parameters through the next free slot */
+		PREP_SLOT(r, v, pp - 1, dtail);
+		tpad = cw = 0;
 		switch (op)
 		{
 		/* Terminate */
 		case op_WEND: case op_WSHOW: case op_WDIALOG:
 			/* Terminate the list */
-			ADD_SLOT(r, NULL, NULL);
+			ADD_SLOT(r, NULL, NULL, NULL);
 
 			/* !!! In GTK+1, doing it earlier makes any following
 			 * gtk_widget_add_accelerator() calls to silently fail */
@@ -4262,17 +4295,17 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add an RGB renderer */
 		case op_RGBIMAGE:
-			widget = rgbimage(v, (int *)((char *)ddata + (int)pp[1]));
+			widget = rgbimage(r, (int *)((char *)ddata + (int)pp[1]));
 // !!! Padding = 0
 			break;
 		/* Add a buffered (by pixmap) RGB renderer */
 		case op_RGBIMAGEP:
-			widget = rgbimagep(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+			widget = rgbimagep(r, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
 // !!! Padding = 0
 			break;
 		/* Add a framed canvas-based renderer */
 		case op_CANVASIMG:
-			widget = canvasimg(v, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF, 0);
+			widget = canvasimg(r, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF, 0);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
 // !!! Padding = 0
@@ -4282,7 +4315,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_CANVASIMGB:
 		{
 			int *xp = (int *)((char *)ddata + (int)pp[1]);
-			widget = canvasimg(v, xp[0], xp[1], xp[2]);
+			widget = canvasimg(r, xp[0], xp[1], xp[2]);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
 // !!! Padding = 0
@@ -4311,7 +4344,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a focusable buffered RGB renderer with cursor */
 		case op_FCIMAGEP:
-			widget = fcimagep(v, ddata, pp - 1);
+			widget = fcimagep(r, ddata);
 // !!! Padding = 0
 			break;
 		/* Add a non-spinning spin to table slot */
@@ -4349,7 +4382,9 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a grid of spins, fill from array of arrays */
 		// !!! Presents one widget out of all grid (the last one)
 		case op_TLSPINPACK:
-			widget = tlspinpack(v, pp - 1, r, CT_TOP(wp));
+			dtail -= (TLSPINPACK_SIZE(pp - 1) + sizeof(void *) - 1) /
+				sizeof(void *);
+			widget = tlspinpack(r, dtail, CT_TOP(wp), (int)pp[lp]);
 			pk = 0;
 			break;
 		/* Add a spinslider */
@@ -4470,13 +4505,13 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a colorlist box, fill from fields */
 		case op_COLORLIST: case op_COLORLISTN:
-			widget = colorlist(v, ddata, pp - 1, NEXT_SLOT(r));
+			widget = colorlist(r, ddata);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_SCROLLVPm;
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
-			widget = gradbar(v, ddata, pp - 1, NEXT_SLOT(r));
+			widget = gradbar(r, ddata);
 // !!! Padding = 0
 			break;
 		/* Add a combo for percent values */
@@ -4486,7 +4521,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a list with pre-defined columns */
 		case op_LISTCCr:
-			widget = listcc(v, ddata, pp - 1, &c, r);
+			widget = listcc(r, ddata, &c);
 			cw = GET_BORDER(LISTCC);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_SCROLLVPv;
@@ -4494,7 +4529,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a clist with pre-defined columns */
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
 		case op_LISTCS: case op_LISTCX:
-			widget = listc(v, ddata, pp - 1, &c, r);
+			widget = listc(r, ddata, &c);
 // !!! Border = 0
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN; // auto-connects to scrollbars
@@ -4563,8 +4598,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = wj_size_box();
 
 			/* Make datastruct */
-			sd = bound_malloc(widget, sizeof(smarttbar_data));
-			gtk_object_set_user_data(GTK_OBJECT(widget), sd);
+			sd = (void *)dtail;
 			sd->tbar = bar;
 			sd->r = r;
 
@@ -4587,8 +4621,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_SMARTTBMORE:
 		{
 			GtkWidget *box = tbar[0];
-			smarttbar_data *sd = gtk_object_get_user_data(
-				GTK_OBJECT(box));
+			smarttbar_data *sd = tbar[2];
 
 			// !!! Box replaces toolbar on stack
 			CT_POP(wp);
@@ -4682,8 +4715,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = wj_size_box();
 
 			/* Make datastruct */
-			sd = bound_malloc(widget, sizeof(smartmenu_data));
-			gtk_object_set_user_data(GTK_OBJECT(widget), sd);
+			sd = (void *)dtail;
 			sd->mbar = bar;
 			sd->r = r;
 
@@ -5024,7 +5056,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Install drag/drop handlers */
 // !!! For drag, this must be done before mouse event handlers
 		case op_DRAGDROP:
-			widget = dragdrop(v, pp, r);
+			widget = dragdrop(r);
 			break;
 		/* Add a clipboard control slot */
 		case op_CLIPBOARD:
@@ -5046,8 +5078,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			case op_LISTC: case op_LISTCd: case op_LISTCu:
 			case op_LISTCS: case op_LISTCX:
 			{
-				listc_data *ld = gtk_object_get_user_data(
-					GTK_OBJECT(*slot));
+				listc_data *ld = slot[2];
 				ld->ok = r;
 				break;
 			}
@@ -5163,7 +5194,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				break;
 			case op_LISTCX:
 			{
-				listc_data *ld = gtk_object_get_user_data(*slot);
+				listc_data *ld = slot[2];
 				ld->change = r;
 				break;
 			}
@@ -5191,10 +5222,10 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		}
 		/* Remember this */
-		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp - 1);
+		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp - 1, dtail);
 		/* Remember events */
-		if (ref > 2) ADD_SLOT(r, res, pp + lp - 4);
-		if (ref > 1) ADD_SLOT(r, res, pp + lp - 2);
+		if (ref > 2) ADD_SLOT(r, res, pp + lp - 4, NULL);
+		if (ref > 1) ADD_SLOT(r, res, pp + lp - 2, NULL);
 		/* Pack this according to mode flags */
 		{
 			GtkWidget *w = do_prepare(widget, pk, cw, minw, minh);
@@ -5251,8 +5282,7 @@ static void do_destroy(void **wdata)
 			gtk_widget_show(where[0]);
 			get_evt_1(where[0], NEXT_SLOT(where));
 		}
-		else if (op == op_LISTCX) listcx_done(GTK_CLIST(*wdata),
-			gtk_object_get_user_data(GTK_OBJECT(*wdata)));
+		else if (op == op_LISTCX) listcx_done(GTK_CLIST(*wdata), wdata[2]);
 		else if (op == op_MAINWINDOW) gtk_main_quit();
 	}
 }
@@ -5460,7 +5490,7 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_TLSPINPACK:
 		{
-			void **vp = gtk_object_get_user_data(*wdata);
+			void **vp = wdata[2];
 			int i, n = (int)pp[1];
 
 			*vp = NULL; // Lock
@@ -5488,14 +5518,14 @@ void cmd_reset(void **slot, void *ddata)
 			gtk_option_menu_set_history(*wdata, *(int *)v);
 			break;
 		case op_LISTCCr:
-			listcc_reset(*wdata, gtk_object_get_user_data(*wdata), -1);
+			listcc_reset(*wdata, wdata[2], -1);
 			/* !!! Or the changes will be ignored if the list wasn't
 			 * yet displayed (as in inactive dock tab) - WJ */
 			gtk_widget_queue_resize(*wdata);
 			break;
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
 		case op_LISTCS: case op_LISTCX:
-			listc_reset(*wdata, gtk_object_get_user_data(*wdata));
+			listc_reset(*wdata, wdata[2]);
 			break;
 		case op_CSCROLL:
 		{
@@ -5523,14 +5553,14 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_RGBIMAGEP:
 		{
-			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			rgbimage_data *rd = wdata[2];
 			rd->rgb = v; // Size is fixed, but update source
 			if (GTK_WIDGET_REALIZED(*wdata)) reset_rgbp(*wdata, rd);
 			break;
 		}
 		case op_CANVASIMGB:
 		{
-			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			rgbimage_data *rd = wdata[2];
 			int nw, *xp = (int *)(ddata + (int)pp[1]);
 
 			nw = (rd->w ^ xp[0]) | (rd->h ^ xp[1]);
@@ -5544,7 +5574,7 @@ void cmd_reset(void **slot, void *ddata)
 		}
 		case op_FCIMAGEP:
 		{
-			fcimage_data *fd = gtk_object_get_user_data(*wdata);
+			fcimage_data *fd = wdata[2];
 			fd->rgb = v; // Update source, leave other parts be
 			if (GTK_WIDGET_REALIZED(*wdata)) reset_fcimage(*wdata, fd);
 			break;
@@ -5586,7 +5616,7 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_RGBIMAGE:
 		{
-			rgbimage_data *rd = gtk_object_get_user_data(*wdata);
+			rgbimage_data *rd = wdata[2];
 			int *wh = (int *)(ddata + (int)pp[1]);
 			rd->rgb = v;
 			rd->w = wh[0];
@@ -5609,7 +5639,7 @@ void cmd_sensitive(void **slot, int state)
 	/* Move focus in LISTCC when delayed by insensitivity */
 	if (state && (op == op_LISTCCr))
 	{
-		listcc_data *dt = gtk_object_get_user_data(GTK_OBJECT(slot[0]));
+		listcc_data *dt = slot[2];
 		if (dt->wantfoc) listcc_select_item(GTK_LIST(slot[0]), dt);
 	}
 }
@@ -5800,7 +5830,7 @@ void cmd_set(void **slot, int v)
 		break;
 	case op_LISTCCr:
 	{
-		listcc_data *dt = gtk_object_get_user_data(slot[0]);
+		listcc_data *dt = slot[2];
 		if ((v < 0) || (v >= *dt->cnt)) break; // Ensure sanity
 		*dt->idx = v;
 		listcc_select_item(slot[0], dt);
@@ -6050,9 +6080,12 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_LABEL: case op_WLABEL: case op_STLABEL:
 		gtk_label_set_text(slot[0], res);
 		break;
-	case op_TEXT: set_textarea(slot[0], res); break;
+	case op_TEXT:
+		set_textarea(slot[0], res);
+		break;
 	case op_ENTRY: case op_MLENTRY:
-		gtk_entry_set_text(slot[0], res); break;
+		gtk_entry_set_text(slot[0], res);
+		break;
 	case op_PENTRY: case op_PATH: case op_PATHs:
 		set_path(slot[0], res, idx);
 		break;
@@ -6068,7 +6101,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_COLORLIST: case op_COLORLISTN:
-		colorlist_reset_color(slot[0], (int)res);
+		colorlist_reset_color(slot, (int)res);
 		break;
 	case op_PROGRESS:
 		gtk_progress_set_percentage(slot[0], (int)res / 100.0);
@@ -6088,7 +6121,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_CANVASIMG: case op_CANVASIMGB:
 	{
-		rgbimage_data *rd = gtk_object_get_user_data(slot[0]);
+		rgbimage_data *rd = slot[2];
 		int *v = res;
 		rd->w = v[0];
 		rd->h = v[1];
@@ -6154,7 +6187,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_FCIMAGEP:
 	{
-		fcimage_data *fd = gtk_object_get_user_data(slot[0]);
+		fcimage_data *fd = slot[2];
 		int *v = res;
 		if (!fd->xy) break;
 		memcpy(fd->xy, v, sizeof(int) * 2);
@@ -6162,7 +6195,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_LISTCCr:
-		listcc_reset(slot[0], gtk_object_get_user_data(slot[0]), (int)res);
+		listcc_reset(slot[0], slot[2], (int)res);
 // !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
 //		gtk_widget_queue_resize(slot[0]);
 		break;
@@ -6170,7 +6203,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_LISTCS: case op_LISTCX:
 	{
 		GtkCList *clist = slot[0];
-		listc_data *ld = gtk_object_get_user_data(slot[0]);
+		listc_data *ld = slot[2];
 
 		if (idx == LISTC_RESET_ROW)
 		{
@@ -6207,6 +6240,7 @@ void cmd_setv(void **slot, void *res, int idx)
 				dp->d.format->format ? dp->d.format->format : 8,
 				pp[0], pp[1] - pp[0]);
 		}
+		break;
 	}
 	case op_EV_COPY:
 	{
@@ -6215,6 +6249,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_selection_data_set(cp->data, cp->data->target,
 			cp->c.format->format ? cp->c.format->format : 8,
 			pp[0], pp[1] - pp[0]);
+		break;
 	}
 	}
 }

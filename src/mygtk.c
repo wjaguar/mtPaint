@@ -1500,16 +1500,6 @@ int internal_clipboard(int which)
 
 #endif
 
-// Allocate a memory chunk which is freed along with a given widget
-
-void *bound_malloc(GtkWidget *widget, int size)
-{
-	void *mem = g_malloc0(size);
-	if (mem) gtk_signal_connect_object(GTK_OBJECT(widget), "destroy",
-		GTK_SIGNAL_FUNC(g_free), (gpointer)mem);
-	return (mem);
-}
-
 // Render stock icons to pixmaps
 
 #if GTK_MAJOR_VERSION == 2
