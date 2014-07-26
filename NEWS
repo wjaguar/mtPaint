@@ -14,6 +14,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled
+	* "Scale canvas" and "Resize canvas" now remember their aspect ratio toggle setting
 	* The Free Rotate window now remembers the previous rotation angle in that mtPaint session
 	* Alpha values for colours A & B are now displayed on settings toolbar when editing image with alpha in coupled alpha mode
 	* Undo system now uses a bit less memory

@@ -3134,18 +3134,6 @@ void reseparate(char *str)
 
 #endif
 
-// Prod the focused spinbutton, if any, to finally update its value
-
-void update_window_spin(GtkWidget *window)
-{
-	if (!GTK_IS_SPIN_BUTTON(GTK_WINDOW(window)->focus_widget)) return;
-#if GTK_MAJOR_VERSION == 1
-	gtk_container_focus(GTK_CONTAINER(window), GTK_DIR_TAB_FORWARD);
-#else
-	gtk_widget_child_focus(window, GTK_DIR_TAB_FORWARD);
-#endif
-}
-
 // Process event queue
 
 void handle_events()

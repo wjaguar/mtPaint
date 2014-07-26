@@ -542,22 +542,21 @@ void pressed_bacteria()
 int spal_mode;
 
 typedef struct {
-	int rgb, start[3], end[3];
+	int rgb, rev, start[3], end[3];
 } spal_dd;
 
 static void spal_evt(spal_dd *dt, void **wdata, int what)
 {
-	int index1, index2, reverse;
+	int index1, index2;
 
 	run_query(wdata);
-	reverse = inifile_get_gboolean("palrevSort", FALSE);
 	index1 = dt->start[0];
 	index2 = dt->end[0];
 
 	if (index1 != index2)
 	{
 		spot_undo(UNDO_XPAL);
-		mem_pal_sort(spal_mode, index1, index2, reverse);
+		mem_pal_sort(spal_mode, index1, index2, dt->rev);
 		mem_undo_prepare();
 		update_stuff(UPD_TPAL);
 	}
@@ -580,7 +579,7 @@ static void *spal_code[] = {
 	BORDER(RPACK, 0),
 	IF(rgb), RPACKv(spal_txt, 9, 5, spal_mode),
 	UNLESS(rgb), RPACKv(spal_txt, 10, 5, spal_mode),
-	CHECKb(_("Reverse Order"), "palrevSort", FALSE),
+	CHECKb(_("Reverse Order"), rev, "palrevSort"),
 	HSEPl(200),
 	OKBOX3B(_("OK"), spal_evt, _("Cancel"), NULL, _("Apply"), spal_evt),
 	WSHOW
@@ -589,7 +588,7 @@ static void *spal_code[] = {
 
 void pressed_sort_pal()
 {
-	spal_dd tdata = { mem_img_bpp == 3, { 0, 0, mem_cols - 1 },
+	spal_dd tdata = { mem_img_bpp == 3, FALSE, { 0, 0, mem_cols - 1 },
 		{ mem_cols - 1, 0, mem_cols - 1 } };
 	run_create(spal_code, &tdata, sizeof(tdata));
 }
@@ -609,7 +608,7 @@ int mem_preview, mem_preview_clip, brcosa_auto;
 int posterize_mode;	// bitwise/truncated/rounded
 
 typedef struct {
-	int rgb;
+	int rgb, show;
 	int rgbclip, pflag;
 	int allow[3];
 	int c01[3 * 2];
@@ -676,7 +675,9 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 	mem_pal_copy(mem_pal, dt->pal);
 
 	if (what != op_EVT_CANCEL) // OK/Apply
-	{	// !!! Buttons disabled for default values
+	{
+		run_query(wdata);
+		// !!! Buttons disabled for default values
 		spot_undo(UNDO_COL);
 
 		brcosa_preview(dt, NULL); // This modifies palette
@@ -724,7 +725,7 @@ static void click_brcosa_show_toggle(brcosa_dd *dt, void **wdata, int what,
 	void **where)
 {
 	cmd_read(where, dt);
-	cmd_showhide(dt->xtra, inifile_get_gboolean("transcol_show", FALSE));
+	cmd_showhide(dt->xtra, dt->show);
 }
 
 static void click_brcosa_reset(brcosa_dd *dt)
@@ -794,7 +795,7 @@ static void *brcosa_code[] = {
 ///	MIDDLE SECTION
 	HSEP,
 	HBOX,
-	CHECKb(_("Show Detail"), "transcol_show", FALSE),
+	CHECKb(_("Show Detail"), show, "transcol_show"),
 	EVENT(CHANGE, click_brcosa_show_toggle), TRIGGER,
 	WDONE,
 	BORDER(TABLE, 0),
@@ -838,7 +839,7 @@ static void *brcosa_code[] = {
 
 void pressed_brcosa()
 {
-	brcosa_dd tdata = { mem_img_bpp == 3,
+	brcosa_dd tdata = { mem_img_bpp == 3, FALSE,
 		mem_clipboard && (mem_clip_bpp == 3), FALSE,
 		{ TRUE, TRUE, TRUE },
 		{ 0, 0, mem_cols - 1, mem_cols - 1, 0, mem_cols - 1 } };
@@ -983,9 +984,12 @@ static void *sisca_code[] = {
 	ENDIF(1),
 	WDONE,
 	HSEP,
-	IF(rgb), HBOX, IF(rgb), VBOX,
-	CHECK(_("Fix Aspect Ratio"), fix), EVENT(CHANGE, sisca_moved),
 	BORDER(RPACK, 0),
+	IF(rgb), HBOX, IF(rgb), VBOX,
+	IFx(mode, 1),
+		CHECKb(_("Fix Aspect Ratio"), fix, "scaleAspect"),
+			EVENT(CHANGE, sisca_moved),
+	ENDIF(1),
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),
 		WDONE, EVBOX,
@@ -1002,10 +1006,12 @@ static void *sisca_code[] = {
 		WDONE, // page 1
 	ENDIF(1),
 	UNLESSx(mode, 1),
+		CHECKb(_("Fix Aspect Ratio"), fix, "resizeAspect"),
+			EVENT(CHANGE, sisca_moved),
 		HSEP,
 		RPACKv(resize_modes, 0, 0, resize_mode),
-		HSEP,
 	ENDIF(1),
+	UNLESS(rgb), HSEP,
 	OKBOXB(_("OK"), click_sisca_ok, _("Cancel"), NULL),
 	WSHOW
 };

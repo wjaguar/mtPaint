@@ -62,6 +62,7 @@ typedef struct {
 	void **destroy;	// Pre-destruction event slot
 	void **wantkey;	// Slot of prioritized keyboard handler
 	void **smmenu;	// SMARTMENU slot
+	void **fupslot;	// Slot which needs defocusing to update (only 1 for now)
 	void *now_evt;	// Keyboard event being handled (check against recursion)
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
@@ -633,10 +634,10 @@ static gboolean tried_drop(GtkWidget *widget, GdkDragContext *context,
 
 void *dragdrop(void **r)
 {
-	void *v = r[0], **pp = r[1] + 1, **slot = origin_slot(PREV_SLOT(r));
+	void *v = r[0], **pp = r[1], **slot = origin_slot(PREV_SLOT(r));
 	clipform_data *cd = **(void ***)v;
 
-	if (pp[3]) // Have drag handler
+	if (pp[4]) // Have drag handler
 	{
 		drag_ctx *dc = r[2];
 		dc->r = NEXT_SLOT(r);
@@ -650,15 +651,15 @@ void *dragdrop(void **r)
 		gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
 			GTK_SIGNAL_FUNC(get_evt_drag), dc);
 	}
-	if (pp[5]) // Have drop handler
+	if (pp[6]) // Have drop handler
 	{
 		int dmode = GTK_DEST_DEFAULT_HIGHLIGHT |
 			GTK_DEST_DEFAULT_MOTION;
-		if (!pp[1]) dmode |= GTK_DEST_DEFAULT_DROP;
+		if (!pp[2]) dmode |= GTK_DEST_DEFAULT_DROP;
 		else gtk_signal_connect(GTK_OBJECT(*slot), "drag_drop",
 			GTK_SIGNAL_FUNC(tried_drop), cd);
 
-		gtk_drag_dest_set(*slot, dmode, cd->ent, cd->n, pp[1] ?
+		gtk_drag_dest_set(*slot, dmode, cd->ent, cd->n, pp[2] ?
 			GDK_ACTION_COPY | GDK_ACTION_MOVE : GDK_ACTION_COPY);
 		gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_received",
 			GTK_SIGNAL_FUNC(get_evt_drop), r);
@@ -1334,18 +1335,18 @@ static void fcimage_rxy(void **slot, int *xy)
 
 //	RPACK*/OPT*/COMBO widgets
 
-GtkWidget *mkpack(int mode, int d, int ref, int v, char *ddata, void **pp,
-	void **r)
+GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
 {
 #if U_NLS
 	char *tc[256];
 #endif
-	char **src = pp[1];
-	int nh, n;
+	void **pp = r[1];
+	char **src = pp[2];
+	int nh, n, v = *(int *)r[0];
 
-	nh = (n = (int)pp[2]) & 255;
+	nh = (n = (int)pp[3]) & 255;
 	if (mode < 0) n >>= 8;
-	if (d) n = -1 , src = *(char ***)(ddata + (int)pp[1]);
+	if (d) n = -1 , src = *(char ***)(ddata + (int)pp[2]);
 	if (!n) n = -1;
 #if U_NLS
 	{
@@ -1653,18 +1654,19 @@ static void comboentry_reset(GtkCombo *combo, char **v, char **src)
 }
 
 // !!! With inlining this, problem also
-GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
+GtkWidget *comboentry(char *ddata, void **r)
 {
+	void **pp = r[1];
 	GtkWidget *w = gtk_combo_new();
 	GtkCombo *combo = GTK_COMBO(w);
 
 	gtk_combo_disable_activate(combo);
-	comboentry_reset(combo, v, *(char ***)(ddata + (int)pp[2]));
+	comboentry_reset(combo, r[0], *(char ***)(ddata + (int)pp[2]));
 
 	gtk_signal_connect_after(GTK_OBJECT(combo->popwin), "hide",
-		GTK_SIGNAL_FUNC(get_evt_1), r);
+		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 	gtk_signal_connect(GTK_OBJECT(combo->entry), "activate",
-		GTK_SIGNAL_FUNC(get_evt_1), r);
+		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 
 	return (w);
 }
@@ -1672,12 +1674,12 @@ GtkWidget *comboentry(char **v, char *ddata, void **pp, void **r)
 //	PCTCOMBO widget
 
 // !!! Even with inlining this, some space gets wasted
-GtkWidget *pctcombo(int v, void **pp, void **r)
+GtkWidget *pctcombo(void **r)
 {
 	GtkWidget *w, *entry;
 	GList *list = NULL;
 	char *ts, *s;
-	int i, n = 0, *ns = pp[1];
+	int i, n = 0, v = *(int *)r[0], *ns = GET_DESCV(r, 2);
 
 	/* Uses 0-terminated array of ints */
 	while (ns[n] > 0) n++;
@@ -1709,10 +1711,10 @@ GtkWidget *pctcombo(int v, void **pp, void **r)
 	/* In GTK1, combo box entry is updated continuously */
 #if GTK_MAJOR_VERSION == 1
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(w)->popwin), "hide",
-		GTK_SIGNAL_FUNC(get_evt_1), r);
+		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 #else /* #if GTK_MAJOR_VERSION == 2 */
 	gtk_signal_connect(GTK_OBJECT(entry), "changed",
-		GTK_SIGNAL_FUNC(get_evt_1), r);
+		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 #endif
 
 	return (w);
@@ -3856,14 +3858,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	while (TRUE)
 	{
 		op = (int)*ifcode;
-		ifcode = (pp = ifcode + 1) + (lp = WB_GETLEN(op));
+		ifcode = (pp = ifcode) + 1 + (lp = WB_GETLEN(op));
 		pk = WB_GETPK(op);
 		/* Table loc is outside the token proper */
 		{
 			int p = pk & pk_MASK; // !!! To prevent GCC misoptimizing
 			lp -= (p >= pk_TABLE) && (p <= pk_TABLEx);
 		}
-		v = lp > 0 ? pp[0] : NULL;
+		v = lp > 0 ? pp[1] : NULL;
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
 		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
 		ref = WB_GETREF(op);
@@ -3871,7 +3873,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		if (cmds[op]) dtail -= (cmds[op]->size + sizeof(void *) - 1) /
 			sizeof(void *);
 		/* Pass most relevant parameters through the next free slot */
-		PREP_SLOT(r, v, pp - 1, dtail);
+		PREP_SLOT(r, v, pp, dtail);
 		tpad = cw = 0;
 		switch (op)
 		{
@@ -3928,7 +3930,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Create the main window */
 		case op_MAINWINDOW:
 		{
-			int wh = (int)pp[2];
+			int wh = (int)pp[3];
 			GdkPixmap *icon_pix;
 
 			gdk_rgb_init();
@@ -3952,7 +3954,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_realize(window);
 
 			icon_pix = gdk_pixmap_create_from_xpm_d(window->window,
-				NULL, NULL, pp[1]);
+				NULL, NULL, pp[2]);
 			gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
 //			gdk_pixmap_unref(icon_pix);
 
@@ -3986,8 +3988,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		{
 			GtkWidget *box;
 			widget = window = fpick(&box,
-				*(char **)((char *)ddata + (int)pp[1]),
-				*(int *)((char *)ddata + (int)pp[2]), r);
+				*(char **)((char *)ddata + (int)pp[2]),
+				*(int *)((char *)ddata + (int)pp[3]), r);
 #ifdef U_FPICK_GTKFILESEL
 			add_del(SLOT_N(r, 2), window);
 #endif
@@ -4054,7 +4056,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_widget_show(p0);
 
 			/* Pack everything */
-			if (do_pack(widget, wp, pp - 1, pk, tpad)) CT_POP(wp);
+			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
 			CT_PUSH(wp, p1, ct_BOX); // right page second
 			CT_PUSH(wp, p0, ct_BOX); // left page first
 // !!! Maybe pk_SHOW ?
@@ -4086,7 +4088,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				gtk_label_new(_(v)) : xpm_image(v);
 			gtk_widget_show(label);
 			widget = gtk_vbox_new(FALSE, op == op_PAGE ?
-				0 : (int)pp[1]);
+				0 : (int)pp[2]);
 			gtk_notebook_append_page(GTK_NOTEBOOK(CT_TOP(wp)),
 				widget, label);
 			ct = ct_BOX;
@@ -4098,7 +4100,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
 			if (lp > 1)
 			{
-				int s = (int)pp[1];
+				int s = (int)pp[2];
 				gtk_table_set_row_spacings(GTK_TABLE(widget), s);
 				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
 			}
@@ -4165,7 +4167,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			gtk_notebook_set_show_border(GTK_NOTEBOOK(widget), FALSE);
 
 // !!! Border = 0
-			if (do_pack(widget, wp, pp - 1, pk, tpad)) CT_POP(wp);
+			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
 			while (n-- > 0)
 			{
 				GtkWidget *page = gtk_vbox_new(FALSE, 0);
@@ -4179,7 +4181,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a toggle button for controlling 2-paged notebook */
 		case op_BOOKBTN:
-			widget = gtk_toggle_button_new_with_label(_(pp[1]));
+			widget = gtk_toggle_button_new_with_label(_(pp[2]));
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
 			gtk_signal_connect(GTK_OBJECT(widget), "toggled",
 				GTK_SIGNAL_FUNC(toggle_vbook), v);
@@ -4198,7 +4200,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		 * proper height (and zero width) for a label containing an empty
 		 * string. And size fixing isn't sure to set the right value if
 		 * the toplevel isn't yet realized (unlike MAINWINDOW) - WJ */
-			if (do_pack(widget, wp, pp - 1, pk, tpad)) CT_POP(wp);
+			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
 			label = pack(widget, gtk_label_new(""));
 			gtk_widget_show(label);
 			/* To prevent statusbar wobbling */
@@ -4236,7 +4238,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a label */
 		case op_LABEL: case op_WLABEL:
 		{
-			int z = lp > 1 ? (int)pp[1] : 0;
+			int z = lp > 1 ? (int)pp[2] : 0;
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
 			if (op == op_WLABEL)
 				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
@@ -4274,7 +4276,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add to table a batch of labels generated from text string */
 		case op_TLTEXT:
-			tltext(v, pp - 1, CT_TOP(wp), GET_BORDER(LABEL));
+			tltext(v, pp, CT_TOP(wp), GET_BORDER(LABEL));
 			pk = 0;
 			break;
 		/* Add a progressbar */
@@ -4288,24 +4290,24 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		case op_COLORPATCH:
 			widget = gtk_drawing_area_new();
 			gtk_drawing_area_size(GTK_DRAWING_AREA(widget),
-				(int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+				(int)pp[2] >> 16, (int)pp[2] & 0xFFFF);
 			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
 				GTK_SIGNAL_FUNC(col_expose), v);
 // !!! Padding = 0
 			break;
 		/* Add an RGB renderer */
 		case op_RGBIMAGE:
-			widget = rgbimage(r, (int *)((char *)ddata + (int)pp[1]));
+			widget = rgbimage(r, (int *)((char *)ddata + (int)pp[2]));
 // !!! Padding = 0
 			break;
 		/* Add a buffered (by pixmap) RGB renderer */
 		case op_RGBIMAGEP:
-			widget = rgbimagep(r, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF);
+			widget = rgbimagep(r, (int)pp[2] >> 16, (int)pp[2] & 0xFFFF);
 // !!! Padding = 0
 			break;
 		/* Add a framed canvas-based renderer */
 		case op_CANVASIMG:
-			widget = canvasimg(r, (int)pp[1] >> 16, (int)pp[1] & 0xFFFF, 0);
+			widget = canvasimg(r, (int)pp[2] >> 16, (int)pp[2] & 0xFFFF, 0);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
 // !!! Padding = 0
@@ -4314,7 +4316,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a framed canvas-based renderer with background */
 		case op_CANVASIMGB:
 		{
-			int *xp = (int *)((char *)ddata + (int)pp[1]);
+			int *xp = (int *)((char *)ddata + (int)pp[2]);
 			widget = canvasimg(r, xp[0], xp[1], xp[2]);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
@@ -4358,7 +4360,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a spin, fill from field/var */
 		case op_SPIN: case op_SPINc:
-			widget = add_a_spin(*(int *)v, (int)pp[1], (int)pp[2]);
+			widget = add_a_spin(*(int *)v, (int)pp[2], (int)pp[3]);
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 			if (op == op_SPINc) gtk_entry_set_alignment(
 				GTK_ENTRY(&(GTK_SPIN_BUTTON(widget)->entry)), 0.5);
@@ -4368,7 +4370,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add float spin, fill from field/var */
 		case op_FSPIN:
 			widget = add_float_spin(*(int *)v / 100.0,
-				(int)pp[1] / 100.0, (int)pp[2] / 100.0);
+				(int)pp[2] / 100.0, (int)pp[3] / 100.0);
 			tpad = GET_BORDER(SPIN);
 			break;
 		/* Add a spin, fill from array */
@@ -4382,20 +4384,20 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a grid of spins, fill from array of arrays */
 		// !!! Presents one widget out of all grid (the last one)
 		case op_TLSPINPACK:
-			dtail -= (TLSPINPACK_SIZE(pp - 1) + sizeof(void *) - 1) /
+			dtail -= (TLSPINPACK_SIZE(pp) + sizeof(void *) - 1) /
 				sizeof(void *);
-			widget = tlspinpack(r, dtail, CT_TOP(wp), (int)pp[lp]);
+			widget = tlspinpack(r, dtail, CT_TOP(wp), (int)pp[lp + 1]);
 			pk = 0;
 			break;
 		/* Add a spinslider */
 		case op_SPINSLIDE: case op_SPINSLIDEa:
 		{
-			int z = lp > 3 ? (int)pp[3] : 0;
+			int z = lp > 3 ? (int)pp[4] : 0;
 			widget = mt_spinslide_new(z > 0xFFFF ? z >> 16 : -1,
 				z & 0xFFFF ? z & 0xFFFF : -1);
 			if (op == op_SPINSLIDEa) mt_spinslide_set_range(widget,
 				((int *)v)[1], ((int *)v)[2]);
-			else mt_spinslide_set_range(widget, (int)pp[1], (int)pp[2]);
+			else mt_spinslide_set_range(widget, (int)pp[2], (int)pp[3]);
 			mt_spinslide_set_value(widget, *(int *)v);
 			tpad = GET_BORDER(SPINSLIDE);
 #if GTK_MAJOR_VERSION == 1
@@ -4404,25 +4406,26 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		}
 		/* Add a named checkbox, fill from field/var/inifile */
-		case op_CHECK: case op_CHECKb:
-			widget = gtk_check_button_new_with_label(_(pp[1]));
+		case op_CHECKb:
+			*(int *)v = inifile_get_gboolean(pp[3], *(int *)v);
+			// Fallthrough
+		case op_CHECK:
+			widget = gtk_check_button_new_with_label(_(pp[2]));
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),
-				op != op_CHECKb ? *(int *)v :
-				inifile_get_gboolean(v, (int)pp[2]));
+				*(int *)v);
 // !!! Padding = 0
 			cw = GET_BORDER(CHECK);
 			break;
 		/* Add a pack of radio buttons for field/var */
 		case op_RPACK: case op_RPACKD:
-			widget = mkpack(-1, op == op_RPACKD, ref,
-				*(int *)v, ddata, pp, r);
+			widget = mkpack(-1, op == op_RPACKD, ref, ddata, r);
 // !!! Padding = 0
 			cw = GET_BORDER(RPACK);
 			break;
 		/* Add an option menu or combobox for field/var */
 		case op_OPT: case op_OPTD: case op_COMBO:
-			widget = mkpack(op == op_COMBO, op == op_OPTD, ref,
-				*(int *)v, ddata, pp, r);
+			widget = mkpack(op == op_COMBO, op == op_OPTD,
+				ref, ddata, r);
 			/* !!! Border for OPT is better left alone - to avoid a
 			 * drawing glitch in GTK+1 */
 // !!! Padding = 0 for COMBO
@@ -4431,7 +4434,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add an entry widget, fill from drop-away buffer */
 		case op_ENTRY: case op_MLENTRY:
 			widget = gtk_entry_new();
-			if (lp > 1) gtk_entry_set_max_length(GTK_ENTRY(widget), (int)pp[1]);
+			if (lp > 1) gtk_entry_set_max_length(GTK_ENTRY(widget),
+				(int)pp[2]);
 			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
 			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
@@ -4440,7 +4444,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a path entry or box to table */
 		case op_PENTRY:
-			widget = gtk_entry_new_with_max_length((int)pp[1]);
+			widget = gtk_entry_new_with_max_length((int)pp[2]);
 			set_path(widget, v, PATH_VALUE);
 			tpad = GET_BORDER(ENTRY);
 			break;
@@ -4466,7 +4470,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			char **ss = v;
 			widget = gtk_font_selection_new();
 			accept_ctrl_enter(GTK_FONT_SELECTION(widget)->preview_entry);
-			if (do_pack(widget, wp, pp - 1, pk, tpad)) CT_POP(wp);
+			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
 			// !!! Fails if no toplevel
 			gtk_font_selection_set_font_name(
 				GTK_FONT_SELECTION(widget), ss[0]);
@@ -4494,13 +4498,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 #endif
 		/* Add a combo-entry for text strings */
 		case op_COMBOENTRY:
-			widget = comboentry(v, ddata, pp - 1, NEXT_SLOT(r));
+			widget = comboentry(ddata, r);
 // !!! Padding = 5
 			tpad = 5;
 			break;
 		/* Add a color picker box, w/field array, & leave unfilled (?) */
 		case op_COLOR: case op_TCOLOR:
 			widget = cpick_create(op == op_TCOLOR);
+			vdata->fupslot = r; // "Hex" needs defocus to update
 // !!! Padding = 0
 			break;
 		/* Add a colorlist box, fill from fields */
@@ -4516,7 +4521,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			break;
 		/* Add a combo for percent values */
 		case op_PCTCOMBO:
-			widget = pctcombo(*(int *)v, pp, NEXT_SLOT(r));
+			widget = pctcombo(r);
 // !!! Padding = 0
 			break;
 		/* Add a list with pre-defined columns */
@@ -4555,7 +4560,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				accel |= 1;
 			}
 			/* Click-event */
-			if ((op != op_BUTTON) || pp[1 + 1])
+			if ((op != op_BUTTON) || pp[3])
 				gtk_signal_connect_object(GTK_OBJECT(widget),
 					"clicked", GTK_SIGNAL_FUNC(do_evt_1_d),
 					(gpointer)NEXT_SLOT(r));
@@ -4564,8 +4569,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		}
 		/* Add a toggle button to OK-box */
 		case op_TOGGLE:
-			widget = gtk_toggle_button_new_with_label(_(pp[1]));
-			if (pp[3]) gtk_signal_connect(GTK_OBJECT(widget),
+			widget = gtk_toggle_button_new_with_label(_(pp[2]));
+			if (pp[4]) gtk_signal_connect(GTK_OBJECT(widget),
 				"toggled", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 			cw = GET_BORDER(BUTTON);
 			break;
@@ -4637,7 +4642,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			widget = pack(CT_N(wp, 1), gtk_toggle_button_new());
 			/* Parasite tooltip on toolbar */
 			gtk_tooltips_set_tip(GTK_TOOLBAR(CT_TOP(wp))->tooltips,
-				widget, _(pp[2]), "Private");
+				widget, _(pp[3]), "Private");
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 			gtk_button_set_focus_on_click(GTK_BUTTON(widget), FALSE);
 #endif
@@ -4662,12 +4667,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				/* Now this represents group */
 				rslot = r; rvar = v;
 				/* Activate the one button whose ID matches var */
-				v = *(int *)v == (int)pp[1] ? &set : NULL;
+				v = *(int *)v == (int)pp[2] ? &set : NULL;
 			}
 
 			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
 				GTK_TOOLBAR(CT_TOP(wp)), mode, rb,
-				NULL, _(pp[2]), "Private", xpm_image(pp[3]),
+				NULL, _(pp[3]), "Private", xpm_image(pp[4]),
 				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
 			if (v) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(widget), *(int *)v);
@@ -4791,7 +4796,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			{
 				widget = gtk_image_menu_item_new_with_label("");
 				gtk_image_menu_item_set_image(
-					GTK_IMAGE_MENU_ITEM(widget), xpm_image(pp[3]));
+					GTK_IMAGE_MENU_ITEM(widget), xpm_image(pp[4]));
 			}
 #endif
 			else widget = gtk_menu_item_new_with_label("");
@@ -4800,14 +4805,14 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			{
 				int f = *(int *)v;
 				/* Activate the one button whose ID matches var */
-				if ((op != op_MENURITEM) || (f = f == (int)pp[1]))
+				if ((op != op_MENURITEM) || (f = f == (int)pp[2]))
 					gtk_check_menu_item_set_active(
 						GTK_CHECK_MENU_ITEM(widget), f);
 				gtk_check_menu_item_set_show_toggle(
 					GTK_CHECK_MENU_ITEM(widget), TRUE);
 			}
 
-			l = strspn(s = pp[2], "/");
+			l = strspn(s = pp[3], "/");
 			if (s[l]) s = _(s); // Translate
 			s += l;
 
@@ -4840,7 +4845,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT: case op_PMOUNT:
 		{
-			void **what = ((mnt_fn)pp[1])(res);
+			void **what = ((mnt_fn)pp[2])(res);
 			*(int *)v = TRUE;
 			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
 			gtk_container_add(GTK_CONTAINER(widget),
@@ -4851,7 +4856,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				GtkWidget *pane = gtk_vpaned_new();
 				paned_mouse_fix(pane);
 				gtk_paned_set_position(GTK_PANED(pane),
-					inifile_get_gint32(pp[2], (int)pp[3]));
+					inifile_get_gint32(pp[3], (int)pp[4]));
 				gtk_paned_pack2(GTK_PANED(pane),
 					gtk_vbox_new(FALSE, 0), TRUE, TRUE);
 				gtk_widget_show_all(pane);
@@ -4894,12 +4899,12 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Skip next token(s) if/unless field/var is unset */
 		case op_IF: case op_UNLESS:
 			if (!*(int *)v ^ (op != op_IF))
-				ifcode = skip_if(pp - 1);
+				ifcode = skip_if(pp);
 			continue;
 		/* Skip next token(s) unless inifile var, set by default, is unset */
 		case op_UNLESSbt:
 			if (inifile_get_gboolean(v, TRUE))
-				ifcode = skip_if(pp - 1);
+				ifcode = skip_if(pp);
 			continue;
 		/* Put last referrable widget into activation map */
 		/* And remember map in a slot for later reference */
@@ -4954,7 +4959,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Use saved size & position for window */
 		case op_WXYWH:
 		{
-			unsigned int n = (unsigned)pp[1];
+			unsigned int n = (unsigned)pp[2];
 			vdata->ininame = v;
 			vdata->xywh[2] = n >> 16;
 			vdata->xywh[3] = n & 0xFFFF;
@@ -5013,7 +5018,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		/* Add a datablock pseudo-column */
 		case op_COLUMNDATA:
-			c.dcolumn = pp - 1;
+			c.dcolumn = pp;
 			continue;
 		/* Add a regular list column */
 		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
@@ -5024,8 +5029,8 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Create an XBM cursor */
 		case op_XBMCURSOR:
 		{
-			int xyl = (int)pp[2], l = xyl >> 16;
-			widget = (void *)make_cursor(v, pp[1], l, l,
+			int xyl = (int)pp[3], l = xyl >> 16;
+			widget = (void *)make_cursor(v, pp[2], l, l,
 				(xyl >> 8) & 255, xyl & 255);
 			break;
 		}
@@ -5036,7 +5041,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Add a group of clipboard formats */
 		case op_CLIPFORM:
 		{
-			int i, n = (int)pp[1], l = sizeof(clipform_data) + 
+			int i, n = (int)pp[2], l = sizeof(clipform_data) + 
 				sizeof(GtkTargetEntry) * (n - 1);
 			clipform_data *cd = calloc(1, l);
 
@@ -5209,7 +5214,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		/* Allocate/copy memory */
 		case op_TALLOC: case op_TCOPY:
 		{
-			int l = *(int *)((char *)ddata + (int)pp[1]);
+			int l = *(int *)((char *)ddata + (int)pp[2]);
 			dtail -= (l + sizeof(void *) - 1) / sizeof(void *);
 			if (op == op_TCOPY) memcpy(dtail, *(void **)v, l);
 			*(void **)v = dtail;
@@ -5222,16 +5227,16 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			continue;
 		}
 		/* Remember this */
-		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp - 1, dtail);
+		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp, dtail);
 		/* Remember events */
-		if (ref > 2) ADD_SLOT(r, res, pp + lp - 4, NULL);
-		if (ref > 1) ADD_SLOT(r, res, pp + lp - 2, NULL);
+		if (ref > 2) ADD_SLOT(r, res, pp + lp - 3, NULL);
+		if (ref > 1) ADD_SLOT(r, res, pp + lp - 1, NULL);
 		/* Pack this according to mode flags */
 		{
 			GtkWidget *w = do_prepare(widget, pk, cw, minw, minh);
 			minw = minh = 0;
 			pk &= pk_MASK;
-			if ((pk != pk_NONE) && do_pack(w, wp, pp - 1, pk, tpad))
+			if ((pk != pk_NONE) && do_pack(w, wp, pp, pk, tpad))
 				CT_POP(wp); // unstack
 		}
 		/* Stack this */
@@ -5316,9 +5321,10 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
 				mt_spinslide_get_value)(*wdata);
 			break;
-		case op_CHECK: case op_TOGGLE:
+		case op_CHECK: case op_CHECKb: case op_TOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
 			*(int *)v = gtk_toggle_button_get_active(*wdata);
+			if (op == op_CHECKb) inifile_set_gboolean(pp[2], *(int *)v);
 			break;
 		case op_TBRBUTTON:
 		{
@@ -5341,9 +5347,6 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = TOOL_ID(slot);
 			break;
 		}
-		case op_CHECKb:
-			inifile_set_gboolean(v, gtk_toggle_button_get_active(*wdata));
-			break;
 		case op_MENUCHECK:
 			*(int *)v = GTK_CHECK_MENU_ITEM(*wdata)->active;
 			break;
@@ -5451,7 +5454,14 @@ static void *do_query(char *data, void **wdata, int mode)
 
 void run_query(void **wdata)
 {
-	update_window_spin(GET_REAL_WINDOW(wdata));
+	/* Prod a focused widget which needs defocusing to update */
+	v_dd *vdata = GET_VDATA(wdata);
+	GtkWidget *w = GET_REAL_WINDOW(wdata), *f = GTK_WINDOW(w)->focus_widget;
+	/* !!! No use to check if "fupslot" has focus - all dialogs with such
+	 * widget get destroyed after query anyway */
+	if (f && (GTK_IS_SPIN_BUTTON(f) || vdata->fupslot))
+		gtk_window_set_focus(GTK_WINDOW(w), NULL);
+
 	do_query(GET_DDATA(wdata), GET_WINDOW(wdata), 0);
 }
 
@@ -5588,7 +5598,7 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_CHECKb:
 			gtk_toggle_button_set_active(*wdata,
-				inifile_get_gboolean(v, (int)pp[2]));
+				*(int *)v = inifile_get_gboolean(pp[2], *(int *)v));
 			break;
 		case op_TBRBUTTON:
 			if (*(int *)v == TOOL_ID(wdata))
@@ -5977,7 +5987,6 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 
 /* These cannot be peeked just by calling do_query() with a preset int* var:
 	op_TBRBUTTON
-	op_CHECKb
 	op_MENURITEM
 	op_TCOLOR
 	op_COMBOENTRY

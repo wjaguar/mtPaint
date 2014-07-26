@@ -539,7 +539,7 @@ static void cpick_spin_change(cpick_dd *dt, void **wdata, int what, void **where
 
 	if (dt->c.lock) return;
 	where = origin_slot(where);
-	i = *(input = slot_data(where, dt));
+	i = *(input = slot_data(origin_slot(where), dt));
 	if (*(int *)cmd_read(where, dt) == i) return; // no change
 	cpick_update(dt, input - dt->c.input_vals);
 }

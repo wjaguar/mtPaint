@@ -363,7 +363,7 @@ void **wdata_slot(void **slot);
 //	From event to its originator
 void **origin_slot(void **slot);
 
-//	From slot to its storage location */
+//	From slot to its storage location (its own, *not* originator's)
 void *slot_data(void **slot, void *ddata);
 
 //	Raise event on slot
@@ -670,7 +670,7 @@ enum {
 #define XSPINSLIDEa(A) WBrhf_x(SPINSLIDEa, 1), WBfield(A)
 #define CHECK(NM,V) WBrhf_(CHECK, 2), WBfield(V), (NM)
 #define CHECKv(NM,V) WBrh_(CHECK, 2), &(V), (NM)
-#define CHECKb(NM,V,V0) WBrh_(CHECKb, 3), (V), (NM), (void *)(V0)
+#define CHECKb(NM,V,I) WBrhf_(CHECKb, 3), WBfield(V), (NM), (I)
 #define XCHECK(NM,V) WBrhf_x(CHECK, 2), WBfield(V), (NM)
 #define TLCHECKl(NM,V,X,Y,L) WBrhf_t(CHECK, 3), WBfield(V), (NM), WBxyl(X, Y, L)
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)

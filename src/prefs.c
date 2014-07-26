@@ -220,6 +220,7 @@ static void conf_tablet()
 typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
 	int tf[3];
+	int confx, centre, zoom;
 	int lang;
 	char *factor_str;
 } pref_dd;
@@ -334,11 +335,11 @@ static void *pref_code[] = {
 	WDONE,
 	CHECKv(_("Display clipboard while pasting"), show_paste),
 	CHECKv(_("Mouse cursor = Tool"), cursor_tool),
-	CHECKb(_("Confirm Exit"), "exitToggle", FALSE),
+	CHECKb(_("Confirm Exit"), confx, "exitToggle"),
 	CHECKv(_("Q key quits mtPaint"), q_quit),
 	CHECKv(_("Changing tool commits paste"), paste_commit),
-	CHECKb(_("Centre tool settings dialogs"), "centerSettings", TRUE),
-	CHECKb(_("New image sets zoom to 100%"), "zoomToggle", FALSE),
+	CHECKb(_("Centre tool settings dialogs"), centre, "centerSettings"),
+	CHECKb(_("New image sets zoom to 100%"), zoom, "zoomToggle"),
 	CHECKv(_("Zoom on cursor position"), cursor_zoom),
 #if GTK_MAJOR_VERSION == 2
 	CHECKv(_("Mouse Scroll Wheel = Zoom"), scroll_zoom),
@@ -437,6 +438,7 @@ void pressed_preferences()
 		{ rint(tablet_tool_factor[0] * 100.0),
 		  rint(tablet_tool_factor[1] * 100.0),
 		  rint(tablet_tool_factor[2] * 100.0) },
+		FALSE, TRUE, FALSE,
 		0, txt };
 
 	// Make sure the user can only open 1 prefs window

@@ -295,10 +295,6 @@ int wjfnmatch(const char *mask, const char *str, int utf);
 void reseparate(char *str);
 #endif
 
-// Prod the focused spinbutton, if any, to finally update its value
-
-void update_window_spin(GtkWidget *window);
-
 // Process event queue
 
 void handle_events();
