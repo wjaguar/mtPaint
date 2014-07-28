@@ -66,13 +66,31 @@ typedef struct {
 	void *now_evt;	// Keyboard event being handled (check against recursion)
 	char *ininame;	// Prefix for inifile vars
 	int xywh[4];	// Stored window position & size
-	int raise;	// Raise after displaying
-	int unfocus;	// Focus to NULL after displaying
-	int done;	// Set when destroyed
+	char raise;	// Raise after displaying
+	char unfocus;	// Focus to NULL after displaying
+	char done;	// Set when destroyed
+	char unreal;	// Set if simulated
 } v_dd;
 
+/* Simulated widget - one struct for all kinds */
+
 typedef struct {
-	unsigned short op, size;
+	char insens;	// Insensitivity flag
+	short op;	// Internal opcode
+	short cnt;	// Options count
+	int value;	// Integer value
+	int range[2];	// Value range
+	char *id;	// Identifying string
+	char **strs;	// Option labels
+} swdata;
+
+#define IS_UNREAL(S) ((S)[0] == (S)[2])
+#define GET_UOP(S) (((swdata *)(S)[0])->op)
+
+/* Command table */
+
+typedef struct {
+	short op, size, uop;
 } cmdef;
 
 static cmdef *cmds[op_LAST];
@@ -1017,6 +1035,8 @@ enum {
 	pk_CONT,
 	pk_BIN,
 	pk_SHOW,	/* No packing needed, just show the widget */
+	pk_UNREAL,	/* Pseudo widget - no packing, just finish creation */
+	pk_UNREALV,	/* Pseudo widget with int value */
 };
 
 #define pk_MASK     0xFF
@@ -3733,9 +3753,27 @@ int do_pack(GtkWidget *widget, void **wp, void **pp, int n, int tpad)
 	return (0);
 }
 
+/* Remap opcodes for script mode */
+static int in_script(int op, char **script)
+{
+	int r = WB_GETREF(op);
+	op &= WB_OPMASK;
+	/* No script - leave as is */
+	if (!script);
+	/* Remap backend-dependent opcodes */
+	else if ((op < op_CTL_0) || (op >= op_CTL_LAST))
+	{
+		int uop = cmds[op] ? cmds[op]->uop : 0;
+		op = uop > 0 ? uop : uop < 0 ? op : r ? op_uOP : op_TRIGGER;
+	}
+	/* No need to connect event handlers in script mode */
+	else if ((op >= op_EVT_0) && (op <= op_EVT_LAST)) op = op_TRIGGER;
+	return (op);
+}
+
 /* Predict how many _void pointers_ a V-code sequence could need */
 // !!! And with inlining this, same problem
-int predict_size(void **ifcode, char *ddata)
+int predict_size(void **ifcode, char *ddata, char **script)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
 	int op, opf, u = 0, n = 2; // safety margin
@@ -3745,7 +3783,7 @@ int predict_size(void **ifcode, char *ddata)
 		opf = op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + WB_GETLEN(op);
 		n += WB_GETREF(op);
-		op &= WB_OPMASK;
+		op = in_script(op, script);
 		if (op < op_END_LAST) break; // End
 		// Subroutine return
 		if (op == op_RET) ifcode = *--rp;
@@ -3790,6 +3828,45 @@ static cmdef cmddefs[] = {
 	{ op_SMARTTBAR,	sizeof(smarttbar_data) },
 	{ op_SMARTMENU,	sizeof(smartmenu_data) },
 	{ op_DRAGDROP,	sizeof(drag_ctx) },
+
+	{ op_WEND,	0, op_uWEND },
+	{ op_WSHOW,	0, op_uWSHOW },
+	{ op_WINDOW,	0, op_uWINDOW },
+	{ op_WINDOWm,	0, op_uWINDOW },
+	{ op_FRAME,	0, op_uFRAME },
+	{ op_LABEL,	0, op_uLABEL },
+	{ op_SPIN,	0, op_uSPIN },
+	{ op_SPINc,	0, op_uSPIN },
+//	op_FSPIN,
+//	op_SPINa,
+	{ op_SPINSLIDE,	0, op_uSPIN },
+//	op_SPINSLIDEa,
+	{ op_CHECK,	0, op_uCHECK },
+//	op_CHECKb,
+	{ op_RPACK,	0, op_uRPACK },
+	{ op_RPACKD,	0, op_uRPACKD },
+	{ op_OPT,	0, op_uOPT },
+//	op_OPTD,
+//	op_COMBO,
+//	and op_ENTRY and various others between it and op_OKBTN
+	{ op_OKBTN,	0, op_uOKBTN },
+//	op_DONEBTN,
+//	op_TOGGLE,
+//	op_BUTTON,
+	{ op_ACTMAP,	0, -1 },
+	{ op_INSENS,	0, -1 },
+
+	{ op_uWINDOW,	sizeof(swdata), -1 },
+	{ op_uOP,	sizeof(swdata), -1 },
+	{ op_uCHECK,	sizeof(swdata), -1 },
+	{ op_uFRAME,	sizeof(swdata), -1 },
+	{ op_uLABEL,	sizeof(swdata), -1 },
+	{ op_uOKBTN,	sizeof(swdata), -1 },
+	{ op_uOPT,	sizeof(swdata), -1 },
+	{ op_uRPACK,	sizeof(swdata), -1 },
+	{ op_uRPACKD,	sizeof(swdata), -1 },
+	{ op_uSPIN,	sizeof(swdata), -1 },
+	{ op_uALTNAME,	sizeof(swdata), -1 },
 };
 
 static void do_destroy(void **wdata);
@@ -3807,7 +3884,7 @@ static void do_destroy(void **wdata);
 #define PREP_SLOT(R,W,D,T) (R)[0] = (W) , (R)[1] = (D) , (R)[2] = (T)
 #define ADD_SLOT(R,W,D,T) PREP_SLOT(R, W, D, T) , (R) += VSLOT_SIZE
 
-void **run_create(void **ifcode, void *ddata, int ddsize)
+void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 {
 	char *ident = VCODE_KEY;
 #if GTK_MAJOR_VERSION == 1
@@ -3827,6 +3904,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	void *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **dtail, **r = NULL, **res = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
+	char *wid = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0, ct = 0;
 
@@ -3838,7 +3916,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 	// Allocation size
 	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
 	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
-	dsize = ld + n + 2 + predict_size(ifcode, ddata);
+	dsize = ld + n + 2 + predict_size(ifcode, ddata, script);
 	if (!(res = calloc(dsize, sizeof(void *)))) return (NULL); // failed
 	dtail = res + dsize; // Locate tail of block
 	memcpy(res, ddata, ddsize); // Copy datastruct
@@ -3869,7 +3947,7 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 		if (op & WB_FFLAG) v = (void *)((char *)ddata + (int)v);
 		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
 		ref = WB_GETREF(op);
-		op &= WB_OPMASK;
+		op = in_script(op, script);
 		if (cmds[op]) dtail -= (cmds[op]->size + sizeof(void *) - 1) /
 			sizeof(void *);
 		/* Pass most relevant parameters through the next free slot */
@@ -3923,6 +4001,102 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 			}
 			/* Return anchor position */
 			return (res);
+		/* Terminate in script mode */
+		case op_uWEND: case op_uWSHOW:
+			/* Terminate the list */
+			ADD_SLOT(r, NULL, NULL, NULL);
+			/* Trigger remembered events */
+			if (!part) trigger_things(res);
+			/* Activate */
+			if (op != op_uWEND)
+				cmd_showhide(GET_WINDOW(res), TRUE);
+			/* Return anchor position - already freed if uWSHOW */
+			return (res);
+		/* Script mode pseudo window */
+		case op_uWINDOW:
+			vdata->unreal = TRUE;
+			/* Store script ref, to run it when done */
+			((swdata *)dtail)->strs = script;
+			wid = ""; // First unnamed field gets to be default
+			pk = pk_UNREAL;
+			break;
+		/* Script mode alternate identifier */
+		case op_uALTNAME:
+			if (!script) continue;
+			wid = v;
+			pk = pk_UNREALV;
+			break;
+		/* Script mode identifier (forced) */
+		case op_uOPNAME:
+			/* If inside script and having something to set */
+			if (script && v)
+			{
+				void **slot = origin_slot(PREV_SLOT(r));
+				if (IS_UNREAL(slot)) // Paranoia
+					((swdata *)dtail)->id = v;
+			}
+			wid = NULL; // Clear current identifier
+			continue;
+		/* Script mode label, as identifier for prev/next control */
+		case op_uLABEL:
+			if (!wid) // Maybe the preceding slot needs a label
+			{
+				void **slot = origin_slot(PREV_SLOT(r));
+				if (IS_UNREAL(slot)) // Paranoia
+				{
+					swdata *sd = slot[0];
+					if (!sd->id && (sd->op != op_uOP))
+						sd->id = v , v = NULL;
+				}
+			}
+			// Fallthrough
+		/* Script mode frame, as identifier to next control */
+		case op_uFRAME:
+			wid = v;
+			// Fallthrough
+		/* Script mode OK button, as placeholder */
+		case op_uOKBTN:
+		/* Script mode generic placeholder */
+		case op_uOP:
+			pk = pk_UNREAL;
+			break;
+		/* Script mode checkbutton */
+		case op_uCHECK:
+			wid = pp[2];
+			tpad = !!*(int *)v;
+			pk = pk_UNREALV;
+			break;
+		/* Script mode spinbutton */
+		case op_uSPIN:
+		{
+			int a, b;
+			((swdata *)dtail)->range[0] = a = (int)pp[2];
+			((swdata *)dtail)->range[1] = b = (int)pp[3];
+			tpad = *(int *)v;
+			tpad = tpad > b ? b : tpad < a ? a : tpad;
+			pk = pk_UNREALV;
+			break;
+		}
+		/* Script mode option pack */
+		case op_uOPT: case op_uRPACK: case op_uRPACKD:
+		{
+			char **strs = pp[2];
+			int n = (int)pp[3];
+
+			if (op == op_uRPACK) n >>= 8;
+			else if (op == op_uRPACKD)
+			{
+				strs = *(char ***)((char *)ddata + (int)strs);
+				n = 0;
+			}
+			if (n <= 0) for (n = 0; strs[n]; n++); // Count strings
+			((swdata *)dtail)->cnt = n;
+			((swdata *)dtail)->strs = strs;
+			tpad = *(int *)v;
+			if ((tpad >= n) || (tpad < 0) || !strs[tpad][0]) tpad = 0;
+			pk = pk_UNREALV;
+			break;
+		}
 		/* Done with a container */
 		case op_WDONE:
 			CT_POP(wp);
@@ -5226,12 +5400,29 @@ void **run_create(void **ifcode, void *ddata, int ddsize)
 				borders[op - op_BOR_0] = lp ? (int)v - DEF_BORDER : 0;
 			continue;
 		}
-		/* Remember this */
-		if (ref) ADD_SLOT(r, widget ? (void *)widget : res, pp, dtail);
+		if (ref)
+		{
+			/* Finish pseudo widget */
+			if (pk == pk_UNREALV)
+			{
+				((swdata *)dtail)->value = tpad;
+				((swdata *)dtail)->id = wid;
+				wid = NULL;
+				pk = pk_UNREAL;
+			}
+			if (pk == pk_UNREAL)
+			{
+				widget = (void *)dtail;
+				((swdata *)dtail)->op = op;
+			}
+			/* Remember this */
+			ADD_SLOT(r, widget ? (void *)widget : res, pp, dtail);
+		}
 		/* Remember events */
 		if (ref > 2) ADD_SLOT(r, res, pp + lp - 3, NULL);
 		if (ref > 1) ADD_SLOT(r, res, pp + lp - 1, NULL);
 		/* Pack this according to mode flags */
+		if (script) continue; // no packing in script mode
 		{
 			GtkWidget *w = do_prepare(widget, pk, cw, minw, minh);
 			minw = minh = 0;
@@ -5268,6 +5459,8 @@ static void do_destroy(void **wdata)
 		op = (int)*pp++;
 		v = pp[0];
 		if (op & WB_FFLAG) v = data + (int)v;
+// !!! No need yet
+//		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
 		if (op == op_CLEANUP) free(*(void **)v);
 		else if (op == op_CLIPFORM)
@@ -5302,6 +5495,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		op = (int)*pp++;
 		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = data + (int)v;
+		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
 		switch (op)
 		{
@@ -5311,6 +5505,10 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_SPIN: case op_SPINc: case op_SPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
+			break;
+		case op_uSPIN: case op_uCHECK:
+		case op_uOPT: case op_uRPACK: case op_uRPACKD:
+			*(int *)v = ((swdata *)*wdata)->value;
 			break;
 		case op_FSPIN:
 			*(int *)v = rint((mode & 1 ?
@@ -5454,13 +5652,18 @@ static void *do_query(char *data, void **wdata, int mode)
 
 void run_query(void **wdata)
 {
-	/* Prod a focused widget which needs defocusing to update */
 	v_dd *vdata = GET_VDATA(wdata);
-	GtkWidget *w = GET_REAL_WINDOW(wdata), *f = GTK_WINDOW(w)->focus_widget;
-	/* !!! No use to check if "fupslot" has focus - all dialogs with such
-	 * widget get destroyed after query anyway */
-	if (f && (GTK_IS_SPIN_BUTTON(f) || vdata->fupslot))
-		gtk_window_set_focus(GTK_WINDOW(w), NULL);
+
+	/* Prod a focused widget which needs defocusing to update */
+	if (!vdata->unreal)
+	{
+		GtkWidget *w = GET_REAL_WINDOW(wdata);
+		GtkWidget *f = GTK_WINDOW(w)->focus_widget;
+		/* !!! No use to check if "fupslot" has focus - all dialogs with
+		 * such widget get destroyed after query anyway */
+		if (f && (GTK_IS_SPIN_BUTTON(f) || vdata->fupslot))
+			gtk_window_set_focus(GTK_WINDOW(w), NULL);
+	}
 
 	do_query(GET_DDATA(wdata), GET_WINDOW(wdata), 0);
 }
@@ -5469,6 +5672,12 @@ void run_destroy(void **wdata)
 {
 	v_dd *vdata = GET_VDATA(wdata);
 	if (vdata->done) return; // already destroyed
+	if (vdata->unreal) // simulated
+	{
+		do_destroy(wdata);
+		free(GET_DDATA(wdata));
+		return;
+	}
 	if (vdata->ininame && vdata->ininame[0])
 		cmd_showhide(GET_WINDOW(wdata), FALSE); // save position & size
 	destroy_dialog(GET_REAL_WINDOW(wdata));
@@ -5487,6 +5696,8 @@ void cmd_reset(void **slot, void *ddata)
 		v = WB_GETLEN(op) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (char *)ddata + (int)v;
 		if (op & WB_NFLAG) v = *(void **)v; // dereference
+// !!! No need yet
+//		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
 		if ((op != op_GROUP) && (cgroup != group)) continue;
 		switch (op)
@@ -5520,7 +5731,7 @@ void cmd_reset(void **slot, void *ddata)
 		case op_SPINSLIDE: case op_SPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
-		case op_CHECK: case op_TOGGLE:
+		case op_CHECK: case op_CHECKb: case op_TOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
 			gtk_toggle_button_set_active(*wdata, *(int *)v);
 			break;
@@ -5596,10 +5807,6 @@ void cmd_reset(void **slot, void *ddata)
 		case op_FSPIN:
 			gtk_spin_button_set_value(*wdata, *(int *)v * 0.01);
 			break;
-		case op_CHECKb:
-			gtk_toggle_button_set_active(*wdata,
-				*(int *)v = inifile_get_gboolean(pp[2], *(int *)v));
-			break;
 		case op_TBRBUTTON:
 			if (*(int *)v == TOOL_ID(wdata))
 				gtk_toggle_button_set_active(*wdata, TRUE);
@@ -5642,8 +5849,14 @@ void cmd_reset(void **slot, void *ddata)
 
 void cmd_sensitive(void **slot, int state)
 {
-	int op = GET_OP(slot);
+	int op;
 
+	if (IS_UNREAL(slot))
+	{
+		((swdata *)slot[0])->insens = !state;
+		return;
+	}
+	op = GET_OP(slot);
 	if (op >= op_EVT_0) return; // only widgets
 	gtk_widget_set_sensitive(slot[0], state);
 	/* Move focus in LISTCC when delayed by insensitivity */
@@ -5654,11 +5867,144 @@ void cmd_sensitive(void **slot, int state)
 	}
 }
 
+static int midmatch(const char *s, const char *v, int l)
+{
+	while ((s = strchr(s, ' ')))
+	{
+		s += strspn(s, " ");
+		if (!strncasecmp(s, v, l)) break;
+	}
+	return (!!s);
+}
+
+static void run_script(void **slot)
+{
+	swdata *sd = slot[0];
+	char *opt, *tmp, *val, **strs = sd->strs, **err = NULL;
+	void **wdata, **where;
+	int op, ll;
+
+	/* Command itself may carry default option */
+	opt = *strs++;
+	if (opt && (opt[0] == '-'))
+		opt = (tmp = strchr(opt, '=')) ? tmp : *strs++;
+	/* Step through options */
+	for (; opt && opt[0] && (opt[0] != '-'); opt = *strs++)
+	{
+		/* First, parse the option */
+		val = strchr(opt, '=');
+		ll = val ? val++ - opt : strlen(opt);
+		/* Now, find target for the option */
+		where = NULL;
+		for (wdata = NEXT_SLOT(slot); wdata[1]; wdata = NEXT_SLOT(wdata))
+		{
+			if (!IS_UNREAL(wdata)) continue;
+			op = GET_UOP(wdata);
+			if (op == op_uOP) continue; // Dummy slot
+			sd = wdata[0];
+			if (!sd->id) continue; // No name
+			/* Match empty option name to an empty ID (default) */
+			if (!ll)
+			{
+				if (!sd->id[0]) break;
+				continue;
+			}
+			/* Match at beginning */
+			if (!strncasecmp(sd->id, opt, ll)) break;
+			/* Match at word beginning */
+			if (!where && midmatch(sd->id, opt, ll)) where = wdata;
+		}
+		if (!wdata[1]) wdata = where; // Middle match
+		/* Raise an error if no match */
+		if (!wdata)
+		{
+			err = strs;
+			break;
+		}
+		/* Resolve alternative name */
+		if (GET_UOP(wdata) == op_uALTNAME) wdata = origin_slot(wdata);
+		/* Leave insensitive slots alone */
+		sd = wdata[0];
+		if (sd->insens) continue;
+// !!! Or maybe raise an error, too?
+		/* Prepare value for slot */
+		switch (sd->op)
+		{
+		case op_uCHECK:
+			ll = !val ? TRUE : !val[0] ? FALSE : str2bool(val);
+			if (ll < 0) sd = NULL; // Error
+			break;
+		case op_uOPT: case op_uRPACK: case op_uRPACKD:
+			if (val && val[0])
+			{
+				int k = -1, n = sd->cnt, l = strlen(val);
+
+				for (ll = 0; ll < n; ll++)
+				{
+					tmp = sd->strs[ll];
+					if (!tmp[0]) continue;
+					/* Match at beginning */
+					if (!strncasecmp(tmp, val, l)) break;
+					/* Match at word beginning */
+					if ((k < 0) && midmatch(tmp, val, l)) k = ll;
+				}
+				if (ll >= n) ll = k; // Middle match
+				if (ll >= 0) break; // Have a match
+			}
+			sd = NULL; // Error
+			break;
+		case op_uSPIN:
+			if (!val) sd = NULL; // Error
+			else if (!val[0]) ll = 0; // Default
+			else
+			{ 
+				ll = strtol(val, &tmp, 10);
+				if (*tmp) sd = NULL; // Error
+			}
+			break;
+		}
+		/* Raise an error if invalid value */
+		if (!sd)
+		{
+			err = strs;
+			break;
+		}
+		/* Set value to pseudo widget */
+		cmd_set(wdata, ll);
+	}
+
+	/* An error happened - report it */
+	if (err)
+	{
+		err--; // Previous option caused the error
+		tmp = g_strdup_printf(!wdata ? _("'%s' doesn't match any widget") :
+			_("'%s' value doesn't fit '%s' widget"), *err,
+			wdata ? ((swdata *)wdata[0])->id : NULL);
+		alert_box(_("Error"), tmp, NULL);
+		g_free(tmp);
+// !!! Here, set error flag so that enclosing script stops
+		free(GET_DDATA(PREV_SLOT(slot))); // This dialog is done with
+		return;
+	}
+
+	/* Now activate the OK handler */
+	for (wdata = NEXT_SLOT(slot); wdata[1]; wdata = NEXT_SLOT(wdata))
+		if (IS_UNREAL(wdata) && (GET_UOP(wdata) == op_uOKBTN)) break;
+	if (wdata[1]) // Paranoia
+		cmd_event(wdata, op_EVT_OK);
+	/* !!! The memory block is likely to be freed at this point */
+}
+
 void cmd_showhide(void **slot, int state)
 {
 	int raise = FALSE, unfocus = FALSE;
 
 	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
+	if (IS_UNREAL(slot))
+	{
+		if ((GET_UOP(slot) == op_uWINDOW) && state) run_script(slot);
+		return;
+	}
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
 	if (!GTK_WIDGET_VISIBLE(slot[0]) ^ !!state) return; // no use
 	if (GET_OP(PREV_SLOT(slot)) == op_WDONE) // toplevels are special
@@ -5696,9 +6042,13 @@ void cmd_showhide(void **slot, int state)
 
 void cmd_set(void **slot, int v)
 {
+	int op;
+
 	slot = origin_slot(slot);
+	op = GET_OP(slot);
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 // !!! Support only what actually used on, and their brethren
-	switch (GET_OP(slot))
+	switch (op)
 	{
 	case op_DOCK:
 	{
@@ -5804,6 +6154,32 @@ void cmd_set(void **slot, int v)
 	case op_SPIN: case op_SPINc: case op_SPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
+	case op_uSPIN: case op_uCHECK:
+	{
+		swdata *sd = slot[0];
+
+		v = op == op_uCHECK ? !!v :
+			v > sd->range[1] ? sd->range[1] :
+			v < sd->range[0] ? sd->range[0] : v;
+		if (v != sd->value)
+		{
+			sd->value = v;
+			cmd_event(slot, op_EVT_CHANGE);
+		}
+		break;
+	}
+	case op_uOPT: case op_uRPACK: case op_uRPACKD:
+	{
+		swdata *sd = slot[0];
+
+		if ((v < 0) || (v >= sd->cnt) || !sd->strs[v][0]) v = 0;
+		if (v != sd->value)
+		{
+			sd->value = v;
+			cmd_event(slot, op_EVT_SELECT);
+		}
+		break;
+	}
 	case op_FSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
@@ -5815,6 +6191,7 @@ void cmd_set(void **slot, int v)
 		gtk_check_menu_item_set_active(slot[0], v);
 		break;
 	case op_OPT: case op_OPTD:
+		/* !!! No support for discontinuous lists, for now */
 		gtk_option_menu_set_history(slot[0], v);
 		break;
 	case op_PCTCOMBO:
@@ -6000,6 +6377,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	int op = GET_OP(slot);
 	if (op == op_WDONE) // skip head noop
 		slot = NEXT_SLOT(slot) , op = GET_OP(slot);
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
@@ -6081,6 +6459,21 @@ void cmd_setv(void **slot, void *res, int idx)
 		int *v = res, n = v[0];
 		spin_set_range(slot[0], v[1], v[2]);
 		gtk_spin_button_set_value(slot[0], n);
+		break;
+	}
+	case op_uSPIN:
+	{
+		swdata *sd = slot[0];
+		int n, a, b, *v = res;
+
+		sd->range[0] = a = v[1];
+		sd->range[1] = b = v[2];
+		n = v[0] > b ? b : v[0] < a ? a : v[0];
+		if (n != sd->value)
+		{
+			sd->value = n;
+			cmd_event(slot, op_EVT_CHANGE);
+		}
 		break;
 	}
 	case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:

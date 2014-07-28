@@ -143,6 +143,9 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_TEST /* Reserved for testing things */
 };
 
+// Currently running script
+char **script_cmds;
+
 // New layer sources for ACT_LR_ADD
 #define LR_NEW   0
 #define LR_DUP   1

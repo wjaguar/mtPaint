@@ -1,5 +1,5 @@
 /*	inifile.h
-	Copyright (C) 2007-2011 Dmitry Groshev
+	Copyright (C) 2007-2014 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -54,6 +54,10 @@ int ini_getsection(inifile *inip, int section, char *key);
 char *slurp_file(char *fname);
 char *get_home_directory(void);
 char *extend_path(const char *path);
+
+/* Helper functions */
+
+int str2bool(const char *s);
 
 /* Compatibility functions */
 

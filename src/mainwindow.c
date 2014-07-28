@@ -3364,6 +3364,126 @@ static void move_marquee(int action, int *xy, int change, int dir)
 	update_stuff(UPD_SGEOM);
 }
 
+/* Number of args is ((char **)res[0] - res - 1); res[] is NULL-terminated */
+static char **wj_parse_argv(char *src)
+{
+	char c, q, q0, *dest, *tmp, **v;
+	int n = 0, l = strlen(src);
+
+	dest = tmp = malloc(l + 1);
+	q0 = q = ' '; // Start outside word
+	while ((c = *src++))
+	{
+		/* Various quoted states */
+		if (q == '#')
+		{
+			if (c == '\n') q = ' ';
+		}
+		else if (q == '\\')
+		{
+			q = q0;
+			if (q == '"')
+			{
+				if ((c != '"') && (c != '\\') && (c != '`') &&
+					(c != '$') && (c != '\n')) *dest++ = '\\';
+				*dest++ = c;
+			}
+			else if (c != '\n')
+			{
+				*dest++ = c;
+				q = 0;
+			}
+		}
+		else if (q == '"')
+		{
+			if (c == '\\') q0 = q , q = c;
+			else if (c == '"') q = 0;
+			else *dest++ = c;
+		}
+		else if (q == '\'')
+		{
+			if (c == '\'') q = 0;
+			else *dest++ = c;
+		}
+		/* Unquoted state - in a word or in between */
+		else if ((c == '\n') || (c == ' ') || (c == '\t'))
+		{
+			if (!q) *dest++ = 0 , n++;
+			q = ' ';
+		}
+		else if (c == '\\') q0 = q , q = c;
+		else if ((c == '#') && q) q = c;
+		else if ((c == '"') || (c == '\'')) q = c;
+		else
+		{
+			*dest++ = c;
+			q = 0;
+		}
+	}
+	/* Final state */
+	if (!q) *dest++ = 0 , n++;
+	else if ((q == '\\') || (q == '"') || (q == '\'')) n = -1; // Error
+	l = dest - tmp;
+	if ((n > 0) && (v = realloc(tmp, sizeof(*v) * (n + 1) + l)))
+	{
+		tmp = (void *)(v + n + 1);
+		memmove(tmp, v, l);
+		for (l = 0; l < n; l++)
+		{
+			v[l] = tmp;
+			tmp += strlen(tmp) + 1;
+		}
+		v[n] = NULL;
+		return (v);
+	}
+	/* Syntax error, or empty string */
+	free(tmp);
+	return (NULL);
+}
+
+char **script_cmds;
+
+typedef struct {
+	char *script;
+} script_dd;
+
+static void click_script_ok(script_dd *dt, void **wdata)
+{
+	char **res;
+
+	cmd_showhide(wdata, FALSE);
+	run_query(wdata);
+	res = wj_parse_argv(dt->script);
+	if (res)
+	{
+		inifile_set("scriptTest", dt->script);
+		script_cmds = res;
+		pressed_quantize(FALSE);
+		script_cmds = NULL;
+		free(res);
+	}
+	run_destroy(wdata);
+}
+
+#define WBbase script_dd
+static void *script_code[] = {
+	WINDOWm(_("Script - Convert To Indexed")),
+	DEFW(400),
+	HSEP,
+	MLENTRY(script),
+	HSEP,
+	OKBOX(_("OK"), click_script_ok, _("Cancel"), NULL),
+	WSHOW
+};
+#undef WBbase
+
+static void script_test()
+{
+	script_dd tdata = { inifile_get("scriptTest",
+		"pal=wu use=16 dither=stucki sel=separate/split err=65") };
+	run_create(script_code, &tdata, sizeof(tdata));
+}
+
 void action_dispatch(int action, int mode, int state, int kbd)
 {
 	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
@@ -3692,6 +3812,10 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_unassociate(); break;
 	case FILT_KUWAHARA:
 		pressed_kuwahara(); break;
+
+	case ACT_TEST:
+		script_test(); break;
+
 	}
 }
 
@@ -4112,6 +4236,10 @@ static void *main_menu_code[] = {
 		ACTMAP(NEED_IDX),
 	MENUITEM(_("//Convert To Indexed ..."), ACTMOD(DLG_INDEXED, 0)),
 		ACTMAP(NEED_24),
+
+	MENUITEM(_("//Script - Convert To Indexed"), ACTMOD(ACT_TEST, 0)),
+		ACTMAP(NEED_24),
+
 	MENUSEP, //
 	MENUITEM(_("//Scale Canvas ..."), ACTMOD(DLG_SCALE, 0)),
 		SHORTCUTs("Page_Up"),

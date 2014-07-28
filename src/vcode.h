@@ -21,6 +21,8 @@ enum {
 	op_WEND = 0,
 	op_WSHOW,
 	op_WDIALOG,
+	op_uWEND,
+	op_uWSHOW,
 
 	op_END_LAST,
 	op_WDONE = op_END_LAST,
@@ -33,6 +35,8 @@ enum {
 	op_POPUP,
 	op_TOPVBOX,
 	op_TOPVBOXV,
+	op_uWINDOW,
+
 	op_DOCK,
 	op_HVSPLIT,
 	op_PAGE,
@@ -64,15 +68,18 @@ enum {
 	op_CANVASIMGB,
 	op_FCIMAGEP,
 	op_NOSPIN,
-	//
+	op_uOP,
+	op_uFRAME,
+	op_uLABEL,
+
 	op_CSCROLL,
 	op_CANVAS,
-	//
+
 	op_SPIN,
 	op_SPINc,
 	op_FSPIN,
 	op_SPINa,
-	//
+
 	op_TLSPINPACK,
 	op_SPINSLIDE,
 	op_SPINSLIDEa,
@@ -133,8 +140,20 @@ enum {
 	op_MOUNT,
 	op_PMOUNT,
 	op_REMOUNT,
+	op_uCHECK,
+	op_uSPIN,
+	op_uOPT,
+	op_uRPACK,
+	op_uRPACKD,
+	op_uOKBTN,
 
-	op_GROUP,
+	op_CLIPBOARD,
+
+	op_XBMCURSOR,
+	op_SYSCURSOR,
+
+	op_CTL_0, // control tags - same for all modes
+	op_GROUP = op_CTL_0,
 
 	op_WLIST,
 	op_COLUMNDATA,
@@ -144,11 +163,6 @@ enum {
 	op_RTXTCOLUMN,
 	op_RFILECOLUMN,
 	op_CHKCOLUMNi0,
-
-	op_CLIPBOARD,
-
-	op_XBMCURSOR,
-	op_SYSCURSOR,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -195,12 +209,17 @@ enum {
 	op_CLEANUP,
 	op_TALLOC,
 	op_TCOPY,
-	op_CLIPFORM,
+	op_IDENT,
+	op_uOPNAME,
+	op_uALTNAME,
+
+	op_CTL_LAST,
+
+	op_CLIPFORM = op_CTL_LAST,
 	op_DRAGDROP,
 	op_ACTMAP,
 	op_SHORTCUTs,
 	op_WANTKEYS,
-	op_IDENT,
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
@@ -320,6 +339,7 @@ enum {
 #define _B3mask (GDK_BUTTON3_MASK)
 #define _B13mask (GDK_BUTTON1_MASK | GDK_BUTTON3_MASK)
 
+//	Functions to run with EVENT
 typedef void (*evt_fn)(void *ddata, void **wdata, int what, void **where);
 typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
@@ -328,7 +348,8 @@ typedef int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where,
 
 //	Build a dialog window out of V-code decription
 //void **run_create(const void **ifcode, const void *ddata, int ddsize);
-void **run_create(void **ifcode, void *ddata, int ddsize);
+void **run_create_(void **ifcode, void *ddata, int ddsize, char **script);
+#define run_create(A,B,C) run_create_(A, B, C, NULL)
 //	Query dialog contents using its widget-map
 void run_query(void **wdata);
 //	Destroy a dialog by its widget-map
@@ -894,6 +915,9 @@ enum {
 	EVENT(DRAGFROM, HF), EVENT(DROP, HT)
 #define CLIPBOARD(F,T,HC,HP) WBr3hf(CLIPBOARD, 2 + 2 * 2), WBfield(F), \
 	(void *)(T), EVENT(COPY, HC), EVENT(PASTE, HP)
+#define ALTNAME(NM) WBrh(uALTNAME, 1), (NM)
+#define OPNAME(NM) WBh(uOPNAME, 1), (NM)
+#define OPNAME0 WBh(uOPNAME, 0)
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0

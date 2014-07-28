@@ -2052,7 +2052,7 @@ void pressed_quantize(int palette)
 		tdata.err = dither_pfract[dither_sel ? 1 : 0];
 	}
 
-	run_create(quantize_code, &tdata, sizeof(tdata));
+	run_create_(quantize_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 ///	GRADIENT WINDOW

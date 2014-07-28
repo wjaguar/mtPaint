@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2013 Dmitry Groshev
+	Copyright (C) 2007-2014 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -697,10 +697,18 @@ int ini_getint(inifile *inip, int section, char *key, int defv)
 	return ((int)(slot->value));
 }
 
-int ini_getbool(inifile *inip, int section, char *key, int defv)
+int str2bool(const char *s)
 {
 	static const char *YN[] = { "n", "y", "0", "1", "no", "yes",
 		"off", "on", "false", "true", "disabled", "enabled", NULL };
+	int i;
+
+	for (i = 0; YN[i]; i++) if (!strcasecmp(YN[i], s)) return (i & 1);
+	return (-1);
+}
+
+int ini_getbool(inifile *inip, int section, char *key, int defv)
+{
 	inislot *slot;
 	int i;
 
@@ -727,9 +735,8 @@ int ini_getbool(inifile *inip, int section, char *key, int defv)
 	{
 		if (slot->type == INI_UNDEF)
 		{
-			for (i = 0; YN[i] && strcasecmp(YN[i], slot->value); i++);
-			slot->value = (char *)(i & 1);
-			if (YN[i]) break;
+			slot->value = (char *)(i = str2bool(slot->value));
+			if (i >= 0) break;
 		}
 		else if (slot->flags & INI_MALLOC) free(slot->value);
 #if VALIDATE_TYPE
