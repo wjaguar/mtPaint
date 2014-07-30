@@ -63,6 +63,8 @@ GtkWidget *main_window;
 GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
 GtkWidget *add_a_spin( int value, int min, int max );
 
+int user_break;
+
 void progress_init(char *text, int canc);		// Initialise progress window
 int progress_update(float val);				// Update progress window
 void progress_end();					// Close progress window

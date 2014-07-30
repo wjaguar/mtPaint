@@ -368,7 +368,7 @@ void pressed_threshold()
 	static spin1_dd tdata = {
 		{ _("Threshold Channel"), spin1_code, FW_FN(do_threshold) },
 		{ 128, 0, 255 } };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 void pressed_unassociate()

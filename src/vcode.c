@@ -3837,12 +3837,12 @@ static cmdef cmddefs[] = {
 	{ op_LABEL,	0, op_uLABEL },
 	{ op_SPIN,	0, op_uSPIN },
 	{ op_SPINc,	0, op_uSPIN },
-//	op_FSPIN,
-//	op_SPINa,
+	{ op_FSPIN,	0, op_uFSPIN },
+	{ op_SPINa,	0, op_uSPINa },
 	{ op_SPINSLIDE,	0, op_uSPIN },
-//	op_SPINSLIDEa,
+	{ op_SPINSLIDEa, 0, op_uSPINa },
 	{ op_CHECK,	0, op_uCHECK },
-//	op_CHECKb,
+	{ op_CHECKb,	0, op_uCHECKb },
 	{ op_RPACK,	0, op_uRPACK },
 	{ op_RPACKD,	0, op_uRPACKD },
 	{ op_OPT,	0, op_uOPT },
@@ -3852,20 +3852,26 @@ static cmdef cmddefs[] = {
 	{ op_OKBTN,	0, op_uOKBTN },
 //	op_DONEBTN,
 //	op_TOGGLE,
-//	op_BUTTON,
+	{ op_BUTTON,	0, op_uBUTTON },
 	{ op_ACTMAP,	0, -1 },
 	{ op_INSENS,	0, -1 },
 
 	{ op_uWINDOW,	sizeof(swdata), -1 },
 	{ op_uOP,	sizeof(swdata), -1 },
 	{ op_uCHECK,	sizeof(swdata), -1 },
+	{ op_uCHECKb,	sizeof(swdata), -1 },
 	{ op_uFRAME,	sizeof(swdata), -1 },
 	{ op_uLABEL,	sizeof(swdata), -1 },
 	{ op_uOKBTN,	sizeof(swdata), -1 },
+	{ op_uBUTTON,	sizeof(swdata), -1 },
 	{ op_uOPT,	sizeof(swdata), -1 },
 	{ op_uRPACK,	sizeof(swdata), -1 },
 	{ op_uRPACKD,	sizeof(swdata), -1 },
 	{ op_uSPIN,	sizeof(swdata), -1 },
+	{ op_uFSPIN,	sizeof(swdata), -1 },
+	{ op_uSPINa,	sizeof(swdata), -1 },
+	{ op_uSCALE,	sizeof(swdata), -1 },
+	{ op_uMENUITEM,	sizeof(swdata), -1 },
 	{ op_uALTNAME,	sizeof(swdata), -1 },
 };
 
@@ -4060,20 +4066,34 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_uOP:
 			pk = pk_UNREAL;
 			break;
-		/* Script mode checkbutton */
+		/* Script mode button */
+		case op_uBUTTON:
+			// Not scriptable by default
+			if (!((int)pp[0] & WB_SFLAG)) op = op_uOP;
+			wid = v;
+			pk = pk_UNREALV;
+			break;
+		/* Script mode checkbox */
+		case op_uCHECKb:
+			*(int *)v = inifile_get_gboolean(pp[3], *(int *)v);
+			// Fallthrough
 		case op_uCHECK:
 			wid = pp[2];
 			tpad = !!*(int *)v;
 			pk = pk_UNREALV;
 			break;
 		/* Script mode spinbutton */
-		case op_uSPIN:
+		case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
 		{
 			int a, b;
-			((swdata *)dtail)->range[0] = a = (int)pp[2];
-			((swdata *)dtail)->range[1] = b = (int)pp[3];
+			if (op != op_uSPINa) a = (int)pp[2] , b = (int)pp[3];
+			else a = ((int *)v)[1] , b = ((int *)v)[2];
+			((swdata *)dtail)->range[0] = a;
+			((swdata *)dtail)->range[1] = b;
 			tpad = *(int *)v;
 			tpad = tpad > b ? b : tpad < a ? a : tpad;
+			if (op == op_uSCALE) // Backup original value
+				((swdata *)dtail)->strs = (void *)tpad;
 			pk = pk_UNREALV;
 			break;
 		}
@@ -4097,6 +4117,12 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			pk = pk_UNREALV;
 			break;
 		}
+		/* Script mode menu item */
+		case op_uMENUITEM:
+			wid = pp[3];
+			((swdata *)dtail)->strs = (void *)NEXT_SLOT(tbar);
+			pk = pk_UNREALV;
+			break;
 		/* Done with a container */
 		case op_WDONE:
 			CT_POP(wp);
@@ -5150,7 +5176,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Make last referrable widget insensitive */
 		case op_INSENS:
-			gtk_widget_set_sensitive(*origin_slot(PREV_SLOT(r)), FALSE);
+			cmd_sensitive(origin_slot(PREV_SLOT(r)), FALSE);
 			continue;
 		/* Make last referrable widget focused */
 		case op_FOCUS:
@@ -5414,6 +5440,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			{
 				widget = (void *)dtail;
 				((swdata *)dtail)->op = op;
+				pk = 0;
 			}
 			/* Remember this */
 			ADD_SLOT(r, widget ? (void *)widget : res, pp, dtail);
@@ -5506,9 +5533,11 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
-		case op_uSPIN: case op_uCHECK:
+		case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
+		case op_uCHECK: case op_uCHECKb:
 		case op_uOPT: case op_uRPACK: case op_uRPACKD:
 			*(int *)v = ((swdata *)*wdata)->value;
+			if (op == op_uCHECKb) inifile_set_gboolean(pp[2], *(int *)v);
 			break;
 		case op_FSPIN:
 			*(int *)v = rint((mode & 1 ?
@@ -5871,23 +5900,177 @@ static int midmatch(const char *s, const char *v, int l)
 {
 	while ((s = strchr(s, ' ')))
 	{
-		s += strspn(s, " ");
+		s += strspn(s, " (");
 		if (!strncasecmp(s, v, l)) break;
 	}
 	return (!!s);
+}
+
+void **find_slot(void **slot, char *id, int l, int mlevel)
+{
+	void **where = NULL;
+	char buf[64], *nm, *ts;
+	int op, n;
+
+	for (; slot[1]; slot = NEXT_SLOT(slot))
+	{
+		if (mlevel >= 0) // Searching menu items
+		{
+			op = GET_OP(slot);
+// !!! Or maybe switch/case?
+			if ((op == op_uALTNAME) || (op == op_uMENUITEM))
+				nm = ((swdata *)slot[0])->id;
+			else if ((op == op_SUBMENU) || (op == op_ESUBMENU) ||
+				(op == op_SSUBMENU))
+			{
+				nm = GET_DESCV(slot, 1);
+				// Remove shortcut marker from toplevel items
+				if ((ts = strchr(nm, '_'))) nm = wjstrcat(buf,
+					sizeof(buf), nm, ts - nm, ts + 1, NULL);
+			}
+			else if ((op == op_MENUITEM) || (op == op_MENUCHECK) ||
+				(op == op_MENURITEM)) nm = GET_DESCV(slot, 3);
+			else continue;
+			if (mlevel) // Searching a sublevel
+			{
+				n = strspn(nm, "/");
+				if ((n < mlevel) && (op != op_uALTNAME))
+					break; // level end
+				else if (n != mlevel)
+					continue; // submenu or direct altname
+				nm += n;
+			}
+		}
+		else // Searching pseudo widgets
+		{
+			if (!IS_UNREAL(slot)) continue;
+			op = GET_UOP(slot);
+			if (op == op_uOP) continue; // Dummy slot
+			nm = ((swdata *)slot[0])->id;
+			if (!nm) continue; // No name
+		}
+		/* Match empty option name to an empty ID (default) */
+		if (!l)
+		{
+			if (nm[0]) continue;
+			where = slot;
+			break;
+		}
+		/* Match at beginning */
+		if (!strncasecmp(nm, id, l))
+		{
+			where = slot;
+			break;
+		}
+		/* Match at word beginning */
+		if (mlevel && !where && midmatch(nm, id, l)) where = slot;
+	}
+	/* Resolve alternative name */
+	if (where && (GET_OP(where) == op_uALTNAME))
+		where = origin_slot(where);
+	return (where);
+}
+
+int cmd_setstr(void **slot, char *s)
+{
+	char *tmp;
+	int ll, res = 1, op = GET_OP(slot);
+
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
+	switch (op)
+	{
+	case op_CHECK: case op_CHECKb: case op_TOGGLE:
+	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
+	case op_MENUCHECK: case op_MENURITEM:
+	case op_uCHECK: case op_uCHECKb: case op_uBUTTON:
+		ll = !s ? TRUE : !s[0] ? FALSE : str2bool(s);
+		if (ll < 0) return (-1); // Error
+		break;
+	case op_uOPT: case op_uRPACK: case op_uRPACKD:
+		if (s && s[0])
+		{
+			swdata *sd = slot[0];
+			int k = -1, n = sd->cnt, l = strlen(s);
+
+			for (ll = 0; ll < n; ll++)
+			{
+				tmp = sd->strs[ll];
+				if (!tmp[0]) continue;
+				/* Match at beginning */
+				if (!strncasecmp(tmp, s, l)) break;
+				/* Match at word beginning */
+				if ((k < 0) && midmatch(tmp, s, l)) k = ll;
+			}
+			if (ll >= n) ll = k; // Middle match
+			if (ll >= 0) break; // Have a match
+		}
+		return (-1); // Error
+	case op_MENUITEM: case op_uMENUITEM:
+		ll = res = 0; // No use for parameter
+		break;
+	case op_FSPIN: case op_uFSPIN: 
+		if (s && s[0])
+		{ 
+			double a = g_strtod(s, &tmp);
+			if (*tmp) return (-1); // Error
+			ll = rint(a * 100);
+			break;
+		}
+		// Fallthrough
+	case op_SPIN: case op_SPINc: case op_SPINa:
+	case op_uSPIN: case op_uSPINa:
+		if (!s) return (-1); // Error
+		ll = 0; // Default
+		if (s[0])
+		{ 
+			ll = strtol(s, &tmp, 10);
+			if (*tmp) return (-1); // Error
+		}
+		break;
+	case op_uSCALE:
+	{
+		swdata *sd = slot[0];
+
+		if (!s || !s[0]) return (-1); // Error
+		if (strchr(s, '%')) /* "w=125%" */
+		{
+			ll = strtol(s, &tmp, 10);
+			if (*tmp != '%') return (-1); // Error
+			ll = (ll * (int)sd->strs) / 100;
+		}
+		else if ((s[0] == 'x') || (s[0] == 'X')) /* "w=x1.25" */
+		{
+			double a = g_strtod(s + 1, &tmp);
+			if (*tmp) return (-1); // Error
+			ll = rint((int)sd->strs * a);
+		}
+		else /* "w=200" */
+		{ 
+			ll = strtol(s, &tmp, 10);
+			if (*tmp) return (-1); // Error
+		}
+		sd->cnt = 3; // Value is being set directly
+		break;
+	}
+	default: return (-1); // Error: cannot hanle
+	}
+	/* Set value to widget */
+	cmd_set(slot, ll);
+	return (res);
 }
 
 static void run_script(void **slot)
 {
 	swdata *sd = slot[0];
 	char *opt, *tmp, *val, **strs = sd->strs, **err = NULL;
-	void **wdata, **where;
-	int op, ll;
+	void **wdata;
+	int ll;
 
 	/* Command itself may carry default option */
 	opt = *strs++;
 	if (opt && (opt[0] == '-'))
 		opt = (tmp = strchr(opt, '=')) ? tmp : *strs++;
+
 	/* Step through options */
 	for (; opt && opt[0] && (opt[0] != '-'); opt = *strs++)
 	{
@@ -5895,94 +6078,34 @@ static void run_script(void **slot)
 		val = strchr(opt, '=');
 		ll = val ? val++ - opt : strlen(opt);
 		/* Now, find target for the option */
-		where = NULL;
-		for (wdata = NEXT_SLOT(slot); wdata[1]; wdata = NEXT_SLOT(wdata))
-		{
-			if (!IS_UNREAL(wdata)) continue;
-			op = GET_UOP(wdata);
-			if (op == op_uOP) continue; // Dummy slot
-			sd = wdata[0];
-			if (!sd->id) continue; // No name
-			/* Match empty option name to an empty ID (default) */
-			if (!ll)
-			{
-				if (!sd->id[0]) break;
-				continue;
-			}
-			/* Match at beginning */
-			if (!strncasecmp(sd->id, opt, ll)) break;
-			/* Match at word beginning */
-			if (!where && midmatch(sd->id, opt, ll)) where = wdata;
-		}
-		if (!wdata[1]) wdata = where; // Middle match
+		wdata = find_slot(NEXT_SLOT(slot), opt, ll, -1);
 		/* Raise an error if no match */
 		if (!wdata)
 		{
 			err = strs;
 			break;
 		}
-		/* Resolve alternative name */
-		if (GET_UOP(wdata) == op_uALTNAME) wdata = origin_slot(wdata);
 		/* Leave insensitive slots alone */
-		sd = wdata[0];
-		if (sd->insens) continue;
+		if (!cmd_checkv(wdata, SLOT_SENSITIVE)) continue;
 // !!! Or maybe raise an error, too?
-		/* Prepare value for slot */
-		switch (sd->op)
+		/* Set value to slot */
+		if (cmd_setstr(wdata, val) < 0)
 		{
-		case op_uCHECK:
-			ll = !val ? TRUE : !val[0] ? FALSE : str2bool(val);
-			if (ll < 0) sd = NULL; // Error
-			break;
-		case op_uOPT: case op_uRPACK: case op_uRPACKD:
-			if (val && val[0])
-			{
-				int k = -1, n = sd->cnt, l = strlen(val);
-
-				for (ll = 0; ll < n; ll++)
-				{
-					tmp = sd->strs[ll];
-					if (!tmp[0]) continue;
-					/* Match at beginning */
-					if (!strncasecmp(tmp, val, l)) break;
-					/* Match at word beginning */
-					if ((k < 0) && midmatch(tmp, val, l)) k = ll;
-				}
-				if (ll >= n) ll = k; // Middle match
-				if (ll >= 0) break; // Have a match
-			}
-			sd = NULL; // Error
-			break;
-		case op_uSPIN:
-			if (!val) sd = NULL; // Error
-			else if (!val[0]) ll = 0; // Default
-			else
-			{ 
-				ll = strtol(val, &tmp, 10);
-				if (*tmp) sd = NULL; // Error
-			}
-			break;
-		}
-		/* Raise an error if invalid value */
-		if (!sd)
-		{
+			/* Raise an error if invalid value */
 			err = strs;
 			break;
 		}
-		/* Set value to pseudo widget */
-		cmd_set(wdata, ll);
 	}
 
 	/* An error happened - report it */
 	if (err)
 	{
 		err--; // Previous option caused the error
-		tmp = g_strdup_printf(!wdata ? _("'%s' doesn't match any widget") :
-			_("'%s' value doesn't fit '%s' widget"), *err,
+		tmp = g_strdup_printf(!wdata ? _("'%s' does not match any widget") :
+			_("'%s' value does not fit '%s' widget"), *err,
 			wdata ? ((swdata *)wdata[0])->id : NULL);
 		alert_box(_("Error"), tmp, NULL);
 		g_free(tmp);
-// !!! Here, set error flag so that enclosing script stops
 		free(GET_DDATA(PREV_SLOT(slot))); // This dialog is done with
 		return;
 	}
@@ -6154,11 +6277,17 @@ void cmd_set(void **slot, int v)
 	case op_SPIN: case op_SPINc: case op_SPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
-	case op_uSPIN: case op_uCHECK:
+	case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
+	case op_uCHECK: case op_uCHECKb:
 	{
 		swdata *sd = slot[0];
 
-		v = op == op_uCHECK ? !!v :
+		/* uSCALE ignores indirect writes after a direct one */
+		if (op != op_uSCALE);
+		else if (sd->cnt == 2) break;
+		else sd->cnt &= 2;
+
+		v = (op == op_uCHECK) || (op == op_uCHECKb) ? !!v :
 			v > sd->range[1] ? sd->range[1] :
 			v < sd->range[0] ? sd->range[0] : v;
 		if (v != sd->value)
@@ -6180,12 +6309,26 @@ void cmd_set(void **slot, int v)
 		}
 		break;
 	}
+	case op_uBUTTON:
+		cmd_event(slot, op_EVT_CLICK); // for any value
+		break;
+	case op_uMENUITEM:
+	{	/* Call event at saved slot, for this slot */
+		swdata *sd = slot[0];
+		void **r = (void *)sd->strs, **base = r[0], **desc = r[1];
+		((evt_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, slot);
+		break;
+	}
 	case op_FSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
-	case op_CHECK: case op_TOGGLE:
+	case op_CHECK: case op_CHECKb: case op_TOGGLE:
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 		gtk_toggle_button_set_active(slot[0], v);
+		break;
+	case op_MENUITEM:
+		gtk_menu_item_activate(slot[0]); // for any value
 		break;
 	case op_MENUCHECK: case op_MENURITEM:
 		gtk_check_menu_item_set_active(slot[0], v);
@@ -6461,7 +6604,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_spin_button_set_value(slot[0], n);
 		break;
 	}
-	case op_uSPIN:
+	case op_uSPIN: case op_uSPINa:
 	{
 		swdata *sd = slot[0];
 		int n, a, b, *v = res;
@@ -6693,6 +6836,11 @@ void cmd_cursor(void **slot, void **cursor)
 int cmd_checkv(void **slot, int idx)
 {
 	int op = GET_OP(slot);
+	if (IS_UNREAL(slot))
+	{
+		if (idx == SLOT_SENSITIVE) return (!((swdata *)slot[0])->insens);
+		op = GET_UOP(slot);
+	}
 	if (op == op_CLIPBOARD)
 	{
 		if (idx == CLIP_OFFER) return (offer_clipboard(slot));
@@ -6719,6 +6867,8 @@ int cmd_checkv(void **slot, int idx)
 			return (w && ((w == slot[0]) ||
 				gtk_widget_is_ancestor(w, slot[0])));
 		}
+		if (idx == SLOT_SCRIPTABLE)
+			return (!!(GET_OPF(slot) & WB_SFLAG));
 	}
 	return (FALSE);
 }

@@ -389,7 +389,7 @@ void pressed_edge_detect()
 {
 	static filterwindow_dd tdata = {
 		_("Edge Detect"), edge_code, FW_FN(do_edge) };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 typedef struct {
@@ -412,7 +412,7 @@ void pressed_sharpen()
 	static spin1f_dd tdata = { {
 		{ _("Edge Sharpen"), spin1_code, FW_FN(do_fx) },
 		{ 50, 1, 100 } }, FX_SHARPEN };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 void pressed_soften()
@@ -420,7 +420,7 @@ void pressed_soften()
 	static spin1f_dd tdata = { {
 		{ _("Edge Soften"), spin1_code, FW_FN(do_fx) },
 		{ 50, 1, 100 } }, FX_SOFTEN };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 void pressed_fx(int what)
@@ -465,8 +465,8 @@ static void gauss_xy_click(gauss_dd *dt, void **wdata, int what, void **where)
 static void *gauss_code[] = {
 	VBOXPS,
 	BORDER(SPIN, 0),
-	FSPIN(x, 0, 20000),
-	REF(yspin), FSPIN(y, 0, 20000), INSENS,
+	FSPIN(x, 0, 20000), ALTNAME("x"),
+	REF(yspin), FSPIN(y, 0, 20000), INSENS, OPNAME("y"),
 	CHECK(_("Different X/Y"), xy), EVENT(CHANGE, gauss_xy_click),
 	IF(rgb), CHECK(_("Gamma corrected"), gamma),
 	WDONE, RET
@@ -478,7 +478,7 @@ void pressed_gauss()
 	gauss_dd tdata = {
 		{ _("Gaussian Blur"), gauss_code, FW_FN(do_gauss) },
 		mem_channel == CHN_IMAGE, 100, 100, FALSE, use_gamma };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 typedef struct {
@@ -503,7 +503,7 @@ static int do_unsharp(unsharp_dd *dt, void **wdata)
 static void *unsharp_code[] = {
 	VBOXPS,
 	BORDER(TABLE, 0),
-	TABLE2(3),
+	TABLE2(3), OPNAME0,
 	TFSPIN(_("Radius"), radius, 0, 20000),
 	TFSPIN(_("Amount"), amount, 0, 1000),
 	TSPIN(_("Threshold "), threshold, 0, 255),
@@ -518,7 +518,7 @@ void pressed_unsharp()
 	unsharp_dd tdata = {
 		{ _("Unsharp Mask"), unsharp_code, FW_FN(do_unsharp) },
 		mem_channel == CHN_IMAGE, 500, 50, 0, use_gamma };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 typedef struct {
@@ -544,7 +544,7 @@ static int do_dog(dog_dd *dt, void **wdata)
 static void *dog_code[] = {
 	VBOXPS,
 	BORDER(TABLE, 0),
-	TABLE2(2),
+	TABLE2(2), OPNAME0,
 	TFSPIN(_("Outer radius"), outer, 0, 20000),
 	TFSPIN(_("Inner radius"), inner, 0, 20000),
 	WDONE,
@@ -559,7 +559,7 @@ void pressed_dog()
 	dog_dd tdata = {
 		{ _("Difference of Gaussians"), dog_code, FW_FN(do_dog) },
 		mem_channel == CHN_IMAGE, 300, 100, TRUE, use_gamma };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 typedef struct {
@@ -593,7 +593,7 @@ void pressed_kuwahara()
 	kuw_dd tdata = {
 		{ _("Kuwahara-Nagao Blur"), kuw_code, FW_FN(do_kuwahara) },
 		1, FALSE, use_gamma };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 void pressed_convert_rgb()
@@ -680,7 +680,7 @@ void pressed_rotate_free()
 	rfree_dd tdata = {
 		{ _("Free Rotate"), rfree_code, FW_FN(do_rotate_free) },
 		mem_img_bpp == 3, TRUE, use_gamma };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 

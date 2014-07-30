@@ -490,14 +490,14 @@ void pressed_add_cols()
 	static spin1_dd tdata = {
 		{ _("Set Palette Size"), spin1_code, FW_FN(do_add_cols) },
 		{ 256, 2, 256 } };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 /* Generic code to handle UI needs of common image transform tasks */
 
 static void do_filterwindow(filterwindow_dd *dt, void **wdata)
 {
-	if (dt->evt(dt, wdata)) run_destroy(wdata);
+	if (dt->evt(dt, wdata) || script_cmds) run_destroy(wdata);
 	update_stuff(UPD_IMG);
 }
 
@@ -533,7 +533,7 @@ void pressed_bacteria()
 	static spin1_dd tdata = {
 		{ _("Bacteria Effect"), spin1_code, FW_FN(do_bacteria) },
 		{ 10, 1, 100 } };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 
@@ -572,13 +572,14 @@ static char *spal_txt[] = {
 #define WBbase spal_dd
 static void *spal_code[] = {
 	WINDOWm(_("Sort Palette Colours")), // modal
-	TABLE2(2),
+	TABLE2(2), OPNAME0,
 	TSPINa(_("Start Index"), start),
 	TSPINa(_("End Index"), end),
 	WDONE,
 	BORDER(RPACK, 0),
 	IF(rgb), RPACKv(spal_txt, 9, 5, spal_mode),
 	UNLESS(rgb), RPACKv(spal_txt, 10, 5, spal_mode),
+	OPNAME(""), // default
 	CHECKb(_("Reverse Order"), rev, "palrevSort"),
 	HSEPl(200),
 	OKBOX3B(_("OK"), spal_evt, _("Cancel"), NULL, _("Apply"), spal_evt),
@@ -590,7 +591,7 @@ void pressed_sort_pal()
 {
 	spal_dd tdata = { mem_img_bpp == 3, FALSE, { 0, 0, mem_cols - 1 },
 		{ mem_cols - 1, 0, mem_cols - 1 } };
-	run_create(spal_code, &tdata, sizeof(tdata));
+	run_create_(spal_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 
@@ -658,6 +659,7 @@ static void brcosa_moved(brcosa_dd *dt, void **wdata, int what, void **where)
 	int i, state;
 	void *cause = cmd_read(where, dt);
 
+	if (script_cmds) return; // Useless in scripted mode
 	if (brcosa_auto) brcosa_preview(dt, NULL);
 	if (cause == &brcosa_auto) cmd_showhide(dt->buttons[0], !brcosa_auto);
 
@@ -775,7 +777,7 @@ static char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
 static void *brcosa_code[] = {
 	WPMOUSE, WINDOWm(_("Transform Colour")), NORESIZE,
 	BORDER(TABLE, 10), BORDER(SPINSLIDE, 0),
-	TABLE2(6),
+	TABLE2(6), OPNAME0,
 	REF(sss[4]), TSPINSLIDE(_("Gamma"), values[4], 20, 500),
 	EVENT(CHANGE, brcosa_moved),
 	REF(sss[0]), TSPINSLIDE(_("Brightness"), values[0], -255, 255),
@@ -795,7 +797,7 @@ static void *brcosa_code[] = {
 ///	MIDDLE SECTION
 	HSEP,
 	HBOX,
-	CHECKb(_("Show Detail"), show, "transcol_show"),
+	CHECKb(_("Show Detail"), show, "transcol_show"), UNNAME,
 	EVENT(CHANGE, click_brcosa_show_toggle), TRIGGER,
 	WDONE,
 	BORDER(TABLE, 0),
@@ -815,10 +817,10 @@ static void *brcosa_code[] = {
 	ENDIF(1),
 	TLHBOXl(1, 2, 2),
 	BORDER(SPIN, 0),
-	XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed),
-	XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed),
+	XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed), OPNAME("from"),
+	XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed), OPNAME("to"),
 	WDONE,
-	TLCHECKv(_("Auto-Preview"), brcosa_auto, 0, 3),
+	TLCHECKv(_("Auto-Preview"), brcosa_auto, 0, 3), UNNAME,
 	EVENT(CHANGE, brcosa_moved), TRIGGER,
 	TLCHECK(_("Red"), allow[0], 1, 3), EVENT(CHANGE, brcosa_changed),
 	TLCHECK(_("Green"), allow[1], 2, 3), EVENT(CHANGE, brcosa_changed),
@@ -856,14 +858,14 @@ void pressed_brcosa()
 
 	mem_preview = TRUE;	// Enable live preview in RGB mode
 
-	run_create(brcosa_code, &tdata, sizeof(tdata));
+	run_create_(brcosa_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 
 ///	RESIZE/RESCALE WINDOWS
 
 typedef struct {
-	int mode, rgb;
+	int script, mode, rgb;
 	int fix, gamma;
 	int w, h, x, y;
 	void **spin[4]; // w, h, x, y
@@ -971,16 +973,21 @@ static void *sisca_code[] = {
 	UNLESS(mode), WINDOWm(_("Resize Canvas")),
 	TABLE(3, 3), // !!! in fact 5 rows in resize mode
 	BORDER(LABEL, 0),
-	TLLABEL(_("Width     "), 1, 0), TLLABEL(_("Height    "), 2, 0),
 	TLLABEL(_("Original      "), 0, 1), TLNOSPIN(w, 1, 1), TLNOSPIN(h, 2, 1),
 	TLABEL(_("New")),
-	REF(spin[0]), TLSPIN(w, 1, MAX_WIDTH, 1, 2), EVENT(CHANGE, sisca_moved),
-	REF(spin[1]), TLSPIN(h, 1, MAX_HEIGHT, 2, 2), EVENT(CHANGE, sisca_moved),
+	TLLABEL(_("Width     "), 1, 0),
+	REF(spin[0]), UNLESS(script), TLSPIN(w, 1, MAX_WIDTH, 1, 2),
+		IF(script), uSCALE(w, 1, MAX_WIDTH),
+		EVENT(CHANGE, sisca_moved),
+	TLLABEL(_("Height    "), 2, 0),
+	REF(spin[1]), UNLESS(script), TLSPIN(h, 1, MAX_HEIGHT, 2, 2),
+		IF(script), uSCALE(h, 1, MAX_HEIGHT),
+		EVENT(CHANGE, sisca_moved),
 	UNLESSx(mode, 1),
 		TLABEL(_("Offset")),
-		REF(spin[2]), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 3),
-		REF(spin[3]), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 3),
-		TLBUTTON(_("Centre"), click_sisca_centre, 0, 4),
+		REF(spin[2]), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 3), OPNAME("x"),
+		REF(spin[3]), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 3), OPNAME("y"),
+		TLBUTTONs(_("Centre"), click_sisca_centre, 0, 4),
 	ENDIF(1),
 	WDONE,
 	HSEP,
@@ -997,7 +1004,7 @@ static void *sisca_code[] = {
 		WDONE, WDONE,
 		HSEP,
 		REF(book), PLAINBOOK, // pages 0 and 1 are both stacked
-		RPACKv(scale_modes, 0, 0, scale_mode),
+		RPACKv(scale_modes, 0, 0, scale_mode), OPNAME(""),
 		HSEP,
 		WDONE, // page 0
 		CHECKv(_("Sharper image reduction"), sharper_reduce),
@@ -1009,7 +1016,7 @@ static void *sisca_code[] = {
 		CHECKb(_("Fix Aspect Ratio"), fix, "resizeAspect"),
 			EVENT(CHANGE, sisca_moved),
 		HSEP,
-		RPACKv(resize_modes, 0, 0, resize_mode),
+		RPACKv(resize_modes, 0, 0, resize_mode), OPNAME(""),
 	ENDIF(1),
 	UNLESS(rgb), HSEP,
 	OKBOXB(_("OK"), click_sisca_ok, _("Cancel"), NULL),
@@ -1019,9 +1026,9 @@ static void *sisca_code[] = {
 
 void pressed_scale_size(int mode)
 {
-	sisca_dd tdata = { mode, mode && (mem_img_bpp == 3), TRUE, use_gamma,
-		mem_width, mem_height, 0, 0 };
-	run_create(sisca_code, &tdata, sizeof(tdata));
+	sisca_dd tdata = { !!script_cmds, mode, mode && (mem_img_bpp == 3),
+		TRUE, use_gamma, mem_width, mem_height, 0, 0 };
+	run_create_(sisca_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 
@@ -2504,7 +2511,7 @@ static int do_pick_gradient(filterwindow_dd *dt, void **wdata)
 
 #define WBbase filterwindow_dd
 static void *gp_code[] = {
-	TABLE2(2),
+	TABLE2(2), OPNAME0,
 	TOPTv(_("Gradient"), interp_txt, 4, pickg_grad),
 	TOPTv(_("Colour space"), cspnames_, NUM_CSPACES, pickg_cspace),
 	WDONE, RET
@@ -2515,7 +2522,7 @@ void pressed_pick_gradient()
 {
 	static filterwindow_dd tdata = {
 		_("Pick Gradient"), gp_code, FW_FN(do_pick_gradient) };
-	run_create(filterwindow_code, &tdata, sizeof(tdata));
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 /// SKEW WINDOW

@@ -64,6 +64,7 @@ GtkWidget *add_a_spin( int value, int min, int max )
 }
 
 
+int user_break;
 
 ////	PROGRESS WINDOW
 
@@ -78,6 +79,7 @@ typedef struct {
 static void do_cancel_progress(progress_dd *dt)
 {
 	dt->stop = 1;
+	user_break = TRUE;
 }
 
 static void delete_progress()
@@ -186,6 +188,7 @@ int alert_box(char *title, char *message, char *text1, ...)
 	res = origin_slot(dt->res) == dt->cb ? 1 : 2;
 	run_destroy(dd);
 
+	if (res == 1) user_break = TRUE;
 	return (res);
 }
 

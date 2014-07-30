@@ -313,8 +313,11 @@ void pressed_select(int all)
 
 static void pressed_remove_unused()
 {
-	if (mem_remove_unused_check() <= 0) alert_box(_("Error"),
-		_("There were no unused colours to remove!"), NULL);
+	if (mem_remove_unused_check() <= 0)
+	{
+		if (!script_cmds) alert_box(_("Error"),
+			_("There were no unused colours to remove!"), NULL);
+	}
 	else
 	{
 		spot_undo(UNDO_XPAL);
@@ -341,11 +344,12 @@ static void pressed_remove_duplicates()
 
 	if (!dups)
 	{
-		alert_box(_("Error"), _("The palette does not contain 2 colours that have identical RGB values"), NULL);
+		if (!script_cmds) alert_box(_("Error"),
+			_("The palette does not contain 2 colours that have identical RGB values"), NULL);
 		return;
 	}
 	mess = g_strdup_printf(__("The palette contains %i colours that have identical RGB values.  Do you really want to merge them into one index and realign the canvas?"), dups);
-	if (alert_box(_("Warning"), mess, _("Yes"), _("No"), NULL) == 1)
+	if (script_cmds || (alert_box(_("Warning"), mess, _("Yes"), _("No"), NULL) == 1))
 	{
 		spot_undo(UNDO_XPAL);
 
@@ -3441,6 +3445,25 @@ static char **wj_parse_argv(char *src)
 	return (NULL);
 }
 
+static void **command_slot(char *cmd)
+{
+	void **slot;
+	int l, m;
+
+	l = strspn(++cmd, "/");
+	l += strcspn(cmd + l, "=/");
+	slot = find_slot(NEXT_SLOT(main_menubar), cmd, l,
+		(cmd[0] != '/') && (cmd[l] == '/'));
+	m = 2;
+	while (slot && (cmd[l] == '/'))
+	{
+		cmd += l + 1;
+		l = strcspn(cmd, "=/");
+		slot = find_slot(NEXT_SLOT(slot), cmd, l, m++);
+	}
+	return (slot);
+}
+
 char **script_cmds;
 
 typedef struct {
@@ -3449,38 +3472,69 @@ typedef struct {
 
 static void click_script_ok(script_dd *dt, void **wdata)
 {
-	char **res;
+	void **slot;
+	char **res, **cur, *tmp, *str = NULL, *err = NULL;
+	int n;
 
 	cmd_showhide(wdata, FALSE);
 	run_query(wdata);
 	res = wj_parse_argv(dt->script);
-	if (res)
+	if (!res) err = _("Empty string or broken quoting");
+	else if (res[0][0] != '-') err = _("Script must begin with a command");
+	else
 	{
-		inifile_set("scriptTest", dt->script);
-		script_cmds = res;
-		pressed_quantize(FALSE);
-		script_cmds = NULL;
-		free(res);
+		inifile_set("script1", dt->script);
+		user_break = 0;
+		for (cur = res; cur[0]; cur++)
+		{
+			if (cur[0][0] != '-') continue; // Skip to next command
+			slot = command_slot(cur[0]);
+			if (!slot) str = _("'%s' does not match any item");
+			else if (!cmd_checkv(slot, SLOT_SCRIPTABLE))
+				str = _("'%s' matches a non-scriptable item");
+			else if (!cmd_checkv(slot, SLOT_SENSITIVE))
+				str = _("'%s' matches a disabled item");
+			else
+			{
+				/* Find default value */
+				tmp = strchr(cur[0], '=');
+
+				/* Activate the item */
+				script_cmds = cur;
+				n = cmd_setstr(slot, tmp + !!tmp);
+				script_cmds = NULL;
+
+				if (n < 0) str = _("'%s' value does not fit item");
+				else if (!user_break) continue;
+			}
+			break; // Terminate on error
+		}
+		if (str) err = str = g_strdup_printf(__(str), cur[0]);
 	}
+	if (err) alert_box(_("Error"), err, NULL);
+	if (str) g_free(str);
+	free(res);
 	run_destroy(wdata);
 }
 
 #define WBbase script_dd
 static void *script_code[] = {
-	WINDOWm(_("Script - Convert To Indexed")),
+	WINDOWm(_("Script")),
 	DEFW(400),
 	HSEP,
-	MLENTRY(script),
+	VBOXB, TEXT(script), WDONE,
 	HSEP,
-	OKBOX(_("OK"), click_script_ok, _("Cancel"), NULL),
+	EQBOX, CANCELBTN(_("Cancel"), NULL),
+		BUTTON(_("OK"), click_script_ok), FOCUS,
 	WSHOW
 };
 #undef WBbase
 
 static void script_test()
 {
-	script_dd tdata = { inifile_get("scriptTest",
-		"pal=wu use=16 dither=stucki sel=separate/split err=65") };
+	script_dd tdata = { inifile_get("script1",
+		"# Resharpen image after rescaling\n"
+		"-effect/unsharp r=1 am=0.4 -effect/unsharp r=30 am=0.1") };
 	run_create(script_code, &tdata, sizeof(tdata));
 }
 
@@ -4232,33 +4286,33 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Image")),
 	MENUTEAR, //
-	MENUITEM(_("//Convert To RGB"), ACTMOD(FILT_2RGB, 0)),
+	MENUITEMs(_("//Convert To RGB"), ACTMOD(FILT_2RGB, 0)),
 		ACTMAP(NEED_IDX),
-	MENUITEM(_("//Convert To Indexed ..."), ACTMOD(DLG_INDEXED, 0)),
+	MENUITEMs(_("//Convert To Indexed ..."), ACTMOD(DLG_INDEXED, 0)),
 		ACTMAP(NEED_24),
-
-	MENUITEM(_("//Script - Convert To Indexed"), ACTMOD(ACT_TEST, 0)),
-		ACTMAP(NEED_24),
-
 	MENUSEP, //
-	MENUITEM(_("//Scale Canvas ..."), ACTMOD(DLG_SCALE, 0)),
+	MENUITEMs(_("//Scale Canvas ..."), ACTMOD(DLG_SCALE, 0)),
 		SHORTCUTs("Page_Up"),
-	MENUITEM(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
+	MENUITEMs(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
 		SHORTCUTs("Page_Down"),
 	MENUITEM(_("//Crop"), ACTMOD(ACT_CROP, 0)),
 		ACTMAP(NEED_CROP), SHORTCUTs("<control><shift>X"),
 	MENUSEP, //
-	MENUITEM(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
-	MENUITEM(_("//Flip Horizontally"), ACTMOD(ACT_FLIP_H, 0)),
+	MENUITEMs(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
+	MENUITEMs(_("//Flip Horizontally"), ACTMOD(ACT_FLIP_H, 0)),
 		SHORTCUTs("<control>M"),
-	MENUITEM(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
-	MENUITEM(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
-	MENUITEM(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
+	uMENUITEMs("//rotate", ACTMOD(DLG_ROTATE, 0)), // for scripting
+	MENUITEMs(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
+	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
+	MENUITEMs(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
 	MENUITEM(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
 	MENUSEP, //
 // !!! Maybe support indexed mode too, later
 	MENUITEM(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
 		ACTMAP(NEED_24),
+
+	MENUITEM(_("//Script ..."), ACTMOD(ACT_TEST, 0)),
+
 	MENUSEP, //
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUTs("<control>I"),
@@ -4317,72 +4371,72 @@ static void *main_menu_code[] = {
 	MENUTEAR, //
 	MENUITEMi(_("//Load ..."), ACTMOD(DLG_FSEL, FS_PALETTE_LOAD), XPM_ICON(open)),
 	MENUITEMi(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PALETTE_SAVE), XPM_ICON(save)),
-	MENUITEM(_("//Load Default"), ACTMOD(ACT_PAL_DEF, 0)),
+	MENUITEMs(_("//Load Default"), ACTMOD(ACT_PAL_DEF, 0)),
 	MENUSEP, //
-	MENUITEM(_("//Mask All"), ACTMOD(ACT_PAL_MASK, 255)),
-	MENUITEM(_("//Mask None"), ACTMOD(ACT_PAL_MASK, 0)),
+	MENUITEMs(_("//Mask All"), ACTMOD(ACT_PAL_MASK, 255)),
+	MENUITEMs(_("//Mask None"), ACTMOD(ACT_PAL_MASK, 0)),
 	MENUSEP, //
-	MENUITEM(_("//Swap A & B"), ACTMOD(ACT_SWAP_AB, 0)),
+	MENUITEMs(_("//Swap A & B"), ACTMOD(ACT_SWAP_AB, 0)),
 		SHORTCUTs("X"),
 	MENUITEM(_("//Edit Colour A & B ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_AB)),
 		SHORTCUTs("<control>E"),
-	MENUITEM(_("//Dither A"), ACTMOD(ACT_DITHER_A, 0)),
+	MENUITEMs(_("//Dither A"), ACTMOD(ACT_DITHER_A, 0)),
 		ACTMAP(NEED_24),
 	MENUITEM(_("//Palette Editor ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_ALL)),
 		SHORTCUTs("<control>W"),
-	MENUITEM(_("//Set Palette Size ..."), ACTMOD(DLG_PAL_SIZE, 0)),
-	MENUITEM(_("//Merge Duplicate Colours"), ACTMOD(ACT_PAL_MERGE, 0)),
+	MENUITEMs(_("//Set Palette Size ..."), ACTMOD(DLG_PAL_SIZE, 0)),
+	MENUITEMs(_("//Merge Duplicate Colours"), ACTMOD(ACT_PAL_MERGE, 0)),
 		ACTMAP(NEED_IDX),
-	MENUITEM(_("//Remove Unused Colours"), ACTMOD(ACT_PAL_CLEAN, 0)),
+	MENUITEMs(_("//Remove Unused Colours"), ACTMOD(ACT_PAL_CLEAN, 0)),
 		ACTMAP(NEED_IDX),
 	MENUSEP, //
-	MENUITEM(_("//Create Quantized ..."), ACTMOD(DLG_INDEXED, 1)),
+	MENUITEMs(_("//Create Quantized ..."), ACTMOD(DLG_INDEXED, 1)),
 		ACTMAP(NEED_24),
 	MENUSEP, //
-	MENUITEM(_("//Sort Colours ..."), ACTMOD(DLG_PAL_SORT, 0)),
+	MENUITEMs(_("//Sort Colours ..."), ACTMOD(DLG_PAL_SORT, 0)),
 	MENUITEM(_("//Palette Shifter ..."), ACTMOD(DLG_PAL_SHIFTER, 0)),
-	MENUITEM(_("//Pick Gradient ..."), ACTMOD(DLG_PICK_GRAD, 0)),
+	MENUITEMs(_("//Pick Gradient ..."), ACTMOD(DLG_PICK_GRAD, 0)),
 	WDONE,
 	SSUBMENU(_("/Effe_cts")),
 	MENUTEAR, //
-	MENUITEMi(_("//Transform Colour ..."), ACTMOD(DLG_BRCOSA, 0), XPM_ICON(brcosa)),
+	MENUITEMis(_("//Transform Colour ..."), ACTMOD(DLG_BRCOSA, 0), XPM_ICON(brcosa)),
 		SHORTCUTs("<control><shift>C"),
-	MENUITEM(_("//Invert"), ACTMOD(FILT_INVERT, 0)),
+	MENUITEMs(_("//Invert"), ACTMOD(FILT_INVERT, 0)),
 		SHORTCUTs("<control><shift>I"),
-	MENUITEM(_("//Greyscale"), ACTMOD(FILT_GREY, 0)),
+	MENUITEMs(_("//Greyscale"), ACTMOD(FILT_GREY, 0)),
 		SHORTCUTs("<control>G"),
-	MENUITEM(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
+	MENUITEMs(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
 		SHORTCUTs("<control><shift>G"),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///
-	MENUITEM(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
-	MENUITEM(_("///Right Side Down"), ACTMOD(ACT_ISOMETRY, 1)),
-	MENUITEM(_("///Top Side Right"), ACTMOD(ACT_ISOMETRY, 2)),
-	MENUITEM(_("///Bottom Side Right"), ACTMOD(ACT_ISOMETRY, 3)),
+	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
+	MENUITEMs(_("///Right Side Down"), ACTMOD(ACT_ISOMETRY, 1)),
+	MENUITEMs(_("///Top Side Right"), ACTMOD(ACT_ISOMETRY, 2)),
+	MENUITEMs(_("///Bottom Side Right"), ACTMOD(ACT_ISOMETRY, 3)),
 	WDONE,
 	MENUSEP, //
-	MENUITEM(_("//Edge Detect ..."), ACTMOD(FILT_EDGE, 0)),
+	MENUITEMs(_("//Edge Detect ..."), ACTMOD(FILT_EDGE, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Difference of Gaussians ..."), ACTMOD(FILT_DOG, 0)),
+	MENUITEMs(_("//Difference of Gaussians ..."), ACTMOD(FILT_DOG, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Sharpen ..."), ACTMOD(FILT_SHARPEN, 0)),
+	MENUITEMs(_("//Sharpen ..."), ACTMOD(FILT_SHARPEN, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Unsharp Mask ..."), ACTMOD(FILT_UNSHARP, 0)),
+	MENUITEMs(_("//Unsharp Mask ..."), ACTMOD(FILT_UNSHARP, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Soften ..."), ACTMOD(FILT_SOFTEN, 0)),
+	MENUITEMs(_("//Soften ..."), ACTMOD(FILT_SOFTEN, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Gaussian Blur ..."), ACTMOD(FILT_GAUSS, 0)),
+	MENUITEMs(_("//Gaussian Blur ..."), ACTMOD(FILT_GAUSS, 0)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Kuwahara-Nagao Blur ..."), ACTMOD(FILT_KUWAHARA, 0)),
+	MENUITEMs(_("//Kuwahara-Nagao Blur ..."), ACTMOD(FILT_KUWAHARA, 0)),
 		ACTMAP(NEED_24),
-	MENUITEM(_("//Emboss"), ACTMOD(FILT_FX, FX_EMBOSS)),
+	MENUITEMs(_("//Emboss"), ACTMOD(FILT_FX, FX_EMBOSS)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Dilate"), ACTMOD(FILT_FX, FX_DILATE)),
+	MENUITEMs(_("//Dilate"), ACTMOD(FILT_FX, FX_DILATE)),
 		ACTMAP(NEED_NOIDX),
-	MENUITEM(_("//Erode"), ACTMOD(FILT_FX, FX_ERODE)),
+	MENUITEMs(_("//Erode"), ACTMOD(FILT_FX, FX_ERODE)),
 		ACTMAP(NEED_NOIDX),
 	MENUSEP, //
-	MENUITEM(_("//Bacteria ..."), ACTMOD(FILT_BACT, 0)),
+	MENUITEMs(_("//Bacteria ..."), ACTMOD(FILT_BACT, 0)),
 		ACTMAP(NEED_IDX),
 	WDONE,
 	SSUBMENU(_("/Cha_nnels")),
@@ -4420,8 +4474,8 @@ static void *main_menu_code[] = {
 	MENUSEP, //
 //	REFv(menu_slots[MENU_RGBA]),
 	MENUCHECKv(_("//Couple RGBA Operations"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),
-	MENUITEM(_("//Threshold ..."), ACTMOD(FILT_THRES, 0)),
-	MENUITEM(_("//Unassociate Alpha"), ACTMOD(FILT_UALPHA, 0)),
+	MENUITEMs(_("//Threshold ..."), ACTMOD(FILT_THRES, 0)),
+	MENUITEMs(_("//Unassociate Alpha"), ACTMOD(FILT_UALPHA, 0)),
 		ACTMAP(NEED_RGBA),
 	MENUSEP, //
 	MENUCHECKv(_("//View Alpha as an Overlay"), ACTMOD(ACT_SET_OVERLAY, 0), overlay_alpha),
