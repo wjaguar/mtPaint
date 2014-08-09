@@ -2900,11 +2900,11 @@ char *resolve_path(char *buf, int buflen, char *path)
 		path += 2;
 	}
 	else *(tm2 = wbuf) = '\0';
-	tmp = g_strconcat(wbuf, tm2, path, NULL);
+	tmp = wjstrcat(NULL, 0, "", 0, wbuf, tm2, path, NULL);
 #else
 	wbuf[0] = '\0';
 	if (path[0] != '/') getcwd(wbuf, PATHBUF - 1);
-	tmp = g_strconcat(wbuf, DIR_SEP_STR, path, NULL);
+	tmp = wjstrcat(NULL, 0, "", 0, wbuf, DIR_SEP_STR, path, NULL);
 #endif
 
 	/* Canonicalize path the way "realpath -s" does, i.e., symlinks
@@ -2944,7 +2944,7 @@ char *resolve_path(char *buf, int buflen, char *path)
 	{
 		strncpy(buf, tmp, buflen);
 		buf[buflen - 1] = 0;
-		g_free(tmp);
+		free(tmp);
 		tmp = buf;
 	}
 	return (tmp);

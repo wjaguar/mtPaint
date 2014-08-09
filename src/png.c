@@ -1677,7 +1677,11 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	}
 	res = 1;
 fail:	mem_free_chanlist(w_set.img);
+#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
+	DGifCloseFile(giffy, NULL);
+#else
 	DGifCloseFile(giffy);
+#endif
 	return (res);
 }
 
@@ -1732,7 +1736,13 @@ static int load_gif(char *file_name, ls_settings *settings)
 		}
 	}
 	res = 1;
-fail:	DGifCloseFile(giffy);
+fail:
+#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
+	DGifCloseFile(giffy, NULL);
+#else
+	DGifCloseFile(giffy);
+#endif
+
 	return (res);
 }
 
@@ -1801,7 +1811,12 @@ static int save_gif(char *file_name, ls_settings *settings)
 	if (!settings->silent) progress_end();
 	msg = 0;
 
-fail:	EGifCloseFile(giffy);
+fail:
+#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
+	EGifCloseFile(giffy, NULL);
+#else
+	EGifCloseFile(giffy);
+#endif
 #ifndef WIN32
 	/* giflib creates files with 0600 permissions, which is nasty - WJ */
 	mode = umask(0022);

@@ -3368,6 +3368,8 @@ static void move_marquee(int action, int *xy, int change, int dir)
 	update_stuff(UPD_SGEOM);
 }
 
+///	SCRIPTING
+
 /* Number of args is ((char **)res[0] - res - 1); res[] is NULL-terminated */
 static char **wj_parse_argv(char *src)
 {
@@ -3473,7 +3475,7 @@ typedef struct {
 static void click_script_ok(script_dd *dt, void **wdata)
 {
 	void **slot;
-	char **res, **cur, *tmp, *str = NULL, *err = NULL;
+	char **res, **cur, *str = NULL, *err = NULL;
 	int n;
 
 	cmd_showhide(wdata, FALSE);
@@ -3496,12 +3498,21 @@ static void click_script_ok(script_dd *dt, void **wdata)
 				str = _("'%s' matches a disabled item");
 			else
 			{
-				/* Find default value */
-				tmp = strchr(cur[0], '=');
+				static char *nocmd;
+				char *tmp = NULL;
 
-				/* Activate the item */
 				script_cmds = cur;
-				n = cmd_setstr(slot, tmp + !!tmp);
+				/* If have toggle-item and default value */
+				if (slot_data(slot, NULL) &&
+					(tmp = strchr(cur[0], '=')))
+				{
+					/* Hide value from item's code */
+					script_cmds = cur[1] && (cur[1][0] == '-') ?
+						&nocmd : cur + 1;
+					tmp++; // Skip "="
+				}
+				/* Activate the item */
+				n = cmd_setstr(slot, tmp);
 				script_cmds = NULL;
 
 				if (n < 0) str = _("'%s' value does not fit item");
@@ -4037,21 +4048,21 @@ static void *main_menu_code[] = {
 	REFv(main_menubar), SMARTMENU(menu_action),
 	SSUBMENU(_("/_File")),
 	MENUTEAR, //
-	MENUITEMi(_("//New"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
+	MENUITEMis(_("//New"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
 		SHORTCUTs("<control>N"),
-	MENUITEMi(_("//Open ..."), ACTMOD(DLG_FSEL, FS_PNG_LOAD), XPM_ICON(open)),
+	MENUITEMis(_("//Open ..."), ACTMOD(DLG_FSEL, FS_PNG_LOAD), XPM_ICON(open)),
 		SHORTCUTs("<control>O"),
-	MENUITEMi(_("//Save"), ACTMOD(ACT_SAVE, 0), XPM_ICON(save)),
+	MENUITEMis(_("//Save"), ACTMOD(ACT_SAVE, 0), XPM_ICON(save)),
 		SHORTCUTs("<control>S"),
-	MENUITEM(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PNG_SAVE)),
+	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PNG_SAVE)),
 	MENUSEP, //
-	MENUITEM(_("//Export Undo Images ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO)),
+	MENUITEMs(_("//Export Undo Images ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO)),
 		ACTMAP(NEED_UNDO),
-	MENUITEM(_("//Export Undo Images (reversed) ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO2)),
+	MENUITEMs(_("//Export Undo Images (reversed) ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO2)),
 		ACTMAP(NEED_UNDO),
-	MENUITEM(_("//Export ASCII Art ..."), ACTMOD(DLG_FSEL, FS_EXPORT_ASCII)),
+	MENUITEMs(_("//Export ASCII Art ..."), ACTMOD(DLG_FSEL, FS_EXPORT_ASCII)),
 		ACTMAP(NEED_IDX),
-	MENUITEM(_("//Export Animated GIF ..."), ACTMOD(DLG_FSEL, FS_EXPORT_GIF)),
+	MENUITEMs(_("//Export Animated GIF ..."), ACTMOD(DLG_FSEL, FS_EXPORT_GIF)),
 		ACTMAP(NEED_IDX),
 	MENUSEP, //
 	SUBMENU(_("//Actions")),
@@ -4143,14 +4154,14 @@ static void *main_menu_code[] = {
 	REFv(menu_slots[MENU_RECENT20]),
 	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 20)),
 	MENUSEP, //
-	MENUITEM(_("//Quit"), ACTMOD(ACT_QUIT, 1)),
+	MENUITEMs(_("//Quit"), ACTMOD(ACT_QUIT, 1)),
 		SHORTCUTs("<control>Q"),
 	WDONE,
 	SSUBMENU(_("/_Edit")),
 	MENUTEAR, //
-	MENUITEMi(_("//Undo"), ACTMOD(ACT_DO_UNDO, 0), XPM_ICON(undo)),
+	MENUITEMis(_("//Undo"), ACTMOD(ACT_DO_UNDO, 0), XPM_ICON(undo)),
 		ACTMAP(NEED_UNDO), SHORTCUTs("<control>Z"),
-	MENUITEMi(_("//Redo"), ACTMOD(ACT_DO_UNDO, 1), XPM_ICON(redo)),
+	MENUITEMis(_("//Redo"), ACTMOD(ACT_DO_UNDO, 1), XPM_ICON(redo)),
 		ACTMAP(NEED_REDO), SHORTCUTs("<control>R"),
 	MENUSEP, //
 	MENUITEMi(_("//Cut"), ACTMOD(ACT_COPY, 1), XPM_ICON(cut)),
@@ -4240,10 +4251,8 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_View")),
 	MENUTEAR, //
-//	REFv(menu_slots[MENU_TBMAIN]),
 	MENUCHECKv(_("//Show Main Toolbar"), ACTMOD(ACT_TBAR, TOOLBAR_MAIN),
 		toolbar_status[TOOLBAR_MAIN]), SHORTCUTs("F5"),
-//	REFv(menu_slots[MENU_TBTOOLS]),
 	MENUCHECKv(_("//Show Tools Toolbar"), ACTMOD(ACT_TBAR, TOOLBAR_TOOLS),
 		toolbar_status[TOOLBAR_TOOLS]), SHORTCUTs("F6"),
 	REFv(menu_slots[MENU_TBSET]),
@@ -4252,18 +4261,14 @@ static void *main_menu_code[] = {
 	REFv(menu_slots[MENU_DOCK]),
 	MENUCHECKv(_("//Show Dock"), ACTMOD(ACT_DOCK, 0), show_dock),
 		SHORTCUTs("F12"), MTRIGGER(menu_action), // to show dock initially
-//	REFv(menu_slots[MENU_SHOWPAL]),
 	MENUCHECKv(_("//Show Palette"), ACTMOD(ACT_TBAR, TOOLBAR_PALETTE),
 		toolbar_status[TOOLBAR_PALETTE]), SHORTCUTs("F8"),
-//	REFv(menu_slots[MENU_SHOWSTAT]),
 	MENUCHECKv(_("//Show Status Bar"), ACTMOD(ACT_TBAR, TOOLBAR_STATUS),
 		toolbar_status[TOOLBAR_STATUS]),
 	MENUSEP, //
 	MENUITEM(_("//Toggle Image View"), ACTMOD(ACT_VIEW, 0)),
 		SHORTCUTs("Home"),
-//	REFv(menu_slots[MENU_CENTER]),
 	MENUCHECKv(_("//Centralize Image"), ACTMOD(ACT_CENTER, 0), canvas_image_centre),
-//	REFv(menu_slots[MENU_SHOWGRID]),
 	MENUCHECKv(_("//Show Zoom Grid"), ACTMOD(ACT_GRID, 0), mem_show_grid),
 	MENUCHECKv(_("//Snap To Tile Grid"), ACTMOD(ACT_SNAP, 0), tgrid_snap),
 		SHORTCUTs("B"),
@@ -4275,7 +4280,6 @@ static void *main_menu_code[] = {
 		SHORTCUTs("V"),
 	MENUCHECKv(_("//Horizontal Split"), ACTMOD(ACT_VWSPLIT, 0), view_vsplit),
 		SHORTCUTs("H"),
-//	REFv(menu_slots[MENU_VWFOCUS]),
 	MENUCHECKv(_("//Focus View Window"), ACTMOD(ACT_VWFOCUS, 0), vw_focus_on),
 	MENUSEP, //
 	MENUITEMi(_("//Pan Window"), ACTMOD(ACT_PAN, 0), XPM_ICON(pan)),
@@ -4308,7 +4312,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
 	MENUSEP, //
 // !!! Maybe support indexed mode too, later
-	MENUITEM(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
+	MENUITEMs(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
 		ACTMAP(NEED_24),
 
 	MENUITEM(_("//Script ..."), ACTMOD(ACT_TEST, 0)),
@@ -4369,8 +4373,8 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Palette")),
 	MENUTEAR, //
-	MENUITEMi(_("//Load ..."), ACTMOD(DLG_FSEL, FS_PALETTE_LOAD), XPM_ICON(open)),
-	MENUITEMi(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PALETTE_SAVE), XPM_ICON(save)),
+	MENUITEMis(_("//Load ..."), ACTMOD(DLG_FSEL, FS_PALETTE_LOAD), XPM_ICON(open)),
+	MENUITEMis(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PALETTE_SAVE), XPM_ICON(save)),
 	MENUITEMs(_("//Load Default"), ACTMOD(ACT_PAL_DEF, 0)),
 	MENUSEP, //
 	MENUITEMs(_("//Mask All"), ACTMOD(ACT_PAL_MASK, 255)),
@@ -4441,23 +4445,23 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/Cha_nnels")),
 	MENUTEAR, //
-	MENUITEM(_("//New ..."), ACTMOD(ACT_CHANNEL, -1)),
-	MENUITEMi(_("//Load ..."), ACTMOD(DLG_FSEL, FS_CHANNEL_LOAD), XPM_ICON(open)),
-	MENUITEMi(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_CHANNEL_SAVE), XPM_ICON(save)),
-	MENUITEM(_("//Delete ..."), ACTMOD(DLG_CHN_DEL, -1)),
+	MENUITEMs(_("//New ..."), ACTMOD(ACT_CHANNEL, -1)),
+	MENUITEMis(_("//Load ..."), ACTMOD(DLG_FSEL, FS_CHANNEL_LOAD), XPM_ICON(open)),
+	MENUITEMis(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_CHANNEL_SAVE), XPM_ICON(save)),
+	MENUITEMs(_("//Delete ..."), ACTMOD(DLG_CHN_DEL, -1)),
 		ACTMAP(NEED_CHAN),
 	MENUSEP, //
 	REFv(menu_slots[MENU_CHAN0]),
-	MENURITEMv(_("//Edit Image"), ACTMOD(ACT_CHANNEL, CHN_IMAGE), menu_chan),
+	MENURITEMvs(_("//Edit Image"), ACTMOD(ACT_CHANNEL, CHN_IMAGE), menu_chan),
 		SHORTCUTs("<shift>1"),
 	REFv(menu_slots[MENU_CHAN1]),
-	MENURITEMv(_("//Edit Alpha"), ACTMOD(ACT_CHANNEL, CHN_ALPHA), menu_chan),
+	MENURITEMvs(_("//Edit Alpha"), ACTMOD(ACT_CHANNEL, CHN_ALPHA), menu_chan),
 		SHORTCUTs("<shift>2"),
 	REFv(menu_slots[MENU_CHAN2]),
-	MENURITEMv(_("//Edit Selection"), ACTMOD(ACT_CHANNEL, CHN_SEL), menu_chan),
+	MENURITEMvs(_("//Edit Selection"), ACTMOD(ACT_CHANNEL, CHN_SEL), menu_chan),
 		SHORTCUTs("<shift>3"),
 	REFv(menu_slots[MENU_CHAN3]),
-	MENURITEMv(_("//Edit Mask"), ACTMOD(ACT_CHANNEL, CHN_MASK), menu_chan),
+	MENURITEMvs(_("//Edit Mask"), ACTMOD(ACT_CHANNEL, CHN_MASK), menu_chan),
 		SHORTCUTs("<shift>4"),
 	MENUSEP, //
 	REFv(menu_slots[MENU_DCHAN0]),
@@ -4472,8 +4476,7 @@ static void *main_menu_code[] = {
 	MENUCHECKv(_("//Disable Mask"), ACTMOD(ACT_CHN_DIS, CHN_MASK),
 		channel_dis[CHN_MASK]),
 	MENUSEP, //
-//	REFv(menu_slots[MENU_RGBA]),
-	MENUCHECKv(_("//Couple RGBA Operations"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),
+	MENUCHECKvs(_("//Couple RGBA Operations"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),
 	MENUITEMs(_("//Threshold ..."), ACTMOD(FILT_THRES, 0)),
 	MENUITEMs(_("//Unassociate Alpha"), ACTMOD(FILT_UALPHA, 0)),
 		ACTMAP(NEED_RGBA),
@@ -4483,12 +4486,12 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Layers")),
 	MENUTEAR, //
-	MENUITEMi(_("//New Layer"), ACTMOD(ACT_LR_ADD, LR_NEW), XPM_ICON(new)),
+	MENUITEMis(_("//New Layer"), ACTMOD(ACT_LR_ADD, LR_NEW), XPM_ICON(new)),
 	MENUITEMi(_("//Save"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
 		SHORTCUTs("<shift><control>S"),
 	MENUITEM(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
-	MENUITEM(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
-	MENUITEM(_("//Composite to New Layer"), ACTMOD(ACT_LR_ADD, LR_COMP)),
+	MENUITEMs(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
+	MENUITEMs(_("//Composite to New Layer"), ACTMOD(ACT_LR_ADD, LR_COMP)),
 	MENUITEM(_("//Remove All Layers"), ACTMOD(ACT_LR_DEL, 1)),
 	MENUSEP, //
 	MENUITEM(_("//Configure Animation ..."), ACTMOD(DLG_ANI, 0)),

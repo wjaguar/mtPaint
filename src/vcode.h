@@ -36,6 +36,7 @@ enum {
 	op_TOPVBOX,
 	op_TOPVBOXV,
 	op_uWINDOW,
+	op_uFPICK,
 
 	op_DOCK,
 	op_HVSPLIT,
@@ -149,6 +150,7 @@ enum {
 	op_uSPINa,
 	op_uSCALE,
 	op_uOPT,
+	op_uOPTD,
 	op_uRPACK,
 	op_uRPACKD,
 	op_uOKBTN,
@@ -845,7 +847,9 @@ enum {
 #define MENUITEMi(NM,ID,IC) WBrh_(MENUITEM, 4), NULL, (void *)(ID), (NM), (IC)
 #define MENUITEMis(NM,ID,IC) WBrhs_(MENUITEM, 4), NULL, (void *)(ID), (NM), (IC)
 #define MENUCHECKv(NM,ID,V) WBrh_(MENUCHECK, 3), &(V), (void *)(ID), (NM)
+#define MENUCHECKvs(NM,ID,V) WBrhs_(MENUCHECK, 3), &(V), (void *)(ID), (NM)
 #define MENURITEMv(NM,ID,V) WBrh_(MENURITEM, 3), &(V), (void *)(ID), (NM)
+#define MENURITEMvs(NM,ID,V) WBrhs_(MENURITEM, 3), &(V), (void *)(ID), (NM)
 #define MENUTEAR WBh_(MENUTEAR, 0)
 #define MENUSEP WBh_(MENUSEP, 0)
 #define MENUSEPr WBrh_(MENUSEP, 0)

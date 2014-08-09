@@ -62,20 +62,19 @@ int channel_dis[NUM_CHANNELS] = {0, 0, 0, 0};
 
 static void **newchan_window;
 
-
-static void click_newchan_cancel()
-{
-	cmd_set(menu_slots[MENU_CHAN0 + mem_channel], TRUE);
-		// Stops cancelled new channel showing as selected in the menu
-
-	run_destroy(newchan_window);
-	newchan_window = NULL;
-}
-
 typedef struct {
 	int chan, state, inv, sens, req;
 	char **names;
 } cchan_dd;
+
+static void click_newchan_cancel(cchan_dd *dt, void **wdata)
+{
+	cmd_set(menu_slots[MENU_CHAN0 + mem_channel], TRUE);
+		// Stops cancelled new channel showing as selected in the menu
+
+	run_destroy(wdata);
+	newchan_window = NULL;
+}
 
 #define chan_new_type (dt->chan + CHN_ALPHA)
 #define chan_new_state (dt->state)
@@ -94,7 +93,7 @@ static void click_newchan_ok(cchan_dd *dt, void **wdata)
 	i = undo_next_core(UC_CREATE, mem_width, mem_height, mem_img_bpp, i);
 	if (i)
 	{
-		click_newchan_cancel();
+		click_newchan_cancel(dt, wdata);
 		memory_errors(i);
 		return;
 	}
@@ -236,7 +235,7 @@ dofail:
 		update_stuff(UPD_NEWCH);
 	}
 	else update_stuff(UPD_ADDCH);
-	click_newchan_cancel();
+	click_newchan_cancel(dt, wdata);
 }
 #undef chan_new_type
 #undef chan_new_state
@@ -281,7 +280,8 @@ void pressed_channel_create(int channel)
 	cchan_dd tdata = { channel < CHN_ALPHA ? 0 : channel - CHN_ALPHA,
 		0, FALSE, channel >= 0, channel, names2 };
 
-	newchan_window = run_create(cchan_code, &tdata, sizeof(tdata));
+	newchan_window = run_create_(cchan_code, &tdata, sizeof(tdata), script_cmds);
+	if (script_cmds) newchan_window = NULL; // already destroyed
 }
 
 typedef struct {
@@ -331,7 +331,7 @@ void pressed_channel_delete()
 		if (mem_img[i]) j = tdata.cc[i] = TRUE;
 	tdata.cf[mem_channel] = tdata.cc[mem_channel];
 	/* If utility channels exist at all */
-	if (j) run_create(dchan_code, &tdata, sizeof(tdata));
+	if (j) run_create_(dchan_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 /* Being plugged into update_menus(), this is prone to be called recursively */

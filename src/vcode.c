@@ -65,11 +65,11 @@ typedef struct {
 	void **fupslot;	// Slot which needs defocusing to update (only 1 for now)
 	void *now_evt;	// Keyboard event being handled (check against recursion)
 	char *ininame;	// Prefix for inifile vars
+	char **script;	// Commands if simulated
 	int xywh[4];	// Stored window position & size
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
-	char unreal;	// Set if simulated
 } v_dd;
 
 /* Simulated widget - one struct for all kinds */
@@ -81,7 +81,7 @@ typedef struct {
 	int value;	// Integer value
 	int range[2];	// Value range
 	char *id;	// Identifying string
-	char **strs;	// Option labels
+	void *strs;	// Option labels / string value / anything else
 } swdata;
 
 #define IS_UNREAL(S) ((S)[0] == (S)[2])
@@ -3833,6 +3833,7 @@ static cmdef cmddefs[] = {
 	{ op_WSHOW,	0, op_uWSHOW },
 	{ op_WINDOW,	0, op_uWINDOW },
 	{ op_WINDOWm,	0, op_uWINDOW },
+	{ op_FPICKpm,	0, op_uFPICK },
 	{ op_FRAME,	0, op_uFRAME },
 	{ op_LABEL,	0, op_uLABEL },
 	{ op_SPIN,	0, op_uSPIN },
@@ -3846,17 +3847,16 @@ static cmdef cmddefs[] = {
 	{ op_RPACK,	0, op_uRPACK },
 	{ op_RPACKD,	0, op_uRPACKD },
 	{ op_OPT,	0, op_uOPT },
-//	op_OPTD,
+	{ op_OPTD,	0, op_uOPTD },
 //	op_COMBO,
 //	and op_ENTRY and various others between it and op_OKBTN
 	{ op_OKBTN,	0, op_uOKBTN },
-//	op_DONEBTN,
-//	op_TOGGLE,
 	{ op_BUTTON,	0, op_uBUTTON },
 	{ op_ACTMAP,	0, -1 },
 	{ op_INSENS,	0, -1 },
 
 	{ op_uWINDOW,	sizeof(swdata), -1 },
+	{ op_uFPICK,	sizeof(swdata), -1 },
 	{ op_uOP,	sizeof(swdata), -1 },
 	{ op_uCHECK,	sizeof(swdata), -1 },
 	{ op_uCHECKb,	sizeof(swdata), -1 },
@@ -3865,6 +3865,7 @@ static cmdef cmddefs[] = {
 	{ op_uOKBTN,	sizeof(swdata), -1 },
 	{ op_uBUTTON,	sizeof(swdata), -1 },
 	{ op_uOPT,	sizeof(swdata), -1 },
+	{ op_uOPTD,	sizeof(swdata), -1 },
 	{ op_uRPACK,	sizeof(swdata), -1 },
 	{ op_uRPACKD,	sizeof(swdata), -1 },
 	{ op_uSPIN,	sizeof(swdata), -1 },
@@ -4018,13 +4019,17 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				cmd_showhide(GET_WINDOW(res), TRUE);
 			/* Return anchor position - already freed if uWSHOW */
 			return (res);
+		/* Script mode fileselector */
+		case op_uFPICK:
+			((swdata *)dtail)->strs = resolve_path(NULL, PATHBUF, v);
+			// Fallthrough
 		/* Script mode pseudo window */
 		case op_uWINDOW:
-			vdata->unreal = TRUE;
 			/* Store script ref, to run it when done */
-			((swdata *)dtail)->strs = script;
+			vdata->script = script;
 			wid = ""; // First unnamed field gets to be default
 			pk = pk_UNREAL;
+			if (op == op_uFPICK) pk = pk_UNREALV;
 			break;
 		/* Script mode alternate identifier */
 		case op_uALTNAME:
@@ -4098,13 +4103,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		}
 		/* Script mode option pack */
-		case op_uOPT: case op_uRPACK: case op_uRPACKD:
+		case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
 		{
 			char **strs = pp[2];
 			int n = (int)pp[3];
 
 			if (op == op_uRPACK) n >>= 8;
-			else if (op == op_uRPACKD)
+			else if (op == op_uOPT);
+			else /* OPTD/RPACKD */
 			{
 				strs = *(char ***)((char *)ddata + (int)strs);
 				n = 0;
@@ -4120,7 +4126,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Script mode menu item */
 		case op_uMENUITEM:
 			wid = pp[3];
-			((swdata *)dtail)->strs = (void *)NEXT_SLOT(tbar);
+			((swdata *)dtail)->strs = NEXT_SLOT(tbar);
 			pk = pk_UNREALV;
 			break;
 		/* Done with a container */
@@ -5486,19 +5492,21 @@ static void do_destroy(void **wdata)
 		op = (int)*pp++;
 		v = pp[0];
 		if (op & WB_FFLAG) v = data + (int)v;
-// !!! No need yet
-//		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
+		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
-		if (op == op_CLEANUP) free(*(void **)v);
-		else if (op == op_CLIPFORM)
+		switch (op)
+		{
+		case op_uFPICK: v = &((swdata *)*wdata)->strs; // Fallthrough
+		case op_CLEANUP: free(*(void **)v); break;
+		case op_CLIPFORM:
 		{
 			clipform_data *cd = *wdata;
 			gtk_target_list_unref(cd->targets);
 			free(cd);
+			break;
 		}
-		else if ((op == op_TEXT) || (op == op_FONTSEL))
-			g_free(*(char **)v);
-		else if (op == op_REMOUNT)
+		case op_TEXT: case op_FONTSEL: g_free(*(char **)v); break;
+		case op_REMOUNT:
 		{
 			void **where = *(void ***)v;
 			GtkWidget *what = GTK_BIN(*wdata)->child;
@@ -5506,9 +5514,11 @@ static void do_destroy(void **wdata)
 			gtk_widget_reparent(what, where[0]);
 			gtk_widget_show(where[0]);
 			get_evt_1(where[0], NEXT_SLOT(where));
+			break;
 		}
-		else if (op == op_LISTCX) listcx_done(GTK_CLIST(*wdata), wdata[2]);
-		else if (op == op_MAINWINDOW) gtk_main_quit();
+		case op_LISTCX: listcx_done(GTK_CLIST(*wdata), wdata[2]); break;
+		case op_MAINWINDOW: gtk_main_quit(); break;
+		}
 	}
 }
 
@@ -5529,13 +5539,16 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_FPICKpm:
 			fpick_get_filename(*wdata, v, PATHBUF, FALSE);
 			break;
+		case op_uFPICK:
+			strncpy0(v, ((swdata *)*wdata)->strs, PATHBUF);
+			break;
 		case op_SPIN: case op_SPINc: case op_SPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
 			break;
 		case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
 		case op_uCHECK: case op_uCHECKb:
-		case op_uOPT: case op_uRPACK: case op_uRPACKD:
+		case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
 			*(int *)v = ((swdata *)*wdata)->value;
 			if (op == op_uCHECKb) inifile_set_gboolean(pp[2], *(int *)v);
 			break;
@@ -5684,7 +5697,7 @@ void run_query(void **wdata)
 	v_dd *vdata = GET_VDATA(wdata);
 
 	/* Prod a focused widget which needs defocusing to update */
-	if (!vdata->unreal)
+	if (!vdata->script)
 	{
 		GtkWidget *w = GET_REAL_WINDOW(wdata);
 		GtkWidget *f = GTK_WINDOW(w)->focus_widget;
@@ -5701,7 +5714,7 @@ void run_destroy(void **wdata)
 {
 	v_dd *vdata = GET_VDATA(wdata);
 	if (vdata->done) return; // already destroyed
-	if (vdata->unreal) // simulated
+	if (vdata->script) // simulated
 	{
 		do_destroy(wdata);
 		free(GET_DDATA(wdata));
@@ -5979,6 +5992,15 @@ int cmd_setstr(void **slot, char *s)
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
+	case op_uFPICK:
+	{
+// !!! Unless running script from commandline
+		char *st = gtkncpy(NULL, s, PATHBUF);
+
+		cmd_setv(slot, st, FPICK_VALUE);
+		g_free(st);
+		return (res);
+	}
 	case op_CHECK: case op_CHECKb: case op_TOGGLE:
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 	case op_MENUCHECK: case op_MENURITEM:
@@ -5986,7 +6008,7 @@ int cmd_setstr(void **slot, char *s)
 		ll = !s ? TRUE : !s[0] ? FALSE : str2bool(s);
 		if (ll < 0) return (-1); // Error
 		break;
-	case op_uOPT: case op_uRPACK: case op_uRPACKD:
+	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
 		if (s && s[0])
 		{
 			swdata *sd = slot[0];
@@ -5994,7 +6016,7 @@ int cmd_setstr(void **slot, char *s)
 
 			for (ll = 0; ll < n; ll++)
 			{
-				tmp = sd->strs[ll];
+				tmp = ((char **)sd->strs)[ll];
 				if (!tmp[0]) continue;
 				/* Match at beginning */
 				if (!strncasecmp(tmp, s, l)) break;
@@ -6061,10 +6083,10 @@ int cmd_setstr(void **slot, char *s)
 
 static void run_script(void **slot)
 {
-	swdata *sd = slot[0];
-	char *opt, *tmp, *val, **strs = sd->strs, **err = NULL;
+	v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
+	char *opt, *tmp, *val, **strs = vdata->script, **err = NULL;
 	void **wdata;
-	int ll;
+	int ll, maybe;
 
 	/* Command itself may carry default option */
 	opt = *strs++;
@@ -6075,13 +6097,15 @@ static void run_script(void **slot)
 	for (; opt && opt[0] && (opt[0] != '-'); opt = *strs++)
 	{
 		/* First, parse the option */
+		opt += (maybe = opt[0] == '.'); // Optional if preceded by "."
 		val = strchr(opt, '=');
 		ll = val ? val++ - opt : strlen(opt);
 		/* Now, find target for the option */
-		wdata = find_slot(NEXT_SLOT(slot), opt, ll, -1);
+		wdata = find_slot(slot, opt, ll, -1);
 		/* Raise an error if no match */
 		if (!wdata)
 		{
+			if (maybe) continue; // Ignore optional options
 			err = strs;
 			break;
 		}
@@ -6111,8 +6135,9 @@ static void run_script(void **slot)
 	}
 
 	/* Now activate the OK handler */
-	for (wdata = NEXT_SLOT(slot); wdata[1]; wdata = NEXT_SLOT(wdata))
-		if (IS_UNREAL(wdata) && (GET_UOP(wdata) == op_uOKBTN)) break;
+	for (wdata = slot; wdata[1]; wdata = NEXT_SLOT(wdata))
+		if (IS_UNREAL(wdata) && ((GET_UOP(wdata) == op_uOKBTN) ||
+			(GET_UOP(wdata) == op_uFPICK))) break;
 	if (wdata[1]) // Paranoia
 		cmd_event(wdata, op_EVT_OK);
 	/* !!! The memory block is likely to be freed at this point */
@@ -6125,7 +6150,8 @@ void cmd_showhide(void **slot, int state)
 	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
 	if (IS_UNREAL(slot))
 	{
-		if ((GET_UOP(slot) == op_uWINDOW) && state) run_script(slot);
+		if ((GET_OP(PREV_SLOT(slot)) == op_WDONE) && state)
+			run_script(slot);
 		return;
 	}
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
@@ -6297,11 +6323,11 @@ void cmd_set(void **slot, int v)
 		}
 		break;
 	}
-	case op_uOPT: case op_uRPACK: case op_uRPACKD:
+	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
 	{
 		swdata *sd = slot[0];
 
-		if ((v < 0) || (v >= sd->cnt) || !sd->strs[v][0]) v = 0;
+		if ((v < 0) || (v >= sd->cnt) || !((char **)sd->strs)[v][0]) v = 0;
 		if (v != sd->value)
 		{
 			sd->value = v;
@@ -6315,7 +6341,7 @@ void cmd_set(void **slot, int v)
 	case op_uMENUITEM:
 	{	/* Call event at saved slot, for this slot */
 		swdata *sd = slot[0];
-		void **r = (void *)sd->strs, **base = r[0], **desc = r[1];
+		void **r = sd->strs, **base = r[0], **desc = r[1];
 		((evt_fn)desc[1])(GET_DDATA(base), base,
 			(int)desc[0] & WB_OPMASK, slot);
 		break;
@@ -6417,9 +6443,18 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
 	if (size <= 0) return;
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
+	case op_uFPICK:
+	{
+		char *s = ((swdata *)slot[0])->strs;
+		/* !!! Pseudo widget uses system encoding in all modes */
+		if (idx == FPICK_RAW) s = strrchr(s, DIR_SEP) + 1; // Guaranteed
+		strncpy0(res, s, size);
+		break;
+	}
 	case op_PENTRY: case op_PATH: case op_PATHs:
 	{
 		char *s = (char *)gtk_entry_get_text(slot[0]);
@@ -6523,6 +6558,9 @@ void cmd_setv(void **slot, void *res, int idx)
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
+	case op_uWINDOW:
+		if (idx != WINDOW_DISAPPEAR) break;
+		// Fallthrough
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
 	{
 		v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
@@ -6553,25 +6591,29 @@ void cmd_setv(void **slot, void *res, int idx)
 		else if (idx == WINDOW_DISAPPEAR)
 		{
 			GtkWidget *w = slot[0];
+
+			if (IS_UNREAL(slot)) w = NULL;
 			if (!res) /* Show again */
 			{
+				if (!w) break; // Paranoia
 #if GTK_MAJOR_VERSION == 2
 				gdk_window_deiconify(w->window);
 #endif
 				gdk_window_raise(w->window);
 				break;
 			}
+			if (w == main_window) w = NULL;
 			/* Hide from view, to allow a screenshot */
 #if GTK_MAJOR_VERSION == 1
 			gdk_window_lower(main_window->window);
-			if (w != main_window) gdk_window_lower(w->window);
+			if (w) gdk_window_lower(w->window);
 
 			gdk_flush();
 			handle_events();	// Wait for minimize
 
 			sleep(1);	// Wait a second for screen to redraw
 #else /* #if GTK_MAJOR_VERSION == 2 */
-			if (w != main_window)
+			if (w)
 			{
 				gtk_window_set_transient_for(slot[0], NULL);
 				gdk_window_iconify(w->window);
@@ -6587,6 +6629,22 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
+	case op_uFPICK:
+	{
+		char *s, *ts, *s0 = ((swdata *)slot[0])->strs;
+
+		/* !!! Pseudo widget uses system encoding in all modes */
+		if (idx == FPICK_RAW)
+		{
+			ts = strrchr(s0, DIR_SEP); // Guaranteed to be there
+			s = wjstrcat(NULL, 0, s0, ts - s0 + 1, res, NULL);
+		}
+		else s = resolve_path(NULL, PATHBUF, res);
+
+		free(s0);
+		((swdata *)slot[0])->strs = s;
+		break;
+	}
 	case op_NBOOK: case op_NBOOKl:
 		gtk_notebook_set_show_tabs(slot[0], (int)res);
 		break;

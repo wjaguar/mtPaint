@@ -1421,6 +1421,9 @@ loaded:
 		/* Don't ask user in viewer mode */
 // !!! When implemented, load as frameset & run animation in that case instead
 		if (viewer_mode && view_image_only) i = 0;
+		/* Don't ask in script mode too */
+// !!! To do more, can add extra ufields to file dialog and pass the struct here
+		else if (script_cmds) i = 0;
 		else i = anim_file_dialog(ftype, is_anim);
 		is_anim = is_anim ? anim_mode : ANM_PAGE;
 
@@ -1670,7 +1673,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	ls_settings settings;
 	char fname[PATHTXT], *msg, *f8;
 	char *c, *ext, *ext2, *gif, *gif2;
-	int i, j, res;
+	int i, j, res, redo = 1;
 
 	run_query(wdata);
 	/* Pick up extra info */
@@ -1738,12 +1741,13 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD:
-		if (do_a_load(dt->filename, undo_load) == 1) goto redo;
+		if (do_a_load(dt->filename, undo_load) == 1) break;
+		redo = 0;
 		break;
 	case FS_PNG_SAVE:
-		if (check_file(dt->filename)) goto redo;
+		if (check_file(dt->filename)) break;
 		store_ls_settings(&settings);	// Update data in memory
-		if (gui_save(dt->filename, &settings) < 0) goto redo;
+		if (gui_save(dt->filename, &settings) < 0) break;
 		if (layers_total > 0)
 		{
 			/* Filename has changed so layers file needs re-saving to be correct */
@@ -1751,35 +1755,43 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 				layers_notify_changed();
 		}
 		set_new_filename(layer_selected, dt->filename);
+		redo = 0;
 		break;
 	case FS_PALETTE_LOAD:
-		if (load_pal(dt->filename)) goto redo;
+		if (load_pal(dt->filename)) break;
 		notify_changed();
+		redo = 0;
 		break;
 	case FS_PALETTE_SAVE:
-		if (check_file(dt->filename)) goto redo;
+		if (check_file(dt->filename)) break;
 		settings.pal = mem_pal;
 		settings.colors = mem_cols;
-		if (save_image(dt->filename, &settings)) goto redo_name;
+		redo = 2;
+		if (save_image(dt->filename, &settings)) break;
+		redo = 0;
 		break;
 	case FS_CLIP_FILE:
 	case FS_SELECT_FILE:
 	case FS_SELECT_DIR:
 		if (dt->pathbox) cmd_setv(dt->pathbox, dt->filename, PATH_VALUE);
+		redo = 0;
 		break;
 	case FS_EXPORT_UNDO:
 	case FS_EXPORT_UNDO2:
 		if (export_undo(dt->filename, &settings))
 			alert_box(_("Error"), _("Unable to export undo images"), NULL);
+		redo = 0;
 		break;
 	case FS_EXPORT_ASCII:
-		if (check_file(dt->filename)) goto redo;
+		if (check_file(dt->filename)) break;
 		if (export_ascii(dt->filename))
 			alert_box(_("Error"), _("Unable to export ASCII file"), NULL);
+		redo = 0;
 		break;
 	case FS_LAYER_SAVE:
-		if (check_file(dt->filename)) goto redo;
-		if (save_layers(dt->filename) != 1) goto redo;
+		if (check_file(dt->filename)) break;
+		if (save_layers(dt->filename) != 1) break;
+		redo = 0;
 		break;
 	case FS_EXPLODE_FRAMES:
 		gif = dt->frames_name;
@@ -1795,11 +1807,11 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 			c = file_in_dir(NULL, dt->filename, c, PATHBUF);
 			run_def_action(DA_GIF_EDIT, c, NULL, preserved_gif_delay);
 			free(c);
+			redo = 0;
 		}
-		else goto redo; // Fatal error
 		break;
 	case FS_EXPORT_GIF:
-		if (check_file(dt->filename)) goto redo;
+		if (check_file(dt->filename)) break;
 		store_ls_settings(&settings);	// Update data in memory
 		gif2 = g_strdup(mem_filename);	// Guaranteed to be non-NULL
 		for (i = strlen(gif2) - 1; i >= 0; i--)
@@ -1810,12 +1822,14 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 		run_def_action(DA_GIF_CREATE, gif2, dt->filename, settings.gif_delay);
 		run_def_action(DA_GIF_PLAY, dt->filename, NULL, 0);
 		g_free(gif2);
+		redo = 0;
 		break;
 	case FS_CHANNEL_LOAD:
-		if (populate_channel(dt->filename)) goto redo;
+		if (populate_channel(dt->filename)) break;
+		redo = 0;
 		break;
 	case FS_CHANNEL_SAVE:
-		if (check_file(dt->filename)) goto redo;
+		if (check_file(dt->filename)) break;
 		settings.img[CHN_IMAGE] = mem_img[mem_channel];
 		settings.width = mem_width;
 		settings.height = mem_height;
@@ -1832,27 +1846,40 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 			settings.colors = 256;
 			settings.xpm_trans = -1;
 		}
-		if (save_image(dt->filename, &settings)) goto redo_name;
+		redo = 2;
+		if (save_image(dt->filename, &settings)) break;
+		redo = 0;
 		break;
 	case FS_COMPOSITE_SAVE:
-		if (check_file(dt->filename)) goto redo;
-		if (layer_save_composite(dt->filename, &settings)) goto redo_name;
+		if (check_file(dt->filename)) break;
+		redo = 2;
+		if (layer_save_composite(dt->filename, &settings)) break;
+		redo = 0;
+		break;
+	default: // Paranoia
+		redo = 0;
 		break;
 	}
 
+	if (redo > 1) /* Report error */
+	{
+		f8 = gtkuncpy(NULL, dt->filename, 0);
+		msg = g_strdup_printf(__("Unable to save file: %s"), f8);
+		alert_box(_("Error"), msg, NULL);
+		g_free(msg);
+		g_free(f8);
+	}
+	if (redo && !script_cmds) /* Redo */
+	{
+		cmd_showhide(GET_WINDOW(wdata), TRUE);
+// !!! Disable for now, see what happens
+//		gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), TRUE);
+		return;
+	}
+	/* Done */
+	user_break |= redo; // Paranoia
 	update_menus();
 	run_destroy(wdata);
-	return;
-redo_name:
-	f8 = gtkuncpy(NULL, dt->filename, 0);
-	msg = g_strdup_printf(__("Unable to save file: %s"), f8);
-	alert_box(_("Error"), msg, NULL);
-	g_free(msg);
-	g_free(f8);
-redo:
-	cmd_showhide(GET_WINDOW(wdata), TRUE);
-// !!! Disable for now, see what happens
-//	gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), TRUE);
 }
 
 #define WBbase fselector_dd
@@ -2041,7 +2068,7 @@ void file_selector_x(int action_type, void **xdata)
 	tdata.icc = apply_icc;
 #endif
 
-	run_create(fselector_code, &tdata, sizeof(tdata));
+	run_create_(fselector_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 void file_selector(int action_type)

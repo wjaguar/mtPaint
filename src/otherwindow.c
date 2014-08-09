@@ -240,13 +240,13 @@ static char *newwin_txt[] = { _("24 bit RGB"), _("Greyscale"),
 static void *newwin_code[] = {
 	IF(type), WINDOWm(_("New Layer")), // modal
 	UNLESS(type), WINDOWm(_("New Image")), // modal
-	TABLE2(3),
+	TABLE2(3), OPNAME0,
 	TSPIN(_("Width"), w, MIN_WIDTH, MAX_WIDTH),
 	TSPIN(_("Height"), h, MIN_HEIGHT, MAX_HEIGHT),
 	TSPIN(_("Colours"), c, 2, 256),
 	WDONE,
 	BORDER(RPACK, 0),
-	RPACK(newwin_txt, 5, 0, im_type),
+	RPACK(newwin_txt, 5, 0, im_type), OPNAME(""),
 	UNLESS(type), CHECK(_("Undoable"), undo),
 	HSEPl(200),
 	OKBOXB(_("Create"), create_new, _("Cancel"), NULL),
@@ -271,7 +271,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 	}
 	tdata.im_type = im_type;
 
-	run_create(newwin_code, &tdata, sizeof(tdata));
+	run_create_(newwin_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 
@@ -2907,5 +2907,5 @@ void pressed_segment()
 	tdata.preview = FALSE;
 	tdata.step = 0;
 
-	run_create(seg_code, &tdata, sizeof(tdata));
+	run_create_(seg_code, &tdata, sizeof(tdata), script_cmds);
 }
