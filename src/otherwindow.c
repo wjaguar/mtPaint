@@ -246,7 +246,10 @@ static void *newwin_code[] = {
 	TSPIN(_("Colours"), c, 2, 256),
 	WDONE,
 	BORDER(RPACK, 0),
-	RPACK(newwin_txt, 5, 0, im_type), OPNAME(""),
+	// !!! Commandline mode leaves GDK uninitialized, but screenshot needs it
+	UNLESSv(cmd_mode), RPACK(newwin_txt, 5, 0, im_type),
+	IFv(cmd_mode), RPACK(newwin_txt, 4, 0, im_type),
+	OPNAME(""),
 	UNLESS(type), CHECK(_("Undoable"), undo),
 	HSEPl(200),
 	OKBOXB(_("Create"), create_new, _("Cancel"), NULL),

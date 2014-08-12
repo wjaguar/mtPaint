@@ -2097,7 +2097,7 @@ void align_size(float new_zoom)		// Set new zoom level
 	if (new_zoom == can_zoom) return;
 
 	zoom_flag = 1;
-	if (!mem_ics)
+	if (!mem_ics && !cmd_mode)
 	{
 		int xc, yc, dx, dy, w, h, x, y, xyhv[4];
 
@@ -2132,6 +2132,7 @@ void realign_size()		// Reapply old zoom
 {
 	int xyhv[4], xywh[4];
 
+	if (cmd_mode) return;
 	cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 	canvas_size(xywh + 2, xywh + 3);
 	xywh[0] = xywh[1] = 0;	// New positions of scrollbar
@@ -3035,6 +3036,7 @@ static void refresh_lines(const int xy0[4], const int xy1[4])
 	int ixy[4], getxy[8], *lines[2] = { ll1, ll2 };
 	int i, j, y, y1, y2, cnt, step, zoom = 1, scale = 1;
 
+	if (cmd_mode) return;
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);

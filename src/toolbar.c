@@ -351,19 +351,21 @@ static void *settings_code[] = {
 	EVENT(CHANGE, ts_spinslide_moved),
 	REFv(ts_label_channel), TLABELr(""), HIDDEN,
 	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3), HIDDEN,
-	EVENT(CHANGE, ts_spinslide_moved),
+	EVENT(CHANGE, ts_spinslide_moved), ALTNAME("value"),
 	WEND
 };
 #undef WBbase
 
 void **create_settings_box()
 {
+	static char *noscript;
 	static settings_dd tdata; // zeroed out, get updated later
 	int i;
 
 	for (i = 0; i < TOTAL_SETTINGS; i++) // Initialize buttons' state
 		v_settings[i] = *vars_settings[i];
-	return (run_create(settings_code, &tdata, sizeof(tdata)));
+	return (run_create_(settings_code, &tdata, sizeof(tdata),
+		cmd_mode ? &noscript : NULL));
 }
 
 static void *sbar_code[] = {
@@ -376,6 +378,7 @@ static void *sbar_code[] = {
 
 static void toolbar_settings_init()
 {
+	if (cmd_mode) return;
 	if (toolbar_boxes[TOOLBAR_SETTINGS]) // Used when Home key is pressed
 	{
 		cmd_showhide(toolbar_boxes[TOOLBAR_SETTINGS], TRUE);

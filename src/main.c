@@ -270,10 +270,17 @@ int main( int argc, char *argv[] )
 				"Options:\n"
 				"  --help          Output this help\n"
 				"  --version       Output version information\n"
+				"  --cmd           Commandline scripting mode, no GUI\n"
 				"  -s              Grab screenshot\n"
-				"  -v              Start in viewer mode\n\n"
+				"  -v              Start in viewer mode\n"
+				"  --              End of options\n\n"
 			, MT_VERSION);
 			exit(0);
+		}
+		if (!strcmp(argv[1], "--cmd"))
+		{
+			cmd_mode = TRUE;
+			script_cmds = argv + 2;
 		}
 	}
 
@@ -303,14 +310,17 @@ int main( int argc, char *argv[] )
 	/* !!! Uncomment to allow GTK+ calls from other threads */
 	/* gdk_threads_init(); */
 #endif
-	gtk_init( &argc, &argv );
-	gtk_init_bugfixes();
-#if GTK_MAJOR_VERSION == 2
+	if (!cmd_mode)
 	{
-		char *theme = inifile_get(DEFAULT_THEME_INI, "");
-		if (theme[0]) gtk_rc_parse(theme);
-	}
+		gtk_init(&argc, &argv);
+		gtk_init_bugfixes();
+#if GTK_MAJOR_VERSION == 2
+		{
+			char *theme = inifile_get(DEFAULT_THEME_INI, "");
+			if (theme[0]) gtk_rc_parse(theme);
+		}
 #endif
+	}
 
 #ifdef U_NLS
 	{
@@ -328,11 +338,17 @@ int main( int argc, char *argv[] )
 	}
 #endif
 
-	for (file_arg_start = 1; file_arg_start < argc; file_arg_start++)
+	for (file_arg_start = 1 + cmd_mode; file_arg_start < argc; file_arg_start++)
 	{
 		char *arg = argv[file_arg_start];
 
-		if (!strcmp(arg, "-g"))		// Loading GIF animation frames
+		if (!strcmp(arg, "--"))		// End of options
+		{
+			file_arg_start++;
+			break;
+		}
+		else if (cmd_mode);		// One more script command
+		else if (!strcmp(arg, "-g"))	// Loading GIF animation frames
 		{
 			if (++file_arg_start >= argc) break;
 			sscanf(argv[file_arg_start], "%i", &preserved_gif_delay);
@@ -420,12 +436,17 @@ int main( int argc, char *argv[] )
 
 	update_menus();
 
-	THREADS_ENTER();
-	gtk_main();
-	THREADS_LEAVE();
+	if (cmd_mode) // Console
+		run_script(script_cmds);
+	else // GUI
+	{
+		THREADS_ENTER();
+		gtk_main();
+		THREADS_LEAVE();
 
+		inifile_quit();
+	}
 	spawn_quit();
-	inifile_quit();
 
 	return 0;
 }

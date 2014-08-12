@@ -63,6 +63,38 @@ GtkWidget *add_a_spin( int value, int min, int max )
 	return (spin_new_x(gtk_adjustment_new(value, min, max, 1, 10, 0), 0));
 }
 
+// Write UTF-8 text to console
+
+static void console_printf(char *format, ...)
+{
+#ifdef WIN32
+	static char codepage[16];
+#endif
+	va_list args;
+	char *txt, *tx2;
+
+	va_start(args, format);
+	txt = g_strdup_vprintf(format, args);
+	va_end(args);
+#if GTK_MAJOR_VERSION == 1
+	/* Same encoding as console */
+	fputs(txt, stdout);
+#else /* if GTK_MAJOR_VERSION == 2 */
+	/* UTF-8 */
+#ifdef WIN32
+	if (!codepage[0]) sprintf(codepage, "cp%d", GetConsoleCP());
+	/* !!! Iconv on Windows knows "utf-8" but no "utf8" */
+	tx2 = g_convert_with_fallback(txt, -1, codepage, "utf-8", "?",
+		NULL, NULL, NULL);
+#else
+	tx2 = g_locale_from_utf8(txt, -1, NULL, NULL, NULL);
+#endif
+	fputs(tx2, stdout);
+	g_free(tx2);
+#endif
+	g_free(txt);
+}
+
 
 int user_break;
 
@@ -102,9 +134,27 @@ static void *progress_code[] = {
 };
 #undef WBbase
 
+/* Print stars for a progress indicator */
+#define STARS_IN_ROW 20
+static void add_stars(double val)
+{
+	int i, l, n = rint(val * STARS_IN_ROW) + 1;
+	for (i = l = (int)progress_window; i < n; i++) putc('*', stdout);
+	if (l < n) fflush(stdout);
+	progress_window = (void *)n;
+}
+
 void progress_init(char *text, int canc)		// Initialise progress window
 {
 	progress_dd tdata = { 0, canc, text };
+
+	if (cmd_mode) // Console
+	{
+		console_printf("%s - %s\n", __(text), __("Please Wait ..."));
+		progress_window = (void *)(1 + 0);
+		return;
+	}
+	// GUI
 
 	/* Break pointer grabs, to avoid originating widget misbehaving later on */
 	release_grab();
@@ -116,7 +166,9 @@ void progress_init(char *text, int canc)		// Initialise progress window
 
 int progress_update(float val)		// Update progress window
 {
-	if (progress_window)
+	if (!progress_window);
+	else if (cmd_mode) add_stars(val); // Console
+	else // GUI
 	{
 		progress_dd *dt = GET_DDATA(progress_window);
 		cmd_setv(dt->pbar, (void *)(int)(val * 100), PROGRESS_PERCENT);
@@ -129,11 +181,15 @@ int progress_update(float val)		// Update progress window
 
 void progress_end()			// Close progress window
 {
-	if (progress_window)
+	if (!progress_window);
+	else if (cmd_mode) // Console
 	{
-		run_destroy(progress_window);
-		progress_window = NULL;
+		add_stars(1.0);
+		putc('\n', stdout);
 	}
+	// GUI
+	else run_destroy(progress_window);
+	progress_window = NULL;
 }
 
 
@@ -169,9 +225,6 @@ int alert_box(char *title, char *message, char *text1, ...)
 	void **dd;
 	int res;
 
-	/* This function must be immune to pointer grabs */
-	release_grab();
-
 	if (text1)
 	{
 		tdata.cancel = text1;
@@ -183,10 +236,23 @@ int alert_box(char *title, char *message, char *text1, ...)
 		}
 		va_end(args);
 	}
-	dd = run_create(alert_code, &tdata, sizeof(tdata)); // run dialog
-	dt = GET_DDATA(dd);
-	res = origin_slot(dt->res) == dt->cb ? 1 : 2;
-	run_destroy(dd);
+
+	if (cmd_mode) // Console
+	{
+		console_printf("%s\n[ %s ]\n", __(message),
+			__(tdata.ok ? tdata.ok : tdata.cancel));
+		res = tdata.ok ? 2 : 1; /* Assume "yes" in commandline mode */
+	}
+	else // GUI
+	{
+		/* This function must be immune to pointer grabs */
+		release_grab();
+
+		dd = run_create(alert_code, &tdata, sizeof(tdata)); // run dialog
+		dt = GET_DDATA(dd);
+		res = origin_slot(dt->res) == dt->cb ? 1 : 2;
+		run_destroy(dd);
+	}
 
 	if (res == 1) user_break = TRUE;
 	return (res);

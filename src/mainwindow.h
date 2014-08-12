@@ -143,9 +143,6 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_TEST /* Reserved for testing things */
 };
 
-// Currently running script
-char **script_cmds;
-
 // New layer sources for ACT_LR_ADD
 #define LR_NEW   0
 #define LR_DUP   1
@@ -277,20 +274,21 @@ char *cspnames_[NUM_CSPACES];
 
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 	**drawing_canvas, **scrolledwindow_canvas,
-
 	**menu_slots[TOTAL_MENU_IDS];
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
-int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
-int	view_vsplit;
-char **file_args;
+int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
+int	files_passed, cmd_mode;
+char **file_args, **script_cmds;
 
 extern char mem_clip_file[];
 
 void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
+
+int run_script(char **res);		// Interpret parsed sequence of commands
 
 void draw_dash(int c0, int c1, int ofs, int x, int y, int w, int h, rgbcontext *ctx);
 void draw_poly(int *xy, int cnt, int shift, int x00, int y00, rgbcontext *ctx);

@@ -37,6 +37,7 @@ enum {
 	op_TOPVBOXV,
 	op_uWINDOW,
 	op_uFPICK,
+	op_uTOPBOX,
 
 	op_DOCK,
 	op_HVSPLIT,
@@ -153,9 +154,15 @@ enum {
 	op_uOPTD,
 	op_uRPACK,
 	op_uRPACKD,
+	op_uENTRY,
+	op_uLISTCC,
 	op_uOKBTN,
 	op_uBUTTON,
+	op_uMENUBAR,
 	op_uMENUITEM,
+	op_uMENUCHECK,
+	op_uMENURITEM,
+	op_uMOUNT,
 
 	op_CLIPBOARD,
 
@@ -1032,3 +1039,4 @@ enum {
 #define SLOT_SENSITIVE	0
 #define SLOT_FOCUSED	1
 #define SLOT_SCRIPTABLE	2
+#define SLOT_UNREAL	3

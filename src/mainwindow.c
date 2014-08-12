@@ -166,16 +166,15 @@ static inilist ini_int[] = {
 
 void **main_window_, **settings_dock, **layers_dock, **main_split,
 	**drawing_canvas, **scrolledwindow_canvas,
-
 	**menu_slots[TOTAL_MENU_IDS];
 
 static void **dock_area, **dock_book, **main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
-int	files_passed, drag_index_vals[2], cursor_corner, use_gamma;
-int	view_vsplit;
-char **file_args;
+int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
+int	files_passed, cmd_mode;
+char **file_args, **script_cmds;
 
 static int show_dock;
 static int mouse_left_canvas;
@@ -407,6 +406,7 @@ static int clipboard_import_fn(main_dd *dt, void **wdata, int what, void **where
 int import_clipboard(int mode)
 {
 	main_dd *dt = GET_DDATA(main_window_);
+	if (cmd_mode) return (FALSE); // !!! Needs active GTK+ to work
 	dt->impmode = mode;
 	return (cmd_checkv(dt->clipboard, CLIP_PROCESS));
 }
@@ -3160,6 +3160,7 @@ static void configure_canvas()
 
 void force_main_configure()
 {
+	if (cmd_mode) return;
 	if (drawing_canvas) configure_canvas();
 	if (view_showing && vw_drawing) vw_configure();
 }
@@ -3466,30 +3467,21 @@ static void **command_slot(char *cmd)
 	return (slot);
 }
 
-char **script_cmds;
-
-typedef struct {
-	char *script;
-} script_dd;
-
-static void click_script_ok(script_dd *dt, void **wdata)
+int run_script(char **res)
 {
 	void **slot;
-	char **res, **cur, *str = NULL, *err = NULL;
+	char **cur, *str = NULL, *err = NULL;
 	int n;
 
-	cmd_showhide(wdata, FALSE);
-	run_query(wdata);
-	res = wj_parse_argv(dt->script);
-	if (!res) err = _("Empty string or broken quoting");
+	if (!res || !res[0]) err = _("Empty string or broken quoting");
 	else if (res[0][0] != '-') err = _("Script must begin with a command");
 	else
 	{
-		inifile_set("script1", dt->script);
 		user_break = 0;
 		for (cur = res; cur[0]; cur++)
 		{
 			if (cur[0][0] != '-') continue; // Skip to next command
+			if (!strcmp(cur[0], "--")) break; // End marker
 			slot = command_slot(cur[0]);
 			if (!slot) str = _("'%s' does not match any item");
 			else if (!cmd_checkv(slot, SLOT_SCRIPTABLE))
@@ -3524,6 +3516,21 @@ static void click_script_ok(script_dd *dt, void **wdata)
 	}
 	if (err) alert_box(_("Error"), err, NULL);
 	if (str) g_free(str);
+	return (!err ? 1 : str ? -1 : 0); // 1 = clean, -1 = buggy, 0 = wrong
+}
+
+typedef struct {
+	char *script;
+} script_dd;
+
+static void click_script_ok(script_dd *dt, void **wdata)
+{
+	char **res;
+
+	cmd_showhide(wdata, FALSE);
+	run_query(wdata);
+	res = wj_parse_argv(dt->script);
+	if (run_script(res)) inifile_set("script1", dt->script);
 	free(res);
 	run_destroy(wdata);
 }
@@ -4662,7 +4669,7 @@ void main_init()
 		tdata.cnt_c = files_passed;
 		tdata.strs_c = (int *)mem.buf;
 	}
-	main_window_ = run_create(main_code, &tdata, sizeof(tdata));
+	main_window_ = run_create_(main_code, &tdata, sizeof(tdata), script_cmds);
 
 	mapped_item_state(0);
 
@@ -4680,6 +4687,9 @@ void main_init()
 
 	set_cursor(NULL);
 	change_to_tool(DEFAULT_TOOL_ICON);
+
+	/* Skip the GUI-specific updates in commandline mode */
+	if (cmd_mode) return;
 
 	cmd_showhide(main_window_, TRUE);
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
@@ -4700,7 +4710,7 @@ void setup_language()			// Change language
 {
 	char *txt = inifile_get( "languageSETTING", "system" ), txt2[64];
 
-	if ( strcmp( "system", txt ) != 0 )
+	if (strcmp("system", txt))
 	{
 		snprintf( txt2, 60, "LANGUAGE=%s", txt );
 		putenv( txt2 );
@@ -4709,13 +4719,16 @@ void setup_language()			// Change language
 		snprintf( txt2, 60, "LC_ALL=%s", txt );
 		putenv( txt2 );
 	}
-#if GTK_MAJOR_VERSION == 1
-	else	txt="";
+	else txt = "";
 
-	setlocale(LC_ALL, txt);
+
+#if GTK_MAJOR_VERSION > 1
+	if (cmd_mode)
 #endif
+	setlocale(LC_ALL, txt);
 	/* !!! Slow or not, but NLS is *really* broken on GTK+1 without it - WJ */
-	gtk_set_locale();	// GTK+1 hates this - it really slows things down
+	// GTK+1 hates this - it really slows things down
+	if (!cmd_mode) gtk_set_locale();
 }
 #endif
 

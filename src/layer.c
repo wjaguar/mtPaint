@@ -1102,6 +1102,7 @@ static void *layers_code[] = {
 
 void **create_layers_box()
 {
+	static char *noscript;
 	layers_dd tdata;
 	void **res;
 
@@ -1109,7 +1110,8 @@ void **create_layers_box()
 	tdata.nlayer = layer_selected;
 	tdata.lnum = layers_total + 1;
 	tdata.lname = "";
-	layers_box_ = res = run_create(layers_code, &tdata, sizeof(tdata));
+	layers_box_ = res = run_create_(layers_code, &tdata, sizeof(tdata),
+		cmd_mode ? &noscript : NULL);
 
 	return (res);
 }
@@ -1125,6 +1127,7 @@ void pressed_layers()
 {
 	void **res;
 
+	if (cmd_mode) return;
 	if (layers_window_) return; // Already have it open
 	layers_window_ = res = run_create(layersw_code, layersw_code, 0);
 

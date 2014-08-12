@@ -586,7 +586,7 @@ void vw_realign()
 {
 	int sw = mem_width, sh = mem_height, i;
 
-	if (!view_showing) return;
+	if (!view_showing || cmd_mode) return;
 
 	if (layers_total && layer_selected)
 	{
