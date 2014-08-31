@@ -64,6 +64,7 @@ typedef struct {
 	void **smmenu;	// SMARTMENU slot
 	void **fupslot;	// Slot which needs defocusing to update (only 1 for now)
 	void *now_evt;	// Keyboard event being handled (check against recursion)
+	void *tparent;	// Transient parent window
 	char *ininame;	// Prefix for inifile vars
 	char **script;	// Commands if simulated
 	int xywh[4];	// Stored window position & size
@@ -1936,6 +1937,8 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 		if (n >= cnt)
 		{
 			gtk_widget_hide(item);
+			/* !!! To stop arrow keys handler from selecting this */
+			gtk_widget_set_sensitive(item, FALSE);
 			continue;
 		}
 		
@@ -1953,6 +1956,7 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 				gtk_toggle_button_set_active(
 					GTK_TOGGLE_BUTTON(widget), *(int *)v);
 		}
+		gtk_widget_set_sensitive(item, TRUE);
 		gtk_widget_show(item);
 		if (row >= 0) break; // one row only
 	}
@@ -4023,8 +4027,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			/* Add finishing touches to a toplevel */
 			if (!part)
 			{
-				gtk_window_set_transient_for(GTK_WINDOW(window),
-					tparent);
+				vdata->tparent = tparent;
 				/* Trigger remembered events */
 				trigger_things(res);
 			}
@@ -5829,9 +5832,9 @@ void run_destroy(void **wdata)
 		free(GET_DDATA(wdata));
 		return;
 	}
-	if (vdata->ininame && vdata->ininame[0])
-		cmd_showhide(GET_WINDOW(wdata), FALSE); // save position & size
-	destroy_dialog(GET_REAL_WINDOW(wdata));
+	/* Work around WM misbehaviour, and save position & size if needed */
+	cmd_showhide(GET_WINDOW(wdata), FALSE);
+	gtk_widget_destroy(GET_REAL_WINDOW(wdata));
 }
 
 void cmd_reset(void **slot, void *ddata)
@@ -6280,6 +6283,7 @@ void cmd_showhide(void **slot, int state)
 
 		if (state) // show - apply stored size, position, raise, unfocus
 		{
+			gtk_window_set_transient_for(GTK_WINDOW(w), vdata->tparent);
 			if (vdata->ininame) gtk_widget_set_uposition(w,
 				vdata->xywh[0], vdata->xywh[1]);
 			else vdata->ininame = ""; // first time
@@ -6293,12 +6297,17 @@ void cmd_showhide(void **slot, int state)
 		}
 		else // hide - remember size & position
 		{
+			/* !!! These reads also do gdk_flush() which, followed by
+			 * set_transient(NULL), KDE somehow needs for restoring
+			 * focus from fileselector back to pref window - WJ */
 			gdk_window_get_size(w->window,
 				vdata->xywh + 2, vdata->xywh + 3);
 			gdk_window_get_root_origin(w->window,
 				vdata->xywh + 0, vdata->xywh + 1);
 			if (vdata->ininame && vdata->ininame[0])
 				rw_pos(vdata, TRUE);
+			/* Needed in Windows to stop GTK+ lowering the main window */
+			gtk_window_set_transient_for(GTK_WINDOW(w), NULL);
 		}
 	}
 	widget_showhide(slot[0], state);

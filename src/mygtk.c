@@ -719,15 +719,6 @@ void list_select_item(GtkWidget *list, GtkWidget *item)
 	}
 }
 
-// Properly destroy transient window
-
-void destroy_dialog(GtkWidget *window)
-{
-	/* Needed in Windows to stop GTK+ lowering the main window */
-	gtk_window_set_transient_for(GTK_WINDOW(window), NULL);
-	gtk_widget_destroy(window);
-}
-
 // Most common use of boxes
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget)

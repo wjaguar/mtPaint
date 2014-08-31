@@ -170,10 +170,6 @@ void clist_enable_drag(GtkWidget *clist);
 
 void list_select_item(GtkWidget *list, GtkWidget *item);
 
-// Properly destroy transient window
-
-void destroy_dialog(GtkWidget *window);
-
 // Most common use of boxes
 
 GtkWidget *pack(GtkWidget *box, GtkWidget *widget);

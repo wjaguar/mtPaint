@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2020,6 +2020,7 @@ void file_selector_x(int action_type, void **xdata)
 			FPICK_LOAD | FPICK_DIRS_ONLY : FPICK_LOAD;
 		tdata.title = xdata[0];
 		tdata.pathbox = xdata[1]; // pathbox slot
+		cmd_peekv(xdata[1], tdata.filename, PATHBUF, PATH_VALUE);
 		break;
 	default: /*
 	FS_LAYER_LOAD,

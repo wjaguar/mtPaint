@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -314,13 +314,15 @@ int main( int argc, char *argv[] )
 	{
 		gtk_init(&argc, &argv);
 		gtk_init_bugfixes();
-#if GTK_MAJOR_VERSION == 2
-		{
-			char *theme = inifile_get(DEFAULT_THEME_INI, "");
-			if (theme[0]) gtk_rc_parse(theme);
-		}
-#endif
 	}
+#if GTK_MAJOR_VERSION == 2
+	if (!cmd_mode)
+	{
+		char *theme = inifile_get(DEFAULT_THEME_INI, "");
+		if (theme[0]) gtk_rc_parse(theme);
+	}
+	else g_type_init();
+#endif
 
 #ifdef U_NLS
 	{
