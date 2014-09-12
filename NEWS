@@ -18,6 +18,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Saving an image now commits paste if auto commit mode is enabled
 	* "Scale canvas" and "Resize canvas" now remember their aspect ratio toggle setting
 	* The Free Rotate window now remembers the previous rotation angle in that mtPaint session
+	* Dock area state is now remembered across sessions (unless opened automatically, for multiple files on command line)
 	* Alpha values for colours A & B are now displayed on settings toolbar when editing image with alpha in coupled alpha mode
 	* Undo system now uses a bit less memory
 	* Support for compiling with giflib 5, libpng 1.6 and libjpeg 9 added

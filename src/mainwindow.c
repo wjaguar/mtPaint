@@ -1092,6 +1092,7 @@ static void delete_event(main_dd *dt, void **wdata)
 	for (ilp = ini_int; ilp->name; ilp++)
 		inifile_set_gint32(ilp->name, *(ilp->var));
 
+	if (files_passed <= 1) inifile_set_gboolean("showDock", show_dock);
 	toggle_dock(FALSE); // To remember dock size
 
 	// Get rid of extra windows + remember positions
@@ -3538,9 +3539,9 @@ static void click_script_ok(script_dd *dt, void **wdata)
 #define WBbase script_dd
 static void *script_code[] = {
 	WINDOWm(_("Script")),
-	DEFW(400),
+	DEFSIZE(400, 200),
 	HSEP,
-	VBOXB, TEXT(script), WDONE,
+	XVBOXB, TEXT(script), WDONE,
 	HSEP,
 	EQBOX, CANCELBTN(_("Cancel"), NULL),
 		BUTTON(_("OK"), click_script_ok), FOCUS,
@@ -4669,6 +4670,7 @@ void main_init()
 		tdata.cnt_c = files_passed;
 		tdata.strs_c = (int *)mem.buf;
 	}
+	show_dock |= inifile_get_gboolean("showDock", FALSE);
 	main_window_ = run_create_(main_code, &tdata, sizeof(tdata), script_cmds);
 
 	mapped_item_state(0);

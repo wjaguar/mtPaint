@@ -50,6 +50,14 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define GET_DESCV(S,N) (((void **)(S)[1])[(N)])
 #define GET_HANDLER(S) GET_DESCV(S, 1)
 
+#if VSLOT_SIZE != 3
+#error "Mismatched slot size"
+#endif
+// !!! V should never be NULL - IS_UNREAL() relies on that
+#define EVSLOT(P,S,V) { (V), &(P), NULL, (S) }
+#define EV_SIZE (VSLOT_SIZE + 1)
+#define EV_PARENT(S) S[VSLOT_SIZE]
+
 #define VCODE_KEY "mtPaint.Vcode"
 
 /* Internal datastore */
@@ -119,7 +127,7 @@ void **wdata_slot(void **slot)
 		if ((op >= op_EVT_0) && (op <= op_EVT_LAST)) return (*slot);
 		// EVs link to parent slot
 		if ((op >= op_EV_0) && (op <= op_EV_LAST))
-			slot = GET_HANDLER(slot);
+			slot = EV_PARENT(slot);
 		// Other slots just repose in sequence
 		else slot = PREV_SLOT(slot);
 		/* And if not valid wdata, die by SIGSEGV in the end */
@@ -135,7 +143,7 @@ void **origin_slot(void **slot)
 		if (op < op_EVT_0) return (slot);
 		// EVs link to parent slot
 		else if ((op >= op_EV_0) && (op <= op_EV_LAST))
-			slot = GET_HANDLER(slot);
+			slot = EV_PARENT(slot);
 		else slot = PREV_SLOT(slot);
 		/* And if not valid wdata, die by SIGSEGV in the end */
 	}
@@ -151,11 +159,6 @@ void *slot_data(void **slot, void *ddata)
 	if (opf & WB_NFLAG) v = *v; // dereference
 	return (v);
 }
-
-#define EVDATA(T,S,V,B) WBh(EV_##T, 1), (S), (V), (B), NULL
-
-//	EVDATA slot size
-#define EV_SIZE		2
 
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
@@ -284,17 +287,17 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 }
 
 typedef struct {
-	void *slot[EV_SIZE + VSLOT_SIZE];
+	void *slot[EV_SIZE];
 	mouse_ext *mouse;
 	int vport[4];
 } mouse_den;
 
 static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 {
+	static void *ev_MOUSE = WBh(EV_MOUSE, 0);
 	void **orig = origin_slot(slot);
 	void **base = slot[0], **desc = slot[1];
-	mouse_den den = { { EVDATA(MOUSE, orig, event, den.slot) },
-		mouse, { 0, 0, 0, 0 } };
+	mouse_den den = { EVSLOT(ev_MOUSE, orig, event), mouse, { 0, 0, 0, 0 } };
 	int op = GET_OP(orig);
 
 #if GTK_MAJOR_VERSION == 2
@@ -313,7 +316,7 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 	}
 
 	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, mouse));
+		(int)desc[0] & WB_OPMASK, den.slot, mouse));
 }
 
 /* !!! After a drop, gtk_drag_end() sends to drag source a fake release event
@@ -470,7 +473,7 @@ typedef struct {
 } drag_sel;
 
 typedef struct {
-	void *slot[EV_SIZE + VSLOT_SIZE];
+	void *slot[EV_SIZE];
 	drag_sel *ds;
 	drag_ctx *dc;
 	drag_ext d;
@@ -478,10 +481,10 @@ typedef struct {
 
 static int drag_event(drag_sel *ds, drag_ctx *dc)
 {
+	static void *ev_DRAGFROM = WBh(EV_DRAGFROM, 0);
 	void **slot = dc->r, **orig = origin_slot(slot);
 	void **base = slot[0], **desc = slot[1];
-	drag_den den = { { EVDATA(DRAGFROM, orig, NULL, den.slot) },
-		ds, dc };
+	drag_den den = { EVSLOT(ev_DRAGFROM, orig, den.slot), ds, dc };
 
 	/* While technically, drag starts at current position, I use the saved
 	 * one - where user had clicked to begin drag - WJ */
@@ -492,7 +495,7 @@ static int drag_event(drag_sel *ds, drag_ctx *dc)
 	den.d.format = ds ? dc->cd->src + ds->info : NULL;
 
 	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, &den.d));
+		(int)desc[0] & WB_OPMASK, den.slot, &den.d));
 }
 
 #define RGB_DND_W 48
@@ -694,7 +697,7 @@ void *dragdrop(void **r)
 //	Clipboard handling
 
 typedef struct {
-	void *slot[EV_SIZE + VSLOT_SIZE];
+	void *slot[EV_SIZE];
 	GtkSelectionData *data;
 	guint info;
 	clipform_data *cd;
@@ -703,15 +706,16 @@ typedef struct {
 
 static void clip_evt(GtkSelectionData *sel, guint info, void **slot)
 {
+	static void *ev_COPY = WBh(EV_COPY, 0);
 	void **base, **desc;
 	clipform_data *cd = slot[0];
-	copy_den den = { { EVDATA(COPY, slot, NULL, den.slot) }, sel, info, cd,
+	copy_den den = { EVSLOT(ev_COPY, slot, den.slot), sel, info, cd,
 		{ sel ? cd->src + info : NULL, NULL, 0 } };
 
 	slot = NEXT_SLOT(slot); // from CLIPBOARD to EVT_COPY
 	base = slot[0]; desc = slot[1];
 	((evtx_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, den.slot + EV_SIZE, &den.c);
+		(int)desc[0] & WB_OPMASK, den.slot, &den.c);
 }
 
 static int paste_evt(GtkSelectionData *sel, clipform_dd *format, void **slot)
@@ -6995,7 +6999,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_EV_DRAGFROM:
 	{
-		drag_den *dp = slot[1];
+		drag_den *dp = (void *)slot;
 		if (idx == DRAG_ICON_RGB) dp->dc->color = (int)res;
 		else /* if (idx == DRAG_DATA) */
 		{
@@ -7010,7 +7014,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_EV_COPY:
 	{
-		copy_den *cp = slot[1];
+		copy_den *cp = (void *)slot;
 		char **pp = res;
 		gtk_selection_data_set(cp->data, cp->data->target,
 			cp->c.format->format ? cp->c.format->format : 8,
@@ -7074,8 +7078,8 @@ int cmd_checkv(void **slot, int idx)
 	}
 	else if (op == op_EV_MOUSE)
 	{
-		mouse_den *dp = slot[1];
-		void **canvas = GET_HANDLER(slot);
+		mouse_den *dp = (void *)slot;
+		void **canvas = EV_PARENT(slot);
 		if (dp->mouse->count) return (FALSE); // Not a move
 		return (wjcanvas_bind_mouse(canvas[0], slot[0],
 			dp->mouse->x - dp->vport[0],
