@@ -1018,7 +1018,7 @@ int cmask_from(chanlist img)
 }
 
 /* Allocate new clipboard, removing or preserving old as needed */
-int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
+int mem_clip_new(int width, int height, int bpp, int cmask, chanlist backup)
 {
 	int res;
 
@@ -1033,38 +1033,18 @@ int mem_clip_new(int width, int height, int bpp, int cmask, int backup)
 		mem_clip_paletted = 0;
 	}
 
-	/* Backup current contents if no backup yet */
-	else if (!HAVE_OLD_CLIP)
-	{
-		/* Ensure a minimal undo stack */
-		if (!mem_clip.undo_.items) init_undo(&mem_clip.undo_, 2);
-
-		/* No point in firing up undo engine for this */
-		mem_clip.undo_.pointer = OLD_CLIP;
-		mem_clip.undo_.items[OLD_CLIP] = newchunk(&undo_items);
-		update_undo(&mem_clip);
-		mem_clip.undo_.done = 1;
-		mem_clip.undo_.pointer = 0;
-	}
-
-	/* Clear current contents if backup exists */
-	else mem_free_chanlist(mem_clip.img);
-
-	/* Add old clipboard's channels to cmask */
-	if (backup) cmask |= cmask_from(mem_clip_real_img);
+	/* Backup current contents */
+	else memcpy(backup, mem_clip.img, sizeof(chanlist));
 
 	/* Allocate new frame */
 	res = mem_alloc_image(AI_NOINIT, &mem_clip, width, height, bpp, cmask, NULL);
 
 	/* Remove backup if allocation failed */
-	if (!res && HAVE_OLD_CLIP)
+	if (!res && backup)
 	{
-		mem_free_image(&mem_clip, FREE_ALL);
+		mem_free_chanlist(backup);
 		mem_clip_paletted = 0;
 	}
-
-	/* Fill current undo frame if any */
-	else if (mem_clip.undo_.items) update_undo(&mem_clip);
 
 	return (!res);
 }
@@ -5112,25 +5092,14 @@ void mem_rotate_geometry(int ow, int oh, double angle, int *nw, int *nh)
 int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 {
 	chanlist old_img, new_img;
-	unsigned char **oldmask;
 	int ow, oh, nw, nh, res, rot_bpp;
 
 
 	if (clipboard)
 	{
 		if (!mem_clipboard) return (-1);	// Nothing to rotate
-		if (!HAVE_OLD_CLIP) clipboard = 2;
-		if (clipboard == 1)
-		{
-			ow = mem_clip_real_w;
-			oh = mem_clip_real_h;
-		}
-		else
-		{
-			mem_clip_real_clear();
-			ow = mem_clip_w;
-			oh = mem_clip_h;
-		}
+		ow = mem_clip_w;
+		oh = mem_clip_h;
 		rot_bpp = mem_clip_bpp;
 	}
 	else
@@ -5157,17 +5126,12 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 		/* Note:  even if the original clipboard doesn't have a mask,
 		 * the rotation will need one to chop off the corners of
 		 * a rotated rectangle. */
-		oldmask = (HAVE_OLD_CLIP ? mem_clip_real_img : mem_clip.img) + CHN_SEL;
-		if (!*oldmask)
-		{
-			if (!(*oldmask = malloc(ow * oh)))
-				return (1);	// Not enough memory
-			memset(*oldmask, 255, ow * oh);
-		}
+		if (!mem_clip_mask && mem_clip_mask_init(255))
+			return (1);	// Not enough memory
 
-		res = mem_clip_new(nw, nh, mem_clip_bpp, 0, TRUE);
+		res = mem_clip_new(nw, nh, mem_clip_bpp,
+			cmask_from(mem_clip.img), old_img);
 		if (res) return (1);	// Not enough memory
-		memcpy(old_img, mem_clip_real_img, sizeof(chanlist));
 		memcpy(new_img, mem_clip.img, sizeof(chanlist));
 	}
 
@@ -5176,8 +5140,8 @@ int mem_rotate_free(double angle, int type, int gcor, int clipboard)
 		gcor, channel_dis[CHN_ALPHA] && !clipboard, clipboard);
 	if (!clipboard) progress_end();
 
-	/* Destructive rotation - lose old unwanted clipboard */
-	if (clipboard > 1) mem_clip_real_clear();
+	/* Lose old unwanted clipboard */
+	if (clipboard) mem_free_chanlist(old_img);
 
 	return 0;
 }

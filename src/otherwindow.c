@@ -2503,7 +2503,7 @@ static int do_pick_gradient(filterwindow_dd *dt, void **wdata)
 
 	len = mem_pick_gradient(buf, pickg_cspace, pickg_grad);
 
-	mem_clip_new(len, 1, 1, CMASK_IMAGE, FALSE);
+	mem_clip_new(len, 1, 1, CMASK_IMAGE, NULL);
 	if (mem_clipboard) memcpy(mem_clipboard, buf, len);
 
 	update_stuff(UPD_XCOPY);

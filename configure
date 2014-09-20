@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.87"
-MT_DATE="2014-09-12"
+MT_V="3.44.88"
+MT_DATE="2014-09-21"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -63,6 +63,7 @@ do
 	"nojpeg" )	NJPEG=NO;;
 	"staticjpeg" )	STATIC_JPEG=JPEG;;
 	"jp2" )		NJP2=OpenJPEG;;
+	"jp2v2" )	NJP2=OpenJPEG2;;
 	"jasper" )	NJP2=JasPer;;
 	"nojp2" )	NJP2=NO;;
 	"staticjp2" )	STATIC_JP2=JPEG2000;;
@@ -186,6 +187,7 @@ jpeg ............. Use libjpeg
 nojpeg ........... Don't use libjpeg
 staticjpeg ....... Statically link JPEG library
 jp2 .............. Use libopenjpeg
+jp2v2 ............ Use libopenjpeg2
 jasper............ Use libjasper
 nojp2 ............ Don't use libopenjpeg and libjasper
 staticjp2 ........ Statically link JPEG 2000 library
@@ -409,7 +411,11 @@ then
 fi
 NJPEG=${NJPEG:-NO}
 
-if IS_LIB "lopenjpeg"
+if IS_LIB "lopenjp2"
+then
+	NJP2=${NJP2:-OpenJPEG2}
+fi
+if IS_LIB "lm -lopenjpeg"
 then
 	NJP2=${NJP2:-OpenJPEG}
 fi
@@ -517,11 +523,17 @@ then
 	fi
 	DEFS="$DEFS -DU_GIF"
 fi
+if [ "$NJP2" = OpenJPEG2 ]
+then
+	INCLUDES="$INCLUDES `PKGCONFIG libopenjp2 --cflags 2>/dev/null`" || \
+		INCLUDES="$INCLUDES -I/usr/include/openjpeg-2.0"
+	LIB_NAME openjp2 "$STATIC_JP2"
+	DEFS="$DEFS -DU_JP2=2"
+fi
 if [ "$NJP2" = OpenJPEG ]
 then
+	INCLUDES="$INCLUDES -I/usr/include/openjpeg"
 	LIB_NAME openjpeg "$STATIC_JP2"
-# !!! If <openjpeg.h> isn't found in include path, use CPPFLAGS or symlink;
-# I'm not inclined to scan all the places where different packagers can put it
 	DEFS="$DEFS -DU_JP2"
 	if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]
 	then

@@ -3988,7 +3988,7 @@ static void pressed_pal_paste()
 	}
 	h = (mem_cols + w - 1) / w;
 
-	mem_clip_new(w, h, 1, CMASK_IMAGE, FALSE);
+	mem_clip_new(w, h, 1, CMASK_IMAGE, NULL);
 	if (!mem_clipboard)
 	{
 		memory_errors(1);

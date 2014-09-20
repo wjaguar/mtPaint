@@ -952,7 +952,7 @@ fail:		free(img);
 		if ((tmp = realloc(pix, l * dest_bpp))) pix = img = tmp;
 	if ((img != pix) && (img != mask)) free(img);
 
-	mem_clip_new(w, h, dest_bpp, 0, FALSE);
+	mem_clip_new(w, h, dest_bpp, 0, NULL);
 	mem_clipboard = pix;
 	mem_clip_mask = mask;
 

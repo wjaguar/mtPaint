@@ -6135,18 +6135,24 @@ int cmd_setstr(void **slot, char *s)
 		if (s && s[0])
 		{
 			swdata *sd = slot[0];
-			int k = -1, n = sd->cnt, l = strlen(s);
+			int i, p = INT_MAX, n = sd->cnt, l = strlen(s);
 
-			for (ll = 0; ll < n; ll++)
+			for (ll = -1 , i = 0; i < n; i++)
 			{
-				tmp = ((char **)sd->strs)[ll];
+				tmp = ((char **)sd->strs)[i];
 				if (!tmp[0]) continue;
 				/* Match at beginning */
-				if (!strncasecmp(tmp, s, l)) break;
+				if (!strncasecmp(tmp, s, l))
+				{
+					int k = strlen(tmp);
+					if (k >= p) continue;
+					p = k;
+				}
+				else if (ll >= 0) continue;
 				/* Match at word beginning */
-				if ((k < 0) && midmatch(tmp, s, l)) k = ll;
+				else if (!midmatch(tmp, s, l)) continue;
+				ll = i;
 			}
-			if (ll >= n) ll = k; // Middle match
 			if (ll >= 0) break; // Have a match
 		}
 		return (-1); // Error

@@ -299,7 +299,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		if (cmask & CMASK_IMAGE)
 		{
 			j = mem_clip_new(settings->width, settings->height,
-				settings->bpp, cmask, FALSE);
+				settings->bpp, cmask, NULL);
 			if (j) return (FILE_MEM_ERROR);
 			memcpy(settings->img, mem_clip.img, sizeof(chanlist));
 			break;
@@ -2107,59 +2107,13 @@ static int save_jpeg(char *file_name, ls_settings *settings)
  * And JP2 images with 4 channels, produced by OpenJPEG, cause JasPer
  * to die horribly - WJ */
 
-static void stupid_callback(const char *msg, void *client_data)
+static int parse_opj(opj_image_t *image, ls_settings *settings)
 {
-}
-
-static int load_jpeg2000(char *file_name, ls_settings *settings)
-{
-	opj_dparameters_t par;
-	opj_dinfo_t *dinfo;
-	opj_cio_t *cio = NULL;
-	opj_image_t *image = NULL;
 	opj_image_comp_t *comp;
-	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
-	unsigned char xtb[256], *dest, *buf = NULL;
-	FILE *fp;
-	int i, j, k, l, w, h, w0, nc, pr, step, delta, shift;
-	int *src, cmask = CMASK_IMAGE, codec = CODEC_JP2, res;
+	unsigned char xtb[256], *dest;
+	int i, j, k, w, h, w0, nc, step, delta, shift;
+	int *src, cmask = CMASK_IMAGE, res;
 
-
-	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
-
-	/* Read in the entire file */
-	fseek(fp, 0, SEEK_END);
-	l = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	buf = malloc(l);
-	res = FILE_MEM_ERROR;
-	if (!buf) goto ffail;
-	res = -1;
-	i = fread(buf, 1, l, fp);
-	if (i < l) goto ffail;
-	fclose(fp);
-	if ((buf[0] == 0xFF) && (buf[1] == 0x4F)) codec = CODEC_J2K;
-
-	/* Decompress it */
-	dinfo = opj_create_decompress(codec);
-	if (!dinfo) goto lfail;
-	memset(&useless_events, 0, sizeof(useless_events));
-	useless_events.error_handler = useless_events.warning_handler =
-		useless_events.info_handler = stupid_callback;
-	opj_set_event_mgr((opj_common_ptr)dinfo, &useless_events, stderr);
-	opj_set_default_decoder_parameters(&par);
-	opj_setup_decoder(dinfo, &par);
-	cio = opj_cio_open((opj_common_ptr)dinfo, buf, l);
-	if (!cio) goto lfail;
-	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
-	image = opj_decode(dinfo, cio);
-	opj_cio_close(cio);
-	opj_destroy_decompress(dinfo);
-	free(buf);
-	if (!image) goto ifail;
-	
-	/* Analyze what we got */
-// !!! OpenJPEG 1.1.1 does *NOT* properly set image->color_space !!!
 	if (image->numcomps < 3) /* Guess this is paletted */
 	{
 		set_gray(settings);
@@ -2175,9 +2129,9 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 		comp++;
 		if ((w != (comp->w + (1 << comp->factor) - 1) >> comp->factor) ||
 			(h != (comp->h + (1 << comp->factor) - 1) >> comp->factor))
-			goto ifail;
+			return (-1);
 	}
-	if ((res = allocate_image(settings, cmask))) goto ifail;
+	if ((res = allocate_image(settings, cmask))) return (res);
 
 	/* Unpack data */
 	for (i = 0 , comp = image->comps; i < nc; i++ , comp++)
@@ -2207,53 +2161,49 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 			}
 		}
 	}
-	res = 1;
-ifail:	if (pr) progress_end();
-	opj_image_destroy(image);
-	return (res);
-lfail:	opj_destroy_decompress(dinfo);
-	free(buf);
-	return (res);
-ffail:	free(buf);
-	fclose(fp);
-	return (res);
+
+#ifdef U_LCMS
+#if U_JP2 >= 2 /* 2.x */
+	/* Extract ICC profile if it's of use */
+	if (!settings->icc_size && image->icc_profile_buf &&
+		(image->icc_profile_len < INT_MAX) &&
+		(settings->icc = malloc(image->icc_profile_len)))
+		memcpy(settings->icc, image->icc_profile_buf,
+			settings->icc_size = image->icc_profile_len);
+#endif
+#endif
+	return (1);
 }
 
-static int save_jpeg2000(char *file_name, ls_settings *settings)
+static opj_image_t *prepare_opj(ls_settings *settings)
 {
-	opj_cparameters_t par;
-	opj_cinfo_t *cinfo;
 	opj_image_cmptparm_t channels[4];
-	opj_cio_t *cio = NULL;
 	opj_image_t *image;
-	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char *src;
-	FILE *fp;
 	int i, j, k, nc, step;
-	int *dest, w = settings->width, h = settings->height, res = -1;
+	int *dest, w = settings->width, h = settings->height;
 
-
-	if (settings->bpp == 1) return WRONG_FORMAT;
-
-	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
-
-	/* Create intermediate structure */
 	nc = settings->img[CHN_ALPHA] ? 4 : 3;
 	memset(channels, 0, sizeof(channels));
 	for (i = 0; i < nc; i++)
 	{
 		channels[i].prec = channels[i].bpp = 8;
 		channels[i].dx = channels[i].dy = 1;
-		channels[i].w = settings->width;
-		channels[i].h = settings->height;
+		channels[i].w = w;
+		channels[i].h = h;
 	}
-	image = opj_image_create(nc, channels, CLRSPC_SRGB);
-	if (!image) goto ffail;
+
+	image = opj_image_create(nc, channels,
+#if U_JP2 < 2 /* 1.x */
+		CLRSPC_SRGB);
+#else /* 2.x */
+		OPJ_CLRSPC_SRGB);
+#endif
+	if (!image) return (NULL);
 	image->x0 = image->y0 = 0;
 	image->x1 = w; image->y1 = h;
 
 	/* Fill it */
-	if (!settings->silent) ls_init("JPEG2000", 1);
 	k = w * h;
 	for (i = 0; i < nc; i++)
 	{
@@ -2271,8 +2221,98 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 		for (j = 0; j < k; j++ , src += step) dest[j] = *src;
 	}
 
+	return (image);
+}
+
+#if U_JP2 < 2 /* 1.x */
+
+static void stupid_callback(const char *msg, void *client_data)
+{
+}
+
+static int load_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_dparameters_t par;
+	opj_dinfo_t *dinfo;
+	opj_cio_t *cio = NULL;
+	opj_image_t *image = NULL;
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
+	unsigned char *buf = NULL;
+	FILE *fp;
+	int i, l, pr, res;
+
+
+	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
+
+	/* Read in the entire file */
+	fseek(fp, 0, SEEK_END);
+	l = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	buf = malloc(l);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto ffail;
+	res = -1;
+	i = fread(buf, 1, l, fp);
+	if (i < l) goto ffail;
+	fclose(fp);
+
+	/* Decompress it */
+	dinfo = opj_create_decompress(settings->ftype == FT_J2K ? CODEC_J2K :
+		CODEC_JP2);
+	if (!dinfo) goto lfail;
+	memset(&useless_events, 0, sizeof(useless_events));
+	useless_events.error_handler = useless_events.warning_handler =
+		useless_events.info_handler = stupid_callback;
+	opj_set_event_mgr((opj_common_ptr)dinfo, &useless_events, stderr);
+	opj_set_default_decoder_parameters(&par);
+	opj_setup_decoder(dinfo, &par);
+	cio = opj_cio_open((opj_common_ptr)dinfo, buf, l);
+	if (!cio) goto lfail;
+	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
+	image = opj_decode(dinfo, cio);
+	opj_cio_close(cio);
+	opj_destroy_decompress(dinfo);
+	free(buf);
+	if (!image) goto ifail;
+	
+	/* Analyze what we got */
+// !!! OpenJPEG 1.1.1 does *NOT* properly set image->color_space !!!
+	res = parse_opj(image, settings);
+
+ifail:	if (pr) progress_end();
+	opj_image_destroy(image);
+	return (res);
+lfail:	opj_destroy_decompress(dinfo);
+	free(buf);
+	return (res);
+ffail:	free(buf);
+	fclose(fp);
+	return (res);
+}
+
+static int save_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_cparameters_t par;
+	opj_cinfo_t *cinfo;
+	opj_cio_t *cio = NULL;
+	opj_image_t *image;
+	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
+	FILE *fp;
+	int k, res = -1;
+
+
+	if (settings->bpp == 1) return WRONG_FORMAT;
+
+	if ((fp = fopen(file_name, "wb")) == NULL) return -1;
+
+	/* Create intermediate structure */
+	image = prepare_opj(settings);
+	if (!image) goto ffail;
+
 	/* Compress it */
-	cinfo = opj_create_compress(settings->ftype == FT_JP2 ? CODEC_JP2 : CODEC_J2K);
+	if (!settings->silent) ls_init("JPEG2000", 1);
+	cinfo = opj_create_compress(settings->ftype == FT_JP2 ? CODEC_JP2 :
+		CODEC_J2K);
 	if (!cinfo) goto fail;
 	memset(&useless_events, 0, sizeof(useless_events));
 	useless_events.error_handler = useless_events.warning_handler =
@@ -2298,6 +2338,107 @@ fail:	if (cio) opj_cio_close(cio);
 ffail:	fclose(fp);
 	return (res);
 }
+
+#else /* 2.x */
+
+static int load_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_dparameters_t par;
+	opj_codec_t *dinfo;
+	opj_stream_t *inp = NULL;
+	opj_image_t *image = NULL;
+	int i, pr, res = -1;
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	FILE *fp;
+#endif
+
+
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
+	if (!(inp = opj_stream_create_default_file_stream(fp, TRUE))) goto ffail;
+#else /* 2.1+ */
+	if (!(inp = opj_stream_create_default_file_stream(file_name, TRUE)))
+		return (-1);
+#endif
+
+	/* Decompress it */
+	dinfo = opj_create_decompress(settings->ftype == FT_J2K ? OPJ_CODEC_J2K :
+		OPJ_CODEC_JP2);
+	if (!dinfo) goto ffail;
+	opj_set_default_decoder_parameters(&par);
+	if (!opj_setup_decoder(dinfo, &par)) goto dfail;
+	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
+	i = opj_read_header(inp, dinfo, &image) &&
+		opj_decode(dinfo, inp, image) &&
+		opj_end_decompress(dinfo, inp);
+	opj_destroy_codec(dinfo);
+	opj_stream_destroy(inp);
+	if (!i) goto ifail;
+	
+	/* Parse what we got */
+	if (image->color_space >= OPJ_CLRSPC_SYCC)
+		goto ifail; // sYCC and CMYK - unsupported till seen in the wild
+	res = parse_opj(image, settings);
+
+ifail:	if (pr) progress_end();
+	opj_image_destroy(image);
+	return (res);
+dfail:	opj_destroy_codec(dinfo);
+ffail:	opj_stream_destroy(inp);
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	fclose(fp);
+#endif
+	return (res);
+}
+
+static int save_jpeg2000(char *file_name, ls_settings *settings)
+{
+	opj_cparameters_t par;
+	opj_codec_t *cinfo;
+	opj_stream_t *outp = NULL;
+	opj_image_t *image;
+	int res = -1;
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	FILE *fp;
+#endif
+
+	if (settings->bpp == 1) return WRONG_FORMAT;
+
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	if ((fp = fopen(file_name, "wb")) == NULL) return (-1);
+	if (!(outp = opj_stream_create_default_file_stream(fp, FALSE))) goto ffail;
+#else /* 2.1+ */
+	if (!(outp = opj_stream_create_default_file_stream(file_name, FALSE)))
+		return (-1);
+#endif
+
+	/* Create intermediate structure */
+	image = prepare_opj(settings);
+	if (!image) goto ffail;
+
+	/* Compress it */
+	if (!settings->silent) ls_init("JPEG2000", 1);
+	cinfo = opj_create_compress(settings->ftype == FT_JP2 ? OPJ_CODEC_JP2 :
+		OPJ_CODEC_J2K);
+	if (!cinfo) goto fail;
+	opj_set_default_encoder_parameters(&par);
+	par.tcp_numlayers = 1;
+	par.tcp_rates[0] = settings->jp2_rate;
+	par.cp_disto_alloc = 1;
+	opj_setup_encoder(cinfo, &par, image);
+	if (opj_start_compress(cinfo, image, outp) &&
+		opj_encode(cinfo, outp) &&
+		opj_end_compress(cinfo, outp)) res = 0;
+fail:	opj_destroy_codec(cinfo);
+	opj_image_destroy(image);
+	if (!settings->silent) progress_end();
+ffail:	opj_stream_destroy(outp);
+#if !OPJ_VERSION_MINOR /* 2.0.x */
+	fclose(fp);
+#endif
+	return (res);
+}
+#endif
 #endif
 
 #ifdef U_JASPER

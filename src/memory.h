@@ -347,14 +347,6 @@ image_info mem_clip;			// Current clipboard
 #define mem_clip_w		mem_clip.width
 #define mem_clip_h		mem_clip.height
 
-// Always use undo slot #1 for clipboard backup
-#define OLD_CLIP 1
-// mem_clip.undo_.done == 0 means no backup clipboard
-#define HAVE_OLD_CLIP		(mem_clip.undo_.done)
-#define mem_clip_real_img	mem_clip.undo_.items[OLD_CLIP]->img
-#define mem_clip_real_w		mem_clip.undo_.items[OLD_CLIP]->width
-#define mem_clip_real_h		mem_clip.undo_.items[OLD_CLIP]->height
-#define mem_clip_real_clear()	mem_free_image(&mem_clip, FREE_UNDO)
 // Repurpose the field
 #define mem_clip_paletted	mem_clip.changed
 #define mem_clip_pal		mem_clip.pal
@@ -591,7 +583,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 //	Allocate space for new image, removing old if needed
 int mem_new( int width, int height, int bpp, int cmask );
 //	Allocate new clipboard, removing or preserving old as needed
-int mem_clip_new(int width, int height, int bpp, int cmask, int backup);
+int mem_clip_new(int width, int height, int bpp, int cmask, chanlist backup);
 
 int load_def_palette(char *name);
 int load_def_patterns(char *name);

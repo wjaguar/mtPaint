@@ -450,5 +450,5 @@ int main( int argc, char *argv[] )
 	}
 	spawn_quit();
 
-	return 0;
+	return (cmd_mode && user_break);
 }

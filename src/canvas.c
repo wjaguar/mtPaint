@@ -312,7 +312,7 @@ void commit_paste(int swap, int *update)
 			free(ti.img[CHN_SEL]);
 			ti.img[CHN_SEL] = NULL;
 		}
-		mem_clip_new(fw, fh, MEM_BPP, 0, FALSE);
+		mem_clip_new(fw, fh, MEM_BPP, 0, NULL);
 		memcpy(mem_clip.img, ti.img, sizeof(chanlist));
 		// !!! marq_x2, marq_y2 will be set by update_stuff()
 		mem_clip_x = marq_x1 = fx;
@@ -650,7 +650,7 @@ static int do_rotate_free(rfree_dd *dt, void **wdata)
 		gcor = dt->gamma;
 		smooth = dt->smooth;
 	}
-	j = mem_rotate_free(angle * 0.01, smooth, gcor, 0);
+	j = mem_rotate_free(angle * 0.01, smooth, gcor, FALSE);
 	if (!j) update_stuff(UPD_GEOM);
 	else
 	{
@@ -931,7 +931,7 @@ static int copy_clip()
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
 		 !channel_dis[CHN_ALPHA]) cmask = CMASK_RGBA;
 	marquee_at(rect);
-	mem_clip_new(rect[2], rect[3], bpp, cmask, FALSE);
+	mem_clip_new(rect[2], rect[3], bpp, cmask, NULL);
 
 	if (!mem_clipboard)
 	{
@@ -993,8 +993,9 @@ static void cut_clip()
 
 static void trim_clip()
 {
-	int i, j, k, offs, offd, maxx, maxy, minx, miny, nw, nh;
+	chanlist old_img;
 	unsigned char *tmp;
+	int i, j, k, offs, offd, maxx, maxy, minx, miny, nw, nh;
 
 	minx = MAX_WIDTH; miny = MAX_HEIGHT; maxx = maxy = 0;
 
@@ -1045,8 +1046,9 @@ static void trim_clip()
 		if (tmp) mem_clip.img[k] = tmp;
 	}
 
-	mem_clip_w = nw;
-	mem_clip_h = nh;
+	/* Reset clipboard to new size */
+	mem_clip_new(nw, nh, mem_clip_bpp, 0, old_img);
+	memcpy(mem_clip.img, old_img, sizeof(chanlist));
 	mem_clip_x += minx;
 	mem_clip_y += miny;
 
