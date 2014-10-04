@@ -1979,7 +1979,7 @@ void mem_init()					// Initialise memory
 		memory_errors(1);
 		exit(0);
 	}
-	mem_mask_setall(0);
+	mem_mask_set(-1, FALSE);
 
 	mem_col_A24.red = 255;
 	mem_col_A24.green = 255;
@@ -2186,9 +2186,11 @@ void mem_mask_init()		// Initialise RGB protection mask array
 	}
 }
 
-void mem_mask_setall(char val)
+void mem_mask_set(int idx, int state)
 {
-	memset(mem_prot_mask, val, 256);
+	state = state ? 255 : 0;
+	if (idx < 0) memset(mem_prot_mask, state, 256);
+	else if (idx < mem_cols) mem_prot_mask[idx] = state;
 	mem_mask_init();
 }
 

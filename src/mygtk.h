@@ -332,6 +332,10 @@ void get_scroll_adjustments(GtkWidget *win, GtkAdjustment **h, GtkAdjustment **v
 
 void widget_showhide(GtkWidget *widget, int what);
 
+// Color name to value
+
+int parse_color(char *what);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

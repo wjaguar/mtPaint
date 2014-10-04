@@ -4026,7 +4026,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		/* Translate the best one */
 		for (j = 0; j < XPM_COL_DEFS; j++)
 		{
-			GdkColor col;
+			int c;
 
 			if (!cdefs[j]) continue;
 			if (!strcasecmp(cdefs[j], "none")) /* Transparent */
@@ -4034,10 +4034,11 @@ static int load_xpm(char *file_name, ls_settings *settings)
 				trans = i;
 				break;
 			}
-			if (!gdk_color_parse(cdefs[j], &col)) continue;
-			dest[0] = (col.red + 128) / 257;
-			dest[1] = (col.green + 128) / 257;
-			dest[2] = (col.blue + 128) / 257;
+			c = parse_color(cdefs[j]);
+			if (c < 0) continue;
+			dest[0] = INT_2_R(c);
+			dest[1] = INT_2_G(c);
+			dest[2] = INT_2_B(c);
 			break;
 		}
 		/* Not one understandable color */

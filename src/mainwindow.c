@@ -266,6 +266,8 @@ static void pressed_crop()
 	else memory_errors(res);
 }
 
+static void script_rect(int *rect);
+
 void pressed_select(int all)
 {
 	int i = 0;
@@ -289,11 +291,12 @@ void pressed_select(int all)
 
 	while (all) /* Select entire canvas */
 	{
+		int rxy[4];
+
+		script_rect(rxy);
+		if (!clip(rxy, 0, 0, mem_width - 1, mem_height - 1, rxy)) break;
 		i |= UPD_SEL;
-		marq_x1 = 0;
-		marq_y1 = 0;
-		marq_x2 = mem_width - 1;
-		marq_y2 = mem_height - 1;
+		copy4(marq_xy, rxy);
 		if (tool_type != TOOL_SELECT)
 		{
 			/* Switch tool, and let that & marquee persistence
@@ -363,12 +366,6 @@ static void pressed_dither_A()
 {
 	mem_find_dither(mem_col_A24.red, mem_col_A24.green, mem_col_A24.blue);
 	update_stuff(UPD_ABP);
-}
-
-static void pressed_mask(int val)
-{
-	mem_mask_setall(val);
-	update_stuff(UPD_CMASK);
 }
 
 // System clipboard import
@@ -3557,6 +3554,129 @@ static void script_test()
 	run_create(script_code, &tdata, sizeof(tdata));
 }
 
+typedef struct {
+	int n;
+} idx_dd;
+
+#define WBbase idx_dd
+static void *idx_code[] = { TOPVBOX, SPIN(n, -1, 256), WSHOW };
+#undef WBbase
+
+static int script_idx()
+{
+	static idx_dd tdata = { -1 };
+	void **res;
+	int n;
+
+	if (!script_cmds) return (-1);
+	res = run_create_(idx_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(res);
+	n = ((idx_dd *)GET_DDATA(res))->n;
+	run_destroy(res);
+	return (n);
+}
+
+typedef struct {
+	int a, b;
+} ab_dd;
+
+#define WBbase ab_dd
+static void *ab_code[] = {
+	TOPVBOX,
+	SPIN(a, -1, 256), ALTNAME("a"),
+	SPIN(b, -1, 256), OPNAME("b"),
+	WSHOW
+};
+#undef WBbase
+
+static void script_ab()
+{
+	static ab_dd tdata = { -1, -1 };
+	ab_dd *dt;
+	void **res;
+
+	res = run_create_(ab_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(res);
+	dt = GET_DDATA(res);
+	if ((dt->a >= 0) && (dt->a < mem_cols))
+		mem_col_A24 = mem_pal[mem_col_A = dt->a];
+	if ((dt->b >= 0) && (dt->b < mem_cols))
+		mem_col_B24 = mem_pal[mem_col_B = dt->b];
+	run_destroy(res);
+	update_stuff(UPD_AB);
+}
+
+typedef struct {
+	int w, h, rxy[4];
+} rect_dd;
+
+#define WBbase rect_dd
+static void *rect_code[] = {
+	TOPVBOX,
+	SPIN(rxy[0], 0, MAX_WIDTH - 1), OPNAME("x0"),
+	SPIN(rxy[1], 0, MAX_HEIGHT - 1), OPNAME("y0"),
+	SPIN(rxy[2], 0, MAX_WIDTH - 1), OPNAME("x1"),
+	SPIN(rxy[3], 0, MAX_HEIGHT - 1), OPNAME("y1"),
+	SPIN(w, 0, MAX_WIDTH), OPNAME("width"),
+	SPIN(h, 0, MAX_HEIGHT), OPNAME("height"),
+	WSHOW
+};
+#undef WBbase
+
+static void script_rect(int *rect)
+{
+	static rect_dd tdata = { 0, 0, { 0, 0, MAX_WIDTH - 1, MAX_HEIGHT - 1 } };
+	rect_dd *dt;
+	void **res;
+
+	copy4(rect, tdata.rxy);
+	if (!script_cmds) return;
+
+	res = run_create_(rect_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(res);
+	dt = GET_DDATA(res);
+	if (dt->w) dt->rxy[2] = dt->rxy[0] + dt->w - 1;
+	if (dt->h) dt->rxy[3] = dt->rxy[1] + dt->h - 1;
+	copy4(rect, dt->rxy);
+	run_destroy(res);
+}
+
+typedef struct {
+	int swap, x, y;
+} paste_dd;
+
+#define WBbase paste_dd
+static void *paste_code[] = {
+	TOPVBOX,
+	CHECK("swap", swap),
+	SPIN(x, -MAX_WIDTH, MAX_WIDTH), OPNAME("x0"),
+	SPIN(y, -MAX_HEIGHT, MAX_HEIGHT), OPNAME("y0"),
+	WSHOW
+};
+#undef WBbase
+
+void script_paste(int centre)
+{
+	int dx = centre ? mem_clip_w / 2 : 0, dy = centre ? mem_clip_h / 2 : 0;
+	paste_dd tdata = { FALSE, marq_x1 + dx, marq_y1 + dy };
+	void **res;
+
+	res = run_create_(paste_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(res);
+	tdata = *(paste_dd *)GET_DDATA(res);
+	run_destroy(res);
+	
+	tdata.x -= dx;
+	tdata.y -= dy;
+	if ((marq_x1 ^ tdata.x) | (marq_y1 ^ tdata.y)) // Moved
+	{
+
+		paint_marquee(MARQ_MOVE, tdata.x, tdata.y, NULL);
+		update_stuff(UPD_SGEOM);
+	}
+	action_dispatch(ACT_COMMIT, tdata.swap, 0, TRUE); // Commit paste
+}
+
 void action_dispatch(int action, int mode, int state, int kbd)
 {
 	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
@@ -3639,16 +3759,17 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_A:
 	case ACT_B:
 		action = action == ACT_B;
+		dir = script_idx();
 		if (mem_channel == CHN_IMAGE)
 		{
-			mode += mem_col_[action];
+			mode = mode ? mode + mem_col_[action] : dir;
 			if ((mode >= 0) && (mode < mem_cols))
 				mem_col_[action] = mode;
 			mem_col_24[action] = mem_pal[mem_col_[action]];
 		}
 		else
 		{
-			mode += channel_col_[action][mem_channel];
+			mode = mode ? mode + channel_col_[action][mem_channel] : dir;
 			if ((mode >= 0) && (mode <= 255))
 				channel_col_[action][mem_channel] = mode;
 		}
@@ -3683,7 +3804,10 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_COPY:
 		pressed_copy(mode); break;
 	case ACT_PASTE:
-		pressed_paste(mode); break;
+		pressed_paste(mode);
+		if (script_cmds && (marq_status >= MARQUEE_PASTE))
+			script_paste(mode); // Move and commit
+		break;
 	case ACT_COPY_PAL:
 		pressed_pal_copy(); break;
 	case ACT_PASTE_PAL:
@@ -3749,7 +3873,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_PAL_DEF:
 		pressed_default_pal(); break;
 	case ACT_PAL_MASK:
-		pressed_mask(mode); break;
+		mem_mask_set(script_idx(), mode);
+		update_stuff(UPD_CMASK);
+		break;
 	case ACT_DITHER_A:
 		pressed_dither_A(); break;
 	case ACT_PAL_MERGE:
@@ -3791,7 +3917,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
 	case DLG_CHOOSER:
-		choose_pattern(mode); break;
+		if (!script_cmds) choose_pattern(mode);
+		else if (mode == CHOOSE_COLOR) script_ab();
+		break;
 	case DLG_SCALE:
 		pressed_scale_size(TRUE); break;
 	case DLG_SIZE:
@@ -4172,17 +4300,17 @@ static void *main_menu_code[] = {
 	MENUITEMis(_("//Redo"), ACTMOD(ACT_DO_UNDO, 1), XPM_ICON(redo)),
 		ACTMAP(NEED_REDO), SHORTCUTs("<control>R"),
 	MENUSEP, //
-	MENUITEMi(_("//Cut"), ACTMOD(ACT_COPY, 1), XPM_ICON(cut)),
+	MENUITEMis(_("//Cut"), ACTMOD(ACT_COPY, 1), XPM_ICON(cut)),
 		ACTMAP(NEED_SEL2), SHORTCUTs("<control>X"),
-	MENUITEMi(_("//Copy"), ACTMOD(ACT_COPY, 0), XPM_ICON(copy)),
+	MENUITEMis(_("//Copy"), ACTMOD(ACT_COPY, 0), XPM_ICON(copy)),
 		ACTMAP(NEED_SEL2), SHORTCUTs("<control>C"),
-	MENUITEM(_("//Copy To Palette"), ACTMOD(ACT_COPY_PAL, 0)),
+	MENUITEMs(_("//Copy To Palette"), ACTMOD(ACT_COPY_PAL, 0)),
 		ACTMAP(NEED_PSEL),
-	MENUITEMi(_("//Paste To Centre"), ACTMOD(ACT_PASTE, 1), XPM_ICON(paste)),
+	MENUITEMis(_("//Paste To Centre"), ACTMOD(ACT_PASTE, 1), XPM_ICON(paste)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>V"),
-	MENUITEM(_("//Paste To New Layer"), ACTMOD(ACT_LR_ADD, LR_PASTE)),
+	MENUITEMs(_("//Paste To New Layer"), ACTMOD(ACT_LR_ADD, LR_PASTE)),
 		ACTMAP(NEED_PCLIP), SHORTCUTs("<control><shift>V"),
-	MENUITEM(_("//Paste"), ACTMOD(ACT_PASTE, 0)),
+	MENUITEMs(_("//Paste"), ACTMOD(ACT_PASTE, 0)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>K"),
 	MENUITEMi(_("//Paste Text"), ACTMOD(DLG_TEXT, 0), XPM_ICON(text)),
 		SHORTCUTs("<shift>T"),
@@ -4190,60 +4318,60 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Paste Text (FreeType)"), ACTMOD(DLG_TEXT_FT, 0)),
 		SHORTCUTs("T"),
 #endif
-	MENUITEM(_("//Paste Palette"), ACTMOD(ACT_PASTE_PAL, 0)),
+	MENUITEMs(_("//Paste Palette"), ACTMOD(ACT_PASTE_PAL, 0)),
 	MENUSEP, //
 	SUBMENU(_("//Load Clipboard")),
 	MENUTEAR, ///
-	MENUITEM("///1", ACTMOD(ACT_LOAD_CLIP, 1)),
+	MENUITEMs("///1", ACTMOD(ACT_LOAD_CLIP, 1)),
 		SHORTCUTs("<shift>F1"),
-	MENUITEM("///2", ACTMOD(ACT_LOAD_CLIP, 2)),
+	MENUITEMs("///2", ACTMOD(ACT_LOAD_CLIP, 2)),
 		SHORTCUTs("<shift>F2"),
-	MENUITEM("///3", ACTMOD(ACT_LOAD_CLIP, 3)),
+	MENUITEMs("///3", ACTMOD(ACT_LOAD_CLIP, 3)),
 		SHORTCUTs("<shift>F3"),
-	MENUITEM("///4", ACTMOD(ACT_LOAD_CLIP, 4)),
+	MENUITEMs("///4", ACTMOD(ACT_LOAD_CLIP, 4)),
 		SHORTCUTs("<shift>F4"),
-	MENUITEM("///5", ACTMOD(ACT_LOAD_CLIP, 5)),
+	MENUITEMs("///5", ACTMOD(ACT_LOAD_CLIP, 5)),
 		SHORTCUTs("<shift>F5"),
-	MENUITEM("///6", ACTMOD(ACT_LOAD_CLIP, 6)),
+	MENUITEMs("///6", ACTMOD(ACT_LOAD_CLIP, 6)),
 		SHORTCUTs("<shift>F6"),
-	MENUITEM("///7", ACTMOD(ACT_LOAD_CLIP, 7)),
+	MENUITEMs("///7", ACTMOD(ACT_LOAD_CLIP, 7)),
 		SHORTCUTs("<shift>F7"),
-	MENUITEM("///8", ACTMOD(ACT_LOAD_CLIP, 8)),
+	MENUITEMs("///8", ACTMOD(ACT_LOAD_CLIP, 8)),
 		SHORTCUTs("<shift>F8"),
-	MENUITEM("///9", ACTMOD(ACT_LOAD_CLIP, 9)),
+	MENUITEMs("///9", ACTMOD(ACT_LOAD_CLIP, 9)),
 		SHORTCUTs("<shift>F9"),
-	MENUITEM("///10", ACTMOD(ACT_LOAD_CLIP, 10)),
+	MENUITEMs("///10", ACTMOD(ACT_LOAD_CLIP, 10)),
 		SHORTCUTs("<shift>F10"),
-	MENUITEM("///11", ACTMOD(ACT_LOAD_CLIP, 11)),
+	MENUITEMs("///11", ACTMOD(ACT_LOAD_CLIP, 11)),
 		SHORTCUTs("<shift>F11"),
-	MENUITEM("///12", ACTMOD(ACT_LOAD_CLIP, 12)),
+	MENUITEMs("///12", ACTMOD(ACT_LOAD_CLIP, 12)),
 		SHORTCUTs("<shift>F12"),
 	WDONE,
 	SUBMENU(_("//Save Clipboard")),
 	MENUTEAR, ///
-	MENUITEM("///1", ACTMOD(ACT_SAVE_CLIP, 1)),
+	MENUITEMs("///1", ACTMOD(ACT_SAVE_CLIP, 1)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F1"),
-	MENUITEM("///2", ACTMOD(ACT_SAVE_CLIP, 2)),
+	MENUITEMs("///2", ACTMOD(ACT_SAVE_CLIP, 2)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F2"),
-	MENUITEM("///3", ACTMOD(ACT_SAVE_CLIP, 3)),
+	MENUITEMs("///3", ACTMOD(ACT_SAVE_CLIP, 3)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F3"),
-	MENUITEM("///4", ACTMOD(ACT_SAVE_CLIP, 4)),
+	MENUITEMs("///4", ACTMOD(ACT_SAVE_CLIP, 4)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F4"),
-	MENUITEM("///5", ACTMOD(ACT_SAVE_CLIP, 5)),
+	MENUITEMs("///5", ACTMOD(ACT_SAVE_CLIP, 5)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F5"),
-	MENUITEM("///6", ACTMOD(ACT_SAVE_CLIP, 6)),
+	MENUITEMs("///6", ACTMOD(ACT_SAVE_CLIP, 6)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F6"),
-	MENUITEM("///7", ACTMOD(ACT_SAVE_CLIP, 7)),
+	MENUITEMs("///7", ACTMOD(ACT_SAVE_CLIP, 7)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F7"),
-	MENUITEM("///8", ACTMOD(ACT_SAVE_CLIP, 8)),
+	MENUITEMs("///8", ACTMOD(ACT_SAVE_CLIP, 8)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F8"),
-	MENUITEM("///9", ACTMOD(ACT_SAVE_CLIP, 9)),
+	MENUITEMs("///9", ACTMOD(ACT_SAVE_CLIP, 9)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F9"),
-	MENUITEM("///10", ACTMOD(ACT_SAVE_CLIP, 10)),
+	MENUITEMs("///10", ACTMOD(ACT_SAVE_CLIP, 10)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F10"),
-	MENUITEM("///11", ACTMOD(ACT_SAVE_CLIP, 11)),
+	MENUITEMs("///11", ACTMOD(ACT_SAVE_CLIP, 11)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F11"),
-	MENUITEM("///12", ACTMOD(ACT_SAVE_CLIP, 12)),
+	MENUITEMs("///12", ACTMOD(ACT_SAVE_CLIP, 12)),
 		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F12"),
 	WDONE,
 	MENUITEM(_("//Import Clipboard from System"), ACTMOD(ACT_LOAD_CLIP, -1)),
@@ -4254,7 +4382,7 @@ static void *main_menu_code[] = {
 		SHORTCUTs("F2"),
 	MENUITEM(_("//Choose Brush ..."), ACTMOD(DLG_CHOOSER, CHOOSE_BRUSH)),
 		SHORTCUTs("F3"),
-	MENUITEM(_("//Choose Colour ..."), ACTMOD(DLG_CHOOSER, CHOOSE_COLOR)),
+	MENUITEMs(_("//Choose Colour ..."), ACTMOD(DLG_CHOOSER, CHOOSE_COLOR)),
 		SHORTCUTs("E"),
 	WDONE,
 	SSUBMENU(_("/_View")),
@@ -4278,7 +4406,7 @@ static void *main_menu_code[] = {
 		SHORTCUTs("Home"),
 	MENUCHECKv(_("//Centralize Image"), ACTMOD(ACT_CENTER, 0), canvas_image_centre),
 	MENUCHECKv(_("//Show Zoom Grid"), ACTMOD(ACT_GRID, 0), mem_show_grid),
-	MENUCHECKv(_("//Snap To Tile Grid"), ACTMOD(ACT_SNAP, 0), tgrid_snap),
+	MENUCHECKvs(_("//Snap To Tile Grid"), ACTMOD(ACT_SNAP, 0), tgrid_snap),
 		SHORTCUTs("B"),
 	MENUITEM(_("//Configure Grid ..."), ACTMOD(DLG_COLORS, COLSEL_GRID)),
 	MENUITEM(_("//Tracing Image ..."), ACTMOD(DLG_TRACE, 0)),
@@ -4307,7 +4435,7 @@ static void *main_menu_code[] = {
 		SHORTCUTs("Page_Up"),
 	MENUITEMs(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
 		SHORTCUTs("Page_Down"),
-	MENUITEM(_("//Crop"), ACTMOD(ACT_CROP, 0)),
+	MENUITEMs(_("//Crop"), ACTMOD(ACT_CROP, 0)),
 		ACTMAP(NEED_CROP), SHORTCUTs("<control><shift>X"),
 	MENUSEP, //
 	MENUITEMs(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
@@ -4334,67 +4462,69 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Selection")),
 	MENUTEAR, //
-	MENUITEM(_("//Select All"), ACTMOD(ACT_SELECT, 1)),
+	MENUITEMs(_("//Select All"), ACTMOD(ACT_SELECT, 1)),
 		SHORTCUTs("<control>A"),
-	MENUITEM(_("//Select None (Esc)"), ACTMOD(ACT_SELECT, 0)),
+	MENUITEMs(_("//Select None (Esc)"), ACTMOD(ACT_SELECT, 0)),
 		ACTMAP(NEED_MARQ), SHORTCUTs("<shift><control>A"),
-	MENUITEMi(_("//Lasso Selection"), ACTMOD(ACT_LASSO, 0), XPM_ICON(lasso)),
+	MENUITEMis(_("//Lasso Selection"), ACTMOD(ACT_LASSO, 0), XPM_ICON(lasso)),
 		ACTMAP(NEED_LAS2), SHORTCUTs("J"),
-	MENUITEM(_("//Lasso Selection Cut"), ACTMOD(ACT_LASSO, 1)),
+	MENUITEMs(_("//Lasso Selection Cut"), ACTMOD(ACT_LASSO, 1)),
 		ACTMAP(NEED_LASSO),
 	MENUSEP, //
-	MENUITEMi(_("//Outline Selection"), ACTMOD(ACT_OUTLINE, 0), XPM_ICON(rect1)),
+	MENUITEMis(_("//Outline Selection"), ACTMOD(ACT_OUTLINE, 0), XPM_ICON(rect1)),
 		ACTMAP(NEED_SEL2), SHORTCUTs("<control>T"),
-	MENUITEMi(_("//Fill Selection"), ACTMOD(ACT_OUTLINE, 1), XPM_ICON(rect2)),
+	MENUITEMis(_("//Fill Selection"), ACTMOD(ACT_OUTLINE, 1), XPM_ICON(rect2)),
 		ACTMAP(NEED_SEL2), SHORTCUTs("<shift><control>T"),
-	MENUITEMi(_("//Outline Ellipse"), ACTMOD(ACT_ELLIPSE, 0), XPM_ICON(ellipse2)),
+	MENUITEMis(_("//Outline Ellipse"), ACTMOD(ACT_ELLIPSE, 0), XPM_ICON(ellipse2)),
 		ACTMAP(NEED_SEL), SHORTCUTs("<control>L"),
-	MENUITEMi(_("//Fill Ellipse"), ACTMOD(ACT_ELLIPSE, 1), XPM_ICON(ellipse)),
+	MENUITEMis(_("//Fill Ellipse"), ACTMOD(ACT_ELLIPSE, 1), XPM_ICON(ellipse)),
 		ACTMAP(NEED_SEL), SHORTCUTs("<shift><control>L"),
 	MENUSEP, //
-	MENUITEMi(_("//Flip Vertically"), ACTMOD(ACT_SEL_FLIP_V, 0), XPM_ICON(flip_vs)),
+	MENUITEMis(_("//Flip Vertically"), ACTMOD(ACT_SEL_FLIP_V, 0), XPM_ICON(flip_vs)),
 		ACTMAP(NEED_CLIP),
-	MENUITEMi(_("//Flip Horizontally"), ACTMOD(ACT_SEL_FLIP_H, 0), XPM_ICON(flip_hs)),
+	MENUITEMis(_("//Flip Horizontally"), ACTMOD(ACT_SEL_FLIP_H, 0), XPM_ICON(flip_hs)),
 		ACTMAP(NEED_CLIP),
-	MENUITEMi(_("//Rotate Clockwise"), ACTMOD(ACT_SEL_ROT, 0), XPM_ICON(rotate_cs)),
+	MENUITEMis(_("//Rotate Clockwise"), ACTMOD(ACT_SEL_ROT, 0), XPM_ICON(rotate_cs)),
 		ACTMAP(NEED_CLIP),
-	MENUITEMi(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_SEL_ROT, 1), XPM_ICON(rotate_as)),
+	MENUITEMis(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_SEL_ROT, 1), XPM_ICON(rotate_as)),
 		ACTMAP(NEED_CLIP),
 	MENUSEP, //
-	MENUITEM(_("//Horizontal Ramp"), ACTMOD(ACT_RAMP, 0)),
+	MENUITEMs(_("//Horizontal Ramp"), ACTMOD(ACT_RAMP, 0)),
 		ACTMAP(NEED_SEL),
-	MENUITEM(_("//Vertical Ramp"), ACTMOD(ACT_RAMP, 1)),
+	MENUITEMs(_("//Vertical Ramp"), ACTMOD(ACT_RAMP, 1)),
 		ACTMAP(NEED_SEL),
 	MENUSEP, //
-	MENUITEM(_("//Alpha Blend A,B"), ACTMOD(ACT_SEL_ALPHA_AB, 0)),
+	MENUITEMs(_("//Alpha Blend A,B"), ACTMOD(ACT_SEL_ALPHA_AB, 0)),
 		ACTMAP(NEED_ACLIP),
-	MENUITEM(_("//Move Alpha to Mask"), ACTMOD(ACT_SEL_ALPHAMASK, 0)),
+	MENUITEMs(_("//Move Alpha to Mask"), ACTMOD(ACT_SEL_ALPHAMASK, 0)),
 		ACTMAP(NEED_CLIP),
-	MENUITEM(_("//Mask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 0)),
+	MENUITEMs(_("//Mask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 0)),
 		ACTMAP(NEED_CLIP),
-	MENUITEM(_("//Unmask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 255)),
+	MENUITEMs(_("//Unmask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 255)),
 		ACTMAP(NEED_CLIP),
-	MENUITEM(_("//Mask All Colours"), ACTMOD(ACT_SEL_MASK, 0)),
+	MENUITEMs(_("//Mask All Colours"), ACTMOD(ACT_SEL_MASK, 0)),
 		ACTMAP(NEED_CLIP),
-	MENUITEM(_("//Clear Mask"), ACTMOD(ACT_SEL_MASK, 255)),
+	MENUITEMs(_("//Clear Mask"), ACTMOD(ACT_SEL_MASK, 255)),
 		ACTMAP(NEED_CLIP),
 	WDONE,
 	SSUBMENU(_("/_Palette")),
+	uMENUITEMs("//a", ACTMOD(ACT_A, 0)), // for scripting
+	uMENUITEMs("//b", ACTMOD(ACT_B, 0)), // for scripting
 	MENUTEAR, //
 	MENUITEMis(_("//Load ..."), ACTMOD(DLG_FSEL, FS_PALETTE_LOAD), XPM_ICON(open)),
 	MENUITEMis(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PALETTE_SAVE), XPM_ICON(save)),
 	MENUITEMs(_("//Load Default"), ACTMOD(ACT_PAL_DEF, 0)),
 	MENUSEP, //
-	MENUITEMs(_("//Mask All"), ACTMOD(ACT_PAL_MASK, 255)),
+	MENUITEMs(_("//Mask All"), ACTMOD(ACT_PAL_MASK, 1)),
 	MENUITEMs(_("//Mask None"), ACTMOD(ACT_PAL_MASK, 0)),
 	MENUSEP, //
 	MENUITEMs(_("//Swap A & B"), ACTMOD(ACT_SWAP_AB, 0)),
 		SHORTCUTs("X"),
-	MENUITEM(_("//Edit Colour A & B ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_AB)),
+	MENUITEMs(_("//Edit Colour A & B ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_AB)),
 		SHORTCUTs("<control>E"),
 	MENUITEMs(_("//Dither A"), ACTMOD(ACT_DITHER_A, 0)),
 		ACTMAP(NEED_24),
-	MENUITEM(_("//Palette Editor ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_ALL)),
+	MENUITEMs(_("//Palette Editor ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_ALL)),
 		SHORTCUTs("<control>W"),
 	MENUITEMs(_("//Set Palette Size ..."), ACTMOD(DLG_PAL_SIZE, 0)),
 	MENUITEMs(_("//Merge Duplicate Colours"), ACTMOD(ACT_PAL_MERGE, 0)),
@@ -4475,13 +4605,13 @@ static void *main_menu_code[] = {
 	REFv(menu_slots[MENU_DCHAN0]),
 	MENUCHECKv(_("//Hide Image"), ACTMOD(ACT_SET_OVERLAY, 1), hide_image),
 	REFv(menu_slots[MENU_DCHAN1]),
-	MENUCHECKv(_("//Disable Alpha"), ACTMOD(ACT_CHN_DIS, CHN_ALPHA),
+	MENUCHECKvs(_("//Disable Alpha"), ACTMOD(ACT_CHN_DIS, CHN_ALPHA),
 		channel_dis[CHN_ALPHA]),
 	REFv(menu_slots[MENU_DCHAN2]),
-	MENUCHECKv(_("//Disable Selection"), ACTMOD(ACT_CHN_DIS, CHN_SEL),
+	MENUCHECKvs(_("//Disable Selection"), ACTMOD(ACT_CHN_DIS, CHN_SEL),
 		channel_dis[CHN_SEL]),
 	REFv(menu_slots[MENU_DCHAN3]),
-	MENUCHECKv(_("//Disable Mask"), ACTMOD(ACT_CHN_DIS, CHN_MASK),
+	MENUCHECKvs(_("//Disable Mask"), ACTMOD(ACT_CHN_DIS, CHN_MASK),
 		channel_dis[CHN_MASK]),
 	MENUSEP, //
 	MENUCHECKvs(_("//Couple RGBA Operations"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),

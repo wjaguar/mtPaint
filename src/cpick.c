@@ -729,15 +729,13 @@ static gboolean hexentry_change(GtkWidget *widget, GdkEventFocus *event,
 	gpointer user_data)
 {
 	void **slot = user_data, **base = slot[0];
-	GdkColor col;
+	int c = parse_color((char *)gtk_entry_get_text(GTK_ENTRY(widget)));
 
-	if (!gdk_color_parse(gtk_entry_get_text(GTK_ENTRY(widget)), &col))
-		return (FALSE);
-
-	*(int *)slot_data(PREV_SLOT(slot), GET_DDATA(base)) = RGB_2_INT(
-		((int)col.red + 128) / 257, ((int)col.green + 128) / 257,
-		((int)col.blue + 128) / 257); // self-updating
-	do_evt_1_d(slot);
+	if (c >= 0) // Valid
+	{
+		*(int *)slot_data(PREV_SLOT(slot), GET_DDATA(base)) = c; // self-updating
+		do_evt_1_d(slot);
+	}
 
 	return (FALSE);
 }

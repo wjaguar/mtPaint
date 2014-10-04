@@ -1470,7 +1470,7 @@ GtkWidget *colorlist(void **r, char *ddata)
 	list = gtk_list_new();
 
 	// Fill datablock
-	v = ddata + (int)pp[3];
+	v = ddata + (int)pp[2];
 	if (((int)pp[0] & WB_OPMASK) == op_COLORLIST) // array of names
 	{
 		sp = *(char ***)v;
@@ -1478,7 +1478,7 @@ GtkWidget *colorlist(void **r, char *ddata)
 	}
 	else cnt = *(int *)v; // op_COLORLISTN - number
 	dt->cnt = cnt;
-	dt->col = (void *)(ddata + (int)pp[2]); // palette
+	dt->col = (void *)(ddata + (int)pp[3]); // palette
 	dt->idx = idx;
 
 	for (i = 0; i < cnt; i++)
@@ -3836,9 +3836,10 @@ static cmdef cmddefs[] = {
 	{ op_RGBIMAGE,	sizeof(rgbimage_data) },
 	{ op_RGBIMAGEP,	sizeof(rgbimage_data) },
 	{ op_CANVASIMG,	sizeof(rgbimage_data) },
+	{ op_CANVASIMGB, sizeof(rgbimage_data) },
 	{ op_FCIMAGEP,	sizeof(fcimage_data) },
-	{ op_COLORLIST,	sizeof(colorlist_data) },
-	{ op_COLORLISTN, sizeof(colorlist_data) },
+	{ op_COLORLIST,	sizeof(colorlist_data), op_uOPTD },
+	{ op_COLORLISTN, sizeof(colorlist_data), op_uLISTCC },
 	{ op_GRADBAR,	sizeof(gradbar_data) },
 	{ op_LISTCCr,	sizeof(listcc_data), op_uLISTCC },
 	{ op_LISTC,	sizeof(listc_data) },
@@ -3874,6 +3875,7 @@ static cmdef cmddefs[] = {
 	{ op_OPTD,	0, op_uOPTD },
 //	op_COMBO,
 	{ op_ENTRY,	0, op_uENTRY },
+	{ op_COLOR,	0, op_uCOLOR },
 //	and various others between op_OPTD and op_OKBTN
 	{ op_OKBTN,	0, op_uOKBTN },
 	{ op_BUTTON,	0, op_uBUTTON },
@@ -3893,20 +3895,23 @@ static cmdef cmddefs[] = {
 	{ op_uFPICK,	sizeof(swdata), -1 },
 	{ op_uTOPBOX,	sizeof(swdata), -1 },
 	{ op_uOP,	sizeof(swdata), -1 },
-	{ op_uCHECK,	sizeof(swdata), -1 },
-	{ op_uCHECKb,	sizeof(swdata), -1 },
 	{ op_uFRAME,	sizeof(swdata), -1 },
 	{ op_uLABEL,	sizeof(swdata), -1 },
-	{ op_uOKBTN,	sizeof(swdata), -1 },
-	{ op_uBUTTON,	sizeof(swdata), -1 },
-	{ op_uOPT,	sizeof(swdata), -1 },
-	{ op_uOPTD,	sizeof(swdata), -1 },
-	{ op_uRPACK,	sizeof(swdata), -1 },
-	{ op_uRPACKD,	sizeof(swdata), -1 },
+	{ op_uCHECK,	sizeof(swdata), -1 },
+	{ op_uCHECKb,	sizeof(swdata), -1 },
 	{ op_uSPIN,	sizeof(swdata), -1 },
 	{ op_uFSPIN,	sizeof(swdata), -1 },
 	{ op_uSPINa,	sizeof(swdata), -1 },
 	{ op_uSCALE,	sizeof(swdata), -1 },
+	{ op_uOPT,	sizeof(swdata), -1 },
+	{ op_uOPTD,	sizeof(swdata), -1 },
+	{ op_uRPACK,	sizeof(swdata), -1 },
+	{ op_uRPACKD,	sizeof(swdata), -1 },
+	{ op_uENTRY,	sizeof(swdata), -1 },
+	{ op_uCOLOR,	sizeof(swdata), -1 },
+	{ op_uLISTCC,	sizeof(swdata), -1 },
+	{ op_uOKBTN,	sizeof(swdata), -1 },
+	{ op_uBUTTON,	sizeof(swdata), -1 },
 	{ op_uMENUBAR,	sizeof(swdata), -1 },
 	{ op_uMENUITEM,	sizeof(swdata), -1 },
 	{ op_uMENUCHECK, sizeof(swdata), -1 },
@@ -4055,7 +4060,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			/* Activate */
 			if (op != op_uWEND)
 				cmd_showhide(GET_WINDOW(res), TRUE);
-			/* Return anchor position - already freed if uWSHOW */
+			/* Return anchor position - maybe already freed */
 			return (res);
 		/* Script mode fileselector */
 		case op_uFPICK:
@@ -4112,10 +4117,12 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Script mode button */
 		case op_uBUTTON:
-			// Not scriptable by default
-			if (!((int)pp[0] & WB_SFLAG)) op = op_uOP;
 			wid = v;
 			pk = pk_UNREALV;
+			// Not scriptable by default
+			if ((int)pp[0] & WB_SFLAG) break;
+			op = op_uOP;
+			pk = pk_UNREAL; // Leave identifier for next widget
 			break;
 		/* Script mode checkbox */
 		case op_uCHECKb:
@@ -4168,6 +4175,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			tpad = ((swdata *)dtail)->value = lp > 1 ? (int)pp[2] : -1;
 			// Replace transient buffer - it may get freed on return
 			*(char **)v = set_uentry((swdata *)dtail, *(char **)v);
+			pk = pk_UNREALV;
+			break;
+		/* Script mode color picker - leave unfilled (?) */
+		case op_uCOLOR:
 			pk = pk_UNREALV;
 			break;
 		/* Script mode list */
@@ -5616,6 +5627,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		op = (int)*pp++;
 		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = data + (int)v;
+		if (op & WB_NFLAG) v = *(void **)v; // dereference
 		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
 		switch (op)
@@ -5633,7 +5645,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
 		case op_uCHECK: case op_uCHECKb:
 		case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
-		case op_uMENUCHECK:
+		case op_uCOLOR: case op_uMENUCHECK:
 			*(int *)v = ((swdata *)*wdata)->value;
 			if (op == op_uCHECKb) inifile_set_gboolean(pp[2], *(int *)v);
 			break;
@@ -6044,7 +6056,7 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 {
 	void **where = NULL;
 	char buf[64], *nm, *ts;
-	int op, n;
+	int op, n, p = INT_MAX;
 
 	for (; slot[1]; slot = NEXT_SLOT(slot))
 	{
@@ -6091,14 +6103,19 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 			where = slot;
 			break;
 		}
-		/* Match at beginning */
+		/* Match at beginning, preferring shortest word */
 		if (!strncasecmp(nm, id, l))
 		{
+			int d = l + strcspn(nm + l, " .,()");
+			// Prefer if no other words
+			d = d + d + !!nm[d + strcspn(nm + d, " .,()")];
+			if (d >= p) continue;
+			p = d;
 			where = slot;
-			break;
 		}
+		else if (where);
 		/* Match at word beginning */
-		if (mlevel && !where && midmatch(nm, id, l)) where = slot;
+		else if (mlevel && midmatch(nm, id, l)) where = slot;
 	}
 	/* Resolve alternative name */
 	if (where && (GET_OP(where) == op_uALTNAME))
@@ -6123,10 +6140,13 @@ int cmd_setstr(void **slot, char *s)
 		g_free(st);
 		return (res);
 	}
+	case op_uBUTTON:
+		res = 0; // No use for parameter
+		// Fallthrough
 	case op_CHECK: case op_CHECKb: case op_TOGGLE:
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 	case op_MENUCHECK: case op_MENURITEM:
-	case op_uCHECK: case op_uCHECKb: case op_uBUTTON:
+	case op_uCHECK: case op_uCHECKb:
 	case op_uMENUCHECK: case op_uMENURITEM:
 		ll = !s ? TRUE : !s[0] ? FALSE : str2bool(s);
 		if (ll < 0) return (-1); // Error
@@ -6179,6 +6199,16 @@ int cmd_setstr(void **slot, char *s)
 			if (*tmp) return (-1); // Error
 		}
 		break;
+	case op_uCOLOR:
+	{
+		swdata *sd = slot[0];
+		int n = parse_color(s);
+
+		if (n < 0) return (-1); // Error
+		sd->value = n;
+		cmd_event(slot, op_EVT_CHANGE);
+		return (res);
+	}
 	case op_uSCALE:
 	{
 		swdata *sd = slot[0];
@@ -6208,6 +6238,7 @@ int cmd_setstr(void **slot, char *s)
 	}
 	/* Set value to widget */
 	cmd_set(slot, ll);
+	if (res) cmd_event(slot, op_EVT_CLICK); // Notify
 	return (res);
 }
 
@@ -6264,12 +6295,11 @@ static void cmd_run_script(void **slot)
 		return;
 	}
 
-	/* Now activate the OK handler */
+	/* Now activate the OK handler if any */
 	for (wdata = slot; wdata[1]; wdata = NEXT_SLOT(wdata))
 		if (IS_UNREAL(wdata) && ((GET_UOP(wdata) == op_uOKBTN) ||
 			(GET_UOP(wdata) == op_uFPICK))) break;
-	if (wdata[1]) // Paranoia
-		cmd_event(wdata, op_EVT_OK);
+	if (wdata[1]) cmd_event(wdata, op_EVT_OK);
 	/* !!! The memory block is likely to be freed at this point */
 }
 
@@ -6876,6 +6906,9 @@ void cmd_setv(void **slot, void *res, int idx)
 		cpick_set_colour(slot[0], v[0], v[1]);
 		break;
 	}
+	case op_uCOLOR:
+		((swdata *)slot[0])->value = *(int *)res;
+		break;
 	case op_COLORLIST: case op_COLORLISTN:
 		colorlist_reset_color(slot, (int)res);
 		break;
@@ -7114,9 +7147,8 @@ void cmd_event(void **slot, int op)
 {
 	int n;
 
-	while (TRUE)
+	while ((slot = NEXT_SLOT(slot))[1])
 	{
-		slot = NEXT_SLOT(slot);
 		n = GET_OP(slot);
 		// Found
 		if (n == op) get_evt_1(NULL, slot);

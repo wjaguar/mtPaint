@@ -1519,12 +1519,12 @@ static void grid_controls_changed(colsel_dd *dt, void **wdata, int what, void **
 
 static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 {
-	void *cause = NULL;
+	void *cause;
 
 	if (dt->rflag) return; // skip recursive calls
-	if (what == op_EVT_CHANGE) cause = cmd_read(where, dt);
+	cause = cmd_read(where, dt);
 
-	if (what == op_EVT_SELECT) // COLORLIST, self-updating
+	if (cause == &dt->idx)
 	{
 		colsel_show_idx(dt); // Set selected color
 		dt->select(dt, CHOOK_SELECT);
@@ -1591,7 +1591,7 @@ static void *colsel_code[] = {
 	REF(csel),
 	IF(opflag), TCOLOR(color), // with opacity
 	UNLESS(opflag), COLOR(color), // solid colors
-	EVENT(CHANGE, colsel_evt),
+	EVENT(CHANGE, colsel_evt), OPNAME("colour"),
 	UNLESS(is_pal), WDONE,
 	/* Task-specific part */
 	BORDER(TABLE, 0),
@@ -1605,7 +1605,10 @@ static void *colsel_code[] = {
 		BUTTON(_("To"), set_range_spin),
 		REF(tspin), SPIN(n1, 0, 255),
 		BORDER(OPT, 0),
-		XVBOXbp(0, 4, 0), OPT(scales_txt, 4, scale), WDONE,
+		XVBOXbp(0, 4, 0),
+		OPT(scales_txt, 4, scale),
+		EVENT(CLICK, make_cscale), OPNAME("Scale"), // For scripting
+		WDONE,
 		BUTTON(_("Create"), make_cscale),
 		WDONE,
 	ENDIF(1),
@@ -1615,6 +1618,7 @@ static void *colsel_code[] = {
 		HBOX,
 		BUTTON(_("Posterize"), posterize_AB),
 		REF(pspin_AB), SPIN(pos_AB, 1, 8),
+		EVENT(CLICK, posterize_AB), // For scripting
 		WDONE,
 		TABLE(3, 2),
 		TXLABEL(_("Alpha"), 0, 0),
@@ -1796,7 +1800,7 @@ void colour_selector(int cs_type)
 	}
 
 	tdata.v0 = tdata.v; // Save original values
-	run_create(colsel_code, &tdata, sizeof(tdata));
+	run_create_(colsel_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 ///	QUANTIZE WINDOW

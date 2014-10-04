@@ -828,28 +828,29 @@ void pressed_paste(int centre)
 	cursor_corner = -1;
 	marq_x1 = mem_clip_x;
 	marq_y1 = mem_clip_y;
-	if (centre)
+	while (centre)
 	{
+		int marq0[4], mxy[4], vxy[4];
+
 		canvas_center(mem_ic);
 		marq_x1 = mem_width * mem_icx - mem_clip_w * 0.5;
 		marq_y1 = mem_height * mem_icy - mem_clip_h * 0.5;
-		/* Snap to grid, if it leaves enough of paste area visible */
-		if (tgrid_snap)
-		{
-			int marq0[4], mxy[4], vxy[4];
-
-			copy4(marq0, marq_xy);
-			locate_marquee(mxy, TRUE);
-			// !!! Could use CSCROLL_XYSIZE here instead
-			cmd_peekv(drawing_canvas, vxy, sizeof(vxy), CANVAS_VPORT);
-			if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
-				vxy[2] - margin_main_x, vxy[3] - margin_main_y, mxy) ||
-				((vxy[2] - vxy[0] < MIN_VISIBLE) &&
-				 (vxy[2] - vxy[0] < mxy[2] - mxy[0])) ||
-				((vxy[3] - vxy[1] < MIN_VISIBLE) &&
-				 (vxy[3] - vxy[1] < mxy[3] - mxy[1])))
-				copy4(marq_xy, marq0);
-		}
+		if (!tgrid_snap) break;
+		/* Snap to grid */
+		copy4(marq0, marq_xy);
+		locate_marquee(mxy, TRUE);
+		if (script_cmds) break; // Scripting must behave consistently
+		/* Undo snap if not enough of paste area is left visible */
+		// !!! Could use CSCROLL_XYSIZE here instead
+		cmd_peekv(drawing_canvas, vxy, sizeof(vxy), CANVAS_VPORT);
+		if (!clip(vxy, vxy[0] - margin_main_x, vxy[1] - margin_main_y,
+			vxy[2] - margin_main_x, vxy[3] - margin_main_y, mxy) ||
+			((vxy[2] - vxy[0] < MIN_VISIBLE) &&
+			 (vxy[2] - vxy[0] < mxy[2] - mxy[0])) ||
+			((vxy[3] - vxy[1] < MIN_VISIBLE) &&
+			 (vxy[3] - vxy[1] < mxy[3] - mxy[1])))
+			copy4(marq_xy, marq0);
+		break;
 	}
 	// !!! marq_x2, marq_y2 will be set by update_stuff()
 	update_stuff(UPD_PASTE);
@@ -2083,10 +2084,12 @@ void canvas_center(float ic[2])		// Center of viewable area
 {
 	int w, h, xyhv[4];
 
+	ic[0] = ic[1] = 0.5;
+	if (script_cmds) return;
 	cmd_peekv(scrolledwindow_canvas, xyhv, sizeof(xyhv), CSCROLL_XYSIZE);
 	canvas_size(&w, &h);
-	ic[0] = xyhv[2] < w ? (xyhv[0] + xyhv[2] * 0.5) / w : 0.5;
-	ic[1] = xyhv[3] < h ? (xyhv[1] + xyhv[3] * 0.5) / h : 0.5;
+	if (xyhv[2] < w) ic[0] = (xyhv[0] + xyhv[2] * 0.5) / w;
+	if (xyhv[3] < h) ic[1] = (xyhv[1] + xyhv[3] * 0.5) / h;
 }
 
 void align_size(float new_zoom)		// Set new zoom level

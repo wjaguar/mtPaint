@@ -3355,6 +3355,18 @@ void widget_showhide(GtkWidget *widget, int what)
 	(what ? gtk_widget_show : gtk_widget_hide)(widget);
 }
 
+// Color name to value
+
+int parse_color(char *what)
+{
+	GdkColor col;
+
+	if (!gdk_color_parse(what, &col)) return (-1);
+	return (RGB_2_INT(((int)col.red + 128) / 257,
+		((int)col.green + 128) / 257,
+		((int)col.blue + 128) / 257));
+}
+
 // Threading helpers
 
 #if 0 /* Not needed for now - GTK+/Win32 still isn't thread-safe anyway */

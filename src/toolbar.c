@@ -708,8 +708,7 @@ static int click_palette(void *dt, void **wdata, int what, void **where,
 	}
 	else /* if (px >= PALETTE_CROSS_X) */		// Mask changed
 	{
-		mem_prot_mask[pindex] ^= 255;
-		mem_mask_init();		// Prepare RGB masks
+		mem_mask_set(pindex, !mem_prot_mask[pindex]);
 		update_stuff(UPD_CMASK);
 	}
 

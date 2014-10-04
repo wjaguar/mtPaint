@@ -155,6 +155,7 @@ enum {
 	op_uRPACK,
 	op_uRPACKD,
 	op_uENTRY,
+	op_uCOLOR,
 	op_uLISTCC,
 	op_uOKBTN,
 	op_uBUTTON,
@@ -792,9 +793,9 @@ enum {
 /* !!! These blocks each hold 2 nested EVENT blocks */
 /* !!! SELECT must be last, for it gets triggered */
 #define COLORLIST(SP,V,CC,HS,HX) WBr3hf_(COLORLIST, 3 + 2 * 2), WBfield(V), \
-	WBfield(CC), WBfield(SP), EVENT(EXT, HX), EVENT(SELECT, HS)
+	WBfield(SP), WBfield(CC), EVENT(EXT, HX), EVENT(SELECT, HS)
 #define COLORLISTN(N,V,CC,HS,HX) WBr3hf_(COLORLISTN, 3 + 2 * 2), WBfield(V), \
-	WBfield(CC), WBfield(N), EVENT(EXT, HX), EVENT(SELECT, HS)
+	WBfield(N), WBfield(CC), EVENT(EXT, HX), EVENT(SELECT, HS)
 #define OKBOX(NOK,HOK,NC,HC) EQBOX, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
 #define OKBOXP(NOK,HOK,NC,HC) EQBOXP, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
 #define OKBOXB(NOK,HOK,NC,HC) EQBOXB, CANCELBTN(NC, HC), OKBTN(NOK, HOK)
