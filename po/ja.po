@@ -1,20 +1,20 @@
 # Japanese translation for mtpaint
 # This file is distributed under the same license as the mtpaint package.
-# Norihiro YONEDA <aoba@avis.ne.jp>, 2007.
-# YoN <yon8844@gmail.com>, 2009. - 2 people to here are equivalence people
+# Norihiro YONEDA (YoN) <yon8844@gmail.com>, 2007-2009.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2011-10-17 19:43+0400\n"
-"PO-Revision-Date: 2014-06-08 10:00+0900\n"
-"Last-Translator: BALLOON a.k.a Fu-sen. (Keiichi SHIGA) <fu-sen+mtpaint@shigakeiichi.com>\n"
+"PO-Revision-Date: 2014-11-10 17:58+0900\n"
+"Last-Translator: BALLOON a.k.a. Fu-sen. (Keiichi SHIGA) <fu-sen+puppylinux@shigakeiichi.com>\n"
 "Language-Team: Puppy Linux Japanese Edition Team\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Rosetta-Version: 0.1\n"
+"X-Generator: Poedit 1.5.7\n"
 
 #: src/ani.c:673
 msgid "Animation Preview"
@@ -236,7 +236,7 @@ msgstr "ガウスの差異"
 
 #: src/canvas.c:594
 msgid "Protect details"
-msgstr ""
+msgstr "プロジェクト詳細"
 
 #: src/canvas.c:596
 msgid "Kuwahara-Nagao Blur"
@@ -330,8 +330,8 @@ msgid ""
 msgstr ""
 "ファイルに問題があるのでファイルインポートライブラリは終了します（たぶん不正"
 "な画像データまたは不完全なファイルです）。ヘッダが間違いないようでしたので、"
-"いくつかのデータを読み込みしました。しかし再度発生しないように、この画像を"
-"新しいファイルへ保存して下さい。"
+"いくつかのデータを読み込みしました。しかし再度発生しないように、この画像を新"
+"しいファイルへ保存して下さい。"
 
 #: src/canvas.c:1396
 msgid "The animation is too long to load all of it into layers."
@@ -801,10 +801,10 @@ msgid ""
 "Foundation; either version 3 of the License, or (at your option) any later "
 "version.\n"
 msgstr ""
-"mtPaint は、無料ソフトです;。フリーソフトウェア財団によって発表された GNU 一般公"
-"有使用許諾 (GPL) の条件の下で、あなたはそれを再配布する事も、それを修正する事も"
-"できます。バージョン３のライセンス、または（あなたのオプションで）どの最新"
-"バージョンでも。\n"
+"mtPaint は、無料ソフトです;。フリーソフトウェア財団によって発表された GNU 一"
+"般公有使用許諾 (GPL) の条件の下で、あなたはそれを再配布する事も、それを修正す"
+"る事もできます。バージョン３のライセンス、または（あなたのオプションで）どの"
+"最新バージョンでも。\n"
 
 #: src/help.c:35
 msgid ""
@@ -813,9 +813,9 @@ msgid ""
 "FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more "
 "details.\n"
 msgstr ""
-"mtPaint は、役に立つ事を希望して配布されますが「無保証」です。商品適格性または"
-"特定目的への適合性の黙示保証もありません。詳細は GNU 一般公有使用許諾を見て下さ"
-"い。\n"
+"mtPaint は、役に立つ事を希望して配布されますが「無保証」です。商品適格性また"
+"は特定目的への適合性の黙示保証もありません。詳細は GNU 一般公有使用許諾を見て"
+"下さい。\n"
 
 #: src/help.c:36
 msgid ""
@@ -826,12 +826,12 @@ msgid ""
 "its simplicity and lack of dependencies it runs well on GNU/Linux, Windows "
 "and older PC hardware.\n"
 msgstr ""
-"mtPaint はアイコンとピクセルベースのアートワークを作成するために設計されたシン"
-"プルな GTK+1/2 ペイントプログラムです。インデックスを付けられたパレットま"
-"たは 24 ビットの RGB イメージを編集でき、基本的な絵とパレット操作ツールを提供しま"
-"す。また、いくつかの強力な特徴、例えばチャンネル、レイヤ、アニメーションもあ"
-"ります。その単純さと依存性がないため、GNU/Linux、Windows と古いパソコンのハードウェア"
-"でも動きます。\n"
+"mtPaint はアイコンとピクセルベースのアートワークを作成するために設計されたシ"
+"ンプルな GTK+1/2 ペイントプログラムです。インデックスを付けられたパレットまた"
+"は 24 ビットの RGB イメージを編集でき、基本的な絵とパレット操作ツールを提供し"
+"ます。また、いくつかの強力な特徴、例えばチャンネル、レイヤ、アニメーションも"
+"あります。その単純さと依存性がないため、GNU/Linux、Windows と古いパソコンの"
+"ハードウェアでも動きます。\n"
 
 #: src/help.c:37
 msgid ""
@@ -839,8 +839,8 @@ msgid ""
 "If you don't already have this, you can download it from the mtPaint "
 "website.\n"
 msgstr ""
-"ハンドブックに含まれる mtPaint の特徴の完全なドキュメントがあります。あなたがま"
-"だ持っていないならば、mtPaint のウェブサイトからダウンロードできます。\n"
+"ハンドブックに含まれる mtPaint の特徴の完全なドキュメントがあります。あなたが"
+"まだ持っていないならば、mtPaint のウェブサイトからダウンロードできます。\n"
 
 #: src/help.c:38
 msgid ""
@@ -848,8 +848,8 @@ msgid ""
 "you want to give some feedback, then the mailing lists may be of interest to "
 "you:\n"
 msgstr ""
-"mtPaint を好みで、新たなリリースの更新を行いたい、あるいは"
-"フィードバックをしたいなら、メーリングリストが興味深いかも知れません：\n"
+"mtPaint を好みで、新たなリリースの更新を行いたい、あるいはフィードバックをし"
+"たいなら、メーリングリストが興味深いかも知れません：\n"
 
 #: src/help.c:39
 msgid "http://sourceforge.net/mail/?group_id=155874"
@@ -974,8 +974,8 @@ msgid ""
 "  Insert            Transform colours - i.e. Brightness, Contrast, "
 "Saturation, Posterize, Gamma"
 msgstr ""
-"  Insert          色を変換 - ブライトネス、明るさ、コントラスト、彩度、ポスタライ"
-"ズ、ガンマ"
+"  Insert          色を変換 - ブライトネス、明るさ、コントラスト、彩度、ポスタ"
+"ライズ、ガンマ"
 
 #: src/help.c:68
 msgid "  Ctrl-G            Greyscale the image"
@@ -1104,49 +1104,49 @@ msgid "  Shift -           View window - Zoom out\n"
 msgstr "  Shift -        表示ウィンドウ - 縮小\n"
 
 #: src/help.c:97
-#, fuzzy, c-format
+#, c-format
 msgid "  1                 10% zoom"
-msgstr "  1              10% ズーム"
+msgstr "  1                 10% zoom"
 
 #: src/help.c:98
-#, fuzzy, c-format
+#, c-format
 msgid "  2                 25% zoom"
-msgstr "  2              25% ズーム"
+msgstr "  2                 25% zoom"
 
 #: src/help.c:99
-#, fuzzy, c-format
+#, c-format
 msgid "  3                 50% zoom"
-msgstr "  3              50% ズーム"
+msgstr "  3                 50% zoom""
 
 #: src/help.c:100
-#, fuzzy, c-format
+#, c-format
 msgid "  4                 100% zoom"
-msgstr "  4              100% ズーム"
+msgstr "  4                 100% zoom"
 
 #: src/help.c:101
-#, fuzzy, c-format
+#, c-format
 msgid "  5                 400% zoom"
-msgstr "  5              400% ズーム"
+msgstr "  5                 400% zoom"
 
 #: src/help.c:102
-#, fuzzy, c-format
+#, c-format
 msgid "  6                 800% zoom"
-msgstr "  6              800% ズーム"
+msgstr "  6                 800% zoom"
 
 #: src/help.c:103
-#, fuzzy, c-format
+#, c-format
 msgid "  7                 1200% zoom"
-msgstr "  7              1200% ズーム"
+msgstr "  7                 1200% zoom"
 
 #: src/help.c:104
-#, fuzzy, c-format
+#, c-format
 msgid "  8                 1600% zoom"
-msgstr "  8              1600% ズーム"
+msgstr "  8                 1600% zoom"
 
 #: src/help.c:105
-#, fuzzy, c-format
+#, c-format
 msgid "  9                 2000% zoom\n"
-msgstr "  9              2000% ズーム\n"
+msgstr "  9                 2000% zoom\n"
 
 #: src/help.c:106
 msgid "  Shift + 1         Edit image channel"
@@ -1646,7 +1646,8 @@ msgid ""
 "One or more of the layers contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
 msgstr ""
-"１つ以上のレイヤーに保存されていない変更があります。変更を破棄してもよろしいですか？"
+"１つ以上のレイヤーに保存されていない変更があります。変更を破棄してもよろしい"
+"ですか？"
 
 #: src/layer.c:499 src/mainwindow.c:1122
 msgid "Cancel Operation"
@@ -1667,8 +1668,8 @@ msgid ""
 "image individually before saving the layers text file in order to load this "
 "composite image in the future."
 msgstr ""
-"一つ以上のレイヤーが保存されていません。後に合成画像を読み込むために、"
-"レイヤーテキストを保存する前に画像を個々に保存して下さい。"
+"一つ以上のレイヤーが保存されていません。後に合成画像を読み込むために、レイ"
+"ヤーテキストを保存する前に画像を個々に保存して下さい。"
 
 #: src/layer.c:919
 msgid "Do you really want to delete all of the layers?"
@@ -1761,8 +1762,8 @@ msgid ""
 "You are trying to save an %s file with a palette of more than %d colours.  "
 "Either use another format or reduce the palette to %d colours."
 msgstr ""
-"ファイル %s を %d 色以上のパレットで保存しようとしています。別の形式"
-"を使用するか、パレットを %d 色に減色して下さい。"
+"ファイル %s を %d 色以上のパレットで保存しようとしています。別の形式を使用す"
+"るか、パレットを %d 色に減色して下さい。"
 
 #: src/mainwindow.c:528
 msgid ""
@@ -2132,7 +2133,7 @@ msgstr "/パレット(_P)"
 #: src/mainwindow.c:4844 src/mainwindow.c:4894
 msgid "//Load ..."
 msgstr "//読み込み..."
- 
+
 #: src/mainwindow.c:4846
 msgid "//Load Default"
 msgstr "//デフォルトを読み込み"
@@ -3143,8 +3144,8 @@ msgstr "カラープロファイルの適用"
 #, c-format
 msgid "%d out of %d frames could not be saved as %s - saved as PNG instead"
 msgstr ""
-"%d フレームのうち %d は %s として保存できませんでした - "
-"かわりに PNG で保存しました"
+"%d フレームのうち %d は %s として保存できませんでした - かわりに PNG で保存し"
+"ました"
 
 #: src/png.c:6744
 msgid "Explode frames"
@@ -3525,21 +3526,21 @@ msgid ""
 "mtPaint Handbook from the web site and install it, or you need to set the "
 "correct location in the Preferences window."
 msgstr ""
-"ドキュメントが見つかりません。"
-"インターネットから mtPaint ハンドブックをインストールするか、"
-"設定ウィンドウで正しいロケーションを設定する必要があります。"
+"ドキュメントが見つかりません。インターネットから mtPaint ハンドブックをインス"
+"トールするか、設定ウィンドウで正しいロケーションを設定する必要があります。"
 
 #: src/spawn.c:820
 msgid ""
 "There was a problem running the HTML browser.  You need to set the correct "
 "program name in the Preferences window."
 msgstr ""
-"HTML ブラウザを実行中に問題が発生しました。"
-"設定ウィンドウでプログラム名を正しく設定する必要があります。"
+"HTML ブラウザを実行中に問題が発生しました。設定ウィンドウでプログラム名を正し"
+"く設定する必要があります。"
 
 #: src/thread.c:322
 msgid "Helper thread is not responding. Save your work and exit the program."
-msgstr "ヘルパースレッドの反応がありせん。作業を保存し、プログラムを終了して下さい。"
+msgstr ""
+"ヘルパースレッドの反応がありせん。作業を保存し、プログラムを終了して下さい。"
 
 #: src/toolbar.c:233
 msgid "RGB Cube"
@@ -3856,29 +3857,29 @@ msgstr "mtPaint について"
 #~ "You are trying to save an RGB image to an XPM file which is not "
 #~ "possible.  I would suggest you save with a PNG extension."
 #~ msgstr ""
-#~ "RGB イメージを不可能な XPM ファイルに保存しようとしています。"
-#~ "拡張子 PNG で保存して下さい。"
+#~ "RGB イメージを不可能な XPM ファイルに保存しようとしています。拡張子 PNG で"
+#~ "保存して下さい。"
 
 #~ msgid ""
 #~ "You are trying to save an RGB image to a GIF file which is not possible.  "
 #~ "I would suggest you save with a PNG extension."
 #~ msgstr ""
-#~ "RGB イメージを不可能な GIF ファイルに保存しようとしています。"
-#~ "拡張子 PNG で保存して下さい。"
+#~ "RGB イメージを不可能な GIF ファイルに保存しようとしています。拡張子 PNG で"
+#~ "保存して下さい。"
 
 #~ msgid ""
 #~ "You are trying to save an XBM file with a palette of more than 2 "
 #~ "colours.  Either use another format or reduce the palette to 2 colours."
 #~ msgstr ""
-#~ "XBM ファイルを 2 色以上のパレットで保存しようとしています。"
-#~ "他のフォーマットにするか、パレットを 2 色に減らして下さい。"
+#~ "XBM ファイルを 2 色以上のパレットで保存しようとしています。他のフォーマッ"
+#~ "トにするか、パレットを 2 色に減らして下さい。"
 
 #~ msgid ""
 #~ "You are trying to save an indexed canvas to a JPEG file which is not "
 #~ "possible.  I would suggest you save with a PNG extension."
 #~ msgstr ""
-#~ "インデックスキャンバスを不可能な JPEG ファイルで保存しようとしています。"
-#~ "拡張子 PNG で保存して下さい。"
+#~ "インデックスキャンバスを不可能な JPEG ファイルで保存しようとしています。拡"
+#~ "張子 PNG で保存して下さい。"
 
 #~ msgid "/File/Actions/sep2"
 #~ msgstr "/ファイル(F)/アクション/sep2"
