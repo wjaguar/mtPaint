@@ -1051,7 +1051,7 @@ static void layer_bar_click(layers_dd *dt, void **wdata, int what, void **where)
 #define WBbase layers_dd
 static void *layers_code[] = {
 	TOPVBOX,
-	BORDER(SCROLL, 0), BORDER(LISTCC, 0),
+	SCRIPTED, BORDER(SCROLL, 0), BORDER(LISTCC, 0),
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
 	IDXCOLUMN(0, 1, 40, 1), // center
@@ -1074,7 +1074,7 @@ static void *layers_code[] = {
 	REF(ltb_del), TBBUTTON(_("Delete Layer"), XPM_ICON(cut),
 		ACTMOD(ACT_LR_DEL, 0)),
 	REF(ltb_close), TBBUTTON(_("Close Layers Window"), XPM_ICON(close),
-		ACTMOD(DLG_LAYERS, 1)),
+		ACTMOD(DLG_LAYERS, 1)), UNNAME,
 	WDONE,
 	TABLEs(3, 4, 5),
 	BORDER(LABEL, 0), BORDER(ENTRY, 0),
@@ -1084,9 +1084,9 @@ static void *layers_code[] = {
 	EVENT(CHANGE, layer_inputs_changed),
 	TLABEL(_("Position")),
 	REF(xspin), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 1),
-	EVENT(CHANGE, layer_inputs_changed),
+	EVENT(CHANGE, layer_inputs_changed), OPNAME("x"),
 	REF(yspin), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 1),
-	EVENT(CHANGE, layer_inputs_changed),
+	EVENT(CHANGE, layer_inputs_changed), OPNAME("y"),
 	TLABEL(_("Opacity")),
 	REF(opslider), TLSPINSLIDExl(opacity, 0, 100, 1, 2, 2),
 	EVENT(CHANGE, layer_inputs_changed),
@@ -1095,7 +1095,7 @@ static void *layers_code[] = {
 	EVENT(CHANGE, layer_inputs_changed),
 	WDONE,
 	CHECKv(_("Show all layers in main window"), show_layers_main),
-	EVENT(CHANGE, layer_inputs_changed),
+	EVENT(CHANGE, layer_inputs_changed), UNNAME,
 	WEND
 };
 #undef WBbase

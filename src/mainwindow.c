@@ -294,7 +294,9 @@ void pressed_select(int all)
 		int rxy[4];
 
 		script_rect(rxy);
-		if (!clip(rxy, 0, 0, mem_width - 1, mem_height - 1, rxy)) break;
+		clip(rxy, 0, 0, mem_width - 1, mem_height - 1, rxy);
+		/* We are selecting an area, so block inside-out selections */
+		if ((rxy[0] > rxy[2]) || (rxy[1] > rxy[3])) break;
 		i |= UPD_SEL;
 		copy4(marq_xy, rxy);
 		if (tool_type != TOOL_SELECT)
@@ -3488,21 +3490,20 @@ int run_script(char **res)
 				str = _("'%s' matches a disabled item");
 			else
 			{
-				static char *nocmd;
-				char *tmp = NULL;
+				char *chain[3], *tmp = strchr(cur[0], '=');
 
-				script_cmds = cur;
-				/* If have toggle-item and default value */
-				if (slot_data(slot, NULL) &&
-					(tmp = strchr(cur[0], '=')))
+				script_cmds = cur + 1;
+				/* Send default value on, if no toggle-item */
+				if (tmp && !slot_data(slot, NULL))
 				{
-					/* Hide value from item's code */
-					script_cmds = cur[1] && (cur[1][0] == '-') ?
-						&nocmd : cur + 1;
-					tmp++; // Skip "="
+					chain[0] = tmp;
+					chain[1] = (void *)&chain[1];
+					chain[2] = (void *)script_cmds;
+					script_cmds = chain;
 				}
+
 				/* Activate the item */
-				n = cmd_setstr(slot, tmp);
+				n = cmd_setstr(slot, tmp + !!tmp); // skip "="
 				script_cmds = NULL;
 
 				if (n < 0) str = _("'%s' value does not fit item");
@@ -3546,12 +3547,20 @@ static void *script_code[] = {
 };
 #undef WBbase
 
-static void script_test()
+static void pressed_script()
 {
 	script_dd tdata = { inifile_get("script1",
 		"# Resharpen image after rescaling\n"
 		"-effect/unsharp r=1 am=0.4 -effect/unsharp r=30 am=0.1") };
 	run_create(script_code, &tdata, sizeof(tdata));
+}
+
+static void do_script(int what)
+{
+	void **where = what == TOOLBAR_LAYERS ? layers_dock :
+		what == TOOLBAR_SETTINGS ? settings_dock :
+		/* what == TOOLBAR_TOOLS */ toolbar_boxes[TOOLBAR_TOOLS];
+	cmd_run_script(where, script_cmds);
 }
 
 typedef struct {
@@ -3914,6 +3923,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		shift_layer(mode); break;
 	case ACT_LR_CENTER:
 		layer_press_centre(); break;
+	case ACT_SCRIPT:
+		do_script(mode); break;
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
 	case DLG_CHOOSER:
@@ -3985,6 +3996,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_pick_gradient(); break;
 	case DLG_SEGMENT:
 		pressed_segment(); break;
+	case DLG_SCRIPT:
+		pressed_script(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4013,10 +4026,6 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_unassociate(); break;
 	case FILT_KUWAHARA:
 		pressed_kuwahara(); break;
-
-	case ACT_TEST:
-		script_test(); break;
-
 	}
 }
 
@@ -4384,6 +4393,10 @@ static void *main_menu_code[] = {
 		SHORTCUTs("F3"),
 	MENUITEMs(_("//Choose Colour ..."), ACTMOD(DLG_CHOOSER, CHOOSE_COLOR)),
 		SHORTCUTs("E"),
+	// for scripting
+	uMENUITEMs("//layers", ACTMOD(ACT_SCRIPT, TOOLBAR_LAYERS)),
+	uMENUITEMs("//settings", ACTMOD(ACT_SCRIPT, TOOLBAR_SETTINGS)),
+	uMENUITEMs("//tools", ACTMOD(ACT_SCRIPT, TOOLBAR_TOOLS)),
 	WDONE,
 	SSUBMENU(_("/_View")),
 	MENUTEAR, //
@@ -4450,9 +4463,7 @@ static void *main_menu_code[] = {
 // !!! Maybe support indexed mode too, later
 	MENUITEMs(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
 		ACTMAP(NEED_24),
-
-	MENUITEM(_("//Script ..."), ACTMOD(ACT_TEST, 0)),
-
+	MENUITEM(_("//Script ..."), ACTMOD(DLG_SCRIPT, 0)),
 	MENUSEP, //
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUTs("<control>I"),
@@ -4625,12 +4636,12 @@ static void *main_menu_code[] = {
 	SSUBMENU(_("/_Layers")),
 	MENUTEAR, //
 	MENUITEMis(_("//New Layer"), ACTMOD(ACT_LR_ADD, LR_NEW), XPM_ICON(new)),
-	MENUITEMi(_("//Save"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
+	MENUITEMis(_("//Save"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
 		SHORTCUTs("<shift><control>S"),
-	MENUITEM(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
+	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
 	MENUITEMs(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
 	MENUITEMs(_("//Composite to New Layer"), ACTMOD(ACT_LR_ADD, LR_COMP)),
-	MENUITEM(_("//Remove All Layers"), ACTMOD(ACT_LR_DEL, 1)),
+	MENUITEMs(_("//Remove All Layers"), ACTMOD(ACT_LR_DEL, 1)),
 	MENUSEP, //
 	MENUITEM(_("//Configure Animation ..."), ACTMOD(DLG_ANI, 0)),
 	MENUITEM(_("//Preview Animation ..."), ACTMOD(DLG_ANI_VIEW, 0)),
@@ -4648,6 +4659,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Rebind Shortcut Keycodes"), ACTMOD(ACT_REBIND_KEYS, 0)),
 	WDONE,
 	SMDONE, // smartmenu
+	ENDSCRIPT,
 	RET
 };
 
@@ -4808,7 +4820,7 @@ void main_init()
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 
-	if (!show_dock) // Stops first icon in toolbar being selected
+	if (!tdata.cline_d) // Stops first icon in toolbar being selected
 		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
 
 	init_status_bar();

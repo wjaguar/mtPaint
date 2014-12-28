@@ -44,6 +44,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 /* Max columns in a list */
 #define MAX_COLS 16
 
+#define VVS(N) (((N) + sizeof(void *) - 1) / sizeof(void *))
+
 #define GET_OPF(S) ((int)*(void **)(S)[1])
 #define GET_OP(S) (GET_OPF(S) & WB_OPMASK)
 
@@ -160,6 +162,21 @@ void *slot_data(void **slot, void *ddata)
 	return (v);
 }
 
+/* Find specific V-code _after_ this slot */
+static void **op_slot(void **slot, int op)
+{
+	while ((slot = NEXT_SLOT(slot))[1])
+	{
+		int n = GET_OP(slot);
+		// Found
+		if (n == op) return (slot);
+		// Till another origin slot
+		if (n < op_EVT_0) break;
+	}
+	// Not found
+	return (NULL);
+}
+
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
 	v_dd *vdata = GET_VDATA(wdata);
@@ -240,14 +257,11 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	/* Now, ask prioritized widget */
 	while (!res && vdata->wantkey)
 	{
-		GtkWidget *focus, *w = origin_slot(vdata->wantkey)[0];
-		void *was_evt;
+		void *was_evt, **wslot = origin_slot(vdata->wantkey);
 
-// !!! Likely later will be cmd_check_focus() - and w/o "...MAPPED()?"
-		if (!GTK_WIDGET_MAPPED(w)) break; // not displayed
-		focus = GTK_WINDOW(widget)->focus_widget;
-		if (!(focus && ((focus == w) ||
-			gtk_widget_is_ancestor(focus, w)))) break; // not focused
+		if (!GTK_WIDGET_MAPPED(wslot[0])) break; // not displayed
+// !!! Maybe this check is enough by itself?
+		if (!cmd_checkv(wslot, SLOT_FOCUSED)) break;
 
 		slot = NEXT_SLOT(vdata->wantkey);
 		if (GET_HANDLER(slot) &&
@@ -303,7 +317,7 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 #if GTK_MAJOR_VERSION == 2
 	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_working)
 	{
-		gdouble pressure;
+		gdouble pressure = 1.0;
 		gdk_event_get_axis(event, GDK_AXIS_PRESSURE, &pressure);
 		mouse->pressure = (int)(pressure * MAX_PRESSURE + 0.5);
 	}
@@ -1013,11 +1027,9 @@ static void trigger_things(void **wdata)
 		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 
 		/* Trigger events for nested widget */
-		if ((op == op_MOUNT) || (op == op_PMOUNT))
+		if (op == op_MOUNT)
 		{
-			GtkWidget *w = GTK_BIN(wdata[0])->child;
-			if (w && (slot = get_wdata(w, NULL)))
-				trigger_things(slot);
+			if ((slot = wdata[2])) trigger_things(slot);
 			continue;
 		}
 		if (op == op_uMOUNT)
@@ -1028,13 +1040,19 @@ static void trigger_things(void **wdata)
 		}
 
 		if (op != op_TRIGGER) continue;
-		base = slot = PREV_SLOT(wdata);
-		if (WB_GETLEN(opf)) // Version for menu/toolbar items
+		if (!WB_GETLEN(opf)) // Regular version
+		{
+			slot = PREV_SLOT(wdata);
+			while (GET_OP(slot) > op_EVT_LAST) // Find EVT slot
+				slot = PREV_SLOT(slot);
+			base = slot;
+		}
+		else // Version for menu/toolbar items
 		{
 			/* Here, event is put into next slot, and widget is
 			 * in nearest widgetlike slot before */
 			base = NEXT_SLOT(wdata);
-			slot = origin_slot(slot);
+			slot = origin_slot(wdata);
 		}
 		desc = base[1];
 		((evt_fn)desc[1])(data, base[0], (int)desc[0] & WB_OPMASK, slot);
@@ -1372,36 +1390,72 @@ static void fcimage_rxy(void **slot, int *xy)
 	xy[1] = xy[1] < 0 ? 0 : xy[1] >= fd->h ? fd->h - 1 : xy[1];
 }
 
-//	RPACK*/OPT*/COMBO widgets
+// OPT* widgets
 
-GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
+#if GTK_MAJOR_VERSION == 2
+
+/* Cause the size to be properly reevaluated */
+static void opt_size_fix(GtkWidget *widget)
 {
-#if U_NLS
-	char *tc[256];
+	gtk_signal_emit_by_name(GTK_OBJECT(gtk_option_menu_get_menu(
+		GTK_OPTION_MENU(widget))), "selection_done");
+}
+
 #endif
+
+static void opt_reset(void **slot, char *ddata, int idx)
+{
+	GtkWidget *menu, *item;
+	void **pp = slot[1];
+	char **names;
+	int i, j, k, cnt, opf = GET_OPF(slot), op = opf & WB_OPMASK;
+
+	if (op == op_OPTD) cnt = -1 , names = *(char ***)(ddata + (int)pp[2]);
+	else cnt = (int)pp[3] , names = pp[2];
+	if (!cnt) cnt = -1;
+
+	menu = gtk_menu_new();
+	for (i = j = k = 0; (i != cnt) && names[i]; i++)
+	{
+		if (!names[i][0]) continue;
+		item = gtk_menu_item_new_with_label(_(names[i]));
+		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
+		if (WB_GETREF(opf) > 1) gtk_signal_connect(GTK_OBJECT(item),
+			"activate", GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(slot));
+		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+		if (i == idx) j = k;
+		k++;
+  	}
+	gtk_widget_show_all(menu);
+	gtk_menu_set_active(GTK_MENU(menu), j);
+	gtk_option_menu_set_menu(GTK_OPTION_MENU(slot[0]), menu);
+#if GTK_MAJOR_VERSION == 2
+	opt_size_fix(slot[0]);
+#endif
+}	
+
+static int wj_option_menu_get_history(GtkWidget *optmenu)
+{
+	optmenu = gtk_option_menu_get_menu(GTK_OPTION_MENU(optmenu));
+	optmenu = gtk_menu_get_active(GTK_MENU(optmenu));
+	return (optmenu ? (int)gtk_object_get_user_data(GTK_OBJECT(optmenu)) : 0);
+}
+
+//	RPACK* and COMBO widgets
+
+static GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
+{
 	void **pp = r[1];
 	char **src = pp[2];
 	int nh, n, v = *(int *)r[0];
 
 	nh = (n = (int)pp[3]) & 255;
-	if (mode < 0) n >>= 8;
+	if (mode) n >>= 8;
 	if (d) n = -1 , src = *(char ***)(ddata + (int)pp[2]);
 	if (!n) n = -1;
-#if U_NLS
-	{
-		int i;
-		for (i = 0; (i != n) && src[i]; i++)
-			tc[i] = src[i][0] ? _(src[i]) : "";
-		n = i;
-		src = tc;
-	}
-#endif
-	return (mode < 0 ? wj_radio_pack(src, n, nh, v,
-		ref > 1 ? NEXT_SLOT(r) : NULL,
-		ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1_t) : NULL) :
-		(mode? wj_combo_box : wj_option_menu)(src, n, v,
-		ref > 1 ? NEXT_SLOT(r) : NULL,
-		ref > 1 ? GTK_SIGNAL_FUNC(get_evt_1) : NULL));
+	return ((mode ? wj_radio_pack : wj_combo_box)(src, n, nh, v,
+		NEXT_SLOT(r), ref < 2 ? NULL : 
+		mode ? GTK_SIGNAL_FUNC(get_evt_1_t) : GTK_SIGNAL_FUNC(get_evt_1)));
 }
 
 //	COLORLIST widget
@@ -1884,21 +1938,52 @@ static void listcc_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 		(int)desc[0] & WB_OPMASK, slot);
 }
 
-static void listcc_select_item(GtkList *list, listcc_data *dt)
+static void listcc_select_item(void **slot)
 {
-	GtkWidget *item;
+	GtkWidget *item, *win, *list = slot[0], *fw = NULL;
+	listcc_data *dt = slot[2];
 	int idx = *dt->idx, n = dt->h - idx - 1; // backward
 
-	if (!(item = g_list_nth_data(list->children, n))) return;
+	if (!(item = g_list_nth_data(GTK_LIST(list)->children, n))) return;
 	/* Move focus if sensitive, flag to be moved later if not */
-	if (!(dt->wantfoc = !GTK_WIDGET_SENSITIVE((GtkWidget *)list)))
+	if (!(dt->wantfoc = !GTK_WIDGET_IS_SENSITIVE(list)))
 	{
 		dt->lock++; // this is strictly a visual update
-		list_select_item((GtkWidget *)list, item);
+
+		win = gtk_widget_get_toplevel(list);
+		if (GTK_IS_WINDOW(win)) fw = GTK_WINDOW(win)->focus_widget;
+
+		/* Focus is somewhere in list - move it, selection will follow */
+		if (fw && gtk_widget_is_ancestor(fw, list))
+			gtk_widget_grab_focus(item);
+		else /* Focus is elsewhere - move whatever remains, then */
+		{
+	/* !!! For simplicity, an undocumented field is used; a bit less hacky
+	 * but longer is to set focus child to item, NULL, and item again - WJ */
+			gtk_container_set_focus_child(GTK_CONTAINER(list), item);
+			GTK_LIST(list)->last_focus_child = item;
+		}
+		/* Clear stuck selections when possible */
+		gtk_list_item_select(GTK_LIST_ITEM(item));
+
 		dt->lock--;
 	}
 	/* Signal must be reliable even with focus delayed */
-	listcc_select(list, item, dt);
+	listcc_select(NULL, item, dt);
+}
+
+static void listcc_update(GtkWidget *widget, GtkStateType state, gpointer user_data)
+{
+	if (state == GTK_STATE_INSENSITIVE)
+	{
+		void **slot = user_data;
+		listcc_data *dt = slot[2];
+
+		if (!dt->wantfoc) return;
+		dt->lock++; // strictly a visual update
+		listcc_select_item(slot);
+		dt->lock--;
+	}
 }
 
 static void listcc_toggled(GtkWidget *widget, gpointer user_data)
@@ -1924,9 +2009,11 @@ static void listcc_toggled(GtkWidget *widget, gpointer user_data)
 		(int)desc[0] & WB_OPMASK, slot, (void *)row);
 }
 
-static void listcc_reset(GtkList *list, listcc_data *ld, int row)
+static void listcc_reset(void **slot, int row)
 {
-	GList *col, *curr = list->children;
+	GtkWidget *list = slot[0];
+	GList *col, *curr = GTK_LIST(list)->children;
+	listcc_data *ld = slot[2];
 	int cnt = *ld->cnt;
 
 
@@ -1947,7 +2034,7 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 		}
 		
 		col = GTK_BOX(GTK_BIN(item)->child)->children;
-		for (j = 0; col; col = col->next , j++)
+		for (j = 0; j < ld->c.ncol; col = col->next , j++)
 		{
 			GtkWidget *widget = ((GtkBoxChild *)(col->data))->widget;
 			char *v = get_cell(&ld->c, n, j);
@@ -1965,7 +2052,7 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 		if (row >= 0) break; // one row only
 	}
 
-	if (row < 0) listcc_select_item(list, ld); // only when full reset
+	if (row < 0) listcc_select_item(slot); // only when full reset
 	ld->lock = FALSE;
 }
 
@@ -1973,7 +2060,7 @@ static void listcc_reset(GtkList *list, listcc_data *ld, int row)
 GtkWidget *listcc(void **r, char *ddata, col_data *c)
 {
 	char txt[128];
-	GtkWidget *widget, *list, *item, *hbox;
+	GtkWidget *widget, *list, *item, *uninit_(hbox);
 	listcc_data *ld = r[2];
 	void **pp = r[1];
 	int j, n, h, *cnt, *idx = r[0];
@@ -2039,10 +2126,15 @@ GtkWidget *listcc(void **r, char *ddata, col_data *c)
 		gtk_widget_show_all(hbox);
 	}
 
-	if (*cnt) listcc_reset(GTK_LIST(list), ld, -1);
+	r[0] = list; // Fix up slot
+	if (*cnt) listcc_reset(r, -1);
 
 	gtk_signal_connect(GTK_OBJECT(list), "select_child",
 		GTK_SIGNAL_FUNC(listcc_select), ld);
+	/* To move focus when delayed by insensitivity */
+	widget = pack(hbox, gtk_label_new("")); // canary: updated last
+	gtk_signal_connect(GTK_OBJECT(widget), "state_changed",
+		GTK_SIGNAL_FUNC(listcc_update), r);
 
 	return (list);
 }
@@ -3797,15 +3889,19 @@ static int in_script(int op, char **script)
 int predict_size(void **ifcode, char *ddata, char **script)
 {
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
-	int op, opf, u = 0, n = 2; // safety margin
+	int scripted = FALSE;
+	int op, opf, ref, u = 0, n = 0;
 
 	while (TRUE)
 	{
 		opf = op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + WB_GETLEN(op);
-		n += WB_GETREF(op);
+		n += ref = WB_GETREF(op);
 		op = in_script(op, script);
 		if (op < op_END_LAST) break; // End
+		// Livescript start/stop
+		if (!script && (op == op_uOPNAME) && (opf & WB_SFLAG))
+			scripted = !ref;
 		// Subroutine return
 		if (op == op_RET) ifcode = *--rp;
 		// Jump or subroutine call
@@ -3821,14 +3917,20 @@ int predict_size(void **ifcode, char *ddata, char **script)
 		// Allocation
 		else 
 		{
-			int l = (op == op_TALLOC) || (op == op_TCOPY) ?
+			u += VVS((op == op_TALLOC) || (op == op_TCOPY) ?
 				*(int *)(ddata + (int)pp[1]) :
 				op == op_TLSPINPACK ? TLSPINPACK_SIZE(pp - 1) :
-				cmds[op] ? cmds[op]->size : 0;
-			u += (l + sizeof(void *) - 1) / sizeof(void *);
+				cmds[op] ? cmds[op]->size : 0);
+			// Name for scripting
+			if (ref && scripted && cmds[op] && cmds[op]->uop)
+			{
+				n++;
+				u += VVS(sizeof(swdata));
+			}
 		}
 	}
 
+	n += 2; // safety margin
 	return (n * VSLOT_SIZE + u);
 }
 
@@ -3838,6 +3940,7 @@ static cmdef cmddefs[] = {
 	{ op_CANVASIMG,	sizeof(rgbimage_data) },
 	{ op_CANVASIMGB, sizeof(rgbimage_data) },
 	{ op_FCIMAGEP,	sizeof(fcimage_data) },
+// !!! Beware - COLORLIST is self-reading and uOPTD is not
 	{ op_COLORLIST,	sizeof(colorlist_data), op_uOPTD },
 	{ op_COLORLISTN, sizeof(colorlist_data), op_uLISTCC },
 	{ op_GRADBAR,	sizeof(gradbar_data) },
@@ -3850,6 +3953,16 @@ static cmdef cmddefs[] = {
 	{ op_SMARTTBAR,	sizeof(smarttbar_data), op_uMENUBAR },
 	{ op_SMARTMENU,	sizeof(smartmenu_data), op_uMENUBAR },
 	{ op_DRAGDROP,	sizeof(drag_ctx) },
+	/* In this, data slot points to dependent widget's wdata */
+	{ op_MOUNT,	0, op_uMOUNT },
+	/* In these, data slot points to menu/toolbar slot */
+	{ op_TBBUTTON,	0, op_uMENUITEM },
+	{ op_TBTOGGLE,	0, op_uMENUCHECK },
+	{ op_TBRBUTTON,	0, op_uMENURITEM },
+	{ op_TBBOXTOG,	0, op_uMENUCHECK },
+	{ op_MENUITEM,	0, op_uMENUITEM },
+	{ op_MENUCHECK,	0, op_uMENUCHECK },
+	{ op_MENURITEM,	0, op_uMENURITEM },
 
 	{ op_WEND,	0, op_uWEND },
 	{ op_WSHOW,	0, op_uWSHOW },
@@ -3873,21 +3986,13 @@ static cmdef cmddefs[] = {
 	{ op_RPACKD,	0, op_uRPACKD },
 	{ op_OPT,	0, op_uOPT },
 	{ op_OPTD,	0, op_uOPTD },
-//	op_COMBO,
+	{ op_COMBO,	0, op_uOPT },
 	{ op_ENTRY,	0, op_uENTRY },
 	{ op_COLOR,	0, op_uCOLOR },
 //	and various others between op_OPTD and op_OKBTN
 	{ op_OKBTN,	0, op_uOKBTN },
 	{ op_BUTTON,	0, op_uBUTTON },
 	{ op_TOOLBAR,	0, op_uMENUBAR },
-	{ op_TBBUTTON,	0, op_uMENUITEM },
-	{ op_TBTOGGLE,	0, op_uMENUCHECK },
-	{ op_TBRBUTTON,	0, op_uMENURITEM },
-	{ op_MENUITEM,	0, op_uMENUITEM },
-	{ op_MENUCHECK,	0, op_uMENUCHECK },
-	{ op_MENURITEM,	0, op_uMENURITEM },
-	{ op_MOUNT,	0, op_uMOUNT },
-	{ op_PMOUNT,	0, op_uMOUNT },
 	{ op_ACTMAP,	0, -1 },
 	{ op_INSENS,	0, -1 },
 
@@ -3934,6 +4039,8 @@ static void do_destroy(void **wdata);
 /* Create a new slot */
 #define PREP_SLOT(R,W,D,T) (R)[0] = (W) , (R)[1] = (D) , (R)[2] = (T)
 #define ADD_SLOT(R,W,D,T) PREP_SLOT(R, W, D, T) , (R) += VSLOT_SIZE
+/* Finalize a prepared slot */
+#define FIX_SLOT(R,W) (R)[0] = (W) , (R) += VSLOT_SIZE
 
 void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 {
@@ -3943,7 +4050,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #if GTK_MAJOR_VERSION == 1
 	int have_sliders = FALSE;
 #endif
-	int part = FALSE, accel = 0;
+	int scripted = FALSE, part = FALSE, accel = 0;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
 	void *wstack[CONT_DEPTH * 2], **wp = wstack + CONT_DEPTH * 2;
 	GtkWidget *window = NULL, *widget = NULL, *sw = NULL;
@@ -3963,9 +4070,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
                 cmds[cmddefs[i].op] = cmddefs + i;
 
 	// Allocation size
-	ld = (ddsize + sizeof(void *) - 1) / sizeof(void *);
-	n = (sizeof(v_dd) + sizeof(void *) - 1) / sizeof(void *);
-	dsize = ld + n + 2 + predict_size(ifcode, ddata, script);
+	ld = VVS(ddsize);
+	n = VVS(sizeof(v_dd));
+	dsize = ld + n + VSLOT_SIZE + predict_size(ifcode, ddata, script);
 	if (!(res = calloc(dsize, sizeof(void *)))) return (NULL); // failed
 	dtail = res + dsize; // Locate tail of block
 	memcpy(res, ddata, ddsize); // Copy datastruct
@@ -3999,9 +4106,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		if (op & WB_NFLAG) v = *(char **)v; // dereference a string
 		ref = WB_GETREF(op);
 		op = in_script(op, script);
-		if (cmds[op]) dtail -= (cmds[op]->size + sizeof(void *) - 1) /
-			sizeof(void *);
-		/* Pass most relevant parameters through the next free slot */
+		if (cmds[op]) dtail -= VVS(cmds[op]->size);
+		/* Prepare slot, with data pointer in widget's place */
 		PREP_SLOT(r, v, pp, dtail);
 		tpad = cw = 0;
 		switch (op)
@@ -4077,34 +4183,32 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Script mode alternate identifier */
 		case op_uALTNAME:
-			if (!script) continue;
+			if (!script && !scripted) continue;
 			wid = v;
 			pk = pk_UNREALV;
 			break;
 		/* Script mode identifier (forced) */
 		case op_uOPNAME:
+			/* If flagged as livescript start/stop marker */
+			if ((int)pp[0] & WB_SFLAG)
+			{
+				widget = NULL;
+				scripted = FALSE;
+				if (ref) break; // stop if ref
+				wid = ""; // default
+				scripted = !script;
+				continue; // start if no ref
+			}
 			/* If inside script and having something to set */
-			if (script && v)
+			if ((script || scripted) && v)
 			{
 				void **slot = origin_slot(PREV_SLOT(r));
-				if (IS_UNREAL(slot)) // Paranoia
-					((swdata *)dtail)->id = v;
+				if (!IS_UNREAL(slot))
+					slot = op_slot(slot, op_uALTNAME);
+				if (slot) ((swdata *)slot[0])->id = v;
 			}
 			wid = NULL; // Clear current identifier
 			continue;
-		/* Script mode label, as identifier for prev/next control */
-		case op_uLABEL:
-			if (!wid) // Maybe the preceding slot needs a label
-			{
-				void **slot = origin_slot(PREV_SLOT(r));
-				if (IS_UNREAL(slot)) // Paranoia
-				{
-					swdata *sd = slot[0];
-					if (!sd->id && (sd->op != op_uOP))
-						sd->id = v , v = NULL;
-				}
-			}
-			// Fallthrough
 		/* Script mode frame, as identifier to next control */
 		case op_uFRAME:
 			wid = v;
@@ -4207,7 +4311,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// Fallthrough
 		case op_uMENUITEM:
 			wid = pp[3];
-			((swdata *)dtail)->strs = NEXT_SLOT(tbar);
+			((swdata *)dtail)->strs = tbar;
 			pk = pk_UNREALV;
 			break;
 		/* Script mode mount socket */
@@ -4418,7 +4522,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			ct = ct_BOX;
 			break;
 		/* Add a frame */
-		case op_FRAME: case op_EFRAME:
+		case op_FRAME:
+			wid = v;
+			// Fallthrough
+		case op_EFRAME:
 			widget = gtk_frame_new(v && *(char *)v ? _(v) : v);
 			if (op == op_EFRAME) gtk_frame_set_shadow_type(
 				GTK_FRAME(widget), GTK_SHADOW_ETCHED_OUT);
@@ -4532,7 +4639,31 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! Padding = 0
 			break;
 		/* Add a label */
-		case op_LABEL: case op_WLABEL:
+		case op_LABEL: case op_uLABEL:
+		{
+			char *wi0 = wid;
+			wid = v;
+			// Maybe the preceding slot needs a label
+			if (!wi0 && (script || scripted))
+			{
+				void **slot = origin_slot(PREV_SLOT(r));
+				if (!IS_UNREAL(slot))
+					slot = op_slot(slot, op_uALTNAME);
+				if (slot)
+				{
+					swdata *sd = slot[0];
+					if (!sd->id && (sd->op != op_uOP))
+						sd->id = wid , wid = NULL;
+				}
+			}
+			if (op == op_uLABEL) // Script mode label
+			{
+				pk = pk_UNREAL;
+				break;
+			}
+			// Fallthrough
+		}
+		case op_WLABEL:
 		{
 			int z = lp > 1 ? (int)pp[2] : 0;
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
@@ -4680,8 +4811,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a grid of spins, fill from array of arrays */
 		// !!! Presents one widget out of all grid (the last one)
 		case op_TLSPINPACK:
-			dtail -= (TLSPINPACK_SIZE(pp) + sizeof(void *) - 1) /
-				sizeof(void *);
+			dtail -= VVS(TLSPINPACK_SIZE(pp));
 			widget = tlspinpack(r, dtail, CT_TOP(wp), (int)pp[lp + 1]);
 			pk = 0;
 			break;
@@ -4706,7 +4836,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			*(int *)v = inifile_get_gboolean(pp[3], *(int *)v);
 			// Fallthrough
 		case op_CHECK:
-			widget = gtk_check_button_new_with_label(_(pp[2]));
+			widget = gtk_check_button_new_with_label(_(wid = pp[2]));
 			gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget),
 				*(int *)v);
 // !!! Padding = 0
@@ -4714,18 +4844,26 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Add a pack of radio buttons for field/var */
 		case op_RPACK: case op_RPACKD:
-			widget = mkpack(-1, op == op_RPACKD, ref, ddata, r);
-// !!! Padding = 0
-			cw = GET_BORDER(RPACK);
-			break;
-		/* Add an option menu or combobox for field/var */
-		case op_OPT: case op_OPTD: case op_COMBO:
-			widget = mkpack(op == op_COMBO, op == op_OPTD,
+		/* Add a combobox for field/var */
+		case op_COMBO:
+			widget = mkpack(op != op_COMBO, op == op_RPACKD,
 				ref, ddata, r);
-			/* !!! Border for OPT is better left alone - to avoid a
-			 * drawing glitch in GTK+1 */
-// !!! Padding = 0 for COMBO
-			if (op != op_COMBO) tpad = GET_BORDER(OPT);
+// !!! Padding = 0
+			if (op != op_COMBO) cw = GET_BORDER(RPACK);
+			break;
+		/* Add an option menu for field/var */
+		case op_OPT: case op_OPTD:
+			widget = r[0] = gtk_option_menu_new(); // Fix up slot
+			 /* !!! Show now - or size won't be set properly */
+			gtk_widget_show(widget);
+#if GTK_MAJOR_VERSION == 2
+			gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+				GTK_SIGNAL_FUNC(opt_size_fix), NULL);
+#endif
+			opt_reset(r, ddata, *(int *)v);
+			/* !!! Border is better left alone - to avoid a drawing
+			 * glitch in GTK+1 */
+			tpad = GET_BORDER(OPT);
 			break;
 		/* Add an entry widget, fill from drop-away buffer */
 		case op_ENTRY: case op_MLENTRY:
@@ -4836,8 +4974,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				pk = pk_BIN; // auto-connects to scrollbars
 			break;
 		/* Add a clickable button */
-		case op_OKBTN: case op_CANCELBTN: case op_DONEBTN:
 		case op_BUTTON:
+			wid = (int)pp[0] & WB_SFLAG ? v : "="; // Hide by default
+			// Fallthrough
+		case op_OKBTN: case op_CANCELBTN: case op_DONEBTN:
 		{
 			widget = gtk_button_new_with_label(_(v));
 			if ((op == op_OKBTN) || (op == op_DONEBTN))
@@ -4938,7 +5078,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			widget = pack(CT_N(wp, 1), gtk_toggle_button_new());
 			/* Parasite tooltip on toolbar */
 			gtk_tooltips_set_tip(GTK_TOOLBAR(CT_TOP(wp))->tooltips,
-				widget, _(pp[3]), "Private");
+				widget, _(wid = pp[3]), "Private");
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 			gtk_button_set_focus_on_click(GTK_BUTTON(widget), FALSE);
 #endif
@@ -4954,6 +5094,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			int mode = op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
 				GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
 
+			r[2] = tbar; // link to toolbar slot
 			if (op == op_TBRBUTTON)
 			{
 				static int set = TRUE;
@@ -4968,7 +5109,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 
 			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
 				GTK_TOOLBAR(CT_TOP(wp)), mode, rb,
-				NULL, _(pp[3]), "Private", xpm_image(pp[4]),
+				NULL, _(wid = pp[3]), "Private", xpm_image(pp[4]),
 				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
 			if (v) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(widget), *(int *)v);
@@ -5075,6 +5216,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			char *s;
 			int l;
 
+			r[2] = tbar; // link to menu slot
 			if (op == op_MENUCHECK)
 				widget = gtk_check_menu_item_new_with_label("");
 			else if (op == op_MENURITEM)
@@ -5139,15 +5281,15 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			gtk_widget_set_sensitive(widget, FALSE);
 			break;
 		/* Add a mount socket with custom-built separable widget */
-		case op_MOUNT: case op_PMOUNT:
+		case op_MOUNT:
 		{
-			void **what = ((mnt_fn)pp[2])(res);
+			void **what = r[2] = ((mnt_fn)pp[2])(res);
 			*(int *)v = TRUE;
 			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
 			gtk_container_add(GTK_CONTAINER(widget),
 				GET_REAL_WINDOW(what));
 // !!! Padding = 0
-			if (op == op_PMOUNT) // put socket in pane w/preset size
+			if (lp > 2 + 2) // put socket in pane w/preset size
 			{
 				GtkWidget *pane = gtk_vpaned_new();
 				paned_mouse_fix(pane);
@@ -5511,7 +5653,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_TALLOC: case op_TCOPY:
 		{
 			int l = *(int *)((char *)ddata + (int)pp[2]);
-			dtail -= (l + sizeof(void *) - 1) / sizeof(void *);
+			dtail -= VVS(l);
 			if (op == op_TCOPY) memcpy(dtail, *(void **)v, l);
 			*(void **)v = dtail;
 			continue;
@@ -5539,11 +5681,21 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				pk = 0;
 			}
 			/* Remember this */
-			ADD_SLOT(r, widget ? (void *)widget : res, pp, dtail);
+			FIX_SLOT(r, widget ? (void *)widget : res);
+			/* Remember events */
+			if (ref > 2) ADD_SLOT(r, res, pp + lp - 3, NULL);
+			if (ref > 1) ADD_SLOT(r, res, pp + lp - 1, NULL);
+			/* Remember name */
+			if (scripted && cmds[op] && (cmds[op]->uop > 0))
+			{
+				static void *id_ALTNAME = WBrh(uALTNAME, 0);
+				dtail -= VVS(sizeof(swdata));
+				ADD_SLOT(r, dtail, &id_ALTNAME, dtail);
+				((swdata *)dtail)->op = op_uALTNAME;
+				((swdata *)dtail)->id = wid;
+				wid = NULL;
+			}
 		}
-		/* Remember events */
-		if (ref > 2) ADD_SLOT(r, res, pp + lp - 3, NULL);
-		if (ref > 1) ADD_SLOT(r, res, pp + lp - 1, NULL);
 		/* Pack this according to mode flags */
 		if (script) continue; // no packing in script mode
 		{
@@ -5807,7 +5959,7 @@ static void *do_query(char *data, void **wdata, int mode)
 				gtk_font_selection_get_preview_text(*wdata);
 			break;
 		}
-		case op_MOUNT: case op_PMOUNT:
+		case op_MOUNT:
 			*(int *)v = !!GTK_BIN(*wdata)->child;
 			break;
 		case op_uMOUNT:
@@ -5900,15 +6052,47 @@ void cmd_reset(void **slot, void *ddata)
 		case op_SPINSLIDE: case op_SPINSLIDEa:
 			mt_spinslide_set_value(*wdata, *(int *)v);
 			break;
+		case op_uSPIN: case op_uSPINa:
+		{
+			swdata *sd = *wdata;
+			int n = *(int *)v;
+			sd->value = n > sd->range[1] ? sd->range[1] :
+				n < sd->range[0] ? sd->range[0] : n;
+			break;
+		}
 		case op_CHECK: case op_CHECKb: case op_TOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
 			gtk_toggle_button_set_active(*wdata, *(int *)v);
 			break;
-		case op_OPT: case op_OPTD:
+		case op_uCHECK: case op_uCHECKb:
+			((swdata *)*wdata)->value = !!*(int *)v;
+			break;
+		case op_OPT:
 			gtk_option_menu_set_history(*wdata, *(int *)v);
 			break;
+		case op_OPTD:
+			opt_reset(wdata, ddata, *(int *)v);
+			break;
+		case op_uOPT: case op_uOPTD:
+		{
+			swdata *sd = *wdata;
+			int n;
+
+			if (op == op_uOPTD)
+			{
+				char **strs = sd->strs =
+					*(char ***)((char *)ddata + (int)pp[1]);
+				for (n = 0; strs[n]; n++); // Count strings
+				sd->cnt = n;
+			}
+
+			n = *(int *)v;
+			sd->value = (n < 0) || (n >= sd->cnt) ||
+				!((char **)sd->strs)[n][0] ? 0 : n;
+			break;
+		}
 		case op_LISTCCr:
-			listcc_reset(*wdata, wdata[2], -1);
+			listcc_reset(wdata, -1);
 			/* !!! Or the changes will be ignored if the list wasn't
 			 * yet displayed (as in inactive dock tab) - WJ */
 			gtk_widget_queue_resize(*wdata);
@@ -6034,12 +6218,6 @@ void cmd_sensitive(void **slot, int state)
 	op = GET_OP(slot);
 	if (op >= op_EVT_0) return; // only widgets
 	gtk_widget_set_sensitive(slot[0], state);
-	/* Move focus in LISTCC when delayed by insensitivity */
-	if (state && (op == op_LISTCCr))
-	{
-		listcc_data *dt = slot[2];
-		if (dt->wantfoc) listcc_select_item(GTK_LIST(slot[0]), dt);
-	}
 }
 
 static int midmatch(const char *s, const char *v, int l)
@@ -6060,10 +6238,11 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 
 	for (; slot[1]; slot = NEXT_SLOT(slot))
 	{
+		op = GET_OP(slot);
+		if (op == op_uOPNAME) break; // ENDSCRIPT marker
 		if (mlevel >= 0) // Searching menu items
 		{
 			/* Reading the descriptors, so ignore unreal state */
-			op = GET_OP(slot);
 // !!! Or maybe switch/case?
 			if ((op == op_uALTNAME) || (op == op_uMENUITEM))
 				nm = ((swdata *)slot[0])->id;
@@ -6125,24 +6304,24 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 
 int cmd_setstr(void **slot, char *s)
 {
-	char *tmp;
+	char *tmp, *st = NULL;
 	int ll, res = 1, op = GET_OP(slot);
 
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
 	case op_uFPICK:
-	{
-		char *st = NULL;
 		// Commandline is already in system encoding
 		if (!cmd_mode) s = st = gtkncpy(NULL, s, PATHBUF);
 		cmd_setv(slot, s, FPICK_VALUE);
 		g_free(st);
-		return (res);
-	}
-	case op_uBUTTON:
-		res = 0; // No use for parameter
-		// Fallthrough
+		goto done;
+	case op_ENTRY: case op_uENTRY:
+		// Commandline is in system encoding
+		if (cmd_mode) s = st = gtkuncpy(NULL, s, 0);
+		cmd_setv(slot, s, ENTRY_VALUE);
+		g_free(st);
+		goto done;
 	case op_CHECK: case op_CHECKb: case op_TOGGLE:
 	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
 	case op_MENUCHECK: case op_MENURITEM:
@@ -6176,6 +6355,7 @@ int cmd_setstr(void **slot, char *s)
 			if (ll >= 0) break; // Have a match
 		}
 		return (-1); // Error
+	case op_BUTTON: case op_TBBUTTON: case op_uBUTTON:
 	case op_MENUITEM: case op_uMENUITEM:
 		ll = res = 0; // No use for parameter
 		break;
@@ -6189,6 +6369,7 @@ int cmd_setstr(void **slot, char *s)
 		}
 		// Fallthrough
 	case op_SPIN: case op_SPINc: case op_SPINa:
+	case op_SPINSLIDE: case op_SPINSLIDEa:
 	case op_uSPIN: case op_uSPINa:
 	case op_LISTCCr: case op_uLISTCC:
 		if (!s) return (-1); // Error
@@ -6200,15 +6381,9 @@ int cmd_setstr(void **slot, char *s)
 		}
 		break;
 	case op_uCOLOR:
-	{
-		swdata *sd = slot[0];
-		int n = parse_color(s);
-
-		if (n < 0) return (-1); // Error
-		sd->value = n;
-		cmd_event(slot, op_EVT_CHANGE);
-		return (res);
-	}
+		ll = parse_color(s);
+		if (ll < 0) return (-1); // Error
+		break;
 	case op_uSCALE:
 	{
 		swdata *sd = slot[0];
@@ -6234,33 +6409,68 @@ int cmd_setstr(void **slot, char *s)
 		sd->cnt = 3; // Value is being set directly
 		break;
 	}
-	default: return (-1); // Error: cannot hanle
+	default: return (-1); // Error: cannot handle
 	}
 	/* Set value to widget */
 	cmd_set(slot, ll);
-	if (res) cmd_event(slot, op_EVT_CLICK); // Notify
+done:	cmd_event(slot, op_EVT_SCRIPT); // Notify
 	return (res);
 }
 
-static void cmd_run_script(void **slot)
+static int tbar_event(void **slot, int what)
 {
-	v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
-	char *opt, *tmp, *val, **strs = vdata->script, **err = NULL;
-	void **wdata;
-	int ll, maybe;
+	void **base, **desc, **tbar = NULL;
+	int op = GET_OP(slot);
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
+	switch (op)
+	{
+	case op_TBBUTTON: case op_TBTOGGLE: case op_TBRBUTTON: case op_TBBOXTOG:
+	case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
+		tbar = slot[2];
+		break;
+	case op_uMENUITEM: case op_uMENUCHECK: case op_uMENURITEM:
+		tbar = ((swdata *)slot[0])->strs;
+		break;
+	}
+	if (tbar) tbar = op_slot(tbar, what);
+	if (!tbar || ((what == op_EVT_CLICK) && (WB_GETLEN(GET_OPF(slot)) < 5)))
+		return (-1); // Fail
+	/* Call event at saved slot, for this slot */
+	base = tbar[0]; desc = tbar[1];
+	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
+	return (0);
+}
 
-	/* Command itself may carry default option */
-	opt = *strs++;
-	if (opt && (opt[0] == '-'))
-		opt = (tmp = strchr(opt, '=')) ? tmp : *strs++;
+int cmd_run_script(void **slot, char **strs)
+{
+	char *opt, *tmp, **err = NULL;
+	void **wdata;
+	int op, ll, maybe;
+
+	/* Resolve slot */
+	op = GET_OP(slot);
+	if (IS_UNREAL(slot)) op = GET_UOP(slot);
+	if (op == op_uMOUNT) slot = ((swdata *)*slot)->strs;
+	else if (op == op_MOUNT) slot = slot[2];
+	if (!slot) return (1); // Paranoia
 
 	/* Step through options */
-	for (; opt && opt[0] && (opt[0] != '-'); opt = *strs++)
+	while ((opt = *strs))
 	{
-		/* First, parse the option */
+		/* Resolve chaining */
+		if (opt == (void *)strs)
+		{
+			strs = (void *)strs[1];
+			continue;
+		}
+		/* Stop on commands and empty strings */
+		if (!opt[0] || (opt[0] == '-')) break;
+		strs++;
+		/* Stop on dialog close */
+		if ((opt[0] == ':') && !opt[1]) break;
+		/* Have option: first, parse it */
 		opt += (maybe = opt[0] == '.'); // Optional if preceded by "."
-		val = strchr(opt, '=');
-		ll = val ? val++ - opt : strlen(opt);
+		ll = strcspn(opt, "=:");
 		/* Now, find target for the option */
 		wdata = find_slot(slot, opt, ll, -1);
 		/* Raise an error if no match */
@@ -6273,34 +6483,49 @@ static void cmd_run_script(void **slot)
 		/* Leave insensitive slots alone */
 		if (!cmd_checkv(wdata, SLOT_SENSITIVE)) continue;
 // !!! Or maybe raise an error, too?
+		script_cmds = strs; // For nested dialog
+		/* Activate right-click handler */
+		if (opt[ll] == ':') ll = tbar_event(wdata, op_EVT_CLICK);
 		/* Set value to slot */
-		if (cmd_setstr(wdata, val) < 0)
+		else ll = cmd_setstr(wdata, opt[ll] ? opt + ll + 1 : NULL);
+		/* Raise an error if invalid value */
+		if (ll < 0)
 		{
-			/* Raise an error if invalid value */
 			err = strs;
 			break;
 		}
+		strs = script_cmds; // Nested dialogs can consume options
+		if (user_break) break;
 	}
+	script_cmds = strs; // Stopped at here
 
 	/* An error happened - report it */
 	if (err)
 	{
 		err--; // Previous option caused the error
+		/* Find name-bearing slot */
+		slot = wdata;
+		if (slot && !IS_UNREAL(slot)) slot = op_slot(wdata, op_uALTNAME);
 		tmp = g_strdup_printf(!wdata ? _("'%s' does not match any widget") :
 			_("'%s' value does not fit '%s' widget"), *err,
-			wdata ? ((swdata *)wdata[0])->id : NULL);
+			slot ? ((swdata *)slot[0])->id : NULL);
 		alert_box(_("Error"), tmp, NULL);
 		g_free(tmp);
-		free(GET_DDATA(PREV_SLOT(slot))); // This dialog is done with
-		return;
+		return (-1);
 	}
 
 	/* Now activate the OK handler if any */
 	for (wdata = slot; wdata[1]; wdata = NEXT_SLOT(wdata))
 		if (IS_UNREAL(wdata) && ((GET_UOP(wdata) == op_uOKBTN) ||
 			(GET_UOP(wdata) == op_uFPICK))) break;
-	if (wdata[1]) cmd_event(wdata, op_EVT_OK);
-	/* !!! The memory block is likely to be freed at this point */
+	if (wdata[1])
+	{
+		cmd_event(wdata, op_EVT_OK);
+		/* !!! The memory block is likely to be freed at this point */
+		return (0);
+	}
+
+	return (1);
 }
 
 void cmd_showhide(void **slot, int state)
@@ -6311,7 +6536,12 @@ void cmd_showhide(void **slot, int state)
 	if (IS_UNREAL(slot))
 	{
 		if ((GET_OP(PREV_SLOT(slot)) == op_WDONE) && state)
-			cmd_run_script(slot);
+		{
+			v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
+			if ((cmd_run_script(slot, vdata->script) < 0) &&
+				(GET_UOP(slot) == op_uWINDOW))
+				run_destroy(slot); // On error
+		}
 		return;
 	}
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
@@ -6357,11 +6587,13 @@ void cmd_showhide(void **slot, int state)
 
 void cmd_set(void **slot, int v)
 {
+	swdata *sd;
 	int op;
 
 	slot = origin_slot(slot);
 	op = GET_OP(slot);
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
+	sd = slot[0];
 // !!! Support only what actually used on, and their brethren
 	switch (op)
 	{
@@ -6469,44 +6701,37 @@ void cmd_set(void **slot, int v)
 	case op_SPIN: case op_SPINc: case op_SPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
-	case op_uSPIN: case op_uFSPIN: case op_uSPINa: case op_uSCALE:
-	case op_uCHECK: case op_uCHECKb:
-	{
-		swdata *sd = slot[0];
-
+	case op_uSCALE:
 		/* uSCALE ignores indirect writes after a direct one */
-		if (op != op_uSCALE);
-		else if (sd->cnt == 2) break;
-		else sd->cnt &= 2;
-
+		if (sd->cnt == 2) break;
+		sd->cnt &= 2;
+		// Fallthrough
+	case op_uSPIN: case op_uFSPIN: case op_uSPINa:
+	case op_uCHECK: case op_uCHECKb:
 		v = (op == op_uCHECK) || (op == op_uCHECKb) ? !!v :
 			v > sd->range[1] ? sd->range[1] :
 			v < sd->range[0] ? sd->range[0] : v;
-		if (v != sd->value)
-		{
-			sd->value = v;
-			cmd_event(slot, op_EVT_CHANGE);
-		}
+		if (v == sd->value) break;
+		// Fallthrough
+	case op_uCOLOR:
+		sd->value = v;
+		cmd_event(slot, op_EVT_CHANGE);
 		break;
-	}
 	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
-	{
-		swdata *sd = slot[0];
-
 		if ((v < 0) || (v >= sd->cnt) || !((char **)sd->strs)[v][0]) v = 0;
-		if (v != sd->value)
-		{
-			sd->value = v;
-			cmd_event(slot, op_EVT_SELECT);
-		}
+		if (v == sd->value) break;
+		sd->value = v;
+		cmd_event(slot, op_EVT_SELECT);
 		break;
-	}
-	case op_uBUTTON:
+	case op_BUTTON: case op_uBUTTON:
 		cmd_event(slot, op_EVT_CLICK); // for any value
+		break;
+	case op_TBBUTTON:
+		gtk_button_clicked(slot[0]); // for any value
 		break;
 	case op_uMENURITEM:
 		// Cannot unset itself, and no use to set twice
-		if (!v || ((swdata *)slot[0])->value) break;
+		if (!v || sd->value) break;
 		/* Unset the whole group */
 		{
 			void **r = slot;
@@ -6523,17 +6748,12 @@ void cmd_set(void **slot, int v)
 		// Fallthrough
 	case op_uMENUCHECK:
 		v = !!v;
-		if (((swdata *)slot[0])->value == v) break;
-		((swdata *)slot[0])->value = v;
+		if (sd->value == v) break;
+		sd->value = v;
 		// Fallthrough
 	case op_uMENUITEM:
-	{	/* Call event at saved slot, for this slot */
-		swdata *sd = slot[0];
-		void **r = sd->strs, **base = r[0], **desc = r[1];
-		((evt_fn)desc[1])(GET_DDATA(base), base,
-			(int)desc[0] & WB_OPMASK, slot);
+		tbar_event(slot, op_EVT_CHANGE);
 		break;
-	}
 	case op_FSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
@@ -6577,12 +6797,11 @@ void cmd_set(void **slot, int v)
 		listcc_data *dt = slot[2];
 		if ((v < 0) || (v >= *dt->cnt)) break; // Ensure sanity
 		*dt->idx = v;
-		listcc_select_item(slot[0], dt);
+		listcc_select_item(slot);
 		break;
 	}
 	case op_uLISTCC:
 	{
-		swdata *sd = slot[0];
 		char *ddata = GET_DDATA(wdata_slot(slot));
 		int *cnt = (void *)(ddata + (int)GET_DESCV(slot, 2));
 
@@ -6608,26 +6827,6 @@ void cmd_set(void **slot, int v)
 			gtk_widget_queue_draw(widget);
 		break;
 	}
-	}
-}
-
-void cmd_setlist(void **slot, char *map, int n)
-{
-// !!! Support only what actually used on, and their brethren
-	int op = GET_OP(slot);
-	if ((op == op_OPT) || (op == op_OPTD))
-	{
-		GList *items = GTK_MENU_SHELL(gtk_option_menu_get_menu(
-			GTK_OPTION_MENU(slot[0])))->children;
-		int i, j, k;
-
-		for (i = j = 0; items; items = items->next , i++)
-		{
-			k = i < n ? map[i] : 0; // show/hide
-			if (k > 1) j = i; // select
-			widget_showhide(GTK_WIDGET(items->data), k);
-		}
-		gtk_option_menu_set_history(GTK_OPTION_MENU(slot[0]), j);
 	}
 }
 
@@ -7004,7 +7203,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_LISTCCr:
-		listcc_reset(slot[0], slot[2], (int)res);
+		listcc_reset(slot, (int)res);
 // !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
 //		gtk_widget_queue_resize(slot[0]);
 		break;
@@ -7145,16 +7344,6 @@ int cmd_checkv(void **slot, int idx)
 
 void cmd_event(void **slot, int op)
 {
-	int n;
-
-	while ((slot = NEXT_SLOT(slot))[1])
-	{
-		n = GET_OP(slot);
-		// Found
-		if (n == op) get_evt_1(NULL, slot);
-		// Till another origin slot
-		else if (n >= op_EVT_0) continue;
-		// Finished
-		break;
-	}
+	slot = op_slot(slot, op);
+	if (slot) get_evt_1(NULL, slot); // Found
 }

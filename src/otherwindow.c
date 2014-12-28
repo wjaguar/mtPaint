@@ -1607,7 +1607,7 @@ static void *colsel_code[] = {
 		BORDER(OPT, 0),
 		XVBOXbp(0, 4, 0),
 		OPT(scales_txt, 4, scale),
-		EVENT(CLICK, make_cscale), OPNAME("Scale"), // For scripting
+		EVENT(SCRIPT, make_cscale), OPNAME("Scale"),
 		WDONE,
 		BUTTON(_("Create"), make_cscale),
 		WDONE,
@@ -1618,7 +1618,7 @@ static void *colsel_code[] = {
 		HBOX,
 		BUTTON(_("Posterize"), posterize_AB),
 		REF(pspin_AB), SPIN(pos_AB, 1, 8),
-		EVENT(CLICK, posterize_AB), // For scripting
+		EVENT(SCRIPT, posterize_AB),
 		WDONE,
 		TABLE(3, 2),
 		TXLABEL(_("Alpha"), 0, 0),
@@ -1645,6 +1645,7 @@ static void *colsel_code[] = {
 		FSPIN(v.csrange, 0, 76500), EVENT(CHANGE, csel_controls_changed),
 		CHECK(_("Inverse"), v.csinv), EVENT(CHANGE, csel_controls_changed),
 		RPACKe(csel_modes, 0, 1, v.csmode, csel_controls_changed),
+		OPNAME("mode"),
 		WDONE,
 	ENDIF(1),
 	IFx(is_grid, 1),
@@ -2078,6 +2079,9 @@ void pressed_quantize(int palette)
 #define PPAD_HEIGHT (PPAD_YSZ * PPAD_SLOT - 1)
 #define PPAD_C ((PPAD_SLOT >> 1) - 1)
 
+#define NUM_GTYPES 7
+#define NUM_OTYPES 3
+
 typedef struct {
 	int pmouse;
 	int channel, nchan;
@@ -2086,6 +2090,7 @@ typedef struct {
 	int gtype, grev;
 	int otype, orev;
 	void **opt, **gbut, **obut, **group;
+	char **gpp, *gp[NUM_GTYPES + 1];
 	grad_info temps[NUM_CHANNELS];
 	grad_map tmaps[NUM_CHANNELS + 1];
 	grad_store tbytes;
@@ -2331,8 +2336,6 @@ static void grad_edit(void **wdata, int opac)
 	cmd_showhide(dd, TRUE);
 }
 
-#define NUM_GTYPES 7
-#define NUM_OTYPES 3
 static const char gtmap[NUM_GTYPES * 2] = { GRAD_TYPE_RGB, 1, GRAD_TYPE_RGB, 2,
 	GRAD_TYPE_SRGB, 2, GRAD_TYPE_HSV, 2, GRAD_TYPE_BK_HSV, 2,
 	GRAD_TYPE_CONST, 3, GRAD_TYPE_CUSTOM, 3 };
@@ -2359,27 +2362,32 @@ static void store_channel_gradient(grad_dd *dt)
 	gmap->orev = dt->orev;
 }
 
+static char *gradtypes_txt[NUM_GTYPES];
+
 static void show_channel_gradient(grad_dd *dt, void **wdata)
 {
 	int channel = dt->channel;
 	grad_info *grad = dt->temps + channel;
 	grad_map *gmap;
-	char wmap[NUM_GTYPES];
 	int i, j, k, idx = channel + 1, bpp = BPP(channel);
 
 	if (bpp == 3) --idx;
 	gmap = dt->tmaps + idx;
 
 	/* Reconfigure gradient selector */
+	dt->gpp = dt->gp;
 	i = bpp == 1 ? 1 : 2;
 	for (k = j = NUM_GTYPES - 1; j >= 0; j--)
 	{
-		wmap[j] = !(gtmap[j * 2 + 1] & i) ? 0 : // hide
-			gtmap[j * 2] == gmap->gtype ? 2 : 1; // select : show
-		if (wmap[k] < wmap[j]) k = j;
+		if (!(gtmap[j * 2 + 1] & i)) dt->gp[j] = ""; // hide
+		else
+		{
+			dt->gp[j] = gradtypes_txt[j]; // show
+			if ((gtmap[j * 2] == gmap->gtype) ||
+				(k == NUM_GTYPES - 1)) k = j; // select
+		}
 	}
 	dt->gtype = k;
-	cmd_setlist(dt->opt, wmap, NUM_GTYPES);
 
 	/* Opacity gradient */
 	for (i = NUM_OTYPES - 1; (i >= 0) && (opmap[i] != gmap->otype); i--);
@@ -2456,13 +2464,13 @@ static void *grad_code[] = {
 	TLLABEL(_("Gradient type"), 2, 0), TLOPT(gtypes_txt, 6, type, 3, 0),
 	TLLABEL(_("Extension type"), 2, 1), TLOPT(rtypes_txt, 4, bound, 3, 1),
 	TLLABEL(_("Preview opacity"), 2, 2),
-		MINWIDTH(200), TLSPINSLIDE(opac, 0, 255, 3, 2),
+		MINWIDTH(200), TLSPINSLIDE(opac, 0, 255, 3, 2), UNNAME,
 	WDONE,
 	/* Select page */
 	EQBOX,
 	BORDER(OPT, 0),
 	FXVBOX(_("Gradient")),
-	VBOXB, REF(opt), OPT(gradtypes_txt, NUM_GTYPES, gtype), WDONE,
+	VBOXB, REF(opt), OPTD(gpp, gtype), WDONE,
 	EQBOX,
 	CHECK(_("Reverse"), grev),
 	REF(gbut), BUTTON(_("Edit Custom"), grad_evt),
@@ -2470,7 +2478,7 @@ static void *grad_code[] = {
 	FXVBOX(_("Opacity")),
 	VBOXB, OPT(optypes_txt, NUM_OTYPES, otype), WDONE,
 	EQBOX,
-	CHECK(_("Reverse"), orev),
+	CHECK(_("Reverse"), orev), ALTNAME("opacity reverse"),
 	REF(obut), BUTTON(_("Edit Custom"), grad_evt),
 	WDONE, WDONE,
 	WDONE,
@@ -2488,10 +2496,11 @@ void gradient_setup(int mode)
 	tdata.pmouse = !mode && !inifile_get_gboolean("centerSettings", TRUE);
 	tdata.channel = tdata.nchan = mem_channel;
 	tdata.opac = grad_opacity;
+	tdata.gpp = tdata.gp; // Gradient menu is empty initially
 	memcpy(tdata.temps, gradient, sizeof(tdata.temps));
 	memcpy(tdata.tmaps, graddata, sizeof(tdata.tmaps));
 	memcpy(tdata.tbytes, gradbytes, sizeof(tdata.tbytes));
-	run_create(grad_code, &tdata, sizeof(tdata));
+	run_create_(grad_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 /// GRADIENT PICKER

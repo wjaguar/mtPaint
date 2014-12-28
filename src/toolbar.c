@@ -154,7 +154,7 @@ void flood_settings() /* Flood fill step */
 	flood_dd tdata = {
 		{ _("Fill settings"), flood_code, FW_FN(set_flood) },
 		rint(flood_step * 100) };
-	run_create(toolwindow_code, &tdata, sizeof(tdata));
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 static int set_settings(filterwindow_dd *dt, void **wdata)
@@ -172,7 +172,7 @@ void smudge_settings() /* Smudge opacity mode */
 {
 	static filterwindow_dd tdata = {
 		_("Smudge settings"), smudge_code, FW_FN(set_settings) };
-	run_create(toolwindow_code, &tdata, sizeof(tdata));
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 #define WBbase filterwindow_dd
@@ -190,7 +190,7 @@ void step_settings() /* Brush spacing */
 {
 	static filterwindow_dd tdata = {
 		_("Brush spacing"), step_code, FW_FN(set_settings) };
-	run_create(toolwindow_code, &tdata, sizeof(tdata));
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 typedef struct {
@@ -245,7 +245,7 @@ void blend_settings() /* Blend mode */
 		~blend_mode & (1 << BLEND_RGBSHIFT),
 		~blend_mode & (2 << BLEND_RGBSHIFT),
 		~blend_mode & (4 << BLEND_RGBSHIFT) };
-	run_create(toolwindow_code, &tdata, sizeof(tdata));
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 #define GP_WIDTH 256
@@ -303,7 +303,7 @@ static void toolbar_click(void *dt, void **wdata, int what, void **where)
 #define WBbase settings_dd
 static void *settings_code[] = {
 	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
-	BORDER(TOOLBAR, 0),
+	SCRIPTED, BORDER(TOOLBAR, 0),
 	TOOLBARx(toolbar_click, toolbar_click),
 	REFv(settings_buttons[SETB_CONT]),
 	TBTOGGLExv(_("Continuous Mode"), XPM_ICON(mode_cont),
@@ -452,6 +452,16 @@ void *toolbar_code[] = {
 	REFv(toolbar_boxes[TOOLBAR_TOOLS]),
 	SMARTTBARx(toolbar_click, toolbar_click),
 	UNLESSv(toolbar_status[TOOLBAR_TOOLS]), HIDDEN, // Only show if user wants
+	SCRIPTED,
+#if 0
+	// for scripting
+	uBUTTONs("", tool_evt), // default; "click" to finish current operation
+	uSPINs(tool_x1, 0, MAX_WIDTH), EVENT(SCRIPT, tool_evt), OPNAME("x1"),
+	uSPINs(tool_y1, 0, MAX_HEIGHT), EVENT(SCRIPT, tool_evt), OPNAME("y1"),
+	uSPINs(tool_x0, 0, MAX_WIDTH), EVENT(SCRIPT, tool_evt), OPNAME("x0"),
+	uSPINs(tool_y0, 0, MAX_HEIGHT), EVENT(SCRIPT, tool_evt), OPNAME("y0"),
+	uFSPIN(tool_pressure, 0, 100), OPNAME("pressure"),
+#endif
 	REFv(icon_buttons[TTB_PAINT]),
 	TBRBUTTONv(_("Paint"), XPM_ICON(paint),
 		ACTMOD(ACT_TOOL, TTB_PAINT), tool_id),
@@ -488,7 +498,8 @@ void *toolbar_code[] = {
 		ACTMOD(ACT_LASSO, 0)),
 		ACTMAP(NEED_LAS2),
 	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
-		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)),
+		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,
+// !!! Text dialogs not yet scriptable
 	TBSPACE,
 	TBBUTTON(_("Ellipse Outline"), XPM_ICON(ellipse2),
 		ACTMOD(ACT_ELLIPSE, 0)),
@@ -515,6 +526,7 @@ void *toolbar_code[] = {
 	TBBUTTON(_("Rotate Selection Anti-Clockwise"), XPM_ICON(rotate_as),
 		ACTMOD(ACT_SEL_ROT, 1)),
 		ACTMAP(NEED_CLIP),
+	ENDSCRIPT,
 	SMARTTBMORE(_("More...")), WDONE,
 	WDONE, // twobox
 	RET
@@ -528,7 +540,6 @@ void ts_update_gradient()
 
 	if (!grad_view) return; // Paranoia
 	dt = GET_DDATA(wdata_slot(grad_view));
-	rgb = dt->rgb;
 
 	slot = mem_channel + 1;
 	if (mem_channel != CHN_IMAGE) /* Create pseudo palette */
@@ -555,7 +566,7 @@ void ts_update_gradient()
 	if (!IS_INDEXED) idx = 0; /* Allow intermediate opacities */
 
 	/* Draw the preview, ignoring RGBA coupling */
-	memset(rgb, mem_background, sizeof(rgb));
+	memset(rgb = dt->rgb, mem_background, GP_WIDTH * GP_HEIGHT * 3);
 	for (i = 0; i < GP_WIDTH; i++)
 	{
 		dest = rgb + i * 3;
@@ -616,6 +627,7 @@ void toolbar_update_settings()
 	cmd_showhide(ts_spinslides[3], !i);
 	cmd_showhide(ts_label_channel, !i);
 	if (!i) cmd_setv(ts_label_channel, channames[mem_channel], LABEL_VALUE);
+	cmd_sensitive(ts_spinslides[3], !i); // For scripting
 	// Disable opacity for indexed image
 	cmd_sensitive(ts_spinslides[2], !IS_INDEXED);
 

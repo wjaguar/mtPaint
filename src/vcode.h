@@ -142,7 +142,6 @@ enum {
 	op_MENUSEP,
 
 	op_MOUNT,
-	op_PMOUNT,
 	op_REMOUNT,
 	op_uCHECK,
 	op_uCHECKb,
@@ -189,6 +188,7 @@ enum {
 	op_EVT_SELECT,
 	op_EVT_CHANGE,
 	op_EVT_DESTROY, // before deallocation
+	op_EVT_SCRIPT, // by cmd_setstr()
 	op_EVT_KEY, // with key data & ret
 	op_EVT_MOUSE, // with button data & ret
 	op_EVT_MMOUSE, // movement, with same
@@ -280,7 +280,7 @@ enum {
 //	Function to run with MOUNT
 typedef void **(*mnt_fn)(void **wdata);
 
-//	Structure which COLORLIST provides to EXC event
+//	Structure which COLORLIST provides to EXT event
 typedef struct {
 	int idx;	// which row was clicked
 	int button;	// which button was clicked (1-3 etc)
@@ -419,8 +419,6 @@ void cmd_showhide(void **slot, int state);
 void cmd_set(void **slot, int v);
 //	Set text-encoded value on slot (-1 fail, 0 unused, 1 set)
 int cmd_setstr(void **slot, char *s);
-//	Set per-item visibility and selection on list-like slot
-void cmd_setlist(void **slot, char *map, int n);
 //	Read back slot value (as is), return its storage location
 void *cmd_read(void **slot, void *ddata);
 //	Read extra data from slot
@@ -435,6 +433,8 @@ void cmd_reset(void **slot, void *ddata);
 void cmd_cursor(void **slot, void **cursor);
 //	Check extra state on slot
 int cmd_checkv(void **slot, int idx);
+//	Run script on slot
+int cmd_run_script(void **slot, char **strs);
 
 ///	Handler for dialog buttons
 void dialog_event(void *ddata, void **wdata, int what, void **where);
@@ -473,6 +473,7 @@ enum {
 #define WBpk(P) ((P) << WB_OPBITS)
 #define WB_0	0
 #define WB_F	WB_FFLAG
+#define WB_S	WB_SFLAG
 #define WB_R	WB_REF1
 #define WB_RF	(WB_REF1 + WB_FFLAG)
 #define WB_RS	(WB_REF1 + WB_SFLAG)
@@ -497,6 +498,7 @@ enum {
 #define WBhf(NM,L) WBp_(op_##NM, L, NONE, F)
 #define WBhf_(NM,L) WBp_(op_##NM, L, PACK, F)
 #define WBhf_t(NM,L) WBp_(op_##NM, L, TABLE, F)
+#define WBhs(NM,L) WBp_(op_##NM, L, NONE, S)
 #define WBrh(NM,L) WBp_(op_##NM, L, NONE, R)
 #define WBrh_(NM,L) WBp_(op_##NM, L, PACK, R)
 #define WBrh_x(NM,L) WBp_(op_##NM, L, XPACK, R)
@@ -510,6 +512,7 @@ enum {
 #define WBrhf_t(NM,L) WBp_(op_##NM, L, TABLE, RF)
 #define WBrhf_tx(NM,L) WBp_(op_##NM, L, TABLEx, RF)
 #define WBrhf_t1(NM,L) WBp_(op_##NM, L, TABLE1x, RF)
+#define WBrhs(NM,L) WBp_(op_##NM, L, NONE, RS)
 #define WBrhs_(NM,L) WBp_(op_##NM, L, PACK, RS)
 #define WBr2h(NM,L) WBp_(op_##NM, L, NONE, R2)
 #define WBr2h_(NM,L) WBp_(op_##NM, L, PACK, R2)
@@ -519,6 +522,7 @@ enum {
 #define WBr2hf_(NM,L) WBp_(op_##NM, L, PACK, R2F)
 #define WBr2hf_x(NM,L) WBp_(op_##NM, L, XPACK, R2F)
 #define WBr2hf_t(NM,L) WBp_(op_##NM, L, TABLE, R2F)
+#define WBr2hs_(NM,L) WBp_(op_##NM, L, PACK, R2S)
 #define WBr2hs_t(NM,L) WBp_(op_##NM, L, TABLE, R2S)
 #define WBr3h_(NM,L) WBp_(op_##NM, L, PACK, R3)
 #define WBr3h_e(NM,L) WBp_(op_##NM, L, PACKEND, R3)
@@ -701,6 +705,8 @@ enum {
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf_(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf_x(SPINa, 1), WBfield(A)
+#define uSPINv(V,V0,V1) WBrh_(uSPIN, 3), &(V), (void *)(V0), (void *)(V1)
+#define uFSPINv(V,V0,V1) WBrh_(uFSPIN, 3), &(V), (void *)(V0), (void *)(V1)
 #define uSCALE(V,V0,V1) WBrhf_(uSCALE, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 /* !!! This block holds 1 nested EVENT block */
@@ -743,6 +749,7 @@ enum {
 #define TOPTv(NM,SS,N,V) WBrh_t1(OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
 #define TLOPT(SS,N,V,X,Y) WBrhf_t(OPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
+#define OPTD(SP,V) WBrhf_(OPTD, 2), WBfield(V), WBfield(SP)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define XOPTe(SS,N,V,HS) WBr2hf_x(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
@@ -822,6 +829,7 @@ enum {
 	WBxyl(X, Y, 1)
 #define TLBUTTONs(NM,H,X,Y) WBr2hs_t(BUTTON, 2 + 2), (NM), EVENT(CLICK, H), \
 	WBxyl(X, Y, 1)
+#define uBUTTONs(NM,H) WBr2hs_(uBUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TOOLBAR(HC) WBr2h_(TOOLBAR, 0 + 2), EVENT(CHANGE, HC)
 #define TOOLBARx(HC,HR) WBr3h_(TOOLBAR, 0 + 2 * 2), EVENT(CHANGE, HC), \
 	EVENT(CLICK, HR)
@@ -863,7 +871,7 @@ enum {
 #define MENUSEPr WBrh_(MENUSEP, 0)
 #define uMENUITEMs(NM,ID) WBrhs_(uMENUITEM, 3), NULL, (void *)(ID), (NM)
 #define MOUNT(V,FN,H) WBr2hf_(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
-#define PMOUNT(V,FN,H,K,NK) WBr2hf_x(PMOUNT, 4 + 2), WBfield(V), (FN), (K), \
+#define PMOUNT(V,FN,H,K,NK) WBr2hf_x(MOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
 #define REMOUNTv(V) WBrh_x(REMOUNT, 1), &(V)
 //#define EXEC(FN) WBh(EXEC, 1), (FN)
@@ -955,7 +963,9 @@ enum {
 #define OPNAME(NM) WBh(uOPNAME, 1), (NM)
 #define OPNAME0 WBh(uOPNAME, 0)
 /* Set an impossible name, to hide widget from script */
-#define UNNAME OPNAME("-")
+#define UNNAME OPNAME("=")
+#define SCRIPTED WBhs(uOPNAME, 0)
+#define ENDSCRIPT WBrhs(uOPNAME, 0)
 
 //	Extra data of FPICK
 #define FPICK_VALUE	0

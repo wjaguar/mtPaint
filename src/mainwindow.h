@@ -89,6 +89,7 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_MODE,
 	ACT_LR_SHIFT,
 	ACT_LR_CENTER,
+	ACT_SCRIPT,
 
 	DLG_BRCOSA,
 	DLG_CHOOSER,
@@ -124,6 +125,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_TRACE,
 	DLG_PICK_GRAD,
 	DLG_SEGMENT,
+	DLG_SCRIPT,
 
 	FILT_2RGB,
 	FILT_INVERT,

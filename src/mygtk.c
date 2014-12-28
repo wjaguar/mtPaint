@@ -321,28 +321,20 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 // Managing batches of radio buttons with minimum of fuss
 
-static void wj_radio_toggle(GtkWidget *btn, gpointer user_data)
-{
-	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(btn))) return;
-	*(int *)user_data = (int)gtk_object_get_user_data(GTK_OBJECT(btn));
-}
-
 /* void handler(GtkWidget *btn, gpointer user_data); */
-GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, void **r,
 	GtkSignalFunc handler)
 {
 	int i, j, x;
 	GtkWidget *table, *button = NULL;
-	GtkSignalFunc hdl = handler;
 
-	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_radio_toggle);
 	table = gtk_table_new(1, 1, FALSE);
 
 	for (i = j = x = 0; (i != cnt) && names[i]; i++)
 	{
 		if (!names[i][0]) continue;
 		button = gtk_radio_button_new_with_label_from_widget(
-			GTK_RADIO_BUTTON_0(button), names[i]);
+			GTK_RADIO_BUTTON_0(button), __(names[i]));
 		gtk_object_set_user_data(GTK_OBJECT(button), (gpointer)i);
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 		if (vnum > 0) x = j / vnum;
@@ -351,10 +343,10 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
 			vnum != 1 ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, 0);
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
-		if (hdl) gtk_signal_connect(GTK_OBJECT(button), "toggled", hdl, var);
+		if (handler) gtk_signal_connect(GTK_OBJECT(button), "toggled",
+			handler, r);
 		j++;
 	}
-	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
 	gtk_widget_show_all(table);
 
 	return (table);
@@ -539,62 +531,6 @@ char *file_in_homedir(char *dest, const char *file, int cnt)
 	return (file_in_dir(dest, get_home_directory(), file, cnt));
 }
 
-// Option menu
-
-static void wj_option(GtkMenuItem *menuitem, gpointer user_data)
-{
-	*(int *)user_data = (int)gtk_object_get_user_data(GTK_OBJECT(menuitem));
-}
-
-#if GTK_MAJOR_VERSION == 2
-
-/* Cause the size to be properly reevaluated */
-void wj_option_realize(GtkWidget *widget, gpointer user_data)
-{
-	gtk_signal_emit_by_name(GTK_OBJECT(gtk_option_menu_get_menu(
-		GTK_OPTION_MENU(widget))), "selection_done");
-}
-
-#endif
-
-/* void handler(GtkMenuItem *menuitem, gpointer user_data); */
-GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
-	GtkSignalFunc handler)
-{
-	int i, j;
-	GtkWidget *opt, *menu, *item;
-	GtkSignalFunc hdl = handler;
-
-	if (!hdl && var) hdl = GTK_SIGNAL_FUNC(wj_option);
-	menu = gtk_menu_new();
-	for (i = j = 0; (i != cnt) && names[i]; i++)
-	{
-		if (!names[i][0]) continue;
-		item = gtk_menu_item_new_with_label(names[i]);
-		gtk_object_set_user_data(GTK_OBJECT(item), (gpointer)i);
-		if (hdl) gtk_signal_connect(GTK_OBJECT(item), "activate", hdl, var);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
-		if (i == idx) j = i;
-  	}
-	if (hdl != handler) *(int *)var = idx < i ? idx : 0;
-	gtk_widget_show_all(menu);
-	opt = gtk_option_menu_new();
-	gtk_widget_show(opt); /* !!! Show now - or size won't be set properly */
-	gtk_option_menu_set_menu(GTK_OPTION_MENU(opt), menu);
-	gtk_option_menu_set_history(GTK_OPTION_MENU(opt), j);
-
-	FIX_OPTION_MENU_SIZE(opt);
-
-	return (opt);
-}
-
-int wj_option_menu_get_history(GtkWidget *optmenu)
-{
-	optmenu = gtk_option_menu_get_menu(GTK_OPTION_MENU(optmenu));
-	optmenu = gtk_menu_get_active(GTK_MENU(optmenu));
-	return ((int)gtk_object_get_user_data(GTK_OBJECT(optmenu)));
-}
-
 // Set minimum size for a widget
 
 static void widget_size_req(GtkWidget *widget, GtkRequisition *requisition,
@@ -696,28 +632,6 @@ void clist_enable_drag(GtkWidget *clist)
 }
 
 #endif
-
-// Move browse-mode selection in GtkList
-
-/* !!! An evil hack for reliably moving focus around in GtkList */
-void list_select_item(GtkWidget *list, GtkWidget *item)
-{
-	GtkWidget *win, *fw = NULL;
-
-	win = gtk_widget_get_toplevel(list);
-	if (GTK_IS_WINDOW(win)) fw = GTK_WINDOW(win)->focus_widget;
-
-	/* Focus is somewhere in list - move it, selection will follow */
-	if (fw && gtk_widget_is_ancestor(fw, list))
-		gtk_widget_grab_focus(item);
-	else /* Focus is elsewhere - move whatever remains, then */
-	{
-	/* !!! For simplicity, an undocumented field is used; a bit less hacky
-	 * but longer is to set focus child to item, NULL, and item again - WJ */
-		gtk_container_set_focus_child(GTK_CONTAINER(list), item);
-		GTK_LIST(list)->last_focus_child = item;
-	}
-}
 
 // Most common use of boxes
 
@@ -1130,12 +1044,6 @@ GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
 /* Use GtkComboBox when available */
 #if GTK2VERSION >= 4 /* GTK+ 2.4+ */
 
-static void wj_combo(GtkComboBox *widget, gpointer user_data)
-{
-	int i = gtk_combo_box_get_active(widget);
-	if (i >= 0) *(int *)user_data = i;
-}
-
 /* Tweak style settings for combo box */
 static void wj_combo_restyle(GtkWidget *cbox)
 {
@@ -1152,7 +1060,7 @@ static void wj_combo_restyle(GtkWidget *cbox)
 }
 
 /* void handler(GtkWidget *combo, gpointer user_data); */
-GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+GtkWidget *wj_combo_box(char **names, int cnt, int u, int idx, void **r,
 	GtkSignalFunc handler)
 {
 	GtkWidget *cbox;
@@ -1161,17 +1069,12 @@ GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
 
 
 	if (idx >= cnt) idx = 0;
-	if (!handler && var)
-	{
-		*(int *)var = idx;
-		handler = GTK_SIGNAL_FUNC(wj_combo);
-	}
 	combo = GTK_COMBO_BOX(cbox = gtk_combo_box_new_text());
 	wj_combo_restyle(cbox);
-	for (i = 0; i < cnt; i++) gtk_combo_box_append_text(combo, names[i]);
+	for (i = 0; i < cnt; i++) gtk_combo_box_append_text(combo, __(names[i]));
 	gtk_combo_box_set_active(combo, idx);
 	if (handler) gtk_signal_connect(GTK_OBJECT(cbox), "changed",
-		handler, var);
+		handler, r);
 
 	return (cbox);
 }
@@ -1195,12 +1098,7 @@ static void wj_combo(GtkWidget *entry, gpointer handler)
 	if (GTK_WIDGET_VISIBLE(GTK_COMBO(combo)->popwin)) return;
 #endif
 	user_data = gtk_object_get_user_data(GTK_OBJECT(entry));
-	if (handler) ((void (*)(GtkWidget *, gpointer))handler)(combo, user_data);
-	else
-	{			
-		int i = wj_combo_box_get_history(combo);
-		if (i >= 0) *(int *)user_data = i;
-	}
+	((void (*)(GtkWidget *, gpointer))handler)(combo, user_data);
 }
 
 #if GTK_MAJOR_VERSION == 1
@@ -1238,7 +1136,7 @@ static gboolean wj_combo_kill_cursor(GtkWidget *widget, GdkEventExpose *event,
 #endif
 
 /* void handler(GtkWidget *combo, gpointer user_data); */
-GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+GtkWidget *wj_combo_box(char **names, int cnt, int u, int idx, void **r,
 	GtkSignalFunc handler)
 {
 	GtkWidget *cbox;
@@ -1249,7 +1147,6 @@ GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
 
 
 	if (idx >= cnt) idx = 0;
-	if (!handler && var) *(int *)var = idx;
 	combo = GTK_COMBO(cbox = gtk_combo_new());
 #if GTK_MAJOR_VERSION == 2
 	wj_combo_restyle(combo->entry);
@@ -1257,17 +1154,17 @@ GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
 		GTK_SIGNAL_FUNC(wj_combo_kill_cursor), NULL);
 #endif
 	gtk_combo_set_value_in_list(combo, TRUE, FALSE);
-	for (i = 0; i < cnt; i++) list = g_list_append(list, names[i]);
+	for (i = 0; i < cnt; i++) list = g_list_append(list, __(names[i]));
 	gtk_combo_set_popdown_strings(combo, list);
 	g_list_free(list);
 	gtk_widget_show_all(cbox);
 	entry = GTK_ENTRY(combo->entry);
 	gtk_entry_set_editable(entry, FALSE);
 	gtk_entry_set_text(entry, names[idx]);
-	if (!handler && !var) return (cbox);
+	if (!handler) return (cbox);
 
 	/* Install signal handler */
-	gtk_object_set_user_data(GTK_OBJECT(combo->entry), var);
+	gtk_object_set_user_data(GTK_OBJECT(combo->entry), r);
 	gtk_signal_connect(GTK_OBJECT(combo->entry), "changed",
 		GTK_SIGNAL_FUNC(wj_combo), (gpointer)handler);
 #if GTK_MAJOR_VERSION == 1

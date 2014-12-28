@@ -87,7 +87,7 @@ void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
 
 // Self-contained package of radio buttons
 
-GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, gpointer var,
+GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, void **r,
 	GtkSignalFunc handler);
 int wj_radio_pack_get_active(GtkWidget *widget);
 
@@ -137,22 +137,6 @@ char *wjstrcat(char *dest, int max, const char *s0, int l, ...);
 char *file_in_dir(char *dest, const char *dir, const char *file, int cnt);
 char *file_in_homedir(char *dest, const char *file, int cnt);
 
-// Option menu
-
-GtkWidget *wj_option_menu(char **names, int cnt, int idx, gpointer var,
-	GtkSignalFunc handler);
-int wj_option_menu_get_history(GtkWidget *optmenu);
-
-// Workaround for broken option menu sizing in GTK2
-#if GTK_MAJOR_VERSION == 2
-void wj_option_realize(GtkWidget *widget, gpointer user_data);
-#define FIX_OPTION_MENU_SIZE(opt) \
-	gtk_signal_connect_after(GTK_OBJECT(opt), "realize", \
-		GTK_SIGNAL_FUNC(wj_option_realize), NULL)
-#else
-#define FIX_OPTION_MENU_SIZE(opt)
-#endif
-
 // Set minimum size for a widget
 
 void widget_set_minsize(GtkWidget *widget, int width, int height);
@@ -165,10 +149,6 @@ void widget_set_keepsize(GtkWidget *widget, int keep_height);
 // Workaround for GtkCList reordering bug in GTK2
 
 void clist_enable_drag(GtkWidget *clist);
-
-// Move browse-mode selection in GtkList
-
-void list_select_item(GtkWidget *list, GtkWidget *item);
 
 // Most common use of boxes
 
@@ -214,7 +194,7 @@ GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
 
 // Menu-like combo box
 
-GtkWidget *wj_combo_box(char **names, int cnt, int idx, gpointer var,
+GtkWidget *wj_combo_box(char **names, int cnt, int u, int idx, void **r,
 	GtkSignalFunc handler);
 int wj_combo_box_get_history(GtkWidget *combobox);
 
