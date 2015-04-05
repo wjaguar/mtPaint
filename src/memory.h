@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -183,6 +183,7 @@ typedef struct {
 	int prot_RGB[256];		// Up to 256 RGB colours protected
 	int col_[2];			// Index for colour A & B
 	png_color col_24[2];		// RGB for colour A & B
+	int iover, aover;		// Image hidden / alpha overlayed
 } image_state;
 
 /// GRADIENTS
@@ -370,6 +371,9 @@ image_state mem_state;			// Current edit settings
 #define mem_col_24		mem_state.col_24
 #define mem_col_A24		mem_state.col_24[0]
 #define mem_col_B24		mem_state.col_24[1]
+
+#define hide_image		mem_state.iover
+#define overlay_alpha		mem_state.aover
 
 int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
 

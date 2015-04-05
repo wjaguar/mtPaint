@@ -31,8 +31,6 @@
 #include "canvas.h"
 #include "channels.h"
 
-int overlay_alpha;
-int hide_image;
 int RGBA_mode;
 
 unsigned char channel_rgb[NUM_CHANNELS][3] = {

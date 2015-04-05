@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -126,6 +126,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_PICK_GRAD,
 	DLG_SEGMENT,
 	DLG_SCRIPT,
+	DLG_LASSO,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -227,6 +228,7 @@ enum {
 	MENU_DCHAN1,
 	MENU_DCHAN2,
 	MENU_DCHAN3,
+	MENU_OALPHA,
 	MENU_HELP,
 	MENU_DOCK,
 
@@ -301,6 +303,7 @@ void main_update_area(int x, int y, int w, int h);	// Update x,y,w,h area of cur
 void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void repaint_perim(rgbcontext *ctx);	// Draw perimeter around mouse cursor
 void clear_perim();			// Clear perimeter around mouse cursor
+void grad_stroke(int x, int y);		// Update stroke gradient
 
 int async_bk;
 void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
@@ -329,9 +332,6 @@ void pressed_value(int value);
 
 int check_zoom_keys(int act_m);
 int check_zoom_keys_real(int act_m);
-
-void zoom_in();
-void zoom_out();
 
 void setup_language();		// Change language
 

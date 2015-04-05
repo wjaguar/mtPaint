@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -42,7 +42,8 @@ int	layers_total,		// Layers currently being used
 
 char layers_filename[PATHBUF];		// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
-	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
+	layers_pastry_cut,		// Pastry cut layers in view area (for animation previews)
+	layer_overlay;			// Toggle overlays per layer
 
 
 // !!! Always follow adding/changing layer's image_info by update_undo()
@@ -163,6 +164,11 @@ void layer_copy_to_main( int l )		// Copy info from layer to main image
 {
 	layer_image *lp = layer_table[l].image;
 
+	if (!layer_overlay)
+	{
+		lp->state_.iover = mem_state.iover;
+		lp->state_.aover = mem_state.aover;
+	}
 	mem_image = lp->image_;
 	mem_state = lp->state_;
 }
@@ -701,7 +707,7 @@ int layer_save_composite(char *fname, ls_settings *settings)
 	image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
 	w = image->width;
 	h = image->height;
-	layer_rgb = malloc(w * h * 3);
+	layer_rgb = calloc(1, w * h * 3);
 	if (layer_rgb)
 	{
 		view_render_rgb(layer_rgb, 0, 0, w, h, 1);	// Render layer

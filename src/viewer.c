@@ -803,6 +803,7 @@ void *init_view_code[] = {
 	EVENT(CHANGE, vw_configure),
 	EVENT(MOUSE, vw_mouse_event), EVENT(RMOUSE, vw_mouse_event),
 	EVENT(MMOUSE, vw_mouse_event),
+	/* !!! Caller adds another event to vw_drawing */
 	RET
 };
 

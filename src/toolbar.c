@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -172,6 +172,18 @@ void smudge_settings() /* Smudge opacity mode */
 {
 	static filterwindow_dd tdata = {
 		_("Smudge settings"), smudge_code, FW_FN(set_settings) };
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
+}
+
+#define WBbase filterwindow_dd
+static void *lasso_code[] = {
+	CHECKv(_("By selection channel"), lasso_sel), RET };
+#undef WBbase
+
+void lasso_settings() /* Lasso selection channel */
+{
+	static filterwindow_dd tdata = {
+		_("Lasso settings"), lasso_code, FW_FN(set_settings) };
 	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
@@ -453,15 +465,6 @@ void *toolbar_code[] = {
 	SMARTTBARx(toolbar_click, toolbar_click),
 	UNLESSv(toolbar_status[TOOLBAR_TOOLS]), HIDDEN, // Only show if user wants
 	SCRIPTED,
-#if 0
-	// for scripting
-	uBUTTONs("", tool_evt), // default; "click" to finish current operation
-	uSPINs(tool_x1, 0, MAX_WIDTH), EVENT(SCRIPT, tool_evt), OPNAME("x1"),
-	uSPINs(tool_y1, 0, MAX_HEIGHT), EVENT(SCRIPT, tool_evt), OPNAME("y1"),
-	uSPINs(tool_x0, 0, MAX_WIDTH), EVENT(SCRIPT, tool_evt), OPNAME("x0"),
-	uSPINs(tool_y0, 0, MAX_HEIGHT), EVENT(SCRIPT, tool_evt), OPNAME("y0"),
-	uFSPIN(tool_pressure, 0, 100), OPNAME("pressure"),
-#endif
 	REFv(icon_buttons[TTB_PAINT]),
 	TBRBUTTONv(_("Paint"), XPM_ICON(paint),
 		ACTMOD(ACT_TOOL, TTB_PAINT), tool_id),
@@ -494,8 +497,8 @@ void *toolbar_code[] = {
 	TBRBUTTONxv(_("Place Gradient"), XPM_ICON(grad_place),
 		ACTMOD(ACT_TOOL, TTB_GRAD), ACTMOD(DLG_GRAD, 0), tool_id),
 	TBSPACE,
-	TBBUTTON(_("Lasso Selection"), XPM_ICON(lasso),
-		ACTMOD(ACT_LASSO, 0)),
+	TBBUTTONx(_("Lasso Selection"), XPM_ICON(lasso),
+		ACTMOD(ACT_LASSO, 0), ACTMOD(DLG_LASSO, 0)),
 		ACTMAP(NEED_LAS2),
 	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
 		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,

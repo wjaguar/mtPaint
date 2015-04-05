@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -3309,7 +3309,7 @@ void mem_find_dither(int red, int green, int blue)
 	r = gamma256[red];
 	g = gamma256[green];
 	b = gamma256[blue];
-	l = 16.0; ix1 = -1;
+	l = 16.0; ix1 = 0;
 
 	for (i = 0; i < mem_cols; i++)
 	{

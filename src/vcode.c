@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2014 Dmitry Groshev
+	Copyright (C) 2013-2015 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2448,10 +2448,8 @@ static void listc_reset(GtkCList *clist, listc_data *ld)
 
 	gtk_clist_thaw(clist);
 
-	/* !!! The below was added into fpick.c in 3.34.72 to fix some, left
-	 * undescribed, incomplete redraws on Windows; disabled for now,
-	 * in hope the glitch won't reappear - WJ */
-//	gtk_widget_queue_draw((GtkWidget *)clist);
+	/* !!! Otherwise the newly empty rows are not cleared on Windows */
+	gtk_widget_queue_draw((GtkWidget *)clist);
 
 	ld->update |= 3;
 	listc_update((GtkWidget *)clist, ld);
@@ -3922,7 +3920,7 @@ int predict_size(void **ifcode, char *ddata, char **script)
 				op == op_TLSPINPACK ? TLSPINPACK_SIZE(pp - 1) :
 				cmds[op] ? cmds[op]->size : 0);
 			// Name for scripting
-			if (ref && scripted && cmds[op] && cmds[op]->uop)
+			if (ref && scripted && cmds[op] && (cmds[op]->uop > 0))
 			{
 				n++;
 				u += VVS(sizeof(swdata));
@@ -4811,7 +4809,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a grid of spins, fill from array of arrays */
 		// !!! Presents one widget out of all grid (the last one)
 		case op_TLSPINPACK:
-			dtail -= VVS(TLSPINPACK_SIZE(pp));
+			r[2] = dtail -= VVS(TLSPINPACK_SIZE(pp));
 			widget = tlspinpack(r, dtail, CT_TOP(wp), (int)pp[lp + 1]);
 			pk = 0;
 			break;
@@ -5646,6 +5644,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Remember that event needs triggering here */
 		/* Or remember start of a group of widgets */
 		/* Or a cleanup location */
+		case op_EVT_SCRIPT:
 		case op_TRIGGER: case op_GROUP: case op_CLEANUP:
 			widget = NULL;
 			break;
@@ -6540,7 +6539,7 @@ void cmd_showhide(void **slot, int state)
 			v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
 			if ((cmd_run_script(slot, vdata->script) < 0) &&
 				(GET_UOP(slot) == op_uWINDOW))
-				run_destroy(slot); // On error
+				run_destroy(PREV_SLOT(slot)); // On error
 		}
 		return;
 	}

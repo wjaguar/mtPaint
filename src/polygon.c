@@ -1,5 +1,5 @@
 /*	polygon.c
-	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -21,8 +21,6 @@
 #include "mygtk.h"
 #include "memory.h"
 
-/* !!! Currently, poly_points should be set to 0 when there's no polygonal
- * selection, because poly_lasso() depends on that - WJ */
 int poly_points;
 int poly_mem[MAX_POLY][2];
 		// Coords in poly_mem are raw coords as plotted over image
@@ -158,8 +156,13 @@ void poly_draw(int filled, unsigned char *buf, int wbuf)
 			borders[i] = (~tv + 1) & 255;
 		}
 		x1 -= x0;
-		if (buf) memcpy(buf + y * wbuf + x0, borders + x0, x1);
-		else put_pixel_row(x0, y, x1, borders + x0);
+		if (!buf) put_pixel_row(x0, y, x1, borders + x0);
+		else
+		{
+			unsigned char *dest = buf + y * wbuf + x0;
+			unsigned char *src = borders + x0;
+			for (i = 0; i < x1; i++) dest[i] |= src[i];
+		}
 		memset(borders + x0, 0, x1);
 	}	
 
@@ -186,23 +189,27 @@ void poly_outline()	// Paint polygon outline onto image
 
 void poly_add(int x, int y)	// Add point to list
 {
-	if (!poly_points)
-	{
-		poly_min_x = poly_max_x = x;
-		poly_min_y = poly_max_y = y;
-	}
-	else
-	{
-		if (poly_points >= MAX_POLY) return;
-		if (poly_min_x > x) poly_min_x = x;
-		if (poly_max_x < x) poly_max_x = x;
-		if (poly_min_y > y) poly_min_y = y;
-		if (poly_max_y < y) poly_max_y = y;
-	}
-
+	if (poly_points >= MAX_POLY) return;
 	poly_mem[poly_points][0] = x;
 	poly_mem[poly_points][1] = y;
 	poly_points++;
+}
+
+void poly_bounds()
+{
+	int i, x, y;
+
+	poly_min_x = poly_max_x = poly_mem[0][0];
+	poly_min_y = poly_max_y = poly_mem[0][1];
+	for (i = 1; i < poly_points; i++)
+	{
+		x = poly_mem[i][0];
+		if (poly_min_x > x) poly_min_x = x;
+		if (poly_max_x < x) poly_max_x = x;
+		y = poly_mem[i][1];
+		if (poly_min_y > y) poly_min_y = y;
+		if (poly_max_y < y) poly_max_y = y;
+	}	
 }
 
 
@@ -296,15 +303,15 @@ void flood_fill24_poly( int x, int y, int target )
 					flood_fill24_poly( newx, y+1, target );
 }
 
-void poly_lasso()		// Lasso around current clipboard
+void poly_lasso(int poly)	// Lasso around current clipboard
 {
 	int i, j, x = 0, y = 0;
 
 	if (!mem_clip_mask) return;	/* Nothing to do */
 
-	/* Fill seed is the first point of polygon, if any,
-	 * or top left corner of the clipboard by default */
-	if (poly_points)
+	/* Fill seed is either the first point of polygon,
+	 * or top left corner of the clipboard */
+	if (poly)
 	{
 		x = poly_mem[0][0] - poly_min_x;
 		y = poly_mem[0][1] - poly_min_y;

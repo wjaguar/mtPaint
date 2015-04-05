@@ -17,8 +17,6 @@
 	along with mtPaint in the file COPYING.
 */
 
-int overlay_alpha;
-int hide_image;
 int RGBA_mode;
 
 unsigned char channel_rgb[NUM_CHANNELS][3];

@@ -1,5 +1,5 @@
 /*	polygon.h
-	Copyright (C) 2005-2009 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -36,9 +36,10 @@ int poly_xy[4];
 ///	PROCEDURES
 
 void poly_add(int x, int y);	// Add point to polygon
+void poly_bounds();		// Determine polygon boundaries
 
 void poly_draw(int filled, unsigned char *buf, int wbuf);
 void poly_mask();		// Paint polygon onto clipboard mask
 void poly_paint();		// Paint polygon onto image
 void poly_outline();		// Paint polygon outline onto image
-void poly_lasso();		// Lasso around current clipboard
+void poly_lasso(int poly);	// Lasso around current clipboard

@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -27,6 +27,7 @@ int poly_status;					// Polygon selection tool
 int clone_x, clone_y;					// Clone offsets
 int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
+int lasso_sel;						// Lasso by selection channel
 
 #define margin_main_x margin_main_xy[0]
 #define margin_main_y margin_main_xy[1]
@@ -138,6 +139,7 @@ int close_to( int x1, int y1 );
 void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx);	// Draw/clear marquee
 void paint_poly_marquee(rgbcontext *ctx);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);		// Clear old temp line, draw next temp line
+void poly_delete_po(int x, int y);		// Delete nearest/last point from polygon
 
 void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar

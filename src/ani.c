@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -779,6 +779,7 @@ static void create_frames_ani()
 			break;
 
 		ani_set_frame_state(k);		// Change layer positions
+		memset(layer_rgb, 0, layer_w * layer_h * 3);	// In case background has holes
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
 
 		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s%05d.%s",

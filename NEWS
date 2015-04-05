@@ -4,12 +4,17 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.45	2014-??-??
+3.45	2015-??-??
 	* Scripting added - "Image->Script" to enter or run a script : See handbook section A.9 for details
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
+	* Lasso tool can be configured to shrink selection based on the selection channel - right click the tool icon
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
+	* Ctrl+Right click now deletes last point when making polygonal selection (from a closed polygon, deletes the point nearest to cursor)
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
 	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)
+	* Scroll wheel zoom now works for view window too
+	* "Hide image" and "View alpha as an overlay" can now be toggled separately for each layer (Preferences->General->Enable overlays by layer)
+	* New keyboard shortcut Ctrl+H added for Channels->Hide image
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
 	* XPM files with 65-92 colours are now saved with smaller size
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
@@ -35,7 +40,9 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
 	* BUGFIX - Animation cycles are now properly updated when layers are reordered, duplicated or deleted
 	* BUGFIX - Command line switches beyond the first one are now parsed properly
+	* BUGFIX - Listing a directory containing files with broken date/time in builtin file selector on Windows doesn't cause crash
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
+	* BUGFIX - Polygonal selections no longer skip some contour pixels in certain situations
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
 	* BUGFIX - Problem with command line window wrongly reacting to mouse in some cases is now eliminated
 	* BUGFIX - Escape and Enter keys now work properly in all dialogs in GTK+1

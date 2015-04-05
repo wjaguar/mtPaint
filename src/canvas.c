@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -60,6 +60,7 @@ int	show_paste,					// Show contents of clipboard while pasting
 	;
 
 int brush_spacing;	// Step in non-continuous mode; 0 means use event coords
+int lasso_sel;		// Lasso by selection channel (just trim it) if present
 
 int preserved_gif_delay = 10, undo_load;
 
@@ -948,15 +949,15 @@ static int copy_clip()
 	return (TRUE);
 }
 
-static void channel_mask()
+static int channel_mask()
 {
 	int i, j, ofs, delta;
 
-	if (!mem_img[CHN_SEL] || channel_dis[CHN_SEL]) return;
-	if (mem_channel > CHN_ALPHA) return;
+	if (!mem_img[CHN_SEL] || channel_dis[CHN_SEL]) return (FALSE);
+	if (mem_channel > CHN_ALPHA) return (FALSE);
 
 	if (!mem_clip_mask) mem_clip_mask_init(255);
-	if (!mem_clip_mask) return;
+	if (!mem_clip_mask) return (FALSE);
 
 	ofs = mem_clip_y * mem_width + mem_clip_x;
 	delta = 0;
@@ -967,6 +968,7 @@ static void channel_mask()
 		ofs += mem_width;
 		delta += mem_clip_w;
 	}
+	return (TRUE);
 }
 
 static void cut_clip()
@@ -1078,8 +1080,11 @@ void pressed_lasso(int cut)
 		if (!copy_clip()) return;
 		if (tool_type == TOOL_POLYGON) poly_mask();
 		else mem_clip_mask_init(255);
-		poly_lasso();
-		channel_mask();
+		if (!lasso_sel || !channel_mask())
+		{
+			poly_lasso(poly_status == POLY_DONE);
+			channel_mask();
+		}
 		trim_clip();
 		if (cut) cut_clip();
 		pressed_paste(TRUE);
@@ -1087,18 +1092,22 @@ void pressed_lasso(int cut)
 	/* Trim an existing clipboard */
 	else
 	{
-		unsigned char *oldmask = mem_clip_mask;
-
-		mem_clip_mask = NULL;
-		mem_clip_mask_init(255);
-		poly_lasso();
-		if (mem_clip_mask && oldmask)
+		if (!lasso_sel || !mem_clip_mask)
 		{
-			int i, j = mem_clip_w * mem_clip_h;
-			for (i = 0; i < j; i++) oldmask[i] &= mem_clip_mask[i];
-			mem_clip_mask_clear();
+			unsigned char *oldmask = mem_clip_mask;
+
+			mem_clip_mask = NULL;
+			mem_clip_mask_init(255);
+			poly_lasso(FALSE);
+			if (mem_clip_mask && oldmask)
+			{
+				int i, j = mem_clip_w * mem_clip_h;
+				for (i = 0; i < j; i++)
+					oldmask[i] &= mem_clip_mask[i];
+				mem_clip_mask_clear();
+			}
+			if (!mem_clip_mask) mem_clip_mask = oldmask;
 		}
-		if (!mem_clip_mask) mem_clip_mask = oldmask;
 		trim_clip();
 		update_stuff(UPD_CGEOM);
 	}
@@ -1143,6 +1152,8 @@ void update_menus()			// Update edit/undo menu
 	if (mem_undo_redo) statemap |= NEED_REDO;
 
 	cmd_set(menu_slots[MENU_CHAN0 + mem_channel], TRUE);
+	cmd_set(menu_slots[MENU_DCHAN0], hide_image);
+	cmd_set(menu_slots[MENU_OALPHA], overlay_alpha);
 
 	for (i = j = 0; i < NUM_CHANNELS; i++)	// Enable/disable channel enable/disable
 	{
@@ -2285,6 +2296,7 @@ static void poly_conclude()
 			poly_mem[n][0], poly_mem[n][1] };
 
 		poly_status = POLY_DONE;
+		poly_bounds();
 		check_marquee();
 		poly_update_cache();
 		/* Combine erasing old line with drawing final segment:
@@ -2317,9 +2329,44 @@ static void poly_add_po(int x, int y)
 	}
 }
 
-static int first_point;
+void poly_delete_po(int x, int y)
+{
+	if ((poly_status != POLY_SELECTING) && (poly_status != POLY_DONE))
+		return; // Do nothing
+	if (poly_points < 2) // Remove the only point
+	{
+		pressed_select(FALSE);
+		return;
+	}
+	if (poly_status == POLY_SELECTING) // Delete last
+	{
+		poly_points--;
+		/* New place for line */
+		line_x2 = x;
+		line_y2 = y;
+		line_x1 = poly_mem[poly_points - 1][0];
+		line_y1 = poly_mem[poly_points - 1][1];
+	}
+	else // Delete nearest
+	{
+		int i, ll, idx = 0, l = INT_MAX;
 
-static int tool_draw(int x, int y, int *update)
+		for (i = 0; i < poly_points; i++)
+		{
+			ll = (poly_mem[i][0] - x) * (poly_mem[i][0] - x) +
+				(poly_mem[i][1] - y) * (poly_mem[i][1] - y);
+			if (ll < l) idx = i , l = ll;
+		}
+		memmove(poly_mem[idx], poly_mem[idx + 1], sizeof(poly_mem[0]) *
+			(--poly_points - idx));
+		poly_bounds();
+		check_marquee();
+	}
+	poly_cache.c_zoom = 0; // Invalidate
+	update_stuff(UPD_PSEL | UPD_RENDER);
+}
+
+static int tool_draw(int x, int y, int first_point, int *update)
 {
 	static int ncx, ncy;
 	int minx, miny, xw, yh, ts2, tr2;
@@ -2455,7 +2502,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	tool_info o_tool = tool_state;
 	int i, j, k, ts2, tr2, res, ox, oy;
 	int oox, ooy;	// Continuous smudge stuff
-	gboolean rmb_tool;
+	int rmb_tool, first_point;
 
 	/* Does tool draw with color B when right button pressed? */
 	rmb_tool = (tool_type <= TOOL_SPRAY) || (tool_type == TOOL_FLOOD);
@@ -2475,9 +2522,10 @@ void tool_action(int count, int x, int y, int button, int pressure)
 
 	if ( tablet_working )
 	{
-// !!! Later, switch the calculations to integer
+// !!! Later maybe switch the calculations to integer
 		double p = pressure <= (MAX_PRESSURE * 2 / 10) ? -1.0 :
 			(pressure - MAX_PRESSURE) * (10.0 / (8 * MAX_PRESSURE));
+		p /= MAX_TF;
 
 		for (i = 0; i < 3; i++)
 		{
@@ -2622,6 +2670,8 @@ void tool_action(int count, int x, int y, int button, int pressure)
 		/* If proper button for tool */
 		if ((button == 1) || ((button == 3) && rmb_tool))
 		{
+			// Update stroke gradient
+			if (STROKE_GRADIENT) grad_stroke(x, y);
 			// Do memory stuff for undo
 			if (tool_type != TOOL_FLOOD) mem_undo_next(UNDO_TOOL);	
 			res = 0; 
@@ -2744,7 +2794,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 		}
 
 		if (first_point || !brush_spacing) /* Single point */
-			tool_draw(x + i, y + j, update_area);
+			tool_draw(x + i, y + j, first_point, update_area);
 		else /* Multiple points */
 		{
 			line_init(ncline, tool_ox + i, tool_oy + j, x + i, y + j);
@@ -2760,7 +2810,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 					lstep = brush_spacing == 1 ? 0.0 :
 						lstep - brush_spacing;
 					if (!tool_draw(ncline[0], ncline[1],
-						update_area)) break;
+						first_point, update_area)) break;
 				}
 				if (line_step(ncline) < 0) break;
 				lstep += len1;

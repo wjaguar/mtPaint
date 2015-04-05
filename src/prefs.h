@@ -1,5 +1,5 @@
 /*	prefs.h
-	Copyright (C) 2005-2009 Mark Tyler
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -23,8 +23,10 @@
 #define DEFAULT_PAT_INI "defaultPatterns"
 #define DEFAULT_THEME_INI "defaultTheme"
 
+#define MAX_TF 100 /* Tablet tool factor scale */
+
 int tablet_working, tablet_tool_use[3];		// Size, flow, opacity
-float tablet_tool_factor[3];			// Size, flow, opacity
+int tablet_tool_factor[3];			// Size, flow, opacity
 
 void pressed_preferences();
 void init_tablet();				// Set up variables

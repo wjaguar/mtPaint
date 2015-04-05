@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -47,7 +47,8 @@ int	layers_total,			// Layers currently in use
 
 char layers_filename[PATHBUF];	// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
-	layers_pastry_cut;		// Pastry cut layers in view area (for animation previews)
+	layers_pastry_cut,		// Pastry cut layers in view area (for animation previews)
+	layer_overlay;			// Toggle overlays per layer
 
 
 

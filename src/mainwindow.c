@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -89,6 +89,10 @@ static inilist ini_bool[] = {
 	{ "applyICC",		&apply_icc,		FALSE },
 	{ "scrollwheelZOOM",	&scroll_zoom,		FALSE },
 	{ "cursorZoom",		&cursor_zoom,		FALSE },
+	{ "layerOverlay",	&layer_overlay,		FALSE },
+	{ "tablet_use_size",	tablet_tool_use + 0,	FALSE },
+	{ "tablet_use_flow",	tablet_tool_use + 1,	FALSE },
+	{ "tablet_use_opacity",	tablet_tool_use + 2,	FALSE },
 	{ "pasteCommit",	&paste_commit,		TRUE  },
 	{ "couple_RGBA",	&RGBA_mode,		TRUE  },
 	{ "gridToggle",		&mem_show_grid,		TRUE  },
@@ -153,6 +157,9 @@ static inilist ini_int[] = {
 	{ "gridTrans",		grid_rgb + GRID_TRANS,	RGB_2_INT(  0, 109, 109) },
 	{ "gridTile",		grid_rgb + GRID_TILE,	RGB_2_INT(170, 170, 170) },
 	{ "gridSegment",	grid_rgb + GRID_SEGMENT,RGB_2_INT(219, 219,   0) },
+	{ "tablet_value_size",	tablet_tool_factor + 0,	MAX_TF },
+	{ "tablet_value_flow",	tablet_tool_factor + 1,	MAX_TF },
+	{ "tablet_value_opacity", tablet_tool_factor + 2,MAX_TF },
 	{ "fontBackground",	&font_bkg,		0   },
 	{ "fontAngle",		&font_angle,		0   },
 #ifdef U_FREETYPE
@@ -621,18 +628,6 @@ static void toggle_view()
 			if (toolbar_boxes[i]) cmd_showhide(toolbar_boxes[i], FALSE);
 	}
 	else toolbar_showhide(); // Switch toolbar/status/palette on if needed
-}
-
-void zoom_in()
-{
-	if (can_zoom >= 1) align_size(can_zoom + 1);
-	else align_size(1.0 / (rint(1.0 / can_zoom) - 1));
-}
-
-void zoom_out()
-{
-	if (can_zoom > 1) align_size(can_zoom - 1);
-	else align_size(1.0 / (rint(1.0 / can_zoom) + 1));
 }
 
 static void zoom_grid(int state)
@@ -1108,8 +1103,9 @@ static void canvas_scroll(main_dd *dt, void **wdata, int what, void **where,
 {
 	if (scroll_zoom)
 	{
-		if (scroll->yscroll > 0) zoom_out();
-		else zoom_in();
+		action_dispatch(origin_slot(where) == drawing_canvas ?
+			ACT_ZOOM : ACT_VWZOOM, scroll->yscroll > 0 ? -1 : 0,
+			FALSE, TRUE);
 		scroll->xscroll = scroll->yscroll = 0;
 	}
 	else if (scroll->state & _Cmask) /* Convert up-down into left-right */
@@ -1120,66 +1116,59 @@ static void canvas_scroll(main_dd *dt, void **wdata, int what, void **where,
 }
 
 
-int grad_tool(int count, int x, int y, unsigned int state, int button)
+void grad_stroke(int x, int y)
+{
+	grad_info *grad = gradient + mem_channel;
+	double d, stroke;
+	int i, j;
+
+	/* No usable gradient */
+	if (grad->wmode == GRAD_MODE_NONE) return;
+
+	if (!pen_down || (tool_type > TOOL_SPRAY)) /* Begin stroke */
+	{
+		grad_path = grad->xv = grad->yv = 0.0;
+	}
+	else /* Continue stroke */
+	{
+		i = x - tool_ox; j = y - tool_oy;
+		stroke = sqrt(i * i + j * j);
+		/* First step - anchor rear end */
+		if (grad_path == 0.0)
+		{
+			d = tool_size * 0.5 / stroke;
+			grad_x0 = tool_ox - i * d;
+			grad_y0 = tool_oy - j * d;
+		}
+		/* Scalar product */
+		d = (tool_ox - grad_x0) * (x - tool_ox) +
+			(tool_oy - grad_y0) * (y - tool_oy);
+		if (d < 0.0) /* Going backward - flip rear */
+		{
+			d = tool_size * 0.5 / stroke;
+			grad_x0 = x - i * d;
+			grad_y0 = y - j * d;
+			grad_path += tool_size + stroke;
+		}
+		else /* Going forward or sideways - drag rear */
+		{
+			stroke = sqrt((x - grad_x0) * (x - grad_x0) +
+				(y - grad_y0) * (y - grad_y0));
+			d = tool_size * 0.5 / stroke;
+			grad_x0 = x + (grad_x0 - x) * d;
+			grad_y0 = y + (grad_y0 - y) * d;
+			grad_path += stroke - tool_size * 0.5;
+		}
+		d = 2.0 / (double)tool_size;
+		grad->xv = (x - grad_x0) * d;
+		grad->yv = (y - grad_y0) * d;
+	}
+}
+
+static void grad_tool(int count, int x, int y, unsigned int state, int button)
 {
 	int i, j, old[4];
-	double d, stroke;
 	grad_info *grad = gradient + mem_channel;
-
-	/* Handle stroke gradients */
-	if (tool_type != TOOL_GRADIENT)
-	{
-		/* Not a gradient stroke */
-		if (!mem_gradient || (grad->status != GRAD_NONE) ||
-			(grad->wmode == GRAD_MODE_NONE) || (count < 0) || !button)
-			return (FALSE);
-
-		/* Limit coordinates to canvas */
-		x = x < 0 ? 0 : x >= mem_width ? mem_width - 1 : x;
-		y = y < 0 ? 0 : y >= mem_height ? mem_height - 1 : y;
-
-		/* Standing still */
-		if ((tool_ox == x) && (tool_oy == y)) return (FALSE);
-		if (!pen_down || (tool_type > TOOL_SPRAY)) /* Begin stroke */
-		{
-			grad_path = grad->xv = grad->yv = 0.0;
-		}
-		else /* Continue stroke */
-		{
-			i = x - tool_ox; j = y - tool_oy;
-			stroke = sqrt(i * i + j * j);
-			/* First step - anchor rear end */
-			if (grad_path == 0.0)
-			{
-				d = tool_size * 0.5 / stroke;
-				grad_x0 = tool_ox - i * d;
-				grad_y0 = tool_oy - j * d;
-			}
-			/* Scalar product */
-			d = (tool_ox - grad_x0) * (x - tool_ox) +
-				(tool_oy - grad_y0) * (y - tool_oy);
-			if (d < 0.0) /* Going backward - flip rear */
-			{
-				d = tool_size * 0.5 / stroke;
-				grad_x0 = x - i * d;
-				grad_y0 = y - j * d;
-				grad_path += tool_size + stroke;
-			}
-			else /* Going forward or sideways - drag rear */
-			{
-				stroke = sqrt((x - grad_x0) * (x - grad_x0) +
-					(y - grad_y0) * (y - grad_y0));
-				d = tool_size * 0.5 / stroke;
-				grad_x0 = x + (grad_x0 - x) * d;
-				grad_y0 = y + (grad_y0 - y) * d;
-				grad_path += stroke - tool_size * 0.5;
-			}
-			d = 2.0 / (double)tool_size;
-			grad->xv = (x - grad_x0) * d;
-			grad->yv = (y - grad_y0) * d;
-		}
-		return (FALSE); /* Let drawing tools run */
-	}
 
 	copy4(old, grad->xy);
 	/* Left click sets points and picks them up again */
@@ -1267,148 +1256,20 @@ int grad_tool(int count, int x, int y, unsigned int state, int button)
 
 	/* Leave hides the dragged line */
 	else if (count == MCOUNT_LEAVE) repaint_grad(NULL);
-
-	return (TRUE);
 }
 
-static int get_bkg(int xc, int yc, int dclick);
-
-static inline int xmmod(int x, int y)
+/* Pick color A/B from canvas, or use one given */
+static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
 {
-	return (x - (x % y));
-}
+	int rgba = RGBA_mode && (mem_channel == CHN_IMAGE);
+	int upd = 0, alpha = 255; // opaque
 
-/* Mouse event from button/motion on the canvas */
-static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
-{
-	static int tool_fix, tool_fixv;	// Fixate on axis
-	int new_cursor;
-	int i, x0, y0, x, y, ox, oy, tox = tool_ox, toy = tool_oy;
-	int zoom = 1, scale = 1;
-
-
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
-	else scale = rint(can_zoom);
-
-	x = x0 = floor_div((m->x - margin_main_x) * zoom, scale) + dx;
-	y = y0 = floor_div((m->y - margin_main_y) * zoom, scale) + dy;
-
-	ox = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
-	oy = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
-
-	if (!mflag) /* Coordinate fixation */
+	if (pixel < 0) // If no pixel value is given
 	{
-		if (!(m->state & _Smask)) tool_fix = 0;
-		else if (!(m->state & _Cmask)) /* Shift */
-		{
-			if (tool_fix != 1) tool_fixv = x0;
-			tool_fix = 1;
-		}
-		else /* Ctrl+Shift */
-		{
-			if (tool_fix != 2) tool_fixv = y0;
-			tool_fix = 2;
-		}
-	}
-	/* No use when moving cursor by keyboard */
-	else if (!m->count) tool_fix = 0;
-
-	if (!tool_fix);
-	/* For rectangular selection it makes sense to fix its width/height */
-	else if ((tool_type == TOOL_SELECT) && (m->button == 1) &&
-		((marq_status == MARQUEE_DONE) || (marq_status == MARQUEE_SELECTING)))
-	{
-		if (tool_fix == 1) x = x0 = marq_x2;
-		else y = y0 = marq_y2;
-	}
-	else if (tool_fix == 1) x = x0 = tool_fixv;
-	else /* if (tool_fix == 2) */ y = y0 = tool_fixv;
-
-	if (tgrid_snap) /* Snap to grid */
-	{
-		int xy[2] = { x0, y0 };
-
-		/* For everything but rectangular selection, snap with rounding
-		 * feels more natural than with flooring - WJ */
-		if (tool_type != TOOL_SELECT)
-		{
-			xy[0] += tgrid_dx >> 1;
-			xy[1] += tgrid_dy >> 1;
-		}
-		snap_xy(xy);
-		if ((x = x0 = xy[0]) < 0) x += xmmod(tgrid_dx - x - 1, tgrid_dx);
-		if (x >= mem_width) x -= xmmod(tgrid_dx + x - mem_width, tgrid_dx);
-		if ((y = y0 = xy[1]) < 0) y += xmmod(tgrid_dy - y - 1, tgrid_dy);
-		if (y >= mem_height) y -= xmmod(tgrid_dy + y - mem_height, tgrid_dy);
-	}
-
-	x = x < 0 ? 0 : x >= mem_width ? mem_width - 1 : x;
-	y = y < 0 ? 0 : y >= mem_height ? mem_height - 1 : y;
-
-	/* ****** Release-event-specific code ****** */
-
-	if (m->count < 0)
-	{
-		tint_mode[2] = 0;
-		pen_down = 0;
-		if ( col_reverse )
-		{
-			col_reverse = FALSE;
-			mem_swap_cols(FALSE);
-		}
-
-		if (grad_tool(m->count, x0, y0, m->state, m->button)) return;
-
-		if ((tool_type == TOOL_LINE) && (m->button == 1) &&
-			(line_status == LINE_START))
-		{
-			line_status = LINE_LINE;
-			repaint_line(NULL);
-		}
-
-		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
-			(m->button == 1))
-		{
-			if (marq_status == MARQUEE_SELECTING)
-				marq_status = MARQUEE_DONE;
-			if (marq_status == MARQUEE_PASTE_DRAG)
-				marq_status = MARQUEE_PASTE;
-			cursor_corner = -1;
-		}
-
-		// Finish off dragged polygon selection
-		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
-			tool_action(m->count, x, y, m->button, m->pressure);
-
-		mem_undo_prepare();
-		update_menus();
-
-		return;
-	}
-
-	/* ****** Common click/motion handling code ****** */
-
-	while ((m->state & _CSmask) == _Cmask)	// Set colour A/B
-	{
-		int ab = m->button == 3; /* A for left, B for right */
-		int pixel, alpha, rgba, upd = 0;
-
-		if (m->button == 2) /* Auto-dither */
-		{
-			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
-				pressed_dither_A();
-			break;
-		}
-		if ((m->button != 1) && (m->button != 3)) break;
 		/* Default alpha */
-		rgba = RGBA_mode && (mem_channel == CHN_IMAGE);
 		alpha = channel_col_[ab][CHN_ALPHA];
-		/* Pick color from tracing image if possible */
-		pixel = get_bkg(m->x + dx * scale, m->y + dy * scale, m->count == 2);
-		if (pixel >= 0) alpha = 255; // opaque
-		/* Otherwise, average brush or selection area on Ctrl+double click */
-		while ((pixel < 0) && (m->count == 2) && (MEM_BPP == 3))
+		/* Average brush or selection area on double click */
+		while (dclick && (MEM_BPP == 3))
 		{
 			int rect[4];
 
@@ -1443,43 +1304,185 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 			if (mem_img[CHN_ALPHA])
 				alpha = mem_img[CHN_ALPHA][mem_width * oy + ox];
 		}
-
-		if (rgba)
-		{
-			upd = channel_col_[ab][CHN_ALPHA] ^ alpha;
-			channel_col_[ab][CHN_ALPHA] = alpha;
-		}
-
-		if (mem_channel != CHN_IMAGE)
-		{
-			upd |= channel_col_[ab][mem_channel] ^ pixel;
-			channel_col_[ab][mem_channel] = pixel;
-		}
-		else if (mem_img_bpp == 1)
-		{
-			upd |= mem_col_[ab] ^ pixel;
-			mem_col_[ab] = pixel;
-			mem_col_24[ab] = mem_pal[pixel];
-		}
-		else
-		{
-			png_color *col = mem_col_24 + ab;
-
-			upd |= PNG_2_INT(*col) ^ pixel;
-			col->red = INT_2_R(pixel);
-			col->green = INT_2_G(pixel);
-			col->blue = INT_2_B(pixel);
-		}
-		if (upd) update_stuff(UPD_CAB);
-		break;
 	}
 
-	if ((m->state & _CSmask) == _Cmask); /* Done above */
+	if (rgba)
+	{
+		upd = channel_col_[ab][CHN_ALPHA] ^ alpha;
+		channel_col_[ab][CHN_ALPHA] = alpha;
+	}
+
+	if (mem_channel != CHN_IMAGE)
+	{
+		upd |= channel_col_[ab][mem_channel] ^ pixel;
+		channel_col_[ab][mem_channel] = pixel;
+	}
+	else if (mem_img_bpp == 1)
+	{
+		upd |= mem_col_[ab] ^ pixel;
+		mem_col_[ab] = pixel;
+		mem_col_24[ab] = mem_pal[pixel];
+	}
+	else
+	{
+		png_color *col = mem_col_24 + ab;
+
+		upd |= PNG_2_INT(*col) ^ pixel;
+		col->red = INT_2_R(pixel);
+		col->green = INT_2_G(pixel);
+		col->blue = INT_2_B(pixel);
+	}
+	if (upd) update_stuff(UPD_CAB);
+}
+
+static void tool_done()
+{
+	tint_mode[2] = 0;
+	pen_down = 0;
+	if (col_reverse)
+	{
+		col_reverse = FALSE;
+		mem_swap_cols(FALSE);
+	}
+
+	mem_undo_prepare();
+}
+
+static int get_bkg(int xc, int yc, int dclick);
+
+static inline int xmmod(int x, int y)
+{
+	return (x - (x % y));
+}
+
+/* Mouse event from button/motion on the canvas */
+static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
+{
+	static int tool_fix, tool_fixv;	// Fixate on axis
+	int new_cursor;
+	int i, x0, y0, ox, oy;
+	int x, y;
+	int zoom = 1, scale = 1;
+
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
+	else scale = rint(can_zoom);
+
+	x0 = floor_div((m->x - margin_main_x) * zoom, scale) + dx;
+	y0 = floor_div((m->y - margin_main_y) * zoom, scale) + dy;
+
+	ox = x0 < 0 ? 0 : x0 >= mem_width ? mem_width - 1 : x0;
+	oy = y0 < 0 ? 0 : y0 >= mem_height ? mem_height - 1 : y0;
+
+	if (!mflag) /* Coordinate fixation */
+	{
+		if (!(m->state & _Smask)) tool_fix = 0;
+		else if (!(m->state & _Cmask)) /* Shift */
+		{
+			if (tool_fix != 1) tool_fixv = x0;
+			tool_fix = 1;
+		}
+		else /* Ctrl+Shift */
+		{
+			if (tool_fix != 2) tool_fixv = y0;
+			tool_fix = 2;
+		}
+	}
+	/* No use when moving cursor by keyboard */
+	else if (!m->count) tool_fix = 0;
+
+	if (!tool_fix);
+	/* For rectangular selection it makes sense to fix its width/height */
+	else if ((tool_type == TOOL_SELECT) && (m->button == 1) &&
+		((marq_status == MARQUEE_DONE) || (marq_status == MARQUEE_SELECTING)))
+	{
+		if (tool_fix == 1) x0 = marq_x2;
+		else y0 = marq_y2;
+	}
+	else if (tool_fix == 1) x0 = tool_fixv;
+	else /* if (tool_fix == 2) */ y0 = tool_fixv;
+
+	x = x0; y = y0;
+	if (tgrid_snap) /* Snap to grid */
+	{
+		int xy[2] = { x0, y0 };
+
+		/* For everything but rectangular selection, snap with rounding
+		 * feels more natural than with flooring - WJ */
+		if (tool_type != TOOL_SELECT)
+		{
+			xy[0] += tgrid_dx >> 1;
+			xy[1] += tgrid_dy >> 1;
+		}
+		snap_xy(xy);
+		if ((x = x0 = xy[0]) < 0) x += xmmod(tgrid_dx - x - 1, tgrid_dx);
+		if (x >= mem_width) x -= xmmod(tgrid_dx + x - mem_width, tgrid_dx);
+		if ((y = y0 = xy[1]) < 0) y += xmmod(tgrid_dy - y - 1, tgrid_dy);
+		if (y >= mem_height) y -= xmmod(tgrid_dy + y - mem_height, tgrid_dy);
+	}
+
+	x = x < 0 ? 0 : x >= mem_width ? mem_width - 1 : x;
+	y = y < 0 ? 0 : y >= mem_height ? mem_height - 1 : y;
+
+	/* ****** Release-event-specific code ****** */
+
+	if (m->count < 0)
+	{
+		if ((tool_type == TOOL_LINE) && (m->button == 1) &&
+			(line_status == LINE_START))
+		{
+			line_status = LINE_LINE;
+			repaint_line(NULL);
+		}
+
+		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
+			(m->button == 1))
+		{
+			if (marq_status == MARQUEE_SELECTING)
+				marq_status = MARQUEE_DONE;
+			if (marq_status == MARQUEE_PASTE_DRAG)
+				marq_status = MARQUEE_PASTE;
+			cursor_corner = -1;
+		}
+
+		// Finish off dragged polygon selection
+		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
+			tool_action(m->count, x, y, m->button, m->pressure);
+
+		tool_done();
+		update_menus();
+
+		return;
+	}
+
+	/* ****** Common click/motion handling code ****** */
+
+	if ((m->state & _CSmask) == _Cmask)
+	{
+		/* Delete point from polygon */
+		if ((m->button == 3) && (tool_type == TOOL_POLYGON))
+		{
+			if (m->count == 1) poly_delete_po(x, y);
+		}
+		else if (m->button == 2) /* Auto-dither */
+		{
+			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
+				pressed_dither_A();
+		}
+		/* Set colour A/B */
+		else if ((m->button == 1) || (m->button == 3)) pick_color(ox, oy,
+			m->button == 3, // A for left, B for right
+			m->count == 2, // Double click for averaging an area
+			// Pick color from tracing image when possible
+			get_bkg(m->x + dx * scale, m->y + dy * scale, m->count == 2));
+	}
 
 	else if ((m->button == 2) || ((m->button == 3) && (m->state & _Smask)))
 		set_zoom_centre(ox, oy);
 
-	else if (grad_tool(m->count, x0, y0, m->state, m->button));
+	else if (tool_type == TOOL_GRADIENT)
+		grad_tool(m->count, x0, y0, m->state, m->button);
 
 	/* Pure moves are handled elsewhere */
 	else if (m->button) tool_action(m->count, x, y, m->button, m->pressure);
@@ -1488,12 +1491,6 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 	if (!m->count)
 	{
-		if (tool_type == TOOL_CLONE)
-		{
-			tool_ox = x;
-			tool_oy = y;
-		}
-
 		if ((poly_status == POLY_SELECTING) && !m->button)
 			stretch_poly_line(x, y);
 
@@ -1520,10 +1517,15 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 		if (perim_status > 0) clear_perim(); // Remove old perimeter box
 
-		if ((tool_type == TOOL_CLONE) && !m->button && (m->state & _Cmask))
+		if (tool_type == TOOL_CLONE)
 		{
-			clone_x += tox - x;
-			clone_y += toy - y;
+			if (!m->button && (m->state & _Cmask))
+			{
+				clone_x += tool_ox - x;
+				clone_y += tool_oy - y;
+			}
+			tool_ox = x;
+			tool_oy = y;
 		}
 
 		if (tool_size * can_zoom > 4)
@@ -1604,7 +1606,7 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
 	if (perim_status > 0) clear_perim();
 
-	if (grad_tool(MCOUNT_LEAVE, 0, 0, 0, 0)) return;
+	if (tool_type == TOOL_GRADIENT) grad_tool(MCOUNT_LEAVE, 0, 0, 0, 0);
 
 	if (((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
 		((tool_type == TOOL_LINE) && (line_status == LINE_LINE)))
@@ -3180,7 +3182,7 @@ void change_to_tool(int icon)
 	if (!cmd_checkv(slot, SLOT_SENSITIVE)) return; // Blocked
 // !!! Unnecessarily complicated approach - better add a peek operation
 	var = cmd_read(slot, NULL);
-	if ((int)var != TOOL_ID(slot)) cmd_set(slot, TRUE);
+	if (*(int *)var != TOOL_ID(slot)) cmd_set(slot, TRUE);
 
 	switch (icon)
 	{
@@ -3207,6 +3209,9 @@ void change_to_tool(int icon)
 
 	/* Tool hasn't changed (likely, recursion changed it from under us) */
 	if (t == tool_type) return;
+
+	/* Make sure tool release actions are done */
+	tool_done();
 
 	if (perim_status) clear_perim();
 	i = tool_type;
@@ -3686,6 +3691,15 @@ void script_paste(int centre)
 	action_dispatch(ACT_COMMIT, tdata.swap, 0, TRUE); // Commit paste
 }
 
+static float new_zoom(int mode, float zoom)
+{
+	return (!mode ? // Zoom in
+		(zoom >= 1 ? zoom + 1 : 1.0 / (rint(1.0 / zoom) - 1)) :
+		mode == -1 ? // Zoom out
+		(zoom > 1 ? zoom - 1 : 1.0 / (rint(1.0 / zoom) + 1)) :
+		mode > 0 ? mode : -1.0 / mode); // Zoom to given factor/divisor
+}
+
 void action_dispatch(int action, int mode, int state, int kbd)
 {
 	int change = mode & 1 ? mem_nudge : 1, dir = (mode >> 1) - 1;
@@ -3695,9 +3709,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_QUIT:
 		quit_all(mode); break;
 	case ACT_ZOOM:
-		if (!mode) zoom_in();
-		else if (mode == -1) zoom_out();
-		else align_size(mode > 0 ? mode : -1.0 / mode);
+		align_size(new_zoom(mode, can_zoom));
 		break;
 	case ACT_VIEW:
 		toggle_view(); break;
@@ -3790,17 +3802,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		else pressed_channel_edit(state, mode);
 		break;
 	case ACT_VWZOOM:
-		if (!mode)
-		{
-			if (vw_zoom >= 1) vw_align_size(vw_zoom + 1);
-			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) - 1));
-		}
-		else if (mode == -1)
-		{
-			if (vw_zoom > 1) vw_align_size(vw_zoom - 1);
-			else vw_align_size(1.0 / (rint(1.0 / vw_zoom) + 1));
-		}
-//		else vw_align_size(mode > 0 ? mode : -1.0 / mode);
+		vw_align_size(new_zoom(mode, vw_zoom));
 		break;
 	case ACT_SAVE:
 		pressed_save_file(); break;
@@ -3998,6 +4000,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_segment(); break;
 	case DLG_SCRIPT:
 		pressed_script(); break;
+	case DLG_LASSO:
+		lasso_settings(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4615,6 +4619,7 @@ static void *main_menu_code[] = {
 	MENUSEP, //
 	REFv(menu_slots[MENU_DCHAN0]),
 	MENUCHECKv(_("//Hide Image"), ACTMOD(ACT_SET_OVERLAY, 1), hide_image),
+		SHORTCUTs("<control>H"),
 	REFv(menu_slots[MENU_DCHAN1]),
 	MENUCHECKvs(_("//Disable Alpha"), ACTMOD(ACT_CHN_DIS, CHN_ALPHA),
 		channel_dis[CHN_ALPHA]),
@@ -4630,6 +4635,7 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Unassociate Alpha"), ACTMOD(FILT_UALPHA, 0)),
 		ACTMAP(NEED_RGBA),
 	MENUSEP, //
+	REFv(menu_slots[MENU_OALPHA]),
 	MENUCHECKv(_("//View Alpha as an Overlay"), ACTMOD(ACT_SET_OVERLAY, 0), overlay_alpha),
 	MENUITEM(_("//Configure Overlays ..."), ACTMOD(DLG_COLORS, COLSEL_OVERLAYS)),
 	WDONE,
@@ -4743,6 +4749,7 @@ static void *main_code[] = {
 	EVENT(SCROLL, canvas_scroll),
 //	VIEW WINDOW
 	CALL(init_view_code),
+	EVENT(SCROLL, canvas_scroll), // for vw_drawing widget
 	WDONE, // hvsplit
 ////	STATUS BAR
 	REFv(toolbar_boxes[TOOLBAR_STATUS]),

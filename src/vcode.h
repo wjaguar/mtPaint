@@ -1,5 +1,5 @@
 /*	vcode.h
-	Copyright (C) 2013-2014 Dmitry Groshev
+	Copyright (C) 2013-2015 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -717,7 +717,7 @@ enum {
 #define TSPINSLIDE(NM,V,V0,V1) T1SPINSLIDE(V,V0,V1), TLABEL(NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf_t(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
-#define TLSPINSLIDEs(V,V0,V1,X,Y) WBrhf_t(SPINSLIDE, 5), WBfield(V), \
+#define TLSPINSLIDEvs(V,V0,V1,X,Y) WBrh_t(SPINSLIDE, 5), &(V), \
 	(void *)(V0), (void *)(V1), WBwh(150, 0), WBxyl(X, Y, 1)
 #define TLSPINSLIDExl(V,V0,V1,X,Y,L) WBrhf_tx(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, L)
@@ -732,6 +732,7 @@ enum {
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
 #define TLCHECKvl(NM,V,X,Y,L) WBrh_t(CHECK, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
+#define uCHECKv(NM,V) WBrh_(uCHECK, 2), &(V), (NM)
 /* !!! No more than 255 choices */
 #define RPACK(SS,N,H,V) WBrhf_x(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
 #define RPACKv(SS,N,H,V) WBrh_x(RPACK, 3), &(V), (SS), WBnh(N, H)

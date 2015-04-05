@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -18,11 +18,16 @@
 */
 
 #include "global.h"
+#undef _
+#define _(X) X
+
 #include "mygtk.h"
 #include "memory.h"
 #include "vcode.h"
+#include "ani.h"
 #include "png.h"
 #include "canvas.h"
+#include "layer.h"
 #include "inifile.h"
 #include "viewer.h"
 #include "mainwindow.h"
@@ -33,10 +38,7 @@
 
 ///	PREFERENCES WINDOW
 
-static void **label_tablet_device, **label_tablet_pressure;
-
-static char	*tablet_ini[] = { "tablet_value_size", "tablet_value_flow", "tablet_value_opacity" },
-		*tablet_ini2[] = { "tablet_use_size", "tablet_use_flow", "tablet_use_opacity" };
+static void **label_tablet_device;
 
 #if GTK_MAJOR_VERSION == 1
 static GdkDeviceInfo *tablet_device;
@@ -49,7 +51,7 @@ static GtkWidget *inputd;
 int tablet_working;		// Has the device been initialized?
 
 int tablet_tool_use[3];				// Size, flow, opacity
-float tablet_tool_factor[3];			// Size, flow, opacity
+int tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
@@ -63,18 +65,12 @@ static char *pref_lang_ini_code[PREF_LANGS] = { "system",
 	"pt_BR", "ru_RU", "sk_SK",
 	"es_ES", "sv_SE", "tl_PH", "tr_TR" };
 
-#undef _
-#define _(X) X
-
 static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 	_("Chinese (Simplified)"), _("Chinese (Taiwanese)"), _("Czech"),
 	_("Dutch"), _("English (UK)"), _("French"), _("Galician"), _("German"),
 	_("Hungarian"), _("Italian"), _("Japanese"), _("Polish"),
 	_("Portuguese"), _("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
 	_("Spanish"), _("Swedish"), _("Tagalog"), _("Turkish") };
-
-#undef _
-#define _(X) __(X)
 
 #endif
 
@@ -112,19 +108,11 @@ static gboolean delete_inputd()
 	return (TRUE);
 }
 
-static void tablet_update_pressure( double pressure )
-{
-	char txt[64];
-
-	sprintf(txt, "%s = %.2f", _("Pressure"), pressure * (1.0 / MAX_PRESSURE));
-	cmd_setv(label_tablet_pressure, txt, LABEL_VALUE);
-}
-
 static void tablet_update_device( char *device )
 {
 	char txt[64];
 
-	sprintf(txt, "%s = %s", _("Current Device"), device);
+	sprintf(txt, "%s = %s", __("Current Device"), device);
 	cmd_setv(label_tablet_device, txt, LABEL_VALUE);
 }
 
@@ -219,16 +207,15 @@ static void conf_tablet()
 
 typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
-	int tf[3];
 	int confx, centre, zoom;
 	int lang;
 	char *factor_str;
+	void **label_tablet_pressure;
 } pref_dd;
 
 static void prefs_evt(pref_dd *dt, void **wdata, int what)
 {
 	char *p, oldpal[PATHBUF], oldpat[PATHBUF];
-	int i, j;
 
 	if (what != op_EVT_CANCEL) // OK/Apply
 	{
@@ -241,14 +228,6 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 		mem_undo_depth = dt->undo_depth[0];
 		mem_xbm_hot_x = dt->hot_x[0];
 		mem_xbm_hot_y = dt->hot_y[0];
-
-		for (i = 0; i < 3; i++)
-		{
-			inifile_set_gboolean(tablet_ini2[i], tablet_tool_use[i]);
-			j = dt->tf[i];
-			inifile_set_gint32(tablet_ini[i], j);
-			tablet_tool_factor[i] = j / 100.0;
-		}
 
 #ifdef U_NLS
 		inifile_set("languageSETTING", pref_lang_ini_code[dt->lang]);
@@ -278,15 +257,18 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
 	mouse_ext *mouse)
 {
-	if (mouse->button == 1) tablet_update_pressure(mouse->pressure);
-  
+	if (mouse->button == 1)
+	{
+		char txt[64];
+		sprintf(txt, "%s = %.2f", __("Pressure"),
+			mouse->pressure * (1.0 / MAX_PRESSURE));
+		cmd_setv(dt->label_tablet_pressure, txt, LABEL_VALUE);
+	}
+
 	return (TRUE);
 }
 
 ///	V-CODE
-
-#undef _
-#define _(X) X
 
 #define WBbase pref_dd
 static void *pref_code[] = {
@@ -314,6 +296,7 @@ static void *pref_code[] = {
 	CHECKv(_("Use gamma correction by default"), use_gamma),
 	CHECKv(_("Optimize alpha chequers"), chequers_optimize),
 	CHECKv(_("Disable view window transparencies"), opaque_view),
+	CHECKv(_("Enable overlays by layer"), layer_overlay),
 ///	LANGUAGE SWITCHBOX
 #ifdef U_NLS
 	BORDER(OPT, 0),
@@ -409,14 +392,14 @@ static void *pref_code[] = {
 	TLCHECKv(_("Opacity"), tablet_tool_use[2], 0, 3),
 	//	Size/Flow/Opacity sliders
 	BORDER(SPINSLIDE, 0),
-	TLSPINSLIDEs(tf[0], -100, 100, 1, 1),
-	TLSPINSLIDEs(tf[1], -100, 100, 1, 2),
-	TLSPINSLIDEs(tf[2], -100, 100, 1, 3),
+	TLSPINSLIDEvs(tablet_tool_factor[0], -MAX_TF, MAX_TF, 1, 1),
+	TLSPINSLIDEvs(tablet_tool_factor[1], -MAX_TF, MAX_TF, 1, 2),
+	TLSPINSLIDEvs(tablet_tool_factor[2], -MAX_TF, MAX_TF, 1, 3),
 	WDONE, WDONE,
 	FVBOXB(_("Test Area")),
 	COLORPATCHv("\xFF\xFF\xFF", 128, 64), // white
 	EVENT(XMOUSE, tablet_preview), EVENT(MXMOUSE, tablet_preview),
-	REFv(label_tablet_pressure), MLABELr(""),
+	REF(label_tablet_pressure), MLABELr(""),
 	WDONE, WDONE,
 	WDONE, // notebook
 ///	Bottom of Prefs window
@@ -425,9 +408,6 @@ static void *pref_code[] = {
 };
 #undef WBbase
 
-#undef _
-#define _(X) __(X)
-
 void pressed_preferences()
 {
 	char txt[128];
@@ -435,11 +415,8 @@ void pressed_preferences()
 		{ mem_xpm_trans, -1, mem_cols - 1 },
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
 		{ mem_xbm_hot_y, -1, mem_height - 1 },
-		{ rint(tablet_tool_factor[0] * 100.0),
-		  rint(tablet_tool_factor[1] * 100.0),
-		  rint(tablet_tool_factor[2] * 100.0) },
 		FALSE, TRUE, FALSE,
-		0, txt };
+		0, txt, NULL };
 
 	// Make sure the user can only open 1 prefs window
 	cmd_sensitive(menu_slots[MENU_PREFS], FALSE);
@@ -452,7 +429,7 @@ void pressed_preferences()
 			if (!strcmp(pref_lang_ini_code[i], cur)) tdata.lang = i;
 	}
 #endif
-	snprintf(txt, sizeof(txt), "%s (%%)", _("Factor"));
+	snprintf(txt, sizeof(txt), "%s (%%)", __("Factor"));
 
 	run_create(pref_code, &tdata, sizeof(tdata));
 
@@ -518,11 +495,5 @@ void init_tablet()				// Set up variables
 			}
 			dlist = dlist->next;		// Not right device so look for next one
 		}
-	}
-
-	for ( i=0; i<3; i++ )
-	{
-		tablet_tool_use[i] = inifile_get_gboolean( tablet_ini2[i], FALSE );
-		tablet_tool_factor[i] = ((float) inifile_get_gint32( tablet_ini[i], 100 )) / 100;
 	}
 }

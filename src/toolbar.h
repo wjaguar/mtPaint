@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -136,5 +136,6 @@ void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns
 void mode_change(int setting, int state);	// Drawing mode variables
 void flood_settings();			// Flood fill step
 void smudge_settings();			// Smudge opacity mode
+void lasso_settings();			// Lasso selection channel
 void step_settings();			// Brush spacing
 void blend_settings();			// Blend mode

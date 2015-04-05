@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -367,6 +367,7 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 	char full_name[PATHBUF], txt_size[64], txt_date[64], tmp_txt[64];
 	char *nm, *src, *dest, *dir = dt->txt_directory;
 	memx2 mem = dt->files;
+	struct tm *lt;
 	struct dirent *ep;
 	struct stat buf;
 	int *tc;
@@ -459,8 +460,11 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 			}
 			else addchars(&mem, 0, 1);
 			// Field #4 - file modification time
-			strftime(txt_date, 60, "%Y-%m-%d   %H:%M.%S",
-				localtime(&buf.st_mtime));
+			strcpy(txt_date, " "); // to sort failed files after dirs
+			lt = localtime(&buf.st_mtime);
+			/* !!! localtime() can fail and return NULL if given
+			 * "wrong" input value */
+			if (lt) strftime(txt_date, 60, "%Y-%m-%d   %H:%M.%S", lt);
 			addstr(&mem, txt_date, 0);
 		}
 		// Field #5 - case-insensitive sort key
