@@ -43,6 +43,8 @@ typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 #define CONT_DEPTH 128
 /* Max columns in a list */
 #define MAX_COLS 16
+/* Max keys in keymap */
+#define MAX_KEYS 512
 
 #define VVS(N) (((N) + sizeof(void *) - 1) / sizeof(void *))
 
@@ -71,17 +73,39 @@ typedef struct {
 	void ***dv;	// Pointer to dialog response
 	void **destroy;	// Pre-destruction event slot
 	void **wantkey;	// Slot of prioritized keyboard handler
+	void **keymap;	// KEYMAP slot
 	void **smmenu;	// SMARTMENU slot
 	void **fupslot;	// Slot which needs defocusing to update (only 1 for now)
+	void **actmap;	// Actmap array
 	void *now_evt;	// Keyboard event being handled (check against recursion)
 	void *tparent;	// Transient parent window
 	char *ininame;	// Prefix for inifile vars
 	char **script;	// Commands if simulated
 	int xywh[4];	// Stored window position & size
+	int actn;	// Actmap slots count
+	int actmask;	// Last actmap mask
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
 } v_dd;
+
+/* Actmap array */
+
+#define ACT_SIZE 2 /* Pointers per actmap slot */
+#define ADD_ACT(W,S,V) ((W)[0] = (S) , (W)[1] = (V))
+
+static void act_state(v_dd *vdata, int mask)
+{
+	void **map = vdata->actmap;
+	int i = vdata->actn;
+
+	vdata->actmask = mask;
+	while (i-- > 0)
+	{
+		cmd_sensitive(map[0], !!((int)map[1] & mask));
+		map += ACT_SIZE;
+	}
+}
 
 /* Simulated widget - one struct for all kinds */
 
@@ -993,6 +1017,415 @@ static int offer_clipboard(void **slot)
 
 #undef CLIPMASK
 
+//	Keynames handling
+
+#if GTK_MAJOR_VERSION == 1
+#include <ctype.h>
+#endif
+
+static void get_keyname(char *buf, int buflen, guint key, guint state, int ui)
+{
+	char tbuf[128], *name, *m1, *m2, *m3, *sp;
+	guint u;
+
+	if (!ui) /* For inifile */
+	{
+		m1 = state & _Cmask ? "C" : "";
+		m2 = state & _Smask ? "S" : "";
+		m3 = state & _Amask ? "A" : "";
+		sp = "_";
+		name = gdk_keyval_name(key);
+	}
+	else /* For display */
+	{
+		m1 = state & _Smask ? "Shift+" : "";
+		m2 = state & _Cmask ? "Ctrl+" : "";
+		m3 = state & _Amask ? "Alt+" : "";
+		sp = "";
+		name = tbuf;
+#if GTK_MAJOR_VERSION == 1
+		u = key;
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		u = gdk_keyval_to_unicode(key);
+		if ((u < 0x80) && (u != key)) u = 0; // Alternative key
+#endif
+		if (u == ' ') name = "Space";
+		else if (u == '\\') name = "Backslash";
+#if GTK_MAJOR_VERSION == 1
+		else if (u < 0x100)
+		{
+			tbuf[0] = toupper(u);
+			tbuf[1] = 0;
+		}
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		else if (u && g_unichar_isgraph(u))
+			tbuf[g_unichar_to_utf8(g_unichar_toupper(u), tbuf)] = 0;
+#endif
+		else
+		{
+			char *s = gdk_keyval_name(gdk_keyval_to_lower(key));
+			int c, i = 0;
+
+			if (s) while (i < sizeof(tbuf) - 1)
+			{
+				if (!(c = s[i])) break;
+				if (c == '_') c = ' ';
+				tbuf[i++] = c;
+			}
+			tbuf[i] = 0;
+			if ((i == 1) && (tbuf[0] >= 'a') && (tbuf[0] <= 'z'))
+				tbuf[0] -= 'a' - 'A';
+		}
+	}
+	wjstrcat(buf, buflen, "", 0, m1, m2, m3, sp, name, NULL);
+}
+
+static guint parse_keyname(char *name, guint *mod)
+{
+	guint m = 0;
+	char c;
+
+	while (TRUE) switch (c = *name++)
+	{
+	case 'C': m |= _Cmask; continue;
+	case 'S': m |= _Smask; continue;
+	case 'A': m |= _Amask; continue;
+	case '_':
+		*mod = m;
+		return (gdk_keyval_from_name(name));
+	default: return (GDK_VoidSymbol);
+	}
+}
+
+#define SEC_KEYNAMES ">keys<" /* Impossible name */
+
+static char *key_name(guint key, guint mod, int section)
+{
+	char buf[256];
+	int nk, ns;
+
+	/* Refer from unique ID to keyval */
+	get_keyname(buf, sizeof(buf), key, mod, FALSE);
+// !!! Maybe pack state into upper bits, like Qt does?
+	nk = ini_setint(&main_ini, section, buf, key);
+	/* Refer from display name to ID slot (the names cannot clash) */
+	get_keyname(buf, sizeof(buf), key, mod, TRUE);
+	ns = ini_setref(&main_ini, section, buf, nk);
+
+	return (INI_KEY(&main_ini, ns));
+}
+
+//	Keymap handling
+
+typedef struct {
+	guint key, mod, keycode;
+	int idx;
+} keyinfo;
+
+typedef struct {
+	void **slot;
+	int section;
+	int idx;	// Used for various mapping indices
+	guint key, mod;	// Last one labeled on menuitem
+} keyslot;
+
+typedef struct {
+	GtkAccelGroup *ag;
+	void ***res;			// Pointer to response var
+	int nkeys, nslots;		// Counters
+	int slotsec, keysec;		// Sections
+	int updated;			// Already matches INI
+	keyinfo map[MAX_KEYS];		// Keys
+	keyslot slots[1];		// Widgets (slot #0 stays empty)
+} keymap_data;
+
+#define KEYMAP_SIZE(N) (sizeof(keymap_data) + (N) * sizeof(keyslot))
+
+// !!! And with inlining this, problem also
+int add_sec_name(memx2 *mem, int base, int sec)
+{
+	char *s, *stack[CONT_DEPTH];
+	int n = 0, h = mem->here;
+
+	while (sec != base)
+	{
+		s = _(INI_KEY(&main_ini, sec));
+		stack[n++] = s + strspn(s, "/");
+		sec = INI_PARENT(&main_ini, sec);
+	}
+	while (n-- > 0)
+	{
+		addstr(mem, stack[n], 1);
+		addchars(mem, '/', 1);
+	}
+	mem->buf[mem->here - 1] = '\0';
+	return (h);
+}
+
+static keymap_dd *keymap_export(keymap_data *keymap)
+{
+	memx2 mem;
+	keymap_dd *km;
+	keyinfo *kf;
+	int lp = sizeof(keymap_dd) + sizeof(char *) * (keymap->nslots + 1);
+	int i, j, k, sec;
+
+	memset(&mem, 0, sizeof(mem));
+	getmemx2(&mem, lp + sizeof(key_dd) * MAX_KEYS);
+
+	/* First, stuff the names into memory block */
+	mem.here = lp;
+	for (i = j = 1; i <= keymap->nslots; i++)
+	{
+		sec = keymap->slots[i].section;
+		k = -1;
+		if (sec > 0)
+		{
+			k = add_sec_name(&mem, keymap->slotsec, sec);
+			((char **)(mem.buf + sizeof(keymap_dd)))[j] = (char *)k;
+			k = j++;
+		}
+		keymap->slots[i].idx = k;
+	}
+
+	lp = mem.here;
+	getmemx2(&mem, sizeof(key_dd) * (MAX_KEYS + 1));
+
+	/* Now the block is at its final size, so set the pointers */
+	km = (void *)mem.buf;
+	km->nslots = j - 1;
+	km->nkeys = keymap->nkeys;
+	km->maxkeys = MAX_KEYS;
+	km->keys = ALIGNED(mem.buf + lp, ALIGNOF(key_dd));
+	km->slotnames = (char **)(mem.buf + sizeof(keymap_dd));
+	km->slotnames[0] = NULL;
+	for (i = 1; i < j; i++)
+		km->slotnames[i] = mem.buf + (int)km->slotnames[i];
+
+	/* Now fill the keys table */
+	sec = ini_setsection(&main_ini, 0, SEC_KEYNAMES);
+	ini_transient(&main_ini, sec, NULL);
+	for (kf = keymap->map , i = 0; i < keymap->nkeys; i++ , kf++)
+	{
+		km->keys[i].slot = keymap->slots[kf->idx].idx;
+		km->keys[i].name = key_name(kf->key, kf->mod, sec);
+	}
+
+	return (km);
+}
+
+static int keymap_add(keymap_data *keymap, void **slot, char *name, int section)
+{
+	keyslot *ks = keymap->slots + ++keymap->nslots;
+	ks->section = !name ? 0 :
+		ini_setint(&main_ini, section, name, keymap->nslots);
+	ks->slot = slot;
+	ks->idx = -1; // No mapping
+	return (TRUE);
+}
+
+static int keymap_map(keymap_data *keymap, int idx, guint key, guint mod)
+{
+	keyinfo *kf = keymap->map + keymap->nkeys;
+
+	if (!key || (keymap->nkeys >= MAX_KEYS)) return (FALSE);
+	kf->key = key;
+	kf->mod = mod;
+	kf->idx = idx;
+	keymap->nkeys++;
+	return (TRUE);
+}
+
+static void keymap_to_ini(keymap_data *keymap)
+{
+	char buf[256];
+	keyinfo *ki, *kd;
+	int i, sec, w = keymap->keysec, f = keymap->updated;
+
+	kd = ki = keymap->map;
+	for (i = keymap->nkeys; i-- > 0; ki++)
+	{
+		sec = keymap->slots[ki->idx].section;
+		if (f && sec) continue;
+		get_keyname(buf, sizeof(buf), ki->key, ki->mod, FALSE);
+		/* Fixed key - clear the ref, preserve the key */
+		if (!sec)
+		{
+			ini_setref(&main_ini, w, buf, 0);
+			*kd++ = *ki;
+		}
+		ini_getref(&main_ini, w, buf, sec);
+	}
+	keymap->nkeys = kd - keymap->map;
+	keymap->updated = TRUE;
+}
+
+static void keymap_update(keymap_data *keymap, keymap_dd *keys)
+{
+	char *nm;
+	guint key, mod;
+	int i, j, n, sec, w = keymap->keysec;
+
+	/* Make default keys into INI defaults */
+	if (!keymap->updated) keymap_to_ini(keymap);
+
+	/* Import keys into INI */
+	if (keys)
+	{
+		/* Clear everything existing */
+		for (i = INI_FIRST(&main_ini, w); i; i = INI_NEXT(&main_ini, i))
+			ini_setref(&main_ini, w, INI_KEY(&main_ini, i), 0);
+
+		/* Prepare reverse map */
+		for (i = j = 1; i <= keymap->nslots; i++)
+			if (keymap->slots[i].section > 0) keymap->slots[j++].idx = i;
+
+		/* Stuff things into inifile */
+		sec = ini_setsection(&main_ini, 0, SEC_KEYNAMES);
+		for (i = 0; i < keys->nkeys; i++)
+		{
+			j = keys->keys[i].slot;
+			if (j < 0) continue; // Fixed key
+			n = ini_getref(&main_ini, sec, keys->keys[i].name, 0);
+			if (n <= 0) continue; // Invalid key
+			ini_setref(&main_ini, w, INI_KEY(&main_ini, n),
+				keymap->slots[keymap->slots[j].idx].section);
+		}
+
+		/* Overwrite fixed keys again */
+		keymap_to_ini(keymap);
+	}
+
+	/* Step through the section reading it in */
+	for (i = INI_FIRST(&main_ini, w); i; i = INI_NEXT(&main_ini, i))
+	{
+		nm = INI_KEY(&main_ini, i);
+		key = parse_keyname(nm, &mod);
+		if (key == GDK_VoidSymbol) continue;
+		sec = ini_getref(&main_ini, w, nm, 0);
+		if (sec <= 0) continue;
+		sec = (int)INI_VALUE(&main_ini, sec);
+		if ((sec > 0) && (sec <= keymap->nslots))
+			keymap_map(keymap, sec, key, mod);
+	}
+}
+
+#define FAKE_ACCEL "<f>/a/k/e"
+
+// !!! And with inlining this, problem also
+void keymap_init(keymap_data *keymap, keymap_dd *keys)
+{
+	char buf[256], *nm;
+	GtkWidget *w;
+	keyslot *ks;
+	guint key, mod, key0, mod0;
+	int i, j, op;
+
+	/* Ensure keys section */
+	nm = INI_KEY(&main_ini, keymap->slotsec);
+	j = strlen(nm);
+	wjstrcat(buf, sizeof(buf), nm, j, " keys" + !j, NULL);
+	j = ini_getsection(&main_ini, 0, buf);
+	keymap->keysec = ini_setsection(&main_ini, 0, buf);
+
+	/* If nondefault keys are there */
+	if (keys || ((j > 0) && !keymap->updated))
+		keymap_update(keymap, keys);
+
+	/* Label new key indices on slots - back to forth */
+	i = keymap->nslots + 1;
+	while (--i > 0) keymap->slots[i].idx = -1;
+	i = keymap->nkeys;
+	while (i-- > 0) keymap->slots[keymap->map[i].idx].idx = i;
+
+	/* Update keys on menuitems */
+	for (ks = keymap->slots + 1 , i = keymap->nslots; i > 0; i-- , ks++)
+	{
+		key = mod = 0;
+		j = ks->idx;
+		if (j >= 0) key = keymap->map[j].key , mod = keymap->map[j].mod;
+		key0 = ks->key; mod0 = ks->mod;
+		ks->key = key; ks->mod = mod; // Update
+		if (!((key ^ key0) | (mod ^ mod0))) continue; // Unchanged
+		// No matter, if not a menuitem
+		op = GET_OP(ks->slot);
+		if ((op < op_MENU_0) || (op >= op_MENU_LAST)) continue;
+		// Tell widget about update
+		w = ks->slot[0];
+		if (key0 | mod0) gtk_widget_remove_accelerator(w, keymap->ag,
+			key0, mod0);
+#if GTK_MAJOR_VERSION == 2
+		/* !!! It has to be there in place of key, for menu spacing */
+		gtk_widget_set_accel_path(w, j < 0 ? FAKE_ACCEL : NULL, keymap->ag);
+#endif
+		if (j >= 0) gtk_widget_add_accelerator(w, "activate", keymap->ag,
+			key, mod, GTK_ACCEL_VISIBLE);
+	}
+}
+
+static void keymap_reset(keymap_data *keymap)
+{
+	keyinfo *kf = keymap->map;
+	int i = keymap->nkeys;
+
+	while (i-- > 0) kf->keycode = keyval_key(kf->key) , kf++;
+}
+
+static void keymap_find(keymap_data *keymap, key_ext *key)
+{
+	keyinfo *kf, *match = NULL;
+	int i;
+
+	for (kf = keymap->map , i = keymap->nkeys; i > 0; i-- , kf++)
+	{
+		/* Modifiers should match first */
+		if ((key->state & _CSAmask) != kf->mod) continue;
+		/* Let keyval have priority; this is also a workaround for
+		 * GTK2 bug #136280 */
+		if (key->lowkey == kf->key) break;
+		/* Let keycodes match when keyvals don't */
+		if (key->realkey == kf->keycode) match = kf;
+	}
+	/* Keyval match */
+	if (i > 0) match = kf;
+/* !!! If the starting layout has the keyval+mods combo mapped to one key, and
+ * the current layout to another, both will work till "rebind keys" is done.
+ * I like this better than shortcuts moving with every layout switch - WJ */
+	/* If we have at least a keycode match */
+	*(keymap->res) = match ? keymap->slots[match->idx].slot : NULL;
+}
+
+//	KEYBUTTON widget
+
+typedef struct {
+	int section;
+	guint key, mod;
+} keybutton_data;
+
+static gboolean convert_key(GtkWidget *widget, GdkEventKey *event,
+	gpointer user_data)
+{
+	keybutton_data *dt = user_data;
+	char buf[256];
+
+	/* Do nothing until button is pressed */
+	if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+		return (FALSE);
+
+	/* Store keypress, display its name */
+	if (event->type == GDK_KEY_PRESS)
+	{
+		get_keyname(buf, sizeof(buf), dt->key = low_key(event),
+			dt->mod = event->state, TRUE);
+		gtk_label_set_text(GTK_LABEL(GTK_BIN(widget)->child), buf);
+	}
+	/* Depress button when key gets released */
+	else /* if (event->type == GDK_KEY_RELEASE) */
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), FALSE);
+
+	return (TRUE);
+}
+
 static void add_del(void **r, GtkWidget *window)
 {
 	gtk_signal_connect(GTK_OBJECT(window), "delete_event",
@@ -1120,9 +1553,11 @@ static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 
 		gtk_widget_get_child_requisition(child, &wreq);
 		n = wreq.width + border;
-		if (requisition->width < n) requisition->width = n;
+		if ((requisition->width < n) && !((int)user_data & 1))
+			requisition->width = n;
 		n = wreq.height + border;
-		if (requisition->height < n) requisition->height = n;
+		if ((requisition->height < n) && !((int)user_data & 2))
+			requisition->height = n;
 	}
 }
 
@@ -2043,7 +2478,7 @@ static void listcc_reset(void **slot, int row)
 
 			if ((op == op_TXTCOLUMN) || (op == op_XTXTCOLUMN))
 				gtk_label_set_text(GTK_LABEL(widget), v);
-			else if (op == op_CHKCOLUMNi0)
+			else if (op == op_CHKCOLUMN)
 				gtk_toggle_button_set_active(
 					GTK_TOGGLE_BUTTON(widget), *(int *)v);
 		}
@@ -2093,7 +2528,7 @@ GtkWidget *listcc(void **r, char *ddata, col_data *c)
 			void **cp = ld->c.columns[j][1];
 			int op = (int)cp[0] & WB_OPMASK, jw = (int)cp[3];
 
-			if (op == op_CHKCOLUMNi0)
+			if (op == op_CHKCOLUMN)
 			{
 #if GTK_MAJOR_VERSION == 1
 			/* !!! Vertical spacing is too small without the label */
@@ -2106,8 +2541,6 @@ GtkWidget *listcc(void **r, char *ddata, col_data *c)
 					(gpointer)j);
 				gtk_signal_connect(GTK_OBJECT(widget), "toggled",
 					GTK_SIGNAL_FUNC(listcc_toggled), ld);
-				/* !!! "i0" means 0th slot is insensitive */
-				if (!n) gtk_widget_set_sensitive(widget, FALSE);
 			}
 			else
 			{
@@ -2287,7 +2720,8 @@ static int listc_collect(gchar **row_text, gchar **row_pix, col_data *c, int row
 		int op = (int)cp[0] & WB_OPMASK;
 
 // !!! IDXCOLUMN not supported
-		if ((op == op_RTXTCOLUMN) || (op == op_RFILECOLUMN))
+		if (op == op_PTXTCOLUMN) v = *(char **)v;
+		else if ((op == op_RTXTCOLUMN) || (op == op_RFILECOLUMN))
 			v += *(int *)v;
 		if (op == op_RFILECOLUMN)
 		{
@@ -3775,6 +4209,14 @@ GtkWidget *do_prepare(GtkWidget *widget, int pk, int cw, int minw, int minh)
 	return (widget);
 }
 
+/* Container stack */
+
+typedef struct {
+	void *widget;
+	int group; // in inifile
+	int type; // how to stuff things into it
+} ctslot;
+
 /* Types of containers */
 
 enum {
@@ -3788,21 +4230,13 @@ enum {
 	ct_NBOOK,
 };
 
-/* Accessors for container stack */
-
-#define CT_PUSH(SP,W,T)	((SP) -= 2 , (SP)[0] = (W) , (SP)[1] = (void *)(T))
-#define CT_POP(SP)	((SP) += 2)
-#define CT_TOP(SP)	((SP)[0])
-#define CT_N(SP,N)	((SP)[(N) * 2 + 0])
-#define CT_WHAT(SP)	((int)(SP)[1])
-
 /* Pack widget into container according to settings */
-int do_pack(GtkWidget *widget, void **wp, void **pp, int n, int tpad)
+int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 {
 	GtkScrolledWindow *sw;
 	GtkAdjustment *adj;
-	GtkWidget *box = CT_TOP(wp);
-	int what = CT_WHAT(wp);
+	GtkWidget *box = ct->widget;
+	int what = ct->type;
 	int y, l = WB_GETLEN((int)pp[0]);
 
 	/* Adapt packing mode to container type */
@@ -3882,19 +4316,28 @@ static int in_script(int op, char **script)
 	return (op);
 }
 
+typedef struct {
+	int slots;	// total slots
+	int top;	// total on-top allocation, in *void's
+	int keys;	// keymap slots
+	int act;	// ACTMAP slots
+} sizedata;
+
 /* Predict how many _void pointers_ a V-code sequence could need */
 // !!! And with inlining this, same problem
-int predict_size(void **ifcode, char *ddata, char **script)
+void predict_size(sizedata *sz, void **ifcode, char *ddata, char **script)
 {
+	sizedata s;
 	void **v, **pp, *rstack[CALL_DEPTH], **rp = rstack;
 	int scripted = FALSE;
-	int op, opf, ref, u = 0, n = 0;
+	int op, opf, ref, uop;
 
+	memset(&s, 0, sizeof(s));
 	while (TRUE)
 	{
 		opf = op = (int)*ifcode++;
 		ifcode = (pp = ifcode) + WB_GETLEN(op);
-		n += ref = WB_GETREF(op);
+		s.slots += ref = WB_GETREF(op);
 		op = in_script(op, script);
 		if (op < op_END_LAST) break; // End
 		// Livescript start/stop
@@ -3912,24 +4355,38 @@ int predict_size(void **ifcode, char *ddata, char **script)
 			if (opf & WB_NFLAG) v = *v; // dereference
 			ifcode = v;
 		}
+		// Keymap
+		else if (op == op_KEYMAP) s.keys = 1;
 		// Allocation
+		else if (op == op_ACTMAP) s.act++;
 		else 
 		{
-			u += VVS((op == op_TALLOC) || (op == op_TCOPY) ?
+			s.top += VVS((op == op_TALLOC) || (op == op_TCOPY) ?
 				*(int *)(ddata + (int)pp[1]) :
 				op == op_TLSPINPACK ? TLSPINPACK_SIZE(pp - 1) :
 				cmds[op] ? cmds[op]->size : 0);
+			/* Nothing else happens to unreferrable things, neither
+			 * to those that simulation ignores */
+			if (!ref || !cmds[op]) continue;
+			uop = cmds[op]->uop;
 			// Name for scripting
-			if (ref && scripted && cmds[op] && (cmds[op]->uop > 0))
+			if (scripted && (uop > 0))
 			{
-				n++;
-				u += VVS(sizeof(swdata));
+				s.slots++;
+				s.top += VVS(sizeof(swdata));
 			}
+			// Slot in keymap
+			if (s.keys &&
+				(((op >= op_uMENU_0) && (op < op_uMENU_LAST)) ||
+				((uop >= op_uMENU_0) && (uop < op_uMENU_LAST))))
+				s.keys++;
 		}
 	}
 
-	n += 2; // safety margin
-	return (n * VSLOT_SIZE + u);
+	if (s.keys) s.top += VVS(KEYMAP_SIZE(s.keys));
+	s.top += s.act * ACT_SIZE;
+	s.slots += 2; // safety margin
+	*sz = s;
 }
 
 static cmdef cmddefs[] = {
@@ -3938,6 +4395,7 @@ static cmdef cmddefs[] = {
 	{ op_CANVASIMG,	sizeof(rgbimage_data) },
 	{ op_CANVASIMGB, sizeof(rgbimage_data) },
 	{ op_FCIMAGEP,	sizeof(fcimage_data) },
+	{ op_KEYBUTTON,	sizeof(keybutton_data) },
 // !!! Beware - COLORLIST is self-reading and uOPTD is not
 	{ op_COLORLIST,	sizeof(colorlist_data), op_uOPTD },
 	{ op_COLORLISTN, sizeof(colorlist_data), op_uLISTCC },
@@ -4040,6 +4498,16 @@ static void do_destroy(void **wdata);
 /* Finalize a prepared slot */
 #define FIX_SLOT(R,W) (R)[0] = (W) , (R) += VSLOT_SIZE
 
+/* Accessors for container stack */
+
+#define CT_PUSH(SP,W,T)	((SP)-- , (SP)->widget = (W) , (SP)->type = (T) , \
+	(SP)->group = keygroup)
+#define CT_POP(SP)	((SP)++)
+#define CT_DROP(SP)	(keygroup = ((SP)++)->group)
+#define CT_TOP(SP)	((SP)->widget)
+#define CT_N(SP,N)	((SP)[(N)].widget)
+#define CT_WHAT(SP)	((SP)->type)
+
 void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 {
 	char *ident = VCODE_KEY;
@@ -4050,15 +4518,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #endif
 	int scripted = FALSE, part = FALSE, accel = 0;
 	int borders[op_BOR_LAST - op_BOR_0], wpos = GTK_WIN_POS_CENTER;
-	void *wstack[CONT_DEPTH * 2], **wp = wstack + CONT_DEPTH * 2;
+	ctslot wstack[CONT_DEPTH], *wp = wstack + CONT_DEPTH;
+	int keygroup = 0;
+	keymap_data *keymap = NULL;
 	GtkWidget *window = NULL, *widget = NULL, *sw = NULL;
 	GtkAccelGroup* ag = NULL;
 	v_dd *vdata;
+	sizedata sz;
 	col_data c;
 	void *rstack[CALL_DEPTH], **rp = rstack;
 	void *v, **pp, **dtail, **r = NULL, **res = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
-	char *wid = NULL;
+	char *wid = NULL, *gid = NULL;
 	int ld, dsize;
 	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0, ct = 0;
 
@@ -4068,9 +4539,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
                 cmds[cmddefs[i].op] = cmddefs + i;
 
 	// Allocation size
+	predict_size(&sz, ifcode, ddata, script);
 	ld = VVS(ddsize);
 	n = VVS(sizeof(v_dd));
-	dsize = ld + n + VSLOT_SIZE + predict_size(ifcode, ddata, script);
+	dsize = ld + n + ++sz.slots * VSLOT_SIZE + sz.top;
 	if (!(res = calloc(dsize, sizeof(void *)))) return (NULL); // failed
 	dtail = res + dsize; // Locate tail of block
 	memcpy(res, ddata, ddsize); // Copy datastruct
@@ -4078,6 +4550,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 	vdata = (void *)(res += ld); // Locate where internal data go
 	r = res += n; // Anchor after it
 	vdata->code = WDONE; // Make internal datastruct a noop
+	// Allocate actmap
+	vdata->actmap = dtail -= sz.act * ACT_SIZE;
 	// Store struct ref at anchor, use datastruct as tag for it
 	ADD_SLOT(r, ddata, vdata, dtail);
 
@@ -4108,12 +4582,21 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Prepare slot, with data pointer in widget's place */
 		PREP_SLOT(r, v, pp, dtail);
 		tpad = cw = 0;
+		gid = NULL;
 		switch (op)
 		{
 		/* Terminate */
 		case op_WEND: case op_WSHOW: case op_WDIALOG:
 			/* Terminate the list */
 			ADD_SLOT(r, NULL, NULL, NULL);
+
+			/* Apply keymap */
+			if (keymap)
+			{
+				keymap->ag = ag;
+				keymap_init(keymap, NULL);
+				accel |= 1;
+			}
 
 			/* !!! In GTK+1, doing it earlier makes any following
 			 * gtk_widget_add_accelerator() calls to silently fail */
@@ -4144,6 +4627,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				/* Trigger remembered events */
 				trigger_things(res);
 			}
+			/* Init actmap to insensitive */
+			act_state(vdata, 0);
 			/* Display */
 			if (op != op_WEND) cmd_showhide(GET_WINDOW(res), TRUE);
 			/* Wait for input */
@@ -4161,6 +4646,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			ADD_SLOT(r, NULL, NULL, NULL);
 			/* Trigger remembered events */
 			if (!part) trigger_things(res);
+			/* Init actmap to insensitive */
+			act_state(vdata, 0);
 			/* Activate */
 			if (op != op_uWEND)
 				cmd_showhide(GET_WINDOW(res), TRUE);
@@ -4323,7 +4810,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Done with a container */
 		case op_WDONE:
-			CT_POP(wp);
+			CT_DROP(wp);
 			continue;
 		/* Create the main window */
 		case op_MAINWINDOW:
@@ -4928,6 +5415,24 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if (pk == pk_TABLE) pk = pk_TABLEp;
 			break;
 #endif
+		/* Add a togglebutton for selecting shortcut keys */
+		case op_KEYBUTTON:
+		{
+			keybutton_data *dt = (void *)dtail;
+			dt->section = ini_setsection(&main_ini, 0, SEC_KEYNAMES);
+			ini_transient(&main_ini, dt->section, NULL);
+
+			widget = gtk_toggle_button_new_with_label(_("New key ..."));
+#if GTK_MAJOR_VERSION == 1
+			gtk_widget_add_events(widget, GDK_KEY_RELEASE_MASK);
+#endif
+			gtk_signal_connect(GTK_OBJECT(widget), "key_press_event",
+				GTK_SIGNAL_FUNC(convert_key), dt);
+			gtk_signal_connect(GTK_OBJECT(widget), "key_release_event",
+				GTK_SIGNAL_FUNC(convert_key), dt);
+			cw = GET_BORDER(BUTTON);
+			break;
+		}
 		/* Add a combo-entry for text strings */
 		case op_COMBOENTRY:
 			widget = comboentry(ddata, r);
@@ -5092,6 +5597,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			int mode = op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
 				GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
 
+			if (keygroup) keymap_add(keymap, r, pp[3], keygroup);
+
 			r[2] = tbar; // link to toolbar slot
 			if (op == op_TBRBUTTON)
 			{
@@ -5171,7 +5678,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_SMDONE:
 			vdata->smmenu = smartmenu_done(tbar, r);
 			/* Done with this container */
-			CT_POP(wp);
+			CT_DROP(wp);
 // !!! Should be fallthrough to WDONE, but such arrangement will be ugly
 			continue;
 		/* Add a dropdown submenu */
@@ -5181,6 +5688,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			char *s;
 			guint keyval;
 			int l;
+
+			gid = v; /* For keymap */
 
 			widget = gtk_menu_item_new_with_label("");
 			if (op == op_ESUBMENU)
@@ -5213,6 +5722,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			char *s;
 			int l;
+
+			if (keygroup) keymap_add(keymap, r, pp[3], keygroup);
 
 			r[2] = tbar; // link to menu slot
 			if (op == op_MENUCHECK)
@@ -5260,7 +5771,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 
 #if GTK_MAJOR_VERSION == 2
 		/* !!! Otherwise GTK+ won't add spacing to an empty accel field */
-			gtk_widget_set_accel_path(widget, "<f>/a/k/e", ag);
+			gtk_widget_set_accel_path(widget, FAKE_ACCEL, ag);
 #endif
 #if GTK2VERSION >= 4
 		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
@@ -5343,28 +5854,51 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				ifcode = skip_if(pp);
 			continue;
 		/* Put last referrable widget into activation map */
-		/* And remember map in a slot for later reference */
 		case op_ACTMAP:
-			mapped_dis_add(origin_slot(PREV_SLOT(r)), (int)v);
-			widget = v;
+		{
+			void **where = vdata->actmap + vdata->actn++ * ACT_SIZE;
+			ADD_ACT(where, origin_slot(PREV_SLOT(r)), v);
+			continue;
+		}
+		/* Set up a configurable keymap for widgets */
+		case op_KEYMAP:
+			vdata->keymap = r;
+			r[2] = dtail -= VVS(KEYMAP_SIZE(sz.keys));
+			keymap = (void *)dtail;
+			keymap->res = v;
+			keymap->slotsec = keygroup =
+				ini_setsection(&main_ini, 0, pp[2]);
+			ini_transient(&main_ini, keygroup, NULL); // Not written out
+			widget = NULL;
 			break;
 		/* Add a shortcut, from text desc, to last referrable widget */
-		/* And remember the fact in a slot for later reference */
-		case op_SHORTCUTs:
+		case op_SHORTCUT:
 		{
+			void **slot = origin_slot(PREV_SLOT(r));
+			int op = GET_OP(slot);
 			guint keyval, mods;
 
-			widget = *origin_slot(PREV_SLOT(r));
+			if (lp < 2) gtk_accelerator_parse(v, &keyval, &mods);
+			else keyval = (guint)v , mods = (guint)pp[2];
+
+			if (keygroup &&
+				// Already mapped
+				((keymap->slots[keymap->nslots].slot == slot) ||
+				// On-demand mapping for script mode menuitems
+				((op >= op_uMENU_0) && (op < op_uMENU_LAST) &&
+				 keymap_add(keymap, slot, GET_DESCV(slot, 3), keygroup))))
+			{
+				keymap_map(keymap, keymap->nslots, keyval, mods);
+				continue;
+			}
 #if GTK_MAJOR_VERSION == 2
 			/* !!! In case one had been set (for menu spacing) */
-			gtk_widget_set_accel_path(widget, NULL, ag);
+			gtk_widget_set_accel_path(*slot, NULL, ag);
 #endif
-			gtk_accelerator_parse(v, &keyval, &mods);
-			gtk_widget_add_accelerator(widget, "activate",
+			gtk_widget_add_accelerator(*slot, "activate",
 				ag, keyval, mods, GTK_ACCEL_VISIBLE);
 			accel |= 1;
-			widget = v;
-			break;
+			continue;
 		}
 		/* Install priority key handler for when widget is focused */
 		case op_WANTKEYS:
@@ -5386,7 +5920,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Make scrolled window request max size */
 		case op_WANTMAX:
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
-				GTK_SIGNAL_FUNC(scroll_max_size_req), NULL);
+				GTK_SIGNAL_FUNC(scroll_max_size_req), v);
 			continue;
 		/* Make widget keep max requested width */
 		case op_KEEPWIDTH:
@@ -5458,7 +5992,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Add a regular list column */
 		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
-		case op_RTXTCOLUMN: case op_RFILECOLUMN: case op_CHKCOLUMNi0:
+		case op_RTXTCOLUMN: case op_PTXTCOLUMN:
+		case op_RFILECOLUMN: case op_CHKCOLUMN:
 			c.columns[c.ncol++] = r;
 			widget = NULL;
 			break;
@@ -5708,6 +6243,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		if (ct) CT_PUSH(wp, sw ? sw : widget, ct);
 		ct = 0;
 		sw = NULL;
+		if (gid && keygroup) // Nested group
+			keygroup = ini_setsection(&main_ini, keygroup, gid);
 	}
 }
 
@@ -5890,6 +6427,13 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
 		case op_LISTCS: case op_LISTCX:
 			break; // self-reading
+		case op_KEYBUTTON:
+		{
+			keybutton_data *dt = wdata[2];
+			*(char **)v = !dt->key ? NULL :
+				key_name(dt->key, dt->mod, dt->section);
+			break;
+		}
 		case op_COLOR:
 			*(int *)v = cpick_get_colour(*wdata, NULL);
 			break;
@@ -6153,6 +6697,9 @@ void cmd_reset(void **slot, void *ddata)
 			if (GTK_WIDGET_REALIZED(*wdata)) reset_fcimage(*wdata, fd);
 			break;
 		}
+		case op_KEYMAP:
+			keymap_reset(wdata[2]);
+			break;
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
 			fpick_set_filename(*wdata, v, FALSE);
@@ -6529,6 +7076,7 @@ int cmd_run_script(void **slot, char **strs)
 
 void cmd_showhide(void **slot, int state)
 {
+	void **keymap = NULL;
 	int raise = FALSE, unfocus = FALSE;
 
 	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
@@ -6560,6 +7108,7 @@ void cmd_showhide(void **slot, int state)
 				vdata->xywh[2] ? vdata->xywh[2] : -1,
 				vdata->xywh[3] ? vdata->xywh[3] : -1);
 			/* Prepare to do postponed actions */
+			keymap = vdata->keymap;
 			raise = vdata->raise;
 			unfocus = vdata->unfocus;
 			vdata->raise = vdata->unfocus = FALSE;
@@ -6582,6 +7131,8 @@ void cmd_showhide(void **slot, int state)
 	widget_showhide(slot[0], state);
 	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
 	if (unfocus) gtk_window_set_focus(slot[0], NULL);
+	/* !!! Have to wait till canvas is displayed, to init keyboard */
+	if (keymap) keymap_reset(keymap[2]);
 }
 
 void cmd_set(void **slot, int v)
@@ -6934,6 +7485,10 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 		*(int *)res = (clist->selection ? (int)clist->selection->data : 0);
 #endif
 	}
+	case op_KEYMAP:
+		if (size >= sizeof(keymap_dd *))
+			*(keymap_dd **)res = keymap_export(slot[2]);
+		break;
 	}
 }
 
@@ -6950,8 +7505,18 @@ void cmd_setv(void **slot, void *res, int idx)
 {
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
-	if (op == op_WDONE) // skip head noop
+	if (op == op_WDONE)
+	{
+		if (idx == WDATA_ACTMAP)
+		{
+			v_dd *vdata = GET_VDATA(slot);
+			if (vdata->actmask != (int)res) // If anything changed
+				act_state(vdata, (int)res);
+			return;
+		}
+		// skip to toplevel slot
 		slot = NEXT_SLOT(slot) , op = GET_OP(slot);
+	}
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
@@ -7234,6 +7799,14 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_clist_select_row(slot[0], (int)res, 0);
 #endif
 	}
+	case op_KEYMAP:
+		if (idx == KEYMAP_KEY) keymap_find(slot[2], res);
+		else /* if (idx == KEYMAP_MAP) */
+		{
+			keymap_init(slot[2], res);
+			keymap_reset(slot[2]);
+		}
+		break;
 	case op_EV_DRAGFROM:
 	{
 		drag_den *dp = (void *)slot;
@@ -7308,6 +7881,8 @@ int cmd_checkv(void **slot, int idx)
 		if (idx == SLOT_UNREAL) return (TRUE);
 		op = GET_UOP(slot);
 	}
+	if (idx == SLOT_RADIO) return ((op == op_TBRBUTTON) ||
+		(op == op_MENURITEM) || (op == op_uMENURITEM));
 	if (op == op_CLIPBOARD)
 	{
 		if (idx == CLIP_OFFER) return (offer_clipboard(slot));

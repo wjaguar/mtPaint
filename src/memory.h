@@ -637,6 +637,7 @@ void mem_pal_load_def();		// Load default palette
 
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
+double pal2B(png_color *c);		// Linear brightness for palette color
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	unsigned char *src, png_color *pal);	// Convert image to RGB

@@ -173,6 +173,12 @@ int file_type_by_ext(char *name, guint32 mask)
 	return (FT_NONE);
 }
 
+/* Which of 2 palette colors is more like black */
+static int get_bw(ls_settings *settings)
+{
+	return (pal2B(settings->pal + 0) > pal2B(settings->pal + 1));
+}
+
 /* Set palette to white and black */
 static void set_bw(ls_settings *settings)
 {
@@ -4380,7 +4386,7 @@ fail:	fclose(fp);
 #define CPB 6  /* Chars per byte */
 static int save_xbm(char *file_name, ls_settings *settings)
 {
-	unsigned char *src;
+	unsigned char bw, *src;
 	unsigned char row[MAX_WIDTH / 8];
 	char buf[CPB * BPL + 16], *tmp;
 	FILE *fp;
@@ -4405,6 +4411,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 
 	if (!settings->silent) ls_init("XBM", 1);
 
+	bw = get_bw(settings);
 	j = k = (w + 7) >> 3; i = l = 0;
 	while (TRUE)
 	{
@@ -4415,7 +4422,7 @@ static int save_xbm(char *file_name, ls_settings *settings)
 			memset(row, 0, k);
 			for (j = 0; j < w; j++)
 			{
-				if (src[j] == 1) row[j >> 3] |= 1 << (j & 7);
+				if (src[j] == bw) row[j >> 3] |= 1 << (j & 7);
 			}
 			j = 0;
 			ls_progress(settings, i, 10);
@@ -5991,7 +5998,7 @@ static int load_pnm(char *file_name, ls_settings *settings)
 
 static int save_pbm(char *file_name, ls_settings *settings)
 {
-	unsigned char buf[MAX_WIDTH / 8], *src;
+	unsigned char buf[MAX_WIDTH / 8], bw, *src;
 	FILE *fp;
 	int i, j, l, w = settings->width, h = settings->height;
 
@@ -6003,6 +6010,8 @@ static int save_pbm(char *file_name, ls_settings *settings)
 	if (!settings->silent) ls_init("PBM", 1);
 	fprintf(fp, "P4\n%d %d\n", w, h);
 
+	bw = get_bw(settings);
+
 	/* Write rows */
 	src = settings->img[CHN_IMAGE];
 	l = (w + 7) >> 3;
@@ -6010,7 +6019,7 @@ static int save_pbm(char *file_name, ls_settings *settings)
 	{
 		memset(buf, 0, l);
 		for (j = 0; j < w; j++)
-			buf[j >> 3] |= (*src++ == 1) << (~j & 7);
+			buf[j >> 3] |= (*src++ == bw) << (~j & 7);
 		fwrite(buf, l, 1, fp);
 		ls_progress(settings, i, 20);
 	}
@@ -6061,8 +6070,9 @@ static int save_pam(char *file_name, ls_settings *settings)
 	if ((ibpp != 3) && (settings->colors > 2)) return WRONG_FORMAT;
 
 	bpp = ibpp + !!settings->img[CHN_ALPHA];
-	/* For BW: image XOR 1, alpha AND 1 */
-	xa = (xv = ibpp == 1) ? 1 : 255;
+	/* For BW: image XOR 1 if white is 0, alpha AND 1 */
+	xv = 0; xa = 255;
+	if (ibpp == 1) xv = get_bw(settings) , xa = 1;
 	if (bpp != 3) // BW needs inversion, and alpha, interlacing
 	{
 		buf = malloc(w * bpp);
@@ -6445,17 +6455,20 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 	if (!settings->silent) ls_init("* PMM *", 1);
 
 	/* First, write palette */
-	mfputs(PMM_ID1 "\n", mf);
-	snprintf(sbuf, sizeof(sbuf), "WIDTH %d\n", settings->colors);
-	mfputs(sbuf, mf);
-	// Extra data for palette: transparent index if any
-	sbuf[0] = '\0';
-	if (settings->xpm_trans >= 0) snprintf(sbuf, sizeof(sbuf),
-		" TRANS=%d", settings->xpm_trans);
-	mfputss(mf, "HEIGHT 1\nDEPTH 3\nMAXVAL 255\nTUPLTYPE PALETTE", sbuf,
-		"\nENDHDR\n", NULL);
-	pal2rgb(sbuf, settings->pal);
-	mfwrite(sbuf, 1, settings->colors * 3, mf);
+	if (settings->pal)
+	{
+		mfputs(PMM_ID1 "\n", mf);
+		snprintf(sbuf, sizeof(sbuf), "WIDTH %d\n", settings->colors);
+		mfputs(sbuf, mf);
+		// Extra data for palette: transparent index if any
+		sbuf[0] = '\0';
+		if (settings->xpm_trans >= 0) snprintf(sbuf, sizeof(sbuf),
+			" TRANS=%d", settings->xpm_trans);
+		mfputss(mf, "HEIGHT 1\nDEPTH 3\nMAXVAL 255\nTUPLTYPE PALETTE",
+			sbuf, "\nENDHDR\n", NULL);
+		pal2rgb(sbuf, settings->pal);
+		mfwrite(sbuf, 1, settings->colors * 3, mf);
+	}
 	/* All done if only writing palette */
 	if (settings->mode == FS_PALETTE_SAVE) goto done;
 
@@ -6938,7 +6951,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 
 	/* Validate transparent color (for now, forbid out-of-palette RGB
 	 * transparency altogether) */
-	if (setw.xpm_trans >= setw.colors)
+	if (setw.colors && (setw.xpm_trans >= setw.colors))
 		setw.xpm_trans = setw.rgb_trans = -1;
 
 	switch (setw.ftype)

@@ -30,3 +30,5 @@ int tablet_tool_factor[3];			// Size, flow, opacity
 
 void pressed_preferences();
 void init_tablet();				// Set up variables
+
+void keys_selector();

@@ -3444,30 +3444,31 @@ int mem_quantize( unsigned char *old_mem_image, int target_cols, int type )
 	return 0;
 }
 
+/* Linear brightness for palette color */
+double pal2B(png_color *c)
+{
+	return (rgb2B(gamma256[c->red], gamma256[c->green], gamma256[c->blue]));
+}
+
 /* Convert image to greyscale */
 void mem_greyscale(int gcor)
 {
-	unsigned char *mask, *img = mem_img[CHN_IMAGE];
+	unsigned char mask[MAX_WIDTH], *img = mem_img[CHN_IMAGE];
 	int i, j, k, v, ch;
-	double value;
 
-	if ( mem_img_bpp == 1)
+	if (mem_img_bpp == 1)
 	{
 		for (i = 0; i < 256; i++)
 		{
 			if (gcor) /* Gamma correction + Helmholtz-Kohlrausch effect */
 			{
-				value = rgb2B(gamma256[mem_pal[i].red],
-					gamma256[mem_pal[i].green],
-					gamma256[mem_pal[i].blue]);
-				v = UNGAMMA256(value);
+				v = UNGAMMA256(pal2B(mem_pal + i));
 			}
 			else /* Usual braindead formula */
 			{
-				value = 0.299 * mem_pal[i].red +
+				v = (int)rint(0.299 * mem_pal[i].red +
 					0.587 * mem_pal[i].green +
-					0.114 * mem_pal[i].blue;
-				v = (int)rint(value);
+					0.114 * mem_pal[i].blue);
 			}
 			mem_pal[i].red = v;
 			mem_pal[i].green = v;
@@ -3476,8 +3477,6 @@ void mem_greyscale(int gcor)
 	}
 	else
 	{
-		mask = malloc(mem_width);
-		if (!mask) return;
 		ch = mem_channel;
 		mem_channel = CHN_IMAGE;
 		for (i = 0; i < mem_height; i++)
@@ -3487,16 +3486,13 @@ void mem_greyscale(int gcor)
 			{
 				if (gcor) /* Gamma + H-K effect */
 				{
-					value = rgb2B(gamma256[img[0]],
-						gamma256[img[1]],
-						gamma256[img[2]]);
-					v = UNGAMMA256(value);
+					v = UNGAMMA256(rgb2B(gamma256[img[0]],
+						gamma256[img[1]], gamma256[img[2]]));
 				}
 				else /* Usual */
 				{
-					value = 0.299 * img[0] + 0.587 * img[1] +
-						0.114 * img[2];
-					v = (int)rint(value);
+					v = (int)rint(0.299 * img[0] +
+						0.587 * img[1] + 0.114 * img[2]);
 				}
 				v *= 255 - mask[j];
 				k = *img * mask[j] + v;
@@ -3508,7 +3504,6 @@ void mem_greyscale(int gcor)
 			}
 		}
 		mem_channel = ch;
-		free(mask);
 	}
 }
 

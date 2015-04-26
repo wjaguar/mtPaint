@@ -698,7 +698,7 @@ static void create_frames_ani()
 	image_info *image;
 	ls_settings settings;
 	png_color pngpal[256], *trans;
-	unsigned char *layer_rgb, *irgb = NULL;
+	unsigned char *layer_rgb, *irgb;
 	char output_path[PATHBUF], *command, *wild_path;
 	int a, b, k, i, tr, cols, layer_w, layer_h, npt, l = 0;
 
@@ -720,7 +720,7 @@ static void create_frames_ani()
 		if ( errno != EEXIST )
 		{
 			alert_box(_("Error"), _("Unable to create output directory"), NULL);
-			goto failure;			// Failure to create directory
+			return;			// Failure to create directory
 		}
 	}
 
@@ -733,13 +733,13 @@ static void create_frames_ani()
 
 	layer_w = image->width;
 	layer_h = image->height;
-	layer_rgb = malloc( layer_w * layer_h * 3);	// Primary layer image for RGB version
-
+	layer_rgb = malloc(layer_w * layer_h * 4);	// Primary layer image for RGB version
 	if (!layer_rgb)
 	{
 		memory_errors(1);
-		goto failure;
+		return;
 	}
+	irgb = layer_rgb + layer_w * layer_h * 3;	// For indexed or alpha
 
 	/* Prepare settings */
 	init_ls_settings(&settings, NULL);
@@ -750,13 +750,6 @@ static void create_frames_ani()
 	settings.silent = TRUE;
 	if (ani_use_gif)
 	{
-		irgb = malloc(layer_w * layer_h);	// Resulting indexed image
-		if (!irgb)
-		{
-			free(layer_rgb);
-			memory_errors(1);
-			goto failure;
-		}
 		settings.ftype = FT_GIF;
 		settings.img[CHN_IMAGE] = irgb;
 		settings.bpp = 1;
@@ -764,8 +757,10 @@ static void create_frames_ani()
 	}
 	else
 	{
+		if (!comp_need_alpha(FT_PNG)) irgb = NULL;
 		settings.ftype = FT_PNG;
 		settings.img[CHN_IMAGE] = layer_rgb;
+		settings.img[CHN_ALPHA] = irgb;
 		settings.bpp = 3;
 		/* Background transparency */
 		settings.xpm_trans = tr = image->trans;
@@ -779,7 +774,7 @@ static void create_frames_ani()
 			break;
 
 		ani_set_frame_state(k);		// Change layer positions
-		memset(layer_rgb, 0, layer_w * layer_h * 3);	// In case background has holes
+		memset(layer_rgb, 0, layer_w * layer_h * 4);	// Init for RGBA compositing
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
 
 		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s%05d.%s",
@@ -817,6 +812,11 @@ static void create_frames_ani()
 				}
 			}
 		}
+		else if (irgb)
+		{
+			collect_alpha(irgb, layer_w, layer_h);
+			mem_demultiply(layer_rgb, irgb, layer_w * layer_h, 3);
+		}
 
 		if (save_image(output_path, &settings) < 0)
 		{
@@ -840,9 +840,6 @@ static void create_frames_ani()
 failure2:
 	progress_end();
 	free( layer_rgb );
-
-failure:
-	free( irgb );
 }
 
 void pressed_remove_key_frames()

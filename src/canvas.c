@@ -1162,7 +1162,7 @@ void update_menus()			// Update edit/undo menu
 	}
 	if (j > 1) statemap |= NEED_CHAN;
 
-	mapped_item_state(statemap);
+	cmd_setv(main_window_, (void *)statemap, WDATA_ACTMAP);
 
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
@@ -1608,6 +1608,8 @@ int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
 
 void init_ls_settings(ls_settings *settings, void **wdata)
 {
+	png_color *pal = mem_pal;
+
 	/* Set defaults */
 	memset(settings, 0, sizeof(ls_settings));
 	settings->ftype = FT_NONE;
@@ -1643,11 +1645,14 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 #ifdef U_LCMS
 		apply_icc = dt->icc;
 #endif
+		// Use background's palette
+		if ((dt->mode == FS_COMPOSITE_SAVE) && layer_selected)
+			pal = layer_table[0].image->image_.pal;
 	}
 
 	/* Default expansion of xpm_trans */
 	settings->rgb_trans = settings->xpm_trans < 0 ? -1 :
-		PNG_2_INT(mem_pal[settings->xpm_trans]);
+		PNG_2_INT(pal[settings->xpm_trans]);
 }
 
 static void store_ls_settings(ls_settings *settings)
@@ -1657,10 +1662,11 @@ static void store_ls_settings(ls_settings *settings)
 	switch (settings->mode)
 	{
 	case FS_PNG_SAVE:
-	case FS_CHANNEL_SAVE:
-	case FS_COMPOSITE_SAVE:
 		if (fflags & FF_TRANS)
 			mem_set_trans(settings->xpm_trans);
+		// Fallthrough
+	case FS_CHANNEL_SAVE:
+	case FS_COMPOSITE_SAVE:
 		if (fflags & FF_SPOT)
 		{
 			mem_xbm_hot_x = settings->hot_x;
@@ -1941,6 +1947,9 @@ void file_selector_x(int action_type, void **xdata)
 	memset(&tdata, 0, sizeof(tdata));
 	tdata.mode = action_type;
 	tdata.fpmode = FPICK_ENTRY;
+	tdata.xtrans[0] = mem_xpm_trans;
+	tdata.xtrans[1] = -1;
+	tdata.xtrans[2] = mem_cols - 1;
 	switch (action_type)
 	{
 	case FS_PNG_LOAD:
@@ -2026,6 +2035,12 @@ void file_selector_x(int action_type, void **xdata)
 		tdata.fmask = FF_RGB;
 		tdata.title = _("Save Composite Image");
 		tdata.need_save = TRUE;
+		if (layer_selected) // Use background's transparency
+		{
+			image_info *image = &layer_table[0].image->image_;
+			tdata.xtrans[0] = image->trans;
+			tdata.xtrans[2] = image->cols - 1;
+		}
 		break;
 	case FS_CLIP_FILE:
 	case FS_SELECT_FILE:
@@ -2062,9 +2077,6 @@ void file_selector_x(int action_type, void **xdata)
 		tdata.ftnames = names;
 	}
 
-	tdata.xtrans[0] = mem_xpm_trans;
-	tdata.xtrans[1] = -1;
-	tdata.xtrans[2] = mem_cols - 1;
 	tdata.xx[0] = mem_xbm_hot_x;
 	tdata.xx[1] = -1;
 	tdata.xx[2] = mem_width - 1;
@@ -2180,7 +2192,7 @@ static void rec_continuous(int nx, int ny, int w, int h)
 
 	/* Redraw starting square only if need to fill in possible gap when
 	 * size changes, or to draw stroke gradient in the proper direction */
-	if (!tablet_working && !STROKE_GRADIENT)
+	if (!tablet_working && !STROKE_GRADIENT && !script_cmds)
 	{
 		i2 = tool_ox + dx[i + 1] + 1 - i * 2;
 		j2 = tool_oy + dy[j + 1] + 1 - j * 2;
@@ -2520,7 +2532,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	}
 	else if ( tool_ox == x && tool_oy == y ) return;	// Only do something with a new point
 
-	if ( tablet_working )
+	if (tablet_working || script_cmds)
 	{
 // !!! Later maybe switch the calculations to integer
 		double p = pressure <= (MAX_PRESSURE * 2 / 10) ? -1.0 :
@@ -2844,7 +2856,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	tool_ox = x;	// Remember the coords just used as they are needed in continuous mode
 	tool_oy = y;
 
-	if (tablet_working) tool_state = o_tool;
+	if (tablet_working || script_cmds) tool_state = o_tool;
 }
 
 void check_marquee()	// Check marquee boundaries are OK - may be outside limits via arrow keys

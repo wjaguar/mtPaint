@@ -102,6 +102,7 @@ enum {
 	op_FONTSEL,
 	op_HEXENTRY,
 	op_EYEDROPPER,
+	op_KEYBUTTON,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -135,10 +136,14 @@ enum {
 	op_SUBMENU,
 	op_ESUBMENU,
 	op_SSUBMENU,
-	op_MENUITEM,
+
+	op_MENU_0,
+	op_MENUITEM = op_MENU_0,
 	op_MENUCHECK,
 	op_MENURITEM,
-	op_MENUTEAR,
+
+	op_MENU_LAST,
+	op_MENUTEAR = op_MENU_LAST,
 	op_MENUSEP,
 
 	op_MOUNT,
@@ -159,10 +164,14 @@ enum {
 	op_uOKBTN,
 	op_uBUTTON,
 	op_uMENUBAR,
-	op_uMENUITEM,
+	
+	op_uMENU_0,
+	op_uMENUITEM = op_uMENU_0,
 	op_uMENUCHECK,
 	op_uMENURITEM,
-	op_uMOUNT,
+
+	op_uMENU_LAST,
+	op_uMOUNT = op_uMENU_LAST,
 
 	op_CLIPBOARD,
 
@@ -177,9 +186,10 @@ enum {
 	op_IDXCOLUMN,
 	op_TXTCOLUMN,
 	op_XTXTCOLUMN,
+	op_PTXTCOLUMN,
 	op_RTXTCOLUMN,
 	op_RFILECOLUMN,
-	op_CHKCOLUMNi0,
+	op_CHKCOLUMN,
 
 	op_EVT_0,
 	op_EVT_OK = op_EVT_0,
@@ -236,7 +246,8 @@ enum {
 	op_CLIPFORM = op_CTL_LAST,
 	op_DRAGDROP,
 	op_ACTMAP,
-	op_SHORTCUTs,
+	op_KEYMAP,
+	op_SHORTCUT,
 	op_WANTKEYS,
 	op_MKSHRINK,
 	op_NORESIZE,
@@ -334,6 +345,18 @@ typedef struct {
 	int len;
 } copy_ext;
 
+//	Structure which is provided by KEYMAP
+typedef struct {
+	char *name;
+	int slot;
+} key_dd;
+
+typedef struct {
+	int nslots, nkeys, maxkeys;
+	key_dd *keys;
+	char **slotnames;
+} keymap_dd;
+
 //	Values of mouse count
 enum {
 	MCOUNT_RELEASE	= -1,
@@ -347,10 +370,13 @@ enum {
 	MCOUNT_NOTHING
 };
 
+#define _0mask (0)
 #define _Cmask (GDK_CONTROL_MASK)
 #define _Smask (GDK_SHIFT_MASK)
 #define _Amask (GDK_MOD1_MASK)
 #define _CSmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
+#define _CAmask (GDK_CONTROL_MASK | GDK_MOD1_MASK)
+#define _SAmask (GDK_SHIFT_MASK | GDK_MOD1_MASK)
 #define _CSAmask (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
 #define _B1mask (GDK_BUTTON1_MASK)
 #define _B2mask (GDK_BUTTON2_MASK)
@@ -581,6 +607,7 @@ enum {
 #define VBOXbp(S,B,P) WBh_(VBOX, 1), WBpbs(P, B, S)
 #define VBOXP VBOXbp(0, 0, 5)
 #define VBOXB VBOXbp(0, 5, 0)
+#define VBOXS VBOXbp(5, 0, 0)
 #define VBOXPS VBOXbp(5, 0, 5)
 #define VBOXBS VBOXbp(5, 5, 0)
 #define VBOXPBS VBOXbp(5, 5, 5)
@@ -599,6 +626,7 @@ enum {
 #define XHBOXbp(S,B,P) WBh_x(HBOX, 1), WBpbs(P, B, S)
 #define XHBOXP XHBOXbp(0, 0, 5)
 #define XHBOXS XHBOXbp(5, 0, 0)
+#define XHBOXBS XHBOXbp(5, 5, 0)
 #define TLHBOXl(X,Y,L) WBh_t(HBOX, 1), WBxyl(X, Y, L)
 #define FVBOX(NM) FRAME(NM), VBOX
 #define FVBOXB(NM) FRAME(NM), VBOXB
@@ -791,6 +819,7 @@ enum {
 #define TEXT(V) WBrhf_x(TEXT, 1), WBfield(V)
 #define COMBOENTRY(V,SP,H) WBr2hf_x(COMBOENTRY, 2 + 2), WBfield(V), \
 	WBfield(SP), EVENT(OK, H)
+#define KEYBUTTON(V) WBrhf_(KEYBUTTON, 1), WBfield(V)
 #define FONTSEL(A) WBrhf_x(FONTSEL, 1), WBfield(A)
 #define HEXENTRY(V,HC,X,Y) WBr2hf_t(HEXENTRY, 2 + 2), WBfield(V), \
 	EVENT(CHANGE, HC), WBxyl(X, Y, 1)
@@ -870,6 +899,8 @@ enum {
 #define MENUTEAR WBh_(MENUTEAR, 0)
 #define MENUSEP WBh_(MENUSEP, 0)
 #define MENUSEPr WBrh_(MENUSEP, 0)
+#define uMENUBAR(HC) WBr2h_(uMENUBAR, 0 + 2), EVENT(CHANGE, HC)
+#define uMENUITEM(NM,ID) WBrh_(uMENUITEM, 3), NULL, (void *)(ID), (NM)
 #define uMENUITEMs(NM,ID) WBrhs_(uMENUITEM, 3), NULL, (void *)(ID), (NM)
 #define MOUNT(V,FN,H) WBr2hf_(MOUNT, 2 + 2), WBfield(V), (FN), EVENT(CHANGE, H)
 #define PMOUNT(V,FN,H,K,NK) WBr2hf_x(MOUNT, 4 + 2), WBfield(V), (FN), (K), \
@@ -893,8 +924,10 @@ enum {
 #define CLEANUP(V) WBrhf(CLEANUP, 1), WBfield(V)
 #define TALLOC(V,L) WBhf(TALLOC, 2), WBfield(V), WBfield(L)
 #define TCOPY(V,L) WBhf(TCOPY, 2), WBfield(V), WBfield(L)
-#define ACTMAP(N) WBrh(ACTMAP, 1), (void *)(N)
-#define SHORTCUTs(NM) WBrh(SHORTCUTs, 1), (NM)
+#define ACTMAP(N) WBh(ACTMAP, 1), (void *)(N)
+#define KEYMAP(V, NM) WBrhf(KEYMAP, 2), WBfield(V), (NM)
+#define SHORTCUTs(NM) WBh(SHORTCUT, 1), (NM)
+#define SHORTCUT(K,M) WBh(SHORTCUT, 2), (void *)(GDK_##K), (void *)(_##M##mask)
 #define GROUP(N) WBrh(GROUP, 1), (void *)(N)
 //#define DEFGROUP WBrh(GROUP, 0)
 #define IDENT(NM) WBh(IDENT, 1), (NM)
@@ -903,6 +936,7 @@ enum {
 #define MKSHRINK WBh(MKSHRINK, 0)
 #define NORESIZE WBh(NORESIZE, 0)
 #define WANTMAX WBh(WANTMAX, 0)
+#define WANTMAXW WBh(WANTMAX, 1), (void *)(2)
 #define WXYWH(NM,W,H) WBh(WXYWH, 2), (NM), WBwh(W, H)
 #define DEFW(V) WXYWH(NULL, V, 0)
 #define DEFH(V) WXYWH(NULL, 0, V)
@@ -931,6 +965,8 @@ enum {
 	(void *)((W) + ((J) << 16)), (NM)
 #define NTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
+#define PTXTCOLUMNp(V,S,W,J) WBrhnf(PTXTCOLUMN, 3), WBfield(V), (void *)(S), \
+	(void *)((W) + ((J) << 16))
 #define RTXTCOLUMND(ST,F,W,J) WBrh(RTXTCOLUMN, 3), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16))
 #define RTXTCOLUMNDi(W,J) WBrh(RTXTCOLUMN, 3), (void *)0, \
@@ -944,7 +980,7 @@ enum {
 	(I), (S)
 #define NRFILECOLUMNDax(NM,F,W,J,I) WBrh(RFILECOLUMN, 5), \
 	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
-#define CHKCOLUMNi0v(A,S,W,J,HC) WBr2h(CHKCOLUMNi0, 3 + 2), &(A), (void *)(S), \
+#define CHKCOLUMNv(A,S,W,J,HC) WBr2h(CHKCOLUMN, 3 + 2), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), EVENT(CHANGE, HC)
 #define	XBMCURSOR(T,X,Y) WBrh(XBMCURSOR, 3), (xbm_##T##_bits), \
 	(xbm_##T##_mask_bits), WBxyl(X, Y, 20 + 1)
@@ -997,6 +1033,10 @@ enum {
 //	Extra data of ENTRY and COMBOENTRY
 #define ENTRY_VALUE	0
 
+//	Extra data of WDATA itself
+// !!! Must not clash with toplevels' data
+#define WDATA_ACTMAP	(-1)	/* Change state of slots which have ACTMAP */
+
 //	Extra data of WINDOW
 #define WINDOW_TITLE	0
 #define WINDOW_ESC_BTN	1
@@ -1033,6 +1073,10 @@ enum {
 //	Extra data of FCIMAGE
 #define FCIMAGE_XY	0
 
+//	Extra data of KEYMAP
+#define KEYMAP_KEY	0
+#define KEYMAP_MAP	1
+
 //	Extra state of EV_MOUSE
 #define MOUSE_BOUND	0
 
@@ -1052,3 +1096,4 @@ enum {
 #define SLOT_FOCUSED	1
 #define SLOT_SCRIPTABLE	2
 #define SLOT_UNREAL	3
+#define SLOT_RADIO	4

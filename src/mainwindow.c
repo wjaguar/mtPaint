@@ -53,6 +53,7 @@ typedef struct {
 	void **drop, **clip;
 	void **clipboard;
 	void **dockpage1;
+	void **keyslot;
 } main_dd;
 
 #define GREY_W 153
@@ -171,7 +172,7 @@ static inilist ini_int[] = {
 };
 
 
-void **main_window_, **settings_dock, **layers_dock, **main_split,
+void **main_window_, **main_keys, **settings_dock, **layers_dock, **main_split,
 	**drawing_canvas, **scrolledwindow_canvas,
 	**menu_slots[TOTAL_MENU_IDS];
 
@@ -207,38 +208,6 @@ static void clear_perim_real( int ox, int oy )
 	repaint_canvas(x1, y0, 1, y1 - y0 + 1);
 	repaint_canvas(x0 + 1, y0, x1 - x0 - 1, 1);
 	repaint_canvas(x0 + 1, y1, x1 - x0 - 1, 1);
-}
-
-typedef struct {
-	void **slot;
-	int actmap;
-} dis_information;
-
-static dis_information *dis_array;
-static int dis_count, dis_allow;
-static int dis_miss = ~0;
-
-void mapped_dis_add(void **slot, int actmap)
-{
-	if (!actmap) return;
-	if (dis_count >= dis_allow) dis_array = realloc(dis_array,
-		(dis_allow += 128) * sizeof(dis_information));
-	/* If no memory, just die of SIGSEGV */
-	dis_array[dis_count].slot = slot;
-	dis_array[dis_count].actmap = actmap;
-	dis_count++;
-}
-
-/* Enable or disable menu items */
-void mapped_item_state(int statemap)
-{
-	int i;
-
-	if (dis_miss == statemap) return; // Nothing changed
-	for (i = 0; i < dis_count; i++)
-		cmd_sensitive(dis_array[i].slot,
-			!!(dis_array[i].actmap & statemap));
-	dis_miss = statemap;
 }
 
 static void pressed_load_recent(int item)
@@ -746,200 +715,158 @@ int check_zoom_keys(int act_m)
 	return (TRUE);
 }
 
-#define _C (GDK_CONTROL_MASK)
-#define _S (GDK_SHIFT_MASK)
-#define _A (GDK_MOD1_MASK)
-#define _CS (GDK_CONTROL_MASK | GDK_SHIFT_MASK)
-#define _CSA (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
+static void menu_action(void *dt, void **wdata, int what, void **where);
 
-static const int mod_bits[] = { 0, _C, _S, _CS, _CSA };
-
-#define MOD_0   0x00
-#define MOD_c   0x01
-#define MOD_s   0x02
-#define MOD_cs  0x03
-#define MOD_csa 0x04
-#define MOD_S   0x22
-#define MOD_cS  0x23
-#define MOD_Cs  0x13
-#define MOD_CS  0x33
-
-typedef struct {
-	short action, mode;
-	int key;
-	unsigned char mod;
-} key_action;
-
-static key_action main_keys[] = {
-	{ ACT_QUIT,	0,		GDK_q,		MOD_0   },
-	{ ACT_ZOOM,	0,		GDK_plus,	MOD_cs  },
-	{ ACT_ZOOM,	0,		GDK_KP_Add,	MOD_cs  },
-	{ ACT_ZOOM,	-1,		GDK_minus,	MOD_cs  },
-	{ ACT_ZOOM,	-1,		GDK_KP_Subtract, MOD_cs },
-	{ ACT_ZOOM,	-10,		GDK_KP_1,	MOD_cs  },
-	{ ACT_ZOOM,	-10,		GDK_1,		MOD_cs  },
-	{ ACT_ZOOM,	-4,		GDK_KP_2,	MOD_cs  },
-	{ ACT_ZOOM,	-4,		GDK_2,		MOD_cs  },
-	{ ACT_ZOOM,	-2,		GDK_KP_3,	MOD_cs  },
-	{ ACT_ZOOM,	-2,		GDK_3,		MOD_cs  },
-	{ ACT_ZOOM,	1,		GDK_KP_4,	MOD_cs  },
-	{ ACT_ZOOM,	1,		GDK_4,		MOD_cs  },
-	{ ACT_ZOOM,	4,		GDK_KP_5,	MOD_cs  },
-	{ ACT_ZOOM,	4,		GDK_5,		MOD_cs  },
-	{ ACT_ZOOM,	8,		GDK_KP_6,	MOD_cs  },
-	{ ACT_ZOOM,	8,		GDK_6,		MOD_cs  },
-	{ ACT_ZOOM,	12,		GDK_KP_7,	MOD_cs  },
-	{ ACT_ZOOM,	12,		GDK_7,		MOD_cs  },
-	{ ACT_ZOOM,	16,		GDK_KP_8,	MOD_cs  },
-	{ ACT_ZOOM,	16,		GDK_8,		MOD_cs  },
-	{ ACT_ZOOM,	20,		GDK_KP_9,	MOD_cs  },
-	{ ACT_ZOOM,	20,		GDK_9,		MOD_cs  },
-	{ ACT_VIEW,	0,		GDK_Home,	MOD_0   },
-	{ DLG_BRCOSA,	0,		GDK_Insert,	MOD_cs  },
-	{ ACT_PAN,	0,		GDK_End,	MOD_cs  },
-	{ ACT_CROP,	0,		GDK_Delete,	MOD_cs  },
-	{ ACT_SWAP_AB,	0,		GDK_x,		MOD_csa },
-	{ DLG_CHOOSER,	CHOOSE_PATTERN,	GDK_F2,		MOD_csa },
-	{ DLG_CHOOSER,	CHOOSE_BRUSH,	GDK_F3,		MOD_csa },
-	{ DLG_CHOOSER,	CHOOSE_COLOR,	GDK_e,		MOD_csa },
-	{ ACT_TOOL,	TTB_PAINT,	GDK_F4,		MOD_csa },
-	{ ACT_TOOL,	TTB_SELECT,	GDK_F9,		MOD_csa },
-	{ ACT_TOOL,	TTB_FLOOD,	GDK_f,		MOD_csa },
-	{ ACT_TOOL,	TTB_LINE,	GDK_d,		MOD_csa },
-	{ ACT_DOCK,	0,		GDK_F12,	MOD_csa },
-	{ ACT_SEL_MOVE,	5,		GDK_Left,	MOD_cS  },
-	{ ACT_SEL_MOVE,	5,		GDK_KP_Left,	MOD_cS  },
-	{ ACT_SEL_MOVE,	7,		GDK_Right,	MOD_cS  },
-	{ ACT_SEL_MOVE,	7,		GDK_KP_Right,	MOD_cS  },
-	{ ACT_SEL_MOVE,	3,		GDK_Down,	MOD_cS  },
-	{ ACT_SEL_MOVE,	3,		GDK_KP_Down,	MOD_cS  },
-	{ ACT_SEL_MOVE,	9,		GDK_Up,		MOD_cS  },
-	{ ACT_SEL_MOVE,	9,		GDK_KP_Up,	MOD_cS  },
-	{ ACT_SEL_MOVE,	4,		GDK_Left,	MOD_cs  },
-	{ ACT_SEL_MOVE,	4,		GDK_KP_Left,	MOD_cs  },
-	{ ACT_SEL_MOVE,	6,		GDK_Right,	MOD_cs  },
-	{ ACT_SEL_MOVE,	6,		GDK_KP_Right,	MOD_cs  },
-	{ ACT_SEL_MOVE,	2,		GDK_Down,	MOD_cs  },
-	{ ACT_SEL_MOVE,	2,		GDK_KP_Down,	MOD_cs  },
-	{ ACT_SEL_MOVE,	8,		GDK_Up,		MOD_cs  },
-	{ ACT_SEL_MOVE,	8,		GDK_KP_Up,	MOD_cs  },
-	{ ACT_OPAC,	1,		GDK_KP_1,	MOD_Cs  },
-	{ ACT_OPAC,	1,		GDK_1,		MOD_Cs  },
-	{ ACT_OPAC,	2,		GDK_KP_2,	MOD_Cs  },
-	{ ACT_OPAC,	2,		GDK_2,		MOD_Cs  },
-	{ ACT_OPAC,	3,		GDK_KP_3,	MOD_Cs  },
-	{ ACT_OPAC,	3,		GDK_3,		MOD_Cs  },
-	{ ACT_OPAC,	4,		GDK_KP_4,	MOD_Cs  },
-	{ ACT_OPAC,	4,		GDK_4,		MOD_Cs  },
-	{ ACT_OPAC,	5,		GDK_KP_5,	MOD_Cs  },
-	{ ACT_OPAC,	5,		GDK_5,		MOD_Cs  },
-	{ ACT_OPAC,	6,		GDK_KP_6,	MOD_Cs  },
-	{ ACT_OPAC,	6,		GDK_6,		MOD_Cs  },
-	{ ACT_OPAC,	7,		GDK_KP_7,	MOD_Cs  },
-	{ ACT_OPAC,	7,		GDK_7,		MOD_Cs  },
-	{ ACT_OPAC,	8,		GDK_KP_8,	MOD_Cs  },
-	{ ACT_OPAC,	8,		GDK_8,		MOD_Cs  },
-	{ ACT_OPAC,	9,		GDK_KP_9,	MOD_Cs  },
-	{ ACT_OPAC,	9,		GDK_9,		MOD_Cs  },
-	{ ACT_OPAC,	10,		GDK_KP_0,	MOD_Cs  },
-	{ ACT_OPAC,	10,		GDK_0,		MOD_Cs  },
-	{ ACT_OPAC,	0,		GDK_plus,	MOD_Cs  },
-	{ ACT_OPAC,	0,		GDK_KP_Add,	MOD_Cs  },
-	{ ACT_OPAC,	-1,		GDK_minus,	MOD_Cs  },
-	{ ACT_OPAC,	-1,		GDK_KP_Subtract, MOD_Cs },
-	{ ACT_LR_MOVE,	5,		GDK_Left,	MOD_CS  },
-	{ ACT_LR_MOVE,	5,		GDK_KP_Left,	MOD_CS  },
-	{ ACT_LR_MOVE,	7,		GDK_Right,	MOD_CS  },
-	{ ACT_LR_MOVE,	7,		GDK_KP_Right,	MOD_CS  },
-	{ ACT_LR_MOVE,	3,		GDK_Down,	MOD_CS  },
-	{ ACT_LR_MOVE,	3,		GDK_KP_Down,	MOD_CS  },
-	{ ACT_LR_MOVE,	9,		GDK_Up,		MOD_CS  },
-	{ ACT_LR_MOVE,	9,		GDK_KP_Up,	MOD_CS  },
-	{ ACT_LR_MOVE,	4,		GDK_Left,	MOD_Cs  },
-	{ ACT_LR_MOVE,	4,		GDK_KP_Left,	MOD_Cs  },
-	{ ACT_LR_MOVE,	6,		GDK_Right,	MOD_Cs  },
-	{ ACT_LR_MOVE,	6,		GDK_KP_Right,	MOD_Cs  },
-	{ ACT_LR_MOVE,	2,		GDK_Down,	MOD_Cs  },
-	{ ACT_LR_MOVE,	2,		GDK_KP_Down,	MOD_Cs  },
-	{ ACT_LR_MOVE,	8,		GDK_Up,		MOD_Cs  },
-	{ ACT_LR_MOVE,	8,		GDK_KP_Up,	MOD_Cs  },
-	{ ACT_ESC,	0,		GDK_Escape,	MOD_cs  },
-	{ DLG_SCALE,	0,		GDK_Page_Up,	MOD_cs  },
-	{ DLG_SIZE,	0,		GDK_Page_Down,	MOD_cs  },
-	{ ACT_COMMIT,	0,		GDK_Return,	MOD_s   },
-	{ ACT_COMMIT,	1,		GDK_Return,	MOD_S   },
-	{ ACT_COMMIT,	0,		GDK_KP_Enter,	MOD_s   },
-	{ ACT_COMMIT,	1,		GDK_KP_Enter,	MOD_S   },
-	{ ACT_RCLICK,	0,		GDK_BackSpace,	MOD_0   },
-	{ ACT_ARROW,	2,		GDK_a,		MOD_csa },
-	{ ACT_ARROW,	3,		GDK_s,		MOD_csa },
-	{ ACT_A,	-1,		GDK_bracketleft, MOD_cs },
-	{ ACT_A,	1,		GDK_bracketright, MOD_cs},
-	{ ACT_B,	-1,		GDK_bracketleft, MOD_cS },
-	{ ACT_B,	-1,		GDK_braceleft,	MOD_cS  },
-	{ ACT_B,	1,		GDK_bracketright, MOD_cS},
-	{ ACT_B,	1,		GDK_braceright,	MOD_cS  },
-	{ ACT_CHANNEL,	CHN_IMAGE,	GDK_KP_1,	MOD_cS  },
-	{ ACT_CHANNEL,	CHN_IMAGE,	GDK_1,		MOD_cS  },
-	{ ACT_CHANNEL,	CHN_ALPHA,	GDK_KP_2,	MOD_cS  },
-	{ ACT_CHANNEL,	CHN_ALPHA,	GDK_2,		MOD_cS  },
-	{ ACT_CHANNEL,	CHN_SEL,	GDK_KP_3,	MOD_cS  },
-	{ ACT_CHANNEL,	CHN_SEL,	GDK_3,		MOD_cS  },
-	{ ACT_CHANNEL,	CHN_MASK,	GDK_KP_4,	MOD_cS  },
-	{ ACT_CHANNEL,	CHN_MASK,	GDK_4,		MOD_cS  },
-	{ ACT_VWZOOM,	0,		GDK_plus,	MOD_cS  },
-	{ ACT_VWZOOM,	0,		GDK_KP_Add,	MOD_cS  },
-	{ ACT_VWZOOM,	-1,		GDK_minus,	MOD_cS  },
-	{ ACT_VWZOOM,	-1,		GDK_KP_Subtract, MOD_cS },
-	{ 0, 0, 0, 0 }
+static void *keylist_code[] = {
+	uMENUBAR(menu_action),
+	uMENUITEM(_("Zoom in"), ACTMOD(ACT_ZOOM, 0)),
+		SHORTCUT(plus, 0), SHORTCUT(KP_Add, 0),
+	uMENUITEM(_("Zoom out"), ACTMOD(ACT_ZOOM, -1)),
+		SHORTCUT(minus, 0), SHORTCUT(KP_Subtract, 0),
+	uMENUITEM(_("10% zoom"), ACTMOD(ACT_ZOOM, -10)),
+		SHORTCUT(1, 0), SHORTCUT(KP_1, 0),
+	uMENUITEM(_("25% zoom"), ACTMOD(ACT_ZOOM, -4)),
+		SHORTCUT(2, 0), SHORTCUT(KP_2, 0),
+	uMENUITEM(_("50% zoom"), ACTMOD(ACT_ZOOM, -2)),
+		SHORTCUT(3, 0), SHORTCUT(KP_3, 0),
+	uMENUITEM(_("100% zoom"), ACTMOD(ACT_ZOOM, 1)),
+		SHORTCUT(4, 0), SHORTCUT(KP_4, 0),
+	uMENUITEM(_("400% zoom"), ACTMOD(ACT_ZOOM, 4)),
+		SHORTCUT(5, 0), SHORTCUT(KP_5, 0),
+	uMENUITEM(_("800% zoom"), ACTMOD(ACT_ZOOM, 8)),
+		SHORTCUT(6, 0), SHORTCUT(KP_6, 0),
+	uMENUITEM(_("1200% zoom"), ACTMOD(ACT_ZOOM, 12)),
+		SHORTCUT(7, 0), SHORTCUT(KP_7, 0),
+	uMENUITEM(_("1600% zoom"), ACTMOD(ACT_ZOOM, 16)),
+		SHORTCUT(8, 0), SHORTCUT(KP_8, 0),
+	uMENUITEM(_("2000% zoom"), ACTMOD(ACT_ZOOM, 20)),
+		SHORTCUT(9, 0), SHORTCUT(KP_9, 0),
+	uMENUITEM(_("10% opacity"), ACTMOD(ACT_OPAC, 1)),
+		SHORTCUT(1, C), SHORTCUT(KP_1, C),
+	uMENUITEM(_("20% opacity"), ACTMOD(ACT_OPAC, 2)),
+		SHORTCUT(2, C), SHORTCUT(KP_2, C),
+	uMENUITEM(_("30% opacity"), ACTMOD(ACT_OPAC, 3)),
+		SHORTCUT(3, C), SHORTCUT(KP_3, C),
+	uMENUITEM(_("40% opacity"), ACTMOD(ACT_OPAC, 4)),
+		SHORTCUT(4, C), SHORTCUT(KP_4, C),
+	uMENUITEM(_("50% opacity"), ACTMOD(ACT_OPAC, 5)),
+		SHORTCUT(5, C), SHORTCUT(KP_5, C),
+	uMENUITEM(_("60% opacity"), ACTMOD(ACT_OPAC, 6)),
+		SHORTCUT(6, C), SHORTCUT(KP_6, C),
+	uMENUITEM(_("70% opacity"), ACTMOD(ACT_OPAC, 7)),
+		SHORTCUT(7, C), SHORTCUT(KP_7, C),
+	uMENUITEM(_("80% opacity"), ACTMOD(ACT_OPAC, 8)),
+		SHORTCUT(8, C), SHORTCUT(KP_8, C),
+	uMENUITEM(_("90% opacity"), ACTMOD(ACT_OPAC, 9)),
+		SHORTCUT(9, C), SHORTCUT(KP_9, C),
+	uMENUITEM(_("100% opacity"), ACTMOD(ACT_OPAC, 10)),
+		SHORTCUT(0, C), SHORTCUT(KP_0, C),
+	uMENUITEM(_("Increase opacity"), ACTMOD(ACT_OPAC, 0)),
+		SHORTCUT(plus, C), SHORTCUT(KP_Add, C),
+	uMENUITEM(_("Decrease opacity"), ACTMOD(ACT_OPAC, -1)),
+		SHORTCUT(minus, C), SHORTCUT(KP_Subtract, C),
+	uMENUITEM(_("Draw open arrow head"), ACTMOD(ACT_ARROW, 2)),
+		SHORTCUT(a, 0),
+	uMENUITEM(_("Draw closed arrow head"), ACTMOD(ACT_ARROW, 3)),
+		SHORTCUT(s, 0),
+	uMENUITEM(_("Previous colour A"), ACTMOD(ACT_A, -1)),
+		SHORTCUT(bracketleft, 0),
+	uMENUITEM(_("Next colour A"), ACTMOD(ACT_A, 1)),
+		SHORTCUT(bracketright, 0),
+	uMENUITEM(_("Previous colour B"), ACTMOD(ACT_B, -1)),
+		SHORTCUT(bracketleft, S), SHORTCUT(braceleft, S),
+	uMENUITEM(_("Next colour B"), ACTMOD(ACT_B, 1)),
+		SHORTCUT(bracketright, S), SHORTCUT(braceright, S),
+	uMENUITEM(_("View window - Zoom in"), ACTMOD(ACT_VWZOOM, 0)),
+		SHORTCUT(plus, S), SHORTCUT(KP_Add, S),
+	uMENUITEM(_("View window - Zoom out"), ACTMOD(ACT_VWZOOM, -1)),
+		SHORTCUT(minus, S), SHORTCUT(KP_Subtract, S),
+///	FIXED KEYS
+	uMENUITEM(NULL, ACTMOD(ACT_QUIT, 0)),
+		SHORTCUT(q, 0), SHORTCUT(q, S), SHORTCUT(q, A),
+		SHORTCUT(q, CS), SHORTCUT(q, CA),
+		SHORTCUT(q, SA), SHORTCUT(q, CSA),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 5)),
+		SHORTCUT(Left, S), SHORTCUT(KP_Left, S),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 7)),
+		SHORTCUT(Right, S), SHORTCUT(KP_Right, S),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 3)),
+		SHORTCUT(Down, S), SHORTCUT(KP_Down, S),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 9)),
+		SHORTCUT(Up, S), SHORTCUT(KP_Up, S),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 4)),
+		SHORTCUT(Left, 0), SHORTCUT(KP_Left, 0),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 6)),
+		SHORTCUT(Right, 0), SHORTCUT(KP_Right, 0),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 2)),
+		SHORTCUT(Down, 0), SHORTCUT(KP_Down, 0),
+	uMENUITEM(NULL, ACTMOD(ACT_SEL_MOVE, 8)),
+		SHORTCUT(Up, 0), SHORTCUT(KP_Up, 0),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 5)),
+		SHORTCUT(Left, CS), SHORTCUT(KP_Left, CS),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 7)),
+		SHORTCUT(Right, CS), SHORTCUT(KP_Right, CS),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 3)),
+		SHORTCUT(Down, CS), SHORTCUT(KP_Down, CS),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 9)),
+		SHORTCUT(Up, CS), SHORTCUT(KP_Up, CS),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 4)),
+		SHORTCUT(Left, C), SHORTCUT(KP_Left, C),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 6)),
+		SHORTCUT(Right, C), SHORTCUT(KP_Right, C),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 2)),
+		SHORTCUT(Down, C), SHORTCUT(KP_Down, C),
+	uMENUITEM(NULL, ACTMOD(ACT_LR_MOVE, 8)),
+		SHORTCUT(Up, C), SHORTCUT(KP_Up, C),
+	uMENUITEM(NULL, ACTMOD(ACT_ESC, 0)),
+		SHORTCUT(Escape, 0), SHORTCUT(Escape, A),
+	uMENUITEM(NULL, ACTMOD(ACT_COMMIT, 0)),
+		SHORTCUT(Return, 0), SHORTCUT(Return, C),
+		SHORTCUT(Return, A), SHORTCUT(Return, CA),
+		SHORTCUT(KP_Enter, 0), SHORTCUT(KP_Enter, C),
+		SHORTCUT(KP_Enter, A), SHORTCUT(KP_Enter, CA),
+	uMENUITEM(NULL, ACTMOD(ACT_COMMIT, 1)),
+		SHORTCUT(Return, S), SHORTCUT(Return, CS),
+		SHORTCUT(Return, SA), SHORTCUT(Return, CSA),
+		SHORTCUT(KP_Enter, S), SHORTCUT(KP_Enter, CS),
+		SHORTCUT(KP_Enter, SA), SHORTCUT(KP_Enter, CSA),
+	uMENUITEM(NULL, ACTMOD(ACT_RCLICK, 0)),
+		SHORTCUT(BackSpace, 0), SHORTCUT(BackSpace, C),
+		SHORTCUT(BackSpace, S), SHORTCUT(BackSpace, A),
+		SHORTCUT(BackSpace, CS), SHORTCUT(BackSpace, CA),
+		SHORTCUT(BackSpace, SA), SHORTCUT(BackSpace, CSA),
+	RET
 };
-
-static guint main_keycodes[sizeof(main_keys) / sizeof(key_action)];
-
-static void fill_keycodes()
-{
-	int i;
-
-	for (i = 0; main_keys[i].action; i++)
-	{
-		main_keycodes[i] = keyval_key(main_keys[i].key);
-	}
-}
 
 /* "Tool of last resort" for when shortcuts don't work */
 static void rebind_keys()
 {
-	fill_keycodes();
+	cmd_reset(main_keys, NULL);
 #if GTK_MAJOR_VERSION > 1
 	gtk_signal_emit_by_name(GTK_OBJECT(main_window), "keys_changed", NULL);
 #endif
 }
 
-int wtf_pressed(key_ext *key)
+int key_action(key_ext *key, int toggle)
 {
-	key_action *ap = main_keys, *cmatch = NULL;
-	guint *kcd = main_keycodes;
+	main_dd *dt = GET_DDATA(main_window_);
+	void *v, **slot;
+	int act_m;
 
-	for (; ap->action; kcd++ , ap++)
+	cmd_setv(main_keys, key, KEYMAP_KEY);
+	slot = dt->keyslot;
+	// Leave unmapped key to be handled elsewhere
+	if (!slot) act_m = 0;
+	// Do nothing if slot is insensitive
+	else if (!cmd_checkv(slot, SLOT_SENSITIVE)) act_m = ACTMOD_DUMMY;
+	// Activate toggleable widget if allowed
+	else if (toggle && (v = slot_data(slot, dt)))
 	{
-		/* Relevant modifiers should match first */
-		if ((key->state & mod_bits[ap->mod & 0xF]) !=
-			mod_bits[ap->mod >> 4]) continue;
-		/* Let keyval have priority; this is also a workaround for
-		 * GTK2 bug #136280 */
-		if (key->lowkey == ap->key) break;
-		/* Let keycodes match when keyvals don't */
-		if (key->realkey == *kcd) cmatch = ap;
+		cmd_set(slot, cmd_checkv(slot, SLOT_RADIO) || !*(int *)v);
+		act_m = ACTMOD_DUMMY;
 	}
-/* !!! If the starting layout has the keyval+mods combo mapped to one key, and
- * the current layout to another, both will work till "rebind keys" is done.
- * I like this better than shortcuts moving with every layout switch - WJ */
-	/* If we have only a keycode match */
-	if (cmatch && !ap->action) ap = cmatch;
-	/* Return 0 if no match */
-	if (!ap->action) return (0);
-	/* Return the matching action */
-	return ((ap->action << 16) + (ap->mode + 0x8000));
+	else act_m = TOOL_ID(slot);
+	return (act_m);
 }
 
 int dock_focused()
@@ -950,11 +877,12 @@ int dock_focused()
 static int handle_keypress(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
-	int act_m = wtf_pressed(keydata);
+	int act_m = key_action(keydata, TRUE);
 
 	if (!act_m) return (FALSE);
 
-	action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
+	if (act_m != ACTMOD_DUMMY)
+		action_dispatch(act_m >> 16, (act_m & 0xFFFF) - 0x8000, 0, TRUE);
 	return (TRUE);
 }
 
@@ -4002,6 +3930,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_script(); break;
 	case DLG_LASSO:
 		lasso_settings(); break;
+	case DLG_KEYS:
+		keys_selector(); break;
 	case FILT_2RGB:
 		pressed_convert_rgb(); break;
 	case FILT_INVERT:
@@ -4198,11 +4128,11 @@ static void *main_menu_code[] = {
 	SSUBMENU(_("/_File")),
 	MENUTEAR, //
 	MENUITEMis(_("//New"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
-		SHORTCUTs("<control>N"),
+		SHORTCUT(n, C),
 	MENUITEMis(_("//Open ..."), ACTMOD(DLG_FSEL, FS_PNG_LOAD), XPM_ICON(open)),
-		SHORTCUTs("<control>O"),
+		SHORTCUT(o, C),
 	MENUITEMis(_("//Save"), ACTMOD(ACT_SAVE, 0), XPM_ICON(save)),
-		SHORTCUTs("<control>S"),
+		SHORTCUT(s, C),
 	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PNG_SAVE)),
 	MENUSEP, //
 	MENUITEMs(_("//Export Undo Images ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO)),
@@ -4217,35 +4147,35 @@ static void *main_menu_code[] = {
 	SUBMENU(_("//Actions")),
 	MENUTEAR, ///
 	REFv(menu_slots[MENU_FACTION1]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 1)),
+	MENUITEM("///1", ACTMOD(ACT_FACTION, 1)),
 	REFv(menu_slots[MENU_FACTION2]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 2)),
+	MENUITEM("///2", ACTMOD(ACT_FACTION, 2)),
 	REFv(menu_slots[MENU_FACTION3]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 3)),
+	MENUITEM("///3", ACTMOD(ACT_FACTION, 3)),
 	REFv(menu_slots[MENU_FACTION4]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 4)),
+	MENUITEM("///4", ACTMOD(ACT_FACTION, 4)),
 	REFv(menu_slots[MENU_FACTION5]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 5)),
+	MENUITEM("///5", ACTMOD(ACT_FACTION, 5)),
 	REFv(menu_slots[MENU_FACTION6]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 6)),
+	MENUITEM("///6", ACTMOD(ACT_FACTION, 6)),
 	REFv(menu_slots[MENU_FACTION7]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 7)),
+	MENUITEM("///7", ACTMOD(ACT_FACTION, 7)),
 	REFv(menu_slots[MENU_FACTION8]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 8)),
+	MENUITEM("///8", ACTMOD(ACT_FACTION, 8)),
 	REFv(menu_slots[MENU_FACTION9]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 9)),
+	MENUITEM("///9", ACTMOD(ACT_FACTION, 9)),
 	REFv(menu_slots[MENU_FACTION10]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 10)),
+	MENUITEM("///10", ACTMOD(ACT_FACTION, 10)),
 	REFv(menu_slots[MENU_FACTION11]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 11)),
+	MENUITEM("///11", ACTMOD(ACT_FACTION, 11)),
 	REFv(menu_slots[MENU_FACTION12]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 12)),
+	MENUITEM("///12", ACTMOD(ACT_FACTION, 12)),
 	REFv(menu_slots[MENU_FACTION13]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 13)),
+	MENUITEM("///13", ACTMOD(ACT_FACTION, 13)),
 	REFv(menu_slots[MENU_FACTION14]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 14)),
+	MENUITEM("///14", ACTMOD(ACT_FACTION, 14)),
 	REFv(menu_slots[MENU_FACTION15]),
-	MENUITEM("///", ACTMOD(ACT_FACTION, 15)),
+	MENUITEM("///15", ACTMOD(ACT_FACTION, 15)),
 	REFv(menu_slots[MENU_FACTION_S]),
 	MENUSEPr, ///
 	MENUITEM(_("///Configure"), ACTMOD(DLG_FACTIONS, 0)),
@@ -4253,150 +4183,150 @@ static void *main_menu_code[] = {
 	REFv(menu_slots[MENU_RECENT_S]),
 	MENUSEPr, //
 	REFv(menu_slots[MENU_RECENT1]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 1)),
-		SHORTCUTs("<shift><control>F1"),
+	MENUITEM("//1", ACTMOD(ACT_LOAD_RECENT, 1)),
+		SHORTCUT(F1, CS),
 	REFv(menu_slots[MENU_RECENT2]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 2)),
-		SHORTCUTs("<shift><control>F2"),
+	MENUITEM("//2", ACTMOD(ACT_LOAD_RECENT, 2)),
+		SHORTCUT(F2, CS),
 	REFv(menu_slots[MENU_RECENT3]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 3)),
-		SHORTCUTs("<shift><control>F3"),
+	MENUITEM("//3", ACTMOD(ACT_LOAD_RECENT, 3)),
+		SHORTCUT(F3, CS),
 	REFv(menu_slots[MENU_RECENT4]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 4)),
-		SHORTCUTs("<shift><control>F4"),
+	MENUITEM("//4", ACTMOD(ACT_LOAD_RECENT, 4)),
+		SHORTCUT(F4, CS),
 	REFv(menu_slots[MENU_RECENT5]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 5)),
-		SHORTCUTs("<shift><control>F5"),
+	MENUITEM("//5", ACTMOD(ACT_LOAD_RECENT, 5)),
+		SHORTCUT(F5, CS),
 	REFv(menu_slots[MENU_RECENT6]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 6)),
-		SHORTCUTs("<shift><control>F6"),
+	MENUITEM("//6", ACTMOD(ACT_LOAD_RECENT, 6)),
+		SHORTCUT(F6, CS),
 	REFv(menu_slots[MENU_RECENT7]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 7)),
-		SHORTCUTs("<shift><control>F7"),
+	MENUITEM("//7", ACTMOD(ACT_LOAD_RECENT, 7)),
+		SHORTCUT(F7, CS),
 	REFv(menu_slots[MENU_RECENT8]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 8)),
-		SHORTCUTs("<shift><control>F8"),
+	MENUITEM("//8", ACTMOD(ACT_LOAD_RECENT, 8)),
+		SHORTCUT(F8, CS),
 	REFv(menu_slots[MENU_RECENT9]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 9)),
-		SHORTCUTs("<shift><control>F9"),
+	MENUITEM("//9", ACTMOD(ACT_LOAD_RECENT, 9)),
+		SHORTCUT(F9, CS),
 	REFv(menu_slots[MENU_RECENT10]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 10)),
-		SHORTCUTs("<shift><control>F10"),
+	MENUITEM("//10", ACTMOD(ACT_LOAD_RECENT, 10)),
+		SHORTCUT(F10, CS),
 	REFv(menu_slots[MENU_RECENT11]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 11)),
+	MENUITEM("//11", ACTMOD(ACT_LOAD_RECENT, 11)),
 	REFv(menu_slots[MENU_RECENT12]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 12)),
+	MENUITEM("//12", ACTMOD(ACT_LOAD_RECENT, 12)),
 	REFv(menu_slots[MENU_RECENT13]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 13)),
+	MENUITEM("//13", ACTMOD(ACT_LOAD_RECENT, 13)),
 	REFv(menu_slots[MENU_RECENT14]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 14)),
+	MENUITEM("//14", ACTMOD(ACT_LOAD_RECENT, 14)),
 	REFv(menu_slots[MENU_RECENT15]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 15)),
+	MENUITEM("//15", ACTMOD(ACT_LOAD_RECENT, 15)),
 	REFv(menu_slots[MENU_RECENT16]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 16)),
+	MENUITEM("//16", ACTMOD(ACT_LOAD_RECENT, 16)),
 	REFv(menu_slots[MENU_RECENT17]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 17)),
+	MENUITEM("//17", ACTMOD(ACT_LOAD_RECENT, 17)),
 	REFv(menu_slots[MENU_RECENT18]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 18)),
+	MENUITEM("//18", ACTMOD(ACT_LOAD_RECENT, 18)),
 	REFv(menu_slots[MENU_RECENT19]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 19)),
+	MENUITEM("//19", ACTMOD(ACT_LOAD_RECENT, 19)),
 	REFv(menu_slots[MENU_RECENT20]),
-	MENUITEM("//", ACTMOD(ACT_LOAD_RECENT, 20)),
+	MENUITEM("//20", ACTMOD(ACT_LOAD_RECENT, 20)),
 	MENUSEP, //
 	MENUITEMs(_("//Quit"), ACTMOD(ACT_QUIT, 1)),
-		SHORTCUTs("<control>Q"),
+		SHORTCUT(q, C),
 	WDONE,
 	SSUBMENU(_("/_Edit")),
 	MENUTEAR, //
 	MENUITEMis(_("//Undo"), ACTMOD(ACT_DO_UNDO, 0), XPM_ICON(undo)),
-		ACTMAP(NEED_UNDO), SHORTCUTs("<control>Z"),
+		ACTMAP(NEED_UNDO), SHORTCUT(z, C),
 	MENUITEMis(_("//Redo"), ACTMOD(ACT_DO_UNDO, 1), XPM_ICON(redo)),
-		ACTMAP(NEED_REDO), SHORTCUTs("<control>R"),
+		ACTMAP(NEED_REDO), SHORTCUT(r, C),
 	MENUSEP, //
 	MENUITEMis(_("//Cut"), ACTMOD(ACT_COPY, 1), XPM_ICON(cut)),
-		ACTMAP(NEED_SEL2), SHORTCUTs("<control>X"),
+		ACTMAP(NEED_SEL2), SHORTCUT(x, C),
 	MENUITEMis(_("//Copy"), ACTMOD(ACT_COPY, 0), XPM_ICON(copy)),
-		ACTMAP(NEED_SEL2), SHORTCUTs("<control>C"),
+		ACTMAP(NEED_SEL2), SHORTCUT(c, C),
 	MENUITEMs(_("//Copy To Palette"), ACTMOD(ACT_COPY_PAL, 0)),
 		ACTMAP(NEED_PSEL),
 	MENUITEMis(_("//Paste To Centre"), ACTMOD(ACT_PASTE, 1), XPM_ICON(paste)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>V"),
+		ACTMAP(NEED_CLIP), SHORTCUT(v, C),
 	MENUITEMs(_("//Paste To New Layer"), ACTMOD(ACT_LR_ADD, LR_PASTE)),
-		ACTMAP(NEED_PCLIP), SHORTCUTs("<control><shift>V"),
+		ACTMAP(NEED_PCLIP), SHORTCUT(v, CS),
 	MENUITEMs(_("//Paste"), ACTMOD(ACT_PASTE, 0)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>K"),
+		ACTMAP(NEED_CLIP), SHORTCUT(k, C),
 	MENUITEMi(_("//Paste Text"), ACTMOD(DLG_TEXT, 0), XPM_ICON(text)),
-		SHORTCUTs("<shift>T"),
+		SHORTCUT(t, S),
 #ifdef U_FREETYPE
 	MENUITEM(_("//Paste Text (FreeType)"), ACTMOD(DLG_TEXT_FT, 0)),
-		SHORTCUTs("T"),
+		SHORTCUT(t, 0),
 #endif
 	MENUITEMs(_("//Paste Palette"), ACTMOD(ACT_PASTE_PAL, 0)),
 	MENUSEP, //
 	SUBMENU(_("//Load Clipboard")),
 	MENUTEAR, ///
 	MENUITEMs("///1", ACTMOD(ACT_LOAD_CLIP, 1)),
-		SHORTCUTs("<shift>F1"),
+		SHORTCUT(F1, S),
 	MENUITEMs("///2", ACTMOD(ACT_LOAD_CLIP, 2)),
-		SHORTCUTs("<shift>F2"),
+		SHORTCUT(F2, S),
 	MENUITEMs("///3", ACTMOD(ACT_LOAD_CLIP, 3)),
-		SHORTCUTs("<shift>F3"),
+		SHORTCUT(F3, S),
 	MENUITEMs("///4", ACTMOD(ACT_LOAD_CLIP, 4)),
-		SHORTCUTs("<shift>F4"),
+		SHORTCUT(F4, S),
 	MENUITEMs("///5", ACTMOD(ACT_LOAD_CLIP, 5)),
-		SHORTCUTs("<shift>F5"),
+		SHORTCUT(F5, S),
 	MENUITEMs("///6", ACTMOD(ACT_LOAD_CLIP, 6)),
-		SHORTCUTs("<shift>F6"),
+		SHORTCUT(F6, S),
 	MENUITEMs("///7", ACTMOD(ACT_LOAD_CLIP, 7)),
-		SHORTCUTs("<shift>F7"),
+		SHORTCUT(F7, S),
 	MENUITEMs("///8", ACTMOD(ACT_LOAD_CLIP, 8)),
-		SHORTCUTs("<shift>F8"),
+		SHORTCUT(F8, S),
 	MENUITEMs("///9", ACTMOD(ACT_LOAD_CLIP, 9)),
-		SHORTCUTs("<shift>F9"),
+		SHORTCUT(F9, S),
 	MENUITEMs("///10", ACTMOD(ACT_LOAD_CLIP, 10)),
-		SHORTCUTs("<shift>F10"),
+		SHORTCUT(F10, S),
 	MENUITEMs("///11", ACTMOD(ACT_LOAD_CLIP, 11)),
-		SHORTCUTs("<shift>F11"),
+		SHORTCUT(F11, S),
 	MENUITEMs("///12", ACTMOD(ACT_LOAD_CLIP, 12)),
-		SHORTCUTs("<shift>F12"),
+		SHORTCUT(F12, S),
 	WDONE,
 	SUBMENU(_("//Save Clipboard")),
 	MENUTEAR, ///
 	MENUITEMs("///1", ACTMOD(ACT_SAVE_CLIP, 1)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F1"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F1, C),
 	MENUITEMs("///2", ACTMOD(ACT_SAVE_CLIP, 2)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F2"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F2, C),
 	MENUITEMs("///3", ACTMOD(ACT_SAVE_CLIP, 3)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F3"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F3, C),
 	MENUITEMs("///4", ACTMOD(ACT_SAVE_CLIP, 4)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F4"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F4, C),
 	MENUITEMs("///5", ACTMOD(ACT_SAVE_CLIP, 5)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F5"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F5, C),
 	MENUITEMs("///6", ACTMOD(ACT_SAVE_CLIP, 6)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F6"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F6, C),
 	MENUITEMs("///7", ACTMOD(ACT_SAVE_CLIP, 7)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F7"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F7, C),
 	MENUITEMs("///8", ACTMOD(ACT_SAVE_CLIP, 8)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F8"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F8, C),
 	MENUITEMs("///9", ACTMOD(ACT_SAVE_CLIP, 9)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F9"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F9, C),
 	MENUITEMs("///10", ACTMOD(ACT_SAVE_CLIP, 10)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F10"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F10, C),
 	MENUITEMs("///11", ACTMOD(ACT_SAVE_CLIP, 11)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F11"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F11, C),
 	MENUITEMs("///12", ACTMOD(ACT_SAVE_CLIP, 12)),
-		ACTMAP(NEED_CLIP), SHORTCUTs("<control>F12"),
+		ACTMAP(NEED_CLIP), SHORTCUT(F12, C),
 	WDONE,
 	MENUITEM(_("//Import Clipboard from System"), ACTMOD(ACT_LOAD_CLIP, -1)),
 	MENUITEM(_("//Export Clipboard to System"), ACTMOD(ACT_SAVE_CLIP, -1)),
 		ACTMAP(NEED_CLIP),
 	MENUSEP, //
 	MENUITEM(_("//Choose Pattern ..."), ACTMOD(DLG_CHOOSER, CHOOSE_PATTERN)),
-		SHORTCUTs("F2"),
+		SHORTCUT(F2, 0),
 	MENUITEM(_("//Choose Brush ..."), ACTMOD(DLG_CHOOSER, CHOOSE_BRUSH)),
-		SHORTCUTs("F3"),
+		SHORTCUT(F3, 0),
 	MENUITEMs(_("//Choose Colour ..."), ACTMOD(DLG_CHOOSER, CHOOSE_COLOR)),
-		SHORTCUTs("E"),
+		SHORTCUT(e, 0),
 	// for scripting
 	uMENUITEMs("//layers", ACTMOD(ACT_SCRIPT, TOOLBAR_LAYERS)),
 	uMENUITEMs("//settings", ACTMOD(ACT_SCRIPT, TOOLBAR_SETTINGS)),
@@ -4405,41 +4335,43 @@ static void *main_menu_code[] = {
 	SSUBMENU(_("/_View")),
 	MENUTEAR, //
 	MENUCHECKv(_("//Show Main Toolbar"), ACTMOD(ACT_TBAR, TOOLBAR_MAIN),
-		toolbar_status[TOOLBAR_MAIN]), SHORTCUTs("F5"),
+		toolbar_status[TOOLBAR_MAIN]), SHORTCUT(F5, 0),
 	MENUCHECKv(_("//Show Tools Toolbar"), ACTMOD(ACT_TBAR, TOOLBAR_TOOLS),
-		toolbar_status[TOOLBAR_TOOLS]), SHORTCUTs("F6"),
+		toolbar_status[TOOLBAR_TOOLS]), SHORTCUT(F6, 0),
 	REFv(menu_slots[MENU_TBSET]),
 	MENUCHECKv(_("//Show Settings Toolbar"), ACTMOD(ACT_TBAR, TOOLBAR_SETTINGS),
-		toolbar_status[TOOLBAR_SETTINGS]), SHORTCUTs("F7"),
+		toolbar_status[TOOLBAR_SETTINGS]), SHORTCUT(F7, 0),
 	REFv(menu_slots[MENU_DOCK]),
 	MENUCHECKv(_("//Show Dock"), ACTMOD(ACT_DOCK, 0), show_dock),
-		SHORTCUTs("F12"), MTRIGGER(menu_action), // to show dock initially
+		SHORTCUT(F12, 0), MTRIGGER(menu_action), // to show dock initially
 	MENUCHECKv(_("//Show Palette"), ACTMOD(ACT_TBAR, TOOLBAR_PALETTE),
-		toolbar_status[TOOLBAR_PALETTE]), SHORTCUTs("F8"),
+		toolbar_status[TOOLBAR_PALETTE]), SHORTCUT(F8, 0),
 	MENUCHECKv(_("//Show Status Bar"), ACTMOD(ACT_TBAR, TOOLBAR_STATUS),
 		toolbar_status[TOOLBAR_STATUS]),
 	MENUSEP, //
 	MENUITEM(_("//Toggle Image View"), ACTMOD(ACT_VIEW, 0)),
-		SHORTCUTs("Home"),
+		SHORTCUT(Home, 0), SHORTCUT(Home, C), SHORTCUT(Home, S),
+		SHORTCUT(Home, A), SHORTCUT(Home, CS), SHORTCUT(Home, CA),
+		SHORTCUT(Home, SA), SHORTCUT(Home, CSA),
 	MENUCHECKv(_("//Centralize Image"), ACTMOD(ACT_CENTER, 0), canvas_image_centre),
 	MENUCHECKv(_("//Show Zoom Grid"), ACTMOD(ACT_GRID, 0), mem_show_grid),
 	MENUCHECKvs(_("//Snap To Tile Grid"), ACTMOD(ACT_SNAP, 0), tgrid_snap),
-		SHORTCUTs("B"),
+		SHORTCUT(b, 0),
 	MENUITEM(_("//Configure Grid ..."), ACTMOD(DLG_COLORS, COLSEL_GRID)),
 	MENUITEM(_("//Tracing Image ..."), ACTMOD(DLG_TRACE, 0)),
 	MENUSEP, //
 	REFv(menu_slots[MENU_VIEW]),
 	MENUCHECKv(_("//View Window"), ACTMOD(ACT_VWWIN, 0), menu_view),
-		SHORTCUTs("V"),
+		SHORTCUT(v, 0),
 	MENUCHECKv(_("//Horizontal Split"), ACTMOD(ACT_VWSPLIT, 0), view_vsplit),
-		SHORTCUTs("H"),
+		SHORTCUT(h, 0),
 	MENUCHECKv(_("//Focus View Window"), ACTMOD(ACT_VWFOCUS, 0), vw_focus_on),
 	MENUSEP, //
 	MENUITEMi(_("//Pan Window"), ACTMOD(ACT_PAN, 0), XPM_ICON(pan)),
-		SHORTCUTs("End"),
+		SHORTCUT(End, 0),
 	REFv(menu_slots[MENU_LAYER]),
 	MENUCHECKv(_("//Layers Window"), ACTMOD(DLG_LAYERS, 0), menu_layer),
-		SHORTCUTs("L"),
+		SHORTCUT(l, 0),
 	WDONE,
 	SSUBMENU(_("/_Image")),
 	MENUTEAR, //
@@ -4449,15 +4381,15 @@ static void *main_menu_code[] = {
 		ACTMAP(NEED_24),
 	MENUSEP, //
 	MENUITEMs(_("//Scale Canvas ..."), ACTMOD(DLG_SCALE, 0)),
-		SHORTCUTs("Page_Up"),
+		SHORTCUT(Page_Up, 0),
 	MENUITEMs(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
-		SHORTCUTs("Page_Down"),
+		SHORTCUT(Page_Down, 0),
 	MENUITEMs(_("//Crop"), ACTMOD(ACT_CROP, 0)),
-		ACTMAP(NEED_CROP), SHORTCUTs("<control><shift>X"),
+		ACTMAP(NEED_CROP), SHORTCUT(x, CS), SHORTCUT(Delete, 0),
 	MENUSEP, //
 	MENUITEMs(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
 	MENUITEMs(_("//Flip Horizontally"), ACTMOD(ACT_FLIP_H, 0)),
-		SHORTCUTs("<control>M"),
+		SHORTCUT(m, C),
 	uMENUITEMs("//rotate", ACTMOD(DLG_ROTATE, 0)), // for scripting
 	MENUITEMs(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
 	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
@@ -4470,30 +4402,30 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Script ..."), ACTMOD(DLG_SCRIPT, 0)),
 	MENUSEP, //
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
-		SHORTCUTs("<control>I"),
+		SHORTCUT(i, C),
 	REFv(menu_slots[MENU_PREFS]),
 	MENUITEM(_("//Preferences ..."), ACTMOD(DLG_PREFS, 0)),
-		SHORTCUTs("<control>P"),
+		SHORTCUT(p, C),
 	WDONE,
 	SSUBMENU(_("/_Selection")),
 	MENUTEAR, //
 	MENUITEMs(_("//Select All"), ACTMOD(ACT_SELECT, 1)),
-		SHORTCUTs("<control>A"),
+		SHORTCUT(a, C),
 	MENUITEMs(_("//Select None (Esc)"), ACTMOD(ACT_SELECT, 0)),
-		ACTMAP(NEED_MARQ), SHORTCUTs("<shift><control>A"),
+		ACTMAP(NEED_MARQ), SHORTCUT(a, CS),
 	MENUITEMis(_("//Lasso Selection"), ACTMOD(ACT_LASSO, 0), XPM_ICON(lasso)),
-		ACTMAP(NEED_LAS2), SHORTCUTs("J"),
+		ACTMAP(NEED_LAS2), SHORTCUT(j, 0),
 	MENUITEMs(_("//Lasso Selection Cut"), ACTMOD(ACT_LASSO, 1)),
 		ACTMAP(NEED_LASSO),
 	MENUSEP, //
 	MENUITEMis(_("//Outline Selection"), ACTMOD(ACT_OUTLINE, 0), XPM_ICON(rect1)),
-		ACTMAP(NEED_SEL2), SHORTCUTs("<control>T"),
+		ACTMAP(NEED_SEL2), SHORTCUT(t, C),
 	MENUITEMis(_("//Fill Selection"), ACTMOD(ACT_OUTLINE, 1), XPM_ICON(rect2)),
-		ACTMAP(NEED_SEL2), SHORTCUTs("<shift><control>T"),
+		ACTMAP(NEED_SEL2), SHORTCUT(t, CS),
 	MENUITEMis(_("//Outline Ellipse"), ACTMOD(ACT_ELLIPSE, 0), XPM_ICON(ellipse2)),
-		ACTMAP(NEED_SEL), SHORTCUTs("<control>L"),
+		ACTMAP(NEED_SEL), SHORTCUT(l, C),
 	MENUITEMis(_("//Fill Ellipse"), ACTMOD(ACT_ELLIPSE, 1), XPM_ICON(ellipse)),
-		ACTMAP(NEED_SEL), SHORTCUTs("<shift><control>L"),
+		ACTMAP(NEED_SEL), SHORTCUT(l, CS),
 	MENUSEP, //
 	MENUITEMis(_("//Flip Vertically"), ACTMOD(ACT_SEL_FLIP_V, 0), XPM_ICON(flip_vs)),
 		ACTMAP(NEED_CLIP),
@@ -4534,13 +4466,13 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Mask None"), ACTMOD(ACT_PAL_MASK, 0)),
 	MENUSEP, //
 	MENUITEMs(_("//Swap A & B"), ACTMOD(ACT_SWAP_AB, 0)),
-		SHORTCUTs("X"),
+		SHORTCUT(x, 0),
 	MENUITEMs(_("//Edit Colour A & B ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_AB)),
-		SHORTCUTs("<control>E"),
+		SHORTCUT(e, C),
 	MENUITEMs(_("//Dither A"), ACTMOD(ACT_DITHER_A, 0)),
 		ACTMAP(NEED_24),
 	MENUITEMs(_("//Palette Editor ..."), ACTMOD(DLG_COLORS, COLSEL_EDIT_ALL)),
-		SHORTCUTs("<control>W"),
+		SHORTCUT(w, C),
 	MENUITEMs(_("//Set Palette Size ..."), ACTMOD(DLG_PAL_SIZE, 0)),
 	MENUITEMs(_("//Merge Duplicate Colours"), ACTMOD(ACT_PAL_MERGE, 0)),
 		ACTMAP(NEED_IDX),
@@ -4557,13 +4489,13 @@ static void *main_menu_code[] = {
 	SSUBMENU(_("/Effe_cts")),
 	MENUTEAR, //
 	MENUITEMis(_("//Transform Colour ..."), ACTMOD(DLG_BRCOSA, 0), XPM_ICON(brcosa)),
-		SHORTCUTs("<control><shift>C"),
+		SHORTCUT(c, CS), SHORTCUT(Insert, 0),
 	MENUITEMs(_("//Invert"), ACTMOD(FILT_INVERT, 0)),
-		SHORTCUTs("<control><shift>I"),
+		SHORTCUT(i, CS),
 	MENUITEMs(_("//Greyscale"), ACTMOD(FILT_GREY, 0)),
-		SHORTCUTs("<control>G"),
+		SHORTCUT(g, C),
 	MENUITEMs(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
-		SHORTCUTs("<control><shift>G"),
+		SHORTCUT(g, CS),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///
 	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
@@ -4606,20 +4538,20 @@ static void *main_menu_code[] = {
 	MENUSEP, //
 	REFv(menu_slots[MENU_CHAN0]),
 	MENURITEMvs(_("//Edit Image"), ACTMOD(ACT_CHANNEL, CHN_IMAGE), menu_chan),
-		SHORTCUTs("<shift>1"),
+		SHORTCUT(1, S), SHORTCUT(KP_1, S),
 	REFv(menu_slots[MENU_CHAN1]),
 	MENURITEMvs(_("//Edit Alpha"), ACTMOD(ACT_CHANNEL, CHN_ALPHA), menu_chan),
-		SHORTCUTs("<shift>2"),
+		SHORTCUT(2, S), SHORTCUT(KP_2, S),
 	REFv(menu_slots[MENU_CHAN2]),
 	MENURITEMvs(_("//Edit Selection"), ACTMOD(ACT_CHANNEL, CHN_SEL), menu_chan),
-		SHORTCUTs("<shift>3"),
+		SHORTCUT(3, S), SHORTCUT(KP_3, S),
 	REFv(menu_slots[MENU_CHAN3]),
 	MENURITEMvs(_("//Edit Mask"), ACTMOD(ACT_CHANNEL, CHN_MASK), menu_chan),
-		SHORTCUTs("<shift>4"),
+		SHORTCUT(4, S), SHORTCUT(KP_4, S),
 	MENUSEP, //
 	REFv(menu_slots[MENU_DCHAN0]),
 	MENUCHECKv(_("//Hide Image"), ACTMOD(ACT_SET_OVERLAY, 1), hide_image),
-		SHORTCUTs("<control>H"),
+		SHORTCUT(h, C),
 	REFv(menu_slots[MENU_DCHAN1]),
 	MENUCHECKvs(_("//Disable Alpha"), ACTMOD(ACT_CHN_DIS, CHN_ALPHA),
 		channel_dis[CHN_ALPHA]),
@@ -4643,7 +4575,7 @@ static void *main_menu_code[] = {
 	MENUTEAR, //
 	MENUITEMis(_("//New Layer"), ACTMOD(ACT_LR_ADD, LR_NEW), XPM_ICON(new)),
 	MENUITEMis(_("//Save"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
-		SHORTCUTs("<shift><control>S"),
+		SHORTCUT(s, CS),
 	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
 	MENUITEMs(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
 	MENUITEMs(_("//Composite to New Layer"), ACTMOD(ACT_LR_ADD, LR_COMP)),
@@ -4660,8 +4592,9 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Documentation"), ACTMOD(ACT_DOCS, 0)),
 	REFv(menu_slots[MENU_HELP]),
 	MENUITEM(_("//About"), ACTMOD(DLG_ABOUT, 0)),
-		SHORTCUTs("F1"),
+		SHORTCUT(F1, 0),
 	MENUSEP, //
+	MENUITEM(_("//Keyboard Shortcuts ..."), ACTMOD(DLG_KEYS, 0)),
 	MENUITEM(_("//Rebind Shortcut Keycodes"), ACTMOD(ACT_REBIND_KEYS, 0)),
 	WDONE,
 	SMDONE, // smartmenu
@@ -4729,6 +4662,9 @@ static void *main_code[] = {
 	 * move as a move, so have to do some non-default processing - WJ */
 	DRAGDROPm(drop, NULL, parse_drag),
 	WXYWH("window", 630, 400),
+///	KEYMAP
+	REFv(main_keys), KEYMAP(keyslot, "main"),
+	CALL(keylist_code),
 	REFv(dock_area), DOCK("dockSize"),
 ///	MENU
 	CALL(main_menu_code),
@@ -4822,8 +4758,6 @@ void main_init()
 	show_dock |= inifile_get_gboolean("showDock", FALSE);
 	main_window_ = run_create_(main_code, &tdata, sizeof(tdata), script_cmds);
 
-	mapped_item_state(0);
-
 	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
 	update_recent_files();
 
@@ -4843,8 +4777,6 @@ void main_init()
 	if (cmd_mode) return;
 
 	cmd_showhide(main_window_, TRUE);
-	/* !!! Have to wait till canvas is displayed, to init keyboard */
-	fill_keycodes(main_keys);
 
 	if (viewer_mode) toggle_view();
 	else toolbar_showhide();

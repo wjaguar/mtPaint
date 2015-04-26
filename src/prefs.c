@@ -497,3 +497,178 @@ void init_tablet()				// Set up variables
 		}
 	}
 }
+
+///	KEYMAPPER WINDOW
+
+typedef struct {
+	keymap_dd *km;
+	char **slots, **keys, **ext;
+	char **keylist;
+	char *newkey;
+	void **sel, **keyb, **keysel, **add, **remove;
+	int slot, nslots, csize;
+	int key, nkeys, lsize;
+} keysel_dd;
+
+static void refresh_keys(keysel_dd *dt)
+{
+	key_dd *kd;
+	int i = dt->km->nkeys, j = 0, n = dt->slot, l = dt->km->nkeys;
+
+	for (kd = dt->km->keys , i = l; i-- > 0; kd++)
+		if (kd->slot - 1 == n) dt->keylist[j++] = kd->name;
+	dt->nkeys = j;
+	cmd_reset(dt->keysel, dt);
+	cmd_sensitive(dt->add, l < dt->km->maxkeys);
+	cmd_sensitive(dt->remove, j);
+}
+
+static void slot_select(keysel_dd *dt, void **wdata, int what, void **where)
+{
+	key_dd *kd;
+	int i, j, l = dt->km->nkeys;
+
+	cmd_read(where, dt);
+
+	/* Init */
+	if (dt->nslots < dt->km->nslots)
+	{
+		dt->nslots = dt->km->nslots;
+		for (kd = dt->km->keys , i = l; i-- > 0; kd++)
+		{
+			if ((j = kd->slot - 1) < 0) continue;
+			if (dt->keys[j]) dt->ext[j] = ">>>";
+			else dt->keys[j] = kd->name;
+		}
+		cmd_reset(origin_slot(where), dt);
+	}
+
+	/* Collect keys for this row */
+	dt->key = 0;
+	refresh_keys(dt);
+}
+
+static void addrem_evt(keysel_dd *dt, void **wdata, int what, void **where)
+{
+	key_dd *kd;
+	char *name, *msg;
+	int i, j, l, m, old, add = origin_slot(where) == dt->add;
+
+	/* Get */
+	name = dt->keylist[dt->key]; // Default is remove
+	if (add)
+	{
+		cmd_read(dt->keyb, dt);
+		name = dt->newkey;
+		if (!name) return; // No key yet
+	}
+
+	/* Find */
+	l = dt->km->nkeys;
+	kd = dt->km->keys;
+	for (i = 0; i < l; i++) if (kd[i].name == name) break;
+
+	/* Check */
+	m = old = dt->slot + 1;
+	if ((i < l) && add && (old = kd[i].slot))
+	{
+		if (old < 0)
+		{
+			alert_box(_("Error"), _("This key is builtin"), NULL);
+			return;
+		}
+		msg = g_strdup_printf(__("This key is mapped to:\n\"%s\""),
+			dt->slots[old - 1]);
+		j = alert_box(_("Warning"), msg, _("Cancel"),
+			old != m ? _("Remap") : NULL, NULL);
+		g_free(msg);
+		if (j != 2) return;
+	}
+
+	/* Delete */
+	if (i < l) memmove(kd + i, kd + i + 1, sizeof(*kd) * (--l - i));
+
+	/* Insert */
+	if (add)
+	{
+		kd += l++;
+		kd->name = name;
+		kd->slot = m;
+	}
+
+	/* Update */
+	dt->km->nkeys = l;
+
+	/* Refresh */
+	old--; m--;
+	dt->ext[old] = dt->keys[old] = dt->ext[m] = dt->keys[m] = NULL;
+	for (kd = dt->km->keys , i = l; i-- > 0; kd++)
+	{
+		j = kd->slot - 1;
+		if ((j != old) && (j != m)) continue;
+		if (dt->keys[j]) dt->ext[j] = ">>>";
+		else dt->keys[j] = kd->name;
+	}
+	cmd_setv(dt->sel, (void *)m, LISTC_RESET_ROW);
+	if (old != m) cmd_setv(dt->sel, (void *)old, LISTC_RESET_ROW);
+	refresh_keys(dt);
+}
+
+static void done_evt(keysel_dd *dt, void **wdata, int what)
+{
+	if (what != op_EVT_CANCEL) // OK/Apply
+		cmd_setv(main_keys, dt->km, KEYMAP_MAP);
+
+	if (what != op_EVT_CLICK) // OK/Cancel
+		run_destroy(wdata);
+}
+
+#define WBbase keysel_dd
+static void *keysel_code[] = {
+	WINDOWm(_("Keyboard Shortcuts")),
+	MKSHRINK,
+//	WXYWH("keysel_window", 600, 400),
+	TALLOC(keys, csize), TALLOC(ext, csize),
+	TALLOC(keylist, lsize),
+
+	BORDER(SCROLL, 0), BORDER(BUTTON, 0),
+	XHBOXBS,
+	XSCROLL(1, 2), // auto/always
+	WANTMAXW, // max width
+	WLIST,
+	PTXTCOLUMNp(slots, sizeof(char *), 0, 0),
+	PTXTCOLUMNp(keys, sizeof(char *), 0, 0),
+	PTXTCOLUMNp(ext, sizeof(char *), 0, 0),
+	REF(sel), LISTCu(slot, nslots, slot_select), TRIGGER,
+	VBOXS,
+	REF(keyb), KEYBUTTON(newkey),
+	MINWIDTH(150),
+	XSCROLL(1, 1), // auto/auto
+	WLIST,
+	PTXTCOLUMNp(keylist, sizeof(char *), 0, 0),
+	REF(keysel), LISTCu(key, nkeys, NULL),
+	REF(add), UBUTTON(_("Add"), addrem_evt),
+	REF(remove), UBUTTON(_("Remove"), addrem_evt),
+	WDONE, // XVBOX
+	WDONE, // XHBOX
+
+	DEFBORDER(BUTTON),
+	OKBOX3(_("OK"), done_evt, _("Cancel"), done_evt, _("Apply"), done_evt),
+	CLEANUP(km),
+	WSHOW
+};
+#undef WBbase
+
+void keys_selector()
+{
+	keysel_dd tdata;
+
+	memset(&tdata, 0, sizeof(tdata));
+	cmd_peekv(main_keys, &tdata.km, sizeof(tdata.km), KEYMAP_MAP);
+
+	tdata.slots = tdata.km->slotnames + 1;
+	tdata.csize = tdata.km->nslots * sizeof(char *);
+	tdata.lsize = tdata.km->maxkeys * sizeof(char *);
+
+	run_create(keysel_code, &tdata, sizeof(tdata));
+}

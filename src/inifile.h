@@ -1,5 +1,5 @@
 /*	inifile.h
-	Copyright (C) 2007-2014 Dmitry Groshev
+	Copyright (C) 2007-2015 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -18,18 +18,29 @@
 */
 
 typedef struct {
-	int sec, key, defv;
-	char *value;
+	char *key, *value, *defv;
+	int sec, chain;
 	short type, flags;
 } inislot;
 
 typedef struct {
-	char *sblock[3];
+	char *sblocks;
 	inislot *slots;
 	gint32 *hash;
 	int count, slen, maxloop;
 	guint32 hmask, seed[2];
 } inifile;
+
+/* Access macros */
+
+#define INI_KEY(P,N)  ((P)->slots[(N)].key)
+#define INI_VALUE(P,N)  ((P)->slots[(N)].value)
+#define INI_PARENT(P,N) ((P)->slots[(N)].sec)
+
+/* Iterator macros */
+
+#define INI_FIRST(P,N) ((int)(P)->slots[(N)].defv)
+#define INI_NEXT(P,N) ((P)->slots[(N)].chain)
 
 /* Core functions */
 
@@ -41,17 +52,21 @@ int write_ini(inifile *inip, char *fname, char *header);
 int ini_setstr(inifile *inip, int section, char *key, char *value);
 int ini_setint(inifile *inip, int section, char *key, int value);
 int ini_setbool(inifile *inip, int section, char *key, int value);
+int ini_setref(inifile *inip, int section, char *key, int value);
 
 char *ini_getstr(inifile *inip, int section, char *key, char *defv);
 int ini_getint(inifile *inip, int section, char *key, int defv);
 int ini_getbool(inifile *inip, int section, char *key, int defv);
+int ini_getref(inifile *inip, int section, char *key, int defv);
 
 int ini_setsection(inifile *inip, int section, char *key);
 int ini_getsection(inifile *inip, int section, char *key);
 
+int ini_transient(inifile *inip, int section, char *key);
+
 /* File functions */
 
-char *slurp_file(char *fname);
+char *slurp_file(char *fname, int before);
 char *get_home_directory(void);
 char *extend_path(const char *path);
 
@@ -60,6 +75,8 @@ char *extend_path(const char *path);
 int str2bool(const char *s);
 
 /* Compatibility functions */
+
+inifile main_ini;
 
 void inifile_init(char *system_ini, char *user_ini);
 void inifile_quit();

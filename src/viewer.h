@@ -1,5 +1,5 @@
 /*	viewer.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -51,5 +51,8 @@ void vw_focus_idle();						// Same but done in idle cycles
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom );
 void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align);
+
+int comp_need_alpha(int ftype);					// Need RGBA compositing
+void collect_alpha(unsigned char *alpha, int pw, int ph);	// Composite alpha channel
 
 void vw_configure();

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.91"
-MT_DATE="2015-04-05"
+MT_V="3.44.92"
+MT_DATE="2015-04-26"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO

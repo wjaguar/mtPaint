@@ -127,6 +127,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_SEGMENT,
 	DLG_SCRIPT,
 	DLG_LASSO,
+	DLG_KEYS,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -152,7 +153,8 @@ enum { // To let constants renumber themselves when adding new ones
 #define LR_PASTE 2
 #define LR_COMP  3
 
-int wtf_pressed(key_ext *key);
+int key_action(key_ext *key, int toggle);
+#define wtf_pressed(X) key_action((X), FALSE)
 void action_dispatch(int action, int mode, int state, int kbd);
 
 /* Widget dependence flags */
@@ -173,9 +175,6 @@ void action_dispatch(int action, int mode, int state, int kbd);
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 #define NEED_PSEL  (NEED_MARQ | NEED_PCLIP)
 #define NEED_LAS2  (NEED_LASSO | NEED_PCLIP)
-
-void mapped_dis_add(void **slot, int actmap);
-void mapped_item_state(int statemap);	// Change state of preset menu items
 
 /* Notable menu items */
 enum {
@@ -276,7 +275,7 @@ char *cspnames[NUM_CSPACES];
 char *channames_[NUM_CHANNELS + 1];
 char *cspnames_[NUM_CSPACES];
 
-void **main_window_, **settings_dock, **layers_dock, **main_split,
+void **main_window_, **main_keys, **settings_dock, **layers_dock, **main_split,
 	**drawing_canvas, **scrolledwindow_canvas,
 	**menu_slots[TOTAL_MENU_IDS];
 

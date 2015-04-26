@@ -336,12 +336,11 @@ static void layer_show_position()
 void layer_show_trans()
 {
 	layers_dd *dt = GET_DDATA(layers_box_);
-	int n = layer_selected ? mem_xpm_trans : -1;
 
-	if (dt->trans != n)
+	if (dt->trans != mem_xpm_trans)
 	{
 		dt->lock++;
-		cmd_set(dt->trspin, n);
+		cmd_set(dt->trspin, mem_xpm_trans);
 		dt->lock--;
 	}
 }
@@ -702,15 +701,22 @@ int layer_save_composite(char *fname, ls_settings *settings)
 {
 	image_info *image;
 	unsigned char *layer_rgb;
-	int w, h, res=0;
+	int w, h, res = 0, tf = comp_need_alpha(settings->ftype);
 
 	image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
 	w = image->width;
 	h = image->height;
-	layer_rgb = calloc(1, w * h * 3);
+	layer_rgb = calloc(1, w * h * (3 + !!tf));
 	if (layer_rgb)
 	{
 		view_render_rgb(layer_rgb, 0, 0, w, h, 1);	// Render layer
+		if (tf)
+		{
+			unsigned char *alpha = layer_rgb + w * h * 3;
+			collect_alpha(alpha, w, h);
+			mem_demultiply(layer_rgb, alpha, w * h, 3);
+			settings->img[CHN_ALPHA] = alpha;
+		}
 		settings->img[CHN_IMAGE] = layer_rgb;
 		settings->width = w;
 		settings->height = h;
@@ -720,13 +726,11 @@ int layer_save_composite(char *fname, ls_settings *settings)
 			settings->x = layer_table[0].x;
 			settings->y = layer_table[0].y;
 		}
-		if (layer_selected) /* Set up transparency correctly */
+		/* Set up palette to go with transparency */
+		if (settings->xpm_trans >= 0)
 		{
-			res = image->trans;
-			settings->xpm_trans = res;
-			settings->rgb_trans = res < 0 ? -1 :
-				PNG_2_INT(image->pal[res]);
-
+			settings->pal = image->pal;
+			settings->colors = image->cols;
 		}
 		res = save_image(fname, settings);
 		free( layer_rgb );
@@ -741,16 +745,24 @@ void layer_add_composite()
 	layer_image *lim;
 	image_info *image = layer_selected ? &layer_table[0].image->image_ :
 		&mem_image;
+	unsigned char **img;
+	int w = image->width, h = image->height;
 
 	if (layers_total >= MAX_LAYERS) return;
-	if (layer_add(image->width, image->height, 3, image->cols, image->pal,
-		CMASK_IMAGE))
+	if (layer_add(w, h, 3, image->cols, image->pal,
+		comp_need_alpha(FT_NONE) ? CMASK_RGBA : CMASK_IMAGE))
 	{
 		/* Render to an invisible layer */
 		layer_table[layers_total].visible = FALSE;
 		lim = layer_table[layers_total].image;
-		view_render_rgb(lim->image_.img[CHN_IMAGE], 0, 0,
-			image->width, image->height, 1);
+		img = lim->image_.img;
+		view_render_rgb(img[CHN_IMAGE], 0, 0, w, h, 1);
+		/* Add alpha if wanted */
+		if (img[CHN_ALPHA])
+		{
+			collect_alpha(img[CHN_ALPHA], w, h);
+			mem_demultiply(img[CHN_IMAGE], img[CHN_ALPHA], w * h, 3);
+		}
 		/* Copy background's transparency and position */
 		lim->image_.trans = image->trans;
 		layer_table[layers_total].x = layer_table[0].x;
@@ -920,10 +932,8 @@ static void layer_select(layers_dd *dt, void **wdata, int what, void **where)
 	// Disable new/duplicate if we have max layers
 	cmd_sensitive(dt->ltb_new, layers_total < MAX_LAYERS);
 	cmd_sensitive(dt->ltb_dup, layers_total < MAX_LAYERS);
-	cmd_sensitive(dt->trspin, j);
-	cmd_sensitive(dt->opslider, j);
 
-	cmd_set(dt->opslider, j ? t->opacity : 100);
+	cmd_set(dt->opslider, t->opacity);
 	layer_show_position();
 	layer_show_trans();
 
@@ -1062,7 +1072,7 @@ static void *layers_code[] = {
 	WLIST,
 	IDXCOLUMN(0, 1, 40, 1), // center
 	XTXTCOLUMNv(layer_table[0].name, sizeof(layer_table[0]), 0, 0), // left
-	CHKCOLUMNi0v(layer_table[0].visible, sizeof(layer_table[0]), 0, 0,
+	CHKCOLUMNv(layer_table[0].visible, sizeof(layer_table[0]), 0, 0,
 		layer_tog_visible),
 	REF(llist), LISTCCHr(nlayer, lnum, MAX_LAYERS + 1, layer_select), TRIGGER,
 	BORDER(TOOLBAR, 0),

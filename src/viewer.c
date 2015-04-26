@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -419,7 +419,7 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	{
 		layer_node *t = layer_table + ll;
 
-		if (ll && !t->visible) continue;
+		if (!t->visible) continue;
 		i = t->x - dx;
 		j = t->y - dy;
 		image = ll == layer_selected ? &mem_image : &t->image->image_;
@@ -432,13 +432,8 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 			floor_div(ii * scale - 1, zoom) + 1,
 			floor_div(jj * scale - 1, zoom) + 1, cxy)) continue;
 
-		xpm = -1;
-		opac = 255;
-		if (t != layer_table) // above background
-		{
-			opac = (t->opacity * 255 + 50) / 100;
-			xpm = image->trans;
-		}
+		xpm = t != layer_table ? image->trans : -1; // above background
+		opac = (t->opacity * 255 + 50) / 100;
 		mw = rxy[2] - (mx = rxy[0]);
 		setup_row(mx, mw, czoom, image->width, xpm, opac, image->bpp, image->pal);
 		mh = rxy[3] - (my = rxy[1]);
@@ -475,6 +470,98 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 	/* Always align on background layer */
 	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
 	overlay_alpha = tmp;
+}
+
+////	COMPOSITE ALPHA
+
+int comp_need_alpha(int ftype)
+{
+	layer_node *t = layer_table;
+	image_info *image = layer_selected ? &t->image->image_ : &mem_image;
+	unsigned char *alpha = image->img[CHN_ALPHA];
+
+	/* Format has to support alpha */
+	ftype &= FTM_FTYPE;
+	if ((ftype != FT_NONE) && !(file_formats[ftype].flags & FF_ALPHAR))
+		return (FALSE);
+	/* Background has to not be solid */
+	return (!t->visible || (!opaque_view && ((t->opacity < 100) ||
+		(alpha && !is_filled(alpha, 255, image->width * image->height)))));
+}
+
+void collect_alpha(unsigned char *alpha, int pw, int ph)
+{
+	int rxy[4], cxy[4] = { 0, 0, pw, ph };
+	unsigned char buf[MAX_WIDTH];
+	image_info *image;
+	unsigned char *tmp, *src, **img;
+	int i, j, k, ll, xpm, opac;
+	int dx, dy, ddx, ddy, mx, mw, my, mh, loc;
+
+	/* Align on background */
+	dx = layer_table[0].x;
+	dy = layer_table[0].y;
+
+	memset(alpha, 0, pw * ph);
+	for (ll = 0; ll <= layers_total; ll++)
+	{
+		layer_node *t = layer_table + ll;
+
+		if (!t->visible) continue;
+		i = t->x - dx;
+		j = t->y - dy;
+		image = ll == layer_selected ? &mem_image : &t->image->image_;
+		if (!clip(rxy, i, j, i + image->width, j + image->height, cxy))
+			continue;
+
+		xpm = t != layer_table ? image->trans : -1; // above background
+		if ((xpm > -1) && (image->bpp == 3))
+			xpm = PNG_2_INT(image->pal[xpm]);
+		opac = opaque_view ? 255 : (t->opacity * 255 + 50) / 100;
+		mw = rxy[2] - (mx = rxy[0]);
+		mh = rxy[3] - (my = rxy[1]);
+		tmp = alpha + my * pw + mx;
+		ddx = mx - i;
+		ddy = my - j;
+
+		img = image->img;
+		for (i = 0; i < mh; i++ , tmp += pw)
+		{
+			loc = (ddy + i) * image->width + ddx;
+			/* Prepare effective source alpha */
+			if (!img[CHN_ALPHA] || opaque_view) memset(buf, 255, mw);
+			else memcpy(buf, img[CHN_ALPHA] + loc, mw);
+			if (opaque_view); // Forced opaque
+			else if (image->bpp == 1) // Indexed
+			{
+				/* Force on-off transparency */
+				for (j = 0; j < mw; j++)
+					if (buf[j]) buf[j] = 255;
+				/* Apply transparent color */
+				if (xpm > -1)
+				{
+					src = img[CHN_IMAGE] + loc;
+					for (j = 0; j < mw; j++)
+						if (src[j] == xpm) buf[j] = 0;
+				}
+			}
+			else if (xpm > -1) // RGB with transparent color
+			{
+				src = img[CHN_IMAGE] + loc * 3;
+				for (j = 0; j < mw; j++)
+					if (MEM_2_INT(src, j * 3) == xpm) buf[j] = 0;
+			}
+
+			/* Mix into destination */
+			for (j = 0; j < mw; j++)
+			{
+				k = opac * buf[j];
+				k = (k + (k >> 8) + 1) >> 8;
+				k = (tmp[j] + k) * 255 - tmp[j] * k;
+				tmp[j] = (k + (k >> 8) + 1) >> 8;
+			}
+		}
+	}
 }
 
 static guint idle_focus;

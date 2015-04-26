@@ -735,7 +735,7 @@ static void font_index_load(char *filename)
 
 
 	font_mem = wjmemnew(0, 0);
-	font_text = slurp_file(filename);
+	font_text = slurp_file(filename, 1);
 	if (!font_mem || !font_text)
 	{
 		font_mem_clear();
