@@ -1532,17 +1532,16 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 	return (res);
 }
 
-#define FORMAT_SPINS 7
-
 typedef struct {
-	void **lsp[FORMAT_SPINS], **pathbox;
-	char *title, **ftnames;
+	void **pathbox;
+	char *title, **ftnames, **tiffnames;
 	char *frames_name;
 	int frames_ftype, frames_anim;
 	int mode, fpmode;
 	int fmask, ftype, ftypes[NUM_FTYPES];
 	int need_save, need_anim, need_undo, need_icc;
 	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
+	int tiff_m, lzma_c;
 	int gif_delay, undo, icc;
 	/* Note: filename is in system encoding */
 	char filename[PATHBUF];
@@ -1551,21 +1550,16 @@ typedef struct {
 static void change_image_format(fselector_dd *dt, void **wdata, int what,
 	void **where)
 {
-	static int flags[FORMAT_SPINS] = { FF_TRANS, FF_COMPJ, FF_COMPZ,
-		FF_COMPR, FF_COMPJ2, FF_SPOT, FF_SPOT };
-	int i, j, ftype, showhide;
+	int ftype;
+	unsigned int flags;
 
 	if (!dt->need_save) return; // no use
 	cmd_read(where, dt);
 	ftype = dt->ftypes[dt->ftype];
+	flags = ftype != FT_TIFF ? file_formats[ftype].flags :
+		tiff_formats[dt->tiff_m].flags;
 	/* Hide/show name/value widget pairs */
-	for (i = 0; i < FORMAT_SPINS; i++)
-	{
-		j = flags[i] & FF_COMP ? FF_COMP : flags[i];
-		showhide = (file_formats[ftype].flags & j) == flags[i];
-		cmd_showhide(dt->lsp[i], showhide);
-		cmd_showhide(NEXT_SLOT(dt->lsp[i]), showhide);
-	}
+	cmd_setv(wdata, (void *)flags, WDATA_ACTMAP);
 }
 
 // !!! GCC inlining this, is a waste of space
@@ -1606,6 +1600,23 @@ int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
 	return (j);
 }
 
+int tiff_type_selector(int mask, int def, char **names)
+{
+	int i, n;
+
+	for (n = i = 0; tiff_formats[i].name; i++)
+	{
+		names[i] = "";
+		if (tiff_formats[i].flags & mask)
+		{
+			names[i] = tiff_formats[i].name;
+			if (i == def) n = i;
+		}
+	}
+	names[i] = NULL;
+	return (n);
+}
+
 void init_ls_settings(ls_settings *settings, void **wdata)
 {
 	png_color *pal = mem_pal;
@@ -1619,6 +1630,8 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 	settings->req_w = settings->req_h = 0;
 	settings->jpeg_quality = jpeg_quality;
 	settings->png_compression = png_compression;
+	settings->lzma_preset = lzma_preset;
+	settings->tiff_type = -1; /* Use default */
 	settings->tga_RLE = tga_RLE;
 	settings->jp2_rate = jp2_rate;
 	settings->gif_delay = preserved_gif_delay;
@@ -1632,6 +1645,8 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 		settings->hot_y = dt->xy[0];
 		settings->jpeg_quality = dt->jpeg_c;
 		settings->png_compression = dt->png_c;
+		settings->lzma_preset = dt->lzma_c;
+		settings->tiff_type = dt->tiff_m;
 		settings->tga_RLE = dt->tga_c;
 		settings->jp2_rate = dt->jp2_c;
 		settings->gif_delay = dt->gif_delay;
@@ -1657,30 +1672,43 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 
 static void store_ls_settings(ls_settings *settings)
 {
-	unsigned int fflags = file_formats[settings->ftype].flags;
+	int ftype = settings->ftype, ttype = settings->tiff_type;
+	unsigned int fflags = (ftype == FT_TIFF) && (ttype >= 0) ?
+		tiff_formats[ttype].flags : file_formats[ftype].flags;
 
 	switch (settings->mode)
 	{
 	case FS_PNG_SAVE:
 		if (fflags & FF_TRANS)
 			mem_set_trans(settings->xpm_trans);
-		// Fallthrough
-	case FS_CHANNEL_SAVE:
-	case FS_COMPOSITE_SAVE:
 		if (fflags & FF_SPOT)
 		{
 			mem_xbm_hot_x = settings->hot_x;
 			mem_xbm_hot_y = settings->hot_y;
 		}
-		fflags &= FF_COMP;
-		if (fflags == FF_COMPJ)
+		// Fallthrough
+	case FS_CHANNEL_SAVE:
+	case FS_COMPOSITE_SAVE:
+		if (fflags & FF_COMPJ)
 			jpeg_quality = settings->jpeg_quality;
-		else if (fflags == FF_COMPZ)
+		if (fflags & (FF_COMPZ | FF_COMPZT))
 			png_compression = settings->png_compression;
-		else if (fflags == FF_COMPR)
+		if (fflags & FF_COMPLZ)
+			lzma_preset = settings->lzma_preset;
+		if (fflags & FF_COMPR)
 			tga_RLE = settings->tga_RLE;
-		else if (fflags == FF_COMPJ2)
+		if (fflags & FF_COMPJ2)
 			jp2_rate = settings->jp2_rate;
+		if ((fflags & FF_COMPT) && (ttype >= 0))
+		{
+			/* Remember selection for incompatible types separately;
+			 * image is not set up yet, so use the mode instead */
+			*(settings->mode == FS_COMPOSITE_SAVE ? &tiff_rtype :
+				(settings->mode == FS_CHANNEL_SAVE) &&
+				(mem_channel != CHN_IMAGE) ? &tiff_itype :
+				mem_img_bpp == 3 ? &tiff_rtype :
+				mem_cols > 2 ? &tiff_itype : &tiff_btype) = ttype;
+		}
 		break;
 	case FS_EXPORT_GIF:
 		preserved_gif_delay = settings->gif_delay;
@@ -1850,6 +1878,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 		break;
 	case FS_CHANNEL_SAVE:
 		if (check_file(dt->filename)) break;
+		store_ls_settings(&settings);	// Update data in memory
 		settings.img[CHN_IMAGE] = mem_img[mem_channel];
 		settings.width = mem_width;
 		settings.height = mem_height;
@@ -1872,6 +1901,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 		break;
 	case FS_COMPOSITE_SAVE:
 		if (check_file(dt->filename)) break;
+		store_ls_settings(&settings);	// Update data in memory
 		redo = 2;
 		if (layer_save_composite(dt->filename, &settings)) break;
 		redo = 0;
@@ -1910,17 +1940,27 @@ static void *fselector_code[] = {
 		OPTDe(ftnames, ftype, change_image_format), TRIGGER,
 	ENDIF(1),
 	IFx(need_save, 1),
-		REF(lsp[0]), MLABELr(_("Transparency index")), SPINa(xtrans),
-		REF(lsp[1]), MLABELr(_("JPEG Save Quality (100=High)")),
-			SPIN(jpeg_c, 0, 100),
-		REF(lsp[2]), MLABELr(_("PNG Compression (0=None)")),
-			SPIN(png_c, 0, 9),
-		REF(lsp[3]), MLABELr(_("TGA RLE Compression")),
-			SPIN(tga_c, 0, 1),
-		REF(lsp[4]), MLABELr(_("JPEG2000 Compression (0=Lossless)")),
-			SPIN(jp2_c, 0, 100),
-		REF(lsp[5]), MLABELr(_("Hotspot at X =")), SPINa(xx),
-		REF(lsp[6]), MLABELr(_("Y =")), SPINa(xy),
+		VISMASK(~0),
+		MLABELr(_("Transparency index")), ACTMAP(FF_TRANS),
+			SPINa(xtrans), ACTMAP(FF_TRANS),
+		MLABELr(_("TIFF Compression")), ACTMAP(FF_COMPT),
+		OPTDe(tiffnames, tiff_m, change_image_format), ACTMAP(FF_COMPT),
+		MLABELr(_("JPEG Save Quality (100=High)")), ACTMAP(FF_COMPJ),
+			SPIN(jpeg_c, 0, 100), ACTMAP(FF_COMPJ),
+		MLABELr(_("ZIP Compression (0=None)")), ACTMAP(FF_COMPZT),
+		MLABELr(_("PNG Compression (0=None)")), ACTMAP(FF_COMPZ),
+			SPIN(png_c, 0, 9), ACTMAP(FF_COMPZ | FF_COMPZT),
+			ALTNAME("ZIP Compression (0=None)"),
+		MLABELr(_("LZMA2 Compression (0=None)")), ACTMAP(FF_COMPLZ),
+			SPIN(lzma_c, 0, 9), ACTMAP(FF_COMPLZ),
+		MLABELr(_("TGA RLE Compression")), ACTMAP(FF_COMPR),
+			SPIN(tga_c, 0, 1), ACTMAP(FF_COMPR),
+		MLABELr(_("JPEG2000 Compression (0=Lossless)")), ACTMAP(FF_COMPJ2),
+			SPIN(jp2_c, 0, 100), ACTMAP(FF_COMPJ2),
+		MLABELr(_("Hotspot at X =")), ACTMAP(FF_SPOT),
+			SPINa(xx), ACTMAP(FF_SPOT),
+		MLABELr(_("Y =")), ACTMAP(FF_SPOT),
+			SPINa(xy), ACTMAP(FF_SPOT),
 	ENDIF(1),
 	IFx(need_anim, 1),
 		MLABEL(_("Animation delay")),
@@ -1940,7 +1980,7 @@ static void *fselector_code[] = {
 void file_selector_x(int action_type, void **xdata)
 {
 	fselector_dd tdata;
-	char *names[NUM_FTYPES + 1], *ext = NULL;
+	char *names[NUM_FTYPES + 1], *tiffnames[TIFF_MAX_TYPES], *ext = NULL;
 	int def = FT_PNG;
 
 
@@ -2069,12 +2109,15 @@ void file_selector_x(int action_type, void **xdata)
 		ext = ext ? ext + 1 : "";
 	}
 
-	/* Filetype selector */
+	/* Filetype selectors */
 	if (tdata.fmask)
 	{
 		tdata.ftype = ftype_selector(tdata.fmask, ext, def,
-			names, tdata.ftypes);
-		tdata.ftnames = names;
+			tdata.ftnames = names, tdata.ftypes);
+		tdata.tiff_m = tiff_type_selector(tdata.fmask,
+			tdata.fmask & FF_RGB ? tiff_rtype :
+			tdata.fmask & FF_BW ? tiff_btype : tiff_itype,
+			tdata.tiffnames = tiffnames);
 	}
 
 	tdata.xx[0] = mem_xbm_hot_x;
@@ -2088,6 +2131,7 @@ void file_selector_x(int action_type, void **xdata)
 	tdata.png_c = png_compression;
 	tdata.tga_c = tga_RLE;
 	tdata.jp2_c = jp2_rate;
+	tdata.lzma_c = lzma_preset;
 
 	tdata.gif_delay = preserved_gif_delay;
 	tdata.undo = undo_load;

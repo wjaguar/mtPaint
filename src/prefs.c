@@ -210,6 +210,7 @@ typedef struct {
 	int confx, centre, zoom;
 	int lang;
 	char *factor_str;
+	char **tiffrs, **tiffis, **tiffbs;
 	void **label_tablet_pressure;
 } pref_dd;
 
@@ -349,7 +350,21 @@ static void *pref_code[] = {
 	CHECKv(_("Apply colour profile"), apply_icc),
 #endif
 	WDONE,
-///	---- TAB4 - PATHS
+#ifdef U_TIFF
+///	---- TAB4 - TIFF
+	PAGE("TIFF"),
+	BORDER(OPT, 2),
+	TABLE2(4),
+// !!! Here also DPI (default)
+	TOPTDv(_("Compression (RGB)"), tiffrs, tiff_rtype),
+	TOPTDv(_("Compression (indexed)"), tiffis, tiff_itype),
+	TOPTDv(_("Compression (monochrome)"), tiffbs, tiff_btype),
+	TSPINv(_("LZMA2 Compression (0=None)"), lzma_preset, 0, 9),
+	WDONE,
+	CHECKv(_("Enable predictor"), tiff_predictor),
+	WDONE,
+#endif
+///	---- TAB5 - PATHS
 	PAGE(_("Paths")),
 	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
 		FS_CLIP_FILE, mem_clip_file),
@@ -366,7 +381,7 @@ static void *pref_code[] = {
 		FS_SELECT_FILE, DEFAULT_THEME_INI),
 #endif
 	WDONE,
-///	---- TAB5 - STATUS BAR
+///	---- TAB6 - STATUS BAR
 	PAGE(_("Status Bar")),
 	CHECKv(_("Canvas Geometry"), status_on[0]),
 	CHECKv(_("Cursor X,Y"), status_on[1]),
@@ -374,7 +389,7 @@ static void *pref_code[] = {
 	CHECKv(_("Selection Geometry"), status_on[3]),
 	CHECKv(_("Undo / Redo"), status_on[4]),
 	WDONE,
-///	---- TAB6 - TABLET
+///	---- TAB7 - TABLET
 	PAGE(_("Tablet")),
 	FVBOXB(_("Device Settings")),
 	BORDER(LABEL, 0),
@@ -410,16 +425,25 @@ static void *pref_code[] = {
 
 void pressed_preferences()
 {
+#ifdef U_TIFF
+	char *tiffts[3][TIFF_MAX_TYPES];
+#endif
 	char txt[128];
 	pref_dd tdata = { { mem_undo_depth & ~1, MIN_UNDO & ~1, MAX_UNDO & ~1 },
 		{ mem_xpm_trans, -1, mem_cols - 1 },
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
 		{ mem_xbm_hot_y, -1, mem_height - 1 },
 		FALSE, TRUE, FALSE,
-		0, txt, NULL };
+		0, txt,
+		NULL, NULL, NULL, NULL };
 
 	// Make sure the user can only open 1 prefs window
 	cmd_sensitive(menu_slots[MENU_PREFS], FALSE);
+#ifdef U_TIFF
+	tiff_rtype = tiff_type_selector(FF_RGB, tiff_rtype, tdata.tiffrs = tiffts[0]);
+	tiff_itype = tiff_type_selector(FF_256, tiff_itype, tdata.tiffis = tiffts[1]);
+	tiff_btype = tiff_type_selector(FF_BW,  tiff_btype, tdata.tiffbs = tiffts[2]);
+#endif
 #ifdef U_NLS
 	{
 		char *cur = inifile_get("languageSETTING", "system");

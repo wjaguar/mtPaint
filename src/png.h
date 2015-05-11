@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -67,31 +67,33 @@ enum {
 #define FTM_FRAMES  0x0400 /* Allow frameset use */
 
 /* Features supported by file formats */
-#define FF_BW      0x00001 /* Black and white */
-#define FF_16      0x00002 /* 16 colors */
-#define FF_256     0x00004 /* 256 colors */
-#define FF_IDX     0x00007 /* Indexed image */
-#define FF_RGB     0x00008 /* Truecolor */
-#define FF_IMAGE   0x0000F /* Image of any kind */
-#define FF_ANIM    0x00010 /* Animation */
-#define FF_ALPHAI  0x00020 /* Alpha channel for indexed images */
-#define FF_ALPHAR  0x00040 /* Alpha channel for RGB images */
-#define FF_ALPHA   0x00060 /* Alpha channel for all images */
-#define FF_MULTI   0x00080 /* Multiple channels */
-#define FF_TRANS   0x00100 /* Indexed transparency */
-#define FF_COMP    0x00E00 /* Configurable compression */
-#define FF_COMPJ   0x00200 /* JPEG compression */
-#define FF_COMPZ   0x00400 /* zlib compression */
-#define FF_COMPR   0x00600 /* RLE compression */
-#define FF_COMPJ2  0x00800 /* JPEG2000 compression */
-#define FF_SPOT    0x01000 /* "Hot spot" */
-#define FF_LAYER   0x02000 /* Layered images */
-#define FF_PALETTE 0x04000 /* Palette file (not image) */
-#define FF_RMEM    0x08000 /* Can be read from memory */
-#define FF_WMEM    0x10000 /* Can be written to memory */
-#define FF_MEM     0x18000 /* Both of the above */
-#define FF_NOSAVE  0x20000 /* Can be read but not written */
-#define FF_SCALE   0x40000 /* Freely scalable (vector format) */
+#define FF_BW      0x000001 /* Black and white */
+#define FF_16      0x000002 /* 16 colors */
+#define FF_256     0x000004 /* 256 colors */
+#define FF_IDX     0x000007 /* Indexed image */
+#define FF_RGB     0x000008 /* Truecolor */
+#define FF_IMAGE   0x00000F /* Image of any kind */
+#define FF_ANIM    0x000010 /* Animation */
+#define FF_ALPHAI  0x000020 /* Alpha channel for indexed images */
+#define FF_ALPHAR  0x000040 /* Alpha channel for RGB images */
+#define FF_ALPHA   0x000060 /* Alpha channel for all images */
+#define FF_MULTI   0x000080 /* Multiple channels */
+#define FF_TRANS   0x000100 /* Indexed transparency */
+#define FF_COMPJ   0x000200 /* JPEG compression */
+#define FF_COMPZ   0x000400 /* PNG zlib compression */
+#define FF_COMPR   0x000800 /* RLE compression */
+#define FF_COMPJ2  0x001000 /* JPEG2000 compression */
+#define FF_COMPZT  0x002000 /* TIFF deflate compression */
+#define FF_COMPLZ  0x004000 /* TIFF LZMA2 compression */
+#define FF_COMPT   0x008000 /* TIFF selectable compression */
+#define FF_SPOT    0x010000 /* "Hot spot" */
+#define FF_LAYER   0x020000 /* Layered images */
+#define FF_PALETTE 0x040000 /* Palette file (not image) */
+#define FF_RMEM    0x080000 /* Can be read from memory */
+#define FF_WMEM    0x100000 /* Can be written to memory */
+#define FF_MEM     0x180000 /* Both of the above */
+#define FF_NOSAVE  0x200000 /* Can be read but not written */
+#define FF_SCALE   0x400000 /* Freely scalable (vector format) */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -113,6 +115,17 @@ typedef struct {
 
 extern fformat file_formats[];
 
+#define TIFF_MAX_TYPES 9 /* Enough for NULL-terminated list of them all */
+
+typedef struct {
+	char *name;
+	int id;
+	unsigned int flags;
+	int pflag;
+} tiff_format;
+
+extern tiff_format tiff_formats[];
+
 /* All-in-one transport container for save/load */
 typedef struct {
 	/* Configuration data */
@@ -122,6 +135,8 @@ typedef struct {
 	int req_w, req_h; // Size request for scalable formats
 	int jpeg_quality;
 	int png_compression;
+	int lzma_preset;
+	int tiff_type;
 	int tga_RLE;
 	int jp2_rate;
 	int gif_delay;
@@ -139,6 +154,7 @@ typedef struct {
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int lzma_preset, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int apply_icc;
 
 int file_type_by_ext(char *name, guint32 mask);

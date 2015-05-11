@@ -84,6 +84,7 @@ typedef struct {
 	int xywh[4];	// Stored window position & size
 	int actn;	// Actmap slots count
 	int actmask;	// Last actmap mask
+	int vismask;	// Visibility mask
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
@@ -97,12 +98,15 @@ typedef struct {
 static void act_state(v_dd *vdata, int mask)
 {
 	void **map = vdata->actmap;
-	int i = vdata->actn;
+	int i, n, m, vm = vdata->vismask;
 
 	vdata->actmask = mask;
+	i = vdata->actn;
 	while (i-- > 0)
 	{
-		cmd_sensitive(map[0], !!((int)map[1] & mask));
+		n = (int)map[1];
+		if ((m = n & vm)) cmd_showhide(map[0], !!(m & mask));
+		if ((m = n & ~vm)) cmd_sensitive(map[0], !!(m & mask));
 		map += ACT_SIZE;
 	}
 }
@@ -2309,15 +2313,15 @@ typedef struct {
 	void **columns[MAX_COLS];	// column slots
 	void **r;			// slot
 	int ncol;			// columns
-	unsigned char idx[MAX_COLS];	// index vector
 } col_data;
 
 static void *get_cell(col_data *c, int row, int col)
 {
 	void **cp = c->columns[col][1];
 	char *v;
-	int op, ofs = 0;
+	int op, kind, ofs = 0;
 
+	kind = (int)cp[3] >> COL_LSHIFT;
 	if (!cp[2]) // relative
 	{
 		ofs = (int)cp[1];
@@ -2326,9 +2330,12 @@ static void *get_cell(col_data *c, int row, int col)
 	op = (int)cp[0];
 	v = cp[1];
 	if (op & WB_FFLAG) v = c->ddata + (int)v;
-	if (op & WB_NFLAG) v = *(void **)v; // dereference
+	if (op & WB_NFLAG) v = *(void **)v; // array dereference
+	v += ofs + row * (int)cp[2];
+	if (kind == col_PTR) v = *(char **)v; // cell dereference
+	else if (kind == col_REL) v += *(int *)v;
 
-	return (v + ofs + row * (int)cp[2]);
+	return (v);
 }
 
 static void set_columns(col_data *c, col_data *src, char *ddata, void **r)
@@ -2341,10 +2348,9 @@ static void set_columns(col_data *c, col_data *src, char *ddata, void **r)
 
 	c->ddata = ddata;
 	c->r = r;
-	for (i = 0; i < MAX_COLS; i++) c->idx[i] = i;
-	/* Link columns to list */
+	/* Link columns to group */
 	for (i = 0; i < c->ncol; i++)
-		c->columns[i][0] = c->idx + i;
+		((swdata *)c->columns[i][0])->strs = (void *)c;
 }
 
 //	LISTCC widget
@@ -2550,7 +2556,7 @@ GtkWidget *listcc(void **r, char *ddata, col_data *c)
 					sprintf(txt, "%d", (int)cp[1] + (int)cp[2] * n);
 				widget = gtk_label_new(txt);
 				gtk_misc_set_alignment(GTK_MISC(widget),
-					(jw >> 16) * 0.5, 0.5);
+					((jw >> 16) & 3) * 0.5, 0.5);
 			}
 			if (jw & 0xFFFF)
 				gtk_widget_set_usize(widget, jw & 0xFFFF, -2);
@@ -2720,10 +2726,7 @@ static int listc_collect(gchar **row_text, gchar **row_pix, col_data *c, int row
 		int op = (int)cp[0] & WB_OPMASK;
 
 // !!! IDXCOLUMN not supported
-		if (op == op_PTXTCOLUMN) v = *(char **)v;
-		else if ((op == op_RTXTCOLUMN) || (op == op_RFILECOLUMN))
-			v += *(int *)v;
-		if (op == op_RFILECOLUMN)
+		if (op == op_FILECOLUMN)
 		{
 			if (!row_pix || (v[0] == ' ')) v++;
 			else row_pix[j] = v , v = "" , res = TRUE;
@@ -3000,7 +3003,7 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 			gtk_clist_set_column_width(clist, j, w);
 		}
 		/* Left justification is default */
-		jw >>= 16;
+		jw = (jw >> 16) & 3;
 		if (jw) gtk_clist_set_column_justification(clist, j,
 			jw == 1 ? GTK_JUSTIFY_CENTER : GTK_JUSTIFY_RIGHT);
 
@@ -3072,6 +3075,27 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 	if (kind == op_LISTCd) clist_enable_drag(list); // draggable rows
 
 	return (list);
+}
+
+//	uLISTC widget
+
+typedef struct {
+	swdata s;
+	col_data c;
+} lswdata;
+
+static int ulistc_reset(void **wdata)
+{
+	lswdata *ld = wdata[2];
+	int l = *(int *)(ld->c.ddata + (int)GET_DESCV(wdata, 2));
+	int idx = *(int *)ld->s.strs;
+
+	/* Constrain the index */
+	if (idx >= l) idx = l - 1;
+	if (idx < 0) idx = 0;
+	*(int *)ld->s.strs = idx;
+
+	return (idx);
 }
 
 //	PATH widget
@@ -4401,10 +4425,10 @@ static cmdef cmddefs[] = {
 	{ op_COLORLISTN, sizeof(colorlist_data), op_uLISTCC },
 	{ op_GRADBAR,	sizeof(gradbar_data) },
 	{ op_LISTCCr,	sizeof(listcc_data), op_uLISTCC },
-	{ op_LISTC,	sizeof(listc_data) },
-	{ op_LISTCd,	sizeof(listc_data) },
+	{ op_LISTC,	sizeof(listc_data), op_uLISTC },
+	{ op_LISTCd,	sizeof(listc_data), op_uLISTC },
 	{ op_LISTCu,	sizeof(listc_data) },
-	{ op_LISTCS,	sizeof(listc_data) },
+	{ op_LISTCS,	sizeof(listc_data), op_uLISTC },
 	{ op_LISTCX,	sizeof(listc_data) },
 	{ op_SMARTTBAR,	sizeof(smarttbar_data), op_uMENUBAR },
 	{ op_SMARTMENU,	sizeof(smartmenu_data), op_uMENUBAR },
@@ -4444,6 +4468,7 @@ static cmdef cmddefs[] = {
 	{ op_OPTD,	0, op_uOPTD },
 	{ op_COMBO,	0, op_uOPT },
 	{ op_ENTRY,	0, op_uENTRY },
+	{ op_MLENTRY,	0, op_uENTRY },
 	{ op_COLOR,	0, op_uCOLOR },
 //	and various others between op_OPTD and op_OKBTN
 	{ op_OKBTN,	0, op_uOKBTN },
@@ -4471,6 +4496,7 @@ static cmdef cmddefs[] = {
 	{ op_uENTRY,	sizeof(swdata), -1 },
 	{ op_uCOLOR,	sizeof(swdata), -1 },
 	{ op_uLISTCC,	sizeof(swdata), -1 },
+	{ op_uLISTC,	sizeof(lswdata), -1 },
 	{ op_uOKBTN,	sizeof(swdata), -1 },
 	{ op_uBUTTON,	sizeof(swdata), -1 },
 	{ op_uMENUBAR,	sizeof(swdata), -1 },
@@ -4478,6 +4504,11 @@ static cmdef cmddefs[] = {
 	{ op_uMENUCHECK, sizeof(swdata), -1 },
 	{ op_uMENURITEM, sizeof(swdata), -1 },
 	{ op_uMOUNT,	sizeof(swdata), -1 },
+	{ op_IDXCOLUMN,	sizeof(swdata), -1 },
+	{ op_TXTCOLUMN,	sizeof(swdata), -1 },
+	{ op_XTXTCOLUMN, sizeof(swdata), -1 },
+	{ op_FILECOLUMN, sizeof(swdata), -1 },
+	{ op_CHKCOLUMN,	sizeof(swdata), -1 },
 	{ op_uALTNAME,	sizeof(swdata), -1 },
 };
 
@@ -4620,6 +4651,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				GTK_OBJECT(window), "show",
 				GTK_SIGNAL_FUNC(gtk_widget_queue_resize), NULL);
 #endif
+			/* Init actmap to insensitive */
+			act_state(vdata, 0);
 			/* Add finishing touches to a toplevel */
 			if (!part)
 			{
@@ -4627,8 +4660,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				/* Trigger remembered events */
 				trigger_things(res);
 			}
-			/* Init actmap to insensitive */
-			act_state(vdata, 0);
 			/* Display */
 			if (op != op_WEND) cmd_showhide(GET_WINDOW(res), TRUE);
 			/* Wait for input */
@@ -4768,6 +4799,13 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Script mode color picker - leave unfilled (?) */
 		case op_uCOLOR:
+			pk = pk_UNREALV;
+			break;
+		/* Script mode list with columns */
+		case op_uLISTC:
+			set_columns(&((lswdata *)dtail)->c, &c, ddata, r);
+			((swdata *)dtail)->strs = v; // Pointer to index
+			tpad = ulistc_reset(r);
 			pk = pk_UNREALV;
 			break;
 		/* Script mode list */
@@ -5855,11 +5893,13 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Put last referrable widget into activation map */
 		case op_ACTMAP:
-		{
-			void **where = vdata->actmap + vdata->actn++ * ACT_SIZE;
-			ADD_ACT(where, origin_slot(PREV_SLOT(r)), v);
+			if (lp > 1) vdata->vismask = (int)v; // VISMASK
+			else
+			{
+				void **where = vdata->actmap + vdata->actn++ * ACT_SIZE;
+				ADD_ACT(where, origin_slot(PREV_SLOT(r)), v);
+			}
 			continue;
-		}
 		/* Set up a configurable keymap for widgets */
 		case op_KEYMAP:
 			vdata->keymap = r;
@@ -5992,10 +6032,16 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Add a regular list column */
 		case op_IDXCOLUMN: case op_TXTCOLUMN: case op_XTXTCOLUMN:
-		case op_RTXTCOLUMN: case op_PTXTCOLUMN:
-		case op_RFILECOLUMN: case op_CHKCOLUMN:
+		case op_FILECOLUMN: case op_CHKCOLUMN:
+			((swdata *)dtail)->cnt = c.ncol;
 			c.columns[c.ncol++] = r;
-			widget = NULL;
+			pk = pk_UNREAL;
+			if ((script || scripted) && (lp - ref * 2 > 1))
+			{
+				wid = pp[4];
+				tpad = 0;
+				pk = pk_UNREALV;
+			}
 			break;
 		/* Create an XBM cursor */
 		case op_XBMCURSOR:
@@ -6425,7 +6471,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_COLORLIST: case op_COLORLISTN: case op_GRADBAR:
 		case op_LISTCCr: case op_uLISTCC:
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
-		case op_LISTCS: case op_LISTCX:
+		case op_LISTCS: case op_LISTCX: case op_uLISTC:
 			break; // self-reading
 		case op_KEYBUTTON:
 		{
@@ -6645,6 +6691,9 @@ void cmd_reset(void **slot, void *ddata)
 		case op_LISTCS: case op_LISTCX:
 			listc_reset(*wdata, wdata[2]);
 			break;
+		case op_uLISTC:
+			ulistc_reset(wdata);
+			break;
 		case op_CSCROLL:
 		{
 			GtkAdjustment *xa, *ya;
@@ -6758,6 +6807,7 @@ void cmd_sensitive(void **slot, int state)
 
 	if (IS_UNREAL(slot))
 	{
+// !!! COLUMNs should redirect to their list slot instead
 		((swdata *)slot[0])->insens = !state;
 		return;
 	}
@@ -6848,10 +6898,47 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 	return (where);
 }
 
+/* Match string to list column of strings, or to widget's string list */
+static int find_string(swdata *sd, char *s, int column)
+{
+	char *tmp;
+	col_data *c = NULL;
+	int i, l, ll, p = INT_MAX, n = sd->cnt;
+
+	if (!s || !s[0]) return (-1); // Error
+	if (column)
+	{
+		c = sd->strs;
+		if (!c) return (-1); // Not linked
+		column = n;
+		/* List length */
+		n = *(int *)(c->ddata + (int)GET_DESCV(c->r, 2));
+	}
+
+	l = strlen(s);
+	for (ll = -1 , i = 0; i < n; i++)
+	{
+		tmp = c ? get_cell(c, i, column) : ((char **)sd->strs)[i];
+		if (!tmp[0]) continue;
+		/* Match at beginning */
+		if (!strncasecmp(tmp, s, l))
+		{
+			int k = strlen(tmp);
+			if (k >= p) continue;
+			p = k;
+		}
+		else if (ll >= 0) continue;
+		/* Match at word beginning */
+		else if (!midmatch(tmp, s, l)) continue;
+		ll = i;
+	}
+	return (ll);
+}
+
 int cmd_setstr(void **slot, char *s)
 {
 	char *tmp, *st = NULL;
-	int ll, res = 1, op = GET_OP(slot);
+	int ll = 0, res = 1, op = GET_OP(slot);
 
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
@@ -6876,31 +6963,13 @@ int cmd_setstr(void **slot, char *s)
 		ll = !s ? TRUE : !s[0] ? FALSE : str2bool(s);
 		if (ll < 0) return (-1); // Error
 		break;
+	case op_TXTCOLUMN: case op_XTXTCOLUMN:
+		ll = TRUE;
+		// Fallthrough
 	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
-		if (s && s[0])
-		{
-			swdata *sd = slot[0];
-			int i, p = INT_MAX, n = sd->cnt, l = strlen(s);
-
-			for (ll = -1 , i = 0; i < n; i++)
-			{
-				tmp = ((char **)sd->strs)[i];
-				if (!tmp[0]) continue;
-				/* Match at beginning */
-				if (!strncasecmp(tmp, s, l))
-				{
-					int k = strlen(tmp);
-					if (k >= p) continue;
-					p = k;
-				}
-				else if (ll >= 0) continue;
-				/* Match at word beginning */
-				else if (!midmatch(tmp, s, l)) continue;
-				ll = i;
-			}
-			if (ll >= 0) break; // Have a match
-		}
-		return (-1); // Error
+		ll = find_string(slot[0], s, ll);
+		if (ll < 0) return (-1); // Error
+		break;
 	case op_BUTTON: case op_TBBUTTON: case op_uBUTTON:
 	case op_MENUITEM: case op_uMENUITEM:
 		ll = res = 0; // No use for parameter
@@ -6917,7 +6986,7 @@ int cmd_setstr(void **slot, char *s)
 	case op_SPIN: case op_SPINc: case op_SPINa:
 	case op_SPINSLIDE: case op_SPINSLIDEa:
 	case op_uSPIN: case op_uSPINa:
-	case op_LISTCCr: case op_uLISTCC:
+	case op_LISTCCr: case op_uLISTCC: case op_uLISTC: case op_IDXCOLUMN:
 		if (!s) return (-1); // Error
 		ll = 0; // Default
 		if (s[0])
@@ -6957,6 +7026,9 @@ int cmd_setstr(void **slot, char *s)
 	}
 	default: return (-1); // Error: cannot handle
 	}
+	/* From column to list */
+	if ((op >= op_COLUMN_0) && (op < op_COLUMN_LAST))
+		slot = ((col_data *)((swdata *)slot[0])->strs)->r;
 	/* Set value to widget */
 	cmd_set(slot, ll);
 done:	cmd_event(slot, op_EVT_SCRIPT); // Notify
@@ -7350,7 +7422,7 @@ void cmd_set(void **slot, int v)
 		listcc_select_item(slot);
 		break;
 	}
-	case op_uLISTCC:
+	case op_uLISTCC: case op_uLISTC:
 	{
 		char *ddata = GET_DDATA(wdata_slot(slot));
 		int *cnt = (void *)(ddata + (int)GET_DESCV(slot, 2));
@@ -7877,7 +7949,16 @@ int cmd_checkv(void **slot, int idx)
 		slot = NEXT_SLOT(slot) , op = GET_OP(slot);
 	if (IS_UNREAL(slot))
 	{
-		if (idx == SLOT_SENSITIVE) return (!((swdata *)slot[0])->insens);
+		if (idx == SLOT_SENSITIVE)
+		{
+			/* Columns redirect to their list */
+			if ((op >= op_COLUMN_0) && (op < op_COLUMN_LAST))
+			{
+				col_data *c = ((swdata *)slot[0])->strs;
+				if (c) return (cmd_checkv(c->r, idx));
+			}
+			return (!((swdata *)slot[0])->insens);
+		}
 		if (idx == SLOT_UNREAL) return (TRUE);
 		op = GET_UOP(slot);
 	}

@@ -108,6 +108,7 @@ static inilist ini_bool[] = {
 	{ "autopreviewToggle",	&brcosa_auto,		TRUE  },
 	{ "colorGrid",		&color_grid,		TRUE  },
 	{ "defaultGamma",	&use_gamma,		TRUE  },
+	{ "tiffPredictor",	&tiff_predictor,	TRUE  },
 #if STATUS_ITEMS != 5
 #error Wrong number of "status?Toggle" inifile items defined
 #endif
@@ -138,6 +139,7 @@ static inilist ini_int[] = {
 	{ "pngCompression",	&png_compression,	9   },
 	{ "tgaRLE",		&tga_RLE,		0   },
 	{ "jpeg2000Rate",	&jp2_rate,		1   },
+	{ "lzmaPreset",		&lzma_preset,		9   },
 	{ "silence_limit",	&silence_limit,		18  },
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },
@@ -978,6 +980,22 @@ void var_init()
 		*(ilp->var) = inifile_get_gboolean(ilp->name, ilp->defv);
 	for (ilp = ini_int; ilp->name; ilp++)
 		*(ilp->var) = inifile_get_gint32(ilp->name, ilp->defv);
+
+#ifdef U_TIFF
+	/* Load TIFF types */
+	{
+		int i, tr, ti, tb;
+		tr = inifile_get_gint32("tiffTypeRGB", 1 /* COMPRESSION_NONE */);
+		ti = inifile_get_gint32("tiffTypeI", 1 /* COMPRESSION_NONE */);
+		tb = inifile_get_gint32("tiffTypeBW", 1 /* COMPRESSION_NONE */);
+		for (i = 0; tiff_formats[i].name; i++)
+		{
+			if (tiff_formats[i].id == tr) tiff_rtype = i;
+			if (tiff_formats[i].id == ti) tiff_itype = i;
+			if (tiff_formats[i].id == tb) tiff_btype = i;
+		}
+	}
+#endif
 }
 
 void string_init()
@@ -1013,6 +1031,13 @@ static void delete_event(main_dd *dt, void **wdata)
 		inifile_set_gboolean(ilp->name, *(ilp->var));
 	for (ilp = ini_int; ilp->name; ilp++)
 		inifile_set_gint32(ilp->name, *(ilp->var));
+
+#ifdef U_TIFF
+	/* Store TIFF types */
+	inifile_set_gint32("tiffTypeRGB", tiff_formats[tiff_rtype].id);
+	inifile_set_gint32("tiffTypeI", tiff_formats[tiff_itype].id);
+	inifile_set_gint32("tiffTypeBW", tiff_formats[tiff_btype].id);
+#endif
 
 	if (files_passed <= 1) inifile_set_gboolean("showDock", show_dock);
 	toggle_dock(FALSE); // To remember dock size
@@ -4258,7 +4283,7 @@ static void *main_menu_code[] = {
 	MENUITEMi(_("//Paste Text"), ACTMOD(DLG_TEXT, 0), XPM_ICON(text)),
 		SHORTCUT(t, S),
 #ifdef U_FREETYPE
-	MENUITEM(_("//Paste Text (FreeType)"), ACTMOD(DLG_TEXT_FT, 0)),
+	MENUITEMs(_("//Paste Text (FreeType)"), ACTMOD(DLG_TEXT_FT, 0)),
 		SHORTCUT(t, 0),
 #endif
 	MENUITEMs(_("//Paste Palette"), ACTMOD(ACT_PASTE_PAL, 0)),

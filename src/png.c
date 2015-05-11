@@ -85,6 +85,7 @@ typedef struct {
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
+int lzma_preset, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int apply_icc;
 
 fformat file_formats[NUM_FTYPES] = {
@@ -104,7 +105,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
-	{ "TIFF", "tif", "tiff", FF_256 | FF_RGB | FF_ALPHA | FF_LAYER },
+#define TIFFLAGS (FF_BW | FF_256 | FF_RGB | FF_ALPHA | FF_LAYER | FF_COMPT)
+	{ "TIFF", "tif", "tiff", TIFFLAGS },
 #else
 	{ "", "", "", 0},
 #endif
@@ -138,6 +140,10 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
 		| FF_TRANS | FF_LAYER | FF_PALETTE | FF_MEM }
 };
+
+#ifndef U_TIFF
+tiff_format tiff_formats[] = { { NULL } };
+#endif
 
 int file_type_by_ext(char *name, guint32 mask)
 {
@@ -2729,6 +2735,15 @@ static void stream_LSB(unsigned char *src, unsigned char *dest, int cnt,
 	}
 }
 
+static void pack_MSB(unsigned char *dest, unsigned char *src, int len, int bw)
+{
+	int i;
+
+	memset(dest, 0, (len + 7) >> 3);
+	for (i = 0; i < len; i++)
+		dest[i >> 3] |= (*src++ == bw) << (~i & 7);
+}
+
 static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
 	int bpp, int step);
 
@@ -2740,6 +2755,30 @@ static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
  * also is a fact of life. Installing latest libtiff may help - or not; sending
  * a bugreport with the offending file attached may help too - but again, it's
  * not guaranteed. But the common varieties of TIFF format should load OK. */
+
+tiff_format tiff_formats[TIFF_MAX_TYPES] = {
+	{ _("None"),	COMPRESSION_NONE, TIFFLAGS },
+#ifdef CCITT_SUPPORT
+	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | FF_LAYER | FF_COMPT },
+	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | FF_LAYER | FF_COMPT },
+#endif
+#ifdef PACKBITS_SUPPORT
+	{ "PackBits",	COMPRESSION_PACKBITS, TIFFLAGS },
+#endif
+#ifdef LZW_SUPPORT
+	{ "LZW",	COMPRESSION_LZW, TIFFLAGS, 1 },
+#endif
+#ifdef ZIP_SUPPORT
+	{ "ZIP",	COMPRESSION_ADOBE_DEFLATE, TIFFLAGS | FF_COMPZT, 1 },
+#endif
+#ifdef LZMA_SUPPORT
+	{ "LZMA2",	COMPRESSION_LZMA, TIFFLAGS | FF_COMPLZ, 1 },
+#endif
+#ifdef JPEG_SUPPORT
+	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | FF_LAYER | FF_COMPJ | FF_COMPT },
+#endif
+	{ NULL }
+};
 
 static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 {
@@ -3210,16 +3249,40 @@ static int load_tiff(char *file_name, ls_settings *settings)
 
 static int save_tiff(char *file_name, ls_settings *settings)
 {
-	unsigned char *src, *row = NULL;
+	unsigned char buf[MAX_WIDTH / 8], *src, *row = NULL;
 	uint16 rgb[256 * 3];
-	int i, res = 0;
+	unsigned int tflags, sflags;
+	int i, l, type, bw, af, pf, res = 0;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
 
 
-	if (settings->img[CHN_ALPHA])
+	/* Select output mode */
+	type = settings->tiff_type;
+	if (type < 0) type = bpp == 3 ? tiff_rtype : // RGB
+		settings->colors <= 2 ?	tiff_btype : // BW
+		tiff_itype; // Indexed
+	tflags = tiff_formats[type].flags;
+	sflags = FF_SAVE_MASK_FOR(*settings) & tflags;
+	bw = !(sflags & (FF_256 | FF_RGB));
+	if (!sflags) return WRONG_FORMAT; // Paranoia
+
+	af = settings->img[CHN_ALPHA] && (tflags & FF_ALPHA);
+
+	/* Use 1-bit mode where possible */
+	if (!bw && !af && (sflags & FF_BW))
 	{
-		row = malloc(w * (bpp + 1));
+		/* No need of palette if the colors are full white and black */
+		i = PNG_2_INT(settings->pal[0]);
+		bw = (!i ? 0xFFFFFF : i == 0xFFFFFF ? 0 : -1) ==
+			PNG_2_INT(settings->pal[1]) ? 1 : -1;
+	}		
+
+	/* !!! When using predictor, libtiff 3.8 modifies row buffer in-place */
+	pf = tiff_predictor && !bw && tiff_formats[type].pflag;
+	if (af || pf)
+	{
+		row = malloc(w * (bpp + af));
 		if (!row) return -1;
 	}
 
@@ -3234,24 +3297,43 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	/* Write regular tags */
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
 	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
-	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, bpp + !!row);
-	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, 8);
-	TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, bpp + af);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, bw ? 1 : 8);
 	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-	if (bpp == 1)
+
+	/* Write compression-specific tags */
+	TIFFSetField(tif, TIFFTAG_COMPRESSION, tiff_formats[type].id);
+#ifdef ZIP_SUPPORT
+	if (tflags & FF_COMPZT)
+		TIFFSetField(tif, TIFFTAG_ZIPQUALITY, settings->png_compression);
+#endif
+#ifdef LZMA_SUPPORT
+	if (tflags & FF_COMPLZ)
+		TIFFSetField(tif, TIFFTAG_LZMAPRESET, settings->lzma_preset);
+#endif
+#ifdef JPEG_SUPPORT
+	if (tflags & FF_COMPJ)
+		TIFFSetField(tif, TIFFTAG_JPEGQUALITY, settings->jpeg_quality);
+#endif
+	if (pf) TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
+
+	if (bw > 0) TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, get_bw(settings) ?
+		PHOTOMETRIC_MINISWHITE : PHOTOMETRIC_MINISBLACK);
+	else if (bpp == 1)
 	{
 		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_PALETTE);
 		memset(rgb, 0, sizeof(rgb));
+		l = bw ? 2 : 256;
 		for (i = 0; i < settings->colors; i++)
 		{
 			rgb[i] = settings->pal[i].red * 257;
-			rgb[i + 256] = settings->pal[i].green * 257;
-			rgb[i + 512] = settings->pal[i].blue * 257;
+			rgb[i + l] = settings->pal[i].green * 257;
+			rgb[i + l * 2] = settings->pal[i].blue * 257;
 		}
-		TIFFSetField(tif, TIFFTAG_COLORMAP, rgb, rgb + 256, rgb + 512);
+		TIFFSetField(tif, TIFFTAG_COLORMAP, rgb, rgb + l, rgb + l * 2);
 	}
 	else TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-	if (row)
+	if (af)
 	{
 		rgb[0] = EXTRASAMPLE_UNASSALPHA;
 		TIFFSetField(tif, TIFFTAG_EXTRASAMPLES, 1, rgb);
@@ -3262,13 +3344,24 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	for (i = 0; i < h; i++)
 	{
 		src = settings->img[CHN_IMAGE] + w * i * bpp;
-		if (row) /* Interlace the channels */
+		if (bw) /* Pack the bits */
+		{
+			pack_MSB(buf, src, w, 1);
+			src = buf;
+		}
+		else if (af) /* Interlace the channels */
 		{
 			copy_bytes(row, src, w, bpp + 1, bpp);
 			copy_bytes(row + bpp, settings->img[CHN_ALPHA] + w * i,
 				w, bpp + 1, 1);
+			src = row;
 		}
-		if (TIFFWriteScanline(tif, row ? row : src, i, 0) == -1)
+		else if (row) /* Copy the row */
+		{
+			memcpy(row, src, w * bpp);
+			src = row;
+		}
+		if (TIFFWriteScanline(tif, src, i, 0) == -1)
 		{
 			res = -1;
 			break;
@@ -6000,7 +6093,7 @@ static int save_pbm(char *file_name, ls_settings *settings)
 {
 	unsigned char buf[MAX_WIDTH / 8], bw, *src;
 	FILE *fp;
-	int i, j, l, w = settings->width, h = settings->height;
+	int i, l, w = settings->width, h = settings->height;
 
 
 	if ((settings->bpp != 1) || (settings->colors > 2)) return WRONG_FORMAT;
@@ -6017,9 +6110,8 @@ static int save_pbm(char *file_name, ls_settings *settings)
 	l = (w + 7) >> 3;
 	for (i = 0; i < h; i++)
 	{
-		memset(buf, 0, l);
-		for (j = 0; j < w; j++)
-			buf[j >> 3] |= (*src++ == bw) << (~j & 7);
+		pack_MSB(buf, src, w, bw);
+		src += w;
 		fwrite(buf, l, 1, fp);
 		ls_progress(settings, i, 20);
 	}

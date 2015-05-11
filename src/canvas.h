@@ -116,6 +116,7 @@ int do_a_load(char *fname, int undo);
 void canvas_center(float ic[2]);
 void align_size(float new_zoom);
 void realign_size();
+int tiff_type_selector(int mask, int def, char **names);
 void init_ls_settings(ls_settings *settings, void **wdata);
 void fs_setup(GtkWidget *fs, int action_type);
 void file_selector_x(int action_type, void **xdata);

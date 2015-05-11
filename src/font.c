@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -125,14 +125,14 @@ typedef struct {
 
 typedef struct {
 	char *text; // !!! widget-owned memory
-	int img, idx;
+	int img, idx, script;
 	int fontname, nfontnames, fnsort;
 	int fontstyle, nfontstyles;
 	int lfontsize, nlfontsizes;
 	int fontfile, nfontfiles;
 	int dir, ndirs;
 	int fontsize;
-	int bkg[3];
+	int bkg[3], angle;
 	int preview_whc[3];
 	int lock;
 	unsigned char *preview_rgb;
@@ -875,6 +875,7 @@ static void font_preview_update(font_dd *dt)
 	int w=1, h=1;
 
 
+	if (script_cmds) return;	// Not visible anyway
 	if (dt->preview_rgb)		// Remove old rendering
 	{
 		free(dt->preview_rgb);
@@ -948,7 +949,13 @@ static void store_values(font_dd *dt)
 	if (inifile_get_gboolean( "fontTypeBitmap", TRUE))
 		font_bmsize = dt->fontsize;
 	else font_size = dt->fontsize;
-	if (mem_channel == CHN_IMAGE) font_bkg = dt->bkg[0];
+	if (mem_channel == CHN_IMAGE)
+	{
+		if (!script_cmds || (font_bk = dt->bkg[0] >= 0))
+			font_bkg = dt->bkg[0];
+	}
+	if (!script_cmds || (font_r = !!dt->angle))
+		font_angle = dt->angle;
 }
 
 static void paste_text_ok(font_dd *dt, void **wdata, int what, void **where)
@@ -999,6 +1006,9 @@ static void collect_fontnames(font_dd *dt)
 		dir = strs[dir];
 		/* Convert name string (to UTF-8 in GTK+2) and store it */
 		ofs = mem.here;
+		/* Label bitmap/scalable fonts for scripting */
+		if (script_cmds)
+			addstr(&mem, fn->style->size->size ? "B " : "S ", 1);
 		gtkuncpy(buf2, fn->font_name, sizeof(buf2));
 		addstr(&mem, buf2, 0);
 		/* Add a row - with offsets for now */
@@ -1466,7 +1476,7 @@ static void *font_code[] = {
 	XHBOX, // !!! Originally the page was an hbox
 	VBOXP, // !!! what for?
 	XSCROLL(0, 1), // never/auto
-	WLIST,
+	WLIST, OPNAME0,
 	RTXTCOLUMND(fontname_cc, dir, 0, 0),
 	RTXTCOLUMND(fontname_cc, bm, 0, 0),
 	NRTXTCOLUMND(_("Font"), fontname_cc, name, 0, 0),
@@ -1486,11 +1496,12 @@ static void *font_code[] = {
 	DEFBORDER(SCROLL),
 	WLIST,
 	NRTXTCOLUMND(_("Size"), fontsize_cc, what, 0, 1), // centered
+		OPNAME("Bitmap size"), // scalable fonts use the spin
 	COLUMNDATA(fontsizes, sizeof(fontsize_cc)), CLEANUP(fontsizes),
 	REF(fsize_l), LISTC(lfontsize, nlfontsizes, select_font),
 	BORDER(SPIN, 0),
 	REF(size_spin), SPINc(fontsize, 1, 500), EVENT(CHANGE, font_entry_changed),
-	DEFBORDER(SPIN),
+	DEFBORDER(SPIN), OPNAME("Size"),
 	WDONE, // XVBOX
 	XSCROLL(1, 1), // auto/auto
 	WLIST,
@@ -1520,20 +1531,29 @@ static void *font_code[] = {
 	UNLESSx(img, 1),
 		CHECKv(_("Invert"), font_bk), EVENT(CHANGE, font_entry_changed),
 	ENDIF(1),
-	IFx(img, 1),
+	IFx(img, 1), UNLESSx(script, 1), /* && */
 		CHECKv(_("Background colour ="), font_bk),
 			EVENT(CHANGE, font_entry_changed),
+	ENDIF(1),
+	IFx(img, 1),
 		SPINa(bkg), EVENT(CHANGE, font_entry_changed),
+			OPNAME("Background colour ="),
 	ENDIF(1),
 	WDONE, // HBOX
 	HBOX,
 	REF(obl_c), CHECKv(_("Oblique"), font_obl), EVENT(CHANGE, font_entry_changed),
-	CHECKv(_("Angle of rotation ="), font_r), EVENT(CHANGE, font_entry_changed),
-	FSPINv(font_angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
+	UNLESSx(script, 1),
+		CHECKv(_("Angle of rotation ="), font_r),
+			EVENT(CHANGE, font_entry_changed),
+	ENDIF(1),
+	FSPIN(angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
+		OPNAME("Angle of rotation ="),
 	WDONE,
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
 	WDONE, WDONE, WDONE, // XVBOXP, XHBOX, PAGE
+	/* !!! PATH isn't scriptable, and not much use to add dirs from script */
+	ENDSCRIPT,
 //	TAB 2 - DIRECTORIES
 	PAGE(_("Font Directories")),
 //	VBOX, // !!! utterly useless
@@ -1569,16 +1589,24 @@ void pressed_mt_text()
 	tdata.bkg[0] = font_bkg % mem_cols;
 	tdata.bkg[1] = 0;
 	tdata.bkg[2] = mem_cols - 1;
+	tdata.angle = font_angle;
 	tdata.preview_whc[0] = tdata.preview_whc[1] = 1;
 	tdata.preview_whc[2] = mem_background * 0x010101;
 	tdata.img = mem_channel == CHN_IMAGE;
 	tdata.idx = tdata.img && (mem_img_bpp == 1);
+	if (script_cmds) // Simplified controls - spins w/o toggles
+	{
+		tdata.script = TRUE;
+		if (!font_bk) tdata.bkg[0] = -1;
+		tdata.bkg[1] = -1;
+		if (!font_r) tdata.angle = 0;
+	}
 	collect_fontnames(&tdata);
 	tdata.fnsort = 3; // By name column, ascending
 	collect_dirnames(&tdata);
 	tdata.dir = -1; // Top sorted
 
-	run_create(font_code, &tdata, sizeof(tdata));
+	run_create_(font_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 #endif	/* U_FREETYPE */

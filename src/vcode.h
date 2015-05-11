@@ -161,6 +161,7 @@ enum {
 	op_uENTRY,
 	op_uCOLOR,
 	op_uLISTCC,
+	op_uLISTC,
 	op_uOKBTN,
 	op_uBUTTON,
 	op_uMENUBAR,
@@ -183,15 +184,17 @@ enum {
 
 	op_WLIST,
 	op_COLUMNDATA,
-	op_IDXCOLUMN,
+
+	op_COLUMN_0,
+	op_IDXCOLUMN = op_COLUMN_0,
 	op_TXTCOLUMN,
 	op_XTXTCOLUMN,
-	op_PTXTCOLUMN,
-	op_RTXTCOLUMN,
-	op_RFILECOLUMN,
+	op_FILECOLUMN,
 	op_CHKCOLUMN,
 
-	op_EVT_0,
+	op_COLUMN_LAST,
+
+	op_EVT_0 = op_COLUMN_LAST,
 	op_EVT_OK = op_EVT_0,
 	op_EVT_CANCEL,
 	op_EVT_CLICK,
@@ -478,6 +481,13 @@ enum {
 
 	pk_LAST
 };
+
+enum {
+	col_DIRECT = 0,
+	col_PTR,
+	col_REL
+};
+#define COL_LSHIFT 24
 
 #define WB_OPBITS      12
 #define WB_OPMASK  0x0FFF /* ((1 << WB_OPBITS) - 1) */
@@ -779,6 +789,7 @@ enum {
 #define TLOPT(SS,N,V,X,Y) WBrhf_t(OPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 #define OPTD(SP,V) WBrhf_(OPTD, 2), WBfield(V), WBfield(SP)
+#define TOPTDv(NM,SP,V) WBrh_t1(OPTD, 2), &(V), WBfield(SP), TLABEL(NM)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define XOPTe(SS,N,V,HS) WBr2hf_x(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
@@ -925,6 +936,7 @@ enum {
 #define TALLOC(V,L) WBhf(TALLOC, 2), WBfield(V), WBfield(L)
 #define TCOPY(V,L) WBhf(TCOPY, 2), WBfield(V), WBfield(L)
 #define ACTMAP(N) WBh(ACTMAP, 1), (void *)(N)
+#define VISMASK(N) WBh(ACTMAP, 2), (void *)(N), NULL
 #define KEYMAP(V, NM) WBrhf(KEYMAP, 2), WBfield(V), (NM)
 #define SHORTCUTs(NM) WBh(SHORTCUT, 1), (NM)
 #define SHORTCUT(K,M) WBh(SHORTCUT, 2), (void *)(GDK_##K), (void *)(_##M##mask)
@@ -965,21 +977,20 @@ enum {
 	(void *)((W) + ((J) << 16)), (NM)
 #define NTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
-#define PTXTCOLUMNp(V,S,W,J) WBrhnf(PTXTCOLUMN, 3), WBfield(V), (void *)(S), \
-	(void *)((W) + ((J) << 16))
-#define RTXTCOLUMND(ST,F,W,J) WBrh(RTXTCOLUMN, 3), (void *)offsetof(ST, F), \
-	NULL, (void *)((W) + ((J) << 16))
-#define RTXTCOLUMNDi(W,J) WBrh(RTXTCOLUMN, 3), (void *)0, \
-	NULL, (void *)((W) + ((J) << 16))
-#define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(RTXTCOLUMN, 4), (void *)offsetof(ST, F), \
-	NULL, (void *)((W) + ((J) << 16)), (NM)
-#define NRTXTCOLUMNDax(NM,F,W,J,I) WBrh(RTXTCOLUMN, 5), \
-	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
-#define NRTXTCOLUMNDaxx(NM,F,W,J,I,S) WBrh(RTXTCOLUMN, 6), \
-	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), \
-	(I), (S)
-#define NRFILECOLUMNDax(NM,F,W,J,I) WBrh(RFILECOLUMN, 5), \
-	(void *)(sizeof(int) * F), NULL, (void *)((W) + ((J) << 16)), (NM), (I)
+#define PTXTCOLUMNp(V,S,W,J) WBrhnf(TXTCOLUMN, 3), WBfield(V), (void *)(S), \
+	(void *)((W) + ((J) << 16) + (col_PTR << COL_LSHIFT))
+#define RTXTCOLUMND(ST,F,W,J) WBrh(TXTCOLUMN, 3), (void *)offsetof(ST, F), \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT))
+#define RTXTCOLUMNDi(W,J) WBrh(TXTCOLUMN, 3), (void *)0, \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT))
+#define NRTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT)), (NM)
+#define NRTXTCOLUMNDax(NM,F,W,J,I) WBrh(TXTCOLUMN, 5), (void *)(sizeof(int) * F), \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT)), (NM), (I)
+#define NRTXTCOLUMNDaxx(NM,F,W,J,I,S) WBrh(TXTCOLUMN, 6), (void *)(sizeof(int) * F), \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT)), (NM), (I), (S)
+#define NRFILECOLUMNDax(NM,F,W,J,I) WBrh(FILECOLUMN, 5), (void *)(sizeof(int) * F), \
+	NULL, (void *)((W) + ((J) << 16) + (col_REL << COL_LSHIFT)), (NM), (I)
 #define CHKCOLUMNv(A,S,W,J,HC) WBr2h(CHKCOLUMN, 3 + 2), &(A), (void *)(S), \
 	(void *)((W) + ((J) << 16)), EVENT(CHANGE, HC)
 #define	XBMCURSOR(T,X,Y) WBrh(XBMCURSOR, 3), (xbm_##T##_bits), \
