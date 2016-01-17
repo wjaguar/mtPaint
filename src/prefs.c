@@ -38,18 +38,6 @@
 
 ///	PREFERENCES WINDOW
 
-static void **label_tablet_device;
-
-#if GTK_MAJOR_VERSION == 1
-static GdkDeviceInfo *tablet_device;
-#endif
-#if GTK_MAJOR_VERSION == 2
-static GdkDevice *tablet_device;
-#endif
-static GtkWidget *inputd;
-
-int tablet_working;		// Has the device been initialized?
-
 int tablet_tool_use[3];				// Size, flow, opacity
 int tablet_tool_factor[3];			// Size, flow, opacity
 
@@ -75,144 +63,25 @@ static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 #endif
 
 
-static gboolean delete_inputd()
-{
-	int i, j;
-	char txt[32];
-
-#if GTK_MAJOR_VERSION == 1
-	GdkDeviceInfo *dev = tablet_device;
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	GdkDevice *dev = GTK_INPUT_DIALOG (inputd)->current_device;
-#endif
-
-	if ( tablet_working )		// Store tablet settings in INI file for future session
-	{
-		inifile_set( "tablet_name", dev->name );
-		inifile_set_gint32( "tablet_mode", dev->mode );
-
-		for ( i=0; i<dev->num_axes; i++ )
-		{
-#if GTK_MAJOR_VERSION == 1
-			j = dev->axes[i];
-#else /* #if GTK_MAJOR_VERSION == 2 */
-			j = dev->axes[i].use;
-#endif
-			sprintf(txt, "tablet_axes_v%i", i);
-			inifile_set_gint32( txt, j );
-		}
-	}
-
-	gtk_widget_destroy(inputd);
-	inputd = NULL;
-	return (TRUE);
-}
-
-static void tablet_update_device( char *device )
-{
-	char txt[64];
-
-	sprintf(txt, "%s = %s", __("Current Device"), device);
-	cmd_setv(label_tablet_device, txt, LABEL_VALUE);
-}
-
-
-#if GTK_MAJOR_VERSION == 1
-static void tablet_gtk1_newdevice(devid)			// Get new device info
-{
-	GList *dlist = gdk_input_list_devices();
-	GdkDeviceInfo *device = NULL;
-
-	tablet_device = NULL;
-	while ( dlist != NULL )
-	{
-		device = dlist->data;
-		if ( device->deviceid == devid )		// Device found
-		{
-			tablet_device = device;
-			break;
-		}
-		dlist = dlist->next;
-	}
-}
-
-static void tablet_enable_device(GtkInputDialog *inputdialog, guint32 devid)
-{
-	tablet_gtk1_newdevice(devid);
-
-	if ( tablet_device != NULL )
-	{
-		tablet_working = TRUE;
-		tablet_update_device( tablet_device->name );
-	}
-	else	tablet_working = FALSE;
-}
-
-static void tablet_disable_device(GtkInputDialog *inputdialog, guint32 devid)
-{
-	tablet_working = FALSE;
-	tablet_update_device( "NONE" );
-}
-#endif
-#if GTK_MAJOR_VERSION == 2
-static void tablet_enable_device(GtkInputDialog *inputdialog, GdkDevice *deviceid, gpointer user_data)
-{
-	tablet_working = TRUE;
-	tablet_update_device( deviceid->name );
-	tablet_device = deviceid;
-}
-
-static void tablet_disable_device(GtkInputDialog *inputdialog, GdkDevice *deviceid, gpointer user_data)
-{
-	tablet_working = FALSE;
-	tablet_update_device( "NONE" );
-}
-#endif
-
-
-static void conf_tablet()
-{
-	GtkWidget *close;
-	GtkAccelGroup* ag;
-
-	if (inputd) return;	// Stops multiple dialogs being opened
-
-	inputd = gtk_input_dialog_new();
-	gtk_window_set_position(GTK_WINDOW(inputd), GTK_WIN_POS_CENTER);
-
-	close = GTK_INPUT_DIALOG(inputd)->close_button;
-	gtk_signal_connect(GTK_OBJECT(close), "clicked",
-		GTK_SIGNAL_FUNC(delete_inputd), NULL);
-	gtk_signal_connect(GTK_OBJECT(inputd), "delete_event",
-		GTK_SIGNAL_FUNC(delete_inputd), NULL);
-	ag = gtk_accel_group_new();
-	gtk_widget_add_accelerator(close, "clicked",
-		ag, GDK_Escape, 0, (GtkAccelFlags)0);
-
-	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
-		GTK_SIGNAL_FUNC(tablet_enable_device), NULL);
-	gtk_signal_connect(GTK_OBJECT(inputd), "disable-device",
-		GTK_SIGNAL_FUNC(tablet_disable_device), NULL);
-
-	if (GTK_INPUT_DIALOG(inputd)->keys_list)
-		gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->keys_list);
-	if (GTK_INPUT_DIALOG(inputd)->keys_listbox)
-		gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->keys_listbox);
-
-	gtk_widget_hide(GTK_INPUT_DIALOG(inputd)->save_button);
-
-	gtk_widget_show(inputd);
-	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
-}
-
 typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
 	int confx, centre, zoom;
-	int lang;
+	int lang, script;
 	char *factor_str;
 	char **tiffrs, **tiffis, **tiffbs;
-	void **label_tablet_pressure;
+	void **label_tablet_pressure, **label_tablet_device;
 } pref_dd;
+
+static void tablet_update_device(pref_dd *dt)
+{
+	char *nm;
+
+	cmd_peekv(main_window_, &nm, sizeof(nm), WDATA_TABLET);
+	tablet_working = !!nm;
+	nm = g_strdup_printf("%s = %s", __("Current Device"), nm ? nm : "NONE");
+	cmd_setv(dt->label_tablet_device, nm, LABEL_VALUE);
+	g_free(nm);
+}
 
 static void prefs_evt(pref_dd *dt, void **wdata, int what)
 {
@@ -249,7 +118,6 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 
 	if (what != op_EVT_CLICK) // OK/Cancel
 	{
-		if (inputd) delete_inputd();
 		run_destroy(wdata);
 		cmd_sensitive(menu_slots[MENU_PREFS], TRUE);
 	}
@@ -283,7 +151,7 @@ static void *pref_code[] = {
 	BORDER(TABLE, 10),
 	BORDER(LABEL, 4), BORDER(SPIN, 4),
 ///	---- TAB1 - GENERAL
-	PAGE(_("General")),
+	PAGE(_("General")), GROUPN,
 #ifdef U_THREADS
 	TABLE2(4),
 	TSPINv(_("Max threads (0 to autodetect)"), maxthreads, 0, 256),
@@ -295,6 +163,8 @@ static void *pref_code[] = {
 	TSPINv(_("Communal layer undo space (%)"), mem_undo_common, 0, 100),
 	WDONE,
 	CHECKv(_("Use gamma correction by default"), use_gamma),
+	/* !!! Only processing is scriptable, interface is not */
+	UNLESSx(script, 1),
 	CHECKv(_("Optimize alpha chequers"), chequers_optimize),
 	CHECKv(_("Disable view window transparencies"), opaque_view),
 	CHECKv(_("Enable overlays by layer"), layer_overlay),
@@ -329,9 +199,10 @@ static void *pref_code[] = {
 	CHECKv(_("Mouse Scroll Wheel = Zoom"), scroll_zoom),
 	CHECKv(_("Use menu icons"), show_menu_icons),
 #endif
+	ENDIF(1), // !script
 	WDONE,
 ///	---- TAB3 - FILES
-	PAGE(_("Files")),
+	PAGE(_("Files")), GROUPN,
 	TABLE2(8),
 	TSPINa(_("Transparency index"), trans),
 	TSPINa(_("XBM X hotspot"), hot_x),
@@ -352,7 +223,7 @@ static void *pref_code[] = {
 	WDONE,
 #ifdef U_TIFF
 ///	---- TAB4 - TIFF
-	PAGE("TIFF"),
+	PAGE("TIFF"), GROUPN,
 	BORDER(OPT, 2),
 	TABLE2(4),
 // !!! Here also DPI (default)
@@ -364,6 +235,8 @@ static void *pref_code[] = {
 	CHECKv(_("Enable predictor"), tiff_predictor),
 	WDONE,
 #endif
+	/* !!! Interface is not scriptable */
+	UNLESSx(script, 1),
 ///	---- TAB5 - PATHS
 	PAGE(_("Paths")),
 	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
@@ -393,9 +266,10 @@ static void *pref_code[] = {
 	PAGE(_("Tablet")),
 	FVBOXB(_("Device Settings")),
 	BORDER(LABEL, 0),
-	REFv(label_tablet_device), MLABELxr("", 5, 5, 0),
+	REF(label_tablet_device), MLABELxr("", 5, 5, 0),
 	BORDER(BUTTON, 0),
-	UBUTTON(_("Configure Device"), conf_tablet),
+	TABLETBTN(_("Configure Device")),
+		EVENT(CHANGE, tablet_update_device), TRIGGER,
 	DEFBORDER(BUTTON),
 	BORDER(TABLE, 0),
 	XTABLE(2, 4),
@@ -416,6 +290,7 @@ static void *pref_code[] = {
 	EVENT(XMOUSE, tablet_preview), EVENT(MXMOUSE, tablet_preview),
 	REF(label_tablet_pressure), MLABELr(""),
 	WDONE, WDONE,
+	ENDIF(1), // !script
 	WDONE, // notebook
 ///	Bottom of Prefs window
 	OKBOX3(_("OK"), prefs_evt, _("Cancel"), prefs_evt, _("Apply"), prefs_evt),
@@ -434,7 +309,7 @@ void pressed_preferences()
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
 		{ mem_xbm_hot_y, -1, mem_height - 1 },
 		FALSE, TRUE, FALSE,
-		0, txt,
+		0, !!script_cmds, txt,
 		NULL, NULL, NULL, NULL };
 
 	// Make sure the user can only open 1 prefs window
@@ -455,71 +330,7 @@ void pressed_preferences()
 #endif
 	snprintf(txt, sizeof(txt), "%s (%%)", __("Factor"));
 
-	run_create(pref_code, &tdata, sizeof(tdata));
-
-	tablet_update_device(tablet_working ? tablet_device->name : "NONE");
-}
-
-
-void init_tablet()				// Set up variables
-{
-	int i;
-	char *devname, txt[64];
-
-	GList *dlist;
-
-#if GTK_MAJOR_VERSION == 1
-	GdkDeviceInfo *device = NULL;
-	gint use;
-#endif
-#if GTK_MAJOR_VERSION == 2
-	GdkDevice *device = NULL;
-	GdkAxisUse use;
-#endif
-
-	if (tablet_working)	// User has got tablet working in past so try to initialize it
-	{
-		tablet_working = FALSE;
-		devname = inifile_get( "tablet_name", "?" );	// Device name last used
-#if GTK_MAJOR_VERSION == 1
-		dlist = gdk_input_list_devices();
-#endif
-#if GTK_MAJOR_VERSION == 2
-		dlist = gdk_devices_list();
-#endif
-		while ( dlist != NULL )
-		{
-			device = dlist->data;
-			if ( strcmp(device->name, devname ) == 0 )
-			{		// Previously used device was found
-
-#if GTK_MAJOR_VERSION == 1
-				gdk_input_set_mode(device->deviceid,
-					inifile_get_gint32("tablet_mode", 0));
-#endif
-#if GTK_MAJOR_VERSION == 2
-				gdk_device_set_mode(device,
-					inifile_get_gint32("tablet_mode", 0));
-#endif
-				for ( i=0; i<device->num_axes; i++ )
-				{
-					sprintf(txt, "tablet_axes_v%i", i);
-					use = inifile_get_gint32( txt, GDK_AXIS_IGNORE );
-#if GTK_MAJOR_VERSION == 1
-					device->axes[i] = use;
-					gdk_input_set_axes(device->deviceid, device->axes);
-#endif
-#if GTK_MAJOR_VERSION == 2
-					gdk_device_set_axis_use(device, i, use);
-#endif
-				}
-				tablet_device = device;
-				tablet_working = TRUE;		// Success!
-				break;
-			}
-			dlist = dlist->next;		// Not right device so look for next one
-		}
-	}
+	run_create_(pref_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 ///	KEYMAPPER WINDOW

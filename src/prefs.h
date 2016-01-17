@@ -25,10 +25,9 @@
 
 #define MAX_TF 100 /* Tablet tool factor scale */
 
-int tablet_working, tablet_tool_use[3];		// Size, flow, opacity
+int tablet_tool_use[3];				// Size, flow, opacity
 int tablet_tool_factor[3];			// Size, flow, opacity
 
 void pressed_preferences();
-void init_tablet();				// Set up variables
 
 void keys_selector();

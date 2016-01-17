@@ -103,6 +103,7 @@ enum {
 	op_HEXENTRY,
 	op_EYEDROPPER,
 	op_KEYBUTTON,
+	op_TABLETBTN,
 	op_COLOR,
 	op_TCOLOR,
 	op_COLORLIST,
@@ -180,9 +181,7 @@ enum {
 	op_SYSCURSOR,
 
 	op_CTL_0, // control tags - same for all modes
-	op_GROUP = op_CTL_0,
-
-	op_WLIST,
+	op_WLIST = op_CTL_0,
 	op_COLUMNDATA,
 
 	op_COLUMN_0,
@@ -426,6 +425,11 @@ void **get_wdata(GtkWidget *widget, char *id);
 //	Run event handler, defaulting to run_destroy()
 void do_evt_1_d(void **slot);
 
+//	Search modes
+#define MLEVEL_FLAT  (-1) /* All */
+#define MLEVEL_GROUP (-2) /* Groups */
+#define MLEVEL_BLOCK (-3) /* In group */
+
 //	Find slot by text name and menu level
 void **find_slot(void **slot, char *id, int l, int mlevel);
 
@@ -559,6 +563,7 @@ enum {
 #define WBr2hf_x(NM,L) WBp_(op_##NM, L, XPACK, R2F)
 #define WBr2hf_t(NM,L) WBp_(op_##NM, L, TABLE, R2F)
 #define WBr2hs_(NM,L) WBp_(op_##NM, L, PACK, R2S)
+#define WBr2hs_x(NM,L) WBp_(op_##NM, L, XPACK, R2S)
 #define WBr2hs_t(NM,L) WBp_(op_##NM, L, TABLE, R2S)
 #define WBr3h_(NM,L) WBp_(op_##NM, L, PACK, R3)
 #define WBr3h_e(NM,L) WBp_(op_##NM, L, PACKEND, R3)
@@ -743,8 +748,10 @@ enum {
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define SPINa(A) WBrhf_(SPINa, 1), WBfield(A)
 #define XSPINa(A) WBrhf_x(SPINa, 1), WBfield(A)
+#define uSPIN(V,V0,V1) WBrhf_(uSPIN, 3), WBfield(V), (void *)(V0), (void *)(V1)
 #define uSPINv(V,V0,V1) WBrh_(uSPIN, 3), &(V), (void *)(V0), (void *)(V1)
 #define uFSPINv(V,V0,V1) WBrh_(uFSPIN, 3), &(V), (void *)(V0), (void *)(V1)
+#define uSPINa(A) WBrhf_(uSPINa, 1), WBfield(A)
 #define uSCALE(V,V0,V1) WBrhf_(uSCALE, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
 /* !!! This block holds 1 nested EVENT block */
@@ -831,6 +838,7 @@ enum {
 #define COMBOENTRY(V,SP,H) WBr2hf_x(COMBOENTRY, 2 + 2), WBfield(V), \
 	WBfield(SP), EVENT(OK, H)
 #define KEYBUTTON(V) WBrhf_(KEYBUTTON, 1), WBfield(V)
+#define TABLETBTN(NM) WBrh_(TABLETBTN, 1), (NM)
 #define FONTSEL(A) WBrhf_x(FONTSEL, 1), WBfield(A)
 #define HEXENTRY(V,HC,X,Y) WBr2hf_t(HEXENTRY, 2 + 2), WBfield(V), \
 	EVENT(CHANGE, HC), WBxyl(X, Y, 1)
@@ -853,6 +861,7 @@ enum {
 	OKBTN(NOK, HOK)
 // !!! These *BTN,*TOGGLE,*BUTTON blocks each hold 1 nested EVENT block */
 #define OKBTN(NM,H) WBr2h_x(OKBTN, 1 + 2), (NM), EVENT(OK, H)
+#define uOKBTN(H) WBr2h_(uOKBTN, 0 + 2), EVENT(OK, H)
 #define CANCELBTN(NM,H) WBr2h_x(CANCELBTN, 1 + 2), (NM), EVENT(CANCEL, H)
 #define CANCELBTNp(NP,H) WBr2hnf_x(CANCELBTN, 1 + 2), WBfield(NP), \
 	EVENT(CANCEL, H)
@@ -863,6 +872,7 @@ enum {
 	EVENT(CHANGE, H)
 #define UTOGGLEv(NM,V,H) WBr2h_(TOGGLE, 2 + 2), &(V), (NM), EVENT(CHANGE, H)
 #define BUTTON(NM,H) WBr2h_x(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define BUTTONs(NM,H) WBr2hs_x(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define BUTTONp(NP,H) WBr2hnf_x(BUTTON, 1 + 2), WBfield(NP), EVENT(CLICK, H)
 #define UBUTTON(NM,H) WBr2h_(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define EBUTTON(NM,H) WBr2h_e(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
@@ -940,8 +950,10 @@ enum {
 #define KEYMAP(V, NM) WBrhf(KEYMAP, 2), WBfield(V), (NM)
 #define SHORTCUTs(NM) WBh(SHORTCUT, 1), (NM)
 #define SHORTCUT(K,M) WBh(SHORTCUT, 2), (void *)(GDK_##K), (void *)(_##M##mask)
-#define GROUP(N) WBrh(GROUP, 1), (void *)(N)
-//#define DEFGROUP WBrh(GROUP, 0)
+#define GROUPR WBrh(uOP, 0)
+#define GROUP0 WBrhs(uOP, 0)
+#define GROUPN WBrhs(uOP, 1), NULL
+#define GROUP(NM) WBrhs(uOP, 1), (NM)
 #define IDENT(NM) WBh(IDENT, 1), (NM)
 #define BORDER(T,V) WBh(BOR_##T, 1), (void *)(V)
 #define DEFBORDER(T) WBh(BOR_##T, 0)
@@ -1047,6 +1059,7 @@ enum {
 //	Extra data of WDATA itself
 // !!! Must not clash with toplevels' data
 #define WDATA_ACTMAP	(-1)	/* Change state of slots which have ACTMAP */
+#define WDATA_TABLET	(-2)	/* Query tablet device */
 
 //	Extra data of WINDOW
 #define WINDOW_TITLE	0

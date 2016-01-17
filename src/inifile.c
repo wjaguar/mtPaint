@@ -70,7 +70,8 @@ enum {
  * possibly for inline backslash */
 static char *escape_string(char *src, int bs)
 {
-	static const char *escaped = "\t\r\n \\";
+	static const char *escaped = "\t \\\r\n";
+	const char *e = escaped;
 	char c, *cp, *tmp, *t2;
 
 	if ((src[0] != '\t') && (src[0] != ' ') &&
@@ -80,12 +81,13 @@ static char *escape_string(char *src, int bs)
 	{
 		while ((c = *src++))
 		{
-			if ((cp = strchr(escaped, c)))
+			if ((cp = strchr(e, c)))
 			{
 				*t2++ = '\\';
-				c = "trn \\"[cp - escaped];
+				c = "t \\rn"[cp - escaped];
 			}
 			*t2++ = c;
+			e = escaped + 2;
 		}
 		*t2 = '\0';
 	}

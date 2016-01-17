@@ -1,5 +1,5 @@
 /*	shifter.c
-	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -31,6 +31,7 @@
 
 typedef struct {
 	int frame[3];
+	int row, sfd[3];
 	png_color old_pal[256];
 	void **spinpack, **label, **slider;
 	void **clear, **fix, **create;
@@ -123,12 +124,20 @@ static int gcd(int a, int b)
 }
 
 /* An input widget has changed in the dialog */
-static void shifter_moved(shifter_dd *dt, void **wdata)
+static void shifter_moved(shifter_dd *dt, void **wdata, int what, void **where)
 {
 	char txt[130];
-	int i, j, l, lcm;
+	int i, j, l, lcm, *v = cmd_read(where, dt);
 
-	/* !!! Spins are self-reading */
+	/* Scriptable parts */
+	if (v == &dt->row) return;
+	if (v && (v != spins[0][0]))
+	{
+		j = v - dt->sfd;
+		i = spins[dt->row][j][2];
+		spins[dt->row][j][0] = *v < i ? *v : i;
+	}
+
 	for (lcm = 1 , i = 0; i < NSHIFT; i++)
 	{
 		l = spins[i][0][0] - spins[i][1][0];
@@ -153,7 +162,7 @@ static void shift_btn(shifter_dd *dt, void **wdata, int what, void **where)
 {
 	int i;
 
-	if (what == op_EVT_CANCEL)
+	if ((what == op_EVT_OK) || (what == op_EVT_CANCEL))
 	{
 		shift_play_state = FALSE; // Stop
 
@@ -193,7 +202,7 @@ static void shift_btn(shifter_dd *dt, void **wdata, int what, void **where)
 		for (i = 0; i < NSHIFT; i++)
 			spins[i][0][0] = spins[i][1][0] = spins[i][2][0] = 0;
 		cmd_reset(dt->spinpack, dt);
-		shifter_moved(dt, wdata);
+		shifter_moved(dt, wdata, op_EVT_CHANGE, dt->spinpack);
 	}
 
 	else if (where == dt->create)	// Button to create a sequence of undo images
@@ -220,27 +229,31 @@ static void *shifter_code[] = {
 	XVBOXB, // !!! Originally the main vbox was that way
 	TABLE(4, 9),
 	BORDER(LABEL, 0),
+	uSPIN(row, 0, 7), EVENT(CHANGE, shifter_moved),
 	TLLABELx(_("Start"), 1, 0, 0, 0, 5),
+		uSPIN(sfd[0], 0, 255), EVENT(CHANGE, shifter_moved),
 	TLLABELx(_("Finish"), 2, 0, 0, 0, 5),
+		uSPIN(sfd[1], 0, 255), EVENT(CHANGE, shifter_moved),
 	TLLABELx(_("Delay"), 3, 0, 0, 0, 5),
+		uSPIN(sfd[2], 0, 255), EVENT(CHANGE, shifter_moved),
 	DEFBORDER(LABEL),
 	TLTEXT("0\n1\n2\n3\n4\n5\n6\n7", 0, 1),
 	REF(spinpack), TLSPINPACKv(spins, 3 * NSHIFT, shifter_moved, 3, 1, 1),
 	TRIGGER,
 	WDONE,
 	HBOX,
-	UTOGGLEv(_("Play"), shift_play_state, shift_btn),
+	UTOGGLEv(_("Play"), shift_play_state, shift_btn), UNNAME,
 	BORDER(LABEL, 0),
 	REF(label), XLABELcr(""),
 	WDONE,
-	REF(slider), SPINSLIDEa(frame),
+	REF(slider), SPINSLIDEa(frame), OPNAME("Play"),
 	EVENT(CHANGE, shifter_slider_moved),
 	HSEP,
 	HBOX,
-	REF(clear), BUTTON(_("Clear"), shift_btn),
-	REF(fix), BUTTON(_("Fix Palette"), shift_btn),
-	REF(create), BUTTON(_("Create Frames"), shift_btn),
-	CANCELBTN(_("Close"), shift_btn),
+	REF(clear), BUTTONs(_("Clear"), shift_btn),
+	REF(fix), BUTTONs(_("Fix Palette"), shift_btn),
+	REF(create), BUTTONs(_("Create Frames"), shift_btn),
+	CANCELBTN(_("Close"), shift_btn), uOKBTN(shift_btn),
 	WDONE,
 // !!! Transient windows cannot be minimized; don't know if that's desirable here
 	ONTOP0,
@@ -266,5 +279,5 @@ void pressed_shifter()
 
 	shift_play_state = FALSE; // Stopped
 
-	run_create(shifter_code, &tdata, sizeof(tdata));
+	run_create_(shifter_code, &tdata, sizeof(tdata), script_cmds);
 }

@@ -236,7 +236,6 @@ int release_grab();
 // Frame widget with passthrough scrolling
 
 GtkWidget *wjframe_new();
-void add_with_wjframe(GtkWidget *bin, GtkWidget *widget);
 
 // Scrollable canvas widget
 

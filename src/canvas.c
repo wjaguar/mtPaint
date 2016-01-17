@@ -47,7 +47,7 @@ int marq_status = MARQUEE_NONE, marq_xy[4] = { -1, -1, -1, -1 };	// Selection ma
 int marq_drag_x, marq_drag_y;						// Marquee dragging offset
 int line_status = LINE_NONE, line_xy[4];				// Line tool
 int poly_status = POLY_NONE;						// Polygon selection tool
-int clone_x, clone_y;							// Clone offsets
+int clone_status, clone_x, clone_y, clone_dx, clone_dy;			// Clone tool
 
 int recent_files;					// Current recent files setting
 
@@ -466,8 +466,8 @@ static void gauss_xy_click(gauss_dd *dt, void **wdata, int what, void **where)
 static void *gauss_code[] = {
 	VBOXPS,
 	BORDER(SPIN, 0),
-	FSPIN(x, 0, 20000), ALTNAME("x"),
-	REF(yspin), FSPIN(y, 0, 20000), INSENS, OPNAME("y"),
+	FSPIN(x, 0, 20000), ALTNAME("X"),
+	REF(yspin), FSPIN(y, 0, 20000), INSENS, OPNAME("Y"),
 	CHECK(_("Different X/Y"), xy), EVENT(CHANGE, gauss_xy_click),
 	IF(rgb), CHECK(_("Gamma corrected"), gamma),
 	WDONE, RET
@@ -2385,7 +2385,7 @@ static void poly_add_po(int x, int y)
 	}
 }
 
-void poly_delete_po(int x, int y)
+static void poly_delete_po(int x, int y)
 {
 	if ((poly_status != POLY_SELECTING) && (poly_status != POLY_DONE))
 		return; // Do nothing
@@ -2509,7 +2509,7 @@ static int tool_draw(int x, int y, int first_point, int *update)
 		break;
 	case TOOL_CLONE:
 		if (first_point || (ox != x) || (oy != y))
-			mem_clone(x + clone_x, y + clone_y, x, y);
+			mem_clone(x + clone_dx, y + clone_dy, x, y);
 		else return (TRUE); /* May try again with other x & y */
 		break;
 	case TOOL_SELECT:
@@ -2548,7 +2548,7 @@ void line_to_gradient()
 	}
 }
 
-void tool_action(int count, int x, int y, int button, int pressure)
+void do_tool_action(int cmd, int x, int y, int pressure)
 {
 	static double lstep;
 	linedata ncline;
@@ -2556,27 +2556,16 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	int update_area[4];
 	int minx = -1, miny = -1, xw = -1, yh = -1;
 	tool_info o_tool = tool_state;
-	int i, j, k, ts2, tr2, res, ox, oy;
+	int i, j, k, ts2, tr2, ox, oy;
 	int oox, ooy;	// Continuous smudge stuff
-	int rmb_tool, first_point;
+	int first_point;
 
-	/* Does tool draw with color B when right button pressed? */
-	rmb_tool = (tool_type <= TOOL_SPRAY) || (tool_type == TOOL_FLOOD);
+	// Only do something with a new point
+	if (!(first_point = !pen_down) && (cmd & TCF_ONCE) &&
+		(tool_ox == x) && (tool_oy == y)) return;
 
-	if (rmb_tool) tint_mode[2] = button; /* Swap tint +/- */
-
-	if ((first_point = !pen_down))
-	{
-		lstep = 0.0;
-		if ((button == 3) && rmb_tool && !tint_mode[0])
-		{
-			col_reverse = TRUE;
-			mem_swap_cols(FALSE);
-		}
-	}
-	else if ( tool_ox == x && tool_oy == y ) return;	// Only do something with a new point
-
-	if (tablet_working || script_cmds)
+	// Apply pressure
+	if ((cmd & TCF_PRES) && (tablet_working || script_cmds))
 	{
 // !!! Later maybe switch the calculations to integer
 		double p = pressure <= (MAX_PRESSURE * 2 / 10) ? -1.0 :
@@ -2595,247 +2584,237 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	ts2 = tool_size >> 1;
 	tr2 = tool_size - ts2 - 1;
 
-	/* Handle "exceptional" tools */
-	res = 1;
-	if (tool_type == TOOL_LINE)
+	switch (cmd &= TC_OPMASK)
 	{
-		if ( button == 1 )
+	case TC_LINE_START: case TC_LINE_ARROW:
+		line_x2 = x;
+		line_y2 = y;
+		if (line_status == LINE_NONE)
 		{
-			line_x2 = x;
-			line_y2 = y;
-			if ( line_status == LINE_NONE )
-			{
-				line_x1 = x;
-				line_y1 = y;
-			}
-
-			// Draw circle at x, y
-			if ( line_status == LINE_LINE )
-			{
-				grad_info svgrad = gradient[mem_channel];
-
-				/* If not called from draw_arrow() */
-				if (count != MCOUNT_NOTHING) line_to_gradient();
-
-				mem_undo_next(UNDO_TOOL);
-				if ( tool_size > 1 )
-				{
-					int oldmode = mem_undo_opacity;
-					mem_undo_opacity = TRUE;
-					f_circle( line_x1, line_y1, tool_size );
-					f_circle( line_x2, line_y2, tool_size );
-					// Draw tool_size thickness line from 1-2
-					tline( line_x1, line_y1, line_x2, line_y2, tool_size );
-					mem_undo_opacity = oldmode;
-				}
-				else sline( line_x1, line_y1, line_x2, line_y2 );
-
-				minx = (line_x1 < line_x2 ? line_x1 : line_x2) - ts2;
-				miny = (line_y1 < line_y2 ? line_y1 : line_y2) - ts2;
-				xw = abs( line_x2 - line_x1 ) + 1 + tool_size;
-				yh = abs( line_y2 - line_y1 ) + 1 + tool_size;
-
-				line_x1 = line_x2;
-				line_y1 = line_y2;
-
-				gradient[mem_channel] = svgrad;
-			}
-			line_status = LINE_START;
+			line_x1 = x;
+			line_y1 = y;
 		}
-		else stop_line();	// Right button pressed so stop line process
-	}
-	else if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-	{
-		if ( marq_status == MARQUEE_PASTE )		// User wants to drag the paste box
+
+		// Draw circle at x, y
+		if (line_status == LINE_LINE)
 		{
-			if ( x>=marq_x1 && x<=marq_x2 && y>=marq_y1 && y<=marq_y2 )
+			grad_info svgrad = gradient[mem_channel];
+
+			/* If not called from draw_arrow() */
+			if (cmd != TC_LINE_ARROW) line_to_gradient();
+
+			mem_undo_next(UNDO_TOOL);
+			if (tool_size > 1)
 			{
-				marq_status = MARQUEE_PASTE_DRAG;
-				marq_drag_x = x - marq_x1;
-				marq_drag_y = y - marq_y1;
+				int oldmode = mem_undo_opacity;
+				mem_undo_opacity = TRUE;
+				f_circle(line_x1, line_y1, tool_size);
+				f_circle(line_x2, line_y2, tool_size);
+				// Draw tool_size thickness line from 1-2
+				tline(line_x1, line_y1, line_x2, line_y2, tool_size);
+				mem_undo_opacity = oldmode;
 			}
+			else sline(line_x1, line_y1, line_x2, line_y2);
+
+			minx = (line_x1 < line_x2 ? line_x1 : line_x2) - ts2;
+			miny = (line_y1 < line_y2 ? line_y1 : line_y2) - ts2;
+			xw = abs( line_x2 - line_x1 ) + 1 + tool_size;
+			yh = abs( line_y2 - line_y1 ) + 1 + tool_size;
+
+			line_x1 = line_x2;
+			line_y1 = line_y2;
+
+			gradient[mem_channel] = svgrad;
 		}
-		if ( marq_status == MARQUEE_PASTE_DRAG && ( button == 1 || button == 13 || button == 2 ) )
-		{	// User wants to drag the paste box
-			paint_marquee(MARQ_MOVE, x - marq_drag_x, y - marq_drag_y, NULL);
-		}
-		if ( (marq_status == MARQUEE_PASTE_DRAG || marq_status == MARQUEE_PASTE ) &&
-			(((button == 3) && (count == 1)) || ((button == 13) && !count)))
-		{	// User wants to commit the paste
-			res = 0; /* Fall through to noncontinuous tools */
-		}
-		if ( tool_type == TOOL_SELECT && button == 3 && (marq_status == MARQUEE_DONE ) )
+		line_status = LINE_START;
+		break;
+	case TC_LINE_NEXT:
+		line_status = LINE_LINE;
+		repaint_line(NULL);
+		break;
+	case TC_LINE_STOP:
+		stop_line();
+		break;
+	case TC_SEL_CLEAR:
+		pressed_select(FALSE);
+		break;
+	case TC_SEL_START:
+	case TC_SEL_SET_0: case TC_SEL_SET_1:
+	case TC_SEL_SET_2: case TC_SEL_SET_3:
+		if (cmd == TC_SEL_START)
 		{
-			pressed_select(FALSE);
-		}
-		if ( tool_type == TOOL_SELECT && button == 1 && (marq_status == MARQUEE_NONE ||
-			marq_status == MARQUEE_DONE) )		// Starting a selection
-		{
-			if ( marq_status == MARQUEE_DONE )
-			{
-				paint_marquee(MARQ_HIDE, 0, 0, NULL);
-				i = close_to(x, y);
-				if (!(i & 1) ^ (marq_x1 > marq_x2))
-					marq_x1 = marq_x2;
-				if (!(i & 2) ^ (marq_y1 > marq_y2))
-					marq_y1 = marq_y2;
-				set_cursor(NULL);
-			}
-			else
-			{
-				marq_x1 = x;
-				marq_y1 = y;
-			}
-			marq_x2 = x;
-			marq_y2 = y;
-			marq_status = MARQUEE_SELECTING;
-			paint_marquee(MARQ_SNAP, 0, 0, NULL);
+			marq_x1 = x;
+			marq_y1 = y;
 		}
 		else
 		{
-			if (marq_status == MARQUEE_SELECTING)	// Continuing to make a selection
-				paint_marquee(MARQ_SIZE, x, y, NULL);
+			paint_marquee(MARQ_HIDE, 0, 0, NULL);
+			i = cmd - TC_SEL_SET_0;
+			if (!(i & 1) ^ (marq_x1 > marq_x2))
+				marq_x1 = marq_x2;
+			if (!(i & 2) ^ (marq_y1 > marq_y2))
+				marq_y1 = marq_y2;
+			set_cursor(NULL);
 		}
-
-		if ( tool_type == TOOL_POLYGON )
-		{
-			if ( poly_status == POLY_NONE && marq_status == MARQUEE_NONE )
-			{
-				// Start doing something
-				if (button == 1) poly_status = POLY_SELECTING;
-				else if (button) poly_status = POLY_DRAGGING;
-			}
-			if ( poly_status == POLY_SELECTING )
-			{
-				/* Add another point to polygon */
-				if (button == 1) poly_add_po(x, y);
-				/* Stop adding points */
-				else if (button == 3) poly_conclude();
-			}
-			if ( poly_status == POLY_DRAGGING )
-			{
-				/* Stop forming polygon */
-				if (count < 0) poly_conclude();
-				/* Add another point to polygon */
-				else poly_add_po(x, y);		
-			}
-		}
-	}
-	else /* Some other kind of tool */
-	{
-		/* If proper button for tool */
-		if ((button == 1) || ((button == 3) && rmb_tool))
-		{
-			// Update stroke gradient
-			if (STROKE_GRADIENT) grad_stroke(x, y);
-			// Do memory stuff for undo
-			if (tool_type != TOOL_FLOOD) mem_undo_next(UNDO_TOOL);	
-			res = 0; 
-		}
-	}
-
-	/* Handle floodfill here, as too irregular a non-continuous tool */
-	if (!res && (tool_type == TOOL_FLOOD))
-	{
-		/* Non-masked start point */
-		if (pixel_protected(x, y) < 255)
-		{
-			j = get_pixel(x, y);
-			k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
-				mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
-			if (j != k) /* And never start on colour A */
-			{
-				spot_undo(UNDO_TOOL);
-				flood_fill(x, y, j);
-				// All pixels could change
-				minx = miny = 0;
-				xw = mem_width;
-				yh = mem_height;
-			}
-		}
-		/* Undo the color swap if fill failed */
-		if (!pen_down && col_reverse)
-		{
-			col_reverse = FALSE;
-			mem_swap_cols(FALSE);
-		}
-		res = 1;
-	}
-
-	/* Handle continuous mode */
-	while (!res && mem_continuous && !first_point)
-	{
-		minx = tool_ox < x ? tool_ox : x;
-		xw = (tool_ox > x ? tool_ox : x) - minx + tool_size;
-		minx -= ts2;
-
-		miny = tool_oy < y ? tool_oy : y;
-		yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
-		miny -= ts2;
-
-		res = 1;
-
-		if (ts2 ? tool_type == TOOL_SQUARE : tool_type < TOOL_SPRAY)
-		{
-			rec_continuous(x, y, tool_size, tool_size);
-			break;
-		}
-		if (tool_type == TOOL_CIRCLE)
-		{
-			/* Redraw stroke gradient in proper direction */
-			if (STROKE_GRADIENT)
-				f_circle(tool_ox, tool_oy, tool_size);
-			tline(tool_ox, tool_oy, x, y, tool_size);
-			f_circle(x, y, tool_size);
-			break;
-		}
-		if (tool_type == TOOL_HORIZONTAL)
-		{
-			miny += ts2; yh -= tool_size - 1;
-			rec_continuous(x, y, tool_size, 1);
-			break;
-		}
-		if (tool_type == TOOL_VERTICAL)
-		{
-			minx += ts2; xw -= tool_size - 1;
-			rec_continuous(x, y, 1, tool_size);
-			break;
-		}
-		if (tool_type == TOOL_SLASH)
-		{
-			g_para(x + tr2, y - ts2, x - ts2, y + tr2,
-				tool_ox - x, tool_oy - y);
-			break;
-		}
-		if (tool_type == TOOL_BACKSLASH)
-		{
-			g_para(x - ts2, y - ts2, x + tr2, y + tr2,
-				tool_ox - x, tool_oy - y);
-			break;
-		}
-		if (tool_type == TOOL_SMUDGE)
-		{
-			linedata line;
-
-			if (button != 1) break; /* Do nothing on right button */
-			line_init(line, tool_ox, tool_oy, x, y);
-			while (TRUE)
-			{
-				oox = line[0];
-				ooy = line[1];
-				if (line_step(line) < 0) break;
-				mem_smudge(oox, ooy, line[0], line[1]);
-			}
-			break;
-		}
-		xw = yh = -1; /* Nothing was done */
-		res = 0; /* Non-continuous tool */
+		marq_x2 = x;
+		marq_y2 = y;
+		marq_status = MARQUEE_SELECTING;
+		paint_marquee(MARQ_SNAP, 0, 0, NULL);
 		break;
-	}
+	case TC_SEL_TO:
+		paint_marquee(MARQ_SIZE, x, y, NULL);
+		break;
+	case TC_SEL_STOP:
+		marq_status = marq_status == MARQUEE_PASTE_DRAG ? MARQUEE_PASTE :
+			MARQUEE_DONE;
+		cursor_corner = -1;
+// !!! Here fallthrough to setting cursor
+		break;
+	case TC_POLY_START: case TC_POLY_START_D:
+		poly_status = cmd == TC_POLY_START ? POLY_SELECTING : POLY_DRAGGING;
+		// Fallthrough
+	case TC_POLY_ADD:
+		poly_add_po(x, y);
+		break;
+	case TC_POLY_DEL:
+		poly_delete_po(x, y);
+		break;
+	case TC_POLY_CLOSE:
+		poly_conclude();
+		break;
+	case TC_PASTE_DRAG:
+	case TC_PASTE_PAINT:
+		if (marq_status != MARQUEE_PASTE_DRAG)
+		{
+			marq_status = MARQUEE_PASTE_DRAG;
+			marq_drag_x = x - marq_x1;
+			marq_drag_y = y - marq_y1;
+		}
+		else paint_marquee(MARQ_MOVE, x - marq_drag_x, y - marq_drag_y, NULL);
+		if (cmd != TC_PASTE_PAINT) break;
+		cmd = TC_PASTE_COMMIT;
+		// Fallthrough
+	case TC_PAINT_B:
+		if (cmd == TC_PAINT_B)
+		{
+			tint_mode[2] = 3; /* Swap tint +/- */
+			if (first_point && !tint_mode[0])
+			{
+				col_reverse = TRUE;
+				mem_swap_cols(FALSE);
+			}
+		}
+		// Fallthrough
+	case TC_PAINT: case TC_PASTE_COMMIT:
+		// Update stroke gradient
+		if (STROKE_GRADIENT) grad_stroke(x, y);
 
-	/* Handle non-continuous mode & tools */
-	if (!res)
-	{
+		/* Handle floodfill here, as too irregular a non-continuous tool */
+		if (tool_type == TOOL_FLOOD)
+		{
+			/* Non-masked start point */
+			if (pixel_protected(x, y) < 255)
+			{
+				j = get_pixel(x, y);
+				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
+					mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
+				if (j != k) /* And never start on colour A */
+				{
+					spot_undo(UNDO_TOOL);
+					flood_fill(x, y, j);
+					// All pixels could change
+					minx = miny = 0;
+					xw = mem_width;
+					yh = mem_height;
+				}
+			}
+			/* Undo the color swap if fill failed */
+			if (!pen_down && col_reverse)
+			{
+				col_reverse = FALSE;
+				mem_swap_cols(FALSE);
+			}
+			break;
+		}
+
+		// Relativise source coords if that isn't yet done
+		if ((tool_type == TOOL_CLONE) && (clone_status == CLONE_ABS))
+		{
+			clone_dx = clone_x - x;
+			clone_dy = clone_y - y;
+			clone_status = CLONE_ABS | CLONE_TRACK;
+		}
+
+		// Do memory stuff for undo
+		mem_undo_next(UNDO_TOOL);	
+
+		/* Handle continuous mode */
+		if (mem_continuous && !first_point)
+		{
+			minx = tool_ox < x ? tool_ox : x;
+			xw = (tool_ox > x ? tool_ox : x) - minx + tool_size;
+			minx -= ts2;
+
+			miny = tool_oy < y ? tool_oy : y;
+			yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
+			miny -= ts2;
+
+			if (ts2 ? tool_type == TOOL_SQUARE : tool_type < TOOL_SPRAY)
+			{
+				rec_continuous(x, y, tool_size, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_CIRCLE)
+			{
+				/* Redraw stroke gradient in proper direction */
+				if (STROKE_GRADIENT)
+					f_circle(tool_ox, tool_oy, tool_size);
+				tline(tool_ox, tool_oy, x, y, tool_size);
+				f_circle(x, y, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_HORIZONTAL)
+			{
+				miny += ts2; yh -= tool_size - 1;
+				rec_continuous(x, y, tool_size, 1);
+				break;
+			}
+			if (tool_type == TOOL_VERTICAL)
+			{
+				minx += ts2; xw -= tool_size - 1;
+				rec_continuous(x, y, 1, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_SLASH)
+			{
+				g_para(x + tr2, y - ts2, x - ts2, y + tr2,
+					tool_ox - x, tool_oy - y);
+				break;
+			}
+			if (tool_type == TOOL_BACKSLASH)
+			{
+				g_para(x - ts2, y - ts2, x + tr2, y + tr2,
+					tool_ox - x, tool_oy - y);
+				break;
+			}
+			if (tool_type == TOOL_SMUDGE)
+			{
+				linedata line;
+
+				line_init(line, tool_ox, tool_oy, x, y);
+				while (TRUE)
+				{
+					oox = line[0];
+					ooy = line[1];
+					if (line_step(line) < 0) break;
+					mem_smudge(oox, ooy, line[0], line[1]);
+				}
+				break;
+			}
+			xw = yh = -1; /* Nothing was done */
+		}
+
+		/* Handle non-continuous mode & tools */
 		update_area[0] = update_area[1] = MAX_WIDTH;
 		update_area[2] = update_area[3] = 0;
 
@@ -2843,11 +2822,13 @@ void tool_action(int count, int x, int y, int button, int pressure)
 		i = j = 0;
 		ox = marq_x1;
 		oy = marq_y1;
-		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+		if (cmd == TC_PASTE_COMMIT)
 		{
 			i = marq_x1 - x;
 			j = marq_y1 - y;
 		}
+
+		if (first_point) lstep = 0.0;
 
 		if (first_point || !brush_spacing) /* Single point */
 			tool_draw(x + i, y + j, first_point, update_area);
@@ -2882,6 +2863,7 @@ void tool_action(int count, int x, int y, int button, int pressure)
 		miny = update_area[1];
 		xw = update_area[2] - minx;
 		yh = update_area[3] - miny;
+		break;
 	}
 
 	if ((xw > 0) && (yh > 0)) /* Some drawing action */
@@ -2900,7 +2882,78 @@ void tool_action(int count, int x, int y, int button, int pressure)
 	tool_ox = x;	// Remember the coords just used as they are needed in continuous mode
 	tool_oy = y;
 
+	tint_mode[2] = 0; /* Default */
 	if (tablet_working || script_cmds) tool_state = o_tool;
+}
+
+int tool_action_(int count, int button, int x, int y)
+{
+	int cmd = TC_NONE;
+
+	/* Handle "exceptional" tools */
+	if (tool_type == TOOL_LINE)
+// !!! Is pressure sensitivity even useful here, or is it a misfeature?
+		cmd = button == 1 ? TC_LINE_START | TCF_PRES : TC_LINE_STOP;
+	else if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+	{
+		// User wants to drag the paste box
+		if ((button == 1) || (button == 13) || (button == 2))
+		{
+			if ((marq_status == MARQUEE_PASTE_DRAG) ||
+				((marq_status == MARQUEE_PASTE) &&
+				(x >= marq_x1) && (x <= marq_x2) &&
+				(y >= marq_y1) && (y <= marq_y2)))
+				cmd = TC_PASTE_DRAG;
+		}
+		// User wants to commit the paste
+		if (((marq_status == MARQUEE_PASTE_DRAG) || (marq_status == MARQUEE_PASTE)) &&
+			(((button == 3) && (count == 1)) || ((button == 13) && !count)))
+			cmd = cmd == TC_PASTE_DRAG ? TC_PASTE_PAINT | TCF_PRES :
+				TC_PASTE_COMMIT | TCF_PRES;
+
+		if ((tool_type == TOOL_SELECT) && (button == 3) && (marq_status == MARQUEE_DONE))
+			cmd = TC_SEL_CLEAR;
+		if ((tool_type == TOOL_SELECT) && (button == 1) &&
+			((marq_status == MARQUEE_NONE) || (marq_status == MARQUEE_DONE)))
+			// Starting a selection
+		{
+			if (marq_status == MARQUEE_DONE)
+				cmd = TC_SEL_SET_0 + close_to(x, y);
+			else cmd = TC_SEL_START;
+		}
+		else
+		{
+			if (marq_status == MARQUEE_SELECTING)
+				cmd = TC_SEL_TO; // Continuing to make a selection
+		}
+
+		if (tool_type == TOOL_POLYGON)
+		{
+			if ((poly_status == POLY_NONE) && (marq_status == MARQUEE_NONE))
+			{
+				// Start doing something
+				if (button == 1) cmd = TC_POLY_START;
+				else if (button) cmd = TC_POLY_START_D;
+			}
+			if (poly_status == POLY_SELECTING)
+			{
+				/* Add another point to polygon */
+				if (button == 1) cmd = TC_POLY_ADD;
+				/* Stop adding points */
+				else if (button == 3) cmd = TC_POLY_CLOSE;
+			}
+			// Add point to polygon
+			if (poly_status == POLY_DRAGGING) cmd = TC_POLY_ADD;
+		}
+	}
+	else /* Some other kind of tool */
+	{
+		if (button == 1) cmd = TC_PAINT | TCF_PRES;
+		/* Does tool draw with color B when right button pressed? */
+		else if ((button == 3) && ((tool_type <= TOOL_SPRAY) ||
+			(tool_type == TOOL_FLOOD))) cmd = TC_PAINT_B | TCF_PRES;
+	}
+	return (cmd);
 }
 
 void check_marquee()	// Check marquee boundaries are OK - may be outside limits via arrow keys

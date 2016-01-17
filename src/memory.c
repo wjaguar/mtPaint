@@ -146,7 +146,7 @@ unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
 				// RGB screen memory holding current palette
 static int found[1024];		// Used by mem_cols_used() & mem_convert_indexed
 
-int mem_brush_list[81][3] = {		// Preset brushes parameters
+int mem_brush_list[NUM_BRUSHES][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 5, 1 }, { TOOL_SPRAY, 7, 1 }, { TOOL_SPRAY, 9, 2 },
 { TOOL_SPRAY, 13, 2 }, { TOOL_SPRAY, 15, 3 }, { TOOL_SPRAY, 19, 3 },
 { TOOL_SPRAY, 23, 4 }, { TOOL_SPRAY, 27, 5 }, { TOOL_SPRAY, 31, 6 },
@@ -1999,23 +1999,38 @@ void mem_init()					// Initialise memory
 
 	mem_pat_update();
 
-	for ( i=0; i<81; i++ )					// Draw each brush
+	for (i = 0; i < NUM_BRUSHES; i++)		// Draw each brush
 	{
-		ix = 18 + 36 * (i % 9);
-		iy = 18 + 36 * (i / 9);
+		ix = BRUSH_CELL / 2 + BRUSH_CELL * (i % BRUSH_GRID_W);
+		iy = BRUSH_CELL / 2 + BRUSH_CELL * (i / BRUSH_GRID_W);
 		bt = mem_brush_list[i][0];
 		bs = mem_brush_list[i][1];
 		bf = mem_brush_list[i][2];
 
-		if ( bt == TOOL_SQUARE ) f_rectangle( ix - bs/2, iy - bs/2, bs, bs );
-		if ( bt == TOOL_CIRCLE ) f_circle( ix, iy, bs );
-		if ( bt == TOOL_VERTICAL ) f_rectangle( ix, iy - bs/2, 1, bs );
-		if ( bt == TOOL_HORIZONTAL ) f_rectangle( ix - bs/2, iy, bs, 1 );
-		if ( bt == TOOL_SLASH ) for ( j=0; j<bs; j++ ) put_pixel( ix-bs/2+j, iy+bs/2-j );
-		if ( bt == TOOL_BACKSLASH ) for ( j=0; j<bs; j++ ) put_pixel( ix+bs/2-j, iy+bs/2-j );
-		if ( bt == TOOL_SPRAY )
-			for ( j=0; j<bf*3; j++ )
-				put_pixel( ix-bs/2 + rand() % bs, iy-bs/2 + rand() % bs );
+		switch (bt)
+		{
+		case TOOL_SQUARE:
+			f_rectangle(ix - bs / 2, iy - bs / 2, bs, bs); break;
+		case TOOL_CIRCLE:
+			f_circle(ix, iy, bs); break;
+		case TOOL_VERTICAL:
+			f_rectangle(ix, iy - bs / 2, 1, bs); break;
+		case TOOL_HORIZONTAL:
+			f_rectangle(ix - bs / 2, iy, bs, 1); break;
+		case TOOL_SLASH:
+			for (j = 0; j < bs; j++)
+				put_pixel(ix - bs / 2 + j, iy + bs / 2 - j);
+			break;
+		case TOOL_BACKSLASH:
+			for (j = 0; j < bs; j++)
+				put_pixel(ix + bs / 2 - j, iy + bs / 2 - j);
+			break;
+		case TOOL_SPRAY:
+			for (j = 0; j < bf * 3; j++)
+				put_pixel(ix - bs / 2 + rand() % bs,
+					iy - bs / 2 + rand() % bs);
+			break;
+		}
 	}
 
 	j = PATCH_WIDTH * PATCH_HEIGHT * 3;

@@ -24,7 +24,7 @@ int marq_status, marq_xy[4];				// Selection marquee
 int marq_drag_x, marq_drag_y;				// Marquee dragging offset
 int line_status, line_xy[4];				// Line tool
 int poly_status;					// Polygon selection tool
-int clone_x, clone_y;					// Clone offsets
+int clone_status, clone_x, clone_y, clone_dx, clone_dy;	// Clone tool
 int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
 int lasso_sel;						// Lasso by selection channel
@@ -85,6 +85,10 @@ int	col_reverse,					// Painting with right button
 #define GRAD_END 2
 #define GRAD_DONE 3
 
+#define CLONE_REL   0
+#define CLONE_ABS   1
+#define CLONE_TRACK 2 /* Flag */
+
 #define MIN_ZOOM 0.1
 #define MAX_ZOOM 20
 
@@ -126,7 +130,48 @@ void set_new_filename(int layer, char *fname);
 void pressed_do_undo(int redo);
 
 void line_to_gradient();	// Setup gradient along line tool
-void tool_action(int count, int x, int y, int button, int pressure);	// Paint some pixels!
+
+/* Tool action codes */
+enum {
+	TC_NONE = 0,
+	TC_LINE_START,
+	TC_LINE_ARROW,
+	TC_LINE_NEXT,
+	TC_LINE_STOP,
+	TC_SEL_CLEAR,
+	TC_SEL_START,
+	TC_SEL_SET_0,
+	TC_SEL_SET_1,
+	TC_SEL_SET_2,
+	TC_SEL_SET_3,
+	TC_SEL_TO,
+	TC_SEL_STOP,
+	TC_POLY_START,
+	TC_POLY_START_D,
+	TC_POLY_ADD,
+	TC_POLY_DEL,
+	TC_POLY_CLOSE,
+	TC_PASTE_DRAG,
+	TC_PASTE_COMMIT,
+	TC_PASTE_PAINT,
+	TC_PAINT,
+	TC_PAINT_B,
+	TC_GRAD_START,
+	TC_GRAD_SET0,
+	TC_GRAD_SET1,
+	TC_GRAD_PICK0,
+	TC_GRAD_PICK1,
+	TC_GRAD_DRAG0,
+	TC_GRAD_DRAG1,
+	TC_GRAD_CLEAR,
+};
+
+#define TC_OPMASK 0x0FF
+#define TCF_PRES  0x100 /* Use pressure */
+#define TCF_ONCE  0x200 /* Skip repeats */
+
+void do_tool_action(int cmd, int x, int y, int pressure);	// Paint some pixels!
+int tool_action_(int count, int button, int x, int y);	// Decide what to paint
 void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );
@@ -140,7 +185,6 @@ int close_to( int x1, int y1 );
 void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx);	// Draw/clear marquee
 void paint_poly_marquee(rgbcontext *ctx);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);		// Clear old temp line, draw next temp line
-void poly_delete_po(int x, int y);		// Delete nearest/last point from polygon
 
 void update_sel_bar();			// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar

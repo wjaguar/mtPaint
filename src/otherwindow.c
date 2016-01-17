@@ -407,7 +407,7 @@ void *pattern_code[] = {
 	/* !!! Given the window is modal, this makes it closeable by button
 	 * release anywhere over mtPaint's main window - WJ */
 	EVENT(RMOUSE, delete_pat),
-	IF(wh[2]), TALLOC(rgb, wh[2]),
+	TALLOC(rgb, wh[2]),
 	RGBIMAGE(rgb, wh), EVENT(MOUSE, click_pat),
 	WEND
 };
@@ -436,10 +436,9 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 		tdata.wh[0] = PATCH_WIDTH;
 		tdata.wh[1] = PATCH_HEIGHT;
 		tdata.wh[2] = 0; // no allocation
-		tdata.xs = PATCH_WIDTH / 9;
-		tdata.ys = PATCH_HEIGHT / 9;
-		tdata.xw = 9;
-		tdata.max = 80;
+		tdata.xs = tdata.ys = BRUSH_CELL;
+		tdata.xw = BRUSH_GRID_W;
+		tdata.max = NUM_BRUSHES - 1;
 	}
 	else /* if (typ == CHOOSE_COLOR) */
 	{
@@ -917,7 +916,12 @@ static void click_sisca_ok(sisca_dd *dt, void **wdata)
 
 	if (!((nw ^ mem_width) | (nh ^ mem_height) | ox | oy))
 	{
-		alert_same_geometry();
+		if (!script_cmds) alert_same_geometry();
+		else // Allow a noop in script mode
+		{
+			spot_undo(UNDO_PAL);
+			run_destroy(wdata);
+		}
 		return;
 	}
 
@@ -988,8 +992,8 @@ static void *sisca_code[] = {
 		EVENT(CHANGE, sisca_moved),
 	UNLESSx(mode, 1),
 		TLABEL(_("Offset")),
-		REF(spin[2]), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 3), OPNAME("x"),
-		REF(spin[3]), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 3), OPNAME("y"),
+		REF(spin[2]), TLSPIN(x, -MAX_WIDTH, MAX_WIDTH, 1, 3), OPNAME("X"),
+		REF(spin[3]), TLSPIN(y, -MAX_HEIGHT, MAX_HEIGHT, 2, 3), OPNAME("Y"),
 		TLBUTTONs(_("Centre"), click_sisca_centre, 0, 4),
 	ENDIF(1),
 	WDONE,
@@ -1591,7 +1595,7 @@ static void *colsel_code[] = {
 	REF(csel),
 	IF(opflag), TCOLOR(color), // with opacity
 	UNLESS(opflag), COLOR(color), // solid colors
-	EVENT(CHANGE, colsel_evt), OPNAME("colour"),
+	EVENT(CHANGE, colsel_evt), OPNAME("Colour"),
 	UNLESS(is_pal), WDONE,
 	/* Task-specific part */
 	BORDER(TABLE, 0),
@@ -1645,7 +1649,7 @@ static void *colsel_code[] = {
 		FSPIN(v.csrange, 0, 76500), EVENT(CHANGE, csel_controls_changed),
 		CHECK(_("Inverse"), v.csinv), EVENT(CHANGE, csel_controls_changed),
 		RPACKe(csel_modes, 0, 1, v.csmode, csel_controls_changed),
-		OPNAME("mode"),
+		OPNAME("Mode"),
 		WDONE,
 	ENDIF(1),
 	IFx(is_grid, 1),
@@ -2099,7 +2103,7 @@ typedef struct {
 typedef struct {
 	void **xw; // parent widget-map
 	int lock; // prevent nested calls
-	int interp, crgb[3];
+	int interp, crgb[4], cidx[3];
 	int cnt, slot, mode;
 	int gsize[3], gxy[2];
 	void **ppad;
@@ -2111,38 +2115,9 @@ typedef struct {
 	unsigned char pad[GRAD_POINTS * 3], mpad[GRAD_POINTS];
 } ged_dd;
 
-static void ged_set_pad(ged_dd *dt, int n)
-{
-	int xy[2], color[2];
-	void **slot;
-
-	if (n > dt->crgb[2]) return; // out of range
-
-	xy[0] = (n % PPAD_XSZ) * PPAD_SLOT + PPAD_C;
-	xy[1] = (n / PPAD_XSZ) * PPAD_SLOT + PPAD_C;
-	cmd_setv(dt->ppad, xy, FCIMAGE_XY);
-
-	if (dt->lock) return;
-	dt->lock = TRUE; /* Block circular signal calls */
-
-	/* RGB */
-	if (!dt->mode)
-	{
-		color[0] = dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3);
-		color[1] = 255;
-		cmd_setv(slot = dt->col, color, COLOR_RGBA);
-	}
-	/* Indexed / utility / opacity */
-	else cmd_set(slot = dt->spin, dt->crgb[0] = n);
-	dt->lock = FALSE;
-
-	cmd_event(slot, op_EVT_CHANGE); // And now call event
-}
-
 static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 {
-	void *cause;
-	int slot;
+	int slot, *cause;
 
 	if (what == op_EVT_OK)
 	{
@@ -2182,31 +2157,43 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 		if (!dt->mode) /* RGB */
 		{
 			unsigned char *gp = dt->pad + slot * 3;
-			int color[4];
 
-			color[0] = color[2] = MEM_2_INT(gp, 0);
-			color[1] = color[3] = 255;
-			cmd_setv(dt->col, color, COLOR_ALL);
+			dt->crgb[0] = dt->crgb[2] = MEM_2_INT(gp, 0);
+			cmd_setv(dt->col, dt->crgb, COLOR_ALL);
 			cmd_set(dt->opt, dt->mpad[slot]);
 		}
 		else /* Indexed / utility / opacity */
 		{
-			cmd_set(dt->spin, dt->pad[slot]);
 			cmd_set(dt->chk, dt->mpad[slot] == GRAD_TYPE_CONST);
-			ged_set_pad(dt, dt->pad[slot]);
+			dt->lock = FALSE;
+			cmd_set(dt->spin, dt->pad[slot]);
 		}
 	}
 	else if (cause == &dt->cnt) /* Set length */
 		cmd_repaint(dt->gbar);
 	else
 	{
+		int n = *cause;
 		if (cause == &dt->interp) /* Select mode */
 		{
-			int n = dt->interp;
 			if (dt->mode) n = n ? GRAD_TYPE_CONST : GRAD_TYPE_RGB;
 			dt->mpad[slot] = n;
 		}
-		else if (!dt->mode) /* RGB */
+		else if (cause == dt->cidx)
+		{
+			int xy[2];
+			xy[0] = (n % PPAD_XSZ) * PPAD_SLOT + PPAD_C;
+			xy[1] = (n / PPAD_XSZ) * PPAD_SLOT + PPAD_C;
+			cmd_setv(dt->ppad, xy, FCIMAGE_XY);
+			if (!dt->mode) /* RGB */
+			{
+				dt->crgb[0] = MEM_2_INT(dt->rgb, n * 3);
+				cmd_setv(dt->col, dt->crgb, COLOR_RGBA);
+			}
+			else dt->pad[slot] = n; /* Indexed / utility / opacity */
+		}
+
+		if (!dt->mode) /* RGB */
 		{
 			unsigned char *gp = dt->pad + slot * 3;
 			int rgb = dt->crgb[0];
@@ -2214,8 +2201,6 @@ static void ged_event(ged_dd *dt, void **wdata, int what, void **where)
 			gp[1] = INT_2_G(rgb);
 			gp[2] = INT_2_B(rgb);
 		}
-		else /* Indexed / utility / opacity */
-			ged_set_pad(dt, dt->pad[slot] = dt->crgb[0]);
 
 		if (dt->cnt <= slot) // Extend as needed
 			cmd_set(dt->pspin, dt->cnt = slot + 1);
@@ -2236,7 +2221,7 @@ static int ged_pkey(ged_dd *dt, void **wdata, int what, void **where,
 	y = y < 0 ? 0 : y >= PPAD_YSZ ? PPAD_YSZ - 1 : y;
 	y = y * PPAD_XSZ + x;
 	y = y < 0 ? 0 : y > 255 ? 255 : y;
-	ged_set_pad(dt, y);
+	cmd_set(dt->spin, y);
 
 	return (TRUE);
 }
@@ -2251,7 +2236,7 @@ static int ged_pclick(ged_dd *dt, void **wdata, int what, void **where,
 	x = mouse->x / PPAD_SLOT;
 	y = mouse->y / PPAD_SLOT;
 	y = y * PPAD_XSZ + x;
-	ged_set_pad(dt, y);
+	cmd_set(dt->spin, y);
 
 	return (TRUE);
 }
@@ -2269,14 +2254,15 @@ static void *ged_code[] = {
 	EVENT(KEY, ged_pkey), EVENT(MOUSE, ged_pclick),
 	HSEP,
 	/* Editor widgets */
+	BORDER(SPINSLIDE, 0),
+	REF(spin), IF(mode), SPINSLIDEa(cidx), UNLESS(mode), uSPINa(cidx),
+		EVENT(CHANGE, ged_event), OPNAME("Value"),
 	UNLESSx(mode, 1), /* RGB */
-		REF(col), COLOR(crgb), EVENT(CHANGE, ged_event),
+		REF(col), COLOR(crgb), EVENT(CHANGE, ged_event), OPNAME("Colour"),
 		EQBOXS, BORDER(OPT, 0),
-		REF(opt), XOPTe(interp_txt, 5, interp, ged_event),
+		REF(opt), XOPTe(interp_txt, 5, interp, ged_event), OPNAME("Type"),
 	ENDIF(1),
 	IFx(mode, 1), /* Indexed / utility / opacity */
-		BORDER(SPINSLIDE, 0),
-		REF(spin), SPINSLIDEa(crgb), EVENT(CHANGE, ged_event),
 		EQBOXS,
 		REF(chk), XCHECK(_("Constant"), interp), EVENT(CHANGE, ged_event),
 	ENDIF(1),
@@ -2285,8 +2271,9 @@ static void *ged_code[] = {
 	REF(pspin), SPIN(cnt, 2, GRAD_POINTS), EVENT(CHANGE, ged_event),
 	WDONE, WDONE,
 	/* Gradient bar */
+	uSPIN(slot, 0, GRAD_POINTS - 1), EVENT(CHANGE, ged_event), TRIGGER,
+		OPNAME(""),
 	REF(gbar), GRADBAR(mode, slot, cnt, GRAD_POINTS, pad, rgb, ged_event),
-	TRIGGER,
 	OKBOX(_("OK"), ged_event, _("Cancel"), NULL),
 	WEND
 };
@@ -2321,17 +2308,25 @@ static void grad_edit(void **wdata, int opac)
 		tdata.mode = idx;
 	}
 	if (tdata.cnt < 2) tdata.cnt = 2;
-	tdata.crgb[2] = tdata.mode <= CHN_IMAGE + 1 ? mem_cols - 1 : 255;
+	tdata.crgb[1] = tdata.crgb[3] = 255;
+	tdata.cidx[2] = tdata.mode <= CHN_IMAGE + 1 ? mem_cols - 1 : 255;
 
 	make_crgb(tdata.rgb, tdata.mode);
 
-	tdata.gsize[2] = (tdata.gsize[0] = PPAD_WIDTH) *
-		(tdata.gsize[1] = PPAD_HEIGHT) * 3;
-	tdata.gxy[0] = tdata.gxy[1] = PPAD_C;
+	if (!script_cmds)
+	{
+		tdata.gsize[2] = (tdata.gsize[0] = PPAD_WIDTH) *
+			(tdata.gsize[1] = PPAD_HEIGHT) * 3;
+		tdata.gxy[0] = tdata.gxy[1] = PPAD_C;
+	}
 
-	dd = run_create(ged_code, &tdata, sizeof(tdata));
-	ddt = GET_DDATA(dd);
-	render_color_grid(ddt->pgrid, PPAD_WIDTH, PPAD_HEIGHT, PPAD_SLOT, ddt->rgb);
+	dd = run_create_(ged_code, &tdata, sizeof(tdata), script_cmds);
+	if (!script_cmds)
+	{
+		ddt = GET_DDATA(dd);
+		render_color_grid(ddt->pgrid, PPAD_WIDTH, PPAD_HEIGHT,
+			PPAD_SLOT, ddt->rgb);
+	}
 
 	cmd_showhide(dd, TRUE);
 }
@@ -2377,15 +2372,12 @@ static void show_channel_gradient(grad_dd *dt, void **wdata)
 	/* Reconfigure gradient selector */
 	dt->gpp = dt->gp;
 	i = bpp == 1 ? 1 : 2;
-	for (k = j = NUM_GTYPES - 1; j >= 0; j--)
+	for (k = -1 , j = 0; j < NUM_GTYPES; j++)
 	{
-		if (!(gtmap[j * 2 + 1] & i)) dt->gp[j] = ""; // hide
-		else
-		{
-			dt->gp[j] = gradtypes_txt[j]; // show
-			if ((gtmap[j * 2] == gmap->gtype) ||
-				(k == NUM_GTYPES - 1)) k = j; // select
-		}
+		dt->gp[j] = ""; // hide
+		if (!(gtmap[j * 2 + 1] & i)) continue;
+		dt->gp[j] = gradtypes_txt[j]; // show
+		if ((gtmap[j * 2] == gmap->gtype) || (k < 0)) k = j; // select
 	}
 	dt->gtype = k;
 
@@ -2457,7 +2449,7 @@ static void *grad_code[] = {
 	TRIGGER,
 	/* Setup block */
 	TABLE(4, 3),
-	REF(group), GROUP(1),
+	REF(group), GROUPR,
 	TSPIN(_("Length"), len, 0, MAX_GRAD),
 	TSPIN(_("Repeat length"), rep, 0, MAX_GRAD),
 	TSPIN(_("Offset"), ofs, -MAX_GRAD, MAX_GRAD),
@@ -2471,16 +2463,16 @@ static void *grad_code[] = {
 	BORDER(OPT, 0),
 	FXVBOX(_("Gradient")),
 	VBOXB, REF(opt), OPTD(gpp, gtype), WDONE,
-	EQBOX,
+	GROUPN, EQBOX,
 	CHECK(_("Reverse"), grev),
-	REF(gbut), BUTTON(_("Edit Custom"), grad_evt),
-	WDONE, WDONE,
+	REF(gbut), BUTTONs(_("Edit Custom"), grad_evt),
+	WDONE, GROUP0, WDONE,
 	FXVBOX(_("Opacity")),
 	VBOXB, OPT(optypes_txt, NUM_OTYPES, otype), WDONE,
-	EQBOX,
-	CHECK(_("Reverse"), orev), ALTNAME("opacity reverse"),
-	REF(obut), BUTTON(_("Edit Custom"), grad_evt),
-	WDONE, WDONE,
+	GROUPN, EQBOX,
+	CHECK(_("Reverse"), orev),
+	REF(obut), BUTTONs(_("Edit Custom"), grad_evt),
+	WDONE, GROUP0, WDONE,
 	WDONE,
 	/* Cancel / Apply / OK */
 	OKBOX3(_("OK"), grad_evt, _("Cancel"), NULL, _("Apply"), grad_evt),
@@ -2613,27 +2605,27 @@ static void *skew_code[] = {
 	WINDOWm(_("Skew")),
 	TABLE(4, 3),
 	BORDER(LABEL, 0),
-	TLLABEL(_("Angle"), 1, 0), TLLABEL(_("Offset"), 2, 0),
-		TLLABEL(_("At distance"), 3, 0),
-	TLLABEL(_("Horizontal "), 0, 1),
+	TLLABEL(_("Horizontal "), 0, 1), GROUPN,
 	REF(aspin[0]), TLFSPIN(angle[0], -8999, 8999, 1, 1),
-	EVENT(CHANGE, skew_moved),
+		EVENT(CHANGE, skew_moved), TLLABEL(_("Angle"), 1, 0),
 	REF(ospin[0]), TLFSPIN(ofs[0], -MAX_WIDTH * 100, MAX_WIDTH * 100, 2, 1),
-	EVENT(CHANGE, skew_moved),
-	TLSPIN(dist[0], 1, MAX_HEIGHT, 3, 1), EVENT(CHANGE, skew_moved),
-	TLLABEL(_("Vertical"), 0, 2),
+		EVENT(CHANGE, skew_moved), TLLABEL(_("Offset"), 2, 0),
+	TLSPIN(dist[0], 1, MAX_HEIGHT, 3, 1),
+		 EVENT(CHANGE, skew_moved), TLLABEL(_("At distance"), 3, 0),
+	TLLABEL(_("Vertical"), 0, 2), GROUPN,
 	REF(aspin[1]), TLFSPIN(angle[1], -8999, 8999, 1, 2),
-	EVENT(CHANGE, skew_moved),
+		EVENT(CHANGE, skew_moved), OPNAME("Angle"),
 	REF(ospin[1]), TLFSPIN(ofs[1], -MAX_HEIGHT * 100, MAX_HEIGHT * 100, 2, 2),
-	EVENT(CHANGE, skew_moved),
-	TLSPIN(dist[1], 1, MAX_WIDTH, 3, 2), EVENT(CHANGE, skew_moved),
-	WDONE,
+		EVENT(CHANGE, skew_moved), OPNAME("Offset"),
+	TLSPIN(dist[1], 1, MAX_WIDTH, 3, 2),
+		EVENT(CHANGE, skew_moved), OPNAME("At distance"),
+	WDONE, GROUP0,
 	HSEP,
 	IFx(rgb, 1),
 		CHECK(_("Gamma corrected"), gamma),
 		HSEP,
 		BORDER(RPACK, 0),
-		RPACKDv(ftxt, 0, skew_mode),
+		RPACKDv(ftxt, 0, skew_mode), OPNAME(""),
 		HSEP,
 	ENDIF(1),
 	OKBOXB(_("OK"), click_skew_ok, _("Cancel"), NULL),
@@ -2657,7 +2649,7 @@ void pressed_skew()
 	tdata.dist[1] = mem_width;
 	tdata.ftxt = fnames;
 
-	run_create(skew_code, &tdata, sizeof(tdata));
+	run_create_(skew_code, &tdata, sizeof(tdata), script_cmds);
 }
 
 /// TRACING IMAGE WINDOW

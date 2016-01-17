@@ -1,0 +1,41 @@
+#!/bin/bash
+WRKDIR=`pwd`
+VERSION=3.40
+tar xf mtpaint-$VERSION.tar.bz2
+cd mtpaint-$VERSION || exit 1
+./configure release intl man staticgif --prefix=/usr --fakeroot=$WRKDIR/ubuntulibs
+make
+DEST=$WRKDIR/zad
+make install DESTDIR=$DEST
+gzip -9 $DEST/usr/share/man/man*/*
+cd $WRKDIR
+unzip mtpaint_handbook-$VERSION.zip
+mkdir -p $DEST/usr/share/doc
+mv mtpaint_handbook-$VERSION/docs $DEST/usr/share/doc/mtpaint
+
+SIZE=`( cd $DEST && du -s)`
+SIZE=${SIZE%%[!0-9]*}
+
+cat > control << CONTROL
+Package: mtpaint
+Version: $VERSION
+Architecture: i386
+Maintainer: Dmitry Groshev <wjaguar@users.sourceforge.net>
+Installed-Size: $SIZE
+Section: graphics
+Priority: extra
+Homepage: http://mtpaint.sourceforge.net/
+Description: mtPaint - Mark Tyler's Painting Program
+ mtPaint is a GTK+1/2 based painting program designed for creating
+ icons and pixel based artwork. It can edit indexed palette or 24 bit
+ RGB images and offers painting and palette manipulation tools.
+CONTROL
+cd $DEST
+md5sum `find * -type f` > $WRKDIR/md5sums
+tar cf $WRKDIR/data.tar *
+cd $WRKDIR 
+tar cf control.tar control md5sums
+gzip -n -9 control.tar data.tar
+echo "2.0" > debian-binary
+
+bsdtar --format ar -cf mtpaint_${VERSION}_i386.deb debian-binary control.tar.gz data.tar.gz 

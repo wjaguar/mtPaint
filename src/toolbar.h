@@ -34,6 +34,8 @@
 
 #define PREVIEW_WIDTH 72
 #define PREVIEW_HEIGHT 48
+#define PREVIEW_BRUSH_X 40
+#define PREVIEW_BRUSH_Y 0
 
 
 //	Main toolbar buttons

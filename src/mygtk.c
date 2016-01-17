@@ -1879,15 +1879,6 @@ GtkWidget *wjframe_new()
 	return (gtk_widget_new(wjframe_get_type(), NULL));
 }
 
-void add_with_wjframe(GtkWidget *bin, GtkWidget *widget)
-{
-	GtkWidget *frame = wjframe_new();
-
-	gtk_widget_show(frame);
-	gtk_container_add(GTK_CONTAINER(frame), widget);
-	gtk_container_add(GTK_CONTAINER(bin), frame);
-}
-
 // Scrollable canvas widget
 
 #define WJCANVAS(obj)		GTK_CHECK_CAST(obj, wjcanvas_get_type(), wjcanvas)

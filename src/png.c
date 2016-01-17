@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -591,10 +591,9 @@ static unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
 
 static void ls_init(char *what, int save)
 {
-	char buf[256];
-
-	sprintf(buf, save ? __("Saving %s image") : __("Loading %s image"), what);
-	progress_init(buf, 0);
+	what = g_strdup_printf(save ? __("Saving %s image") : __("Loading %s image"), what);
+	progress_init(what, 0);
+	g_free(what);
 }
 
 static void ls_progress(ls_settings *settings, int n, int steps)

@@ -488,7 +488,7 @@ static void *spawn_code[] = {
 	NTXTCOLUMND(_("Command"), spawn_row, cmd, 0 /* 200 */, 0),
 	COLUMNDATA(strs, sizeof(spawn_row)), CLEANUP(strs),
 	REF(list), LISTCd(nidx, cnt, faction_select_row), TRIGGER,
-	REF(group), GROUP(1),
+	REF(group), GROUPR,
 	FHBOXB(_("Action")), XENTRY(name), EVENT(CHANGE, faction_changed), WDONE,
 	FHBOXB(_("Command")), XENTRY(cmd), EVENT(CHANGE, faction_changed), WDONE,
 	PATH(_("Directory"), _("Select Directory"), FS_SELECT_DIR, dir),

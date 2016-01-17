@@ -53,9 +53,6 @@
 #define PALETTE_W3 (PALETTE_WIDTH * 3)
 #define PALETTE_HEIGHT (PALETTE_SWATCH_H * 256 + PALETTE_SWATCH_Y * 2)
 
-#define PATCH_WIDTH 324
-#define PATCH_HEIGHT 324
-
 enum {
 	TOOL_SQUARE = 0,
 	TOOL_CIRCLE,
@@ -377,8 +374,15 @@ image_state mem_state;			// Current edit settings
 
 int mem_clip_x, mem_clip_y;		// Clipboard location on canvas
 
+#define BRUSH_CELL 36
+#define BRUSH_GRID_W 9
+#define BRUSH_GRID_H 9
+#define NUM_BRUSHES (BRUSH_GRID_W * BRUSH_GRID_H)
+#define PATCH_WIDTH (BRUSH_CELL * BRUSH_GRID_W)
+#define PATCH_HEIGHT (BRUSH_CELL * BRUSH_GRID_H)
+
 extern unsigned char mem_brushes[];	// Preset brushes image
-int mem_brush_list[81][3];		// Preset brushes parameters
+int mem_brush_list[NUM_BRUSHES][3];	// Preset brushes parameters
 int mem_nudge;				// Nudge pixels per SHIFT+Arrow key during selection/paste
 
 int mem_undo_limit;		// Max MB memory allocation limit

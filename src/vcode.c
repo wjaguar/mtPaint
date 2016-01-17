@@ -205,6 +205,14 @@ static void **op_slot(void **slot, int op)
 	return (NULL);
 }
 
+/* Find unreal slot before this one */
+static void **prev_uslot(void **slot)
+{
+	slot = origin_slot(PREV_SLOT(slot));
+	if (!IS_UNREAL(slot)) slot = op_slot(slot, op_uALTNAME);
+	return (slot);
+}
+
 void dialog_event(void *ddata, void **wdata, int what, void **where)
 {
 	v_dd *vdata = GET_VDATA(wdata);
@@ -328,6 +336,194 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	return (res);
 }
 
+//	Tablet handling
+
+#if GTK_MAJOR_VERSION == 1
+static GdkDeviceInfo *tablet_device;
+#else /* #if GTK_MAJOR_VERSION == 2 */
+static GdkDevice *tablet_device;
+#endif
+
+static void init_tablet()
+{
+	GList *devs;
+	char *name, buf[64];
+	int i, n, mode;
+
+	/* Do nothing if tablet wasn't working the last time */
+	if (!inifile_get_gboolean("tablet_USE", FALSE)) return;
+
+	name = inifile_get("tablet_name", "?");
+	mode = inifile_get_gint32("tablet_mode", 0);
+
+#if GTK_MAJOR_VERSION == 1
+	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
+	{
+		GdkDeviceInfo *device = devs->data;
+		GdkAxisUse *u;
+
+		if (strcmp(device->name, name)) continue;
+		/* Found the one that was working the last time */
+		tablet_device = device;
+		gdk_input_set_mode(device->deviceid, mode);
+		n = device->num_axes;
+		u = calloc(n, sizeof(*u));
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+			u[i] = inifile_get_gint32(buf, GDK_AXIS_IGNORE);
+		}
+		gdk_input_set_axes(device->deviceid, u);
+		free(u);
+		break;
+	}
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	for (devs = gdk_devices_list(); devs; devs = devs->next)
+	{
+		GdkDevice *device = devs->data;
+
+		if (strcmp(device->name, name)) continue;
+		/* Found the one that was working the last time */
+		tablet_device = device;
+		gdk_device_set_mode(device, mode);
+		n = device->num_axes;
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+			gdk_device_set_axis_use(device, i,
+				inifile_get_gint32(buf, GDK_AXIS_IGNORE));
+		}
+		break;
+	}
+#endif
+
+	inifile_set_gboolean("tablet_USE", !!tablet_device);
+}
+
+//	TABLETBTN widget
+
+#if GTK_MAJOR_VERSION == 1
+
+static GdkDeviceInfo *tablet_find(gint deviceid)
+{
+	GList *devs;
+
+	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
+	{
+		GdkDeviceInfo *device = devs->data;
+		if (device->deviceid == deviceid) return (device);
+	}
+	return (NULL);
+}
+
+static void tablet_toggle(GtkInputDialog *inputdialog, gint deviceid,
+	gpointer user_data)
+{
+	GdkDeviceInfo *dev = tablet_find(deviceid);
+	tablet_device = !dev || (dev->mode == GDK_MODE_DISABLED) ? NULL : dev;
+	cmd_event(user_data, op_EVT_CHANGE);
+}
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+static void tablet_toggle(GtkInputDialog *inputdialog, GdkDevice *deviceid,
+	gpointer user_data)
+{
+	tablet_device = deviceid->mode == GDK_MODE_DISABLED ? NULL : deviceid;
+	cmd_event(user_data, op_EVT_CHANGE);
+}
+
+#endif
+
+static void **tablet_slot;
+static GtkWidget *tablet_dlg;
+
+static void conf_done(GtkWidget *widget)
+{
+	GtkWidget *w = tablet_dlg;
+	char buf[64];
+	int i, n;
+
+	if (!tablet_slot) return;
+
+	/* Use last selected device if it's active */
+	{
+#if GTK_MAJOR_VERSION == 1
+		GdkDeviceInfo *dev = tablet_find(GTK_INPUT_DIALOG(w)->current_device);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		GdkDevice *dev = GTK_INPUT_DIALOG(w)->current_device;
+#endif
+		if (dev && (dev->mode != GDK_MODE_DISABLED))
+		{
+			tablet_device = dev;
+			// Skip event if within do_destroy()
+			if (widget) cmd_event(tablet_slot, op_EVT_CHANGE);
+		}
+	}
+
+	if (tablet_device)
+	{
+		inifile_set("tablet_name", tablet_device->name);
+		inifile_set_gint32("tablet_mode", tablet_device->mode);
+
+		n = tablet_device->num_axes;
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+#if GTK_MAJOR_VERSION == 1
+			inifile_set_gint32(buf, tablet_device->axes[i]);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+			inifile_set_gint32(buf, tablet_device->axes[i].use);
+#endif
+		}
+	}
+	inifile_set_gboolean("tablet_USE", !!tablet_device);
+
+	gtk_widget_destroy(w);
+	tablet_slot = NULL;
+}
+
+static gboolean conf_del(GtkWidget *widget)
+{
+	conf_done(widget);
+	return (TRUE);
+}
+
+static void conf_tablet(GtkButton *button, gpointer user_data)
+{
+	GtkWidget *inputd;
+	GtkInputDialog *inp;
+	GtkAccelGroup *ag;
+
+	if (tablet_slot) return;	// There can be only one
+	tablet_slot = user_data;
+	tablet_dlg = inputd = gtk_input_dialog_new();
+	gtk_window_set_position(GTK_WINDOW(inputd), GTK_WIN_POS_CENTER);
+	inp = GTK_INPUT_DIALOG(inputd);
+
+	ag = gtk_accel_group_new();
+	gtk_signal_connect(GTK_OBJECT(inp->close_button), "clicked",
+		GTK_SIGNAL_FUNC(conf_done), NULL);
+	gtk_widget_add_accelerator(inp->close_button, "clicked", ag,
+		GDK_Escape, 0, (GtkAccelFlags)0);
+	gtk_signal_connect(GTK_OBJECT(inputd), "delete_event",
+		GTK_SIGNAL_FUNC(conf_del), NULL);
+
+	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
+		GTK_SIGNAL_FUNC(tablet_toggle), user_data);
+	gtk_signal_connect(GTK_OBJECT(inputd), "disable-device",
+		GTK_SIGNAL_FUNC(tablet_toggle), user_data);
+
+	if (inp->keys_list) gtk_widget_hide(inp->keys_list);
+	if (inp->keys_listbox) gtk_widget_hide(inp->keys_listbox);
+	gtk_widget_hide(inp->save_button);
+
+	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
+	gtk_widget_show(inputd);
+}
+
+//	Mouse handling
+
 typedef struct {
 	void *slot[EV_SIZE];
 	mouse_ext *mouse;
@@ -343,7 +539,7 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 	int op = GET_OP(orig);
 
 #if GTK_MAJOR_VERSION == 2
-	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_working)
+	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_device)
 	{
 		gdouble pressure = 1.0;
 		gdk_event_get_axis(event, GDK_AXIS_PRESSURE, &pressure);
@@ -4452,6 +4648,7 @@ static cmdef cmddefs[] = {
 	{ op_FPICKpm,	0, op_uFPICK },
 	{ op_TOPVBOX,	0, op_uTOPBOX },
 	{ op_TOPVBOXV,	0, op_uTOPBOX },
+	{ op_PAGE,	0, op_uFRAME },
 	{ op_FRAME,	0, op_uFRAME },
 	{ op_LABEL,	0, op_uLABEL },
 	{ op_SPIN,	0, op_uSPIN },
@@ -4718,9 +4915,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			/* If inside script and having something to set */
 			if ((script || scripted) && v)
 			{
-				void **slot = origin_slot(PREV_SLOT(r));
-				if (!IS_UNREAL(slot))
-					slot = op_slot(slot, op_uALTNAME);
+				void **slot = prev_uslot(r);
 				if (slot) ((swdata *)slot[0])->id = v;
 			}
 			wid = NULL; // Clear current identifier
@@ -4731,9 +4926,19 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// Fallthrough
 		/* Script mode OK button, as placeholder */
 		case op_uOKBTN:
-		/* Script mode generic placeholder */
+		/* Script mode generic placeholder / group marker */
 		case op_uOP:
 			pk = pk_UNREAL;
+			/* If a group ID and inside script */
+			if ((((int)pp[0] & WB_OPMASK) == op_uOP) && lp &&
+				(script || scripted))
+			{
+				void **slot;
+				if (v) wid = v;
+				if (!wid && (slot = prev_uslot(r)))
+					wid = ((swdata *)slot[0])->id;
+				pk = pk_UNREALV;
+			}
 			break;
 		/* Script mode button */
 		case op_uBUTTON:
@@ -5169,9 +5374,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// Maybe the preceding slot needs a label
 			if (!wi0 && (script || scripted))
 			{
-				void **slot = origin_slot(PREV_SLOT(r));
-				if (!IS_UNREAL(slot))
-					slot = op_slot(slot, op_uALTNAME);
+				void **slot = prev_uslot(r);
 				if (slot)
 				{
 					swdata *sd = slot[0];
@@ -5471,6 +5674,13 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			cw = GET_BORDER(BUTTON);
 			break;
 		}
+		/* Add a button for tablet config dialog */
+		case op_TABLETBTN:
+			widget = gtk_button_new_with_label(_(v));
+			gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+				GTK_SIGNAL_FUNC(conf_tablet), (gpointer)r);
+			cw = GET_BORDER(BUTTON);
+			break;
 		/* Add a combo-entry for text strings */
 		case op_COMBOENTRY:
 			widget = comboentry(ddata, r);
@@ -6223,16 +6433,16 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			}
 		} // fallthrough
 		/* Remember that event needs triggering here */
-		/* Or remember start of a group of widgets */
-		/* Or a cleanup location */
+		/* Or remember a cleanup location */
 		case op_EVT_SCRIPT:
-		case op_TRIGGER: case op_GROUP: case op_CLEANUP:
+		case op_TRIGGER: case op_CLEANUP:
 			widget = NULL;
 			break;
 		/* Allocate/copy memory */
 		case op_TALLOC: case op_TCOPY:
 		{
 			int l = *(int *)((char *)ddata + (int)pp[2]);
+			if (!l) continue;
 			dtail -= VVS(l);
 			if (op == op_TCOPY) memcpy(dtail, *(void **)v, l);
 			*(void **)v = dtail;
@@ -6331,6 +6541,7 @@ static void do_destroy(void **wdata)
 		}
 		case op_uENTRY: v = &((swdata *)*wdata)->strs; // Fallthrough
 		case op_TEXT: case op_FONTSEL: g_free(*(char **)v); break;
+		case op_TABLETBTN: conf_done(NULL); break;
 		case op_uMOUNT:
 			// !!! REMOUNT not expected in unreal state
 			run_destroy(((swdata *)*wdata)->strs);
@@ -6467,7 +6678,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = TOOL_ID(slot);
 			break;
 		}
-		case op_HEXENTRY: case op_EYEDROPPER:
+		case op_TLSPINPACK: case op_HEXENTRY: case op_EYEDROPPER:
 		case op_COLORLIST: case op_COLORLISTN: case op_GRADBAR:
 		case op_LISTCCr: case op_uLISTCC:
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
@@ -6598,23 +6809,22 @@ void cmd_reset(void **slot, void *ddata)
 {
 // !!! Support only what actually used on, and their brethren
 	void *v, **pp, **wdata = slot;
-	int op, group, cgroup;
+	int op, opf, group = FALSE;
 
-	cgroup = group = -1;
 	for (; (pp = wdata[1]); wdata = NEXT_SLOT(wdata))
 	{
-		op = (int)*pp++;
+		opf = op = (int)*pp++;
 		v = WB_GETLEN(op) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = (char *)ddata + (int)v;
 		if (op & WB_NFLAG) v = *(void **)v; // dereference
 		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
 		op &= WB_OPMASK;
-		if ((op != op_GROUP) && (cgroup != group)) continue;
 		switch (op)
 		{
-		case op_GROUP:
-			group = (int)v;
-			if (cgroup < 0) cgroup = group;
+		case op_uOP:
+			/* If GROUP, reset up to one w/o script flag */
+			if ((opf & WB_OPMASK) == op_uOP)
+				group = !group || (opf & WB_SFLAG);
 			break;
 		case op_SPIN: case op_SPINc: case op_SPINa:
 			gtk_spin_button_set_value(*wdata, *(int *)v);
@@ -6797,7 +7007,7 @@ void cmd_reset(void **slot, void *ddata)
 		}
 #endif
 		}
-		if (cgroup < 0) return;
+		if (!group) return;
 	}
 }
 
@@ -6828,7 +7038,7 @@ static int midmatch(const char *s, const char *v, int l)
 
 void **find_slot(void **slot, char *id, int l, int mlevel)
 {
-	void **where = NULL;
+	void **start = slot, **where = NULL;
 	char buf[64], *nm, *ts;
 	int op, n, p = INT_MAX;
 
@@ -6866,8 +7076,17 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 		else // Searching pseudo widgets
 		{
 			if (!IS_UNREAL(slot)) continue;
-			op = GET_UOP(slot);
-			if (op == op_uOP) continue; // Dummy slot
+			if (GET_UOP(slot) == op_uOP)
+			{
+				// Ignore dummy slots
+				if (op != op_uOP) continue;
+				// Skip groups in flat search
+				if (mlevel == MLEVEL_FLAT) continue;
+				// Stop on new group in block search
+				if (mlevel == MLEVEL_BLOCK) break;
+			}
+			// Ignore anything but groups in group search
+			else if (mlevel == MLEVEL_GROUP) continue;
 			nm = ((swdata *)slot[0])->id;
 			if (!nm) continue; // No name
 		}
@@ -6895,6 +7114,14 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 	/* Resolve alternative name */
 	if (where && (GET_OP(where) == op_uALTNAME))
 		where = origin_slot(where);
+	/* Try in-group searching */
+	if (!where && (mlevel == MLEVEL_FLAT) && (ts = memchr(id, '/', l)) &&
+		(ts != id) && (id + l - ts > 1))
+	{
+		where = find_slot(start, id, ts - id, MLEVEL_GROUP);
+		if (where) where = find_slot(NEXT_SLOT(where), ts + 1,
+			id + l - ts - 1, MLEVEL_BLOCK);
+	}
 	return (where);
 }
 
@@ -7090,7 +7317,7 @@ int cmd_run_script(void **slot, char **strs)
 		opt += (maybe = opt[0] == '.'); // Optional if preceded by "."
 		ll = strcspn(opt, "=:");
 		/* Now, find target for the option */
-		wdata = find_slot(slot, opt, ll, -1);
+		wdata = find_slot(slot, opt, ll, MLEVEL_FLAT);
 		/* Raise an error if no match */
 		if (!wdata)
 		{
@@ -7466,6 +7693,10 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
+	case op_WDONE:
+		if (size >= sizeof(char *))
+			*(char **)res = tablet_device ? tablet_device->name : NULL;
+		break;
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
 	case op_uFPICK:
 	{
@@ -7553,10 +7784,11 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 		if (l > clist->rows) l = clist->rows;
 		for (i = 0; i < l; i++)
 			((int *)res)[(int)gtk_clist_get_row_data(clist, i)] = i;
+		break;
+	}
 #if 0 /* Getting raw selection - not needed for now */
 		*(int *)res = (clist->selection ? (int)clist->selection->data : 0);
 #endif
-	}
 	case op_KEYMAP:
 		if (size >= sizeof(keymap_dd *))
 			*(keymap_dd **)res = keymap_export(slot[2]);

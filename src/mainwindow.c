@@ -79,7 +79,6 @@ typedef struct {
 static inilist ini_bool[] = {
 	{ "layermainToggle",	&show_layers_main,	FALSE },
 	{ "sharperReduce",	&sharper_reduce,	FALSE },
-	{ "tablet_USE",		&tablet_working,	FALSE },
 	{ "tga565",		&tga_565,		FALSE },
 	{ "tgaDefdir",		&tga_defdir,		FALSE },
 	{ "disableTransparency", &opaque_view,		FALSE },
@@ -183,7 +182,7 @@ static void **dock_area, **dock_book, **main_menubar;
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
 int	show_menu_icons, paste_commit, scroll_zoom;
 int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
-int	files_passed, cmd_mode;
+int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
 
 static int show_dock;
@@ -191,6 +190,7 @@ static int mouse_left_canvas;
 static int cvxy[2];	// canvas window position
 
 static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
+static int perim_cx, perim_cy;	// Clone perimeter offset
 
 static void clear_perim_real( int ox, int oy )
 {
@@ -201,10 +201,11 @@ static void clear_perim_real( int ox, int oy )
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
-	y0 = margin_main_y + ((perim_y + oy) * scale) / zoom;
-	x1 = margin_main_x + ((perim_x + ox + perim_s - 1) * scale) / zoom + scale - 1;
-	y1 = margin_main_y + ((perim_y + oy + perim_s - 1) * scale) / zoom + scale - 1;
+	ox += perim_x; oy += perim_y;
+	x0 = margin_main_x + (ox * scale) / zoom;
+	y0 = margin_main_y + (oy * scale) / zoom;
+	x1 = margin_main_x + ((ox + perim_s - 1) * scale) / zoom + scale - 1;
+	y1 = margin_main_y + ((oy + perim_s - 1) * scale) / zoom + scale - 1;
 
 	repaint_canvas(x0, y0, 1, y1 - y0 + 1);
 	repaint_canvas(x1, y0, 1, y1 - y0 + 1);
@@ -915,7 +916,7 @@ static void draw_arrow(int mode)
 // !!! Call this, or let undo engine do it?
 //	mem_undo_prepare();
 	pen_down = 0;
-	tool_action(MCOUNT_NOTHING, line_x2, line_y2, 1, MAX_PRESSURE);
+	do_tool_action(TC_LINE_ARROW, line_x2, line_y2, MAX_PRESSURE);
 	line_status = LINE_LINE;
 
 	// Draw arrow lines & circles
@@ -1118,42 +1119,82 @@ void grad_stroke(int x, int y)
 	}
 }
 
-static void grad_tool(int count, int x, int y, unsigned int state, int button)
+#define GF_UPDATE 1
+#define GF_REDRAW 2
+#define GF_DRAW   4
+
+static void do_grad_action(int cmd, int x, int y)
 {
-	int i, j, old[4];
 	grad_info *grad = gradient + mem_channel;
+	int old[4], prev = grad->status, upd = 0;
 
 	copy4(old, grad->xy);
+	switch (cmd)
+	{
+	case TC_GRAD_START:
+		grad->xy[0] = grad->xy[2] = x;
+		grad->xy[1] = grad->xy[3] = y;
+		grad->status = GRAD_END;
+		upd = GF_UPDATE | GF_DRAW;
+		break;
+	case TC_GRAD_PICK0:
+		grad->status = GRAD_START;
+		// Fallthrough
+	case TC_GRAD_SET0:
+		grad->xy[0] = x;
+		grad->xy[1] = y;
+		if (cmd == TC_GRAD_SET0) prev = grad->status = GRAD_DONE;
+		upd = GF_UPDATE | GF_REDRAW;
+		break;
+	case TC_GRAD_PICK1:
+		grad->status = GRAD_END;
+		// Fallthrough
+	case TC_GRAD_SET1:
+		grad->xy[2] = x;
+		grad->xy[3] = y;
+		if (cmd == TC_GRAD_SET1) prev = grad->status = GRAD_DONE;
+		upd = GF_UPDATE | GF_REDRAW;
+		break;
+	case TC_GRAD_DRAG0: case TC_GRAD_DRAG1:
+	{
+		int *xy = grad->xy + (cmd == TC_GRAD_DRAG0 ? 0 : 2);
+		if ((xy[0] != x) || (xy[1] != y))
+		{
+			xy[0] = x;
+			xy[1] = y;
+			upd = GF_UPDATE | GF_REDRAW;
+		}
+		break;
+	}
+	case TC_GRAD_CLEAR:
+		grad->status = GRAD_NONE;
+		upd = GF_UPDATE | GF_DRAW;
+		break;
+	}
+
+	if (upd & GF_UPDATE) grad_update(grad);
+	if (upd & (GF_REDRAW | GF_DRAW))
+	{
+		if ((prev == GRAD_DONE) && grad_opacity)
+			cmd_repaint(drawing_canvas);
+		else repaint_grad(upd & GF_REDRAW ? old : NULL);
+	}
+}
+
+static int grad_action(int count, int button, int x, int y)
+{
+	grad_info *grad = gradient + mem_channel;
+	int i, j, cmd = TC_NONE;
+
 	/* Left click sets points and picks them up again */
 	if ((count == 1) && (button == 1))
 	{
 		/* Start anew */
-		if (grad->status == GRAD_NONE)
-		{
-			grad->xy[0] = grad->xy[2] = x;
-			grad->xy[1] = grad->xy[3] = y;
-			grad->status = GRAD_END;
-			grad_update(grad);
-			repaint_grad(NULL);
-		}
+		if (grad->status == GRAD_NONE) cmd = TC_GRAD_START;
 		/* Place starting point */
-		else if (grad->status == GRAD_START)
-		{
-			grad->xy[0] = x;
-			grad->xy[1] = y;
-			grad->status = GRAD_DONE;
-			grad_update(grad);
-			if (grad_opacity) cmd_repaint(drawing_canvas);
-		}
+		else if (grad->status == GRAD_START) cmd = TC_GRAD_SET0;
 		/* Place end point */
-		else if (grad->status == GRAD_END)
-		{
-			grad->xy[2] = x;
-			grad->xy[3] = y;
-			grad->status = GRAD_DONE;
-			grad_update(grad);
-			if (grad_opacity) cmd_repaint(drawing_canvas);
-		}
+		else if (grad->status == GRAD_END) cmd = TC_GRAD_SET1;
 		/* Pick up nearest end */
 		else if (grad->status == GRAD_DONE)
 		{
@@ -1161,21 +1202,7 @@ static void grad_tool(int count, int x, int y, unsigned int state, int button)
 				(y - grad->xy[1]) * (y - grad->xy[1]);
 			j = (x - grad->xy[2]) * (x - grad->xy[2]) +
 				(y - grad->xy[3]) * (y - grad->xy[3]);
-			if (i < j)
-			{
-				grad->xy[0] = x;
-				grad->xy[1] = y;
-				grad->status = GRAD_START;
-			}
-			else
-			{
-				grad->xy[2] = x;
-				grad->xy[3] = y;
-				grad->status = GRAD_END;
-			}
-			grad_update(grad);
-			if (grad_opacity) cmd_repaint(drawing_canvas);
-			else repaint_grad(old);
+			cmd = i < j ? TC_GRAD_PICK0 : TC_GRAD_PICK1;
 		}
 	}
 
@@ -1183,32 +1210,16 @@ static void grad_tool(int count, int x, int y, unsigned int state, int button)
 	else if (grad->status == GRAD_NONE);
 
 	/* Right click deletes the gradient */
-	else if (count == 1) /* button != 1 */
-	{
-		grad->status = GRAD_NONE;
-		if (grad_opacity) cmd_repaint(drawing_canvas);
-		else repaint_grad(NULL);
-		grad_update(grad);
-	}
+	else if (count == 1) cmd = TC_GRAD_CLEAR; /* button != 1 */
 
 	/* Motion is irrelevant with gradient in place */
 	else if (grad->status == GRAD_DONE);
 
 	/* Motion drags points around */
 	else if (!count)
-	{
-		int *xy = grad->xy + (grad->status == GRAD_START ? 0 : 2);
-		if ((xy[0] != x) || (xy[1] != y))
-		{
-			xy[0] = x;
-			xy[1] = y;
-			grad_update(grad);
-			repaint_grad(old);
-		}
-	}
+		cmd = grad->status == GRAD_START ? TC_GRAD_DRAG0 : TC_GRAD_DRAG1;
 
-	/* Leave hides the dragged line */
-	else if (count == MCOUNT_LEAVE) repaint_grad(NULL);
+	return (cmd);
 }
 
 /* Pick color A/B from canvas, or use one given */
@@ -1290,7 +1301,7 @@ static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
 
 static void tool_done()
 {
-	tint_mode[2] = 0;
+	tint_mode[2] = 0; // Paranoia
 	pen_down = 0;
 	if (col_reverse)
 	{
@@ -1314,7 +1325,7 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 	static int tool_fix, tool_fixv;	// Fixate on axis
 	int new_cursor;
 	int i, x0, y0, ox, oy;
-	int x, y;
+	int x, y, cmd;
 	int zoom = 1, scale = 1;
 
 
@@ -1382,26 +1393,19 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 	if (m->count < 0)
 	{
+		cmd = TC_NONE;
 		if ((tool_type == TOOL_LINE) && (m->button == 1) &&
-			(line_status == LINE_START))
-		{
-			line_status = LINE_LINE;
-			repaint_line(NULL);
-		}
+			(line_status == LINE_START)) cmd = TC_LINE_NEXT;
 
 		if (((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
-			(m->button == 1))
-		{
-			if (marq_status == MARQUEE_SELECTING)
-				marq_status = MARQUEE_DONE;
-			if (marq_status == MARQUEE_PASTE_DRAG)
-				marq_status = MARQUEE_PASTE;
-			cursor_corner = -1;
-		}
+			(m->button == 1) && ((marq_status == MARQUEE_SELECTING) ||
+			(marq_status == MARQUEE_PASTE_DRAG))) cmd = TC_SEL_STOP;
 
 		// Finish off dragged polygon selection
 		if ((tool_type == TOOL_POLYGON) && (poly_status == POLY_DRAGGING))
-			tool_action(m->count, x, y, m->button, m->pressure);
+			cmd = TC_POLY_CLOSE;
+
+		if (cmd != TC_NONE) do_tool_action(cmd, x, y, 0);
 
 		tool_done();
 		update_menus();
@@ -1416,7 +1420,7 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 		/* Delete point from polygon */
 		if ((m->button == 3) && (tool_type == TOOL_POLYGON))
 		{
-			if (m->count == 1) poly_delete_po(x, y);
+			if (m->count == 1) do_tool_action(TC_POLY_DEL, x, y, 0);
 		}
 		else if (m->button == 2) /* Auto-dither */
 		{
@@ -1435,10 +1439,19 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 		set_zoom_centre(ox, oy);
 
 	else if (tool_type == TOOL_GRADIENT)
-		grad_tool(m->count, x0, y0, m->state, m->button);
+	{
+		cmd = grad_action(m->count, m->button, x0, y0);
+		if (cmd != TC_NONE) do_grad_action(cmd, x0, y0);
+	}
 
 	/* Pure moves are handled elsewhere */
-	else if (m->button) tool_action(m->count, x, y, m->button, m->pressure);
+	else if (m->button)
+	{
+		cmd = tool_action_(m->count, m->button, x, y);
+		if (cmd != TC_NONE)
+			do_tool_action(cmd | TCF_ONCE, x, y, m->pressure);
+	}
+
 
 	/* ****** Now to mouse-move-specific part ****** */
 
@@ -1468,24 +1481,35 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 		/* TOOL PERIMETER BOX UPDATES */
 
-		if (perim_status > 0) clear_perim(); // Remove old perimeter box
-
 		if (tool_type == TOOL_CLONE)
 		{
-			if (!m->button && (m->state & _Cmask))
+			if ((clone_status == CLONE_ABS) ||
+				((clone_status & CLONE_TRACK) &&
+				!m->button && (m->state & _Cmask)))
 			{
-				clone_x += tool_ox - x;
-				clone_y += tool_oy - y;
+				/* Source stays put */
+				clone_dx = clone_x - x;
+				clone_dy = clone_y - y;
 			}
-			tool_ox = x;
-			tool_oy = y;
+			else
+			{
+				/* Source follows cursor */
+				clone_x = x + clone_dx;
+				clone_y = y + clone_dy;
+			}
+			clone_status = !m->button && (m->state & _Cmask) ?
+				CLONE_ABS | CLONE_TRACK : CLONE_REL | CLONE_TRACK;
 		}
 
+		if (perim_status) clear_perim(); // Remove old perimeter box
+// !!! Maybe "tool_size * scale > 4 * zoom" instead?
 		if (tool_size * can_zoom > 4)
 		{
 			perim_x = x - (tool_size >> 1);
 			perim_y = y - (tool_size >> 1);
 			perim_s = tool_size;
+			perim_cx = clone_dx;
+			perim_cy = clone_dy;
 			repaint_perim(NULL); // Repaint 4 sides
 		}
 
@@ -1559,7 +1583,15 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
 	if (perim_status > 0) clear_perim();
 
-	if (tool_type == TOOL_GRADIENT) grad_tool(MCOUNT_LEAVE, 0, 0, 0, 0);
+	clone_status &= ~CLONE_TRACK; // Unattach source from cursor
+
+	if (tool_type == TOOL_GRADIENT)
+	{ 
+		/* Let leave hide the dragged line */
+		grad_info *grad = gradient + mem_channel;
+		if ((grad->status == GRAD_START) || (grad->status == GRAD_END))
+			repaint_grad(NULL);
+	}
 
 	if (((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
 		((tool_type == TOOL_LINE) && (line_status == LINE_LINE)))
@@ -2987,7 +3019,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		refresh_line(tool_type == TOOL_LINE ? 1 : 2, vxy, ctx);
 
 	/* Redraw perimeter if needed */
-	if (perim_status && !mouse_left_canvas) repaint_perim(ctx);
+	if (perim_status) repaint_perim(ctx);
 
 	return (TRUE); // now draw this
 }
@@ -3053,7 +3085,7 @@ void clear_perim()
 	/* Don't bother if tool has no perimeter */
 	if (NO_PERIM(tool_type)) return;
 	clear_perim_real(0, 0);
-	if ( tool_type == TOOL_CLONE ) clear_perim_real(clone_x, clone_y);
+	if (tool_type == TOOL_CLONE) clear_perim_real(perim_cx, perim_cy);
 }
 
 static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
@@ -3065,10 +3097,11 @@ static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	x0 = margin_main_x + ((perim_x + ox) * scale) / zoom;
-	y0 = margin_main_y + ((perim_y + oy) * scale) / zoom;
-	x1 = margin_main_x + ((perim_x + ox + perim_s - 1) * scale) / zoom + scale - 1;
-	y1 = margin_main_y + ((perim_y + oy + perim_s - 1) * scale) / zoom + scale - 1;
+	ox += perim_x; oy += perim_y;
+	x0 = margin_main_x + (ox * scale) / zoom;
+	y0 = margin_main_y + (oy * scale) / zoom;
+	x1 = margin_main_x + ((ox + perim_s - 1) * scale) / zoom + scale - 1;
+	y1 = margin_main_y + ((oy + perim_s - 1) * scale) / zoom + scale - 1;
 
 	w = x1 - x0 + 1;
 	h = y1 - y0 + 1;
@@ -3083,10 +3116,10 @@ static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
 void repaint_perim(rgbcontext *ctx)
 {
 	/* Don't bother if tool has no perimeter */
-	if (NO_PERIM(tool_type)) return;
+	if (NO_PERIM(tool_type) || mouse_left_canvas) return;
 	repaint_perim_real(RGB_2_INT(255, 255, 255), 0, 0, ctx);
-	if ( tool_type == TOOL_CLONE )
-		repaint_perim_real(RGB_2_INT(255, 0, 0), clone_x, clone_y, ctx);
+	if (tool_type == TOOL_CLONE)
+		repaint_perim_real(RGB_2_INT(255, 0, 0), perim_cx, perim_cy, ctx);
 	perim_status = 1; /* Drawn */
 }
 
@@ -3198,8 +3231,9 @@ void change_to_tool(int icon)
 	}
 	if ( tool_type == TOOL_CLONE )
 	{
-		clone_x = -tool_size;
-		clone_y = tool_size;
+		clone_dx = -tool_size;
+		clone_dy = tool_size;
+		clone_status = CLONE_REL;
 	}
 	/* Persistent selection frame */
 // !!! To NOT show selection frame while placing gradient
@@ -3574,6 +3608,76 @@ static void script_ab()
 }
 
 typedef struct {
+	int x[3], y[3], n[3], brush;
+	void **nspin;
+} nxy_dd;
+
+static void bp_evt(nxy_dd *dt, void **wdata, int what, void **where)
+{
+	int w = dt->x[2] + 1;
+	if (cmd_read(where, dt) == dt->n)
+	{
+		int n = dt->n[0];
+		dt->x[0] = n % w;
+		dt->y[0] = n / w;
+		if (dt->brush) mem_set_brush(n);
+		else mem_tool_pat = n;
+	}
+	else if ((what == op_EVT_SCRIPT) && (dt->x[0] >= 0) && (dt->y[0] >= 0))
+		cmd_set(dt->nspin, dt->y[0] * w + dt->x[0]);
+}
+
+static char *brush_txt[TOOL_SPRAY + 1] = { "Square", "Circle",
+	"Horizontal", "Vertical", "Slash", "Backslash", "Spray" };
+
+#define WBbase nxy_dd
+static void *bp_code[] = {
+	TOPVBOX,
+	REF(nspin), SPINa(n), EVENT(CHANGE, bp_evt),
+	SPINa(x), EVENT(SCRIPT, bp_evt), OPNAME("X"),
+	SPINa(y), EVENT(SCRIPT, bp_evt), OPNAME("Y"),
+	IFx(brush, 1),
+		RPACKv(brush_txt, TOOL_SPRAY + 1, 1, brush_type),
+			 EVENT(SELECT, bp_evt), OPNAME("Type"),
+		SPINv(tool_size, 1, 255), EVENT(CHANGE, bp_evt), OPNAME("Size"),
+		SPINv(tool_flow, 1, 255), EVENT(CHANGE, bp_evt), OPNAME("Flow"),
+	ENDIF(1),
+	WSHOW
+};
+#undef WBbase
+
+static void script_bp(int mode)
+{
+	nxy_dd tdata;
+
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.x[1] = tdata.y[1] = -1;
+	if (mode == CHOOSE_BRUSH)
+	{
+		tdata.x[2] = BRUSH_GRID_W - 1;
+		tdata.y[2] = BRUSH_GRID_H - 1;
+		tdata.x[0] = tdata.y[0] = -1;
+		tdata.brush = TRUE;
+	}
+	else
+	{
+		tdata.x[2] = PATTERN_GRID_W - 1;
+		tdata.y[2] = PATTERN_GRID_H - 1;
+		tdata.n[0] = mem_tool_pat;
+		tdata.x[0] = mem_tool_pat % PATTERN_GRID_W;
+		tdata.y[0] = mem_tool_pat / PATTERN_GRID_W;
+	}
+	tdata.n[2] = (tdata.x[2] + 1) * (tdata.y[2] + 1) - 1;
+	run_destroy(run_create_(bp_code, &tdata, sizeof(tdata), script_cmds));
+	if (mode == CHOOSE_BRUSH)
+	{
+		change_to_tool(TTB_PAINT);
+		update_stuff(UPD_BRUSH);
+	}
+	else update_stuff(UPD_PAT);
+}
+
+typedef struct {
 	int w, h, rxy[4];
 } rect_dd;
 
@@ -3885,6 +3989,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_CHOOSER:
 		if (!script_cmds) choose_pattern(mode);
 		else if (mode == CHOOSE_COLOR) script_ab();
+		else script_bp(mode);
 		break;
 	case DLG_SCALE:
 		pressed_scale_size(TRUE); break;
@@ -4346,9 +4451,9 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Export Clipboard to System"), ACTMOD(ACT_SAVE_CLIP, -1)),
 		ACTMAP(NEED_CLIP),
 	MENUSEP, //
-	MENUITEM(_("//Choose Pattern ..."), ACTMOD(DLG_CHOOSER, CHOOSE_PATTERN)),
+	MENUITEMs(_("//Choose Pattern ..."), ACTMOD(DLG_CHOOSER, CHOOSE_PATTERN)),
 		SHORTCUT(F2, 0),
-	MENUITEM(_("//Choose Brush ..."), ACTMOD(DLG_CHOOSER, CHOOSE_BRUSH)),
+	MENUITEMs(_("//Choose Brush ..."), ACTMOD(DLG_CHOOSER, CHOOSE_BRUSH)),
 		SHORTCUT(F3, 0),
 	MENUITEMs(_("//Choose Colour ..."), ACTMOD(DLG_CHOOSER, CHOOSE_COLOR)),
 		SHORTCUT(e, 0),
@@ -4419,7 +4524,7 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
 	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
 	MENUITEMs(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
-	MENUITEM(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
+	MENUITEMs(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
 	MENUSEP, //
 // !!! Maybe support indexed mode too, later
 	MENUITEMs(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
@@ -4429,7 +4534,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUT(i, C),
 	REFv(menu_slots[MENU_PREFS]),
-	MENUITEM(_("//Preferences ..."), ACTMOD(DLG_PREFS, 0)),
+	MENUITEMs(_("//Preferences ..."), ACTMOD(DLG_PREFS, 0)),
 		SHORTCUT(p, C),
 	WDONE,
 	SSUBMENU(_("/_Selection")),
@@ -4508,7 +4613,7 @@ static void *main_menu_code[] = {
 		ACTMAP(NEED_24),
 	MENUSEP, //
 	MENUITEMs(_("//Sort Colours ..."), ACTMOD(DLG_PAL_SORT, 0)),
-	MENUITEM(_("//Palette Shifter ..."), ACTMOD(DLG_PAL_SHIFTER, 0)),
+	MENUITEMs(_("//Palette Shifter ..."), ACTMOD(DLG_PAL_SHIFTER, 0)),
 	MENUITEMs(_("//Pick Gradient ..."), ACTMOD(DLG_PICK_GRAD, 0)),
 	WDONE,
 	SSUBMENU(_("/Effe_cts")),
@@ -4757,7 +4862,7 @@ static void *main_code[] = {
 void main_init()
 {
 	main_dd tdata;
-	char txt[PATHTXT];
+	char *tdev, txt[PATHTXT];
 
 	memset(&tdata, 0, sizeof(tdata));
 	/* Prepare commandline list */
@@ -4800,6 +4905,9 @@ void main_init()
 
 	/* Skip the GUI-specific updates in commandline mode */
 	if (cmd_mode) return;
+
+	cmd_peekv(main_window_, &tdev, sizeof(tdev), WDATA_TABLET); // Check tablet state
+	tablet_working = !!tdev;
 
 	cmd_showhide(main_window_, TRUE);
 

@@ -363,7 +363,7 @@ static void *settings_code[] = {
 	EVENT(CHANGE, ts_spinslide_moved),
 	REFv(ts_label_channel), TLABELr(""), HIDDEN,
 	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3), HIDDEN,
-	EVENT(CHANGE, ts_spinslide_moved), ALTNAME("value"),
+	EVENT(CHANGE, ts_spinslide_moved), ALTNAME("Value"),
 	WEND
 };
 #undef WBbase
@@ -791,17 +791,24 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 
 	brush_type = mem_brush_list[val][0];
 	tool_size = mem_brush_list[val][1];
-	if ( mem_brush_list[val][2]>0 ) tool_flow = mem_brush_list[val][2];
+	if (mem_brush_list[val][2] > 0) tool_flow = mem_brush_list[val][2];
 
-	offset = 3*( 2 + 36*(val % 9) + 36*PATCH_WIDTH*(val / 9) + 2*PATCH_WIDTH );
+	offset = 3 * (2 + BRUSH_CELL * (val % BRUSH_GRID_W) +
+		2 * PATCH_WIDTH + BRUSH_CELL * (val / BRUSH_GRID_W) * PATCH_WIDTH);
 			// Offset in brush RGB
-	for ( j=0; j<32; j++ )
+	for (j = 0; j < BRUSH_CELL - 2 * 2; j++)
 	{
-		o = 3*(40 + PREVIEW_WIDTH*j);		// Preview offset
-		o2 = offset + 3*PATCH_WIDTH*j;		// Offset in brush RGB
-		memcpy(mem_prev + o, mem_brushes + o2, 32 * 3);
+		o = 3 * (PREVIEW_BRUSH_X + PREVIEW_WIDTH * PREVIEW_BRUSH_Y +
+			PREVIEW_WIDTH * j);	// Preview offset
+		o2 = offset + 3 * PATCH_WIDTH * j;	// Offset in brush RGB
+		memcpy(mem_prev + o, mem_brushes + o2, (BRUSH_CELL - 2 * 2) * 3);
 	}
 }
+
+#if (PREVIEW_BRUSH_X + BRUSH_CELL - 2 * 2 > PREVIEW_WIDTH) || \
+	(PREVIEW_BRUSH_Y + BRUSH_CELL - 2 * 2 > PREVIEW_HEIGHT)
+#error "Mismatched preview size"
+#endif
 
 #include "graphics/xbm_patterns.xbm"
 #if (PATTERN_GRID_W * 8 != xbm_patterns_width) || (PATTERN_GRID_H * 8 != xbm_patterns_height)
