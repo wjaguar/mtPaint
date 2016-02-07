@@ -40,6 +40,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
 	* BUGFIX - All keyboard shortcuts now work in Image View mode, as they should
 	* BUGFIX - Transparent colour in composite images now works again
+	* BUGFIX - Flood fill with shapeburst gradient now works again
+	* BUGFIX - Saving LSS16 images no longer produces broken files in certain rare cases
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale (except if written as grayscale - ImageMagick does that)
 	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers

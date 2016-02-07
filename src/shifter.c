@@ -1,5 +1,5 @@
 /*	shifter.c
-	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -123,20 +123,10 @@ static int gcd(int a, int b)
 	return (a);
 }
 
-/* An input widget has changed in the dialog */
-static void shifter_moved(shifter_dd *dt, void **wdata, int what, void **where)
+static void reset_frames(shifter_dd *dt)
 {
 	char txt[130];
-	int i, j, l, lcm, *v = cmd_read(where, dt);
-
-	/* Scriptable parts */
-	if (v == &dt->row) return;
-	if (v && (v != spins[0][0]))
-	{
-		j = v - dt->sfd;
-		i = spins[dt->row][j][2];
-		spins[dt->row][j][0] = *v < i ? *v : i;
-	}
+	int i, j, l, lcm;
 
 	for (lcm = 1 , i = 0; i < NSHIFT; i++)
 	{
@@ -156,6 +146,46 @@ static void shifter_moved(shifter_dd *dt, void **wdata, int what, void **where)
 
 	snprintf(txt, 128, "%s = %i", _("Frames"), lcm);
 	cmd_setv(dt->label, txt, LABEL_VALUE);
+}
+
+/* An input widget has changed in the dialog */
+static void shifter_moved(shifter_dd *dt, void **wdata, int what, void **where)
+{
+	int i, j, *v = cmd_read(where, dt);
+
+	/* Scriptable parts */
+	if (v == &dt->row) return;
+	if (v && (v != spins[0][0]))
+	{
+		j = v - dt->sfd;
+		i = spins[dt->row][j][2];
+		spins[dt->row][j][0] = *v < i ? *v : i;
+	}
+
+	reset_frames(dt);
+}
+
+static int shift_all(shifter_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	int i, j, rows = mx->nrows;
+
+	/* Sanity check */
+	if ((rows > NSHIFT) || (mx->ncols > 3) || (mx->mincols < 3) ||
+		(mx->fractcol >= 0)) return (0); // Error
+
+	for (i = 0; i < rows; i++)
+	{
+		int *row = mx->rows[i] + 1;
+		for (j = 0; j < 3; j++)
+			spins[i][j][0] = bounded(row[j], 0, spins[i][j][2]);
+	}
+	for (; i < NSHIFT; i++)
+		spins[i][0][0] = spins[i][1][0] = spins[i][2][0] = 0;
+
+	reset_frames(dt);
+
+	return (1);
 }
 
 static void shift_btn(shifter_dd *dt, void **wdata, int what, void **where)
@@ -229,7 +259,7 @@ static void *shifter_code[] = {
 	XVBOXB, // !!! Originally the main vbox was that way
 	TABLE(4, 9),
 	BORDER(LABEL, 0),
-	uSPIN(row, 0, 7), EVENT(CHANGE, shifter_moved),
+	uSPIN(row, 0, 7), EVENT(CHANGE, shifter_moved), EVENT(MULTI, shift_all),
 	TLLABELx(_("Start"), 1, 0, 0, 0, 5),
 		uSPIN(sfd[0], 0, 255), EVENT(CHANGE, shifter_moved),
 	TLLABELx(_("Finish"), 2, 0, 0, 0, 5),

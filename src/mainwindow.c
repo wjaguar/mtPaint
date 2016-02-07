@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -245,7 +245,8 @@ static void pressed_crop()
 	else memory_errors(res);
 }
 
-static void script_rect(int *rect);
+static multi_ext *script_rect(int *rect);
+static void select_poly(multi_ext *mx);
 
 void pressed_select(int all)
 {
@@ -270,9 +271,16 @@ void pressed_select(int all)
 
 	while (all) /* Select entire canvas */
 	{
+		multi_ext *mx;
 		int rxy[4];
 
-		script_rect(rxy);
+		if ((mx = script_rect(rxy))) // Script wants a polygon
+		{
+			change_to_tool(TTB_POLY);
+			select_poly(mx);
+			free(mx);
+			break;
+		}
 		clip(rxy, 0, 0, mem_width - 1, mem_height - 1, rxy);
 		/* We are selecting an area, so block inside-out selections */
 		if ((rxy[0] > rxy[2]) || (rxy[1] > rxy[3])) break;
@@ -840,15 +848,6 @@ static void *keylist_code[] = {
 		SHORTCUT(BackSpace, SA), SHORTCUT(BackSpace, CSA),
 	RET
 };
-
-/* "Tool of last resort" for when shortcuts don't work */
-static void rebind_keys()
-{
-	cmd_reset(main_keys, NULL);
-#if GTK_MAJOR_VERSION > 1
-	gtk_signal_emit_by_name(GTK_OBJECT(main_window), "keys_changed", NULL);
-#endif
-}
 
 int key_action(key_ext *key, int toggle)
 {
@@ -1447,7 +1446,7 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 	/* Pure moves are handled elsewhere */
 	else if (m->button)
 	{
-		cmd = tool_action_(m->count, m->button, x, y);
+		cmd = tool_action(m->count, m->button, x, y);
 		if (cmd != TC_NONE)
 			do_tool_action(cmd | TCF_ONCE, x, y, m->pressure);
 	}
@@ -1527,7 +1526,7 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 		}
 	}
 
-	update_sel_bar();
+	update_sel_bar(FALSE);
 }
 
 static int canvas_mouse(main_dd *dt, void **wdata, int what, void **where,
@@ -3504,6 +3503,7 @@ int run_script(char **res)
 			break; // Terminate on error
 		}
 		if (str) err = str = g_strdup_printf(__(str), cur[0]);
+		update_stuff(CF_NOW); // Do cumulative update
 	}
 	if (err) alert_box(_("Error"), err, NULL);
 	if (str) g_free(str);
@@ -3679,11 +3679,43 @@ static void script_bp(int mode)
 
 typedef struct {
 	int w, h, rxy[4];
+	multi_ext *mx;
+	void **group;
 } rect_dd;
+
+static int make_select(rect_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	/* Drop previous polygon if any */
+	free(dt->mx);
+	dt->mx = NULL;
+
+	/* Sanity check */
+	if ((mx->ncols != 2) || (mx->mincols != 2) || (mx->fractcol >= 0))
+		return (0);
+
+	/* Point/rectangle selection */
+	if (mx->nrows <= 2)
+	{
+		int *row = mx->rows[0] + 1;
+		dt->rxy[0] = row[0];
+		dt->rxy[1] = row[1];
+		if (mx->nrows > 1) row = mx->rows[1] + 1;
+		dt->rxy[2] = row[0];
+		dt->rxy[3] = row[1];
+		cmd_reset(dt->group, dt); // Update widgets
+		return (1);
+	}
+
+	/* Polygon selection */
+	dt->mx = mx;
+	return (-1); // Keep the data
+}
 
 #define WBbase rect_dd
 static void *rect_code[] = {
-	TOPVBOX,
+	TOPVBOX, EVENT(MULTI, make_select), OPNAME(""),
+	REF(group), GROUPR,
 	SPIN(rxy[0], 0, MAX_WIDTH - 1), OPNAME("x0"),
 	SPIN(rxy[1], 0, MAX_HEIGHT - 1), OPNAME("y0"),
 	SPIN(rxy[2], 0, MAX_WIDTH - 1), OPNAME("x1"),
@@ -3694,32 +3726,86 @@ static void *rect_code[] = {
 };
 #undef WBbase
 
-static void script_rect(int *rect)
+static multi_ext *script_rect(int *rect)
 {
 	static rect_dd tdata = { 0, 0, { 0, 0, MAX_WIDTH - 1, MAX_HEIGHT - 1 } };
 	rect_dd *dt;
+	multi_ext *mx;
 	void **res;
 
 	copy4(rect, tdata.rxy);
-	if (!script_cmds) return;
+	if (!script_cmds) return (NULL);
 
 	res = run_create_(rect_code, &tdata, sizeof(tdata), script_cmds);
 	run_query(res);
 	dt = GET_DDATA(res);
+	mx = dt->mx;
 	if (dt->w) dt->rxy[2] = dt->rxy[0] + dt->w - 1;
 	if (dt->h) dt->rxy[3] = dt->rxy[1] + dt->h - 1;
 	copy4(rect, dt->rxy);
 	run_destroy(res);
+	return (mx);
 }
 
 typedef struct {
-	int swap, x, y;
+	int swap, mx, dx, dy, align, x, y;
 } paste_dd;
+
+static char *paste_align[] = { "Left", "Right", "Top", "Bottom", "Centre" };
+
+static void align_evt(paste_dd *dt, void **wdata, int what, void **where)
+{
+	cmd_read(where, dt);
+	switch (dt->align)
+	{
+	case 0: // Left
+		dt->dx = 0; break;
+	case 1: // Right
+		dt->dx = mem_clip_w - 1; break;
+	case 2: // Top
+		dt->dy = 0; break;
+	case 3: // Bottom
+		dt->dy = mem_clip_h - 1; break;
+	case 4: // Center
+		dt->dx = mem_clip_w / 2; dt->dy = mem_clip_h / 2; break;
+	}
+}
+
+static int do_paste(paste_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	int i, fr, mode, rows, dx = dt->dx, dy = dt->dy, p = MAX_PRESSURE;
+
+	/* Sanity check */
+	if ((mx->ncols > 3) || (mx->mincols < 2) ||
+		((mx->fractcol >= 0) && (mx->fractcol != 2))) return (0); // Error
+
+	do_tool_action(TC_PASTE_DRAG, marq_x1, marq_y1, 0);
+
+	mode = dt->swap ? TC_PASTE_PSWAP | TCF_PRES | TCF_ONCE :
+		TC_PASTE_PAINT | TCF_PRES | TCF_ONCE;
+	fr = mx->fractcol == 2;
+	rows = mx->nrows;
+	for (i = 0; i < rows; i++)
+	{
+		int *row = mx->rows[i];
+		if (row[0] > 2) p = bounded(fr ? row[3] :
+			(row[3] * MAX_PRESSURE) / 100, 0, MAX_PRESSURE);
+		do_tool_action(mode, row[1] - dx, row[2] - dy, p);
+	}
+
+	do_tool_action(TC_SEL_STOP, marq_x1, marq_y1, 0);
+	tool_done();
+	dt->mx = TRUE;
+	return (1);
+}
 
 #define WBbase paste_dd
 static void *paste_code[] = {
 	TOPVBOX,
-	CHECK("swap", swap),
+	OPT(paste_align, 5, align), EVENT(SCRIPT, align_evt),
+		ALTNAME("align"), FLATTEN, EVENT(MULTI, do_paste),
+	CHECK("swap", swap), EVENT(CHANGE, align_evt),
 	SPIN(x, -MAX_WIDTH, MAX_WIDTH), OPNAME("x0"),
 	SPIN(y, -MAX_HEIGHT, MAX_HEIGHT), OPNAME("y0"),
 	WSHOW
@@ -3728,25 +3814,151 @@ static void *paste_code[] = {
 
 void script_paste(int centre)
 {
-	int dx = centre ? mem_clip_w / 2 : 0, dy = centre ? mem_clip_h / 2 : 0;
-	paste_dd tdata = { FALSE, marq_x1 + dx, marq_y1 + dy };
+	paste_dd tdata, *dt;
 	void **res;
 
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.x = marq_x1;
+	tdata.y = marq_y1;
+	if (centre)
+	{
+		tdata.x += tdata.dx = mem_clip_w / 2;
+		tdata.y += tdata.dy = mem_clip_h / 2;
+		tdata.align = 4;
+	}
 	res = run_create_(paste_code, &tdata, sizeof(tdata), script_cmds);
 	run_query(res);
-	tdata = *(paste_dd *)GET_DDATA(res);
-	run_destroy(res);
-	
-	tdata.x -= dx;
-	tdata.y -= dy;
-	if ((marq_x1 ^ tdata.x) | (marq_y1 ^ tdata.y)) // Moved
+	dt = GET_DDATA(res);
+	if (!dt->mx) // No commits yet - paste at x & y
 	{
-
-		paint_marquee(MARQ_MOVE, tdata.x, tdata.y, NULL);
-		update_stuff(UPD_SGEOM);
+		int x = dt->x - dt->dx, y = dt->y - dt->dy;
+		if ((marq_x1 ^ x) | (marq_y1 ^ y)) // Moved
+			paint_marquee(MARQ_MOVE, x, y, NULL);
+		commit_paste(dt->swap, NULL);
+		tool_done();
 	}
-	action_dispatch(ACT_COMMIT, tdata.swap, 0, TRUE); // Commit paste
+	run_destroy(res);
+	update_stuff(UPD_SGEOM);
 }
+
+static void do_act_esc()
+{
+	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
+		pressed_select(FALSE);
+	else if (tool_type == TOOL_LINE)
+	{
+		stop_line();
+		update_sel_bar(FALSE);
+	}
+	else if ((tool_type == TOOL_GRADIENT) &&
+		(gradient[mem_channel].status != GRAD_NONE))
+	{
+		do_grad_action(TC_GRAD_CLEAR, 0, 0);
+		update_sel_bar(FALSE);
+	}
+}
+
+static void select_poly(multi_ext *mx)
+{
+	int i, rows = mx->nrows;
+
+	for (i = 0; i < rows; i++)
+	{
+		int *row = mx->rows[i] + 1;
+		do_tool_action(i ? TC_POLY_ADD | TCF_ONCE : TC_POLY_START,
+			bounded(row[0], 0, mem_width - 1),
+			bounded(row[1], 0, mem_height - 1), 0);
+	}
+	do_tool_action(TC_POLY_CLOSE, 0, 0, 0);
+}
+
+static int tool_command(main_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	int *row;
+	int i, p, fr, rows = mx->nrows, res = 0;
+
+	do_act_esc();
+	switch (tool_type)
+	{
+	case TOOL_GRADIENT:
+		if ((rows == 1) && (mx->ncols < 3)) res = 1; // Valid clear op
+		if ((rows != 2) || (mx->ncols != 2) || (mx->mincols != 2) ||
+			(mx->fractcol >= 0)) break; // Error
+		row = mx->rows[0] + 1;
+		do_grad_action(TC_GRAD_START,
+			bounded(row[0], -MAX_WIDTH, MAX_WIDTH),
+			bounded(row[1], -MAX_HEIGHT, MAX_HEIGHT));
+		row = mx->rows[1] + 1;
+		do_grad_action(TC_GRAD_SET1,
+			bounded(row[0], -MAX_WIDTH, MAX_WIDTH),
+			bounded(row[1], -MAX_HEIGHT, MAX_HEIGHT));
+		res = 1;
+		break;
+	case TOOL_LINE:
+		if ((rows < 2) || (mx->ncols != 2) || (mx->mincols != 2) ||
+			(mx->fractcol >= 0)) break; // Error
+		for (i = 0; i < rows; i++)
+		{
+			row = mx->rows[i] + 1;
+			do_tool_action(TC_LINE_START,
+				bounded(row[0], 0, mem_width - 1),
+				bounded(row[1], 0, mem_height - 1), MAX_PRESSURE);
+			line_status = LINE_LINE;
+		}
+		stop_line();
+		res = 1;
+		break;
+	case TOOL_SELECT:
+		if ((rows > 2) || (mx->ncols != 2) || (mx->mincols != 2) ||
+			(mx->fractcol >= 0)) break; // Error
+		row = mx->rows[0] + 1;
+		do_tool_action(TC_SEL_START,
+				bounded(row[0], 0, mem_width - 1),
+				bounded(row[1], 0, mem_height - 1), 0);
+		if (rows > 1) row = mx->rows[1] + 1;
+		do_tool_action(TC_SEL_TO,
+				bounded(row[0], 0, mem_width - 1),
+				bounded(row[1], 0, mem_height - 1), 0);
+		do_tool_action(TC_SEL_STOP, 0, 0, 0);
+		res = 1;
+		break;
+	case TOOL_POLYGON:
+		if ((mx->ncols != 2) || (mx->mincols != 2) ||
+			(mx->fractcol >= 0)) break; // Error
+		select_poly(mx);
+		res = 1;
+		break;
+	default: /* Regular painting tools */
+		if ((mx->ncols > 3) || (mx->mincols < 2) ||
+			((mx->fractcol >= 0) && (mx->fractcol != 2))) break; // Error
+		fr = mx->fractcol == 2;
+		p = MAX_PRESSURE;
+		for (i = 0; i < rows; i++)
+		{
+			row = mx->rows[i];
+			if (row[0] > 2) p = bounded(fr ? row[3] :
+				(row[3] * MAX_PRESSURE) / 100, 0, MAX_PRESSURE);
+			do_tool_action(TC_PAINT | TCF_PRES | TCF_ONCE,
+				bounded(row[1], 0, mem_width - 1),
+				bounded(row[2], 0, mem_height - 1), p);
+		}
+		res = 1;
+		break;
+	}
+
+	if (res) /* Do as for button release */
+	{
+		tool_done();
+		update_menus();
+	}
+	return (res);
+}
+
+void *scriptbar_code[] = {
+	EVENT(MULTI, tool_command), ALTNAME(""), // for tools toolbar
+	RET
+};
 
 static float new_zoom(int mode, float zoom)
 {
@@ -3804,23 +4016,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		else if (layers_total) move_layer_relative(layer_selected,
 			change * arrow_dx[dir], change * arrow_dy[dir]);
 		break;
-	case ACT_ESC:
-		if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
-			pressed_select(FALSE);
-		else if (tool_type == TOOL_LINE)
-		{
-			stop_line();
-			update_sel_bar();
-		}
-		else if ((tool_type == TOOL_GRADIENT) &&
-			(gradient[mem_channel].status != GRAD_NONE))
-		{
-			gradient[mem_channel].status = GRAD_NONE;
-			if (grad_opacity) update_stuff(UPD_RENDER);
-			else repaint_grad(NULL);
-			update_sel_bar();
-		}
-		break;
+	case ACT_ESC: do_act_esc(); break;
 	case ACT_COMMIT:
 		if (marq_status >= MARQUEE_PASTE)
 		{
@@ -3975,7 +4171,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 			inifile_get(HANDBOOK_LOCATION_INI, NULL));
 		break;
 	case ACT_REBIND_KEYS:
-		rebind_keys(); break;
+		/* "Tool of last resort" for when shortcuts don't work */
+		cmd_reset(main_keys, NULL); break;
 	case ACT_MODE:
 		mode_change(mode, state); break;
 	case ACT_LR_SHIFT:

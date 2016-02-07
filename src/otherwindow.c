@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1648,7 +1648,7 @@ static void *colsel_code[] = {
 		REF(fspin_csel),
 		FSPIN(v.csrange, 0, 76500), EVENT(CHANGE, csel_controls_changed),
 		CHECK(_("Inverse"), v.csinv), EVENT(CHANGE, csel_controls_changed),
-		RPACKe(csel_modes, 0, 1, v.csmode, csel_controls_changed),
+		RPACKe(csel_modes, 0, 1, v.csmode, csel_controls_changed), FLATTEN,
 		OPNAME("Mode"),
 		WDONE,
 	ENDIF(1),

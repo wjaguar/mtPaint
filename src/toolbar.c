@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -465,6 +465,8 @@ void *toolbar_code[] = {
 	SMARTTBARx(toolbar_click, toolbar_click),
 	UNLESSv(toolbar_status[TOOLBAR_TOOLS]), HIDDEN, // Only show if user wants
 	SCRIPTED,
+	/* !!! scriptbar_code[] adds ALTNAME and event to SMARTTBARx */
+	CALL(scriptbar_code),
 	REFv(icon_buttons[TTB_PAINT]),
 	TBRBUTTONv(_("Paint"), XPM_ICON(paint),
 		ACTMOD(ACT_TOOL, TTB_PAINT), tool_id), SHORTCUT(F4, 0),
@@ -503,7 +505,7 @@ void *toolbar_code[] = {
 		ACTMAP(NEED_LAS2),
 	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
 		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,
-// !!! Text dialogs not yet scriptable
+// !!! Basic text dialog not yet scriptable
 	TBSPACE,
 	TBBUTTON(_("Ellipse Outline"), XPM_ICON(ellipse2),
 		ACTMOD(ACT_ELLIPSE, 0)),

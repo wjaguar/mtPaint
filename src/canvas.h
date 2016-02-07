@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -154,6 +154,7 @@ enum {
 	TC_PASTE_DRAG,
 	TC_PASTE_COMMIT,
 	TC_PASTE_PAINT,
+	TC_PASTE_PSWAP,
 	TC_PAINT,
 	TC_PAINT_B,
 	TC_GRAD_START,
@@ -171,7 +172,7 @@ enum {
 #define TCF_ONCE  0x200 /* Skip repeats */
 
 void do_tool_action(int cmd, int x, int y, int pressure);	// Paint some pixels!
-int tool_action_(int count, int button, int x, int y);	// Decide what to paint
+int tool_action(int count, int button, int x, int y);	// Decide what to paint
 void update_menus();					// Update undo/edit menu
 
 int close_to( int x1, int y1 );
@@ -186,7 +187,7 @@ void paint_marquee(int action, int new_x, int new_y, rgbcontext *ctx);	// Draw/c
 void paint_poly_marquee(rgbcontext *ctx);	// Paint polygon marquee
 void stretch_poly_line(int x, int y);		// Clear old temp line, draw next temp line
 
-void update_sel_bar();			// Update selection stats on status bar
+void update_sel_bar(int now);		// Update selection stats on status bar
 void update_xy_bar(int x, int y);	// Update cursor tracking on status bar
 void init_status_bar();			// Initialize status bar
 
@@ -264,6 +265,7 @@ void create_default_image();			// Create default new image
 #define CF_ALIGN  0x00100000 /* Realign image window */
 #define CF_VALIGN 0x00200000 /* Realign view window */
 #define CF_TRANS  0x00400000 /* Transparent color in layers window */
+#define CF_NOW    0x00800000 /* Do not wait for cumulative update */
 
 /* Compound updates */
 

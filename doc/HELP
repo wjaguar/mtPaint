@@ -1,0 +1,139 @@
+------------------
+Keyboard shortcuts
+------------------
+
+  Ctrl-N            Create new image
+  Ctrl-O            Open Image
+  Ctrl-S            Save Image
+  Ctrl-Shift-S      Save layers file
+  Ctrl-Q            Quit program
+
+  Ctrl-A            Select whole image
+  Escape            Select nothing, cancel paste box
+  J                 Lasso selection
+
+  Ctrl-C            Copy selection to clipboard
+  Ctrl-X            Copy selection to clipboard, and then paint current pattern to selection area
+  Ctrl-V            Paste clipboard to centre of current view
+  Ctrl-K            Paste clipboard to location it was copied from
+  Ctrl-Shift-V      Paste clipboard to new layer
+  Enter/Return      Commit paste to canvas
+  Shift+Enter/Return  Commit paste and swap canvas into the clipboard
+
+  Arrow keys        Paint Mode - Move the mouse pointer
+  Arrow keys        Selection Mode - Nudge selection box or paste box by one pixel
+  Shift+Arrow keys  Nudge mouse pointer, selection box or paste box by x pixels - x is defined by the Preferences window
+  Ctrl+Arrows       Move layer or resize selection box
+  Ctrl+Shift+Arrows  Move layer or resize selection box by x pixels
+
+  Enter/Return      Paint Mode - Simulate left click
+  Backspace         Paint Mode - Simulate right click
+
+  [ or ]            Change colour A to the next or previous palette item
+  Shift+[ or ]      Change colour B to the next or previous palette item
+
+  Delete            Crop image to selection
+  Insert            Transform colours - i.e. Brightness, Contrast, Saturation, Posterize, Gamma
+  Ctrl-G            Greyscale the image
+  Shift-Ctrl-G      Greyscale the image (Gamma corrected)
+  Ctrl+M            Mirror the image
+  Shift-Ctrl-I      Invert the image
+
+  Ctrl-T            Draw a rectangle around the selection area with the current fill
+  Ctrl-Shift-T      Fill in the selection area with the current fill
+  Ctrl-L            Draw an ellipse spanning the selection area
+  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area
+
+  Ctrl-E            Edit the RGB values for colours A & B
+  Ctrl-W            Edit all palette colours
+
+  Ctrl-P            Preferences
+  Ctrl-I            Information
+
+  Ctrl-Z            Undo last action
+  Ctrl-R            Redo an undone action
+
+  Shift-T           Text Tool (GTK+)
+  T                 Text Tool (FreeType)
+
+  V                 View Window
+  L                 Layers Window
+
+  B                 Toggle Snap to Tile Grid mode
+
+  X                 Swap Colours A & B
+  E                 Choose Colour
+
+  A                 Draw open arrow head when using the line tool (size set by flow setting)
+  S                 Draw closed arrow head when using the line tool (size set by flow setting)
+
+  D                 Line Tool
+  F                 Flood Fill Tool
+
+  +,=               Main edit window - Zoom in
+  -                 Main edit window - Zoom out
+  Shift +,=         View window - Zoom in
+  Shift -           View window - Zoom out
+
+  1                 10% zoom
+  2                 25% zoom
+  3                 50% zoom
+  4                 100% zoom
+  5                 400% zoom
+  6                 800% zoom
+  7                 1200% zoom
+  8                 1600% zoom
+  9                 2000% zoom
+
+  Shift + 1         Edit image channel
+  Shift + 2         Edit alpha channel
+  Shift + 3         Edit selection channel
+  Shift + 4         Edit mask channel
+
+  F1                Help
+  F2                Choose Pattern
+  F3                Choose Brush
+  F4                Paint Tool
+  F5                Toggle Main Toolbar
+  F6                Toggle Tools Toolbar
+  F7                Toggle Settings Toolbar
+  F8                Toggle Palette
+  F9                Selection Tool
+  F12               Toggle Dock Area
+
+  Ctrl + F1 - F12   Save current clipboard to file 1-12
+  Shift + F1 - F12  Load clipboard from file 1-12
+
+  Ctrl + 1, 2, ... , 0  Set opacity to 10%, 20%, ... , 100% (main or keypad numbers)
+  Ctrl + + or =     Increase opacity by 1
+  Ctrl + -          Decrease opacity by 1
+
+  Home              Show or hide main window menu/toolbar/status bar/palette
+  Page Up           Scale Image
+  Page Down         Resize Image canvas
+  End               Pan Window
+
+---------------
+Mouse shortcuts
+---------------
+
+  Left button          Paint to canvas using the current tool
+  Middle button        Selects the point which will be the centre of the image after the next zoom
+  Right button         Commit paste to canvas / Stop drawing current line / Cancel selection
+
+  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window
+
+  Ctrl+Left button     Choose colour A from under mouse pointer
+  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour in A (RGB images only)
+  Ctrl+Right button    Choose colour B from under mouse pointer
+  Ctrl+Scroll Wheel    Scroll the main edit window left or right
+
+  Ctrl+Double click    Set colour A or B to average colour under brush square or selection marquee (RGB only)
+
+  Shift+Right button   Selects the point which will be the centre of the image after the next zoom
+
+
+You can fixate the X/Y co-ordinates while moving the mouse:
+
+  Shift                Constrain mouse movements to vertical line
+  Shift+Ctrl           Constrain mouse movements to horizontal line

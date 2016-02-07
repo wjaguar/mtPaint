@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -158,6 +158,7 @@ void progress_init(char *text, int canc)		// Initialise progress window
 
 	/* Break pointer grabs, to avoid originating widget misbehaving later on */
 	release_grab();
+	update_stuff(CF_NOW);
 
 	progress_window = run_create(progress_code, &tdata, sizeof(tdata));
 
@@ -247,6 +248,7 @@ int alert_box(char *title, char *message, char *text1, ...)
 	{
 		/* This function must be immune to pointer grabs */
 		release_grab();
+		update_stuff(CF_NOW);
 
 		dd = run_create(alert_code, &tdata, sizeof(tdata)); // run dialog
 		dt = GET_DDATA(dd);

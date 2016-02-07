@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -4001,12 +4001,13 @@ static void put_pixel_row_sb(int x, int y, int len, unsigned char *xsel)
 	int x1, y1, sb_ofs, offset, use_mask, masked;
 
 
-	if (len <= 0) return;
+	if ((len <= 0) || (x + len <= sb_rect[0])) return;
 	x1 = x - sb_rect[0];
 	y1 = y - sb_rect[1];
-	if ((x1 < 0) || (x1 >= sb_rect[2]) || (y1 < 0) || (y1 >= sb_rect[3]))
+	if ((x1 >= sb_rect[2]) || (y1 < 0) || (y1 >= sb_rect[3]))
 		return;
-	if (x1 + len > sb_rect[2]) len = sb_rect[2] - x1;
+	if (x1 + len > sb_rect[2]) len = sb_rect[2] - x1; // Clip right side
+	if (x1 < 0) x -= x1 , len += x1 , xsel -= x1 , x1 = 0; // Clip left side
 
 	sb_ofs = y1 * sb_rect[2] + x1;
 	offset = x + mem_width * y;

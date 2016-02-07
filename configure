@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.94"
-MT_DATE="2016-01-17"
+MT_V="3.44.95"
+MT_DATE="2016-02-07"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -498,6 +498,12 @@ if HAVE_GCC_VER 4.1
 then # Tell gcc 4.1+ to shut up some more
 	WARN="$WARN -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast"
 fi
+# Deterministic compile
+SET_RANDSEED=
+if HAVE_GCC_VER 3.3
+then
+	SET_RANDSEED='-frandom-seed=$*'
+fi
 
 ### Setup libraries
 
@@ -713,8 +719,8 @@ LDFLAG = $AS_NEEDED $LIBS $LDFLAGS
 CFLAG = $DEFS $INCLUDES $CPPFLAGS $CFLAGS
 subdirs = $MAKE_DIRS
 BIN_INSTALL="$MT_BINDIR"
+SET_RANDSEED = $SET_RANDSEED
 CONFIG
-HAVE_GCC_VER 3.3 && echo "HAVE_RANDSEED=1" >> $GTK_FILE
 
 ### Report config
 

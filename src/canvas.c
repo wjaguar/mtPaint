@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -64,6 +64,8 @@ int lasso_sel;		// Lasso by selection channel (just trim it) if present
 
 int preserved_gif_delay = 10, undo_load;
 
+static int update_later;
+
 
 ///	STATUS BAR
 
@@ -98,7 +100,7 @@ static void update_image_bar()
 	cmd_setv(label_bar[STATUS_GEOMETRY], txt, LABEL_VALUE);
 }
 
-void update_sel_bar()			// Update selection stats on status bar
+void update_sel_bar(int now)		// Update selection stats on status bar
 {
 	char txt[64] = "";
 	int rect[4];
@@ -107,6 +109,9 @@ void update_sel_bar()			// Update selection stats on status bar
 
 
 	if (!status_on[STATUS_SELEGEOM]) return;
+	update_later |= CF_SELBAR;
+	if (script_cmds && !now) return;
+	update_later &= ~CF_SELBAR;
 
 	if ((((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON)) &&
 		(marq_status > MARQUEE_NONE)) ||
@@ -1186,8 +1191,6 @@ void update_stuff(int flags)
 
 	if (flags & CF_CAB)
 		flags |= mem_channel == CHN_IMAGE ? UPD_AB : UPD_GRAD;
-	if (flags & CF_NAME)
-		update_titlebar();
 	if (flags & CF_GEOM)
 	{
 		int wh[2];
@@ -1232,21 +1235,32 @@ void update_stuff(int flags)
 		update_menus();
 	if (flags & CF_SET)
 		toolbar_update_settings();
-	if (flags & CF_IMGBAR)
-		update_image_bar();
-	if (flags & CF_SELBAR)
-		update_sel_bar();
 #if 0
 // !!! Too risky for now - need a safe path which only calls update_xy_bar()
 	if (flags & CF_PIXEL)
 		move_mouse(0, 0, 0);	// To cause update of XY bar
 #endif
-	if (flags & CF_CURSOR)
-		set_cursor(NULL);
 	if (flags & CF_PMODE)
 		if ((marq_status >= MARQUEE_PASTE) && show_paste) flags |= CF_DRAW;
 	if (flags & CF_GMODE)
 		if ((tool_type == TOOL_GRADIENT) && grad_opacity) flags |= CF_DRAW;
+
+	/* The next parts can be done later in a cumulative update */
+	flags |= update_later;
+	if (script_cmds && !(flags & CF_NOW)) flags ^= update_later = flags &
+		(CF_NAME | CF_IMGBAR | CF_SELBAR | CF_TRANS | CF_CURSOR |
+		 CF_DRAW | CF_VDRAW | CF_PDRAW | CF_TDRAW |
+		 CF_ALIGN | CF_VALIGN);
+	update_later &= ~flags;
+
+	if (flags & CF_NAME)
+		update_titlebar();
+	if (flags & CF_IMGBAR)
+		update_image_bar();
+	if (flags & CF_SELBAR)
+		update_sel_bar(TRUE);
+	if (flags & CF_CURSOR)
+		set_cursor(NULL);
 	if (flags & CF_DRAW)
 		if (drawing_canvas) cmd_repaint(drawing_canvas);
 	if (flags & CF_VDRAW)
@@ -2381,7 +2395,7 @@ static void poly_add_po(int x, int y)
 		/* Combine erasing old line with redrawing new segment:
 		 * the 1-point new line will be drawn as part of it */
 		refresh_lines(old, edge);
-		update_sel_bar();
+		update_sel_bar(FALSE);
 	}
 }
 
@@ -2512,17 +2526,6 @@ static int tool_draw(int x, int y, int first_point, int *update)
 			mem_clone(x + clone_dx, y + clone_dy, x, y);
 		else return (TRUE); /* May try again with other x & y */
 		break;
-	case TOOL_SELECT:
-	case TOOL_POLYGON:
-		/* Adjust paste location */
-		marq_x2 += x - marq_x1;
-		marq_y2 += y - marq_y1;
-		marq_x1 = x;
-		marq_y1 = y;
-
-		commit_paste(FALSE, update);
-		return (TRUE); /* Area updated already */
-		break;
 	default: return (FALSE); /* Stop this nonsense now! */
 	}
 
@@ -2558,7 +2561,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 	tool_info o_tool = tool_state;
 	int i, j, k, ts2, tr2, ox, oy;
 	int oox, ooy;	// Continuous smudge stuff
-	int first_point;
+	int first_point, pswap = FALSE;
 
 	// Only do something with a new point
 	if (!(first_point = !pen_down) && (cmd & TCF_ONCE) &&
@@ -2682,6 +2685,9 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 	case TC_POLY_CLOSE:
 		poly_conclude();
 		break;
+	case TC_PASTE_PSWAP:
+		pswap = TRUE;
+		// Fallthrough
 	case TC_PASTE_DRAG:
 	case TC_PASTE_PAINT:
 		if (marq_status != MARQUEE_PASTE_DRAG)
@@ -2691,7 +2697,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 			marq_drag_y = y - marq_y1;
 		}
 		else paint_marquee(MARQ_MOVE, x - marq_drag_x, y - marq_drag_y, NULL);
-		if (cmd != TC_PASTE_PAINT) break;
+		if (cmd == TC_PASTE_DRAG) break;
 		cmd = TC_PASTE_COMMIT;
 		// Fallthrough
 	case TC_PAINT_B:
@@ -2818,22 +2824,26 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 		update_area[0] = update_area[1] = MAX_WIDTH;
 		update_area[2] = update_area[3] = 0;
 
-		/* Use marquee coords for paste */
-		i = j = 0;
-		ox = marq_x1;
-		oy = marq_y1;
-		if (cmd == TC_PASTE_COMMIT)
-		{
-			i = marq_x1 - x;
-			j = marq_y1 - y;
-		}
-
 		if (first_point) lstep = 0.0;
 
 		if (first_point || !brush_spacing) /* Single point */
-			tool_draw(x + i, y + j, first_point, update_area);
+		{
+			if (cmd == TC_PASTE_COMMIT)
+				commit_paste(pswap, update_area); // At marquee
+			else tool_draw(x, y, first_point, update_area);
+		}
 		else /* Multiple points */
 		{
+			/* Use marquee coords for paste */
+			i = j = 0;
+			ox = marq_x1;
+			oy = marq_y1;
+			if (cmd == TC_PASTE_COMMIT)
+			{
+				i = marq_x1 - x;
+				j = marq_y1 - y;
+			}
+
 			line_init(ncline, tool_ox + i, tool_oy + j, x + i, y + j);
 			i = abs(x - tool_ox);
 			j = abs(y - tool_oy);
@@ -2846,7 +2856,16 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 					/* Drop error for 1-pixel step */
 					lstep = brush_spacing == 1 ? 0.0 :
 						lstep - brush_spacing;
-					if (!tool_draw(ncline[0], ncline[1],
+					if (cmd == TC_PASTE_COMMIT)
+					{
+						/* Adjust paste location */
+						marq_x2 += ncline[0] - marq_x1;
+						marq_y2 += ncline[1] - marq_y1;
+						marq_x1 = ncline[0];
+						marq_y1 = ncline[1];
+						commit_paste(pswap, update_area);
+					}
+					else if (!tool_draw(ncline[0], ncline[1],
 						first_point, update_area)) break;
 				}
 				if (line_step(ncline) < 0) break;
@@ -2886,7 +2905,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 	if (tablet_working || script_cmds) tool_state = o_tool;
 }
 
-int tool_action_(int count, int button, int x, int y)
+int tool_action(int count, int button, int x, int y)
 {
 	int cmd = TC_NONE;
 

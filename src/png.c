@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -4692,8 +4692,7 @@ static int save_lss(char *file_name, ls_settings *settings)
 			for (; j < w; j++)
 			{
 				k = *src++ & 0xF;
-				if ((k != last) || (cnt >= 255 + 16)) break;
-				cnt++;
+				if ((k != last) || (++cnt >= 255 + 16)) break;
 			}
 			if (cnt)
 			{
@@ -4709,12 +4708,8 @@ static int save_lss(char *file_name, ls_settings *settings)
 				buf[idx >> 1] |= cnt << ((idx & 1) << 2); ++idx;
 			}
 			if (j++ >= w) break; /* Final repeat */
-			if (k == last)
-			{
-				cnt = 1;
-				continue; /* Chain of repeats */
-			}
 			cnt = 0;
+			if (k == last) continue; /* Chain of repeats */
 			buf[idx >> 1] |= k << ((idx & 1) << 2); ++idx;
 			last = k;
 		}			
@@ -7443,7 +7438,7 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	ani->settings.hot_x = ani->settings.hot_y = -1;
 	ani->settings.xpm_trans = ani->settings.rgb_trans = -1;
 	/* No load progressbar when exploding frames */
-	if (ani_mode == FS_EXPLODE_FRAMES) ani->settings.silent = TRUE;
+	if (mode == FS_EXPLODE_FRAMES) ani->settings.silent = TRUE;
 
 	/* !!! Use default palette - for now */
 	mem_pal_copy(pal, mem_pal_def);

@@ -1,5 +1,5 @@
 /*	vcode.h
-	Copyright (C) 2013-2015 Dmitry Groshev
+	Copyright (C) 2013-2016 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -201,6 +201,7 @@ enum {
 	op_EVT_CHANGE,
 	op_EVT_DESTROY, // before deallocation
 	op_EVT_SCRIPT, // by cmd_setstr()
+	op_EVT_MULTI, // by same, with intlist data & ret
 	op_EVT_KEY, // with key data & ret
 	op_EVT_MOUSE, // with button data & ret
 	op_EVT_MMOUSE, // movement, with same
@@ -358,6 +359,14 @@ typedef struct {
 	key_dd *keys;
 	char **slotnames;
 } keymap_dd;
+
+//	Structure which is provided to MULTI event
+typedef struct {
+	int nrows, ncols;
+	int mincols; // Minimum tuple size
+	int fractcol; // Which column is fixedpoint (-1 if all integer)
+	int *rows[1]; // Pointers to rows (int arrays preceded by their length)
+} multi_ext;
 
 //	Values of mouse count
 enum {
@@ -1020,6 +1029,8 @@ enum {
 #define CLIPBOARD(F,T,HC,HP) WBr3hf(CLIPBOARD, 2 + 2 * 2), WBfield(F), \
 	(void *)(T), EVENT(COPY, HC), EVENT(PASTE, HP)
 #define ALTNAME(NM) WBrh(uALTNAME, 1), (NM)
+/* Make option strings referrable as widget names */
+#define FLATTEN ALTNAME(":")
 #define OPNAME(NM) WBh(uOPNAME, 1), (NM)
 #define OPNAME0 WBh(uOPNAME, 0)
 /* Set an impossible name, to hide widget from script */

@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2015 Dmitry Groshev
+	Copyright (C) 2013-2016 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -6434,7 +6434,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		} // fallthrough
 		/* Remember that event needs triggering here */
 		/* Or remember a cleanup location */
-		case op_EVT_SCRIPT:
+		case op_EVT_SCRIPT: case op_EVT_MULTI:
 		case op_TRIGGER: case op_CLEANUP:
 			widget = NULL;
 			break;
@@ -6958,6 +6958,11 @@ void cmd_reset(void **slot, void *ddata)
 		}
 		case op_KEYMAP:
 			keymap_reset(wdata[2]);
+#if GTK_MAJOR_VERSION > 1
+			gtk_signal_emit_by_name(GTK_OBJECT(gtk_widget_get_toplevel(
+				GET_REAL_WINDOW(wdata_slot(wdata)))),
+				"keys_changed", NULL);
+#endif
 			break;
 #if 0 /* Not needed for now */
 		case op_FPICKpm:
@@ -7036,6 +7041,8 @@ static int midmatch(const char *s, const char *v, int l)
 	return (!!s);
 }
 
+static int find_string(swdata *sd, char *s, int l, int column);
+
 void **find_slot(void **slot, char *id, int l, int mlevel)
 {
 	void **start = slot, **where = NULL;
@@ -7097,6 +7104,19 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 			where = slot;
 			break;
 		}
+		/* In a flattened widget, match contents */
+		if ((nm[0] == ':') && !nm[1] && (op == op_uALTNAME))
+		{
+			void **w = origin_slot(slot);
+			if (!IS_UNREAL(w)) continue;
+			n = GET_UOP(w);
+			// Allow only static lists for now
+			if ((n != op_uOPT) && (n != op_uRPACK)) continue;
+			n = find_string(w[0], id, l, FALSE);
+			if (n < 0) continue;
+			// Use matched string as widget name
+			nm = ((char **)((swdata *)w[0])->strs)[n];
+		}
 		/* Match at beginning, preferring shortest word */
 		if (!strncasecmp(nm, id, l))
 		{
@@ -7113,7 +7133,11 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 	}
 	/* Resolve alternative name */
 	if (where && (GET_OP(where) == op_uALTNAME))
-		where = origin_slot(where);
+	{
+		nm = ((swdata *)where[0])->id;
+		if ((nm[0] != ':') || nm[1]) // Leave flattening markers be
+			where = origin_slot(where);
+	}
 	/* Try in-group searching */
 	if (!where && (mlevel == MLEVEL_FLAT) && (ts = memchr(id, '/', l)) &&
 		(ts != id) && (id + l - ts > 1))
@@ -7126,13 +7150,13 @@ void **find_slot(void **slot, char *id, int l, int mlevel)
 }
 
 /* Match string to list column of strings, or to widget's string list */
-static int find_string(swdata *sd, char *s, int column)
+static int find_string(swdata *sd, char *s, int l, int column)
 {
 	char *tmp;
 	col_data *c = NULL;
-	int i, l, ll, p = INT_MAX, n = sd->cnt;
+	int i, ll, p = INT_MAX, n = sd->cnt;
 
-	if (!s || !s[0]) return (-1); // Error
+	if (!s || !l) return (-1); // Error
 	if (column)
 	{
 		c = sd->strs;
@@ -7142,7 +7166,6 @@ static int find_string(swdata *sd, char *s, int column)
 		n = *(int *)(c->ddata + (int)GET_DESCV(c->r, 2));
 	}
 
-	l = strlen(s);
 	for (ll = -1 , i = 0; i < n; i++)
 	{
 		tmp = c ? get_cell(c, i, column) : ((char **)sd->strs)[i];
@@ -7162,11 +7185,110 @@ static int find_string(swdata *sd, char *s, int column)
 	return (ll);
 }
 
+/* Resolve parameter chaining */
+static char **unchain_p(char **strs)
+{
+	while (*strs == (void *)strs) strs = (void *)strs[1];
+	return (strs);
+}
+
+/* Parse a parenthesized list of tuples into an array of ints
+ * List may continue in next script positions */
+static multi_ext *multi_parse(char *s0)
+{
+	multi_ext *mx;
+	char c, *ss, *tmp, **strs;
+	int w = 0, mw = INT_MAX, fp = -1;
+	int n, l, cnt, sc, err, *ix, **rows;
+
+	/* Crudely count the parts */
+	if (s0[0] != '(') return (NULL); // Wrong
+	ss = s0 + 1;
+	cnt = sc = 0;
+	strs = script_cmds;
+	while (TRUE)
+	{
+		c = *ss++;
+		if (c == ')') break;
+		if (c == ',') cnt++;
+		if (!c)
+		{
+			strs = unchain_p(strs);
+			ss = *strs++;
+			if (!ss) return (NULL); // Unterminated
+			sc++;
+		}
+	}
+
+	/* Allocate */
+	mx = calloc(1, sizeof(multi_ext) + sizeof(int *) * (sc + 2 - 1) +
+		sizeof(int) * (cnt + sc * 2 + 2 + 1));
+	if (!mx) return (NULL);
+	ix = (void *)(mx->rows + sc + 2);
+	// Extremely unlikely, but why not make sure
+	if (ALIGNOF(int) > ALIGNOF(int *)) ix = ALIGNED(ix, ALIGNOF(int));
+
+	/* Parse & fill */
+	sc = l = err = 0;
+	rows = mx->rows;
+	strs = script_cmds;
+	for (ss = s0 + 1; ss; strs = unchain_p(strs) , ss = *strs++)
+	{
+		if (!ss[0]) continue; // Empty
+		if ((ss[0] == ')') && !ss[1]) break; // Lone ')'
+		rows[l++] = ix++;
+		n = 0; err = 1;
+		while (TRUE)
+		{
+			ix[n] = strtol(ss, &tmp, 10);
+			if (tmp == ss) break; // Error
+			if (*tmp == '.') // Maybe floating - use fixedpoint
+			{
+				// !!! Only one fixedpoint column allowed for now
+				if ((fp >= 0) && (fp != n)) break;
+
+				ix[fp = n] = (int)(g_strtod(ss, &tmp) *
+					MAX_PRESSURE + 0.5);
+			}
+			n++;
+			ss = tmp + 1;
+			if (*tmp == ',') continue;
+			if (*tmp && ((*tmp != ')') || tmp[1])) break; // Error
+			err = 0; // Valid tuple
+			*(ix - 1) = n; // Store count
+			ix += n; // Skip over
+			if (w < n) w = n; // Update max
+			if (mw > n) mw = n; // Update min
+			break;
+		}
+		if (err || *tmp) break;
+	}
+	if (err || !ss || (l <= 0))
+	{
+		free(mx);
+		return (NULL);
+	}
+
+	/* Finalize */
+	script_cmds = strs;
+
+	mx->nrows = l;
+	mx->ncols = w;
+	mx->mincols = mw;
+	mx->fractcol = fp;
+	return (mx);
+}
+
 int cmd_setstr(void **slot, char *s)
 {
+	void *v;
 	char *tmp, *st = NULL;
-	int ll = 0, res = 1, op = GET_OP(slot);
+	int op, ll = 0, res = 1;
 
+	/* If see a list and prepared to handle it, do so */
+	if (s && (s[0] == '(') && (v = op_slot(slot, op_EVT_MULTI))) slot = v;
+
+	op = GET_OP(slot);
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
@@ -7194,7 +7316,7 @@ int cmd_setstr(void **slot, char *s)
 		ll = TRUE;
 		// Fallthrough
 	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
-		ll = find_string(slot[0], s, ll);
+		ll = find_string(slot[0], s, strlen(s), ll);
 		if (ll < 0) return (-1); // Error
 		break;
 	case op_BUTTON: case op_TBBUTTON: case op_uBUTTON:
@@ -7251,6 +7373,16 @@ int cmd_setstr(void **slot, char *s)
 		sd->cnt = 3; // Value is being set directly
 		break;
 	}
+	case op_EVT_MULTI:
+		if ((v = multi_parse(s)))
+		{
+			void **base = slot[0], **desc = slot[1];
+			res = ((evtxr_fn)desc[1])(GET_DDATA(base), base,
+				(int)desc[0] & WB_OPMASK, slot, v);
+			if (res >= 0) free(v); // Handler can ask to keep it
+			if (res) return (1);
+		}
+		// !!! Fallthrough to fail
 	default: return (-1); // Error: cannot handle
 	}
 	/* From column to list */
@@ -7300,14 +7432,8 @@ int cmd_run_script(void **slot, char **strs)
 	if (!slot) return (1); // Paranoia
 
 	/* Step through options */
-	while ((opt = *strs))
+	while (strs = unchain_p(strs) , opt = *strs)
 	{
-		/* Resolve chaining */
-		if (opt == (void *)strs)
-		{
-			strs = (void *)strs[1];
-			continue;
-		}
 		/* Stop on commands and empty strings */
 		if (!opt[0] || (opt[0] == '-')) break;
 		strs++;
@@ -7315,7 +7441,8 @@ int cmd_run_script(void **slot, char **strs)
 		if ((opt[0] == ':') && !opt[1]) break;
 		/* Have option: first, parse it */
 		opt += (maybe = opt[0] == '.'); // Optional if preceded by "."
-		ll = strcspn(opt, "=:");
+		// Expect "(list)", "name=value", or "name:"
+		ll = opt[0] == '(' ? 0 : strcspn(opt, "=:");
 		/* Now, find target for the option */
 		wdata = find_slot(slot, opt, ll, MLEVEL_FLAT);
 		/* Raise an error if no match */
@@ -7325,14 +7452,25 @@ int cmd_run_script(void **slot, char **strs)
 			err = strs;
 			break;
 		}
+		/* For flattened lists, uALTNAME gets returned */
+		op = GET_OP(wdata);
+		wdata = origin_slot(wdata);
 		/* Leave insensitive slots alone */
 		if (!cmd_checkv(wdata, SLOT_SENSITIVE)) continue;
 // !!! Or maybe raise an error, too?
 		script_cmds = strs; // For nested dialog
+		/* Set value to flattened list */
+		if (op == op_uALTNAME)
+		{
+			ll = find_string(wdata[0], opt, ll, FALSE); // Cannot fail
+			cmd_set(wdata, ll);
+			cmd_event(wdata, op_EVT_SCRIPT); // Notify
+		}
 		/* Activate right-click handler */
-		if (opt[ll] == ':') ll = tbar_event(wdata, op_EVT_CLICK);
+		else if (opt[ll] == ':') ll = tbar_event(wdata, op_EVT_CLICK);
 		/* Set value to slot */
-		else ll = cmd_setstr(wdata, opt[ll] ? opt + ll + 1 : NULL);
+		else ll = cmd_setstr(wdata, !opt[ll] ? NULL :
+			opt + ll + (opt[ll] == '='));
 		/* Raise an error if invalid value */
 		if (ll < 0)
 		{

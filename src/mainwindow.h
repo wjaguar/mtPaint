@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -286,6 +286,8 @@ int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
 
 extern char mem_clip_file[];
+
+extern void *scriptbar_code[];		// Set up scriptable items for tools toolbar
 
 void var_init();			// Load INI variables
 void string_init();			// Translate static strings

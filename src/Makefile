@@ -1,10 +1,7 @@
 include ../_conf.txt
 
-ifdef HAVE_RANDSEED # Generate identical object files if possible
-  CFLAGS = $(CFLAG) -frandom-seed=$*
-else
-  CFLAGS = $(CFLAG)
-endif
+# Generate identical object files if possible
+CFLAGS = $(CFLAG) $(SET_RANDSEED)
 LDFLAGS = $(LDFLAG)
 
 BIN = mtpaint$(EXEEXT)

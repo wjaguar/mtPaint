@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -432,6 +432,13 @@ extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 
 int mem_background;			// Non paintable area
 int mem_histogram[256];
+
+/// Number in bounds
+
+static inline int bounded(int n, int n0, int n1)
+{
+	return (n < n0 ? n0 : n > n1 ? n1 : n);
+}
 
 /// Next power of two
 
