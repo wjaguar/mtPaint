@@ -25,6 +25,7 @@
 
 int font_obl, font_bmsize, font_size;
 int font_dirs;
+int ft_setdpi;
 
 void pressed_mt_text();
 void ft_render_text();			// FreeType equivalent of render_text()

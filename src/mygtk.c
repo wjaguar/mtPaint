@@ -383,7 +383,7 @@ double read_float_spin(GtkWidget *spin)
 	return (GTK_SPIN_BUTTON(spin)->adjustment->value);
 }
 
-#if (GTK_MAJOR_VERSION == 1) && !U_MTK
+#if (GTK_MAJOR_VERSION == 1) && !defined(U_MTK)
 
 #define MIN_SPIN_BUTTON_WIDTH 30
 
@@ -410,7 +410,7 @@ static void spin_size_req(GtkWidget *widget, GtkRequisition *requisition,
 static GtkWidget *spin_new_x(GtkObject *adj, int fpart)
 {
 	GtkWidget *spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, fpart);
-#if (GTK_MAJOR_VERSION == 1) && !U_MTK
+#if (GTK_MAJOR_VERSION == 1) && !defined(U_MTK)
 	gtk_signal_connect_after(GTK_OBJECT(spin), "size_request",
 		GTK_SIGNAL_FUNC(spin_size_req), NULL);
 #endif
@@ -3255,6 +3255,48 @@ int parse_color(char *what)
 	return (RGB_2_INT(((int)col.red + 128) / 257,
 		((int)col.green + 128) / 257,
 		((int)col.blue + 128) / 257));
+}
+
+//	DPI value
+
+double window_dpi(GtkWidget *win)
+{
+#if GTK2VERSION >= 10
+	double d = gdk_screen_get_resolution(gdk_drawable_get_screen(win->window));
+	if (d > 0) return (d); // Seems good
+#endif
+#if GTK2VERSION >= 4
+	{
+		GValue v;
+		memset(&v, 0, sizeof(&v));
+		g_value_init(&v, G_TYPE_INT);
+		if (gdk_screen_get_setting(gdk_drawable_get_screen(win->window),
+			"gtk-xft-dpi", &v))
+			return (g_value_get_int(&v) / (double)1024.0);
+	}
+#endif
+#if defined(U_MTK) || defined(GDK_WINDOWING_X11) /* GTK+2/X */
+	{
+		/* Get DPI from Xft */
+		char *e, *v = XGetDefault(GDK_WINDOW_XDISPLAY(win->window),
+			"Xft", "dpi");
+		if (v)
+		{
+			double d = g_strtod(v, &e);
+			if (e != v) return (d); // Seems good
+		}
+	}
+#endif
+#if GTK2VERSION >= 2
+	{
+		GdkScreen *sc = gdk_drawable_get_screen(win->window);
+		return ((gdk_screen_get_height(sc) * (double)25.4) /
+			gdk_screen_get_height_mm(sc));
+	}
+#else
+	return ((gdk_screen_height() * (double)25.4) /
+		gdk_screen_height_mm());
+#endif
 }
 
 // Threading helpers

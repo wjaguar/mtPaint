@@ -129,7 +129,9 @@ static inilist ini_bool[] = {
 	{ "fontAntialias2",	&font_r,		FALSE },
 #ifdef U_FREETYPE
 	{ "fontAntialias3",	&font_obl,		FALSE },
+	{ "ftSetDPI",		&ft_setdpi,		TRUE  },
 #endif
+	{ "fontSetDPI",		&font_setdpi,		FALSE },
 	{ NULL,			NULL }
 };
 
@@ -164,6 +166,7 @@ static inilist ini_int[] = {
 	{ "tablet_value_opacity", tablet_tool_factor + 2,MAX_TF },
 	{ "fontBackground",	&font_bkg,		0   },
 	{ "fontAngle",		&font_angle,		0   },
+	{ "fontDPI",		&font_dpi,		72  },
 #ifdef U_FREETYPE
 	{ "fontSizeBitmap",	&font_bmsize,		1   },
 	{ "fontSize",		&font_size,		12  },
@@ -1301,6 +1304,7 @@ static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
 static void tool_done()
 {
 	tint_mode[2] = 0; // Paranoia
+	clone_status &= CLONE_ABS;
 	pen_down = 0;
 	if (col_reverse)
 	{
@@ -1426,6 +1430,13 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 			if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 3))
 				pressed_dither_A();
 		}
+		/* Snap clone source to point */
+		else if ((m->button == 1) && (tool_type == TOOL_CLONE))
+		{
+			clone_x = x;
+			clone_y = y;
+			clone_dx = clone_dy = 0;
+		}
 		/* Set colour A/B */
 		else if ((m->button == 1) || (m->button == 3)) pick_color(ox, oy,
 			m->button == 3, // A for left, B for right
@@ -1480,11 +1491,10 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 		/* TOOL PERIMETER BOX UPDATES */
 
-		if (tool_type == TOOL_CLONE)
+		if ((tool_type == TOOL_CLONE) && !(clone_status & CLONE_DRAG))
 		{
 			if ((clone_status == CLONE_ABS) ||
-				((clone_status & CLONE_TRACK) &&
-				!m->button && (m->state & _Cmask)))
+				(clone_status == (CLONE_REL | CLONE_TRACK)))
 			{
 				/* Source stays put */
 				clone_dx = clone_x - x;
@@ -1496,8 +1506,8 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 				clone_x = x + clone_dx;
 				clone_y = y + clone_dy;
 			}
-			clone_status = !m->button && (m->state & _Cmask) ?
-				CLONE_ABS | CLONE_TRACK : CLONE_REL | CLONE_TRACK;
+			clone_status = (!m->button && (m->state & _Cmask) ?
+				CLONE_TRACK : 0) | (clone_status & CLONE_ABS);
 		}
 
 		if (perim_status) clear_perim(); // Remove old perimeter box
@@ -1582,7 +1592,7 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
 	if (perim_status > 0) clear_perim();
 
-	clone_status &= ~CLONE_TRACK; // Unattach source from cursor
+	clone_status &= ~CLONE_TRACK; // No tracking w/o perimeter
 
 	if (tool_type == TOOL_GRADIENT)
 	{ 
@@ -3228,12 +3238,7 @@ void change_to_tool(int icon)
 		poly_points = 0;
 		update |= CF_DRAW;			// Needed to clear selection
 	}
-	if ( tool_type == TOOL_CLONE )
-	{
-		clone_dx = -tool_size;
-		clone_dy = tool_size;
-		clone_status = CLONE_REL;
-	}
+	if (tool_type == TOOL_CLONE) init_clone();
 	/* Persistent selection frame */
 // !!! To NOT show selection frame while placing gradient
 //	if ((tool_type == TOOL_SELECT)
@@ -4241,6 +4246,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		flood_settings(); break;
 	case DLG_SMUDGE:
 		smudge_settings(); break;
+	case DLG_CLONE:
+		clone_settings(); break;
 	case DLG_GRAD:
 		gradient_setup(mode); break;
 	case DLG_STEP:
@@ -4260,7 +4267,10 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_KEYS:
 		keys_selector(); break;
 	case FILT_2RGB:
-		pressed_convert_rgb(); break;
+		if (mem_img_bpp == 1) pressed_convert_rgb();
+		// Allow a noop in script mode
+		else if (script_cmds) spot_undo(UNDO_PAL);
+		break;
 	case FILT_INVERT:
 		pressed_invert(); break;
 	case FILT_GREY:
@@ -4582,8 +4592,11 @@ static void *main_menu_code[] = {
 		ACTMAP(NEED_PCLIP), SHORTCUT(v, CS),
 	MENUITEMs(_("//Paste"), ACTMOD(ACT_PASTE, 0)),
 		ACTMAP(NEED_CLIP), SHORTCUT(k, C),
-	MENUITEMi(_("//Paste Text"), ACTMOD(DLG_TEXT, 0), XPM_ICON(text)),
+	MENUITEMis(_("//Paste Text"), ACTMOD(DLG_TEXT, 0), XPM_ICON(text)),
 		SHORTCUT(t, S),
+		IFvx(cmd_mode, 1), // Disable GUI-only text renderer
+			UNLESSv(texteng_con), ACTMAP(NEED_SKIP),
+		ENDIF(1),
 #ifdef U_FREETYPE
 	MENUITEMs(_("//Paste Text (FreeType)"), ACTMOD(DLG_TEXT_FT, 0)),
 		SHORTCUT(t, 0),
@@ -4702,7 +4715,8 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Image")),
 	MENUTEAR, //
-	MENUITEMs(_("//Convert To RGB"), ACTMOD(FILT_2RGB, 0)),
+	uMENUITEMs("//Convert To RGB", ACTMOD(FILT_2RGB, 0)), // for scripting
+	MENUITEM(_("//Convert To RGB"), ACTMOD(FILT_2RGB, 0)),
 		ACTMAP(NEED_IDX),
 	MENUITEMs(_("//Convert To Indexed ..."), ACTMOD(DLG_INDEXED, 0)),
 		ACTMAP(NEED_24),

@@ -119,6 +119,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_SKEW,
 	DLG_FLOOD,
 	DLG_SMUDGE,
+	DLG_CLONE,
 	DLG_GRAD,
 	DLG_STEP,
 	DLG_FILT,
@@ -172,6 +173,7 @@ void action_dispatch(int action, int mode, int state, int kbd);
 #define NEED_CHAN  0x0800
 #define NEED_RGBA  0x1000
 #define NEED_PCLIP 0x2000
+#define NEED_SKIP  0x4000 /* Never activated at all */
 #define NEED_SEL2  (NEED_SEL | NEED_LASSO)
 #define NEED_PSEL  (NEED_MARQ | NEED_PCLIP)
 #define NEED_LAS2  (NEED_LASSO | NEED_PCLIP)

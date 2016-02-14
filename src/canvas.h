@@ -24,7 +24,8 @@ int marq_status, marq_xy[4];				// Selection marquee
 int marq_drag_x, marq_drag_y;				// Marquee dragging offset
 int line_status, line_xy[4];				// Line tool
 int poly_status;					// Polygon selection tool
-int clone_status, clone_x, clone_y, clone_dx, clone_dy;	// Clone tool
+int clone_status, clone_x, clone_y, clone_dx, clone_dy;	// Clone tool state
+int clone_mode, clone_x0, clone_y0, clone_dx0, clone_dy0;	// Clone settings
 int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
 int lasso_sel;						// Lasso by selection channel
@@ -87,7 +88,8 @@ int	col_reverse,					// Painting with right button
 
 #define CLONE_REL   0
 #define CLONE_ABS   1
-#define CLONE_TRACK 2 /* Flag */
+#define CLONE_TRACK 2 /* Reposition flag */
+#define CLONE_DRAG  4 /* Stroke flag */
 
 #define MIN_ZOOM 0.1
 #define MAX_ZOOM 20

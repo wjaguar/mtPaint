@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -37,6 +37,7 @@
 
 int font_aa, font_bk, font_r;
 int font_bkg, font_angle;
+int font_setdpi, font_dpi, sys_dpi;
 
 int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
 float vw_zoom = 1;
@@ -897,8 +898,6 @@ void *init_view_code[] = {
 
 ////	TEXT TOOL
 
-#define PAD_SIZE 4
-
 /* !!! This function invalidates "img" (may free or realloc it) */
 int make_text_clipboard(unsigned char *img, int w, int h, int src_bpp)
 {
@@ -1049,107 +1048,50 @@ fail:		free(img);
 
 void render_text()
 {
-	GtkWidget *widget = main_window;
-	GdkPixmap *text_pixmap;
-	unsigned char *buf;
-	int width, height, have_rgb = 0;
+	texteng_dd td = { inifile_get("textString", ""),
+		inifile_get("lastTextFont", ""),
+		font_r ? font_angle : 0,
+		font_setdpi ? font_dpi : 0 };
 
-#if GTK_MAJOR_VERSION == 2
-
-	PangoContext *context;
-	PangoLayout *layout;
-	PangoFontDescription *font_desc;
-	int tx = PAD_SIZE, ty = PAD_SIZE;
-
-
-	context = gtk_widget_create_pango_context (widget);
-	layout = pango_layout_new( context );
-	font_desc = pango_font_description_from_string( inifile_get( "lastTextFont", "" ) );
-	pango_layout_set_font_description( layout, font_desc );
-	pango_font_description_free( font_desc );
-
-	pango_layout_set_text( layout, inifile_get( "textString", "" ), -1 );
-
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	if (font_r)		// Rotation Toggle
-	{
-		PangoMatrix matrix = PANGO_MATRIX_INIT;
-		double degs, angle;
-		int w2, h2;
-
-		degs = font_angle * 0.01;
-		angle = G_PI*degs/180;
-		pango_matrix_rotate (&matrix, degs);
-		pango_context_set_matrix (context, &matrix);
-		pango_layout_context_changed( layout );
-		pango_layout_get_pixel_size( layout, &width, &height );
-		w2 = abs(width * cos(angle)) + abs(height * sin(angle));
-		h2 = abs(width * sin(angle)) + abs(height * cos(angle));
-		width = w2;
-		height = h2;
-	}
-	else
-#endif
-	pango_layout_get_pixel_size( layout, &width, &height );
-
-	width += PAD_SIZE*2;
-	height += PAD_SIZE*2;
-
-	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
-
-	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
-	gdk_draw_layout(text_pixmap, widget->style->white_gc, tx, ty, layout);
-
-	g_object_unref( layout );
-	g_object_unref( context );
-
-#else /* #if GTK_MAJOR_VERSION == 1 */
-
-	GdkFont *t_font = gdk_font_load( inifile_get( "lastTextFont", "" ) );
-	int lbearing, rbearing, f_width, ascent, descent;
-
-
-	gdk_string_extents( t_font, inifile_get( "textString", "" ),
-		&lbearing, &rbearing, &f_width, &ascent, &descent );
-
-	width = rbearing - lbearing + PAD_SIZE*2;
-	height = ascent + descent + PAD_SIZE*2;
-
-	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
-	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
-	gdk_draw_string(text_pixmap, t_font, widget->style->white_gc,
-			PAD_SIZE - lbearing, ascent + PAD_SIZE, inifile_get("textString", ""));
-
-	gdk_font_unref( t_font );
-
-#endif
-
-	buf = malloc(width * height * 3);
-	if (buf) have_rgb = !!wj_get_rgb_image(widget->window, text_pixmap,
-		buf, 0, 0, width, height);
-	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
-
+	td.ctx.rgb = NULL;
+	cmd_setv(main_window_, &td, WINDOW_TEXTENG);
 	text_paste = TEXT_PASTE_NONE;
-	if (!have_rgb) free(buf);
-	else have_rgb = make_text_clipboard(buf, width, height, 3);
-
-	if (have_rgb) text_paste = TEXT_PASTE_GTK;
+	if (td.ctx.rgb &&
+		make_text_clipboard(td.ctx.rgb, td.ctx.xy[2], td.ctx.xy[3], 3))
+		text_paste = TEXT_PASTE_GTK;
 	else alert_box(_("Error"), _("Not enough memory to create clipboard"), NULL);
 }
 
 typedef struct {
 	char *fsel[2];
+	int bkg[3], dpi[3];
 	int img, idx;
-	int bkg[3];
+	int script, angle;
+	void **book, **fs;
 } text_dd;
 
 static void paste_text_ok(text_dd *dt, void **wdata, int what)
 {
 	run_query(wdata);
 
-	if (mem_channel == CHN_IMAGE) font_bkg = dt->bkg[0];
-
 	if (dt->fsel[0]) inifile_set("lastTextFont", dt->fsel[0]);
+	else
+	{
+		alert_box(_("Error"), _("No font selected"), NULL);
+		if (script_cmds) run_destroy(wdata);
+		return;
+	}
+
+	if (mem_channel == CHN_IMAGE)
+	{
+		if (!script_cmds || (font_bk = dt->bkg[0] >= 0))
+			font_bkg = dt->bkg[0];
+	}
+	if (!script_cmds || (font_r = !!dt->angle))
+		font_angle = dt->angle;
+	if (!script_cmds || (font_setdpi = !!dt->dpi[0]))
+		font_dpi = dt->dpi[0];
+
 	inifile_set("textString", dt->fsel[1]);
 
 	render_text();
@@ -1159,25 +1101,49 @@ static void paste_text_ok(text_dd *dt, void **wdata, int what)
 	run_destroy(wdata);
 }
 
+static void dpi_changed(text_dd *dt, void **wdata, int what, void **where)
+{
+	if (cmd_read(where, dt) == &font_setdpi) cmd_set(dt->book, font_setdpi);
+	cmd_setv(dt->fs, (void *)(font_setdpi ? dt->dpi[0] : 0), FONTSEL_DPI);
+}
+
 #define WBbase text_dd
 static void *text_code[] = {
 	WINDOWm(_("Paste Text")),
 	DEFSIZE(400, 400),
-	FONTSEL(fsel), FOCUS,
+	REF(fs), FONTSEL(fsel), FOCUS, OPNAME("Font"),
+	IFx(script, 1),
+		XENTRY(fsel[1]), OPNAME("Text"),
+	ENDIF(1),
 	HSEPl(200),
 	HBOXP,
-#if defined(U_MTK) || GTK_MAJOR_VERSION == 2
-	UNLESS(idx), CHECKv(_("Antialias"), font_aa),
-#endif
-	UNLESS(img), CHECKv(_("Invert"), font_bk),
-	IFx(img, 1),
-		CHECKv(_("Background colour ="), font_bk), SPINa(bkg),
+	IFvx(texteng_aa, 1), UNLESSx(idx, 1), /* && */
+		CHECKv(_("Antialias"), font_aa),
 	ENDIF(1),
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
-	CHECKv(_("Angle of rotation ="), font_r),
-	FSPINv(font_angle, -36000, 36000),
-#endif
+	UNLESS(img), CHECKv(_("Invert"), font_bk),
+	IFx(img, 1), UNLESSx(script, 1), /* && */
+		CHECKv(_("Background colour ="), font_bk),
+	ENDIF(1),
+	IFx(img, 1),
+		SPINa(bkg), OPNAME("Background colour ="),
+	ENDIF(1),
+	IFvx(texteng_rot, 1),
+		UNLESS(script), CHECKv(_("Angle of rotation ="), font_r),
+		FSPIN(angle, -36000, 36000), OPNAME("Angle of rotation ="),
+	ENDIF(1),
 	WDONE,
+	IFvx(texteng_dpi, 2),
+		HBOX,
+		UNLESSx(script, 1),
+			CHECKv(_("DPI ="), font_setdpi),
+				EVENT(CHANGE, dpi_changed), TRIGGER,
+		ENDIF(1),
+		REF(book), PLAINBOOK,
+		NOSPINv(sys_dpi), WDONE, // page 0
+		SPINa(dpi), EVENT(CHANGE, dpi_changed), OPNAME("DPI ="),
+		WDONE, // page 1
+		WDONE,
+	ENDIF(2),
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
 	WSHOW
@@ -1187,11 +1153,20 @@ static void *text_code[] = {
 void pressed_text()
 {
 	text_dd tdata = { { inifile_get("lastTextFont",
-		"-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1" ),
+		"-misc-fixed-bold-r-normal-*-*-120-*-*-c-*-iso8859-1"),
 		inifile_get("textString", __("Enter Text Here")) },
-		mem_channel == CHN_IMAGE,
-		tdata.img && (mem_img_bpp == 1),
-		{ font_bkg % mem_cols, 0, mem_cols - 1 } };
+		{ font_bkg % mem_cols, 0, mem_cols - 1 }, { font_dpi, 1, 65535 },
+		mem_channel == CHN_IMAGE, tdata.img && (mem_img_bpp == 1),
+		!!script_cmds, font_angle };
 
-	run_create(text_code, &tdata, sizeof(tdata));
+	cmd_peekv(main_window_, &sys_dpi, sizeof(sys_dpi), WINDOW_DPI);
+	if (script_cmds) // Simplified controls - spins w/o toggles
+	{
+		if (!font_bk) tdata.bkg[0] = -1;
+		tdata.bkg[1] = -1;
+		if (!font_r) tdata.angle = 0;
+		if (!font_setdpi) tdata.dpi[0] = 0;
+		tdata.dpi[1] = 0;
+	}
+	run_create_(text_code, &tdata, sizeof(tdata), script_cmds);
 }

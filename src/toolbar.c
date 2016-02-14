@@ -175,6 +175,50 @@ void smudge_settings() /* Smudge opacity mode */
 	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
+void init_clone()
+{
+	if (clone_mode) // Aligned aka relative
+	{
+		clone_status = CLONE_REL;
+		if (!(clone_dx0 | clone_dy0)) // Both 0 for default values
+			clone_dx = -tool_size , clone_dy = tool_size;
+	}
+	else // Absolute
+	{
+		clone_status = CLONE_ABS;
+		if (clone_x0 >= 0) clone_x = clone_x0; // -1 for no change
+		if (clone_y0 >= 0) clone_y = clone_y0;
+	}
+}
+
+static int set_clone(filterwindow_dd *dt, void **wdata)
+{
+	run_query(wdata);
+	if (tool_type == TOOL_CLONE) init_clone();
+	return (TRUE);
+}
+
+#define WBbase filterwindow_dd
+static void *clone_code[] = {
+	TABLE(3, 3),
+	BORDER(LABEL, 0),
+	TLABEL(_("Position")), GROUPN,
+	TLXSPINv(clone_x0, -1, MAX_WIDTH - 1, 1, 0), OPNAME("X"),
+	TLXSPINv(clone_y0, -1, MAX_HEIGHT - 1, 2, 0), OPNAME("Y"),
+	TLABEL(_("Offset")), GROUPN,
+	TLXSPINv(clone_dx0, -MAX_WIDTH, MAX_WIDTH, 1, 1), OPNAME("X"),
+	TLXSPINv(clone_dy0, -MAX_HEIGHT, MAX_HEIGHT, 2, 1), OPNAME("Y"),
+	TLCHECKv(_("Aligned"), clone_mode, 0, 2),
+	WDONE, RET };
+#undef WBbase
+
+void clone_settings()
+{
+	static filterwindow_dd tdata = {
+		_("Clone settings"), clone_code, FW_FN(set_clone) };
+	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
+}
+
 #define WBbase filterwindow_dd
 static void *lasso_code[] = {
 	CHECKv(_("By selection channel"), lasso_sel), RET };
@@ -488,8 +532,8 @@ void *toolbar_code[] = {
 		ACTMOD(ACT_TOOL, TTB_SMUDGE), ACTMOD(DLG_SMUDGE, 0), tool_id),
 		ACTMAP(NEED_24),
 	REFv(icon_buttons[TTB_CLONE]),
-	TBRBUTTONv(_("Clone"), XPM_ICON(clone),
-		ACTMOD(ACT_TOOL, TTB_CLONE), tool_id),
+	TBRBUTTONxv(_("Clone"), XPM_ICON(clone),
+		ACTMOD(ACT_TOOL, TTB_CLONE), ACTMOD(DLG_CLONE, 0), tool_id),
 	REFv(icon_buttons[TTB_SELECT]),
 	TBRBUTTONv(_("Make Selection"), XPM_ICON(select),
 		ACTMOD(ACT_TOOL, TTB_SELECT), tool_id), SHORTCUT(F9, 0),

@@ -315,6 +315,10 @@ void widget_showhide(GtkWidget *widget, int what);
 
 int parse_color(char *what);
 
+//	DPI value
+
+double window_dpi(GtkWidget *win);
+
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
 #define XINE_FAKERY(key) 0

@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -128,6 +128,7 @@ void pressed_toolbar_toggle(int state, int which);
 						// Menu toggle for toolbars
 
 
+void init_clone();			// Init clone tool
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
 void update_top_swatch();		// Update selected colours A & B
@@ -138,6 +139,7 @@ void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns
 void mode_change(int setting, int state);	// Drawing mode variables
 void flood_settings();			// Flood fill step
 void smudge_settings();			// Smudge opacity mode
+void clone_settings();			// Clone mode & position
 void lasso_settings();			// Lasso selection channel
 void step_settings();			// Brush spacing
 void blend_settings();			// Blend mode

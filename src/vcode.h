@@ -368,6 +368,13 @@ typedef struct {
 	int *rows[1]; // Pointers to rows (int arrays preceded by their length)
 } multi_ext;
 
+//	Structure which is supplied to WINDOW_TEXTENG
+typedef struct {
+	char *text, *font;
+	int angle, dpi;
+	rgbcontext ctx;
+} texteng_dd;
+
 //	Values of mouse count
 enum {
 	MCOUNT_RELEASE	= -1,
@@ -400,6 +407,12 @@ typedef void (*evtx_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
 typedef int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where,
 	void *xdata);
+
+//	Textengine flags
+int texteng_aa;  /* Antialias */
+int texteng_rot; /* Rotate */
+int texteng_dpi; /* Set DPI */
+int texteng_con; /* Work in console mode */
 
 //	Build a dialog window out of V-code decription
 //void **run_create(const void **ifcode, const void *ddata, int ddsize);
@@ -554,6 +567,7 @@ enum {
 #define WBrh_c(NM,L) WBp_(op_##NM, L, EPACK, R)
 #define WBrh_e(NM,L) WBp_(op_##NM, L, PACKEND, R)
 #define WBrh_t(NM,L) WBp_(op_##NM, L, TABLE, R)
+#define WBrh_tx(NM,L) WBp_(op_##NM, L, TABLEx, R)
 #define WBrh_t1(NM,L) WBp_(op_##NM, L, TABLE1x, R)
 #define WBrhf(NM,L) WBp_(op_##NM, L, NONE, RF)
 #define WBrhf_(NM,L) WBp_(op_##NM, L, PACK, RF)
@@ -729,9 +743,12 @@ enum {
 	EVENT(EXT, HX)
 #define TLNOSPIN(V,X,Y) WBhf_t(NOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
 #define TLNOSPINr(V,X,Y) WBrhf_t(NOSPIN, 2), WBfield(V), WBxyl(X, Y, 1)
+#define NOSPINv(V) WBh_(NOSPIN, 1), &(V)
 #define TLSPIN(V,V0,V1,X,Y) WBrhf_t(SPIN, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLXSPIN(V,V0,V1,X,Y) WBrhf_tx(SPIN, 4), WBfield(V), \
+	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
+#define TLXSPINv(V,V0,V1,X,Y) WBrh_tx(SPIN, 4), &(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define T1SPIN(V,V0,V1) WBrhf_t1(SPIN, 3), WBfield(V), \
 	(void *)(V0), (void *)(V1)
@@ -944,6 +961,7 @@ enum {
 #define IF(X) WBhf(IF, 1), WBfield(X)
 #define IFx(X,N) WBhf(IF, 2), WBfield(X), (void *)(N)
 #define IFv(X) WBh(IF, 1), &(X)
+#define IFvx(X,N) WBh(IF, 2), &(X), (void *)(N)
 #define UNLESS(X) WBhf(UNLESS, 1), WBfield(X)
 #define UNLESSx(X,N) WBhf(UNLESS, 2), WBfield(X), (void *)(N)
 #define UNLESSv(X) WBh(UNLESS, 1), &(X)
@@ -1078,6 +1096,8 @@ enum {
 #define WINDOW_FOCUS	2
 #define WINDOW_RAISE	3
 #define WINDOW_DISAPPEAR 4
+#define WINDOW_DPI	5
+#define WINDOW_TEXTENG	6
 
 //	Extra data of COLOR
 #define COLOR_RGBA	0
@@ -1132,3 +1152,6 @@ enum {
 #define SLOT_SCRIPTABLE	2
 #define SLOT_UNREAL	3
 #define SLOT_RADIO	4
+
+//	Extra data of FONTSEL
+#define FONTSEL_DPI	0

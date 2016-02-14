@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.44.95"
-MT_DATE="2016-02-07"
+MT_V="3.44.96"
+MT_DATE="2016-02-15"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -538,7 +538,9 @@ then
 fi
 if [ "$NJP2" = OpenJPEG ]
 then
-	INCLUDES="$INCLUDES -I/usr/include/openjpeg"
+	INCLUDES="$INCLUDES `PKGCONFIG libopenjpeg1 --cflags 2>/dev/null`" || \
+	INCLUDES="$INCLUDES `PKGCONFIG libopenjpeg --cflags 2>/dev/null`" || \
+		INCLUDES="$INCLUDES -I/usr/include/openjpeg"
 	LIB_NAME openjpeg "$STATIC_JP2"
 	DEFS="$DEFS -DU_JP2"
 	if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]

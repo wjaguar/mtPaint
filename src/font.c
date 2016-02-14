@@ -62,6 +62,7 @@
 /* Persistent settings */
 int font_obl, font_bmsize, font_size;
 int font_dirs;
+int ft_setdpi;
 
 
 typedef struct filenameNODE filenameNODE;
@@ -132,7 +133,7 @@ typedef struct {
 	int fontfile, nfontfiles;
 	int dir, ndirs;
 	int fontsize;
-	int bkg[3], angle;
+	int bkg[3], angle, dpi[3];
 	int preview_whc[3];
 	int lock;
 	unsigned char *preview_rgb;
@@ -143,7 +144,7 @@ typedef struct {
 	fontfile_cc *fontfiles;
 	dir_cc *dirs;
 	void **preview_area;
-	void **obl_c, **size_spin, **add_b;
+	void **obl_c, **size_spin, **add_b, **book;
 	void **fname_l, **fstyle_l, **fsize_l, **ffile_l, **dir_l;
 	char dirp[PATHBUF];
 } font_dd;
@@ -223,6 +224,7 @@ static unsigned char *mt_text_render(
 	double		ca, sa, angle_r = angle / 180 * M_PI;
 	int		bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable;
 	int		Y1, Y2, X1, X2, ll, line, xflag;
+	int		dpi = ft_setdpi ? font_dpi : sys_dpi;
 	int		minxy[4] = { MAX_WIDTH, MAX_HEIGHT, -MAX_WIDTH, -MAX_HEIGHT };
 	size_t		s, ssize1 = characters, ssize2 = characters * 4 + 5;
 	iconv_t		cd;
@@ -285,7 +287,7 @@ static unsigned char *mt_text_render(
 			load_flags |= FT_LOAD_NO_BITMAP;
 		}
 
-		error = FT_Set_Char_Size( face, size*64, 0, 0, 0 );
+		error = FT_Set_Char_Size(face, size * 64, 0, dpi, 0);
 		if (error) goto fail1;
 
 		Y1 = FT_MulFix(face->ascender, face->size->metrics.y_scale);
@@ -956,6 +958,8 @@ static void store_values(font_dd *dt)
 	}
 	if (!script_cmds || (font_r = !!dt->angle))
 		font_angle = dt->angle;
+	if (!script_cmds || (ft_setdpi = !!dt->dpi[0]))
+		font_dpi = dt->dpi[0];
 }
 
 static void paste_text_ok(font_dd *dt, void **wdata, int what, void **where)
@@ -1459,7 +1463,7 @@ static void init_font_lists()		//	LIST INITIALIZATION
 
 static void font_entry_changed(font_dd *dt, void **wdata, int what, void **where)
 {
-	cmd_read(where, dt);
+	if (cmd_read(where, dt) == &ft_setdpi) cmd_set(dt->book, ft_setdpi);
 	if (dt->lock) return;
 
 	store_values(dt);
@@ -1548,7 +1552,15 @@ static void *font_code[] = {
 	ENDIF(1),
 	FSPIN(angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
 		OPNAME("Angle of rotation ="),
-	WDONE,
+	UNLESSx(script, 1),
+		CHECKv(_("DPI ="), ft_setdpi),
+			EVENT(CHANGE, font_entry_changed), TRIGGER,
+	ENDIF(1),
+	REF(book), PLAINBOOK,
+	NOSPINv(sys_dpi), WDONE, // page 0
+	SPINa(dpi), EVENT(CHANGE, font_entry_changed), OPNAME("DPI ="),
+	WDONE, // page 1
+	WDONE, // HBOX
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
 	WDONE, WDONE, WDONE, // XVBOXP, XHBOX, PAGE
@@ -1582,6 +1594,7 @@ void pressed_mt_text()
 	font_dd tdata;
 
 	if (!global_font_node) init_font_lists();
+	cmd_peekv(main_window_, &sys_dpi, sizeof(sys_dpi), WINDOW_DPI);
 
 	memset(&tdata, 0, sizeof(tdata));
 	tdata.fontsize = font_size; // !!! is reset
@@ -1594,12 +1607,17 @@ void pressed_mt_text()
 	tdata.preview_whc[2] = mem_background * 0x010101;
 	tdata.img = mem_channel == CHN_IMAGE;
 	tdata.idx = tdata.img && (mem_img_bpp == 1);
+	tdata.dpi[0] = font_dpi;
+	tdata.dpi[1] = 1;
+	tdata.dpi[2] = 65535;
 	if (script_cmds) // Simplified controls - spins w/o toggles
 	{
 		tdata.script = TRUE;
 		if (!font_bk) tdata.bkg[0] = -1;
 		tdata.bkg[1] = -1;
 		if (!font_r) tdata.angle = 0;
+		if (!ft_setdpi) tdata.dpi[0] = 0;
+		tdata.dpi[1] = 0;
 	}
 	collect_fontnames(&tdata);
 	tdata.fnsort = 3; // By name column, ascending

@@ -8548,9 +8548,9 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 	delta = delta1 * bpp;
 
 	/* Copy source if destination overwrites it */
-	cpf = !yv && (xv > 0) && (w > xv); 
+	cpf = (src == dest) && !yv && (xv > 0) && (w > xv); 
 	/* Set up Y pass to prevent overwriting source */
-	if ((yv > 0) && (h > yv))
+	if ((src == dest) && (yv > 0) && (h > yv))
 		y0 = ay + h - 1 , y1 = ay - 1 , dy = -1; // Bottom to top
 	else y0 = ay , y1 = ay + h , dy = 1; // Top to bottom
 

@@ -336,6 +336,220 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	return (res);
 }
 
+//	Text renderer
+
+#if GTK_MAJOR_VERSION == 2
+
+int texteng_aa = TRUE;
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+int texteng_rot = TRUE;
+#else
+#define PangoMatrix void /* For rotate_box() */
+int texteng_rot = FALSE;
+#endif
+int texteng_dpi = TRUE;
+
+#else /* GTK+1 */
+
+#ifdef U_MTK
+int texteng_aa = TRUE;
+#else
+int texteng_aa = FALSE;
+#endif
+int texteng_rot = FALSE;
+int texteng_dpi = FALSE;
+
+#endif
+
+int texteng_con = FALSE;
+
+typedef struct {
+	double sysdpi;
+	int dpi;
+} fontsel_data;
+
+#if GTK_MAJOR_VERSION == 2
+
+/* Pango coords to pixels, inclusive */
+static void rotate_box(PangoRectangle *lr, PangoMatrix *m)
+{
+	double xx[4] = { lr->x, lr->x + lr->width, lr->x, lr->x + lr->width };
+	double yy[4] = { lr->y, lr->y, lr->y + lr->height, lr->y + lr->height };
+	double x_min, x_max, y_min, y_max;
+	int i;
+
+
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+	if (m) for (i = 0; i < 4; i++)
+	{
+		double xt, yt;
+		xt = xx[i] * m->xx + yy[i] * m->xy + m->x0;
+		yt = xx[i] * m->yx + yy[i] * m->yy + m->y0;
+		xx[i] = xt;
+		yy[i] = yt;
+	}
+#endif
+	x_min = x_max = xx[0];
+	y_min = y_max = yy[0];
+	for (i = 1; i < 4; i++)
+	{
+		if (x_min > xx[i]) x_min = xx[i];
+		if (x_max < xx[i]) x_max = xx[i];
+		if (y_min > yy[i]) y_min = yy[i];
+		if (y_max < yy[i]) y_max = yy[i];
+	}
+
+	lr->x = floor(x_min / PANGO_SCALE);
+	lr->width = ceil(x_max / PANGO_SCALE) - lr->x;
+	lr->y = floor(y_min / PANGO_SCALE);
+	lr->height = ceil(y_max / PANGO_SCALE) - lr->y;
+}
+
+/* In principle, similar approach can be used with GTK+1 too - but it would be
+ * much less clean and less precise, and I am unsure about possibly wasting
+ * a lot of X font resources; therefore, no DPI for GTK+1 - WJ */
+static void fontsel_style(GtkWidget *widget, GtkStyle *previous_style,
+	gpointer user_data)
+{
+	PangoContext *c;
+	PangoFontDescription *d;
+	void **r = user_data;
+	fontsel_data *fd = r[2];
+	int sz;
+
+	if (!fd->dpi || !fd->sysdpi) return; // Leave alone
+	c = gtk_widget_get_pango_context(widget);
+	if (!c) return;
+	d = pango_context_get_font_description(c);
+	sz = (pango_font_description_get_size(d) * fd->dpi) / fd->sysdpi;
+	/* !!! 1st is used for font render, 2nd for GtkEntry size calculation;
+	 * need to modify both the same way */
+	pango_font_description_set_size(d, sz);
+	pango_font_description_set_size(widget->style->font_desc, sz);
+}
+
+#endif
+
+static void fontsel_prepare(GtkWidget *widget, gpointer user_data)
+{
+	char **ss = user_data;
+	gtk_font_selection_set_font_name(GTK_FONT_SELECTION(widget), ss[0]);
+	gtk_font_selection_set_preview_text(GTK_FONT_SELECTION(widget), ss[1]);
+	ss[0] = ss[1] = NULL;
+}
+
+static GtkWidget *fontsel(void **r, void *v)
+{
+	GtkWidget *widget = gtk_font_selection_new();
+	accept_ctrl_enter(GTK_FONT_SELECTION(widget)->preview_entry);
+	/* !!! Setting initial values fails if no toplevel */
+	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+		GTK_SIGNAL_FUNC(fontsel_prepare), v);
+#if GTK_MAJOR_VERSION == 2
+	gtk_signal_connect_after(GTK_OBJECT(GTK_FONT_SELECTION(widget)->preview_entry),
+		"style_set", GTK_SIGNAL_FUNC(fontsel_style), r);
+#endif
+	return (widget);
+}
+
+#define PAD_SIZE 2
+
+static void do_render_text(texteng_dd *td)
+{
+	GtkWidget *widget = main_window;
+	GdkPixmap *text_pixmap;
+	unsigned char *buf;
+	int width, height, have_rgb = 0;
+
+#if GTK_MAJOR_VERSION == 2
+
+	PangoRectangle ink, rect;
+	PangoContext *context;
+	PangoLayout *layout;
+	PangoFontDescription *font_desc;
+	int tx, ty;
+
+
+	context = gtk_widget_create_pango_context(widget);
+	layout = pango_layout_new(context);
+	font_desc = pango_font_description_from_string(td->font);
+	if (td->dpi) pango_font_description_set_size(font_desc,
+		(int)(pango_font_description_get_size(font_desc) *
+		(td->dpi / window_dpi(main_window))));
+	pango_layout_set_font_description(layout, font_desc);
+	pango_font_description_free(font_desc);
+
+	pango_layout_set_text(layout, td->text, -1);
+
+#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+	if (td->angle)
+	{
+		PangoMatrix matrix = PANGO_MATRIX_INIT;
+
+		pango_matrix_rotate(&matrix, td->angle * 0.01);
+		pango_context_set_matrix(context, &matrix);
+		pango_layout_context_changed(layout);
+		pango_layout_get_extents(layout, &ink, &rect);
+		rotate_box(&rect, &matrix); // What gdk_draw_layout() uses
+		rotate_box(&ink, &matrix); // What one should use
+		tx = PAD_SIZE - ink.x + rect.x;
+		ty = PAD_SIZE - ink.y + rect.y;
+	}
+	else
+#endif
+	{
+		pango_layout_get_extents(layout, &ink, NULL);
+		rotate_box(&ink, NULL); // What one should use
+		tx = PAD_SIZE - ink.x;
+		ty = PAD_SIZE - ink.y;
+	}
+	width = ink.width + PAD_SIZE * 2;
+	height = ink.height + PAD_SIZE * 2;
+
+	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
+
+	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
+	gdk_draw_layout(text_pixmap, widget->style->white_gc, tx, ty, layout);
+
+	g_object_unref(layout);
+	g_object_unref(context);
+
+#else /* #if GTK_MAJOR_VERSION == 1 */
+
+	GdkFont *t_font = gdk_font_load(td->font);
+	int lbearing, rbearing, f_width, ascent, descent;
+
+
+	gdk_string_extents(t_font, td->text,
+		&lbearing, &rbearing, &f_width, &ascent, &descent);
+
+	width = rbearing - lbearing + PAD_SIZE * 2;
+	height = ascent + descent + PAD_SIZE * 2;
+
+	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
+	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
+	gdk_draw_string(text_pixmap, t_font, widget->style->white_gc,
+			PAD_SIZE - lbearing, ascent + PAD_SIZE, td->text);
+
+	gdk_font_unref(t_font);
+
+#endif
+
+	buf = malloc(width * height * 3);
+	if (buf) have_rgb = !!wj_get_rgb_image(widget->window, text_pixmap,
+		buf, 0, 0, width, height);
+	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
+
+	memset(&td->ctx, 0, sizeof(td->ctx));
+	if (!have_rgb) free(buf);
+	else
+	{
+		td->ctx.xy[2] = width;
+		td->ctx.xy[3] = height;
+		td->ctx.rgb = buf;
+	}
+}
+
 //	Tablet handling
 
 #if GTK_MAJOR_VERSION == 1
@@ -4616,6 +4830,7 @@ static cmdef cmddefs[] = {
 	{ op_CANVASIMGB, sizeof(rgbimage_data) },
 	{ op_FCIMAGEP,	sizeof(fcimage_data) },
 	{ op_KEYBUTTON,	sizeof(keybutton_data) },
+	{ op_FONTSEL,	sizeof(fontsel_data), op_uENTRY },
 // !!! Beware - COLORLIST is self-reading and uOPTD is not
 	{ op_COLORLIST,	sizeof(colorlist_data), op_uOPTD },
 	{ op_COLORLISTN, sizeof(colorlist_data), op_uLISTCC },
@@ -5626,22 +5841,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Add a font selector, fill from array: font name/test string */
 		case op_FONTSEL:
-		{
-			char **ss = v;
-			widget = gtk_font_selection_new();
-			accept_ctrl_enter(GTK_FONT_SELECTION(widget)->preview_entry);
-			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
-			// !!! Fails if no toplevel
-			gtk_font_selection_set_font_name(
-				GTK_FONT_SELECTION(widget), ss[0]);
-			gtk_font_selection_set_preview_text(
-				GTK_FONT_SELECTION(widget), ss[1]);
-			ss[0] = ss[1] = NULL;
+			widget = fontsel(r, v);
 // !!! Border = 4
 			cw = 4;
-			pk = pk_SHOW;
 			break;
-		}
 #ifdef U_CPICK_MTPAINT
 		/* Add a hex color entry */
 		case op_HEXENTRY:
@@ -7828,12 +8031,25 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 // !!! Support only what actually used on
 	int op = GET_OP(slot);
 	if (size <= 0) return;
+	if (op == op_WDONE)
+	{
+		if (idx == WDATA_TABLET)
+		{
+			if (size >= sizeof(char *)) *(char **)res =
+				tablet_device ? tablet_device->name : NULL;
+			return;
+		}
+		// skip to toplevel slot
+		slot = NEXT_SLOT(slot) , op = GET_OP(slot);
+	}
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
-	case op_WDONE:
-		if (size >= sizeof(char *))
-			*(char **)res = tablet_device ? tablet_device->name : NULL;
+	case op_uWINDOW:
+	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
+		if ((idx != WINDOW_DPI) || (size < sizeof(int))) break;
+		*(int *)res = cmd_mode ? 72 : // Use FreeType's default DPI
+			(int)(window_dpi(op == op_uWINDOW ? main_window : slot[0]) + 0.5);
 		break;
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
 	case op_uFPICK:
@@ -8030,6 +8246,7 @@ void cmd_setv(void **slot, void *res, int idx)
 			g_usleep(400000);	// Wait 0.4 s for screen to redraw
 #endif
 		}
+		else if (idx == WINDOW_TEXTENG) do_render_text(res);
 		break;
 	}
 	case op_FPICKpm: fpick_set_filename(slot[0], res, idx); break;
@@ -8273,6 +8490,22 @@ void cmd_setv(void **slot, void *res, int idx)
 			pp[0], pp[1] - pp[0]);
 		break;
 	}
+#if GTK_MAJOR_VERSION == 2
+	case op_FONTSEL:
+	{
+		GtkFontSelection *fs = slot[0];
+		fontsel_data *fd = slot[2];
+		int size = fs->size;
+
+		fd->dpi = (int)res;
+		if (!fd->sysdpi) fd->sysdpi = window_dpi(main_window); // Init
+		/* To cause full preview reset */
+		fs->size = 0;
+		gtk_widget_activate(fs->size_entry);
+		fs->size = size;
+		break;
+	}
+#endif
 	}
 }
 

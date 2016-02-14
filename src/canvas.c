@@ -47,7 +47,9 @@ int marq_status = MARQUEE_NONE, marq_xy[4] = { -1, -1, -1, -1 };	// Selection ma
 int marq_drag_x, marq_drag_y;						// Marquee dragging offset
 int line_status = LINE_NONE, line_xy[4];				// Line tool
 int poly_status = POLY_NONE;						// Polygon selection tool
-int clone_status, clone_x, clone_y, clone_dx, clone_dy;			// Clone tool
+int clone_status, clone_x, clone_y, clone_dx, clone_dy;			// Clone tool state
+int clone_mode = TRUE, clone_x0 = -1, clone_y0 = -1,			// Clone settings
+	clone_dx0, clone_dy0;
 
 int recent_files;					// Current recent files setting
 
@@ -2743,12 +2745,13 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 			break;
 		}
 
-		// Relativise source coords if that isn't yet done
-		if ((tool_type == TOOL_CLONE) && (clone_status == CLONE_ABS))
+		// Relativize source coords if that isn't yet done
+		if (tool_type == TOOL_CLONE)
 		{
-			clone_dx = clone_x - x;
-			clone_dy = clone_y - y;
-			clone_status = CLONE_ABS | CLONE_TRACK;
+			if ((clone_status == CLONE_ABS) ||
+				(clone_status == (CLONE_REL | CLONE_TRACK)))
+				clone_dx = clone_x - x , clone_dy = clone_y - y;
+			clone_status = (clone_status & CLONE_ABS) | CLONE_DRAG;
 		}
 
 		// Do memory stuff for undo
