@@ -1338,6 +1338,10 @@ static int populate_channel(char *filename)
 	return (res == 1 ? 0 : -1);
 }
 
+
+
+///	FILE SELECTION WINDOW
+
 static int anim_mode = ANM_COMP;
 
 typedef struct {
@@ -1379,9 +1383,6 @@ static int anim_file_dialog(int ftype, int is_anim)
 	int i;
 
 
-	/* This function is better be immune to pointer grabs */
-	release_grab();
-
 	tdata.is_anim = is_anim;
 	tmp = g_strdup_printf(is_anim ? __("This is an animated %s file.") :
 		__("This is a multipage %s file."),
@@ -1422,14 +1423,74 @@ static void handle_file_error(int res)
 	if (txt) alert_box(_("Error"), txt, NULL);
 }
 
-int do_a_load(char *fname, int undo)
+typedef struct {
+	char *what;
+	void **ok, **res;
+	int w, h;
+} scale_dd;
+
+#define WBbase scale_dd
+static void *scale_code[] = {
+	WINDOWm(_("Size")),
+	MLABELpx(what, 5, 5, 4),
+	TABLE2(2),
+	TSPIN(_("Width"), w, 0, MAX_WIDTH),
+	TSPIN(_("Height"), h, 0, MAX_HEIGHT),
+	WDONE,
+	HSEP,
+	EQBOXB,
+	CANCELBTN(_("Cancel"), dialog_event),
+	REF(ok), OKBTN(_("OK"), dialog_event),
+	WDONE,
+	RAISED, WDIALOG(res)
+};
+#undef WBbase
+
+static void scale_file_dialog(int ftype, int *w, int *h)
+{
+	scale_dd tdata, *dt;
+	void **res;
+	char *tmp;
+
+
+	memset(&tdata, 0, sizeof(tdata));
+	tdata.what = tmp = g_strdup_printf(__("This is a scalable %s file."),
+		file_formats[ftype & FTM_FTYPE].name);
+	res = run_create(scale_code, &tdata, sizeof(tdata)); // run dialog
+	g_free(tmp);
+
+	/* Retrieve results */
+	run_query(res);
+	dt = GET_DDATA(res);
+	if (origin_slot(dt->res) == dt->ok) *w = dt->w , *h = dt->h;
+	run_destroy(res);
+}
+
+typedef struct {
+	void **pathbox;
+	char *title, **ftnames, **tiffnames;
+	char *frames_name, *ex_path;
+	int frames_ftype, frames_anim, load_lr;
+	int mode, fpmode;
+	int fmask, ftype, ftypes[NUM_FTYPES];
+	int need_save, need_anim, need_undo, need_icc, script;
+	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
+	int tiff_m, lzma_c;
+	int gif_delay, undo, icc;
+	int w, h;
+	/* Note: filename is in system encoding */
+	char filename[PATHBUF];
+} fselector_dd;
+
+int do_a_load_x(char *fname, int undo, void *v)
 {
 	char real_fname[PATHBUF];
-	int res, ftype, mult = 0;
+	int res, rres, ftype, mult = 0, w = 0, h = 0;
 
 
 	resolve_path(real_fname, PATHBUF, fname);
 	ftype = detect_image_format(real_fname);
+
 	if ((ftype < 0) || (ftype == FT_NONE))
 	{
 		alert_box(_("Error"), ftype < 0 ? _("Cannot open file") :
@@ -1440,7 +1501,20 @@ int do_a_load(char *fname, int undo)
 	set_image(FALSE);
 
 	if (ftype == FT_LAYERS1) mult = res = load_layers(real_fname);
-	else res = load_image(real_fname, FS_PNG_LOAD, undo ? ftype | FTM_UNDO : ftype);
+	else
+	{
+		if (script_cmds && v)
+		{
+			fselector_dd *dt = v;
+			w = dt->w;
+			h = dt->h;
+		}
+		else if (!script_cmds && (file_formats[ftype].flags & FF_SCALE))
+			scale_file_dialog(ftype, &w, &h);
+		res = load_image_scale(real_fname, FS_PNG_LOAD,
+			ftype | (undo ? FTM_UNDO : 0), w, h);
+	}
+	rres = res;
 
 loaded:
 	/* Multiframe file was loaded so tell user */
@@ -1452,7 +1526,11 @@ loaded:
 // !!! When implemented, load as frameset & run animation in that case instead
 		if (viewer_mode && view_image_only) i = 0;
 		/* Don't ask in script mode too */
-// !!! To do more, can add extra ufields to file dialog and pass the struct here
+		else if (script_cmds && v)
+		{
+			fselector_dd *dt = v;
+			i = dt->ex_path ? -1 : dt->load_lr ? 3 : 0;
+		}
 		else if (script_cmds) i = 0;
 		else i = anim_file_dialog(ftype, is_anim);
 		is_anim = is_anim ? anim_mode : ANM_PAGE;
@@ -1470,7 +1548,15 @@ loaded:
 			}
 			mult = res = load_to_layers(real_fname, ftype, is_anim);
 			goto loaded;
-		} 
+		}
+		else if (i == -1) /* Explode frames into preset directory */
+		{
+			fselector_dd *dt = v;
+			i = dt->ftypes[dt->ftype];
+			res = explode_frames(dt->ex_path, is_anim, real_fname,
+				ftype, i == FT_NONE ? ftype : i);
+			goto loaded;
+		}
 		else if (i == 1) /* Ask for directory to explode frames to */
 		{
 			void *xdata[3];
@@ -1500,7 +1586,7 @@ loaded:
 	if (!mult) /* A single image */
 	{
 		/* To prevent 1st frame overwriting a multiframe file */
-		char *nm = g_strconcat(real_fname, res == FILE_HAS_FRAMES ?
+		char *nm = g_strconcat(real_fname, rres == FILE_HAS_FRAMES ?
 			".000" : NULL, NULL);
 		set_new_filename(layer_selected, nm);
 		g_free(nm);
@@ -1527,10 +1613,6 @@ loaded:
 	return (0);
 }
 
-
-
-///	FILE SELECTION WINDOW
-
 int check_file( char *fname )		// Does file already exist?  Ask if OK to overwrite
 {
 	char *msg, *f8;
@@ -1547,21 +1629,6 @@ int check_file( char *fname )		// Does file already exist?  Ask if OK to overwri
 
 	return (res);
 }
-
-typedef struct {
-	void **pathbox;
-	char *title, **ftnames, **tiffnames;
-	char *frames_name;
-	int frames_ftype, frames_anim;
-	int mode, fpmode;
-	int fmask, ftype, ftypes[NUM_FTYPES];
-	int need_save, need_anim, need_undo, need_icc;
-	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
-	int tiff_m, lzma_c;
-	int gif_delay, undo, icc;
-	/* Note: filename is in system encoding */
-	char filename[PATHBUF];
-} fselector_dd;
 
 static void change_image_format(fselector_dd *dt, void **wdata, int what,
 	void **where)
@@ -1584,7 +1651,9 @@ int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
 	fformat *ff;
 	int i, j, k, l, ft_sort[NUM_FTYPES], ft_key[NUM_FTYPES];
 
-	for (i = k = 0; i < NUM_FTYPES; i++)	// Populate sorted filetype list
+	ft_key[0] = ft_sort[0] = 0;
+	k = def == FT_NONE;	// Include FT_NONE if default
+	for (i = 0; i < NUM_FTYPES; i++)	// Populate sorted filetype list
 	{
 		ff = file_formats + i;
 		if (ff->flags & FF_NOSAVE) continue;
@@ -1765,6 +1834,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 			*c = '\0';
 		}
 		/* Modify the file extension if needed */
+		else if (settings.mode == FS_PNG_LOAD) break;
 		else
 		{
 			ext = file_formats[settings.ftype].ext;
@@ -1805,7 +1875,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	switch (settings.mode)
 	{
 	case FS_PNG_LOAD:
-		if (do_a_load(dt->filename, undo_load) == 1) break;
+		if (do_a_load_x(dt->filename, undo_load, dt) == 1) break;
 		redo = 0;
 		break;
 	case FS_PNG_SAVE:
@@ -1884,7 +1954,8 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 			if ((unsigned char)(gif2[i] - '0') <= 9) gif2[i] = '?';
 		}
 		run_def_action(DA_GIF_CREATE, gif2, dt->filename, settings.gif_delay);
-		run_def_action(DA_GIF_PLAY, dt->filename, NULL, 0);
+		if (!cmd_mode) // Don't launch GUI from commandline
+			run_def_action(DA_GIF_PLAY, dt->filename, NULL, 0);
 		g_free(gif2);
 		redo = 0;
 		break;
@@ -1987,6 +2058,15 @@ static void *fselector_code[] = {
 	IF(need_icc), CHECK(_("Apply colour profile"), icc),
 #endif
 	WDONE,
+	IFx(script, 1),
+		/* For loading multiframe files */
+		CHECK("Load into Layers", load_lr),
+		uPATHSTR(ex_path), OPNAME("Explode Frames"),
+		OPTv(modes_txt, 3, anim_mode), OPNAME("Frames"),
+		/* For loading scalable images */
+		SPIN(w, 0, MAX_WIDTH), OPNAME("Width"),
+		SPIN(h, 0, MAX_HEIGHT), OPNAME("Height"),
+	ENDIF(1),
 	WXYWH("fs_window", 550, 500),
 	CLEANUP(frames_name),
 	RAISED, WSHOW
@@ -2001,6 +2081,7 @@ void file_selector_x(int action_type, void **xdata)
 
 
 	memset(&tdata, 0, sizeof(tdata));
+	tdata.script = !!script_cmds;
 	tdata.mode = action_type;
 	tdata.fpmode = FPICK_ENTRY;
 	tdata.xtrans[0] = mem_xpm_trans;
@@ -2017,6 +2098,12 @@ void file_selector_x(int action_type, void **xdata)
 #ifdef U_LCMS
 		tdata.need_icc = TRUE;
 #endif
+		if (script_cmds)
+		{
+			tdata.fmask = FF_IMAGE;
+			ext = "";
+			def = FT_NONE;
+		}
 		break;
 	case FS_PNG_SAVE:
 		tdata.fmask = FF_SAVE_MASK;

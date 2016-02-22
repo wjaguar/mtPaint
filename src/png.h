@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -164,6 +164,7 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings);
 
 int load_image(char *file_name, int mode, int ftype);
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype);
+int load_image_scale(char *file_name, int mode, int ftype, int w, int h);
 
 // !!! The only allowed mode for now is FS_LAYER_LOAD
 int load_frameset(frameset *frames, int ani_mode, char *file_name, int mode,

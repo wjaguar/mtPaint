@@ -128,7 +128,8 @@ typedef struct {
 
 static char *set_uentry(swdata *sd, char *s)
 {
-	return (sd->strs = sd->value < 0 ? g_strdup(s) : g_strndup(s, sd->value));
+	return (sd->strs = !s ? NULL :
+		sd->value < 0 ? g_strdup(s) : g_strndup(s, sd->value));
 }
 
 /* Command table */
@@ -347,6 +348,7 @@ int texteng_rot = TRUE;
 #define PangoMatrix void /* For rotate_box() */
 int texteng_rot = FALSE;
 #endif
+int texteng_lf = TRUE;
 int texteng_dpi = TRUE;
 
 #else /* GTK+1 */
@@ -357,6 +359,7 @@ int texteng_aa = TRUE;
 int texteng_aa = FALSE;
 #endif
 int texteng_rot = FALSE;
+int texteng_lf = FALSE;
 int texteng_dpi = FALSE;
 
 #endif
@@ -463,6 +466,8 @@ static void do_render_text(texteng_dd *td)
 
 #if GTK_MAJOR_VERSION == 2
 
+	static const PangoAlignment align[3] = {
+		PANGO_ALIGN_LEFT, PANGO_ALIGN_CENTER, PANGO_ALIGN_RIGHT };
 	PangoRectangle ink, rect;
 	PangoContext *context;
 	PangoLayout *layout;
@@ -480,6 +485,7 @@ static void do_render_text(texteng_dd *td)
 	pango_font_description_free(font_desc);
 
 	pango_layout_set_text(layout, td->text, -1);
+	pango_layout_set_alignment(layout, align[td->align]);
 
 #if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 	if (td->angle)
@@ -4906,6 +4912,7 @@ static cmdef cmddefs[] = {
 	{ op_uRPACK,	sizeof(swdata), -1 },
 	{ op_uRPACKD,	sizeof(swdata), -1 },
 	{ op_uENTRY,	sizeof(swdata), -1 },
+	{ op_uPATHSTR,	sizeof(swdata), -1 },
 	{ op_uCOLOR,	sizeof(swdata), -1 },
 	{ op_uLISTCC,	sizeof(swdata), -1 },
 	{ op_uLISTC,	sizeof(lswdata), -1 },
@@ -5079,6 +5086,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			{
 				*(void ***)v = NULL; // clear result slot
 				vdata->dv = v; // announce it
+				release_grab(); // must be immune to pointer grabs
 				while (!*(void ***)v) gtk_main_iteration();
 			}
 			/* Return anchor position */
@@ -5210,7 +5218,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		}
 		/* Script mode entry - fill from drop-away buffer */
-		case op_uENTRY:
+		case op_uENTRY: case op_uPATHSTR:
 			// Length limit (not including 0)
 			tpad = ((swdata *)dtail)->value = lp > 1 ? (int)pp[2] : -1;
 			// Replace transient buffer - it may get freed on return
@@ -6742,7 +6750,9 @@ static void do_destroy(void **wdata)
 			free(cd);
 			break;
 		}
-		case op_uENTRY: v = &((swdata *)*wdata)->strs; // Fallthrough
+		case op_uENTRY: case op_uPATHSTR:
+			v = &((swdata *)*wdata)->strs;
+			// Fallthrough
 		case op_TEXT: case op_FONTSEL: g_free(*(char **)v); break;
 		case op_TABLETBTN: conf_done(NULL); break;
 		case op_uMOUNT:
@@ -6931,7 +6941,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_ENTRY: case op_MLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
 			break;
-		case op_uENTRY:
+		case op_uENTRY: case op_uPATHSTR:
 			*(char **)v = ((swdata *)*wdata)->strs;
 			break;
 		case op_PENTRY: case op_PATH:
@@ -7174,7 +7184,7 @@ void cmd_reset(void **slot, void *ddata)
 		case op_FSPIN:
 			gtk_spin_button_set_value(*wdata, *(int *)v * 0.01);
 			break;
-		case op_uENTRY:
+		case op_uENTRY: case op_uPATHSTR:
 			// Replace transient buffer - it may get freed on return
 			*(char **)v = set_uentry(*wdata, *(char **)v);
 			cmd_event(wdata, op_EVT_CHANGE);
@@ -7495,10 +7505,10 @@ int cmd_setstr(void **slot, char *s)
 	if (IS_UNREAL(slot)) op = GET_UOP(slot);
 	switch (op)
 	{
-	case op_uFPICK:
+	case op_uFPICK: case op_uPATHSTR:
 		// Commandline is already in system encoding
 		if (!cmd_mode) s = st = gtkncpy(NULL, s, PATHBUF);
-		cmd_setv(slot, s, FPICK_VALUE);
+		cmd_setv(slot, s, op == op_uFPICK ? FPICK_VALUE : ENTRY_VALUE);
 		g_free(st);
 		goto done;
 	case op_ENTRY: case op_uENTRY:
@@ -8310,7 +8320,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_ENTRY: case op_MLENTRY:
 		gtk_entry_set_text(slot[0], res);
 		break;
-	case op_uENTRY:
+	case op_uENTRY: case op_uPATHSTR:
 		set_uentry(slot[0], res);
 		cmd_event(slot, op_EVT_CHANGE);
 		break;

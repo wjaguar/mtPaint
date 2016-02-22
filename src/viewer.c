@@ -36,7 +36,7 @@
 #include "font.h"
 
 int font_aa, font_bk, font_r;
-int font_bkg, font_angle;
+int font_bkg, font_angle, font_align;
 int font_setdpi, font_dpi, sys_dpi;
 
 int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
@@ -1051,7 +1051,8 @@ void render_text()
 	texteng_dd td = { inifile_get("textString", ""),
 		inifile_get("lastTextFont", ""),
 		font_r ? font_angle : 0,
-		font_setdpi ? font_dpi : 0 };
+		font_setdpi ? font_dpi : 0,
+		font_align };
 
 	td.ctx.rgb = NULL;
 	cmd_setv(main_window_, &td, WINDOW_TEXTENG);
@@ -1107,6 +1108,8 @@ static void dpi_changed(text_dd *dt, void **wdata, int what, void **where)
 	cmd_setv(dt->fs, (void *)(font_setdpi ? dt->dpi[0] : 0), FONTSEL_DPI);
 }
 
+char *align_txt[] = { _("Left"), _("Centre"), _("Right") };
+
 #define WBbase text_dd
 static void *text_code[] = {
 	WINDOWm(_("Paste Text")),
@@ -1127,13 +1130,7 @@ static void *text_code[] = {
 	IFx(img, 1),
 		SPINa(bkg), OPNAME("Background colour ="),
 	ENDIF(1),
-	IFvx(texteng_rot, 1),
-		UNLESS(script), CHECKv(_("Angle of rotation ="), font_r),
-		FSPIN(angle, -36000, 36000), OPNAME("Angle of rotation ="),
-	ENDIF(1),
-	WDONE,
 	IFvx(texteng_dpi, 2),
-		HBOX,
 		UNLESSx(script, 1),
 			CHECKv(_("DPI ="), font_setdpi),
 				EVENT(CHANGE, dpi_changed), TRIGGER,
@@ -1142,8 +1139,17 @@ static void *text_code[] = {
 		NOSPINv(sys_dpi), WDONE, // page 0
 		SPINa(dpi), EVENT(CHANGE, dpi_changed), OPNAME("DPI ="),
 		WDONE, // page 1
-		WDONE,
 	ENDIF(2),
+	WDONE,
+	HBOX,
+	IFvx(texteng_rot, 1),
+		UNLESS(script), CHECKv(_("Angle of rotation ="), font_r),
+		FSPIN(angle, -36000, 36000), OPNAME("Angle of rotation ="),
+	ENDIF(1),
+	IFvx(texteng_lf, 1),
+		MLABEL(_("Align")), OPTv(align_txt, 3, font_align),
+	ENDIF(1),
+	WDONE,
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
 	WSHOW

@@ -87,15 +87,8 @@ static void fpick_btn(fpick_dd *dt, void **wdata, int what, void **where);
 
 #if GTK_MAJOR_VERSION == 1
 
-#define _GNU_SOURCE
 #include <fnmatch.h>
-#undef _GNU_SOURCE
-#ifndef FNM_CASEFOLD
-#define FNM_CASEFOLD 0
-#endif
-
-#define fpick_fnmatch(mask, str) !fnmatch(mask, str, FNM_PATHNAME | \
-	(case_insensitive ? FNM_CASEFOLD : 0))
+#define fpick_fnmatch(mask, str) !fnmatch(mask, str, FNM_PATHNAME)
 
 #elif (GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 4) /* GTK+ 2.0/2.2 */
 #define fpick_fnmatch(mask, str) wjfnmatch(mask, str, TRUE)

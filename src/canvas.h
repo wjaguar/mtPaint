@@ -118,7 +118,8 @@ enum {
 	FS_PALETTE_DEF
 };
 
-int do_a_load(char *fname, int undo);
+int do_a_load_x(char *fname, int undo, void *v);
+#define do_a_load(A,B) do_a_load_x(A, B, NULL)
 void canvas_center(float ic[2]);
 void align_size(float new_zoom);
 void realign_size();

@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -133,13 +133,56 @@ void spawn_quit()
 	if (mt_temp_dir) rmdir(mt_temp_dir);
 }
 
+int get_tempname(char *buf, char *f, int type)
+{
+	char nstub[NAMEBUF], ids[32], *c;
+	int fd, cnt, idx;
+
+	/* Prepare temp directory */
+	if (!mt_temp_dir) mt_temp_dir = new_temp_dir();
+	if (!mt_temp_dir) return (FALSE); /* Temp dir creation failed */
+
+	/* Stubify filename */
+	strcpy(nstub, "tmp");
+	if (f) /* Have original filename */
+	{
+		c = strrchr(f, DIR_SEP);
+		if (c) f = c + 1;
+		c = strrchr(f, '.');
+		if (c != f) /* Extension should not be alone */
+			wjstrcat(nstub, NAMEBUF, f, c ? c - f : strlen(f), NULL);
+	}
+	f = nstub;
+
+	/* Create temp file */
+	while (TRUE)
+	{
+		idx = last_temp_index(f, -1);
+		ids[0] = 0;
+		for (cnt = 0; cnt < 256; cnt++ , idx++)
+		{
+			if (idx) sprintf(ids, "%d", idx);
+			snprintf(buf, PATHBUF, "%s" DIR_SEP_STR "%s%s.%s",
+				mt_temp_dir, f, ids, file_formats[type].ext);
+			fd = open(buf, O_WRONLY | O_CREAT | O_EXCL, 0644);
+			if (fd >= 0) break;
+		}
+		last_temp_index(f, idx);
+		if (fd >= 0) break;
+		if (!strcmp(f, "tmp")) return (FALSE); /* Utter failure */
+		f = "tmp"; /* Try again with "tmp" */
+	}
+	close(fd);
+	return (TRUE);
+}
+
 static char *get_temp_file(int type, int rgb)
 {
 	ls_settings settings;
 	tempfile *tmp;
 	unsigned char *img = NULL;
-	char buf[PATHBUF], nstub[NAMEBUF], ids[32], *c, *f = "tmp.png";
-	int fd, cnt, idx, res;
+	char buf[PATHBUF], *f = "tmp.png";
+	int res;
 
 	/* Use the original file if possible */
 	if (!mem_changed && mem_filename && (!rgb ^ (mem_img_bpp == 3)) &&
@@ -147,17 +190,9 @@ static char *get_temp_file(int type, int rgb)
 		 (detect_file_format(mem_filename, FALSE) == type)))
 		return (mem_filename);
 
-	/* Prepare temp directory */
-	if (!mt_temp_dir) mt_temp_dir = new_temp_dir();
-	if (!mt_temp_dir) return (NULL); /* Temp dir creation failed */
-
 	/* Analyze name */
 	if ((type == FT_NONE) && mem_filename)
-	{
-		f = strrchr(mem_filename, DIR_SEP);
-		if (!f) f = mem_filename;
-		type = file_type_by_ext(f, FF_SAVE_MASK);
-	}
+		type = file_type_by_ext(f = mem_filename, FF_SAVE_MASK);
 	if (type == FT_NONE) type = FT_PNG;
 
 	/* Use existing file if possible */
@@ -168,31 +203,8 @@ static char *get_temp_file(int type, int rgb)
 			return (tmp->name);
 	}
 
-	/* Stubify filename */
-	strcpy(nstub, "tmp");
-	c = strrchr(f, '.');
-	if (c != f) /* Extension should not be alone */
-		wjstrcat(nstub, NAMEBUF, f, c ? c - f : strlen(f), NULL);
-
 	/* Create temp file */
-	while (TRUE)
-	{
-		idx = last_temp_index(nstub, -1);
-		ids[0] = 0;
-		for (cnt = 0; cnt < 256; cnt++ , idx++)
-		{
-			if (idx) sprintf(ids, "%d", idx);
-			snprintf(buf, PATHBUF, "%s" DIR_SEP_STR "%s%s.%s",
-				mt_temp_dir, nstub, ids, file_formats[type].ext);
-			fd = open(buf, O_WRONLY | O_CREAT | O_EXCL, 0644);
-			if (fd >= 0) break;
-		}
-		last_temp_index(nstub, idx);
-		if (fd >= 0) break;
-		if (!strcmp(nstub, "tmp")) return (NULL); /* Utter failure */
-		strcpy(nstub, "tmp"); /* Try again with "tmp" */
-	}
-	close(fd);
+	if (!get_tempname(buf, f, type)) return (NULL); /* Fail */
 
 	/* Save image */
 	init_ls_settings(&settings, NULL);
@@ -711,7 +723,7 @@ static char *quote_spaces(const char *src)
 int run_def_action(int action, char *sname, char *dname, int delay)
 {
 	char *msg, *c8, *command = NULL;
-	int res, code;
+	int res, code, w, h;
 
 	switch (action)
 	{
@@ -731,6 +743,15 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 	case DA_GIF_EDIT:
 		command = g_strdup_printf("mtpaint -g %d -w \"%s.???\" -w \"%s.????\""
 			CMD_DETACH, delay, sname, sname);
+		break;
+	case DA_SVG_CONVERT:
+		w = delay & 0xFFFF;
+		h = delay >> 16;
+		c8 = w && h ? "-w %d -h %d" : w ? "-w %d" : h ? "-h %d" : "";
+		c8 = g_strdup_printf(c8, w ? w : h, h);
+		command = g_strdup_printf("rsvg-convert %s -o \"%s\" \"%s\"",
+			c8, dname, sname);
+		free(c8);
 		break;
 	}
 

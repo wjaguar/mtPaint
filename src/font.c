@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -224,6 +224,7 @@ static unsigned char *mt_text_render(
 	double		ca, sa, angle_r = angle / 180 * M_PI;
 	int		bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable;
 	int		Y1, Y2, X1, X2, ll, line, xflag;
+	int		pass, lines = 0, *lw = NULL;
 	int		dpi = ft_setdpi ? font_dpi : sys_dpi;
 	int		minxy[4] = { MAX_WIDTH, MAX_HEIGHT, -MAX_WIDTH, -MAX_HEIGHT };
 	size_t		s, ssize1 = characters, ssize2 = characters * 4 + 5;
@@ -318,20 +319,29 @@ static unsigned char *mt_text_render(
 	iconv_close(cd);
 	if (s == (size_t)(-1)) goto fail0;
 	characters = (txtp2 - (char *)txt2) / sizeof(*txt2); // Converted length
-	txt2[characters] = 0; // Terminate the line
+	txt2[characters] = 0x0A; // Final newline
+	txt2[characters + 1] = 0; // Terminate the line
+
+	if (font_align) // Left align is not doing anything
+	{
+		for (tmp2 = txt2; *tmp2; tmp2++)
+			lines += *tmp2 == 0x0A;
+		lw = calloc(lines, sizeof(int)); // For line widths
+	}
 
 	xflag = X1 = X2 = 0;
-	while (TRUE)
+	for (pass = -!!lw; pass <= 1; pass++)
 	{
 		pen.x = pen.y = 0;
-		ll = line = 0;
-		tmp2 = txt2;
+		ll = 0;
+		line = -1;
 
-		while (TRUE)
+		for (tmp2 = txt2 , unichar = 0x0A; unichar; unichar = *tmp2++)
 		{
-			unichar = *tmp2++;
-			if (!unichar || (unichar == 0x0A)) // EOL or newline
+			if (unichar == 0x0A) // Newline
 			{
+				line++;
+				if (pass < 0) continue;
 				// Remember right boundary
 				if (ll && face->glyph)
 				{
@@ -343,10 +353,14 @@ static unsigned char *mt_text_render(
 					tdx += tx * ca + ty * sa;
 					if (tdx > X2) X2 = tdx;
 				}
-				if (!unichar) break;
-				ll = (Y1 - Y2) * ++line;
+				ll = (Y1 - Y2) * line;
 				pen.x = ll * sa;
 				pen.y = ll * -ca;
+				if (lw)
+				{
+					pen.x += lw[line] * ca;
+					pen.y += lw[line] * sa;
+				}
 				ll = 0; // Reset horizontal index
 				continue;
 			}
@@ -359,10 +373,17 @@ static unsigned char *mt_text_render(
 			error = FT_Load_Glyph( face, glyph_index, load_flags );
 			if ( error ) continue;
 
+			if (pass < 0) // Calculating line widths
+			{
+				lw[line] += face->glyph->metrics.horiAdvance;
+				continue;
+			}
+
 			// Remember left boundary
 			if (!ll++)
 			{
 				int tx = face->glyph->metrics.horiBearingX;
+				if (lw) tx += lw[line];
 				if (!xflag++) X1 = X2 = tx; // First glyph
 				if (tx < X1) X1 = tx;
 				pen0 = pen;
@@ -401,11 +422,23 @@ static unsigned char *mt_text_render(
 				bx - minxy[0], by - minxy[1], ppb);
 		}
 
+		if (pass < 0) // Calculate line offsets
+		{
+			for (ll = line = 0; line < lines; line++)
+				if (ll < lw[line]) ll = lw[line];
+			for (line = 0; line < lines; line++)
+			{
+				lw[line] = ll - lw[line];
+				if (font_align == 1) lw[line] >>= 1; // Center
+			}
+			continue;
+		}
+
 		if (mem) break; // Done
 
 		/* Adjust bounds for full-height rectangle; ignore possible
 		 * rounding issues, for their effect is purely visual - WJ */
-		by = Y2 + (Y2 - Y1) * line;
+		by = Y1 + (Y2 - Y1) * line;
 		while (TRUE)
 		{
 			bx = X1;
@@ -495,6 +528,7 @@ static unsigned char *mt_text_render(
 			}
 		}
 	}
+	free(lw);
 
 fail0:
 	free(txt2);
@@ -1543,6 +1577,14 @@ static void *font_code[] = {
 		SPINa(bkg), EVENT(CHANGE, font_entry_changed),
 			OPNAME("Background colour ="),
 	ENDIF(1),
+	UNLESSx(script, 1),
+		CHECKv(_("DPI ="), ft_setdpi),
+			EVENT(CHANGE, font_entry_changed), TRIGGER,
+	ENDIF(1),
+	REF(book), PLAINBOOK,
+	NOSPINv(sys_dpi), WDONE, // page 0
+	SPINa(dpi), EVENT(CHANGE, font_entry_changed), OPNAME("DPI ="),
+	WDONE, // page 1
 	WDONE, // HBOX
 	HBOX,
 	REF(obl_c), CHECKv(_("Oblique"), font_obl), EVENT(CHANGE, font_entry_changed),
@@ -1552,14 +1594,7 @@ static void *font_code[] = {
 	ENDIF(1),
 	FSPIN(angle, -36000, 36000), EVENT(CHANGE, font_entry_changed),
 		OPNAME("Angle of rotation ="),
-	UNLESSx(script, 1),
-		CHECKv(_("DPI ="), ft_setdpi),
-			EVENT(CHANGE, font_entry_changed), TRIGGER,
-	ENDIF(1),
-	REF(book), PLAINBOOK,
-	NOSPINv(sys_dpi), WDONE, // page 0
-	SPINa(dpi), EVENT(CHANGE, font_entry_changed), OPNAME("DPI ="),
-	WDONE, // page 1
+	MLABEL(_("Align")), OPTve(align_txt, 3, font_align, font_entry_changed),
 	WDONE, // HBOX
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,

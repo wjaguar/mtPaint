@@ -671,7 +671,8 @@ void mem_find_dither(int red, int green, int blue);
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 void mem_invert();			// Invert the palette
 
-void mem_mask_set(int idx, int state);	// Clear/set protection (-1 - all colors)
+//	Clear/set protection (what = NULL - color n, n = -1 - all colors)
+void mem_mask_setv(int *what, int n, int state);
 void mem_mask_init();			// Initialise RGB protection mask
 int mem_protected_RGB(int intcol);	// Is this intcol in list?
 

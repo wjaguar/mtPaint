@@ -246,8 +246,6 @@ int alert_box(char *title, char *message, char *text1, ...)
 	}
 	else // GUI
 	{
-		/* This function must be immune to pointer grabs */
-		release_grab();
 		update_stuff(CF_NOW);
 
 		dd = run_create(alert_code, &tdata, sizeof(tdata)); // run dialog
@@ -1458,6 +1456,121 @@ int internal_clipboard(int which)
 }
 
 #endif
+
+// Clipboard pixmaps
+
+#ifdef HAVE_PIXMAPS
+
+/* Make code not compile if unthinkable happens */
+typedef char XID_Is_Not_32b[2 * (sizeof(Pixmap) == sizeof(guint32)) - 1];
+
+/* It's unclear who should free clipboard pixmaps and when, so I do the same
+ * thing Qt does, destroying the next-to-last allocated pixmap each time a new
+ * one is allocated - WJ */
+
+int export_pixmap(pixmap_info *p, int w, int h)
+{
+	static GdkPixmap *exported[2];
+
+	if (exported[0])
+	{
+		if (exported[1])
+		{
+			/* Someone might have destroyed the X pixmap already,
+			 * so get ready to live through an X error */
+			gdk_error_trap_push();
+			gdk_pixmap_unref(exported[1]);
+			gdk_error_trap_pop();
+		}
+		exported[1] = exported[0];
+	}
+	exported[0] = p->pm = gdk_pixmap_new(main_window->window, w, h, -1);
+	if (!exported[0]) return (FALSE);
+
+	p->w = w;
+	p->h = h;
+	p->depth = -1;
+	p->xid = GDK_WINDOW_XWINDOW(exported[0]);
+	
+	return (TRUE);
+}
+
+void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt)
+{
+	gdk_draw_rgb_image(p->pm, main_window->style->black_gc,
+		0, y, p->w, cnt, GDK_RGB_DITHER_NONE, src, p->w * 3);
+}
+
+#endif
+
+int import_pixmap(pixmap_info *p, guint32 *xid)
+{
+	if (xid) // Pixmap by ID
+	{
+/* This ugly code imports X Window System's pixmaps; this allows mtPaint to
+ * receive images from programs such as XPaint */
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+		int w, h, d, dd;
+
+		gdk_error_trap_push(); // No guarantee that we got a valid pixmap
+		p->pm = gdk_pixmap_foreign_new(p->xid = *xid);
+		gdk_error_trap_pop(); // The above call returns NULL on failure anyway
+		if (!p->pm) return (FALSE);
+		dd = gdk_visual_get_system()->depth;
+#if GTK_MAJOR_VERSION == 1
+		gdk_window_get_geometry(p->pm, NULL, NULL, &w, &h, &d);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		gdk_drawable_get_size(p->pm, &w, &h);
+		d = gdk_drawable_get_depth(p->pm);
+#endif
+		if ((d == 1) || (d == dd))
+		{
+			p->w = w;
+			p->h = h;
+			p->depth = d;
+			return (TRUE);
+		}
+		drop_pixmap(p);
+#endif
+		return (FALSE);
+	}
+	else // NULL means a screenshot
+	{
+		p->w = gdk_screen_width();
+		p->h = gdk_screen_height();
+		p->depth = 3;
+		p->pm = NULL;
+		p->xid = 0;
+	}
+	return (TRUE);
+}
+
+void drop_pixmap(pixmap_info *p)
+{
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+	if (!p->pm) return;
+#if GTK_MAJOR_VERSION == 1
+	/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
+	 * implement freeing the GdkPixmap structure here instead */
+	gdk_xid_table_remove(((GdkWindowPrivate *)p->pm)->xwindow);
+	g_dataset_destroy(p->pm);
+	g_free(p->pm);
+#else /* #if GTK_MAJOR_VERSION == 2 */
+	gdk_pixmap_unref(p->pm);
+#endif
+#endif
+}
+
+int pixmap_get_rows(pixmap_info *p, unsigned char *dest, int y, int cnt)
+{
+	return (!!wj_get_rgb_image(p->depth == 1 ? NULL :
+#if GTK_MAJOR_VERSION == 1
+		(GdkWindow *)&gdk_root_parent,
+#else /* #if GTK_MAJOR_VERSION == 2 */
+		gdk_get_default_root_window(),
+#endif
+		p->pm, dest, 0, y, p->w, cnt));
+}
 
 // Render stock icons to pixmaps
 
@@ -3297,6 +3410,57 @@ double window_dpi(GtkWidget *win)
 	return ((gdk_screen_height() * (double)25.4) /
 		gdk_screen_height_mm());
 #endif
+}
+
+//	Memory size (Mb)
+
+#ifndef _SC_PHYS_PAGES
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#endif
+
+unsigned sys_mem_size()
+{
+#ifdef WIN32
+	MEMORYSTATUS mem;
+	mem.dwLength = sizeof(mem);
+	GlobalMemoryStatus(&mem);
+	return (mem.dwTotalPhys / (1024 * 1024));
+#elif defined _SC_PHYS_PAGES
+	size_t n;
+#ifdef _SC_PAGESIZE
+	n = sysconf(_SC_PAGESIZE);
+#else
+	n = sysconf(_SC_PAGE_SIZE);
+#endif
+	return (((n / 1024) * sysconf(_SC_PHYS_PAGES)) / 1024);
+#elif defined CTL_HW
+#undef FAIL
+	int mib[2] = { CTL_HW };
+	size_t n;
+#ifdef HW_MEMSIZE 
+	uint64_t v;
+	mib[1] = HW_MEMSIZE;
+#elif defined HW_PHYSMEM64
+	uint64_t v;
+	mib[1] = HW_PHYSMEM64;
+#elif defined HW_REALMEM
+	unsigned long v;
+	mib[1] = HW_REALMEM;
+#elif defined HW_PHYSMEM
+	unsigned long v;
+	mib[1] = HW_PHYSMEM;
+#else
+#define FAIL
+#endif
+#ifndef FAIL
+	n = sizeof(v);
+	if (!sysctl(mib, 2, &v, &n, NULL, 0) && (n == sizeof(v)))
+		return ((unsigned)(v / (1024 * 1024)));
+#endif
+#endif
+	return (0); // Fail
 }
 
 // Threading helpers

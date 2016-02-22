@@ -71,6 +71,7 @@
 #include "canvas.h"
 #include "toolbar.h"
 #include "layer.h"
+#include "spawn.h"
 
 /* All-in-one transport container for animation save/load */
 typedef struct {
@@ -375,6 +376,14 @@ static void deallocate_image(ls_settings *settings, int cmask)
 			(settings->mode == FS_CLIPBOARD))
 			mem_clip.img[i] = NULL;
 	}
+}
+
+/* Deallocate alpha channel if useless; namely, all filled with given value */
+static void delete_alpha(ls_settings *settings, int v)
+{
+	if (settings->img[CHN_ALPHA] && is_filled(settings->img[CHN_ALPHA], v,
+		settings->width * settings->height))
+		deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
 }
 
 typedef struct {
@@ -3713,14 +3722,8 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		}
 	}
 
-	/* Check if alpha channel is valid */
-	if (def_alpha && settings->img[CHN_ALPHA])
-	{
-		/* Delete all-zero "alpha" */
-		if (is_filled(settings->img[CHN_ALPHA], 0,
-			settings->width * settings->height))
-			deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
-	}
+	/* Delete all-zero "alpha" */
+	if (def_alpha) delete_alpha(settings, 0);
 
 fail3:	if (!settings->silent) progress_end();
 fail2:	free(buf);
@@ -5123,11 +5126,7 @@ static int load_tga(char *file_name, ls_settings *settings)
 
 	/* Check if alpha channel is valid */
 	if (!real_alpha && settings->img[CHN_ALPHA])
-	{
-		if (is_filled(settings->img[CHN_ALPHA],
-			settings->img[CHN_ALPHA][0], w * h))
-			deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
-	}
+		delete_alpha(settings, settings->img[CHN_ALPHA][0]);
 
 	/* Check if alpha in 16-bpp BGRA is inverse */
 	if (settings->img[CHN_ALPHA] && (wmode == 3) && !assoc_alpha)
@@ -6594,18 +6593,11 @@ done:	if (fp) fclose(fp);
 
 /* Put screenshots and X pixmaps on an equal footing with regular files */
 
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-
-#include <X11/Xlib.h>
-#include <gdk/gdkx.h>
-
-/* It's unclear who should free clipboard pixmaps and when, so I do the same
- * thing Qt does, destroying the next-to-last allocated pixmap each time a new
- * one is allocated - WJ */
+#ifdef HAVE_PIXMAPS
 
 static int save_pixmap(ls_settings *settings, memFILE *mf)
 {
-	static GdkPixmap *exported[2];
+	pixmap_info p;
 	unsigned char *src, *dest, *sel, *buf = NULL;
 	int i, j, l, w = settings->width, h = settings->height;
 
@@ -6617,28 +6609,15 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 		if (!buf) return (-1);
 	}
 
-	if (exported[0])
-	{
-		if (exported[1])
-		{
-			/* Someone might have destroyed the X pixmap already,
-			 * so get ready to live through an X error */
-			gdk_error_trap_push();
-			gdk_pixmap_unref(exported[1]);
-			gdk_error_trap_pop();
-		}
-		exported[1] = exported[0];
-	}
-	exported[0] = gdk_pixmap_new(main_window->window, w, h, -1);
-	if (!exported[0])
+	if (!export_pixmap(&p, w, h))
 	{
 		free(buf);
 		return (-1);
 	}
 
 	/* Plain RGB - copy it whole */
-	if (!buf) gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
-		0, 0, w, h, GDK_RGB_DITHER_NONE, settings->img[CHN_IMAGE], w * 3);
+	if (!buf) pixmap_put_rows(&p, settings->img[CHN_IMAGE], 0, h);
+
 	/* Something else - render & copy row by row */
 	else
 	{
@@ -6646,20 +6625,8 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 		for (i = 0; i < h; i++)
 		{
 			src = settings->img[CHN_IMAGE] + l * i;
-			dest = buf;
-			if (settings->bpp == 3) memcpy(dest, src, l);
-			else /* Indexed to RGB */
-			{
-				png_color *pal = settings->pal;
-
-				for (j = 0; j < w; j++ , dest += 3)
-				{
-					png_color *col = pal + *src++;
-					dest[0] = col->red;
-					dest[1] = col->green;
-					dest[2] = col->blue;
-				}
-			}
+			if (settings->bpp == 3) memcpy(buf, src, l);
+			else do_convert_rgb(0, 1, w, buf, src, settings->pal);
 			/* There is no way to send alpha to XPaint, so I use
 			 * alpha (and selection if any) to blend image with
 			 * white and send the result - WJ */
@@ -6685,15 +6652,14 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 					}
 				}
 			}
-			gdk_draw_rgb_image(exported[0], main_window->style->black_gc,
-				0, i, w, 1, GDK_RGB_DITHER_NONE, buf, w * 3);
+			pixmap_put_rows(&p, buf, i, 1);
 		}
+		free(buf);
 	}
-	free(buf);
 
 	/* !!! '(void *)' is there to make GCC 4 shut up - WJ */
-	*(Pixmap *)(void *)&mf->m.buf = GDK_WINDOW_XWINDOW(exported[0]);
-	mf->top = sizeof(Pixmap);
+	*(guint32 *)(void *)&mf->m.buf = p.xid;
+	mf->top = sizeof(guint32);
 	return (0);
 }
 
@@ -6703,58 +6669,18 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 
 static int load_pixmap(char *pixmap_id, ls_settings *settings)
 {
-#if GTK_MAJOR_VERSION == 1
-	GdkWindow *mainwin = (GdkWindow *)&gdk_root_parent;
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	GdkWindow *mainwin = gdk_get_default_root_window();
-#endif
-	int w, h, res = -1;
+	pixmap_info p;
+	int res = -1;
 
-	if (pixmap_id) // Pixmap by ID
+	if (import_pixmap(&p, (void *)pixmap_id)) // id = NULL means a screenshot
 	{
-/* This ugly code imports X Window System's pixmaps; this allows mtPaint to
- * receive images from programs such as XPaint */
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-		GdkPixmap *pm;
-		int d, dd;
-
-		gdk_error_trap_push(); // No guarantee that we got a valid pixmap
-		pm = gdk_pixmap_foreign_new(*(Pixmap *)pixmap_id);
-		gdk_error_trap_pop(); // The above call returns NULL on failure anyway
-		if (!pm) return (-1);
-		dd = gdk_visual_get_system()->depth;
-#if GTK_MAJOR_VERSION == 1
-		gdk_window_get_geometry(pm, NULL, NULL, &w, &h, &d);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-		gdk_drawable_get_size(pm, &w, &h);
-		d = gdk_drawable_get_depth(pm);
-#endif
-		settings->width = w;
-		settings->height = h;
-		settings->bpp = 3;
-		if ((d == 1) || (d == dd))
-			res = allocate_image(settings, CMASK_IMAGE);
-		if (!res) res = wj_get_rgb_image(d == 1 ? NULL : mainwin, pm,
-			settings->img[CHN_IMAGE], 0, 0, w, h) ? 1 : -1;
-#if GTK_MAJOR_VERSION == 1
-		/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
-		 * implement freeing the GdkPixmap structure here instead */
-		gdk_xid_table_remove(((GdkWindowPrivate *)pm)->xwindow);
-		g_dataset_destroy(pm);
-		g_free(pm);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-		gdk_pixmap_unref(pm);
-#endif
-#endif
-	}
-	else // NULL means a screenshot
-	{
-		w = settings->width = gdk_screen_width();
-		h = settings->height = gdk_screen_height();
+		settings->width = p.w;
+		settings->height = p.h;
 		settings->bpp = 3;
 		res = allocate_image(settings, CMASK_IMAGE);
-		if (!res) res = wj_get_rgb_image(mainwin, NULL,
-			settings->img[CHN_IMAGE], 0, 0, w, h) ? 1 : -1;
+		if (!res) res = pixmap_get_rows(&p,
+			settings->img[CHN_IMAGE], 0, p.h) ? 1 : -1;
+		drop_pixmap(&p);
 	}
 	return (res);
 }
@@ -6765,7 +6691,7 @@ static int load_pixmap(char *pixmap_id, ls_settings *settings)
 
 #define MAY_HANDLE_SVG
 
-static int svg_ftype = -1;
+static int svg_check = -1;
 
 static int svg_supported()
 {
@@ -6846,11 +6772,36 @@ static int load_svg(char *file_name, ls_settings *settings)
 	}
 	res = 1;
 
+	/* Delete all-set "alpha" */
+	delete_alpha(settings, 255);
+
 fail:	g_object_unref(pbuf);
 	return (res);
 }
 
 #endif
+
+/* Handle SVG import using rsvg-convert */
+
+static int import_svg(char *file_name, ls_settings *settings)
+{
+	char buf[PATHBUF];
+	int res = -1;
+
+	if (!get_tempname(buf, file_name, FT_PNG)) return (-1);
+#if (MAX_WIDTH | MAX_HEIGHT) > 0x7FFF
+#error "Height & width too large to pack both into 32-bit int"
+#endif
+	if (!run_def_action(DA_SVG_CONVERT, file_name, buf,
+		(settings->req_h << 16) + settings->req_w))
+		res = load_png(buf, settings, NULL);
+	unlink(buf);
+
+	/* Delete all-set "alpha" */
+	if (res == 1) delete_alpha(settings, 255);
+
+	return (res);
+}
 
 /* Handle textual palette file formats - GIMP's GPL and mtPaint's own TXT */
 
@@ -7174,7 +7125,8 @@ static void store_image_extras(image_info *image, image_state *state,
 	image->cols = settings->colors;
 }
 
-static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
+static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
+	int rw, int rh)
 {
 	layer_image *lim = NULL;
 	png_color pal[256];
@@ -7196,7 +7148,12 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 		if (!lim) return (FILE_MEM_ERROR);
 	}
 
+	/* Fit scalable image into channel */
+	if (mode == FS_CHANNEL_LOAD) rw = mem_width , rh = mem_height;
+
 	init_ls_settings(&settings, NULL);
+	settings.req_w = rw;
+	settings.req_h = rh;
 	/* Preset delay to -1, to detect animations by its changing */
 	settings.gif_delay = -1;
 #ifdef U_LCMS
@@ -7249,9 +7206,13 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
 	case FT_PMM: res0 = load_pmm(file_name, &settings, mf); break;
 	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
+	case FT_SVG:
 #ifdef MAY_HANDLE_SVG
-	case FT_SVG: res0 = load_svg(file_name, &settings); break;
+		if (svg_check < 0) svg_check = svg_supported();
+		if (svg_check) res0 = load_svg(file_name, &settings);
+		else
 #endif
+		res0 = import_svg(file_name, &settings); break;
 	/* Palette files */
 	case FT_GPL:
 	case FT_TXT: res0 = load_txtpal(file_name, &settings); break;
@@ -7402,7 +7363,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype)
 
 int load_image(char *file_name, int mode, int ftype)
 {
-	return (load_image_x(file_name, NULL, mode, ftype));
+	return (load_image_x(file_name, NULL, mode, ftype, 0, 0));
 }
 
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
@@ -7411,13 +7372,18 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 
 	if ((ftype & FTM_FTYPE) == FT_PIXMAP)
 		/* Special case: buf points to a pixmap ID */
-		return (load_image_x(buf, NULL, mode, ftype));
+		return (load_image_x(buf, NULL, mode, ftype, 0, 0));
 
 	if (!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
 
 	memset(&mf, 0, sizeof(mf));
 	mf.m.buf = buf; mf.top = mf.m.size = len;
-	return (load_image_x(NULL, &mf, mode, ftype));
+	return (load_image_x(NULL, &mf, mode, ftype, 0, 0));
+}
+
+int load_image_scale(char *file_name, int mode, int ftype, int w, int h)
+{
+	return (load_image_x(file_name, NULL, mode, ftype, w, h));
 }
 
 // !!! The only allowed modes for now are FS_LAYER_LOAD and FS_EXPLODE_FRAMES
@@ -7722,15 +7688,8 @@ static int do_detect_format(char *name, FILE *fp)
 	/* Assume generic XML is SVG */
 	i = 0; sscanf(buf, " <?xml %n", &i);
 	if (!i) sscanf(buf, " <svg%n", &i);
-#ifdef MAY_HANDLE_SVG
-	if (i)
-	{ /* SVG support need be checked at runtime */
-		if (svg_ftype < 0) svg_ftype = svg_supported() ? FT_SVG : FT_NONE;
-		return (svg_ftype);
-	}
-#else
-	if (i) return (FT_NONE);
-#endif
+	if (!i) sscanf(buf, " <!DOCTYPE svg%n", &i);
+	if (i) return (FT_SVG);
 
 	/* Discern PCX from TGA */
 	while (buf[0] == 10)

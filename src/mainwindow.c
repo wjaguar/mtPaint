@@ -144,7 +144,7 @@ static inilist ini_int[] = {
 	{ "silence_limit",	&silence_limit,		18  },
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },
-	{ "undoMBlimit",	&mem_undo_limit,	32  },
+	{ "undoMBlimit",	&mem_undo_limit,	0   },
 	{ "undoCommon",		&mem_undo_common,	25  },
 	{ "maxThreads",		&maxthreads,		0   },
 	{ "backgroundGrey",	&mem_background,	180 },
@@ -166,6 +166,7 @@ static inilist ini_int[] = {
 	{ "tablet_value_opacity", tablet_tool_factor + 2,MAX_TF },
 	{ "fontBackground",	&font_bkg,		0   },
 	{ "fontAngle",		&font_angle,		0   },
+	{ "fontAlign",		&font_align,		0   },
 	{ "fontDPI",		&font_dpi,		72  },
 #ifdef U_FREETYPE
 	{ "fontSizeBitmap",	&font_bmsize,		1   },
@@ -192,23 +193,39 @@ static int show_dock;
 static int mouse_left_canvas;
 static int cvxy[2];	// canvas window position
 
-static int perim_status, perim_x, perim_y, perim_s;	// Tool perimeter
-static int perim_cx, perim_cy;	// Clone perimeter offset
+typedef struct {
+	int mode;	// (tool_type + 1) if drawn, 0 if not
+	int x, y, s;	// Top left corner and size
+	int cx, cy;	// Clone perimeter offset
+} perim_info;
 
-static void clear_perim_real( int ox, int oy )
+static perim_info perim_state;	// Tool perimeter
+static int perim_wx, perim_wy;	// Cursor position
+
+#define perim_status	perim_state.mode
+#define perim_x		perim_state.x
+#define perim_y		perim_state.y
+#define perim_s		perim_state.s
+#define perim_cx	perim_state.cx
+#define perim_cy	perim_state.cy
+
+static void repaint_perim(rgbcontext *ctx);	// Redraw perimeter around mouse cursor
+static void clear_perim(perim_info *p);		// Clear perimeter around mouse cursor
+static void move_perim(int x, int y);		// Move perimeter to a new location
+
+static void clear_perim_real(int x0, int y0, int s)
 {
-	int x0, y0, x1, y1, zoom = 1, scale = 1;
+	int x1, y1, zoom = 1, scale = 1;
 
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	ox += perim_x; oy += perim_y;
-	x0 = margin_main_x + (ox * scale) / zoom;
-	y0 = margin_main_y + (oy * scale) / zoom;
-	x1 = margin_main_x + ((ox + perim_s - 1) * scale) / zoom + scale - 1;
-	y1 = margin_main_y + ((oy + perim_s - 1) * scale) / zoom + scale - 1;
+	x1 = margin_main_x + ((x0 + s - 1) * scale) / zoom + scale - 1;
+	y1 = margin_main_y + ((y0 + s - 1) * scale) / zoom + scale - 1;
+	x0 = margin_main_x + (x0 * scale) / zoom;
+	y0 = margin_main_y + (y0 * scale) / zoom;
 
 	repaint_canvas(x0, y0, 1, y1 - y0 + 1);
 	repaint_canvas(x1, y0, 1, y1 - y0 + 1);
@@ -369,7 +386,7 @@ static clipform_dd clip_formats[] = {
 	{ "image/bmp", (void *)(FT_BMP) },
 	{ "image/x-bmp", (void *)(FT_BMP) },
 	{ "image/x-MS-bmp", (void *)(FT_BMP) },
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+#ifdef HAVE_PIXMAPS
 	/* These two don't make sense without X */
 	{ "PIXMAP", (void *)(FT_PIXMAP), 4, 32 },
 	{ "BITMAP", (void *)(FT_PIXMAP), 4, 32 },
@@ -984,6 +1001,18 @@ void var_init()
 	for (ilp = ini_int; ilp->name; ilp++)
 		*(ilp->var) = inifile_get_gint32(ilp->name, ilp->defv);
 
+	/* Initialize undo memory space */
+	if (mem_undo_limit <= 0)
+	{
+		unsigned mem = sys_mem_size();
+		/* Limit usable space to 2 Gb on 32-bit systems */
+		if ((sizeof(void *) <= 4) && (mem > 2048)) mem = 2048;
+		/* Take 1/4 of memory space, rounded up to nearest 32 Mb */
+		mem_undo_limit = ((mem / 4) + 31) & ~31;
+		/* But no less than 32 Mb */
+		if (!mem_undo_limit) mem_undo_limit = 32;
+	}
+
 #ifdef U_TIFF
 	/* Load TIFF types */
 	{
@@ -1225,7 +1254,7 @@ static int grad_action(int count, int button, int x, int y)
 }
 
 /* Pick color A/B from canvas, or use one given */
-static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
+static int pick_color(int ox, int oy, int ab, int area[4], int pixel)
 {
 	int rgba = RGBA_mode && (mem_channel == CHN_IMAGE);
 	int upd = 0, alpha = 255; // opaque
@@ -1235,25 +1264,19 @@ static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
 		/* Default alpha */
 		alpha = channel_col_[ab][CHN_ALPHA];
 		/* Average brush or selection area on double click */
-		while (dclick && (MEM_BPP == 3))
+		while (area)
 		{
 			int rect[4];
 
-			/* Have brush square */
-			if (!NO_PERIM(tool_type))
-			{
-				int ts2 = tool_size >> 1;
-				rect[0] = ox - ts2; rect[1] = oy - ts2;
-				rect[2] = rect[3] = tool_size;
-			}
-			/* Have selection marquee */
-			else if ((marq_status > MARQUEE_NONE) &&
-				(marq_status < MARQUEE_PASTE)) marquee_at(rect);
-			else break;
 			/* Clip to image */
+			copy4(rect, area);
 			rect[2] += rect[0];
 			rect[3] += rect[1];
 			if (!clip(rect, 0, 0, mem_width, mem_height, rect)) break;
+			/* Average utility channel */
+			if (mem_channel != CHN_IMAGE) pixel = average_channel(
+				mem_img[mem_channel], mem_width, rect);
+			if (MEM_BPP != 3) break;
 			/* Average alpha if needed */
 			if (rgba && mem_img[CHN_ALPHA]) alpha = average_channel(
 				mem_img[CHN_ALPHA], mem_width, rect);
@@ -1298,7 +1321,7 @@ static void pick_color(int ox, int oy, int ab, int dclick, int pixel)
 		col->green = INT_2_G(pixel);
 		col->blue = INT_2_B(pixel);
 	}
-	if (upd) update_stuff(UPD_CAB);
+	return (upd);
 }
 
 static void tool_done()
@@ -1436,13 +1459,37 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 			clone_x = x;
 			clone_y = y;
 			clone_dx = clone_dy = 0;
+			move_perim(x, y);
 		}
 		/* Set colour A/B */
-		else if ((m->button == 1) || (m->button == 3)) pick_color(ox, oy,
-			m->button == 3, // A for left, B for right
-			m->count == 2, // Double click for averaging an area
-			// Pick color from tracing image when possible
-			get_bkg(m->x + dx * scale, m->y + dy * scale, m->count == 2));
+		else if ((m->button == 1) || (m->button == 3))
+		{
+			int pix, rect[4];
+
+			/* Pick color from tracing image when possible */
+			pix = get_bkg(m->x + dx * scale, m->y + dy * scale,
+				m->count == 2);
+
+			/* Double click averages an area */
+			rect[2] = 0;
+			if (pix >= 0); // Got it from tracing image
+			else if (m->count != 2); // No double click
+			// Have brush square
+			else if (!NO_PERIM(tool_type))
+			{
+				int ts2 = tool_size >> 1;
+				rect[0] = ox - ts2; rect[1] = oy - ts2;
+				rect[2] = rect[3] = tool_size;
+			}
+			// Have selection marquee
+			else if ((marq_status > MARQUEE_NONE) &&
+				(marq_status < MARQUEE_PASTE)) marquee_at(rect);
+
+			if (pick_color(ox, oy,
+				m->button == 3, // A for left, B for right
+				rect[2] ? rect : NULL, // Area to average
+				pix)) update_stuff(UPD_CAB);
+		}
 	}
 
 	else if ((m->button == 2) || ((m->button == 3) && (m->state & _Smask)))
@@ -1510,17 +1557,7 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 				CLONE_TRACK : 0) | (clone_status & CLONE_ABS);
 		}
 
-		if (perim_status) clear_perim(); // Remove old perimeter box
-// !!! Maybe "tool_size * scale > 4 * zoom" instead?
-		if (tool_size * can_zoom > 4)
-		{
-			perim_x = x - (tool_size >> 1);
-			perim_y = y - (tool_size >> 1);
-			perim_s = tool_size;
-			perim_cx = clone_dx;
-			perim_cy = clone_dy;
-			repaint_perim(NULL); // Repaint 4 sides
-		}
+		move_perim(x, y);
 
 		/* LINE UPDATES */
 
@@ -1590,7 +1627,7 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 		cmd_setv(label_bar[STATUS_CURSORXY], "", LABEL_VALUE);
 	if (status_on[STATUS_PIXELRGB])
 		cmd_setv(label_bar[STATUS_PIXELRGB], "", LABEL_VALUE);
-	if (perim_status > 0) clear_perim();
+	if (perim_status > 0) clear_perim(&perim_state);
 
 	clone_status &= ~CLONE_TRACK; // No tracking w/o perimeter
 
@@ -3088,13 +3125,13 @@ void canvas_size(int *w, int *h)
 	*h = (mem_height * scale + zoom - 1) / zoom;
 }
 
-void clear_perim()
+static void clear_perim(perim_info *p)
 {
-	perim_status = 0; /* Cleared */
-	/* Don't bother if tool has no perimeter */
-	if (NO_PERIM(tool_type)) return;
-	clear_perim_real(0, 0);
-	if (tool_type == TOOL_CLONE) clear_perim_real(perim_cx, perim_cy);
+	int ps = p->mode;
+	p->mode = 0; /* Cleared */
+	clear_perim_real(p->x, p->y, p->s);
+	if (ps == TOOL_CLONE + 1)
+		clear_perim_real(p->x + p->cx, p->y + p->cy, p->s);
 }
 
 static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
@@ -3122,14 +3159,31 @@ static void repaint_perim_real(int c, int ox, int oy, rgbcontext *ctx)
 	draw_dash(c, RGB_2_INT(0, 0, 0), 0, x0 + 1, y1, w - 2, 1, ctx);
 }
 
-void repaint_perim(rgbcontext *ctx)
+static void repaint_perim(rgbcontext *ctx)
 {
-	/* Don't bother if tool has no perimeter */
-	if (NO_PERIM(tool_type) || mouse_left_canvas) return;
 	repaint_perim_real(RGB_2_INT(255, 255, 255), 0, 0, ctx);
-	if (tool_type == TOOL_CLONE)
+	if (perim_status == TOOL_CLONE + 1)
 		repaint_perim_real(RGB_2_INT(255, 0, 0), perim_cx, perim_cy, ctx);
-	perim_status = 1; /* Drawn */
+}
+
+static void move_perim(int x, int y)
+{
+	perim_info p = perim_state;
+
+	perim_status = 0; /* Clear */
+	perim_wx = x; /* Remember */
+	perim_wy = y;
+	if ((tool_size * can_zoom > 4) && !NO_PERIM(tool_type) && !mouse_left_canvas)
+	{
+		perim_x = x - (tool_size >> 1);
+		perim_y = y - (tool_size >> 1);
+		perim_s = tool_size;
+		perim_cx = clone_dx;
+		perim_cy = clone_dy;
+		perim_status = tool_type + 1; /* Draw */
+	}
+	if (p.mode) clear_perim(&p);
+	if (perim_status) repaint_perim(NULL);
 }
 
 static void configure_canvas()
@@ -3208,7 +3262,7 @@ void change_to_tool(int icon)
 	/* Make sure tool release actions are done */
 	tool_done();
 
-	if (perim_status) clear_perim();
+	if (perim_status) clear_perim(&perim_state);
 	i = tool_type;
 	tool_type = t;
 
@@ -3255,7 +3309,7 @@ void change_to_tool(int icon)
 		else repaint_grad(NULL);
 	}
 	update_stuff(update);
-	if (!(update & CF_DRAW)) repaint_perim(NULL);
+	move_perim(perim_wx, perim_wy); // New perimeter in old location
 }
 
 static void pressed_view_hori(int state)
@@ -3560,21 +3614,81 @@ static void do_script(int what)
 	cmd_run_script(where, script_cmds);
 }
 
+/* Script mode color picker */
+static int pick_pixel(multi_ext *mx, void **where, int ab)
+{
+	int area[4], *row = mx->rows[0] + 1;
+
+	/* Sanity check */
+	if ((mx->mincols < 2) || (mx->fractcol >= 0) || (mx->nrows > 2))
+		return (0);
+
+	/* 2 corners */
+	if ((mx->nrows == 2) && (mx->ncols == 2))
+	{
+		area[0] = row[0];
+		area[1] = row[1];
+		row = mx->rows[1] + 1;
+		area[2] = row[0] + 1;
+		area[3] = row[1] + 1;
+	}
+	/* 1 point */
+	else if (mx->ncols == 2)
+	{
+		area[2] = (area[0] = row[0]) + 1;
+		area[3] = (area[1] = row[1]) + 1;
+	}
+	/* Area with size */
+	else if (mx->ncols == 4)
+	{
+		area[2] = (area[0] = row[0]) + row[2];
+		area[3] = (area[1] = row[1]) + row[3];
+	}
+	/* Error */
+	else return (0);
+
+	/* Drop previous regular value */
+	cmd_set(origin_slot(where), -1);
+
+	if (clip(area, 0, 0, mem_width, mem_height, area))
+	{
+		int sz = (area[2] -= area[0]) | (area[3] -= area[1]);
+		pick_color(area[0], area[1], ab, sz != 1 ? area : NULL, -1);
+	}
+	return (1);
+}
+
 typedef struct {
-	int n;
+	int n, mode;
 } idx_dd;
 
+static int idx_multi_evt(idx_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	/* A/B mode */
+	if (dt->mode < 0x100) return (pick_pixel(mx, where, dt->mode));
+	/* Unmask/mask mode */
+	if ((mx->fractcol >= 0) || (mx->nrows > 1)) return (0);  // Error
+	cmd_set(origin_slot(where), 256); // Drop previous regular value
+	mem_mask_setv(mx->rows[0] + 1, mx->rows[0][0], dt->mode - 0x100);
+	return (1);
+}
+
 #define WBbase idx_dd
-static void *idx_code[] = { TOPVBOX, SPIN(n, -1, 256), WSHOW };
+static void *idx_code[] = {
+	TOPVBOX, SPIN(n, -1, 256), EVENT(MULTI, idx_multi_evt), WSHOW
+};
 #undef WBbase
 
-static int script_idx()
+static int script_idx(int mode)
 {
-	static idx_dd tdata = { -1 };
+	idx_dd tdata;
 	void **res;
 	int n;
 
 	if (!script_cmds) return (-1);
+	tdata.n = -1;
+	tdata.mode = mode;
 	res = run_create_(idx_code, &tdata, sizeof(tdata), script_cmds);
 	run_query(res);
 	n = ((idx_dd *)GET_DDATA(res))->n;
@@ -3586,11 +3700,17 @@ typedef struct {
 	int a, b;
 } ab_dd;
 
+static int ab_pick_pixel(ab_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	return (pick_pixel(mx, where, cmd_read(where, dt) == &dt->b));
+}
+
 #define WBbase ab_dd
 static void *ab_code[] = {
 	TOPVBOX,
-	SPIN(a, -1, 256), ALTNAME("a"),
-	SPIN(b, -1, 256), OPNAME("b"),
+	SPIN(a, -1, 256), ALTNAME("a"), EVENT(MULTI, ab_pick_pixel),
+	SPIN(b, -1, 256), OPNAME("b"), EVENT(MULTI, ab_pick_pixel),
 	WSHOW
 };
 #undef WBbase
@@ -3696,7 +3816,8 @@ static int make_select(rect_dd *dt, void **wdata, int what, void **where,
 	dt->mx = NULL;
 
 	/* Sanity check */
-	if ((mx->ncols != 2) || (mx->mincols != 2) || (mx->fractcol >= 0))
+	if ((mx->mincols < 2) || (mx->fractcol >= 0)) return (0);
+	if ((mx->ncols != 2) && ((mx->nrows != 1) || (mx->ncols != 4)))
 		return (0);
 
 	/* Point/rectangle selection */
@@ -3708,6 +3829,11 @@ static int make_select(rect_dd *dt, void **wdata, int what, void **where,
 		if (mx->nrows > 1) row = mx->rows[1] + 1;
 		dt->rxy[2] = row[0];
 		dt->rxy[3] = row[1];
+		if (mx->ncols > 2)
+		{
+			dt->rxy[2] += row[2] - 1;
+			dt->rxy[3] += row[3] - 1;
+		}
 		cmd_reset(dt->group, dt); // Update widgets
 		return (1);
 	}
@@ -3809,7 +3935,7 @@ static int do_paste(paste_dd *dt, void **wdata, int what, void **where,
 static void *paste_code[] = {
 	TOPVBOX,
 	OPT(paste_align, 5, align), EVENT(SCRIPT, align_evt),
-		ALTNAME("align"), FLATTEN, EVENT(MULTI, do_paste),
+		ALTNAME("Align"), FLATTEN, EVENT(MULTI, do_paste),
 	CHECK("swap", swap), EVENT(CHANGE, align_evt),
 	SPIN(x, -MAX_WIDTH, MAX_WIDTH), OPNAME("x0"),
 	SPIN(y, -MAX_HEIGHT, MAX_HEIGHT), OPNAME("y0"),
@@ -4038,8 +4164,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_A:
 	case ACT_B:
 		action = action == ACT_B;
-		dir = script_idx();
-		if (mem_channel == CHN_IMAGE)
+		dir = script_idx(action);
+		if (dir < 0); // Nothing to do
+		else if (mem_channel == CHN_IMAGE)
 		{
 			mode = mode ? mode + mem_col_[action] : dir;
 			if ((mode >= 0) && (mode < mem_cols))
@@ -4142,7 +4269,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_PAL_DEF:
 		pressed_default_pal(); break;
 	case ACT_PAL_MASK:
-		mem_mask_set(script_idx(), mode);
+		mem_mask_setv(NULL, script_idx(mode + 0x100), mode);
 		update_stuff(UPD_CMASK);
 		break;
 	case ACT_DITHER_A:

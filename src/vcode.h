@@ -160,6 +160,7 @@ enum {
 	op_uRPACK,
 	op_uRPACKD,
 	op_uENTRY,
+	op_uPATHSTR,
 	op_uCOLOR,
 	op_uLISTCC,
 	op_uLISTC,
@@ -371,7 +372,7 @@ typedef struct {
 //	Structure which is supplied to WINDOW_TEXTENG
 typedef struct {
 	char *text, *font;
-	int angle, dpi;
+	int angle, dpi, align;
 	rgbcontext ctx;
 } texteng_dd;
 
@@ -412,6 +413,7 @@ typedef int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where,
 int texteng_aa;  /* Antialias */
 int texteng_rot; /* Rotate */
 int texteng_dpi; /* Set DPI */
+int texteng_lf;  /* Handle newlines */
 int texteng_con; /* Work in console mode */
 
 //	Build a dialog window out of V-code decription
@@ -704,6 +706,7 @@ enum {
 #define MLABELc(NM) WBh_(LABEL, 2), (NM), WBppa(0, 0, 5)
 #define MLABELxr(NM,PX,PY,AX) WBrh_(LABEL, 2), (NM), WBppa(PX, PY, AX)
 #define MLABELcp(V) WBhnf_(LABEL, 2), WBfield(V), WBppa(0, 0, 5)
+#define MLABELpx(V,PX,PY,AX) WBhnf_(LABEL, 2), WBfield(V), WBppa(PX, PY, AX)
 #define WLABELp(V) WBhnf_x(WLABEL, 2), WBfield(V), WBppa(0, 0, 5)
 #define XLABELcr(NM) WBrh_x(LABEL, 2), (NM), WBppa(0, 0, 5)
 #define TLABEL(NM) WBh_t1(LABEL, 1), (NM)
@@ -818,12 +821,15 @@ enum {
 #define RPACKDve(SP,H,V,HS) WBr2h_x(RPACKD, 3 + 2), &(V), WBfield(SP), \
 	(H), EVENT(SELECT, HS)
 #define OPT(SS,N,V) WBrhf_(OPT, 3), WBfield(V), (SS), (void *)(N)
+#define OPTv(SS,N,V) WBrh_(OPT, 3), &(V), (SS), (void *)(N)
 #define TOPTv(NM,SS,N,V) WBrh_t1(OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
 #define TLOPT(SS,N,V,X,Y) WBrhf_t(OPT, 4), WBfield(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 #define OPTD(SP,V) WBrhf_(OPTD, 2), WBfield(V), WBfield(SP)
 #define TOPTDv(NM,SP,V) WBrh_t1(OPTD, 2), &(V), WBfield(SP), TLABEL(NM)
 /* !!! These blocks each hold 1 nested EVENT block */
+#define OPTve(SS,N,V,HS) WBr2h_(OPT, 3 + 2), &(V), (SS), (void *)(N), \
+	EVENT(SELECT, HS)
 #define XOPTe(SS,N,V,HS) WBr2hf_x(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
 #define TLOPTle(SS,N,V,HS,X,Y,L) WBr2hf_t(OPT, 4 + 2), WBfield(V), (SS), \
@@ -860,6 +866,7 @@ enum {
 #define PATH(NM,T,M,V) FRAME(NM), WBrhf_(PATH, 3), WBfield(V), (T), (void *)(M)
 #define PATHv(NM,T,M,V) FRAME(NM), WBrh_(PATH, 3), (V), (T), (void *)(M)
 #define PATHs(NM,T,M,V) FRAME(NM), WBrh_(PATHs, 3), (V), (T), (void *)(M)
+#define uPATHSTR(V) WBrhf_(uPATHSTR, 1), WBfield(V)
 #define TEXT(V) WBrhf_x(TEXT, 1), WBfield(V)
 #define COMBOENTRY(V,SP,H) WBr2hf_x(COMBOENTRY, 2 + 2), WBfield(V), \
 	WBfield(SP), EVENT(OK, H)

@@ -9,7 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
 	* New keyboard shortcut Ctrl+H added for Channels->Hide image
-	* Text tools now allow selection of DPI value
+	* Text tools now allow selection of DPI value, and alignment for multiline text
 	* Composite images now can have alpha transparency, when background is non-opaque
 	* Background layer now can use transparency like any other layer
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
@@ -25,6 +25,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* XPM files with 65-92 colours are now saved with smaller size
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
 	* TIFF compression made configurable
+	* Dimensions can now be specified when loading SVG files
+	* SVG files now can be loaded through 'rsvg-convert', in absence of GTK+2 librsvg plugin
 	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled
@@ -33,6 +35,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Dock area state is now remembered across sessions (unless opened automatically, for multiple files on command line)
 	* Alpha values for colours A & B are now displayed on settings toolbar when editing image with alpha in coupled alpha mode
 	* Undo system now uses a bit less memory
+	* Initial undo memory size is now 1/4 of available memory
 	* Support for compiling with giflib 5, libpng 1.6, libjpeg 9, OpenJPEG 2 added
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
@@ -46,6 +49,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Flood fill with shapeburst gradient now works again
 	* BUGFIX - Saving LSS16 images no longer produces broken files in certain rare cases
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale (except if written as grayscale - ImageMagick does that)
+	* BUGFIX - SVG files starting with "<!DOCTYPE" no longer fail to load
 	* BUGFIX - Animation cycling now doesn't skip over the last frame of a GIF loaded into layers
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
 	* BUGFIX - Animation cycles are now properly updated when layers are reordered, duplicated or deleted

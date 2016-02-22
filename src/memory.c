@@ -1979,7 +1979,7 @@ void mem_init()					// Initialise memory
 		memory_errors(1);
 		exit(0);
 	}
-	mem_mask_set(-1, FALSE);
+	mem_mask_setv(NULL, -1, FALSE);
 
 	mem_col_A24.red = 255;
 	mem_col_A24.green = 255;
@@ -2201,11 +2201,19 @@ void mem_mask_init()		// Initialise RGB protection mask array
 	}
 }
 
-void mem_mask_set(int idx, int state)
+void mem_mask_setv(int *what, int n, int state)
 {
 	state = state ? 255 : 0;
-	if (idx < 0) memset(mem_prot_mask, state, 256);
-	else if (idx < mem_cols) mem_prot_mask[idx] = state;
+	if (what)
+	{
+		while (n-- > 0)
+		{
+			int i = *what++;
+			if ((i >= 0) && (i < mem_cols)) mem_prot_mask[i] = state;
+		}
+	}
+	else if (n < 0) memset(mem_prot_mask, state, 256);
+	else if (n < mem_cols) mem_prot_mask[n] = state;
 	mem_mask_init();
 }
 
@@ -4129,9 +4137,10 @@ void render_sb(unsigned char *mask)
 /* 
  * Level bitmaps are ordered from nearest to farthest, with cells interleaved
  * in the following order: Left-Y Right-Y Top-X Bottom-X.
+ * Pixel bitmap is packed by Y, not by X: byte[x, y / 8] |= 1 << (y % 8)
  */
 
-static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
+static int wjfloodfill(int x, int y, int col, unsigned char *bmap)
 {
 	short nearq[QMINSIZE * QMINSIZE * 2];
 	/* QMINSIZE bits per cell */
@@ -4154,7 +4163,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	memset(lmap, 0, lmax * sizeof(*lmap));
 
 	/* Start drawing */
-	if (bmap) bmap[y * lw + (x >> 3)] |= 1 << (x & 7);
+	if (bmap) bmap[(y >> 3) * mem_width + x] |= 1 << (y & 7);
 	else
 	{
 		put_pixel(x, y);
@@ -4246,8 +4255,8 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 				ty = coords[3];
 				if (bmap)
 				{
-					bidx = ty * lw + (tx >> 3);
-					bbit = 1 << (tx & 7);
+					bidx = (ty >> 3) * mem_width + tx;
+					bbit = 1 << (ty & 7);
 					if (bmap[bidx] & bbit) continue;
 				}
 				/* Sliding mode */
@@ -4333,50 +4342,43 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap, int lw)
 	return (TRUE);
 }
 
-/* Determine bitmap boundaries */
-static int bitmap_bounds(int *rect, unsigned char *pat, int lw)
+/* Determine Y-packed bitmap boundaries */
+static int bitmap_bounds(int *rect, unsigned char *pat)
 {
-	unsigned char buf[MAX_WIDTH / 8], *tmp;
-	int i, j, k, x0, x1, y0, y1, w, h;
+	unsigned char u, c, buf[MAX_WIDTH];
+	int n, x, y, y0, y1, w = rect[2], h = (rect[3] + 7) >> 3;
 
-	/* Find top row */
-	k = lw * rect[3];
-	tmp = pat; i = k;
-	while (!*tmp++ && i--);
-	if (i <= 0) return (0); /* Nothing there */
-	y0 = y1 = (tmp - pat - 1) / lw;
 
-	/* Find bottom row */
-	for (j = y0 + 1; j < rect[3]; j++)
+	/* Scan */
+	memset(buf, 0, w);
+	for (y0 = y1 = y = 0; y < h; y++)
 	{
-		tmp = pat + j * lw; i = lw;
-		while (!*tmp++ && i--);
-		if (i > 0) y1 = j;
+		for (u = x = 0; x < w; x++)
+			u |= c = *pat++ , buf[x] |= c;
+		if (!u) continue;
+		y1 = (y << 8) + u;
+		if (!y0) y0 = y1;
 	}
-	y1++;
+	if (!y0) return (0); // Empty
 
-	/* Find left & right extents (8 pixels granular) */
-	memcpy(buf, tmp = pat + y0 * lw, lw); tmp += lw;
-	for (j = y0 + 1; j < y1; j++)
-	{
-		for (i = 0; i < lw; i++) buf[i] |= *tmp++;
-	}
-	for (x0 = 0; !buf[x0] && (x0 < lw); x0++);
-	for (x1 = lw - 1; !buf[x1] && (x1 > x0); x1--);
-	x0 *= 8; x1 = x1 * 8 + 8;
-	if (x1 > rect[2]) x1 = rect[2];
+	/* Analyze */
+	for (y = (y0 >> 8) * 8; !(y0 & 1); y++ , y0 >>= 1);
+	rect[1] += n = y;
+	for (y = (y1 >> 8) * 8 + 7; !(y1 & 0x80); y-- , y1 <<= 1);
+	rect[3] = y -= n - 1; // h
+	for (x = 0; !buf[x]; x++);
+	rect[0] += n = x;
+	for (x = w - 1; !buf[x]; x--);
+	rect[2] = x -= n - 1; // w
 
-	/* Set up boundaries */
-	rect[0] += x0; rect[1] += y0;
-	rect[2] = w = x1 - x0; rect[3] = h = y1 - y0;
-	return (w * h);
+	return (x * y);
 }
 
 /* Flood fill - may use temporary area (1 bit per pixel) */
 void flood_fill(int x, int y, unsigned int target)
 {
 	unsigned char *pat, *buf, *temp;
-	int i, j, k, l, sb, lw = (mem_width + 7) >> 3;
+	int i, j, l, sb;
 
 	/* Shapeburst mode */
 	sb = STROKE_GRADIENT;
@@ -4385,49 +4387,38 @@ void flood_fill(int x, int y, unsigned int target)
 	if (!sb && !mem_tool_pat && (tool_opacity == 255) && !flood_step &&
 		(!flood_img || (mem_channel == CHN_IMAGE)))
 	{
-		wjfloodfill(x, y, target, NULL, 0);
+		wjfloodfill(x, y, target, NULL);
 		return;
 	}
 
-	buf = calloc(1, mem_width + lw * mem_height);
+	buf = calloc((mem_height + 7 + 8) >> 3, mem_width);
 	if (!buf)
 	{
 		memory_errors(1);
 		return;
 	}
-	pat = temp = buf + mem_width;
-	while (wjfloodfill(x, y, target, pat, lw))
+	pat = buf + mem_width;
+	while (wjfloodfill(x, y, target, pat))
 	{
 		if (sb) /* Shapeburst - setup rendering backbuffer */
 		{
 			sb_rect[0] = sb_rect[1] = 0;
 			sb_rect[2] = mem_width;
 			sb_rect[3] = mem_height;
-			l = bitmap_bounds(sb_rect, pat, lw);
+			l = bitmap_bounds(sb_rect, pat);
 			if (!l) break; /* Nothing to draw */
 			if (!init_sb()) break; /* Not enough memory */
 		}
 
 		for (i = 0; i < mem_height; i++)
 		{
-			for (j = l = 0; j < mem_width; )
-			{
-				k = *temp++;
-				if (!k)
-				{
-					j += 8;
-					continue;
-				}
-				for (; k; k >>= 1)
-				{
-					if (k & 1) l = buf[j] = 255;
-					j++;
-				}
-				j = (j + 7) & ~(7);
-			}
-			if (!l) continue; // Avoid wasting time on empty rows
+			unsigned u, f = 1 << (i & 7);
+
+			temp = pat + (i >> 3) * mem_width;
+			for (u = j = 0; j < mem_width; j++)
+				u |= buf[j] = (0x10000 - (temp[j] & f)) >> 8;
+			if (!u) continue; // Avoid wasting time on empty rows
 			put_pixel_row(0, i, mem_width, buf);
-			memset(buf, 0, mem_width);
 		}
 
 		if (sb) render_sb(NULL); /* Finalize */

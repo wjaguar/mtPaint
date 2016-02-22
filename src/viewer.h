@@ -18,8 +18,10 @@
 */
 
 int font_aa, font_bk, font_r;
-int font_bkg, font_angle;
+int font_bkg, font_angle, font_align;
 int font_setdpi, font_dpi, sys_dpi;
+
+extern char *align_txt[];
 
 int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
 int vw_focus_on;

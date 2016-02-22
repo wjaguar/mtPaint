@@ -1,5 +1,5 @@
 /*	spawn.h
-	Copyright (C) 2007-2010 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -32,13 +32,16 @@ void pressed_file_configure();
 void pressed_file_action(int item);
 void init_factions();					// Initialize file action menu
 
+int get_tempname(char *buf, char *f, int type);		// Create tempfile for name
 void spawn_quit();	// Delete temp files
 
 // Default action codes
-#define DA_GIF_CREATE  0
-//#define DA_GIF_EXPLODE 1
-#define DA_GIF_PLAY    2
-#define DA_GIF_EDIT    3
+enum {
+	DA_GIF_CREATE = 0,
+	DA_GIF_PLAY,
+	DA_GIF_EDIT,
+	DA_SVG_CONVERT
+};
 
 //	Run some default action
 int run_def_action(int action, char *sname, char *dname, int delay);

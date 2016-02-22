@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -215,6 +215,23 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 
 int internal_clipboard(int which);
 
+// Clipboard pixmaps
+
+typedef struct {
+	int w, h, depth;
+	guint32 xid;
+	GdkPixmap *pm;
+} pixmap_info;
+
+#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+#define HAVE_PIXMAPS
+int export_pixmap(pixmap_info *p, int w, int h);
+void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt);
+#endif
+int import_pixmap(pixmap_info *p, guint32 *xid); // xid = NULL for a screenshot
+void drop_pixmap(pixmap_info *p);
+int pixmap_get_rows(pixmap_info *p, unsigned char *dest, int y, int cnt);
+
 // Image widget
 
 GtkWidget *xpm_image(XPM_TYPE xpm);
@@ -318,6 +335,10 @@ int parse_color(char *what);
 //	DPI value
 
 double window_dpi(GtkWidget *win);
+
+//	Memory size (Mb)
+
+unsigned sys_mem_size();
 
 // Filtering bogus xine-ui "keypresses" (Linux only)
 #ifdef WIN32
