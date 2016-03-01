@@ -497,7 +497,7 @@ int gui_save(char *filename, ls_settings *settings)
 	else
 	{
 		/* Commit paste if required */
-		if (paste_commit && (marq_status >= MARQUEE_PASTE))
+		if (!script_cmds && paste_commit && (marq_status >= MARQUEE_PASTE))
 		{
 			commit_paste(FALSE, NULL);
 			pen_down = 0;
@@ -3276,7 +3276,7 @@ void change_to_tool(int icon)
 	}
 	if ( marq_status != MARQUEE_NONE)
 	{
-		if (paste_commit && (marq_status >= MARQUEE_PASTE))
+		if (!script_cmds && paste_commit && (marq_status >= MARQUEE_PASTE))
 		{
 			commit_paste(FALSE, NULL);
 			pen_down = 0;
@@ -3517,14 +3517,19 @@ static void **command_slot(char *cmd)
 	return (slot);
 }
 
+#define MAX_NESTING 16 /* Defuse recursion bombs */
+
 int run_script(char **res)
 {
+	static int level;
 	void **slot;
 	char **cur, *str = NULL, *err = NULL;
 	int n;
 
+	level++;
 	if (!res || !res[0]) err = _("Empty string or broken quoting");
 	else if (res[0][0] != '-') err = _("Script must begin with a command");
+	else if (level > MAX_NESTING) err = _("Script nesting limit exceeded");
 	else
 	{
 		user_break = 0;
@@ -3564,46 +3569,255 @@ int run_script(char **res)
 		if (str) err = str = g_strdup_printf(__(str), cur[0]);
 		update_stuff(CF_NOW); // Do cumulative update
 	}
+	level--;
 	if (err) alert_box(_("Error"), err, NULL);
 	if (str) g_free(str);
 	return (!err ? 1 : str ? -1 : 0); // 1 = clean, -1 = buggy, 0 = wrong
 }
 
+#define SCRIPT_ITEMS 10
+#define SCRIPTS_MAX FACTION_ROWS_TOTAL
+#define MAXNAMELEN 2048
+
+#define SCRIPT1_NAME "# Resharpen image"
+#define SCRIPT1_CODE "# Resharpen image after rescaling\n" \
+	"-effect/unsharp r=1 am=0.4 -effect/unsharp r=30 am=0.1"
+
+static char *script_ini[2] = { "scriptName%d", "script%d" };
+
+static void launch_script(int n)
+{
+	char txt[64], **res;
+
+	sprintf(txt, script_ini[1], n);
+	res = wj_parse_argv(inifile_get(txt, ""));
+	run_script(res);
+	free(res);
+}
+
+static void update_script_menu()	// Populate menu
+{
+	int i, v, items = 0;
+	char txt[64], *nm, *sm, *ns = SCRIPT1_NAME, *ss = SCRIPT1_CODE;
+	void **slot;
+
+	/* Show valid slots in menu */
+	for (i = 1; i <= SCRIPT_ITEMS; i++)
+	{
+		sprintf(txt, script_ini[0], i);
+		nm = inifile_get(txt, ns);
+
+		sprintf(txt, script_ini[1], i);
+		sm = inifile_get(txt, ss);
+
+		slot = menu_slots[MENU_SCRIPT1 - 1 + i];
+
+		if ((v = nm && nm[0] && (nm[0] != '#') && sm && sm[0]))
+			cmd_setv(slot, nm, LABEL_VALUE);
+
+		cmd_showhide(slot, v); // Hide by default
+		cmd_sensitive(slot, v); // Make insensitive for shortcuts
+		items += v;
+		ns = ss = "";
+	}
+
+	/* Hide submenu if no valid slots */
+	cmd_showhide(menu_slots[MENU_SCRIPT_M], items);
+	cmd_showhide(menu_slots[MENU_SCRIPT], !items);
+}	
+
 typedef struct {
-	char *script;
+	char *rows[SCRIPTS_MAX][4];
+	char *script, *name;
+	void **list, **nm, **tx, **exec;
+	int nidx, idx, cnt, lock, changed;
 } script_dd;
 
-static void click_script_ok(script_dd *dt, void **wdata)
+static void update_text(script_dd *dt)
 {
-	char **res;
+	if (dt->changed)
+	{
+		char **rp = dt->rows[dt->idx];
+		cmd_read(dt->tx, dt);
+		if (rp[1] != rp[3]) free(rp[1]);
+		rp[1] = strdup(dt->script);
+		dt->changed = FALSE;
+	}
+}
+
+static void script_click(script_dd *dt, void **wdata, int what, void **where)
+{
+	char txt[64], **rp;
+	int i, idx[SCRIPTS_MAX];
+
+	if (what != op_EVT_CANCEL) update_text(dt);
+
+	if (origin_slot(where) == dt->exec) // Run script
+	{
+		char **res = wj_parse_argv(dt->rows[dt->idx][1]);
+		run_script(res);
+		free(res);
+		return;
+	}
 
 	cmd_showhide(wdata, FALSE);
-	run_query(wdata);
-	res = wj_parse_argv(dt->script);
-	if (run_script(res)) inifile_set("script1", dt->script);
-	free(res);
+	if (what != op_EVT_CANCEL) // Store scripts
+	{
+		cmd_peekv(dt->list, idx, sizeof(idx), LISTC_ORDER);
+		/* Copy out reordered strings */
+		for (i = 0; i < SCRIPTS_MAX; i++)
+		{
+			if (idx[i] == i) continue;
+			rp = dt->rows[i];
+			if (rp[0] == rp[2]) rp[0] = strdup(rp[0]);
+			if (rp[1] == rp[3]) rp[1] = strdup(rp[1]);
+		}
+		/* Store into inifile */
+		for (i = 0; i < SCRIPTS_MAX; i++)
+		{
+			rp = dt->rows[i];
+			sprintf(txt, script_ini[0], idx[i] + 1);
+			if (rp[0] != rp[2]) inifile_set(txt, rp[0]);
+			sprintf(txt, script_ini[1], idx[i] + 1);
+			if (rp[1] != rp[3]) inifile_set(txt, rp[1]);
+		}
+		/* Display in menu */
+		update_script_menu();
+	}
+
+	for (i = 0; i < SCRIPTS_MAX; i++) // Release string memory
+	{
+		rp = dt->rows[i];
+		if (rp[0] != rp[2]) free(rp[0]);
+		if (rp[1] != rp[3]) free(rp[1]);
+	}
+
 	run_destroy(wdata);
+}
+
+static void script_changed(script_dd *dt, void **wdata, int what, void **where)
+{
+	char **rp;
+
+	if (dt->lock) return;
+	if (origin_slot(where) == dt->tx) // Text entry
+	{
+		dt->changed = TRUE; // Read it later
+		return;
+	}
+
+	cmd_read(where, dt); // Name entry
+	rp = dt->rows[dt->idx];
+	if (rp[0] == rp[2]) rp[0] = malloc(MAXNAMELEN);
+	strncpy0(rp[0], dt->name, MAXNAMELEN);
+	cmd_setv(dt->list, (void *)dt->idx, LISTC_RESET_ROW);
+}
+
+static void script_select_row(script_dd *dt, void **wdata, int what, void **where)
+{
+	char **rp;
+
+	cmd_read(where, dt);
+
+	if (dt->nidx == dt->idx) return; // no change
+	dt->lock = TRUE;
+	
+	/* Update outgoing row */
+	update_text(dt);
+
+	/* Get fields from array for incoming row */
+	rp = dt->rows[dt->idx = dt->nidx];
+	cmd_setv(dt->nm, rp[0], ENTRY_VALUE);
+	cmd_setv(dt->tx, rp[1], TEXT_VALUE);
+
+	dt->lock = FALSE;
 }
 
 #define WBbase script_dd
 static void *script_code[] = {
 	WINDOWm(_("Script")),
-	DEFSIZE(400, 200),
+//	WXYWH("script", 400, 400),
+	DEFSIZE(400, 400),
 	HSEP,
-	XVBOXB, TEXT(script), WDONE,
+	XVBOXB,
+	BORDER(SCROLL, 0), BORDER(FRAME, 0), BORDER(ENTRY, 0),
+	VSPLIT,
+	XSCROLL(1, 1), // auto/auto; 1st page
+		WLIST,
+		PTXTCOLUMN(rows[0][0], WBsizeof(rows[0]), 200, 0),
+		REF(list), LISTCd(nidx, cnt, script_select_row), TRIGGER,
+	VBOXS, // 2nd page
+		FHBOXB(_("Action")),
+		REF(nm), XENTRY(name), EVENT(CHANGE, script_changed),
+		WDONE, // FHBOX
+		REF(tx), TEXT(script), EVENT(CHANGE, script_changed),
+	WDONE, // VBOX
+	WDONE, // VSPLIT
+	WDONE, // XVBOX
 	HSEP,
-	EQBOX, CANCELBTN(_("Cancel"), NULL),
-		BUTTON(_("OK"), click_script_ok), FOCUS,
+	EQBOX, CANCELBTN(_("Cancel"), script_click),
+		REF(exec), BUTTON(_("Execute"), script_click),
+		BUTTON(_("OK"), script_click), FOCUS,
 	WSHOW
 };
 #undef WBbase
 
 static void pressed_script()
 {
-	script_dd tdata = { inifile_get("script1",
-		"# Resharpen image after rescaling\n"
-		"-effect/unsharp r=1 am=0.4 -effect/unsharp r=30 am=0.1") };
+	script_dd tdata;
+	char txt[64], *ns = SCRIPT1_NAME, *ss = SCRIPT1_CODE;
+	int i;
+
+	memset(&tdata, 0, sizeof(tdata));
+	for (i = 0; i < SCRIPTS_MAX; i++)
+	{
+		sprintf(txt, script_ini[0], i + 1);
+		tdata.rows[i][0] = tdata.rows[i][2] = inifile_get(txt, ns);
+		sprintf(txt, script_ini[1], i + 1);
+		tdata.rows[i][1] = tdata.rows[i][3] = inifile_get(txt, ss);
+		ns = ss = "";
+	}
+
+	tdata.idx = 1;
+	tdata.cnt = SCRIPTS_MAX;
 	run_create(script_code, &tdata, sizeof(tdata));
+}
+
+typedef struct {
+	char *name;
+} name_dd;
+
+#define WBbase name_dd
+static void *name_code[] = {
+	TOPVBOX, uPATHSTR(name), WSHOW
+};
+#undef WBbase
+
+static void load_script()
+{
+	name_dd *dt, tdata = { NULL };
+	char *txt, *tx2 = NULL, **res = NULL;
+	void **wdata;
+
+	wdata = run_create_(name_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(wdata);
+	dt = GET_DDATA(wdata);
+	txt = slurp_file(dt->name, 0);
+	run_destroy(wdata);
+	if (!txt)
+	{
+		alert_box(_("Error"), _("Unable to load script"), NULL);
+		return;
+	}
+
+	/* Stepping through arguments is done within run_create_(), so here
+	 * script_cmds is done with and free for overloading - WJ */
+	if (!cmd_mode) tx2 = gtkuncpy(NULL, txt, 0); // Files are in system encoding
+	res = wj_parse_argv(tx2 ? tx2 : txt);
+	run_script(res);
+	free(res);
+	free(tx2);
+	free(txt);
 }
 
 static void do_script(int what)
@@ -4313,6 +4527,10 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		layer_press_centre(); break;
 	case ACT_SCRIPT:
 		do_script(mode); break;
+	case ACT_RUN_SCRIPT:
+		if (!mode) load_script();
+		else launch_script(mode);
+		break;
 	case DLG_BRCOSA:
 		pressed_brcosa(); break;
 	case DLG_CHOOSER:
@@ -4867,7 +5085,35 @@ static void *main_menu_code[] = {
 // !!! Maybe support indexed mode too, later
 	MENUITEMs(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
 		ACTMAP(NEED_24),
+	uMENUITEMs("//Script ...", ACTMOD(ACT_RUN_SCRIPT, 0)), // for scripting
+	REFv(menu_slots[MENU_SCRIPT]),
 	MENUITEM(_("//Script ..."), ACTMOD(DLG_SCRIPT, 0)),
+	REFv(menu_slots[MENU_SCRIPT_M]),
+	SUBMENU(_("//Scripts")),
+	MENUTEAR, ///
+	REFv(menu_slots[MENU_SCRIPT1]),
+	MENUITEMs("///1", ACTMOD(ACT_RUN_SCRIPT, 1)),
+	REFv(menu_slots[MENU_SCRIPT2]),
+	MENUITEMs("///2", ACTMOD(ACT_RUN_SCRIPT, 2)),
+	REFv(menu_slots[MENU_SCRIPT3]),
+	MENUITEMs("///3", ACTMOD(ACT_RUN_SCRIPT, 3)),
+	REFv(menu_slots[MENU_SCRIPT4]),
+	MENUITEMs("///4", ACTMOD(ACT_RUN_SCRIPT, 4)),
+	REFv(menu_slots[MENU_SCRIPT5]),
+	MENUITEMs("///5", ACTMOD(ACT_RUN_SCRIPT, 5)),
+	REFv(menu_slots[MENU_SCRIPT6]),
+	MENUITEMs("///6", ACTMOD(ACT_RUN_SCRIPT, 6)),
+	REFv(menu_slots[MENU_SCRIPT7]),
+	MENUITEMs("///7", ACTMOD(ACT_RUN_SCRIPT, 7)),
+	REFv(menu_slots[MENU_SCRIPT8]),
+	MENUITEMs("///8", ACTMOD(ACT_RUN_SCRIPT, 8)),
+	REFv(menu_slots[MENU_SCRIPT9]),
+	MENUITEMs("///9", ACTMOD(ACT_RUN_SCRIPT, 9)),
+	REFv(menu_slots[MENU_SCRIPT10]),
+	MENUITEMs("///10", ACTMOD(ACT_RUN_SCRIPT, 10)),
+	MENUSEP, ///
+	MENUITEM(_("///Configure"), ACTMOD(DLG_SCRIPT, 0)),
+	WDONE,
 	MENUSEP, //
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUT(i, C),
@@ -5234,6 +5480,7 @@ void main_init()
 
 	init_status_bar();
 	init_factions();				// Initialize file action menu
+	update_script_menu();
 
 	file_in_homedir(txt, ".clipboard", PATHBUF);
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);

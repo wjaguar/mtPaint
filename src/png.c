@@ -7511,7 +7511,7 @@ static void warn_miss(int miss, int total, int ftype)
 	char *txt = g_strdup_printf(
 		__("%d out of %d frames could not be saved as %s - saved as PNG instead"),
 		miss, total, file_formats[ftype].name);
-	alert_box(_("Warning"), txt, NULL);
+	alert_box(_("Warning"), txt, "", NULL); // Not an error
 	g_free(txt);
 }
 

@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 

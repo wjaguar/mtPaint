@@ -389,6 +389,8 @@ int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
+int mem_undo_fail;		// Undo space shortfall
+
 /// COLOR TRANSFORM
 
 typedef struct {
@@ -735,6 +737,7 @@ void *mem_try_malloc(size_t size);
 
 //// Drawing Primitives
 
+int sb_dist;				// Distance measure
 int sb_rect[4];				// Backbuffer placement
 int init_sb();				// Create shapeburst backbuffer
 void render_sb(unsigned char *mask);	// Render from shapeburst backbuffer

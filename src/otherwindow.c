@@ -264,7 +264,8 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 
 	if (!type)
 	{
-		if (check_for_changes() == 1) return;
+		if ((!script_cmds || !undo_load) &&
+			(check_for_changes() == 1)) return;
 
 		tdata.w = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH);
 		tdata.h = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT);
@@ -2448,15 +2449,16 @@ static void *grad_code[] = {
 	FRPACKe(_("Channel"), channames_, NUM_CHANNELS, 1, nchan, grad_evt),
 	TRIGGER,
 	/* Setup block */
-	TABLE(4, 3),
+	TABLE(4, 4),
 	REF(group), GROUPR,
 	TSPIN(_("Length"), len, 0, MAX_GRAD),
 	TSPIN(_("Repeat length"), rep, 0, MAX_GRAD),
 	TSPIN(_("Offset"), ofs, -MAX_GRAD, MAX_GRAD),
 	TLLABEL(_("Gradient type"), 2, 0), TLOPT(gtypes_txt, 6, type, 3, 0),
 	TLLABEL(_("Extension type"), 2, 1), TLOPT(rtypes_txt, 4, bound, 3, 1),
-	TLLABEL(_("Preview opacity"), 2, 2),
-		MINWIDTH(200), TLSPINSLIDE(opac, 0, 255, 3, 2), UNNAME,
+	TLLABEL(_("Distance type"), 2, 2), TLOPTv(dist_txt, 3, sb_dist, 3, 2),
+	TLABEL(_("Preview opacity")),
+		MINWIDTH(200), TLSPINSLIDExl(opac, 0, 255, 1, 3, 3), UNNAME,
 	WDONE,
 	/* Select page */
 	EQBOX,

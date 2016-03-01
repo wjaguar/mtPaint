@@ -114,6 +114,8 @@ int mem_undo_limit;		// Max MB memory allocation limit
 int mem_undo_common;		// Percent of undo space in common arena
 int mem_undo_opacity;		// Use previous image for opacity calculations?
 
+int mem_undo_fail;		// Undo space shortfall
+
 typedef struct {
 	unsigned int n, size, freecnt;
 	void *datastore, *freelist;
@@ -1462,27 +1464,27 @@ static size_t mem_undo_lsize()
 static int mem_undo_space(size_t mem_req)
 {
 	undo_stack *heap[MAX_LAYERS + 2], *wp, *hp;
-	size_t mem_r, mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
+	size_t mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
 	int i, l, l2, h, csz = mem_undo_common * layers_total;
 	
 	/* Layer mem limit including common area */
 	mem_lim = mem_max * (csz * 0.01 + 1) / (layers_total + 1);
 
 	/* Fail if hopeless */
-	if (mem_req > mem_lim) return (2);
+	if (mem_req > mem_lim) return (mem_req - mem_lim);
 
 	/* Layer mem limit exceeded - drop oldest */
-	mem_r = mem_req + mem_undo_size(&mem_image.undo_);
-	while (mem_r > mem_lim)
+	mem_req += mem_undo_size(&mem_image.undo_);
+	while (mem_req > mem_lim)
 	{
-		if (!mem_undo_done) return (1);
-		mem_r -= lose_oldest(&mem_image.undo_);
+		if (!mem_undo_done) return (mem_req - mem_lim);
+		mem_req -= lose_oldest(&mem_image.undo_);
 	}
 	/* All done if no common area */
 	if (!csz) return (0);
 
-	mem_r += mem_undo_lsize();
-	if (mem_r <= mem_max) return (0); // No need to trim other layers yet
+	mem_req += mem_undo_lsize();
+	if (mem_req <= mem_max) return (0); // No need to trim other layers yet
 	mem_lim -= mem_max * (mem_undo_common * 0.01); // Reserved space per layer
 
 	/* Build heap of undo stacks */
@@ -1516,8 +1518,8 @@ static int mem_undo_space(size_t mem_req)
 		{
 			size_t res = lose_oldest(wp);
 			wp->size -= res; // Maintain undo stack size
-			mem_r -= res;
-			if (mem_r <= mem_max) return (0);
+			mem_req -= res;
+			if (mem_req <= mem_max) return (0);
 			if (!(wp->done + wp->redo) || (wp->size <= mem_lim))
 				wp = heap[h--];
 			else if (wp->size >= mem_nx) continue;
@@ -1609,7 +1611,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 		if (cmask & CMASK_IMAGE) j += new_bpp - 1;
 		mem_req += (wh + 32) * j;
 // !!! Must be after update_undo() to get used memory right
-		if (mem_undo_space(mem_req)) return (2);
+		if ((mem_undo_fail = mem_undo_space(mem_req))) return (2);
 	}
 	if (mode & UC_GETMEM) return (0); // Enough memory was freed
 
@@ -3983,8 +3985,11 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv )
 
 /* Shapeburst engine */
 
+int sb_dist = DIST_L1;
 int sb_rect[4];
+static void *sb_mem;
 static unsigned short *sb_buf;
+static uint32_t *sb_buf2;
 
 static void put_pixel_sb(int x, int y)
 {
@@ -3998,7 +4003,8 @@ static void put_pixel_sb(int x, int y)
 	j = pixel_protected(x, y);
 	if (IS_INDEXED ? j : j == 255) return;
 
-	sb_buf[y1 * sb_rect[2] + x1] = 0xFFFF;
+	if (!sb_buf2) sb_buf[y1 * sb_rect[2] + x1] = 0xFFFF;
+	else sb_buf2[y1 * sb_rect[2] + x1] = 0xFFFF;
 }
 
 static void mask_select(unsigned char *mask, unsigned char *xsel, int l);
@@ -4037,7 +4043,11 @@ static void put_pixel_row_sb(int x, int y, int len, unsigned char *xsel)
 		}
 
 		for (i = 0; i < l; i++)
-			if (mask[i] < masked) sb_buf[sb_ofs + i] = 0xFFFF;
+		{
+			if (mask[i] >= masked) continue;
+			if (!sb_buf2) sb_buf[sb_ofs + i] = 0xFFFF;
+			else sb_buf2[sb_ofs + i] = 0xFFFF;
+		}
 
 		if (!(len -= l)) return;
 		sb_ofs += l;
@@ -4045,12 +4055,11 @@ static void put_pixel_row_sb(int x, int y, int len, unsigned char *xsel)
 	}
 }
 
-/* Distance transform of binary image map;
- * for now, uses hardcoded L1 distance metric */
-static int shapeburst(int w, int h, unsigned short *dmap)
+/* Distance transform of binary image map, using L1 or Linf distance metric */
+static int shapeburst()
 {
-	unsigned short *r0;
-	int i, j, k, l, dx, dy, maxd;
+	unsigned short *r0, *dmap = sb_buf;
+	int i, j, k, l, dx, dy, maxd = 0, w = sb_rect[2], h = sb_rect[3];
 
 
 	/* Calculate distance */
@@ -4067,7 +4076,13 @@ static int shapeburst(int w, int h, unsigned short *dmap)
 			/* Other pixels */
 			for (i = w - 1; i > 0; i-- , r0 += dx)
 			{
+				/* L1 */
 				k = *(r0 - dx); l = *(r0 - dy);
+				if (k > l) k = l;
+				if (*r0 > k) *r0 = k + 1;
+				if (sb_dist != DIST_LINF) continue;
+				/* Linf */
+				k = *(r0 - dy - dx); l = *(r0 - dy + dx);
 				if (k > l) k = l;
 				if (*r0 > k) *r0 = k + 1;
 			}
@@ -4077,15 +4092,121 @@ static int shapeburst(int w, int h, unsigned short *dmap)
 	}
 
 	/* Find largest */
-	maxd = 0; r0 = dmap;
+	r0 = dmap;
 	for (k = w * h; k; k-- , r0++) if (maxd < *r0) maxd = *r0;
 	return (maxd);
 }
 
+/* Meijster algorithm for squared Euclidean distance transform */
+
+typedef struct {
+	int x, e, v, w;
+} par_data;
+
+static void dist_pass1(int w, int h, uint32_t *dmap)
+{
+	uint32_t m, *r0;
+	int i, j, dy;
+
+
+	/* Calculate distance by column */
+	r0 = dmap; dy = w; /* Forward pass */
+	while (TRUE)
+	{
+		/* First row */
+		for (i = 0; i < w; i++) if (r0[i]) r0[i] = 1;
+		/* Other rows */
+		for (j = 1; j < h; j++)
+		{
+			r0 += dy;
+			for (i = 0; i < w; i++)
+			{
+				m = r0[i - dy];
+				if (r0[i] > m) r0[i] = m + 1;
+			}
+		}
+		if (dy < 0) return; /* Both passes done */
+		dy = -dy; /* Backward pass */
+	}
+}
+
+static int dist_pass2_e2(int w, int h, uint32_t *dmap, par_data *pb)
+{
+	par_data *pn;
+	int x, y, mx = 0;
+
+	for (y = 0; y < h; y++ , dmap += w)
+	{
+		/* Left border */
+		pn = pb;
+		pn->x = -1;
+		pn->e = pn->v = 0;
+		pn->w = 1; /* v + x^2 */
+		/* Find envelope */
+		for (x = 0; ; x++)
+		{
+			int k = 0, v2 = 0;
+
+			if (x < w) v2 = dmap[x] * dmap[x];
+			else if (x > w) break;
+
+			while (((x - pn->e) * (x - pn->e) + v2) < pn->w)
+				if (--pn - pb < 0) break;
+			if (pn - pb >= 0) /* Find intersection */
+			{
+				/* 1 + Sep(s[q], u) */
+				k = (x * x + v2 - pn->x * pn->x - pn->v) /
+					((x - pn->x) * 2) + 1;
+				if (k >= w) continue; // Not inside
+			}
+
+			/* Add a segment */
+			pn++;
+			pn->x = x;
+			pn->v = v2;
+			pn->e = k;
+			pn->w = (x - k) * (x - k) + v2;
+		}
+
+		/* Fill up squared distances */
+// !!! Also possible to run left to right, by using _next_ slot's "e"
+// (only then need one extra slot allocated, and set pn[1].e=w every time)
+// (but then, may loop to e, and only then check if this e >= w)
+		for (x = w - 1; x >= 0; x--)
+		{
+			int l = pn->v + (x - pn->x) * (x - pn->x);
+			if (mx < l) mx = l; // Finding the max
+			dmap[x] = l;
+			if (x == pn->e) pn--;
+		}
+	}
+
+	return (mx);
+}
+
+/* Euclidean (L2 metric) distance transform of binary image map */
+static int shapeburst_m()
+{
+	int maxd, w = sb_rect[2], h = sb_rect[3];
+
+	dist_pass1(w, h, sb_buf2);
+	maxd = dist_pass2_e2(w, h, sb_buf2, sb_mem);
+	return (ceil(sqrt(maxd)));
+}
+
 int init_sb()
 {
-	sb_buf = calloc(sb_rect[2] * sb_rect[3], sizeof(unsigned short));
-	if (!sb_buf)
+	int l = sb_rect[2] + 3, wh = sb_rect[2] * sb_rect[3];
+
+	if (sb_dist != DIST_L2) /* Use simple distance algorithm */
+		sb_mem = sb_buf = calloc(wh, sizeof(unsigned short));
+	/* Use squared Euclidean distance */
+	else if ((sb_mem = calloc(1, l * sizeof(par_data) + wh * sizeof(uint32_t))))
+	{
+		/* Pointer to uint32 array */
+		sb_buf2 = (void *)((par_data *)sb_mem + l);
+	}
+	if (!sb_mem)
 	{
 		memory_errors(1);
 		return (FALSE);
@@ -4101,10 +4222,10 @@ void render_sb(unsigned char *mask)
 	grad_info svgrad, *grad = gradient + mem_channel;
 	int i, maxd;
 
-	if (!sb_buf) return; /* Uninitialized */
+	if (!sb_mem) return; /* Uninitialized */
 	put_pixel = put_pixel_def;
 	put_pixel_row = put_pixel_row_def;
-	maxd = shapeburst(sb_rect[2], sb_rect[3], sb_buf);
+	maxd = sb_dist != DIST_L2 ? shapeburst() : shapeburst_m();
 	if (maxd) /* Have something to draw */
 	{
 		svgrad = *grad;
@@ -4118,8 +4239,8 @@ void render_sb(unsigned char *mask)
 
 		*grad = svgrad;
 	}
-	free(sb_buf);
-	sb_buf = NULL;
+	free(sb_mem);
+	sb_buf2 = sb_mem = sb_buf = NULL;
 }
 
 /*
@@ -8751,12 +8872,19 @@ void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask
 			if (grad->wmode != GRAD_MODE_BURST) dist = grad_path +
 				(x - grad_x0) * grad->xv + (y - grad_y0) * grad->yv;
 			/* Shapeburst gradient */
-			else
+			else if (!sb_buf2)
 			{
 				int n = sb_buf[(y - sb_rect[1]) * sb_rect[2] +
 					(x - sb_rect[0])] - 1;
 				if (n < 0) continue;
 				dist = n;
+			}
+			else
+			{
+				int n = sb_buf2[(y - sb_rect[1]) * sb_rect[2] +
+					(x - sb_rect[0])];
+				if (!n) continue;
+				dist = sqrt(n) - 1.0;
 			}
 		}
 		else

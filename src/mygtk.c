@@ -224,9 +224,10 @@ int alert_box(char *title, char *message, char *text1, ...)
 	va_list args;
 	char *txt;
 	void **dd;
-	int res;
+	int res, aok = FALSE;
 
-	if (text1)
+	// Empty string here means, "OK" is ok: no choice but no error
+	if (text1 && !(aok = !text1[0]))
 	{
 		tdata.cancel = text1;
 		va_start(args, text1);
@@ -254,6 +255,7 @@ int alert_box(char *title, char *message, char *text1, ...)
 		run_destroy(dd);
 	}
 
+	if (aok) res = 2;
 	if (res == 1) user_break = TRUE;
 	return (res);
 }
@@ -3381,7 +3383,7 @@ double window_dpi(GtkWidget *win)
 #if GTK2VERSION >= 4
 	{
 		GValue v;
-		memset(&v, 0, sizeof(&v));
+		memset(&v, 0, sizeof(v));
 		g_value_init(&v, G_TYPE_INT);
 		if (gdk_screen_get_setting(gdk_drawable_get_screen(win->window),
 			"gtk-xft-dpi", &v))

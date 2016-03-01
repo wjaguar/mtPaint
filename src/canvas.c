@@ -1122,8 +1122,12 @@ void pressed_lasso(int cut)
 
 void update_menus()			// Update edit/undo menu
 {
+	static int memwarn;
 	int i, j, statemap;
 
+	if (mem_undo_fail && !memwarn) memwarn = alert_box(_("Warning"),
+		_("You have not allocated enough memory in the Preferences window to undo this action."),
+		"", NULL); // Not an error
 	update_undo_bar();
 
 	statemap = mem_img_bpp == 3 ? NEED_24 | NEED_NOIDX : NEED_IDX;
@@ -1582,7 +1586,7 @@ loaded:
 	}
 
 	/* Whether we loaded something or failed to, old image is gone anyway */
-	register_file(real_fname);
+	if (!script_cmds) register_file(real_fname); // Ignore what scripts do
 	if (!mult) /* A single image */
 	{
 		/* To prevent 1st frame overwriting a multiframe file */
@@ -2090,8 +2094,9 @@ void file_selector_x(int action_type, void **xdata)
 	switch (action_type)
 	{
 	case FS_PNG_LOAD:
-		if ((layers_total ? check_layers_for_changes() :
-			check_for_changes()) == 1) return;
+		if ((!script_cmds || !undo_load) && ((layers_total ?
+			check_layers_for_changes() : check_for_changes()) == 1))
+			return;
 		tdata.title = _("Load Image File");
 		tdata.fpmode = FPICK_LOAD;
 		tdata.need_undo = TRUE;

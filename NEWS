@@ -10,6 +10,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
 	* New keyboard shortcut Ctrl+H added for Channels->Hide image
 	* Text tools now allow selection of DPI value, and alignment for multiline text
+	* Distance function for shapeburst gradients is now selectable : "Distance type"
 	* Composite images now can have alpha transparency, when background is non-opaque
 	* Background layer now can use transparency like any other layer
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer

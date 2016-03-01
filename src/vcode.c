@@ -1891,6 +1891,12 @@ static void trigger_things(void **wdata)
 				trigger_things(slot);
 			continue;
 		}
+		/* Prepare preset split widget */
+		if ((op == op_HVSPLIT) && WB_GETLEN(opf))
+		{
+			cmd_set(wdata, (int)GET_DESCV(wdata, 1));
+			continue;
+		}
 
 		if (op != op_TRIGGER) continue;
 		if (!WB_GETLEN(opf)) // Regular version
@@ -3382,7 +3388,8 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 	GtkCList *clist;
 	listc_data *ld = r[2];
 	void **pp = r[1];
-	int j, w, sm, kind, *cntv, *sort = &zero, **map = NULL;
+	int *cntv, *sort = &zero, **map = NULL;
+	int j, w, sm, kind, heads = 0;
 
 
 	cntv = (void *)(ddata + (int)pp[2]); // length var
@@ -3425,7 +3432,8 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 
 		hbox = gtk_hbox_new(FALSE, 0);
 		(!jw ? pack : jw == 1 ? xpack : pack_end)(hbox,
-			gtk_label_new(l > 3 ? _(cp[4]) : ""));
+			gtk_label_new((l > 3) && *(char *)cp[4] ? _(cp[4]) : ""));
+		heads += l > 3;
 		gtk_widget_show_all(hbox);
 		// !!! Must be before gtk_clist_column_title_passive()
 		gtk_clist_set_column_widget(clist, j, hbox);
@@ -3451,7 +3459,7 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 			GTK_SIGNAL_FUNC(listc_column_button), ld);
 	}
 
-	if (kind != op_LISTCu) gtk_clist_column_titles_show(clist);
+	if (sm || heads) gtk_clist_column_titles_show(clist); // Hide if useless
 	gtk_clist_set_selection_mode(clist, GTK_SELECTION_BROWSE);
 
 	if (kind == op_LISTCX)
@@ -5079,6 +5087,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				/* Trigger remembered events */
 				trigger_things(res);
 			}
+			/* Dialogs must be immune to pointer grabs */
+	// !!! Must do this while invisible, to avoid breaking own modal grab
+			if (op == op_WDIALOG) release_grab();
 			/* Display */
 			if (op != op_WEND) cmd_showhide(GET_WINDOW(res), TRUE);
 			/* Wait for input */
@@ -5086,7 +5097,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			{
 				*(void ***)v = NULL; // clear result slot
 				vdata->dv = v; // announce it
-				release_grab(); // must be immune to pointer grabs
 				while (!*(void ***)v) gtk_main_iteration();
 			}
 			/* Return anchor position */
@@ -5819,7 +5829,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			widget = gtk_entry_new();
 			if (lp > 1) gtk_entry_set_max_length(GTK_ENTRY(widget),
 				(int)pp[2]);
-			gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
+			if (*(char **)v)
+				gtk_entry_set_text(GTK_ENTRY(widget), *(char **)v);
 			if (op == op_MLENTRY) accept_ctrl_enter(widget);
 			// Replace transient buffer - it may get freed on return
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(widget));

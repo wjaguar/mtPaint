@@ -407,7 +407,8 @@ static void update_faction_menu()	// Populate menu
 			cm && cm[0] && (cm[0] != '#')))
 			cmd_setv(slot, nm, LABEL_VALUE);
 
-		cmd_showhide(slot, v);	/* Hide by default */
+		cmd_showhide(slot, v); // Hide by default
+		cmd_sensitive(slot, v); // Make insensitive for shortcuts
 		items += v;
 	}
 

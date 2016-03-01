@@ -612,6 +612,8 @@ enum {
 #define WBpbs(P,B,S) (void *)(((S) & 255) + ((B) << 8) + ((P) << 16))
 #define WBppa(PX,PY,AX) (void *)((PY) + ((PX) << 8) + (AX << 16))
 
+#define WBsizeof(V) sizeof(((WBbase *)NULL)->V)
+
 #define WEND WBh(WEND, 0)
 #define WSHOW WBh(WSHOW, 0)
 #define WDIALOG(V) WBhf(WDIALOG, 1), WBfield(V)
@@ -631,6 +633,7 @@ enum {
 #define TOPVBOXV WBrh(TOPVBOXV, 0)
 #define DOCK(K) WBrh_(DOCK, 1), (K)
 #define HVSPLIT WBrh_x(HVSPLIT, 0)
+#define VSPLIT WBrh_x(HVSPLIT, 1), (void *)2
 #define PAGE(NM) WBh(PAGE, 1), (NM)
 #define PAGEvp(NP) WBhn(PAGE, 1), &(NP)
 #define PAGEi(ICN,S) WBh(PAGEi, 2), (ICN), (void *)(S)
@@ -824,6 +827,8 @@ enum {
 #define OPTv(SS,N,V) WBrh_(OPT, 3), &(V), (SS), (void *)(N)
 #define TOPTv(NM,SS,N,V) WBrh_t1(OPT, 3), &(V), (SS), (void *)(N), TLABEL(NM)
 #define TLOPT(SS,N,V,X,Y) WBrhf_t(OPT, 4), WBfield(V), (SS), (void *)(N), \
+	WBxyl(X, Y, 1)
+#define TLOPTv(SS,N,V,X,Y) WBrh_t(OPT, 4), &(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 #define OPTD(SP,V) WBrhf_(OPTD, 2), WBfield(V), WBfield(SP)
 #define TOPTDv(NM,SP,V) WBrh_t1(OPTD, 2), &(V), WBfield(SP), TLABEL(NM)
@@ -1023,6 +1028,8 @@ enum {
 	(void *)((W) + ((J) << 16)), (NM)
 #define NTXTCOLUMND(NM,ST,F,W,J) WBrh(TXTCOLUMN, 4), (void *)offsetof(ST, F), \
 	NULL, (void *)((W) + ((J) << 16)), (NM)
+#define PTXTCOLUMN(V,S,W,J) WBrhf(TXTCOLUMN, 3), WBfield(V), (void *)(S), \
+	(void *)((W) + ((J) << 16) + (col_PTR << COL_LSHIFT))
 #define PTXTCOLUMNp(V,S,W,J) WBrhnf(TXTCOLUMN, 3), WBfield(V), (void *)(S), \
 	(void *)((W) + ((J) << 16) + (col_PTR << COL_LSHIFT))
 #define RTXTCOLUMND(ST,F,W,J) WBrh(TXTCOLUMN, 3), (void *)offsetof(ST, F), \
@@ -1091,6 +1098,9 @@ enum {
 
 //	Extra data of ENTRY and COMBOENTRY
 #define ENTRY_VALUE	0
+
+//	Extra data of TEXT
+#define TEXT_VALUE	0
 
 //	Extra data of WDATA itself
 // !!! Must not clash with toplevels' data
