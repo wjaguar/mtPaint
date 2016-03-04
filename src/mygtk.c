@@ -1464,7 +1464,7 @@ int internal_clipboard(int which)
 #ifdef HAVE_PIXMAPS
 
 /* Make code not compile if unthinkable happens */
-typedef char XID_Is_Not_32b[2 * (sizeof(Pixmap) == sizeof(guint32)) - 1];
+typedef char Mismatched_XID_type[2 * (sizeof(Pixmap) == sizeof(XID_type)) - 1];
 
 /* It's unclear who should free clipboard pixmaps and when, so I do the same
  * thing Qt does, destroying the next-to-last allocated pixmap each time a new
@@ -1505,7 +1505,7 @@ void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt)
 
 #endif
 
-int import_pixmap(pixmap_info *p, guint32 *xid)
+int import_pixmap(pixmap_info *p, XID_type *xid)
 {
 	if (xid) // Pixmap by ID
 	{

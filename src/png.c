@@ -6657,9 +6657,8 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 		free(buf);
 	}
 
-	/* !!! '(void *)' is there to make GCC 4 shut up - WJ */
-	*(guint32 *)(void *)&mf->m.buf = p.xid;
-	mf->top = sizeof(guint32);
+	*(XID_type *)mf->m.buf = p.xid;
+	mf->top = sizeof(XID_type);
 	return (0);
 }
 
@@ -6667,12 +6666,12 @@ static int save_pixmap(ls_settings *settings, memFILE *mf)
 #define save_pixmap(A,B) (-1)
 #endif
 
-static int load_pixmap(char *pixmap_id, ls_settings *settings)
+static int load_pixmap(ls_settings *settings, memFILE *mf)
 {
 	pixmap_info p;
 	int res = -1;
 
-	if (import_pixmap(&p, (void *)pixmap_id)) // id = NULL means a screenshot
+	if (import_pixmap(&p, mf ? (void *)mf->m.buf : NULL)) // !mf == screenshot
 	{
 		settings->width = p.w;
 		settings->height = p.h;
@@ -7041,19 +7040,10 @@ int save_mem_image(unsigned char **buf, int *len, ls_settings *settings)
 
 	memset(&mf, 0, sizeof(mf));
 	if ((settings->ftype & FTM_FTYPE) == FT_PIXMAP)
-	{
-		/* !!! Evil hack: we abuse memFILE struct, storing pixmap XID
-		 * in buffer pointer, and then copy it into passed-in buffer
-		 * pointer - WJ */
-		res = save_image_x(NULL, settings, &mf);
-		if (!res) *buf = mf.m.buf , *len = mf.top;
-		return (res);
-	}
-
-	if (!(file_formats[settings->ftype & FTM_FTYPE].flags & FF_WMEM))
+		mf.m.buf = malloc(sizeof(XID_type)); // Expect to know type here
+	else if (!(file_formats[settings->ftype & FTM_FTYPE].flags & FF_WMEM))
 		return (-1);
-
-	mf.m.buf = malloc(mf.m.size = 0x4000 - 64);
+	else mf.m.buf = malloc(mf.m.size = 0x4000 - 64);
 	/* Be silent when saving to memory */
 	settings->silent = TRUE;
 	res = save_image_x(NULL, settings, &mf);
@@ -7205,7 +7195,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	case FT_PPM:
 	case FT_PAM: res0 = load_pnm(file_name, &settings); break;
 	case FT_PMM: res0 = load_pmm(file_name, &settings, mf); break;
-	case FT_PIXMAP: res0 = load_pixmap(file_name, &settings); break;
+	case FT_PIXMAP: res0 = load_pixmap(&settings, mf); break;
 	case FT_SVG:
 #ifdef MAY_HANDLE_SVG
 		if (svg_check < 0) svg_check = svg_supported();
@@ -7370,12 +7360,8 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 {
 	memFILE mf;
 
-	if ((ftype & FTM_FTYPE) == FT_PIXMAP)
-		/* Special case: buf points to a pixmap ID */
-		return (load_image_x(buf, NULL, mode, ftype, 0, 0));
-
-	if (!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
-
+	if (((ftype & FTM_FTYPE) != FT_PIXMAP) /* Special case */ &&
+		!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
 	memset(&mf, 0, sizeof(mf));
 	mf.m.buf = buf; mf.top = mf.m.size = len;
 	return (load_image_x(NULL, &mf, mode, ftype, 0, 0));

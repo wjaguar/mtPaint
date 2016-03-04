@@ -388,8 +388,8 @@ static clipform_dd clip_formats[] = {
 	{ "image/x-MS-bmp", (void *)(FT_BMP) },
 #ifdef HAVE_PIXMAPS
 	/* These two don't make sense without X */
-	{ "PIXMAP", (void *)(FT_PIXMAP), 4, 32 },
-	{ "BITMAP", (void *)(FT_PIXMAP), 4, 32 },
+	{ "PIXMAP", (void *)(FT_PIXMAP), sizeof(XID_type), 32 },
+	{ "BITMAP", (void *)(FT_PIXMAP), sizeof(XID_type), 32 },
 	/* !!! BITMAP requests are handled same as PIXMAP - because it is only
 	 * done to appease buggy XPaint which requests both and crashes if
 	 * receiving only one - WJ */
@@ -447,15 +447,6 @@ static void clipboard_export_fn(main_dd *dt, void **wdata, int what, void **wher
 	res = save_mem_image(&buf, &len, &settings);
 	if (res) return; // No luck creating in-memory image
 
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-	/* !!! XID of pixmap gets returned in buffer pointer */
-	if ((type & FTM_FTYPE) == FT_PIXMAP)
-	{
-		pp[1] = (pp[0] = (void *)&buf) + len; 
-		cmd_setv(where, pp, COPY_DATA);
-		return;
-	}
-#endif
 	pp[1] = (pp[0] = buf) + len; 
 	cmd_setv(where, pp, COPY_DATA);
 	free(buf);

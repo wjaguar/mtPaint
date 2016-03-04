@@ -59,6 +59,7 @@ Keyboard shortcuts
   V                 View Window
   L                 Layers Window
 
+  Ctrl-H            Toggle Hide Image mode
   B                 Toggle Snap to Tile Grid mode
 
   X                 Swap Colours A & B
@@ -124,8 +125,10 @@ Mouse shortcuts
   Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window
 
   Ctrl+Left button     Choose colour A from under mouse pointer
+  Ctrl+Left button     Clone tool - Select source
   Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour in A (RGB images only)
   Ctrl+Right button    Choose colour B from under mouse pointer
+  Ctrl+Right button    Polygon tool - Delete last point / Delete nearest point
   Ctrl+Scroll Wheel    Scroll the main edit window left or right
 
   Ctrl+Double click    Set colour A or B to average colour under brush square or selection marquee (RGB only)

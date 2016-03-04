@@ -217,9 +217,11 @@ int internal_clipboard(int which);
 
 // Clipboard pixmaps
 
+typedef unsigned long XID_type;
+
 typedef struct {
 	int w, h, depth;
-	guint32 xid;
+	XID_type xid;
 	GdkPixmap *pm;
 } pixmap_info;
 
@@ -228,7 +230,7 @@ typedef struct {
 int export_pixmap(pixmap_info *p, int w, int h);
 void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt);
 #endif
-int import_pixmap(pixmap_info *p, guint32 *xid); // xid = NULL for a screenshot
+int import_pixmap(pixmap_info *p, XID_type *xid); // xid = NULL for a screenshot
 void drop_pixmap(pixmap_info *p);
 int pixmap_get_rows(pixmap_info *p, unsigned char *dest, int y, int cnt);
 
