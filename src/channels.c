@@ -1,5 +1,5 @@
 /*	channels.c
-	Copyright (C) 2006-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -242,7 +242,7 @@ dofail:
 static void *cchan_code[] = {
 	WINDOWm(_("Create Channel")),
 	FRPACK(_("Channel Type"), channames_ + CHN_ALPHA,
-		NUM_CHANNELS - CHN_ALPHA, 1, chan),
+		NUM_CHANNELS - CHN_ALPHA, 1, chan), ALTNAME(""),
 	IF(sens), INSENS,
 	FVBOXB(_("Initial Channel State")),
 	BORDER(RPACK, 0),

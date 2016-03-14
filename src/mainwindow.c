@@ -83,7 +83,6 @@ static inilist ini_bool[] = {
 	{ "tgaDefdir",		&tga_defdir,		FALSE },
 	{ "disableTransparency", &opaque_view,		FALSE },
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
-	{ "undoableLoad",	&undo_load,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
 	{ "showTileGrid",	&show_tile_grid,	FALSE },
 	{ "applyICC",		&apply_icc,		FALSE },
@@ -107,6 +106,7 @@ static inilist ini_bool[] = {
 	{ "autopreviewToggle",	&brcosa_auto,		TRUE  },
 	{ "colorGrid",		&color_grid,		TRUE  },
 	{ "defaultGamma",	&use_gamma,		TRUE  },
+	{ "undoableLoad",	&undo_load,		TRUE  },
 	{ "tiffPredictor",	&tiff_predictor,	TRUE  },
 #if STATUS_ITEMS != 5
 #error Wrong number of "status?Toggle" inifile items defined
@@ -596,14 +596,6 @@ void pressed_opacity(int opacity)
 	if (IS_INDEXED) opacity = 255;
 	tool_opacity = opacity < 1 ? 1 : opacity > 255 ? 255 : opacity;
 	update_stuff(UPD_OPAC);
-}
-
-void pressed_value(int value)
-{
-	if (mem_channel == CHN_IMAGE) return;
-	channel_col_A[mem_channel] =
-		value < 0 ? 0 : value > 255 ? 255 : value;
-	update_stuff(UPD_CAB);
 }
 
 static void toggle_view()

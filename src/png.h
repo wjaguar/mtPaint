@@ -126,6 +126,8 @@ typedef struct {
 
 extern tiff_format tiff_formats[];
 
+int tiff_lzma; /* LZMA2 compression supported */
+
 /* All-in-one transport container for save/load */
 typedef struct {
 	/* Configuration data */

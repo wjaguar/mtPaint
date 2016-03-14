@@ -4759,8 +4759,9 @@ static int in_script(int op, char **script)
 		int uop = cmds[op] ? cmds[op]->uop : 0;
 		op = uop > 0 ? uop : uop < 0 ? op : r ? op_uOP : op_TRIGGER;
 	}
-	/* No need to connect event handlers in script mode */
-	else if ((op >= op_EVT_0) && (op <= op_EVT_LAST)) op = op_TRIGGER;
+	/* No need to connect event handlers in script mode - except DESTROY */
+	else if ((op != op_EVT_DESTROY) &&
+		(op >= op_EVT_0) && (op <= op_EVT_LAST)) op = op_TRIGGER;
 	return (op);
 }
 

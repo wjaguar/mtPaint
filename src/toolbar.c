@@ -309,13 +309,13 @@ void blend_settings() /* Blend mode */
 static void **grad_view;
 
 typedef struct {
-	int size, flow, opac, chan;
+	int size, flow, opac, chan[NUM_CHANNELS];
 	unsigned char rgb[GP_WIDTH * GP_HEIGHT * 3];
 } settings_dd;
 
 static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **where)
 {
-	void *cause = cmd_read(where, dt);
+	int n, *cause = cmd_read(where, dt);
 
 	if (cause == &dt->size) tool_size = dt->size;
 	else if (cause == &dt->flow) tool_flow = dt->flow;
@@ -323,10 +323,15 @@ static void ts_spinslide_moved(settings_dd *dt, void **wdata, int what, void **w
 	{
 		if (dt->opac != tool_opacity) pressed_opacity(dt->opac);
 	}
-	else /* if (cause == &dt->chan) */
+	else /* Somewhere in dt->chan[] */
 	{
-		if (dt->chan != channel_col_A[mem_channel])
-			pressed_value(dt->chan);
+		n = cause - dt->chan;
+		if (n == CHN_IMAGE) n = mem_channel;
+		if ((n != CHN_IMAGE) && (*cause != channel_col_A[n]))
+		{
+			channel_col_A[n] = *cause;
+			update_stuff(UPD_CAB);
+		}
 	}
 }
 
@@ -405,9 +410,15 @@ static void *settings_code[] = {
 	TLABEL(_("Opacity")),
 	REFv(ts_spinslides[2]), TLSPINSLIDEx(opac, 0, 255, 1, 2),
 	EVENT(CHANGE, ts_spinslide_moved),
+	uSPIN(chan[CHN_ALPHA], 0, 255), EVENT(SCRIPT, ts_spinslide_moved),
+	OPNAME("Alpha"),
+	uSPIN(chan[CHN_SEL], 0, 255), EVENT(SCRIPT, ts_spinslide_moved),
+	OPNAME("Selection"),
+	uSPIN(chan[CHN_MASK], 0, 255), EVENT(SCRIPT, ts_spinslide_moved),
+	OPNAME("Mask"),
 	REFv(ts_label_channel), TLABELr(""), HIDDEN,
-	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan, 0, 255, 1, 3), HIDDEN,
-	EVENT(CHANGE, ts_spinslide_moved), ALTNAME("Value"),
+	REFv(ts_spinslides[3]), TLSPINSLIDEx(chan[CHN_IMAGE], 0, 255, 1, 3),
+	EVENT(CHANGE, ts_spinslide_moved), HIDDEN, ALTNAME("Value"),
 	WEND
 };
 #undef WBbase

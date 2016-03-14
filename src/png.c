@@ -106,7 +106,8 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
-#define TIFFLAGS (FF_BW | FF_256 | FF_RGB | FF_ALPHA | FF_LAYER | FF_COMPT)
+#define TIFF0FLAGS (FF_LAYER | FF_COMPT)
+#define TIFFLAGS (FF_BW | FF_256 | FF_RGB | FF_ALPHA | TIFF0FLAGS)
 	{ "TIFF", "tif", "tiff", TIFFLAGS },
 #else
 	{ "", "", "", 0},
@@ -2767,8 +2768,8 @@ static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
 tiff_format tiff_formats[TIFF_MAX_TYPES] = {
 	{ _("None"),	COMPRESSION_NONE, TIFFLAGS },
 #ifdef CCITT_SUPPORT
-	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | FF_LAYER | FF_COMPT },
-	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | FF_LAYER | FF_COMPT },
+	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | TIFF0FLAGS },
+	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | TIFF0FLAGS },
 #endif
 #ifdef PACKBITS_SUPPORT
 	{ "PackBits",	COMPRESSION_PACKBITS, TIFFLAGS },
@@ -2783,10 +2784,16 @@ tiff_format tiff_formats[TIFF_MAX_TYPES] = {
 	{ "LZMA2",	COMPRESSION_LZMA, TIFFLAGS | FF_COMPLZ, 1 },
 #endif
 #ifdef JPEG_SUPPORT
-	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | FF_LAYER | FF_COMPJ | FF_COMPT },
+	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | FF_COMPJ | TIFF0FLAGS },
 #endif
 	{ NULL }
 };
+
+#ifdef LZMA_SUPPORT
+int tiff_lzma = TRUE;
+#else
+int tiff_lzma; /* FALSE */
+#endif
 
 static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 {

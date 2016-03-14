@@ -87,6 +87,12 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 {
 	char *p, oldpal[PATHBUF], oldpat[PATHBUF];
 
+	if (what == op_EVT_DESTROY) // Finalize
+	{
+		cmd_sensitive(menu_slots[MENU_PREFS], TRUE);
+		return;
+	}
+
 	if (what != op_EVT_CANCEL) // OK/Apply
 	{
 		// Preserve old values
@@ -116,11 +122,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 		mem_set_trans(dt->trans[0]);
 	}
 
-	if (what != op_EVT_CLICK) // OK/Cancel
-	{
-		run_destroy(wdata);
-		cmd_sensitive(menu_slots[MENU_PREFS], TRUE);
-	}
+	if (what != op_EVT_CLICK) run_destroy(wdata); // OK/Cancel
 }
 
 static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
@@ -142,6 +144,7 @@ static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
 #define WBbase pref_dd
 static void *pref_code[] = {
 	WINDOW(_("Preferences")), // nonmodal
+	EVENT(DESTROY, prefs_evt),
 	MKSHRINK, // shrinkable
 	BORDER(SCROLL, 0),
 	XSCROLL(1, 1), // auto/auto
@@ -230,7 +233,9 @@ static void *pref_code[] = {
 	TOPTDv(_("Compression (RGB)"), tiffrs, tiff_rtype),
 	TOPTDv(_("Compression (indexed)"), tiffis, tiff_itype),
 	TOPTDv(_("Compression (monochrome)"), tiffbs, tiff_btype),
+	IFvx(tiff_lzma, 1),
 	TSPINv(_("LZMA2 Compression (0=None)"), lzma_preset, 0, 9),
+	ENDIF(1),
 	WDONE,
 	CHECKv(_("Enable predictor"), tiff_predictor),
 	WDONE,
