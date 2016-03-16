@@ -2331,7 +2331,8 @@ void realign_size()		// Reapply old zoom
 }
 
 /* This tool is seamless: doesn't draw pixels twice if not requested to - WJ */
-static void rec_continuous(int nx, int ny, int w, int h)
+// !!! With GCC inlining this, weird size fluctuations can happen
+void rec_continuous(int nx, int ny, int w, int h)
 {
 	linedata line1, line2, line3, line4;
 	int ws2 = w >> 1, hs2 = h >> 1;
@@ -2344,7 +2345,8 @@ static void rec_continuous(int nx, int ny, int w, int h)
 
 	/* Redraw starting square only if need to fill in possible gap when
 	 * size changes, or to draw stroke gradient in the proper direction */
-	if (!tablet_working && !STROKE_GRADIENT && !script_cmds)
+	if (!tablet_working && !script_cmds &&
+		((tool_type == TOOL_CLONE) || !STROKE_GRADIENT))
 	{
 		i2 = tool_ox + dx[i + 1] + 1 - i * 2;
 		j2 = tool_oy + dy[j + 1] + 1 - j * 2;
@@ -2376,6 +2378,27 @@ static void rec_continuous(int nx, int ny, int w, int h)
 		line_init(line1, *xv, line3[1], *xv, line2[1]);
 		line_init(line4, nx + dx[i + 1], ny + dy[j],
 			nx + dx[i + 1], ny + dy[j + 1]);
+	}
+
+	/* Prevent overwriting clone source */
+	while (tool_type == TOOL_CLONE)
+	{
+		if ((j * 2 - 1) * clone_dy <= 0) break; // Ahead of dest
+		if (mem_undo_opacity && (mem_undo_previous(mem_channel) !=
+			mem_img[mem_channel])) break; // In another frame
+#if 0 /* No real reason to spend code on avoiding the flip */
+		i = abs(ny - tool_oy) + h - 1;
+		if ((clone_dy < -i) || (clone_dy > i)) break; // Out Y range
+		i = abs(nx - tool_ox) + w - 1;
+		if ((clone_dx < -i) || (clone_dx > i)) break; // Out X range
+#endif
+		line_flip(line1);
+		line_flip(line3);
+		if (tool_ox == nx) break; // Only 2 lines
+		line_flip(line2);
+		line_flip(line4);
+		draw_quad(line2, line1, line4, line3);
+		return;
 	}
 
 	draw_quad(line1, line2, line3, line4);
@@ -2548,7 +2571,7 @@ static int tool_draw(int x, int y, int first_point, int *update)
 
 	switch (tool_type)
 	{
-	case TOOL_SQUARE:
+	case TOOL_SQUARE: case TOOL_CLONE:
 		f_rectangle(x - ts2, y - ts2, tool_size, tool_size);
 		break;
 	case TOOL_CIRCLE:
@@ -2614,11 +2637,6 @@ static int tool_draw(int x, int y, int first_point, int *update)
 	case TOOL_SMUDGE:
 		if (first_point) return (FALSE);
 		mem_smudge(ox, oy, x, y);
-		break;
-	case TOOL_CLONE:
-		if (first_point || (ox != x) || (oy != y))
-			mem_clone(x + clone_dx, y + clone_dy, x, y);
-		else return (TRUE); /* May try again with other x & y */
 		break;
 	default: return (FALSE); /* Stop this nonsense now! */
 	}
@@ -2860,7 +2878,8 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 			yh = (tool_oy > y ? tool_oy : y) - miny + tool_size;
 			miny -= ts2;
 
-			if (ts2 ? tool_type == TOOL_SQUARE : tool_type < TOOL_SPRAY)
+			if ((tool_type == TOOL_CLONE) ||
+				(ts2 ? tool_type == TOOL_SQUARE : tool_type < TOOL_SPRAY))
 			{
 				rec_continuous(x, y, tool_size, tool_size);
 				break;

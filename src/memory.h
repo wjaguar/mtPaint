@@ -751,11 +751,7 @@ void mem_mask_colors(unsigned char *mask, unsigned char *img, unsigned char v,
 void mem_clip_mask_set(unsigned char val);		// Mask colours A and B on the clipboard
 void mem_clip_mask_clear();				// Clear the clipboard mask
 
-void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode);
-#define mem_smudge(A, B, C, D) do_clone((A), (B), (C), (D), tool_opacity / 2, \
-	smudge_mode && mem_undo_opacity)
-#define mem_clone(A, B, C, D) do_clone((A), (B), (C), (D), tool_opacity, \
-	mem_undo_opacity)
+void mem_smudge(int ox, int oy, int nx, int ny);
 
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,

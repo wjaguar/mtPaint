@@ -180,6 +180,8 @@ void init_clone()
 	if (clone_mode) // Aligned aka relative
 	{
 		clone_status = CLONE_REL;
+		clone_dx = clone_dx0;
+		clone_dy = clone_dy0;
 		if (!(clone_dx0 | clone_dy0)) // Both 0 for default values
 			clone_dx = -tool_size , clone_dy = tool_size;
 	}

@@ -4559,6 +4559,13 @@ void f_rectangle(int x, int y, int w, int h)	// Draw a filled rectangle
 	if (h > mem_height) h = mem_height;
 	w -= x;
 
+	/* !!! Test is oversimplified and is overkill, see rec_continuous() */
+	if ((tool_type == TOOL_CLONE) && (clone_dy < 0))
+	{
+		while (--h >= y) put_pixel_row(x, h, w, NULL);
+		return;
+	}
+
 	for (; y < h; y++) put_pixel_row(x, y, w, NULL);
 }
 
@@ -6709,7 +6716,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		tmp_alpha[ROW_BUFLEN], tmp_opacity[ROW_BUFLEN],
 		*source_alpha = NULL, *source_opacity = NULL;
 	unsigned char *old_image, *old_alpha, *srcp, src1[8];
-	int offset, use_mask, bpp, idx;
+	int offset, use_mask, bpp, idx, cx, cy, uninit_(d), s = ROW_BUFLEN;
 
 
 	if (len <= 0) return;
@@ -6719,15 +6726,27 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 	old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
 		mem_img[CHN_ALPHA];
 
-	offset = x + mem_width * y;
-
 	bpp = MEM_BPP; idx = IS_INDEXED;
 	use_mask = (mem_channel <= CHN_ALPHA) && mem_img[CHN_MASK] && !channel_dis[CHN_MASK];
 	if ((mem_channel == CHN_IMAGE) && RGBA_mode && mem_img[CHN_ALPHA])
 		source_alpha = tmp_alpha;
 
+	if (tool_type == TOOL_CLONE) /* Clone mode */
+	{
+		cy = y + clone_dy;
+		if ((cy < 0) || (cy >= mem_height)) return;
+		cx = x + clone_dx;
+		if (cx + len > mem_width) len = mem_width - cx;
+		if (cx < 0) len += cx , x -= cx;
+		if (len <= 0) return;
+		d = clone_dx + clone_dy * mem_width;
+		// Backward step in the rare case of unbufferable overlap
+		if (!clone_dy && (old_image == mem_img[mem_channel]) &&
+			(clone_dx < 0) && (clone_dx > -len) && (len > ROW_BUFLEN))
+			x += len - ROW_BUFLEN , s = -ROW_BUFLEN;
+	}
 // !!! This depends on buffer length being a multiple of pattern length
-	if (!mem_gradient) /* Default mode - init buffer(s) from pattern */
+	else if (!mem_gradient) /* Default mode - init buffer(s) from pattern */
 	{
 		int i, dy = 8 * (y & 7), l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
 
@@ -6748,6 +6767,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		pattern_rep(tmp_image, srcp, x & 7, 8, l, bpp);
 	}
 
+	offset = x + mem_width * y;
 	idx ^= 1; // 0 if indexed, now
 	while (TRUE)
 	{
@@ -6763,8 +6783,15 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 			xsel += l;
 		}
 
+		/* Clone mode */
+		if (tool_type == TOOL_CLONE)
+		{
+			memcpy(tmp_image, old_image + (offset + d) * bpp, l * bpp);
+			if (source_alpha)
+				memcpy(tmp_alpha, old_alpha + offset + d, l);
+		}
 		/* Gradient mode */
-		if (mem_gradient) grad_pixels(0, 1, l, x, y, mask,
+		else if (mem_gradient) grad_pixels(0, 1, l, x, y, mask,
 			source_opacity = tmp_opacity, tmp_image, source_alpha);
 		/* Buffers stay unchanged for default mode */
 
@@ -6777,9 +6804,9 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 			old_image + offset * bpp, tmp_image,
 			tmp_image, bpp, idx);
 
-		if (!(len -= l)) return;
-		x += l;
-		offset += l;
+		if ((len -= ROW_BUFLEN) <= 0) return;
+		x += s;
+		offset += s;
 	}
 }
 
@@ -8612,17 +8639,17 @@ int mem_scale_alpha(unsigned char *img, unsigned char *alpha,
 	return 0;
 }
 
-void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
+void mem_smudge(int ox, int oy, int nx, int ny)
 {
 	unsigned char mask[256], img[256 * 2 * 3], alf[256 * 2];
 	unsigned char *src, *dest, *srca = NULL, *dsta = NULL;
 	int ax, ay, bx, by, w, h;
 	int xv = nx - ox, yv = ny - oy;		// Vector
 	int i, j, delta, delta1, bpp;
-	int y0, y1, dy, opw, op2, cpf;
+	int y0, y1, dy, opw, op2, cpf, mode;
 
 
-	if (!opacity) return;
+	if (tool_opacity < 2) return;
 
 	/* Clip source and dest areas to image bounds */
 	ax = ox - tool_size / 2;
@@ -8643,9 +8670,8 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 
 	if ((w < 1) || (h < 1)) return;
 
-	if (IS_INDEXED) opacity = -1; // No mixing for indexed image
-
 /* !!! I modified this tool action somewhat - White Jaguar */
+	mode = smudge_mode && mem_undo_opacity;
 	if (mode) src = mem_undo_previous(mem_channel);
 	else src = mem_img[mem_channel];
 	dest = mem_img[mem_channel];
@@ -8694,14 +8720,7 @@ void do_clone(int ox, int oy, int nx, int ny, int opacity, int mode)
 		{
 			int k = mask[i], k0, k1, k2;
 
-			if (opacity < 0)
-			{
-				if (k) continue;
-				*td = *ts;
-				if (tda) tda[i] = tsa[i];
-				continue;
-			}
-			opw = (255 - k) * opacity;
+			opw = (255 - k) * (tool_opacity >> 1);
 			opw = (opw + (opw >> 8) + 1) >> 8;
 			if (!opw) continue;
 			if (tda)
