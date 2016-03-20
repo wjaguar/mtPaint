@@ -286,6 +286,9 @@ int main( int argc, char *argv[] )
 
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
 
+	/* Disable bug-ridden eyecandy module that breaks sizing */
+	putenv("LIBOVERLAY_SCROLLBAR=0");
+
 #if GTK2VERSION >= 4
 	/* Tablet handling in GTK+ 2.18+ is broken beyond repair if this mode
 	 * is set; so unset it, if g_unsetenv() is present */

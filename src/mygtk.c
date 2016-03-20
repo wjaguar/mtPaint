@@ -3416,10 +3416,12 @@ double window_dpi(GtkWidget *win)
 
 //	Memory size (Mb)
 
+#ifndef WIN32
 #ifndef _SC_PHYS_PAGES
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
+#endif
 #endif
 
 unsigned sys_mem_size()

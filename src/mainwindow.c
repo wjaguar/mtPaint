@@ -4362,7 +4362,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_B:
 		action = action == ACT_B;
 		dir = script_idx(action);
-		if (dir < 0); // Nothing to do
+		if (!mode && (dir < 0)); // Nothing to do
 		else if (mem_channel == CHN_IMAGE)
 		{
 			mode = mode ? mode + mem_col_[action] : dir;
