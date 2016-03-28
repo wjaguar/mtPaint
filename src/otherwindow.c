@@ -681,11 +681,12 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 
 	if (what != op_EVT_CANCEL) // OK/Apply
 	{
-		run_query(wdata);
 		// !!! Buttons disabled for default values
 		spot_undo(UNDO_COL);
 
-		brcosa_preview(dt, NULL); // This modifies palette
+		run_query(wdata); // This may modify palette if preview active
+
+		brcosa_preview(dt, NULL); // This definitely modifies it
 		while (mem_preview && (mem_img_bpp == 3)) // This modifies image
 		{
 			mask = malloc(mem_width);

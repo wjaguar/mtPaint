@@ -166,6 +166,7 @@ static void *pref_code[] = {
 	TSPINv(_("Communal layer undo space (%)"), mem_undo_common, 0, 100),
 	WDONE,
 	CHECKv(_("Use gamma correction by default"), use_gamma),
+	CHECKv(_("Use gamma correction when painting"), paint_gamma),
 	/* !!! Only processing is scriptable, interface is not */
 	UNLESSx(script, 1),
 	CHECKv(_("Optimize alpha chequers"), chequers_optimize),

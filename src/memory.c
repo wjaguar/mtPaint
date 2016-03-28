@@ -67,6 +67,8 @@ int mem_blend;
 int mem_unmask;
 int mem_gradient;
 
+int paint_gamma;
+
 /// BLEND MODE SETTINGS
 
 int blend_mode = BLEND_HUE;
@@ -2239,15 +2241,14 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char rgb[3], fmask;
 	int br, co, sa;
 	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
-	int opacity, op0 = 0, op1 = 0, op2 = 0, ops;
+	int opacity, ops = 0;
 	int j, mstep, r, g, b, ofs3;
 
 	cnt = start + step * cnt;
 
-	if (!mem_bcsp.allow[0]) op0 = 255;
-	if (!mem_bcsp.allow[1]) op1 = 255;
-	if (!mem_bcsp.allow[2]) op2 = 255;
-	ops = op0 | op1 | op2;
+	if (!mem_bcsp.allow[0]) ops |= 0xFF;
+	if (!mem_bcsp.allow[1]) ops |= 0xFF00;
+	if (!mem_bcsp.allow[2]) ops |= 0xFF0000;
 
 	br = mem_bcsp.bcsp[0] * 256;
 	co = mem_bcsp.bcsp[1];
@@ -2393,7 +2394,7 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		/* If we do saturation transform */
 		if (sa)
 		{
-			j = 0.299 * r + 0.587 * g + 0.114 * b;
+			j = (299 * r + 587 * g + 114 * b) / 1000;
 			r = r * 256 + (r - j) * sa;
 			r = r < 0 ? 0 : r > (255 * 256) ? 255 : r >> 8;
 			g = g * 256 + (g - j) * sa;
@@ -2409,14 +2410,35 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 			b = ps_table[b];
 		}
 		/* If we do partial masking */
-		if (ops | opacity)
+		if (!opacity);
+		else if (paint_gamma)
 		{
-			r = r * 255 + (img0[ofs3 + 0] - r) * (opacity | op0);
+			double rr, gg, bb, o = opacity / 255.0;
+
+			rr = gamma256[r];
+			rr += (gamma256[img0[ofs3 + 0]] - rr) * o;
+			gg = gamma256[g];
+			gg += (gamma256[img0[ofs3 + 1]] - gg) * o;
+			bb = gamma256[b];
+			bb += (gamma256[img0[ofs3 + 2]] - bb) * o;
+			r = UNGAMMA256(rr);
+			g = UNGAMMA256(gg);
+			b = UNGAMMA256(bb);
+		}
+		else
+		{
+			r = r * 255 + (img0[ofs3 + 0] - r) * opacity;
 			r = (r + (r >> 8) + 1) >> 8;
-			g = g * 255 + (img0[ofs3 + 1] - g) * (opacity | op1);
+			g = g * 255 + (img0[ofs3 + 1] - g) * opacity;
 			g = (g + (g >> 8) + 1) >> 8;
-			b = b * 255 + (img0[ofs3 + 2] - b) * (opacity | op2);
+			b = b * 255 + (img0[ofs3 + 2] - b) * opacity;
 			b = (b + (b >> 8) + 1) >> 8;
+		}
+		if (ops)
+		{
+			r ^= (r ^ img0[ofs3 + 0]) & ops;
+			g ^= (g ^ img0[ofs3 + 1]) & (ops >> 8);
+			b ^= (b ^ img0[ofs3 + 2]) & (ops >> 16);
 		}
 		imgr[ofs3 + 0] = r;
 		imgr[ofs3 + 1] = g;
@@ -3478,9 +3500,15 @@ double pal2B(png_color *c)
 /* Convert image to greyscale */
 void mem_greyscale(int gcor)
 {
-	unsigned char mask[MAX_WIDTH], *img = mem_img[CHN_IMAGE];
+	unsigned char *mask, *img = mem_img[CHN_IMAGE];
 	int i, j, k, v, ch;
 
+	mask = malloc(mem_width);
+	if (!mask)
+	{
+		memory_errors(1);
+		return;
+	}
 	if (mem_img_bpp == 1)
 	{
 		for (i = 0; i < 256; i++)
@@ -3491,9 +3519,9 @@ void mem_greyscale(int gcor)
 			}
 			else /* Usual braindead formula */
 			{
-				v = (int)rint(0.299 * mem_pal[i].red +
-					0.587 * mem_pal[i].green +
-					0.114 * mem_pal[i].blue);
+				v = (299 * mem_pal[i].red +
+					587 * mem_pal[i].green +
+					114 * mem_pal[i].blue + 500) / 1000;
 			}
 			mem_pal[i].red = v;
 			mem_pal[i].green = v;
@@ -3508,17 +3536,31 @@ void mem_greyscale(int gcor)
 		{
 			row_protected(0, i, mem_width, mask);
 			for (j = 0; j < mem_width; j++)
+			if (paint_gamma && mask[j] && (mask[j] != 255))
 			{
-				if (gcor) /* Gamma + H-K effect */
-				{
-					v = UNGAMMA256(rgb2B(gamma256[img[0]],
-						gamma256[img[1]], gamma256[img[2]]));
-				}
-				else /* Usual */
-				{
-					v = (int)rint(0.299 * img[0] +
-						0.587 * img[1] + 0.114 * img[2]);
-				}
+				double d, d0, d1, d2, m;
+				m = 1.0 - mask[j] / 255.0;
+				d0 = gamma256[img[0]];
+				d1 = gamma256[img[1]];
+				d2 = gamma256[img[2]];
+				/* Gamma + H-K effect / Usual */
+				d = gcor ? rgb2B(d0, d1, d2) :
+					gamma256[(299 * img[0] + 587 * img[1] +
+					114 * img[2] + 500) / 1000];
+				d0 += (d - d0) * m;
+				d1 += (d - d1) * m;
+				d2 += (d - d2) * m;
+				*img++ = UNGAMMA256(d0);
+				*img++ = UNGAMMA256(d1);
+				*img++ = UNGAMMA256(d2);
+			}
+			else
+			{
+				/* Gamma + H-K effect / Usual */
+				v = gcor ? UNGAMMA256(rgb2B(gamma256[img[0]],
+					gamma256[img[1]], gamma256[img[2]])) :
+					(299 * img[0] + 587 * img[1] +
+					114 * img[2] + 500) / 1000;
 				v *= 255 - mask[j];
 				k = *img * mask[j] + v;
 				*img++ = (k + (k >> 8) + 1) >> 8;
@@ -3530,6 +3572,7 @@ void mem_greyscale(int gcor)
 		}
 		mem_channel = ch;
 	}
+	free(mask);
 }
 
 /* Valid for x=0..5, which is enough here */
@@ -3652,8 +3695,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 		case 2: tab1[i] = rint(1024 * rgb_hsl(2, mem_pal[i]));
 			break;
 		/* Brightness */
-		case 3: tab1[i] = rint(1024 * rgb2B(gamma256[mem_pal[i].red],
-			gamma256[mem_pal[i].green], gamma256[mem_pal[i].blue]));
+		case 3: tab1[i] = rint(1024 * pal2B(mem_pal + i));
 			break;
 		/* Distance to A */
 		case 4: get_lxn(lxn, PNG_2_INT(mem_pal[i]));
@@ -6936,9 +6978,12 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	/* RGB image */
 	else
 	{
-		int rgbmask = mem_blend ? (blend_mode >> BLEND_RGBSHIFT) & 7 : 0;
+		int ops = mem_blend ? (blend_mode >> BLEND_RGBSHIFT) & 7 : 0;
 		unsigned char r, g, b, nrgb[3];
 		int i, j, ofs3, opacity;
+
+		/* Make mask */
+		ops = (ops + (ops >> 1) * 0xFE + (ops >> 2) * 0xFE00) * 0xFF;
 
 		for (i = start; i < cnt; i += step)
 		{
@@ -6970,7 +7015,22 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				}
 			}
 
-			if (opacity < 255)
+			if (opacity == 255);
+			else if (paint_gamma)
+			{
+				double r, g, b, o = opacity / 255.0;
+
+				r = gamma256[img0[ofs3 + 0]];
+				r += (gamma256[nrgb[0]] - r) * o;
+				g = gamma256[img0[ofs3 + 1]];
+				g += (gamma256[nrgb[1]] - g) * o;
+				b = gamma256[img0[ofs3 + 2]];
+				b += (gamma256[nrgb[2]] - b) * o;
+				nrgb[0] = UNGAMMA256(r);
+				nrgb[1] = UNGAMMA256(g);
+				nrgb[2] = UNGAMMA256(b);
+			}
+			else
 			{
 				r = img0[ofs3 + 0];
 				g = img0[ofs3 + 1];
@@ -6983,18 +7043,11 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 				nrgb[2] = (j + (j >> 8) + 1) >> 8;
 			}
 
-			if (rgbmask)
-			switch (rgbmask)
+			if (ops)
 			{
-			case 6: nrgb[1] = img0[ofs3 + 1]; /* Red */
-			case 4: nrgb[2] = img0[ofs3 + 2]; /* Red + Green */
-				break;
-			case 5: nrgb[2] = img0[ofs3 + 2]; /* Green */
-			case 1: nrgb[0] = img0[ofs3 + 0]; /* Green + Blue */
-				break;
-			case 3: nrgb[0] = img0[ofs3 + 0]; /* Blue */
-			case 2: nrgb[1] = img0[ofs3 + 1]; /* Blue + Red */
-				break;
+				nrgb[0] ^= (nrgb[0] ^ img0[ofs3 + 0]) & ops;
+				nrgb[1] ^= (nrgb[1] ^ img0[ofs3 + 1]) & (ops >> 8);
+				nrgb[2] ^= (nrgb[2] ^ img0[ofs3 + 2]) & (ops >> 16);
 			}
 
 			imgr[ofs3 + 0] = nrgb[0];
@@ -7106,10 +7159,13 @@ static inline double dist(int n1, int n2)
 	return (sqrt(n1 * n1 + n2 * n2));
 }
 
+static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
+	unsigned char *upper, unsigned char *alpha, int len, int bpp);
+
 void do_effect(int type, int param)
 {
-	unsigned char *src, *dest, *tmp, *mask;
-	int i, j, k = 0, k1, k2, bpp, ll, dxp1, dxm1, dyp1, dym1;
+	unsigned char *src, *dest, *tmp, *mask, *buf;
+	int i, j, uninit_(k), k1, k2, bpp, ll, dxp1, dxm1, dyp1, dym1;
 	int op, md, ms;
 	double blur = (double)param / 200.0;
 
@@ -7118,13 +7174,14 @@ void do_effect(int type, int param)
 	ms = bpp == 3 ? 1 : 4;
 
 	src = mem_undo_previous(mem_channel);
-	dest = mem_img[mem_channel];
-	mask = malloc(mem_width);
+	mask = malloc(mem_width * (bpp + 1));
 	if (!mask)
 	{
 		memory_errors(1);
 		return;
 	}
+	buf = mask + mem_width;
+
 	progress_init(_("Applying Effect"), 1);
 
 	for (i = 0; i < mem_height; i++)
@@ -7132,6 +7189,7 @@ void do_effect(int type, int param)
 		row_protected(0, i, mem_width, tmp = mask);
 		dyp1 = i < mem_height - 1 ? ll : -ll;
 		dym1 = i ? -ll : ll;
+		dest = buf;
 		for (md = j = 0; j < ll; j++ , src++ , dest++)
 		{
 			op = *tmp;
@@ -7243,10 +7301,10 @@ void do_effect(int type, int param)
 				if (k < src[dyp1 + dxp1]) k = src[dyp1 + dxp1];
 				break;
 			}
-			k = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
-			k = 255 * k + (*src - k) * op;
-			*dest = (k + (k >> 8) + 1) >> 8;
+			*dest = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
 		}
+		dest = mem_img[mem_channel] + i * ll;
+		do_alpha_blend(dest, buf, dest, mask, ll, bpp);
 		if ((i * 10) % mem_height >= mem_height - 10)
 			if (progress_update((float)(i + 1) / mem_height)) break;
 	}
@@ -7364,27 +7422,43 @@ static void hor_gauss3(double *temp, int w, double *gaussX, int lenX,
 static void pack_row3(unsigned char *dest, const double *src, int w, int gcor,
 	unsigned char *mask)
 {
-	int j, jj, k0, k1, k2, m;
-	double sum0, sum1, sum2;
+	int j, jj, uninit_(k0), uninit_(k1), uninit_(k2), m;
+	double sum0, sum1, sum2, mm;
 
 	for (j = jj = 0; jj < w; jj++ , j += 3)
 	{
+		if (mask[jj] == 255) continue;
 		sum0 = src[j];
 		sum1 = src[j + 1];
 		sum2 = src[j + 2];
-		if (gcor) /* Reverse gamma correction */
-		{
-			k0 = UNGAMMA256(sum0);
-			k1 = UNGAMMA256(sum1);
-			k2 = UNGAMMA256(sum2);
-		}
-		else /* Simply round to nearest */
+		if (!gcor) /* Simply round to nearest */
 		{
 			k0 = rint(sum0);
 			k1 = rint(sum1);
 			k2 = rint(sum2);
 		}
 		m = mask[jj];
+		if (paint_gamma && m) /* Gamma corrected mask blend */
+		{
+			if (!gcor) // RGB to linear
+			{
+				sum0 = gamma256[k0];
+				sum1 = gamma256[k1];
+				sum2 = gamma256[k2];
+			}
+			mm = m / 255.0;
+			sum0 += (gamma256[dest[j + 0]] - sum0) * mm;
+			sum1 += (gamma256[dest[j + 1]] - sum1) * mm;
+			sum2 += (gamma256[dest[j + 2]] - sum2) * mm;
+			m = 0;
+			goto ungamma;
+		}
+		if (gcor) /* Reverse gamma correction */
+		{
+ungamma:		k0 = UNGAMMA256(sum0);
+			k1 = UNGAMMA256(sum1);
+			k2 = UNGAMMA256(sum2);
+		}
 		k0 = k0 * 255 + (dest[j] - k0) * m;
 		dest[j] = (k0 + (k0 >> 8) + 1) >> 8;
 		k1 = k1 * 255 + (dest[j + 1] - k1) * m;
@@ -7750,8 +7824,8 @@ static void unsharp_filter(tcb *thread)
 	gaussd *gd = thread->data;
 	int lenX = gd->lenX, threshold = gd->threshold, channel = gd->channel;
 	int i, ii, cnt, wid, bpp, gcor = gd->gcor;
-	double *temp, *gaussX = gd->gaussX;
-	double sum, sum1, sum2, amount = gd->amount;
+	double *temp, *gaussX = gd->gaussX, *gt = gd->temp;
+	double sum, amount = gd->amount, u = gcor ? 1.0 : 255.0;
 	unsigned char *chan, *dest, *mask = gd->mask;
 
 	cnt = thread->nsteps;
@@ -7767,74 +7841,46 @@ static void unsharp_filter(tcb *thread)
 		dest = mem_img[channel] + i * wid;
 		if (bpp == 3) /* Run 3-bpp horizontal filter */
 		{
-			int j, jj, k, k1, k2, x1, x2;
+			int j, jj, k, k1, k2;
 
-			for (j = jj = 0; jj < mem_width; jj++ , j += 3)
+			hor_gauss3(temp, mem_width, gaussX, lenX, mask);
+			/* Threshold to mask */
+			if (threshold) for (j = jj = 0; jj < mem_width; jj++ , j += 3)
 			{
 				if (mask[jj] == 255) continue;
-				sum = temp[j] * gaussX[0];
-				sum1 = temp[j + 1] * gaussX[0];
-				sum2 = temp[j + 2] * gaussX[0];
-				x1 = x2 = j;
-				for (k = 1; k < lenX; k++)
-				{
-					double gv = gaussX[k];
-					x1 -= 3; x2 += 3;
-					sum += (temp[x1] + temp[x2]) * gv;
-					sum1 += (temp[x1 + 1] + temp[x2 + 1]) * gv;
-					sum2 += (temp[x1 + 2] + temp[x2 + 2]) * gv;
-				}
 				if (gcor) /* Reverse gamma correction */
 				{
-					k = UNGAMMA256(sum);
-					k1 = UNGAMMA256(sum1);
-					k2 = UNGAMMA256(sum2);
+					k = UNGAMMA256(gt[j]);
+					k1 = UNGAMMA256(gt[j + 1]);
+					k2 = UNGAMMA256(gt[j + 2]);
 				}
 				else /* Simply round to nearest */
 				{
-					k = rint(sum);
-					k1 = rint(sum1);
-					k2 = rint(sum2);
+					k = rint(gt[j]);
+					k1 = rint(gt[j + 1]);
+					k2 = rint(gt[j + 2]);
 				}
-				/* Threshold */
 	/* !!! GIMP has an apparent bug which I won't reproduce - so mtPaint's
 	 * threshold value means _actual_ difference, not half of it - WJ */
 				if ((abs(k - dest[j]) < threshold) &&
 					(abs(k1 - dest[j + 1]) < threshold) &&
 					(abs(k2 - dest[j + 2]) < threshold))
-					continue;
-				if (gcor) /* Involve gamma *AGAIN* */
-				{
-					sum = gamma256[dest[j]] + amount *
-						(gamma256[dest[j]] - sum);
-					sum1 = gamma256[dest[j + 1]] + amount *
-						(gamma256[dest[j + 1]] - sum1);
-					sum2 = gamma256[dest[j + 2]] + amount *
-						(gamma256[dest[j + 2]] - sum2);
-					k = UNGAMMA256X(sum);
-					k1 = UNGAMMA256X(sum1);
-					k2 = UNGAMMA256X(sum2);
-				}
-				else /* Combine values as linear */
-				{
-					k = rint(dest[j] + amount *
-						(dest[j] - sum));
-					k = k < 0 ? 0 : k > 255 ? 255 : k;
-					k1 = rint(dest[j + 1] + amount *
-						(dest[j + 1] - sum1));
-					k1 = k1 < 0 ? 0 : k1 > 255 ? 255 : k1;
-					k2 = rint(dest[j + 2] + amount *
-						(dest[j + 2] - sum2));
-					k2 = k2 < 0 ? 0 : k2 > 255 ? 255 : k2;
-				}
-				/* Store the result */
-				k = k * 255 + (dest[j] - k) * mask[jj];
-				dest[j] = (k + (k >> 8) + 1) >> 8;
-				k1 = k1 * 255 + (dest[j + 1] - k1) * mask[jj];
-				dest[j + 1] = (k1 + (k1 >> 8) + 1) >> 8;
-				k2 = k2 * 255 + (dest[j + 2] - k2) * mask[jj];
-				dest[j + 2] = (k2 + (k2 >> 8) + 1) >> 8;
+					mask[jj] = 255;
 			}
+
+			/* !!! Mask is ignored here - but this pass takes about
+			 * 25% time at worst, and masking adds 5% time at best;
+			 * so the common case of no mask is optimized for - WJ */
+			k = mem_width * 3;
+			for (j = 0; j < k; j++)
+			{
+				sum = gcor ? gamma256[dest[j]] : dest[j];
+				sum += amount * (sum - gt[j]);
+				/* Limit values, for pack_row3() cannot */
+				gt[j] = sum < 0.0 ? 0.0 : sum > u ? u : sum;
+			}
+
+			pack_row3(dest, gt, mem_width, gcor, mask);
 		}
 		else /* Run 1-bpp horizontal filter - no gamma here */
 		{
@@ -7892,11 +7938,26 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
 	unsigned char *upper, unsigned char *alpha, int len, int bpp)
 {
-	int j, k, mv;
+	double s0, s1, s2, m;
+	int j, k, mv, pg = paint_gamma && (bpp == 3);
 
-	for (j = 0; j < len;)
+	for (j = 0; j < len; alpha++)
+	if (pg && *alpha && (*alpha != 255))
 	{
-		mv = *alpha++;
+		m = *alpha / 255.0;
+		s0 = gamma256[lower[j]];
+		s0 += (gamma256[upper[j]] - s0) * m;
+		s1 = gamma256[lower[j + 1]];
+		s1 += (gamma256[upper[j + 1]] - s1) * m;
+		s2 = gamma256[lower[j + 2]];
+		s2 += (gamma256[upper[j + 2]] - s2) * m;
+		dest[j++] = UNGAMMA256(s0);
+		dest[j++] = UNGAMMA256(s1);
+		dest[j++] = UNGAMMA256(s2);
+	}
+	else
+	{
+		mv = *alpha;
 		k = lower[j];
 		k = k * 255 + (upper[j] - k) * mv;
 		dest[j++] = (k + (k >> 8) + 1) >> 8;
@@ -8227,8 +8288,8 @@ static void kuwahara_min(int base, kuwahara_info *info)
 }
 
 /* Replace each pixel in image row by nearest color in 3x3 Kuwahara'ed region */
-static void kuwahara_detailed(unsigned char *buf, unsigned char *mask, int y,
-	int gcor)
+static void kuwahara_detailed(unsigned char *buf, unsigned char *mask,
+	unsigned char *dest, int y, int gcor)
 {
 	unsigned char *tmp;
 	int l, w = mem_width * 3;
@@ -8243,7 +8304,7 @@ static void kuwahara_detailed(unsigned char *buf, unsigned char *mask, int y,
 
 	row_protected(0, y, mem_width, mask);
 	tmp = mem_img[CHN_IMAGE] + y * w;
-	for (l = 0; l < mem_width; l++ , tmp += 3)
+	for (l = 0; l < mem_width; l++ , tmp += 3 , dest += 3)
 	{
 		unsigned char *tb, *found;
 		int rr, gg, bb, op = *mask++;
@@ -8287,14 +8348,9 @@ static void kuwahara_detailed(unsigned char *buf, unsigned char *mask, int y,
 				found = tb; d = d2;
 			}
 		}
-		/* Mask-merge it into image */
-		rr = found[0]; gg = found[1]; bb = found[2];
-		rr = 255 * rr + (*tmp - rr) * op;
-		tmp[0] = (rr + (rr >> 8) + 1) >> 8;
-		gg = 255 * gg + (*tmp - gg) * op;
-		tmp[1] = (gg + (gg >> 8) + 1) >> 8;
-		bb = 255 * bb + (*tmp - bb) * op;
-		tmp[2] = (bb + (bb >> 8) + 1) >> 8;
+		dest[0] = found[0];
+		dest[1] = found[1];
+		dest[2] = found[2];
 	}
 #undef REGION_SIZE
 }
@@ -8315,7 +8371,7 @@ static int idx2row(int idx)
 void mem_kuwahara(int r, int gcor, int detail)
 {
 	kuwahara_info info;
-	unsigned char *mem, *src, *buf, *mask, *tmp, *timg;
+	unsigned char *mem, *src, *buf, *mask, *tmp, *timg, *tx;
 	int i, j, k, l, ir, len, rl, r1 = r + 1;
 	int w = mem_width * 3, wbuf = w + 3 * 2, ch = mem_channel;
 	double r2i = 1.0 / (double)(r1 * r1);
@@ -8425,8 +8481,14 @@ void mem_kuwahara(int r, int gcor, int detail)
 			memcpy(tmp + 3, tmp, 3);
 			/* Copy-extend the top row */
 			if (!i) memcpy(timg + wbuf * 2, buf, wbuf);
-			/* Build and mask-merge the previous row */
-			else kuwahara_detailed(timg, mask, i - 1, gcor);
+			else /* Build and mask-merge the previous row */
+			{
+				// Overwrite outgoing pixels of outgoing row
+				tx = timg + wbuf * ((i + 1) % 3);
+				kuwahara_detailed(timg, mask, tx, i - 1, gcor);
+				tmp = mem_img[CHN_IMAGE] + (i - 1) * w;
+				do_alpha_blend(tmp, tx, tmp, mask, w, 3);
+			}
 		}
 		else
 		{
@@ -8452,7 +8514,9 @@ void mem_kuwahara(int r, int gcor, int detail)
 			/* Copy-extend the bottom row */
 			memcpy(timg + wbuf * (i % 3), buf, wbuf);
 			/* Build and mask-merge it */
-			kuwahara_detailed(timg, mask, i - 1, gcor);
+			kuwahara_detailed(timg, mask, timg, i - 1, gcor);
+			tmp = mem_img[CHN_IMAGE] + (i - 1) * w;
+			do_alpha_blend(tmp, timg, tmp, mask, w, 3);
 		}
 		break;
 	}

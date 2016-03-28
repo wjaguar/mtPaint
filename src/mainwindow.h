@@ -320,12 +320,25 @@ void repaint_canvas( int px, int py, int pw, int ph );		// Redraw area of canvas
 void grad_stroke(int x, int y);		// Update stroke gradient
 
 int async_bk;
-void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
-	int bpp, png_color *pal);
-void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
-	chanlist xtra_img);
-void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
-	chanlist xtra_img);
+
+typedef struct {
+	int dx;
+	int width;
+	int xwid;
+	int zoom;
+	int scale;
+	int mw;
+	int opac;
+	int xpm;
+	int bpp;
+	int cmask;
+	png_color *pal;
+} renderstate;
+
+void setup_row(renderstate *r, int x0, int width, double czoom, int mw, int xpm,
+	int opac, int bpp, png_color *pal);
+void render_row(renderstate *r, unsigned char *rgb, chanlist base_img,
+	int x, int y, chanlist xtra_img);
 
 void stop_line();
 void change_to_tool(int icon);

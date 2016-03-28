@@ -249,9 +249,9 @@ void commit_paste(int swap, int *update)
 
 	if (swap) /* Prepare to convert image contents into new clipboard */
 	{
-		cmask = CMASK_IMAGE | CMASK_FOR(CHN_SEL);
+		cmask = CMASK_IMAGE | CMASK_SEL;
 		if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
-			 !channel_dis[CHN_ALPHA]) cmask |= CMASK_FOR(CHN_ALPHA);
+			 !channel_dis[CHN_ALPHA]) cmask |= CMASK_ALPHA;
 		if (!mem_alloc_image(AI_CLEAR | AI_NOINIT, &ti, fw, fh, MEM_BPP,
 			cmask, NULL)) goto quit;
 		copy_area(&ti, &mem_image, fx, fy);

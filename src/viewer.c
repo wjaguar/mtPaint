@@ -375,10 +375,11 @@ int vw_focus_on;
 void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	double czoom, int lr0, int lr1, int align)
 {
+	renderstate rs;
 	int rxy[4], cxy[4] = { px, py, px + pw, py + ph };
 	image_info *image;
 	unsigned char *tmp, **img;
-	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xpm, opac, thid, tdis;
+	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xpm, opac;
 	int dx, dy, ddx, ddy, mx, mw, my, mh;
 	int step = pw * 3, zoom = 1, scale = 1;
 
@@ -410,12 +411,6 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	wx1 = floor_div((cxy[2] - 1) * zoom, scale);
 	wy1 = floor_div((cxy[3] - 1) * zoom, scale);
 
-	/* No point in doing that here */
-	thid = hide_image;
-	hide_image = FALSE;
-	tdis = channel_dis[CHN_ALPHA];
-	channel_dis[CHN_ALPHA] = FALSE;
-
 	for (ll = lr0; ll <= lr1; ll++)
 	{
 		layer_node *t = layer_table + ll;
@@ -436,7 +431,8 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 		xpm = t != layer_table ? image->trans : -1; // above background
 		opac = (t->opacity * 255 + 50) / 100;
 		mw = rxy[2] - (mx = rxy[0]);
-		setup_row(mx, mw, czoom, image->width, xpm, opac, image->bpp, image->pal);
+		setup_row(&rs, mx, mw, czoom, image->width, xpm, opac,
+			image->bpp, image->pal);
 		mh = rxy[3] - (my = rxy[1]);
 		tmp = rgb + (my - py) * step + (mx - px) * 3;
 		ddx = floor_div(mx * zoom, scale) - i;
@@ -454,11 +450,9 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 				continue;
 			}
 			j = i / scale;
-			render_row(tmp, img, ddx, ddy + j, NULL);
+			render_row(&rs, tmp, img, ddx, ddy + j, NULL);
 		}
 	}
-	hide_image = thid;
-	channel_dis[CHN_ALPHA] = tdis;
 }
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )

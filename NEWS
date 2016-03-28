@@ -9,6 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
 	* New keyboard shortcut Ctrl+H added for Channels->Hide image
+	* Optional gamma correction for painting and masking (Preferences->General->Use gamma correction when painting)
 	* Text tools now allow selection of DPI value, and alignment for multiline text
 	* Distance function for shapeburst gradients is now selectable : "Distance type"
 	* Composite images now can have alpha transparency, when background is non-opaque

@@ -86,6 +86,9 @@ enum {
 
 #define CMASK_NONE  0
 #define CMASK_IMAGE (1 << CHN_IMAGE)
+#define CMASK_ALPHA (1 << CHN_ALPHA)
+#define CMASK_SEL   (1 << CHN_SEL)
+#define CMASK_MASK  (1 << CHN_MASK)
 #define CMASK_RGBA  ((1 << CHN_IMAGE) | (1 << CHN_ALPHA))
 #define CMASK_ALL   ((1 << NUM_CHANNELS) - 1)
 #define CMASK_CURR  (1 << mem_channel)
@@ -258,6 +261,8 @@ int mem_cselect;
 int mem_blend;
 int mem_unmask;
 int mem_gradient;
+
+int paint_gamma;
 
 /// BLEND MODE
 

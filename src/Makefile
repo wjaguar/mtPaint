@@ -14,6 +14,8 @@ OBJS = mainwindow.o inifile.o png.o memory.o canvas.o otherwindow.o mygtk.o\
 $(BIN): main.o $(OBJS)
 	$(CC) main.o $(OBJS) -o $(BIN) $(LDFLAGS)
 
+$(OBJS): *.h graphics/*
+
 .c.o:
 	$(CC) $(CFLAGS) -c -o $*.o $*.c
 

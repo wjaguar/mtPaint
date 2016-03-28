@@ -89,6 +89,7 @@ static inilist ini_bool[] = {
 	{ "scrollwheelZOOM",	&scroll_zoom,		FALSE },
 	{ "cursorZoom",		&cursor_zoom,		FALSE },
 	{ "layerOverlay",	&layer_overlay,		FALSE },
+	{ "paintGamma",		&paint_gamma,		FALSE },
 	{ "tablet_use_size",	tablet_tool_use + 0,	FALSE },
 	{ "tablet_use_flow",	tablet_tool_use + 1,	FALSE },
 	{ "tablet_use_opacity",	tablet_tool_use + 2,	FALSE },
@@ -1836,25 +1837,10 @@ static int get_bkg(int xc, int yc, int dclick)
 /* This is set when background is at different scale than image */
 int async_bk;
 
-/* This is for a faster way to pass parameters into render_row() */
-typedef struct {
-	int dx;
-	int width;
-	int xwid;
-	int zoom;
-	int scale;
-	int mw;
-	int opac;
-	int xpm;
-	int bpp;
-	png_color *pal;
-} renderstate;
-
-static renderstate rr;
-
-void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
-	int bpp, png_color *pal)
+void setup_row(renderstate *r, int x0, int width, double czoom, int mw, int xpm,
+	int opac, int bpp, png_color *pal)
 {
+	renderstate rr;
 	/* Horizontal zoom */
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	if (czoom <= 1.0)
@@ -1892,11 +1878,15 @@ void setup_row(int x0, int width, double czoom, int mw, int xpm, int opac,
 
 	rr.bpp = bpp;
 	rr.pal = pal;
+	rr.cmask = 0;
+
+	*r = rr;
 }
 
-void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
-	chanlist xtra_img)
+void render_row(renderstate *r, unsigned char *rgb, chanlist base_img,
+	int x, int y, chanlist xtra_img)
 {
+	renderstate rr = *r;
 	int alpha_blend = !overlay_alpha;
 	unsigned char *src = NULL, *dest, *alpha = NULL, px, beta = 255;
 	int i, j, k, ii, ds = rr.zoom * 3, da = 0;
@@ -1907,7 +1897,7 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 		src = xtra_img[CHN_IMAGE];
 		alpha = xtra_img[CHN_ALPHA];
 	}
-	if (channel_dis[CHN_ALPHA]) alpha = &beta; /* Ignore alpha if disabled */
+	if (rr.cmask & CMASK_ALPHA) alpha = &beta; /* Ignore alpha if disabled */
 	if (!src) src = base_img[CHN_IMAGE] + (rr.mw * y + x) * rr.bpp;
 	if (!alpha) alpha = base_img[CHN_ALPHA] ? base_img[CHN_ALPHA] +
 		rr.mw * y + x : &beta;
@@ -1915,7 +1905,8 @@ void render_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	dest = rgb;
 	ii = rr.dx;
 
-	if (hide_image) /* Substitute non-transparent "image overlay" colour */
+	/* Substitute non-transparent "image overlay" colour */
+	if (rr.cmask & CMASK_IMAGE)
 	{
 		w_bpp = 3;
 		w_xpm = -1;
@@ -2057,9 +2048,10 @@ rr4_s:
 	}
 }
 
-void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
-	chanlist xtra_img)
+void overlay_row(renderstate *r, unsigned char *rgb, chanlist base_img,
+	int x, int y, chanlist xtra_img)
 {
+	renderstate rr = *r;
 	unsigned char *alpha, *sel, *mask, *dest;
 	int i, j, k, ii, dw, opA, opS, opM, t0, t1, t2, t3;
 
@@ -2076,12 +2068,12 @@ void overlay_row(unsigned char *rgb, chanlist base_img, int x, int y,
 	if (!mask && base_img[CHN_MASK]) mask = base_img[CHN_MASK] + j;
 
 	/* Prepare channel weights (256-based) */
-	k = hide_image ? 256 : 256 - channel_opacity[CHN_IMAGE] -
+	k = rr.cmask & CMASK_IMAGE ? 256 : 256 - channel_opacity[CHN_IMAGE] -
 		(channel_opacity[CHN_IMAGE] >> 7);
-	opA = alpha && overlay_alpha && !channel_dis[CHN_ALPHA] ?
+	opA = alpha && overlay_alpha && !(rr.cmask & CMASK_ALPHA) ?
 		channel_opacity[CHN_ALPHA] : 0;
-	opS = sel && !channel_dis[CHN_SEL] ? channel_opacity[CHN_SEL] : 0;
-	opM = mask && !channel_dis[CHN_MASK] ? channel_opacity[CHN_MASK] : 0;
+	opS = sel && !(rr.cmask & CMASK_SEL) ? channel_opacity[CHN_SEL] : 0;
+	opM = mask && !(rr.cmask & CMASK_MASK) ? channel_opacity[CHN_MASK] : 0;
 
 	/* Nothing to do - don't waste time then */
 	j = opA + opS + opM;
@@ -2146,8 +2138,10 @@ or_s:
 }
 
 /* Specialized renderer for irregular overlays */
-void overlay_preview(unsigned char *rgb, unsigned char *map, int col, int opacity)
+void overlay_preview(renderstate *r, unsigned char *rgb, unsigned char *map,
+	int col, int opacity)
 {
+	renderstate rr = *r;
 	unsigned char *dest, crgb[3] = {INT_2_R(col), INT_2_G(col), INT_2_B(col)};
 	int i, j, k, ii, dw;
 
@@ -2417,6 +2411,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 	grad_render_state grstate;
 	int pflag = FALSE;
 	paste_render_state prstate;
+	renderstate rs;
 
 
 	memset(&r, 0, sizeof(r));
@@ -2463,8 +2458,12 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 		pflag = init_paste_render(&prstate, &r, xtemp ? xrstate.pvm : NULL);
 
 	/* Start rendering */
-	setup_row(r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
+	setup_row(&rs, r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
 		gtemp && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
+	rs.cmask = (hide_image ? CMASK_IMAGE : 0) |
+		(channel_dis[CHN_ALPHA] ? CMASK_ALPHA : 0) |
+		(channel_dis[CHN_SEL] ? CMASK_SEL : 0) |
+		(channel_dis[CHN_MASK] ? CMASK_MASK : 0);
  	j0 = -1; pw *= 3; pw23 = r.pw2 * 3;
 	for (jj = 0; jj < r.ph2; jj++ , rgb += pw)
 	{
@@ -2513,9 +2512,9 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 			memcpy(rgb, rgb - pw, pw23);
 			continue;
 		}
-		render_row(rgb, mem_img, r.dx, j, tlist);
-		if (!cstemp) overlay_row(rgb, mem_img, r.dx, j, tlist);
-		else overlay_preview(rgb, cstemp, csel_preview, csel_preview_a);
+		render_row(&rs, rgb, mem_img, r.dx, j, tlist);
+		if (!cstemp) overlay_row(&rs, rgb, mem_img, r.dx, j, tlist);
+		else overlay_preview(&rs, rgb, cstemp, csel_preview, csel_preview_a);
 	}
 	free(xtemp);
 	free(cstemp);

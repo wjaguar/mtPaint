@@ -384,7 +384,7 @@ static void delete_alpha(ls_settings *settings, int v)
 {
 	if (settings->img[CHN_ALPHA] && is_filled(settings->img[CHN_ALPHA], v,
 		settings->width * settings->height))
-		deallocate_image(settings, CMASK_FOR(CHN_ALPHA));
+		deallocate_image(settings, CMASK_ALPHA);
 }
 
 typedef struct {
@@ -571,7 +571,7 @@ static int palette_trans(ls_settings *settings, unsigned char ttb[256])
 		}
 	}
 	/* Anything else means alpha transparency */
-	res = allocate_image(settings, CMASK_FOR(CHN_ALPHA));
+	res = allocate_image(settings, CMASK_ALPHA);
 	if (!res && settings->img[CHN_ALPHA])
 	{
 		unsigned char *src, *dest;
@@ -3697,8 +3697,8 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			/* Transparency detected first time? */
 			if (!skip && ((dy != 1) || dx || (j < w)))
 			{
-				if ((res = allocate_image(settings,
-					CMASK_FOR(CHN_ALPHA)))) goto fail3;
+				if ((res = allocate_image(settings, CMASK_ALPHA)))
+					goto fail3;
 				res = FILE_LIB_ERROR;
 				skip = 1;
 				if (settings->img[CHN_ALPHA]) /* Got alpha */
