@@ -1,5 +1,5 @@
 /*	thread.c
-	Copyright (C) 2009-2010 Dmitry Groshev
+	Copyright (C) 2009-2016 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -137,16 +137,20 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 		sharesz = (sharesz + align) & ~align;
 		sharesz += va_arg(args, int);
 	}
-	threadsz = (sizeof(tcb) + talign - 1) & ~(talign - 1);
-	threadsz += dsize;
+	threadsz = 0;
 	while (va_arg(args, void *))
 	{
 		threadsz = (threadsz + align) & ~align;
 		threadsz += va_arg(args, int);
 	}
-	threadsz = (threadsz + talign - 1) & ~(talign - 1);
-	if (!(threadsz & (THREAD_DEALIGN - 1))) threadsz += talign;
 	va_end(args);
+	if ((tmax == 1) && !(sharesz + threadsz) && (flags & MA_FLAG_NONE))
+		return (MEM_NONE);
+
+	sz = (sizeof(tcb) + talign - 1) & ~(talign - 1);
+	sz = (sz + dsize + align) & ~align;
+	threadsz = (sz + threadsz + talign - 1) & ~(talign - 1);
+	if (!(threadsz & (THREAD_DEALIGN - 1))) threadsz += talign;
 
 	/* Allocate space */
 	while (TRUE)
@@ -233,7 +237,7 @@ int thread_progress(tcb *thread)
 
 int threads_running;
 
-void launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
+int launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
 {
 	tcb *tp;
 	clock_t uninit_(before), now;
@@ -307,7 +311,7 @@ void launch_threads(thread_func thread, threaddata *tdata, char *title, int tota
 			}
 			flag |= 1;
 		}
-		thread_progress(tdata->threads[0]);
+		if (!tdata->silent) thread_progress(tdata->threads[0]);
 		/* Let 'em run */
 #if GTK_MAJOR_VERSION == 1
 		sched_yield();
@@ -320,8 +324,10 @@ void launch_threads(thread_func thread, threaddata *tdata, char *title, int tota
 
 /* !!! Even with OS threading, killing a thread is not supported on some systems,
  * and if a thread needs killing, it likely has corrupted some data already - WJ */
-	if (flag > 1) alert_box(_("Error"),
+	if (flag <= 1) return (0); // All OK
+	if (!tdata->silent) alert_box(_("Error"),
 		_("Helper thread is not responding. Save your work and exit the program."), NULL);
+	return (-1);
 }
 
 #else /* Multithreading disabled - functions manage one thread only */
@@ -349,15 +355,18 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 		sharesz = (sharesz + align) & ~align;
 		sharesz += va_arg(args, int);
 	}
-	threadsz = (sizeof(tcb) + talign - 1) & ~(talign - 1);
-	threadsz += dsize;
+	threadsz = 0;
 	while (va_arg(args, void *))
 	{
 		threadsz = (threadsz + align) & ~align;
 		threadsz += va_arg(args, int);
 	}
-	threadsz = (threadsz + talign - 1) & ~(talign - 1);
 	va_end(args);
+	if (!(sharesz + threadsz) && (flags & MA_FLAG_NONE)) return (MEM_NONE);
+
+	sz = (sizeof(tcb) + talign - 1) & ~(talign - 1);
+	sz = (sz + dsize + align) & ~align;
+	threadsz = (sz + threadsz + talign - 1) & ~(talign - 1);
 
 	/* Allocate space */
 	sz = align ? align + 1 : 0;
@@ -414,7 +423,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 	return (res);
 }
 
-void launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
+int launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
 {
 	tcb *tp = tdata->threads[0];
 
@@ -423,6 +432,7 @@ void launch_threads(thread_func thread, threaddata *tdata, char *title, int tota
 	if (title) progress_init(title, 1); /* Let init/end be done outside */
 	thread(tp);
 	if (title) progress_end();
+	return (0);
 }
 
 #endif

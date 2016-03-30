@@ -156,8 +156,10 @@ static void *pref_code[] = {
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")), GROUPN,
 #ifdef U_THREADS
-	TABLE2(4),
+	TABLE2(5),
 	TSPINv(_("Max threads (0 to autodetect)"), maxthreads, 0, 256),
+	TSPINv(_("Min kpixels per render thread"), kpix_threads,
+		16, (MAX_WIDTH * MAX_HEIGHT + 1023) / 1024),
 #else
 	TABLE2(3),
 #endif

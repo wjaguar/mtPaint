@@ -10,6 +10,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
 	* New keyboard shortcut Ctrl+H added for Channels->Hide image
 	* Optional gamma correction for painting and masking (Preferences->General->Use gamma correction when painting)
+	* Rendering now uses multiple threads to utilize all available CPU cores
 	* Text tools now allow selection of DPI value, and alignment for multiline text
 	* Distance function for shapeburst gradients is now selectable : "Distance type"
 	* Composite images now can have alpha transparency, when background is non-opaque
@@ -24,7 +25,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)
 	* Scroll wheel zoom now works for view window too
 	* "Hide image" and "View alpha as an overlay" can now be toggled separately for each layer (Preferences->General->Enable overlays by layer)
-	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2 for details
+	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2.4 for details
 	* XPM files with 65-92 colours are now saved with smaller size
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
 	* TIFF compression made configurable

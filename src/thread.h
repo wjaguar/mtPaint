@@ -1,5 +1,5 @@
 /*	thread.h
-	Copyright (C) 2009-2011 Dmitry Groshev
+	Copyright (C) 2009-2016 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -34,6 +34,7 @@ struct tcb {
 //	Thread array header
 typedef struct {
 	int count;
+	int silent;
 	tcb *threads[1];
 } threaddata;
 
@@ -46,7 +47,7 @@ int maxthreads;
 //	Prepare memory structures for threads' use
 threaddata *talloc(int flags, int tmax, void *data, int dsize, ...);
 //	Launch threads and wait for their exiting
-void launch_threads(thread_func thread, threaddata *tdata, char *title, int total);
+int launch_threads(thread_func thread, threaddata *tdata, char *title, int total);
 
 #ifdef U_THREADS
 

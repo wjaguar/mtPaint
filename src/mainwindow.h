@@ -304,6 +304,8 @@ extern char mem_clip_file[];
 
 extern void *scriptbar_code[];		// Set up scriptable items for tools toolbar
 
+int kpix_threads;			// Min kpixels per render thread
+
 void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window

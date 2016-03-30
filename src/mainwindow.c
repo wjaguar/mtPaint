@@ -148,6 +148,7 @@ static inilist ini_int[] = {
 	{ "undoMBlimit",	&mem_undo_limit,	0   },
 	{ "undoCommon",		&mem_undo_common,	25  },
 	{ "maxThreads",		&maxthreads,		0   },
+	{ "kpixThreads",	&kpix_threads,		256 },
 	{ "backgroundGrey",	&mem_background,	180 },
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },
@@ -2415,21 +2416,33 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		bpp, p->opacity);
 }
 
+int kpix_threads;	// Min kpixels per render thread
+
+typedef struct {
+	main_render_state r;
+	paste_render_state p;
+	render_mem_req m;
+	int tflag, gflag, pflag;
+	int pw;
+	unsigned char *rgb;
+	threaddata *tdata; // For simplicity
+} u_render_state;
+
+static void do_main_render(tcb *thread);
+static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph);
+
 static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)
 {
 	main_render_state r;
-	unsigned char **tlist = r.tlist;
-	int j, jj, j0, l, pw23;
-	grad_render_state grstate;
-	int tflag, gflag = FALSE, pflag = FALSE;
 	paste_render_state prstate;
-	renderstate rs;
 	render_mem_req mr;
-	unsigned char *buf;
+	u_render_state u;
+	int nt, wh, nt2;
 
 
 	memset(&r, 0, sizeof(r));
 	memset(&mr, 0, sizeof(mr));
+	u.gflag = u.pflag = FALSE;
 
 	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
 	r.zoom = r.scale = 1;
@@ -2447,7 +2460,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 	/* ****** Memory request phase ****** */
 
 	/* Color transform preview */
-	if ((tflag = mem_preview && (mem_img_bpp == 3)))
+	if ((u.tflag = mem_preview && (mem_img_bpp == 3)))
 	{
 		mr.mask_s = r.lx;
 		if (mem_channel == CHN_IMAGE) mr.channel_s = r.lx * 3;
@@ -2459,23 +2472,67 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 
 	/* Gradient preview */
 	else if ((tool_type == TOOL_GRADIENT) && grad_opacity)
-		gflag = grad_render_req(&mr, r.lx);
+		u.gflag = grad_render_req(&mr, r.lx);
 
 	/* Paste preview - can only coexist with transform */
-	if (show_paste && (marq_status >= MARQUEE_PASTE) && !mr.overlay_s && !gflag)
-		pflag = paste_render_req(&mr, &prstate, &r);
+	if (show_paste && (marq_status >= MARQUEE_PASTE) && !mr.overlay_s &&
+		!u.gflag) u.pflag = paste_render_req(&mr, &prstate, &r);
 
-	buf = multialloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE,
-		&mr.rgb, mr.rgb_s,
-		&mr.mask, mr.mask_s,
-		&mr.overlay, mr.overlay_s,
-		&mr.channel, mr.channel_s,
-		&mr.alpha, mr.alpha_s,
-		&mr.n_channel, mr.n_channel_s,
-		&mr.n_alpha, mr.n_alpha_s,
-		&mr.n_opacity, mr.n_opacity_s,
+	/* Calculate amount of work for threads */
+	wh = (r.py2 + r.ph2 - 1) / r.scale - r.py2 / r.scale + 1;
+	nt = image_threads(r.pww, wh);
+	nt2 = (r.pww * wh + kpix_threads * 1024 - 1) / (kpix_threads * 1024);
+	if (nt > nt2) nt = nt2;
+
+	/* Collect data to pass */
+	u.r = r; u.m = mr; u.p = prstate; u.rgb = rgb; u.pw = pw * 3;
+
+	u.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt,
+		&u, sizeof(u), NULL,
+		&u.m.rgb, u.m.rgb_s,
+		&u.m.mask, u.m.mask_s,
+		&u.m.overlay, u.m.overlay_s,
+		&u.m.channel, u.m.channel_s,
+		&u.m.alpha, u.m.alpha_s,
+		&u.m.n_channel, u.m.n_channel_s,
+		&u.m.n_alpha, u.m.n_alpha_s,
+		&u.m.n_opacity, u.m.n_opacity_s,
 		NULL);
-	if (!buf) return (FALSE);
+	if (!u.tdata) return (FALSE);
+
+	if (u.tdata == MEM_NONE) // Running as single thread w/static mem
+		main_render(&u, rgb, r.py2, r.ph2);
+	else // One or more threads w/allocation
+	{
+		u.tdata->silent = TRUE;
+		launch_threads(do_main_render, u.tdata, NULL, wh);
+		free(u.tdata);
+	}
+	return (u.pflag); /* "There was paste" */
+}
+
+static void do_main_render(tcb *thread)
+{
+	u_render_state *u = thread->data;
+	int y0 = u->r.py2, scale = u->r.scale, h = thread->nsteps * scale;
+	int d = y0 % scale, ofs = 0;
+
+	if (thread->step0) ofs = thread->step0 * scale - d;
+	else h -= d;
+	if (ofs + h > u->r.ph2) h = u->r.ph2 - ofs;
+
+	main_render(u, u->rgb + ofs * u->pw, y0 + ofs, h);
+
+	thread_done(thread);
+}
+
+static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph)
+{
+	main_render_state r = u->r;
+	grad_render_state grstate;
+	renderstate rs;
+	unsigned char **tlist = r.tlist, *overlay = u->m.overlay;
+	int j, jj, j0, l, pw23, pw = u->pw;
 
 	/* ****** Init phase ****** */
 
@@ -2487,33 +2544,33 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 		r.lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
 
 	/* Color transform preview */
-	if (tflag)
+	if (u->tflag)
 	{
-		r.pvm = mr.mask;
-		r.tlist[CHN_IMAGE] = r.pvi = mr.rgb ? mr.rgb : mr.channel;
+		r.pvm = u->m.mask;
+		r.tlist[CHN_IMAGE] = r.pvi = u->m.rgb ? u->m.rgb : u->m.channel;
 	}
 
 	/* Gradient preview */
-	if (gflag)
+	if (u->gflag)
 	{
 		if (mem_channel > CHN_ALPHA) r.mask0 = NULL;
-		init_grad_render(&mr, &grstate, r.lx, r.tlist);
+		init_grad_render(&u->m, &grstate, r.lx, r.tlist);
 	}
 
 	/* Paste preview */
-	if (pflag) init_paste_render(&mr, &prstate, &r);
+	if (u->pflag) init_paste_render(&u->m, &u->p, &r);
 
 	/* Start rendering */
 	setup_row(&rs, r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
-		gflag && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
+		u->gflag && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
 	rs.cmask = (hide_image ? CMASK_IMAGE : 0) |
 		(channel_dis[CHN_ALPHA] ? CMASK_ALPHA : 0) |
 		(channel_dis[CHN_SEL] ? CMASK_SEL : 0) |
 		(channel_dis[CHN_MASK] ? CMASK_MASK : 0);
- 	j0 = -1; pw *= 3; pw23 = r.pw2 * 3;
-	for (jj = 0; jj < r.ph2; jj++ , rgb += pw)
+ 	j0 = -1; pw23 = r.pw2 * 3;
+	for (jj = 0; jj < ph; jj++ , rgb += pw)
 	{
-		j = ((r.py2 + jj) * r.zoom) / r.scale;
+		j = ((py + jj) * r.zoom) / r.scale;
 		if (j != j0)
 		{
 			j0 = j;
@@ -2521,7 +2578,7 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 			tlist = r.tlist; /* Default override */
 
 			/* Color transform preview */
-			if (tflag)
+			if (u->tflag)
 			{
 				prep_mask(0, r.zoom, r.pww, r.pvm,
 					r.mask0 ? r.mask0 + l : NULL,
@@ -2530,27 +2587,27 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 					r.pvi, mem_img[CHN_IMAGE] + l * 3);
 			}
 			/* Color selective mode preview */
-			else if (mr.overlay)
+			else if (overlay)
 			{
-				memset(mr.overlay, 0, r.lx);
-				csel_scan(0, r.zoom, r.pww, mr.overlay,
+				memset(overlay, 0, r.lx);
+				csel_scan(0, r.zoom, r.pww, overlay,
 					mem_img[CHN_IMAGE] + l * mem_img_bpp,
 					csel_data);
 			}
 			/* Gradient preview */
-			else if (gflag) grad_render(0, r.zoom, r.pww, r.dx, j,
+			else if (u->gflag) grad_render(0, r.zoom, r.pww, r.dx, j,
 				r.mask0 ? r.mask0 + l : NULL, &grstate);
 
 			/* Paste preview - should be after transform */
-			if (pflag && (j >= marq_y1) && (j <= marq_y2))
+			if (u->pflag && (j >= marq_y1) && (j <= marq_y2))
 			{
-				tlist = prstate.tlist; /* Paste-area override */
-				if (prstate.alpha) memcpy(tlist[CHN_ALPHA],
+				tlist = u->p.tlist; /* Paste-area override */
+				if (u->p.alpha) memcpy(tlist[CHN_ALPHA],
 					mem_img[CHN_ALPHA] + l, r.lx);
-				if (prstate.pixf) memcpy(tlist[mem_channel],
-					mem_img[mem_channel] + l * prstate.bpp,
-					r.lx * prstate.bpp);
-				paste_render(0, r.zoom, j, &prstate);
+				if (u->p.pixf) memcpy(tlist[mem_channel],
+					mem_img[mem_channel] + l * u->p.bpp,
+					r.lx * u->p.bpp);
+				paste_render(0, r.zoom, j, &u->p);
 			}
 		}
 		else if (!async_bk)
@@ -2559,12 +2616,9 @@ static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int p
 			continue;
 		}
 		render_row(&rs, rgb, mem_img, r.dx, j, tlist);
-		if (!mr.overlay) overlay_row(&rs, rgb, mem_img, r.dx, j, tlist);
-		else overlay_preview(&rs, rgb, mr.overlay, csel_preview, csel_preview_a);
+		if (!overlay) overlay_row(&rs, rgb, mem_img, r.dx, j, tlist);
+		else overlay_preview(&rs, rgb, overlay, csel_preview, csel_preview_a);
 	}
-	if (buf != MEM_NONE) free(buf);
-
-	return (pflag); /* "There was paste" */
 }
 
 /// GRID
