@@ -531,12 +531,16 @@ size_t getmemx2(memx2 *mem, size_t length);
 void addstr(memx2 *mem, char *s, int bk);
 void addchars(memx2 *mem, int c, int l);
 
+extern char MEM_NONE_[];
+#define MEM_NONE (void *)MEM_NONE_ /* Non-NULL pointer which means nothing */
+
 /// Multiblock allocator
 
 #define MA_ALIGN_MASK    0x03 /* For alignment constraints */
 #define MA_ALIGN_DEFAULT 0x00
 #define MA_ALIGN_DOUBLE  0x01
 #define MA_SKIP_ZEROSIZE 0x04 /* Leave pointers to zero-size areas unchanged */
+#define MA_FLAG_NONE     0x08 /* Return MEM_NONE if total size is zero */
 
 void *multialloc(int flags, void *ptr, int size, ...);
 

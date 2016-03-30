@@ -45,6 +45,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key
 	* BUGFIX - Gradient button no longer fails to show current gradient mode after showing settings toolbar
+	* BUGFIX - Preview of Transform Colour no longer ignores area within paste marquee
 	* BUGFIX - Ctrl+left/right/double click now set both colour and alpha from canvas in coupled alpha mode, as they should
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated

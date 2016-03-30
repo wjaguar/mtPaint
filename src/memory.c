@@ -463,6 +463,8 @@ static inline void freechunk(memchunks *mem, void *chunk)
 	mem->freelist = chunk;
 }
 
+char MEM_NONE_[1]; /* Nothing is located here :-) */
+
 /* This allocates several memory chunks in one block - making it one single
  * point of allocation failure, and needing just a single free() later on.
  * On Windows, allocations aren't guaranteed to be double-aligned, so
@@ -485,6 +487,7 @@ void *multialloc(int flags, void *ptr, int size, ...)
 		sz += va_arg(args, int);
 	}
 	va_end(args);
+	if (!sz && (flags & MA_FLAG_NONE)) return (MEM_NONE);
 	if (align) sz += align + 1;
 	tmp = res = calloc(1, sz);
 	if (res)
