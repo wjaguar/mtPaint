@@ -460,7 +460,8 @@ static void toolbar_settings_init()
 }
 
 static int zooms[] = {
-	10, 20, 25, 33, 50, 100, 200, 300, 400, 800, 1200, 1600, 2000, 0 };
+	10, 20, 25, 33, 50, 100, 200, 300, 400, 600, 800, 1000, 1200, 1600, 2000,
+	4000, 8000, 0 };
 
 /* !!! For later change_to_tool(DEFAULT_TOOL_ICON) to go through, this need be
  * set to something different initially */

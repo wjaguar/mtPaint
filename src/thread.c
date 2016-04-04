@@ -83,7 +83,8 @@ int image_threads(int w, int h)
 	int n = h / 3;
 // This can overflow, but mtPaint is unlikely to handle a 8+ Tb image anyway :-)
 	int m = ((size_t)w * h) / (THREAD_DEALIGN + THREAD_ALIGN);
-	return (n < m ? n : m);
+	if (n > m) n = m;
+	return (n + !n);
 }
 
 /* This function takes *two* variable-length NULL-terminated sequences of
@@ -175,12 +176,13 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 	/* Set up tcbs */
 	sz = (sizeof(tcb) + talign - 1) & ~(talign - 1);
 	res->count = tmax;
+	res->chunks = -1; // Disabled by default
 	for (i = 0; i < tmax; i++)
 	{
 		res->threads[i] = thread = (void *)(tcb0 + threadsz * i);
 		thread->index = i;
 		thread->count = tmax;
-		thread->threads = res->threads;
+		thread->tdata = res;
 		thread->data = (void *)((char *)thread + sz);
 	}
 
@@ -225,7 +227,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 
 int thread_progress(tcb *thread)
 {
-	tcb **tp = thread->threads;
+	tcb **tp = thread->tdata->threads;
 	int i, j, n = thread->count;
 
 	for (i = j = 0; i < n; i++) j += tp[i]->progress;
@@ -235,13 +237,31 @@ int thread_progress(tcb *thread)
 	return (TRUE);
 }
 
+static void thread_chunk(tcb *thread)
+{
+	threaddata *tdata = thread->tdata;
+	thread_func tf = tdata->what;
+	int nx, step = thread->nsteps;
+
+	while (TRUE)
+	{
+		tf(thread);
+		if (thread->stop || thread->stopped) break;
+		nx = thread_xadd(&tdata->done, step);
+		if (nx >= tdata->total) break;
+		thread->step0 = nx;
+		thread->nsteps = step > tdata->total - nx ? tdata->total - nx : step;
+	}
+	thread_done(thread);
+}
+
 int threads_running;
 
 int launch_threads(thread_func thread, threaddata *tdata, char *title, int total)
 {
 	tcb *tp;
 	clock_t uninit_(before), now;
-	int i, j, n0, n1 = total, flag = FALSE;
+	int i, j, n0, n1, flag = FALSE;
 #if GTK_MAJOR_VERSION == 1
 	pthread_t tid;
 	pthread_attr_t attr;
@@ -254,9 +274,18 @@ int launch_threads(thread_func thread, threaddata *tdata, char *title, int total
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 #endif
 
+	/* Prepare chunking */
+	tdata->threads[0]->tsteps = tdata->total = total;
+	i = tdata->count;
+	j = tdata->chunks;
+	if ((i > 1) && (j > 1))	j *= i , total = ((total + j - 1) / j) * i;
+	tdata->done = n1 = total;
+
 	/* Launch aux threads */
+	tdata->what = thread;
+	if (tdata->chunks >= 0) thread = thread_chunk;
 	threads_running = TRUE;
-	for (i = tdata->count - 1; i > 0; i--)
+	for (i -= 1; i > 0; i--)
 	{
 		tp = tdata->threads[i];
 		/* Reinit thread state */
@@ -285,7 +314,6 @@ int launch_threads(thread_func thread, threaddata *tdata, char *title, int total
 	tp->progress = 0;
 	tp->step0 = 0;
 	tp->nsteps = n1;
-	tp->tsteps = total;
 	if (title) progress_init(title, 1); /* Let init/end be done outside */
 	thread(tp);
 
@@ -329,6 +357,22 @@ int launch_threads(thread_func thread, threaddata *tdata, char *title, int total
 		_("Helper thread is not responding. Save your work and exit the program."), NULL);
 	return (-1);
 }
+
+#if !defined(__G_ATOMIC_H__) && !defined(HAVE__SFA)
+
+int thread_xadd(volatile int *var, int n)
+{
+	DEF_MUTEX(xadd_lock);
+	int v;
+
+	LOCK_MUTEX(xadd_lock);
+	v = *var;
+	*var += n;
+	UNLOCK_MUTEX(xadd_lock);
+	return (v);
+}
+
+#endif
 
 #else /* Multithreading disabled - functions manage one thread only */
 
@@ -387,7 +431,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 	res->threads[0] = thread = (void *)tcb0;
 	thread->index = 0;
 	thread->count = 1;
-	thread->threads = res->threads;
+	thread->tdata = res;
 	thread->data = (void *)((char *)thread + sz);
 
 	/* Set up shared data pointers */
@@ -427,6 +471,7 @@ int launch_threads(thread_func thread, threaddata *tdata, char *title, int total
 {
 	tcb *tp = tdata->threads[0];
 
+	tdata->what = thread;
 	tp->step0 = 0;
 	tp->nsteps = total;
 	if (title) progress_init(title, 1); /* Let init/end be done outside */

@@ -3841,6 +3841,19 @@ int clip4(int *rect04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, i
 	return ((p - rect04 - 4) >> 2);
 }
 
+int xy_span(int *rxy, int scale, int yf)
+{
+	return (floor_div(rxy[2 + yf] - 1, scale) - floor_div(rxy[yf], scale) + 1);
+}
+
+void xy_origin(int *rxy, int *vxy, int x, int y)
+{
+	rxy[0] = vxy[0] - x;
+	rxy[1] = vxy[1] - y;
+	rxy[2] = vxy[2] - x;
+	rxy[3] = vxy[3] - y;
+}
+
 void line_init(linedata line, int x0, int y0, int x1, int y1)
 {
 	int i;

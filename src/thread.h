@@ -17,8 +17,13 @@
 	along with mtPaint in the file COPYING.
 */
 
-//	Thread control block
 typedef struct tcb tcb;
+typedef struct threaddata threaddata;
+
+//	Thread function type
+typedef void (*thread_func)(tcb *thread);
+
+//	Thread control block
 struct tcb {
 	volatile int stop;	// Signal to stop
 	volatile int progress;	// Progress counter
@@ -27,19 +32,20 @@ struct tcb {
 	int count;		// Number of threads
 	int step0, nsteps;	// Work allocated to this thread
 	int tsteps;		// Total amount of work - set only for thread 0
-	tcb **threads;		// Pointers to all tcbs
+	threaddata *tdata;	// Pointer to array header
 	void *data;		// Parameters & buffers structure for function
 };
 
 //	Thread array header
-typedef struct {
-	int count;
-	int silent;
-	tcb *threads[1];
-} threaddata;
-
-//	Thread function type
-typedef void (*thread_func)(tcb *thread);
+struct threaddata {
+	volatile int done;	// Allocated amount of work
+	int total;		// Total amount of work
+	int count;		// Number of threads
+	int chunks;		// Number of chunks per thread
+	int silent;		// No progressbar & error window
+	thread_func what;	// Function to run
+	tcb *threads[1];	// Threads' TCBs
+};
 
 //	Configure max number of threads to launch
 int maxthreads;
@@ -83,6 +89,14 @@ static inline void thread_done(tcb *thread)
 #define UNLOCK_MUTEX(name) \
 	if (threads_running) g_static_mutex_unlock(&name)
 
+#ifdef __G_ATOMIC_H__
+#define thread_xadd(A,B) g_atomic_int_exchange_and_add((A), (B))
+#elif HAVE__SFA
+#define thread_xadd(A,B) __sync_fetch_and_add((A), (B))
+#else
+int thread_xadd(volatile int *var, int n);
+#endif
+
 #else /* Only one actual thread */
 
 #define image_threads(w,h) 1
@@ -98,5 +112,12 @@ static inline int thread_step(tcb *thread, int i, int tlim, int steps)
 #define	DEF_MUTEX(name)
 #define LOCK_MUTEX(name)
 #define UNLOCK_MUTEX(name)
+
+static inline int thread_xadd(int *var, int n)
+{
+	int v = *var;
+	*var += n;
+	return (v);
+}
 
 #endif

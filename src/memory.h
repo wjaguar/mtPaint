@@ -494,6 +494,13 @@ static inline int ceil_div(int dd, int dr)
 	return (dd / dr + (dd % dr > 0));
 }
 
+/// Floored integer modulus
+
+static inline int floor_mod(int dd, int dr)
+{
+	return (dd - dr * floor_div(dd, dr));
+}
+
 /// Table-based translation
 
 static inline void do_xlate(unsigned char *xlat, unsigned char *data, int len)
@@ -554,6 +561,12 @@ int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy);
 
 	// Intersect outer & inner rectangle, write out what it separates into
 int clip4(int *rect04, int xo, int yo, int wo, int ho, int xi, int yi, int wi, int hi);
+
+	// Get scaled span of rectangle on X or Y
+int xy_span(int *rxy, int scale, int yf);
+
+	// Rebase rectangle to origin X, Y
+void xy_origin(int *rxy, int *vxy, int x, int y);
 
 /// Line iterator
 

@@ -2935,7 +2935,8 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 		}
 
 		/* Handle non-continuous mode & tools */
-		update_area[0] = update_area[1] = MAX_WIDTH;
+		update_area[0] = MAX_WIDTH;
+		update_area[1] = MAX_HEIGHT;
 		update_area[2] = update_area[3] = 0;
 
 		if (first_point) lstep = 0.0;

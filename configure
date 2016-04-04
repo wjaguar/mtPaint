@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.06"
-MT_DATE="2016-03-30"
+MT_V="3.49.07"
+MT_DATE="2016-04-04"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -368,10 +368,14 @@ IS_LIB()
 {
 	$MT_TESTLINK -$1 -o _conf.tmp > /dev/null 2>&1
 }
+CAN_DO()
+{
+	echo "main() { $1; }" > _conf.c
+	$MT_TESTCOMP _conf.c -o _conf.tmp > /dev/null 2>&1
+}
 HAVE_FUNC()
 {
-	echo "main() { $1(); }" > _conf.c
-	$MT_TESTCOMP _conf.c -o _conf.tmp > /dev/null 2>&1
+	CAN_DO "$1()"
 }
 
 HAVE_GCC_VER()
@@ -389,6 +393,11 @@ HAVE_GCC_VER()
 }
 
 ### Detect libraries and functions
+
+if CAN_DO "volatile int v, z; z = __sync_fetch_and_add(&v, 1)"
+then
+	DEFS="$DEFS -DHAVE__SFA"
+fi
 
 if HAVE_FUNC "mkdtemp"
 then

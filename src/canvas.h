@@ -92,7 +92,7 @@ int	col_reverse,					// Painting with right button
 #define CLONE_DRAG  4 /* Stroke flag */
 
 #define MIN_ZOOM 0.1
-#define MAX_ZOOM 20
+#define MAX_ZOOM 80
 
 /* File selector codes */
 enum {

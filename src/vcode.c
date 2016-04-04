@@ -6349,9 +6349,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			void **slot = origin_slot(PREV_SLOT(r));
 			int op = GET_OP(slot);
-			guint keyval, mods;
+			guint keyval = 0, mods = 0;
 
-			if (lp < 2) gtk_accelerator_parse(v, &keyval, &mods);
+			if (!lp); // Do nothing
+			else if (lp < 2) gtk_accelerator_parse(v, &keyval, &mods);
 			else keyval = (guint)v , mods = (guint)pp[2];
 
 			if (keygroup &&
@@ -6361,7 +6362,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				((op >= op_uMENU_0) && (op < op_uMENU_LAST) &&
 				 keymap_add(keymap, slot, GET_DESCV(slot, 3), keygroup))))
 			{
-				keymap_map(keymap, keymap->nslots, keyval, mods);
+				if (lp) keymap_map(keymap, keymap->nslots, keyval, mods);
 				continue;
 			}
 #if GTK_MAJOR_VERSION == 2

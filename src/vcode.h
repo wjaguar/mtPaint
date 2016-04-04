@@ -989,6 +989,7 @@ enum {
 #define KEYMAP(V, NM) WBrhf(KEYMAP, 2), WBfield(V), (NM)
 #define SHORTCUTs(NM) WBh(SHORTCUT, 1), (NM)
 #define SHORTCUT(K,M) WBh(SHORTCUT, 2), (void *)(GDK_##K), (void *)(_##M##mask)
+#define SHORTCUT0 WBh(SHORTCUT, 0)
 #define GROUPR WBrh(uOP, 0)
 #define GROUP0 WBrhs(uOP, 0)
 #define GROUPN WBrhs(uOP, 1), NULL

@@ -749,14 +749,22 @@ static void *keylist_code[] = {
 		SHORTCUT(4, 0), SHORTCUT(KP_4, 0),
 	uMENUITEM(_("400% zoom"), ACTMOD(ACT_ZOOM, 4)),
 		SHORTCUT(5, 0), SHORTCUT(KP_5, 0),
+	uMENUITEM(_("600% zoom"), ACTMOD(ACT_ZOOM, 6)),
+		SHORTCUT0,
 	uMENUITEM(_("800% zoom"), ACTMOD(ACT_ZOOM, 8)),
 		SHORTCUT(6, 0), SHORTCUT(KP_6, 0),
+	uMENUITEM(_("1000% zoom"), ACTMOD(ACT_ZOOM, 10)),
+		SHORTCUT0,
 	uMENUITEM(_("1200% zoom"), ACTMOD(ACT_ZOOM, 12)),
 		SHORTCUT(7, 0), SHORTCUT(KP_7, 0),
 	uMENUITEM(_("1600% zoom"), ACTMOD(ACT_ZOOM, 16)),
 		SHORTCUT(8, 0), SHORTCUT(KP_8, 0),
 	uMENUITEM(_("2000% zoom"), ACTMOD(ACT_ZOOM, 20)),
 		SHORTCUT(9, 0), SHORTCUT(KP_9, 0),
+	uMENUITEM(_("4000% zoom"), ACTMOD(ACT_ZOOM, 40)),
+		SHORTCUT0,
+	uMENUITEM(_("8000% zoom"), ACTMOD(ACT_ZOOM, 80)),
+		SHORTCUT0,
 	uMENUITEM(_("10% opacity"), ACTMOD(ACT_OPAC, 1)),
 		SHORTCUT(1, C), SHORTCUT(KP_1, C),
 	uMENUITEM(_("20% opacity"), ACTMOD(ACT_OPAC, 2)),
@@ -1841,25 +1849,17 @@ static int get_bkg(int xc, int yc, int dclick)
 /* This is set when background is at different scale than image */
 int async_bk;
 
-void setup_row(renderstate *r, int x0, int width, double czoom, int mw, int xpm,
-	int opac, int bpp, png_color *pal)
+void setup_row(renderstate *r, int x0, int width, int zoom, int scale, int mw,
+	int xpm, int opac, int bpp, png_color *pal)
 {
 	renderstate rr;
+
 	/* Horizontal zoom */
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	if (czoom <= 1.0)
-	{
-		rr.zoom = rint(1.0 / czoom);
-		rr.scale = 1;
-		x0 = 0;
-	}
-	else
-	{
-		rr.zoom = 1;
-		rr.scale = rint(czoom);
-		x0 %= rr.scale;
-		if (x0 < 0) x0 += rr.scale;
-	}
+	rr.zoom = zoom;
+	rr.scale = scale;
+	x0 %= rr.scale;
+	if (x0 < 0) x0 += rr.scale;
+
 	if (width + x0 > rr.scale)
 	{
 		rr.dx = rr.scale - x0;
@@ -2266,8 +2266,7 @@ typedef struct {
 	unsigned char *mask0;	// Active mask channel
 	unsigned char *pvi;	// Xform render: temp image row
 	unsigned char *pvm;	// Xform render: temp mask row
-	int px2, py2;		// Clipped area position
-	int pw2, ph2;		// Clipped area size
+	int rxy[4];		// Clipped area
 	int dx;			// Image-space X offset
 	int lx;			// Allocated row length
 	int pww;		// Logical row length
@@ -2299,28 +2298,19 @@ typedef struct {
 static int paste_render_req(render_mem_req *mr, paste_render_state *p,
 	main_render_state *r)
 {
-	int x, y, w, h, mx, my, bpp, scale = r->scale, zoom = r->zoom;
+	int rxy[4], bpp, scale = r->scale, zoom = r->zoom;
 
 
 	/* Clip paste area to update area */
-	x = (marq_x1 * scale + zoom - 1) / zoom;
-	y = (marq_y1 * scale + zoom - 1) / zoom;
-	if (x < r->px2) x = r->px2;
-	if (y < r->py2) y = r->py2;
-	w = (marq_x2 * scale) / zoom + scale;
-	h = (marq_y2 * scale) / zoom + scale;
-	mx = r->px2 + r->pw2;
-	w = (w < mx ? w : mx) - x;
-	my = r->py2 + r->ph2;
-	h = (h < my ? h : my) - y;
-	if ((w <= 0) || (h <= 0)) return (FALSE);
-
-	memset(p, 0, sizeof(paste_render_state));
+	if (!clip(rxy, (marq_x1 * scale + zoom - 1) / zoom,
+		(marq_y1 * scale + zoom - 1) / zoom,
+		(marq_x2 * scale) / zoom + scale,
+		(marq_y2 * scale) / zoom + scale, r->rxy)) return (FALSE);
 
 	/* Setup row position and size */
-	p->dx = (x * zoom) / scale;
-	if (zoom > 1) p->lx = (w - 1) * zoom + 1 , p->pww = w;
-	else p->lx = p->pww = (x + w - 1) / scale - p->dx + 1;
+	p->dx = (rxy[0] * zoom) / scale;
+	p->pww = xy_span(rxy, scale, 0);
+	p->lx = (p->pww - 1) * zoom + 1;
 
 	if ((mem_channel == CHN_IMAGE) && mem_img[CHN_ALPHA] &&
 		!channel_dis[CHN_ALPHA])
@@ -2340,6 +2330,9 @@ static int paste_render_req(render_mem_req *mr, paste_render_state *p,
 	// Need xform buffer
 	p->xform = mem_preview_clip && (bpp == 3) && (mem_clip_bpp == 3);
 	if (p->xform || NEED_XBUF_PASTE) mr->n_channel_s = p->lx * bpp;
+
+	/* Setup opacity mode */
+	if (!IS_INDEXED) p->opacity = tool_opacity;
 
 	return (TRUE);
 }
@@ -2382,9 +2375,6 @@ static void init_paste_render(render_mem_req *mr, paste_render_state *p,
 
 	/* Setup fake alpha */
 	if (p->t_alpha) memset(p->t_alpha, channel_col_A[CHN_ALPHA], p->lx);
-
-	/* Setup opacity mode */
-	if (!IS_INDEXED) p->opacity = tool_opacity;
 }
 
 static void paste_render(int start, int step, int y, paste_render_state *p)
@@ -2416,125 +2406,21 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		bpp, p->opacity);
 }
 
-int kpix_threads;	// Min kpixels per render thread
-
 typedef struct {
 	main_render_state r;
 	paste_render_state p;
 	render_mem_req m;
-	int tflag, gflag, pflag;
+	int tflag, gflag, pflag, lr;
 	int pw;
-	unsigned char *rgb;
+	int cxy[4];
+	unsigned char *rgb, *irgb;
 	threaddata *tdata; // For simplicity
 } u_render_state;
 
-static void do_main_render(tcb *thread);
-static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph);
-
-static int main_render_rgb(unsigned char *rgb, int x, int y, int w, int h, int pw)
-{
-	main_render_state r;
-	paste_render_state prstate;
-	render_mem_req mr;
-	u_render_state u;
-	int nt, wh, nt2;
-
-
-	memset(&r, 0, sizeof(r));
-	memset(&mr, 0, sizeof(mr));
-	u.gflag = u.pflag = FALSE;
-
-	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
-	r.zoom = r.scale = 1;
-	if (can_zoom < 1.0) r.zoom = rint(1.0 / can_zoom);
-	else r.scale = rint(can_zoom);
-
-	r.px2 = x; r.py2 = y;
-	r.pw2 = w; r.ph2 = h;
-
-	/* Setup row position and size */
-	r.dx = (r.px2 * r.zoom) / r.scale;
-	if (r.zoom > 1) r.lx = (r.pw2 - 1) * r.zoom + 1 , r.pww = r.pw2;
-	else r.lx = r.pww = (r.px2 + r.pw2 - 1) / r.scale - r.dx + 1;
-
-	/* ****** Memory request phase ****** */
-
-	/* Color transform preview */
-	if ((u.tflag = mem_preview && (mem_img_bpp == 3)))
-	{
-		mr.mask_s = r.lx;
-		if (mem_channel == CHN_IMAGE) mr.channel_s = r.lx * 3;
-		else mr.rgb_s = r.lx * 3;
-	}
-
-	/* Color selective mode preview */
-	else if (csel_overlay) mr.overlay_s = r.lx;
-
-	/* Gradient preview */
-	else if ((tool_type == TOOL_GRADIENT) && grad_opacity)
-		u.gflag = grad_render_req(&mr, r.lx);
-
-	/* Paste preview - can only coexist with transform */
-	if (show_paste && (marq_status >= MARQUEE_PASTE) && !mr.overlay_s &&
-		!u.gflag) u.pflag = paste_render_req(&mr, &prstate, &r);
-
-	/* Calculate amount of work for threads */
-	wh = (r.py2 + r.ph2 - 1) / r.scale - r.py2 / r.scale + 1;
-	nt = image_threads(r.pww, wh);
-	nt2 = (r.pww * wh + kpix_threads * 1024 - 1) / (kpix_threads * 1024);
-	if (nt > nt2) nt = nt2;
-
-	/* Collect data to pass */
-	u.r = r; u.m = mr; u.p = prstate; u.rgb = rgb; u.pw = pw * 3;
-
-	u.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt,
-		&u, sizeof(u), NULL,
-		&u.m.rgb, u.m.rgb_s,
-		&u.m.mask, u.m.mask_s,
-		&u.m.overlay, u.m.overlay_s,
-		&u.m.channel, u.m.channel_s,
-		&u.m.alpha, u.m.alpha_s,
-		&u.m.n_channel, u.m.n_channel_s,
-		&u.m.n_alpha, u.m.n_alpha_s,
-		&u.m.n_opacity, u.m.n_opacity_s,
-		NULL);
-	if (!u.tdata) return (FALSE);
-
-	if (u.tdata == MEM_NONE) // Running as single thread w/static mem
-		main_render(&u, rgb, r.py2, r.ph2);
-	else // One or more threads w/allocation
-	{
-		u.tdata->silent = TRUE;
-		launch_threads(do_main_render, u.tdata, NULL, wh);
-		free(u.tdata);
-	}
-	return (u.pflag); /* "There was paste" */
-}
-
-static void do_main_render(tcb *thread)
-{
-	u_render_state *u = thread->data;
-	int y0 = u->r.py2, scale = u->r.scale, h = thread->nsteps * scale;
-	int d = y0 % scale, ofs = 0;
-
-	if (thread->step0) ofs = thread->step0 * scale - d;
-	else h -= d;
-	if (ofs + h > u->r.ph2) h = u->r.ph2 - ofs;
-
-	main_render(u, u->rgb + ofs * u->pw, y0 + ofs, h);
-
-	thread_done(thread);
-}
-
-static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph)
+static void main_render_req(u_render_state *u)
 {
 	main_render_state r = u->r;
-	grad_render_state grstate;
-	renderstate rs;
-	unsigned char **tlist = r.tlist, *overlay = u->m.overlay;
-	int j, jj, j0, l, pw23, pw = u->pw;
 
-	/* ****** Init phase ****** */
 
 	if (!channel_dis[CHN_MASK]) r.mask0 = mem_img[CHN_MASK];
 
@@ -2542,6 +2428,46 @@ static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph)
 	r.lop = 255;
 	if (show_layers_main && layers_total && layer_selected)
 		r.lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
+
+	/* Setup row position and size */
+	r.dx = (r.rxy[0] * r.zoom) / r.scale;
+	r.pww = xy_span(r.rxy, r.scale, 0);
+	r.lx = (r.pww - 1) * r.zoom + 1;
+
+	/* ****** Memory request phase ****** */
+
+	/* Color transform preview */
+	if ((u->tflag = mem_preview && (mem_img_bpp == 3)))
+	{
+		u->m.mask_s = r.lx;
+		if (mem_channel == CHN_IMAGE) u->m.channel_s = r.lx * 3;
+		else u->m.rgb_s = r.lx * 3;
+	}
+
+	/* Color selective mode preview */
+	else if (csel_overlay) u->m.overlay_s = r.lx;
+
+	/* Gradient preview */
+	else if ((tool_type == TOOL_GRADIENT) && grad_opacity)
+		u->gflag = grad_render_req(&u->m, r.lx);
+
+	/* Paste preview - can only coexist with transform */
+	if (show_paste && (marq_status >= MARQUEE_PASTE) && !u->m.overlay_s &&
+		!u->gflag) u->pflag = paste_render_req(&u->m, &u->p, &r);
+
+	/* Pass the data */
+	u->r = r;
+}
+
+static void main_render(u_render_state *u, int py, int ph)
+{
+	main_render_state r = u->r;
+	grad_render_state grstate;
+	renderstate rs;
+	unsigned char *rgb, **tlist = r.tlist, *overlay = u->m.overlay;
+	int j, jj, j0, l, pw2, pw;
+
+	/* ****** Init phase ****** */
 
 	/* Color transform preview */
 	if (u->tflag)
@@ -2561,13 +2487,15 @@ static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph)
 	if (u->pflag) init_paste_render(&u->m, &u->p, &r);
 
 	/* Start rendering */
-	setup_row(&rs, r.px2, r.pw2, can_zoom, mem_width, r.xpm, r.lop,
+	pw2 = r.rxy[2] - r.rxy[0];
+	setup_row(&rs, r.rxy[0], pw2, r.zoom, r.scale, mem_width, r.xpm, r.lop,
 		u->gflag && grstate.rgb ? 3 : mem_img_bpp, mem_pal);
 	rs.cmask = (hide_image ? CMASK_IMAGE : 0) |
 		(channel_dis[CHN_ALPHA] ? CMASK_ALPHA : 0) |
 		(channel_dis[CHN_SEL] ? CMASK_SEL : 0) |
 		(channel_dis[CHN_MASK] ? CMASK_MASK : 0);
- 	j0 = -1; pw23 = r.pw2 * 3;
+ 	j0 = -1; pw2 *= 3;
+	rgb = u->irgb + (py - r.rxy[1]) * (pw = u->pw);
 	for (jj = 0; jj < ph; jj++ , rgb += pw)
 	{
 		j = ((py + jj) * r.zoom) / r.scale;
@@ -2612,7 +2540,7 @@ static void main_render(u_render_state *u, unsigned char *rgb, int py, int ph)
 		}
 		else if (!async_bk)
 		{
-			memcpy(rgb, rgb - pw, pw23);
+			memcpy(rgb, rgb - pw, pw2);
 			continue;
 		}
 		render_row(&rs, rgb, mem_img, r.dx, j, tlist);
@@ -3026,17 +2954,12 @@ static unsigned char *clip_to_image(int *rect, unsigned char *rgb, int *vxy)
 	int rxy[4], mw, mh;
 
 	/* Clip update area to image bounds */
+	xy_origin(rxy, vxy, margin_main_x, margin_main_y);
 	canvas_size(&mw, &mh);
-	if (!clip(rxy, margin_main_x, margin_main_y,
-		margin_main_x + mw, margin_main_y + mh, vxy)) return (NULL);
-
-	rect[0] = rxy[0] - margin_main_x;
-	rect[1] = rxy[1] - margin_main_y;
-	rect[2] = rxy[2] - rxy[0];
-	rect[3] = rxy[3] - rxy[1];
+	if (!clip(rect, 0, 0, mw, mh, rxy)) return (NULL);
 
 	/* Align buffer with image */
-	rgb += ((vxy[2] - vxy[0]) * (rxy[1] - vxy[1]) + (rxy[0] - vxy[0])) * 3;
+	rgb += ((rxy[2] - rxy[0]) * (rect[1] - rxy[1]) + (rect[0] - rxy[0])) * 3;
 	return (rgb);
 }
 
@@ -3049,12 +2972,57 @@ void prepare_line_clip(int *lxy, int *vxy, int scale)
 		lxy[i] = floor_div(vxy[i] - margin_main_xy[i & 1] - (i >> 1), scale);
 }
 
+static void canvas_render(u_render_state *u, int py, int ph)
+{
+	int cxy[4], rxy[4], pw = u->pw;
+	unsigned char *rgb = NULL;
+
+	/* Render underlying layers */
+	if (u->lr)
+	{
+		copy4(cxy, u->cxy);
+		rgb = u->rgb + (py - cxy[1]) * pw;
+		cxy[3] = (cxy[1] = py) + ph;
+		render_layers(rgb, cxy, pw, u->r.zoom, u->r.scale,
+			0, layer_selected - 1, layer_selected);
+	}
+
+	/* Render canvas image */
+	if (u->irgb && clip(rxy, 0, py, INT_MAX, py + ph, u->r.rxy))
+		main_render(u, rxy[1], rxy[3] - rxy[1]);
+
+	/* Render overlying layers */
+	if (u->lr) render_layers(rgb, cxy, pw, u->r.zoom, u->r.scale,
+		layer_selected + 1, layers_total, layer_selected);
+}
+
+#ifdef U_THREADS
+
+static void do_canvas_render(tcb *thread)
+{
+	u_render_state *u = thread->data;
+	int *rr = u->lr ? u->cxy : u->r.rxy;
+	int y0 = rr[1], scale = u->r.scale, h = thread->nsteps * scale;
+	int d = floor_mod(y0, scale);
+
+	if (thread->step0) y0 += thread->step0 * scale - d;
+	else h -= d;
+	if (h > rr[3] - y0) h = rr[3] - y0;
+
+	canvas_render(u, y0, h);
+}
+
+#endif
+
+int kpix_threads;	// Min kpixels per render thread
+
 static int paint_canvas(void *dt, void **wdata, int what, void **where,
 	rgbcontext *ctx)
 {
+	u_render_state u;
 	unsigned char *irgb, *rgb = ctx->rgb;
-	int rect[4], vxy[4], rpx, rpy;
-	int i, lr, px, py, pw, ph, zoom = 1, scale = 1, paste_f = FALSE;
+	int rect[4], vxy[4];
+	int i, px, py, pw, ph, zoom = 1, scale = 1, paste_f = FALSE;
 
 	pw = ctx->xy[2] - (px = ctx->xy[0]);
 	ph = ctx->xy[3] - (py = ctx->xy[1]);
@@ -3067,26 +3035,97 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 	if (can_zoom < 1.0) zoom = rint(1.0 / can_zoom);
 	else scale = rint(can_zoom);
 
-	rpx = px - margin_main_x;
-	rpy = py - margin_main_y;
+	/* Prepare data for renderer */
+	memset(&u, 0, sizeof(u));
+	u.r.zoom = zoom;
+	u.r.scale = scale;
+	u.rgb = rgb;
+	u.irgb = irgb;
+	u.pw = pw * 3;
+	xy_origin(u.cxy, ctx->xy, margin_main_x, margin_main_y);
 
-	lr = layers_total && show_layers_main;
+	/* Set up image for renderer */
+	if (irgb)
+	{
+		copy4(u.r.rxy, rect);
+		main_render_req(&u);
+		paste_f = u.pflag;
+	}
+
+	u.lr = layers_total && show_layers_main;
 	if (bkg_flag && bkg_rgb) async_bk = render_bkg(ctx); /* Tracing image */
-	else if (!lr) /* Render default background if no layers shown */
+	else if (!u.lr) /* Render default background if no layers shown */
 	{
 		if (irgb && ((mem_xpm_trans >= 0) ||
 			(!overlay_alpha && mem_img[CHN_ALPHA] && !channel_dis[CHN_ALPHA])))
-			async_bk = render_background(irgb,
-				rect[0], rect[1], rect[2], rect[3], pw * 3);
+			async_bk = render_background(irgb, rect[0], rect[1],
+				rect[2] - rect[0], rect[3] - rect[1], pw * 3);
 	}
-	/* Render underlying layers */
-	if (lr) render_layers(rgb, rpx, rpy, pw, ph,
-		can_zoom, 0, layer_selected - 1, layer_selected);
 
-	if (irgb) paste_f = main_render_rgb(irgb, rect[0], rect[1], rect[2], rect[3], pw);
+	if (irgb || u.lr)
+	{
+#ifdef U_THREADS
+		int nt, nt2, pww = 0, wh = 0;
+		size_t vpix = 0;
 
-	if (lr) render_layers(rgb, rpx, rpy, pw, ph,
-		can_zoom, layer_selected + 1, layers_total, layer_selected);
+		/* Calculate amount of work for threads */
+		if (irgb)
+		{
+			wh = xy_span(rect, scale, 1);
+			pww = xy_span(rect, scale, 0);
+			vpix = pww * wh;
+		}
+		if (u.lr)
+		{
+			size_t vp2 = render_layers(NULL, u.cxy, 0, zoom, scale,
+				0, layers_total, layer_selected);
+			// !!! Heuristic weight; maybe 1/8 would be better?
+			vpix += (vp2 - vpix) / 4;
+
+			u.rgb += ((u.cxy[1] - py + margin_main_y) * pw +
+				u.cxy[0] - px + margin_main_x) * 3;
+
+			wh = xy_span(u.cxy, scale, 1);
+			pww = xy_span(u.cxy, async_bk ? 1 : scale, 0);
+		}
+
+		nt = image_threads(pww, wh);
+		nt2 = ceil_div(vpix, kpix_threads * 1024);
+		if (nt2 > nt) nt2 = nt;
+
+		u.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt2,
+			&u, sizeof(u), NULL,
+#else
+		u.tdata = multialloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE,
+#endif
+			&u.m.rgb, u.m.rgb_s,
+			&u.m.mask, u.m.mask_s,
+			&u.m.overlay, u.m.overlay_s,
+			&u.m.channel, u.m.channel_s,
+			&u.m.alpha, u.m.alpha_s,
+			&u.m.n_channel, u.m.n_channel_s,
+			&u.m.n_alpha, u.m.n_alpha_s,
+			&u.m.n_opacity, u.m.n_opacity_s,
+			NULL);
+
+#ifdef U_THREADS
+		if (u.tdata && (u.tdata != MEM_NONE)) // Threads w/allocation
+		{
+			nt /= u.tdata->count;
+			if (nt > MAX_TH_STRIPS) nt = MAX_TH_STRIPS;
+			u.tdata->chunks = nt;
+			u.tdata->silent = TRUE;
+			launch_threads(do_canvas_render, u.tdata, NULL, wh);
+		}
+		else
+#endif
+		if (u.tdata) // Single thread
+		{
+			int *rr = u.lr ? u.cxy : rect;
+			canvas_render(&u, rr[1], rr[3] - rr[1]);
+		}
+		if (u.tdata != MEM_NONE) free(u.tdata);
+	}
 
 	/* No grid at all */
 	if (!mem_show_grid || (scale < mem_grid_min));
@@ -3115,12 +3154,12 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 	}
 
 	/* Tile grid */
-	if (show_tile_grid && irgb)
-		draw_tgrid(irgb, rect[0], rect[1], rect[2], rect[3], pw);
+	if (show_tile_grid && irgb) draw_tgrid(irgb, rect[0], rect[1],
+		rect[2] - rect[0], rect[3] - rect[1], pw);
 
 	/* Segmentation preview */
-	if (seg_preview && irgb)
-		draw_segments(irgb, rect[0], rect[1], rect[2], rect[3], pw);
+	if (seg_preview && irgb) draw_segments(irgb, rect[0], rect[1],
+		rect[2] - rect[0], rect[3] - rect[1], pw);
 
 	async_bk = FALSE;
 

@@ -34,6 +34,7 @@
 #include "channels.h"
 #include "toolbar.h"
 #include "font.h"
+#include "thread.h"
 
 int font_aa, font_bk, font_r;
 int font_bkg, font_angle, font_align;
@@ -372,19 +373,17 @@ static void **vw_scrolledwindow;
 void **vw_drawing;
 int vw_focus_on;
 
-void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
-	double czoom, int lr0, int lr1, int align)
+size_t render_layers(unsigned char *rgb, int cxy[4], int pw, int zoom, int scale,
+	int lr0, int lr1, int align)
 {
 	renderstate rs;
-	int rxy[4], cxy[4] = { px, py, px + pw, py + ph };
+	int rxy[4], txy[4] = { cxy[2], cxy[3], cxy[0], cxy[1] };
 	image_info *image;
 	unsigned char *tmp, **img;
 	int i, j, ii, jj, ll, wx0, wy0, wx1, wy1, xpm, opac;
 	int dx, dy, ddx, ddy, mx, mw, my, mh;
-	int step = pw * 3, zoom = 1, scale = 1;
-
-	if (czoom < 1.0) zoom = rint(1.0 / czoom);
-	else scale = rint(czoom);
+	int px = cxy[0], py = cxy[1];
+	size_t npix = 0, nrow = 0;
 
 	/* Align on specified layer */
 	dx = layer_table[align].x;
@@ -402,7 +401,7 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 			floor_div(ddy + zoom, zoom),
 			floor_div(ddx + image->width * scale, zoom) + 1,
 			floor_div(ddy + image->height * scale, zoom) + 1,
-			cxy)) return;
+			cxy)) return (0);
 	}
 
 	/* Get image-space bounds */
@@ -415,26 +414,41 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 	{
 		layer_node *t = layer_table + ll;
 
-		if (!t->visible) continue;
+		image = ll == layer_selected ? &mem_image : &t->image->image_;
+		/* !!! When sizing canvas, do not skip selected layer */
+		if (!t->visible && (pw || (ll != layer_selected))) continue;
 		i = t->x - dx;
 		j = t->y - dy;
-		image = ll == layer_selected ? &mem_image : &t->image->image_;
 		ii = i + image->width;
 		jj = j + image->height;
 		if ((i > wx1) || (j > wy1) || (ii <= wx0) || (jj <= wy0))
 			continue;
-		if (!clip(rxy, floor_div(i * scale + zoom - 1, zoom),
-			floor_div(j * scale + zoom - 1, zoom),
+		if (!clip(rxy, ceil_div(i * scale, zoom),
+			ceil_div(j * scale, zoom),
 			floor_div(ii * scale - 1, zoom) + 1,
 			floor_div(jj * scale - 1, zoom) + 1, cxy)) continue;
+
+#ifdef U_THREADS
+		if (!rgb) /* Calculating area & load */
+		{
+			int mw = rxy[2] - rxy[0], mh = rxy[3] - rxy[1];
+			npix += mw * mh;
+			nrow += mh;
+			if (txy[0] > rxy[0]) txy[0] = rxy[0];
+			if (txy[1] > rxy[1]) txy[1] = rxy[1];
+			if (txy[2] < rxy[2]) txy[2] = rxy[2];
+			if (txy[3] < rxy[3]) txy[3] = rxy[3];
+			continue;
+		}
+#endif
 
 		xpm = t != layer_table ? image->trans : -1; // above background
 		opac = (t->opacity * 255 + 50) / 100;
 		mw = rxy[2] - (mx = rxy[0]);
-		setup_row(&rs, mx, mw, czoom, image->width, xpm, opac,
+		setup_row(&rs, mx, mw, zoom, scale, image->width, xpm, opac,
 			image->bpp, image->pal);
 		mh = rxy[3] - (my = rxy[1]);
-		tmp = rgb + (my - py) * step + (mx - px) * 3;
+		tmp = rgb + (my - py) * pw + (mx - px) * 3;
 		ddx = floor_div(mx * zoom, scale) - i;
 		ddy = floor_div(my * zoom, scale) - j;
 
@@ -442,28 +456,108 @@ void render_layers(unsigned char *rgb, int px, int py, int pw, int ph,
 		if (i < 0) i += scale;
 		mh = mh * zoom + i;
 		img = image->img;
-		for (j = -1; i < mh; i += zoom , tmp += step)
+		for (j = -1; i < mh; i += zoom , tmp += pw)
 		{
 			if ((i / scale == j) && !async_bk)
 			{
-				memcpy(tmp, tmp - step, mw * 3);
+				memcpy(tmp, tmp - pw, mw * 3);
 				continue;
 			}
 			j = i / scale;
 			render_row(&rs, tmp, img, ddx, ddy + j, NULL);
 		}
 	}
+
+#ifdef U_THREADS
+	if (rgb) return (0);
+
+	/* Total work to do */
+	if (async_bk) scale = 1;
+	// Weight coefficients are empirical
+	npix = npix / 6 + npix / (scale * scale) + (nrow / scale) * 75;
+	copy4(cxy, txy);
+#endif
+	return (npix);
 }
+
+typedef struct {
+	unsigned char *rgb;
+	int cxy[4];
+	int pw, zoom, scale;
+	threaddata *tdata; // For simplicity
+} lr_render_state;
+
+#ifdef U_THREADS
+
+static void do_layers_render(tcb *thread)
+{
+	lr_render_state *ls = thread->data;
+	int rxy[4];
+	int scale = ls->scale, h = thread->nsteps * scale;
+	int y0, d, ofs = 0;
+
+	copy4(rxy, ls->cxy);
+	d = floor_mod(y0 = rxy[1], scale);
+	if (thread->step0) rxy[1] = y0 += ofs = thread->step0 * scale - d;
+	else h -= d;
+	if (y0 + h < rxy[3]) rxy[3] = y0 + h;
+
+	/* Always align on background layer */
+	render_layers(ls->rgb + ofs * ls->pw, rxy, ls->pw, ls->zoom, scale,
+		0, layers_total, 0);
+}
+
+#endif
 
 void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double czoom )
 {
+	lr_render_state ls = { rgb, { px, py, px + pw, py + ph }, pw * 3, 1, 1 };
 	int tmp = overlay_alpha;
+#ifdef U_THREADS
+	int wh, nt, nt2;
+	size_t vpix;
+#endif
 
 	if (!rgb) return; /* Paranoia */
 	/* Control transparency separately */
 	overlay_alpha = opaque_view;
-	/* Always align on background layer */
-	render_layers(rgb, px, py, pw, ph, czoom, 0, layers_total, 0);
+
+	/* !!! This uses the fact that zoom factor is either N or 1/N !!! */
+	if (czoom < 1.0) ls.zoom = rint(1.0 / czoom);
+	else ls.scale = rint(czoom);
+
+#ifdef U_THREADS
+	/* Calculate amount of work for threads */
+	vpix = render_layers(NULL, ls.cxy, 1, ls.zoom, ls.scale,
+		0, layers_total, 0);
+
+	wh = xy_span(ls.cxy, ls.scale, 1);
+	nt = image_threads(xy_span(ls.cxy, ls.scale, 0), wh);
+	vpix /= 4; // !!! Heuristic weight; maybe 1/8 would be better?
+	nt2 = ceil_div(vpix, kpix_threads * 1024);
+	if (nt2 > nt) nt2 = nt;
+
+	ls.rgb += ((ls.cxy[1] - py) * pw + ls.cxy[0] - px) * 3;
+
+	ls.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt2,
+		&ls, sizeof(ls), NULL, NULL);
+
+	if (ls.tdata && (ls.tdata != MEM_NONE)) // 2+ threads w/allocation
+	{
+		nt /= ls.tdata->count;
+		if (nt > MAX_TH_STRIPS) nt = MAX_TH_STRIPS;
+		ls.tdata->chunks = nt;
+		ls.tdata->silent = TRUE;
+		launch_threads(do_layers_render, ls.tdata, NULL, wh);
+		free(ls.tdata);
+	}
+	else // No alloc - single thread
+#endif
+	{
+		/* Always align on background layer */
+		render_layers(ls.rgb, ls.cxy, ls.pw, ls.zoom, ls.scale,
+			0, layers_total, 0);
+	}
 	overlay_alpha = tmp;
 }
 

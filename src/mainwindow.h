@@ -306,6 +306,12 @@ extern void *scriptbar_code[];		// Set up scriptable items for tools toolbar
 
 int kpix_threads;			// Min kpixels per render thread
 
+/* With 2 cores and uniform layers stack, no noticeable difference between
+ * 1, 4 and 8 strips per thread; time jitter of about 10% is common, and spikes
+ * of about 40% sometimes happen; with 1 strip, even 50% was observed once.
+ * Still, with nonuniform layers, more strips can maybe balance better - WJ */
+#define MAX_TH_STRIPS 8
+
 void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
@@ -337,8 +343,8 @@ typedef struct {
 	png_color *pal;
 } renderstate;
 
-void setup_row(renderstate *r, int x0, int width, double czoom, int mw, int xpm,
-	int opac, int bpp, png_color *pal);
+void setup_row(renderstate *r, int x0, int width, int zoom, int scale, int mw,
+	int xpm, int opac, int bpp, png_color *pal);
 void render_row(renderstate *r, unsigned char *rgb, chanlist base_img,
 	int x, int y, chanlist xtra_img);
 

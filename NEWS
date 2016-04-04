@@ -24,6 +24,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
 	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)
 	* Scroll wheel zoom now works for view window too
+	* Zoom is now up to 8000%
 	* "Hide image" and "View alpha as an overlay" can now be toggled separately for each layer (Preferences->General->Enable overlays by layer)
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2.4 for details
 	* XPM files with 65-92 colours are now saved with smaller size
