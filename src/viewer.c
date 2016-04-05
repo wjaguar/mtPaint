@@ -374,7 +374,7 @@ void **vw_drawing;
 int vw_focus_on;
 
 size_t render_layers(unsigned char *rgb, int cxy[4], int pw, int zoom, int scale,
-	int lr0, int lr1, int align)
+	int lr0, int lr1, int view)
 {
 	renderstate rs;
 	int rxy[4], txy[4] = { cxy[2], cxy[3], cxy[0], cxy[1] };
@@ -385,12 +385,17 @@ size_t render_layers(unsigned char *rgb, int cxy[4], int pw, int zoom, int scale
 	int px = cxy[0], py = cxy[1];
 	size_t npix = 0, nrow = 0;
 
-	/* Align on specified layer */
-	dx = layer_table[align].x;
-	dy = layer_table[align].y;
+	/* Align view on background, canvas on image */
+	dx = layer_table[0].x;
+	dy = layer_table[0].y;
+	if (!view)
+	{
+		dx = layer_table_p[layer_selected].x;
+		dy = layer_table_p[layer_selected].y;
+	}
 
 	/* Clip to background if needed */
-	if (layers_pastry_cut)
+	if (view && ani_state)
 	{
 		image = layer_selected ? &layer_table[0].image->image_ : &mem_image;
 
@@ -412,11 +417,11 @@ size_t render_layers(unsigned char *rgb, int cxy[4], int pw, int zoom, int scale
 
 	for (ll = lr0; ll <= lr1; ll++)
 	{
-		layer_node *t = layer_table + ll;
+		layer_node *t = (view ? layer_table : layer_table_p) + ll;
 
 		image = ll == layer_selected ? &mem_image : &t->image->image_;
 		/* !!! When sizing canvas, do not skip selected layer */
-		if (!t->visible && (pw || (ll != layer_selected))) continue;
+		if (!t->visible && (view || (ll != layer_selected))) continue;
 		i = t->x - dx;
 		j = t->y - dy;
 		ii = i + image->width;
@@ -442,7 +447,7 @@ size_t render_layers(unsigned char *rgb, int cxy[4], int pw, int zoom, int scale
 		}
 #endif
 
-		xpm = t != layer_table ? image->trans : -1; // above background
+		xpm = ll ? image->trans : -1; // above background
 		opac = (t->opacity * 255 + 50) / 100;
 		mw = rxy[2] - (mx = rxy[0]);
 		setup_row(&rs, mx, mw, zoom, scale, image->width, xpm, opac,
@@ -504,7 +509,7 @@ static void do_layers_render(tcb *thread)
 
 	/* Always align on background layer */
 	render_layers(ls->rgb + ofs * ls->pw, rxy, ls->pw, ls->zoom, scale,
-		0, layers_total, 0);
+		0, layers_total, TRUE);
 }
 
 #endif
@@ -528,8 +533,8 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 
 #ifdef U_THREADS
 	/* Calculate amount of work for threads */
-	vpix = render_layers(NULL, ls.cxy, 1, ls.zoom, ls.scale,
-		0, layers_total, 0);
+	vpix = render_layers(NULL, ls.cxy, 0, ls.zoom, ls.scale,
+		0, layers_total, TRUE);
 
 	wh = xy_span(ls.cxy, ls.scale, 1);
 	nt = image_threads(xy_span(ls.cxy, ls.scale, 0), wh);
@@ -556,7 +561,7 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 	{
 		/* Always align on background layer */
 		render_layers(ls.rgb, ls.cxy, ls.pw, ls.zoom, ls.scale,
-			0, layers_total, 0);
+			0, layers_total, TRUE);
 	}
 	overlay_alpha = tmp;
 }

@@ -1,5 +1,5 @@
 /*	ani.h
-	Copyright (C) 2005-2013 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -41,6 +41,14 @@ typedef struct {
 	ani_slot pos[MAX_POS_SLOTS];
 	unsigned char cycles[MAX_CYC_ITEMS * 2];
 } ani_info;
+
+enum {
+	ANI_NONE = 0,
+	ANI_PLAY,
+	ANI_CONF
+};
+
+int ani_state;
 
 int ani_frame1, ani_frame2, ani_gif_delay;
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];

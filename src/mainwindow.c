@@ -2426,8 +2426,8 @@ static void main_render_req(u_render_state *u)
 
 	r.xpm = mem_xpm_trans;
 	r.lop = 255;
-	if (show_layers_main && layers_total && layer_selected)
-		r.lop = (layer_table[layer_selected].opacity * 255 + 50) / 100;
+	if (u->lr && layer_selected)
+		r.lop = (layer_table_p[layer_selected].opacity * 255 + 50) / 100;
 
 	/* Setup row position and size */
 	r.dx = (r.rxy[0] * r.zoom) / r.scale;
@@ -2984,7 +2984,7 @@ static void canvas_render(u_render_state *u, int py, int ph)
 		rgb = u->rgb + (py - cxy[1]) * pw;
 		cxy[3] = (cxy[1] = py) + ph;
 		render_layers(rgb, cxy, pw, u->r.zoom, u->r.scale,
-			0, layer_selected - 1, layer_selected);
+			0, layer_selected - 1, FALSE);
 	}
 
 	/* Render canvas image */
@@ -2993,7 +2993,7 @@ static void canvas_render(u_render_state *u, int py, int ph)
 
 	/* Render overlying layers */
 	if (u->lr) render_layers(rgb, cxy, pw, u->r.zoom, u->r.scale,
-		layer_selected + 1, layers_total, layer_selected);
+		layer_selected + 1, layers_total, FALSE);
 }
 
 #ifdef U_THREADS
@@ -3044,6 +3044,8 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 	u.pw = pw * 3;
 	xy_origin(u.cxy, ctx->xy, margin_main_x, margin_main_y);
 
+	u.lr = layers_total && LAYERS_MAIN;
+
 	/* Set up image for renderer */
 	if (irgb)
 	{
@@ -3052,7 +3054,6 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		paste_f = u.pflag;
 	}
 
-	u.lr = layers_total && show_layers_main;
 	if (bkg_flag && bkg_rgb) async_bk = render_bkg(ctx); /* Tracing image */
 	else if (!u.lr) /* Render default background if no layers shown */
 	{
@@ -3078,7 +3079,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		if (u.lr)
 		{
 			size_t vp2 = render_layers(NULL, u.cxy, 0, zoom, scale,
-				0, layers_total, layer_selected);
+				0, layers_total, FALSE);
 			// !!! Heuristic weight; maybe 1/8 would be better?
 			vpix += (vp2 - vpix) / 4;
 

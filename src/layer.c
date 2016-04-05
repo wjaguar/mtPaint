@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -42,12 +42,12 @@ int	layers_total,		// Layers currently being used
 
 char layers_filename[PATHBUF];		// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
-	layers_pastry_cut,		// Pastry cut layers in view area (for animation previews)
 	layer_overlay;			// Toggle overlays per layer
 
 
 // !!! Always follow adding/changing layer's image_info by update_undo()
-layer_node layer_table[MAX_LAYERS + 1];	// Table of layer info
+layer_node layer_table[(MAX_LAYERS + 1) * 2];	// Table of layer info & its backup
+layer_node *layer_table_p = layer_table;	// Unmodified layer table
 
 
 static void layer_clear_slot(int l, int visible)
@@ -93,12 +93,12 @@ static void repaint_layer(int l)	// Repaint layer in view/main window
 	ly = t->y - layer_table[layer_selected].y;
 
 	vw_update_area(lx, ly, lw, lh);
-	if (show_layers_main) main_update_area(lx, ly, lw, lh);
+	if (LAYERS_MAIN) main_update_area(lx, ly, lw, lh);
 }
 
 static void repaint_layers()
 {
-	update_stuff(show_layers_main ? UPD_ALLV : UPD_VIEW);
+	update_stuff(LAYERS_MAIN ? UPD_ALLV : UPD_VIEW);
 }
 
 
@@ -1048,9 +1048,9 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	{
 		layer_show_position();
 		// All layers get moved while the current one stays still
-		if (show_layers_main) upd |= UPD_RENDER;
+		if (LAYERS_MAIN) upd |= UPD_RENDER;
 	}
-	else if (show_layers_main) main_update_area(lx, ly, lw, lh);
+	else if (LAYERS_MAIN) main_update_area(lx, ly, lw, lh);
 	// All layers get moved while the background stays still
 	if (l == 0) upd |= UPD_VIEW;
 	else vw_update_area(lx, ly, lw, lh);

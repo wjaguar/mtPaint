@@ -1,5 +1,5 @@
 /*	layer.h
-	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -39,7 +39,8 @@ typedef struct {
 } layer_node;
 
 
-layer_node layer_table[MAX_LAYERS+1];	// Table of layer info
+layer_node layer_table[(MAX_LAYERS + 1) * 2];	// Table of layer info & its backup
+layer_node *layer_table_p;		// Unmodified layer table
 
 int	layers_total,			// Layers currently in use
 	layer_selected,			// Layer currently selected in the layers window
@@ -47,9 +48,9 @@ int	layers_total,			// Layers currently in use
 
 char layers_filename[PATHBUF];	// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
-	layers_pastry_cut,		// Pastry cut layers in view area (for animation previews)
 	layer_overlay;			// Toggle overlays per layer
 
+#define LAYERS_MAIN (show_layers_main && (ani_state != ANI_CONF))
 
 
 ///	PROCEDURES

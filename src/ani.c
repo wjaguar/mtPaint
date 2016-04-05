@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -58,6 +58,8 @@ typedef struct {
 
 ///	GLOBALS
 
+int ani_state;
+
 int	ani_frame1 = 1, ani_frame2 = 1, ani_gif_delay = 10;
 static int ani_play_state, ani_timer_state;
 
@@ -67,10 +69,8 @@ static int ani_play_state, ani_timer_state;
 
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
-static int
-	ani_layer_data[MAX_LAYERS + 1][4];	// x, y, opacity, visible
 static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
-static int ani_use_gif, ani_show_main_state;
+static int ani_use_gif;
 
 
 
@@ -398,30 +398,17 @@ static int ani_pos_sscanf(char *txt, ani_slot *ani)
 
 
 
-static void ani_read_layer_data()		// Read current layer x/y/opacity data to table
+static void ani_read_layer_data()	// Save current layer state
 {
-	int i;
-
-	for ( i=0; i<=MAX_LAYERS; i++ )
-	{
-		ani_layer_data[i][0] = layer_table[i].x;
-		ani_layer_data[i][1] = layer_table[i].y;
-		ani_layer_data[i][2] = layer_table[i].opacity;
-		ani_layer_data[i][3] = layer_table[i].visible;
-	}
+	memcpy(layer_table_p = layer_table + (MAX_LAYERS + 1), layer_table,
+		(MAX_LAYERS + 1) * sizeof(layer_table[0]));
 }
 
-static void ani_write_layer_data()		// Write current layer x/y/opacity data from table
+static void ani_write_layer_data(int final)	// Restore layer state
 {
-	int i;
-
-	for ( i=0; i<=MAX_LAYERS; i++ )
-	{
-		layer_table[i].x       = ani_layer_data[i][0];
-		layer_table[i].y       = ani_layer_data[i][1];
-		layer_table[i].opacity = ani_layer_data[i][2];
-		layer_table[i].visible = ani_layer_data[i][3];
-	}
+	memcpy(layer_table, layer_table_p,
+		(MAX_LAYERS + 1) * sizeof(layer_table[0]));
+	if (final) layer_table_p = layer_table;
 }
 
 static char *ani_cyc_txt()	// Text for the cycle text widget
@@ -492,15 +479,13 @@ static void create_frames_ani();
 static void ani_btn(anim_dd *dt, void **wdata, int what, void **where)
 {
 	ani_win_read_widgets(wdata);
-	ani_write_layer_data();
+	ani_write_layer_data(what == op_EVT_CANCEL);
 
 	if (what == op_EVT_CANCEL)
 	{
 		run_destroy(wdata);
 
-		layers_pastry_cut = FALSE;
-
-		show_layers_main = ani_show_main_state;
+		ani_state = ANI_NONE;
 		update_stuff(UPD_ALLV);
 		return;
 	}
@@ -639,8 +624,8 @@ static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)
 		if (awin) cmd_showhide(GET_WINDOW(awin), TRUE);
 		else
 		{
-			ani_write_layer_data();
-			layers_pastry_cut = FALSE;
+			ani_write_layer_data(TRUE);
+			ani_state = ANI_NONE;
 			update_stuff(UPD_ALLV);
 		}
 	}
@@ -655,6 +640,7 @@ static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)
 	{
 		ani_read_layer_data();
 		layers_notify_changed();
+		update_stuff(UPD_RENDER);
 	}
 }
 
@@ -686,7 +672,7 @@ void ani_but_preview(void **awin)
 	if (awin) cmd_showhide(GET_WINDOW(awin), FALSE);
 	else
 	{
-		layers_pastry_cut = TRUE;
+		ani_state = ANI_PLAY;
 		update_stuff(UPD_ALLV);
 	}
 
@@ -1053,10 +1039,8 @@ void pressed_animate_window()
 	run_create(anim_code, &tdata, sizeof(tdata));
 	free(tdata.cyc);
 
-	ani_show_main_state = show_layers_main;	// Remember old state
-	show_layers_main = FALSE;		// Don't show all layers in main window - too messy
+	ani_state = ANI_CONF;	// Don't show all layers in main window - too messy
 
-	layers_pastry_cut = TRUE;
 	update_stuff(UPD_ALLV);
 }
 
