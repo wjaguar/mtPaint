@@ -50,8 +50,6 @@ char layers_filename[PATHBUF];	// Current filename for layers file
 int	show_layers_main,		// Show all layers in main window
 	layer_overlay;			// Toggle overlays per layer
 
-#define LAYERS_MAIN (show_layers_main && (ani_state != ANI_CONF))
-
 
 ///	PROCEDURES
 

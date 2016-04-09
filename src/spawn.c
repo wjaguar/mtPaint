@@ -502,6 +502,7 @@ static void *spawn_code[] = {
 	COLUMNDATA(strs, sizeof(spawn_row)), CLEANUP(strs),
 	REF(list), LISTCd(nidx, cnt, faction_select_row), TRIGGER,
 	REF(group), GROUPR,
+	BORDER(ENTRY, 0),
 	FHBOXB(_("Action")), XENTRY(name), EVENT(CHANGE, faction_changed), WDONE,
 	FHBOXB(_("Command")), XENTRY(cmd), EVENT(CHANGE, faction_changed), WDONE,
 	PATH(_("Directory"), _("Select Directory"), FS_SELECT_DIR, dir),

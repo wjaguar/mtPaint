@@ -80,7 +80,9 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src)
 	return (NULL);
 }
 
-static void repaint_layer(int l)	// Repaint layer in view/main window
+/* Repaint layer in view/main window
+ * !!! Never called in anim mode, so position is the same in both windows */
+static void repaint_layer(int l)
 {
 	layer_node *t = layer_table + l;
 	image_info *image;
@@ -93,12 +95,12 @@ static void repaint_layer(int l)	// Repaint layer in view/main window
 	ly = t->y - layer_table[layer_selected].y;
 
 	vw_update_area(lx, ly, lw, lh);
-	if (LAYERS_MAIN) main_update_area(lx, ly, lw, lh);
+	if (show_layers_main) main_update_area(lx, ly, lw, lh);
 }
 
 static void repaint_layers()
 {
-	update_stuff(LAYERS_MAIN ? UPD_ALLV : UPD_VIEW);
+	update_stuff(show_layers_main ? UPD_ALLV : UPD_VIEW);
 }
 
 
@@ -1028,7 +1030,9 @@ void pressed_paste_layer()
 	view_show();
 }
 
-void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & update window labels
+/* Move a layer & update window labels
+ * !!! Never called in anim mode, so coords are the same in both windows */
+void move_layer_relative(int l, int change_x, int change_y)
 {
 	image_info *image = l == layer_selected ? &mem_image :
 		&layer_table[l].image->image_;
@@ -1048,9 +1052,9 @@ void move_layer_relative(int l, int change_x, int change_y)	// Move a layer & up
 	{
 		layer_show_position();
 		// All layers get moved while the current one stays still
-		if (LAYERS_MAIN) upd |= UPD_RENDER;
+		if (show_layers_main) upd |= UPD_RENDER;
 	}
-	else if (LAYERS_MAIN) main_update_area(lx, ly, lw, lh);
+	else if (show_layers_main) main_update_area(lx, ly, lw, lh);
 	// All layers get moved while the background stays still
 	if (l == 0) upd |= UPD_VIEW;
 	else vw_update_area(lx, ly, lw, lh);

@@ -1649,7 +1649,6 @@ static void change_image_format(fselector_dd *dt, void **wdata, int what,
 	cmd_setv(wdata, (void *)flags, WDATA_ACTMAP);
 }
 
-// !!! GCC inlining this, is a waste of space
 int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
 {
 	fformat *ff;

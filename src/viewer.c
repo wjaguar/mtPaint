@@ -538,8 +538,8 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 
 	wh = xy_span(ls.cxy, ls.scale, 1);
 	nt = image_threads(xy_span(ls.cxy, ls.scale, 0), wh);
-	vpix /= 4; // !!! Heuristic weight; maybe 1/8 would be better?
-	nt2 = ceil_div(vpix, kpix_threads * 1024);
+	// !!! Heuristic weight; maybe 1/8 would be better?
+	nt2 = ceil_div(vpix, kpix_threads * 1024 * 4);
 	if (nt2 > nt) nt2 = nt;
 
 	ls.rgb += ((ls.cxy[1] - py) * pw + ls.cxy[0] - px) * 3;
@@ -556,7 +556,7 @@ void view_render_rgb( unsigned char *rgb, int px, int py, int pw, int ph, double
 		launch_threads(do_layers_render, ls.tdata, NULL, wh);
 		free(ls.tdata);
 	}
-	else // No alloc - single thread
+	else if (vpix) // No alloc, single thread, something to draw
 #endif
 	{
 		/* Always align on background layer */

@@ -3044,7 +3044,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 	u.pw = pw * 3;
 	xy_origin(u.cxy, ctx->xy, margin_main_x, margin_main_y);
 
-	u.lr = layers_total && LAYERS_MAIN;
+	u.lr = layers_total && show_layers_main;
 
 	/* Set up image for renderer */
 	if (irgb)
@@ -3063,7 +3063,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 				rect[2] - rect[0], rect[3] - rect[1], pw * 3);
 	}
 
-	if (irgb || u.lr)
+	while (irgb || u.lr)
 	{
 #ifdef U_THREADS
 		int nt, nt2, pww = 0, wh = 0;
@@ -3080,6 +3080,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		{
 			size_t vp2 = render_layers(NULL, u.cxy, 0, zoom, scale,
 				0, layers_total, FALSE);
+			if (!vp2) break; // Nothing here, move along
 			// !!! Heuristic weight; maybe 1/8 would be better?
 			vpix += (vp2 - vpix) / 4;
 
@@ -3126,6 +3127,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 			canvas_render(&u, rr[1], rr[3] - rr[1]);
 		}
 		if (u.tdata != MEM_NONE) free(u.tdata);
+		break;
 	}
 
 	/* No grid at all */

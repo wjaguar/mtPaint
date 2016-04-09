@@ -109,8 +109,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 	int i, nt;
 
 
-	if (!tmax) /* Number of threads is whatever fits the current image */
-		tmax = image_threads(mem_width, mem_height);
+	if (tmax < 1) tmax = 1; // No less than 1 thread
 
 	if (!(nt = maxthreads)) /* Use as many threads as there are cores */
 	{
@@ -123,7 +122,6 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 	}
 
 	if (tmax > nt) tmax = nt;
-	else if (tmax < 1) tmax = 1;
 
 	if ((flags & MA_ALIGN_MASK) == MA_ALIGN_DOUBLE)
 		align = sizeof(double) - 1;

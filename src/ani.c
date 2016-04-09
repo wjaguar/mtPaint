@@ -43,8 +43,10 @@
 typedef struct {
 	int frame1, frame2;
 	int nlayer, lnum, layer;
+	int ftype, ftypes[NUM_FTYPES];
 	int lock;
 	char *pos, *cyc; // text buffers
+	char **ftnames;
 	void **posw, **cycw;
 	void **save, **preview, **frames;
 } anim_dd;
@@ -70,7 +72,7 @@ static int ani_play_state, ani_timer_state;
 ani_cycle ani_cycle_table[MAX_CYC_SLOTS];
 
 static char ani_output_path[PATHBUF], ani_file_prefix[ANI_PREFIX_LEN+2];
-static int ani_use_gif;
+static int ani_format;
 
 
 
@@ -466,7 +468,7 @@ void ani_init()			// Initialize variables/arrays etc. before loading or on start
 	strcpy(ani_output_path, "frames");
 	strcpy(ani_file_prefix, "f");
 
-	ani_use_gif = TRUE;
+	ani_format = FT_GIF;
 }
 
 
@@ -566,6 +568,8 @@ static void ani_win_read_widgets(void **wdata)	// Read all widgets and set up re
 	b = dt->frame2;
 	ani_frame1 = a < b ? a : b;
 	ani_frame2 = a < b ? b : a;
+
+	ani_format = dt->ftypes[dt->ftype];
 }
 
 
@@ -691,8 +695,11 @@ static void create_frames_ani()
 
 	layer_press_save();		// Save layers data file
 
-	command = strrchr(layers_filename, DIR_SEP);
-	if (command) l = command - layers_filename + 1;
+	if (path_type(ani_output_path) == PT_REL)
+	{
+		command = strrchr(layers_filename, DIR_SEP);
+		if (command) l = command - layers_filename + 1;
+	}
 	wjstrcat(output_path, PATHBUF, layers_filename, l, ani_output_path, NULL);
 	l = strlen(output_path);
 
@@ -734,17 +741,19 @@ static void create_frames_ani()
 	settings.height = layer_h;
 	settings.colors = 256;
 	settings.silent = TRUE;
-	if (ani_use_gif)
+	settings.ftype = ani_format;
+	/* Indexed */
+	if (!(file_formats[ani_format].flags & FF_RGB) ||
+		(ani_format == FT_XPM)) // XPM has FF_RGB but limited to 4096 cols
 	{
-		settings.ftype = FT_GIF;
 		settings.img[CHN_IMAGE] = irgb;
 		settings.bpp = 1;
 		settings.pal = pngpal;
 	}
+	/* RGB */
 	else
 	{
-		if (!comp_need_alpha(FT_PNG)) irgb = NULL;
-		settings.ftype = FT_PNG;
+		if (!comp_need_alpha(ani_format)) irgb = NULL;
 		settings.img[CHN_IMAGE] = layer_rgb;
 		settings.img[CHN_ALPHA] = irgb;
 		settings.bpp = 3;
@@ -764,9 +773,9 @@ static void create_frames_ani()
 		view_render_rgb( layer_rgb, 0, 0, layer_w, layer_h, 1 );	// Render layer
 
 		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s%05d.%s",
-			ani_file_prefix, k, ani_use_gif ? "gif" : "png");
+			ani_file_prefix, k, file_formats[ani_format].ext);
 
-		if ( ani_use_gif )	// Prepare palette
+		if (settings.bpp == 1)	// Prepare palette
 		{
 			cols = mem_cols_used_real(layer_rgb, layer_w, layer_h, 258, 0);
 							// Count colours in image
@@ -811,7 +820,8 @@ static void create_frames_ani()
 		}
 	}
 
-	if ( ani_use_gif )	// all GIF files created OK so lets give them to gifsicle
+	/* all GIF files created OK so lets give them to gifsicle */
+	if (ani_format == FT_GIF)
 	{
 		wild_path = wjstrcat(NULL, 0, output_path, l,
 			DIR_SEP_STR, ani_file_prefix, "?????.gif", NULL);
@@ -957,21 +967,21 @@ static void *anim_code[] = {
 	WXYWH("ani", 200, 200),
 	NBOOK,
 	PAGE(_("Output Files")),
-	BORDER(TABLE, 0), BORDER(ENTRY, 0),
-	XTABLE(2, 5),
+	BORDER(TABLE, 0), BORDER(ENTRY, 0), BORDER(PATH, 0),
+	XTABLE(2, 6),
 	TSPIN(_("Start frame"), frame1, 1, MAX_FRAME),
 	EVENT(CHANGE, ani_widget_changed),
 	TSPIN(_("End frame"), frame2, 1, MAX_FRAME),
 	EVENT(CHANGE, ani_widget_changed),
 	TSPINv(_("Delay"), ani_gif_delay, 1, MAX_DELAY),
 	EVENT(CHANGE, ani_widget_changed),
-	TPENTRYv(_("Output path"), ani_output_path, PATHBUF),
+	TPATHv(_("Output path"), _("Select Directory"), 
+		FS_SELECT_DIR, ani_output_path),
 	EVENT(CHANGE, ani_widget_changed),
 	TPENTRYv(_("File prefix"), ani_file_prefix, ANI_PREFIX_LEN),
 	EVENT(CHANGE, ani_widget_changed),
-	WDONE,
-	CHECKv(_("Create GIF frames"), ani_use_gif),
-	EVENT(CHANGE, ani_widget_changed),
+	TOPTDe(_("File Format"), ftnames, ftype, ani_widget_changed),
+	WDONE, // XTABLE
 	WDONE,
 ///	LAYERS TABLES
 	PAGE(_("Positions")),
@@ -1008,6 +1018,7 @@ static void *anim_code[] = {
 
 void pressed_animate_window()
 {
+	char *names[NUM_FTYPES + 1];
 	anim_dd tdata;
 
 
@@ -1036,10 +1047,13 @@ void pressed_animate_window()
 	tdata.nlayer = layers_total - 1; // last layer in list
 	tdata.layer = layers_total; // regular index of same
 
+	tdata.ftype = ftype_selector(FF_256 | FF_RGB, "", ani_format,
+		tdata.ftnames = names, tdata.ftypes);
+
 	run_create(anim_code, &tdata, sizeof(tdata));
 	free(tdata.cyc);
 
-	ani_state = ANI_CONF;	// Don't show all layers in main window - too messy
+	ani_state = ANI_CONF;
 
 	update_stuff(UPD_ALLV);
 }
@@ -1080,12 +1094,12 @@ void ani_read_file( FILE *fp )			// Read data from layers file already opened
 	i = read_file_num(fp, tin);
 	if ( i<0 )
 	{
-		ani_use_gif = FALSE;
+		ani_format = FT_PNG;
 		ani_gif_delay = -i;
 	}
 	else
 	{
-		ani_use_gif = TRUE;
+		ani_format = FT_GIF;
 		ani_gif_delay = i;
 	}
 
@@ -1133,7 +1147,7 @@ void ani_write_file( FILE *fp )			// Write data to layers file already opened
 	if ( layers_total == 0 ) return;	// No layers memory allocated so bail out
 
 
-	if ( !ani_use_gif ) gifcode = -gifcode;
+	if (ani_format != FT_GIF) gifcode = -gifcode;
 
 	// HEADER
 

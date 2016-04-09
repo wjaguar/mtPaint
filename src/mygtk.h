@@ -275,6 +275,15 @@ void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
 	int width, int height, int hot_x, int hot_y, int focused);
 int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr);
 
+// Type of pathname
+
+#define PT_ABS 0	/* Absolute */
+#define PT_REL 1	/* Relative */
+#define PT_DRIVE_ABS 2	/* On Windows: absolute w/o drive (\DIR\FILE) */
+#define PT_DRIVE_REL 3	/* On Windows: relative with drive (C:FILE) */
+
+int path_type(char *path);
+
 // Convert pathname to absolute
 
 char *resolve_path(char *buf, int buflen, char *path);

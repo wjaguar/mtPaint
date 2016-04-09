@@ -3533,16 +3533,15 @@ static void pathbox_button(GtkWidget *widget, gpointer user_data)
 }
 
 // !!! With inlining this, problem also
-GtkWidget *pathbox(void **r)
+GtkWidget *pathbox(void **r, int border)
 {
 	GtkWidget *hbox, *entry, *button;
 
-	hbox = gtk_hbox_new(FALSE, 0);
+	hbox = gtk_hbox_new(FALSE, 5 - 2);
 	gtk_widget_show(hbox);
-	gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
 
-	entry = gtk_entry_new();
-	gtk_box_pack_start(GTK_BOX(hbox), entry, TRUE, TRUE, 5);
+	entry = xpack(hbox, gtk_entry_new());
 	button = pack(hbox, gtk_button_new_with_label(_("Browse")));
 	gtk_container_set_border_width(GTK_CONTAINER(button), 2);
 	gtk_widget_show(button);
@@ -5088,11 +5087,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				/* Trigger remembered events */
 				trigger_things(res);
 			}
-			/* Dialogs must be immune to pointer grabs */
-	// !!! Must do this while invisible, to avoid breaking own modal grab
-			if (op == op_WDIALOG) release_grab();
 			/* Display */
 			if (op != op_WEND) cmd_showhide(GET_WINDOW(res), TRUE);
+			/* Dialogs must be immune to stuck pointer grabs */
+			if (op == op_WDIALOG)
+			{
+				// Paranoia
+				GtkWidget *grab = gtk_grab_get_current();
+				if (grab && (grab != GET_REAL_WINDOW(res)))
+					gtk_grab_add(GET_REAL_WINDOW(res));
+				// Real concern - a server grab
+				release_grab();
+			}
 			/* Wait for input */
 			if (op == op_WDIALOG)
 			{
@@ -5847,7 +5853,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_PATHs:
 			v = inifile_get(v, ""); // read and fallthrough
 		case op_PATH:
-			widget = pathbox(r);
+			widget = pathbox(r, GET_BORDER(PATH));
 			set_path(widget, v, PATH_VALUE);
 // !!! Padding = 0 Border = 0
 			pk |= pkf_PARENT;

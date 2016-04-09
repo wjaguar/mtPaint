@@ -7738,7 +7738,9 @@ static threaddata *init_gauss(gaussd *gd, double radiusX, double radiusY, int mo
 	l = 2 * (lenX - 1);
 	w = mem_width + l;
 
-	tdata = talloc(MA_ALIGN_DOUBLE, 0, gd, sizeof(gaussd),
+	tdata = talloc(MA_ALIGN_DOUBLE,
+		image_threads(mem_width, mem_height),
+		gd, sizeof(gaussd),
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
 		&gd->idx, l * sizeof(int),

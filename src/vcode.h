@@ -285,6 +285,7 @@ enum {
 	op_BOR_RPACK,
 	op_BOR_ENTRY,
 	op_BOR_LISTCC,
+	op_BOR_PATH,
 
 	op_BOR_LAST,
 	op_LAST = op_BOR_LAST
@@ -587,6 +588,7 @@ enum {
 #define WBr2hf_(NM,L) WBp_(op_##NM, L, PACK, R2F)
 #define WBr2hf_x(NM,L) WBp_(op_##NM, L, XPACK, R2F)
 #define WBr2hf_t(NM,L) WBp_(op_##NM, L, TABLE, R2F)
+#define WBr2hf_t1(NM,L) WBp_(op_##NM, L, TABLE1x, R2F)
 #define WBr2hs_(NM,L) WBp_(op_##NM, L, PACK, R2S)
 #define WBr2hs_x(NM,L) WBp_(op_##NM, L, XPACK, R2S)
 #define WBr2hs_t(NM,L) WBp_(op_##NM, L, TABLE, R2S)
@@ -844,6 +846,8 @@ enum {
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define OPTDe(SP,V,HS) WBr2hf_(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS)
+#define TOPTDe(NM,SP,V,HS) WBr2hf_t1(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
+	EVENT(SELECT, HS), TLABEL(NM)
 #define COMBO(SS,N,V) WBrhf_(COMBO, 3), WBfield(V), (SS), (void *)(N)
 #define GRADBAR(M,V,L,MX,A,CC,HS) WBr2hf_(GRADBAR, 6 + 2), WBfield(V), \
 	WBfield(M), WBfield(L), WBfield(A), WBfield(CC), (void *)(MX), \
@@ -871,6 +875,7 @@ enum {
 #define PATH(NM,T,M,V) FRAME(NM), WBrhf_(PATH, 3), WBfield(V), (T), (void *)(M)
 #define PATHv(NM,T,M,V) FRAME(NM), WBrh_(PATH, 3), (V), (T), (void *)(M)
 #define PATHs(NM,T,M,V) FRAME(NM), WBrh_(PATHs, 3), (V), (T), (void *)(M)
+#define TPATHv(NM,T,M,V) WBrh_t1(PATH, 3), (V), (T), (void *)(M), TLABEL(NM)
 #define uPATHSTR(V) WBrhf_(uPATHSTR, 1), WBfield(V)
 #define TEXT(V) WBrhf_x(TEXT, 1), WBfield(V)
 #define COMBOENTRY(V,SP,H) WBr2hf_x(COMBOENTRY, 2 + 2), WBfield(V), \

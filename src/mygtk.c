@@ -1648,13 +1648,9 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 
 int release_grab()
 {
-	GtkWidget *grab = gtk_grab_get_current();
-	int res = gdk_pointer_is_grabbed();
-
-	if (grab) gtk_grab_remove(grab);
-	if (res) gdk_pointer_ungrab(GDK_CURRENT_TIME);
-
-	return (res || grab);
+	if (!gdk_pointer_is_grabbed()) return (FALSE);
+	gdk_pointer_ungrab(GDK_CURRENT_TIME);
+	return (TRUE);
 }
 
 // Frame widget with passthrough scrolling
@@ -2937,21 +2933,39 @@ int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 	return ((x >= 0) && (x < pix->pm.width) && (y >= 0) && (y < pix->pm.height));
 }
 
+// Type of pathname
+
+int path_type(char *path)
+{
+#ifdef WIN32
+	return ((path[0] == '/') || (path[0] == '\\') ? PT_DRIVE_ABS :
+		path[1] != ':' ? PT_REL :
+		(path[2] != '/') && (path[2] != '\\') ? PT_DRIVE_REL : PT_ABS);
+#else
+	return (path[0] != '/' ? PT_REL : PT_ABS);
+#endif
+}
+
 // Convert pathname to absolute
 
 char *resolve_path(char *buf, int buflen, char *path)
 {
-	char wbuf[PATHBUF], *tmp, *tm2, *src, *dest;
-	int ch, dot, dots;
+	char wbuf[PATHBUF], *tmp, *src, *dest, *tm2 = "";
+	int ch, dot, dots, pt;
 
-
+	pt = path_type(path);
+	wbuf[0] = '\0';
 	/* Relative name to absolute */
+	if (pt != PT_ABS)
+	{
+		getcwd(wbuf, PATHBUF - 1);
+		tm2 = DIR_SEP_STR;
+	}
 #ifdef WIN32
-	tm2 = "\\";
-	getcwd(wbuf, PATHBUF - 1);
-	if ((path[0] == '/') || (path[0] == '\\')) wbuf[2] = '\0';
-	else if (path[1] != ':');
-	else if ((path[2] != '/') && (path[2] != '\\'))
+	/* Drive-absolute pathname needs current drive */
+	if (pt == PT_DRIVE_ABS) wbuf[2] = '\0';
+	/* Drive-relative pathname needs drive's current directory */
+	else if (pt == PT_DRIVE_REL)
 	{
 		char tbuf[PATHBUF];
 
@@ -2961,13 +2975,8 @@ char *resolve_path(char *buf, int buflen, char *path)
 		memcpy(wbuf, tbuf, PATHBUF);
 		path += 2;
 	}
-	else *(tm2 = wbuf) = '\0';
-	tmp = wjstrcat(NULL, 0, "", 0, wbuf, tm2, path, NULL);
-#else
-	wbuf[0] = '\0';
-	if (path[0] != '/') getcwd(wbuf, PATHBUF - 1);
-	tmp = wjstrcat(NULL, 0, "", 0, wbuf, DIR_SEP_STR, path, NULL);
 #endif
+	tmp = wjstrcat(NULL, 0, "", 0, wbuf, tm2, path, NULL);
 
 	/* Canonicalize path the way "realpath -s" does, i.e., symlinks
 	 * followed by ".." will get resolved wrong - WJ */
