@@ -2235,19 +2235,17 @@ void mem_get_histogram(int channel)	// Calculate how many of each colour index i
 }
 
 void do_transform(int start, int step, int cnt, unsigned char *mask,
-	unsigned char *imgr, unsigned char *img0)
+	unsigned char *imgr, unsigned char *img0, int m0)
 {
 	static const int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
+	static unsigned char fmask = 255;
 	static unsigned char gamma_table[256], bc_table[256], ps_table[256];
 	static int last_gamma, last_br, last_co, last_ps;
 	int do_gamma, do_bc, /*do_sa,*/ do_ps;
-	unsigned char rgb[3], fmask;
+	unsigned char rgb[3];
 	int br, co, sa;
-	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0;
-	int opacity, ops = 0;
-	int j, mstep, r, g, b, ofs3;
-
-	cnt = start + step * cnt;
+	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0, ops = 0;
+	int j, mstep, r, g, b;
 
 	if (!mem_bcsp.allow[0]) ops |= 0xFF;
 	if (!mem_bcsp.allow[1]) ops |= 0xFF00;
@@ -2327,23 +2325,19 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 	ix0 = ixx[dc]; ix1 = ixx[dc + 1]; ix2 = ixx[dc + 2];
 
 	/* Use fake mask if no real one provided */
-	if (!mask) mask = &fmask , mstep = 0 , fmask = 0;
-	else mask += start , mstep = step;
+	if (!mask) mask = &fmask , mstep = 0;
+	else mask += start - step , mstep = step;
 
-	start *= 3; step *= 3; cnt *= 3; // Step by triples
-	for (ofs3 = start; ofs3 < cnt; ofs3 += step , mask += mstep)
+	start *= 3; step *= 3; // Step by triples
+	img0 += start - step;
+	imgr += start - step;
+	while (cnt-- > 0)
 	{
-		rgb[0] = img0[ofs3 + 0];
-		rgb[1] = img0[ofs3 + 1];
-		rgb[2] = img0[ofs3 + 2];
-		opacity = *mask;
-		if (opacity == 255)
-		{
-			imgr[ofs3 + 0] = rgb[0];
-			imgr[ofs3 + 1] = rgb[1];
-			imgr[ofs3 + 2] = rgb[2];
-			continue;
-		}
+		img0 += step; imgr += step; mask += mstep;
+		if (*mask == (unsigned char)m0) continue;
+		rgb[0] = img0[0];
+		rgb[1] = img0[1];
+		rgb[2] = img0[2];
 		/* If we do gamma transform */
 		if (do_gamma)
 		{
@@ -2412,40 +2406,16 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 			g = ps_table[g];
 			b = ps_table[b];
 		}
-		/* If we do partial masking */
-		if (!opacity);
-		else if (paint_gamma)
-		{
-			double rr, gg, bb, o = opacity / 255.0;
-
-			rr = gamma256[r];
-			rr += (gamma256[img0[ofs3 + 0]] - rr) * o;
-			gg = gamma256[g];
-			gg += (gamma256[img0[ofs3 + 1]] - gg) * o;
-			bb = gamma256[b];
-			bb += (gamma256[img0[ofs3 + 2]] - bb) * o;
-			r = UNGAMMA256(rr);
-			g = UNGAMMA256(gg);
-			b = UNGAMMA256(bb);
-		}
-		else
-		{
-			r = r * 255 + (img0[ofs3 + 0] - r) * opacity;
-			r = (r + (r >> 8) + 1) >> 8;
-			g = g * 255 + (img0[ofs3 + 1] - g) * opacity;
-			g = (g + (g >> 8) + 1) >> 8;
-			b = b * 255 + (img0[ofs3 + 2] - b) * opacity;
-			b = (b + (b >> 8) + 1) >> 8;
-		}
+		/* If we do channel masking */
 		if (ops)
 		{
-			r ^= (r ^ img0[ofs3 + 0]) & ops;
-			g ^= (g ^ img0[ofs3 + 1]) & (ops >> 8);
-			b ^= (b ^ img0[ofs3 + 2]) & (ops >> 16);
+			r ^= (r ^ img0[0]) & ops;
+			g ^= (g ^ img0[1]) & (ops >> 8);
+			b ^= (b ^ img0[2]) & (ops >> 16);
 		}
-		imgr[ofs3 + 0] = r;
-		imgr[ofs3 + 1] = g;
-		imgr[ofs3 + 2] = b;
+		imgr[0] = r;
+		imgr[1] = g;
+		imgr[2] = b;
 	}
 }
 
@@ -2543,7 +2513,7 @@ void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2)
 		wrk[2] = pal2->blue;
 	}
 
-	do_transform(0, 1, l, NULL, tmp, tmp);
+	do_transform(0, 1, l, NULL, tmp, tmp, 0);
 
 	wrk = tmp; pal1 += p1;
 	for (i = 0; i < l; i++ , wrk += 3 , pal1++)
@@ -2568,17 +2538,15 @@ void set_zoom_centre( int x, int y )
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	unsigned char *src, png_color *pal)
 {
-	int i, s3 = step * 3;
-
 	dest += start * 3;
-	cnt = start + step * cnt;
-	for (i = start; i < cnt; i += step)
+	src += start;
+	while (cnt-- > 0)
 	{
-		png_color *col = pal + src[i];
+		png_color *col = pal + *src;
 		dest[0] = col->red;
 		dest[1] = col->green;
 		dest[2] = col->blue;
-		dest += s3;
+		dest += step * 3; src += step;
 	}
 }
 
@@ -6361,8 +6329,9 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
-static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
-	unsigned char *imgr, unsigned char *img0, unsigned char *img, int bpp)
+static void blend_pixels(int start, int step, int cnt, const unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0, unsigned char *img,
+	int bpp, int mode)
 {
 	static const unsigned char hhsv[8 * 3] = {
 		0, 1, 2, /* #0: B..M */
@@ -6374,7 +6343,7 @@ static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
 		1, 2, 0, /* #6: R..Y */
 		1, 2, 0  /* #7: W */ };
 	const unsigned char *new, *old;
-	int j, step3, uninit_(nhex), uninit_(ohex), mode = blend_mode;
+	int j, step3, uninit_(nhex), uninit_(ohex);
 
 
 	/* Backward transfer? */
@@ -6383,19 +6352,20 @@ static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
 	mode &= BLEND_MMASK;
 	if (bpp == 1) mode += BLEND_NMODES;
 
-	cnt = start + step * (cnt - 1);
-	step3 = step * bpp;
-	new += (start - step) * bpp; old += (start - step) * bpp;
 	j = start - step;
-	while (j < cnt)
+	mask += j;
+	j *= bpp;
+	step3 = step * bpp;
+	new += j; old += j;
+	while (cnt-- > 0)
 	{
 		unsigned char *dest;
 		int j0, j1, j2;
 
-		j += step; old += step3; new += step3;
-		if (!mask[j]) continue;
+		old += step3; new += step3; mask += step; j += step3;
+		if (!*mask) continue;
 
-		dest = imgr + j * bpp;
+		dest = imgr + j;
 
 		if (mode < BLEND_1BPP)
 		{
@@ -6653,14 +6623,13 @@ static int blend_pixels(int start, int step, int cnt, const unsigned char *mask,
  			break;
 		}
 	}
-	return (TRUE);
 }
 
 void put_pixel_def(int x, int y)	/* Combined */
 {
 	unsigned char *ti, *old_image, *old_alpha = NULL;
 	unsigned char fmask, opacity = 255, cset[NUM_CHANNELS + 3];
-	int i, j, offset, idx, bpp, tint, op = tool_opacity;
+	int i, j, offset, idx, bpp, op = tool_opacity;
 
 
 	idx = IS_INDEXED;
@@ -6668,9 +6637,6 @@ void put_pixel_def(int x, int y)	/* Combined */
 	if (idx ? j : j == 255) return;
 	bpp = MEM_BPP;
 	ti = cset + (bpp == 3 ? 0 : mem_channel + 3);
-
-	tint = tint_mode[0];
-	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
 
 	if (mem_gradient) /* Gradient mode - ask for one pixel */
 	{
@@ -6725,7 +6691,7 @@ void put_pixel_def(int x, int y)	/* Combined */
 	offset *= bpp;
 	process_img(0, 1, 1, &opacity,
 		mem_img[mem_channel] + offset, old_image + offset, ti,
-		ti, bpp, !idx);
+		ti, bpp, 0);
 }
 
 /* Repeat pattern in buffer */
@@ -6860,7 +6826,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		process_img(0, 1, l, mask,
 			mem_img[mem_channel] + offset * bpp,
 			old_image + offset * bpp, tmp_image,
-			tmp_image, bpp, idx);
+			tmp_image, bpp, 0);
 
 		if ((len -= ROW_BUFLEN) <= 0) return;
 		x += s;
@@ -6873,9 +6839,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha)
 {
 	unsigned char *xalpha = NULL;
-
-
-	cnt = start + step * cnt;
+	int i, j, k;
 
 	/* Use alpha as selection when pasting RGBA to RGB */
 	if (alpha && !alphar)
@@ -6884,15 +6848,15 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 		alpha = NULL;
 	}
 
+	i = start - step;
 	/* Opacity mode */
 	if (opacity)
 	{
-		int i, j, k;
-
-		for (i = start; i < cnt; i += step)
+		while (cnt-- > 0)
 		{
 			unsigned char newc, oldc;
 
+			i += step;
 			k = (255 - mask[i]) * opacity;
 			if (!k)
 			{
@@ -6927,10 +6891,9 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	/* Indexed mode - set mask to on-off */
 	else
 	{
-		int i, k;
-
-		for (i = start; i < cnt; i += step)
+		while (cnt-- > 0)
 		{
+			i += step;
 			k = mask[i];
 			if (trans)
 			{
@@ -6946,39 +6909,45 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	}
 }
 
-/* Here, opacity is just a "not indexed" flag, any nonzero value will serve */
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	unsigned char *xbuf, int bpp, int opacity)
+	unsigned char *xbuf, int bpp, int blend)
 {
-	int tint;
+	int opm = 0;
 
+	/* Calculate drawing mode */
+	if (!(blend & BLENDF_SET))
+	{
+		blend = mem_blend ? blend_mode : 0;
+		if (tint_mode[0]) blend |= tint_mode[1] ^ (tint_mode[2] < 2) ?
+			BLENDF_TINTM : BLENDF_TINT;
+		if (IS_INDEXED) blend |= BLENDF_IDX;
+	}
+	if (blend & BLENDF_INVM) opm = 255;
 
 	/* Apply blend mode's transform part */
-	if (mem_blend && (blend_mode & BLEND_MMASK) &&
-		blend_pixels(start, step, cnt, mask, xbuf, img0, img, bpp))
+	if (blend & BLEND_MMASK)
+	{
+		// !!! Ignores BLENDF_INVM, as is never combined with it
+		blend_pixels(start, step, cnt, mask, xbuf, img0, img, bpp, blend);
 		img = xbuf;
-
-	cnt = start + step * cnt;
-
-	tint = tint_mode[0];
-	if (tint_mode[1] ^ (tint_mode[2] < 2)) tint = -tint;
+	}
 
 	/* Indexed image or utility channel */
 	if (bpp < 3)
 	{
 		unsigned char newc, oldc;
-		int i, j, mx = opacity ? 255 : mem_cols - 1;
+		int i, j, mx = blend & BLENDF_IDX ? mem_cols - 1 : 255;
 
-		for (i = start; i < cnt; i += step)
+		for (i = start; cnt-- > 0; i += step)
 		{
-			j = mask[i];
+			j = mask[i] ^ opm;
 			if (!j) continue;
 			newc = img[i];
 			oldc = img0[i];
 
-			if (!tint); // Do nothing
-			else if (tint < 0) newc = oldc + newc < mx ?
+			if (!(blend & (BLENDF_TINTM | BLENDF_TINT))); // Do nothing
+			else if (blend & BLENDF_TINTM) newc = oldc + newc < mx ?
 				oldc + newc : mx;
 			else newc = oldc > newc ? oldc - newc : 0;
 
@@ -6994,30 +6963,35 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	/* RGB image */
 	else
 	{
-		int ops = mem_blend ? (blend_mode >> BLEND_RGBSHIFT) & 7 : 0;
+		int ops = (blend >> BLEND_RGBSHIFT) & 7;
 		unsigned char r, g, b, nrgb[3];
-		int i, j, ofs3, opacity;
+		int j, opacity;
 
 		/* Make mask */
 		ops = (ops + (ops >> 1) * 0xFE + (ops >> 2) * 0xFE00) * 0xFF;
 
-		for (i = start; i < cnt; i += step)
+		img0 += (start - step) * 3;
+		img += (start - step) * 3;
+		imgr += (start - step) * 3;
+		mask += start - step;
+		while (cnt-- > 0)
 		{
-			opacity = mask[i];
+			img0 += step * 3; img += step * 3; imgr += step * 3;
+			mask += step;
+			opacity = *mask ^ opm;
 			if (!opacity) continue;
-			ofs3 = i * 3;
-			nrgb[0] = img[ofs3 + 0];
-			nrgb[1] = img[ofs3 + 1];
-			nrgb[2] = img[ofs3 + 2];
+			nrgb[0] = img[0];
+			nrgb[1] = img[1];
+			nrgb[2] = img[2];
 
 /* !!! On x86, register pressure here is too large already, so rereading img0
  * is preferable to lengthening r/g/b's living ranges - WJ */
-			if (tint)
+			if (blend & (BLENDF_TINTM | BLENDF_TINT))
 			{
-				r = img0[ofs3 + 0];
-				g = img0[ofs3 + 1];
-				b = img0[ofs3 + 2];
-				if (tint < 0)
+				r = img0[0];
+				g = img0[1];
+				b = img0[2];
+				if (blend & BLENDF_TINTM)
 				{
 					nrgb[0] = r > 255 - nrgb[0] ? 255 : r + nrgb[0];
 					nrgb[1] = g > 255 - nrgb[1] ? 255 : g + nrgb[1];
@@ -7036,11 +7010,11 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			{
 				double r, g, b, o = opacity / 255.0;
 
-				r = gamma256[img0[ofs3 + 0]];
+				r = gamma256[img0[0]];
 				r += (gamma256[nrgb[0]] - r) * o;
-				g = gamma256[img0[ofs3 + 1]];
+				g = gamma256[img0[1]];
 				g += (gamma256[nrgb[1]] - g) * o;
-				b = gamma256[img0[ofs3 + 2]];
+				b = gamma256[img0[2]];
 				b += (gamma256[nrgb[2]] - b) * o;
 				nrgb[0] = UNGAMMA256(r);
 				nrgb[1] = UNGAMMA256(g);
@@ -7048,9 +7022,9 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			}
 			else
 			{
-				r = img0[ofs3 + 0];
-				g = img0[ofs3 + 1];
-				b = img0[ofs3 + 2];
+				r = img0[0];
+				g = img0[1];
+				b = img0[2];
 				j = r * 255 + (nrgb[0] - r) * opacity;
 				nrgb[0] = (j + (j >> 8) + 1) >> 8;
 				j = g * 255 + (nrgb[1] - g) * opacity;
@@ -7061,14 +7035,14 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 
 			if (ops)
 			{
-				nrgb[0] ^= (nrgb[0] ^ img0[ofs3 + 0]) & ops;
-				nrgb[1] ^= (nrgb[1] ^ img0[ofs3 + 1]) & (ops >> 8);
-				nrgb[2] ^= (nrgb[2] ^ img0[ofs3 + 2]) & (ops >> 16);
+				nrgb[0] ^= (nrgb[0] ^ img0[0]) & ops;
+				nrgb[1] ^= (nrgb[1] ^ img0[1]) & (ops >> 8);
+				nrgb[2] ^= (nrgb[2] ^ img0[2]) & (ops >> 16);
 			}
 
-			imgr[ofs3 + 0] = nrgb[0];
-			imgr[ofs3 + 1] = nrgb[1];
-			imgr[ofs3 + 2] = nrgb[2];
+			imgr[0] = nrgb[0];
+			imgr[1] = nrgb[1];
+			imgr[2] = nrgb[2];
 		}
 	}	
 }
@@ -7174,9 +7148,6 @@ static inline double dist(int n1, int n2)
 {
 	return (sqrt(n1 * n1 + n2 * n2));
 }
-
-static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
-	unsigned char *upper, unsigned char *alpha, int len, int bpp);
 
 void do_effect(int type, int param)
 {
@@ -7320,7 +7291,8 @@ void do_effect(int type, int param)
 			*dest = k < 0 ? 0 : k > 0xFF ? 0xFF : k;
 		}
 		dest = mem_img[mem_channel] + i * ll;
-		do_alpha_blend(dest, buf, dest, mask, ll, bpp);
+		process_img(0, 1, mem_width, mask, dest, dest, buf,
+			NULL, bpp, BLENDF_SET | BLENDF_INVM);
 		if ((i * 10) % mem_height >= mem_height - 10)
 			if (progress_update((float)(i + 1) / mem_height)) break;
 	}
@@ -7953,48 +7925,12 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	free(tdata);
 }	
 
-static void do_alpha_blend(unsigned char *dest, unsigned char *lower,
-	unsigned char *upper, unsigned char *alpha, int len, int bpp)
-{
-	double s0, s1, s2, m;
-	int j, k, mv, pg = paint_gamma && (bpp == 3);
-
-	for (j = 0; j < len; alpha++)
-	if (pg && *alpha && (*alpha != 255))
-	{
-		m = *alpha / 255.0;
-		s0 = gamma256[lower[j]];
-		s0 += (gamma256[upper[j]] - s0) * m;
-		s1 = gamma256[lower[j + 1]];
-		s1 += (gamma256[upper[j + 1]] - s1) * m;
-		s2 = gamma256[lower[j + 2]];
-		s2 += (gamma256[upper[j + 2]] - s2) * m;
-		dest[j++] = UNGAMMA256(s0);
-		dest[j++] = UNGAMMA256(s1);
-		dest[j++] = UNGAMMA256(s2);
-	}
-	else
-	{
-		mv = *alpha;
-		k = lower[j];
-		k = k * 255 + (upper[j] - k) * mv;
-		dest[j++] = (k + (k >> 8) + 1) >> 8;
-		if (bpp == 1) continue;
-		k = lower[j];
-		k = k * 255 + (upper[j] - k) * mv;
-		dest[j++] = (k + (k >> 8) + 1) >> 8;
-		k = lower[j];
-		k = k * 255 + (upper[j] - k) * mv;
-		dest[j++] = (k + (k >> 8) + 1) >> 8;
-	}
-}
-
 /* Retroactive masking - by blending with undo frame */
 void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 {
 	chanlist tlist;
 	unsigned char *dest, *mask0 = NULL;
-	int i, ofs, bpp = BPP(channel), w = mem_width * bpp;
+	int i, ofs, bpp = BPP(channel);
 
 	memcpy(tlist, mem_img, sizeof(chanlist));
 	tlist[channel] = old;
@@ -8009,7 +7945,8 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 		prep_mask(0, 1, mem_width, mask, mask0 ? mask0 + ofs : NULL,
 			tlist[CHN_IMAGE] + ofs * mem_img_bpp);
 		dest = mem_img[channel] + ofs * bpp;
-		do_alpha_blend(dest, dest, old + ofs * bpp, mask, w, bpp);
+		process_img(0, 1, mem_width, mask, dest, dest, old + ofs * bpp,
+			NULL, bpp, BLENDF_SET);
 	}
 }
 
@@ -8505,14 +8442,16 @@ void mem_kuwahara(int r, int gcor, int detail)
 				tx = timg + wbuf * ((i + 1) % 3);
 				kuwahara_detailed(timg, mask, tx, i - 1, gcor);
 				tmp = mem_img[CHN_IMAGE] + (i - 1) * w;
-				do_alpha_blend(tmp, tx, tmp, mask, w, 3);
+				process_img(0, 1, mem_width, mask, tmp, tmp, tx,
+					NULL, 3, BLENDF_SET | BLENDF_INVM);
 			}
 		}
 		else
 		{
 			/* Mask-merge current row */
 			tmp = mem_img[CHN_IMAGE] + i * w;
-			do_alpha_blend(tmp, buf + 3, tmp, mask, w, 3);
+			process_img(0, 1, mem_width, mask, tmp, tmp, buf + 3,
+				NULL, 3, BLENDF_SET | BLENDF_INVM);
 		}
 
 		if (++i < mem_height)
@@ -8534,7 +8473,8 @@ void mem_kuwahara(int r, int gcor, int detail)
 			/* Build and mask-merge it */
 			kuwahara_detailed(timg, mask, timg, i - 1, gcor);
 			tmp = mem_img[CHN_IMAGE] + (i - 1) * w;
-			do_alpha_blend(tmp, timg, tmp, mask, w, 3);
+			process_img(0, 1, mem_width, mask, tmp, tmp, timg,
+				NULL, 3, BLENDF_SET | BLENDF_INVM);
 		}
 		break;
 	}
@@ -9244,8 +9184,7 @@ void blend_indexed(int start, int step, int cnt, unsigned char *rgb,
 	png_color *col, *col0;
 	int i, j, k, i3;
 
-	cnt = start + step * cnt;
-	for (i = start; i < cnt; i += step)
+	for (i = start; cnt-- > 0; i += step)
 	{
 		j = opacity;
 		if (alpha)

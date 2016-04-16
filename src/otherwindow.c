@@ -674,7 +674,7 @@ static void brcosa_moved(brcosa_dd *dt, void **wdata, int what, void **where)
 
 static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 {
-	unsigned char *mask, *mask0, *tmp;
+	unsigned char *mask, *mask0, *tmp, *xbuf;
 	int i;
 
 	mem_pal_copy(mem_pal, dt->pal);
@@ -689,15 +689,18 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 		brcosa_preview(dt, NULL); // This definitely modifies it
 		while (mem_preview && (mem_img_bpp == 3)) // This modifies image
 		{
-			mask = malloc(mem_width);
+			mask = malloc(mem_width * 4);
 			if (!mask) break;
+			xbuf = mask + mem_width;
 			mask0 = NULL;
 			if (!channel_dis[CHN_MASK]) mask0 = mem_img[CHN_MASK];
 			tmp = mem_img[CHN_IMAGE];
 			for (i = 0; i < mem_height; i++)
 			{
 				prep_mask(0, 1, mem_width, mask, mask0, tmp);
-				do_transform(0, 1, mem_width, mask, tmp, tmp);
+				do_transform(0, 1, mem_width, mask, xbuf, tmp, 255);
+				process_img(0, 1, mem_width, mask, tmp, tmp, xbuf,
+					NULL, 3, BLENDF_SET | BLENDF_INVM);
 				if (mask0) mask0 += mem_width;
 				tmp += mem_width * 3;
 			}
@@ -708,7 +711,7 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 		{
 			// This modifies clipboard
 			do_transform(0, 1, mem_clip_w * mem_clip_h, NULL,
-				mem_clipboard, mem_clipboard);
+				mem_clipboard, mem_clipboard, 0);
 		}
 		mem_undo_prepare();
 	}

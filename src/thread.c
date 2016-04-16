@@ -83,8 +83,7 @@ int image_threads(int w, int h)
 	int n = h / 3;
 // This can overflow, but mtPaint is unlikely to handle a 8+ Tb image anyway :-)
 	int m = ((size_t)w * h) / (THREAD_DEALIGN + THREAD_ALIGN);
-	if (n > m) n = m;
-	return (n + !n);
+	return (n < m ? n : m);
 }
 
 /* This function takes *two* variable-length NULL-terminated sequences of

@@ -300,7 +300,12 @@ enum {
 #define BLEND_MMASK    0x7F
 #define BLEND_REVERSE  0x80
 #define BLEND_RGBSHIFT 8
-
+/* Flags for internal use */
+#define BLENDF_TINT	0x01000000	/* Tint add */
+#define BLENDF_TINTM	0x02000000	/* Tint sub */
+#define BLENDF_IDX	0x04000000	/* Indexed mode */
+#define BLENDF_INVM	0x08000000	/* Invert mask */
+#define BLENDF_SET	0x10000000	/* Ignore settings, use parameter */
 
 /// FLOOD FILL SETTINGS
 
@@ -777,7 +782,7 @@ void mem_smudge(int ox, int oy, int nx, int ny);
 
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,
-	unsigned char *imgr, unsigned char *img0);
+	unsigned char *imgr, unsigned char *img0, int m0);
 
 void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vertically
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally
@@ -847,7 +852,7 @@ void process_mask(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *trans, int opacity, int noalpha);
 void process_img(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
-	unsigned char *xbuf, int bpp, int opacity); // opacity value is ignored
+	unsigned char *xbuf, int bpp, int blend);
 void copy_area(image_info *dest, image_info *src, int x, int y);
 
 // Retroactive masking - by blending with undo frame

@@ -302,8 +302,7 @@ void commit_paste(int swap, int *update)
 		}
 
 		process_img(0, 1, fw, mask, mem_img[mem_channel] + iofs * bpp,
-			old_image + iofs * bpp, img,
-			xbuf, bpp, opacity);
+			old_image + iofs * bpp, img, xbuf, bpp, 0);
 
 		image += mem_clip_w * mem_clip_bpp;
 		ofs += mem_clip_w;

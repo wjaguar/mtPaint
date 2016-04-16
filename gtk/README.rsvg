@@ -1,0 +1,72 @@
+-----------
+The History
+-----------
+
+Since mtPaint 3.40, the program could load SVG files using a GTK+ plugin provided by librsvg. Unfortunately, any usable version of librsvg requires GTK+ libraries of a later generation than the ones packaged with mtPaint. As the result, the Windows build of mtPaint 3.40 lacked SVG support.
+
+In mtPaint 3.50, there is a fallback SVG loader, using 'rsvg-convert' binary. And a static build of said binary, being self-contained, can be included with the Windows build of mtPaint, no matter what GTK+ version is used.
+
+For this reason, a custom build of librsvg is done.
+
+-------------
+The Specifics
+-------------
+
+Original patches from Pango tree:
+- svn 2489 / git d686e1d4ae80b64390149e7336329c0254479161
+  On Windows store the default aliases file in a string array. (#492517)
+  (BACKPORTED: needed to handle 'pango.aliases' for Windows Vista & Windows 7)
+- git 25ddf43c0185e3c7935414618bd21aee0c35dfe2
+  Bug 733137 - Don't force no static builds on Win32
+  (APPLIED)
+
+Implementation of function g_clear_object() from GLib 2.28.8 added to librsvg,
+to satisfy the dependencies.
+
+---------
+The Build
+---------
+
+The build was done on a Slackware Linux system using MinGW cross-compiler installation combined of the following parts:
+- TDM-GCC 4.2.4		( http://www.tdragon.net/recentgcc/ )
+- binutils 2.19		( http://mingw.sourceforge.net/ )
+- MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
+- Win32 API 3.13	( http://mingw.sourceforge.net/ )
+
+To replicate it, you need the following source packages:
+- GLib 2.26.1 (this specific version and no other):
+    glib-2.26.1.tar.bz2
+    http://ftp.gnome.org/pub/GNOME/sources/glib/2.26/glib-2.26.1.tar.bz2
+- Pango 1.16.5 (this specific version and no other):
+    pango-1.16.5.tar.bz2
+    http://ftp.gnome.org/pub/GNOME/sources/pango/1.16/pango-1.16.5.tar.bz2
+- Cairo 1.10.2 (this specific version and no other):
+    cairo-1.10.2.tar.gz
+    http://www.cairographics.org/releases/cairo-1.10.2.tar.gz
+- pixman 0.18.4 (this specific version and no other):
+    pixman-0.18.4.tar.gz
+    http://www.cairographics.org/releases/pixman-0.18.4.tar.gz
+- librsvg 2.36.4 (this specific version and no other):
+    librsvg-2.36.4.tar.xz
+    http://ftp.gnome.org/pub/GNOME/sources/librsvg/2.36/librsvg-2.36.4.tar.xz
+- gdk-pixbuf 2.22.1:
+    gdk-pixbuf-2.22.1.tar.bz2
+    http://ftp.gnome.org/pub/GNOME/sources/gdk-pixbuf/2.22/gdk-pixbuf-2.22.1.tar.bz2
+- libcroco 0.6.2:
+    libcroco-0.6.2.tar.bz2
+    http://ftp.gnome.org/pub/GNOME/sources/libcroco/0.6/libcroco-0.6.2.tar.bz2
+- libxml2 2.9.2:
+    libxml2-2.9.2.tar.gz
+    ftp://xmlsoft.org/libxml2/libxml2-2.9.2.tar.gz
+- dev files from Windows build of mtPaint, packaged:
+    dev.tar.*
+    ./zad/dev/
+
+Also you need the following files from 'gtk' subdirectory of mtPaint source package:
+  winbuild_rsvg.sh
+  pango182_1wj.patch
+
+To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild_rsvg.sh' if necessary, and run 'winbuild_rsvg.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, the executable will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
+
+---------------------------------
+Copyright (C) 2016 Dmitry Groshev

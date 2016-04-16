@@ -2199,7 +2199,7 @@ typedef struct {
 
 typedef struct {
 	unsigned char *wmask, *gmask, *walpha, *galpha;
-	unsigned char *wimg, *gimg, *rgb, *xbuf;
+	unsigned char *wimg, *gimg, *rgb;
 	int opac, len, bpp;
 } grad_render_state;
 
@@ -2255,7 +2255,7 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 
 	memcpy(g->wimg, mem_img[mem_channel] + l * g->bpp, g->len * g->bpp);
 	process_img(start, step, cnt, g->wmask, g->wimg, g->wimg, g->gimg,
-		g->gimg, g->bpp, g->opac);
+		g->gimg, g->bpp, 0);
 
 	if (g->rgb) blend_indexed(start, step, cnt, g->rgb, mem_img[CHN_IMAGE] + l,
 		g->wimg, mem_img[CHN_ALPHA] + l, g->walpha, grad_opacity);
@@ -2392,7 +2392,7 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 		mem_clip_mask ? mem_clip_mask + dc : NULL, p->opacity, 0);
 	if (p->xform) /* Apply color transform if preview requested */
 	{
-		do_transform(start, step, cnt, NULL, p->xbuf, clip_src);
+		do_transform(start, step, cnt, p->mask, p->xbuf, clip_src, 0);
 		clip_src = p->xbuf;
 	}
 	if (mem_clip_bpp < bpp)
@@ -2402,8 +2402,8 @@ static void paste_render(int start, int step, int y, paste_render_state *p)
 			mem_clip_paletted ? mem_clip_pal : mem_pal);
 		clip_src = p->xbuf;
 	}
-	process_img(start, step, cnt, p->mask, p->pix, p->pix, clip_src, p->xbuf,
-		bpp, p->opacity);
+	process_img(start, step, cnt, p->mask, p->pix, p->pix, clip_src,
+		p->xbuf, bpp, 0);
 }
 
 typedef struct {
@@ -2508,11 +2508,13 @@ static void main_render(u_render_state *u, int py, int ph)
 			/* Color transform preview */
 			if (u->tflag)
 			{
+				unsigned char *src = mem_img[CHN_IMAGE] + l * 3;
 				prep_mask(0, r.zoom, r.pww, r.pvm,
-					r.mask0 ? r.mask0 + l : NULL,
-					mem_img[CHN_IMAGE] + l * 3);
+					r.mask0 ? r.mask0 + l : NULL, src);
 				do_transform(0, r.zoom, r.pww, r.pvm,
-					r.pvi, mem_img[CHN_IMAGE] + l * 3);
+					r.pvi, src, 255);
+				process_img(0, r.zoom, r.pww, r.pvm,
+					r.pvi, r.pvi, src, NULL, 3, BLENDF_SET);
 			}
 			/* Color selective mode preview */
 			else if (overlay)
