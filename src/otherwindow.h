@@ -50,7 +50,7 @@ extern void *spin1_code[];
 
 
 int mem_preview, mem_preview_clip, brcosa_auto;
-int posterize_mode;
+transform_state def_bcsp;
 int sharper_reduce;
 int spal_mode;
 seg_state *seg_preview;
@@ -58,7 +58,7 @@ seg_state *seg_preview;
 void generic_new_window(int type);
 
 void pressed_add_cols();
-void pressed_brcosa();
+void pressed_brcosa(void **xb);
 void pressed_bacteria();
 void pressed_scale_size(int mode);
 

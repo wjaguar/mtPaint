@@ -267,6 +267,7 @@ int paint_gamma;
 /// BLEND MODE
 
 int blend_mode;
+int blend_src;
 
 /* Blend modes */
 enum {
@@ -297,7 +298,8 @@ enum {
 };
 #define BLEND_1BPP BLEND_MULT /* First one-byte mode */
 
-#define BLEND_MMASK    0x7F
+#define BLEND_MMASK    0x3F
+#define BLEND_XFORM    0x40
 #define BLEND_REVERSE  0x80
 #define BLEND_RGBSHIFT 8
 /* Flags for internal use */
@@ -306,6 +308,13 @@ enum {
 #define BLENDF_IDX	0x04000000	/* Indexed mode */
 #define BLENDF_INVM	0x08000000	/* Invert mask */
 #define BLENDF_SET	0x10000000	/* Ignore settings, use parameter */
+
+/* Blend sources */
+enum {
+	SRC_NORMAL = 0,
+	SRC_IMAGE,
+	SRC_LAYER
+};
 
 /// FLOOD FILL SETTINGS
 
@@ -409,7 +418,11 @@ typedef struct {
 	int pmode;	// bitwise/truncated/rounded
 } transform_state;
 
-transform_state mem_bcsp;
+transform_state mem_bcsp[2];
+
+#define BRCOSA_ITEMS 6
+#define BRCOSA_POSTERIZE 3
+#define DEF_POSTERIZE(T) ((T) ? 256 : 8) /* truncated/rounded vs bitwise */
 
 /// PATTERNS
 
@@ -841,7 +854,7 @@ void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
 #define IS_INDEXED ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
 
 /* Whether process_img() needs extra buffer passed in */
-#define NEED_XBUF_DRAW (mem_blend && (blend_mode & BLEND_MMASK))
+#define NEED_XBUF_DRAW (mem_blend && (blend_mode & (BLEND_MMASK | BLEND_XFORM)))
 #define NEED_XBUF_PASTE (NEED_XBUF_DRAW || \
 	((mem_channel == CHN_IMAGE) && (mem_clip_bpp < mem_img_bpp)))
 
@@ -928,9 +941,6 @@ void mem_seg_scan(unsigned char *dest, int y, int x, int w, int zoom,
 void mem_seg_render(unsigned char *img, const seg_state *s);
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
-
-#define mtMIN(a,b,c) if ( b<c ) a=b; else a=c;
-#define mtMAX(a,b,c) if ( b>c ) a=b; else a=c;
 
 /*
  * Win32 libc (MSVCRT.DLL) violates the C standard as to malloc()'ed memory

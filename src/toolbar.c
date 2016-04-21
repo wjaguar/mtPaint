@@ -253,8 +253,10 @@ void step_settings() /* Brush spacing */
 
 typedef struct {
 	filterwindow_dd fw;
-	int mode, reverse;
+	int mode, reverse, xform, src;
 	int red, green, blue;
+	char **lnames;
+	void **xb;
 } blend_dd;
 
 static int set_blend(blend_dd *dt, void **wdata)
@@ -266,11 +268,29 @@ static int set_blend(blend_dd *dt, void **wdata)
 	j = !dt->red + (!dt->green << 1) + (!dt->blue << 2);
 
 	/* Don't accept stop-all or do-nothing */
-	if ((j == 7) || !(i | j)) return (FALSE);
+	if ((j == 7) || !(i | j | dt->xform | dt->src)) return (FALSE);
 
-	blend_mode = i | (dt->reverse ? BLEND_REVERSE : 0) | (j << BLEND_RGBSHIFT);
+	blend_mode = i | (dt->reverse ? BLEND_REVERSE : 0) | 
+		(dt->xform ? BLEND_XFORM : 0) | (j << BLEND_RGBSHIFT);
+	blend_src = dt->src;
 
 	return (TRUE);
+}
+
+static void blend_xf(blend_dd *dt, void **wdata, int what, void **where)
+{
+	if (what == op_EVT_CHANGE) /* Toggling transform mode */
+	{
+		/* OK if initialized */
+		if (mem_bcsp[1].bcsp[BRCOSA_POSTERIZE]) return;
+		/* OK if toggled off */
+		cmd_read(where, dt);
+		if (!dt->xform) return;
+	}
+	/* Hide for awhile */
+	cmd_showhide(GET_WINDOW(wdata), FALSE);
+	/* Send user to do init */
+	pressed_brcosa(dt->xb);
 }
 
 static char *blends[BLEND_NMODES] = {
@@ -286,6 +306,12 @@ static void *blend_code[] = {
 	VBOXPBS,
 	COMBO(blends, BLEND_NMODES, mode),
 	CHECK(_("Reverse"), reverse),
+	HBOX,
+	REF(xb), CHECK(_("Transform Colour"), xform), EVENT(CHANGE, blend_xf),
+	EBUTTON(_("Settings"), blend_xf),
+	WDONE, // HBOX
+	BORDER(OPT, 0),
+	FHBOXB(_("Source")), XOPTD(lnames, src), WDONE,
 	HSEP,
 	EQBOXS,
 	CHECK(_("Red"), red),
@@ -297,12 +323,29 @@ static void *blend_code[] = {
 
 void blend_settings() /* Blend mode */
 {
+	char *names[SRC_LAYER + MAX_LAYERS + 2];
+	char ns[MAX_LAYERS + 1][LAYER_NAMELEN + 5];
 	blend_dd tdata = {
 		{ _("Blend mode"), blend_code, FW_FN(set_blend) },
-		blend_mode & BLEND_MMASK, blend_mode & BLEND_REVERSE,
+		blend_mode & BLEND_MMASK,
+		blend_mode & BLEND_REVERSE,
+		blend_mode & BLEND_XFORM,
+		blend_src,
 		~blend_mode & (1 << BLEND_RGBSHIFT),
 		~blend_mode & (2 << BLEND_RGBSHIFT),
-		~blend_mode & (4 << BLEND_RGBSHIFT) };
+		~blend_mode & (4 << BLEND_RGBSHIFT),
+		names };
+	int i;
+
+	names[SRC_NORMAL] = _("Normal");
+	names[SRC_IMAGE] = _("Image");
+	for (i = 0; i <= layers_total; i++)
+	{
+		snprintf(ns[i], sizeof(ns[i]), "%d %s", i, layer_table[i].name);
+		names[SRC_LAYER + i] = ns[i];
+	}
+	names[SRC_LAYER + i] = NULL;
+
 	run_create_(toolwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 

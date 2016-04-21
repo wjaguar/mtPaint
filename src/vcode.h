@@ -833,6 +833,7 @@ enum {
 #define TLOPTv(SS,N,V,X,Y) WBrh_t(OPT, 4), &(V), (SS), (void *)(N), \
 	WBxyl(X, Y, 1)
 #define OPTD(SP,V) WBrhf_(OPTD, 2), WBfield(V), WBfield(SP)
+#define XOPTD(SP,V) WBrhf_x(OPTD, 2), WBfield(V), WBfield(SP)
 #define TOPTDv(NM,SP,V) WBrh_t1(OPTD, 2), &(V), WBfield(SP), TLABEL(NM)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define OPTve(SS,N,V,HS) WBr2h_(OPT, 3 + 2), &(V), (SS), (void *)(N), \

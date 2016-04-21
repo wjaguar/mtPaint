@@ -72,6 +72,7 @@ int paint_gamma;
 /// BLEND MODE SETTINGS
 
 int blend_mode = BLEND_HUE;
+int blend_src;
 
 /// FLOOD FILL SETTINGS
 
@@ -98,7 +99,7 @@ unsigned char mem_brushes[PATCH_WIDTH * PATCH_HEIGHT * 3];
 int mem_clip_x = -1, mem_clip_y = -1;	// Clipboard location on canvas
 int mem_nudge = -1;			// Nudge pixels per SHIFT+Arrow key during selection/paste
 
-transform_state mem_bcsp;
+transform_state mem_bcsp[2];
 
 /// UNDO ENGINE
 
@@ -2234,47 +2235,55 @@ void mem_get_histogram(int channel)	// Calculate how many of each colour index i
 	for (i = 0; i < j; i++) mem_histogram[*img++]++;
 }
 
+typedef struct {
+	int last_gamma, last_br, last_co, last_ps;
+	unsigned char gamma_table[256], bc_table[256], ps_table[256];
+} transform_cache;
+
 void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, int m0)
 {
 	static const int ixx[7] = {0, 1, 2, 0, 1, 2, 0};
 	static unsigned char fmask = 255;
-	static unsigned char gamma_table[256], bc_table[256], ps_table[256];
-	static int last_gamma, last_br, last_co, last_ps;
+	static transform_cache tc[2];
 	int do_gamma, do_bc, /*do_sa,*/ do_ps;
 	unsigned char rgb[3];
 	int br, co, sa;
 	int dH, sH, tH, ix0, ix1, ix2, c0, c1, c2, dc = 0, ops = 0;
 	int j, mstep, r, g, b;
+	transform_cache *tp = tc;
+	transform_state *mp = mem_bcsp;
 
-	if (!mem_bcsp.allow[0]) ops |= 0xFF;
-	if (!mem_bcsp.allow[1]) ops |= 0xFF00;
-	if (!mem_bcsp.allow[2]) ops |= 0xFF0000;
+	if (m0 > 255) tp++ , mp++; // Brush mode
 
-	br = mem_bcsp.bcsp[0] * 256;
-	co = mem_bcsp.bcsp[1];
+	if (!mp->allow[0]) ops |= 0xFF;
+	if (!mp->allow[1]) ops |= 0xFF00;
+	if (!mp->allow[2]) ops |= 0xFF0000;
+
+	br = mp->bcsp[0] * 256;
+	co = mp->bcsp[1];
 	if (co > 0) co *= 3;
 	co += 100;
 	co = (256 * co) / 100;
-	sa = (256 * mem_bcsp.bcsp[2]) / 100;
-	dH = sH = mem_bcsp.bcsp[5];
+	sa = (256 * mp->bcsp[2]) / 100;
+	dH = sH = mp->bcsp[5];
 
 	// Map bitwise to truncated
-	do_ps = mem_bcsp.pmode ? mem_bcsp.bcsp[3] : 1 << mem_bcsp.bcsp[3];
+	do_ps = mp->pmode ? mp->bcsp[3] : 1 << mp->bcsp[3];
 	// Disable if 1:1, else separate truncated from rounded
-	if (do_ps &= 255) do_ps += (mem_bcsp.pmode > 1) << 8;
+	if (do_ps &= 255) do_ps += (mp->pmode > 1) << 8;
 
-	do_gamma = mem_bcsp.bcsp[4] - 100;
+	do_gamma = mp->bcsp[4] - 100;
 	do_bc = br | (co - 256);
 //	do_sa = sa - 255;
 
 	/* Prepare posterize table */
-	if (do_ps && (do_ps != last_ps))
+	if (do_ps && (do_ps != tp->last_ps))
 	{
 		int mul = do_ps & 255, div = 256, add = 0, div2 = mul - 1;
 		int i, j;
 
-		last_ps = do_ps;
+		tp->last_ps = do_ps;
 		if (do_ps > 255) // Rounded
 		{
 			mul += mul - 2;
@@ -2284,32 +2293,32 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		for (i = 0; i < 256; i++)
 		{
 			j = (i * mul + add) / div;
-			ps_table[i] = (j * 255 * 2 + div2) / (div2 + div2);
+			tp->ps_table[i] = (j * 255 * 2 + div2) / (div2 + div2);
 		}
 	}
 	/* Prepare gamma table */
-	if (do_gamma && (do_gamma != last_gamma))
+	if (do_gamma && (do_gamma != tp->last_gamma))
 	{
 		double w;
 		int i;
 
-		last_gamma = do_gamma;
-		w = 100.0 / (double)mem_bcsp.bcsp[4];
+		tp->last_gamma = do_gamma;
+		w = 100.0 / (double)(do_gamma + 100);
 		for (i = 0; i < 256; i++)
 		{
-			gamma_table[i] = rint(255.0 * pow((double)i / 255.0, w));
+			tp->gamma_table[i] = rint(255.0 * pow((double)i / 255.0, w));
 		}
 	}
 	/* Prepare brightness-contrast table */
-	if (do_bc && ((br ^ last_br) | (co ^ last_co)))
+	if (do_bc && ((br ^ tp->last_br) | (co ^ tp->last_co)))
 	{
 		int i, j;
 
-		last_br = br; last_co = co;
+		tp->last_br = br; tp->last_co = co;
 		for (i = 0; i < 256; i++)
 		{
 			j = ((i + i - 255) * co + (255 * 256)) / 2 + br;
-			bc_table[i] = j < 0 ? 0 : j > (255 * 256) ? 255 : j >> 8;
+			tp->bc_table[i] = j < 0 ? 0 : j > (255 * 256) ? 255 : j >> 8;
 		}
 	}
 	if (dH)
@@ -2341,9 +2350,9 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		/* If we do gamma transform */
 		if (do_gamma)
 		{
-			rgb[0] = gamma_table[rgb[0]];
-			rgb[1] = gamma_table[rgb[1]];
-			rgb[2] = gamma_table[rgb[2]];
+			rgb[0] = tp->gamma_table[rgb[0]];
+			rgb[1] = tp->gamma_table[rgb[1]];
+			rgb[2] = tp->gamma_table[rgb[2]];
 		}
 		/* If we do hue transform & colour has a hue */
 		if (dH && ((rgb[0] ^ rgb[1]) | (rgb[0] ^ rgb[2])))
@@ -2384,9 +2393,9 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		/* If we do brightness/contrast transform */
 		if (do_bc)
 		{
-			r = bc_table[r];
-			g = bc_table[g];
-			b = bc_table[b];
+			r = tp->bc_table[r];
+			g = tp->bc_table[g];
+			b = tp->bc_table[b];
 		}
 		/* If we do saturation transform */
 		if (sa)
@@ -2402,9 +2411,9 @@ void do_transform(int start, int step, int cnt, unsigned char *mask,
 		/* If we do posterize transform */
 		if (do_ps)
 		{
-			r = ps_table[r];
-			g = ps_table[g];
-			b = ps_table[b];
+			r = tp->ps_table[r];
+			g = tp->ps_table[g];
+			b = tp->ps_table[b];
 		}
 		/* If we do channel masking */
 		if (ops)
@@ -4527,17 +4536,15 @@ void flood_fill(int x, int y, unsigned int target)
 	unsigned char *pat, *buf, *temp;
 	int i, j, l, sb;
 
-	/* Shapeburst mode */
-	sb = STROKE_GRADIENT;
-
 	/* Regular fill? */
-	if (!sb && !mem_tool_pat && (tool_opacity == 255) && !flood_step &&
-		(!flood_img || (mem_channel == CHN_IMAGE)))
+	if (!mem_gradient && !(mem_blend && blend_src) && !mem_tool_pat &&
+		!flood_step && (!flood_img || (mem_channel == CHN_IMAGE)))
 	{
 		wjfloodfill(x, y, target, NULL);
 		return;
 	}
 
+	/* Patterned or fuzzy fill - use bitmap */
 	buf = calloc((mem_height + 7 + 8) >> 3, mem_width);
 	if (!buf)
 	{
@@ -4547,7 +4554,9 @@ void flood_fill(int x, int y, unsigned int target)
 	pat = buf + mem_width;
 	while (wjfloodfill(x, y, target, pat))
 	{
-		if (sb) /* Shapeburst - setup rendering backbuffer */
+		/* Shapeburst - setup rendering backbuffer */
+		sb = STROKE_GRADIENT;
+		if (sb)
 		{
 			sb_rect[0] = sb_rect[1] = 0;
 			sb_rect[2] = mem_width;
@@ -6487,18 +6496,15 @@ static void blend_pixels(int start, int step, int cnt, const unsigned char *mask
 			dest[nvi] = (vs1y + vsy1) / y1;
 			break;
 		}
-		case BLEND_SATPP: /* Perceived saturation (a hack, but useful one) */
+		case BLEND_SATPP: /* Perceived saturation */
 		{
-			int i, xyz = old[0] + old[1] + old[2];
+			int i, xyz = (new[0] + new[1] + new[2]) / 3;
 
-			/* This makes difference between MIN and MAX twice larger -
-			 * somewhat like doubling HSL saturation, but without strictly
-			 * preserving L */
-			i = (old[0] * 6 - xyz + 2) / 3;
+			i = old[0] + new[0] - xyz;
 			dest[0] = i < 0 ? 0 : i > 255 ? 255 : i;
-			i = (old[1] * 6 - xyz + 2) / 3;
+			i = old[1] + new[1] - xyz;
 			dest[1] = i < 0 ? 0 : i > 255 ? 255 : i;
-			i = (old[2] * 6 - xyz + 2) / 3;
+			i = old[2] + new[2] - xyz;
 			dest[2] = i < 0 ? 0 : i > 255 ? 255 : i;
 			break;
 		}
@@ -6627,7 +6633,7 @@ static void blend_pixels(int start, int step, int cnt, const unsigned char *mask
 
 void put_pixel_def(int x, int y)	/* Combined */
 {
-	unsigned char *ti, *old_image, *old_alpha = NULL;
+	unsigned char *src, *ti, *old_image, *old_alpha = NULL;
 	unsigned char fmask, opacity = 255, cset[NUM_CHANNELS + 3];
 	int i, j, offset, idx, bpp, op = tool_opacity;
 
@@ -6638,6 +6644,14 @@ void put_pixel_def(int x, int y)	/* Combined */
 	bpp = MEM_BPP;
 	ti = cset + (bpp == 3 ? 0 : mem_channel + 3);
 
+	old_image = mem_undo_opacity ? mem_undo_previous(mem_channel) :
+		mem_img[mem_channel];
+	if ((mem_channel == CHN_IMAGE) && RGBA_mode)
+		old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
+			mem_img[CHN_ALPHA];
+
+	offset = x + mem_width * y;
+
 	if (mem_gradient) /* Gradient mode - ask for one pixel */
 	{
 		fmask = 0; // Fake mask on input
@@ -6645,7 +6659,62 @@ void put_pixel_def(int x, int y)	/* Combined */
 			cset + CHN_ALPHA + 3);
 		if (!(op = fmask)) return;
 	}
-	else /* Default mode - init "colorset" */
+	else if (mem_blend && blend_src) /* Source mode - copy from layer */
+	{
+		cset[CHN_ALPHA + 3] = channel_col_A[CHN_ALPHA]; // Fake alpha
+		if ((blend_src == SRC_IMAGE) || // Same layer
+			(blend_src == SRC_LAYER + layer_selected))
+		{
+			if (bpp == 3) goto set3;
+			cset[mem_channel + 3] = old_image[offset];
+			goto seta;
+		}
+		else // Other layer
+		{
+			layer_node *t = layer_table + blend_src - SRC_LAYER;
+			image_info *img = &t->image->image_;
+			int u, w;
+
+			src = img->img[mem_channel];
+			if (!src) return; // Nothing here
+			w = img->width;
+			u = floor_mod(y - t->y, img->height) * w +
+				floor_mod(x - t->x, w);
+
+			if (mem_channel == CHN_IMAGE)
+			{
+				if (img->bpp > bpp) return; // Incompatible
+				if (img->bpp < bpp)
+				{
+					png_color *p = img->pal + src[u];
+					cset[0] = p->red;
+					cset[1] = p->green;
+					cset[2] = p->blue;
+				}
+				else if (bpp == 3)
+				{
+					src += u * 3;
+					cset[0] = src[0];
+					cset[1] = src[1];
+					cset[2] = src[2];
+				}
+				else cset[CHN_IMAGE + 3] = src[u];
+			}
+			else cset[mem_channel + 3] = src[u];
+			if ((src = img->img[CHN_ALPHA]))
+				cset[CHN_ALPHA + 3] = src[u];
+		}
+	}
+	/* Transform mode - copy from dest */
+	else if (mem_blend && (blend_mode & BLEND_XFORM) && (bpp == 3))
+	{
+set3:		src = old_image + offset * 3;
+		cset[0] = src[0];
+		cset[1] = src[1];
+		cset[2] = src[2];
+seta:		if (old_alpha) cset[CHN_ALPHA + 3] = old_alpha[offset];
+	}
+	else /* Default mode - init from pattern */
 	{
 		i = ((x & 7) + 8 * (y & 7));
 		cset[mem_channel + 3] = channel_col_[mem_pattern[i]][mem_channel];
@@ -6657,19 +6726,11 @@ void put_pixel_def(int x, int y)	/* Combined */
 		cset[2] = mem_col_pat24[i + 2];
 	}
 
-	old_image = mem_undo_opacity ? mem_undo_previous(mem_channel) :
-		mem_img[mem_channel];
-	if ((mem_channel == CHN_IMAGE) && RGBA_mode)
-		old_alpha = mem_undo_opacity ? mem_undo_previous(CHN_ALPHA) :
-			mem_img[CHN_ALPHA];
-
 	if (!idx) // No use for opacity with indexed images
 	{
 		j = (255 - j) * op;
 		opacity = (j + (j >> 8) + 1) >> 8;
 	}
-
-	offset = x + mem_width * y;
 
 	/* Coupled alpha channel */
 	if (old_alpha && mem_img[CHN_ALPHA])
@@ -6733,14 +6794,27 @@ static void mask_select(unsigned char *mask, unsigned char *xsel, int l)
 	}
 }
 
+enum {
+	PP_DEF = 0,	// Default (pattern)
+	PP_OFS,		// Offset
+	PP_BUF,		// Buffer
+	PP_GRAD,	// Gradient
+	PP_LR,		// Layer
+	PP_L2R,		// Indexed layer to RGB
+	PP_LBUF		// Buffered layer
+};
+
 /* Faster function for large brushes and fills */
 void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 {
 	unsigned char tmp_image[ROW_BUFLEN * 3], mask[ROW_BUFLEN],
 		tmp_alpha[ROW_BUFLEN], tmp_opacity[ROW_BUFLEN],
-		*source_alpha = NULL, *source_opacity = NULL;
+		*source_image = tmp_image, *source_alpha = NULL,
+		*source_opacity = NULL;
 	unsigned char *old_image, *old_alpha, *srcp, src1[8];
-	int offset, use_mask, bpp, idx, cx, cy, uninit_(d), s = ROW_BUFLEN;
+	image_info *img = NULL;
+	int offset, use_mask, bpp, idx, uninit_(cx), cy, d = 0, s = ROW_BUFLEN;
+	int mode = PP_DEF;
 
 
 	if (len <= 0) return;
@@ -6764,13 +6838,69 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 		if (cx < 0) len += cx , x -= cx;
 		if (len <= 0) return;
 		d = clone_dx + clone_dy * mem_width;
-		// Backward step in the rare case of unbufferable overlap
-		if (!clone_dy && (old_image == mem_img[mem_channel]) &&
-			(clone_dx < 0) && (clone_dx > -len) && (len > ROW_BUFLEN))
-			x += len - ROW_BUFLEN , s = -ROW_BUFLEN;
+		mode = PP_OFS; // Use offset
+		if (!clone_dy && (old_image == mem_img[mem_channel]))
+		{
+			mode = PP_BUF; // Use buffering
+			// Backward step in the rare case of unbufferable overlap
+			if ((clone_dx < 0) && (clone_dx > -len) && (len > ROW_BUFLEN))
+				x += len - ROW_BUFLEN , s = -ROW_BUFLEN;
+		}
 	}
+	else if (mem_gradient) mode = PP_GRAD; /* Gradient mode */
+	else if (mem_blend && blend_src) /* Source mode */
+	{
+		if ((blend_src == SRC_IMAGE) || // Same layer - use offset
+			(blend_src == SRC_LAYER + layer_selected)) mode = PP_OFS;
+		else // From other layer
+		{
+			layer_node *t = layer_table + blend_src - SRC_LAYER;
+			int u, w;
+
+			img = &t->image->image_;
+			if (!img->img[mem_channel]) return; // Nothing here
+
+			mode = PP_LR;
+			if (mem_channel == CHN_IMAGE)
+			{
+				if (img->bpp > bpp) return; // Incompatible
+				if (img->bpp < bpp) mode = PP_L2R; // Idx to RGB
+			}
+
+			w = img->width;
+			cx = floor_mod(x - t->x, w);
+			d = floor_mod(y - t->y, img->height) * w;
+			u = len;
+
+			if ((len > w) && (w <= ROW_BUFLEN / 2)) // Buffered repeat
+			{
+				u += cx;
+				if (u > ROW_BUFLEN) u = ROW_BUFLEN;
+
+				if (mode == PP_LR) memcpy(tmp_image,
+					img->img[mem_channel] + d * bpp, w * bpp);
+				else do_convert_rgb(0, 1, w, tmp_image,
+					img->img[CHN_IMAGE] + d, img->pal);
+				pattern_rep(tmp_image + w * bpp, tmp_image,
+					0, w, u - w, bpp);
+				
+				if (source_alpha && img->img[CHN_ALPHA])
+					pattern_rep(tmp_alpha, img->img[CHN_ALPHA] + d,
+						0, w, u, 1);
+
+				mode = PP_LBUF;
+			}
+
+			/* Fake alpha */
+			if (source_alpha && !img->img[CHN_ALPHA])
+				memset(tmp_alpha, channel_col_A[CHN_ALPHA],
+					u > ROW_BUFLEN ? ROW_BUFLEN : u);
+		}
+	}
+	/* Transform mode - use offset */
+	else if (mem_blend && (blend_mode & BLEND_XFORM) && (bpp == 3)) mode = PP_OFS;
 // !!! This depends on buffer length being a multiple of pattern length
-	else if (!mem_gradient) /* Default mode - init buffer(s) from pattern */
+	else /* Default mode - init buffer(s) from pattern */
 	{
 		int i, dy = 8 * (y & 7), l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
 
@@ -6797,6 +6927,44 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 	{
 		int l = len <= ROW_BUFLEN ? len : ROW_BUFLEN;
 
+		/* Offset mode */
+		if (mode == PP_OFS)
+		{
+			source_image = old_image + (offset + d) * bpp;
+			if (source_alpha) source_alpha = old_alpha + offset + d;
+		}
+		/* Buffered mode */
+		if (mode == PP_BUF)
+		{
+			memcpy(tmp_image, old_image + (offset + d) * bpp, l * bpp);
+			if (source_alpha)
+				memcpy(tmp_alpha, old_alpha + offset + d, l);
+		}
+		/* Layer mode, direct */
+		if ((mode == PP_LR) || (mode == PP_L2R))
+		{
+			int w = img->width;
+			if (l + cx > w) l = w - cx;
+			if (mode == PP_L2R) do_convert_rgb(0, 1, l, tmp_image,
+				img->img[CHN_IMAGE] + d + cx, img->pal);
+			else source_image = img->img[mem_channel] + (d + cx) * bpp;
+			if (source_alpha && img->img[CHN_ALPHA])
+				source_alpha = img->img[CHN_ALPHA] + d + cx;
+			cx = (cx + l) % w;
+			s = l;
+		}
+		/* Layer mode, buffered */
+		if (mode == PP_LBUF)
+		{
+			if (l + cx > ROW_BUFLEN) l = ROW_BUFLEN - cx;
+			source_image = tmp_image + cx * bpp;
+			if (source_alpha) source_alpha = tmp_alpha + cx;
+			cx = (cx + l) % img->width;
+			s = l;
+		}
+		/* Buffers stay unchanged for default mode */
+
+		/* Mask */
 		prep_mask(0, 1, l, mask,
 			use_mask ? mem_img[CHN_MASK] + offset : NULL,
 			mem_img[CHN_IMAGE] + offset * mem_img_bpp);
@@ -6807,17 +6975,9 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 			xsel += l;
 		}
 
-		/* Clone mode */
-		if (tool_type == TOOL_CLONE)
-		{
-			memcpy(tmp_image, old_image + (offset + d) * bpp, l * bpp);
-			if (source_alpha)
-				memcpy(tmp_alpha, old_alpha + offset + d, l);
-		}
 		/* Gradient mode */
-		else if (mem_gradient) grad_pixels(0, 1, l, x, y, mask,
+		if (mode == PP_GRAD) grad_pixels(0, 1, l, x, y, mask,
 			source_opacity = tmp_opacity, tmp_image, source_alpha);
-		/* Buffers stay unchanged for default mode */
 
 		process_mask(0, 1, l, mask,
 			mem_img[CHN_ALPHA] + offset,
@@ -6825,10 +6985,10 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 			idx * tool_opacity, channel_dis[CHN_ALPHA]);
 		process_img(0, 1, l, mask,
 			mem_img[mem_channel] + offset * bpp,
-			old_image + offset * bpp, tmp_image,
+			old_image + offset * bpp, source_image,
 			tmp_image, bpp, 0);
 
-		if ((len -= ROW_BUFLEN) <= 0) return;
+		if ((len -= l) <= 0) return;
 		x += s;
 		offset += s;
 	}
@@ -6925,10 +7085,15 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 	}
 	if (blend & BLENDF_INVM) opm = 255;
 
-	/* Apply blend mode's transform part */
+	/* Apply blend mode's transform parts */
+	// !!! Both calls ignore BLENDF_INVM, as are never combined with it
+	if ((blend & BLEND_XFORM) && (bpp == 3))
+	{
+		do_transform(start, step, cnt, mask, xbuf, img, 256);
+		img = xbuf;
+	}
 	if (blend & BLEND_MMASK)
 	{
-		// !!! Ignores BLENDF_INVM, as is never combined with it
 		blend_pixels(start, step, cnt, mask, xbuf, img0, img, bpp, blend);
 		img = xbuf;
 	}

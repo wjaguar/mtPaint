@@ -815,17 +815,22 @@ static int vw_repaint(void *dt, void **wdata, int what, void **where,
 	return (TRUE); // now draw this
 }
 
-void vw_update_area(int x, int y, int w, int h)	// Update x,y,w,h area of current image
+void lr_update_area(int lr, int x, int y, int w, int h)	// Update x,y,w,h area of a layer
 {
-	int zoom, scale, rxy[4];
+	int mx, my, zoom, scale, rxy[4];
+
+	if ((lr < LR_ANIM) && (show_layers_main || (lr == layer_selected)))
+	{
+		mx = x + layer_table_p[lr].x - layer_table_p[layer_selected].x;
+		my = y + layer_table_p[lr].y - layer_table_p[layer_selected].y;
+		main_update_area(mx, my, w, h);
+	}
 
 	if (!view_showing) return;
+	lr &= LR_ANIM - 1; // Drop view-only flag
 	
-	if (layer_selected)
-	{
-		x += layer_table[layer_selected].x - layer_table[0].x;
-		y += layer_table[layer_selected].y - layer_table[0].y;
-	}
+	x += layer_table[lr].x - layer_table[0].x;
+	y += layer_table[lr].y - layer_table[0].y;
 
 	if (vw_zoom < 1.0)
 	{

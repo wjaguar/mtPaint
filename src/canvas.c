@@ -333,8 +333,7 @@ quit:	free(mask);
 	else if (!update) /* Update right now */
 	{
 		update_stuff(upd);
-		vw_update_area(fx, fy, fw, fh);
-		main_update_area(fx, fy, fw, fh);
+		lr_update_area(layer_selected, fx, fy, fw, fh);
 	}
 	else /* Accumulate update area for later */
 	{
@@ -3006,10 +3005,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 		if (miny < 0) yh += miny , miny = 0;
 
 		if ((xw > 0) && (yh > 0))
-		{
-			main_update_area(minx, miny, xw, yh);
-			vw_update_area(minx, miny, xw, yh);
-		}
+			lr_update_area(layer_selected, minx, miny, xw, yh);
 	}
 	tool_ox = x;	// Remember the coords just used as they are needed in continuous mode
 	tool_oy = y;

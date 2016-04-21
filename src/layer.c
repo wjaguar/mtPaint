@@ -80,22 +80,12 @@ layer_image *alloc_layer(int w, int h, int bpp, int cmask, image_info *src)
 	return (NULL);
 }
 
-/* Repaint layer in view/main window
- * !!! Never called in anim mode, so position is the same in both windows */
+/* Repaint layer in view/main window */
 static void repaint_layer(int l)
 {
-	layer_node *t = layer_table + l;
-	image_info *image;
-	int lx, ly, lw, lh;
-
-	image = l == layer_selected ? &mem_image : &t->image->image_;
-	lw = image->width;
-	lh = image->height;
-	lx = t->x - layer_table[layer_selected].x;
-	ly = t->y - layer_table[layer_selected].y;
-
-	vw_update_area(lx, ly, lw, lh);
-	if (show_layers_main) main_update_area(lx, ly, lw, lh);
+	image_info *image = l == layer_selected ? &mem_image :
+		&layer_table[l].image->image_;
+	lr_update_area(l, 0, 0, image->width, image->height);
 }
 
 static void repaint_layers()
@@ -182,6 +172,11 @@ void shift_layer(int val)
 	int newbkg, lv = layer_selected + val;
 
 	if ((lv < 0) || (lv > layers_total)) return; // Cannot move
+
+	/* Update source layer */
+	if ((blend_src == SRC_LAYER + layer_selected) || (blend_src == SRC_LAYER + lv))
+		blend_src ^= (SRC_LAYER + layer_selected) ^ (SRC_LAYER + lv);
+
 	layer_copy_from_main(layer_selected);
 	temp = layer_table[layer_selected];
 	layer_table[layer_selected] = layer_table[lv];
@@ -315,6 +310,7 @@ void layer_press_delete()
 	i = alert_box(_("Warning"), txt, _("No"), _("Yes"), NULL);
 	if ((i != 2) || (check_for_changes() == 1)) return;
 
+	if (blend_src == SRC_LAYER + layer_selected) blend_src = SRC_NORMAL;
 	layer_copy_from_main(layer_selected);
 	layer_copy_to_main(--layer_selected);
 	update_main_with_new_layer();
@@ -394,6 +390,8 @@ static void layer_update_filename( char *name )
 static void layers_free_all()
 {
 	layer_node *t;
+
+	if (blend_src > SRC_LAYER + 0) blend_src = SRC_NORMAL;
 
 	if (layers_total && layer_selected)	// Copy over layer 0
 	{
@@ -1030,22 +1028,15 @@ void pressed_paste_layer()
 	view_show();
 }
 
-/* Move a layer & update window labels
- * !!! Never called in anim mode, so coords are the same in both windows */
+/* Move a layer & update window labels */
 void move_layer_relative(int l, int change_x, int change_y)
 {
 	image_info *image = l == layer_selected ? &mem_image :
 		&layer_table[l].image->image_;
-	int lx = layer_table[l].x, ly = layer_table[l].y, lw, lh, upd = 0;
+	int upd = 0;
 
 	layer_table[l].x += change_x;
 	layer_table[l].y += change_y;
-	if (change_x < 0) lx += change_x;
-	if (change_y < 0) ly += change_y;
-	lw = image->width + abs(change_x);
-	lh = image->height + abs(change_y);
-	lx -= layer_table[layer_selected].x;
-	ly -= layer_table[layer_selected].y;
 
 	layers_notify_changed();
 	if (l == layer_selected)
@@ -1054,10 +1045,11 @@ void move_layer_relative(int l, int change_x, int change_y)
 		// All layers get moved while the current one stays still
 		if (show_layers_main) upd |= UPD_RENDER;
 	}
-	else if (show_layers_main) main_update_area(lx, ly, lw, lh);
 	// All layers get moved while the background stays still
 	if (l == 0) upd |= UPD_VIEW;
-	else vw_update_area(lx, ly, lw, lh);
+
+	lr_update_area(l, change_x < 0 ? 0 : -change_x, change_y < 0 ? 0 : -change_y,
+		image->width + abs(change_x), image->height + abs(change_y));
 	if (upd) update_stuff(upd);
 }
 

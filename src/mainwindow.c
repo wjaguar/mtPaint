@@ -153,7 +153,7 @@ static inilist ini_int[] = {
 	{ "pixelNudge",		&mem_nudge,		8   },
 	{ "recentFiles",	&recent_files,		10  },
 	{ "lastspalType",	&spal_mode,		2   },
-	{ "posterizeMode",	&posterize_mode,	0   },
+	{ "posterizeMode",	&def_bcsp.pmode,	0   },
 	{ "panSize",		&max_pan,		128 },
 	{ "undoDepth",		&mem_undo_depth,	DEF_UNDO },
 	{ "tileWidth",		&tgrid_dx,		32  },
@@ -972,8 +972,7 @@ static void draw_arrow(int mode)
 	h = maxy - miny + 1;
 
 	update_stuff(UPD_IMGP);
-	main_update_area(minx, miny, w, h);
-	vw_update_area(minx, miny, w, h);
+	lr_update_area(layer_selected, minx, miny, w, h);
 }
 
 int check_for_changes()			// 1=STOP, 2=IGNORE, -10=NOT CHANGED
@@ -4656,7 +4655,7 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		else launch_script(mode);
 		break;
 	case DLG_BRCOSA:
-		pressed_brcosa(); break;
+		pressed_brcosa(NULL); break;
 	case DLG_CHOOSER:
 		if (!script_cmds) choose_pattern(mode);
 		else if (mode == CHOOSE_COLOR) script_ab();

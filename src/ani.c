@@ -599,20 +599,14 @@ static gboolean ani_play_timer_call(gpointer data)
 static void ani_frame_slider_moved(apview_dd *dt, void **wdata, int what,
 	void **where)
 {
-	int x = 0, y = 0, w = mem_width, h = mem_height;
+	image_info *image = !layer_selected ? &mem_image :
+		&layer_table[0].image->image_;
 
 	cmd_read(where, dt);
 	ani_set_frame_state(dt->frame[0]);
 
-	if (layer_selected)
-	{
-		x = layer_table[0].x - layer_table[layer_selected].x;
-		y = layer_table[0].y - layer_table[layer_selected].y;
-		w = layer_table[0].image->image_.width;
-		h = layer_table[0].image->image_.height;
-	}
-
-	vw_update_area(x, y, w, h);	// Update only the area we need
+	// Update only view window
+	lr_update_area(LR_ANIM, 0, 0, image->width, image->height);
 }
 
 static void ani_play_btn(apview_dd *dt, void **wdata, int what, void **where)

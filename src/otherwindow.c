@@ -600,42 +600,40 @@ void pressed_sort_pal()
 
 ///	BRIGHTNESS-CONTRAST-SATURATION WINDOW
 
-#define BRCOSA_ITEMS 6
-#define BRCOSA_POSTERIZE 3
-#define BRCOSA_INDEX(i) (((i) == BRCOSA_POSTERIZE) && posterize_mode ? \
-	BRCOSA_ITEMS : (i))
-
-static int brcosa_values_default[BRCOSA_ITEMS + 1] = {0, 0, 0, 8, 100, 0, 256};
+transform_state def_bcsp = { { 0, 0, 0, 8, 100, 0 }, { TRUE, TRUE, TRUE } };
 
 int mem_preview, mem_preview_clip, brcosa_auto;
 
-int posterize_mode;	// bitwise/truncated/rounded
-
 typedef struct {
-	int rgb, show;
+	transform_state t;
+	int rgb, show, tmode;
 	int rgbclip, pflag;
-	int allow[3];
 	int c01[3 * 2];
-	int values[BRCOSA_ITEMS];
+	void **xb; // Transform mode toggle
 	void **sss[BRCOSA_ITEMS]; // Spinsliders
 	void **buttons[4]; // Preview/Reset/Apply/OK
 	void **xtra; // "Details" area
 	png_color pal[256];
 } brcosa_dd;
 
+static int check_transform_defaults(transform_state *t)
+{
+	int i;
+
+	for (i = 0; i < BRCOSA_ITEMS; i++)
+		if (t->bcsp[i] != (i != BRCOSA_POSTERIZE ? def_bcsp.bcsp[i] :
+			DEF_POSTERIZE(t->pmode))) return (TRUE);
+	return (FALSE);
+}
+
 static void brcosa_preview(brcosa_dd *dt, void *cause)
 {
-	int i, j, update = UPD_PAL;
+	int j, update = UPD_PAL;
 	int do_pal = TRUE;	// palette processing
 
 	mem_pal_copy(mem_pal, dt->pal);	// Get back normal palette
 
-	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mem_bcsp.bcsp[i] = dt->values[i];
-	mem_bcsp.pmode = posterize_mode;
-
-	for (i = 0; i < 3; i++)
-		mem_bcsp.allow[i] = dt->allow[i];
+	mem_bcsp[0] = dt->t;
 
 	if (mem_img_bpp == 3)
 	{
@@ -667,8 +665,7 @@ static void brcosa_moved(brcosa_dd *dt, void **wdata, int what, void **where)
 	if (cause == &brcosa_auto) cmd_showhide(dt->buttons[0], !brcosa_auto);
 
 	// Set 3 brcosa button as sensitive if the user has assigned changes
-	for (state = i = 0; i < BRCOSA_ITEMS; i++)
-		state |= dt->values[i] ^ brcosa_values_default[BRCOSA_INDEX(i)];
+	state = check_transform_defaults(&dt->t);
 	for (i = 1; i < 4; i++) cmd_sensitive(dt->buttons[i], state);
 }
 
@@ -679,7 +676,8 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 
 	mem_pal_copy(mem_pal, dt->pal);
 
-	if (what != op_EVT_CANCEL) // OK/Apply
+	if (what == op_EVT_CANCEL); 
+	else if (!dt->tmode) // OK/Apply
 	{
 		// !!! Buttons disabled for default values
 		spot_undo(UNDO_COL);
@@ -715,19 +713,39 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 		}
 		mem_undo_prepare();
 	}
+	else // OK/Apply for transform mode
+	{
+		run_query(wdata); // May modify palette, through preview
+		mem_bcsp[1] = dt->t; // Safe: buttons disabled for default values
+		mem_pal_copy(mem_pal, dt->pal); // Restore palette
+		if (mem_blend) update_stuff(UPD_MODE);
+	}
 
 	// Disable preview for final update
 	if (what != op_EVT_CLICK) mem_preview = mem_preview_clip = FALSE;
 
 	update_stuff(UPD_PAL);
 
-	if (what == op_EVT_CLICK) // Apply
+	if (what != op_EVT_CLICK) // OK/Cancel
+	{
+		void **xb = dt->xb;
+
+		run_destroy(wdata);
+		if (xb) // Transform mode
+		{
+			// Toggle transform off if still uninitialized
+			if (!mem_bcsp[1].bcsp[BRCOSA_POSTERIZE])
+				cmd_set(xb, FALSE);
+			// Show its dialog
+			cmd_showhide(GET_WINDOW(wdata_slot(xb)), TRUE);
+		}
+	}
+	else if (!dt->tmode) // Apply
 	{
 		// Reload palette and redo preview
 		mem_pal_copy(dt->pal, mem_pal);
 		brcosa_preview(dt, NULL);
 	}
-	else run_destroy(wdata); // OK/Cancel
 }
 
 static void click_brcosa_show_toggle(brcosa_dd *dt, void **wdata, int what,
@@ -744,7 +762,8 @@ static void click_brcosa_reset(brcosa_dd *dt)
 	mem_pal_copy(mem_pal, dt->pal);
 
 	for (i = 0; i < BRCOSA_ITEMS; i++)
-		cmd_set(dt->sss[i], brcosa_values_default[BRCOSA_INDEX(i)]);
+		cmd_set(dt->sss[i], i != BRCOSA_POSTERIZE ? def_bcsp.bcsp[i] :
+			DEF_POSTERIZE(dt->t.pmode));
 
 	update_stuff(UPD_PAL);
 }
@@ -753,14 +772,15 @@ static void brcosa_posterize_changed(brcosa_dd *dt, void **wdata, int what,
 	void **where)
 {
 	int vvv[3];
-	int i, v, oldv = posterize_mode;
+	int i, v, m;
 
 	cmd_read(where, dt);
-	if (!oldv ^ !posterize_mode) // From/to bitwise
+	m = dt->t.pmode;
+	if (!def_bcsp.pmode ^ !m) // From/to bitwise
 	{
 		cmd_read(dt->sss[BRCOSA_POSTERIZE], dt);
-		v = dt->values[BRCOSA_POSTERIZE];
-		if (oldv) // To bitwise
+		v = dt->t.bcsp[BRCOSA_POSTERIZE];
+		if (!m) // To bitwise
 		{
 			for (i = 0 , v -= 1; v ; i++ , v >>= 1);
 			vvv[0] = i;
@@ -776,6 +796,7 @@ static void brcosa_posterize_changed(brcosa_dd *dt, void **wdata, int what,
 		cmd_setv(dt->sss[BRCOSA_POSTERIZE], vvv, SPIN_ALL);
 	}
 	else if (brcosa_auto) brcosa_preview(dt, NULL);
+	def_bcsp.pmode = m; // Remember
 }
 
 static char *pos_txt[] = { _("Bitwise"), _("Truncated"), _("Rounded") };
@@ -785,20 +806,20 @@ static void *brcosa_code[] = {
 	WPMOUSE, WINDOWm(_("Transform Colour")), NORESIZE,
 	BORDER(TABLE, 10), BORDER(SPINSLIDE, 0),
 	TABLE2(6), OPNAME0,
-	REF(sss[4]), TSPINSLIDE(_("Gamma"), values[4], 20, 500),
+	REF(sss[4]), TSPINSLIDE(_("Gamma"), t.bcsp[4], 20, 500),
 	EVENT(CHANGE, brcosa_moved),
-	REF(sss[0]), TSPINSLIDE(_("Brightness"), values[0], -255, 255),
+	REF(sss[0]), TSPINSLIDE(_("Brightness"), t.bcsp[0], -255, 255),
 	EVENT(CHANGE, brcosa_moved),
-	REF(sss[1]), TSPINSLIDE(_("Contrast"), values[1], -100, 100),
+	REF(sss[1]), TSPINSLIDE(_("Contrast"), t.bcsp[1], -100, 100),
 	EVENT(CHANGE, brcosa_moved),
-	REF(sss[2]), TSPINSLIDE(_("Saturation"), values[2], -100, 100),
+	REF(sss[2]), TSPINSLIDE(_("Saturation"), t.bcsp[2], -100, 100),
 	EVENT(CHANGE, brcosa_moved),
-	REF(sss[5]), TSPINSLIDE(_("Hue"), values[5], -1529, 1529),
+	REF(sss[5]), TSPINSLIDE(_("Hue"), t.bcsp[5], -1529, 1529),
 	EVENT(CHANGE, brcosa_moved),
 	TLABEL(_("Posterize")),
 	REF(sss[3]),
-	UNLESSv(posterize_mode), T1SPINSLIDE(values[3], 1, 8),
-	IFv(posterize_mode), T1SPINSLIDE(values[3], 2, 256),
+	UNLESS(t.pmode), T1SPINSLIDE(t.bcsp[3], 1, 8),
+	IF(t.pmode), T1SPINSLIDE(t.bcsp[3], 2, 256),
 	EVENT(CHANGE, brcosa_moved),
 	WDONE,
 ///	MIDDLE SECTION
@@ -811,27 +832,30 @@ static void *brcosa_code[] = {
 	REF(xtra), TABLEr(4, 4),
 	TLABEL(_("Posterize type")),
 	BORDER(OPT, 0),
-	TLOPTvle(pos_txt, 3, posterize_mode, brcosa_posterize_changed, 1, 0, 2),
-	UNLESS(rgb), TLLABEL(_("Palette"), 0, 2),
-	IFx(rgb, 1),
-		TLCHECK(_("Palette"), pflag, 0, 2),
-		EVENT(CHANGE, brcosa_changed),
-		TLCHECKv(_("Image"), mem_preview, 0, 1),
-		EVENT(CHANGE, brcosa_changed),
-		IF(rgbclip),
-			TLCHECKvl(_("Clipboard"), mem_preview_clip, 1, 1, 2),
-		IF(rgbclip), EVENT(CHANGE, brcosa_changed),
+	TLOPTle(pos_txt, 3, t.pmode, brcosa_posterize_changed, 1, 0, 2),
+	UNLESSx(tmode, 1),
+		UNLESS(rgb), TLLABEL(_("Palette"), 0, 2),
+		IFx(rgb, 2),
+			TLCHECK(_("Palette"), pflag, 0, 2),
+			EVENT(CHANGE, brcosa_changed),
+			TLCHECKv(_("Image"), mem_preview, 0, 1),
+			EVENT(CHANGE, brcosa_changed),
+			IFx(rgbclip, 3),
+				TLCHECKvl(_("Clipboard"), mem_preview_clip, 1, 1, 2),
+				EVENT(CHANGE, brcosa_changed),
+			ENDIF(3),
+		ENDIF(2),
+		TLHBOXl(1, 2, 2),
+		BORDER(SPIN, 0),
+		XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed), OPNAME("from"),
+		XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed), OPNAME("to"),
+		WDONE,
 	ENDIF(1),
-	TLHBOXl(1, 2, 2),
-	BORDER(SPIN, 0),
-	XSPINa(c01[0]), EVENT(CHANGE, brcosa_changed), OPNAME("from"),
-	XSPINa(c01[3]), EVENT(CHANGE, brcosa_changed), OPNAME("to"),
-	WDONE,
 	TLCHECKv(_("Auto-Preview"), brcosa_auto, 0, 3), UNNAME,
 	EVENT(CHANGE, brcosa_moved), TRIGGER,
-	TLCHECK(_("Red"), allow[0], 1, 3), EVENT(CHANGE, brcosa_changed),
-	TLCHECK(_("Green"), allow[1], 2, 3), EVENT(CHANGE, brcosa_changed),
-	TLCHECK(_("Blue"), allow[2], 3, 3), EVENT(CHANGE, brcosa_changed),
+	TLCHECK(_("Red"), t.allow[0], 1, 3), EVENT(CHANGE, brcosa_changed),
+	TLCHECK(_("Green"), t.allow[1], 2, 3), EVENT(CHANGE, brcosa_changed),
+	TLCHECK(_("Blue"), t.allow[2], 3, 3), EVENT(CHANGE, brcosa_changed),
 	WDONE,
 ///	BOTTOM AREA
 	HSEP,
@@ -846,22 +870,17 @@ static void *brcosa_code[] = {
 };
 #undef WBbase
 
-void pressed_brcosa()
+void pressed_brcosa(void **xb)
 {
-	brcosa_dd tdata = { mem_img_bpp == 3, FALSE,
+	brcosa_dd tdata = { def_bcsp, mem_img_bpp == 3, FALSE, !!xb,
 		mem_clipboard && (mem_clip_bpp == 3), FALSE,
-		{ TRUE, TRUE, TRUE },
-		{ 0, 0, mem_cols - 1, mem_cols - 1, 0, mem_cols - 1 } };
-	int i;
+		{ 0, 0, mem_cols - 1, mem_cols - 1, 0, mem_cols - 1 }, xb };
 
-	memcpy(tdata.values, brcosa_values_default, sizeof(tdata.values));
-	tdata.values[BRCOSA_POSTERIZE] =
-		brcosa_values_default[BRCOSA_INDEX(BRCOSA_POSTERIZE)];
+	tdata.t.bcsp[BRCOSA_POSTERIZE] = DEF_POSTERIZE(tdata.t.pmode);
+	/* Remember settings for transform mode if initialized */
+	if (xb && mem_bcsp[1].bcsp[BRCOSA_POSTERIZE]) tdata.t = mem_bcsp[1];
 	mem_pal_copy(tdata.pal, mem_pal);	// Remember original palette
-
-	/* !!! In case a redraw happens inside run_create() */
-	for (i = 0; i < BRCOSA_ITEMS; i++)
-		mem_bcsp.bcsp[i] = brcosa_values_default[i];
+	mem_bcsp[0] = tdata.t; // !!! In case a redraw happens inside run_create()
 
 	mem_preview = TRUE;	// Enable live preview in RGB mode
 
