@@ -81,7 +81,7 @@ typedef struct {
 	void *tparent;	// Transient parent window
 	char *ininame;	// Prefix for inifile vars
 	char **script;	// Commands if simulated
-	int xywh[4];	// Stored window position & size
+	int xywh[5];	// Stored window position/size/state
 	int actn;	// Actmap slots count
 	int actmask;	// Last actmap mask
 	int vismask;	// Visibility mask
@@ -4626,11 +4626,11 @@ void rw_pos(v_dd *vdata, int set)
 
 	memcpy(name, vdata->ininame, l);
 	name[l++] = '_'; name[l + 1] = '\0';
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 5; i++)
 	{
-		name[l] = "xywh"[i];
+		name[l] = "xywhm"[i];
 		if (set) inifile_set_gint32(name, vdata->xywh[i]);
-		else if (vdata->xywh[i] || (i < 2)) /* 0 means auto-size */
+		else if (vdata->xywh[i] || (i < 2) || (i > 3)) // 0 means auto-size
 			vdata->xywh[i] = inifile_get_gint32(name, vdata->xywh[i]);
 	}
 }
@@ -4640,11 +4640,11 @@ GtkWidget *do_prepare(GtkWidget *widget, int pk, int cw, int minw, int minh)
 {
 	/* Show this */
 	if (pk) gtk_widget_show(widget);
-	/* Border this */
-	if (cw) gtk_container_set_border_width(GTK_CONTAINER(widget), cw);
 	/* Unwrap this */
 	if (pk & pkf_PARENT)
 		while (widget->parent) widget = widget->parent;
+	/* Border this */
+	if (cw) gtk_container_set_border_width(GTK_CONTAINER(widget), cw);
 	/* Set fixed width/height for this */
 	if ((minw > 0) || (minh > 0)) gtk_widget_set_usize(widget,
 		minw > 0 ? minw : -2, minh > 0 ? minh : -2);
@@ -5815,7 +5815,20 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			widget = mkpack(op != op_COMBO, op == op_RPACKD,
 				ref, ddata, r);
 // !!! Padding = 0
-			if (op != op_COMBO) cw = GET_BORDER(RPACK);
+			cw = GET_BORDER(RPACK);
+			if (op != op_COMBO) break;
+			cw = GET_BORDER(OPT);
+#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+			/* !!! GtkComboBox ignores its border setting, and is
+			 * easier to wrap than fix */
+			if (cw)
+			{
+				GtkWidget *w = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
+				gtk_container_add(GTK_CONTAINER(w), widget);
+				gtk_widget_show(w);
+				pk |= pkf_PARENT;
+			}
+#endif
 			break;
 		/* Add an option menu for field/var */
 		case op_OPT: case op_OPTD:
@@ -7746,7 +7759,7 @@ int cmd_run_script(void **slot, char **strs)
 void cmd_showhide(void **slot, int state)
 {
 	void **keymap = NULL;
-	int raise = FALSE, unfocus = FALSE;
+	int raise = FALSE, unfocus = FALSE, mx = FALSE;
 
 	if (GET_OP(slot) == op_WDONE) slot = NEXT_SLOT(slot); // skip head noop
 	if (IS_UNREAL(slot))
@@ -7777,6 +7790,7 @@ void cmd_showhide(void **slot, int state)
 				vdata->xywh[2] ? vdata->xywh[2] : -1,
 				vdata->xywh[3] ? vdata->xywh[3] : -1);
 			/* Prepare to do postponed actions */
+			mx = vdata->xywh[4];
 			keymap = vdata->keymap;
 			raise = vdata->raise;
 			unfocus = vdata->unfocus;
@@ -7787,10 +7801,14 @@ void cmd_showhide(void **slot, int state)
 			/* !!! These reads also do gdk_flush() which, followed by
 			 * set_transient(NULL), KDE somehow needs for restoring
 			 * focus from fileselector back to pref window - WJ */
-			gdk_window_get_size(w->window,
-				vdata->xywh + 2, vdata->xywh + 3);
-			gdk_window_get_root_origin(w->window,
-				vdata->xywh + 0, vdata->xywh + 1);
+			if (!(vdata->xywh[4] = !!(gdk_window_get_state(w->window) &
+				GDK_WINDOW_STATE_MAXIMIZED)))
+			{
+				gdk_window_get_size(w->window,
+					vdata->xywh + 2, vdata->xywh + 3);
+				gdk_window_get_root_origin(w->window,
+					vdata->xywh + 0, vdata->xywh + 1);
+			}
 			if (vdata->ininame && vdata->ininame[0])
 				rw_pos(vdata, TRUE);
 			/* Needed in Windows to stop GTK+ lowering the main window */
@@ -7798,6 +7816,9 @@ void cmd_showhide(void **slot, int state)
 		}
 	}
 	widget_showhide(slot[0], state);
+	/* !!! Window must be visible, or maximize fails if either dimension is
+	 * already at max, with KDE3 at least - WJ */
+	if (mx) gtk_window_maximize(slot[0]);
 	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
 	if (unfocus) gtk_window_set_focus(slot[0], NULL);
 	/* !!! Have to wait till canvas is displayed, to init keyboard */

@@ -147,6 +147,8 @@ int mem_continuous;		// Area we painting the static shapes continuously?
 
 /// PALETTE
 
+int mem_pal_id_c, mem_pal_ab_c;	// Text & A/B highlight colors
+
 unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
 				// RGB screen memory holding current palette
 static int found[1024];		// Used by mem_cols_used() & mem_convert_indexed
@@ -2120,58 +2122,73 @@ void mem_set_trans(int trans)
 	update_stuff(UPD_TRANS);
 }
 
-#define PALETTE_TEXT_GREY 200
-
 static void repaint_swatch(int index)		// Update a palette colour swatch
 {
-	unsigned char *tmp, pcol[2] = { 0, 0 };
-	int i, j;
+	static const int ll[3] = { PALETTE_SWATCH_X, PALETTE_SWATCH_W,
+		PALETTE_WIDTH - PALETTE_CROSS_X };
+	unsigned char *tr, *tmp;
+	int i, j, k, n, d, c = PNG_2_INT(mem_pal[index]);
+	int cc[4] = { mem_pal_ab_c, c, mem_pal_ab_c, mem_pal_id_c };
 
-	tmp = mem_pals + index * PALETTE_SWATCH_H * PALETTE_W3 +
-		PALETTE_SWATCH_Y * PALETTE_W3 + PALETTE_SWATCH_X * 3;
-	tmp[0] = mem_pal[index].red;
-	tmp[1] = mem_pal[index].green;
-	tmp[2] = mem_pal[index].blue;
-	for (i = 3; i < PALETTE_SWATCH_W * 3; i++) tmp[i] = tmp[i - 3];
-	for (i = 1; i < PALETTE_SWATCH_H; i++)
-		memcpy(tmp + i * PALETTE_W3, tmp, PALETTE_SWATCH_W * 3);
+	/* Unhighlight background if not A or B */
+	if ((index ^ mem_col_A) | (c ^ PNG_2_INT(mem_col_A24))) cc[0] = 0;
+	if ((index ^ mem_col_B) | (c ^ PNG_2_INT(mem_col_B24))) cc[2] = 0;
 
-	if (mem_prot_mask[index]) pcol[1] = PALETTE_TEXT_GREY;	// Protection mask cross
-	tmp += PALETTE_CROSS_DY * PALETTE_W3 +
-		(PALETTE_CROSS_X + PALETTE_CROSS_DX - PALETTE_SWATCH_X) * 3;
-	for (i = 0; i < PALETTE_CROSS_H; i++)
+	tr = mem_pals + index * PALETTE_SWATCH_H * PALETTE_W3 +
+		PALETTE_SWATCH_Y * PALETTE_W3;
+
+	/* Draw color & background */
+	tmp = tr;
+	for (n = 0; n < 3; n++)
 	{
-		for (j = 0; j < PALETTE_CROSS_W; j++)
+		c = cc[n]; j = ll[n];
+		for (i = 0; i < j; i++ , tmp += 3)
 		{
-			tmp[0] = tmp[1] = tmp[2] = pcol[(mem_cross[i] >> j) & 1];
-			tmp += 3;
+			tmp[0] = INT_2_R(c);
+			tmp[1] = INT_2_G(c);
+			tmp[2] = INT_2_B(c);
 		}
-		tmp += PALETTE_W3 - PALETTE_CROSS_W * 3;
 	}
-}
+	for (i = 1; i < PALETTE_SWATCH_H; i++)
+		memcpy(tr + i * PALETTE_W3, tr, PALETTE_W3);
 
-static void copy_num(int index, int tx, int ty)
-{
-	static const unsigned char pcol[2] = { 0, PALETTE_TEXT_GREY };
-	unsigned char *tmp = mem_pals + ty * PALETTE_W3 + tx * 3;
-	int i, j, n, d, v = index;
-
+	/* Draw index */
+	cc[1] = mem_pal_id_c;
+	tmp = tr + PALETTE_INDEX_DY * PALETTE_W3 + PALETTE_INDEX_X * 3;
 	for (d = 100; d; d /= 10 , tmp += (PALETTE_DIGIT_W + 1) * 3)
 	{
 		if ((index < d) && (d > 1)) continue;
-		v -= (n = v / d) * d;
-		n *= PALETTE_DIGIT_H;
+		n = ((index / d) % 10) * PALETTE_DIGIT_H;
 		for (i = 0; i < PALETTE_DIGIT_H; i++)
 		{
-			for (j = 0; j < PALETTE_DIGIT_W; j++)
+			k = xbm_n7x7_bits[n + i];
+			for (j = 0; j < PALETTE_DIGIT_W; j++ , k >>= 1 , tmp += 3)
 			{
-				tmp[0] = tmp[1] = tmp[2] =
-					pcol[(xbm_n7x7_bits[n + i] >> j) & 1];
-				tmp += 3;
+				c = cc[k & 1];
+				tmp[0] = INT_2_R(c);
+				tmp[1] = INT_2_G(c);
+				tmp[2] = INT_2_B(c);
 			}
 			tmp += PALETTE_W3 - PALETTE_DIGIT_W * 3;
 		}
 		tmp -= PALETTE_DIGIT_H * PALETTE_W3;
+	}
+
+	/* Draw protection mask cross */
+	if (!mem_prot_mask[index]) return;
+	tmp = tr + PALETTE_CROSS_DY * PALETTE_W3 +
+		(PALETTE_CROSS_X + PALETTE_CROSS_DX) * 3;
+	for (i = 0; i < PALETTE_CROSS_H; i++)
+	{
+		k = mem_cross[i];
+		for (j = 0; j < PALETTE_CROSS_W; j++ , k >>= 1 , tmp += 3)
+		{
+			c = cc[(k & 1) + 2];
+			tmp[0] = INT_2_R(c);
+			tmp[1] = INT_2_G(c);
+			tmp[2] = INT_2_B(c);
+		}
+		tmp += PALETTE_W3 - PALETTE_CROSS_W * 3;
 	}
 }
 
@@ -2180,12 +2197,7 @@ void mem_pal_init()			// Redraw whole palette
 	int i;
 
 	memset(mem_pals, 0, PALETTE_WIDTH * PALETTE_HEIGHT * 3);
-	for (i = 0; i < mem_cols; i++)
-	{
-		repaint_swatch(i);
-		copy_num(i, PALETTE_INDEX_X, i * PALETTE_SWATCH_H +
-			PALETTE_SWATCH_Y + PALETTE_INDEX_DY);	// Index number
-	}
+	for (i = 0; i < mem_cols; i++) repaint_swatch(i);
 }
 
 void mem_pal_load_def()					// Load default palette
@@ -4530,18 +4542,44 @@ static int bitmap_bounds(int *rect, unsigned char *pat)
 	return (x * y);
 }
 
+/* Try drawing on a pixel */
+int try_pixel(int x, int y)
+{
+	unsigned char uninit_(ab), ib[3], *img, *uninit_(alpha);
+	int res, bpp = MEM_BPP, ofs = x + mem_width * y, op = mem_undo_opacity;
+
+	img = mem_img[mem_channel] + ofs * bpp;
+	memcpy(ib, img, bpp);
+	if (mem_img[CHN_ALPHA]) ab = *(alpha = mem_img[CHN_ALPHA] + ofs);
+
+	mem_undo_opacity = FALSE; // No prepared undo frame
+	put_pixel_def(x, y);
+	mem_undo_opacity = op;
+
+	res = memcmp(ib, img, bpp);
+	memcpy(img, ib, bpp);
+	if (mem_img[CHN_ALPHA])
+	{
+		res |= *alpha ^ ab;
+		*alpha = ab;
+	}
+	return (res);
+}
+
 /* Flood fill - may use temporary area (1 bit per pixel) */
-void flood_fill(int x, int y, unsigned int target)
+int flood_fill(int x, int y, unsigned int target)
 {
 	unsigned char *pat, *buf, *temp;
-	int i, j, l, sb;
+	int i, j, l, sb, res = FALSE;
 
 	/* Regular fill? */
 	if (!mem_gradient && !(mem_blend && blend_src) && !mem_tool_pat &&
 		!flood_step && (!flood_img || (mem_channel == CHN_IMAGE)))
 	{
-		wjfloodfill(x, y, target, NULL);
-		return;
+		/* Try modifying the first pixel */
+		if (!try_pixel(x, y)) return (FALSE);
+		spot_undo(UNDO_TOOL);
+		return (wjfloodfill(x, y, target, NULL));
 	}
 
 	/* Patterned or fuzzy fill - use bitmap */
@@ -4549,7 +4587,7 @@ void flood_fill(int x, int y, unsigned int target)
 	if (!buf)
 	{
 		memory_errors(1);
-		return;
+		return (FALSE);
 	}
 	pat = buf + mem_width;
 	while (wjfloodfill(x, y, target, pat))
@@ -4566,6 +4604,8 @@ void flood_fill(int x, int y, unsigned int target)
 			if (!init_sb()) break; /* Not enough memory */
 		}
 
+		res = TRUE;
+		spot_undo(UNDO_TOOL);
 		for (i = 0; i < mem_height; i++)
 		{
 			unsigned u, f = 1 << (i & 7);
@@ -4582,6 +4622,7 @@ void flood_fill(int x, int y, unsigned int target)
 		break;
 	}
 	free(buf);
+	return (res);
 }
 
 

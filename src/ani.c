@@ -822,8 +822,9 @@ static void create_frames_ani()
 		snprintf(output_path + l, PATHBUF - l, DIR_SEP_STR "%s.gif",
 			ani_file_prefix);
 
-		run_def_action(DA_GIF_CREATE, wild_path, output_path, ani_gif_delay);
-		run_def_action(DA_GIF_PLAY, output_path, NULL, 0);
+		if (!run_def_action(DA_GIF_CREATE, wild_path, output_path, ani_gif_delay) &&
+			!cmd_mode) /* Don't launch GUI from commandline */
+			run_def_action(DA_GIF_PLAY, output_path, NULL, 0);
 		free(wild_path);
 	}
 

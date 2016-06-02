@@ -2866,7 +2866,7 @@ static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 	}
 
 	/* Let's decide how to store it */
-	if ((width > MAX_WIDTH) || (height > MAX_HEIGHT)) return (-1);
+	if ((width > MAX_WIDTH) || (height > MAX_HEIGHT)) return (TOO_BIG);
 	settings->width = width;
 	settings->height = height;
 	if ((sform != SAMPLEFORMAT_UINT) && (sform != SAMPLEFORMAT_INT) &&

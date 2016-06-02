@@ -741,8 +741,7 @@ void pressed_clip_alpha_scale()
 	if (!mem_clip_mask) mem_clip_mask_init(255);
 	if (!mem_clip_mask) return;
 
-	if (mem_scale_alpha(mem_clipboard, mem_clip_mask,
-		mem_clip_w, mem_clip_h, TRUE)) return;
+	mem_scale_alpha(mem_clipboard, mem_clip_mask, mem_clip_w, mem_clip_h, TRUE);
 
 	update_stuff(UPD_CLIP);
 }
@@ -1954,8 +1953,8 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 			if (gif2[i] == DIR_SEP) break;
 			if ((unsigned char)(gif2[i] - '0') <= 9) gif2[i] = '?';
 		}
-		run_def_action(DA_GIF_CREATE, gif2, dt->filename, settings.gif_delay);
-		if (!cmd_mode) // Don't launch GUI from commandline
+		if (!run_def_action(DA_GIF_CREATE, gif2, dt->filename, settings.gif_delay) &&
+			!cmd_mode) /* Don't launch GUI from commandline */
 			run_def_action(DA_GIF_PLAY, dt->filename, NULL, 0);
 		g_free(gif2);
 		redo = 0;
@@ -2668,7 +2667,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 	int update_area[4];
 	int minx = -1, miny = -1, xw = -1, yh = -1;
 	tool_info o_tool = tool_state;
-	int i, j, k, ts2, tr2, ox, oy;
+	int i, j, ts2, tr2, ox, oy;
 	int oox, ooy;	// Continuous smudge stuff
 	int first_point, pswap = FALSE;
 
@@ -2827,21 +2826,14 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 		/* Handle floodfill here, as too irregular a non-continuous tool */
 		if (tool_type == TOOL_FLOOD)
 		{
-			/* Non-masked start point */
-			if (pixel_protected(x, y) < 255)
+			/* Non-masked start point, and working fill */
+			if ((pixel_protected(x, y) < 255) &&
+				flood_fill(x, y, get_pixel(x, y)))
 			{
-				j = get_pixel(x, y);
-				k = mem_channel != CHN_IMAGE ? channel_col_A[mem_channel] :
-					mem_img_bpp == 1 ? mem_col_A : PNG_2_INT(mem_col_A24);
-				if (j != k) /* And never start on colour A */
-				{
-					spot_undo(UNDO_TOOL);
-					flood_fill(x, y, j);
-					// All pixels could change
-					minx = miny = 0;
-					xw = mem_width;
-					yh = mem_height;
-				}
+				// All pixels could change
+				minx = miny = 0;
+				xw = mem_width;
+				yh = mem_height;
 			}
 			/* Undo the color swap if fill failed */
 			if (!pen_down && col_reverse)

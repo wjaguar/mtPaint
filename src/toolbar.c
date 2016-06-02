@@ -303,7 +303,6 @@ static char *blends[BLEND_NMODES] = {
 
 #define WBbase blend_dd
 static void *blend_code[] = {
-	VBOXPBS,
 	COMBO(blends, BLEND_NMODES, mode),
 	CHECK(_("Reverse"), reverse),
 	HBOX,
@@ -317,7 +316,7 @@ static void *blend_code[] = {
 	CHECK(_("Red"), red),
 	CHECK(_("Green"), green),
 	CHECK(_("Blue"), blue),
-	WDONE, WDONE, RET
+	WDONE, RET
 };
 #undef WBbase
 

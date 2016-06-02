@@ -288,7 +288,7 @@ void create_default_image();			// Create default new image
 //	Changed color or value A or B
 #define UPD_CAB    CF_CAB
 //	Changed color A or B
-#define UPD_AB     (CF_AB | CF_GRAD | CF_SET | CF_GMODE | CF_TDRAW)
+#define UPD_AB     (CF_AB | CF_GRAD | CF_SET | CF_GMODE | CF_TDRAW | CF_PDRAW)
 //	Changed pattern
 #define UPD_PAT    (CF_AB | CF_TDRAW)
 //	Changed A, B, and pattern

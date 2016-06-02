@@ -1078,7 +1078,7 @@ enum {
 typedef struct {
 	unsigned char rgb[768]; // everything needs it
 	unsigned char opac[256]; // only EDIT_OVERLAYS uses it
-	int AB[2][NUM_CHANNELS]; // for EDIT_AB
+	int AB[4][NUM_CHANNELS]; // for EDIT_AB
 	int csrange, csinv, csmode; // for EDIT_CSEL
 	int cgrid, tgrid, grid_min, tgrid_dx, tgrid_dy; // for GRID
 } csdata_dd;
@@ -1104,7 +1104,7 @@ struct colsel_dd {
 
 	int is_AB;
 	int pos_AB, v_AB[NUM_CHANNELS];
-	void **pspin_AB, **spin_AB[NUM_CHANNELS];
+	void **xtbox, **pspin_AB, **spin_AB[NUM_CHANNELS];
 
 	int is_csel;
 	void **fspin_csel;
@@ -1174,6 +1174,8 @@ static void do_AB(csdata_dd *v)
 
 	A0->red = v->rgb[0]; A0->green = v->rgb[1]; A0->blue = v->rgb[2];
 	B0->red = v->rgb[3]; B0->green = v->rgb[4]; B0->blue = v->rgb[5];
+	mem_pal_ab_c = MEM_2_INT(v->rgb, 6);
+	mem_pal_id_c = MEM_2_INT(v->rgb, 9);
 	update_stuff(mem_img_bpp == 1 ? UPD_PAL : UPD_AB);
 }
 
@@ -1432,6 +1434,7 @@ static void select_AB(colsel_dd *dt, int what)
 		v = dt->v.AB[dt->idx];
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 			cmd_set(dt->spin_AB[i], v[i]);
+		cmd_sensitive(dt->xtbox, dt->idx < 2);
 		break;
 	}
 }
@@ -1586,7 +1589,7 @@ static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 }
 
 static char *scales_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
-static char *AB_txt[] = { "A", "B", NULL };
+static char *AB_txt[] = { "A", "B", _("Highlight"), _("Index"), NULL };
 static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview"), NULL };
 static char *csel_modes[] = { _("Sphere"), _("Angle"), _("Cube"), NULL };
 static char *grid_txt[GRID_MAX + 1] = { _("Opaque"), _("Border"),
@@ -1643,6 +1646,7 @@ static void *colsel_code[] = {
 	IFx(is_AB, 1),
 		BORDER(SPINSLIDE, 0),
 		BORDER(LABEL, 0),
+		REF(xtbox), VBOXr,
 		HBOX,
 		BUTTON(_("Posterize"), posterize_AB),
 		REF(pspin_AB), SPIN(pos_AB, 1, 8),
@@ -1662,6 +1666,7 @@ static void *colsel_code[] = {
 		TLSPINSLIDEx(v_AB[CHN_MASK], 0, 255, 2, 1),
 		EVENT(CHANGE, AB_spin_moved),
 		WDONE,
+		WDONE, // VBOXr
 	ENDIF(1),
 	IFx(is_csel, 1),
 		BORDER(SPIN, 0),
@@ -1754,7 +1759,7 @@ void colour_selector(int cs_type)
 		tdata.name = _("Colour Editor");
 		tdata.cnames = AB_txt;
 		tdata.mpflag = TRUE; // at cursor
-		tdata.cnt = 2;
+		tdata.cnt = 4;
 		tdata.is_AB = TRUE;
 
 		tdata.pos_AB = inifile_get_gint32("posterizeInt", 1);
@@ -1764,6 +1769,12 @@ void colour_selector(int cs_type)
 
 		rgb[0] = A0->red; rgb[1] = A0->green; rgb[2] = A0->blue;
 		rgb[3] = B0->red; rgb[4] = B0->green; rgb[5] = B0->blue;
+		rgb[6] = INT_2_R(mem_pal_ab_c);
+		rgb[7] = INT_2_G(mem_pal_ab_c);
+		rgb[8] = INT_2_B(mem_pal_ab_c);
+		rgb[9] = INT_2_R(mem_pal_id_c);
+		rgb[10] = INT_2_G(mem_pal_id_c);
+		rgb[11] = INT_2_B(mem_pal_id_c);
 		for (i = CHN_ALPHA; i < NUM_CHANNELS; i++)
 		{
 			tdata.v.AB[0][i] = tdata.v_AB[i] = channel_col_A[i];
@@ -2724,7 +2735,6 @@ static char *srcs_txt[4] = { _("Unchanged"), _("None"), _("Image"),
 #define WBbase bkg_dd
 static void *bkg_code[] = {
 	WINDOWm(_("Tracing Image")),
-	XVBOXB, // !!! Originally the main vbox was that way
 	TABLE(3, 4),
 	TLABEL(_("Source")),
 	TLOPTle(srcs_txt, 4, src, bkg_evt, 1, 0, 2), TRIGGER,

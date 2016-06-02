@@ -453,6 +453,7 @@ int mem_continuous;			// Area we painting the static shapes continuously?
 
 png_color mem_pal_def[256];		// Default palette entries for new image
 int mem_pal_def_i;			// Items in default palette
+int mem_pal_id_c, mem_pal_ab_c;		// Text & A/B highlight colors
 extern unsigned char mem_pals[];	// RGB screen memory holding current palette
 
 int mem_background;			// Non paintable area
@@ -829,7 +830,7 @@ void set_xlate_n(unsigned char *xlat, int n);			// Build value rescaling table
 #define set_xlate(A,B) set_xlate_n((A), (1 << (B)) - 1)		/* Bitdepth translation table */
 int is_filled(unsigned char *data, unsigned char val, int len);	// Check if byte array is all one value
 
-void flood_fill( int x, int y, unsigned int target );
+int flood_fill(int x, int y, unsigned int target);
 
 void sline( int x1, int y1, int x2, int y2 );			// Draw single thickness straight line
 void tline( int x1, int y1, int x2, int y2, int size );		// Draw size thickness straight line

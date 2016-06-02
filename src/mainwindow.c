@@ -163,6 +163,8 @@ static inilist ini_int[] = {
 	{ "gridTrans",		grid_rgb + GRID_TRANS,	RGB_2_INT(  0, 109, 109) },
 	{ "gridTile",		grid_rgb + GRID_TILE,	RGB_2_INT(170, 170, 170) },
 	{ "gridSegment",	grid_rgb + GRID_SEGMENT,RGB_2_INT(219, 219,   0) },
+	{ "palAB",		&mem_pal_ab_c,		RGB_2_INT(53,   53, 162) },
+	{ "palIndex",		&mem_pal_id_c,		RGB_2_INT(200, 200, 200) },
 	{ "tablet_value_size",	tablet_tool_factor + 0,	MAX_TF },
 	{ "tablet_value_flow",	tablet_tool_factor + 1,	MAX_TF },
 	{ "tablet_value_opacity", tablet_tool_factor + 2,MAX_TF },
