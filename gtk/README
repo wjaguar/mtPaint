@@ -1,14 +1,12 @@
------------
 The History
------------
+===========
 
 For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of GTK+ 2.6.4 and 2.6.9, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support Windows 98, which became unsupported with GTK+ 2.8.
 
 But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Moreover, libraries such as libpng, libjpeg, LibTIFF, FreeType, and even zlib have undergone multiple version changes in the meantime, with bugfixes and other improvements. Still, upgrading the package to a newer official distribution of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with a custom build of GTK+ based on version 2.6.7 with a set of patches backported from the later versions, compiled from source along with all its dependencies.
 
--------------
 The Specifics
--------------
+=============
 
 Original patches from GTK+ tree contained in the cumulative patch:
 - svn  7886 / git d73fa807875951d0240dce572398992d395bbe77
@@ -121,9 +119,9 @@ Patch from Pango tree:
   On Windows store the default aliases file in a string array. (#492517)
   (BACKPORTED: needed to handle 'pango.aliases' for Windows Vista & Windows 7)
 
----------
+
 The Build
----------
+========
 
 The build was done on a Slackware Linux system using MinGW cross-compiler installation combined of the following parts:
 - TDM-GCC 4.2.4		( http://www.tdragon.net/recentgcc/ )
@@ -197,5 +195,5 @@ To recreate the "etc/pango/pango.modules" and "etc/gtk-2.0/gdk-pixbuf.loaders" f
 
 To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, executables and runtime files will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
 
----------------------------------
+
 Copyright (C) 2010,2011 Dmitry Groshev
