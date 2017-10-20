@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild.sh - cross-compile GTK+ and its dependencies for Windows
 
-# Copyright (C) 2010,2011 Dmitry Groshev
+# Copyright (C) 2010,2011,2017 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,10 +21,11 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-LIBS="giflib zlib xz libjpeg libpng libtiff freetype jasper lcms "\
+LIBS="giflib zlib xz libjpeg libpng libtiff freetype openjpeg lcms "\
 "libiconv gettext glib atk pango gtk"
 PROGRAMS="gifsicle mtpaint mtpaint_handbook"
 PHONY="libs all"
+TOOLS="dev vars"
 LOCALES="es cs fr pt pt_BR de pl tr zh_TW sk zh_CN ja ru gl nl it sv tl hu"
 # Applied only to GTK+ ATM
 OPTIMIZE="-march=i686 -O2 -fweb -fomit-frame-pointer -fmodulo-sched -Wno-pointer-sign"
@@ -57,14 +58,22 @@ MTARGET=i586-mingw32
 #MPREFIX=~/mingw-cross-env-2.18/usr
 #MTARGET=i686-pc-mingw32
 
+# MXE
+# http://mxe.cc/
+#MPREFIX=~/mxe/usr
+#MTARGET=i686-w64-mingw32.shared
+
+ALLPATHS='
 LONGPATH="$TOPDIR:$MPREFIX/bin:$PATH"
 SHORTPATH="$TOPDIR:$TOPDIR/bin:$PATH"
 ALLPATH="$TOPDIR:$TOPDIR/bin:$MPREFIX/bin:$PATH"
+'
+eval "$ALLPATHS"
 
 ########################
 
 # Initialize vars
-COMPONENTS=" $LIBS $PROGRAMS $PHONY "
+COMPONENTS=" $LIBS $PROGRAMS $PHONY $TOOLS "
 for ZAD in $COMPONENTS
 do
 	eval "DEP_$ZAD="
@@ -169,8 +178,9 @@ TARGET_STRIP="$MPREFIX/bin/$MTARGET-strip"
 BUILD_giflib ()
 {
 	UNPACK "giflib-*.tar.*" || return 0
+	sed -i '/-no-undefined/ n; /libgif_la_LDFLAGS/ s/=/= -no-undefined/' lib/Makefile.in
 	PATH="$LONGPATH"
-	./configure CPPFLAGS=-D_OPEN_BINARY LDFLAGS=-no-undefined \
+	./configure CPPFLAGS=-D_OPEN_BINARY LDFLAGS=-static-libgcc \
 		--prefix="$WPREFIX" --host=$MTARGET
 	make all
 	make install-strip DESTDIR="$DESTDIR"
@@ -182,13 +192,13 @@ BUILD_zlib ()
 {
 	UNPACK "zlib-*.tar.*" || return 0
 	PATH="$SHORTPATH"
-	make -f win32/Makefile.gcc install INCLUDE_PATH="$DEST/include" \
-		LIBRARY_PATH="$DEST/lib" BINARY_PATH="$DEST/bin"
+	make -f win32/Makefile.gcc install SHARED_MODE=1 INCLUDE_PATH="$DEST/include" \
+		LIBRARY_PATH="$DEST/lib" BINARY_PATH="$DEST/bin" LOC=-static-libgcc
 	mkdir -p "$DEST/bin"
 	cp -fp zlib1.dll "$DEST"/bin
 	if [ -e "$DEST"/lib/pkgconfig/zlib.pc ]
 	then
-		# Relativize pkgconfig file of zlib 1.2.6
+		# Relativize pkgconfig file of zlib 1.2.6+
 		cat <<- PKGFIX > zlib.pc_
 		prefix=$WPREFIX
 		exec_prefix=\${prefix}
@@ -211,9 +221,23 @@ BUILD_xz ()
 	UNPACK "xz-*.tar.*" || return 0
 	PATH="$LONGPATH"
 	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-threads \
-		--disable-nls --enable-small --disable-scripts
+		--disable-nls --enable-small --disable-scripts LDFLAGS=-static-libgcc
 	make
 	make install-strip DESTDIR="$DESTDIR"
+	if grep 'exec_prefix=\$' "$DEST"/lib/pkgconfig/liblzma.pc
+	then :
+	else
+		# Relativize pkgconfig file of XZ 5.0.6+
+		cat <<- PKGFIX > liblzma.pc_
+		prefix=$WPREFIX
+		exec_prefix=\${prefix}
+		libdir=\${exec_prefix}/lib
+		includedir=\${prefix}/include
+		
+		`sed -e '/^Name:/,$!d' "$DEST"/lib/pkgconfig/liblzma.pc`
+		PKGFIX
+		cp -fp liblzma.pc_ "$DEST"/lib/pkgconfig/liblzma.pc
+	fi
 	EXPORT
 }
 
@@ -221,7 +245,7 @@ BUILD_libjpeg ()
 {
 	UNPACK "jpegsrc.*.tar.*" || return 0
 	PATH="$LONGPATH"
-	./configure --prefix="$WPREFIX" --host=$MTARGET
+	./configure --prefix="$WPREFIX" --host=$MTARGET LDFLAGS=-static-libgcc
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
@@ -237,7 +261,7 @@ BUILD_libpng ()
 	# !!! Make libpng12 default DLL, same as it is default everything else
 	sed -i 's/for ext in a la so sl/for ext in a dll.a la so sl/' ./Makefile.in
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --without-libpng-compat
 	make
 	make install-strip DESTDIR="$DESTDIR"
@@ -252,45 +276,48 @@ BUILD_libtiff ()
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-cxx \
 		--without-x
-	make
+	make LDFLAGS="-XCClinker -static-libgcc -L$TOPDIR/lib"
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
 }
 
-DEP_freetype="zlib"
+DEP_freetype="zlib libpng"
 BUILD_freetype ()
 {
 	UNPACK "freetype-*.tar.*" || return 0
+	sed -i 's/_pkg_min_version=.*/_pkg_min_version=0.23/' \
+		builds/unix/configure # Does not need more
 # !!! Cross-compile breaks down if cross-gcc named "gcc" is present in PATH
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET
 	make
 	"$TARGET_STRIP" --strip-unneeded objs/.libs/*.dll objs/.libs/*.a
 	make install DESTDIR="$DESTDIR"
+	if grep 'exec_prefix=\$' "$DEST"/lib/pkgconfig/freetype2.pc
+	then :
+	else
+		# Relativize pkgconfig file of FreeType 2.4.12+
+		cat <<- PKGFIX > freetype2.pc_
+		prefix=$WPREFIX
+		exec_prefix=\${prefix}
+		libdir=\${exec_prefix}/lib
+		includedir=\${prefix}/include
+		
+		`sed -e '/^Name:/,$!d' "$DEST"/lib/pkgconfig/freetype2.pc`
+		PKGFIX
+		cp -fp freetype2.pc_ "$DEST"/lib/pkgconfig/freetype2.pc
+	fi
 	EXPORT
 }
 
+: << 'COMMENTED_OUT'
 DEP_jasper="libjpeg"
+# !!! Versions 2.x not supported yet !!!
 BUILD_jasper ()
 {
-	UNPACK "jasper-*.zip" || return 0
-	patch -p1 <<- 'END' # Fix CVE-2007-2721
-	--- jasper-1.900.1.orig/src/libjasper/jpc/jpc_cs.c	2007-01-19 22:43:07.000000000 +0100
-	+++ jasper-1.900.1/src/libjasper/jpc/jpc_cs.c	2007-04-06 01:29:02.000000000 +0200
-	@@ -982,7 +982,10 @@ static int jpc_qcx_getcompparms(jpc_qcxc
-	 		compparms->numstepsizes = (len - n) / 2;
-	 		break;
-	 	}
-	-	if (compparms->numstepsizes > 0) {
-	+	if (compparms->numstepsizes > 3 * JPC_MAXRLVLS + 1) {
-	+		jpc_qcx_destroycompparms(compparms);
-	+		return -1;
-	+	} else if (compparms->numstepsizes > 0) {
-	 		compparms->stepsizes = jas_malloc(compparms->numstepsizes *
-	 		  sizeof(uint_fast16_t));
-	 		assert(compparms->stepsizes);
-	END
+	UNPACK "jasper-1.*.tar.*" || return 0
+	sed -i '/libjasper_la_LDFLAGS/ s/=/= -no-undefined/' src/libjasper/Makefile.in
 	patch -p1 <<- 'END' # Fix compilation
 	diff -rup jasper-1.900.1/src/appl/tmrdemo.c jasper-1.900.1.new/src/appl/tmrdemo.c
 	--- jasper-1.900.1/src/appl/tmrdemo.c	2007-01-19 16:43:08.000000000 -0500
@@ -312,14 +339,30 @@ BUILD_jasper ()
 	 	printf("time delay %.8f s\n", t);
 	END
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-no-undefined -L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --enable-shared \
 		lt_cv_deplibs_check_method='match_pattern \.dll\.a$'
 	# !!! Otherwise it tests for PE file format, which naturally fails
 	# if no .la file is present to provide redirection
-	make
+	make LDFLAGS="-XCClinker -static-libgcc -L$TOPDIR/lib"
 	make install-strip DESTDIR="$DESTDIR"
 	"$TARGET_STRIP" --strip-unneeded "$DEST"/bin/libjasper*.dll
+	EXPORT
+}
+COMMENTED_OUT
+
+BUILD_openjpeg ()
+{
+	UNPACK "openjpeg-*.tar.*" || return 0
+	sed -i '/^project(/ s/)/ C)/' CMakeLists.txt
+	PATH="$LONGPATH"
+	mkdir build
+	cd build
+	LDFLAGS=-static-libgcc \
+	cmake -DCMAKE_TOOLCHAIN_FILE="$TOPDIR/toolchain" \
+		-DCMAKE_BUILD_TYPE=Release ..
+	make install/strip DESTDIR="$DESTDIR"
+	rm -rf "$DESTDIR"/lib/openjpeg-* # Useless
 	EXPORT
 }
 
@@ -327,7 +370,7 @@ BUILD_lcms ()
 {
 	UNPACK "lcms2-*.tar.*" || return 0
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET
 	make
 	make install-strip DESTDIR="$DESTDIR"
@@ -394,7 +437,7 @@ BUILD_libiconv ()
 {
 	UNPACK "libiconv-*.tar.*" || return 0
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET \
 		--enable-static
 	make
@@ -448,22 +491,19 @@ BUILD_gettext ()
 	 # endif
 	 # ifndef SUBLANG_SERBIAN_LATIN
 	 # define SUBLANG_SERBIAN_LATIN 0x02
-	@@ -607,12 +607,12 @@
-	 # ifndef SUBLANG_SERBIAN_CYRILLIC
+	@@ -608,10 +608,10 @@
 	 # define SUBLANG_SERBIAN_CYRILLIC 0x03
 	 # endif
-	-# ifndef SUBLANG_SINDHI_INDIA
+	 # ifndef SUBLANG_SINDHI_INDIA
 	-# define SUBLANG_SINDHI_INDIA 0x00
-	-# endif
-	 # ifndef SUBLANG_SINDHI_PAKISTAN
-	 # define SUBLANG_SINDHI_PAKISTAN 0x01
+	+# define SUBLANG_SINDHI_INDIA 0x01
 	 # endif
-	+# ifndef SUBLANG_SINDHI_AFGHANISTAN
-	+# define SUBLANG_SINDHI_AFGHANISTAN 0x02
-	+# endif
+	 # ifndef SUBLANG_SINDHI_PAKISTAN
+	-# define SUBLANG_SINDHI_PAKISTAN 0x01
+	+# define SUBLANG_SINDHI_PAKISTAN 0x02
+	 # endif
 	 # ifndef SUBLANG_SPANISH_GUATEMALA
 	 # define SUBLANG_SPANISH_GUATEMALA 0x04
-	 # endif
 	@@ -670,14 +670,14 @@
 	 # ifndef SUBLANG_TAMAZIGHT_ARABIC
 	 # define SUBLANG_TAMAZIGHT_ARABIC 0x01
@@ -483,16 +523,6 @@ BUILD_gettext ()
 	 # endif
 	 # ifndef SUBLANG_URDU_PAKISTAN
 	 # define SUBLANG_URDU_PAKISTAN 0x01
-	@@ -1378,8 +1378,8 @@ _nl_locale_name_default (void)
-	       case LANG_SINDHI:
-	 	switch (sub)
-	 	  {
-	-	  case SUBLANG_SINDHI_INDIA: return "sd_IN";
-	 	  case SUBLANG_SINDHI_PAKISTAN: return "sd_PK";
-	+	  case SUBLANG_SINDHI_AFGHANISTAN: return "sd_AF";
-	 	  }
-	 	return "sd";
-	       case LANG_SINHALESE: return "si_LK";
 	@@ -1432,7 +1432,7 @@ _nl_locale_name_default (void)
 	 	  {
 	 	  /* FIXME: Adjust this when Tamazight locales appear on Unix.  */
@@ -506,7 +536,7 @@ BUILD_gettext ()
 # !!! Try upgrading to latest version - *this* one dir shouldn't drag in much
 # (But disable threading then - for use with mtPaint, it's a complete waste)
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET \
 		--without-libexpat-prefix
 	make -C gettext-runtime/intl
@@ -519,6 +549,20 @@ DEP_glib="libiconv gettext"
 BUILD_glib ()
 {
 	UNPACK "glib-2.6.*.tar.*" || return 0
+	patch -p1 <<- 'END' # Is needed to fix build failure with gcc 4.3+
+	diff -udr glib-2.6.6/glib/gutils.h glib-2.6.6_/glib/gutils.h
+	--- glib-2.6.6/glib/gutils.h	2005-04-19 12:06:05.000000000 +0400
+	+++ glib-2.6.6_/glib/gutils.h	2017-10-10 02:35:44.765808857 +0300
+	@@ -97,7 +97,7 @@
+	 #  define G_INLINE_FUNC
+	 #  undef  G_CAN_INLINE
+	 #elif defined (__GNUC__) 
+	-#  define G_INLINE_FUNC extern inline
+	+#  define G_INLINE_FUNC static inline
+	 #elif defined (G_CAN_INLINE) 
+	 #  define G_INLINE_FUNC static inline
+	 #else /* can't inline */
+	END
 	# Derived from gettext's git ec56ad8f2bf513a88efc3dba44953edff3909207
 	# (Chosen instead of the route GLib 2.14+ has taken with svn 5257, to
 	# preserve consistent behaviour across various Windows versions despite
@@ -561,22 +605,19 @@ BUILD_glib ()
 	 #endif
 	 #ifndef SUBLANG_SERBIAN_LATIN
 	 #define SUBLANG_SERBIAN_LATIN 0x02
-	@@ -529,12 +529,12 @@ g_win32_ftruncate (gint  fd,
-	 #ifndef SUBLANG_SERBIAN_CYRILLIC
+	@@ -530,10 +530,10 @@ g_win32_ftruncate (gint  fd,
 	 #define SUBLANG_SERBIAN_CYRILLIC 0x03
 	 #endif
-	-#ifndef SUBLANG_SINDHI_INDIA
+	 #ifndef SUBLANG_SINDHI_INDIA
 	-#define SUBLANG_SINDHI_INDIA 0x00
-	-#endif
-	 #ifndef SUBLANG_SINDHI_PAKISTAN
-	 #define SUBLANG_SINDHI_PAKISTAN 0x01
+	+#define SUBLANG_SINDHI_INDIA 0x01
 	 #endif
-	+#ifndef SUBLANG_SINDHI_AFGHANISTAN
-	+#define SUBLANG_SINDHI_AFGHANISTAN 0x02
-	+#endif
+	 #ifndef SUBLANG_SINDHI_PAKISTAN
+	-#define SUBLANG_SINDHI_PAKISTAN 0x01
+	+#define SUBLANG_SINDHI_PAKISTAN 0x02
+	 #endif
 	 #ifndef SUBLANG_SPANISH_GUATEMALA
 	 #define SUBLANG_SPANISH_GUATEMALA 0x04
-	 #endif
 	@@ -592,14 +592,14 @@ g_win32_ftruncate (gint  fd,
 	 #ifndef SUBLANG_TAMAZIGHT_ARABIC
 	 #define SUBLANG_TAMAZIGHT_ARABIC 0x01
@@ -596,16 +637,6 @@ BUILD_glib ()
 	 #endif
 	 #ifndef SUBLANG_URDU_PAKISTAN
 	 #define SUBLANG_URDU_PAKISTAN 0x01
-	@@ -922,8 +922,8 @@ g_win32_getlocale (void)
-	     case LANG_SINDHI: l = "sd";
-	       switch (sub)
-	 	{
-	-	case SUBLANG_SINDHI_INDIA: sl = "IN"; break;
-	 	case SUBLANG_SINDHI_PAKISTAN: sl = "PK"; break;
-	+	case SUBLANG_SINDHI_AFGHANISTAN: sl = "AF"; break;
-	 	}
-	       break;
-	     case LANG_SINHALESE: l = "si"; sl = "LK"; break;
 	END
 	# Remove traces of existing install - just to be on the safe side
 	rm -rf "$TOPDIR/include/glib-2.0" "$TOPDIR/lib/glib-2.0"
@@ -614,14 +645,14 @@ BUILD_glib ()
 	rm -f "$TOPDIR/lib"/libglib*.dll.a "$TOPDIR/lib"/libgmodule*.dll.a
 	rm -f "$TOPDIR/lib"/libgobject*.dll.a "$TOPDIR/lib"/libgthread*.dll.a
 	PATH="$ALLPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib -mno-cygwin" \
-	CFLAGS="-mno-cygwin -mms-bitfields $OPTIMIZE" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CFLAGS="-mms-bitfields $OPTIMIZE" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --enable-all-warnings \
 		--disable-static --disable-gtk-doc --enable-debug=yes \
 		--enable-explicit-deps=no \
 		--with-threads=win32 glib_cv_stack_grows=no
 # !!! See about "-fno-strict-aliasing": is it needed here with GCC 4, or not?
-	make
+	make LDFLAGS="-XCClinker -static-libgcc -L$TOPDIR/lib"
 	make install-strip DESTDIR="$DESTDIR"
 	find "$DEST/" -name '*.dll' -exec "$TARGET_STRIP" --strip-unneeded {} +
 	mv "$DEST/share/locale" "$DEST/lib/locale"
@@ -638,8 +669,8 @@ BUILD_atk ()
 	rm -rf "$TOPDIR/include/atk-1.0"
 	rm -f "$TOPDIR/lib/pkgconfig"/atk.pc "$TOPDIR/lib"/libatk*.dll.a
 	PATH="$ALLPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib -mno-cygwin" \
-	CFLAGS="-mno-cygwin -mms-bitfields $OPTIMIZE" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
+	CFLAGS="-mms-bitfields $OPTIMIZE" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --enable-all-warnings \
 		--disable-static --disable-gtk-doc --enable-debug=yes \
 		--enable-explicit-deps=no
@@ -661,8 +692,8 @@ BUILD_pango ()
 	# !!! The only way to disable Fc backend is to report Fontconfig missing
 	rm -f "$TOPDIR/lib/pkgconfig/fontconfig.pc"
 	PATH="$ALLPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib -mno-cygwin" \
-	CFLAGS="-mno-cygwin -mms-bitfields $OPTIMIZE" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
+	CFLAGS="-mms-bitfields $OPTIMIZE" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --enable-all-warnings \
 		--disable-static --disable-gtk-doc --enable-debug=yes \
 		--enable-explicit-deps=no \
@@ -686,18 +717,18 @@ BUILD_gtk ()
 	local WTKIT
 	WTKIT="$DEST"
 	UNPACK "gtk+-2.6.7.tar.*" || return 0
-	patch -p1 -i "$SRCDIR/gtk267_5wj.patch"
+	patch -p1 -i "$SRCDIR/gtk267_6wj.patch"
 	# !!! Remove traces of existing install - else confusion will result
 	rm -rf "$TOPDIR/include/gtk-2.0" "$TOPDIR/lib/gtk-2.0"
 	rm -f "$TOPDIR/lib/pkgconfig"/g[dt]k*.pc "$TOPDIR/lib"/libg[dt]k*.dll.a
 	PATH="$ALLPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib -mno-cygwin" \
-	CFLAGS="-mno-cygwin -mms-bitfields $OPTIMIZE" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CFLAGS="-mms-bitfields $OPTIMIZE" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --enable-all-warnings \
 		--disable-static --disable-gtk-doc --enable-debug=yes \
 		--enable-explicit-deps=no \
 		--with-gdktarget=win32 --with-wintab="$WTKIT"
-	make
+	make LDFLAGS="-XCClinker -static-libgcc -L$TOPDIR/lib"
 	make install-strip DESTDIR="$DESTDIR"
 	find "$DEST/" -name '*.dll' -exec "$TARGET_STRIP" --strip-unneeded {} +
 	find "$DEST/lib/gtk-2.0/2.4.0/" \( -name '*.dll.a' -o -name '*.la' \) -delete
@@ -716,7 +747,7 @@ BUILD_gifsicle ()
 {
 	UNPACK "gifsicle-*.tar.*" || return 0
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET \
 		--without-x
 	make
@@ -730,7 +761,7 @@ BUILD_mtpaint ()
 {
 	UNPACK "mtpaint-*.tar.bz2" || return 0
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET \
 		release intl
 	make
@@ -849,6 +880,28 @@ BUILD_all ()
 	INST_all
 }
 
+BUILD_dev ()
+{
+	UNPACK "dev.tar.*" || return 0
+	touch "$DEST.exclude" # Do not package the contents
+	ln -sf "$FDIR" "$DEST"
+	EXPORT
+}
+
+BUILD_vars ()
+{
+	cat <<- VARS > "$TOPDIR/vars"
+	MPREFIX='$MPREFIX'
+	MTARGET=$MTARGET
+	TOPDIR='$TOPDIR'
+	$ALLPATHS
+	PATH="\$LONGPATH"
+	CPPFLAGS="-isystem \$TOPDIR/include"
+	LDFLAGS="-static-libgcc -L\$TOPDIR/lib"
+	PKG_CONFIG="\$TOPDIR${PKG_CONFIG#$TOPDIR}"
+	VARS
+}
+
 # Ctrl+C terminates script
 trap exit INT
 
@@ -895,8 +948,8 @@ set -e # "set -eu" feels like overkill
 
 # Prepare build directories
 mkdir -p "$WRKDIR" "$INSDIR" "$PKGDIR" "$DEVDIR"
-test -d "$TOPDIR/include" || cp -sR "$MPREFIX/include/" "$TOPDIR/include/"
-test -d "$TOPDIR/lib" || cp -sR "$MPREFIX/lib/" "$TOPDIR/lib/"
+test -d "$TOPDIR/include" || cp -sR "$MPREFIX/$MTARGET/include/" "$TOPDIR/include/"
+test -d "$TOPDIR/lib" || cp -sR "$MPREFIX/$MTARGET/lib/" "$TOPDIR/lib/"
 
 # Create links for what misconfigured cross-compilers fail to provide
 mkdir -p "$TOPDIR/bin"
@@ -929,6 +982,30 @@ chmod +x "$PKG_CONFIG"
 # Not actually needed for the packages in here, but why not
 ln -sf pkg-config "$TOPDIR/$MTARGET-pkg-config"
 
+# Prepare cmake toolchain config
+cat << TOOLCHAIN > "$TOPDIR/toolchain"
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_CROSS_COMPILING ON)
+set(CMAKE_C_COMPILER "$MPREFIX/bin/$MTARGET-gcc")
+set(CMAKE_RC_COMPILER "$MPREFIX/bin/$MTARGET-windres")
+set(CMAKE_FIND_ROOT_PATH "$TOPDIR" "$MPREFIX")
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_INSTALL_PREFIX "${WPREFIX:-/}" CACHE PATH "")
+
+option(BUILD_PKGCONFIG_FILES "" ON)
+TOOLCHAIN
+
+# Provide glib-genmarshal wrapper
+GLIB_GENMARSHAL="$TOPDIR/$MTARGET-glib-genmarshal"
+export GLIB_GENMARSHAL
+rm -f "$GLIB_GENMARSHAL"
+cat << GENMARSHAL > "$GLIB_GENMARSHAL"
+#!/bin/sh
+glib-genmarshal "\$@" | sed 's/g_value_get_schar/g_value_get_char/'
+GENMARSHAL
+chmod +x "$GLIB_GENMARSHAL"
 # Provide (stripped-down) GLib 2.6.6 scripts for ATK & Pango
 SCRIPTDIR="$WRKDIR/glib/build/win32"
 mkdir -p "$SCRIPTDIR"
@@ -1000,7 +1077,7 @@ END
 chmod +x "$SCRIPTDIR"/*
 
 # A little extra safety
-LIBS= PROGRAMS= PHONY=
+LIBS= PROGRAMS= PHONY= TOOLS=
 
 # Do the build in proper order
 READY=

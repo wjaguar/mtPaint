@@ -1,5 +1,5 @@
 /*	thread.c
-	Copyright (C) 2009-2016 Dmitry Groshev
+	Copyright (C) 2009-2017 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -75,6 +75,21 @@ static int numcpus()
 
 #endif
 
+int helper_threads()
+{
+	int nt = maxthreads;
+	if (!nt) /* Use as many threads as there are cores */
+	{
+		if (!ncores) /* Autodetect number of cores */
+		{
+			ncores = numcpus();
+			if (ncores < 1) ncores = 1;
+		}
+		nt = ncores;
+	}
+	return (nt);
+}
+
 #define THREAD_ALIGN    128
 #define THREAD_DEALIGN 4096
 
@@ -110,15 +125,7 @@ threaddata *talloc(int flags, int tmax, void *data, int dsize, ...)
 
 	if (tmax < 1) tmax = 1; // No less than 1 thread
 
-	if (!(nt = maxthreads)) /* Use as many threads as there are cores */
-	{
-		if (!ncores) /* Autodetect number of cores */
-		{
-			ncores = numcpus();
-			if (ncores < 1) ncores = 1;
-		}
-		nt = ncores;
-	}
+	nt = helper_threads();
 
 	if (tmax > nt) tmax = nt;
 

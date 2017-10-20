@@ -113,6 +113,9 @@ Original patches from GTK+ tree contained in the cumulative patch:
 - svn 22511 / git 703a18c25fc4b1e8f06c4b9c8ea7cb74c06b3871
   Can not resize shaped windows on Windows
   (APPLIED)
+- git 106ddae86d5ffd3409901c5f9772b1a01f84ad04
+  Emit changed and notify:text only once. The same fix was applied for
+  (BACKPORTED)
 
 In addition, there are couple of my own patches, solving the build problems arising from use of recent MinGW on a Linux box (in GTK+ 2.6.x time, official Windows packages were built with MSVC on Windows).
 
@@ -130,6 +133,7 @@ The build was done on a Slackware Linux system using MinGW cross-compiler instal
 - binutils 2.19		( http://mingw.sourceforge.net/ )
 - MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
 - Win32 API 3.13	( http://mingw.sourceforge.net/ )
+And CMake 2.8.12 (for building OpenJPEG).
 
 To replicate it, you need the following source packages:
 - GTK+ 2.6.7 (this specific version and no other):
@@ -137,7 +141,7 @@ To replicate it, you need the following source packages:
     http://ftp.gtk.org/pub/gtk/v2.6/gtk+-2.6.7.tar.bz2
 - Wintab development package:
     wtkit126.zip
-    http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
+    https://web.archive.org/web/20070728143618/http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
 - Pango 1.8.2 (this specific version and no other):
     pango-1.8.2.tar.bz2
     http://ftp.gtk.org/pub/gtk/v2.6/pango-1.8.2.tar.bz2
@@ -149,46 +153,46 @@ To replicate it, you need the following source packages:
     http://ftp.gtk.org/pub/gtk/v2.6/glib-2.6.6.tar.bz2
 - GNU gettext 0.14.5:
     gettext-0.14.5.tar.gz
-    http://ftp.gnu.org/gnu/gettext/gettext-0.14.5.tar.gz
+    http://ftp.gnu.org/pub/gnu/gettext/gettext-0.14.5.tar.gz
 - GNU libiconv 1.9.2:
     libiconv-1.9.2.tar.gz
     http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.9.2.tar.gz
-- zlib 1.2.6:
-    zlib-1.2.6.tar.bz2
-    http://zlib.net/zlib-1.2.6.tar.bz2
-- XZ Utils 5.0.3:
-    xz-5.0.3.tar.bz2
-    http://tukaani.org/xz/xz-5.0.3.tar.bz2
-- libpng 1.2.46:
-    libpng-1.2.46.tar.gz
-    ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng-1.2.46.tar.gz
-- libjpeg 8c:
-    jpegsrc.v8c.tar.gz
-    http://www.ijg.org/files/jpegsrc.v8c.tar.gz
-- LibTIFF 4.0.0:
-    tiff-4.0.0.tar.gz
-    http://download.osgeo.org/libtiff/tiff-4.0.0.tar.gz
-- FreeType 2.4.8:
-    freetype-2.4.8.tar.bz2
-    http://download.savannah.gnu.org/releases/freetype/freetype-2.4.8.tar.bz2
-- giflib 4.1.6:
-    giflib-4.1.6.tar.bz2
-    http://heanet.dl.sourceforge.net/project/giflib/giflib%204.x/giflib-4.1.6/giflib-4.1.6.tar.bz2
-- JasPer 1.900.1 (this specific version and no other):
-    jasper-1.900.1.zip
-    http://www.ece.uvic.ca/~mdadams/jasper/software/jasper-1.900.1.zip
-- Little CMS 2.3:
-    lcms2-2.3.tar.gz
-    http://heanet.dl.sourceforge.net/project/lcms/lcms/2.3/lcms2-2.3.tar.gz
-- Gifsicle 1.64:
-    gifsicle-1.64.tar.gz
-    http://www.lcdf.org/gifsicle/gifsicle-1.64.tar.gz
-- mtPaint 3.40 (or later):
-    mtpaint-3.40.tar.bz2
+- zlib 1.2.11:
+    zlib-1.2.11.tar.gz
+    https://zlib.net/zlib-1.2.11.tar.gz
+- XZ Utils 5.2.3:
+    xz-5.2.3.tar.bz2
+    https://tukaani.org/xz/xz-5.2.3.tar.bz2
+- libpng 1.2.59 (not version 1.4+):
+    libpng-1.2.59.tar.gz
+    https://sourceforge.net/projects/libpng/files/libpng12/1.2.59/libpng-1.2.59.tar.gz/download
+- libjpeg 9b:
+    jpegsrc.v9b.tar.gz
+    http://www.ijg.org/files/jpegsrc.v9b.tar.gz
+- LibTIFF 4.0.8:
+    tiff-4.0.8.tar.gz
+    ftp://download.osgeo.org/libtiff/tiff-4.0.8.tar.gz
+- FreeType 2.8.1:
+    freetype-2.8.1.tar.bz2
+    http://download.savannah.gnu.org/releases/freetype/freetype-2.8.1.tar.bz2
+- giflib 4.2.3 (not version 5+):
+    giflib-4.2.3.tar.bz2
+    https://sourceforge.net/projects/giflib/files/giflib-4.x/giflib-4.2.3.tar.bz2/download
+- OpenJPEG 2.3.0:
+    openjpeg-2.3.0.tar.gz
+    https://github.com/uclouvain/openjpeg/archive/v2.3.0.tar.gz
+- Little CMS 2.8:
+    lcms2-2.8.tar.gz
+    https://sourceforge.net/projects/lcms/files/lcms/2.8/lcms2-2.8.tar.gz/download
+- Gifsicle 1.90:
+    gifsicle-1.90.tar.gz
+    https://www.lcdf.org/gifsicle/gifsicle-1.90.tar.gz
+- mtPaint 3.50 (or later):
+    mtpaint-3.50.tar.bz2
 
 Also you need the following files from 'gtk' subdirectory of mtPaint source package:
   winbuild.sh
-  gtk267_5wj.patch
+  gtk267_6wj.patch
   gtkrc
   pango182_1wj.patch
   pango.aliases
@@ -197,5 +201,9 @@ To recreate the "etc/pango/pango.modules" and "etc/gtk-2.0/gdk-pixbuf.loaders" f
 
 To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, executables and runtime files will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
 
+An alternative cross-compiler installation using MXE http://mxe.cc :
+git clone https://github.com/mxe/mxe.git
+cd mxe && make gcc MXE_TARGETS=i686-w64-mingw32.shared
+
 ---------------------------------
-Copyright (C) 2010,2011 Dmitry Groshev
+Copyright (C) 2010,2011,2017 Dmitry Groshev

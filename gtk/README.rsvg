@@ -55,9 +55,9 @@ To replicate it, you need the following source packages:
 - libcroco 0.6.2:
     libcroco-0.6.2.tar.bz2
     http://ftp.gnome.org/pub/GNOME/sources/libcroco/0.6/libcroco-0.6.2.tar.bz2
-- libxml2 2.9.2:
-    libxml2-2.9.2.tar.gz
-    ftp://xmlsoft.org/libxml2/libxml2-2.9.2.tar.gz
+- libxml2 2.9.6:
+    libxml2-2.9.6.tar.gz
+    ftp://xmlsoft.org/libxml2/libxml2-2.9.6.tar.gz
 - dev files from Windows build of mtPaint, packaged:
     dev.tar.*
     ./zad/dev/
@@ -68,5 +68,9 @@ Also you need the following files from 'gtk' subdirectory of mtPaint source pack
 
 To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild_rsvg.sh' if necessary, and run 'winbuild_rsvg.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, the executable will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
 
+An alternative cross-compiler installation using MXE http://mxe.cc :
+git clone https://github.com/mxe/mxe.git
+cd mxe && make gcc MXE_TARGETS=i686-w64-mingw32.shared
+
 ---------------------------------
-Copyright (C) 2016 Dmitry Groshev
+Copyright (C) 2016,2017 Dmitry Groshev

@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2016 Dmitry Groshev
+	Copyright (C) 2007-2017 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -749,7 +749,11 @@ int ini_getint(inifile *inip, int section, char *key, int defv)
 			slot->value = (char *)l;
 			if (!*tail) break;
 		}
-		else if (slot->flags & INI_MALLOC) free(slot->value);
+		else if (slot->flags & INI_MALLOC)
+		{
+			free(slot->value);
+			slot->flags ^= INI_MALLOC;
+		}
 #if VALIDATE_TYPE
 		if (slot->type != INI_NONE)
 			g_printerr("INI key '%s' wrong type\n", key);
@@ -802,7 +806,11 @@ int ini_getbool(inifile *inip, int section, char *key, int defv)
 			slot->value = (char *)(i = str2bool(slot->value));
 			if (i >= 0) break;
 		}
-		else if (slot->flags & INI_MALLOC) free(slot->value);
+		else if (slot->flags & INI_MALLOC)
+		{
+			free(slot->value);
+			slot->flags ^= INI_MALLOC;
+		}
 #if VALIDATE_TYPE
 		if (slot->type != INI_NONE)
 			g_printerr("INI key '%s' wrong type\n", key);
@@ -863,7 +871,11 @@ int ini_getref(inifile *inip, int section, char *key, int defv)
 			slot->value = (char *)section;
 			break;
 		}
-		else if (slot->flags & INI_MALLOC) free(slot->value);
+		else if (slot->flags & INI_MALLOC)
+		{
+			free(slot->value);
+			slot->flags ^= INI_MALLOC;
+		}
 #if VALIDATE_TYPE
 		if (slot->type != INI_NONE)
 			g_printerr("INI key '%s' wrong type\n", key);

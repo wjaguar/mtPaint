@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2017 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -72,6 +72,7 @@
 #include "toolbar.h"
 #include "layer.h"
 #include "spawn.h"
+#include "thread.h"
 
 /* All-in-one transport container for animation save/load */
 typedef struct {
@@ -2126,7 +2127,9 @@ static int save_jpeg(char *file_name, ls_settings *settings)
  * Another thing - Linux builds of OpenJPEG cannot properly encode an opacity
  * channel (fixed in SVN on 06.11.09, revision 541)
  * And JP2 images with 4 channels, produced by OpenJPEG, cause JasPer
- * to die horribly - WJ */
+ * to die horribly.
+ * Version 2.3.0 (04.10.17) was a sharp improvement, being twice faster than
+ * JasPer and less memory hungry (overhead of 5x size) - WJ */
 
 static int parse_opj(opj_image_t *image, ls_settings *settings)
 {
@@ -2388,6 +2391,10 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	if (!dinfo) goto ffail;
 	opj_set_default_decoder_parameters(&par);
 	if (!opj_setup_decoder(dinfo, &par)) goto dfail;
+#if !defined(WIN32) && defined(U_THREADS) && (OPJ_VERSION_MINOR >= 2) /* 2.2+ */
+	/* Not much effect as of 2.3.0 - only 10% faster from a 2nd core */
+	opj_codec_set_threads(dinfo, helper_threads());
+#endif
 	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
 	i = opj_read_header(inp, dinfo, &image) &&
 		opj_decode(dinfo, inp, image) &&
@@ -5738,7 +5745,7 @@ static int load_pam_frame(FILE *fp, ls_settings *settings)
 		"BLACKANDWHITE", "BLACKANDWHITE_ALPHA",
 		"GRAYSCALE", "GRAYSCALE_ALPHA",
 		"RGB", "RGB_ALPHA",
-		"CMYK", "CMYK_ALPHA" };
+		"CMYK", "CMYK_ALPHA", NULL };
 	static const char depths[] = { 1, 2, 1, 2, 3, 4, 4, 5 };
 	memFILE fake_mf;
 	cvt_func cvt_stream;
@@ -7745,15 +7752,18 @@ int detect_file_format(char *name, int need_palette)
 	return (i);
 }
 
-int valid_file( char *filename )		// Can this file be opened for reading?
-{
-	FILE *fp;
+// Can this file be opened for reading?
 
-	fp = fopen(filename, "r");
+/* 0 = readable, -1 = not exists, 1 = error, 2 = a directory */
+int valid_file(char *filename)
+{
+	FILE *fp = fopen(filename, "r");
 	if (!fp) return (errno == ENOENT ? -1 : 1);
 	else
 	{
+		struct stat buf;
+		int d = fstat(fileno(fp), &buf) ? 1 : S_ISDIR(buf.st_mode) ? 2 : 0;
 		fclose(fp);
-		return 0;
+		return (d);
 	}
 }

@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2016 Dmitry Groshev
+	Copyright (C) 2013-2017 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -85,6 +85,7 @@ typedef struct {
 	int actn;	// Actmap slots count
 	int actmask;	// Last actmap mask
 	int vismask;	// Visibility mask
+	char modal;	// Set modal flag when displaying
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
@@ -2627,6 +2628,17 @@ GtkWidget *comboentry(char *ddata, void **r)
 
 //	PCTCOMBO widget
 
+#if (GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 12) /* GTK+ 2.10 or earlier */
+
+static void pctcombo_chg(GtkWidget *entry, gpointer user_data)
+{
+	/* Filter out spurious deletions */
+	if (strlen(gtk_entry_get_text(GTK_ENTRY(entry))))
+		get_evt_1(NULL, user_data);
+}
+
+#endif
+
 // !!! Even with inlining this, some space gets wasted
 GtkWidget *pctcombo(void **r)
 {
@@ -2666,7 +2678,10 @@ GtkWidget *pctcombo(void **r)
 #if GTK_MAJOR_VERSION == 1
 	gtk_signal_connect(GTK_OBJECT(GTK_COMBO(w)->popwin), "hide",
 		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#elif GTK2VERSION < 12 /* GTK+ 2.10 or earlier */
+	gtk_signal_connect(GTK_OBJECT(entry), "changed",
+		GTK_SIGNAL_FUNC(pctcombo_chg), NEXT_SLOT(r));
+#else /* GTK+ 2.12+ */
 	gtk_signal_connect(GTK_OBJECT(entry), "changed",
 		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 #endif
@@ -5334,17 +5349,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Create a toplevel window, and put a vertical box inside it */
 		case op_WINDOW: case op_WINDOWm:
+			vdata->modal = op != op_WINDOW;
 			widget = window = add_a_window(GTK_WINDOW_TOPLEVEL,
-				*(char *)v ? _(v) : v, wpos, op != op_WINDOW);
+				*(char *)v ? _(v) : v, wpos);
 			sw = add_vbox(window);
 			ct = ct_BOX;
 			break;
 		/* Create a dialog window, with vertical & horizontal box */
 		case op_DIALOGm:
+			vdata->modal = TRUE;
 			widget = window = gtk_dialog_new();
 			gtk_window_set_title(GTK_WINDOW(window), _(v));
 			gtk_window_set_position(GTK_WINDOW(window), wpos);
-			gtk_window_set_modal(GTK_WINDOW(window), TRUE);
 // !!! Border = 6
 			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
 			/* Both boxes go onto stack, with vbox on top */
@@ -5355,6 +5371,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_FPICKpm:
 		{
 			GtkWidget *box;
+
+			vdata->modal = TRUE;
 			widget = window = fpick(&box,
 				*(char **)((char *)ddata + (int)pp[2]),
 				*(int *)((char *)ddata + (int)pp[3]), r);
@@ -5369,8 +5387,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Create a popup window */
 		case op_POPUP:
+			vdata->modal = TRUE;
 			widget = window = add_a_window(GTK_WINDOW_POPUP,
-				*(char *)v ? _(v) : v, wpos, TRUE);
+				*(char *)v ? _(v) : v, wpos);
 			cw = GET_BORDER(POPUP);
 			ct = ct_BIN;
 			break;
@@ -6614,6 +6633,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			void **slot = origin_slot(PREV_SLOT(r));
 			gtk_signal_connect(GTK_OBJECT(*slot), "scroll_event",
 				GTK_SIGNAL_FUNC(get_evt_scroll), r);
+			widget = NULL;
 			break;
 		}
 #endif
@@ -7789,6 +7809,7 @@ void cmd_showhide(void **slot, int state)
 			gtk_window_set_default_size(GTK_WINDOW(w),
 				vdata->xywh[2] ? vdata->xywh[2] : -1,
 				vdata->xywh[3] ? vdata->xywh[3] : -1);
+			if (vdata->modal) gtk_window_set_modal(GTK_WINDOW(w), TRUE);
 			/* Prepare to do postponed actions */
 			mx = vdata->xywh[4];
 			keymap = vdata->keymap;
@@ -7801,8 +7822,7 @@ void cmd_showhide(void **slot, int state)
 			/* !!! These reads also do gdk_flush() which, followed by
 			 * set_transient(NULL), KDE somehow needs for restoring
 			 * focus from fileselector back to pref window - WJ */
-			if (!(vdata->xywh[4] = !!(gdk_window_get_state(w->window) &
-				GDK_WINDOW_STATE_MAXIMIZED)))
+			if (!(vdata->xywh[4] = is_maximized(w)))
 			{
 				gdk_window_get_size(w->window,
 					vdata->xywh + 2, vdata->xywh + 3);
@@ -7811,14 +7831,17 @@ void cmd_showhide(void **slot, int state)
 			}
 			if (vdata->ininame && vdata->ininame[0])
 				rw_pos(vdata, TRUE);
-			/* Needed in Windows to stop GTK+ lowering the main window */
+			/* Needed for "dialogparent" effect in KDE4 to not misbehave */
+			if (vdata->modal) gtk_window_set_modal(GTK_WINDOW(w), FALSE);
+			/* Needed in Windows to stop GTK+ lowering the main window,
+			 * and everywhere to avoid forcing focus to main window */
 			gtk_window_set_transient_for(GTK_WINDOW(w), NULL);
 		}
 	}
 	widget_showhide(slot[0], state);
 	/* !!! Window must be visible, or maximize fails if either dimension is
 	 * already at max, with KDE3 at least - WJ */
-	if (mx) gtk_window_maximize(slot[0]);
+	if (mx) set_maximized(slot[0]);
 	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
 	if (unfocus) gtk_window_set_focus(slot[0], NULL);
 	/* !!! Have to wait till canvas is displayed, to init keyboard */

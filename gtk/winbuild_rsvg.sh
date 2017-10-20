@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild_rsvg.sh - cross-compile static rsvg-convert.exe for Windows
 
-# Copyright (C) 2016 Dmitry Groshev
+# Copyright (C) 2016,2017 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,6 +51,11 @@ MTARGET=i586-mingw32
 # http://mingw-cross-env.nongnu.org/
 #MPREFIX=~/mingw-cross-env-2.18/usr
 #MTARGET=i686-pc-mingw32
+
+# MXE
+# http://mxe.cc/
+#MPREFIX=~/mxe/usr
+#MTARGET=i686-w64-mingw32.shared
 
 LONGPATH="$TOPDIR:$MPREFIX/bin:$PATH"
 SHORTPATH="$TOPDIR:$TOPDIR/bin:$PATH"
@@ -181,6 +186,7 @@ BUILD_glib ()
 	rm -f "$TOPDIR/lib"/libglib*.dll.a "$TOPDIR/lib"/libgmodule*.dll.a
 	rm -f "$TOPDIR/lib"/libgobject*.dll.a "$TOPDIR/lib"/libgthread*.dll.a
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --disable-gtk-doc-html --with-threads=win32 \
 		--disable-shared --enable-static \
 		--prefix="$WPREFIX" --host=$MTARGET
@@ -230,6 +236,7 @@ BUILD_gdkpixbuf ()
 	[ "`echo \"$TOPDIR\"/lib/libjasper*`" != "$TOPDIR/lib/libjasper*" ] && \
 		WANT_JASPER=--with-libjasper
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --disable-modules --with-included-loaders $WANT_JASPER \
 		--disable-gdiplus --disable-shared --enable-static \
 		--prefix="$WPREFIX" --host=$MTARGET
@@ -245,7 +252,7 @@ BUILD_pixman ()
 	UNPACK "pixman-*.tar.*" || return 0
 	PATH="$LONGPATH"
 	./configure --disable-sse2 --disable-shared --enable-static \
-		--prefix="$WPREFIX" --host=$MTARGET
+		--prefix="$WPREFIX" --host=$MTARGET LIBS="`pkg-config gio-2.0 --libs`"
 	make
 	make install DESTDIR="$DESTDIR"
 	EXPORT
@@ -257,7 +264,9 @@ BUILD_cairo ()
 {
 	UNPACK "cairo-*.tar.*" || return 0
 	sed -i 's,^\(Libs:.*\),\1 @CAIRO_NONPKGCONFIG_LIBS@,' src/cairo.pc.in
+	sed -i 's/ -flto//' configure # Broken lib if enabled
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --disable-xlib --disable-xlib-xrender --disable-ft \
 		--disable-atomic --disable-pthread --disable-ps --disable-pdf \
 		--disable-gtk-doc --disable-shared --enable-static \
@@ -321,6 +330,7 @@ BUILD_libxml2 ()
 {
 	UNPACK "libxml2-*.tar.*" || return 0
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --without-debug --without-python --without-threads \
 		--disable-shared --enable-static \
 		--prefix="$WPREFIX" --host=$MTARGET
@@ -336,8 +346,10 @@ BUILD_libcroco ()
 {
 	UNPACK "libcroco-*.tar.*" || return 0
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --disable-gtk-doc --disable-shared --enable-static \
-		--prefix="$WPREFIX" --host=$MTARGET
+		--prefix="$WPREFIX" --host=$MTARGET \
+		LIBXML2_LIBS="`pkg-config libxml-2.0 --libs --static`"
 	make
 	make install DESTDIR="$DESTDIR"
 	EXPORT
@@ -375,10 +387,25 @@ BUILD_librsvg ()
 	     PROP_0,
 	     PROP_FLAGS,
 	END
+	patch <<- 'END'
+	--- rsvg-base.c0	2012-08-19 21:59:52.000000000 +0400
+	+++ rsvg-base.c	2017-10-11 03:27:44.063649365 +0300
+	@@ -1722,6 +1722,8 @@
+	     return rsvg_handle_close_impl (handle, error);
+	 }
+	 
+	+void
+	+g_clear_object (volatile GObject **object_ptr);
+	 /**
+	  * rsvg_handle_read_stream_sync:
+	  * @handle: a #RsvgHandle
+	END
 	PATH="$ALLPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-L$TOPDIR/lib" \
 	./configure --enable-introspection=no --disable-pixbuf-loader \
 		--disable-gtk-doc --disable-shared --enable-static \
-		--prefix="$WPREFIX" --host=$MTARGET
+		--prefix="$WPREFIX" --host=$MTARGET \
+		LIBS="`pkg-config libxml-2.0 --libs --static`"
 	make
 	make install DESTDIR="$DESTDIR"
 	"$TARGET_STRIP" --strip-unneeded "$DEST"/bin/*.exe
@@ -485,8 +512,8 @@ set -e # "set -eu" feels like overkill
 
 # Prepare build directories
 mkdir -p "$WRKDIR" "$INSDIR" "$PKGDIR" "$DEVDIR"
-test -d "$TOPDIR/include" || cp -sR "$MPREFIX/include/" "$TOPDIR/include/"
-test -d "$TOPDIR/lib" || cp -sR "$MPREFIX/lib/" "$TOPDIR/lib/"
+test -d "$TOPDIR/include" || cp -sR "$MPREFIX/$MTARGET/include/" "$TOPDIR/include/"
+test -d "$TOPDIR/lib" || cp -sR "$MPREFIX/$MTARGET/lib/" "$TOPDIR/lib/"
 
 # Create links for what misconfigured cross-compilers fail to provide
 mkdir -p "$TOPDIR/bin"

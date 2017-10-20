@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2017 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -35,6 +35,7 @@
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <gdk/gdkx.h>
 #elif defined GDK_WINDOWING_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -48,12 +49,11 @@ GtkWidget *main_window;
 
 static GtkWidget *spin_new_x(GtkObject *adj, int fpart);
 
-GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal )
+GtkWidget *add_a_window(GtkWindowType type, char *title, GtkWindowPosition pos)
 {
 	GtkWidget *win = gtk_window_new(type);
 	gtk_window_set_title(GTK_WINDOW(win), title);
 	gtk_window_set_position(GTK_WINDOW(win), pos);
-	gtk_window_set_modal(GTK_WINDOW(win), modal);
 
 	return win;
 }
@@ -1265,6 +1265,73 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
 	}
 	return (state);
 }
+
+// Maximized state
+
+#if GTK_MAJOR_VERSION == 1
+
+static Atom netwm[3];
+static int netwm_set;
+
+static int init_netwm(GdkWindow *w)
+{
+	static char *nm[3] = {
+		"_NET_WM_STATE",
+		"_NET_WM_STATE_MAXIMIZED_VERT",
+		"_NET_WM_STATE_MAXIMIZED_HORZ" };
+	return (XInternAtoms(GDK_WINDOW_XDISPLAY(w), nm, 3, FALSE, netwm));
+}
+
+int is_maximized(GtkWidget *window)
+{
+	Atom type, *atoms;
+	int format, vh = 0;
+	unsigned long i, nitems, after;
+	unsigned char *data;
+	GdkWindow *w = window->window;
+
+	if (!netwm_set) netwm_set = init_netwm(w);
+
+	gdk_error_trap_push();
+	XGetWindowProperty(GDK_WINDOW_XDISPLAY(w), GDK_WINDOW_XWINDOW(w),
+		netwm[0], 0, G_MAXLONG, False, XA_ATOM,
+		&type, &format, &nitems, &after, &data);
+	gdk_error_trap_pop();
+
+	atoms = (void *)data;
+	for (i = 0; i < nitems; i++)
+	{
+		if (atoms[i] == netwm[1]) vh |= 1;
+		else if (atoms[i] == netwm[2]) vh |= 2;
+        }
+	XFree(atoms);
+	return (vh == 3);
+}
+
+void set_maximized(GtkWidget *window)
+{
+	XEvent xev;
+	GdkWindow *w = window->window;
+
+	if (!netwm_set) netwm_set = init_netwm(w);
+
+	xev.xclient.type = ClientMessage;
+	xev.xclient.serial = 0;
+	xev.xclient.send_event = True;
+	xev.xclient.window = GDK_WINDOW_XWINDOW(w);
+	xev.xclient.message_type = netwm[0];
+	xev.xclient.format = 32;
+	xev.xclient.data.l[0] = 1; /* _NET_WM_STATE_ADD */
+	xev.xclient.data.l[1] = netwm[1];
+	xev.xclient.data.l[2] = netwm[2];
+	xev.xclient.data.l[3] = 0;
+	xev.xclient.data.l[4] = 0;
+
+	XSendEvent(GDK_WINDOW_XDISPLAY(w), DefaultRootWindow(GDK_WINDOW_XDISPLAY(w)),
+		False, SubstructureRedirectMask | SubstructureNotifyMask, &xev);
+}
+
+#endif
 
 // Drawable to RGB
 

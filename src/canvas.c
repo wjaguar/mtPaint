@@ -55,6 +55,7 @@ int recent_files;					// Current recent files setting
 
 int	show_paste,					// Show contents of clipboard while pasting
 	col_reverse,					// Painting with right button
+	status_on[STATUS_ITEMS],			// Show status bar items?
 	text_paste,					// Are we pasting text?
 	canvas_image_centre,				// Are we centering the image?
 	chequers_optimize,				// Are we optimizing the chequers for speed?
@@ -1812,10 +1813,6 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	/* Pick up extra info */
 	init_ls_settings(&settings, wdata);
 
-	/* Needed to show progress in Windows GTK+2 */
-// !!! Disable for now, see what happens
-//	gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), FALSE);
-
 	/* Looks better if no dialog under progressbar */
 	cmd_showhide(GET_WINDOW(wdata), FALSE);
 
@@ -2009,8 +2006,6 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 	if (redo && !script_cmds) /* Redo */
 	{
 		cmd_showhide(GET_WINDOW(wdata), TRUE);
-// !!! Disable for now, see what happens
-//		gtk_window_set_modal(GTK_WINDOW(GET_REAL_WINDOW(wdata)), TRUE);
 		return;
 	}
 	/* Done */

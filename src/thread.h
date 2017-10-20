@@ -1,5 +1,5 @@
 /*	thread.h
-	Copyright (C) 2009-2016 Dmitry Groshev
+	Copyright (C) 2009-2017 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -60,6 +60,8 @@ int launch_threads(thread_func thread, threaddata *tdata, char *title, int total
 //	Show threading status
 int threads_running;
 
+//	Max threads to be used
+int helper_threads();
 //	Estimate how many threads is enough for image
 int image_threads(int w, int h);
 //	Update progressbar from main thread
@@ -99,6 +101,7 @@ int thread_xadd(volatile int *var, int n);
 
 #else /* Only one actual thread */
 
+#define helper_threads() 1
 #define image_threads(w,h) 1
 
 static inline int thread_step(tcb *thread, int i, int tlim, int steps)

@@ -1010,7 +1010,6 @@ GtkWidget *fpick(GtkWidget **box, char *title, int flags, void **r)
 
 	fp = gtk_file_selection_new(__(title));
 	fs = GTK_FILE_SELECTION(fp);
-	gtk_window_set_modal(GTK_WINDOW(fp), TRUE);
 	if ( flags & FPICK_DIRS_ONLY )
 	{
 		gtk_widget_hide(GTK_WIDGET(fs->selection_entry));

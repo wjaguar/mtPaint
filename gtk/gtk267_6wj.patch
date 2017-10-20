@@ -1,6 +1,54 @@
+diff -udpr gtk+-2.6.7_/demos/gtk-demo/geninclude.pl.in gtk+-2.6.7/demos/gtk-demo/geninclude.pl.in
+--- gtk+-2.6.7_/demos/gtk-demo/geninclude.pl.in	2003-11-09 01:08:04.000000000 +0300
++++ gtk+-2.6.7/demos/gtk-demo/geninclude.pl.in	2017-10-14 14:36:20.000000000 +0300
+@@ -40,7 +40,7 @@ foreach $href (@demos) {
+ 	my $do_next = 0;
+ 
+ 	# parent detected
+-	if (defined @parents) {
++	if (@parents) {
+ 	    foreach $foo (@parents) {
+ 		if ($foo eq $parent_name) {
+ 		    $do_next = 1;
+@@ -54,7 +54,7 @@ foreach $href (@demos) {
+ 
+ 	push @parents, $parent_name;
+ 
+-	$tmp = (defined @child_arrays)?($#child_arrays + 1):0;
++	$tmp = @child_arrays?($#child_arrays + 1):0;
+ 	push @child_arrays, "child$tmp";
+ 
+ 	push @demos, {"title" => $parent_name, "file" => "NULL",
+@@ -62,7 +62,7 @@ foreach $href (@demos) {
+     }
+ }
+ 
+-if (defined @parents) {
++if (@parents) {
+     $i = 0;
+     for ($i = 0; $i <= $#parents; $i++) {
+ 	$first = 1;
+@@ -105,7 +105,7 @@ if (defined @parents) {
+ } @demos_old;
+ 
+ # sort the child arrays
+-if (defined @child_arrays) {
++if (@child_arrays) {
+     for ($i = 0; $i <= $#child_arrays; $i++) {
+ 	@foo_old = @{$child_arrays[$i]};
+ 
+@@ -133,7 +133,7 @@ foreach $href (@demos) {
+ 	print ", \n";
+     }
+ 
+-    if (defined @parents) {
++    if (@parents) {
+ 	for ($i = 0; $i <= $#parents; $i++) {
+ 	    if ($parents[$i] eq $href->{title}) {
+ 
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c gtk+-2.6.7/gdk/win32/gdkcursor-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c	2004-03-06 06:37:07.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkcursor-win32.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkcursor-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -41,6 +41,12 @@ _gdk_win32_data_to_wcursor (GdkCursorTyp
    if (i >= G_N_ELEMENTS (cursors) || !cursors[i].name)
      return NULL;
@@ -16,7 +64,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkcursor-win32.c gtk+-2.6.7/gdk/win32/gdkcurso
  
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkdnd-win32.c gtk+-2.6.7/gdk/win32/gdkdnd-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkdnd-win32.c	2004-12-20 00:00:58.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkdnd-win32.c	2010-04-27 01:52:49.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkdnd-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -978,6 +978,8 @@ gdk_dropfiles_filter (GdkXEvent *xev,
        /* WM_DROPFILES drops are always file names */
        context->targets =
@@ -39,7 +87,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkdnd-win32.c gtk+-2.6.7/gdk/win32/gdkdnd-win3
        nfiles = DragQueryFile (hdrop, 0xFFFFFFFF, NULL, 0);
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkdrawable-win32.c gtk+-2.6.7/gdk/win32/gdkdrawable-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkdrawable-win32.c	2005-04-04 00:36:39.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkdrawable-win32.c	2010-04-27 01:32:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkdrawable-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -1856,6 +1856,16 @@ _gdk_win32_blit (gboolean              u
  			   xdest, ydest,
  			   use_fg_bg));
@@ -59,7 +107,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkdrawable-win32.c gtk+-2.6.7/gdk/win32/gdkdra
    if (GDK_IS_DRAWABLE_IMPL_WIN32 (src))
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkevents-win32.c gtk+-2.6.7/gdk/win32/gdkevents-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkevents-win32.c	2005-04-04 03:40:42.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkevents-win32.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkevents-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -162,7 +162,8 @@ static HKL latin_locale = NULL;
  #endif
  
@@ -536,7 +584,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkevents-win32.c gtk+-2.6.7/gdk/win32/gdkevent
  
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c	2005-03-13 01:07:34.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkgeometry-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -108,9 +108,9 @@ gdk_window_scroll (GdkWindow *window,
    GdkRegion *invalidate_region;
    GdkWindowImplWin32 *impl;
@@ -609,7 +657,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkgeometry-win32.c gtk+-2.6.7/gdk/win32/gdkgeo
  void
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkinput-win32.c gtk+-2.6.7/gdk/win32/gdkinput-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkinput-win32.c	2005-02-25 03:09:52.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkinput-win32.c	2010-04-27 01:52:07.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkinput-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -43,16 +43,10 @@
  #define PACKETMODE (PK_BUTTONS)
  #include <pktdef.h>
@@ -939,7 +987,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkinput-win32.c gtk+-2.6.7/gdk/win32/gdkinput-
        event->proximity.device = &gdkdev->info;
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkkeys-win32.c gtk+-2.6.7/gdk/win32/gdkkeys-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkkeys-win32.c	2005-02-24 01:02:59.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkkeys-win32.c	2010-04-27 01:36:26.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkkeys-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -265,7 +265,7 @@ reset_after_dead (guchar key_state[256])
      }
  }
@@ -982,7 +1030,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkkeys-win32.c gtk+-2.6.7/gdk/win32/gdkkeys-wi
  		    {
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h gtk+-2.6.7/gdk/win32/gdkprivate-win32.h
 --- gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h	2005-04-04 03:40:42.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkprivate-win32.h	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkprivate-win32.h	2017-10-14 14:36:20.000000000 +0300
 @@ -360,6 +360,8 @@ HRGN	  _gdk_win32_gdkregion_to_hrgn  (Gd
  					 gint         x_origin,
  					 gint         y_origin);
@@ -994,7 +1042,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkprivate-win32.h gtk+-2.6.7/gdk/win32/gdkpriv
  
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkproperty-win32.c gtk+-2.6.7/gdk/win32/gdkproperty-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkproperty-win32.c	2005-04-04 03:40:42.000000000 +0400
-+++ gtk+-2.6.7/gdk/win32/gdkproperty-win32.c	2010-04-27 01:55:59.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkproperty-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -561,7 +561,7 @@ gdk_screen_get_setting (GdkScreen   *scr
                          const gchar *name,
                          GValue      *value)
@@ -1006,7 +1054,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkproperty-win32.c gtk+-2.6.7/gdk/win32/gdkpro
     * XXX : if these values get changed through the Windoze UI the
 diff -udpr gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c gtk+-2.6.7/gdk/win32/gdkwindow-win32.c
 --- gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c	2005-03-12 02:45:53.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/gdkwindow-win32.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/gdkwindow-win32.c	2017-10-14 14:36:20.000000000 +0300
 @@ -37,7 +37,13 @@
  #include "gdkprivate-win32.h"
  #include "gdkinput-win32.h"
@@ -1024,7 +1072,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/gdkwindow-win32.c gtk+-2.6.7/gdk/win32/gdkwindo
    LONG         bV5Width; 
 diff -udpr gtk+-2.6.7_/gdk/win32/xcursors.h gtk+-2.6.7/gdk/win32/xcursors.h
 --- gtk+-2.6.7_/gdk/win32/xcursors.h	2001-02-23 06:51:40.000000000 +0300
-+++ gtk+-2.6.7/gdk/win32/xcursors.h	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk/win32/xcursors.h	2017-10-14 14:36:20.000000000 +0300
 @@ -1,357 +1,357 @@
 -static const struct { const gchar *name; gint type; guchar width; guchar height; guchar hotx; guchar hoty; guchar *data; } cursors[] = {
 -  { "X_cursor", 0, 16, 16, 7, 7, 
@@ -1487,7 +1535,7 @@ diff -udpr gtk+-2.6.7_/gdk/win32/xcursors.h gtk+-2.6.7/gdk/win32/xcursors.h
      "\246\245\124\125" }, 
 diff -udpr gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h
 --- gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h	2004-11-16 06:01:57.000000000 +0300
-+++ gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gdk-pixbuf/gdk-pixbuf-private.h	2017-10-14 14:36:20.000000000 +0300
 @@ -97,9 +97,9 @@ GdkPixbuf *_gdk_pixbuf_generic_image_loa
  GdkPixbufFormat *_gdk_pixbuf_get_format (GdkPixbufModule *image_module);
  
@@ -1502,7 +1550,7 @@ diff -udpr gtk+-2.6.7_/gdk-pixbuf/gdk-pixbuf-private.h gtk+-2.6.7/gdk-pixbuf/gdk
  #endif /* GDK_PIXBUF_ENABLE_BACKEND */
 diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-bmp.c gtk+-2.6.7/gdk-pixbuf/io-bmp.c
 --- gtk+-2.6.7_/gdk-pixbuf/io-bmp.c	2005-04-10 01:53:39.000000000 +0400
-+++ gtk+-2.6.7/gdk-pixbuf/io-bmp.c	2010-04-27 01:56:37.000000000 +0400
++++ gtk+-2.6.7/gdk-pixbuf/io-bmp.c	2017-10-14 14:36:20.000000000 +0300
 @@ -1074,14 +1074,10 @@ gdk_pixbuf__bmp_image_load_increment(gpo
  
  	gint BytesToCopy;
@@ -1558,7 +1606,7 @@ diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-bmp.c gtk+-2.6.7/gdk-pixbuf/io-bmp.c
  		case READ_STATE_DONE:
 diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-pnm.c gtk+-2.6.7/gdk-pixbuf/io-pnm.c
 --- gtk+-2.6.7_/gdk-pixbuf/io-pnm.c	2005-02-16 06:39:27.000000000 +0300
-+++ gtk+-2.6.7/gdk-pixbuf/io-pnm.c	2010-04-27 01:57:05.000000000 +0400
++++ gtk+-2.6.7/gdk-pixbuf/io-pnm.c	2017-10-14 14:36:20.000000000 +0300
 @@ -245,7 +245,7 @@ pnm_read_next_value (PnmIOBuffer *inbuf,
  	
  	/* get the value */
@@ -1570,7 +1618,7 @@ diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-pnm.c gtk+-2.6.7/gdk-pixbuf/io-pnm.c
  			     GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
 diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-xpm.c gtk+-2.6.7/gdk-pixbuf/io-xpm.c
 --- gtk+-2.6.7_/gdk-pixbuf/io-xpm.c	2005-03-03 17:03:53.000000000 +0300
-+++ gtk+-2.6.7/gdk-pixbuf/io-xpm.c	2010-04-27 01:57:28.000000000 +0400
++++ gtk+-2.6.7/gdk-pixbuf/io-xpm.c	2017-10-14 14:36:20.000000000 +0300
 @@ -1167,7 +1167,8 @@ file_buffer (enum buf_op op, gpointer ha
  		/* Fall through to the xpm_read_string. */
  
@@ -1594,7 +1642,7 @@ diff -udpr gtk+-2.6.7_/gdk-pixbuf/io-xpm.c gtk+-2.6.7/gdk-pixbuf/io-xpm.c
                               GDK_PIXBUF_ERROR_CORRUPT_IMAGE,
 diff -udpr gtk+-2.6.7_/gtk/gtkcombobox.c gtk+-2.6.7/gtk/gtkcombobox.c
 --- gtk+-2.6.7_/gtk/gtkcombobox.c	2005-04-09 02:03:53.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkcombobox.c	2010-04-27 01:55:00.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkcombobox.c	2017-10-14 14:36:20.000000000 +0300
 @@ -103,6 +103,7 @@ struct _GtkComboBoxPrivate
    guint changed_id;
    guint popup_idle_id;
@@ -1671,7 +1719,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkcombobox.c gtk+-2.6.7/gtk/gtkcombobox.c
      }
 diff -udpr gtk+-2.6.7_/gtk/gtkdnd.c gtk+-2.6.7/gtk/gtkdnd.c
 --- gtk+-2.6.7_/gtk/gtkdnd.c	2005-03-20 09:25:27.000000000 +0300
-+++ gtk+-2.6.7/gtk/gtkdnd.c	2010-04-27 01:18:04.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkdnd.c	2017-10-14 14:36:20.000000000 +0300
 @@ -1949,11 +1949,7 @@ gtk_drag_begin_internal (GtkWidget      
        return NULL;
      }
@@ -1707,8 +1755,92 @@ diff -udpr gtk+-2.6.7_/gtk/gtkdnd.c gtk+-2.6.7/gtk/gtkdnd.c
  }
 diff -udpr gtk+-2.6.7_/gtk/gtkentry.c gtk+-2.6.7/gtk/gtkentry.c
 --- gtk+-2.6.7_/gtk/gtkentry.c	2005-04-07 08:45:30.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkentry.c	2010-04-27 01:35:21.000000000 +0400
-@@ -3553,7 +3553,7 @@ gtk_entry_move_forward_word (GtkEntry *e
++++ gtk+-2.6.7/gtk/gtkentry.c	2017-10-14 14:36:20.000000000 +0300
+@@ -75,6 +75,8 @@ struct _GtkEntryPrivate 
+ {
+   gfloat xalign;
+   gint insert_pos;
++  guint real_changed : 1;
++  guint change_count : 8;
+ };
+ 
+ enum {
+@@ -349,6 +351,9 @@ static void         disconnect_completio
+ static void         connect_completion_signals         (GtkEntry           *entry,
+ 							GtkEntryCompletion *completion);
+ 
++static void         begin_change                       (GtkEntry *entry);
++static void         end_change                         (GtkEntry *entry);
++static void         emit_changed                       (GtkEntry *entry);
+ 
+ static GtkWidgetClass *parent_class = NULL;
+ 
+@@ -1024,6 +1029,46 @@ gtk_entry_init (GtkEntry *entry)
+ 		    G_CALLBACK (gtk_entry_delete_surrounding_cb), entry);
+ }
+ 
++static void
++begin_change (GtkEntry *entry)
++{
++  GtkEntryPrivate *priv = GTK_ENTRY_GET_PRIVATE (entry);
++
++  priv->change_count++;
++}
++
++static void
++end_change (GtkEntry *entry)
++{
++  GtkEditable *editable = GTK_EDITABLE (entry);
++  GtkEntryPrivate *priv = GTK_ENTRY_GET_PRIVATE (entry);
++ 
++  g_return_if_fail (priv->change_count > 0);
++
++  priv->change_count--;
++
++  if (priv->change_count == 0)
++    {
++       if (priv->real_changed) 
++         {
++           g_signal_emit_by_name (editable, "changed");
++           priv->real_changed = FALSE;
++         }
++    } 
++}
++
++static void
++emit_changed (GtkEntry *entry)
++{
++  GtkEditable *editable = GTK_EDITABLE (entry);
++  GtkEntryPrivate *priv = GTK_ENTRY_GET_PRIVATE (entry);
++
++  if (priv->change_count == 0)
++    g_signal_emit_by_name (editable, "changed");
++  else 
++    priv->real_changed = TRUE;
++}
++
+ /*
+  * Overwrite a memory that might contain sensitive information.
+  */
+@@ -2243,7 +2288,7 @@ gtk_entry_real_insert_text (GtkEditable 
+ 
+   gtk_entry_recompute (entry);
+ 
+-  g_signal_emit_by_name (editable, "changed");
++  emit_changed (entry);
+   g_object_notify (G_OBJECT (editable), "text");
+ }
+ 
+@@ -2293,7 +2338,7 @@ gtk_entry_real_delete_text (GtkEditable 
+       
+       gtk_entry_recompute (entry);
+ 
+-      g_signal_emit_by_name (editable, "changed");
++      emit_changed (entry);
+       g_object_notify (G_OBJECT (editable), "text");
+     }
+ }
+@@ -3553,7 +3598,7 @@ gtk_entry_move_forward_word (GtkEntry *e
        
        /* Find the next word end */
        new_pos++;
@@ -1717,7 +1849,52 @@ diff -udpr gtk+-2.6.7_/gtk/gtkentry.c gtk+-2.6.7/gtk/gtkentry.c
  	new_pos++;
  
        g_free (log_attrs);
-@@ -4790,6 +4790,7 @@ cursor_blinks (GtkEntry *entry)
+@@ -3688,12 +3733,16 @@ paste_received (GtkClipboard *clipboard,
+ 	    _gtk_entry_completion_popdown (completion);
+ 	}
+ 
++      begin_change (entry);
++      g_object_freeze_notify (G_OBJECT (entry));
+       if (gtk_editable_get_selection_bounds (editable, &start, &end))
+         gtk_editable_delete_text (editable, start, end);
+ 
+       pos = entry->current_pos;
+       gtk_editable_insert_text (editable, text, -1, &pos);
+       gtk_editable_set_position (editable, pos);
++      g_object_thaw_notify (G_OBJECT (entry));
++      end_change (entry);
+ 
+       if (completion)
+ 	g_signal_handler_unblock (entry, completion->priv->changed_id);
+@@ -3838,10 +3887,14 @@ gtk_entry_set_text (GtkEntry    *entry,
+   if (completion)
+     g_signal_handler_block (entry, completion->priv->changed_id);
+ 
++  begin_change (entry);
++  g_object_freeze_notify (G_OBJECT (entry));
+   gtk_editable_delete_text (GTK_EDITABLE (entry), 0, -1);
+ 
+   tmp_pos = 0;
+   gtk_editable_insert_text (GTK_EDITABLE (entry), text, strlen (text), &tmp_pos);
++  g_object_thaw_notify (G_OBJECT (entry));
++  end_change (entry);
+ 
+   if (completion)
+     g_signal_handler_unblock (entry, completion->priv->changed_id);
+@@ -4724,8 +4777,12 @@ gtk_entry_drag_data_received (GtkWidget 
+       else
+ 	{
+ 	  /* Replacing selection */
++          begin_change (entry);
++          g_object_freeze_notify (G_OBJECT (entry));
+ 	  gtk_editable_delete_text (editable, sel1, sel2);
+ 	  gtk_editable_insert_text (editable, str, -1, &sel1);
++          g_object_thaw_notify (G_OBJECT (entry));
++          end_change (entry);
+ 	}
+       
+       g_free (str);
+@@ -4790,6 +4847,7 @@ cursor_blinks (GtkEntry *entry)
    gboolean blink;
  
    if (GTK_WIDGET_HAS_FOCUS (entry) &&
@@ -1727,7 +1904,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkentry.c gtk+-2.6.7/gtk/gtkentry.c
        g_object_get (settings, "gtk-cursor-blink", &blink, NULL);
 diff -udpr gtk+-2.6.7_/gtk/gtkfilesel.c gtk+-2.6.7/gtk/gtkfilesel.c
 --- gtk+-2.6.7_/gtk/gtkfilesel.c	2005-04-07 08:45:30.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkfilesel.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkfilesel.c	2017-10-14 14:36:20.000000000 +0300
 @@ -2070,7 +2070,8 @@ win32_gtk_add_drives_to_dir_list (GtkLis
    while (*textPtr != '\0')
      {
@@ -1740,7 +1917,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkfilesel.c gtk+-2.6.7/gtk/gtkfilesel.c
  	  g_snprintf (formatBuffer, sizeof (formatBuffer), "%c:\\", toupper (textPtr[0]));
 diff -udpr gtk+-2.6.7_/gtk/gtkmain.c gtk+-2.6.7/gtk/gtkmain.c
 --- gtk+-2.6.7_/gtk/gtkmain.c	2005-03-20 09:25:28.000000000 +0300
-+++ gtk+-2.6.7/gtk/gtkmain.c	2010-04-27 01:32:08.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkmain.c	2017-10-14 14:36:20.000000000 +0300
 @@ -290,13 +290,46 @@ _gtk_get_libdir (void)
    return gtk_libdir;
  }
@@ -1792,7 +1969,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkmain.c gtk+-2.6.7/gtk/gtkmain.c
  }
 diff -udpr gtk+-2.6.7_/gtk/gtknotebook.c gtk+-2.6.7/gtk/gtknotebook.c
 --- gtk+-2.6.7_/gtk/gtknotebook.c	2005-04-07 08:45:30.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtknotebook.c	2010-04-27 01:17:37.000000000 +0400
++++ gtk+-2.6.7/gtk/gtknotebook.c	2017-10-14 14:36:20.000000000 +0300
 @@ -4370,10 +4370,8 @@ gtk_notebook_insert_page_menu (GtkNotebo
    if (!notebook->first_tab)
      notebook->first_tab = notebook->children;
@@ -1808,7 +1985,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtknotebook.c gtk+-2.6.7/gtk/gtknotebook.c
      {
 diff -udpr gtk+-2.6.7_/gtk/gtkradiobutton.c gtk+-2.6.7/gtk/gtkradiobutton.c
 --- gtk+-2.6.7_/gtk/gtkradiobutton.c	2005-03-20 09:25:28.000000000 +0300
-+++ gtk+-2.6.7/gtk/gtkradiobutton.c	2010-04-27 01:53:29.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkradiobutton.c	2017-10-14 14:36:20.000000000 +0300
 @@ -510,7 +510,7 @@ gtk_radio_button_focus (GtkWidget       
  	    {
  	      GtkWidget *child = tmp_list->data;
@@ -1829,7 +2006,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkradiobutton.c gtk+-2.6.7/gtk/gtkradiobutton.c
  		  break;
 diff -udpr gtk+-2.6.7_/gtk/gtkscale.c gtk+-2.6.7/gtk/gtkscale.c
 --- gtk+-2.6.7_/gtk/gtkscale.c	2005-04-07 08:45:30.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkscale.c	2010-04-27 01:53:49.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkscale.c	2017-10-14 14:36:20.000000000 +0300
 @@ -265,10 +265,10 @@ gtk_scale_class_init (GtkScaleClass *cla
    add_slider_binding (binding_set, GDK_KP_Down, GDK_CONTROL_MASK,
                        GTK_SCROLL_PAGE_DOWN);
@@ -1858,7 +2035,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkscale.c gtk+-2.6.7/gtk/gtkscale.c
    add_slider_binding (binding_set, GDK_Page_Down, 0,
 diff -udpr gtk+-2.6.7_/gtk/gtkwindow.c gtk+-2.6.7/gtk/gtkwindow.c
 --- gtk+-2.6.7_/gtk/gtkwindow.c	2005-04-07 09:09:33.000000000 +0400
-+++ gtk+-2.6.7/gtk/gtkwindow.c	2010-04-27 01:29:04.000000000 +0400
++++ gtk+-2.6.7/gtk/gtkwindow.c	2017-10-14 14:36:20.000000000 +0300
 @@ -4695,16 +4695,20 @@ gtk_window_real_set_focus (GtkWindow *wi
  {
    GtkWidget *old_focus = window->focus_widget;
@@ -1918,7 +2095,7 @@ diff -udpr gtk+-2.6.7_/gtk/gtkwindow.c gtk+-2.6.7/gtk/gtkwindow.c
      }
 diff -udpr gtk+-2.6.7_/modules/engines/ms-windows/msw_style.c gtk+-2.6.7/modules/engines/ms-windows/msw_style.c
 --- gtk+-2.6.7_/modules/engines/ms-windows/msw_style.c	2005-03-21 01:40:58.000000000 +0300
-+++ gtk+-2.6.7/modules/engines/ms-windows/msw_style.c	2010-04-27 01:10:46.000000000 +0400
++++ gtk+-2.6.7/modules/engines/ms-windows/msw_style.c	2017-10-14 14:36:20.000000000 +0300
 @@ -1448,10 +1448,13 @@ draw_box (GtkStyle      *style,
      }
    else if (detail && strcmp (detail, "menuitem") == 0) {

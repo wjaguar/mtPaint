@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.12"
-MT_DATE="2016-06-02"
+MT_V="3.49.13"
+MT_DATE="2017-10-20"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -109,7 +109,9 @@ do
 	"--localedir="* )	MT_LOCDIR="${A#*=}";;
 	"--mandir="* )	MT_MANDIR="${A#*=}";;
 	"--host="* )	MT_HOST="${A#*=}";;
-	"--fakeroot="* ) FAKE_ROOT="${A#*=}";;
+	"--fakeroot"* )	FAKE_ROOT="${A#*=}"
+			FAKE_LL="${A%%=*}"
+			FAKE_LL="${FAKE_LL#--fakeroot}";;
 	"panic" )	WARN="-Wextra -Wno-missing-field-initializers -Wno-unused-parameter";;
 	"flush" )	echo Clearing out directory to original state
 			echo
@@ -342,11 +344,11 @@ if [ -n "$FAKE_ROOT" ] # A way to replace just some libraries, leaving others be
 then
 	PKGCONFIG () # Check both locations in turn
 	{
-		PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$FAKE_ROOT/lib/pkgconfig" \
+		PKG_CONFIG_PATH= PKG_CONFIG_LIBDIR="$FAKE_ROOT/lib$FAKE_LL/pkgconfig" \
 			pkg-config --define-variable=prefix="$FAKE_ROOT" "$@" \
 			2> /dev/null || "$PKG_CONFIG" "$@"
 	}
-	MT_TESTLINK="$CCLD -L$FAKE_ROOT/lib -Wl,--unresolved-symbols=ignore-in-shared-libs $LDFLAGS"
+	MT_TESTLINK="$CCLD -L$FAKE_ROOT/lib$FAKE_LL -Wl,--unresolved-symbols=ignore-in-shared-libs $LDFLAGS"
 	MT_TESTCOMP="$CC -fno-builtin -isystem $FAKE_ROOT/include $CPPFLAGS ${MT_TESTLINK#$CCLD}"
 else
 	PKGCONFIG ()
@@ -709,7 +711,7 @@ if [ "$FAKE_ROOT" ]
 then
 	# !!! Spaces in paths will NOT be well received here
 	FAKE_PATHS "$LIBS" -L
-	LIBS="-L$FAKE_ROOT/lib $FAKE_KEYS $LIBS"
+	LIBS="-L$FAKE_ROOT/lib$FAKE_LL $FAKE_KEYS $LIBS"
 	FAKE_PATHS "$INCLUDES" -I
 	INCLUDES="-isystem $FAKE_ROOT/include $FAKE_KEYS $INCLUDES"
 	AS_NEEDED="-Wl,--as-needed,--no-add-needed,--unresolved-symbols=ignore-in-shared-libs"

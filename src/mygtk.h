@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2017 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -60,7 +60,7 @@ GtkWidget *main_window;
 
 ///	Generic Widget Primitives
 
-GtkWidget *add_a_window( GtkWindowType type, char *title, GtkWindowPosition pos, gboolean modal );
+GtkWidget *add_a_window(GtkWindowType type, char *title, GtkWindowPosition pos);
 GtkWidget *add_a_spin( int value, int min, int max );
 
 int user_break;
@@ -205,6 +205,17 @@ GtkWidget *wj_size_box();
 // Disable visual updates while tweaking container's contents
 
 gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
+
+// Maximized state
+
+#if GTK_MAJOR_VERSION == 1
+int is_maximized(GtkWidget *window);
+void set_maximized(GtkWidget *window);
+#else /* if GTK_MAJOR_VERSION == 2 */
+#define is_maximized(W) \
+	(!!(gdk_window_get_state((W)->window) & GDK_WINDOW_STATE_MAXIMIZED))
+#define set_maximized(W) gtk_window_maximize(W)
+#endif
 
 // Drawable to RGB
 
