@@ -1,0 +1,10 @@
+_conf.txt
+.vscode
+src/graphics
+*.mo
+*.o
+src/mtpaint
+.vstags
+.project
+.cproject
+

@@ -673,6 +673,15 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor);
 void mem_dog(double radiusW, double radiusN, int norm, int gcor);
 void mem_kuwahara(int r, int gcor, int detail);
 
+static enum {
+	NOISE_COLOR,
+	NOISE_ATOB,
+	NOISE_AORB,
+	NOISE_MAX
+};
+
+void mem_noise(int);
+
 /* Colorspaces */
 #define CSPACE_RGB  0
 #define CSPACE_SRGB 1

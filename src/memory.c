@@ -8156,6 +8156,78 @@ void mask_merge(unsigned char *old, int channel, unsigned char *mask)
 	}
 }
 
+/* Noise filter */
+void mem_noise(int type) {
+	int i, j;
+	unsigned char *img;
+
+	unsigned char *mask = calloc(1, mem_width);
+
+	j = mem_width * mem_height;
+	if (mem_channel == CHN_IMAGE) j *= 3;
+	img = mem_img[mem_channel];
+
+	switch(type) {
+		case NOISE_COLOR:
+			for (i = 0; i < j; i++)
+			{
+				*img++ = rand();
+			}
+		break;
+		case NOISE_AORB:
+			if (mem_channel == CHN_IMAGE)
+			{
+				for (i = 0; i < j; i += 3)
+				{
+					png_color next = rand() % 2 ? mem_col_A24 : mem_col_B24;
+					*img++ = next.red;
+					*img++ = next.green;
+					*img++ = next.blue;
+				}
+			}
+			else
+			{
+				for (i = 0; i < j; i++)
+				{
+					unsigned char next = rand() % 2 ? channel_col_A[mem_channel] : channel_col_B[mem_channel];
+					*img++ = next;
+				}
+			}
+		break;
+		case NOISE_ATOB:
+			if (mem_channel == CHN_IMAGE)
+			{
+				png_color col1 = mem_col_A24;
+				png_color col2 = mem_col_B24;
+				for (i = 0; i < j; i += 3)
+				{
+
+					float rnd = (float) rand() / RAND_MAX;
+					*img++ = col1.red + round((col2.red - col1.red) * rnd);
+					*img++ = col1.green + round((col2.green - col1.green) * rnd);
+					*img++ = col1.blue + round((col2.blue - col1.blue) * rnd);
+				}
+			}
+			else
+			{
+				char col1 = channel_col_A[mem_channel];
+				char col2 = channel_col_B[mem_channel];
+				for (i = 0; i < j; i++)
+				{
+					float rnd = (float) rand() / RAND_MAX;
+					*img++ = col1 + round((col2 - col1) * rnd);
+				}
+			}
+		break;
+		
+	}
+	if (mask)
+	{
+		mask_merge(mem_undo_previous(mem_channel), mem_channel, mask);
+		free(mask);
+	}
+}
+
 static void dog_filter(tcb *thread)
 {
 	gaussd *gd = thread->data;

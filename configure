@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.13"
-MT_DATE="2017-10-20"
+MT_V="3.49.14"
+MT_DATE="2018-08-07"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -71,6 +71,7 @@ do
 	"notiff" )	NTIFF=NO;;
 	"statictiff" )	STATIC_TIFF=TIFF;;
 	"noft" )	NFT=NO;;
+	"legacyft" )	LEGACYFT=NO;;
 	"staticft" )	STATIC_FT=FreeType;;
 	"lcms" )	NCMS=LittleCMS;;
 	"lcms2" )	NCMS=LittleCMS2;;
@@ -197,6 +198,7 @@ tiff ............. Use libtiff
 notiff ........... Don't use libtiff
 statictiff ....... Statically link TIFF library
 noft ............. Don't use FreeType
+legacyft ......... Use non-pkg-config freetype search on Linux
 staticft ......... Statically link FreeType library
 lcms ............. Use LittleCMS
 lcms2............. Use LittleCMS2
@@ -444,6 +446,7 @@ NTIFF=${NTIFF:-NO}
 
 if IS_LIB "lfreetype"
 then
+	LEGACYFT=${LEGACYFT:-no}
 	NFT=${NFT:-YES}
 fi
 NFT=${NFT:-NO}
@@ -577,7 +580,7 @@ fi
 if [ "$NFT" = YES ]
 then
 	DEFS="$DEFS -DU_FREETYPE"
-	if [ "$OS" = "GNU/Linux" ]
+	if [ "$OS" = "GNU/Linux" ] && [ "$LEGACYFT" = "YES" ]
 	then # Do it the old way, for native builds on *very* old distros
 		INCLUDES="$INCLUDES `freetype-config --cflags`"
 		LIB_NAME "" "$STATIC_FT" "`freetype-config --libs`"

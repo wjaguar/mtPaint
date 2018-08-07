@@ -4767,6 +4767,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_unassociate(); break;
 	case FILT_KUWAHARA:
 		pressed_kuwahara(); break;
+	case FILT_NOISE:
+		pressed_noise(); break;
 	}
 }
 
@@ -5362,6 +5364,9 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Dilate"), ACTMOD(FILT_FX, FX_DILATE)),
 		ACTMAP(NEED_NOIDX),
 	MENUITEMs(_("//Erode"), ACTMOD(FILT_FX, FX_ERODE)),
+		ACTMAP(NEED_NOIDX),
+	MENUSEP, //
+	MENUITEMs(_("//Noise ..."), ACTMOD(FILT_NOISE, 0)),
 		ACTMAP(NEED_NOIDX),
 	MENUSEP, //
 	MENUITEMs(_("//Bacteria ..."), ACTMOD(FILT_BACT, 0)),
