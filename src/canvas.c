@@ -603,6 +603,38 @@ void pressed_kuwahara()
 	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
 }
 
+typedef struct {
+	filterwindow_dd fw;
+	int noise_type;
+} noise_dd;
+
+static char *noise_txt[] = { _("Colored"), _("A to B"), _("A or B"), NULL};
+
+static int do_noise(noise_dd *dt, void **wdata)
+{
+	run_query(wdata);
+	spot_undo(UNDO_DRAW);
+	mem_noise(dt->noise_type);
+	mem_undo_prepare();
+	return (TRUE);
+}
+
+#define WBbase noise_dd
+static void *noise_code[] = {
+	VBOXPS,
+	FRPACK(_("Noise type"), noise_txt, NOISE_MAX, 1, noise_type),
+	WDONE, RET
+};
+#undef WBbase
+
+void pressed_noise()
+{
+	noise_dd tdata = {
+		{ _("Noise"), noise_code, FW_FN(do_noise) },
+		NOISE_COLOR };
+	run_create_(filterwindow_code, &tdata, sizeof(tdata), script_cmds);
+}
+
 void pressed_convert_rgb()
 {
 	unsigned char *old_img = mem_img[CHN_IMAGE];
