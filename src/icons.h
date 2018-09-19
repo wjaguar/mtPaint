@@ -84,6 +84,8 @@ DEF_XPM_ICON(undo);
 DEF_XPM_ICON(up);
 DEF_XPM_ICON(cline);
 DEF_XPM_ICON(layers);
+DEF_XPM_ICON(layers_close);
+DEF_XPM_ICON(layer_delete);
 //DEF_XPM_ICON(config);
 
 extern unsigned char

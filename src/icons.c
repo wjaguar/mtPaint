@@ -102,6 +102,8 @@
 #include "graphics/xpm_up.xpm"
 #include "graphics/xpm_cline.xpm"
 #include "graphics/xpm_layers.xpm"
+#include "graphics/xpm_layers_close.xpm"
+#include "graphics/xpm_layer_delete.xpm"
 //#include "graphics/xpm_config.xpm"
 
 #undef static
