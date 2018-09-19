@@ -211,12 +211,14 @@ static void create_new(newwin_dd *dt, void **wdata)
 	bpp = im_type == 0 ? 3 : 1;
 	if (im_type > 2); // Successfully done above
 	else if (new_window_type == 1) // Layer
+	{
 		layer_new(nw, nh, bpp, nc, pal, CMASK_IMAGE);
 
 		mem_col_[0] = 7;
 		mem_col_24[0] = mem_pal[7];
 		update_stuff(UPD_AB);
 		flood_fill(1,1, get_pixel(4,4));
+	}
 	else // Image
 	{
 		/* Nothing to undo if image got deleted already */
