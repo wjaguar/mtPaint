@@ -76,6 +76,7 @@ DEF_XPM_ICON(redo);
 DEF_XPM_ICON(rotate_as);
 DEF_XPM_ICON(rotate_cs);
 DEF_XPM_ICON(save);
+DEF_XPM_ICON(save_composite);
 DEF_XPM_ICON(select);
 DEF_XPM_ICON(shuffle);
 DEF_XPM_ICON(smudge);

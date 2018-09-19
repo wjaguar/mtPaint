@@ -5413,7 +5413,6 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
 	MENUITEMs(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
 	MENUITEMs(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
-	MENUITEMs(_("//Crop Layer"), ACTMOD(ACT_CROP_LAYER, 0)),
 		ACTMAP(NEED_CROP), SHORTCUT(Delete, S),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///
