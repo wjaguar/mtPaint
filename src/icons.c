@@ -94,6 +94,7 @@
 #include "graphics/xpm_rotate_as.xpm"
 #include "graphics/xpm_rotate_cs.xpm"
 #include "graphics/xpm_save.xpm"
+#include "graphics/xpm_save_composite.xpm"
 #include "graphics/xpm_select.xpm"
 #include "graphics/xpm_shuffle.xpm"
 #include "graphics/xpm_smudge.xpm"
@@ -102,6 +103,8 @@
 #include "graphics/xpm_up.xpm"
 #include "graphics/xpm_cline.xpm"
 #include "graphics/xpm_layers.xpm"
+#include "graphics/xpm_layers_close.xpm"
+#include "graphics/xpm_layer_delete.xpm"
 //#include "graphics/xpm_config.xpm"
 
 #undef static

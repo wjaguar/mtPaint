@@ -270,7 +270,7 @@ static int set_blend(blend_dd *dt, void **wdata)
 	/* Don't accept stop-all or do-nothing */
 	if ((j == 7) || !(i | j | dt->xform | dt->src)) return (FALSE);
 
-	blend_mode = i | (dt->reverse ? BLEND_REVERSE : 0) | 
+	blend_mode = i | (dt->reverse ? BLEND_REVERSE : 0) |
 		(dt->xform ? BLEND_XFORM : 0) | (j << BLEND_RGBSHIFT);
 	blend_src = dt->src;
 
@@ -538,7 +538,8 @@ void *toolbar_code[] = {
 	UNLESSv(toolbar_status[TOOLBAR_MAIN]), HIDDEN, // Only show if user wants
 	TBBUTTON(_("New Image"), XPM_ICON(new), ACTMOD(DLG_NEW, 0)),
 	TBBUTTON(_("Load Image File"), XPM_ICON(open), ACTMOD(DLG_FSEL, FS_PNG_LOAD)),
-	TBBUTTON(_("Save Image File"), XPM_ICON(save), ACTMOD(ACT_SAVE, 0)),
+	TBBUTTON(_("Save Layers Composite to Image"), XPM_ICON(save_composite), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
+	TBBUTTON(_("Save Layer to Image"), XPM_ICON(save), ACTMOD(ACT_SAVE, 0)),
 	TBSPACE,
 	TBBUTTON(_("Cut"),XPM_ICON(cut), ACTMOD(ACT_COPY, 1)),
 		ACTMAP(NEED_SEL2),
@@ -573,16 +574,19 @@ void *toolbar_code[] = {
 	/* !!! This, with matching tool_id, would set default tool - which is
 	 * exactly the wrong thing to do in here */
 //		EVENT(CHANGE, toolbar_click), TRIGGER,
-	REFv(icon_buttons[TTB_SHUFFLE]),
-	TBRBUTTONv(_("Shuffle"), XPM_ICON(shuffle),
-		ACTMOD(ACT_TOOL, TTB_SHUFFLE), tool_id),
+	REFv(icon_buttons[TTB_LINE]),
+	TBRBUTTONv(_("Straight Line"), XPM_ICON(line),
+		ACTMOD(ACT_TOOL, TTB_LINE), tool_id), SHORTCUT(d, 0),
 	REFv(icon_buttons[TTB_FLOOD]),
 	TBRBUTTONxv(_("Flood Fill"), XPM_ICON(flood),
 		ACTMOD(ACT_TOOL, TTB_FLOOD), ACTMOD(DLG_FLOOD, 0), tool_id),
 		SHORTCUT(f, 0),
-	REFv(icon_buttons[TTB_LINE]),
-	TBRBUTTONv(_("Straight Line"), XPM_ICON(line),
-		ACTMOD(ACT_TOOL, TTB_LINE), tool_id), SHORTCUT(d, 0),
+	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
+		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,
+// !!! Basic text dialog not yet scriptable
+	REFv(icon_buttons[TTB_SHUFFLE]),
+	TBRBUTTONv(_("Shuffle"), XPM_ICON(shuffle),
+		ACTMOD(ACT_TOOL, TTB_SHUFFLE), tool_id),
 	REFv(icon_buttons[TTB_SMUDGE]),
 	TBRBUTTONxv(_("Smudge"), XPM_ICON(smudge),
 		ACTMOD(ACT_TOOL, TTB_SMUDGE), ACTMOD(DLG_SMUDGE, 0), tool_id),
@@ -590,23 +594,20 @@ void *toolbar_code[] = {
 	REFv(icon_buttons[TTB_CLONE]),
 	TBRBUTTONxv(_("Clone"), XPM_ICON(clone),
 		ACTMOD(ACT_TOOL, TTB_CLONE), ACTMOD(DLG_CLONE, 0), tool_id),
+	REFv(icon_buttons[TTB_GRAD]),
+	TBRBUTTONxv(_("Place Gradient"), XPM_ICON(grad_place),
+		ACTMOD(ACT_TOOL, TTB_GRAD), ACTMOD(DLG_GRAD, 0), tool_id),
+	TBSPACE,
 	REFv(icon_buttons[TTB_SELECT]),
 	TBRBUTTONv(_("Make Selection"), XPM_ICON(select),
 		ACTMOD(ACT_TOOL, TTB_SELECT), tool_id), SHORTCUT(F9, 0),
 	REFv(icon_buttons[TTB_POLY]),
 	TBRBUTTONv(_("Polygon Selection"), XPM_ICON(polygon),
 		ACTMOD(ACT_TOOL, TTB_POLY), tool_id),
-	REFv(icon_buttons[TTB_GRAD]),
-	TBRBUTTONxv(_("Place Gradient"), XPM_ICON(grad_place),
-		ACTMOD(ACT_TOOL, TTB_GRAD), ACTMOD(DLG_GRAD, 0), tool_id),
 	TBSPACE,
 	TBBUTTONx(_("Lasso Selection"), XPM_ICON(lasso),
 		ACTMOD(ACT_LASSO, 0), ACTMOD(DLG_LASSO, 0)),
 		ACTMAP(NEED_LAS2),
-	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
-		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,
-// !!! Basic text dialog not yet scriptable
-	TBSPACE,
 	TBBUTTON(_("Ellipse Outline"), XPM_ICON(ellipse2),
 		ACTMOD(ACT_ELLIPSE, 0)),
 		ACTMAP(NEED_SEL),

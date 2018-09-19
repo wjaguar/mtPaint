@@ -451,7 +451,7 @@ static void clipboard_export_fn(main_dd *dt, void **wdata, int what, void **wher
 	res = save_mem_image(&buf, &len, &settings);
 	if (res) return; // No luck creating in-memory image
 
-	pp[1] = (pp[0] = buf) + len; 
+	pp[1] = (pp[0] = buf) + len;
 	cmd_setv(where, pp, COPY_DATA);
 	free(buf);
 }
@@ -1626,7 +1626,7 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 	clone_status &= ~CLONE_TRACK; // No tracking w/o perimeter
 
 	if (tool_type == TOOL_GRADIENT)
-	{ 
+	{
 		/* Let leave hide the dragged line */
 		grad_info *grad = gradient + mem_channel;
 		if ((grad->status == GRAD_START) || (grad->status == GRAD_END))
@@ -1653,7 +1653,7 @@ static int render_background(unsigned char *rgb, int x0, int y0, int wid, int hg
 	}
 	dx = x0 % step;
 	dy = y0 % step;
-	
+
 	py = (x0 / step + y0 / step) & 1;
 	if (hgt + dy > step)
 	{
@@ -3749,7 +3749,7 @@ static void update_script_menu()	// Populate menu
 	/* Hide submenu if no valid slots */
 	cmd_showhide(menu_slots[MENU_SCRIPT_M], items);
 	cmd_showhide(menu_slots[MENU_SCRIPT], !items);
-}	
+}
 
 typedef struct {
 	char *rows[SCRIPTS_MAX][4];
@@ -3846,7 +3846,7 @@ static void script_select_row(script_dd *dt, void **wdata, int what, void **wher
 
 	if (dt->nidx == dt->idx) return; // no change
 	dt->lock = TRUE;
-	
+
 	/* Update outgoing row */
 	update_text(dt);
 
@@ -4934,13 +4934,18 @@ static void *main_menu_code[] = {
 	REFv(main_menubar), SMARTMENU(menu_action),
 	SSUBMENU(_("/_File")),
 	MENUTEAR, //
-	MENUITEMis(_("//New"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
+	MENUITEMis(_("//New Layer"), ACTMOD(DLG_NEW, 0), XPM_ICON(new)),
 		SHORTCUT(n, C),
-	MENUITEMis(_("//Open ..."), ACTMOD(DLG_FSEL, FS_PNG_LOAD), XPM_ICON(open)),
+	MENUITEMis(_("//Open Image to Layer..."), ACTMOD(DLG_FSEL, FS_PNG_LOAD), XPM_ICON(open)),
 		SHORTCUT(o, C),
-	MENUITEMis(_("//Save"), ACTMOD(ACT_SAVE, 0), XPM_ICON(save)),
+	MENUITEMis(_("//Save Current Layer"), ACTMOD(ACT_SAVE, 0), XPM_ICON(save)),
 		SHORTCUT(s, C),
-	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_PNG_SAVE)),
+	MENUITEMs(_("//Save Current Layer As ..."), ACTMOD(DLG_FSEL, FS_PNG_SAVE)),
+	MENUSEP, //
+	MENUITEMs(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
+	MENUITEMis(_("//Save Layers Map"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
+//		SHORTCUT(s, CS),
+	MENUITEMs(_("//Save Layers Map As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
 	MENUSEP, //
 	MENUITEMs(_("//Export Undo Images ..."), ACTMOD(DLG_FSEL, FS_EXPORT_UNDO)),
 		ACTMAP(NEED_UNDO),
@@ -5185,60 +5190,18 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/_Image")),
 	MENUTEAR, //
+	MENUITEMs(_("//Crop Image"), ACTMOD(ACT_CROP, 0)),
+		ACTMAP(NEED_CROP), SHORTCUT(Delete, 0), SHORTCUT(x, CS),
+	MENUITEMs(_("//Scale Image ..."), ACTMOD(DLG_SCALE, 0)),
+		SHORTCUT(Page_Up, 0),
+	MENUITEMs(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
+		SHORTCUT(Page_Down, 0),
+	MENUSEP, //
 	uMENUITEMs("//Convert To RGB", ACTMOD(FILT_2RGB, 0)), // for scripting
 	MENUITEM(_("//Convert To RGB"), ACTMOD(FILT_2RGB, 0)),
 		ACTMAP(NEED_IDX),
 	MENUITEMs(_("//Convert To Indexed ..."), ACTMOD(DLG_INDEXED, 0)),
 		ACTMAP(NEED_24),
-	MENUSEP, //
-	MENUITEMs(_("//Scale Canvas ..."), ACTMOD(DLG_SCALE, 0)),
-		SHORTCUT(Page_Up, 0),
-	MENUITEMs(_("//Resize Canvas ..."), ACTMOD(DLG_SIZE, 0)),
-		SHORTCUT(Page_Down, 0),
-	MENUITEMs(_("//Crop"), ACTMOD(ACT_CROP, 0)),
-		ACTMAP(NEED_CROP), SHORTCUT(x, CS), SHORTCUT(Delete, 0),
-	MENUSEP, //
-	MENUITEMs(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
-	MENUITEMs(_("//Flip Horizontally"), ACTMOD(ACT_FLIP_H, 0)),
-		SHORTCUT(m, C),
-	uMENUITEMs("//rotate", ACTMOD(DLG_ROTATE, 0)), // for scripting
-	MENUITEMs(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
-	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
-	MENUITEMs(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
-	MENUITEMs(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
-	MENUSEP, //
-// !!! Maybe support indexed mode too, later
-	MENUITEMs(_("//Segment ..."), ACTMOD(DLG_SEGMENT, 0)),
-		ACTMAP(NEED_24),
-	uMENUITEMs("//Script ...", ACTMOD(ACT_RUN_SCRIPT, 0)), // for scripting
-	REFv(menu_slots[MENU_SCRIPT]),
-	MENUITEM(_("//Script ..."), ACTMOD(DLG_SCRIPT, 0)),
-	REFv(menu_slots[MENU_SCRIPT_M]),
-	SUBMENU(_("//Scripts")),
-	MENUTEAR, ///
-	REFv(menu_slots[MENU_SCRIPT1]),
-	MENUITEMs("///1", ACTMOD(ACT_RUN_SCRIPT, 1)),
-	REFv(menu_slots[MENU_SCRIPT2]),
-	MENUITEMs("///2", ACTMOD(ACT_RUN_SCRIPT, 2)),
-	REFv(menu_slots[MENU_SCRIPT3]),
-	MENUITEMs("///3", ACTMOD(ACT_RUN_SCRIPT, 3)),
-	REFv(menu_slots[MENU_SCRIPT4]),
-	MENUITEMs("///4", ACTMOD(ACT_RUN_SCRIPT, 4)),
-	REFv(menu_slots[MENU_SCRIPT5]),
-	MENUITEMs("///5", ACTMOD(ACT_RUN_SCRIPT, 5)),
-	REFv(menu_slots[MENU_SCRIPT6]),
-	MENUITEMs("///6", ACTMOD(ACT_RUN_SCRIPT, 6)),
-	REFv(menu_slots[MENU_SCRIPT7]),
-	MENUITEMs("///7", ACTMOD(ACT_RUN_SCRIPT, 7)),
-	REFv(menu_slots[MENU_SCRIPT8]),
-	MENUITEMs("///8", ACTMOD(ACT_RUN_SCRIPT, 8)),
-	REFv(menu_slots[MENU_SCRIPT9]),
-	MENUITEMs("///9", ACTMOD(ACT_RUN_SCRIPT, 9)),
-	REFv(menu_slots[MENU_SCRIPT10]),
-	MENUITEMs("///10", ACTMOD(ACT_RUN_SCRIPT, 10)),
-	MENUSEP, ///
-	MENUITEM(_("///Configure"), ACTMOD(DLG_SCRIPT, 0)),
-	WDONE,
 	MENUSEP, //
 	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUT(i, C),
@@ -5327,6 +5290,7 @@ static void *main_menu_code[] = {
 	WDONE,
 	SSUBMENU(_("/Effe_cts")),
 	MENUTEAR, //
+	MENUSEP, //
 	MENUITEMis(_("//Transform Colour ..."), ACTMOD(DLG_BRCOSA, 0), XPM_ICON(brcosa)),
 		SHORTCUT(c, CS), SHORTCUT(Insert, 0),
 	MENUITEMs(_("//Invert"), ACTMOD(FILT_INVERT, 0)),
@@ -5335,13 +5299,9 @@ static void *main_menu_code[] = {
 		SHORTCUT(g, C),
 	MENUITEMs(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
 		SHORTCUT(g, CS),
-	SUBMENU(_("//Isometric Transformation")),
-	MENUTEAR, ///
-	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
-	MENUITEMs(_("///Right Side Down"), ACTMOD(ACT_ISOMETRY, 1)),
-	MENUITEMs(_("///Top Side Right"), ACTMOD(ACT_ISOMETRY, 2)),
-	MENUITEMs(_("///Bottom Side Right"), ACTMOD(ACT_ISOMETRY, 3)),
-	WDONE,
+	MENUITEMs(_("//Threshold ..."), ACTMOD(FILT_THRES, 0)),
+	MENUITEMs(_("//Threshold Segmentation"), ACTMOD(DLG_SEGMENT, 0)),
+		ACTMAP(NEED_24),
 	MENUSEP, //
 	MENUITEMs(_("//Edge Detect ..."), ACTMOD(FILT_EDGE, 0)),
 		ACTMAP(NEED_NOIDX),
@@ -5366,8 +5326,38 @@ static void *main_menu_code[] = {
 	MENUSEP, //
 	MENUITEMs(_("//Bacteria ..."), ACTMOD(FILT_BACT, 0)),
 		ACTMAP(NEED_IDX),
+	MENUSEP, //
+	uMENUITEMs("//Script ...", ACTMOD(ACT_RUN_SCRIPT, 0)), // for scripting
+	REFv(menu_slots[MENU_SCRIPT]),
+	MENUITEM(_("//Script ..."), ACTMOD(DLG_SCRIPT, 0)),
+	REFv(menu_slots[MENU_SCRIPT_M]),
+	SUBMENU(_("//Scripts")),
+	MENUTEAR, ///
+	REFv(menu_slots[MENU_SCRIPT1]),
+	MENUITEMs("///1", ACTMOD(ACT_RUN_SCRIPT, 1)),
+	REFv(menu_slots[MENU_SCRIPT2]),
+	MENUITEMs("///2", ACTMOD(ACT_RUN_SCRIPT, 2)),
+	REFv(menu_slots[MENU_SCRIPT3]),
+	MENUITEMs("///3", ACTMOD(ACT_RUN_SCRIPT, 3)),
+	REFv(menu_slots[MENU_SCRIPT4]),
+	MENUITEMs("///4", ACTMOD(ACT_RUN_SCRIPT, 4)),
+	REFv(menu_slots[MENU_SCRIPT5]),
+	MENUITEMs("///5", ACTMOD(ACT_RUN_SCRIPT, 5)),
+	REFv(menu_slots[MENU_SCRIPT6]),
+	MENUITEMs("///6", ACTMOD(ACT_RUN_SCRIPT, 6)),
+	REFv(menu_slots[MENU_SCRIPT7]),
+	MENUITEMs("///7", ACTMOD(ACT_RUN_SCRIPT, 7)),
+	REFv(menu_slots[MENU_SCRIPT8]),
+	MENUITEMs("///8", ACTMOD(ACT_RUN_SCRIPT, 8)),
+	REFv(menu_slots[MENU_SCRIPT9]),
+	MENUITEMs("///9", ACTMOD(ACT_RUN_SCRIPT, 9)),
+	REFv(menu_slots[MENU_SCRIPT10]),
+	MENUITEMs("///10", ACTMOD(ACT_RUN_SCRIPT, 10)),
+	MENUSEP, ///
+	MENUITEM(_("///Configure"), ACTMOD(DLG_SCRIPT, 0)),
 	WDONE,
-	SSUBMENU(_("/Cha_nnels")),
+	WDONE,
+	SSUBMENU(_("/Cha_nnel")),
 	MENUTEAR, //
 	MENUITEMs(_("//New ..."), ACTMOD(ACT_CHANNEL, -1)),
 	MENUITEMis(_("//Load ..."), ACTMOD(DLG_FSEL, FS_CHANNEL_LOAD), XPM_ICON(open)),
@@ -5401,8 +5391,7 @@ static void *main_menu_code[] = {
 	MENUCHECKvs(_("//Disable Mask"), ACTMOD(ACT_CHN_DIS, CHN_MASK),
 		channel_dis[CHN_MASK]),
 	MENUSEP, //
-	MENUCHECKvs(_("//Couple RGBA Operations"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),
-	MENUITEMs(_("//Threshold ..."), ACTMOD(FILT_THRES, 0)),
+	MENUCHECKvs(_("//Couple Image and Alpha channels"), ACTMOD(ACT_SET_RGBA, 0), RGBA_mode),
 	MENUITEMs(_("//Unassociate Alpha"), ACTMOD(FILT_UALPHA, 0)),
 		ACTMAP(NEED_RGBA),
 	MENUSEP, //
@@ -5410,15 +5399,29 @@ static void *main_menu_code[] = {
 	MENUCHECKv(_("//View Alpha as an Overlay"), ACTMOD(ACT_SET_OVERLAY, 0), overlay_alpha),
 	MENUITEM(_("//Configure Overlays ..."), ACTMOD(DLG_COLORS, COLSEL_OVERLAYS)),
 	WDONE,
-	SSUBMENU(_("/_Layers")),
+	SSUBMENU(_("/_Layer")),
 	MENUTEAR, //
 	MENUITEMis(_("//New Layer"), ACTMOD(ACT_LR_ADD, LR_NEW), XPM_ICON(new)),
-	MENUITEMis(_("//Save"), ACTMOD(ACT_LR_SAVE, 0), XPM_ICON(save)),
-		SHORTCUT(s, CS),
-	MENUITEMs(_("//Save As ..."), ACTMOD(DLG_FSEL, FS_LAYER_SAVE)),
-	MENUITEMs(_("//Save Composite Image ..."), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
 	MENUITEMs(_("//Composite to New Layer"), ACTMOD(ACT_LR_ADD, LR_COMP)),
 	MENUITEMs(_("//Remove All Layers"), ACTMOD(ACT_LR_DEL, 1)),
+	MENUSEP, //
+	MENUITEMs(_("//Flip Vertically"), ACTMOD(ACT_FLIP_V, 0)),
+	MENUITEMs(_("//Flip Horizontally"), ACTMOD(ACT_FLIP_H, 0)),
+		SHORTCUT(m, C),
+	uMENUITEMs("//rotate", ACTMOD(DLG_ROTATE, 0)), // for scripting
+	MENUITEMs(_("//Rotate Clockwise"), ACTMOD(ACT_ROTATE, 0)),
+	MENUITEMs(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_ROTATE, 1)),
+	MENUITEMs(_("//Free Rotate ..."), ACTMOD(DLG_ROTATE, 0)),
+	MENUITEMs(_("//Skew ..."), ACTMOD(DLG_SKEW, 0)),
+		ACTMAP(NEED_CROP), SHORTCUT(Delete, S),
+	SUBMENU(_("//Isometric Transformation")),
+	MENUTEAR, ///
+	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
+	MENUITEMs(_("///Right Side Down"), ACTMOD(ACT_ISOMETRY, 1)),
+	MENUITEMs(_("///Top Side Right"), ACTMOD(ACT_ISOMETRY, 2)),
+	MENUITEMs(_("///Bottom Side Right"), ACTMOD(ACT_ISOMETRY, 3)),
+	WDONE,
+// !!! Maybe support indexed mode too, later
 	MENUSEP, //
 	MENUITEM(_("//Configure Animation ..."), ACTMOD(DLG_ANI, 0)),
 	MENUITEM(_("//Preview Animation ..."), ACTMOD(DLG_ANI_VIEW, 0)),

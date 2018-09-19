@@ -76,6 +76,7 @@ DEF_XPM_ICON(redo);
 DEF_XPM_ICON(rotate_as);
 DEF_XPM_ICON(rotate_cs);
 DEF_XPM_ICON(save);
+DEF_XPM_ICON(save_composite);
 DEF_XPM_ICON(select);
 DEF_XPM_ICON(shuffle);
 DEF_XPM_ICON(smudge);
@@ -84,6 +85,8 @@ DEF_XPM_ICON(undo);
 DEF_XPM_ICON(up);
 DEF_XPM_ICON(cline);
 DEF_XPM_ICON(layers);
+DEF_XPM_ICON(layers_close);
+DEF_XPM_ICON(layer_delete);
 //DEF_XPM_ICON(config);
 
 extern unsigned char
