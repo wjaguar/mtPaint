@@ -69,6 +69,10 @@ enum {
 	TOOL_POLYGON,
 	TOOL_CLONE,
 	TOOL_GRADIENT,
+	TOOL_FUZZYCIRCLE,
+	TOOL_GRADIENTCIRCLE,
+	TOOL_CIRCLE_OUTLINE,
+
 
 	TOTAL_CURSORS
 };
@@ -838,6 +842,9 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv );	// Draw general p
 void f_rectangle( int x, int y, int w, int h );			// Draw a filled rectangle
 void f_circle( int x, int y, int r );				// Draw a filled circle
 void mem_ellipse( int x1, int y1, int x2, int y2, int thick );	// Thickness 0 means filled
+void f_fuzzycircle( int x, int y, int r );				// Draw a filled circle
+void f_gradientcircle( int x, int y, int r );				// Draw a filled circle
+void f_circle_outline( int x, int y, int r );				// Draw a filled circle
 
 // Draw whatever is bounded by two pairs of lines
 void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);

@@ -2568,6 +2568,15 @@ static int tool_draw(int x, int y, int first_point, int *update)
 	case TOOL_CIRCLE:
 		f_circle(x, y, tool_size);
 		break;
+	case TOOL_FUZZYCIRCLE:
+		f_fuzzycircle(x, y, tool_size);
+		break;
+	case TOOL_GRADIENTCIRCLE:
+		f_gradientcircle(x, y, tool_size);
+		break;
+	case TOOL_CIRCLE_OUTLINE:
+		f_circle_outline(x, y, tool_size);
+		break;
 	case TOOL_HORIZONTAL:
 		miny = y; yh = 1;
 		sline(x - ts2, y, x + tr2, y);
@@ -2875,6 +2884,33 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 					f_circle(tool_ox, tool_oy, tool_size);
 				tline(tool_ox, tool_oy, x, y, tool_size);
 				f_circle(x, y, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_FUZZYCIRCLE)
+			{
+				/* Redraw stroke gradient in proper direction */
+				if (STROKE_GRADIENT)
+					f_fuzzycircle(tool_ox, tool_oy, tool_size);
+				tline(tool_ox, tool_oy, x, y, tool_size);
+				f_fuzzycircle(x, y, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_GRADIENTCIRCLE)
+			{
+				/* Redraw stroke gradient in proper direction */
+				if (STROKE_GRADIENT)
+					f_gradientcircle(tool_ox, tool_oy, tool_size);
+				tline(tool_ox, tool_oy, x, y, tool_size);
+				f_gradientcircle(x, y, tool_size);
+				break;
+			}
+			if (tool_type == TOOL_CIRCLE_OUTLINE)
+			{
+				/* Redraw stroke gradient in proper direction */
+				if (STROKE_GRADIENT)
+					f_circle_outline(tool_ox, tool_oy, tool_size);
+				tline(tool_ox, tool_oy, x, y, tool_size);
+				f_circle_outline(x, y, tool_size);
 				break;
 			}
 			if (tool_type == TOOL_HORIZONTAL)
