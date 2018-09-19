@@ -1474,7 +1474,7 @@ static int mem_undo_space(size_t mem_req)
 	undo_stack *heap[MAX_LAYERS + 2], *wp, *hp;
 	size_t mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
 	int i, l, l2, h, csz = mem_undo_common * layers_total;
-	
+
 	/* Layer mem limit including common area */
 	mem_lim = mem_max * (csz * 0.01 + 1) / (layers_total + 1);
 
@@ -1683,7 +1683,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	mem_width = new_width;
 	mem_height = new_height;
 	mem_img_bpp = new_bpp;
- 
+
 	/* Do postponed change notify, now that new frame is created */
 	if (need_frame) notify_changed();
 
@@ -1968,8 +1968,8 @@ void mem_init()					// Initialise memory
 	mem_channel = CHN_IMAGE;
 	mem_icx = mem_icy = 0.5;
 	mem_xbm_hot_x = mem_xbm_hot_y = -1;
-	mem_col_A = 1;
-	mem_col_B = 0;
+	mem_col_A = 0;
+	mem_col_B = 2;
 
 	/* Set up default undo stack */
 	mem_undo_depth = mem_undo_depth <= MIN_UNDO ? MIN_UNDO :
@@ -2940,7 +2940,7 @@ static int find_nearest(int col[3], int n)
 	unsigned char tmp_[4 * sizeof(double)];
 	double *tmp = ALIGNED(tmp_, sizeof(double));
 
-	
+
 	/* Prepare colour coords */
 	switch (ctp->cspace)
 	{
@@ -3670,7 +3670,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 
 	if (a == 4) get_lxn(lxnA, PNG_2_INT(mem_col_A24));
 	if (a == 9) mem_get_histogram(CHN_IMAGE);
-	
+
 	for (i = 0; i < 256; i++)
 		tab0[i] = i;
 	for (i = i1; i <= i2; i++)
@@ -4302,7 +4302,7 @@ void render_sb(unsigned char *mask)
 #define QMINSIZE 32
 #define QMINLEVEL 5
 
-/* 
+/*
  * Level bitmaps are ordered from nearest to farthest, with cells interleaved
  * in the following order: Left-Y Right-Y Top-X Bottom-X.
  * Pixel bitmap is packed by Y, not by X: byte[x, y / 8] |= 1 << (y % 8)
@@ -4363,7 +4363,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap)
 	/* Set up initial area */
 	corners[0] = x & ~(QMINSIZE - 1);
 	corners[2] = y & ~(QMINSIZE - 1);
-	nearq[0] = x; nearq[1] = y; ntail = 2; 
+	nearq[0] = x; nearq[1] = y; ntail = 2;
 
 	while (1)
 	{
@@ -5484,7 +5484,7 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 		buf->idx = j0;
 		buf->k = kp;
 		kp += k0 - j0;
-		sum = 0.0; 
+		sum = 0.0;
 		for (; j < k; j++)
 		{
 			ix = j;
@@ -6035,7 +6035,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 
 	/* Clear */
 	if (!mode || !hmode)
-	{			
+	{
 		int i, l, cc;
 
 		l = nw * nh;
@@ -6924,7 +6924,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 					img->img[CHN_IMAGE] + d, img->pal);
 				pattern_rep(tmp_image + w * bpp, tmp_image,
 					0, w, u - w, bpp);
-				
+
 				if (source_alpha && img->img[CHN_ALPHA])
 					pattern_rep(tmp_alpha, img->img[CHN_ALPHA] + d,
 						0, w, u, 1);
@@ -7250,7 +7250,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			imgr[1] = nrgb[1];
 			imgr[2] = nrgb[2];
 		}
-	}	
+	}
 }
 
 /* !!! This assumes dest area lies entirely within src, its bpp matches src's
@@ -7922,7 +7922,7 @@ static threaddata *init_gauss(gaussd *gd, double radiusX, double radiusY, int mo
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
 		&gd->idx, l * sizeof(int),
-		NULL, 
+		NULL,
 		&gd->temp, i * w * sizeof(double),
 		&gd->mask, mem_width,
 		NULL);
@@ -8129,7 +8129,7 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	/* Run filter */
 	launch_threads(unsharp_filter, tdata, _("Unsharp Mask"), mem_height);
 	free(tdata);
-}	
+}
 
 /* Retroactive masking - by blending with undo frame */
 void mask_merge(unsigned char *old, int channel, unsigned char *mask)
@@ -8914,7 +8914,7 @@ void mem_smudge(int ox, int oy, int nx, int ny)
 	delta = delta1 * bpp;
 
 	/* Copy source if destination overwrites it */
-	cpf = (src == dest) && !yv && (xv > 0) && (w > xv); 
+	cpf = (src == dest) && !yv && (xv > 0) && (w > xv);
 	/* Set up Y pass to prevent overwriting source */
 	if ((src == dest) && (yv > 0) && (h > yv))
 		y0 = ay + h - 1 , y1 = ay - 1 , dy = -1; // Bottom to top
@@ -9097,7 +9097,7 @@ void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask
 	unsigned char *dest;
 	int i, mmask, dither, op, slot, wrk[NUM_CHANNELS + 3];
 	double dist, len1, l2;
-	
+
 
 	if (!RGBA_mode) alpha0 = NULL;
 	mmask = IS_INDEXED ? 1 : 255; /* On/off opacity */
@@ -9354,7 +9354,7 @@ void grad_def_update(int slot)
 	gradmap = graddata + slot;
 
 	grad_def[0] = tool_opacity;
-	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
+	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */
 	grad_def[1] = 0;
 	grad_def[2] = gradmap->otype;
 
@@ -9696,7 +9696,7 @@ static void skew_fill_rgba(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Accumulate empty space */
 		while (x1 > ow) acc += filt[--x1];
 		while (x < 0) acc += filt[x++];
@@ -9770,7 +9770,7 @@ static void skew_fill_rgb(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Accumulate empty space */
 		while (x1 > ow) acc += filt[--x1];
 		while (x < 0) acc += filt[x++];
@@ -9832,7 +9832,7 @@ static void skew_fill_util(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Skip empty space */
 		while (x1 > ow) x1--;
 		while (x < 0) x++;

@@ -38,3 +38,4 @@ void pressed_threshold();
 void pressed_unassociate();
 void pressed_channel_toggle(int state, int what);
 void pressed_RGBA_toggle(int state);
+void make_alpha(void **wdata);

@@ -134,7 +134,7 @@ static int clip_to_layer(int layer)
 }
 
 typedef struct {
-	int type, w, h, c, undo, im_type;
+	int type, w, h, c, undo, im_type, alpha_make;
 } newwin_dd;
 
 static void create_new(newwin_dd *dt, void **wdata)
@@ -221,13 +221,18 @@ static void create_new(newwin_dd *dt, void **wdata)
 			/* System was unable to allocate memory for
 			 * image, using 8x8 instead */
 			nw = mem_width;
-			nh = mem_height;  
+			nh = mem_height;
 		}
 
 		inifile_set_gint32("lastnewWidth", nw );
 		inifile_set_gint32("lastnewHeight", nh );
 		inifile_set_gint32("lastnewCols", nc );
 		inifile_set_gint32("lastnewType", im_type );
+	}
+
+	if (dt->alpha_make)
+	{
+		make_alpha(wdata);
 	}
 
 	run_destroy(wdata);
@@ -246,6 +251,7 @@ static void *newwin_code[] = {
 	TSPIN(_("Colours"), c, 2, 256),
 	WDONE,
 	BORDER(RPACK, 0),
+	CHECK(_("Add alpha transparency"), alpha_make),
 	// !!! Commandline mode leaves GDK uninitialized, but screenshot needs it
 	UNLESSv(cmd_mode), RPACK(newwin_txt, 5, 0, im_type),
 	IFv(cmd_mode), RPACK(newwin_txt, 4, 0, im_type),
@@ -259,7 +265,9 @@ static void *newwin_code[] = {
 
 void generic_new_window(int type)	// 0=New image, 1=New layer
 {
-	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load };
+	int alpha_make = 1;
+
+	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load, alpha_make };
 	int im_type = 3 - mem_img_bpp;
 
 	if (!type)
@@ -274,6 +282,7 @@ void generic_new_window(int type)	// 0=New image, 1=New layer
 		if ((im_type < 0) || (im_type > 2)) im_type = 0;
 	}
 	tdata.im_type = im_type;
+	tdata.alpha_make = alpha_make;	// TODO: probably use inifile_get
 
 	run_create_(newwin_code, &tdata, sizeof(tdata), script_cmds);
 }
@@ -676,7 +685,7 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 
 	mem_pal_copy(mem_pal, dt->pal);
 
-	if (what == op_EVT_CANCEL); 
+	if (what == op_EVT_CANCEL);
 	else if (!dt->tmode) // OK/Apply
 	{
 		// !!! Buttons disabled for default values
@@ -987,7 +996,7 @@ static void click_sisca_centre(sisca_dd *dt, void **wdata)
 
 static char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
 static char *resize_modes[] = { _("Clear"), _("Tile"), _("Mirror tile"), NULL };
-static char *scale_modes[] = { 
+static char *scale_modes[] = {
 	_("Nearest Neighbour"),
 	_("Bilinear / Area Mapping"),
 	_("Bicubic"),
