@@ -538,7 +538,8 @@ void *toolbar_code[] = {
 	UNLESSv(toolbar_status[TOOLBAR_MAIN]), HIDDEN, // Only show if user wants
 	TBBUTTON(_("New Image"), XPM_ICON(new), ACTMOD(DLG_NEW, 0)),
 	TBBUTTON(_("Load Image File"), XPM_ICON(open), ACTMOD(DLG_FSEL, FS_PNG_LOAD)),
-	TBBUTTON(_("Save Image File"), XPM_ICON(save), ACTMOD(ACT_SAVE, 0)),
+	TBBUTTON(_("Save Layers Composite to Image"), XPM_ICON(save_composite), ACTMOD(DLG_FSEL, FS_COMPOSITE_SAVE)),
+	TBBUTTON(_("Save Layer to Image"), XPM_ICON(save), ACTMOD(ACT_SAVE, 0)),
 	TBSPACE,
 	TBBUTTON(_("Cut"),XPM_ICON(cut), ACTMOD(ACT_COPY, 1)),
 		ACTMAP(NEED_SEL2),
