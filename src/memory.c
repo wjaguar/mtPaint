@@ -167,8 +167,8 @@ int mem_brush_list[NUM_BRUSHES][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 23, 69 }, { TOOL_SPRAY, 27, 81 }, { TOOL_SPRAY, 31, 93 },
 
 { TOOL_CIRCLE, 3, -1 }, { TOOL_CIRCLE, 5, -1 }, { TOOL_CIRCLE, 7, -1 },
-{ TOOL_CIRCLE, 9, -1 }, { TOOL_CIRCLE, 13, -1 }, { TOOL_CIRCLE, 17, -1 },
-{ TOOL_CIRCLE, 21, -1 }, { TOOL_CIRCLE, 25, -1 }, { TOOL_CIRCLE, 31, -1 },
+{ TOOL_CIRCLE, 9, -1 }, { TOOL_CIRCLE, 13, -1 }, { TOOL_CIRCLE, 25, -1 },
+{ TOOL_CIRCLE_OUTLINE, 25, -1 }, { TOOL_GRADIENTCIRCLE, 25, -1 }, { TOOL_FUZZYCIRCLE, 25, -1 },
 
 { TOOL_SQUARE, 1, -1 }, { TOOL_SQUARE, 2, -1 }, { TOOL_SQUARE, 3, -1 },
 { TOOL_SQUARE, 4, -1 }, { TOOL_SQUARE, 8, -1 }, { TOOL_SQUARE, 12, -1 },
@@ -1474,7 +1474,7 @@ static int mem_undo_space(size_t mem_req)
 	undo_stack *heap[MAX_LAYERS + 2], *wp, *hp;
 	size_t mem_lim, mem_max = (size_t)mem_undo_limit * (1024 * 1024);
 	int i, l, l2, h, csz = mem_undo_common * layers_total;
-	
+
 	/* Layer mem limit including common area */
 	mem_lim = mem_max * (csz * 0.01 + 1) / (layers_total + 1);
 
@@ -1683,7 +1683,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	mem_width = new_width;
 	mem_height = new_height;
 	mem_img_bpp = new_bpp;
- 
+
 	/* Do postponed change notify, now that new frame is created */
 	if (need_frame) notify_changed();
 
@@ -2023,6 +2023,12 @@ void mem_init()					// Initialise memory
 			f_rectangle(ix - bs / 2, iy - bs / 2, bs, bs); break;
 		case TOOL_CIRCLE:
 			f_circle(ix, iy, bs); break;
+		case TOOL_FUZZYCIRCLE:
+			f_fuzzycircle(ix, iy, bs); break;
+		case TOOL_GRADIENTCIRCLE:
+			f_gradientcircle(ix, iy, bs); break;
+		case TOOL_CIRCLE_OUTLINE:
+			f_circle_outline(ix, iy, bs); break;
 		case TOOL_VERTICAL:
 			f_rectangle(ix, iy - bs / 2, 1, bs); break;
 		case TOOL_HORIZONTAL:
@@ -2047,7 +2053,7 @@ void mem_init()					// Initialise memory
 	memcpy(mem_brushes, mem_img[CHN_IMAGE], j);	// Store image for later use
 	memset(mem_img[CHN_IMAGE], 0, j);	// Clear so user doesn't see it upon load fail
 
-	mem_set_brush(36);		// Initial brush
+	mem_set_brush(28);		// Initial brush
 
 	for ( i=0; i<NUM_CHANNELS; i++ )
 	{
@@ -2940,7 +2946,7 @@ static int find_nearest(int col[3], int n)
 	unsigned char tmp_[4 * sizeof(double)];
 	double *tmp = ALIGNED(tmp_, sizeof(double));
 
-	
+
 	/* Prepare colour coords */
 	switch (ctp->cspace)
 	{
@@ -3670,7 +3676,7 @@ void mem_pal_sort( int a, int i1, int i2, int rev )		// Sort colours in palette
 
 	if (a == 4) get_lxn(lxnA, PNG_2_INT(mem_col_A24));
 	if (a == 9) mem_get_histogram(CHN_IMAGE);
-	
+
 	for (i = 0; i < 256; i++)
 		tab0[i] = i;
 	for (i = i1; i <= i2; i++)
@@ -4302,7 +4308,7 @@ void render_sb(unsigned char *mask)
 #define QMINSIZE 32
 #define QMINLEVEL 5
 
-/* 
+/*
  * Level bitmaps are ordered from nearest to farthest, with cells interleaved
  * in the following order: Left-Y Right-Y Top-X Bottom-X.
  * Pixel bitmap is packed by Y, not by X: byte[x, y / 8] |= 1 << (y % 8)
@@ -4363,7 +4369,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap)
 	/* Set up initial area */
 	corners[0] = x & ~(QMINSIZE - 1);
 	corners[2] = y & ~(QMINSIZE - 1);
-	nearq[0] = x; nearq[1] = y; ntail = 2; 
+	nearq[0] = x; nearq[1] = y; ntail = 2;
 
 	while (1)
 	{
@@ -4843,6 +4849,108 @@ void f_circle( int x, int y, int r )				// Draw a filled circle
 		x1 -= x0;
 		if (y0 >= 0) put_pixel_row(x0, y0, x1, NULL);
 		if ((y1 != y0) && (y1 < mem_height)) put_pixel_row(x0, y1, x1, NULL);
+	}
+}
+
+void f_fuzzycircle( int x, int y, int r )				// Draw a filled circle
+{
+	int i, x0, x1, y0, y1;
+	int r1, half;
+
+	for (r1 = r - 1; r1 > 0 ; r1--)
+	{
+		retrace_circle(r1);
+		half = r1 & 1;
+		/* Draw result */
+		for (i = half; i <= r1; i += 2)
+		{
+			y0 = y - ((i + half) >> 1);
+			y1 = y + ((i - half) >> 1);
+			if ((y0 >= mem_height) || (y1 < 0)) continue;
+
+			x0 = x - ((circ_trace[i >> 1] + half) >> 1);
+			x1 = x + ((circ_trace[i >> 1] - 0) >> 1);
+
+			if (x0 < 0) x0 = 0;
+
+			if (y0 >= 0)
+			{
+				if (rand() %8 == 0) put_pixel(x0,y0);	// upper left circle arc
+				if (rand() %8 == 0) put_pixel(x1,y0); // upper right circle arc
+			}
+			if ((y1 != y0) && (y1 < mem_height))
+			{
+				if (rand() %8 == 0) put_pixel(x0,y1); // lower left circle arc
+				if (rand() %8 == 0) put_pixel(x1,y1); // lower right circle arc
+			}
+		}
+	}
+}
+void f_gradientcircle( int x, int y, int r )				// Draw a filled circle
+{
+	int i, x0, x1, y0, y1;
+	int r1, half;
+	int aaa;
+
+	for (r1 = r - 1; r1 > 0 ; r1--)
+	{
+		retrace_circle(r1);
+		half = r1 & 1;
+		/* Draw result */
+		for (i = half; i <= r1; i += 2)
+		{
+			y0 = y - ((i + half) >> 1);
+			y1 = y + ((i - half) >> 1);
+			if ((y0 >= mem_height) || (y1 < 0)) continue;
+
+			x0 = x - ((circ_trace[i >> 1] + half) >> 1);
+			x1 = x + ((circ_trace[i >> 1] - 0) >> 1);
+
+			if (x0 < 0) x0 = 0;
+
+			if (y0 >= 0)
+			{
+				aaa = (int) (1 + (r1 / 5));
+				if (rand() % aaa == 0) put_pixel(x0,y0);	// upper left circle arc
+				if (rand() % aaa == 0) put_pixel(x1,y0); // upper right circle arc
+			}
+			if ((y1 != y0) && (y1 < mem_height))
+			{
+				if (rand() % aaa == 0) put_pixel(x0,y1); // lower left circle arc
+				if (rand() % aaa == 0) put_pixel(x1,y1); // lower right circle arc
+			}
+		}
+	}
+}
+void f_circle_outline( int x, int y, int r )				// Draw a filled circle
+{
+	int i, x0, x1, y0, y1, r1 = r - 1, half = r1 & 1;
+
+	/* Prepare & cache circle contour */
+	if (circ_r != r) retrace_circle(r);
+
+	/* Draw result */
+	for (i = half; i <= r; i += 2)
+	{
+		y0 = y - ((i + half) >> 1);
+		y1 = y + ((i - half) >> 1);
+		if ((y0 >= mem_height) || (y1 < 0)) continue;
+
+		x0 = x - ((circ_trace[i >> 1] + half) >> 1);
+		x1 = x + ((circ_trace[i >> 1] - 0) >> 1);
+
+		if (x0 < 0) x0 = 0;
+
+		if (y0 >= 0)
+		{
+			put_pixel(x0,y0);	// upper left circle arc
+			put_pixel(x1,y0); // upper right circle arc
+		}
+		if ((y1 != y0) && (y1 < mem_height))
+		{
+			put_pixel(x0,y1); // lower left circle arc
+			put_pixel(x1,y1); // lower right circle arc
+		}
 	}
 }
 
@@ -5484,7 +5592,7 @@ static fstep *make_filter(int l0, int l1, int type, int sharp, int bound)
 		buf->idx = j0;
 		buf->k = kp;
 		kp += k0 - j0;
-		sum = 0.0; 
+		sum = 0.0;
 		for (; j < k; j++)
 		{
 			ix = j;
@@ -6035,7 +6143,7 @@ int mem_image_resize(int nw, int nh, int ox, int oy, int mode)
 
 	/* Clear */
 	if (!mode || !hmode)
-	{			
+	{
 		int i, l, cc;
 
 		l = nw * nh;
@@ -6924,7 +7032,7 @@ void put_pixel_row_def(int x, int y, int len, unsigned char *xsel)
 					img->img[CHN_IMAGE] + d, img->pal);
 				pattern_rep(tmp_image + w * bpp, tmp_image,
 					0, w, u - w, bpp);
-				
+
 				if (source_alpha && img->img[CHN_ALPHA])
 					pattern_rep(tmp_alpha, img->img[CHN_ALPHA] + d,
 						0, w, u, 1);
@@ -7250,7 +7358,7 @@ void process_img(int start, int step, int cnt, unsigned char *mask,
 			imgr[1] = nrgb[1];
 			imgr[2] = nrgb[2];
 		}
-	}	
+	}
 }
 
 /* !!! This assumes dest area lies entirely within src, its bpp matches src's
@@ -7922,7 +8030,7 @@ static threaddata *init_gauss(gaussd *gd, double radiusX, double radiusY, int mo
 		&gd->gaussX, lenX * sizeof(double),
 		&gd->gaussY, lenY * sizeof(double),
 		&gd->idx, l * sizeof(int),
-		NULL, 
+		NULL,
 		&gd->temp, i * w * sizeof(double),
 		&gd->mask, mem_width,
 		NULL);
@@ -8129,7 +8237,7 @@ void mem_unsharp(double radius, double amount, int threshold, int gcor)
 	/* Run filter */
 	launch_threads(unsharp_filter, tdata, _("Unsharp Mask"), mem_height);
 	free(tdata);
-}	
+}
 
 /* Retroactive masking - by blending with undo frame */
 void mask_merge(unsigned char *old, int channel, unsigned char *mask)
@@ -8914,7 +9022,7 @@ void mem_smudge(int ox, int oy, int nx, int ny)
 	delta = delta1 * bpp;
 
 	/* Copy source if destination overwrites it */
-	cpf = (src == dest) && !yv && (xv > 0) && (w > xv); 
+	cpf = (src == dest) && !yv && (xv > 0) && (w > xv);
 	/* Set up Y pass to prevent overwriting source */
 	if ((src == dest) && (yv > 0) && (h > yv))
 		y0 = ay + h - 1 , y1 = ay - 1 , dy = -1; // Bottom to top
@@ -9097,7 +9205,7 @@ void grad_pixels(int start, int step, int cnt, int x, int y, unsigned char *mask
 	unsigned char *dest;
 	int i, mmask, dither, op, slot, wrk[NUM_CHANNELS + 3];
 	double dist, len1, l2;
-	
+
 
 	if (!RGBA_mode) alpha0 = NULL;
 	mmask = IS_INDEXED ? 1 : 255; /* On/off opacity */
@@ -9354,7 +9462,7 @@ void grad_def_update(int slot)
 	gradmap = graddata + slot;
 
 	grad_def[0] = tool_opacity;
-	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */ 
+	/* !!! As there's only 1 tool_opacity, use 0 for 2nd point */
 	grad_def[1] = 0;
 	grad_def[2] = gradmap->otype;
 
@@ -9696,7 +9804,7 @@ static void skew_fill_rgba(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Accumulate empty space */
 		while (x1 > ow) acc += filt[--x1];
 		while (x < 0) acc += filt[x++];
@@ -9770,7 +9878,7 @@ static void skew_fill_rgb(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Accumulate empty space */
 		while (x1 > ow) acc += filt[--x1];
 		while (x < 0) acc += filt[x++];
@@ -9832,7 +9940,7 @@ static void skew_fill_util(double *buf, double *filler,
 		x = j + dxx[y];
 		x1 = x + xfsz;
 		filt = xfilt - x + y * xfsz;
-		
+
 		/* Skip empty space */
 		while (x1 > ow) x1--;
 		while (x < 0) x++;

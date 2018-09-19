@@ -437,6 +437,17 @@ int main( int argc, char *argv[] )
 	if ( new_empty )		// If no file was loaded, start with a blank canvas
 	{
 		create_default_image();
+
+		mem_col_[0] = 7;
+		mem_col_24[0] = mem_pal[7];
+		update_stuff(UPD_AB);
+		flood_fill(1,1, get_pixel(4,4));
+
+		mem_col_[0] = 0;
+		mem_col_[1] = 4;
+		mem_col_24[0] = mem_pal[0];
+		mem_col_24[1] = mem_pal[4];
+		update_stuff(UPD_AB);
 	}
 
 	update_menus();

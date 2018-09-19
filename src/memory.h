@@ -30,8 +30,8 @@
  * !!! will have to be modified to use size_t instead */
 #define MAX_DIM (MAX_WIDTH > MAX_HEIGHT ? MAX_WIDTH : MAX_HEIGHT)
 
-#define DEFAULT_WIDTH 640
-#define DEFAULT_HEIGHT 480
+#define DEFAULT_WIDTH 800
+#define DEFAULT_HEIGHT 600
 
 /* Palette area layout */
 
@@ -69,6 +69,10 @@ enum {
 	TOOL_POLYGON,
 	TOOL_CLONE,
 	TOOL_GRADIENT,
+	TOOL_FUZZYCIRCLE,
+	TOOL_GRADIENTCIRCLE,
+	TOOL_CIRCLE_OUTLINE,
+
 
 	TOTAL_CURSORS
 };
@@ -337,7 +341,7 @@ int mem_undo_depth;				// Current undo depth
 
 image_info mem_image;			// Current image
 
-#define mem_img		mem_image.img		
+#define mem_img		mem_image.img
 #define mem_pal		mem_image.pal
 #define mem_cols	mem_image.cols
 #define mem_img_bpp	mem_image.bpp
@@ -709,7 +713,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 int mem_dumb_dither(unsigned char *old, unsigned char *new, png_color *pal,
 	int width, int height, int ncols, int dither);
 //	Set up colors A, B, and pattern for dithering a given RGB color
-void mem_find_dither(int red, int green, int blue); 
+void mem_find_dither(int red, int green, int blue);
 //	Convert image to Indexed Palette using quantize
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 void mem_invert();			// Invert the palette
@@ -838,6 +842,9 @@ void g_para( int x1, int y1, int x2, int y2, int xv, int yv );	// Draw general p
 void f_rectangle( int x, int y, int w, int h );			// Draw a filled rectangle
 void f_circle( int x, int y, int r );				// Draw a filled circle
 void mem_ellipse( int x1, int y1, int x2, int y2, int thick );	// Thickness 0 means filled
+void f_fuzzycircle( int x, int y, int r );				// Draw a filled circle
+void f_gradientcircle( int x, int y, int r );				// Draw a filled circle
+void f_circle_outline( int x, int y, int r );				// Draw a filled circle
 
 // Draw whatever is bounded by two pairs of lines
 void draw_quad(linedata line1, linedata line2, linedata line3, linedata line4);
