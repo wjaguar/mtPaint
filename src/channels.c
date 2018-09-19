@@ -255,6 +255,19 @@ static void *cchan_code[] = {
 };
 #undef WBbase
 
+void make_alpha(void **wdata)
+{
+
+	char *names2[] = {};
+	cchan_dd dtc = { 0, 0, 0, 0, 1, names2};
+
+	click_newchan_ok(&dtc, wdata);	// make alpha channel
+	 pressed_channel_edit(1, 0);		// switch from alpha to edit channel
+	 pressed_RGBA_toggle(1);	// turn on couple RGBA
+	 update_stuff(UPD_MODE | CF_SET);	// check couple RGBA
+	 update_menus();
+}
+
 #if NUM_CHANNELS > CHN_MASK + 1
 #error "Not all channels listed in dialog"
 #endif
