@@ -212,6 +212,11 @@ static void create_new(newwin_dd *dt, void **wdata)
 	if (im_type > 2); // Successfully done above
 	else if (new_window_type == 1) // Layer
 		layer_new(nw, nh, bpp, nc, pal, CMASK_IMAGE);
+
+		mem_col_[0] = 7;
+		mem_col_24[0] = mem_pal[7];
+		update_stuff(UPD_AB);
+		flood_fill(1,1, get_pixel(4,4));
 	else // Image
 	{
 		/* Nothing to undo if image got deleted already */
@@ -221,7 +226,7 @@ static void create_new(newwin_dd *dt, void **wdata)
 			/* System was unable to allocate memory for
 			 * image, using 8x8 instead */
 			nw = mem_width;
-			nh = mem_height;  
+			nh = mem_height;
 		}
 
 		inifile_set_gint32("lastnewWidth", nw );
@@ -676,7 +681,7 @@ static void brcosa_btn(brcosa_dd *dt, void **wdata, int what)
 
 	mem_pal_copy(mem_pal, dt->pal);
 
-	if (what == op_EVT_CANCEL); 
+	if (what == op_EVT_CANCEL);
 	else if (!dt->tmode) // OK/Apply
 	{
 		// !!! Buttons disabled for default values
@@ -987,7 +992,7 @@ static void click_sisca_centre(sisca_dd *dt, void **wdata)
 
 static char *bound_modes[] = { _("Mirror"), _("Tile"), _("Void") };
 static char *resize_modes[] = { _("Clear"), _("Tile"), _("Mirror tile"), NULL };
-static char *scale_modes[] = { 
+static char *scale_modes[] = {
 	_("Nearest Neighbour"),
 	_("Bilinear / Area Mapping"),
 	_("Bicubic"),

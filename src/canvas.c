@@ -1836,7 +1836,7 @@ static void fs_ok(fselector_dd *dt, void **wdata)
 		{
 			ext = file_formats[settings.ftype].ext;
 			if (!ext[0]) break;
-		
+
 			if (c) /* There is an extension */
 			{
 				/* Same extension? */
@@ -2315,7 +2315,7 @@ void realign_size()		// Reapply old zoom
 	 * is the actual resize; so to communicate new position to that latter
 	 * resize, I preset both position and range of CSCROLL here - WJ */
 	cmd_setv(scrolledwindow_canvas, xywh, CSCROLL_XYRANGE);
- 
+
 	cmd_setv(drawing_canvas, xywh + 2, CANVAS_SIZE);
 	vw_focus_view();	// View window position may need updating
 	toolbar_zoom_update();	// Zoom factor may have been reset
@@ -2849,7 +2849,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 		}
 
 		// Do memory stuff for undo
-		mem_undo_next(UNDO_TOOL);	
+		mem_undo_next(UNDO_TOOL);
 
 		/* Handle continuous mode */
 		if (mem_continuous && !first_point)
@@ -2947,7 +2947,7 @@ void do_tool_action(int cmd, int x, int y, int pressure)
 			i = abs(x - tool_ox);
 			j = abs(y - tool_oy);
 			len1 = sqrt(i * i + j * j) / (i > j ? i : j);
-			
+
 			while (TRUE)
 			{
 				if (lstep + (1.0 / 65536.0) >= brush_spacing)
@@ -3515,7 +3515,7 @@ void create_default_image()			// Create default new image
 	int	nw = inifile_get_gint32("lastnewWidth", DEFAULT_WIDTH ),
 		nh = inifile_get_gint32("lastnewHeight", DEFAULT_HEIGHT ),
 		nc = inifile_get_gint32("lastnewCols", 256 ),
-		nt = inifile_get_gint32("lastnewType", 2 );
+		nt = inifile_get_gint32("lastnewType", 0 );
 
 	do_new_one(nw, nh, nc, nt == 1 ? NULL : mem_pal_def,
 		(nt == 0) || (nt > 2) ? 3 : 1, FALSE);
