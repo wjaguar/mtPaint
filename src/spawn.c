@@ -425,7 +425,7 @@ void init_factions()
 		{"View filesystem data (xterm)", "xterm -hold -e ls -l %f"},
 		{"Edit in Gimp", "gimp %f"},
 		{"View in GQview", "gqview %f"},
-		{"Print image", "kprinter %f"},
+		{"Print image", "yad --print --type IMAGE --print-add-preview --filename %f"},
 		{"Email image", "seamonkey -compose attachment=file://%f"},
 		{"Send image to Firefox", "firefox %f"},
 		{"Send image to OpenOffice", "soffice %f"},
