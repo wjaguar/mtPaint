@@ -425,7 +425,7 @@ void init_factions()
 		{"View filesystem data (xterm)", "xterm -hold -e ls -l %f"},
 		{"Edit in Gimp", "gimp %f"},
 		{"View in GQview", "gqview %f"},
-		{"Print image", "kprinter %f"},
+		{"Print image", "yad --print --type IMAGE --print-add-preview --filename %f"},
 		{"Email image", "seamonkey -compose attachment=file://%f"},
 		{"Send image to Firefox", "firefox %f"},
 		{"Send image to OpenOffice", "soffice %f"},
@@ -782,7 +782,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 
 #else /* Linux */
 
-#define HANDBOOK_BROWSER "firefox"
+#define HANDBOOK_BROWSER "xdg-open"
 #define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
 #define HANDBOOK_LOCATION2 "/usr/share/doc/mtpaint/index.html"
 

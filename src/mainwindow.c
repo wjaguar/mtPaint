@@ -44,6 +44,8 @@
 #include "icons.h"
 #include "thread.h"
 
+#include <locale.h>
+
 
 typedef struct {
 	int idx_c, nidx_c, cnt_c;

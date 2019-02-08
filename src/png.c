@@ -774,7 +774,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	if (settings->bpp == 3)
 	{
 		png_set_strip_16(png_ptr);
-		png_set_gray_1_2_4_to_8(png_ptr);
+		png_set_expand_gray_1_2_4_to_8(png_ptr);
 		png_set_palette_to_rgb(png_ptr);
 		png_set_gray_to_rgb(png_ptr);
 
@@ -871,7 +871,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		png_set_strip_alpha(png_ptr);
 		png_set_packing(png_ptr);
 		if ((color_type == PNG_COLOR_TYPE_GRAY) && (bit_depth < 8))
-			png_set_gray_1_2_4_to_8(png_ptr);
+			png_set_expand_gray_1_2_4_to_8(png_ptr);
 		for (i = 0; i < height; i++)
 		{
 			row_pointers[i] = settings->img[CHN_IMAGE] + i * width;
