@@ -1,5 +1,5 @@
 /*	viewer.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -37,7 +37,7 @@
 #include "thread.h"
 
 int font_aa, font_bk, font_r;
-int font_bkg, font_angle, font_align;
+int font_bkg, font_angle, font_align, font_spacing;
 int font_setdpi, font_dpi, sys_dpi;
 
 int view_showing;	// 0: hidden, 1: horizontal split, 2: vertical split
@@ -1150,7 +1150,7 @@ void render_text()
 		inifile_get("lastTextFont", ""),
 		font_r ? font_angle : 0,
 		font_setdpi ? font_dpi : 0,
-		font_align };
+		font_align, font_spacing };
 
 	td.ctx.rgb = NULL;
 	cmd_setv(main_window_, &td, WINDOW_TEXTENG);
@@ -1248,6 +1248,12 @@ static void *text_code[] = {
 		MLABEL(_("Align")), OPTv(align_txt, 3, font_align),
 	ENDIF(1),
 	WDONE,
+	IFvx(texteng_spc, 1),
+		HBOX,
+		MLABEL(_("Spacing")),
+		FSPINv(font_spacing, -MAX_WIDTH * 100, MAX_WIDTH * 100),
+		WDONE,
+	ENDIF(1),
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Cancel"), NULL),
 	WSHOW

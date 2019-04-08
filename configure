@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.13"
-MT_DATE="2017-10-20"
+MT_V="3.49.14"
+MT_DATE="2019-04-08"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -38,7 +38,7 @@ MT_HOST=
 
 # Initialize library-tracking vars
 STATICLIBS=
-for A in PNG GIF JPEG JP2 TIFF FT CMS
+for A in PNG GIF JPEG JP2 TIFF WEBP FT CMS
 do
 	eval "N$A="
 	eval "STATIC_$A="
@@ -70,6 +70,9 @@ do
 	"tiff" )	NTIFF=YES;;
 	"notiff" )	NTIFF=NO;;
 	"statictiff" )	STATIC_TIFF=TIFF;;
+	"webp" )	NWEBP=YES;;
+	"nowebp" )	NWEBP=NO;;
+	"staticwebp" )	STATIC_WEBP=WebP;;
 	"noft" )	NFT=NO;;
 	"staticft" )	STATIC_FT=FreeType;;
 	"lcms" )	NCMS=LittleCMS;;
@@ -196,6 +199,9 @@ staticjp2 ........ Statically link JPEG 2000 library
 tiff ............. Use libtiff
 notiff ........... Don't use libtiff
 statictiff ....... Statically link TIFF library
+webp ............. Use libwebp
+nowebp ........... Don't use libwebp
+staticwebp ....... Statically link WebP library
 noft ............. Don't use FreeType
 staticft ......... Statically link FreeType library
 lcms ............. Use LittleCMS
@@ -442,6 +448,12 @@ then
 fi
 NTIFF=${NTIFF:-NO}
 
+if IS_LIB "lwebp"
+then
+	NWEBP=${NWEBP:-YES}
+fi
+NWEBP=${NWEBP:-NO}
+
 if IS_LIB "lfreetype"
 then
 	NFT=${NFT:-YES}
@@ -564,6 +576,11 @@ then
 	LIB_NAME jasper "$STATIC_JP2"
 	DEFS="$DEFS -DU_JASPER"
 fi
+if [ "$NWEBP" = YES ]
+then
+	LIB_NAME webp "$STATIC_WEBP"
+	DEFS="$DEFS -DU_WEBP"
+fi
 if [ "$NTIFF" = YES ]
 then
 	LIB_NAME tiff "$STATIC_TIFF"
@@ -577,7 +594,7 @@ fi
 if [ "$NFT" = YES ]
 then
 	DEFS="$DEFS -DU_FREETYPE"
-	if [ "$OS" = "GNU/Linux" ]
+	if [ "$OS" = "GNU/Linux" ] && which freetype-config > /dev/null 2>&1
 	then # Do it the old way, for native builds on *very* old distros
 		INCLUDES="$INCLUDES `freetype-config --cflags`"
 		LIB_NAME "" "$STATIC_FT" "`freetype-config --libs`"
@@ -680,6 +697,8 @@ else
 	echo "Failed to find required GTK+$GTK libraries" 1>&2
 	exit 1
 fi
+# Need to add this to use GTK+1 with GCC 5
+[ "$GTK" = 1 ] && HAVE_GCC_VER 5.0 && CFLAGS="$CFLAGS -std=gnu89"
 # Also need to add "-lX11" on GTK+2/X systems
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
 # GTK+2 version to use
@@ -778,6 +797,7 @@ File Types
     Use JPEG            $NJPEG
     Use JPEG 2000       $NJP2
     Use TIFF            $NTIFF
+    Use WebP            $NWEBP
 
 ------------
 Installation

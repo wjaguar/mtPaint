@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2017 Dmitry Groshev
+	Copyright (C) 2007-2018 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -385,13 +385,14 @@ void forget_ini(inifile *inip)
 char *slurp_file(char *fname, int before)
 {
 	FILE *fp;
-	char *buf;
+	char *buf = NULL;
 	int i, l;
 
 	if (!fname || !(fp = fopen(fname, "rb"))) return (NULL);
 	fseek(fp, 0, SEEK_END);
 	l = ftell(fp);
-	buf = calloc(1, l + before + 2);
+	if ((l >= 0) && (l < INT_MAX - before - 2))
+		buf = calloc(1, l + before + 2);
 	if (buf)
 	{
 		fseek(fp, 0, SEEK_SET);

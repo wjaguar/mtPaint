@@ -1,5 +1,5 @@
 /*	toolbar.h
-	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -20,9 +20,6 @@
 
 //	DEFINITIONS
 
-#define PATTERN_GRID_W 10
-#define PATTERN_GRID_H 10
-
 #define TOOLBAR_MAIN 1
 #define TOOLBAR_TOOLS 2
 #define TOOLBAR_SETTINGS 3
@@ -36,6 +33,9 @@
 #define PREVIEW_HEIGHT 48
 #define PREVIEW_BRUSH_X 40
 #define PREVIEW_BRUSH_Y 0
+
+#define PATTERN_CELL (8 * 4 + 4)
+#define DEF_PATTERNS 16
 
 
 //	Main toolbar buttons
@@ -111,6 +111,8 @@ void **drawing_col_prev, **drawing_palette;
 void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 	**toolbar_zoom_view;
 
+int patterns_grid_w, patterns_grid_h;
+
 //	GLOBAL PROCEDURES
 
 extern void *toolbar_code[];			// Set up the widgets to the vbox
@@ -134,7 +136,7 @@ void mem_pat_update();			// Update indexed and then RGB pattern preview
 void update_top_swatch();		// Update selected colours A & B
 
 void render_patterns(unsigned char *buf);	// Create RGB dump of patterns to display
-void set_patterns(unsigned char *src);	// Set 0-1 indexed image as new patterns
+int set_patterns(ls_settings *settings);	// Test/set image as new patterns
 
 void mode_change(int setting, int state);	// Drawing mode variables
 void flood_settings();			// Flood fill step

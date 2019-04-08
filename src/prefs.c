@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -169,6 +169,7 @@ static void *pref_code[] = {
 	WDONE,
 	CHECKv(_("Use gamma correction by default"), use_gamma),
 	CHECKv(_("Use gamma correction when painting"), paint_gamma),
+	CHECKv(_("Separate patterns for A & B"), pattern_B),
 	/* !!! Only processing is scriptable, interface is not */
 	UNLESSx(script, 1),
 	CHECKv(_("Optimize alpha chequers"), chequers_optimize),
@@ -243,9 +244,20 @@ static void *pref_code[] = {
 	CHECKv(_("Enable predictor"), tiff_predictor),
 	WDONE,
 #endif
+#ifdef U_WEBP
+///	---- TAB5 - WebP
+	PAGE("WebP"), GROUPN,
+	BORDER(OPT, 2),
+	TABLE2(3),
+	TOPTv(_("Compression mode"), webp_presets, 0, webp_preset),
+	TSPINv(_("V8 Save Quality (100=High)"), webp_quality, 0, 100),
+	TSPINv(_("V8L Compression (0=None)"), webp_compression, 0, 9),
+	WDONE,
+	WDONE,
+#endif
 	/* !!! Interface is not scriptable */
 	UNLESSx(script, 1),
-///	---- TAB5 - PATHS
+///	---- TAB6 - PATHS
 	PAGE(_("Paths")),
 	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
 		FS_CLIP_FILE, mem_clip_file),
@@ -262,7 +274,7 @@ static void *pref_code[] = {
 		FS_SELECT_FILE, DEFAULT_THEME_INI),
 #endif
 	WDONE,
-///	---- TAB6 - STATUS BAR
+///	---- TAB7 - STATUS BAR
 	PAGE(_("Status Bar")),
 	CHECKv(_("Canvas Geometry"), status_on[0]),
 	CHECKv(_("Cursor X,Y"), status_on[1]),
@@ -270,7 +282,7 @@ static void *pref_code[] = {
 	CHECKv(_("Selection Geometry"), status_on[3]),
 	CHECKv(_("Undo / Redo"), status_on[4]),
 	WDONE,
-///	---- TAB7 - TABLET
+///	---- TAB8 - TABLET
 	PAGE(_("Tablet")),
 	FVBOXB(_("Device Settings")),
 	BORDER(LABEL, 0),

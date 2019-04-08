@@ -1,5 +1,5 @@
 /*	viewer.h
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -18,7 +18,7 @@
 */
 
 int font_aa, font_bk, font_r;
-int font_bkg, font_angle, font_align;
+int font_bkg, font_angle, font_align, font_spacing;
 int font_setdpi, font_dpi, sys_dpi;
 
 extern char *align_txt[];

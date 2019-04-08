@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -133,7 +133,7 @@ typedef struct {
 	int fontfile, nfontfiles;
 	int dir, ndirs;
 	int fontsize;
-	int bkg[3], angle, dpi[3];
+	int bkg[3], angle, dpi[3], spacing;
 	int preview_whc[3];
 	int lock;
 	unsigned char *preview_rgb;
@@ -224,7 +224,10 @@ static unsigned char *mt_text_render(
 	double		ca, sa, angle_r = angle / 180 * M_PI;
 	int		bx, by, bw, bh, bits, ppb, fix_w, fix_h, scalable;
 	int		Y1, Y2, X1, X2, ll, line, xflag;
-	int		pass, lines = 0, *lw = NULL;
+	int		spc, spcx, spcy;
+	int		pass, lines = 0;
+#define MAX_LW 16
+	int		tx0, tx1, lwa[MAX_LW * 2], *lw, *lw0 = lwa;
 	int		dpi = ft_setdpi ? font_dpi : sys_dpi;
 	int		minxy[4] = { MAX_WIDTH, MAX_HEIGHT, -MAX_WIDTH, -MAX_HEIGHT };
 	size_t		s, ssize1 = characters, ssize2 = characters * 4 + 5;
@@ -294,6 +297,9 @@ static unsigned char *mt_text_render(
 		Y1 = FT_MulFix(face->ascender, face->size->metrics.y_scale);
 		Y2 = FT_MulFix(face->descender, face->size->metrics.y_scale);
 	}
+	spc = font_spacing * 0.64;
+	spcx = font_spacing * 0.64 * ca;
+	spcy = font_spacing * 0.64 * sa;
 
 	txt2 = calloc(1, ssize2 + 4);
 	if (!txt2) goto fail1;
@@ -322,15 +328,13 @@ static unsigned char *mt_text_render(
 	txt2[characters] = 0x0A; // Final newline
 	txt2[characters + 1] = 0; // Terminate the line
 
-	if (font_align) // Left align is not doing anything
-	{
-		for (tmp2 = txt2; *tmp2; tmp2++)
-			lines += *tmp2 == 0x0A;
-		lw = calloc(lines, sizeof(int)); // For line widths
-	}
+	for (tmp2 = txt2; *tmp2; tmp2++) lines += *tmp2 == 0x0A;
+	/* For line boundaries */
+	if (lines > MAX_LW) lw0 = malloc(lines * sizeof(int) * 2);
+	memset(lw0, 0, lines * sizeof(int) * 2);
 
 	xflag = X1 = X2 = 0;
-	for (pass = -!!lw; pass <= 1; pass++)
+	for (pass = -1; pass <= 1; pass++)
 	{
 		pen.x = pen.y = 0;
 		ll = 0;
@@ -340,30 +344,18 @@ static unsigned char *mt_text_render(
 		{
 			if (unichar == 0x0A) // Newline
 			{
-				line++;
-				if (pass < 0) continue;
-				// Remember right boundary
-				if (ll && face->glyph)
-				{
-					int tx = pen.x - pen0.x - face->glyph->advance.x;
-					int ty = pen.y - pen0.y - face->glyph->advance.y;
-					int tdx = face->glyph->metrics.horiBearingX +
-						face->glyph->metrics.width - 64;
-					/* Project pen offset onto rotated X axis */
-					tdx += tx * ca + ty * sa;
-					if (tdx > X2) X2 = tdx;
-				}
-				ll = (Y1 - Y2) * line;
-				pen.x = ll * sa;
-				pen.y = ll * -ca;
-				if (lw)
-				{
-					pen.x += lw[line] * ca;
-					pen.y += lw[line] * sa;
-				}
+				lw = lw0 + ++line * 2;
+				tx0 = 0;
 				ll = 0; // Reset horizontal index
+				if (pass < 0) continue;
+				tx1 = (Y1 - Y2) * line;
+				pen.x = tx1 * sa + lw[0] * ca;
+				pen.y = tx1 * -ca + lw[0] * sa;
 				continue;
 			}
+
+			// Apply spacing
+			if (ll) pen.x += spcx , pen.y += spcy;
 
 			glyph_index = FT_Get_Char_Index(face, unichar);
 
@@ -373,21 +365,26 @@ static unsigned char *mt_text_render(
 			error = FT_Load_Glyph( face, glyph_index, load_flags );
 			if ( error ) continue;
 
-			if (pass < 0) // Calculating line widths
+			if (pass < 0) // Calculating line bounds
 			{
-				lw[line] += face->glyph->metrics.horiAdvance;
+				if (lw[0] > tx0) lw[0] = tx0;
+				tx0 += face->glyph->metrics.horiAdvance;
+				if (lw[1] < tx0) lw[1] = tx0;
+				tx0 += spc;
 				continue;
 			}
 
-			// Remember left boundary
+			// Remember boundaries
+			tx0 = lw[0] + face->glyph->metrics.horiBearingX;
 			if (!ll++)
 			{
-				int tx = face->glyph->metrics.horiBearingX;
-				if (lw) tx += lw[line];
-				if (!xflag++) X1 = X2 = tx; // First glyph
-				if (tx < X1) X1 = tx;
+				if (!xflag++) X1 = X2 = tx0; // First glyph
 				pen0 = pen;
 			}
+			tx0 += (pen.x - pen0.x) * ca + (pen.y - pen0.y) * sa;
+			if (X1 > tx0) X1 = tx0;
+			tx0 += face->glyph->metrics.width - 64;
+			if (X2 < tx0) X2 = tx0;
 
 			switch (face->glyph->bitmap.pixel_mode)
 			{
@@ -424,12 +421,21 @@ static unsigned char *mt_text_render(
 
 		if (pass < 0) // Calculate line offsets
 		{
-			for (ll = line = 0; line < lines; line++)
-				if (ll < lw[line]) ll = lw[line];
-			for (line = 0; line < lines; line++)
+			lw = lw0;
+			for (tx0 = tx1 = 0 , line = lines; line-- > 0; )
 			{
-				lw[line] = ll - lw[line];
-				if (font_align == 1) lw[line] >>= 1; // Center
+				if (tx0 > lw[0]) tx0 = lw[0];
+				if (tx1 < lw[1]) tx1 = lw[1];
+				lw += 2;
+			}
+			lw = lw0;
+			for (line = lines; line-- > 0; )
+			{
+				lw[0] = !font_align ? tx0 - lw[0] : // Left
+					font_align == 1 ? // Center
+					(tx0 + tx1 - lw[0] - lw[1]) / 2 :
+					tx1 - lw[1]; // Right
+				lw += 2;
 			}
 			continue;
 		}
@@ -528,7 +534,7 @@ static unsigned char *mt_text_render(
 			}
 		}
 	}
-	free(lw);
+	if (lw0 != lwa) free(lw0);
 
 fail0:
 	free(txt2);
@@ -994,6 +1000,7 @@ static void store_values(font_dd *dt)
 		font_angle = dt->angle;
 	if (!script_cmds || (ft_setdpi = !!dt->dpi[0]))
 		font_dpi = dt->dpi[0];
+	font_spacing = dt->spacing;
 }
 
 static void paste_text_ok(font_dd *dt, void **wdata, int what, void **where)
@@ -1596,6 +1603,10 @@ static void *font_code[] = {
 		OPNAME("Angle of rotation ="),
 	MLABEL(_("Align")), OPTve(align_txt, 3, font_align, font_entry_changed),
 	WDONE, // HBOX
+	HBOX,
+	MLABEL(_("Spacing")), FSPIN(spacing, -MAX_WIDTH * 100, MAX_WIDTH * 100),
+		EVENT(CHANGE, font_entry_changed),
+	WDONE, // HBOX
 	HSEPl(200),
 	OKBOXP(_("Paste Text"), paste_text_ok, _("Close"), NULL), WDONE,
 	WDONE, WDONE, WDONE, // XVBOXP, XHBOX, PAGE
@@ -1645,6 +1656,7 @@ void pressed_mt_text()
 	tdata.dpi[0] = font_dpi;
 	tdata.dpi[1] = 1;
 	tdata.dpi[2] = 65535;
+	tdata.spacing = font_spacing;
 	if (script_cmds) // Simplified controls - spins w/o toggles
 	{
 		tdata.script = TRUE;

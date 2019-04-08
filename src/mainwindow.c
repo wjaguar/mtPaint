@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -90,6 +90,7 @@ static inilist ini_bool[] = {
 	{ "cursorZoom",		&cursor_zoom,		FALSE },
 	{ "layerOverlay",	&layer_overlay,		FALSE },
 	{ "paintGamma",		&paint_gamma,		FALSE },
+	{ "patternB",		&pattern_B,		FALSE },
 	{ "tablet_use_size",	tablet_tool_use + 0,	FALSE },
 	{ "tablet_use_flow",	tablet_tool_use + 1,	FALSE },
 	{ "tablet_use_opacity",	tablet_tool_use + 2,	FALSE },
@@ -142,6 +143,9 @@ static inilist ini_int[] = {
 	{ "tgaRLE",		&tga_RLE,		0   },
 	{ "jpeg2000Rate",	&jp2_rate,		1   },
 	{ "lzmaPreset",		&lzma_preset,		9   },
+	{ "webpPreset",		&webp_preset,		1   },
+	{ "webpQuality",	&webp_quality,		90  },
+	{ "webpCompression",	&webp_compression,	9   },
 	{ "silence_limit",	&silence_limit,		18  },
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },
@@ -172,6 +176,7 @@ static inilist ini_int[] = {
 	{ "fontAngle",		&font_angle,		0   },
 	{ "fontAlign",		&font_align,		0   },
 	{ "fontDPI",		&font_dpi,		72  },
+	{ "fontSpacing",	&font_spacing,		0   },
 #ifdef U_FREETYPE
 	{ "fontSizeBitmap",	&font_bmsize,		1   },
 	{ "fontSize",		&font_size,		12  },
@@ -803,6 +808,14 @@ static void *keylist_code[] = {
 		SHORTCUT(bracketleft, S), SHORTCUT(braceleft, S),
 	uMENUITEM(_("Next colour B"), ACTMOD(ACT_B, 1)),
 		SHORTCUT(bracketright, S), SHORTCUT(braceright, S),
+	uMENUITEM(_("Previous pattern"), ACTMOD(ACT_PAT, -1)),
+		SHORTCUT0,
+	uMENUITEM(_("Next pattern"), ACTMOD(ACT_PAT, 1)),
+		SHORTCUT0,
+	uMENUITEM(_("Larger brush"), ACTMOD(ACT_SIZE, 1)),
+		SHORTCUT0,
+	uMENUITEM(_("Smaller brush"), ACTMOD(ACT_SIZE, -1)),
+		SHORTCUT0,
 	uMENUITEM(_("View window - Zoom in"), ACTMOD(ACT_VWZOOM, 0)),
 		SHORTCUT(plus, S), SHORTCUT(KP_Add, S),
 	uMENUITEM(_("View window - Zoom out"), ACTMOD(ACT_VWZOOM, -1)),
@@ -4048,8 +4061,8 @@ static int ab_pick_pixel(ab_dd *dt, void **wdata, int what, void **where,
 #define WBbase ab_dd
 static void *ab_code[] = {
 	TOPVBOX,
-	SPIN(a, -1, 256), ALTNAME("a"), EVENT(MULTI, ab_pick_pixel),
-	SPIN(b, -1, 256), OPNAME("b"), EVENT(MULTI, ab_pick_pixel),
+	SPIN(a, -1, 256), ALTNAME("A"), EVENT(MULTI, ab_pick_pixel),
+	SPIN(b, -1, 256), OPNAME("B"), EVENT(MULTI, ab_pick_pixel),
 	WSHOW
 };
 #undef WBbase
@@ -4072,14 +4085,16 @@ static void script_ab()
 }
 
 typedef struct {
-	int x[3], y[3], n[3], brush;
+	int x[3], y[3], n[3], b[3], brush;
 	void **nspin;
 } nxy_dd;
 
 static void bp_evt(nxy_dd *dt, void **wdata, int what, void **where)
 {
+	void *var = cmd_read(where, dt);
 	int w = dt->x[2] + 1;
-	if (cmd_read(where, dt) == dt->n)
+
+	if (var == dt->n)
 	{
 		int n = dt->n[0];
 		dt->x[0] = n % w;
@@ -4087,8 +4102,27 @@ static void bp_evt(nxy_dd *dt, void **wdata, int what, void **where)
 		if (dt->brush) mem_set_brush(n);
 		else mem_tool_pat = n;
 	}
+	else if (var == dt->b) mem_tool_pat_B = dt->b[0];
 	else if ((what == op_EVT_SCRIPT) && (dt->x[0] >= 0) && (dt->y[0] >= 0))
 		cmd_set(dt->nspin, dt->y[0] * w + dt->x[0]);
+}
+
+static int bp_pick(nxy_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	/* Sanity check */
+	if (mx->fractcol >= 0) return (0);  // Error
+
+	/* Grid position */
+	if ((mx->nrows == 1) && (mx->ncols == 2))
+	{
+		int *row = mx->rows[0] + 1, x = row[0], y = row[1];
+		cmd_set(where, bounded(y, 0, dt->y[2]) * (dt->x[2] + 1) +
+			bounded(x, 0, dt->x[2]));
+		return (1);
+	}
+
+	return (0); // Error
 }
 
 static char *brush_txt[TOOL_SPRAY + 1] = { "Square", "Circle",
@@ -4097,7 +4131,10 @@ static char *brush_txt[TOOL_SPRAY + 1] = { "Square", "Circle",
 #define WBbase nxy_dd
 static void *bp_code[] = {
 	TOPVBOX,
-	REF(nspin), SPINa(n), EVENT(CHANGE, bp_evt),
+	REF(nspin), SPINa(n), EVENT(CHANGE, bp_evt), EVENT(MULTI, bp_pick),
+	UNLESSx(brush, 1), ALTNAME("A"), IFvx(pattern_B, 1), /* && */
+		SPINa(b), EVENT(CHANGE, bp_evt), EVENT(MULTI, bp_pick), OPNAME("B"),
+	ENDIF(1),
 	SPINa(x), EVENT(SCRIPT, bp_evt), OPNAME("X"),
 	SPINa(y), EVENT(SCRIPT, bp_evt), OPNAME("Y"),
 	IFx(brush, 1),
@@ -4125,13 +4162,14 @@ static void script_bp(int mode)
 	}
 	else
 	{
-		tdata.x[2] = PATTERN_GRID_W - 1;
-		tdata.y[2] = PATTERN_GRID_H - 1;
+		tdata.x[2] = patterns_grid_w - 1;
+		tdata.y[2] = patterns_grid_h - 1;
 		tdata.n[0] = mem_tool_pat;
-		tdata.x[0] = mem_tool_pat % PATTERN_GRID_W;
-		tdata.y[0] = mem_tool_pat / PATTERN_GRID_W;
+		tdata.b[0] = mem_tool_pat_B;
+		tdata.x[0] = mem_tool_pat % patterns_grid_w;
+		tdata.y[0] = mem_tool_pat / patterns_grid_w;
 	}
-	tdata.n[2] = (tdata.x[2] + 1) * (tdata.y[2] + 1) - 1;
+	tdata.n[2] = tdata.b[2] = (tdata.x[2] + 1) * (tdata.y[2] + 1) - 1;
 	run_destroy(run_create_(bp_code, &tdata, sizeof(tdata), script_cmds));
 	if (mode == CHOOSE_BRUSH)
 	{
@@ -4519,6 +4557,15 @@ void action_dispatch(int action, int mode, int state, int kbd)
 				channel_col_[action][mem_channel] = mode;
 		}
 		update_stuff(UPD_CAB);
+		break;
+	case ACT_SIZE:
+		tool_size = bounded(tool_size + mode, 1, 255);
+		update_stuff(UPD_BRUSH);
+		break;
+	case ACT_PAT:
+		mem_tool_pat = bounded(mem_tool_pat + mode, -DEF_PATTERNS,
+			patterns_grid_w * patterns_grid_h - 1);
+		update_stuff(UPD_PAT);
 		break;
 	case ACT_CHANNEL:
 		if (kbd) state = TRUE;
@@ -5632,6 +5679,7 @@ void spot_undo(int mode)
 }
 
 #ifdef U_NLS
+#include <locale.h>
 void setup_language()			// Change language
 {
 	char *txt = inifile_get( "languageSETTING", "system" ), txt2[64];

@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2017 Dmitry Groshev
+	Copyright (C) 2013-2019 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -345,9 +345,12 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 int texteng_aa = TRUE;
 #if GTK2VERSION >= 6 /* GTK+ 2.6+ */
 int texteng_rot = TRUE;
+int texteng_spc = TRUE;
 #else
-#define PangoMatrix void /* For rotate_box() */
+#define PangoMatrix int /* For rotate_box() */
+#define PANGO_MATRIX_INIT 0
 int texteng_rot = FALSE;
+int texteng_spc = FALSE;
 #endif
 int texteng_lf = TRUE;
 int texteng_dpi = TRUE;
@@ -360,6 +363,7 @@ int texteng_aa = TRUE;
 int texteng_aa = FALSE;
 #endif
 int texteng_rot = FALSE;
+int texteng_spc = FALSE;
 int texteng_lf = FALSE;
 int texteng_dpi = FALSE;
 
@@ -469,6 +473,7 @@ static void do_render_text(texteng_dd *td)
 
 	static const PangoAlignment align[3] = {
 		PANGO_ALIGN_LEFT, PANGO_ALIGN_CENTER, PANGO_ALIGN_RIGHT };
+	PangoMatrix matrix = PANGO_MATRIX_INIT, *mp = NULL;
 	PangoRectangle ink, rect;
 	PangoContext *context;
 	PangoLayout *layout;
@@ -489,27 +494,36 @@ static void do_render_text(texteng_dd *td)
 	pango_layout_set_alignment(layout, align[td->align]);
 
 #if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+	if (td->spacing)
+	{
+		PangoAttrList *al = pango_attr_list_new();
+		PangoAttribute *a = pango_attr_letter_spacing_new(
+			(td->spacing * PANGO_SCALE) / 100);
+		pango_attr_list_insert(al, a);
+		pango_layout_set_attributes(layout, al);
+		pango_attr_list_unref(al);
+	}
 	if (td->angle)
 	{
-		PangoMatrix matrix = PANGO_MATRIX_INIT;
-
 		pango_matrix_rotate(&matrix, td->angle * 0.01);
 		pango_context_set_matrix(context, &matrix);
 		pango_layout_context_changed(layout);
-		pango_layout_get_extents(layout, &ink, &rect);
-		rotate_box(&rect, &matrix); // What gdk_draw_layout() uses
-		rotate_box(&ink, &matrix); // What one should use
-		tx = PAD_SIZE - ink.x + rect.x;
-		ty = PAD_SIZE - ink.y + rect.y;
+		mp = &matrix;
 	}
-	else
 #endif
-	{
-		pango_layout_get_extents(layout, &ink, NULL);
-		rotate_box(&ink, NULL); // What one should use
-		tx = PAD_SIZE - ink.x;
-		ty = PAD_SIZE - ink.y;
-	}
+	pango_layout_get_extents(layout, &ink, &rect);
+
+	// Adjust height of ink rectangle to logical
+	tx = ink.y + ink.height;
+	ty = rect.y + rect.height;
+	if (tx < ty) tx = ty;
+	if (ink.y > rect.y) ink.y = rect.y;
+	ink.height = tx - ink.y;
+
+	rotate_box(&rect, mp); // What gdk_draw_layout() uses
+	rotate_box(&ink, mp); // What one should use
+	tx = PAD_SIZE - ink.x + rect.x;
+	ty = PAD_SIZE - ink.y + rect.y;
 	width = ink.width + PAD_SIZE * 2;
 	height = ink.height + PAD_SIZE * 2;
 
@@ -5314,7 +5328,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_MAINWINDOW:
 		{
 			int wh = (int)pp[3];
-			GdkPixmap *icon_pix;
 
 			gdk_rgb_init();
 			init_tablet();	// Set up the tablet
@@ -5336,10 +5349,20 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// for items on the toolbar & menus in the context of it
 			gtk_widget_realize(window);
 
-			icon_pix = gdk_pixmap_create_from_xpm_d(window->window,
-				NULL, NULL, pp[2]);
-			gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
-//			gdk_pixmap_unref(icon_pix);
+#if GTK_MAJOR_VERSION == 1
+			{
+				GdkPixmap *icon_pix = gdk_pixmap_create_from_xpm_d(
+					window->window, NULL, NULL, pp[2]);
+				gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
+//				gdk_pixmap_unref(icon_pix);
+			}
+#else /* #if GTK_MAJOR_VERSION == 2 */
+			{
+				GdkPixbuf *p = gdk_pixbuf_new_from_xpm_data(pp[2]);
+				gtk_window_set_icon(GTK_WINDOW(window), p);
+				g_object_unref(p);
+			}
+#endif
 
 			// For use as anchor and context
 			main_window = window;
@@ -7558,12 +7581,14 @@ int cmd_setstr(void **slot, char *s)
 	switch (op)
 	{
 	case op_uFPICK: case op_uPATHSTR:
+		if (!s) s = "";
 		// Commandline is already in system encoding
 		if (!cmd_mode) s = st = gtkncpy(NULL, s, PATHBUF);
 		cmd_setv(slot, s, op == op_uFPICK ? FPICK_VALUE : ENTRY_VALUE);
 		g_free(st);
 		goto done;
 	case op_ENTRY: case op_uENTRY:
+		if (!s) s = "";
 		// Commandline is in system encoding
 		if (cmd_mode) s = st = gtkuncpy(NULL, s, 0);
 		cmd_setv(slot, s, ENTRY_VALUE);
@@ -7581,6 +7606,7 @@ int cmd_setstr(void **slot, char *s)
 		ll = TRUE;
 		// Fallthrough
 	case op_uOPT: case op_uOPTD: case op_uRPACK: case op_uRPACKD:
+		if (!s) return (-1); // Error
 		ll = find_string(slot[0], s, strlen(s), ll);
 		if (ll < 0) return (-1); // Error
 		break;

@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -91,6 +91,8 @@ enum { // To let constants renumber themselves when adding new ones
 	ACT_LR_CENTER,
 	ACT_SCRIPT,
 	ACT_RUN_SCRIPT,
+	ACT_SIZE,
+	ACT_PAT,
 
 	DLG_BRCOSA,
 	DLG_CHOOSER,

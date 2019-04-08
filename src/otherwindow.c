@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -384,12 +384,15 @@ static int click_pat(pattern_dd *dt, void **wdata, int what, void **where,
 		mem_col_24[ab] = mem_pal[pat_no];
 		update_stuff(UPD_AB);
 	}
-	else if (mouse->button != 1) return (FALSE); // Left click only
 	else if (dt->mode == CHOOSE_PATTERN)
 	{
-		mem_tool_pat = pat_no;
+		if (mouse->button == 1) mem_tool_pat = pat_no; // Left
+		else if (pattern_B && (mouse->button == 3)) // Right
+			mem_tool_pat_B = pat_no;
+		else return (FALSE);
 		update_stuff(UPD_PAT);
 	}
+	else if (mouse->button != 1) return (FALSE); // Left click only
 	else /* if (dt->mode == CHOOSE_BRUSH) */
 	{
 		mem_set_brush(pat_no);
@@ -425,11 +428,11 @@ void choose_pattern(int typ)	// Bring up pattern chooser (0) or brush (1)
 	tdata.wh[2] = 3; // bpp
 	if (typ == CHOOSE_PATTERN)
 	{
-		tdata.wh[0] = PATTERN_GRID_W * (8 * 4 + 4);
-		tdata.wh[1] = PATTERN_GRID_H * (8 * 4 + 4);
-		tdata.xs = tdata.ys = 8 * 4 + 4;
-		tdata.xw = PATTERN_GRID_W;
-		tdata.max = PATTERN_GRID_W * PATTERN_GRID_H - 1;
+		tdata.wh[0] = patterns_grid_w * PATTERN_CELL;
+		tdata.wh[1] = patterns_grid_h * PATTERN_CELL;
+		tdata.xs = tdata.ys = PATTERN_CELL;
+		tdata.xw = patterns_grid_w;
+		tdata.max = patterns_grid_w * patterns_grid_h - 1;
 	}
 	else if (typ == CHOOSE_BRUSH)
 	{

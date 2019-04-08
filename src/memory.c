@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -131,7 +131,8 @@ static memchunks undo_items = { DEF_UNDO, sizeof(undo_item) };
 
 /// PATTERNS
 
-unsigned char mem_pattern[8 * 8];		// Original 0-1 pattern
+int pattern_B;				// Let colour B have its own pattern
+unsigned char *mem_pattern;		// Original 0-1 pattern
 unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
 unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 
@@ -635,6 +636,7 @@ void init_istate(image_state *state, image_info *image)
 	state->col_24[0] = image->pal[1];
 	state->col_24[1] = image->pal[0];
 	state->tool_pat = 0;
+	state->tool_pat_B = 0;
 }
 
 /* Add a new undo data node */
@@ -2086,6 +2088,12 @@ void mem_swap_cols(int redraw)
 	int oc, flags;
 	png_color o24;
 
+	if (pattern_B)
+	{
+		oc = mem_tool_pat;
+		mem_tool_pat = mem_tool_pat_B;
+		mem_tool_pat_B = oc;
+	}
 	if (mem_channel != CHN_IMAGE)
 	{
 		oc = channel_col_A[mem_channel];
@@ -3394,7 +3402,8 @@ void mem_find_dither(int red, int green, int blue)
 	mem_col_B = ix2;
 /* !!! A mix with less than half of nearest color cannot be better than it, so
  * !!! patterns less dense than 50:50 won't be needed */
-	mem_tool_pat = pat == 4 ? pn : pn * 4;
+	mem_tool_pat = -pn; /* pn*4 for 8x8 */
+	if (pattern_B) mem_tool_pat_B = pn - 16; /* pat**2 */
 
 	mem_col_A24 = mem_pal[mem_col_A];
 	mem_col_B24 = mem_pal[mem_col_B];

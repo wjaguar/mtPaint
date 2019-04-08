@@ -1,5 +1,5 @@
 /*	vcode.h
-	Copyright (C) 2013-2016 Dmitry Groshev
+	Copyright (C) 2013-2019 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -373,7 +373,7 @@ typedef struct {
 //	Structure which is supplied to WINDOW_TEXTENG
 typedef struct {
 	char *text, *font;
-	int angle, dpi, align;
+	int angle, dpi, align, spacing;
 	rgbcontext ctx;
 } texteng_dd;
 
@@ -413,6 +413,7 @@ typedef int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where,
 //	Textengine flags
 int texteng_aa;  /* Antialias */
 int texteng_rot; /* Rotate */
+int texteng_spc; /* Set spacing */
 int texteng_dpi; /* Set DPI */
 int texteng_lf;  /* Handle newlines */
 int texteng_con; /* Work in console mode */
@@ -811,6 +812,7 @@ enum {
 #define TLCHECK(NM,V,X,Y) TLCHECKl(NM, V, X, Y, 1)
 #define TLCHECKvl(NM,V,X,Y,L) WBrh_t(CHECK, 3), &(V), (NM), WBxyl(X, Y, L)
 #define TLCHECKv(NM,V,X,Y) TLCHECKvl(NM, V, X, Y, 1)
+#define uCHECK(NM,V) WBrhf_(uCHECK, 2), WBfield(V), (NM)
 #define uCHECKv(NM,V) WBrh_(uCHECK, 2), &(V), (NM)
 /* !!! No more than 255 choices */
 #define RPACK(SS,N,H,V) WBrhf_x(RPACK, 3), WBfield(V), (SS), WBnh(N, H)
@@ -837,6 +839,8 @@ enum {
 #define TOPTDv(NM,SP,V) WBrh_t1(OPTD, 2), &(V), WBfield(SP), TLABEL(NM)
 /* !!! These blocks each hold 1 nested EVENT block */
 #define OPTve(SS,N,V,HS) WBr2h_(OPT, 3 + 2), &(V), (SS), (void *)(N), \
+	EVENT(SELECT, HS)
+#define OPTe(SS,N,V,HS) WBr2hf_(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)
 #define XOPTe(SS,N,V,HS) WBr2hf_x(OPT, 3 + 2), WBfield(V), (SS), (void *)(N), \
 	EVENT(SELECT, HS)

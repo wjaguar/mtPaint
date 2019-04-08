@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2017 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1680,6 +1680,24 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 /* !!! GtkImage is broken on GTK+ 2.12.9 at least, with regard to pixmaps -
  * background gets corrupted when widget is made insensitive, so GtkPixmap is
  * the only choice in that case - WJ */
+
+#if GTK_MAJOR_VERSION == 2
+/* Guard against different depth visuals */
+static void xpm_realize(GtkWidget *widget, gpointer user_data)
+{
+	if (gdk_drawable_get_depth(widget->window) !=
+		gdk_drawable_get_depth(GTK_PIXMAP(widget)->pixmap))
+	{
+		GdkPixmap *icon, *mask;
+		icon = gdk_pixmap_create_from_xpm_d(widget->window, &mask, NULL,
+			user_data);
+		gtk_pixmap_set(GTK_PIXMAP(widget), icon, mask);
+		gdk_pixmap_unref(icon);
+		gdk_pixmap_unref(mask);
+	}
+}
+#endif
+
 GtkWidget *xpm_image(XPM_TYPE xpm)
 {
 	GdkPixmap *icon, *mask;
@@ -1707,7 +1725,10 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 	gdk_pixmap_unref(icon);
 	gdk_pixmap_unref(mask);
 	gtk_widget_show(widget);
-
+#if GTK_MAJOR_VERSION == 2
+	gtk_signal_connect(GTK_OBJECT(widget), "realize",
+		GTK_SIGNAL_FUNC(xpm_realize), (char **)xpm[1]);
+#endif
 	return (widget);
 }
 

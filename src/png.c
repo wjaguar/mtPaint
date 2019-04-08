@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2017 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -50,6 +50,10 @@
 #define NEED_CMYK
 #include <tiffio.h>
 #endif
+#ifdef U_WEBP
+#include <webp/encode.h>
+#include <webp/decode.h>
+#endif
 #if U_LCMS == 2
 #include <lcms2.h>
 /* For version 1.x compatibility */
@@ -88,6 +92,7 @@ typedef struct {
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
 int lzma_preset, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
+int webp_preset, webp_quality, webp_compression;
 int apply_icc;
 
 fformat file_formats[NUM_FTYPES] = {
@@ -141,11 +146,22 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 /* mtPaint's own format - extended PAM */
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_LAYER | FF_PALETTE | FF_MEM }
+		| FF_TRANS | FF_LAYER | FF_PALETTE | FF_MEM },
+#ifdef U_WEBP
+/* !!! For later */
+//	{ "WEBP", "webp", "", FF_RGB | FF_ANIM | FF_ALPHA | FF_COMPW },
+/* For now */
+	{ "WEBP", "webp", "", FF_RGB | FF_ALPHA | FF_COMPW },
+#else
+	{ "", "", "", 0},
+#endif
 };
 
 #ifndef U_TIFF
 tiff_format tiff_formats[] = { { NULL } };
+#endif
+#ifndef U_WEBP
+char *webp_presets[] = { NULL };
 #endif
 
 int file_type_by_ext(char *name, guint32 mask)
@@ -261,7 +277,7 @@ static int process_page_frame(char *file_name, ani_settings *ani, ls_settings *w
 static int allocate_image(ls_settings *settings, int cmask)
 {
 	size_t sz, l;
-	int i, j, oldmask, mode = settings->mode;
+	int i, j, oldmask, wbpp, mode = settings->mode;
 
 	if ((settings->width < 1) || (settings->height < 1)) return (-1);
 
@@ -287,6 +303,10 @@ static int allocate_image(ls_settings *settings, int cmask)
 	oldmask |= cmask;
 	if (!(oldmask & CMASK_IMAGE)) return (-1);
 
+	/* Can ask for RGBA-capable image channel */
+	wbpp = settings->bpp;
+	if (wbpp > 3) settings->bpp = 3;
+
 	j = TRUE; // For FS_LAYER_LOAD
 	sz = (size_t)settings->width * settings->height;
 	switch (mode)
@@ -303,7 +323,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
 			if (!(cmask & CMASK_FOR(i))) continue;
-			l = i == CHN_IMAGE ? sz * settings->bpp : sz;
+			l = i == CHN_IMAGE ? sz * wbpp : sz;
 			settings->img[i] = j ? malloc(l) : mem_try_malloc(l);
 			if (!settings->img[i]) return (FILE_MEM_ERROR);
 		}
@@ -318,6 +338,13 @@ static int allocate_image(ls_settings *settings, int cmask)
 			if (j) return (FILE_MEM_ERROR);
 			memcpy(settings->img, mem_clip.img, sizeof(chanlist));
 			break;
+		}
+		/* Try to extend image channel to RGBA if asked */
+		if (wbpp > 3)
+		{
+			unsigned char *w = realloc(mem_clipboard, sz * wbpp);
+			if (!w) return (FILE_MEM_ERROR);
+			settings->img[CHN_IMAGE] = mem_clipboard = w;
 		}
 		/* Try to add clipboard alpha and/or mask */
 		for (i = 0; i < NUM_CHANNELS; i++)
@@ -337,17 +364,15 @@ static int allocate_image(ls_settings *settings, int cmask)
 			settings->height, settings->bpp, CMASK_CURR);
 		if (j) return (FILE_MEM_ERROR);
 		/* Allocate */
-		settings->img[CHN_IMAGE] = mem_try_malloc(sz * settings->bpp);
+		settings->img[CHN_IMAGE] = mem_try_malloc(sz * wbpp);
 		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
 		break;
 	case FS_PATTERN_LOAD: /* Patterns */
 		settings->silent = TRUE;
-		/* Fixed dimensions and depth */
-		if ((settings->width != PATTERN_GRID_W * 8) ||
-			(settings->height != PATTERN_GRID_H * 8) ||
-			(settings->bpp != 1)) return (-1);
+		/* Check dimensions & depth */
+		if (!set_patterns(settings)) return (-1);
 		/* Allocate temp memory */
-		settings->img[CHN_IMAGE] = calloc(1, sz);
+		settings->img[CHN_IMAGE] = calloc(1, sz * wbpp);
 		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
 		break;
 	case FS_PALETTE_LOAD: /* Palette */
@@ -3399,6 +3424,161 @@ static int save_tiff(char *file_name, ls_settings *settings)
 }
 #endif
 
+#ifdef U_WEBP
+
+/* Read in the entire file */
+static int file2mem(char *file_name, unsigned char **where, size_t *len)
+{
+	FILE *fp;
+	unsigned char *buf;
+	long l;
+	int res = -1;
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	fseek(fp, 0, SEEK_END);
+	/* Where a long is too short to hold the file's size, address space is
+	 * too small to usefully hold the whole file anyway - WJ */
+	if ((l = ftell(fp)) > 0)
+	{
+		fseek(fp, 0, SEEK_SET);
+		res = FILE_MEM_ERROR;
+		if ((buf = malloc(l)))
+		{
+			res = -1;
+			if (fread(buf, 1, l, fp) < l) free(buf);
+			else *where = buf , *len = l , res = 0;
+		}
+	}
+	fclose(fp);
+	return (res);
+}
+
+static int load_webp(char *file_name, ls_settings *settings)
+{
+	WebPBitstreamFeatures ffs;
+	unsigned char *buf;
+	size_t len;
+	int res, wh, wbpp = 3, cmask = CMASK_IMAGE;
+
+	if ((res = file2mem(file_name, &buf, &len))) return (res);
+	res = -1;
+	if (WebPGetFeatures((void *)buf, len, &ffs) != VP8_STATUS_OK)
+		goto fail;
+	if (ffs.has_alpha) wbpp = 4 , cmask = CMASK_RGBA;
+	wh = ffs.width * ffs.height;
+	settings->width = ffs.width;
+	settings->height = ffs.height;
+	settings->bpp = wbpp;
+	if ((res = allocate_image(settings, cmask))) goto fail;
+	if (!settings->silent) ls_init("WebP", 0);
+	res = FILE_LIB_ERROR;
+	if (settings->img[CHN_ALPHA]) /* Read RGBA and separate out alpha */
+	{
+		if (WebPDecodeRGBAInto((void *)buf, len,
+			(void *)settings->img[CHN_IMAGE], wh * 4,
+			settings->width * 4))
+		{
+			copy_bytes(settings->img[CHN_ALPHA],
+				settings->img[CHN_IMAGE] + 3, wh, 1, 4);
+			copy_bytes(settings->img[CHN_IMAGE],
+				settings->img[CHN_IMAGE], wh, 3, 4);
+			res = 1;
+		}
+	}
+	else /* Read as RGB */
+	{
+		if (WebPDecodeRGBInto((void *)buf, len,
+			(void *)settings->img[CHN_IMAGE], wh * 3,
+			settings->width * 3)) res = 1;
+	}
+	/* Downsize image channel */
+	if ((wbpp > 3) && (res == 1))
+	{
+		unsigned char *w = realloc(settings->img[CHN_IMAGE], wh * 3);
+		if (w) settings->img[CHN_IMAGE] = w;
+	}
+	if ((res == 1) && ffs.has_animation) res = FILE_HAS_FRAMES;
+	if (!settings->silent) progress_end();
+fail:	free(buf);
+	return (res);
+}
+
+static int webp_fwrite(const uint8_t *data, size_t data_size, const WebPPicture *picture)
+{
+	return (fwrite(data, sizeof(uint8_t), data_size, picture->custom_ptr) == data_size);
+}
+
+static int webp_progress(int percent, const WebPPicture *picture)
+{
+	return (!progress_update((float)percent / 100));
+}
+
+char *webp_presets[] = { _("Lossless"), _("Default"), _("Picture"), _("Photo"),
+	_("Drawing"), _("Icon"), _("Text"), NULL };
+
+// !!! Min version 0.5.0
+
+static int save_webp(char *file_name, ls_settings *settings)
+{
+	static const signed char presets[] = {
+		WEBP_PRESET_DEFAULT, /* Lossless */
+		WEBP_PRESET_DEFAULT,
+		WEBP_PRESET_PICTURE,
+		WEBP_PRESET_PHOTO,
+		WEBP_PRESET_DRAWING,
+		WEBP_PRESET_ICON,
+		WEBP_PRESET_TEXT };
+	WebPConfig conf;
+	WebPPicture pic;
+	FILE *fp;
+	unsigned char *rgba;
+	int wh, st, res = -1;
+
+	if (settings->bpp == 1) return WRONG_FORMAT;
+
+	if ((fp = fopen(file_name, "wb")) == NULL) return (-1);
+
+	if (!WebPConfigPreset(&conf, presets[settings->webp_preset],
+		settings->webp_quality)) goto ffail; // Lib failure
+	if (!settings->webp_preset)
+		WebPConfigLosslessPreset(&conf, settings->webp_compression);
+	conf.exact = TRUE; // Preserve invisible parts
+
+	/* Prepare intermediate container */
+	if (!WebPPictureInit(&pic)) goto ffail; // Lib failure
+	pic.use_argb = TRUE;
+	pic.width = settings->width;
+	pic.height = settings->height;
+	wh = pic.width * pic.height;
+	pic.writer = webp_fwrite;
+	pic.custom_ptr = (void *)fp;
+	if (!settings->silent) pic.progress_hook = webp_progress;
+	if (settings->img[CHN_ALPHA]) /* Need RGBA */
+	{
+		rgba = malloc(wh * 4);
+		if (!rgba) goto ffail;
+		copy_bytes(rgba, settings->img[CHN_IMAGE], wh, 4, 3);
+		copy_bytes(rgba + 3, settings->img[CHN_ALPHA], wh, 4, 1);
+		st = WebPPictureImportRGBA(&pic, rgba, pic.width * 4);
+		free(rgba);
+	}
+	/* RGB is enough */
+	else st = WebPPictureImportRGB(&pic, settings->img[CHN_IMAGE], pic.width * 3);
+
+	/* Do encode */
+	if (st)
+	{
+		if (!settings->silent) ls_init("WebP", 1);
+		if (WebPEncode(&conf, &pic)) res = 0;
+		WebPPictureFree(&pic);
+		if (!settings->silent) progress_end();
+	}
+
+ffail:	fclose(fp);
+	return (res);
+}
+#endif
+
 /* Macros for accessing values in Intel byte order */
 #define GET16(buf) (((buf)[1] << 8) + (buf)[0])
 #define GET32(buf) (((buf)[3] << 24) + ((buf)[2] << 16) + ((buf)[1] << 8) + (buf)[0])
@@ -4609,6 +4789,7 @@ static int load_lss(char *file_name, ls_settings *settings)
 	/* Load all image at once */
 	fseek(fp, 0, SEEK_END);
 	bl = ftell(fp) - LSS_HSIZE;
+	if (bl <= 0) goto fail; /* Too large or too small */
 	fseek(fp, LSS_HSIZE, SEEK_SET);
 	i = (w * h * 3) >> 1;
 	if (bl > i) bl = i; /* Cannot possibly be longer */
@@ -7021,6 +7202,9 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 #ifdef U_GIF
 	case FT_GIF: res = save_gif(file_name, &setw); break;
 #endif
+#ifdef U_WEBP
+	case FT_WEBP: res = save_webp(file_name, &setw); break;
+#endif
 	case FT_BMP: res = save_bmp(file_name, &setw, mf); break;
 	case FT_XPM: res = save_xpm(file_name, &setw); break;
 	case FT_XBM: res = save_xbm(file_name, &setw); break;
@@ -7198,6 +7382,9 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 #ifdef U_TIFF
 	case FT_TIFF: res0 = load_tiff(file_name, &settings); break;
 #endif
+#ifdef U_WEBP
+	case FT_WEBP: res0 = load_webp(file_name, &settings); break;
+#endif
 	case FT_BMP: res0 = load_bmp(file_name, &settings, mf); break;
 	case FT_XPM: res0 = load_xpm(file_name, &settings); break;
 	case FT_XBM: res0 = load_xbm(file_name, &settings); break;
@@ -7331,8 +7518,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 		break;
 	case FS_PATTERN_LOAD:
 		/* Success - rebuild patterns */
-		if ((res == 1) && (settings.colors == 2))
-			set_patterns(settings.img[CHN_IMAGE]);
+		if (res == 1) set_patterns(&settings);
 		free(settings.img[CHN_IMAGE]);
 		break;
 	case FS_PALETTE_LOAD:
@@ -7418,6 +7604,9 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 #endif
 #ifdef U_TIFF
 	case FT_TIFF: return (load_tiff_frames(file_name, ani));
+#endif
+#ifdef U_WEBP
+//	case FT_WEBP: res0 = load_webp_frames(file_name, ani); break;
 #endif
 	case FT_PBM:
 	case FT_PGM:
@@ -7658,6 +7847,12 @@ static int do_detect_format(char *name, FILE *fp)
 #else
 		return (FT_NONE);
 #endif
+	if (!memcmp(buf, "RIFF", 4) && !memcmp(buf + 8, "WEBP", 4))
+#ifdef U_WEBP
+		return (FT_WEBP);
+#else
+		return (FT_NONE);
+#endif
 	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
@@ -7744,7 +7939,7 @@ int detect_file_format(char *name, int need_palette)
 			int l;
 			fseek(fp, 0, SEEK_END);
 			l = ftell(fp);
-			i = l && (l <= 768) && !(l % 3) ? FT_PAL : FT_NONE;
+			i = (l > 0) && (l <= 768) && !(l % 3) ? FT_PAL : FT_NONE;
 		}
 	}
 	else if (!(f & (FF_IMAGE | FF_LAYER))) i = FT_NONE;

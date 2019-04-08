@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2018 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1478,6 +1478,7 @@ typedef struct {
 	int need_save, need_anim, need_undo, need_icc, script;
 	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
 	int tiff_m, lzma_c;
+	int webp_p, webp_q, webp_c;
 	int gif_delay, undo, icc;
 	int w, h;
 	/* Note: filename is in system encoding */
@@ -1643,6 +1644,8 @@ static void change_image_format(fselector_dd *dt, void **wdata, int what,
 	ftype = dt->ftypes[dt->ftype];
 	flags = ftype != FT_TIFF ? file_formats[ftype].flags :
 		tiff_formats[dt->tiff_m].flags;
+	if (ftype == FT_WEBP) flags |= dt->webp_p ? FF_COMPV8 : FF_COMPV8L;
+
 	/* Hide/show name/value widget pairs */
 	cmd_setv(wdata, (void *)flags, WDATA_ACTMAP);
 }
@@ -1720,6 +1723,9 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 	settings->tiff_type = -1; /* Use default */
 	settings->tga_RLE = tga_RLE;
 	settings->jp2_rate = jp2_rate;
+	settings->webp_preset = webp_preset;
+	settings->webp_quality = webp_quality;
+	settings->webp_compression = webp_compression;
 	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
@@ -1735,6 +1741,9 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 		settings->tiff_type = dt->tiff_m;
 		settings->tga_RLE = dt->tga_c;
 		settings->jp2_rate = dt->jp2_c;
+		settings->webp_preset = dt->webp_p;
+		settings->webp_quality = dt->webp_q;
+		settings->webp_compression = dt->webp_c;
 		settings->gif_delay = dt->gif_delay;
 
 		settings->mode = dt->mode;
@@ -1785,6 +1794,12 @@ static void store_ls_settings(ls_settings *settings)
 			tga_RLE = settings->tga_RLE;
 		if (fflags & FF_COMPJ2)
 			jp2_rate = settings->jp2_rate;
+		if (fflags & FF_COMPW)
+		{
+			webp_preset = settings->webp_preset;
+			if (webp_preset) webp_quality = settings->webp_quality;
+			else webp_compression = settings->webp_compression;
+		}
 		if ((fflags & FF_COMPT) && (ttype >= 0))
 		{
 			/* Remember selection for incompatible types separately;
@@ -2039,6 +2054,12 @@ static void *fselector_code[] = {
 			SPIN(tga_c, 0, 1), ACTMAP(FF_COMPR),
 		MLABELr(_("JPEG2000 Compression (0=Lossless)")), ACTMAP(FF_COMPJ2),
 			SPIN(jp2_c, 0, 100), ACTMAP(FF_COMPJ2),
+		MLABELr(_("WebP Compression")), ACTMAP(FF_COMPW),
+		OPTe(webp_presets, 0, webp_p, change_image_format), ACTMAP(FF_COMPW),
+		MLABELr(_("V8 Save Quality (100=High)")), ACTMAP(FF_COMPV8),
+			SPIN(webp_q, 0, 100), ACTMAP(FF_COMPV8),
+		MLABELr(_("V8L Compression (0=None)")), ACTMAP(FF_COMPV8L),
+			SPIN(webp_c, 0, 9), ACTMAP(FF_COMPV8L),
 		MLABELr(_("Hotspot at X =")), ACTMAP(FF_SPOT),
 			SPINa(xx), ACTMAP(FF_SPOT),
 		MLABELr(_("Y =")), ACTMAP(FF_SPOT),
@@ -2231,6 +2252,9 @@ void file_selector_x(int action_type, void **xdata)
 	tdata.tga_c = tga_RLE;
 	tdata.jp2_c = jp2_rate;
 	tdata.lzma_c = lzma_preset;
+	tdata.webp_p = webp_preset;
+	tdata.webp_q = webp_quality;
+	tdata.webp_c = webp_compression;
 
 	tdata.gif_delay = preserved_gif_delay;
 	tdata.undo = undo_load;

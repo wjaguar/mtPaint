@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -782,7 +782,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 
 #else /* Linux */
 
-#define HANDBOOK_BROWSER "firefox"
+#define HANDBOOK_BROWSER "seamonkey"
 #define HANDBOOK_LOCATION "/usr/doc/mtpaint/index.html"
 #define HANDBOOK_LOCATION2 "/usr/share/doc/mtpaint/index.html"
 

@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -176,7 +176,7 @@ typedef struct {
 	int channel;			// Current active channel
 	int ics;			// Has the centre been set by the user?
 	float ic[2];			// Current centre x,y
-	int tool_pat;			// Tool pattern number
+	int tool_pat, tool_pat_B;	// Tool pattern number
 	int xbm_hot_x, xbm_hot_y;	// Current XBM hot spot
 	char prot_mask[256];		// 256 bytes used for indexed images
 	int prot;			// Number of protected colours in prot_RGB
@@ -376,6 +376,7 @@ image_state mem_state;			// Current edit settings
 #define mem_icy			mem_state.ic[1]
 #define mem_ics			mem_state.ics
 #define mem_tool_pat		mem_state.tool_pat
+#define mem_tool_pat_B		mem_state.tool_pat_B
 #define mem_xbm_hot_x		mem_state.xbm_hot_x
 #define mem_xbm_hot_y		mem_state.xbm_hot_y
 #define mem_prot_mask		mem_state.prot_mask
@@ -426,7 +427,8 @@ transform_state mem_bcsp[2];
 
 /// PATTERNS
 
-unsigned char mem_pattern[8 * 8];	// Current pattern
+int pattern_B;				// Let colour B have its own pattern
+unsigned char *mem_pattern;		// Current pattern
 unsigned char mem_col_pat[8 * 8];	// Indexed 8x8 colourised pattern using colours A & B
 unsigned char mem_col_pat24[8 * 8 * 3];	// RGB 8x8 colourised pattern using colours A & B
 

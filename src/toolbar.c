@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -49,6 +49,8 @@ void **toolbar_boxes[TOOLBAR_MAX],		// Used for showing/hiding
 
 void **m_cursor[TOTAL_CURSORS];			// My mouse cursors
 void **move_cursor, **busy_cursor, **corner_cursor[4]; // System cursors
+
+int patterns_grid_w, patterns_grid_h;
 
 
 
@@ -887,6 +889,11 @@ void pressed_toolbar_toggle(int state, int which)
 ///	PATTERNS/TOOL PREVIEW AREA
 
 
+#define EXT_PATTERNS 256
+
+static unsigned char patterns[8 * 8 * (DEF_PATTERNS + EXT_PATTERNS)];
+#define pattern0 (patterns + 8 * 8 * DEF_PATTERNS)
+
 void mem_set_brush(int val)			// Set brush, update size/flow/preview
 {
 	int offset, j, o, o2;
@@ -913,58 +920,95 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 #endif
 
 #include "graphics/xbm_patterns.xbm"
-#if (PATTERN_GRID_W * 8 != xbm_patterns_width) || (PATTERN_GRID_H * 8 != xbm_patterns_height)
-#error "Mismatched patterns bitmap"
+#if (xbm_patterns_width % 8) || (xbm_patterns_width < 8 * 2) || \
+	(xbm_patterns_width > 8 * 16) || (xbm_patterns_height % 8) || \
+	(xbm_patterns_height < 8 * 2) || (xbm_patterns_height > 8 * 16)
+#error "Unacceptable width/height of patterns bitmap"
 #endif
 
-/* Create RGB dump of patterns to display, with each pattern repeated 4x4 */
+/* Create RGB dump of patterns to display: arranged as in their source file,
+ * each 8x8 pattern repeated 4x4 with 2 pixels border and 4 pixels separation */
 void render_patterns(unsigned char *buf)
 {
 	png_color *p;
-	unsigned char *dest;
-	int i = 0, j, x, y, h, b;
+	unsigned char *dest, *src = pattern0;
+	int j, x, y, h, rowl = patterns_grid_w * PATTERN_CELL * 3;
 
-#define PAT_ROW_L (PATTERN_GRID_W * (8 * 4 + 4) * 3)
-#define PAT_8ROW_L (8 * PAT_ROW_L)
-	dest = buf + 2 * PAT_ROW_L + 2 * 3;
-	for (y = 0; y < PATTERN_GRID_H; y++ , dest += (8 * 3 + 4) * PAT_ROW_L)
+	dest = buf + rowl * 2 + 2 * 3;
+	for (y = 0; y < patterns_grid_h; y++)
 	{
 		for (h = 0; h < 8; h++)
-		for (x = 0; x < PATTERN_GRID_W; x++ , dest += (8 * 3 + 4) * 3)
 		{
-			b = xbm_patterns_bits[i++];
-			for (j = 0; j < 8; j++ , b >>= 1)
+			for (x = 0; x < patterns_grid_w; x++)
 			{
-				p = mem_col_24 + (b & 1);
-				*dest++ = p->red;
-				*dest++ = p->green;
-				*dest++ = p->blue;
+				for (j = 0; j < 8; j++)
+				{
+					p = mem_col_24 + *src++;
+					*dest++ = p->red;
+					*dest++ = p->green;
+					*dest++ = p->blue;
+				}
+				memcpy(dest, dest - 8 * 3, 8 * 3);
+				memcpy(dest + 8 * 3, dest - 8 * 3, 8 * 3 * 2);
+				src += 8 * 8 - 8;
+				dest += (PATTERN_CELL - 8) * 3;
 			}
-			memcpy(dest, dest - 8 * 3, 8 * 3);
-			memcpy(dest + 8 * 3, dest - 8 * 3, 2 * 8 * 3);
+			src -= patterns_grid_w * 8 * 8 - 8;
 		}
-		memcpy(dest, dest - PAT_8ROW_L, PAT_8ROW_L);
-		memcpy(dest + PAT_8ROW_L, dest - PAT_8ROW_L, 2 * PAT_8ROW_L);
+		memcpy(dest, dest - rowl * 8, rowl * 8);
+		memcpy(dest + rowl * 8 , dest - rowl * 8, rowl * 8 * 2);
+		src += (patterns_grid_w - 1) * 8 * 8;
+		dest += rowl * (PATTERN_CELL - 8);
 	}
-#undef PAT_8ROW_L
-#undef PAT_ROW_L
 }
 
-/* Set 0-1 indexed image as new patterns */
-void set_patterns(unsigned char *src)
+/* Test/set 0-1 indexed image as new patterns */
+int set_patterns(ls_settings *settings)
 {
-	int i, j, b, l = PATTERN_GRID_W * PATTERN_GRID_H * 8;
+	unsigned char *dest = pattern0, *src = settings->img[CHN_IMAGE];
+	int j, l, ll, w = settings->width, h = settings->height;
 
-	for (i = 0; i < l; i++)
+	/* Check dimensions (2x2..16x16 of 8x8 cells) and depth */
+	if ((w % 8) || (w < 8 * 2) || (w > 8 * 16) ||
+		(h % 8) || (h < 8 * 2) || (h > 8 * 16) || (settings->bpp != 1))
+		return (0); // Forget it
+	if (!src) return (-1); // Can try
+	if (settings->colors != 2) return (0); // 0-1 it must be
+
+	ll = l = (patterns_grid_w = w / 8) * (patterns_grid_h = h / 8);
+	while (l-- > 0)
 	{
-		for (b = j = 0; j < 8; j++) b += *src++ << j;
-		xbm_patterns_bits[i] = b;
+		for (j = 8; j-- > 0; src += w , dest += 8) memcpy(dest, src, 8);
+		src -= ((dest - pattern0) % (w * 8) ? w * 8 : w) - 8;
 	}
+	return (ll);
 }
 
 void mem_pat_update()			// Update indexed and then RGB pattern preview
 {
-	int i, j, k, l, ii, b;
+	int i, j, k, l;
+
+	if (!patterns_grid_w) /* Unpack the XBM */
+	{
+		unsigned char *src = xbm_patterns_bits, *dest = pattern0;
+		int w;
+
+		patterns_grid_w = w = xbm_patterns_width / 8;
+		l = w * (patterns_grid_h = xbm_patterns_height / 8);
+		while (l-- > 0)
+		{
+			for (j = 8; j-- > 0; src += w)
+				for (i = *src + 0x100; i > 1; i >>= 1) *dest++ = i & 1;
+			src -= ((dest - pattern0) % (w * 8 * 8) ? w * 8 : w) - 1;
+		}
+	}
+
+	if (!mem_pattern) /* Set up default Bayer 4x4 patterns */
+	{
+		for (i = 0; i < DEF_PATTERNS * 8 * 8; i++)
+			patterns[i] = bayer[((i << 2) ^ (i >> 1)) & 0xC] * 2 +
+				bayer[(i >> 1) & 0xC] + (i >> 6) < 16;
+	}
 
 	if ( mem_img_bpp == 1 )
 	{
@@ -972,21 +1016,15 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 		mem_col_B24 = mem_pal[mem_col_B];
 	}
 
-	/* Pattern bitmap starts here */
-	l = mem_tool_pat * 8 - (mem_tool_pat % PATTERN_GRID_W) * 7;
-
-	/* Set up pattern maps from XBM */
-	for (i = ii = 0; i < 8; i++)
+	/* Set up pattern maps */
+	mem_pattern = pattern0 + mem_tool_pat * 8 * 8;
+	for (i = 0; i < 8 * 8; i++)
 	{
-		b = xbm_patterns_bits[l + i * PATTERN_GRID_W];
-		for (k = 0; k < 8; k++ , ii++ , b >>= 1)
-		{
-			mem_pattern[ii] = j = b & 1;
-			mem_col_pat[ii] = mem_col_[j];
-			mem_col_pat24[ii * 3 + 0] = mem_col_24[j].red;
-			mem_col_pat24[ii * 3 + 1] = mem_col_24[j].green;
-			mem_col_pat24[ii * 3 + 2] = mem_col_24[j].blue;
-		}
+		j = mem_pattern[i];
+		mem_col_pat[i] = mem_col_[j];
+		mem_col_pat24[i * 3 + 0] = mem_col_24[j].red;
+		mem_col_pat24[i * 3 + 1] = mem_col_24[j].green;
+		mem_col_pat24[i * 3 + 2] = mem_col_24[j].blue;
 	}
 
 	k = PREVIEW_WIDTH * 32 * 3;

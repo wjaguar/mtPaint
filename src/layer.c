@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2017 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -100,6 +100,7 @@ typedef struct {
 	int lock;
 	int x, y, opacity, trans;
 	int nlayer, lnum;
+	int vis;
 	char *lname;
 	void **llist, **nmentry, **xspin, **yspin, **opslider, **trspin;
 	void **ltb_new, **ltb_raise, **ltb_lower, **ltb_dup, **ltb_center,
@@ -889,6 +890,12 @@ static void layer_inputs_changed(layers_dd *dt, void **wdata, int what,
 		t->opacity = dt->opacity;
 		repaint_layer(layer_selected);
 	}
+	else if (cause == &dt->vis) // Scripted visibility toggle
+	{
+		t->visible = dt->vis;
+		cmd_setv(dt->llist, (void *)layer_selected, LISTCC_RESET_ROW);
+		repaint_layer(layer_selected);
+	}
 	else /* if (cause == &dt->trans) */ // Transparency spin
 	{
 		mem_set_trans(dt->trans);
@@ -1105,6 +1112,7 @@ static void *layers_code[] = {
 	TLLABELl(_("Transparent Colour"), 0, 3, 2),
 	REF(trspin), TLSPIN(trans, -1, 255, 2, 3),
 	EVENT(CHANGE, layer_inputs_changed),
+	uCHECK("Visible", vis), EVENT(SCRIPT, layer_inputs_changed),
 	WDONE,
 	CHECKv(_("Show all layers in main window"), show_layers_main),
 	EVENT(CHANGE, layer_inputs_changed), UNNAME,
