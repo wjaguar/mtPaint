@@ -1438,8 +1438,8 @@ static int offer_clipboard(void **slot)
 		for (i = 0; i < 2; i++)
 		{
 			if (!gtk_clipboard_set_with_data(gtk_clipboard_get(
-				which ? GDK_SELECTION_CLIPBOARD :
-				GDK_SELECTION_PRIMARY), cd->ent, cd->n,
+				which ? GDK_SELECTION_PRIMARY :
+				GDK_SELECTION_CLIPBOARD), cd->ent, cd->n,
 				clip_copy, clip_clear, slot)) continue;
 			res = TRUE;
 			break;

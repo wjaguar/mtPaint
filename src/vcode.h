@@ -674,6 +674,7 @@ enum {
 #define XHBOXS XHBOXbp(5, 0, 0)
 #define XHBOXBS XHBOXbp(5, 5, 0)
 #define TLHBOXl(X,Y,L) WBh_t(HBOX, 1), WBxyl(X, Y, L)
+#define TLHBOXpl(P,X,Y,L) WBh_t(HBOX, 2), WBpbs(P, 0, 0), WBxyl(X, Y, L)
 #define FVBOX(NM) FRAME(NM), VBOX
 #define FVBOXB(NM) FRAME(NM), VBOXB
 #define FVBOXBS(NM) FRAME(NM), VBOXBS
@@ -872,6 +873,7 @@ enum {
 #define LISTCX(V,L,SM,M,HS,HX) WBr3hf_(LISTCX, 4 + 2 * 2), WBfield(V), \
 	WBfield(L), WBfield(SM), WBfield(M), EVENT(SELECT, HS), EVENT(EXT, HX)
 #define XENTRY(V) WBrhf_x(ENTRY, 1), WBfield(V)
+#define XLENTRY(V,MX) WBrhf_x(ENTRY, 2), WBfield(V), (void *)(MX)
 #define MLENTRY(V) WBrhf_(MLENTRY, 1), WBfield(V)
 #define TLENTRY(V,MX,X,Y,L) WBrhf_t(ENTRY, 3), WBfield(V), (void *)(MX), \
 	WBxyl(X, Y, L)

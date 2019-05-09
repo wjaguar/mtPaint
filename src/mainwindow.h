@@ -297,7 +297,7 @@ void **main_window_, **main_keys, **settings_dock, **layers_dock, **main_split,
 	**menu_slots[TOTAL_MENU_IDS];
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
-int	show_menu_icons, paste_commit, scroll_zoom;
+int	show_menu_icons, paste_commit, scroll_zoom, arrow_scroll;
 int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
 int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;

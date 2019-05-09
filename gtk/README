@@ -133,7 +133,7 @@ The build was done on a Slackware Linux system using MinGW cross-compiler instal
 - binutils 2.19		( http://mingw.sourceforge.net/ )
 - MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
 - Win32 API 3.13	( http://mingw.sourceforge.net/ )
-And CMake 2.8.12 (for building OpenJPEG).
+And CMake 2.8.12 (for building OpenJPEG and zstd).
 
 To replicate it, you need the following source packages:
 - GTK+ 2.6.7 (this specific version and no other):
@@ -160,33 +160,39 @@ To replicate it, you need the following source packages:
 - zlib 1.2.11:
     zlib-1.2.11.tar.gz
     https://zlib.net/zlib-1.2.11.tar.gz
-- XZ Utils 5.2.3:
-    xz-5.2.3.tar.bz2
-    https://tukaani.org/xz/xz-5.2.3.tar.bz2
+- XZ Utils 5.2.4:
+    xz-5.2.4.tar.bz2
+    https://sourceforge.net/projects/lzmautils/files/xz-5.2.4.tar.bz2/download
+- zstd 1.3.8:
+    zstd-1.3.8.tar.gz
+    https://github.com/facebook/zstd/releases/download/v1.3.8/zstd-1.3.8.tar.gz
 - libpng 1.2.59 (not version 1.4+):
     libpng-1.2.59.tar.gz
     https://sourceforge.net/projects/libpng/files/libpng12/1.2.59/libpng-1.2.59.tar.gz/download
-- libjpeg 9b:
-    jpegsrc.v9b.tar.gz
-    http://www.ijg.org/files/jpegsrc.v9b.tar.gz
-- LibTIFF 4.0.8:
-    tiff-4.0.8.tar.gz
-    ftp://download.osgeo.org/libtiff/tiff-4.0.8.tar.gz
+- libjpeg 9c:
+    jpegsrc.v9c.tar.gz
+    https://www.ijg.org/files/jpegsrc.v9c.tar.gz
+- libwebp 1.0.2:
+    libwebp-1.0.2.tar.gz
+    https://github.com/webmproject/libwebp/archive/v1.0.2.tar.gz
+- LibTIFF 4.0.10:
+    tiff-4.0.10.tar.gz
+    https://download.osgeo.org/libtiff/tiff-4.0.10.tar.gz
 - FreeType 2.8.1:
     freetype-2.8.1.tar.bz2
     http://download.savannah.gnu.org/releases/freetype/freetype-2.8.1.tar.bz2
 - giflib 4.2.3 (not version 5+):
     giflib-4.2.3.tar.bz2
     https://sourceforge.net/projects/giflib/files/giflib-4.x/giflib-4.2.3.tar.bz2/download
-- OpenJPEG 2.3.0:
-    openjpeg-2.3.0.tar.gz
-    https://github.com/uclouvain/openjpeg/archive/v2.3.0.tar.gz
-- Little CMS 2.8:
-    lcms2-2.8.tar.gz
-    https://sourceforge.net/projects/lcms/files/lcms/2.8/lcms2-2.8.tar.gz/download
-- Gifsicle 1.90:
-    gifsicle-1.90.tar.gz
-    https://www.lcdf.org/gifsicle/gifsicle-1.90.tar.gz
+- OpenJPEG 2.3.1:
+    openjpeg-2.3.1.tar.gz
+    https://github.com/uclouvain/openjpeg/archive/v2.3.1/openjpeg-2.3.1.tar.gz
+- Little CMS 2.9:
+    lcms2-2.9.tar.gz
+    https://sourceforge.net/projects/lcms/files/lcms/2.9/lcms2-2.9.tar.gz/download
+- Gifsicle 1.91:
+    gifsicle-1.91.tar.gz
+    https://www.lcdf.org/gifsicle/gifsicle-1.91.tar.gz
 - mtPaint 3.50 (or later):
     mtpaint-3.50.tar.bz2
 
@@ -206,4 +212,4 @@ git clone https://github.com/mxe/mxe.git
 cd mxe && make gcc MXE_TARGETS=i686-w64-mingw32.shared
 
 ---------------------------------
-Copyright (C) 2010,2011,2017 Dmitry Groshev
+Copyright (C) 2010,2011,2017,2019 Dmitry Groshev

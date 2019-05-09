@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2018 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -98,6 +98,8 @@ enum {
 #define FF_COMPV8  0x0800000 /* WebP V8 compression */
 #define FF_COMPV8L 0x1000000 /* WebP V8L compression */
 #define FF_COMPW   0x2000000 /* WebP selectable compression */
+#define FF_COMPWT  0x4000000 /* TIFF WebP compression */
+#define FF_COMPZS  0x8000000 /* TIFF ZSTD compression */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -119,7 +121,7 @@ typedef struct {
 
 extern fformat file_formats[];
 
-#define TIFF_MAX_TYPES 9 /* Enough for NULL-terminated list of them all */
+#define TIFF_MAX_TYPES 11 /* Enough for NULL-terminated list of them all */
 
 typedef struct {
 	char *name;
@@ -130,7 +132,7 @@ typedef struct {
 
 extern tiff_format tiff_formats[];
 
-int tiff_lzma; /* LZMA2 compression supported */
+int tiff_lzma, tiff_zstd; /* LZMA2 & ZSTD compression supported */
 
 extern char *webp_presets[];
 
@@ -144,6 +146,7 @@ typedef struct {
 	int jpeg_quality;
 	int png_compression;
 	int lzma_preset;
+	int zstd_level;
 	int tiff_type;
 	int tga_RLE;
 	int jp2_rate;
@@ -163,7 +166,7 @@ typedef struct {
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
-int lzma_preset, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
+int lzma_preset, zstd_level, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int webp_preset, webp_quality, webp_compression;
 int apply_icc;
 
@@ -190,3 +193,11 @@ int detect_file_format(char *name, int need_palette);
 #define detect_palette_format(X) detect_file_format(X, TRUE)
 
 int valid_file(char *filename);		// Can this file be opened for reading?
+
+/* Compression levels range for ZSTD */
+#define ZSTD_MIN 1
+#define ZSTD_MAX 22
+
+#ifdef U_TIFF
+void init_tiff_formats();	// Check what libtiff can handle
+#endif

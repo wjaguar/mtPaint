@@ -31,6 +31,7 @@
 #include "inifile.h"
 #include "viewer.h"
 #include "mainwindow.h"
+#include "toolbar.h"
 #include "thread.h"
 
 #include "prefs.h"
@@ -67,7 +68,7 @@ typedef struct {
 	int undo_depth[3], trans[3], hot_x[3], hot_y[3];
 	int confx, centre, zoom;
 	int lang, script;
-	char *factor_str;
+	char *factor_str, *pattern;
 	char **tiffrs, **tiffis, **tiffbs;
 	void **label_tablet_pressure, **label_tablet_device;
 } pref_dd;
@@ -111,6 +112,7 @@ static void prefs_evt(pref_dd *dt, void **wdata, int what)
 		string_init();			// Translate static strings
 #endif
 
+		set_master_pattern(dt->pattern);
 		inifile_set("clipFilename", mem_clip_file);
 		if (strcmp(oldpal, p = inifile_get(DEFAULT_PAL_INI, "")))
 			load_def_palette(p);
@@ -152,20 +154,25 @@ static void *pref_code[] = {
 	BORDER(NBOOK, 0),
 	NBOOKl,
 	BORDER(TABLE, 10),
-	BORDER(LABEL, 4), BORDER(SPIN, 4),
+	BORDER(LABEL, 4), BORDER(SPIN, 4), BORDER(ENTRY, 0),
 ///	---- TAB1 - GENERAL
 	PAGE(_("General")), GROUPN,
 #ifdef U_THREADS
-	TABLE2(5),
+	TABLE2(6),
 	TSPINv(_("Max threads (0 to autodetect)"), maxthreads, 0, 256),
 	TSPINv(_("Min kpixels per render thread"), kpix_threads,
 		16, (MAX_WIDTH * MAX_HEIGHT + 1023) / 1024),
+#define XROWS 2
 #else
-	TABLE2(3),
+	TABLE2(4),
+#define XROWS 0
 #endif
 	TSPINv(_("Max memory used for undo (MB)"), mem_undo_limit, 1, 2048),
 	TSPINa(_("Max undo levels"), undo_depth),
 	TSPINv(_("Communal layer undo space (%)"), mem_undo_common, 0, 100),
+	TLHBOXpl(4, 0, 3 + XROWS, 2),
+	MLABEL(_("Bayer master pattern")), XLENTRY(pattern, 48),
+	WDONE,
 	WDONE,
 	CHECKv(_("Use gamma correction by default"), use_gamma),
 	CHECKv(_("Use gamma correction when painting"), paint_gamma),
@@ -175,19 +182,18 @@ static void *pref_code[] = {
 	CHECKv(_("Optimize alpha chequers"), chequers_optimize),
 	CHECKv(_("Disable view window transparencies"), opaque_view),
 	CHECKv(_("Enable overlays by layer"), layer_overlay),
-///	LANGUAGE SWITCHBOX
+	WDONE,
 #ifdef U_NLS
-	BORDER(OPT, 0),
-	FVBOXBS(_("Language")),
-	BORDER(LABEL, 0),
+///	---- TAB2 - LANGUAGE
+	PAGE(_("Language")),
+	VBOXBS,
 	MLABELc(_("Select preferred language translation\n\n"
 	"You will need to restart mtPaint\nfor this to take full effect")),
-	BORDER(LABEL, 4),
 	OPT(pref_langs, PREF_LANGS, lang),
 	WDONE,
-#endif
 	WDONE,
-///	---- TAB2 - INTERFACE
+#endif
+///	---- TAB3 - INTERFACE
 	PAGE(_("Interface")),
 	TABLE2(3),
 	TSPINv(_("Greyscale backdrop"), mem_background, 0, 255),
@@ -198,6 +204,7 @@ static void *pref_code[] = {
 	CHECKv(_("Mouse cursor = Tool"), cursor_tool),
 	CHECKb(_("Confirm Exit"), confx, "exitToggle"),
 	CHECKv(_("Q key quits mtPaint"), q_quit),
+	CHECKv(_("Arrow keys scroll canvas"), arrow_scroll),
 	CHECKv(_("Changing tool commits paste"), paste_commit),
 	CHECKb(_("Centre tool settings dialogs"), centre, "centerSettings"),
 	CHECKb(_("New image sets zoom to 100%"), zoom, "zoomToggle"),
@@ -208,7 +215,7 @@ static void *pref_code[] = {
 #endif
 	ENDIF(1), // !script
 	WDONE,
-///	---- TAB3 - FILES
+///	---- TAB4 - FILES
 	PAGE(_("Files")), GROUPN,
 	TABLE2(8),
 	TSPINa(_("Transparency index"), trans),
@@ -229,10 +236,10 @@ static void *pref_code[] = {
 #endif
 	WDONE,
 #ifdef U_TIFF
-///	---- TAB4 - TIFF
+///	---- TAB5 - TIFF
 	PAGE("TIFF"), GROUPN,
 	BORDER(OPT, 2),
-	TABLE2(4),
+	TABLE2(5),
 // !!! Here also DPI (default)
 	TOPTDv(_("Compression (RGB)"), tiffrs, tiff_rtype),
 	TOPTDv(_("Compression (indexed)"), tiffis, tiff_itype),
@@ -240,12 +247,15 @@ static void *pref_code[] = {
 	IFvx(tiff_lzma, 1),
 	TSPINv(_("LZMA2 Compression (0=None)"), lzma_preset, 0, 9),
 	ENDIF(1),
+	IFvx(tiff_zstd, 1),
+	TSPINv(_("ZSTD Compression Level"), zstd_level, ZSTD_MIN, ZSTD_MAX),
+	ENDIF(1),
 	WDONE,
 	CHECKv(_("Enable predictor"), tiff_predictor),
 	WDONE,
 #endif
 #ifdef U_WEBP
-///	---- TAB5 - WebP
+///	---- TAB6 - WebP
 	PAGE("WebP"), GROUPN,
 	BORDER(OPT, 2),
 	TABLE2(3),
@@ -257,7 +267,7 @@ static void *pref_code[] = {
 #endif
 	/* !!! Interface is not scriptable */
 	UNLESSx(script, 1),
-///	---- TAB6 - PATHS
+///	---- TAB7 - PATHS
 	PAGE(_("Paths")),
 	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
 		FS_CLIP_FILE, mem_clip_file),
@@ -274,7 +284,7 @@ static void *pref_code[] = {
 		FS_SELECT_FILE, DEFAULT_THEME_INI),
 #endif
 	WDONE,
-///	---- TAB7 - STATUS BAR
+///	---- TAB8 - STATUS BAR
 	PAGE(_("Status Bar")),
 	CHECKv(_("Canvas Geometry"), status_on[0]),
 	CHECKv(_("Cursor X,Y"), status_on[1]),
@@ -282,7 +292,7 @@ static void *pref_code[] = {
 	CHECKv(_("Selection Geometry"), status_on[3]),
 	CHECKv(_("Undo / Redo"), status_on[4]),
 	WDONE,
-///	---- TAB8 - TABLET
+///	---- TAB9 - TABLET
 	PAGE(_("Tablet")),
 	FVBOXB(_("Device Settings")),
 	BORDER(LABEL, 0),
@@ -329,7 +339,7 @@ void pressed_preferences()
 		{ mem_xbm_hot_x, -1, mem_width - 1 },
 		{ mem_xbm_hot_y, -1, mem_height - 1 },
 		FALSE, TRUE, FALSE,
-		0, !!script_cmds, txt,
+		0, !!script_cmds, txt, inifile_get("masterPattern", ""),
 		NULL, NULL, NULL, NULL };
 
 	// Make sure the user can only open 1 prefs window

@@ -91,6 +91,7 @@ static inilist ini_bool[] = {
 	{ "layerOverlay",	&layer_overlay,		FALSE },
 	{ "paintGamma",		&paint_gamma,		FALSE },
 	{ "patternB",		&pattern_B,		FALSE },
+	{ "arrowScroll",	&arrow_scroll,		FALSE },
 	{ "tablet_use_size",	tablet_tool_use + 0,	FALSE },
 	{ "tablet_use_flow",	tablet_tool_use + 1,	FALSE },
 	{ "tablet_use_opacity",	tablet_tool_use + 2,	FALSE },
@@ -143,6 +144,7 @@ static inilist ini_int[] = {
 	{ "tgaRLE",		&tga_RLE,		0   },
 	{ "jpeg2000Rate",	&jp2_rate,		1   },
 	{ "lzmaPreset",		&lzma_preset,		9   },
+	{ "zstdLevel",		&zstd_level,		9   },
 	{ "webpPreset",		&webp_preset,		1   },
 	{ "webpQuality",	&webp_quality,		90  },
 	{ "webpCompression",	&webp_compression,	9   },
@@ -193,7 +195,7 @@ void **main_window_, **main_keys, **settings_dock, **layers_dock, **main_split,
 static void **dock_area, **dock_book, **main_menubar;
 
 int	view_image_only, viewer_mode, drag_index, q_quit, cursor_tool;
-int	show_menu_icons, paste_commit, scroll_zoom;
+int	show_menu_icons, paste_commit, scroll_zoom, arrow_scroll;
 int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
 int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
@@ -635,6 +637,26 @@ static void quit_all(int mode)
 	if (mode || q_quit) delete_event(GET_DDATA(main_window_), main_window_);
 }
 
+/* Scroll canvas under cursor instead of moving the cursor */
+static int try_scroll(int *dxy)
+{
+	int bx, by, mx[2];
+
+	if (!arrow_scroll || mouse_left_canvas) return (TRUE); // Let cursor go
+
+	cmd_read(scrolledwindow_canvas, NULL);
+	cmd_peekv(scrolledwindow_canvas, mx, sizeof(mx), CSCROLL_LIMITS);
+	dxy[0] -= (bx = bounded(cvxy[0] + dxy[0], 0, mx[0])) - cvxy[0];
+	dxy[1] -= (by = bounded(cvxy[1] + dxy[1], 0, mx[1])) - cvxy[1];
+	if ((bx ^ cvxy[0]) | (by ^ cvxy[1]))
+	{
+		cvxy[0] = bx;
+		cvxy[1] = by;
+		cmd_reset(scrolledwindow_canvas, NULL);
+	}
+	return (dxy[0] | dxy[1]);
+}
+
 /* Forward declaration */
 static void mouse_event(mouse_ext *m, int mflag, int dx, int dy);
 
@@ -672,35 +694,41 @@ static void move_mouse(int dx, int dy, int button)
 	{
 		lastdx = dx; lastdy = dy;
 		mouse_event(&m, 1, dx, dy); // motion
+		unreal_move = 2;
 
 		/* Nudge cursor when needed */
 		if ((abs(lastdx) >= zoom) || (abs(lastdy) >= zoom))
 		{
 			lastdx -= (dxy[0] = lastdx * can_zoom) * zoom;
 			lastdy -= (dxy[1] = lastdy * can_zoom) * zoom;
-			unreal_move = 3;
-			/* Event can be delayed or lost */
-			cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
+			if (try_scroll(dxy))
+			{
+				unreal_move = 3;
+				/* Event can be delayed or lost */
+				cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
+			}
 		}
-		else unreal_move = 2;
 	}
 	else /* Real mouse is precise enough */
 	{
 		unreal_move = 1;
 
-		/* Simulate movement if failed to actually move mouse */
+		/* Simulate movement unless actually moved mouse */
 		dxy[0] = dx * scale;
 		dxy[1] = dy * scale;
-		cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
-		if (dxy[0] | dxy[1]) // failed
+		while (TRUE)
 		{
-			lastdx = dx; lastdy = dy;
+			if (try_scroll(dxy))
+			{
+				cmd_setv(drawing_canvas, dxy, CANVAS_BMOVE_MOUSE);
+				if (!(dxy[0] | dxy[1])) break; // Moved OK
+				lastdx = dxy[0] / scale;
+				lastdy = dxy[1] / scale;
+			}
 			mouse_event(&m, 1, dx, dy); // motion
+			break;
 		}
 	}
-	/* !!! The code above doesn't even try to handle situation where
-	 * autoscroll works but cursor warp doesn't. If one such ever arises,
-	 * values returned from CANVAS_BMOVE_MOUSE will have to be used - WJ */
 }
 
 void stop_line()
@@ -1027,6 +1055,7 @@ void var_init()
 		tr = inifile_get_gint32("tiffTypeRGB", 1 /* COMPRESSION_NONE */);
 		ti = inifile_get_gint32("tiffTypeI", 1 /* COMPRESSION_NONE */);
 		tb = inifile_get_gint32("tiffTypeBW", 1 /* COMPRESSION_NONE */);
+		init_tiff_formats();
 		for (i = 0; tiff_formats[i].name; i++)
 		{
 			if (tiff_formats[i].id == tr) tiff_rtype = i;
@@ -4168,6 +4197,7 @@ static void script_bp(int mode)
 		tdata.b[0] = mem_tool_pat_B;
 		tdata.x[0] = mem_tool_pat % patterns_grid_w;
 		tdata.y[0] = mem_tool_pat / patterns_grid_w;
+		tdata.n[1] = tdata.b[1] = -DEF_PATTERNS;
 	}
 	tdata.n[2] = tdata.b[2] = (tdata.x[2] + 1) * (tdata.y[2] + 1) - 1;
 	run_destroy(run_create_(bp_code, &tdata, sizeof(tdata), script_cmds));
@@ -5150,33 +5180,33 @@ static void *main_menu_code[] = {
 	SUBMENU(_("//Save Clipboard")),
 	MENUTEAR, ///
 	MENUITEMs("///1", ACTMOD(ACT_SAVE_CLIP, 1)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F1, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F1, C),
 	MENUITEMs("///2", ACTMOD(ACT_SAVE_CLIP, 2)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F2, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F2, C),
 	MENUITEMs("///3", ACTMOD(ACT_SAVE_CLIP, 3)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F3, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F3, C),
 	MENUITEMs("///4", ACTMOD(ACT_SAVE_CLIP, 4)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F4, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F4, C),
 	MENUITEMs("///5", ACTMOD(ACT_SAVE_CLIP, 5)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F5, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F5, C),
 	MENUITEMs("///6", ACTMOD(ACT_SAVE_CLIP, 6)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F6, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F6, C),
 	MENUITEMs("///7", ACTMOD(ACT_SAVE_CLIP, 7)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F7, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F7, C),
 	MENUITEMs("///8", ACTMOD(ACT_SAVE_CLIP, 8)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F8, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F8, C),
 	MENUITEMs("///9", ACTMOD(ACT_SAVE_CLIP, 9)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F9, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F9, C),
 	MENUITEMs("///10", ACTMOD(ACT_SAVE_CLIP, 10)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F10, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F10, C),
 	MENUITEMs("///11", ACTMOD(ACT_SAVE_CLIP, 11)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F11, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F11, C),
 	MENUITEMs("///12", ACTMOD(ACT_SAVE_CLIP, 12)),
-		ACTMAP(NEED_CLIP), SHORTCUT(F12, C),
+		ACTMAP(NEED_PCLIP), SHORTCUT(F12, C),
 	WDONE,
 	MENUITEM(_("//Import Clipboard from System"), ACTMOD(ACT_LOAD_CLIP, -1)),
 	MENUITEM(_("//Export Clipboard to System"), ACTMOD(ACT_SAVE_CLIP, -1)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUSEP, //
 	MENUITEMs(_("//Choose Pattern ..."), ACTMOD(DLG_CHOOSER, CHOOSE_PATTERN)),
 		SHORTCUT(F2, 0),
@@ -5314,13 +5344,13 @@ static void *main_menu_code[] = {
 		ACTMAP(NEED_SEL), SHORTCUT(l, CS),
 	MENUSEP, //
 	MENUITEMis(_("//Flip Vertically"), ACTMOD(ACT_SEL_FLIP_V, 0), XPM_ICON(flip_vs)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUITEMis(_("//Flip Horizontally"), ACTMOD(ACT_SEL_FLIP_H, 0), XPM_ICON(flip_hs)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUITEMis(_("//Rotate Clockwise"), ACTMOD(ACT_SEL_ROT, 0), XPM_ICON(rotate_cs)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUITEMis(_("//Rotate Anti-Clockwise"), ACTMOD(ACT_SEL_ROT, 1), XPM_ICON(rotate_as)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUSEP, //
 	MENUITEMs(_("//Horizontal Ramp"), ACTMOD(ACT_RAMP, 0)),
 		ACTMAP(NEED_SEL),
@@ -5330,15 +5360,15 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Alpha Blend A,B"), ACTMOD(ACT_SEL_ALPHA_AB, 0)),
 		ACTMAP(NEED_ACLIP),
 	MENUITEMs(_("//Move Alpha to Mask"), ACTMOD(ACT_SEL_ALPHAMASK, 0)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUITEMs(_("//Mask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 0)),
 		ACTMAP(NEED_CLIP),
 	MENUITEMs(_("//Unmask Colour A,B"), ACTMOD(ACT_SEL_MASK_AB, 255)),
 		ACTMAP(NEED_CLIP),
 	MENUITEMs(_("//Mask All Colours"), ACTMOD(ACT_SEL_MASK, 0)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	MENUITEMs(_("//Clear Mask"), ACTMOD(ACT_SEL_MASK, 255)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	WDONE,
 	SSUBMENU(_("/_Palette")),
 	uMENUITEMs("//a", ACTMOD(ACT_A, 0)), // for scripting

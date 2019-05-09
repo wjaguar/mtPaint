@@ -91,7 +91,7 @@ typedef struct {
 
 int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
-int lzma_preset, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
+int lzma_preset, zstd_level, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int webp_preset, webp_quality, webp_compression;
 int apply_icc;
 
@@ -2799,33 +2799,47 @@ static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
 
 tiff_format tiff_formats[TIFF_MAX_TYPES] = {
 	{ _("None"),	COMPRESSION_NONE, TIFFLAGS },
-#ifdef CCITT_SUPPORT
 	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | TIFF0FLAGS },
 	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | TIFF0FLAGS },
-#endif
-#ifdef PACKBITS_SUPPORT
 	{ "PackBits",	COMPRESSION_PACKBITS, TIFFLAGS },
-#endif
-#ifdef LZW_SUPPORT
 	{ "LZW",	COMPRESSION_LZW, TIFFLAGS, 1 },
-#endif
-#ifdef ZIP_SUPPORT
 	{ "ZIP",	COMPRESSION_ADOBE_DEFLATE, TIFFLAGS | FF_COMPZT, 1 },
-#endif
-#ifdef LZMA_SUPPORT
+#ifdef COMPRESSION_LZMA
 	{ "LZMA2",	COMPRESSION_LZMA, TIFFLAGS | FF_COMPLZ, 1 },
 #endif
-#ifdef JPEG_SUPPORT
+#ifdef COMPRESSION_ZSTD
+	{ "ZSTD",	COMPRESSION_ZSTD, TIFFLAGS | FF_COMPZS, 1 },
+#endif
 	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | FF_COMPJ | TIFF0FLAGS },
+#ifdef COMPRESSION_WEBP
+	{ "WebP",	COMPRESSION_WEBP, FF_RGB | FF_ALPHAR | FF_COMPWT | TIFF0FLAGS },
 #endif
 	{ NULL }
 };
 
-#ifdef LZMA_SUPPORT
-int tiff_lzma = TRUE;
-#else
-int tiff_lzma; /* FALSE */
+int tiff_lzma, tiff_zstd; /* FALSE by default */
+
+void init_tiff_formats()	// Check what libtiff can handle
+{
+	tiff_format *src, *dest;
+
+	/* Try all compiled-in formats */
+	src = dest = tiff_formats + 1; // COMPRESSION_NONE is always there
+	while (src->name)
+	{
+		if (TIFFIsCODECConfigured(src->id)) *dest++ = *src;
+		src++;
+	}
+	/* Zero out extra slots */
+	while (dest != src) *dest++ = *src;
+	/* Set flag variables */
+#ifdef COMPRESSION_LZMA
+	tiff_lzma = TIFFIsCODECConfigured(COMPRESSION_LZMA);
 #endif
+#ifdef COMPRESSION_ZSTD
+	tiff_zstd = TIFFIsCODECConfigured(COMPRESSION_ZSTD);
+#endif
+}
 
 static int load_tiff_frame(TIFF *tif, ls_settings *settings)
 {
@@ -3350,18 +3364,27 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 	/* Write compression-specific tags */
 	TIFFSetField(tif, TIFFTAG_COMPRESSION, tiff_formats[type].id);
-#ifdef ZIP_SUPPORT
 	if (tflags & FF_COMPZT)
 		TIFFSetField(tif, TIFFTAG_ZIPQUALITY, settings->png_compression);
-#endif
-#ifdef LZMA_SUPPORT
+#ifdef COMPRESSION_LZMA
 	if (tflags & FF_COMPLZ)
 		TIFFSetField(tif, TIFFTAG_LZMAPRESET, settings->lzma_preset);
 #endif
-#ifdef JPEG_SUPPORT
+#ifdef COMPRESSION_ZSTD
+	if (tflags & FF_COMPZS)
+		TIFFSetField(tif, TIFFTAG_ZSTD_LEVEL, settings->zstd_level);
+#endif
+#ifdef COMPRESSION_WEBP
+	if (tflags & FF_COMPWT)
+	{
+		TIFFSetField(tif, TIFFTAG_WEBP_LEVEL, settings->webp_quality);
+		// !!! libtiff 4.0.10 *FAILS* to do it losslessly despite trying
+		if (settings->webp_quality == 100)
+			TIFFSetField(tif, TIFFTAG_WEBP_LOSSLESS, 1);
+	}
+#endif
 	if (tflags & FF_COMPJ)
 		TIFFSetField(tif, TIFFTAG_JPEGQUALITY, settings->jpeg_quality);
-#endif
 	if (pf) TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
 
 	if (bw > 0) TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, get_bw(settings) ?

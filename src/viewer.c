@@ -240,8 +240,8 @@ static void do_pan(pan_dd *dt, int w, int h, int nv_h, int nv_v)
 	int mx[2], *xy;
 
 	cmd_peekv(scrolledwindow_canvas, mx, sizeof(mx), CSCROLL_LIMITS);
-	nv_h = nv_h < 0 ? 0 : nv_h > mx[0] ? mx[0] : nv_h;
-	nv_v = nv_v < 0 ? 0 : nv_v > mx[1] ? mx[1] : nv_v;
+	nv_h = bounded(nv_h, 0, mx[0]);
+	nv_v = bounded(nv_v, 0, mx[1]);
 
 	if (dt->in_pan) /* Delay reaction */
 	{

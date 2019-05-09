@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild.sh - cross-compile GTK+ and its dependencies for Windows
 
-# Copyright (C) 2010,2011,2017 Dmitry Groshev
+# Copyright (C) 2010,2011,2017,2019 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-LIBS="giflib zlib xz libjpeg libpng libtiff freetype openjpeg lcms "\
+LIBS="giflib zlib xz zstd libjpeg libwebp libpng libtiff freetype openjpeg lcms "\
 "libiconv gettext glib atk pango gtk"
 PROGRAMS="gifsicle mtpaint mtpaint_handbook"
 PHONY="libs all"
@@ -172,6 +172,24 @@ EXPORT ()
 	rm -f "$TOPDIR/lib/"*.la # !!! These break some utils' compilation
 }
 
+# Relativize .pc file
+RELATIVIZE ()
+{
+	if grep 'exec_prefix=\$' "$1"
+	then :
+	else # Relativize pkgconfig file
+		cat <<- PKGFIX > "$1"_
+		prefix=$WPREFIX
+		exec_prefix=\${prefix}
+		libdir=\${exec_prefix}/lib
+		includedir=\${prefix}/include
+		
+		`sed -e '/^Name:/,$!d' "$1"`
+		PKGFIX
+		cp -fp "$1"_ "$1"
+	fi
+}
+
 # Tools
 TARGET_STRIP="$MPREFIX/bin/$MTARGET-strip"
 
@@ -224,20 +242,88 @@ BUILD_xz ()
 		--disable-nls --enable-small --disable-scripts LDFLAGS=-static-libgcc
 	make
 	make install-strip DESTDIR="$DESTDIR"
-	if grep 'exec_prefix=\$' "$DEST"/lib/pkgconfig/liblzma.pc
-	then :
-	else
-		# Relativize pkgconfig file of XZ 5.0.6+
-		cat <<- PKGFIX > liblzma.pc_
-		prefix=$WPREFIX
-		exec_prefix=\${prefix}
-		libdir=\${exec_prefix}/lib
-		includedir=\${prefix}/include
-		
-		`sed -e '/^Name:/,$!d' "$DEST"/lib/pkgconfig/liblzma.pc`
-		PKGFIX
-		cp -fp liblzma.pc_ "$DEST"/lib/pkgconfig/liblzma.pc
-	fi
+	RELATIVIZE "$DEST"/lib/pkgconfig/liblzma.pc
+	EXPORT
+}
+
+BUILD_zstd ()
+{
+	UNPACK "zstd-*.tar.*" || return 0
+	sed -i '/^project(/ s/)/ C)/' build/cmake/CMakeLists.txt build/cmake/*/CMakeLists.txt
+	patch -p0 <<- 'UNCXX' # Not attempt to mess with C++ cross-compiler
+	--- build/cmake/CMakeModules/AddZstdCompilationFlags.cmake0	2018-12-27 15:42:44.000000000 +0300
+	+++ build/cmake/CMakeModules/AddZstdCompilationFlags.cmake	2019-04-12 12:38:03.000000000 +0300
+	@@ -1,4 +1,3 @@
+	-include(CheckCXXCompilerFlag)
+	 include(CheckCCompilerFlag)
+	 
+	 function(EnableCompilerFlag _flag _C _CXX)
+	@@ -12,18 +11,10 @@
+	             set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${_flag}" PARENT_SCOPE)
+	         endif ()
+	     endif ()
+	-    if (_CXX)
+	-        CHECK_CXX_COMPILER_FLAG(${_flag} CXX_FLAG_${varname})
+	-        if (CXX_FLAG_${varname})
+	-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${_flag}" PARENT_SCOPE)
+	-        endif ()
+	-    endif ()
+	 endfunction()
+	 
+	 macro(ADD_ZSTD_COMPILATION_FLAGS)
+	-    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" OR MINGW) #Not only UNIX but also WIN32 for MinGW
+	-        #Set c++11 by default
+	-        EnableCompilerFlag("-std=c++11" false true)
+	+    if (CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" OR MINGW) #Not only UNIX but also WIN32 for MinGW
+	         #Set c99 by default
+	         EnableCompilerFlag("-std=c99" true false)
+	         EnableCompilerFlag("-Wall" true true)
+	@@ -47,9 +38,7 @@
+	 
+	     # Remove duplicates compilation flags
+	     foreach (flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+	-             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+	-             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+	-             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+	+             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+	         separate_arguments(${flag_var})
+	         list(REMOVE_DUPLICATES ${flag_var})
+	         string(REPLACE ";" " " ${flag_var} "${${flag_var}}")
+	@@ -59,7 +48,7 @@
+	         foreach (flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+	                  CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+	                  CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+	-                 CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+	+                 CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_[1;5HCXX_FLAGS_RELWITHDEBINFO)
+	             string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+	         endforeach ()
+	     endif ()
+	UNCXX
+	patch -p1 <<- 'PKGC' # Install .pc
+	--- a/build/cmake/lib/CMakeLists.txt
+	+++ b/build/cmake/lib/CMakeLists.txt
+	@@ -165,7 +165,7 @@ if (ZSTD_BUILD_STATIC)
+	             OUTPUT_NAME ${STATIC_LIBRARY_BASE_NAME})
+	 endif ()
+	
+	-if (UNIX)
+	+if (UNIX OR MINGW)
+	     # pkg-config
+	     set(PREFIX "${CMAKE_INSTALL_PREFIX}")
+	     set(LIBDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+	PKGC
+	PATH="$LONGPATH"
+	mkdir tbuild
+	cd tbuild
+	LDFLAGS=-static-libgcc \
+	cmake -DCMAKE_TOOLCHAIN_FILE="$TOPDIR/toolchain" \
+		-DZSTD_MULTITHREAD_SUPPORT=OFF -DZSTD_BUILD_STATIC=OFF \
+		-DZSTD_BUILD_PROGRAMS=OFF -DCMAKE_INSTALL_PREFIX= \
+		../build/cmake
+	make
+	make install DESTDIR="$DESTDIR"
+	"$TARGET_STRIP" --strip-unneeded "$DEST"/bin/*.dll
+	RELATIVIZE "$DEST"/lib/pkgconfig/libzstd.pc
 	EXPORT
 }
 
@@ -246,6 +332,18 @@ BUILD_libjpeg ()
 	UNPACK "jpegsrc.*.tar.*" || return 0
 	PATH="$LONGPATH"
 	./configure --prefix="$WPREFIX" --host=$MTARGET LDFLAGS=-static-libgcc
+	make
+	make install-strip DESTDIR="$DESTDIR"
+	EXPORT
+}
+
+BUILD_libwebp ()
+{
+	UNPACK "libwebp-*.tar.*" || return 0
+	PATH="$LONGPATH"
+	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
+	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-static \
+		--disable-silent-rules --enable-everything --enable-swap-16bit-csp
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
@@ -268,7 +366,7 @@ BUILD_libpng ()
 	EXPORT
 }
 
-DEP_libtiff="zlib xz libjpeg"
+DEP_libtiff="zlib xz zstd libjpeg libwebp"
 BUILD_libtiff ()
 {
 	UNPACK "tiff-*.tar.*" || return 0
@@ -370,8 +468,12 @@ BUILD_lcms ()
 {
 	UNPACK "lcms2-*.tar.*" || return 0
 	PATH="$LONGPATH"
-	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
-	./configure --prefix="$WPREFIX" --host=$MTARGET
+	# The '-D...' and 'ax_cv_...' are workarounds for config bugs in 2.9
+	CPPFLAGS="-isystem $TOPDIR/include -DCMS_RELY_ON_WINDOWS_STATIC_MUTEX_INIT" \
+	LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
+	./configure --prefix="$WPREFIX" --host=$MTARGET \
+		ax_cv_have_func_attribute_visibility=no \
+		ax_cv_check_cflags___fvisibility_hidden=no
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT

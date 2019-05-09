@@ -135,6 +135,7 @@ void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
 void update_top_swatch();		// Update selected colours A & B
 
+int set_master_pattern(char *m);		// Make 4x4 dither patterns from master
 void render_patterns(unsigned char *buf);	// Create RGB dump of patterns to display
 int set_patterns(ls_settings *settings);	// Test/set image as new patterns
 

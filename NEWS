@@ -9,6 +9,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
 	* New keyboard shortcut Ctrl+H added for Channels->Hide image
+	* Keyboard shortcuts now can be assigned for choosing previous/next pattern, and larger/smaller brush size
 	* Optional gamma correction for painting and masking (Preferences->General->Use gamma correction when painting)
 	* Rendering now uses multiple threads to utilize all available CPU cores
 	* Text tools now allow selection of DPI value, letter-spacing, and alignment for multiline text
@@ -16,6 +17,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Composite images now can have alpha transparency, when background is non-opaque
 	* Background layer now can use transparency like any other layer
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
+	* Patterns for colours A and B can now be chosen separately (Preferences->General->Separate patterns for A&B)
+	* Builtin Bayer patterns now can be redefined : See handbook section A.4.3 for details
 	* Colour transform and source selection added to blend mode options
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)
 	* Lasso tool can be configured to shrink selection based on the selection channel - right click the tool icon
@@ -24,6 +27,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Ctrl+Left click now positions clone source when using clone tool
 	* Ctrl+Right click now deletes last point when making polygonal selection (from a closed polygon, deletes the point nearest to cursor)
 	* Shift and Shift+Ctrl now constrain selection box width/height when resizing it by clicking and dragging
+	* Arrow keys can now be used for scrolling (Preferences->Interface->Arrow keys scroll canvas)
 	* Zooming now can use mouse cursor position as its fixed point (Preferences->Interface->Zoom on cursor position)
 	* Scroll wheel zoom now works for view window too
 	* Zoom is now up to 8000%

@@ -624,16 +624,16 @@ void *toolbar_code[] = {
 	TBSPACE,
 	TBBUTTON(_("Flip Selection Vertically"), XPM_ICON(flip_vs),
 		ACTMOD(ACT_SEL_FLIP_V, 0)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	TBBUTTON(_("Flip Selection Horizontally"), XPM_ICON(flip_hs),
 		ACTMOD(ACT_SEL_FLIP_H, 0)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	TBBUTTON(_("Rotate Selection Clockwise"), XPM_ICON(rotate_cs),
 		ACTMOD(ACT_SEL_ROT, 0)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	TBBUTTON(_("Rotate Selection Anti-Clockwise"), XPM_ICON(rotate_as),
 		ACTMOD(ACT_SEL_ROT, 1)),
-		ACTMAP(NEED_CLIP),
+		ACTMAP(NEED_PCLIP),
 	ENDSCRIPT,
 	SMARTTBMORE(_("More...")), WDONE,
 	WDONE, // twobox
@@ -926,6 +926,47 @@ void mem_set_brush(int val)			// Set brush, update size/flow/preview
 #error "Unacceptable width/height of patterns bitmap"
 #endif
 
+int set_master_pattern(char *m)
+{
+	static const unsigned char bayer_map[16] = {
+		 0,  8,  2, 10,
+		12,  4, 14,  6,
+		 3, 11,  1,  9,
+		15,  7, 13,  5};
+	char *tail, buf[16 * 3];
+	unsigned char map[16], mk[16];
+	int i, n;
+
+	buf[0] = '\0';
+	if (!m) m = inifile_get("masterPattern", "");
+	if (*m) /* Have string to parse */
+	{
+		memset(mk, 0, 16);
+		for (i = 0; i < 16; i++)
+		{
+			n = strtol(m, &tail, 10);
+			if ((tail == m) || (n < 0) || (n > 15) || mk[n]++) break;
+			map[i] = n;
+			m = tail + ((i < 15) && (*tail == ','));
+		}
+		/* Canonicalize string if good */
+		if ((i >= 16) && !m[strspn(m, "\t ")]) sprintf(buf,
+			"%d,%d,%d,%d %d,%d,%d,%d %d,%d,%d,%d %d,%d,%d,%d",
+			 map[0],  map[1],  map[2],  map[3],
+			 map[4],  map[5],  map[6],  map[7],
+			 map[8],  map[9], map[10], map[11],
+			map[12], map[13], map[14], map[15]);
+		inifile_set("masterPattern", buf);
+	}
+	if (!buf[0]) memcpy(map, bayer_map, 16);
+
+	/* Expand map into a set of 16 8x8 patterns */
+	for (i = 0; i < DEF_PATTERNS * 8 * 8; i++)
+		patterns[i] = map[(i & 3) + ((i >> 1) & 0xC)] >= (i >> 6);
+
+	return (!!buf[0]);
+}
+
 /* Create RGB dump of patterns to display: arranged as in their source file,
  * each 8x8 pattern repeated 4x4 with 2 pixels border and 4 pixels separation */
 void render_patterns(unsigned char *buf)
@@ -1003,12 +1044,8 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 		}
 	}
 
-	if (!mem_pattern) /* Set up default Bayer 4x4 patterns */
-	{
-		for (i = 0; i < DEF_PATTERNS * 8 * 8; i++)
-			patterns[i] = bayer[((i << 2) ^ (i >> 1)) & 0xC] * 2 +
-				bayer[(i >> 1) & 0xC] + (i >> 6) < 16;
-	}
+	/* Set up default Bayer 4x4 patterns */
+	if (!mem_pattern) set_master_pattern(NULL);
 
 	if ( mem_img_bpp == 1 )
 	{
