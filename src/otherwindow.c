@@ -45,7 +45,7 @@ void reset_tools()
 {
 	if (!mem_img[mem_channel]) mem_channel = CHN_IMAGE; // Safety first
 	pressed_select(FALSE); // To prevent automatic paste
-	change_to_tool(DEFAULT_TOOL_ICON);
+	change_to_tool(get_default_tool_icon());
 
 	init_istate(&mem_state, &mem_image);
 	memset(channel_col_A, 255, NUM_CHANNELS);

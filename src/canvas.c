@@ -1176,7 +1176,7 @@ void update_menus()			// Update edit/undo menu
 	/* Switch to default tool if active smudge tool got disabled */
 	if ((tool_type == TOOL_SMUDGE) &&
 		!cmd_checkv(icon_buttons[SMUDGE_TOOL_ICON], SLOT_SENSITIVE))
-		change_to_tool(DEFAULT_TOOL_ICON);
+		change_to_tool(get_default_tool_icon());
 }
 
 void update_stuff(int flags)

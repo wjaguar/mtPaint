@@ -80,7 +80,6 @@ enum {
 
 	TOTAL_ICONS_TOOLS
 };
-#define DEFAULT_TOOL_ICON TTB_SELECT
 #define SMUDGE_TOOL_ICON TTB_SMUDGE
 
 #define TTB_0 TOTAL_SETTINGS
@@ -133,6 +132,7 @@ void pressed_toolbar_toggle(int state, int which);
 void init_clone();			// Init clone tool
 void mem_set_brush(int val);		// Set brush, update size/flow/preview
 void mem_pat_update();			// Update indexed and then RGB pattern preview
+int get_default_tool_icon(); // get default tool icon
 void update_top_swatch();		// Update selected colours A & B
 
 int set_master_pattern(char *m);		// Make 4x4 dither patterns from master

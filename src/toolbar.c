@@ -507,7 +507,7 @@ static int zooms[] = {
 	10, 20, 25, 33, 50, 100, 200, 300, 400, 600, 800, 1000, 1200, 1600, 2000,
 	4000, 8000, 0 };
 
-/* !!! For later change_to_tool(DEFAULT_TOOL_ICON) to go through, this need be
+/* !!! For later change_to_tool(get_default_tool_icon()) to go through, this need be
  * set to something different initially */
 static int tool_id = TTB_PAINT;
 
@@ -1075,6 +1075,33 @@ void mem_pat_update()			// Update indexed and then RGB pattern preview
 			mem_prev[k + 2] = mem_col_pat24[l + 2];
 		}
 	}
+}
+
+int get_default_tool_icon() {
+	char* icon = inifile_get("default_tool_icon", "");
+	int default_icon = TTB_SELECT;
+	if(!*icon) return default_icon;
+	if(!strcmp(icon, "paint")) return TTB_PAINT;
+	if(!strcmp(icon, "shuffle")) return TTB_SHUFFLE;
+	if(!strcmp(icon, "flood")) return TTB_FLOOD;
+	if(!strcmp(icon, "line")) return TTB_LINE;
+	if(!strcmp(icon, "smudge")) return TTB_SMUDGE;
+	if(!strcmp(icon, "clone")) return TTB_CLONE;
+	if(!strcmp(icon, "select")) return TTB_SELECT;
+	if(!strcmp(icon, "poly")) return TTB_POLY;
+	if(!strcmp(icon, "grad")) return TTB_GRAD;
+	if(!strcmp(icon, "lasso")) return TTB_LASSO;
+	if(!strcmp(icon, "text")) return TTB_TEXT;
+	if(!strcmp(icon, "ellipse")) return TTB_ELLIPSE;
+	if(!strcmp(icon, "fellipse")) return TTB_FELLIPSE;
+	if(!strcmp(icon, "outline")) return TTB_OUTLINE;
+	if(!strcmp(icon, "fill")) return TTB_FILL;
+	if(!strcmp(icon, "selfv")) return TTB_SELFV;
+	if(!strcmp(icon, "selfh")) return TTB_SELFH;
+	if(!strcmp(icon, "selrcw")) return TTB_SELRCW;
+	if(!strcmp(icon, "selrccw")) return TTB_SELRCCW;
+
+	return default_icon;
 }
 
 void update_top_swatch()			// Update selected colours A & B

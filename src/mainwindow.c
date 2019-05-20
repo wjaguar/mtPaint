@@ -270,7 +270,7 @@ static void pressed_crop()
 	if (!res)
 	{
 		pressed_select(FALSE);
-		change_to_tool(DEFAULT_TOOL_ICON);
+		change_to_tool(get_default_tool_icon());
 		update_stuff(UPD_GEOM);
 	}
 	else memory_errors(res);
@@ -5688,7 +5688,7 @@ void main_init()
 	strncpy0(mem_clip_file, inifile_get("clipFilename", txt), PATHBUF);
 
 	set_cursor(NULL);
-	change_to_tool(DEFAULT_TOOL_ICON);
+	change_to_tool(get_default_tool_icon());
 
 	/* Skip the GUI-specific updates in commandline mode */
 	if (cmd_mode) return;
